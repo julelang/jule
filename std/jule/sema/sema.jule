@@ -814,7 +814,7 @@ impl Sema {
     }
 
     fn check_assign_type(mut &self, dest_is_ref: bool, mut &dest: &TypeKind,
-        mut &d: &Data, mut error_token: Token, deref: bool) {
+        mut &d: &Data, mut error_token: Token) {
         if dest_is_ref {
             if !dest.equals(d.kind) {
                 self.push_err(error_token, LogMsg.IncompatibleTypes, dest.to_str(), d.kind.to_str())
@@ -825,7 +825,6 @@ impl Sema {
                 error_token: error_token,
                 dest:        dest,
                 d:           d,
-                deref:       deref,
             }
             let ok = atc.check()
             if !ok {
@@ -847,7 +846,7 @@ impl Sema {
     }
 
     fn check_type_compatibility(mut &self, mut &dest: &TypeKind,
-        mut &src: &TypeKind, mut &error_token: Token, deref: bool): bool {
+        mut &src: &TypeKind, mut &error_token: Token): bool {
         // Tuple to single type, always fails.
         if real(src.tup()) {
             self.push_err(
@@ -860,7 +859,6 @@ impl Sema {
             error_token: error_token,
             dest:        dest,
             src:         src,
-            deref:       deref,
         }
         let ok = tcc.check()
         if !ok {
@@ -1120,7 +1118,7 @@ impl Sema {
                     self.push_err(item.value.expr.token, LogMsg.ExprNotConst)
                 }
 
-                self.check_assign_type(false, e.kind.kind, d, item.token, false)
+                self.check_assign_type(false, e.kind.kind, d, item.token)
                 item.value.data = d
             }
         }
@@ -1152,7 +1150,7 @@ impl Sema {
                     self.push_err(item.value.expr.token, LogMsg.ExprNotConst)
                 }
 
-                self.check_assign_type(false, e.kind.kind, d, item.token, false)
+                self.check_assign_type(false, e.kind.kind, d, item.token)
                 item.value.data = d
             }
         }
@@ -1966,7 +1964,7 @@ impl Sema {
                 }
             }
 
-            self.check_assign_type(v.reference, v.kind.kind, v.value.data, v.value.expr.token, false)
+            self.check_assign_type(v.reference, v.kind.kind, v.value.data, v.value.expr.token)
         }
 
         if v.reference && !is_valid_for_ref(v.kind.kind) {

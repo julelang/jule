@@ -130,13 +130,6 @@ struct TypeCompatibilityChecker {
     src:         &TypeKind
     error_token: Token
     ignore_any:  bool
-
-    // References uses elem's type itself if true.
-    deref: bool
-
-    // This checker is sub-checker for another checker's element.
-    // For example: elements of slice ([]T) types.
-    sub_check: bool
 }
 
 impl TypeCompatibilityChecker {
@@ -182,17 +175,17 @@ impl TypeCompatibilityChecker {
     }
 
     fn check_ref(mut self): (ok: bool) {
-        if self.dest.to_str() == self.src.to_str() {
+        if self.src.is_nil() {
             ret true
-        } else if !self.deref {
-            ret false
-        } else if !real(self.src.ref()) {
-            self.dest = self.dest.ref().elem
-            ret self.check()
         }
 
-        self.src = self.src.ref().elem
-        ret self.check()
+        let mut src = self.src.ref()
+        if !real(src) {
+            ret false
+        }
+
+        let mut dest = self.dest.ref()
+        ret dest.elem.equals(src.elem)
     }
 
     fn check_ptr(mut self): (ok: bool) {
@@ -211,15 +204,7 @@ impl TypeCompatibilityChecker {
             ret true
         }
 
-        let mut sub = TypeCompatibilityChecker{
-            s:           self.s,
-            error_token: self.error_token,
-            src:         src.elem,
-            dest:        dest.elem,
-            sub_check:   true,
-            ignore_any:  true,
-        }
-        ret sub.check()
+        ret dest.elem.equals(src.elem)
     }
 
     fn check_slc(mut self): (ok: bool) {
@@ -238,7 +223,6 @@ impl TypeCompatibilityChecker {
             error_token: self.error_token,
             src:         src.elem,
             dest:        dest.elem,
-            sub_check:   true,
             ignore_any:  true,
         }
         ret sub.check()
@@ -259,7 +243,6 @@ impl TypeCompatibilityChecker {
             error_token: self.error_token,
             src:         src.elem,
             dest:        dest.elem,
-            sub_check:   true,
             ignore_any:  true,
         }
         ret sub.check()
@@ -282,7 +265,6 @@ impl TypeCompatibilityChecker {
             error_token: self.error_token,
             src:         src.key,
             dest:        dest.key,
-            sub_check:   true,
         }
         if !sub.check() {
             ret false
@@ -372,18 +354,11 @@ impl TypeCompatibilityChecker {
             self.ignore_any = true
         }
 
-        if real(self.dest.ref()) {
-            ret self.check_ref()
-        }
-
-        if !self.sub_check && real(self.src.ref()) {
-            self.src = self.src.ref().elem
-        }
-
         match {
         | self.dest.cpp_linked():     ret self.check_cpp_linked()
         | real(self.dest.prim()):     ret self.check_prim()
         | real(self.dest.trt()):      ret self.check_trait()
+        | real(self.dest.ref()):      ret self.check_ref()
         | real(self.dest.ptr()):      ret self.check_ptr()
         | real(self.dest.slc()):      ret self.check_slc()
         | real(self.dest.arr()):      ret self.check_arr()
@@ -403,7 +378,6 @@ struct AssignTypeChecker {
     dest:        &TypeKind
     d:           &Data
     error_token: Token
-    deref:       bool // Same as TypeCompatibilityChecker.deref field.
 }
 
 impl AssignTypeChecker {
@@ -486,7 +460,7 @@ impl AssignTypeChecker {
             ret true
 
         |:
-            ret self.s.check_type_compatibility(self.dest, self.d.kind, self.error_token, self.deref)
+            ret self.s.check_type_compatibility(self.dest, self.d.kind, self.error_token)
         }
     }
 }
@@ -739,7 +713,7 @@ impl FnCallArgChecker {
 
         self.e.s.check_validity_for_init_expr(
             p.decl.mutable, p.decl.reference, p.kind, arg, error_token)
-        self.e.s.check_assign_type(p.decl.reference, p.kind, arg, error_token, false)
+        self.e.s.check_assign_type(p.decl.reference, p.kind, arg, error_token)
         ret true
     }
 
@@ -911,7 +885,7 @@ impl StructLitChecker {
         const REFERENCE = false
         self.e.s.check_validity_for_init_expr(
             !self.e.immutable, REFERENCE, f.kind, d, error_token)
-        self.e.s.check_assign_type(false, f.kind, d, error_token, false)
+        self.e.s.check_assign_type(false, f.kind, d, error_token)
     }
 
     fn check_pair(mut self, mut &pair: &FieldExprPair, mut &exprs: []ExprData) {
