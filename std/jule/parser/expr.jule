@@ -194,27 +194,29 @@ fn eliminate_comments(mut &tokens: []Token): []Token {
 fn find_lowest_prec_op(&tokens: []Token): int {
     let mut prec = Precedencer{}
     let mut brace_n = 0
-    let mut skip_to_next_open = false
+    let mut skip_to_next_brace_open = false
     for i, token in tokens {
         match {
         | token.id == TokenId.Range:
             match token.kind {
-            | str(TokenKind.LBrace)
+            | str(TokenKind.LBrace):
+                skip_to_next_brace_open = false
+                fall
+
             | str(TokenKind.LParent)
             | str(TokenKind.LBracket):
                 brace_n++
-                skip_to_next_open = false
 
             |:
                 brace_n--
             }
             continue
 
-        | skip_to_next_open:
+        | skip_to_next_brace_open:
             continue
 
         | token.id == TokenId.If:
-            skip_to_next_open = true
+            skip_to_next_brace_open = true
             continue
 
         | i == 0:
