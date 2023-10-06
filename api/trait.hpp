@@ -37,9 +37,9 @@ namespace jule {
 
             *alloc = data;
 #ifdef __JULE_DISABLE__REFERENCE_COUNTING
-            this->data = jule::Ref<Mask>::make(static_cast<Mask*>(alloc), nullptr);
+            this->data = jule::Ref<Mask>::make(reinterpret_cast<Mask*>(alloc), nullptr);
 #else
-            this->data = jule::Ref<Mask>::make(static_cast<Mask*>(alloc));
+            this->data = jule::Ref<Mask>::make(reinterpret_cast<Mask*>(alloc));
 #endif
             this->type_id = typeid(T).name();
         }
@@ -47,9 +47,9 @@ namespace jule {
         template<typename T>
         Trait<Mask>(const jule::Ref<T> &ref) {
 #ifdef __JULE_DISABLE__REFERENCE_COUNTING
-            this->data = jule::Ref<Mask>::make(static_cast<Mask*>(ref.alloc), nullptr);
+            this->data = jule::Ref<Mask>::make(reinterpret_cast<Mask*>(ref.alloc), nullptr);
 #else
-            this->data = jule::Ref<Mask>::make(static_cast<Mask*>(ref.alloc), ref.ref);
+            this->data = jule::Ref<Mask>::make(reinterpret_cast<Mask*>(ref.alloc), ref.ref);
             if (ref.real())
                 this->data.add_ref();
 #endif
