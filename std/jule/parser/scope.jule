@@ -47,7 +47,7 @@ fn is_st(current: Token, prev: Token): (ok: bool, terminated: bool) {
     ret
 }
 
-fn prev_is_incomplete_binary_expr(&tokens: []Token, &i: int): bool {
+fn prev_is_incomplete_expr(&tokens: []Token, &i: int): bool {
     // Ignore namespaces.
     if i > 1 && tokens[i-2].id == TokenId.DblColon {
         ret false
@@ -55,9 +55,10 @@ fn prev_is_incomplete_binary_expr(&tokens: []Token, &i: int): bool {
 
     unsafe {
         let prev = &tokens[i-1]
-        ret prev.id == TokenId.Op &&
+        ret prev.id == TokenId.Dot ||
+            (prev.id == TokenId.Op &&
             is_bin_op(prev.kind) &&
-            prev.row < tokens[i].row
+            prev.row < tokens[i].row)
     }
 }
 
@@ -76,7 +77,7 @@ fn next_st_pos(&tokens: []Token, start: int): (int, bool) {
             | str(TokenKind.LBracket)
             | str(TokenKind.LParent):
                 if brace_n == 0 && i > start {
-                    if !prev_is_incomplete_binary_expr(tokens, i) {
+                    if !prev_is_incomplete_expr(tokens, i) {
                         ok, terminated = is_st(tok, tokens[i-1])
                         if ok {
                             goto return
@@ -103,7 +104,7 @@ fn next_st_pos(&tokens: []Token, start: int): (int, bool) {
         }
         
         if i > start {
-            if prev_is_incomplete_binary_expr(tokens, i) {
+            if prev_is_incomplete_expr(tokens, i) {
                 continue
             }
             ok, terminated = is_st(tok, tokens[i-1])
