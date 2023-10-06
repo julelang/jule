@@ -91,8 +91,8 @@ fn build_param_vars(mut &f: &FnIns): []&Var {
         ret nil
     }
 
-    let mut vars = make([]&Var, f.params.len)
-    for (i, mut p) in f.params {
+    let mut vars = make([]&Var, 0, f.params.len)
+    for (_, mut p) in f.params {
         let mut v = &Var{
             used:    true,
             mutable: p.decl.mutable,
@@ -128,7 +128,7 @@ fn build_param_vars(mut &f: &FnIns): []&Var {
             v.kind.kind = p.kind.clone()
         }
 
-        vars[i] = v
+        vars = append(vars, v)
     }
 
     ret vars
@@ -144,32 +144,32 @@ fn build_generic_type_aliases(mut &f: &FnIns): []&TypeAlias {
         ret nil
     }
 
-    let mut aliases = make([]&TypeAlias, size)
+    let mut aliases = make([]&TypeAlias, 0, size)
 
     for (i, mut g) in f.generics {
         let mut decl = f.decl.generics[i]
-        aliases[i] = &TypeAlias{
+        aliases = append(aliases, &TypeAlias{
             used:    true,
             generic: true,
             scope:   f.decl.scope,
             ident:   decl.ident,
             token:   decl.token,
             kind:    &TypeSymbol{kind: g},
-        }
+        })
     }
 
     if real(f.decl.owner) {
         let mut owner = f.owner
         for (i, mut g) in owner.generics {
             let mut decl = owner.decl.generics[i]
-            aliases[f.generics.len+i] = &TypeAlias{
+            aliases = append(aliases, &TypeAlias{
                 used:    true,
                 generic: true,
                 scope:   f.decl.scope,
                 ident:   decl.ident,
                 token:   decl.token,
                 kind:    &TypeSymbol{kind: g},
-            }
+            })
         }
     }
 

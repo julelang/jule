@@ -71,7 +71,7 @@ fn find_builtins_sema(ident: str, mut s: &Sema): any {
     ret nil
 }
 
-fn is_ok_for_shifting(mut d: &Data): bool {
+fn is_ok_for_shifting(mut &d: &Data): bool {
     let prim = d.kind.prim()
     if !real(prim) || !types::is_int(prim.to_str()) {
         ret false
@@ -104,7 +104,7 @@ fn is_ptr_arithmetic_compatible_int(mut &d: &Data): bool {
     ret tcc.check()
 }
 
-fn normalize_bitsize(mut d: &Data) {
+fn normalize_bitsize(mut &d: &Data) {
     if !d.is_const() {
         ret
     }
@@ -131,7 +131,7 @@ fn normalize_bitsize(mut d: &Data) {
     d.kind.kind = build_prim_type(kind)
 }
 
-fn normalize_type(mut d: &Data) {
+fn normalize_type(mut &d: &Data) {
     match {
     | int_assignable(str(PrimKind.Int), d):
         d.kind.kind = build_prim_type(str(PrimKind.Int))
@@ -143,7 +143,7 @@ fn normalize_type(mut d: &Data) {
     }
 }
 
-fn apply_cast_kind_model(mut d: &Data) {
+fn apply_cast_kind_model(mut &d: &Data) {
     d.model = &CastingExprModel{
         expr:      d.model,
         kind:      d.cast_kind,
@@ -151,7 +151,7 @@ fn apply_cast_kind_model(mut d: &Data) {
     }
 }
 
-fn apply_cast_kind(mut d: &Data) {
+fn apply_cast_kind(mut &d: &Data) {
     if !real(d.cast_kind) {
         ret
     }
@@ -191,7 +191,7 @@ fn kind_by_bitsize(expr: any): str {
     }
 }
 
-fn check_data_for_integer_indexing(mut d: &Data): (err_fmt: LogMsg) {
+fn check_data_for_integer_indexing(mut &d: &Data): (err_fmt: LogMsg) {
     if !real(d) {
         ret LogMsg.Empty
     }
@@ -307,9 +307,9 @@ impl Eval {
         }
     }
 
-    fn lit_str(self, lt: &LitExpr): &Data {
-        let mut s = lt.value[1 : lt.value.len-1] // Remove quotes.
-        if is_raw_str(lt.value) {
+    fn lit_str(self, &l: &LitExpr): &Data {
+        let mut s = l.value[1 : l.value.len-1] // Remove quotes.
+        if is_raw_str(l.value) {
             s = lit::to_raw_str(([]byte)(s))
         } else {
             s = lit::to_str(([]byte)(s))
@@ -328,8 +328,8 @@ impl Eval {
         }
     }
 
-    fn lit_bool(self, lit: &LitExpr): &Data {
-        let mut constant = Const.new_bool(lit.value == str(TokenKind.True))
+    fn lit_bool(self, &l: &LitExpr): &Data {
+        let mut constant = Const.new_bool(l.value == str(TokenKind.True))
         ret &Data{
             lvalue:   false,
             mutable:  false,
@@ -342,7 +342,7 @@ impl Eval {
         }
     }
 
-    fn lit_rune(self, l: &LitExpr): &Data {
+    fn lit_rune(self, &l: &LitExpr): &Data {
         const BYTE_KIND = str(PrimKind.U8)
         const RUNE_KIND = str(PrimKind.I32)
 
@@ -371,7 +371,7 @@ impl Eval {
         ret data
     }
 
-    fn lit_float(self, l: &LitExpr): &Data {
+    fn lit_float(self, &l: &LitExpr): &Data {
         const FLOAT_KIND = str(PrimKind.F64)
 
         let (f, _) = parse_float(l.value, 64)
@@ -389,7 +389,7 @@ impl Eval {
         }
     }
 
-    fn lit_int(mut self, l: &LitExpr): &Data {
+    fn lit_int(mut self, &l: &LitExpr): &Data {
         const BIT_SIZE = 0b01000000
 
         let mut lit = l.value
@@ -447,7 +447,7 @@ impl Eval {
         ret d
     }
 
-    fn lit_num(mut self, l: &LitExpr): &Data {
+    fn lit_num(mut self, &l: &LitExpr): &Data {
         match {
         | std::jule::lex::is_float(l.value): ret self.lit_float(l)
         |:                                   ret self.lit_int(l)
@@ -520,7 +520,7 @@ impl Eval {
         ret self.find_builtins(ident)
     }
 
-    fn push_reference(mut self, mut references: &ReferenceStack) {
+    fn push_reference(mut self, mut &references: &ReferenceStack) {
         match type self.lookup {
         | &ScopeChecker:
             let mut sc = (&ScopeChecker)(self.lookup).get_root()
@@ -535,7 +535,7 @@ impl Eval {
         }
     }
 
-    fn push_reference_to_fn(mut self, mut f: &FnIns) {
+    fn push_reference_to_fn(mut self, mut &f: &FnIns) {
         match type self.lookup {
         | &ScopeChecker:
             let mut sc = (&ScopeChecker)(self.lookup).get_root()
@@ -546,7 +546,7 @@ impl Eval {
         self.push_reference(f.references)
     }
 
-    fn push_reference_to_var(mut self, mut v: &Var) {
+    fn push_reference_to_var(mut self, mut &v: &Var) {
         if !real(v.references) {
             ret
         }
@@ -562,7 +562,7 @@ impl Eval {
         self.push_reference(v.references)
     }
 
-    fn push_reference_to_struct(mut self, mut s: &StructIns) {
+    fn push_reference_to_struct(mut self, mut &s: &StructIns) {
         match type self.lookup {
         | &ScopeChecker:
             let mut sc = (&ScopeChecker)(self.lookup).get_root()
@@ -643,14 +643,14 @@ impl Eval {
         ret self.eval_fn_ins(ins)
     }
 
-    fn push_illegal_cycle_error(mut self, v1: &Var, v2: &Var, mut &message: str) {
+    fn push_illegal_cycle_error(mut self, &v1: &Var, &v2: &Var, mut &message: str) {
         const PADDING = 4
 
         let refers_to = logf(LogMsg.RefersTo, v1.ident, v2.ident)
         message = str_repeat(" ", PADDING) + refers_to + "\n" + message
     }
 
-    fn check_cross_cycle(mut self, v: &Var, mut &message: str): bool {
+    fn check_cross_cycle(mut self, &v: &Var, mut &message: str): bool {
         for _, d in v.depends {
             if &d == &self.owner {
                 self.push_illegal_cycle_error(v, d, message)
@@ -669,7 +669,7 @@ impl Eval {
     // Checks owner illegal cycles.
     // Appends depend to depends if there is no illegal cycle.
     // Returns true if e.owner is nil.
-    fn check_illegal_cycles(mut self, mut v: &Var, decl_token: Token): (ok: bool) {
+    fn check_illegal_cycles(mut self, mut &v: &Var, decl_token: Token): (ok: bool) {
         if !real(self.owner) {
             ret true
         }
@@ -840,18 +840,20 @@ impl Eval {
         ret self.eval_def(def, ident.token)
     }
 
-    fn eval_unary_minus(self, mut d: &Data): &Data {
+    fn eval_unary_minus(self, mut &d: &Data) {
         if real(d.kind.ref()) {
             let mut ref = d.kind.ref()
             let prim = ref.elem.prim()
             if !real(prim) || !types::is_num(prim.to_str()) {
-                ret new(Data)
+                drop(d)
+                ret
             }
             d.kind = ref.elem
         } else {
             let t = d.kind.prim()
             if !real(t) || !types::is_num(t.to_str()) {
-                ret new(Data)
+                drop(d)
+                ret
             }
         }
 
@@ -869,21 +871,22 @@ impl Eval {
             expr: d.model,
             op:   str(TokenKind.Minus),
         }
-        ret d
     }
 
-    fn eval_unary_plus(self, mut d: &Data): &Data {
+    fn eval_unary_plus(self, mut &d: &Data) {
         if real(d.kind.ref()) {
             let mut ref = d.kind.ref()
             let prim = ref.elem.prim()
             if !real(prim) || !types::is_num(prim.to_str()) {
-                ret new(Data)
+                drop(d)
+                ret
             }
             d.kind = ref.elem
         } else {
             let t = d.kind.prim()
             if !real(t) || !types::is_num(t.to_str()) {
-                ret new(Data)
+                drop(d)
+                ret
             }
         }
 
@@ -901,21 +904,22 @@ impl Eval {
             expr: d.model,
             op:   str(TokenKind.Plus),
         }
-        ret d
     }
 
-    fn eval_unary_caret(self, mut d: &Data): &Data {
+    fn eval_unary_caret(self, mut &d: &Data) {
         if real(d.kind.ref()) {
             let mut ref = d.kind.ref()
             let prim = ref.elem.prim()
             if !real(prim) || !types::is_int(prim.to_str()) {
-                ret new(Data)
+                drop(d)
+                ret
             }
             d.kind = ref.elem
         } else {
             let t = d.kind.prim()
             if !real(t) || !types::is_int(t.to_str()) {
-                ret new(Data)
+                drop(d)
+                ret
             }
         }
 
@@ -934,21 +938,22 @@ impl Eval {
             expr: d.model,
             op:   str(TokenKind.Caret),
         }
-        ret d
     }
 
-    fn eval_unary_excl(self, mut d: &Data): &Data {
+    fn eval_unary_excl(self, mut &d: &Data) {
         if real(d.kind.ref()) {
             let mut ref = d.kind.ref()
             let prim = ref.elem.prim()
             if !real(prim) || !prim.is_bool() {
-                ret new(Data)
+                drop(d)
+                ret
             }
             d.kind = ref.elem
         } else {
             let t = d.kind.prim()
             if !real(t) || !t.is_bool() {
-                ret new(Data)
+                drop(d)
+                ret
             }
         }
 
@@ -964,17 +969,17 @@ impl Eval {
             expr: d.model,
             op:   str(TokenKind.Excl),
         }
-        ret d
     }
 
-    fn eval_unary_star(mut self, mut d: &Data, op: Token): &Data {
+    fn eval_unary_star(mut self, mut &d: &Data, &op: Token) {
         if !self.is_unsafe() {
             self.push_err(op, LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
         }
 
         let mut t = d.kind.ptr()
         if !real(t) || t.is_unsafe() {
-            ret new(Data)
+            drop(d)
+            ret
         }
         drop(d.constant)
         d.lvalue = true
@@ -983,10 +988,9 @@ impl Eval {
             expr: d.model,
             op:   str(TokenKind.Star),
         }
-        ret d
     }
 
-    fn eval_unary_amper(self, mut d: &Data): &Data {
+    fn eval_unary_amper(self, mut &d: &Data) {
         match type d.model {
         | &StructLitExprModel:
             let mut lit = (&StructLitExprModel)(d.model)
@@ -1021,11 +1025,9 @@ impl Eval {
             d.lvalue = false
             d.mutable = true
         }
-
-        ret d
     }
 
-    fn eval_unary_type_decl(mut self, mut d: &Data, mut u: &UnaryExpr): &Data {
+    fn eval_unary_type_decl(mut self, mut &d: &Data, mut &u: &UnaryExpr) {
         let mut tc = TypeChecker{
             s:           self.s,
             lookup:      self.lookup,
@@ -1041,11 +1043,11 @@ impl Eval {
 
         |:
             self.push_err(u.op, LogMsg.InvalidExprForUnary, u.op.kind)
-            ret new(Data)
+            drop(d)
+            ret
         }
 
         d.decl = true
-        ret d
     }
 
     fn eval_unary(mut &self, mut u: &UnaryExpr): &Data {
@@ -1059,17 +1061,18 @@ impl Eval {
         }
 
         if d.decl {
-            ret self.eval_unary_type_decl(d, u)
+            self.eval_unary_type_decl(d, u)
+            ret d
         }
 
         let mut cast_kind = d.cast_kind
         match u.op.kind {
-        | str(TokenKind.Minus): d = self.eval_unary_minus(d)
-        | str(TokenKind.Plus):  d = self.eval_unary_plus(d)
-        | str(TokenKind.Caret): d = self.eval_unary_caret(d)
-        | str(TokenKind.Excl):  d = self.eval_unary_excl(d)
-        | str(TokenKind.Star):  d = self.eval_unary_star(d, u.op)
-        | str(TokenKind.Amper): d = self.eval_unary_amper(d)
+        | str(TokenKind.Minus): self.eval_unary_minus(d)
+        | str(TokenKind.Plus):  self.eval_unary_plus(d)
+        | str(TokenKind.Caret): self.eval_unary_caret(d)
+        | str(TokenKind.Excl):  self.eval_unary_excl(d)
+        | str(TokenKind.Star):  self.eval_unary_star(d, u.op)
+        | str(TokenKind.Amper): self.eval_unary_amper(d)
         |:                      drop(d)
         }
 
@@ -1147,19 +1150,19 @@ impl Eval {
 
         let mut model = &ArrayExprModel{
             kind:  arr,
-            elems: make([]ExprModel, s.elems.len),
+            elems: make([]ExprModel, 0, s.elems.len),
         }
 
         let mut prefix = self.prefix
         self.prefix = arr.elem
-        for (i, mut elem) in s.elems {
+        for (_, mut elem) in s.elems {
             let mut d = self.eval_expr_kind(elem)
             if !real(d) {
                 continue
             }
 
             self.s.check_assign_type(false, arr.elem, d, s.token, true)
-            model.elems[i] = d.model
+            model.elems = append(model.elems,  d.model)
         }
         self.prefix = prefix
 
@@ -1177,19 +1180,19 @@ impl Eval {
 
         let mut model = &SliceExprModel{
             elem_kind: elem_type,
-            elems:     make([]ExprModel, s.elems.len),
+            elems:     make([]ExprModel, 0, s.elems.len),
         }
 
         let mut prefix = self.prefix
         self.prefix = slc.elem
-        for (i, mut elem) in s.elems {
+        for (_, mut elem) in s.elems {
             let mut d = self.eval_expr_kind(elem)
             if !real(d) {
                 continue
             }
 
             self.s.check_assign_type(false, slc.elem, d, s.token, true)
-            model.elems[i] = d.model
+            model.elems = append(model.elems, d.model)
         }
         self.prefix = prefix
 
@@ -1231,14 +1234,14 @@ impl Eval {
         ret d
     }
 
-    fn check_integer_indexing_by_data(mut self, mut d: &Data, token: Token) {
+    fn check_integer_indexing_by_data(mut self, mut &d: &Data, token: Token) {
         let err_key = check_data_for_integer_indexing(d)
         if err_key != LogMsg.Empty {
             self.push_err(token, err_key)
         }
     }
 
-    fn indexing_ptr(mut self, mut d: &Data, mut index: &Data, i: &IndexingExpr) {
+    fn indexing_ptr(mut self, mut &d: &Data, mut &index: &Data, &i: &IndexingExpr) {
         self.check_integer_indexing_by_data(index, i.token)
 
         let mut ptr = d.kind.ptr()
@@ -1254,7 +1257,7 @@ impl Eval {
         d.kind = ptr.elem.clone()
     }
 
-    fn indexing_arr(mut self, mut d: &Data, mut index: &Data, i: &IndexingExpr) {
+    fn indexing_arr(mut self, mut &d: &Data, mut &index: &Data, &i: &IndexingExpr) {
         let mut arr = d.kind.arr()
         d.kind = arr.elem.clone()
         self.check_integer_indexing_by_data(index, i.token)
@@ -1263,7 +1266,7 @@ impl Eval {
         }
     }
 
-    fn indexing_slc(mut self, mut d: &Data, mut index: &Data, i: &IndexingExpr) {
+    fn indexing_slc(mut self, mut &d: &Data, mut &index: &Data, &i: &IndexingExpr) {
         let mut slc = d.kind.slc()
         d.kind = slc.elem.clone()
         self.check_integer_indexing_by_data(index, i.token)
@@ -1285,7 +1288,7 @@ impl Eval {
         }
     }
 
-    fn indexing_map(mut self, mut d: &Data, mut index: &Data, mut i: &IndexingExpr) {
+    fn indexing_map(mut self, mut &d: &Data, mut &index: &Data, mut &i: &IndexingExpr) {
         if !real(index) {
             ret
         }
@@ -1303,7 +1306,7 @@ impl Eval {
         d.kind = m.val.clone()
     }
 
-    fn indexing_str(mut self, mut d: &Data, mut index: &Data, i: &IndexingExpr) {
+    fn indexing_str(mut self, mut &d: &Data, mut &index: &Data, &i: &IndexingExpr) {
         const BYTE_KIND = str(PrimKind.U8)
         d.kind.kind = build_prim_type(BYTE_KIND)
 
@@ -1330,7 +1333,7 @@ impl Eval {
         }
     }
 
-    fn to_indexing(mut self, mut d: &Data, mut index: &Data, mut i: &IndexingExpr) {
+    fn to_indexing(mut self, mut &d: &Data, mut &index: &Data, mut &i: &IndexingExpr) {
         match {
         | real(d.kind.ptr()):
             self.indexing_ptr(d, index, i)
@@ -1360,7 +1363,7 @@ impl Eval {
         self.push_err(i.token, LogMsg.NotSupportsIndexing, d.kind.to_str())
     }
 
-    fn eval_ident_decl_from_indexing(mut &self, mut i: &IndexingExpr): &Data {
+    fn eval_ident_decl_from_indexing(mut &self, mut &i: &IndexingExpr): &Data {
         match type i.expr {
         | &IdentExpr:
         |:
@@ -1459,7 +1462,7 @@ impl Eval {
     // Returns zero integer expression if slicing have not left index.
     // So, left index always represents an expression.
     // Left data is nil if expression eval failed.
-    fn eval_slicing_exprs(mut &self, mut s: &SlicingExpr): (&Data, &Data) {
+    fn eval_slicing_exprs(mut &self, mut &s: &SlicingExpr): (&Data, &Data) {
         let mut prefix = self.prefix
         drop(self.prefix)
         defer { self.prefix = prefix }
@@ -1494,7 +1497,7 @@ impl Eval {
         ret l, r
     }
 
-    fn slicing_arr(self, mut d: &Data) {
+    fn slicing_arr(self, mut &d: &Data) {
         let mut elem_type = d.kind.arr().elem.clone()
         d.kind.kind = &Slc{elem: elem_type}
 
@@ -1505,11 +1508,11 @@ impl Eval {
         d.mutable = d.mutable || !elem_type.mutable()
     }
 
-    fn slicing_slc(self, mut d: &Data) {
+    fn slicing_slc(self, mut &d: &Data) {
         d.lvalue = false
     }
 
-    fn slicing_str(self, mut d: &Data, l: &Data, r: &Data) {
+    fn slicing_str(self, mut &d: &Data, &l: &Data, &r: &Data) {
         d.lvalue = false
         d.mutable = true
         if !d.is_const() {
@@ -1545,7 +1548,7 @@ impl Eval {
         }
     }
 
-    fn check_slicing(mut self, mut d: &Data, l: &Data, r: &Data, s: &SlicingExpr) {
+    fn check_slicing(mut self, mut &d: &Data, &l: &Data, &r: &Data, &s: &SlicingExpr) {
         match {
         | real(d.kind.arr()):
             self.slicing_arr(d)
@@ -1973,7 +1976,7 @@ impl Eval {
         }
     }
 
-    fn call_type_fn(mut &self, mut fc: &FnCallExpr, mut d: &Data): &Data {
+    fn call_type_fn(mut &self, mut &fc: &FnCallExpr, mut &d: &Data) {
         if fc.generics.len > 0 {
             self.push_err(fc.token, LogMsg.TypeNotSupportsGenerics, d.kind.to_str())
         } else if fc.args.len < 1 {
@@ -1991,7 +1994,6 @@ impl Eval {
         }
 
         d.decl = false
-        ret d
     }
 
     fn check_fn_call_generics(mut self, mut f: &FnIns,
@@ -2008,30 +2010,29 @@ impl Eval {
 
         |:
             // Build real kinds of generic types.
-            f.generics = make([]&TypeKind, f.decl.generics.len)
-            for (i, mut g) in fc.generics {
+            f.generics = make([]&TypeKind, 0, f.decl.generics.len)
+            for (_, mut g) in fc.generics {
                 let mut k = build_type(g)
                 ok = self.s.check_type(k, self.lookup)
                 if !ok {
                     ret false, false
                 }
-                f.generics[i] = k.kind
+                f.generics = append(f.generics, k.kind)
             }
 
             ret true, false
         }
     }
 
-    fn call_builtin_fn(mut &self, mut fc: &FnCallExpr, mut d: &Data): &Data {
+    fn call_builtin_fn(mut &self, mut &fc: &FnCallExpr, mut &d: &Data) {
         let mut f = d.kind.fnc()
 
         d = f.caller(self, fc, d)
         if !real(d) {
-            ret new(Data)
+            ret
         }
 
         d.mutable = true
-        ret d
     }
 
     fn check_fn_of_concurrent_call(mut self, &f: &FnIns, error_token: Token) {
@@ -2047,10 +2048,11 @@ impl Eval {
         }
     }
 
-    fn call_fn(mut &self, mut fc: &FnCallExpr, mut d: &Data): &Data {
+    fn call_fn(mut &self, mut &fc: &FnCallExpr, mut &d: &Data) {
         let mut f = d.kind.fnc()
         if f.is_builtin() {
-            ret self.call_builtin_fn(fc, d)
+            self.call_builtin_fn(fc, d)
+            ret
         }
 
         if fc.concurrent {
@@ -2065,7 +2067,8 @@ impl Eval {
 
         let (mut ok, dynamic_annotation) = self.check_fn_call_generics(f, fc)
         if !ok {
-            ret new(Data)
+            drop(d)
+            ret
         }
 
         let mut old = self.s
@@ -2085,7 +2088,8 @@ impl Eval {
             if !f.reloaded {
                 ok = self.s.reload_fn_ins_types(f)
                 if !ok {
-                    ret new(Data)
+                    drop(d)
+                    ret
                 }
                 f.reloaded = true
             }
@@ -2109,7 +2113,8 @@ impl Eval {
         }
 
         if !ok && dynamic_annotation {
-            ret new(Data)
+            drop(d)
+            ret
         }
 
         let (is_unique_ins, pos) = f.decl.append_instance(f)
@@ -2125,7 +2130,8 @@ impl Eval {
             if dynamic_annotation {
                 ok = self.s.reload_fn_ins_types(f)
                 if !ok {
-                    ret new(Data)
+                    drop(d)
+                    ret
                 }
                 f.reloaded = true
             }
@@ -2146,8 +2152,6 @@ impl Eval {
             // Check generic function instance instantly.
             self.s.check_fn_ins(f)
         }
-
-        ret d
     }
 
     fn eval_fn_call(mut &self, mut fc: &FnCallExpr): &Data {
@@ -2161,7 +2165,8 @@ impl Eval {
         }
 
         if d.decl {
-            ret self.call_type_fn(fc, d)
+            self.call_type_fn(fc, d)
+            ret d
         }
 
         if !real(d.kind.fnc()) {
@@ -2169,7 +2174,8 @@ impl Eval {
             ret new(Data)
         }
 
-        ret self.call_fn(fc, d)
+        self.call_fn(fc, d)
+        ret d
     }
 
     fn eval_enum_static(mut self, mut enm: &Enum, ident: Token): &Data {
@@ -3135,21 +3141,21 @@ impl Eval {
 
     fn eval_tuple(mut &self, mut tup: &TupleExpr): &Data {
         let mut tup_t = &Tuple{}
-        tup_t.types = make([]&TypeKind, tup.expr.len)
+        tup_t.types = make([]&TypeKind, 0, tup.expr.len)
 
         let mut model = &TupleExprModel{
-            datas: make([]&Data, tup.expr.len),
+            datas: make([]&Data, 0, tup.expr.len),
         }
 
         let mut ok = true
-        for (i, mut expr) in tup.expr {
+        for (_, mut expr) in tup.expr {
             let mut d = self.eval_expr_kind(expr.kind)
             if !real(d) {
                 ok = false
                 continue
             }
-            tup_t.types[i] = d.kind
-            model.datas[i] = d
+            tup_t.types = append(tup_t.types, d.kind)
+            model.datas = append(model.datas, d)
         }
 
         if !ok {
@@ -3760,7 +3766,7 @@ impl BinopSolver {
         self.r.kind = self.l.kind
     }
 
-    fn check_mod_data(mut self, mut d: &Data) {
+    fn check_mod_data(mut self, mut &d: &Data) {
         if !d.is_const() {
             if !real(d.kind.prim()) || !types::is_int(d.kind.prim().kind) {
                 self.e.push_err(self.op, LogMsg.ModuloWithNotInt)
@@ -4047,7 +4053,7 @@ impl BinopSolver {
         }
     }
 
-    fn solve_const(mut self, mut d: &Data) {
+    fn solve_const(mut self, mut &d: &Data) {
         match {
         | !real(d):
             ret
@@ -4133,7 +4139,7 @@ impl BinopSolver {
         d.model = d.constant
     }
 
-    fn post_const(self, mut d: &Data) {
+    fn post_const(self, mut &d: &Data) {
         if !real(d) {
             ret
         }
@@ -4141,7 +4147,7 @@ impl BinopSolver {
         normalize_bitsize(d)
     }
 
-    fn prepare_data(self, mut d: &Data) {
+    fn prepare_data(self, mut &d: &Data) {
         if real(d) && real(d.kind.ref()) {
             d.kind = d.kind.ref().elem
         }
@@ -4152,7 +4158,7 @@ impl BinopSolver {
         self.prepare_data(self.l)
     }
 
-    fn check_data(mut self, mut d: &Data) {
+    fn check_data(mut self, mut &d: &Data) {
         let f = d.kind.fnc()
         if real(f) && real(f.decl) && f.decl.is_method() {
             self.e.push_err(self.op, LogMsg.InvalidExprForBinop)
@@ -4164,7 +4170,7 @@ impl BinopSolver {
         self.check_data(self.r)
     }
 
-    fn solve_explicit(mut self, mut l: &Data, mut r: &Data): &Data {
+    fn solve_explicit(mut self, mut &l: &Data, mut &r: &Data): &Data {
         self.l, self.r = l, r
 
         self.prepare_eval()
@@ -4190,7 +4196,7 @@ impl BinopSolver {
         ret d
     }
 
-    fn solve(mut self, mut op: &BinopExpr): &Data {
+    fn solve(mut self, mut &op: &BinopExpr): &Data {
         let mut l = self.e.eval_expr_kind(op.left)
         if !real(l) || !real(l.kind) {
             ret new(Data)

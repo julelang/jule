@@ -36,7 +36,7 @@ use types for std::jule::types
 // Statement type.
 pub type St: any
 
-fn new_scope_checker_base(mut s: &Sema, mut owner: &FnIns): &ScopeChecker {
+fn new_scope_checker_base(mut &s: &Sema, mut owner: &FnIns): &ScopeChecker {
     ret &ScopeChecker{
         s:     s,
         owner: owner,
@@ -44,7 +44,7 @@ fn new_scope_checker_base(mut s: &Sema, mut owner: &FnIns): &ScopeChecker {
     }
 }
 
-fn new_scope_checker(mut s: &Sema, mut owner: &FnIns): &ScopeChecker {
+fn new_scope_checker(mut &s: &Sema, mut owner: &FnIns): &ScopeChecker {
     let mut base = new_scope_checker_base(s, owner)
     base.labels = new([]&ScopeLabel, nil)
     base.gotos = new([]&ScopeGoto, nil)
@@ -105,7 +105,7 @@ fn stmt_is_goto_scope(&stmt: any, &sc: &Scope): bool {
     }
 }
 
-fn count_match_type(m: &Match, t: &TypeKind): int {
+fn count_match_type(&m: &Match, &t: &TypeKind): int {
     let mut n = 0
     let kind = t.to_str()
 loop:
@@ -129,7 +129,7 @@ loop:
     ret n
 }
 
-fn get_datas_from_tuple_data(mut d: &Data): []&Data {
+fn get_datas_from_tuple_data(mut &d: &Data): []&Data {
     if real(d.kind.tup()) {
         match type d.model {
         | &TupleExprModel:
@@ -137,12 +137,12 @@ fn get_datas_from_tuple_data(mut d: &Data): []&Data {
 
         |:
             let mut t = d.kind.tup()
-            let mut r = make([]&Data, t.types.len)
-            for (i, mut kind) in t.types {
-                r[i] = &Data{
+            let mut r = make([]&Data, 0, t.types.len)
+            for (_, mut kind) in t.types {
+                r = append(r, &Data{
                     mutable: true, // Function return.
                     kind:    kind,
-                }
+                })
             }
             ret r
         }
@@ -151,7 +151,7 @@ fn get_datas_from_tuple_data(mut d: &Data): []&Data {
     }
 }
 
-fn get_expr_models(mut m: ExprModel): []ExprModel {
+fn get_expr_models(mut &m: ExprModel): []ExprModel {
     match type m {
     | &TupleExpr:
         let mut tup = (&TupleExpr)(m)
@@ -166,7 +166,7 @@ fn get_expr_models(mut m: ExprModel): []ExprModel {
     }
 }
 
-fn check_mut(mut s: &Sema, left: &Data, mut right: &Data, error_token: Token): (ok: bool) {
+fn check_mut(mut &s: &Sema, &left: &Data, mut right: &Data, error_token: Token): (ok: bool) {
     match {
     | !left.mutable:
         s.push_err(error_token, LogMsg.AssignToNonMut)
@@ -181,7 +181,7 @@ fn check_mut(mut s: &Sema, left: &Data, mut right: &Data, error_token: Token): (
     }
 }
 
-fn check_assign(mut s: &Sema, mut left: &Data, mut right: &Data, error_token: Token): (ok: bool) {
+fn check_assign(mut &s: &Sema, mut &left: &Data, mut right: &Data, error_token: Token): (ok: bool) {
     let f = left.kind.fnc()
     if real(f) && real(f.decl) && f.decl.global {
         s.push_err(error_token, LogMsg.AssignTypeNotSupportValue)
@@ -206,7 +206,7 @@ fn check_assign(mut s: &Sema, mut left: &Data, mut right: &Data, error_token: To
     }
 }
 
-fn is_valid_ast_st_for_next_st(mut n: NodeData): bool {
+fn is_valid_ast_st_for_next_st(mut &n: NodeData): bool {
     match type n {
     | &AssignSt:
         ret !(&AssignSt)(n).declarative
@@ -220,7 +220,7 @@ fn is_valid_ast_st_for_next_st(mut n: NodeData): bool {
     }
 }
 
-fn is_valid_st_for_next_st(st: St): bool {
+fn is_valid_st_for_next_st(&st: St): bool {
     match type st {
     | &FnCallExprModel
     | &Postfix
@@ -239,7 +239,7 @@ fn is_valid_st_for_next_st(st: St): bool {
     }
 }
 
-fn st_is_def(st: St): bool {
+fn st_is_def(&st: St): bool {
     match type st {
     | &Var: ret true
     |:      ret false
@@ -658,18 +658,18 @@ impl ScopeChecker {
         }
     }
 
-    fn check_child_ssc(mut &self, mut tree: &ScopeTree, mut s: &Scope, mut ssc: &ScopeChecker) {
+    fn check_child_ssc(mut &self, mut &tree: &ScopeTree, mut &s: &Scope, mut &ssc: &ScopeChecker) {
         ssc.parent = self
         ssc.check(tree, s)
     }
 
-    fn check_child_sc(mut &self, mut tree: &ScopeTree, mut ssc: &ScopeChecker): &Scope {
+    fn check_child_sc(mut &self, mut &tree: &ScopeTree, mut &ssc: &ScopeChecker): &Scope {
         let mut s = self.get_child()
         self.check_child_ssc(tree, s, ssc)
         ret s
     }
 
-    fn check_child(mut &self, mut tree: &ScopeTree): &Scope {
+    fn check_child(mut &self, mut &tree: &ScopeTree): &Scope {
         let mut ssc = self.new_child_checker()
         ret self.check_child_sc(tree, ssc)
     }
@@ -679,7 +679,7 @@ impl ScopeChecker {
         self.scope.stmts = append(self.scope.stmts, s)
     }
 
-    fn try_call_recover(mut &self, mut d: &Data): bool {
+    fn try_call_recover(mut &self, mut &d: &Data): bool {
         match type d.model {
         | &Recover: // Ok.
         |:          ret false
@@ -759,11 +759,11 @@ impl ScopeChecker {
         let mut c = &Conditional{}
         self.scope.stmts = append(self.scope.stmts, c)
 
-        c.elifs = make([]&If, conditional.tail.len+1)
+        c.elifs = make([]&If, 0, conditional.tail.len+1)
 
-        c.elifs[0] = self.check_if(conditional.head)
-        for (i, mut elif) in conditional.tail {
-            c.elifs[i+1] = self.check_if(elif)
+        c.elifs = append(c.elifs, self.check_if(conditional.head))
+        for (_, mut elif) in conditional.tail {
+            c.elifs = append(c.elifs, self.check_if(elif))
         }
 
         if real(conditional.default) {
@@ -776,12 +776,12 @@ impl ScopeChecker {
         ret self.check_child_sc(tree, ssc)
     }
 
-    fn check_iter_scope(mut &self, it: uintptr, mut tree: &ScopeTree): &Scope {
+    fn check_iter_scope(mut &self, it: uintptr, mut &tree: &ScopeTree): &Scope {
         let mut ssc = self.new_child_checker()
         ret self.check_iter_scope_sc(it, tree, ssc)
     }
 
-    fn check_inf_iter(mut &self, mut it: &Iter) {
+    fn check_inf_iter(mut &self, mut &it: &Iter) {
         let mut kind = &InfIter{}
 
         self.scope.stmts = append(self.scope.stmts, kind)
@@ -789,7 +789,7 @@ impl ScopeChecker {
         kind.scope = self.check_iter_scope(uintptr(&kind), it.scope)
     }
 
-    fn check_while_iter(mut &self, mut it: &Iter) {
+    fn check_while_iter(mut &self, mut &it: &Iter) {
         let mut wh = (&WhileKind)(it.kind)
         if !real(wh.expr) && wh.next == nil {
             self.check_inf_iter(it)
@@ -842,7 +842,7 @@ impl ScopeChecker {
         }
     }
 
-    fn check_range_iter(mut &self, mut it: &Iter) {
+    fn check_range_iter(mut &self, mut &it: &Iter) {
         let mut rang = (&RangeKind)(it.kind)
 
         let mut d = self.s.eval(self).eval_expr(rang.expr)
@@ -1080,7 +1080,7 @@ impl ScopeChecker {
         ret self.table.def_by_ident(ident, false) == nil
     }
 
-    fn check_single_assign(mut &self, mut a: &AssignSt) {
+    fn check_single_assign(mut &self, mut &a: &AssignSt) {
         let mut l = new(Data)
 
         if !is_ignore_ident(a.left[0].ident) {
@@ -1215,7 +1215,7 @@ impl ScopeChecker {
         st.l = append(st.l, l.model)
     }
 
-    fn check_ret_multi_assign(mut &self, mut a: &AssignSt) {
+    fn check_ret_multi_assign(mut &self, mut &a: &AssignSt) {
         let mut rd = self.s.eval(self).eval_expr(a.right)
         if !real(rd) {
             ret
@@ -1259,7 +1259,7 @@ impl ScopeChecker {
         self.scope.stmts = append(self.scope.stmts, st)
     }
 
-    fn check_multi_assign(mut &self, mut a: &AssignSt) {
+    fn check_multi_assign(mut &self, mut &a: &AssignSt) {
         match type a.right.kind {
         | &FnCallExpr:
             self.check_ret_multi_assign(a)
@@ -1336,7 +1336,7 @@ impl ScopeChecker {
         self.check_multi_assign(a)
     }
 
-    fn check_case_scope(mut &self, c: &Case, mut tree: &ScopeTree): &Scope {
+    fn check_case_scope(mut &self, &c: &Case, mut &tree: &ScopeTree): &Scope {
         let mut ssc = self.new_child_checker()
         ssc.cse = uintptr(&c)
         ret self.check_child_sc(tree, ssc)
@@ -1344,10 +1344,10 @@ impl ScopeChecker {
 
     fn check_case(mut &self, mut m: &Match, i: int, mut c: &std::jule::ast::Case, mut expr: &Data): &Case {
         let mut _case = m.cases[i]
-        _case.exprs = make([]ExprModel, c.exprs.len)
+        _case.exprs = make([]ExprModel, 0, c.exprs.len)
         let mut generic_matched = false
 
-        for (j, mut e) in c.exprs {
+        for (_, mut e) in c.exprs {
             if m.type_match {
                 let mut eval = &Eval{
                     s:      self.s,
@@ -1356,7 +1356,7 @@ impl ScopeChecker {
 
                 let mut d = eval.eval(e)
                 if real(d) {
-                    _case.exprs[j] = d.kind
+                    _case.exprs = append(_case.exprs, d.kind)
                     if count_match_type(m, d.kind) > 1 {
                         self.s.push_err(e.token, LogMsg.DuplicateMatchType, d.kind.to_str())
                     }
@@ -1379,7 +1379,7 @@ impl ScopeChecker {
                 continue
             }
 
-            _case.exprs[j] = d.model
+            _case.exprs = append(_case.exprs, d.model)
 
             let mut checker = AssignTypeChecker{
                 s:           self.s,
@@ -1659,7 +1659,7 @@ impl ScopeChecker {
         }
     }
 
-    fn check_node(mut &self, mut node: NodeData) {
+    fn check_node(mut &self, mut &node: NodeData) {
         match type node {
         | &Comment:                     break // Ignore.
         | &ScopeTree:                   self.check_anon_scope((&ScopeTree)(node))
@@ -1683,11 +1683,12 @@ impl ScopeChecker {
     fn check_tree(mut &self) {
         self.i = 0
         for self.i < self.tree.stmts.len; self.i++ {
-            self.check_node(self.tree.stmts[self.i])
+            let mut stmt = self.tree.stmts[self.i]
+            self.check_node(stmt)
         }
     }
 
-    fn check_goto(mut self, mut &gt: &ScopeGoto, mut label: &ScopeLabel) {
+    fn check_goto(mut self, mut &gt: &ScopeGoto, mut &label: &ScopeLabel) {
         let mut gtsc = gt.scope
         for gtsc.child_index-1 > label.scope.child_index {
             gtsc = gtsc.parent
@@ -1765,7 +1766,7 @@ impl ScopeChecker {
     }
 
     // Checks scope tree.
-    fn check(mut &self, mut tree: &ScopeTree, mut s: &Scope) {
+    fn check(mut &self, mut &tree: &ScopeTree, mut &s: &Scope) {
         s.deferred = tree.deferred
         s.unsafety = tree.unsafety
 

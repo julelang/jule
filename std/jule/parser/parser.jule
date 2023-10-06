@@ -509,13 +509,14 @@ impl Parser {
         }
 
         let (mut parts, errors) = parts(tokens, TokenId.Comma, true)
-        self.errors = append(self.errors, errors...)
+        if errors.len > 0 {
+            self.errors = append(self.errors, errors...)
+            ret nil
+        }
 
-        let mut generics = make([]&GenericDecl, parts.len)
-        for (i, mut part) in parts {
-            if parts.len > 0 {
-                generics[i] = self.build_generic(part)
-            }
+        let mut generics = make([]&GenericDecl, 0, parts.len)
+        for (_, mut part) in parts {
+            generics = append(generics, self.build_generic(part))
         }
 
         ret generics
@@ -940,8 +941,8 @@ impl Parser {
             ret nil
         }
 
-        let mut selectors = make([]Token, parts.len)
-        for (j, mut part) in parts {
+        let mut selectors = make([]Token, 0, parts.len)
+        for (_, mut part) in parts {
             if part.len > 1 {
                 self.push_err(part[1], LogMsg.InvalidSyntax)
             }
@@ -951,7 +952,7 @@ impl Parser {
                 self.push_suggestion(LogMsg.ExpectedIdentifier)
                 continue
             }
-            selectors[j] = tok
+            selectors = append(selectors, tok)
         }
         ret selectors
     }
@@ -1186,7 +1187,7 @@ impl Parser {
     }
 
     fn build_enum_items(mut &self, mut &tokens: []Token): []&EnumItemDecl {
-        let mut items = make([]&EnumItemDecl, 0)
+        let mut items = make([]&EnumItemDecl, 0, 1)
         let mut i = new(int, 0)
         for i < tokens.len; i++ {
             let mut t = tokens[i]

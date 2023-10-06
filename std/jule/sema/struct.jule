@@ -66,19 +66,19 @@ impl Struct {
 
         let mut ins = &StructIns{
             decl:       self,
-            fields:     make([]&FieldIns, self.fields.len),
-            methods:    make([]&Fn, self.methods.len),
+            fields:     make([]&FieldIns, 0, self.fields.len),
+            methods:    make([]&Fn, 0, self.methods.len),
             references: ReferenceStack.new(),
         }
 
-        for (i, mut f) in self.fields {
-            ins.fields[i] = f.instance()
+        for (_, mut f) in self.fields {
+            ins.fields = append(ins.fields, f.instance())
             if real(f.kind.kind) && f.kind.kind.mutable() {
                 ins.mutable = true
             }
         }
 
-        for (i, mut f) in self.methods {
+        for (_, mut f) in self.methods {
             let mut fins = &Fn{
                 sema: f.sema,
                 token: f.token,
@@ -97,7 +97,7 @@ impl Struct {
                 owner: f.owner,
                 instances: nil,
             }
-            ins.methods[i] = fins
+            ins.methods = append(ins.methods, fins)
         }
 
         ret ins

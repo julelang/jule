@@ -899,14 +899,14 @@ impl TypeChecker {
             owner: ins.decl,
         }
 
-        let mut generics = make([]&TypeAlias, ins.generics.len)
+        let mut generics = make([]&TypeAlias, 0, ins.generics.len)
         for (i, mut g) in ins.generics {
-            generics[i] = &TypeAlias{
+            generics = append(generics, &TypeAlias{
                 ident: ins.decl.generics[i].ident,
                 kind: &TypeSymbol{
                     kind: g,
                 },
-            }
+            })
         }
 
         let mut old_sema_file = ins.decl.sema.file
@@ -980,16 +980,16 @@ impl TypeChecker {
 
         self.append_used_struct_reference(s)
         let mut ins = s.instance()
-        ins.generics = make([]&TypeKind, decl.generics.len)
+        ins.generics = make([]&TypeKind, 0, decl.generics.len)
         let mut referencer = self.referencer
         drop(self.referencer)
-        for (i, mut g) in decl.generics {
+        for (_, mut g) in decl.generics {
             let mut kind = self.build(g.kind)
             if !real(kind) {
                 ok = false
                 continue
             }
-            ins.generics[i] = kind
+            ins.generics = append(ins.generics, kind)
         }
 
         self.referencer = referencer
@@ -1265,13 +1265,13 @@ impl TypeChecker {
     }
 
     fn build_tuple(mut self, mut decl: &TupleTypeDecl): &Tuple {
-        let mut types = make([]&TypeKind, decl.types.len)
-        for (i, mut t) in decl.types {
+        let mut types = make([]&TypeKind, 0, decl.types.len)
+        for (_, mut t) in decl.types {
             let mut kind = self.check_decl(t)
             if !real(kind) {
                 ret new(Tuple)
             }
-            types[i] = kind
+            types = append(types, kind)
         }
 
         ret &Tuple{types: types}

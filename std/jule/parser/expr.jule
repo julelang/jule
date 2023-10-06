@@ -307,10 +307,10 @@ impl ExprBuilder {
 
     fn build_tuple(mut self, mut &parts: [][]Token): &TupleExpr {
         let mut tuple = &TupleExpr{
-            expr: make([]&Expr, parts.len),
+            expr: make([]&Expr, 0, parts.len),
         }
-        for (i, mut part) in parts {
-            tuple.expr[i] = self.build_from_tokens(part)
+        for (_, mut part) in parts {
+            tuple.expr = append(tuple.expr, self.build_from_tokens(part))
         }
         ret tuple
     }
@@ -619,9 +619,9 @@ impl ExprBuilder {
 
         tokens = tokens[1 : tokens.len-1] // Remove brackets.
         let (mut parts, errs) = parts(tokens, TokenId.Comma, true)
-        let mut generics = make([]&TypeDecl, parts.len)
+        let mut generics = make([]&TypeDecl, 0, parts.len)
         self.p.errors = append(self.p.errors, errs...)
-        for (i, mut part) in parts {
+        for (_, mut part) in parts {
             if part.len == 0 {
                 continue
             }
@@ -630,7 +630,7 @@ impl ExprBuilder {
             if j < part.len {
                 self.push_err(part[j], LogMsg.InvalidSyntax)
             }
-            generics[i] = generic
+            generics = append(generics, generic)
         }
 
         ret generics
@@ -786,9 +786,9 @@ impl ExprBuilder {
             ret nil
         }
 
-        let mut pairs = make([]ExprData, parts.len)
-        for (i, mut part) in parts {
-            pairs[i] = self.build_struct_lit_expr(part)
+        let mut pairs = make([]ExprData, 0, parts.len)
+        for (_, mut part) in parts {
+            pairs = append(pairs, self.build_struct_lit_expr(part))
         }
         ret pairs
     }
@@ -839,9 +839,9 @@ impl ExprBuilder {
             ret lit
         }
 
-        lit.exprs = make([]ExprData, parts.len)
-        for (i, mut part) in parts {
-            lit.exprs[i] = self.build_brace_lit_part(part)
+        lit.exprs = make([]ExprData, 0, parts.len)
+        for (_, mut part) in parts {
+            lit.exprs = append(lit.exprs, self.build_brace_lit_part(part))
         }
 
         ret lit
@@ -894,9 +894,9 @@ impl ExprBuilder {
             ret slc
         }
 
-        slc.elems = make([]ExprData, parts.len)
-        for (i, mut p) in parts {
-            slc.elems[i] = self.build_from_tokens(p).kind
+        slc.elems = make([]ExprData, 0, parts.len)
+        for (_, mut p) in parts {
+            slc.elems = append(slc.elems, self.build_from_tokens(p).kind)
         }
 
         ret slc
