@@ -198,7 +198,7 @@ namespace jule {
             if (ref == nullptr)
                 stream << "nil";
             else
-                stream << *ref.alloc;
+                stream << ref.alloc;
             return stream;
         }
     };
