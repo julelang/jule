@@ -3436,13 +3436,7 @@ struct BinopSolver {
 
 impl BinopSolver {
     fn check_type_compatibility(mut self): bool {
-        let mut tcc = TypeCompatibilityChecker{
-            s:           self.e.s,
-            error_token: self.op,
-            dest:        self.l.kind,
-            src:         self.r.kind,
-        }
-        ret tcc.check()
+        ret self.e.s.check_type_compatibility(self.l.kind, self.r.kind, self.op)
     }
 
     fn eval_nil(mut self): &Data {
@@ -3973,7 +3967,6 @@ impl BinopSolver {
     fn eval_prim(mut self): &Data {
         let prim = self.l.kind.prim()
         match {
-        | prim.is_any():  ret self.eval_any()
         | prim.is_bool(): ret self.eval_bool()
         | prim.is_str():  ret self.eval_str()
         }
@@ -3998,6 +3991,10 @@ impl BinopSolver {
         | self.l.kind.void():
             self.e.push_err(self.op, LogMsg.OperatorNotForJuleType, self.op.kind, "void")
             ret nil
+
+        | self.l.kind.prim() != nil && self.l.kind.prim().is_any()
+        | self.r.kind.prim() != nil && self.r.kind.prim().is_any():
+            ret self.eval_any()
 
         | self.l.kind.is_nil():
             ret self.eval_nil()
