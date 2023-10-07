@@ -12,7 +12,7 @@
 #endif
 
 #include "types.hpp"
-#include "ref.hpp"
+#include "ptr.hpp"
 #include "slice.hpp"
 #include "utf16.hpp"
 

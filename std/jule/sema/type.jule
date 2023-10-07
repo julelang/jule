@@ -19,7 +19,7 @@ use std::jule::ast::{
     NamespaceTypeDecl,
     TypeDeclKind,
     TupleTypeDecl,
-    RefTypeDecl,
+    SptrTypeDecl,
     IdentTypeDecl,
 }
 use std::jule::build::{Derives, LogMsg, logf}
@@ -124,7 +124,7 @@ impl TypeKind {
         unsafe {
             let mut _self = &self
 
-            ret _self.ref() != nil ||
+            ret _self.sptr() != nil ||
                 _self.ptr() != nil ||
                 _self.slc() != nil ||
                 _self.map() != nil
@@ -151,7 +151,7 @@ impl TypeKind {
             }
             ret _self.slc() != nil ||
                 _self.ptr() != nil ||
-                _self.ref() != nil
+                _self.sptr() != nil
         }
     }
 
@@ -167,7 +167,7 @@ impl TypeKind {
 
             ret _self.is_nil() ||
                 _self.fnc() != nil ||
-                _self.ref() != nil ||
+                _self.sptr() != nil ||
                 _self.ptr() != nil ||
                 _self.trt() != nil ||
                 _self.slc() != nil ||
@@ -198,8 +198,8 @@ impl TypeKind {
             | _self.arr() != nil:
                 ret _self.arr().elem.supports_cloning()
 
-            | _self.ref() != nil:
-                ret _self.ref().elem.supports_cloning()
+            | _self.sptr() != nil:
+                ret _self.sptr().elem.supports_cloning()
 
             | _self.strct() != nil:
                 let mut s = _self.strct()
@@ -235,10 +235,10 @@ impl TypeKind {
         }
     }
 
-    // Returns reference type if kind is reference, nil reference if not.
-    pub fn ref(mut self): &Ref {
+    // Returns reference type if kind is smart pointer, nil reference if not.
+    pub fn sptr(mut self): &Sptr {
         match type self.kind {
-        | &Ref: ret (&Ref)(self.kind)
+        | &Sptr: ret (&Sptr)(self.kind)
         |:      ret nil
         }
     }
@@ -400,22 +400,22 @@ impl Prim {
     pub fn is_any(self): bool { ret self.kind == str(PrimKind.Any) }
 }
 
-// Reference type.
-pub struct Ref {
+// Smart pointer.
+pub struct Sptr {
     pub elem: &TypeKind
 }
 
-impl Kind for Ref {
-    // Returns reference kind as string.
+impl Kind for Sptr {
+    // Returns smart pointer kind as string.
     fn to_str(self): str { ret "&" + self.elem.to_str() }
 
     // Reports whether types are same.
     fn equals(self, other: &TypeKind): bool {
-        let ref = unsafe { (&other).ref() }
-        if ref == nil {
+        let sptr = unsafe { (&other).sptr() }
+        if sptr == nil {
             ret false
         }
-        ret self.elem.equals(ref.elem)
+        ret self.elem.equals(sptr.elem)
     }
 }
 
@@ -575,8 +575,8 @@ fn can_get_ptr(mut &d: &Data): bool {
     }
 }
 
-// Reports kind is valid for reference type such as &T.
-fn is_valid_for_ref_type(mut &t: &TypeKind): bool {
+// Reports kind is valid for smart pointer type such as &T.
+fn is_valid_for_sptr_type(mut &t: &TypeKind): bool {
     let mut s = t.strct()
     if s != nil && s.decl != nil && s.decl.cpp_linked {
         ret false
@@ -610,8 +610,8 @@ fn get_struct_from_kind(mut k: &TypeKind): &Struct {
     | k.strct() != nil:
         ret k.strct().decl
 
-    | k.ref() != nil:
-        ret get_struct_from_kind(k.ref().elem)
+    | k.sptr() != nil:
+        ret get_struct_from_kind(k.sptr().elem)
 
     | k.slc() != nil:
         ret get_struct_from_kind(k.slc().elem)
@@ -1087,7 +1087,7 @@ impl TypeChecker {
         }
     }
 
-    fn build_ref_from_type(mut self, mut &elem: &TypeKind): &Ref {
+    fn build_sptr_from_type(mut self, mut &elem: &TypeKind): &Sptr {
         // Check special cases.
         match {
         | elem == nil:
@@ -1105,18 +1105,18 @@ impl TypeChecker {
             ret nil
         }
 
-        ret &Ref{
+        ret &Sptr{
             elem: elem,
         }
     }
 
-    fn build_ref(mut self, mut decl: &RefTypeDecl): &Ref {
+    fn build_sptr(mut self, mut decl: &SptrTypeDecl): &Sptr {
         let not_plain = self.not_plain
         self.not_plain = true
         defer { self.not_plain = not_plain }
 
         let mut elem = self.check_decl(decl.elem)
-        ret self.build_ref_from_type(elem)
+        ret self.build_sptr_from_type(elem)
     }
 
     fn build_ptr_from_type(mut self, mut &elem: &TypeKind): &Ptr {
@@ -1330,8 +1330,8 @@ impl TypeChecker {
                 kind = t
             }
 
-        | &RefTypeDecl:
-            let mut t = self.build_ref((&RefTypeDecl)(decl_kind))
+        | &SptrTypeDecl:
+            let mut t = self.build_sptr((&SptrTypeDecl)(decl_kind))
             if t != nil {
                 kind = t
             }

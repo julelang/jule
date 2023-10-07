@@ -294,7 +294,7 @@ fn builtin_caller_new(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data
         ret nil
     }
 
-    if !is_valid_for_ref_type(t.kind) {
+    if !is_valid_for_sptr_type(t.kind) {
         let mut s = t.kind.strct()
         if s != nil && s.decl != nil && s.decl.cpp_linked {
             e.push_err(fc.args[0].token, LogMsg.CppLinkedStructForRef)
@@ -302,7 +302,7 @@ fn builtin_caller_new(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data
         ret nil
     }
 
-    d.kind = &TypeKind{kind: &Ref{elem: t.kind.clone()}}
+    d.kind = &TypeKind{kind: &Sptr{elem: t.kind.clone()}}
 
     if fc.args.len == 2 { // Initialize expression.
         let mut old = e.prefix
@@ -617,8 +617,8 @@ fn builtin_caller_clone(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Da
                 e.push_err(fc.args[0].token, LogMsg.InternalTypeNotSupportsClone, k.to_str())
             }
 
-        | k.ref() != nil:
-            if !k.ref().elem.supports_cloning() {
+        | k.sptr() != nil:
+            if !k.sptr().elem.supports_cloning() {
                 e.push_err(fc.args[0].token, LogMsg.InternalTypeNotSupportsClone, k.to_str())
             }
 

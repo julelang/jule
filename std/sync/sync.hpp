@@ -11,7 +11,7 @@
 
 struct __jule_mutex_handle {
 public:
-    mutable jule::Ref<std::mutex> _mutex{};
+    mutable jule::Ptr<std::mutex> _mutex{};
 
     __jule_mutex_handle(void) = default;
 
@@ -22,7 +22,7 @@ public:
         std::mutex *mtx{ new (std::nothrow) std::mutex() };
         if (mtx == nullptr)
             jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
-        this->_mutex = jule::Ref<std::mutex>::make(mtx);
+        this->_mutex = jule::Ptr<std::mutex>::make(mtx);
     }
 
     inline std::mutex *mutex(void) noexcept

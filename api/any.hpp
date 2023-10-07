@@ -13,7 +13,7 @@
 
 #include "str.hpp"
 #include "builtin.hpp"
-#include "ref.hpp"
+#include "ptr.hpp"
 
 namespace jule {
 

@@ -11,7 +11,7 @@
 #include <initializer_list>
 
 #include "error.hpp"
-#include "ref.hpp"
+#include "ptr.hpp"
 #include "types.hpp"
 
 namespace jule {
@@ -23,7 +23,7 @@ namespace jule {
     template<typename Item>
     class Slice {
     public:
-        mutable jule::Ref<Item> data{};
+        mutable jule::Ptr<Item> data{};
         mutable Item *_slice{ nullptr };
         mutable jule::Int _len{ 0 };
         mutable jule::Int _cap{ 0 };
@@ -152,9 +152,9 @@ namespace jule {
                 jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
 
 #ifdef __JULE_DISABLE__REFERENCE_COUNTING
-            this->data = jule::Ref<Item>::make(alloc, nullptr);
+            this->data = jule::Ptr<Item>::make(alloc, nullptr);
 #else
-            this->data = jule::Ref<Item>::make(alloc);
+            this->data = jule::Ptr<Item>::make(alloc);
 #endif
             this->_len = len;
             this->_cap = cap;

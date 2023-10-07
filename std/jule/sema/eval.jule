@@ -49,7 +49,7 @@ fn find_builtins_import(ident: str, imp: &ImportInfo): any {
 
 fn make_struct_lit_alloc(mut &d: &Data, mut &lit: &StructLitExprModel) {
     d.kind = &TypeKind{
-        kind: &Ref{
+        kind: &Sptr{
             elem: &TypeKind{kind: lit.strct},
         },
     }
@@ -939,9 +939,8 @@ impl Eval {
             }
             d.kind = t.elem
 
-        | d.kind.ref() != nil:
-            let mut t = d.kind.ref()
-            d.kind = t.elem
+        | d.kind.sptr() != nil:
+            d.kind = d.kind.sptr().elem
 
         |:
             d = nil
@@ -964,9 +963,9 @@ impl Eval {
 
         |:
             match {
-            | d.kind.ref() != nil:
+            | d.kind.sptr() != nil:
                 d.kind = &TypeKind{
-                    kind: &Ptr{elem: d.kind.ref().elem.clone()},
+                    kind: &Ptr{elem: d.kind.sptr().elem.clone()},
                 }
                 d.model = &GetRefPtrExprModel{
                     expr: d.model,
@@ -1005,7 +1004,7 @@ impl Eval {
             d.kind = &TypeKind{kind: tc.build_ptr_from_type(d.kind)}
 
         | str(TokenKind.Amper):
-            d.kind = &TypeKind{kind: tc.build_ref_from_type(d.kind)}
+            d.kind = &TypeKind{kind: tc.build_sptr_from_type(d.kind)}
 
         |:
             self.push_err(u.op, LogMsg.InvalidExprForUnary, u.op.kind)
@@ -1598,9 +1597,9 @@ impl Eval {
     }
 
     fn cast_ref(mut self, mut t: &TypeKind, mut d: &Data, error_token: Token) {
-        let mut ref = t.ref()
-        if ref.elem.strct() != nil {
-            self.cast_struct(ref.elem, d, error_token)
+        let mut sptr = t.sptr()
+        if sptr.elem.strct() != nil {
+            self.cast_struct(sptr.elem, d, error_token)
             ret
         }
 
@@ -1773,7 +1772,7 @@ impl Eval {
         | t.ptr() != nil:
             self.cast_ptr(t, d, error_token)
 
-        | t.ref() != nil:
+        | t.sptr() != nil:
             self.cast_ref(t, d, error_token)
 
         | t.slc() != nil:
@@ -1895,8 +1894,8 @@ impl Eval {
 
         let mut s = t.kind.strct()
         if s == nil {
-            if t.kind.ref() != nil {
-                s = t.kind.ref().elem.strct()
+            if t.kind.sptr() != nil {
+                s = t.kind.sptr().elem.strct()
                 if s != nil {
                     goto eval
                 }
@@ -1907,7 +1906,7 @@ impl Eval {
 
     eval:
         let mut d = self.eval_struct_lit_explicit(s, lit.exprs, lit.kind.token)
-        if t.kind.ref() != nil {
+        if t.kind.sptr() != nil {
             let mut model = (&StructLitExprModel)(d.model)
             make_struct_lit_alloc(d, model)
         }
@@ -3035,8 +3034,8 @@ impl Eval {
                 }
                 kind = d.kind.ptr().elem
             }
-        } else if d.kind.ref() != nil {
-            kind = d.kind.ref().elem
+        } else if d.kind.sptr() != nil {
+            kind = d.kind.sptr().elem
         }
 
         match {
@@ -3046,7 +3045,7 @@ impl Eval {
         | kind.strct() != nil:
             let s = kind.strct()
             if is_instanced_struct(s) {
-                let mut used_reference_elem = d.kind.ref() != nil
+                let mut used_reference_elem = d.kind.sptr() != nil
                 ret self.eval_struct_sub_ident(d, kind.strct(), si, used_reference_elem)
             }
 
@@ -3492,7 +3491,7 @@ impl BinopSolver {
         }
     }
 
-    fn eval_ref(mut self): &Data {
+    fn eval_sptr(mut self): &Data {
         if !self.check_type_compatibility() {
             self.e.push_err(self.op, LogMsg.IncompatibleTypes, self.l.kind.to_str(), self.r.kind.to_str())
             ret nil
@@ -3992,8 +3991,8 @@ impl BinopSolver {
         | self.l.kind.enm() != nil:
             ret self.eval_enum()
 
-        | self.l.kind.ref() != nil || self.r.kind.ref() != nil:
-            ret self.eval_ref()
+        | self.l.kind.sptr() != nil || self.r.kind.sptr() != nil:
+            ret self.eval_sptr()
 
         | self.l.kind.ptr() != nil || self.r.kind.ptr() != nil:
             ret self.eval_ptr()

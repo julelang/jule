@@ -145,9 +145,9 @@ impl TypeCompatibilityChecker {
         let trt = self.dest.trt()
         let mut ref = false
         match {
-        | self.src.ref() != nil:
+        | self.src.sptr() != nil:
             ref = true
-            self.src = self.src.ref().elem
+            self.src = self.src.sptr().elem
             if self.src.strct() == nil {
                 ret false
             }
@@ -174,17 +174,17 @@ impl TypeCompatibilityChecker {
         }
     }
 
-    fn check_ref(mut self): (ok: bool) {
+    fn check_sptr(mut self): (ok: bool) {
         if self.src.is_nil() {
             ret true
         }
 
-        let mut src = self.src.ref()
+        let mut src = self.src.sptr()
         if src == nil {
             ret false
         }
 
-        let mut dest = self.dest.ref()
+        let mut dest = self.dest.sptr()
         ret dest.elem.equals(src.elem)
     }
 
@@ -358,7 +358,7 @@ impl TypeCompatibilityChecker {
         | self.dest.cpp_linked():     ret self.check_cpp_linked()
         | self.dest.prim() != nil:    ret self.check_prim()
         | self.dest.trt() != nil:     ret self.check_trait()
-        | self.dest.ref() != nil:     ret self.check_ref()
+        | self.dest.sptr() != nil:    ret self.check_sptr()
         | self.dest.ptr() != nil:     ret self.check_ptr()
         | self.dest.slc() != nil:     ret self.check_slc()
         | self.dest.arr() != nil:     ret self.check_arr()
@@ -580,16 +580,16 @@ impl DynamicTypeAnnotation {
         ret self.annotate_kind(ptr.elem)
     }
 
-    unsafe fn annotate_ref(mut self, mut &k: &TypeKind): (ok: bool) {
-        let mut rref = (*self.k).ref()
-        if rref == nil {
+    unsafe fn annotate_sptr(mut self, mut &k: &TypeKind): (ok: bool) {
+        let mut ssptr = (*self.k).sptr()
+        if ssptr == nil {
             ret false
         }
 
-        let mut ref = k.ref()
-        let mut crref = &rref.elem
-        self.k = &crref
-        ret self.annotate_kind(ref.elem)
+        let mut sptr = k.sptr()
+        let mut cssptr = &ssptr.elem
+        self.k = &cssptr
+        ret self.annotate_kind(sptr.elem)
     }
 
     unsafe fn annotate_any(mut self, mut &k: &TypeKind): (ok: bool) {
@@ -628,7 +628,7 @@ impl DynamicTypeAnnotation {
         | k.map() != nil:       ret self.annotate_map(k)
         | k.fnc() != nil:       ret self.annotate_fn(k)
         | k.ptr() != nil:       ret self.annotate_ptr(k)
-        | k.ref() != nil:       ret self.annotate_ref(k)
+        | k.sptr() != nil:      ret self.annotate_sptr(k)
         |:                      ret false
         }
     }

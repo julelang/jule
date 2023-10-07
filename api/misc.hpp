@@ -7,7 +7,7 @@
 
 #include "error.hpp"
 #include "panic.hpp"
-#include "ref.hpp"
+#include "ptr.hpp"
 
 namespace jule {
     template<typename T, typename Denominator>
@@ -22,8 +22,8 @@ namespace jule {
     template<typename T, typename Denominator>
     inline auto unsafe_mod(const T &x, const Denominator &denominator);
 
-    template<typename T> jule::Ref<T> new_struct(T *ptr);
-    template<typename T> jule::Ref<T> new_struct_ref(T *ptr);
+    template<typename T> jule::Ptr<T> new_struct(T *ptr);
+    template<typename T> jule::Ptr<T> new_struct_ptr(T *ptr);
 
     // Dispose mask for implement dispose functionality.
     // It's also built-in Dispose trait.
@@ -58,19 +58,19 @@ namespace jule {
     { return x % denominator; }
 
     template<typename T>
-    jule::Ref<T> new_struct(T *ptr) {
+    jule::Ptr<T> new_struct(T *ptr) {
         if (!ptr)
             jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
 
 #ifndef __JULE_DISABLE__REFERENCE_COUNTING
-        return jule::Ref<T>::make(ptr);
+        return jule::Ptr<T>::make(ptr);
 #endif
 
-        return jule::Ref<T>::make(ptr, nullptr);
+        return jule::Ptr<T>::make(ptr, nullptr);
     }
 
     template<typename T>
-    jule::Ref<T> new_struct_ref(T *ptr) {
+    jule::Ptr<T> new_struct_ptr(T *ptr) {
         if (!ptr)
             jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
 
