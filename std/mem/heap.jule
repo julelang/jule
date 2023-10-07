@@ -7,7 +7,7 @@ use integrated for std::jule::integrated
 // Wrapper for heap allocation.
 // Should be freed, occurs memory leak if did not.
 pub struct Heap[T] {
-    _addr: uintptr
+    heap: *T
 }
 
 impl Heap {
@@ -15,12 +15,12 @@ impl Heap {
     // that points relevant allocation.
     // Returns nil reference if allocation failed.
     pub static fn new(): &Heap[T] {
-        let addr = integrated::new_u[T]()
-        if addr == 0 {
+        let mut heap = integrated::new[T]()
+        if heap == nil {
             ret nil
         }
         ret &Heap[T]{
-            _addr: addr,
+            heap: heap,
         }
     }
 }
@@ -28,29 +28,29 @@ impl Heap {
 impl Heap {
     // Returns address of allocation.
     // Returns 0 if internal pointer is nil.
-    pub fn addr(self): uintptr { ret self._addr }
+    pub fn addr(self): uintptr { ret uintptr(self.heap) }
 
     // Frees allocation and sets address as 0 (aka nil).
     pub fn free(mut self) {
-        unsafe { integrated::delete_u[T](self._addr) }
-        self._addr = 0
+        unsafe { integrated::delete[T](self.heap) }
+        self.heap = nil
     }
 
     // Dereferences and returns value of internal pointer.
     // Panics if internal pointer is nil.
     pub fn get(mut self): T {
-        if self._addr == 0 {
+        if self.heap == nil {
             panic("std::mem: Heap.get: nil pointer dereference")
         }
-        ret unsafe { integrated::deref[T](self._addr) }
+        ret unsafe { *self.heap }
     }
 
     // Sets value of internal pointer.
     // Panics if internal pointer is nil.
     pub fn set(mut self, mut val: T) {
-        if self._addr == 0 {
+        if self.heap == nil {
             panic("std::mem: Heap.set: nil pointer dereference")
         }
-        unsafe { integrated::assign[T](self._addr, val) }
+        unsafe { *self.heap = val }
     }
 }
