@@ -6,12 +6,18 @@ cpp fn malloc(size: uint): *unsafe
 cpp fn calloc(size: uint, n: uint): *unsafe
 cpp unsafe fn realloc(mut ptr: *unsafe, size: uint): *unsafe
 cpp unsafe fn free(mut ptr: *unsafe)
-cpp fn __jule_new[T](): uintptr
-cpp fn __jule_new_array[T](size: int): uintptr
-cpp unsafe fn __jule_delete[T](heap: uintptr)
-cpp unsafe fn __jule_delete_array[T](heap: uintptr)
-cpp unsafe fn __jule_deref_ptr[T](heap: uintptr): T
-cpp unsafe fn __jule_assign_ptr[T](heap: uintptr, mut val: T)
+
+cpp fn __jule_new[T](): *T
+cpp fn __jule_new_array[T](size: int): *T
+
+//jule:cdef
+cpp unsafe fn __jule_delete[T](heap: *T)
+//jule:cdef
+cpp unsafe fn __jule_delete_array[T](heap: *T)
+//jule:cdef
+cpp unsafe fn __jule_deref_ptr[T](heap: *T): T
+//jule:cdef
+cpp unsafe fn __jule_assign_ptr[T](heap: *T, mut val: T)
 
 // Allocates size bytes of memory.
 // Memory does not initialize.
@@ -45,70 +51,17 @@ pub unsafe fn realloc(mut ptr: *unsafe, size: uint): *unsafe { ret cpp.realloc(p
 pub unsafe fn free(mut ptr: *unsafe) { cpp.free(ptr) }
 
 // Allocates new memory.
-// Equavalent to: (uintptr_t)new T in C++
-//
-// It can be used also for unsupported
-// types by pointers such as references.
-// So you can get *&T actually.
-pub fn new_u[T](): uintptr { ret cpp.__jule_new[T]() }
-
-// Allocates new memory.
 // Equavalent to: new T in C++
-pub fn new[T](): *T { ret unsafe { (*T)(new_u[T]()) } }
+pub fn new[T](): *T { ret cpp.__jule_new[T]() }
 
 // Allocates new array memory.
-// Equavalent to: (uintptr_t)new T[size] in C++
-//
-// It can be used also for unsupported
-// types by pointers such as references.
-// So you can get *&T actually.
-pub fn new_array_u[T](size: int): uintptr {
-    if size < 0 {
-        panic("std::jule::integrated new_array[T]: size < 0")
-    }
-    ret cpp.__jule_new_array[T](size)
-}
-
-// Allocates new array memory.
-// Equavalent to: (uintptr_t)new T[size] in C++
-pub fn new_array[T](size: int): *T { ret unsafe { (*T)(new_array_u[T](size)) } }
-
-// Deallocates memory allocation.
-// Equavalent to: delete (T*)heap in C++
-//
-// It can be used also for unsupported
-// types by pointers such as references.
-// So you can delete *&T actually.
-pub unsafe fn delete_u[T](heap: uintptr) { cpp.__jule_delete[T](heap) }
+// Equavalent to: new T[size] in C++
+pub fn new_array[T](size: int): *T { ret unsafe { cpp.__jule_new_array[T](size) } }
 
 // Deallocates memory allocation.
 // Equavalent to: delete heap in C++
-pub unsafe fn delete[T](heap: *T) { delete_u[T](uintptr(heap)) }
-
-// Deallocates array memory allocation.
-// Equavalent to: delete[] (T*)heap in C++
-//
-// It can be used also for unsupported
-// types by pointers such as references.
-// So you can delete *&T actually.
-pub unsafe fn delete_array_u[T](heap: uintptr) { cpp.__jule_delete_array[T](heap) }
+pub unsafe fn delete[T](heap: *T) { cpp.__jule_delete[T](heap) }
 
 // Deallocates array memory allocation.
 // Equavalent to: delete[] heap in C++
-pub unsafe fn delete_array[T](heap: *T) { delete_array_u[T](uintptr(heap)) }
-
-// Dereferences pointer by address.
-// Equavalent to: *(T*)heap in C++
-//
-// It can be used also for unsupported
-// types by pointers such as references.
-// So you can dereference *&T actually.
-pub unsafe fn deref[T](heap: uintptr): T { ret cpp.__jule_deref_ptr[T](heap) }
-
-// Assign to pointer by address.
-// Equavalent to: *(T*)heap = val in C++
-//
-// It can be used also for unsupported
-// types by pointers such as references.
-// So you can assign to *&T actually.
-pub unsafe fn assign[T](heap: uintptr, mut val: T) { cpp.__jule_assign_ptr[T](heap, val) }
+pub unsafe fn delete_array[T](heap: *T) { cpp.__jule_delete_array[T](heap) }
