@@ -276,7 +276,7 @@ impl ScopeParser {
 
     fn build_range_kind_key(mut self, mut &tokens: []Token): &VarDecl {
         if tokens.len == 0 {
-            ret new(VarDecl)
+            ret nil
         }
         let mut key = &VarDecl{
             token: tokens[0],
@@ -293,7 +293,7 @@ impl ScopeParser {
         if key.token.id != TokenId.Ident {
             self.push_err(key.token, LogMsg.InvalidSyntax)
             self.push_suggestion(LogMsg.ExpectedIdentifier)
-            ret new(VarDecl)
+            ret nil
         }
         key.ident = key.token.kind
         ret key
@@ -477,7 +477,7 @@ impl ScopeParser {
             self.stop()
             self.push_err(model.token, LogMsg.BodyNotExist)
             self.push_suggestion(LogMsg.ExpectedBody)
-            ret new(If)
+            ret nil
         }
         if i < tokens.len {
             if tokens[i].id == TokenId.Else {
@@ -507,7 +507,7 @@ impl ScopeParser {
                 self.push_err(els.token, LogMsg.BodyNotExist)
                 self.push_suggestion(LogMsg.ExpectedBody)
             }
-            ret new(Else)
+            ret nil
         }
         if i < tokens.len {
             self.push_err(tokens[i], LogMsg.InvalidSyntax)
@@ -520,7 +520,7 @@ impl ScopeParser {
         let mut chain = &Conditional{
             head: self.build_if(tokens),
         }
-        if !real(chain.head) {
+        if chain.head == nil {
             ret nil
         }
         for tokens != nil {
@@ -549,7 +549,7 @@ impl ScopeParser {
             self.push_err(token, LogMsg.ExprNotFnCall)
         }
         let mut expr = self.p.build_expr(tokens)
-        if real(expr) && !expr.is_fn_call() {
+        if expr != nil && !expr.is_fn_call() {
             self.push_err(token, LogMsg.InvalidSyntax)
         }
         ret expr
@@ -698,7 +698,7 @@ impl ScopeParser {
 
     fn build_cases(mut self, mut tokens: []Token, type_match: bool): ([]&Case, &Else) {
         let mut cases: []&Case = nil
-        let mut def: &Else = new(Else)
+        let mut def: &Else = nil
         let mut def_not_last = false
         for tokens.len > 0 {
             let mut tok = tokens[0]
@@ -715,7 +715,7 @@ impl ScopeParser {
             let (mut c, is_default) = self.build_case(tokens, type_match)
             if is_default {
                 c.token = tok
-                if !real(def) {
+                if def == nil {
                     def = &Else{
                         token: c.token,
                         scope: c.scope,
@@ -724,7 +724,7 @@ impl ScopeParser {
                     self.push_err(tok, LogMsg.InvalidSyntax)
                 }
             } else {
-                def_not_last = def_not_last || real(def)
+                def_not_last = def_not_last || def != nil
                 cases = append(cases, c)
             }
         }
@@ -760,7 +760,7 @@ impl ScopeParser {
             self.stop()
             self.push_err(m.token, LogMsg.BodyNotExist)
             self.push_suggestion(LogMsg.ExpectedBody)
-            ret new(MatchCase)
+            ret nil
         }
 
         m.cases, m.default = self.build_cases(block_toks, m.type_match)
@@ -776,7 +776,7 @@ impl ScopeParser {
             tokens = tokens[1:]
             if tokens.len == 0 {
                 self.push_err(token, LogMsg.InvalidSyntax)
-                ret new(ScopeTree)
+                ret nil
             }
             token = tokens[0]
             if token.id == TokenId.Defer {
@@ -784,7 +784,7 @@ impl ScopeParser {
                 tokens = tokens[1:]
                 if tokens.len == 0 {
                     self.push_err(token, LogMsg.InvalidSyntax)
-                    ret new(ScopeTree)
+                    ret nil
                 }
             }
         } else if token.id == TokenId.Defer {
@@ -792,7 +792,7 @@ impl ScopeParser {
             tokens = tokens[1:]
             if tokens.len == 0 {
                 self.push_err(token, LogMsg.InvalidSyntax)
-                ret new(ScopeTree)
+                ret nil
             }
         }
 
@@ -800,7 +800,7 @@ impl ScopeParser {
         let mut scope_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
         if scope_tokens == nil {
             self.push_err(token, LogMsg.InvalidSyntax)
-            ret new(ScopeTree)
+            ret nil
         } else if i < tokens.len {
             self.push_err(tokens[i], LogMsg.InvalidSyntax)
         }
@@ -912,7 +912,7 @@ impl ScopeParser {
     fn build_plain_assign(mut self, mut &tokens: []Token): (&AssignSt, bool) {
         let mut info = self.build_assign_info(tokens)
         if !info.ok {
-            ret new(AssignSt), false
+            ret nil, false
         }
 
         let mut assign = &AssignSt{
@@ -922,7 +922,7 @@ impl ScopeParser {
         let (mut parts, errs) = parts(info.l, TokenId.Comma, true)
         if errs.len > 0 {
             self.p.errors = append(self.p.errors, errs...)
-            ret new(AssignSt), false
+            ret nil, false
         }
 
         assign.left = self.build_assign_ls(parts)
@@ -935,13 +935,13 @@ impl ScopeParser {
 
     fn build_decl_assign(mut self, mut tokens: []Token): (&AssignSt, bool) {
         if tokens.len < 1 {
-            ret new(AssignSt), false
+            ret nil, false
         }
 
         tokens = tokens[1:] // Skip "let" keyword
         let mut token = tokens[0]
         if token.id != TokenId.Range || token.kind != str(TokenKind.LParent) {
-            ret new(AssignSt), false
+            ret nil, false
         }
 
         let mut assign = &AssignSt{
@@ -952,7 +952,7 @@ impl ScopeParser {
         let mut rang = range(i, TokenKind.LParent, TokenKind.RParent, tokens)
         if rang == nil {
             self.push_err(token, LogMsg.InvalidSyntax)
-            ret new(AssignSt), false
+            ret nil, false
         } else if i+1 < tokens.len {
             assign.setter = tokens[i]
             i++
@@ -964,7 +964,7 @@ impl ScopeParser {
         let (mut parts, errs) = parts(rang, TokenId.Comma, true)
         if errs.len > 0 {
             self.p.errors = append(self.p.errors, errs...)
-            ret new(AssignSt), false
+            ret nil, false
         }
 
         for (_, mut part) in parts {
@@ -1008,7 +1008,7 @@ impl ScopeParser {
 
     fn build_assign_st(mut self, mut &tokens: []Token): (st: &AssignSt, ok: bool) {
         if !check_assign_tokens(tokens) {
-            ret new(AssignSt), false
+            ret nil, false
         }
 
         match tokens[0].id {
@@ -1096,7 +1096,7 @@ impl ScopeParser {
     }
 
     fn build(mut self, mut &tokens: []Token, mut &s: &ScopeTree) {
-        if !real(s) {
+        if s == nil {
             ret
         }
 

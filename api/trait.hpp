@@ -12,7 +12,7 @@
 #include "types.hpp"
 #include "panic.hpp"
 #include "error.hpp"
-#include "ref.hpp"
+#include "ptr.hpp"
 
 namespace jule {
 
@@ -23,7 +23,7 @@ namespace jule {
     template<typename Mask>
     struct Trait {
     public:
-        mutable jule::Ref<Mask> data{};
+        mutable jule::Ptr<Mask> data{};
         const char *type_id { nullptr };
 
         Trait<Mask>(void) = default;
@@ -37,20 +37,20 @@ namespace jule {
 
             *alloc = data;
 #ifdef __JULE_DISABLE__REFERENCE_COUNTING
-            this->data = jule::Ref<Mask>::make(reinterpret_cast<Mask*>(alloc), nullptr);
+            this->data = jule::Ptr<Mask>::make(reinterpret_cast<Mask*>(alloc), nullptr);
 #else
-            this->data = jule::Ref<Mask>::make(reinterpret_cast<Mask*>(alloc));
+            this->data = jule::Ptr<Mask>::make(reinterpret_cast<Mask*>(alloc));
 #endif
             this->type_id = typeid(T).name();
         }
 
         template<typename T>
-        Trait<Mask>(const jule::Ref<T> &ref) {
+        Trait<Mask>(const jule::Ptr<T> &ref) {
 #ifdef __JULE_DISABLE__REFERENCE_COUNTING
-            this->data = jule::Ref<Mask>::make(reinterpret_cast<Mask*>(ref.alloc), nullptr);
+            this->data = jule::Ptr<Mask>::make(reinterpret_cast<Mask*>(ref.alloc), nullptr);
 #else
-            this->data = jule::Ref<Mask>::make(reinterpret_cast<Mask*>(ref.alloc), ref.ref);
-            if (ref.real())
+            this->data = jule::Ptr<Mask>::make(reinterpret_cast<Mask*>(ref.alloc), ref.ref);
+            if (ref != nullptr)
                 this->data.add_ref();
 #endif
             this->type_id = typeid(ref).name();
@@ -87,14 +87,14 @@ namespace jule {
 #ifndef __JULE_DISABLE__SAFETY
             this->must_ok();
 #endif
-            return this->data;
+            return *this->data;
         }
 
         inline Mask &get(void) const {
 #ifndef __JULE_DISABLE__SAFETY
             this->must_ok();
 #endif
-            return this->data;
+            return *this->data;
         }
 
         ~Trait(void) {}
@@ -110,17 +110,17 @@ namespace jule {
         }
 
         template<typename T>
-        operator jule::Ref<T>(void) {
+        operator jule::Ptr<T>(void) {
 #ifndef __JULE_DISABLE__SAFETY
             this->must_ok();
-            if (std::strcmp(this->type_id, typeid(jule::Ref<T>).name()) != 0)
+            if (std::strcmp(this->type_id, typeid(jule::Ptr<T>).name()) != 0)
                 jule::panic(jule::ERROR_INCOMPATIBLE_TYPE);
 #endif
 
 #ifndef __JULE_DISABLE__REFERENCE_COUNTING
             this->data.add_ref();
 #endif
-            return jule::Ref<T>::make(
+            return jule::Ptr<T>::make(
                 reinterpret_cast<T*>(this->data.alloc), this->data.ref);
         }
 

@@ -7,7 +7,7 @@ use std::jule::ast::{
     IdentTypeDecl,
     NamespaceTypeDecl,
     PtrTypeDecl,
-    RefTypeDecl,
+    SptrTypeDecl,
     SlcTypeDecl,
     ArrTypeDecl,
     MapTypeDecl,
@@ -196,7 +196,7 @@ impl TypeBuilder {
     unsafe fn build_cpp_link(mut self): &TypeDecl {
         if *self.i+1 >= self.tokens.len || self.tokens[*self.i+1].id != TokenId.Dot {
             self.push_err(self.tokens[*self.i], LogMsg.InvalidSyntax)
-            ret new(TypeDecl)
+            ret nil
         }
         *self.i += 2 // Skip cpp keyword and dot token.
         let mut t = self.build_ident()
@@ -207,8 +207,8 @@ impl TypeBuilder {
     unsafe fn build_fn(mut self): &TypeDecl {
         let mut token = self.tokens[*self.i]
         let mut f = self.p.build_fn_prototype(self.tokens, *self.i, false)
-        if !real(f) {
-            ret new(TypeDecl)
+        if f == nil {
+            ret nil
         }
         if !f.is_anon() {
             self.push_err(f.token, LogMsg.InvalidSyntax)
@@ -223,7 +223,7 @@ impl TypeBuilder {
         let mut token = self.tokens[*self.i]
         if *self.i+1 >= self.tokens.len {
             self.push_err(token, LogMsg.InvalidSyntax)
-            ret new(TypeDecl)
+            ret nil
         }
 
         *self.i++
@@ -232,14 +232,14 @@ impl TypeBuilder {
             ret &TypeDecl{
                 token: token,
                 kind:  &PtrTypeDecl{
-                    elem: new(TypeDecl), // Set Elem as nil for unsafe pointer (*unsafe) type.
+                    elem: nil, // Set Elem as nil for unsafe pointer (*unsafe) type.
                 },
             }
         }
 
         let mut elem = self.step()
-        if !real(elem) {
-            ret new(TypeDecl)
+        if elem == nil {
+            ret nil
         }
 
         ret &TypeDecl{
@@ -250,22 +250,22 @@ impl TypeBuilder {
         }
     }
 
-    unsafe fn build_ref(mut self): &TypeDecl {
+    unsafe fn build_sptr(mut self): &TypeDecl {
         let mut token = self.tokens[*self.i]
         if *self.i+1 >= self.tokens.len {
             self.push_err(token, LogMsg.InvalidSyntax)
-            ret new(TypeDecl)
+            ret nil
         }
 
         *self.i++
         let mut elem = self.step()
-        if !real(elem){
-            ret new(TypeDecl)
+        if elem == nil {
+            ret nil
         }
 
         ret &TypeDecl{
             token: token,
-            kind:  &RefTypeDecl{
+            kind:  &SptrTypeDecl{
                 elem: elem,
             },
         }
@@ -278,15 +278,18 @@ impl TypeBuilder {
             ret self.build_ptr()
 
         | str(TokenKind.Amper):
-            ret self.build_ref()
+            ret self.build_sptr()
 
         | str(TokenKind.DblAmper):
-            self.push_err(token, LogMsg.RefRefsRef)
-            ret self.build_ref() // Skip tokens and many type error
+            ret &TypeDecl{
+                kind: &SptrTypeDecl{
+                    elem: self.build_sptr(),
+                },
+            }
 
         |:
             self.push_err(token, LogMsg.InvalidSyntax)
-            ret new(TypeDecl)
+            ret nil
         }
     }
 
@@ -294,8 +297,8 @@ impl TypeBuilder {
         let mut token = self.tokens[*self.i]
         *self.i++ // skip right bracket
         let mut elem = self.step()
-        if !real(elem) {
-            ret new(TypeDecl)
+        if elem == nil {
+            ret nil
         }
         ret &TypeDecl{
             token: token,
@@ -311,14 +314,14 @@ impl TypeBuilder {
 
         if *self.i >= self.tokens.len {
             self.push_err(self.tokens[*self.i-1], LogMsg.MissingType)
-            ret new(TypeDecl)
+            ret nil
         }
 
         let expr_delta = *self.i
 
         let mut elem = self.step()
-        if !real(elem) {
-            ret new(TypeDecl)
+        if elem == nil {
+            ret nil
         }
 
         let mut arrt = &ArrTypeDecl{
@@ -345,7 +348,7 @@ impl TypeBuilder {
         let mut colon_token = self.tokens[colon]
         if colon == 0 || colon+1 >= tokens.len {
             self.push_err(colon_token, LogMsg.MissingType)
-            ret new(TypeDecl)
+            ret nil
         }
         let mut key_tokens = tokens[:colon]
         let mut val_tokens = tokens[colon+1:]
@@ -354,7 +357,7 @@ impl TypeBuilder {
         let mut j = 0
         let (mut keyt, mut ok) = unsafe { self.p.build_type(key_tokens, &j, self.err) }
         if !ok {
-            ret new(TypeDecl)
+            ret nil
         } else if j < key_tokens.len {
             self.push_err(key_tokens[j], LogMsg.InvalidSyntax)
         }
@@ -363,7 +366,7 @@ impl TypeBuilder {
         j = 0
         let (mut valt, ok) = unsafe { self.p.build_type(val_tokens, &j, self.err) }
         if !ok {
-            ret new(TypeDecl)
+            ret nil
         }  else if j < val_tokens.len {
             self.push_err(val_tokens[j], LogMsg.InvalidSyntax)
         }
@@ -377,11 +380,11 @@ impl TypeBuilder {
 
     unsafe fn build_enumerable(mut self): &TypeDecl {
         let mut token = self.tokens[*self.i]
-        if (*self.i+2 >= self.tokens.len ||
+        if *self.i+2 >= self.tokens.len ||
             token.id != TokenId.Range ||
-            token.kind != str(TokenKind.LBracket)) {
+            token.kind != str(TokenKind.LBracket) {
             self.push_err(token, LogMsg.InvalidSyntax)
-            ret new(TypeDecl)
+            ret nil
         }
         *self.i++
         token = self.tokens[*self.i]
@@ -422,7 +425,7 @@ impl TypeBuilder {
         |:
             *self.i++
             self.push_err(token, LogMsg.InvalidSyntax)
-            ret new(TypeDecl)
+            ret nil
         }
     }
 
@@ -430,7 +433,7 @@ impl TypeBuilder {
     // Returns void if error occurs.
     unsafe fn build(mut self): (&TypeDecl, ok: bool) {
         let mut root = self.step()
-        if !real(root) {
+        if root == nil {
             ret build_void_type(), false
         }
         ret root, true

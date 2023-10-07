@@ -41,14 +41,14 @@ fn iter_expr_is_copy_optimizable(&expr: &Data, &v: &Var): bool {
 }
 
 fn gen_range_index_iter(mut &it: &RangeIter): str {
-    let begin = iter_begin_label_ident(uintptr(&it))
-    let next = iter_next_label_ident(uintptr(&it))
+    let begin = iter_begin_label_ident(uintptr(it))
+    let next = iter_next_label_ident(uintptr(it))
 
     let mut obj = "{\n"
     add_indent()
     obj += indent()
     obj += "auto "
-    if env::OPT_COPY && it.expr.lvalue && !it.expr.mutable {
+    if *env::OPT_COPY && it.expr.lvalue && !it.expr.mutable {
         obj += "&"
     }
     obj += "expr = "
@@ -63,13 +63,13 @@ fn gen_range_index_iter(mut &it: &RangeIter): str {
     obj += "if (it != expr.end()) {\n"
     add_indent()
     obj += indent()
-    if real(it.key_a) {
+    if it.key_a != nil {
         obj += gen_var_init_expr(it.key_a, "it - expr.begin()");
         obj += "\n"
         obj += indent()
     }
-    if real(it.key_b) {
-        if env::OPT_COPY {
+    if it.key_b != nil {
+        if *env::OPT_COPY {
             it.key_b.reference = iter_expr_is_copy_optimizable(it.expr, it.key_b)
         }
         obj += gen_var_init_expr(it.key_b, "*it")
@@ -84,7 +84,7 @@ fn gen_range_index_iter(mut &it: &RangeIter): str {
     obj += indent()
     obj += "++it;\n"
     obj += indent()
-    if real(it.key_a) {
+    if it.key_a != nil {
         obj += var_out_ident(it.key_a);
         obj += "++;\n"
         obj += indent()
@@ -99,7 +99,7 @@ fn gen_range_index_iter(mut &it: &RangeIter): str {
     obj += "}\n"
 
     obj += indent()
-    obj += iter_end_label_ident(uintptr(&it))
+    obj += iter_end_label_ident(uintptr(it))
     obj += ":;\n"
 
     // Close scope.
@@ -111,14 +111,14 @@ fn gen_range_index_iter(mut &it: &RangeIter): str {
 }
 
 fn gen_range_hashmap_iter(mut &it: &RangeIter): str {
-    let begin = iter_begin_label_ident(uintptr(&it))
-    let next = iter_next_label_ident(uintptr(&it))
+    let begin = iter_begin_label_ident(uintptr(it))
+    let next = iter_next_label_ident(uintptr(it))
 
     let mut obj = "{\n"
     add_indent()
     obj += indent()
     obj += "auto "
-    if env::OPT_COPY && it.expr.lvalue && !it.expr.mutable {
+    if *env::OPT_COPY && it.expr.lvalue && !it.expr.mutable {
         obj += "&"
     }
     obj += "expr = "
@@ -133,16 +133,16 @@ fn gen_range_hashmap_iter(mut &it: &RangeIter): str {
     obj += "if (it != expr.end()) {\n"
     add_indent()
     obj += indent()
-    if real(it.key_a) {
-        if env::OPT_COPY {
+    if it.key_a != nil {
+        if *env::OPT_COPY {
             it.key_a.reference = iter_expr_is_copy_optimizable(it.expr, it.key_a)
         }
         obj += gen_var_init_expr(it.key_a, "it->first")
         obj += "\n"
         obj += indent()
     }
-    if real(it.key_b) {
-        if env::OPT_COPY {
+    if it.key_b != nil {
+        if *env::OPT_COPY {
             it.key_b.reference = iter_expr_is_copy_optimizable(it.expr, it.key_b)
         }
         obj += gen_var_init_expr(it.key_b, "it->second")
@@ -167,7 +167,7 @@ fn gen_range_hashmap_iter(mut &it: &RangeIter): str {
     obj += "}\n"
 
     obj += indent()
-    obj += iter_end_label_ident(uintptr(&it))
+    obj += iter_end_label_ident(uintptr(it))
     obj += ":;\n"
 
     // Close scope.
@@ -194,7 +194,7 @@ fn gen_conditional(mut c: &Conditional): str {
         obj += gen_if(elif)
     }
 
-    if real(c.default) {
+    if c.default != nil {
         obj += " else "
         obj += gen_scope(c.default.scope)
     }
@@ -214,12 +214,12 @@ fn gen_inf_iter(mut it: &InfIter): str {
 
     obj += "\n"
     obj += indent
-    obj += iter_next_label_ident(uintptr(&it))
+    obj += iter_next_label_ident(uintptr(it))
     obj += ":;\n"
     obj += indent
     obj += "}\n"
     obj += indent
-    obj += iter_end_label_ident(uintptr(&it))
+    obj += iter_end_label_ident(uintptr(it))
     obj += ":;"
 
     ret obj
@@ -251,22 +251,22 @@ fn gen_while_iter(mut it: &WhileIter): str {
     done_indent()
     obj += indent()
 
-    obj += iter_next_label_ident(uintptr(&it))
+    obj += iter_next_label_ident(uintptr(it))
     obj += ":;\n"
     obj += indent()
     obj += "}\n"
     obj += indent()
-    obj += iter_end_label_ident(uintptr(&it))
+    obj += iter_end_label_ident(uintptr(it))
     obj += ":;"
     ret obj
 }
 
 fn gen_range_iter(mut it: &RangeIter): str {
     match {
-    | real(it.expr.kind.slc()): ret gen_range_index_iter(it)
-    | real(it.expr.kind.arr()): ret gen_range_index_iter(it)
-    | real(it.expr.kind.map()): ret gen_range_hashmap_iter(it)
-    |:                          ret gen_range_index_iter(it) // Str
+    | it.expr.kind.slc() != nil: ret gen_range_index_iter(it)
+    | it.expr.kind.arr() != nil: ret gen_range_index_iter(it)
+    | it.expr.kind.map() != nil: ret gen_range_hashmap_iter(it)
+    |:                           ret gen_range_index_iter(it) // Str
     }
 }
 
@@ -314,7 +314,7 @@ fn gen_assign(mut a: &Assign): str {
 
     let mut obj = gen_expr(a.l)
     obj += a.op
-    if env::OPT_APPEND {
+    if *env::OPT_APPEND {
         match type a.r {
         | &BuiltinAppendCallExprModel:
             let mut model = (&BuiltinAppendCallExprModel)(a.r)
@@ -357,7 +357,7 @@ fn gen_multi_assign(mut a: &MultiAssign): str {
 fn gen_case(mut m: &Match, mut c: &Case): str {
     const MATCH_EXPR = "_match_expr"
 
-    let end = case_end_label_ident(uintptr(&c))
+    let end = case_end_label_ident(uintptr(c))
     let mut obj = ""
 
     if c.exprs.len > 0 && !m.is_generic_type_match() {
@@ -397,7 +397,7 @@ fn gen_case(mut m: &Match, mut c: &Case): str {
 
     if c.scope.stmts.len > 0 {
         obj += indent()
-        obj += case_begin_label_ident(uintptr(&c))
+        obj += case_begin_label_ident(uintptr(c))
         obj += ":;\n"
         obj += indent()
         obj += gen_scope(c.scope)
@@ -406,7 +406,7 @@ fn gen_case(mut m: &Match, mut c: &Case): str {
 
     obj += indent()
     obj += "goto "
-    obj += match_end_label_ident(uintptr(&m)) + CPP_ST_TERM
+    obj += match_end_label_ident(uintptr(m)) + CPP_ST_TERM
     obj += "\n"
     obj += indent()
     obj += end
@@ -415,12 +415,12 @@ fn gen_case(mut m: &Match, mut c: &Case): str {
 }
 
 fn gen_match(mut m: &Match): str {
-    if m.cases.len == 0 && !real(m.default) {
+    if m.cases.len == 0 && m.default == nil {
         ret ""
     }
 
     let generic_type_match = m.is_generic_type_match()
-    if generic_type_match && (!real(m.default) || m.default.scope.stmts.len == 0) {
+    if generic_type_match && (m.default == nil || m.default.scope.stmts.len == 0) {
         ret ""
     }
 
@@ -432,7 +432,7 @@ fn gen_match(mut m: &Match): str {
 
     // Constant expressions generated as literals in conditions.
     if !generic_type_match && !m.expr.is_const() {
-        if m.expr.lvalue && env::OPT_COPY {
+        if m.expr.lvalue && *env::OPT_COPY {
             obj += "auto &_match_expr{ "
         } else {
             obj += "auto _match_expr{ "
@@ -451,14 +451,14 @@ fn gen_match(mut m: &Match): str {
         }
     }
 
-    if real(m.default) {
+    if m.default != nil {
         obj += "\n"
         obj += gen_case(m, m.default)
     }
 
     obj += "\n"
     obj += indent()
-    obj += match_end_label_ident(uintptr(&m))
+    obj += match_end_label_ident(uintptr(m))
     obj += ":;"
     obj += "\n"
 
@@ -598,7 +598,7 @@ fn gen_ret_st(mut r: &RetSt): str {
 
 fn gen_ret_st_with_defaults(mut result: &TypeKind): str {
     let mut obj = "return "
-    if real(result.tup()) {
+    if result.tup() != nil {
         obj += "std::make_tuple("
         for (_, mut t) in result.tup().types {
             obj += get_init_expr(t)
@@ -722,7 +722,7 @@ fn gen_scope(mut s: &Scope): str {
 
 // Generates C++ code of function's scope.
 fn gen_fn_scope(mut f: &FnIns): str {
-    if real(f.owner) {
+    if f.owner != nil {
         ret gen_method_scope(f)
     }
 

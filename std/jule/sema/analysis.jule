@@ -23,16 +23,16 @@ fn build_symbols(mut &ast: &Ast, mut &importer: Importer, mut owner: &SymbolBuil
     if sb.errors.len == 0 {
         ret sb.table, nil
     }
-    ret new(SymbolTable), sb.errors
+    ret nil, sb.errors
 }
 
 fn __analyze_package(mut &files: []&Ast, mut &importer: Importer, &flags: SemaFlag): (&Package, []Log) {
     // Build symbol tables of files.
     let mut tables = make([]&SymbolTable, 0, files.len)
     for (_, mut f) in files {
-        let (mut table, mut errors) = build_symbols(f, importer, new(SymbolBuilder))
+        let (mut table, mut errors) = build_symbols(f, importer, nil)
         if errors.len > 0 {
-            ret new(Package), errors
+            ret nil, errors
         }
         tables = append(tables, table)
     }
@@ -42,7 +42,7 @@ fn __analyze_package(mut &files: []&Ast, mut &importer: Importer, &flags: SemaFl
     }
     sema.check(tables)
     if sema.errors.len > 0 {
-        ret new(Package), sema.errors
+        ret nil, sema.errors
     }
 
     let mut pkg = &Package{
@@ -71,7 +71,7 @@ fn __analyze_package(mut &files: []&Ast, mut &importer: Importer, &flags: SemaFl
 //     semantic analyzer used nil importer.
 pub fn analyze_package(mut files: []&Ast, mut importer: Importer, flags: SemaFlag): (&Package, []Log) {
     if files.len == 0 {
-        ret new(Package), nil
+        ret nil, nil
     }
 
     let (mut package, mut logs) = __analyze_package(files, importer, flags)
@@ -99,7 +99,7 @@ pub fn analyze_file(mut f: &Ast, mut importer: Importer, flags: SemaFlag): (&Sym
     let mut files: []&Ast = [f]
     let (mut pkg, mut errors) = analyze_package(files, importer, flags)
     if errors.len > 0 {
-        ret new(SymbolTable), errors
+        ret nil, errors
     }
 
     // Select first table, because package has only one file.

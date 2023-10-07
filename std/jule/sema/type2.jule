@@ -25,10 +25,10 @@ use types for std::jule::types
 
 fn get_fn_result_types(mut &f: &FnIns): []&TypeKind {
     match {
-    | f.decl.is_void() || !real(f.result):
+    | f.decl.is_void() || f.result == nil:
         ret nil
 
-    | !real(f.result.tup()):
+    | f.result.tup() == nil:
         ret [f.result]
 
     |:
@@ -130,13 +130,6 @@ struct TypeCompatibilityChecker {
     src:         &TypeKind
     error_token: Token
     ignore_any:  bool
-
-    // References uses elem's type itself if true.
-    deref: bool
-
-    // This checker is sub-checker for another checker's element.
-    // For example: elements of slice ([]T) types.
-    sub_check: bool
 }
 
 impl TypeCompatibilityChecker {
@@ -152,28 +145,28 @@ impl TypeCompatibilityChecker {
         let trt = self.dest.trt()
         let mut ref = false
         match {
-        | real(self.src.ref()):
+        | self.src.sptr() != nil:
             ref = true
-            self.src = self.src.ref().elem
-            if real(self.src.strct()) {
+            self.src = self.src.sptr().elem
+            if self.src.strct() == nil {
                 ret false
             }
             fall
 
-        | real(self.src.strct()):
+        | self.src.strct() != nil:
             let s = self.src.strct()
             if !s.decl.is_implements(trt) {
                 ret false
             }
 
-            if trait_has_reference_receiver(trt) && !ref {
+            if !ref && trait_has_reference_receiver(trt) {
                 self.push_err(LogMsg.TraitHasRefParamFn)
                 ret false
             }
 
             ret true
 
-        | real(self.src.trt()):
+        | self.src.trt() != nil:
             ret trt == self.src.trt()
 
         |:
@@ -181,18 +174,18 @@ impl TypeCompatibilityChecker {
         }
     }
 
-    fn check_ref(mut self): (ok: bool) {
-        if self.dest.to_str() == self.src.to_str() {
+    fn check_sptr(mut self): (ok: bool) {
+        if self.src.is_nil() {
             ret true
-        } else if !self.deref {
-            ret false
-        } else if !real(self.src.ref()) {
-            self.dest = self.dest.ref().elem
-            ret self.check()
         }
 
-        self.src = self.src.ref().elem
-        ret self.check()
+        let mut src = self.src.sptr()
+        if src == nil {
+            ret false
+        }
+
+        let mut dest = self.dest.sptr()
+        ret dest.elem.equals(src.elem)
     }
 
     fn check_ptr(mut self): (ok: bool) {
@@ -201,7 +194,7 @@ impl TypeCompatibilityChecker {
         }
 
         let mut src = self.src.ptr()
-        if !real(src) {
+        if src == nil {
             ret false
         }
 
@@ -211,15 +204,7 @@ impl TypeCompatibilityChecker {
             ret true
         }
 
-        let mut sub = TypeCompatibilityChecker{
-            s:           self.s,
-            error_token: self.error_token,
-            src:         src.elem,
-            dest:        dest.elem,
-            sub_check:   true,
-            ignore_any:  true,
-        }
-        ret sub.check()
+        ret dest.elem.equals(src.elem)
     }
 
     fn check_slc(mut self): (ok: bool) {
@@ -228,7 +213,7 @@ impl TypeCompatibilityChecker {
         }
 
         let mut src = self.src.slc()
-        if !real(src) {
+        if src == nil {
             ret false
         }
         let mut dest = self.dest.slc()
@@ -238,7 +223,6 @@ impl TypeCompatibilityChecker {
             error_token: self.error_token,
             src:         src.elem,
             dest:        dest.elem,
-            sub_check:   true,
             ignore_any:  true,
         }
         ret sub.check()
@@ -246,7 +230,7 @@ impl TypeCompatibilityChecker {
 
     fn check_arr(mut self): (ok: bool) {
         let mut src = self.src.arr()
-        if !real(src) {
+        if src == nil {
             ret false
         }
         let mut dest = self.dest.arr()
@@ -259,7 +243,6 @@ impl TypeCompatibilityChecker {
             error_token: self.error_token,
             src:         src.elem,
             dest:        dest.elem,
-            sub_check:   true,
             ignore_any:  true,
         }
         ret sub.check()
@@ -271,7 +254,7 @@ impl TypeCompatibilityChecker {
         }
 
         let mut src = self.src.map()
-        if !real(src) {
+        if src == nil {
             ret false
         }
 
@@ -282,7 +265,6 @@ impl TypeCompatibilityChecker {
             error_token: self.error_token,
             src:         src.key,
             dest:        dest.key,
-            sub_check:   true,
         }
         if !sub.check() {
             ret false
@@ -295,12 +277,12 @@ impl TypeCompatibilityChecker {
 
     fn check_struct(mut self): (ok: bool) {
         let mut src = self.src.strct()
-        if !real(src) {
+        if src == nil {
             ret false
         }
         let mut dest = self.dest.strct()
         match {
-        | &dest.decl != &src.decl:
+        | dest.decl != src.decl:
             ret false
 
         | dest.generics.len == 0:
@@ -328,7 +310,7 @@ impl TypeCompatibilityChecker {
         }
 
         let mut src = self.src.fnc()
-        if !real(src) {
+        if src == nil {
             ret false
         }
 
@@ -338,16 +320,16 @@ impl TypeCompatibilityChecker {
 
     fn check_enum(mut self): (ok: bool) {
         let r = self.src.enm()
-        if !real(r) {
+        if r == nil {
             ret false
         }
-        ret &self.dest.enm() == &r
+        ret self.dest.enm() == r
     }
 
     fn check_prim(mut self): (ok: bool) {
         let dest = self.dest.prim()
         let mut src = self.src.prim()
-        if !real(src) {
+        if src == nil {
             ret dest.is_any()
         }
         if dest.is_any() {
@@ -362,7 +344,7 @@ impl TypeCompatibilityChecker {
     }
 
     fn check(mut self): (ok: bool) {
-        if !real(self.src) {
+        if self.src == nil {
             ret false
         }
 
@@ -372,25 +354,18 @@ impl TypeCompatibilityChecker {
             self.ignore_any = true
         }
 
-        if real(self.dest.ref()) {
-            ret self.check_ref()
-        }
-
-        if !self.sub_check && real(self.src.ref()) {
-            self.src = self.src.ref().elem
-        }
-
         match {
         | self.dest.cpp_linked():     ret self.check_cpp_linked()
-        | real(self.dest.prim()):     ret self.check_prim()
-        | real(self.dest.trt()):      ret self.check_trait()
-        | real(self.dest.ptr()):      ret self.check_ptr()
-        | real(self.dest.slc()):      ret self.check_slc()
-        | real(self.dest.arr()):      ret self.check_arr()
-        | real(self.dest.map()):      ret self.check_map()
-        | real(self.dest.enm()):      ret self.check_enum()
-        | real(self.dest.strct()):    ret self.check_struct()
-        | real(self.dest.fnc()):      ret self.check_fn()
+        | self.dest.prim() != nil:    ret self.check_prim()
+        | self.dest.trt() != nil:     ret self.check_trait()
+        | self.dest.sptr() != nil:    ret self.check_sptr()
+        | self.dest.ptr() != nil:     ret self.check_ptr()
+        | self.dest.slc() != nil:     ret self.check_slc()
+        | self.dest.arr() != nil:     ret self.check_arr()
+        | self.dest.map() != nil:     ret self.check_map()
+        | self.dest.enm() != nil:     ret self.check_enum()
+        | self.dest.strct() != nil:   ret self.check_struct()
+        | self.dest.fnc() != nil:     ret self.check_fn()
         | self.dest.nil_compatible(): ret self.src.is_nil()
         |:                            ret false
         }
@@ -403,7 +378,6 @@ struct AssignTypeChecker {
     dest:        &TypeKind
     d:           &Data
     error_token: Token
-    deref:       bool // Same as TypeCompatibilityChecker.deref field.
 }
 
 impl AssignTypeChecker {
@@ -415,7 +389,7 @@ impl AssignTypeChecker {
         let mut valid = true
 
         match {
-        | real(self.d.kind.fnc()):
+        | self.d.kind.fnc() != nil:
             let f = self.d.kind.fnc()
             match {
             | f.is_builtin():
@@ -435,7 +409,7 @@ impl AssignTypeChecker {
                 valid = false
             }
 
-        | real(self.d.kind.tup()):
+        | self.d.kind.tup() != nil:
             self.push_err(LogMsg.TupleAssignToSingle)
             valid = false
         }
@@ -445,8 +419,8 @@ impl AssignTypeChecker {
 
     fn check_const(mut self): bool {
         if !self.d.is_const() ||
-            !real(self.dest.prim()) ||
-            !real(self.d.kind.prim()) ||
+            self.dest.prim() == nil ||
+            self.d.kind.prim() == nil ||
             !types::is_num(self.d.kind.prim().kind) {
             ret false
         }
@@ -474,7 +448,7 @@ impl AssignTypeChecker {
 
     fn check(mut self): bool {
         match {
-        | !real(self.d):
+        | self.d == nil:
             // Skip Data is nil.
             ret false
 
@@ -486,7 +460,7 @@ impl AssignTypeChecker {
             ret true
 
         |:
-            ret self.s.check_type_compatibility(self.dest, self.d.kind, self.error_token, self.deref)
+            ret self.s.check_type_compatibility(self.dest, self.d.kind, self.error_token)
         }
     }
 }
@@ -497,7 +471,7 @@ struct DynamicTypeAnnotation {
     p:           &ParamIns
     a:           &Data
     error_token: Token
-    k:           **TypeKind
+    k:           *&TypeKind
 }
 
 impl DynamicTypeAnnotation {
@@ -514,7 +488,7 @@ impl DynamicTypeAnnotation {
 
             let t = self.f.generics[i]
             match {
-            | !real(t):
+            | t == nil:
                 self.push_generic(k, i)
 
             | !t.equals(k):
@@ -531,17 +505,16 @@ impl DynamicTypeAnnotation {
 
     unsafe fn annotate_slc(mut self, mut &k: &TypeKind): (ok: bool) {
         let mut pslc = (*self.k).slc()
-        if !real(pslc) {
+        if pslc == nil {
             ret false
         }
 
         let mut slc = k.slc()
-        let mut kk = &pslc.elem
-        self.k = &kk
+        self.k = &pslc.elem
         ret self.annotate_kind(slc.elem)
     }
 
-    unsafe fn check_map_key(mut self, mut k: **TypeKind, mut &ck: &TypeKind): (ok: bool) {
+    unsafe fn check_map_key(mut self, mut k: *&TypeKind, mut &ck: &TypeKind): (ok: bool) {
         let mut old = self.k
         self.k = k
         ok = self.annotate_kind(ck)
@@ -551,20 +524,19 @@ impl DynamicTypeAnnotation {
 
     unsafe fn annotate_map(mut self, mut &k: &TypeKind): (ok: bool) {
         let mut pmap = (*self.k).map()
-        if !real(pmap) {
+        if pmap == nil {
             ret false
         }
 
         let mut m = k.map()
 
-        let mut key = &pmap.key
-        let mut val = &pmap.val
-        ret self.check_map_key(&key, m.key) && self.check_map_key(&val, m.val)
+        ret self.check_map_key(&pmap.key, m.key) &&
+            self.check_map_key(&pmap.val, m.val)
     }
 
     unsafe fn annotate_fn(mut self, mut &k: &TypeKind): (ok: bool) {
         let mut pf = (*self.k).fnc()
-        if !real(pf) {
+        if pf == nil {
             ret false
         }
         let mut f = k.fnc()
@@ -579,14 +551,12 @@ impl DynamicTypeAnnotation {
         ok = true
         let mut old = self.k
         for (i, mut fp) in f.params {
-            let mut pfp = &pf.params[i].kind
-            self.k = &pfp
+            self.k = &pf.params[i].kind
             ok = self.annotate_kind(fp.kind) && ok
         }
 
         if !pf.decl.is_void() {
-            let mut result = &pf.result
-            self.k = &result
+            self.k = &pf.result
             ok = self.annotate_kind(f.result) && ok
         }
 
@@ -596,26 +566,24 @@ impl DynamicTypeAnnotation {
 
     unsafe fn annotate_ptr(mut self, mut &k: &TypeKind): (ok: bool) {
         let mut pptr = (*self.k).ptr()
-        if !real(pptr) {
+        if pptr == nil {
             ret false
         }
 
         let mut ptr = k.ptr()
-        let mut cpptr = &pptr.elem
-        self.k = &cpptr
+        self.k = &pptr.elem
         ret self.annotate_kind(ptr.elem)
     }
 
-    unsafe fn annotate_ref(mut self, mut &k: &TypeKind): (ok: bool) {
-        let mut rref = (*self.k).ref()
-        if !real(rref) {
+    unsafe fn annotate_sptr(mut self, mut &k: &TypeKind): (ok: bool) {
+        let mut ssptr = (*self.k).sptr()
+        if ssptr == nil {
             ret false
         }
 
-        let mut ref = k.ref()
-        let mut crref = &rref.elem
-        self.k = &crref
-        ret self.annotate_kind(ref.elem)
+        let mut sptr = k.sptr()
+        self.k = &ssptr.elem
+        ret self.annotate_kind(sptr.elem)
     }
 
     unsafe fn annotate_any(mut self, mut &k: &TypeKind): (ok: bool) {
@@ -627,7 +595,7 @@ impl DynamicTypeAnnotation {
 
             let t = self.f.generics[i]
             match {
-            | !real(t):
+            | t == nil:
                 self.push_generic(k, i)
 
             | !t.equals(k):
@@ -649,20 +617,18 @@ impl DynamicTypeAnnotation {
 
         match {
         | self.annotate_any(k): ret true
-        | real(k.prim()):       ret self.annotate_prim(k)
-        | real(k.slc()):        ret self.annotate_slc(k)
-        | real(k.map()):        ret self.annotate_map(k)
-        | real(k.fnc()):        ret self.annotate_fn(k)
-        | real(k.ptr()):        ret self.annotate_ptr(k)
-        | real(k.ref()):        ret self.annotate_ref(k)
+        | k.prim() != nil:      ret self.annotate_prim(k)
+        | k.slc() != nil:       ret self.annotate_slc(k)
+        | k.map() != nil:       ret self.annotate_map(k)
+        | k.fnc() != nil:       ret self.annotate_fn(k)
+        | k.ptr() != nil:       ret self.annotate_ptr(k)
+        | k.sptr() != nil:      ret self.annotate_sptr(k)
         |:                      ret false
         }
     }
 
     unsafe fn annotate(mut self): (ok: bool) {
-        let mut pk = &self.p.kind
-        self.k = &pk
-
+        self.k = &self.p.kind
         ret self.annotate_kind(self.a.kind)
     }
 }
@@ -686,7 +652,9 @@ impl FnCallArgChecker {
     }
 
     fn get_params(mut self): []&ParamIns {
-        if self.f.params.len > 0 && real(self.f.params[0].decl) && self.f.params[0].decl.is_self() {
+        if self.f.params.len > 0 &&
+            self.f.params[0].decl != nil &&
+            self.f.params[0].decl.is_self() {
             ret self.f.params[1:] // Remove receiver parameter.
         }
         ret self.f.params
@@ -739,27 +707,27 @@ impl FnCallArgChecker {
 
         self.e.s.check_validity_for_init_expr(
             p.decl.mutable, p.decl.reference, p.kind, arg, error_token)
-        self.e.s.check_assign_type(p.decl.reference, p.kind, arg, error_token, false)
+        self.e.s.check_assign_type(p.decl.reference, p.kind, arg, error_token)
         ret true
     }
 
     fn push(mut self, mut &p: &ParamIns, mut arg: &Expr): (ok: bool) {
         let mut old = self.e.prefix
         let old_immut = self.e.immutable
-        let mut d = new(Data)
+        let mut d: &Data = nil
 
         self.e.immutable = !p.decl.mutable
         if !self.dynamic_annotation && !p.decl.variadic {
             self.e.prefix = p.kind
         } else {
-            drop(self.e.prefix)
+            self.e.prefix = nil
         }
         d = self.e.eval_expr_kind(arg.kind)
 
         self.e.prefix = old
         self.e.immutable = old_immut
 
-        if !real(d) {
+        if d == nil {
             ret false
         }
 
@@ -788,7 +756,7 @@ impl FnCallArgChecker {
             }
 
             let mut d = self.e.eval_expr_kind(arg.kind)
-            if !real(d) {
+            if d == nil {
                 ok = false
                 continue
             }
@@ -810,7 +778,7 @@ impl FnCallArgChecker {
                     model.elem_kind = p.kind
 
                 |:
-                    drop(model)
+                    model = nil
                     self.arg_models = append(self.arg_models, d.model)
                 }
 
@@ -827,7 +795,7 @@ impl FnCallArgChecker {
             self.push_err(LogMsg.MoreArgsWithVariadiced)
         }
 
-        if real(model) {
+        if model != nil {
             self.arg_models = append(self.arg_models, model)
         }
         ret ok
@@ -862,7 +830,7 @@ impl FnCallArgChecker {
 
     fn check_dynamic_type_annotation(mut self): (ok: bool) {
         for _, g in self.f.generics {
-            if !real(g) {
+            if g == nil {
                 self.push_err(LogMsg.DynamicTypeAnnotationFailed)
                 ret false
             }
@@ -911,13 +879,13 @@ impl StructLitChecker {
         const REFERENCE = false
         self.e.s.check_validity_for_init_expr(
             !self.e.immutable, REFERENCE, f.kind, d, error_token)
-        self.e.s.check_assign_type(false, f.kind, d, error_token, false)
+        self.e.s.check_assign_type(false, f.kind, d, error_token)
     }
 
     fn check_pair(mut self, mut &pair: &FieldExprPair, mut &exprs: []ExprData) {
         // Check existing.
         let mut f = self.s.find_field(pair.field.kind)
-        if !real(f) {
+        if f == nil {
             self.push_err(pair.field, LogMsg.IdentNotExist, pair.field.kind)
             ret
         }
@@ -949,7 +917,7 @@ impl StructLitChecker {
         self.e.prefix = f.kind
 
         let mut d = self.e.eval_expr_kind(pair.expr)
-        if !real(d) {
+        if d == nil {
             ret
         }
         self.push_match(f, d, pair.field)
@@ -1018,7 +986,7 @@ impl StructLitChecker {
                 self.e.prefix = field.kind
 
                 let mut d = self.e.eval_expr_kind(e.kind)
-                if !real(d) {
+                if d == nil {
                     continue
                 }
 
@@ -1060,7 +1028,7 @@ impl RangeChecker {
     }
 
     fn set_size_key(mut self) {
-        if !real(self.rang.key_a) || is_ignore_ident(self.rang.key_a.ident) {
+        if self.rang.key_a == nil || is_ignore_ident(self.rang.key_a.ident) {
             ret
         }
 
@@ -1100,7 +1068,7 @@ impl RangeChecker {
 
     fn check_slice(mut self) {
         self.set_size_key()
-        if !real(self.rang.key_b) || is_ignore_ident(self.rang.key_b.ident) {
+        if self.rang.key_b == nil || is_ignore_ident(self.rang.key_b.ident) {
             ret
         }
 
@@ -1113,7 +1081,7 @@ impl RangeChecker {
 
     fn check_array(mut self) {
         self.set_size_key()
-        if !real(self.rang.key_b) || is_ignore_ident(self.rang.key_b.ident) {
+        if self.rang.key_b == nil || is_ignore_ident(self.rang.key_b.ident) {
             ret
         }
 
@@ -1125,7 +1093,7 @@ impl RangeChecker {
     }
 
     fn check_map_key_a(mut self) {
-        if !real(self.rang.key_a) || is_ignore_ident(self.rang.key_a.ident) {
+        if self.rang.key_a == nil || is_ignore_ident(self.rang.key_a.ident) {
             ret
         }
 
@@ -1133,14 +1101,14 @@ impl RangeChecker {
         self.kind.key_a = self.build_var(self.rang.key_a)
         self.kind.key_a.kind = &TypeSymbol{kind: m.key}
 
-        let mut d = new(Data, self.d)
+        let mut d = new(Data, *self.d)
         d.kind = m.key
 
         self.check_range_expr_validity(d, self.kind.key_a, m.key)
     }
 
     fn check_map_key_b(mut self) {
-        if !real(self.rang.key_b) || is_ignore_ident(self.rang.key_b.ident) {
+        if self.rang.key_b == nil || is_ignore_ident(self.rang.key_b.ident) {
             ret
         }
 
@@ -1148,7 +1116,7 @@ impl RangeChecker {
         self.kind.key_b = self.build_var(self.rang.key_b)
         self.kind.key_b.kind = &TypeSymbol{kind: m.val}
 
-        let mut d = new(Data, self.d)
+        let mut d = new(Data, *self.d)
         d.kind = m.val
 
         self.check_range_expr_validity(d, self.kind.key_b, m.val)
@@ -1161,7 +1129,7 @@ impl RangeChecker {
 
     fn check_str(mut self) {
         self.set_size_key()
-        if !real(self.rang.key_b) || is_ignore_ident(self.rang.key_b.ident) {
+        if self.rang.key_b == nil || is_ignore_ident(self.rang.key_b.ident) {
             ret
         }
 
@@ -1174,29 +1142,22 @@ impl RangeChecker {
     }
 
     fn check(mut self): bool {
-        if real(self.d.kind.ref()) {
-            self.d.model = &ExplicitDerefExprModel{
-                expr: self.d.model,
-            }
-            self.d.kind = self.d.kind.ref().elem
-        }
-
         match {
-        | real(self.d.kind.slc()):
+        | self.d.kind.slc() != nil:
             self.check_slice()
             ret true
 
-        | real(self.d.kind.arr()):
+        | self.d.kind.arr() != nil:
             self.check_array()
             ret true
 
-        | real(self.d.kind.map()):
+        | self.d.kind.map() != nil:
             self.check_map()
             ret true
         }
 
         let prim = self.d.kind.prim()
-        if real(prim) && prim.is_str() {
+        if prim != nil && prim.is_str() {
             self.check_str()
             ret true
         }
@@ -1223,7 +1184,7 @@ impl RetTypeChecker {
     }
 
     fn prepare_exprs(mut self, mut &e: &Expr) {
-        if !real(e) {
+        if e == nil {
             ret
         }
 
@@ -1278,7 +1239,7 @@ impl RetTypeChecker {
             let mut t = self.types[i]
 
             let mut d = self.sc.s.evalp(self.sc, t).eval_expr(expr)
-            if !real(d) {
+            if d == nil {
                 continue
             }
 

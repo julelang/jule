@@ -12,7 +12,7 @@
 #endif
 
 #include "types.hpp"
-#include "ref.hpp"
+#include "ptr.hpp"
 #include "slice.hpp"
 #include "utf16.hpp"
 
@@ -39,12 +39,6 @@ namespace jule {
     template<typename Item>
     jule::Slice<Item> append(jule::Slice<Item> src,
                              const jule::Slice<Item> &components);
-
-    template<typename T>
-    inline void drop(T &obj)  ;
-
-    template<typename T>
-    inline jule::Bool real(const T &obj)  ;
 
     template<typename T>
     inline void out(const T &obj) {
@@ -116,14 +110,6 @@ namespace jule {
         src._len += components._len;
         return src;
     }
-
-    template<typename T>
-    inline void drop(T &obj)
-    { obj.drop(); }
-
-    template<typename T>
-    inline jule::Bool real(const T &obj)
-    { return obj.real(); }
 
 } // namespace jule
 

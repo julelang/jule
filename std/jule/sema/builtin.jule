@@ -20,7 +20,6 @@ type BuiltinCaller: fn(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Dat
 static mut BUILTIN_FN_OUT: &FnIns = &FnIns{}
 static mut BUILTIN_FN_OUTLN: &FnIns = &FnIns{}
 static mut BUILTIN_FN_NEW: &FnIns = &FnIns{}
-static mut BUILTIN_FN_DROP: &FnIns = &FnIns{}
 static mut BUILTIN_FN_PANIC: &FnIns = &FnIns{}
 static mut BUILTIN_FN_MAKE: &FnIns = &FnIns{}
 static mut BUILTIN_FN_APPEND: &FnIns = &FnIns{}
@@ -29,10 +28,6 @@ static mut BUILTIN_FN_CLONE: &FnIns = &FnIns{}
 static mut BUILTIN_FN_STD_MEM_SIZE_OF: &FnIns = &FnIns{}
 static mut BUILTIN_FN_STD_MEM_ALIGN_OF: &FnIns = &FnIns{}
 static mut BUILTIN_FN_STD_JULE_INTEGRATED_TO_STR: &FnIns = &FnIns{}
-
-static mut BUILTIN_FN_REAL: &FnIns = &FnIns{
-    result: &TypeKind{kind: build_prim_type(str(PrimKind.Bool))},
-}
 
 static mut BUILTIN_FN_COPY: &FnIns = &FnIns{
     result: &TypeKind{kind: build_prim_type(str(PrimKind.Int))},
@@ -95,8 +90,6 @@ fn init() {
     BUILTIN_FN_OUT.caller = builtin_caller_out
     BUILTIN_FN_OUTLN.caller = builtin_caller_outln
     BUILTIN_FN_NEW.caller = builtin_caller_new
-    BUILTIN_FN_REAL.caller = builtin_caller_real
-    BUILTIN_FN_DROP.caller = builtin_caller_drop
     BUILTIN_FN_PANIC.caller = builtin_caller_panic
     BUILTIN_FN_MAKE.caller = builtin_caller_make
     BUILTIN_FN_APPEND.caller = builtin_caller_append
@@ -126,15 +119,13 @@ fn find_builtin_fn(ident: str): &FnIns {
     | "out":     ret BUILTIN_FN_OUT
     | "outln":   ret BUILTIN_FN_OUTLN
     | "new":     ret BUILTIN_FN_NEW
-    | "real":    ret BUILTIN_FN_REAL
-    | "drop":    ret BUILTIN_FN_DROP
     | "panic":   ret BUILTIN_FN_PANIC
     | "make":    ret BUILTIN_FN_MAKE
     | "append":  ret BUILTIN_FN_APPEND
     | "copy":    ret BUILTIN_FN_COPY
     | "recover": ret BUILTIN_FN_RECOVER
     | "clone":   ret BUILTIN_FN_CLONE
-    |:           ret new(FnIns)
+    |:           ret nil
     }
 }
 
@@ -142,7 +133,7 @@ fn find_builtin_type_alias(ident: str): &TypeAlias {
     match ident {
     | "byte": ret BUILTIN_TYPE_ALIAS_BYTE
     | "rune": ret BUILTIN_TYPE_ALIAS_RUNE
-    |:        ret new(TypeAlias)
+    |:        ret nil
     }
 }
 
@@ -150,23 +141,23 @@ fn find_builtin_trait(ident: str): &Trait {
     match ident {
     | "Error":   ret BUILTIN_TRAIT_ERROR
     | "Dispose": ret BUILTIN_TRAIT_DISPOSE
-    |:           ret new(Trait)
+    |:           ret nil
     }
 }
 
 fn find_builtin_def(ident: str): any {
     let mut f = find_builtin_fn(ident)
-    if real(f) {
+    if f != nil {
         ret f
     }
 
     let mut ta = find_builtin_type_alias(ident)
-    if real(ta) {
+    if ta != nil {
         ret ta
     }
 
     let mut t = find_builtin_trait(ident)
-    if real(t) {
+    if t != nil {
         ret t
     }
 
@@ -215,7 +206,7 @@ fn builtin_caller_common_plain(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Dat
         args:  fcac.arg_models,
     }
 
-    if !real(f.result) {
+    if f.result == nil {
         d = build_void_data()
     } else {
         d = &Data{
@@ -248,20 +239,20 @@ fn builtin_caller_out(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data
     }
     if fc.args.len < 1 {
         e.push_err(fc.token, LogMsg.MissingExprFor, "v")
-        ret new(Data)
+        ret nil
     }
     if fc.args.len > 1 {
         e.push_err(fc.args[1].token, LogMsg.ArgumentOverflow)
     }
 
     let mut expr = e.eval_expr(fc.args[0])
-    if !real(expr) {
-        ret new(Data)
+    if expr == nil {
+        ret nil
     }
 
-    if expr.is_void() || real(expr.kind.fnc()) || real(expr.kind.tup()) {
+    if expr.is_void() || expr.kind.fnc() != nil || expr.kind.tup() != nil {
         e.push_err(fc.args[0].token, LogMsg.InvalidExpr)
-        ret new(Data)
+        ret nil
     }
 
     let mut d = build_void_data()
@@ -271,8 +262,8 @@ fn builtin_caller_out(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data
 
 fn builtin_caller_outln(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data {
     d = builtin_caller_out(e, fc, d)
-    if !real(d) {
-        ret new(Data)
+    if d == nil {
+        ret nil
     }
 
     d.model = &BuiltinOutlnCallExprModel{
@@ -287,33 +278,31 @@ fn builtin_caller_new(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data
     }
     if fc.args.len < 1 {
         e.push_err(fc.token, LogMsg.MissingExprFor, "type")
-        ret new(Data)
+        ret nil
     }
     if fc.args.len > 2 {
         e.push_err(fc.args[2].token, LogMsg.ArgumentOverflow)
     }
 
     let mut t = e.eval_expr_kind(fc.args[0].kind)
-    if !real(t) {
-        ret new(Data)
+    if t == nil {
+        ret nil
     }
 
     if !t.decl {
         e.push_err(fc.args[0].token, LogMsg.InvalidType)
-        ret new(Data)
+        ret nil
     }
 
-    if !is_valid_for_ref_type(t.kind) {
+    if !is_valid_for_sptr_type(t.kind) {
         let mut s = t.kind.strct()
-        if real(s) && real(s.decl) && s.decl.cpp_linked {
+        if s != nil && s.decl != nil && s.decl.cpp_linked {
             e.push_err(fc.args[0].token, LogMsg.CppLinkedStructForRef)
-        } else {
-            e.push_err(fc.args[0].token, LogMsg.InvalidType)
         }
-        ret new(Data)
+        ret nil
     }
 
-    d.kind = &TypeKind{kind: &Ref{elem: t.kind.clone()}}
+    d.kind = &TypeKind{kind: &Sptr{elem: t.kind.clone()}}
 
     if fc.args.len == 2 { // Initialize expression.
         let mut old = e.prefix
@@ -323,18 +312,12 @@ fn builtin_caller_new(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data
 
         e.prefix = old
 
-        if real(init) {
+        if init != nil {
             let mut token = fc.args[1].token
             const REFERENCE = false
             e.s.check_validity_for_init_expr(
                 !e.immutable, REFERENCE, t.kind, init, token)
-            e.s.check_assign_type(false, t.kind, init, token, false)
-
-            if real(init.kind.ref()) {
-                init.model = &ExplicitDerefExprModel{
-                    expr: init.model,
-                }
-            }
+            e.s.check_assign_type(false, t.kind, init, token)
 
             d.model = &BuiltinNewCallExprModel{
                 kind: t.kind,
@@ -348,82 +331,24 @@ fn builtin_caller_new(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data
     ret d
 }
 
-fn builtin_caller_real(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data {
-    if fc.generics.len > 0 {
-        e.push_err(fc.token, LogMsg.NotHasGenerics)
-    }
-    if fc.args.len < 1 {
-        e.push_err(fc.token, LogMsg.MissingExprFor, "ref")
-        ret new(Data)
-    }
-    if fc.args.len > 1 {
-        e.push_err(fc.args[1].token, LogMsg.ArgumentOverflow)
-    }
-
-    let mut ref = e.eval_expr(fc.args[0])
-    if !real(ref) {
-        ret new(Data)
-    }
-
-    if !real(ref.kind.ref()) {
-        e.push_err(fc.args[0].token, LogMsg.InvalidExpr)
-        e.push_suggestion(LogMsg.ExpressionMustBeReferenceType)
-        ret new(Data)
-    }
-
-    d.kind = BUILTIN_FN_REAL.result
-    d.model = &BuiltinRealCallExprModel{expr: ref.model}
-    ret d
-}
-
-fn builtin_caller_drop(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data {
-    if fc.generics.len > 0 {
-        e.push_err(fc.token, LogMsg.NotHasGenerics)
-    }
-    if fc.args.len < 1 {
-        e.push_err(fc.token, LogMsg.MissingExprFor, "ref")
-        ret new(Data)
-    }
-    if fc.args.len > 1 {
-        e.push_err(fc.args[2].token, LogMsg.ArgumentOverflow)
-    }
-
-    let mut ref = e.eval_expr(fc.args[0])
-    if !real(ref) {
-        ret new(Data)
-    }
-
-    if !real(ref.kind.ref()) {
-        e.push_err(fc.args[0].token, LogMsg.InvalidExpr)
-        e.push_suggestion(LogMsg.ExpressionMustBeReferenceType)
-        ret new(Data)
-    }
-
-    _ = check_mut(e.s, ref, new(Data), fc.args[0].token)
-
-    let mut d = build_void_data()
-    d.model = &BuiltinDropCallExprModel{expr: ref.model}
-    ret d
-}
-
 fn builtin_caller_panic(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data {
     if fc.generics.len > 0 {
         e.push_err(fc.token, LogMsg.NotHasGenerics)
     }
     if fc.args.len < 1 {
         e.push_err(fc.token, LogMsg.MissingExprFor, "error")
-        ret new(Data)
+        ret nil
     }
     if fc.args.len > 1 {
         e.push_err(fc.args[2].token, LogMsg.ArgumentOverflow)
     }
 
     let mut expr = e.eval_expr(fc.args[0])
-    if !real(expr) {
-        ret new(Data)
+    if expr == nil {
+        ret nil
     }
 
-    if real(expr.kind.strct()) {
+    if expr.kind.strct() != nil {
         let s = expr.kind.strct()
         if s.decl.is_implements(BUILTIN_TRAIT_ERROR) {
             expr.cast_kind = &TypeKind{
@@ -445,29 +370,29 @@ fn builtin_caller_make(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Dat
     if fc.args.len < 2 {
         if fc.args.len == 1 {
             e.push_err(fc.token, LogMsg.MissingExprFor, "size")
-            ret new(Data)
+            ret nil
         }
         e.push_err(fc.token, LogMsg.MissingExprFor, "type, size")
-        ret new(Data)
+        ret nil
     }
     if fc.args.len > 3 {
         e.push_err(fc.args[3].token, LogMsg.ArgumentOverflow)
     }
 
     let mut t = e.eval_expr_kind(fc.args[0].kind)
-    if !real(t) {
-        ret new(Data)
+    if t == nil {
+        ret nil
     }
 
-    if !t.decl || !real(t.kind.slc()) {
+    if !t.decl || t.kind.slc() == nil {
         e.push_err(fc.args[0].token, LogMsg.InvalidType)
-        ret new(Data)
+        ret nil
     }
 
     d.kind = t.kind
 
     let mut len = e.s.evalp(e.lookup, t.kind).eval_expr(fc.args[1])
-    if !real(len) {
+    if len == nil {
         ret d
     }
 
@@ -475,7 +400,7 @@ fn builtin_caller_make(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Dat
 
     if fc.args.len == 3 {
         let mut cap = e.s.evalp(e.lookup, t.kind).eval_expr(fc.args[2])
-        if !real(cap) {
+        if cap == nil {
             ret d
         }
 
@@ -502,26 +427,20 @@ fn builtin_caller_append(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &D
     if fc.args.len < 2 {
         if fc.args.len == 1 {
             e.push_err(fc.token, LogMsg.MissingExprFor, "src")
-            ret new(Data)
+            ret nil
         }
         e.push_err(fc.token, LogMsg.MissingExprFor, "src, values")
-        ret new(Data)
+        ret nil
     }
 
     let mut t = e.eval_expr(fc.args[0])
-    if !real(t) {
-        ret new(Data)
+    if t == nil {
+        ret nil
     }
 
-    let mut ref = false
-    if real(t.kind.ref()) {
-        t.kind = t.kind.ref().elem
-        ref = true
-    }
-
-    if !real(t.kind.slc()) {
+    if t.kind.slc() == nil {
         e.push_err(fc.args[0].token, LogMsg.InvalidExpr)
-        ret new(Data)
+        ret nil
     }
 
     let mut f = &FnIns{
@@ -547,13 +466,8 @@ fn builtin_caller_append(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &D
     d.model = &CommonIdentExprModel{ident: "append"}
 
     d = builtin_caller_common_plain(e, fc, d)
-    if real(d) {
+    if d != nil {
         let mut model = (&FnCallExprModel)(d.model)
-        if ref {
-            model.args[0] = &ExplicitDerefExprModel{
-                expr: t.model,
-            }
-        }
         d.model = &BuiltinAppendCallExprModel{
             dest:     model.args[0],
             elements: model.args[1],
@@ -569,29 +483,23 @@ fn builtin_caller_copy(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Dat
     if fc.args.len < 2 {
         if fc.args.len == 1 {
             e.push_err(fc.token, LogMsg.MissingExprFor, "src")
-            ret new(Data)
+            ret nil
         }
         e.push_err(fc.token, LogMsg.MissingExprFor, "src, values")
-        ret new(Data)
+        ret nil
     }
     if fc.args.len > 2 {
         e.push_err(fc.args[2].token, LogMsg.ArgumentOverflow)
     }
 
     let mut t = e.eval_expr(fc.args[0])
-    if !real(t) {
-        ret new(Data)
+    if t == nil {
+        ret nil
     }
 
-    let mut ref = false
-    if real(t.kind.ref()) {
-        t.kind = t.kind.ref().elem
-        ref = false
-    }
-
-    if !real(t.kind.slc()) {
+    if t.kind.slc() == nil {
         e.push_err(fc.args[0].token, LogMsg.InvalidExpr)
-        ret new(Data)
+        ret nil
     }
 
     if !t.mutable {
@@ -619,11 +527,6 @@ fn builtin_caller_copy(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Dat
     d.model = &CommonIdentExprModel{ident: "copy"}
 
     d = builtin_caller_common_plain(e, fc, d)
-    if real(d) && ref {
-        (&FnCallExprModel)(d.model).args[0] = &ExplicitDerefExprModel{
-            expr: t.model,
-        }
-    }
     ret d
 }
 
@@ -649,21 +552,21 @@ fn builtin_caller_recover(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &
 
     if fc.args.len < 1 {
         e.push_err(fc.token, LogMsg.MissingExprFor, "handler")
-        ret new(Data)
+        ret nil
     }
     if fc.args.len > 1 {
         e.push_err(fc.args[1].token, LogMsg.ArgumentOverflow)
     }
 
     let mut t = e.eval_expr(fc.args[0])
-    if !real(t) {
-        ret new(Data)
+    if t == nil {
+        ret nil
     }
 
     let f = t.kind.fnc()
-    if !real(f) {
+    if f == nil {
         e.push_err(fc.args[0].token, LogMsg.InvalidExpr)
-        ret new(Data)
+        ret nil
     }
 
     if !f.equals(HANDLER_KIND) {
@@ -685,46 +588,46 @@ fn builtin_caller_clone(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Da
 
     if fc.args.len < 1 {
         e.push_err(fc.token, LogMsg.MissingExprFor, "expr")
-        ret new(Data)
+        ret nil
     }
     if fc.args.len > 1 {
         e.push_err(fc.args[1].token, LogMsg.ArgumentOverflow)
     }
 
     let mut d = e.eval_expr_kind(fc.args[0].kind)
-    if !real(d) {
-        ret new(Data)
+    if d == nil {
+        ret nil
     }
 
     let check_kind = fn(mut k: &TypeKind) {
         match {
-        | real(k.slc()):
+        | k.slc() != nil:
             if !k.slc().elem.supports_cloning() {
                 e.push_err(fc.args[0].token, LogMsg.InternalTypeNotSupportsClone, k.to_str())
             }
 
-        | real(k.map()):
+        | k.map() != nil:
             let m = k.map()
             if !m.key.supports_cloning() || !m.val.supports_cloning() {
                 e.push_err(fc.args[0].token, LogMsg.InternalTypeNotSupportsClone, k.to_str())
             }
 
-        | real(k.arr()):
+        | k.arr() != nil:
             if !k.arr().elem.supports_cloning() {
                 e.push_err(fc.args[0].token, LogMsg.InternalTypeNotSupportsClone, k.to_str())
             }
 
-        | real(k.ref()):
-            if !k.ref().elem.supports_cloning() {
+        | k.sptr() != nil:
+            if !k.sptr().elem.supports_cloning() {
                 e.push_err(fc.args[0].token, LogMsg.InternalTypeNotSupportsClone, k.to_str())
             }
 
-        | real(k.strct()):
+        | k.strct() != nil:
             let s = d.kind.strct()
             if !s.mutable {
                 e.push_err(fc.args[0].token, LogMsg.CloneImmutStruct, d.kind.to_str())
             }
-            if !real(s.decl) || s.decl.cpp_linked || !s.decl.is_derives(str(Derives.Clone)) {
+            if s.decl == nil || s.decl.cpp_linked || !s.decl.is_derives(str(Derives.Clone)) {
                 e.push_err(fc.args[0].token, LogMsg.TypeIsNotDerives, d.kind.to_str(), str(Derives.Clone))
             }
 
@@ -763,7 +666,7 @@ fn builtin_caller_std_mem_size_of(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &
     }
 
     let mut d = e.eval_expr_kind(fc.args[0].kind)
-    if !real(d) {
+    if d == nil {
         ret result
     }
 
@@ -788,7 +691,7 @@ fn builtin_caller_std_mem_align_of(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: 
     }
 
     let mut d = e.eval_expr_kind(fc.args[0].kind)
-    if !real(d) {
+    if d == nil {
         ret result
     }
 
@@ -803,15 +706,15 @@ fn builtin_caller_std_jule_integrated_to_str(mut &e: &Eval, mut &fc: &FnCallExpr
 
     if fc.args.len < 1 {
         e.push_err(fc.token, LogMsg.MissingExprFor, "expr")
-        ret new(Data)
+        ret nil
     }
     if fc.args.len > 1 {
         e.push_err(fc.args[1].token, LogMsg.ArgumentOverflow)
     }
 
     let mut d = e.eval_expr_kind(fc.args[0].kind)
-    if !real(d) {
-        ret new(Data)
+    if d == nil {
+        ret nil
     }
 
     ret &Data{

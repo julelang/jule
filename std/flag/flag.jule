@@ -32,7 +32,7 @@ struct Flag[T] {
 impl CommonFlag for Flag {
     pub fn name(self): str { ret self._name }
     pub fn what(self): str { ret self._what }
-    pub fn reset(mut self) { self._data = self._default }
+    pub fn reset(mut self) { *self._data = self._default }
     pub fn short(self): rune { ret self._short }
 }
 
@@ -170,7 +170,7 @@ impl FlagSet {
     // Same with add method but do not allocates new reference, uses existing.
     pub fn add_var[T](mut self, mut &var: &T, name: str, short: rune, what: str) {
         let mut flag = self.add_flag_common[T](name, short, what)
-        flag._default = var
+        flag._default = *var
         flag._data = var
     }
 }
@@ -219,7 +219,7 @@ impl ArgParser {
         match type flag {
         | BoolFlag:
             let mut bf = BoolFlag(flag)
-            bf._data = !bf._default
+            *bf._data = !bf._default
             ret
         }
 
@@ -232,7 +232,7 @@ impl ArgParser {
         match type flag {
         | IntFlag:
             let mut intf = IntFlag(flag)
-            let ((intf._data), ok) = self.parse_integer[int](data, fn(s: str, base: int): (int, bool) {
+            let ((*intf._data), ok) = self.parse_integer[int](data, fn(s: str, base: int): (int, bool) {
                 let (x, err) = conv::parse_int(s, base, BIT64)
                 ret x, err == conv::ConvError.Ok
             })
@@ -242,7 +242,7 @@ impl ArgParser {
 
         | UintFlag:
             let mut uintf = UintFlag(flag)
-            let ((uintf._data), ok) = self.parse_integer[uint](data, fn(s: str, base: int): (uint, bool) {
+            let ((*uintf._data), ok) = self.parse_integer[uint](data, fn(s: str, base: int): (uint, bool) {
                 let (x, err) = conv::parse_uint(s, base, BIT64)
                 ret x, err == conv::ConvError.Ok
             })
@@ -252,13 +252,13 @@ impl ArgParser {
 
         | FloatFlag:
             let mut ff = FloatFlag(flag)
-            let ((ff._data), err) = conv::parse_float(data, BIT64)
+            let ((*ff._data), err) = conv::parse_float(data, BIT64)
             if err != conv::ConvError.Ok {
                 self.error = "--" + flag.name() + ": expression must be valid floating-point"
             }
 
         | StrFlag:
-            StrFlag(flag)._data = data
+            *StrFlag(flag)._data = data
         }
     }
 

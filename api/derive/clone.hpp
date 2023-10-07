@@ -10,7 +10,7 @@
 #include "../array.hpp"
 #include "../slice.hpp"
 #include "../map.hpp"
-#include "../ref.hpp"
+#include "../ptr.hpp"
 #include "../trait.hpp"
 #include "../fn.hpp"
 
@@ -28,7 +28,7 @@ namespace jule {
     template<typename Item> jule::Slice<Item> clone(const jule::Slice<Item> &s);
     template<typename Item, const jule::Uint N> jule::Array<Item, N> clone(const jule::Array<Item, N> &arr);
     template<typename Key, typename Value> jule::Map<Key, Value> clone(const jule::Map<Key, Value> &m);
-    template<typename T> jule::Ref<T> clone(const jule::Ref<T> &r);
+    template<typename T> jule::Ptr<T> clone(const jule::Ptr<T> &r);
     template<typename T> jule::Trait<T> clone(const jule::Trait<T> &t);
     template<typename T> jule::Fn<T> clone(const jule::Fn<T> &fn);
     template<typename T> T *clone(T *ptr);
@@ -71,11 +71,11 @@ namespace jule {
     }
 
     template<typename T>
-    jule::Ref<T> clone(const jule::Ref<T> &r) {
-        if (!r.real())
+    jule::Ptr<T> clone(const jule::Ptr<T> &r) {
+        if (r == nullptr)
             return r;
 
-        jule::Ref<T> r_clone{ jule::Ref<T>::make(jule::clone(r.operator T())) };
+        jule::Ptr<T> r_clone{ jule::Ptr<T>::make(jule::clone(r.operator T())) };
         return r_clone;
     }
 

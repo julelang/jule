@@ -73,7 +73,7 @@ impl Struct {
 
         for (_, mut f) in self.fields {
             ins.fields = append(ins.fields, f.instance())
-            if real(f.kind.kind) && f.kind.kind.mutable() {
+            if f.kind.kind != nil && f.kind.kind.mutable() {
                 ins.mutable = true
             }
         }
@@ -118,7 +118,7 @@ impl Struct {
         }
 
         self.instances = append(self.instances, ins)
-        ret new(StructIns)
+        ret nil
     }
 
     // Returns method by identifier.
@@ -129,7 +129,7 @@ impl Struct {
                 ret f
             }
         }
-        ret new(Fn)
+        ret nil
     }
 
     // Returns static field by identifier.
@@ -140,7 +140,7 @@ impl Struct {
                 ret v
             }
         }
-        ret new(Var)
+        ret nil
     }
 
     // Returns field by identifier.
@@ -151,13 +151,13 @@ impl Struct {
                 ret f
             }
         }
-        ret new(Field)
+        ret nil
     }
 
     // Reports whether structure implements given trait.
     pub fn is_implements(self, t: &Trait): bool {
         for _, it in self.implements {
-            if &t == &it {
+            if t == it {
                 ret true
             }
         }
@@ -179,7 +179,7 @@ impl Struct {
     // Reports whether structure is uses given structure.
     pub fn is_uses(self, s: &Struct): bool {
         for _, u in self.uses {
-            for &s == &u {
+            for s == u {
                 ret true
             }
         }
@@ -233,13 +233,13 @@ impl Kind for StructIns {
     }
 
     // Reports whether types are same.
-    fn equals(self, other: &TypeKind): bool {
-        let s = unsafe { (&other).strct() }
-        if !real(s) {
+    fn equals(&self, other: &TypeKind): bool {
+        let s = unsafe { (*(&other)).strct() }
+        if s == nil {
             ret false
         }
 
-        if &self.decl != &s.decl {
+        if self.decl != s.decl {
             ret false
         }
 
@@ -262,7 +262,7 @@ impl StructIns {
     // Reports whether instances are same.
     // Returns true if declarations and generics are same.
     pub fn same(self, s: &StructIns): bool {
-        if &self.decl != &s.decl || s.generics.len != self.generics.len {
+        if self.decl != s.decl || s.generics.len != self.generics.len {
             ret false
         }
 
@@ -282,7 +282,7 @@ impl StructIns {
                 ret f
             }
         }
-        ret new(Fn)
+        ret nil
     }
 
     // Returns field by identifier.
@@ -293,6 +293,6 @@ impl StructIns {
                 ret f
             }
         }
-        ret new(FieldIns)
+        ret nil
     }
 }

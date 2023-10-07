@@ -69,7 +69,7 @@ impl ReferenceStack {
         for _, ref in self.buffer {
             match type ref {
             | &T:
-                if &(&T)(ref) == &t {
+                if (&T)(ref) == t {
                     ret true
                 }
             }
@@ -97,7 +97,7 @@ fn str_repeat(sub: str, mut n: int): str {
 }
 
 fn build_doc(mut cg: &CommentGroup): str {
-    if !real(cg) {
+    if cg == nil {
         ret ""
     }
 
@@ -110,8 +110,8 @@ fn build_doc(mut cg: &CommentGroup): str {
 }
 
 fn build_type(mut t: &TypeDecl): &TypeSymbol {
-    if !real(t) {
-        ret new(TypeSymbol)
+    if t == nil {
+        ret nil
     }
     ret &TypeSymbol{
         decl: t,
@@ -119,8 +119,8 @@ fn build_type(mut t: &TypeDecl): &TypeSymbol {
 }
 
 fn build_expr(mut expr: &Expr): &Value {
-    if !real(expr) {
-        ret new(Value)
+    if expr == nil {
+        ret nil
     }
 
     ret &Value{
@@ -191,8 +191,8 @@ fn build_params(mut &decls: []&ParamDecl): []&Param {
 }
 
 fn build_ret_type(mut decl: &RetTypeDecl): &RetType {
-    if decl.idents == nil && !real(decl.kind) {
-        ret new(RetType) // Void type.
+    if decl.idents == nil && decl.kind == nil {
+        ret nil // Void type.
     }
     ret &RetType{
         kind:   build_type(decl.kind),
@@ -312,7 +312,7 @@ struct SymbolBuilder {
 impl SymbolBuilder {
     fn get_root(mut &self): &SymbolBuilder {
         let mut root = self
-        for real(root.owner) {
+        for root.owner != nil {
             root = root.owner
         }
         ret root
@@ -358,7 +358,7 @@ impl SymbolBuilder {
         if !is_std_header_path(decl.link_path) {
             let mut ok = self.check_cpp_use_decl_path(decl)
             if !ok {
-                ret new(ImportInfo)
+                ret nil
             }
 
             // Set to absolute path for correct include path.
@@ -375,7 +375,7 @@ impl SymbolBuilder {
             ident:      "", // Cpp headers haven't identifiers.
             cpp_linked: true,
             std:        false,
-            package:    new(Package), // Cpp headers haven't symbol table.
+            package:    nil, // Cpp headers haven't symbol table.
         }
     }
 
@@ -386,14 +386,14 @@ impl SymbolBuilder {
         let (path, ok) = abs(path)
         if !ok {
             self.push_err(decl.token, LogMsg.UseNotFound, decl.link_path)
-            ret new(ImportInfo)
+            ret nil
         }
 
         let (info, err) = Status.of(path)
         // Exist?
         if err != FsError.Ok || !info.is_dir() {
             self.push_err(decl.token, LogMsg.UseNotFound, decl.link_path)
-            ret new(ImportInfo)
+            ret nil
         }
 
         // Select last identifier of namespace chain.
@@ -422,14 +422,14 @@ impl SymbolBuilder {
         let (path, ok) = abs(path)
         if !ok {
             self.push_err(decl.token, LogMsg.UseNotFound, decl.link_path)
-            ret new(ImportInfo)
+            ret nil
         }
 
         let (info, err) = Status.of(path)
         // Exist?
         if err != FsError.Ok || !info.is_dir() {
             self.push_err(decl.token, LogMsg.UseNotFound, decl.link_path)
-            ret new(ImportInfo)
+            ret nil
         }
 
         // Select last identifier of namespace chain.
@@ -463,7 +463,7 @@ impl SymbolBuilder {
         let lpkg = self.table.select_package(fn(spkg: &ImportInfo): bool {
             ret pkg.path == spkg.path
         })
-        if !real(lpkg) {
+        if lpkg == nil {
             ret true
         }
 
@@ -516,10 +516,10 @@ impl SymbolBuilder {
         let mut owner = self.owner
         let mut old = self
 
-        for real(owner.owner) {
+        for owner.owner != nil {
             self.push_cycle_error(old.owner, old.table.file.dir(), message)
 
-            if &owner.owner == &target {
+            if owner.owner == target {
                 self.push_cycle_error(target, owner.table.file.dir(), message)
                 break
             }
@@ -537,7 +537,7 @@ impl SymbolBuilder {
             ret false
         }
 
-        if !real(self.owner) {
+        if self.owner == nil {
             ret true
         }
 
@@ -553,7 +553,7 @@ impl SymbolBuilder {
             ret false
         }
 
-        if real(owner.owner) {
+        if owner.owner != nil {
             owner = owner.owner
             goto iter
         }
@@ -567,7 +567,7 @@ impl SymbolBuilder {
         }
 
         let mut port = self.importer.get_import(imp.path)
-        if real(port) {
+        if port != nil {
             imp.package = port.package
             imp.duplicate = true
         } else {
@@ -603,13 +603,13 @@ impl SymbolBuilder {
     fn import_use_decl(mut &self, mut &decl: &UseDecl): &ImportInfo {
         let mut imp = self.build_import(decl)
         // Break analysis if error occurs.
-        if !real(imp) {
-            ret new(ImportInfo)
+        if imp == nil {
+            ret nil
         }
 
         let mut ok = self.check_duplicate_use_decl(imp)
         if !ok {
-            ret new(ImportInfo)
+            ret nil
         }
 
         if imp.alias.len != 0 && decl.selected.len > 0 {
@@ -622,7 +622,7 @@ impl SymbolBuilder {
             self.importer.imported(imp)
             ret imp
         }
-        ret new(ImportInfo)
+        ret nil
     }
 
     fn import_use_decls(mut &self) {
