@@ -91,6 +91,7 @@ namespace jule {
         }
 
         Ref<T>(void) = default;
+        Ref<T>(const std::nullptr_t&): Ref<T>() {}
 
         Ref<T> (const jule::Ref<T> &src)
         { this->__get_copy(src); }
@@ -148,11 +149,6 @@ namespace jule {
             this->alloc = nullptr;
         }
 
-        // Reports whether reference is counting for allocation.
-        // In other word, allocation is nil or not.
-        inline jule::Bool real(void) const
-        { return this->alloc != nullptr; }
-
         inline T *operator->(void) const {
 #ifndef __JULE_DISABLE__SAFETY
             this->must_ok();
@@ -199,32 +195,14 @@ namespace jule {
             this->__get_copy(src);
         }
 
-        inline void operator=(const T &val) const {
-#ifndef __JULE_DISABLE__SAFETY
-            this->must_ok();
-#endif
-            *this->alloc = val;
-        }
+        inline jule::Bool operator==(const std::nullptr_t&) const
+        { return this->alloc == nullptr; }
 
-        inline jule::Bool operator==(const T &val) const
-        { return this->alloc == nullptr ? false : *this->alloc == val; }
+        inline jule::Bool operator!=(const std::nullptr_t&) const
+        { return !this->operator==(nullptr); }
 
-        inline jule::Bool operator!=(const T &val) const
-        { return !this->operator==(val); }
-
-        inline jule::Bool operator==(const jule::Ref<T> &ref) const {
-            if (this->alloc == nullptr)
-                return ref.alloc == nullptr;
-
-            if (ref.alloc == nullptr)
-                return false;
-
-            // Break comparison cycle.
-            if (this->alloc == ref.alloc)
-                return true;
-
-            return *this->alloc == *ref.alloc;
-        }
+        inline jule::Bool operator==(const jule::Ref<T> &ref) const
+        { return this->alloc == ref.alloc; }
 
         inline jule::Bool operator!=(const jule::Ref<T> &ref) const
         { return !this->operator==(ref); }
@@ -242,7 +220,7 @@ namespace jule {
 
     template<typename T>
     inline jule::Ref<T> new_ref(void)
-    { return jule::Ref<T>(); }
+    { return jule::Ref<T>::make(T()); }
 
     template<typename T>
     inline jule::Ref<T> new_ref(const T &init) {

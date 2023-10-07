@@ -62,10 +62,10 @@ pub struct Fn {
 
 impl Fn {
     // Reports whether return type is void.
-    pub fn is_void(self): bool { ret !real(self.result) }
+    pub fn is_void(self): bool { ret self.result == nil }
 
     // Reports whether function is method.
-    pub fn is_method(self): bool { ret real(self.owner) }
+    pub fn is_method(self): bool { ret self.owner != nil }
 
     // Reports whether function is entry point.
     pub fn is_entry_point(self): bool { ret self.ident == ENTRY_POINT }
@@ -77,7 +77,7 @@ impl Fn {
     pub fn is_anon(self): bool { ret is_anon_ident(self.ident) }
 
     // Reports whether function has return variable(s).
-    pub fn any_var(self): bool { ret real(self.result) && self.result.idents.len > 0 }
+    pub fn any_var(self): bool { ret self.result != nil && self.result.idents.len > 0 }
 
     // Reports whether any parameter uses generic types.
     pub fn parameters_uses_generics(self): bool {
@@ -98,7 +98,7 @@ impl Fn {
     pub fn result_uses_generics(self): bool {
         if self.is_void() {
             ret false
-        } else if !real(self.result.kind) || !real(self.result.kind.kind) {
+        } else if self.result.kind == nil || self.result.kind.kind == nil {
             ret false
         }
 
@@ -122,7 +122,7 @@ impl Fn {
             ins.params = append(ins.params, p.instance())
         }
 
-        if real(ins.decl.result) {
+        if ins.decl.result != nil {
             ins.result = ins.decl.result.kind.kind
         }
 
@@ -196,7 +196,7 @@ impl ParamIns {
         if self.decl.variadic {
             s += "..."
         }
-        if real(self.kind) {
+        if self.kind != nil {
             s += self.kind.to_str()
         }
         ret s
@@ -233,7 +233,7 @@ impl Kind for FnIns {
     // Reports whether types are same.
     fn equals(self, other: &TypeKind): bool {
         let f = unsafe { (&other).fnc() }
-        if !real(f) {
+        if f == nil {
             ret false
         }
 
@@ -310,7 +310,7 @@ impl FnIns {
     pub fn is_builtin(self): bool { ret self.caller != nil }
 
     // Reports whether instance is anonymous function.
-    pub fn is_anon(self): bool { ret self.anon || real(self.decl) && self.decl.is_anon() }
+    pub fn is_anon(self): bool { ret self.anon || self.decl != nil && self.decl.is_anon() }
 
     // Reports whether instances are same.
     // Returns true if declarations and generics are same.
@@ -343,7 +343,7 @@ impl FnIns {
 
         s += "fn"
 
-        if ident && real(self.decl) {
+        if ident && self.decl != nil {
             s += " " + self.decl.ident
         }
 

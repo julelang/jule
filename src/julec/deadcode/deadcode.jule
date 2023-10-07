@@ -149,7 +149,7 @@ fn is_fn_dead(mut f: &FnIns): bool {
         ret !f.decl.statically
     }
 
-    if real(f.owner) {
+    if f.owner != nil {
         if is_exist_ref(checking, f.owner) {
             // Cycle, also already checking and should be marked dead.
             ret true
@@ -180,25 +180,25 @@ fn is_var_dead(mut v: &Var): bool {
 
 fn kind_is_dead(mut k: &TypeKind): bool {
     match {
-    | real(k.ref()):
+    | k.ref() != nil:
         ret kind_is_dead(k.ref().elem)
 
-    | real(k.ptr()):
+    | k.ptr() != nil:
         ret kind_is_dead(k.ptr().elem)
 
-    | real(k.slc()):
+    | k.slc() != nil:
         ret kind_is_dead(k.slc().elem)
 
-    | real(k.arr()):
+    | k.arr() != nil:
         ret kind_is_dead(k.arr().elem)
 
-    | real(k.trt()):
+    | k.trt() != nil:
         let mut t = k.trt()
         if is_dead(t) {
             ret true
         }
 
-    | real(k.strct()):
+    | k.strct() != nil:
         let mut s = k.strct()
         if is_dead(s) {
             ret true
@@ -345,7 +345,7 @@ fn catch_alive_init(mut &pkg: &Package) {
     const CPP_LINKED = false
     const INIT_FN = "init"
     let mut f = pkg.find_fn(INIT_FN, CPP_LINKED)
-    if !real(f) {
+    if f == nil {
         ret
     }
 

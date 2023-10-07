@@ -25,10 +25,10 @@ use types for std::jule::types
 
 fn get_fn_result_types(mut &f: &FnIns): []&TypeKind {
     match {
-    | f.decl.is_void() || !real(f.result):
+    | f.decl.is_void() || f.result == nil:
         ret nil
 
-    | !real(f.result.tup()):
+    | f.result.tup() == nil:
         ret [f.result]
 
     |:
@@ -145,15 +145,15 @@ impl TypeCompatibilityChecker {
         let trt = self.dest.trt()
         let mut ref = false
         match {
-        | real(self.src.ref()):
+        | self.src.ref() != nil:
             ref = true
             self.src = self.src.ref().elem
-            if !real(self.src.strct()) {
+            if self.src.strct() == nil {
                 ret false
             }
             fall
 
-        | real(self.src.strct()):
+        | self.src.strct() != nil:
             let s = self.src.strct()
             if !s.decl.is_implements(trt) {
                 ret false
@@ -166,7 +166,7 @@ impl TypeCompatibilityChecker {
 
             ret true
 
-        | real(self.src.trt()):
+        | self.src.trt() != nil:
             ret trt == self.src.trt()
 
         |:
@@ -180,7 +180,7 @@ impl TypeCompatibilityChecker {
         }
 
         let mut src = self.src.ref()
-        if !real(src) {
+        if src == nil {
             ret false
         }
 
@@ -194,7 +194,7 @@ impl TypeCompatibilityChecker {
         }
 
         let mut src = self.src.ptr()
-        if !real(src) {
+        if src == nil {
             ret false
         }
 
@@ -213,7 +213,7 @@ impl TypeCompatibilityChecker {
         }
 
         let mut src = self.src.slc()
-        if !real(src) {
+        if src == nil {
             ret false
         }
         let mut dest = self.dest.slc()
@@ -230,7 +230,7 @@ impl TypeCompatibilityChecker {
 
     fn check_arr(mut self): (ok: bool) {
         let mut src = self.src.arr()
-        if !real(src) {
+        if src == nil {
             ret false
         }
         let mut dest = self.dest.arr()
@@ -254,7 +254,7 @@ impl TypeCompatibilityChecker {
         }
 
         let mut src = self.src.map()
-        if !real(src) {
+        if src == nil {
             ret false
         }
 
@@ -277,7 +277,7 @@ impl TypeCompatibilityChecker {
 
     fn check_struct(mut self): (ok: bool) {
         let mut src = self.src.strct()
-        if !real(src) {
+        if src == nil {
             ret false
         }
         let mut dest = self.dest.strct()
@@ -310,7 +310,7 @@ impl TypeCompatibilityChecker {
         }
 
         let mut src = self.src.fnc()
-        if !real(src) {
+        if src == nil {
             ret false
         }
 
@@ -320,7 +320,7 @@ impl TypeCompatibilityChecker {
 
     fn check_enum(mut self): (ok: bool) {
         let r = self.src.enm()
-        if !real(r) {
+        if r == nil {
             ret false
         }
         ret &self.dest.enm() == &r
@@ -329,7 +329,7 @@ impl TypeCompatibilityChecker {
     fn check_prim(mut self): (ok: bool) {
         let dest = self.dest.prim()
         let mut src = self.src.prim()
-        if !real(src) {
+        if src == nil {
             ret dest.is_any()
         }
         if dest.is_any() {
@@ -344,7 +344,7 @@ impl TypeCompatibilityChecker {
     }
 
     fn check(mut self): (ok: bool) {
-        if !real(self.src) {
+        if self.src == nil {
             ret false
         }
 
@@ -356,16 +356,16 @@ impl TypeCompatibilityChecker {
 
         match {
         | self.dest.cpp_linked():     ret self.check_cpp_linked()
-        | real(self.dest.prim()):     ret self.check_prim()
-        | real(self.dest.trt()):      ret self.check_trait()
-        | real(self.dest.ref()):      ret self.check_ref()
-        | real(self.dest.ptr()):      ret self.check_ptr()
-        | real(self.dest.slc()):      ret self.check_slc()
-        | real(self.dest.arr()):      ret self.check_arr()
-        | real(self.dest.map()):      ret self.check_map()
-        | real(self.dest.enm()):      ret self.check_enum()
-        | real(self.dest.strct()):    ret self.check_struct()
-        | real(self.dest.fnc()):      ret self.check_fn()
+        | self.dest.prim() != nil:    ret self.check_prim()
+        | self.dest.trt() != nil:     ret self.check_trait()
+        | self.dest.ref() != nil:     ret self.check_ref()
+        | self.dest.ptr() != nil:     ret self.check_ptr()
+        | self.dest.slc() != nil:     ret self.check_slc()
+        | self.dest.arr() != nil:     ret self.check_arr()
+        | self.dest.map() != nil:     ret self.check_map()
+        | self.dest.enm() != nil:     ret self.check_enum()
+        | self.dest.strct() != nil:   ret self.check_struct()
+        | self.dest.fnc() != nil:     ret self.check_fn()
         | self.dest.nil_compatible(): ret self.src.is_nil()
         |:                            ret false
         }
@@ -389,7 +389,7 @@ impl AssignTypeChecker {
         let mut valid = true
 
         match {
-        | real(self.d.kind.fnc()):
+        | self.d.kind.fnc() != nil:
             let f = self.d.kind.fnc()
             match {
             | f.is_builtin():
@@ -409,7 +409,7 @@ impl AssignTypeChecker {
                 valid = false
             }
 
-        | real(self.d.kind.tup()):
+        | self.d.kind.tup() != nil:
             self.push_err(LogMsg.TupleAssignToSingle)
             valid = false
         }
@@ -419,8 +419,8 @@ impl AssignTypeChecker {
 
     fn check_const(mut self): bool {
         if !self.d.is_const() ||
-            !real(self.dest.prim()) ||
-            !real(self.d.kind.prim()) ||
+            self.dest.prim() == nil ||
+            self.d.kind.prim() == nil ||
             !types::is_num(self.d.kind.prim().kind) {
             ret false
         }
@@ -448,7 +448,7 @@ impl AssignTypeChecker {
 
     fn check(mut self): bool {
         match {
-        | !real(self.d):
+        | self.d == nil:
             // Skip Data is nil.
             ret false
 
@@ -488,7 +488,7 @@ impl DynamicTypeAnnotation {
 
             let t = self.f.generics[i]
             match {
-            | !real(t):
+            | t == nil:
                 self.push_generic(k, i)
 
             | !t.equals(k):
@@ -505,7 +505,7 @@ impl DynamicTypeAnnotation {
 
     unsafe fn annotate_slc(mut self, mut &k: &TypeKind): (ok: bool) {
         let mut pslc = (*self.k).slc()
-        if !real(pslc) {
+        if pslc == nil {
             ret false
         }
 
@@ -525,7 +525,7 @@ impl DynamicTypeAnnotation {
 
     unsafe fn annotate_map(mut self, mut &k: &TypeKind): (ok: bool) {
         let mut pmap = (*self.k).map()
-        if !real(pmap) {
+        if pmap == nil {
             ret false
         }
 
@@ -538,7 +538,7 @@ impl DynamicTypeAnnotation {
 
     unsafe fn annotate_fn(mut self, mut &k: &TypeKind): (ok: bool) {
         let mut pf = (*self.k).fnc()
-        if !real(pf) {
+        if pf == nil {
             ret false
         }
         let mut f = k.fnc()
@@ -570,7 +570,7 @@ impl DynamicTypeAnnotation {
 
     unsafe fn annotate_ptr(mut self, mut &k: &TypeKind): (ok: bool) {
         let mut pptr = (*self.k).ptr()
-        if !real(pptr) {
+        if pptr == nil {
             ret false
         }
 
@@ -582,7 +582,7 @@ impl DynamicTypeAnnotation {
 
     unsafe fn annotate_ref(mut self, mut &k: &TypeKind): (ok: bool) {
         let mut rref = (*self.k).ref()
-        if !real(rref) {
+        if rref == nil {
             ret false
         }
 
@@ -601,7 +601,7 @@ impl DynamicTypeAnnotation {
 
             let t = self.f.generics[i]
             match {
-            | !real(t):
+            | t == nil:
                 self.push_generic(k, i)
 
             | !t.equals(k):
@@ -623,12 +623,12 @@ impl DynamicTypeAnnotation {
 
         match {
         | self.annotate_any(k): ret true
-        | real(k.prim()):       ret self.annotate_prim(k)
-        | real(k.slc()):        ret self.annotate_slc(k)
-        | real(k.map()):        ret self.annotate_map(k)
-        | real(k.fnc()):        ret self.annotate_fn(k)
-        | real(k.ptr()):        ret self.annotate_ptr(k)
-        | real(k.ref()):        ret self.annotate_ref(k)
+        | k.prim() != nil:      ret self.annotate_prim(k)
+        | k.slc() != nil:       ret self.annotate_slc(k)
+        | k.map() != nil:       ret self.annotate_map(k)
+        | k.fnc() != nil:       ret self.annotate_fn(k)
+        | k.ptr() != nil:       ret self.annotate_ptr(k)
+        | k.ref() != nil:       ret self.annotate_ref(k)
         |:                      ret false
         }
     }
@@ -660,7 +660,9 @@ impl FnCallArgChecker {
     }
 
     fn get_params(mut self): []&ParamIns {
-        if self.f.params.len > 0 && real(self.f.params[0].decl) && self.f.params[0].decl.is_self() {
+        if self.f.params.len > 0 &&
+            self.f.params[0].decl != nil &&
+            self.f.params[0].decl.is_self() {
             ret self.f.params[1:] // Remove receiver parameter.
         }
         ret self.f.params
@@ -720,20 +722,20 @@ impl FnCallArgChecker {
     fn push(mut self, mut &p: &ParamIns, mut arg: &Expr): (ok: bool) {
         let mut old = self.e.prefix
         let old_immut = self.e.immutable
-        let mut d = new(Data)
+        let mut d: &Data = nil
 
         self.e.immutable = !p.decl.mutable
         if !self.dynamic_annotation && !p.decl.variadic {
             self.e.prefix = p.kind
         } else {
-            drop(self.e.prefix)
+            self.e.prefix = nil
         }
         d = self.e.eval_expr_kind(arg.kind)
 
         self.e.prefix = old
         self.e.immutable = old_immut
 
-        if !real(d) {
+        if d == nil {
             ret false
         }
 
@@ -762,7 +764,7 @@ impl FnCallArgChecker {
             }
 
             let mut d = self.e.eval_expr_kind(arg.kind)
-            if !real(d) {
+            if d == nil {
                 ok = false
                 continue
             }
@@ -784,7 +786,7 @@ impl FnCallArgChecker {
                     model.elem_kind = p.kind
 
                 |:
-                    drop(model)
+                    model = nil
                     self.arg_models = append(self.arg_models, d.model)
                 }
 
@@ -801,7 +803,7 @@ impl FnCallArgChecker {
             self.push_err(LogMsg.MoreArgsWithVariadiced)
         }
 
-        if real(model) {
+        if model != nil {
             self.arg_models = append(self.arg_models, model)
         }
         ret ok
@@ -836,7 +838,7 @@ impl FnCallArgChecker {
 
     fn check_dynamic_type_annotation(mut self): (ok: bool) {
         for _, g in self.f.generics {
-            if !real(g) {
+            if g == nil {
                 self.push_err(LogMsg.DynamicTypeAnnotationFailed)
                 ret false
             }
@@ -891,7 +893,7 @@ impl StructLitChecker {
     fn check_pair(mut self, mut &pair: &FieldExprPair, mut &exprs: []ExprData) {
         // Check existing.
         let mut f = self.s.find_field(pair.field.kind)
-        if !real(f) {
+        if f == nil {
             self.push_err(pair.field, LogMsg.IdentNotExist, pair.field.kind)
             ret
         }
@@ -923,7 +925,7 @@ impl StructLitChecker {
         self.e.prefix = f.kind
 
         let mut d = self.e.eval_expr_kind(pair.expr)
-        if !real(d) {
+        if d == nil {
             ret
         }
         self.push_match(f, d, pair.field)
@@ -992,7 +994,7 @@ impl StructLitChecker {
                 self.e.prefix = field.kind
 
                 let mut d = self.e.eval_expr_kind(e.kind)
-                if !real(d) {
+                if d == nil {
                     continue
                 }
 
@@ -1034,7 +1036,7 @@ impl RangeChecker {
     }
 
     fn set_size_key(mut self) {
-        if !real(self.rang.key_a) || is_ignore_ident(self.rang.key_a.ident) {
+        if self.rang.key_a == nil || is_ignore_ident(self.rang.key_a.ident) {
             ret
         }
 
@@ -1074,7 +1076,7 @@ impl RangeChecker {
 
     fn check_slice(mut self) {
         self.set_size_key()
-        if !real(self.rang.key_b) || is_ignore_ident(self.rang.key_b.ident) {
+        if self.rang.key_b == nil || is_ignore_ident(self.rang.key_b.ident) {
             ret
         }
 
@@ -1087,7 +1089,7 @@ impl RangeChecker {
 
     fn check_array(mut self) {
         self.set_size_key()
-        if !real(self.rang.key_b) || is_ignore_ident(self.rang.key_b.ident) {
+        if self.rang.key_b == nil || is_ignore_ident(self.rang.key_b.ident) {
             ret
         }
 
@@ -1099,7 +1101,7 @@ impl RangeChecker {
     }
 
     fn check_map_key_a(mut self) {
-        if !real(self.rang.key_a) || is_ignore_ident(self.rang.key_a.ident) {
+        if self.rang.key_a == nil || is_ignore_ident(self.rang.key_a.ident) {
             ret
         }
 
@@ -1114,7 +1116,7 @@ impl RangeChecker {
     }
 
     fn check_map_key_b(mut self) {
-        if !real(self.rang.key_b) || is_ignore_ident(self.rang.key_b.ident) {
+        if self.rang.key_b == nil || is_ignore_ident(self.rang.key_b.ident) {
             ret
         }
 
@@ -1135,7 +1137,7 @@ impl RangeChecker {
 
     fn check_str(mut self) {
         self.set_size_key()
-        if !real(self.rang.key_b) || is_ignore_ident(self.rang.key_b.ident) {
+        if self.rang.key_b == nil || is_ignore_ident(self.rang.key_b.ident) {
             ret
         }
 
@@ -1149,21 +1151,21 @@ impl RangeChecker {
 
     fn check(mut self): bool {
         match {
-        | real(self.d.kind.slc()):
+        | self.d.kind.slc() != nil:
             self.check_slice()
             ret true
 
-        | real(self.d.kind.arr()):
+        | self.d.kind.arr() != nil:
             self.check_array()
             ret true
 
-        | real(self.d.kind.map()):
+        | self.d.kind.map() != nil:
             self.check_map()
             ret true
         }
 
         let prim = self.d.kind.prim()
-        if real(prim) && prim.is_str() {
+        if prim != nil && prim.is_str() {
             self.check_str()
             ret true
         }
@@ -1190,7 +1192,7 @@ impl RetTypeChecker {
     }
 
     fn prepare_exprs(mut self, mut &e: &Expr) {
-        if !real(e) {
+        if e == nil {
             ret
         }
 
@@ -1245,7 +1247,7 @@ impl RetTypeChecker {
             let mut t = self.types[i]
 
             let mut d = self.sc.s.evalp(self.sc, t).eval_expr(expr)
-            if !real(d) {
+            if d == nil {
                 continue
             }
 

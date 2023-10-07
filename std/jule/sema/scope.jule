@@ -56,9 +56,9 @@ fn new_scope_checker(mut &s: &Sema, mut owner: &FnIns): &ScopeChecker {
 // Lookups given scope and parent scopes.
 fn find_label_parent(ident: str, mut scope: &ScopeChecker): &ScopeLabel {
     let mut label = scope.find_label_scope(ident)
-    for !real(label) {
-        if !real(scope.parent) || real(scope.owner) {
-            ret new(ScopeLabel)
+    for label == nil {
+        if scope.parent == nil || scope.owner != nil {
+            ret nil
         }
 
         scope = scope.parent
@@ -89,7 +89,7 @@ fn stmt_is_goto_scope(&stmt: any, &sc: &Scope): bool {
                 ret true
             }
         }
-        ret real(m.default) && &m.default.scope == &sc
+        ret m.default != nil && &m.default.scope == &sc
 
     | &Conditional:
         let c = (&Conditional)(stmt)
@@ -98,7 +98,7 @@ fn stmt_is_goto_scope(&stmt: any, &sc: &Scope): bool {
                 ret true
             }
         }
-        ret real(c.default) && &c.default.scope == &sc
+        ret c.default != nil && &c.default.scope == &sc
 
     |:
         ret false
@@ -110,7 +110,7 @@ fn count_match_type(&m: &Match, &t: &TypeKind): int {
     let kind = t.to_str()
 loop:
     for _, c in m.cases {
-        if !real(c) {
+        if c == nil {
             continue
         }
 
@@ -130,7 +130,7 @@ loop:
 }
 
 fn get_datas_from_tuple_data(mut &d: &Data): []&Data {
-    if real(d.kind.tup()) {
+    if d.kind.tup() != nil {
         match type d.model {
         | &TupleExprModel:
             ret (&TupleExprModel)(d.model).datas
@@ -172,7 +172,7 @@ fn check_mut(mut &s: &Sema, &left: &Data, mut right: &Data, error_token: Token):
         s.push_err(error_token, LogMsg.AssignToNonMut)
         ret false
 
-    | real(right) && !right.mutable && right.kind.mutable():
+    | right != nil && !right.mutable && right.kind.mutable():
         s.push_err(error_token, LogMsg.AssignNonMutToMut)
         ret false
 
@@ -183,7 +183,7 @@ fn check_mut(mut &s: &Sema, &left: &Data, mut right: &Data, error_token: Token):
 
 fn check_assign(mut &s: &Sema, mut &left: &Data, mut right: &Data, error_token: Token): (ok: bool) {
     let f = left.kind.fnc()
-    if real(f) && real(f.decl) && f.decl.global {
+    if f != nil && f.decl != nil && f.decl.global {
         s.push_err(error_token, LogMsg.AssignTypeNotSupportValue)
         ret false
     }
@@ -347,7 +347,7 @@ pub struct Match {
 impl Match {
     // Reports whether match is type-match for generic type.
     pub fn is_generic_type_match(self): bool {
-        ret self.type_match && real(self.expr) && self.expr.kind.generic
+        ret self.type_match && self.expr != nil && self.expr.kind.generic
     }
 }
 
@@ -444,14 +444,14 @@ impl Lookup for ScopeChecker {
         // Search reverse for correct shadowing.
         const REVERSE = true
         let mut v = self.table.__find_var(ident, cpp_linked, REVERSE)
-        if real(v) {
+        if v != nil {
             ret v
         }
 
         let mut parent = self.parent
-        for real(parent) {
+        for parent != nil {
             v = parent.table.__find_var(ident, cpp_linked, REVERSE)
-            if real(v) {
+            if v != nil {
                 ret v
             }
             parent = parent.parent
@@ -471,14 +471,14 @@ impl Lookup for ScopeChecker {
         // Search reverse for correct shadowing.
         const REVERSE = true
         let mut ta = self.table.__find_type_alias(ident, cpp_linked, REVERSE)
-        if real(ta) {
+        if ta != nil {
             ret ta
         }
 
         let mut parent = self.parent
-        for real(parent) {
+        for parent != nil {
             ta = parent.table.__find_type_alias(ident, cpp_linked, REVERSE)
-            if real(ta) {
+            if ta != nil {
                 ret ta
             }
             parent = parent.parent
@@ -534,7 +534,7 @@ impl ScopeChecker {
             ret true
         }
 
-        if real(scope.parent) {
+        if scope.parent != nil {
             scope = scope.parent
             goto iter
         }
@@ -544,13 +544,13 @@ impl ScopeChecker {
 
     // Reports scope is root.
     // Accepts anonymous functions as root.
-    fn is_root(self): bool { ret !real(self.parent) || real(self.owner) }
+    fn is_root(self): bool { ret self.parent == nil || self.owner != nil }
 
     // Returns root scope.
     // Accepts anonymous functions as root.
     fn get_root(mut &self): &ScopeChecker {
         let mut root = self
-        for real(root.parent) && !real(root.owner) {
+        for root.parent != nil && root.owner == nil {
             root = root.parent
         }
         ret root
@@ -569,7 +569,7 @@ impl ScopeChecker {
                 }
             }
         }
-        ret new(Label)
+        ret nil
     }
 
     // Returns label by identifier.
@@ -577,11 +577,11 @@ impl ScopeChecker {
     // Just lookups current scope.
     fn find_label_scope(mut &self, ident: str): &ScopeLabel {
         let mut label = self.find_label_all(ident)
-        if real(label) && &label.scope == &self {
+        if label != nil && &label.scope == &self {
             ret label
         }
 
-        ret new(ScopeLabel)
+        ret nil
     }
 
     // Returns label by identifier.
@@ -593,7 +593,7 @@ impl ScopeChecker {
                 ret lbl
             }
         }
-        ret new(ScopeLabel)
+        ret nil
     }
 
     // Reports this identifier duplicated in scope.
@@ -601,16 +601,16 @@ impl ScopeChecker {
     // If founded identifier address equals to self, will be skipped.
     fn is_duplicated_ident(mut self, itself: uintptr, ident: str): bool {
         let v = self.find_var(ident, false)
-        if real(v) && uintptr(&v) != itself {
-            if !real(v.scope) { // Ignore globals.
+        if v != nil && uintptr(&v) != itself {
+            if v.scope == nil { // Ignore globals.
                 ret false
             }
             ret &v.scope == &self.scope || !self.s.is_flag(SemaFlag.Shadowing)
         }
 
         let ta = self.find_type_alias(ident, false)
-        if real(ta) && uintptr(&ta) != itself {
-            if !real(ta.scope) { // Ignore globals.
+        if ta != nil && uintptr(&ta) != itself {
+            if ta.scope == nil { // Ignore globals.
                 ret false
             }
             ret &ta.scope == &self.tree || !self.s.is_flag(SemaFlag.Shadowing)
@@ -634,7 +634,7 @@ impl ScopeChecker {
         }
 
         self.s.check_var_decl(v, self)
-        if !v.is_type_inferred() && (!real(v.kind) || !real(v.kind.kind)) {
+        if !v.is_type_inferred() && (v.kind == nil || v.kind.kind == nil) {
             ret
         }
 
@@ -700,7 +700,7 @@ impl ScopeChecker {
 
     fn check_expr(mut &self, mut expr: &Expr) {
         let mut d = self.s.eval(self).eval_expr(expr)
-        if !real(d) {
+        if d == nil {
             ret
         }
 
@@ -718,14 +718,14 @@ impl ScopeChecker {
         let mut s = self.check_child(i.scope)
 
         let mut d = self.s.eval(self).eval_expr(i.expr)
-        if !real(d) {
-            ret new(If)
+        if d == nil {
+            ret nil
         }
 
         let mut prim = d.kind.prim()
-        if !real(prim) || !prim.is_bool() {
+        if prim == nil || !prim.is_bool() {
             self.s.push_err(i.expr.token, LogMsg.IfRequireBoolExpr)
-            ret new(If)
+            ret nil
         }
 
         ret &If{
@@ -751,7 +751,7 @@ impl ScopeChecker {
             c.elifs = append(c.elifs, self.check_if(elif))
         }
 
-        if real(conditional.default) {
+        if conditional.default != nil {
             c.default = self.check_else(conditional.default)
         }
     }
@@ -776,7 +776,7 @@ impl ScopeChecker {
 
     fn check_while_iter(mut &self, mut &it: &Iter) {
         let mut wh = (&WhileKind)(it.kind)
-        if !real(wh.expr) && wh.next == nil {
+        if wh.expr == nil && wh.next == nil {
             self.check_inf_iter(it)
             ret
         }
@@ -787,14 +787,14 @@ impl ScopeChecker {
 
         kind.scope = self.check_iter_scope(uintptr(&kind), it.scope)
 
-        if real(wh.expr) {
+        if wh.expr != nil {
             let mut d = self.s.eval(self).eval_expr(wh.expr)
-            if !real(d) {
+            if d == nil {
                 ret
             }
 
             let prim = d.kind.prim()
-            if !real(prim) {
+            if prim == nil {
                 self.s.push_err(it.token, LogMsg.IterWhileRequireBoolExpr)
                 ret
             }
@@ -831,7 +831,7 @@ impl ScopeChecker {
         let mut rang = (&RangeKind)(it.kind)
 
         let mut d = self.s.eval(self).eval_expr(rang.expr)
-        if !real(d) {
+        if d == nil {
             ret
         }
 
@@ -854,7 +854,7 @@ impl ScopeChecker {
 
         let mut ssc = self.new_child_checker()
 
-        if real(kind.key_a) {
+        if kind.key_a != nil {
             if !self.s.is_flag(SemaFlag.Shadowing) && self.is_duplicated_ident(0, kind.key_a.ident) {
                 self.s.push_err(kind.key_a.token, LogMsg.DuplicatedIdent, kind.key_a.ident)
                 self.s.push_suggestion(LogMsg.RenameForAvoidDuplication)
@@ -862,7 +862,7 @@ impl ScopeChecker {
             ssc.table.vars = append(ssc.table.vars, kind.key_a)
         }
 
-        if real(kind.key_b) {
+        if kind.key_b != nil {
             if !self.s.is_flag(SemaFlag.Shadowing) && self.is_duplicated_ident(0, kind.key_b.ident) {
                 self.s.push_err(kind.key_b.token, LogMsg.DuplicatedIdent, kind.key_b.ident)
                 self.s.push_suggestion(LogMsg.RenameForAvoidDuplication)
@@ -894,7 +894,7 @@ impl ScopeChecker {
             ret true
         }
 
-        if real(scope.parent) {
+        if scope.parent != nil {
             scope = scope.parent
             goto iter
         }
@@ -917,7 +917,7 @@ impl ScopeChecker {
             }
         }
 
-        if real(scope.parent) {
+        if scope.parent != nil {
             scope = scope.parent
             goto iter
         }
@@ -933,7 +933,7 @@ impl ScopeChecker {
         let mut scope = self
     iter:
         match {
-        | scope.it == 0 && real(scope.parent) && !real(scope.owner):
+        | scope.it == 0 && scope.parent != nil && scope.owner == nil:
             scope = scope.parent
             goto iter
 
@@ -942,18 +942,18 @@ impl ScopeChecker {
         }
 
         self.s.push_err(c.token, LogMsg.ContinueAtOutOfValidScope)
-        ret new(ContSt)
+        ret nil
     }
 
     fn check_cont(mut &self, c: &std::jule::ast::ContSt) {
         let mut cont = self.check_cont_valid_scope(c)
-        if !real(cont) {
+        if cont == nil {
             ret
         }
 
         if c.label.id != TokenId.Na { // Label given.
             let mut label = find_label_parent(c.label.kind, self.parent)
-            if !real(label) {
+            if label == nil {
                 self.s.push_err(c.label, LogMsg.LabelNotExist, c.label.kind)
                 ret
             }
@@ -989,7 +989,7 @@ impl ScopeChecker {
     }
 
     fn check_label(mut &self, mut l: &LabelSt) {
-        if real(self.find_label(l.ident)) {
+        if self.find_label(l.ident) != nil {
             self.s.push_err(l.token, LogMsg.LabelExist, l.ident)
             ret
         }
@@ -1027,20 +1027,20 @@ impl ScopeChecker {
 
         let mut expr = a.left[0].expr
         let mut d = self.s.eval(self).eval_expr(expr)
-        if !real(d) {
+        if d == nil {
             ret
         }
 
-        _ = check_assign(self.s, d, new(Data), a.setter)
+        _ = check_assign(self.s, d, nil, a.setter)
 
-        if real(d.kind.ptr()) {
+        if d.kind.ptr() != nil {
             let mut ptr = d.kind.ptr()
             if ptr.is_unsafe() {
                 self.s.push_err(a.setter, LogMsg.OperatorNotForJuleType, a.setter.kind, d.kind.to_str())
                 ret
             }
         } else {
-            if !real(d.kind.prim()) || !types::is_num(d.kind.prim().kind) {
+            if d.kind.prim() == nil || !types::is_num(d.kind.prim().kind) {
                 self.s.push_err(a.setter, LogMsg.OperatorNotForJuleType, a.setter.kind, d.kind.to_str())
                 ret
             }
@@ -1061,27 +1061,27 @@ impl ScopeChecker {
     }
 
     fn check_single_assign(mut &self, mut &a: &AssignSt) {
-        let mut l = new(Data)
+        let mut l: &Data = nil
 
         if !is_ignore_ident(a.left[0].ident) {
             let mut expr = a.left[0].expr
             l = self.s.eval(self).eval_expr(expr)
-            if !real(l) {
+            if l == nil {
                 ret
             }
         }
 
-        let mut eval = if real(l) {
+        let mut eval = if l != nil {
             self.s.evalp(self, l.kind)
         } else {
             self.s.eval(self)
         }
         let mut r = eval.eval_expr(a.right)
-        if !real(r) {
+        if r == nil {
             ret
         }
 
-        if !real(l) {
+        if l == nil {
             if r.kind.void() {
                 self.s.push_err(a.right.token, LogMsg.InvalidExpr)
             }
@@ -1094,7 +1094,7 @@ impl ScopeChecker {
             ret
         }
 
-        if real(r.kind.tup()) {
+        if r.kind.tup() != nil {
             self.s.push_err(a.setter, LogMsg.MissingMultiAssignIdents)
             ret
         }
@@ -1118,7 +1118,7 @@ impl ScopeChecker {
             }
 
             r = solver.solve_explicit(l, r)
-            if !real(r) {
+            if r == nil {
                 ret
             }
             a.setter.kind += str(TokenKind.Eq)
@@ -1195,7 +1195,7 @@ impl ScopeChecker {
 
     fn check_ret_multi_assign(mut &self, mut &a: &AssignSt) {
         let mut rd = self.s.eval(self).eval_expr(a.right)
-        if !real(rd) {
+        if rd == nil {
             ret
         }
 
@@ -1215,18 +1215,18 @@ impl ScopeChecker {
             r: rd.model,
         }
 
-        if !real(rd.kind.tup()) {
+        if rd.kind.tup() == nil {
             st.r = &TupleExprModel{datas: r}
         }
 
         for i in a.left {
             let mut lexpr = a.left[i]
-            let mut l = new(Data)
+            let mut l: &Data = nil
 
             if !is_ignore_ident(lexpr.ident) &&
                 (!a.declarative || !self.is_new_assign_ident(lexpr.ident)) {
                 l = self.s.eval(self).eval_expr(lexpr.expr)
-                if !real(l) {
+                if l == nil {
                     continue
                 }
             }
@@ -1271,24 +1271,24 @@ impl ScopeChecker {
 
         for i in a.left {
             let mut lexpr = a.left[i]
-            let mut l = new(Data)
+            let mut l: &Data = nil
 
             if !is_ignore_ident(lexpr.ident) &&
                 (!a.declarative || !self.is_new_assign_ident(lexpr.ident)) {
                 l = self.s.eval(self).eval_expr(lexpr.expr)
-                if !real(l) {
+                if l == nil {
                     continue
                 }
             }
 
             let mut expr = &Expr{kind: right[i], token: a.right.token}
-            let mut eval = if real(l) {
+            let mut eval = if l != nil {
                 self.s.evalp(self, l.kind)
             } else {
                 self.s.eval(self)
             }
             let mut r = eval.eval_expr(expr)
-            if !real(r) {
+            if r == nil {
                 continue
             }
 
@@ -1333,7 +1333,7 @@ impl ScopeChecker {
                 }
 
                 let mut d = eval.eval(e)
-                if real(d) {
+                if d != nil {
                     _case.exprs = append(_case.exprs, d.kind)
                     if count_match_type(m, d.kind) > 1 {
                         self.s.push_err(e.token, LogMsg.DuplicateMatchType, d.kind.to_str())
@@ -1344,7 +1344,7 @@ impl ScopeChecker {
                     generic_matched = generic_matched || expr.kind.equals(d.kind)
                 } else {
                     let trt = expr.kind.trt()
-                    if real(trt) {
+                    if trt != nil {
                         _ = self.s.check_type_compatibility(expr.kind, d.kind, e.token)
                     }
                 }
@@ -1353,7 +1353,7 @@ impl ScopeChecker {
             }
 
             let mut d = self.s.eval(self).eval_expr(e)
-            if !real(d) {
+            if d == nil {
                 continue
             }
 
@@ -1388,7 +1388,7 @@ impl ScopeChecker {
             rm.cases[i] = _case
         }
 
-        if real(rm.default) && m.cases.len > 0 {
+        if rm.default != nil && m.cases.len > 0 {
             rm.cases[rm.cases.len-1].next = rm.default
         }
 
@@ -1433,14 +1433,14 @@ impl ScopeChecker {
         // Match cases by kind.
         if tm.expr.kind.generic {
             for (i, mut c) in tm.cases {
-                if real(c.scope) {
+                if c.scope != nil {
                     tm.cases = nil
                     tm.default = c
                     self.check_comptime_panic(c.scope, m.cases[i].token)
                     goto push
                 }
             }
-            if real(tm.default) {
+            if tm.default != nil {
                 self.check_comptime_panic(tm.default.scope, m.default.token)
             }
             tm.cases = nil
@@ -1452,12 +1452,12 @@ impl ScopeChecker {
 
     fn check_type_match(mut &self, mut &m: &MatchCase) {
         let mut d = self.s.eval(self).eval(m.expr)
-        if !real(d) {
+        if d == nil {
             ret
         }
 
         if !d.kind.generic &&
-            !((real(d.kind.prim()) && d.kind.prim().is_any()) || real(d.kind.trt())) {
+            !((d.kind.prim() != nil && d.kind.prim().is_any()) || d.kind.trt() != nil) {
             self.s.push_err(m.expr.token, LogMsg.TypeCaseHasNotValidExpr)
             ret
         }
@@ -1467,7 +1467,7 @@ impl ScopeChecker {
             expr:       d,
         }
 
-        if real(m.default) {
+        if m.default != nil {
             tm.default = self.check_default(tm, m.default)
         }
         self.check_cases(m, tm, d)
@@ -1476,8 +1476,8 @@ impl ScopeChecker {
     }
 
     fn check_common_match(mut &self, mut &m: &MatchCase) {
-        let mut d = new(Data)
-        if !real(m.expr) {
+        let mut d: &Data = nil
+        if m.expr == nil {
             d = &Data{
                 constant: Const.new_bool(true),
                 kind:     &TypeKind{kind: build_prim_type(str(PrimKind.Bool))},
@@ -1485,7 +1485,7 @@ impl ScopeChecker {
             d.model = d.constant
         } else {
             d = self.s.eval(self).eval_expr(m.expr)
-            if !real(d) {
+            if d == nil {
                 ret
             }
         }
@@ -1496,7 +1496,7 @@ impl ScopeChecker {
 
         self.scope.stmts = append(self.scope.stmts, mc)
 
-        if real(m.default) {
+        if m.default != nil {
             mc.default = self.check_default(mc, m.default)
         }
         self.check_cases(m, mc, d)
@@ -1517,7 +1517,7 @@ impl ScopeChecker {
         }
 
         let mut _case = unsafe { (*Case)(self.cse) }
-        if !real(unsafe { _case.next }) {
+        if (unsafe { _case.next }) == nil {
             self.s.push_err(f.token, LogMsg.FallthroughIntoFinalCase)
             self.s.push_suggestion(LogMsg.RemoveFallthroughFromFinalCase)
             ret
@@ -1530,8 +1530,8 @@ impl ScopeChecker {
 
     fn check_break_with_label(mut &self, b: &std::jule::ast::BreakSt): &BreakSt {
         let mut brk = self.check_plain_break(b)
-        if !real(brk) {
-            ret new(BreakSt)
+        if brk == nil {
+            ret nil
         }
 
         // Set pointer to zero.
@@ -1540,16 +1540,16 @@ impl ScopeChecker {
         brk.mtch = 0
 
         let mut label = find_label_parent(b.label.kind, self.parent)
-        if !real(label) {
+        if label == nil {
             self.s.push_err(b.label, LogMsg.LabelNotExist, b.label.kind)
-            ret new(BreakSt)
+            ret nil
         }
 
         label.used = true
 
         if label.pos+1 >= label.scope.scope.stmts.len {
             self.s.push_err(b.label, LogMsg.InvalidLabel)
-            ret new(BreakSt)
+            ret nil
         }
 
         let i = label.pos + 1
@@ -1585,7 +1585,7 @@ impl ScopeChecker {
         let mut scope = self
     iter:
         match {
-        | scope.it == 0 && scope.cse == 0 && real(scope.parent) && !real(scope.owner):
+        | scope.it == 0 && scope.cse == 0 && scope.parent != nil && scope.owner == nil:
             scope = scope.parent
             goto iter
 
@@ -1597,7 +1597,7 @@ impl ScopeChecker {
         }
 
         self.s.push_err(b.token, LogMsg.BreakAtOutOfValidScope)
-        ret new(BreakSt)
+        ret nil
     }
 
     fn check_break(mut &self, b: &std::jule::ast::BreakSt) {
@@ -1625,13 +1625,13 @@ impl ScopeChecker {
             ret
         }
 
-        if !real(r.expr) && rtc.vars.len == 0 {
+        if r.expr == nil && rtc.vars.len == 0 {
             ret
         }
 
         rt.vars = rtc.vars
 
-        if real(r.expr) {
+        if r.expr != nil {
             rt.expr = rtc.model
         }
     }
@@ -1708,7 +1708,7 @@ impl ScopeChecker {
     fn check_gotos(mut self) {
         for (_, mut gt) in *self.gotos {
             let mut label = self.find_label_all(gt.gt.label.kind)
-            if !real(label) {
+            if label == nil {
                 self.s.push_err(gt.gt.token, LogMsg.LabelNotExist, gt.gt.label.kind)
                 continue
             }
@@ -1767,7 +1767,7 @@ impl ScopeChecker {
     }
 
     fn new_child_checker(mut &self): &ScopeChecker {
-        let mut base = new_scope_checker_base(self.s, new(FnIns))
+        let mut base = new_scope_checker_base(self.s, nil)
         base.parent = self
         base.labels = self.labels
         base.gotos = self.gotos

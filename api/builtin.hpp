@@ -41,12 +41,6 @@ namespace jule {
                              const jule::Slice<Item> &components);
 
     template<typename T>
-    inline void drop(T &obj)  ;
-
-    template<typename T>
-    inline jule::Bool real(const T &obj)  ;
-
-    template<typename T>
     inline void out(const T &obj) {
 #ifdef OS_WINDOWS
         const jule::Str str{ jule::to_str<T>(obj) };
@@ -116,14 +110,6 @@ namespace jule {
         src._len += components._len;
         return src;
     }
-
-    template<typename T>
-    inline void drop(T &obj)
-    { obj.drop(); }
-
-    template<typename T>
-    inline jule::Bool real(const T &obj)
-    { return obj.real(); }
 
 } // namespace jule
 

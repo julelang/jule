@@ -58,7 +58,7 @@ fn imp_is_lookupable(&i: &ImportInfo, ident: str): bool {
 }
 
 fn build_ret_vars(mut &f: &FnIns): []&Var {
-    if f.decl.is_void() || !real(f.result) {
+    if f.decl.is_void() || f.result == nil {
         ret nil
     }
 
@@ -136,7 +136,7 @@ fn build_param_vars(mut &f: &FnIns): []&Var {
 
 fn build_generic_type_aliases(mut &f: &FnIns): []&TypeAlias {
     let mut size = f.generics.len
-    if real(f.decl.owner) {
+    if f.decl.owner != nil {
         size += f.decl.owner.generics.len
     }
 
@@ -158,7 +158,7 @@ fn build_generic_type_aliases(mut &f: &FnIns): []&TypeAlias {
         })
     }
 
-    if real(f.decl.owner) {
+    if f.decl.owner != nil {
         let mut owner = f.owner
         for (i, mut g) in owner.generics {
             let mut decl = owner.decl.generics[i]
@@ -182,13 +182,13 @@ fn find_file(mut &files: []&SymbolTable, &handler: &File): &SymbolTable {
             ret fl
         }
     }
-    ret new(SymbolTable)
+    ret nil
 }
 
 fn conditional_has_ret(mut c: &Conditional): (ok: bool, breaking: bool) {
     let mut breaked = false
     for (_, mut elif) in c.elifs {
-        if !real(elif) {
+        if elif == nil {
             ret false, false
         }
         ok, _, breaking = __has_ret(elif.scope)
@@ -198,7 +198,7 @@ fn conditional_has_ret(mut c: &Conditional): (ok: bool, breaking: bool) {
         }
     }
 
-    if !real(c.default) {
+    if c.default == nil {
         ret false, breaked
     }
 
@@ -208,7 +208,7 @@ fn conditional_has_ret(mut c: &Conditional): (ok: bool, breaking: bool) {
 }
 
 fn match_has_ret(mut m: &Match): bool {
-    if !real(m.default) {
+    if m.default == nil {
         ret false
     }
 
@@ -216,7 +216,7 @@ fn match_has_ret(mut m: &Match): bool {
     let mut falled = false
     let mut breaked = false
     for (_, mut c) in m.cases {
-        if !real(c) {
+        if c == nil {
             ret false
         }
         ok, falled, breaked = __has_ret(c.scope)
@@ -232,7 +232,7 @@ fn match_has_ret(mut m: &Match): bool {
             fall
 
         | falled:
-            if !real(c.next) {
+            if c.next == nil {
                 ret false
             }
             continue
@@ -244,7 +244,7 @@ fn match_has_ret(mut m: &Match): bool {
 }
 
 fn __has_ret(mut s: &Scope): (ok: bool, falled: bool, breaked: bool) {
-    if !real(s) {
+    if s == nil {
         ret false, false, false
     }
 
@@ -354,7 +354,7 @@ impl Lookup for Sema {
     pub fn find_var(mut self, ident: str, cpp_linked: bool): &Var {
         // Lookup package files.
         let mut v = find_var_in_package(self.files, ident, cpp_linked)
-        if real(v) {
+        if v != nil {
             ret v
         }
 
@@ -364,12 +364,12 @@ impl Lookup for Sema {
                 continue
             }
             v = imp.find_var(ident, cpp_linked)
-            if real(v) && self.is_accessible_define(v.public, v.token) {
+            if v != nil && self.is_accessible_define(v.public, v.token) {
                 ret v
             }
         }
 
-        ret new(Var)
+        ret nil
     }
 
     // Returns type alias by identifier and cpp linked state.
@@ -381,7 +381,7 @@ impl Lookup for Sema {
     pub fn find_type_alias(mut self, ident: str, cpp_linked: bool): &TypeAlias {
         // Lookup package files.
         let mut ta = find_type_alias_in_package(self.files, ident, cpp_linked)
-        if real(ta) {
+        if ta != nil {
             ret ta
         }
 
@@ -391,12 +391,12 @@ impl Lookup for Sema {
                 continue
             }
             ta = imp.find_type_alias(ident, cpp_linked)
-            if real(ta) && self.is_accessible_define(ta.public, ta.token) {
+            if ta != nil && self.is_accessible_define(ta.public, ta.token) {
                 ret ta
             }
         }
 
-        ret new(TypeAlias)
+        ret nil
     }
 
     // Returns struct by identifier and cpp linked state.
@@ -408,7 +408,7 @@ impl Lookup for Sema {
     pub fn find_struct(mut self, ident: str, cpp_linked: bool): &Struct {
         // Lookup package files.
         let mut s = find_struct_in_package(self.files, ident, cpp_linked)
-        if real(s) {
+        if s != nil {
             ret s
         }
 
@@ -418,12 +418,12 @@ impl Lookup for Sema {
                 continue
             }
             s = imp.find_struct(ident, cpp_linked)
-            if real(s) && self.is_accessible_define(s.public, s.token) {
+            if s != nil && self.is_accessible_define(s.public, s.token) {
                 ret s
             }
         }
 
-        ret new(Struct)
+        ret nil
     }
 
     // Returns function by identifier and cpp linked state.
@@ -435,7 +435,7 @@ impl Lookup for Sema {
     pub fn find_fn(mut self, ident: str, cpp_linked: bool): &Fn {
         // Lookup package files.
         let mut f = find_fn_in_package(self.files, ident, cpp_linked)
-        if real(f) {
+        if f != nil {
             ret f
         }
 
@@ -445,12 +445,12 @@ impl Lookup for Sema {
                 continue
             }
             f = imp.find_fn(ident, cpp_linked)
-            if real(f) && self.is_accessible_define(f.public, f.token) {
+            if f != nil && self.is_accessible_define(f.public, f.token) {
                 ret f
             }
         }
 
-        ret new(Fn)
+        ret nil
     }
 
     // Returns trait by identifier.
@@ -462,7 +462,7 @@ impl Lookup for Sema {
     pub fn find_trait(mut self, ident: str): &Trait {
         // Lookup package files.
         let mut t = find_trait_in_package(self.files, ident)
-        if real(t) {
+        if t != nil {
             ret t
         }
 
@@ -472,12 +472,12 @@ impl Lookup for Sema {
                 continue
             }
             t = imp.find_trait(ident)
-            if real(t) && self.is_accessible_define(t.public, t.token) {
+            if t != nil && self.is_accessible_define(t.public, t.token) {
                 ret t
             }
         }
 
-        ret new(Trait)
+        ret nil
     }
 
     // Returns enum by identifier.
@@ -489,7 +489,7 @@ impl Lookup for Sema {
     pub fn find_enum(mut self, ident: str): &Enum {
         // Lookup package files.
         let mut e = find_enum_in_package(self.files, ident)
-        if real(e) {
+        if e != nil {
             ret e
         }
 
@@ -499,12 +499,12 @@ impl Lookup for Sema {
                 continue
             }
             e = imp.find_enum(ident)
-            if real(e) && self.is_accessible_define(e.public, e.token) {
+            if e != nil && self.is_accessible_define(e.public, e.token) {
                 ret e
             }
         }
 
-        ret new(Enum)
+        ret nil
     }
 }
 
@@ -525,7 +525,7 @@ impl Sema {
 
     // Reports whether define is accessible in the current package.
     fn is_accessible_define(self, public: bool, token: Token): bool {
-        ret public || !real(token.file) || self.file.file.dir() == token.file.dir()
+        ret public || token.file == nil || self.file.file.dir() == token.file.dir()
     }
 
     // Reports this identifier duplicated in package's global scope.
@@ -764,7 +764,7 @@ impl Sema {
     // Checks type and builds result as kind.
     // Skips already checked types.
     fn check_type(mut &self, mut &t: &TypeSymbol, mut l: Lookup): (ok: bool) {
-        ret self.check_type_with_refers(t, l, new(Referencer))
+        ret self.check_type_with_refers(t, l, nil)
     }
 
     // Builds type with type aliases for generics.
@@ -805,12 +805,12 @@ impl Sema {
 
     // Returns Eval instance for configuration with type prefix.
     fn evalp(mut &self, mut l: Lookup, mut p: &TypeKind): &Eval {
-        ret self.evalpd(l, p, new(Var))
+        ret self.evalpd(l, p, nil)
     }
 
     // Returns Eval instance for configuration.
     fn eval(mut &self, mut l: Lookup): &Eval {
-        ret self.evalp(l, new(TypeKind))
+        ret self.evalp(l, nil)
     }
 
     fn check_assign_type(mut &self, dest_is_ref: bool, mut &dest: &TypeKind,
@@ -832,7 +832,7 @@ impl Sema {
             }
         }
 
-        if !d.is_const() || !real(dest.prim()) {
+        if !d.is_const() || dest.prim() == nil {
             ret
         }
 
@@ -848,7 +848,7 @@ impl Sema {
     fn check_type_compatibility(mut &self, mut &dest: &TypeKind,
         mut &src: &TypeKind, mut &error_token: Token): bool {
         // Tuple to single type, always fails.
-        if real(src.tup()) {
+        if src.tup() != nil {
             self.push_err(
                 error_token, LogMsg.IncompatibleTypes, dest.to_str(), src.to_str())
             ret false
@@ -918,12 +918,12 @@ impl Sema {
         let mut old = f.decl.sema.file
         defer { f.decl.sema.set_current_file(old) }
         let mut file = find_file(f.decl.sema.files, f.decl.token.file)
-        if real(file) {
+        if file != nil {
             f.decl.sema.set_current_file(file)
         }
 
         let mut size = f.generics.len
-        if real(f.decl) && real(f.decl.owner) {
+        if f.decl != nil && f.decl.owner != nil {
             size += f.decl.owner.generics.len
         }
 
@@ -938,7 +938,7 @@ impl Sema {
             })
         }
 
-        if real(f.decl) && real(f.decl.owner) {
+        if f.decl != nil && f.decl.owner != nil {
             let mut owner = f.owner
             for (i, mut g) in owner.generics {
                 generics = append(generics, &TypeAlias{
@@ -954,7 +954,7 @@ impl Sema {
         for (_, mut p) in f.params {
             if !p.decl.is_self() {
                 p.kind = sema.build_type_with_generics(p.decl.kind.decl, generics)
-                if real(p.kind) {
+                if p.kind != nil {
                     if p.decl.reference && !is_valid_for_ref(p.kind) {
                         self.push_err(p.decl.token, LogMsg.RefPointsToInvalidType, p.kind.to_str())
                     }
@@ -966,7 +966,7 @@ impl Sema {
 
         if !f.decl.is_void() {
             f.result = sema.build_type_with_generics(f.decl.result.kind.decl, generics)
-            ok = real(f.result) && ok
+            ok = f.result != nil && ok
         }
 
         if &sema != &self {
@@ -1036,7 +1036,7 @@ impl Sema {
         let mut old = self.file
         defer { self.set_current_file(old) }
         let mut file = find_file(self.files, ta.token.file)
-        if real(file) {
+        if file != nil {
             self.set_current_file(file)
         }
 
@@ -1045,7 +1045,7 @@ impl Sema {
             owner: ta,
             refs:  &ta.refers,
         })
-        if ok && real(ta.kind.kind.arr()) && ta.kind.kind.arr().auto {
+        if ok && ta.kind.kind.arr() != nil && ta.kind.kind.arr().auto {
             self.push_err(ta.kind.decl.token, LogMsg.ArrayAutoSized)
             ok = false
         }
@@ -1110,7 +1110,7 @@ impl Sema {
                 item.value.data.model = item.value.data.constant
             } else {
                 let mut d = self.eval(self).eval_expr(item.value.expr)
-                if !real(d) {
+                if d == nil {
                     continue
                 }
 
@@ -1142,7 +1142,7 @@ impl Sema {
                 item.value.data.model = item.value.data.constant
             } else {
                 let mut d = self.eval(self).eval_expr(item.value.expr)
-                if !real(d) {
+                if d == nil {
                     continue
                 }
 
@@ -1170,7 +1170,7 @@ impl Sema {
 
         self.check_enum_items_dup(e)
 
-        if real(e.kind) {
+        if e.kind != nil {
             if !self.check_type(e.kind, self) {
                 ret
             }
@@ -1184,7 +1184,7 @@ impl Sema {
         }
 
         let mut t = e.kind.kind.prim()
-        if !real(t) {
+        if t == nil {
             self.push_err(e.token, LogMsg.InvalidTypeSource)
             ret
         }
@@ -1332,21 +1332,21 @@ impl Sema {
         ok = true
 
         let mut generics = f.generics
-        if real(f.owner) {
+        if f.owner != nil {
             generics = append(generics, f.owner.generics...)
         }
 
         for (_, mut p) in f.params {
             if !p.is_self() {
                 let mut kind = self.build_non_generic_type_kind(p.kind.decl, generics)
-                ok = real(kind) && ok
+                ok = kind != nil && ok
                 p.kind.kind = kind
             }
         }
 
         if !f.is_void() {
             let mut kind = self.build_non_generic_type_kind(f.result.kind.decl, generics)
-            ok = real(kind) && ok
+            ok = kind != nil && ok
             f.result.kind.kind = kind
         }
 
@@ -1433,7 +1433,7 @@ impl Sema {
     fn check_trait_impl_methods(mut self, mut &base: &Trait, &ipl: &Impl): (ok: bool) {
         ok = true
         for _, f in ipl.methods {
-            if !real(base.find_method(f.ident)) {
+            if base.find_method(f.ident) == nil {
                 self.push_err(f.token, LogMsg.TraitHaveNotIdent, base.ident, f.ident)
                 ok = false
             }
@@ -1446,7 +1446,7 @@ impl Sema {
 
         // Methods.
         for (_, mut f) in ipl.methods {
-            if real(dest.find_method(f.ident, f.statically)) || real(dest.find_field(f.ident)) {
+            if dest.find_method(f.ident, f.statically) != nil || dest.find_field(f.ident) != nil {
                 self.push_err(f.token, LogMsg.StructAlreadyHaveIdent, dest.ident, f.ident)
                 ok = false
                 continue
@@ -1470,7 +1470,7 @@ impl Sema {
 
         for (_, mut v) in ipl.statics {
             const STATIC = true
-            if real(dest.find_method(v.ident, STATIC)) || real(dest.find_static(v.ident)) {
+            if dest.find_method(v.ident, STATIC) != nil || dest.find_static(v.ident) != nil {
                 self.push_err(v.token, LogMsg.StructAlreadyHaveIdent, dest.ident, v.ident)
                 ok = false
                 continue
@@ -1486,10 +1486,10 @@ impl Sema {
     // Implement trait to destination.
     fn impl_trait(mut &self, mut &decl: &Impl) {
         let mut base = self.find_trait(decl.base.kind)
-        if !real(base) {
+        if base == nil {
             base = find_builtin_trait(decl.base.kind)
         }
-        if !real(base) {
+        if base == nil {
             self.push_err(decl.base, LogMsg.ImplBaseNotExist, decl.base.kind)
             ret
         }
@@ -1499,7 +1499,7 @@ impl Sema {
         const CPP_LINKED = false
 
         let mut dest = self.find_struct(decl.dest.kind, CPP_LINKED)
-        if !real(dest) {
+        if dest == nil {
             self.push_err(decl.dest, LogMsg.ImplDestNotExist, decl.dest.kind)
             ret
         }
@@ -1528,7 +1528,7 @@ impl Sema {
         const CPP_LINKED = false
 
         let mut dest = self.find_struct(decl.dest.kind, CPP_LINKED)
-        if !real(dest) {
+        if dest == nil {
             self.push_err(decl.dest, LogMsg.ImplDestNotExist, decl.dest.kind)
             ret
         }
@@ -1625,7 +1625,7 @@ impl Sema {
             let mut exist = false
             let mut sf = strct.find_method(tf.ident, tf.statically)
             let tf_k = self.get_trait_check_fn_kind(tf)
-            if real(sf) {
+            if sf != nil {
                 let mut sf_k = self.get_trait_check_fn_kind(sf)
                 exist = (
                     tf_k.decl.public == sf_k.decl.public &&
@@ -1671,7 +1671,7 @@ impl Sema {
         for (_, mut f) in st.fields {
             f.owner = st
             f.kind.kind = tc.check_decl(f.kind.decl)
-            ok = real(f.kind.kind) && ok
+            ok = f.kind.kind != nil && ok
 
             for _, cf in st.fields {
                 if f == cf {
@@ -1686,7 +1686,7 @@ impl Sema {
 
         // Save itself for legal cycles like *Struct, or &Struct.
         if ok && n != st.instances.len {
-            drop(tc.referencer)
+            tc.referencer = nil
             st.instances = st.instances[:n]
             for (_, mut f) in st.fields {
                 f.kind.kind = tc.check_decl(f.kind.decl)
@@ -1807,7 +1807,7 @@ impl Sema {
 
     fn check_struct_derive_illegal_cycles(mut self, derive: str, &st1: &Struct, mut &k: &TypeKind): (ok: bool) {
         let mut st2 = get_struct_from_kind(k)
-        if !real(st2) {
+        if st2 == nil {
             ret true
         }
 
@@ -1838,7 +1838,7 @@ impl Sema {
         }
 
         for (_, mut f) in st.fields {
-            if !real(f.kind) || !f.kind.mutable() {
+            if f.kind == nil || !f.kind.mutable() {
                 continue
             }
 
@@ -1955,10 +1955,10 @@ impl Sema {
             self.check_data_for_type_inference(v.value.data, v.value.expr.token)
         } else {
             let mut arr = v.kind.kind.arr()
-            if real(arr) {
+            if arr != nil {
                 if arr.auto {
                     let data_arr = v.value.data.kind.arr()
-                    if real(data_arr) {
+                    if data_arr != nil {
                         arr.n = data_arr.n
                     }
                 }
@@ -1983,12 +1983,12 @@ impl Sema {
                 self.push_err(v.value.expr.token, LogMsg.ExprNotConst)
             }
         } else {
-            drop(v.value.data.constant)
+            v.value.data.constant = nil
         }
 
         // Remove kind for avoid more tuple-type errors.
-        if real(v.kind.kind.tup()) {
-            drop(v.kind.kind)
+        if v.kind.kind.tup() != nil {
+            v.kind.kind = nil
         }
     }
 
@@ -1997,14 +1997,14 @@ impl Sema {
             ret
         }
 
-        let mut eval = if real(decl.kind) {
+        let mut eval = if decl.kind != nil {
             self.evalpd(l, decl.kind.kind, decl)
         } else {
-            self.evalpd(l, new(TypeKind), decl)
+            self.evalpd(l, nil, decl)
         }
         eval.immutable = !decl.mutable
         decl.value.data = eval.eval_expr(decl.value.expr)
-        if !real(decl.value.data) {
+        if decl.value.data == nil {
             ret // Skip checks if error ocurrs.
         }
 
@@ -2120,7 +2120,7 @@ impl Sema {
         let mut old = f.decl.sema.file
         defer { f.decl.sema.set_current_file(old) }
         let mut file = find_file(f.decl.sema.files, f.decl.token.file)
-        if real(file) {
+        if file != nil {
             f.decl.sema.set_current_file(file)
         }
 

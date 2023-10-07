@@ -85,7 +85,7 @@ fn concat_all_parts(parts: ...str): str {
 }
 
 fn get_accessor(mut &t: &TypeKind): str {
-    if real(t.ref()) || real(t.ptr()) {
+    if t.ref() != nil || t.ptr() != nil {
         ret "->"
     }
     ret str(TokenKind.Dot)
@@ -325,7 +325,7 @@ fn gen_binop_expr_model(mut m: &BinopExprModel): str {
 fn gen_var_expr_model(mut m: &Var): str {
     if m.cpp_linked {
         let d = find_directive(m.directives, str(Directive.Namespace))
-        if real(d) {
+        if d != nil {
             let mut obj = concat_all_parts(d.args...)
             obj += "::"
             obj += var_out_ident(m)
@@ -448,22 +448,22 @@ fn gen_alloc_struct_lit_expr_model(mut m: &AllocStructLitExprModel): str {
 fn gen_casting_expr_model(mut m: &CastingExprModel): str {
     let mut obj = ""
     match {
-    | real(m.kind.prim()) && m.kind.prim().is_any():
+    | m.kind.prim() != nil && m.kind.prim().is_any():
         obj += gen_type_kind(m.kind)
         obj += "("
         obj += gen_expr_model(m.expr)
         obj += ")"
 
-    | real(m.expr_kind.ptr())
-    | real(m.kind.ptr()):
+    | m.expr_kind.ptr() != nil
+    | m.kind.ptr() != nil:
         obj += "(("
         obj += gen_type_kind(m.kind)
         obj += ")("
         obj += gen_expr(m.expr)
         obj += "))"
 
-    | real(m.expr_kind.trt())
-    | real(m.expr_kind.prim()) && m.expr_kind.prim().is_any():
+    | m.expr_kind.trt() != nil
+    | m.expr_kind.prim() != nil && m.expr_kind.prim().is_any():
         obj += gen_expr_model(m.expr)
         obj += get_accessor(m.expr_kind)
         obj += "operator "
@@ -541,7 +541,7 @@ fn gen_indexing_expr_model(mut m: &IndexigExprModel): str {
 
     // Try access optimization.
     if *env::OPT_ACCESS {
-        let array = real(m.expr.kind.arr())
+        let array = m.expr.kind.arr() != nil
 
         // Constants checked by semantic analysis for arrays, safe.
         if array && m.index.is_const() {
@@ -554,7 +554,7 @@ fn gen_indexing_expr_model(mut m: &IndexigExprModel): str {
         match type m.index.model {
         | &Var:
             let i = (&Var)(m.index.model)
-            if i.mutable || !real(i.iter_relation) {
+            if i.mutable || i.iter_relation == nil {
                 break
             }
             match type m.expr.model {
@@ -642,7 +642,7 @@ fn gen_trait_sub_ident_expr_model(mut m: &TraitSubIdentExprModel): str {
 fn gen_struct_sub_ident_expr_model(mut m: &StructSubIdentExprModel): str {
     let mut obj = gen_expr_model(m.expr)
     obj += get_accessor(m.expr_kind)
-    if real(m.field) {
+    if m.field != nil {
         obj += field_out_ident(m.field.decl)
     } else {
         obj += fn_ins_out_ident(m.method)
@@ -681,9 +681,9 @@ fn gen_fn_ins_expr_model_common(mut m: &FnIns): str {
 
 // Returns elementary expression model of function instance.
 fn gen_fn_ins_expr_model(mut m: &FnIns): str {
-    if real(m.decl) && m.decl.cpp_linked {
+    if m.decl != nil && m.decl.cpp_linked {
         let d = find_directive(m.decl.directives, str(Directive.Namespace))
-        if real(d) {
+        if d != nil {
             let mut obj = concat_all_parts(d.args...)
             obj += "::"
             obj += fn_ins_out_ident(m)
@@ -761,7 +761,7 @@ fn gen_builtin_make_call_expr_model(mut m: &BuiltinMakeCallExprModel): str {
         obj += "," + gen_expr(m.cap)
     }
 
-    if real(m.kind.slc().elem.enm()) {
+    if m.kind.slc().elem.enm() != nil {
         obj += ","
         obj += get_init_expr(m.kind.slc().elem)
         if m.cap != nil {
@@ -1052,12 +1052,12 @@ fn gen_val(mut v: &Value): str {
 }
 
 fn get_init_expr(mut t: &TypeKind): str {
-    if real(t.ptr()) {
+    if t.ptr() != nil {
         ret "nullptr"
     }
 
     let mut enm = t.enm()
-    if real(enm) {
+    if enm != nil {
         ret gen_val(enm.items[0].value)
     }
     ret gen_type_kind(t) + "()"

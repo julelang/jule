@@ -346,17 +346,17 @@ impl ExprBuilder {
 
     fn build_cpp_linked_ident(mut self, mut &tokens: []Token): &IdentExpr {
         if tokens[0].id != TokenId.Cpp {
-            ret new(IdentExpr)
+            ret nil
         } else if tokens[1].id != TokenId.Dot {
             self.push_err(tokens[1], LogMsg.InvalidSyntax)
             self.push_suggestion(LogMsg.ExpectedDotForCpp)
-            ret new(IdentExpr)
+            ret nil
         }
         let mut token = tokens[2]
         if token.id != TokenId.Ident {
             self.push_err(tokens[2], LogMsg.InvalidSyntax)
             self.push_suggestion(LogMsg.ExpectedIdentifier)
-            ret new(IdentExpr)
+            ret nil
         }
         let mut expr = build_ident_expr(token)
         expr.cpp_linked = true
@@ -367,10 +367,10 @@ impl ExprBuilder {
         let mut op = tokens[0]
         if tokens.len == 1 {
             self.push_err(op, LogMsg.MissingExprForUnary)
-            ret new(UnaryExpr)
+            ret nil
         } else if !is_unary_op(op.kind) {
             self.push_err(op, LogMsg.InvalidOpForUnary, op.kind)
-            ret new(UnaryExpr)
+            ret nil
         }
 
         // Length is 1 cause all length of operator tokens is 1.
@@ -391,7 +391,7 @@ impl ExprBuilder {
         tokens = tokens[:i] // Remove dot token and selected identifier token.
         if tokens.len == 0 {
             self.push_err(ident_token, LogMsg.InvalidSyntax)
-            ret new(SubIdentExpr)
+            ret nil
         }
         ret &SubIdentExpr{
             ident: ident_token,
@@ -423,7 +423,7 @@ impl ExprBuilder {
         let (mut t, ok) = unsafe { self.p.build_type(tokens, &i, false) }
         if !ok {
             self.push_err(tokens[0], LogMsg.InvalidSyntax)
-            ret new(TypeDecl)
+            ret nil
         }
 
         if i < tokens.len {
@@ -504,7 +504,7 @@ impl ExprBuilder {
             if range_n > 0 {
                 continue
             } else if i+1 == tokens.len {
-                ret new(CastExpr)
+                ret nil
             }
 
             let mut type_tokens = tokens[:i+1]
@@ -512,12 +512,12 @@ impl ExprBuilder {
 
             if expr_tokens.len == 0 {
                 // Expression is parentheses group.
-                ret new(CastExpr)
+                ret nil
             }
 
             let tok = expr_tokens[0]
             if tok.id != TokenId.Range || tok.kind != str(TokenKind.LParent) {
-                ret new(CastExpr)
+                ret nil
             }
 
             let mut cast = &CastExpr{}
@@ -548,7 +548,7 @@ impl ExprBuilder {
                     let mut j = 0
                     _ = range(j, TokenKind.LParent, TokenKind.RParent, expr_tokens)
                     if j < expr_tokens.len {
-                        ret new(CastExpr)
+                        ret nil
                     }
                     expr_tokens = expr_tokens[:j]
                     cast.expr = self.build(expr_tokens)
@@ -557,7 +557,7 @@ impl ExprBuilder {
             ret cast
         }
 
-        ret new(CastExpr)
+        ret nil
     }
 
     fn push_arg(mut self, mut &args: []&Expr, mut tokens: []Token, err_token: Token) {
@@ -652,7 +652,7 @@ impl ExprBuilder {
             match token.kind {
             | str(TokenKind.LParent):
                 let mut expr = self.try_build_cast(tokens)
-                if real(expr) {
+                if expr != nil {
                     ret expr
                 }
             }
@@ -676,7 +676,7 @@ impl ExprBuilder {
         let mut range_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
         if range_tokens.len == 0 {
             self.push_err(tokens[0], LogMsg.MissingExpr)
-            ret new(UnsafeExpr)
+            ret nil
         }
         ret &UnsafeExpr{
             token: token,
@@ -797,17 +797,17 @@ impl ExprBuilder {
         let mut i = 0
         let (mut t, ok) = unsafe { self.p.build_type(tokens, &i, true) }
         if !ok {
-            ret new(StructLit)
+            ret nil
         } else if i >= tokens.len {
             self.push_err(tokens[i], LogMsg.InvalidSyntax)
-            ret new(StructLit)
+            ret nil
         }
 
         tokens = tokens[i:] // Remove type tokens.
         let token = tokens[0]
         if token.id != TokenId.Range || token.kind != str(TokenKind.LBrace) {
             self.push_err(token, LogMsg.InvalidSyntax)
-            ret new(StructLit)
+            ret nil
         }
 
         ret &StructLit{
@@ -1103,13 +1103,13 @@ impl ExprBuilder {
         if left_tokens.len == 0 {
             self.push_err(tokens[i], LogMsg.InvalidSyntax)
             self.push_suggestion(LogMsg.ExpectedLeftOperand)
-            ret new(BinopExpr)
+            ret nil
         }
 
         if right_tokens.len == 0 {
             self.push_err(tokens[i], LogMsg.InvalidSyntax)
             self.push_suggestion(LogMsg.ExpectedRightOperand)
-            ret new(BinopExpr)
+            ret nil
         }
 
         ret &BinopExpr{
@@ -1141,7 +1141,7 @@ impl ExprBuilder {
     fn build_from_tokens(mut self, mut tokens: []Token): &Expr {
         tokens = eliminate_comments(tokens)
         if tokens.len == 0 {
-            ret new(Expr)
+            ret nil
         }
         ret &Expr{
             token: tokens[0],

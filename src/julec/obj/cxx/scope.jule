@@ -63,12 +63,12 @@ fn gen_range_index_iter(mut &it: &RangeIter): str {
     obj += "if (it != expr.end()) {\n"
     add_indent()
     obj += indent()
-    if real(it.key_a) {
+    if it.key_a != nil {
         obj += gen_var_init_expr(it.key_a, "it - expr.begin()");
         obj += "\n"
         obj += indent()
     }
-    if real(it.key_b) {
+    if it.key_b != nil {
         if *env::OPT_COPY {
             it.key_b.reference = iter_expr_is_copy_optimizable(it.expr, it.key_b)
         }
@@ -84,7 +84,7 @@ fn gen_range_index_iter(mut &it: &RangeIter): str {
     obj += indent()
     obj += "++it;\n"
     obj += indent()
-    if real(it.key_a) {
+    if it.key_a != nil {
         obj += var_out_ident(it.key_a);
         obj += "++;\n"
         obj += indent()
@@ -133,7 +133,7 @@ fn gen_range_hashmap_iter(mut &it: &RangeIter): str {
     obj += "if (it != expr.end()) {\n"
     add_indent()
     obj += indent()
-    if real(it.key_a) {
+    if it.key_a != nil {
         if *env::OPT_COPY {
             it.key_a.reference = iter_expr_is_copy_optimizable(it.expr, it.key_a)
         }
@@ -141,7 +141,7 @@ fn gen_range_hashmap_iter(mut &it: &RangeIter): str {
         obj += "\n"
         obj += indent()
     }
-    if real(it.key_b) {
+    if it.key_b != nil {
         if *env::OPT_COPY {
             it.key_b.reference = iter_expr_is_copy_optimizable(it.expr, it.key_b)
         }
@@ -194,7 +194,7 @@ fn gen_conditional(mut c: &Conditional): str {
         obj += gen_if(elif)
     }
 
-    if real(c.default) {
+    if c.default != nil {
         obj += " else "
         obj += gen_scope(c.default.scope)
     }
@@ -263,10 +263,10 @@ fn gen_while_iter(mut it: &WhileIter): str {
 
 fn gen_range_iter(mut it: &RangeIter): str {
     match {
-    | real(it.expr.kind.slc()): ret gen_range_index_iter(it)
-    | real(it.expr.kind.arr()): ret gen_range_index_iter(it)
-    | real(it.expr.kind.map()): ret gen_range_hashmap_iter(it)
-    |:                          ret gen_range_index_iter(it) // Str
+    | it.expr.kind.slc() != nil: ret gen_range_index_iter(it)
+    | it.expr.kind.arr() != nil: ret gen_range_index_iter(it)
+    | it.expr.kind.map() != nil: ret gen_range_hashmap_iter(it)
+    |:                           ret gen_range_index_iter(it) // Str
     }
 }
 
@@ -415,12 +415,12 @@ fn gen_case(mut m: &Match, mut c: &Case): str {
 }
 
 fn gen_match(mut m: &Match): str {
-    if m.cases.len == 0 && !real(m.default) {
+    if m.cases.len == 0 && m.default == nil {
         ret ""
     }
 
     let generic_type_match = m.is_generic_type_match()
-    if generic_type_match && (!real(m.default) || m.default.scope.stmts.len == 0) {
+    if generic_type_match && (m.default == nil || m.default.scope.stmts.len == 0) {
         ret ""
     }
 
@@ -451,7 +451,7 @@ fn gen_match(mut m: &Match): str {
         }
     }
 
-    if real(m.default) {
+    if m.default != nil {
         obj += "\n"
         obj += gen_case(m, m.default)
     }
@@ -598,7 +598,7 @@ fn gen_ret_st(mut r: &RetSt): str {
 
 fn gen_ret_st_with_defaults(mut result: &TypeKind): str {
     let mut obj = "return "
-    if real(result.tup()) {
+    if result.tup() != nil {
         obj += "std::make_tuple("
         for (_, mut t) in result.tup().types {
             obj += get_init_expr(t)
@@ -722,7 +722,7 @@ fn gen_scope(mut s: &Scope): str {
 
 // Generates C++ code of function's scope.
 fn gen_fn_scope(mut f: &FnIns): str {
-    if real(f.owner) {
+    if f.owner != nil {
         ret gen_method_scope(f)
     }
 
