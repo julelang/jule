@@ -129,7 +129,6 @@ struct TypeCompatibilityChecker {
     dest:        &TypeKind
     src:         &TypeKind
     error_token: Token
-    ignore_any:  bool
 }
 
 impl TypeCompatibilityChecker {
@@ -174,28 +173,9 @@ impl TypeCompatibilityChecker {
         }
     }
 
-    fn check_sptr(mut self): (ok: bool) {
-        if self.src.is_nil() {
-            ret true
-        }
-
-        let mut src = self.src.sptr()
-        if src == nil {
-            ret false
-        }
-
-        let mut dest = self.dest.sptr()
-        ret dest.elem.equals(src.elem)
-    }
-
     fn check_ptr(mut self): (ok: bool) {
         if self.src.is_nil() {
             ret true
-        }
-
-        let mut src = self.src.ptr()
-        if src == nil {
-            ret false
         }
 
         let mut dest = self.dest.ptr()
@@ -204,170 +184,31 @@ impl TypeCompatibilityChecker {
             ret true
         }
 
-        ret dest.elem.equals(src.elem)
-    }
-
-    fn check_slc(mut self): (ok: bool) {
-        if self.src.is_nil() {
-            ret true
-        }
-
-        let mut src = self.src.slc()
-        if src == nil {
-            ret false
-        }
-        let mut dest = self.dest.slc()
-
-        let mut sub = TypeCompatibilityChecker{
-            s:           self.s,
-            error_token: self.error_token,
-            src:         src.elem,
-            dest:        dest.elem,
-            ignore_any:  true,
-        }
-        ret sub.check()
-    }
-
-    fn check_arr(mut self): (ok: bool) {
-        let mut src = self.src.arr()
-        if src == nil {
-            ret false
-        }
-        let mut dest = self.dest.arr()
-        if dest.n != src.n {
-            ret false
-        }
-
-        let mut sub = TypeCompatibilityChecker{
-            s:           self.s,
-            error_token: self.error_token,
-            src:         src.elem,
-            dest:        dest.elem,
-            ignore_any:  true,
-        }
-        ret sub.check()
-    }
-
-    fn check_map(mut self): (ok: bool) {
-        if self.src.is_nil() {
-            ret true
-        }
-
-        let mut src = self.src.map()
-        if src == nil {
-            ret false
-        }
-
-        let mut dest = self.dest.map()
-
-        let mut sub = TypeCompatibilityChecker{
-            s:           self.s,
-            error_token: self.error_token,
-            src:         src.key,
-            dest:        dest.key,
-        }
-        if !sub.check() {
-            ret false
-        }
-
-        sub.src = src.val
-        sub.dest = dest.val
-        ret sub.check()
-    }
-
-    fn check_struct(mut self): (ok: bool) {
-        let mut src = self.src.strct()
-        if src == nil {
-            ret false
-        }
-        let mut dest = self.dest.strct()
-        match {
-        | dest.decl != src.decl:
-            ret false
-
-        | dest.generics.len == 0:
-            ret true
-        }
-
-        for (i, mut dg) in dest.generics {
-            let mut sg = src.generics[i]
-            let mut sub = TypeCompatibilityChecker{
-                s:           self.s,
-                error_token: self.error_token,
-                src:         sg,
-                dest:        dg,
-            }
-            if !sub.check() {
-                ret false
-            }
-        }
-        ret true
-    }
-
-    fn check_fn(mut self): (ok: bool) {
-        if self.src.is_nil() {
-            ret true
-        }
-
-        let mut src = self.src.fnc()
-        if src == nil {
-            ret false
-        }
-
-        let mut dest = self.dest.fnc()
-        ret dest.equals(&TypeKind{kind: src})
-    }
-
-    fn check_enum(mut self): (ok: bool) {
-        let r = self.src.enm()
-        if r == nil {
-            ret false
-        }
-        ret self.dest.enm() == r
+        ret self.dest.equals(self.src)
     }
 
     fn check_prim(mut self): (ok: bool) {
-        let dest = self.dest.prim()
-        let mut src = self.src.prim()
-        if src == nil {
-            ret dest.is_any()
+        let prim = self.dest.prim()
+        if prim != nil && prim.is_any() {
+            ret true
         }
-        if dest.is_any() {
-            ret !self.ignore_any || src.is_any()
-        }
-        ret types::types_are_compatible(dest.to_str(), src.to_str())
-    }
-
-    fn check_cpp_linked(mut self): (ok: bool) {
-        ret self.src.cpp_linked() &&
-            self.dest.cpp_ident == self.src.cpp_ident
+        ret self.dest.equals(self.src)
     }
 
     fn check(mut self): (ok: bool) {
-        if self.src == nil {
-            ret false
+        if self.dest.ptr() != nil {
+            ret self.check_ptr()
         }
-
-        if self.dest.variadic != self.src.variadic {
-            ret false
-        } else if self.dest.variadic {
-            self.ignore_any = true
+        if self.dest.nil_compatible() {
+            if self.src.is_nil() {
+                ret true
+            }
         }
 
         match {
-        | self.dest.cpp_linked():     ret self.check_cpp_linked()
-        | self.dest.prim() != nil:    ret self.check_prim()
-        | self.dest.trt() != nil:     ret self.check_trait()
-        | self.dest.sptr() != nil:    ret self.check_sptr()
-        | self.dest.ptr() != nil:     ret self.check_ptr()
-        | self.dest.slc() != nil:     ret self.check_slc()
-        | self.dest.arr() != nil:     ret self.check_arr()
-        | self.dest.map() != nil:     ret self.check_map()
-        | self.dest.enm() != nil:     ret self.check_enum()
-        | self.dest.strct() != nil:   ret self.check_struct()
-        | self.dest.fnc() != nil:     ret self.check_fn()
-        | self.dest.nil_compatible(): ret self.src.is_nil()
-        |:                            ret false
+        | self.dest.prim() != nil: ret self.check_prim()
+        | self.dest.trt() != nil:  ret self.check_trait()
+        |:                         ret self.dest.equals(self.src)
         }
     }
 }
@@ -446,6 +287,20 @@ impl AssignTypeChecker {
         ret true
     }
 
+    // Reports case is good for primitive types.
+    fn is_prim(mut self): bool {
+        // Ignore variadics.
+        if self.dest.variadic || self.d.kind.variadic {
+            ret false
+        }
+        // Ignore cpp-linked types.
+        if self.dest.cpp_linked() || self.d.kind.cpp_linked() {
+            ret false
+        }
+
+        ret self.dest.prim() != nil && self.d.kind.prim() != nil
+    }
+
     fn check(mut self): bool {
         match {
         | self.d == nil:
@@ -458,6 +313,14 @@ impl AssignTypeChecker {
 
         | self.check_const():
             ret true
+
+        | self.is_prim():
+            let dest = self.dest.prim()
+            if dest.is_any() {
+                ret true
+            }
+            let mut src = self.d.kind.prim()
+            ret types::types_are_compatible(dest.kind, src.kind)
 
         |:
             ret self.s.check_type_compatibility(self.dest, self.d.kind, self.error_token)
@@ -1143,6 +1006,9 @@ impl RangeChecker {
 
     fn check(mut self): bool {
         match {
+        | self.d.kind.variadic:
+            // Fail.
+
         | self.d.kind.slc() != nil:
             self.check_slice()
             ret true
@@ -1154,12 +1020,13 @@ impl RangeChecker {
         | self.d.kind.map() != nil:
             self.check_map()
             ret true
-        }
 
-        let prim = self.d.kind.prim()
-        if prim != nil && prim.is_str() {
-            self.check_str()
-            ret true
+        |:
+            let prim = self.d.kind.prim()
+            if prim != nil && prim.is_str() {
+                self.check_str()
+                ret true
+            }
         }
 
         self.sc.s.push_err(self.rang.in_token, LogMsg.IterRangeRequireEnumerableExpr)

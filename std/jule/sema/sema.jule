@@ -847,25 +847,32 @@ impl Sema {
 
     fn check_type_compatibility(mut &self, mut &dest: &TypeKind,
         mut &src: &TypeKind, mut &error_token: Token): bool {
-        // Tuple to single type, always fails.
-        if src.tup() != nil {
-            self.push_err(
-                error_token, LogMsg.IncompatibleTypes, dest.to_str(), src.to_str())
+        if src == nil {
+            self.push_err(error_token, LogMsg.IncompatibleTypes,
+                dest.to_str(), src.to_str())
             ret false
         }
 
-        let mut tcc = &TypeCompatibilityChecker{
+        // Tuple to single type, always fails.
+        if src.tup() != nil {
+            self.push_err(error_token, LogMsg.IncompatibleTypes,
+                dest.to_str(), src.to_str())
+            ret false
+        }
+
+        let mut tcc = TypeCompatibilityChecker{
             s:           self,
             error_token: error_token,
             dest:        dest,
             src:         src,
         }
-        let ok = tcc.check()
-        if !ok {
-            self.push_err(
-                error_token, LogMsg.IncompatibleTypes, dest.to_str(), src.to_str())
+
+        if tcc.check() {
+            ret true
         }
-        ret ok
+
+        self.push_err(error_token, LogMsg.IncompatibleTypes, dest.to_str(), src.to_str())
+        ret false
     }
 
     // Builds non-generic types but skips generic types.
@@ -955,6 +962,7 @@ impl Sema {
             if !p.decl.is_self() {
                 p.kind = sema.build_type_with_generics(p.decl.kind.decl, generics)
                 if p.kind != nil {
+                    p.kind.variadic = p.decl.variadic
                     if p.decl.reference && !is_valid_for_ref(p.kind) {
                         self.push_err(p.decl.token, LogMsg.RefPointsToInvalidType, p.kind.to_str())
                     }
