@@ -1559,7 +1559,15 @@ impl Eval {
         ret d
     }
 
-    fn cast_ptr(mut self, t: &TypeKind, mut d: &Data, error_token: Token) {
+    fn cast_ptr(mut self, mut t: &TypeKind, mut d: &Data, error_token: Token) {
+        let sptr = d.kind.sptr()
+        if sptr != nil {
+            if !t.ptr().elem.equals(sptr.elem) {
+                self.push_err(error_token, LogMsg.TypeNotSupportsCastingTo, d.kind.to_str(), t.to_str())
+            }
+            ret
+        }
+
         if !self.is_unsafe() {
             self.push_err(error_token, LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
             ret

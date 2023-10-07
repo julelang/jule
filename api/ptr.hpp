@@ -166,6 +166,9 @@ namespace jule {
         inline operator jule::Uintptr(void) const
         { return (jule::Uintptr)(this->alloc); }
 
+        inline operator T*(void) const
+        { return this->alloc; }
+
         inline void must_ok(void) const {
             if (this->operator==(nullptr))
                 jule::panic(jule::ERROR_INVALID_MEMORY);
