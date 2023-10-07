@@ -14,9 +14,6 @@ template<typename Item>
 inline void __jule_std_vec_copy_range(void *dest, void *buff, const jule::Int &length);
 
 template<typename Item>
-inline void *__jule_get_ptr_of_slice(const jule::Slice<Item> &slice);
-
-template<typename Item>
 struct StdJuleVecBuffer;
 
 
@@ -28,12 +25,8 @@ inline void __jule_std_vec_copy_range(void *dest, void *buff, const jule::Int &l
 }
 
 template<typename Item>
-inline void *__jule_get_ptr_of_slice(const jule::Slice<Item> &slice)
-{ return slice._slice; }
-
-template<typename Item>
 struct StdJuleVecBuffer {
-    void *heap{ nullptr };
+    Item *heap{ nullptr };
     jule::Int len{ 0 };
     jule::Int cap{ 0 };
 

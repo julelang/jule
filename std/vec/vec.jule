@@ -3,18 +3,16 @@
 // license that can be found in the LICENSE file.
 
 use integrated for std::jule::integrated
-use mem for std::mem
 
 cpp use "alloc.hpp"
 
 cpp unsafe fn __jule_std_vec_copy_range[T](dest: *unsafe, buff: *unsafe, len: int)
-cpp unsafe fn __jule_get_ptr_of_slice[T](slc: []T): *unsafe
 
 //jule:typedef
 cpp struct StdJuleVecBuffer[T] {
     len:  int
     cap:  int
-    heap: *unsafe
+    heap: *T
 }
 
 const GROW_FACTOR = 2
@@ -35,7 +33,7 @@ pub struct Vec[T] {
 
 impl Vec {
     // Allocate new vector with capacity.
-    static fn new(cap: int): Vec[T] {
+    pub static fn new(cap: int): Vec[T] {
         let mut vec = Vec[T]{}
         if cap != 0 {
             vec.resize_alloc(cap)
@@ -50,7 +48,7 @@ impl Dispose for Vec {
         self.buff.len = 0
         self.buff.cap = 0
 
-        unsafe { integrated::delete_array_u[T](uintptr(self.buff.heap)) }
+        unsafe { integrated::delete_array[T](self.buff.heap) }
         self.buff.heap = nil
     }
 }
@@ -62,7 +60,7 @@ impl Vec {
     }
 
     fn resize_alloc(mut self, n: int) {
-        let mut new_heap = unsafe { (*unsafe)(integrated::new_array_u[T](n)) }
+        let mut new_heap = unsafe { integrated::new_array[T](n) }
         if new_heap == nil {
             panic("Vec[T].resize_alloc: heap reallocation failed")
         }
@@ -80,7 +78,7 @@ impl Vec {
                     self.buff.heap,
                     self.buff.len)
             }
-            unsafe { integrated::delete_array_u[T](uintptr(self.buff.heap)) }
+            unsafe { integrated::delete_array[T](self.buff.heap) }
             self.buff.heap = new_heap
         }
         self.buff.cap = n
@@ -90,31 +88,6 @@ impl Vec {
         if self.buff.len+delta > self.buff.cap {
             self.resize_alloc(self.calc_grow(delta))
         }
-    }
-
-    fn get_addr_by_index(self, i: int): uintptr {
-        ret uintptr(self.buff.heap)+(mem::size_of(T)*i)
-    }
-
-    fn set_by_index(mut self, i: int, mut &item: T) {
-        unsafe { integrated::assign[T](self.get_addr_by_index(i), item) }
-    }
-
-    fn begin(self): uintptr {
-        ret self.get_addr_by_index(0)
-    }
-
-    fn end(self): uintptr {
-        ret self.get_addr_by_index(self.buff.len)
-    }
-
-    fn get_by_index(mut self, i: int): T {
-        ret unsafe { integrated::deref[T](self.get_addr_by_index(i)) }
-    }
-
-    fn move(mut self, i: int, dest: int) {
-        let mut item = self.get_by_index(i)
-        self.set_by_index(dest, item)
     }
 
     // Returns length.
@@ -142,7 +115,7 @@ impl Vec {
         if i < 0 || i >= self.buff.len {
             panic("Vec[T].at: out of range")
         }
-        ret self.get_by_index(i)
+        ret unsafe { self.buff.heap[i] }
     }
 
     // Set element by index.
@@ -150,7 +123,7 @@ impl Vec {
         if i < 0 || i >= self.buff.len {
             panic("Vec[T].set: out of range")
         }
-        self.set_by_index(i, item)
+        unsafe { self.buff.heap[i] = item }
     }
 
     // Push item to end of heap.
@@ -159,7 +132,7 @@ impl Vec {
             self.resize_alloc((self.buff.cap*GROW_FACTOR)+1)
         }
 
-        self.set_by_index(self.buff.len, item)
+        unsafe { self.buff.heap[self.buff.len] = item }
         self.buff.len++
     }
 
@@ -172,10 +145,10 @@ impl Vec {
         // Shift items.
         let mut i = self.buff.len-1
         for i >= 0; i-- {
-            self.move(i, i+1)
+            unsafe { self.buff.heap[i+1] = self.buff.heap[i] }
         }
 
-        self.set_by_index(0, item)
+        unsafe { self.buff.heap[0] = item }
         self.buff.len++
     }
 
@@ -189,8 +162,8 @@ impl Vec {
 
         unsafe {
             cpp.__jule_std_vec_copy_range[T](
-                (*unsafe)(self.end()),
-                cpp.__jule_get_ptr_of_slice[T](items),
+                self.buff.heap + self.buff.len,
+                &items[0],
                 items.len)
         }
         self.buff.len += items.len
@@ -206,7 +179,7 @@ impl Vec {
 
         unsafe {
             cpp.__jule_std_vec_copy_range[T](
-                (*unsafe)(self.end()),
+                self.buff.heap + self.buff.len,
                 vec.buff.heap,
                 vec.buff.len)
         }
@@ -224,7 +197,7 @@ impl Vec {
         // Shift items.
         let mut i = self.buff.len-1
         for i >= 0; i-- {
-            self.move(i, i+vec.buff.len)
+            unsafe { self.buff.heap[i+vec.buff.len] = self.buff.heap[i] }
         }
 
         unsafe {
@@ -255,7 +228,7 @@ impl Vec {
         // Shift items.
         let mut i = start + n
         for i < self.buff.len; i++ {
-            self.move(i, i-n)
+            unsafe { self.buff.heap[i-n] = self.buff.heap[i] }
         }
 
         self.buff.len -= n
@@ -277,11 +250,11 @@ impl Vec {
         // Shift items.
         let mut j = self.buff.len-1
         for j >= i; j-- {
-            self.move(j, j+1)
+            unsafe { self.buff.heap[j+1] = self.buff.heap[j] }
         }
 
         // Assign.
-        unsafe { integrated::assign[T](self.get_addr_by_index(i), item) }
+        unsafe { self.buff.heap[i] = item }
         self.buff.len++
     }
 
@@ -312,7 +285,7 @@ impl Vec {
         unsafe {
             cpp.__jule_std_vec_copy_range[T](
                 vec.buff.heap,
-                (*unsafe)(self.get_addr_by_index(start)),
+                self.buff.heap + start,
                 vec.buff.cap)
         }
 
