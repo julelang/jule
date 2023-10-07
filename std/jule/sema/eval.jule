@@ -1796,7 +1796,7 @@ impl Eval {
         // Even if the data is not mutable, set as mutable if the type is not mutable-type.
         d.mutable = d.mutable || (!d.kind.mutable() && t.mutable())
 
-        d.lvalue = t.lvalue()
+        d.lvalue = false
         d.decl = false
         self.cast_constant(t, d)
 
@@ -2087,7 +2087,7 @@ impl Eval {
             }
 
             d.kind = f.result
-            d.lvalue = f.result.lvalue()
+            d.lvalue = false
         }
 
         d.mutable = true
@@ -2228,6 +2228,7 @@ impl Eval {
             }
             d.model = model
             d.kind = f.kind.clone()
+            d.lvalue = true
 
             if f.decl.mutable && !d.mutable {
                 // Interior mutability.
@@ -2265,7 +2266,6 @@ impl Eval {
         if m.params[0].is_ref() && !ref {
             self.push_err(si.ident, LogMsg.RefMethodUsedWithNotRefInstance)
         }
-
 
         let mut ins = m.instance()
         ins.owner = s
@@ -3281,7 +3281,7 @@ impl Eval {
 
         let mut r = &Data{}
         r.kind = ac.dest
-        r.lvalue = r.kind.lvalue()
+        r.lvalue = false
         r.mutable = r.kind.mutable()
         r.model = &TernaryExprModel{
             condition:  d.model,
@@ -4144,7 +4144,7 @@ impl BinopSolver {
         self.post_const(d)
 
         if d != nil {
-            d.lvalue = d.kind.lvalue()
+            d.lvalue = false
             if !d.is_const() {
                 d.model = &BinopExprModel{
                     left:  l.model,
