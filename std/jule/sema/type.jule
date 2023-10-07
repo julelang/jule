@@ -581,7 +581,7 @@ fn is_valid_for_ref_type(mut &t: &TypeKind): bool {
     if s != nil && s.decl != nil && s.decl.cpp_linked {
         ret false
     }
-    ret !(t.enm() != nil || t.ptr() != nil || t.ref() != nil || t.arr() != nil)
+    ret true
 }
 
 // Reports kind is valid for reference such as reference variables.
@@ -1100,20 +1100,8 @@ impl TypeChecker {
                 ret nil
             }
 
-        | elem.ref() != nil:
-            self.push_err(self.error_token, LogMsg.RefRefsRef)
-            ret nil
-
-        | elem.ptr() != nil:
-            self.push_err(self.error_token, LogMsg.RefRefsPtr)
-            ret nil
-
-        | elem.enm() != nil:
-            self.push_err(self.error_token, LogMsg.RefRefsEnum)
-            ret nil
-
-        | elem.arr() != nil:
-            self.push_err(self.error_token, LogMsg.RefRefsArr)
+        | elem.arr() != nil && elem.arr().auto:
+            self.push_err(self.error_token, LogMsg.ArrayAutoSized)
             ret nil
         }
 
@@ -1137,17 +1125,9 @@ impl TypeChecker {
         | elem == nil:
             ret nil
 
-        | elem.ref() != nil:
-            self.push_err(self.error_token, LogMsg.PtrPointsRef)
-            ret nil
-
-        | elem.enm() != nil:
-            self.push_err(self.error_token, LogMsg.PtrPointsEnum)
-            ret nil
-
         | elem.arr() != nil && elem.arr().auto:
             self.push_err(self.error_token, LogMsg.ArrayAutoSized)
-            ret nil
+            ret new(Ptr)
         }
 
         ret &Ptr{

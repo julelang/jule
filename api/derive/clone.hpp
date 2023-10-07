@@ -72,7 +72,7 @@ namespace jule {
 
     template<typename T>
     jule::Ref<T> clone(const jule::Ref<T> &r) {
-        if (!r.real())
+        if (r == nullptr)
             return r;
 
         jule::Ref<T> r_clone{ jule::Ref<T>::make(jule::clone(r.operator T())) };

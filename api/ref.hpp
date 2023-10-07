@@ -182,7 +182,7 @@ namespace jule {
         { return this->operator T&(); }
 
         inline void must_ok(void) const {
-            if (!this->real())
+            if (this->operator==(nullptr))
                 jule::panic(jule::ERROR_INVALID_MEMORY);
         }
 
@@ -210,7 +210,7 @@ namespace jule {
         friend inline
         std::ostream &operator<<(std::ostream &stream,
                                  const jule::Ref<T> &ref) {
-            if (!ref.real())
+            if (ref == nullptr)
                 stream << "nil";
             else
                 stream << ref.operator T();

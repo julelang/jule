@@ -50,7 +50,7 @@ namespace jule {
             this->data = jule::Ref<Mask>::make(reinterpret_cast<Mask*>(ref.alloc), nullptr);
 #else
             this->data = jule::Ref<Mask>::make(reinterpret_cast<Mask*>(ref.alloc), ref.ref);
-            if (ref.real())
+            if (ref != nullptr)
                 this->data.add_ref();
 #endif
             this->type_id = typeid(ref).name();
