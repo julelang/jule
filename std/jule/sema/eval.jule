@@ -197,10 +197,10 @@ fn check_data_for_integer_indexing(mut &d: &Data): (err_fmt: LogMsg) {
 
     match {
     | d.kind.prim() == nil:
-        ret LogMsg.InvalidExpr
+        ret LogMsg.InvalidTypeForIndexing
 
     | !types::is_int(d.kind.prim().to_str()):
-        ret LogMsg.InvalidExpr
+        ret LogMsg.InvalidTypeForIndexing
 
     | d.is_const():
         if d.constant.as_f64() < 0 {
@@ -1186,7 +1186,14 @@ impl Eval {
 
     fn check_integer_indexing_by_data(mut self, mut &d: &Data, token: Token) {
         let err_key = check_data_for_integer_indexing(d)
-        if err_key != LogMsg.Empty {
+        match err_key {
+        | LogMsg.Empty:
+            ret
+
+        | LogMsg.InvalidTypeForIndexing:
+            self.push_err(token, err_key, d.kind.to_str())
+
+        |:
             self.push_err(token, err_key)
         }
     }
