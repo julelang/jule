@@ -282,7 +282,7 @@ impl TypeCompatibilityChecker {
         }
         let mut dest = self.dest.strct()
         match {
-        | &dest.decl != &src.decl:
+        | dest.decl != src.decl:
             ret false
 
         | dest.generics.len == 0:
@@ -323,7 +323,7 @@ impl TypeCompatibilityChecker {
         if r == nil {
             ret false
         }
-        ret &self.dest.enm() == &r
+        ret self.dest.enm() == r
     }
 
     fn check_prim(mut self): (ok: bool) {
@@ -471,7 +471,7 @@ struct DynamicTypeAnnotation {
     p:           &ParamIns
     a:           &Data
     error_token: Token
-    k:           **TypeKind
+    k:           *&TypeKind
 }
 
 impl DynamicTypeAnnotation {
@@ -510,12 +510,11 @@ impl DynamicTypeAnnotation {
         }
 
         let mut slc = k.slc()
-        let mut kk = &pslc.elem
-        self.k = &kk
+        self.k = &pslc.elem
         ret self.annotate_kind(slc.elem)
     }
 
-    unsafe fn check_map_key(mut self, mut k: **TypeKind, mut &ck: &TypeKind): (ok: bool) {
+    unsafe fn check_map_key(mut self, mut k: *&TypeKind, mut &ck: &TypeKind): (ok: bool) {
         let mut old = self.k
         self.k = k
         ok = self.annotate_kind(ck)
@@ -531,9 +530,8 @@ impl DynamicTypeAnnotation {
 
         let mut m = k.map()
 
-        let mut key = &pmap.key
-        let mut val = &pmap.val
-        ret self.check_map_key(&key, m.key) && self.check_map_key(&val, m.val)
+        ret self.check_map_key(&pmap.key, m.key) &&
+            self.check_map_key(&pmap.val, m.val)
     }
 
     unsafe fn annotate_fn(mut self, mut &k: &TypeKind): (ok: bool) {
@@ -553,14 +551,12 @@ impl DynamicTypeAnnotation {
         ok = true
         let mut old = self.k
         for (i, mut fp) in f.params {
-            let mut pfp = &pf.params[i].kind
-            self.k = &pfp
+            self.k = &pf.params[i].kind
             ok = self.annotate_kind(fp.kind) && ok
         }
 
         if !pf.decl.is_void() {
-            let mut result = &pf.result
-            self.k = &result
+            self.k = &pf.result
             ok = self.annotate_kind(f.result) && ok
         }
 
@@ -575,8 +571,7 @@ impl DynamicTypeAnnotation {
         }
 
         let mut ptr = k.ptr()
-        let mut cpptr = &pptr.elem
-        self.k = &cpptr
+        self.k = &pptr.elem
         ret self.annotate_kind(ptr.elem)
     }
 
@@ -587,8 +582,7 @@ impl DynamicTypeAnnotation {
         }
 
         let mut sptr = k.sptr()
-        let mut cssptr = &ssptr.elem
-        self.k = &cssptr
+        self.k = &ssptr.elem
         ret self.annotate_kind(sptr.elem)
     }
 
@@ -634,9 +628,7 @@ impl DynamicTypeAnnotation {
     }
 
     unsafe fn annotate(mut self): (ok: bool) {
-        let mut pk = &self.p.kind
-        self.k = &pk
-
+        self.k = &self.p.kind
         ret self.annotate_kind(self.a.kind)
     }
 }

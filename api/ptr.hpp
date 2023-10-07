@@ -163,23 +163,8 @@ namespace jule {
             return *this->alloc;
         }
 
-        inline operator T(void) const {
-#ifndef __JULE_DISABLE__SAFETY
-            this->must_ok();
-#endif
-            return *this->alloc;
-        }
-
-        inline operator T&(void) {
-#ifndef __JULE_DISABLE__SAFETY
-            this->must_ok();
-#endif
-            return *this->alloc;
-        }
-
-        // Returns data of allocation.
-        inline T& get(void)
-        { return this->operator T&(); }
+        inline operator jule::Uintptr(void) const
+        { return (jule::Uintptr)(this->alloc); }
 
         inline void must_ok(void) const {
             if (this->operator==(nullptr))
@@ -213,7 +198,7 @@ namespace jule {
             if (ref == nullptr)
                 stream << "nil";
             else
-                stream << ref.operator T();
+                stream << *ref.alloc;
             return stream;
         }
     };

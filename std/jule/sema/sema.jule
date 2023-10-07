@@ -178,7 +178,7 @@ fn build_generic_type_aliases(mut &f: &FnIns): []&TypeAlias {
 
 fn find_file(mut &files: []&SymbolTable, &handler: &File): &SymbolTable {
     for (_, mut fl) in files {
-        if &fl.file == &handler {
+        if fl.file == handler {
             ret fl
         }
     }
@@ -573,7 +573,7 @@ impl Sema {
 
     fn is_duplicated_import_selection(self, itself: uintptr, ident: str): bool {
         for _, imp in self.file.imports {
-            if uintptr(&imp) == itself {
+            if uintptr(imp) == itself {
                 // Don't scan trailing imports.
                 break
             }
@@ -608,7 +608,7 @@ impl Sema {
                 continue
             }
 
-            if self.is_duplicated_import_selection(uintptr(&imp), ident.kind) {
+            if self.is_duplicated_import_selection(uintptr(imp), ident.kind) {
                 self.push_err(ident, LogMsg.DuplicatedIdent, ident.kind)
                 self.push_suggestion(LogMsg.RenameForAvoidDuplication)
                 continue
@@ -672,7 +672,7 @@ impl Sema {
         }
 
         for (_, mut imp2) in self.file.imports {
-            if &imp2 == &imp {
+            if imp2 == imp {
                 break
             }
             if imp2.alias == imp.alias {
@@ -969,7 +969,7 @@ impl Sema {
             ok = f.result != nil && ok
         }
 
-        if &sema != &self {
+        if sema != self {
             self.errors = append(self.errors, sema.errors...)
             sema.errors = nil
         }
@@ -1061,7 +1061,7 @@ impl Sema {
 
     // Checks type alias declaration with duplicated identifiers.
     fn check_type_alias_decl_dup(mut &self, mut &ta: &TypeAlias) {
-        if self.is_duplicated_ident(uintptr(&ta), ta.ident, ta.cpp_linked) {
+        if self.is_duplicated_ident(uintptr(ta), ta.ident, ta.cpp_linked) {
             self.push_err(ta.token, LogMsg.DuplicatedIdent, ta.ident)
             self.push_suggestion(LogMsg.RenameForAvoidDuplication)
         }
@@ -1159,7 +1159,7 @@ impl Sema {
     fn check_enum_decl(mut &self, mut &e: &Enum) {
         if is_ignore_ident(e.ident) {
             self.push_err(e.token, LogMsg.IgnoreIdent)
-        } else if self.is_duplicated_ident(uintptr(&e), e.ident, false) {
+        } else if self.is_duplicated_ident(uintptr(e), e.ident, false) {
             self.push_err(e.token, LogMsg.DuplicatedIdent, e.ident)
             self.push_suggestion(LogMsg.RenameForAvoidDuplication)
         }
@@ -1409,7 +1409,7 @@ impl Sema {
     fn check_trait_decl(mut &self, mut &t: &Trait) {
         if is_ignore_ident(t.ident) {
             self.push_err(t.token, LogMsg.IgnoreIdent)
-        } else if self.is_duplicated_ident(uintptr(&t), t.ident, false) {
+        } else if self.is_duplicated_ident(uintptr(t), t.ident, false) {
             self.push_err(t.token, LogMsg.DuplicatedIdent, t.ident)
             self.push_suggestion(LogMsg.RenameForAvoidDuplication)
         }
@@ -1592,7 +1592,7 @@ impl Sema {
     // Checks variable declaration for global scope.
     // Checks duplicated identifiers by Sema.
     fn check_global_var_decl(mut &self, mut &decl: &Var) {
-        if self.is_duplicated_ident(uintptr(&decl), decl.ident, decl.cpp_linked) {
+        if self.is_duplicated_ident(uintptr(decl), decl.ident, decl.cpp_linked) {
             self.push_err(decl.token, LogMsg.DuplicatedIdent, decl.ident)
             self.push_suggestion(LogMsg.RenameForAvoidDuplication)
         }
@@ -1708,7 +1708,7 @@ impl Sema {
     fn check_struct_decl(mut &self, mut &s: &Struct) {
         if is_ignore_ident(s.ident) {
             self.push_err(s.token, LogMsg.IgnoreIdent)
-        } else if self.is_duplicated_ident(uintptr(&s), s.ident, s.cpp_linked) {
+        } else if self.is_duplicated_ident(uintptr(s), s.ident, s.cpp_linked) {
             self.push_err(s.token, LogMsg.DuplicatedIdent, s.ident)
             self.push_suggestion(LogMsg.RenameForAvoidDuplication)
         }
@@ -1739,7 +1739,7 @@ impl Sema {
     fn check_fn_decl(mut &self, mut &f: &Fn) {
         if is_ignore_ident(f.ident) {
             self.push_err(f.token, LogMsg.IgnoreIdent)
-        } else if self.is_duplicated_ident(uintptr(&f), f.ident, f.cpp_linked) {
+        } else if self.is_duplicated_ident(uintptr(f), f.ident, f.cpp_linked) {
             self.push_err(f.token, LogMsg.DuplicatedIdent, f.ident)
             self.push_suggestion(LogMsg.RenameForAvoidDuplication)
         }
@@ -1791,7 +1791,7 @@ impl Sema {
 
     fn check_cross_cycle(self, &st1: &Struct, &st2: &Struct, mut &message: str): bool {
         for _, u in st2.uses {
-            if &u == &st1 {
+            if u == st1 {
                 self.push_cycle_error(st2, u, message)
                 ret false
             }
@@ -1813,7 +1813,7 @@ impl Sema {
 
         // Check illegal cycle for itself.
         // Because refers's owner is ta.
-        if &st1 == &st2 {
+        if st1 == st2 {
             self.push_err(st1.token, LogMsg.DeriveIllegalCycleRefersItself, derive, st1.ident)
             ret false
         }
@@ -2112,7 +2112,7 @@ impl Sema {
         self.check_rets(f)
     }
 
-    fn check_fn_ins(mut self, mut &f: &FnIns) {
+    fn check_fn_ins(mut &self, mut &f: &FnIns) {
         if f.decl.cpp_linked {
             ret
         }
@@ -2127,7 +2127,7 @@ impl Sema {
         let mut sc = new_scope_checker(f.decl.sema, f)
         self.check_fn_ins_sc(f, sc)
 
-        if &f.decl.sema != &self {
+        if f.decl.sema != self {
             self.errors = append(self.errors, f.decl.sema.errors...)
             f.decl.sema.errors = nil
         }

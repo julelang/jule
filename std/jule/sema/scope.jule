@@ -71,34 +71,34 @@ fn find_label_parent(ident: str, mut scope: &ScopeChecker): &ScopeLabel {
 fn stmt_is_goto_scope(&stmt: any, &sc: &Scope): bool {
     match type stmt {
     | &Scope:
-        ret &(&Scope)(stmt) == &sc
+        ret (&Scope)(stmt) == sc
 
     | &InfIter:
-        ret &(&InfIter)(stmt).scope == &sc
+        ret (&InfIter)(stmt).scope == sc
 
     | &RangeIter:
-        ret &(&RangeIter)(stmt).scope == &sc
+        ret (&RangeIter)(stmt).scope == sc
 
     | &WhileIter:
-        ret &(&WhileIter)(stmt).scope == &sc
+        ret (&WhileIter)(stmt).scope == sc
 
     | &Match:
         let m = (&Match)(stmt)
         for _, c in m.cases {
-            if &c.scope == &sc {
+            if c.scope == sc {
                 ret true
             }
         }
-        ret m.default != nil && &m.default.scope == &sc
+        ret m.default != nil && m.default.scope == sc
 
     | &Conditional:
         let c = (&Conditional)(stmt)
         for _, elif in c.elifs {
-            if &elif.scope == &sc {
+            if elif.scope == sc {
                 ret true
             }
         }
-        ret c.default != nil && &c.default.scope == &sc
+        ret c.default != nil && c.default.scope == sc
 
     |:
         ret false
@@ -577,7 +577,7 @@ impl ScopeChecker {
     // Just lookups current scope.
     fn find_label_scope(mut &self, ident: str): &ScopeLabel {
         let mut label = self.find_label_all(ident)
-        if label != nil && &label.scope == &self {
+        if label != nil && label.scope == self {
             ret label
         }
 
@@ -601,19 +601,19 @@ impl ScopeChecker {
     // If founded identifier address equals to self, will be skipped.
     fn is_duplicated_ident(mut self, itself: uintptr, ident: str): bool {
         let v = self.find_var(ident, false)
-        if v != nil && uintptr(&v) != itself {
+        if v != nil && uintptr(v) != itself {
             if v.scope == nil { // Ignore globals.
                 ret false
             }
-            ret &v.scope == &self.scope || !self.s.is_flag(SemaFlag.Shadowing)
+            ret v.scope == self.scope || !self.s.is_flag(SemaFlag.Shadowing)
         }
 
         let ta = self.find_type_alias(ident, false)
-        if ta != nil && uintptr(&ta) != itself {
+        if ta != nil && uintptr(ta) != itself {
             if ta.scope == nil { // Ignore globals.
                 ret false
             }
-            ret &ta.scope == &self.tree || !self.s.is_flag(SemaFlag.Shadowing)
+            ret ta.scope == self.tree || !self.s.is_flag(SemaFlag.Shadowing)
         }
 
         ret false
@@ -628,7 +628,7 @@ impl ScopeChecker {
             self.scope.stmts = append(self.scope.stmts, v)
         }
 
-        if self.is_duplicated_ident(uintptr(&v), v.ident) {
+        if self.is_duplicated_ident(uintptr(v), v.ident) {
             self.s.push_err(v.token, LogMsg.DuplicatedIdent, v.ident)
             self.s.push_suggestion(LogMsg.RenameForAvoidDuplication)
         }
@@ -643,7 +643,7 @@ impl ScopeChecker {
 
     fn check_type_alias_decl(mut &self, mut decl: &TypeAliasDecl) {
         let mut ta = build_type_alias(decl)
-        if self.is_duplicated_ident(uintptr(&ta), ta.ident) {
+        if self.is_duplicated_ident(uintptr(ta), ta.ident) {
             self.s.push_err(ta.token, LogMsg.DuplicatedIdent, ta.ident)
             self.s.push_suggestion(LogMsg.RenameForAvoidDuplication)
         }
@@ -771,7 +771,7 @@ impl ScopeChecker {
 
         self.scope.stmts = append(self.scope.stmts, kind)
 
-        kind.scope = self.check_iter_scope(uintptr(&kind), it.scope)
+        kind.scope = self.check_iter_scope(uintptr(kind), it.scope)
     }
 
     fn check_while_iter(mut &self, mut &it: &Iter) {
@@ -785,7 +785,7 @@ impl ScopeChecker {
 
         self.scope.stmts = append(self.scope.stmts, kind)
 
-        kind.scope = self.check_iter_scope(uintptr(&kind), it.scope)
+        kind.scope = self.check_iter_scope(uintptr(kind), it.scope)
 
         if wh.expr != nil {
             let mut d = self.s.eval(self).eval_expr(wh.expr)
@@ -870,7 +870,7 @@ impl ScopeChecker {
             ssc.table.vars = append(ssc.table.vars, kind.key_b)
         }
 
-        kind.scope = self.check_iter_scope_sc(uintptr(&kind), it.scope, ssc)
+        kind.scope = self.check_iter_scope_sc(uintptr(kind), it.scope, ssc)
     }
 
     fn check_iter(mut &self, mut it: &Iter) {
@@ -911,7 +911,7 @@ impl ScopeChecker {
         }
 
         if scope.cse != 0 {
-            let mtch = unsafe { uintptr(&(*Case)(scope.cse).owner) }
+            let mtch = unsafe { uintptr((*Case)(scope.cse).owner) }
             if mtch == ptr {
                 ret true
             }
@@ -971,9 +971,9 @@ impl ScopeChecker {
             } else {
                 let mut st = label.scope.scope.stmts[i]
                 match type st {
-                | &InfIter:   cont.it = uintptr(&(&InfIter)(st))
-                | &RangeIter: cont.it = uintptr(&(&RangeIter)(st))
-                | &WhileIter: cont.it = uintptr(&(&WhileIter)(st))
+                | &InfIter:   cont.it = uintptr((&InfIter)(st))
+                | &RangeIter: cont.it = uintptr((&RangeIter)(st))
+                | &WhileIter: cont.it = uintptr((&WhileIter)(st))
                 |:            self.s.push_err(c.label, LogMsg.InvalidLabel)
                 }
             }
@@ -1316,7 +1316,7 @@ impl ScopeChecker {
 
     fn check_case_scope(mut &self, &c: &Case, mut &tree: &ScopeTree): &Scope {
         let mut ssc = self.new_child_checker()
-        ssc.cse = uintptr(&c)
+        ssc.cse = uintptr(c)
         ret self.check_child_sc(tree, ssc)
     }
 
@@ -1524,7 +1524,7 @@ impl ScopeChecker {
         }
 
         self.scope.stmts = append(self.scope.stmts, &FallSt{
-            dest_case: unsafe { uintptr(&_case.next) },
+            dest_case: unsafe { uintptr(_case.next) },
         })
     }
 
@@ -1558,10 +1558,10 @@ impl ScopeChecker {
         } else {
             let mut st = label.scope.scope.stmts[i]
             match type st {
-            | &InfIter:   brk.it = uintptr(&(&InfIter)(st))
-            | &RangeIter: brk.it = uintptr(&(&RangeIter)(st))
-            | &WhileIter: brk.it = uintptr(&(&WhileIter)(st))
-            | &Match:     brk.mtch = uintptr(&(&Match)(st))
+            | &InfIter:   brk.it = uintptr((&InfIter)(st))
+            | &RangeIter: brk.it = uintptr((&RangeIter)(st))
+            | &WhileIter: brk.it = uintptr((&WhileIter)(st))
+            | &Match:     brk.mtch = uintptr((&Match)(st))
             |:            self.s.push_err(b.label, LogMsg.InvalidLabel)
             }
         }
@@ -1593,7 +1593,7 @@ impl ScopeChecker {
             ret &BreakSt{it: scope.it}
 
         | scope.cse != 0:
-            ret &BreakSt{mtch: unsafe { uintptr(&(*Case)(scope.cse).owner) }}
+            ret &BreakSt{mtch: unsafe { uintptr((*Case)(scope.cse).owner) }}
         }
 
         self.s.push_err(b.token, LogMsg.BreakAtOutOfValidScope)
@@ -1673,7 +1673,7 @@ impl ScopeChecker {
 
         let mut n = 0
 
-        if &gtsc.scope == &label.scope.scope {
+        if gtsc.scope == label.scope.scope {
             // Scopes are same and label at above, so safe.
             if gt.pos > label.pos {
                 ret

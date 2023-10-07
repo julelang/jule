@@ -87,14 +87,14 @@ namespace jule {
 #ifndef __JULE_DISABLE__SAFETY
             this->must_ok();
 #endif
-            return this->data;
+            return *this->data;
         }
 
         inline Mask &get(void) const {
 #ifndef __JULE_DISABLE__SAFETY
             this->must_ok();
 #endif
-            return this->data;
+            return *this->data;
         }
 
         ~Trait(void) {}

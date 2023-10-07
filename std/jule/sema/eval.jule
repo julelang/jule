@@ -646,7 +646,7 @@ impl Eval {
 
     fn check_cross_cycle(mut self, &v: &Var, mut &message: str): bool {
         for _, d in v.depends {
-            if &d == &self.owner {
+            if d == self.owner {
                 self.push_illegal_cycle_error(v, d, message)
                 ret false
             }
@@ -670,7 +670,7 @@ impl Eval {
 
         // Check illegal cycle for itself.
         // Because refers's owner is ta.
-        if &self.owner == &v {
+        if self.owner == v {
             self.push_err(self.owner.token, LogMsg.IllegalCycleRefersItself, self.owner.ident)
             ret false
         }
@@ -716,7 +716,7 @@ impl Eval {
             for s.owner == nil && s.parent != nil {
                 s = s.parent
             }
-            if s.owner != nil && s.owner.anon && &v.scope != &s.owner.scope {
+            if s.owner != nil && s.owner.anon && v.scope != s.owner.scope {
                 self.push_err(error_token, LogMsg.UsedRefInAnonFnFromParentScope, v.ident)
             }
         }
@@ -1663,6 +1663,13 @@ impl Eval {
             }
         }
 
+        if d.kind.sptr() != nil {
+            let prim = t.prim()
+            if !prim.is_uintptr() {
+                self.push_err(error_token, LogMsg.TypeNotSupportsCastingTo, d.kind.to_str(), t.to_str())
+            }
+            ret
+        }
         if d.kind.ptr() != nil {
             let prim = t.prim()
             if prim.is_uintptr() {
@@ -2020,7 +2027,7 @@ impl Eval {
         }
 
         defer {
-            if &old != &self.s {
+            if old != self.s {
                 old.errors = append(old.errors, self.s.errors...)
                 self.s.errors = nil
             }
@@ -2185,7 +2192,7 @@ impl Eval {
         }
 
         let mut model: any = nil
-        if &trt == &BUILTIN_TRAIT_ERROR {
+        if trt == BUILTIN_TRAIT_ERROR {
             model = &BuiltinErrorTraitSubIdentExprModel{
                 expr:  d.model,
                 ident: ident.kind,
@@ -2227,7 +2234,7 @@ impl Eval {
                 match type self.lookup {
                 | &ScopeChecker:
                     let scope = (&ScopeChecker)(self.lookup).get_root()
-                    d.mutable = scope.owner != nil && &scope.owner.owner == &s
+                    d.mutable = scope.owner != nil && scope.owner.owner == s
                     if d.mutable {
                         let mut field = (&Var)(model.expr)
                         let mut v = &Var{
@@ -3446,7 +3453,7 @@ impl BinopSolver {
 
     fn eval_enum(mut self): &Data {
         let mut enm = self.l.kind.enm()
-        if self.r.kind.enm() == nil || &enm != &self.r.kind.enm() {
+        if self.r.kind.enm() == nil || enm != self.r.kind.enm() {
             self.e.push_err(self.op, LogMsg.IncompatibleTypes, enm.ident, self.r.kind.to_str())
             ret nil
         }
