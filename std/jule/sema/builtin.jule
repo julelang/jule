@@ -603,36 +603,59 @@ fn builtin_caller_clone(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Da
         match {
         | k.slc() != nil:
             if !k.slc().elem.supports_cloning() {
-                e.push_err(fc.args[0].token, LogMsg.InternalTypeNotSupportsClone, k.to_str())
+                unsafe {
+                    e.push_err(fc.args[0].token,
+                        LogMsg.InternalTypeNotSupportsClone, k.to_str())
+                }
             }
 
         | k.map() != nil:
             let m = k.map()
             if !m.key.supports_cloning() || !m.val.supports_cloning() {
-                e.push_err(fc.args[0].token, LogMsg.InternalTypeNotSupportsClone, k.to_str())
+                unsafe {
+                    e.push_err(fc.args[0].token,
+                        LogMsg.InternalTypeNotSupportsClone, k.to_str())
+                }
             }
 
         | k.arr() != nil:
             if !k.arr().elem.supports_cloning() {
-                e.push_err(fc.args[0].token, LogMsg.InternalTypeNotSupportsClone, k.to_str())
+                unsafe {
+                    e.push_err(fc.args[0].token,
+                        LogMsg.InternalTypeNotSupportsClone, k.to_str())
+                }
             }
 
         | k.sptr() != nil:
             if !k.sptr().elem.supports_cloning() {
-                e.push_err(fc.args[0].token, LogMsg.InternalTypeNotSupportsClone, k.to_str())
+                unsafe {
+                    e.push_err(fc.args[0].token,
+                        LogMsg.InternalTypeNotSupportsClone, k.to_str())
+                }
             }
 
         | k.strct() != nil:
             let s = d.kind.strct()
             if !s.mutable {
-                e.push_err(fc.args[0].token, LogMsg.CloneImmutStruct, d.kind.to_str())
+                unsafe {
+                    e.push_err(fc.args[0].token,
+                        LogMsg.CloneImmutStruct, d.kind.to_str())
+                }
             }
-            if s.decl == nil || s.decl.cpp_linked || !s.decl.is_derives(str(Derives.Clone)) {
-                e.push_err(fc.args[0].token, LogMsg.TypeIsNotDerives, d.kind.to_str(), str(Derives.Clone))
+            if s.decl == nil ||
+                s.decl.cpp_linked ||
+                !s.decl.is_derives(str(Derives.Clone)) {
+                unsafe {
+                    e.push_err(fc.args[0].token, LogMsg.TypeIsNotDerives,
+                        d.kind.to_str(), str(Derives.Clone))
+                }
             }
 
         |:
-            e.push_err(fc.args[0].token, LogMsg.TypeIsNotDerives, d.kind.to_str(), str(Derives.Clone))
+            unsafe {
+                e.push_err(fc.args[0].token, LogMsg.TypeIsNotDerives,
+                    d.kind.to_str(), str(Derives.Clone))
+            }
         }
     }
 
