@@ -547,10 +547,12 @@ impl ScopeParser {
         let token = tokens[0]
         if is_fn_call(tokens) == nil {
             self.push_err(token, LogMsg.ExprNotFnCall)
+            ret nil
         }
         let mut expr = self.p.build_expr(tokens)
         if expr != nil && !expr.is_fn_call() {
             self.push_err(token, LogMsg.InvalidSyntax)
+            ret nil
         }
         ret expr
     }
@@ -558,7 +560,9 @@ impl ScopeParser {
     fn build_co_call_st(mut self, mut tokens: []Token): NodeData {
         tokens = tokens[1:] // Skip "co" token.
         let mut cc = self.build_call_st(tokens)
-        (&FnCallExpr)((&Expr)(cc).kind).concurrent = true
+        if cc != nil {
+            (&FnCallExpr)((&Expr)(cc).kind).concurrent = true
+        }
         ret cc
     }
 
