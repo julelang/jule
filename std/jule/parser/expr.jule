@@ -97,11 +97,19 @@ fn get_call_data(mut &tokens: []Token): &CallData {
 // Returns expression tokens comes before block if exist, nil if not.
 fn get_block_expr(mut &tokens: []Token): []Token {
     let mut brace_n = 0
+    let mut skip_to_next_brace_close = 0
     for i, tok in tokens {
-        if tok.id == TokenId.Range {
+        match tok.id {
+        | TokenId.If | TokenId.Else | TokenId.Unsafe:
+            skip_to_next_brace_close++
+
+        | TokenId.Range:
             match tok.kind {
             | str(TokenKind.LBrace):
-                if brace_n > 0 {
+                if brace_n > 0 || skip_to_next_brace_close > 0 {
+                    if skip_to_next_brace_close > 0 {
+                        skip_to_next_brace_close--
+                    }
                     brace_n++
                     break
                 }
