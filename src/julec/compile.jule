@@ -5,7 +5,7 @@
 use deadcode
 use env::{self, Opt, OptLevel, push_opt_level}
 use importer
-use obj
+use obj::{IR}
 use cxx for obj::cxx
 
 use std::env
@@ -36,23 +36,17 @@ use std::jule::build::{
 
 cpp unsafe fn system(cmd: *integrated::Char): int
 
-static mut flagset: &FlagSet = FlagSet.new()
-
 // Sets by COMPILER or command-line inputs.
-static mut COMPILER: &str = new(str, "")
-static mut COMPILER_PATH: &str = new(str, "")
+static mut COMPILER: str = ""
+static mut COMPILER_PATH: str = ""
 
 static mut OUT_DIR: str = "dist"
 static mut OUT_NAME: str = "ir.cpp"
-static mut OUT: &str = new(str, "")
+static mut OUT: str = ""
 static mut CPP_STD: str = "c++17" // Default C++ standard
 
-static mut SEMA_FLAGS: SemaFlag = SemaFlag.Default
-
-static mut SHADOWING: &bool = new(bool, false)
-static mut TRANSPILATION: &bool = new(bool, false)
-static mut OPT: &str = new(str, "L0")
-static mut TARGET: &str = new(str, "native-native")
+static mut SHADOWING: bool = false
+static mut TRANSPILATION: bool = false
 
 fn system(cmd: str): int {
     ret unsafe { cpp.system((*integrated::Char)(&cmd[0])) }
@@ -104,7 +98,7 @@ fn compile_ir(compiler: str, compiler_cmd: str) {
 fn do_spell(obj: str, compiler: str, compiler_cmd: str) {
     let path = get_compile_path()
     write_output(path, obj)
-    if !*TRANSPILATION {
+    if !TRANSPILATION {
         compile_ir(compiler, compiler_cmd)
     }
 }
@@ -118,39 +112,47 @@ fn is_cpp_source_file(path: str): bool {
 }
 
 // Generate compile command for backend-compiler.
-fn gen_compile_cmd(source_path: str, &ir: &obj::IR): (str, str) {
-    let compiler: str = *COMPILER_PATH
+fn gen_compile_cmd(source_path: str, &ir: &IR): (str, str) {
+    let &compiler = COMPILER_PATH
 
     const ZERO_LEVEL_OPTIMIZATION = "-O0"
     const DISABLE_ALL_WARNINGS_CLANG = "-Wno-everything"
     const DISABLE_ALL_WARNINGS_GCC = "-w"
     let SET_STD = "--std=" + CPP_STD
 
-    let mut cmd = ZERO_LEVEL_OPTIMIZATION + " "
+    let mut cmd = ZERO_LEVEL_OPTIMIZATION
+    cmd += " "
 
-    match *COMPILER {
+    match COMPILER {
     | "gcc":
-        cmd += DISABLE_ALL_WARNINGS_GCC + " "
+        cmd += DISABLE_ALL_WARNINGS_GCC
+        cmd += " "
 
     | "clang":
-        cmd += DISABLE_ALL_WARNINGS_CLANG + " "
+        cmd += DISABLE_ALL_WARNINGS_CLANG
+        cmd += " "
     }
-    cmd += SET_STD + " "
+    cmd += SET_STD
+    cmd += " "
 
     // Push passes.
     for _, pass in ir.passes {
-        cmd += pass + " "
+        cmd += pass
+        cmd += " "
     }
 
     // Push linked source files.
     for _, u in ir.used {
         if u.cpp_linked && is_cpp_source_file(u.path) {
-            cmd += u.path + " "
+            cmd += u.path
+            cmd += " "
         }
     }
 
-    if *OUT != "" {
-        cmd += "-o " + *OUT + " "
+    if OUT != "" {
+        cmd += "-o "
+        cmd += OUT
+        cmd += " "
     }
     cmd += source_path
 
@@ -167,25 +169,25 @@ fn get_compile_path(): str {
     ret join(OUT_DIR, OUT_NAME)
 }
 
-fn apply_target_independent_optimizations(mut &ir: &obj::IR) {
-    if *env::OPT_DEADCODE {
+fn apply_target_independent_optimizations(mut &ir: &IR) {
+    if env::OPT_DEADCODE {
         deadcode::eliminate(ir)
     }
 }
 
 fn check_compiler_flag() {
-    match *COMPILER {
+    match COMPILER {
     | "":
         exit_err("missing option value: --compiler")
 
     | "clang":
-        *COMPILER_PATH = "clang++"
+        COMPILER_PATH = "clang++"
 
     | "gcc":
-        *COMPILER_PATH = "g++"
+        COMPILER_PATH = "g++"
 
     |:
-        exit_err("invalid option value for --compiler: " + *COMPILER)
+        exit_err("invalid option value for --compiler: " + COMPILER)
     }
 }
 
@@ -209,14 +211,14 @@ fn check_target_os(os: str) {
     exit_err("--target: unsupported/undefined operating system: " + os)
 }
 
-fn check_target_flag() {
-    if *TARGET == "" {
+fn check_target_flag(&target: str) {
+    if target == "" {
         exit_err("missing option value: --target")
     }
 
-    let parts = TARGET.split("-", -1)
+    let parts = target.split("-", -1)
     if parts.len != 2 {
-        exit_err("--target: undefined platform target format: " + *TARGET)
+        exit_err("--target: undefined platform target format: " + target)
     }
 
     let (os, arch) = parts[0], parts[1]
@@ -232,36 +234,61 @@ fn check_target_flag() {
     }
 }
 
-fn check_opt_flag() {
-    if *OPT == "" {
+fn check_opt_flag(&opt: str) {
+    if opt == "" {
         exit_err("missing option value: --opt")
     }
 
-    match *OPT {
+    match opt {
     | "L0": // Nothing.
     | "L1": push_opt_level(OptLevel.L1)
-    |:      exit_err("--opt: invalid optimization level: " + *OPT)
+    |:      exit_err("--opt: invalid optimization level: " + opt)
     }
 }
 
-fn check_flags() {
-    check_compiler_flag()
-    check_target_flag()
-    check_opt_flag()
+fn check_flags(&args: []str): []str {
+    let mut opt: str = "L0"
+    let mut target: str = "native-native"
 
-    if *SHADOWING {
-        SEMA_FLAGS |= SemaFlag.Shadowing
-    }
-}
+    let mut fs = FlagSet.new()
 
-// Process compile command by "ARGS" global.
-fn compile_command(&args: []str) {
-    let (content, error) = flagset.parse(args[1:])
+    fs.add_var[bool](unsafe { (&bool)(&SHADOWING) }, "shadowing", 0, "Let shadowing")
+    fs.add_var[bool](unsafe { (&bool)(&TRANSPILATION) }, "transpile", 't', "Transpile code")
+    fs.add_var[str](unsafe { (&str)(&COMPILER) }, "compiler", 0, "Backend compiler")
+    fs.add_var[str](unsafe { (&str)(&opt) }, "opt", 0, "Optimization level")
+    fs.add_var[str](unsafe { (&str)(&target) }, "target", 0, "Target system")
+    fs.add_var[str](unsafe { (&str)(&OUT) }, "out", 'o', "Output identifier")
+    fs.add_var[bool](unsafe { (&bool)(&env::OPT_COPY) }, "opt-copy", 0, "Copy optimization")
+    fs.add_var[bool](unsafe { (&bool)(&env::OPT_DEADCODE) }, "opt-deadcode", 0, "Deadcode optimization")
+    fs.add_var[bool](unsafe { (&bool)(&env::OPT_APPEND) }, "opt-append", 0, "Append optimization")
+    fs.add_var[bool](unsafe { (&bool)(&env::OPT_MATH) }, "opt-math", 0, "Math optimization")
+    fs.add_var[bool](unsafe { (&bool)(&env::OPT_ACCESS) }, "opt-access", 0, "Access optimization")
+    fs.add_var[bool](unsafe { (&bool)(&env::OPT_INLINE) }, "opt-inline", 0, "Inline optimization")
+    fs.add_var[bool](unsafe { (&bool)(&env::OPT_PTR) }, "opt-ptr", 0, "Pointer optimizations")
+
+    let (mut content, error) = fs.parse(args[1:])
     if error != "" {
         exit_err(error)
     }
 
-    check_flags()
+    check_compiler_flag()
+    check_target_flag(target)
+    check_opt_flag(opt)
+
+    ret content
+}
+
+fn setup_sema_flags(mut &flags: SemaFlag) {
+    if SHADOWING {
+        flags |= SemaFlag.Shadowing
+    }
+}
+
+fn build_ir(&args: []str): &IR {
+    let content = check_flags(args)
+
+    let mut sema_flags = SemaFlag.Default
+    setup_sema_flags(sema_flags)
 
     if content.len == 0 {
         exit_err(logf(LogMsg.MissingCompilePath))
@@ -279,7 +306,7 @@ fn compile_command(&args: []str) {
     // Initialize flags for directive eval.
     importer::init_flags()
 
-    let (mut ir, logs) = obj::IR.build(path, SEMA_FLAGS)
+    let (mut ir, logs) = IR.build(path, sema_flags)
 
     if ir == nil && logs == nil {
         exit_err(logf(LogMsg.NoFileInEntryPackage, path))
@@ -289,6 +316,13 @@ fn compile_command(&args: []str) {
         Logger.print_logs(logs)
         exit_err("")
     }
+
+    ret ir
+}
+
+// Process compile command by "ARGS" global.
+fn compile_command(&args: []str) {
+    let mut ir = build_ir(args)
 
     const CPP_LINKED = false
     let mut f = ir.main.find_fn(ENTRY_POINT, CPP_LINKED)
