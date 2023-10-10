@@ -93,8 +93,11 @@ namespace jule {
         Ptr<T>(void) = default;
         Ptr<T>(const std::nullptr_t&): Ptr<T>() {}
 
-        Ptr<T> (const jule::Ptr<T> &src)
+        Ptr<T>(const jule::Ptr<T> &src)
         { this->__get_copy(src); }
+
+        Ptr<T>(T *src)
+        { this->alloc = src; }
 
         ~Ptr<T>(void)
         { this->drop(); }
