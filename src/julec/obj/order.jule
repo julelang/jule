@@ -16,15 +16,18 @@ impl DefineOrderer {
     // Reports whether type in correct order by dependencies.
     // Checked "t" should have minimum 1 dependency.
     static fn is_common_ordered[T](&s: []&T, t: &T): bool {
-        let mut j = 0
+        let mut p = &t.depends[0]
+        let end = p + t.depends.len
         for _, tt in s {
-            if tt == t {
-                break
-            }
-            if tt == t.depends[j] {
-                j++
-                if j >= t.depends.len {
-                    ret true
+            unsafe {
+                if tt == t {
+                    break
+                }
+                if (*p).cpp_linked ||  tt == *p {
+                    p++
+                    if p >= end {
+                        ret true
+                    }
                 }
             }
         }
@@ -36,7 +39,7 @@ impl DefineOrderer {
     pub static fn order_common[T](mut &s: []&T) {
         let mut i = 0
         for (j, mut t) in s {
-            if t.depends.len == 0 {
+            if t.cpp_linked || t.depends.len == 0 {
                 s[i], s[j] = t, s[i]
                 i++
             }
