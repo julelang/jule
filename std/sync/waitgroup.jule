@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use std::sync::atomic::{MemoryOrder, add, load, compare_swap}
+use std::sync::atomic::{MemoryOrder, AtomicU32}
 
 // Do not copy an instance of WaitGroup, use a ref or pointer instead.
 //
@@ -14,8 +14,8 @@ use std::sync::atomic::{MemoryOrder, add, load, compare_swap}
 // in each parallel job:
 // `wg.done()` when finished
 pub struct WaitGroup {
-    task_n: u32  // current task count - reading/writing should be atomic
-    wait_n: u32  // current wait count - reading/writing should be atomic
+    task_n: AtomicU32  // current task count - reading/writing should be atomic
+    wait_n: AtomicU32  // current wait count - reading/writing should be atomic
 }
 
 impl WaitGroup {
@@ -23,7 +23,7 @@ impl WaitGroup {
     // and unblocks any wait() calls if task count becomes zero.
     // Panics if task count reaches below zero.
     pub fn add(mut self, delta: int) {
-        let old_nr_tasks = int(add[u32](self.task_n, u32(delta), MemoryOrder.Relaxed))
+        let old_nr_tasks = int(self.task_n.add(u32(delta), MemoryOrder.Relaxed))
         let new_nr_tasks = old_nr_tasks + delta
         if new_nr_tasks < 0 {
             panic("negative number of tasks in WaitGroup")
@@ -33,17 +33,17 @@ impl WaitGroup {
             ret
         }
 
-        let mut n_waiters = load[u32](self.wait_n, MemoryOrder.Relaxed)
+        let mut n_waiters = self.wait_n.load(MemoryOrder.Relaxed)
         if n_waiters == 0 {
             ret
         }
         // clear waiters
         for {
-            compare_swap[u32](self.wait_n, n_waiters, 0, MemoryOrder.Relaxed)
+            self.wait_n.compare_swap(n_waiters, 0, MemoryOrder.Relaxed)
             if n_waiters == 0 {
                 ret
             }
-            n_waiters = load[u32](self.wait_n, MemoryOrder.Relaxed)
+            n_waiters = self.wait_n.load(MemoryOrder.Relaxed)
         }
     }
 
@@ -52,13 +52,13 @@ impl WaitGroup {
 
     // Blocks until all tasks are done (task count becomes zero)
     pub fn wait(mut self) {
-        let nr_tasks = int(load[u32](self.task_n, MemoryOrder.Relaxed))
+        let nr_tasks = int(self.task_n.load(MemoryOrder.Relaxed))
         if nr_tasks == 0 {
             // no need to wait
             ret
         }
-        add[u32](self.wait_n, 1, MemoryOrder.Relaxed)
+        self.wait_n.add(1, MemoryOrder.Relaxed)
         // blocks until task_n becomes 0
-        for load[u32](self.wait_n, MemoryOrder.Relaxed) != 0 {}
+        for self.wait_n.load(MemoryOrder.Relaxed) != 0 {}
     }
 }
