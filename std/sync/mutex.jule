@@ -14,7 +14,6 @@ cpp struct mutex {
 
 //jule:typedef
 cpp struct __jule_mutex_handle {
-    init:  fn()
     drop:  fn()
     mutex: fn(): *cpp.mutex
 }
@@ -22,8 +21,7 @@ cpp struct __jule_mutex_handle {
 // Muxtex is a primitive used to protect memory in
 // multi-threading situations such as concurrent access.
 //
-// A Mutex must be initialized, use the new static method
-// for this. If you try to lock an already locked mutex again
+// If you try to lock an already locked mutex again
 // in the same thread or exhibit similar behavior, a system
 // signal is likely to occur.
 pub struct Mutex {
@@ -34,9 +32,7 @@ pub struct Mutex {
 impl Mutex {
     // Returns new initialized ready-for-use Mutex.
     pub static fn new(): &Mutex {
-        let mut mtx = &Mutex{}
-        mtx.handle.init()
-        ret mtx
+        ret &Mutex{}
     }
 }
 
@@ -53,22 +49,14 @@ impl Mutex {
     // another thread, it stops the execution of the
     // algorithm to seize it and waits to lock the mutex.
     pub fn lock(self) {
-        let mtx = self.handle.mutex()
-        if mtx == nil {
-            panic("std::sync: Mutex.lock: mutex did not initialized")
-        }
-        unsafe { mtx.lock() }
+        unsafe { self.handle.mutex().lock() }
         self.locked = true
     }
 
     // Unlock the mutex you locked and make it open
     // to locking by the thread.
     pub fn unlock(self) {
-        let mtx = self.handle.mutex()
-        if mtx == nil {
-            panic("std::sync: Mutex.unlock: mutex did not initialized")
-        }
-        unsafe { mtx.unlock() }
+        unsafe { self.handle.mutex().unlock() }
     }
 
     // Try locking the mutex. But unlike the lock
@@ -76,10 +64,6 @@ impl Mutex {
     // to lock. Returns true if the locking was
     // successful, false otherwise.
     pub fn try_lock(self): bool {
-        let mtx = self.handle.mutex()
-        if mtx == nil {
-            panic("std::sync: Mutex.try_lock: mutex did not initialized")
-        }
-        ret unsafe { mtx.try_lock() }
+        ret unsafe { self.handle.mutex().try_lock() }
     }
 }

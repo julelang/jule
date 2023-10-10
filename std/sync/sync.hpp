@@ -13,17 +13,15 @@ struct __jule_mutex_handle {
 public:
     mutable jule::Ptr<std::mutex> _mutex{};
 
-    __jule_mutex_handle(void) = default;
-
-    __jule_mutex_handle(const __jule_mutex_handle &jmh)
-    { this->_mutex = jmh._mutex; }
-
-    inline void init(void) {
+    __jule_mutex_handle(void) {
         std::mutex *mtx{ new (std::nothrow) std::mutex() };
         if (mtx == nullptr)
             jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
         this->_mutex = jule::Ptr<std::mutex>::make(mtx);
     }
+
+    __jule_mutex_handle(const __jule_mutex_handle &jmh)
+    { this->_mutex = jmh._mutex; }
 
     inline std::mutex *mutex(void) noexcept
     { return _mutex.alloc; }
