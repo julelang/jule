@@ -23,27 +23,28 @@ impl WaitGroup {
     // and unblocks any wait() calls if task count becomes zero.
     // Panics if task count reaches below zero.
     pub fn add(mut self, delta: int) {
-        let old_nr_tasks = int(self.task_n.add(u32(delta), MemoryOrder.Relaxed))
-        let new_nr_tasks = old_nr_tasks + delta
-        if new_nr_tasks < 0 {
-            panic("negative number of tasks in WaitGroup")
+        let old_task = int(self.task_n.add(u32(delta), MemoryOrder.Relaxed))
+        let n_task = old_task + delta
+        if n_task < 0 {
+            panic("std:sync: WaitGroup.add: negative number of tasks")
         }
 
-        if new_nr_tasks != 0 {
+        // Number of tasks still greater than zero.
+        // No need to clear waiters.
+        if n_task != 0 {
             ret
         }
 
-        let mut n_waiters = self.wait_n.load(MemoryOrder.Relaxed)
-        if n_waiters == 0 {
-            ret
-        }
-        // clear waiters
+        // Number of tasks reaches to zero, therefore clear waiters.
         for {
-            self.wait_n.compare_swap(n_waiters, 0, MemoryOrder.Relaxed)
+            let n_waiters = self.wait_n.load(MemoryOrder.Relaxed)
             if n_waiters == 0 {
                 ret
             }
-            n_waiters = self.wait_n.load(MemoryOrder.Relaxed)
+
+            if self.wait_n.compare_swap(n_waiters, 0, MemoryOrder.Relaxed) {
+                ret
+            }
         }
     }
 
@@ -52,13 +53,16 @@ impl WaitGroup {
 
     // Blocks until all tasks are done (task count becomes zero)
     pub fn wait(mut self) {
-        let nr_tasks = int(self.task_n.load(MemoryOrder.Relaxed))
-        if nr_tasks == 0 {
-            // no need to wait
+        let n_task = self.task_n.load(MemoryOrder.Relaxed)
+        if n_task == 0 {
+            // No task, no need to wait.
             ret
         }
+
+        // Register this wait call to waiters.
         self.wait_n.add(1, MemoryOrder.Relaxed)
-        // blocks until task_n becomes 0
+
+        // Wait for clearing waiters.
         for self.wait_n.load(MemoryOrder.Relaxed) != 0 {}
     }
 }
