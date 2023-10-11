@@ -4012,8 +4012,10 @@ impl BinopSolver {
             self.e.push_err(self.op, LogMsg.OperatorNotForJuleType, self.op.kind, "void")
             ret nil
 
-        | self.l.kind.prim() != nil && self.l.kind.prim().is_any()
         | self.r.kind.prim() != nil && self.r.kind.prim().is_any():
+            self.l, self.r = self.r, self.l
+            fall
+        | self.l.kind.prim() != nil && self.l.kind.prim().is_any():
             ret self.eval_any()
 
         | self.l.kind.is_nil():
@@ -4022,10 +4024,16 @@ impl BinopSolver {
         | self.l.kind.enm() != nil:
             ret self.eval_enum()
 
-        | self.l.kind.sptr() != nil || self.r.kind.sptr() != nil:
+        | self.r.kind.sptr() != nil:
+            self.l, self.r = self.r, self.l
+            fall
+        | self.l.kind.sptr() != nil:
             ret self.eval_sptr()
 
-        | self.l.kind.ptr() != nil || self.r.kind.ptr() != nil:
+        | self.r.kind.ptr() != nil:
+            self.l, self.r = self.r, self.l
+            fall
+        | self.l.kind.ptr() != nil:
             ret self.eval_ptr()
 
         | self.l.kind.arr() != nil:
@@ -4037,10 +4045,10 @@ impl BinopSolver {
         | self.l.kind.fnc() != nil:
             ret self.eval_fn()
 
-        | self.l.kind.trt() != nil || self.r.kind.trt() != nil:
-            if self.r.kind.trt() != nil {
-                self.l, self.r = self.r, self.l
-            }
+        | self.r.kind.trt() != nil:
+            self.l, self.r = self.r, self.l
+            fall
+        | self.l.kind.trt() != nil:
             ret self.eval_trait()
 
         | self.l.kind.strct() != nil:
@@ -4170,7 +4178,7 @@ impl BinopSolver {
         self.check_datas()
 
         let mut d = self.eval()
-        self.l, self.r = l, r // Save normal order
+        //self.l, self.r = l, r // Save normal order
 
         self.solve_const(d)
         self.post_const(d)
@@ -4179,8 +4187,8 @@ impl BinopSolver {
             d.lvalue = false
             if !d.is_const() {
                 d.model = &BinopExprModel{
-                    left:  l.model,
-                    right: r.model,
+                    left:  self.l.model,
+                    right: self.r.model,
                     op:    self.op.kind,
                 }
             }
