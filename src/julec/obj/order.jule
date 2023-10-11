@@ -1,3 +1,143 @@
+/*
+
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use std::jule::sema::{Package, Struct, Var}
+
+// Collection for ordered defines.
+pub struct OrderedDefines {
+    pub structs: []&Struct
+    pub globals: []&Var
+}
+
+pub struct DefineOrderer {
+    mut defs: OrderedDefines
+
+    // Stores all ordered definitions.
+    mut ordered: []any
+
+    // Stores currently checking definitions.
+    mut checking: []any
+
+    // Currently checking.
+    mut current: any
+
+    mut main_current: any
+}
+
+impl DefineOrderer {
+    pub fn reset(self) {
+        self.ordered = nil
+        self.checking = nil
+        self.current = nil
+        self.main_current = nil
+    }
+
+    // Reports whether the reference type of T exist in arr.
+    fn is_exist(self, arr: []any, t: any): bool {
+        for _, d in arr {
+            if d == t {
+                ret true
+            }
+        }
+        ret false
+    }
+
+    // Reports whether reference in dead.
+    fn is_ordered(self, mut d: any): bool {
+        if self.is_exist(self.ordered, d) {
+            // Cycle, also already checked and marked as ordered.
+            ret true
+        }
+        if self.is_exist([self.current, self.main_current], d) {
+            ret true
+        }
+        if self.is_exist(self.checking, d) {
+            // Cycle, also already checking and should be marked ordered.
+            ret true
+        }
+
+        let mut old = self.current
+        self.current = d
+        let len = self.checking.len
+        self.checking = append(self.checking, d)
+        defer {
+            self.current = old
+            // Remove position, and following references.
+            // This is safe.
+            // References dropped after processed, so following
+            // references should be already processed.
+            self.checking = self.checking[:len]
+        }
+
+        match type d {
+        | &Var: ret self.is_global_ordered((&Var)(d))
+        |:      ret false
+        }
+    }
+
+    fn is_global_ordered(self, mut v: &Var): bool {
+        if v.cpp_linked || v.depends.len == 0 {
+            ret true
+        }
+
+        let mut p = &v.depends[0]
+        let end = p + v.depends.len
+        for _, tt in self.defs.globals {
+            unsafe {
+                if self.current == tt {
+                    continue
+                }
+                if self.main_current == tt {
+                    continue
+                }
+                if tt == *p {
+                    if !self.is_ordered(*p) {
+                        ret false
+                    }
+                    p++
+                    if p >= end {
+                        ret true
+                    }
+                }
+            }
+        }
+        ret false
+    }
+
+    pub fn order_globals(self) {
+        let mut i = 0
+        for (j, mut t) in self.defs.globals {
+            if t.cpp_linked || t.depends.len == 0 {
+                self.defs.globals[i], self.defs.globals[j] = t, self.defs.globals[i]
+                i++
+            }
+        }
+
+        for i < self.defs.globals.len {
+            let mut v = self.defs.globals[i]
+            self.main_current = v
+            if self.is_global_ordered(v) {
+                self.ordered = append(self.ordered, v)
+                i++
+                continue
+            }
+            self.defs.globals[i], self.defs.globals[i+1] = self.defs.globals[i+1], self.defs.globals[i]
+        }
+        self.reset()
+    }
+
+    pub fn order(self, mut &defs: OrderedDefines) {
+        self.defs = defs
+        self.order_globals()
+    }
+}
+
+
+*/
+
 // Copyright 2023 The Jule Programming Language.
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
@@ -23,9 +163,9 @@ impl DefineOrderer {
                 if tt == t {
                     break
                 }
-                if (*p).cpp_linked ||  tt == *p {
+                if (*p).cpp_linked || (*p).depends.len == 0 || tt == *p {
                     p++
-                    if p >= end {
+                    if p == end {
                         ret true
                     }
                 }
