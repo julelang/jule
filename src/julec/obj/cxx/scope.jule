@@ -504,7 +504,8 @@ fn gen_ret_vars(mut r: &RetSt): str {
     obj = obj[:obj.len-1] // Remove last comma.
 
     if r.vars.len > 1 {
-        obj = "return std::make_tuple(" + obj + ")"
+        obj = "return std::make_tuple(" + obj
+        obj += ")"
     } else {
         obj = "return " + obj
     }
@@ -526,14 +527,20 @@ fn gen_ret_expr_tuple(mut r: &RetSt): str {
     let mut obj = ""
 
     for (i, mut v) in r.vars {
-        if !is_ignore_ident(v.ident) {
-            let ident = var_out_ident(v)
-            obj += ident
-            obj += " = "
-            obj += gen_expr(datas[i].model)
-            obj += ";\n"
-            obj += indent()
+        if is_ignore_ident(v.ident) {
+            continue
         }
+        let mut model = datas[i].model
+        // Ignore self assignment.
+        if model == v {
+            continue
+        }
+        let ident = var_out_ident(v)
+        obj += ident
+        obj += " = "
+        obj += gen_expr(model)
+        obj += ";\n"
+        obj += indent()
     }
 
     obj += "return std::make_tuple("
@@ -565,8 +572,10 @@ fn gen_ret_expr(mut r: &RetSt): str {
         ret gen_ret_expr_tuple(r)
     }
 
-    if !is_ignore_ident(r.vars[0].ident) {
-        let ident = var_out_ident(r.vars[0])
+    let mut v = r.vars[0]
+    // Ignore self assignments and ignored variables.
+    if !is_ignore_ident(v.ident) && r.expr != v {
+        let ident = var_out_ident(v)
         let mut obj = ident
         obj += " = "
         obj += gen_expr(r.expr)
