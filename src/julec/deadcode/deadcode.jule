@@ -26,8 +26,8 @@ static mut current: any = nil
 
 static mut main_current: any = nil
 
-// Reports whether the reference type of T exist in arr.
-fn is_exist[T](arr: []any, t: &T): bool {
+// Reports whether the reference tpye of t exist in arr.
+fn is_exist(arr: []any, t: any): bool {
     for _, ref in arr {
         if ref == t {
             ret true
@@ -36,20 +36,9 @@ fn is_exist[T](arr: []any, t: &T): bool {
     ret false
 }
 
-// Reports whether ref is exist in refs.
-fn is_exist_ref(mut refs: []any, ref: any): bool {
-    match type ref {
-    | &FnIns:     ret is_exist[FnIns](refs, (&FnIns)(ref))
-    | &Var:       ret is_exist[Var](refs, (&Var)(ref))
-    | &StructIns: ret is_exist[StructIns](refs, (&StructIns)(ref))
-    | &Trait:     ret is_exist[Trait](refs, (&Trait)(ref))
-    |:            ret false
-    }
-}
-
 // Reports whether reference in dead.
 fn is_dead(mut ref: any): (dead: bool) {
-    if is_exist_ref(deads, ref) {
+    if is_exist(deads, ref) {
         // Cycle, also already checked and marked as dead.
         ret true
     }
@@ -60,10 +49,10 @@ fn is_dead(mut ref: any): (dead: bool) {
         }
         fall
     |:
-        if is_exist_ref([current, main_current], ref) {
+        if ref == current || ref == main_current {
             ret true
         }
-        if is_exist_ref(checking, ref) {
+        if is_exist(checking, ref) {
             // Cycle, also already checking and should be marked dead.
             ret true
         }
@@ -108,7 +97,7 @@ fn drop_ref(mut &refs: []any, pos: int) {
     refs = refs[:pos]
 }
 
-fn is_all_references_are_dead[T](mut references: &ReferenceStack): bool {
+fn is_all_references_are_dead(mut references: &ReferenceStack): bool {
     let mut i = 0
     for i < references.len(); i++ {
         let mut ref = references.at(i)
@@ -135,7 +124,7 @@ fn is_fn_dead(mut f: &FnIns): bool {
     }
 
     if f.owner != nil {
-        if is_exist_ref(checking, f.owner) {
+        if is_exist(checking, f.owner) {
             // Cycle, also already checking and should be marked dead.
             ret true
         }
@@ -148,7 +137,7 @@ fn is_fn_dead(mut f: &FnIns): bool {
         }
     }*/
 
-    ret is_all_references_are_dead[FnIns](f.references)
+    ret is_all_references_are_dead(f.references)
 }
 
 fn is_var_dead(mut v: &Var): bool {
@@ -160,7 +149,7 @@ fn is_var_dead(mut v: &Var): bool {
         ret false
     }
 
-    ret is_all_references_are_dead[Var](v.references)
+    ret is_all_references_are_dead(v.references)
 }
 
 fn kind_is_dead(mut k: &TypeKind): bool {
@@ -215,7 +204,7 @@ fn is_struct_dead(mut s: &StructIns): bool {
         }
     }*/
 
-    ret is_all_references_are_dead[StructIns](s.references)
+    ret is_all_references_are_dead(s.references)
 }
 
 fn is_trait_dead(mut t: &Trait): bool {
