@@ -24,13 +24,13 @@
 
 namespace jule {
 
-    constexpr const char *ERROR_INVALID_MEMORY{ "invalid memory address or nil pointer deference" };
-    constexpr const char *ERROR_INCOMPATIBLE_TYPE{ "incompatible type" };
-    constexpr const char *ERROR_MEMORY_ALLOCATION_FAILED{ "memory allocation failed" };
-    constexpr const char *ERROR_INDEX_OUT_OF_RANGE{ "index out of range" };
-    constexpr const char *ERROR_DIVIDE_BY_ZERO{ "divide by zero" };
+    constexpr const char *ERROR_INVALID_MEMORY = "invalid memory address or nil pointer deference";
+    constexpr const char *ERROR_INCOMPATIBLE_TYPE = "incompatible type";
+    constexpr const char *ERROR_MEMORY_ALLOCATION_FAILED = "memory allocation failed";
+    constexpr const char *ERROR_INDEX_OUT_OF_RANGE = "index out of range";
+    constexpr const char *ERROR_DIVIDE_BY_ZERO = "divide by zero";
 
-    constexpr signed int EXIT_PANIC{ 2 };
+    constexpr signed int EXIT_PANIC = 2;
 } // namespace jule
 
 #endif // ifndef __JULE_ERROR_HPP

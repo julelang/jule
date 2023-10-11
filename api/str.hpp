@@ -31,7 +31,7 @@ namespace jule {
 
     class Str {
     public:
-        std::basic_string<jule::U8> buffer{};
+        std::basic_string<jule::U8> buffer;
 
         Str(void) = default;
         Str(const jule::Str &src) = default;
@@ -46,7 +46,7 @@ namespace jule {
 
         Str(const jule::Slice<jule::I32> &src) {
             for (const jule::I32 &r: src) {
-                const jule::Slice<jule::U8> bytes{ jule::utf8_rune_to_bytes(r) };
+                const jule::Slice<jule::U8> bytes = jule::utf8_rune_to_bytes(r);
                 this->buffer += std::basic_string<jule::U8>(bytes.begin(), bytes.end());
             }
         }
@@ -79,7 +79,7 @@ namespace jule {
             if (start == end)
                 return jule::Str();
 
-            const jule::Int n{ end-start };
+            const jule::Int n = end-start;
             return jule::Str(this->buffer.substr(start, n).c_str(), n);
         }
 
@@ -115,13 +115,13 @@ namespace jule {
         }
 
         jule::Str ltrim(const jule::Str &bytes) const {
-            ConstIterator it{ this->begin() };
-            const ConstIterator end{ this->end() };
-            ConstIterator begin{ this->begin() };
+            ConstIterator it = this->begin();
+            const ConstIterator end = this->end();
+            ConstIterator begin = this->begin();
             for (; it < end; ++it) {
-                jule::Bool exist{ false };
-                ConstIterator bytes_it{ bytes.begin() };
-                const ConstIterator bytes_end{ bytes.end() };
+                jule::Bool exist = false;
+                ConstIterator bytes_it = bytes.begin();
+                const ConstIterator bytes_end = bytes.end();
                 for (; bytes_it < bytes_end; ++bytes_it) {
                     if ((exist = *it == *bytes_it))
                         break;
@@ -134,12 +134,12 @@ namespace jule {
         }
 
         jule::Str rtrim(const jule::Str &bytes) const {
-            ConstIterator it{ this->end()-1 };
-            const ConstIterator begin{ this->begin() };
+            ConstIterator it = this->end()-1;
+            const ConstIterator begin = this->begin();
             for (; it >= begin; --it) {
-                jule::Bool exist{ false };
-                ConstIterator bytes_it{ bytes.begin() };
-                const ConstIterator bytes_end{ bytes.end() };
+                jule::Bool exist = false;
+                ConstIterator bytes_it = bytes.begin();
+                const ConstIterator bytes_end = bytes.end();
                 for (; bytes_it < bytes_end; ++bytes_it) {
                     if ((exist = *it == *bytes_it))
                         break;
@@ -156,9 +156,9 @@ namespace jule {
             if (n == 0)
                 return parts;
 
-            std::basic_string<jule::U8> s{ this->buffer.c_str() };
-            constexpr jule::Uint npos{ static_cast<jule::Uint>(std::string::npos) };
-            jule::Uint pos{ npos };
+            std::basic_string<jule::U8> s = this->buffer.c_str();
+            constexpr jule::Uint npos = static_cast<jule::Uint>(std::string::npos);
+            jule::Uint pos = npos;
             if (n < 0) {
                 while ((pos = s.find(sub.buffer)) != npos) {
                     parts.push(jule::Str(s.substr(0, pos).c_str(), pos));
@@ -167,7 +167,7 @@ namespace jule {
                 if (!s.empty())
                     parts.push(jule::Str(s.c_str(), s.length()));
             } else {
-                jule::Uint _n{ 0 };
+                jule::Uint _n = 0;
                 while ((pos = s.find(sub.buffer)) != npos) {
                     if (++_n >= n) {
                         parts.push(jule::Str(s.c_str(), s.length()));
@@ -192,15 +192,15 @@ namespace jule {
                 return *this;
 
             std::basic_string<jule::U8> s(this->buffer);
-            constexpr jule::Uint npos{ static_cast<jule::Uint>(std::string::npos) };
-            jule::Uint start_pos{ 0 };
+            constexpr jule::Uint npos = static_cast<jule::Uint>(std::string::npos);
+            jule::Uint start_pos = 0;
             if (n < 0) {
                 while((start_pos = s.find(sub.buffer, start_pos)) != npos) {
                     s.replace(start_pos, sub.len(), _new.buffer);
                     start_pos += _new.len();
                 }
             } else {
-                jule::Uint _n{ 0 };
+                jule::Uint _n = 0;
                 while((start_pos = s.find(sub.buffer, start_pos)) != npos) {
                     s.replace(start_pos, sub.len(), _new.buffer);
                     start_pos += _new.len();
@@ -232,9 +232,9 @@ namespace jule {
         }
 
         operator jule::Slice<jule::I32>(void) const {
-            jule::Slice<jule::I32> runes{};
-            const char *str{ this->operator const char *() };
-            for (jule::Int index{ 0 }; index < this->len(); ) {
+            jule::Slice<jule::I32> runes;
+            const char *str = this->operator const char *();
+            for (jule::Int index = 0; index < this->len(); ) {
                 jule::I32 rune;
                 jule::Int n;
                 std::tie(rune, n) = jule::utf8_decode_rune_str(str+index,

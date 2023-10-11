@@ -9,9 +9,9 @@
 
 struct __jule_thread_handle {
 public:
-    mutable jule::Ptr<std::thread> _thread{};
+    mutable jule::Ptr<std::thread> _thread;
 
-    __jule_thread_handle(void) {};
+    __jule_thread_handle(void) = default;
 
     __jule_thread_handle(const __jule_thread_handle &jth)
     { this->_thread = jth._thread; }

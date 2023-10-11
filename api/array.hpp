@@ -23,7 +23,7 @@ namespace jule {
     template<typename Item, const jule::Uint N>
     struct Array {
     public:
-        mutable Item buffer[N]{};
+        mutable Item buffer[N];
 
         Array<Item, N>(void) = default;
 
@@ -130,7 +130,7 @@ namespace jule {
         friend std::ostream &operator<<(std::ostream &stream,
                                         const jule::Array<Item, N> &src) {
             stream << '[';
-            for (jule::Int index{0}; index < N;) {
+            for (jule::Int index = 0; index < N;) {
                 stream << src.buffer[index++];
                 if (index < N)
                     stream << " ";

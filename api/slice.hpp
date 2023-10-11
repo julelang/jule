@@ -23,10 +23,10 @@ namespace jule {
     template<typename Item>
     class Slice {
     public:
-        mutable jule::Ptr<Item> data{};
-        mutable Item *_slice{ nullptr };
-        mutable jule::Int _len{ 0 };
-        mutable jule::Int _cap{ 0 };
+        mutable jule::Ptr<Item> data;
+        mutable Item *_slice = nullptr;
+        mutable jule::Int _len = 0;
+        mutable jule::Int _cap = 0;
 
         static jule::Slice<Item> alloc(const jule::Uint &len) {
             if (len < 0)
@@ -85,8 +85,8 @@ namespace jule {
 
             this->alloc_new(0, src.size());
             this->_len = this->_cap;
-            const auto src_begin{ src.begin() };
-            for (jule::Int i{ 0 }; i < this->_len; ++i)
+            const auto src_begin = src.begin();
+            for (jule::Int i = 0; i < this->_len; ++i)
                 this->data.alloc[i] = *static_cast<const Item*>(src_begin+i);
         }
 
@@ -147,7 +147,7 @@ namespace jule {
         void alloc_new(const jule::Int &len, const jule::Int &cap) {
             this->dealloc();
 
-            Item *alloc{ new (std::nothrow) Item[cap] };
+            Item *alloc = new (std::nothrow) Item[cap];
             if (!alloc)
                 jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
 
@@ -165,7 +165,7 @@ namespace jule {
             this->alloc_new(len, cap);
 
             // Initialize elements.
-            for (jule::Int i{ 0 }; i < len; ++i)
+            for (jule::Int i = 0; i < len; ++i)
                 *(this->_slice+i) = def;
         }
 
@@ -249,7 +249,7 @@ namespace jule {
             if (this->_len != src._len)
                 return false;
 
-            for (jule::Int index{ 0 }; index < this->_len; ++index) {
+            for (jule::Int index = 0; index < this->_len; ++index) {
                 if (this->_slice[index] != src._slice[index])
                     return false;
             }
@@ -309,7 +309,7 @@ namespace jule {
                 return stream << "[]";
 
             stream << '[';
-            for (jule::Int index{ 0 }; index < src._len;) {
+            for (jule::Int index = 0; index < src._len;) {
                 stream << src._slice[index++];
                 if (index < src._len)
                     stream << ' ';

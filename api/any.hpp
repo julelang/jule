@@ -32,18 +32,18 @@ namespace jule {
             { delete static_cast<T*>(alloc); }
 
             static jule::Bool eq(void *alloc, void *other) {
-                T *l{ static_cast<T*>(alloc) };
-                T *r{ static_cast<T*>(other) };
+                T *l = static_cast<T*>(alloc);
+                T *r = static_cast<T*>(other);
                 return *l == *r;
             }
 
             static const jule::Str to_str(const void *alloc) {
-                const T *v{ static_cast<const T*>(alloc) };
+                const T *v = static_cast<const T*>(alloc);
                 return jule::to_str(*v);
             }
 
             static void *alloc_new_copy(void *data) {
-                T *heap{ new (std::nothrow) T };
+                T *heap = new (std::nothrow) T;
                 if (!heap)
                     return nullptr;
 
@@ -75,8 +75,8 @@ namespace jule {
         }
 
     public:
-        void *data{ nullptr };
-        jule::Any::Type *type{ nullptr };
+        void *data = nullptr;
+        jule::Any::Type *type = nullptr;
 
         Any(void) = default;
         Any(const std::nullptr_t): Any() {}
@@ -96,7 +96,7 @@ namespace jule {
             if (src == nullptr)
                 return;
 
-            void *new_heap{ src.type->alloc_new_copy(src.data) };
+            void *new_heap = src.type->alloc_new_copy(src.data);
             if (!new_heap)
                 jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
 
@@ -107,7 +107,7 @@ namespace jule {
         // Assign data.
         template<typename T>
         void __assign(const T &expr) {
-            T *alloc{ new (std::nothrow) T };
+            T *alloc = new (std::nothrow) T;
             if (!alloc)
                 jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
 

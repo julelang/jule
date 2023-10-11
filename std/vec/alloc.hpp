@@ -20,17 +20,17 @@ struct StdJuleVecBuffer;
 
 template<typename Item>
 inline void __jule_std_vec_copy_range(void *dest, void *buff, const jule::Int &length) {
-    Item *_buff{ static_cast<Item*>(buff) };
+    Item *_buff = static_cast<Item*>(buff);
     std::copy(_buff, _buff+length, static_cast<Item*>(dest));
 }
 
 template<typename Item>
 struct StdJuleVecBuffer {
-    Item *heap{ nullptr };
-    jule::Int len{ 0 };
-    jule::Int cap{ 0 };
+    Item *heap = nullptr;
+    jule::Int len = 0;
+    jule::Int cap = 0;
 
-    StdJuleVecBuffer<Item>(void) {}
+    StdJuleVecBuffer<Item>(void) = default;
 
     StdJuleVecBuffer<Item>(const StdJuleVecBuffer<Item> &ref)
     { this->operator=(ref); }

@@ -91,7 +91,7 @@ namespace jule {
     template<typename T, typename... U>
     jule::Uintptr addr_of_fn(std::function<T(U...)> f) {
         typedef T(FnType)(U...);
-        FnType **fn_ptr{ f.template target<FnType*>() };
+        FnType **fn_ptr = f.template target<FnType*>();
         if (!fn_ptr)
             return 0;
         return (jule::Uintptr)(*fn_ptr);

@@ -23,12 +23,12 @@
 
 namespace jule {
 
-    constexpr signed int UTF16_REPLACEMENT_CHAR{ 65533 };
-    constexpr signed int UTF16_SURR1{ 0xd800 };
-    constexpr signed int UTF16_SURR2{ 0xdc00 };
-    constexpr signed int UTF16_SURR3{ 0xe000 };
-    constexpr signed int UTF16_SURR_SELF{ 0x10000 };
-    constexpr signed int UTF16_MAX_RUNE{ 1114111 };
+    constexpr signed int UTF16_REPLACEMENT_CHAR = 65533;
+    constexpr signed int UTF16_SURR1 = 0xd800;
+    constexpr signed int UTF16_SURR2 = 0xdc00;
+    constexpr signed int UTF16_SURR3 = 0xe000;
+    constexpr signed int UTF16_SURR_SELF = 0x10000;
+    constexpr signed int UTF16_MAX_RUNE = 1114111;
 
     inline jule::I32 utf16_decode_rune(const jule::I32 r1, const jule::I32 r2);
     jule::Slice<jule::I32> utf16_decode(const jule::Slice<jule::I32> s);
@@ -50,10 +50,10 @@ namespace jule {
     }
 
     jule::Slice<jule::I32> utf16_decode(const jule::Slice<jule::U16> &s) {
-        jule::Slice<jule::I32> a{ jule::Slice<jule::I32>::alloc(s.len()) };
-        jule::Int n{ 0 };
-        for (jule::Int i{ 0 }; i < s.len(); ++i) {
-            jule::U16 r{ s[i] };
+        jule::Slice<jule::I32> a = jule::Slice<jule::I32>::alloc(s.len());
+        jule::Int n = 0;
+        for (jule::Int i = 0; i < s.len(); ++i) {
+            jule::U16 r = s[i];
             if (r < jule::UTF16_SURR1 || jule::UTF16_SURR3 <= r)
                 a[n] = static_cast<jule::I32>(r);
 
@@ -75,8 +75,8 @@ namespace jule {
 
     jule::Str utf16_to_utf8_str(const wchar_t *wstr,
                                 const std::size_t len) {
-        jule::Slice<jule::U16> code_page{ jule::Slice<jule::U16>::alloc(len) };
-        for (jule::Int i{ 0 }; i < len; ++i)
+        jule::Slice<jule::U16> code_page = jule::Slice<jule::U16>::alloc(len);
+        for (jule::Int i = 0; i < len; ++i)
             code_page[i] = static_cast<jule::U16>(wstr[i]);
         return static_cast<jule::Str>(jule::utf16_decode(code_page));
     }
@@ -92,12 +92,12 @@ namespace jule {
     }
 
     jule::Slice<jule::U16> utf16_encode(const jule::Slice<jule::I32> &runes) {
-        jule::Int n{ runes.len() };
+        jule::Int n = runes.len();
         for (const jule::I32 v: runes)
             if ( v >= jule::UTF16_SURR_SELF )
                 ++n;
 
-        jule::Slice<jule::U16> a{ jule::Slice<jule::U16>::alloc(n) };
+        jule::Slice<jule::U16> a = jule::Slice<jule::U16>::alloc(n);
         n = 0;
         for (const jule::I32 v: runes) {
             if ((0 <= v &&
@@ -141,8 +141,8 @@ namespace jule {
 
     jule::Slice<jule::U16> utf16_from_str(const jule::Str &s) {
         constexpr char NULL_TERMINATION = '\x00';
-        jule::Slice<jule::U16> buff{ nullptr };
-        jule::Slice<jule::I32> runes{ static_cast<jule::Slice<jule::I32>>(s) };
+        jule::Slice<jule::U16> buff;
+        jule::Slice<jule::I32> runes = static_cast<jule::Slice<jule::I32>>(s);
         for (const jule::I32 &r: runes) {
             if (r == NULL_TERMINATION)
                 break;

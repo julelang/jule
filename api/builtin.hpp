@@ -43,9 +43,9 @@ namespace jule {
     template<typename T>
     inline void out(const T &obj) {
 #ifdef OS_WINDOWS
-        const jule::Str str{ jule::to_str<T>(obj) };
-        const jule::Slice<jule::U16> utf16_str{ jule::utf16_from_str(str) };
-        HANDLE handle{ GetStdHandle(STD_OUTPUT_HANDLE) };
+        const jule::Str str = jule::to_str<T>(obj);
+        const jule::Slice<jule::U16> utf16_str = jule::utf16_from_str(str);
+        HANDLE handle = GetStdHandle(STD_OUTPUT_HANDLE);
         WriteConsoleW(handle, &utf16_str[0], utf16_str.len(), nullptr, nullptr);
 #else
         std::cout << obj;
@@ -62,8 +62,8 @@ namespace jule {
     jule::Slice<Item> alloc_for_append(const jule::Slice<Item> &dest,
                                        const jule::Int &n) {
         if (dest._len+n > dest._cap) {
-            const jule::Int alloc_size{ (dest._len+n)*2 };
-            jule::Slice<Item> buffer{ jule::Slice<Item>::alloc(0, alloc_size) };
+            const jule::Int alloc_size = (dest._len+n)*2;
+            jule::Slice<Item> buffer = jule::Slice<Item>::alloc(0, alloc_size);
             buffer._len = dest._len;
             std::copy(
                 dest._slice,
@@ -80,10 +80,9 @@ namespace jule {
         if (dest.empty() || src.empty())
             return 0;
 
-        const jule::Int len{ dest.len() > src.len() ? src.len()
+        const jule::Int len = dest.len() > src.len() ? src.len()
                             : src.len() > dest.len() ? dest.len()
-                            : src.len()
-        };
+                            : src.len();
 
         std::copy(src._slice, src._slice+len, dest._slice);
 

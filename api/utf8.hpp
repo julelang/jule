@@ -21,32 +21,32 @@
 
 namespace jule {
 
-    constexpr signed int UTF8_RUNE_ERROR{ 65533 };
-    constexpr signed int UTF8_MASKX{ 63 };
-    constexpr signed int UTF8_MASK2{ 31 };
-    constexpr signed int UTF8_MASK3{ 15 };
-    constexpr signed int UTF8_MASK4{ 7 };
-    constexpr signed int UTF8_LOCB{ 128 };
-    constexpr signed int UTF8_HICB{ 191 };
-    constexpr signed int UTF8_XX{ 241 };
-    constexpr signed int UTF8_AS{ 240 };
-    constexpr signed int UTF8_S1{ 2 };
-    constexpr signed int UTF8_S2{ 19 };
-    constexpr signed int UTF8_S3{ 3 };
-    constexpr signed int UTF8_S4{ 35 };
-    constexpr signed int UTF8_S5{ 52 };
-    constexpr signed int UTF8_S6{ 4 };
-    constexpr signed int UTF8_S7{ 68 };
-    constexpr signed int UTF8_RUNE1_MAX{ 127 };
-    constexpr signed int UTF8_RUNE2_MAX{ 2047 };
-    constexpr signed int UTF8_RUNE3_MAX{ 65535 };
-    constexpr signed int UTF8_TX{ 128 };
-    constexpr signed int UTF8_T2{ 192 };
-    constexpr signed int UTF8_T3{ 224 };
-    constexpr signed int UTF8_T4{ 240 };
-    constexpr signed int UTF8_MAX_RUNE{ 1114111 };
-    constexpr signed int UTF8_SURROGATE_MIN{ 55296 };
-    constexpr signed int UTF8_SURROGATE_MAX{ 57343 };
+    constexpr signed int UTF8_RUNE_ERROR = 65533;
+    constexpr signed int UTF8_MASKX = 63;
+    constexpr signed int UTF8_MASK2 = 31;
+    constexpr signed int UTF8_MASK3 = 15;
+    constexpr signed int UTF8_MASK4 = 7;
+    constexpr signed int UTF8_LOCB = 128;
+    constexpr signed int UTF8_HICB = 191;
+    constexpr signed int UTF8_XX = 241;
+    constexpr signed int UTF8_AS = 240;
+    constexpr signed int UTF8_S1 = 2;
+    constexpr signed int UTF8_S2 = 19;
+    constexpr signed int UTF8_S3 = 3;
+    constexpr signed int UTF8_S4 = 35;
+    constexpr signed int UTF8_S5 = 52;
+    constexpr signed int UTF8_S6 = 4;
+    constexpr signed int UTF8_S7 = 68;
+    constexpr signed int UTF8_RUNE1_MAX = 127;
+    constexpr signed int UTF8_RUNE2_MAX = 2047;
+    constexpr signed int UTF8_RUNE3_MAX = 65535;
+    constexpr signed int UTF8_TX = 128;
+    constexpr signed int UTF8_T2 = 192;
+    constexpr signed int UTF8_T3 = 224;
+    constexpr signed int UTF8_T4 = 240;
+    constexpr signed int UTF8_MAX_RUNE = 1114111;
+    constexpr signed int UTF8_SURROGATE_MIN = 55296;
+    constexpr signed int UTF8_SURROGATE_MAX = 57343;
 
     // Declarations
 
@@ -90,20 +90,20 @@ namespace jule {
         if (len < 1)
             return std::make_tuple<jule::I32, jule::Int>(jule::UTF8_RUNE_ERROR, 0);
 
-        const jule::U8 s0{ static_cast<jule::U8>(s[0]) };
-        const jule::U8 x{ jule::utf8_first[s0] };
+        const jule::U8 s0 = static_cast<jule::U8>(s[0]);
+        const jule::U8 x = jule::utf8_first[s0];
         if (x >= jule::UTF8_AS) {
-            const jule::I32 mask{ x << 31 >> 31 };
+            const jule::I32 mask = x << 31 >> 31;
             return std::make_tuple( (static_cast<jule::I32>(s[0])&~mask) |
                                     (jule::UTF8_RUNE_ERROR&mask), 1);
         }
 
-        const jule::Int sz{ static_cast<jule::Int>(x&7) };
-        const struct jule::UTF8AcceptRange accept{ jule::utf8_accept_ranges[x>>4] };
+        const jule::Int sz = static_cast<jule::Int>(x&7);
+        const struct jule::UTF8AcceptRange accept = jule::utf8_accept_ranges[x>>4];
         if (len < sz)
             return std::make_tuple<jule::I32, jule::Int>( jule::UTF8_RUNE_ERROR, 1 );
 
-        const jule::U8 s1{ static_cast<jule::U8>(s[1]) };
+        const jule::U8 s1 = static_cast<jule::U8>(s[1]);
         if (s1 < accept.lo || accept.hi < s1)
             return std::make_tuple<jule::I32, jule::Int>(jule::UTF8_RUNE_ERROR, 1);
 
@@ -112,7 +112,7 @@ namespace jule {
                 (static_cast<jule::I32>(s0&jule::UTF8_MASK2)<<6) |
                  static_cast<jule::I32>(s1&jule::UTF8_MASKX), 2);
 
-        const jule::U8 s2{ static_cast<jule::U8>(s[2]) };
+        const jule::U8 s2 = static_cast<jule::U8>(s[2]);
         if (s2 < jule::UTF8_LOCB || jule::UTF8_HICB < s2)
             return std::make_tuple<jule::I32, jule::Int>(jule::UTF8_RUNE_ERROR, 1);
 
@@ -122,7 +122,7 @@ namespace jule {
                 (static_cast<jule::I32>(s1&jule::UTF8_MASKX)<<6) |
                  static_cast<jule::I32>(s2&jule::UTF8_MASKX), 3);
 
-        const jule::U8 s3{ static_cast<jule::U8>(s[3]) };
+        const jule::U8 s3 = static_cast<jule::U8>(s[3]);
         if (s3 < jule::UTF8_LOCB || jule::UTF8_HICB < s3)
             return std::make_tuple<jule::I32, jule::Int>(jule::UTF8_RUNE_ERROR, 1);
 
@@ -136,13 +136,13 @@ namespace jule {
         if (static_cast<jule::U32>(r) <= jule::UTF8_RUNE1_MAX)
             return jule::Slice<jule::U8>({static_cast<jule::U8>(r)});
 
-        const jule::U32 i{ static_cast<jule::U32>(r) };
+        const jule::U32 i = static_cast<jule::U32>(r);
         if (i < jule::UTF8_RUNE2_MAX) {
             return jule::Slice<jule::U8>({ static_cast<jule::U8>(jule::UTF8_T2|static_cast<jule::U8>(r>>6)),
                                            static_cast<jule::U8>(jule::UTF8_TX|(static_cast<jule::U8>(r)&jule::UTF8_MASKX)) });
         }
 
-        jule::I32 _r{ r };
+        jule::I32 _r = r;
         if (i > jule::UTF8_MAX_RUNE ||
             (jule::UTF8_SURROGATE_MIN <= i && i <= jule::UTF8_SURROGATE_MAX))
             _r = jule::UTF8_RUNE_ERROR;

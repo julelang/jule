@@ -23,15 +23,15 @@ namespace jule {
     template<typename Mask>
     struct Trait {
     public:
-        mutable jule::Ptr<Mask> data{};
-        const char *type_id { nullptr };
+        mutable jule::Ptr<Mask> data;
+        const char *type_id = nullptr;
 
         Trait<Mask>(void) = default;
         Trait<Mask>(std::nullptr_t): Trait<Mask>() {}
 
         template<typename T>
         Trait<Mask>(const T &data) {
-            T *alloc{ new(std::nothrow) T };
+            T *alloc = new(std::nothrow) T;
             if (!alloc)
                 jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
 

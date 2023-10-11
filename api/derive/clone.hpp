@@ -47,18 +47,18 @@ namespace jule {
 
     template<typename Item>
     jule::Slice<Item> clone(const jule::Slice<Item> &s) {
-        jule::Slice<Item> s_clone{ jule::Slice<Item>::alloc(0, s._len) };
+        jule::Slice<Item> s_clone = jule::Slice<Item>::alloc(0, s._len);
         s_clone._len = s._len;
-        for (int i{ 0 }; i < s._len; ++i)
+        for (int i = 0; i < s._len; ++i)
             s_clone._slice[i] = jule::clone(s._slice[i]);
         return s_clone;
     }
 
     template<typename Item, const jule::Uint N>
     jule::Array<Item, N> clone(const jule::Array<Item, N> &arr) {
-        jule::Array<Item, N> arr_clone{};
-        for (int i{ 0 }; i < arr.len(); ++i)
-            arr_clone.operator[](i) = jule::clone(arr.operator[](i));
+        jule::Array<Item, N> arr_clone;
+        for (int i = 0; i < arr.len(); ++i)
+            arr_clone.__at(i) = jule::clone(arr.__at(i));
         return arr_clone;
     }
 
@@ -75,13 +75,12 @@ namespace jule {
         if (r == nullptr)
             return r;
 
-        jule::Ptr<T> r_clone{ jule::Ptr<T>::make(jule::clone(r.operator T())) };
-        return r_clone;
+        return jule::Ptr<T>::make(jule::clone(r.operator T()));
     }
 
     template<typename T>
     jule::Trait<T> clone(const jule::Trait<T> &t) {
-        jule::Trait<T> t_clone{ t };
+        jule::Trait<T> t_clone = t;
         t_clone.data = jule::clone(t_clone.data);
         return t;
     }

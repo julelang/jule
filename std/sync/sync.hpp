@@ -14,7 +14,7 @@ public:
     mutable jule::Ptr<std::mutex> _mutex{};
 
     __jule_mutex_handle(void) {
-        std::mutex *mtx{ new (std::nothrow) std::mutex() };
+        std::mutex *mtx = new (std::nothrow) std::mutex();
         if (mtx == nullptr)
             jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
         this->_mutex = jule::Ptr<std::mutex>::make(mtx);

@@ -16,7 +16,7 @@ namespace jule {
 
     // The reference counting data delta value that must occur
     // per each reference counting operation.
-    constexpr signed int REFERENCE_DELTA{ 1 };
+    constexpr signed int REFERENCE_DELTA = 1;
 
     // Wrapper structure for raw pointer of JuleC.
     // This structure is the used by Jule references for reference-counting
@@ -34,8 +34,8 @@ namespace jule {
 
     template<typename T>
     struct Ptr {
-        mutable T *alloc{ nullptr };
-        mutable jule::Uint *ref{ nullptr };
+        mutable T *alloc = nullptr;
+        mutable jule::Uint *ref = nullptr;
 
         // Creates new reference from allocation and reference counting
         // allocation. Reference does not counted if reference count
