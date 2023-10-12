@@ -4172,26 +4172,41 @@ impl BinopSolver {
         self.check_data(self.r)
     }
 
+    fn set_model(mut self, mut &d: &Data) {
+        if d.is_const() {
+            ret
+        }
+
+        let (mut l, mut r) = self.l, self.r
+        match {
+        | self.r.kind.prim() != nil && self.r.kind.prim().is_any()
+        | self.l.kind.is_nil()
+        | self.r.kind.trt() != nil:
+            l, r = r, l
+        }
+
+        d.model = &BinopExprModel{
+            left:  l.model,
+            right: r.model,
+            op:    self.op.kind,
+        }
+    }
+
     fn solve_explicit(mut self, mut &l: &Data, mut &r: &Data): &Data {
         self.l, self.r = l, r
 
         self.check_datas()
 
         let mut d = self.eval()
-        //self.l, self.r = l, r // Save normal order
+
+        self.l, self.r = l, r // Save normal order
 
         self.solve_const(d)
         self.post_const(d)
 
         if d != nil {
             d.lvalue = false
-            if !d.is_const() {
-                d.model = &BinopExprModel{
-                    left:  self.l.model,
-                    right: self.r.model,
-                    op:    self.op.kind,
-                }
-            }
+            self.set_model(d)
         }
 
         ret d
