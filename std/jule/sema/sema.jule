@@ -1605,9 +1605,16 @@ impl Sema {
         if decl.cpp_linked && decl.constant {
             self.push_err(decl.token, LogMsg.CppLinkedVarIsConst)
         }
-        if !decl.cpp_linked && !decl.constant && !decl.statically {
-            self.push_err(decl.token, LogMsg.GlobalNotStatic)
-            self.push_suggestion(LogMsg.UseStaticKeywordToDef)
+        if !decl.cpp_linked {
+            if !decl.constant && !decl.statically {
+                self.push_err(decl.token, LogMsg.GlobalNotStatic)
+                self.push_suggestion(LogMsg.UseStaticKeywordToDef)
+            }
+
+            if decl.directives.len > 0 {
+                self.push_err(decl.token, LogMsg.VarHasDirective)
+                self.push_suggestion(LogMsg.MaybeCppDefine)
+            }
         }
 
         self.check_var_decl(decl, self)
@@ -1748,6 +1755,11 @@ impl Sema {
         } else if self.is_duplicated_ident(uintptr(f), f.ident, f.cpp_linked) {
             self.push_err(f.token, LogMsg.DuplicatedIdent, f.ident)
             self.push_suggestion(LogMsg.RenameForAvoidDuplication)
+        }
+
+        if !f.cpp_linked && f.directives.len > 0 {
+            self.push_err(f.token, LogMsg.FnHasDirective)
+            self.push_suggestion(LogMsg.MaybeCppDefine)
         }
 
         f.sema = self

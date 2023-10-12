@@ -1790,6 +1790,9 @@ impl Parser {
             // Ignore
 
         |:
+            if self.directives.len != 0 {
+                self.push_err(self.directives[0].tag, LogMsg.UnusedDirective)
+            }
             self.directives = nil
         }
     }
@@ -2059,11 +2062,15 @@ impl Parser {
                 let mut d = (&Directive)(node.data)
                 if d != nil && is_top_directive(d.tag.kind) {
                     self.ast.top_directives = append(self.ast.top_directives, d)
+                } else {
+                    break
                 }
             } else if node.is_comment() {
                 let mut d = self.get_directive((&Comment)(node.data))
                 if d != nil && is_top_directive(d.tag.kind) {
                     self.ast.top_directives = append(self.ast.top_directives, d)
+                } else {
+                    break
                 }
             } else {
                 break
