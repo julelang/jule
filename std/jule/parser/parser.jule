@@ -257,50 +257,71 @@ impl Parser {
             ret nil
         }
 
-        let mut d = &Directive{
-            token: c.token,
-        }
+        let mut d = &Directive{}
 
         let pragma = c.token.kind[DIRECTIVE_PREFIX.len:] // Remove directive prefix
         let mut parts = pragma.split(" ", -1)
 
-        d.tag = parts[0]
-        d.args = parts[1:]
+        d.args = make([]Token, 0, parts.len)
+        for _, part in parts {
+            d.args = append(d.args, Token{kind: part})
+        }
 
         // Don't append if directive kind is invalid.
-        let mut ok = false
+        let tag = d.tag()
         for _, kind in DIRECTIVES {
-            if d.tag == str(kind) {
-                ok = true
-                break
+            if tag == str(kind) {
+                ret d
             }
         }
-        if !ok {
+        ret nil
+    }
+
+    fn build_directive(mut self, mut tokens: []Token): &Directive {
+        if tokens[0].column > 1 {
+            self.push_err(tokens[0], LogMsg.DirectiveUsedAtMiddle)
+            ret nil
+        } else if tokens.len == 1 {
+            self.push_err(tokens[0], LogMsg.InvalidSyntax)
             ret nil
         }
 
-        ret d
+        let mut d = &Directive{
+            args: tokens[1:], // Start 1 to skip '#' token.
+        }
+
+        // Don't append if directive kind is invalid.
+        let tag = d.tag()
+        for _, kind in DIRECTIVES {
+            if tag == str(kind) {
+                ret d
+            }
+        }
+        ret nil
     }
 
-    fn push_directive(mut self, mut &c: &Comment) {
-        let mut d = self.get_directive(c)
+    fn push_directive(mut self, mut d: &Directive) {
         if d == nil {
             ret
         }
 
         // Don't append if already added this directive.
+        let tag = d.tag()
         for _, pd in self.directives {
-            if d.tag == pd.tag {
+            if tag == pd.tag() {
                 ret
             }
         }
-
         self.directives = append(self.directives, d)
+    }
+
+    fn push_directive_by_comment(mut self, mut &c: &Comment) {
+        self.push_directive(self.get_directive(c))
     }
 
     fn process_comment(mut self, mut &c: &Comment) {
         if c.is_directive() {
-            self.push_directive(c)
+            self.push_directive_by_comment(c)
             ret
         }
         if self.comment_group == nil {
@@ -1728,6 +1749,9 @@ impl Parser {
         | TokenId.Cpp:
             ret self.build_cpp_link(tokens)
 
+        | TokenId.Hash:
+            ret self.build_directive(tokens)
+
         | TokenId.Comment:
             // Push first token because this is full text comment.
             // Comments are just single-line.
@@ -1907,6 +1931,9 @@ impl Parser {
         }
 
         match {
+        | node.is_directive():
+            self.push_directive((&Directive)(node.data))
+
         | node.is_use_decl():
             self.ast.use_decls = append(self.ast.use_decls, (&UseDecl)(node.data))
 
@@ -2031,7 +2058,7 @@ impl Parser {
             let mut node = Node{data: data}
             if node.is_comment() {
                 let mut d = self.get_directive((&Comment)(node.data))
-                if d != nil && is_top_directive(d.tag) {
+                if d != nil && is_top_directive(d.tag()) {
                     self.ast.top_directives = append(self.ast.top_directives, d)
                 }
             } else {
