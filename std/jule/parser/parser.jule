@@ -262,15 +262,15 @@ impl Parser {
         let pragma = c.token.kind[DIRECTIVE_PREFIX.len:] // Remove directive prefix
         let mut parts = pragma.split(" ", -1)
 
-        d.args = make([]Token, 0, parts.len)
-        for _, part in parts {
+        d.args = make([]Token, 0, parts.len-1)
+        d.tag.kind = parts[0]
+        for _, part in parts[1:] {
             d.args = append(d.args, Token{kind: part})
         }
 
         // Don't append if directive kind is invalid.
-        let tag = d.tag()
         for _, kind in DIRECTIVES {
-            if tag == str(kind) {
+            if d.tag.kind == str(kind) {
                 ret d
             }
         }
@@ -287,13 +287,13 @@ impl Parser {
         }
 
         let mut d = &Directive{
-            args: tokens[1:], // Start 1 to skip '#' token.
+            tag:  tokens[1],
+            args: tokens[2:], // Start 2 to skip '#', and tag tokens.
         }
 
         // Don't append if directive kind is invalid.
-        let tag = d.tag()
         for _, kind in DIRECTIVES {
-            if tag == str(kind) {
+            if d.tag.kind == str(kind) {
                 ret d
             }
         }
@@ -306,9 +306,8 @@ impl Parser {
         }
 
         // Don't append if already added this directive.
-        let tag = d.tag()
         for _, pd in self.directives {
-            if tag == pd.tag() {
+            if d.tag.kind == pd.tag.kind {
                 ret
             }
         }
@@ -2056,9 +2055,14 @@ impl Parser {
             }
 
             let mut node = Node{data: data}
-            if node.is_comment() {
+            if node.is_directive() {
+                let mut d = (&Directive)(node.data)
+                if d != nil && is_top_directive(d.tag.kind) {
+                    self.ast.top_directives = append(self.ast.top_directives, d)
+                }
+            } else if node.is_comment() {
                 let mut d = self.get_directive((&Comment)(node.data))
-                if d != nil && is_top_directive(d.tag()) {
+                if d != nil && is_top_directive(d.tag.kind) {
                     self.ast.top_directives = append(self.ast.top_directives, d)
                 }
             } else {
