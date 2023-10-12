@@ -251,25 +251,6 @@ impl Parser {
         ret expr
     }
 
-    fn get_directive(self, mut c: &Comment): &Directive {
-        if c.text.len <= DIRECTIVE_PREFIX.len {
-            ret nil
-        }
-
-        let mut d = &Directive{}
-
-        let pragma = c.token.kind[DIRECTIVE_PREFIX.len:] // Remove directive prefix
-        let mut parts = pragma.split(" ", -1)
-
-        d.args = make([]Token, 0, parts.len-1)
-        d.tag.kind = parts[0]
-        for _, part in parts[1:] {
-            d.args = append(d.args, Token{kind: part})
-        }
-
-        ret d
-    }
-
     fn build_directive(mut self, mut tokens: []Token): &Directive {
         if tokens[0].column > 1 {
             self.push_err(tokens[0], LogMsg.DirectiveUsedAtMiddle)
@@ -299,15 +280,7 @@ impl Parser {
         self.directives = append(self.directives, d)
     }
 
-    fn push_directive_by_comment(mut self, mut &c: &Comment) {
-        self.push_directive(self.get_directive(c))
-    }
-
     fn process_comment(mut self, mut &c: &Comment) {
-        if c.is_directive() {
-            self.push_directive_by_comment(c)
-            ret
-        }
         if self.comment_group == nil {
             self.comment_group = &CommentGroup{}
         }
@@ -2052,11 +2025,9 @@ impl Parser {
                     break iter
                 }
 
-            | &Comment:
-                let mut d = self.get_directive((&Comment)(data))
-                if d != nil && is_top_directive(d.tag.kind) {
-                    self.ast.top_directives = append(self.ast.top_directives, d)
-                }
+            | &Comment
+            | &CommentGroup:
+                // Ignore.
 
             |:
                 break iter
