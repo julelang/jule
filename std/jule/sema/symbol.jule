@@ -34,7 +34,7 @@ use std::jule::build::{
     is_valid_header_ext,
     is_valid_cpp_ext,
 }
-use std::jule::lex::{Token, TokenKind}
+use std::jule::lex::{Token, TokenId, TokenKind}
 
 // Stack for symbol references.
 pub struct ReferenceStack {
@@ -678,21 +678,34 @@ impl SymbolBuilder {
     }
 
     fn push_directive_pass(mut self, mut &d: &std::jule::ast::Directive) {
-        let mut pass = Pass{
-            token: d.token,
+        if d.args.len == 0 {
+            self.push_err(d.tag, LogMsg.MissingExpr)
+            ret
+        } else if d.args.len > 1 {
+            let arg = d.args[1]
+            self.push_err(arg, LogMsg.ArgumentOverflow)
         }
-        for _, arg in d.args {
-            if arg != "" {
-                pass.text += arg + " "
-            }
+
+        let arg = d.args[0]
+        if arg.id != TokenId.Lit {
+            self.push_err(arg, LogMsg.InvalidSyntax)
+            ret
         }
-        pass.text = pass.text.trim(" \n\r\t\v")
-        self.table.passes = append(self.table.passes, pass)
+
+        if arg.kind[0] != '"' {
+            self.push_err(arg, LogMsg.InvalidSyntax)
+            ret
+        }
+
+        self.table.passes = append(self.table.passes, Pass{
+            token: d.tag,
+            text:  arg.kind[1:arg.kind.len-1],
+        })
     }
 
     fn append_top_directives(mut self) {
         for (_, mut d) in self.ast.top_directives {
-            match d.tag {
+            match d.tag.kind {
             | str(Directive.Pass):
                 self.push_directive_pass(d)
             }

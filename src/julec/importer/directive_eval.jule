@@ -2,117 +2,147 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-// Eval directive flag.
-fn eval_directive_ident(ident: str): bool {
-    if ident == "" {
-        ret false
-    }
+use std::jule::ast::{Directive}
+use std::jule::build::{Log, LogKind, LogMsg, logf}
+use std::jule::lex::{Token, TokenId, TokenKind}
 
-    for _, flag in FLAGS {
-        if flag == ident {
-            ret true
-        }
-    }
-
-    ret false
-}
-
-// Eval directive expression part.
-// Accepts unary operators.
-fn eval_directive_part(mut part: str): bool {
-    let logical_not = part[0] == '!'
-    if logical_not {
-        part = part[1:]
-    }
-
-    let mut result = eval_directive_ident(part)
-    if logical_not {
-        result = !result
-    }
-    ret result
-}
-
-// Split operans by binary operators.
-// Skips range of parentheses.
-fn split_operans(op: str, expr: str): []str {
-    let mut parts = make([]str, 0, 10)
-
-    let mut range_n = 0
-    let mut i = 0
-    let mut last = 0
-    for i < expr.len - 1; i++ {
-        let b = expr[i]
-        if b == '(' {
-            range_n++
-            continue
-        } else if b == ')' {
-            range_n--
-        }
-
-        if range_n > 0 {
-            continue
-        }
-
-        match op {
-        | "||":
-            if b == '|' && expr[i+1] == '|' {
-                parts = append(parts, expr[last:i])
-                last = i + 2
-            }
-
-        | "&&":
-            if b == '&' && expr[i+1] == '&' {
-                parts = append(parts, expr[last:i])
-                last = i + 2
-            }
-        }
-    }
-
-    if last < expr.len {
-        parts = append(parts, expr[last:])
-    } else {
-        // Missing operand.
-        // Add empty part for error handling.
-        parts = append(parts, "")
-    }
-
-    ret parts
-}
-
-// Eval directory expression.
-// Directory expressions are logial expressions and uses flags.
+// Eval directive expression.
+// Directive expressions are logial expressions and uses flags.
 //
 // Read manual for more information about syntax or etc:
-// https://manual.jule.dev/compiler/platform-specific-programming#the-build-directive
-fn eval_directive_expr(expr: str): bool {
-    if expr == "" {
-        ret false
+// https://manual.jule.dev/compiler/directives.html#directive-expressions
+struct DirectiveEval {
+    logs: []Log
+    d:    &Directive
+}
+
+impl DirectiveEval {
+    fn push_err(mut self, t: Token, fmt: LogMsg, args: ...any) {
+        self.logs = append(self.logs, Log{
+            kind:   LogKind.Error,
+            row:    t.row,
+            column: t.column,
+            path:   t.file.path(),
+            text:   logf(fmt, args...),
+        })
     }
 
-    let mut result = false
+    // Split operans by binary operators.
+    // Skips range of parentheses.
+    fn split_operans(mut self, op: TokenKind, mut &tokens: []Token): [][]Token {
+        let mut parts = make([][]Token, 0, 10)
 
-    let logical_or_parts = split_operans("||", expr)
-    for _, part in logical_or_parts {
-        if part == "" {
+        let mut i = 0
+        let mut range_n = 0
+        let mut last = 0
+        for i < tokens.len - 1; i++ {
+            let b = tokens[i]
+            if b.id == TokenId.Range {
+                match b.kind {
+                | str(TokenKind.LParent):
+                    range_n++
+                    continue
+
+                | str(TokenKind.RParent):
+                    range_n--
+                }
+            }
+
+            if range_n > 0 || b.id != TokenId.Op {
+                continue
+            }
+
+            if b.kind == str(op) {
+                parts = append(parts, tokens[last:i])
+               last = i + 1
+            }
+        }
+
+        if last < tokens.len {
+            parts = append(parts, tokens[last:])
+        } else {
+            // Missing operand.
+            self.push_err(tokens[last-1], LogMsg.MissingExpr)
+            ret nil
+        }
+
+        ret parts
+    }
+
+    // Eval directive flag.
+    fn eval_directive_ident(self, ident: str): bool {
+        if ident == "" {
             ret false
         }
 
-        let mut and = true
-        let logical_and_parts = split_operans("&&", part)
-        for _, and_part in logical_and_parts {
-            if and_part.find("(") != -1 {
-                if and_part[and_part.len-1] != ')' { // Missing close.
-                    ret false
-                }
-                let _expr = and_part[1:and_part.len-1] // Remove parentheses.
-                and = and && eval_directive_expr(_expr)
-            } else {
-                and = and && eval_directive_part(and_part)
+        for _, flag in FLAGS {
+            if flag == ident {
+                ret true
             }
         }
 
-        result = result || and
+        ret false
     }
 
-    ret result
+    // Eval directive expression part.
+    // Accepts unary operators.
+    fn eval_directive_part(mut self, mut part: []Token): bool {
+        let logical_not = part[0].id == TokenId.Op && part[0].kind == str(TokenKind.Excl)
+        if logical_not {
+            part = part[1:]
+        }
+
+        if part.len > 1 {
+            self.push_err(part[1], LogMsg.InvalidSyntax)
+            ret false
+        }
+
+        let mut result = self.eval_directive_ident(part[0].kind)
+        if logical_not {
+            result = !result
+        }
+        ret result
+    }
+
+    fn eval(mut self): bool {
+        if self.d.args.len == 0 {
+            self.push_err(self.d.tag, LogMsg.MissingExpr)
+            ret false
+        }
+
+        let mut result = false
+
+        let mut logical_or_parts = self.split_operans(TokenKind.DblVline, self.d.args)
+        if logical_or_parts == nil {
+            ret false
+        }
+
+        for (_, mut part) in logical_or_parts {
+            let mut and = true
+            let mut logical_and_parts = self.split_operans(TokenKind.DblAmper, part)
+            if logical_and_parts == nil {
+                ret false
+            }
+
+            for (_, mut and_part) in logical_and_parts {
+                let first = and_part[0]
+                if first.id == TokenId.Range && first.kind == str(TokenKind.LParent) {
+                    let end = and_part[and_part.len-1]
+
+                    // Missing close.
+                    if end.id != TokenId.Range || end.kind != str(TokenKind.RParent) {
+                        self.push_err(first, LogMsg.WaitCloseParent)
+                        ret false
+                    }
+
+                    and_part = and_part[1:and_part.len-1] // Remove parentheses.
+                }
+                and = and && self.eval_directive_part(and_part)
+            }
+
+            result = result || and
+        }
+
+        ret result
+    }
 }

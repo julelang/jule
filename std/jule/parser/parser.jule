@@ -38,7 +38,6 @@ use std::jule::lex::{
     is_ignore_ident,
 }
 use std::jule::build::{
-    DIRECTIVES,
     DIRECTIVE_PREFIX,
     LogMsg,
     Log,
@@ -252,57 +251,36 @@ impl Parser {
         ret expr
     }
 
-    fn get_directive(self, mut c: &Comment): &Directive {
-        if c.text.len <= DIRECTIVE_PREFIX.len {
+    fn build_directive(mut self, mut tokens: []Token): &Directive {
+        if tokens[0].column > 1 {
+            self.push_err(tokens[0], LogMsg.DirectiveUsedAtMiddle)
+            ret nil
+        } else if tokens.len == 1 {
+            self.push_err(tokens[0], LogMsg.InvalidSyntax)
             ret nil
         }
 
-        let mut d = &Directive{
-            token: c.token,
+        ret &Directive{
+            tag:  tokens[1],
+            args: tokens[2:], // Start 2 to skip '#', and tag tokens.
         }
-
-        let pragma = c.token.kind[DIRECTIVE_PREFIX.len:] // Remove directive prefix
-        let mut parts = pragma.split(" ", -1)
-
-        d.tag = parts[0]
-        d.args = parts[1:]
-
-        // Don't append if directive kind is invalid.
-        let mut ok = false
-        for _, kind in DIRECTIVES {
-            if d.tag == str(kind) {
-                ok = true
-                break
-            }
-        }
-        if !ok {
-            ret nil
-        }
-
-        ret d
     }
 
-    fn push_directive(mut self, mut &c: &Comment) {
-        let mut d = self.get_directive(c)
+    fn push_directive(mut self, mut d: &Directive) {
         if d == nil {
             ret
         }
 
         // Don't append if already added this directive.
         for _, pd in self.directives {
-            if d.tag == pd.tag {
+            if d.tag.kind == pd.tag.kind {
                 ret
             }
         }
-
         self.directives = append(self.directives, d)
     }
 
     fn process_comment(mut self, mut &c: &Comment) {
-        if c.is_directive() {
-            self.push_directive(c)
-            ret
-        }
         if self.comment_group == nil {
             self.comment_group = &CommentGroup{}
         }
@@ -1728,6 +1706,9 @@ impl Parser {
         | TokenId.Cpp:
             ret self.build_cpp_link(tokens)
 
+        | TokenId.Hash:
+            ret self.build_directive(tokens)
+
         | TokenId.Comment:
             // Push first token because this is full text comment.
             // Comments are just single-line.
@@ -1767,6 +1748,9 @@ impl Parser {
             // Ignore
 
         |:
+            if self.directives.len != 0 {
+                self.push_err(self.directives[0].tag, LogMsg.UnusedDirective)
+            }
             self.directives = nil
         }
     }
@@ -1907,6 +1891,9 @@ impl Parser {
         }
 
         match {
+        | node.is_directive():
+            self.push_directive((&Directive)(node.data))
+
         | node.is_use_decl():
             self.ast.use_decls = append(self.ast.use_decls, (&UseDecl)(node.data))
 
@@ -2013,6 +2000,7 @@ impl Parser {
 
         // Get top directives.
         let mut i = 0
+    iter:
         for i < stms.len; i++ {
             let mut st = stms[i]
             if st.tokens.len == 0 {
@@ -2028,14 +2016,21 @@ impl Parser {
                 ret
             }
 
-            let mut node = Node{data: data}
-            if node.is_comment() {
-                let mut d = self.get_directive((&Comment)(node.data))
-                if d != nil && is_top_directive(d.tag) {
+            match type data {
+            | &Directive:
+                let mut d = (&Directive)(data)
+                if d != nil && is_top_directive(d.tag.kind) {
                     self.ast.top_directives = append(self.ast.top_directives, d)
+                } else {
+                    break iter
                 }
-            } else {
-                break
+
+            | &Comment
+            | &CommentGroup:
+                // Ignore.
+
+            |:
+                break iter
             }
         }
 

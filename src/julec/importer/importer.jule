@@ -11,7 +11,7 @@ use std::jule::build::{
     Log,
     EXT,
 }
-use std::jule::lex::{new_file_set, lex}
+use std::jule::lex::{Token, new_file_set, lex}
 use std::jule::parser::{parse_file}
 use std::jule::sema::{
     Importer,
@@ -66,29 +66,25 @@ fn read_package_dirents(path: str): ([]&DirEntry, err_msg: str) {
     ret passed_dirents, ""
 }
 
-// Concatenate all strings into single string.
-fn concat_all_parts(parts: ...str): str {
-    let mut s = ""
-    for _, part in parts {
-        s += part
-    }
-    ret s
-}
-
 // Reports whether file passes build directives.
-fn is_pass_build_directives(mut &file: &Ast): bool {
-    for _, td in file.top_directives {
-        if td.tag != str(Directive.Build) {
+fn is_pass_build_directives(mut &file: &Ast): (bool, []Log) {
+    for (_, mut td) in file.top_directives {
+        if td.tag.kind != str(Directive.Build) {
             continue
         }
 
-        let expr = concat_all_parts(td.args...)
-        let result = eval_directive_expr(expr)
+        let mut de = DirectiveEval{
+            d: td,
+        }
+        let result = de.eval()
+        if de.logs.len > 0 {
+            ret false, de.logs
+        }
         if !result {
-            ret false
+            ret false, nil
         }
     }
-    ret true
+    ret true, nil
 }
 
 // Common importer of JuleC.
@@ -134,8 +130,13 @@ impl Importer for PlainImporter {
                 continue
             }
 
+            let (r, mut logs) = is_pass_build_directives(finfo.ast)
+            if logs.len > 0 {
+                ret nil, logs
+            }
+
             // Skip file if can't pass build directives.
-            if !is_pass_build_directives(finfo.ast) {
+            if !r {
                 continue
             }
 
