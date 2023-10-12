@@ -38,7 +38,6 @@ use std::jule::lex::{
     is_ignore_ident,
 }
 use std::jule::build::{
-    DIRECTIVES,
     DIRECTIVE_PREFIX,
     LogMsg,
     Log,
@@ -268,13 +267,7 @@ impl Parser {
             d.args = append(d.args, Token{kind: part})
         }
 
-        // Don't append if directive kind is invalid.
-        for _, kind in DIRECTIVES {
-            if d.tag.kind == str(kind) {
-                ret d
-            }
-        }
-        ret nil
+        ret d
     }
 
     fn build_directive(mut self, mut tokens: []Token): &Directive {
@@ -286,18 +279,10 @@ impl Parser {
             ret nil
         }
 
-        let mut d = &Directive{
+        ret &Directive{
             tag:  tokens[1],
             args: tokens[2:], // Start 2 to skip '#', and tag tokens.
         }
-
-        // Don't append if directive kind is invalid.
-        for _, kind in DIRECTIVES {
-            if d.tag.kind == str(kind) {
-                ret d
-            }
-        }
-        ret nil
     }
 
     fn push_directive(mut self, mut d: &Directive) {
@@ -2042,6 +2027,7 @@ impl Parser {
 
         // Get top directives.
         let mut i = 0
+    iter:
         for i < stms.len; i++ {
             let mut st = stms[i]
             if st.tokens.len == 0 {
@@ -2057,23 +2043,23 @@ impl Parser {
                 ret
             }
 
-            let mut node = Node{data: data}
-            if node.is_directive() {
-                let mut d = (&Directive)(node.data)
+            match type data {
+            | &Directive:
+                let mut d = (&Directive)(data)
                 if d != nil && is_top_directive(d.tag.kind) {
                     self.ast.top_directives = append(self.ast.top_directives, d)
                 } else {
-                    break
+                    break iter
                 }
-            } else if node.is_comment() {
-                let mut d = self.get_directive((&Comment)(node.data))
+
+            | &Comment:
+                let mut d = self.get_directive((&Comment)(data))
                 if d != nil && is_top_directive(d.tag.kind) {
                     self.ast.top_directives = append(self.ast.top_directives, d)
-                } else {
-                    break
                 }
-            } else {
-                break
+
+            |:
+                break iter
             }
         }
 

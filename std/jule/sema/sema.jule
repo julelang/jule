@@ -6,8 +6,9 @@ use std::jule::ast::{
     Expr,
     TypeDecl,
     GenericDecl,
+    Directive,
 }
-use std::jule::build::{Derives, LogMsg, Log, LogKind, logf}
+use std::jule::build::{Derive, LogMsg, Log, LogKind, logf}
 use std::jule::constant::{Const}
 use std::jule::lex::{File, Token, TokenKind, is_ignore_ident, is_anon_ident}
 use types for std::jule::types
@@ -547,6 +548,15 @@ impl Sema {
             }
         }
         ret false
+    }
+
+    fn check_directives(mut &self, mut &d: []&Directive, mut o: any) {
+        let mut dc = DirectiveChecker{
+            s: self,
+            d: d,
+            o: o,
+        }
+        dc.check()
     }
 
     fn check_generic_quantity(mut self, required: int, given: int, error_token: Token): (ok: bool) {
@@ -1605,17 +1615,12 @@ impl Sema {
         if decl.cpp_linked && decl.constant {
             self.push_err(decl.token, LogMsg.CppLinkedVarIsConst)
         }
-        if !decl.cpp_linked {
-            if !decl.constant && !decl.statically {
-                self.push_err(decl.token, LogMsg.GlobalNotStatic)
-                self.push_suggestion(LogMsg.UseStaticKeywordToDef)
-            }
-
-            if decl.directives.len > 0 {
-                self.push_err(decl.token, LogMsg.VarHasDirective)
-                self.push_suggestion(LogMsg.MaybeCppDefine)
-            }
+        if !decl.cpp_linked && !decl.constant && !decl.statically {
+            self.push_err(decl.token, LogMsg.GlobalNotStatic)
+            self.push_suggestion(LogMsg.UseStaticKeywordToDef)
         }
+
+        self.check_directives(decl.directives, decl)
 
         self.check_var_decl(decl, self)
     }
@@ -1726,6 +1731,8 @@ impl Sema {
             self.push_suggestion(LogMsg.RenameForAvoidDuplication)
         }
 
+        self.check_directives(s.directives, s)
+
         s.sema = self
         match {
         | !self.check_decl_generics(s.generics): ret
@@ -1757,10 +1764,7 @@ impl Sema {
             self.push_suggestion(LogMsg.RenameForAvoidDuplication)
         }
 
-        if !f.cpp_linked && f.directives.len > 0 {
-            self.push_err(f.token, LogMsg.FnHasDirective)
-            self.push_suggestion(LogMsg.MaybeCppDefine)
-        }
+        self.check_directives(f.directives, f)
 
         f.sema = self
         _ = self.check_fn_decl_prototype(f)
@@ -1777,27 +1781,6 @@ impl Sema {
             }
         }
         ret true
-    }
-
-    fn check_directive_pass(mut self, &pass: Pass): (ok: bool) {
-        if pass.text == "" {
-            ret true
-        }
-
-        if pass.text[0] != '-' {
-            self.push_err(pass.token, LogMsg.PassDirectiveNotStartsWithDash)
-            ret false
-        }
-
-        ret true
-    }
-
-    fn check_passes(mut self): (ok: bool) {
-        ok = true
-        for (_, mut pass) in self.file.passes {
-            ok = self.check_directive_pass(pass) && ok
-        }
-        ret
     }
 
     fn push_cycle_error(self, &st1: &Struct, &st2: &Struct, mut &message: str) {
@@ -1851,7 +1834,7 @@ impl Sema {
     }
 
     fn check_struct_ins_derive_clone(mut self, mut st: &StructIns): (ok: bool) {
-        if !st.decl.is_derives(str(Derives.Clone)) {
+        if !st.decl.is_derives(str(Derive.Clone)) {
             ret true
         }
 
@@ -1861,11 +1844,11 @@ impl Sema {
             }
 
             if !f.kind.supports_cloning() {
-                self.push_err(st.decl.token, LogMsg.TypeNotCompatibleForDerive, f.kind.to_str(), str(Derives.Clone))
+                self.push_err(st.decl.token, LogMsg.TypeNotCompatibleForDerive, f.kind.to_str(), str(Derive.Clone))
                 ret false
             }
 
-            if !self.check_struct_derive_illegal_cycles(str(Derives.Clone), st.decl, f.kind) {
+            if !self.check_struct_derive_illegal_cycles(str(Derive.Clone), st.decl, f.kind) {
                 ret false
             }
         }
@@ -1902,13 +1885,6 @@ impl Sema {
     // Checks declarations of all package files.
     // Breaks checking if checked file failed.
     fn check_package_decls(mut &self) {
-        for (_, mut f) in self.files {
-            self.set_current_file(f)
-            if !self.check_passes() {
-                ret
-            }
-        }
-
         for (_, mut f) in self.files {
             self.set_current_file(f)
             if !self.check_type_alias_decls() {

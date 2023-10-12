@@ -1,0 +1,137 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use ast for std::jule::ast
+use std::jule::build::{Directive, LogMsg, Derive}
+use std::jule::lex::{TokenId}
+
+struct DirectiveChecker {
+    s: &Sema
+    d: []&ast::Directive
+    o: any
+}
+
+impl DirectiveChecker {
+    fn check_cdef(mut self, &d: &ast::Directive) {
+        match type self.o {
+        | &Fn:
+            if (&Fn)(self.o).cpp_linked {
+                break
+            }
+            fall
+        |:
+            self.s.push_err(d.tag, LogMsg.UnsupportedDirective, d.tag.kind)
+        }
+
+        if d.args.len > 0 {
+            self.s.push_err(d.args[0], LogMsg.InvalidSyntax)
+        }
+    }
+
+    fn check_typedef(mut self, &d: &ast::Directive) {
+        match type self.o {
+        | &Struct:
+            if (&Struct)(self.o).cpp_linked {
+                break
+            }
+            fall
+        |:
+            self.s.push_err(d.tag, LogMsg.UnsupportedDirective, d.tag.kind)
+        }
+
+        if d.args.len > 0 {
+            self.s.push_err(d.args[0], LogMsg.InvalidSyntax)
+        }
+    }
+
+    fn check_derive(mut self, &d: &ast::Directive) {
+        match type self.o {
+        | &Struct:
+            if !(&Struct)(self.o).cpp_linked {
+                break
+            }
+            fall
+        |:
+            self.s.push_err(d.tag, LogMsg.UnsupportedDirective)
+        }
+
+        if d.args.len == 0 {
+            self.s.push_err(d.tag, LogMsg.MissingExpr)
+            self.s.push_suggestion(LogMsg.ExpectedIdentifier)
+            ret
+        } else if d.args.len > 1 {
+            self.s.push_err(d.args[1], LogMsg.ArgumentOverflow)
+        }
+
+        match d.args[0].kind {
+        | str(Derive.Clone):
+        |:
+            self.s.push_err(d.args[0], LogMsg.IdentNotExist, d.args[0].kind)
+        }
+    }
+
+    fn check_namespace(mut self, mut &d: &ast::Directive) {
+        match type self.o {
+        | &Struct:
+            if !(&Struct)(self.o).cpp_linked {
+                self.s.push_err(d.tag, LogMsg.UnsupportedDirective, d.tag.kind)
+            }
+
+        | &Fn:
+            if !(&Fn)(self.o).cpp_linked {
+                self.s.push_err(d.tag, LogMsg.UnsupportedDirective, d.tag.kind)
+            }
+
+        | &Var:
+            if !(&Var)(self.o).cpp_linked {
+                self.s.push_err(d.tag, LogMsg.UnsupportedDirective, d.tag.kind)
+            }
+
+        |:
+            self.s.push_err(d.tag, LogMsg.UnsupportedDirective, d.tag.kind)
+        }
+
+        if d.args.len == 0 {
+            self.s.push_err(d.tag, LogMsg.MissingExpr)
+            ret
+        } else if d.args.len > 1 {
+            self.s.push_err(d.args[1], LogMsg.ArgumentOverflow)
+        }
+
+        let arg = d.args[0]
+        if arg.id != TokenId.Lit {
+            self.s.push_err(arg, LogMsg.InvalidSyntax)
+            ret
+        }
+
+        if arg.kind[0] != '"' {
+            self.s.push_err(arg, LogMsg.InvalidSyntax)
+            ret
+        }
+
+        d.args[0].kind = arg.kind[1:arg.kind.len-1]
+    }
+
+    fn check_directive(mut self, mut &d: &ast::Directive) {
+        match d.tag.kind {
+        | str(Directive.Cdef): self.check_cdef(d)
+        | str(Directive.Typedef): self.check_typedef(d)
+        | str(Directive.Derive): self.check_derive(d)
+        | str(Directive.Namespace): self.check_namespace(d)
+
+        | str(Directive.Build)
+        | str(Directive.Pass):
+            self.s.push_err(d.tag, LogMsg.UnsupportedDirective, d.tag.kind)
+
+        |:
+            self.s.push_err(d.tag, LogMsg.InvalidLabel)
+        }
+    }
+
+    fn check(mut self) {
+        for (_, mut d) in self.d {
+            self.check_directive(d)
+        }
+    }
+}
