@@ -192,14 +192,12 @@ namespace jule {
                                  const jule::Int &end) const {
 #ifndef __JULE_DISABLE__SAFETY
             this->check();
-
             if (start < 0 || end < 0 || start > end || end > this->_len) {
-                std::stringstream sstream;
-                __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(sstream, start, end);
-                jule::panic(sstream.str().c_str());
+                std::string error;
+                __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(error, start, end);
+                jule::panic(error);
             }
 #endif
-
             jule::Slice<Item> slice;
             slice.data = this->data;
             slice._slice = this->_slice+start;
@@ -278,9 +276,9 @@ namespace jule {
 #ifndef __JULE_DISABLE__SAFETY
             this->check();
             if (this->empty() || index < 0 || this->len() <= index) {
-                std::stringstream sstream;
-                __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(sstream, index);
-                jule::panic(sstream.str().c_str());
+                std::string error;
+                __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(error, index);
+                jule::panic(error);
             }
 #endif
             return this->__at(index);

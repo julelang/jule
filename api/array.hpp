@@ -56,10 +56,10 @@ namespace jule {
                                        const jule::Int &end) const {
 #ifndef __JULE_DISABLE__SAFETY
             if (start < 0 || end < 0 || start > end || end > N) {
-                std::stringstream sstream;
+                std::string error;
                 __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(
-                    sstream, start, end );
-                jule::panic(sstream.str().c_str());
+                    error, start, end );
+                jule::panic(error);
             }
 #endif
             if (start == end)
@@ -119,9 +119,9 @@ namespace jule {
         Item &operator[](const jule::Int &index) const {
 #ifndef __JULE_DISABLE__SAFETY
             if (this->empty() || index < 0 || N <= index) {
-                std::stringstream sstream;
-                __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(sstream, index);
-                jule::panic(sstream.str().c_str());
+                std::string error;
+                __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(error, index);
+                jule::panic(error);
             }
 #endif
             return this->__at(index);

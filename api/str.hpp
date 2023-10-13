@@ -70,15 +70,13 @@ namespace jule {
                                const jule::Int &end) const {
 #ifndef __JULE_DISABLE__SAFETY
             if (start < 0 || end < 0 || start > end || end > this->len()) {
-                std::stringstream sstream;
-                __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(
-                    sstream, start, end);
-                jule::panic(sstream.str().c_str());
+                std::string error;
+                __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(error, start, end);
+                jule::panic(error);
             }
 #endif
             if (start == end)
                 return jule::Str();
-
             const jule::Int n = end-start;
             return jule::Str(this->buffer.substr(start, n).c_str(), n);
         }
@@ -95,9 +93,8 @@ namespace jule {
         inline jule::Bool empty(void) const noexcept
         { return this->buffer.empty(); }
 
-        inline jule::Bool has_prefix(const jule::Str &sub) const {
-            return this->buffer.find(sub.buffer, 0) == 0;
-        }
+        inline jule::Bool has_prefix(const jule::Str &sub) const
+        { return this->buffer.find(sub.buffer, 0) == 0; }
 
         inline jule::Bool has_suffix(const jule::Str &sub) const {
             return this->len() >= sub.len() &&
@@ -110,9 +107,8 @@ namespace jule {
         inline jule::Int rfind(const jule::Str &sub) const
         { return static_cast<jule::Int>(this->buffer.rfind(sub.buffer)); }
 
-        jule::Str trim(const jule::Str &bytes) const {
-            return this->ltrim(bytes).rtrim(bytes);
-        }
+        jule::Str trim(const jule::Str &bytes) const
+        { return this->ltrim(bytes).rtrim(bytes); }
 
         jule::Str ltrim(const jule::Str &bytes) const {
             ConstIterator it = this->begin();
@@ -253,9 +249,9 @@ namespace jule {
         jule::U8 &operator[](const jule::Int &index) {
 #ifndef __JULE_DISABLE__SAFETY
             if (this->empty() || index < 0 || this->len() <= index) {
-                std::stringstream sstream;
-                __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(sstream, index);
-                jule::panic(sstream.str().c_str());
+                std::string error;
+                __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(error, index);
+                jule::panic(error);
             }
 #endif
             return this->__at(index);

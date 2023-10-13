@@ -5,22 +5,19 @@
 #ifndef __JULE_ERROR_HPP
 #define __JULE_ERROR_HPP
 
-#define __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(STREAM, START, LEN) \
-    (   \
-        STREAM << jule::ERROR_INDEX_OUT_OF_RANGE \
-               << '[' \
-               << START \
-               << ':' \
-               << LEN \
-               << ']' \
-    )
-#define __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(STREAM, INDEX) \
-    ( \
-        STREAM << jule::ERROR_INDEX_OUT_OF_RANGE \
-               << '[' \
-               << INDEX \
-               << ']' \
-    )
+#define __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(STR, START, LEN) \
+    STR += jule::ERROR_INDEX_OUT_OF_RANGE; \
+    STR += "["; \
+    STR += std::to_string(START); \
+    STR += ":"; \
+    STR += std::to_string(LEN); \
+    STR += "]";
+
+#define __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(STR, INDEX) \
+    STR += jule::ERROR_INDEX_OUT_OF_RANGE; \
+    STR += "["; \
+    STR += std::to_string(INDEX); \
+    STR += "]"
 
 namespace jule {
 
