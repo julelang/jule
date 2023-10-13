@@ -332,7 +332,7 @@ fn builtin_caller_panic(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Da
         e.push_err(fc.token, LogMsg.NotHasGenerics)
     }
     if fc.args.len < 1 {
-        e.push_err(fc.token, LogMsg.MissingExprFor, "error")
+        e.push_err(fc.token, LogMsg.MissingExprFor, "message")
         ret nil
     }
     if fc.args.len > 1 {
@@ -344,14 +344,8 @@ fn builtin_caller_panic(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Da
         ret nil
     }
 
-    if expr.kind.strct() != nil {
-        let s = expr.kind.strct()
-        if s.decl.is_implements(BUILTIN_TRAIT_ERROR) {
-            expr.cast_kind = &TypeKind{
-                kind: BUILTIN_TRAIT_ERROR,
-            }
-            apply_cast_kind(expr)
-        }
+    if expr.kind.prim() == nil || !expr.kind.prim().is_str() {
+        e.push_err(fc.token, LogMsg.PanicedWithNonStr)
     }
 
     let mut d = build_void_data()
