@@ -23,7 +23,6 @@ static mut BUILTIN_FN_NEW = &FnIns{}
 static mut BUILTIN_FN_PANIC = &FnIns{}
 static mut BUILTIN_FN_MAKE = &FnIns{}
 static mut BUILTIN_FN_APPEND = &FnIns{}
-static mut BUILTIN_FN_RECOVER = &FnIns{}
 static mut BUILTIN_FN_CLONE = &FnIns{}
 static mut BUILTIN_FN_STD_MEM_SIZE_OF = &FnIns{}
 static mut BUILTIN_FN_STD_MEM_ALIGN_OF = &FnIns{}
@@ -94,7 +93,6 @@ fn init() {
     BUILTIN_FN_MAKE.caller = builtin_caller_make
     BUILTIN_FN_APPEND.caller = builtin_caller_append
     BUILTIN_FN_COPY.caller = builtin_caller_copy
-    BUILTIN_FN_RECOVER.caller = builtin_caller_recover
     BUILTIN_FN_CLONE.caller = builtin_caller_clone
 
     BUILTIN_FN_STD_MEM_SIZE_OF.caller = builtin_caller_std_mem_size_of
@@ -123,7 +121,6 @@ fn find_builtin_fn(ident: str): &FnIns {
     | "make":    ret BUILTIN_FN_MAKE
     | "append":  ret BUILTIN_FN_APPEND
     | "copy":    ret BUILTIN_FN_COPY
-    | "recover": ret BUILTIN_FN_RECOVER
     | "clone":   ret BUILTIN_FN_CLONE
     |:           ret nil
     }
@@ -526,57 +523,6 @@ fn builtin_caller_copy(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Dat
     d.model = &CommonIdentExprModel{ident: "copy"}
 
     d = builtin_caller_common_plain(e, fc, d)
-    ret d
-}
-
-fn builtin_caller_recover(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data {
-    if fc.generics.len > 0 {
-        e.push_err(fc.token, LogMsg.NotHasGenerics)
-    }
-    let HANDLER_KIND = &TypeKind{
-        kind: &FnIns{
-            decl: &Fn{},
-            params: [
-                &ParamIns{
-                    decl: &Param{
-                        ident: "err",
-                    },
-                    kind: &TypeKind{
-                        kind: BUILTIN_TRAIT_ERROR,
-                    },
-                },
-            ],
-        },
-    }
-
-    if fc.args.len < 1 {
-        e.push_err(fc.token, LogMsg.MissingExprFor, "handler")
-        ret nil
-    }
-    if fc.args.len > 1 {
-        e.push_err(fc.args[1].token, LogMsg.ArgumentOverflow)
-    }
-
-    let mut t = e.eval_expr(fc.args[0])
-    if t == nil {
-        ret nil
-    }
-
-    let f = t.kind.fnc()
-    if f == nil {
-        e.push_err(fc.args[0].token, LogMsg.InvalidExpr)
-        ret nil
-    }
-
-    if !f.equals(HANDLER_KIND) {
-        e.push_err(fc.args[0].token, LogMsg.IncompatibleTypes, t.kind.to_str(), HANDLER_KIND.to_str())
-    }
-
-    let mut d = build_void_data()
-    d.kind = t.kind.clone()
-    d.model = &Recover{
-        handler_expr: t.model,
-    }
     ret d
 }
 

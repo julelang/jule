@@ -29,7 +29,6 @@ use std::jule::sema::{
     Case,
     FallSt,
     RetSt,
-    Recover,
     FnCallExprModel,
     TupleExprModel,
     TypeKind,
@@ -622,55 +621,6 @@ fn gen_ret_st_with_defaults(mut result: &TypeKind): str {
     ret obj
 }
 
-fn gen_recover(mut r: &Recover): str {
-    let mut obj = "try "
-    obj += gen_scope(r.scope)
-    obj += " catch(jule::Exception e) "
-    if r.handler.is_anon() {
-        // Anonymous function.
-
-        add_indent()
-        obj += "{\n"
-        obj += indent()
-        obj += gen_expr(r.handler_expr)
-        obj += "(jule::exception_to_error(e))" + CPP_ST_TERM
-
-        if !r.scope_owner.decl.is_void() {
-            obj += "\n"
-            obj += indent()
-            done_indent()
-            obj += gen_ret_st_with_defaults(r.scope_owner.result)
-        } else {
-            done_indent()
-        }
-        obj += "\n"
-        obj += indent()
-        obj += "}"
-    } else {
-        // Passed defined function.
-        // Therefore, call passed function with error.
-
-        obj += "{\n"
-        add_indent()
-        obj += indent()
-        obj += gen_expr(r.handler_expr)
-        obj += "(jule::exception_to_error(e));\n"
-        obj += indent()
-        if r.scope_owner.decl.is_void() {
-            done_indent()
-            obj += " }"
-        } else {
-            obj += gen_ret_st_with_defaults(r.scope_owner.result)
-            obj += "\n"
-            done_indent()
-            obj += indent()
-            obj += "}"
-        }
-    }
-
-    ret obj
-}
-
 fn gen_data_expr(mut d: &Data): str {
     ret gen_expr(d.model) + CPP_ST_TERM
 }
@@ -702,7 +652,6 @@ fn gen_st(mut st: St): str {
     | &FallSt:      ret gen_fall_st((&FallSt)(st))
     | &BreakSt:     ret gen_break_st((&BreakSt)(st))
     | &RetSt:       ret gen_ret_st((&RetSt)(st))
-    | &Recover:     ret gen_recover((&Recover)(st))
     |:              ret "<unimplemented_stmt>"
     }
 }
