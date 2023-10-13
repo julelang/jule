@@ -25,6 +25,7 @@ use std::jule::ast::{
     LabelSt,
     AssignLeft,
     AssignSt,
+    CoExpr,
 }
 use std::jule::build::{LogMsg}
 use std::jule::lex::{
@@ -543,27 +544,13 @@ impl ScopeParser {
         ret build_comment(token)
     }
 
-    fn build_call_st(mut self, mut &tokens: []Token): NodeData {
-        let token = tokens[0]
-        if is_fn_call(tokens) == nil {
-            self.push_err(token, LogMsg.ExprNotFnCall)
-            ret nil
-        }
-        let mut expr = self.p.build_expr(tokens)
-        if expr != nil && !expr.is_fn_call() {
-            self.push_err(token, LogMsg.InvalidSyntax)
-            ret nil
-        }
-        ret expr
-    }
-
     fn build_co_call_st(mut self, mut tokens: []Token): NodeData {
-        tokens = tokens[1:] // Skip "co" token.
-        let mut cc = self.build_call_st(tokens)
-        if cc != nil {
-            (&FnCallExpr)((&Expr)(cc).kind).concurrent = true
+        let mut c = &CoExpr{
+            token: tokens[0],
         }
-        ret cc
+        tokens = tokens[1:] // Start 1 to skip "co" token.
+        c.expr = self.p.build_expr(tokens)
+        ret c
     }
 
     fn build_goto_st(mut self, mut &tokens: []Token): NodeData {
@@ -1090,8 +1077,9 @@ impl ScopeParser {
             }
 
         |:
-            if is_fn_call(st.tokens) != nil {
-                ret self.build_call_st(st.tokens)
+            let mut expr = self.p.build_expr(st.tokens)
+            if expr != nil {
+                ret expr
             }
         }
 

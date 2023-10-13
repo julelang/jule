@@ -20,6 +20,7 @@ use std::jule::ast::{
     UnsafeExpr,
     AssignLeft,
     MatchCase,
+    CoExpr,
 }
 use std::jule::build::{LogMsg}
 use std::jule::constant::{Const}
@@ -704,14 +705,45 @@ impl ScopeChecker {
             ret
         }
 
-        if expr.is_fn_call() {
+        match type d.model {
+        | &BuiltinAppendCallExprModel
+        | &BuiltinCloneCallExprModel
+        | &BuiltinDropCallExprModel
+        | &BuiltinOutCallExprModel
+        | &BuiltinOutlnCallExprModel
+        | &BuiltinPanicCallExprModel:
+            self.scope.stmts = append(self.scope.stmts, d)
+
+        | &FnCallExprModel:
             let ok = self.try_call_recover(d)
-            if ok {
-                ret
+            if !ok {
+                self.scope.stmts = append(self.scope.stmts, d)
             }
+
+        |:
+            self.s.push_err(expr.token, LogMsg.InvalidSyntax)
+        }
+    }
+
+    fn check_co_expr(mut &self, mut expr: &CoExpr) {
+        let mut eval = self.s.eval(self)
+        let mut d = eval.eval_expr(expr.expr)
+        if d == nil {
+            ret
         }
 
-        self.scope.stmts = append(self.scope.stmts, d)
+        match type d.model {
+        | &FnCallExprModel:
+            let mut model = (&FnCallExprModel)(d.model)
+            model.is_co = true
+            eval.check_fn_of_concurrent_call(model.func, expr.expr.token)
+            self.scope.stmts = append(self.scope.stmts, d)
+
+        |:
+            self.s.push_err(expr.token, LogMsg.ExprNotFnCall)
+            ret
+        }
+
     }
 
     fn check_if(mut &self, mut i: &std::jule::ast::If): &If {
@@ -1643,6 +1675,7 @@ impl ScopeChecker {
         | &VarDecl:                     self.check_var_decl((&VarDecl)(node))
         | &TypeAliasDecl:               self.check_type_alias_decl((&TypeAliasDecl)(node))
         | &Expr:                        self.check_expr((&Expr)(node))
+        | &CoExpr:                        self.check_co_expr((&CoExpr)(node))
         | &std::jule::ast::Conditional: self.check_conditional((&std::jule::ast::Conditional)(node))
         | &Iter:                        self.check_iter((&Iter)(node))
         | &std::jule::ast::ContSt:      self.check_cont((&std::jule::ast::ContSt)(node))
