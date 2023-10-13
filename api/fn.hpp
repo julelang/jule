@@ -9,8 +9,9 @@
 #include <functional>
 #include <thread>
 
-#include "builtin.hpp"
+#include "types.hpp"
 #include "error.hpp"
+#include "panic.hpp"
 
 #define __JULE_CO_SPAWN(ROUTINE) \
     ( std::thread{ROUTINE} )
