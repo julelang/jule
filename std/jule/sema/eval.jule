@@ -266,6 +266,15 @@ impl Data {
 
     // Reports whether Data is constant expression.
     pub fn is_const(self): bool { ret self.constant != nil }
+
+    // Reports left and right operand is good order.
+    // If reports false, left and right operand should be swapped.
+    // Accepts itself as left operand.
+    pub fn good_operand(self, mut &other: &Data): bool {
+        ret (other.kind.prim() == nil || !other.kind.prim().is_any()) &&
+            other.kind.trt() == nil &&
+            !self.kind.is_nil()
+    }
 }
 
 // Value.
@@ -4253,10 +4262,7 @@ impl BinopSolver {
         }
 
         let (mut l, mut r) = self.l, self.r
-        match {
-        | self.r.kind.prim() != nil && self.r.kind.prim().is_any()
-        | self.l.kind.is_nil()
-        | self.r.kind.trt() != nil:
+        if !l.good_operand(r) {
             l, r = r, l
         }
 

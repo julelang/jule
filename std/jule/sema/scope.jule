@@ -122,7 +122,7 @@ loop:
                 break loop
             }
 
-            if kind == (&TypeKind)(expr).to_str() {
+            if kind == (&TypeKind)(expr.model).to_str() {
                 n++
             }
         }
@@ -356,7 +356,7 @@ impl Match {
 pub struct Case {
     pub owner: &Match
     pub scope: &Scope
-    pub exprs: []ExprModel
+    pub exprs: []&Data
     pub next:  &Case
 }
 
@@ -1339,7 +1339,7 @@ impl ScopeChecker {
 
     fn check_case(mut &self, mut m: &Match, i: int, mut c: &std::jule::ast::Case, mut expr: &Data): &Case {
         let mut _case = m.cases[i]
-        _case.exprs = make([]ExprModel, 0, c.exprs.len)
+        _case.exprs = make([]&Data, 0, c.exprs.len)
         let mut generic_matched = false
 
         for (_, mut e) in c.exprs {
@@ -1351,7 +1351,7 @@ impl ScopeChecker {
 
                 let mut d = eval.eval(e)
                 if d != nil {
-                    _case.exprs = append(_case.exprs, d.kind)
+                    _case.exprs = append(_case.exprs, d)
                     if count_match_type(m, d.kind) > 1 {
                         self.s.push_err(e.token, LogMsg.DuplicateMatchType, d.kind.to_str())
                     }
@@ -1374,7 +1374,7 @@ impl ScopeChecker {
                 continue
             }
 
-            _case.exprs = append(_case.exprs, d.model)
+            _case.exprs = append(_case.exprs, d)
 
             let mut checker = AssignTypeChecker{
                 s:           self.s,

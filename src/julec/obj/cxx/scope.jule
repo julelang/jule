@@ -364,24 +364,33 @@ fn gen_case(mut m: &Match, mut c: &Case): str {
         for (i, mut expr) in c.exprs {
             match {
             | !m.type_match:
-                obj += "("
-                obj += gen_expr(expr)
-                obj += ")"
-
                 if m.expr.is_const() {
+                    obj += "("
+                    obj += gen_expr(expr.model)
+                    obj += ")"
                     if !m.expr.constant.is_bool() || !m.expr.constant.read_bool() {
-                        obj += " == "
                         obj += gen_expr_model(m.expr.model)
+                        obj += " == "
                     }
                 } else {
-                    obj += " == "
-                    obj += MATCH_EXPR
+                    if m.expr.good_operand(expr) {
+                        obj += MATCH_EXPR
+                        obj += " == "
+                        obj += "("
+                        obj += gen_expr(expr.model)
+                        obj += ")"
+                    } else {
+                        obj += "("
+                        obj += gen_expr(expr.model)
+                        obj += ") == "
+                        obj += MATCH_EXPR
+                    }
                 }
 
             |:
                 obj += MATCH_EXPR
                 obj += ".type_is<"
-                obj += gen_expr(expr)
+                obj += gen_expr(expr.model)
                 obj += ">()"
             }
 
