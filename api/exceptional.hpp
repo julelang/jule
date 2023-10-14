@@ -12,7 +12,6 @@
 namespace jule {
 
     // Wrapper structure for Jule's void exceptionals.
-    template<typename T>
     class VoidExceptional {
     public:
         jule::Any error;
