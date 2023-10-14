@@ -40,20 +40,21 @@ impl Param {
 pub struct Fn {
     sema: &Sema
 
-    pub token:      Token
-    pub global:     bool
-    pub unsafety:   bool
-    pub public:     bool
-    pub cpp_linked: bool
-    pub statically: bool
-    pub ident:      str
-    pub directives: []&Directive
-    pub doc:        str
-    pub scope:      &ScopeTree
-    pub generics:   []&GenericDecl
-    pub result:     &RetType
-    pub params:     []&Param
-    pub owner:      &Struct
+    pub token:       Token
+    pub global:      bool
+    pub unsafety:    bool
+    pub public:      bool
+    pub cpp_linked:  bool
+    pub statically:  bool
+    pub exceptional: bool
+    pub ident:       str
+    pub directives:  []&Directive
+    pub doc:         str
+    pub scope:       &ScopeTree
+    pub generics:    []&GenericDecl
+    pub result:      &RetType
+    pub params:      []&Param
+    pub owner:       &Struct
 
     // Function instances for each unique type combination of function call.
     // Nil if function is never used.
@@ -241,6 +242,10 @@ impl Kind for FnIns {
             ret false
         }
 
+        if self.decl.exceptional != f.decl.exceptional {
+            ret false
+        }
+
         if self.decl.unsafety != f.decl.unsafety {
             ret false
         }
@@ -377,6 +382,9 @@ impl FnIns {
             s = s[:s.len-1] // Remove comma.
         }
         s += ")"
+        if self.decl.exceptional {
+            s += "!"
+        }
         if !self.decl.is_void() {
             s += ":"
             s += self.result.to_str()

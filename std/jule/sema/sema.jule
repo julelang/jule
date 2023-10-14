@@ -64,7 +64,7 @@ fn build_ret_vars(mut &f: &FnIns): []&Var {
     }
 
     let mut vars: []&Var = nil
-    let mut types = get_fn_result_types(f)
+    let mut types = get_result_types(f.result)
     for (i, mut ident) in f.decl.result.idents {
         if is_ignore_ident(ident.kind) {
             continue
@@ -278,14 +278,9 @@ fn __has_ret(mut s: &Scope): (ok: bool, falled: bool, breaked: bool) {
 
         | &Data:
             match type (&Data)(st).model {
-            | &BuiltinPanicCallExprModel:
+            | &BuiltinPanicCallExprModel
+            | &BuiltinErrorCallExprModel:
                 ret true, falled, breaked
-            }
-
-        | &Recover:
-            let (ok, _falled, _breaked) = __has_ret((&Recover)(st).scope)
-            if ok {
-                ret true, _falled, _breaked
             }
 
         | &Conditional:
@@ -1375,6 +1370,11 @@ impl Sema {
     // Checks generics, parameters and return type.
     // Not checks scope, and other things.
     fn check_fn_decl_prototype(mut &self, mut &f: &Fn): (ok: bool) {
+        if f.exceptional && f.cpp_linked {
+            self.push_err(f.token, LogMsg.CDefineExceptional)
+            ret false
+        }
+
         match {
         | !self.check_decl_generics(f.generics): ret false
         | !self.check_fn_decl_params_dup(f):     ret false

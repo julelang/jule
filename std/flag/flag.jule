@@ -108,13 +108,13 @@ impl FlagSet {
     //   all following characters are considered short names and thus collective
     //   use is allowed. If the short name flags used need values, the values ​
     //   should follow respectively.
-    pub fn parse(mut self, args: []str): (content: []str, error: str) {
+    pub fn parse(mut self, args: []str): (content: []str, err: str) {
         let mut ap = ArgParser{
             set:  self,
             args: unsafe { *(&args) },
         }
         ap.parse()
-        ret ap.content, ap.error
+        ret ap.content, ap.err
     }
 
     // Resets all flags to default value.
@@ -178,7 +178,7 @@ impl FlagSet {
 struct ArgParser {
     set:     FlagSet
     args:    []str
-    error:   str
+    err:     str
     content: []str
     i:       int
 }
@@ -225,7 +225,7 @@ impl ArgParser {
 
         let data = self.get_data()
         if data == "" {
-            self.error = "--" + flag.name() + ": expression missing"
+            self.err = "--" + flag.name() + ": expression missing"
             ret
         }
 
@@ -237,7 +237,7 @@ impl ArgParser {
                 ret x, err == conv::ConvError.Ok
             })
             if !ok {
-                self.error = "--" + flag.name() + ": expression must be valid signed integer"
+                self.err = "--" + flag.name() + ": expression must be valid signed integer"
             }
 
         | UintFlag:
@@ -247,14 +247,14 @@ impl ArgParser {
                 ret x, err == conv::ConvError.Ok
             })
             if !ok {
-                self.error = "--" + flag.name() + ": expression must be valid unsigned integer"
+                self.err = "--" + flag.name() + ": expression must be valid unsigned integer"
             }
 
         | FloatFlag:
             let mut ff = FloatFlag(flag)
             let ((*ff._data), err) = conv::parse_float(data, BIT64)
             if err != conv::ConvError.Ok {
-                self.error = "--" + flag.name() + ": expression must be valid floating-point"
+                self.err = "--" + flag.name() + ": expression must be valid floating-point"
             }
 
         | StrFlag:
@@ -267,7 +267,7 @@ impl ArgParser {
         for _, r in rarg {
             let mut flag = self.set.find_flag_short(r)
             if flag == nil {
-                self.error = arg + ": flag is not exist: " + str(r)
+                self.err = arg + ": flag is not exist: " + str(r)
                 ret
             }
 
@@ -278,7 +278,7 @@ impl ArgParser {
     fn double_dash(mut self, &arg: str) {
         let mut flag = self.set.find_flag(arg[2:]) // Start at 2 to skip dashes.
         if flag == nil {
-            self.error = arg + ": flag is not exist"
+            self.err = arg + ": flag is not exist"
             ret
         }
 
@@ -306,7 +306,7 @@ impl ArgParser {
     fn parse(mut self) {
         for self.i < self.args.len; self.i++ {
             self.try_arg()
-            if self.error.len != 0 {
+            if self.err.len != 0 {
                 break
             }
         }

@@ -11,11 +11,7 @@
 namespace jule {
     class Exception;
 
-    // Libraries uses this function for throw panic.
-    // Also it is builtin panic function.
-    template<typename T>
-    void panic(const T &expr);
-    void panic(const std::string &expr);
+    inline void panic(const std::string &expr);
 
     class Exception: public std::exception {
     private:
@@ -33,15 +29,7 @@ namespace jule {
         { return this->message.c_str(); }
     };
 
-    template<typename T>
-    void panic(const T &expr) {
-        std::stringstream sstream;
-        sstream << expr;
-
-        jule::panic(sstream.str());
-    }
-
-    void panic(const std::string &expr) {
+    inline void panic(const std::string &expr) {
         jule::Exception exception(expr);
         throw exception;
     }

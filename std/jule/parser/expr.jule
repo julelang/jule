@@ -26,6 +26,7 @@ use std::jule::ast::{
     SlicingExpr,
     BinopExpr,
     TernaryExpr,
+    ScopeTree,
 }
 use std::jule::build::{LogMsg}
 use std::jule::lex::{
@@ -302,7 +303,8 @@ impl ExprBuilder {
             ret self.build_lit(token)
 
         | TokenId.Ident
-        | TokenId.Self:
+        | TokenId.Self
+        | TokenId.Error:
             ret build_ident_expr(token)
 
         | TokenId.Prim:
@@ -435,13 +437,26 @@ impl ExprBuilder {
     fn build_op_right(mut self, mut &tokens: []Token): ExprData {
         let mut token = tokens[tokens.len-1]
         match token.kind {
+        | str(TokenKind.Excl):
+            tokens = tokens[:tokens.len-1] // Ignore "!" token.
+            let mut d = self.build(tokens)
+            if d == nil {
+                ret nil
+            }
+            match type d {
+            | &FnCallExpr:
+                (&FnCallExpr)(d).exception = &ScopeTree{
+                    deferred: true,
+                }
+                ret d
+            }
+
         | str(TokenKind.TripleDot):
             ret self.build_variadic(tokens)
 
-        |:
-            self.push_err(token, LogMsg.InvalidSyntax)
-            ret nil
         }
+        self.push_err(token, LogMsg.InvalidSyntax)
+        ret nil
     }
 
     fn build_between_parentheses(mut self, mut tokens: []Token): ExprData {
@@ -818,7 +833,7 @@ impl ExprBuilder {
     }
 
     fn build_brace_range(mut self, mut &tokens: []Token): ExprData {
-        let (expr_tokens, range_n) = get_range_expr_tokens(tokens)
+        let (mut expr_tokens, range_n) = get_range_expr_tokens(tokens)
 
         match {
         | expr_tokens.len == 0:
@@ -827,6 +842,27 @@ impl ExprBuilder {
         | range_n > 0:
             self.push_err(tokens[0], LogMsg.InvalidSyntax)
             ret nil
+        }
+
+        // Exceptional handling.
+        if expr_tokens[expr_tokens.len-1].id == TokenId.Else {
+            expr_tokens = expr_tokens[:expr_tokens.len-1] // Ignore keyword "else"
+            let mut d = self.build(expr_tokens)
+            if d == nil {
+                ret nil
+            }
+            match type d {
+            | &FnCallExpr:
+                tokens = tokens[expr_tokens.len+1:] // Get range: {...}
+                let mut i = 0
+                let mut range_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
+                (&FnCallExpr)(d).exception = self.p.build_scope(range_tokens)
+                ret d
+
+            |:
+                self.push_err(expr_tokens[0], LogMsg.InvalidSyntax)
+                ret nil
+            }
         }
 
         match expr_tokens[0].id {

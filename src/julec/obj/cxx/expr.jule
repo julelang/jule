@@ -5,6 +5,7 @@
 use env
 
 use conv for std::conv
+use fmt for std::fmt
 use std::jule::build::{Directive, is_64bit}
 use std::jule::constant::{Const}
 use std::jule::lex::{Token, TokenKind}
@@ -45,6 +46,7 @@ use std::jule::sema::{
     BuiltinPanicCallExprModel,
     BuiltinMakeCallExprModel,
     BuiltinAppendCallExprModel,
+    BuiltinErrorCallExprModel,
     BuiltinErrorTraitSubIdentExprModel,
     SizeofExprModel,
     AlignofExprModel,
@@ -127,21 +129,25 @@ fn sbtoa(b: byte): str {
     ret "\\" + seq
 }
 
-fn get_str_model(&c: &Const): str {
-    let content = c.read_str()
-    let bytes = ([]byte)(content)
-    let len = conv::fmt_int(i64(bytes.len), 10)
-
+fn get_cstr_model(bytes: []byte): str {
     let mut lit = ""
     for _, b in bytes {
         lit += sbtoa(b)
     }
 
-    if lit.len == 0 {
+    ret `"` + lit + `"`
+}
+
+fn get_str_model(&c: &Const): str {
+    let content = c.read_str()
+    if content.len == 0 { // Empty.
         ret as_jt("str") + "()"
     }
 
-    ret as_jt("str") + `("` + lit + `", ` + len + ")"
+    let bytes = []byte(content)
+    let len = conv::fmt_int(bytes.len, 10)
+    let lit = get_cstr_model(bytes)
+    ret as_jt("str") + "(" + lit + ", " + len + ")"
 }
 
 fn get_bool_model(&c: &Const): str {
@@ -501,7 +507,7 @@ fn gen_expr_model_for_call(mut expr: ExprModel): str {
     }
 }
 
-fn gen_fn_call_expr_model(mut m: &FnCallExprModel): str {
+fn gen_pure_fn_call_expr_model(mut &m: &FnCallExprModel): str {
     let mut obj = gen_expr_model_for_call(m.expr)
     if !m.func.is_builtin() {
         if m.func.decl.cpp_linked && m.func.generics.len > 0 {
@@ -525,6 +531,41 @@ fn gen_fn_call_expr_model(mut m: &FnCallExprModel): str {
         obj += ")"
     }
 
+    ret obj
+}
+
+fn gen_fn_call_expr_model(mut m: &FnCallExprModel): str {
+    if m.func.is_builtin() || !m.func.decl.exceptional {
+        ret gen_pure_fn_call_expr_model(m)
+    }
+
+    let mut obj = "({\n"
+    add_indent()
+    obj += indent()
+    obj += "auto except = "
+    obj += gen_pure_fn_call_expr_model(m)
+    obj += ";\n"
+    obj += indent()
+    if m.except != nil {
+        obj += "(except.ok()) ? (except.result) : ("
+        obj += gen_scope(m.except)
+        obj += ");\n"
+        done_indent()
+    } else {
+        obj += `if (!except.ok()) jule::panic(jule::Str("`
+        obj += fmt::format(
+            `unhandled exceptional: ") + except.error.type->to_str(except.error.data) + jule::Str("\nlocation: {}:{}:{}"));`,
+            m.token.file.path(), conv::itoa(m.token.row), conv::itoa(m.token.column))
+        obj += "\n"
+        if !m.func.decl.is_void() {
+            obj += indent()
+            obj += "(except.result);\n"
+            done_indent()
+        }
+    }
+
+    obj += indent()
+    obj += "})"
     ret obj
 }
 
@@ -734,6 +775,20 @@ fn gen_builtin_outln_call_expr_model(mut m: &BuiltinOutlnCallExprModel): str {
 fn gen_builtin_panic_call_expr_model(mut m: &BuiltinPanicCallExprModel): str {
     let mut obj = "jule::panic("
     obj += gen_expr(m.expr)
+    obj += ")"
+    ret obj
+}
+
+fn gen_builtin_error_call_expr_model(mut m: &BuiltinErrorCallExprModel): str {
+    let mut obj = "return "
+    if m.func.decl.is_void() {
+        obj += "jule::VoidExceptional("
+    } else {
+        obj += "jule::Exceptional<"
+        obj += gen_type_kind(m.func.result)
+        obj += ">("
+    }
+    obj += gen_expr(m.err)
     obj += ")"
     ret obj
 }
@@ -974,6 +1029,9 @@ fn gen_expr_model(mut m: ExprModel): str {
 
     | &BuiltinPanicCallExprModel:
         ret gen_builtin_panic_call_expr_model((&BuiltinPanicCallExprModel)(m))
+
+    | &BuiltinErrorCallExprModel:
+        ret gen_builtin_error_call_expr_model((&BuiltinErrorCallExprModel)(m))
 
     | &BuiltinMakeCallExprModel:
         ret gen_builtin_make_call_expr_model((&BuiltinMakeCallExprModel)(m))

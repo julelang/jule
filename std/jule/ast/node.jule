@@ -298,10 +298,23 @@ pub struct BinopExpr {
 
 // Function call expression kind.
 pub struct FnCallExpr {
-    pub token:      Token
-    pub expr:       &Expr
-    pub generics:   []&TypeDecl
-    pub args:       []&Expr
+    pub token:     Token
+    pub expr:      &Expr
+    pub generics:  []&TypeDecl
+    pub args:      []&Expr
+    pub exception: &ScopeTree // Exception handling scope.
+}
+
+impl FnCallExpr {
+    // Reports whether exception is not handled.
+    pub fn unhandled(self): bool { ret self.exception == nil }
+
+    // Reports whether exception is ignored.
+    pub fn ignored(self): bool {
+        // Return true if deferred field is true.
+        // Deferred field used mark for exception ignored calls like: x()!
+        ret self.exception != nil && self.exception.deferred
+    }
 }
 
 // Field-Expression pair.
@@ -449,6 +462,7 @@ pub struct FnDecl {
     pub public:       bool
     pub cpp_linked:   bool
     pub statically:   bool
+    pub exceptional:  bool
     pub ident:        str
     pub directives:   []&Directive
     pub doc_comments: &CommentGroup

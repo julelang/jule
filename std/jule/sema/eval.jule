@@ -59,6 +59,25 @@ fn make_struct_lit_alloc(mut &d: &Data, mut &lit: &StructLitExprModel) {
     }
 }
 
+fn build_error_var(mut &s: &Scope, mut &fc: &FnCallExpr): &Var {
+    ret &Var{
+        used:      true,
+        reference: false,
+        mutable:   true,
+        ident:     "error",
+        token:     fc.token,
+        kind:      &TypeSymbol{
+            kind: &TypeKind{
+                kind: build_prim_type(str(PrimKind.Any)),
+            },
+        },
+        scope: s,
+        value: &Value{
+            data: &Data{},
+        },
+    }
+}
+
 fn find_builtins_sema(ident: str, mut s: &Sema): any {
     for (_, mut imp) in s.file.imports {
         if imp.import_all || imp.exist_ident(ident) {
@@ -262,6 +281,7 @@ struct Eval {
     prefix:    &TypeKind
     unsafety:  bool
     immutable: bool // This expression will assigned to immutable memory.
+    ignored:   bool // Evaluated expression is not for assignment or something else.
     owner:     &Var
 }
 
@@ -2033,6 +2053,40 @@ impl Eval {
         }
     }
 
+    fn process_exceptional_handler(mut self, mut &f: &FnIns, mut &fc: &FnCallExpr, mut &d: &Data) {
+        let result_needed = !f.decl.is_void() && !self.ignored
+        let mut csc: &ScopeChecker = nil
+        let mut ch: &Scope = nil
+
+        match type self.lookup {
+        | &Sema:
+            let mut s = (&Sema)(self.lookup)
+            csc = new_scope_checker(s, nil)
+            if result_needed {
+                csc.result = f.result
+            }
+            ch = &Scope{}
+            csc.table.vars = append(csc.table.vars, build_error_var(ch, fc))
+            csc.check(fc.exception, ch)
+
+        | &ScopeChecker:
+            let mut sc = (&ScopeChecker)(self.lookup)
+            csc = sc.new_child_checker()
+            if result_needed {
+                csc.result = f.result
+            }
+            ch = sc.get_child()
+            csc.table.vars = append(csc.table.vars, build_error_var(ch, fc))
+            sc.check_child_ssc(fc.exception, ch, csc)
+        }
+
+        (&FnCallExprModel)(d.model).except = ch
+
+        if result_needed && csc.result != nil {
+            self.push_err(fc.token, LogMsg.MissingAssignRet)
+        }
+    }
+
     fn call_fn(mut &self, mut &fc: &FnCallExpr, mut &d: &Data) {
         let mut f = d.kind.fnc()
         if f.is_builtin() {
@@ -2123,9 +2177,26 @@ impl Eval {
 
         d.mutable = true
         d.model = &FnCallExprModel{
+            token: fc.token,
             func:  f,
             expr:  call_model,
             args:  fcac.arg_models,
+        }
+
+        if f.decl.exceptional {
+            match {
+            | fc.unhandled():
+                self.push_err(fc.token, LogMsg.UnhandledExceptional)
+                self.push_suggestion(LogMsg.HandleExceptional)
+
+            | fc.ignored():
+                // Ok.
+
+            |: // Handled with scope.
+                self.process_exceptional_handler(f, fc, d)
+            }
+        } else if !fc.unhandled() {
+            self.push_err(fc.token, LogMsg.HandledUnexceptional)
         }
 
         if f.generics.len > 0 && is_unique_ins {
@@ -2138,6 +2209,15 @@ impl Eval {
         let mut prefix = self.prefix
         self.prefix = nil
         defer { self.prefix = prefix }
+
+        match type fc.expr.kind {
+        | &IdentExpr:
+            // Use fc.expr.token.kind instead of casting.
+            // Same thing, but more efficient and performant.
+            if fc.expr.token.kind == str(TokenKind.Error) {
+                ret builtin_caller_error(self, fc)
+            }
+        }
 
         let mut d = self.eval_expr_kind(fc.expr.kind)
         if d == nil {
