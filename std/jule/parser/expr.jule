@@ -833,7 +833,7 @@ impl ExprBuilder {
     }
 
     fn build_brace_range(mut self, mut &tokens: []Token): ExprData {
-        let (expr_tokens, range_n) = get_range_expr_tokens(tokens)
+        let (mut expr_tokens, range_n) = get_range_expr_tokens(tokens)
 
         match {
         | expr_tokens.len == 0:
@@ -842,6 +842,27 @@ impl ExprBuilder {
         | range_n > 0:
             self.push_err(tokens[0], LogMsg.InvalidSyntax)
             ret nil
+        }
+
+        // Exceptional handling.
+        if expr_tokens[expr_tokens.len-1].id == TokenId.Else {
+            expr_tokens = expr_tokens[:expr_tokens.len-1] // Ignore keyword "else"
+            let mut d = self.build(expr_tokens)
+            if d == nil {
+                ret nil
+            }
+            match type d {
+            | &FnCallExpr:
+                tokens = tokens[expr_tokens.len+1:] // Get range: {...}
+                let mut i = 0
+                let mut range_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
+                (&FnCallExpr)(d).exception = self.p.build_scope(range_tokens)
+                ret d
+
+            |:
+                self.push_err(expr_tokens[0], LogMsg.InvalidSyntax)
+                ret nil
+            }
         }
 
         match expr_tokens[0].id {

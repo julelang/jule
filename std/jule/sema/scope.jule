@@ -400,6 +400,7 @@ struct ScopeChecker {
     table:       &SymbolTable
     scope:       &Scope
     tree:        &ScopeTree
+    result:      &TypeKind // Result type for last statement.
     it:          uintptr
     cse:         uintptr
     labels:      &[]&ScopeLabel // All labels of all scopes.
@@ -674,7 +675,9 @@ impl ScopeChecker {
     }
 
     fn check_expr(mut &self, mut expr: &Expr) {
-        let mut d = self.s.eval(self).eval_expr(expr)
+        let mut eval = self.s.eval(self)
+        eval.ignored = true
+        let mut d = eval.eval_expr(expr)
         if d == nil {
             ret
         }
@@ -704,6 +707,7 @@ impl ScopeChecker {
 
     fn check_co_expr(mut &self, mut expr: &CoExpr) {
         let mut eval = self.s.eval(self)
+        eval.ignored = true
         let mut d = eval.eval_expr(expr.expr)
         if d == nil {
             ret
@@ -712,6 +716,10 @@ impl ScopeChecker {
         match type d.model {
         | &FnCallExprModel:
             let mut model = (&FnCallExprModel)(d.model)
+            if model.except != nil {
+                self.s.push_err(expr.token, LogMsg.CoHasExceptionalHandler)
+                self.s.push_suggestion(LogMsg.HandleInFn)
+            }
             model.is_co = true
             eval.check_fn_of_concurrent_call(model.func, expr.expr.token)
             self.scope.stmts = append(self.scope.stmts, d)
@@ -1654,7 +1662,7 @@ impl ScopeChecker {
         | &VarDecl:                     self.check_var_decl((&VarDecl)(node))
         | &TypeAliasDecl:               self.check_type_alias_decl((&TypeAliasDecl)(node))
         | &Expr:                        self.check_expr((&Expr)(node))
-        | &CoExpr:                        self.check_co_expr((&CoExpr)(node))
+        | &CoExpr:                      self.check_co_expr((&CoExpr)(node))
         | &std::jule::ast::Conditional: self.check_conditional((&std::jule::ast::Conditional)(node))
         | &Iter:                        self.check_iter((&Iter)(node))
         | &std::jule::ast::ContSt:      self.check_cont((&std::jule::ast::ContSt)(node))
@@ -1669,11 +1677,46 @@ impl ScopeChecker {
         }
     }
 
+    fn check_result_stmt(mut &self, mut &expr: &Expr) {
+        let mut d = self.s.eval(self).eval_expr(expr)
+        if d == nil {
+            ret
+        }
+
+        self.scope.stmts = append(self.scope.stmts, d)
+
+        let mut rtc = &RetTypeChecker{
+            sc:          self,
+            error_token: expr.token,
+            types:       get_result_types(self.result),
+        }
+        _ = rtc.check(expr)
+    }
+
     fn check_tree(mut &self) {
+        let mut n = self.tree.stmts.len
+        if self.result != nil {
+            n--
+        }
+
         self.i = 0
-        for self.i < self.tree.stmts.len; self.i++ {
+        for self.i < n; self.i++ {
             let mut stmt = self.tree.stmts[self.i]
             self.check_node(stmt)
+        }
+
+        if self.result != nil && self.i < self.tree.stmts.len {
+            let mut stmt = self.tree.stmts[self.i]
+            match type stmt {
+            | &Expr:
+                let mut expr = (&Expr)(stmt)
+                self.check_result_stmt(expr)
+
+                // Set result to nil, it is a mark for whether result is processed.
+                self.result = nil
+            |:
+                self.check_node(stmt)
+            }
         }
     }
 

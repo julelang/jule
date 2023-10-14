@@ -23,16 +23,16 @@ use lit for std::jule::constant::lit
 use std::jule::lex::{Token, Ident, is_ignore_ident}
 use types for std::jule::types
 
-fn get_fn_result_types(mut &f: &FnIns): []&TypeKind {
+fn get_result_types(mut &result: &TypeKind): []&TypeKind {
     match {
-    | f.decl.is_void() || f.result == nil:
+    | result == nil:
         ret nil
 
-    | f.result.tup() == nil:
-        ret [f.result]
+    | result.tup() == nil:
+        ret [result]
 
     |:
-        ret f.result.tup().types
+        ret result.tup().types
     }
 }
 
@@ -1047,7 +1047,9 @@ struct RetTypeChecker {
 
 impl RetTypeChecker {
     fn prepare_types(mut self) {
-        self.types = get_fn_result_types(self.f)
+        if self.f != nil {
+            self.types = get_result_types(self.f.result)
+        }
     }
 
     fn prepare_exprs(mut self, mut &e: &Expr) {
@@ -1065,7 +1067,7 @@ impl RetTypeChecker {
     }
 
     fn ret_vars(mut self) {
-        if self.f.decl.is_void() {
+        if self.f == nil || self.f.decl.is_void() {
             ret
         }
         self.vars = make([]&Var, 0, self.f.decl.result.idents.len)
@@ -1142,7 +1144,7 @@ impl RetTypeChecker {
         self.ret_vars()
 
         let n = self.exprs.len
-        if n == 0 && !self.f.decl.is_void() {
+        if n == 0 && self.types.len > 0 {
             if !self.f.decl.any_var() {
                 self.sc.s.push_err(self.error_token, LogMsg.RequireRetExpr)
                 ret false
@@ -1150,7 +1152,7 @@ impl RetTypeChecker {
             ret true
         }
 
-        if n > 0 && self.f.decl.is_void() {
+        if n > 0 && self.f != nil && self.f.decl.is_void() {
             self.sc.s.push_err(self.error_token, LogMsg.VoidFnRetExpr)
             ret false
         }

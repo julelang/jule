@@ -546,14 +546,22 @@ fn gen_fn_call_expr_model(mut m: &FnCallExprModel): str {
     obj += gen_pure_fn_call_expr_model(m)
     obj += ";\n"
     obj += indent()
-    obj += `if (!except.ok()) jule::panic(jule::Str("`
-    obj += fmt::format(`unhandled exceptional: ") + except.error.type->to_str(except.error.data) + jule::Str("\nlocation: {}:{}:{}"));`, m.token.file.path(), conv::itoa(m.token.row), conv::itoa(m.token.column))
-    obj += "\n"
-
-    if !m.func.decl.is_void() {
-        obj += indent()
-        obj += "(except.result);\n"
+    if m.except != nil {
+        obj += "(except.ok()) ? (except.result) : ("
+        obj += gen_scope(m.except)
+        obj += ");\n"
         done_indent()
+    } else {
+        obj += `if (!except.ok()) jule::panic(jule::Str("`
+        obj += fmt::format(
+            `unhandled exceptional: ") + except.error.type->to_str(except.error.data) + jule::Str("\nlocation: {}:{}:{}"));`,
+            m.token.file.path(), conv::itoa(m.token.row), conv::itoa(m.token.column))
+        obj += "\n"
+        if !m.func.decl.is_void() {
+            obj += indent()
+            obj += "(except.result);\n"
+            done_indent()
+        }
     }
 
     obj += indent()
