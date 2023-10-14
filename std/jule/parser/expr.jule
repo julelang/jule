@@ -26,6 +26,7 @@ use std::jule::ast::{
     SlicingExpr,
     BinopExpr,
     TernaryExpr,
+    ScopeTree,
 }
 use std::jule::build::{LogMsg}
 use std::jule::lex::{
@@ -302,7 +303,8 @@ impl ExprBuilder {
             ret self.build_lit(token)
 
         | TokenId.Ident
-        | TokenId.Self:
+        | TokenId.Self
+        | TokenId.Error:
             ret build_ident_expr(token)
 
         | TokenId.Prim:
@@ -435,13 +437,26 @@ impl ExprBuilder {
     fn build_op_right(mut self, mut &tokens: []Token): ExprData {
         let mut token = tokens[tokens.len-1]
         match token.kind {
+        | str(TokenKind.Excl):
+            tokens = tokens[:tokens.len-1] // Ignore "!" token.
+            let mut d = self.build(tokens)
+            if d == nil {
+                ret nil
+            }
+            match type d {
+            | &FnCallExpr:
+                (&FnCallExpr)(d).exception = &ScopeTree{
+                    deferred: true,
+                }
+                ret d
+            }
+
         | str(TokenKind.TripleDot):
             ret self.build_variadic(tokens)
 
-        |:
-            self.push_err(token, LogMsg.InvalidSyntax)
-            ret nil
         }
+        self.push_err(token, LogMsg.InvalidSyntax)
+        ret nil
     }
 
     fn build_between_parentheses(mut self, mut tokens: []Token): ExprData {

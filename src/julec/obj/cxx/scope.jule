@@ -514,14 +514,6 @@ fn gen_ret_vars(mut r: &RetSt): str {
 }
 
 fn gen_ret_expr_tuple(mut r: &RetSt): str {
-    match type r.expr {
-    | &FnCallExprModel:
-        let mut obj = "return "
-        obj += gen_expr_model(r.expr)
-        obj += CPP_ST_TERM
-        ret obj
-    }
-
     let mut datas = (&TupleExprModel)(r.expr).datas
     let mut obj = ""
 
@@ -542,46 +534,65 @@ fn gen_ret_expr_tuple(mut r: &RetSt): str {
         obj += indent()
     }
 
-    obj += "return std::make_tuple("
+    let mut oobj = "std::make_tuple("
     for (i, mut d) in datas {
         let mut v = r.vars[i]
         if is_ignore_ident(v.ident) {
-            obj += gen_expr(d.model)
+            oobj += gen_expr(d.model)
         } else {
-            obj += var_out_ident(v)
+            oobj += var_out_ident(v)
         }
 
-        obj += ","
+        oobj += ","
     }
-    obj = obj[:obj.len-1] // Remove last comma.
-    obj += ");"
+    oobj = obj[:oobj.len-1] // Remove last comma.
+    oobj += ")"
 
+    if r.func.decl.exceptional {
+        obj += "return jule::Exceptional(jule::Any(),"
+        obj += oobj
+        obj += ")"
+    } else {
+        obj += "return "
+        obj += oobj
+    }
+
+    obj += CPP_ST_TERM
     ret obj
 }
 
 fn gen_ret_expr(mut r: &RetSt): str {
-    if r.vars.len == 0 {
-        let mut obj = "return "
-        obj += gen_expr(r.expr)
-        obj += CPP_ST_TERM
-        ret obj
-    }
-
     if r.vars.len > 1 {
         ret gen_ret_expr_tuple(r)
     }
 
-    let mut v = r.vars[0]
     // Ignore self assignments and ignored variables.
-    if !is_ignore_ident(v.ident) && r.expr != v {
-        let ident = var_out_ident(v)
-        let mut obj = ident
-        obj += " = "
+    if r.vars.len > 0 {
+        let mut v = r.vars[0]
+        if !is_ignore_ident(v.ident) && r.expr != v {
+            let ident = var_out_ident(v)
+            let mut obj = ident
+            obj += " = "
+            obj += gen_expr(r.expr)
+            obj += ";\n"
+            obj += indent()
+            if r.func.decl.exceptional {
+                obj += "return jule::Exceptional(jule::Any(),"
+                obj += ident
+                obj += ")"
+            } else {
+                obj += "return "
+                obj += ident
+            }
+            obj += CPP_ST_TERM
+            ret obj
+        }
+    }
+
+    if r.func.decl.exceptional {
+        let mut obj = "return jule::Exceptional(jule::Any(),"
         obj += gen_expr(r.expr)
-        obj += ";\n"
-        obj += indent()
-        obj += "return "
-        obj += ident
+        obj += ")"
         obj += CPP_ST_TERM
         ret obj
     }

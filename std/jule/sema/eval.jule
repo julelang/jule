@@ -2040,6 +2040,15 @@ impl Eval {
             ret
         }
 
+        if f.decl.exceptional {
+            if fc.unhandled() {
+                self.push_err(fc.token, LogMsg.UnhandledExceptional)
+                self.push_suggestion(LogMsg.HandleExceptional)
+            }
+        } else if !fc.unhandled() {
+            self.push_err(fc.token, LogMsg.HandledUnexceptional)
+        }
+
         if !d.mutable && f.decl.is_method() && !f.decl.statically && f.decl.params[0].mutable {
             self.push_err(fc.token, LogMsg.MutOperationOnImmut)
         } else if !self.is_unsafe() && f.decl.unsafety {
@@ -2123,6 +2132,7 @@ impl Eval {
 
         d.mutable = true
         d.model = &FnCallExprModel{
+            token: fc.token,
             func:  f,
             expr:  call_model,
             args:  fcac.arg_models,
@@ -2138,6 +2148,15 @@ impl Eval {
         let mut prefix = self.prefix
         self.prefix = nil
         defer { self.prefix = prefix }
+
+        match type fc.expr.kind {
+        | &IdentExpr:
+            // Use fc.expr.token.kind instead of casting.
+            // Same thing, but more efficient and performant.
+            if fc.expr.token.kind == str(TokenKind.Error) {
+                ret builtin_caller_error(self, fc)
+            }
+        }
 
         let mut d = self.eval_expr_kind(fc.expr.kind)
         if d == nil {

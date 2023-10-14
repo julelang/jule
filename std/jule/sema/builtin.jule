@@ -229,6 +229,30 @@ fn builtin_caller_common_mut(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data)
     ret builtin_caller_common(e, fc, d)
 }
 
+fn builtin_caller_error(mut &e: &Eval, mut &fc: &FnCallExpr): &Data {
+    if fc.generics.len > 0 {
+        e.push_err(fc.token, LogMsg.NotHasGenerics)
+    }
+    if fc.args.len < 1 {
+        e.push_err(fc.token, LogMsg.MissingExprFor, "err")
+        ret nil
+    }
+    if fc.args.len > 1 {
+        e.push_err(fc.args[1].token, LogMsg.ArgumentOverflow)
+    }
+    let mut expr = e.eval_expr(fc.args[0])
+    if expr == nil {
+        ret nil
+    }
+
+    let mut d = build_void_data()
+    d.model = &BuiltinErrorCallExprModel{
+        err: expr.model,
+    }
+
+    ret d
+}
+
 fn builtin_caller_out(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data {
     if fc.generics.len > 0 {
         e.push_err(fc.token, LogMsg.NotHasGenerics)

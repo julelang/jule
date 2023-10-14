@@ -778,6 +778,11 @@ impl Parser {
                 ret
             }
 
+        | TokenId.Op:
+            if token.kind == str(TokenKind.Eq) {
+                ret
+            }
+
         | TokenId.Colon:
             if i+1 >= tokens.len {
                 self.push_err(token, LogMsg.MissingType)
@@ -868,6 +873,14 @@ impl Parser {
         let mut params_toks = range(i, TokenKind.LParent, TokenKind.RParent, tokens)
         if params_toks.len > 0 {
             f.params = self.build_params(params_toks, method)
+        }
+
+        if i < tokens.len {
+            let token = tokens[i]
+            if token.id == TokenId.Op && token.kind == str(TokenKind.Excl) {
+                f.exceptional = true
+                i++
+            }
         }
 
         f.result, _ = self.build_ret_type(tokens, i)

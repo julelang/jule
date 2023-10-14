@@ -22,6 +22,7 @@ CONFIGURATION DEFINES
 #include "defer.hpp"
 #include "env.hpp"
 #include "error.hpp"
+#include "exceptional.hpp"
 #include "fn.hpp"
 #include "map.hpp"
 #include "misc.hpp"

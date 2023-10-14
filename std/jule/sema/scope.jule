@@ -372,6 +372,7 @@ pub struct FallSt {
 
 // Return statement.
 pub struct RetSt {
+    pub func: &FnIns
     pub vars: []&Var // Used "_" identifier to pass ignored vars for ordering.
     pub expr: ExprModel
 }
@@ -679,6 +680,15 @@ impl ScopeChecker {
         }
 
         match type d.model {
+        | &BuiltinErrorCallExprModel:
+            let mut root = self.get_root()
+            if !root.owner.decl.exceptional {
+                self.s.push_err(expr.token, LogMsg.ErrorWithNonExceptional)
+                self.s.push_suggestion(LogMsg.DeclareExceptional)
+            }
+            (&BuiltinErrorCallExprModel)(d.model).func = root.owner
+            self.scope.stmts = append(self.scope.stmts, d)
+
         | &BuiltinAppendCallExprModel
         | &BuiltinCloneCallExprModel
         | &BuiltinOutCallExprModel
@@ -1611,12 +1621,14 @@ impl ScopeChecker {
     }
 
     fn check_ret(mut &self, mut r: &std::jule::ast::RetSt) {
-        let mut rt = &RetSt{}
+        let mut rt = &RetSt{
+            func: self.get_root().owner,
+        }
         self.scope.stmts = append(self.scope.stmts, rt)
 
         let mut rtc = &RetTypeChecker{
             sc:          self,
-            f:           self.get_root().owner,
+            f:           rt.func,
             error_token: r.token,
         }
         let ok = rtc.check(r.expr)
