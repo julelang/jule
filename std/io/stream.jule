@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use integrated for std::jule::integrated
-use err for std::errors
 use std::fs::{FsError, File}
 
 // Reader trait mask for stream reader.
@@ -12,24 +10,22 @@ pub trait Reader {
     // The number of bytes readed can never exceed the length of the buff.
     // If the buff is larger than the number of bytes that can be read,
     // the buffer will not cause an overflow.
-    // Returns 0 if error occurs.
-    pub fn read(mut self, mut buff: []byte): (n: int, err: Error)
+    pub fn read(mut self, mut buff: []byte)!: (n: int)
 }
 
 // Reader trait mask for stream writer.
 pub trait Writer {
     // Writes bytes to stream and returns writed byte count.
     // The number of bytes written can never exceed the length of the buff.
-    // Returns 0 if error occurs.
-    pub fn write(mut self, buff: []byte): (n: int, err: Error)
+    pub fn write(mut self, buff: []byte)!: (n: int)
 }
 
 // Stream trait mask for R/W streams.
 pub trait Stream {
     // Derived from Reader trait.
-    pub fn read(mut self, mut buff: []byte): (n: int, err: Error)
+    pub fn read(mut self, mut buff: []byte)!: (n: int)
     // Derived from Writer trait.
-    pub fn write(mut self, buff: []byte): (n: int, err: Error)
+    pub fn write(mut self, buff: []byte)!: (n: int)
 }
 
 // Stream implementation for file handles.
@@ -48,28 +44,28 @@ impl Reader for FileStream {} // Implemented by Stream trait
 impl Writer for FileStream {} // Implemented by Stream trait
 
 impl Stream for FileStream {
-    pub fn read(mut self, mut buff: []byte): (n: int, err: Error) {
+    pub fn read(mut self, mut buff: []byte)!: (n: int) {
         let (n, fserr) = self.buff.read(buff)
         if fserr != FsError.Ok {
-            ret 0, err::new(integrated::to_str(fserr))
+            error(fserr)
         }
-        ret n, nil
+        ret n
     }
 
-    pub fn write(mut self, buff: []byte): (n: int, err: Error) {
+    pub fn write(mut self, buff: []byte)!: (n: int) {
         let (n, fserr) = self.buff.write(buff)
         if fserr != FsError.Ok {
-            ret 0, err::new(integrated::to_str(fserr))
+            error(fserr)
         }
-        ret n, nil
+        ret n
     }
 }
 
 impl FileStream {
     // Reads line from file handle via &File.read method.
     // Returns bytes until line delimiter (\n) byte.
-    // Returns zero-length byte slice and nil error when reached EOF.
-    pub fn read_line(mut self): ([]byte, Error) {
+    // Returns zero-length byte slice when reached EOF.
+    pub fn read_line(mut self)!: []byte {
         const LINE_DELIMITER = '\n'
 
         let mut buff = make([]byte, 0, 1024)
@@ -77,7 +73,7 @@ impl FileStream {
         for {
             let (n, fserr) = self.buff.read(part)
             if fserr != FsError.Ok {
-                ret nil, err::new(integrated::to_str(fserr))
+                error(fserr)
             }
             if n == 0 {
                 break
@@ -90,6 +86,6 @@ impl FileStream {
                 break
             }
         }
-        ret buff, nil
+        ret buff
     }
 }
