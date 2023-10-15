@@ -1311,9 +1311,9 @@ impl Parser {
 
     fn build_struct_decl_fields(mut &self, mut tokens: []Token): []&FieldDecl {
         let mut fields: []&FieldDecl = nil
-        let mut stms = split_stms(tokens)
-        for (_, mut st) in stms {
-            tokens = st.tokens
+        let mut stmts = split_stmts(tokens)
+        for (_, mut stmt) in stmts {
+            tokens = stmt.tokens
             if tokens[0].id == TokenId.Comment {
                 continue
             }
@@ -1390,9 +1390,9 @@ impl Parser {
 
     fn build_trait_methods(mut &self, mut tokens: []Token): []&FnDecl {
         let mut methods: []&FnDecl = nil
-        let mut stms = split_stms(tokens)
-        for (_, mut st) in stms {
-            tokens = eliminate_comments(st.tokens)
+        let mut stmts = split_stmts(tokens)
+        for (_, mut stmt) in stmts {
+            tokens = eliminate_comments(stmt.tokens)
             if tokens.len == 0 {
                 continue
             }
@@ -1569,9 +1569,9 @@ impl Parser {
     }
 
     fn parse_impl_body(mut &self, mut &ipl: &Impl, mut &tokens: []Token) {
-        let mut stms = split_stms(tokens)
-        for (_, mut st) in stms {
-            tokens = st.tokens
+        let mut stmts = split_stmts(tokens)
+        for (_, mut stmt) in stmts {
+            tokens = stmt.tokens
             let mut token = tokens[0]
             let mut is_pub = false
             match token.id {
@@ -2009,18 +2009,18 @@ impl Parser {
             ret
         }
 
-        let mut stms = split_stms(tokens)
+        let mut stmts = split_stmts(tokens)
 
         // Get top directives.
         let mut i = 0
     iter:
-        for i < stms.len; i++ {
-            let mut st = stms[i]
-            if st.tokens.len == 0 {
+        for i < stmts.len; i++ {
+            let mut stmt = stmts[i]
+            if stmt.tokens.len == 0 {
                 ret
             }
 
-            let (_, mut data) = self.build_general_scope_node_data(st.tokens)
+            let (_, mut data) = self.build_general_scope_node_data(stmt.tokens)
             if data == nil {
                 break
             }
@@ -2050,9 +2050,9 @@ impl Parser {
         // Remove all errors.
         self.errors = nil
 
-        for i < stms.len; i++ {
-            let mut st = stms[i]
-            self.append_node(st.tokens)
+        for i < stmts.len; i++ {
+            let mut stmt = stmts[i]
+            self.append_node(stmt.tokens)
 
             if self.stopped() {
                 break

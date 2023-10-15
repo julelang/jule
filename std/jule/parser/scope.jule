@@ -149,7 +149,7 @@ struct Stmt {
 }
 
 // Splits all statements.
-fn split_stms(mut &tokens: []Token): []&Stmt {
+fn split_stmts(mut &tokens: []Token): []&Stmt {
     let mut stms: []&Stmt = nil
     let mut pos = 0
     for pos < tokens.len {
@@ -163,17 +163,17 @@ fn split_stms(mut &tokens: []Token): []&Stmt {
 }
 
 struct ScopeParser {
-    p:    &Parser
-    s:    &ScopeTree
-    stms: []&Stmt
-    pos:  int
+    p:     &Parser
+    s:     &ScopeTree
+    stmts: []&Stmt
+    pos:   int
 }
 
 impl ScopeParser {
     fn stop(mut self) { self.pos = -1 }
     fn stopped(self): bool { ret self.pos == -1 }
-    fn finished(self): bool { ret self.pos >= self.stms.len }
-    fn is_last_st(self): bool { ret self.pos+1 >= self.stms.len }
+    fn finished(self): bool { ret self.pos >= self.stmts.len }
+    fn is_last_st(self): bool { ret self.pos+1 >= self.stmts.len }
     fn push_err(mut self, token: Token, fmt: LogMsg) { self.p.push_err(token, fmt) }
 
     // Push suggestion to last log.
@@ -182,13 +182,13 @@ impl ScopeParser {
     }
 
     fn insert_as_next(mut self, mut &tokens: []Token) {
-        self.stms = append(self.stms[:self.pos+1], self.stms[self.pos:]...)
-        self.stms[self.pos+1] = &Stmt{tokens: tokens}
+        self.stmts = append(self.stmts[:self.pos+1], self.stmts[self.pos:]...)
+        self.stmts[self.pos+1] = &Stmt{tokens: tokens}
     }
 
     fn next(mut self): &Stmt {
         self.pos++
-        ret self.stms[self.pos]
+        ret self.stmts[self.pos]
     }
 
     fn build_scope(mut self, mut &tokens: []Token): &ScopeTree {
@@ -1092,7 +1092,7 @@ impl ScopeParser {
             ret
         }
 
-        self.stms = split_stms(tokens)
+        self.stmts = split_stmts(tokens)
         self.pos = -1 // sp.next() first increase position
         self.s = s
         for !self.is_last_st() && !self.finished() {
