@@ -541,6 +541,23 @@ impl ScopeChecker {
     // Accepts anonymous functions as root.
     fn is_root(self): bool { ret self.parent == nil || self.owner != nil }
 
+    // Reports scope is deferred.
+    fn is_deferred(mut &self): bool {
+        let mut scope = self
+
+    iter:
+        if scope.scope.deferred {
+            ret true
+        }
+
+        if scope.parent != nil {
+            scope = scope.parent
+            goto iter
+        }
+
+        ret false
+    }
+
     // Returns root scope.
     // Accepts anonymous functions as root.
     fn get_root(mut &self): &ScopeChecker {
@@ -675,6 +692,10 @@ impl ScopeChecker {
     }
 
     fn process_error_call(mut &self, mut &m: &BuiltinErrorCallExprModel, err: Token) {
+        if self.is_deferred() {
+            self.s.push_err(err, LogMsg.ErrorInDeferred)
+        }
+
         let mut root = self.get_root()
         if !root.owner.decl.exceptional {
             self.s.push_err(err, LogMsg.ErrorWithNonExceptional)
@@ -948,6 +969,11 @@ impl ScopeChecker {
     }
 
     fn check_cont_valid_scope(mut &self, c: &std::jule::ast::ContSt): &ContSt {
+        if self.is_deferred() {
+            self.s.push_err(c.token, LogMsg.ContinueAtOutOfValidScope)
+            ret nil
+        }
+
         if c.label.id != TokenId.Na {
             ret &ContSt{}
         }
@@ -1532,8 +1558,10 @@ impl ScopeChecker {
         self.check_common_match(m)
     }
 
-    fn check_fall(mut self, f: &std::jule::ast::FallSt) {
-        if self.cse == 0 || self.scope.stmts.len+1 < self.scope.stmts.len {
+    fn check_fall(mut &self, f: &std::jule::ast::FallSt) {
+        if self.cse == 0 ||
+            self.scope.stmts.len+1 < self.scope.stmts.len ||
+            self.is_deferred() {
             self.s.push_err(f.token, LogMsg.FalltroughWrongUse)
             ret
         }
@@ -1604,6 +1632,11 @@ impl ScopeChecker {
     }
 
     fn check_plain_break(mut &self, b: &std::jule::ast::BreakSt): &BreakSt {
+        if self.is_deferred() {
+            self.s.push_err(b.token, LogMsg.BreakAtOutOfValidScope)
+            ret nil
+        }
+
         let mut scope = self
     iter:
         match {
@@ -1634,6 +1667,10 @@ impl ScopeChecker {
     }
 
     fn check_ret(mut &self, mut r: &std::jule::ast::RetSt) {
+        if self.is_deferred() {
+            self.s.push_err(r.token, LogMsg.RetInDeferred)
+        }
+
         let mut rt = &RetSt{
             func: self.get_root().owner,
         }
