@@ -845,6 +845,7 @@ impl ExprBuilder {
         }
 
         // Exceptional handling.
+        let else_token = expr_tokens[expr_tokens.len-1]
         if expr_tokens[expr_tokens.len-1].id == TokenId.Else {
             expr_tokens = expr_tokens[:expr_tokens.len-1] // Ignore keyword "else"
             let mut d = self.build(expr_tokens)
@@ -856,7 +857,12 @@ impl ExprBuilder {
                 tokens = tokens[expr_tokens.len+1:] // Get range: {...}
                 let mut i = 0
                 let mut range_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
-                (&FnCallExpr)(d).exception = self.p.build_scope(range_tokens)
+                let mut model = (&FnCallExpr)(d)
+                if model.ignored() {
+                    self.push_err(else_token, LogMsg.InvalidSyntax)
+                    self.push_suggestion(LogMsg.JustIgnoreOrHandle)
+                }
+                model.exception = self.p.build_scope(range_tokens)
                 ret d
 
             |:
