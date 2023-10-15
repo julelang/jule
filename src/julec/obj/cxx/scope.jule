@@ -353,9 +353,19 @@ fn gen_multi_assign(mut a: &MultiAssign): str {
     ret obj
 }
 
-fn gen_case(mut m: &Match, mut c: &Case): str {
-    const MATCH_EXPR = "_match_expr"
+const MATCH_EXPR = "_match_expr"
 
+fn get_case_match_expr(mut &m: &Match): str {
+    if !m.expr.is_const() {
+        ret MATCH_EXPR
+    }
+    if !m.expr.constant.is_bool() || !m.expr.constant.read_bool() {
+        ret gen_expr_model(m.expr.model)
+    }
+    ret ""
+}
+
+fn gen_case(mut m: &Match, mut c: &Case): str {
     let end = case_end_label_ident(uintptr(c))
     let mut obj = ""
 
@@ -364,26 +374,22 @@ fn gen_case(mut m: &Match, mut c: &Case): str {
         for (i, mut expr) in c.exprs {
             match {
             | !m.type_match:
-                if m.expr.is_const() {
+                let case_expr = get_case_match_expr(m)
+                if m.expr.good_operand(expr) {
+                    if case_expr.len != 0 {
+                        obj += case_expr
+                        obj += " == "
+                    }
                     obj += "("
                     obj += gen_expr(expr.model)
                     obj += ")"
-                    if !m.expr.constant.is_bool() || !m.expr.constant.read_bool() {
-                        obj += gen_expr_model(m.expr.model)
-                        obj += " == "
-                    }
                 } else {
-                    if m.expr.good_operand(expr) {
-                        obj += MATCH_EXPR
+                    obj += "("
+                    obj += gen_expr(expr.model)
+                    obj += ")"
+                    if case_expr.len != 0 {
                         obj += " == "
-                        obj += "("
-                        obj += gen_expr(expr.model)
-                        obj += ")"
-                    } else {
-                        obj += "("
-                        obj += gen_expr(expr.model)
-                        obj += ") == "
-                        obj += MATCH_EXPR
+                        obj += case_expr
                     }
                 }
 
