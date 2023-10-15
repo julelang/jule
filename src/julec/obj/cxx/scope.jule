@@ -619,7 +619,11 @@ fn gen_ret_expr(mut r: &RetSt): str {
 }
 
 fn gen_ret_st(mut r: &RetSt): str {
+    // Void.
     if r.expr == nil && r.vars.len == 0 {
+        if r.func.decl.exceptional {
+            ret "return jule::VoidExceptional();"
+        }
         ret "return;"
     }
 
@@ -706,11 +710,15 @@ fn gen_scope(mut s: &Scope): str {
 
 // Generates C++ code of function's scope.
 fn gen_fn_scope(mut f: &FnIns): str {
-    if f.owner != nil {
-        ret gen_method_scope(f)
+    let mut obj = if f.owner != nil { gen_method_scope(f) } else { gen_scope(f.scope) }
+    if f.decl.exceptional && f.decl.is_void() {
+        // Just for void exceptionals.
+        // Other cases checked by semantic analyzer and disallowed
+        // if they are not returns.
+        obj = obj[:obj.len-2] + " return jule::VoidExceptional(); }"
     }
 
-    ret gen_scope(f.scope)
+    ret obj
 }
 
 // Generates C++ code of method's scope.
