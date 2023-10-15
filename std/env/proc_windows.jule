@@ -11,21 +11,21 @@ use std::sys::{
 
 // Possible errors:
 //  Denied
-fn __getwd(): (str, EnvError) {
+fn __getwd()!: str {
     let mut buff: [MAX_PATH + 1]u16 = []
     let n = unsafe { get_current_directory(buff.len, &buff[0]) }
     if n == 0 {
-        ret "", get_last_os_error_windows()
+        error(get_last_os_error_windows())
     }
-    ret unsafe { integrated::u16_ptr_to_str(&buff[0]) }, EnvError.Ok
+    ret unsafe { integrated::u16_ptr_to_str(&buff[0]) }
 }
 
 // Possible errors:
 //  Denied NotExist Device
-fn __chdir(path: str): EnvError {
+fn __chdir(path: str)! {
     let utf16_path = integrated::utf16_from_str(path)
     if unsafe { set_current_directory(&utf16_path[0]) } {
-        ret EnvError.Ok
+        ret
     }
-    ret get_last_os_error_windows()
+    error(get_last_os_error_windows())
 }

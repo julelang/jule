@@ -7,21 +7,21 @@ use sys for std::sys
 
 // Possible errors:
 //  Denied
-fn __getwd(): (str, EnvError) {
+fn __getwd()!: str {
     let mut buff = unsafe { sys::getcwd(nil, 0) }
     if buff == nil {
-        ret "", get_last_os_error()
+        error(get_last_os_error())
     }
     let pwd = unsafe { integrated::byte_ptr_to_str(buff) }
     unsafe { integrated::free(buff) }
-    ret pwd, EnvError.Ok
+    ret pwd
 }
 
 // Possible errors:
 //  Denied IO Loop LongPath NotExist NotDir InsufficientMemory
-fn __chdir(path: str): EnvError {
+fn __chdir(path: str)! {
     if unsafe { sys::chdir(&path[0]) } == 0 {
-        ret EnvError.Ok
+        ret
     }
-    ret get_last_os_error()
+    error(get_last_os_error())
 }
