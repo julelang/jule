@@ -674,6 +674,15 @@ impl ScopeChecker {
         self.scope.stmts = append(self.scope.stmts, s)
     }
 
+    fn process_error_call(mut &self, mut &m: &BuiltinErrorCallExprModel, err: Token) {
+        let mut root = self.get_root()
+        if !root.owner.decl.exceptional {
+            self.s.push_err(err, LogMsg.ErrorWithNonExceptional)
+            self.s.push_suggestion(LogMsg.DeclareExceptional)
+        }
+        m.func = root.owner
+    }
+
     fn check_expr(mut &self, mut expr: &Expr) {
         let mut eval = self.s.eval(self)
         eval.ignored = true
@@ -684,12 +693,8 @@ impl ScopeChecker {
 
         match type d.model {
         | &BuiltinErrorCallExprModel:
-            let mut root = self.get_root()
-            if !root.owner.decl.exceptional {
-                self.s.push_err(expr.token, LogMsg.ErrorWithNonExceptional)
-                self.s.push_suggestion(LogMsg.DeclareExceptional)
-            }
-            (&BuiltinErrorCallExprModel)(d.model).func = root.owner
+            let mut m = (&BuiltinErrorCallExprModel)(d.model)
+            self.process_error_call(m, expr.token)
             self.scope.stmts = append(self.scope.stmts, d)
 
         | &BuiltinAppendCallExprModel
@@ -1685,12 +1690,41 @@ impl ScopeChecker {
 
         self.scope.stmts = append(self.scope.stmts, d)
 
+        match type d.model {
+        | &BuiltinErrorCallExprModel:
+            let mut m = (&BuiltinErrorCallExprModel)(d.model)
+            self.process_error_call(m, expr.token)
+            ret
+        }
+
         let mut rtc = &RetTypeChecker{
             sc:          self,
             error_token: expr.token,
             types:       get_result_types(self.result),
         }
         _ = rtc.check(expr)
+    }
+
+    fn check_result(mut &self) {
+        let mut stmt = self.tree.stmts[self.i]
+        match type stmt {
+        | &Expr:
+            let mut expr = (&Expr)(stmt)
+            self.check_result_stmt(expr)
+        
+        | &std::jule::ast::GotoSt
+        | &std::jule::ast::BreakSt
+        | &std::jule::ast::ContSt
+        | &std::jule::ast::RetSt:
+            self.check_node(stmt)
+
+        |:
+            self.check_node(stmt)
+            ret
+        }
+
+        // Set result to nil, it is a mark for whether result is processed.
+        self.result = nil
     }
 
     fn check_tree(mut &self) {
@@ -1706,17 +1740,7 @@ impl ScopeChecker {
         }
 
         if self.result != nil && self.i < self.tree.stmts.len {
-            let mut stmt = self.tree.stmts[self.i]
-            match type stmt {
-            | &Expr:
-                let mut expr = (&Expr)(stmt)
-                self.check_result_stmt(expr)
-
-                // Set result to nil, it is a mark for whether result is processed.
-                self.result = nil
-            |:
-                self.check_node(stmt)
-            }
+            self.check_result()
         }
     }
 

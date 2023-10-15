@@ -55,6 +55,7 @@ use std::jule::sema::{
     StructStaticIdentExprModel,
     IntegratedToStrExprModel,
     TernaryExprModel,
+    Scope,
 }
 use std::jule::types::{
     MAX_F32,
@@ -534,6 +535,23 @@ fn gen_pure_fn_call_expr_model(mut &m: &FnCallExprModel): str {
     ret obj
 }
 
+fn is_forwarded(&s: &Scope): bool {
+    let last = s.stmts[s.stmts.len-1]
+    match type last {
+    | &Data:
+        match type (&Data)(last).model {
+        | &BuiltinErrorCallExprModel:
+            ret true
+
+        |:
+            ret false
+        }
+
+    |:
+        ret true
+    }
+}
+
 fn gen_fn_call_expr_model(mut m: &FnCallExprModel): str {
     if m.func.is_builtin() || !m.func.decl.exceptional {
         ret gen_pure_fn_call_expr_model(m)
@@ -547,8 +565,17 @@ fn gen_fn_call_expr_model(mut m: &FnCallExprModel): str {
     obj += ";\n"
     obj += indent()
     if m.except != nil {
+        let forwarded = is_forwarded(m.except)
         obj += "(except.ok()) ? (except.result) : ("
+        if forwarded {
+            obj += "{"
+        }
         obj += gen_scope(m.except)
+        if forwarded {
+            obj += " "
+            obj += get_init_expr(m.func.result)
+            obj += CPP_ST_TERM + "}"
+        }
         obj += ");\n"
         done_indent()
     } else {
