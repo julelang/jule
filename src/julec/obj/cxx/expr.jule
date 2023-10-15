@@ -564,18 +564,24 @@ fn gen_fn_call_expr_model(mut m: &FnCallExprModel): str {
     obj += ";\n"
     obj += indent()
     if m.except != nil {
-        let forwarded = is_forwarded(m.except)
-        obj += "(except.ok()) ? (except.result) : ("
-        if forwarded {
-            obj += "{"
+        if m.func.result == nil {
+            obj += "if (!except.ok()) "
+            obj += gen_scope(m.except)
+            obj += "\n"
+        } else {
+            let forwarded = is_forwarded(m.except)
+            obj += "(except.ok()) ? (except.result) : ("
+            if forwarded {
+                obj += "{"
+            }
+            obj += gen_scope(m.except)
+            if forwarded {
+                obj += " "
+                obj += get_init_expr(m.func.result)
+                obj += CPP_ST_TERM + "}"
+            }
+            obj += ");\n"
         }
-        obj += gen_scope(m.except)
-        if forwarded {
-            obj += " "
-            obj += get_init_expr(m.func.result)
-            obj += CPP_ST_TERM + "}"
-        }
-        obj += ");\n"
         done_indent()
     } else {
         obj += `if (!except.ok()) jule::panic(jule::Str("`
