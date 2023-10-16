@@ -21,6 +21,7 @@ use std::jule::ast::{
     AssignLeft,
     MatchCase,
     CoExpr,
+    UseExpr,
 }
 use std::jule::build::{LogMsg}
 use std::jule::constant::{Const}
@@ -1697,6 +1698,23 @@ impl ScopeChecker {
         }
     }
 
+    fn check_use_expr(mut &self, ue: &UseExpr) {
+        if self.result == nil {
+            self.s.push_err(ue.token, LogMsg.UseExprOutOfScope)
+            ret
+        }
+
+        if self.is_deferred() {
+            self.s.push_err(ue.token, LogMsg.UseExprInDeferred)
+        }
+
+        if self.i+1 < self.tree.stmts.len {
+            self.s.push_err(ue.token, LogMsg.UseExprNotLast)
+        }
+
+        // Validated at end of scope's analysis.
+    }
+
     fn check_node(mut &self, mut &node: NodeData) {
         match type node {
         | &Comment:                     break // Ignore.
@@ -1715,40 +1733,48 @@ impl ScopeChecker {
         | &std::jule::ast::FallSt:      self.check_fall((&std::jule::ast::FallSt)(node))
         | &std::jule::ast::BreakSt:     self.check_break((&std::jule::ast::BreakSt)(node))
         | &std::jule::ast::RetSt:       self.check_ret((&std::jule::ast::RetSt)(node))
+        | &UseExpr:                     self.check_use_expr((&UseExpr)(node))
         |:                              outln("error <unimplemented scope node>")
         }
     }
 
-    fn check_result_stmt(mut &self, mut &expr: &Expr) {
-        let mut d = self.s.eval(self).eval_expr(expr)
-        if d == nil {
-            ret
-        }
-
-        self.scope.stmts = append(self.scope.stmts, d)
-
-        match type d.model {
-        | &BuiltinErrorCallExprModel:
-            let mut m = (&BuiltinErrorCallExprModel)(d.model)
-            self.process_error_call(m, expr.token)
-            ret
-        }
-
-        let mut rtc = &RetTypeChecker{
-            sc:          self,
-            error_token: expr.token,
-            types:       get_result_types(self.result),
-        }
-        _ = rtc.check(expr)
-    }
-
     fn check_result(mut &self) {
-        let mut stmt = self.tree.stmts[self.i]
+        let mut stmt = self.tree.stmts[self.tree.stmts.len-1]
         match type stmt {
+        | &UseExpr:
+            let mut ue = (&UseExpr)(stmt)
+            let mut d = self.s.eval(self).eval_expr(ue.expr)
+            if d == nil {
+                ret
+            }
+
+            self.scope.stmts = append(self.scope.stmts, d)
+
+            let mut rtc = &RetTypeChecker{
+                sc:          self,
+                error_token: ue.expr.token,
+                types:       get_result_types(self.result),
+            }
+            _ = rtc.check(ue.expr)
+
         | &Expr:
             let mut expr = (&Expr)(stmt)
-            self.check_result_stmt(expr)
-        
+            let mut d = self.s.eval(self).eval_expr(expr)
+            if d == nil {
+                ret
+            }
+
+            self.scope.stmts = append(self.scope.stmts, d)
+
+            match type d.model {
+            | &BuiltinErrorCallExprModel:
+                let mut m = (&BuiltinErrorCallExprModel)(d.model)
+                self.process_error_call(m, expr.token)
+
+            |:
+                ret
+            }
+
         | &std::jule::ast::GotoSt
         | &std::jule::ast::BreakSt
         | &std::jule::ast::ContSt
@@ -1765,18 +1791,13 @@ impl ScopeChecker {
     }
 
     fn check_tree(mut &self) {
-        let mut n = self.tree.stmts.len
-        if self.result != nil {
-            n--
-        }
-
         self.i = 0
-        for self.i < n; self.i++ {
+        for self.i < self.tree.stmts.len; self.i++ {
             let mut stmt = self.tree.stmts[self.i]
             self.check_node(stmt)
         }
 
-        if self.result != nil && self.i < self.tree.stmts.len {
+        if self.result != nil && self.tree.stmts.len != 0 {
             self.check_result()
         }
     }

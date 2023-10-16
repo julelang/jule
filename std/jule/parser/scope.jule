@@ -26,6 +26,7 @@ use std::jule::ast::{
     AssignLeft,
     AssignSt,
     CoExpr,
+    UseExpr,
 }
 use std::jule::build::{LogMsg}
 use std::jule::lex::{
@@ -1010,6 +1011,21 @@ impl ScopeParser {
         ret
     }
 
+    fn build_use_expr(mut self, mut &tokens: []Token): NodeData {
+        if tokens.len == 1 {
+            self.push_err(tokens[0], LogMsg.MissingExpr)
+            ret nil
+        }
+
+        let mut ue = &UseExpr{
+            token: tokens[0],
+        }
+
+        tokens = tokens[1:] // Ignore "use" keyword.
+        ue.expr = self.p.build_expr(tokens)
+        ret ue
+    }
+
     fn build_st(mut self, mut &st: &Stmt): NodeData {
         let mut token = st.tokens[0]
         if token.id == TokenId.Ident {
@@ -1025,6 +1041,9 @@ impl ScopeParser {
         }
 
         match token.id {
+        | TokenId.Use:
+            ret self.build_use_expr(st.tokens)
+
         | TokenId.Static
         | TokenId.Const
         | TokenId.Let
