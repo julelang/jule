@@ -33,7 +33,7 @@ namespace jule {
                 jule::panic("[]T: slice allocation length lower than zero");
 
             jule::Slice<Item> buffer;
-            buffer.alloc_new(len, len);
+            buffer.alloc_new(len, len, Item());
             return buffer;
         }
 
@@ -46,7 +46,7 @@ namespace jule {
                 jule::panic("[]T: slice allocation length greater than capacity");
 
             jule::Slice<Item> buffer;
-            buffer.alloc_new(len, cap);
+            buffer.alloc_new(len, cap, Item());
             return buffer;
         }
 
