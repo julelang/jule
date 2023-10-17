@@ -6,11 +6,8 @@
 #define __JULE_TERMINATE_HPP
 
 #include <cstdlib>
+#include <string>
 
-#include "trait.hpp"
-#include "types.hpp"
-#include "str.hpp"
-#include "error.hpp"
 #include "builtin.hpp"
 
 namespace jule {
