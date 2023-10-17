@@ -59,6 +59,9 @@ namespace jule {
         Trait<Mask>(const jule::Trait<Mask> &src)
         { this->__get_copy(src); }
 
+        Trait<Mask>(const jule::Trait<Mask> &&src)
+        { this->__get_copy(src); }
+
         void dealloc(void)
         { this->data.drop(); }
 

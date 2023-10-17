@@ -75,8 +75,8 @@ namespace jule {
         }
 
     public:
-        void *data = nullptr;
-        jule::Any::Type *type = nullptr;
+        mutable void *data = nullptr;
+        mutable jule::Any::Type *type = nullptr;
 
         Any(void) = default;
         Any(const std::nullptr_t): Any() {}
@@ -87,6 +87,14 @@ namespace jule {
 
         Any(const jule::Any &src)
         { this->__get_copy(src); }
+
+        Any(const jule::Any &&src) {
+            this->data = src.data;
+            this->type = src.type;
+
+            // Avoid deallocation.
+            src.data = nullptr;
+        }
 
         ~Any(void)
         { this->dealloc(); }

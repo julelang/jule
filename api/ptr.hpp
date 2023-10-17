@@ -96,6 +96,14 @@ namespace jule {
         Ptr<T>(const jule::Ptr<T> &src)
         { this->__get_copy(src); }
 
+        Ptr<T>(const jule::Ptr<T> &&src) {
+            this->alloc = src.alloc;
+            this->ref = src.ref;
+
+            // Avoid deallocation.
+            src.ref = nullptr;
+        }
+
         Ptr<T>(T *src)
         { this->alloc = src; }
 

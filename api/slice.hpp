@@ -76,7 +76,10 @@ namespace jule {
         Slice<Item>(void) = default;
         Slice<Item>(const std::nullptr_t): Slice<Item>() {}
 
-        Slice<Item>(const jule::Slice<Item>& src)
+        Slice<Item>(const jule::Slice<Item> &src)
+        { this->__get_copy(src); }
+
+        Slice<Item>(const jule::Slice<Item> &&src)
         { this->__get_copy(src); }
 
         Slice<Item>(const std::initializer_list<Item> &src) {
