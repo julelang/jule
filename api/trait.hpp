@@ -33,7 +33,7 @@ namespace jule {
         Trait<Mask>(const T &data) {
             T *alloc = new(std::nothrow) T;
             if (!alloc)
-                jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
+                jule::panic(__JULE_ERROR__MEMORY_ALLOCATION_FAILED "\nfile: api/trait.hpp");
 
             *alloc = data;
 #ifdef __JULE_DISABLE__REFERENCE_COUNTING
@@ -75,7 +75,7 @@ namespace jule {
 
         inline void must_ok(void) const {
             if (this->operator==(nullptr))
-                jule::panic(jule::ERROR_INVALID_MEMORY);
+                jule::panic(__JULE_ERROR__INVALID_MEMORY "\nfile: api/trait.hpp");
         }
 
         template<typename T>
@@ -107,7 +107,8 @@ namespace jule {
 #ifndef __JULE_DISABLE__SAFETY
             this->must_ok();
             if (std::strcmp(this->type_id, typeid(T).name()) != 0)
-                jule::panic(jule::ERROR_INCOMPATIBLE_TYPE);
+                jule::panic(__JULE_ERROR__INCOMPATIBLE_TYPE
+                    "\nruntime: trait casted to incompatible type");
 #endif
             return *reinterpret_cast<T*>(this->data.alloc);
         }
@@ -117,7 +118,8 @@ namespace jule {
 #ifndef __JULE_DISABLE__SAFETY
             this->must_ok();
             if (std::strcmp(this->type_id, typeid(jule::Ptr<T>).name()) != 0)
-                jule::panic(jule::ERROR_INCOMPATIBLE_TYPE);
+                jule::panic(__JULE_ERROR__INCOMPATIBLE_TYPE
+                    "\nruntime: trait casted to incompatible type");
 #endif
 
 #ifndef __JULE_DISABLE__REFERENCE_COUNTING

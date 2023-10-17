@@ -72,6 +72,7 @@ namespace jule {
             if (start < 0 || end < 0 || start > end || end > this->len()) {
                 std::string error;
                 __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(error, start, end);
+                error += "\nruntime: string slicing with out of range indexes";
                 jule::panic(error);
             }
 #endif
@@ -251,6 +252,7 @@ namespace jule {
             if (this->empty() || index < 0 || this->len() <= index) {
                 std::string error;
                 __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(error, index);
+                error += "\nruntime: string indexing with out of range index";
                 jule::panic(error);
             }
 #endif

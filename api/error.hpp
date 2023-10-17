@@ -5,28 +5,25 @@
 #ifndef __JULE_ERROR_HPP
 #define __JULE_ERROR_HPP
 
+#define __JULE_ERROR__INVALID_MEMORY "invalid memory address or nil pointer deference"
+#define __JULE_ERROR__INCOMPATIBLE_TYPE "incompatible type"
+#define __JULE_ERROR__MEMORY_ALLOCATION_FAILED "memory allocation failed"
+#define __JULE_ERROR__INDEX_OUT_OF_RANGE "index out of range"
+#define __JULE_ERROR__DIVIDE_BY_ZERO "divide by zero"
+
 #define __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(STR, START, LEN) \
-    STR += jule::ERROR_INDEX_OUT_OF_RANGE; \
-    STR += "["; \
+    STR += __JULE_ERROR__INDEX_OUT_OF_RANGE "["; \
     STR += std::to_string(START); \
     STR += ":"; \
     STR += std::to_string(LEN); \
     STR += "]";
 
 #define __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(STR, INDEX) \
-    STR += jule::ERROR_INDEX_OUT_OF_RANGE; \
-    STR += "["; \
+    STR += __JULE_ERROR__INDEX_OUT_OF_RANGE "["; \
     STR += std::to_string(INDEX); \
     STR += "]"
 
 namespace jule {
-
-    constexpr const char *ERROR_INVALID_MEMORY = "invalid memory address or nil pointer deference";
-    constexpr const char *ERROR_INCOMPATIBLE_TYPE = "incompatible type";
-    constexpr const char *ERROR_MEMORY_ALLOCATION_FAILED = "memory allocation failed";
-    constexpr const char *ERROR_INDEX_OUT_OF_RANGE = "index out of range";
-    constexpr const char *ERROR_DIVIDE_BY_ZERO = "divide by zero";
-
     constexpr signed int EXIT_PANIC = 2;
 } // namespace jule
 

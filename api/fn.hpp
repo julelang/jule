@@ -54,7 +54,7 @@ namespace jule {
         auto operator()(Arguments... arguments) {
 #ifndef __JULE_DISABLE__SAFETY
             if (this->buffer == nullptr)
-                jule::panic(jule::ERROR_INVALID_MEMORY);
+                jule::panic(__JULE_ERROR__INVALID_MEMORY "\nfile: api/fn.hpp");
 #endif
             return this->buffer(arguments...);
         }

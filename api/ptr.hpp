@@ -56,7 +56,8 @@ namespace jule {
 #ifndef __JULE_DISABLE__REFERENCE_COUNTING
             buffer.ref = new (std::nothrow) jule::Uint;
             if (!buffer.ref)
-                jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
+                jule::panic(__JULE_ERROR__MEMORY_ALLOCATION_FAILED
+                    "\nruntime: memory allocation failed for reference counter of reference type");
 
             *buffer.ref = jule::REFERENCE_DELTA;
 #endif
@@ -70,7 +71,8 @@ namespace jule {
 
             buffer.alloc = new (std::nothrow) T;
             if (!buffer.alloc)
-                jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
+                jule::panic(__JULE_ERROR__MEMORY_ALLOCATION_FAILED
+                    "\nruntime: memory allocation failed for heap of reference type");
 
             *buffer.alloc = instance;
             buffer.ref = ref;
@@ -83,7 +85,8 @@ namespace jule {
 #else
             jule::Uint *ref = new (std::nothrow) jule::Uint;
             if (!ref)
-                jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
+                jule::panic(__JULE_ERROR__MEMORY_ALLOCATION_FAILED
+                    "\nruntime: memory allocation failed for reference counter of reference type");
             *ref = jule::REFERENCE_DELTA;
 
             return jule::Ptr<T>::make(instance, ref);
@@ -182,7 +185,7 @@ namespace jule {
 
         inline void must_ok(void) const {
             if (this->operator==(nullptr))
-                jule::panic(jule::ERROR_INVALID_MEMORY);
+                jule::panic(__JULE_ERROR__INVALID_MEMORY "\nruntime: reference type is nil");
         }
 
         void operator=(const jule::Ptr<T> &src) {

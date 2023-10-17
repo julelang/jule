@@ -106,7 +106,8 @@ namespace jule {
 
             void *new_heap = src.type->alloc_new_copy(src.data);
             if (!new_heap)
-                jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
+                jule::panic(__JULE_ERROR__MEMORY_ALLOCATION_FAILED
+                    "\nruntime: memory allocation failed for heap data of type any");
 
             this->data = new_heap;
             this->type = src.type;
@@ -117,7 +118,8 @@ namespace jule {
         void __assign(const T &expr) {
             T *alloc = new (std::nothrow) T;
             if (!alloc)
-                jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
+                jule::panic(__JULE_ERROR__MEMORY_ALLOCATION_FAILED
+                    "\nruntime: memory allocation failed for heap data of type any");
 
             *alloc = expr;
             this->data = static_cast<void*>(alloc);
@@ -165,10 +167,12 @@ namespace jule {
         operator T(void) const {
 #ifndef __JULE_DISABLE__SAFETY
             if (this->operator==(nullptr))
-                jule::panic(jule::ERROR_INVALID_MEMORY);
+                jule::panic(__JULE_ERROR__INVALID_MEMORY
+                    "\nruntime: type any casted but data is nil");
 
         if (!this->type_is<T>())
-            jule::panic(jule::ERROR_INCOMPATIBLE_TYPE);
+            jule::panic(__JULE_ERROR__INCOMPATIBLE_TYPE
+                "\nruntime: type any casted to incompatible type");
 #endif
 
             return *static_cast<T*>(this->data);

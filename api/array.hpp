@@ -57,8 +57,8 @@ namespace jule {
 #ifndef __JULE_DISABLE__SAFETY
             if (start < 0 || end < 0 || start > end || end > N) {
                 std::string error;
-                __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(
-                    error, start, end );
+                __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(error, start, end);
+                error += "\nruntime: array slicing with out of range indexes";
                 jule::panic(error);
             }
 #endif
@@ -121,6 +121,7 @@ namespace jule {
             if (this->empty() || index < 0 || N <= index) {
                 std::string error;
                 __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(error, index);
+                error += "\nruntime: array indexing with out of range index";
                 jule::panic(error);
             }
 #endif

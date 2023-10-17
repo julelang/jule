@@ -30,7 +30,7 @@ namespace jule {
 
         static jule::Slice<Item> alloc(const jule::Uint &len) {
             if (len < 0)
-                jule::panic("[]T: slice allocation length lower than zero");
+                jule::panic("runtime: []T: slice allocation length lower than zero");
 
             jule::Slice<Item> buffer;
             buffer.alloc_new(len, len, Item());
@@ -39,11 +39,11 @@ namespace jule {
 
         static jule::Slice<Item> alloc(const jule::Uint &len, const jule::Uint &cap) {
             if (len < 0)
-                jule::panic("[]T: slice allocation length lower than zero");
+                jule::panic("runtime: []T: slice allocation length lower than zero");
             if (cap < 0)
-                jule::panic("[]T: slice allocation capacity lower than zero");
+                jule::panic("runtime: []T: slice allocation capacity lower than zero");
             if (len > cap)
-                jule::panic("[]T: slice allocation length greater than capacity");
+                jule::panic("runtime: []T: slice allocation length greater than capacity");
 
             jule::Slice<Item> buffer;
             buffer.alloc_new(len, cap, Item());
@@ -52,7 +52,7 @@ namespace jule {
 
         static jule::Slice<Item> alloc_def(const jule::Uint &len, const Item &def) {
             if (len < 0)
-                jule::panic("[]T: slice allocation length lower than zero");
+                jule::panic("runtime: []T: slice allocation length lower than zero");
 
             jule::Slice<Item> buffer;
             buffer.alloc_new(len, len, def);
@@ -62,11 +62,11 @@ namespace jule {
         static jule::Slice<Item> alloc(const jule::Uint &len,
             const jule::Uint &cap, const Item &def) {
             if (len < 0)
-                jule::panic("[]T: slice allocation length lower than zero");
+                jule::panic("runtime: []T: slice allocation length lower than zero");
             if (cap < 0)
-                jule::panic("[]T: slice allocation capacity lower than zero");
+                jule::panic("runtime: []T: slice allocation capacity lower than zero");
             if (len > cap)
-                jule::panic("[]T: slice allocation length greater than capacity");
+                jule::panic("runtime: []T: slice allocation length greater than capacity");
 
             jule::Slice<Item> buffer;
             buffer.alloc_new(len, cap, def);
@@ -109,7 +109,7 @@ namespace jule {
 
         inline void check(void) const {
             if(this->operator==(nullptr))
-                jule::panic(jule::ERROR_INVALID_MEMORY);
+                jule::panic(__JULE_ERROR__INVALID_MEMORY "\nruntime: slice is nil");
         }
 
         void dealloc(void) {
@@ -152,7 +152,8 @@ namespace jule {
 
             Item *alloc = new (std::nothrow) Item[cap];
             if (!alloc)
-                jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
+                jule::panic(__JULE_ERROR__MEMORY_ALLOCATION_FAILED
+                    "\nruntime: heap allocation failed of slice");
 
 #ifdef __JULE_DISABLE__REFERENCE_COUNTING
             this->data = jule::Ptr<Item>::make(alloc, nullptr);
@@ -198,6 +199,7 @@ namespace jule {
             if (start < 0 || end < 0 || start > end || end > this->_len) {
                 std::string error;
                 __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(error, start, end);
+                error += "\nruntime: slice slicing with out of range indexes";
                 jule::panic(error);
             }
 #endif
@@ -281,6 +283,7 @@ namespace jule {
             if (this->empty() || index < 0 || this->len() <= index) {
                 std::string error;
                 __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(error, index);
+                error += "\nruntime: slice indexing with out of range index";
                 jule::panic(error);
             }
 #endif

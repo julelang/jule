@@ -35,7 +35,7 @@ namespace jule {
     inline auto div(const T &x, const Denominator &denominator) {
 #ifndef __JULE_DISABLE__SAFETY
         if (denominator == 0)
-            jule::panic(jule::ERROR_DIVIDE_BY_ZERO);
+            jule::panic(__JULE_ERROR__DIVIDE_BY_ZERO "\nruntime: divide-by-zero occurred when division");
 #endif
         return x / denominator;
     }
@@ -44,7 +44,7 @@ namespace jule {
     inline auto mod(const T &x, const Denominator &denominator) {
 #ifndef __JULE_DISABLE__SAFETY
         if (denominator == 0)
-            jule::panic(jule::ERROR_DIVIDE_BY_ZERO);
+            jule::panic(__JULE_ERROR__DIVIDE_BY_ZERO "\nruntime: divide-by-zero occurred when modulo");
 #endif
         return x % denominator;
     }
@@ -60,7 +60,7 @@ namespace jule {
     template<typename T>
     jule::Ptr<T> new_struct(T *ptr) {
         if (!ptr)
-            jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
+            jule::panic(__JULE_ERROR__MEMORY_ALLOCATION_FAILED "\nruntime: allocation failed for structure");
 
 #ifndef __JULE_DISABLE__REFERENCE_COUNTING
         return jule::Ptr<T>::make(ptr);
@@ -72,12 +72,12 @@ namespace jule {
     template<typename T>
     jule::Ptr<T> new_struct_ptr(T *ptr) {
         if (!ptr)
-            jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
+            jule::panic(__JULE_ERROR__MEMORY_ALLOCATION_FAILED "\nruntime: allocation failed for structure");
 
 #ifndef __JULE_DISABLE__REFERENCE_COUNTING
         ptr->self.ref = new (std::nothrow) jule::Uint;
         if (!ptr->self.ref)
-            jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED );
+            jule::panic(__JULE_ERROR__MEMORY_ALLOCATION_FAILED "\nruntime: allocation failed for structure");
 
         // Initialize with zero because return reference is counts 1 reference.
         *ptr->self.ref = 0; // ( jule::REFERENCE_DELTA - jule::REFERENCE_DELTA );

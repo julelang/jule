@@ -16,7 +16,7 @@ public:
     __jule_mutex_handle(void) {
         std::mutex *mtx = new (std::nothrow) std::mutex();
         if (mtx == nullptr)
-            jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
+            jule::panic(__JULE_ERROR__MEMORY_ALLOCATION_FAILED "\nfrom: std::sync");
         this->_mutex = jule::Ptr<std::mutex>::make(mtx);
     }
 
