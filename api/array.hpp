@@ -17,10 +17,10 @@
 namespace jule {
 
     // Built-in array type.
-    template<typename Item, const jule::Uint N>
+    template<typename Item, const jule::Int N>
     struct Array;
 
-    template<typename Item, const jule::Uint N>
+    template<typename Item, const jule::Int N>
     struct Array {
     public:
         mutable Item buffer[N];

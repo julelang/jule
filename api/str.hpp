@@ -78,8 +78,7 @@ namespace jule {
 #endif
             if (start == end)
                 return jule::Str();
-            const jule::Int n = end-start;
-            return jule::Str(this->buffer.substr(start, n).c_str(), n);
+            return jule::Str(this->buffer.substr(start, end-start));
         }
 
         inline jule::Str slice(const jule::Int &start) const
