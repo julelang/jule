@@ -26,7 +26,7 @@ namespace jule {
         size_t operator()(const jule::Str &key) const {
             size_t hash = 0;
             for (jule::Int i = 0; i < key.len(); ++i)
-                hash += key[i] % 7;
+                hash += key.buffer[i] % 7;
             return hash;
         }
 
@@ -87,26 +87,26 @@ namespace jule {
         jule::Bool has(const Key &key) const
         { return this->buffer.find(key) != this->end(); }
 
-        inline jule::Int len(void) const
+        inline jule::Int len(void) const noexcept
         { return this->buffer.size(); }
 
         inline void del(const Key &key)
         { this->buffer.erase(key); }
 
-        inline jule::Bool operator==(const std::nullptr_t) const
+        inline jule::Bool operator==(const std::nullptr_t) const noexcept
         { return this->buffer.empty(); }
 
-        inline jule::Bool operator!=(const std::nullptr_t) const
+        inline jule::Bool operator!=(const std::nullptr_t) const noexcept
         { return !this->operator==(nullptr); }
 
-        Value &operator[](const Key &key)
+        Value &operator[](const Key &key) noexcept
         { return this->buffer[key]; }
 
-        Value &operator[](const Key &key) const
+        Value &operator[](const Key &key) const noexcept
         { return this->buffer[key]; }
 
         friend std::ostream &operator<<(std::ostream &stream,
-                                        const Map<Key, Value> &src) {
+                                        const Map<Key, Value> &src) noexcept {
             stream << '{';
             jule::Int length = src.len();
             for (const auto pair: src) {

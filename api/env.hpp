@@ -28,21 +28,21 @@ namespace jule {
     char **argv;
     char **envp;
 
-    inline void setup_argv(int argc, char **argv);
-    inline void setup_envp(char **envp);
-    jule::Slice<jule::Str> args(void);
-    jule::Slice<jule::Str> env(void);
-    jule::Str executable(void);
+    inline void setup_argv(int argc, char **argv) noexcept;
+    inline void setup_envp(char **envp) noexcept;
+    jule::Slice<jule::Str> args(void) noexcept;
+    jule::Slice<jule::Str> env(void) noexcept;
+    jule::Str executable(void) noexcept;
 
-    inline void setup_argv(int argc, char **argv) {
+    inline void setup_argv(int argc, char **argv) noexcept {
         jule::argc = argc;
         jule::argv = argv;
     }
 
-    inline void setup_envp(char **envp)
+    inline void setup_envp(char **envp) noexcept
     { jule::envp = envp; }
 
-    jule::Slice<jule::Str> args(void) {
+    jule::Slice<jule::Str> args(void) noexcept {
 #ifdef OS_WINDOWS
         const LPWSTR cmdl = GetCommandLineW();
         LPWSTR *argvw = CommandLineToArgvW(cmdl, &argc);
@@ -66,7 +66,7 @@ namespace jule {
         return args;
     }
 
-    jule::Slice<jule::Str> env(void) {
+    jule::Slice<jule::Str> env(void) noexcept {
         jule::Slice<jule::Str> env;
 #ifdef OS_WINDOWS
         wchar_t *env_s = GetEnvironmentStringsW();
@@ -86,7 +86,7 @@ namespace jule {
         return env;
     }
 
-    jule::Str executable(void) {
+    jule::Str executable(void) noexcept {
 #if defined(OS_DARWIN)
         char buff[PATH_MAX];
         uint32_t buff_size = PATH_MAX;

@@ -129,7 +129,7 @@ namespace jule {
         }
 
         friend std::ostream &operator<<(std::ostream &stream,
-                                        const jule::Array<Item, N> &src) {
+                                        const jule::Array<Item, N> &src) noexcept {
             stream << '[';
             for (jule::Int index = 0; index < N;) {
                 stream << src.buffer[index++];

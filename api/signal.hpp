@@ -14,10 +14,10 @@ namespace jule {
     typedef int Signal;
 
     // Sets all signals to handler.
-    void set_sig_handler(void(*handler)(jule::Signal sig));
+    void set_sig_handler(void(*handler)(jule::Signal sig)) noexcept;
 
     // JuleC signal handler.
-    void signal_handler(jule::Signal sig);
+    void signal_handler(jule::Signal sig) noexcept;
 
 #if defined(OS_WINDOWS)
 
@@ -110,7 +110,7 @@ namespace jule {
 
 #endif
 
-    void set_sig_handler(void(*handler)(jule::Signal sig)) {
+    void set_sig_handler(void(*handler)(jule::Signal sig)) noexcept {
 #if defined(OS_WINDOWS)
 
     std::signal(jule::SIG_HUP, handler);
@@ -203,7 +203,7 @@ namespace jule {
 #endif
     }
 
-    void signal_handler(jule::Signal sig) {
+    void signal_handler(jule::Signal sig) noexcept {
         jule::out("program terminated with signal: ");
         jule::outln(sig);
         std::exit(sig);

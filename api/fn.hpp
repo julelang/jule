@@ -24,7 +24,7 @@ namespace jule {
     template <typename > struct Fn;
 
     template<typename T, typename... U>
-    jule::Uintptr addr_of_fn(std::function<T(U...)> f);
+    jule::Uintptr addr_of_fn(std::function<T(U...)> f) noexcept;
 
     template <typename Function>
     struct Fn {
@@ -36,14 +36,14 @@ namespace jule {
         Fn<Function>(const Fn<Function> &fn) = default;
         Fn<Function>(std::nullptr_t): Fn<Function>() {}
 
-        Fn<Function>(const std::function<Function> &function) {
+        Fn<Function>(const std::function<Function> &function) noexcept {
             this->_addr = jule::addr_of_fn(function);
             if (this->_addr == 0)
                 this->_addr = (jule::Uintptr)(&function);
             this->buffer = function;
         }
 
-        Fn<Function>(const Function *function) {
+        Fn<Function>(const Function *function) noexcept {
             this->buffer = function;
             this->_addr = jule::addr_of_fn(this->buffer);
             if (this->_addr == 0)
@@ -59,10 +59,10 @@ namespace jule {
             return this->buffer(arguments...);
         }
 
-        jule::Uintptr addr(void) const
+        jule::Uintptr addr(void) const noexcept
         { return this->_addr; }
 
-        inline void operator=(std::nullptr_t)
+        inline void operator=(std::nullptr_t) noexcept
         { this->buffer = nullptr; }
 
         inline void operator=(const std::function<Function> &function)
@@ -71,26 +71,26 @@ namespace jule {
         inline void operator=(const Function &function)
         { this->buffer = function; }
 
-        inline jule::Bool operator==(const Fn<Function> &fn) const
+        inline jule::Bool operator==(const Fn<Function> &fn) const noexcept
         { return this->addr() == fn.addr(); }
 
-        inline jule::Bool operator!=(const Fn<Function> &fn) const
+        inline jule::Bool operator!=(const Fn<Function> &fn) const noexcept
         { return !this->operator==(fn); }
 
-        inline jule::Bool operator==(std::nullptr_t) const
+        inline jule::Bool operator==(std::nullptr_t) const noexcept
         { return this->buffer == nullptr; }
 
-        inline jule::Bool operator!=(std::nullptr_t) const
+        inline jule::Bool operator!=(std::nullptr_t) const noexcept
         { return !this->operator==(nullptr); }
 
         friend std::ostream &operator<<(std::ostream &stream,
-                                        const Fn<Function> &src) {
+                                        const Fn<Function> &src) noexcept {
             return (stream << (void*)src._addr);
         }
     };
 
     template<typename T, typename... U>
-    jule::Uintptr addr_of_fn(std::function<T(U...)> f) {
+    jule::Uintptr addr_of_fn(std::function<T(U...)> f) noexcept {
         typedef T(FnType)(U...);
         FnType **fn_ptr = f.template target<FnType*>();
         if (!fn_ptr)

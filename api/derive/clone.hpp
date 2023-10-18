@@ -16,14 +16,14 @@
 
 namespace jule {
 
-    char clone(const char &x);
-    signed char clone(const signed char &x);
-    unsigned char clone(const unsigned char &x);
-    char *clone(char *x);
-    const char *clone(const char *x);
-    jule::Int clone(const jule::Int &x);
-    jule::Uint clone(const jule::Uint &x);
-    jule::Bool clone(const jule::Bool &x);
+    char clone(const char &x) noexcept;
+    signed char clone(const signed char &x) noexcept;
+    unsigned char clone(const unsigned char &x) noexcept;
+    char *clone(char *x) noexcept;
+    const char *clone(const char *x) noexcept;
+    jule::Int clone(const jule::Int &x) noexcept;
+    jule::Uint clone(const jule::Uint &x) noexcept;
+    jule::Bool clone(const jule::Bool &x) noexcept;
     jule::Str clone(const jule::Str &x);
     template<typename Item> jule::Slice<Item> clone(const jule::Slice<Item> &s);
     template<typename Item, const jule::Uint N> jule::Array<Item, N> clone(const jule::Array<Item, N> &arr);
@@ -35,14 +35,14 @@ namespace jule {
     template<typename T> const T *clone(const T *ptr);
     template<typename T> T clone(const T &t);
 
-    char clone(const char &x) { return x; }
-    signed char clone(const signed char &x) { return x; }
-    unsigned char clone(const unsigned char &x) { return x; }
-    char *clone(char *x) { return x; }
-    const char *clone(const char *x) { return x; }
-    jule::Int clone(const jule::Int &x) { return x; }
-    jule::Uint clone(const jule::Uint &x) { return x; }
-    jule::Bool clone(const jule::Bool &x) { return x; }
+    char clone(const char &x) noexcept { return x; }
+    signed char clone(const signed char &x) noexcept { return x; }
+    unsigned char clone(const unsigned char &x) noexcept { return x; }
+    char *clone(char *x) noexcept { return x; }
+    const char *clone(const char *x) noexcept { return x; }
+    jule::Int clone(const jule::Int &x) noexcept { return x; }
+    jule::Uint clone(const jule::Uint &x) noexcept { return x; }
+    jule::Bool clone(const jule::Bool &x) noexcept { return x; }
     jule::Str clone(const jule::Str &x) { return x; }
 
     template<typename Item>

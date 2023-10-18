@@ -25,9 +25,9 @@ namespace jule {
     // Also it is builtin str type constructor.
     template<typename T>
     jule::Str to_str(const T &obj);
-    inline jule::Str to_str(const jule::Str &s);
-    inline jule::Str to_str(const char *s);
-    inline jule::Str to_str(char *s);
+    inline jule::Str to_str(const jule::Str &s) noexcept;
+    inline jule::Str to_str(const char *s) noexcept;
+    inline jule::Str to_str(char *s) noexcept;
 
     class Str {
     public:
@@ -54,16 +54,16 @@ namespace jule {
         typedef jule::U8       *Iterator;
         typedef const jule::U8 *ConstIterator;
 
-        inline Iterator begin(void)
+        inline Iterator begin(void) noexcept
         { return static_cast<Iterator>(&this->buffer[0]); }
 
-        inline ConstIterator begin(void) const
+        inline ConstIterator begin(void) const noexcept
         { return static_cast<ConstIterator>(&this->buffer[0]); }
 
-        inline Iterator end(void)
+        inline Iterator end(void) noexcept
         { return static_cast<Iterator>(&this->buffer[this->len()]); }
 
-        inline ConstIterator end(void) const
+        inline ConstIterator end(void) const noexcept
         { return static_cast<ConstIterator>(&this->buffer[this->len()]); }
 
         inline jule::Str slice(const jule::Int &start,
@@ -208,10 +208,10 @@ namespace jule {
             return jule::Str(s);
         }
 
-        inline operator char*(void) const
+        inline operator char*(void) const noexcept
         { return const_cast<char*>(reinterpret_cast<const char*>(this->buffer.c_str())); }
 
-        inline operator const char*(void) const
+        inline operator const char*(void) const noexcept
         { return reinterpret_cast<const char*>(this->buffer.c_str()); }
 
         inline operator const std::basic_string<jule::U8>(void) const
@@ -259,23 +259,20 @@ namespace jule {
             return this->__at(index);
         }
 
-        inline jule::U8 operator[](const jule::Int &index) const
-        { return (*this).buffer[index]; }
-
         inline void operator+=(const jule::Str &str)
         { this->buffer += str.buffer; }
 
         inline jule::Str operator+(const jule::Str &str) const
         { return jule::Str(this->buffer + str.buffer); }
 
-        inline jule::Bool operator==(const jule::Str &str) const
+        inline jule::Bool operator==(const jule::Str &str) const noexcept
         { return this->buffer == str.buffer; }
 
-        inline jule::Bool operator!=(const jule::Str &str) const
+        inline jule::Bool operator!=(const jule::Str &str) const noexcept
         { return !this->operator==(str); }
 
         friend std::ostream &operator<<(std::ostream &stream,
-                                        const jule::Str &src) {
+                                        const jule::Str &src) noexcept {
             for (const jule::U8 &b: src)
             { stream << static_cast<char>(b); }
             return stream;
@@ -289,13 +286,13 @@ namespace jule {
         return jule::Str(stream.str());
     }
 
-    inline jule::Str to_str(const jule::Str &s)
+    inline jule::Str to_str(const jule::Str &s) noexcept
     { return s; }
 
-    inline jule::Str to_str(const char *s)
+    inline jule::Str to_str(const char *s) noexcept
     { return jule::Str(s); }
 
-    inline jule::Str to_str(char *s)
+    inline jule::Str to_str(char *s) noexcept
     { return jule::Str(s); }
 
 } // namespace jule

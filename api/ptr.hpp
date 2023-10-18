@@ -40,7 +40,7 @@ namespace jule {
         // Creates new reference from allocation and reference counting
         // allocation. Reference does not counted if reference count
         // allocation is null.
-        static jule::Ptr<T> make(T *ptr, jule::Uint *ref) {
+        static jule::Ptr<T> make(T *ptr, jule::Uint *ref) noexcept {
             jule::Ptr<T> buffer;
             buffer.alloc = ptr;
             buffer.ref = ref;
@@ -96,7 +96,7 @@ namespace jule {
         Ptr<T>(void) = default;
         Ptr<T>(const std::nullptr_t&): Ptr<T>() {}
 
-        Ptr<T>(const jule::Ptr<T> &src)
+        Ptr<T>(const jule::Ptr<T> &src) noexcept
         { this->__get_copy(src); }
 
         Ptr<T>(const jule::Ptr<T> &&src) {
@@ -114,7 +114,7 @@ namespace jule {
         { this->drop(); }
 
         // Copy content from source.
-        void __get_copy(const jule::Ptr<T> &src) {
+        void __get_copy(const jule::Ptr<T> &src) noexcept {
             if (src.ref)
                 src.add_ref();
 
@@ -122,21 +122,21 @@ namespace jule {
             this->alloc = src.alloc;
         }
 
-        inline jule::Int drop_ref(void) const {
+        inline jule::Int drop_ref(void) const noexcept {
             return __jule_atomic_add_explicit(
                 this->ref,
                 -jule::REFERENCE_DELTA,
                 __JULE_ATOMIC_MEMORY_ORDER__RELAXED);
         }
 
-        inline jule::Int add_ref(void) const {
+        inline jule::Int add_ref(void) const noexcept {
             return __jule_atomic_add_explicit(
                 this->ref,
                 jule::REFERENCE_DELTA,
                 __JULE_ATOMIC_MEMORY_ORDER__RELAXED);
         }
 
-        inline jule::Uint get_ref_n(void) const {
+        inline jule::Uint get_ref_n(void) const noexcept {
             return __jule_atomic_load_explicit(
                 this->ref, __JULE_ATOMIC_MEMORY_ORDER__RELAXED);
         }
@@ -144,7 +144,7 @@ namespace jule {
         // Drops reference.
         // This function will destruct this instace for reference counting.
         // Frees memory if reference counting reaches to zero.
-        void drop(void) const {
+        void drop(void) const noexcept {
             if (!this->ref) {
                 this->alloc = nullptr;
                 return;
@@ -177,7 +177,7 @@ namespace jule {
             return *this->alloc;
         }
 
-        inline operator jule::Uintptr(void) const
+        inline operator jule::Uintptr(void) const noexcept
         { return (jule::Uintptr)(this->alloc); }
 
         inline operator T*(void) const
@@ -188,7 +188,7 @@ namespace jule {
                 jule::panic(__JULE_ERROR__INVALID_MEMORY "\nruntime: reference type is nil");
         }
 
-        void operator=(const jule::Ptr<T> &src) {
+        void operator=(const jule::Ptr<T> &src) noexcept {
             // Assignment to itself.
             if (this->alloc != nullptr && this->alloc == src.alloc)
                 return;
@@ -197,21 +197,21 @@ namespace jule {
             this->__get_copy(src);
         }
 
-        inline jule::Bool operator==(const std::nullptr_t&) const
+        inline jule::Bool operator==(const std::nullptr_t&) const noexcept
         { return this->alloc == nullptr; }
 
-        inline jule::Bool operator!=(const std::nullptr_t&) const
+        inline jule::Bool operator!=(const std::nullptr_t&) const noexcept
         { return !this->operator==(nullptr); }
 
-        inline jule::Bool operator==(const jule::Ptr<T> &ref) const
+        inline jule::Bool operator==(const jule::Ptr<T> &ref) const noexcept
         { return this->alloc == ref.alloc; }
 
-        inline jule::Bool operator!=(const jule::Ptr<T> &ref) const
+        inline jule::Bool operator!=(const jule::Ptr<T> &ref) const noexcept
         { return !this->operator==(ref); }
 
         friend inline
         std::ostream &operator<<(std::ostream &stream,
-                                 const jule::Ptr<T> &ref) {
+                                 const jule::Ptr<T> &ref) noexcept {
             if (ref == nullptr)
                 stream << "nil";
             else

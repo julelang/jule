@@ -30,7 +30,7 @@ namespace jule {
     constexpr signed int UTF16_SURR_SELF = 0x10000;
     constexpr signed int UTF16_MAX_RUNE = 1114111;
 
-    inline jule::I32 utf16_decode_rune(const jule::I32 r1, const jule::I32 r2);
+    inline jule::I32 utf16_decode_rune(const jule::I32 r1, const jule::I32 r2) noexcept;
     jule::Slice<jule::I32> utf16_decode(const jule::Slice<jule::I32> s);
     jule::Str utf16_to_utf8_str(const wchar_t *wstr, const std::size_t len);
     std::tuple<jule::I32, jule::I32> utf16_encode_rune(jule::I32 r);
@@ -38,7 +38,7 @@ namespace jule {
     jule::Slice<jule::U16> utf16_append_rune(jule::Slice<jule::U16> &a, const jule::I32 &r);
     jule::Slice<jule::U16> utf16_from_str(const jule::Str &s);
 
-    inline jule::I32 utf16_decode_rune(const jule::I32 r1, const jule::I32 r2) {
+    inline jule::I32 utf16_decode_rune(const jule::I32 r1, const jule::I32 r2) noexcept {
         if (jule::UTF16_SURR1 <= r1 &&
             r1 < jule::UTF16_SURR2 &&
             jule::UTF16_SURR2 <= r2 &&

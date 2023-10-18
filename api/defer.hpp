@@ -15,8 +15,6 @@
 
 namespace jule {
 
-    struct DeferBase;
-
     struct DeferBase {
     public:
         std::function<void(void)> scope;

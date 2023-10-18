@@ -22,10 +22,10 @@ namespace jule {
     typedef jule::I32 Rune; // builtin: type rune: i32
 
     template<typename T>
-    inline void out(const T &obj);
+    inline void out(const T &obj) noexcept;
 
     template<typename T>
-    inline void outln(const T &obj);
+    inline void outln(const T &obj) noexcept;
 
     // Returns itself of slice if slice has enough capacity for +n elements.
     // Returns new allocated slice if not.
@@ -34,14 +34,14 @@ namespace jule {
                                        const jule::Int &n);
 
     template<typename Item>
-    jule::Int copy(const jule::Slice<Item> &dest, const jule::Slice<Item> &src);
+    jule::Int copy(const jule::Slice<Item> &dest, const jule::Slice<Item> &src) noexcept;
 
     template<typename Item>
     jule::Slice<Item> append(jule::Slice<Item> src,
-                             const jule::Slice<Item> &components);
+                             const jule::Slice<Item> &components) noexcept;
 
     template<typename T>
-    inline void out(const T &obj) {
+    inline void out(const T &obj) noexcept {
 #ifdef OS_WINDOWS
         const jule::Str str = jule::to_str<T>(obj);
         const jule::Slice<jule::U16> utf16_str = jule::utf16_from_str(str);
@@ -53,7 +53,7 @@ namespace jule {
     }
 
     template<typename T>
-    inline void outln(const T &obj) {
+    inline void outln(const T &obj) noexcept {
         jule::out(obj);
         std::cout << std::endl;
     }
@@ -76,7 +76,7 @@ namespace jule {
 
     template<typename Item>
     jule::Int copy(const jule::Slice<Item> &dest,
-                   const jule::Slice<Item> &src) {
+                   const jule::Slice<Item> &src) noexcept {
         if (dest.empty() || src.empty())
             return 0;
 
@@ -91,7 +91,7 @@ namespace jule {
 
     template<typename Item>
     jule::Slice<Item> append(jule::Slice<Item> src,
-                             const jule::Slice<Item> &components) {
+                             const jule::Slice<Item> &components) noexcept {
         if (src == nullptr && components == nullptr)
             return nullptr;
 
