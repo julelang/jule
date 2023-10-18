@@ -31,7 +31,7 @@ You can also [join the Discord community](https://discord.gg/ReWQgPDnP6) to disc
 
 ## Our Mission
 
-Our motivation is to develop a reliable and safe programming language that focuses on systems programming. While doing this, we do not want to compromise too much on performance. We want to create a balanced language by keeping cost to minimum for safety. However, even though we create a new language, we do not want to ignore the popular C and C++ languages ​​that are frequently used in system programming. Therefore we aimed to provide good interoperability support for these languages.
+The mission is to develop a reliable and safe programming language that focuses on systems programming. While doing this, performance should not be compromised too much. Jule should be a balanced language that keeping the cost to a minimum for safety purposes. Even if it is a new language design, the popular C and C++ languages, which are frequently used in system programming, should not be ignored. Therefore, good interoperability support should be provided for these languages.
 
 To be safe, Jule should adopt approaches that serve the purpose in a balanced way, rather than having a design that contains a lot of complexity in the language. It should be a language that is significantly safe as well as being satisfactorily efficient and performant for developers.
 
@@ -55,7 +55,7 @@ The syntax and language design of the Jule programming language has emerged and 
 
 There is also the idea of ​​adding a package manager that ships with the official compiler at some stage. Jule's modern understanding of language and convenience suggest that there should be a package manager that comes with the compiler. This package manager will provide management of non-standard library packages developed and published by the community. Jule's standard library only gets updates with compiler releases.
 
-In addition to the currently supported C++ compilers, the official compiler may get support or improve support for more compilers and development environments in the future. We hope that Jule's platform support will further expand in areas such as backend compiler, CPU architecture, and operating system.
+In addition to the currently supported C++ compilers, the official compiler may get support or improve support for more compilers and development environments in the future. Expected that Jule's platform support will expand further in areas such as backend compiler, CPU architecture, and operating system.
 
 ## Community
 
