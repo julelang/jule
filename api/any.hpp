@@ -82,10 +82,10 @@ namespace jule {
         Any(const std::nullptr_t): Any() {}
 
         template<typename T>
-        Any(const T &expr)
+        Any(const T &expr) noexcept
         { this->__assign<T>(expr); }
 
-        Any(const jule::Any &src)
+        Any(const jule::Any &src) noexcept
         { this->__get_copy(src); }
 
         Any(const jule::Any &&src) noexcept {
@@ -100,7 +100,7 @@ namespace jule {
         { this->dealloc(); }
 
         // Copy content from source.
-        void __get_copy(const jule::Any &src) {
+        void __get_copy(const jule::Any &src) noexcept {
             if (src == nullptr)
                 return;
 
@@ -115,7 +115,7 @@ namespace jule {
 
         // Assign data.
         template<typename T>
-        void __assign(const T &expr) {
+        void __assign(const T &expr) noexcept {
             T *alloc = new (std::nothrow) T;
             if (!alloc)
                 jule::panic(__JULE_ERROR__MEMORY_ALLOCATION_FAILED
@@ -146,12 +146,12 @@ namespace jule {
         }
 
         template<typename T>
-        void operator=(const T &expr) {
+        void operator=(const T &expr) noexcept {
             this->dealloc();
             this->__assign<T>(expr);
         }
 
-        void operator=(const jule::Any &src) {
+        void operator=(const jule::Any &src) noexcept {
             // Assignment to itself.
             if (this->data != nullptr && this->data == src.data)
                 return;
@@ -164,7 +164,7 @@ namespace jule {
         { this->dealloc(); }
 
         template<typename T>
-        operator T(void) const {
+        operator T(void) const noexcept {
 #ifndef __JULE_DISABLE__SAFETY
             if (this->operator==(nullptr))
                 jule::panic(__JULE_ERROR__INVALID_MEMORY

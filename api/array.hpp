@@ -53,7 +53,7 @@ namespace jule {
         { return this->begin() + N; }
 
         inline jule::Slice<Item> slice(const jule::Int &start,
-                                       const jule::Int &end) const {
+                                       const jule::Int &end) const noexcept {
 #ifndef __JULE_DISABLE__SAFETY
             if (start < 0 || end < 0 || start > end || end > N) {
                 std::string error;
@@ -78,10 +78,10 @@ namespace jule {
             return slice;
         }
 
-        inline jule::Slice<Item> slice(const jule::Int &start) const
+        inline jule::Slice<Item> slice(const jule::Int &start) const noexcept
         { return this->slice(start, N); }
 
-        inline jule::Slice<Item> slice(void) const
+        inline jule::Slice<Item> slice(void) const noexcept
         { return this->slice(0, N); }
 
         inline constexpr

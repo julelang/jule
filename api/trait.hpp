@@ -30,7 +30,7 @@ namespace jule {
         Trait<Mask>(std::nullptr_t): Trait<Mask>() {}
 
         template<typename T>
-        Trait<Mask>(const T &data) {
+        Trait<Mask>(const T &data) noexcept {
             T *alloc = new(std::nothrow) T;
             if (!alloc)
                 jule::panic(__JULE_ERROR__MEMORY_ALLOCATION_FAILED "\nfile: api/trait.hpp");
@@ -45,7 +45,7 @@ namespace jule {
         }
 
         template<typename T>
-        Trait<Mask>(const jule::Ptr<T> &ref) {
+        Trait<Mask>(const jule::Ptr<T> &ref) noexcept {
 #ifdef __JULE_DISABLE__REFERENCE_COUNTING
             this->data = jule::Ptr<Mask>::make(reinterpret_cast<Mask*>(ref.alloc), nullptr);
 #else
@@ -73,7 +73,7 @@ namespace jule {
             this->type_id = src.type_id;
         }
 
-        inline void must_ok(void) const {
+        inline void must_ok(void) const noexcept {
             if (this->operator==(nullptr))
                 jule::panic(__JULE_ERROR__INVALID_MEMORY "\nfile: api/trait.hpp");
         }
@@ -86,14 +86,14 @@ namespace jule {
             return std::strcmp(this->type_id, typeid(T).name()) == 0;
         }
 
-        inline Mask &get(void) {
+        inline Mask &get(void) noexcept {
 #ifndef __JULE_DISABLE__SAFETY
             this->must_ok();
 #endif
             return *this->data;
         }
 
-        inline Mask &get(void) const {
+        inline Mask &get(void) const noexcept {
 #ifndef __JULE_DISABLE__SAFETY
             this->must_ok();
 #endif
@@ -103,7 +103,7 @@ namespace jule {
         ~Trait(void) {}
 
         template<typename T>
-        operator T(void) {
+        operator T(void) noexcept {
 #ifndef __JULE_DISABLE__SAFETY
             this->must_ok();
             if (std::strcmp(this->type_id, typeid(T).name()) != 0)
@@ -114,7 +114,7 @@ namespace jule {
         }
 
         template<typename T>
-        operator jule::Ptr<T>(void) {
+        operator jule::Ptr<T>(void) noexcept {
 #ifndef __JULE_DISABLE__SAFETY
             this->must_ok();
             if (std::strcmp(this->type_id, typeid(jule::Ptr<T>).name()) != 0)

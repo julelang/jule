@@ -32,7 +32,6 @@ CONFIGURATION DEFINES
 #include "signal.hpp"
 #include "slice.hpp"
 #include "str.hpp"
-#include "terminate.hpp"
 #include "trait.hpp"
 #include "types.hpp"
 #include "utf8.hpp"

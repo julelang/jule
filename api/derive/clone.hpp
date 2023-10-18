@@ -30,9 +30,9 @@ namespace jule {
     template<typename Key, typename Value> jule::Map<Key, Value> clone(const jule::Map<Key, Value> &m);
     template<typename T> jule::Ptr<T> clone(const jule::Ptr<T> &r);
     template<typename T> jule::Trait<T> clone(const jule::Trait<T> &t);
-    template<typename T> jule::Fn<T> clone(const jule::Fn<T> &fn);
-    template<typename T> T *clone(T *ptr);
-    template<typename T> const T *clone(const T *ptr);
+    template<typename T> jule::Fn<T> clone(const jule::Fn<T> &fn) noexcept;
+    template<typename T> T *clone(T *ptr) noexcept;
+    template<typename T> const T *clone(const T *ptr) noexcept;
     template<typename T> T clone(const T &t);
 
     char clone(const char &x) noexcept { return x; }
@@ -86,15 +86,15 @@ namespace jule {
     }
 
     template<typename T>
-    jule::Fn<T> clone(const jule::Fn<T> &fn)
+    jule::Fn<T> clone(const jule::Fn<T> &fn) noexcept
     { return fn; }
 
     template<typename T>
-    T *clone(T *ptr)
+    T *clone(T *ptr) noexcept
     { return ptr; }
 
     template<typename T>
-    const T *clone(const T *ptr)
+    const T *clone(const T *ptr) noexcept
     { return ptr; }
 
     template<typename T>

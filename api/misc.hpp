@@ -11,10 +11,10 @@
 
 namespace jule {
     template<typename T, typename Denominator>
-    inline auto div(const T &x, const Denominator &denominator);
+    inline auto div(const T &x, const Denominator &denominator) noexcept;
 
     template<typename T, typename Denominator>
-    inline auto mod(const T &x, const Denominator &denominator);
+    inline auto mod(const T &x, const Denominator &denominator) noexcept;
 
     template<typename T, typename Denominator>
     inline auto unsafe_div(const T &x, const Denominator &denominator) noexcept;
@@ -22,8 +22,8 @@ namespace jule {
     template<typename T, typename Denominator>
     inline auto unsafe_mod(const T &x, const Denominator &denominator) noexcept;
 
-    template<typename T> jule::Ptr<T> new_struct(T *ptr);
-    template<typename T> jule::Ptr<T> new_struct_ptr(T *ptr);
+    template<typename T> jule::Ptr<T> new_struct(T *ptr) noexcept;
+    template<typename T> jule::Ptr<T> new_struct_ptr(T *ptr) noexcept;
 
     // Dispose mask for implement dispose functionality.
     // It's also built-in Dispose trait.
@@ -32,7 +32,7 @@ namespace jule {
     };
 
     template<typename T, typename Denominator>
-    inline auto div(const T &x, const Denominator &denominator) {
+    inline auto div(const T &x, const Denominator &denominator) noexcept {
 #ifndef __JULE_DISABLE__SAFETY
         if (denominator == 0)
             jule::panic(__JULE_ERROR__DIVIDE_BY_ZERO "\nruntime: divide-by-zero occurred when division");
@@ -41,7 +41,7 @@ namespace jule {
     }
 
     template<typename T, typename Denominator>
-    inline auto mod(const T &x, const Denominator &denominator) {
+    inline auto mod(const T &x, const Denominator &denominator) noexcept {
 #ifndef __JULE_DISABLE__SAFETY
         if (denominator == 0)
             jule::panic(__JULE_ERROR__DIVIDE_BY_ZERO "\nruntime: divide-by-zero occurred when modulo");
@@ -58,7 +58,7 @@ namespace jule {
     { return x % denominator; }
 
     template<typename T>
-    jule::Ptr<T> new_struct(T *ptr) {
+    jule::Ptr<T> new_struct(T *ptr) noexcept {
         if (!ptr)
             jule::panic(__JULE_ERROR__MEMORY_ALLOCATION_FAILED "\nruntime: allocation failed for structure");
 
@@ -70,7 +70,7 @@ namespace jule {
     }
 
     template<typename T>
-    jule::Ptr<T> new_struct_ptr(T *ptr) {
+    jule::Ptr<T> new_struct_ptr(T *ptr) noexcept {
         if (!ptr)
             jule::panic(__JULE_ERROR__MEMORY_ALLOCATION_FAILED "\nruntime: allocation failed for structure");
 

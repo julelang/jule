@@ -26,11 +26,11 @@ namespace jule {
 
     // Equavelent of Jule's new(T) call.
     template<typename T>
-    inline jule::Ptr<T> new_ptr(void);
+    inline jule::Ptr<T> new_ptr(void) noexcept;
 
     // Equavelent of Jule's ptr(T, EXPR) call.
     template<typename T>
-    inline jule::Ptr<T> new_ptr(const T &init);
+    inline jule::Ptr<T> new_ptr(const T &init) noexcept;
 
     template<typename T>
     struct Ptr {
@@ -50,7 +50,7 @@ namespace jule {
         // Creates new reference from allocation.
         // Allocates new allocation for reference counting data and
         // starts counting to jule::REFERENCE_DELTA.
-        static jule::Ptr<T> make(T *ptr) {
+        static jule::Ptr<T> make(T *ptr) noexcept {
             jule::Ptr<T> buffer;
 
 #ifndef __JULE_DISABLE__REFERENCE_COUNTING
@@ -66,7 +66,7 @@ namespace jule {
             return buffer;
         }
 
-        static jule::Ptr<T> make(const T &instance, jule::Uint *ref) {
+        static jule::Ptr<T> make(const T &instance, jule::Uint *ref) noexcept {
             jule::Ptr<T> buffer;
 
             buffer.alloc = new (std::nothrow) T;
@@ -79,7 +79,7 @@ namespace jule {
             return buffer;
         }
 
-        static jule::Ptr<T> make(const T &instance) {
+        static jule::Ptr<T> make(const T &instance) noexcept {
 #ifdef __JULE_DISABLE__REFERENCE_COUNTING
             return jule::Ptr<T>::make(instance, nullptr);
 #else
@@ -99,7 +99,7 @@ namespace jule {
         Ptr<T>(const jule::Ptr<T> &src) noexcept
         { this->__get_copy(src); }
 
-        Ptr<T>(const jule::Ptr<T> &&src) {
+        Ptr<T>(const jule::Ptr<T> &&src) noexcept {
             this->alloc = src.alloc;
             this->ref = src.ref;
 
@@ -107,10 +107,10 @@ namespace jule {
             src.ref = nullptr;
         }
 
-        Ptr<T>(T *src)
+        Ptr<T>(T *src) noexcept
         { this->alloc = src; }
 
-        ~Ptr<T>(void)
+        ~Ptr<T>(void) noexcept
         { this->drop(); }
 
         // Copy content from source.
@@ -163,14 +163,14 @@ namespace jule {
             this->alloc = nullptr;
         }
 
-        inline T *operator->(void) const {
+        inline T *operator->(void) const noexcept {
 #ifndef __JULE_DISABLE__SAFETY
             this->must_ok();
 #endif
             return this->alloc;
         }
 
-        inline T &operator*(void) const {
+        inline T &operator*(void) const noexcept {
 #ifndef __JULE_DISABLE__SAFETY
             this->must_ok();
 #endif
@@ -180,10 +180,10 @@ namespace jule {
         inline operator jule::Uintptr(void) const noexcept
         { return (jule::Uintptr)(this->alloc); }
 
-        inline operator T*(void) const
+        inline operator T*(void) const noexcept
         { return this->alloc; }
 
-        inline void must_ok(void) const {
+        inline void must_ok(void) const noexcept {
             if (this->operator==(nullptr))
                 jule::panic(__JULE_ERROR__INVALID_MEMORY "\nruntime: reference type is nil");
         }
@@ -221,11 +221,11 @@ namespace jule {
     };
 
     template<typename T>
-    inline jule::Ptr<T> new_ptr(void)
+    inline jule::Ptr<T> new_ptr(void) noexcept
     { return jule::Ptr<T>::make(T()); }
 
     template<typename T>
-    inline jule::Ptr<T> new_ptr(const T &init) {
+    inline jule::Ptr<T> new_ptr(const T &init) noexcept {
 #ifdef __JULE_DISABLE__REFERENCE_COUNTING
         return jule::Ptr<T>::make(init, nullptr);
 #else

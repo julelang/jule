@@ -5,33 +5,14 @@
 #ifndef __JULE_PANIC_HPP
 #define __JULE_PANIC_HPP
 
-#include <sstream>
-#include <string>
+#include <iostream>
 
 namespace jule {
-    class Exception;
+    constexpr signed int EXIT_PANIC = 2;
 
-    inline void panic(const std::string &expr);
-
-    class Exception: public std::exception {
-    private:
-        std::string message;
-
-    public:
-        Exception(void) = default;
-        Exception(char *message): message(message) {}
-        Exception(const std::string &message): message(message) {}
-
-        char *what(void) noexcept
-        { return (char*)this->message.c_str(); }
-
-        const char *what(void) const noexcept
-        { return this->message.c_str(); }
-    };
-
-    inline void panic(const std::string &expr) {
-        jule::Exception exception(expr);
-        throw exception;
+    inline void panic(const std::string &expr) noexcept {
+        std::cout << "panic: " << expr << std::endl;
+        std::exit(jule::EXIT_PANIC);
     }
 
 } // namespace jule

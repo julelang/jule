@@ -67,7 +67,7 @@ namespace jule {
         { return static_cast<ConstIterator>(&this->buffer[this->len()]); }
 
         inline jule::Str slice(const jule::Int &start,
-                               const jule::Int &end) const {
+                               const jule::Int &end) const noexcept {
 #ifndef __JULE_DISABLE__SAFETY
             if (start < 0 || end < 0 || start > end || end > this->len()) {
                 std::string error;
@@ -81,10 +81,10 @@ namespace jule {
             return jule::Str(this->buffer.substr(start, end-start));
         }
 
-        inline jule::Str slice(const jule::Int &start) const
+        inline jule::Str slice(const jule::Int &start) const noexcept
         { return this->slice(start, this->len()); }
 
-        inline jule::Str slice(void) const
+        inline jule::Str slice(void) const noexcept
         { return this->slice(0, this->len()); }
 
         inline jule::Int len(void) const noexcept
@@ -246,7 +246,7 @@ namespace jule {
         inline jule::U8 &__at(const jule::Int &index) noexcept
         { return this->buffer[index]; }
 
-        jule::U8 &operator[](const jule::Int &index) {
+        jule::U8 &operator[](const jule::Int &index) noexcept {
 #ifndef __JULE_DISABLE__SAFETY
             if (this->empty() || index < 0 || this->len() <= index) {
                 std::string error;

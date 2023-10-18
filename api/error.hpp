@@ -23,8 +23,4 @@
     STR += std::to_string(INDEX); \
     STR += "]"
 
-namespace jule {
-    constexpr signed int EXIT_PANIC = 2;
-} // namespace jule
-
 #endif // ifndef __JULE_ERROR_HPP

@@ -67,7 +67,7 @@ namespace jule {
         inline void clear(void) noexcept
         { this->buffer.clear(); }
 
-        jule::Slice<Key> keys(void) const {
+        jule::Slice<Key> keys(void) const noexcept {
             jule::Slice<Key> keys = jule::Slice<Key>::alloc(this->len());
             jule::Uint index = 0;
             for (const auto &pair: *this)
@@ -75,7 +75,7 @@ namespace jule {
             return keys;
         }
 
-        jule::Slice<Value> values(void) const {
+        jule::Slice<Value> values(void) const noexcept {
             jule::Slice<Value> keys = jule::Slice<Value>::alloc(this->len());
             jule::Uint index = 0;
             for (const auto &pair: *this)

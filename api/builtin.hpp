@@ -31,7 +31,7 @@ namespace jule {
     // Returns new allocated slice if not.
     template<typename Item>
     jule::Slice<Item> alloc_for_append(const jule::Slice<Item> &dest,
-                                       const jule::Int &n);
+                                       const jule::Int &n) noexcept;
 
     template<typename Item>
     jule::Int copy(const jule::Slice<Item> &dest, const jule::Slice<Item> &src) noexcept;
@@ -60,7 +60,7 @@ namespace jule {
 
     template<typename Item>
     jule::Slice<Item> alloc_for_append(const jule::Slice<Item> &dest,
-                                       const jule::Int &n) {
+                                       const jule::Int &n) noexcept {
         if (dest._len+n > dest._cap) {
             const jule::Int alloc_size = (dest._len+n)*2;
             jule::Slice<Item> buffer = jule::Slice<Item>::alloc(0, alloc_size);
