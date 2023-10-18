@@ -1,11 +1,10 @@
 <div align="center">
 <p>
-    <img width="150" src="https://raw.githubusercontent.com/julelang/resources/master/jule_icon.svg?sanitize=true">
+    <img width="100" src="https://raw.githubusercontent.com/julelang/resources/master/jule_icon.svg?sanitize=true">
 </p>
 <h1>The Jule Programming Language</h1>
 
-This repository is the main source tree of the Jule. \
-It contains the reference compiler, API, and standard library.
+An effective programming language to build efficient, fast, reliable and safe software.
 
 [Website](https://jule.dev) |
 [Manual](https://manual.jule.dev) |
@@ -20,237 +19,83 @@ It contains the reference compiler, API, and standard library.
 
 </div>
 
-<h2 id="motivation">Motivation</h2>
+## Introduction
 
-Our motivation is to develop a safe and fast programming language that focuses on systems programming.
-However, instead of ignoring C and C++ programming languages, which are widely used in systems programming, it is aimed to provide good interoperability support for these languages.
-Jule cares about security and tries to maintain a balance of performance.
-It guarantees memory safety and is committed to not containing undefined behavior (except Unsafe Jule), it has a reference compiler with obsessions that encourage developers to build safe software.
-It offers fully integrated Jule-C++ development with API and interoperability.
+This repository is the main source tree of the Jule. \
+It contains the reference compiler, API, and standard library.
 
-Showcase: `quicksort.jule`
-```rs
-fn quicksort(mut s: []int) {
-    if s.len <= 1 {
-        ret
-    }
+Jule does not have a stable version yet and is still being developed to become more stable.
+Some commits may not be fully honored due to some compiler/API errors.
+Please report it with the [Jule Issue Tracker](https://github.com/julelang/jule/issues) if you come across something like this.
+You can also [join the Discord community](https://discord.gg/ReWQgPDnP6) to discuss, helping, and ask more questions about Jule with the community.
 
-    let (mut i, last) = -1, s[s.len-1]
-    for j in s {
-        if s[j] <= last {
-            i++
-            s[j], s[i] = s[i], s[j]
-        }
-    }
+## Our Mission
 
-    quicksort(s[:i])
-    quicksort(s[i+1:])
-}
+Our motivation is to develop a reliable and safe programming language that focuses on systems programming. While doing this, we do not want to compromise too much on performance. We want to create a balanced language by keeping cost to minimum for safety. However, even though we create a new language, we do not want to ignore the popular C and C++ languages ​​that are frequently used in system programming. Therefore we aimed to provide good interoperability support for these languages.
 
-fn main() {
-    let mut my_slice = [5, 9, 0, 4, 8, 6, 7, 2, 1, 3]
-    outln(my_slice)
-    quicksort(my_slice)
-    outln(my_slice)
-}
-```
+To be safe, Jule should adopt approaches that serve the purpose in a balanced way, rather than having a design that contains a lot of complexity in the language. It should be a language that is significantly safe as well as being satisfactorily efficient and performant for developers.
 
-> **Note** \
-> [JuleC](#what-is-julec) is still under development for a stable release.\
-> Therefore, design changes and the like may occur in the language.
->
-> Some commits may not be fully honored due to some compiler/API errors.\
-> Please report it with the [Jule Issue Tracker](https://github.com/julelang/jule/issues) if you come across something like this.
+- **Simplicity and Maintainability**: Jule's design should to be such that it avoids imposing constraints that increase time costs of developers, or having to think about the rules they must frequently follow when designing their algorithms. As much as possible, Jule's safety design and experience should be such that it prevents developers from thinking the way Jule wants them to and not the way they do. Design choices for safety or performance must be made without adding significant complexity to the Jule at the same time.
 
-<h2 id="key-features">Design Principles</h2>
+- **Safety**: Jule code must be safe at both compile time and runtime. This requires measures such as bounds checking and nil dereferencing checking at compile time and runtime. Jule also should adopt immutability and disallow shadowing by default as safety measures. Anything that might be unsafe should be blocked or checked. If unsafe behavior is desired, this should be clearly stated and awareness should be made.
 
-Jule is developed within the framework of specific design principles.
-These principles often follow the motivation for the emergence of Jule.
-Our aim is to present a design and implementation that meets these principles in the most balanced way.
+- **Efficiency and Performance**: To be efficient, Jule should try to behave in a way that uses the least memory consumption. In addition, it should be high-performance and be able to create fast software. Instead of relying entirely on the backend compiler that will be used when the IR is created, it should have an optimizing reference compiler to generate the best IR.
 
-### Our Design Principles
+- **High C/C++ Interoperability**: C and C++ are languages ​​that are popular in system programming, widely used and have a wide ecosystem. Therefore, Jule should embrace and collaborate with the existing ecosystem rather than completely ignoring it. Jule developers should also be able to use and interoperate with C/C++ within Jule if they wish. Therefore, Jule is compiled by creating C++ IR. It supports different compilers such as Clang, GNU GCC. It has an API developed in C++ to make things easier for Jule developers and make things more standardized.
 
-- Simplicity and maintainability
-- Fast and scalable development
-- Performance-critical software
-- Memory safety
-- Immutability by default
-- Efficiency and performance
-- High C++ interoperability
+- **Compile Time**: Jule should have a good compile time that serves the mission. For this, it must have capabilities such as having compile-time constants, avoiding repetitive checks by checking generics once for each instance, and performing safety-related checks whenever possible. The compiler should support developers with safety checks at compile-time and give some optimization options such as constant evaluations.
 
-<h2 id="what-is-julec">What is JuleC?</h2>
-JuleC is the name of the reference compiler for the Jule programming language.
-It is the original compiler of the Jule programming language and written in Jule.
-The features that JuleC represents are the official and must-have features of the Jule programming language.
-This is a standard for the Jule programming language and represents the minimum competency that unofficial/3rd party Jule compilers should have.
+- **Brand-New**: Jule should be like a truly brand-new language. For example, it should have UTF-8 strings, support Unicode and type inference, and a cross-platform portable standard library. Unless the developer really wants to do platform specific programming, shouldn't worry about the portability of the standard library, should have Unicode support and a common standard like UTF-8 should be easy to handle.
 
-<h2 id="memory-safety">Memory Safety and Management</h2>
-Memory safety and memory management are major challenges in C, C++, and similar programming languages.
-Jule has a reference-based memory management design to solve these issues.
-Jule guarantees memory safety and uses reference counting for memory management.
-An allocation is automatically released as soon as the reference count reaches zero.
-Please read the <a href="https://manual.jule.dev/memory/memory-management">memory management</a> part of the manual for more information about the reference-counting approach of Jule.
-<br><br>
-Variables are immutable by default, and each variable is encouraged to be initialized at declaration.
-Safe Jule performs bounds checking and nil (aka null) checking.
-It is committed to having no undefined behavior.
-Unsafe behaviors are encouraged to be done deliberately with unsafe scopes.
-Please read the <a href="https://manual.jule.dev/unsafe-jule">Unsafe Jule</a> part of the manual for more information about Unsafe Jule.
-<br><br>
 
-> **Note** \
-> Jule also provides different memory management approaches.\
-> For example, the `std::jule::integrated` standard library provides C-like and CPP-like memory management.
+## Future of Jule
+Jule is in beta versions, changing and evolving rapidly. Our main priority right now is for Jule to become more stable and have a robust standard library. To make it easier for the community and official developers to develop any tools for Jule, a significant portion of Jule's official compiler is included in the standard library. The standard library has important stages such as lexer, parser and semantic analyzer and is suitable for use in tool development.
 
-<h2 id="cpp-interoperability">C++ Interoperability</h2>
-Jule is designed to be interoperable with C++.
-A C++ header file dependency can be added to the Jule code and its functions can be linked.
-It's pretty easy to write C++ code that is compatible with the Jule code and compiled by the compiler.
-JuleC keeps all the C++ code it uses for Jule in its <a href="https://github.com/julelang/jule/tree/master/api">api</a> directory.
-This API makes it possible and easy to write C++ code that can be fully integrated into Jule.
-<ol></ol> <!-- for space -->
+The syntax and language design of the Jule programming language has emerged and is not expected to undergo major changes. Many parts of reference compiler, are included in the standard library such as a lexer, parser, and semantic analyzer. This will also allow developers to quickly develop tools for the language by leveraging Jule's standard library.
 
-File: ``sum.hpp``
-```cpp
-using namespace jule;
+There is also the idea of ​​adding a package manager that ships with the official compiler at some stage. Jule's modern understanding of language and convenience suggest that there should be a package manager that comes with the compiler. This package manager will provide management of non-standard library packages developed and published by the community. Jule's standard library only gets updates with compiler releases.
 
-Int sum(const Slice<Int> s) {
-    Int t{ 0 };
-    for (const Int x: s)
-        t += x;
-    return t;
-}
-```
+In addition to the currently supported C++ compilers, the official compiler may get support or improve support for more compilers and development environments in the future. We hope that Jule's platform support will further expand in areas such as backend compiler, CPU architecture, and operating system.
 
-File: ``main.jule``
-```rs
-cpp use "sum.hpp"
+## Community
 
-cpp fn sum([]int): int
-
-fn main() {
-    let numbers = [1, 2, 3, 4, 5, 6, 7, 8]
-    let total = cpp.sum(numbers)
-    outln(total)
-}
-```
-
-The above example demonstrates the interoperability of Jule with a C++ function that returns the total of all values of an integer slice.
-The C++ header file is written entirely using the Jule API.
-The `Int`, and `Slice` types are part of the API.
-The `Int` data type is equally sensitive to the system architecture as in Jule.
-The Jule source code declares to use `sum.hpp` first and binds the C++ function into Jule accordingly.
-Then, a call is made from Jule and the result of the function is written to the command line.
-
-<h2 id="future-changes">Future Changes</h2>
-JuleC is in early development and currently does not have a stable version yet.
-However, despite being in the early development stage, many algorithms (<a href="https://github.com/julelang/jule/tree/master/std">see the standard library</a>) can be successfully implemented.
-However, Jule's compiler is bootstrapped.
-The reference compiler, JuleC, is developed with Pure Jule.
-JuleC has or is very close to having many of the things Jule was intended to incorporate, such as memory safety, no undefined behavior, and structures with methods and generics.
-<br><br>
-The syntax and language design of the Jule programming language has emerged and is not expected to undergo major changes.
-Many parts of JuleC, are included in the standard library such as a lexer, parser, and semantic analyzer.
-This will also allow developers to quickly develop tools for the language by leveraging Jule's standard library.
-<br><br>
-There is an idea to include a package manager in JuleC as well, although it doesn't have one yet.
-Jule's modern understanding of language and convenience suggest that there should be a package manager that comes with the compiler.
-This package manager will provide management of non-standard library packages developed and published by the community.
-Jule's standard library only gets updates with compiler releases.
-<br><br>
-The language and standard library will continue to evolve and change in the future but JuleC will guarantee stability starting with its first stable release.
-Some packages of the standard library
-(<a href="https://github.com/julelang/jule/tree/master/std/math">std::math</a>,
-<a href="https://github.com/julelang/jule/tree/master/std/conv">std::conv</a>,
-<a href="https://github.com/julelang/jule/tree/master/std/unicode/utf8">std::unicode::utf8</a>
-or etc.) are almost complete and are not expected to undergo major changes.
-
-<h2 id="os-support">Compiler and C++ Standard Support</h2>
-JuleC officially supports some C++ compilers.
-When you try to compile with these compilers, it promises that code can be compiled in the officially supported C++ standard.
-JuleC is committed to creating code according to the most ideal C++ standard it has adopted, and that the generated code can be compiled by C++ compilers that fully support this standard.
-Likewise, this commitment is also true for the <a href="./api">API</a> of JuleC.
-Jule's ideal C++ standard is determined by the most ideal C++ standard, fully supported by officially supported C++ compilers.
-<br><br>
-If you are getting a compiler error even though you are using the officially supported compiler and standard, please let us know with the <a href="https://github.com/julelang/jule/issues">Jule Issue Tracker</a>.
-If you are trying to use a standard or a compiler that is not officially supported, you can still contact us to find out about the problem.
-But keep in mind that since it's out of official support, it's likely that the maintainers won't make the effort to fix it.
-<br><br>
-
-See [C++ backend compilers](https://manual.jule.dev/compiler/backend/cpp-backend-compilers/) part of the manual for supported compilers and C++ standards.
-
-<h2 id="os-support">Platform Support</h2>
-Jule supports multiple platforms.
-It supports development on intel 386, amd64, and arm64 architectures on Windows, Linux, and macOS (Darwin) platforms. 
-JuleC undertakes the effort, that the code and standard library it produces will be compatible with all these platforms.
-All supported platforms by JuleC are documented in the <a href="https://manual.jule.dev/compiler/platform-support">platform support</a> part of the manual. 
-
-<h2 id="building-project">Building the Project</h2>
-
-> **Note** \
-> Please refer to the [install from source](https://manual.jule.dev/getting-started/install-from-source) section in the manual to compile the project from source.
- 
-When you enter the directory where the source code is located, you can find some compilation scripts for compiling JuleC. \
-These scripts are written to be run from the [src](./src/julec) directory:
-
-- `build`: scripts used for compile.
-- `brun`: scripts used for compile and execute if compiling is successful.
-
-JuleC aims to have a single main build file. \
-JuleC is in development with the [Jule](https://github.com/julelang/jule) programming language.
-
-### Building with JuleC
-
-In `src/julec` directory:
-
-> **Note** \
-> This example command assumes that JuleC is already available in your path.
-
-```bash
-julec -o ../../bin/julec .
-```
-
-Run the above command in your terminal, in the `src/julec` directory of the Jule project.
-
-<h3 id="building-project-ir-options">IR Options</h2>
-
-Released JuleC versions may not be able to compile existing JuleC code after major changes.
-If your current JuleC build isn't up-to-date enough to compile from source code, you can use JuleC's C++ IR to get a fairly up-to-date build.
-IR codes can also be used for different purposes.
-For more detailed information about JuleC IR, please see the relevant repository.
-
-Here is the [IRs](https://github.com/julelang/julec-ir) of JuleC.
-
-<h2 id="documentations">Documentations</h2>
-
-All documentation about Jule and JuleC is on the website as a manual. <br>
-See [Jule Manual](https://manual.jule.dev).
-
-To contribute to the website, manual, or anything else, please use the <a href="https://github.com/julelang/website">website repository</a>.
-
-<h2 id="community">Community</h2>
+Contribute and get involved in our community.
 
 Join Julenours to support Jule, explore and interact with the community.\
 Our main community platforms:
 
-- [Official Discord server of the Jule Community](https://discord.gg/CZhK7dyh9X)
+- [Official Discord Server of The Jule Community](https://discord.gg/CZhK7dyh9X)
 - [GitHub Discussions](https://github.com/jule-lang/jule/discussions)
 
-<h2 id="contributing">Contributing</h2>
+## Compile from Source
 
-Thanks in advance for your contribution to Jule! \
-Every contribution, big or small, to Jule, is greatly appreciated.
+If you want to get Jule from the source, there are many ways to do so.
+Jule has a bootstrapped compiler, so you'll need to get one first if you don't have one.
+There are two options to do this: obtain the release or use IR.
+However, it is recommended to use IR as it is always more up to date and ensures there is enough left to compile the [master](https://github.com/julelang/jule/tree/master) branch.
+Officially, the recommended method to always get the most up-to-date build of compiler from the latest source code is to use IR.
 
-The Jule project uses issues only for bug reports and proposals. \
-To contribute, please read the [contribution guidelines](https://jule.dev/contribute). \
-For discussions and asking questions, please use [discussions](https://github.com/julelang/jule/discussions). \
-Regarding security, please refer to the [security policy](https://github.com/julelang/jule/security/policy).
+If you already have a compiler, you can use build scripts designed for developers by obtaining the latest source code.
+But remember, these are for developers and they compile the compiler for debugging new source code, not for production use. So you can get an inefficient and slow version.
 
-<h2 id="code-of-conduct">Code of Conduct</h2>
+- Learn about: [compile from IR](https://manual.jule.dev/getting-started/install-from-source/compile-from-ir.html)
+- Learn about: [build Scripts](https://manual.jule.dev/getting-started/install-from-source/build-scripts.html)
 
-[See Julenour Code of Conduct](https://jule.dev/code-of-conduct)
+## Contributing
 
-<h2 id="license">License</h2>
+Any contribution to Jule is greatly appreciated, whether it's a typo fix, a brand new compiler feature, or a bug report.
 
-The JuleC and standard library are distributed under the terms of the BSD 3-Clause license. <br>
+The Jule project only uses issues for things like proposals, bug reports, and vulnerabilities.
+If you want to discuss anything, [discussions](https://github.com/julelang/jule/discussions) is a better place for that.
+If you are interested in reporting a security vulnerability, please read the out [security policy](https://github.com/julelang/jule/security/policy) first.
+
+- Please read [Julenour Code of Conduct](https://jule.dev/code-of-conduct) before contributing anything
+- To contribute, please read the [contribution guidelines](https://jule.dev/contribute)
+- For discussions and asking questions, please use [discussions](https://github.com/julelang/jule/discussions)
+- Regarding security, please refer to the [security policy](https://github.com/julelang/jule/security/policy)
+
+## License
+
+The reference compiler, API, and standard library are distributed under the terms of the BSD 3-Clause license. <br>
 [See License Details](./LICENSE)
+
