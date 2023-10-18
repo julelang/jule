@@ -51,7 +51,7 @@ To be safe, Jule should adopt approaches that serve the purpose in a balanced wa
 ## Future of Jule
 Jule is in beta versions, changing and evolving rapidly. Our main priority right now is for Jule to become more stable and have a robust standard library. To make it easier for the community and official developers to develop any tools for Jule, a significant portion of Jule's official compiler is included in the standard library. The standard library has important stages such as lexer, parser and semantic analyzer and is suitable for use in tool development.
 
-The syntax and language design of the Jule programming language has emerged and is not expected to undergo major changes. Many parts of reference compiler, are included in the standard library such as a lexer, parser, and semantic analyzer. This will also allow developers to quickly develop tools for the language by leveraging Jule's standard library.
+The syntax and language design of the Jule programming language has emerged and is not expected to undergo major changes. Expecting Jule developers not to make massive updates to their old code between releases. However, no commitment for that.
 
 There is also the idea of ​​adding a package manager that ships with the official compiler at some stage. Jule's modern understanding of language and convenience suggest that there should be a package manager that comes with the compiler. This package manager will provide management of non-standard library packages developed and published by the community. Jule's standard library only gets updates with compiler releases.
 
