@@ -366,11 +366,14 @@ fn get_case_match_expr(mut &m: &Match): str {
 }
 
 fn gen_case(mut m: &Match, mut c: &Case): str {
-    let end = case_end_label_ident(uintptr(c))
     let mut obj = ""
 
-    if c.exprs.len > 0 && !m.is_generic_type_match() {
-        obj += "if (!("
+    if c.exprs.len != 0 && !m.is_generic_type_match() {
+        if m.cases.len > 0 && m.cases[0] == c {
+            obj += "if ("
+        } else {
+            obj += "else if ("
+        }
         for (i, mut expr) in c.exprs {
             match {
             | !m.type_match:
@@ -380,13 +383,9 @@ fn gen_case(mut m: &Match, mut c: &Case): str {
                         obj += case_expr
                         obj += " == "
                     }
-                    obj += "("
                     obj += gen_expr(expr.model)
-                    obj += ")"
                 } else {
-                    obj += "("
                     obj += gen_expr(expr.model)
-                    obj += ")"
                     if case_expr.len != 0 {
                         obj += " == "
                         obj += case_expr
@@ -404,27 +403,32 @@ fn gen_case(mut m: &Match, mut c: &Case): str {
                 obj += " || "
             }
         }
-        obj += ")) { goto "
-        obj += end
-        obj += "; }\n"
+        obj += ") "
+    } else if m.default == c && m.cases.len != 0 {
+        obj += indent()
+        obj += "else "
+    } else {
+        obj += indent()
     }
 
+    add_indent()
+
+    obj += "{\n"
+    obj += indent()
+    obj += case_begin_label_ident(uintptr(c))
+    obj += ":;\n"
     if c.scope.stmts.len > 0 {
-        obj += indent()
-        obj += case_begin_label_ident(uintptr(c))
-        obj += ":;\n"
         obj += indent()
         obj += gen_scope(c.scope)
         obj += "\n"
     }
 
+    done_indent()
+
     obj += indent()
-    obj += "goto "
-    obj += match_end_label_ident(uintptr(m)) + CPP_ST_TERM
-    obj += "\n"
-    obj += indent()
-    obj += end
-    obj += ":;"
+    obj += "}"
+
+
     ret obj
 }
 
