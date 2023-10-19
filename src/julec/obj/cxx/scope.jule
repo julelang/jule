@@ -521,15 +521,26 @@ fn gen_ret_vars(mut r: &RetSt): str {
 
     obj = obj[:obj.len-1] // Remove last comma.
 
-    if r.vars.len > 1 {
-        obj = "return std::make_tuple(" + obj
-        obj += ")"
-    } else {
-        obj = "return " + obj
+    let mut oobj = "return "
+
+    if r.func.decl.exceptional {
+        oobj += "jule::Exceptional(jule::Any(),"
     }
 
-    obj += CPP_ST_TERM
-    ret obj
+    if r.vars.len > 1 {
+        oobj += "std::make_tuple("
+        oobj += obj
+        oobj += ")"
+    } else {
+        oobj += obj
+    }
+
+    if r.func.decl.exceptional {
+        oobj += ")"
+    }
+
+    oobj += CPP_ST_TERM
+    ret oobj
 }
 
 fn gen_ret_expr_tuple(mut r: &RetSt): str {
