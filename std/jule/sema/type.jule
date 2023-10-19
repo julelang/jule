@@ -93,19 +93,6 @@ impl Kind for TypeKind {
 }
 
 impl TypeKind {
-    // Returns clone.
-    fn clone(mut &self): &TypeKind {
-        if self == nil {
-            ret nil
-        }
-
-        let mut kind = &TypeKind{
-            cpp_ident:  self.cpp_ident,
-            kind:       self.kind,
-        }
-        ret kind
-    }
-
     // Reports whether type is cpp-linked kind.
     pub fn cpp_linked(self): bool { ret self.cpp_ident.len != 0 }
 
@@ -115,7 +102,7 @@ impl TypeKind {
     // Reports whether kind is "void".
     pub fn void(self): bool {
         let prim = unsafe { (*(&self)).prim() }
-        ret prim != nil && prim.to_str() == "void"
+        ret prim != nil && prim.kind == "void"
     }
 
     // Reports whether kind is mutable.
@@ -824,14 +811,11 @@ impl TypeChecker {
             ret nil
         }
 
-        let mut kind = ta.kind.kind.clone()
-        kind.generic = ta.generic
-
-        if ta.cpp_linked {
-            kind.cpp_ident = ta.ident
+        ret &TypeKind{
+            generic:   ta.generic,
+            cpp_ident: if ta.cpp_linked { ta.ident } else { ta.kind.kind.cpp_ident },
+            kind:      ta.kind.kind.kind,
         }
-
-        ret kind
     }
 
     fn from_enum(mut self, &decl: &IdentTypeDecl, mut &e: &Enum): &Enum {

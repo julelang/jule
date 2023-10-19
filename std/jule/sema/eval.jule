@@ -237,14 +237,13 @@ fn check_data_for_integer_indexing(mut &d: &Data): (err_fmt: LogMsg) {
 
 // Value data.
 pub struct Data {
-    pub kind:       &TypeKind
-    pub cast_kind:  &TypeKind // This expression should be cast to this kind.
-    pub mutable:    bool
-    pub reference:  bool
-    pub lvalue:     bool
-    pub variadiced: bool
-    pub is_rune:    bool
-    pub model:      ExprModel
+    pub kind:      &TypeKind
+    pub cast_kind: &TypeKind // This expression should be cast to this kind.
+    pub mutable:   bool
+    pub reference: bool
+    pub lvalue:    bool
+    pub is_rune:   bool
+    pub model:     ExprModel
 
     // True if kind is declaration such as:
     //  - &Enum
@@ -785,8 +784,7 @@ impl Eval {
             lvalue:    !v.constant,
             mutable:   v.mutable,
             reference: v.reference,
-            decl:      false,
-            kind:      v.kind.kind.clone(),
+            kind:      v.kind.kind,
             model:     v,
         }
 
@@ -831,14 +829,11 @@ impl Eval {
         |:
             let mut d = &Data{
                 decl: true,
-                kind: ta.kind.kind.clone(),
-            }
-
-            d.kind.generic = ta.generic
-
-            // Save C identifier of type.
-            if ta.cpp_linked {
-                d.kind.cpp_ident = ta.ident
+                kind: &TypeKind{
+                    generic:   ta.generic,
+                    cpp_ident: if ta.cpp_linked { ta.ident } else { ta.kind.kind.cpp_ident },
+                    kind:      ta.kind.kind.kind,
+                },
             }
 
             d.model = d.kind
@@ -1008,7 +1003,7 @@ impl Eval {
             match {
             | can_get_ptr(d):
                 d.kind = &TypeKind{
-                    kind: &Ptr{elem: d.kind.clone()},
+                    kind: &Ptr{elem: d.kind},
                 }
                 d.model = &UnaryExprModel{
                     expr: d.model,
@@ -1103,9 +1098,13 @@ impl Eval {
             ret nil
         }
 
-        d.variadiced = true
-        d.kind = d.kind.slc().elem
-        d.kind.variadic = true
+        let slc = d.kind.slc()
+        d.kind = &TypeKind{
+            variadic:  true,
+            generic:   slc.elem.generic,
+            cpp_ident: slc.elem.cpp_ident,
+            kind:      slc.elem.kind,
+        }
         ret d
     }
 
@@ -1130,10 +1129,8 @@ impl Eval {
             elem: pt.elem,
         }
 
-        if pt.auto {
-            arr.n = s.elems.len
-        } else {
-            arr.n = s.elems.len
+        arr.n = s.elems.len
+        if !pt.auto {
             if arr.n > pt.n {
                 self.push_err(s.token, LogMsg.OverflowLimits)
             } else if arr.n < pt.n {
@@ -1155,7 +1152,7 @@ impl Eval {
             }
 
             self.s.check_assign_type(false, arr.elem, d, s.token)
-            model.elems = append(model.elems,  d.model)
+            model.elems = append(model.elems, d.model)
         }
         self.prefix = prefix
 
@@ -1254,12 +1251,12 @@ impl Eval {
             self.push_err(i.token, LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
         }
 
-        d.kind = ptr.elem.clone()
+        d.kind = ptr.elem
     }
 
     fn indexing_arr(mut self, mut &d: &Data, mut &index: &Data, &i: &IndexingExpr) {
         let mut arr = d.kind.arr()
-        d.kind = arr.elem.clone()
+        d.kind = arr.elem
         self.check_integer_indexing_by_data(index, i.token)
         if index.is_const() && index.constant.as_f64() >= f64(arr.n) {
             self.push_err(i.token, LogMsg.OverflowLimits)
@@ -1268,7 +1265,7 @@ impl Eval {
 
     fn indexing_slc(mut self, mut &d: &Data, mut &index: &Data, &i: &IndexingExpr) {
         let mut slc = d.kind.slc()
-        d.kind = slc.elem.clone()
+        d.kind = slc.elem
         self.check_integer_indexing_by_data(index, i.token)
 
         // Check compile-time bounds.
@@ -1302,12 +1299,12 @@ impl Eval {
         }
         _ = atc.check()
 
-        d.kind = m.val.clone()
+        d.kind = m.val
     }
 
     fn indexing_str(mut self, mut &d: &Data, mut &index: &Data, &i: &IndexingExpr) {
         const BYTE_KIND = str(PrimKind.U8)
-        d.kind.kind = build_prim_type(BYTE_KIND)
+        d.kind = &TypeKind{kind: build_prim_type(BYTE_KIND)}
 
         if index == nil {
             ret
@@ -1497,8 +1494,8 @@ impl Eval {
     }
 
     fn slicing_arr(self, mut &d: &Data) {
-        let mut elem_type = d.kind.arr().elem.clone()
-        d.kind.kind = &Slc{elem: elem_type}
+        let mut elem_type = d.kind.arr().elem
+        d.kind = &TypeKind{kind: &Slc{elem: elem_type}}
 
         d.lvalue = false
 
@@ -1870,7 +1867,7 @@ impl Eval {
         d.decl = false
         self.cast_constant(t, d)
 
-        if d.kind.enm() == nil || d.kind.enm().kind.kind.to_str() != t.to_str() {
+        if d.kind.enm() == nil || !d.kind.enm().kind.kind.equals(t) {
             d.cast_kind = t
             // d.kind = t // Do not this, will be set automatically end of the eval.
         } else {
@@ -2342,7 +2339,7 @@ impl Eval {
                 field:     f,
             }
             d.model = model
-            d.kind = f.kind.clone()
+            d.kind = f.kind
             d.lvalue = true
 
             if f.decl.mutable && !d.mutable {
@@ -3269,9 +3266,6 @@ impl Eval {
 
         ret &Data{
             mutable:    true,
-            lvalue:     false,
-            variadiced: false,
-            decl:       false,
             kind:       &TypeKind{kind: m},
             model:      model,
         }
@@ -3443,13 +3437,13 @@ impl Eval {
             match {
             | d.constant.is_i64():
                 if int_assignable(str(PrimKind.Int), d) {
-                    d.kind.kind = build_prim_type(str(PrimKind.Int))
+                    d.kind = &TypeKind{kind: build_prim_type(str(PrimKind.Int))}
                     d.constant.set_i64(d.constant.as_i64())
                 }
 
             | d.constant.is_u64():
                 if int_assignable(str(PrimKind.Uint), d) {
-                    d.kind.kind = build_prim_type(str(PrimKind.Uint))
+                    d.kind = &TypeKind{kind: build_prim_type(str(PrimKind.Uint))}
                     d.constant.set_u64(d.constant.as_u64())
                 }
             }
@@ -3459,7 +3453,7 @@ impl Eval {
             if !d.kind.cpp_linked() &&
                 self.prefix != nil &&
                 d.cast_kind == nil &&
-                !d.variadiced &&
+                !d.kind.variadic &&
                 !d.lvalue &&
                 !d.is_const() &&
                 d.kind.prim() != nil &&

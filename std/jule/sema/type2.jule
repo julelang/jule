@@ -618,21 +618,22 @@ impl FnCallArgChecker {
                 self.e.prefix = p.kind
             }
 
-            let mut d = self.e.eval_expr_kind(arg.kind)
+            let mut d = self.e.eval(arg)
             if d == nil {
                 ok = false
                 continue
             }
 
-            if d.variadiced {
+            if d.kind.variadic {
                 variadiced = true
-                d.variadiced = false // For ignore assignment checking error.
 
-                p.kind.variadic = true
-                d.kind.variadic = true
+                let pold = p.kind.variadic
+                let dold = d.kind.variadic
+                p.kind.variadic = false
+                d.kind.variadic = false
                 defer {
-                    d.kind.variadic = false
-                    p.kind.variadic = false
+                    p.kind.variadic = pold
+                    d.kind.variadic = dold
                 }
 
                 match type d.model {
@@ -645,12 +646,12 @@ impl FnCallArgChecker {
                     self.arg_models = append(self.arg_models, d.model)
                 }
 
-                ok = self.check_arg(p, d, arg.token) && ok
+                ok = ok && self.check_arg(p, d, arg.token)
                 continue
             }
 
             model.elems = append(model.elems, d.model)
-            ok = self.check_arg(p, d, arg.token) && ok
+            ok = ok && self.check_arg(p, d, arg.token)
         }
         self.e.prefix = old
 
