@@ -8,16 +8,14 @@ use sys for std::sys
 
 impl Directory {
     // Reads the named directory and returs all its directory entries can read.
-    // Returns nil if no any directory entry or error occurs.
     //
     // Possible errors:
     //  Denied InvalidDescriptor PerProcessLimit SystemWideLimit
     //  NotExist InsufficientMemory NotDir
-    pub static fn read(path: str): (dirents: []&DirEntry, err: FsError) {
+    pub static fn read(path: str)!: (dirents: []&DirEntry) {
         let mut dir = unsafe { sys::opendir(&path[0]) }
         if dir == nil {
-            err = get_last_fs_error()
-            ret
+            error(get_last_fs_error())
         }
         for {
             let dirent = unsafe { sys::readdir(dir) }
@@ -25,12 +23,7 @@ impl Directory {
                 break
             }
             let name = unsafe { integrated::byte_ptr_to_str((*u8)(dirent.d_name)) }
-            let (mut stat, serr) = Status.of(path::join(path, name))
-            if serr != FsError.Ok {
-                err = serr
-                dirents = nil
-                break
-            }
+            let mut stat = Status.of(path::join(path, name)) else { error(error) }
             dirents = append(dirents, &DirEntry{
                 name: name,
                 stat: stat,
@@ -43,23 +36,21 @@ impl Directory {
     // Creates directory.
     //
     // Possible errors: Denied Exist ReadOnly NoSpace
-    pub static fn create(path: str): FsError {
+    pub static fn create(path: str)! {
         // NOTICE
         // Also can has EMLINK error-code.
         // Make sure this situation should documented or not.
-        if unsafe { sys::mkdir(&path[0], 0700) } == 0 {
-            ret FsError.Ok
+        if unsafe { sys::mkdir(&path[0], 0700) } != 0 {
+            error(get_last_fs_error())
         }
-        ret get_last_fs_error()
     }
 
     // Removes empty directory.
     //
     // Possible errors: Denined NotExist NotEmpty SyncIO IO Loop NotDir
-    pub static fn remove(path: str): FsError {
-        if unsafe { sys::rmdir(&path[0]) } == 0 {
-            ret FsError.Ok
+    pub static fn remove(path: str)! {
+        if unsafe { sys::rmdir(&path[0]) } != 0 {
+            error(get_last_fs_error())
         }
-        ret get_last_fs_error()
     }
 }

@@ -54,23 +54,20 @@ fn system(cmd: str): int {
 fn write_output(path: str, content: str) {
     let dir = dir(path)
 
-    let (_, mut err) = Status.of(dir)
-    if err != FsError.Ok {
-        err = Directory.create(dir)
-        if err != FsError.Ok {
+    Status.of(dir) else {
+        Directory.create(dir) else {
             exit_err("a problem occurs when code generation")
         }
     }
 
-    err = File.write(path, ([]byte)(content), 0660)
-    if err != FsError.Ok {
+    File.write(path, ([]byte)(content), 0660) else {
         exit_err("a problem occurs when code generation")
     }
 }
 
 // Remove generated objects for compilation.
 fn clear_objects() {
-    if File.remove(get_compile_path()) != FsError.Ok {
+    File.remove(get_compile_path()) else {
         outln("a problem occurs when object cleaning")
         ret
     }
@@ -78,7 +75,7 @@ fn clear_objects() {
     // All created objects are cleaned.
     // So, deletes directory if empty after cleaned all objects,
     // if not, leaves the directory.
-    _ = Directory.remove(OUT_DIR)
+    Directory.remove(OUT_DIR) else {}
 }
 
 // Compie generated IR.
@@ -297,8 +294,11 @@ fn build_ir(&args: []str): &IR {
     let path = content[0]
 
     // Check standard library.
-    let (inf, err) = Status.of(PATH_STDLIB)
-    if err != FsError.Ok || !inf.is_dir() {
+    let inf = Status.of(PATH_STDLIB) else {
+        exit_err(logf(LogMsg.StdlibNotExist))
+        ret nil // Avoid error.
+    }
+    if !inf.is_dir() {
         exit_err(logf(LogMsg.StdlibNotExist))
     }
 

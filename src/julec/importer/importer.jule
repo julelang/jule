@@ -28,11 +28,10 @@ fn exit_err(msg: str) {
 
 // Read buffer by file path.
 fn read_buff(path: str): []byte {
-    let (mut buffer, err) = File.read(path)
-    if err != FsError.Ok {
+    ret File.read(path) else {
         exit_err("error: file cannot read")
+        ret nil // Avoid error
     }
-    ret buffer
 }
 
 // Make compiler error, just text.
@@ -45,12 +44,10 @@ fn flat_compiler_err(text: str): Log {
 }
 
 // Read package directory entries by package (directory) path.
-fn read_package_dirents(path: str): ([]&DirEntry, err_msg: str) {
-    let (mut dirents, err) = Directory.read(path)
-    if err != FsError.Ok {
-        ret nil, "connot read package directory: " + path
+fn read_package_dirents(path: str)!: []&DirEntry {
+    let mut dirents = Directory.read(path) else {
+        error("connot read package directory: " + path)
     }
-
     let mut passed_dirents: []&DirEntry = nil
     for (_, mut dirent) in dirents {
         let name = dirent.name
@@ -63,7 +60,7 @@ fn read_package_dirents(path: str): ([]&DirEntry, err_msg: str) {
         passed_dirents = append(passed_dirents, dirent)
     }
 
-    ret passed_dirents, ""
+    ret passed_dirents
 }
 
 // Reports whether file passes build directives.
@@ -104,9 +101,8 @@ impl Importer for PlainImporter {
     }
 
     pub fn import_package(mut self, path: str): ([]&Ast, []Log) {
-        let (dirents, err_msg) = read_package_dirents(path)
-        if err_msg != "" {
-            let mut errors = [flat_compiler_err(err_msg)]
+        let dirents = read_package_dirents(path) else {
+            let mut errors = [flat_compiler_err(str(error))]
             ret nil, errors
         }
 

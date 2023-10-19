@@ -10,50 +10,47 @@ impl File {
     // not exist and OFlag.Creat flag is passed, will created with
     // mode (before umask). If successful, returns File reference with handle
     // to file stream and the reference can used for I/O operations.
-    // Returns nil reference if error occurs.
     //
     // Possible errors:
     //  Denied Exist Signal SyncIO IO IsDir Loop PerProcessLimit LongPath
     //  SystemWideLimit NotExist UnableStream NoSpace NotDir Device Overflow
     //  ReadOnly Retry Busy
-    pub static fn open(path: str, flag: OFlag, mode: int): (&File, FsError) {
+    pub static fn open(path: str, flag: OFlag, mode: int)!: &File {
         let handle = unsafe { sys::open(&path[0], int(flag), mode) }
         if handle == -1 {
-            ret File.new(0), get_last_fs_error()
+            error(get_last_fs_error())
         }
-        ret File.new(uintptr(handle)), FsError.Ok
+        ret File.new(uintptr(handle))
     }
 
     // Removes named file.
     //
     // Possible errors:
     //  Denined Busy LongPath NotExist InsufficientMemory NotDir
-    pub static fn remove(path: str): FsError {
-        if unsafe { sys::unlink(&path[0]) } == 0 {
-            ret FsError.Ok
+    pub static fn remove(path: str)! {
+        if unsafe { sys::unlink(&path[0]) } != 0 {
+            error(get_last_fs_error())
         }
-        ret get_last_fs_error()
     }
 }
 
 impl File {
     // Writes bytes to handle and returns writed byte count.
     // The number of bytes written can never exceed the length of the buff.
-    // Returns 0 if error occurs.
     //
     // Possible errors:
     //  Retry InvalidDescriptor Big Signal IO NoSpace Pipe Range SyncIO
     //  Seek Device Buffer
-    pub fn write(mut self, buff: []byte): (n: int, FsError) {
+    pub fn write(mut self, buff: []byte)!: (n: int) {
         if buff.len == 0 {
-            ret 0, FsError.Ok
+            ret 0
         }
 
         n = unsafe { sys::write(int(self.handle), &buff[0], uint(buff.len)) }
         if n == -1 {
-            ret 0, get_last_fs_error()
+            error(get_last_fs_error())
         }
-        ret n, FsError.Ok
+        ret n
     }
 
     // Read bytes to buffer from handle and returns readed byte count.
@@ -61,20 +58,18 @@ impl File {
     // If the buff is larger than the number of bytes that can be read,
     // the buffer will not cause an overflow. Offset will be shifted
     // by the number of bytes read.
-    // Returns 0 if error occurs.
     //
     // Possible errors:
     //  Retry InvalidDescriptor Signal SyncIO IO IsDir Overflow Buffer
     //  InsufficientMemory Device Seek
-    pub fn read(mut self, mut buff: []byte): (n: int, FsError) {
+    pub fn read(mut self, mut buff: []byte)!: (n: int) {
         if buff.len == 0 {
-            ret 0, FsError.Ok
+            ret 0
         }
         n = unsafe { sys::read(int(self.handle), &buff[0], uint(buff.len)) }
         if n == -1 {
-            n = 0
-            ret n, get_last_fs_error()
+            error(get_last_fs_error())
         }
-        ret n, FsError.Ok
+        ret n
     }
 }
