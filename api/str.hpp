@@ -93,13 +93,11 @@ namespace jule {
         inline jule::Bool empty(void) const noexcept
         { return this->buffer.empty(); }
 
-        inline jule::Bool has_prefix(const jule::Str &sub) const
+        inline jule::Bool has_prefix(const jule::Str &sub) const noexcept
         { return this->buffer.find(sub.buffer, 0) == 0; }
 
-        inline jule::Bool has_suffix(const jule::Str &sub) const {
-            return this->len() >= sub.len() &&
-                this->buffer.substr(this->len()-sub.len()) == sub.buffer;
-        }
+        inline jule::Bool has_suffix(const jule::Str &sub) const noexcept
+        { return this->buffer.rfind(sub.buffer, this->len()-sub.len()) != std::string::npos; }
 
         inline jule::Int find(const jule::Str &sub) const
         { return static_cast<jule::Int>(this->buffer.find(sub.buffer) ); }
