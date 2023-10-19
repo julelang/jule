@@ -33,6 +33,9 @@ namespace jule {
         Array<Item, N>(const std::initializer_list<Item> &src)
         { std::copy(src.begin(), src.end(), this->begin()); }
 
+        Array<Item, N>(const Item &def)
+        { std::fill(this->begin(), this->end(), def); }
+
         typedef Item       *Iterator;
         typedef const Item *ConstIterator;
 
