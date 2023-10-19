@@ -119,37 +119,6 @@ fn split_colon(mut &tokens: []Token): ([]Token, []Token) {
     ret nil, nil
 }
 
-struct Precedencer {
-    pairs: [][]any
-}
-
-impl Precedencer {
-    fn set(mut self, level: int, expr: any) {
-        for i, pair in self.pairs {
-            let pair_level = (int)(pair[0])
-            if level > pair_level {
-                let mut first = self.pairs[:i]
-                let mut buffer: [][]any = [[level, expr]]
-                let mut appended = append(buffer, self.pairs[i:]...)
-                self.pairs = append(first, appended...)
-                ret
-            }
-        }
-        self.pairs = append(self.pairs, [level, expr])
-    }
-
-    fn get_lower(mut self): any {
-        let mut i = self.pairs.len - 1
-        for i >= 0; i-- {
-            let mut data = self.pairs[i][1]
-            if data != nil {
-                ret data
-            }
-        }
-        ret nil
-    }
-}
-
 fn eliminate_comments(mut &tokens: []Token): []Token {
     let mut cutted: []Token = nil
     for (_, mut token) in tokens {
@@ -163,7 +132,13 @@ fn eliminate_comments(mut &tokens: []Token): []Token {
 // Finds index of priority operator and returns index of operator
 // if found, returns -1 if not.
 fn find_lowest_prec_op(&tokens: []Token): int {
-    let mut prec = Precedencer{}
+    // Set to 255, there is nothing for precedence 255.
+    // It's provides optimization, avoid prec != -1 (if not setted) checking.
+    // Always greater than actual precedences.
+    // So, It's will initialized by first precedence without any checking that if not setted.
+    let mut prec: byte = 255
+    let mut prec_pos = -1
+
     let mut brace_n = 0
     let mut skip_to_next_brace_open = false
     for i, token in tokens {
@@ -218,16 +193,13 @@ fn find_lowest_prec_op(&tokens: []Token): int {
         }
 
         let p = token.prec()
-        if p != -1 {
-            prec.set(p, i)
+        if p != 0 && p <= prec {
+            prec = p
+            prec_pos = i
         }
     }
 
-    let data = prec.get_lower()
-    if data == nil {
-        ret -1
-    }
-    ret (int)(data)
+    ret prec_pos
 }
 
 fn build_ident_expr(mut &token: Token): &IdentExpr {
