@@ -50,7 +50,6 @@ type StrFlag: &Flag[str]
 // Flag parser for command-line arguments.
 pub struct FlagSet {
     _flags:  []CommonFlag
-    _errors: []str
 }
 
 impl FlagSet {
@@ -89,8 +88,8 @@ impl FlagSet {
     }
 
     // Parse arguments and process flags.
-    // Returns error text if any error occurs.
     // Returns non-flag content.
+    // Exceptional always is string and holds error message.
     //
     // Syntax:
     //   Long names can be used with double dash (--). Short names can be
@@ -108,13 +107,13 @@ impl FlagSet {
     //   all following characters are considered short names and thus collective
     //   use is allowed. If the short name flags used need values, the values ​
     //   should follow respectively.
-    pub fn parse(mut self, args: []str): (content: []str, err: str) {
+    pub fn parse(mut self, args: []str)!: []str {
         let mut ap = ArgParser{
             set:  self,
             args: unsafe { *(&args) },
         }
-        ap.parse()
-        ret ap.content, ap.err
+        ap.parse() else { error(error) }
+        ret ap.content
     }
 
     // Resets all flags to default value.
@@ -178,7 +177,6 @@ impl FlagSet {
 struct ArgParser {
     set:     FlagSet
     args:    []str
-    err:     str
     content: []str
     i:       int
 }
@@ -215,7 +213,7 @@ impl ArgParser {
         ret self.args[self.i]
     }
 
-    fn process_flag(mut self, mut &flag: CommonFlag) {
+    fn process_flag(mut self, mut &flag: CommonFlag)! {
         match type flag {
         | BoolFlag:
             let mut bf = BoolFlag(flag)
@@ -225,8 +223,7 @@ impl ArgParser {
 
         let data = self.get_data()
         if data == "" {
-            self.err = "--" + flag.name() + ": expression missing"
-            ret
+            error("--" + flag.name() + ": expression missing")
         }
 
         match type flag {
@@ -237,7 +234,7 @@ impl ArgParser {
                 ret x, err == conv::ConvError.Ok
             })
             if !ok {
-                self.err = "--" + flag.name() + ": expression must be valid signed integer"
+                error("--" + flag.name() + ": expression must be valid signed integer")
             }
 
         | UintFlag:
@@ -247,14 +244,14 @@ impl ArgParser {
                 ret x, err == conv::ConvError.Ok
             })
             if !ok {
-                self.err = "--" + flag.name() + ": expression must be valid unsigned integer"
+                error("--" + flag.name() + ": expression must be valid unsigned integer")
             }
 
         | FloatFlag:
             let mut ff = FloatFlag(flag)
             let ((*ff._data), err) = conv::parse_float(data, BIT64)
             if err != conv::ConvError.Ok {
-                self.err = "--" + flag.name() + ": expression must be valid floating-point"
+                error("--" + flag.name() + ": expression must be valid floating-point")
             }
 
         | StrFlag:
@@ -262,30 +259,28 @@ impl ArgParser {
         }
     }
 
-    fn single_dash(mut self, &arg: str) {
+    fn single_dash(mut self, &arg: str)! {
         let rarg = ([]rune(arg))[1:] // Start at 1 to skip dash.
         for _, r in rarg {
             let mut flag = self.set.find_flag_short(r)
             if flag == nil {
-                self.err = arg + ": flag is not exist: " + str(r)
-                ret
+                error(arg + ": flag is not exist: " + str(r))
             }
 
-            self.process_flag(flag)
+            self.process_flag(flag) else { error(error) }
         }
     }
 
-    fn double_dash(mut self, &arg: str) {
+    fn double_dash(mut self, &arg: str)! {
         let mut flag = self.set.find_flag(arg[2:]) // Start at 2 to skip dashes.
         if flag == nil {
-            self.err = arg + ": flag is not exist"
-            ret
+            error(arg + ": flag is not exist")
         }
 
-        self.process_flag(flag)
+        self.process_flag(flag) else { error(error) }
     }
 
-    fn try_arg(mut self) {
+    fn try_arg(mut self)! {
         let arg = self.args[self.i]
         if self.args.len == 0 {
             ret
@@ -293,22 +288,19 @@ impl ArgParser {
 
         if arg[0] == '-' {
             if self.args.len > 1 && arg[1] == '-' {
-                self.double_dash(arg)
+                self.double_dash(arg) else { error(error) }
                 ret
             }
-            self.single_dash(arg)
+            self.single_dash(arg) else { error(error) }
             ret
         }
 
         self.content = append(self.content, arg)
     }
 
-    fn parse(mut self) {
+    fn parse(mut self)! {
         for self.i < self.args.len; self.i++ {
-            self.try_arg()
-            if self.err.len != 0 {
-                break
-            }
+            self.try_arg() else { error(error) }
         }
     }
 }
