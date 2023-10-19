@@ -552,7 +552,9 @@ fn is_forwarded(&s: &Scope): bool {
 }
 
 fn gen_fn_call_expr_model(mut m: &FnCallExprModel): str {
-    if m.func.is_builtin() || !m.func.decl.exceptional {
+    if m.func.is_builtin() ||
+        !m.func.decl.exceptional ||
+        m.except != nil && m.except.stmts.len == 0 {
         ret gen_pure_fn_call_expr_model(m)
     }
 
@@ -585,15 +587,14 @@ fn gen_fn_call_expr_model(mut m: &FnCallExprModel): str {
         done_indent()
     } else {
         obj += `if (!except.ok()) jule::panic(jule::Str("`
-        obj += fmt::format(
-            `unhandled exceptional: ") + except.error.type->to_str(except.error.data) + jule::Str("\nlocation: {}:{}:{}"));`,
-            m.token.file.path(), conv::itoa(m.token.row), conv::itoa(m.token.column))
-        obj += "\n"
+        obj += `unhandled exceptional: ") + except.error.type->to_str(except.error.data) + jule::Str("\nlocation: `
+        obj += fmt::format(`{}:{}:{}`, m.token.file.path(), conv::itoa(m.token.row), conv::itoa(m.token.column))
+        obj += "\"));\n"
         if !m.func.decl.is_void() {
             obj += indent()
             obj += "(except.result);\n"
-            done_indent()
         }
+        done_indent()
     }
 
     obj += indent()
