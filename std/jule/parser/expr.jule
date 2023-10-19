@@ -274,6 +274,13 @@ impl ExprBuilder {
         | TokenId.Lit:
             ret self.build_lit(token)
 
+        | TokenId.Op:
+            if token.kind == str(TokenKind.TripleDot) {
+                ret &VariadicExpr{
+                    token: token,
+                }
+            }
+
         | TokenId.Ident
         | TokenId.Self
         | TokenId.Error:
@@ -281,11 +288,9 @@ impl ExprBuilder {
 
         | TokenId.Prim:
             ret self.build_primitive_type(token)
-
-        |:
-            self.push_err(token, LogMsg.InvalidSyntax)
-            ret nil
         }
+        self.push_err(token, LogMsg.InvalidSyntax)
+        ret nil
     }
 
     fn build_cpp_linked_ident(mut self, mut &tokens: []Token): &IdentExpr {

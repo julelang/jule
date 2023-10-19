@@ -1084,6 +1084,11 @@ impl Eval {
     }
 
     fn eval_variadic(mut &self, mut v: &VariadicExpr): &Data {
+        if v.expr == nil {
+            self.push_err(v.token, LogMsg.InvalidExpr)
+            ret nil
+        }
+
         let mut prefix = self.prefix
         self.prefix = nil
         defer { self.prefix = prefix }
@@ -1129,6 +1134,26 @@ impl Eval {
             elem: pt.elem,
         }
 
+        let mut filled = false
+
+        if s.elems.len == 2 {
+            match type s.elems[1] {
+            | &VariadicExpr:
+                if (&VariadicExpr)(s.elems[1]).expr != nil {
+                    break
+                }
+                // Filled.
+
+                if pt.auto {
+                    self.push_err(s.token, LogMsg.AutoSizedArrFilled)
+                    ret nil
+                }
+
+                filled = true
+                s.elems = s.elems[:1]
+            }
+        }
+
         arr.n = s.elems.len
         if !pt.auto {
             if arr.n > pt.n {
@@ -1140,7 +1165,7 @@ impl Eval {
 
         let mut model = &ArrayExprModel{
             kind:  arr,
-            elems: make([]ExprModel, 0, s.elems.len),
+            elems: make([]ExprModel, 0, if filled { 2 } else { s.elems.len }),
         }
 
         let mut prefix = self.prefix
@@ -1155,6 +1180,11 @@ impl Eval {
             model.elems = append(model.elems, d.model)
         }
         self.prefix = prefix
+
+        if filled {
+            // Fill mark.
+            model.elems = append(model.elems, nil)
+        }
 
         ret &Data{
             mutable: true,
