@@ -27,6 +27,7 @@ static mut BUILTIN_FN_CLONE = &FnIns{}
 static mut BUILTIN_FN_STD_MEM_SIZE_OF = &FnIns{}
 static mut BUILTIN_FN_STD_MEM_ALIGN_OF = &FnIns{}
 static mut BUILTIN_FN_STD_JULE_INTEGRATED_TO_STR = &FnIns{}
+static mut BUILTIN_FN_STD_JULE_INTEGRATED_INLINE = &FnIns{}
 
 static mut BUILTIN_FN_COPY = &FnIns{
     result: &TypeKind{kind: build_prim_type(str(PrimKind.Int))},
@@ -78,6 +79,7 @@ fn init() {
     BUILTIN_FN_STD_MEM_ALIGN_OF.caller = builtin_caller_std_mem_align_of
 
     BUILTIN_FN_STD_JULE_INTEGRATED_TO_STR.caller = builtin_caller_std_jule_integrated_to_str
+    BUILTIN_FN_STD_JULE_INTEGRATED_INLINE.caller = builtin_caller_std_jule_integrated_inline
 
     let mut dispose_method = BUILTIN_TRAIT_DISPOSE.find_method("dispose")
     let mut dispose_method_ins = dispose_method.instance()
@@ -144,6 +146,7 @@ fn find_builtin_def_std_mem(ident: str): any {
 fn find_builtin_def_std_jule_integrated(ident: str): any {
     match ident {
     | "to_str":  ret BUILTIN_FN_STD_JULE_INTEGRATED_TO_STR
+    | "inline":  ret BUILTIN_FN_STD_JULE_INTEGRATED_INLINE
     |:           ret nil
     }
 }
@@ -693,4 +696,51 @@ fn builtin_caller_std_jule_integrated_to_str(mut &e: &Eval, mut &fc: &FnCallExpr
             expr: d.model,
         },
     }
+}
+
+fn builtin_caller_std_jule_integrated_inline(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data {
+    if !e.is_unsafe() {
+        e.push_err(fc.token, LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
+    }
+
+    if fc.args.len < 1 {
+        e.push_err(fc.token, LogMsg.MissingExprFor, "code")
+        ret nil
+    }
+    if fc.args.len > 1 {
+        e.push_err(fc.args[1].token, LogMsg.ArgumentOverflow)
+    }
+
+    let mut d = e.eval_expr(fc.args[0])
+    if d == nil {
+        ret nil
+    }
+
+    if d.kind.prim() == nil || !d.kind.prim().is_str() {
+        e.push_err(fc.args[0].token, LogMsg.IncompatibleTypes, PrimKind.Str, d.kind.to_str())
+        ret nil
+    }
+
+    if !d.is_const() || !d.constant.is_str() {
+        e.push_err(fc.args[0].token, LogMsg.ExprNotConst)
+        ret nil
+    }
+
+    let mut r = build_void_data()
+
+    if fc.generics.len != 0 {
+        if !e.s.check_generic_quantity(1, fc.generics.len, fc.token) {
+            ret nil
+        }
+        let mut k = build_type(fc.generics[0])
+        if !e.s.check_type(k, e.lookup) {
+            ret nil
+        }
+        r.kind = k.kind
+    }
+
+    r.model = &BackendEmitExprModel{
+        code: d.constant.read_str(),
+    }
+    ret r
 }
