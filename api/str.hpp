@@ -51,7 +51,7 @@ namespace jule {
         Str(const jule::Slice<jule::I32> &src) {
             for (const jule::I32 &r: src) {
                 const std::vector<jule::U8> bytes = jule::utf8_rune_to_bytes(r);
-                buffer.append(bytes.begin(), bytes.end());
+                this->buffer.append(bytes.begin(), bytes.end());
             }
         }
 
@@ -225,17 +225,22 @@ namespace jule {
             jule::Slice<jule::U8> slice;
             slice.alloc_new(0, this->len());
             slice._len = this->len();
-            std::copy(this->begin(), this->end(), slice._slice);
+            std::copy(this->begin(), this->end(), slice.begin());
             return slice;
         }
 
         operator jule::Slice<jule::I32>(void) const {
-            std::vector<jule::I32> vec = jule::utf8_to_runes(this->operator const std::basic_string<char>());
-            jule::Slice<jule::I32> slc;
-            slc.alloc_new(0, vec.size());
-            slc._len = slc._cap;
-            std::copy(vec.begin(), vec.end(), slc.begin());
-            return slc;
+            jule::Slice<jule::I32> runes;
+            const char *str = this->operator const char *();
+            for (jule::Int index = 0; index < this->len(); ) {
+                jule::I32 rune;
+                jule::Int n;
+                std::tie(rune, n) = jule::utf8_decode_rune_str(str+index,
+                                                               this->len()-index);
+                index += n;
+                runes.push(rune);
+            }
+            return runes;
         }
 
         // Returns element by index.
