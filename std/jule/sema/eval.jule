@@ -1858,6 +1858,11 @@ impl Eval {
     }
 
     fn eval_cast_by_type_n_data(mut self, mut t: &TypeKind, mut d: &Data, error_token: Token): &Data {
+        if d != nil && d.decl {
+            self.push_err(error_token, LogMsg.InvalidExpr)
+            ret nil
+        }
+
         match {
         | d.kind.prim() != nil && d.kind.prim().is_any():
             if t.enm() != nil {
@@ -1923,9 +1928,7 @@ impl Eval {
             ret nil
         }
 
-        d = self.eval_cast_by_type_n_data(t.kind, d, c.kind.token)
-
-        ret d
+        ret self.eval_cast_by_type_n_data(t.kind, d, c.kind.token)
     }
 
     fn eval_ns_selection(mut self, s: &NsSelectionExpr): &Data {
@@ -2040,7 +2043,9 @@ impl Eval {
             }
         }
 
-        d.decl = false
+        if d != nil {
+            d.decl = false
+        }
     }
 
     fn check_fn_call_generics(mut self, mut f: &FnIns,
