@@ -24,7 +24,6 @@ typedef bool __jule_bool;
 template<typename T> inline T *__jule_new(void);
 template<typename T> inline T *__jule_new_array(const jule::Int &size);
 
-inline jule::Str __jule_str_from_byte_ptr(const char *ptr);
 inline jule::Str __jule_str_from_byte_ptr(const jule::Byte *ptr);
 inline jule::Str __jule_type_id_of_any(const jule::Any &any);
 
@@ -34,9 +33,6 @@ template<typename T> inline T *__jule_new(void)
 
 template<typename T> inline T *__jule_new_array(const jule::Int &size)
 { return new(std::nothrow) T[size]; }
-
-inline jule::Str __jule_str_from_byte_ptr(const char *ptr)
-{ return __jule_str_from_byte_ptr((const jule::Byte*)(ptr)); }
 
 inline jule::Str __jule_str_from_byte_ptr(const jule::Byte *ptr)
 { return jule::Str(ptr); }
