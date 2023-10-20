@@ -10,6 +10,7 @@
 #include <ostream>
 #include <initializer_list>
 
+#include "panic.hpp"
 #include "error.hpp"
 #include "ptr.hpp"
 #include "types.hpp"

@@ -15,9 +15,9 @@
 //
 
 #include <tuple>
+#include <vector>
 
 #include "types.hpp"
-#include "slice.hpp"
 
 namespace jule {
 
@@ -51,8 +51,9 @@ namespace jule {
     // Declarations
 
     struct UTF8AcceptRange;
+    std::string runes_to_utf8(const std::vector<jule::I32> &s) noexcept;
     std::tuple<jule::I32, jule::Int> utf8_decode_rune_str(const char *s, const jule::Int &len);
-    jule::Slice<jule::U8> utf8_rune_to_bytes(const jule::I32 &r);
+    std::vector<jule::U8> utf8_rune_to_bytes(const jule::I32 &r);
 
     // Definitions
 
@@ -84,6 +85,15 @@ namespace jule {
         { 0x90, jule::UTF8_HICB },
         { jule::UTF8_LOCB, 0x8F },
     };
+
+    std::string runes_to_utf8(const std::vector<jule::I32> &s) noexcept {
+        std::string buffer;
+        for (const jule::I32 &r: s) {
+            const std::vector<jule::U8> bytes = jule::utf8_rune_to_bytes(r);
+            buffer.append(bytes.begin(), bytes.end());
+        }
+        return buffer;
+    }
 
     std::tuple<jule::I32, jule::Int>
     utf8_decode_rune_str(const char *s, const jule::Int &len) {
@@ -132,13 +142,13 @@ namespace jule {
                                 static_cast<jule::I32>(s3&jule::UTF8_MASKX), 4);
     }
 
-    jule::Slice<jule::U8> utf8_rune_to_bytes(const jule::I32 &r) {
+    std::vector<jule::U8> utf8_rune_to_bytes(const jule::I32 &r) {
         if (static_cast<jule::U32>(r) <= jule::UTF8_RUNE1_MAX)
-            return jule::Slice<jule::U8>({static_cast<jule::U8>(r)});
+            return std::vector<jule::U8>({static_cast<jule::U8>(r)});
 
         const jule::U32 i = static_cast<jule::U32>(r);
         if (i < jule::UTF8_RUNE2_MAX) {
-            return jule::Slice<jule::U8>({ static_cast<jule::U8>(jule::UTF8_T2|static_cast<jule::U8>(r>>6)),
+            return std::vector<jule::U8>({ static_cast<jule::U8>(jule::UTF8_T2|static_cast<jule::U8>(r>>6)),
                                            static_cast<jule::U8>(jule::UTF8_TX|(static_cast<jule::U8>(r)&jule::UTF8_MASKX)) });
         }
 
@@ -148,11 +158,11 @@ namespace jule {
             _r = jule::UTF8_RUNE_ERROR;
 
         if (i <= jule::UTF8_RUNE3_MAX)
-            return jule::Slice<jule::U8>({ static_cast<jule::U8>(jule::UTF8_T3|static_cast<jule::U8>(_r>>12)),
+            return std::vector<jule::U8>({ static_cast<jule::U8>(jule::UTF8_T3|static_cast<jule::U8>(_r>>12)),
                                            static_cast<jule::U8>(jule::UTF8_TX|(static_cast<jule::U8>(_r>>6)&jule::UTF8_MASKX)),
                                            static_cast<jule::U8>(jule::UTF8_TX|(static_cast<jule::U8>(_r)&jule::UTF8_MASKX)) });
 
-        return jule::Slice<jule::U8>({ static_cast<jule::U8>(jule::UTF8_T4|static_cast<jule::U8>(_r>>18)),
+        return std::vector<jule::U8>({ static_cast<jule::U8>(jule::UTF8_T4|static_cast<jule::U8>(_r>>18)),
                                        static_cast<jule::U8>(jule::UTF8_TX|(static_cast<jule::U8>(_r>>12)&jule::UTF8_MASKX)),
                                        static_cast<jule::U8>(jule::UTF8_TX|(static_cast<jule::U8>(_r>>6)&jule::UTF8_MASKX)),
                                        static_cast<jule::U8>(jule::UTF8_TX|(static_cast<jule::U8>(_r)&jule::UTF8_MASKX)) });

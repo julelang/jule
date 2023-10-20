@@ -9,6 +9,7 @@
 #include <sstream>
 #include <ostream>
 
+#include "panic.hpp"
 #include "error.hpp"
 #include "panic.hpp"
 #include "types.hpp"

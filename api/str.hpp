@@ -9,12 +9,15 @@
 #include <ostream>
 #include <string>
 #include <cstring>
+#include <vector>
 
 #include "panic.hpp"
 #include "utf8.hpp"
+#include "utf16.hpp"
 #include "slice.hpp"
 #include "types.hpp"
 #include "error.hpp"
+#include "panic.hpp"
 
 namespace jule {
 
@@ -43,11 +46,12 @@ namespace jule {
         Str(const char *src): buffer(src, src+std::strlen(src)) {}
         Str(const std::string &src): buffer(src.begin(), src.end()) {}
         Str(const jule::Slice<U8> &src): buffer(src.begin(), src.end()) {}
+        Str(const std::vector<U8> &src): buffer(src.begin(), src.end()) {}
 
         Str(const jule::Slice<jule::I32> &src) {
             for (const jule::I32 &r: src) {
-                const jule::Slice<jule::U8> bytes = jule::utf8_rune_to_bytes(r);
-                this->buffer += std::basic_string<jule::U8>(bytes.begin(), bytes.end());
+                const std::vector<jule::U8> bytes = jule::utf8_rune_to_bytes(r);
+                buffer.append(bytes.begin(), bytes.end());
             }
         }
 
@@ -226,17 +230,12 @@ namespace jule {
         }
 
         operator jule::Slice<jule::I32>(void) const {
-            jule::Slice<jule::I32> runes;
-            const char *str = this->operator const char *();
-            for (jule::Int index = 0; index < this->len(); ) {
-                jule::I32 rune;
-                jule::Int n;
-                std::tie(rune, n) = jule::utf8_decode_rune_str(str+index,
-                                                               this->len()-index);
-                index += n;
-                runes.push(rune);
-            }
-            return runes;
+            std::vector<jule::I32> vec = jule::utf8_to_runes(this->operator const std::basic_string<char>());
+            jule::Slice<jule::I32> slc;
+            slc.alloc_new(0, vec.size());
+            slc._len = slc._cap;
+            std::copy(vec.begin(), vec.end(), slc.begin());
+            return slc;
         }
 
         // Returns element by index.

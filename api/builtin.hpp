@@ -8,6 +8,7 @@
 #include <iostream>
 
 #ifdef OS_WINDOWS
+#include <vector>
 #include <windows.h>
 #endif
 
@@ -43,10 +44,9 @@ namespace jule {
     template<typename T>
     inline void out(const T &obj) noexcept {
 #ifdef OS_WINDOWS
-        const jule::Str str = jule::to_str<T>(obj);
-        const jule::Slice<jule::U16> utf16_str = jule::utf16_from_str(str);
+        const std::vector<jule::U16> utf16_str = jule::utf16_from_str(jule::to_str<T>(obj));
         HANDLE handle = GetStdHandle(STD_OUTPUT_HANDLE);
-        WriteConsoleW(handle, &utf16_str[0], utf16_str.len(), nullptr, nullptr);
+        WriteConsoleW(handle, utf16_str.data(), utf16_str.size(), nullptr, nullptr);
 #else
         std::cout << obj;
 #endif

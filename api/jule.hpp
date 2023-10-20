@@ -37,4 +37,5 @@ CONFIGURATION DEFINES
 #include "utf8.hpp"
 #include "utf16.hpp"
 
+
 #endif // ifndef __JULE_HPP
