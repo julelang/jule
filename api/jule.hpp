@@ -29,7 +29,6 @@ CONFIGURATION DEFINES
 #include "panic.hpp"
 #include "platform.hpp"
 #include "ptr.hpp"
-#include "signal.hpp"
 #include "slice.hpp"
 #include "str.hpp"
 #include "trait.hpp"
