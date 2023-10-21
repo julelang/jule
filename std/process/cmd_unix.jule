@@ -1,0 +1,67 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use integ for std::jule::integrated
+
+cpp use "<signal.h>"
+cpp use "<sys/wait.h>"
+cpp use "cmd.hpp"
+
+cpp fn __jule_execvp(file: str, argv: []str): int
+cpp fn __jule_execve(file: str, argv: []str, env: []str): int
+cpp fn kill(pid: int, sig: int): int
+cpp fn fork(): int
+cpp unsafe fn waitpid(pid: int, mut status: *integ::Int, options: int): int
+cpp fn WEXITSTATUS(status: int): int
+
+impl Cmd {
+    // Spawns process.
+    pub fn spawn(mut self)! {
+        if self._pid != Cmd.NPID {
+            error("command already spawned")
+        }
+
+        self._pid = cpp.fork()
+        match self._pid {
+        | -1:
+            error("fork failed")
+
+        | 0:
+            let stat = if self.env == nil {
+                cpp.__jule_execvp(self._fle, self.args)
+            } else {
+                cpp.__jule_execve(self._fle, self.args, self.env)
+            }
+            if stat == -1 {
+                error(get_last_process_error())
+            }
+
+            exit(255)
+        }
+    }
+
+    // Kills process.
+    // Fails if process is not alive.
+    pub fn kill(mut self)! {
+        if cpp.kill(self._pid, 1) != 0 {
+            error("kill failed")
+        }
+        self._pid = Cmd.NPID
+    }
+
+    // Waits complete for running of process.
+    // Returns exit code of process.
+    pub fn wait(mut self)!: int {
+        if self._pid == Cmd.NPID {
+            error("command is not spawned")
+        }
+
+        let mut status = 0
+        if unsafe { cpp.waitpid(self._pid, (*integ::Int)(&status), 0) == -1 } {
+            error(get_last_process_error())
+        }
+        self._pid = Cmd.NPID
+        ret cpp.WEXITSTATUS(status)
+    }
+}

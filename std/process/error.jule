@@ -1,0 +1,56 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+// Do not process EFAULT, Jule should not allow EFAULT occurs.
+use std::sys::{
+    get_last_errno,
+    E2BIG,
+    EACCES,
+    EINVAL,
+    EINTR,
+    ELOOP,
+    ENAMETOOLONG,
+    ENOENT,
+    ENOLINK,
+    ENOTDIR,
+    ENOEXEC,
+    EBADF,
+    ETXTBSY,
+    EBUSY,
+}
+
+// Process error codes.
+enum ProcessError {
+    Denied,   // Permission is not enough
+    Loop,     // Too many symbolic links were encountered in translating path or file
+    LongPath, // The length of the path argument exceeds maxium path length or a pathname component is longer than maximum name length
+    NotExist, // One or more components of the new process path name of the file do not exist or is a null pathname
+    NotDir,   // A component of the new process path of the file prefix is not a directory
+    Signal,   // A signal was caught during the execution
+    SyncIO,   // The new process image file has the appropriate permission and has a recognized executable binary format, but the system does not support execution of a file with this format
+    Busy,     // The new process image file is a pure procedure (shared text) file that is currently open for writing by some process
+    BadFile,  // The argument is not a valid file descriptor.
+    NotExec,  // The new process image file has the appropriate access permission but is not in the proper format
+    NoLink,   // The path points to a remote machine and the link to that machine is no longer active
+    Big,      // The number of bytes in the new process's argument list is greater than the system-imposed limit of maximum argument bytes
+}
+
+// Returns last process error by errno.
+fn get_last_process_error(): ProcessError {
+    let err = get_last_errno()
+    match err {
+    | EACCES:          ret ProcessError.Denied
+    | ELOOP:           ret ProcessError.Loop
+    | ENAMETOOLONG:    ret ProcessError.LongPath
+    | ENOENT:          ret ProcessError.NotExist
+    | ENOTDIR:         ret ProcessError.NotDir
+    | EINTR:           ret ProcessError.Signal
+    | EINVAL:          ret ProcessError.SyncIO
+    | ETXTBSY | EBUSY: ret ProcessError.Busy
+    | ENOEXEC:         ret ProcessError.NotExec
+    | ENOLINK:         ret ProcessError.NoLink
+    | E2BIG:           ret ProcessError.Big
+    |:                 ret ProcessError.Denied
+    }
+}
