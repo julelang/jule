@@ -13,7 +13,7 @@ An effective programming language to build efficient, fast, reliable and safe so
 
 [![Build](https://github.com/julelang/jule/actions/workflows/build.yml/badge.svg)](https://github.com/julelang/jule/actions/workflows/build.yml)
 [![Tests](https://github.com/julelang/jule/actions/workflows/tests.yml/badge.svg)](https://github.com/julelang/jule/actions/workflows/tests.yml)
-[![Jule Community](https://dcbadge.vercel.app/api/server/ReWQgPDnP6?style=flat)](https://discord.gg/ReWQgPDnP6)
+[![Jule Community](https://dcbadge.vercel.app/api/server/ReWQgPDnP6?style=flat)](https://discord.gg/XNSUUDuGGQ)
 
 </strong>
 
@@ -64,7 +64,7 @@ Contribute and get involved in our community.
 Join Julenours to support Jule, explore and interact with the community.\
 Our main community platforms:
 
-- [Official Discord Server of The Jule Community](https://discord.gg/CZhK7dyh9X)
+- [Official Discord Server of The Jule Community](https://discord.gg/XNSUUDuGGQ)
 - [GitHub Discussions](https://github.com/jule-lang/jule/discussions)
 
 ## Compile from Source
