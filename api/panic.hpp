@@ -8,13 +8,13 @@
 #include <iostream>
 #include <vector>
 
+#ifdef OS_WINDOWS
+#include "windows.h"
+
 #include "types.hpp"
 #include "platform.hpp"
 #include "str.hpp"
-#include "utf8.hpp"
-
-#ifdef OS_WINDOWS
-#include "windows.h"
+#include "utf16.hpp"
 #endif
 
 namespace jule {
