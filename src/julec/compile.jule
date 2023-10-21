@@ -32,8 +32,7 @@ use std::jule::build::{
     logf,
     is_valid_cpp_ext,
 }
-
-cpp unsafe fn system(cmd: *integrated::Char): int
+use std::process::{Cmd}
 
 // Sets by COMPILER or command-line inputs.
 static mut COMPILER = ""
@@ -46,10 +45,6 @@ static mut CPP_STD = "c++17" // Default C++ standard
 
 static mut SHADOWING = false
 static mut TRANSPILATION = false
-
-fn system(cmd: str): int {
-    ret unsafe { cpp.system((*integrated::Char)(&cmd[0])) }
-}
 
 fn write_output(path: str, content: str) {
     let dir = dir(path)
@@ -80,10 +75,16 @@ fn clear_objects() {
 
 // Compie generated IR.
 fn compile_ir(compiler: str, compiler_cmd: str) {
-    let status = system(compiler + " " + compiler_cmd)
+    let mut cmd = Cmd.new(compiler)
+    cmd.args = [compiler]
+    cmd.args = append(cmd.args, compiler_cmd.split(" ", -1)...)
+    cmd.spawn()!
+    let status = cmd.wait()!
     if status != 0 {
-        out("external compiler failed with status code: ");
-        outln(status)
+        let error_message = "\n>>> your backend compiler (" + COMPILER + `) reports problems
+>>> please check errors above
+>>> is this a compiler problem, please report us: https://github.com/julelang/jule/issues/new/choose`
+        AnsiEscape.print(str(AnsiSeq.Red), error_message)
         exit_err("")
     }
 
