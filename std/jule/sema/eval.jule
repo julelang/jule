@@ -3632,6 +3632,23 @@ impl BinopSolver {
 
     fn eval_enum(mut self): &Data {
         let mut enm = self.l.kind.enm()
+        match self.op.kind {
+        | str(TokenKind.Eqs)
+        | str(TokenKind.NotEq):
+            let mut rkind = self.r.kind
+            if self.r.kind.enm() != nil {
+                rkind = self.r.kind.enm().kind.kind
+            }
+            if !self.e.s.check_type_compatibility(enm.kind.kind, rkind, self.op) {
+                ret nil
+            }
+            ret &Data{
+                kind: &TypeKind{
+                    kind: build_prim_type(str(PrimKind.Bool)),
+                },
+            }
+        }
+
         if self.r.kind.enm() == nil || enm != self.r.kind.enm() {
             self.e.push_err(self.op, LogMsg.IncompatibleTypes, enm.ident, self.r.kind.to_str())
             ret nil
@@ -3646,10 +3663,6 @@ impl BinopSolver {
                 self.e.push_err(self.op, LogMsg.OperatorNotForJuleType, self.op.kind, enm.ident)
                 ret nil
             }
-            fall
-
-        | str(TokenKind.Eqs)
-        | str(TokenKind.NotEq):
             ret &Data{
                 kind: &TypeKind{
                     kind: build_prim_type(str(PrimKind.Bool)),
@@ -4166,6 +4179,10 @@ impl BinopSolver {
 
         | self.l.kind.is_nil():
             ret self.eval_nil()
+
+        | self.r.kind.enm() != nil:
+            self.l, self.r = self.r, self.l
+            fall
 
         | self.l.kind.enm() != nil:
             ret self.eval_enum()
