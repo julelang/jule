@@ -1,0 +1,27 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use std::sync::{WaitGroup}
+use std::sync::atomic::{AtomicInt, MemoryOrder}
+
+static mut n: AtomicInt = AtomicInt.new(0)
+
+fn add_to_n(mut wg: *WaitGroup) {
+    unsafe defer { wg.done() }
+    n.add(1, MemoryOrder.Relaxed)
+}
+
+fn main() {
+    let mut wg = WaitGroup{}
+
+    let mut j = 0
+    for j < 1000000; j++ {
+        wg.add(1)
+        co add_to_n(&wg)
+    }
+
+    wg.wait()
+
+    outln(n.load(MemoryOrder.Relaxed))
+}
