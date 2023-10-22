@@ -2,13 +2,8 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use std::jule::ast::{
-    Expr,
-    TypeDecl,
-    GenericDecl,
-    Directive,
-}
-use std::jule::build::{Derive, LogMsg, Log, LogKind, logf}
+use ast for std::jule::ast
+use std::jule::build::{Directive, Derive, LogMsg, Log, LogKind, logf}
 use std::jule::constant::{Const}
 use std::jule::lex::{File, Token, TokenKind, is_ignore_ident, is_anon_ident}
 use types for std::jule::types
@@ -551,7 +546,7 @@ impl Sema {
         ret false
     }
 
-    fn check_directives(mut &self, mut &d: []&Directive, mut o: any) {
+    fn check_directives(mut &self, mut &d: []&ast::Directive, mut o: any) {
         let mut dc = DirectiveChecker{
             s: self,
             d: d,
@@ -782,7 +777,7 @@ impl Sema {
 
     // Builds type with type aliases for generics.
     // Returns nil if error occur or failed.
-    fn build_type_with_generics(mut &self, mut &t: &TypeDecl,
+    fn build_type_with_generics(mut &self, mut &t: &ast::TypeDecl,
         mut generics: []&TypeAlias): &TypeKind {
         let mut tc = &TypeChecker{
             s:            self,
@@ -793,7 +788,7 @@ impl Sema {
     }
 
     // Same as s.build_type_with_generics but not uses any generics.
-    fn build_type(mut &self, mut &t: &TypeDecl): &TypeKind {
+    fn build_type(mut &self, mut &t: &ast::TypeDecl): &TypeKind {
         ret self.build_type_with_generics(t, nil)
     }
 
@@ -898,8 +893,8 @@ impl Sema {
     // Useful:
     //   - For non-generic type parsed string type kinds.
     //   - For checking non-generic types.
-    fn build_non_generic_type_kind(mut &self, mut &ast: &TypeDecl,
-        mut &generics: []&GenericDecl): &TypeKind {
+    fn build_non_generic_type_kind(mut &self, mut &ast: &ast::TypeDecl,
+        mut &generics: []&ast::GenericDecl): &TypeKind {
         let mut tc = &TypeChecker{
             s:               self,
             lookup:          self,
@@ -909,7 +904,7 @@ impl Sema {
     }
 
     fn build_fn_non_generic_type_kinds(mut &self, mut &f: &FnIns) {
-        let mut generics: []&GenericDecl = nil
+        let mut generics: []&ast::GenericDecl = nil
         if f.decl.is_method() {
             generics = append(f.decl.generics, f.decl.owner.generics...)
         } else {
@@ -1240,7 +1235,7 @@ impl Sema {
         ret true
     }
 
-    fn check_decl_generics(mut self, &generics: []&GenericDecl): (ok: bool) {
+    fn check_decl_generics(mut self, &generics: []&ast::GenericDecl): (ok: bool) {
         ok = true
         for i, g in generics {
             if is_ignore_ident(g.ident) {
@@ -1672,7 +1667,13 @@ impl Sema {
                     tf_k.equals(&TypeKind{kind: sf_k})
                 )
             }
-            if !exist {
+            if exist {
+                let d = find_directive(sf.directives, Directive.Deprecated)
+                if d != nil {
+                    self.push_err(d.tag, LogMsg.TraitImplDeprecated)
+                }
+                ok = false
+            } else {
                 const IDENT = true
                 let mut s = tf_k.get_kind_str(IDENT)
                 if tf.public {

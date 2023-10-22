@@ -44,6 +44,16 @@ use std::jule::lex::{
 }
 use types for std::jule::types
 
+// Returns directive if exist.
+fn find_directive(mut &directives: []&std::jule::ast::Directive, d: Directive): &std::jule::ast::Directive {
+    for (_, mut dr) in directives {
+        if dr.tag.kind == str(d) {
+            ret dr
+        }
+    }
+    ret nil
+}
+
 fn find_builtins_import(ident: str, imp: &ImportInfo): any {
     ret find_package_builtin_def(imp.link_path, ident)
 }
@@ -656,21 +666,19 @@ impl Eval {
         }
     }
 
-    fn check_deprecated(mut self, directives: []&std::jule::ast::Directive, tok: Token) {
+    fn check_deprecated(mut self, mut &directives: []&std::jule::ast::Directive, tok: Token) {
         if self.is_unsafe() {
             ret
         }
 
-        for _, d in directives {
-            if d.tag.kind == str(Directive.Deprecated) {
-                if d.args.len == 0 {
-                    self.push_err(tok, LogMsg.UsingDeprecated, "this code is deprecated")
-                } else {
-                    self.push_err(tok, LogMsg.UsingDeprecated, d.args[0].kind)
-                }
-                self.push_suggestion(LogMsg.UseUnsafeForDeprecated)
-                ret
+        let d = find_directive(directives, Directive.Deprecated)
+        if d != nil {
+            if d.args.len == 0 {
+                self.push_err(tok, LogMsg.UsingDeprecated, "this code is deprecated")
+            } else {
+                self.push_err(tok, LogMsg.UsingDeprecated, d.args[0].kind)
             }
+            self.push_suggestion(LogMsg.UseUnsafeForDeprecated)
         }
     }
 
