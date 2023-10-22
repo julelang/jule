@@ -4,6 +4,7 @@
 
 use std::conv::{ConvError, parse_float, parse_int, parse_uint}
 use std::jule::ast::{
+    self,
     Expr,
     LitExpr,
     IdentExpr,
@@ -28,7 +29,7 @@ use std::jule::ast::{
     IdentTypeDecl,
     TernaryExpr,
 }
-use std::jule::build::{LogMsg, logf}
+use std::jule::build::{LogMsg, Directive, logf}
 use std::jule::constant::{Const}
 use lit for std::jule::constant::lit
 use std::jule::lex::{
@@ -637,6 +638,8 @@ impl Eval {
             ret nil
         }
 
+        self.check_deprecated(s.decl.directives, error_token)
+
         ret self.__eval_struct(s)
     }
 
@@ -653,12 +656,32 @@ impl Eval {
         }
     }
 
+    fn check_deprecated(mut self, directives: []&std::jule::ast::Directive, tok: Token) {
+        if self.is_unsafe() {
+            ret
+        }
+
+        for _, d in directives {
+            if d.tag.kind == str(Directive.Deprecated) {
+                if d.args.len == 0 {
+                    self.push_err(tok, LogMsg.UsingDeprecated, "this code is deprecated")
+                } else {
+                    self.push_err(tok, LogMsg.UsingDeprecated, d.args[0].kind)
+                }
+                self.push_suggestion(LogMsg.UseUnsafeForDeprecated)
+                ret
+            }
+        }
+    }
+
     fn eval_fn(mut self, mut f: &Fn, error_token: Token): &Data {
         if !self.s.is_accessible_define(f.public, f.token) {
             self.push_err(error_token, LogMsg.IdentIsNotAccessible, f.ident)
             self.push_suggestion(LogMsg.MakePubToAccess)
             ret nil
         }
+
+        self.check_deprecated(f.directives, error_token)
 
         let mut ins = f.instance()
         self.push_reference_to_fn(ins)
@@ -724,6 +747,8 @@ impl Eval {
             self.push_suggestion(LogMsg.MakePubToAccess)
             ret nil
         }
+
+        self.check_deprecated(v.directives, error_token)
 
         v.used = true
 
@@ -1966,6 +1991,7 @@ impl Eval {
         // NOTE: Instance already checked (just fields) if generic quantity passes.
 
         self.push_reference_to_struct(s)
+        self.check_deprecated(s.decl.directives, error_token)
 
         let mut slc = StructLitChecker{
             e:           self,
@@ -2416,6 +2442,8 @@ impl Eval {
         if m.params[0].is_ref() && !ref {
             self.push_err(si.ident, LogMsg.RefMethodUsedWithNotRefInstance)
         }
+
+        self.check_deprecated(m.directives, si.ident)
 
         let mut ins = m.instance()
         ins.owner = s

@@ -113,12 +113,55 @@ impl DirectiveChecker {
         d.args[0].kind = arg.kind[1:arg.kind.len-1]
     }
 
+    fn check_deprecated(mut self, mut &d: &ast::Directive) {
+        match type self.o {
+        | &Struct:
+            if (&Struct)(self.o).cpp_linked {
+                self.s.push_err(d.tag, LogMsg.UnsupportedDirective, d.tag.kind)
+            }
+
+        | &Fn:
+            if (&Fn)(self.o).cpp_linked {
+                self.s.push_err(d.tag, LogMsg.UnsupportedDirective, d.tag.kind)
+            }
+
+        | &Var:
+            if (&Var)(self.o).cpp_linked {
+                self.s.push_err(d.tag, LogMsg.UnsupportedDirective, d.tag.kind)
+            }
+
+        |:
+            self.s.push_err(d.tag, LogMsg.UnsupportedDirective, d.tag.kind)
+        }
+
+        if d.args.len == 0 {
+            ret
+        }
+        if d.args.len > 1 {
+            self.s.push_err(d.args[1], LogMsg.ArgumentOverflow)
+        }
+
+        let arg = d.args[0]
+        if arg.id != TokenId.Lit {
+            self.s.push_err(arg, LogMsg.InvalidSyntax)
+            ret
+        }
+
+        if arg.kind[0] != '"' {
+            self.s.push_err(arg, LogMsg.InvalidSyntax)
+            ret
+        }
+
+        d.args[0].kind = arg.kind[1:arg.kind.len-1]
+    }
+
     fn check_directive(mut self, mut &d: &ast::Directive) {
         match d.tag.kind {
         | str(Directive.Cdef): self.check_cdef(d)
         | str(Directive.Typedef): self.check_typedef(d)
         | str(Directive.Derive): self.check_derive(d)
         | str(Directive.Namespace): self.check_namespace(d)
+        | str(Directive.Deprecated): self.check_deprecated(d)
 
         | str(Directive.Build)
         | str(Directive.Pass):
