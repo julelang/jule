@@ -47,7 +47,7 @@ use types for std::jule::types
 // Returns directive if exist.
 fn find_directive(mut &directives: []&std::jule::ast::Directive, d: Directive): &std::jule::ast::Directive {
     for (_, mut dr) in directives {
-        if dr.tag.kind == str(d) {
+        if dr.tag.kind == d {
             ret dr
         }
     }
@@ -79,7 +79,7 @@ fn build_error_var(mut &s: &Scope, mut &fc: &FnCallExpr): &Var {
         token:     fc.token,
         kind:      &TypeSymbol{
             kind: &TypeKind{
-                kind: build_prim_type(str(PrimKind.Any)),
+                kind: build_prim_type(PrimKind.Any),
             },
         },
         scope: s,
@@ -124,10 +124,10 @@ fn is_instanced_struct(s: &StructIns): bool {
 
 fn is_ptr_arithmetic_compatible_int(mut &d: &Data): bool {
     if d.is_const() {
-        ret int_assignable(str(types::TypeKind.Int), d)
+        ret int_assignable(types::TypeKind.Int, d)
     }
     let mut tcc = TypeCompatibilityChecker{
-        dest:        &TypeKind{kind: build_prim_type(str(types::TypeKind.Int))},
+        dest:        &TypeKind{kind: build_prim_type(types::TypeKind.Int)},
         src:         d.kind,
     }
     ret tcc.check()
@@ -162,12 +162,12 @@ fn normalize_bitsize(mut &d: &Data) {
 
 fn normalize_type(mut &d: &Data) {
     match {
-    | int_assignable(str(PrimKind.Int), d):
-        d.kind.kind = build_prim_type(str(PrimKind.Int))
+    | int_assignable(PrimKind.Int, d):
+        d.kind.kind = build_prim_type(PrimKind.Int)
         d.constant.set_i64(i64(d.constant.as_f64()))
 
-    | int_assignable(str(PrimKind.Uint), d):
-        d.kind.kind = build_prim_type(str(PrimKind.Uint))
+    | int_assignable(PrimKind.Uint, d):
+        d.kind.kind = build_prim_type(PrimKind.Uint)
         d.constant.set_u64(u64(d.constant.as_f64()))
     }
 }
@@ -239,8 +239,8 @@ fn check_data_for_integer_indexing(mut &d: &Data): (err_fmt: LogMsg) {
 
     | d.kind.prim() == nil
     | d.is_const()
-    | types::real_kind_of(d.kind.prim().to_str()) != types::real_kind_of(str(PrimKind.Int)):
-        d.cast_kind = &TypeKind{kind: build_prim_type(str(PrimKind.Int))}
+    | types::real_kind_of(d.kind.prim().to_str()) != types::real_kind_of(PrimKind.Int):
+        d.cast_kind = &TypeKind{kind: build_prim_type(PrimKind.Int)}
         apply_cast_kind(d)
     }
     ret LogMsg.Empty
@@ -343,9 +343,9 @@ impl Eval {
     fn lit_str(self, &l: &LitExpr): &Data {
         let mut s = l.value[1 : l.value.len-1] // Remove quotes.
         if is_raw_str(l.value) {
-            s = lit::to_raw_str(([]byte)(s))
+            s = lit::to_raw_str([]byte(s))
         } else {
-            s = lit::to_str(([]byte)(s))
+            s = lit::to_str([]byte(s))
         }
         let mut constant = Const.new_str(s)
 
@@ -355,7 +355,7 @@ impl Eval {
             constant: constant,
             decl:     false,
             kind: &TypeKind{
-                kind: build_prim_type(str(PrimKind.Str)),
+                kind: build_prim_type(PrimKind.Str),
             },
             model: constant,
         }
@@ -369,15 +369,15 @@ impl Eval {
             constant: constant,
             decl:     false,
             kind: &TypeKind{
-                kind: build_prim_type(str(PrimKind.Bool)),
+                kind: build_prim_type(PrimKind.Bool),
             },
             model: constant,
         }
     }
 
     fn lit_rune(self, &l: &LitExpr): &Data {
-        const BYTE_KIND = str(PrimKind.U8)
-        const RUNE_KIND = str(PrimKind.I32)
+        const BYTE_KIND: str = PrimKind.U8
+        const RUNE_KIND: str = PrimKind.I32
 
         let lt = l.value[1 : l.value.len-1] // Remove quotes.
         let r = lit::to_rune(([]byte)(lt))
@@ -405,7 +405,7 @@ impl Eval {
     }
 
     fn lit_float(self, &l: &LitExpr): &Data {
-        const FLOAT_KIND = str(PrimKind.F64)
+        const FLOAT_KIND: str = PrimKind.F64
 
         let (f, _) = parse_float(l.value, 64)
         let mut constant = Const.new_f64(f)
@@ -1366,7 +1366,7 @@ impl Eval {
     }
 
     fn indexing_str(mut self, mut &d: &Data, mut &index: &Data, &i: &IndexingExpr) {
-        const BYTE_KIND = str(PrimKind.U8)
+        const BYTE_KIND: str = PrimKind.U8
         d.kind = &TypeKind{kind: build_prim_type(BYTE_KIND)}
 
         if index == nil {
@@ -1757,20 +1757,20 @@ impl Eval {
         if d.kind.prim() != nil {
             let prim = d.kind.prim()
             if !prim.is_u8() && !prim.is_i32() {
-                self.push_err(error_token, LogMsg.TypeNotSupportsCastingTo, str(PrimKind.Str), d.kind.to_str())
+                self.push_err(error_token, LogMsg.TypeNotSupportsCastingTo, PrimKind.Str, d.kind.to_str())
             }
             ret
         }
 
         if d.kind.slc() == nil {
-            self.push_err(error_token, LogMsg.TypeNotSupportsCastingTo, str(PrimKind.Str), d.kind.to_str())
+            self.push_err(error_token, LogMsg.TypeNotSupportsCastingTo, PrimKind.Str, d.kind.to_str())
             ret
         }
 
         let mut t = d.kind.slc().elem
         let prim = t.prim()
         if prim == nil || (!prim.is_u8() && !prim.is_i32()) {
-            self.push_err(error_token, LogMsg.TypeNotSupportsCastingTo, str(PrimKind.Str), d.kind.to_str())
+            self.push_err(error_token, LogMsg.TypeNotSupportsCastingTo, PrimKind.Str, d.kind.to_str())
         }
     }
 
@@ -2596,7 +2596,7 @@ impl Eval {
                                 kind: map_kind.key,
                             },
                         ],
-                        result: &TypeKind{kind: build_prim_type(str(PrimKind.Bool))},
+                        result: &TypeKind{kind: build_prim_type(PrimKind.Bool)},
                     },
                 },
                 model: &CommonSubIdentExprModel{
@@ -2636,7 +2636,7 @@ impl Eval {
     }
 
     fn eval_str_sub_ident(mut self, mut d: &Data, ident: Token): &Data {
-        let mut str_kind = &TypeKind{kind: build_prim_type(str(PrimKind.Str))}
+        let mut str_kind = &TypeKind{kind: build_prim_type(PrimKind.Str)}
         match ident.kind {
         | "len":
             ret &Data{
@@ -2662,7 +2662,7 @@ impl Eval {
                                 kind: str_kind,
                             },
                         ],
-                        result: &TypeKind{kind: build_prim_type(str(PrimKind.Bool))},
+                        result: &TypeKind{kind: build_prim_type(PrimKind.Bool)},
                     },
                 },
                 model: &CommonSubIdentExprModel{
@@ -2685,7 +2685,7 @@ impl Eval {
                                 kind: str_kind,
                             },
                         ],
-                        result: &TypeKind{kind: build_prim_type(str(PrimKind.Bool))},
+                        result: &TypeKind{kind: build_prim_type(PrimKind.Bool)},
                     },
                 },
                 model: &CommonSubIdentExprModel{
@@ -2708,7 +2708,7 @@ impl Eval {
                                 kind: str_kind,
                             },
                         ],
-                        result: &TypeKind{kind: build_prim_type(str(PrimKind.Int))},
+                        result: &TypeKind{kind: build_prim_type(PrimKind.Int)},
                     },
                 },
                 model: &CommonSubIdentExprModel{
@@ -2731,7 +2731,7 @@ impl Eval {
                                 kind: str_kind,
                             },
                         ],
-                        result: &TypeKind{kind: build_prim_type(str(PrimKind.Int))},
+                        result: &TypeKind{kind: build_prim_type(PrimKind.Int)},
                     },
                 },
                 model: &CommonSubIdentExprModel{
@@ -2826,7 +2826,7 @@ impl Eval {
                                 decl: &Param{
                                     ident: "n",
                                 },
-                                kind: &TypeKind{kind: build_prim_type(str(PrimKind.Int))},
+                                kind: &TypeKind{kind: build_prim_type(PrimKind.Int)},
                             },
                         ],
                         result: &TypeKind{
@@ -2865,7 +2865,7 @@ impl Eval {
                                 decl: &Param{
                                     ident: "n",
                                 },
-                                kind: &TypeKind{kind: build_prim_type(str(PrimKind.Int))},
+                                kind: &TypeKind{kind: build_prim_type(PrimKind.Int)},
                             },
                         ],
                         result: str_kind,
@@ -2885,7 +2885,7 @@ impl Eval {
     }
 
     fn eval_int_type_static(mut self, ident: Token): &Data {
-        const kind = str(PrimKind.Int)
+        const kind: str = PrimKind.Int
 
         match ident.kind {
         | "MAX":
@@ -2911,7 +2911,7 @@ impl Eval {
     }
 
     fn eval_uint_type_static(mut self, ident: Token): &Data {
-        const kind = str(PrimKind.Uint)
+        const kind: str = PrimKind.Uint
 
         match ident.kind {
         | "MAX":
@@ -2929,7 +2929,7 @@ impl Eval {
     }
 
     fn eval_i8_type_static(mut self, ident: Token): &Data {
-        const kind = str(PrimKind.I8)
+        const kind: str = PrimKind.I8
         const min = types::MIN_I8
         const max = types::MAX_I8
 
@@ -2957,7 +2957,7 @@ impl Eval {
     }
 
     fn eval_i16_type_static(mut self, ident: Token): &Data {
-        const kind = str(PrimKind.I16)
+        const kind: str = PrimKind.I16
         const min = types::MIN_I16
         const max = types::MAX_I16
 
@@ -2985,7 +2985,7 @@ impl Eval {
     }
 
     fn eval_i32_type_static(mut self, ident: Token): &Data {
-        const kind = str(PrimKind.I32)
+        const kind: str = PrimKind.I32
         const min = types::MIN_I32
         const max = types::MAX_I32
 
@@ -3013,7 +3013,7 @@ impl Eval {
     }
 
     fn eval_i64_type_static(mut self, ident: Token): &Data {
-        const kind = str(PrimKind.I64)
+        const kind: str = PrimKind.I64
         const min = types::MIN_I64
         const max = types::MAX_I64
 
@@ -3041,7 +3041,7 @@ impl Eval {
     }
 
     fn eval_u8_type_static(mut self, ident: Token): &Data {
-        const kind = str(PrimKind.U8)
+        const kind: str = PrimKind.U8
         const max = types::MAX_U8
 
         match ident.kind {
@@ -3060,7 +3060,7 @@ impl Eval {
     }
 
     fn eval_u16_type_static(mut self, ident: Token): &Data {
-        const kind = str(PrimKind.U16)
+        const kind: str = PrimKind.U16
         const max = types::MAX_U16
 
         match ident.kind {
@@ -3079,7 +3079,7 @@ impl Eval {
     }
 
     fn eval_u32_type_static(mut self, ident: Token): &Data {
-        const kind = str(PrimKind.U32)
+        const kind: str = PrimKind.U32
         const max = types::MAX_U32
 
         match ident.kind {
@@ -3098,7 +3098,7 @@ impl Eval {
     }
 
     fn eval_u64_type_static(mut self, ident: Token): &Data {
-        const kind = str(PrimKind.U64)
+        const kind: str = PrimKind.U64
         const max = types::MAX_U64
 
         match ident.kind {
@@ -3117,7 +3117,7 @@ impl Eval {
     }
 
     fn eval_f32_type_tatic(mut self, ident: Token): &Data {
-        const kind = str(PrimKind.F32)
+        const kind: str = PrimKind.F32
         const max = types::MAX_F32
         const min = types::MIN_F32
 
@@ -3145,7 +3145,7 @@ impl Eval {
     }
 
     fn eval_f64_type_static(mut self, ident: Token): &Data {
-        const kind = str(PrimKind.F64)
+        const kind: str = PrimKind.F64
         const max = types::MAX_F64
         const min = types::MIN_F64
 
@@ -3174,18 +3174,18 @@ impl Eval {
 
     fn eval_prim_static(mut self, kind: str, ident: Token): &Data {
         match kind {
-        | str(PrimKind.Int):  ret self.eval_int_type_static(ident)
-        | str(PrimKind.Uint): ret self.eval_uint_type_static(ident)
-        | str(PrimKind.I8):   ret self.eval_i8_type_static(ident)
-        | str(PrimKind.I16):  ret self.eval_i16_type_static(ident)
-        | str(PrimKind.I32):  ret self.eval_i32_type_static(ident)
-        | str(PrimKind.I64):  ret self.eval_i64_type_static(ident)
-        | str(PrimKind.U8):   ret self.eval_u8_type_static(ident)
-        | str(PrimKind.U16):  ret self.eval_u16_type_static(ident)
-        | str(PrimKind.U32):  ret self.eval_u32_type_static(ident)
-        | str(PrimKind.U64):  ret self.eval_u64_type_static(ident)
-        | str(PrimKind.F32):  ret self.eval_f32_type_tatic(ident)
-        | str(PrimKind.F64):  ret self.eval_f64_type_static(ident)
+        | PrimKind.Int:  ret self.eval_int_type_static(ident)
+        | PrimKind.Uint: ret self.eval_uint_type_static(ident)
+        | PrimKind.I8:   ret self.eval_i8_type_static(ident)
+        | PrimKind.I16:  ret self.eval_i16_type_static(ident)
+        | PrimKind.I32:  ret self.eval_i32_type_static(ident)
+        | PrimKind.I64:  ret self.eval_i64_type_static(ident)
+        | PrimKind.U8:   ret self.eval_u8_type_static(ident)
+        | PrimKind.U16:  ret self.eval_u16_type_static(ident)
+        | PrimKind.U32:  ret self.eval_u32_type_static(ident)
+        | PrimKind.U64:  ret self.eval_u64_type_static(ident)
+        | PrimKind.F32:  ret self.eval_f32_type_tatic(ident)
+        | PrimKind.F64:  ret self.eval_f64_type_static(ident)
         |:
             self.push_err(ident, LogMsg.TypeHaveNotIdent, kind, ident.kind)
             ret nil
@@ -3246,7 +3246,7 @@ impl Eval {
         | kind.prim() != nil:
             let p = kind.prim()
             match p.kind {
-            | str(PrimKind.Str):
+            | PrimKind.Str:
                 ret self.eval_str_sub_ident(d, si.ident)
             }
         }
@@ -3510,14 +3510,14 @@ impl Eval {
         if d.cast_kind == nil && d.is_const() && !d.is_rune && d.kind.prim() != nil {
             match {
             | d.constant.is_i64():
-                if int_assignable(str(PrimKind.Int), d) {
-                    d.kind = &TypeKind{kind: build_prim_type(str(PrimKind.Int))}
+                if int_assignable(PrimKind.Int, d) {
+                    d.kind = &TypeKind{kind: build_prim_type(PrimKind.Int)}
                     d.constant.set_i64(d.constant.as_i64())
                 }
 
             | d.constant.is_u64():
-                if int_assignable(str(PrimKind.Uint), d) {
-                    d.kind = &TypeKind{kind: build_prim_type(str(PrimKind.Uint))}
+                if int_assignable(PrimKind.Uint, d) {
+                    d.kind = &TypeKind{kind: build_prim_type(PrimKind.Uint)}
                     d.constant.set_u64(d.constant.as_u64())
                 }
             }
@@ -3620,7 +3620,7 @@ impl BinopSolver {
         | TokenKind.NotEq:
             ret &Data{
                 kind: &TypeKind{
-                    kind: build_prim_type(str(PrimKind.Bool)),
+                    kind: build_prim_type(PrimKind.Bool),
                 },
             }
 
@@ -3644,7 +3644,7 @@ impl BinopSolver {
             }
             ret &Data{
                 kind: &TypeKind{
-                    kind: build_prim_type(str(PrimKind.Bool)),
+                    kind: build_prim_type(PrimKind.Bool),
                 },
             }
         }
@@ -3665,7 +3665,7 @@ impl BinopSolver {
             }
             ret &Data{
                 kind: &TypeKind{
-                    kind: build_prim_type(str(PrimKind.Bool)),
+                    kind: build_prim_type(PrimKind.Bool),
                 },
             }
 
@@ -3692,7 +3692,7 @@ impl BinopSolver {
         | TokenKind.NotEq:
             ret &Data{
                 kind: &TypeKind{
-                    kind: build_prim_type(str(PrimKind.Bool)),
+                    kind: build_prim_type(PrimKind.Bool),
                 },
             }
 
@@ -3715,7 +3715,7 @@ impl BinopSolver {
             }
             ret &Data{
                 kind: &TypeKind{
-                    kind: build_prim_type(str(PrimKind.Bool)),
+                    kind: build_prim_type(PrimKind.Bool),
                 },
             }
 
@@ -3749,7 +3749,7 @@ impl BinopSolver {
         | TokenKind.NotEq:
             ret &Data{
                 kind: &TypeKind{
-                    kind: build_prim_type(str(PrimKind.Bool)),
+                    kind: build_prim_type(PrimKind.Bool),
                 },
             }
 
@@ -3769,7 +3769,7 @@ impl BinopSolver {
         | TokenKind.NotEq:
             ret &Data{
                 kind: &TypeKind{
-                    kind: build_prim_type(str(PrimKind.Bool)),
+                    kind: build_prim_type(PrimKind.Bool),
                 },
             }
 
@@ -3789,7 +3789,7 @@ impl BinopSolver {
         | TokenKind.NotEq:
             ret &Data{
                 kind: &TypeKind{
-                    kind: build_prim_type(str(PrimKind.Bool)),
+                    kind: build_prim_type(PrimKind.Bool),
                 },
             }
 
@@ -3809,7 +3809,7 @@ impl BinopSolver {
         | TokenKind.NotEq:
             ret &Data{
                 kind: &TypeKind{
-                    kind: build_prim_type(str(PrimKind.Bool)),
+                    kind: build_prim_type(PrimKind.Bool),
                 },
             }
 
@@ -3829,7 +3829,7 @@ impl BinopSolver {
         | TokenKind.NotEq:
             ret &Data{
                 kind: &TypeKind{
-                    kind: build_prim_type(str(PrimKind.Bool)),
+                    kind: build_prim_type(PrimKind.Bool),
                 },
             }
 
@@ -3845,12 +3845,12 @@ impl BinopSolver {
         | TokenKind.NotEq:
             ret &Data{
                 kind: &TypeKind{
-                    kind: build_prim_type(str(PrimKind.Bool)),
+                    kind: build_prim_type(PrimKind.Bool),
                 },
             }
 
         |:
-            self.e.push_err(self.op, LogMsg.OperatorNotForJuleType, self.op.kind, str(PrimKind.Any))
+            self.e.push_err(self.op, LogMsg.OperatorNotForJuleType, self.op.kind, PrimKind.Any)
             ret nil
         }
     }
@@ -3875,7 +3875,7 @@ impl BinopSolver {
 
     fn eval_str(mut self): &Data {
         let mut rk = self.r.kind.to_str()
-        if rk != str(PrimKind.Str) {
+        if rk != PrimKind.Str {
             self.e.push_err(self.op, LogMsg.IncompatibleTypes, self.l.kind.to_str(), rk)
             ret nil
         }
@@ -3888,12 +3888,12 @@ impl BinopSolver {
         | TokenKind.NotEq:
             ret &Data{
                 kind: &TypeKind{
-                    kind: build_prim_type(str(PrimKind.Bool)),
+                    kind: build_prim_type(PrimKind.Bool),
                 },
             }
 
         |:
-            self.e.push_err(self.op, LogMsg.OperatorNotForJuleType, self.op.kind, str(PrimKind.Any))
+            self.e.push_err(self.op, LogMsg.OperatorNotForJuleType, self.op.kind, PrimKind.Any)
             ret nil
         }
     }
@@ -3925,10 +3925,10 @@ impl BinopSolver {
         }
 
         match {
-        | sig_assignable(str(PrimKind.I64), d):
+        | sig_assignable(PrimKind.I64, d):
             d.constant.set_i64(d.constant.as_i64())
 
-        | unsig_assignable(str(PrimKind.U64), d):
+        | unsig_assignable(PrimKind.U64, d):
             d.constant.set_u64(d.constant.as_u64())
 
         |:
@@ -3950,17 +3950,17 @@ impl BinopSolver {
             ret true
         }
 
-        if lk == str(types::TypeKind.F32) {
+        if lk == types::TypeKind.F32 {
             if self.r.is_const() {
                 ret true
             }
-            ret rk == str(types::TypeKind.F32)
+            ret rk == types::TypeKind.F32
         }
-        if lk == str(types::TypeKind.F64) {
+        if lk == types::TypeKind.F64 {
             if self.r.is_const() {
                 ret true
             }
-            ret rk == str(types::TypeKind.F64)
+            ret rk == types::TypeKind.F64
         }
 
         if self.r.is_const() {
@@ -3972,8 +3972,8 @@ impl BinopSolver {
             // Skip castings.
             match type self.r.model {
             | &Const:
-                ret int_assignable(str(types::TypeKind.Int), self.r) ||
-                    int_assignable(str(types::TypeKind.Uint), self.r)
+                ret int_assignable(types::TypeKind.Int, self.r) ||
+                    int_assignable(types::TypeKind.Uint, self.r)
 
             |:
                 ret false
@@ -4001,7 +4001,7 @@ impl BinopSolver {
         | TokenKind.LessEq:
             ret &Data{
                 kind: &TypeKind{
-                    kind: build_prim_type(str(PrimKind.Bool)),
+                    kind: build_prim_type(PrimKind.Bool),
                 },
             }
         }
@@ -4047,7 +4047,7 @@ impl BinopSolver {
         | TokenKind.LessEq:
             ret &Data{
                 kind: &TypeKind{
-                    kind: build_prim_type(str(PrimKind.Bool)),
+                    kind: build_prim_type(PrimKind.Bool),
                 },
             }
         }
@@ -4106,7 +4106,7 @@ impl BinopSolver {
         | TokenKind.LessEq:
             ret &Data{
                 kind: &TypeKind{
-                    kind: build_prim_type(str(PrimKind.Bool)),
+                    kind: build_prim_type(PrimKind.Bool),
                 },
             }
         }
