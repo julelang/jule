@@ -252,15 +252,12 @@ impl Parser {
     }
 
     fn build_directive(mut self, mut tokens: []Token): &Directive {
-        if tokens[0].column > 1 {
-            self.push_err(tokens[0], LogMsg.DirectiveUsedAtMiddle)
-            ret nil
-        } else if tokens.len == 1 {
+        if tokens.len == 1 {
             self.push_err(tokens[0], LogMsg.InvalidSyntax)
             ret nil
         }
 
-        if tokens[1].column != 2 {
+        if tokens[1].column != tokens[0].column+1 {
             self.push_err(tokens[0], LogMsg.InvalidSyntax)
             ret nil
         }
@@ -283,13 +280,6 @@ impl Parser {
             }
         }
         self.directives = append(self.directives, d)
-    }
-
-    fn process_comment(mut self, mut &c: &Comment) {
-        if self.comment_group == nil {
-            self.comment_group = &CommentGroup{}
-        }
-        self.comment_group.comments = append(self.comment_group.comments, c)
     }
 
     fn build_scope(mut &self, mut &tokens: []Token): &ScopeTree {
@@ -1579,6 +1569,11 @@ impl Parser {
                 // Ignore.
                 continue
 
+            | TokenId.Hash:
+                // CHECK TRAIT BODIES
+                self.push_directive(self.build_directive(tokens))
+                continue
+
             | TokenId.Pub:
                 is_pub = true
                 if tokens.len == 1 {
@@ -1604,8 +1599,8 @@ impl Parser {
             | TokenId.Unsafe:
                 let mut f = self.get_method(tokens)
                 if f != nil {
-                    f.public = is_pub
                     self.check_method_receiver(f)
+                    self.apply_fn_meta(f, is_pub)
                     ipl.methods = append(ipl.methods, f)
                 }
 
@@ -1723,12 +1718,7 @@ impl Parser {
             ret self.build_directive(tokens)
 
         | TokenId.Comment:
-            // Push first token because this is full text comment.
-            // Comments are just single-line.
-            // Range comments not accepts by lexer.
-            let mut c = build_comment(token)
-            self.process_comment(c)
-            ret c
+            ret build_comment(token)
 
         |:
             self.push_err(token, LogMsg.InvalidSyntax)
@@ -1768,6 +1758,15 @@ impl Parser {
         }
     }
 
+    fn apply_fn_meta(mut self, mut &f: &FnDecl, mut is_pub: bool) {
+        f.public = is_pub
+        is_pub = false
+        f.directives = self.directives
+        self.directives = nil
+        f.doc_comments = self.comment_group
+        self.comment_group = nil
+    }
+
     fn apply_meta(mut self, mut &node: Node, mut is_pub: bool) {
         match type node.data {
         | &VarDecl:
@@ -1790,12 +1789,8 @@ impl Parser {
                 ret
             }
 
-            f.public = is_pub
+            self.apply_fn_meta(f, is_pub)
             is_pub = false
-            f.directives = self.directives
-            self.directives = nil
-            f.doc_comments = self.comment_group
-            self.comment_group = nil
 
         | &TypeAliasDecl:
             let mut tad = (&TypeAliasDecl)(node.data)
@@ -1915,9 +1910,10 @@ impl Parser {
             self.ast.decls = append(self.ast.decls, node)
 
         | node.is_comment():
-            // Global scope is not appends &CommentGroup.
-            let mut c = (&Comment)(node.data)
-            self.ast.comments = append(self.ast.comments, c)
+            if self.comment_group == nil {
+                self.comment_group = &CommentGroup{}
+            }
+            self.comment_group.comments = append(self.comment_group.comments, (&Comment)(node.data))
 
         | node.is_impl():
             self.ast.impls = append(self.ast.impls, (&Impl)(node.data))
