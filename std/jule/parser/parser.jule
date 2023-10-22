@@ -1757,16 +1757,15 @@ impl Parser {
         }
     }
 
-    fn apply_fn_meta(mut self, mut &f: &FnDecl, mut is_pub: bool) {
+    fn apply_fn_meta(mut self, mut &f: &FnDecl, is_pub: bool) {
         f.public = is_pub
-        is_pub = false
         f.directives = self.directives
         self.directives = nil
         f.doc_comments = self.comment_group
         self.comment_group = nil
     }
 
-    fn apply_meta(mut self, mut &node: Node, mut is_pub: bool) {
+    fn apply_meta(mut self, mut &node: Node, is_pub: bool) {
         match type node.data {
         | &VarDecl:
             let mut v = (&VarDecl)(node.data)
@@ -1774,7 +1773,6 @@ impl Parser {
                 ret
             }
             v.public = is_pub
-            is_pub = false
 
             v.doc_comments = self.comment_group
             self.comment_group = nil
@@ -1789,7 +1787,6 @@ impl Parser {
             }
 
             self.apply_fn_meta(f, is_pub)
-            is_pub = false
 
         | &TypeAliasDecl:
             let mut tad = (&TypeAliasDecl)(node.data)
@@ -1797,7 +1794,6 @@ impl Parser {
                 ret
             }
             tad.public = is_pub
-            is_pub = false
             tad.doc_comments = self.comment_group
             self.comment_group = nil
 
@@ -1809,7 +1805,6 @@ impl Parser {
             ed.doc_comments = self.comment_group
             self.comment_group = nil
             ed.public = is_pub
-            is_pub = false
 
         | &StructDecl:
             let mut sd = (&StructDecl)(node.data)
@@ -1821,7 +1816,6 @@ impl Parser {
             sd.doc_comments = self.comment_group
             self.comment_group = nil
             sd.public = is_pub
-            is_pub = false
 
         | &TraitDecl:
             let mut td = (&TraitDecl)(node.data)
@@ -1831,10 +1825,11 @@ impl Parser {
             td.doc_comments = self.comment_group
             self.comment_group = nil
             td.public = is_pub
-            is_pub = false
-        }
-        if is_pub {
-            self.push_err(node.token, LogMsg.DefNotSupportPub)
+        
+        |:
+            if is_pub {
+                self.push_err(node.token, LogMsg.DefNotSupportPub)
+            }
         }
     }
 
