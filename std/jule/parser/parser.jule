@@ -112,9 +112,9 @@ fn range_last(mut &tokens: []Token): (cutted: []Token, cut: []Token) {
         let token = tokens[i]
         if token.id == TokenId.Range {
             match token.kind {
-            | str(TokenKind.RBrace)
-            | str(TokenKind.RBracket)
-            | str(TokenKind.RParent):
+            | TokenKind.RBrace
+            | TokenKind.RBracket
+            | TokenKind.RParent:
                 brace_n++
                 continue
 
@@ -150,9 +150,9 @@ fn parts(mut &tokens: []Token, id: TokenId, expr_must: bool): ([][]Token, []Log)
     for i, token in tokens {
         if token.id == TokenId.Range {
             match token.kind {
-            | str(TokenKind.LBrace)
-            | str(TokenKind.LBracket)
-            | str(TokenKind.LParent):
+            | TokenKind.LBrace
+            | TokenKind.LBracket
+            | TokenKind.LParent:
                 range_n++
                 continue
             |:
@@ -185,10 +185,10 @@ fn parts(mut &tokens: []Token, id: TokenId, expr_must: bool): ([][]Token, []Log)
 
 fn get_close_kind_of_brace(left: str): str {
     match left {
-        | str(TokenKind.RParent):  ret str(TokenKind.LParent)
-        | str(TokenKind.RBrace):   ret str(TokenKind.LBrace)
-        | str(TokenKind.RBracket): ret str(TokenKind.LBracket)
-        |:                         ret ""
+        | TokenKind.RParent:  ret TokenKind.LParent
+        | TokenKind.RBrace:   ret TokenKind.LBrace
+        | TokenKind.RBracket: ret TokenKind.LBracket
+        |:                        ret ""
     }
 }
 
@@ -359,7 +359,7 @@ impl Parser {
         if tok.id == TokenId.Colon {
             i++ // Skip type annotation operator (:)
             if (i >= tokens.len ||
-            (tokens[i].id == TokenId.Op && tokens[i].kind == str(TokenKind.Eq))) {
+            (tokens[i].id == TokenId.Op && tokens[i].kind == TokenKind.Eq)) {
                 self.push_err(tok, LogMsg.MissingType)
                 ret
             }
@@ -374,7 +374,7 @@ impl Parser {
         }
 
         if tok.id == TokenId.Op {
-            if tok.kind != str(TokenKind.Eq) {
+            if tok.kind != TokenKind.Eq {
                 self.push_err(tok, LogMsg.InvalidSyntax)
                 ret
             }
@@ -449,7 +449,7 @@ impl Parser {
         }
 
         tokens = tokens[*i:]
-        if tokens[0].id == TokenId.Op && tokens[0].kind == str(TokenKind.Amper) {
+        if tokens[0].id == TokenId.Op && tokens[0].kind == TokenKind.Amper {
             v.reference = true
             if tokens.len == 1 {
                 ret nil
@@ -513,8 +513,8 @@ impl Parser {
             }
         }
 
-        if tokens[i].kind == str(TokenKind.Amper) {
-            param.ident = str(TokenKind.Amper)
+        if tokens[i].kind == TokenKind.Amper {
+            param.ident = TokenKind.Amper
             i++
             if i >= tokens.len {
                 self.push_err(tokens[i-1], LogMsg.InvalidSyntax)
@@ -539,7 +539,7 @@ impl Parser {
             let token = tokens[i]
             if token.id != TokenId.Op {
                 ret
-            } else if token.kind != str(TokenKind.TripleDot) {
+            } else if token.kind != TokenKind.TripleDot {
                 ret
             }
 
@@ -611,7 +611,7 @@ impl Parser {
 
         // Catch reference parameters.
         if tokens.len >= 3 {
-            if param.token.id == TokenId.Op && param.token.kind == str(TokenKind.Amper) {
+            if param.token.id == TokenId.Op && param.token.kind == TokenKind.Amper {
                 if tokens.len == 1 {
                     self.push_err(tokens[0], LogMsg.InvalidSyntax)
                     ret nil
@@ -764,12 +764,12 @@ impl Parser {
         let mut token = tokens[i]
         match token.id {
         | TokenId.Range:
-            if token.kind == str(TokenKind.LBrace) {
+            if token.kind == TokenKind.LBrace {
                 ret
             }
 
         | TokenId.Op:
-            if token.kind == str(TokenKind.Eq) {
+            if token.kind == TokenKind.Eq {
                 ret
             }
 
@@ -783,11 +783,11 @@ impl Parser {
             token = tokens[i]
             if token.id == TokenId.Range {
                 match token.kind {
-                | str(TokenKind.LParent):
+                | TokenKind.LParent:
                     let (mut decl, ok) = self.build_multi_ret_type(tokens, i)
                     ret decl, ok
 
-                | str(TokenKind.LBrace):
+                | TokenKind.LBrace:
                     self.push_err(token, LogMsg.MissingType)
                     ret
                 }
@@ -855,7 +855,7 @@ impl Parser {
             f.generics = self.build_generics(generics_tokens, error_token)
         }
 
-        if tokens[i].kind != str(TokenKind.LParent) {
+        if tokens[i].kind != TokenKind.LParent {
             self.push_err(tokens[i], LogMsg.MissingFnParentheses)
             ret nil
         }
@@ -867,7 +867,7 @@ impl Parser {
 
         if i < tokens.len {
             let token = tokens[i]
-            if token.id == TokenId.Op && token.kind == str(TokenKind.Excl) {
+            if token.id == TokenId.Op && token.kind == TokenKind.Excl {
                 f.exceptional = true
                 i++
             }
@@ -971,7 +971,7 @@ impl Parser {
             ret
 
         | TokenId.Range:
-            if token.kind != str(TokenKind.RBrace) {
+            if token.kind != TokenKind.RBrace {
                 self.push_err(token, LogMsg.InvalidSyntax)
                 ret
             }
@@ -994,7 +994,7 @@ impl Parser {
             }
 
         | TokenId.Op:
-            if token.kind != str(TokenKind.Star) {
+            if token.kind != TokenKind.Star {
                 self.push_err(token, LogMsg.InvalidSyntax)
                 ret
             }
@@ -1028,7 +1028,7 @@ impl Parser {
             ret
 
         | TokenId.Range:
-            if token.kind != str(TokenKind.RBrace) {
+            if token.kind != TokenKind.RBrace {
                 self.push_err(token, LogMsg.InvalidSyntax)
                 ret
             }
@@ -1054,7 +1054,7 @@ impl Parser {
             }
 
         | TokenId.Op:
-            if token.kind != str(TokenKind.Star) {
+            if token.kind != TokenKind.Star {
                 self.push_err(token, LogMsg.InvalidSyntax)
                 ret
             }
@@ -1139,9 +1139,9 @@ impl Parser {
             let t = tokens[*i]
             if t.id == TokenId.Range {
                 match t.kind {
-                | str(TokenKind.LBrace)
-                | str(TokenKind.LBracket)
-                | str(TokenKind.LParent):
+                | TokenKind.LBrace
+                | TokenKind.LBracket
+                | TokenKind.LParent:
                     brace_n++
                     continue
 
@@ -1193,7 +1193,7 @@ impl Parser {
             *i++
             t = tokens[*i]
             *i++
-            if t.id != TokenId.Op || t.kind != str(TokenKind.Eq) {
+            if t.id != TokenId.Op || t.kind != TokenKind.Eq {
                 self.push_err(t, LogMsg.InvalidSyntax)
                 self.push_suggestion(LogMsg.ExpectedEqualsForAssign)
                 continue
@@ -1631,7 +1631,7 @@ impl Parser {
         }
         token = tokens[2]
         if token.id != TokenId.For {
-            if token.id == TokenId.Range && token.kind == str(TokenKind.LBrace) {
+            if token.id == TokenId.Range && token.kind == TokenKind.LBrace {
                 // This implementation is single.
                 // Just implements to destination.
                 // Therefore, swap Base and Dest tokens.
@@ -1937,9 +1937,9 @@ impl Parser {
 
     fn push_wrong_order_close_err(mut self, &t: Token, &tokens: []Token, &ranges: []int) {
         match tokens[ranges[ranges.len-1]].kind {
-        | str(TokenKind.LParent):  self.push_err(t, LogMsg.ExpectedParentClose)
-        | str(TokenKind.LBrace):   self.push_err(t, LogMsg.ExpectedBraceClose)
-        | str(TokenKind.LBracket): self.push_err(t, LogMsg.ExpectedBracketClose)
+        | TokenKind.LParent:  self.push_err(t, LogMsg.ExpectedParentClose)
+        | TokenKind.LBrace:   self.push_err(t, LogMsg.ExpectedBraceClose)
+        | TokenKind.LBracket: self.push_err(t, LogMsg.ExpectedBracketClose)
         }
     }
 
@@ -1947,9 +1947,9 @@ impl Parser {
         let n = ranges.len
         if n == 0 {
             match t.kind {
-            | str(TokenKind.RBracket): self.push_err(t, LogMsg.ExtraClosedBracket)
-            | str(TokenKind.RBrace):   self.push_err(t, LogMsg.ExtraClosedBrace)
-            | str(TokenKind.RParent):  self.push_err(t, LogMsg.ExtraClosedParent)
+            | TokenKind.RBracket: self.push_err(t, LogMsg.ExtraClosedBracket)
+            | TokenKind.RBrace:   self.push_err(t, LogMsg.ExtraClosedBrace)
+            | TokenKind.RParent:  self.push_err(t, LogMsg.ExtraClosedParent)
             }
             ret
         } else if tokens[ranges[n-1]].kind != left {
@@ -1967,28 +1967,28 @@ impl Parser {
             }
 
             match token.kind {
-            | str(TokenKind.LParent)
-            | str(TokenKind.LBrace)
-            | str(TokenKind.LBracket):
+            | TokenKind.LParent
+            | TokenKind.LBrace
+            | TokenKind.LBracket:
                 ranges = append(ranges, i)
 
-            | str(TokenKind.RParent):
-                self.push_range_close(token, str(TokenKind.LParent), tokens, ranges)
+            | TokenKind.RParent:
+                self.push_range_close(token, TokenKind.LParent, tokens, ranges)
 
-            | str(TokenKind.RBrace):
-                self.push_range_close(token, str(TokenKind.LBrace), tokens, ranges)
+            | TokenKind.RBrace:
+                self.push_range_close(token, TokenKind.LBrace, tokens, ranges)
 
-            | str(TokenKind.RBracket):
-                self.push_range_close(token, str(TokenKind.LBracket), tokens, ranges)
+            | TokenKind.RBracket:
+                self.push_range_close(token, TokenKind.LBracket, tokens, ranges)
             }
         }
 
         for _, i in ranges {
             let token = tokens[i]
             match token.kind {
-            | str(TokenKind.LParent):  self.push_err(token, LogMsg.WaitCloseParent)
-            | str(TokenKind.LBrace):   self.push_err(token, LogMsg.WaitCloseBrace)
-            | str(TokenKind.LBracket): self.push_err(token, LogMsg.WaitCloseBracket)
+            | TokenKind.LParent:  self.push_err(token, LogMsg.WaitCloseParent)
+            | TokenKind.LBrace:   self.push_err(token, LogMsg.WaitCloseBrace)
+            | TokenKind.LBracket: self.push_err(token, LogMsg.WaitCloseBracket)
             }
         }
     }

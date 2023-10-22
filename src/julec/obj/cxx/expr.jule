@@ -87,7 +87,7 @@ fn get_accessor(mut &t: &TypeKind): str {
     if t.sptr() != nil || t.ptr() != nil {
         ret "->"
     }
-    ret str(TokenKind.Dot)
+    ret TokenKind.Dot
 }
 
 fn decompose_common_esq(b: byte): str {
@@ -287,8 +287,8 @@ fn gen_const_expr_model(m: &Const): str {
 fn gen_div_by_zero_binop_expr_model(op: str, mut l: ExprModel, mut r: ExprModel): str {
     let mut op_func = ""
     match op {
-    | str(TokenKind.Solidus): op_func = "div"
-    | str(TokenKind.Percent): op_func = "mod"
+    | TokenKind.Solidus: op_func = "div"
+    | TokenKind.Percent: op_func = "mod"
     }
 
     if env::OPT_MATH {
@@ -310,8 +310,8 @@ fn gen_div_by_zero_binop_expr_model(op: str, mut l: ExprModel, mut r: ExprModel)
 
 fn gen_binop_expr_model(mut m: &BinopExprModel): str {
     match m.op {
-    | str(TokenKind.Solidus)
-    | str(TokenKind.Percent):
+    | TokenKind.Solidus
+    | TokenKind.Percent:
         ret gen_div_by_zero_binop_expr_model(m.op, m.left, m.right)
     }
 
@@ -327,7 +327,7 @@ fn gen_binop_expr_model(mut m: &BinopExprModel): str {
 
 fn gen_var_expr_model(mut m: &Var): str {
     if m.cpp_linked {
-        let d = find_directive(m.directives, str(Directive.Namespace))
+        let d = find_directive(m.directives, Directive.Namespace)
         if d != nil {
             let mut obj = concat_all_parts(d.args...)
             obj += "::"
@@ -347,18 +347,18 @@ fn gen_struct_ins_expr_model(mut m: &StructIns): str {
 }
 
 fn gen_unary_expr_model(mut m: &UnaryExprModel): str {
-    if env::OPT_PTR && m.op == str(TokenKind.Star) {
+    if env::OPT_PTR && m.op == TokenKind.Star {
         match type m.expr {
         | &UnaryExprModel:
             let mut um = (&UnaryExprModel)(m.expr)
-            if um.op == str(TokenKind.Amper) {
+            if um.op == TokenKind.Amper {
                 ret gen_expr_model(um.expr)
             }
         }
     }
 
     match m.op {
-    | str(TokenKind.Caret):
+    | TokenKind.Caret:
         let mut obj = "(~("
         obj += gen_expr(m.expr)
         obj += "))"
@@ -511,7 +511,7 @@ fn gen_pure_fn_call_expr_model(mut &m: &FnCallExprModel): str {
     let mut obj = gen_expr_model_for_call(m.expr)
     if !m.func.is_builtin() {
         if m.func.decl.cpp_linked && m.func.generics.len > 0 {
-            if !has_directive(m.func.decl.directives, str(Directive.Cdef)) {
+            if !has_directive(m.func.decl.directives, Directive.Cdef) {
                 obj += "<"
                 for (_, mut g) in m.func.generics {
                     obj += gen_type_kind(g)
@@ -775,7 +775,7 @@ fn gen_fn_ins_expr_model_common(mut m: &FnIns): str {
 // Returns elementary expression model of function instance.
 fn gen_fn_ins_expr_model(mut m: &FnIns): str {
     if m.decl != nil && m.decl.cpp_linked {
-        let d = find_directive(m.decl.directives, str(Directive.Namespace))
+        let d = find_directive(m.decl.directives, Directive.Namespace)
         if d != nil {
             let mut obj = concat_all_parts(d.args...)
             obj += "::"

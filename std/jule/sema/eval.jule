@@ -362,7 +362,7 @@ impl Eval {
     }
 
     fn lit_bool(self, &l: &LitExpr): &Data {
-        let mut constant = Const.new_bool(l.value == str(TokenKind.True))
+        let mut constant = Const.new_bool(l.value == TokenKind.True)
         ret &Data{
             lvalue:   false,
             mutable:  false,
@@ -924,7 +924,7 @@ impl Eval {
         d.lvalue = false
         d.model = &UnaryExprModel{
             expr: d.model,
-            op:   str(TokenKind.Minus),
+            op:   TokenKind.Minus,
         }
     }
 
@@ -947,7 +947,7 @@ impl Eval {
         d.lvalue = false
         d.model = &UnaryExprModel{
             expr: d.model,
-            op:   str(TokenKind.Plus),
+            op:   TokenKind.Plus,
         }
     }
 
@@ -971,7 +971,7 @@ impl Eval {
         d.lvalue = false
         d.model = &UnaryExprModel{
             expr: d.model,
-            op:   str(TokenKind.Caret),
+            op:   TokenKind.Caret,
         }
     }
 
@@ -992,7 +992,7 @@ impl Eval {
         d.lvalue = false
         d.model = &UnaryExprModel{
             expr: d.model,
-            op:   str(TokenKind.Excl),
+            op:   TokenKind.Excl,
         }
     }
 
@@ -1022,7 +1022,7 @@ impl Eval {
         d.lvalue = true
         d.model = &UnaryExprModel{
             expr: d.model,
-            op:   str(TokenKind.Star),
+            op:   TokenKind.Star,
         }
     }
 
@@ -1040,7 +1040,7 @@ impl Eval {
                 }
                 d.model = &UnaryExprModel{
                     expr: d.model,
-                    op:   str(TokenKind.Amper),
+                    op:   TokenKind.Amper,
                 }
 
             |:
@@ -1063,10 +1063,10 @@ impl Eval {
         }
 
         match u.op.kind {
-        | str(TokenKind.Star):
+        | TokenKind.Star:
             d.kind = &TypeKind{kind: tc.build_ptr_from_type(d.kind)}
 
-        | str(TokenKind.Amper):
+        | TokenKind.Amper:
             d.kind = &TypeKind{kind: tc.build_sptr_from_type(d.kind)}
 
         |:
@@ -1095,12 +1095,12 @@ impl Eval {
 
         let mut cast_kind = d.cast_kind
         match u.op.kind {
-        | str(TokenKind.Minus): self.eval_unary_minus(d)
-        | str(TokenKind.Plus):  self.eval_unary_plus(d)
-        | str(TokenKind.Caret): self.eval_unary_caret(d)
-        | str(TokenKind.Excl):  self.eval_unary_excl(d)
-        | str(TokenKind.Star):  self.eval_unary_star(d, u.op)
-        | str(TokenKind.Amper): self.eval_unary_amper(d)
+        | TokenKind.Minus: self.eval_unary_minus(d)
+        | TokenKind.Plus:  self.eval_unary_plus(d)
+        | TokenKind.Caret: self.eval_unary_caret(d)
+        | TokenKind.Excl:  self.eval_unary_excl(d)
+        | TokenKind.Star:  self.eval_unary_star(d, u.op)
+        | TokenKind.Amper: self.eval_unary_amper(d)
         |:                      d = nil
         }
 
@@ -1973,7 +1973,7 @@ impl Eval {
             ret p.link_path == path
         })
 
-        if imp == nil || !imp.is_lookupable(str(TokenKind.Self)) {
+        if imp == nil || !imp.is_lookupable(TokenKind.Self) {
             self.push_err(s.ident, LogMsg.NamespaceNotExist, path)
             ret nil
         }
@@ -2298,7 +2298,7 @@ impl Eval {
         | &IdentExpr:
             // Use fc.expr.token.kind instead of casting.
             // Same thing, but more efficient and performant.
-            if fc.expr.token.kind == str(TokenKind.Error) {
+            if fc.expr.token.kind == TokenKind.Error {
                 ret builtin_caller_error(self, fc)
             }
         }
@@ -3611,13 +3611,13 @@ impl BinopSolver {
 
     fn eval_nil(mut self): &Data {
         if !self.r.kind.nil_compatible() {
-            self.e.push_err(self.op, LogMsg.IncompatibleTypes, str(TokenKind.Nil), self.r.kind.to_str())
+            self.e.push_err(self.op, LogMsg.IncompatibleTypes, TokenKind.Nil, self.r.kind.to_str())
             ret nil
         }
 
         match self.op.kind {
-        | str(TokenKind.Eqs)
-        | str(TokenKind.NotEq):
+        | TokenKind.Eqs
+        | TokenKind.NotEq:
             ret &Data{
                 kind: &TypeKind{
                     kind: build_prim_type(str(PrimKind.Bool)),
@@ -3625,7 +3625,7 @@ impl BinopSolver {
             }
 
         |:
-            self.e.push_err(self.op, LogMsg.OperatorNotForJuleType, self.op.kind, str(TokenKind.Nil))
+            self.e.push_err(self.op, LogMsg.OperatorNotForJuleType, self.op.kind, TokenKind.Nil)
             ret nil
         }
     }
@@ -3633,8 +3633,8 @@ impl BinopSolver {
     fn eval_enum(mut self): &Data {
         let mut enm = self.l.kind.enm()
         match self.op.kind {
-        | str(TokenKind.Eqs)
-        | str(TokenKind.NotEq):
+        | TokenKind.Eqs
+        | TokenKind.NotEq:
             let mut rkind = self.r.kind
             if self.r.kind.enm() != nil {
                 rkind = self.r.kind.enm().kind.kind
@@ -3655,10 +3655,10 @@ impl BinopSolver {
         }
 
         match self.op.kind {
-        | str(TokenKind.Gt)
-        | str(TokenKind.Lt)
-        | str(TokenKind.GreatEq)
-        | str(TokenKind.LessEq):
+        | TokenKind.Gt
+        | TokenKind.Lt
+        | TokenKind.GreatEq
+        | TokenKind.LessEq:
             if !types::is_num(enm.kind.kind.to_str()) {
                 self.e.push_err(self.op, LogMsg.OperatorNotForJuleType, self.op.kind, enm.ident)
                 ret nil
@@ -3669,8 +3669,8 @@ impl BinopSolver {
                 },
             }
 
-        | str(TokenKind.Amper)
-        | str(TokenKind.Vline):
+        | TokenKind.Amper
+        | TokenKind.Vline:
             if enm.kind.kind.prim() == nil || !types::is_int(enm.kind.kind.prim().to_str()) {
                 self.e.push_err(self.op, LogMsg.OperatorNotForJuleType, self.op.kind, enm.ident)
             }
@@ -3688,8 +3688,8 @@ impl BinopSolver {
         }
 
         match self.op.kind {
-        | str(TokenKind.Eqs)
-        | str(TokenKind.NotEq):
+        | TokenKind.Eqs
+        | TokenKind.NotEq:
             ret &Data{
                 kind: &TypeKind{
                     kind: build_prim_type(str(PrimKind.Bool)),
@@ -3704,12 +3704,12 @@ impl BinopSolver {
 
     fn eval_ptr(mut self): &Data {
         match self.op.kind {
-        | str(TokenKind.Eqs)
-        | str(TokenKind.NotEq)
-        | str(TokenKind.Lt)
-        | str(TokenKind.Gt)
-        | str(TokenKind.LessEq)
-        | str(TokenKind.GreatEq):
+        | TokenKind.Eqs
+        | TokenKind.NotEq
+        | TokenKind.Lt
+        | TokenKind.Gt
+        | TokenKind.LessEq
+        | TokenKind.GreatEq:
             if !self.check_type_compatibility() {
                 ret nil
             }
@@ -3719,8 +3719,8 @@ impl BinopSolver {
                 },
             }
 
-        | str(TokenKind.Plus)
-        | str(TokenKind.Minus):
+        | TokenKind.Plus
+        | TokenKind.Minus:
             if self.l.kind.ptr() == nil {
                 self.l, self.r = self.r, self.l
             }
@@ -3745,8 +3745,8 @@ impl BinopSolver {
         }
 
         match self.op.kind {
-        | str(TokenKind.Eqs)
-        | str(TokenKind.NotEq):
+        | TokenKind.Eqs
+        | TokenKind.NotEq:
             ret &Data{
                 kind: &TypeKind{
                     kind: build_prim_type(str(PrimKind.Bool)),
@@ -3765,8 +3765,8 @@ impl BinopSolver {
         }
 
         match self.op.kind {
-        | str(TokenKind.Eqs)
-        | str(TokenKind.NotEq):
+        | TokenKind.Eqs
+        | TokenKind.NotEq:
             ret &Data{
                 kind: &TypeKind{
                     kind: build_prim_type(str(PrimKind.Bool)),
@@ -3785,8 +3785,8 @@ impl BinopSolver {
         }
 
         match self.op.kind {
-        | str(TokenKind.Eqs)
-        | str(TokenKind.NotEq):
+        | TokenKind.Eqs
+        | TokenKind.NotEq:
             ret &Data{
                 kind: &TypeKind{
                     kind: build_prim_type(str(PrimKind.Bool)),
@@ -3805,8 +3805,8 @@ impl BinopSolver {
         }
 
         match self.op.kind {
-        | str(TokenKind.Eqs)
-        | str(TokenKind.NotEq):
+        | TokenKind.Eqs
+        | TokenKind.NotEq:
             ret &Data{
                 kind: &TypeKind{
                     kind: build_prim_type(str(PrimKind.Bool)),
@@ -3825,8 +3825,8 @@ impl BinopSolver {
         }
 
         match self.op.kind {
-        | str(TokenKind.Eqs)
-        | str(TokenKind.NotEq):
+        | TokenKind.Eqs
+        | TokenKind.NotEq:
             ret &Data{
                 kind: &TypeKind{
                     kind: build_prim_type(str(PrimKind.Bool)),
@@ -3841,8 +3841,8 @@ impl BinopSolver {
 
     fn eval_any(mut self): &Data {
         match self.op.kind {
-        | str(TokenKind.Eqs)
-        | str(TokenKind.NotEq):
+        | TokenKind.Eqs
+        | TokenKind.NotEq:
             ret &Data{
                 kind: &TypeKind{
                     kind: build_prim_type(str(PrimKind.Bool)),
@@ -3861,10 +3861,10 @@ impl BinopSolver {
         }
 
         match self.op.kind {
-        | str(TokenKind.Eqs)
-        | str(TokenKind.NotEq)
-        | str(TokenKind.DblAmper)
-        | str(TokenKind.DblVline):
+        | TokenKind.Eqs
+        | TokenKind.NotEq
+        | TokenKind.DblAmper
+        | TokenKind.DblVline:
             ret self.l
 
         |:
@@ -3881,11 +3881,11 @@ impl BinopSolver {
         }
 
         match self.op.kind {
-        | str(TokenKind.Plus):
+        | TokenKind.Plus:
             ret self.l
 
-        | str(TokenKind.Eqs)
-        | str(TokenKind.NotEq):
+        | TokenKind.Eqs
+        | TokenKind.NotEq:
             ret &Data{
                 kind: &TypeKind{
                     kind: build_prim_type(str(PrimKind.Bool)),
@@ -3993,12 +3993,12 @@ impl BinopSolver {
 
         // Logicals.
         match self.op.kind {
-        | str(TokenKind.Eqs)
-        | str(TokenKind.NotEq)
-        | str(TokenKind.Lt)
-        | str(TokenKind.Gt)
-        | str(TokenKind.GreatEq)
-        | str(TokenKind.LessEq):
+        | TokenKind.Eqs
+        | TokenKind.NotEq
+        | TokenKind.Lt
+        | TokenKind.Gt
+        | TokenKind.GreatEq
+        | TokenKind.LessEq:
             ret &Data{
                 kind: &TypeKind{
                     kind: build_prim_type(str(PrimKind.Bool)),
@@ -4008,14 +4008,14 @@ impl BinopSolver {
 
         // Arithmetics.
         match self.op.kind {
-        | str(TokenKind.Plus)
-        | str(TokenKind.Minus)
-        | str(TokenKind.Star)
-        | str(TokenKind.Solidus):
+        | TokenKind.Plus
+        | TokenKind.Minus
+        | TokenKind.Star
+        | TokenKind.Solidus:
             self.set_type_to_greater()
             ret self.l
 
-        | str(TokenKind.Percent):
+        | TokenKind.Percent:
             if !types::is_int(rk) {
                 self.e.push_err(self.op, LogMsg.IncompatibleTypes, lk, rk)
                 ret nil
@@ -4039,12 +4039,12 @@ impl BinopSolver {
 
         // Logicals.
         match self.op.kind {
-        | str(TokenKind.Eqs)
-        | str(TokenKind.NotEq)
-        | str(TokenKind.Lt)
-        | str(TokenKind.Gt)
-        | str(TokenKind.GreatEq)
-        | str(TokenKind.LessEq):
+        | TokenKind.Eqs
+        | TokenKind.NotEq
+        | TokenKind.Lt
+        | TokenKind.Gt
+        | TokenKind.GreatEq
+        | TokenKind.LessEq:
             ret &Data{
                 kind: &TypeKind{
                     kind: build_prim_type(str(PrimKind.Bool)),
@@ -4054,23 +4054,23 @@ impl BinopSolver {
 
         // Arithmetics.
         match self.op.kind {
-        | str(TokenKind.Plus)
-        | str(TokenKind.Minus)
-        | str(TokenKind.Star)
-        | str(TokenKind.Solidus)
-        | str(TokenKind.Amper)
-        | str(TokenKind.Vline)
-        | str(TokenKind.Caret):
+        | TokenKind.Plus
+        | TokenKind.Minus
+        | TokenKind.Star
+        | TokenKind.Solidus
+        | TokenKind.Amper
+        | TokenKind.Vline
+        | TokenKind.Caret:
             self.set_type_to_greater()
             ret self.l
 
-        | str(TokenKind.Percent):
+        | TokenKind.Percent:
             self.mod()
             self.set_type_to_greater()
             ret self.l
 
-        | str(TokenKind.Lshift)
-        | str(TokenKind.Rshift):
+        | TokenKind.Lshift
+        | TokenKind.Rshift:
             if !is_ok_for_shifting(self.r) {
                 self.e.push_err(self.op, LogMsg.BitShiftMustUnsigned)
                 ret nil
@@ -4098,12 +4098,12 @@ impl BinopSolver {
 
         // Logicals.
         match self.op.kind {
-        | str(TokenKind.Eqs)
-        | str(TokenKind.NotEq)
-        | str(TokenKind.Lt)
-        | str(TokenKind.Gt)
-        | str(TokenKind.GreatEq)
-        | str(TokenKind.LessEq):
+        | TokenKind.Eqs
+        | TokenKind.NotEq
+        | TokenKind.Lt
+        | TokenKind.Gt
+        | TokenKind.GreatEq
+        | TokenKind.LessEq:
             ret &Data{
                 kind: &TypeKind{
                     kind: build_prim_type(str(PrimKind.Bool)),
@@ -4113,23 +4113,23 @@ impl BinopSolver {
 
         // Arithmetics.
         match self.op.kind {
-        | str(TokenKind.Plus)
-        | str(TokenKind.Minus)
-        | str(TokenKind.Star)
-        | str(TokenKind.Solidus)
-        | str(TokenKind.Amper)
-        | str(TokenKind.Vline)
-        | str(TokenKind.Caret):
+        | TokenKind.Plus
+        | TokenKind.Minus
+        | TokenKind.Star
+        | TokenKind.Solidus
+        | TokenKind.Amper
+        | TokenKind.Vline
+        | TokenKind.Caret:
             self.set_type_to_greater()
             ret self.l
 
-        | str(TokenKind.Percent):
+        | TokenKind.Percent:
             self.mod()
             self.set_type_to_greater()
             ret self.l
 
-        | str(TokenKind.Lshift)
-        | str(TokenKind.Rshift):
+        | TokenKind.Lshift
+        | TokenKind.Rshift:
             if !is_ok_for_shifting(self.r) {
                 self.e.push_err(self.op, LogMsg.BitShiftMustUnsigned)
                 ret nil
@@ -4237,77 +4237,77 @@ impl BinopSolver {
         }
 
         match self.op.kind {
-        | str(TokenKind.Eqs):
+        | TokenKind.Eqs:
             d.constant = Const.new_bool(self.l.constant.eqs(*self.r.constant))
 
-        | str(TokenKind.NotEq):
+        | TokenKind.NotEq:
             d.constant = Const.new_bool(!self.l.constant.eqs(*self.r.constant))
 
-        | str(TokenKind.DblColon):
+        | TokenKind.DblColon:
             d.constant = Const.new_bool(self.l.constant.or(*self.r.constant))
 
-        | str(TokenKind.DblAmper):
+        | TokenKind.DblAmper:
             d.constant = Const.new_bool(self.l.constant.and(*self.r.constant))
 
-        | str(TokenKind.Gt):
+        | TokenKind.Gt:
             d.constant = Const.new_bool(self.l.constant.gt(*self.r.constant))
 
-        | str(TokenKind.Lt):
+        | TokenKind.Lt:
             d.constant = Const.new_bool(self.l.constant.lt(*self.r.constant))
 
-        | str(TokenKind.GreatEq):
+        | TokenKind.GreatEq:
             d.constant = Const.new_bool(
                 self.l.constant.gt(*self.r.constant) ||
                 self.l.constant.eqs(*self.r.constant))
 
-        | str(TokenKind.LessEq):
+        | TokenKind.LessEq:
             d.constant = Const.new_bool(
                 self.l.constant.lt(*self.r.constant) ||
                 self.l.constant.eqs(*self.r.constant))
 
-        | str(TokenKind.Plus):
+        | TokenKind.Plus:
             _ = self.l.constant.add(*self.r.constant)
             d.constant = self.l.constant
 
-        | str(TokenKind.Minus):
+        | TokenKind.Minus:
             _ = self.l.constant.sub(*self.r.constant)
             d.constant = self.l.constant
 
-        | str(TokenKind.Star):
+        | TokenKind.Star:
             _ = self.l.constant.mul(*self.r.constant)
             d.constant = self.l.constant
 
-        | str(TokenKind.Solidus):
+        | TokenKind.Solidus:
             let ok = self.l.constant.div(*self.r.constant)
             if !ok && self.r.constant.as_f64() == 0 {
                 self.e.push_err(self.op, LogMsg.DivByZero)
             }
             d.constant = self.l.constant
 
-        | str(TokenKind.Percent):
+        | TokenKind.Percent:
             let ok = self.l.constant.mod(*self.r.constant)
             if !ok && self.r.constant.as_f64() == 0 {
                 self.e.push_err(self.op, LogMsg.DivByZero)
             }
             d.constant = self.l.constant
 
-        | str(TokenKind.Vline):
+        | TokenKind.Vline:
             _ = self.l.constant.bitwise_or(*self.r.constant)
             d.constant = self.l.constant
 
-        | str(TokenKind.Amper):
+        | TokenKind.Amper:
             _ = self.l.constant.bitwise_and(*self.r.constant)
             d.constant = self.l.constant
 
-        | str(TokenKind.Caret):
+        | TokenKind.Caret:
             _ = self.l.constant.xor(*self.r.constant)
             d.constant = self.l.constant
 
-        | str(TokenKind.Lshift):
+        | TokenKind.Lshift:
             _ = self.l.constant.lshift(*self.r.constant)
             d.constant = self.l.constant
 
-        | str(TokenKind.Rshift):
+        | TokenKind.Rshift:
             _ = self.l.constant.rshift(*self.r.constant)
             d.constant = self.l.constant
         }
@@ -4373,7 +4373,7 @@ impl BinopSolver {
     }
 
     fn solve(mut self, mut &op: &BinopExpr): &Data {
-        if op.op.kind == str(TokenKind.Eq) {
+        if op.op.kind == TokenKind.Eq {
             self.e.push_err(op.op, LogMsg.AssignInExpr)
             self.e.push_suggestion(LogMsg.UseImperative)
             ret nil

@@ -51,7 +51,7 @@ fn get_call_data(mut &tokens: []Token): &CallData {
 
     // Below is call expression
     let token = data.expr_tokens[data.expr_tokens.len-1]
-    if token.id == TokenId.Range && token.kind == str(TokenKind.RBracket) {
+    if token.id == TokenId.Range && token.kind == TokenKind.RBracket {
         data.expr_tokens, data.generics_tokens = range_last(data.expr_tokens)
     }
     ret data
@@ -68,7 +68,7 @@ fn get_block_expr(mut &tokens: []Token): []Token {
 
         | TokenId.Range:
             match tok.kind {
-            | str(TokenKind.LBrace):
+            | TokenKind.LBrace:
                 if brace_n > 0 || skip_to_next_brace_close > 0 {
                     if skip_to_next_brace_close > 0 {
                         skip_to_next_brace_close--
@@ -78,8 +78,8 @@ fn get_block_expr(mut &tokens: []Token): []Token {
                 }
                 ret tokens[:i]
 
-            | str(TokenKind.LBracket)
-            | str(TokenKind.LParent):
+            | TokenKind.LBracket
+            | TokenKind.LParent:
                 brace_n++
 
             |:
@@ -98,9 +98,9 @@ fn split_colon(mut &tokens: []Token): ([]Token, []Token) {
         match token.id {
         | TokenId.Range:
             match token.kind {
-            | str(TokenKind.LBrace)
-            | str(TokenKind.LBracket)
-            | str(TokenKind.LParent):
+            | TokenKind.LBrace
+            | TokenKind.LBracket
+            | TokenKind.LParent:
                 range_n++
                 continue
 
@@ -145,12 +145,12 @@ fn find_lowest_prec_op(&tokens: []Token): int {
         match {
         | token.id == TokenId.Range:
             match token.kind {
-            | str(TokenKind.LBrace):
+            | TokenKind.LBrace:
                 skip_to_next_brace_open = false
                 fall
 
-            | str(TokenKind.LParent)
-            | str(TokenKind.LBracket):
+            | TokenKind.LParent
+            | TokenKind.LBracket:
                 brace_n++
 
             |:
@@ -182,11 +182,11 @@ fn find_lowest_prec_op(&tokens: []Token): int {
             continue
         }
 
-        if i > 1 && left.id == TokenId.Range && left.kind == str(TokenKind.RBracket) {
+        if i > 1 && left.id == TokenId.Range && left.kind == TokenKind.RBracket {
             let lleft = tokens[i-2]
-            if lleft.id == TokenId.Range && lleft.kind == str(TokenKind.LBracket) {
+            if lleft.id == TokenId.Range && lleft.kind == TokenKind.LBracket {
                 // Skip potential type annotations.
-                if token.kind == str(TokenKind.Amper) || token.kind == str(TokenKind.Star) {
+                if token.kind == TokenKind.Amper || token.kind == TokenKind.Star {
                     continue
                 }
             }
@@ -217,9 +217,9 @@ fn get_range_expr_tokens(mut &tokens: []Token): ([]Token, int) {
         let tok = tokens[i]
         if tok.id == TokenId.Range {
             match tok.kind {
-            | str(TokenKind.RBrace)
-            | str(TokenKind.RBracket)
-            | str(TokenKind.RParent):
+            | TokenKind.RBrace
+            | TokenKind.RBracket
+            | TokenKind.RParent:
                 range_n++
     
             |:
@@ -275,7 +275,7 @@ impl ExprBuilder {
             ret self.build_lit(token)
 
         | TokenId.Op:
-            if token.kind == str(TokenKind.TripleDot) {
+            if token.kind == TokenKind.TripleDot {
                 ret &VariadicExpr{
                     token: token,
                 }
@@ -393,7 +393,7 @@ impl ExprBuilder {
 
         | TokenId.Range:
             // Catch slice, and array types.
-            if token.kind == str(TokenKind.RBracket) {
+            if token.kind == TokenKind.RBracket {
                 ret self.build_type(tokens)
             }
         }
@@ -414,7 +414,7 @@ impl ExprBuilder {
     fn build_op_right(mut self, mut &tokens: []Token): ExprData {
         let mut token = tokens[tokens.len-1]
         match token.kind {
-        | str(TokenKind.Excl):
+        | TokenKind.Excl:
             tokens = tokens[:tokens.len-1] // Ignore "!" token.
             let mut d = self.build(tokens)
             if d == nil {
@@ -428,7 +428,7 @@ impl ExprBuilder {
                 ret d
             }
 
-        | str(TokenKind.TripleDot):
+        | TokenKind.TripleDot:
             ret self.build_variadic(tokens)
 
         }
@@ -452,9 +452,9 @@ impl ExprBuilder {
         for i, token in tokens {
             if token.id == TokenId.Range {
                 match token.kind {
-                | str(TokenKind.LBrace)
-                | str(TokenKind.LBracket)
-                | str(TokenKind.LParent):
+                | TokenKind.LBrace
+                | TokenKind.LBracket
+                | TokenKind.LParent:
                     range_n++
                     continue
 
@@ -478,7 +478,7 @@ impl ExprBuilder {
             }
 
             let tok = expr_tokens[0]
-            if tok.id != TokenId.Range || tok.kind != str(TokenKind.LParent) {
+            if tok.id != TokenId.Range || tok.kind != TokenKind.LParent {
                 ret nil
             }
 
@@ -544,9 +544,9 @@ impl ExprBuilder {
         for i, token in tokens {
             if token.id == TokenId.Range {
                 match token.kind {
-                | str(TokenKind.LBrace)
-                | str(TokenKind.LBracket)
-                | str(TokenKind.LParent):
+                | TokenKind.LBrace
+                | TokenKind.LBracket
+                | TokenKind.LParent:
                     range_n++
 
                 |:
@@ -612,7 +612,7 @@ impl ExprBuilder {
         match token.id {
         | TokenId.Range:
             match token.kind {
-            | str(TokenKind.LParent):
+            | TokenKind.LParent:
                 let mut expr = self.try_build_cast(tokens)
                 if expr != nil {
                     ret expr
@@ -691,9 +691,9 @@ impl ExprBuilder {
         for i, token in tokens {
             if token.id == TokenId.Range {
                 match token.kind {
-                | str(TokenKind.LBrace)
-                | str(TokenKind.LBracket)
-                | str(TokenKind.LParent):
+                | TokenKind.LBrace
+                | TokenKind.LBracket
+                | TokenKind.LParent:
                     range_n++
 
                 |:
@@ -767,7 +767,7 @@ impl ExprBuilder {
 
         tokens = tokens[i:] // Remove type tokens.
         let token = tokens[0]
-        if token.id != TokenId.Range || token.kind != str(TokenKind.LBrace) {
+        if token.id != TokenId.Range || token.kind != TokenKind.LBrace {
             self.push_err(token, LogMsg.InvalidSyntax)
             ret nil
         }
@@ -1026,7 +1026,7 @@ impl ExprBuilder {
 
         | TokenId.Op:
             // Handle pointer to primitive type.
-            if tokens.len > 1 && token.kind == str(TokenKind.Star) {
+            if tokens.len > 1 && token.kind == TokenKind.Star {
                 token = tokens[1]
                 if token.id == TokenId.Prim || token.id == TokenId.Unsafe {
                     ret self.build_type(tokens)
@@ -1043,13 +1043,13 @@ impl ExprBuilder {
             // Catch type casting.
             if tokens.len > 3 {
                 let t = tokens[tokens.len-1]
-                if t.id == TokenId.Range && t.kind == str(TokenKind.RParent) {
+                if t.id == TokenId.Range && t.kind == TokenKind.RParent {
                     break
                 }
             }
 
             let next = tokens[1]
-            if next.id != TokenId.Range || next.kind != str(TokenKind.RBracket) {
+            if next.id != TokenId.Range || next.kind != TokenKind.RBracket {
                 break
             }
 
@@ -1070,13 +1070,13 @@ impl ExprBuilder {
 
         | TokenId.Range:
             match token.kind {
-            | str(TokenKind.RParent):
+            | TokenKind.RParent:
                 ret self.build_parentheses_range(tokens)
 
-            | str(TokenKind.RBrace):
+            | TokenKind.RBrace:
                 ret self.build_brace_range(tokens)
 
-            | str(TokenKind.RBracket):
+            | TokenKind.RBracket:
                 ret self.build_bracket_range(tokens)
             }
         }

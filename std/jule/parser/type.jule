@@ -40,9 +40,9 @@ fn split_map_range(mut &tokens: []Token, mut &i: int): (range_tokens: []Token, c
         let token = tokens[i]
         if token.id == TokenId.Range {
             match token.kind {
-            | str(TokenKind.LBrace)
-            | str(TokenKind.LBracket)
-            | str(TokenKind.LParent):
+            | TokenKind.LBrace
+            | TokenKind.LBracket
+            | TokenKind.LParent:
                 range_n++
                 continue
 
@@ -129,7 +129,7 @@ impl TypeBuilder {
             ret nil
         }
         let token = self.tokens[*self.i]
-        if token.id != TokenId.Range || token.kind != str(TokenKind.LBracket) {
+        if token.id != TokenId.Range || token.kind != TokenKind.LBracket {
             ret nil
         }
 
@@ -158,8 +158,8 @@ impl TypeBuilder {
             let token = self.tokens[*self.i]
             if token.id == TokenId.Range {
                 match token.kind {
-                | str(TokenKind.LBracket): range_n++
-                | str(TokenKind.RBracket): range_n--
+                | TokenKind.LBracket: range_n++
+                | TokenKind.RBracket: range_n--
                 }
             }
             if range_n == 0 {
@@ -274,13 +274,13 @@ impl TypeBuilder {
     unsafe fn build_op(mut self): &TypeDecl {
         let mut token = self.tokens[*self.i]
         match token.kind {
-        | str(TokenKind.Star):
+        | TokenKind.Star:
             ret self.build_ptr()
 
-        | str(TokenKind.Amper):
+        | TokenKind.Amper:
             ret self.build_sptr()
 
-        | str(TokenKind.DblAmper):
+        | TokenKind.DblAmper:
             ret &TypeDecl{
                 kind: &SptrTypeDecl{
                     elem: self.build_sptr(),
@@ -332,7 +332,7 @@ impl TypeBuilder {
         _, expr_tokens = range_last(expr_tokens)
         expr_tokens = expr_tokens[1 : expr_tokens.len-1] // Remove brackets.
         let mut token = expr_tokens[0]
-        if expr_tokens.len == 1 && token.id == TokenId.Op && token.kind == str(TokenKind.TripleDot) {
+        if expr_tokens.len == 1 && token.id == TokenId.Op && token.kind == TokenKind.TripleDot {
             // Ignore.
         } else {
             arrt.size = self.p.build_expr(expr_tokens)
@@ -382,13 +382,13 @@ impl TypeBuilder {
         let mut token = self.tokens[*self.i]
         if *self.i+2 >= self.tokens.len ||
             token.id != TokenId.Range ||
-            token.kind != str(TokenKind.LBracket) {
+            token.kind != TokenKind.LBracket {
             self.push_err(token, LogMsg.InvalidSyntax)
             ret nil
         }
         *self.i++
         token = self.tokens[*self.i]
-        if token.id == TokenId.Range && token.kind == str(TokenKind.RBracket) {
+        if token.id == TokenId.Range && token.kind == TokenKind.RBracket {
             ret self.build_slc()
         }
 
