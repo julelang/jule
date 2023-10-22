@@ -27,7 +27,7 @@ It contains the reference compiler, API, and standard library.
 Jule does not have a stable version yet and is still being developed to become more stable.
 Some commits may not be fully honored due to some compiler/API errors.
 Please report it with the [Jule Issue Tracker](https://github.com/julelang/jule/issues) if you come across something like this.
-You can also [join the Discord community](https://discord.gg/ReWQgPDnP6) to discuss, helping, and ask more questions about Jule with the community.
+You can also [join the Discord community](https://discord.gg/XNSUUDuGGQ) to discuss, helping, and ask more questions about Jule with the community.
 
 ## The Mission
 
