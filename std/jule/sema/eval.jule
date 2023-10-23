@@ -3876,7 +3876,7 @@ impl BinopSolver {
     fn eval_str(mut self): &Data {
         let mut rk = self.r.kind.to_str()
         if rk != PrimKind.Str {
-            self.e.push_err(self.op, LogMsg.IncompatibleTypes, self.l.kind.to_str(), rk)
+            self.e.push_err(self.op, LogMsg.IncompatibleTypes, PrimKind.Str, rk)
             ret nil
         }
 
@@ -3899,21 +3899,19 @@ impl BinopSolver {
     }
 
     fn set_type_to_greater(mut self) {
-        if self.l.is_const() && self.r.is_const() || !self.l.is_const() && !self.r.is_const() {
-            let lk = self.l.kind.to_str()
-            let rk = self.r.kind.to_str()
-            if types::is_greater(rk, lk) {
+        if self.l.is_const() {
+            if !self.r.is_const() {
                 self.l.kind = self.r.kind
             }
             ret
         }
-
-        if self.l.is_const() {
-            self.l.kind = self.r.kind
+        if self.r.is_const() {
             ret
         }
 
-        self.r.kind = self.l.kind
+        if types::is_greater(self.r.kind.prim().kind, self.l.kind.prim().kind) {
+            self.l.kind = self.r.kind
+        }
     }
 
     fn check_mod_data(mut self, mut &d: &Data) {
@@ -3964,28 +3962,24 @@ impl BinopSolver {
         }
 
         if self.r.is_const() {
-            if !self.r.constant.is_f64() {
-                ret true
-            }
-
             // Truncate only literals.
             // Skip castings.
             match type self.r.model {
+            | &RuneExprModel
             | &Const:
-                ret int_assignable(types::TypeKind.Int, self.r) ||
-                    int_assignable(types::TypeKind.Uint, self.r)
-
-            |:
-                ret false
+                if types::is_sig_int(lk) {
+                    ret int_assignable(types::TypeKind.Int, self.r)
+                }
+                ret int_assignable(types::TypeKind.Uint, self.r)
             }
         }
 
-        ret !types::is_float(rk)
+        ret types::is_sig_int(lk) == types::is_sig_int(rk)
     }
 
     fn eval_float(mut self): &Data {
-        let lk = self.l.kind.to_str()
-        let rk = self.r.kind.to_str()
+        let lk = self.l.kind.prim().kind // Float guaranteed.
+        let rk = self.r.kind.prim().kind // Primitive guaranteed.
         if !self.numbers_are_compatibile(lk, rk) {
             self.e.push_err(self.op, LogMsg.IncompatibleTypes, lk, rk)
             ret nil
@@ -4029,68 +4023,29 @@ impl BinopSolver {
         }
     }
 
-    fn eval_unsig_int(mut self): &Data {
-        let lk = self.l.kind.to_str()
-        let rk = self.r.kind.to_str()
-        if !self.numbers_are_compatibile(lk, rk) {
-            self.e.push_err(self.op, LogMsg.IncompatibleTypes, lk, rk)
-            ret nil
-        }
+    fn eval_int(mut self): &Data {
+        let lk = self.l.kind.prim().kind // Integer guaranteed.
+        let rk = self.r.kind.prim().kind // Primitive guaranteed.
 
-        // Logicals.
         match self.op.kind {
-        | TokenKind.Eqs
-        | TokenKind.NotEq
-        | TokenKind.Lt
-        | TokenKind.Gt
-        | TokenKind.GreatEq
-        | TokenKind.LessEq:
-            ret &Data{
-                kind: &TypeKind{
-                    kind: build_prim_type(PrimKind.Bool),
-                },
-            }
-        }
-
-        // Arithmetics.
-        match self.op.kind {
-        | TokenKind.Plus
-        | TokenKind.Minus
-        | TokenKind.Star
-        | TokenKind.Solidus
-        | TokenKind.Amper
-        | TokenKind.Vline
-        | TokenKind.Caret:
-            self.set_type_to_greater()
-            ret self.l
-
-        | TokenKind.Percent:
-            self.mod()
-            self.set_type_to_greater()
-            ret self.l
-
         | TokenKind.Lshift
         | TokenKind.Rshift:
+            if !types::is_int(lk) || !types::is_int(rk) {
+                self.e.push_err(self.op, LogMsg.IncompatibleTypes, lk, rk)
+                ret nil
+            }
             if !is_ok_for_shifting(self.r) {
                 self.e.push_err(self.op, LogMsg.BitShiftMustUnsigned)
                 ret nil
             }
 
-            if self.l.is_const() {
+            if self.l.is_const() && !self.r.is_const() {
                 self.l.kind = self.r.kind
             }
 
             ret self.l
-
-        |:
-            self.e.push_err(self.op, LogMsg.OperatorNotForUint, self.op.kind)
-            ret nil
         }
-    }
 
-    fn eval_sig_int(mut self): &Data {
-        let lk = self.l.kind.to_str()
-        let rk = self.r.kind.to_str()
         if !self.numbers_are_compatibile(lk, rk) {
             self.e.push_err(self.op, LogMsg.IncompatibleTypes, lk, rk)
             ret nil
@@ -4126,15 +4081,6 @@ impl BinopSolver {
         | TokenKind.Percent:
             self.mod()
             self.set_type_to_greater()
-            ret self.l
-
-        | TokenKind.Lshift
-        | TokenKind.Rshift:
-            if !is_ok_for_shifting(self.r) {
-                self.e.push_err(self.op, LogMsg.BitShiftMustUnsigned)
-                ret nil
-            }
-
             ret self.l
 
         |:
@@ -4150,18 +4096,20 @@ impl BinopSolver {
         | prim.is_str():  ret self.eval_str()
         }
 
-        let rprim = self.r.kind.prim()
-        if rprim == nil {
+        if self.r.kind.prim() == nil {
             self.e.push_err(self.op, LogMsg.IncompatibleTypes, prim.to_str(), self.r.kind.to_str())
             ret nil
         }
 
-        let lk = prim.to_str()
         match {
-        | types::is_float(lk):     ret self.eval_float()
-        | types::is_unsig_int(lk): ret self.eval_unsig_int()
-        | types::is_sig_int(lk):   ret self.eval_sig_int()
-        |:                         ret nil
+        | types::is_float(prim.kind):
+            ret self.eval_float()
+
+        | types::is_int(prim.kind):
+            ret self.eval_int()
+
+        |:
+            ret nil
         }
     }
 
