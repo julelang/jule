@@ -45,6 +45,7 @@ static mut CPP_STD = "c++17" // Default C++ standard
 
 static mut SHADOWING = false
 static mut TRANSPILATION = false
+static mut PRODUCTION = false
 
 fn write_output(path: str, content: str) {
     let dir = dir(path)
@@ -108,29 +109,53 @@ fn is_cpp_source_file(path: str): bool {
     ret is_valid_cpp_ext(path[offset:])
 }
 
+fn push_comp_cmd_clang(mut &cmd: str) {
+    // Disable all warnings.
+    cmd += "-Wno-everything "
+
+    // Set C++ standard.
+    cmd += "--std="
+    cmd += CPP_STD
+    cmd += " "
+
+    if PRODUCTION {
+        cmd += "-O3 " // Enable all optimizations.
+        cmd += "-flto " // Enable LTO.
+        cmd += "-DNDEBUG " // Define NDEBUG, turn off assertions.
+        cmd += "-fomit-frame-pointer " // Do not use frame pointer.
+    } else {
+        cmd += "-O0 " // No optimization.
+    }
+}
+
+fn push_comp_cmd_gcc(mut &cmd: str) {
+    // Disable all warnings.
+    cmd += "-w "
+
+    // Set C++ standard.
+    cmd += "--std="
+    cmd += CPP_STD
+    cmd += " "
+
+    if PRODUCTION {
+        cmd += "-O3 " // Enable all optimizations.
+        cmd += "-DNDEBUG " // Define NDEBUG, turn off assertions.
+        cmd += "-fomit-frame-pointer " // Do not use frame pointer.
+    } else {
+        cmd += "-O0 " // No optimization.
+    }
+}
+
 // Generate compile command for backend-compiler.
 fn gen_compile_cmd(source_path: str, &ir: &IR): (str, str) {
     let &compiler = COMPILER_PATH
 
-    const ZERO_LEVEL_OPTIMIZATION = "-O0"
-    const DISABLE_ALL_WARNINGS_CLANG = "-Wno-everything"
-    const DISABLE_ALL_WARNINGS_GCC = "-w"
-    let SET_STD = "--std=" + CPP_STD
-
-    let mut cmd = ZERO_LEVEL_OPTIMIZATION
-    cmd += " "
+    let mut cmd = ""
 
     match COMPILER {
-    | "gcc":
-        cmd += DISABLE_ALL_WARNINGS_GCC
-        cmd += " "
-
-    | "clang":
-        cmd += DISABLE_ALL_WARNINGS_CLANG
-        cmd += " "
+    | "gcc":   push_comp_cmd_gcc(cmd)
+    | "clang": push_comp_cmd_clang(cmd)
     }
-    cmd += SET_STD
-    cmd += " "
 
     // Push passes.
     for _, pass in ir.passes {
@@ -251,6 +276,7 @@ fn check_flags(&args: []str): []str {
 
     fs.add_var[bool](unsafe { (&bool)(&SHADOWING) }, "shadowing", 0, "Let shadowing")
     fs.add_var[bool](unsafe { (&bool)(&TRANSPILATION) }, "transpile", 't', "Transpile code")
+    fs.add_var[bool](unsafe { (&bool)(&PRODUCTION) }, "production", 'p', "Compile for production")
     fs.add_var[str](unsafe { (&str)(&COMPILER) }, "compiler", 0, "Backend compiler")
     fs.add_var[str](unsafe { (&str)(&opt) }, "opt", 0, "Optimization level")
     fs.add_var[str](unsafe { (&str)(&target) }, "target", 0, "Target system")
