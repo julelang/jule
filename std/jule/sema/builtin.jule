@@ -24,6 +24,7 @@ static mut BUILTIN_FN_PANIC = &FnIns{}
 static mut BUILTIN_FN_MAKE = &FnIns{}
 static mut BUILTIN_FN_APPEND = &FnIns{}
 static mut BUILTIN_FN_CLONE = &FnIns{}
+static mut BUILTIN_FN_ASSERT = &FnIns{}
 static mut BUILTIN_FN_STD_MEM_SIZE_OF = &FnIns{}
 static mut BUILTIN_FN_STD_MEM_ALIGN_OF = &FnIns{}
 static mut BUILTIN_FN_STD_JULE_INTEGRATED_TO_STR = &FnIns{}
@@ -74,6 +75,7 @@ fn init() {
     BUILTIN_FN_APPEND.caller = builtin_caller_append
     BUILTIN_FN_COPY.caller = builtin_caller_copy
     BUILTIN_FN_CLONE.caller = builtin_caller_clone
+    BUILTIN_FN_ASSERT.caller = builtin_caller_assert
 
     BUILTIN_FN_STD_MEM_SIZE_OF.caller = builtin_caller_std_mem_size_of
     BUILTIN_FN_STD_MEM_ALIGN_OF.caller = builtin_caller_std_mem_align_of
@@ -89,15 +91,16 @@ fn init() {
 
 fn find_builtin_fn(ident: str): &FnIns {
     match ident {
-    | "out":     ret BUILTIN_FN_OUT
-    | "outln":   ret BUILTIN_FN_OUTLN
-    | "new":     ret BUILTIN_FN_NEW
-    | "panic":   ret BUILTIN_FN_PANIC
-    | "make":    ret BUILTIN_FN_MAKE
-    | "append":  ret BUILTIN_FN_APPEND
-    | "copy":    ret BUILTIN_FN_COPY
-    | "clone":   ret BUILTIN_FN_CLONE
-    |:           ret nil
+    | "out":    ret BUILTIN_FN_OUT
+    | "outln":  ret BUILTIN_FN_OUTLN
+    | "new":    ret BUILTIN_FN_NEW
+    | "panic":  ret BUILTIN_FN_PANIC
+    | "make":   ret BUILTIN_FN_MAKE
+    | "append": ret BUILTIN_FN_APPEND
+    | "copy":   ret BUILTIN_FN_COPY
+    | "clone":  ret BUILTIN_FN_CLONE
+    | "assert": ret BUILTIN_FN_ASSERT
+    |:          ret nil
     }
 }
 
@@ -614,6 +617,35 @@ fn builtin_caller_clone(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Da
 
     d.mutable = true
     d.model = &BuiltinCloneCallExprModel{expr: d.model}
+    ret d
+}
+
+fn builtin_caller_assert(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data {
+    if fc.generics.len > 0 {
+        e.push_err(fc.token, LogMsg.NotHasGenerics)
+    }
+    if fc.args.len < 1 {
+        e.push_err(fc.token, LogMsg.MissingExprFor, "expr")
+        ret nil
+    }
+    if fc.args.len > 1 {
+        e.push_err(fc.args[2].token, LogMsg.ArgumentOverflow)
+    }
+
+    let mut expr = e.eval_expr(fc.args[0])
+    if expr == nil {
+        ret nil
+    }
+
+    if expr.kind.prim() == nil || !expr.kind.prim().is_bool() {
+        e.push_err(fc.token, LogMsg.AssertNonBool)
+    }
+
+    let mut d = build_void_data()
+    d.model = &BuiltinAssertCallExprModel{
+        token: fc.token,
+        expr:  expr.model,
+    }
     ret d
 }
 

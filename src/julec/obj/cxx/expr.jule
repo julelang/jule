@@ -43,6 +43,7 @@ use std::jule::sema::{
     BuiltinCloneCallExprModel,
     BuiltinNewCallExprModel,
     BuiltinPanicCallExprModel,
+    BuiltinAssertCallExprModel,
     BuiltinMakeCallExprModel,
     BuiltinAppendCallExprModel,
     BuiltinErrorCallExprModel,
@@ -838,6 +839,22 @@ fn gen_builtin_panic_call_expr_model(mut m: &BuiltinPanicCallExprModel): str {
     ret obj
 }
 
+fn gen_builtin_assert_call_expr_model(mut m: &BuiltinAssertCallExprModel): str {
+    let mut path = get_cstr_model([]byte(m.token.file.path()))
+    path = path[1:path.len-1] // Remove quotes.
+
+    let mut obj = "if (!("
+    obj += gen_expr(m.expr)
+    obj += `)) jule::panic(jule::Str("assertion failed\nlocation: `
+    obj += path
+    obj += ":"
+    obj += conv::itoa(m.token.row)
+    obj += ":"
+    obj += conv::itoa(m.token.column)
+    obj += "\"));"
+    ret obj
+}
+
 fn gen_builtin_error_call_expr_model(mut m: &BuiltinErrorCallExprModel): str {
     let mut obj = "return "
     if m.func.decl.is_void() {
@@ -1084,6 +1101,9 @@ fn gen_expr_model(mut m: ExprModel): str {
 
     | &BuiltinPanicCallExprModel:
         ret gen_builtin_panic_call_expr_model((&BuiltinPanicCallExprModel)(m))
+
+    | &BuiltinAssertCallExprModel:
+        ret gen_builtin_assert_call_expr_model((&BuiltinAssertCallExprModel)(m))
 
     | &BuiltinErrorCallExprModel:
         ret gen_builtin_error_call_expr_model((&BuiltinErrorCallExprModel)(m))

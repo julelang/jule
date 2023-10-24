@@ -33,6 +33,7 @@ use std::jule::sema::{
     TupleExprModel,
     TypeKind,
     BuiltinAppendCallExprModel,
+    BuiltinAssertCallExprModel,
 }
 
 fn iter_expr_is_copy_optimizable(&expr: &Data, &v: &Var): bool {
@@ -666,6 +667,13 @@ fn gen_ret_st_with_defaults(mut result: &TypeKind): str {
 }
 
 fn gen_data_expr(mut d: &Data): str {
+    // Do not generate assertions for production compilations.
+    if env::PRODUCTION {
+        match type d.model {
+        | &BuiltinAssertCallExprModel:
+            ret ""
+        }
+    }
     ret gen_expr(d.model) + CPP_ST_TERM
 }
 
