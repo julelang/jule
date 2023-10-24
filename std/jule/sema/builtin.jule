@@ -17,22 +17,24 @@ use std::jule::build::{Derive, LogMsg}
 //  d: Data instance for evaluated expression of function.
 type BuiltinCaller: fn(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data
 
-static mut BUILTIN_FN_OUT = &FnIns{}
-static mut BUILTIN_FN_OUTLN = &FnIns{}
-static mut BUILTIN_FN_NEW = &FnIns{}
-static mut BUILTIN_FN_PANIC = &FnIns{}
-static mut BUILTIN_FN_MAKE = &FnIns{}
-static mut BUILTIN_FN_APPEND = &FnIns{}
-static mut BUILTIN_FN_CLONE = &FnIns{}
-static mut BUILTIN_FN_ASSERT = &FnIns{}
-static mut BUILTIN_FN_STD_MEM_SIZE_OF = &FnIns{}
-static mut BUILTIN_FN_STD_MEM_ALIGN_OF = &FnIns{}
-static mut BUILTIN_FN_STD_JULE_INTEGRATED_TO_STR = &FnIns{}
-static mut BUILTIN_FN_STD_JULE_INTEGRATED_INLINE = &FnIns{}
+type Caller: byte
 
-static mut BUILTIN_FN_COPY = &FnIns{
-    result: &TypeKind{kind: build_prim_type(PrimKind.Int)},
-}
+const BUILTIN_CALLER_COMMON = Caller(0x1)
+const BUILTIN_CALLER_COMMON_MUT = Caller(0x2)
+const BUILTIN_CALLER_COMMON_PLAIN = Caller(0x3)
+const BUILTIN_CALLER_OUT = Caller(0x4)
+const BUILTIN_CALLER_OUTLN = Caller(0x5)
+const BUILTIN_CALLER_NEW = Caller(0x6)
+const BUILTIN_CALLER_PANIC = Caller(0x7)
+const BUILTIN_CALLER_COPY = Caller(0x8)
+const BUILTIN_CALLER_MAKE = Caller(0x9)
+const BUILTIN_CALLER_APPEND = Caller(0xA)
+const BUILTIN_CALLER_CLONE = Caller(0xB)
+const BUILTIN_CALLER_ASSERT = Caller(0xC)
+const BUILTIN_CALLER_STD_MEM_SIZE_OF = Caller(0xD)
+const BUILTIN_CALLER_STD_MEM_ALIGN_OF = Caller(0xE)
+const BUILTIN_CALLER_STD_JULE_INTEGRATED_TO_STR = Caller(0xF)
+const BUILTIN_CALLER_STD_JULE_INTEGRATED_INLINE = Caller(0x10)
 
 static mut BUILTIN_TYPE_ALIAS_BYTE = &TypeAlias{
     public: true,
@@ -62,44 +64,81 @@ pub static mut BUILTIN_TRAIT_DISPOSE = &Trait{
                     ident:   "self",
                 },
             ],
+            instances: [
+                &FnIns{
+                    caller: BUILTIN_CALLER_COMMON,
+                }
+            ],
         },
     ],
 }
 
-fn init() {
-    BUILTIN_FN_OUT.caller = builtin_caller_out
-    BUILTIN_FN_OUTLN.caller = builtin_caller_outln
-    BUILTIN_FN_NEW.caller = builtin_caller_new
-    BUILTIN_FN_PANIC.caller = builtin_caller_panic
-    BUILTIN_FN_MAKE.caller = builtin_caller_make
-    BUILTIN_FN_APPEND.caller = builtin_caller_append
-    BUILTIN_FN_COPY.caller = builtin_caller_copy
-    BUILTIN_FN_CLONE.caller = builtin_caller_clone
-    BUILTIN_FN_ASSERT.caller = builtin_caller_assert
+fn find_builtin_caller(c: Caller): BuiltinCaller {
+    match c {
+    | BUILTIN_CALLER_COMMON:
+        ret builtin_caller_common
 
-    BUILTIN_FN_STD_MEM_SIZE_OF.caller = builtin_caller_std_mem_size_of
-    BUILTIN_FN_STD_MEM_ALIGN_OF.caller = builtin_caller_std_mem_align_of
+    | BUILTIN_CALLER_COMMON_MUT:
+        ret builtin_caller_common_mut
 
-    BUILTIN_FN_STD_JULE_INTEGRATED_TO_STR.caller = builtin_caller_std_jule_integrated_to_str
-    BUILTIN_FN_STD_JULE_INTEGRATED_INLINE.caller = builtin_caller_std_jule_integrated_inline
+    | BUILTIN_CALLER_COMMON_PLAIN:
+        ret builtin_caller_common_plain
 
-    let mut dispose_method = BUILTIN_TRAIT_DISPOSE.find_method("dispose")
-    let mut dispose_method_ins = dispose_method.instance()
-    dispose_method_ins.caller = builtin_caller_common
-    dispose_method.append_instance(dispose_method_ins)
+    | BUILTIN_CALLER_OUT:
+        ret builtin_caller_out
+
+    | BUILTIN_CALLER_OUTLN:
+        ret builtin_caller_outln
+
+    | BUILTIN_CALLER_NEW:
+        ret builtin_caller_new
+    
+    | BUILTIN_CALLER_PANIC:
+        ret builtin_caller_panic
+
+    | BUILTIN_CALLER_COPY:
+        ret builtin_caller_copy
+    
+    | BUILTIN_CALLER_MAKE:
+        ret builtin_caller_make
+
+    | BUILTIN_CALLER_APPEND:
+        ret builtin_caller_append
+
+    | BUILTIN_CALLER_CLONE:
+        ret builtin_caller_clone
+
+    | BUILTIN_CALLER_ASSERT:
+        ret builtin_caller_assert
+
+    | BUILTIN_CALLER_STD_MEM_SIZE_OF:
+        ret builtin_caller_std_mem_size_of
+
+    | BUILTIN_CALLER_STD_MEM_ALIGN_OF:
+        ret builtin_caller_std_mem_align_of
+
+    | BUILTIN_CALLER_STD_JULE_INTEGRATED_TO_STR:
+        ret builtin_caller_std_jule_integrated_to_str
+
+    | BUILTIN_CALLER_STD_JULE_INTEGRATED_INLINE:
+        ret builtin_caller_std_jule_integrated_inline
+
+    |:
+        panic("builtin caller not exist")
+    }
 }
 
 fn find_builtin_fn(ident: str): &FnIns {
     match ident {
-    | "out":    ret BUILTIN_FN_OUT
-    | "outln":  ret BUILTIN_FN_OUTLN
-    | "new":    ret BUILTIN_FN_NEW
-    | "panic":  ret BUILTIN_FN_PANIC
-    | "make":   ret BUILTIN_FN_MAKE
-    | "append": ret BUILTIN_FN_APPEND
-    | "copy":   ret BUILTIN_FN_COPY
-    | "clone":  ret BUILTIN_FN_CLONE
-    | "assert": ret BUILTIN_FN_ASSERT
+    | "out":    ret &FnIns{caller: BUILTIN_CALLER_OUT}
+    | "outln":  ret &FnIns{caller: BUILTIN_CALLER_OUTLN}
+    | "new":    ret &FnIns{caller: BUILTIN_CALLER_NEW}
+    | "panic":  ret &FnIns{caller: BUILTIN_CALLER_PANIC}
+    | "make":   ret &FnIns{caller: BUILTIN_CALLER_MAKE}
+    | "append": ret &FnIns{caller: BUILTIN_CALLER_APPEND}
+    | "copy":   ret &FnIns{caller: BUILTIN_CALLER_COPY}
+    | "clone":  ret &FnIns{caller: BUILTIN_CALLER_CLONE}
+    | "assert": ret &FnIns{caller: BUILTIN_CALLER_ASSERT}
     |:          ret nil
     }
 }
@@ -140,16 +179,16 @@ fn find_builtin_def(ident: str): any {
 
 fn find_builtin_def_std_mem(ident: str): any {
     match ident {
-    | "size_of":  ret BUILTIN_FN_STD_MEM_SIZE_OF
-    | "align_of": ret BUILTIN_FN_STD_MEM_ALIGN_OF
+    | "size_of":  ret &FnIns{caller: BUILTIN_CALLER_STD_MEM_SIZE_OF}
+    | "align_of": ret &FnIns{caller: BUILTIN_CALLER_STD_MEM_ALIGN_OF}
     |:            ret nil
     }
 }
 
 fn find_builtin_def_std_jule_integrated(ident: str): any {
     match ident {
-    | "to_str":  ret BUILTIN_FN_STD_JULE_INTEGRATED_TO_STR
-    | "inline":  ret BUILTIN_FN_STD_JULE_INTEGRATED_INLINE
+    | "to_str":  ret &FnIns{caller: BUILTIN_CALLER_STD_JULE_INTEGRATED_TO_STR}
+    | "inline":  ret &FnIns{caller: BUILTIN_CALLER_STD_JULE_INTEGRATED_INLINE}
     |:           ret nil
     }
 }
@@ -459,7 +498,7 @@ fn builtin_caller_append(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &D
             },
         ],
         result: t.kind,
-        caller: builtin_caller_common_plain,
+        caller: BUILTIN_CALLER_COMMON_PLAIN,
     }
     d.kind = &TypeKind{kind: f}
     d.model = &CommonIdentExprModel{ident: "append"}
@@ -518,8 +557,8 @@ fn builtin_caller_copy(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Dat
                 kind: t.kind,
             },
         ],
-        result: BUILTIN_FN_COPY.result,
-        caller: builtin_caller_common_plain,
+        result: &TypeKind{kind: build_prim_type(PrimKind.Int)},
+        caller: BUILTIN_CALLER_COMMON_PLAIN,
     }
 
     d.kind = &TypeKind{kind: f}
