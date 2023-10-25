@@ -35,6 +35,8 @@ const BUILTIN_CALLER_STD_MEM_SIZE_OF = Caller(0xD)
 const BUILTIN_CALLER_STD_MEM_ALIGN_OF = Caller(0xE)
 const BUILTIN_CALLER_STD_JULE_INTEGRATED_TO_STR = Caller(0xF)
 const BUILTIN_CALLER_STD_JULE_INTEGRATED_INLINE = Caller(0x10)
+const BUILTIN_CALLER_STD_DEBUG_OUT = Caller(0x11)
+const BUILTIN_CALLER_STD_DEBUG_OUTLN = Caller(0x12)
 
 static mut BUILTIN_TYPE_ALIAS_BYTE = &TypeAlias{
     public: true,
@@ -122,6 +124,12 @@ fn find_builtin_caller(c: Caller): BuiltinCaller {
 
     | BUILTIN_CALLER_STD_JULE_INTEGRATED_INLINE:
         ret builtin_caller_std_jule_integrated_inline
+    
+    | BUILTIN_CALLER_STD_DEBUG_OUT:
+        ret builtin_caller_std_debug_out
+
+    | BUILTIN_CALLER_STD_DEBUG_OUTLN:
+        ret builtin_caller_std_debug_outln
 
     |:
         panic("builtin caller not exist")
@@ -177,6 +185,14 @@ fn find_builtin_def(ident: str): any {
     ret nil
 }
 
+fn find_builtin_def_std_debug(ident: str): any {
+    match ident {
+    | "out":   ret &FnIns{caller: BUILTIN_CALLER_STD_DEBUG_OUT}
+    | "outln": ret &FnIns{caller: BUILTIN_CALLER_STD_DEBUG_OUTLN}
+    |:         ret nil
+    }
+}
+
 fn find_builtin_def_std_mem(ident: str): any {
     match ident {
     | "size_of":  ret &FnIns{caller: BUILTIN_CALLER_STD_MEM_SIZE_OF}
@@ -195,6 +211,7 @@ fn find_builtin_def_std_jule_integrated(ident: str): any {
 
 fn find_package_builtin_def(link_path: str, ident: str): any {
     match link_path {
+    | "std::debug":            ret find_builtin_def_std_debug(ident)
     | "std::mem":              ret find_builtin_def_std_mem(ident)
     | "std::jule::integrated": ret find_builtin_def_std_jule_integrated(ident)
     |:                         ret nil
@@ -814,4 +831,24 @@ fn builtin_caller_std_jule_integrated_inline(mut &e: &Eval, mut &fc: &FnCallExpr
         code: d.constant.read_str(),
     }
     ret r
+}
+
+fn builtin_caller_std_debug_out(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data {
+    d = builtin_caller_out(e, fc, d)
+    if d == nil {
+        ret nil
+    }
+
+    (&BuiltinOutCallExprModel)(d.model).debug = true
+    ret d
+}
+
+fn builtin_caller_std_debug_outln(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data {
+    d = builtin_caller_outln(e, fc, d)
+    if d == nil {
+        ret nil
+    }
+
+    (&BuiltinOutlnCallExprModel)(d.model).debug = true
+    ret d
 }

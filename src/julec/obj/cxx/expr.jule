@@ -810,6 +810,9 @@ fn gen_builtin_new_call_expr_model(mut m: &BuiltinNewCallExprModel): str {
 }
 
 fn gen_builtin_out_call_expr_model(mut m: &BuiltinOutCallExprModel): str {
+    if m.debug && env::PRODUCTION {
+        ret ""
+    }
     let mut obj = "jule::out("
     obj += gen_expr(m.expr)
     obj += ")"
@@ -817,6 +820,9 @@ fn gen_builtin_out_call_expr_model(mut m: &BuiltinOutCallExprModel): str {
 }
 
 fn gen_builtin_outln_call_expr_model(mut m: &BuiltinOutlnCallExprModel): str {
+    if m.debug && env::PRODUCTION {
+        ret ""
+    }
     let mut obj = "jule::outln("
     obj += gen_expr(m.expr)
     obj += ")"
@@ -840,6 +846,9 @@ fn gen_builtin_panic_call_expr_model(mut m: &BuiltinPanicCallExprModel): str {
 }
 
 fn gen_builtin_assert_call_expr_model(mut m: &BuiltinAssertCallExprModel): str {
+    if env::PRODUCTION {
+        ret ""
+    }
     let mut path = get_cstr_model([]byte(m.token.file.path()))
     path = path[1:path.len-1] // Remove quotes.
 
@@ -1145,7 +1154,7 @@ fn gen_expr_model(mut m: ExprModel): str {
 
 fn gen_expr(mut e: ExprModel): str {
     let mut obj = gen_expr_model(e)
-    if obj[0] != '(' {
+    if obj.len == 0 || obj[0] != '(' {
         ret obj
     }
 
