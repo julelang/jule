@@ -28,9 +28,9 @@
 #endif
 
 #if defined(ARCH_AMD64) || defined(ARCH_ARM64)
-#define ARCH_64BIT
+#define ARCH_X64
 #else
-#define ARCH_32BIT
+#define ARCH_X32
 #endif
 
 #endif // ifndef __JULE_PLATFORM_HPP

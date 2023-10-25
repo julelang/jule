@@ -12,7 +12,7 @@
 
 namespace jule {
 
-#ifdef ARCH_32BIT
+#ifdef ARCH_X32
     typedef unsigned long int Uint;
     typedef signed long int Int;
     typedef unsigned long int Uintptr;
