@@ -204,15 +204,15 @@ fn build_void_data(): &Data {
 fn kind_by_bitsize(expr: any): str {
     match type expr {
     | f64:
-        let x = (f64)(expr)
+        let x = f64(expr)
         ret types::float_from_bits(types::bitsize_of_float(x))
 
     | i64:
-        let x = (i64)(expr)
+        let x = i64(expr)
         ret types::int_from_bits(types::bitsize_of_int(x))
 
     | u64:
-        let x = (u64)(expr)
+        let x = u64(expr)
         ret types::uint_from_bits(types::bitsize_of_uint(x))
 
     |:
@@ -295,13 +295,14 @@ pub struct Value {
 
 // Evaluator.
 struct Eval {
-    s:         &Sema // Used for error logging.
-    lookup:    Lookup
-    prefix:    &TypeKind
-    unsafety:  bool
-    immutable: bool // This expression will assigned to immutable memory.
-    ignored:   bool // Evaluated expression is not for assignment or something else.
-    owner:     &Var
+    s:           &Sema // Used for error logging.
+    lookup:      Lookup
+    prefix:      &TypeKind
+    unsafety:    bool
+    immutable:   bool // This expression will assigned to immutable memory.
+    ignored:     bool // Evaluated expression is not for assignment or something else.
+    dis_builtin: bool // Disallow/suppress Jule's built-in defines.
+    owner:       &Var
 }
 
 impl Eval {
@@ -313,6 +314,9 @@ impl Eval {
     fn push_suggestion(mut self, fmt: LogMsg, args: ...any) {
         self.s.push_suggestion(fmt, args...)
     }
+
+    fn allow_builtin(mut self) { self.dis_builtin = false }
+    fn disallow_builtin(mut self) { self.dis_builtin = true }
 
     // Reports whether evaluation in unsafe scope.
     fn is_unsafe(self): bool { ret self.unsafety }
@@ -519,7 +523,7 @@ impl Eval {
             }
         }
 
-        ret find_builtin_def(ident)
+        ret if self.dis_builtin { nil } else { find_builtin_def(ident) }
     }
 
     fn get_def(mut self, ident: str, cpp_linked: bool): any {
@@ -1982,7 +1986,9 @@ impl Eval {
         self.lookup = imp
 
         const CPP_LINKED = false
+        self.disallow_builtin()
         let mut def = self.get_def(s.ident.kind, CPP_LINKED)
+        self.allow_builtin()
         self.lookup = lookup
 
         let mut d = self.eval_def(def, s.ident)
