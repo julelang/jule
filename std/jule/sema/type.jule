@@ -665,12 +665,17 @@ struct TypeChecker {
     // Current checked type is not plain type.
     // Type is pointer, reference, slice or similar.
     not_plain: bool
+
+    dis_builtin: bool // Disallow/suppress Jule's built-in defines.
 }
 
 impl TypeChecker {
     fn push_err(mut self, token: Token, fmt: LogMsg, args: ...any) {
         self.s.push_err(token, fmt, args...)
     }
+
+    fn allow_builtin(mut self) { self.dis_builtin = false }
+    fn disallow_builtin(mut self) { self.dis_builtin = true }
 
     fn build_prim(mut self, &decl: &IdentTypeDecl): &Prim {
         if !is_prim(decl.ident) {
@@ -1006,7 +1011,7 @@ impl TypeChecker {
             }
 
             let mut t = self.lookup.find_trait(decl.ident)
-            if t == nil {
+            if t == nil && !self.dis_builtin {
                 t = find_builtin_trait(decl.ident)
             }
             if t != nil {
@@ -1029,7 +1034,7 @@ impl TypeChecker {
         }
 
         let mut ta = self.lookup.find_type_alias(decl.ident, decl.cpp_linked)
-        if ta == nil {
+        if ta == nil && !self.dis_builtin {
             ta = find_builtin_type_alias(decl.ident)
         }
         if ta != nil {
@@ -1270,7 +1275,9 @@ impl TypeChecker {
         let mut lookup = self.lookup
         self.lookup = imp
 
+        self.disallow_builtin()
         let mut kind = self.build_ident(decl.kind)
+        self.allow_builtin()
 
         self.lookup = lookup
 
