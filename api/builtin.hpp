@@ -65,7 +65,7 @@ namespace jule {
             const jule::Int alloc_size = (dest._len+n)*2;
             jule::Slice<Item> buffer = jule::Slice<Item>::alloc(0, alloc_size);
             buffer._len = dest._len;
-            std::copy(
+            std::move(
                 dest._slice,
                 dest._slice+dest._len,
                 buffer._slice);

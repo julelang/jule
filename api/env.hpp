@@ -49,9 +49,8 @@ namespace jule {
 #endif
 
         jule::Slice<jule::Str> args;
-        args.alloc_new(0, jule::argc);
-        args._len = jule::argc;
-        for (jule::Int i = 0; i < argc; ++i) {
+        args.alloc_new(jule::argc, jule::argc);
+        for (jule::Int i = 0; i < jule::argc; ++i) {
 #ifdef OS_WINDOWS
             const LPWSTR warg = argvw[i];
             args._slice[i] = jule::utf16_to_utf8_str(warg, std::wcslen(warg));

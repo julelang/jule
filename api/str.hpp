@@ -223,8 +223,7 @@ namespace jule {
 
         operator jule::Slice<jule::U8>(void) const {
             jule::Slice<jule::U8> slice;
-            slice.alloc_new(0, this->len());
-            slice._len = this->len();
+            slice.alloc_new(this->len(), this->len());
             std::copy(this->begin(), this->end(), slice.begin());
             return slice;
         }

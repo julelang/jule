@@ -14,8 +14,7 @@
 jule::Slice<std::vector<jule::U16>>
 __jule_str_slice_to_ustr_slice(const jule::Slice<jule::Str> &s) noexcept {
     jule::Slice<std::vector<jule::U16>> us;
-    us.alloc_new(0, s.len());
-    us._len = us.cap();
+    us.alloc_new(s.len(), s.len());
 
     jule::Slice<jule::Str>::ConstIterator s_it = s.begin();
     jule::Slice<std::vector<jule::U16>>::Iterator us_it = us.begin();

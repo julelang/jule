@@ -147,6 +147,12 @@ namespace jule {
 
         template<typename T>
         void operator=(const T &expr) noexcept {
+            jule::Any::Type *type = jule::Any::new_type<T>();
+            if (this->type != nullptr && this->type == type) {
+                // Same type, not null, avoid allocation, use current.
+                *this->data = expr;
+                return;
+            }
             this->dealloc();
             this->__assign<T>(expr);
         }

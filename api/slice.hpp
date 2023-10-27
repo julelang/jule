@@ -86,8 +86,7 @@ namespace jule {
             if (src.size() == 0)
                 return;
 
-            this->alloc_new(0, src.size());
-            this->_len = this->_cap;
+            this->alloc_new(src.size(), src.size());
             const auto src_begin = src.begin();
             for (jule::Int i = 0; i < this->_len; ++i)
                 this->data.alloc[i] = *static_cast<const Item*>(src_begin+i);
@@ -142,7 +141,6 @@ namespace jule {
 
             delete[] this->data.alloc;
             this->data.alloc = nullptr;
-            this->data.ref = nullptr;
             this->_slice = nullptr;
 #endif // __JULE_DISABLE__REFERENCE_COUNTING
         }
@@ -231,31 +229,27 @@ namespace jule {
         void push(const Item &item) {
             if (this->_len == this->_cap) {
                 jule::Slice<Item> _new;
-                _new.alloc_new(0, (this->_len+1) * 2);
-                _new._len = this->_len+1;
-                std::copy(
+                _new.alloc_new(this->_len+1, (this->_len+1) * 2);
+                std::move(
                     this->_slice,
                     this->_slice+this->_len,
                     _new._slice);
                 *(_new._slice+this->_len) = item;
 
-                this->dealloc();
-                *this = _new;
+                this->operator=(_new);
                 return;
             }
 
-            *(this->_slice+this->_len) = item;
-            ++this->_len;
+            this->_slice[this->_len++] = item;
         }
 
         jule::Bool operator==(const jule::Slice<Item> &src) const {
             if (this->_len != src._len)
                 return false;
 
-            for (jule::Int index = 0; index < this->_len; ++index) {
+            for (jule::Int index = 0; index < this->_len; ++index)
                 if (this->_slice[index] != src._slice[index])
                     return false;
-            }
 
             return true;
         }
@@ -295,7 +289,6 @@ namespace jule {
             if (this->data.alloc != nullptr && this->data.alloc == src.data.alloc) {
                 this->_len = src._len;
                 this->_cap = src._cap;
-                this->data = src.data;
                 this->_slice = src._slice;
                 return;
             }
