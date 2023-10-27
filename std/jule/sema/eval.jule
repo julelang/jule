@@ -1970,14 +1970,14 @@ impl Eval {
 
     fn eval_ns_selection(mut self, s: &NsSelectionExpr): &Data {
         let path = build_link_path_by_tokens(s.ns)
-        let mut imp = self.lookup.select_package(fn(p: &ImportInfo): bool {
-            if s.ns.len == 1 && p.alias == path {
+        let mut imp = self.lookup.select_package(fn(imp: &ImportInfo): bool {
+            if s.ns.len == 1 && imp.alias == path {
                 ret true
             }
-            ret p.link_path == path
+            ret imp.link_path == path && imp.is_accessible_via_selection()
         })
 
-        if imp == nil || !imp.is_lookupable(TokenKind.Self) {
+        if imp == nil {
             self.push_err(s.ident, LogMsg.NamespaceNotExist, path)
             ret nil
         }
@@ -4130,14 +4130,9 @@ impl BinopSolver {
         }
 
         match {
-        | types::is_float(prim.kind):
-            ret self.eval_float()
-
-        | types::is_int(prim.kind):
-            ret self.eval_int()
-
-        |:
-            ret nil
+        | types::is_float(prim.kind): ret self.eval_float()
+        | types::is_int(prim.kind):   ret self.eval_int()
+        |:                            ret nil
         }
     }
 
