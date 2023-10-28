@@ -120,6 +120,24 @@ namespace jule {
         inline constexpr Item &__at(const jule::Int &index) const noexcept
         { return this->buffer[index]; }
 
+        inline void swap(const jule::Int &i, const jule::Int &j) const noexcept {
+#ifndef __JULE_DISABLE__SAFETY
+            if (this->empty() || i < 0 || N <= i) {
+                std::string error;
+                __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(error, i);
+                error += "\nruntime: array indexing with out of range index";
+                jule::panic(error);
+            }
+            if (this->empty() || j < 0 || N <= j) {
+                std::string error;
+                __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(error, j);
+                error += "\nruntime: array indexing with out of range index";
+                jule::panic(error);
+            }
+#endif
+            std::swap(this->__at(i), this->__at(j));
+        }
+
         Item &operator[](const jule::Int &index) const {
 #ifndef __JULE_DISABLE__SAFETY
             if (this->empty() || index < 0 || N <= index) {
