@@ -150,7 +150,7 @@ namespace jule {
             jule::Any::Type *type = jule::Any::new_type<T>();
             if (this->type != nullptr && this->type == type) {
                 // Same type, not null, avoid allocation, use current.
-                *this->data = expr;
+                *(T*)this->data = expr;
                 return;
             }
             this->dealloc();
