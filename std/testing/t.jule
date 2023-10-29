@@ -1,0 +1,70 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use fmt for std::fmt
+
+// A test utility also used by the Jule runtime.
+// It provides functionalities that facilitate the
+// management and development of tests.
+pub struct T {
+    mut s: byte
+}
+
+impl T {
+    const S_NA   = byte(0x0)
+    const S_SKIP = byte(0x1 << 0)
+    const S_FAIL = byte(0x1 << 1)
+
+    // Used by runtime.
+    // Reset all data.
+    fn reset(self) {
+        self.s = T.S_NA
+    }
+
+    // Wrapper for internal logs.
+    fn __outln(self, msg: str) {
+        fmt::println("    ", msg)
+    }
+
+    // Fails test.
+    // Does not breaks scope execution.
+    pub fn fail(self) {
+        if self.s == T.S_SKIP {
+            panic("std::testing: T.fail: failed test that already skipped")
+        }
+        self.s = T.S_FAIL
+    }
+
+    // Reports whether test is failed.
+    pub fn failed(self): bool { ret self.s == T.S_FAIL }
+
+    // Skip test.
+    // Does not breaks scope execution.
+    pub fn skip(self) {
+        if self.s == T.S_SKIP {
+            panic("std::testing: T.skip: skipped test that already failed")
+        }
+        self.s = T.S_SKIP
+    }
+
+    // Reports whether test is skipped.
+    pub fn skipped(self): bool { ret self.s == T.S_SKIP }
+
+    // Set status of test as failure if expression is evaluated false at runtime.
+    pub fn assert(self, expr: bool): bool {
+        if !expr {
+            self.__outln("assertion failed")
+            self.fail()
+        }
+        ret expr
+    }
+
+    // Set status of test as failure and print message by formatting.
+    // Prints new-line after formatted text.
+    // Uses std::fmt internally.
+    pub fn errorf(self, fmt: str, args: ...any) {
+        self.__outln(fmt::format(fmt, args...))
+        self.fail()
+    }
+}

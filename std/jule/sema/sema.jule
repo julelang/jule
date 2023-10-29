@@ -2172,6 +2172,28 @@ impl Sema {
         }
     }
 
+    fn check_test_fn(mut self, mut &f: &FnIns) {
+        if f.params.len != 1 || f.result != nil {
+            self.push_err(f.decl.token, LogMsg.WrongTestFnDecl)
+            self.push_suggestion(LogMsg.UseExpectedTestFnDecl)
+            ret
+        }
+
+        let mut sptr = f.params[0].kind.sptr()
+        if sptr == nil {
+            self.push_err(f.decl.token, LogMsg.WrongTestFnDecl)
+            self.push_suggestion(LogMsg.UseExpectedTestFnDecl)
+            ret
+        }
+
+        let s = sptr.elem.strct()
+        if s == nil || !is_std_package(s.decl.token.file.path(), "testing") {
+            self.push_err(f.decl.token, LogMsg.WrongTestFnDecl)
+            self.push_suggestion(LogMsg.UseExpectedTestFnDecl)
+            ret
+        }
+    }
+
     fn precheck_type_fn(mut &self, mut &f: &Fn) {
         if f.cpp_linked {
             ret
@@ -2187,6 +2209,10 @@ impl Sema {
             f.instances = append(f.instances, ins)
             self.reload_fn_ins_types(ins)
             ins.reloaded = true
+
+            if has_directive(f.directives, Directive.Test) {
+                self.check_test_fn(ins)
+            }
         }
     }
 

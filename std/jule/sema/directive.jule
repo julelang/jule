@@ -155,6 +155,27 @@ impl DirectiveChecker {
         d.args[0].kind = arg.kind[1:arg.kind.len-1]
     }
 
+     fn check_test(mut self, &d: &ast::Directive) {
+        match type self.o {
+        | &Fn:
+            let f = (&Fn)(self.o)
+            if !f.cpp_linked && !f.is_init() && !f.is_entry_point() {
+                break
+            }
+            if f.is_method() {
+                self.s.push_err(f.token, LogMsg.TestMethod)
+                break
+            }
+            fall
+        |:
+            self.s.push_err(d.tag, LogMsg.UnsupportedDirective, d.tag.kind)
+        }
+
+        if d.args.len > 0 {
+            self.s.push_err(d.args[0], LogMsg.InvalidSyntax)
+        }
+    }
+
     fn check_directive(mut self, mut &d: &ast::Directive) {
         match d.tag.kind {
         | Directive.Cdef: self.check_cdef(d)
@@ -162,6 +183,7 @@ impl DirectiveChecker {
         | Directive.Derive: self.check_derive(d)
         | Directive.Namespace: self.check_namespace(d)
         | Directive.Deprecated: self.check_deprecated(d)
+        | Directive.Test: self.check_test(d)
 
         | Directive.Build
         | Directive.Pass:

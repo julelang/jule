@@ -8,6 +8,7 @@ use obj::{IR}
 use conv for std::conv
 use std::jule::{VERSION}
 use std::jule::build::{
+    Directive,
     Derive,
     INIT_FN,
     PATH_API,
@@ -762,6 +763,9 @@ fn gen_pkg_fns(mut &p: &Package): str {
     let mut obj = ""
     for (_, mut f) in p.files {
         for (_, mut f) in f.funcs {
+            if !env::TEST && has_directive(f.directives, Directive.Test) {
+                continue
+            }
             if !f.cpp_linked && f.token.id != TokenId.Na {
                 obj += gen_fn(f)
                 obj += "\n\n"
@@ -935,6 +939,85 @@ fn gen_init_caller(mut &ir: &IR): str {
     ret obj
 }
 
+pub fn find_testing_package(mut &ir: &IR): &ImportInfo {
+    for (_, mut imp) in ir.used {
+        if imp.link_path == "std::testing" {
+            ret imp
+        }
+    }
+    ret nil
+}
+
+pub fn append_test(mut &obj: str, mut f: &FnIns) {
+    obj += indent()
+    obj += "_t->_method_reset();\n"
+    obj += indent()
+    obj += "std::cout << \">>> TEST RUNNING: \";\n"
+    obj += indent()
+    obj += "jule::outln("
+    obj += get_cstr_model([]byte(f.decl.ident))
+    obj += ");\n"
+    obj += indent()
+    obj += fn_ins_out_ident(f)
+    obj += "(_t);\n"
+    obj += indent()
+    obj += "post_test();\n"
+}
+
+pub fn append_package_tests(mut &obj: str, mut &p: &Package) {
+    for (_, mut file) in p.files {
+        for (_, mut f) in file.funcs {
+            if has_directive(f.directives, Directive.Test) {
+                append_test(obj, f.instances[0])
+            }
+        }
+    }
+}
+
+pub fn append_test_point(mut &obj: str, mut &ir: &IR) {
+    let mut p = find_testing_package(ir)
+    let mut t = p.find_struct("T", false).instances[0]
+
+    obj += "\nvoid test_point(void) {\n"
+    add_indent()
+
+    obj += indent()
+    obj += as_sptr_kind(gen_struct_kind_ins(t))
+    obj += " _t = jule::new_struct<"
+    obj += gen_struct_kind_ins(t)
+    obj += ">(new(std::nothrow) "
+    obj += gen_struct_kind_ins(t)
+    obj += ");\n"
+
+    obj += indent()
+    obj += "jule::Uint total = 0, failed = 0, skipped = 0;\n"
+    obj += indent()
+
+    obj += "auto post_test = [&](void) {\n"
+    add_indent()
+    obj += indent()
+    obj += "++total;\n"
+    obj += indent()
+    obj += "if (_t->_method_failed()) { ++failed; std::cout << \"    [*] FAILED\" << std::endl; }\n"
+    obj += indent()
+    obj += "else if (_t->_method_skipped()) { ++skipped; std::cout << \"    [*] SKIPPED\" << std::endl; }\n"
+    obj += indent()
+    obj += "else { std::cout << \"    [*] PASSED\" << std::endl; }\n"
+    done_indent()
+    obj += indent()
+    obj += "};\n"
+
+    append_package_tests(obj, ir.main)
+
+    obj += "\n\n"
+    obj += indent()
+    obj += "std::cout << std::endl << std::endl << \"total tests: \" << total << \"  skipped: \" << skipped << \" failed: \" << failed << \" pass: \" << total-failed-skipped << std::endl;\n"
+
+    done_indent()
+    obj += indent()
+    obj += "}\n"
+}
+
 pub fn append_standard(mut &obj_code: str, compiler: str, compiler_cmd: str) {
     let time = Time.now().abs()
     
@@ -974,7 +1057,14 @@ int main(int argc, char *argv[], char *envp[]) {
     jule::setup_envp(envp);
 
     __jule_call_initializers();
-    entry_point();
+    `
+    if env::TEST {
+        s += "test_point();"
+    } else {
+        s += "entry_point();"
+    }
+
+    s += `
 
     return EXIT_SUCCESS;
 }`

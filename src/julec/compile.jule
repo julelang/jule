@@ -288,7 +288,7 @@ fn check_flags(&args: []str): []str {
     fs.add_var[bool](unsafe { (&bool)(&env::OPT_INLINE) }, "opt-inline", 0, "Inline optimization")
     fs.add_var[bool](unsafe { (&bool)(&env::OPT_PTR) }, "opt-ptr", 0, "Pointer optimizations")
 
-    let mut content = fs.parse(args[1:]) else {
+    let mut content = fs.parse(args) else {
         exit_err(str(error))
         use nil // Avoid error.
     }
@@ -346,7 +346,12 @@ fn build_ir(&args: []str): &IR {
 }
 
 // Process compile command by "ARGS" global.
-fn compile_command(&args: []str) {
+fn compile_command(mut &args: []str) {
+    args = args[1:] // Remove program path.
+    if args[0] == "test" {
+        env::TEST = true
+        args = args[1:]
+    }
     let mut ir = build_ir(args)
 
     const CPP_LINKED = false
@@ -369,6 +374,9 @@ fn compile_command(&args: []str) {
     let (compiler, compiler_cmd) = gen_compile_cmd(get_compile_path(), ir)
 
     let mut obj = cxx::gen(ir)
+    if env::TEST {
+        cxx::append_test_point(obj, ir)
+    }
     cxx::append_standard(obj, compiler, compiler_cmd)
 
     do_spell(obj, compiler, compiler_cmd)
