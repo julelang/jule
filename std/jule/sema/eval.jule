@@ -1074,7 +1074,7 @@ impl Eval {
             d.kind = &TypeKind{kind: tc.build_sptr_from_type(d.kind)}
 
         |:
-            self.push_err(u.op, LogMsg.InvalidExprForUnary, u.op.kind)
+            self.push_err(u.op, LogMsg.InvalidExprForUnary, u.op.kind, d.kind.to_str())
             d = nil
             ret
         }
@@ -1098,6 +1098,7 @@ impl Eval {
         }
 
         let mut cast_kind = d.cast_kind
+        let kind = d.kind
         match u.op.kind {
         | TokenKind.Minus: self.eval_unary_minus(d)
         | TokenKind.Plus:  self.eval_unary_plus(d)
@@ -1105,11 +1106,11 @@ impl Eval {
         | TokenKind.Excl:  self.eval_unary_excl(d)
         | TokenKind.Star:  self.eval_unary_star(d, u.op)
         | TokenKind.Amper: self.eval_unary_amper(d)
-        |:                      d = nil
+        |:                 d = nil
         }
 
         if d == nil {
-            self.push_err(u.op, LogMsg.InvalidExprForUnary, u.op.kind)
+            self.push_err(u.op, LogMsg.InvalidExprForUnary, u.op.kind, kind.to_str())
         } else if d.is_const() {
             d.model = d.constant
         } else if cast_kind != nil {
@@ -2342,7 +2343,7 @@ impl Eval {
 
         let mut item = enm.find_item(ident.kind)
         if item == nil {
-            self.push_err(ident, LogMsg.ObjHaveNotIdent, ident.kind)
+            self.push_err(ident, LogMsg.ObjHaveNotIdent, enm.ident, ident.kind)
         } else {
             d.constant = new(Const, *item.value.data.constant)
             d.model = d.constant
@@ -2384,14 +2385,14 @@ impl Eval {
             ret self.eval_var(sttc, ident)
         }
 
-        self.push_err(ident, LogMsg.ObjHaveNotIdent, ident.kind)
+        self.push_err(ident, LogMsg.ObjHaveNotIdent, s.decl.ident, ident.kind)
         ret nil
     }
 
     fn eval_trait_sub_ident(mut self, mut d: &Data, mut trt: &Trait, ident: Token): &Data {
         let mut f = trt.find_method(ident.kind)
         if f == nil {
-            self.push_err(ident, LogMsg.ObjHaveNotIdent, ident.kind)
+            self.push_err(ident, LogMsg.ObjHaveNotIdent, trt.ident, ident.kind)
             ret nil
         }
 
@@ -2453,7 +2454,7 @@ impl Eval {
         const STATIC = false
         let mut m = s.find_method(si.ident.kind, STATIC)
         if m == nil {
-            self.push_err(si.ident, LogMsg.ObjHaveNotIdent, si.ident.kind)
+            self.push_err(si.ident, LogMsg.ObjHaveNotIdent, s.decl.ident, si.ident.kind)
             ret nil
         }
 
@@ -2529,7 +2530,7 @@ impl Eval {
             }
 
         |:
-            self.push_err(ident, LogMsg.ObjHaveNotIdent, ident.kind)
+            self.push_err(ident, LogMsg.ObjHaveNotIdent, d.kind.to_str(), ident.kind)
             ret nil
         }
     }
@@ -2575,7 +2576,7 @@ impl Eval {
             }
 
         |:
-            self.push_err(ident, LogMsg.ObjHaveNotIdent, ident.kind)
+            self.push_err(ident, LogMsg.ObjHaveNotIdent, d.kind.to_str(), ident.kind)
             ret nil
         }
     }
@@ -2698,7 +2699,7 @@ impl Eval {
             }
 
         |:
-            self.push_err(ident, LogMsg.ObjHaveNotIdent, ident.kind)
+            self.push_err(ident, LogMsg.ObjHaveNotIdent, map_kind.to_str(), ident.kind)
             ret nil
         }
     }
@@ -2947,7 +2948,7 @@ impl Eval {
             }
 
         |:
-            self.push_err(ident, LogMsg.ObjHaveNotIdent, ident.kind)
+            self.push_err(ident, LogMsg.ObjHaveNotIdent, str_kind.to_str(), ident.kind)
             ret nil
         }
     }
