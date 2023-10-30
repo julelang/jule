@@ -684,7 +684,7 @@ fn builtin_caller_assert(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &D
         e.push_err(fc.token, LogMsg.MissingExprFor, "expr")
         ret nil
     }
-    if fc.args.len > 1 {
+    if fc.args.len > 2 {
         e.push_err(fc.args[2].token, LogMsg.ArgumentOverflow)
     }
 
@@ -697,11 +697,29 @@ fn builtin_caller_assert(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &D
         e.push_err(fc.token, LogMsg.AssertNonBool)
     }
 
-    let mut d = build_void_data()
-    d.model = &BuiltinAssertCallExprModel{
+    let mut model = &BuiltinAssertCallExprModel{
         token: fc.token,
         expr:  expr.model,
+        log:   "assertion failed", // Default log message.
     }
+
+    // Custom log message is exist.
+    if fc.args.len == 2 {
+        let mut log = e.eval_expr(fc.args[1])
+        if log == nil {
+            ret nil
+        }
+
+        if !log.is_const() || log.kind.prim() == nil || !log.kind.prim().is_str() {
+            e.push_err(fc.args[1].token, LogMsg.IncompatibleTypes, "const str", log.kind.to_str())
+            ret nil
+        }
+
+        model.log = log.constant.read_str()
+    }
+
+    let mut d = build_void_data()
+    d.model = model
     ret d
 }
 
