@@ -677,7 +677,7 @@ fn gen_prototypes(mut &ir: &IR): str {
     }
     obj += gen_trait_prototypes(ir.main)
 
-    
+
     obj += gen_struct_plain_prototypes(ir.ordered.structs)
 
     obj += gen_traits(ir)
@@ -975,11 +975,21 @@ pub fn append_package_tests(mut &obj: str, mut &p: &Package) {
 }
 
 pub fn append_test_point(mut &obj: str, mut &ir: &IR) {
-    let mut p = find_testing_package(ir)
-    let mut t = p.find_struct("T", false).instances[0]
-
     obj += "\nvoid test_point(void) {\n"
     add_indent()
+    obj += indent()
+
+    let mut p = find_testing_package(ir)
+    if p == nil {
+        // std::testing is not used.
+        // So, developers cannot write valid test function.
+        // Append empty test point and return.
+        obj += "}"
+        done_indent()
+        ret
+    }
+
+    let mut t = p.find_struct("T", false).instances[0]
 
     obj += indent()
     obj += as_sptr_kind(gen_struct_kind_ins(t))
@@ -1020,7 +1030,7 @@ pub fn append_test_point(mut &obj: str, mut &ir: &IR) {
 
 pub fn append_standard(mut &obj_code: str, compiler: str, compiler_cmd: str) {
     let time = Time.now().abs()
-    
+
     let mut time_str = ""
     time_str += conv::fmt_uint(time.day, 10)
     time_str += "/"
