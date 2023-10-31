@@ -19,5 +19,5 @@ RUN mkdir ./bin
 
 WORKDIR /usr/local/jule
 RUN curl -o ir.cpp https://raw.githubusercontent.com/julelang/julec-ir/main/src/linux-arm64.cpp
-RUN clang++ -O3 -static -Wno-everything --std=c++17 -o ./bin/julec ir.cpp
+RUN clang++ -O3 -DNDEBUG -fomit-frame-pointer -flto -static -Wno-everything --std=c++17 -o ./bin/julec ir.cpp
 WORKDIR /usr/local/jule
