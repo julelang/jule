@@ -4,7 +4,7 @@
 
 use importer::{PlainImporter}
 
-use std::jule::build::{Log, LogKind, logf}
+use std::jule::build::{Log, LogKind}
 use sema for std::jule::sema
 
 // Intermediate representation of code for compiler.
@@ -25,6 +25,13 @@ impl IR {
     pub static fn build(path: str, flags: sema::SemaFlag): (&IR, []Log) {
         let mut importer = &PlainImporter{
             mod: find_module_file(path),
+        }
+
+        if importer.mod.len != 0 { // Module exist.
+            let mut errs = check_module_file(importer.mod)
+            if errs.len != 0 {
+                ret nil, errs
+            }
         }
 
         let (mut files, mut logs) = importer.import_package(path)

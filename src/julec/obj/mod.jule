@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use std::fs::{Directory, DirEntry}
+use std::fs::{File, Directory, DirEntry}
 use path for std::fs::path
-use build for std::jule::build
+use build for std::jule::build::{Log, LogKind}
 
 fn __find_module_file(&dirents: []&DirEntry): bool {
     for _, d in dirents {
@@ -34,4 +34,23 @@ fn find_module_file(mut path: str): str {
     }
 
     ret ""
+}
+
+fn check_module_file(path: str): []Log {
+    let bytes = File.read(path::join(path, build::MODULE_FILE)) else {
+        ret [{
+            kind: LogKind.Flat,
+            text: "module file could not checked because of a problem",
+        }]
+    }
+
+    let s = str(bytes).trim(" \t\v\n")
+    if s.len != 0 {
+        ret [{
+            kind: LogKind.Flat,
+            text: "module file has syntax error(s)",
+        }]
+    }
+
+    ret nil
 }
