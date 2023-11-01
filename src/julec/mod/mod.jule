@@ -6,7 +6,9 @@ use std::fs::{File, Directory, DirEntry}
 use path for std::fs::path
 use build for std::jule::build::{Log, LogKind}
 
-fn __find_module_file(&dirents: []&DirEntry): bool {
+// Searches module file in path.
+// Reports whether module file is exist in given directory.
+pub fn find_module_file(&dirents: []&DirEntry): bool {
     for _, d in dirents {
         if !d.stat.is_dir() && d.name == build::MODULE_FILE {
             ret true
@@ -15,13 +17,16 @@ fn __find_module_file(&dirents: []&DirEntry): bool {
     ret false
 }
 
-fn find_module_file(mut path: str): str {
+// Searches module file in path, and their parent paths.
+// Returns empty string if any module file is not exist.
+// Returns directory path of module file if exist.
+pub fn find_module_file_deep(mut path: str): str {
     for {
         let mut dirents = Directory.read(path) else {
             break
         }
 
-        let exist = __find_module_file(dirents)
+        let exist = find_module_file(dirents)
         if exist {
             ret path
         }
@@ -36,7 +41,8 @@ fn find_module_file(mut path: str): str {
     ret ""
 }
 
-fn check_module_file(path: str): []Log {
+// Checks module file of given directory.
+pub fn check_module_file(path: str): []Log {
     let bytes = File.read(path::join(path, build::MODULE_FILE)) else {
         ret [{
             kind: LogKind.Flat,

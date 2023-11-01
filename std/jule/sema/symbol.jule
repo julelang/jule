@@ -419,7 +419,7 @@ impl SymbolBuilder {
     }
 
     fn build_ident_import(mut &self, mut &decl: &UseDecl): &ImportInfo {
-        let mod_path = self.importer.mod_path()
+        let mod_path = self.importer.get_mod_path()
         if mod_path.len == 0 {
             self.push_err(decl.token, LogMsg.ModuleNotFound)
             self.push_suggestion(LogMsg.UseModInit)
@@ -436,11 +436,11 @@ impl SymbolBuilder {
             ret nil
         }
 
+        // Exist?
         let info = Status.of(path) else {
             self.push_err(decl.token, LogMsg.UseNotFound, decl.link_path)
             ret nil
         }
-        // Exist?
         if !info.is_dir() {
             self.push_err(decl.token, LogMsg.UseNotFound, decl.link_path)
             ret nil
@@ -504,7 +504,7 @@ impl SymbolBuilder {
             ret "std" + path.replace(str(SEPARATOR), TokenKind.DblColon, -1)
         }
 
-        let (root, _) = abs(self.importer.mod_path())
+        let (root, _) = abs(self.importer.get_mod_path())
         path = path[root.len:]
         if path[0] == SEPARATOR {
             path = path[1:]
@@ -589,7 +589,9 @@ impl SymbolBuilder {
                 ret false
             }
 
-            let (mut asts, errors) = self.importer.import_package(imp.path)
+            let old_mod = self.importer.get_mod_path()
+            defer { self.importer.set_mod_path(old_mod) }
+            let (mut asts, errors) = self.importer.import_package(imp.path, !imp.std)
             if errors.len > 0 {
                 self.errors = append(self.errors, errors...)
                 ret false

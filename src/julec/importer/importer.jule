@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use mod
+
 use std::fs::{OFlag, FsError, DirEntry, File, Directory}
 use std::fs::path::{join}
 use std::jule::ast::{Ast}
@@ -43,26 +45,6 @@ fn flat_compiler_err(text: str): Log {
     }
 }
 
-// Read package directory entries by package (directory) path.
-fn read_package_dirents(path: str)!: []&DirEntry {
-    let mut dirents = Directory.read(path) else {
-        error("connot read package directory: " + path)
-    }
-    let mut passed_dirents: []&DirEntry = nil
-    for (_, mut dirent) in dirents {
-        let name = dirent.name
-
-        // Skip directories, and non-jule files.
-        if dirent.stat.is_dir() || !name.has_suffix(EXT) {
-            continue
-        }
-
-        passed_dirents = append(passed_dirents, dirent)
-    }
-
-    ret passed_dirents
-}
-
 // Reports whether file passes build directives.
 fn is_pass_build_directives(mut &file: &Ast): (bool, []Log) {
     for (_, mut td) in file.top_directives {
@@ -91,7 +73,11 @@ pub struct PlainImporter {
 }
 
 impl Importer for PlainImporter {
-    pub fn mod_path(self): str {
+    pub fn set_mod_path(mut self, path: str) {
+        self.mod = path
+    }
+
+    pub fn get_mod_path(self): str {
         ret self.mod
     }
 
@@ -105,14 +91,26 @@ impl Importer for PlainImporter {
         ret nil
     }
 
-    pub fn import_package(mut self, path: str): ([]&Ast, []Log) {
-        let dirents = read_package_dirents(path) else {
-            let mut errors = [flat_compiler_err(str(error))]
-            ret nil, errors
+    pub fn import_package(mut self, path: str, update_mod: bool): ([]&Ast, []Log) {
+        let mut dirents = Directory.read(path) else {
+            ret nil, [flat_compiler_err("connot read package directory: " + path)]
+        }
+
+        if mod::find_module_file(dirents) { // Module exist.
+            self.mod = path
+            let mut errs = mod::check_module_file(path)
+            if errs.len != 0 {
+                ret nil, errs
+            }
         }
 
         let mut asts = make([]&Ast, 0, dirents.len)
         for _, dirent in dirents {
+            // Skip directories, and non-jule files.
+            if dirent.stat.is_dir() || !dirent.name.has_suffix(EXT) {
+                continue
+            }
+
             let _path = join(path, dirent.name)
             let mut file = new_file_set(_path)
             file.fill(read_buff(file.path()))
