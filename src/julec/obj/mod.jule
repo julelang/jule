@@ -1,0 +1,37 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use std::fs::{Directory, DirEntry}
+use path for std::fs::path
+use build for std::jule::build
+
+fn __find_module_file(&dirents: []&DirEntry): bool {
+    for _, d in dirents {
+        if !d.stat.is_dir() && d.name == build::MODULE_FILE {
+            ret true
+        }
+    }
+    ret false
+}
+
+fn find_module_file(mut path: str): str {
+    for {
+        let mut dirents = Directory.read(path) else {
+            break
+        }
+
+        let exist = __find_module_file(dirents)
+        if exist {
+            ret path
+        }
+
+        let n = path.len
+        path = path::join("..", path)
+        if path.len == n { // Same path, no difference.
+            break
+        }
+    }
+
+    ret ""
+}
