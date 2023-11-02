@@ -96,11 +96,14 @@ impl Importer for PlainImporter {
             ret nil, [flat_compiler_err("connot read package directory: " + path)]
         }
 
-        if update_mod && mod::find_module_file(dirents) { // Module exist.
-            self.mod = path
-            let mut errs = mod::check_module_file(path)
-            if errs.len != 0 {
-                ret nil, errs
+        if update_mod {
+            let new_mod = mod::find_module_file_deep(path)
+            if new_mod != self.mod {
+                self.mod = new_mod
+                let mut errs = mod::check_module_file(self.mod)
+                if errs.len != 0 {
+                    ret nil, errs
+                }
             }
         }
 
