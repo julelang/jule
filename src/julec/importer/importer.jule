@@ -7,7 +7,7 @@ use mod
 use std::fs::{OFlag, FsError, DirEntry, File, Directory}
 use std::fs::path::{join}
 use std::jule::ast::{Ast}
-use std::jule::build::{
+use build for std::jule::build::{
     Directive,
     LogKind,
     Log,
@@ -68,8 +68,19 @@ fn is_pass_build_directives(mut &file: &Ast): (bool, []Log) {
 
 // Common importer of JuleC.
 pub struct PlainImporter {
+    mods:             []str
     pub mod:          str
     pub all_packages: []&ImportInfo
+}
+
+impl PlainImporter {
+    const STD_MOD = int(-1)
+
+    pub static fn new(): &PlainImporter {
+        ret &PlainImporter{
+            mods: [build::PATH_STDLIB],
+        }
+    }
 }
 
 impl Importer for PlainImporter {
@@ -79,6 +90,10 @@ impl Importer for PlainImporter {
 
     pub fn get_mod_path(self): str {
         ret self.mod
+    }
+
+    pub fn mod_by_id(self, id: int): str {
+        ret self.mods[id]
     }
 
     pub fn get_import(mut self, path: str): &ImportInfo {
@@ -154,6 +169,18 @@ impl Importer for PlainImporter {
             if p.cpp_linked == imp.cpp_linked && p.link_path == imp.link_path {
                 ret
             }
+        }
+
+        if self.mod.len != 0 {
+            for i, mod in self.mods {
+                if self.mod == mod {
+                    imp.mod_id = i
+                    goto setted
+                }
+            }
+            imp.mod_id = self.mods.len
+            self.mods = append(self.mods, self.mod)
+        setted:
         }
 
         self.all_packages = append(self.all_packages, imp)

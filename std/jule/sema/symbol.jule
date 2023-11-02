@@ -575,6 +575,18 @@ impl SymbolBuilder {
         ret true
     }
 
+    // Checks internal packages or etc. for accessibility.
+    //
+    // Parameters:
+    //  - decl: relevant use declaration.
+    //  - mod: module that imports relevant package.
+    //  - path: path of package that importing.
+    fn check_package_accessibility(mut self, &decl: &UseDecl, &mod: str, &path: str) {
+        if self.importer.get_mod_path() != mod && path.rfind("internal") != -1 {
+            self.push_err(decl.token, LogMsg.UseDeclForInternal)
+        }
+    }
+
     fn import_package(mut &self, mut &imp: &ImportInfo, mut &decl: &UseDecl): (ok: bool) {
         if imp.cpp_linked {
             ret true
@@ -584,6 +596,11 @@ impl SymbolBuilder {
         if port != nil {
             imp.package = port.package
             imp.duplicate = true
+
+            let old_mod = self.importer.get_mod_path()
+            self.importer.set_mod_path(self.importer.mod_by_id(imp.mod_id))
+            self.check_package_accessibility(decl, old_mod, port.path)
+            self.importer.set_mod_path(old_mod)
         } else {
             if !self.check_import_cycles(imp, decl) {
                 ret false
@@ -591,11 +608,16 @@ impl SymbolBuilder {
 
             let old_mod = self.importer.get_mod_path()
             defer { self.importer.set_mod_path(old_mod) }
+            if imp.std {
+                self.importer.set_mod_path(PATH_STDLIB)
+            }
             let (mut asts, errors) = self.importer.import_package(imp.path, !imp.std)
             if errors.len > 0 {
                 self.errors = append(self.errors, errors...)
                 ret false
             }
+
+            self.check_package_accessibility(decl, old_mod, imp.path)
 
             for (_, mut ast) in asts {
                 let (mut table, errors) = build_symbols(ast, self.importer, self)
