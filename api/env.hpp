@@ -22,7 +22,8 @@
 #include <linux/limits.h>
 #endif
 
-namespace jule {
+namespace jule
+{
 
     int argc;
     char **argv;
@@ -34,15 +35,19 @@ namespace jule {
     jule::Slice<jule::Str> env(void) noexcept;
     jule::Str executable(void) noexcept;
 
-    inline void setup_argv(int argc, char **argv) noexcept {
+    inline void setup_argv(int argc, char **argv) noexcept
+    {
         jule::argc = argc;
         jule::argv = argv;
     }
 
     inline void setup_envp(char **envp) noexcept
-    { jule::envp = envp; }
+    {
+        jule::envp = envp;
+    }
 
-    jule::Slice<jule::Str> args(void) noexcept {
+    jule::Slice<jule::Str> args(void) noexcept
+    {
 #ifdef OS_WINDOWS
         const LPWSTR cmdl = GetCommandLineW();
         LPWSTR *argvw = CommandLineToArgvW(cmdl, &argc);
@@ -50,7 +55,8 @@ namespace jule {
 
         jule::Slice<jule::Str> args;
         args.alloc_new(jule::argc, jule::argc);
-        for (jule::Int i = 0; i < jule::argc; ++i) {
+        for (jule::Int i = 0; i < jule::argc; ++i)
+        {
 #ifdef OS_WINDOWS
             const LPWSTR warg = argvw[i];
             args._slice[i] = jule::utf16_to_utf8_str(warg, std::wcslen(warg));
@@ -65,15 +71,19 @@ namespace jule {
         return args;
     }
 
-    jule::Slice<jule::Str> env(void) noexcept {
+    jule::Slice<jule::Str> env(void) noexcept
+    {
         jule::Slice<jule::Str> env;
 #ifdef OS_WINDOWS
         wchar_t *env_s = GetEnvironmentStringsW();
         wchar_t *np = env_s;
         wchar_t *latest = env_s;
-        while (*latest != 0) {
-            for (; *np != 0; ++np) {}
-            env.push(jule::utf16_to_utf8_str(latest, np-latest));
+        while (*latest != 0)
+        {
+            for (; *np != 0; ++np)
+            {
+            }
+            env.push(jule::utf16_to_utf8_str(latest, np - latest));
             ++np;
             latest = np;
         }
@@ -85,11 +95,12 @@ namespace jule {
         return env;
     }
 
-    jule::Str executable(void) noexcept {
+    jule::Str executable(void) noexcept
+    {
 #if defined(OS_DARWIN)
         char buff[PATH_MAX];
         uint32_t buff_size = PATH_MAX;
-        if(!_NSGetExecutablePath(buff, &buff_size))
+        if (!_NSGetExecutablePath(buff, &buff_size))
             return jule::Str(buff);
         return jule::Str();
 #elif defined(OS_WINDOWS)

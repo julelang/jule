@@ -14,44 +14,50 @@
 #include "panic.hpp"
 
 #define __JULE_CO_SPAWN(ROUTINE) \
-    ( std::thread{ROUTINE} )
+    (std::thread{ROUTINE})
 #define __JULE_CO(EXPR) \
-    ( __JULE_CO_SPAWN([&](void) mutable -> void { EXPR; }).detach() )
+    (__JULE_CO_SPAWN([&](void) mutable -> void { EXPR; }).detach())
 
-namespace jule {
+namespace jule
+{
 
     // std::function wrapper of JuleC.
-    template <typename > struct Fn;
+    template <typename>
+    struct Fn;
 
-    template<typename T, typename... U>
+    template <typename T, typename... U>
     jule::Uintptr addr_of_fn(std::function<T(U...)> f) noexcept;
 
     template <typename Function>
-    struct Fn {
+    struct Fn
+    {
     public:
         std::function<Function> buffer;
         jule::Uintptr _addr;
 
         Fn(void) = default;
         Fn(const Fn<Function> &fn) = default;
-        Fn(std::nullptr_t): Fn() {}
+        Fn(std::nullptr_t) : Fn() {}
 
-        Fn(const std::function<Function> &function) noexcept {
+        Fn(const std::function<Function> &function) noexcept
+        {
             this->_addr = jule::addr_of_fn(function);
             if (this->_addr == 0)
                 this->_addr = (jule::Uintptr)(&function);
             this->buffer = function;
         }
 
-        Fn(const Function *function) noexcept {
+        Fn(const Function *function) noexcept
+        {
             this->buffer = function;
             this->_addr = jule::addr_of_fn(this->buffer);
             if (this->_addr == 0)
                 this->_addr = (jule::Uintptr)(function);
         }
 
-        template<typename ...Arguments>
-        auto operator()(Arguments... arguments) {
+        template <typename... Arguments>
+        auto operator()(Arguments... arguments)
+        {
 #ifndef __JULE_DISABLE__SAFETY
             if (this->buffer == nullptr)
                 jule::panic(__JULE_ERROR__INVALID_MEMORY "\nfile: api/fn.hpp");
@@ -60,39 +66,57 @@ namespace jule {
         }
 
         jule::Uintptr addr(void) const noexcept
-        { return this->_addr; }
+        {
+            return this->_addr;
+        }
 
         inline void operator=(std::nullptr_t) noexcept
-        { this->buffer = nullptr; }
+        {
+            this->buffer = nullptr;
+        }
 
         inline void operator=(const std::function<Function> &function)
-        { this->buffer = function; }
+        {
+            this->buffer = function;
+        }
 
         inline void operator=(const Function &function)
-        { this->buffer = function; }
+        {
+            this->buffer = function;
+        }
 
         inline jule::Bool operator==(const Fn<Function> &fn) const noexcept
-        { return this->addr() == fn.addr(); }
+        {
+            return this->addr() == fn.addr();
+        }
 
         inline jule::Bool operator!=(const Fn<Function> &fn) const noexcept
-        { return !this->operator==(fn); }
+        {
+            return !this->operator==(fn);
+        }
 
         inline jule::Bool operator==(std::nullptr_t) const noexcept
-        { return this->buffer == nullptr; }
+        {
+            return this->buffer == nullptr;
+        }
 
         inline jule::Bool operator!=(std::nullptr_t) const noexcept
-        { return !this->operator==(nullptr); }
+        {
+            return !this->operator==(nullptr);
+        }
 
         friend std::ostream &operator<<(std::ostream &stream,
-                                        const Fn<Function> &src) noexcept {
-            return (stream << (void*)src._addr);
+                                        const Fn<Function> &src) noexcept
+        {
+            return (stream << (void *)src._addr);
         }
     };
 
-    template<typename T, typename... U>
-    jule::Uintptr addr_of_fn(std::function<T(U...)> f) noexcept {
+    template <typename T, typename... U>
+    jule::Uintptr addr_of_fn(std::function<T(U...)> f) noexcept
+    {
         typedef T(FnType)(U...);
-        FnType **fn_ptr = f.template target<FnType*>();
+        FnType **fn_ptr = f.template target<FnType *>();
         if (!fn_ptr)
             return 0;
         return (jule::Uintptr)(*fn_ptr);

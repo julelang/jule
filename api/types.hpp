@@ -10,7 +10,8 @@
 
 #include "platform.hpp"
 
-namespace jule {
+namespace jule
+{
 
 #ifdef ARCH_X32
     typedef unsigned long int Uint;
@@ -47,9 +48,13 @@ namespace jule {
 } // namespace jule
 
 inline std::ostream &operator<<(std::ostream &stream, const jule::I8 &x)
-{ return stream << static_cast<int>(x); }
+{
+    return stream << static_cast<int>(x);
+}
 
 inline std::ostream &operator<<(std::ostream &stream, const jule::U8 &x)
-{ return stream << static_cast<int>(x); }
+{
+    return stream << static_cast<int>(x);
+}
 
 #endif // ifndef __JULE_TYPES_HPP

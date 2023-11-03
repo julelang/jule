@@ -9,35 +9,42 @@
 
 #include "any.hpp"
 
-namespace jule {
+namespace jule
+{
 
     // Wrapper structure for Jule's void exceptionals.
-    class VoidExceptional {
+    class VoidExceptional
+    {
     public:
         jule::Any error;
 
         VoidExceptional(void) = default;
-        VoidExceptional(const jule::Any &error): error(error) {}
+        VoidExceptional(const jule::Any &error) : error(error) {}
 
         // Reports whether no exception.
         bool ok(void) const noexcept
-        { return this->error == nullptr; }
+        {
+            return this->error == nullptr;
+        }
     };
 
     // Wrapper structure for Jule's exceptionals.
-    template<typename T>
-    class Exceptional {
+    template <typename T>
+    class Exceptional
+    {
     public:
         jule::Any error;
-        T         result;
+        T result;
 
         Exceptional(void) = default;
-        Exceptional(const jule::Any &error): error(error) {}
-        Exceptional(const jule::Any &error, const T &result): error(error), result(result) {}
+        Exceptional(const jule::Any &error) : error(error) {}
+        Exceptional(const jule::Any &error, const T &result) : error(error), result(result) {}
 
         // Reports whether no exception.
         bool ok(void) const noexcept
-        { return this->error == nullptr; }
+        {
+            return this->error == nullptr;
+        }
     };
 
 } // namespace jule

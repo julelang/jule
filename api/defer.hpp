@@ -7,23 +7,27 @@
 
 #include <functional>
 
-#define __JULE_CCONCAT(A, B) A ## B
+#define __JULE_CCONCAT(A, B) A##B
 #define __JULE_CONCAT(A, B) __JULE_CCONCAT(A, B)
 
 #define __JULE_DEFER(BLOCK) \
-    jule::DeferBase __JULE_CONCAT(__deferred_, __LINE__){ [&]BLOCK }
+    jule::DeferBase __JULE_CONCAT(__deferred_, __LINE__) { [&] BLOCK }
 
-namespace jule {
+namespace jule
+{
 
-    struct DeferBase {
+    struct DeferBase
+    {
     public:
         std::function<void(void)> scope;
 
         DeferBase(void) = default;
-        DeferBase(const std::function<void(void)> &fn): scope(fn) {}
+        DeferBase(const std::function<void(void)> &fn) : scope(fn) {}
 
         ~DeferBase(void)
-        { this->scope(); }
+        {
+            this->scope();
+        }
     };
 }
 

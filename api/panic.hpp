@@ -17,10 +17,12 @@
 #include "utf16.hpp"
 #endif
 
-namespace jule {
+namespace jule
+{
     constexpr signed int EXIT_PANIC = 2;
 
-    inline void panic(const std::string &expr) noexcept {
+    inline void panic(const std::string &expr) noexcept
+    {
         std::cerr << "panic: ";
 #ifdef OS_WINDOWS
         const std::vector<jule::U16> utf16_str = jule::utf16_from_str(expr);
