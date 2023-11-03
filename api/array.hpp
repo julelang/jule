@@ -26,15 +26,15 @@ namespace jule {
     public:
         mutable Item buffer[N];
 
-        Array<Item, N>(void) = default;
+        Array(void) = default;
 
-        Array<Item, N>(const jule::Array<Item, N> &src)
+        Array(const jule::Array<Item, N> &src)
         { std::copy(src.begin(), src.end(), this->begin()); }
 
-        Array<Item, N>(const std::initializer_list<Item> &src)
+        Array(const std::initializer_list<Item> &src)
         { std::copy(src.begin(), src.end(), this->begin()); }
 
-        Array<Item, N>(const Item &def)
+        Array(const Item &def)
         { std::fill(this->begin(), this->end(), def); }
 
         typedef Item       *Iterator;

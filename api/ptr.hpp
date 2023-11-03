@@ -93,13 +93,13 @@ namespace jule {
 #endif
         }
 
-        Ptr<T>(void) = default;
-        Ptr<T>(const std::nullptr_t&): Ptr<T>() {}
+        Ptr(void) = default;
+        Ptr(const std::nullptr_t&): Ptr() {}
 
-        Ptr<T>(const jule::Ptr<T> &src) noexcept
+        Ptr(const jule::Ptr<T> &src) noexcept
         { this->__get_copy(src); }
 
-        Ptr<T>(const jule::Ptr<T> &&src) noexcept {
+        Ptr(const jule::Ptr<T> &&src) noexcept {
             this->alloc = src.alloc;
             this->ref = src.ref;
 
@@ -107,10 +107,10 @@ namespace jule {
             src.ref = nullptr;
         }
 
-        Ptr<T>(T *src) noexcept
+        Ptr(T *src) noexcept
         { this->alloc = src; }
 
-        ~Ptr<T>(void) noexcept
+        ~Ptr(void) noexcept
         { this->drop(); }
 
         // Copy content from source.

@@ -26,11 +26,11 @@ namespace jule {
         mutable jule::Ptr<Mask> data;
         const char *type_id = nullptr;
 
-        Trait<Mask>(void) = default;
-        Trait<Mask>(std::nullptr_t): Trait<Mask>() {}
+        Trait(void) = default;
+        Trait(std::nullptr_t): Trait() {}
 
         template<typename T>
-        Trait<Mask>(const T &data) noexcept {
+        Trait(const T &data) noexcept {
             T *alloc = new(std::nothrow) T;
             if (!alloc)
                 jule::panic(__JULE_ERROR__MEMORY_ALLOCATION_FAILED "\nfile: api/trait.hpp");
@@ -45,7 +45,7 @@ namespace jule {
         }
 
         template<typename T>
-        Trait<Mask>(const jule::Ptr<T> &ref) noexcept {
+        Trait(const jule::Ptr<T> &ref) noexcept {
 #ifdef __JULE_DISABLE__REFERENCE_COUNTING
             this->data = jule::Ptr<Mask>::make(reinterpret_cast<Mask*>(ref.alloc), nullptr);
 #else
@@ -56,10 +56,10 @@ namespace jule {
             this->type_id = typeid(ref).name();
         }
 
-        Trait<Mask>(const jule::Trait<Mask> &src) noexcept
+        Trait(const jule::Trait<Mask> &src) noexcept
         { this->__get_copy(src); }
 
-        Trait<Mask>(const jule::Trait<Mask> &&src) noexcept
+        Trait(const jule::Trait<Mask> &&src) noexcept
         { this->__get_copy(src); }
 
         void dealloc(void) noexcept

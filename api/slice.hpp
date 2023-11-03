@@ -73,16 +73,16 @@ namespace jule {
             return buffer;
         }
 
-        Slice<Item>(void) = default;
-        Slice<Item>(const std::nullptr_t): Slice<Item>() {}
+        Slice(void) = default;
+        Slice(const std::nullptr_t): Slice() {}
 
-        Slice<Item>(const jule::Slice<Item> &src) noexcept
+        Slice(const jule::Slice<Item> &src) noexcept
         { this->__get_copy(src); }
 
-        Slice<Item>(const jule::Slice<Item> &&src) noexcept
+        Slice(const jule::Slice<Item> &&src) noexcept
         { this->__get_copy(src); }
 
-        Slice<Item>(const std::initializer_list<Item> &src) {
+        Slice(const std::initializer_list<Item> &src) {
             if (src.size() == 0)
                 return;
 
@@ -92,7 +92,7 @@ namespace jule {
                 this->data.alloc[i] = *static_cast<const Item*>(src_begin+i);
         }
 
-        ~Slice<Item>(void) noexcept
+        ~Slice(void) noexcept
         { this->dealloc(); }
 
         // Copy content from source.
