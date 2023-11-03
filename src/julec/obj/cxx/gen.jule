@@ -731,16 +731,51 @@ fn gen_var(mut v: &Var): str {
     ret gen_var_init_expr(v, get_init_expr(v.kind.kind))
 }
 
-// Generates C++ code of all globals.
-fn gen_globals(mut &globals: []&Var): str {
+fn gen_pkg_globals(mut &p: &Package, mut &global_initializers: str): str {
     let mut obj = ""
+    for (_, mut f) in p.files {
+        for (_, mut v) in f.vars {
+            if v.token.id != TokenId.Na && !v.cpp_linked {
+                obj += gen_type_kind(v.kind.kind)
+                obj += " "
+                if v.reference {
+                    obj += "&"
+                }
+                obj += var_out_ident(v)
+                obj += ";\n"
 
-    for (_, mut v) in globals {
-        if v.token.id != TokenId.Na {
-            obj += gen_var(v)
-            obj += "\n"
+                global_initializers += indent() // Indentation for initializer scope.
+                global_initializers += var_out_ident(v)
+                if v.value != nil && v.value.expr != nil {
+                    if v.value.data.model != nil {
+                        global_initializers += " = "
+                        global_initializers += gen_val(v.value)
+                    }
+                } else {
+                    global_initializers += " = "
+                    global_initializers += get_init_expr(v.kind.kind)
+                }
+                global_initializers += ";\n"
+            }
         }
     }
+    ret obj
+}
+
+// Generates C++ code of all globals.
+fn gen_globals(mut ir: &IR, mut &global_initializers: str): str {
+    let mut obj = ""
+
+    add_indent() // For global initializers's function indentation.
+
+    for (_, mut u) in ir.used {
+        if !u.cpp_linked {
+            obj += gen_pkg_globals(u.package, global_initializers)
+        }
+    }
+    obj += gen_pkg_globals(ir.main, global_initializers)
+
+    done_indent()
 
     ret obj
 }
@@ -923,10 +958,11 @@ fn push_init(mut &pkg: &Package, mut &obj: str) {
 }
 
 // Generated C++ code of all initializer functions.
-fn gen_init_caller(mut &ir: &IR): str {
+fn gen_init_caller(mut &ir: &IR, &global_initializers: str): str {
     let mut obj = "void "
     obj += INIT_CALLER_IDENT
-    obj += "(void) {"
+    obj += "(void) {\n"
+    obj += global_initializers
 
     for (_, mut u) in ir.used {
         if !u.cpp_linked {
@@ -1083,17 +1119,18 @@ int main(int argc, char *argv[], char *envp[]) {
 
 // Generates C++ codes from SymbolTables.
 pub fn gen(mut &ir: &IR): str {
+    let mut global_initializers = ""
     let mut obj = ""
     obj += gen_links(ir)
     obj += "\n"
     obj += gen_prototypes(ir)
     obj += "\n\n"
-    obj += gen_globals(ir.ordered.globals)
+    obj += gen_globals(ir, global_initializers)
     obj += "\n"
     obj += gen_structs(ir.ordered.structs)
     obj += gen_fns(ir)
     obj += "\n"
-    obj += gen_init_caller(ir)
+    obj += gen_init_caller(ir, global_initializers)
     obj += "\n"
     ret obj
 }

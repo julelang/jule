@@ -76,37 +76,9 @@ impl IR {
         ret buffer
     }
 
-    fn append_vars(self, mut &p: &sema::Package, mut &buffer: []&sema::Var) {
-        for (_, mut f) in p.files {
-            for (_, mut v) in f.vars {
-                if !v.cpp_linked && !v.constant {
-                    buffer = append(buffer, v)
-                }
-            }
-        }
-    }
-
-    // Returns all variables of main package and used pakcages.
-    // Ignores cpp-linked and constant declarations.
-    pub fn get_all_variables(mut self): []&sema::Var {
-        let mut buffer: []&sema::Var = nil
-
-        self.append_vars(self.main, buffer)
-
-        for (_, mut u) in self.used {
-            if !u.cpp_linked {
-                self.append_vars(u.package, buffer)
-            }
-        }
-
-        ret buffer
-    }
-
     // Order defines at update ordered field of instance.
     pub fn order(mut self) {
         self.ordered.structs = self.get_all_structures()
-        self.ordered.globals = self.get_all_variables()
-        DefineOrderer.order_variables(self.ordered.globals)
         DefineOrderer.order_structures(self.ordered.structs)
     }
 }
