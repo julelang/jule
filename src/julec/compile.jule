@@ -106,7 +106,11 @@ fn push_comp_cmd_clang(mut &cmd: str) {
 
     // Set C++ standard.
     cmd += "--std="
-    cmd += env::CPP_STD
+    match env::CPP_STD {
+    | "cpp14": cmd += "c++14"
+    | "cpp17": cmd += "c++17"
+    | "cpp20": cmd += "c++20"
+    }
     cmd += " "
 
     if env::PRODUCTION {
@@ -125,7 +129,11 @@ fn push_comp_cmd_gcc(mut &cmd: str) {
 
     // Set C++ standard.
     cmd += "--std="
-    cmd += env::CPP_STD
+    match env::CPP_STD {
+    | "cpp14": cmd += "c++14"
+    | "cpp17": cmd += "c++17"
+    | "cpp20": cmd += "c++20"
+    }
     cmd += " "
 
     if env::PRODUCTION {
@@ -259,6 +267,18 @@ fn check_opt_flag(&opt: str) {
     }
 }
 
+fn check_cpp_std_flag() {
+    match env::CPP_STD {
+    | "cpp14"
+    | "cpp17"
+    | "cpp20":
+        // Ok.
+
+    |:
+        exit_err("--cppstd: invalid optimization level: " + env::CPP_STD)
+    }
+}
+
 fn check_flags(&args: []str): []str {
     let mut opt: str = "L0"
     let mut target: str = "native-native"
@@ -272,6 +292,7 @@ fn check_flags(&args: []str): []str {
     fs.add_var[bool](unsafe { (&bool)(&env::TRANSPILATION) }, "transpile", 't', "Transpile code")
     fs.add_var[str](unsafe { (&str)(&env::COMPILER) }, "compiler", 0, "Backend compiler")
     fs.add_var[bool](unsafe { (&bool)(&env::PRODUCTION) }, "production", 'p', "Compile for production")
+    fs.add_var[str](unsafe { (&str)(&env::CPP_STD) }, "cppstd", 0, "C++ standard")
     fs.add_var[bool](unsafe { (&bool)(&env::OPT_COPY) }, "opt-copy", 0, "Copy optimization")
     fs.add_var[bool](unsafe { (&bool)(&env::OPT_DEADCODE) }, "opt-deadcode", 0, "Deadcode optimization")
     fs.add_var[bool](unsafe { (&bool)(&env::OPT_APPEND) }, "opt-append", 0, "Append optimization")
@@ -286,6 +307,7 @@ fn check_flags(&args: []str): []str {
     }
 
     check_compiler_flag()
+    check_cpp_std_flag()
     check_target_flag(target)
     check_opt_flag(opt)
 
