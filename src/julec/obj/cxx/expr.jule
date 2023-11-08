@@ -566,10 +566,20 @@ fn gen_pure_fn_call_expr_model(mut &m: &FnCallExprModel): str {
         }
     }
     if !env::PRODUCTION && m.func.anon {
-        obj += ".call("
-        obj += gen_loc_info(m.token)
-        if m.args.len != 0 {
-            obj += ","
+        match type m.expr {
+        | &StructSubIdentExprModel:
+            if (&StructSubIdentExprModel)(m.expr).field.decl.owner.cpp_linked {
+                obj += "("
+                break
+            }
+
+            fall
+        |:
+            obj += ".call("
+            obj += gen_loc_info(m.token)
+            if m.args.len != 0 {
+                obj += ","
+            }
         }
     } else {
         obj += "("
