@@ -5,6 +5,7 @@
 #ifndef __JULE_TRAIT_HPP
 #define __JULE_TRAIT_HPP
 
+#include <string>
 #include <typeinfo>
 #include <ostream>
 #include <cstring>
@@ -36,7 +37,7 @@ namespace jule
         {
             T *alloc = new (std::nothrow) T;
             if (!alloc)
-                jule::panic(__JULE_ERROR__MEMORY_ALLOCATION_FAILED "\nfile: api/trait.hpp");
+                jule::panic(__JULE_ERROR__MEMORY_ALLOCATION_FAILED "\nfile: /api/trait.hpp");
 
             *alloc = data;
 #ifdef __JULE_DISABLE__REFERENCE_COUNTING
@@ -84,10 +85,24 @@ namespace jule
             this->type_id = src.type_id;
         }
 
-        inline void must_ok(void) const noexcept
+        inline void must_ok(
+#ifndef __JULE_ENABLE__PRODUCTION
+            const char *file
+#else
+            void
+#endif
+        ) const noexcept
         {
             if (this->operator==(nullptr))
-                jule::panic(__JULE_ERROR__INVALID_MEMORY "\nfile: api/trait.hpp");
+            {
+#ifndef __JULE_ENABLE__PRODUCTION
+                std::string error = __JULE_ERROR__INVALID_MEMORY "\nfile: ";
+                error += file;
+                jule::panic(error);
+#else
+                jule::panic(__JULE_ERROR__INVALID_MEMORY "\nfile: /api/trait.hpp");
+#endif
+            }
         }
 
         template <typename T>
@@ -99,18 +114,20 @@ namespace jule
             return std::strcmp(this->type_id, typeid(T).name()) == 0;
         }
 
-        inline Mask &get(void) noexcept
-        {
-#ifndef __JULE_DISABLE__SAFETY
-            this->must_ok();
+        inline Mask &get(
+#ifndef __JULE_ENABLE__PRODUCTION
+            const char *file
+#else
+            void
 #endif
-            return *this->data;
-        }
-
-        inline Mask &get(void) const noexcept
+        ) const noexcept
         {
 #ifndef __JULE_DISABLE__SAFETY
-            this->must_ok();
+            this->must_ok(
+#ifndef __JULE_ENABLE__PRODUCTION
+                file
+#endif
+            );
 #endif
             return *this->data;
         }
@@ -118,25 +135,59 @@ namespace jule
         ~Trait(void) {}
 
         template <typename T>
-        operator T(void) noexcept
+        inline T cast(
+#ifndef __JULE_ENABLE__PRODUCTION
+            const char *file
+#else
+            void
+#endif
+            ) noexcept
         {
 #ifndef __JULE_DISABLE__SAFETY
-            this->must_ok();
+            this->must_ok(
+#ifndef __JULE_ENABLE__PRODUCTION
+                file
+#endif
+            );
             if (std::strcmp(this->type_id, typeid(T).name()) != 0)
-                jule::panic(__JULE_ERROR__INCOMPATIBLE_TYPE
-                            "\nruntime: trait casted to incompatible type");
+            {
+#ifndef __JULE_ENABLE__PRODUCTION
+                std::string error = __JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: trait casted to incompatible type\nfile: ";
+                error += file;
+                jule::panic(error);
+#else
+                jule::panic(__JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: trait casted to incompatible type");
+#endif
+            }
 #endif
             return *reinterpret_cast<T *>(this->data.alloc);
         }
 
         template <typename T>
-        operator jule::Ptr<T>(void) noexcept
+        jule::Ptr<T> cast_ptr(
+#ifndef __JULE_ENABLE__PRODUCTION
+            const char *file
+#else
+            void
+#endif
+            ) noexcept
         {
 #ifndef __JULE_DISABLE__SAFETY
-            this->must_ok();
+            this->must_ok(
+#ifndef __JULE_ENABLE__PRODUCTION
+                file
+#endif
+            );
             if (std::strcmp(this->type_id, typeid(jule::Ptr<T>).name()) != 0)
-                jule::panic(__JULE_ERROR__INCOMPATIBLE_TYPE
-                            "\nruntime: trait casted to incompatible type");
+            {
+#ifndef __JULE_ENABLE__PRODUCTION
+                std::string error = __JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: trait casted to incompatible type\nfile: ";
+                error += file;
+                jule::panic(error);
+#else
+                jule::panic(__JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: trait casted to incompatible type");
+#endif
+            }
 #endif
 
 #ifndef __JULE_DISABLE__REFERENCE_COUNTING
@@ -144,6 +195,26 @@ namespace jule
 #endif
             return jule::Ptr<T>::make(
                 reinterpret_cast<T *>(this->data.alloc), this->data.ref);
+        }
+
+        template <typename T>
+        inline operator T(void) noexcept
+        {
+            this->cast<T>(
+#ifndef __JULE_ENABLE__PRODUCTION
+                "/api/trait.hpp"
+#endif
+            );
+        }
+
+        template <typename T>
+        inline operator jule::Ptr<T>(void) noexcept
+        {
+            return this->cast_ptr<T>(
+#ifndef __JULE_ENABLE__PRODUCTION
+                "/api/trait.hpp"
+#endif
+            );
         }
 
         inline void operator=(const std::nullptr_t) noexcept

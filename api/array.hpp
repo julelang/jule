@@ -68,8 +68,12 @@ namespace jule
             return this->begin() + N;
         }
 
-        inline jule::Slice<Item> slice(const jule::Int &start,
-                                       const jule::Int &end) const noexcept
+        jule::Slice<Item> slice(
+#ifndef __JULE_ENABLE__PRODUCTION
+            const char *file,
+#endif
+            const jule::Int &start,
+            const jule::Int &end) const noexcept
         {
 #ifndef __JULE_DISABLE__SAFETY
             if (start < 0 || end < 0 || start > end || end > N)
@@ -77,6 +81,10 @@ namespace jule
                 std::string error;
                 __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(error, start, end);
                 error += "\nruntime: array slicing with out of range indexes";
+#ifndef __JULE_ENABLE__PRODUCTION
+                error += "\nfile: ";
+                error += file;
+#endif
                 jule::panic(error);
             }
 #endif
@@ -96,14 +104,32 @@ namespace jule
             return slice;
         }
 
-        inline jule::Slice<Item> slice(const jule::Int &start) const noexcept
+        inline jule::Slice<Item> slice(
+#ifndef __JULE_ENABLE__PRODUCTION
+            const char *file,
+#endif
+            const jule::Int &start) const noexcept
         {
-            return this->slice(start, N);
+            return this->slice(
+#ifndef __JULE_ENABLE__PRODUCTION
+                file,
+#endif
+                start, N);
         }
 
-        inline jule::Slice<Item> slice(void) const noexcept
+        inline jule::Slice<Item> slice(
+#ifndef __JULE_ENABLE__PRODUCTION
+            const char *file
+#else
+            void
+#endif
+        ) const noexcept
         {
-            return this->slice(0, N);
+            return this->slice(
+#ifndef __JULE_ENABLE__PRODUCTION
+                file,
+#endif
+                0, N);
         }
 
         inline constexpr jule::Int len(void) const noexcept
@@ -143,6 +169,30 @@ namespace jule
             return this->buffer[index];
         }
 
+        // Returns element by index.
+        // Includes safety checking.
+        inline Item &at(
+#ifndef __JULE_ENABLE__PRODUCTION
+            const char *file,
+#endif
+            const jule::Int &index) const noexcept
+        {
+#ifndef __JULE_DISABLE__SAFETY
+            if (this->empty() || index < 0 || N <= index)
+            {
+                std::string error;
+                __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(error, index);
+                error += "\nruntime: array indexing with out of range index";
+#ifndef __JULE_ENABLE__PRODUCTION
+                error += "\nfile: ",
+                    error += file;
+#endif
+                jule::panic(error);
+            }
+#endif
+            return this->__at(index);
+        }
+
         inline void swap(const jule::Int &i, const jule::Int &j) const noexcept
         {
 #ifndef __JULE_DISABLE__SAFETY
@@ -164,18 +214,13 @@ namespace jule
             std::swap(this->__at(i), this->__at(j));
         }
 
-        Item &operator[](const jule::Int &index) const
+        inline Item &operator[](const jule::Int &index) const
         {
-#ifndef __JULE_DISABLE__SAFETY
-            if (this->empty() || index < 0 || N <= index)
-            {
-                std::string error;
-                __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(error, index);
-                error += "\nruntime: array indexing with out of range index";
-                jule::panic(error);
-            }
+#ifndef __JULE_ENABLE__PRODUCTION
+            return this->at("/api/array.hpp", index);
+#else
+            return this->at(index);
 #endif
-            return this->__at(index);
         }
 
         friend std::ostream &operator<<(std::ostream &stream,

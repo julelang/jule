@@ -5,6 +5,7 @@
 #ifndef __JULE_ANY_HPP
 #define __JULE_ANY_HPP
 
+#include <string>
 #include <typeinfo>
 #include <stddef.h>
 #include <cstdlib>
@@ -198,19 +199,49 @@ namespace jule
         }
 
         template <typename T>
-        operator T(void) const noexcept
+        T cast(
+#ifndef __JULE_ENABLE__PRODUCTION
+            const char *file
+#else
+            void
+#endif
+        ) const noexcept
         {
 #ifndef __JULE_DISABLE__SAFETY
             if (this->operator==(nullptr))
-                jule::panic(__JULE_ERROR__INVALID_MEMORY
-                            "\nruntime: type any casted but data is nil");
+            {
+#ifndef __JULE_ENABLE__PRODUCTION
+                std::string error = __JULE_ERROR__INVALID_MEMORY "\nruntime: type any casted but data is nil\nfile: ";
+                error += file;
+                jule::panic(error);
+#else
+                jule::panic(__JULE_ERROR__INVALID_MEMORY "\nruntime: type any casted but data is nil");
+#endif
+            }
 
             if (!this->type_is<T>())
-                jule::panic(__JULE_ERROR__INCOMPATIBLE_TYPE
-                            "\nruntime: type any casted to incompatible type");
+            {
+#ifndef __JULE_ENABLE__PRODUCTION
+                std::string error = __JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: type any casted to incompatible type\nfile: ";
+                error += file;
+                jule::panic(error);
+#else
+                jule::panic(__JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: type any casted to incompatible type");
+#endif
+            }
 #endif
 
             return *static_cast<T *>(this->data);
+        }
+
+        template <typename T>
+        inline operator T(void) const noexcept
+        {
+#ifndef __JULE_ENABLE__PRODUCTION
+            return this->cast<T>("/api/any.hpp");
+#else
+            return this->cast<T>();
+#endif
         }
 
         template <typename T>

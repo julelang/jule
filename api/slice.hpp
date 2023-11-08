@@ -120,10 +120,22 @@ namespace jule
             this->_slice = src._slice;
         }
 
-        inline void check(void) const noexcept
+        inline void check(
+#ifndef __JULE_ENABLE__PRODUCTION
+            const char *file
+#endif
+        ) const noexcept
         {
             if (this->operator==(nullptr))
+            {
+#ifndef __JULE_ENABLE__PRODUCTION
+                std::string error = __JULE_ERROR__INVALID_MEMORY "\nruntime: slice is nil\nfile: ";
+                error += file;
+                jule::panic(error);
+#else
                 jule::panic(__JULE_ERROR__INVALID_MEMORY "\nruntime: slice is nil");
+#endif
+            }
         }
 
         void dealloc(void) noexcept
@@ -214,16 +226,28 @@ namespace jule
             return this->_slice + this->_len;
         }
 
-        inline Slice<Item> slice(const jule::Int &start,
-                                 const jule::Int &end) const noexcept
+        inline Slice<Item> slice(
+#ifndef __JULE_ENABLE__PRODUCTION
+            const char *file,
+#endif
+            const jule::Int &start,
+            const jule::Int &end) const noexcept
         {
 #ifndef __JULE_DISABLE__SAFETY
-            this->check();
+            this->check(
+#ifndef __JULE_ENABLE__PRODUCTION
+                file
+#endif
+            );
             if (start < 0 || end < 0 || start > end || end > this->_len)
             {
                 std::string error;
                 __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(error, start, end);
                 error += "\nruntime: slice slicing with out of range indexes";
+#ifndef __JULE_ENABLE__PRODUCTION
+                error += "\nfile: ";
+                error += file;
+#endif
                 jule::panic(error);
             }
 #endif
@@ -235,14 +259,33 @@ namespace jule
             return slice;
         }
 
-        inline jule::Slice<Item> slice(const jule::Int &start) const noexcept
+        inline jule::Slice<Item> slice(
+#ifndef __JULE_ENABLE__PRODUCTION
+            const char *file,
+#endif
+            const jule::Int &start) const noexcept
         {
-            return this->slice(start, this->len());
+            return this->slice(
+#ifndef __JULE_ENABLE__PRODUCTION
+                file,
+#endif
+                start, this->len());
         }
 
-        inline jule::Slice<Item> slice(void) const noexcept
+        inline jule::Slice<Item> slice(
+#ifndef __JULE_ENABLE__PRODUCTION
+            const char *file
+#else
+            void
+#endif
+        ) const noexcept
         {
-            return this->slice(0, this->len());
+            return this->slice(
+#ifndef __JULE_ENABLE__PRODUCTION
+                file,
+#endif
+                0,
+                this->len());
         }
 
         inline constexpr jule::Int len(void) const noexcept
@@ -334,19 +377,42 @@ namespace jule
             return this->_slice[index];
         }
 
-        Item &operator[](const jule::Int &index) const noexcept
+        // Returns element by index.
+        // Includes safety checking.
+        inline Item &at(
+#ifndef __JULE_ENABLE__PRODUCTION
+            const char *file,
+#endif
+            const jule::Int &index) const noexcept
         {
 #ifndef __JULE_DISABLE__SAFETY
-            this->check();
+            this->check(
+#ifndef __JULE_ENABLE__PRODUCTION
+                file
+#endif
+            );
             if (this->empty() || index < 0 || this->len() <= index)
             {
                 std::string error;
                 __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(error, index);
                 error += "\nruntime: slice indexing with out of range index";
+#ifndef __JULE_ENABLE__PRODUCTION
+                error += "\nfile: ";
+                error += file;
+#endif
                 jule::panic(error);
             }
 #endif
             return this->__at(index);
+        }
+
+        inline Item &operator[](const jule::Int &index) const noexcept
+        {
+            return this->at(
+#ifndef __JULE_ENABLE__PRODUCTION
+                "/api/slice.hpp",
+#endif
+                index);
         }
 
         void operator=(const jule::Slice<Item> &src) noexcept
@@ -364,7 +430,7 @@ namespace jule
             this->__get_copy(src);
         }
 
-        void operator=(const std::nullptr_t) noexcept
+        inline void operator=(const std::nullptr_t) noexcept
         {
             this->dealloc();
         }

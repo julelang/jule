@@ -82,8 +82,12 @@ namespace jule
             return static_cast<ConstIterator>(&this->buffer[this->len()]);
         }
 
-        inline jule::Str slice(const jule::Int &start,
-                               const jule::Int &end) const noexcept
+        inline jule::Str slice(
+#ifndef __JULE_ENABLE__PRODUCTION
+            const char *file,
+#endif
+            const jule::Int &start,
+            const jule::Int &end) const noexcept
         {
 #ifndef __JULE_DISABLE__SAFETY
             if (start < 0 || end < 0 || start > end || end > this->len())
@@ -91,6 +95,10 @@ namespace jule
                 std::string error;
                 __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(error, start, end);
                 error += "\nruntime: string slicing with out of range indexes";
+#ifndef __JULE_ENABLE__PRODUCTION
+                error += "\nfile:";
+                error += file;
+#endif
                 jule::panic(error);
             }
 #endif
@@ -99,14 +107,32 @@ namespace jule
             return jule::Str(this->buffer.substr(start, end - start));
         }
 
-        inline jule::Str slice(const jule::Int &start) const noexcept
+        inline jule::Str slice(
+#ifndef __JULE_ENABLE__PRODUCTION
+            const char *file,
+#endif
+            const jule::Int &start) const noexcept
         {
-            return this->slice(start, this->len());
+            return this->slice(
+#ifndef __JULE_ENABLE__PRODUCTION
+                file,
+#endif
+                start, this->len());
         }
 
-        inline jule::Str slice(void) const noexcept
+        inline jule::Str slice(
+#ifndef __JULE_ENABLE__PRODUCTION
+            const char *file
+#else
+            void
+#endif
+        ) const noexcept
         {
-            return this->slice(0, this->len());
+            return this->slice(
+#ifndef __JULE_ENABLE__PRODUCTION
+                file,
+#endif
+                0, this->len());
         }
 
         inline jule::Int len(void) const noexcept
@@ -311,7 +337,13 @@ namespace jule
             return this->buffer[index];
         }
 
-        jule::U8 &operator[](const jule::Int &index) noexcept
+        // Returns element by index.
+        // Includes safety checking.
+        inline jule::U8 &at(
+#ifndef __JULE_ENABLE__PRODUCTION
+            const char *file,
+#endif
+            const jule::Int &index) noexcept
         {
 #ifndef __JULE_DISABLE__SAFETY
             if (this->empty() || index < 0 || this->len() <= index)
@@ -319,10 +351,23 @@ namespace jule
                 std::string error;
                 __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(error, index);
                 error += "\nruntime: string indexing with out of range index";
+#ifndef __JULE_ENABLE__PRODUCTION
+                error += "\nfile: ";
+                error += file;
+#endif
                 jule::panic(error);
             }
 #endif
             return this->__at(index);
+        }
+
+        inline jule::U8 &operator[](const jule::Int &index) noexcept
+        {
+#ifndef __JULE_ENABLE__PRODUCTION
+            return this->at("/api/str.hpp", index);
+#else
+            return this->at(index);
+#endif
         }
 
         inline void operator+=(const jule::Str &str)

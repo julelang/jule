@@ -86,7 +86,7 @@ fn concat_all_parts(parts: ...Token): str {
 }
 
 fn get_accessor(mut &t: &TypeKind): str {
-    if t.sptr() != nil || t.ptr() != nil {
+    if t.ptr() != nil {
         ret "->"
     }
     ret TokenKind.Dot
@@ -286,11 +286,11 @@ fn gen_const_expr_model(m: &Const): str {
     }
 }
 
-fn gen_div_by_zero_binop_expr_model(op: str, mut l: ExprModel, mut r: ExprModel): str {
+fn gen_div_by_zero_binop_expr_model(&op: Token, mut &l: ExprModel, mut &r: ExprModel): str {
     let mut op_func = ""
-    match op {
-    | TokenKind.Solidus: op_func = "div"
-    | TokenKind.Percent: op_func = "mod"
+    match op.kind {
+    | TokenKind.Solidus | TokenKind.SolidusEq: op_func = "div"
+    | TokenKind.Percent | TokenKind.PercentEq: op_func = "mod"
     }
 
     if env::OPT_MATH {
@@ -303,6 +303,10 @@ fn gen_div_by_zero_binop_expr_model(op: str, mut l: ExprModel, mut r: ExprModel)
     let mut obj = "jule::"
     obj += op_func
     obj += "("
+    if !env::PRODUCTION {
+        obj += gen_loc_info(op)
+        obj += ","
+    }
     obj += gen_expr(l)
     obj += ","
     obj += gen_expr(r)
@@ -311,7 +315,7 @@ fn gen_div_by_zero_binop_expr_model(op: str, mut l: ExprModel, mut r: ExprModel)
 }
 
 fn gen_binop_expr_model(mut m: &BinopExprModel): str {
-    match m.op {
+    match m.op.kind {
     | TokenKind.Solidus
     | TokenKind.Percent:
         ret gen_div_by_zero_binop_expr_model(m.op, m.left, m.right)
@@ -320,7 +324,7 @@ fn gen_binop_expr_model(mut m: &BinopExprModel): str {
     let mut obj = "("
     obj += gen_expr_model(m.left)
     obj += " "
-    obj += m.op
+    obj += m.op.kind
     obj += " "
     obj += gen_expr_model(m.right)
     obj += ")"
@@ -349,31 +353,41 @@ fn gen_struct_ins_expr_model(mut m: &StructIns): str {
 }
 
 fn gen_unary_expr_model(mut m: &UnaryExprModel): str {
-    if env::OPT_PTR && m.op == TokenKind.Star {
-        match type m.expr {
+    if env::OPT_PTR && m.op.kind == TokenKind.Star {
+        match type m.expr.model {
         | &UnaryExprModel:
-            let mut um = (&UnaryExprModel)(m.expr)
-            if um.op == TokenKind.Amper {
-                ret gen_expr_model(um.expr)
+            let mut um = (&UnaryExprModel)(m.expr.model)
+            if um.op.kind == TokenKind.Amper {
+                ret gen_expr_model(um.expr.model)
             }
         }
     }
 
-    match m.op {
+    match m.op.kind {
     | TokenKind.Caret:
         let mut obj = "(~("
-        obj += gen_expr(m.expr)
+        obj += gen_expr(m.expr.model)
         obj += "))"
         ret obj
 
-    |:
-        let mut obj = "("
-        obj += m.op
-        obj += "("
-        obj += gen_expr(m.expr)
-        obj += "))"
+    | TokenKind.Star:
+        if env::PRODUCTION || m.expr.kind.sptr() == nil {
+            break
+        }
+
+        let mut obj = gen_expr(m.expr.model)
+        obj += ".get("
+        obj += gen_loc_info(m.op)
+        obj += ")"
         ret obj
     }
+
+    let mut obj = "("
+    obj += m.op.kind
+    obj += "("
+    obj += gen_expr(m.expr.model)
+    obj += "))"
+    ret obj
 }
 
 fn gen_cpp_struct_lit_expr_model(mut m: &StructLitExprModel): str {
@@ -447,7 +461,12 @@ fn gen_alloc_struct_lit_expr_model(mut m: &AllocStructLitExprModel): str {
     }
     obj += "<"
     obj += struct_ins_out_ident(m.lit.strct)
-    obj += ">(new( std::nothrow ) "
+    obj += ">("
+    if !env::PRODUCTION {
+        obj += gen_loc_info(m.lit.token)
+        obj += ","
+    }
+    obj += "new( std::nothrow ) "
     obj += gen_struct_lit_expr_model(m.lit)
     obj += ")"
     ret obj
@@ -474,9 +493,22 @@ fn gen_casting_expr_model(mut m: &CastingExprModel): str {
     | m.expr_kind.prim() != nil && m.expr_kind.prim().is_any():
         obj += gen_expr_model(m.expr)
         obj += get_accessor(m.expr_kind)
-        obj += "operator "
-        obj += gen_type_kind(m.kind)
-        obj += "()"
+        if env::PRODUCTION {
+            obj += "operator "
+            obj += gen_type_kind(m.kind)
+            obj += "()"
+        } else {
+            if m.expr_kind.trt() != nil && m.kind.sptr() != nil {
+                obj += "cast_ptr<"
+                obj += gen_type_kind(m.kind.sptr().elem)
+            } else {
+                obj += "cast<"
+                obj += gen_type_kind(m.kind)
+            }
+            obj += ">("
+            obj += gen_loc_info(m.token)
+            obj += ")"
+        }
 
     |:
         obj += "static_cast<"
@@ -509,6 +541,15 @@ fn gen_expr_model_for_call(mut expr: ExprModel): str {
     }
 }
 
+fn gen_loc_info(&t: Token): str {
+    let mut loc = t.file.path()
+    loc += ":"
+    loc += conv::itoa(t.row)
+    loc += ":"
+    loc += conv::itoa(t.column)
+    ret get_cstr_model([]byte(loc))
+}
+
 fn gen_pure_fn_call_expr_model(mut &m: &FnCallExprModel): str {
     let mut obj = gen_expr_model_for_call(m.expr)
     if !m.func.is_builtin() {
@@ -524,7 +565,15 @@ fn gen_pure_fn_call_expr_model(mut &m: &FnCallExprModel): str {
             }
         }
     }
-    obj += "("
+    if !env::PRODUCTION && m.func.anon {
+        obj += ".call("
+        obj += gen_loc_info(m.token)
+        if m.args.len != 0 {
+            obj += ","
+        }
+    } else {
+        obj += "("
+    }
     obj += gen_arg_expr_models(m.args)
     obj += ")"
 
@@ -672,9 +721,20 @@ fn gen_indexing_expr_model(mut m: &IndexigExprModel): str {
     }
 
     // Index access with safety measures.
-    obj += "["
-    obj += gen_expr(m.index.model)
-    obj += "]"
+    match {
+    | env::PRODUCTION | m.expr.kind.ptr() != nil:
+        obj += "["
+        obj += gen_expr(m.index.model)
+        obj += "]"
+
+    |:
+        obj += ".at("
+        obj += gen_loc_info(m.token)
+        obj += ","
+        obj += gen_expr(m.index.model)
+        obj += ")"
+    }
+
     ret obj
 }
 
@@ -716,6 +776,10 @@ fn gen_map_expr_model(mut m: &MapExprModel): str {
 fn gen_slicing_expr_model(mut m: &SlicingExprModel): str {
     let mut obj = gen_expr_model(m.expr)
     obj += ".slice("
+    if !env::PRODUCTION {
+        obj += gen_loc_info(m.token)
+        obj += ","
+    }
     obj += gen_expr(m.left)
     if m.right != nil {
         obj += ","
@@ -727,7 +791,11 @@ fn gen_slicing_expr_model(mut m: &SlicingExprModel): str {
 
 fn gen_trait_sub_ident_expr_model(mut m: &TraitSubIdentExprModel): str {
     let mut obj = gen_expr_model(m.expr)
-    obj += ".get()._method_"
+    obj += ".get("
+    if !env::PRODUCTION {
+        obj += gen_loc_info(m.token)
+    }
+    obj += ")._method_"
     obj += m.ident
     ret obj
 }

@@ -35,6 +35,7 @@ use lit for std::jule::constant::lit
 use std::jule::lex::{
     self,
     Token,
+    TokenId,
     TokenKind,
     is_str,
     is_bool,
@@ -928,7 +929,7 @@ impl Eval {
         ret self.eval_def(def, ident.token)
     }
 
-    fn eval_unary_minus(self, mut &d: &Data) {
+    fn eval_unary_minus(self, mut &d: &Data, mut &op: Token) {
         let t = d.kind.prim()
         if t == nil || !types::is_num(t.to_str()) {
             d = nil
@@ -946,12 +947,12 @@ impl Eval {
 
         d.lvalue = false
         d.model = &UnaryExprModel{
-            expr: d.model,
-            op:   TokenKind.Minus,
+            expr: new(Data, *d),
+            op:   op,
         }
     }
 
-    fn eval_unary_plus(self, mut &d: &Data) {
+    fn eval_unary_plus(self, mut &d: &Data, mut &op: Token) {
         let t = d.kind.prim()
         if t == nil || !types::is_num(t.to_str()) {
             d = nil
@@ -969,12 +970,12 @@ impl Eval {
 
         d.lvalue = false
         d.model = &UnaryExprModel{
-            expr: d.model,
-            op:   TokenKind.Plus,
+            expr: new(Data, *d),
+            op:   op,
         }
     }
 
-    fn eval_unary_caret(self, mut &d: &Data) {
+    fn eval_unary_caret(self, mut &d: &Data, mut &op: Token) {
         let t = d.kind.prim()
         if t == nil || !types::is_int(t.to_str()) {
             d = nil
@@ -993,12 +994,12 @@ impl Eval {
 
         d.lvalue = false
         d.model = &UnaryExprModel{
-            expr: d.model,
-            op:   TokenKind.Caret,
+            expr: new(Data, *d),
+            op:   op,
         }
     }
 
-    fn eval_unary_excl(self, mut &d: &Data) {
+    fn eval_unary_excl(self, mut &d: &Data, mut &op: Token) {
         let t = d.kind.prim()
         if t == nil || !t.is_bool() {
             d = nil
@@ -1014,12 +1015,17 @@ impl Eval {
 
         d.lvalue = false
         d.model = &UnaryExprModel{
-            expr: d.model,
-            op:   TokenKind.Excl,
+            expr: new(Data, *d),
+            op:   op,
         }
     }
 
-    fn eval_unary_star(mut self, mut &d: &Data, &op: Token) {
+    fn eval_unary_star(mut self, mut &d: &Data, mut &op: Token) {
+        d.model = &UnaryExprModel{
+            expr: new(Data, *d),
+            op:   op,
+        }
+
         match {
         | d.kind.ptr() != nil:
             if !self.is_unsafe() {
@@ -1043,13 +1049,9 @@ impl Eval {
 
         d.constant = nil
         d.lvalue = true
-        d.model = &UnaryExprModel{
-            expr: d.model,
-            op:   TokenKind.Star,
-        }
     }
 
-    fn eval_unary_amper(self, mut &d: &Data) {
+    fn eval_unary_amper(self, mut &d: &Data, mut &op: Token) {
         match type d.model {
         | &StructLitExprModel:
             let mut lit = (&StructLitExprModel)(d.model)
@@ -1062,8 +1064,8 @@ impl Eval {
                     kind: &Ptr{elem: d.kind},
                 }
                 d.model = &UnaryExprModel{
-                    expr: d.model,
-                    op:   TokenKind.Amper,
+                    expr: new(Data, *d),
+                    op:   op,
                 }
 
             |:
@@ -1119,12 +1121,12 @@ impl Eval {
         let mut cast_kind = d.cast_kind
         let kind = d.kind
         match u.op.kind {
-        | TokenKind.Minus: self.eval_unary_minus(d)
-        | TokenKind.Plus:  self.eval_unary_plus(d)
-        | TokenKind.Caret: self.eval_unary_caret(d)
-        | TokenKind.Excl:  self.eval_unary_excl(d)
+        | TokenKind.Minus: self.eval_unary_minus(d, u.op)
+        | TokenKind.Plus:  self.eval_unary_plus(d, u.op)
+        | TokenKind.Caret: self.eval_unary_caret(d, u.op)
+        | TokenKind.Excl:  self.eval_unary_excl(d, u.op)
         | TokenKind.Star:  self.eval_unary_star(d, u.op)
-        | TokenKind.Amper: self.eval_unary_amper(d)
+        | TokenKind.Amper: self.eval_unary_amper(d, u.op)
         |:                 d = nil
         }
 
@@ -1533,6 +1535,7 @@ impl Eval {
             d.decl = false
         } else {
             d.model = &IndexigExprModel{
+                token: i.token,
                 expr:  new(Data, old_d),
                 index: index,
             }
@@ -1679,6 +1682,7 @@ impl Eval {
             d.decl = false
         } else {
             let mut model = &SlicingExprModel{
+                token: s.token,
                 expr: d.model,
                 left: l.model,
             }
@@ -1914,7 +1918,7 @@ impl Eval {
         d.model = d.constant
     }
 
-    fn eval_cast_by_type_n_data(mut self, mut t: &TypeKind, mut d: &Data, error_token: Token): &Data {
+    fn eval_cast_by_type_n_data(mut self, mut t: &TypeKind, mut d: &Data, mut error_token: Token): &Data {
         if d != nil && d.decl {
             self.push_err(error_token, LogMsg.InvalidExpr)
             ret nil
@@ -1961,6 +1965,8 @@ impl Eval {
 
         if d.kind.enm() == nil || !d.kind.enm().kind.kind.equals(t) {
             d.cast_kind = t
+            apply_cast_kind(d)
+            (&CastingExprModel)(d.model).token = error_token
             // d.kind = t // Do not this, will be set automatically end of the eval.
         } else {
             d.kind = t
@@ -2038,6 +2044,7 @@ impl Eval {
             mutable: !self.immutable,
             kind:    &TypeKind{kind: s},
             model: &StructLitExprModel{
+                token: error_token,
                 strct: s,
                 args:  slc.args,
             },
@@ -2408,7 +2415,7 @@ impl Eval {
         ret nil
     }
 
-    fn eval_trait_sub_ident(mut self, mut d: &Data, mut trt: &Trait, ident: Token): &Data {
+    fn eval_trait_sub_ident(mut self, mut d: &Data, mut trt: &Trait, mut ident: Token): &Data {
         let mut f = trt.find_method(ident.kind)
         if f == nil {
             self.push_err(ident, LogMsg.ObjHaveNotIdent, trt.ident, ident.kind)
@@ -2421,6 +2428,7 @@ impl Eval {
             mutable: false,
             kind:    &TypeKind{kind: f.instance()},
             model:   &TraitSubIdentExprModel{
+                token: ident,
                 expr:  d.model,
                 ident: ident.kind,
             },
@@ -3309,6 +3317,14 @@ impl Eval {
             }
         } else if d.kind.sptr() != nil {
             kind = d.kind.sptr().elem
+            let mut model = new(Data, *d)
+            let mut token = si.ident
+            token.id = TokenId.Op
+            token.kind = TokenKind.Star
+            d.model = &UnaryExprModel{
+               expr: model,
+               op:   token,
+            }
         }
 
         match {
@@ -4408,7 +4424,7 @@ impl BinopSolver {
         d.model = &BinopExprModel{
             left:  l.model,
             right: r.model,
-            op:    self.op.kind,
+            op:    self.op,
         }
     }
 

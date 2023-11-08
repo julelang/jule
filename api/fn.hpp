@@ -5,6 +5,7 @@
 #ifndef __JULE_FN_HPP
 #define __JULE_FN_HPP
 
+#include <string>
 #include <stddef.h>
 #include <functional>
 #include <thread>
@@ -56,13 +57,31 @@ namespace jule
         }
 
         template <typename... Arguments>
-        auto operator()(Arguments... arguments)
+        auto call(
+#ifndef __JULE_ENABLE__PRODUCTION
+            const char *file,
+#endif
+            Arguments... arguments)
         {
 #ifndef __JULE_DISABLE__SAFETY
             if (this->buffer == nullptr)
-                jule::panic(__JULE_ERROR__INVALID_MEMORY "\nfile: api/fn.hpp");
-#endif
+#ifndef __JULE_ENABLE__PRODUCTION
+                jule::panic((std::string(__JULE_ERROR__INVALID_MEMORY) + "\nfile: ") + file);
+#else
+                jule::panic(__JULE_ERROR__INVALID_MEMORY);
+#endif // PRODUCTION
+#endif // SAFETY
             return this->buffer(arguments...);
+        }
+
+        template <typename... Arguments>
+        inline auto operator()(Arguments... arguments)
+        {
+#ifndef __JULE_ENABLE__PRODUCTION
+            return this->call<Arguments...>("/api/fn.hpp", arguments...);
+#else
+            return this->call<Arguments...>(arguments...);
+#endif
         }
 
         jule::Uintptr addr(void) const noexcept

@@ -5,6 +5,7 @@
 #ifndef __JULE_PTR_HPP
 #define __JULE_PTR_HPP
 
+#include <string>
 #include <ostream>
 
 #include "atomic.hpp"
@@ -183,20 +184,58 @@ namespace jule
             this->alloc = nullptr;
         }
 
-        inline T *operator->(void) const noexcept
+        inline T *ptr(
+#ifndef __JULE_ENABLE__PRODUCTION
+            const char *file
+#else
+            void
+#endif
+        ) const noexcept
         {
 #ifndef __JULE_DISABLE__SAFETY
-            this->must_ok();
+            this->must_ok(
+#ifndef __JULE_ENABLE__PRODUCTION
+                file
+#endif
+            );
 #endif
             return this->alloc;
         }
 
-        inline T &operator*(void) const noexcept
+        inline T &get(
+#ifndef __JULE_ENABLE__PRODUCTION
+            const char *file
+#else
+            void
+#endif
+        ) const noexcept
         {
 #ifndef __JULE_DISABLE__SAFETY
-            this->must_ok();
+            this->must_ok(
+#ifndef __JULE_ENABLE__PRODUCTION
+                file
+#endif
+            );
 #endif
             return *this->alloc;
+        }
+
+        inline T *operator->(void) const noexcept
+        {
+            return this->ptr(
+#ifndef __JULE_ENABLE__PRODUCTION
+                "/api/ptr.hpp"
+#endif
+            );
+        }
+
+        inline T &operator*(void) const noexcept
+        {
+            return this->get(
+#ifndef __JULE_ENABLE__PRODUCTION
+                "/api/ptr.hpp"
+#endif
+            );
         }
 
         inline operator jule::Uintptr(void) const noexcept
@@ -209,10 +248,24 @@ namespace jule
             return this->alloc;
         }
 
-        inline void must_ok(void) const noexcept
+        inline void must_ok(
+#ifndef __JULE_ENABLE__PRODUCTION
+            const char *file
+#else
+            void
+#endif
+        ) const noexcept
         {
             if (this->operator==(nullptr))
+            {
+#ifndef __JULE_ENABLE__PRODUCTION
+                std::string error = __JULE_ERROR__INVALID_MEMORY "\nruntime: reference type is nil\nfile: ";
+                error += file;
+                jule::panic(error);
+#else
                 jule::panic(__JULE_ERROR__INVALID_MEMORY "\nruntime: reference type is nil");
+#endif
+            }
         }
 
         void operator=(const jule::Ptr<T> &src) noexcept
