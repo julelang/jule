@@ -349,6 +349,36 @@ impl Eval {
         }
     }
 
+    fn apply_numeric_prefix(mut self, mut &d: &Data) {
+        if d == nil || d.cast_kind != nil || !d.is_const() || d.kind.prim() == nil {
+            ret
+        }
+        if self.prefix == nil || self.prefix.prim() == nil {
+            ret
+        }
+
+        let pk = self.prefix.prim().kind
+        match {
+        | types::is_float(pk):
+            d.kind = &TypeKind{kind: self.prefix.kind}
+            d.constant.set_f64(d.constant.as_f64())
+
+        | types::is_sig_int(pk):
+            if !int_assignable(pk, d) {
+                break
+            }
+            d.kind = &TypeKind{kind: self.prefix.kind}
+            d.constant.set_i64(d.constant.as_i64())
+
+        | types::is_unsig_int(pk):
+            if !int_assignable(pk, d) {
+                break
+            }
+            d.kind = &TypeKind{kind: self.prefix.kind}
+            d.constant.set_u64(d.constant.as_u64())
+        }
+    }
+
     fn lit_nil(self): &Data {
         // Return new Data with nil kind.
         // Nil kind represents "nil" literal.
@@ -479,11 +509,12 @@ impl Eval {
             decl:    false,
         }
 
-        let mut value: any = nil
         let (sig, err) = parse_int(lit, base, BIT_SIZE)
         if err == ConvError.Ok {
-            value = sig
             d.constant = Const.new_i64(sig)
+            d.kind = &TypeKind{
+                kind: build_prim_type(PrimKind.Int),
+            }
         } else {
             let (unsig, err) = parse_uint(lit, base, BIT_SIZE)
             if err != ConvError.Ok {
@@ -491,14 +522,11 @@ impl Eval {
                 self.push_suggestion(LogMsg.TryFloatingPoint)
             }
             d.constant = Const.new_u64(unsig)
-            value = unsig
+            d.kind = &TypeKind{
+                kind: build_prim_type(PrimKind.Uint),
+            }
         }
 
-        d.kind = &TypeKind{
-            kind: build_prim_type(kind_by_bitsize(value)),
-        }
-
-        normalize_bitsize(d)
         d.model = d.constant
 
         ret d
@@ -1967,7 +1995,6 @@ impl Eval {
             d.cast_kind = t
             apply_cast_kind(d)
             (&CastingExprModel)(d.model).token = error_token
-            // d.kind = t // Do not this, will be set automatically end of the eval.
         } else {
             d.kind = t
         }
@@ -3528,6 +3555,7 @@ impl Eval {
         if td == nil {
             ret nil
         }
+        self.apply_numeric_prefix(td)
 
         if td.kind.void() {
             self.push_err(ter.token, LogMsg.VoidUsedForTernary)
@@ -3538,6 +3566,7 @@ impl Eval {
         self.prefix = td.kind
 
         let mut fd = self.eval_expr_kind(ter.false_expr)
+        self.apply_numeric_prefix(fd)
 
         self.prefix = prefix
         if fd == nil {
@@ -3609,46 +3638,6 @@ impl Eval {
 
         if d.kind == nil {
             ret d
-        }
-
-        if d.cast_kind == nil && d.is_const() && d.kind.prim() != nil {
-            if self.prefix != nil && self.prefix.prim() != nil {
-                // Apply numeric prefix.
-                let pk= self.prefix.prim().kind
-                match {
-                | types::is_float(pk):
-                    d.kind = &TypeKind{kind: self.prefix.kind}
-                    d.constant.set_f64(d.constant.as_f64())
-
-                | types::is_sig_int(pk):
-                    if !int_assignable(pk, d) {
-                        break
-                    }
-                    d.kind = &TypeKind{kind: self.prefix.kind}
-                    d.constant.set_i64(d.constant.as_i64())
-
-                | types::is_unsig_int(pk):
-                    if !int_assignable(pk, d) {
-                        break
-                    }
-                    d.kind = &TypeKind{kind: self.prefix.kind}
-                    d.constant.set_u64(d.constant.as_u64())
-                }
-            } else if !d.is_rune {
-                match {
-                | d.constant.is_i64():
-                    if int_assignable(PrimKind.Int, d) {
-                        d.kind = &TypeKind{kind: build_prim_type(PrimKind.Int)}
-                        d.constant.set_i64(d.constant.as_i64())
-                    }
-
-                | d.constant.is_u64():
-                    if int_assignable(PrimKind.Uint, d) {
-                        d.kind = &TypeKind{kind: build_prim_type(PrimKind.Uint)}
-                        d.constant.set_u64(d.constant.as_u64())
-                    }
-                }
-            }
         }
 
         if !d.decl {
@@ -4391,10 +4380,9 @@ impl BinopSolver {
     }
 
     fn post_const(self, mut &d: &Data) {
-        if d == nil {
+        if !d.is_const() {
             ret
         }
-
         normalize_bitsize(d)
         fit_type(d)
     }
@@ -4428,6 +4416,15 @@ impl BinopSolver {
         }
     }
 
+    fn post_eval(mut self, mut &d: &Data) {
+        self.post_const(d)
+
+        d.lvalue = false
+        self.set_model(d)
+
+        self.e.apply_numeric_prefix(d)
+    }
+
     fn solve_explicit(mut self, mut &l: &Data, mut &r: &Data): &Data {
         self.l, self.r = l, r
 
@@ -4438,11 +4435,9 @@ impl BinopSolver {
         self.l, self.r = l, r // Save normal order
 
         self.solve_const(d)
-        self.post_const(d)
 
         if d != nil {
-            d.lvalue = false
-            self.set_model(d)
+            self.post_eval(d)
         }
 
         ret d
