@@ -8,22 +8,36 @@ use std::jule::constant::{Const}
 use std::jule::lex::{File, Token, TokenKind, is_ignore_ident, is_anon_ident}
 use types for std::jule::types
 
-fn is_valid_model_for_ref(m: ExprModel): bool {
+fn is_valid_model_for_ref(mut &m: ExprModel): bool {
     match type m {
     | &Var:
         ret true
 
     | &StructSubIdentExprModel:
-        let model = (&StructSubIdentExprModel)(m)
+        let mut model = (&StructSubIdentExprModel)(m)
         ret is_valid_model_for_ref(model.expr)
 
     | &TraitSubIdentExprModel:
-        let model = (&TraitSubIdentExprModel)(m)
+        let mut model = (&TraitSubIdentExprModel)(m)
         ret is_valid_model_for_ref(model.expr)
 
     | &UnaryExprModel:
-        let unary = (&UnaryExprModel)(m)
-        ret unary.op.kind == TokenKind.Star
+        let mut unary = (&UnaryExprModel)(m)
+        if unary.op.kind != TokenKind.Star {
+            ret false
+        }
+
+        // Return true because of pointer dereferencing is an Unsafe Jule feature.
+        if unary.expr.kind.ptr() != nil {
+            ret true
+        }
+
+        // Dereferencing should be smart pointer, in other words return false.
+        if unary.expr.kind.sptr() == nil {
+            ret false
+        }
+
+        ret is_valid_model_for_ref(unary.expr.model)
 
     |:
         ret false
@@ -721,7 +735,7 @@ impl Sema {
             sema.errors = nil
             ret false
         }
-    
+
         self.check_import_selections(imp)
         ret true
     }
@@ -1006,19 +1020,19 @@ impl Sema {
         ret ok
     }
 
-    fn check_ref_validity_for_init_expr(mut &self, left_mut: bool, &d: &Data, mut &error_token: Token) {
+    fn check_ref_validity_for_init_expr(mut &self, left_mut: bool, mut &d: &Data, mut &error_token: Token) {
         match type d.model {
         | &Var:
             // Pass.
 
         | &TraitSubIdentExprModel:
-            let model = (&TraitSubIdentExprModel)(d.model)
+            let mut model = (&TraitSubIdentExprModel)(d.model)
             if !is_valid_model_for_ref(model.expr) {
                 self.push_err(error_token, LogMsg.RefIsDangling, model.ident)
             }
 
         | &StructSubIdentExprModel:
-            let model = (&StructSubIdentExprModel)(d.model)
+            let mut model = (&StructSubIdentExprModel)(d.model)
             if !is_valid_model_for_ref(model.expr) {
                 self.push_err(error_token, LogMsg.RefIsDangling, model.field.decl.ident)
             }
@@ -1028,17 +1042,19 @@ impl Sema {
             self.push_err(error_token, LogMsg.BuiltinUsedForRef)
 
         | &UnaryExprModel:
-            let unary = (&UnaryExprModel)(d.model)
+            let mut unary = (&UnaryExprModel)(d.model)
             if unary.op.kind == TokenKind.Star {
-                // Pointer dereference, pass
+                if !is_valid_model_for_ref(d.model) {
+                    self.push_err(error_token, LogMsg.RefIsDangling, "address from * &T")
+                }
                 break
             }
 
             fall
-
         |:
             self.push_err(error_token, LogMsg.RefAssignNonVar)
         }
+
         if left_mut && !d.mutable {
             self.push_err(error_token, LogMsg.MutRefPointsImmut)
         }
@@ -1411,7 +1427,7 @@ impl Sema {
         if is_ignore_ident(f.ident) {
             self.push_err(f.token, LogMsg.IgnoreIdent)
         }
-    
+
         self.check_fn_decl_prototype(f)
         f.sema = self
     }
