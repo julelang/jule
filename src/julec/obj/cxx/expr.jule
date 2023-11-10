@@ -85,13 +85,6 @@ fn concat_all_parts(parts: ...Token): str {
     ret s
 }
 
-fn get_accessor(mut &t: &TypeKind): str {
-    if t.ptr() != nil {
-        ret "->"
-    }
-    ret TokenKind.Dot
-}
-
 fn decompose_common_esq(b: byte): str {
     match b {
     | '\\': ret "\\\\"
@@ -492,7 +485,7 @@ fn gen_casting_expr_model(mut m: &CastingExprModel): str {
     | m.expr_kind.trt() != nil
     | m.expr_kind.prim() != nil && m.expr_kind.prim().is_any():
         obj += gen_expr_model(m.expr)
-        obj += get_accessor(m.expr_kind)
+        obj += "."
         if env::PRODUCTION {
             obj += "operator "
             obj += gen_type_kind(m.kind)
@@ -814,7 +807,7 @@ fn gen_trait_sub_ident_expr_model(mut m: &TraitSubIdentExprModel): str {
 
 fn gen_struct_sub_ident_expr_model(mut m: &StructSubIdentExprModel): str {
     let mut obj = gen_expr_model(m.expr)
-    obj += get_accessor(m.expr_kind)
+    obj += "."
     if m.field != nil {
         obj += field_out_ident(m.field.decl)
     } else {
@@ -829,7 +822,7 @@ fn gen_common_ident_expr_model(m: &CommonIdentExprModel): str {
 
 fn gen_common_sub_ident_expr_model(mut m: &CommonSubIdentExprModel): str {
     let mut obj = gen_expr_model(m.expr)
-    obj += get_accessor(m.expr_kind)
+    obj += "."
     obj += m.ident
     ret obj
 }
@@ -1016,8 +1009,7 @@ fn gen_builtin_append_call_expr_model_assign_opt(
     }
     for (_, mut e) in s.elems {
         obj += dest_expr
-        obj += get_accessor(dest_kind)
-        obj += "push("
+        obj += ".push("
         obj += gen_expr_model(e)
         obj += ")" + CPP_ST_TERM
     }

@@ -3341,9 +3341,21 @@ impl Eval {
                     self.push_err(si.ident, LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
                 }
                 kind = d.kind.ptr().elem
+                let mut model = new(Data, *d)
+
+                // Append dereferencing model for pointer.
+                let mut token = si.ident
+                token.id = TokenId.Op
+                token.kind = TokenKind.Star
+                d.model = &UnaryExprModel{
+                   expr: model,
+                   op:   token,
+                }
             }
         } else if d.kind.sptr() != nil {
             kind = d.kind.sptr().elem
+
+            // Append dereferencing model for pointer.
             let mut model = new(Data, *d)
             let mut token = si.ident
             token.id = TokenId.Op
