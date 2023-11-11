@@ -776,7 +776,7 @@ impl Sema {
         }
     }
 
-    // Checks type, builds result as kind and collect referred type aliases.
+    // Checks type, builds result as kind and collects referred type aliases.
     // Skips already checked types.
     fn check_type_with_refers(mut &self, mut &t: &TypeSymbol,
         mut l: Lookup, mut referencer: &Referencer): (ok: bool) {
@@ -810,9 +810,19 @@ impl Sema {
         ret tc.check_decl(t)
     }
 
-    // Same as s.build_type_with_generics but not uses any generics.
+    // Same as self.build_type_with_generics but not uses any generics.
     fn build_type(mut &self, mut &t: &ast::TypeDecl): &TypeKind {
         ret self.build_type_with_generics(t, nil)
+    }
+
+    // Select type with name selection.
+    fn select_type(mut &self, mut &t: &ast::TypeDecl): &TypeKind {
+        let mut tc = &TypeChecker{
+            s:         self,
+            lookup:    self,
+            selection: true,
+        }
+        ret tc.check_decl(t)
     }
 
     // Returns Eval instance for configuration with
@@ -1545,27 +1555,32 @@ impl Sema {
 
     // Implement trait to destination.
     fn impl_trait(mut &self, mut &decl: &Impl) {
-        let mut base = self.find_trait(decl.base.kind)
-        if base == nil {
-            base = find_builtin_trait(decl.base.kind)
+        let mut base_t = self.select_type(decl.base)
+        if base_t == nil {
+            ret
         }
+        let mut base = base_t.trt()
         if base == nil {
-            self.push_err(decl.base, LogMsg.ImplBaseNotExist, decl.base.kind)
+            self.push_err(decl.base.token, LogMsg.ImplInvalidBase)
+            self.push_suggestion(LogMsg.ExpectedTrait)
             ret
         }
 
-        // Cpp-link state always false because cpp-linked
-        // definitions haven't support implementations.
-        const CPP_LINKED = false
-
-        let mut dest = self.find_struct(decl.dest.kind, CPP_LINKED)
-        if dest == nil {
-            self.push_err(decl.dest, LogMsg.ImplDestNotExist, decl.dest.kind)
+        let mut dest_t = self.select_type(decl.dest)
+        if dest_t == nil {
             ret
         }
+        let mut dest_s = dest_t.strct()
+        if dest_s == nil {
+            self.push_err(decl.dest.token, LogMsg.ImplInvalidDest)
+            self.push_suggestion(LogMsg.ExpectedStruct)
+            ret
+        }
+
+        let mut dest = dest_s.decl
 
         if dest.token.file.dir() != self.file.file.dir() {
-            self.push_err(decl.dest, LogMsg.IllegalImplOutOfPackage)
+            self.push_err(decl.dest.token, LogMsg.IllegalImplOutOfPackage)
             ret
         }
 
@@ -1583,18 +1598,20 @@ impl Sema {
     }
 
     fn impl_struct(mut &self, mut &decl: &Impl) {
-        // Cpp-link state always false because cpp-linked
-        // definitions haven't support implementations.
-        const CPP_LINKED = false
-
-        let mut dest = self.find_struct(decl.dest.kind, CPP_LINKED)
-        if dest == nil {
-            self.push_err(decl.dest, LogMsg.ImplDestNotExist, decl.dest.kind)
+        let mut dest_t = self.select_type(decl.dest)
+        if dest_t == nil {
+            ret
+        }
+        let mut dest_s = dest_t.strct()
+        if dest_s == nil {
+            self.push_err(decl.dest.token, LogMsg.ImplInvalidDest)
+            self.push_suggestion(LogMsg.ExpectedStruct)
             ret
         }
 
+        let mut dest = dest_s.decl
         if dest.token.file.dir() != self.file.file.dir() {
-            self.push_err(decl.dest, LogMsg.IllegalImplOutOfPackage)
+            self.push_err(decl.dest.token, LogMsg.IllegalImplOutOfPackage)
             ret
         }
 

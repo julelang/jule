@@ -1616,20 +1616,23 @@ impl Parser {
             self.push_err(token, LogMsg.InvalidSyntax)
             ret nil
         }
-        token = tokens[1]
-        if token.id != TokenId.Ident {
-            self.push_err(token, LogMsg.InvalidSyntax)
-            self.push_suggestion(LogMsg.ExpectedIdentifier)
+
+        let mut i = 1
+
+        let (mut base, mut ok) = unsafe { self.build_type(tokens, &i, true) }
+        if !ok {
             ret nil
         }
-        if tokens.len < 3 {
+        if i >= tokens.len {
             self.push_err(token, LogMsg.InvalidSyntax)
             ret nil
         }
+
         let mut ipl = &Impl{
-            base: token,
+            base: base,
         }
-        token = tokens[2]
+
+        token = tokens[i]
         if token.id != TokenId.For {
             if token.id == TokenId.Range && token.kind == TokenKind.LBrace {
                 // This implementation is single.
@@ -1637,30 +1640,38 @@ impl Parser {
                 // Therefore, swap Base and Dest tokens.
                 ipl.base, ipl.dest = ipl.dest, ipl.base
 
-                tokens = tokens[2:]  // Remove prefix tokens.
                 goto body
             }
-            self.push_err(token, LogMsg.InvalidSyntax)
+
+            self.stop()
+            self.push_err(token, LogMsg.BodyNotExist)
+            self.push_suggestion(LogMsg.ExpectedBody)
             ret nil
         }
-        if tokens.len < 4 {
-            self.push_err(token, LogMsg.InvalidSyntax)
+        i++
+        if i >= tokens.len {
+            self.stop()
+            self.push_err(token, LogMsg.BodyNotExist)
+            self.push_suggestion(LogMsg.ExpectedBody)
             ret nil
         }
-        token = tokens[3]
-        if token.id != TokenId.Ident {
-            self.push_err(token, LogMsg.InvalidSyntax)
-            self.push_suggestion(LogMsg.ExpectedIdentifier)
+
+        ipl.dest, ok = unsafe { self.build_type(tokens, &i, true) }
+        if !ok {
             ret nil
         }
-        ipl.dest = token
-        tokens = tokens[4:] // Remove prefix tokens.
+        if i >= tokens.len {
+            self.stop()
+            self.push_err(token, LogMsg.BodyNotExist)
+            self.push_suggestion(LogMsg.ExpectedBody)
+            ret nil
+        }
+
     body:
-        let mut i = 0
         let mut body_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
         if body_tokens == nil {
             self.stop()
-            self.push_err(ipl.base, LogMsg.BodyNotExist)
+            self.push_err(token, LogMsg.BodyNotExist)
             self.push_suggestion(LogMsg.ExpectedBody)
             ret nil
         }

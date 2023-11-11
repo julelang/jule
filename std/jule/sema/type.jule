@@ -677,6 +677,13 @@ struct TypeChecker {
     not_plain: bool
 
     dis_builtin: bool // Disallow/suppress Jule's built-in defines.
+
+    // Name selection is enabled.
+    // No cpp-linked definitions, no generic type representation.
+    // Only typename selection.
+    //
+    // If selection is a struct, returns invalid instance that only has decl field.
+    selection: bool
 }
 
 impl TypeChecker {
@@ -944,6 +951,19 @@ impl TypeChecker {
             ret nil
         }
 
+        // Name selection.
+        // Return instance instantly.
+        if self.selection {
+            if decl.generics.len > 0 {
+                self.push_err(decl.token, LogMsg.GenericsNotAllowed)
+                ret nil
+            }
+
+            ret &StructIns{
+                decl: s,
+            }
+        }
+
         if self.ignore_generics.len > 0 {
             // Ignore prototypes.
             ret nil
@@ -1036,6 +1056,9 @@ impl TypeChecker {
                 }
                 ret t
             }
+        } else if self.selection {
+            self.push_err(decl.token, LogMsg.CppLinkedTypeNotAllowed)
+            ret nil
         }
 
         let mut s = self.lookup.find_struct(decl.ident, decl.cpp_linked)
