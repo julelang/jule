@@ -200,14 +200,14 @@ namespace jule
             {
                 std::string error;
                 __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(error, i, N);
-                error += "\nruntime: array element swapping wtih out of range index";
+                error += "\nruntime: array element swapping with out of range index";
                 jule::panic(error);
             }
             if (this->empty() || j < 0 || N <= j)
             {
                 std::string error;
                 __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(error, j, N);
-                error += "\nruntime: array element swapping wtih out of range index";
+                error += "\nruntime: array element swapping with out of range index";
                 jule::panic(error);
             }
 #endif

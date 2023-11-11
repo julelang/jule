@@ -356,14 +356,14 @@ namespace jule
             {
                 std::string error;
                 __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(error, i, this->len());
-                error += "\nruntime: slice element swapping wtih out of range index";
+                error += "\nruntime: slice element swapping with out of range index";
                 jule::panic(error);
             }
             if (this->empty() || j < 0 || this->len() <= j)
             {
                 std::string error;
                 __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(error, j, this->len());
-                error += "\nruntime: slice element swapping wtih out of range index";
+                error += "\nruntime: slice element swapping with out of range index";
                 jule::panic(error);
             }
 #endif
