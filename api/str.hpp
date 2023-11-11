@@ -93,7 +93,7 @@ namespace jule
             if (start < 0 || end < 0 || start > end || end > this->len())
             {
                 std::string error;
-                __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(error, start, end);
+                __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(error, start, end, this->len());
                 error += "\nruntime: string slicing with out of range indexes";
 #ifndef __JULE_ENABLE__PRODUCTION
                 error += "\nfile:";
@@ -349,7 +349,7 @@ namespace jule
             if (this->empty() || index < 0 || this->len() <= index)
             {
                 std::string error;
-                __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(error, index);
+                __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(error, index, this->len());
                 error += "\nruntime: string indexing with out of range index";
 #ifndef __JULE_ENABLE__PRODUCTION
                 error += "\nfile: ";

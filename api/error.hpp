@@ -11,16 +11,18 @@
 #define __JULE_ERROR__INDEX_OUT_OF_RANGE "index out of range"
 #define __JULE_ERROR__DIVIDE_BY_ZERO "divide by zero"
 
-#define __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(STR, START, LEN) \
-    STR += __JULE_ERROR__INDEX_OUT_OF_RANGE "[";                       \
-    STR += std::to_string(START);                                      \
-    STR += ":";                                                        \
-    STR += std::to_string(LEN);                                        \
-    STR += "]";
+#define __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(STR, START, END, LEN) \
+    STR += __JULE_ERROR__INDEX_OUT_OF_RANGE " [";                           \
+    STR += std::to_string(START);                                           \
+    STR += ":";                                                             \
+    STR += std::to_string(END);                                             \
+    STR += "] with length ";                                                \
+    STR += std::to_string(LEN)
 
-#define __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(STR, INDEX) \
-    STR += __JULE_ERROR__INDEX_OUT_OF_RANGE "[";          \
-    STR += std::to_string(INDEX);                         \
-    STR += "]"
+#define __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(STR, INDEX, LEN) \
+    STR += __JULE_ERROR__INDEX_OUT_OF_RANGE " [";              \
+    STR += std::to_string(INDEX);                              \
+    STR += "] with length ";                                   \
+    STR += std::to_string(LEN)
 
 #endif // ifndef __JULE_ERROR_HPP

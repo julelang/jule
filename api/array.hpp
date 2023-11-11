@@ -79,7 +79,7 @@ namespace jule
             if (start < 0 || end < 0 || start > end || end > N)
             {
                 std::string error;
-                __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(error, start, end);
+                __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(error, start, end, N);
                 error += "\nruntime: array slicing with out of range indexes";
 #ifndef __JULE_ENABLE__PRODUCTION
                 error += "\nfile: ";
@@ -181,7 +181,7 @@ namespace jule
             if (this->empty() || index < 0 || N <= index)
             {
                 std::string error;
-                __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(error, index);
+                __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(error, index, N);
                 error += "\nruntime: array indexing with out of range index";
 #ifndef __JULE_ENABLE__PRODUCTION
                 error += "\nfile: ",
@@ -199,14 +199,14 @@ namespace jule
             if (this->empty() || i < 0 || N <= i)
             {
                 std::string error;
-                __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(error, i);
+                __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(error, i, N);
                 error += "\nruntime: array indexing with out of range index";
                 jule::panic(error);
             }
             if (this->empty() || j < 0 || N <= j)
             {
                 std::string error;
-                __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(error, j);
+                __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(error, j, N);
                 error += "\nruntime: array indexing with out of range index";
                 jule::panic(error);
             }
