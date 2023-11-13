@@ -2107,12 +2107,14 @@ impl Sema {
     }
 
     fn check_field_defaults(mut &self, mut &ins: &StructIns) {
+        let mut eval = self.eval(self)
         for (_, mut f) in ins.fields {
             // Skip this field if not has default value.
             if f.decl.default == nil {
                 continue
             }
-            f.default = self.eval(self).eval_expr(f.decl.default)
+            eval.prefix = f.kind
+            f.default = eval.eval_expr(f.decl.default)
 
             // Skip if eval returned nil.
             // Relevant error(s) logged by eval.
