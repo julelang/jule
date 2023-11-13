@@ -2106,6 +2106,25 @@ impl Sema {
         }
     }
 
+    fn check_field_defaults(mut &self, mut &ins: &StructIns) {
+        for (_, mut f) in ins.fields {
+            // Skip this field if not has default value.
+            if f.decl.default == nil {
+                continue
+            }
+            f.default = self.eval(self).eval_expr(f.decl.default)
+
+            // Skip if eval returned nil.
+            // Relevant error(s) logged by eval.
+            if f.default == nil {
+                continue
+            }
+
+            const REFERENCE = false // Fields cannot be reference.
+            self.check_assign_type(REFERENCE, f.kind, f.default, f.decl.default.token)
+        }
+    }
+
     fn check_type_struct(mut &self, mut &strct: &Struct) {
         if strct.cpp_linked {
             ret
@@ -2123,6 +2142,7 @@ impl Sema {
         }
 
         for (_, mut ins) in strct.instances {
+            self.check_field_defaults(ins)
             for (_, mut f) in ins.methods {
                 self.check_type_method(ins, f)
             }

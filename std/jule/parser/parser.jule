@@ -1292,8 +1292,18 @@ impl Parser {
         let mut i = 0
         f.kind, _ = unsafe { self.build_type(tokens, &i, true) }
         if i < tokens.len {
-            self.push_err(tokens[i], LogMsg.InvalidSyntax)
-            ret nil
+            let token = tokens[i]
+            if token.id != TokenId.Op || token.kind != TokenKind.Eq {
+                self.push_err(tokens[i], LogMsg.InvalidSyntax)
+                ret nil
+            }
+            i++
+            if i >= tokens.len {
+                self.push_err(token, LogMsg.MissingExpr)
+                ret nil
+            }
+            tokens = tokens[i:]
+            f.default = self.build_expr(tokens)
         }
 
         ret f
