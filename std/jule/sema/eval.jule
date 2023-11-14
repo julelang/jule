@@ -323,6 +323,7 @@ struct Eval {
     ignored:     bool // Evaluated expression is not for assignment or something else.
     dis_builtin: bool // Disallow/suppress Jule's built-in defines.
     owner:       &Var
+    field:       &FieldIns // Field of this default expression. Used for checking cycles.
 }
 
 impl Eval {
@@ -2055,7 +2056,11 @@ impl Eval {
         if !ok {
             ret nil
         }
-        // NOTE: Instance already checked (just fields) if generic quantity passes.
+        // NOTICE: Instance already checked (just fields) if generic quantity passes.
+
+        if self.field != nil && self.field.decl.owner == s.decl {
+            self.push_err(error_token, LogMsg.IllegalCycleRefersItself, s.decl.ident)
+        }
 
         self.push_reference_to_struct(s)
         self.check_deprecated(s.decl.directives, error_token)
