@@ -20,7 +20,7 @@ public:
     { return _thread.alloc; }
 
     inline void drop(void)
-    { this->_thread.drop(); }
+    { this->_thread.dealloc(); }
 
     inline jule::Uint ref_count(void)
     { return this->_thread.ref != nullptr ? this->_thread.get_ref_n() : 0; }
