@@ -56,6 +56,7 @@ use std::jule::sema::{
     IntegratedToStrExprModel,
     BackendEmitExprModel,
     TernaryExprModel,
+    FreeExprModel,
     Scope,
 }
 use std::jule::types::{
@@ -1111,6 +1112,13 @@ fn gen_backend_emit_expr_model(mut m: &BackendEmitExprModel): str {
     ret m.code
 }
 
+fn gen_free_expr_model(mut m: &FreeExprModel): str {
+    if env::RC {
+        ret gen_expr(m.expr) + ".dealloc()"
+    }
+    ret gen_expr(m.expr) + ".__free()"
+}
+
 fn gen_expr_model(mut m: ExprModel): str {
     match type m {
     | &TypeKind:
@@ -1232,6 +1240,9 @@ fn gen_expr_model(mut m: ExprModel): str {
 
     | &BackendEmitExprModel:
         ret gen_backend_emit_expr_model((&BackendEmitExprModel)(m))
+
+    | &FreeExprModel:
+        ret gen_free_expr_model((&FreeExprModel)(m))
 
     |:
         ret "<unimplemented_expression_model>"

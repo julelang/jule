@@ -33,6 +33,7 @@ const BUILTIN_CALLER_CLONE = Caller(0xB)
 const BUILTIN_CALLER_ASSERT = Caller(0xC)
 const BUILTIN_CALLER_STD_MEM_SIZE_OF = Caller(0xD)
 const BUILTIN_CALLER_STD_MEM_ALIGN_OF = Caller(0xE)
+const BUILTIN_CALLER_STD_MEM_FREE = Caller(0x13)
 const BUILTIN_CALLER_STD_JULE_INTEGRATED_TO_STR = Caller(0xF)
 const BUILTIN_CALLER_STD_JULE_INTEGRATED_INLINE = Caller(0x10)
 const BUILTIN_CALLER_STD_DEBUG_OUT = Caller(0x11)
@@ -119,6 +120,9 @@ fn find_builtin_caller(c: Caller): BuiltinCaller {
     | BUILTIN_CALLER_STD_MEM_ALIGN_OF:
         ret builtin_caller_std_mem_align_of
 
+    | BUILTIN_CALLER_STD_MEM_FREE:
+        ret builtin_caller_std_mem_free
+
     | BUILTIN_CALLER_STD_JULE_INTEGRATED_TO_STR:
         ret builtin_caller_std_jule_integrated_to_str
 
@@ -197,6 +201,7 @@ fn find_builtin_def_std_mem(ident: str): any {
     match ident {
     | "size_of":  ret &FnIns{caller: BUILTIN_CALLER_STD_MEM_SIZE_OF}
     | "align_of": ret &FnIns{caller: BUILTIN_CALLER_STD_MEM_ALIGN_OF}
+    | "free":     ret &FnIns{caller: BUILTIN_CALLER_STD_MEM_FREE}
     |:            ret nil
     }
 }
@@ -770,6 +775,33 @@ fn builtin_caller_std_mem_align_of(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: 
     }
 
     result.model = &AlignofExprModel{expr: d.model}
+    ret result
+}
+
+fn builtin_caller_std_mem_free(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data {
+    if fc.generics.len > 0 {
+        e.push_err(fc.token, LogMsg.NotHasGenerics)
+    }
+
+    if fc.args.len < 1 {
+        e.push_err(fc.token, LogMsg.MissingExprFor, "h")
+        ret nil
+    }
+    if fc.args.len > 1 {
+        e.push_err(fc.args[1].token, LogMsg.ArgumentOverflow)
+    }
+
+    let mut d = e.eval_expr_kind(fc.args[0].kind)
+    if d == nil {
+        ret nil
+    }
+
+    if !d.kind.performs_rc() {
+        e.push_err(fc.args[0].token, LogMsg.InvalidExpr)
+    }
+
+    let mut result = build_void_data()
+    result.model = &FreeExprModel{expr: d.model}
     ret result
 }
 

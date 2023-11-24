@@ -138,12 +138,24 @@ namespace jule
             }
         }
 
+        // Frees memory. Unsafe function, not includes any safety checking for
+        // heap allocations are valid or something like that.
+        void __free(void) noexcept
+        {
+            delete this->data.ref;
+            this->data.ref = nullptr;
+
+            delete[] this->data.alloc;
+            this->data.alloc = nullptr;
+            this->_slice = nullptr;
+        }
+
         void dealloc(void) noexcept
         {
 #ifdef __JULE_DISABLE__REFERENCE_COUNTING
             this->_len = 0;
             this->_cap = 0;
-            this->data.drop();
+            this->data.dealloc();
 #else
             this->_len = 0;
             this->_cap = 0;
@@ -166,12 +178,7 @@ namespace jule
                 return;
             }
 
-            delete this->data.ref;
-            this->data.ref = nullptr;
-
-            delete[] this->data.alloc;
-            this->data.alloc = nullptr;
-            this->_slice = nullptr;
+            this->__free();
 #endif // __JULE_DISABLE__REFERENCE_COUNTING
         }
 

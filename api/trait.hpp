@@ -71,9 +71,16 @@ namespace jule
             this->__get_copy(src);
         }
 
+        // Frees memory. Unsafe function, not includes any safety checking for
+        // heap allocations are valid or something like that.
+        void __free(void) noexcept
+        {
+            this->data.__free();
+        }
+
         void dealloc(void) noexcept
         {
-            this->data.drop();
+            this->data.dealloc();
         }
 
         // Copy content from source.

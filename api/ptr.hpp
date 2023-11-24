@@ -124,7 +124,7 @@ namespace jule
 
         ~Ptr(void) noexcept
         {
-            this->drop();
+            this->dealloc();
         }
 
         // Copy content from source.
@@ -159,10 +159,21 @@ namespace jule
                 this->ref, __JULE_ATOMIC_MEMORY_ORDER__RELAXED);
         }
 
+        // Frees memory. Unsafe function, not includes any safety checking for
+        // heap allocations are valid or something like that.
+        void __free(void) const noexcept
+        {
+            delete this->ref;
+            this->ref = nullptr;
+
+            delete this->alloc;
+            this->alloc = nullptr;
+        }
+
         // Drops reference.
         // This function will destruct this instace for reference counting.
         // Frees memory if reference counting reaches to zero.
-        void drop(void) const noexcept
+        void dealloc(void) const noexcept
         {
             if (!this->ref)
             {
@@ -177,11 +188,7 @@ namespace jule
                 return;
             }
 
-            delete this->ref;
-            this->ref = nullptr;
-
-            delete this->alloc;
-            this->alloc = nullptr;
+            this->__free();
         }
 
         inline T *ptr(
@@ -274,7 +281,7 @@ namespace jule
             if (this->alloc != nullptr && this->alloc == src.alloc)
                 return;
 
-            this->drop();
+            this->dealloc();
             this->__get_copy(src);
         }
 
