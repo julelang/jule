@@ -27,7 +27,7 @@ public:
     { return _mutex.alloc; }
 
     inline void drop(void)
-    { this->_mutex.drop(); }
+    { this->_mutex.dealloc(); }
 
     inline jule::Uint ref_count(void)
     { return this->_mutex.ref != nullptr ? this->_mutex.get_ref_n() : 0; }
