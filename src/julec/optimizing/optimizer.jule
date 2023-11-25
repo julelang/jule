@@ -1,0 +1,83 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use obj::{IR}
+use env
+
+use std::jule::sema::{
+    Package,
+    Fn,
+    Struct,
+}
+
+// Target-independent optimizer for IR.
+pub struct Optimizer {
+    ir: &IR
+}
+
+impl Optimizer {
+    // Returns new optimizer for IR.
+    pub static fn new(mut &ir: &IR): &Optimizer {
+        ret &Optimizer{
+            ir: ir,
+        }
+    }
+
+    fn optimize_function(mut self, mut &func: &Fn) {
+        if func.cpp_linked {
+            ret
+        }
+
+        for (_, mut ins) in func.instances {
+            let mut so = ScopeOptimizer.new(ins.scope)
+            so.optimize()
+        }
+    }
+
+    fn optimize_struct(mut self, mut &s: &Struct) {
+        if s.cpp_linked {
+            ret
+        }
+
+        for (_, mut ins) in s.instances {
+            for (_, mut m) in ins.methods {
+                for (_, mut mins) in m.instances {
+                    let mut so = ScopeOptimizer.new(mins.scope)
+                    so.optimize()
+                }
+            }
+        }
+    }
+
+    fn optimize_functions(mut self, mut &p: &Package) {
+        for (_, mut f) in p.files {
+            for (_, mut func) in f.funcs {
+                self.optimize_function(func)
+            }
+        }
+    }
+
+    fn optimize_structs(mut self, mut &p: &Package) {
+        for (_, mut f) in p.files {
+            for (_, mut s) in f.structs {
+                self.optimize_struct(s)
+            }
+        }
+    }
+
+    fn optimize_package(mut self, mut &p: &Package) {
+        self.optimize_functions(p)
+        self.optimize_structs(p)
+    }
+
+    // Optimizes IR by enabled optimizations.
+    pub fn optimize(mut self) {
+        for (_, mut u) in self.ir.used {
+            if !u.cpp_linked {
+                self.optimize_package(u.package)
+            }
+        }
+        self.optimize_package(self.ir.main)
+    }
+}

@@ -1,0 +1,68 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use env
+
+use path for std::fs::path
+use std::jule::build::{PATH_STDLIB}
+use std::jule::sema::{
+    Data,
+    Scope,
+    St,
+    FnCallExprModel,
+}
+
+// Scope optimizer that applies target-independent optimizations.
+struct ScopeOptimizer {
+    i:     int
+    scope: &Scope
+}
+
+impl ScopeOptimizer {
+    pub static fn new(mut scope: &Scope): &ScopeOptimizer {
+        ret &ScopeOptimizer{
+            scope: scope,
+        }
+    }
+
+    fn optimize_data(mut self, mut d: &Data) {
+        match type d.model {
+        | &FnCallExprModel:
+            let mut m = (&FnCallExprModel)(d.model)
+            if env::PRODUCTION {
+                if !m.func.is_builtin() &&
+                    is_std_package(m.func.decl.token.file.path(), "debug") {
+                    self.scope.stmts[self.i] = nil
+                }
+            }
+        }
+    }
+
+    fn optimize_stmt(mut self, mut stmt: St) {
+        match type stmt {
+        | &Scope:
+            self.optimize_child((&Scope)(stmt))
+
+        | &Data:
+            self.optimize_data((&Data)(stmt))
+        }
+    }
+
+    fn optimize_child(mut self, mut child: &Scope) {
+        let mut so = ScopeOptimizer.new(child)
+        so.optimize()
+    }
+
+    // Optimizes scope by enabled optimizations.
+    pub fn optimize(mut self) {
+        self.i = 0
+        for self.i < self.scope.stmts.len; self.i++ {
+            self.optimize_stmt(self.scope.stmts[self.i])
+        }
+    }
+}
+
+fn is_std_package(f: str, p: str): bool {
+    ret f.has_prefix(path::join(PATH_STDLIB, p))
+}
