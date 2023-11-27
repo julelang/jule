@@ -6,11 +6,14 @@ use env
 
 use path for std::fs::path
 use std::jule::build::{PATH_STDLIB}
+use std::jule::constant::{Const}
 use std::jule::sema::{
     Data,
     Scope,
     St,
     FnCallExprModel,
+    Conditional,
+    If,
 }
 
 // Scope optimizer that applies target-independent optimizations.
@@ -39,6 +42,24 @@ impl ScopeOptimizer {
         }
     }
 
+    fn optimize_conditional(mut self, mut c: &Conditional) {
+        if !env::OPT_COND {
+            ret
+        }
+
+        let mut i = &c.elifs[0]
+        let end = &c.elifs[c.elifs.len-1]
+        for i <= end; i++ {
+            unsafe {
+                if !is_unreachable_conditional_case(*i) {
+                    i++
+                    continue
+                }
+                *i = nil
+            }
+        }
+    }
+
     fn optimize_stmt(mut self, mut stmt: St) {
         match type stmt {
         | &Scope:
@@ -46,6 +67,9 @@ impl ScopeOptimizer {
 
         | &Data:
             self.optimize_data((&Data)(stmt))
+
+        | &Conditional:
+            self.optimize_conditional((&Conditional)(stmt))
         }
     }
 
@@ -65,4 +89,14 @@ impl ScopeOptimizer {
 
 fn is_std_package(f: str, p: str): bool {
     ret f.has_prefix(path::join(PATH_STDLIB, p))
+}
+
+fn is_unreachable_conditional_case(&i: &If): bool {
+    match type i.expr {
+    | &Const:
+        let c = (&Const)(i.expr)
+        ret c.is_bool() && !c.read_bool()
+    }
+
+    ret false
 }
