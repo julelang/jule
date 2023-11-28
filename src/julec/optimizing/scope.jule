@@ -47,6 +47,17 @@ impl ScopeOptimizer {
             ret
         }
 
+        // Remove unnecessary trailing cases that comes after constant true case.
+        for (i, mut case) in c.elifs {
+            if !is_constant_valid_conditional_case(case) {
+                continue
+            }
+            c.elifs = c.elifs[:i+1]
+            c.default = nil // Remove default case, unreachable.
+            break
+        }
+
+        // Remove unreachable cases.
         let mut i = &c.elifs[0]
         let end = &c.elifs[c.elifs.len-1]
         for i <= end; i++ {
@@ -89,6 +100,16 @@ impl ScopeOptimizer {
 
 fn is_std_package(f: str, p: str): bool {
     ret f.has_prefix(path::join(PATH_STDLIB, p))
+}
+
+fn is_constant_valid_conditional_case(&i: &If): bool {
+    match type i.expr {
+    | &Const:
+        let c = (&Const)(i.expr)
+        ret c.is_bool() && c.read_bool()
+    }
+
+    ret false
 }
 
 fn is_unreachable_conditional_case(&i: &If): bool {
