@@ -193,12 +193,18 @@ fn get_compile_path(): str {
 
 fn apply_target_independent_optimizations(mut &ir: &IR) {
     if env::OPT_DEADCODE {
-        deadcode::eliminate(ir)
+        // See compiler reference (2)
+        deadcode::eliminate_defines(ir)
     }
 
     // Apply target-independent optimizations.
     let mut opt = Optimizer.new(ir)
     opt.optimize()
+
+    if env::OPT_DEADCODE {
+        // See compiler reference (3)
+        deadcode::eliminate_scopes(ir)
+    }
 }
 
 fn check_compiler_flag() {

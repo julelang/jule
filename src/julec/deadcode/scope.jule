@@ -2,7 +2,11 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use obj::{IR}
+
 use std::jule::sema::{
+    Package,
+    Fn,
     Scope,
     St,
     Data,
@@ -78,4 +82,35 @@ fn eliminate_dead_code_of_scope(mut s: &Scope) {
         stmts: &s.stmts,
     }
     unsafe { sdc.optimize_stmts() }
+}
+
+// Eliminates dead functions.
+fn eliminate_scope_functions(mut &funcs: []&Fn) {
+    for (_, mut func) in funcs {
+        for (_, mut ins) in func.instances {
+            eliminate_dead_code_of_scope(ins.scope)
+        }
+    }
+}
+
+fn eliminate_functions_scope_package(mut &pkg: &Package) {
+    for (_, mut f) in pkg.files {
+        eliminate_scope_functions(f.funcs)
+    }
+}
+
+fn eliminate_scope_package(mut &pkg: &Package) {
+    eliminate_functions_scope_package(pkg)
+}
+
+// Eliminate dead scope codes.
+pub fn eliminate_scopes(mut &ir: &IR) {
+    let mut i = ir.used.len -1 
+    for i >= 0 ; i-- {
+        let mut u = ir.used[i]
+        if !u.cpp_linked {
+            eliminate_scope_package(u.package)
+        }
+    }
+    eliminate_scope_package(ir.main)
 }

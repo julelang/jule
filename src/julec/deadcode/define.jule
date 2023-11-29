@@ -224,7 +224,6 @@ fn is_trait_dead(mut t: &Trait): bool {
 }
 
 // Eliminates dead functions.
-// If functions is alive, eliminates unreachable codes, and etc for scope.
 fn eliminate_dead_functions(mut &funcs: []&Fn) {
     let mut i = 0
     for i < funcs.len {
@@ -236,10 +235,9 @@ fn eliminate_dead_functions(mut &funcs: []&Fn) {
             if is_fn_dead(ins) {
                 deads = append(deads, ins)
                 f.instances = append(f.instances[:j], f.instances[j+1:]...)
-                continue
+            } else {
+                j++
             }
-            eliminate_dead_code_of_scope(ins.scope)
-            j++
         }
 
         // Remove function, no instances.
@@ -352,7 +350,8 @@ fn eliminate_package(mut &pkg: &Package) {
     eliminate_dead_functions_package(pkg)
 }
 
-pub fn eliminate(mut &ir: &IR) {
+// Eliminate dead defines.
+pub fn eliminate_defines(mut &ir: &IR) {
     let mut i = ir.used.len -1 
     for i >= 0 ; i-- {
         let mut u = ir.used[i]
