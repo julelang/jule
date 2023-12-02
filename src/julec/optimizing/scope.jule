@@ -14,6 +14,8 @@ use std::jule::sema::{
     FnCallExprModel,
     Conditional,
     If,
+    Case,
+    Match,
 }
 
 // Scope optimizer that applies target-independent optimizations.
@@ -77,16 +79,47 @@ impl ScopeOptimizer {
         }
     }
 
+    fn optimize_match(mut self, mut m: &Match) {
+        if !env::OPT_COND {
+            ret
+        }
+
+        // Remove unnecessary trailing cases that comes after constant true case.
+        for (i, mut case) in m.cases {
+            if !is_constant_valid_match_case(case) {
+                continue
+            }
+            if i == 0 { // First case.
+                // Set current stmt to scope of case.
+                self.scope.stmts[self.i] = case.scope
+                ret
+            }
+            m.cases = m.cases[:i+1]
+            case.exprs = nil // Remove expressions to remove eval overhead.
+            m.default = nil  // Remove default case, unreachable.
+            break
+        }
+
+        // Remove unreachable cases.
+        let mut i = &m.cases[0]
+        let end = &m.cases[m.cases.len-1]
+        for i <= end; i++ {
+            unsafe {
+                if !is_unreachable_match_case(*i) {
+                    i++
+                    continue
+                }
+                *i = nil
+            }
+        }
+    }
+
     fn optimize_stmt(mut self, mut stmt: St) {
         match type stmt {
-        | &Scope:
-            self.optimize_child((&Scope)(stmt))
-
-        | &Data:
-            self.optimize_data((&Data)(stmt))
-
-        | &Conditional:
-            self.optimize_conditional((&Conditional)(stmt))
+        | &Scope:       self.optimize_child((&Scope)(stmt))
+        | &Data:        self.optimize_data((&Data)(stmt))
+        | &Conditional: self.optimize_conditional((&Conditional)(stmt))
+        | &Match:       self.optimize_match((&Match)(stmt))
         }
     }
 
@@ -118,11 +151,31 @@ fn is_constant_valid_conditional_case(&i: &If): bool {
     ret false
 }
 
+fn is_constant_valid_match_case(&case: &Case): bool {
+    for _, expr in case.exprs {
+        if expr.is_const() && expr.constant.is_bool() && expr.constant.read_bool() {
+            ret true
+        }
+    }
+
+    ret false
+}
+
 fn is_unreachable_conditional_case(&i: &If): bool {
     match type i.expr {
     | &Const:
         let c = (&Const)(i.expr)
         ret c.is_bool() && !c.read_bool()
+    }
+
+    ret false
+}
+
+fn is_unreachable_match_case(&case: &Case): bool {
+    for _, expr in case.exprs {
+        if expr.is_const() && expr.constant.is_bool() && !expr.constant.read_bool() {
+            ret true
+        }
     }
 
     ret false
