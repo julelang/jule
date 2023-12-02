@@ -31,6 +31,14 @@ impl ScopeOptimizer {
         }
     }
 
+    fn set_current_stmt(mut self, mut stmt: any) {
+        self.scope.stmts[self.i] = stmt
+    }
+
+    fn current_stmt(mut self): any {
+        ret self.scope.stmts[self.i]
+    }
+
     fn optimize_data(mut self, mut d: &Data) {
         match type d.model {
         | &FnCallExprModel:
@@ -49,18 +57,16 @@ impl ScopeOptimizer {
             ret
         }
 
+        let mut const_case = false // Has cosntant true case.
+
         // Remove unnecessary trailing cases that comes after constant true case.
-        for (i, mut case) in c.elifs {
-            if !is_constant_valid_conditional_case(case) {
+        for (i, mut elif) in c.elifs {
+            if !is_constant_valid_conditional_case(elif) {
                 continue
             }
-            if i == 0 { // First case.
-                // Set current stmt to scope of case.
-                self.scope.stmts[self.i] = case.scope
-                ret
-            }
+            const_case = true
             c.elifs = c.elifs[:i+1]
-            case.expr = nil // Remove expression to remove eval overhead.
+            elif.expr = nil // Remove expression to remove eval overhead.
             c.default = nil // Remove default case, unreachable.
             break
         }
@@ -77,6 +83,31 @@ impl ScopeOptimizer {
                 *i = nil
             }
         }
+
+        if c.elifs.len == 0 {
+            ret
+        }
+
+        // Skip one-case checking if const-case is not exist.
+        if !const_case {
+            ret
+        }
+
+        let mut only = -1
+        for j, elif in c.elifs {
+            if elif != nil {
+                if only != -1 {
+                    // Break checking, there is more than one case.
+                    ret
+                }
+                only = j
+            }
+        }
+
+        // Here is one case.
+        if only != -1 {
+            self.set_current_stmt(c.elifs[only].scope)
+        }
     }
 
     fn optimize_match(mut self, mut m: &Match) {
@@ -84,20 +115,22 @@ impl ScopeOptimizer {
             ret
         }
 
+        let mut const_case = false // Has cosntant true case.
+
         // Remove unnecessary trailing cases that comes after constant true case.
         for (i, mut case) in m.cases {
             if !is_constant_valid_match_case(case) {
                 continue
             }
-            if i == 0 { // First case.
-                // Set current stmt to scope of case.
-                self.scope.stmts[self.i] = case.scope
-                ret
-            }
+            const_case = true
             m.cases = m.cases[:i+1]
             case.exprs = nil // Remove expressions to remove eval overhead.
             m.default = nil  // Remove default case, unreachable.
             break
+        }
+
+        if m.cases.len == 0 {
+            ret
         }
 
         // Remove unreachable cases.
@@ -111,6 +144,27 @@ impl ScopeOptimizer {
                 }
                 *i = nil
             }
+        }
+
+        // Skip one-case checking if const-case is not exist.
+        if !const_case {
+            ret
+        }
+
+        let mut only = -1
+        for j, case in m.cases {
+            if case != nil {
+                if only != -1 {
+                    // Break checking, there is more than one case.
+                    ret
+                }
+                only = j
+            }
+        }
+
+        // Here is one case.
+        if only != -1 {
+            self.set_current_stmt(m.cases[only].scope)
         }
     }
 
@@ -132,7 +186,7 @@ impl ScopeOptimizer {
     pub fn optimize(mut self) {
         self.i = 0
         for self.i < self.scope.stmts.len; self.i++ {
-            self.optimize_stmt(self.scope.stmts[self.i])
+            self.optimize_stmt(self.current_stmt())
         }
     }
 }
