@@ -827,6 +827,26 @@ fn gen_struct_method_defs(mut &s: &StructIns): str {
     ret obj
 }
 
+// Reports method is reversed to_str method.
+fn fn_is_to_str(mut &f: &Fn): bool {
+    if f == nil ||
+        !f.public ||
+        f.is_void() ||
+        f.generics.len != 0 ||
+        f.params.len != 1 ||
+        f.params[0].mutable ||
+        f.params[0].is_ref() {
+        ret false
+    }
+
+    let mut ins = f.instances[0]
+    let prim = ins.result.prim()
+    if prim == nil {
+        ret false
+    }
+    ret prim.is_str()
+}
+
 // Generates C++ code of structure's ostream.
 fn gen_struct_ostream(mut &s: &StructIns): str {
     let mut obj = ""
@@ -836,36 +856,48 @@ fn gen_struct_ostream(mut &s: &StructIns): str {
     obj += " &_Src) {\n"
     add_indent()
     obj += indent()
-    obj += `_Stream << "`
-    obj += s.decl.ident
-    obj += "{\";\n"
 
-    for (i, mut f) in s.fields {
-        obj += indent()
+    let mut fts = s.find_method("to_str", false)
+    if fn_is_to_str(fts) {
+        obj += "_Stream << (("
+        obj += struct_ins_out_ident(s)
+        obj += ")(_Src))."
+        obj += fn_out_ident(fts)
+        obj += "();\n"
+    } else {
         obj += `_Stream << "`
-        obj += f.decl.ident
-        obj += `:`
+        obj += s.decl.ident
+        obj += "{\";\n"
 
-        // Skip C++-linked struct kinds.
-        let strct = f.kind.strct()
-        if strct != nil && strct.decl != nil && strct.decl.cpp_linked {
-            obj += ` cpp.`
-            obj += field_out_ident(f.decl)
-            obj += `"`
-        } else {
-            obj += `" << _Src.`
-            obj += field_out_ident(f.decl)
+        for (i, mut f) in s.fields {
+            obj += indent()
+            obj += `_Stream << "`
+            obj += f.decl.ident
+            obj += `:`
+
+            // Skip C++-linked struct kinds.
+            let strct = f.kind.strct()
+            if strct != nil && strct.decl != nil && strct.decl.cpp_linked {
+                obj += ` cpp.`
+                obj += field_out_ident(f.decl)
+                obj += `"`
+            } else {
+                obj += `" << _Src.`
+                obj += field_out_ident(f.decl)
+            }
+            if i+1 < s.fields.len {
+                obj += " << \", \""
+            }
+            obj += ";\n"
         }
-        if i+1 < s.fields.len {
-            obj += " << \", \""
-        }
-        obj += ";\n"
+
+        obj += indent()
+        obj += "_Stream << \"}\";\n"
     }
 
     obj += indent()
-    obj += "_Stream << \"}\";\n"
-    obj += indent()
     obj += "return _Stream;\n"
+
     done_indent()
     obj += indent()
     obj += "}"
