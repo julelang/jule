@@ -85,4 +85,37 @@ impl Cmplx {
         let w = ct.add(x2).log()
         ret Cmplx.new(w.imag(), -w.real()) // -i * w
     }
+
+    // Returns the inverse hyperbolic sine of complex number.
+    pub fn asinh(self): Cmplx {
+        match {
+        | self.imag() == 0 && math::abs(self.real()) <= 1:
+            ret Cmplx.new(math::asinh(self.real()), self.imag())
+        | self.real() == 0 && math::abs(self.imag()) <= 1:
+            ret Cmplx.new(self.real(), math::asin(self.imag()))
+        | math::is_inf(self.real(), 0):
+            match {
+            | math::is_inf(self.imag(), 0):
+                ret Cmplx.new(self.real(), math::copysign(math::PI/4, self.imag()))
+            | math::is_nan(self.imag()):
+                ret self
+            |:
+                ret Cmplx.new(self.real(), math::copysign(0.0, self.imag()))
+            }
+        | math::is_nan(self.real()):
+            match {
+            | self.imag() == 0:
+                ret self
+            | math::is_inf(self.imag(), 0):
+                ret Cmplx.new(self.imag(), self.real())
+            |:
+                ret Cmplx.nan()
+            }
+        | math::is_inf(self.imag(), 0):
+            ret Cmplx.new(math::copysign(self.imag(), self.real()), math::copysign(math::PI/2, self.imag()))
+        }
+        let xx = self.mul(self)
+        let x1 = Cmplx.new(1+xx.real(), xx.imag()) // 1 + x*x
+        ret self.add(x1.sqrt()).log()              // log(x + sqrt(1 + x*x))
+    }
 }
