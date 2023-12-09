@@ -142,6 +142,38 @@ impl Cmplx {
         let (sh, ch) = sinhcosh(self.imag())
         ret Cmplx.new(c*ch, -s*sh)
     }
+
+    // Complex hyperbolic cosine
+    //
+    // DESCRIPTION:
+    //
+    // ccosh(z) = cosh x  cos y + i sinh x sin y .
+    //
+    // ACCURACY:
+    //
+    //                      Relative error:
+    // arithmetic   domain     # trials      peak         rms
+    //    IEEE      -10,+10     30000       2.9e-16     8.1e-17
+
+    // Returns the hyperbolic cosine of complex number.
+    pub fn cosh(self): Cmplx {
+        match {
+        | self.real() == 0 && (math::is_inf(self.imag(), 0) || math::is_nan(self.imag())):
+            ret Cmplx.new(math::nan(), self.real()*math::copysign(0, self.imag()))
+        | math::is_inf(self.real(), 0):
+            match {
+            | self.imag() == 0:
+                ret Cmplx.new(math::inf(1), self.imag()*math::copysign(0, self.real()))
+            | math::is_inf(self.imag(), 0) || math::is_nan(self.imag()):
+                ret Cmplx.new(math::inf(1), math::nan())
+            }
+        | self.imag() == 0 && math::is_nan(self.real()):
+            ret Cmplx.new(math::nan(), self.imag())
+        }
+        let (s, c) = math::sincos(self.imag())
+        let (sh, ch) = sinhcosh(self.real())
+        ret Cmplx.new(c*ch, s*sh)
+    }
 }
 
 // calculate sinh and cosh.
