@@ -80,6 +80,37 @@ impl Cmplx {
         }
         ret Cmplx.new(math::sin(2*self.real())/d, math::sinh(2*self.imag())/d)
     }
+
+    // Complex hyperbolic tangent
+    //
+    // DESCRIPTION:
+    //
+    // tanh z = (sinh 2x  +  i sin 2y) / (cosh 2x + cos 2y) .
+    //
+    // ACCURACY:
+    //
+    //                      Relative error:
+    // arithmetic   domain     # trials      peak         rms
+    //    IEEE      -10,+10     30000       1.7e-14     2.4e-16
+
+    // Returns the hyperbolic tangent of complex number.
+    pub fn tanh(self): Cmplx {
+        match {
+        | math::is_inf(self.real(), 0):
+            match {
+            | math::is_inf(self.imag(), 0) | math::is_nan(self.imag()):
+                ret Cmplx.new(math::copysign(1, self.real()), math::copysign(0, self.imag()))
+            }
+            ret Cmplx.new(math::copysign(1, self.real()), math::copysign(0, math::sin(2*self.imag())))
+        | self.imag() == 0 && math::is_nan(self.real()):
+            ret self
+        }
+        let d = math::cosh(2*self.real()) + math::cos(2*self.imag())
+        if d == 0 {
+            ret Cmplx.inf(1)
+        }
+        ret Cmplx.new(math::sinh(2*self.real())/d, math::sin(2*self.imag())/d)
+    }
 }
 
 // Reduces the input argument x to the range (-PI/2, PI/2].
