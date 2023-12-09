@@ -1,0 +1,231 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use math for std::math
+use bits for std::math::bits
+
+// The Jule code is a modified version of the original Go code from
+// https://github.com/golang/go/blob/go1.20/src/math/cmplx/tan.go and came with this notice.
+//
+// ====================================================
+// The original C code, the long comment, and the constants
+// below are from http://netlib.sandia.gov/cephes/c9x-complex/clog.c.
+// The go code is a simplified version of the original C.
+//
+// Cephes Math Library Release 2.8:  June, 2000
+// Copyright 1984, 1987, 1989, 1992, 2000 by Stephen L. Moshier
+//
+// The readme file at http://netlib.sandia.gov/cephes/ says:
+//    Some software in this archive may be from the book _Methods and
+// Programs for Mathematical Functions_ (Prentice-Hall or Simon & Schuster
+// International, 1989) or from the Cephes Mathematical Library, a
+// commercial product. In either event, it is copyrighted by the author.
+// What you see here may be used freely but it comes with no support or
+// guarantee.
+//
+//   The two known misprints in the book are repaired here in the
+// source listings for the gamma function and the incomplete beta
+// integral.
+//
+//   Stephen L. Moshier
+//   moshier@na-net.ornl.gov
+
+impl Cmplx {
+    // Complex circular tangent
+    //
+    // DESCRIPTION:
+    //
+    // If
+    //     z = x + iy,
+    //
+    // then
+    //
+    //           sin 2x  +  i sinh 2y
+    //     w  =  --------------------.
+    //            cos 2x  +  cosh 2y
+    //
+    // On the real axis the denominator is zero at odd multiples
+    // of PI/2. The denominator is evaluated by its Taylor
+    // series near these points.
+    //
+    // ctan(z) = -i ctanh(iz).
+    //
+    // ACCURACY:
+    //
+    //                      Relative error:
+    // arithmetic   domain     # trials      peak         rms
+    //    DEC       -10,+10      5200       7.1e-17     1.6e-17
+    //    IEEE      -10,+10     30000       7.2e-16     1.2e-16
+    // Also tested by ctan * ccot = 1 and catan(ctan(z))  =  z.
+
+    // Returns the tangent of complex number.
+    pub fn tan(self): Cmplx {
+        match {
+        | math::is_inf(self.imag(), 0):
+            match {
+            | math::is_inf(self.real(), 0) | math::is_nan(self.real()):
+                ret Cmplx.new(math::copysign(0, self.real()), math::copysign(1, self.imag()))
+            }
+            ret Cmplx.new(math::copysign(0, math::sin(2*self.real())), math::copysign(1, self.imag()))
+        | self.real() == 0 && math::is_nan(self.imag()):
+            ret self
+        }
+        let mut d = math::cos(2*self.real()) + math::cosh(2*self.imag())
+        if math::abs(d) < 0.25 {
+            d = tan_series(self)
+        }
+        if d == 0 {
+            ret Cmplx.inf(1)
+        }
+        ret Cmplx.new(math::sin(2*self.real())/d, math::sinh(2*self.imag())/d)
+    }
+}
+
+// Reduces the input argument x to the range (-PI/2, PI/2].
+// x must be greater than or equal to 0. For small arguments it
+// uses Cody-Waite reduction in 3 f64 parts based on:
+// "Elementary Function Evaluation:  Algorithms and Implementation"
+// Jean-Michel Muller, 1997.
+// For very large arguments it uses Payne-Hanek range reduction based on:
+// "ARGUMENT REDUCTION FOR HUGE ARGUMENTS: Good to the Last Bit"
+// K. C. Ng et al, March 24, 1992.
+fn reduce_pi(mut x: f64): f64 {
+    // reduce_threshold is the maximum value of x where the reduction using
+    // Cody-Waite reduction still gives accurate results. This threshold
+    // is set by t*PIn being representable as a float64 without error
+    // where t is given by t = floor(x * (1 / PI)) and PIn are the leading partial
+    // terms of PI. Since the leading terms, PI1 and PI2 below, have 30 and 32
+    // trailing zero bits respectively, t should have less than 30 significant bits.
+    //	t < 1<<30  -> floor(x*(1/PI)+0.5) < 1<<30 -> x < (1<<30-1) * PI - 0.5
+    // So, conservatively we can take x < 1<<30.
+    const REDUCE_THRESHOLD: f64 = 1 << 30
+
+    if math::abs(x) < REDUCE_THRESHOLD {
+        // Use Cody-Waite reduction in three parts.
+
+        // PI1, PI2 and PI3 comprise an extended precision value of PI
+        // such that PI ~= PI1 + PI2 + PI3. The parts are chosen so
+        // that PI1 and PI2 have an approximately equal number of trailing
+        // zero bits. This ensures that t*PI1 and t*PI2 are exact for
+        // large integer values of t. The full precision PI3 ensures the
+        // approximation of PI is accurate to 102 bits to handle cancellation
+        // during subtraction.
+        const PI1 = 3.141592502593994      // 0x400921fb40000000
+        const PI2 = 1.5099578831723193e-07 // 0x3e84442d00000000
+        const PI3 = 1.0780605716316238e-14 // 0x3d08469898cc5170
+
+        let mut t = x / math::PI
+        t += 0.5
+        t = f64(i64(t)) // i64(t) = the multiple
+        ret ((x - t*PI1) - t*PI2) - t*PI3
+    }
+    // Must apply Payne-Hanek range reduction
+    const MASK      = 0x7FF
+    const SHIFT     = 64 - 11 - 1
+    const BIAS      = 1023
+    const FRAC_MASK = 1<<SHIFT - 1
+
+    // Extract out the integer and exponent such that,
+    // x = ix * 2 ** exp.
+    let mut ix = math::f64_bits(x)
+    let exp = int(ix>>SHIFT&MASK) - BIAS - SHIFT
+    ix &= FRAC_MASK
+    ix |= 1 << SHIFT
+
+    // m_pi is the binary digits of 1/PI as a u64 array,
+    // that is, 1/PI = Sum mPI[i]*2^(-64*i).
+    // 19 64-bit digits give 1216 bits of precision
+    // to handle the largest possible f64 exponent.
+    let m_pi: [...]u64 = [
+        0x0000000000000000,
+        0x517cc1b727220a94,
+        0xfe13abe8fa9a6ee0,
+        0x6db14acc9e21c820,
+        0xff28b1d5ef5de2b0,
+        0xdb92371d2126e970,
+        0x0324977504e8c90e,
+        0x7f0ef58e5894d39f,
+        0x74411afa975da242,
+        0x74ce38135a2fbf20,
+        0x9cc8eb1cc1a99cfa,
+        0x4e422fc5defc941d,
+        0x8ffc4bffef02cc07,
+        0xf79788c5ad05368f,
+        0xb69b3f6793e584db,
+        0xa7a31fb34f2ff516,
+        0xba93dd63f5f2f8bd,
+        0x9e839cfbc5294975,
+        0x35fdafd88fc6ae84,
+        0x2b0198237e3db5d5,
+    ]
+    // Use the exponent to extract the 3 appropriate u64 digits from mPi,
+    // B ~ (z0, z1, z2), such that the product leading digit has the exponent -64.
+    // Note, exp >= 50 since x >= REDUCE_THRESHOLD and exp < 971 for maximum f64.
+    let (digit, bitshift) = uint(exp+64)/64, uint(exp+64)%64
+    let z0 = (m_pi[digit] << bitshift) | (m_pi[digit+1] >> (64 - bitshift))
+    let z1 = (m_pi[digit+1] << bitshift) | (m_pi[digit+2] >> (64 - bitshift))
+    let z2 = (m_pi[digit+2] << bitshift) | (m_pi[digit+3] >> (64 - bitshift))
+    // Multiply mantissa by the digits and extract the upper two digits (hi, lo).
+    let (z2hi, _) = bits::mul64(z2, ix)
+    let (z1hi, z1lo) = bits::mul64(z1, ix)
+    let z0lo = z0 * ix
+    let (lo, c) = bits::add64(z1lo, z2hi, 0)
+    let (mut hi, _) = bits::add64(z0lo, z1hi, c)
+    // Find the magnitude of the fraction.
+    let lz = uint(bits::leading_zeros64(hi))
+    let e = u64(BIAS - (lz + 1))
+    // Clear implicit mantissa bit and shift into place.
+    hi = (hi << (lz + 1)) | (lo >> (64 - (lz + 1)))
+    hi >>= 64 - SHIFT
+    // Include the exponent and convert to a float.
+    hi |= e << SHIFT
+    x = math::f64_from_bits(hi)
+    // map to (-PI/2, PI/2]
+    if x > 0.5 {
+        x--
+    }
+    ret math::PI * x
+}
+
+// Taylor series expansion for cosh(2y) - cos(2x)
+fn tan_series(z: Cmplx): f64 {
+    const MACHEP = 1.0 / (1 << 53)
+
+    let mut x = reduce_pi(math::abs(2 * z.real()))
+    x = x * x
+    let mut y = math::abs(2 * z.imag())
+    y = y * y
+    let mut x2 = 1.0
+    let mut y2 = 1.0
+    let mut f = 1.0
+    let mut rn = 0.0
+    let mut d = 0.0
+    for {
+        rn++
+        f *= rn
+        rn++
+        f *= rn
+        x2 *= x
+        y2 *= y
+        let mut t = y2 + x2
+        t /= f
+        d += t
+
+        rn++
+        f *= rn
+        rn++
+        f *= rn
+        x2 *= x
+        y2 *= y
+        t = y2 - x2
+        t /= f
+        d += t
+        if !(math::abs(t/d) > MACHEP) {
+            // Caution: Use ! and > instead of <= for correct behavior if t/d is NaN.
+            // See issue 17577 of Go project.
+            break
+        }
+    }
+    ret d
+}
