@@ -85,7 +85,7 @@ impl Cmplx {
     // arithmetic   domain     # trials      peak         rms
     //    IEEE      -10,+10     30000       3.1e-16     8.2e-17
 
-    // Sinh returns the hyperbolic sine of x.
+    // Returns the hyperbolic sine of complex number.
     pub fn sinh(self): Cmplx {
         match {
         | self.real() == 0 && (math::is_inf(self.imag(), 0) || math::is_nan(self.imag())):
@@ -103,6 +103,44 @@ impl Cmplx {
         let (s, c) = math::sincos(self.imag())
         let (sh, ch) = sinhcosh(self.real())
         ret Cmplx.new(c*sh, s*ch)
+    }
+
+    // Complex circular cosine
+    //
+    // DESCRIPTION:
+    //
+    // If
+    //     z = x + iy,
+    //
+    // then
+    //
+    //     w = cos x  cosh y  -  i sin x sinh y.
+    //
+    // ACCURACY:
+    //
+    //                      Relative error:
+    // arithmetic   domain     # trials      peak         rms
+    //    DEC       -10,+10      8400       4.5e-17     1.3e-17
+    //    IEEE      -10,+10     30000       3.8e-16     1.0e-16
+
+    // Returns the cosine of complex number.
+    pub fn cos(self): Cmplx {
+        match {
+        | self.imag() == 0 && (math::is_inf(self.real(), 0) || math::is_nan(self.real())):
+            ret Cmplx.new(math::nan(), -self.imag()*math::copysign(0, self.real()))
+        | math::is_inf(self.imag(), 0):
+            match {
+            | self.real() == 0:
+                ret Cmplx.new(math::inf(1), -self.real()*math::copysign(0, self.imag()))
+            | math::is_inf(self.real(), 0) | math::is_nan(self.real()):
+                ret Cmplx.new(math::inf(1), math::nan())
+            }
+        | self.real() == 0 && math::is_nan(self.imag()):
+            ret Cmplx.new(math::nan(), 0)
+        }
+        let (s, c) = math::sincos(self.real())
+        let (sh, ch) = sinhcosh(self.imag())
+        ret Cmplx.new(c*ch, -s*sh)
     }
 }
 
