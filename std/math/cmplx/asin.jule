@@ -1,0 +1,88 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use math for std::math
+
+// The Jule code is a modified version of the original Go code from
+// https://github.com/golang/go/blob/go1.20/src/math/cmplx/asin.go and came with this notice.
+//
+// ====================================================
+// The original C code, the long comment, and the constants
+// below are from http://netlib.sandia.gov/cephes/c9x-complex/clog.c.
+// The go code is a simplified version of the original C.
+//
+// Cephes Math Library Release 2.8:  June, 2000
+// Copyright 1984, 1987, 1989, 1992, 2000 by Stephen L. Moshier
+//
+// The readme file at http://netlib.sandia.gov/cephes/ says:
+//    Some software in this archive may be from the book _Methods and
+// Programs for Mathematical Functions_ (Prentice-Hall or Simon & Schuster
+// International, 1989) or from the Cephes Mathematical Library, a
+// commercial product. In either event, it is copyrighted by the author.
+// What you see here may be used freely but it comes with no support or
+// guarantee.
+//
+//   The two known misprints in the book are repaired here in the
+// source listings for the gamma function and the incomplete beta
+// integral.
+//
+//   Stephen L. Moshier
+//   moshier@na-net.ornl.gov
+
+impl Cmplx {
+    // Complex circular arc sine
+    //
+    // DESCRIPTION:
+    //
+    // Inverse complex sine:
+    //                               2
+    // w = -i clog( iz + csqrt( 1 - z ) ).
+    //
+    // casin(z) = -i casinh(iz)
+    //
+    // ACCURACY:
+    //
+    //                      Relative error:
+    // arithmetic   domain     # trials      peak         rms
+    //    DEC       -10,+10     10100       2.1e-15     3.4e-16
+    //    IEEE      -10,+10     30000       2.2e-14     2.7e-15
+    // Larger relative error can be observed for z near zero.
+    // Also tested by csin(casin(z)) = z.
+
+    // Returns the inverse sine of complex number.
+    pub fn asin(self): Cmplx {
+        match {
+        | self.imag() == 0 && math::abs(self.real()) <= 1:
+            ret Cmplx.new(math::asin(self.real()), self.imag())
+        | self.real() == 0 && math::abs(self.imag()) <= 1:
+            ret Cmplx.new(self.real(), math::asinh(self.imag()))
+        | math::is_nan(self.imag()):
+            match {
+            | self.real() == 0:
+                ret Cmplx.new(self.real(), math::nan())
+            | math::is_inf(self.real(), 0):
+                ret Cmplx.new(math::nan(), self.real())
+            |:
+                ret Cmplx.nan()
+            }
+        | math::is_inf(self.imag(), 0):
+            match {
+            | math::is_nan(self.real()):
+                ret self
+            | math::is_inf(self.real(), 0):
+                ret Cmplx.new(math::copysign(math::PI/4, self.real()), self.imag())
+            |:
+                ret Cmplx.new(math::copysign(0, self.real()), self.imag())
+            }
+        | math::is_inf(self.real(), 0):
+            ret Cmplx.new(math::copysign(math::PI/2, self.real()), math::copysign(self.real(), self.imag()))
+        }
+        let ct = Cmplx.new(-self.imag(), self.real()) // i * x
+        let xx = self.mul(self)
+        let x1 = Cmplx.new(1-xx.real(), -xx.imag()) // 1 - x*x
+        let x2 = x1.sqrt()                       // x2 = sqrt(1 - x*x)
+        let w = ct.add(x2).log()
+        ret Cmplx.new(w.imag(), -w.real()) // -i * w
+    }
+}
