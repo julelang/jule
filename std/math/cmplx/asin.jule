@@ -149,4 +149,70 @@ impl Cmplx {
         }
         ret Cmplx.new(w.imag(), -w.real()) // -i * w
     }
+
+    // Complex circular arc tangent
+    //
+    // DESCRIPTION:
+    //
+    // If
+    //     z = x + iy,
+    //
+    // then
+    //          1       (    2x     )
+    // Re w  =  - arctan(-----------)  +  k PI
+    //          2       (     2    2)
+    //                  (1 - x  - y )
+    //
+    //               ( 2         2)
+    //          1    (x  +  (y+1) )
+    // Im w  =  - log(------------)
+    //          4    ( 2         2)
+    //               (x  +  (y-1) )
+    //
+    // Where k is an arbitrary integer.
+    //
+    // catan(z) = -i catanh(iz).
+    //
+    // ACCURACY:
+    //
+    //                      Relative error:
+    // arithmetic   domain     # trials      peak         rms
+    //    DEC       -10,+10      5900       1.3e-16     7.8e-18
+    //    IEEE      -10,+10     30000       2.3e-15     8.5e-17
+    // The check catan( ctan(z) )  =  z, with |x| and |y| < PI/2,
+    // had peak relative error 1.5e-16, rms relative error
+    // 2.9e-17.  See also clog().
+
+    // Returns the inverse tangent of complex number.
+    pub fn atan(self): Cmplx {
+        match {
+        | self.imag() == 0:
+            ret Cmplx.new(math::atan(self.real()), self.imag())
+        | self.real() == 0 && math::abs(self.imag()) <= 1:
+            ret Cmplx.new(self.real(), math::atanh(self.imag()))
+        | math::is_inf(self.imag(), 0) | math::is_inf(self.real(), 0):
+            if math::is_nan(self.real()) {
+                ret Cmplx.new(math::nan(), math::copysign(0, self.imag()))
+            }
+            ret Cmplx.new(math::copysign(math::PI/2, self.real()), math::copysign(0, self.imag()))
+        | math::is_nan(self.real()) | math::is_nan(self.imag()):
+            ret Cmplx.nan()
+        }
+        let x2 = self.real() * self.real()
+        let a = 1 - x2 - self.imag()*self.imag()
+        if a == 0 {
+            ret Cmplx.nan()
+        }
+        let mut t = 0.5 * math::atan2(2*self.real(), a)
+        let w = reduce_pi(t)
+    
+        t = self.imag() - 1
+        let b = x2 + t*t
+        if b == 0 {
+            ret Cmplx.nan()
+        }
+        t = self.imag() + 1
+        let c = (x2 + t*t) / b
+        ret Cmplx.new(w, 0.25*math::log(c))
+    }
 }
