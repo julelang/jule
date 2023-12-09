@@ -111,6 +111,43 @@ impl Cmplx {
         }
         ret Cmplx.new(math::sinh(2*self.real())/d, math::sin(2*self.imag())/d)
     }
+
+    // Complex circular cotangent
+    //
+    // DESCRIPTION:
+    //
+    // If
+    //     z = x + iy,
+    //
+    // then
+    //
+    //           sin 2x  -  i sinh 2y
+    //     w  =  --------------------.
+    //            cosh 2y  -  cos 2x
+    //
+    // On the real axis, the denominator has zeros at even
+    // multiples of PI/2.  Near these points it is evaluated
+    // by a Taylor series.
+    //
+    // ACCURACY:
+    //
+    //                      Relative error:
+    // arithmetic   domain     # trials      peak         rms
+    //    DEC       -10,+10      3000       6.5e-17     1.6e-17
+    //    IEEE      -10,+10     30000       9.2e-16     1.2e-16
+    // Also tested by ctan * ccot = 1 + i0.
+
+    // Cot returns the cotangent of x.
+    pub fn cot(self): Cmplx {
+        let mut d = math::cosh(2*self.imag()) - math::cos(2*self.real())
+        if math::abs(d) < 0.25 {
+            d = tan_series(self)
+        }
+        if d == 0 {
+            ret Cmplx.inf(1)
+        }
+        ret Cmplx.new(math::sin(2*self.real())/d, -math::sinh(2*self.imag())/d)
+    }
 }
 
 // Reduces the input argument x to the range (-PI/2, PI/2].
