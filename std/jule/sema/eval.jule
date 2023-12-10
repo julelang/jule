@@ -3550,10 +3550,8 @@ impl Eval {
         self.prefix = nil
         defer { self.prefix = prefix }
 
-        let mut bs = BinopSolver{
-            e: self,
-        }
-        ret bs.solve(op)
+        let mut bs = BinaryEval.new_plain(self)
+        ret bs.eval(op)
     }
 
     fn eval_ternary(mut &self, mut ter: &TernaryExpr): &Data {
@@ -3729,14 +3727,27 @@ impl Eval {
     }
 }
 
-struct BinopSolver {
+struct BinaryEval {
     e:  &Eval
     l:  &Data
     r:  &Data
     op: Token
 }
 
-impl BinopSolver {
+impl BinaryEval {
+    static fn new_plain(mut e: &Eval): BinaryEval {
+        ret BinaryEval{
+            e:  e,
+        }
+    }
+
+    static fn new(mut e: &Eval, mut op: Token): BinaryEval {
+        ret BinaryEval{
+            e:  e,
+            op: op,
+        }
+    }
+
     // Reports whether types are compatible.
     // Also logs error message about incompatibility if types are incompatible.
     fn check_type_compatibility(mut self): bool {
@@ -4246,7 +4257,7 @@ impl BinopSolver {
         }
     }
 
-    fn eval(mut self): &Data {
+    fn eval_op(mut self): &Data {
         match {
         | self.l.kind.void():
             self.e.push_err(self.op, LogMsg.OperatorNotForJuleType, self.op.kind, "void")
@@ -4306,7 +4317,7 @@ impl BinopSolver {
         }
     }
 
-    fn solve_const(mut self, mut &d: &Data) {
+    fn eval_const(mut self, mut &d: &Data) {
         match {
         | d == nil:
             ret
@@ -4447,11 +4458,11 @@ impl BinopSolver {
 
         self.check_datas()
 
-        let mut d = self.eval()
+        let mut d = self.eval_op()
 
         self.l, self.r = l, r // Save normal order
 
-        self.solve_const(d)
+        self.eval_const(d)
 
         if d != nil {
             self.post_eval(d)
@@ -4460,7 +4471,7 @@ impl BinopSolver {
         ret d
     }
 
-    fn solve(mut self, mut &op: &BinopExpr): &Data {
+    fn eval(mut self, mut &op: &BinopExpr): &Data {
         if op.op.kind == TokenKind.Eq {
             self.e.push_err(op.op, LogMsg.AssignInExpr)
             self.e.push_suggestion(LogMsg.UseImperative)
