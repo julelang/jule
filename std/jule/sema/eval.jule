@@ -958,217 +958,9 @@ impl Eval {
         ret self.eval_def(def, ident.token)
     }
 
-    fn eval_unary_minus(self, mut &d: &Data, mut &op: Token) {
-        let t = d.kind.prim()
-        if t == nil || !types::is_num(t.to_str()) {
-            d = nil
-            ret
-        }
-
-        if d.is_const() {
-            match {
-            | d.constant.is_f64(): d.constant.set_f64(-d.constant.read_f64())
-            | d.constant.is_i64(): d.constant.set_f64(-d.constant.as_f64())
-            | d.constant.is_u64(): d.constant.set_f64(-d.constant.as_f64())
-            }
-            normalize_type(d)
-        }
-
-        d.lvalue = false
-        d.model = &UnaryExprModel{
-            expr: new(Data, *d),
-            op:   op,
-        }
-    }
-
-    fn eval_unary_plus(self, mut &d: &Data, mut &op: Token) {
-        let t = d.kind.prim()
-        if t == nil || !types::is_num(t.to_str()) {
-            d = nil
-            ret
-        }
-
-        if d.is_const() {
-            match {
-            | d.constant.is_f64(): d.constant.set_f64(+d.constant.read_f64())
-            | d.constant.is_i64(): d.constant.set_f64(+d.constant.as_f64())
-            | d.constant.is_u64(): d.constant.set_f64(+d.constant.as_f64())
-            }
-            normalize_type(d)
-        }
-
-        d.lvalue = false
-        d.model = &UnaryExprModel{
-            expr: new(Data, *d),
-            op:   op,
-        }
-    }
-
-    fn eval_unary_caret(self, mut &d: &Data, mut &op: Token) {
-        let t = d.kind.prim()
-        if t == nil || !types::is_int(t.to_str()) {
-            d = nil
-            ret
-        }
-
-        if d.is_const() {
-            match {
-            | d.constant.is_i64():
-                d.constant.set_i64(^d.constant.read_i64())
-
-            | d.constant.is_u64():
-                d.constant.set_u64(^d.constant.read_u64())
-            }
-        }
-
-        d.lvalue = false
-        d.model = &UnaryExprModel{
-            expr: new(Data, *d),
-            op:   op,
-        }
-    }
-
-    fn eval_unary_excl(self, mut &d: &Data, mut &op: Token) {
-        let t = d.kind.prim()
-        if t == nil || !t.is_bool() {
-            d = nil
-            ret
-        }
-
-        if d.is_const() {
-            match {
-            | d.constant.is_bool():
-                d.constant.set_bool(!d.constant.read_bool())
-            }
-        }
-
-        d.lvalue = false
-        d.model = &UnaryExprModel{
-            expr: new(Data, *d),
-            op:   op,
-        }
-    }
-
-    fn eval_unary_star(mut self, mut &d: &Data, mut &op: Token) {
-        d.model = &UnaryExprModel{
-            expr: new(Data, *d),
-            op:   op,
-        }
-
-        match {
-        | d.kind.ptr() != nil:
-            if !self.is_unsafe() {
-                self.push_err(op, LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
-            }
-
-            let mut t = d.kind.ptr()
-            if t.is_unsafe() {
-                d = nil
-                ret
-            }
-            d.kind = t.elem
-
-        | d.kind.sptr() != nil:
-            d.kind = d.kind.sptr().elem
-
-        |:
-            d = nil
-            ret
-        }
-
-        d.constant = nil
-        d.lvalue = true
-    }
-
-    fn eval_unary_amper(self, mut &d: &Data, mut &op: Token) {
-        match type d.model {
-        | &StructLitExprModel:
-            let mut lit = (&StructLitExprModel)(d.model)
-            make_struct_lit_alloc(d, lit)
-
-        |:
-            match {
-            | can_get_ptr(d):
-                d.kind = &TypeKind{
-                    kind: &Ptr{elem: d.kind},
-                }
-                d.model = &UnaryExprModel{
-                    expr: new(Data, *d),
-                    op:   op,
-                }
-
-            |:
-                d = nil
-            }
-        }
-
-        if d != nil {
-            d.constant = nil
-            d.lvalue = false
-            d.mutable = true
-        }
-    }
-
-    fn eval_unary_type_decl(mut self, mut &d: &Data, mut &u: &UnaryExpr) {
-        let mut tc = TypeChecker{
-            s:           self.s,
-            lookup:      self.lookup,
-            error_token: u.op,
-        }
-
-        match u.op.kind {
-        | TokenKind.Star:
-            d.kind = &TypeKind{kind: tc.build_ptr_from_type(d.kind)}
-
-        | TokenKind.Amper:
-            d.kind = &TypeKind{kind: tc.build_sptr_from_type(d.kind)}
-
-        |:
-            self.push_err(u.op, LogMsg.InvalidExprForUnary, u.op.kind, d.kind.to_str())
-            d = nil
-            ret
-        }
-
-        d.decl = true
-    }
-
     fn eval_unary(mut &self, mut u: &UnaryExpr): &Data {
-        let mut prefix = self.prefix
-        self.prefix = nil
-        defer { self.prefix = prefix }
-
-        let mut d = self.eval_expr_kind(u.expr)
-        if d == nil {
-            ret nil
-        }
-
-        if d.decl {
-            self.eval_unary_type_decl(d, u)
-            ret d
-        }
-
-        let mut cast_kind = d.cast_kind
-        let kind = d.kind
-        match u.op.kind {
-        | TokenKind.Minus: self.eval_unary_minus(d, u.op)
-        | TokenKind.Plus:  self.eval_unary_plus(d, u.op)
-        | TokenKind.Caret: self.eval_unary_caret(d, u.op)
-        | TokenKind.Excl:  self.eval_unary_excl(d, u.op)
-        | TokenKind.Star:  self.eval_unary_star(d, u.op)
-        | TokenKind.Amper: self.eval_unary_amper(d, u.op)
-        |:                 d = nil
-        }
-
-        if d == nil {
-            self.push_err(u.op, LogMsg.InvalidExprForUnary, u.op.kind, kind.to_str())
-        } else if d.is_const() {
-            d.model = d.constant
-        } else if cast_kind != nil {
-            d.cast_kind = cast_kind
-            apply_cast_kind(d)
-        }
-
-        ret d
+        let mut unary = UnaryEval.new(self)
+        ret unary.eval(u)
     }
 
     fn eval_variadic(mut &self, mut v: &VariadicExpr): &Data {
@@ -3724,6 +3516,245 @@ impl Eval {
         |:
             ret d
         }
+    }
+}
+
+struct UnaryEval {
+    e: &Eval
+    d: &Data
+    u: &UnaryExpr
+}
+
+impl UnaryEval {
+    static fn new(mut e: &Eval): UnaryEval {
+        ret UnaryEval{
+            e: e,
+        }
+    }
+
+    fn eval_minus(mut self) {
+        let t = self.d.kind.prim()
+        if t == nil || !types::is_num(t.to_str()) {
+            self.d = nil
+            ret
+        }
+
+        if self.d.is_const() {
+            match {
+            | self.d.constant.is_f64():
+                self.d.constant.set_f64(-self.d.constant.read_f64())
+
+            | self.d.constant.is_i64():
+                self.d.constant.set_f64(-self.d.constant.as_f64())
+ 
+            | self.d.constant.is_u64():
+                self.d.constant.set_f64(-self.d.constant.as_f64())
+            }
+            normalize_type(self.d)
+        }
+
+        self.d.lvalue = false
+        self.d.model = &UnaryExprModel{
+            expr: new(Data, *self.d),
+            op:   self.u.op,
+        }
+    }
+
+    fn eval_plus(mut self) {
+        let t = self.d.kind.prim()
+        if t == nil || !types::is_num(t.to_str()) {
+            self.d = nil
+            ret
+        }
+
+        if self.d.is_const() {
+            match {
+            | self.d.constant.is_f64():
+                self.d.constant.set_f64(+self.d.constant.read_f64())
+
+            | self.d.constant.is_i64():
+                self.d.constant.set_f64(+self.d.constant.as_f64())
+
+            | self.d.constant.is_u64():
+                self.d.constant.set_f64(+self.d.constant.as_f64())
+            }
+            normalize_type(self.d)
+        }
+
+        self.d.lvalue = false
+        self.d.model = &UnaryExprModel{
+            expr: new(Data, *self.d),
+            op:   self.u.op,
+        }
+    }
+
+    fn eval_caret(mut self) {
+        let t = self.d.kind.prim()
+        if t == nil || !types::is_int(t.to_str()) {
+            self.d = nil
+            ret
+        }
+
+        if self.d.is_const() {
+            match {
+            | self.d.constant.is_i64():
+                self.d.constant.set_i64(^self.d.constant.read_i64())
+
+            | self.d.constant.is_u64():
+                self.d.constant.set_u64(^self.d.constant.read_u64())
+            }
+        }
+
+        self.d.lvalue = false
+        self.d.model = &UnaryExprModel{
+            expr: new(Data, *self.d),
+            op:   self.u.op,
+        }
+    }
+
+    fn eval_excl(mut self) {
+        let t = self.d.kind.prim()
+        if t == nil || !t.is_bool() {
+            self.d = nil
+            ret
+        }
+
+        if self.d.is_const() {
+            match {
+            | self.d.constant.is_bool():
+                self.d.constant.set_bool(!self.d.constant.read_bool())
+            }
+        }
+
+        self.d.lvalue = false
+        self.d.model = &UnaryExprModel{
+            expr: new(Data, *self.d),
+            op:   self.u.op,
+        }
+    }
+
+    fn eval_star(mut self) {
+        self.d.model = &UnaryExprModel{
+            expr: new(Data, *self.d),
+            op:   self.u.op,
+        }
+
+        match {
+        | self.d.kind.ptr() != nil:
+            if !self.e.is_unsafe() {
+                self.e.push_err(self.u.op, LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
+            }
+
+            let mut t = self.d.kind.ptr()
+            if t.is_unsafe() {
+                self.d = nil
+                ret
+            }
+            self.d.kind = t.elem
+
+        | self.d.kind.sptr() != nil:
+            self.d.kind = self.d.kind.sptr().elem
+
+        |:
+            self.d = nil
+            ret
+        }
+
+        self.d.constant = nil
+        self.d.lvalue = true
+    }
+
+    fn eval_amper(mut self) {
+        match type self.d.model {
+        | &StructLitExprModel:
+            let mut lit = (&StructLitExprModel)(self.d.model)
+            make_struct_lit_alloc(self.d, lit)
+
+        |:
+            match {
+            | can_get_ptr(self.d):
+                self.d.kind = &TypeKind{
+                    kind: &Ptr{elem: self.d.kind},
+                }
+                self.d.model = &UnaryExprModel{
+                    expr: new(Data, *self.d),
+                    op:   self.u.op,
+                }
+
+            |:
+                self.d = nil
+            }
+        }
+
+        if self.d != nil {
+            self.d.constant = nil
+            self.d.lvalue = false
+            self.d.mutable = true
+        }
+    }
+
+    fn eval_type_decl(mut self) {
+        let mut tc = TypeChecker{
+            s:           self.e.s,
+            lookup:      self.e.lookup,
+            error_token: self.u.op,
+        }
+
+        match self.u.op.kind {
+        | TokenKind.Star:
+            self.d.kind = &TypeKind{kind: tc.build_ptr_from_type(self.d.kind)}
+
+        | TokenKind.Amper:
+            self.d.kind = &TypeKind{kind: tc.build_sptr_from_type(self.d.kind)}
+
+        |:
+            self.e.push_err(self.u.op, LogMsg.InvalidExprForUnary, self.u.op.kind, self.d.kind.to_str())
+            self.d = nil
+            ret
+        }
+
+        self.d.decl = true
+    }
+
+    fn eval(mut self, mut u: &UnaryExpr): &Data {
+        self.u = u
+
+        let mut prefix = self.e.prefix
+        self.e.prefix = nil
+        defer { self.e.prefix = prefix }
+
+        self.d = self.e.eval_expr_kind(self.u.expr)
+        if self.d == nil {
+            ret nil
+        }
+
+        if self.d.decl {
+            self.eval_type_decl()
+            ret self.d
+        }
+
+        let mut cast_kind = self.d.cast_kind
+        let kind = self.d.kind
+        match u.op.kind {
+        | TokenKind.Minus: self.eval_minus()
+        | TokenKind.Plus:  self.eval_plus()
+        | TokenKind.Caret: self.eval_caret()
+        | TokenKind.Excl:  self.eval_excl()
+        | TokenKind.Star:  self.eval_star()
+        | TokenKind.Amper: self.eval_amper()
+        |:                 self.d = nil
+        }
+
+        if self.d == nil {
+            self.e.push_err(self.u.op, LogMsg.InvalidExprForUnary, self.u.op.kind, kind.to_str())
+        } else if self.d.is_const() {
+            self.d.model = self.d.constant
+        } else if cast_kind != nil {
+            self.d.cast_kind = cast_kind
+            apply_cast_kind(self.d)
+        }
+
+        ret self.d
     }
 }
 
