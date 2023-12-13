@@ -3,6 +3,7 @@
 // license that can be found in the LICENSE file.
 
 use std::conv::{ConvError, parse_float, parse_int, parse_uint}
+use path for std::fs::path
 use std::jule::ast::{
     self,
     Expr,
@@ -29,7 +30,7 @@ use std::jule::ast::{
     IdentTypeDecl,
     TernaryExpr,
 }
-use std::jule::build::{LogMsg, Directive, logf}
+use std::jule::build::{LogMsg, Directive, PATH_STDLIB, logf}
 use std::jule::constant::{Const}
 use lit for std::jule::constant::lit
 use std::jule::lex::{
@@ -99,6 +100,19 @@ fn find_builtins_sema(ident: str, mut s: &Sema): any {
             }
         }
     }
+
+    // If package is std, check for internal builtin defines.
+    let mut ppath = s.file.file.dir()
+    if ppath.has_prefix(PATH_STDLIB) {
+        // Remove STDLIB directory path.
+        ppath = ppath[PATH_STDLIB.len:]
+        // Add "std" to beginning without separator
+        // because path has separator at beginning.
+        ppath = "std" + ppath.replace(str(path::SEPARATOR), "::", -1)
+
+        ret find_package_builtin_def(ppath, ident)
+    }
+
     ret nil
 }
 
