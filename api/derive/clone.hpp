@@ -26,6 +26,7 @@ namespace jule
     jule::Bool clone(const jule::Bool &x) noexcept;
     jule::Str clone(const jule::Str &x);
     jule::F32 clone(const jule::F32 &x);
+    jule::F64 clone(const jule::F64 &x);
     template <typename Item>
     jule::Slice<Item> clone(const jule::Slice<Item> &s);
     template <typename Item, const jule::Uint N>
@@ -55,6 +56,7 @@ namespace jule
     jule::Bool clone(const jule::Bool &x) noexcept { return x; }
     jule::Str clone(const jule::Str &x) { return x; }
     jule::F32 clone(const jule::F32 &x) { return x; }
+    jule::F64 clone(const jule::F64 &x) { return x; }
 
     template <typename Item>
     jule::Slice<Item> clone(const jule::Slice<Item> &s)
