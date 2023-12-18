@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use std::fs::{FsError, File}
-
 // Reader trait mask for stream reader.
 pub trait Reader {
     // Read bytes to buffer from stream and returns readed byte count.
@@ -26,55 +24,4 @@ pub trait Stream {
     pub fn read(mut self, mut buff: []byte)!: (n: int)
     // Derived from Writer trait.
     pub fn write(mut self, buff: []byte)!: (n: int)
-}
-
-// Stream implementation for file handles.
-pub struct FileStream {
-    buff: &File
-}
-
-impl FileStream {
-    // Returns new FileStream instance for file.
-    pub static fn new(mut f: &File): &FileStream {
-        ret &FileStream{buff: f}
-    }
-}
-
-impl Reader for FileStream {} // Implemented by Stream trait
-impl Writer for FileStream {} // Implemented by Stream trait
-
-impl Stream for FileStream {
-    pub fn read(mut self, mut buff: []byte)!: (n: int) {
-        ret self.buff.read(buff) else { error(error) }
-    }
-
-    pub fn write(mut self, buff: []byte)!: (n: int) {
-        ret self.buff.write(buff) else { error(error) }
-    }
-}
-
-impl FileStream {
-    // Reads line from file handle via &File.read method.
-    // Returns bytes until line delimiter (\n) byte.
-    // Returns zero-length byte slice when reached EOF.
-    pub fn read_line(mut self)!: []byte {
-        const LINE_DELIMITER = '\n'
-
-        let mut buff = make([]byte, 0, 1024)
-        let mut part = make([]byte, 1)
-        for {
-            let n = self.buff.read(part) else { error(error) }
-            if n == 0 {
-                break
-            }
-
-            let b = part[0]
-            buff = append(buff, b)
-
-            if b == LINE_DELIMITER {
-                break
-            }
-        }
-        ret buff
-    }
 }
