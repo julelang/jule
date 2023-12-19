@@ -1,0 +1,68 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+// Stream implementation for bytes.
+// Uses internally mutable buffer.
+// Does not clearing internal buffer at all.
+// Large buffers can be memory hungry.
+pub struct ByteStream {
+    pos:  int
+    buff: []byte
+}
+
+impl Reader for ByteStream {} // Implemented by Stream trait
+impl Writer for ByteStream {} // Implemented by Stream trait
+
+impl Stream for ByteStream {
+    pub fn read(mut self, mut buff: []byte)!: (n: int) {
+        if !self.data() {
+            ret 0
+        }
+
+        let offset = self.buff.len - self.pos
+        if offset < buff.len {
+            n = buff.len - offset
+            _ = copy(buff, self.buff[self.pos:self.pos+n])
+        } else {
+            n = buff.len
+            _ = copy(buff, self.buff[self.pos:self.pos+n])
+        }
+        self.pos += n
+        ret
+    }
+
+    pub fn write(mut self, buff: []byte)!: (n: int) {
+        n = buff.len
+        self.buff = append(self.buff, buff...)
+        ret
+    }
+}
+
+impl ByteStream {
+    // Returns new ByteStream instance.
+    pub static fn new(): &ByteStream {
+        ret new(ByteStream)
+    }
+
+    // Reports whether buffer have readable data.
+    pub fn data(self): bool {
+        ret self.pos < self.buff.len
+    }
+
+    // Removes readed bytes from buffer.
+    // Maybe help to reduce memory usage for large buffers.
+    pub fn fit(mut self) {
+        if !self.data() {
+            self.pos = 0
+            self.buff = nil
+            ret
+        }
+
+        let n = self.buff.len - self.pos
+        let mut buff = make([]byte, n)
+        copy(buff, self.buff[self.pos:])
+        self.pos = 0
+        self.buff = buff
+    }
+}
