@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use utf8 for std::unicode::utf8
+
 // Returns string that equals to concatenation of n-count s.
 // Returns empty string is n <= 0.
 pub fn repeat(s: str, mut n: int): str {
@@ -16,15 +18,34 @@ pub fn repeat(s: str, mut n: int): str {
     ret ss
 }
 
-// Reports string has prefix as specified substring or not.
-pub fn has_prefix(s: str, sub: str): bool {
-    if sub.len == 0 || s.len < sub.len {
+fn _has_prefix(&s: str, &sub: str, mut start: int): bool {
+    if sub.len == 0 || s.len-start < sub.len {
         ret false
     }
 
     let mut i = 0
+    for i < sub.len; i, start = i + 1, start + 1 {
+        if s[start] != sub[i] {
+            ret false
+        }
+    }
+    ret true
+}
+
+// Reports string has prefix as specified substring or not.
+pub fn has_prefix(s: str, sub: str): bool {
+    ret _has_prefix(s, sub, 0)
+}
+
+fn _has_suffix(&s: str, &sub: str, mut start: int): bool {
+    if sub.len == 0 || s.len-start < sub.len {
+        ret false
+    }
+
+    start = s.len - start
+    let mut i = 0
     for i < sub.len; i++ {
-        if s[i] != sub[i] {
+        if s[start-i-1] != sub[sub.len-i-1] {
             ret false
         }
     }
@@ -33,15 +54,21 @@ pub fn has_prefix(s: str, sub: str): bool {
 
 // Reports string has suffix as specified substring or not.
 pub fn has_suffix(s: str, sub: str): bool {
-    if sub.len == 0 || s.len < sub.len {
-        ret false
-    }
+    ret _has_suffix(s, sub, 0)
+}
 
+// Returns index of first matched item with specified substring,
+// returns -1 if not exist any match. Starts searching at left
+// of string to right.
+pub fn find(s: str, sub: str): int {
+    if s.len < sub.len {
+        ret -1
+    }
     let mut i = 0
-    for i < sub.len; i++ {
-        if s[s.len-i-1] != sub[sub.len-i-1] {
-            ret false
+    for i < s.len; i++ {
+        if _has_prefix(s, sub, i) {
+            ret i
         }
     }
-    ret true
+    ret -1
 }
