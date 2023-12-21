@@ -454,10 +454,11 @@ impl Lex {
         for i < self.file.data.len; i++ {
             let r = rune(self.file.data[i])
             if is_space(r) {
+                const TAB_LEN = 8
                 self.pos++
                 match r {
                 | '\n': self.new_line()
-                | '\t': self.column += 8
+                | '\t': self.column += TAB_LEN
                 |:      self.column++
                 }
                 continue
@@ -602,14 +603,13 @@ impl Lex {
             let part = txt[i:]
             let r = self.get_rune(part, false)
             run += r
-            let length = r.len
-            self.column += length
+            self.column += utf8::rune_count_str(r)
             if r == "'" {
                 self.pos++
                 break
             }
-            if length > 1 {
-                i += length - 1
+            if r.len > 1 {
+                i += r.len - 1
             }
             n++
         }
@@ -647,7 +647,7 @@ impl Lex {
             let mut part = self.file.data[self.pos:]
             let r = self.get_rune(part, raw)
             s += r
-            self.column += r.len
+            self.column += utf8::rune_count_str(r)
             if ch == mark {
                 break
             }
@@ -769,7 +769,7 @@ impl Lex {
             ret t
         }
 
-        self.column += t.kind.len
+        self.column += utf8::rune_count_str(t.kind)
         ret t
     }
 }
