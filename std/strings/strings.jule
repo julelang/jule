@@ -261,20 +261,37 @@ pub fn to_upper(s: str): str {
     ret map(s, unicode::to_upper)
 }
 
+fn _trim_left(mut &s: []byte, &cutset: []byte) {
+    let mut i = 0
+    for i < s.len {
+        let (r, n) = utf8::decode_rune(s[i:])
+        if _find_rune(cutset, r) == N_INDEX {
+            s = s[i:]
+            break
+        }
+        i += n
+    }
+}
+
 // Trims string by specified runes at left.
 // Cutset should include runes to trim.
 pub fn trim_left(s: str, cutset: str): str {
     let mut bytes = stobs(s)
     let bcutset = stobs(cutset)
-    let mut i = 0
-    for i < bytes.len {
-        let (r, n) = utf8::decode_rune(bytes[i:])
-        if _find_rune(bcutset, r) == N_INDEX {
-            ret s[i:]
+    _trim_left(bytes, bcutset)
+    ret str(bytes)
+}
+
+fn _trim_right(mut &s: []byte, &cutset: []byte) {
+    let mut i = s.len
+    for i > 0 {
+        let (r, n) = utf8::decode_last_rune(s[:i])
+        if _find_rune(cutset, r) == N_INDEX {
+            s = s[:i]
+            ret
         }
-        i += n
+        i -= n
     }
-    ret s
 }
 
 // Trims string by specified runes at right.
@@ -282,13 +299,16 @@ pub fn trim_left(s: str, cutset: str): str {
 pub fn trim_right(s: str, cutset: str): str {
     let mut bytes = stobs(s)
     let bcutset = stobs(cutset)
-    let mut i = bytes.len
-    for i > 0 {
-        let (r, n) = utf8::decode_last_rune(bytes[:i])
-        if _find_rune(bcutset, r) == N_INDEX {
-            ret s[:i]
-        }
-        i -= n
-    }
-    ret s
+    _trim_right(bytes, bcutset)
+    ret str(bytes)
+}
+
+// Trims string by specified runes at left and right.
+// Cutset should include runes to trim.
+pub fn trim(s: str, cutset: str): str {
+    let mut bytes = stobs(s)
+    let bcutset = stobs(cutset)
+    _trim_left(bytes, bcutset)
+    _trim_right(bytes, bcutset)
+    ret str(bytes)
 }
