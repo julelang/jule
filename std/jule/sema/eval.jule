@@ -45,6 +45,7 @@ use std::jule::lex::{
     is_raw_str,
 }
 use types for std::jule::types
+use strings for std::strings
 
 // Returns directive if exist.
 fn find_directive(mut &directives: []&std::jule::ast::Directive, d: Directive): &std::jule::ast::Directive {
@@ -103,12 +104,12 @@ fn find_builtins_sema(ident: str, mut s: &Sema): any {
 
     // If package is std, check for internal builtin defines.
     let mut ppath = s.file.file.dir()
-    if ppath.has_prefix(PATH_STDLIB) {
+    if strings::has_prefix(ppath, PATH_STDLIB) {
         // Remove STDLIB directory path.
         ppath = ppath[PATH_STDLIB.len:]
         // Add "std" to beginning without separator
         // because path has separator at beginning.
-        ppath = "std" + ppath.replace(str(path::SEPARATOR), "::", -1)
+        ppath = "std" + strings::replace(ppath, str(path::SEPARATOR), "::", -1)
 
         ret find_package_builtin_def(ppath, ident)
     }
@@ -498,15 +499,15 @@ impl Eval {
         let mut base = 0
 
         match {
-        | lit.has_prefix("0x"): // Hexadecimal
+        | strings::has_prefix(lit, "0x"): // Hexadecimal
             lit = lit[2:]
             base = 0b00010000
 
-        | lit.has_prefix("0b"): // Binary
+        | strings::has_prefix(lit, "0b"): // Binary
             lit = lit[2:]
             base = 0b10
 
-        | lit.has_prefix("0o"): // Ocatal
+        | strings::has_prefix(lit, "0o"): // Ocatal
             lit = lit[2:]
             base = 0b1000
 
@@ -767,7 +768,7 @@ impl Eval {
         const PADDING = 4
 
         let refers_to = logf(LogMsg.RefersTo, v1.ident, v2.ident)
-        message = str_repeat(" ", PADDING) + refers_to + "\n" + message
+        message = strings::repeat(" ", PADDING) + refers_to + "\n" + message
     }
 
     fn check_cross_cycle(mut self, &v: &Var, mut &message: str): bool {

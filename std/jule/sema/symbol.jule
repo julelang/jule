@@ -35,6 +35,7 @@ use std::jule::build::{
     is_valid_cpp_ext,
 }
 use std::jule::lex::{Token, TokenId, TokenKind}
+use strings for std::strings
 
 // Stack for symbol references.
 pub struct ReferenceStack {
@@ -79,18 +80,6 @@ impl ReferenceStack {
 pub struct Pass {
     pub token: Token
     pub text:  str
-}
-
-fn str_repeat(sub: str, mut n: int): str {
-    if n == 0 {
-        ret ""
-    }
-
-    let mut s = ""
-    for n > 0; n-- {
-        s += sub
-    }
-    ret s
 }
 
 fn build_doc(mut cg: &CommentGroup): str {
@@ -383,7 +372,7 @@ impl SymbolBuilder {
 
     fn build_std_import(mut self, mut &decl: &UseDecl): &ImportInfo {
         let mut path = decl.link_path["std::".len:] // Skip "std::" prefix.
-        path = path.replace(TokenKind.DblColon, str(SEPARATOR), -1)
+        path = strings::replace(path, TokenKind.DblColon, str(SEPARATOR), -1)
         path = join(PATH_STDLIB, path)
         let (path, ok) = abs(path)
         if !ok {
@@ -402,7 +391,8 @@ impl SymbolBuilder {
         }
 
         // Select last identifier of namespace chain.
-        let ident = decl.link_path[decl.link_path.rfind(TokenKind.DblColon)+1:]
+        let i = strings::find_last(decl.link_path, TokenKind.DblColon)+1
+        let ident = decl.link_path[i:]
 
         ret &ImportInfo{
             import_all: decl.full,
@@ -428,7 +418,7 @@ impl SymbolBuilder {
         }
 
         let mut path = decl.link_path
-        path = path.replace(TokenKind.DblColon, str(SEPARATOR), -1)
+        path = strings::replace(path, TokenKind.DblColon, str(SEPARATOR), -1)
         path = join(mod_path, path)
 
         let (path, ok) = abs(path)
@@ -448,7 +438,8 @@ impl SymbolBuilder {
         }
 
         // Select last identifier of namespace chain.
-        let ident = decl.link_path[decl.link_path.rfind(TokenKind.DblColon)+1:]
+        let i = strings::find_last(decl.link_path, TokenKind.DblColon) + 1
+        let ident = decl.link_path[i:]
 
         ret &ImportInfo{
             import_all: decl.full,
@@ -500,9 +491,9 @@ impl SymbolBuilder {
     }
 
     fn get_as_link_path(mut &self, mut path: str): str {
-        if path.has_prefix(PATH_STDLIB) {
+        if strings::has_prefix(path, PATH_STDLIB) {
             path = path[PATH_STDLIB.len:]
-            ret "std" + path.replace(str(SEPARATOR), TokenKind.DblColon, -1)
+            ret "std" + strings::replace(path, str(SEPARATOR), TokenKind.DblColon, -1)
         }
 
         let (root, _) = abs(self.importer.get_mod_path())
@@ -510,7 +501,7 @@ impl SymbolBuilder {
         if path[0] == SEPARATOR {
             path = path[1:]
         }
-        ret path.replace(str(SEPARATOR), TokenKind.DblColon, -1)
+        ret strings::replace(path, str(SEPARATOR), TokenKind.DblColon, -1)
     }
 
     fn push_cycle_error(mut &self, &sb: &SymbolBuilder, path: str, mut &message: str) {
@@ -520,7 +511,7 @@ impl SymbolBuilder {
             LogMsg.RefersTo,
             self.get_as_link_path(sb.table.file.dir()),
             self.get_as_link_path(path))
-        message = str_repeat(" ", PADDING) + refers_to + "\n" + message
+        message = strings::repeat(" ", PADDING) + refers_to + "\n" + message
     }
 
     fn push_cross_cycle_error(mut &self, &target: &SymbolBuilder, &imp: &ImportInfo, &error_token: Token) {
@@ -583,7 +574,7 @@ impl SymbolBuilder {
     //  - mod: module that imports relevant package.
     //  - path: path of package that importing.
     fn check_package_accessibility(mut self, &decl: &UseDecl, &mod: str, &path: str) {
-        if self.importer.get_mod_path() != mod && path.rfind("internal") != -1 {
+        if self.importer.get_mod_path() != mod && strings::contains(path, "internal") {
             self.push_err(decl.token, LogMsg.UseDeclForInternal)
         }
     }
