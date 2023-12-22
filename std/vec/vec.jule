@@ -4,15 +4,20 @@
 
 use integrated for std::jule::integrated
 
-cpp use "alloc.hpp"
-
-cpp unsafe fn __jule_std_vec_copy_range[T](dest: *unsafe, buff: *unsafe, len: int)
+cpp use "vec.hpp"
 
 #typedef
 cpp struct StdJuleVecBuffer[T] {
     len:  int
     cap:  int
     heap: *T
+}
+
+#namespace "std"
+cpp unsafe fn copy(mut start: *unsafe, mut end: *unsafe, mut dest: *unsafe)
+
+unsafe fn copy[T](mut dest: *T, mut buff: *T, len: int) {
+    cpp.copy(buff, buff + len, dest);
 }
 
 const GROW_FACTOR = 2
@@ -31,17 +36,6 @@ pub struct Vec[T] {
     buff: cpp.StdJuleVecBuffer[T]
 }
 
-impl Vec {
-    // Allocate new vector with capacity.
-    pub static fn new(cap: int): Vec[T] {
-        let mut vec = Vec[T]{}
-        if cap != 0 {
-            vec.resize_alloc(cap)
-        }
-        ret vec
-    }
-}
-
 impl Dispose for Vec {
     // Deallocate heap.
     pub fn dispose(mut self) {
@@ -54,9 +48,18 @@ impl Dispose for Vec {
 }
 
 impl Vec {
+    // Allocate new vector with capacity.
+    pub static fn new(cap: int): Vec[T] {
+        let mut vec = Vec[T]{}
+        if cap != 0 {
+            vec.resize_alloc(cap)
+        }
+        ret vec
+    }
+
     fn calc_grow(self, delta: int): int {
         let t = self.buff.len + delta
-        ret t*GROW_FACTOR
+        ret t * GROW_FACTOR
     }
 
     fn resize_alloc(mut self, n: int) {
@@ -73,10 +76,7 @@ impl Vec {
 
         unsafe {
             if self.buff.len > 0 {
-                cpp.__jule_std_vec_copy_range[T](
-                    new_heap,
-                    self.buff.heap,
-                    self.buff.len)
+                copy[T](new_heap, self.buff.heap, self.buff.len)
             }
             unsafe { integrated::delete_array[T](self.buff.heap) }
             self.buff.heap = new_heap
@@ -129,7 +129,7 @@ impl Vec {
     // Push item to end of heap.
     pub fn push(mut self, mut item: T) {
         if self.buff.len >= self.buff.cap {
-            self.resize_alloc((self.buff.cap*GROW_FACTOR)+1)
+            self.resize_alloc((self.buff.cap * GROW_FACTOR) + 1)
         }
 
         unsafe { self.buff.heap[self.buff.len] = item }
@@ -139,7 +139,7 @@ impl Vec {
     // Push item to front of heap.
     pub fn push_front(mut self, mut item: T) {
         if self.buff.len >= self.buff.cap {
-            self.resize_alloc((self.buff.cap*GROW_FACTOR)+1)
+            self.resize_alloc((self.buff.cap * GROW_FACTOR) + 1)
         }
 
         // Shift items.
@@ -160,12 +160,7 @@ impl Vec {
 
         self.review_allocation(items.len)
 
-        unsafe {
-            cpp.__jule_std_vec_copy_range[T](
-                self.buff.heap + self.buff.len,
-                &items[0],
-                items.len)
-        }
+        unsafe { copy[T](self.buff.heap + self.buff.len, &items[0], items.len) }
         self.buff.len += items.len
     }
 
@@ -177,12 +172,7 @@ impl Vec {
 
         self.review_allocation(vec.buff.len)
 
-        unsafe {
-            cpp.__jule_std_vec_copy_range[T](
-                self.buff.heap + self.buff.len,
-                vec.buff.heap,
-                vec.buff.len)
-        }
+        unsafe { copy[T](self.buff.heap + self.buff.len, vec.buff.heap, vec.buff.len) }
         self.buff.len += vec.buff.len
     }
 
@@ -195,17 +185,12 @@ impl Vec {
         self.review_allocation(vec.buff.len)
 
         // Shift items.
-        let mut i = self.buff.len-1
+        let mut i = self.buff.len - 1
         for i >= 0; i-- {
             unsafe { self.buff.heap[i+vec.buff.len] = self.buff.heap[i] }
         }
 
-        unsafe {
-            cpp.__jule_std_vec_copy_range[T](
-                self.buff.heap,
-                vec.buff.heap,
-                vec.buff.len)
-        }
+        unsafe { copy[T](self.buff.heap, vec.buff.heap, vec.buff.len) }
         self.buff.len += vec.buff.len
     }
 
@@ -244,7 +229,7 @@ impl Vec {
         }
 
         if self.buff.len >= self.buff.cap {
-            self.resize_alloc((self.buff.cap*GROW_FACTOR)+1)
+            self.resize_alloc((self.buff.cap * GROW_FACTOR) + 1)
         }
 
         // Shift items.
@@ -280,14 +265,9 @@ impl Vec {
             ret Vec[T].new(0)
         }
 
-        let mut vec = Vec[T].new(end-start)
+        let mut vec = Vec[T].new(end - start)
 
-        unsafe {
-            cpp.__jule_std_vec_copy_range[T](
-                vec.buff.heap,
-                self.buff.heap + start,
-                vec.buff.cap)
-        }
+        unsafe { copy[T](vec.buff.heap, self.buff.heap + start, vec.buff.cap) }
 
         vec.buff.len = vec.buff.cap
 
