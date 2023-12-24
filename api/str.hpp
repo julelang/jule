@@ -249,6 +249,46 @@ namespace jule
             return !this->operator==(str);
         }
 
+        jule::Bool operator<(const jule::Str &str) const noexcept
+        {
+            jule::Slice<jule::I32> thisr = this->operator jule::Slice<jule::I32>();
+            jule::Slice<jule::I32> strr = str.operator jule::Slice<jule::I32>();
+            jule::Int n = thisr.len() < strr.len() ? thisr.len() : strr.len();
+            if (n == 0)
+                return false;
+            if (thisr.__at(0) > strr.__at(0))
+                return false;
+            for (jule::Int i = 0; i < n; ++i)
+                if (thisr.__at(i) < strr.__at(i))
+                    return true;
+            return thisr.len() < strr.len();
+        }
+
+        jule::Bool operator<=(const jule::Str &str) const noexcept
+        {
+            return this->operator==(str) || this->operator<(str);
+        }
+
+        jule::Bool operator>(const jule::Str &str) const noexcept
+        {
+            jule::Slice<jule::I32> thisr = this->operator jule::Slice<jule::I32>();
+            jule::Slice<jule::I32> strr = str.operator jule::Slice<jule::I32>();
+            jule::Int n = thisr.len() < strr.len() ? thisr.len() : strr.len();
+            if (n == 0)
+                return false;
+            if (thisr.__at(0) < strr.__at(0))
+                return false;
+            for (jule::Int i = 0; i < n; ++i)
+                if (thisr.__at(i) > strr.__at(i))
+                    return true;
+            return thisr.len() > strr.len();
+        }
+
+        jule::Bool operator>=(const jule::Str &str) const noexcept
+        {
+            return this->operator==(str) || this->operator>(str);
+        }
+
         friend std::ostream &operator<<(std::ostream &stream,
                                         const jule::Str &src) noexcept
         {
