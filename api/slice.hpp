@@ -241,11 +241,12 @@ namespace jule
             const jule::Int &end) const noexcept
         {
 #ifndef __JULE_DISABLE__SAFETY
-            this->check(
+            if (start != 0 && end != 0)
+                this->check(
 #ifndef __JULE_ENABLE__PRODUCTION
-                file
+                    file
 #endif
-            );
+                );
             if (start < 0 || end < 0 || start > end || end > this->_len)
             {
                 std::string error;
