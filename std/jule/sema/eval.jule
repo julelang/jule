@@ -2574,15 +2574,21 @@ impl Eval {
         let mut str_kind = &TypeKind{kind: build_prim_type(PrimKind.Str)}
         match ident.kind {
         | "len":
-            ret &Data{
+            let mut sd = &Data{
                 mutable: false,
                 kind:    &TypeKind{kind: build_prim_type(types::SYS_INT)},
-                model: &CommonSubIdentExprModel{
+            }
+            if d.is_const() {
+                sd.constant = Const.new_i64(d.constant.read_str().len)
+                sd.model = sd.constant
+            } else {
+                sd.model = &CommonSubIdentExprModel{
                     expr_kind: d.kind,
                     expr:      d.model,
                     ident:     "len()",
-                },
+                }
             }
+            ret sd
 
         |:
             self.push_err(ident, LogMsg.ObjHaveNotIdent, str_kind.to_str(), ident.kind)
