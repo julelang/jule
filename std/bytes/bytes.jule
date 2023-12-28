@@ -7,6 +7,8 @@
 // But optimized for byte slices, may provide more efficient functions.
 // If you have byte slice form of strings, this package is the best option for most cases.
 
+use utf8 for std::unicode::utf8
+
 // Negative situation index such as not found, not exist, or etc.
 const N_INDEX = -1
 
@@ -114,6 +116,21 @@ loop:
 // Returns index of first matched item with specified sub byte slice,
 // returns -1 if not exist any match. Starts searching at right
 // of slice to left.
-pub fn find_last(s: str, sub: str): int {
-    ret find_last_at(s, sub, s.len-1)
+pub fn find_last(b: []byte, sub: []byte): int {
+    ret find_last_at(b, sub, b.len-1)
+}
+
+// Returns index of first matched item with specified rune,
+// returns -1 if not exist any match. Starts searching at left
+// of slice to right.
+pub fn find_rune(b: []byte, r: rune): int {
+    let mut i = 0
+    for i < b.len {
+        let (br, n) = utf8::decode_rune(b[i:])
+        if r == br {
+            ret i
+        }
+        i += n
+    }
+    ret N_INDEX
 }
