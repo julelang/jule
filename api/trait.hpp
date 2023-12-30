@@ -41,9 +41,9 @@ namespace jule
 
             *alloc = data;
 #ifdef __JULE_DISABLE__REFERENCE_COUNTING
-            this->data = jule::Ptr<Mask>::make(reinterpret_cast<Mask *>(alloc), nullptr);
+            this->data = jule::Ptr<Mask>::make(static_cast<Mask *>(alloc), nullptr);
 #else
-            this->data = jule::Ptr<Mask>::make(reinterpret_cast<Mask *>(alloc));
+            this->data = jule::Ptr<Mask>::make(static_cast<Mask *>(alloc));
 #endif
             this->type_id = typeid(T).name();
         }
@@ -52,9 +52,9 @@ namespace jule
         Trait(const jule::Ptr<T> &ref) noexcept
         {
 #ifdef __JULE_DISABLE__REFERENCE_COUNTING
-            this->data = jule::Ptr<Mask>::make(reinterpret_cast<Mask *>(ref.alloc), nullptr);
+            this->data = jule::Ptr<Mask>::make(static_cast<Mask *>(ref.alloc), nullptr);
 #else
-            this->data = jule::Ptr<Mask>::make(reinterpret_cast<Mask *>(ref.alloc), ref.ref);
+            this->data = jule::Ptr<Mask>::make(static_cast<Mask *>(ref.alloc), ref.ref);
             if (ref != nullptr)
                 this->data.add_ref();
 #endif
@@ -167,7 +167,7 @@ namespace jule
 #endif
             }
 #endif
-            return *reinterpret_cast<T *>(this->data.alloc);
+            return *static_cast<T *>(this->data.alloc);
         }
 
         template <typename T>
@@ -200,8 +200,7 @@ namespace jule
 #ifndef __JULE_DISABLE__REFERENCE_COUNTING
             this->data.add_ref();
 #endif
-            return jule::Ptr<T>::make(
-                reinterpret_cast<T *>(this->data.alloc), this->data.ref);
+            return jule::Ptr<T>::make(static_cast<T *>(this->data.alloc), this->data.ref);
         }
 
         template <typename T>
