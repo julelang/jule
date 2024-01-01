@@ -450,7 +450,8 @@ fn gen_struct_constructor(mut &s: &StructIns): str {
 }
 
 fn gen_struct_destructor(mut &s: &StructIns): str {
-    let disposed = s.decl.is_implements(BUILTIN_TRAIT_DISPOSE)
+    const STATIC = false // Dispose method must be non-static
+    let mut disposed = fn_is_dispose(s.decl.find_method("dispose", STATIC))
     let ref_access = s.decl.has_ref_accessible()
     // Call destructor if implemented.
     if !ref_access && !disposed {
@@ -846,6 +847,17 @@ fn fn_is_to_str(mut &f: &Fn): bool {
         ret false
     }
     ret prim.is_str()
+}
+
+// Reports method is reversed dispose method.
+fn fn_is_dispose(mut f: &Fn): bool {
+    ret f != nil &&
+        f.public &&
+        f.is_void() &&
+        f.generics.len == 0 &&
+        f.params.len == 1 &&
+        f.params[0].mutable &&
+        !f.params[0].is_ref()
 }
 
 // Generates C++ code of structure's ostream.
