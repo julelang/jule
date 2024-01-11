@@ -311,6 +311,12 @@ namespace jule
             return !this->_slice || this->_len == 0 || this->_cap == 0;
         }
 
+        // Push item to last without allocation checks.
+        void __push(const Item &item)
+        {
+            this->_slice[this->_len++] = item;
+        }
+
         void push(const Item &item)
         {
             if (this->_len == this->_cap)
@@ -327,7 +333,7 @@ namespace jule
                 return;
             }
 
-            this->_slice[this->_len++] = item;
+            this->__push(item);
         }
 
         jule::Bool operator==(const jule::Slice<Item> &src) const
