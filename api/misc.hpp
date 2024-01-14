@@ -75,7 +75,11 @@ namespace jule
         }
 
         template <typename T, typename Denominator>
-        inline auto unsafe_mod(const T &x, const Denominator &denominator) noexcept
+        inline auto unsafe_mod(
+#ifndef __JULE_ENABLE__PRODUCTION
+            const char *file,
+#endif
+            const T &x, const Denominator &denominator) noexcept
         {
                 return x % denominator;
         }
