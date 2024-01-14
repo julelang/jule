@@ -60,7 +60,7 @@ use std::jule::sema::{
     FreeExprModel,
     Scope,
 }
-use std::jule::types::{
+use types for std::jule::types::{
     MAX_F32,
     MAX_F64,
     MIN_F32,
@@ -313,10 +313,36 @@ fn gen_binop_expr_model(mut m: &BinopExprModel): str {
     match m.op.kind {
     | TokenKind.Solidus
     | TokenKind.Percent:
-        ret gen_div_by_zero_binop_expr_model(m.op, m.left, m.right)
+        ret gen_div_by_zero_binop_expr_model(m.op, m.left.model, m.right.model)
     }
 
     let mut obj = "("
+    if env::OPT_MATH {
+        match m.op.kind {
+        | TokenKind.Star: // Multiplication
+            if !types::is_int(m.left.kind.to_str()) || !types::is_int(m.right.kind.to_str()) {
+                break
+            }
+            if !m.right.is_const() {
+                break
+            }
+            let x = m.right.constant.as_u64()
+            if x == 0 || x%2 != 0 {
+                break
+            }
+            let j = math::log2(f64(x))
+            let z = u64(j)
+            if f64(z) != j {
+                break
+            }
+            obj += gen_expr_model(m.left)
+            obj += " << "
+            obj += u64toa(u64(z))
+            obj += ")"
+            ret obj
+        }
+    }
+
     obj += gen_expr_model(m.left)
     obj += " "
     obj += m.op.kind
