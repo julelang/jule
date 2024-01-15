@@ -87,6 +87,34 @@ fn concat_all_parts(parts: ...Token): str {
     ret s
 }
 
+// Checks for bit-shifting optimizations.
+// Reports true if conditions are:
+//   - l is integer
+//   - r is integer
+//   - r is constant
+//   - r > 0 && r%2 == 0
+//   - log2(r) returns integer without fraction
+//
+// As a result: returns whether bit-shifting is possible and what nth power of 2^r.
+fn check_for_bit_shift_opt(&l: &Data, &r: &Data): (ok: bool, x: u64) {
+    if !types::is_int(l.kind.to_str()) || !types::is_int(r.kind.to_str()) {
+        ret false, 0
+    }
+    if !r.is_const() {
+        ret false, 0
+    }
+    x = r.constant.as_u64()
+    if x == 0 || x%2 != 0 {
+        ret false, 0
+    }
+    let j = math::log2(f64(x))
+    let z = u64(j)
+    if f64(z) != j {
+        ret false, 0
+    }
+    ret true, z
+}
+
 fn decompose_common_esq(b: byte): str {
     match b {
     | '\\': ret "\\\\"
@@ -281,31 +309,54 @@ fn gen_const_expr_model(m: &Const): str {
     }
 }
 
-fn gen_div_by_zero_binop_expr_model(&op: Token, mut &l: ExprModel, mut &r: ExprModel): str {
-    let mut op_func = ""
-    match op.kind {
-    | TokenKind.Solidus | TokenKind.SolidusEq: op_func = "div"
-    | TokenKind.Percent | TokenKind.PercentEq: op_func = "mod"
-    }
-
+fn gen_div_by_zero_binop_expr_model(&op: Token, mut &l: &Data, mut &r: &Data): str {
+    let mut opt = false
     if env::OPT_MATH {
-        match type r {
+        match type r.model {
         | &Const:
-            op_func = "unsafe_" + op_func
+            opt = true
         }
     }
 
-    let mut obj = "jule::"
-    obj += op_func
-    obj += "("
-    if !env::PRODUCTION {
-        obj += gen_loc_info(op)
-        obj += ","
+    let mut op_func = ""
+    match op.kind {
+    | TokenKind.Solidus | TokenKind.SolidusEq:
+        op_func = if opt { "/" } else { "div" }
+
+    | TokenKind.Percent | TokenKind.PercentEq:
+        op_func = if opt { "%" } else { "mod" }
     }
-    obj += gen_expr(l)
-    obj += ","
-    obj += gen_expr(r)
-    obj += ")"
+
+    let mut obj = ""
+    if opt {
+        obj = "("
+        obj += gen_expr(l)
+
+        let (ok, x) = check_for_bit_shift_opt(l, r)
+        if ok {
+            obj += " >> "
+            obj += u64toa(x)
+        } else {
+            obj += " "
+            obj += op_func
+            obj += " "
+            obj += gen_expr(r)
+        }
+
+        obj += ")"
+    } else {
+        obj = "jule::"
+        obj += op_func
+        obj += "("
+        if !env::PRODUCTION {
+            obj += gen_loc_info(op)
+            obj += ","
+        }
+        obj += gen_expr(l)
+        obj += ","
+        obj += gen_expr(r)
+        obj += ")"
+    }
     ret obj
 }
 
@@ -313,31 +364,20 @@ fn gen_binop_expr_model(mut m: &BinopExprModel): str {
     match m.op.kind {
     | TokenKind.Solidus
     | TokenKind.Percent:
-        ret gen_div_by_zero_binop_expr_model(m.op, m.left.model, m.right.model)
+        ret gen_div_by_zero_binop_expr_model(m.op, m.left, m.right)
     }
 
     let mut obj = "("
     if env::OPT_MATH {
         match m.op.kind {
         | TokenKind.Star: // Multiplication
-            if !types::is_int(m.left.kind.to_str()) || !types::is_int(m.right.kind.to_str()) {
-                break
-            }
-            if !m.right.is_const() {
-                break
-            }
-            let x = m.right.constant.as_u64()
-            if x == 0 || x%2 != 0 {
-                break
-            }
-            let j = math::log2(f64(x))
-            let z = u64(j)
-            if f64(z) != j {
+            let (ok, x) = check_for_bit_shift_opt(m.left, m.right)
+            if !ok {
                 break
             }
             obj += gen_expr_model(m.left)
             obj += " << "
-            obj += u64toa(u64(z))
+            obj += u64toa(x)
             obj += ")"
             ret obj
         }
