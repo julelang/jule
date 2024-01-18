@@ -65,7 +65,7 @@ namespace jule
         }
 
         template <typename T, typename Denominator>
-        inline auto unsafe_div(
+        inline constexpr auto unsafe_div(
 #ifndef __JULE_ENABLE__PRODUCTION
             const char *file,
 #endif
@@ -75,7 +75,7 @@ namespace jule
         }
 
         template <typename T, typename Denominator>
-        inline auto unsafe_mod(
+        inline constexpr auto unsafe_mod(
 #ifndef __JULE_ENABLE__PRODUCTION
             const char *file,
 #endif

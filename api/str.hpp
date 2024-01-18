@@ -52,6 +52,7 @@ namespace jule
 
         Str(const jule::Slice<jule::I32> &src)
         {
+            this->buffer.reserve(src.len() * 4);
             for (const jule::I32 &r : src)
             {
                 const std::vector<jule::U8> bytes = jule::utf8_rune_to_bytes(r);
@@ -62,22 +63,22 @@ namespace jule
         typedef jule::U8 *Iterator;
         typedef const jule::U8 *ConstIterator;
 
-        inline Iterator begin(void) noexcept
+        inline constexpr Iterator begin(void) noexcept
         {
             return static_cast<Iterator>(&this->buffer[0]);
         }
 
-        inline ConstIterator begin(void) const noexcept
+        inline constexpr ConstIterator begin(void) const noexcept
         {
             return static_cast<ConstIterator>(&this->buffer[0]);
         }
 
-        inline Iterator end(void) noexcept
+        inline constexpr Iterator end(void) noexcept
         {
             return static_cast<Iterator>(&this->buffer[this->len()]);
         }
 
-        inline ConstIterator end(void) const noexcept
+        inline constexpr ConstIterator end(void) const noexcept
         {
             return static_cast<ConstIterator>(&this->buffer[this->len()]);
         }
@@ -135,22 +136,22 @@ namespace jule
                 0, this->len());
         }
 
-        inline jule::Int len(void) const noexcept
+        inline constexpr jule::Int len(void) const noexcept
         {
             return this->buffer.length();
         }
 
-        inline jule::Bool empty(void) const noexcept
+        inline constexpr jule::Bool empty(void) const noexcept
         {
             return this->buffer.empty();
         }
 
-        inline operator char *(void) const noexcept
+        inline constexpr operator char *(void) const noexcept
         {
             return const_cast<char *>(reinterpret_cast<const char *>(this->buffer.c_str()));
         }
 
-        inline operator const char *(void) const noexcept
+        inline constexpr operator const char *(void) const noexcept
         {
             return reinterpret_cast<const char *>(this->buffer.c_str());
         }
@@ -169,7 +170,7 @@ namespace jule
         {
             jule::Slice<jule::U8> slice;
             slice.alloc_new(this->len(), this->len());
-            std::copy(this->begin(), this->end(), slice.begin());
+            std::memcpy(slice.begin(), this->begin(), this->len());
             return slice;
         }
 
@@ -191,7 +192,7 @@ namespace jule
 
         // Returns element by index.
         // Not includes safety checking.
-        inline jule::U8 &__at(const jule::Int &index) noexcept
+        inline constexpr jule::U8 &__at(const jule::Int &index) noexcept
         {
             return this->buffer[index];
         }
@@ -293,9 +294,7 @@ namespace jule
                                         const jule::Str &src) noexcept
         {
             for (const jule::U8 &b : src)
-            {
                 stream << static_cast<char>(b);
-            }
             return stream;
         }
     };

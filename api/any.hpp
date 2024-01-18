@@ -279,12 +279,12 @@ namespace jule
             return !this->operator==(other);
         }
 
-        inline jule::Bool operator==(std::nullptr_t) const noexcept
+        inline constexpr jule::Bool operator==(std::nullptr_t) const noexcept
         {
             return !this->data;
         }
 
-        inline jule::Bool operator!=(std::nullptr_t) const noexcept
+        inline constexpr jule::Bool operator!=(std::nullptr_t) const noexcept
         {
             return !this->operator==(nullptr);
         }

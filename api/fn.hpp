@@ -84,7 +84,7 @@ namespace jule
 #endif
         }
 
-        jule::Uintptr addr(void) const noexcept
+        inline constexpr jule::Uintptr addr(void) const noexcept
         {
             return this->_addr;
         }
@@ -104,22 +104,22 @@ namespace jule
             this->buffer = function;
         }
 
-        inline jule::Bool operator==(const Fn<Function> &fn) const noexcept
+        inline constexpr jule::Bool operator==(const Fn<Function> &fn) const noexcept
         {
             return this->addr() == fn.addr();
         }
 
-        inline jule::Bool operator!=(const Fn<Function> &fn) const noexcept
+        inline constexpr jule::Bool operator!=(const Fn<Function> &fn) const noexcept
         {
             return !this->operator==(fn);
         }
 
-        inline jule::Bool operator==(std::nullptr_t) const noexcept
+        inline constexpr jule::Bool operator==(std::nullptr_t) const noexcept
         {
             return this->buffer == nullptr;
         }
 
-        inline jule::Bool operator!=(std::nullptr_t) const noexcept
+        inline constexpr jule::Bool operator!=(std::nullptr_t) const noexcept
         {
             return !this->operator==(nullptr);
         }

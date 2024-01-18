@@ -73,12 +73,12 @@ namespace jule
 
         // Frees memory. Unsafe function, not includes any safety checking for
         // heap allocations are valid or something like that.
-        void __free(void) noexcept
+        inline void __free(void) noexcept
         {
             this->data.__free();
         }
 
-        void dealloc(void) noexcept
+        inline void dealloc(void) noexcept
         {
             this->data.dealloc();
         }
@@ -238,22 +238,22 @@ namespace jule
             this->__get_copy(src);
         }
 
-        inline jule::Bool operator==(const jule::Trait<Mask> &src) const noexcept
+        inline constexpr jule::Bool operator==(const jule::Trait<Mask> &src) const noexcept
         {
             return this->data.alloc == this->data.alloc;
         }
 
-        inline jule::Bool operator!=(const jule::Trait<Mask> &src) const noexcept
+        inline constexpr jule::Bool operator!=(const jule::Trait<Mask> &src) const noexcept
         {
             return !this->operator==(src);
         }
 
-        inline jule::Bool operator==(std::nullptr_t) const noexcept
+        inline constexpr jule::Bool operator==(std::nullptr_t) const noexcept
         {
             return this->data.alloc == nullptr;
         }
 
-        inline jule::Bool operator!=(std::nullptr_t) const noexcept
+        inline constexpr jule::Bool operator!=(std::nullptr_t) const noexcept
         {
             return !this->operator==(nullptr);
         }
