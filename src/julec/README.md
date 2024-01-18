@@ -11,6 +11,8 @@ That's why paths are adjusted accordingly.
 
 > Some important parts of the reference compiler are publicly available in the standard library. See [`std::jule`](https://github.com/julelang/jule/tree/master/std/jule) library.
 
+<img width="1617" alt="JuleC" src="https://github.com/julelang/jule/assets/54983926/648b9942-8662-4ba0-9ff8-bf66c32e0ba6">
+
 JuleC has a structure that handles processes step by step. \
 The working principle of the compiler roughly consists of the steps described below.
 
