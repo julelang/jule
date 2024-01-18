@@ -4283,9 +4283,15 @@ impl BinaryEval {
         }
 
         d.model = &BinopExprModel{
-            left:  l,
-            right: r,
-            op:    self.op,
+            left: &OperandExprModel{
+                kind: l.kind,
+                model: l.model,
+            },
+            right: &OperandExprModel{
+                kind: r.kind,
+                model: r.model,
+            },
+            op: self.op,
         }
     }
 
@@ -4303,13 +4309,7 @@ impl BinaryEval {
 
         self.check_datas()
 
-        // Create new Data reference to avoid cycle.
-        // Explaining typical case:
-        //   The [self.eval_op] returns [self.l] or [self.r] as result.
-        //   The [self.set_model] called after that.
-        //   So, [self.set_model] sets model with [self.l] and [self.r].
-        //   As a result: d refers itself via model, appears a cycle.
-        let mut d = new(Data, *self.eval_op())
+        let mut d = self.eval_op()
 
         self.l, self.r = l, r // Save normal order
 

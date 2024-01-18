@@ -58,6 +58,7 @@ use std::jule::sema::{
     BackendEmitExprModel,
     TernaryExprModel,
     FreeExprModel,
+    OperandExprModel,
     Scope,
 }
 use types for std::jule::types::{
@@ -96,14 +97,18 @@ fn concat_all_parts(parts: ...Token): str {
 //   - log2(r) returns integer without fraction
 //
 // As a result: returns whether bit-shifting is possible and what nth power of 2^r.
-fn check_for_bit_shift_opt(&l: &Data, &r: &Data): (ok: bool, x: u64) {
+fn check_for_bit_shift_opt(&l: &OperandExprModel, &r: &OperandExprModel): (ok: bool, x: u64) {
     if !types::is_int(l.kind.to_str()) || !types::is_int(r.kind.to_str()) {
         ret false, 0
     }
-    if !r.is_const() {
+    match type r.model {
+    | &Const:
+        break
+
+    |:
         ret false, 0
     }
-    x = r.constant.as_u64()
+    x = (&Const)(r.model).as_u64()
     if x == 0 || x%2 != 0 {
         ret false, 0
     }
@@ -309,7 +314,7 @@ fn gen_const_expr_model(m: &Const): str {
     }
 }
 
-fn gen_div_by_zero_binop_expr_model(&op: Token, mut &l: &Data, mut &r: &Data): str {
+fn gen_div_by_zero_binop_expr_model(&op: Token, mut &l: &OperandExprModel, mut &r: &OperandExprModel): str {
     let mut opt = false
     if env::OPT_MATH {
         match type r.model {
@@ -330,7 +335,7 @@ fn gen_div_by_zero_binop_expr_model(&op: Token, mut &l: &Data, mut &r: &Data): s
     let mut obj = ""
     if opt {
         obj = "("
-        obj += gen_expr(l)
+        obj += gen_expr(l.model)
 
         match op.kind {
         | TokenKind.Solidus:
@@ -345,7 +350,7 @@ fn gen_div_by_zero_binop_expr_model(&op: Token, mut &l: &Data, mut &r: &Data): s
             obj += " "
             obj += op_func
             obj += " "
-            obj += gen_expr(r)
+            obj += gen_expr(r.model)
         }
 
         obj += ")"
@@ -357,9 +362,9 @@ fn gen_div_by_zero_binop_expr_model(&op: Token, mut &l: &Data, mut &r: &Data): s
             obj += gen_loc_info(op)
             obj += ","
         }
-        obj += gen_expr(l)
+        obj += gen_expr(l.model)
         obj += ","
-        obj += gen_expr(r)
+        obj += gen_expr(r.model)
         obj += ")"
     }
     ret obj
@@ -380,7 +385,7 @@ fn gen_binop_expr_model(mut m: &BinopExprModel): str {
             if !ok {
                 break
             }
-            obj += gen_expr_model(m.left)
+            obj += gen_expr_model(m.left.model)
             obj += " << "
             obj += u64toa(x)
             obj += ")"
@@ -388,11 +393,11 @@ fn gen_binop_expr_model(mut m: &BinopExprModel): str {
         }
     }
 
-    obj += gen_expr_model(m.left)
+    obj += gen_expr_model(m.left.model)
     obj += " "
     obj += m.op.kind
     obj += " "
-    obj += gen_expr_model(m.right)
+    obj += gen_expr_model(m.right.model)
     obj += ")"
     ret obj
 }
