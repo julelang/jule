@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use fmt for std::fmt
 use std::jule::ast::{
     FnCallExpr,
     TypeDecl,
@@ -829,9 +830,6 @@ fn builtin_caller_std_jule_integrated_emit(mut &e: &Eval, mut &fc: &FnCallExpr, 
         e.push_err(fc.token, LogMsg.MissingExprFor, "code")
         ret nil
     }
-    if fc.args.len > 1 {
-        e.push_err(fc.args[1].token, LogMsg.ArgumentOverflow)
-    }
 
     let mut d = e.eval_expr(fc.args[0])
     if d == nil {
@@ -861,9 +859,22 @@ fn builtin_caller_std_jule_integrated_emit(mut &e: &Eval, mut &fc: &FnCallExpr, 
         r.kind = k.kind
     }
 
-    r.model = &BackendEmitExprModel{
+    let mut model = &BackendEmitExprModel{
         code: d.constant.read_str(),
     }
+
+    if fc.args.len > 1 {
+        model.exprs = make([]ExprModel, 0, fc.args.len - 1)
+        for (_, mut arg) in fc.args[1:] {
+            let mut argd = e.eval_expr_kind(arg.kind)
+            if argd == nil {
+                ret nil
+            }
+            model.exprs = append(model.exprs, argd.model)
+        }
+    }
+
+    r.model = model
     ret r
 }
 
