@@ -2,12 +2,17 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-cpp use "unsafe.hpp"
-
-cpp fn str_to_byte_slice(s: str): []byte
+use integ for std::jule::integrated
 
 // Returns byte slice that uses string's allocation.
 // Does not performs deallocation.
 fn stobs(&s: str): []byte {
-    ret cpp.str_to_byte_slice(s)
+    unsafe {
+        integ::emit("{} slice;", []byte)
+        integ::emit("slice.data.alloc = {}.begin();", s)
+        integ::emit("slice.data.ref = {};", nil)
+        integ::emit("slice._slice = slice.data.alloc;")
+        integ::emit("slice._len = slice._cap = {};", s.len)
+        ret integ::emit[[]byte]("slice")
+    }
 }
