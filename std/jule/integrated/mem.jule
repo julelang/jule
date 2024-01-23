@@ -7,32 +7,24 @@ cpp fn calloc(size: uint, n: uint): *unsafe
 cpp unsafe fn realloc(mut ptr: *unsafe, size: uint): *unsafe
 cpp unsafe fn free(mut ptr: *unsafe)
 
-cpp fn __jule_new[T](): *T
-cpp fn __jule_new_array[T](size: int): *T
-
-#cdef
-cpp unsafe fn __jule_delete[T](heap: *T)
-#cdef
-cpp unsafe fn __jule_delete_array[T](heap: *T)
-#cdef
-cpp unsafe fn __jule_deref_ptr[T](heap: *T): T
-#cdef
-cpp unsafe fn __jule_assign_ptr[T](heap: *T, mut val: T)
-
 // Allocates size bytes of memory.
 // Memory does not initialize.
 // Returns pointer to allocation if success, nil if not.
 //
 // This function is part of the C-style memory management.
 // It can be very dangerous.
-pub fn malloc(size: uint): *unsafe { ret cpp.malloc(size) }
+pub fn malloc(size: uint): *unsafe {
+    ret cpp.malloc(size)
+}
 
 // Allocates n elements of size bytes each, all initialized to zero.
 // Returns pointer to allocation if success, nil if not.
 //
 // This function is part of the C-style memory management.
 // It can be very dangerous.
-pub fn calloc(size: uint, n: uint): *unsafe { ret cpp.calloc(size, n) }
+pub fn calloc(size: uint, n: uint): *unsafe {
+    ret cpp.calloc(size, n)
+}
 
 // Re-allocates the previously allocated block in ptr,
 // making the new block size bytes long.
@@ -40,7 +32,9 @@ pub fn calloc(size: uint, n: uint): *unsafe { ret cpp.calloc(size, n) }
 //
 // This function is part of the C-style memory management.
 // It can be very dangerous.
-pub unsafe fn realloc(mut ptr: *unsafe, size: uint): *unsafe { ret cpp.realloc(ptr, size) }
+pub unsafe fn realloc(mut ptr: *unsafe, size: uint): *unsafe {
+    ret cpp.realloc(ptr, size)
+}
 
 // Free a block allocated by malloc, realloc or calloc.
 // ptr is not setted as nil by function, therefore ptr is dangling after free.
@@ -48,20 +42,34 @@ pub unsafe fn realloc(mut ptr: *unsafe, size: uint): *unsafe { ret cpp.realloc(p
 //
 // This function is part of the C-style memory management.
 // It can be very dangerous.
-pub unsafe fn free(mut ptr: *unsafe) { cpp.free(ptr) }
+pub unsafe fn free(mut ptr: *unsafe) {
+    cpp.free(ptr)
+}
 
 // Allocates new memory.
 // Equavalent to: new T in C++
-pub fn new[T](): *T { ret cpp.__jule_new[T]() }
+pub fn new[T](): *T {
+    unsafe {
+        ret emit[*T]("new (std::nothrow) {}", T)
+    }
+}
 
 // Allocates new array memory.
 // Equavalent to: new T[size] in C++
-pub fn new_array[T](size: int): *T { ret unsafe { cpp.__jule_new_array[T](size) } }
+pub fn new_array[T](size: int): *T {
+    unsafe {
+        ret emit[*T]("new (std::nothrow) {}[{}]", T, size)
+    }
+}
 
 // Deallocates memory allocation.
 // Equavalent to: delete heap in C++
-pub unsafe fn delete[T](heap: *T) { cpp.__jule_delete[T](heap) }
+pub unsafe fn delete[T](heap: *T) {
+    emit("delete {}", heap)
+}
 
 // Deallocates array memory allocation.
 // Equavalent to: delete[] heap in C++
-pub unsafe fn delete_array[T](heap: *T) { cpp.__jule_delete_array[T](heap) }
+pub unsafe fn delete_array[T](heap: *T) {
+    emit("delete[] {}", heap)
+}
