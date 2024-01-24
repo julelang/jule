@@ -254,14 +254,10 @@ namespace jule
         {
             jule::Slice<jule::I32> thisr = this->operator jule::Slice<jule::I32>();
             jule::Slice<jule::I32> strr = str.operator jule::Slice<jule::I32>();
-            jule::Int n = thisr.len() < strr.len() ? thisr.len() : strr.len();
-            if (n == 0)
-                return false;
-            if (thisr.__at(0) > strr.__at(0))
-                return false;
+            jule::Int n = thisr.len() > strr.len() ? strr.len() : thisr.len();
             for (jule::Int i = 0; i < n; ++i)
-                if (thisr.__at(i) < strr.__at(i))
-                    return true;
+                if (thisr.__at(i) > strr.__at(i))
+                    return thisr.__at(i) < strr.__at(i);
             return thisr.len() < strr.len();
         }
 
@@ -274,14 +270,10 @@ namespace jule
         {
             jule::Slice<jule::I32> thisr = this->operator jule::Slice<jule::I32>();
             jule::Slice<jule::I32> strr = str.operator jule::Slice<jule::I32>();
-            jule::Int n = thisr.len() < strr.len() ? thisr.len() : strr.len();
-            if (n == 0)
-                return false;
-            if (thisr.__at(0) < strr.__at(0))
-                return false;
+            jule::Int n = thisr.len() > strr.len() ? strr.len() : thisr.len();
             for (jule::Int i = 0; i < n; ++i)
-                if (thisr.__at(i) > strr.__at(i))
-                    return true;
+                if (thisr.__at(i) != strr.__at(i))
+                    return thisr.__at(i) > strr.__at(i);
             return thisr.len() > strr.len();
         }
 
