@@ -655,10 +655,6 @@ impl FnCallArgChecker {
             }
 
             if d.kind.variadic {
-                if variadiced {
-                    // Break iteration early, we have a problem.
-                    break
-                }
                 variadiced = true
 
                 match type d.model {
@@ -673,8 +669,12 @@ impl FnCallArgChecker {
 
                 p.kind.variadic = true
                 ok = ok && self.check_arg(p, d, arg.token)
-                p.kind.variadic = false
-                continue
+                
+                // Break iteration early, this argument is variadic, so should be last.
+                // If this argument is not last, following algorithm will create error log for that.
+                // Increase variable i for point to following argument.
+                i++
+                break
             }
 
             model.elems = append(model.elems, d.model)
@@ -683,8 +683,9 @@ impl FnCallArgChecker {
         self.e.prefix = old
 
         if variadiced && more {
-            // Use argument i, because when this problem appears, iteration will break.
-            // Therefore, argument i always points to problematic argument.
+            // Use variable i because when variadic argument appears iteral will break.
+            // And it will increase variable i for point to following argument.
+            // Therefore, variable i always points to problematic argument.
             self.push_err_token(self.args[i].token, LogMsg.MoreArgsWithVariadiced)
         }
 
