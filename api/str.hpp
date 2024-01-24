@@ -256,7 +256,7 @@ namespace jule
             jule::Slice<jule::I32> strr = str.operator jule::Slice<jule::I32>();
             jule::Int n = thisr.len() > strr.len() ? strr.len() : thisr.len();
             for (jule::Int i = 0; i < n; ++i)
-                if (thisr.__at(i) > strr.__at(i))
+                if (thisr.__at(i) != strr.__at(i))
                     return thisr.__at(i) < strr.__at(i);
             return thisr.len() < strr.len();
         }
