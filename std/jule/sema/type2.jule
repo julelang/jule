@@ -188,9 +188,11 @@ impl TypeCompatibilityChecker {
     }
 
     fn check_prim(mut self): (ok: bool) {
-        let prim = self.dest.prim()
-        if prim != nil && prim.is_any() {
-            ret true
+        if !self.dest.variadic {
+            let prim = self.dest.prim()
+            if prim != nil && prim.is_any() {
+                ret true
+            }
         }
         ret self.dest.equals(self.src)
     }
@@ -566,14 +568,17 @@ impl FnCallArgChecker {
 
     fn check_arg(mut self, mut &p: &ParamIns, mut &arg: &Data, mut &error_token: Token): (ok: bool) {
         if self.dynamic_annotation && parameter_uses_generics(p.decl, self.f.decl.generics) {
-            let mut dta = DynamicTypeAnnotation{
-                e:           self.e,
-                f:           self.f,
-                p:           p,
-                a:           arg,
-                error_token: error_token,
+            ok = !p.decl.variadic // Accept as fail if parameter is variadic.
+            if ok {
+                let mut dta = DynamicTypeAnnotation{
+                    e:           self.e,
+                    f:           self.f,
+                    p:           p,
+                    a:           arg,
+                    error_token: error_token,
+                }
+                ok = unsafe { dta.annotate() }
             }
-            ok = unsafe { dta.annotate() }
             if !ok {
                 self.push_err_token(error_token, LogMsg.DynamicTypeAnnotationFailed)
                 ret false
@@ -618,12 +623,26 @@ impl FnCallArgChecker {
         }
 
         let mut old = self.e.prefix
+
+        // Save variadic status into separate variable.
+        // Because parameter might be variadic, but type might be not variadic.
+        // Some built-in functions passes non-variadic types.
+        let variadic = p.kind.variadic
+        p.kind.variadic = false
+        defer {
+            p.kind.variadic = variadic
+        }
+
         for i < self.args.len; i++ {
             let mut arg = self.args[i]
 
             match type arg.kind {
             | &VariadicExpr:
-                self.e.prefix = &TypeKind{kind: &Slc{elem: p.kind}}
+                self.e.prefix = &TypeKind{
+                    kind: &Slc{
+                        elem: p.kind,
+                    }
+                }
 
             |:
                 self.e.prefix = p.kind
@@ -642,15 +661,6 @@ impl FnCallArgChecker {
                 }
                 variadiced = true
 
-                let pold = p.kind.variadic
-                let dold = d.kind.variadic
-                p.kind.variadic = false
-                d.kind.variadic = false
-                defer {
-                    p.kind.variadic = pold
-                    d.kind.variadic = dold
-                }
-
                 match type d.model {
                 | &SliceExprModel:
                     model = (&SliceExprModel)(d.model)
@@ -661,7 +671,9 @@ impl FnCallArgChecker {
                     self.arg_models = append(self.arg_models, d)
                 }
 
+                p.kind.variadic = true
                 ok = ok && self.check_arg(p, d, arg.token)
+                p.kind.variadic = false
                 continue
             }
 
