@@ -63,22 +63,22 @@ namespace jule
         typedef jule::U8 *Iterator;
         typedef const jule::U8 *ConstIterator;
 
-        inline constexpr Iterator begin(void) noexcept
+        constexpr Iterator begin(void) noexcept
         {
             return static_cast<Iterator>(&this->buffer[0]);
         }
 
-        inline constexpr ConstIterator begin(void) const noexcept
+        constexpr ConstIterator begin(void) const noexcept
         {
             return static_cast<ConstIterator>(&this->buffer[0]);
         }
 
-        inline constexpr Iterator end(void) noexcept
+        constexpr Iterator end(void) noexcept
         {
             return static_cast<Iterator>(&this->buffer[this->len()]);
         }
 
-        inline constexpr ConstIterator end(void) const noexcept
+        constexpr ConstIterator end(void) const noexcept
         {
             return static_cast<ConstIterator>(&this->buffer[this->len()]);
         }
@@ -136,22 +136,22 @@ namespace jule
                 0, this->len());
         }
 
-        inline constexpr jule::Int len(void) const noexcept
+        constexpr jule::Int len(void) const noexcept
         {
             return this->buffer.length();
         }
 
-        inline constexpr jule::Bool empty(void) const noexcept
+        constexpr jule::Bool empty(void) const noexcept
         {
             return this->buffer.empty();
         }
 
-        inline constexpr operator char *(void) const noexcept
+        constexpr operator char *(void) const noexcept
         {
             return const_cast<char *>(reinterpret_cast<const char *>(this->buffer.c_str()));
         }
 
-        inline constexpr operator const char *(void) const noexcept
+        constexpr operator const char *(void) const noexcept
         {
             return reinterpret_cast<const char *>(this->buffer.c_str());
         }
@@ -192,7 +192,7 @@ namespace jule
 
         // Returns element by index.
         // Not includes safety checking.
-        inline constexpr jule::U8 &__at(const jule::Int &index) noexcept
+        constexpr jule::U8 &__at(const jule::Int &index) noexcept
         {
             return this->buffer[index];
         }
