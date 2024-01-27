@@ -55,27 +55,27 @@ namespace jule
                 this->buffer.insert(pair);
         }
 
-        inline constexpr auto begin(void) noexcept
+        constexpr auto begin(void) noexcept
         {
             return this->buffer.begin();
         }
 
-        inline constexpr auto begin(void) const noexcept
+        constexpr auto begin(void) const noexcept
         {
             return this->buffer.begin();
         }
 
-        inline constexpr auto end(void) noexcept
+        constexpr auto end(void) noexcept
         {
             return this->buffer.end();
         }
 
-        inline constexpr auto end(void) const noexcept
+        constexpr auto end(void) const noexcept
         {
             return this->buffer.end();
         }
 
-        inline constexpr void clear(void) noexcept
+        constexpr void clear(void) noexcept
         {
             this->buffer.clear();
         }
@@ -98,12 +98,12 @@ namespace jule
             return keys;
         }
 
-        inline constexpr jule::Bool has(const Key &key) const
+        constexpr jule::Bool has(const Key &key) const
         {
             return this->buffer.find(key) != this->end();
         }
 
-        inline constexpr jule::Int len(void) const noexcept
+        constexpr jule::Int len(void) const noexcept
         {
             return this->buffer.size();
         }
@@ -113,12 +113,12 @@ namespace jule
             this->buffer.erase(key);
         }
 
-        inline constexpr jule::Bool operator==(const std::nullptr_t) const noexcept
+        constexpr jule::Bool operator==(const std::nullptr_t) const noexcept
         {
             return this->buffer.empty();
         }
 
-        inline constexpr jule::Bool operator!=(const std::nullptr_t) const noexcept
+        constexpr jule::Bool operator!=(const std::nullptr_t) const noexcept
         {
             return !this->operator==(nullptr);
         }

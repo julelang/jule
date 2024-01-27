@@ -238,22 +238,22 @@ namespace jule
             this->__get_copy(src);
         }
 
-        inline constexpr jule::Bool operator==(const jule::Trait<Mask> &src) const noexcept
+        constexpr jule::Bool operator==(const jule::Trait<Mask> &src) const noexcept
         {
             return this->data.alloc == this->data.alloc;
         }
 
-        inline constexpr jule::Bool operator!=(const jule::Trait<Mask> &src) const noexcept
+        constexpr jule::Bool operator!=(const jule::Trait<Mask> &src) const noexcept
         {
             return !this->operator==(src);
         }
 
-        inline constexpr jule::Bool operator==(std::nullptr_t) const noexcept
+        constexpr jule::Bool operator==(std::nullptr_t) const noexcept
         {
             return this->data.alloc == nullptr;
         }
 
-        inline constexpr jule::Bool operator!=(std::nullptr_t) const noexcept
+        constexpr jule::Bool operator!=(std::nullptr_t) const noexcept
         {
             return !this->operator==(nullptr);
         }

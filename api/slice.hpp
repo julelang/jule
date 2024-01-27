@@ -213,22 +213,22 @@ namespace jule
         typedef Item *Iterator;
         typedef const Item *ConstIterator;
 
-        inline constexpr Iterator begin(void) noexcept
+        constexpr Iterator begin(void) noexcept
         {
             return this->_slice;
         }
 
-        inline constexpr ConstIterator begin(void) const noexcept
+        constexpr ConstIterator begin(void) const noexcept
         {
             return this->_slice;
         }
 
-        inline constexpr Iterator end(void) noexcept
+        constexpr Iterator end(void) noexcept
         {
             return this->_slice + this->_len;
         }
 
-        inline constexpr ConstIterator end(void) const noexcept
+        constexpr ConstIterator end(void) const noexcept
         {
             return this->_slice + this->_len;
         }
@@ -296,12 +296,12 @@ namespace jule
                 this->len());
         }
 
-        inline constexpr jule::Int len(void) const noexcept
+        constexpr jule::Int len(void) const noexcept
         {
             return this->_len;
         }
 
-        inline constexpr jule::Int cap(void) const noexcept
+        constexpr jule::Int cap(void) const noexcept
         {
             return this->_cap;
         }
@@ -348,17 +348,17 @@ namespace jule
             return true;
         }
 
-        inline constexpr jule::Bool operator!=(const jule::Slice<Item> &src) const
+        constexpr jule::Bool operator!=(const jule::Slice<Item> &src) const
         {
             return !this->operator==(src);
         }
 
-        inline constexpr jule::Bool operator==(const std::nullptr_t) const noexcept
+        constexpr jule::Bool operator==(const std::nullptr_t) const noexcept
         {
             return !this->_slice;
         }
 
-        inline constexpr jule::Bool operator!=(const std::nullptr_t) const noexcept
+        constexpr jule::Bool operator!=(const std::nullptr_t) const noexcept
         {
             return !this->operator==(nullptr);
         }

@@ -251,7 +251,7 @@ namespace jule
         }
 
         template <typename T>
-        inline constexpr jule::Bool operator!=(const T &expr) const
+        constexpr jule::Bool operator!=(const T &expr) const
         {
             return !this->operator==(expr);
         }
@@ -279,12 +279,12 @@ namespace jule
             return !this->operator==(other);
         }
 
-        inline constexpr jule::Bool operator==(std::nullptr_t) const noexcept
+        constexpr jule::Bool operator==(std::nullptr_t) const noexcept
         {
             return !this->data;
         }
 
-        inline constexpr jule::Bool operator!=(std::nullptr_t) const noexcept
+        constexpr jule::Bool operator!=(std::nullptr_t) const noexcept
         {
             return !this->operator==(nullptr);
         }
