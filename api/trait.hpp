@@ -240,7 +240,7 @@ namespace jule
 
         constexpr jule::Bool operator==(const jule::Trait<Mask> &src) const noexcept
         {
-            return this->data.alloc == this->data.alloc;
+            return this->data.alloc == src.data.alloc;
         }
 
         constexpr jule::Bool operator!=(const jule::Trait<Mask> &src) const noexcept
