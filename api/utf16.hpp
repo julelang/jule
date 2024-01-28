@@ -32,7 +32,7 @@ namespace jule
     constexpr signed int UTF16_MAX_RUNE = 1114111;
 
     inline jule::I32 utf16_decode_rune(const jule::I32 r1, const jule::I32 r2) noexcept;
-    std::vector<jule::I32> utf16_decode(const std::vector<jule::I32> s);
+    std::vector<jule::I32> utf16_decode(const std::vector<jule::I32> &s);
     std::vector<jule::I32> utf8_to_runes(const std::string &s) noexcept;
     std::string utf16_to_utf8_str(const wchar_t *wstr, const std::size_t len);
     std::tuple<jule::I32, jule::I32> utf16_encode_rune(jule::I32 r);
