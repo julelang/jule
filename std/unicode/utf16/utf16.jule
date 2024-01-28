@@ -125,11 +125,15 @@ pub fn decode(s: []u16): []rune {
         | r < SURR1 | SURR3 <= r:
             // normal rune
             a[n] = rune(r)
-        | (SURR1 <= r && r < SURR2 && i+1 < s.len &&
-            SURR2 <= s[i+1] && s[i+1] < SURR3):
+
+        // This case requires r >= SURR1 condition is true.
+        // Previous case checks this condition already.
+        // Therefore this case will not check this.
+        | r < SURR2 && i+1 < s.len && SURR2 <= s[i+1] && s[i+1] < SURR3:
             // valid surrogate sequence
             a[n] = decode_rune(rune(r), rune(s[i+1]))
             i++
+
         |:
             // invalid surrogate sequence
             a[n] = REPLACEMENT_CHAR
