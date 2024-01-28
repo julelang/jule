@@ -206,7 +206,7 @@ namespace jule
         template <typename T>
         inline operator T(void) noexcept
         {
-            this->cast<T>(
+            return this->cast<T>(
 #ifndef __JULE_ENABLE__PRODUCTION
                 "/api/trait.hpp"
 #endif
