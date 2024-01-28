@@ -1,0 +1,120 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use integ for std::jule::integrated
+
+cpp use "dynar.hpp"
+
+#typedef
+#namespace "jule_std"
+cpp struct DynarBuffer[T] {
+    pub heap: *T
+    pub len:  int
+    pub cap:  int
+}
+
+#namespace "std"
+cpp unsafe fn copy(mut start: *unsafe, mut end: *unsafe, mut dest: *unsafe)
+
+unsafe fn copy[T](mut dest: *T, mut buff: *T, len: int) {
+    cpp.copy(buff, buff + len, dest);
+}
+
+// Dynamic allocation on heap, suitable for dynamic array scenarios.
+// Independent from slice type of Jule, pure pointer implementation.
+// Implements dispose method that deallocates buffer.
+// Implements internal copy algorithm that copies all elements to
+// destination Dynar[T] instead of using shared memory.
+//
+// This structure can accept as fully unsafe.
+// But all functions can use in safe Jule without Unsaf Jule.
+// However, this functions have not any safet checks for performance purposes.
+// Use this structure carefully.
+pub struct Dynar[T] {
+    pub buff: cpp.DynarBuffer[T]
+}
+
+impl Dynar {
+    pub static fn new(): Dynar[T] {
+        ret Dynar[T]{}
+    }
+
+    // Deallocate heap.
+    pub fn dispose(mut self) {
+        self.buff.len = 0
+        self.buff.cap = 0
+        unsafe {
+            integ::delete_array[T](self.buff.heap)
+        }
+        self.buff.heap = nil
+    }
+
+    // Resizes heap. It will allocate new allocation by size and
+    // copies old elements into new heap after allocation, then
+    // deallocates old heap allocation.
+    // Reports whether process completed successfuly.
+    pub fn resize(mut self, n: int): bool {
+        let mut new_heap = integ::new_array[T](n)
+        if new_heap == nil {
+            ret false
+        }
+        if self.buff.heap == nil {
+            self.buff.heap = new_heap
+            self.buff.cap = n
+            ret true
+        }
+        unsafe {
+            if self.buff.len > 0 {
+                copy[T](new_heap, self.buff.heap, self.buff.len)
+            }
+            unsafe {
+                integ::delete_array[T](self.buff.heap)
+            }
+            self.buff.heap = new_heap
+        }
+        self.buff.cap = n
+        ret true
+    }
+
+    // Returns pointer that points to first element of buffer.
+    pub fn begin(mut self): *T {
+        ret self.buff.heap
+    }
+
+    // Returns pointer that points to end of the last element of buffer.
+    pub fn end(mut self): *T {
+        ret self.buff.heap + self.buff.len
+    }
+
+    // Shift elements to right by n until reach i.
+    // Starts at end of buffer, goes to left step by step.
+    pub fn shift_right(mut self, i: int, n: int) {
+        let mut j = self.end() - 1
+        let k = self.begin() + i
+        for j >= k; j-- {
+            unsafe {
+                *(j + n) = *j
+            }
+        }
+    }
+
+    // Shift elements to left by n untin reach j, start at i.
+    pub fn shift_left(mut self, i: int, j: int, n: int) {
+        let mut k = self.begin() + i
+        let l = self.begin() + j
+        for k < l; k++ {
+            unsafe {
+                *(k - n) = *k
+            }
+        }
+    }
+
+    // Set buffer elements, starts at i.
+    // Uses p for read data, reads n elements and assigns to buffer.
+    pub fn set(mut self, i: int, mut p: *T, n: int) {
+        unsafe {
+            copy[T](self.begin() + i, p, n)
+        }
+    }
+}
