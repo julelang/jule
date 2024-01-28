@@ -181,8 +181,8 @@ namespace jule
                 __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(error, index, N);
                 error += "\nruntime: array indexing with out of range index";
 #ifndef __JULE_ENABLE__PRODUCTION
-                error += "\nfile: ",
-                    error += file;
+                error += "\nfile: ";
+                error += file;
 #endif
                 jule::panic(error);
             }
