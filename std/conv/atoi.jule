@@ -40,13 +40,13 @@ const __INT_SIZE = 32 << (^uint(0) >> 63)
 // Is the size in bits of an int or uint value.
 pub const INT_SIZE = __INT_SIZE
 
-const MAX_UINT64 =  u64.MAX // 1<<64 - 1
-
 // Is a lower-case letter if and only if
 // c is either that lower-case letter or the equivalent upper-case letter.
 // Instead of writing c == 'x' || c == 'X' one can write lower(c) == 'x'.
 // Note that lower of non-letters can produce other non-letters.
-fn lower(c: byte): byte { ret c | ('x' - 'X') }
+fn lower(c: byte): byte {
+    ret c | ('x' - 'X')
+}
 
 // Is like parse_int but for unsigned numbers.
 //
@@ -88,19 +88,24 @@ pub fn parse_uint(mut s: str, mut base: int, mut bit_size: int): (u64, ConvError
         ret 0, ConvError.InvalidBitSize
     }
 
-    // Cutoff is the smallest number such that cutoff*base > MAX_UINT64.
+    // Cutoff is the smallest number such that cutoff*base > u64.MAX.
     // Use compile-time constants for common cases.
     let mut cutoff: u64 = 0
     match base {
-    | 10: cutoff = MAX_UINT64/10 + 1
-    | 16: cutoff = MAX_UINT64/16 + 1
-    |:    cutoff = MAX_UINT64/u64(base) + 1
+    | 10:
+        cutoff = u64.MAX/10 + 1
+    | 16:
+        cutoff = u64.MAX/16 + 1
+    |:
+        cutoff = u64.MAX/u64(base) + 1
     }
 
     let mut max_val: u64 = 0
     match bit_size {
-    | 32: max_val = u32.MAX
-    | 64: max_val = u64.MAX
+    | 32:
+        max_val = u32.MAX
+    | 64:
+        max_val = u64.MAX
     }
     /*
     let mut prec = 1
@@ -117,6 +122,8 @@ pub fn parse_uint(mut s: str, mut base: int, mut bit_size: int): (u64, ConvError
             d = c - '0'
         | 'a' <= lower(c) && lower(c) <= 'z':
             d = lower(c) - 'a' + 10
+        | c == '_':
+            continue
         |:
             ret 0, ConvError.InvalidSyntax
         }

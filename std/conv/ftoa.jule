@@ -76,29 +76,29 @@ struct DecimalSlice {
 // The special precision -1 uses the smallest number of digits
 // necessary such that parse_float will return f exactly.
 pub fn fmt_float(f: f64, fmt: byte, prec: int, bit_size: int): str {
-    ret str(generic_ftoa(nil, f, fmt, prec, bit_size))
+    ret str(generic_ftoa(make([]byte, 0, max(prec+4, 24)), f, fmt, prec, bit_size))
 }
 
 fn generic_ftoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bit_size: int): []byte {
     let mut bits: u64 = 0
-    let mut flt: *FloatInfo = nil
+    let mut flt: &FloatInfo = nil
     match bit_size {
     | 32:
         bits = u64(math::f32_bits(f32(val)))
-        flt = &F32_INFO
+        flt = unsafe { (&FloatInfo)(&F32_INFO) }
     | 64:
         bits = math::f64_bits(val)
-        flt = &F64_INFO
+        flt = unsafe { (&FloatInfo)(&F64_INFO) }
     |:
         panic("std::conv: illegal bit_size")
     }
 
-    let neg = unsafe { bits>>(flt.expbits+flt.mantbits) } != 0
-    let mut exp = unsafe { int(bits>>flt.mantbits) & int(1<<flt.expbits - 1) }
-    let mut mant = unsafe { bits & (u64(1)<<flt.mantbits - 1) }
+    let neg = bits>>(flt.expbits+flt.mantbits) != 0
+    let mut exp = int(bits>>flt.mantbits) & int(1<<flt.expbits - 1)
+    let mut mant = bits & (u64(1)<<flt.mantbits - 1)
 
     match exp {
-    | unsafe { int(1<<flt.expbits - 1) }:
+    | int(1<<flt.expbits - 1):
         // +inf, nan
         match {
         | mant != 0:
@@ -113,20 +113,20 @@ fn generic_ftoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bit_size: i
         exp++
     |:
         // add implicit top bit
-        mant |= u64(1) << unsafe { flt.mantbits }
+        mant |= u64(1) << flt.mantbits
     }
-    exp += unsafe { flt.bias }
+    exp += flt.bias
     
     // Pick off easy binary, hex formats.
     if fmt == 'b' {
-        ret fmt_b(dst, neg, mant, exp, unsafe { *flt })
+        ret fmt_b(dst, neg, mant, exp, *flt)
     }
     if fmt == 'x' || fmt == 'X' {
-        ret fmt_x(dst, prec, fmt, neg, mant, exp, unsafe { *flt })
+        ret fmt_x(dst, prec, fmt, neg, mant, exp, *flt)
     }
 
     if !OPTIMIZE {
-        ret big_ftoa(dst, prec, fmt, neg, mant, exp, unsafe { *flt })
+        ret big_ftoa(dst, prec, fmt, neg, mant, exp, *flt)
     }
 
     let mut digs = DecimalSlice{}
@@ -136,7 +136,7 @@ fn generic_ftoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bit_size: i
     if shortest {
         // Use Ryu algorithm.
         digs.d = make([]byte, 32)
-        ryu_ftoa_shortest(digs, mant, unsafe { exp-int(flt.mantbits) }, unsafe { *flt })
+        ryu_ftoa_shortest(digs, mant, exp-int(flt.mantbits), *flt)
         ok = true
         // Precision for shortest representation mode.
         match fmt {
@@ -164,16 +164,16 @@ fn generic_ftoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bit_size: i
         }
         if bit_size == 32 && digits <= 9 {
             digs.d = make([]byte, 24)
-            ryu_ftoa_fixed32(digs, u32(mant), unsafe { exp-int(flt.mantbits) }, digits)
+            ryu_ftoa_fixed32(digs, u32(mant), exp-int(flt.mantbits), digits)
             ok = true
         } else if digits <= 18 {
             digs.d = make([]byte, 24)
-            ryu_ftoa_fixed64(digs, mant, unsafe { exp-int(flt.mantbits) }, digits)
+            ryu_ftoa_fixed64(digs, mant, exp-int(flt.mantbits), digits)
             ok = true
         }
     }
     if !ok {
-        ret big_ftoa(dst, prec, fmt, neg, mant, exp, unsafe { *flt })
+        ret big_ftoa(dst, prec, fmt, neg, mant, exp, *flt)
     }
     ret fmt_digits(dst, shortest, neg, digs, prec, fmt)
 }
@@ -532,10 +532,7 @@ fn fmt_x(mut dst: []byte, prec: int, fmt: byte, neg: bool,
         }
     }
 
-    let mut hex = lowerhex
-    if fmt == 'X' {
-        hex = upperhex
-    }
+    let hex = if fmt == 'X' { UPPERHEX } else { LOWERHEX }
 
     // sign, 0x, leading digit
     if neg {
@@ -587,15 +584,9 @@ fn fmt_x(mut dst: []byte, prec: int, fmt: byte, neg: bool,
 }
 
 fn min(a: int, b: int): int {
-    if a < b {
-        ret a
-    }
-    ret b
+    ret  if a < b { a } else { b }
 }
 
 fn max(a: int, b: int): int {
-    if a > b {
-        ret a
-    }
-    ret b
+    ret if a > b { a } else { b }
 }

@@ -131,6 +131,9 @@ fn float_fmt_e(&txt: []byte, mut i: int): (lit: str) {
     }
 
     let mut b = txt[i]
+    if b == '_' {
+        ret
+    }
     if b == '+' || b == '-' {
         i++ // Skip operator
         if i >= txt.len {
@@ -141,7 +144,7 @@ fn float_fmt_e(&txt: []byte, mut i: int): (lit: str) {
     let first = i
     for i < txt.len; i++ {
         b = txt[i]
-        if !is_decimal(b) {
+        if b != '_' && !is_decimal(b) {
             break
         }
     }
@@ -152,7 +155,9 @@ fn float_fmt_e(&txt: []byte, mut i: int): (lit: str) {
     ret str(txt[:i])
 }
 
-fn float_fmt_p(&txt: []byte, i: int): str { ret float_fmt_e(txt, i) }
+fn float_fmt_p(&txt: []byte, i: int): str {
+    ret float_fmt_e(txt, i)
+}
 
 fn float_fmt_dotnp(&txt: []byte, mut i: int): str {
     if txt[i] != '.' {
@@ -164,9 +169,14 @@ loop:
     for i < txt.len; i++ {
         let b = txt[i]
         match {
-        | is_decimal(b):        continue
-        | is_float_fmt_p(b, i): ret float_fmt_p(txt, i)
-        |:                      break loop
+        | b == '_' | is_decimal(b):
+            continue
+
+        | is_float_fmt_p(b, i):
+            ret float_fmt_p(txt, i)
+
+        |:
+            break loop
         }
     }
     ret ""
@@ -193,7 +203,7 @@ fn float_num(&txt: []byte, mut i: int): (lit: str) {
         if i > 1 && (b == 'e' || b == 'E') {
             ret float_fmt_e(txt, i)
         }
-        if !is_decimal(b) {
+        if b != '_' && !is_decimal(b) {
             break
         }
     }
@@ -210,9 +220,14 @@ loop:
     for i < txt.len; i++ {
         let b = txt[i]
         match {
-        | b == '.':             ret float_num(txt, i)
-        | is_float_fmt_e(b, i): ret float_fmt_e(txt, i)
-        | !is_decimal(b):       break loop
+        | b == '.':
+            ret float_num(txt, i)
+        | b == '_':
+            continue
+        | is_float_fmt_e(b, i):
+            ret float_fmt_e(txt, i)
+        | !is_decimal(b):
+            break loop
         }
     }
 
@@ -233,7 +248,7 @@ fn binary_num(&txt: []byte): (lit: str) {
     const BINARY_START = 2
     let mut i = BINARY_START
     for i < txt.len; i++ {
-        if !is_binary(txt[i]) {
+        if txt[i] != '_' && !is_binary(txt[i]) {
             break
         }
     }
@@ -244,8 +259,13 @@ fn binary_num(&txt: []byte): (lit: str) {
     ret str(txt[:i])
 }
 
-fn is_float_fmt_e(b: byte, i: int): bool { ret i > 0 && (b == 'e' || b == 'E') }
-fn is_float_fmt_p(b: byte, i: int): bool { ret i > 0 && (b == 'p' || b == 'P') }
+fn is_float_fmt_e(b: byte, i: int): bool {
+    ret i > 0 && (b == 'e' || b == 'E')
+}
+
+fn is_float_fmt_p(b: byte, i: int): bool {
+    ret i > 0 && (b == 'p' || b == 'P')
+}
 
 fn is_float_fmt_dotnp(&txt: []byte, mut i: int): bool {
     if txt[i] != '.' {
@@ -257,9 +277,12 @@ loop:
     for i < txt.len; i++ {
         let b = txt[i]
         match {
-        | is_decimal(b):        continue
-        | is_float_fmt_p(b, i): ret true
-        |:                      break loop
+        | b == '_' | is_decimal(b):
+            continue
+        | is_float_fmt_p(b, i):
+            ret true
+        |:
+            break loop
         }
     }
 
@@ -268,20 +291,29 @@ loop:
 
 fn is_float_fmt_dotp(&txt: []byte, i: int): bool {
     match {
-    | txt.len < 3:                        fall
-    | txt[i] != '.':                      fall
-    | txt[i+1] != 'p' && txt[i+1] != 'P': ret false
-    |:                                    ret true
+    | txt.len < 3:
+        fall
+    | txt[i] != '.':
+        fall
+    | txt[i+1] != 'p' && txt[i+1] != 'P':
+        ret false
+    |:
+        ret true
     }
 }
 
 fn is_float_fmt_dotfp(&txt: []byte, i: int): bool {
     match {
-    | txt.len < 4:                        fall
-    | txt[i] != '.':                      fall
-    | txt[i+1] != 'f' && txt[i+1] != 'F': fall
-    | txt[i+2] != 'p' && txt[i+1] != 'P': ret false
-    |:                                    ret true
+    | txt.len < 4:
+        fall
+    | txt[i] != '.':
+        fall
+    | txt[i+1] != 'f' && txt[i+1] != 'F':
+        fall
+    | txt[i+2] != 'p' && txt[i+1] != 'P':
+        ret false
+    |:
+        ret true
     }
 }
 
@@ -295,20 +327,28 @@ fn octal_num(&txt: []byte): (lit: str) {
 
     let mut octal_start = 1
 
+    let mut o = false
     if txt[1] == 'o' {
         if txt.len < 3 {
             ret
         }
         octal_start++
+        o = true
     }
 
     let mut i = octal_start
     for i < txt.len; i++ {
         let b = txt[i]
+        if b == '.' {
+            if o {
+                ret ""
+            }
+            ret float_num(txt, i)
+        }
         if is_float_fmt_e(b, i) {
             ret float_fmt_e(txt, i)
         }
-        if !is_octal(b) {
+        if b != '_' && !is_octal(b) {
             break
         }
     }
@@ -335,17 +375,13 @@ loop:
         match {
         | is_float_fmt_dotp(txt, i):
             ret float_fmt_dotp(txt, i)
-
         | is_float_fmt_dotfp(txt, i):
             ret float_fmt_dotfp(txt, i)
-
         | is_float_fmt_p(b, i):
             ret float_fmt_p(txt, i)
-
         | is_float_fmt_dotnp(txt, i):
             ret float_fmt_dotnp(txt, i)
-
-        | !is_hex(b):
+        | b != '_' && !is_hex(b):
             break loop
         }
     }
@@ -374,11 +410,19 @@ fn hex_escape(&txt: []byte, n: int): (seq: str) {
 }
 
 // Pattern (RegEx): ^\\U.{8}
-fn big_unicode_point_escape(&txt: []byte): str { ret hex_escape(txt, 10) }
+fn big_unicode_point_escape(&txt: []byte): str {
+    ret hex_escape(txt, 10)
+}
+
 // Pattern (RegEx): ^\\u.{4}
-fn little_unicode_point_escape(&txt: []byte): str { ret hex_escape(txt, 6) }
+fn little_unicode_point_escape(&txt: []byte): str {
+    ret hex_escape(txt, 6)
+}
+
 // Pattern (RegEx): ^\\x..
-fn hex_byte_escape(&txt: []byte): str { ret hex_escape(txt, 4) }
+fn hex_byte_escape(&txt: []byte): str {
+    ret hex_escape(txt, 4)
+}
 
 // Patter (RegEx): ^\\[0-7]{3}
 fn byte_escape(&txt: []byte): (seq: str) {
@@ -522,6 +566,9 @@ impl Lex {
 
     // Returns literal if next token is numeric, returns empty string if not.
     fn num(mut self, &txt: []byte): (lit: str) {
+        if txt[0] == '_' {
+            ret ""
+        }
         lit = hex_num(txt)
         if lit != "" {
             goto end
