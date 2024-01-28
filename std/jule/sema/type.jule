@@ -700,8 +700,13 @@ impl TypeChecker {
         self.s.push_err(token, fmt, args...)
     }
 
-    fn allow_builtin(mut self) { self.dis_builtin = false }
-    fn disallow_builtin(mut self) { self.dis_builtin = true }
+    fn allow_builtin(mut self) {
+        self.dis_builtin = false
+    }
+
+    fn disallow_builtin(mut self) {
+        self.dis_builtin = true
+    }
 
     fn build_prim(mut self, &decl: &IdentTypeDecl): &Prim {
         if !is_prim(decl.ident) {
@@ -722,10 +727,14 @@ impl TypeChecker {
 
         let get_ident = fn(&def: any): str {
             match type def {
-            | &TypeAlias: ret (&TypeAlias)(def).ident
-            | &Struct:    ret (&Struct)(def).ident
-            | &Enum:      ret (&Enum)(def).ident
-            |:            ret ""
+            | &TypeAlias:
+                ret (&TypeAlias)(def).ident
+            | &Struct:
+                ret (&Struct)(def).ident
+            | &Enum:
+                ret (&Enum)(def).ident
+            |:
+                ret ""
             }
         }
 
@@ -750,7 +759,6 @@ impl TypeChecker {
                     ret false
                 }
             }
-
         | &Struct:
             let s = (&Struct)(decl)
             for _, d in s.depends {
@@ -786,7 +794,7 @@ impl TypeChecker {
         }
 
         // Check illegal cycle for itself.
-        // Because refers's owner is ta.
+        // Because refers's owner is decl.
         if self.referencer.owner == decl {
             self.push_err(ident.token, LogMsg.IllegalCycleRefersItself, self.referencer.ident)
             ret false
@@ -805,8 +813,9 @@ impl TypeChecker {
 
         match type self.referencer.owner {
         | &TypeAlias:
-            unsafe { *self.referencer.refs = append(*self.referencer.refs, decl) }
-
+            unsafe {
+                *self.referencer.refs = append(*self.referencer.refs, decl)
+            }
         | &Struct:
             match type decl {
             | &Struct:
