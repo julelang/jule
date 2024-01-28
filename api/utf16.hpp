@@ -62,8 +62,7 @@ namespace jule
             if (r < jule::UTF16_SURR1 || jule::UTF16_SURR3 <= r)
                 a[n] = static_cast<jule::I32>(r);
 
-            else if (jule::UTF16_SURR1 <= r &&
-                     r < jule::UTF16_SURR2 &&
+            else if (r < jule::UTF16_SURR2 &&
                      i + 1 < s.size() &&
                      jule::UTF16_SURR2 <= s[i + 1] &&
                      s[i + 1] < jule::UTF16_SURR3)
