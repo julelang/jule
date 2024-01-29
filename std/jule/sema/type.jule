@@ -703,6 +703,10 @@ struct TypeChecker {
     // Usually stores structure generics and method generics.
     // See developer reference (5).
     banned_generics: []&TypeAlias
+
+    // Enable/Disable status of instantiation catching.
+    // See developer reference (6).
+    inscatch: bool
 }
 
 impl TypeChecker {
@@ -850,17 +854,31 @@ impl TypeChecker {
             ret nil
         }
 
+        // Enable instantiation cycle catching if type alias is
+        // one of the banned generics.
+        if !self.inscatch && self.banned_generics != nil {
+            self.inscatch = true
+            for _, bg in self.banned_generics {
+                if bg == ta || ta.kind.kind != nil && ta.kind.kind.equals(bg.kind.kind) {
+                    self.inscatch = false
+                    break
+                }
+            }
+        }
+
         // Catch instantiation cycles.
         // See developer reference (5).
-        for _, bg in self.banned_generics {
-            if bg == ta {
-                self.push_err(decl.token, LogMsg.InitiationCycle, decl.ident)
-                ret nil
-            }
-            for _, dg in ta.generics {
-                if bg == dg {
+        if self.inscatch {
+            for _, bg in self.banned_generics {
+                if bg == ta {
                     self.push_err(decl.token, LogMsg.InitiationCycle, decl.ident)
                     ret nil
+                }
+                for _, dg in ta.generics {
+                    if bg == dg {
+                        self.push_err(decl.token, LogMsg.InitiationCycle, decl.ident)
+                        ret nil
+                    }
                 }
             }
         }
@@ -1000,18 +1018,23 @@ impl TypeChecker {
         self.referencer = nil
         let mut banned_generics = self.banned_generics
 
-        // Save banned generics to catch initiation cycles.
-        match type self.lookup {
-        | &ScopeChecker:
-            let mut sc = (&ScopeChecker)(self.lookup)
-            let mut hard = sc.get_hard_root()
-            if hard.owner.owner == nil || hard.owner.owner.decl != s {
-                break
+        // Set banned generics to catch initiation cycles.
+        // This just necessary for root, therefore avoid set each time.
+        if self.banned_generics == nil {
+            match type self.lookup {
+            | &ScopeChecker:
+                let mut sc = (&ScopeChecker)(self.lookup)
+                let mut hard = sc.get_hard_root()
+                if hard.owner.owner == nil || hard.owner.owner.decl != s {
+                    break
+                }
+                let n = hard.owner.generics.len + hard.owner.owner.generics.len
+                // Add scope generics to to catch instantiation cycles.
+                // See developer reference (5).
+                self.banned_generics = hard.table.type_aliases[:n]
             }
-            let n = hard.owner.generics.len + hard.owner.owner.generics.len
-            // Add scope generics to to catch instantiation cycles.
-            // See developer reference (5).
-            self.banned_generics = hard.table.type_aliases[:n]
+        } else {
+            self.inscatch = true
         }
 
         // Build generics.
@@ -1152,8 +1175,10 @@ impl TypeChecker {
 
     fn build_ident(mut self, mut decl: &IdentTypeDecl): Kind {
         match {
-        | is_prim(decl.ident): ret self.build_prim(decl)
-        |:                     ret self.get_def(decl)
+        | is_prim(decl.ident):
+            ret self.build_prim(decl)
+        |:
+            ret self.get_def(decl)
         }
     }
 
@@ -1391,78 +1416,72 @@ impl TypeChecker {
 
     fn build(mut self, mut &decl_kind: TypeDeclKind): &TypeKind {
         let mut kind: Kind = nil
-
         match type decl_kind {
         | &TypeKind:
             kind = (&TypeKind)(decl_kind)
-
         | &IdentTypeDecl:
             let mut t = self.build_ident((&IdentTypeDecl)(decl_kind))
             if t != nil {
                 kind = t
             }
-
         | &SptrTypeDecl:
+            self.inscatch = true
             let mut t = self.build_sptr((&SptrTypeDecl)(decl_kind))
             if t != nil {
                 kind = t
             }
-
         | &PtrTypeDecl:
+            self.inscatch = true
             let mut t = self.build_ptr((&PtrTypeDecl)(decl_kind))
             if t != nil {
                 kind = t
             }
-
         | &SlcTypeDecl:
+            self.inscatch = true
             let mut t = self.build_slc((&SlcTypeDecl)(decl_kind))
             if t != nil {
                 kind = t
             }
-
         | &ArrTypeDecl:
+            self.inscatch = true
             let mut t = self.build_arr((&ArrTypeDecl)(decl_kind))
             if t != nil {
                 kind = t
             }
-
         | &MapTypeDecl:
+            self.inscatch = true
             let mut t = self.build_map((&MapTypeDecl)(decl_kind))
             if t != nil {
                 kind = t
             }
-
         | &TupleTypeDecl:
+            self.inscatch = true
             let mut t = self.build_tuple((&TupleTypeDecl)(decl_kind))
             if t != nil {
                 kind = t
             }
-
         | &FnDecl:
+            self.inscatch = true
             let mut t = self.build_fn((&FnDecl)(decl_kind))
             if t != nil {
                 kind = t
             }
-
         | &NamespaceTypeDecl:
+            self.inscatch = true
             let mut t = self.build_by_namespace((&NamespaceTypeDecl)(decl_kind))
             if t != nil {
                 kind = t
             }
-
         |:
             self.push_err(self.error_token, LogMsg.InvalidType)
             ret nil
         }
-
         if kind == nil {
             ret nil
         }
-
         match type kind {
         | &TypeKind:
             ret (&TypeKind)(kind)
-
         |:
             ret &TypeKind{
                 kind: kind,
@@ -1485,7 +1504,6 @@ impl TypeChecker {
         if t.decl == nil {
             ret
         }
-
         let mut kind = self.check_decl(t.decl)
         if kind == nil {
             t.remove_kind()
