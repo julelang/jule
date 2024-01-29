@@ -395,7 +395,7 @@ struct ScopeGoto {
 // Scope checker.
 struct ScopeChecker {
     s:           &Sema
-    owner:       &FnIns
+    owner:       &FnIns // See developer reference (1).
     parent:      &ScopeChecker
     child_index: int // Index of child scope.
     table:       &SymbolTable
@@ -540,7 +540,19 @@ impl ScopeChecker {
 
     // Reports scope is root.
     // Accepts anonymous functions as root.
-    fn is_root(self): bool { ret self.parent == nil || self.owner != nil }
+    fn is_root(self): bool {
+        ret self.parent == nil || self.owner != nil
+    }
+
+    // Stop checking.
+    fn stop(mut self) {
+        self.i = -1
+    }
+
+    // Reports whether checking is stopped.
+    fn stopped(self): bool {
+        ret self.i == -1
+    }
 
     // Reports scope is deferred.
     fn is_deferred(mut &self): bool {
@@ -564,6 +576,16 @@ impl ScopeChecker {
     fn get_root(mut &self): &ScopeChecker {
         let mut root = self
         for root.parent != nil && root.owner == nil {
+            root = root.parent
+        }
+        ret root
+    }
+
+    // Returns hard root scope, owner always represents root function of this scope.
+    // Not accepts anonymous functions as root.
+    fn get_hard_root(mut &self): &ScopeChecker {
+        let mut root = self
+        for root.parent != nil {
             root = root.parent
         }
         ret root
@@ -644,6 +666,8 @@ impl ScopeChecker {
         if self.is_duplicated_ident(uintptr(v), v.ident) {
             self.s.push_err(v.token, LogMsg.DuplicatedIdent, v.ident)
             self.s.push_suggestion(LogMsg.RenameForAvoidDuplication)
+            self.stop()
+            ret
         }
 
         self.s.check_var_decl(v, self)
@@ -659,6 +683,8 @@ impl ScopeChecker {
         if self.is_duplicated_ident(uintptr(ta), ta.ident) {
             self.s.push_err(ta.token, LogMsg.DuplicatedIdent, ta.ident)
             self.s.push_suggestion(LogMsg.RenameForAvoidDuplication)
+            self.stop()
+            ret
         }
         self.s.check_type_alias_decl(ta, self)
 
@@ -1801,8 +1827,10 @@ impl ScopeChecker {
         for self.i < self.tree.stmts.len; self.i++ {
             let mut stmt = self.tree.stmts[self.i]
             self.check_node(stmt)
+            if self.stopped() {
+                ret
+            }
         }
-
         if self.result != nil && self.tree.stmts.len != 0 {
             self.check_result()
         }

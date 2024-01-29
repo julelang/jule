@@ -160,6 +160,8 @@ fn build_param_vars(mut &f: &FnIns): []&Var {
     ret vars
 }
 
+// Builds type aliases for generic types of scope.
+// See developer reference (1), and (2).
 fn build_generic_type_aliases(mut &f: &FnIns): []&TypeAlias {
     let mut size = f.generics.len
     if f.decl.owner != nil {
@@ -793,6 +795,14 @@ impl Sema {
             lookup:     l,
             referencer: referencer,
         }
+
+        // Referencer's refs field is not nil if owner is type alias.
+        if referencer != nil && referencer.refs != nil {
+            // Set owner alias field of TypeChecker to collect generic dependencies.
+            // See developer reference (4).
+            tc.owner_alias = (&TypeAlias)(referencer.owner)
+        }
+
         tc.check(t)
         ret t.checked()
     }

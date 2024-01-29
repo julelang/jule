@@ -51,6 +51,7 @@ pub struct TypeAlias {
     pub kind:       &TypeSymbol
     pub doc:        str
     pub refers:     []any // Referred identifiers.
+    pub generics:   []&TypeAlias // See developer reference (1).
 }
 
 trait Kind {
@@ -685,7 +686,8 @@ struct TypeChecker {
     // Type is pointer, reference, slice or similar.
     not_plain: bool
 
-    dis_builtin: bool // Disallow/suppress Jule's built-in defines.
+    // Disallow/suppress Jule's built-in defines.
+    dis_builtin: bool
 
     // Name selection is enabled.
     // No cpp-linked definitions, no generic type representation.
@@ -693,6 +695,14 @@ struct TypeChecker {
     //
     // If selection is a struct, returns invalid instance that only has decl field.
     selection: bool
+
+    // See developer reference (4).
+    owner_alias: &TypeAlias
+
+    // This generics are banned because of causes instantiation cycles.
+    // Usually stores structure generics and method generics.
+    // See developer reference (5).
+    banned_generics: []&TypeAlias
 }
 
 impl TypeChecker {
@@ -840,6 +850,21 @@ impl TypeChecker {
             ret nil
         }
 
+        // Catch instantiation cycles.
+        // See developer reference (5).
+        for _, bg in self.banned_generics {
+            if bg == ta {
+                self.push_err(decl.token, LogMsg.InitiationCycle, decl.ident)
+                ret nil
+            }
+            for _, dg in ta.generics {
+                if bg == dg {
+                    self.push_err(decl.token, LogMsg.InitiationCycle, decl.ident)
+                    ret nil
+                }
+            }
+        }
+
         let mut ok = self.check_illegal_cycles(decl, ta)
         if !ok {
             ret nil
@@ -849,6 +874,12 @@ impl TypeChecker {
         ok = self.s.check_type_alias_decl_kind(ta, self.lookup)
         if !ok {
             ret nil
+        }
+
+        // Push generic reference to owner type alias.
+        // See developer reference (3) and (4) for more information.
+        if ta.generic && self.owner_alias != nil {
+            self.owner_alias.generics = append(self.owner_alias.generics, ta)
         }
 
         ret &TypeKind{
@@ -963,6 +994,44 @@ impl TypeChecker {
         }
     }
 
+    fn build_struct_instance(mut self, mut &decl: &IdentTypeDecl, mut &s: &Struct): &StructIns {
+        // Save configuration.
+        let mut referencer = self.referencer
+        self.referencer = nil
+        let mut banned_generics = self.banned_generics
+
+        // Save banned generics to catch initiation cycles.
+        match type self.lookup {
+        | &ScopeChecker:
+            let mut sc = (&ScopeChecker)(self.lookup)
+            let mut hard = sc.get_hard_root()
+            if hard.owner.owner == nil || hard.owner.owner.decl != s {
+                break
+            }
+            let n = hard.owner.generics.len + hard.owner.owner.generics.len
+            // Add scope generics to to catch instantiation cycles.
+            // See developer reference (5).
+            self.banned_generics = hard.table.type_aliases[:n]
+        }
+
+        // Build generics.
+        let mut ins = s.instance()
+        ins.generics = make([]&TypeKind, 0, decl.generics.len)
+        for (_, mut g) in decl.generics {
+            let mut kind = self.build(g.kind)
+            if kind == nil {
+                ret nil
+            }
+            ins.generics = append(ins.generics, kind)
+        }
+
+        // Restore configuration.
+        self.banned_generics = banned_generics
+        self.referencer = referencer
+
+        ret ins
+    }
+
     fn from_struct(mut self, mut &decl: &IdentTypeDecl, mut &s: &Struct): &StructIns {
         if !self.s.is_accessible_define(s.public, s.token) {
             self.push_err(decl.token, LogMsg.IdentNotExist, decl.ident)
@@ -976,7 +1045,6 @@ impl TypeChecker {
                 self.push_err(decl.token, LogMsg.GenericsNotAllowed)
                 ret nil
             }
-
             ret &StructIns{
                 decl: s,
             }
@@ -991,24 +1059,10 @@ impl TypeChecker {
         if !ok {
             ret nil
         }
-
         self.append_used_struct_reference(s)
-        let mut ins = s.instance()
-        ins.generics = make([]&TypeKind, 0, decl.generics.len)
-        let mut referencer = self.referencer
-        self.referencer = nil
-        for (_, mut g) in decl.generics {
-            let mut kind = self.build(g.kind)
-            if kind == nil {
-                ok = false
-                continue
-            }
-            ins.generics = append(ins.generics, kind)
-        }
 
-        self.referencer = referencer
-
-        if !ok {
+        let mut ins = self.build_struct_instance(decl, s)
+        if ins == nil {
             ret nil
         }
 
