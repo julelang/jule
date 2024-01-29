@@ -46,7 +46,7 @@ namespace jule
                 return *l == *r;
             }
 
-            static const jule::Str to_str(const void *alloc) noexcept
+            static jule::Str to_str(const void *alloc) noexcept
             {
                 const T *v = static_cast<const T *>(alloc);
                 return jule::to_str(*v);
