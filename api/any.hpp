@@ -69,7 +69,7 @@ namespace jule
             const char *(*type_id)(void);
             void (*dealloc)(void *alloc);
             jule::Bool (*eq)(void *alloc, void *other);
-            const jule::Str (*to_str)(const void *alloc);
+            jule::Str (*to_str)(const void *alloc);
             void *(*alloc_new_copy)(void *data);
         };
 
