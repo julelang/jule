@@ -146,12 +146,12 @@ namespace jule
             return this->buffer.empty();
         }
 
-        constexpr operator char *(void) const noexcept
+        operator char *(void) const noexcept
         {
             return const_cast<char *>(reinterpret_cast<const char *>(this->buffer.c_str()));
         }
 
-        constexpr operator const char *(void) const noexcept
+        operator const char *(void) const noexcept
         {
             return reinterpret_cast<const char *>(this->buffer.c_str());
         }
