@@ -5,7 +5,7 @@
 #ifndef __JULE_SLICE_HPP
 #define __JULE_SLICE_HPP
 
-#include <stddef.h>
+#include <cstddef>
 #include <sstream>
 #include <ostream>
 #include <initializer_list>

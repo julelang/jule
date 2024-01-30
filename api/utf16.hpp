@@ -14,7 +14,7 @@
 // Based on std::unicode::utf16
 //
 
-#include <stddef.h>
+#include <cstddef>
 #include <tuple>
 #include <string>
 
