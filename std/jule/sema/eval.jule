@@ -29,6 +29,7 @@ use std::jule::ast::{
     KeyValPair,
     IdentTypeDecl,
     TernaryExpr,
+    NamespaceTypeDecl,
 }
 use std::jule::build::{LogMsg, Directive, PATH_STDLIB, logf}
 use std::jule::constant::{Const}
@@ -1286,19 +1287,7 @@ impl Eval {
         self.push_err(i.token, LogMsg.NotSupportsIndexing, d.kind.to_str())
     }
 
-    fn eval_ident_decl_from_indexing(mut &self, mut &i: &IndexingExpr): &Data {
-        match type i.expr {
-        | &IdentExpr:
-            // Ok.
-        |:
-            self.push_err(i.token, LogMsg.InvalidSyntax)
-            ret nil
-        }
-
-        let mut decl = &IdentTypeDecl{
-            ident: (&IdentExpr)(i.expr).ident,
-        }
-
+    fn push_generics_from_index_data(mut &self, mut &decl: &IdentTypeDecl, mut &i: &IndexingExpr): bool {
         match type i.index {
         | &UnaryExpr:
             // Unary eval catches type declarations.
@@ -1306,32 +1295,72 @@ impl Eval {
             let mut d = self.eval_unary((&UnaryExpr)(i.index))
             if !d.decl {
                 self.push_err(i.token, LogMsg.InvalidSyntax)
-                ret nil
+                ret false
             }
-            decl.generics = append(decl.generics, &TypeDecl{kind: d.kind})
+            decl.generics = append(decl.generics, &TypeDecl{
+                kind: d.kind,
+            })
         | &TypeDecl:
             decl.generics = append(decl.generics, (&TypeDecl)(i.index))
         | &IdentExpr:
+            let mut expr = (&IdentExpr)(i.index)
             decl.generics = append(decl.generics, &TypeDecl{
-                kind: &IdentTypeDecl{ident: (&IdentExpr)(i.index).ident}
+                kind: &IdentTypeDecl{
+                    token: expr.token,
+                    ident: expr.ident,
+                }
             })
         | &TupleExpr:
             for (_, mut expr) in (&TupleExpr)(i.index).expr {
                 match type expr.kind {
                 | &TypeDecl:
                     decl.generics = append(decl.generics, (&TypeDecl)(expr.kind))
-
                 | &IdentExpr:
+                    let mut expr = (&IdentExpr)(expr.kind)
                     decl.generics = append(decl.generics, &TypeDecl{
-                        kind: &IdentTypeDecl{ident: (&IdentExpr)(expr.kind).ident}
+                        kind: &IdentTypeDecl{
+                            token: expr.token,
+                            ident: expr.ident,
+                        },
                     })
                 }
             }
         |:
             self.push_err(i.token, LogMsg.InvalidSyntax)
+            ret false
+        }
+        ret true
+    }
+
+    fn eval_ident_decl_from_indexing(mut &self, mut &d: &Data, mut &i: &IndexingExpr): &Data {
+        let mut tdecl = &TypeDecl{}
+        let mut decl: &IdentTypeDecl = nil
+        match type i.expr {
+        | &IdentExpr:
+            let mut expr = (&IdentExpr)(i.expr)
+            decl = &IdentTypeDecl{
+                token: expr.token,
+                ident: expr.ident,
+            }
+            tdecl.kind = decl
+        | &NsSelectionExpr:
+            let mut expr = (&NsSelectionExpr)(i.expr)
+            decl = &IdentTypeDecl{
+                token: expr.ident,
+                ident: expr.ident.kind,
+            }
+            tdecl.kind = &NamespaceTypeDecl{
+                idents: expr.ns,
+                kind:   decl,
+            }
+        |:
+            self.push_err(i.token, LogMsg.InvalidSyntax)
             ret nil
         }
-        ret self.eval_type(&TypeDecl{kind: decl})
+        if !self.push_generics_from_index_data(decl, i) {
+            ret nil
+        }
+        ret self.eval_type(tdecl)
     }
 
     fn eval_indexing(mut &self, mut i: &IndexingExpr): &Data {
@@ -1346,7 +1375,7 @@ impl Eval {
 
         // Catch types.
         if d.decl {
-            ret self.eval_ident_decl_from_indexing(i)
+            ret self.eval_ident_decl_from_indexing(d, i)
         }
 
         let mut old_d = *d
@@ -1924,7 +1953,6 @@ impl Eval {
         if !ok {
             ret nil
         }
-
         ret &Data{
             decl:  true,
             kind:  tk.kind,
@@ -3226,62 +3254,43 @@ impl Eval {
 
     fn eval_expr_kind(mut &self, mut kind: ExprData): &Data {
         let mut d: &Data = nil
-
         match type kind {
         | &LitExpr:
             d = self.eval_lit((&LitExpr)(kind))
-
         | &IdentExpr:
             d = self.eval_ident((&IdentExpr)(kind))
-
         | &UnaryExpr:
             d = self.eval_unary((&UnaryExpr)(kind))
-
         | &VariadicExpr:
             d = self.eval_variadic((&VariadicExpr)(kind))
-
         | &UnsafeExpr:
             d = self.eval_unsafe((&UnsafeExpr)(kind))
-
         | &SliceExpr:
             d = self.eval_slice_expr((&SliceExpr)(kind))
-
         | &IndexingExpr:
             d = self.eval_indexing((&IndexingExpr)(kind))
-
         | &SlicingExpr:
             d = self.eval_slicing((&SlicingExpr)(kind))
-
         | &CastExpr:
             d = self.eval_cast((&CastExpr)(kind))
-
         | &NsSelectionExpr:
             d = self.eval_ns_selection((&NsSelectionExpr)(kind))
-
         | &StructLit:
             d = self.eval_struct_lit((&StructLit)(kind))
-
         | &TypeDecl:
             d = self.eval_type((&TypeDecl)(kind))
-
         | &FnCallExpr:
             d = self.eval_fn_call((&FnCallExpr)(kind))
-
         | &SubIdentExpr:
             d = self.eval_sub_ident((&SubIdentExpr)(kind))
-
         | &TupleExpr:
             d = self.eval_tuple((&TupleExpr)(kind))
-
         | &BraceLit:
             d = self.eval_brace_lit((&BraceLit)(kind))
-
         | &FnDecl:
             d = self.eval_anon_fn((&FnDecl)(kind))
-
         | &BinopExpr:
             d = self.eval_binop((&BinopExpr)(kind))
-
         | &TernaryExpr:
             d = self.eval_ternary((&TernaryExpr)(kind))
         }
@@ -3289,7 +3298,6 @@ impl Eval {
         if d == nil {
             ret nil
         }
-
         if d.kind == nil {
             ret d
         }
@@ -3334,11 +3342,9 @@ impl Eval {
             if f.is_builtin() {
                 break
             }
-
             if f.generics.len != f.decl.generics.len {
                 self.s.push_err(expr.token, LogMsg.HasGenerics)
             }
-
             if f.decl.is_method() {
                 self.s.push_err(expr.token, LogMsg.MethodNotInvoked)
             }
@@ -3355,11 +3361,9 @@ impl Eval {
         match {
         | d == nil:
             ret nil
-
         | d.decl:
             self.push_err(expr.token, LogMsg.InvalidExpr)
             ret nil
-
         |:
             ret d
         }

@@ -912,13 +912,23 @@ impl TypeChecker {
             self.push_err(decl.token, LogMsg.IdentNotExist, decl.ident)
             ret nil
         }
-
         if decl.generics.len > 0 {
             self.push_err(decl.token, LogMsg.TypeNotSupportsGenerics, decl.ident)
             ret nil
         }
-
         ret e
+    }
+
+    fn from_trait(mut self, &decl: &IdentTypeDecl, mut &t: &Trait): &Trait {
+        if !self.s.is_accessible_define(t.public, t.token) {
+            self.push_err(decl.token, LogMsg.IdentNotExist, decl.ident)
+            ret nil
+        }
+        if decl.generics.len > 0 {
+           self.push_err(decl.token, LogMsg.TypeNotSupportsGenerics, decl.ident)
+           ret nil
+        }
+        ret t
     }
 
     fn check_struct_ins(mut self, mut &ins: &StructIns, &error_token: Token): (ok: bool) {
@@ -1147,16 +1157,7 @@ impl TypeChecker {
                 t = find_builtin_trait(decl.ident)
             }
             if t != nil {
-                if !self.s.is_accessible_define(t.public, t.token) {
-                    self.push_err(decl.token, LogMsg.IdentNotExist, decl.ident)
-                    ret nil
-                }
-
-                if decl.generics.len > 0 {
-                    self.push_err(decl.token, LogMsg.TypeNotSupportsGenerics, decl.ident)
-                    ret nil
-                }
-                ret t
+                ret self.from_trait(decl, t)
             }
         } else if self.selection {
             self.push_err(decl.token, LogMsg.CppLinkedTypeNotAllowed)
