@@ -5,7 +5,7 @@
 #ifndef __JULE_TYPES_HPP
 #define __JULE_TYPES_HPP
 
-#include <stddef.h>
+#include <cstddef>
 #include <ostream>
 
 #include "platform.hpp"

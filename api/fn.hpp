@@ -6,7 +6,7 @@
 #define __JULE_FN_HPP
 
 #include <string>
-#include <stddef.h>
+#include <cstddef>
 #include <functional>
 #include <thread>
 
