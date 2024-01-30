@@ -1109,7 +1109,14 @@ impl TypeChecker {
         ret ins
     }
 
-    fn get_def(mut self, mut &decl: &IdentTypeDecl): Kind {
+    // Returns identifier if found. Also checks founded identifier.
+    // Uses internal lookup for all process except finding step of identifier.
+    // Will find identifier in [l], not internal lookup.
+    // Also finds in built-in lookup if allowed.
+    // If another lookup nedeed, uses internal lookup, so any generic type build
+    // process will use internal lookup. This might be useful for building
+    // genericed type from another package.
+    fn get_def(mut self, l: Lookup, mut &decl: &IdentTypeDecl): Kind {
         for _, g in self.ignore_generics {
             if g.ident == decl.ident {
                 ret build_prim_type(g.ident)
@@ -1130,12 +1137,12 @@ impl TypeChecker {
         }
 
         if !decl.cpp_linked {
-            let mut e = self.lookup.find_enum(decl.ident)
+            let mut e = l.find_enum(decl.ident)
             if e != nil {
                 ret self.from_enum(decl, e)
             }
 
-            let mut t = self.lookup.find_trait(decl.ident)
+            let mut t = l.find_trait(decl.ident)
             if t == nil && !self.dis_builtin {
                 t = find_builtin_trait(decl.ident)
             }
@@ -1156,12 +1163,12 @@ impl TypeChecker {
             ret nil
         }
 
-        let mut s = self.lookup.find_struct(decl.ident, decl.cpp_linked)
+        let mut s = l.find_struct(decl.ident, decl.cpp_linked)
         if s != nil {
             ret self.from_struct(decl, s)
         }
 
-        let mut ta = self.lookup.find_type_alias(decl.ident, decl.cpp_linked)
+        let mut ta = l.find_type_alias(decl.ident, decl.cpp_linked)
         if ta == nil && !self.dis_builtin {
             ta = find_builtin_type_alias(decl.ident)
         }
@@ -1178,7 +1185,7 @@ impl TypeChecker {
         | is_prim(decl.ident):
             ret self.build_prim(decl)
         |:
-            ret self.get_def(decl)
+            ret self.get_def(self.lookup, decl)
         }
     }
 
@@ -1402,14 +1409,9 @@ impl TypeChecker {
             ret nil
         }
 
-        let mut lookup = self.lookup
-        self.lookup = imp
-
         self.disallow_builtin()
-        let mut kind = self.build_ident(decl.kind)
+        let mut kind = self.get_def(imp, decl.kind)
         self.allow_builtin()
-
-        self.lookup = lookup
 
         ret kind
     }
