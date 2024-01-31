@@ -56,7 +56,7 @@ namespace jule
     {
         std::vector<jule::I32> a(s.size());
         jule::Int n = 0;
-        for (decltype(s.size()) i = 0; i < s.size(); ++i)
+        for (std::size_t i = 0; i < s.size(); ++i)
         {
             jule::U16 r = s[i];
             if (r < jule::UTF16_SURR1 || jule::UTF16_SURR3 <= r)
@@ -84,7 +84,7 @@ namespace jule
     {
         std::vector<jule::I32> runes;
         const char *str = s.c_str();
-        for (decltype(s.length()) index = 0; index < s.length();)
+        for (std::size_t index = 0; index < s.length();)
         {
             jule::I32 rune;
             jule::Int n;
