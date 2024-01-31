@@ -346,7 +346,7 @@ namespace jule
         if (len < 1)
             return std::make_tuple<jule::I32, jule::Int>(jule::UTF8_RUNE_ERROR, 0);
 
-        const jule::U8 s0 = static_cast<jule::U8>(s[0]);
+        const auto s0 = static_cast<jule::U8>(s[0]);
         const jule::U8 x = jule::utf8_first[s0];
         if (x >= jule::UTF8_AS)
         {
@@ -356,12 +356,12 @@ namespace jule
                                    1);
         }
 
-        const jule::Int sz = static_cast<jule::Int>(x & 7);
+        const auto sz = static_cast<jule::Int>(x & 7);
         const struct jule::UTF8AcceptRange accept = jule::utf8_accept_ranges[x >> 4];
         if (len < sz)
             return std::make_tuple<jule::I32, jule::Int>(jule::UTF8_RUNE_ERROR, 1);
 
-        const jule::U8 s1 = static_cast<jule::U8>(s[1]);
+        const auto s1 = static_cast<jule::U8>(s[1]);
         if (s1 < accept.lo || accept.hi < s1)
             return std::make_tuple<jule::I32, jule::Int>(jule::UTF8_RUNE_ERROR, 1);
 
@@ -371,7 +371,7 @@ namespace jule
                     static_cast<jule::I32>(s1 & jule::UTF8_MASKX),
                 2);
 
-        const jule::U8 s2 = static_cast<jule::U8>(s[2]);
+        const auto s2 = static_cast<jule::U8>(s[2]);
         if (s2 < jule::UTF8_LOCB || jule::UTF8_HICB < s2)
             return std::make_tuple<jule::I32, jule::Int>(jule::UTF8_RUNE_ERROR, 1);
 
@@ -382,7 +382,7 @@ namespace jule
                     static_cast<jule::I32>(s2 & jule::UTF8_MASKX),
                 3);
 
-        const jule::U8 s3 = static_cast<jule::U8>(s[3]);
+        const auto s3 = static_cast<jule::U8>(s[3]);
         if (s3 < jule::UTF8_LOCB || jule::UTF8_HICB < s3)
             return std::make_tuple<jule::I32, jule::Int>(jule::UTF8_RUNE_ERROR, 1);
 
@@ -398,7 +398,7 @@ namespace jule
         if (static_cast<jule::U32>(r) <= jule::UTF8_RUNE1_MAX)
             return std::vector<jule::U8>({static_cast<jule::U8>(r)});
 
-        const jule::U32 i = static_cast<jule::U32>(r);
+        const auto i = static_cast<jule::U32>(r);
         if (i < jule::UTF8_RUNE2_MAX)
         {
             return std::vector<jule::U8>({static_cast<jule::U8>(jule::UTF8_T2 | static_cast<jule::U8>(r >> 6)),
