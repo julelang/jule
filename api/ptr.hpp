@@ -90,7 +90,7 @@ namespace jule
 #ifdef __JULE_DISABLE__REFERENCE_COUNTING
             return jule::Ptr<T>::make(instance, nullptr);
 #else
-            jule::Uint *ref = new (std::nothrow) jule::Uint;
+            auto *ref = new (std::nothrow) jule::Uint;
             if (!ref)
                 jule::panic(__JULE_ERROR__MEMORY_ALLOCATION_FAILED
                             "\nruntime: memory allocation failed for reference counter of reference type");
