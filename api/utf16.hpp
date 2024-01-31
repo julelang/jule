@@ -55,7 +55,7 @@ namespace jule
     std::vector<jule::I32> utf16_decode(const std::vector<jule::U16> &s) noexcept
     {
         std::vector<jule::I32> a(s.size());
-        jule::Int n = 0;
+        std::size_t n = 0;
         for (std::size_t i = 0; i < s.size(); ++i)
         {
             jule::U16 r = s[i];
