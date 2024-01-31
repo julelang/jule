@@ -1,0 +1,125 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use dynar for std::internal::dynar
+
+const GROW_FACTOR = 2
+
+// LIFO data structure wich is commonly called as stack.
+//
+// Deallocates itself when destroyed.
+//
+// Stacks aren't use shared allocation between themselves.
+// Allocates new space and copies (not deep copy) items into space.
+pub struct Stack[T] {
+    mem: dynar::Dynar[T]
+}
+
+impl Stack {
+    // Returns new stack instance with capacity.
+    pub static fn new(cap: int): Stack[T] {
+        let mut stack = Stack[T]{
+            mem: dynar::Dynar[T].new(),
+        }
+        if cap > 0 {
+            stack.resize(cap)
+        }
+        ret stack
+    }
+
+    fn resize(mut self, n: int) {
+        let ok = self.mem.resize(n)
+        if !ok {
+            panic("Stack[T]: heap reallocation failed")
+        }
+    }
+
+    // Deallocate heap.
+    pub fn dispose(mut self) {
+        self.mem.dispose()
+    }
+
+    // Set capacity to length.
+    // Removes additional capacity that waiting to use.
+    // Allocates new memory to cut additional capacity.
+    pub fn fit(mut self) {
+        if self.len() != self.cap() {
+            self.resize(self.len())
+        }
+    }
+
+    // Returns length of stack.
+    // Another meaning is count of elements.
+    pub fn len(self): int {
+        ret self.mem.buff.len
+    }
+
+    // Returns capacity of stack.
+    // Another meaning is additional redy-to-use allocation size.
+    pub fn cap(self): int {
+        ret self.mem.buff.cap
+    }
+
+    // Reports whether stack is empty.
+    pub fn empty(self): bool {
+        ret self.len() == 0
+    }
+
+    // Removes all elements.
+    // Does not deallocates buffer, keeps capacity.
+    pub fn clear(mut self) {
+        self.mem.buff.len = 0
+    }
+
+    // Pushes element to top of the stack.
+    pub fn push(mut self, mut t: T) {
+        if self.len() >= self.cap() {
+            self.resize((self.cap() * GROW_FACTOR) + 1)
+        }
+        unsafe {
+            self.mem.buff.heap[self.len()] = t
+        }
+        self.mem.buff.len++
+    }
+
+    // Returns top element of stack, then removes top element.
+    // Panics if stack is empty.
+    pub fn pop(mut self): T {
+        if self.empty() {
+            panic("Stack[T]: pop with zero-length stack")
+        }
+        self.mem.buff.len--
+        unsafe {
+            ret self.mem.buff.heap[self.len()]
+        }
+    }
+
+    // Returns top element of stack.
+    // Panics if stack is empty.
+    pub fn top(mut self): T {
+        if self.empty() {
+            panic("Stack[T]: top with zero-length stack")
+        }
+        unsafe {
+            ret self.mem.buff.heap[self.len() - 1]
+        }
+    }
+
+    // Returns slice that contains elements of stack.
+    // Slice is not mutable reference to internal buffer, but can effect internal
+    // buffer if T is mutable type.
+    // Appends elements in top-to-bottom order.
+    pub fn slice(mut self): []T {
+        if self.empty() {
+            ret nil
+        }
+        let mut s = make([]T, 0, self.len())
+        let mut i = self.mem.buff.heap + self.len() - 1
+        let j = self.mem.buff.heap
+        for i >= j; i-- {
+            s = append(s, unsafe { *i })
+        }
+        ret s
+    }
+}
