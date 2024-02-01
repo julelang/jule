@@ -6,6 +6,7 @@
 #define __JULE_TYPES_HPP
 
 #include <cstddef>
+#include <cstdint>
 #include <ostream>
 
 #include "platform.hpp"
@@ -23,14 +24,14 @@ namespace jule
     typedef unsigned long long int Uintptr;
 #endif
 
-    typedef signed char I8;
-    typedef signed short int I16;
-    typedef signed long int I32;
-    typedef signed long long int I64;
-    typedef unsigned char U8;
-    typedef unsigned short int U16;
-    typedef unsigned long int U32;
-    typedef unsigned long long int U64;
+    using I8 = std::int8_t;
+    using I16 = std::int16_t;
+    using I32 = std::int32_t;
+    using I64 = std::int64_t;
+    using U8 = std::uint8_t;
+    using U16 = std::uint16_t;
+    using U32 = std::uint32_t;
+    using U64 = std::uint64_t;
     typedef float F32;
     typedef double F64;
     typedef bool Bool;
