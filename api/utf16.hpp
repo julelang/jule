@@ -87,7 +87,7 @@ namespace jule
         for (std::size_t index = 0; index < s.length();)
         {
             jule::I32 rune;
-            jule::Int n;
+            std::size_t n;
             std::tie(rune, n) = jule::utf8_decode_rune_str(str + index,
                                                            s.length() - index);
             index += n;
