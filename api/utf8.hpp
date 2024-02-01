@@ -52,7 +52,7 @@ namespace jule
 
     struct UTF8AcceptRange;
     std::string runes_to_utf8(const std::vector<jule::I32> &s) noexcept;
-    std::tuple<jule::I32, jule::Int> utf8_decode_rune_str(const char *s, const jule::Int &len);
+    std::tuple<jule::I32, std::size_t> utf8_decode_rune_str(const char *s, const std::size_t len);
     std::vector<jule::U8> utf8_rune_to_bytes(const jule::I32 &r);
 
     // Definitions
@@ -340,10 +340,10 @@ namespace jule
         return buffer;
     }
 
-    std::tuple<jule::I32, jule::Int>
-    utf8_decode_rune_str(const char *s, const jule::Int &len)
+    std::tuple<jule::I32, std::size_t>
+    utf8_decode_rune_str(const char *s, const std::size_t len)
     {
-        if (len < 1)
+        if (len == 0)
             return std::make_tuple<jule::I32, jule::Int>(jule::UTF8_RUNE_ERROR, 0);
 
         const auto s0 = static_cast<jule::U8>(s[0]);
@@ -356,27 +356,27 @@ namespace jule
                                    1);
         }
 
-        const auto sz = static_cast<jule::Int>(x & 7);
+        const auto sz = static_cast<std::size_t>(x & 7);
         const struct jule::UTF8AcceptRange accept = jule::utf8_accept_ranges[x >> 4];
         if (len < sz)
-            return std::make_tuple<jule::I32, jule::Int>(jule::UTF8_RUNE_ERROR, 1);
+            return std::make_tuple<jule::I32, std::size_t>(jule::UTF8_RUNE_ERROR, 1);
 
         const auto s1 = static_cast<jule::U8>(s[1]);
         if (s1 < accept.lo || accept.hi < s1)
-            return std::make_tuple<jule::I32, jule::Int>(jule::UTF8_RUNE_ERROR, 1);
+            return std::make_tuple<jule::I32, std::size_t>(jule::UTF8_RUNE_ERROR, 1);
 
         if (sz <= 2)
-            return std::make_tuple<jule::I32, jule::Int>(
+            return std::make_tuple<jule::I32, std::size_t>(
                 (static_cast<jule::I32>(s0 & jule::UTF8_MASK2) << 6) |
                     static_cast<jule::I32>(s1 & jule::UTF8_MASKX),
                 2);
 
         const auto s2 = static_cast<jule::U8>(s[2]);
         if (s2 < jule::UTF8_LOCB || jule::UTF8_HICB < s2)
-            return std::make_tuple<jule::I32, jule::Int>(jule::UTF8_RUNE_ERROR, 1);
+            return std::make_tuple<jule::I32, std::size_t>(jule::UTF8_RUNE_ERROR, 1);
 
         if (sz <= 3)
-            return std::make_tuple<jule::I32, jule::Int>(
+            return std::make_tuple<jule::I32, std::size_t>(
                 (static_cast<jule::I32>(s0 & jule::UTF8_MASK3) << 12) |
                     (static_cast<jule::I32>(s1 & jule::UTF8_MASKX) << 6) |
                     static_cast<jule::I32>(s2 & jule::UTF8_MASKX),
@@ -384,7 +384,7 @@ namespace jule
 
         const auto s3 = static_cast<jule::U8>(s[3]);
         if (s3 < jule::UTF8_LOCB || jule::UTF8_HICB < s3)
-            return std::make_tuple<jule::I32, jule::Int>(jule::UTF8_RUNE_ERROR, 1);
+            return std::make_tuple<jule::I32, std::size_t>(jule::UTF8_RUNE_ERROR, 1);
 
         return std::make_tuple((static_cast<jule::I32>(s0 & jule::UTF8_MASK4) << 18) |
                                    (static_cast<jule::I32>(s1 & jule::UTF8_MASKX) << 12) |
