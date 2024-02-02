@@ -108,11 +108,8 @@ namespace jule
             this->__get_copy(src);
         }
 
-        Ptr(jule::Ptr<T> &&src) noexcept
+        Ptr(jule::Ptr<T> &&src) noexcept : alloc(src.alloc), ref(src.ref)
         {
-            this->alloc = src.alloc;
-            this->ref = src.ref;
-
             // Avoid deallocation.
             src.ref = nullptr;
         }
