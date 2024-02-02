@@ -87,7 +87,7 @@ namespace jule
             this->__get_copy(src);
         }
 
-        Slice(const jule::Slice<Item> &&src) noexcept
+        Slice(jule::Slice<Item> &&src) noexcept
         {
             this->__get_copy(src);
         }

@@ -66,7 +66,7 @@ namespace jule
             this->__get_copy(src);
         }
 
-        Trait(const jule::Trait<Mask> &&src) noexcept
+        Trait(jule::Trait<Mask> &&src) noexcept
         {
             this->__get_copy(src);
         }
