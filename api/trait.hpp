@@ -139,7 +139,7 @@ namespace jule
             return *this->data;
         }
 
-        ~Trait(void) {}
+        ~Trait(void) = default;
 
         template <typename T>
         inline T cast(
