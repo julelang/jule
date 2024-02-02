@@ -105,11 +105,8 @@ namespace jule
             this->__get_copy(src);
         }
 
-        Any(const jule::Any &&src) noexcept
+        Any(const jule::Any &&src) noexcept : data(src.data), type(src.type)
         {
-            this->data = src.data;
-            this->type = src.type;
-
             // Avoid deallocation.
             src.data = nullptr;
         }
