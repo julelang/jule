@@ -11,6 +11,7 @@
 #include <cstring>
 #include <vector>
 
+#include "impl_flag.hpp"
 #include "panic.hpp"
 #include "utf8.hpp"
 #include "utf16.hpp"
@@ -63,22 +64,22 @@ namespace jule
         typedef jule::U8 *Iterator;
         typedef const jule::U8 *ConstIterator;
 
-        constexpr Iterator begin(void) noexcept
+        __JULE_INLINE_BEFORE_CPP20 __JULE_CONSTEXPR_SINCE_CPP20 Iterator begin(void) noexcept
         {
             return static_cast<Iterator>(&this->buffer[0]);
         }
 
-        constexpr ConstIterator begin(void) const noexcept
+        __JULE_INLINE_BEFORE_CPP20 __JULE_CONSTEXPR_SINCE_CPP20 ConstIterator begin(void) const noexcept
         {
             return static_cast<ConstIterator>(&this->buffer[0]);
         }
 
-        constexpr Iterator end(void) noexcept
+        __JULE_INLINE_BEFORE_CPP20 __JULE_CONSTEXPR_SINCE_CPP20 Iterator end(void) noexcept
         {
             return static_cast<Iterator>(&this->buffer[this->len()]);
         }
 
-        constexpr ConstIterator end(void) const noexcept
+        inline ConstIterator end(void) const noexcept
         {
             return static_cast<ConstIterator>(&this->buffer[this->len()]);
         }
@@ -136,12 +137,12 @@ namespace jule
                 0, this->len());
         }
 
-        constexpr jule::Int len(void) const noexcept
+        __JULE_INLINE_BEFORE_CPP20 __JULE_CONSTEXPR_SINCE_CPP20 jule::Int len(void) const noexcept
         {
-            return this->buffer.length();
+            return static_cast<jule::Int>(this->buffer.length());
         }
 
-        constexpr jule::Bool empty(void) const noexcept
+        __JULE_INLINE_BEFORE_CPP20 __JULE_CONSTEXPR_SINCE_CPP20 jule::Bool empty(void) const noexcept
         {
             return this->buffer.empty();
         }
@@ -192,7 +193,7 @@ namespace jule
 
         // Returns element by index.
         // Not includes safety checking.
-        constexpr jule::U8 &__at(const jule::Int &index) noexcept
+        __JULE_INLINE_BEFORE_CPP20 __JULE_CONSTEXPR_SINCE_CPP20 jule::U8 &__at(const jule::Int &index) noexcept
         {
             return this->buffer[index];
         }

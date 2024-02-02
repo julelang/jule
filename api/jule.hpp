@@ -16,6 +16,7 @@ CONFIGURATION DEFINES
 #ifndef __JULE_HPP
 #define __JULE_HPP
 
+#include "impl_flag.hpp"
 #include "derive/derive.hpp"
 #include "any.hpp"
 #include "array.hpp"
