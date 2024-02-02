@@ -108,7 +108,7 @@ namespace jule
             this->__get_copy(src);
         }
 
-        Ptr(const jule::Ptr<T> &&src) noexcept
+        Ptr(jule::Ptr<T> &&src) noexcept
         {
             this->alloc = src.alloc;
             this->ref = src.ref;
