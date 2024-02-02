@@ -11,8 +11,6 @@ An effective programming language to build efficient, fast, reliable and safe so
 [Contributing](https://jule.dev/contribute) |
 [Community](https://jule.dev/community)
 
-[![Build](https://github.com/julelang/jule/actions/workflows/build.yml/badge.svg)](https://github.com/julelang/jule/actions/workflows/build.yml)
-[![Tests](https://github.com/julelang/jule/actions/workflows/tests.yml/badge.svg)](https://github.com/julelang/jule/actions/workflows/tests.yml)
 [![Jule Community](https://dcbadge.vercel.app/api/server/ReWQgPDnP6?style=flat)](https://discord.gg/XNSUUDuGGQ)
 
 </strong>
