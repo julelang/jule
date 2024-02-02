@@ -21,32 +21,32 @@
 
 namespace jule
 {
-    constexpr signed int UTF8_RUNE_ERROR = 65533;
-    constexpr signed int UTF8_MASKX = 63;
-    constexpr signed int UTF8_MASK2 = 31;
-    constexpr signed int UTF8_MASK3 = 15;
-    constexpr signed int UTF8_MASK4 = 7;
-    constexpr signed int UTF8_LOCB = 128;
-    constexpr signed int UTF8_HICB = 191;
-    constexpr signed int UTF8_XX = 241;
-    constexpr signed int UTF8_AS = 240;
-    constexpr signed int UTF8_S1 = 2;
-    constexpr signed int UTF8_S2 = 19;
-    constexpr signed int UTF8_S3 = 3;
-    constexpr signed int UTF8_S4 = 35;
-    constexpr signed int UTF8_S5 = 52;
-    constexpr signed int UTF8_S6 = 4;
-    constexpr signed int UTF8_S7 = 68;
-    constexpr signed int UTF8_RUNE1_MAX = 127;
-    constexpr signed int UTF8_RUNE2_MAX = 2047;
-    constexpr signed int UTF8_RUNE3_MAX = 65535;
-    constexpr signed int UTF8_TX = 128;
-    constexpr signed int UTF8_T2 = 192;
-    constexpr signed int UTF8_T3 = 224;
-    constexpr signed int UTF8_T4 = 240;
-    constexpr signed int UTF8_MAX_RUNE = 1114111;
-    constexpr signed int UTF8_SURROGATE_MIN = 55296;
-    constexpr signed int UTF8_SURROGATE_MAX = 57343;
+    constexpr jule::I32 UTF8_RUNE_ERROR = 65533;
+    constexpr jule::I32 UTF8_MASKX = 63;
+    constexpr jule::I32 UTF8_MASK2 = 31;
+    constexpr jule::I32 UTF8_MASK3 = 15;
+    constexpr jule::I32 UTF8_MASK4 = 7;
+    constexpr jule::I32 UTF8_LOCB = 128;
+    constexpr jule::I32 UTF8_HICB = 191;
+    constexpr jule::I32 UTF8_XX = 241;
+    constexpr jule::I32 UTF8_AS = 240;
+    constexpr jule::I32 UTF8_S1 = 2;
+    constexpr jule::I32 UTF8_S2 = 19;
+    constexpr jule::I32 UTF8_S3 = 3;
+    constexpr jule::I32 UTF8_S4 = 35;
+    constexpr jule::I32 UTF8_S5 = 52;
+    constexpr jule::I32 UTF8_S6 = 4;
+    constexpr jule::I32 UTF8_S7 = 68;
+    constexpr jule::I32 UTF8_RUNE1_MAX = 127;
+    constexpr jule::I32 UTF8_RUNE2_MAX = 2047;
+    constexpr jule::I32 UTF8_RUNE3_MAX = 65535;
+    constexpr jule::I32 UTF8_TX = 128;
+    constexpr jule::I32 UTF8_T2 = 192;
+    constexpr jule::I32 UTF8_T3 = 224;
+    constexpr jule::I32 UTF8_T4 = 240;
+    constexpr jule::I32 UTF8_MAX_RUNE = 1114111;
+    constexpr jule::I32 UTF8_SURROGATE_MIN = 55296;
+    constexpr jule::I32 UTF8_SURROGATE_MAX = 57343;
 
     // Declarations
 
@@ -344,7 +344,7 @@ namespace jule
     utf8_decode_rune_str(const char *s, const std::size_t len)
     {
         if (len == 0)
-            return std::make_tuple<jule::I32, jule::Int>(jule::UTF8_RUNE_ERROR, 0);
+            return std::make_tuple(jule::UTF8_RUNE_ERROR, 0);
 
         const auto s0 = static_cast<jule::U8>(s[0]);
         const jule::U8 x = jule::utf8_first[s0];
@@ -359,11 +359,11 @@ namespace jule
         const auto sz = static_cast<std::size_t>(x & 7);
         const struct jule::UTF8AcceptRange accept = jule::utf8_accept_ranges[x >> 4];
         if (len < sz)
-            return std::make_tuple<jule::I32, std::size_t>(jule::UTF8_RUNE_ERROR, 1);
+            return std::make_tuple(jule::UTF8_RUNE_ERROR, 1);
 
         const auto s1 = static_cast<jule::U8>(s[1]);
         if (s1 < accept.lo || accept.hi < s1)
-            return std::make_tuple<jule::I32, std::size_t>(jule::UTF8_RUNE_ERROR, 1);
+            return std::make_tuple(jule::UTF8_RUNE_ERROR, 1);
 
         if (sz <= 2)
             return std::make_tuple<jule::I32, std::size_t>(
@@ -373,7 +373,7 @@ namespace jule
 
         const auto s2 = static_cast<jule::U8>(s[2]);
         if (s2 < jule::UTF8_LOCB || jule::UTF8_HICB < s2)
-            return std::make_tuple<jule::I32, std::size_t>(jule::UTF8_RUNE_ERROR, 1);
+            return std::make_tuple(jule::UTF8_RUNE_ERROR, 1);
 
         if (sz <= 3)
             return std::make_tuple<jule::I32, std::size_t>(
@@ -384,7 +384,7 @@ namespace jule
 
         const auto s3 = static_cast<jule::U8>(s[3]);
         if (s3 < jule::UTF8_LOCB || jule::UTF8_HICB < s3)
-            return std::make_tuple<jule::I32, std::size_t>(jule::UTF8_RUNE_ERROR, 1);
+            return std::make_tuple(jule::UTF8_RUNE_ERROR, 1);
 
         return std::make_tuple((static_cast<jule::I32>(s0 & jule::UTF8_MASK4) << 18) |
                                    (static_cast<jule::I32>(s1 & jule::UTF8_MASKX) << 12) |

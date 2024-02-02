@@ -108,11 +108,11 @@ namespace jule
     std::tuple<jule::I32, jule::I32> utf16_encode_rune(jule::I32 r)
     {
         if (r < jule::UTF16_SURR_SELF || r > jule::UTF16_MAX_RUNE)
-            return std::make_tuple<jule::I32, jule::I32>(
+            return std::make_tuple(
                 jule::UTF16_REPLACEMENT_CHAR, jule::UTF16_REPLACEMENT_CHAR);
 
         r -= jule::UTF16_SURR_SELF;
-        return std::make_tuple<jule::I32, jule::I32>(
+        return std::make_tuple(
             jule::UTF16_SURR1 + (r >> 10) & 0x3ff, jule::UTF16_SURR2 + r & 0x3ff);
     }
 

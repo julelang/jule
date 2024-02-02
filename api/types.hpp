@@ -6,34 +6,34 @@
 #define __JULE_TYPES_HPP
 
 #include <cstddef>
+#include <cstdint>
 #include <ostream>
 
 #include "platform.hpp"
 
 namespace jule
 {
-
-#ifdef ARCH_X32
-    typedef unsigned long int Uint;
-    typedef signed long int Int;
-    typedef unsigned long int Uintptr;
-#else
-    typedef unsigned long long int Uint;
-    typedef signed long long int Int;
-    typedef unsigned long long int Uintptr;
-#endif
-
-    typedef signed char I8;
-    typedef signed short int I16;
-    typedef signed long int I32;
-    typedef signed long long int I64;
-    typedef unsigned char U8;
-    typedef unsigned short int U16;
-    typedef unsigned long int U32;
-    typedef unsigned long long int U64;
+    using I8 = std::int8_t;
+    using I16 = std::int16_t;
+    using I32 = std::int32_t;
+    using I64 = std::int64_t;
+    using U8 = std::uint8_t;
+    using U16 = std::uint16_t;
+    using U32 = std::uint32_t;
+    using U64 = std::uint64_t;
     typedef float F32;
     typedef double F64;
     typedef bool Bool;
+
+#ifdef ARCH_X32
+    using Uint = std::uint32_t;
+    using Int = std::int32_t;
+    using Uintptr = std::uint32_t;
+#else
+    using Uint = std::uint64_t;
+    using Int = std::int64_t;
+    using Uintptr = std::uint64_t;
+#endif
 
     constexpr decltype(nullptr) nil = nullptr;
 
@@ -44,7 +44,6 @@ namespace jule
     constexpr jule::I64 MAX_I64 = 9223372036854775807LL;
     constexpr jule::I64 MIN_I64 = -9223372036854775807 - 1;
     constexpr jule::U64 MAX_U64 = 18446744073709551615LLU;
-
 } // namespace jule
 
 inline std::ostream &operator<<(std::ostream &stream, const jule::I8 &x)
