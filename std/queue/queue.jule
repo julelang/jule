@@ -6,32 +6,32 @@ use dynar for std::internal::dynar
 
 const GROW_FACTOR = 2
 
-// LIFO data structure which is commonly called as stack.
+// FIFO data structure which is commonly called as queue.
 //
 // Deallocates itself when destroyed.
 //
-// Stacks aren't use shared allocation between themselves.
+// Queues aren't use shared allocation between themselves.
 // Allocates new space and copies (not deep copy) items into space.
-pub struct Stack[T] {
+pub struct Queue[T] {
     mem: dynar::Dynar[T]
 }
 
-impl Stack {
-    // Returns new stack instance with capacity.
-    pub static fn new(cap: int): Stack[T] {
-        let mut stack = Stack[T]{
+impl Queue {
+    // Returns new queue instance with capacity.
+    pub static fn new(cap: int): Queue[T] {
+        let mut queue = Queue[T]{
             mem: dynar::Dynar[T].new(),
         }
         if cap > 0 {
-            stack.resize(cap)
+            queue.resize(cap)
         }
-        ret stack
+        ret queue
     }
 
     fn resize(mut self, n: int) {
         let ok = self.mem.resize(n)
         if !ok {
-            panic("Stack[T]: heap reallocation failed")
+            panic("Queue[T]: heap reallocation failed")
         }
     }
 
@@ -49,19 +49,19 @@ impl Stack {
         }
     }
 
-    // Returns length of stack.
+    // Returns length of queue.
     // Another meaning is count of elements.
     pub fn len(self): int {
         ret self.mem.buff.len
     }
 
-    // Returns capacity of stack.
+    // Returns capacity of queue.
     // Another meaning is additional redy-to-use allocation size.
     pub fn cap(self): int {
         ret self.mem.buff.cap
     }
 
-    // Reports whether stack is empty.
+    // Reports whether queue is empty.
     pub fn empty(self): bool {
         ret self.len() == 0
     }
@@ -72,7 +72,7 @@ impl Stack {
         self.mem.buff.len = 0
     }
 
-    // Pushes element to top of the stack.
+    // Pushes element to rear of the queue.
     pub fn push(mut self, mut t: T) {
         if self.len() >= self.cap() {
             self.resize((self.cap() * GROW_FACTOR) + 1)
@@ -83,41 +83,43 @@ impl Stack {
         self.mem.buff.len++
     }
 
-    // Returns top element of stack, then removes top element.
-    // Panics if stack is empty.
+    // Returns element front of the queue, then removes front element.
+    // Panics if queue is empty.
     pub fn pop(mut self): T {
         if self.empty() {
-            panic("Stack[T]: pop with zero-length stack")
+            panic("Queue[T]: pop with zero-length queue")
+        }
+        let mut t = unsafe { self.mem.buff.heap[0] }
+        if self.len() != 1 {
+            self.mem.shift_left(1, self.len(), 1)
         }
         self.mem.buff.len--
-        unsafe {
-            ret self.mem.buff.heap[self.len()]
-        }
+        ret t
     }
 
-    // Returns top element of stack.
-    // Panics if stack is empty.
-    pub fn top(mut self): T {
+    // Returns front element of the queue.
+    // Panics if queue is empty.
+    pub fn front(mut self): T {
         if self.empty() {
-            panic("Stack[T]: top with zero-length stack")
+            panic("Queue[T]: front with zero-length queue")
         }
         unsafe {
-            ret self.mem.buff.heap[self.len() - 1]
+            ret self.mem.buff.heap[0]
         }
     }
 
-    // Returns slice that contains elements of stack.
+    // Returns slice that contains elements of queue.
     // Slice is not mutable reference to internal buffer, but can effect internal
     // buffer if T is mutable type.
-    // Appends elements in top-to-bottom order.
+    // Appends elements in front-to-rear order.
     pub fn slice(mut self): []T {
         if self.empty() {
             ret nil
         }
         let mut s = make([]T, 0, self.len())
-        let mut i = self.mem.buff.heap + self.len() - 1
-        let j = self.mem.buff.heap
-        for i >= j; i-- {
+        let mut i = self.mem.buff.heap
+        let j = self.mem.buff.heap + self.len()
+        for i < j; i++ {
             s = append(s, unsafe { *i })
         }
         ret s
