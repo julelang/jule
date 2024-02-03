@@ -50,7 +50,7 @@ pub struct TypeAlias {
     pub ident:      str
     pub kind:       &TypeSymbol
     pub doc:        str
-    pub refers:     []any // Referred identifiers.
+    pub refers:     []any // Referred identifiers, except cpp-linked ones.
     pub generics:   []&TypeAlias // See developer reference (1).
 }
 
@@ -764,12 +764,11 @@ impl TypeChecker {
         | &TypeAlias:
             let ta = (&TypeAlias)(decl)
             for _, d in ta.refers {
-                if self.referencer.owner == d {
+                match {
+                | self.referencer.owner == d:
                     self.push_cycle_error(ta, d, message)
                     ret false
-                }
-
-                if !self.check_cross_cycle(d, message) {
+                | !self.check_cross_cycle(d, message):
                     self.push_cycle_error(ta, d, message)
                     ret false
                 }
@@ -777,18 +776,16 @@ impl TypeChecker {
         | &Struct:
             let s = (&Struct)(decl)
             for _, d in s.depends {
-                if self.referencer.owner == d {
+                match {
+                | self.referencer.owner == d:
                     self.push_cycle_error(s, d, message)
                     ret false
-                }
-
-                if !self.check_cross_cycle(d, message) {
+                | !self.check_cross_cycle(d, message):
                     self.push_cycle_error(s, d, message)
                     ret false
                 }
             }
         }
-
         ret true
     }
 
@@ -803,7 +800,11 @@ impl TypeChecker {
 
         match type decl {
         | &Struct:
-            if self.not_plain {
+            if self.not_plain || (&Struct)(decl).cpp_linked {
+                ret true
+            }
+        | &TypeAlias:
+            if (&TypeAlias)(decl).cpp_linked {
                 ret true
             }
         }
