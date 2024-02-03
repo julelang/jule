@@ -26,7 +26,8 @@ namespace jule
     struct Array
     {
     public:
-        mutable Item buffer[N];
+        static_assert(N >= 0);
+        mutable Item buffer[static_cast<std::size_t>(N)];
 
         Array(void) = default;
 
@@ -163,7 +164,7 @@ namespace jule
         // Not includes safety checking.
         constexpr Item &__at(const jule::Int &index) const noexcept
         {
-            return this->buffer[index];
+            return this->buffer[static_cast<std::size_t>(index)];
         }
 
         // Returns element by index.
@@ -226,7 +227,7 @@ namespace jule
             stream << '[';
             for (jule::Int index = 0; index < N;)
             {
-                stream << src.buffer[index++];
+                stream << src[index++];
                 if (index < N)
                     stream << " ";
             }
