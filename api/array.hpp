@@ -19,10 +19,10 @@ namespace jule
 {
 
     // Built-in array type.
-    template <typename Item, const jule::Int N>
+    template <typename Item, jule::Int N>
     struct Array;
 
-    template <typename Item, const jule::Int N>
+    template <typename Item, jule::Int N>
     struct Array
     {
     public:
