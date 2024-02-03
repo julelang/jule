@@ -68,7 +68,7 @@ namespace jule
         return s_clone;
     }
 
-    template <typename Item, const jule::Uint N>
+    template <typename Item, jule::Uint N>
     jule::Array<Item, N> clone(const jule::Array<Item, N> &arr)
     {
         jule::Array<Item, N> arr_clone;
