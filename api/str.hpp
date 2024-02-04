@@ -61,8 +61,8 @@ namespace jule
             }
         }
 
-        typedef jule::U8 *Iterator;
-        typedef const jule::U8 *ConstIterator;
+        using Iterator = jule::U8*;
+        using ConstIterator = const jule::U8*;
 
         __JULE_INLINE_BEFORE_CPP20 __JULE_CONSTEXPR_SINCE_CPP20 Iterator begin(void) noexcept
         {

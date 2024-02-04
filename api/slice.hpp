@@ -210,8 +210,8 @@ namespace jule
                 *(this->_slice + i) = def;
         }
 
-        typedef Item *Iterator;
-        typedef const Item *ConstIterator;
+        using Iterator = Item*;
+        using ConstIterator = const Item*;
 
         constexpr Iterator begin(void) noexcept
         {
