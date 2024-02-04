@@ -3,24 +3,6 @@
 // license that can be found in the LICENSE file.
 
 use ast for std::jule::ast
-
-// Returns directive if exist.
-fn find_directive(mut &directives: []&ast::Directive, tag: str): &ast::Directive {
-    for (_, mut dr) in directives {
-        if dr.tag.kind == tag {
-            ret dr
-        }
-    }
-    ret nil
-}
-
-// Reports whether directive is exist.
-fn has_directive(&directives: []&ast::Directive, tag: str): bool {
-    ret find_directive(unsafe { *(&directives) }, tag) != nil
-}
-
-/*
-
 use conv for std::conv
 use std::jule::build::{Directive}
 use std::jule::sema::{
@@ -37,196 +19,250 @@ use std::jule::sema::{
     StructIns,
     FnIns,
     Arr,
+    ParamIns,
 }
 
-
-
-// Generates C++ code of Prim TypeKind.
-fn gen_prim_kind(p: &Prim): str {
-    ret as_jt(p.to_str())
+// Returns directive if exist.
+fn find_directive(mut &directives: []&ast::Directive, tag: str): &ast::Directive {
+    for (_, mut dr) in directives {
+        if dr.tag.kind == tag {
+            ret dr
+        }
+    }
+    ret nil
 }
 
-// Generates C++ code of Tupe TypeKind.
-fn gen_tuple_kind(mut t: &Tuple): str {
-    let mut obj = "std::tuple<"
-    for (_, mut tk) in t.types {
-        obj += gen_type_kind(tk)
+// Reports whether directive is exist.
+fn has_directive(&directives: []&ast::Directive, tag: str): bool {
+    ret find_directive(unsafe { *(&directives) }, tag) != nil
+}
+
+struct TypeCoder {}
+
+impl TypeCoder {
+    // Returns given identifier as Jule type identifier.
+    static fn to_type(mut id: str): str {
+        if 97 <= id[0] && id[0] <= 122 {
+            id[0] -= 32 // To upper first byte.
+        }
+        ret "jule::" + id
+    }
+
+    // Generates C++ code of Prim TypeKind.
+    static fn from_prim(p: &Prim): str {
+        ret TypeCoder.to_type(p.to_str())
+    }
+
+    // Generates C++ code of Tupe TypeKind.
+    static fn from_tuple(mut t: &Tuple): str {
+        let mut obj = "std::tuple<"
+        for (_, mut tk) in t.types {
+            obj += TypeCoder.from_kind(tk)
+            obj += ","
+        }
+        obj = obj[:obj.len-1] // Remove comma
+        obj += ">"
+        ret obj
+    }
+
+    // Returns C++ code of smart pointer type with element type.
+    static fn as_sptr(elem: str): str {
+        let mut obj = TypeCoder.to_type("ptr")
+        obj += "<"
+        obj += elem
+        obj += ">"
+        ret obj
+    }
+
+    // Generates C++ code of smart pointer TypeKind.
+    static fn from_sptr(mut sptr: &Sptr): str {
+        ret TypeCoder.as_sptr(TypeCoder.from_kind(sptr.elem))
+    }
+
+    // Generates C++ code of Ptr TypeKind.
+    static fn from_ptr(mut p: &Ptr): str {
+        const CPP_POINTER_MARK = "*"
+        if p.is_unsafe() {
+            ret "void" + CPP_POINTER_MARK
+        }
+        let mut elem = TypeCoder.from_kind(p.elem)
+        elem += CPP_POINTER_MARK
+        ret elem
+    }
+
+    // Generates C++ code of Enum TypeKind.
+    static fn from_enum(mut e: &Enum): str {
+        ret TypeCoder.from_kind(e.kind.kind)
+    }
+
+    static fn as_slice(mut elem: &TypeKind): str {
+        let mut obj = TypeCoder.to_type("slice")
+        obj += "<"
+        obj += TypeCoder.from_kind(elem)
+        obj += ">"
+        ret obj
+    }
+
+    // Generates C++ code of Slc TypeKind.
+    static fn from_slice(mut s: &Slc): str {
+        ret TypeCoder.as_slice(s.elem)
+    }
+
+    // Generates C++ code of Map TypeKind.
+    static fn from_map(mut m: &Map): str {
+        let mut obj = TypeCoder.to_type("map")
+        obj += "<"
+        obj += TypeCoder.from_kind(m.key)
         obj += ","
+        obj += TypeCoder.from_kind(m.val)
+        obj += ">"
+        ret obj
     }
-    obj = obj[:obj.len-1] // Remove comma
-    obj += ">"
-    ret obj
-}
 
-// Returns C++ code of smart pointer type with element type.
-fn as_sptr_kind(elem: str): str {
-    let mut obj = as_jt("ptr")
-    obj += "<"
-    obj += elem
-    obj += ">"
-    ret obj
-}
-
-// Generates C++ code of smart pointer TypeKind.
-fn gen_sptr_kind(mut sptr: &Sptr): str {
-    ret as_sptr_kind(gen_type_kind(sptr.elem))
-}
-
-// Generates C++ code of Ptr TypeKind.
-fn gen_ptr_kind(mut p: &Ptr): str {
-    const CPP_POINTER_MARK = "*"
-    if p.is_unsafe() {
-        ret "void" + CPP_POINTER_MARK
+    static fn from_trait_ident(ident: str): str {
+        let mut obj = TypeCoder.to_type("trait")
+        obj += "<"
+        obj += ident
+        obj += ">"
+        ret obj
     }
-    let mut elem = gen_type_kind(p.elem)
-    elem += CPP_POINTER_MARK
-    ret elem
-}
 
-// Generates C++ code of Enum TypeKind.
-fn gen_enum_kind(mut e: &Enum): str {
-    ret gen_type_kind(e.kind.kind)
-}
-
-fn as_slice_kind(mut elem: &TypeKind): str {
-    let mut obj = as_jt("slice")
-    obj += "<"
-    obj += gen_type_kind(elem)
-    obj += ">"
-    ret obj
-}
-
-// Generates C++ code of Slc TypeKind.
-fn gen_slice_kind(mut s: &Slc): str {
-    ret as_slice_kind(s.elem)
-}
-
-// Generates C++ code of Map TypeKind.
-fn gen_map_kind(mut m: &Map): str {
-    let mut obj = as_jt("map")
-    obj += "<"
-    obj += gen_type_kind(m.key)
-    obj += ","
-    obj += gen_type_kind(m.val)
-    obj += ">"
-    ret obj
-}
-
-fn gen_trait_kind_from_ident(ident: str): str {
-    let mut obj = as_jt("trait")
-    obj += "<"
-    obj += ident
-    obj += ">"
-    ret obj
-}
-
-// Generates C++ code of Trait TypeKind.
-fn gen_trait_kind(t: &Trait): str {
-    let ident = trait_out_ident(t)
-    ret gen_trait_kind_from_ident(ident)
-}
-
-// Generates C++ code of Struct TypeKind.
-fn gen_struct_kind(s: &Struct): str {
-    let mut rep = ""
-    if s.cpp_linked && !has_directive(s.directives, Directive.Typedef) {
-        rep += "struct "
+    // Generates C++ code of Trait TypeKind.
+    static fn from_trait(t: &Trait): str {
+        ret TypeCoder.from_trait_ident(IdentCoder.from_trait(t))
     }
-    rep += struct_out_ident(s)
-    ret rep
-}
 
-// Generates C++ code of Struct instance TypeKind.
-fn gen_struct_kind_ins(mut s: &StructIns): str {
-    if s.decl.cpp_linked {
-        let mut ident = struct_ins_out_ident(s)
-        if s.generics.len > 0 {
-            ident += "<"
-            for (_, mut g) in s.generics {
-                ident += gen_type_kind(g)
-                ident += ","
+    // Generates C++ code of Struct TypeKind.
+    static fn from_struct(s: &Struct): str {
+        let mut rep = ""
+        if s.cpp_linked && !has_directive(s.directives, Directive.Typedef) {
+            rep += "struct "
+        }
+        rep += IdentCoder.from_struct(s)
+        ret rep
+    }
+
+    // Generates C++ code of Struct instance TypeKind.
+    static fn from_struct_ins(mut s: &StructIns): str {
+        if s.decl.cpp_linked {
+            let mut ident = IdentCoder.from_struct_ins(s)
+            if s.generics.len > 0 {
+                ident += "<"
+                for (_, mut g) in s.generics {
+                    ident += TypeCoder.from_kind(g)
+                    ident += ","
+                }
+                ident = ident[:ident.len-1] // Remove last comma.
+                ident += ">"
             }
-            ident = ident[:ident.len-1] // Remove last comma.
-            ident += ">"
-        }
-        let d = find_directive(s.decl.directives, Directive.Namespace)
-        if d != nil {
-            ident = concat_all_parts(d.args...) + "::" + ident
-        }
-        ret ident
-    }
-    ret struct_ins_out_ident(s)
-}
-
-// Generates C++ code of Arr TypeKind.
-fn gen_array_kind(mut a: &Arr): str {
-    let mut obj = as_jt("array")
-    obj += "<"
-    obj += gen_type_kind(a.elem)
-    obj += ","
-    obj += conv::itoa(a.n)
-    obj += ">"
-    ret obj
-}
-
-fn gen_fn_anon_decl(mut f: &FnIns): str {
-    let mut decl = gen_fn_ins_result(f)
-
-    decl += "("
-    if f.params.len > 0 {
-        for (_, mut param) in f.params {
-            if param.decl.is_self() {
-                continue
+            let d = find_directive(s.decl.directives, Directive.Namespace)
+            if d != nil {
+                ident = concat_all_parts(d.args...) + "::" + ident
             }
-            decl += gen_param_ins_prototype(param)
-            decl += ","
+            ret ident
         }
-        decl = decl[:decl.len-1] // Remove last comma.
-    } else {
-        decl += "void"
+        ret IdentCoder.from_struct_ins(s)
     }
-    decl += ")"
-    ret decl
-}
 
-// Generates C++ code of Fn TypeKind.
-fn gen_fn_kind(mut f: &FnIns): str {
-    let mut obj = as_jt("fn")
-    obj += "<"
-    obj += gen_fn_anon_decl(f)
-    obj += ">"
-    ret obj
-}
+    // Generates C++ code of Arr TypeKind.
+    static fn from_array(mut a: &Arr): str {
+        let mut obj = TypeCoder.to_type("array")
+        obj += "<"
+        obj += TypeCoder.from_kind(a.elem)
+        obj += ","
+        obj += conv::itoa(a.n)
+        obj += ">"
+        ret obj
+    }
 
-// Generates C++ code of TypeKind.
-fn gen_type_kind(mut k: &TypeKind): str {
-    match {
-    | k.cpp_linked():
-        ret k.cpp_ident
-    | k.prim() != nil:
-        ret gen_prim_kind(k.prim())
-    | k.tup() != nil:
-        ret gen_tuple_kind(k.tup())
-    | k.sptr() != nil:
-        ret gen_sptr_kind(k.sptr())
-    | k.ptr() != nil:
-        ret gen_ptr_kind(k.ptr())
-    | k.enm() != nil:
-        ret gen_enum_kind(k.enm())
-    | k.slc() != nil:
-        ret gen_slice_kind(k.slc())
-    | k.map() != nil:
-        ret gen_map_kind(k.map())
-    | k.trt() != nil:
-        ret gen_trait_kind(k.trt())
-    | k.strct() != nil:
-        ret gen_struct_kind_ins(k.strct())
-    | k.arr() != nil:
-        ret gen_array_kind(k.arr())
-    | k.fnc() != nil:
-        ret gen_fn_kind(k.fnc())
-    |:
-        ret "[<unimplemented_type_kind>]"
+    // Generates C++ prototype code of parameter instance.
+    static fn from_param_ins(mut &p: &ParamIns): str {
+        let mut obj = ""
+        if p.decl.variadic {
+            obj += TypeCoder.to_type("slice")
+            obj += "<"
+            obj += TypeCoder.from_kind(p.kind)
+            obj += ">"
+        } else {
+            obj += TypeCoder.from_kind(p.kind)
+        }
+        if p.decl.reference {
+            obj += "&"
+        }
+        ret obj
+    }
+
+    // Generates C++ code of function instance's result type.
+    static fn from_fn_ins_result(mut &f: &FnIns): str {
+        if f.decl.is_void() {
+            if f.decl.exceptional {
+                ret "jule::VoidExceptional"
+            }
+            ret "void"
+        }
+        if f.decl.exceptional {
+            ret "jule::Exceptional<" + TypeCoder.from_kind(f.result) + ">"
+        }
+        ret TypeCoder.from_kind(f.result)
+    }
+
+    static fn gen_fn_anon_decl(mut f: &FnIns): str {
+        let mut decl = TypeCoder.from_fn_ins_result(f)
+        decl += "("
+        if f.params.len > 0 {
+            for (_, mut param) in f.params {
+                if param.decl.is_self() {
+                    continue
+                }
+                decl += TypeCoder.from_param_ins(param)
+                decl += ","
+            }
+            decl = decl[:decl.len-1] // Remove last comma.
+        } else {
+            decl += "void"
+        }
+        decl += ")"
+        ret decl
+    }
+
+    // Generates C++ code of Fn TypeKind.
+    static fn from_fn(mut f: &FnIns): str {
+        let mut obj = TypeCoder.to_type("fn")
+        obj += "<"
+        obj += TypeCoder.gen_fn_anon_decl(f)
+        obj += ">"
+        ret obj
+    }
+
+    // Generates C++ code of TypeKind.
+    static fn from_kind(mut k: &TypeKind): str {
+        match {
+        | k.cpp_linked():
+            ret k.cpp_ident
+        | k.prim() != nil:
+            ret TypeCoder.from_prim(k.prim())
+        | k.tup() != nil:
+            ret TypeCoder.from_tuple(k.tup())
+        | k.sptr() != nil:
+            ret TypeCoder.from_sptr(k.sptr())
+        | k.ptr() != nil:
+            ret TypeCoder.from_ptr(k.ptr())
+        | k.enm() != nil:
+            ret TypeCoder.from_enum(k.enm())
+        | k.slc() != nil:
+            ret TypeCoder.from_slice(k.slc())
+        | k.map() != nil:
+            ret TypeCoder.from_map(k.map())
+        | k.trt() != nil:
+            ret TypeCoder.from_trait(k.trt())
+        | k.strct() != nil:
+            ret TypeCoder.from_struct_ins(k.strct())
+        | k.arr() != nil:
+            ret TypeCoder.from_array(k.arr())
+        | k.fnc() != nil:
+            ret TypeCoder.from_fn(k.fnc())
+        |:
+            ret "[<unimplemented_type_kind>]"
+        }
     }
 }
-*/
