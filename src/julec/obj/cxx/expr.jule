@@ -73,6 +73,7 @@ use types for std::jule::types::{
 }
 use math for std::math
 use strings for std::strings
+use utf8 for std::unicode::utf8
 
 // Ignore expression for std::tie function.
 const CPP_IGNORE = "std::ignore"
@@ -105,7 +106,6 @@ fn check_for_bit_shift_opt(&l: &OperandExprModel, &r: &OperandExprModel): (ok: b
     match type r.model {
     | &Const:
         break
-
     |:
         ret false, 0
     }
@@ -123,17 +123,28 @@ fn check_for_bit_shift_opt(&l: &OperandExprModel, &r: &OperandExprModel): (ok: b
 
 fn decompose_common_esq(b: byte): str {
     match b {
-    | '\\': ret "\\\\"
-    | '\'': ret "'"
-    | '"':  ret `\"`
-    | '\a': ret `\a`
-    | '\b': ret `\b`
-    | '\f': ret `\f`
-    | '\n': ret `\n`
-    | '\r': ret `\r`
-    | '\t': ret `\t`
-    | '\v': ret `\v`
-    |:      ret ""
+    | '\\':
+        ret "\\\\"
+    | '\'':
+        ret "'"
+    | '"':
+        ret `\"`
+    | '\a':
+        ret `\a`
+    | '\b':
+        ret `\b`
+    | '\f':
+        ret `\f`
+    | '\n':
+        ret `\n`
+    | '\r':
+        ret `\r`
+    | '\t':
+        ret `\t`
+    | '\v':
+        ret `\v`
+    |:
+        ret ""
     }
 }
 
@@ -141,18 +152,15 @@ fn sbtoa(b: byte): str {
     if b == 0 {
         ret "\\x00"
     }
-
-    if b <= 127 { // ASCII
+    if b < utf8::RUNE_SELF { // ASCII, fast way.
         let seq = decompose_common_esq(b)
         if seq != "" {
             ret seq
         }
-
         if 32 <= b && b <= 126 {
             ret str(b)
         }
     }
-
     let seq = conv::fmt_uint(u64(b), 8)
     if seq.len == 2 {
         ret "\\0" + seq
@@ -160,13 +168,16 @@ fn sbtoa(b: byte): str {
     ret "\\" + seq
 }
 
-fn get_cstr_model(bytes: []byte): str {
+fn gen_cstr_bytes(bytes: []byte): str {
     let mut lit = ""
     for _, b in bytes {
         lit += sbtoa(b)
     }
+    ret lit
+}
 
-    ret `"` + lit + `"`
+fn get_cstr_model(bytes: []byte): str {
+    ret `"` + gen_cstr_bytes(bytes) + `"`
 }
 
 fn get_str_model(&c: &Const): str {
@@ -174,7 +185,6 @@ fn get_str_model(&c: &Const): str {
     if content.len == 0 { // Empty.
         ret as_jt("str") + "()"
     }
-
     let bytes = []byte(content)
     let len = conv::fmt_int(bytes.len, 10)
     let lit = get_cstr_model(bytes)
@@ -182,20 +192,23 @@ fn get_str_model(&c: &Const): str {
 }
 
 fn get_bool_model(&c: &Const): str {
-    if c.read_bool() {
-        ret "true"
-    }
-    ret "false"
+    ret if c.read_bool() { "true" } else { "false" }
 }
 
-fn get_nil_model(): str { ret "nullptr" }
+fn get_nil_model(): str {
+    ret "nullptr"
+}
 
 fn gen_float_special_cases(&x: f64): str {
     match {
-    | math::is_nan(x):     ret "NAN"
-    | math::is_inf(x, 1):  ret "INFINITY"
-    | math::is_inf(x, -1): ret "-INFINITY"
-    |:                     ret ""
+    | math::is_nan(x):
+        ret "NAN"
+    | math::is_inf(x, 1):
+        ret "INFINITY"
+    | math::is_inf(x, -1):
+        ret "-INFINITY"
+    |:
+        ret ""
     }
 }
 
@@ -208,7 +221,6 @@ fn ftoa(f: f64, bitsize: int): str {
             ret u64toa(u64(f))
         }
     }
-
     let mut m = conv::fmt_float(f, 'f', -1, bitsize)
     if !strings::contains(m, ".") {
         m += ".0"
@@ -226,10 +238,11 @@ fn get_f32_model(&c: &Const): str {
     }
 
     match {
-    | x == MAX_F32: ret "jule::MAX_F32"
-    | x == MIN_F32: ret "jule::MIN_F32"
+    | x == MAX_F32:
+        ret "jule::MAX_F32"
+    | x == MIN_F32:
+        ret "jule::MIN_F32"
     }
-
     ret ftoa(x, 32) + "f"
 }
 
@@ -243,8 +256,10 @@ fn get_f64_model(&c: &Const): str {
     }
 
     match {
-    | x == MAX_F64: ret "jule::MAX_F64"
-    | x == MIN_F64: ret "jule::MIN_F64"
+    | x == MAX_F64:
+        ret "jule::MAX_F64"
+    | x == MIN_F64:
+        ret "jule::MIN_F64"
     }
 
     ret ftoa(x, 64)
@@ -252,15 +267,19 @@ fn get_f64_model(&c: &Const): str {
 
 fn get_float_model(mut &d: &Data): str {
     match {
-    | d.kind.prim().is_f32(): ret get_f32_model(d.constant)
-    |:                        ret get_f64_model(d.constant) // 64-bit
+    | d.kind.prim().is_f32():
+        ret get_f32_model(d.constant)
+    |:
+        ret get_f64_model(d.constant) // 64-bit
     }
 }
 
 fn i64toa(x: i64): str {
     match {
-    | x == MAX_I64: ret "jule::MAX_I64"
-    | x == MIN_I64: ret "jule::MIN_I64"
+    | x == MAX_I64:
+        ret "jule::MAX_I64"
+    | x == MIN_I64:
+        ret "jule::MIN_I64"
     }
 
     let fmt = conv::fmt_int(x, 10)
@@ -293,25 +312,39 @@ fn get_u64_model(c: &Const): str {
 
 fn gen_const_expr(mut d: &Data): str {
     match {
-    | d.constant.is_str():  ret get_str_model(d.constant)
-    | d.constant.is_bool(): ret get_bool_model(d.constant)
-    | d.constant.is_f64():  ret get_float_model(d)
-    | d.constant.is_i64():  ret get_i64_model(d.constant)
-    | d.constant.is_u64():  ret get_u64_model(d.constant)
-    | d.constant.is_nil():  ret get_nil_model()
-    |:                      ret "" // Here is should be unreachable code.
+    | d.constant.is_str():
+        ret get_str_model(d.constant)
+    | d.constant.is_bool():
+        ret get_bool_model(d.constant)
+    | d.constant.is_f64():
+        ret get_float_model(d)
+    | d.constant.is_i64():
+        ret get_i64_model(d.constant)
+    | d.constant.is_u64():
+        ret get_u64_model(d.constant)
+    | d.constant.is_nil():
+        ret get_nil_model()
+    |:
+        ret "" // Here is should be unreachable code.
     }
 }
 
 fn gen_const_expr_model(m: &Const): str {
     match {
-    | m.is_str():  ret get_str_model(m)
-    | m.is_bool(): ret get_bool_model(m)
-    | m.is_f64():  ret get_f64_model(m)
-    | m.is_i64():  ret get_i64_model(m)
-    | m.is_u64():  ret get_u64_model(m)
-    | m.is_nil():  ret get_nil_model()
-    |:             ret "" // Here is should be unreachable code.
+    | m.is_str():
+        ret get_str_model(m)
+    | m.is_bool():
+        ret get_bool_model(m)
+    | m.is_f64():
+        ret get_f64_model(m)
+    | m.is_i64():
+        ret get_i64_model(m)
+    | m.is_u64():
+        ret get_u64_model(m)
+    | m.is_nil():
+        ret get_nil_model()
+    |:
+        ret "" // Here is should be unreachable code.
     }
 }
 
@@ -326,10 +359,11 @@ fn gen_div_by_zero_binop_expr_model(&op: Token, mut &l: &OperandExprModel, mut &
 
     let mut op_func = ""
     match op.kind {
-    | TokenKind.Solidus | TokenKind.SolidusEq:
+    | TokenKind.Solidus
+    | TokenKind.SolidusEq:
         op_func = if opt { "/" } else { "div" }
-
-    | TokenKind.Percent | TokenKind.PercentEq:
+    | TokenKind.Percent
+    | TokenKind.PercentEq:
         op_func = if opt { "%" } else { "mod" }
     }
 
@@ -337,7 +371,6 @@ fn gen_div_by_zero_binop_expr_model(&op: Token, mut &l: &OperandExprModel, mut &
     if opt {
         obj = "("
         obj += gen_expr(l.model)
-
         match op.kind {
         | TokenKind.Solidus:
             let (ok, x) = check_for_bit_shift_opt(l, r)
@@ -353,15 +386,15 @@ fn gen_div_by_zero_binop_expr_model(&op: Token, mut &l: &OperandExprModel, mut &
             obj += " "
             obj += gen_expr(r.model)
         }
-
         obj += ")"
     } else {
         obj = "jule::"
         obj += op_func
         obj += "("
         if !env::PRODUCTION {
+            obj += "\""
             obj += gen_loc_info(op)
-            obj += ","
+            obj += "\","
         }
         obj += gen_expr(l.model)
         obj += ","
@@ -441,16 +474,14 @@ fn gen_unary_expr_model(mut m: &UnaryExprModel): str {
         obj += gen_expr(m.expr.model)
         obj += "))"
         ret obj
-
     | TokenKind.Star:
         if env::PRODUCTION || m.expr.kind.sptr() == nil {
             break
         }
-
         let mut obj = gen_expr(m.expr.model)
-        obj += ".get("
+        obj += ".get(\""
         obj += gen_loc_info(m.op)
-        obj += ")"
+        obj += "\")"
         ret obj
     }
 
@@ -481,7 +512,6 @@ fn gen_cpp_struct_lit_expr_model(mut m: &StructLitExprModel): str {
                 }
                 continue
             }
-
             obj += field_out_ident(f.decl)
             obj += ": "
             for (_, mut arg) in m.args {
@@ -535,8 +565,9 @@ fn gen_alloc_struct_lit_expr_model(mut m: &AllocStructLitExprModel): str {
     obj += struct_ins_out_ident(m.lit.strct)
     obj += ">("
     if !env::PRODUCTION {
+        obj += "\""
         obj += gen_loc_info(m.lit.token)
-        obj += ","
+        obj += "\","
     }
     obj += "new( std::nothrow ) "
     obj += gen_struct_lit_expr_model(m.lit)
@@ -552,7 +583,6 @@ fn gen_casting_expr_model(mut m: &CastingExprModel): str {
         obj += "("
         obj += gen_expr_model(m.expr)
         obj += ")"
-
     | m.expr_kind.ptr() != nil
     | m.kind.ptr() != nil:
         obj += "(("
@@ -560,7 +590,6 @@ fn gen_casting_expr_model(mut m: &CastingExprModel): str {
         obj += ")("
         obj += gen_expr(m.expr)
         obj += "))"
-
     | m.expr_kind.trt() != nil
     | m.expr_kind.prim() != nil && m.expr_kind.prim().is_any():
         obj += gen_expr_model(m.expr)
@@ -577,11 +606,10 @@ fn gen_casting_expr_model(mut m: &CastingExprModel): str {
                 obj += "cast<"
                 obj += gen_type_kind(m.kind)
             }
-            obj += ">("
+            obj += ">(\""
             obj += gen_loc_info(m.token)
-            obj += ")"
+            obj += "\")"
         }
-
     |:
         obj += "static_cast<"
         obj += gen_type_kind(m.kind)
@@ -596,7 +624,6 @@ fn gen_arg_expr_models(mut models: []ExprModel): str {
     if models.len == 0 {
         ret ""
     }
-
     let mut obj = ""
     for (_, mut m) in models {
         obj += gen_expr(m)
@@ -608,18 +635,21 @@ fn gen_arg_expr_models(mut models: []ExprModel): str {
 
 fn gen_expr_model_for_call(mut expr: ExprModel): str {
     match type expr {
-    | &FnIns: ret gen_fn_ins_expr_model((&FnIns)(expr))
-    |:        ret gen_expr_model(expr)
+    | &FnIns:
+        ret gen_fn_ins_expr_model((&FnIns)(expr))
+    |:
+        ret gen_expr_model(expr)
     }
 }
 
+// Returns location information of token as cstr bytes.
 fn gen_loc_info(&t: Token): str {
     let mut loc = t.file.path()
     loc += ":"
     loc += conv::itoa(t.row)
     loc += ":"
     loc += conv::itoa(t.column)
-    ret get_cstr_model([]byte(loc))
+    ret gen_cstr_bytes([]byte(loc))
 }
 
 fn gen_pure_fn_call_expr_model(mut &m: &FnCallExprModel): str {
@@ -644,11 +674,11 @@ fn gen_pure_fn_call_expr_model(mut &m: &FnCallExprModel): str {
                 obj += "("
                 break
             }
-
             fall
         |:
-            obj += ".call("
+            obj += ".call(\""
             obj += gen_loc_info(m.token)
+            obj += "\""
             if m.args.len != 0 {
                 obj += ","
             }
@@ -674,11 +704,9 @@ fn is_forwarded(&s: &Scope): bool {
         match type (&Data)(last).model {
         | &BuiltinErrorCallExprModel:
             ret true
-
         |:
             ret false
         }
-
     |:
         ret true
     }
@@ -720,16 +748,9 @@ fn gen_fn_call_expr_model(mut m: &FnCallExprModel): str {
         }
         done_indent()
     } else {
-        let mut path = get_cstr_model([]byte(m.token.file.path()))
-        path = path[1:path.len-1] // Remove quotes.
-
         obj += `if (!except.ok()) jule::panic(jule::Str("`
         obj += `unhandled exceptional: ") + except.error.type->to_str(except.error.data) + jule::Str("\nlocation: `
-        obj += path
-        obj += ":"
-        obj += conv::itoa(m.token.row)
-        obj += ":"
-        obj += conv::itoa(m.token.column)
+        obj += gen_loc_info(m.token)
         obj += "\"));\n"
         if !m.func.decl.is_void() {
             obj += indent()
@@ -747,7 +768,6 @@ fn gen_slice_expr_model(mut m: &SliceExprModel): str {
     if m.elems.len == 0 {
         ret as_slice_kind(m.elem_kind) + "()"
     }
-
     let mut obj = as_slice_kind(m.elem_kind)
     obj += "({"
     obj += gen_arg_expr_models(m.elems)
@@ -799,11 +819,10 @@ fn gen_indexing_expr_model(mut m: &IndexingExprModel): str {
         obj += "["
         obj += gen_expr(m.index.model)
         obj += "]"
-
     |:
-        obj += ".at("
+        obj += ".at(\""
         obj += gen_loc_info(m.token)
-        obj += ","
+        obj += "\","
         obj += gen_expr(m.index.model)
         obj += ")"
     }
@@ -850,8 +869,9 @@ fn gen_slicing_expr_model(mut m: &SlicingExprModel): str {
     let mut obj = gen_expr_model(m.expr)
     obj += ".slice("
     if !env::PRODUCTION {
+        obj += "\""
         obj += gen_loc_info(m.token)
-        obj += ","
+        obj += "\","
     }
     obj += gen_expr(m.left)
     if m.right != nil {
@@ -866,7 +886,9 @@ fn gen_trait_sub_ident_expr_model(mut m: &TraitSubIdentExprModel): str {
     let mut obj = gen_expr_model(m.expr)
     obj += ".get("
     if !env::PRODUCTION {
+        obj += "\""
         obj += gen_loc_info(m.token)
+        obj += "\""
     }
     obj += ")._method_"
     obj += m.ident
@@ -983,17 +1005,10 @@ fn gen_builtin_outln_call_expr_model(mut m: &BuiltinOutlnCallExprModel): str {
 }
 
 fn gen_builtin_panic_call_expr_model(mut m: &BuiltinPanicCallExprModel): str {
-    let mut path = get_cstr_model([]byte(m.token.file.path()))
-    path = path[1:path.len-1] // Remove quotes.
-
     let mut obj = "jule::panic("
     obj += gen_expr(m.expr)
     obj += ` + jule::Str("\nlocation: `
-    obj += path
-    obj += ":"
-    obj += conv::itoa(m.token.row)
-    obj += ":"
-    obj += conv::itoa(m.token.column)
+    obj += gen_loc_info(m.token)
     obj += "\"));"
     ret obj
 }
@@ -1002,19 +1017,12 @@ fn gen_builtin_assert_call_expr_model(mut m: &BuiltinAssertCallExprModel): str {
     if env::PRODUCTION {
         ret ""
     }
-    let mut path = get_cstr_model([]byte(m.token.file.path()))
-    path = path[1:path.len-1] // Remove quotes.
-
     let mut obj = "if (!("
     obj += gen_expr(m.expr)
     obj += ")) jule::panic(jule::Str("
     obj += get_cstr_model([]byte(m.log))
     obj += `) + jule::Str("\nlocation: `
-    obj += path
-    obj += ":"
-    obj += conv::itoa(m.token.row)
-    obj += ":"
-    obj += conv::itoa(m.token.column)
+    obj += gen_loc_info(m.token)
     obj += "\"));"
     ret obj
 }
@@ -1096,7 +1104,6 @@ fn gen_builtin_append_call_expr_model_assign(mut dest: ExprModel, mut m: &Builti
             let same_dest = m.dest == dest_var
             ret gen_builtin_append_call_expr_model_assign_opt(
                 same_dest, dest_expr, dest_var.kind.kind, s, m), true
-
         | &StructSubIdentExprModel:
             let mut s = (&SliceExprModel)(m.elements)
             let dest_expr = gen_expr_model(dest)
@@ -1180,7 +1187,6 @@ fn gen_backend_emit_expr_model(mut m: &BackendEmitExprModel): str {
     if m.exprs.len == 0 {
         ret m.code
     }
-
     for (i, mut expr) in m.exprs {
         m.exprs[i] = gen_expr(expr)
     }
@@ -1198,130 +1204,88 @@ fn gen_expr_model(mut m: ExprModel): str {
     match type m {
     | &Data:
         ret gen_expr_model((&Data)(m).model)
-
     | &TypeKind:
         ret gen_type_kind((&TypeKind)(m))
-
     | &Const:
         ret gen_const_expr_model((&Const)(m))
-
     | &Var:
         ret gen_var_expr_model((&Var)(m))
-
     | &Trait:
         ret trait_out_ident((&Trait)(m))
-
     | &Struct:
         ret gen_struct_expr_model((&Struct)(m))
-
     | &StructIns:
         ret gen_struct_ins_expr_model((&StructIns)(m))
-
     | &FnIns:
         ret gen_fn_ins_expr_model_common((&FnIns)(m))
-
     | &BinopExprModel:
         ret gen_binop_expr_model((&BinopExprModel)(m))
-
     | &UnaryExprModel:
         ret gen_unary_expr_model((&UnaryExprModel)(m))
-
     | &StructLitExprModel:
         ret gen_struct_lit_expr_model((&StructLitExprModel)(m))
-
     | &AllocStructLitExprModel:
         ret gen_alloc_struct_lit_expr_model((&AllocStructLitExprModel)(m))
-
     | &CastingExprModel:
         ret gen_casting_expr_model((&CastingExprModel)(m))
-
     | &FnCallExprModel:
         ret gen_fn_call_expr_model((&FnCallExprModel)(m))
-
     | &SliceExprModel:
         ret gen_slice_expr_model((&SliceExprModel)(m))
-
     | &ArrayExprModel:
         ret gen_array_expr_model((&ArrayExprModel)(m))
-
     | &IndexingExprModel:
         ret gen_indexing_expr_model((&IndexingExprModel)(m))
-
     | &AnonFnExprModel:
         ret gen_anon_fn_expr_model((&AnonFnExprModel)(m))
-
     | &MapExprModel:
         ret gen_map_expr_model((&MapExprModel)(m))
-
     | &SlicingExprModel:
         ret gen_slicing_expr_model((&SlicingExprModel)(m))
-
     | &TraitSubIdentExprModel:
         ret gen_trait_sub_ident_expr_model((&TraitSubIdentExprModel)(m))
-
     | &StructSubIdentExprModel:
         ret gen_struct_sub_ident_expr_model((&StructSubIdentExprModel)(m))
-
     | &CommonIdentExprModel:
         ret gen_common_ident_expr_model((&CommonIdentExprModel)(m))
-
     | &CommonSubIdentExprModel:
         ret gen_common_sub_ident_expr_model((&CommonSubIdentExprModel)(m))
-
     | &TupleExprModel:
         ret gen_tuple_expr_model((&TupleExprModel)(m))
-
     | &BuiltinOutCallExprModel:
         ret gen_builtin_out_call_expr_model((&BuiltinOutCallExprModel)(m))
-
     | &BuiltinOutlnCallExprModel:
         ret gen_builtin_outln_call_expr_model((&BuiltinOutlnCallExprModel)(m))
-
     | &BuiltinNewCallExprModel:
         ret gen_builtin_new_call_expr_model((&BuiltinNewCallExprModel)(m))
-
     | &BuiltinPanicCallExprModel:
         ret gen_builtin_panic_call_expr_model((&BuiltinPanicCallExprModel)(m))
-
     | &BuiltinAssertCallExprModel:
         ret gen_builtin_assert_call_expr_model((&BuiltinAssertCallExprModel)(m))
-
     | &BuiltinErrorCallExprModel:
         ret gen_builtin_error_call_expr_model((&BuiltinErrorCallExprModel)(m))
-
     | &BuiltinMakeCallExprModel:
         ret gen_builtin_make_call_expr_model((&BuiltinMakeCallExprModel)(m))
-
     | &BuiltinAppendCallExprModel:
         ret gen_builtin_append_call_expr_model((&BuiltinAppendCallExprModel)(m))
-
     | &BuiltinCloneCallExprModel:
         ret gen_builtin_clone_call_expr_model((&BuiltinCloneCallExprModel)(m))
-
     | &SizeofExprModel:
         ret gen_sizeof_expr_model((&SizeofExprModel)(m))
-
     | &AlignofExprModel:
         ret gen_alignof_expr_model((&AlignofExprModel)(m))
-
     | &RuneExprModel:
         ret gen_rune_expr_model((&RuneExprModel)(m))
-
     | &StructStaticIdentExprModel:
         ret gen_struct_static_ident_expr_model((&StructStaticIdentExprModel)(m))
-
     | &IntegratedToStrExprModel:
         ret gen_integrated_to_str_expr_model((&IntegratedToStrExprModel)(m))
-
     | &TernaryExprModel:
         ret gen_ternary_expr_model((&TernaryExprModel)(m))
-
     | &BackendEmitExprModel:
         ret gen_backend_emit_expr_model((&BackendEmitExprModel)(m))
-
     | &FreeExprModel:
         ret gen_free_expr_model((&FreeExprModel)(m))
-
     |:
         ret "<unimplemented_expression_model>"
     }
@@ -1332,7 +1296,6 @@ fn gen_expr(mut e: ExprModel): str {
     if obj.len == 0 || obj[0] != '(' {
         ret obj
     }
-
     match type e {
     | &BinopExprModel:
         obj = obj[1:obj.len-1]
@@ -1351,7 +1314,6 @@ fn get_init_expr(mut t: &TypeKind): str {
     if t.ptr() != nil {
         ret "nullptr"
     }
-
     let mut enm = t.enm()
     if enm != nil {
         ret gen_val(enm.items[0].value)
