@@ -142,7 +142,7 @@ namespace jule
 
         constexpr jule::Bool operator==(const jule::Array<Item, N> &src) const
         {
-            if (this->begin() == src.begin())
+            if (*this == src)
                 return true;
 
             jule::Array<Item, N>::ConstIterator it = src.begin();
