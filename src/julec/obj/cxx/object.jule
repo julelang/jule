@@ -1,62 +1,49 @@
-// Copyright 2023-2024 The Jule Programming Language.
+// Copyright 2024 The Jule Programming Language.
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
-/*
-use env
+
 use obj::{IR}
 
-use conv for std::conv
-use std::jule::{VERSION}
 use std::jule::build::{
-    Directive,
-    Derive,
-    INIT_FN,
-    PATH_API,
     is_std_header_path,
-    is_valid_cpp_ext,
     is_valid_header_ext,
 }
 use std::jule::lex::{
     TokenId,
-    TokenKind,
     is_ignore_ident,
     is_anon_ident,
 }
 use std::jule::sema::{
     Package,
-    ImportInfo,
     SymbolTable,
-    Var,
-    StructIns,
-    Struct,
-    FieldIns,
-    Fn,
-    FnIns,
-    Trait,
     Param,
     ParamIns,
-    BUILTIN_TRAIT_DISPOSE,
+    Trait,
+    Struct,
+    FieldIns,
 }
-use std::time::{Time}
 use strings for std::strings
-
-// The self keyword equavalent of generated cpp.
-const CPP_SELF = "this"
-
-// C++ statement terminator.
-const CPP_ST_TERM = ";"
-
-const INDENT_KIND = "\t"
 
 struct ObjectCoder {
     ir: &IR
     // Current indention.
     indent_buffer: str
+
+    ec: &ExprCoder
+    sc: &ScopeCoder
 }
 
 impl ObjectCoder {
+    static fn new(mut &ir: &IR): &ObjectCoder {
+        let mut objc = new(ObjectCoder)
+        objc.ec = ExprCoder.new(objc)
+        objc.sc = ScopeCoder.new(objc)
+        ret objc
+    }
+
     // Increase indentation.
     fn add_indent(mut self) {
+        const INDENT_KIND = "\t"
         self.indent_buffer += INDENT_KIND
     }
 
@@ -97,48 +84,20 @@ impl ObjectCoder {
         ret obj
     }
 
-    // Generates C++ code of function's result type.
-    fn gen_fn_result(mut self, mut &f: &Fn): str {
-        if f.is_void() {
-            if f.exceptional {
-                ret "jule::VoidExceptional"
-            }
-            ret "void"
-        }
-        if f.exceptional {
-            ret "jule::Exceptional<" + gen_type_kind(f.result.kind.kind) + ">"
-        }
-        ret gen_type_kind(f.result.kind.kind)
-    }
-
-    // Generates C++ prototype code of parameter.
-    fn gen_param_prototype(mut self, mut &p: &Param): str {
-        let mut obj = ""
-        if p.variadic {
-            obj += as_jt("slice")
-            obj += "<"
-            obj += gen_type_kind(p.kind.kind)
-            obj += ">"
-        } else {
-            obj += gen_type_kind(p.kind.kind)
-        }
-        ret obj
-    }
-
     // Generates C++ code of parameter instance.
-    fn gen_param_ins(mut self, mut &p: &ParamIns): str {
-        let mut obj = self.gen_param_ins_prototype(p)
+    fn gen_param_ins(self, mut &p: &ParamIns): str {
+        let mut obj = TypeCoder.from_param_ins(p)
         obj += " "
-        obj += param_out_ident(p.decl)
+        obj += IdentCoder.from_param(p.decl)
         ret obj
     }
 
     // Generates C++ code of parameter.
     fn gen_param(mut self, mut &p: &Param): str {
-        let mut obj = gen_param_prototype(p)
+        let mut obj = TypeCoder.from_param(p)
         if p.ident != "" && !is_ignore_ident(p.ident) && !is_anon_ident(p.ident) {
             obj += " "
-            obj += param_out_ident(p)
+            obj += IdentCoder.from_param(p)
         }
         ret obj
     }
@@ -154,7 +113,7 @@ impl ObjectCoder {
         let mut obj = "("
         for (_, mut p) in params {
             if !p.is_self() {
-                obj += gen_param(p) + ","
+                obj += self.gen_param(p) + ","
             }
         }
 
@@ -174,7 +133,7 @@ impl ObjectCoder {
         let mut obj = "("
         for (_, mut p) in params {
             if !p.decl.is_self() {
-                obj += gen_param_ins(p) + ","
+                obj += self.gen_param_ins(p) + ","
             }
         }
 
@@ -195,7 +154,7 @@ impl ObjectCoder {
         let mut obj = "("
         for (_, mut p) in params {
             if !p.decl.is_self() {
-                obj += gen_param_ins_prototype(p)
+                obj += TypeCoder.from_param_ins(p)
                 obj += ","
             }
         }
@@ -208,7 +167,7 @@ impl ObjectCoder {
     // Generates C++ code of trait.
     fn gen_trait(mut self, mut &t: &Trait): str {
         const INDENTION = "\t"
-        let outid = trait_out_ident(t)
+        let outid = IdentCoder.from_trait(t)
 
         let mut obj = "struct "
         obj += outid
@@ -220,10 +179,10 @@ impl ObjectCoder {
         for (_, mut f) in t.methods {
             obj += INDENTION
             obj += "virtual "
-            obj += gen_fn_result(f)
+            obj += TypeCoder.from_fn_result(f)
             obj += " _method_"
             obj += f.ident
-            obj += gen_params(f.params)
+            obj += self.gen_params(f.params)
             obj += " {"
             if !f.is_void() {
                 obj += " return {}; "
@@ -238,7 +197,7 @@ impl ObjectCoder {
     fn gen_traits_tbl(mut self, mut &tbl: &SymbolTable): str {
         let mut obj = ""
         for (_, mut t) in tbl.traits {
-            obj += gen_trait(t)
+            obj += self.gen_trait(t)
             obj += "\n\n"
         }
         ret obj
@@ -248,38 +207,38 @@ impl ObjectCoder {
     fn gen_traits_pkg(mut self, mut &pkg: &Package): str {
         let mut obj = ""
         for (_, mut tbl) in pkg.files {
-            obj += gen_traits_tbl(tbl)
+            obj += self.gen_traits_tbl(tbl)
         }
         ret obj
     }
 
     // Generates C++ code of all traits.
-    fn gen_traits(mut self, mut &ir: &IR): str {
+    fn gen_traits(mut self): str {
         let mut obj = ""
-        for (_, mut u) in ir.used {
+        for (_, mut u) in self.ir.used {
             if !u.cpp_linked {
-                obj += gen_traits_pkg(u.package)
+                obj += self.gen_traits_pkg(u.package)
             }
         }
-        obj += gen_traits_pkg(ir.main)
+        obj += self.gen_traits_pkg(self.ir.main)
         ret obj
     }
 
     // Generates C++ declaration code of trait.
-    fn gen_trait_prototype(mut self, &t: &Trait): str {
+    fn gen_trait_decl(mut self, &t: &Trait): str {
         let mut obj = "struct "
-        obj += trait_out_ident(t)
-        obj += CPP_ST_TERM
+        obj += IdentCoder.from_trait(t)
+        obj += ";"
         ret obj
     }
 
     // Generates C++ declaration code of all traits.
-    fn gen_trait_prototypes(mut self, mut &p: &Package): str {
+    fn gen_trait_decls(mut self, mut &p: &Package): str {
         let mut obj = ""
         for (_, mut f) in p.files {
             for _, t in f.traits {
                 if t.token.id != TokenId.Na {
-                    obj += gen_trait_prototype(t)
+                    obj += self.gen_trait_decl(t)
                     obj += "\n"
                 }
             }
@@ -288,23 +247,22 @@ impl ObjectCoder {
     }
 
     // Generates C++ plain-prototype code of structure.
-    fn gen_struct_plain_prototype(mut self, mut &s: &Struct): str {
+    fn gen_struct_plain_decl(mut self, mut &s: &Struct): str {
         let mut obj = ""
         for (_, mut ins) in s.instances {
             obj += "\nstruct "
-            obj += struct_ins_out_ident(ins)
-            obj += CPP_ST_TERM
-            obj += "\n"
+            obj += IdentCoder.from_struct_ins(ins)
+            obj += ";\n"
         }
         ret obj
     }
 
     // Generates C++ plain-prototype code of all structures.
-    fn gen_struct_plain_prototypes(mut self, mut &structs: []&Struct): str {
+    fn gen_struct_plain_decls(mut self): str {
         let mut obj = ""
-        for (_, mut s) in structs {
+        for (_, mut s) in self.ir.ordered.structs {
             if !s.cpp_linked && s.token.id != TokenId.Na {
-                obj += gen_struct_plain_prototype(s)
+                obj += self.gen_struct_plain_decl(s)
                 obj += "\n"
             }
         }
@@ -319,18 +277,53 @@ impl ObjectCoder {
         let mut obj = ": "
         for _, i in s.implements {
             obj += "public "
-            obj += trait_out_ident(i)
+            obj += IdentCoder.from_trait(i)
             obj += ","
         }
         obj = obj[:obj.len-1] // Remove last comma.
         ret obj
     }
+}
 
+fn is_cpp_header_file(path: str): bool {
+    let offset = strings::find_last_byte(path, '.')
+    if offset == -1 {
+        ret false
+    }
+    ret is_valid_header_ext(path[offset:])
+}
+
+/*
+use env
+
+use conv for std::conv
+use std::jule::{VERSION}
+use std::jule::build::{
+    Directive,
+    Derive,
+    INIT_FN,
+    PATH_API,
+    is_valid_cpp_ext,
+}
+use std::jule::lex::{
+    TokenKind,
+}
+use std::jule::sema::{
+    ImportInfo,
+    Var,
+    StructIns,
+    Fn,
+    FnIns,
+    BUILTIN_TRAIT_DISPOSE,
+}
+use std::time::{Time}
+
+impl ObjectCoder {
     // Generates C++ declaration code of field.
     fn gen_field_decl(mut self, mut &f: &FieldIns): str {
-        let mut obj = gen_type_kind(f.kind)
+        let mut obj = TypeCoder.from_kind(f.kind)
         obj += " "
-        obj += field_out_ident(f.decl)
+        obj += IdentCoder.from_field(f.decl)
         obj += " = "
         if f.default == nil {
             // No default expression.
@@ -339,7 +332,7 @@ impl ObjectCoder {
         } else {
             obj += gen_expr(f.default.model)
         }
-        obj += CPP_ST_TERM
+        obj += ";"
         ret obj
     }
 
@@ -984,106 +977,6 @@ fn fn_is_dispose(mut f: &Fn): bool {
         f.params.len == 1 &&
         f.params[0].mutable &&
         !f.params[0].is_ref()
-}
-
-fn is_cpp_header_file(path: str): bool {
-    let offset = strings::find_last_byte(path, '.')
-    if offset == -1 {
-        ret false
-    }
-    ret is_valid_header_ext(path[offset:])
-}
-
-pub fn find_testing_package(mut &ir: &IR): &ImportInfo {
-    for (_, mut imp) in ir.used {
-        if imp.link_path == "std::testing" {
-            ret imp
-        }
-    }
-    ret nil
-}
-
-pub fn append_test(mut &obj: str, mut f: &FnIns) {
-    obj += indent()
-    obj += "_t->_method_reset();\n"
-    obj += indent()
-    obj += "std::cout << \">>> TEST RUNNING: \";\n"
-    obj += indent()
-    obj += "jule::outln("
-    obj += get_cstr_model([]byte(f.decl.ident))
-    obj += ");\n"
-    obj += indent()
-    obj += fn_ins_out_ident(f)
-    obj += "(_t);\n"
-    obj += indent()
-    obj += "post_test();\n"
-}
-
-pub fn append_package_tests(mut &obj: str, mut &p: &Package) {
-    for (_, mut file) in p.files {
-        for (_, mut f) in file.funcs {
-            if has_directive(f.directives, Directive.Test) {
-                append_test(obj, f.instances[0])
-            }
-        }
-    }
-}
-
-pub fn append_test_point(mut &obj: str, mut &ir: &IR) {
-    obj += "\nvoid test_point(void) {\n"
-    add_indent()
-    obj += indent()
-
-    let mut p = find_testing_package(ir)
-    if p == nil {
-        // std::testing is not used.
-        // So, developers cannot write valid test function.
-        // Append empty test point and return.
-        obj += "}"
-        done_indent()
-        ret
-    }
-
-    let mut t = p.find_struct("T", false).instances[0]
-
-    obj += as_sptr_kind(gen_struct_kind_ins(t))
-    obj += " _t = jule::new_struct<"
-    obj += gen_struct_kind_ins(t)
-    obj += ">("
-    if !env::PRODUCTION {
-        obj += `"/jule/init", `
-    }
-    obj += "new(std::nothrow) "
-    obj += gen_struct_kind_ins(t)
-    obj += ");\n"
-
-    obj += indent()
-    obj += "jule::Uint total = 0, failed = 0, skipped = 0;\n"
-    obj += indent()
-
-    obj += "auto post_test = [&](void) {\n"
-    add_indent()
-    obj += indent()
-    obj += "++total;\n"
-    obj += indent()
-    obj += "if (_t->_method_failed()) { ++failed; std::cout << \"    [*] FAILED\" << std::endl; }\n"
-    obj += indent()
-    obj += "else if (_t->_method_skipped()) { ++skipped; std::cout << \"    [*] SKIPPED\" << std::endl; }\n"
-    obj += indent()
-    obj += "else { std::cout << \"    [*] PASSED\" << std::endl; }\n"
-    done_indent()
-    obj += indent()
-    obj += "};\n"
-
-    append_package_tests(obj, ir.main)
-
-    obj += "\n\n"
-    obj += indent()
-    obj += "std::cout << std::endl << std::endl << \"total tests: \" << total << \" skipped: \" << skipped << \" failed: \" << failed << \" pass: \" << total-failed-skipped << std::endl;\n"
-
-    done_indent()
-    obj += indent()
-    obj += "}\n"
 }
 
 pub fn append_standard(mut &obj_code: str, compiler: str, compiler_cmd: str) {

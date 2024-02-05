@@ -2,12 +2,9 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-/*
-
 use env
 
-use std::jule::constant::{Const}
-use std::jule::lex::{TokenKind, is_ignore_ident, is_anon_ident}
+use std::jule::lex::{TokenKind, is_ignore_ident}
 use std::jule::sema::{
     Data,
     St,
@@ -15,7 +12,6 @@ use std::jule::sema::{
     Var,
     Scope,
     If,
-    Else,
     Conditional,
     InfIter,
     WhileIter,
@@ -31,11 +27,64 @@ use std::jule::sema::{
     Case,
     FallSt,
     RetSt,
-    FnCallExprModel,
     TupleExprModel,
     TypeKind,
     BuiltinAppendCallExprModel,
 }
+
+struct ScopeCoder {
+    oc: &ObjectCoder
+}
+
+impl ScopeCoder {
+    static fn new(mut &oc: &ObjectCoder): &ScopeCoder {
+        ret &ScopeCoder{
+            oc: oc,
+        }
+    }
+
+    // Generates C++ code of scope.
+    fn scope(mut self, mut s: &Scope): str {
+        let mut obj = "{\n"
+        self.oc.add_indent()
+
+        for (_, mut st) in s.stmts {
+            obj += self.oc.indent()
+            _ = st
+            //obj += self.st(st)
+            obj += "\n"
+        }
+
+        self.oc.done_indent()
+        obj += self.oc.indent()
+        obj += "}"
+
+        if s.deferred {
+            obj = "__JULE_DEFER(" + obj + ");"
+        }
+
+        ret obj
+    }
+
+    // Generates C++ code of function's scope.
+    fn func_scope(mut self, mut f: &FnIns): str {
+        let mut obj = if f.owner != nil { self.method_scope(f) } else { self.scope(f.scope) }
+        if f.decl.exceptional && f.decl.is_void() {
+            // Just for void exceptionals.
+            // Other cases checked by semantic analyzer and disallowed
+            // if they are not returns.
+            obj = obj[:obj.len-2] + " return jule::VoidExceptional(); }"
+        }
+        ret obj
+    }
+
+    // Generates C++ code of method's scope.
+    fn method_scope(mut self, mut f: &FnIns): str {
+        ret self.scope(f.scope)
+    }
+}
+
+/*
 
 fn iter_expr_is_copy_optimizable(&expr: &Data, &v: &Var): bool {
     ret (!expr.lvalue && !expr.kind.mutable()) || !v.mutable
@@ -721,46 +770,6 @@ fn gen_st(mut st: St): str {
     | &RetSt:       ret gen_ret_st((&RetSt)(st))
     |:              ret "<unimplemented_stmt>"
     }
-}
-
-// Generates C++ code of scope.
-fn gen_scope(mut s: &Scope): str {
-    let mut obj = "{\n"
-    add_indent()
-
-    for (_, mut st) in s.stmts {
-        obj += indent()
-        obj += gen_st(st)
-        obj += "\n"
-    }
-
-    done_indent()
-    obj += indent()
-    obj += "}"
-
-    if s.deferred {
-        obj = "__JULE_DEFER(" + obj + ");"
-    }
-
-    ret obj
-}
-
-// Generates C++ code of function's scope.
-fn gen_fn_scope(mut f: &FnIns): str {
-    let mut obj = if f.owner != nil { gen_method_scope(f) } else { gen_scope(f.scope) }
-    if f.decl.exceptional && f.decl.is_void() {
-        // Just for void exceptionals.
-        // Other cases checked by semantic analyzer and disallowed
-        // if they are not returns.
-        obj = obj[:obj.len-2] + " return jule::VoidExceptional(); }"
-    }
-
-    ret obj
-}
-
-// Generates C++ code of method's scope.
-fn gen_method_scope(mut f: &FnIns): str {
-    ret gen_scope(f.scope)
 }
 
 */

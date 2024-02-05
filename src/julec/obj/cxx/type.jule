@@ -20,6 +20,8 @@ use std::jule::sema::{
     FnIns,
     Arr,
     ParamIns,
+    Fn,
+    Param,
 }
 
 // Returns directive if exist.
@@ -175,6 +177,20 @@ impl TypeCoder {
         ret obj
     }
 
+    // Generates C++ prototype code of parameter.
+    static fn from_param(mut &p: &Param): str {
+        let mut obj = ""
+        if p.variadic {
+            obj += TypeCoder.to_type("slice")
+            obj += "<"
+            obj += TypeCoder.from_kind(p.kind.kind)
+            obj += ">"
+        } else {
+            obj += TypeCoder.from_kind(p.kind.kind)
+        }
+        ret obj
+    }
+
     // Generates C++ prototype code of parameter instance.
     static fn from_param_ins(mut &p: &ParamIns): str {
         let mut obj = ""
@@ -190,6 +206,20 @@ impl TypeCoder {
             obj += "&"
         }
         ret obj
+    }
+
+    // Generates C++ code of function's result type.
+    static fn from_fn_result(mut &f: &Fn): str {
+        if f.is_void() {
+            if f.exceptional {
+                ret "jule::VoidExceptional"
+            }
+            ret "void"
+        }
+        if f.exceptional {
+            ret "jule::Exceptional<" + TypeCoder.from_kind(f.result.kind.kind) + ">"
+        }
+        ret TypeCoder.from_kind(f.result.kind.kind)
     }
 
     // Generates C++ code of function instance's result type.

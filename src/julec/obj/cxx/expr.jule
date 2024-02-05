@@ -2,26 +2,12 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use std::jule::lex::{Token}
-
-// Concatenate all strings into single string.
-fn concat_all_parts(parts: ...Token): str {
-    let mut s = ""
-    for _, p in parts {
-        s += p.kind
-    }
-    ret s
-}
-
-/*
-
 use env
 
 use conv for std::conv
 use std::env::{ARCH}
 use fmt for std::fmt
-use path for std::fs::path
-use std::jule::build::{Directive, PATH_STDLIB, is_64bit}
+use std::jule::build::{Directive, is_64bit}
 use std::jule::constant::{Const}
 use std::jule::lex::{Token, TokenKind}
 use std::jule::sema::{
@@ -30,14 +16,12 @@ use std::jule::sema::{
     FnIns,
     Trait,
     StructIns,
-    FieldIns,
     TypeKind,
     Data,
     Value,
     ExprModel,
     BinopExprModel,
     UnaryExprModel,
-    StructArgExprModel,
     StructLitExprModel,
     AllocStructLitExprModel,
     CastingExprModel,
@@ -45,7 +29,6 @@ use std::jule::sema::{
     SliceExprModel,
     IndexingExprModel,
     AnonFnExprModel,
-    KeyValPairExprModel,
     MapExprModel,
     SlicingExprModel,
     TraitSubIdentExprModel,
@@ -65,7 +48,6 @@ use std::jule::sema::{
     BuiltinErrorCallExprModel,
     SizeofExprModel,
     AlignofExprModel,
-    StrConstructorCallExprModel,
     RuneExprModel,
     StructStaticIdentExprModel,
     IntegratedToStrExprModel,
@@ -93,6 +75,1063 @@ const CPP_IGNORE = "std::ignore"
 
 // Represents default expression for type.
 const CPP_DEFAULT_EXPR = "{}"
+
+struct ExprCoder {
+    oc: &ObjectCoder
+}
+
+impl ExprCoder {
+    static fn new(mut &oc: &ObjectCoder): &ExprCoder {
+        ret &ExprCoder{
+            oc: oc,
+        }
+    }
+
+    fn string(self, &c: &Const): str {
+        let content = c.read_str()
+        if content.len == 0 { // Empty.
+            ret TypeCoder.to_type("str") + "()"
+        }
+        let bytes = []byte(content)
+        let len = conv::fmt_int(bytes.len, 10)
+        let lit = cstr_lit(bytes)
+        ret TypeCoder.to_type("str") + "(" + lit + ", " + len + ")"
+    }
+
+    fn boolean(self, &c: &Const): str {
+        ret if c.read_bool() { "true" } else { "false" }
+    }
+
+    fn nil_lit(self): str {
+        ret "nullptr"
+    }
+
+    fn ftoa_special_cases(self, &x: f64): str {
+        match {
+        | math::is_nan(x):
+            ret "NAN"
+        | math::is_inf(x, 1):
+            ret "INFINITY"
+        | math::is_inf(x, -1):
+            ret "-INFINITY"
+        |:
+            ret ""
+        }
+    }
+
+    fn float32(self, &c: &Const): str {
+        let x = c.as_f64()
+
+        // Special cases.
+        let f = self.ftoa_special_cases(x)
+        if f != "" {
+            ret f
+        }
+
+        match {
+        | x == MAX_F32:
+            ret "jule::MAX_F32"
+        | x == MIN_F32:
+            ret "jule::MIN_F32"
+        |:
+            ret ftoa(x, 32) + "f"
+        }
+    }
+
+    fn float64(self, &c: &Const): str {
+        let x = c.as_f64()
+
+        // Special cases.
+        let f = self.ftoa_special_cases(x)
+        if f != "" {
+            ret f
+        }
+
+        match {
+        | x == MAX_F64:
+            ret "jule::MAX_F64"
+        | x == MIN_F64:
+            ret "jule::MIN_F64"
+        |:
+            ret ftoa(x, 64)
+        }
+    }
+
+    // fx32: 32-bit floating-point
+    fn constant(self, mut c: &Const, fx32: bool): str {
+        match {
+        | c.is_str():
+            ret self.string(c)
+        | c.is_bool():
+            ret self.boolean(c)
+        | c.is_f64():
+            match {
+            | fx32:
+                ret self.float32(c)
+            |:
+                ret self.float64(c)
+            }
+        | c.is_i64():
+            ret itoa(c.read_i64())
+        | c.is_u64():
+            ret utoa(c.read_u64())
+        | c.is_nil():
+            ret self.nil_lit()
+        |:
+            ret "<unimplemented_constant_expression>"
+        }
+    }
+
+    fn div_by_zero_binary(mut self, &op: Token, mut &l: &OperandExprModel, mut &r: &OperandExprModel): str {
+        let mut opt = false
+        if env::OPT_MATH {
+            match type r.model {
+            | &Const:
+                opt = true
+            }
+        }
+
+        let mut op_func = ""
+        match op.kind {
+        | TokenKind.Solidus
+        | TokenKind.SolidusEq:
+            op_func = if opt { "/" } else { "div" }
+        | TokenKind.Percent
+        | TokenKind.PercentEq:
+            op_func = if opt { "%" } else { "mod" }
+        }
+
+        let mut obj = ""
+        if opt {
+            obj = "("
+            obj += self.expr(l.model)
+            match op.kind {
+            | TokenKind.Solidus:
+                let (ok, x) = check_for_bit_shift_opt(l, r)
+                if ok {
+                    obj += " >> "
+                    obj += utoa(x)
+                    break
+                }
+                fall
+            |:
+                obj += " "
+                obj += op_func
+                obj += " "
+                obj += self.expr(r.model)
+            }
+            obj += ")"
+        } else {
+            obj = "jule::"
+            obj += op_func
+            obj += "("
+            if !env::PRODUCTION {
+                obj += "\""
+                obj += gen_loc_info(op)
+                obj += "\","
+            }
+            obj += self.expr(l.model)
+            obj += ","
+            obj += self.expr(r.model)
+            obj += ")"
+        }
+        ret obj
+    }
+
+    fn binary(mut self, mut m: &BinopExprModel): str {
+        match m.op.kind {
+        | TokenKind.Solidus
+        | TokenKind.Percent:
+            ret self.div_by_zero_binary(m.op, m.left, m.right)
+        }
+
+        let mut obj = "("
+        if env::OPT_MATH {
+            match m.op.kind {
+            | TokenKind.Star: // Multiplication
+                let (ok, x) = check_for_bit_shift_opt(m.left, m.right)
+                if !ok {
+                    break
+                }
+                obj += self.model(m.left.model)
+                obj += " << "
+                obj += utoa(x)
+                obj += ")"
+                ret obj
+            }
+        }
+
+        obj += self.model(m.left.model)
+        obj += " "
+        obj += m.op.kind
+        obj += " "
+        obj += self.model(m.right.model)
+        obj += ")"
+        ret obj
+    }
+
+    fn var(self, mut m: &Var): str {
+        if m.cpp_linked {
+            let d = find_directive(m.directives, Directive.Namespace)
+            if d != nil {
+                let mut obj = concat_all_parts(d.args...)
+                obj += "::"
+                obj += IdentCoder.from_var(m)
+                ret obj
+            }
+        }
+        ret IdentCoder.from_var(m)
+    }
+
+    fn structure(self, m: &Struct): str {
+        ret TypeCoder.from_struct(m)
+    }
+
+    fn structure_ins(self, mut m: &StructIns): str {
+        ret TypeCoder.from_struct_ins(m)
+    }
+
+    fn unary(mut self, mut m: &UnaryExprModel): str {
+        if env::OPT_PTR && m.op.kind == TokenKind.Star {
+            match type m.expr.model {
+            | &UnaryExprModel:
+                let mut um = (&UnaryExprModel)(m.expr.model)
+                if um.op.kind == TokenKind.Amper {
+                    ret self.model(um.expr.model)
+                }
+            }
+        }
+
+        match m.op.kind {
+        | TokenKind.Caret:
+            let mut obj = "(~("
+            obj += self.expr(m.expr.model)
+            obj += "))"
+            ret obj
+        | TokenKind.Star:
+            if env::PRODUCTION || m.expr.kind.sptr() == nil {
+                break
+            }
+            let mut obj = self.expr(m.expr.model)
+            obj += ".get(\""
+            obj += gen_loc_info(m.op)
+            obj += "\")"
+            ret obj
+        }
+
+        let mut obj = "("
+        obj += m.op.kind
+        obj += "("
+        obj += self.expr(m.expr.model)
+        obj += "))"
+        ret obj
+    }
+
+    fn cpp_structure_lit(mut self, mut m: &StructLitExprModel): str {
+        let mut obj = "(" + TypeCoder.from_struct_ins(m.strct)
+        obj += "){"
+        if m.args.len > 0 {
+        iter:
+            for (_, mut f) in m.strct.fields {
+                if m.strct.decl.cpp_linked {
+                    for (_, mut arg) in m.args {
+                        if arg.field == f {
+                            obj += "."
+                            obj += IdentCoder.from_field(f.decl)
+                            obj += "="
+                            obj += self.expr(arg.expr)
+                            obj += ","
+                            continue iter
+                        }
+                    }
+                    continue
+                }
+                obj += IdentCoder.from_field(f.decl)
+                obj += ": "
+                for (_, mut arg) in m.args {
+                    if arg.field == f {
+                        obj += self.expr(arg.expr)
+                        obj += ","
+                        continue iter
+                    }
+                }
+                obj += self.init_expr(f.kind)
+                obj += ","
+            }
+            obj = obj[:obj.len-1] // Remove last comma.
+        }
+        obj += "}"
+        ret obj
+    }
+
+    fn structure_lit(mut self, mut m: &StructLitExprModel): str {
+        if m.strct.decl.cpp_linked {
+            ret self.cpp_structure_lit(m)
+        }
+
+        let mut obj = IdentCoder.from_struct_ins(m.strct)
+        obj += "("
+        if m.args.len > 0 {
+        iter:
+            for (_, mut f) in m.strct.fields {
+                for (_, mut arg) in m.args {
+                    if arg.field == f {
+                        obj += self.expr(arg.expr)
+                        obj += ","
+                        continue iter
+                    }
+                }
+                obj += self.init_expr(f.kind)
+                obj += ","
+            }
+            obj = obj[:obj.len-1] // Remove last comma.
+        }
+        obj += ")"
+        ret obj
+    }
+
+    fn alloc_structure(mut self, mut m: &AllocStructLitExprModel): str {
+        let mut obj = "jule::new_struct"
+        if m.lit.strct.decl.has_ref_accessible() {
+            obj += "_ptr"
+        }
+        obj += "<"
+        obj += IdentCoder.from_struct_ins(m.lit.strct)
+        obj += ">("
+        if !env::PRODUCTION {
+            obj += "\""
+            obj += gen_loc_info(m.lit.token)
+            obj += "\","
+        }
+        obj += "new( std::nothrow ) "
+        obj += self.structure_lit(m.lit)
+        obj += ")"
+        ret obj
+    }
+
+    fn casting(mut self, mut m: &CastingExprModel): str {
+        let mut obj = ""
+        match {
+        | m.kind.prim() != nil && m.kind.prim().is_any():
+            obj += TypeCoder.from_kind(m.kind)
+            obj += "("
+            obj += self.model(m.expr)
+            obj += ")"
+        | m.expr_kind.ptr() != nil
+        | m.kind.ptr() != nil:
+            obj += "(("
+            obj += TypeCoder.from_kind(m.kind)
+            obj += ")("
+            obj += self.expr(m.expr)
+            obj += "))"
+        | m.expr_kind.trt() != nil
+        | m.expr_kind.prim() != nil && m.expr_kind.prim().is_any():
+            obj += self.model(m.expr)
+            obj += "."
+            if env::PRODUCTION {
+                obj += "operator "
+                obj += TypeCoder.from_kind(m.kind)
+                obj += "()"
+            } else {
+                if m.expr_kind.trt() != nil && m.kind.sptr() != nil {
+                    obj += "cast_ptr<"
+                    obj += TypeCoder.from_kind(m.kind.sptr().elem)
+                } else {
+                    obj += "cast<"
+                    obj += TypeCoder.from_kind(m.kind)
+                }
+                obj += ">(\""
+                obj += gen_loc_info(m.token)
+                obj += "\")"
+            }
+        |:
+            obj += "static_cast<"
+            obj += TypeCoder.from_kind(m.kind)
+            obj += ">("
+            obj += self.expr(m.expr)
+            obj += ")"
+        }
+        ret obj
+    }
+
+    fn args(mut self, mut args: []ExprModel): str {
+        if args.len == 0 {
+            ret ""
+        }
+        let mut obj = ""
+        for (_, mut a) in args {
+            obj += self.expr(a)
+            obj += ","
+        }
+        obj = obj[:obj.len-1] // Remove last comma.
+        ret obj
+    }
+
+    fn model_for_call(mut self, mut expr: ExprModel): str {
+        match type expr {
+        | &FnIns:
+            ret self.func_ins((&FnIns)(expr))
+        |:
+            ret self.model(expr)
+        }
+    }
+
+    fn pure_func_call(mut self, mut &m: &FnCallExprModel): str {
+        let mut obj = self.model_for_call(m.expr)
+        if !m.func.is_builtin() {
+            if m.func.decl.cpp_linked && m.func.generics.len > 0 {
+                if !has_directive(m.func.decl.directives, Directive.Cdef) {
+                    obj += "<"
+                    for (_, mut g) in m.func.generics {
+                        obj += TypeCoder.from_kind(g)
+                        obj += ","
+                    }
+                    obj = obj[:obj.len-1] // Remove last comma.
+                    obj += ">"
+                }
+            }
+        }
+        if !env::PRODUCTION && m.func.anon {
+            match type m.expr {
+            | &StructSubIdentExprModel:
+                if (&StructSubIdentExprModel)(m.expr).field.decl.owner.cpp_linked {
+                    obj += "("
+                    break
+                }
+                fall
+            |:
+                obj += ".call(\""
+                obj += gen_loc_info(m.token)
+                obj += "\""
+                if m.args.len != 0 {
+                    obj += ","
+                }
+            }
+        } else {
+            obj += "("
+        }
+        obj += self.args(m.args)
+        obj += ")"
+
+        if m.is_co {
+            obj = "__JULE_CO(" + obj
+            obj += ")"
+        }
+
+        ret obj
+    }
+
+    fn func_call(mut self, mut m: &FnCallExprModel): str {
+        if m.func.is_builtin() ||
+            !m.func.decl.exceptional ||
+            m.except != nil && m.except.stmts.len == 0 {
+            ret self.pure_func_call(m)
+        }
+
+        // Generate code for exceptional.
+        let mut obj = "({\n"
+        self.oc.add_indent()
+        obj += self.oc.indent()
+        obj += "auto except = "
+        obj += self.pure_func_call(m)
+        obj += ";\n"
+        obj += self.oc.indent()
+        if m.except != nil {
+            if m.func.result == nil || !m.assigned {
+                obj += "if (!except.ok()) "
+                obj += self.oc.sc.scope(m.except)
+                obj += "\n"
+            } else {
+                let forwarded = is_forwarded(m.except)
+                obj += "(except.ok()) ? (except.result) : ("
+                if forwarded {
+                    obj += "{"
+                }
+                obj += self.oc.sc.scope(m.except)
+                if forwarded {
+                    obj += " "
+                    obj += self.init_expr(m.func.result)
+                    obj += ";}"
+                }
+                obj += ");\n"
+            }
+            self.oc.done_indent()
+        } else {
+            obj += `if (!except.ok()) jule::panic(jule::Str("`
+            obj += `unhandled exceptional: ") + except.error.type->to_str(except.error.data) + jule::Str("\nlocation: `
+            obj += gen_loc_info(m.token)
+            obj += "\"));\n"
+            if !m.func.decl.is_void() {
+                obj += self.oc.indent()
+                obj += "(except.result);\n"
+            }
+            self.oc.done_indent()
+        }
+
+        obj += self.oc.indent()
+        obj += "})"
+        ret obj
+    }
+
+    fn slice(mut self, mut m: &SliceExprModel): str {
+        if m.elems.len == 0 {
+            ret TypeCoder.as_slice(m.elem_kind) + "()"
+        }
+        let mut obj = TypeCoder.as_slice(m.elem_kind)
+        obj += "({"
+        obj += self.args(m.elems)
+        obj += "})"
+        ret obj
+    }
+
+    fn indexing(mut self, mut m: &IndexingExprModel): str {
+        let mut obj = self.model(m.expr.model)
+
+        // Try access optimization.
+        if env::OPT_ACCESS {
+            let array = m.expr.kind.arr() != nil
+
+            // Constants checked by semantic analysis for arrays, safe.
+            if array && m.index.is_const() {
+                obj += ".__at("
+                obj += self.expr(m.index.model)
+                obj += ")"
+                ret obj
+            }
+
+            match type m.index.model {
+            | &Var:
+                let i = (&Var)(m.index.model)
+                if i.mutable || i.iter_relation == nil {
+                    break
+                }
+                match type m.expr.model {
+                | &Var:
+                    let r = (&Var)(m.expr.model)
+
+                    // Iterated variable is indexed variable?
+                    if i.iter_relation.range == r {
+                        obj += ".__at("
+                        obj += self.expr(m.index.model)
+                        obj += ")"
+                        ret obj
+                    }
+                }
+            }
+        }
+
+        // Index access with safety measures.
+        match {
+        | env::PRODUCTION
+        | m.expr.kind.ptr() != nil
+        | m.expr.kind.map() != nil:
+            obj += "["
+            obj += self.expr(m.index.model)
+            obj += "]"
+        |:
+            obj += ".at(\""
+            obj += gen_loc_info(m.token)
+            obj += "\","
+            obj += self.expr(m.index.model)
+            obj += ")"
+        }
+
+        ret obj
+    }
+
+    fn anon_func(mut self, mut m: &AnonFnExprModel): str {
+        let mut obj = TypeCoder.from_fn(m.func)
+        obj += "([=]"
+        obj += self.oc.gen_params_ins(m.func.params)
+        obj += " mutable -> "
+        obj += TypeCoder.from_fn_ins_result(m.func)
+        obj += " "
+        obj += self.oc.sc.func_scope(m.func)
+        obj += ")"
+        ret obj
+    }
+
+    fn map(mut self, mut m: &MapExprModel): str {
+        let mut obj = TypeCoder.to_type("map")
+        obj += "<"
+        obj += TypeCoder.from_kind(m.key_kind)
+        obj += ","
+        obj += TypeCoder.from_kind(m.val_kind)
+        obj += ">({"
+        if m.entries.len > 0 {
+            for (_, mut pair) in m.entries {
+                let mut pair_obj = "{"
+                pair_obj += self.expr(pair.key)
+                pair_obj += ","
+                pair_obj += self.expr(pair.val)
+                pair_obj += "}"
+                obj += pair_obj
+                obj += ","
+            }
+            obj = obj[:obj.len-1] // Remove last comma.
+        }
+        obj += "})"
+        ret obj
+    }
+
+    fn slicing(mut self, mut m: &SlicingExprModel): str {
+        let mut obj = self.model(m.expr)
+        obj += ".slice("
+        if !env::PRODUCTION {
+            obj += "\""
+            obj += gen_loc_info(m.token)
+            obj += "\","
+        }
+        obj += self.expr(m.left)
+        if m.right != nil {
+            obj += ","
+            obj += self.expr(m.right)
+        }
+        obj += ")"
+        ret obj
+    }
+
+    fn trait_sub(mut self, mut m: &TraitSubIdentExprModel): str {
+        let mut obj = self.model(m.expr)
+        obj += ".get("
+        if !env::PRODUCTION {
+            obj += "\""
+            obj += gen_loc_info(m.token)
+            obj += "\""
+        }
+        obj += ")._method_"
+        obj += m.ident
+        ret obj
+    }
+
+    fn structure_sub(mut self, mut m: &StructSubIdentExprModel): str {
+        let mut obj = self.model(m.expr)
+        obj += "."
+        if m.field != nil {
+            obj += IdentCoder.from_field(m.field.decl)
+        } else {
+            obj += IdentCoder.from_fn_ins(m.method)
+        }
+        ret obj
+    }
+
+    fn common_ident(self, m: &CommonIdentExprModel): str {
+        ret m.ident
+    }
+
+    fn common_sub(mut self, mut m: &CommonSubIdentExprModel): str {
+        let mut obj = self.model(m.expr)
+        obj += "."
+        obj += m.ident
+        ret obj
+    }
+
+    fn array(mut self, mut m: &ArrayExprModel): str {
+        let mut obj = TypeCoder.from_array(m.kind)
+        if m.elems.len == 0 {
+            obj += "()"
+            ret obj
+        }
+
+        // Filled.
+        if m.elems.len == 2 && m.elems[1] == nil {
+            obj += "("
+            obj += self.expr(m.elems[0])
+            obj += ")"
+            ret obj
+        }
+
+        obj += "({"
+        obj += self.args(m.elems)
+        obj += "})"
+        ret obj
+    }
+
+    // Returns complete expression model of function instance.
+    // Usefull for strict type safety.
+    fn func_ins_common(self, mut m: &FnIns): str {
+        let mut obj = TypeCoder.from_fn(m)
+        obj += "("
+        obj += self.func_ins(m)
+        obj += ")"
+        ret obj
+    }
+
+    // Returns elementary expression model of function instance.
+    fn func_ins(self, mut m: &FnIns): str {
+        if m.decl != nil && m.decl.cpp_linked {
+            let d = find_directive(m.decl.directives, Directive.Namespace)
+            if d != nil {
+                let mut obj = concat_all_parts(d.args...)
+                obj += "::"
+                obj += IdentCoder.from_fn_ins(m)
+                ret obj
+            }
+        }
+        ret IdentCoder.from_fn_ins(m)
+    }
+
+    fn tuple(mut self, mut m: &TupleExprModel): str {
+        let mut obj = "std::make_tuple("
+        for (_, mut d) in m.datas {
+            obj += self.expr(d.model)
+            obj += ","
+        }
+        obj = obj[:obj.len-1] // Remove last comma.
+        obj += ")"
+        ret obj
+    }
+
+    fn new_call(mut self, mut m: &BuiltinNewCallExprModel): str {
+        let mut obj = "jule::new_ptr<"
+        obj += TypeCoder.from_kind(m.kind)
+        obj += ">("
+        if m.init != nil {
+            obj += self.expr(m.init)
+        }
+        obj += ")"
+        ret obj
+    }
+
+    fn out_call(mut self, mut m: &BuiltinOutCallExprModel): str {
+        if m.debug && env::PRODUCTION {
+            ret ""
+        }
+        let mut obj = "jule::out("
+        obj += self.expr(m.expr)
+        obj += ")"
+        ret obj
+    }
+
+    fn outln_call(mut self, mut m: &BuiltinOutlnCallExprModel): str {
+        if m.debug && env::PRODUCTION {
+            ret ""
+        }
+        let mut obj = "jule::outln("
+        obj += self.expr(m.expr)
+        obj += ")"
+        ret obj
+    }
+
+    fn panic_call(mut self, mut m: &BuiltinPanicCallExprModel): str {
+        let mut obj = "jule::panic("
+        obj += self.expr(m.expr)
+        obj += ` + jule::Str("\nlocation: `
+        obj += gen_loc_info(m.token)
+        obj += "\"));"
+        ret obj
+    }
+
+    fn assert_call(mut self, mut m: &BuiltinAssertCallExprModel): str {
+        if env::PRODUCTION {
+            ret ""
+        }
+        let mut obj = "if (!("
+        obj += self.expr(m.expr)
+        obj += ")) jule::panic(jule::Str("
+        obj += cstr_lit([]byte(m.log))
+        obj += `) + jule::Str("\nlocation: `
+        obj += gen_loc_info(m.token)
+        obj += "\"));"
+        ret obj
+    }
+
+    fn error_call(mut self, mut m: &BuiltinErrorCallExprModel): str {
+        let mut obj = "return "
+        if m.func.decl.is_void() {
+            obj += "jule::VoidExceptional("
+        } else {
+            obj += "jule::Exceptional<"
+            obj += TypeCoder.from_kind(m.func.result)
+            obj += ">("
+        }
+        obj += self.expr(m.err)
+        obj += ")"
+        ret obj
+    }
+
+    fn make_call(mut self, mut m: &BuiltinMakeCallExprModel): str {
+        let mut obj = ""
+        if m.len != nil {
+            obj += self.expr(m.len)
+        } else {
+            obj += "0"
+        }
+        if m.cap != nil {
+            obj += "," + self.expr(m.cap)
+        }
+
+        if m.kind.slc().elem.enm() != nil {
+            obj += ","
+            obj += self.init_expr(m.kind.slc().elem)
+            if m.cap != nil {
+                obj = TypeCoder.from_kind(m.kind) + "::alloc(" + obj
+            } else {
+                obj = TypeCoder.from_kind(m.kind) + "::alloc_def(" + obj
+            }
+        } else {
+            obj = TypeCoder.from_kind(m.kind) + "::alloc(" + obj
+        }
+
+        obj += ")"
+        ret obj
+    }
+
+    fn __append_call_assign(mut self, same_dest: bool, &dest_expr: str,
+        mut &dest_kind: &TypeKind, mut &s: &SliceExprModel, mut &m: &BuiltinAppendCallExprModel): str {
+        let mut obj = ""
+        if !same_dest {
+            obj += dest_expr
+            obj += " = jule::alloc_for_append("
+            obj += self.model(m.dest)
+            obj += ","
+            obj += conv::itoa(s.elems.len)
+            obj += ");"
+        }
+        for (_, mut e) in s.elems {
+            obj += dest_expr
+            // Use the "__push" function to skip allocation boundary checking.
+            obj += ".__push("
+            obj += self.model(e)
+            obj += ");"
+        }
+        ret obj
+    }
+
+    fn append_call_assign(mut self, mut dest: ExprModel, mut m: &BuiltinAppendCallExprModel): (str, optimized: bool) {
+        match type m.elements {
+        | &SliceExprModel:
+            match type dest {
+            | &Var:
+                let mut s = (&SliceExprModel)(m.elements)
+                let dest_expr = self.model(dest)
+                let mut dest_var = (&Var)(dest)
+                let same_dest = m.dest == dest_var
+                ret self.__append_call_assign(same_dest, dest_expr, dest_var.kind.kind, s, m), true
+            | &StructSubIdentExprModel:
+                let mut s = (&SliceExprModel)(m.elements)
+                let dest_expr = self.model(dest)
+                let mut dest_field = (&StructSubIdentExprModel)(dest).field
+                let same_dest = m.dest == dest_field
+                ret self.__append_call_assign(same_dest, dest_expr, dest_field.kind, s, m), true
+            }
+        }
+        ret self.append_call(m), false
+    }
+
+    fn append_call(mut self, mut m: &BuiltinAppendCallExprModel): str {
+        let mut obj = "jule::append("
+        obj += self.model(m.dest)
+        obj += ","
+        obj += self.model(m.elements)
+        obj += ")"
+        ret obj
+    }
+
+    fn clone_call(mut self, mut m: &BuiltinCloneCallExprModel): str {
+        let mut obj = "jule::clone("
+        obj += self.model(m.expr)
+        obj += ")"
+        ret obj
+    }
+
+    fn sizeof(mut self, mut m: &SizeofExprModel): str {
+        let mut obj = "sizeof("
+        obj += self.expr(m.expr)
+        obj += ")"
+        ret obj
+    }
+
+    fn alignof(mut self, mut m: &AlignofExprModel): str {
+        let mut obj = "alignof("
+        obj += self.expr(m.expr)
+        obj += ")"
+        ret obj
+    }
+
+    fn rune_lit(self, m: &RuneExprModel): str {
+        if m.code <= 127 { // ASCII
+            let mut b = sbtoa(byte(m.code))
+            if b == "'" {
+                b = "\\'"
+            }
+            ret "'" + b + "'"
+        }
+        ret itoa(i64(m.code))
+    }
+
+    fn structure_static(self, mut m: &StructStaticIdentExprModel): str {
+        let mut obj = IdentCoder.from_struct_ins(m.structure)
+        obj += "::"
+        obj += IdentCoder.from_fn_ins(m.method)
+        ret obj
+    }
+
+    fn integrated_to_str(mut self, mut m: &IntegratedToStrExprModel): str {
+        let mut obj = "jule::to_str("
+        obj += self.model(m.expr)
+        obj += ")"
+        ret obj
+    }
+
+    fn ternary(mut self, mut m: &TernaryExprModel): str {
+        let mut obj = "(("
+        obj += self.model(m.condition)
+        obj += ") ? ("
+        obj += self.model(m.true_expr)
+        obj += ") : ("
+        obj += self.model(m.false_expr)
+        obj += "))"
+        ret obj
+    }
+
+    fn backend_emit(mut self, mut m: &BackendEmitExprModel): str {
+        if m.exprs.len == 0 {
+            ret m.code
+        }
+        for (i, mut expr) in m.exprs {
+            m.exprs[i] = self.expr(expr)
+        }
+        ret fmt::format(m.code, m.exprs...)
+    }
+
+    fn free(mut self, mut m: &FreeExprModel): str {
+        if env::RC {
+            ret self.expr(m.expr) + ".dealloc()"
+        }
+        ret self.expr(m.expr) + ".__free()"
+    }
+
+    fn model(mut self, mut m: ExprModel): str {
+        match type m {
+        | &Data:
+            ret self.model((&Data)(m).model)
+        | &TypeKind:
+            ret TypeCoder.from_kind((&TypeKind)(m))
+        | &Const:
+            ret self.constant((&Const)(m), false)
+        | &Var:
+            ret self.var((&Var)(m))
+        | &Trait:
+            ret IdentCoder.from_trait((&Trait)(m))
+        | &Struct:
+            ret self.structure((&Struct)(m))
+        | &StructIns:
+            ret self.structure_ins((&StructIns)(m))
+        | &FnIns:
+            ret self.func_ins_common((&FnIns)(m))
+        | &BinopExprModel:
+            ret self.binary((&BinopExprModel)(m))
+        | &UnaryExprModel:
+            ret self.unary((&UnaryExprModel)(m))
+        | &StructLitExprModel:
+            ret self.structure_lit((&StructLitExprModel)(m))
+        | &AllocStructLitExprModel:
+            ret self.alloc_structure((&AllocStructLitExprModel)(m))
+        | &CastingExprModel:
+            ret self.casting((&CastingExprModel)(m))
+        | &FnCallExprModel:
+            ret self.func_call((&FnCallExprModel)(m))
+        | &SliceExprModel:
+            ret self.slice((&SliceExprModel)(m))
+        | &ArrayExprModel:
+            ret self.array((&ArrayExprModel)(m))
+        | &IndexingExprModel:
+            ret self.indexing((&IndexingExprModel)(m))
+        | &AnonFnExprModel:
+            ret self.anon_func((&AnonFnExprModel)(m))
+        | &MapExprModel:
+            ret self.map((&MapExprModel)(m))
+        | &SlicingExprModel:
+            ret self.slicing((&SlicingExprModel)(m))
+        | &TraitSubIdentExprModel:
+            ret self.trait_sub((&TraitSubIdentExprModel)(m))
+        | &StructSubIdentExprModel:
+            ret self.structure_sub((&StructSubIdentExprModel)(m))
+        | &CommonIdentExprModel:
+            ret self.common_ident((&CommonIdentExprModel)(m))
+        | &CommonSubIdentExprModel:
+            ret self.common_sub((&CommonSubIdentExprModel)(m))
+        | &TupleExprModel:
+            ret self.tuple((&TupleExprModel)(m))
+        | &BuiltinOutCallExprModel:
+            ret self.out_call((&BuiltinOutCallExprModel)(m))
+        | &BuiltinOutlnCallExprModel:
+            ret self.outln_call((&BuiltinOutlnCallExprModel)(m))
+        | &BuiltinNewCallExprModel:
+            ret self.new_call((&BuiltinNewCallExprModel)(m))
+        | &BuiltinPanicCallExprModel:
+            ret self.panic_call((&BuiltinPanicCallExprModel)(m))
+        | &BuiltinAssertCallExprModel:
+            ret self.assert_call((&BuiltinAssertCallExprModel)(m))
+        | &BuiltinErrorCallExprModel:
+            ret self.error_call((&BuiltinErrorCallExprModel)(m))
+        | &BuiltinMakeCallExprModel:
+            ret self.make_call((&BuiltinMakeCallExprModel)(m))
+        | &BuiltinAppendCallExprModel:
+            ret self.append_call((&BuiltinAppendCallExprModel)(m))
+        | &BuiltinCloneCallExprModel:
+            ret self.clone_call((&BuiltinCloneCallExprModel)(m))
+        | &SizeofExprModel:
+            ret self.sizeof((&SizeofExprModel)(m))
+        | &AlignofExprModel:
+            ret self.alignof((&AlignofExprModel)(m))
+        | &RuneExprModel:
+            ret self.rune_lit((&RuneExprModel)(m))
+        | &StructStaticIdentExprModel:
+            ret self.structure_static((&StructStaticIdentExprModel)(m))
+        | &IntegratedToStrExprModel:
+            ret self.integrated_to_str((&IntegratedToStrExprModel)(m))
+        | &TernaryExprModel:
+            ret self.ternary((&TernaryExprModel)(m))
+        | &BackendEmitExprModel:
+            ret self.backend_emit((&BackendEmitExprModel)(m))
+        | &FreeExprModel:
+            ret self.free((&FreeExprModel)(m))
+        |:
+            ret "<unimplemented_expression_model>"
+        }
+    }
+
+    fn expr(mut self, mut e: ExprModel): str {
+        let mut obj = self.model(e)
+        if obj.len == 0 || obj[0] != '(' {
+            ret obj
+        }
+        match type e {
+        | &BinopExprModel:
+            obj = obj[1:obj.len-1]
+        }
+        ret obj
+    }
+
+    fn val(mut self, mut v: &Value): str {
+        if v.data.is_const() {
+            ret self.constant(v.data.constant, v.data.kind.prim().is_f32())
+        }
+        ret self.expr(v.data.model)
+    }
+
+    fn init_expr(mut self, mut t: &TypeKind): str {
+        if t.ptr() != nil {
+            ret "nullptr"
+        }
+        let mut enm = t.enm()
+        if enm != nil {
+            ret self.val(enm.items[0].value)
+        }
+        ret TypeCoder.from_kind(t) + "()"
+    }
+}
+
+// Concatenate all strings into single string.
+fn concat_all_parts(parts: ...Token): str {
+    let mut s = ""
+    for _, p in parts {
+        s += p.kind
+    }
+    ret s
+}
 
 // Checks for bit-shifting optimizations.
 // Reports true if conditions are:
@@ -172,7 +1211,7 @@ fn sbtoa(b: byte): str {
     ret "\\" + seq
 }
 
-fn gen_cstr_bytes(bytes: []byte): str {
+fn cstr_bytes(bytes: []byte): str {
     let mut lit = ""
     for _, b in bytes {
         lit += sbtoa(b)
@@ -180,49 +1219,17 @@ fn gen_cstr_bytes(bytes: []byte): str {
     ret lit
 }
 
-fn get_cstr_model(bytes: []byte): str {
-    ret `"` + gen_cstr_bytes(bytes) + `"`
-}
-
-fn get_str_model(&c: &Const): str {
-    let content = c.read_str()
-    if content.len == 0 { // Empty.
-        ret as_jt("str") + "()"
-    }
-    let bytes = []byte(content)
-    let len = conv::fmt_int(bytes.len, 10)
-    let lit = get_cstr_model(bytes)
-    ret as_jt("str") + "(" + lit + ", " + len + ")"
-}
-
-fn get_bool_model(&c: &Const): str {
-    ret if c.read_bool() { "true" } else { "false" }
-}
-
-fn get_nil_model(): str {
-    ret "nullptr"
-}
-
-fn gen_float_special_cases(&x: f64): str {
-    match {
-    | math::is_nan(x):
-        ret "NAN"
-    | math::is_inf(x, 1):
-        ret "INFINITY"
-    | math::is_inf(x, -1):
-        ret "-INFINITY"
-    |:
-        ret ""
-    }
+fn cstr_lit(bytes: []byte): str {
+    ret `"` + cstr_bytes(bytes) + `"`
 }
 
 fn ftoa(f: f64, bitsize: int): str {
     if bitsize != 32 {
         if f == f64(i64(f)) {
-            ret i64toa(i64(f))
+            ret itoa(i64(f))
         }
         if f == f64(u64(f)) {
-            ret u64toa(u64(f))
+            ret utoa(u64(f))
         }
     }
     let mut m = conv::fmt_float(f, 'f', -1, bitsize)
@@ -232,53 +1239,7 @@ fn ftoa(f: f64, bitsize: int): str {
     ret m
 }
 
-fn get_f32_model(&c: &Const): str {
-    let x = c.as_f64()
-
-    // Special cases.
-    let f = gen_float_special_cases(x)
-    if f != "" {
-        ret f
-    }
-
-    match {
-    | x == MAX_F32:
-        ret "jule::MAX_F32"
-    | x == MIN_F32:
-        ret "jule::MIN_F32"
-    }
-    ret ftoa(x, 32) + "f"
-}
-
-fn get_f64_model(&c: &Const): str {
-    let x = c.as_f64()
-
-    // Special cases.
-    let f = gen_float_special_cases(x)
-    if f != "" {
-        ret f
-    }
-
-    match {
-    | x == MAX_F64:
-        ret "jule::MAX_F64"
-    | x == MIN_F64:
-        ret "jule::MIN_F64"
-    }
-
-    ret ftoa(x, 64)
-}
-
-fn get_float_model(mut &d: &Data): str {
-    match {
-    | d.kind.prim().is_f32():
-        ret get_f32_model(d.constant)
-    |:
-        ret get_f64_model(d.constant) // 64-bit
-    }
-}
-
-fn i64toa(x: i64): str {
+fn itoa(x: i64): str {
     match {
     | x == MAX_I64:
         ret "jule::MAX_I64"
@@ -293,11 +1254,7 @@ fn i64toa(x: i64): str {
     ret fmt + "L"
 }
 
-fn get_i64_model(&c: &Const): str {
-    ret i64toa(c.read_i64())
-}
-
-fn u64toa(x: u64): str {
+fn utoa(x: u64): str {
     match {
     | x == MAX_U64:
         ret "jule::MAX_U64"
@@ -310,342 +1267,6 @@ fn u64toa(x: u64): str {
     ret fmt + "LU"
 }
 
-fn get_u64_model(c: &Const): str {
-    ret u64toa(c.read_u64())
-}
-
-fn gen_const_expr(mut d: &Data): str {
-    match {
-    | d.constant.is_str():
-        ret get_str_model(d.constant)
-    | d.constant.is_bool():
-        ret get_bool_model(d.constant)
-    | d.constant.is_f64():
-        ret get_float_model(d)
-    | d.constant.is_i64():
-        ret get_i64_model(d.constant)
-    | d.constant.is_u64():
-        ret get_u64_model(d.constant)
-    | d.constant.is_nil():
-        ret get_nil_model()
-    |:
-        ret "" // Here is should be unreachable code.
-    }
-}
-
-fn gen_const_expr_model(m: &Const): str {
-    match {
-    | m.is_str():
-        ret get_str_model(m)
-    | m.is_bool():
-        ret get_bool_model(m)
-    | m.is_f64():
-        ret get_f64_model(m)
-    | m.is_i64():
-        ret get_i64_model(m)
-    | m.is_u64():
-        ret get_u64_model(m)
-    | m.is_nil():
-        ret get_nil_model()
-    |:
-        ret "" // Here is should be unreachable code.
-    }
-}
-
-fn gen_div_by_zero_binop_expr_model(&op: Token, mut &l: &OperandExprModel, mut &r: &OperandExprModel): str {
-    let mut opt = false
-    if env::OPT_MATH {
-        match type r.model {
-        | &Const:
-            opt = true
-        }
-    }
-
-    let mut op_func = ""
-    match op.kind {
-    | TokenKind.Solidus
-    | TokenKind.SolidusEq:
-        op_func = if opt { "/" } else { "div" }
-    | TokenKind.Percent
-    | TokenKind.PercentEq:
-        op_func = if opt { "%" } else { "mod" }
-    }
-
-    let mut obj = ""
-    if opt {
-        obj = "("
-        obj += gen_expr(l.model)
-        match op.kind {
-        | TokenKind.Solidus:
-            let (ok, x) = check_for_bit_shift_opt(l, r)
-            if ok {
-                obj += " >> "
-                obj += u64toa(x)
-                break
-            }
-            fall
-        |:
-            obj += " "
-            obj += op_func
-            obj += " "
-            obj += gen_expr(r.model)
-        }
-        obj += ")"
-    } else {
-        obj = "jule::"
-        obj += op_func
-        obj += "("
-        if !env::PRODUCTION {
-            obj += "\""
-            obj += gen_loc_info(op)
-            obj += "\","
-        }
-        obj += gen_expr(l.model)
-        obj += ","
-        obj += gen_expr(r.model)
-        obj += ")"
-    }
-    ret obj
-}
-
-fn gen_binop_expr_model(mut m: &BinopExprModel): str {
-    match m.op.kind {
-    | TokenKind.Solidus
-    | TokenKind.Percent:
-        ret gen_div_by_zero_binop_expr_model(m.op, m.left, m.right)
-    }
-
-    let mut obj = "("
-    if env::OPT_MATH {
-        match m.op.kind {
-        | TokenKind.Star: // Multiplication
-            let (ok, x) = check_for_bit_shift_opt(m.left, m.right)
-            if !ok {
-                break
-            }
-            obj += gen_expr_model(m.left.model)
-            obj += " << "
-            obj += u64toa(x)
-            obj += ")"
-            ret obj
-        }
-    }
-
-    obj += gen_expr_model(m.left.model)
-    obj += " "
-    obj += m.op.kind
-    obj += " "
-    obj += gen_expr_model(m.right.model)
-    obj += ")"
-    ret obj
-}
-
-fn gen_var_expr_model(mut m: &Var): str {
-    if m.cpp_linked {
-        let d = find_directive(m.directives, Directive.Namespace)
-        if d != nil {
-            let mut obj = concat_all_parts(d.args...)
-            obj += "::"
-            obj += var_out_ident(m)
-            ret obj
-        }
-    }
-    ret var_out_ident(m)
-}
-
-fn gen_struct_expr_model(m: &Struct): str {
-    ret gen_struct_kind(m)
-}
-
-fn gen_struct_ins_expr_model(mut m: &StructIns): str {
-    ret gen_struct_kind_ins(m)
-}
-
-fn gen_unary_expr_model(mut m: &UnaryExprModel): str {
-    if env::OPT_PTR && m.op.kind == TokenKind.Star {
-        match type m.expr.model {
-        | &UnaryExprModel:
-            let mut um = (&UnaryExprModel)(m.expr.model)
-            if um.op.kind == TokenKind.Amper {
-                ret gen_expr_model(um.expr.model)
-            }
-        }
-    }
-
-    match m.op.kind {
-    | TokenKind.Caret:
-        let mut obj = "(~("
-        obj += gen_expr(m.expr.model)
-        obj += "))"
-        ret obj
-    | TokenKind.Star:
-        if env::PRODUCTION || m.expr.kind.sptr() == nil {
-            break
-        }
-        let mut obj = gen_expr(m.expr.model)
-        obj += ".get(\""
-        obj += gen_loc_info(m.op)
-        obj += "\")"
-        ret obj
-    }
-
-    let mut obj = "("
-    obj += m.op.kind
-    obj += "("
-    obj += gen_expr(m.expr.model)
-    obj += "))"
-    ret obj
-}
-
-fn gen_cpp_struct_lit_expr_model(mut m: &StructLitExprModel): str {
-    let mut obj = "(" + gen_struct_kind_ins(m.strct)
-    obj += "){"
-    if m.args.len > 0 {
-    iter:
-        for (_, mut f) in m.strct.fields {
-            if m.strct.decl.cpp_linked {
-                for (_, mut arg) in m.args {
-                    if arg.field == f {
-                        obj += "."
-                        obj += field_out_ident(f.decl)
-                        obj += "="
-                        obj += gen_expr(arg.expr)
-                        obj += ","
-                        continue iter
-                    }
-                }
-                continue
-            }
-            obj += field_out_ident(f.decl)
-            obj += ": "
-            for (_, mut arg) in m.args {
-                if arg.field == f {
-                    obj += gen_expr(arg.expr)
-                    obj += ","
-                    continue iter
-                }
-            }
-            obj += get_init_expr(f.kind)
-            obj += ","
-        }
-        obj = obj[:obj.len-1] // Remove last comma.
-    }
-    obj += "}"
-    ret obj
-}
-
-fn gen_struct_lit_expr_model(mut m: &StructLitExprModel): str {
-    if m.strct.decl.cpp_linked {
-        ret gen_cpp_struct_lit_expr_model(m)
-    }
-
-    let mut obj = struct_ins_out_ident(m.strct)
-    obj += "("
-    if m.args.len > 0 {
-    iter:
-        for (_, mut f) in m.strct.fields {
-            for (_, mut arg) in m.args {
-                if arg.field == f {
-                    obj += gen_expr(arg.expr)
-                    obj += ","
-                    continue iter
-                }
-            }
-            obj += get_init_expr(f.kind)
-            obj += ","
-        }
-        obj = obj[:obj.len-1] // Remove last comma.
-    }
-    obj += ")"
-    ret obj
-}
-
-fn gen_alloc_struct_lit_expr_model(mut m: &AllocStructLitExprModel): str {
-    let mut obj = "jule::new_struct"
-    if m.lit.strct.decl.has_ref_accessible() {
-        obj += "_ptr"
-    }
-    obj += "<"
-    obj += struct_ins_out_ident(m.lit.strct)
-    obj += ">("
-    if !env::PRODUCTION {
-        obj += "\""
-        obj += gen_loc_info(m.lit.token)
-        obj += "\","
-    }
-    obj += "new( std::nothrow ) "
-    obj += gen_struct_lit_expr_model(m.lit)
-    obj += ")"
-    ret obj
-}
-
-fn gen_casting_expr_model(mut m: &CastingExprModel): str {
-    let mut obj = ""
-    match {
-    | m.kind.prim() != nil && m.kind.prim().is_any():
-        obj += gen_type_kind(m.kind)
-        obj += "("
-        obj += gen_expr_model(m.expr)
-        obj += ")"
-    | m.expr_kind.ptr() != nil
-    | m.kind.ptr() != nil:
-        obj += "(("
-        obj += gen_type_kind(m.kind)
-        obj += ")("
-        obj += gen_expr(m.expr)
-        obj += "))"
-    | m.expr_kind.trt() != nil
-    | m.expr_kind.prim() != nil && m.expr_kind.prim().is_any():
-        obj += gen_expr_model(m.expr)
-        obj += "."
-        if env::PRODUCTION {
-            obj += "operator "
-            obj += gen_type_kind(m.kind)
-            obj += "()"
-        } else {
-            if m.expr_kind.trt() != nil && m.kind.sptr() != nil {
-                obj += "cast_ptr<"
-                obj += gen_type_kind(m.kind.sptr().elem)
-            } else {
-                obj += "cast<"
-                obj += gen_type_kind(m.kind)
-            }
-            obj += ">(\""
-            obj += gen_loc_info(m.token)
-            obj += "\")"
-        }
-    |:
-        obj += "static_cast<"
-        obj += gen_type_kind(m.kind)
-        obj += ">("
-        obj += gen_expr(m.expr)
-        obj += ")"
-    }
-    ret obj
-}
-
-fn gen_arg_expr_models(mut models: []ExprModel): str {
-    if models.len == 0 {
-        ret ""
-    }
-    let mut obj = ""
-    for (_, mut m) in models {
-        obj += gen_expr(m)
-        obj += ","
-    }
-    obj = obj[:obj.len-1] // Remove last comma.
-    ret obj
-}
-
-fn gen_expr_model_for_call(mut expr: ExprModel): str {
-    match type expr {
-    | &FnIns:
-        ret gen_fn_ins_expr_model((&FnIns)(expr))
-    |:
-        ret gen_expr_model(expr)
-    }
-}
-
 // Returns location information of token as cstr bytes.
 fn gen_loc_info(&t: Token): str {
     let mut loc = t.file.path()
@@ -653,52 +1274,7 @@ fn gen_loc_info(&t: Token): str {
     loc += conv::itoa(t.row)
     loc += ":"
     loc += conv::itoa(t.column)
-    ret gen_cstr_bytes([]byte(loc))
-}
-
-fn gen_pure_fn_call_expr_model(mut &m: &FnCallExprModel): str {
-    let mut obj = gen_expr_model_for_call(m.expr)
-    if !m.func.is_builtin() {
-        if m.func.decl.cpp_linked && m.func.generics.len > 0 {
-            if !has_directive(m.func.decl.directives, Directive.Cdef) {
-                obj += "<"
-                for (_, mut g) in m.func.generics {
-                    obj += gen_type_kind(g)
-                    obj += ","
-                }
-                obj = obj[:obj.len-1] // Remove last comma.
-                obj += ">"
-            }
-        }
-    }
-    if !env::PRODUCTION && m.func.anon {
-        match type m.expr {
-        | &StructSubIdentExprModel:
-            if (&StructSubIdentExprModel)(m.expr).field.decl.owner.cpp_linked {
-                obj += "("
-                break
-            }
-            fall
-        |:
-            obj += ".call(\""
-            obj += gen_loc_info(m.token)
-            obj += "\""
-            if m.args.len != 0 {
-                obj += ","
-            }
-        }
-    } else {
-        obj += "("
-    }
-    obj += gen_arg_expr_models(m.args)
-    obj += ")"
-
-    if m.is_co {
-        obj = "__JULE_CO(" + obj
-        obj += ")"
-    }
-
-    ret obj
+    ret cstr_bytes([]byte(loc))
 }
 
 fn is_forwarded(&s: &Scope): bool {
@@ -715,613 +1291,3 @@ fn is_forwarded(&s: &Scope): bool {
         ret true
     }
 }
-
-fn gen_fn_call_expr_model(mut m: &FnCallExprModel): str {
-    if m.func.is_builtin() ||
-        !m.func.decl.exceptional ||
-        m.except != nil && m.except.stmts.len == 0 {
-        ret gen_pure_fn_call_expr_model(m)
-    }
-
-    // Generate code for exceptional.
-    let mut obj = "({\n"
-    add_indent()
-    obj += indent()
-    obj += "auto except = "
-    obj += gen_pure_fn_call_expr_model(m)
-    obj += ";\n"
-    obj += indent()
-    if m.except != nil {
-        if m.func.result == nil || !m.assigned {
-            obj += "if (!except.ok()) "
-            obj += gen_scope(m.except)
-            obj += "\n"
-        } else {
-            let forwarded = is_forwarded(m.except)
-            obj += "(except.ok()) ? (except.result) : ("
-            if forwarded {
-                obj += "{"
-            }
-            obj += gen_scope(m.except)
-            if forwarded {
-                obj += " "
-                obj += get_init_expr(m.func.result)
-                obj += CPP_ST_TERM + "}"
-            }
-            obj += ");\n"
-        }
-        done_indent()
-    } else {
-        obj += `if (!except.ok()) jule::panic(jule::Str("`
-        obj += `unhandled exceptional: ") + except.error.type->to_str(except.error.data) + jule::Str("\nlocation: `
-        obj += gen_loc_info(m.token)
-        obj += "\"));\n"
-        if !m.func.decl.is_void() {
-            obj += indent()
-            obj += "(except.result);\n"
-        }
-        done_indent()
-    }
-
-    obj += indent()
-    obj += "})"
-    ret obj
-}
-
-fn gen_slice_expr_model(mut m: &SliceExprModel): str {
-    if m.elems.len == 0 {
-        ret as_slice_kind(m.elem_kind) + "()"
-    }
-    let mut obj = as_slice_kind(m.elem_kind)
-    obj += "({"
-    obj += gen_arg_expr_models(m.elems)
-    obj += "})"
-    ret obj
-}
-
-fn gen_indexing_expr_model(mut m: &IndexingExprModel): str {
-    let mut obj = gen_expr_model(m.expr.model)
-
-    // Try access optimization.
-    if env::OPT_ACCESS {
-        let array = m.expr.kind.arr() != nil
-
-        // Constants checked by semantic analysis for arrays, safe.
-        if array && m.index.is_const() {
-            obj += ".__at("
-            obj += gen_expr(m.index.model)
-            obj += ")"
-            ret obj
-        }
-
-        match type m.index.model {
-        | &Var:
-            let i = (&Var)(m.index.model)
-            if i.mutable || i.iter_relation == nil {
-                break
-            }
-            match type m.expr.model {
-            | &Var:
-                let r = (&Var)(m.expr.model)
-
-                // Iterated variable is indexed variable?
-                if i.iter_relation.range == r {
-                    obj += ".__at("
-                    obj += gen_expr(m.index.model)
-                    obj += ")"
-                    ret obj
-                }
-            }
-        }
-    }
-
-    // Index access with safety measures.
-    match {
-    | env::PRODUCTION
-    | m.expr.kind.ptr() != nil
-    | m.expr.kind.map() != nil:
-        obj += "["
-        obj += gen_expr(m.index.model)
-        obj += "]"
-    |:
-        obj += ".at(\""
-        obj += gen_loc_info(m.token)
-        obj += "\","
-        obj += gen_expr(m.index.model)
-        obj += ")"
-    }
-
-    ret obj
-}
-
-fn gen_anon_fn_expr_model(mut m: &AnonFnExprModel): str {
-    let mut obj = gen_fn_kind(m.func)
-    obj += "([=]"
-    obj += gen_params_ins(m.func.params)
-    obj += " mutable -> "
-    obj += gen_fn_ins_result(m.func)
-    obj += " "
-    obj += gen_fn_scope(m.func)
-    obj += ")"
-    ret obj
-}
-
-fn gen_map_expr_model(mut m: &MapExprModel): str {
-    let mut obj = as_jt("map")
-    obj += "<"
-    obj += gen_type_kind(m.key_kind)
-    obj += ","
-    obj += gen_type_kind(m.val_kind)
-    obj += ">({"
-    if m.entries.len > 0 {
-        for (_, mut pair) in m.entries {
-            let mut pair_obj = "{"
-            pair_obj += gen_expr(pair.key)
-            pair_obj += ","
-            pair_obj += gen_expr(pair.val)
-            pair_obj += "}"
-            obj += pair_obj
-            obj += ","
-        }
-        obj = obj[:obj.len-1] // Remove last comma.
-    }
-    obj += "})"
-    ret obj
-}
-
-fn gen_slicing_expr_model(mut m: &SlicingExprModel): str {
-    let mut obj = gen_expr_model(m.expr)
-    obj += ".slice("
-    if !env::PRODUCTION {
-        obj += "\""
-        obj += gen_loc_info(m.token)
-        obj += "\","
-    }
-    obj += gen_expr(m.left)
-    if m.right != nil {
-        obj += ","
-        obj += gen_expr(m.right)
-    }
-    obj += ")"
-    ret obj
-}
-
-fn gen_trait_sub_ident_expr_model(mut m: &TraitSubIdentExprModel): str {
-    let mut obj = gen_expr_model(m.expr)
-    obj += ".get("
-    if !env::PRODUCTION {
-        obj += "\""
-        obj += gen_loc_info(m.token)
-        obj += "\""
-    }
-    obj += ")._method_"
-    obj += m.ident
-    ret obj
-}
-
-fn gen_struct_sub_ident_expr_model(mut m: &StructSubIdentExprModel): str {
-    let mut obj = gen_expr_model(m.expr)
-    obj += "."
-    if m.field != nil {
-        obj += field_out_ident(m.field.decl)
-    } else {
-        obj += fn_ins_out_ident(m.method)
-    }
-    ret obj
-}
-
-fn gen_common_ident_expr_model(m: &CommonIdentExprModel): str {
-    ret m.ident
-}
-
-fn gen_common_sub_ident_expr_model(mut m: &CommonSubIdentExprModel): str {
-    let mut obj = gen_expr_model(m.expr)
-    obj += "."
-    obj += m.ident
-    ret obj
-}
-
-fn gen_array_expr_model(mut m: &ArrayExprModel): str {
-    if m.elems.len == 0 {
-        ret gen_array_kind(m.kind) + "()"
-    }
-
-    let mut obj = gen_array_kind(m.kind)
-
-    // Filled.
-    if m.elems.len == 2 && m.elems[1] == nil {
-        obj += "("
-        obj += gen_expr(m.elems[0])
-        obj += ")"
-        ret obj
-    }
-
-    obj += "({"
-    obj += gen_arg_expr_models(m.elems)
-    obj += "})"
-    ret obj
-}
-
-// Returns complete expression model of function instance.
-// Usefull for strict type safety.
-fn gen_fn_ins_expr_model_common(mut m: &FnIns): str {
-    let mut obj = gen_fn_kind(m)
-    obj += "("
-    obj += gen_fn_ins_expr_model(m)
-    obj += ")"
-    ret obj
-}
-
-// Returns elementary expression model of function instance.
-fn gen_fn_ins_expr_model(mut m: &FnIns): str {
-    if m.decl != nil && m.decl.cpp_linked {
-        let d = find_directive(m.decl.directives, Directive.Namespace)
-        if d != nil {
-            let mut obj = concat_all_parts(d.args...)
-            obj += "::"
-            obj += fn_ins_out_ident(m)
-            ret obj
-        }
-    }
-    ret fn_ins_out_ident(m)
-}
-
-fn gen_tuple_expr_model(mut m: &TupleExprModel): str {
-    let mut obj = "std::make_tuple("
-    for (_, mut d) in m.datas {
-        obj += gen_expr(d.model)
-        obj += ","
-    }
-    obj = obj[:obj.len-1] // Remove last comma.
-    obj += ")"
-    ret obj
-}
-
-fn gen_builtin_new_call_expr_model(mut m: &BuiltinNewCallExprModel): str {
-    let mut obj = "jule::new_ptr<"
-    obj += gen_type_kind(m.kind)
-    obj += ">("
-    if m.init != nil {
-        obj += gen_expr(m.init)
-    }
-    obj += ")"
-    ret obj
-}
-
-fn gen_builtin_out_call_expr_model(mut m: &BuiltinOutCallExprModel): str {
-    if m.debug && env::PRODUCTION {
-        ret ""
-    }
-    let mut obj = "jule::out("
-    obj += gen_expr(m.expr)
-    obj += ")"
-    ret obj
-}
-
-fn gen_builtin_outln_call_expr_model(mut m: &BuiltinOutlnCallExprModel): str {
-    if m.debug && env::PRODUCTION {
-        ret ""
-    }
-    let mut obj = "jule::outln("
-    obj += gen_expr(m.expr)
-    obj += ")"
-    ret obj
-}
-
-fn gen_builtin_panic_call_expr_model(mut m: &BuiltinPanicCallExprModel): str {
-    let mut obj = "jule::panic("
-    obj += gen_expr(m.expr)
-    obj += ` + jule::Str("\nlocation: `
-    obj += gen_loc_info(m.token)
-    obj += "\"));"
-    ret obj
-}
-
-fn gen_builtin_assert_call_expr_model(mut m: &BuiltinAssertCallExprModel): str {
-    if env::PRODUCTION {
-        ret ""
-    }
-    let mut obj = "if (!("
-    obj += gen_expr(m.expr)
-    obj += ")) jule::panic(jule::Str("
-    obj += get_cstr_model([]byte(m.log))
-    obj += `) + jule::Str("\nlocation: `
-    obj += gen_loc_info(m.token)
-    obj += "\"));"
-    ret obj
-}
-
-fn gen_builtin_error_call_expr_model(mut m: &BuiltinErrorCallExprModel): str {
-    let mut obj = "return "
-    if m.func.decl.is_void() {
-        obj += "jule::VoidExceptional("
-    } else {
-        obj += "jule::Exceptional<"
-        obj += gen_type_kind(m.func.result)
-        obj += ">("
-    }
-    obj += gen_expr(m.err)
-    obj += ")"
-    ret obj
-}
-
-fn gen_builtin_make_call_expr_model(mut m: &BuiltinMakeCallExprModel): str {
-    let mut obj = ""
-    if m.len != nil {
-        obj += gen_expr(m.len)
-    } else {
-        obj += "0"
-    }
-    if m.cap != nil {
-        obj += "," + gen_expr(m.cap)
-    }
-
-    if m.kind.slc().elem.enm() != nil {
-        obj += ","
-        obj += get_init_expr(m.kind.slc().elem)
-        if m.cap != nil {
-            obj = gen_type_kind(m.kind) + "::alloc(" + obj
-        } else {
-            obj = gen_type_kind(m.kind) + "::alloc_def(" + obj
-        }
-    } else {
-        obj = gen_type_kind(m.kind) + "::alloc(" + obj
-    }
-
-    obj += ")"
-    ret obj
-}
-
-fn gen_builtin_append_call_expr_model_assign_opt(
-    same_dest: bool,
-    &dest_expr: str,
-    mut &dest_kind: &TypeKind,
-    mut &s: &SliceExprModel,
-    mut &m: &BuiltinAppendCallExprModel): str {
-    let mut obj = ""
-    if !same_dest {
-        obj += dest_expr
-        obj += " = jule::alloc_for_append("
-        obj += gen_expr_model(m.dest)
-        obj += ","
-        obj += conv::itoa(s.elems.len)
-        obj += ")" + CPP_ST_TERM
-    }
-    for (_, mut e) in s.elems {
-        obj += dest_expr
-        // Use the "__push" function to skip allocation boundary checking.
-        obj += ".__push("
-        obj += gen_expr_model(e)
-        obj += ")" + CPP_ST_TERM
-    }
-    ret obj
-}
-
-fn gen_builtin_append_call_expr_model_assign(mut dest: ExprModel, mut m: &BuiltinAppendCallExprModel): (str, optimized: bool) {
-    match type m.elements {
-    | &SliceExprModel:
-        match type dest {
-        | &Var:
-            let mut s = (&SliceExprModel)(m.elements)
-            let dest_expr = gen_expr_model(dest)
-            let mut dest_var = (&Var)(dest)
-            let same_dest = m.dest == dest_var
-            ret gen_builtin_append_call_expr_model_assign_opt(
-                same_dest, dest_expr, dest_var.kind.kind, s, m), true
-        | &StructSubIdentExprModel:
-            let mut s = (&SliceExprModel)(m.elements)
-            let dest_expr = gen_expr_model(dest)
-            let mut dest_field = (&StructSubIdentExprModel)(dest).field
-            let same_dest = m.dest == dest_field
-            ret gen_builtin_append_call_expr_model_assign_opt(
-                same_dest, dest_expr, dest_field.kind, s, m), true
-        }
-
-    }
-    ret gen_builtin_append_call_expr_model(m), false
-}
-
-fn gen_builtin_append_call_expr_model(mut m: &BuiltinAppendCallExprModel): str {
-    let mut obj = "jule::append("
-    obj += gen_expr_model(m.dest)
-    obj += ","
-    obj += gen_expr_model(m.elements)
-    obj += ")"
-    ret obj
-}
-
-fn gen_builtin_clone_call_expr_model(mut m: &BuiltinCloneCallExprModel): str {
-    let mut obj = "jule::clone("
-    obj += gen_expr_model(m.expr)
-    obj += ")"
-    ret obj
-}
-
-fn gen_sizeof_expr_model(mut m: &SizeofExprModel): str {
-    let mut obj = "sizeof("
-    obj += gen_expr(m.expr)
-    obj += ")"
-    ret obj
-}
-
-fn gen_alignof_expr_model(mut m: &AlignofExprModel): str {
-    let mut obj = "alignof("
-    obj += gen_expr(m.expr)
-    obj += ")"
-    ret obj
-}
-
-fn gen_rune_expr_model(m: &RuneExprModel): str {
-    if m.code <= 127 { // ASCII
-        let mut b = sbtoa(byte(m.code))
-        if b == "'" {
-            b = "\\'"
-        }
-        ret "'" + b + "'"
-    }
-    ret i64toa(i64(m.code))
-}
-
-fn gen_struct_static_ident_expr_model(mut m: &StructStaticIdentExprModel): str {
-    let mut obj = struct_ins_out_ident(m.structure)
-    obj += "::"
-    obj += fn_ins_out_ident(m.method)
-    ret obj
-}
-
-fn gen_integrated_to_str_expr_model(mut m: &IntegratedToStrExprModel): str {
-    let mut obj = "jule::to_str("
-    obj += gen_expr_model(m.expr)
-    obj += ")"
-    ret obj
-}
-
-fn gen_ternary_expr_model(mut m: &TernaryExprModel): str {
-    let mut obj = "(("
-    obj += gen_expr_model(m.condition)
-    obj += ") ? ("
-    obj += gen_expr_model(m.true_expr)
-    obj += ") : ("
-    obj += gen_expr_model(m.false_expr)
-    obj += "))"
-    ret obj
-}
-
-fn gen_backend_emit_expr_model(mut m: &BackendEmitExprModel): str {
-    if m.exprs.len == 0 {
-        ret m.code
-    }
-    for (i, mut expr) in m.exprs {
-        m.exprs[i] = gen_expr(expr)
-    }
-    ret fmt::format(m.code, m.exprs...)
-}
-
-fn gen_free_expr_model(mut m: &FreeExprModel): str {
-    if env::RC {
-        ret gen_expr(m.expr) + ".dealloc()"
-    }
-    ret gen_expr(m.expr) + ".__free()"
-}
-
-fn gen_expr_model(mut m: ExprModel): str {
-    match type m {
-    | &Data:
-        ret gen_expr_model((&Data)(m).model)
-    | &TypeKind:
-        ret gen_type_kind((&TypeKind)(m))
-    | &Const:
-        ret gen_const_expr_model((&Const)(m))
-    | &Var:
-        ret gen_var_expr_model((&Var)(m))
-    | &Trait:
-        ret trait_out_ident((&Trait)(m))
-    | &Struct:
-        ret gen_struct_expr_model((&Struct)(m))
-    | &StructIns:
-        ret gen_struct_ins_expr_model((&StructIns)(m))
-    | &FnIns:
-        ret gen_fn_ins_expr_model_common((&FnIns)(m))
-    | &BinopExprModel:
-        ret gen_binop_expr_model((&BinopExprModel)(m))
-    | &UnaryExprModel:
-        ret gen_unary_expr_model((&UnaryExprModel)(m))
-    | &StructLitExprModel:
-        ret gen_struct_lit_expr_model((&StructLitExprModel)(m))
-    | &AllocStructLitExprModel:
-        ret gen_alloc_struct_lit_expr_model((&AllocStructLitExprModel)(m))
-    | &CastingExprModel:
-        ret gen_casting_expr_model((&CastingExprModel)(m))
-    | &FnCallExprModel:
-        ret gen_fn_call_expr_model((&FnCallExprModel)(m))
-    | &SliceExprModel:
-        ret gen_slice_expr_model((&SliceExprModel)(m))
-    | &ArrayExprModel:
-        ret gen_array_expr_model((&ArrayExprModel)(m))
-    | &IndexingExprModel:
-        ret gen_indexing_expr_model((&IndexingExprModel)(m))
-    | &AnonFnExprModel:
-        ret gen_anon_fn_expr_model((&AnonFnExprModel)(m))
-    | &MapExprModel:
-        ret gen_map_expr_model((&MapExprModel)(m))
-    | &SlicingExprModel:
-        ret gen_slicing_expr_model((&SlicingExprModel)(m))
-    | &TraitSubIdentExprModel:
-        ret gen_trait_sub_ident_expr_model((&TraitSubIdentExprModel)(m))
-    | &StructSubIdentExprModel:
-        ret gen_struct_sub_ident_expr_model((&StructSubIdentExprModel)(m))
-    | &CommonIdentExprModel:
-        ret gen_common_ident_expr_model((&CommonIdentExprModel)(m))
-    | &CommonSubIdentExprModel:
-        ret gen_common_sub_ident_expr_model((&CommonSubIdentExprModel)(m))
-    | &TupleExprModel:
-        ret gen_tuple_expr_model((&TupleExprModel)(m))
-    | &BuiltinOutCallExprModel:
-        ret gen_builtin_out_call_expr_model((&BuiltinOutCallExprModel)(m))
-    | &BuiltinOutlnCallExprModel:
-        ret gen_builtin_outln_call_expr_model((&BuiltinOutlnCallExprModel)(m))
-    | &BuiltinNewCallExprModel:
-        ret gen_builtin_new_call_expr_model((&BuiltinNewCallExprModel)(m))
-    | &BuiltinPanicCallExprModel:
-        ret gen_builtin_panic_call_expr_model((&BuiltinPanicCallExprModel)(m))
-    | &BuiltinAssertCallExprModel:
-        ret gen_builtin_assert_call_expr_model((&BuiltinAssertCallExprModel)(m))
-    | &BuiltinErrorCallExprModel:
-        ret gen_builtin_error_call_expr_model((&BuiltinErrorCallExprModel)(m))
-    | &BuiltinMakeCallExprModel:
-        ret gen_builtin_make_call_expr_model((&BuiltinMakeCallExprModel)(m))
-    | &BuiltinAppendCallExprModel:
-        ret gen_builtin_append_call_expr_model((&BuiltinAppendCallExprModel)(m))
-    | &BuiltinCloneCallExprModel:
-        ret gen_builtin_clone_call_expr_model((&BuiltinCloneCallExprModel)(m))
-    | &SizeofExprModel:
-        ret gen_sizeof_expr_model((&SizeofExprModel)(m))
-    | &AlignofExprModel:
-        ret gen_alignof_expr_model((&AlignofExprModel)(m))
-    | &RuneExprModel:
-        ret gen_rune_expr_model((&RuneExprModel)(m))
-    | &StructStaticIdentExprModel:
-        ret gen_struct_static_ident_expr_model((&StructStaticIdentExprModel)(m))
-    | &IntegratedToStrExprModel:
-        ret gen_integrated_to_str_expr_model((&IntegratedToStrExprModel)(m))
-    | &TernaryExprModel:
-        ret gen_ternary_expr_model((&TernaryExprModel)(m))
-    | &BackendEmitExprModel:
-        ret gen_backend_emit_expr_model((&BackendEmitExprModel)(m))
-    | &FreeExprModel:
-        ret gen_free_expr_model((&FreeExprModel)(m))
-    |:
-        ret "<unimplemented_expression_model>"
-    }
-}
-
-fn gen_expr(mut e: ExprModel): str {
-    let mut obj = gen_expr_model(e)
-    if obj.len == 0 || obj[0] != '(' {
-        ret obj
-    }
-    match type e {
-    | &BinopExprModel:
-        obj = obj[1:obj.len-1]
-    }
-    ret obj
-}
-
-fn gen_val(mut v: &Value): str {
-    if v.data.is_const() {
-        ret gen_const_expr(v.data)
-    }
-    ret gen_expr(v.data.model)
-}
-
-fn get_init_expr(mut t: &TypeKind): str {
-    if t.ptr() != nil {
-        ret "nullptr"
-    }
-    let mut enm = t.enm()
-    if enm != nil {
-        ret gen_val(enm.items[0].value)
-    }
-    ret gen_type_kind(t) + "()"
-}
-*/
