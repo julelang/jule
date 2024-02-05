@@ -276,19 +276,19 @@ impl ExprCoder {
             if d != nil {
                 let mut obj = concat_all_parts(d.args...)
                 obj += "::"
-                obj += IdentCoder.from_var(m)
+                obj += IdentCoder.var(m)
                 ret obj
             }
         }
-        ret IdentCoder.from_var(m)
+        ret IdentCoder.var(m)
     }
 
     fn structure(self, m: &Struct): str {
-        ret TypeCoder.from_struct(m)
+        ret TypeCoder.structure(m)
     }
 
     fn structure_ins(self, mut m: &StructIns): str {
-        ret TypeCoder.from_struct_ins(m)
+        ret TypeCoder.structure_ins(m)
     }
 
     fn unary(mut self, mut m: &UnaryExprModel): str {
@@ -328,7 +328,7 @@ impl ExprCoder {
     }
 
     fn cpp_structure_lit(mut self, mut m: &StructLitExprModel): str {
-        let mut obj = "(" + TypeCoder.from_struct_ins(m.strct)
+        let mut obj = "(" + TypeCoder.structure_ins(m.strct)
         obj += "){"
         if m.args.len > 0 {
         iter:
@@ -337,7 +337,7 @@ impl ExprCoder {
                     for (_, mut arg) in m.args {
                         if arg.field == f {
                             obj += "."
-                            obj += IdentCoder.from_field(f.decl)
+                            obj += IdentCoder.field(f.decl)
                             obj += "="
                             obj += self.expr(arg.expr)
                             obj += ","
@@ -346,7 +346,7 @@ impl ExprCoder {
                     }
                     continue
                 }
-                obj += IdentCoder.from_field(f.decl)
+                obj += IdentCoder.field(f.decl)
                 obj += ": "
                 for (_, mut arg) in m.args {
                     if arg.field == f {
@@ -369,7 +369,7 @@ impl ExprCoder {
             ret self.cpp_structure_lit(m)
         }
 
-        let mut obj = IdentCoder.from_struct_ins(m.strct)
+        let mut obj = IdentCoder.structure_ins(m.strct)
         obj += "("
         if m.args.len > 0 {
         iter:
@@ -396,7 +396,7 @@ impl ExprCoder {
             obj += "_ptr"
         }
         obj += "<"
-        obj += IdentCoder.from_struct_ins(m.lit.strct)
+        obj += IdentCoder.structure_ins(m.lit.strct)
         obj += ">("
         if !env::PRODUCTION {
             obj += "\""
@@ -413,14 +413,14 @@ impl ExprCoder {
         let mut obj = ""
         match {
         | m.kind.prim() != nil && m.kind.prim().is_any():
-            obj += TypeCoder.from_kind(m.kind)
+            obj += TypeCoder.kind(m.kind)
             obj += "("
             obj += self.model(m.expr)
             obj += ")"
         | m.expr_kind.ptr() != nil
         | m.kind.ptr() != nil:
             obj += "(("
-            obj += TypeCoder.from_kind(m.kind)
+            obj += TypeCoder.kind(m.kind)
             obj += ")("
             obj += self.expr(m.expr)
             obj += "))"
@@ -430,15 +430,15 @@ impl ExprCoder {
             obj += "."
             if env::PRODUCTION {
                 obj += "operator "
-                obj += TypeCoder.from_kind(m.kind)
+                obj += TypeCoder.kind(m.kind)
                 obj += "()"
             } else {
                 if m.expr_kind.trt() != nil && m.kind.sptr() != nil {
                     obj += "cast_ptr<"
-                    obj += TypeCoder.from_kind(m.kind.sptr().elem)
+                    obj += TypeCoder.kind(m.kind.sptr().elem)
                 } else {
                     obj += "cast<"
-                    obj += TypeCoder.from_kind(m.kind)
+                    obj += TypeCoder.kind(m.kind)
                 }
                 obj += ">(\""
                 obj += gen_loc_info(m.token)
@@ -446,7 +446,7 @@ impl ExprCoder {
             }
         |:
             obj += "static_cast<"
-            obj += TypeCoder.from_kind(m.kind)
+            obj += TypeCoder.kind(m.kind)
             obj += ">("
             obj += self.expr(m.expr)
             obj += ")"
@@ -483,7 +483,7 @@ impl ExprCoder {
                 if !has_directive(m.func.decl.directives, Directive.Cdef) {
                     obj += "<"
                     for (_, mut g) in m.func.generics {
-                        obj += TypeCoder.from_kind(g)
+                        obj += TypeCoder.kind(g)
                         obj += ","
                     }
                     obj = obj[:obj.len-1] // Remove last comma.
@@ -640,11 +640,11 @@ impl ExprCoder {
     }
 
     fn anon_func(mut self, mut m: &AnonFnExprModel): str {
-        let mut obj = TypeCoder.from_fn(m.func)
+        let mut obj = TypeCoder.func(m.func)
         obj += "([=]"
         obj += self.oc.gen_params_ins(m.func.params)
         obj += " mutable -> "
-        obj += TypeCoder.from_fn_ins_result(m.func)
+        obj += TypeCoder.func_ins_result(m.func)
         obj += " "
         obj += self.oc.sc.func_scope(m.func)
         obj += ")"
@@ -654,9 +654,9 @@ impl ExprCoder {
     fn map(mut self, mut m: &MapExprModel): str {
         let mut obj = TypeCoder.to_type("map")
         obj += "<"
-        obj += TypeCoder.from_kind(m.key_kind)
+        obj += TypeCoder.kind(m.key_kind)
         obj += ","
-        obj += TypeCoder.from_kind(m.val_kind)
+        obj += TypeCoder.kind(m.val_kind)
         obj += ">({"
         if m.entries.len > 0 {
             for (_, mut pair) in m.entries {
@@ -708,9 +708,9 @@ impl ExprCoder {
         let mut obj = self.model(m.expr)
         obj += "."
         if m.field != nil {
-            obj += IdentCoder.from_field(m.field.decl)
+            obj += IdentCoder.field(m.field.decl)
         } else {
-            obj += IdentCoder.from_fn_ins(m.method)
+            obj += IdentCoder.func_ins(m.method)
         }
         ret obj
     }
@@ -727,7 +727,7 @@ impl ExprCoder {
     }
 
     fn array(mut self, mut m: &ArrayExprModel): str {
-        let mut obj = TypeCoder.from_array(m.kind)
+        let mut obj = TypeCoder.array(m.kind)
         if m.elems.len == 0 {
             obj += "()"
             ret obj
@@ -750,7 +750,7 @@ impl ExprCoder {
     // Returns complete expression model of function instance.
     // Usefull for strict type safety.
     fn func_ins_common(self, mut m: &FnIns): str {
-        let mut obj = TypeCoder.from_fn(m)
+        let mut obj = TypeCoder.func(m)
         obj += "("
         obj += self.func_ins(m)
         obj += ")"
@@ -764,11 +764,11 @@ impl ExprCoder {
             if d != nil {
                 let mut obj = concat_all_parts(d.args...)
                 obj += "::"
-                obj += IdentCoder.from_fn_ins(m)
+                obj += IdentCoder.func_ins(m)
                 ret obj
             }
         }
-        ret IdentCoder.from_fn_ins(m)
+        ret IdentCoder.func_ins(m)
     }
 
     fn tuple(mut self, mut m: &TupleExprModel): str {
@@ -784,7 +784,7 @@ impl ExprCoder {
 
     fn new_call(mut self, mut m: &BuiltinNewCallExprModel): str {
         let mut obj = "jule::new_ptr<"
-        obj += TypeCoder.from_kind(m.kind)
+        obj += TypeCoder.kind(m.kind)
         obj += ">("
         if m.init != nil {
             obj += self.expr(m.init)
@@ -842,7 +842,7 @@ impl ExprCoder {
             obj += "jule::VoidExceptional("
         } else {
             obj += "jule::Exceptional<"
-            obj += TypeCoder.from_kind(m.func.result)
+            obj += TypeCoder.kind(m.func.result)
             obj += ">("
         }
         obj += self.expr(m.err)
@@ -865,12 +865,12 @@ impl ExprCoder {
             obj += ","
             obj += self.init_expr(m.kind.slc().elem)
             if m.cap != nil {
-                obj = TypeCoder.from_kind(m.kind) + "::alloc(" + obj
+                obj = TypeCoder.kind(m.kind) + "::alloc(" + obj
             } else {
-                obj = TypeCoder.from_kind(m.kind) + "::alloc_def(" + obj
+                obj = TypeCoder.kind(m.kind) + "::alloc_def(" + obj
             }
         } else {
-            obj = TypeCoder.from_kind(m.kind) + "::alloc(" + obj
+            obj = TypeCoder.kind(m.kind) + "::alloc(" + obj
         }
 
         obj += ")"
@@ -961,9 +961,9 @@ impl ExprCoder {
     }
 
     fn structure_static(self, mut m: &StructStaticIdentExprModel): str {
-        let mut obj = IdentCoder.from_struct_ins(m.structure)
+        let mut obj = IdentCoder.structure_ins(m.structure)
         obj += "::"
-        obj += IdentCoder.from_fn_ins(m.method)
+        obj += IdentCoder.func_ins(m.method)
         ret obj
     }
 
@@ -1007,13 +1007,13 @@ impl ExprCoder {
         | &Data:
             ret self.model((&Data)(m).model)
         | &TypeKind:
-            ret TypeCoder.from_kind((&TypeKind)(m))
+            ret TypeCoder.kind((&TypeKind)(m))
         | &Const:
             ret self.constant((&Const)(m), false)
         | &Var:
             ret self.var((&Var)(m))
         | &Trait:
-            ret IdentCoder.from_trait((&Trait)(m))
+            ret IdentCoder.trait_decl((&Trait)(m))
         | &Struct:
             ret self.structure((&Struct)(m))
         | &StructIns:
@@ -1120,7 +1120,7 @@ impl ExprCoder {
         if enm != nil {
             ret self.val(enm.items[0].value)
         }
-        ret TypeCoder.from_kind(t) + "()"
+        ret TypeCoder.kind(t) + "()"
     }
 }
 

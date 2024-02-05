@@ -29,7 +29,7 @@ impl IdentCoder {
     }
 
     // Returns cpp output identifier form of pointer address.
-    static fn from_addr(addr: uintptr): str {
+    static fn addr(addr: uintptr): str {
         ret "_" + conv::fmt_uint(u64(addr), 0xF)
     }
 
@@ -40,7 +40,7 @@ impl IdentCoder {
     //   - addr:  Pointer address of package file handler.
     static fn to_out(ident: str, addr: uintptr): str {
         if addr != 0 {
-            let mut obj = IdentCoder.from_addr(addr)
+            let mut obj = IdentCoder.addr(addr)
             obj += "_"
             obj += ident
             ret  obj
@@ -63,7 +63,7 @@ impl IdentCoder {
     }
 
     // Returns output identifier of function.
-    static fn from_fn(&f: &Fn): str {
+    static fn func(&f: &Fn): str {
         match {
         | f.cpp_linked:
             ret f.ident
@@ -80,16 +80,16 @@ impl IdentCoder {
     }
 
     // Returns output identifier of function instance.
-    static fn from_fn_ins(mut &f: &FnIns): str {
+    static fn func_ins(mut &f: &FnIns): str {
         if f.is_builtin() {
             ret "jule::" + f.decl.ident
         }
         if f.decl.cpp_linked || f.generics.len == 0 {
-            ret IdentCoder.from_fn(f.decl)
+            ret IdentCoder.func(f.decl)
         }
         for (i, mut ins) in f.decl.instances {
             if ins.same(f) {
-                let mut obj = IdentCoder.from_fn(f.decl)
+                let mut obj = IdentCoder.func(f.decl)
                 obj += "_"
                 obj += conv::itoa(i)
                 ret obj
@@ -99,7 +99,7 @@ impl IdentCoder {
     }
 
     // Returns output identifier of trait.
-    static fn from_trait(t: &Trait): str {
+    static fn trait_decl(t: &Trait): str {
         if t.is_builtin() {
             ret "jule::" + t.ident
         }
@@ -107,7 +107,7 @@ impl IdentCoder {
     }
 
     // Returns output identifier of parameter.
-    static fn from_param(&p: &Param): str {
+    static fn param(&p: &Param): str {
         if is_anon_ident(p.ident) || is_ignore_ident(p.ident) {
             ret ""
         }
@@ -115,7 +115,7 @@ impl IdentCoder {
     }
 
     // Returns output identifier of structure.
-    static fn from_struct(&s: &Struct): str {
+    static fn structure(&s: &Struct): str {
         if s.cpp_linked {
             if has_directive(s.directives, Directive.Typedef) {
                 ret s.ident
@@ -126,13 +126,13 @@ impl IdentCoder {
     }
 
     // Returns output identifier of structure instance.
-    static fn from_struct_ins(mut &s: &StructIns): str {
+    static fn structure_ins(mut &s: &StructIns): str {
         if s.decl.cpp_linked || s.generics.len == 0 {
-            ret IdentCoder.from_struct(s.decl)
+            ret IdentCoder.structure(s.decl)
         }
         for (i, mut ins) in s.decl.instances {
             if ins.same(s) {
-                let mut obj = IdentCoder.from_struct(s.decl)
+                let mut obj = IdentCoder.structure(s.decl)
                 obj += "_"
                 obj += conv::itoa(i)
                 ret obj
@@ -142,7 +142,7 @@ impl IdentCoder {
     }
 
     // Returns output identifier of field.
-    static fn from_field(&f: &Field): str {
+    static fn field(&f: &Field): str {
         if f.owner.cpp_linked {
             ret f.ident
         }
@@ -150,7 +150,7 @@ impl IdentCoder {
     }
 
     // Returns output identifier of variable.
-    static fn from_var(mut v: &Var): str {
+    static fn var(mut v: &Var): str {
         match {
         | v.cpp_linked:
             ret v.ident
