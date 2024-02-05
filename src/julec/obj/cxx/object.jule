@@ -2,9 +2,16 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use env
 use obj::{IR}
 
+use conv for std::conv
+use std::jule::{VERSION}
 use std::jule::build::{
+    Directive,
+    Derive,
+    INIT_FN,
+    PATH_API,
     is_std_header_path,
     is_valid_header_ext,
 }
@@ -21,8 +28,13 @@ use std::jule::sema::{
     Trait,
     Struct,
     FieldIns,
+    Var,
+    StructIns,
+    Fn,
+    FnIns,
 }
 use strings for std::strings
+use std::time::{Time}
 
 struct ObjectCoder {
     ir: &IR
@@ -283,6 +295,41 @@ impl ObjectCoder {
         obj = obj[:obj.len-1] // Remove last comma.
         ret obj
     }
+
+    // Generats C++ code of variable with initialize expression.
+    fn var_init_expr(mut self, mut &v: &Var, init: str): str {
+        let mut obj = ""
+        if v.statically {
+            obj += "static "
+        }
+
+        obj += TypeCoder.kind(v.kind.kind)
+        obj += " "
+        if v.reference {
+            obj += "&"
+        }
+        obj += IdentCoder.var(v)
+        if init != "" {
+            obj += " = "
+            obj += init
+        }
+        obj += ";"
+        ret obj
+    }
+
+    // Generates C++ code of variable.
+    fn var(mut self, mut v: &Var): str {
+        if is_ignore_ident(v.ident) {
+            ret ""
+        }
+        if v.value != nil && v.value.expr != nil {
+            if v.value.data.model != nil {
+                ret self.var_init_expr(v, self.ec.val(v.value))
+            }
+            ret self.var_init_expr(v, "")
+        }
+        ret self.var_init_expr(v, self.ec.init_expr(v.kind.kind))
+    }
 }
 
 fn is_cpp_header_file(path: str): bool {
@@ -294,29 +341,6 @@ fn is_cpp_header_file(path: str): bool {
 }
 
 /*
-use env
-
-use conv for std::conv
-use std::jule::{VERSION}
-use std::jule::build::{
-    Directive,
-    Derive,
-    INIT_FN,
-    PATH_API,
-    is_valid_cpp_ext,
-}
-use std::jule::lex::{
-    TokenKind,
-}
-use std::jule::sema::{
-    ImportInfo,
-    Var,
-    StructIns,
-    Fn,
-    FnIns,
-    BUILTIN_TRAIT_DISPOSE,
-}
-use std::time::{Time}
 
 impl ObjectCoder {
     // Generates C++ declaration code of field.
@@ -605,7 +629,7 @@ impl ObjectCoder {
             obj += indent()
             obj += gen_fn_decl_head(c, method)
             obj += gen_params_prototypes(c.params)
-            obj += CPP_ST_TERM + "\n"
+            obj += ";\n"
         }
         ret obj
     }
@@ -650,41 +674,6 @@ impl ObjectCoder {
         obj += gen_fn_prototypes(self.ir.main)
 
         ret obj
-    }
-
-    // Generats C++ code of variable with initialize expression.
-    fn gen_var_init_expr(mut self, mut &v: &Var, init: str): str {
-        let mut obj = ""
-        if v.statically {
-            obj += "static "
-        }
-
-        obj += gen_type_kind(v.kind.kind)
-        obj += " "
-        if v.reference {
-            obj += "&"
-        }
-        obj += var_out_ident(v)
-        if init != "" {
-            obj += " = "
-            obj += init
-        }
-        obj += CPP_ST_TERM
-        ret obj
-    }
-
-    // Generates C++ code of variable.
-    fn gen_var(mut self, mut v: &Var): str {
-        if is_ignore_ident(v.ident) {
-            ret ""
-        }
-        if v.value != nil && v.value.expr != nil {
-            if v.value.data.model != nil {
-                ret gen_var_init_expr(v, gen_val(v.value))
-            }
-            ret gen_var_init_expr(v, "")
-        }
-        ret gen_var_init_expr(v, get_init_expr(v.kind.kind))
     }
 
     fn gen_pkg_globals(mut self, mut &p: &Package, mut &global_initializers: str): str {
