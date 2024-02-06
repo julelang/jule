@@ -4,23 +4,31 @@
 
 /*
 
+use env
+use obj::{IR}
+
+use std::jule::build::{
+    Directive,
+}
 use std::jule::sema::{
     ImportInfo,
+    Package,
+    FnIns,
 }
 
 struct TestCoder {
-    objc: &ObjectCoder
+    oc: &ObjectCoder
 }
 
 impl TestCoder {
-    static fn new(mut &objc: &ObjectCoder): &TestCoder {
+    static fn new(mut &oc: &ObjectCoder): &TestCoder {
         ret &TestCoder{
-            objc: objc,
+            oc: oc,
         }
     }
 
     fn find_testing_package(mut self): &ImportInfo {
-        for (_, mut imp) in self.ir.used {
+        for (_, mut imp) in self.oc.ir.used {
             if imp.link_path == "std::testing" {
                 ret imp
             }
@@ -29,88 +37,93 @@ impl TestCoder {
     }
 
     fn append_test(mut self, mut &obj: str, mut f: &FnIns) {
-        obj += self.objc.indent()
+        obj += self.oc.indent()
         obj += "_t->_method_reset();\n"
-        obj += self.objc.indent()
+        obj += self.oc.indent()
         obj += "std::cout << \">>> TEST RUNNING: \";\n"
-        obj += self.objc.indent()
+        obj += self.oc.indent()
         obj += "jule::outln("
-        obj += get_cstr_model([]byte(f.decl.ident))
+        obj += cstr_lit([]byte(f.decl.ident))
         obj += ");\n"
-        obj += self.objc.indent()
-        obj += IdentCoder.from_fn_ins(f)
+        obj += self.oc.indent()
+        obj += IdentCoder.func_ins(f)
         obj += "(_t);\n"
-        obj += self.objc.indent()
+        obj += self.oc.indent()
         obj += "post_test();\n"
     }
-}
 
-/*
-
-pub fn append_package_tests(mut &obj: str, mut &p: &Package) {
-    for (_, mut file) in p.files {
-        for (_, mut f) in file.funcs {
-            if has_directive(f.directives, Directive.Test) {
-                append_test(obj, f.instances[0])
+    fn append_package_tests(mut self, mut &obj: str, mut &p: &Package) {
+        for (_, mut file) in p.files {
+            for (_, mut f) in file.funcs {
+                if has_directive(f.directives, Directive.Test) {
+                    self.append_test(obj, f.instances[0])
+                }
             }
         }
+    }
+
+    // Serialize tests and test point.
+    fn serialize(mut self, mut &obj: str) {
+        obj += "\nvoid test_point(void) {\n"
+        self.oc.add_indent()
+        obj += self.oc.indent()
+
+        let mut p = self.find_testing_package()
+        if p == nil {
+            // std::testing is not used.
+            // So, developers cannot write valid test function.
+            // Append empty test point and return.
+            obj += "}"
+            self.oc.done_indent()
+            ret
+        }
+
+        let mut t = p.find_struct("T", false).instances[0]
+
+        obj += TypeCoder.as_sptr(TypeCoder.structure_ins(t))
+        obj += " _t = jule::new_struct<"
+        obj += TypeCoder.structure_ins(t)
+        obj += ">("
+        if !env::PRODUCTION {
+            obj += `"/jule/init", `
+        }
+        obj += "new(std::nothrow) "
+        obj += TypeCoder.structure_ins(t)
+        obj += ");\n"
+
+        obj += self.oc.indent()
+        obj += "jule::Uint total = 0, failed = 0, skipped = 0;\n"
+        obj += self.oc.indent()
+
+        obj += "auto post_test = [&](void) {\n"
+        self.oc.add_indent()
+        obj += self.oc.indent()
+        obj += "++total;\n"
+        obj += self.oc.indent()
+        obj += "if (_t->_method_failed()) { ++failed; std::cout << \"    [*] FAILED\" << std::endl; }\n"
+        obj += self.oc.indent()
+        obj += "else if (_t->_method_skipped()) { ++skipped; std::cout << \"    [*] SKIPPED\" << std::endl; }\n"
+        obj += self.oc.indent()
+        obj += "else { std::cout << \"    [*] PASSED\" << std::endl; }\n"
+        self.oc.done_indent()
+        obj += self.oc.indent()
+        obj += "};\n"
+
+        self.append_package_tests(obj, self.oc.ir.main)
+
+        obj += "\n\n"
+        obj += self.oc.indent()
+        obj += "std::cout << std::endl << std::endl << \"total tests: \" << total << \" skipped: \" << skipped << \" failed: \" << failed << \" pass: \" << total-failed-skipped << std::endl;\n"
+
+        self.oc.done_indent()
+        obj += self.oc.indent()
+        obj += "}\n"
     }
 }
 
 pub fn append_test_point(mut &obj: str, mut &ir: &IR) {
-    obj += "\nvoid test_point(void) {\n"
-    add_indent()
-    obj += indent()
-
-    let mut p = find_testing_package(ir)
-    if p == nil {
-        // std::testing is not used.
-        // So, developers cannot write valid test function.
-        // Append empty test point and return.
-        obj += "}"
-        done_indent()
-        ret
-    }
-
-    let mut t = p.find_struct("T", false).instances[0]
-
-    obj += as_sptr_kind(gen_struct_kind_ins(t))
-    obj += " _t = jule::new_struct<"
-    obj += gen_struct_kind_ins(t)
-    obj += ">("
-    if !env::PRODUCTION {
-        obj += `"/jule/init", `
-    }
-    obj += "new(std::nothrow) "
-    obj += gen_struct_kind_ins(t)
-    obj += ");\n"
-
-    obj += indent()
-    obj += "jule::Uint total = 0, failed = 0, skipped = 0;\n"
-    obj += indent()
-
-    obj += "auto post_test = [&](void) {\n"
-    add_indent()
-    obj += indent()
-    obj += "++total;\n"
-    obj += indent()
-    obj += "if (_t->_method_failed()) { ++failed; std::cout << \"    [*] FAILED\" << std::endl; }\n"
-    obj += indent()
-    obj += "else if (_t->_method_skipped()) { ++skipped; std::cout << \"    [*] SKIPPED\" << std::endl; }\n"
-    obj += indent()
-    obj += "else { std::cout << \"    [*] PASSED\" << std::endl; }\n"
-    done_indent()
-    obj += indent()
-    obj += "};\n"
-
-    append_package_tests(obj, ir.main)
-
-    obj += "\n\n"
-    obj += indent()
-    obj += "std::cout << std::endl << std::endl << \"total tests: \" << total << \" skipped: \" << skipped << \" failed: \" << failed << \" pass: \" << total-failed-skipped << std::endl;\n"
-
-    done_indent()
-    obj += indent()
-    obj += "}\n"
+    let mut oc = ObjectCoder.new(ir)
+    let mut tc = TestCoder.new(oc)
+    tc.serialize(obj)
 }
 */
