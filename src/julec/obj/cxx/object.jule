@@ -12,10 +12,12 @@ use std::jule::build::{
     Derive,
     INIT_FN,
     PATH_API,
+    PATH_STDLIB,
     is_std_header_path,
     is_valid_header_ext,
 }
 use std::jule::lex::{
+    Token,
     TokenId,
     is_ignore_ident,
     is_anon_ident,
@@ -33,6 +35,7 @@ use std::jule::sema::{
     Fn,
     FnIns,
 }
+use path for std::fs::path
 use strings for std::strings
 use std::time::{Time}
 
@@ -69,6 +72,31 @@ impl ObjectCoder {
     // Returns indention string by indent_buffer.
     fn indent(self): str {
         ret self.indent_buffer
+    }
+
+    // Returns location information of token as cstr bytes.
+    fn loc_info(self, &t: Token): str {
+        let mut loc = t.file.path()
+
+        // Normalize path if production compilation enabled.
+        if env::PRODUCTION {
+            match {
+            | strings::has_prefix(loc, PATH_STDLIB):
+                // Remove absolute path prefix of standard library.
+                // Just keeps "std/" prefix.
+                loc = loc[path::dir(PATH_STDLIB).len + 1:]
+            | strings::has_prefix(loc, self.ir.root):
+                // Remove absolute path prefix of root package.
+                // Just keeps "[package_dir]/" prefix.
+                loc = loc[path::dir(self.ir.root).len + 1:]
+            }
+        }
+
+        loc += ":"
+        loc += conv::itoa(t.row)
+        loc += ":"
+        loc += conv::itoa(t.column)
+        ret cstr_bytes([]byte(loc))
     }
 
     // Generates all C/C++ include directives.
