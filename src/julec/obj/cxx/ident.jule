@@ -14,202 +14,187 @@ use std::jule::sema::{
     Field,
     Var,
     Param,
-    TypeKind,
 }
 
 // Identifier of initialize function caller function.
 const INIT_CALLER_IDENT = "__jule_call_initializers"
 
-// Returns specified identifer as JuleC identifer.
-// Equavalents: "JULEC_ID(" + ident + ")" of JuleC API.
-fn as_ident(ident: str): str { ret "_" + ident }
+struct IdentCoder {}
 
-// Returns given identifier as Jule type identifier.
-fn as_jt(mut id: str): str {
-    if 97 <= id[0] && id[0] <= 122 {
-        id[0] -= 32 // To upper.
+impl IdentCoder {
+    // Returns specified identifer as JuleC identifer.
+    // Equavalents: "JULEC_ID(" + ident + ")" of JuleC API.
+    static fn to_ident(ident: str): str {
+        ret "_" + ident
     }
-    ret "jule::" + id
-}
 
-// Returns cpp output identifier form of pointer address.
-fn get_addr_as_ident(addr: uintptr): str {
-    ret "_" + conv::fmt_uint(u64(addr), 0xF)
-}
+    // Returns cpp output identifier form of pointer address.
+    static fn addr(addr: uintptr): str {
+        ret "_" + conv::fmt_uint(u64(addr), 0xF)
+    }
 
-// Returns cpp output identifier form of given identifier.
-//
-// Parameters:
-//   - ident: Identifier.
-//   - addr:  Pointer address of package file handler.
-fn as_out_ident(ident: str, addr: uintptr): str {
-    if addr != 0 {
-        let mut obj = get_addr_as_ident(addr)
+    // Returns cpp output identifier form of given identifier.
+    //
+    // Parameters:
+    //   - ident: Identifier.
+    //   - addr:  Pointer address of package file handler.
+    static fn to_out(ident: str, addr: uintptr): str {
+        if addr != 0 {
+            let mut obj = IdentCoder.addr(addr)
+            obj += "_"
+            obj += ident
+            ret  obj
+        }
+        ret IdentCoder.to_ident(ident)
+    }
+
+    // Returns cpp output local identifier form of fiven identifier.
+    //
+    // Parameters:
+    //   - row:   Row of definition.
+    //   - col:   Column of definition.
+    //   - ident: Identifier of definition.
+    static fn to_local(row: int, col: int, ident: str): str {
+        let mut obj = conv::itoa(row)
+        obj += conv::itoa(col)
         obj += "_"
         obj += ident
-        ret  obj
-    }
-    ret as_ident(ident)
-}
-
-// Returns cpp output local identifier form of fiven identifier.
-//
-// Parameters:
-//   - row:   Row of definition.
-//   - col:   Column of definition.
-//   - ident: Identifier of definition.
-fn as_local_ident(row: int, col: int, ident: str): str {
-    let mut obj = conv::itoa(row)
-    obj += conv::itoa(col)
-    obj += "_"
-    obj += ident
-    ret as_ident(obj)
-}
-
-// Returns output identifier of function.
-fn fn_out_ident(&f: &Fn): str {
-    match {
-    | f.cpp_linked:
-        ret f.ident
-
-    | f.ident == ENTRY_POINT:
-        ret "entry_point"
-
-    | f.is_method():
-        if f.statically {
-            ret "_static_method_" + f.ident
-        }
-        ret "_method_" + f.ident
-
-    |:
-        ret as_out_ident(f.ident, f.token.file.addr())
-    }
-}
-
-// Returns output identifier of function instance.
-fn fn_ins_out_ident(mut &f: &FnIns): str {
-    if f.is_builtin() {
-        ret "jule::" + f.decl.ident
+        ret IdentCoder.to_ident(obj)
     }
 
-    if f.decl.cpp_linked || f.generics.len == 0 {
-        ret fn_out_ident(f.decl)
-    }
-
-    for (i, mut ins) in f.decl.instances {
-        if ins.same(f) {
-            let mut obj = fn_out_ident(f.decl)
-            obj += "_"
-            obj += conv::itoa(i)
-            ret obj
+    // Returns output identifier of function.
+    static fn func(&f: &Fn): str {
+        match {
+        | f.cpp_linked:
+            ret f.ident
+        | f.ident == ENTRY_POINT:
+            ret "entry_point"
+        | f.is_method():
+            if f.statically {
+                ret "_static_method_" + f.ident
+            }
+            ret "_method_" + f.ident
+        |:
+            ret IdentCoder.to_out(f.ident, f.token.file.addr())
         }
     }
 
-    ret "__?__"
-}
-
-// Returns output identifier of trait.
-fn trait_out_ident(t: &Trait): str {
-    if t.is_builtin() {
-        ret "jule::" + t.ident
-    }
-    ret as_out_ident(t.ident, t.token.file.addr())
-}
-
-// Returns output identifier of parameter.
-fn param_out_ident(&p: &Param): str {
-    if is_anon_ident(p.ident) || is_ignore_ident(p.ident) {
-        ret ""
-    }
-    ret as_local_ident(p.token.row, p.token.column, p.ident)
-}
-
-// Returns output identifier of structure.
-fn struct_out_ident(&s: &Struct): str {
-    if s.cpp_linked {
-        if has_directive(s.directives, Directive.Typedef) {
-            ret s.ident
+    // Returns output identifier of function instance.
+    static fn func_ins(mut &f: &FnIns): str {
+        if f.is_builtin() {
+            ret "jule::" + f.decl.ident
         }
-        ret "struct " + s.ident
+        if f.decl.cpp_linked || f.generics.len == 0 {
+            ret IdentCoder.func(f.decl)
+        }
+        for (i, mut ins) in f.decl.instances {
+            if ins.same(f) {
+                let mut obj = IdentCoder.func(f.decl)
+                obj += "_"
+                obj += conv::itoa(i)
+                ret obj
+            }
+        }
+        ret "__?__"
     }
-    ret as_out_ident(s.ident, s.token.file.addr())
-}
 
-// Returns output identifier of structure instance.
-fn struct_ins_out_ident(mut &s: &StructIns): str {
-    if s.decl.cpp_linked || s.generics.len == 0 {
-        ret struct_out_ident(s.decl)
+    // Returns output identifier of trait.
+    static fn trait_decl(t: &Trait): str {
+        if t.is_builtin() {
+            ret "jule::" + t.ident
+        }
+        ret IdentCoder.to_out(t.ident, t.token.file.addr())
     }
 
-    for (i, mut ins) in s.decl.instances {
-        if ins.same(s) {
-            let mut obj = struct_out_ident(s.decl)
-            obj += "_"
-            obj += conv::itoa(i)
-            ret obj
+    // Returns output identifier of parameter.
+    static fn param(&p: &Param): str {
+        if is_anon_ident(p.ident) || is_ignore_ident(p.ident) {
+            ret ""
+        }
+        ret IdentCoder.to_local(p.token.row, p.token.column, p.ident)
+    }
+
+    // Returns output identifier of structure.
+    static fn structure(&s: &Struct): str {
+        if s.cpp_linked {
+            if has_directive(s.directives, Directive.Typedef) {
+                ret s.ident
+            }
+            ret "struct " + s.ident
+        }
+        ret IdentCoder.to_out(s.ident, s.token.file.addr())
+    }
+
+    // Returns output identifier of structure instance.
+    static fn structure_ins(mut &s: &StructIns): str {
+        if s.decl.cpp_linked || s.generics.len == 0 {
+            ret IdentCoder.structure(s.decl)
+        }
+        for (i, mut ins) in s.decl.instances {
+            if ins.same(s) {
+                let mut obj = IdentCoder.structure(s.decl)
+                obj += "_"
+                obj += conv::itoa(i)
+                ret obj
+            }
+        }
+        ret "__?__"
+    }
+
+    // Returns output identifier of field.
+    static fn field(&f: &Field): str {
+        if f.owner.cpp_linked {
+            ret f.ident
+        }
+        ret "_field_" + f.ident
+    }
+
+    // Returns output identifier of variable.
+    static fn var(mut v: &Var): str {
+        match {
+        | v.cpp_linked:
+            ret v.ident
+        | v.ident == TokenKind.Error:
+            ret "except.error"
+        | v.ident == TokenKind.Self:
+            if v.kind.kind.sptr() != nil {
+                ret "this->self"
+            }
+            ret "(*this)"
+        | v.scope != nil:
+            ret IdentCoder.to_local(v.token.row, v.token.column, v.ident)
+        |:
+            ret IdentCoder.to_out(v.ident, v.token.file.addr())
         }
     }
 
-    ret "__?__"
-}
-
-// Returns output identifier of field.
-fn field_out_ident(&f: &Field): str {
-    if f.owner.cpp_linked {
-        ret f.ident
+    // Returns begin label identifier of iteration.
+    static fn to_iter_begin(it: uintptr): str {
+        ret "_iter_begin_" + conv::itoa(int(it))
     }
-    ret "_field_" + f.ident
-}
 
-// Returns output identifier of variable.
-fn var_out_ident(mut v: &Var): str {
-    match {
-    | v.cpp_linked:
-        ret v.ident
-
-    | v.ident == TokenKind.Error:
-        ret "except.error"
-
-    | v.ident == TokenKind.Self:
-        if v.kind.kind.sptr() != nil {
-            ret "this->self"
-        }
-        ret "(*this)"
-
-    | v.scope != nil:
-        ret as_local_ident(v.token.row, v.token.column, v.ident)
-
-    |:
-        ret as_out_ident(v.ident, v.token.file.addr())
+    // Returns end label identifier of iteration.
+    static fn to_iter_end(it: uintptr): str {
+        ret "_iter_end_" + conv::itoa(int(it))
     }
-}
 
-// Returns begin label identifier of iteration.
-fn iter_begin_label_ident(it: uintptr): str {
-    ret "_iter_begin_" + conv::itoa(int(it))
-}
+    // Returns next label identifier of iteration.
+    static fn to_iter_next(it: uintptr): str {
+        ret "_iter_next_" + conv::itoa(int(it))
+    }
 
-// Returns end label identifier of iteration.
-fn iter_end_label_ident(it: uintptr): str {
-    ret "_iter_end_" + conv::itoa(int(it))
-}
+    // Returns label identifier.
+    static fn label(ident: str): str {
+        ret "_julec_label_" + ident
+    }
 
-// Returns next label identifier of iteration.
-fn iter_next_label_ident(it: uintptr): str {
-    ret "_iter_next_" + conv::itoa(int(it))
-}
+    // Returns end label identifier of match-case.
+    static fn to_match_end(m: uintptr): str {
+        ret "_match_end_" + conv::itoa(int(m))
+    }
 
-// Returns label identifier.
-fn label_ident(ident: str): str {
-    ret "_julec_label_" + ident
-}
-
-// Returns end label identifier of match-case.
-fn match_end_label_ident(m: uintptr): str {
-    ret "_match_end_" + conv::itoa(int(m))
-}
-
-// Returns begin label identifier of case.
-fn case_begin_label_ident(c: uintptr): str {
-    ret "_case_begin_" + conv::itoa(int(c))
+    // Returns begin label identifier of case.
+    static fn to_case_begin(c: uintptr): str {
+        ret "_case_begin_" + conv::itoa(int(c))
+    }
 }
