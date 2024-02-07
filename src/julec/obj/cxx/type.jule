@@ -42,6 +42,15 @@ fn has_directive(&directives: []&ast::Directive, tag: str): bool {
 struct TypeCoder {}
 
 impl TypeCoder {
+    const Str   = "jule::Str"
+    const Map   = "jule::Map"
+    const Ptr   = "jule::Ptr"
+    const Sptr  = "jule::Sptr"
+    const Slice = "jule::Slice"
+    const Trait = "jule::Trait"
+    const Array = "jule::Array"
+    const Fn    = "jule::Fn"
+
     // Returns given identifier as Jule type identifier.
     static fn to_type(mut id: str): str {
         if 97 <= id[0] && id[0] <= 122 {
@@ -69,8 +78,7 @@ impl TypeCoder {
 
     // Returns C++ code of smart pointer type with element type.
     static fn as_sptr(elem: str): str {
-        let mut obj = TypeCoder.to_type("ptr")
-        obj += "<"
+        let mut obj = TypeCoder.Ptr + "<"
         obj += elem
         obj += ">"
         ret obj
@@ -98,8 +106,7 @@ impl TypeCoder {
     }
 
     static fn as_slice(mut elem: &TypeKind): str {
-        let mut obj = TypeCoder.to_type("slice")
-        obj += "<"
+        let mut obj = TypeCoder.Slice + "<"
         obj += TypeCoder.kind(elem)
         obj += ">"
         ret obj
@@ -112,8 +119,7 @@ impl TypeCoder {
 
     // Generates C++ code of Map TypeKind.
     static fn map(mut m: &Map): str {
-        let mut obj = TypeCoder.to_type("map")
-        obj += "<"
+        let mut obj = TypeCoder.Map + "<"
         obj += TypeCoder.kind(m.key)
         obj += ","
         obj += TypeCoder.kind(m.val)
@@ -122,8 +128,7 @@ impl TypeCoder {
     }
 
     static fn trait_ident(ident: str): str {
-        let mut obj = TypeCoder.to_type("trait")
-        obj += "<"
+        let mut obj = TypeCoder.Trait + "<"
         obj += ident
         obj += ">"
         ret obj
@@ -168,8 +173,7 @@ impl TypeCoder {
 
     // Generates C++ code of Arr TypeKind.
     static fn array(mut a: &Arr): str {
-        let mut obj = TypeCoder.to_type("array")
-        obj += "<"
+        let mut obj = TypeCoder.Array + "<"
         obj += TypeCoder.kind(a.elem)
         obj += ","
         obj += conv::itoa(a.n)
@@ -181,8 +185,7 @@ impl TypeCoder {
     static fn param(mut &p: &Param): str {
         let mut obj = ""
         if p.variadic {
-            obj += TypeCoder.to_type("slice")
-            obj += "<"
+            obj += TypeCoder.Slice + "<"
             obj += TypeCoder.kind(p.kind.kind)
             obj += ">"
         } else {
@@ -195,8 +198,7 @@ impl TypeCoder {
     static fn param_ins(mut &p: &ParamIns): str {
         let mut obj = ""
         if p.decl.variadic {
-            obj += TypeCoder.to_type("slice")
-            obj += "<"
+            obj += TypeCoder.Slice + "<"
             obj += TypeCoder.kind(p.kind)
             obj += ">"
         } else {
@@ -257,8 +259,7 @@ impl TypeCoder {
 
     // Generates C++ code of Fn TypeKind.
     static fn func(mut f: &FnIns): str {
-        let mut obj = TypeCoder.to_type("fn")
-        obj += "<"
+        let mut obj = TypeCoder.Fn + "<"
         obj += TypeCoder.anon_func(f)
         obj += ">"
         ret obj
