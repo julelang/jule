@@ -4,22 +4,24 @@
 
 use fmt for std::fmt
 
+enum Status: byte {
+    Na   = 0x0,
+    Skip = 0x1 << 0,
+    Fail = 0x1 << 1,
+}
+
 // A test utility also used by the Jule runtime.
 // It provides functionalities that facilitate the
 // management and development of tests.
 pub struct T {
-    mut s: byte
+    mut s: Status
 }
 
 impl T {
-    const S_NA   = byte(0x0)
-    const S_SKIP = byte(0x1 << 0)
-    const S_FAIL = byte(0x1 << 1)
-
     // Used by runtime.
     // Reset all data.
     fn reset(self) {
-        self.s = T.S_NA
+        self.s = Status.Na
     }
 
     // Wrapper for internal logs.
@@ -30,26 +32,30 @@ impl T {
     // Fails test.
     // Does not breaks scope execution.
     pub fn fail(self) {
-        if self.s == T.S_SKIP {
+        if self.s == Status.Skip {
             panic("std::testing: T.fail: failed test that already skipped")
         }
-        self.s = T.S_FAIL
+        self.s = Status.Fail
     }
 
     // Reports whether test is failed.
-    pub fn failed(self): bool { ret self.s == T.S_FAIL }
+    pub fn failed(self): bool {
+        ret self.s == Status.Fail
+    }
 
     // Skip test.
     // Does not breaks scope execution.
     pub fn skip(self) {
-        if self.s == T.S_SKIP {
+        if self.s == Status.Skip {
             panic("std::testing: T.skip: skipped test that already failed")
         }
-        self.s = T.S_SKIP
+        self.s = Status.Skip
     }
 
     // Reports whether test is skipped.
-    pub fn skipped(self): bool { ret self.s == T.S_SKIP }
+    pub fn skipped(self): bool {
+        ret self.s == Status.Skip
+    }
 
     // Set status of test as failure if expression is evaluated false at runtime.
     pub fn assert(self, expr: bool, message: str): bool {
