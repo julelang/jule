@@ -66,12 +66,12 @@ namespace jule
 
         __JULE_INLINE_BEFORE_CPP20 __JULE_CONSTEXPR_SINCE_CPP20 Iterator begin(void) noexcept
         {
-            return static_cast<Iterator>(&this->buffer[0]);
+            return static_cast<Iterator>(this->buffer.data());
         }
 
         __JULE_INLINE_BEFORE_CPP20 __JULE_CONSTEXPR_SINCE_CPP20 ConstIterator begin(void) const noexcept
         {
-            return static_cast<ConstIterator>(&this->buffer[0]);
+            return static_cast<ConstIterator>(this->buffer.data());
         }
 
         __JULE_INLINE_BEFORE_CPP20 __JULE_CONSTEXPR_SINCE_CPP20 Iterator end(void) noexcept
