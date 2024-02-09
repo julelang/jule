@@ -634,7 +634,8 @@ impl Sema {
         ret nil
     }
 
-    fn check_import_selections(mut self, mut &imp: &ImportInfo) {
+    fn check_import_selections(mut self, mut &imp: &ImportInfo): (ok: bool) {
+        ok = true
         for _, ident in imp.selected {
             if ident.kind == TokenKind.Self {
                 continue
@@ -643,6 +644,7 @@ impl Sema {
             if self.is_duplicated_import_selection(uintptr(imp), ident.kind) {
                 self.push_err(ident, LogMsg.DuplicatedIdent, ident.kind)
                 self.push_suggestion(LogMsg.RenameForAvoidDuplication)
+                ok = false
                 continue
             }
 
@@ -690,12 +692,15 @@ impl Sema {
 
             |:
                 self.push_err(ident, LogMsg.IdentNotExist, ident.kind)
+                ok = false
                 continue
             }
 
             self.push_err(ident, LogMsg.IdentIsNotAccessible, ident.kind)
             self.push_suggestion(LogMsg.MakePubToAccess)
+            ok = false
         }
+        ret
     }
 
     fn is_use_alias_duplication(mut self, &imp: &ImportInfo): bool {
@@ -729,22 +734,18 @@ impl Sema {
             self.push_suggestion(LogMsg.RenameUseAliasAvoidDuplication)
         }
 
-        if imp.duplicate {
-            ret true
+        if !imp.duplicate {
+            let mut sema = &Sema{
+                flags: self.flags,
+            }
+            sema.check(imp.package.files)
+            if sema.errors.len != 0 {
+                self.errors = append(self.errors, sema.errors...)
+                sema.errors = nil
+                ret false
+            }
         }
-
-        let mut sema = &Sema{
-            flags: self.flags,
-        }
-        sema.check(imp.package.files)
-        if sema.errors.len > 0 {
-            self.errors = append(self.errors, sema.errors...)
-            sema.errors = nil
-            ret false
-        }
-
-        self.check_import_selections(imp)
-        ret true
+        ret self.check_import_selections(imp)
     }
 
     fn check_imports(mut self) {
@@ -2363,13 +2364,13 @@ impl Sema {
 
         self.check_imports()
         // Break checking if imports has error.
-        if self.errors.len > 0 {
+        if self.errors.len != 0 {
             ret
         }
 
         self.check_enums()
         // Break checking if enums has error.
-        if self.errors.len > 0 {
+        if self.errors.len != 0 {
             ret
         }
 
@@ -2377,14 +2378,14 @@ impl Sema {
 
         self.impl_impls()
         // Break checking if imports has error.
-        if self.errors.len > 0 {
+        if self.errors.len != 0 {
             ret
         }
 
         self.check_package_decls()
 
         // Break checking if imports has error.
-        if self.errors.len > 0 {
+        if self.errors.len != 0 {
             ret
         }
 
