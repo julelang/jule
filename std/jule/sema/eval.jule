@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use integ for std::jule::integrated
+
 use std::conv::{ConvError, parse_float, parse_int, parse_uint}
 use path for std::fs::path
 use std::jule::ast::{
@@ -42,7 +44,6 @@ use lex for std::jule::lex::{
     is_str,
     is_bool,
     is_rune,
-    is_byte,
     is_raw_str,
 }
 use types for std::jule::types
@@ -118,20 +119,20 @@ fn find_builtins_sema(ident: str, mut s: &Sema): any {
 }
 
 fn is_ok_for_shifting(mut &d: &Data): bool {
+    if d.is_const() {
+        match {
+        | d.constant.is_i64():
+            ret d.constant.read_i64() >= 0
+        | d.constant.is_u64():
+            ret true
+        | d.constant.is_f64():
+            ret d.constant.read_f64() >= 0
+        |:
+            ret false
+        }
+    }
     let prim = d.kind.prim()
-    if prim == nil || !types::is_int(prim.to_str()) {
-        ret false
-    }
-
-    if !d.is_const() {
-        ret true
-    }
-
-    match {
-    | d.constant.is_i64(): ret d.constant.read_i64() >= 0
-    | d.constant.is_u64(): ret true
-    |:                     ret false
-    }
+    ret prim != nil && types::is_int(prim.to_str())
 }
 
 fn is_instanced_struct(s: &StructIns): bool {
@@ -149,39 +150,11 @@ fn is_ptr_arithmetic_compatible_int(mut &d: &Data): bool {
     ret tcc.check()
 }
 
-fn normalize_bitsize(mut &d: &Data) {
-    if !d.is_const() {
-        ret
-    }
-
-    let mut kind = ""
-    match {
-    | d.constant.is_i64():
-        let x = d.constant.read_i64()
-        kind = types::int_from_bits(types::bitsize_of_int(x))
-
-    | d.constant.is_u64():
-        let x = d.constant.read_u64()
-        kind = types::uint_from_bits(types::bitsize_of_uint(x))
-
-    |:
-        ret
-    }
-
-    // Save enum.
-    if d.kind.enm() != nil {
-        ret
-    }
-
-    d.kind.kind = build_prim_type(kind)
-}
-
 fn normalize_type(mut &d: &Data) {
     match {
     | int_assignable(PrimKind.Int, d):
         d.kind.kind = build_prim_type(PrimKind.Int)
         d.constant.set_i64(i64(d.constant.as_f64()))
-
     | int_assignable(PrimKind.Uint, d):
         d.kind.kind = build_prim_type(PrimKind.Uint)
         d.constant.set_u64(u64(d.constant.as_f64()))
@@ -330,15 +303,15 @@ pub struct Value {
 
 // Evaluator.
 struct Eval {
-    s:           &Sema // Used for error logging.
-    lookup:      Lookup
-    prefix:      &TypeKind
-    unsafety:    bool
-    immutable:   bool // This expression will assigned to immutable memory.
-    ignored:     bool // Evaluated expression is not for assignment or something else.
-    dis_builtin: bool // Disallow/suppress Jule's built-in defines.
-    owner:       &Var
-    field:       &FieldIns // Field of this default expression. Used for checking cycles.
+    s:             &Sema // Used for error logging.
+    lookup:        Lookup
+    prefix:        &TypeKind
+    unsafety:      bool
+    immutable:     bool // This expression will assigned to immutable memory.
+    ignored:       bool // Evaluated expression is not for assignment or something else.
+    dis_builtin:   bool // Disallow/suppress Jule's built-in defines.
+    owner:         &Var
+    field:         &FieldIns // Field of this default expression. Used for checking cycles.
 }
 
 impl Eval {
@@ -376,21 +349,19 @@ impl Eval {
         let pk = self.prefix.prim().kind
         match {
         | types::is_float(pk):
-            d.kind = &TypeKind{kind: self.prefix.kind}
+            d.kind = new(TypeKind, *self.prefix)
             d.constant.set_f64(d.constant.as_f64())
-
         | types::is_sig_int(pk):
             if !int_assignable(pk, d) {
                 break
             }
-            d.kind = &TypeKind{kind: self.prefix.kind}
+            d.kind = new(TypeKind, *self.prefix)
             d.constant.set_i64(d.constant.as_i64())
-
         | types::is_unsig_int(pk):
             if !int_assignable(pk, d) {
                 break
             }
-            d.kind = &TypeKind{kind: self.prefix.kind}
+            d.kind = new(TypeKind, *self.prefix)
             d.constant.set_u64(d.constant.as_u64())
         }
     }
@@ -544,6 +515,9 @@ impl Eval {
         }
 
         d.model = d.constant
+
+        // Apply prefix.
+        self.apply_numeric_prefix(d)
 
         ret d
     }
@@ -913,6 +887,10 @@ impl Eval {
                 // (because has an identifier via variable).
                 f.decl.ident = v.ident
             }
+        }
+
+        if d.is_const() {
+            self.apply_numeric_prefix(d)
         }
 
         ret d
@@ -1429,7 +1407,7 @@ impl Eval {
         } else {
             l = &Data{
                 constant: Const.new_i64(0),
-                kind:     &TypeKind{kind: build_prim_type(types::SYS_INT)},
+                kind:     &TypeKind{kind: build_prim_type(PrimKind.Int)},
             }
             l.model = l.constant
         }
@@ -1910,7 +1888,9 @@ impl Eval {
 
         ret &Data{
             mutable: !self.immutable,
-            kind:    &TypeKind{kind: s},
+            kind:    &TypeKind{
+                kind: s,
+            },
             model: &StructLitExprModel{
                 token: error_token,
                 strct: s,
@@ -2379,7 +2359,7 @@ impl Eval {
         | "len":
             ret &Data{
                 mutable: false,
-                kind:    &TypeKind{kind: build_prim_type(types::SYS_INT)},
+                kind:    &TypeKind{kind: build_prim_type(PrimKind.Int)},
                 model:   &CommonSubIdentExprModel{
                     expr_kind: d.kind,
                     expr:      d.model,
@@ -2390,7 +2370,7 @@ impl Eval {
         | "cap":
             ret &Data{
                 mutable: false,
-                kind:    &TypeKind{kind: build_prim_type(types::SYS_INT)},
+                kind:    &TypeKind{kind: build_prim_type(PrimKind.Int)},
                 model:   &CommonSubIdentExprModel{
                     expr_kind: d.kind,
                     expr:      d.model,
@@ -2409,13 +2389,13 @@ impl Eval {
                                 decl: &Param{
                                     ident: "i",
                                 },
-                                kind: &TypeKind{kind: build_prim_type(types::SYS_INT)},
+                                kind: &TypeKind{kind: build_prim_type(PrimKind.Int)},
                             },
                             &ParamIns{
                                 decl: &Param{
                                     ident: "j",
                                 },
-                                kind: &TypeKind{kind: build_prim_type(types::SYS_INT)},
+                                kind: &TypeKind{kind: build_prim_type(PrimKind.Int)},
                             },
                         ],
                     },
@@ -2440,7 +2420,7 @@ impl Eval {
             ret &Data{
                 constant: c,
                 mutable:  false,
-                kind:     &TypeKind{kind: build_prim_type(types::SYS_INT)},
+                kind:     &TypeKind{kind: build_prim_type(PrimKind.Int)},
                 model:    c,
             }
 
@@ -2455,13 +2435,13 @@ impl Eval {
                                 decl: &Param{
                                     ident: "i",
                                 },
-                                kind: &TypeKind{kind: build_prim_type(types::SYS_INT)},
+                                kind: &TypeKind{kind: build_prim_type(PrimKind.Int)},
                             },
                             &ParamIns{
                                 decl: &Param{
                                     ident: "j",
                                 },
-                                kind: &TypeKind{kind: build_prim_type(types::SYS_INT)},
+                                kind: &TypeKind{kind: build_prim_type(PrimKind.Int)},
                             },
                         ],
                     },
@@ -2486,7 +2466,7 @@ impl Eval {
         | "len":
             ret &Data{
                 mutable: false,
-                kind:    &TypeKind{kind: build_prim_type(types::SYS_INT)},
+                kind:    &TypeKind{kind: build_prim_type(PrimKind.Int)},
                 model: &CommonSubIdentExprModel{
                     expr_kind: d.kind,
                     expr:      d.model,
@@ -2607,11 +2587,10 @@ impl Eval {
         match ident.kind {
         | "len":
             let mut sd = &Data{
-                mutable: false,
-                kind:    &TypeKind{kind: build_prim_type(types::SYS_INT)},
+                kind:    &TypeKind{kind: build_prim_type(PrimKind.Int)},
             }
             if d.is_const() {
-                sd.constant = Const.new_i64(d.constant.read_str().len)
+                sd.constant = Const.new_i64(i64(d.constant.read_str().len))
                 sd.model = sd.constant
             } else {
                 sd.model = &CommonSubIdentExprModel{
@@ -3132,13 +3111,10 @@ impl Eval {
         | self.prefix == nil:
             self.push_err(lit.token, LogMsg.InvalidSyntax)
             ret nil
-
         | self.prefix.map() != nil:
             ret self.eval_map(self.prefix.map(), lit)
-
         | self.prefix.strct() != nil:
             ret self.eval_struct_lit_explicit(self.prefix.strct(), lit.exprs, lit.token)
-
         |:
             self.push_err(lit.token, LogMsg.InvalidSyntax)
             ret nil
@@ -3180,10 +3156,6 @@ impl Eval {
     }
 
     fn eval_binop(mut &self, mut op: &BinopExpr): &Data {
-        let mut prefix = self.prefix
-        self.prefix = nil
-        defer { self.prefix = prefix }
-
         let mut bs = BinaryEval.new_plain(self)
         ret bs.eval(op)
     }
@@ -3398,14 +3370,11 @@ impl UnaryEval {
             match {
             | self.d.constant.is_f64():
                 self.d.constant.set_f64(-self.d.constant.read_f64())
-
             | self.d.constant.is_i64():
                 self.d.constant.set_f64(-self.d.constant.as_f64())
- 
             | self.d.constant.is_u64():
                 self.d.constant.set_f64(-self.d.constant.as_f64())
             }
-            normalize_type(self.d)
         }
 
         self.d.lvalue = false
@@ -3426,14 +3395,11 @@ impl UnaryEval {
             match {
             | self.d.constant.is_f64():
                 self.d.constant.set_f64(+self.d.constant.read_f64())
-
             | self.d.constant.is_i64():
                 self.d.constant.set_f64(+self.d.constant.as_f64())
-
             | self.d.constant.is_u64():
                 self.d.constant.set_f64(+self.d.constant.as_f64())
             }
-            normalize_type(self.d)
         }
 
         self.d.lvalue = false
@@ -3454,7 +3420,6 @@ impl UnaryEval {
             match {
             | self.d.constant.is_i64():
                 self.d.constant.set_i64(^self.d.constant.read_i64())
-
             | self.d.constant.is_u64():
                 self.d.constant.set_u64(^self.d.constant.read_u64())
             }
@@ -3554,35 +3519,34 @@ impl UnaryEval {
             lookup:      self.e.lookup,
             error_token: self.u.op,
         }
-
         match self.u.op.kind {
         | TokenKind.Star:
             self.d.kind = &TypeKind{kind: tc.build_ptr_from_type(self.d.kind)}
-
         | TokenKind.Amper:
             self.d.kind = &TypeKind{kind: tc.build_sptr_from_type(self.d.kind)}
-
         |:
             self.e.push_err(self.u.op, LogMsg.InvalidExprForUnary, self.u.op.kind, self.d.kind.to_str())
             self.d = nil
             ret
         }
-
         self.d.decl = true
+    }
+
+    fn eval_data(mut self) {
+        match self.u.op.kind {
+        | TokenKind.Amper:
+            let mut prefix = self.e.prefix
+            self.e.prefix = nil
+            self.d = self.e.eval_expr_kind(self.u.expr)
+            self.e.prefix = prefix
+        |:
+            self.d = self.e.eval_expr_kind(self.u.expr)
+        }
     }
 
     fn eval(mut self, mut u: &UnaryExpr): &Data {
         self.u = u
-
-        let mut prefix = self.e.prefix
-        self.e.prefix = nil
-        defer { self.e.prefix = prefix }
-
-        self.d = self.e.eval_expr_kind(self.u.expr)
-        if self.d == nil {
-            ret nil
-        }
-
+        self.eval_data()
         if self.d.decl {
             self.eval_type_decl()
             ret self.d
@@ -3590,7 +3554,7 @@ impl UnaryEval {
 
         let mut cast_kind = self.d.cast_kind
         let kind = self.d.kind
-        match u.op.kind {
+        match self.u.op.kind {
         | TokenKind.Minus: self.eval_minus()
         | TokenKind.Plus:  self.eval_plus()
         | TokenKind.Caret: self.eval_caret()
@@ -3600,11 +3564,12 @@ impl UnaryEval {
         |:                 self.d = nil
         }
 
-        if self.d == nil {
+        match {
+        | self.d == nil:
             self.e.push_err(self.u.op, LogMsg.InvalidExprForUnary, self.u.op.kind, kind.to_str())
-        } else if self.d.is_const() {
+        | self.d.is_const():
             self.d.model = self.d.constant
-        } else if cast_kind != nil {
+        | cast_kind != nil:
             self.d.cast_kind = cast_kind
             apply_cast_kind(self.d)
         }
@@ -3925,15 +3890,12 @@ impl BinaryEval {
                 self.l.kind = self.r.kind
                 ret
             }
-            if types::is_greater(self.r.kind.prim().kind, self.l.kind.prim().kind) {
-                self.l.kind = self.r.kind
-            }
-            ret
+            goto set
         }
         if self.r.is_const() {
             ret
         }
-
+    set:
         if types::is_greater(self.r.kind.prim().kind, self.l.kind.prim().kind) {
             self.l.kind = self.r.kind
         }
@@ -3984,7 +3946,8 @@ impl BinaryEval {
         }
 
         if self.r.is_const() {
-            // Truncate only literals.
+            ret true
+            /*// Truncate only literals.
             // Skip castings.
             match type self.r.model {
             | &RuneExprModel
@@ -3993,7 +3956,7 @@ impl BinaryEval {
                     ret int_assignable(types::TypeKind.Int, self.r)
                 }
                 ret int_assignable(types::TypeKind.Uint, self.r)
-            }
+            }*/
         }
 
         ret types::is_sig_int(lk) == types::is_sig_int(rk)
@@ -4005,6 +3968,26 @@ impl BinaryEval {
         if !self.numbers_are_compatibile(lk, rk) {
             self.e.push_err(self.op, LogMsg.IncompatibleTypes, lk, rk)
             ret nil
+        }
+
+        match self.op.kind {
+        | TokenKind.Lshift
+        | TokenKind.Rshift:
+            if !self.l.is_const() || !int_assignable(PrimKind.I64, self.l) {
+                self.e.push_err(self.op, LogMsg.IncompatibleTypes, lk, rk)
+                ret nil
+            }
+            if !self.r.is_const() || !int_assignable(PrimKind.U64, self.r) {
+                self.e.push_err(self.op, LogMsg.IncompatibleTypes, lk, rk)
+                ret nil
+            }
+            self.l.constant.set_i64(self.l.constant.as_i64())
+            self.r.constant.set_u64(self.r.constant.as_u64())
+            if !is_ok_for_shifting(self.r) {
+                self.e.push_err(self.op, LogMsg.BitShiftMustUnsigned)
+                ret nil
+            }
+            ret self.l
         }
 
         // Logicals.
@@ -4057,9 +4040,6 @@ impl BinaryEval {
             if !is_ok_for_shifting(self.r) {
                 self.e.push_err(self.op, LogMsg.BitShiftMustUnsigned)
                 ret nil
-            }
-            if self.l.is_const() && !self.r.is_const() {
-                self.l.kind = self.r.kind
             }
             ret self.l
         }
@@ -4248,14 +4228,6 @@ impl BinaryEval {
         d.model = d.constant
     }
 
-    fn post_const(self, mut &d: &Data) {
-        if !d.is_const() {
-            ret
-        }
-        normalize_bitsize(d)
-        fit_type(d)
-    }
-
     fn check_data(mut self, mut &d: &Data) {
         let f = d.kind.fnc()
         if f != nil && f.decl != nil && f.decl.is_method() {
@@ -4292,8 +4264,6 @@ impl BinaryEval {
     }
 
     fn post_eval(mut self, mut &d: &Data) {
-        self.post_const(d)
-
         d.lvalue = false
         self.set_model(d)
 
@@ -4307,7 +4277,8 @@ impl BinaryEval {
 
         let mut d = self.eval_op()
 
-        self.l, self.r = l, r // Save normal order
+        // Save normal order
+        self.l, self.r = l, r
 
         self.eval_const(d)
 
@@ -4330,6 +4301,9 @@ impl BinaryEval {
             ret nil
         }
 
+        let mut prefix = self.e.prefix
+        self.e.prefix = l.kind
+        defer { self.e.prefix = prefix }
         let mut r = self.e.eval_expr_kind(op.right)
         if r == nil || r.kind == nil {
             ret nil

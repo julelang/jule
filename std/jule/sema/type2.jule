@@ -208,9 +208,12 @@ impl TypeCompatibilityChecker {
         }
 
         match {
-        | self.dest.prim() != nil: ret self.check_prim()
-        | self.dest.trt() != nil:  ret self.check_trait()
-        |:                         ret self.dest.equals(self.src)
+        | self.dest.prim() != nil:
+            ret self.check_prim()
+        | self.dest.trt() != nil:
+            ret self.check_trait()
+        |:
+            ret self.dest.equals(self.src)
         }
     }
 }
@@ -230,7 +233,6 @@ impl AssignTypeChecker {
 
     fn check_validity(mut self): bool {
         let mut valid = true
-
         match {
         | self.d.kind.fnc() != nil:
             let f = self.d.kind.fnc()
@@ -238,25 +240,20 @@ impl AssignTypeChecker {
             | f.is_builtin():
                 self.push_err(LogMsg.BuiltinAsNonFn)
                 valid = false
-
             | f.decl.cpp_linked:
                 self.push_err(LogMsg.CppFnAsAnonFn)
                 valid = false
-
             | f.decl.is_method():
                 self.push_err(LogMsg.MethodAsAnonFn)
                 valid = false
-
             | f.decl.generics.len > 0:
                 self.push_err(LogMsg.GenericedFnAsAnonFn)
                 valid = false
             }
-
         | self.d.kind.tup() != nil:
             self.push_err(LogMsg.TupleAssignToSingle)
             valid = false
         }
-
         ret valid
     }
 
@@ -308,14 +305,11 @@ impl AssignTypeChecker {
         | self.d == nil:
             // Skip Data is nil.
             ret false
-
         | !self.check_validity():
             // Data is invalid and error(s) logged about it.
             ret false
-
         | self.check_const():
             ret true
-
         | self.d.kind.enm() != nil:
             let mut dkind = self.dest
             if self.dest.enm() != nil {
@@ -323,11 +317,9 @@ impl AssignTypeChecker {
             } else if self.dest.prim() == nil {
                 break
             }
-
             if types::types_are_compatible(self.d.kind.enm().kind.kind.prim().kind, dkind.prim().kind) {
                 ret true
             }
-
         | self.is_prim():
             let dest = self.dest.prim()
             if dest.is_any() {
