@@ -1950,7 +1950,10 @@ impl Eval {
         }
 
         if fc.args.len > 0 {
+            let mut prefix = self.prefix
+            self.prefix = nil
             let mut arg = self.eval_expr_kind(fc.args[0].kind)
+            self.prefix = prefix
 
             if arg != nil {
                 d = self.eval_cast_by_type_n_data(d.kind, arg, fc.args[0].token)
@@ -3157,6 +3160,18 @@ impl Eval {
 
     fn eval_binop(mut &self, mut op: &BinopExpr): &Data {
         let mut bs = BinaryEval.new_plain(self)
+
+        // Apply prefix for just numericals.
+        if self.prefix != nil {
+            let prim = self.prefix.prim()
+            if prim == nil || !types::is_num(prim.to_str()) {
+                let mut prefix = self.prefix
+                self.prefix = nil
+                defer { self.prefix = prefix }
+                ret bs.eval(op)
+            }
+        }
+
         ret bs.eval(op)
     }
 
@@ -3278,9 +3293,8 @@ impl Eval {
             ret d
         }
 
-        if !d.decl {
+        if !d.decl && self.prefix != nil {
             if !d.kind.cpp_linked() &&
-                self.prefix != nil &&
                 d.cast_kind == nil &&
                 !d.kind.variadic &&
                 !d.lvalue &&
@@ -3293,7 +3307,7 @@ impl Eval {
             apply_cast_kind(d)
 
             if d.kind.prim() == nil || !d.kind.prim().is_any() {
-                if self.prefix != nil && self.prefix.prim() != nil && self.prefix.prim().is_any() {
+                if self.prefix.prim() != nil && self.prefix.prim().is_any() {
                     d.cast_kind = self.prefix
                     apply_cast_kind_model(d)
                     d.cast_kind = nil
