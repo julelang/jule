@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-cpp use "sync.hpp"
+use integ for std::jule::integrated
 
 #namespace "std"
 #typedef
@@ -12,10 +12,24 @@ cpp struct mutex {
     try_lock: fn(): bool
 }
 
-#typedef
-cpp struct __jule_mutex_handle {
-    drop:  fn()
-    mutex: fn(): *cpp.mutex
+struct mutex {
+    p: *cpp.mutex
+}
+
+impl mutex {
+    static fn new(): &mutex {
+        let mut mtx = &mutex{
+            p: integ::new[cpp.mutex](),
+        }
+        if mtx.p == nil {
+            panic("std::sync: mutex: allocation failed")
+        }
+        ret mtx
+    }
+
+    pub fn dispose(mut self) {
+        unsafe { integ::delete[cpp.mutex](self.p) }
+    }
 }
 
 // Muxtex is a primitive used to protect memory in
@@ -24,15 +38,21 @@ cpp struct __jule_mutex_handle {
 // If you try to lock an already locked mutex again
 // in the same thread or exhibit similar behavior, a system
 // signal is likely to occur.
+//
+// Mutextes are uses internal mutability and internal allocations.
+// Locking, unlocking and etc is not mutable operations.
+// Mutex suitable for using without smart pointers thanks to internal allocations.
+// The internal allocation automatically deallocated by smart pointer.
 pub struct Mutex {
-    handle: cpp.__jule_mutex_handle
-    mut locked: bool
+    mtx: &mutex
 }
 
 impl Mutex {
     // Returns new initialized ready-for-use Mutex.
-    pub static fn new(): &Mutex {
-        ret &Mutex{}
+    pub static fn new(): Mutex {
+        ret Mutex{
+            mtx: mutex.new(),
+        }
     }
 }
 
@@ -41,14 +61,13 @@ impl Mutex {
     // another thread, it stops the execution of the
     // algorithm to seize it and waits to lock the mutex.
     pub fn lock(self) {
-        unsafe { self.handle.mutex().lock() }
-        self.locked = true
+        unsafe { self.mtx.p.lock() }
     }
 
     // Unlock the mutex you locked and make it open
     // to locking by the thread.
     pub fn unlock(self) {
-        unsafe { self.handle.mutex().unlock() }
+        unsafe { self.mtx.p.unlock() }
     }
 
     // Try locking the mutex. But unlike the lock
@@ -56,12 +75,6 @@ impl Mutex {
     // to lock. Returns true if the locking was
     // successful, false otherwise.
     pub fn try_lock(self): bool {
-        ret unsafe { self.handle.mutex().try_lock() }
-    }
-
-    // Dispose all resources.
-    // After this function called, mutex will be uninitialized.
-    pub fn dispose(mut self) {
-        self.handle.drop()
+        ret unsafe { self.mtx.p.try_lock() }
     }
 }
