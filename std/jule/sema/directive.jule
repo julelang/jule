@@ -8,7 +8,7 @@ use std::jule::lex::{TokenId}
 
 struct DirectiveChecker {
     s: &Sema
-    d: []&ast::Directive
+    d: &[]&ast::Directive
     o: any
 }
 
@@ -111,6 +111,15 @@ impl DirectiveChecker {
         }
 
         d.args[0].kind = arg.kind[1:arg.kind.len-1]
+
+        // Push relevant directives.
+        if find_directive(*self.d, Directive.Typedef) == nil {
+            let mut typedef = &ast::Directive{
+                tag: d.tag,
+            }
+            typedef.tag.kind = Directive.Typedef
+            *self.d = append(*self.d, typedef)
+        }
     }
 
     fn check_deprecated(mut self, mut &d: &ast::Directive) {
@@ -195,7 +204,7 @@ impl DirectiveChecker {
     }
 
     fn check(mut self) {
-        for (_, mut d) in self.d {
+        for (_, mut d) in *self.d {
             self.check_directive(d)
         }
     }
