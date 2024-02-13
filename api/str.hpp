@@ -105,7 +105,7 @@ namespace jule
             }
 #endif
             if (start == end)
-                return jule::Str();
+                return {};
             return jule::Str(this->buffer.substr(start, end - start));
         }
 
