@@ -272,14 +272,15 @@ namespace jule
             }
         }
 
-        void operator=(const jule::Ptr<T> &src) noexcept
+        Ptr& operator=(const jule::Ptr<T> &src) noexcept
         {
             // Assignment to itself.
             if (this->alloc != nullptr && this->alloc == src.alloc)
-                return;
+                return *this;
 
             this->dealloc();
             this->__get_copy(src);
+            return *this;
         }
 
         inline jule::Bool operator==(const std::nullptr_t &) const noexcept
