@@ -429,7 +429,7 @@ namespace jule
                 index);
         }
 
-        void operator=(const jule::Slice<Item> &src) noexcept
+        Slice& operator=(const jule::Slice<Item> &src) noexcept
         {
             // Assignment to itself.
             if (this->data.alloc != nullptr && this->data.alloc == src.data.alloc)
@@ -437,16 +437,18 @@ namespace jule
                 this->_len = src._len;
                 this->_cap = src._cap;
                 this->_slice = src._slice;
-                return;
+                return *this;
             }
 
             this->dealloc();
             this->__get_copy(src);
+            return *this;
         }
 
-        inline void operator=(const std::nullptr_t) noexcept
+        inline Slice& operator=(const std::nullptr_t) noexcept
         {
             this->dealloc();
+            return *this;
         }
 
         friend std::ostream &operator<<(std::ostream &stream,
