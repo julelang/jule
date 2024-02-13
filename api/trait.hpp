@@ -223,19 +223,21 @@ namespace jule
             );
         }
 
-        inline void operator=(const std::nullptr_t) noexcept
+        inline jule::Trait<Mask>& operator=(const std::nullptr_t) noexcept
         {
             this->dealloc();
+            return *this;
         }
 
-        inline void operator=(const jule::Trait<Mask> &src) noexcept
+        inline jule::Trait<Mask>& operator=(const jule::Trait<Mask> &src) noexcept
         {
             // Assignment to itself.
             if (this->data.alloc != nullptr && this->data.alloc == src.data.alloc)
-                return;
+                return *this;
 
             this->dealloc();
             this->__get_copy(src);
+            return *this;
         }
 
         constexpr jule::Bool operator==(const jule::Trait<Mask> &src) const noexcept
