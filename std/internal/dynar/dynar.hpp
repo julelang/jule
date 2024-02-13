@@ -27,11 +27,11 @@ namespace jule_std
             this->operator=(ref);
         }
 
-        void operator=(const jule_std::DynarBuffer<Item> &ref)
+        jule_std::DynarBuffer<Item>& operator=(const jule_std::DynarBuffer<Item> &ref)
         {
             // Assignment to itself.
             if (this->heap != nullptr && this->heap == ref.heap)
-                return;
+                return *this;
 
             this->heap = new (std::nothrow) Item[ref.len];
             if (!this->heap)
@@ -39,6 +39,7 @@ namespace jule_std
             this->len = ref.len;
             this->cap = this->len;
             std::copy(ref.heap, ref.heap + this->len, this->heap);
+            return *this;
         }
     };
 
