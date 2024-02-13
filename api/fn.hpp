@@ -89,19 +89,22 @@ namespace jule
             return this->_addr;
         }
 
-        inline void operator=(std::nullptr_t) noexcept
+        inline Fn<Function>& operator=(std::nullptr_t) noexcept
         {
             this->buffer = nullptr;
+            return *this;
         }
 
-        inline void operator=(const std::function<Function> &function)
+        inline Fn<Function>& operator=(const std::function<Function> &function)
         {
             this->buffer = function;
+            return *this;
         }
 
-        inline void operator=(const Function &function)
+        inline Fn<Function>& operator=(const Function &function)
         {
             this->buffer = function;
+            return *this;
         }
 
         constexpr jule::Bool operator==(const Fn<Function> &fn) const noexcept
