@@ -167,32 +167,35 @@ namespace jule
         }
 
         template <typename T>
-        void operator=(const T &expr) noexcept
+        Any& operator=(const T &expr) noexcept
         {
             jule::Any::Type *type = jule::Any::new_type<T>();
             if (this->type != nullptr && this->type == type)
             {
                 // Same type, not null, avoid allocation, use current.
                 *(T *)this->data = expr;
-                return;
+                return *this;
             }
             this->dealloc();
             this->__assign<T>(expr);
+            return *this;
         }
 
-        void operator=(const jule::Any &src) noexcept
+        Any& operator=(const jule::Any &src) noexcept
         {
             // Assignment to itself.
             if (this->data != nullptr && this->data == src.data)
-                return;
+                return *this;
 
             this->dealloc();
             this->__get_copy(src);
+            return *this;
         }
 
-        inline void operator=(const std::nullptr_t) noexcept
+        inline Any& operator=(const std::nullptr_t) noexcept
         {
             this->dealloc();
+            return *this;
         }
 
         template <typename T>
