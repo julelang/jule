@@ -35,7 +35,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // ====================================================
 
-use std::sync::atomic::{MemoryOrder, AtomicU32}
+use std::sync::atomic::{MemoryOrder, AtomicU8}
 
 // Once is an object that will perform exactly one action.
 // A Once must not be copied after first use.
@@ -45,7 +45,7 @@ pub struct Once {
     // The hot path is inlined at every call site.
     // Placing done first allows more compact instructions on some architectures (amd64/i386),
     // and fewer instructions (to calculate offset) on other architectures.
-    mut done: AtomicU32
+    mut done: AtomicU8
     mut m:    Mutex
 }
 
@@ -95,8 +95,8 @@ impl Once {
         self.m.lock()
         if self.done.load(MemoryOrder.Relaxed) == 0 {
             f()
+            self.done.store(1, MemoryOrder.Relaxed)
         }
-        self.done.store(1, MemoryOrder.Relaxed)
         self.m.unlock()
     }
 }
