@@ -5,54 +5,63 @@
 use integ for std::jule::integrated
 
 cpp use "<fcntl.h>"
-cpp use "cmd.hpp"
+cpp use "<unistd.h>"
 
 cpp type HANDLE: *unsafe
 
-cpp fn __jule_execvp(file: str, argv: []str): int
-cpp fn __jule_execve(file: str, argv: []str, env: []str): int
-cpp unsafe fn TerminateProcess(pid: cpp.HANDLE, code: int): bool
+cpp let P_NOWAIT: int
+
+cpp fn _wspawnvp(mode: int, file: *integ::Wchar, args: **integ::Wchar): int
+cpp fn _wspawnvpe(mode: int, file: *integ::Wchar, args: **integ::Wchar, env: **integ::Wchar): int
 cpp unsafe fn _cwait(mut status: *integ::Int, pid: int, action: int): int
 
+fn ustr_slice_to_wcstr_slice(us: [][]u16): []*integ::Wchar {
+    let mut wcs = make([]*integ::Wchar, 0, us.len + 1)
+    for i in us {
+        wcs = append(wcs, unsafe { (*integ::Wchar)(&us[i][0]) })
+    }
+    wcs = append(wcs, nil)
+    ret wcs
+}
+
+fn str_slice_to_ustr_slice(s: []str): [][]u16 {
+    let mut us = make([][]u16, 0, s.len)
+    for _, p in s {
+        us = append(us, integ::utf16_from_str(p))
+    }
+    ret us
+}
+
+fn execvp(file: str, argv: []str): int {
+    let utf16_file = integ::utf16_from_str(file)
+    let ucargv = str_slice_to_ustr_slice(argv)
+    let cargv = ustr_slice_to_wcstr_slice(ucargv)
+    ret cpp._wspawnvp(cpp.P_NOWAIT, unsafe { (*integ::Wchar)(&utf16_file[0]) }, &cargv[0])
+}
+
+fn execve(file: str, argv: []str, env: []str): int {
+    let ucargv = str_slice_to_ustr_slice(argv)
+    let cargv = ustr_slice_to_wcstr_slice(ucargv)
+    let ucenv = str_slice_to_ustr_slice(env)
+    let cenv = ustr_slice_to_wcstr_slice(ucenv)
+    let utf16_file = integ::utf16_from_str(file)
+    ret cpp._wspawnvpe(cpp.P_NOWAIT, unsafe { (*integ::Wchar)(&utf16_file[0]) }, &cargv[0], &cenv[0])
+}
+
 impl Cmd {
-    // Spawns process.
-    pub fn spawn(mut self)! {
-        if self._pid != Cmd.NPID {
-            error("command already spawned")
-        }
-
-        self._pid = if self.env == nil {
-            cpp.__jule_execvp(self._fle, self.args)
+    fn __spawn(self)!: int {
+        let pid = if self.env == nil {
+            execvp(self.path, self.args)
         } else {
-            cpp.__jule_execve(self._fle, self.args, self.env)
+            execve(self.path, self.args, self.env)
         }
-        if self._pid == -1 {
+        if pid == -1 {
             error(get_last_process_error())
         }
-    }
-
-    // Kills process.
-    // Fails if process is not alive.
-    pub fn kill(mut self)! {
-        if unsafe { cpp.TerminateProcess(cpp.HANDLE(self._pid), 0) } {
-            self._pid = Cmd.NPID
-            ret
-        }
-        error("kill failed")
-    }
-
-    // Waits complete for running of process.
-    // Returns exit code of process.
-    pub fn wait(mut self)!: int {
-        if self._pid == Cmd.NPID {
-            error("command is not spawned")
-        }
-
-        let mut status = 0
-        if unsafe { cpp._cwait((*integ::Int)(&status), self._pid, 0) } == -1 {
+        let status = 0
+        if unsafe { cpp._cwait((*integ::Int)(&status), pid, 0) } == -1 {
             error(get_last_process_error())
         }
-        self._pid = Cmd.NPID
         ret status
     }
 }

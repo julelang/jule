@@ -33,7 +33,7 @@ use std::jule::build::{
     logf,
     is_valid_cpp_ext,
 }
-use std::process::{Cmd}
+use std::process::{ProcessError, Cmd}
 use strings for std::strings
 
 static mut OUT_DIR = "dist"
@@ -72,8 +72,22 @@ fn compile_ir(compiler: str, compiler_cmd: str) {
     let mut cmd = Cmd.new(compiler)
     cmd.args = [compiler]
     cmd.args = append(cmd.args, strings::split(compiler_cmd, " ", -1)...)
-    cmd.spawn()!
-    let status = cmd.wait()!
+    let status = cmd.spawn() else {
+        match error {
+        | ProcessError.Fork:
+            AnsiEscape.print(AnsiSeq.Red, "back-end compiler could not used because of fork problem")
+        | ProcessError.NotExist:
+            AnsiEscape.print(AnsiSeq.Red, "back-end compiler could not used because of compiler path is not exist")
+        | ProcessError.NotExec:
+            AnsiEscape.print(AnsiSeq.Red, "back-end compiler could not used because of compiler path is not in the proper format")
+        | ProcessError.Denied:
+            AnsiEscape.print(AnsiSeq.Red, "back-end compiler could not used because of permission denied")
+        |:
+            AnsiEscape.print(AnsiSeq.Red, "back-end compiler could not used because of unkown problem")
+        }
+        exit_err("")
+        use 0
+    }
     if status != 0 {
         let error_message = "\n>>> your backend compiler (" + env::COMPILER + `) reports problems
 >>> please check errors above
@@ -150,7 +164,6 @@ fn push_comp_cmd_gcc(mut &cmd: str) {
 // Generate compile command for backend-compiler.
 fn gen_compile_cmd(source_path: str, &ir: &IR): (str, str) {
     let &compiler = env::COMPILER_PATH
-
     let mut cmd = ""
 
     match env::COMPILER {
