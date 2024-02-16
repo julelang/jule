@@ -254,6 +254,22 @@ fn check_data_for_integer_indexing(mut &d: &Data): (err_fmt: LogMsg) {
     ret LogMsg.Empty
 }
 
+// Applies casting model to data by enum.
+// This is necessary to keep exact same type of enum's field type.
+// The parameter d should be constant data.
+fn apply_cast_model_by_enum(mut &d: &Data, mut e: &Enum) {
+    if e == nil {
+        ret
+    }
+    let p = e.kind.kind.prim()
+    if p.is_str() {
+        ret
+    }
+    d.cast_kind = e.kind.kind
+    apply_cast_kind_model(d)
+    d.cast_kind = nil
+}
+
 // Value data.
 pub struct Data {
     pub kind:      &TypeKind
@@ -2214,7 +2230,9 @@ impl Eval {
             lvalue:  false,
             decl:    false,
             mutable: false,
-            kind:    &TypeKind{kind: enm},
+            kind:    &TypeKind{
+                kind: enm,
+            },
         }
 
         let mut item = enm.find_item(ident.kind)
@@ -2223,6 +2241,7 @@ impl Eval {
         } else {
             d.constant = new(Const, *item.value.data.constant)
             d.model = d.constant
+            apply_cast_model_by_enum(d, enm)
         }
 
         ret d
@@ -4230,6 +4249,7 @@ impl BinaryEval {
         }
 
         d.model = d.constant
+        apply_cast_model_by_enum(d, d.kind.enm())
     }
 
     fn check_data(mut self, mut &d: &Data) {
