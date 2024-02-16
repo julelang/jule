@@ -876,17 +876,14 @@ impl ExprCoder {
         ret obj
     }
 
-    fn __append_call_assign(mut self, same_dest: bool, &dest_expr: str,
-        mut &dest_kind: &TypeKind, mut &s: &SliceExprModel, mut &m: &BuiltinAppendCallExprModel): str {
-        let mut obj = ""
-        if !same_dest {
-            obj += dest_expr
-            obj += " = jule::alloc_for_append("
-            obj += self.model(m.dest)
-            obj += ","
-            obj += conv::itoa(s.elems.len)
-            obj += ");"
-        }
+    fn __append_call_assign(mut self, &dest_expr: str, mut &dest_kind: &TypeKind,
+        mut &s: &SliceExprModel, mut &m: &BuiltinAppendCallExprModel): str {
+        let mut obj = dest_expr
+        obj += " = jule::alloc_for_append("
+        obj += self.model(m.dest)
+        obj += ","
+        obj += conv::itoa(s.elems.len)
+        obj += ");"
         for (_, mut e) in s.elems {
             obj += dest_expr
             // Use the "__push" function to skip allocation boundary checking.
@@ -905,14 +902,12 @@ impl ExprCoder {
                 let mut s = (&SliceExprModel)(m.elements)
                 let dest_expr = self.model(dest)
                 let mut dest_var = (&Var)(dest)
-                let same_dest = m.dest == dest_var
-                ret self.__append_call_assign(same_dest, dest_expr, dest_var.kind.kind, s, m), true
+                ret self.__append_call_assign(dest_expr, dest_var.kind.kind, s, m), true
             | &StructSubIdentExprModel:
                 let mut s = (&SliceExprModel)(m.elements)
                 let dest_expr = self.model(dest)
                 let mut dest_field = (&StructSubIdentExprModel)(dest).field
-                let same_dest = m.dest == dest_field
-                ret self.__append_call_assign(same_dest, dest_expr, dest_field.kind, s, m), true
+                ret self.__append_call_assign(dest_expr, dest_field.kind, s, m), true
             }
         }
         ret self.append_call(m), false

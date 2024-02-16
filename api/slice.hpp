@@ -312,7 +312,7 @@ namespace jule
         }
 
         // Push item to last without allocation checks.
-        void __push(const Item &item)
+        inline void __push(const Item &item)
         {
             this->_slice[this->_len++] = item;
         }
