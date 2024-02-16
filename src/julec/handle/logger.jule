@@ -6,34 +6,18 @@ use conv for std::conv
 use std::jule::build::{Log, LogKind}
 use strings for std::strings
 
-enum AnsiSeq: str {
-    Reset = "\033[0m",
-    Bold = "\u001b[1m",
-    Red = "\033[31m",
-    BrightMagenta = "\033[95m",
-}
-
-struct AnsiEscape {}
-
-impl AnsiEscape {
-    static fn reset() { out(AnsiSeq.Reset) }
-
-    static fn print(escape: str, text: str) {
-        out(escape)
-        out(text)
-        AnsiEscape.reset()
-    }
-}
-
-struct Logger{}
+// Logger for compiler logs.
+pub struct Logger{}
 
 impl Logger {
     // Prints flag log.
-    static fn log_flat(&l: Log) { outln(l.text) }
+    pub static fn log_flat(&l: Log) {
+        outln(l.text)
+    }
 
     // Prints error log.
-    static fn log_error(&l: Log) {
-        out(AnsiSeq.Red)
+    pub static fn log_error(&l: Log) {
+        out(AnsiEscape.Red)
         out("error: ")
         out(l.text)
         AnsiEscape.reset()
@@ -70,7 +54,7 @@ impl Logger {
                 out("\n  ")
                 out(strings::repeat(" ", row.len))
                 out(" | ")
-                AnsiEscape.print(AnsiSeq.BrightMagenta, "suggestion: ")
+                AnsiEscape.print(AnsiEscape.BrightMagenta, "suggestion: ")
                 out(l.suggestion)
             }
         }
@@ -78,15 +62,17 @@ impl Logger {
     }
 
     // Log.
-    static fn log(&l: Log) {
+    pub static fn log(&l: Log) {
         match l.kind {
-        | LogKind.Flat:  Logger.log_flat(l)
-        | LogKind.Error: Logger.log_error(l)
+        | LogKind.Flat:
+            Logger.log_flat(l)
+        | LogKind.Error:
+            Logger.log_error(l)
         }
     }
 
-    // Prints logs.
-    static fn print_logs(&logs: []Log) {
+    // Prints all logs.
+    pub static fn print_logs(&logs: []Log) {
         for _, l in logs {
             Logger.log(l)
         }

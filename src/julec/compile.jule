@@ -4,6 +4,7 @@
 
 use deadcode
 use env::{self, OptLevel, push_opt_level}
+use handle::{AnsiEscape, Logger, throw}
 use importer
 use obj::{IR}
 use cxx for obj::cxx
@@ -45,12 +46,12 @@ fn write_output(path: str, content: str) {
 
     Status.of(dir) else {
         Directory.create(dir) else {
-            exit_err("a problem occurs when code generation")
+            throw("a problem occurs when code generation")
         }
     }
 
     File.write(path, []byte(content), 0660) else {
-        exit_err("a problem occurs when code generation")
+        throw("a problem occurs when code generation")
     }
 }
 
@@ -75,25 +76,25 @@ fn compile_ir(compiler: str, compiler_cmd: str) {
     let status = cmd.spawn() else {
         match error {
         | ProcessError.Fork:
-            AnsiEscape.print(AnsiSeq.Red, "back-end compiler could not used because of fork problem")
+            AnsiEscape.print(AnsiEscape.Red, "back-end compiler could not used because of fork problem")
         | ProcessError.NotExist:
-            AnsiEscape.print(AnsiSeq.Red, "back-end compiler could not used because of compiler path is not exist")
+            AnsiEscape.print(AnsiEscape.Red, "back-end compiler could not used because of compiler path is not exist")
         | ProcessError.NotExec:
-            AnsiEscape.print(AnsiSeq.Red, "back-end compiler could not used because of compiler path is not in the proper format")
+            AnsiEscape.print(AnsiEscape.Red, "back-end compiler could not used because of compiler path is not in the proper format")
         | ProcessError.Denied:
-            AnsiEscape.print(AnsiSeq.Red, "back-end compiler could not used because of permission denied")
+            AnsiEscape.print(AnsiEscape.Red, "back-end compiler could not used because of permission denied")
         |:
-            AnsiEscape.print(AnsiSeq.Red, "back-end compiler could not used because of unkown problem")
+            AnsiEscape.print(AnsiEscape.Red, "back-end compiler could not used because of unkown problem")
         }
-        exit_err("")
+        throw("")
         use 0
     }
     if status != 0 {
         let error_message = "\n>>> your backend compiler (" + env::COMPILER + `) reports problems
 >>> please check errors above
 >>> is this a compiler problem, please report us: https://github.com/julelang/jule/issues/new/choose`
-        AnsiEscape.print(AnsiSeq.Red, error_message)
-        exit_err("")
+        AnsiEscape.print(AnsiEscape.Red, error_message)
+        throw("")
     }
 
     clear_objects()
@@ -224,16 +225,13 @@ fn apply_target_independent_optimizations(mut &ir: &IR) {
 fn check_compiler_flag() {
     match env::COMPILER {
     | "":
-        exit_err("missing option value: --compiler")
-
+        throw("missing option value: --compiler")
     | "clang":
         env::COMPILER_PATH = "clang++"
-
     | "gcc":
         env::COMPILER_PATH = "g++"
-
     |:
-        exit_err("invalid option value for --compiler: " + env::COMPILER)
+        throw("invalid option value for --compiler: " + env::COMPILER)
     }
 }
 
@@ -243,8 +241,7 @@ fn check_target_arch(arch: str) {
             ret
         }
     }
-
-    exit_err("--target: unsupported/undefined architecture: " + arch)
+    throw("--target: unsupported/undefined architecture: " + arch)
 }
 
 fn check_target_os(os: str) {
@@ -253,18 +250,17 @@ fn check_target_os(os: str) {
             ret
         }
     }
-
-    exit_err("--target: unsupported/undefined operating system: " + os)
+    throw("--target: unsupported/undefined operating system: " + os)
 }
 
 fn check_target_flag(&target: str) {
     if target == "" {
-        exit_err("missing option value: --target")
+        throw("missing option value: --target")
     }
 
     let parts = strings::split(target, "-", -1)
     if parts.len != 2 {
-        exit_err("--target: undefined platform target format: " + target)
+        throw("--target: undefined platform target format: " + target)
     }
 
     let (os, arch) = parts[0], parts[1]
@@ -282,13 +278,13 @@ fn check_target_flag(&target: str) {
 
 fn check_opt_flag(&opt: str) {
     if opt == "" {
-        exit_err("missing option value: --opt")
+        throw("missing option value: --opt")
     }
 
     match opt {
     | "L0": // Nothing.
     | "L1": push_opt_level(OptLevel.L1)
-    |:      exit_err("--opt: invalid optimization level: " + opt)
+    |:      throw("--opt: invalid optimization level: " + opt)
     }
 }
 
@@ -297,10 +293,9 @@ fn check_cpp_std_flag() {
     | "cpp14"
     | "cpp17"
     | "cpp20":
-        // Ok.
-
+        break
     |:
-        exit_err("--cppstd: invalid optimization level: " + env::CPP_STD)
+        throw("--cppstd: invalid optimization level: " + env::CPP_STD)
     }
 }
 
@@ -330,7 +325,7 @@ fn check_flags(&args: []str): []str {
     fs.add_var[bool](unsafe { (&bool)(&env::OPT_COND) }, "opt-cond", 0, "Conditional optimizations")
 
     let mut content = fs.parse(args) else {
-        exit_err(str(error))
+        throw(str(error))
         use nil // Avoid error.
     }
 
@@ -355,22 +350,22 @@ fn build_ir(&args: []str): &IR {
     setup_sema_flags(sema_flags)
 
     if content.len == 0 {
-        exit_err(logf(LogMsg.MissingCompilePath))
+        throw(logf(LogMsg.MissingCompilePath))
     } else if content.len > 1 {
-        exit_err("undefined content: " + content[1])
+        throw("undefined content: " + content[1])
     }
     let (mut path, ok) = path::abs(content[0])
     if !ok {
-        exit_err("compile path could not processed because of a problem")
+        throw("compile path could not processed because of a problem")
     }
 
     // Check standard library.
     let inf = Status.of(PATH_STDLIB) else {
-        exit_err(logf(LogMsg.StdlibNotExist))
+        throw(logf(LogMsg.StdlibNotExist))
         ret nil // Avoid error.
     }
     if !inf.is_dir() {
-        exit_err(logf(LogMsg.StdlibNotExist))
+        throw(logf(LogMsg.StdlibNotExist))
     }
 
     // Initialize variables for directive eval.
@@ -379,12 +374,12 @@ fn build_ir(&args: []str): &IR {
     let (mut ir, logs) = IR.build(path, sema_flags)
 
     if ir == nil && logs == nil {
-        exit_err(logf(LogMsg.NoFileInEntryPackage, path))
+        throw(logf(LogMsg.NoFileInEntryPackage, path))
     }
 
     if logs != nil {
         Logger.print_logs(logs)
-        exit_err("")
+        throw("")
     }
 
     ret ir
@@ -404,7 +399,7 @@ fn compile_command(mut &args: []str) {
     if !env::TEST {
         let mut f = ir.main.find_fn(ENTRY_POINT, CPP_LINKED)
         if f == nil {
-            exit_err(logf(LogMsg.NoEntryPoint))
+            throw(logf(LogMsg.NoEntryPoint))
         }
         f.statically = true // Mark used for deadcode elimination.
     }
