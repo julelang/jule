@@ -580,24 +580,20 @@ impl Sema {
         dc.check()
     }
 
-    fn check_generic_quantity(mut self, required: int, given: int, error_token: Token): (ok: bool) {
+    fn check_generic_quantity(mut self, required: int, given: int, token: Token): (ok: bool) {
         match {
         | required == 0 && given > 0:
-            self.push_err(error_token, LogMsg.NotHasGenerics)
+            self.push_err(token, LogMsg.NotHasGenerics)
             ret false
-
         | required > 0 && given == 0:
-            self.push_err(error_token, LogMsg.HasGenerics)
+            self.push_err(token, LogMsg.HasGenerics)
             ret false
-
         | required < given:
-            self.push_err(error_token, LogMsg.GenericsOverflow)
+            self.push_err(token, LogMsg.GenericsOverflow)
             ret false
-
         | required > given:
-            self.push_err(error_token, LogMsg.MissingGenerics)
+            self.push_err(token, LogMsg.MissingGenerics)
             ret false
-
         |:
             ret true
         }
@@ -1201,19 +1197,23 @@ impl Sema {
     }
 
     fn check_enum_items_int(mut &self, mut &e: &Enum) {
-        let mut max = u64(types::max(e.kind.kind.prim().to_str()))
+        let prim = e.kind.kind.prim()
+        let mut max = u64(types::max(prim.to_str()))
         for (i, mut item) in e.items {
             if max == 0 {
                 self.push_err(item.token, LogMsg.OverflowLimits)
             } else {
                 max--
             }
-
             if item.auto_expr() {
                 item.value = &Value{
-                    data: &Data{
-                        constant: Const.new_u64(max - (max - u64(i))),
-                    },
+                    data: new(Data),
+                }
+                match {
+                | types::is_sig_int(prim.to_str()):
+                    item.value.data.constant = Const.new_i64(i64(max - (max - u64(i))))
+                |:
+                    item.value.data.constant = Const.new_u64(max - (max - u64(i)))
                 }
                 item.value.data.model = item.value.data.constant
             } else {
