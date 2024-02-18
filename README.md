@@ -8,6 +8,7 @@ An effective programming language to build efficient, fast, reliable and safe so
 
 [Website](https://jule.dev) |
 [Manual](https://manual.jule.dev) |
+[Future of Jule](https://jule.dev/future-of-jule) |
 [Contributing](https://jule.dev/contribute) |
 [Community](https://jule.dev/community)
 
@@ -44,16 +45,6 @@ To be safe, Jule should adopt approaches that serve the purpose in a balanced wa
 - **Compile Time**: Jule should have a good compile time that serves the mission. For this, it must have capabilities such as having compile-time constants, avoiding repetitive checks by checking generics once for each instance, and performing safety-related checks whenever possible. The compiler should support developers with safety checks at compile-time and give some optimization options such as constant evaluations.
 
 - **Brand-New**: Jule should be like a truly brand-new language. For example, it should have UTF-8 strings, support Unicode and type inference, and a cross-platform portable standard library. Unless the developer really wants to do platform specific programming, shouldn't worry about the portability of the standard library, should have Unicode support and a common standard like UTF-8 should be easy to handle.
-
-
-## Future of Jule
-Jule is in beta versions, changing and evolving rapidly. Our main priority right now is for Jule to become more stable and have a robust standard library. To make it easier for the community and official developers to develop any tools for Jule, a significant portion of Jule's official compiler is included in the standard library. The standard library has important stages such as lexer, parser and semantic analyzer and is suitable for use in tool development.
-
-The syntax and language design of the Jule programming language has emerged and is not expected to undergo major changes. Expecting Jule developers not to make massive updates to their old code between releases. However, no commitment for that.
-
-There is also the idea of ​​adding a package manager that ships with the official compiler at some stage. Jule's modern understanding of language and convenience suggest that there should be a package manager that comes with the compiler. This package manager will provide management of non-standard library packages developed and published by the community. Jule's standard library only gets updates with compiler releases.
-
-In addition to the currently supported C++ compilers, the official compiler may get support or improve support for more compilers and development environments in the future. Expected that Jule's platform support will expand further in areas such as backend compiler, CPU architecture, and operating system.
 
 ## Community
 
