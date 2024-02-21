@@ -1328,7 +1328,6 @@ impl ScopeChecker {
         | &FnCallExpr:
             self.check_ret_multi_assign(a)
             ret
-
         | &UnsafeExpr:
             match type (&UnsafeExpr)(a.right.kind).expr {
             | &FnCallExpr:
@@ -1409,17 +1408,17 @@ impl ScopeChecker {
         let mut _case = m.cases[i]
         _case.exprs = make([]&Data, 0, c.exprs.len)
         let mut generic_matched = false
-
+        let mut eval = self.s.eval(self)
         for (_, mut e) in c.exprs {
+            let mut d = eval.eval_expr_kind(e.kind)
+            if d == nil {
+                continue
+            } 
             if m.type_match {
-                let mut d = self.s.eval(self).eval_expr_kind(e.kind)
-                if d != nil {
-                    _case.exprs = append(_case.exprs, d)
-                    if count_match_type(m, d.kind) > 1 {
-                        self.s.push_err(e.token, LogMsg.DuplicateMatchType, d.kind.to_str())
-                    }
+                _case.exprs = append(_case.exprs, d)
+                if count_match_type(m, d.kind) > 1 {
+                    self.s.push_err(e.token, LogMsg.DuplicateMatchType, d.kind.to_str())
                 }
-
                 if expr.kind.generic {
                     generic_matched = generic_matched || expr.kind.equals(d.kind)
                 } else {
@@ -1432,10 +1431,7 @@ impl ScopeChecker {
                 continue
             }
 
-            let mut d = self.s.eval(self).eval_expr_kind(e.kind)
-            if d == nil {
-                continue
-            } else if d.decl {
+            if d.decl {
                 self.s.push_err(e.token, LogMsg.DeclFoundInsteadExpr)
                 self.s.push_suggestion(LogMsg.UseTypeMatch)
                 continue
@@ -1458,7 +1454,7 @@ impl ScopeChecker {
     }
 
     fn check_cases(mut &self, mut &m: &MatchCase, mut rm: &Match, mut expr: &Data) {
-        rm.cases = make([]&Case, m.cases.len)
+        rm.cases = make([]&Case, 0, m.cases.len)
         for i in m.cases {
             let mut _case = &Case{
                 owner: rm,
@@ -1466,7 +1462,7 @@ impl ScopeChecker {
             if i > 0 {
                 rm.cases[i-1].next = _case
             }
-            rm.cases[i] = _case
+            rm.cases = append(rm.cases, _case)
         }
 
         if rm.default != nil && m.cases.len > 0 {
