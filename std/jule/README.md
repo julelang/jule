@@ -5,11 +5,12 @@ It is also used by the official reference compiler JuleC and is developed in par
 
 ## Packages
 
-- [`ast`](https://github.com/julelang/jule/tree/master/std/jule/ast): AST things.
-- [`lex`](https://github.com/julelang/jule/tree/master/std/jule/lex): Lexical analyzer.
-- [`parser`](https://github.com/julelang/jule/tree/master/std/jule/parser): Parser.
-- [`sema`](https://github.com/julelang/jule/tree/master/std/jule/sema): Semantic analyzer.
-- [`types`](https://github.com/julelang/jule/tree/master/std/jule/types): Elementary package for type safety.
+- [`ast`](./ast): AST things.
+- [`lex`](./lex): Lexical analyzer.
+- [`parser`](./parser): Parser.
+- [`pattern`](./pattern): Pattern checking for defines such as reserved functions.
+- [`sema`](./sema): Semantic analyzer.
+- [`types`](./types): Elementary package for type safety.
 
 ## Developer Reference
 
