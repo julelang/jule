@@ -1343,7 +1343,6 @@ impl ScopeChecker {
         | a.left.len > right.len:
             self.s.push_err(a.setter, LogMsg.OverflowMultiAssignIdents)
             ret
-
         | a.left.len < right.len:
             self.s.push_err(a.setter, LogMsg.MissingMultiAssignIdents)
             ret
@@ -1413,12 +1412,7 @@ impl ScopeChecker {
 
         for (_, mut e) in c.exprs {
             if m.type_match {
-                let mut eval = &Eval{
-                    s:      self.s,
-                    lookup: self,
-                }
-
-                let mut d = eval.eval(e)
+                let mut d = self.s.eval(self).eval_expr_kind(e.kind)
                 if d != nil {
                     _case.exprs = append(_case.exprs, d)
                     if count_match_type(m, d.kind) > 1 {
@@ -1438,8 +1432,12 @@ impl ScopeChecker {
                 continue
             }
 
-            let mut d = self.s.eval(self).eval_expr(e)
+            let mut d = self.s.eval(self).eval_expr_kind(e.kind)
             if d == nil {
+                continue
+            } else if d.decl {
+                self.s.push_err(e.token, LogMsg.DeclFoundInsteadExpr)
+                self.s.push_suggestion(LogMsg.UseTypeMatch)
                 continue
             }
 
@@ -1453,7 +1451,6 @@ impl ScopeChecker {
             }
             checker.check()
         }
-
         if !m.type_match || !expr.kind.generic || generic_matched {
             _case.scope = self.check_case_scope(_case, c.scope)
         }
@@ -1466,11 +1463,9 @@ impl ScopeChecker {
             let mut _case = &Case{
                 owner: rm,
             }
-
             if i > 0 {
                 rm.cases[i-1].next = _case
             }
-
             rm.cases[i] = _case
         }
 
@@ -1557,7 +1552,6 @@ impl ScopeChecker {
             tm.default = self.check_default(tm, m.default)
         }
         self.check_cases(m, tm, d)
-
         self.push_type_match(tm, m)
     }
 
