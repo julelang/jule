@@ -1,0 +1,43 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use std::jule::sema::{
+    Fn,
+}
+
+// Pattern checker for functions and methods.
+pub struct FuncPattern {}
+
+impl FuncPattern {
+    // Reports whether function is the reserved dispose function.
+    pub static fn dispose(f: &Fn): bool {
+        ret f != nil &&
+            f.public &&
+            f.is_void() &&
+            f.generics.len == 0 &&
+            f.params.len == 1 &&
+            f.params[0].mutable &&
+            !f.params[0].is_ref()
+    }
+
+    // Reports whether function is the reserved to_str function.
+    pub static fn to_str(f: &Fn): bool {
+        if f == nil ||
+            !f.public ||
+            f.is_void() ||
+            f.generics.len != 0 ||
+            f.params.len != 1 ||
+            f.params[0].mutable ||
+            f.params[0].is_ref() {
+            ret false
+        }
+
+        let mut ins = unsafe { *(&f.instances[0]) }
+        let prim = ins.result.prim()
+        if prim == nil {
+            ret false
+        }
+        ret prim.is_str()
+    }
+}
