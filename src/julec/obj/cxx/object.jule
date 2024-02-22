@@ -616,6 +616,23 @@ impl ObjectCoder {
         obj += "(_other); }\n\n"
     }
 
+    fn structure_operator_shl(mut self, mut &obj: str, &ident: str, mut &s: &StructIns) {
+        let mut shl = s.find_method("shl", false)
+        if shl == nil || !FuncPattern.shl(shl) {
+            ret
+        }
+        obj += self.indent()
+        if env::OPT_INLINE {
+            obj += "inline "
+        }
+        obj += ident
+        obj += " operator<<("
+        obj += ident
+        obj += " _other) { return this->"
+        obj += IdentCoder.func(shl)
+        obj += "(_other); }\n\n"
+    }
+
     fn structure_operators(mut self, mut &s: &StructIns): str {
         let ident = IdentCoder.structure_ins(s)
         let mut obj = ""
@@ -625,6 +642,7 @@ impl ObjectCoder {
         self.structure_operator_gt_eq(obj, ident, s)
         self.structure_operator_lt(obj, ident, s)
         self.structure_operator_lt_eq(obj, ident, s)
+        self.structure_operator_shl(obj, ident, s)
         self.structure_operator_shr(obj, ident, s)
         ret obj
     }
