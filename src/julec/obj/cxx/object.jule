@@ -535,102 +535,61 @@ impl ObjectCoder {
         obj += " &_other) const { return !this->operator==(_other); }\n\n"
     }
 
-    fn structure_operator_gt(mut self, mut &obj: str, &ident: str, mut &s: &StructIns) {
-        let mut gt = s.find_method("gt", false)
-        if gt == nil || !FuncPattern.gt(gt) {
-            ret
-        }
+    fn structure_operator(mut self, mut &obj: str, &ident: str, &f: &Fn, op: str, result: str) {
         obj += self.indent()
         if env::OPT_INLINE {
             obj += "inline "
         }
-        obj += "bool operator>("
+        obj += result
+        obj += " operator"
+        obj += op
+        obj += "("
         obj += ident
         obj += " _other) { return this->"
-        obj += IdentCoder.func(gt)
+        obj += IdentCoder.func(f)
         obj += "(_other); }\n\n"
+    }
+
+    fn structure_operator_gt(mut self, mut &obj: str, &ident: str, mut &s: &StructIns) {
+        let mut gt = s.find_method("gt", false)
+        if FuncPattern.gt(gt) {
+            self.structure_operator(obj, ident, gt, ">", "bool")
+        }
     }
 
     fn structure_operator_gt_eq(mut self, mut &obj: str, &ident: str, mut &s: &StructIns) {
         let mut gt_eq = s.find_method("gt_eq", false)
-        if gt_eq == nil || !FuncPattern.gt_eq(gt_eq) {
-            ret
+        if FuncPattern.gt_eq(gt_eq) {
+            self.structure_operator(obj, ident, gt_eq, ">=", "bool")
         }
-        obj += self.indent()
-        if env::OPT_INLINE {
-            obj += "inline "
-        }
-        obj += "bool operator>=("
-        obj += ident
-        obj += " _other) { return this->"
-        obj += IdentCoder.func(gt_eq)
-        obj += "(_other); }\n\n"
     }
 
     fn structure_operator_lt(mut self, mut &obj: str, &ident: str, mut &s: &StructIns) {
         let mut lt = s.find_method("lt", false)
-        if lt == nil || !FuncPattern.lt(lt) {
-            ret
+        if FuncPattern.lt(lt) {
+            self.structure_operator(obj, ident, lt, "<", "bool")
         }
-        obj += self.indent()
-        if env::OPT_INLINE {
-            obj += "inline "
-        }
-        obj += "bool operator<("
-        obj += ident
-        obj += " _other) { return this->"
-        obj += IdentCoder.func(lt)
-        obj += "(_other); }\n\n"
     }
 
     fn structure_operator_lt_eq(mut self, mut &obj: str, &ident: str, mut &s: &StructIns) {
         let mut lt_eq = s.find_method("lt_eq", false)
-        if lt_eq == nil || !FuncPattern.lt_eq(lt_eq) {
-            ret
+        if FuncPattern.lt_eq(lt_eq) {
+            self.structure_operator(obj, ident, lt_eq, "<=", "bool")
         }
-        obj += self.indent()
-        if env::OPT_INLINE {
-            obj += "inline "
-        }
-        obj += "bool operator<=("
-        obj += ident
-        obj += " _other) { return this->"
-        obj += IdentCoder.func(lt_eq)
-        obj += "(_other); }\n\n"
-    }
-
-    fn structure_operator_shr(mut self, mut &obj: str, &ident: str, mut &s: &StructIns) {
-        let mut shr = s.find_method("shr", false)
-        if shr == nil || !FuncPattern.shr(shr) {
-            ret
-        }
-        obj += self.indent()
-        if env::OPT_INLINE {
-            obj += "inline "
-        }
-        obj += ident
-        obj += " operator>>("
-        obj += ident
-        obj += " _other) { return this->"
-        obj += IdentCoder.func(shr)
-        obj += "(_other); }\n\n"
     }
 
     fn structure_operator_shl(mut self, mut &obj: str, &ident: str, mut &s: &StructIns) {
         let mut shl = s.find_method("shl", false)
-        if shl == nil || !FuncPattern.shl(shl) {
-            ret
+        if FuncPattern.shl(shl) {
+            self.structure_operator(obj, ident, shl, "<<", ident)
         }
-        obj += self.indent()
-        if env::OPT_INLINE {
-            obj += "inline "
+    }
+
+    fn structure_operator_shr(mut self, mut &obj: str, &ident: str, mut &s: &StructIns) {
+        let mut shr = s.find_method("shr", false)
+        if FuncPattern.shr(shr) {
+            self.structure_operator(obj, ident, shr, ">>", ident)
         }
-        obj += ident
-        obj += " operator<<("
-        obj += ident
-        obj += " _other) { return this->"
-        obj += IdentCoder.func(shl)
-        obj += "(_other); }\n\n"
     }
 
     fn structure_operators(mut self, mut &s: &StructIns): str {
