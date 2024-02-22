@@ -478,13 +478,20 @@ impl ObjectCoder {
     }
 
     fn structure_operator_eq(mut self, mut &obj: str, &ident: str, mut &s: &StructIns) {
+        // Operator overloading.
+        let mut eq = s.find_method("eq", false)
+        if FuncPattern.eq(eq) {
+            self.structure_operator(obj, ident, eq, "==", "bool")
+            ret
+        }
+
         obj += self.indent()
         if env::OPT_INLINE {
             obj += "inline "
         }
-        obj += "bool operator==(const "
+        obj += "bool operator==("
         obj += ident
-        obj += " &_other) const {"
+        obj += " _other) {"
         if s.fields.len > 0 {
             self.add_indent()
             obj += "\n"
@@ -530,9 +537,9 @@ impl ObjectCoder {
         if env::OPT_INLINE {
             obj += "inline "
         }
-        obj += "bool operator!=(const "
+        obj += "bool operator!=("
         obj += ident
-        obj += " &_other) const { return !this->operator==(_other); }\n\n"
+        obj += " _other) { return !this->operator==(_other); }\n\n"
     }
 
     fn structure_operator(mut self, mut &obj: str, &ident: str, &f: &Fn, op: str, result: str) {
