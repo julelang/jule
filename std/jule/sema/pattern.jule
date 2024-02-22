@@ -113,4 +113,29 @@ impl FuncPattern {
         }
         ret ins.owner == y.kind.strct()
     }
+
+    // Reports whether function is the reserved lt_eq function.
+    pub static fn lt_eq(f: &Fn): bool {
+        if f == nil ||
+            f.owner == nil ||
+            !f.public ||
+            f.is_void() ||
+            f.generics.len != 0 ||
+            f.params.len != 2 ||
+            f.params[0].mutable ||
+            f.params[0].is_ref() {
+            ret false
+        }
+
+        let mut ins = unsafe { *(&f.instances[0]) }
+        let prim = ins.result.prim()
+        if prim == nil || !prim.is_bool() {
+            ret false
+        }
+        let mut y = ins.params[1]
+        if y.decl.mutable || y.decl.reference {
+            ret false
+        }
+        ret ins.owner == y.kind.strct()
+    }
 }
