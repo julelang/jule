@@ -10,6 +10,9 @@ impl FuncPattern {
     pub static fn dispose(f: &Fn): bool {
         ret f != nil &&
             f.owner != nil &&
+            f.ident == "dispose" &&
+            !f.statically &&
+            !f.unsafety &&
             f.public &&
             f.is_void() &&
             f.generics.len == 0 &&
@@ -22,6 +25,9 @@ impl FuncPattern {
     pub static fn to_str(f: &Fn): bool {
         if f == nil ||
             f.owner == nil ||
+            f.ident != "to_str" ||
+            f.statically ||
+            f.unsafety ||
             !f.public ||
             f.is_void() ||
             f.generics.len != 0 ||
@@ -44,12 +50,16 @@ impl FuncPattern {
             f.ident != ident ||
             f.owner == nil ||
             f.instances.len == 0 ||
+            f.statically ||
+            f.unsafety ||
             !f.public ||
             f.is_void() ||
             f.generics.len != 0 ||
             f.params.len != 2 ||
             f.params[0].mutable ||
-            f.params[0].is_ref() {
+            f.params[0].is_ref() ||
+            f.params[1].mutable ||
+            f.params[1].reference {
             ret false
         }
 
@@ -58,11 +68,7 @@ impl FuncPattern {
         if prim == nil || !prim.is_bool() {
             ret false
         }
-        let mut y = ins.params[1]
-        if y.decl.mutable || y.decl.reference {
-            ret false
-        }
-        ret ins.owner == y.kind.strct()
+        ret ins.owner == ins.params[1].kind.strct()
     }
 
     // Reports whether function is the reserved eq function.
@@ -95,12 +101,16 @@ impl FuncPattern {
             f.ident != ident ||
             f.owner == nil ||
             f.instances.len == 0 ||
+            f.statically ||
+            f.unsafety ||
             !f.public ||
             f.is_void() ||
             f.generics.len != 0 ||
             f.params.len != 2 ||
             f.params[0].mutable ||
-            f.params[0].is_ref() {
+            f.params[0].is_ref() ||
+            f.params[1].mutable ||
+            f.params[1].reference {
             ret false
         }
 
@@ -108,11 +118,7 @@ impl FuncPattern {
         if ins.result.strct() != ins.owner {
             ret false
         }
-        let mut y = ins.params[1]
-        if y.decl.mutable || y.decl.reference {
-            ret false
-        }
-        ret ins.owner == y.kind.strct()
+        ret ins.owner == ins.params[1].kind.strct()
     }
 
     // Reports whether function is the reserved shl function.
@@ -170,6 +176,8 @@ impl FuncPattern {
             f.ident != ident ||
             f.owner == nil ||
             f.instances.len == 0 ||
+            f.statically ||
+            f.unsafety ||
             !f.public ||
             f.is_void() ||
             f.generics.len != 0 ||
@@ -191,5 +199,32 @@ impl FuncPattern {
     // Reports whether function is the reserved pos function.
     pub static fn pos(f: &Fn): bool {
         ret FuncPattern.unary(f, "pos")
+    }
+
+    static fn assign(&f: &Fn, ident: str): bool {
+        if f == nil ||
+            f.ident != ident ||
+            f.owner == nil ||
+            f.instances.len == 0 ||
+            f.statically ||
+            f.unsafety ||
+            !f.public ||
+            !f.is_void() ||
+            f.generics.len != 0 ||
+            f.params.len != 2 ||
+            !f.params[0].mutable ||
+            f.params[0].is_ref() ||
+            f.params[1].mutable ||
+            f.params[1].reference {
+            ret false
+        }
+
+        let mut ins = unsafe { *(&f.instances[0]) }
+        ret ins.owner == ins.params[1].kind.strct()
+    }
+
+    // Reports whether function is the reserved add_assign function.
+    pub static fn add_assign(f: &Fn): bool {
+        ret FuncPattern.assign(f, "add_assign")
     }
 }

@@ -1144,8 +1144,12 @@ impl ScopeChecker {
     }
 
     fn check_structure_assign_op(mut &self, &s: &StructIns, mut &a: &AssignSt): bool {
-        self.s.push_err(a.setter, LogMsg.OperatorNotForJuleType, a.setter.kind, s.to_str())
-        ret false
+        match a.setter.kind {
+        | TokenKind.Plus:
+            ret s.operators.add_assign != nil
+        |:
+            ret false
+        }
     }
 
     fn check_single_assign(mut &self, mut &a: &AssignSt) {
@@ -1200,17 +1204,27 @@ impl ScopeChecker {
         })
 
         if a.setter.kind != TokenKind.Eq {
-            let mut strct = l.kind.strct()
-            if strct != nil && !self.check_structure_assign_op(strct, a) {
-                ret
-            }
             a.setter.kind = a.setter.kind[:a.setter.kind.len-1]
 
             let mut solver = BinaryEval.new(&Eval{
-                    s:        self.s,
-                    lookup:   self,
-                    unsafety: self.is_unsafe(),
-                }, a.setter)
+                s:        self.s,
+                lookup:   self,
+                unsafety: self.is_unsafe(),
+            }, a.setter)
+
+            let mut strct = l.kind.strct()
+            if strct != nil {
+                if !self.check_structure_assign_op(strct, a) {
+                    self.s.push_err(a.setter, LogMsg.OperatorNotForJuleType, a.setter.kind + str(TokenKind.Eq), strct.to_str())
+                    ret
+                }
+                solver.l = l
+                solver.r = r
+                if !solver.check_type_compatibility() {
+                    ret
+                }
+                ret
+            }
 
             r = solver.solve_explicit(l, r)
             if r == nil {

@@ -543,6 +543,7 @@ impl ObjectCoder {
 
     // Write operator overloading forwarding for reserved function.
     // If the ident parameter is empty, writes operator overloading for unary.
+    // If the result parameter is empty, writes operator overloading for assignment.
     fn structure_operator(mut self, mut &obj: str, &ident: str, mut &f: &FnIns, op: str, result: str) {
         if f == nil {
             ret
@@ -551,7 +552,12 @@ impl ObjectCoder {
         if env::OPT_INLINE {
             obj += "inline "
         }
-        obj += result
+        if result == "" {
+            obj += ident
+            obj += "&"
+        } else {
+            obj += result
+        }
         obj += " operator"
         obj += op
         obj += "("
@@ -559,10 +565,18 @@ impl ObjectCoder {
             obj += ident
             obj += " _other"
         }
-        obj += ") { return this->"
+        obj += ") { "
+        if result != "" {
+            obj += "return "
+        }
+        obj += "this->"
         obj += IdentCoder.func_ins(f)
         if ident != "" {
-            obj += "(_other); }"
+            obj += "(_other); "
+            if result == "" {
+                obj += "return *this; "
+            }
+            obj += "}"
         } else {
             obj += "(); }"
         }
@@ -591,6 +605,7 @@ impl ObjectCoder {
         self.structure_operator(obj, ident, s.operators.bit_xor, "^", ident)
         self.structure_operator(obj, unary, s.operators.neg, "-", ident)
         self.structure_operator(obj, unary, s.operators.pos, "+", ident)
+        self.structure_operator(obj, ident, s.operators.add_assign, "+=", "")
         ret obj
     }
 
