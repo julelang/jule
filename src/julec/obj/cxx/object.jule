@@ -479,9 +479,8 @@ impl ObjectCoder {
 
     fn structure_operator_eq(mut self, mut &obj: str, &ident: str, mut &s: &StructIns) {
         // Operator overloading.
-        let mut eq = s.find_method("eq", false)
-        if FuncPattern.eq(eq) {
-            self.structure_operator(obj, ident, eq, "==", "bool")
+        if s.operators.eq != nil {
+            self.structure_operator(obj, ident, s.operators.eq, "==", "bool")
             ret
         }
 
@@ -542,7 +541,10 @@ impl ObjectCoder {
         obj += " _other) { return !this->operator==(_other); }\n\n"
     }
 
-    fn structure_operator(mut self, mut &obj: str, &ident: str, &f: &Fn, op: str, result: str) {
+    fn structure_operator(mut self, mut &obj: str, &ident: str, mut &f: &FnIns, op: str, result: str) {
+        if f == nil {
+            ret
+        }
         obj += self.indent()
         if env::OPT_INLINE {
             obj += "inline "
@@ -553,106 +555,8 @@ impl ObjectCoder {
         obj += "("
         obj += ident
         obj += " _other) { return this->"
-        obj += IdentCoder.func(f)
+        obj += IdentCoder.func_ins(f)
         obj += "(_other); }\n\n"
-    }
-
-    fn structure_operator_gt(mut self, mut &obj: str, &ident: str, mut &s: &StructIns) {
-        let mut f = s.find_method("gt", false)
-        if FuncPattern.gt(f) {
-            self.structure_operator(obj, ident, f, ">", "bool")
-        }
-    }
-
-    fn structure_operator_gt_eq(mut self, mut &obj: str, &ident: str, mut &s: &StructIns) {
-        let mut f = s.find_method("gt_eq", false)
-        if FuncPattern.gt_eq(f) {
-            self.structure_operator(obj, ident, f, ">=", "bool")
-        }
-    }
-
-    fn structure_operator_lt(mut self, mut &obj: str, &ident: str, mut &s: &StructIns) {
-        let mut f = s.find_method("lt", false)
-        if FuncPattern.lt(f) {
-            self.structure_operator(obj, ident, f, "<", "bool")
-        }
-    }
-
-    fn structure_operator_lt_eq(mut self, mut &obj: str, &ident: str, mut &s: &StructIns) {
-        let mut f = s.find_method("lt_eq", false)
-        if FuncPattern.lt_eq(f) {
-            self.structure_operator(obj, ident, f, "<=", "bool")
-        }
-    }
-
-    fn structure_operator_shl(mut self, mut &obj: str, &ident: str, mut &s: &StructIns) {
-        let mut f = s.find_method("shl", false)
-        if FuncPattern.shl(f) {
-            self.structure_operator(obj, ident, f, "<<", ident)
-        }
-    }
-
-    fn structure_operator_shr(mut self, mut &obj: str, &ident: str, mut &s: &StructIns) {
-        let mut f = s.find_method("shr", false)
-        if FuncPattern.shr(f) {
-            self.structure_operator(obj, ident, f, ">>", ident)
-        }
-    }
-
-    fn structure_operator_add(mut self, mut &obj: str, &ident: str, mut &s: &StructIns) {
-        let mut f = s.find_method("add", false)
-        if FuncPattern.add(f) {
-            self.structure_operator(obj, ident, f, "+", ident)
-        }
-    }
-
-    fn structure_operator_sub(mut self, mut &obj: str, &ident: str, mut &s: &StructIns) {
-        let mut f = s.find_method("sub", false)
-        if FuncPattern.sub(f) {
-            self.structure_operator(obj, ident, f, "-", ident)
-        }
-    }
-
-    fn structure_operator_div(mut self, mut &obj: str, &ident: str, mut &s: &StructIns) {
-        let mut f = s.find_method("div", false)
-        if FuncPattern.div(f) {
-            self.structure_operator(obj, ident, f, "/", ident)
-        }
-    }
-
-    fn structure_operator_mul(mut self, mut &obj: str, &ident: str, mut &s: &StructIns) {
-        let mut f = s.find_method("mul", false)
-        if FuncPattern.mul(f) {
-            self.structure_operator(obj, ident, f, "*", ident)
-        }
-    }
-
-    fn structure_operator_mod(mut self, mut &obj: str, &ident: str, mut &s: &StructIns) {
-        let mut f = s.find_method("mod", false)
-        if FuncPattern.mod(f) {
-            self.structure_operator(obj, ident, f, "%", ident)
-        }
-    }
-
-    fn structure_operator_bit_and(mut self, mut &obj: str, &ident: str, mut &s: &StructIns) {
-        let mut f = s.find_method("bit_and", false)
-        if FuncPattern.bit_and(f) {
-            self.structure_operator(obj, ident, f, "&", ident)
-        }
-    }
-
-    fn structure_operator_bit_or(mut self, mut &obj: str, &ident: str, mut &s: &StructIns) {
-        let mut f = s.find_method("bit_or", false)
-        if FuncPattern.bit_or(f) {
-            self.structure_operator(obj, ident, f, "|", ident)
-        }
-    }
-
-    fn structure_operator_bit_xor(mut self, mut &obj: str, &ident: str, mut &s: &StructIns) {
-        let mut f = s.find_method("bit_xor", false)
-        if FuncPattern.bit_xor(f) {
-            self.structure_operator(obj, ident, f, "^", ident)
-        }
     }
 
     fn structure_operators(mut self, mut &s: &StructIns): str {
@@ -660,20 +564,20 @@ impl ObjectCoder {
         let mut obj = ""
         self.structure_operator_eq(obj, ident, s)
         self.structure_operator_not_eq(obj, ident, s)
-        self.structure_operator_gt(obj, ident, s)
-        self.structure_operator_gt_eq(obj, ident, s)
-        self.structure_operator_lt(obj, ident, s)
-        self.structure_operator_lt_eq(obj, ident, s)
-        self.structure_operator_shl(obj, ident, s)
-        self.structure_operator_shr(obj, ident, s)
-        self.structure_operator_add(obj, ident, s)
-        self.structure_operator_sub(obj, ident, s)
-        self.structure_operator_div(obj, ident, s)
-        self.structure_operator_mul(obj, ident, s)
-        self.structure_operator_mod(obj, ident, s)
-        self.structure_operator_bit_and(obj, ident, s)
-        self.structure_operator_bit_or(obj, ident, s)
-        self.structure_operator_bit_xor(obj, ident, s)
+        self.structure_operator(obj, ident, s.operators.gt, ">", ident)
+        self.structure_operator(obj, ident, s.operators.gt_eq, ">=", ident)
+        self.structure_operator(obj, ident, s.operators.lt, "<", ident)
+        self.structure_operator(obj, ident, s.operators.lt_eq, "<=", ident)
+        self.structure_operator(obj, ident, s.operators.shl, "<<", ident)
+        self.structure_operator(obj, ident, s.operators.shr, ">>", ident)
+        self.structure_operator(obj, ident, s.operators.add, "+", ident)
+        self.structure_operator(obj, ident, s.operators.sub, "-", ident)
+        self.structure_operator(obj, ident, s.operators.div, "/", ident)
+        self.structure_operator(obj, ident, s.operators.mul, "*", ident)
+        self.structure_operator(obj, ident, s.operators.mod, "%", ident)
+        self.structure_operator(obj, ident, s.operators.bit_and, "&", ident)
+        self.structure_operator(obj, ident, s.operators.bit_or, "|", ident)
+        self.structure_operator(obj, ident, s.operators.bit_xor, "^", ident)
         ret obj
     }
 
