@@ -1046,53 +1046,58 @@ impl Sema {
         ret ok
     }
 
-    fn check_ref_validity_for_init_expr(mut &self, left_mut: bool, mut &d: &Data, mut &error_token: Token) {
+    fn check_ref_validity_for_init_expr(mut &self, left_mut: bool, mut &d: &Data, mut &error_token: Token): bool {
         match type d.model {
         | &Var:
-            // Pass.
-
+            break
         | &TraitSubIdentExprModel:
             let mut model = (&TraitSubIdentExprModel)(d.model)
             if !is_valid_model_for_ref(model.expr) {
                 self.push_err(error_token, LogMsg.RefIsDangling, model.ident)
+                ret false
             }
-
         | &StructSubIdentExprModel:
             let mut model = (&StructSubIdentExprModel)(d.model)
             if !is_valid_model_for_ref(model.expr) {
                 self.push_err(error_token, LogMsg.RefIsDangling, model.field.decl.ident)
+                ret false
             }
-
         | &CommonIdentExprModel
         | &CommonSubIdentExprModel:
             self.push_err(error_token, LogMsg.BuiltinUsedForRef)
-
+            ret false
         | &UnaryExprModel:
             let mut unary = (&UnaryExprModel)(d.model)
             if unary.op.kind == TokenKind.Star {
                 if !is_valid_model_for_ref(d.model) {
                     self.push_err(error_token, LogMsg.RefIsDangling, "address from * &T")
+                    ret false
                 }
                 break
             }
-
             fall
         |:
             self.push_err(error_token, LogMsg.RefAssignNonVar)
+            ret false
         }
 
         if left_mut && !d.mutable {
             self.push_err(error_token, LogMsg.MutRefPointsImmut)
+            ret false
         }
+        ret true
     }
 
     fn check_validity_for_init_expr(mut &self, left_mut: bool, left_ref: bool,
-        &left_kind: &TypeKind, mut &d: &Data, mut &error_token: Token) {
+        &left_kind: &TypeKind, mut &d: &Data, mut &error_token: Token): bool {
         if left_mut && !d.mutable && d.kind.mutable() {
             self.push_err(error_token, LogMsg.AssignNonMutToMut)
+            ret false
         }
         if left_ref {
-            self.check_ref_validity_for_init_expr(left_mut, d, error_token)
+            if !self.check_ref_validity_for_init_expr(left_mut, d, error_token) {
+                ret false
+            }
         }
 
         let mut atc = &AssignTypeChecker{
@@ -1100,7 +1105,7 @@ impl Sema {
             d:           d,
             error_token: error_token,
         }
-        _ = atc.check_validity()
+        ret atc.check_validity()
     }
 
     fn check_type_alias_decl_kind(mut &self, mut &ta: &TypeAlias, mut l: Lookup): (ok: bool) {

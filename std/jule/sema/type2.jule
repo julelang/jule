@@ -535,10 +535,8 @@ impl FnCallArgChecker {
         match {
         | diff == 0:
             ret true
-
         | n > 0 && params[n-1].decl.variadic:
             ret true
-
         | diff < 0 || diff > params.len:
             self.push_err(LogMsg.ArgumentOverflow)
             ret false
@@ -573,8 +571,11 @@ impl FnCallArgChecker {
             }
         }
 
-        self.e.s.check_validity_for_init_expr(p.decl.mutable, p.decl.reference, p.kind, arg, error_token)
-        self.e.s.check_assign_type(p.decl.reference, p.kind, arg, error_token)
+        if self.e.s.check_validity_for_init_expr(p.decl.mutable, p.decl.reference, p.kind, arg, error_token) {
+            // Check type if validity is good.
+            // Helps to reduce error logs and duplicated logs.
+            self.e.s.check_assign_type(p.decl.reference, p.kind, arg, error_token)
+        }
         ret true
     }
 
