@@ -1143,6 +1143,11 @@ impl ScopeChecker {
         ret self.table.def_by_ident(ident, false) == nil
     }
 
+    fn check_structure_assign_op(mut &self, &s: &StructIns, mut &a: &AssignSt): bool {
+        self.s.push_err(a.setter, LogMsg.OperatorNotForJuleType, a.setter.kind, s.to_str())
+        ret false
+    }
+
     fn check_single_assign(mut &self, mut &a: &AssignSt) {
         let mut l: &Data = nil
 
@@ -1195,6 +1200,10 @@ impl ScopeChecker {
         })
 
         if a.setter.kind != TokenKind.Eq {
+            let mut strct = l.kind.strct()
+            if strct != nil && !self.check_structure_assign_op(strct, a) {
+                ret
+            }
             a.setter.kind = a.setter.kind[:a.setter.kind.len-1]
 
             let mut solver = BinaryEval.new(&Eval{
