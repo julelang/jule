@@ -22,8 +22,8 @@ use std::jule::lex::{
     is_ignore_ident,
     is_anon_ident,
 }
-use std::jule::pattern::{FuncPattern}
 use std::jule::sema::{
+    FuncPattern,
     Package,
     SymbolTable,
     Param,
@@ -451,7 +451,8 @@ impl ObjectCoder {
 
     fn structure_destructor(mut self, mut &s: &StructIns): str {
         const STATIC = false // Dispose method must be non-static
-        let mut disposed = FuncPattern.dispose(s.decl.find_method("dispose", STATIC))
+        let dispose_method = s.find_method("dispose", STATIC)
+        let mut disposed = FuncPattern.dispose(dispose_method)
         let ref_access = s.decl.has_ref_accessible()
         // Call destructor if implemented.
         if !ref_access && !disposed {
@@ -463,7 +464,6 @@ impl ObjectCoder {
         obj += "(void) { "
 
         if disposed {
-            let dispose_method = s.find_method("dispose", false)
             obj += "this->"
             obj += IdentCoder.func(dispose_method)
             obj += "(); "
@@ -477,17 +477,14 @@ impl ObjectCoder {
         ret obj
     }
 
-    fn structure_operators(mut self, mut &s: &StructIns): str {
-        let out_ident = IdentCoder.structure_ins(s)
-        let mut obj = ""
-
+    fn structure_operator_eq(mut self, mut &obj: str, &ident: str, mut &s: &StructIns) {
         obj += self.indent()
         if env::OPT_INLINE {
             obj += "inline "
         }
         obj += "bool operator==(const "
-        obj += out_ident
-        obj += " &_Src) const {"
+        obj += ident
+        obj += " &_other) const {"
         if s.fields.len > 0 {
             self.add_indent()
             obj += "\n"
@@ -508,7 +505,7 @@ impl ObjectCoder {
                 obj += "this->"
                 let f_ident = IdentCoder.field(f.decl)
                 obj += f_ident
-                obj += " == _Src."
+                obj += " == _other."
                 obj += f_ident
                 obj += " &&"
             }
@@ -526,13 +523,40 @@ impl ObjectCoder {
             obj += " return true; }"
         }
         obj += "\n\n"
+    }
+
+    fn structure_operator_not_eq(mut self, mut &obj: str, &ident: str, mut &s: &StructIns) {
         obj += self.indent()
         if env::OPT_INLINE {
             obj += "inline "
         }
         obj += "bool operator!=(const "
-        obj += out_ident
-        obj += " &_Src) const { return !this->operator==(_Src); }"
+        obj += ident
+        obj += " &_other) const { return !this->operator==(_other); }\n\n"
+    }
+
+    fn structure_operator_gt(mut self, mut &obj: str, &ident: str, mut &s: &StructIns) {
+        let mut gt = s.find_method("gt", false)
+        if gt == nil || !FuncPattern.gt(gt) {
+            ret
+        }
+        obj += self.indent()
+        if env::OPT_INLINE {
+            obj += "inline "
+        }
+        obj += "bool operator>("
+        obj += ident
+        obj += " _other) { return this->"
+        obj += IdentCoder.func(gt)
+        obj += "(_other); }\n\n"
+    }
+
+    fn structure_operators(mut self, mut &s: &StructIns): str {
+        let ident = IdentCoder.structure_ins(s)
+        let mut obj = ""
+        self.structure_operator_eq(obj, ident, s)
+        self.structure_operator_not_eq(obj, ident, s)
+        self.structure_operator_gt(obj, ident, s)
         ret obj
     }
 

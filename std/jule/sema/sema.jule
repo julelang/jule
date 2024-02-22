@@ -2099,7 +2099,21 @@ impl Sema {
         }
     }
 
-    fn check_type_method(mut &self, mut &strct: &StructIns, mut &f: &Fn) {
+    // Returns new FnIns as ready-to-analysis.
+    // If function already has a instance, returns existing instance.
+    fn ready_to_check_fn(mut &self, mut &s: &StructIns, mut &f: &Fn): &FnIns {
+        let mut ins = f.instance()
+        if f.instances.len != 0 {
+            ret ins
+        }
+        ins.owner = s
+        f.append_instance(ins)
+        self.reload_fn_ins_types(ins)
+        ins.reloaded = true
+        ret ins
+    }
+
+    fn check_type_method(mut &self, mut &s: &StructIns, mut &f: &Fn) {
         if f.cpp_linked {
             ret
         }
@@ -2109,14 +2123,7 @@ impl Sema {
             ret
         }
 
-        if f.instances.len == 0 {
-            let mut ins = f.instance()
-            ins.owner = strct
-            f.append_instance(ins)
-            self.reload_fn_ins_types(ins)
-            ins.reloaded = true
-        }
-
+        _ = self.ready_to_check_fn(s, f)
         for (_, mut ins) in f.instances {
             if ins.scope.stmts.len > 0 {
                 // Checked
@@ -2148,27 +2155,51 @@ impl Sema {
         }
     }
 
-    fn check_type_struct(mut &self, mut &strct: &Struct) {
-        if strct.cpp_linked {
+    fn check_struct_ins_op(mut &self, mut &s: &StructIns, method: str): &FnIns {
+        const STATIC = false // Operator methods cannot be static.
+        let mut op = s.find_method(method, STATIC)
+        if op == nil {
+            ret nil
+        }
+        let mut ins = self.ready_to_check_fn(s, op)
+        match method {
+        | "gt":
+            ret if FuncPattern.gt(op) { ins } else { nil }
+        |:
+            ret nil
+        }
+    }
+
+    fn check_struct_ins(mut &self, mut &s: &StructIns) {
+        self.check_field_defaults(s)
+
+        // Check operators first.
+        // See developer reference (7.1)
+        s.operators.gt = self.check_struct_ins_op(s, "gt")
+
+        for (_, mut f) in s.methods {
+            self.check_type_method(s, f)
+        }
+    }
+
+    fn check_type_struct(mut &self, mut &s: &Struct) {
+        if s.cpp_linked {
             ret
         }
 
         // Generic instances are checked instantly.
-        if strct.generics.len > 0 {
+        if s.generics.len > 0 {
             ret
         }
 
-        if strct.instances.len == 0 {
-            let mut ins = strct.instance()
+        if s.instances.len == 0 {
+            let mut ins = s.instance()
             ins.checked = true
-            strct.append_instance(ins)
+            s.append_instance(ins)
         }
 
-        for (_, mut ins) in strct.instances {
-            self.check_field_defaults(ins)
-            for (_, mut f) in ins.methods {
-                self.check_type_method(ins, f)
-            }
+        for (_, mut ins) in s.instances {
+            self.check_struct_ins(ins)
         }
     }
 
@@ -2331,14 +2362,15 @@ impl Sema {
             self.precheck_fn_types()
         }
 
+        // See developer reference (7)
         for (_, mut f) in self.files {
             self.set_current_file(f)
-            self.check_fn_types()
+            self.check_struct_types()
         }
 
         for (_, mut f) in self.files {
             self.set_current_file(f)
-            self.check_struct_types()
+            self.check_fn_types()
         }
     }
 

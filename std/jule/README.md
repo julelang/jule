@@ -8,7 +8,6 @@ It is also used by the official reference compiler JuleC and is developed in par
 - [`ast`](./ast): AST things.
 - [`lex`](./lex): Lexical analyzer.
 - [`parser`](./parser): Parser.
-- [`pattern`](./pattern): Pattern checking for defines such as reserved functions.
 - [`sema`](./sema): Semantic analyzer.
 - [`types`](./types): Elementary package for type safety.
 
@@ -31,12 +30,16 @@ For example:
   struct Test[T1, T2] {}
   
   impl Test {
-	  static fn new(): Test[T1, T2] {
-		  type Y: T1
-		  ret Test[T1, T2]{}
-		  ret Test[T2, Y]{}
-		  ret Test[Test[T1, T2], T2]{}
-	  }
+      static fn new(): Test[T1, T2] {
+          type Y: T1
+          ret Test[T1, T2]{}
+          ret Test[T2, Y]{}
+          ret Test[Test[T1, T2], T2]{}
+      }
   }
   ```
   In this example above `Test[T]` and `Test[Y]` declaring same thing which is good. Also `Test[T2, Y]` (which is declares different generic instance for owner structure) is valid because there is plain usage of it's own generics. But latest return statement declares `Test[Test[T1, T2], T2]` type which is causes cycle. `T2` is plain usage, but `Test[T1, T2]` is nested usage not plain, causes cycle. Same rules are works for slices, pointers or etc. Plain usage is just the generic, not else.
+
+- **(7)** Semantic analysis should analysis structures first. If methods have operator overloads, these will cause problems in the analysis because they are not analyzed and qualified accordingly. Therefore, structures need to be analyzed before functions.
+
+    - **(7.1)** When analyzing structures, operator overload methods must first be made ready for control and qualified. If an operator tries to use overloading, one of whose construction methods has not yet been analyzed, it will cause analysis errors.
