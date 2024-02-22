@@ -2379,7 +2379,7 @@ impl Eval {
                     ident:     "len()",
                 },
             }
-    
+
         | "cap":
             ret &Data{
                 mutable: false,
@@ -3383,11 +3383,21 @@ impl UnaryEval {
         }
     }
 
-    fn eval_minus(mut self) {
-        let t = self.d.kind.prim()
-        if t == nil || !types::is_num(t.to_str()) {
+    fn minus(mut self) {
+        match {
+        | self.d.kind == nil:
             self.d = nil
             ret
+        | self.d.kind.prim() != nil:
+            if !types::is_num(self.d.kind.to_str()) {
+                self.d = nil
+                ret
+            }
+        | self.d.kind.strct() != nil:
+            if self.d.kind.strct().operators.neg == nil {
+                self.d = nil
+                ret
+            }
         }
 
         if self.d.is_const() {
@@ -3408,7 +3418,7 @@ impl UnaryEval {
         }
     }
 
-    fn eval_plus(mut self) {
+    fn plus(mut self) {
         let t = self.d.kind.prim()
         if t == nil || !types::is_num(t.to_str()) {
             self.d = nil
@@ -3433,7 +3443,7 @@ impl UnaryEval {
         }
     }
 
-    fn eval_caret(mut self) {
+    fn caret(mut self) {
         let t = self.d.kind.prim()
         if t == nil || !types::is_int(t.to_str()) {
             self.d = nil
@@ -3456,7 +3466,7 @@ impl UnaryEval {
         }
     }
 
-    fn eval_excl(mut self) {
+    fn excl(mut self) {
         let t = self.d.kind.prim()
         if t == nil || !t.is_bool() {
             self.d = nil
@@ -3477,7 +3487,7 @@ impl UnaryEval {
         }
     }
 
-    fn eval_star(mut self) {
+    fn star(mut self) {
         self.d.model = &UnaryExprModel{
             expr: new(Data, *self.d),
             op:   self.u.op,
@@ -3508,7 +3518,7 @@ impl UnaryEval {
         self.d.lvalue = true
     }
 
-    fn eval_amper(mut self) {
+    fn amper(mut self) {
         match type self.d.model {
         | &StructLitExprModel:
             let mut lit = (&StructLitExprModel)(self.d.model)
@@ -3537,7 +3547,7 @@ impl UnaryEval {
         }
     }
 
-    fn eval_type_decl(mut self) {
+    fn type_decl(mut self) {
         let mut tc = TypeChecker{
             s:           self.e.s,
             lookup:      self.e.lookup,
@@ -3575,20 +3585,27 @@ impl UnaryEval {
             ret nil
         }
         if self.d.decl {
-            self.eval_type_decl()
+            self.type_decl()
             ret self.d
         }
 
         let mut cast_kind = self.d.cast_kind
         let kind = self.d.kind
         match self.u.op.kind {
-        | TokenKind.Minus: self.eval_minus()
-        | TokenKind.Plus:  self.eval_plus()
-        | TokenKind.Caret: self.eval_caret()
-        | TokenKind.Excl:  self.eval_excl()
-        | TokenKind.Star:  self.eval_star()
-        | TokenKind.Amper: self.eval_amper()
-        |:                 self.d = nil
+        | TokenKind.Minus:
+            self.minus()
+        | TokenKind.Plus:
+            self.plus()
+        | TokenKind.Caret:
+            self.caret()
+        | TokenKind.Excl:
+            self.excl()
+        | TokenKind.Star:
+            self.star()
+        | TokenKind.Amper:
+            self.amper()
+        |:
+            self.d = nil
         }
 
         match {
