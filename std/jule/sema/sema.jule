@@ -2160,47 +2160,14 @@ impl Sema {
         }
     }
 
-    fn check_struct_ins_op(mut &self, mut &s: &StructIns, method: str): &FnIns {
+    fn check_struct_ins_op(mut &self, mut &s: &StructIns, method: str, p: fn(f: &Fn): bool): &FnIns {
         const STATIC = false // Operator methods cannot be static.
         let mut op = s.find_method(method, STATIC)
-        if op == nil || op.generics.len != 0 {
+        if op == nil {
             ret nil
         }
         let mut ins = self.ready_to_check_fn(s, op)
-        match method {
-        | "eq":
-            ret if FuncPattern.eq(op) { ins } else { nil }
-        | "gt":
-            ret if FuncPattern.gt(op) { ins } else { nil }
-        | "gt_eq":
-            ret if FuncPattern.gt_eq(op) { ins } else { nil }
-        | "lt":
-            ret if FuncPattern.lt(op) { ins } else { nil }
-        | "lt_eq":
-            ret if FuncPattern.lt_eq(op) { ins } else { nil }
-        | "shl":
-            ret if FuncPattern.shl(op) { ins } else { nil }
-        | "shr":
-            ret if FuncPattern.shr(op) { ins } else { nil }
-        | "add":
-            ret if FuncPattern.add(op) { ins } else { nil }
-        | "sub":
-            ret if FuncPattern.sub(op) { ins } else { nil }
-        | "div":
-            ret if FuncPattern.div(op) { ins } else { nil }
-        | "mul":
-            ret if FuncPattern.mul(op) { ins } else { nil }
-        | "mod":
-            ret if FuncPattern.mod(op) { ins } else { nil }
-        | "bit_and":
-            ret if FuncPattern.bit_and(op) { ins } else { nil }
-        | "bit_or":
-            ret if FuncPattern.bit_or(op) { ins } else { nil }
-        | "bit_xor":
-            ret if FuncPattern.bit_xor(op) { ins } else { nil }
-        |:
-            ret nil
-        }
+        ret if p(op) { ins } else { nil }
     }
 
     fn check_struct_ins(mut &self, mut &s: &StructIns) {
@@ -2208,21 +2175,21 @@ impl Sema {
 
         // Check operators first.
         // See developer reference (7.1)
-        s.operators.eq = self.check_struct_ins_op(s, "eq")
-        s.operators.gt = self.check_struct_ins_op(s, "gt")
-        s.operators.gt_eq = self.check_struct_ins_op(s, "gt_eq")
-        s.operators.lt = self.check_struct_ins_op(s, "lt")
-        s.operators.lt_eq = self.check_struct_ins_op(s, "lt_eq")
-        s.operators.shl = self.check_struct_ins_op(s, "shl")
-        s.operators.shr = self.check_struct_ins_op(s, "shr")
-        s.operators.add = self.check_struct_ins_op(s, "add")
-        s.operators.sub = self.check_struct_ins_op(s, "sub")
-        s.operators.div = self.check_struct_ins_op(s, "div")
-        s.operators.mul = self.check_struct_ins_op(s, "mul")
-        s.operators.mod = self.check_struct_ins_op(s, "mod")
-        s.operators.bit_and = self.check_struct_ins_op(s, "bit_and")
-        s.operators.bit_or = self.check_struct_ins_op(s, "bit_or")
-        s.operators.bit_xor = self.check_struct_ins_op(s, "bit_xor")
+        s.operators.eq = self.check_struct_ins_op(s, "eq", fn(f: &Fn): bool { ret FuncPattern.eq(f) })
+        s.operators.gt = self.check_struct_ins_op(s, "gt", fn(f: &Fn): bool { ret FuncPattern.gt(f) })
+        s.operators.gt_eq = self.check_struct_ins_op(s, "gt_eq", fn(f: &Fn): bool { ret FuncPattern.gt_eq(f) })
+        s.operators.lt = self.check_struct_ins_op(s, "lt", fn(f: &Fn): bool { ret FuncPattern.lt(f) })
+        s.operators.lt_eq = self.check_struct_ins_op(s, "lt_eq", fn(f: &Fn): bool { ret FuncPattern.lt_eq(f) })
+        s.operators.shl = self.check_struct_ins_op(s, "shl", fn(f: &Fn): bool { ret FuncPattern.shl(f) })
+        s.operators.shr = self.check_struct_ins_op(s, "shr", fn(f: &Fn): bool { ret FuncPattern.shr(f) })
+        s.operators.add = self.check_struct_ins_op(s, "add", fn(f: &Fn): bool { ret FuncPattern.add(f) })
+        s.operators.sub = self.check_struct_ins_op(s, "sub", fn(f: &Fn): bool { ret FuncPattern.sub(f) })
+        s.operators.div = self.check_struct_ins_op(s, "div", fn(f: &Fn): bool { ret FuncPattern.div(f) })
+        s.operators.mul = self.check_struct_ins_op(s, "mul", fn(f: &Fn): bool { ret FuncPattern.mul(f) })
+        s.operators.mod = self.check_struct_ins_op(s, "mod", fn(f: &Fn): bool { ret FuncPattern.mod(f) })
+        s.operators.bit_and = self.check_struct_ins_op(s, "bit_and", fn(f: &Fn): bool { ret FuncPattern.bit_and(f) })
+        s.operators.bit_or = self.check_struct_ins_op(s, "bit_or", fn(f: &Fn): bool { ret FuncPattern.bit_or(f) })
+        s.operators.bit_xor = self.check_struct_ins_op(s, "bit_xor", fn(f: &Fn): bool { ret FuncPattern.bit_xor(f) })
 
         for (_, mut f) in s.methods {
             self.check_type_method(s, f)
