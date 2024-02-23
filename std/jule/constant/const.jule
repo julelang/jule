@@ -83,13 +83,10 @@ impl Const {
         match type self.data {
         | i64:
             ret i64(self.data)
-
         | u64:
             ret i64(u64(self.data))
-
         | f64:
             ret i64(f64(self.data))
-
         |:
             ret 0
         }
@@ -101,13 +98,10 @@ impl Const {
         match type self.data {
         | u64:
             ret u64(self.data)
-
         | i64:
             ret u64(i64(self.data))
-
         | f64:
             ret u64(f64(self.data))
-
         |:
             ret 0
         }
@@ -119,13 +113,10 @@ impl Const {
         match type self.data {
         | f64:
             ret f64(self.data)
-
         | i64:
             ret f64(i64(self.data))
-
         | u64:
             ret f64(u64(self.data))
-
         |:
             ret 0
         }
@@ -198,13 +189,20 @@ impl Const {
     // Reports whether self and x has same type.
     pub fn are_same_types(self, x: Const): bool {
         match {
-        | self.is_i64() == x.is_i64():   ret true
-        | self.is_u64() == x.is_u64():   ret true
-        | self.is_f64() == x.is_f64():   ret true
-        | self.is_bool() == x.is_bool(): ret true
-        | self.is_str() == x.is_str():   ret true
-        | self.is_nil() == x.is_nil():   ret true
-        |:                               ret false
+        | self.is_i64() == x.is_i64():
+            ret true
+        | self.is_u64() == x.is_u64():
+            ret true
+        | self.is_f64() == x.is_f64():
+            ret true
+        | self.is_bool() == x.is_bool():
+            ret true
+        | self.is_str() == x.is_str():
+            ret true
+        | self.is_nil() == x.is_nil():
+            ret true
+        |:
+            ret false
         }
     }
 
@@ -218,7 +216,6 @@ impl Const {
         match {
         | self.is_bool() && x.is_bool():
             ret self.read_bool() && x.read_bool()
-
         |:
             ret false
         }
@@ -230,7 +227,6 @@ impl Const {
         match {
         | self.is_bool() && x.is_bool():
             ret self.read_bool() || x.read_bool()
-
         |:
             ret false
         }
@@ -238,26 +234,20 @@ impl Const {
 
     // Reports whether self and x are equals.
     // Returns false if type is not supported.
-    pub fn eqs(self, x: Const): bool {
+    pub fn eq(self, x: Const): bool {
         match {
         | self.is_nil():
             ret x.is_nil()
-
         | self.is_bool():
             ret x.is_bool() && self.read_bool() == x.read_bool()
-
         | self.is_str():
             ret x.is_str() && self.read_str() == x.read_str()
-
         | self.is_i64():
             ret self.read_i64() == x.as_i64()
-
         | self.is_u64():
             ret self.read_u64() == x.as_u64()
-
         | self.is_f64():
             ret self.read_f64() == x.as_f64()
-
         |:
             ret false
         }
@@ -275,16 +265,35 @@ impl Const {
         match {
         | self.is_str():
             ret x.is_str() && self.read_str() < x.read_str()
-
         | self.is_i64():
             ret self.read_i64() < x.as_i64()
-
         | self.is_u64():
             ret self.read_u64() < x.as_u64()
-
         | self.is_f64():
             ret self.read_f64() < x.as_f64()
+        |:
+            ret false
+        }
+    }
 
+    // Reports whether self less than or equals to x.
+    // Returns false if type is unsupported by operation.
+    //
+    // Supported types are:
+    //  - strings
+    //  - 64-bit signed integer
+    //  - 64-bit unsigned integer
+    //  - 64-bit floating-point
+    pub fn lt_eq(self, x: Const): bool {
+        match {
+        | self.is_str():
+            ret x.is_str() && self.read_str() <= x.read_str()
+        | self.is_i64():
+            ret self.read_i64() <= x.as_i64()
+        | self.is_u64():
+            ret self.read_u64() <= x.as_u64()
+        | self.is_f64():
+            ret self.read_f64() <= x.as_f64()
         |:
             ret false
         }
@@ -302,16 +311,35 @@ impl Const {
         match {
         | self.is_str():
             ret x.is_str() && self.read_str() > x.read_str()
-
         | self.is_i64():
             ret self.read_i64() > x.as_i64()
-
         | self.is_u64():
             ret self.read_u64() > x.as_u64()
-
         | self.is_f64():
             ret self.read_f64() > x.as_f64()
+        |:
+            ret false
+        }
+    }
 
+    // Reports whether self greater than or equals to x.
+    // Returns false if type is unsupported by operation.
+    //
+    // Supported types are:
+    //  - strings
+    //  - 64-bit signed integer
+    //  - 64-bit unsigned integer
+    //  - 64-bit floating-point
+    pub fn gt_eq(self, x: Const): bool {
+        match {
+        | self.is_str():
+            ret x.is_str() && self.read_str() >= x.read_str()
+        | self.is_i64():
+            ret self.read_i64() >= x.as_i64()
+        | self.is_u64():
+            ret self.read_u64() >= x.as_u64()
+        | self.is_f64():
+            ret self.read_f64() >= x.as_f64()
         |:
             ret false
         }
@@ -330,24 +358,20 @@ impl Const {
                 ret false
             }
             self.set_str(self.read_str() + x.read_str())
-
         | self.is_f64():
              self.set_f64(self.read_f64() + x.as_f64())
-
         | self.is_i64():
             if x.is_f64() {
                 self.set_f64(self.as_f64() + x.read_f64())
             } else {
                 self.set_i64(self.read_i64() + x.as_i64())
             }
-
         | self.is_u64():
             if x.is_f64() {
                 self.set_f64(self.as_f64() + x.read_f64())
             } else {
                 self.set_u64(self.read_u64() + x.as_u64())
             }
-
         |:
             ret false
         }
@@ -360,21 +384,18 @@ impl Const {
         match {
         | self.is_f64():
              self.set_f64(self.read_f64() - x.as_f64())
-
         | self.is_i64():
             if x.is_f64() {
                 self.set_f64(self.as_f64() - x.read_f64())
             } else {
                 self.set_i64(self.read_i64() - x.as_i64())
             }
-
         | self.is_u64():
             if x.is_f64() {
                 self.set_f64(self.as_f64() - x.read_f64())
             } else {
                 self.set_u64(self.read_u64() - x.as_u64())
             }
-
         |:
             ret false
         }
@@ -387,21 +408,18 @@ impl Const {
         match {
         | self.is_f64():
              self.set_f64(self.read_f64() * x.as_f64())
-
         | self.is_i64():
             if x.is_f64() {
                 self.set_f64(self.as_f64() * x.read_f64())
             } else {
                 self.set_i64(self.read_i64() * x.as_i64())
             }
-
         | self.is_u64():
             if x.is_f64() {
                 self.set_f64(self.as_f64() * x.read_f64())
             } else {
                 self.set_u64(self.read_u64() * x.as_u64())
             }
-
         |:
             ret false
         }
@@ -422,21 +440,18 @@ impl Const {
                 ret false
             }
             self.set_f64(self.read_f64() / l)
-
         | self.is_i64():
             let l = x.as_f64()
             if l == 0 {
                 ret false
             }
             self.set_f64(self.as_f64() / l)
-
         | self.is_u64():
             let l = x.as_f64()
             if l == 0 {
                 ret false
             }
             self.set_f64(self.as_f64() / l)
-
         |:
             ret false
         }
@@ -454,14 +469,12 @@ impl Const {
                 ret false
             }
             self.set_i64(self.read_i64() % l)
-
         | self.is_u64():
             let l = x.as_u64()
             if l == 0 {
                 ret false
             }
             self.set_u64(self.read_u64() % l)
-
         |:
             ret false
         }
@@ -474,10 +487,8 @@ impl Const {
         match {
         | self.is_i64():
             self.set_i64(self.read_i64() & x.as_i64())
-
         | self.is_u64():
             self.set_u64(self.read_u64() & x.as_u64())
-
         |:
             ret false
         }
@@ -490,10 +501,8 @@ impl Const {
         match {
         | self.is_i64():
             self.set_i64(self.read_i64() | x.as_i64())
-
         | self.is_u64():
             self.set_u64(self.read_u64() | x.as_u64())
-
         |:
             ret false
         }
@@ -506,10 +515,8 @@ impl Const {
         match {
         | self.is_i64():
             self.set_i64(self.read_i64() ^ x.as_i64())
-
         | self.is_u64():
             self.set_u64(self.read_u64() ^ x.as_u64())
-
         |:
             ret false
         }
@@ -528,14 +535,11 @@ impl Const {
             } else {
                 lshift_unsig(self, x)
             }
-
         | self.is_u64():
             lshift_unsig(self, x)
-
         |:
             ret false
         }
-
         ret true
     }
 
@@ -551,14 +555,11 @@ impl Const {
             } else {
                 rshift_unsig(self, x)
             }
-
         | self.is_u64():
             rshift_unsig(self, x)
-
         |:
             ret false
         }
-
         ret true
     }
 }
