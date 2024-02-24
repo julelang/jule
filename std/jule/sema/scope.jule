@@ -168,35 +168,41 @@ fn get_expr_models(mut &m: ExprModel): []ExprModel {
     }
 }
 
-fn check_mut(mut &s: &Sema, &left: &Data, mut right: &Data, error_token: Token): (ok: bool) {
+fn check_mut(mut &s: &Sema, &left: &Data, mut right: &Data, op: Token): (ok: bool) {
     match {
     | !left.mutable:
-        s.push_err(error_token, LogMsg.AssignToNonMut)
+        s.push_err(op, LogMsg.AssignToNonMut)
         ret false
     | right != nil && !right.mutable && right.kind.mutable():
-        s.push_err(error_token, LogMsg.AssignNonMutToMut)
+        if op.kind != TokenKind.Eq && right.kind.strct() != nil {
+            // If operator is not assignment, and kind is structure, allow.
+            // Operator overloading uses immutable copy of right operand.
+            // It's safe.
+            ret true
+        }
+        s.push_err(op, LogMsg.AssignNonMutToMut)
         ret false
     |:
         ret true
     }
 }
 
-fn check_assign(mut &s: &Sema, mut &left: &Data, mut right: &Data, error_token: Token): (ok: bool) {
+fn check_assign(mut &s: &Sema, mut &left: &Data, mut right: &Data, op: Token): (ok: bool) {
     let f = left.kind.fnc()
     if f != nil && f.decl != nil && f.decl.global {
-        s.push_err(error_token, LogMsg.AssignTypeNotSupportValue)
+        s.push_err(op, LogMsg.AssignTypeNotSupportValue)
         ret false
     }
 
     match {
     | left.is_const():
-        s.push_err(error_token, LogMsg.AssignConst)
+        s.push_err(op, LogMsg.AssignConst)
         s.push_suggestion(LogMsg.RemoveConstToAssign)
         ret false
     | !left.lvalue:
-        s.push_err(error_token, LogMsg.AssignRequireLvalue)
+        s.push_err(op, LogMsg.AssignRequireLvalue)
         ret false
-    | !check_mut(s, left, right, error_token):
+    | !check_mut(s, left, right, op):
         ret false
     |:
         ret true
