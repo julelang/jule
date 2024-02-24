@@ -43,3 +43,5 @@ For example:
 - **(7)** Semantic analysis should analysis structures first. If methods have operator overloads, these will cause problems in the analysis because they are not analyzed and qualified accordingly. Therefore, structures need to be analyzed before functions.
 
     - **(7.1)** When analyzing structures, operator overload methods must first be made ready for control and qualified. If an operator tries to use overloading, one of whose construction methods has not yet been analyzed, it will cause analysis errors.
+
+    - **(7.2)** Operators must be checkec and assigned to structures before analysis of methods and others. Because problems can occur if you analysis operators structure by structure. Semantic will analyze structures file by file. Therefore if an operator tries to use overloading from other file, one of whose construction methods has not yet been assigned, it will cause analysis errors.
