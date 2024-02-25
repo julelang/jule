@@ -3,7 +3,10 @@
 // license that can be found in the LICENSE file.
 
 use obj::{IR}
+use env
 
+use ast for std::jule::ast
+use std::jule::build::{Directive}
 use std::jule::sema::{
     Package,
     Fn,
@@ -25,6 +28,21 @@ static mut checking: []any = nil
 static mut current: any = nil
 
 static mut main_current: any = nil
+
+// Returns directive if exist.
+fn find_directive(mut &directives: []&ast::Directive, tag: str): &ast::Directive {
+    for (_, mut dr) in directives {
+        if dr.tag.kind == tag {
+            ret dr
+        }
+    }
+    ret nil
+}
+
+// Reports whether directive is exist.
+fn has_directive(&directives: []&ast::Directive, tag: str): bool {
+    ret find_directive(unsafe { *(&directives) }, tag) != nil
+}
 
 // Reports whether the reference tpye of t exist in arr.
 fn is_exist(arr: []any, t: any): bool {
@@ -73,16 +91,12 @@ fn is_dead(mut ref: any): (dead: bool) {
     match type ref {
     | &FnIns:
         ret is_fn_dead((&FnIns)(ref))
-
     | &Var:
         ret is_var_dead((&Var)(ref))
-
     | &StructIns:
         ret is_struct_dead((&StructIns)(ref))
-
     | &Trait:
         ret is_trait_dead((&Trait)(ref))
-
     |:
         ret false
     }
@@ -123,6 +137,10 @@ fn is_fn_dead(mut f: &FnIns): bool {
         ret !f.decl.statically
     }
 
+    if env::TEST && has_directive(f.decl.directives, Directive.Test) {
+        ret false
+    }
+
     if f.owner != nil {
         if is_exist(checking, f.owner) {
             // Cycle, also already checking and should be marked dead.
@@ -156,22 +174,17 @@ fn kind_is_dead(mut k: &TypeKind): bool {
     match {
     | k.sptr() != nil:
         ret kind_is_dead(k.sptr().elem)
-
     | k.ptr() != nil:
         ret kind_is_dead(k.ptr().elem)
-
     | k.slc() != nil:
         ret kind_is_dead(k.slc().elem)
-
     | k.arr() != nil:
         ret kind_is_dead(k.arr().elem)
-
     | k.trt() != nil:
         let mut t = k.trt()
         if is_dead(t) {
             ret true
         }
-
     | k.strct() != nil:
         let mut s = k.strct()
         if is_dead(s) {
