@@ -1,0 +1,121 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+// Single bit.
+type bit: byte
+
+// Bits are stored in reversed order for performance purposes.
+type bits: []bit
+
+fn u64_from_bits(b: bits): u64 {
+    let mut u = u64(0)
+    for i, bit in b {
+        u |= u64(bit) << i
+    }
+    ret u
+}
+
+// Add one to bits.
+// Equals to x++ operator.
+fn add_one(mut &b: bits): (carry: bit) {
+    for i, x in b {
+        if x == 0 {
+            b[i] = 1
+            ret 0b0
+        }
+        b[i] = 0
+    }
+    ret 0b1
+}
+
+// Update bits by 1's complement.
+fn ones_complement(mut &b: bits) {
+    for i, x in b {
+        b[i] = ^x & 0b1
+    }
+}
+
+// Update bits by 2's complement.
+fn twos_complement(mut &b: bits) {
+    ones_complement(b)
+    _ = add_one(b)
+}
+
+// Addition operation on operand bits.
+// Returns bits and carry.
+// Carry is guaranteed to be 0b0 or 0b1.
+// Does not allocates new bits for result, updates elements of x.
+// x and y should be have same bitsize.
+fn add_bits_fast(mut &x: bits, &y: bits): (carry: bit) {
+    for i, xbit in x {
+        let ybit = y[i]
+        x[i] = xbit ^ ybit ^ carry
+        carry = (xbit & ybit) | (xbit & carry) | (ybit & carry)
+    }
+    ret
+}
+
+// Addition operation on operand bits.
+// Returns bits and carry.
+// Carry is guaranteed to be 0b0 or 0b1.
+// Does not allocates new bits for result, updates elements of x.
+// y implies imaginary zero-bits for missing part if y.bit-size < x.bit-size.
+fn add_bits_rfast(mut &x: bits, &y: bits): (carry: bit) {
+    for i, xbit in x {
+        let ybit = if i < y.len { y[i] } else { 0b0 }
+        x[i] = xbit ^ ybit ^ carry
+        carry = (xbit & ybit) | (xbit & carry) | (ybit & carry)
+    }
+    ret
+}
+
+// Addition operation on operand bits.
+// Returns bits and carry.
+// Carry is guaranteed to be 0b0 or 0b1.
+// y implies imaginary zero-bits for missing part if y.bit-size < x.bit-size.
+fn add_bits(&x: bits, &y: bits): (r: bits, carry: bit) {
+    r = make(bits, 0, x.len)
+    for i, xbit in x {
+        let ybit = if i < y.len { y[i] } else { 0b0 }
+        r = append(r, xbit ^ ybit ^ carry)
+        carry = (xbit & ybit) | (xbit & carry) | (ybit & carry)
+    }
+    ret
+}
+
+// Eliminates initial-zeros, normalizes bits.
+fn fit_bits(mut &b: bits) {
+    let mut i = b.len - 1
+    for i >= 0; i-- {
+        if b[i] != 0b0 {
+            break
+        }
+    }
+    b = b[:i + 1]
+}
+
+// Compares bits.
+// Returns +1 if x > y.
+// Returns 0 if x == y.
+// Returns -1 if x < y.
+fn bits_cmp(&x: bits, &y: bits): int {
+    match {
+    | x.len < y.len:
+        ret -1
+    | x.len > y.len:
+        ret +1
+    }
+    let mut i = x.len - 1
+    for i >= 0; i-- {
+        let xbit = x[i]
+        let ybit = y[i]
+        match {
+        | xbit > ybit:
+            ret +1
+        | xbit < ybit:
+            ret -1
+        }
+    }
+    ret 0
+}

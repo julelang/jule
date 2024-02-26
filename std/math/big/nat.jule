@@ -1,0 +1,193 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+// An arbitrary-precision natural number.
+#derive Clone
+struct Nat {
+    bits: bits
+}
+
+impl Nat {
+    // Returns Nat that represents zero.
+    static fn zero(): Nat {
+        ret Nat{}
+    }
+
+    // Returns Nat that represents one.
+    static fn one(): Nat {
+        ret Nat{
+            bits: [1],
+        }
+    }
+
+    // Parse Nat from bits that represented in string.
+    // Results with exceptional if bits are not in the format or empty.
+    // Exceptional is always BigError.Format.
+    static fn from_bits(b: str)!: Nat {
+        if b == "" {
+            error(BigError.Format)
+        }
+        // Eliminate initial-zeros to normalize and fit minimum mandatory bit-size.
+        let mut j = 0
+        for j < b.len; j++ {
+            if b[j] != '0' {
+                break
+            }
+        }
+        if b.len == j {
+            // All bits are zero.
+            ret Nat.zero()
+        }
+        let mut n = Nat{
+            bits: make(bits, 0, b.len - j),
+        }
+        let mut k = b.len - 1
+        for k >= j; k-- {
+            match b[k] {
+            | '1':
+                n.bits = append(n.bits, 0b1)
+            | '0':
+                n.bits = append(n.bits, 0b0)
+            |:
+                error(BigError.Format)
+            }
+        }
+        ret n
+    }
+
+    // Returns count of bits.
+    // Return value also means the minimum number of bits that can represent the integer.
+    fn len(self): int {
+        ret self.bits.len
+    }
+
+    // Eliminates initial-zeros, normalizes bits.
+    fn fit(mut self) {
+        fit_bits(self.bits)
+    }
+
+    // Adds two Nat and returns result.
+    pub fn add(self, y: Nat): Nat {
+        let mut r = clone(self)
+        if y.len() == 0 {
+            ret r
+        }
+        r += y
+        ret r
+    }
+
+    // Adds Nat.
+    pub fn add_assign(mut self, y: Nat) {
+        if y.len() == 0 {
+            ret
+        }
+
+        let mut carry = bit(0)
+        match {
+        | y.len() == 1:
+            // y is one.
+            // Add one to bits quicky.
+            self.bits = clone(self.bits)
+            carry = add_one(self.bits)
+        | self.len() == y.len():
+            self.bits = clone(self.bits)
+            carry = add_bits_fast(self.bits, y.bits)
+        | self.len() > y.len():
+            self.bits = clone(self.bits)
+            carry = add_bits_rfast(self.bits, y.bits)
+        |:
+            self.bits, carry = add_bits(y.bits, self.bits)
+        }
+        if carry == 0b1 {
+            self.bits = append(self.bits, 0b1)
+        }
+    }
+
+    // Subtracts two Nat and returns result.
+    pub fn sub(self, y: Nat): Nat {
+        let mut r = clone(self)
+        if y.len() == 0 {
+            ret r
+        }
+        r -= y
+        ret r
+    }
+
+    // Subtracts Nat.
+    pub fn sub_assign(mut self, y: Nat) {
+        if y.len() == 0 {
+            ret
+        }
+        let mut carry = bit(0)
+        match {
+        | y.len() == 1:
+            // y is one.
+            // Add one to bits quicky.
+            self.bits = clone(self.bits)
+            twos_complement(self.bits)
+            carry = add_one(self.bits)
+        | self.len() == y.len():
+            self.bits = clone(self.bits)
+            twos_complement(self.bits)
+            carry = add_bits_fast(self.bits, y.bits)
+        | self.len() > y.len():
+            self.bits = clone(self.bits)
+            twos_complement(self.bits)
+            carry = add_bits_rfast(self.bits, y.bits)
+        |:
+            let mut xbits = make(bits, y.len())
+            _ = copy(xbits, self.bits)
+            self.bits = xbits
+            twos_complement(self.bits)
+            carry = add_bits_fast(self.bits, y.bits)
+        }
+        if carry == 0b0 {
+            twos_complement(self.bits)
+        }
+        self.fit()
+    }
+
+    // Compares bits.
+    // Returns +1 if self > y.
+    // Returns 0 if self == y.
+    // Returns -1 if self < y.
+    fn cmp(self, y: Nat): int {
+        ret bits_cmp(self.bits, y.bits)
+    }
+
+    // Reports whether integer less than other.
+    pub fn lt(self, y: Nat): bool {
+        ret bits_cmp(self.bits, y.bits) == -1
+    }
+
+    // Reports whether integer less than or equals to other.
+    pub fn lt_eq(self, y: Nat): bool {
+        ret bits_cmp(self.bits, y.bits) < +1
+    }
+
+    // Reports whether integer greater than other.
+    pub fn gt(self, y: Nat): bool {
+        ret bits_cmp(self.bits, y.bits) == +1
+    }
+
+    // Reports whether integer greater than or equals to other.
+    pub fn gt_eq(self, y: Nat): bool {
+        ret bits_cmp(self.bits, y.bits) > -1
+    }
+
+    // Reports whether bits are equals.
+    pub fn eq(self, y: Nat): bool {
+        ret bits_cmp(self.bits, y.bits) == 0
+    }
+
+    // Returns integer in u64.
+    // Causes exception if nuber large than capacity of u64.
+    // Exception is always equals to u64.MAX constant.
+    fn to_u64(self)!: u64 {
+        if self.len() > 64 {
+            error(u64.MAX)
+        }
+        ret u64_from_bits(self.bits)
+    }
+}

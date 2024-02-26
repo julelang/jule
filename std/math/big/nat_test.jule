@@ -1,0 +1,135 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use std::testing::{T}
+
+static cases_nat_from_bits = [
+    "1011010",
+    "1111011000",
+    "10001100011000",
+    "10001101101110101011110110000110111111101101",
+    "10001100011111",
+    "11111111111111111111111110011",
+]
+
+static cases_nat_add = [
+    ["1011010", "1011010", "10110100"],
+    ["1011010", "0000001", "1011011"],
+    ["10011000000111", "100000101011101000", "100011000011101111"],
+    ["00000000000000", "00000000001", "1"],
+    ["100000101011101000", "111101100111111001", "1011110010011100001"]
+]
+
+static cases_nat_sub = [
+    ["1011010", "1011010", ""],
+    ["1011010", "0000001", "1011001"],
+    ["100000101011101000", "10011000000111", "11110010011100001"],
+    ["100010", "110111001110", "110110101100"],
+    ["10001100001110", "111101101", "10000100100001"],
+    ["1010", "10100", "1010"],
+    ["101011", "11000", "10011"],
+]
+
+#test
+fn test_nat_from_bits(mut t: &T) {
+    for _, c in cases_nat_from_bits {
+        let n = Nat.from_bits(c) else {
+            t.errorf("exceptional occurs: {}", error)
+            continue
+        }
+        if n.bits.len != c.len {
+            t.errorf("{} != {}", c, c)
+            continue
+        }
+        for i, b in n.bits {
+            let cb = c[c.len - 1 - i]
+            if b == 0b1 && cb != '1' ||
+                b == 0b0 && cb != '0' {
+                t.errorf("{} != {}", c, c)
+                break
+            }
+        }
+    }
+}
+
+#test
+fn test_nat_add(mut t: &T) {
+    for _, c in cases_nat_add {
+        let n1 = Nat.from_bits(c[0]) else {
+            t.errorf("exception occurs: {}", error)
+            continue
+        }
+        let n2 = Nat.from_bits(c[1]) else {
+            t.errorf("exception occurs: {}", error)
+            continue
+        }
+        let mut r = n1.add(n2)
+        let cr = c[2]
+        if r.len() != cr.len {
+            t.errorf("{} + {} != {}", c[0], c[1], cr)
+            continue
+        }
+        for i, b in r.bits {
+            let cb = cr[cr.len - 1 - i]
+            if b == 0b1 && cb != '1' ||
+                b == 0b0 && cb != '0' {
+                t.errorf("{} + {} != {}", c[0], c[1], cr)
+                break
+            }
+        }
+    }
+}
+
+#test
+fn test_nat_sub(mut t: &T) {
+    for _, c in cases_nat_sub {
+        let n1 = Nat.from_bits(c[0]) else {
+            t.errorf("exception occurs: {}", error)
+            continue
+        }
+        let n2 = Nat.from_bits(c[1]) else {
+            t.errorf("exception occurs: {}", error)
+            continue
+        }
+        let mut r = n1.sub(n2)
+        let cr = c[2]
+        if r.len() != cr.len {
+            t.errorf("{} - {} != {}", c[0], c[1], cr)
+            continue
+        }
+        for i, b in r.bits {
+            let cb = cr[cr.len - 1 - i]
+            if b == 0b1 && cb != '1' ||
+                b == 0b0 && cb != '0' {
+                t.errorf("{} - {} != {}", c[0], c[1], cr)
+                break
+            }
+        }
+    }
+}
+
+#test
+fn test_nat_lt(mut t: &T) {
+    t.assert(!Nat.from_bits("1011010")!.lt(Nat.from_bits("00001011010")!), "1) 1011010 < 00001011010")
+    t.assert(!Nat.from_bits("1111011000")!.lt(Nat.from_bits("000000000001111011000")!), "2) 1111011000 < 000000000001111011000")
+    t.assert(!Nat.from_bits("10001100011000")!.lt(Nat.from_bits("100011")!), "3) 10001100011000 < 100011")
+    t.assert(!Nat.from_bits("10001101101110101011110110000110111111101111")!.lt(Nat.from_bits("10001101101110101011110110000110111111101101")!), "4) 10001101101110101011110110000110111111101111 < 10001101101110101011110110000110111111101101")
+}
+
+#test
+fn test_nat_gt(mut t: &T) {
+    t.assert(!Nat.from_bits("1011010")!.gt(Nat.from_bits("00001011010")!), "1) 1011010 > 00001011010")
+    t.assert(!Nat.from_bits("1111011000")!.gt(Nat.from_bits("000000000001111011000")!), "2) 1111011000 > 000000000001111011000")
+    t.assert(Nat.from_bits("10001100011000")!.gt(Nat.from_bits("100011")!), "3) 10001100011000 <= 100011")
+    t.assert(Nat.from_bits("10001101101110101011110110000110111111101111")!.gt(Nat.from_bits("10001101101110101011110110000110111111101101")!), "4) 10001101101110101011110110000110111111101111 <= 10001101101110101011110110000110111111101101")
+    t.assert(!Nat.from_bits("10000100100001")!.gt(Nat.from_bits("10011001101010")!), "5) 10000100100001 >= 10011001101010")
+}
+
+#test
+fn test_nat_eq(mut t: &T) {
+    t.assert(Nat.from_bits("1011010")!.eq(Nat.from_bits("00001011010")!), "1) 1011010 != 00001011010")
+    t.assert(Nat.from_bits("1111011000")!.eq(Nat.from_bits("000000000001111011000")!), "2) 1111011000 != 000000000001111011000")
+    t.assert(Nat.from_bits("10001100011000")!.eq(Nat.from_bits("10001100011000")!), "3) 10001100011000 != 10001100011000")
+    t.assert(Nat.from_bits("10001101101110101011110110000110111111101101")!.eq(Nat.from_bits("10001101101110101011110110000110111111101101")!), "4) 10001101101110101011110110000110111111101101 != 10001101101110101011110110000110111111101101")
+}

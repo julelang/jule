@@ -1,0 +1,189 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+// Big arbitrary-precision signed integer.
+// Always in the normalized format, leading-zeros are eliminated.
+#derive Clone
+pub struct Int {
+    neg: bool
+    nat: Nat
+}
+
+impl Int {
+    // Returns big integer that represents zero.
+    pub static fn zero(): Int {
+        ret Int{
+            nat: Nat.zero(),
+        }
+    }
+
+    // Returns big integer that represents one.
+    pub static fn one(): Int {
+        ret Int{
+            nat: Nat.one(),
+        }
+    }
+
+    // Parse big integer from bits that represented in string.
+    // Results with exceptional if bits are not in the format or empty.
+    // Exceptional is always BigError.Format.
+    pub static fn from_bits(b: str, neg: bool)!: Int {
+        ret Int{
+            neg: neg,
+            nat: Nat.from_bits(b) else { error(error) },
+        }
+    }
+
+    // Returns count of bits except sign-bit.
+    // Return value also means the minimum number of bits that can represent the integer.
+    pub fn len(self): int {
+        ret self.nat.len()
+    }
+
+    // Adds two Int and returns result.
+    pub fn add(self, y: Int): Int {
+        let mut r = clone(self)
+        if y.len() == 0 {
+            ret r
+        }
+        r += y
+        ret r
+    }
+
+    // Adds Int.
+    pub fn add_assign(mut self, y: Int) {
+        match {
+        | y.len() == 0:
+            ret
+        | self.neg == y.neg:
+            self.nat += y.nat
+        |:
+            let mut cmp = self.nat.cmp(y.nat)
+            if cmp == 0 {
+                self.neg = false
+                self.nat = Nat.zero()
+                ret
+            }
+            if y.neg {
+                cmp = -cmp
+            }
+            if self.neg && cmp == +1 ||
+                y.neg && cmp == -1 {
+                self.nat -= y.nat
+            } else {
+                self.nat = y.nat - self.nat
+            }
+            self.neg = cmp == +1
+        }
+    }
+
+    // Subtracts two Int and returns result.
+    pub fn sub(self, y: Int): Int {
+        let mut r = clone(self)
+        if y.len() == 0 {
+            ret r
+        }
+        r -= y
+        ret r
+    }
+
+    // Subtracts Int.
+    pub fn sub_assign(mut self, y: Int) {
+        if y.len() == 0 {
+            ret
+        }
+        let mut cmp = self.cmp(y)
+        if cmp == 0 {
+            self.neg = false
+            self.nat = Nat.zero()
+            ret
+        }
+        if self.neg == y.neg {
+            self.neg = cmp == -1
+            if cmp == +1 {
+                self.nat -= y.nat
+            } else {
+                self.nat = y.nat - self.nat
+            }
+            ret
+        }
+        self.neg = false
+        self.nat += y.nat
+        ret
+    }
+
+    // Compares bits.
+    // Returns +1 if self > y.
+    // Returns 0 if self == y.
+    // Returns -1 if self < y.
+    pub fn cmp(self, y: Int): int {
+        match {
+        | self.neg && !y.neg:
+            ret -1
+        | !self.neg && y.neg:
+            ret +1
+        }
+        let cmp = bits_cmp(self.nat.bits, y.nat.bits)
+        match {
+        | cmp == +1 && self.neg
+        | cmp == -1 && !self.neg:
+            ret -1
+        | cmp == +1 && !self.neg
+        | cmp == -1 && self.neg:
+            ret +1
+        |:
+            ret 0
+        }
+    }
+
+    // Reports whether integer less than other.
+    pub fn lt(self, y: Int): bool {
+        ret self.cmp(y) == -1
+    }
+
+    // Reports whether integer less than or equals to other.
+    pub fn lt_eq(self, y: Int): bool {
+        ret self.cmp(y) < +1
+    }
+
+    // Reports whether integer greater than other.
+    pub fn gt(self, y: Int): bool {
+        ret self.cmp(y) == +1
+    }
+
+    // Reports whether integer greater than or equals to other.
+    pub fn gt_eq(self, y: Int): bool {
+        ret self.cmp(y) > -1
+    }
+
+    // Reports whether integers are equals.
+    pub fn eq(self, y: Int): bool {
+        ret self.cmp(y) == 0
+    }
+
+    // Returns integer in i64.
+    // Causes exception if nuber large than capacity of i64.
+    // Exception is equals to i64.MIN constant if integer is negative, else i64.MAX.
+    pub fn to_i64(self)!: i64 {
+        if self.len() > 63 {
+            error(if self.neg { i64.MIN } else { i64.MAX })
+        }
+        let x = i64(self.nat.to_u64() else { error(error) })
+        if self.neg {
+            ret -x
+        }
+        ret x
+    }
+
+    // Returns integer in u64.
+    // Causes exception if nuber large than capacity of u64.
+    // Exception is always equals to u64.MAX constant.
+    pub fn to_u64(self)!: u64 {
+        let x = self.nat.to_u64() else { error(error) }
+        if self.neg {
+            ret -x
+        }
+        ret x
+    }
+}
