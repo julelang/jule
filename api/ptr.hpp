@@ -43,7 +43,7 @@ namespace jule
         // Creates new reference from allocation and reference counting
         // allocation. Reference does not counted if reference count
         // allocation is null.
-        static jule::Ptr<T> make(T *ptr, const jule::Uint *ref) noexcept
+        static jule::Ptr<T> make(T *ptr, jule::Uint *ref) noexcept
         {
             jule::Ptr<T> buffer;
             buffer.alloc = ptr;
@@ -71,7 +71,7 @@ namespace jule
             return buffer;
         }
 
-        static jule::Ptr<T> make(const T &instance, const jule::Uint *ref) noexcept
+        static jule::Ptr<T> make(const T &instance, jule::Uint *ref) noexcept
         {
             jule::Ptr<T> buffer;
 
