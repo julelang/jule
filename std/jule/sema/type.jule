@@ -994,6 +994,7 @@ impl TypeChecker {
         }
 
         if ins.generics.len > 0 {
+            self.s.check_struct_ins_operators(ins)
             self.s.check_struct_ins(ins)
         }
 
@@ -1187,19 +1188,16 @@ impl TypeChecker {
         match {
         | elem == nil:
             ret nil
-
         | elem.strct() != nil:
             let s = elem.strct()
             if s.decl != nil && s.decl.cpp_linked {
                 self.push_err(self.error_token, LogMsg.CppLinkedStructForRef)
                 ret nil
             }
-
         | elem.arr() != nil && elem.arr().auto:
             self.push_err(self.error_token, LogMsg.ArrayAutoSized)
             ret nil
         }
-
         ret &Sptr{
             elem: elem,
         }
@@ -1303,7 +1301,6 @@ impl TypeChecker {
         match {
         | elem == nil:
             ret nil
-
         | elem.arr() != nil && elem.arr().auto:
             self.push_err(decl.elem.token, LogMsg.ArrayAutoSized)
             ret nil
