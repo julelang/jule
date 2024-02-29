@@ -480,7 +480,7 @@ impl ObjectCoder {
     fn structure_operator_eq(mut self, mut &obj: str, &ident: str, mut &s: &StructIns) {
         // Operator overloading.
         if s.operators.eq != nil {
-            self.structure_operator(obj, ident, s.operators.eq, "==", "bool")
+            self.structure_operator(obj, ident, s.operators.eq, "==")
             ret
         }
 
@@ -542,38 +542,47 @@ impl ObjectCoder {
     }
 
     // Write operator overloading forwarding for reserved function.
-    // If the ident parameter is empty, writes operator overloading for unary.
-    // If the result parameter is empty, writes operator overloading for assignment.
-    fn structure_operator(mut self, mut &obj: str, &ident: str, mut &f: &FnIns, op: str, result: str) {
+    fn structure_operator(mut self, mut &obj: str, &ident: str, mut &f: &FnIns, op: str) {
         if f == nil {
             ret
         }
+
+        let unary = f.params.len == 1 // Just self parameter.
+        let assignment = f.decl.is_void()
+
         obj += self.indent()
         if env::OPT_INLINE {
             obj += "inline "
         }
-        if result == "" {
+        if assignment {
             obj += ident
             obj += "&"
         } else {
-            obj += result
+            if f.result.prim() == nil {
+                // If result type is not primitive, always structure's itself.
+                obj += ident
+            } else {
+                // Logical.
+                obj += TypeCoder.Bool
+            }
         }
         obj += " operator"
         obj += op
         obj += "("
-        if ident != "" {
-            obj += ident
+        if !unary {
+            let mut p = f.params[1]
+            obj += TypeCoder.param_ins(p)
             obj += " _other"
         }
         obj += ") { "
-        if result != "" {
+        if !assignment {
             obj += "return "
         }
         obj += "this->"
         obj += IdentCoder.func_ins(f)
-        if ident != "" {
+        if !unary {
             obj += "(_other); "
-            if result == "" {
+            if assignment {
                 obj += "return *this; "
             }
             obj += "}"
@@ -584,44 +593,43 @@ impl ObjectCoder {
     }
 
     fn structure_operators(mut self, mut &s: &StructIns): str {
-        let unary = "" // To write unary operators.
         let ident = IdentCoder.structure_ins(s)
         let mut obj = ""
 
         // Binary.
         self.structure_operator_eq(obj, ident, s)
         self.structure_operator_not_eq(obj, ident, s)
-        self.structure_operator(obj, ident, s.operators.gt, ">", "bool")
-        self.structure_operator(obj, ident, s.operators.gt_eq, ">=", "bool")
-        self.structure_operator(obj, ident, s.operators.lt, "<", "bool")
-        self.structure_operator(obj, ident, s.operators.lt_eq, "<=", "bool")
-        self.structure_operator(obj, ident, s.operators.shl, "<<", ident)
-        self.structure_operator(obj, ident, s.operators.shr, ">>", ident)
-        self.structure_operator(obj, ident, s.operators.add, "+", ident)
-        self.structure_operator(obj, ident, s.operators.sub, "-", ident)
-        self.structure_operator(obj, ident, s.operators.div, "/", ident)
-        self.structure_operator(obj, ident, s.operators.mul, "*", ident)
-        self.structure_operator(obj, ident, s.operators.mod, "%", ident)
-        self.structure_operator(obj, ident, s.operators.bit_and, "&", ident)
-        self.structure_operator(obj, ident, s.operators.bit_or, "|", ident)
-        self.structure_operator(obj, ident, s.operators.bit_xor, "^", ident)
+        self.structure_operator(obj, ident, s.operators.gt, ">")
+        self.structure_operator(obj, ident, s.operators.gt_eq, ">=")
+        self.structure_operator(obj, ident, s.operators.lt, "<")
+        self.structure_operator(obj, ident, s.operators.lt_eq, "<=")
+        self.structure_operator(obj, ident, s.operators.shl, "<<")
+        self.structure_operator(obj, ident, s.operators.shr, ">>")
+        self.structure_operator(obj, ident, s.operators.add, "+")
+        self.structure_operator(obj, ident, s.operators.sub, "-")
+        self.structure_operator(obj, ident, s.operators.div, "/")
+        self.structure_operator(obj, ident, s.operators.mul, "*")
+        self.structure_operator(obj, ident, s.operators.mod, "%")
+        self.structure_operator(obj, ident, s.operators.bit_and, "&")
+        self.structure_operator(obj, ident, s.operators.bit_or, "|")
+        self.structure_operator(obj, ident, s.operators.bit_xor, "^")
 
         // Unary.
-        self.structure_operator(obj, unary, s.operators.neg, "-", ident)
-        self.structure_operator(obj, unary, s.operators.pos, "+", ident)
-        self.structure_operator(obj, unary, s.operators.bit_not, "~", ident)
+        self.structure_operator(obj, ident, s.operators.neg, "-")
+        self.structure_operator(obj, ident, s.operators.pos, "+")
+        self.structure_operator(obj, ident, s.operators.bit_not, "~")
 
         // Assignment.
-        self.structure_operator(obj, ident, s.operators.add_assign, "+=", "")
-        self.structure_operator(obj, ident, s.operators.sub_assign, "-=", "")
-        self.structure_operator(obj, ident, s.operators.div_assign, "/=", "")
-        self.structure_operator(obj, ident, s.operators.mul_assign, "*=", "")
-        self.structure_operator(obj, ident, s.operators.mod_assign, "%=", "")
-        self.structure_operator(obj, ident, s.operators.shl_assign, "<<=", "")
-        self.structure_operator(obj, ident, s.operators.shr_assign, ">>=", "")
-        self.structure_operator(obj, ident, s.operators.bit_or_assign, "|=", "")
-        self.structure_operator(obj, ident, s.operators.bit_and_assign, "&=", "")
-        self.structure_operator(obj, ident, s.operators.bit_xor_assign, "^=", "")
+        self.structure_operator(obj, ident, s.operators.add_assign, "+=")
+        self.structure_operator(obj, ident, s.operators.sub_assign, "-=")
+        self.structure_operator(obj, ident, s.operators.div_assign, "/=")
+        self.structure_operator(obj, ident, s.operators.mul_assign, "*=")
+        self.structure_operator(obj, ident, s.operators.mod_assign, "%=")
+        self.structure_operator(obj, ident, s.operators.shl_assign, "<<=")
+        self.structure_operator(obj, ident, s.operators.shr_assign, ">>=")
+        self.structure_operator(obj, ident, s.operators.bit_or_assign, "|=")
+        self.structure_operator(obj, ident, s.operators.bit_and_assign, "&=")
+        self.structure_operator(obj, ident, s.operators.bit_xor_assign, "^=")
         ret obj
     }
 

@@ -1140,31 +1140,43 @@ impl ScopeChecker {
         ret self.table.def_by_ident(ident, false) == nil
     }
 
-    fn check_structure_assign_op(mut &self, &s: &StructIns, mut &a: &AssignSt): bool {
+    fn check_structure_assign_op(mut &self, mut &s: &StructIns, mut &a: &AssignSt, mut &r: &Data): bool {
+        // This method adopted from [BinaryEval.check_struct_common_operator_compatibility].
+        // Should follow this method.
+        let mut overload: &FnIns = nil
         match a.setter.kind {
-        | TokenKind.Plus:
-            ret s.operators.add_assign != nil
-        | TokenKind.Minus:
-            ret s.operators.sub_assign != nil
-        | TokenKind.Solidus:
-            ret s.operators.div_assign != nil
-        | TokenKind.Star:
-            ret s.operators.mul_assign != nil
-        | TokenKind.Percent:
-            ret s.operators.mod_assign != nil
-        | TokenKind.Lshift:
-            ret s.operators.shl_assign != nil
-        | TokenKind.Rshift:
-            ret s.operators.shr_assign != nil
-        | TokenKind.Vline:
-            ret s.operators.bit_or_assign != nil
-        | TokenKind.Amper:
-            ret s.operators.bit_and_assign != nil
-        | TokenKind.Caret:
-            ret s.operators.bit_xor_assign != nil
+        | TokenKind.PlusEq:
+            overload = s.operators.add_assign
+        | TokenKind.MinusEq:
+            overload = s.operators.sub_assign
+        | TokenKind.SolidusEq:
+            overload = s.operators.div_assign
+        | TokenKind.StarEq:
+            overload = s.operators.mul_assign
+        | TokenKind.PercentEq:
+            overload = s.operators.mod_assign
+        | TokenKind.LshiftEq:
+            overload = s.operators.shl_assign
+        | TokenKind.RshiftEq:
+            overload = s.operators.shr_assign
+        | TokenKind.VlineEq:
+            overload = s.operators.bit_or_assign
+        | TokenKind.AmperEq:
+            overload = s.operators.bit_and_assign
+        | TokenKind.CaretEq:
+            overload = s.operators.bit_xor_assign
         |:
+            self.s.push_err(a.setter, LogMsg.OperatorNotForJuleType, a.setter.kind, s.to_str())
             ret false
         }
+
+        if overload == nil {
+            self.s.push_err(a.setter, LogMsg.OperatorNotForJuleType, a.setter.kind, s.to_str())
+            ret false
+        }
+
+        let mut p = overload.params[1]
+        ret self.s.check_assign_type(p.decl.reference, p.kind, r, a.setter)
     }
 
     fn check_single_assign(mut &self, mut &a: &AssignSt) {
@@ -1219,28 +1231,18 @@ impl ScopeChecker {
         })
 
         if a.setter.kind != TokenKind.Eq {
-            a.setter.kind = a.setter.kind[:a.setter.kind.len-1]
+            let mut strct = l.kind.strct()
+            if strct != nil {
+                self.check_structure_assign_op(strct, a, r)
+                ret
+            }
 
+            a.setter.kind = a.setter.kind[:a.setter.kind.len-1]
             let mut solver = BinaryEval.new(&Eval{
                 s:        self.s,
                 lookup:   self,
                 unsafety: self.is_unsafe(),
             }, a.setter)
-
-            let mut strct = l.kind.strct()
-            if strct != nil {
-                if !self.check_structure_assign_op(strct, a) {
-                    self.s.push_err(a.setter, LogMsg.OperatorNotForJuleType, a.setter.kind + str(TokenKind.Eq), strct.to_str())
-                    ret
-                }
-                solver.l = l
-                solver.r = r
-                if !solver.check_type_compatibility() {
-                    ret
-                }
-                ret
-            }
-
             r = solver.solve_explicit(l, r)
             if r == nil {
                 ret

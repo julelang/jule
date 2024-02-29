@@ -867,10 +867,10 @@ impl Sema {
     }
 
     fn check_assign_type(mut &self, dest_is_ref: bool, mut &dest: &TypeKind,
-        mut &d: &Data, mut error_token: Token) {
+        mut &d: &Data, mut error_token: Token): bool {
         if d.decl {
             self.push_err(error_token, LogMsg.InvalidExpr)
-            ret
+            ret false
         }
         /*if d.kind.variadic {
             self.push_err(error_token, LogMsg.InvalidExpr)
@@ -879,6 +879,7 @@ impl Sema {
         if dest_is_ref {
             if !dest.equals(d.kind) {
                 self.push_err(error_token, LogMsg.IncompatibleTypes, dest.to_str(), d.kind.to_str())
+                ret false
             }
         } else {
             let mut atc = &AssignTypeChecker{
@@ -889,21 +890,26 @@ impl Sema {
             }
             let ok = atc.check()
             if !ok {
-                ret
+                ret false
             }
         }
 
         if !d.is_const() || dest.prim() == nil {
-            ret
+            ret true
         }
 
         let mut kind = dest.prim().kind
 
         match {
-        | types::is_sig_int(kind):   d.constant.set_i64(d.constant.as_i64())
-        | types::is_unsig_int(kind): d.constant.set_u64(d.constant.as_u64())
-        | types::is_float(kind):     d.constant.set_f64(d.constant.as_f64())
+        | types::is_sig_int(kind):
+            d.constant.set_i64(d.constant.as_i64())
+        | types::is_unsig_int(kind):
+            d.constant.set_u64(d.constant.as_u64())
+        | types::is_float(kind):
+            d.constant.set_f64(d.constant.as_f64())
         }
+
+        ret true
     }
 
     fn check_type_compatibility(mut &self, mut &dest: &TypeKind,
@@ -1195,7 +1201,7 @@ impl Sema {
                     self.push_err(item.value.expr.token, LogMsg.ExprNotConst)
                 }
 
-                self.check_assign_type(false, e.kind.kind, d, item.token)
+                _ = self.check_assign_type(false, e.kind.kind, d, item.token)
                 item.value.data = d
             }
         }
@@ -1231,7 +1237,7 @@ impl Sema {
                     self.push_err(item.value.expr.token, LogMsg.ExprNotConst)
                 }
 
-                self.check_assign_type(false, e.kind.kind, d, item.token)
+                _ = self.check_assign_type(false, e.kind.kind, d, item.token)
                 item.value.data = d
             }
         }
@@ -2098,7 +2104,7 @@ impl Sema {
                 }
             }
 
-            self.check_assign_type(v.reference, v.kind.kind, v.value.data, v.value.expr.token)
+            _ = self.check_assign_type(v.reference, v.kind.kind, v.value.data, v.value.expr.token)
         }
 
         if v.reference && !is_valid_for_ref(v.kind.kind) {
@@ -2207,7 +2213,7 @@ impl Sema {
             }
 
             const REFERENCE = false // Fields cannot be reference.
-            self.check_assign_type(REFERENCE, f.kind, f.default, f.decl.default.token)
+            _ = self.check_assign_type(REFERENCE, f.kind, f.default, f.decl.default.token)
         }
     }
 

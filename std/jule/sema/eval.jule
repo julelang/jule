@@ -1055,7 +1055,7 @@ impl Eval {
                 continue
             }
 
-            self.s.check_assign_type(false, arr.elem, d, s.token)
+            _ = self.s.check_assign_type(false, arr.elem, d, s.token)
             model.elems = append(model.elems, d.model)
         }
         self.prefix = prefix
@@ -1092,7 +1092,7 @@ impl Eval {
                 continue
             }
 
-            self.s.check_assign_type(false, slc.elem, d, s.token)
+            _ = self.s.check_assign_type(false, slc.elem, d, s.token)
             model.elems = append(model.elems, d.model)
         }
         self.prefix = prefix
@@ -3103,8 +3103,8 @@ impl Eval {
                 ret nil
             }
 
-            self.s.check_assign_type(false, m.key, key, pair.colon)
-            self.s.check_assign_type(false, m.val, val, pair.colon)
+            _ = self.s.check_assign_type(false, m.key, key, pair.colon)
+            _ = self.s.check_assign_type(false, m.val, val, pair.colon)
 
             model.entries = append(model.entries, &KeyValPairExprModel{
                 key: key.model,
@@ -3678,6 +3678,43 @@ impl BinaryEval {
         ret self.e.s.check_type_compatibility(self.l.kind, self.r.kind, self.op)
     }
 
+    fn check_struct_common_operator_compatibility(mut self): bool {
+        let mut overload: &FnIns = nil
+        match self.op.kind {
+        | TokenKind.Lshift:
+            overload = self.l.kind.strct().operators.shl
+        | TokenKind.Rshift:
+            overload = self.l.kind.strct().operators.shr
+        | TokenKind.Plus:
+            overload = self.l.kind.strct().operators.add
+        | TokenKind.Minus:
+            overload = self.l.kind.strct().operators.sub
+        | TokenKind.Solidus:
+            overload = self.l.kind.strct().operators.div
+        | TokenKind.Star:
+            overload = self.l.kind.strct().operators.mul
+        | TokenKind.Percent:
+            overload = self.l.kind.strct().operators.mod
+        | TokenKind.Amper:
+            overload = self.l.kind.strct().operators.bit_and
+        | TokenKind.Vline:
+            overload = self.l.kind.strct().operators.bit_or
+        | TokenKind.Caret:
+            overload = self.l.kind.strct().operators.bit_xor
+        |:
+            self.e.push_err(self.op, LogMsg.OperatorNotForJuleType, self.op.kind, self.l.kind.to_str())
+            ret false
+        }
+
+        if overload == nil {
+            self.e.push_err(self.op, LogMsg.OperatorNotForJuleType, self.op.kind, self.l.kind.to_str())
+            ret false
+        }
+
+        let mut p = overload.params[1]
+        ret self.e.s.check_assign_type(p.decl.reference, p.kind, self.r, self.op)
+    }
+
     fn eval_nil(mut self): &Data {
         if !self.r.kind.nil_compatible() {
             self.e.push_err(self.op, LogMsg.IncompatibleTypes, TokenKind.Nil, self.r.kind.to_str())
@@ -3861,10 +3898,6 @@ impl BinaryEval {
     }
 
     fn eval_struct(mut self): &Data {
-        if !self.check_type_compatibility() {
-            ret nil
-        }
-
         match self.op.kind {
         | TokenKind.Gt:
             if self.l.kind.strct().operators.gt == nil {
@@ -3906,77 +3939,22 @@ impl BinaryEval {
                     kind: build_prim_type(PrimKind.Bool),
                 },
             }
-        | TokenKind.Lshift:
-            if self.l.kind.strct().operators.shl == nil {
-                self.e.push_err(self.op, LogMsg.OperatorNotForJuleType, self.op.kind, self.l.kind.to_str())
-                ret nil
-            }
-            ret self.l
-        | TokenKind.Rshift:
-            if self.l.kind.strct().operators.shr == nil {
-                self.e.push_err(self.op, LogMsg.OperatorNotForJuleType, self.op.kind, self.l.kind.to_str())
-                ret nil
-            }
-            ret self.l
-        | TokenKind.Plus:
-            if self.l.kind.strct().operators.add == nil {
-                self.e.push_err(self.op, LogMsg.OperatorNotForJuleType, self.op.kind, self.l.kind.to_str())
-                ret nil
-            }
-            ret self.l
-        | TokenKind.Minus:
-            if self.l.kind.strct().operators.sub == nil {
-                self.e.push_err(self.op, LogMsg.OperatorNotForJuleType, self.op.kind, self.l.kind.to_str())
-                ret nil
-            }
-            ret self.l
-        | TokenKind.Solidus:
-            if self.l.kind.strct().operators.div == nil {
-                self.e.push_err(self.op, LogMsg.OperatorNotForJuleType, self.op.kind, self.l.kind.to_str())
-                ret nil
-            }
-            ret self.l
-        | TokenKind.Star:
-            if self.l.kind.strct().operators.mul == nil {
-                self.e.push_err(self.op, LogMsg.OperatorNotForJuleType, self.op.kind, self.l.kind.to_str())
-                ret nil
-            }
-            ret self.l
-        | TokenKind.Percent:
-            if self.l.kind.strct().operators.mod == nil {
-                self.e.push_err(self.op, LogMsg.OperatorNotForJuleType, self.op.kind, self.l.kind.to_str())
-                ret nil
-            }
-            ret self.l
-        | TokenKind.Amper:
-            if self.l.kind.strct().operators.bit_and == nil {
-                self.e.push_err(self.op, LogMsg.OperatorNotForJuleType, self.op.kind, self.l.kind.to_str())
-                ret nil
-            }
-            ret self.l
-        | TokenKind.Vline:
-            if self.l.kind.strct().operators.bit_or == nil {
-                self.e.push_err(self.op, LogMsg.OperatorNotForJuleType, self.op.kind, self.l.kind.to_str())
-                ret nil
-            }
-            ret self.l
-        | TokenKind.Caret:
-            if self.l.kind.strct().operators.bit_xor == nil {
-                self.e.push_err(self.op, LogMsg.OperatorNotForJuleType, self.op.kind, self.l.kind.to_str())
-                ret nil
-            }
-            ret self.l
         | TokenKind.Eqs
         | TokenKind.NotEq:
+            if !self.check_type_compatibility() {
+                ret nil
+            }
             ret &Data{
                 kind: &TypeKind{
                     kind: build_prim_type(PrimKind.Bool),
                 },
             }
-        |:
-            self.e.push_err(self.op, LogMsg.OperatorNotForJuleType, self.op.kind, self.l.kind.to_str())
+        }
+
+        if !self.check_struct_common_operator_compatibility() {
             ret nil
         }
+        ret self.l
     }
 
     fn eval_trait(mut self): &Data {
