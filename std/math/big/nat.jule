@@ -47,9 +47,9 @@ impl Nat {
         | u64:
             nat.bits = make(bits, 1 << 6)
         | int:
-            nat.bits = make(bits, (32 << (^uint(0) >> 63)) - 1)
+            nat.bits = make(bits, INT_SIZE - 1)
         | uint:
-            nat.bits = make(bits, 32 << (^uint(0) >> 63))
+            nat.bits = make(bits, INT_SIZE)
         |:
             panic("std::math::big: Nat.new[T]: T is should be signed or unsigned integer type")
         }
@@ -181,6 +181,63 @@ impl Nat {
         if carry == 0b0 {
             twos_complement(self.bits)
         }
+        self.fit()
+    }
+
+    // Multiplies two Nat and returns result.
+    pub fn mul(self, y: Nat): Nat {
+        let mut r = self
+        r *= y
+        ret r
+    }
+
+    // Multiplies Nat.
+    pub fn mul_assign(mut self, y: Nat) {
+        if y.len() == 1 {
+            ret
+        }
+        if y.len() == 0 {
+            self.bits = nil
+            ret
+        }
+
+        let mut xb = self.bits
+        let mut yb = y.bits
+
+        let mut xr = true
+        let mut yr = true
+        if xb.len != yb.len {
+            let n = max(xb.len, yb.len)
+            if xb.len < n {
+                xr = false
+                let mut xbn = make(bits, n)
+                _ = copy(xbn, xb)
+                xb = xbn
+            }
+            if yb.len < n {
+                yr = false
+                let mut ybn = make(bits, n)
+                _ = copy(ybn, yb)
+                yb = ybn
+            }
+        }
+
+        // Reverse bits, karatsuba uses normal-order bits.
+        reverse(xb)
+        reverse(yb)
+
+        let mut r = karatsuba(xb, yb)
+
+        // Reverse bits to save internal order.
+        if xr {
+            reverse(self.bits)
+        }
+        if yr {
+            reverse(y.bits)
+        }
+        reverse(r)
+
+        self.bits = r
         self.fit()
     }
 

@@ -5,8 +5,10 @@
 // Single bit.
 type bit: byte
 
-// Bits are stored in reversed order for performance purposes.
+// In internal order, bits are stored in reversed order for performance purposes.
 type bits: []bit
+
+const INT_SIZE = 32 << (^uint(0) >> 63)
 
 fn u64_from_bits(b: bits): u64 {
     let mut u = u64(0)
@@ -27,6 +29,37 @@ fn add_one(mut &b: bits): (carry: bit) {
         b[i] = 0
     }
     ret 0b1
+}
+
+fn reverse(mut &b: bits) {
+    let mut i = 0
+    for i < b.len / 2; i++ {
+        b.swap(i, b.len - 1 - i)
+    }
+}
+
+fn sub(mut &x: bits, &y: bits) {
+    let mut carry = bit(0)
+    match {
+    | y.len == 1:
+        twos_complement(x)
+        carry = add_one(x)
+    | x.len == y.len:
+        twos_complement(x)
+        carry = add_bits_fast(x, y)
+    | x.len > y.len:
+        twos_complement(x)
+        carry = add_bits_rfast(x, y)
+    |:
+        let mut xn = make(bits, y.len)
+        _ = copy(xn, x)
+        x = xn
+        twos_complement(x)
+        carry = add_bits_fast(x, y)
+    }
+    if carry == 0b0 {
+        twos_complement(x)
+    }
 }
 
 // Update bits by 1's complement.
@@ -118,4 +151,68 @@ fn bits_cmp(&x: bits, &y: bits): int {
         }
     }
     ret 0
+}
+
+fn karatsuba_add_bits(mut x: bits, mut y: bits): bits {
+    reverse(x)
+    reverse(y)
+    defer {
+        reverse(x)
+        reverse(y)
+    }
+
+    let mut carry = bit(0)
+    let mut r: bits = nil
+    match {
+    | x.len == y.len:
+        r, carry = add_bits(x, y)
+    | x.len > y.len:
+        r, carry = add_bits(x, y)
+    |:
+        r, carry = add_bits(y, x)
+    }
+    if carry == 0b1 {
+        r = append(r, 0b1)
+    }
+    reverse(r)
+    ret r
+}
+
+fn karatsuba_sub_bits(mut x: bits, mut y: bits): bits {
+    x = clone(x)
+    reverse(x)
+    reverse(y)
+
+    sub(x, y)
+    reverse(x)
+    reverse(y)
+    ret x
+}
+
+fn karatsuba_shl(mut s: bits, n: int): bits {
+    ret append(s, make(bits, n)...)
+}
+
+fn karatsuba(mut x: bits, mut y: bits): bits {
+    let n = max(x.len, y.len)
+    if n == 1 {
+        if x.len == 0 || y.len == 0 || x[0] == 0b0 || y[0] == 0b0 {
+            ret nil
+        }
+        ret [1]
+    }
+
+    let m = n >> 1
+    let mut xl = x[:m]
+    let mut xr = x[m:]
+    let mut yl = y[:m]
+    let mut yr = y[m:]
+
+    let mut p1 = karatsuba(xl, yl)
+    let mut p2 = karatsuba(xr, yr)
+    let mut p3 = karatsuba(karatsuba_add_bits(xl, xr), karatsuba_add_bits(yl, yr))
+
+    let mut c2 = karatsuba_shl(karatsuba_sub_bits(p3, karatsuba_add_bits(p1, p2)), n - m)
+    let mut c1 = karatsuba_shl(p1, (n - m) << 1)
+    ret karatsuba_add_bits(karatsuba_add_bits(c1, c2), p2)
 }
