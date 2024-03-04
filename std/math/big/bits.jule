@@ -31,10 +31,44 @@ fn add_one(mut &b: bits): (carry: bit) {
     ret 0b1
 }
 
+// Subrract one from bits.
+// Equals to x-- operator.
+fn sub_one(mut &b: bits) {
+    let mut j = 0
+    for i, x in b {
+        if x == 0b1 {
+            b[i] = 0b0
+            j = i
+            break
+        }
+        b[i] = 0
+    }
+    for i in b[:j] {
+        b[i] = 0b1
+    }
+}
+
 fn reverse(mut &b: bits) {
     let mut i = 0
     for i < b.len / 2; i++ {
         b.swap(i, b.len - 1 - i)
+    }
+}
+
+fn add(mut &x: bits, &y: bits) {
+    let mut carry = bit(0)
+    match {
+    | y.len == 1:
+        carry = add_one(x)
+    | x.len == y.len:
+        carry = add_bits_fast(x, y)
+    | x.len > y.len:
+        carry = add_bits_rfast(x, y)
+    |:
+        x, carry = add_bits(y, x)
+    }
+    if carry == 0b1 {
+        x = append(x, 0b1)
     }
 }
 
@@ -151,6 +185,30 @@ fn bits_cmp(&x: bits, &y: bits): int {
         }
     }
     ret 0
+}
+
+// Reports whether number is odd that represented by bits.
+fn is_odd(&b: bits): bool {
+    ret b.len > 0 && b[0] == 0b1
+}
+
+// Basic multiplication algorithm for bits.
+fn basic_mul(mut x: bits, mut y: bits): bits {
+    if y.len == 1 {
+        ret x
+    }
+    let mut r: bits = nil
+    let mut m = make(bits, x.len, x.len << 1)
+    _ = copy(m, x)
+    for y.len > 0 {
+        if is_odd(y) {
+            add(r, m)
+        }
+        m = append(m[:1], m...)
+        m[0] = 0b0
+        y = y[1:]
+    }
+    ret r
 }
 
 fn karatsuba_add_bits(mut x: bits, mut y: bits): bits {
