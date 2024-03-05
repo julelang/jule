@@ -45,6 +45,7 @@ use lex for std::jule::lex::{
     is_bool,
     is_rune,
     is_raw_str,
+    is_ignore_ident,
 }
 use types for std::jule::types
 use strings for std::strings
@@ -2964,6 +2965,11 @@ impl Eval {
     }
 
     fn eval_obj_sub_ident(mut self, mut d: &Data, mut si: &SubIdentExpr): &Data {
+        if is_ignore_ident(si.ident.kind) {
+            self.push_err(si.ident, LogMsg.InvalidSyntax)
+            ret nil
+        }
+
         let mut kind = d.kind
         if d.kind.ptr() != nil {
             let ptr = d.kind.ptr()
