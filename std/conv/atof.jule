@@ -753,20 +753,23 @@ fn parse_float_prefix(s: str, bit_size: int): (f64, int, ConvError) {
 // there are more bits in the hexadecimal representation than
 // will fit in the mantissa.)
 //
-// The errors that returns have concrete type ConvError.
+// The exceptional errors that have concrete type ConvError.
 //
-// If s is not syntactically well-formed, returns err = ConvError.InvalidSyntax.
+// If s is not syntactically well-formed, throws exception = ConvError.InvalidSyntax.
 //
 // If s is syntactically well-formed but is more than 1/2 ULP
 // away from the largest floating point number of the given size,
-// Returns f = ±inf, err = ConvError.OutOfRange.
+// Exceptional = ConvError.OutOfRange.
 //
 // Recognizes the string "nan", and the (possibly signed) strings "inf" and "infinity"
 // as their respective special floating point values. It ignores case when matching.
-pub fn parse_float(s: str, bit_size: int): (f64, ConvError) {
+pub fn parse_float(s: str, bit_size: int)!: f64 {
     let (f, n, err) = parse_float_prefix(s, bit_size)
     if n != s.len && (err == ConvError.Ok || err != ConvError.InvalidSyntax) {
-        ret 0, ConvError.InvalidSyntax
+        error(ConvError.InvalidSyntax)
     }
-    ret f, err
+    if err != ConvError.Ok {
+        error(err)
+    }
+    ret f
 }

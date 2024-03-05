@@ -464,7 +464,7 @@ impl Eval {
     fn lit_float(self, &l: &LitExpr): &Data {
         const FLOAT_KIND: str = PrimKind.F64
 
-        let (f, _) = parse_float(l.value, 64)
+        let f = parse_float(l.value, 64) else { use f64.MAX }
         let mut constant = Const.new_f64(f)
 
         ret &Data{
@@ -489,19 +489,15 @@ impl Eval {
         | strings::has_prefix(lit, "0x"): // Hexadecimal
             lit = lit[2:]
             base = 0b00010000
-
         | strings::has_prefix(lit, "0b"): // Binary
             lit = lit[2:]
             base = 0b10
-
         | strings::has_prefix(lit, "0o"): // Ocatal
             lit = lit[2:]
             base = 0b1000
-
         | lit[0] == '0' && lit.len > 1: // Octal
             lit = lit[1:]
             base = 0b1000
-
         |: // Decimal
             base = 0b1010
         }
@@ -512,17 +508,21 @@ impl Eval {
             decl:    false,
         }
 
-        let (sig, err) = parse_int(lit, base, BIT_SIZE)
-        if err == ConvError.Ok {
+        let mut ok = true
+        let sig = parse_int(lit, base, BIT_SIZE) else {
+            ok = false
+            use 0
+        }
+        if ok {
             d.constant = Const.new_i64(sig)
             d.kind = &TypeKind{
                 kind: build_prim_type(PrimKind.Int),
             }
         } else {
-            let (unsig, err) = parse_uint(lit, base, BIT_SIZE)
-            if err != ConvError.Ok {
+            let unsig = parse_uint(lit, base, BIT_SIZE) else {
                 self.push_err(l.token, LogMsg.InvalidNumericRange)
                 self.push_suggestion(LogMsg.TryFloatingPoint)
+                use u64.MAX
             }
             d.constant = Const.new_u64(unsig)
             d.kind = &TypeKind{

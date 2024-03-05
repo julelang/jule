@@ -187,19 +187,14 @@ impl ArgParser {
         match {
         | s == "":
             ret 0, false
-
         | strings::has_prefix(s, "0x"): // Hexadecimal
             x, ok = parser(s[2:], 0b00010000)
-
         | strings::has_prefix(s, "0b"): // Binary
             x, ok = parser(s[2:], 0b10)
-
         | strings::has_prefix(s, "0o"): // Octal
             x, ok = parser(s[2:], 0b1000)
-
         | s[0] == '0': // Octal
             x, ok = parser(s[1:], 0b1000)
-
         |: // Decimal
             x, ok = parser(s, 0b1010)
         }
@@ -231,30 +226,24 @@ impl ArgParser {
         | IntFlag:
             let mut intf = IntFlag(flag)
             let ((*intf._data), ok) = self.parse_integer[i64](data, fn(s: str, base: int): (i64, bool) {
-                let (x, err) = conv::parse_int(s, base, BIT64)
-                ret x, err == conv::ConvError.Ok
+                ret conv::parse_int(s, base, BIT64) else { ret 0, false }, true
             })
             if !ok {
                 error("--" + flag.name() + ": expression must be valid signed integer")
             }
-
         | UintFlag:
             let mut uintf = UintFlag(flag)
             let ((*uintf._data), ok) = self.parse_integer[u64](data, fn(s: str, base: int): (u64, bool) {
-                let (x, err) = conv::parse_uint(s, base, BIT64)
-                ret x, err == conv::ConvError.Ok
+                ret conv::parse_uint(s, base, BIT64) else { ret 0, false }, true
             })
             if !ok {
                 error("--" + flag.name() + ": expression must be valid unsigned integer")
             }
-
         | FloatFlag:
             let mut ff = FloatFlag(flag)
-            let ((*ff._data), err) = conv::parse_float(data, BIT64)
-            if err != conv::ConvError.Ok {
+            *ff._data = conv::parse_float(data, BIT64) else {
                 error("--" + flag.name() + ": expression must be valid floating-point")
             }
-
         | StrFlag:
             *StrFlag(flag)._data = data
         }
