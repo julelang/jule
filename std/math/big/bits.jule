@@ -198,7 +198,7 @@ fn is_even(&b: bits): bool {
 }
 
 // Basic multiplication algorithm for bits.
-fn basic_mul(mut x: bits, mut y: bits): bits {
+fn basic_mul(mut &x: bits, mut y: bits): bits {
     if y.len == 1 {
         ret x
     }
@@ -256,6 +256,10 @@ fn karatsuba_shl(mut s: bits, n: int): bits {
     ret append(s, make(bits, n)...)
 }
 
+// This threshold is represents number of bits small numbers for karatsuba algorithm.
+// If the y operand's bitlength <= threshold, use basic multiplication algorithm.
+const KARATSUBA_THRESHOLD = 1 << 5 + 8
+
 fn karatsuba(mut x: bits, mut y: bits): bits {
     let n = max(x.len, y.len)
     if n == 1 {
@@ -263,6 +267,16 @@ fn karatsuba(mut x: bits, mut y: bits): bits {
             ret nil
         }
         ret [1]
+    }
+
+    if y.len < KARATSUBA_THRESHOLD {
+        reverse(x)
+        reverse(y)
+        let mut r = basic_mul(x, y)
+        reverse(x)
+        reverse(y)
+        reverse(r)
+        ret r
     }
 
     let m = n >> 1
