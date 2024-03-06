@@ -162,11 +162,21 @@ fn fit_bits(mut &b: bits) {
     b = b[:i + 1]
 }
 
-// Compares bits.
+// Same as fit_bits, but designed for normal order bits.
+fn fit_bits_rev(mut &b: bits) {
+    for i, bit in b {
+        if bit != 0b0 {
+            b = b[i:]
+            break
+        }
+    }
+}
+
+// Compares bits. Bits should be normalized.
 // Returns +1 if x > y.
 // Returns 0 if x == y.
 // Returns -1 if x < y.
-fn bits_cmp(&x: bits, &y: bits): int {
+fn bits_cmp(x: bits, &y: bits): int {
     match {
     | x.len < y.len:
         ret -1
@@ -175,6 +185,27 @@ fn bits_cmp(&x: bits, &y: bits): int {
     }
     let mut i = x.len - 1
     for i >= 0; i-- {
+        let xbit = x[i]
+        let ybit = y[i]
+        match {
+        | xbit > ybit:
+            ret +1
+        | xbit < ybit:
+            ret -1
+        }
+    }
+    ret 0
+}
+
+// Same as bits_cmp, but designed for normal order bits.
+fn bits_cmp_rev(mut &x: bits, mut &y: bits): int {
+    match {
+    | x.len < y.len:
+        ret -1
+    | x.len > y.len:
+        ret +1
+    }
+    for i in x {
         let xbit = x[i]
         let ybit = y[i]
         match {
@@ -216,7 +247,7 @@ fn basic_mul(mut &x: bits, mut y: bits): bits {
     ret r
 }
 
-fn karatsuba_add_bits(mut x: bits, mut y: bits): bits {
+fn karatsuba_add(mut x: bits, mut y: bits): bits {
     reverse(x)
     reverse(y)
     defer {
@@ -241,7 +272,7 @@ fn karatsuba_add_bits(mut x: bits, mut y: bits): bits {
     ret r
 }
 
-fn karatsuba_sub_bits(mut x: bits, mut y: bits): bits {
+fn karatsuba_sub(mut x: bits, mut y: bits): bits {
     x = clone(x)
     reverse(x)
     reverse(y)
@@ -287,9 +318,42 @@ fn karatsuba(mut x: bits, mut y: bits): bits {
 
     let mut p1 = karatsuba(xl, yl)
     let mut p2 = karatsuba(xr, yr)
-    let mut p3 = karatsuba(karatsuba_add_bits(xl, xr), karatsuba_add_bits(yl, yr))
+    let mut p3 = karatsuba(karatsuba_add(xl, xr), karatsuba_add(yl, yr))
 
-    let mut c2 = karatsuba_shl(karatsuba_sub_bits(p3, karatsuba_add_bits(p1, p2)), n - m)
+    let mut c2 = karatsuba_shl(karatsuba_sub(p3, karatsuba_add(p1, p2)), n - m)
     let mut c1 = karatsuba_shl(p1, (n - m) << 1)
-    ret karatsuba_add_bits(karatsuba_add_bits(c1, c2), p2)
+    ret karatsuba_add(karatsuba_add(c1, c2), p2)
+}
+
+fn recursive_div(mut &x: bits, mut &y: bits): bits {
+    if x.len < y.len {
+        ret nil
+    }
+    if x == y {
+        ret [1]
+    }
+    let mut q = make(bits, 1, x.len)
+    q[0] = 0b1
+    for {
+        let mut z = karatsuba(q, y)
+        fit_bits_rev(z)
+        if bits_cmp_rev(z, x) != -1 {
+            break
+        }
+        q = append(q, 0b0)
+    }
+    if q.len == 1 {
+        ret [1]
+    }
+    q.swap(0, 1)
+    let mut yq = karatsuba(q, y)
+    let mut z = karatsuba_sub(x, yq)
+    fit_bits_rev(z)
+    let mut k = recursive_div(z, y)
+    reverse(q)
+    reverse(k)
+    add(q, k)
+    reverse(q)
+    reverse(k)
+    ret q
 }
