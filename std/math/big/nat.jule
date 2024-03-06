@@ -217,17 +217,28 @@ impl Nat {
         | y.len() == 1:
             ret
         | y.len() == 0:
-            panic("std::math::big: Int.div/Int.div_assign: division by zero")
-        | y.len() > self.len():
-            self.bits = nil
-            ret 
+            panic("std::math::big: division by zero")
         }
+        match self.cmp(y) {
+        | -1:
+            self.bits = nil
+            ret
+        | 0:
+            self = Nat.one()
+            ret
+        }
+
+        // Reverse bits, recursive division uses normal-order bits.
         reverse(self.bits)
         reverse(y.bits)
+
         let mut r = recursive_div(self.bits, y.bits)
+
+        // Reverse bits to save internal order.
         reverse(self.bits)
         reverse(y.bits)
         reverse(r)
+
         self.bits = r
         self.fit()
     }
