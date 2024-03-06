@@ -733,11 +733,11 @@ impl Parser {
                 t.idents = append(t.idents, token)
             }
 
-            let (mut t, _) = unsafe { self.build_type(part, &offset, true) }
+            let (mut tk, _) = unsafe { self.build_type(part, &offset, true) }
             if offset < part.len {
                 self.push_err(part[offset], LogMsg.InvalidSyntax)
             }
-            types = append(types, t)
+            types = append(types, tk)
         }
 
         if types.len > 1 {
@@ -768,12 +768,10 @@ impl Parser {
             if token.kind == TokenKind.LBrace {
                 ret
             }
-
         | TokenId.Op:
             if token.kind == TokenKind.Eq {
                 ret
             }
-
         | TokenId.Colon:
             if i+1 >= tokens.len {
                 self.push_err(token, LogMsg.MissingType)
@@ -785,9 +783,8 @@ impl Parser {
             if token.id == TokenId.Range {
                 match token.kind {
                 | TokenKind.LParent:
-                    let (mut decl, ok) = self.build_multi_ret_type(tokens, i)
-                    ret decl, ok
-
+                    t, ok = self.build_multi_ret_type(tokens, i)
+                    ret
                 | TokenKind.LBrace:
                     self.push_err(token, LogMsg.MissingType)
                     ret

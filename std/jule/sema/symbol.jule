@@ -603,7 +603,7 @@ impl SymbolBuilder {
             if imp.std {
                 self.importer.set_mod_path(PATH_STDLIB)
             }
-            let (mut asts, errors) = self.importer.import_package(imp.path, !imp.std)
+            let (mut asts, mut errors) = self.importer.import_package(imp.path, !imp.std)
             if errors.len > 0 {
                 self.errors = append(self.errors, errors...)
                 ret false
@@ -612,7 +612,8 @@ impl SymbolBuilder {
             self.check_package_accessibility(decl, old_mod, imp.path)
 
             for (_, mut ast) in asts {
-                let (mut table, errors) = build_symbols(ast, self.importer, self)
+                let mut table: &SymbolTable = nil
+                table, errors = build_symbols(ast, self.importer, self)
 
                 // Break import if file has error(s).
                 if errors.len > 0 {
