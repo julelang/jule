@@ -106,7 +106,7 @@ impl Nat {
 
     // Eliminates initial-zeros, normalizes bits.
     fn fit(mut self) {
-        fit_bits(self.bits)
+        fit(self.bits)
     }
 
     // Adds two Nat and returns result.
@@ -118,29 +118,13 @@ impl Nat {
 
     // Adds Nat.
     pub fn add_assign(mut self, y: Nat) {
-        if y.len() == 0 {
-            ret
-        }
-
-        let mut carry = bit(0)
         match {
-        | y.len() == 1:
-            // y is one.
-            // Add one to bits quicky.
+        | y.len() == 0:
+            ret
+        | y.len() == 1 | self.len() >= y.len():
             self.bits = clone(self.bits)
-            carry = add_one(self.bits)
-        | self.len() == y.len():
-            self.bits = clone(self.bits)
-            carry = add_bits_fast(self.bits, y.bits)
-        | self.len() > y.len():
-            self.bits = clone(self.bits)
-            carry = add_bits_rfast(self.bits, y.bits)
-        |:
-            self.bits, carry = add_bits(y.bits, self.bits)
         }
-        if carry == 0b1 {
-            self.bits = append(self.bits, 0b1)
-        }
+        add_res(self.bits, y.bits)
     }
 
     // Subtracts two Nat and returns result.
@@ -152,35 +136,13 @@ impl Nat {
 
     // Subtracts Nat.
     pub fn sub_assign(mut self, y: Nat) {
-        if y.len() == 0 {
-            ret
-        }
-        let mut carry = bit(0)
         match {
-        | y.len() == 1:
-            // y is one.
-            // Add one to bits quicky.
+        | y.len() == 0:
+            ret
+        | y.len() == 1 | self.len() >= y.len():
             self.bits = clone(self.bits)
-            twos_complement(self.bits)
-            carry = add_one(self.bits)
-        | self.len() == y.len():
-            self.bits = clone(self.bits)
-            twos_complement(self.bits)
-            carry = add_bits_fast(self.bits, y.bits)
-        | self.len() > y.len():
-            self.bits = clone(self.bits)
-            twos_complement(self.bits)
-            carry = add_bits_rfast(self.bits, y.bits)
-        |:
-            let mut xbits = make(bits, y.len())
-            _ = copy(xbits, self.bits)
-            self.bits = xbits
-            twos_complement(self.bits)
-            carry = add_bits_fast(self.bits, y.bits)
         }
-        if carry == 0b0 {
-            twos_complement(self.bits)
-        }
+        sub_res(self.bits, y.bits)
         self.fit()
     }
 
@@ -193,10 +155,10 @@ impl Nat {
 
     // Multiplies Nat.
     pub fn mul_assign(mut self, y: Nat) {
-        if y.len() == 1 {
+        match y.len() {
+        | 1:
             ret
-        }
-        if y.len() == 0 {
+        | 0:
             self.bits = nil
             ret
         }
@@ -211,23 +173,16 @@ impl Nat {
 
         let mut xb = self.bits
         let mut yb = y.bits
-
-        let mut xr = true
-        let mut yr = true
-        if xb.len != yb.len {
-            let n = max(xb.len, yb.len)
-            if xb.len < n {
-                xr = false
-                let mut xbn = make(bits, n)
-                _ = copy(xbn, xb)
-                xb = xbn
-            }
-            if yb.len < n {
-                yr = false
-                let mut ybn = make(bits, n)
-                _ = copy(ybn, yb)
-                yb = ybn
-            }
+        let n = max(xb.len, yb.len)
+        if xb.len < n {
+            let mut xbn = make(bits, n)
+            _ = copy(xbn, xb)
+            xb = xbn
+        }
+        if yb.len < n {
+            let mut ybn = make(bits, n)
+            _ = copy(ybn, yb)
+            yb = ybn
         }
 
         // Reverse bits, karatsuba uses normal-order bits.
@@ -237,10 +192,10 @@ impl Nat {
         let mut r = karatsuba(xb, yb)
 
         // Reverse bits to save internal order.
-        if xr {
+        if self.len() < n {
             reverse(self.bits)
         }
-        if yr {
+        if y.len() < n {
             reverse(y.bits)
         }
         reverse(r)
@@ -258,12 +213,12 @@ impl Nat {
 
     // Divides Nat.
     pub fn div_assign(mut self, y: Nat) {
-        if y.len() == 0 || y.len() > self.len() {
+        match {
+        | y.len() == 1:
+            ret
+        | y.len() == 0 | y.len() > self.len():
             self.bits = nil
             ret 
-        }
-        if y.len() == 1 {
-            ret
         }
         reverse(self.bits)
         reverse(y.bits)
@@ -315,32 +270,32 @@ impl Nat {
     // Returns 0 if self == y.
     // Returns -1 if self < y.
     fn cmp(self, y: Nat): int {
-        ret bits_cmp(self.bits, y.bits)
+        ret cmp(self.bits, y.bits)
     }
 
     // Reports whether integer less than other.
     pub fn lt(self, y: Nat): bool {
-        ret bits_cmp(self.bits, y.bits) == -1
+        ret self.cmp(y) == -1
     }
 
     // Reports whether integer less than or equals to other.
     pub fn lt_eq(self, y: Nat): bool {
-        ret bits_cmp(self.bits, y.bits) < +1
+        ret self.cmp(y) < +1
     }
 
     // Reports whether integer greater than other.
     pub fn gt(self, y: Nat): bool {
-        ret bits_cmp(self.bits, y.bits) == +1
+        ret self.cmp(y) == +1
     }
 
     // Reports whether integer greater than or equals to other.
     pub fn gt_eq(self, y: Nat): bool {
-        ret bits_cmp(self.bits, y.bits) > -1
+        ret self.cmp(y) > -1
     }
 
     // Reports whether bits are equals.
     pub fn eq(self, y: Nat): bool {
-        ret bits_cmp(self.bits, y.bits) == 0
+        ret self.cmp(y) == 0
     }
 
     // Reports whether number is odd.

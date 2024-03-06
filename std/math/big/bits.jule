@@ -55,24 +55,26 @@ fn reverse(mut &b: bits) {
     }
 }
 
-fn add(mut &x: bits, &y: bits) {
+// Add bits with size responsive.
+fn add_res(mut &x: bits, &y: bits) {
     let mut carry = bit(0)
     match {
     | y.len == 1:
         carry = add_one(x)
     | x.len == y.len:
-        carry = add_bits_fast(x, y)
+        carry = add_fast(x, y)
     | x.len > y.len:
-        carry = add_bits_rfast(x, y)
+        carry = add_rfast(x, y)
     |:
-        x, carry = add_bits(y, x)
+        x, carry = add(y, x)
     }
     if carry == 0b1 {
         x = append(x, 0b1)
     }
 }
 
-fn sub(mut &x: bits, &y: bits) {
+// Subtract bits with size responsive.
+fn sub_res(mut &x: bits, &y: bits) {
     let mut carry = bit(0)
     match {
     | y.len == 1:
@@ -80,16 +82,16 @@ fn sub(mut &x: bits, &y: bits) {
         carry = add_one(x)
     | x.len == y.len:
         twos_complement(x)
-        carry = add_bits_fast(x, y)
+        carry = add_fast(x, y)
     | x.len > y.len:
         twos_complement(x)
-        carry = add_bits_rfast(x, y)
+        carry = add_rfast(x, y)
     |:
         let mut xn = make(bits, y.len)
         _ = copy(xn, x)
         x = xn
         twos_complement(x)
-        carry = add_bits_fast(x, y)
+        carry = add_fast(x, y)
     }
     if carry == 0b0 {
         twos_complement(x)
@@ -114,7 +116,7 @@ fn twos_complement(mut &b: bits) {
 // Carry is guaranteed to be 0b0 or 0b1.
 // Does not allocates new bits for result, updates elements of x.
 // x and y should be have same bitsize.
-fn add_bits_fast(mut &x: bits, &y: bits): (carry: bit) {
+fn add_fast(mut &x: bits, &y: bits): (carry: bit) {
     for i, xbit in x {
         let ybit = y[i]
         x[i] = xbit ^ ybit ^ carry
@@ -128,7 +130,7 @@ fn add_bits_fast(mut &x: bits, &y: bits): (carry: bit) {
 // Carry is guaranteed to be 0b0 or 0b1.
 // Does not allocates new bits for result, updates elements of x.
 // y implies imaginary zero-bits for missing part if y.bit-size < x.bit-size.
-fn add_bits_rfast(mut &x: bits, &y: bits): (carry: bit) {
+fn add_rfast(mut &x: bits, &y: bits): (carry: bit) {
     for i, xbit in x {
         let ybit = if i < y.len { y[i] } else { 0b0 }
         x[i] = xbit ^ ybit ^ carry
@@ -141,7 +143,7 @@ fn add_bits_rfast(mut &x: bits, &y: bits): (carry: bit) {
 // Returns bits and carry.
 // Carry is guaranteed to be 0b0 or 0b1.
 // y implies imaginary zero-bits for missing part if y.bit-size < x.bit-size.
-fn add_bits(&x: bits, &y: bits): (r: bits, carry: bit) {
+fn add(&x: bits, &y: bits): (r: bits, carry: bit) {
     r = make(bits, 0, x.len)
     for i, xbit in x {
         let ybit = if i < y.len { y[i] } else { 0b0 }
@@ -152,7 +154,7 @@ fn add_bits(&x: bits, &y: bits): (r: bits, carry: bit) {
 }
 
 // Eliminates initial-zeros, normalizes bits.
-fn fit_bits(mut &b: bits) {
+fn fit(mut &b: bits) {
     let mut i = b.len - 1
     for i >= 0; i-- {
         if b[i] != 0b0 {
@@ -163,7 +165,7 @@ fn fit_bits(mut &b: bits) {
 }
 
 // Same as fit_bits, but designed for normal order bits.
-fn fit_bits_rev(mut &b: bits) {
+fn fit_rev(mut &b: bits) {
     for i, bit in b {
         if bit != 0b0 {
             b = b[i:]
@@ -176,7 +178,7 @@ fn fit_bits_rev(mut &b: bits) {
 // Returns +1 if x > y.
 // Returns 0 if x == y.
 // Returns -1 if x < y.
-fn bits_cmp(x: bits, &y: bits): int {
+fn cmp(x: bits, &y: bits): int {
     match {
     | x.len < y.len:
         ret -1
@@ -198,7 +200,7 @@ fn bits_cmp(x: bits, &y: bits): int {
 }
 
 // Same as bits_cmp, but designed for normal order bits.
-fn bits_cmp_rev(mut &x: bits, mut &y: bits): int {
+fn cmp_rev(mut &x: bits, mut &y: bits): int {
     match {
     | x.len < y.len:
         ret -1
@@ -238,7 +240,7 @@ fn basic_mul(mut &x: bits, mut y: bits): bits {
     _ = copy(m, x)
     for y.len > 0 {
         if is_odd(y) {
-            add(r, m)
+            add_res(r, m)
         }
         m = append(m[:1], m...)
         m[0] = 0b0
@@ -259,11 +261,11 @@ fn karatsuba_add(mut x: bits, mut y: bits): bits {
     let mut r: bits = nil
     match {
     | x.len == y.len:
-        r, carry = add_bits(x, y)
+        r, carry = add(x, y)
     | x.len > y.len:
-        r, carry = add_bits(x, y)
+        r, carry = add(x, y)
     |:
-        r, carry = add_bits(y, x)
+        r, carry = add(y, x)
     }
     if carry == 0b1 {
         r = append(r, 0b1)
@@ -277,7 +279,7 @@ fn karatsuba_sub(mut x: bits, mut y: bits): bits {
     reverse(x)
     reverse(y)
 
-    sub(x, y)
+    sub_res(x, y)
     reverse(x)
     reverse(y)
     ret x
@@ -336,8 +338,8 @@ fn recursive_div(mut &x: bits, mut &y: bits): bits {
     q[0] = 0b1
     for {
         let mut z = karatsuba(q, y)
-        fit_bits_rev(z)
-        if bits_cmp_rev(z, x) != -1 {
+        fit_rev(z)
+        if cmp_rev(z, x) != -1 {
             break
         }
         q = append(q, 0b0)
@@ -348,11 +350,11 @@ fn recursive_div(mut &x: bits, mut &y: bits): bits {
     q.swap(0, 1)
     let mut yq = karatsuba(q, y)
     let mut z = karatsuba_sub(x, yq)
-    fit_bits_rev(z)
+    fit_rev(z)
     let mut k = recursive_div(z, y)
     reverse(q)
     reverse(k)
-    add(q, k)
+    add_res(q, k)
     reverse(q)
     reverse(k)
     ret q
