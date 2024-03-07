@@ -326,36 +326,19 @@ fn eliminate_dead_traits(mut &pkg: &Package) {
     }
 }
 
-fn catch_alive_init(mut &pkg: &Package) {
+fn keep_alive_init(mut &pkg: &Package) {
     const CPP_LINKED = false
     const INIT_FN = "init"
     let mut f = pkg.find_fn(INIT_FN, CPP_LINKED)
-    if f == nil {
-        ret
-    }
-
-    let n = deads.len
-    defer {
-        // Clear memory.
-        deads = deads[:n]
-        checking = nil
-        current = nil
-    }
-
-    let mut ins = f.instances[0]
-    let mut i = 0
-    for i < ins.refers.len(); i++ {
-        if !is_dead(ins.refers.at(i)) {
-            f.statically = true
-            ret
-        }
+    if f != nil {
+        f.statically = true
     }
 }
 
 fn eliminate_package(mut &pkg: &Package) {
-    deads = make([]any, 0, 2000)
+    deads = make([]any, 0, 1 << 10)
 
-    catch_alive_init(pkg)
+    keep_alive_init(pkg)
 
     //eliminate_dead_structs(pkg)
     //eliminate_dead_traits(pkg)
