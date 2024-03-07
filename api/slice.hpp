@@ -363,7 +363,11 @@ namespace jule
             return !this->operator==(nullptr);
         }
 
-        inline void swap(const jule::Int &i, const jule::Int &j) const noexcept
+        void swap(
+#ifndef __JULE_ENABLE__PRODUCTION
+            const char *file,
+#endif
+            const jule::Int &i, const jule::Int &j) const noexcept
         {
 #ifndef __JULE_DISABLE__SAFETY
             if (this->empty() || i < 0 || this->len() <= i)
@@ -371,6 +375,10 @@ namespace jule
                 std::string error;
                 __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(error, i, this->len());
                 error += "\nruntime: slice element swapping with out of range index";
+#ifndef __JULE_ENABLE__PRODUCTION
+                error += "\nfile: ";
+                error += file;
+#endif
                 jule::panic(error);
             }
             if (this->empty() || j < 0 || this->len() <= j)
@@ -378,6 +386,10 @@ namespace jule
                 std::string error;
                 __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(error, j, this->len());
                 error += "\nruntime: slice element swapping with out of range index";
+#ifndef __JULE_ENABLE__PRODUCTION
+                error += "\nfile: ";
+                error += file;
+#endif
                 jule::panic(error);
             }
 #endif

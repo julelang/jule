@@ -493,21 +493,23 @@ impl ExprCoder {
                 }
             }
         }
-        if !env::PRODUCTION && m.func.anon {
-            match type m.expr {
-            | &StructSubIdentExprModel:
-                if (&StructSubIdentExprModel)(m.expr).field.decl.owner.cpp_linked {
-                    obj += "("
-                    break
+        if !env::PRODUCTION && (m.func.anon || is_builtin_call_has_debuginf(m)) {
+            if m.func.anon {
+                match type m.expr {
+                | &StructSubIdentExprModel:
+                    if (&StructSubIdentExprModel)(m.expr).field.decl.owner.cpp_linked {
+                        break
+                    }
+                    fall
+                |:
+                    obj += ".call"
                 }
-                fall
-            |:
-                obj += ".call(\""
-                obj += self.oc.loc_info(m.token)
-                obj += "\""
-                if m.args.len != 0 {
-                    obj += ","
-                }
+            }
+            obj += "(\""
+            obj += self.oc.loc_info(m.token)
+            obj += "\""
+            if m.args.len != 0 {
+                obj += ","
             }
         } else {
             obj += "("
@@ -1275,5 +1277,18 @@ fn is_forwarded(&s: &Scope): bool {
         }
     |:
         ret true
+    }
+}
+
+fn is_builtin_call_has_debuginf(&m: &FnCallExprModel): bool {
+    if !m.func.is_builtin() {
+        ret false
+    }
+    match type m.expr {
+    | &CommonSubIdentExprModel:
+        let csie = (&CommonSubIdentExprModel)(m.expr)
+        ret csie.ident == "swap"
+    |:
+        ret false
     }
 }
