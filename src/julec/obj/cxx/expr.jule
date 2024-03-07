@@ -478,6 +478,31 @@ impl ExprCoder {
         }
     }
 
+    fn push_call_inf(mut self, mut &obj: str, &m: &FnCallExprModel) {
+        if env::PRODUCTION || (!m.func.anon && !is_builtin_call_has_debuginf(m)) {
+            obj += "("
+            ret
+        }
+        if m.func.anon {
+            match type m.expr {
+            | &StructSubIdentExprModel:
+                if (&StructSubIdentExprModel)(m.expr).field.decl.owner.cpp_linked {
+                    obj += "("
+                    ret
+                }
+                fall
+            |:
+                obj += ".call"
+            }
+        }
+        obj += "(\""
+        obj += self.oc.loc_info(m.token)
+        obj += "\""
+        if m.args.len != 0 {
+            obj += ","
+        }
+    }
+
     fn pure_func_call(mut self, mut &m: &FnCallExprModel): str {
         let mut obj = self.model_for_call(m.expr)
         if !m.func.is_builtin() {
@@ -493,27 +518,7 @@ impl ExprCoder {
                 }
             }
         }
-        if !env::PRODUCTION && (m.func.anon || is_builtin_call_has_debuginf(m)) {
-            if m.func.anon {
-                match type m.expr {
-                | &StructSubIdentExprModel:
-                    if (&StructSubIdentExprModel)(m.expr).field.decl.owner.cpp_linked {
-                        break
-                    }
-                    fall
-                |:
-                    obj += ".call"
-                }
-            }
-            obj += "(\""
-            obj += self.oc.loc_info(m.token)
-            obj += "\""
-            if m.args.len != 0 {
-                obj += ","
-            }
-        } else {
-            obj += "("
-        }
+        self.push_call_inf(obj, m)
         obj += self.args(m.args)
         obj += ")"
 
