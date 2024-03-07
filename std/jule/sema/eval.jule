@@ -69,17 +69,28 @@ fn find_builtins_import(ident: str, imp: &ImportInfo): any {
 // Data should be numerical constant of course.
 fn fit_bitsize(mut &d: &Data) {
     let mut prim = d.kind.prim()
-    let mut k = ""
+    let z = types::bitsize_of(prim.to_str())
+    if z == 1 << 6 {
+        // z is already equals to biggest bitsize.
+        ret
+    }
+    let mut k = 0
     match {
     | d.constant.is_i64():
-        k = types::int_from_bits(types::bitsize_of_int(d.constant.read_i64()))
+        k = types::bitsize_of_int(d.constant.read_i64())
+        if k > z {
+            prim.kind = types::int_from_bits(k)
+        }
     | d.constant.is_u64():
-        k = types::uint_from_bits(types::bitsize_of_uint(d.constant.read_u64()))
+        k = types::bitsize_of_uint(d.constant.read_u64())
+        if k > z {
+            prim.kind = types::uint_from_bits(k)
+        }
     | d.constant.is_f64():
-        k = types::float_from_bits(types::bitsize_of_float(d.constant.read_f64()))
-    }
-    if types::is_greater(k, types::real_kind_of(prim.kind)) {
-        prim.kind = k
+        k = types::bitsize_of_float(d.constant.read_f64())
+        if k > z {
+            prim.kind = types::float_from_bits(k)
+        }
     }
 }
 
@@ -170,10 +181,6 @@ fn is_ptr_arithmetic_compatible_int(mut &d: &Data): bool {
         src: d.kind,
     }
     ret tcc.check()
-}
-
-fn normalize_type(mut &d: &Data) {
-
 }
 
 fn apply_cast_kind_model(mut &d: &Data) {
@@ -320,11 +327,18 @@ impl Eval {
         self.s.push_suggestion(fmt, args...)
     }
 
-    fn allow_builtin(mut self) { self.dis_builtin = false }
-    fn disallow_builtin(mut self) { self.dis_builtin = true }
+    fn allow_builtin(mut self) {
+        self.dis_builtin = false
+    }
+    
+    fn disallow_builtin(mut self) {
+        self.dis_builtin = true
+    }
 
     // Reports whether evaluation in unsafe scope.
-    fn is_unsafe(self): bool { ret self.unsafety }
+    fn is_unsafe(self): bool {
+        ret self.unsafety
+    }
 
     // Reports whether evaluated expression is in global scope.
     fn is_global(self): bool {
@@ -352,13 +366,13 @@ impl Eval {
             d.kind = new(TypeKind, *self.prefix)
             d.constant.set_f64(d.constant.as_f64())
         | types::is_sig_int(prim.to_str()):
-            if !int_assignable(prim.to_str(), d) {
+            if !sig_assignable(prim.to_str(), d) {
                 ret false
             }
             d.kind = new(TypeKind, *self.prefix)
             d.constant.set_i64(d.constant.as_i64())
         | types::is_unsig_int(prim.to_str()):
-            if !int_assignable(prim.to_str(), d) {
+            if !unsig_assignable(prim.to_str(), d) {
                 ret false
             }
             d.kind = new(TypeKind, *self.prefix)
@@ -1663,10 +1677,8 @@ impl Eval {
             match {
             | types::is_float(prim.kind):
                 d.constant.set_f64(d.constant.as_f64())
-
             | types::is_sig_int(prim.kind):
                 d.constant.set_i64(d.constant.as_i64())
-
             | types::is_unsig_int(prim.kind):
                 d.constant.set_u64(d.constant.as_u64())
             }
@@ -1692,16 +1704,12 @@ impl Eval {
         match {
         | prim.is_any():
             // The any type supports casting to any data type.
-
         | prim.is_str():
             self.cast_str(d, error_token)
-
         | types::is_int(prim.to_str()):
             self.cast_int(t, d, error_token)
-
         | types::is_num(prim.to_str()):
             self.cast_num(t, d, error_token)
-
         |:
             self.push_err(error_token, LogMsg.TypeNotSupportsCasting, t.to_str())
         }
@@ -1939,7 +1947,6 @@ impl Eval {
             // Make empty types to generics for ordering.
             f.generics = make([]&TypeKind, f.decl.generics.len)
             ret true, true
-
         | !self.s.check_generic_quantity(f.decl.generics.len, fc.generics.len, fc.token):
             ret false, false
 
@@ -2123,10 +2130,8 @@ impl Eval {
             | fc.unhandled():
                 self.push_err(fc.token, LogMsg.UnhandledExceptional)
                 self.push_suggestion(LogMsg.HandleExceptional)
-
             | fc.ignored():
                 // Ok.
-
             |: // Handled with scope.
                 self.process_exceptional_handler(f, fc, d)
             }
@@ -2219,7 +2224,9 @@ impl Eval {
                 expr:      d.model,
                 method:    ins,
             }
-            d.kind = &TypeKind{kind: ins}
+            d.kind = &TypeKind{
+                kind: ins,
+            }
             ret d
         }
 
@@ -3468,10 +3475,8 @@ impl UnaryEval {
                 ret
             }
             self.d.kind = t.elem
-
         | self.d.kind.sptr() != nil:
             self.d.kind = self.d.kind.sptr().elem
-
         |:
             self.d = nil
             ret
@@ -3486,7 +3491,6 @@ impl UnaryEval {
         | &StructLitExprModel:
             let mut lit = (&StructLitExprModel)(self.d.model)
             make_struct_lit_alloc(self.d, lit)
-
         |:
             match {
             | can_get_ptr(self.d):
