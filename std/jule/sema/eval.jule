@@ -4,7 +4,7 @@
 
 use integ for std::jule::integrated
 
-use std::conv::{ConvError, parse_float, parse_int, parse_uint}
+use conv for std::conv
 use path for std::fs::path
 use std::jule::ast::{
     self,
@@ -62,6 +62,25 @@ fn find_directive(mut &directives: []&std::jule::ast::Directive, d: Directive): 
 
 fn find_builtins_import(ident: str, imp: &ImportInfo): any {
     ret find_package_builtin_def(imp.link_path, ident)
+}
+
+// If current type is not enough to store constant data, update to minimum type
+// that can store constant data. This function designed for numerical types only.
+// Data should be numerical constant of course.
+fn fit_bitsize(mut &d: &Data) {
+    let mut prim = d.kind.prim()
+    let mut k = ""
+    match {
+    | d.constant.is_i64():
+        k = types::int_from_bits(types::bitsize_of_int(d.constant.read_i64()))
+    | d.constant.is_u64():
+        k = types::uint_from_bits(types::bitsize_of_uint(d.constant.read_u64()))
+    | d.constant.is_f64():
+        k = types::float_from_bits(types::bitsize_of_float(d.constant.read_f64()))
+    }
+    if types::is_greater(k, types::real_kind_of(prim.kind)) {
+        prim.kind = k
+    }
 }
 
 fn make_struct_lit_alloc(mut &d: &Data, mut &lit: &StructLitExprModel) {
@@ -154,14 +173,7 @@ fn is_ptr_arithmetic_compatible_int(mut &d: &Data): bool {
 }
 
 fn normalize_type(mut &d: &Data) {
-    match {
-    | int_assignable(PrimKind.Int, d):
-        d.kind.kind = build_prim_type(PrimKind.Int)
-        d.constant.set_i64(d.constant.as_i64())
-    | int_assignable(PrimKind.Uint, d):
-        d.kind.kind = build_prim_type(PrimKind.Uint)
-        d.constant.set_u64(d.constant.as_u64())
-    }
+
 }
 
 fn apply_cast_kind_model(mut &d: &Data) {
@@ -323,26 +335,30 @@ impl Eval {
     }
 
     fn apply_numeric_prefix(mut self, mut &d: &Data): bool {
-        if d == nil || d.cast_kind != nil || !d.is_const() || d.kind.prim() == nil {
+        if d == nil ||
+            d.cast_kind != nil ||
+            !d.is_const() ||
+            d.kind.prim() == nil ||
+            self.prefix == nil {
             ret false
         }
-        if self.prefix == nil || self.prefix.prim() == nil {
+        let prim = self.prefix.prim()
+        if prim == nil {
             ret false
         }
 
-        let pk = self.prefix.prim().kind
         match {
-        | types::is_float(pk):
+        | types::is_float(prim.to_str()):
             d.kind = new(TypeKind, *self.prefix)
             d.constant.set_f64(d.constant.as_f64())
-        | types::is_sig_int(pk):
-            if !int_assignable(pk, d) {
+        | types::is_sig_int(prim.to_str()):
+            if !int_assignable(prim.to_str(), d) {
                 ret false
             }
             d.kind = new(TypeKind, *self.prefix)
             d.constant.set_i64(d.constant.as_i64())
-        | types::is_unsig_int(pk):
-            if !int_assignable(pk, d) {
+        | types::is_unsig_int(prim.to_str()):
+            if !int_assignable(prim.to_str(), d) {
                 ret false
             }
             d.kind = new(TypeKind, *self.prefix)
@@ -433,7 +449,7 @@ impl Eval {
     fn lit_float(self, &l: &LitExpr): &Data {
         const FLOAT_KIND: str = PrimKind.F64
 
-        let f = parse_float(l.value, 64) else { use f64.MAX }
+        let f = conv::parse_float(l.value, 64) else { use f64.MAX }
         let mut constant = Const.new_f64(f)
 
         ret &Data{
@@ -457,18 +473,18 @@ impl Eval {
         match {
         | strings::has_prefix(lit, "0x"): // Hexadecimal
             lit = lit[2:]
-            base = 0b00010000
+            base = 1 << 4
         | strings::has_prefix(lit, "0b"): // Binary
             lit = lit[2:]
-            base = 0b10
+            base = 1 << 1
         | strings::has_prefix(lit, "0o"): // Ocatal
             lit = lit[2:]
-            base = 0b1000
+            base = 1 << 3
         | lit[0] == '0' && lit.len > 1: // Octal
             lit = lit[1:]
-            base = 0b1000
+            base = 1 << 3
         |: // Decimal
-            base = 0b1010
+            base = 1 << 3 + 2
         }
 
         let mut d = &Data{
@@ -478,30 +494,33 @@ impl Eval {
         }
 
         let mut ok = true
-        let sig = parse_int(lit, base, BIT_SIZE) else {
+        let sig = conv::parse_int(lit, base, BIT_SIZE) else {
             ok = false
             use 0
         }
         if ok {
             d.constant = Const.new_i64(sig)
             d.kind = &TypeKind{
-                kind: build_prim_type(PrimKind.I64),
+                kind: build_prim_type(PrimKind.Int),
             }
         } else {
-            let unsig = parse_uint(lit, base, BIT_SIZE) else {
+            let unsig = conv::parse_uint(lit, base, BIT_SIZE) else {
                 self.push_err(l.token, LogMsg.InvalidNumericRange)
                 self.push_suggestion(LogMsg.TryFloatingPoint)
                 use u64.MAX
             }
             d.constant = Const.new_u64(unsig)
             d.kind = &TypeKind{
-                kind: build_prim_type(PrimKind.U64),
+                kind: build_prim_type(PrimKind.Uint),
             }
         }
 
         d.model = d.constant
         if !self.apply_numeric_prefix(d) {
-            normalize_type(d)
+            // If prefix is not implemented, check constant bitsize.
+            // Arcihtecture bitsize type might be insufficient to store constant data.
+            // If this concern is true, set kind to minimum type that has enough bitsize.
+            fit_bitsize(d)
         }
         ret d
     }
@@ -539,20 +558,17 @@ impl Eval {
             if def != nil {
                 ret def
             }
-
         | &Sema:
             let mut def = find_builtins_sema(ident, (&Sema)(self.lookup))
             if def != nil {
                 ret def
             }
-
         | &ScopeChecker:
             let mut def = find_builtins_sema(ident, (&ScopeChecker)(self.lookup).s)
             if def != nil {
                 ret def
             }
         }
-
         ret if self.dis_builtin { nil } else { find_builtin_def(ident) }
     }
 
@@ -4287,23 +4303,11 @@ impl BinaryEval {
         if prim == nil || !types::is_num(prim.to_str()) {
             ret
         }
-        if self.e.apply_numeric_prefix(d) {
-            ret
-        }
-        // If prefix is not implemented, check constant bitsize.
-        // Current data kind might be insufficient to store constant data.
-        // If this concern is true, set kind to minimum type that has enough bitsize.
-        let mut k = ""
-        match {
-        | d.constant.is_i64():
-            k = types::int_from_bits(types::bitsize_of_int(d.constant.read_i64()))
-        | d.constant.is_u64():
-            k = types::uint_from_bits(types::bitsize_of_uint(d.constant.read_u64()))
-        | d.constant.is_f64():
-            k = types::float_from_bits(types::bitsize_of_float(d.constant.read_f64()))
-        }
-        if types::is_greater(k, types::real_kind_of(prim.kind)) {
-            prim.kind = k
+        if !self.e.apply_numeric_prefix(d) {
+            // If prefix is not implemented, check constant bitsize.
+            // Current data kind might be insufficient to store constant data.
+            // If this concern is true, set kind to minimum type that has enough bitsize.
+            fit_bitsize(d)
         }
     }
 

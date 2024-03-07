@@ -59,27 +59,23 @@ fn float_assignable(kind: str, &d: &Data): bool {
 fn sig_assignable(kind: str, &d: &Data): bool {
     let min = types::min(kind)
     let max = types::max(kind)
-
     match {
     | d.constant.is_f64():
-        let x = f64(d.constant.read_f64())
+        let x = d.constant.read_f64()
         let (i, frac) = modf(x)
         if frac != 0 {
             ret false
         }
         ret i >= min && i <= max
-
     | d.constant.is_u64():
-        let x = f64(d.constant.read_u64())
+        let x = d.constant.as_f64()
         if x <= max {
             ret true
         }
-
     | d.constant.is_i64():
-        let x = f64(d.constant.read_i64())
+        let x = d.constant.as_f64()
         ret min <= x && x <= max
     }
-
     ret false
 }
 
@@ -95,32 +91,31 @@ fn unsig_assignable(kind: str, &d: &Data): bool {
         if x < 0 {
             ret false
         }
-
         let (i, frac) = modf(x)
         if frac != 0 {
             ret false
         }
         ret i <= max
-
     | d.constant.is_u64():
-        let x = f64(d.constant.read_u64())
+        let x = d.constant.as_f64()
         if x <= max {
             ret true
         }
-
     | d.constant.is_i64():
-        let x = f64(d.constant.read_i64())
+        let x = d.constant.as_f64()
         ret 0 <= x && x <= max
     }
-
     ret false
 }
 
 fn int_assignable(kind: str, &d: &Data): bool {
     match {
-    | types::is_sig_int(kind):   ret sig_assignable(kind, d)
-    | types::is_unsig_int(kind): ret unsig_assignable(kind, d)
-    |:                           ret false
+    | types::is_sig_int(kind):
+        ret sig_assignable(kind, d)
+    | types::is_unsig_int(kind):
+        ret unsig_assignable(kind, d)
+    |:
+        ret false
     }
 }
 
