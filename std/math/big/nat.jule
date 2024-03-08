@@ -159,6 +159,12 @@ impl Nat {
         | 1:
             ret
         | 0:
+            // Right operand is zero, result is always zero.
+            self.bits = nil
+            ret
+        }
+        if self.len() == 0 {
+            // Right operand is zero, result is always zero.
             self.bits = nil
             ret
         }
@@ -171,6 +177,7 @@ impl Nat {
             ret
         }
 
+        // Make size of operands are equal if not.
         let mut xb = self.bits
         let mut yb = y.bits
         let n = max(xb.len, yb.len)
@@ -213,23 +220,80 @@ impl Nat {
 
     // Divides Nat.
     pub fn div_assign(mut self, y: Nat) {
+        if self.len() == 0 {
+            // Left operans is zero, remainder is always zero.
+            ret
+        }
+        match y.len() {
+        | 1:
+            // Right operand is 1, quotient is always equals to left operand.
+            ret
+        | 0:
+            panic("std::math::big: division by zero")
+        }
+        match self.cmp(y) {
+        | -1:
+            // Left operand is less than right oprand.
+            // Quotient is always equals to zero.
+            self.bits = nil
+            ret
+        | 0:
+            // Left oprand and right operand are equal.
+            // Quotient is always zero.
+            self.bits = [1]
+            ret
+        }
+        // Use clone because of recursive division can change left operand.
+        let mut xb = clone(self.bits)
+        self.bits = recursive_div(xb, y.bits)
+        self.fit()
+    }
+
+    // Modulo two Nat and returns result.
+    pub fn mod(self, y: Nat): Nat {
+        let mut r = self
+        r %= y
+        ret r
+    }
+
+    // Modulo Nat.
+    pub fn mod_assign(mut self, y: Nat) {
+        if self.len() == 0 {
+            // Left operans is zero, remainder is always zero.
+            ret
+        }
         match {
         | y.len() == 1:
+            // Right operand is 1, remainder is always zero.
+            self.bits = nil
+            ret
+        | y.len() == 2 && y.bits[0] == 0b0:
+            // Right operand is 2.
+            // If left opeand is even, remainder is always zero.
+            // If left operand is odd, remainder is always one.
+            if self.even() {
+               self.bits = nil
+            } else {
+               self.bits = [1]
+            }
             ret
         | y.len() == 0:
             panic("std::math::big: division by zero")
         }
         match self.cmp(y) {
         | -1:
-            self.bits = nil
+            // Left operand less than right operand.
+            // Remainder always equals to left operand.
             ret
         | 0:
-            self = Nat.one()
+            // Left oprand and right operand are equal.
+            // Remainder is always zero.
+            self.bits = nil
             ret
         }
         // Use clone because of recursive division can change left operand.
         let mut xb = clone(self.bits)
-        self.bits = recursive_div(xb, y.bits)
+        self.bits = recursive_mod(xb, y.bits)
         self.fit()
     }
 
