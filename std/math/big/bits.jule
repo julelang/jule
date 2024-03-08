@@ -74,7 +74,7 @@ fn add_res(mut &x: bits, &y: bits) {
 }
 
 // Subtract bits with size responsive.
-fn sub_res(mut &x: bits, &y: bits) {
+fn sub_res(mut &x: bits, y: bits) {
     let mut carry = bit(0)
     match {
     | y.len == 1:
@@ -164,7 +164,7 @@ fn fit(mut &b: bits) {
     b = b[:i + 1]
 }
 
-// Same as fit_bits, but designed for normal order bits.
+// Same as fit, but designed for normal order bits.
 fn fit_rev(mut &b: bits) {
     for i, bit in b {
         if bit != 0b0 {
@@ -199,7 +199,7 @@ fn cmp(x: bits, &y: bits): int {
     ret 0
 }
 
-// Same as bits_cmp, but designed for normal order bits.
+// Same as cmp, but designed for normal order bits.
 fn cmp_rev(mut &x: bits, mut &y: bits): int {
     match {
     | x.len < y.len:
@@ -331,31 +331,35 @@ fn recursive_div(mut &x: bits, mut &y: bits): bits {
     if x.len < y.len {
         ret nil
     }
-    if x == y {
+    if cmp(x, y) == 0 {
         ret [1]
     }
-    let mut q = make(bits, 1, x.len)
-    q[0] = 0b1
-    for {
-        let mut z = karatsuba(q, y)
-        fit_rev(z)
-        if cmp_rev(z, x) != -1 {
-            break
-        }
-        q = append(q, 0b0)
+    let mut yq = make(bits, y.len, x.len)
+    _ = copy(yq, y)
+    for cmp(yq, x) == -1 {
+        yq = append(yq[:1], yq...)
+        yq[0] = 0b0
     }
-    if q.len == 1 {
+    if yq.len == y.len {
         ret [1]
     }
-    q.swap(0, 1)
-    let mut yq = karatsuba(q, y)
-    let mut z = karatsuba_sub(x, yq)
-    fit_rev(z)
-    let mut k = recursive_div(z, y)
-    reverse(q)
-    reverse(k)
-    add_res(q, k)
-    reverse(q)
-    reverse(k)
-    ret q
+    sub_res(x, yq[1:])
+    fit(x)
+    let mut k = recursive_div(x, y)
+    yq = yq[y.len:]
+    for i in yq {
+        yq[i] = 0b0
+    }
+    yq[yq.len - 1] = 0b1
+    if k.len == 0 {
+        ret yq
+    }
+    if k.len > yq.len {
+        // Use k + yq calculation istead of yq + k to avoid allocation.
+        // Because add_res function allocates new bits if left operand less than right operand.
+        add_res(k, yq)
+        ret k
+    }
+    add_res(yq, k)
+    ret yq
 }
