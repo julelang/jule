@@ -65,10 +65,9 @@ static cases_int_mod = [
     ["1010", "+", "10000000000", "-", "1111110110", "-"],
 ]
 
-#test
-fn test_int_add(mut t: &T) {
-    for _, c in cases_int_add {
-        let n1 = Int.from_bits(c[0], c[1] == "-") else {
+fn test_common_int_op(mut &t: &T, op: str, &cases: [][]str) {
+    for _, c in cases {
+        let mut n1 = Int.from_bits(c[0], c[1] == "-") else {
             t.errorf("exception occurs: {}", error)
             continue
         }
@@ -76,143 +75,59 @@ fn test_int_add(mut t: &T) {
             t.errorf("exception occurs: {}", error)
             continue
         }
-        let mut r = n1.add(n2)
+        match op {
+        | "+":
+            n1 += n2
+        | "-":
+            n1 -= n2
+        | "*":
+            n1 *= n2
+        | "/":
+            n1 /= n2
+        | "%":
+            n1 %= n2
+        }
         let cr = c[4]
-        if r.len() != cr.len ||
-            r.neg && c[5] != "-" ||
-            !r.neg && c[5] != "+" {
-            t.errorf("{}{} + {}{} != {}{}", c[1], c[0], c[3], c[2], c[5], c[4])
+        if n1.len() != cr.len ||
+            n1.neg && c[5] != "-" ||
+            !n1.neg && c[5] != "+" {
+            t.errorf("{}{} {} {}{} != {}{}", c[1], c[0], op, c[3], c[2], c[5], c[4])
             continue
         }
-        for i, b in r.nat.bits {
+        for i, b in n1.nat.bits {
             let cb = cr[cr.len - 1 - i]
             if b == 0b1 && cb != '1' ||
                 b == 0b0 && cb != '0' {
-                t.errorf("{}{} + {}{} != {}{}", c[1], c[0], c[3], c[2], c[5], c[4])
+                t.errorf("{}{} {} {}{} != {}{}", c[1], c[0], op, c[3], c[2], c[5], c[4])
                 break
             }
         }
     }
+}
+
+#test
+fn test_int_add(mut t: &T) {
+    test_common_int_op(t, "+", cases_int_add)
 }
 
 #test
 fn test_int_sub(mut t: &T) {
-    for _, c in cases_int_sub {
-        let n1 = Int.from_bits(c[0], c[1] == "-") else {
-            t.errorf("exception occurs: {}", error)
-            continue
-        }
-        let n2 = Int.from_bits(c[2], c[3] == "-") else {
-            t.errorf("exception occurs: {}", error)
-            continue
-        }
-        let mut r = n1.sub(n2)
-        let cr = c[4]
-        if r.len() != cr.len ||
-            r.neg && c[5] != "-" ||
-            !r.neg && c[5] != "+" {
-            t.errorf("{}{} - {}{} != {}{}", c[1], c[0], c[3], c[2], c[5], c[4])
-            continue
-        }
-        for i, b in r.nat.bits {
-            let cb = cr[cr.len - 1 - i]
-            if b == 0b1 && cb != '1' ||
-                b == 0b0 && cb != '0' {
-                t.errorf("{}{} - {}{} != {}{}", c[1], c[0], c[3], c[2], c[5], c[4])
-                break
-            }
-        }
-    }
+    test_common_int_op(t, "-", cases_int_sub)
 }
 
 #test
 fn test_int_mul(mut t: &T) {
-    for _, c in cases_int_mul {
-        let n1 = Int.from_bits(c[0], c[1] == "-") else {
-            t.errorf("exception occurs: {}", error)
-            continue
-        }
-        let n2 = Int.from_bits(c[2], c[3] == "-") else {
-            t.errorf("exception occurs: {}", error)
-            continue
-        }
-        let mut r = n1.mul(n2)
-        let cr = c[4]
-        if r.len() != cr.len ||
-            r.neg && c[5] != "-" ||
-            !r.neg && c[5] != "+" {
-            t.errorf("{}{} * {}{} != {}{}", c[1], c[0], c[3], c[2], c[5], c[4])
-            continue
-        }
-        for i, b in r.nat.bits {
-            let cb = cr[cr.len - 1 - i]
-            if b == 0b1 && cb != '1' ||
-                b == 0b0 && cb != '0' {
-                t.errorf("{}{} * {}{} != {}{}", c[1], c[0], c[3], c[2], c[5], c[4])
-                break
-            }
-        }
-    }
+    test_common_int_op(t, "*", cases_int_mul)
 }
 
 #test
 fn test_int_div(mut t: &T) {
-    for _, c in cases_int_div {
-        let n1 = Int.from_bits(c[0], c[1] == "-") else {
-            t.errorf("exception occurs: {}", error)
-            continue
-        }
-        let n2 = Int.from_bits(c[2], c[3] == "-") else {
-            t.errorf("exception occurs: {}", error)
-            continue
-        }
-        let mut r = n1.div(n2)
-        let cr = c[4]
-        if r.len() != cr.len ||
-            r.neg && c[5] != "-" ||
-            !r.neg && c[5] != "+" {
-            t.errorf("{}{} / {}{} != {}{}", c[1], c[0], c[3], c[2], c[5], c[4])
-            continue
-        }
-        for i, b in r.nat.bits {
-            let cb = cr[cr.len - 1 - i]
-            if b == 0b1 && cb != '1' ||
-                b == 0b0 && cb != '0' {
-                t.errorf("{}{} / {}{} != {}{}", c[1], c[0], c[3], c[2], c[5], c[4])
-                break
-            }
-        }
-    }
+    test_common_int_op(t, "/", cases_int_div)
 }
 
 #test
 fn test_int_mod(mut t: &T) {
-    for _, c in cases_int_mod {
-        let n1 = Int.from_bits(c[0], c[1] == "-") else {
-            t.errorf("exception occurs: {}", error)
-            continue
-        }
-        let n2 = Int.from_bits(c[2], c[3] == "-") else {
-            t.errorf("exception occurs: {}", error)
-            continue
-        }
-        let mut r = n1.mod(n2)
-        let cr = c[4]
-        if r.len() != cr.len ||
-            r.neg && c[5] != "-" ||
-            !r.neg && c[5] != "+" {
-            t.errorf("{}{} % {}{} != {}{}", c[1], c[0], c[3], c[2], c[5], c[4])
-            continue
-        }
-        for i, b in r.nat.bits {
-            let cb = cr[cr.len - 1 - i]
-            if b == 0b1 && cb != '1' ||
-                b == 0b0 && cb != '0' {
-                t.errorf("{}{} % {}{} != {}{}", c[1], c[0], c[3], c[2], c[5], c[4])
-                break
-            }
-        }
-    }
+    test_common_int_op(t, "%", cases_int_mod)
 }
 
 #test

@@ -118,10 +118,9 @@ fn test_nat_from_bits(mut t: &T) {
     }
 }
 
-#test
-fn test_nat_add(mut t: &T) {
-    for _, c in cases_nat_add {
-        let n1 = Nat.from_bits(c[0]) else {
+fn test_common_nat_op(mut &t: &T, op: str, &cases: [][]str) {
+    for _, c in cases {
+        let mut n1 = Nat.from_bits(c[0]) else {
             t.errorf("exception occurs: {}", error)
             continue
         }
@@ -129,133 +128,57 @@ fn test_nat_add(mut t: &T) {
             t.errorf("exception occurs: {}", error)
             continue
         }
-        let mut r = n1.add(n2)
+        match op {
+        | "+":
+            n1 += n2
+        | "-":
+            n1 -= n2
+        | "*":
+            n1 *= n2
+        | "/":
+            n1 /= n2
+        | "%":
+            n1 %= n2
+        }
         let cr = c[2]
-        if r.len() != cr.len {
-            t.errorf("{} + {} != {}", c[0], c[1], cr)
+        if n1.len() != cr.len {
+            t.errorf("{} {} {} != {}", c[0], op, c[1], cr)
             continue
         }
-        for i, b in r.bits {
+        for i, b in n1.bits {
             let cb = cr[cr.len - 1 - i]
             if b == 0b1 && cb != '1' ||
                 b == 0b0 && cb != '0' {
-                t.errorf("{} + {} != {}", c[0], c[1], cr)
+                t.errorf("{} {} {} != {}", c[0], op, c[1], cr)
                 break
             }
         }
     }
+}
+
+#test
+fn test_nat_add(mut t: &T) {
+    test_common_nat_op(t, "+", cases_nat_add)
 }
 
 #test
 fn test_nat_sub(mut t: &T) {
-    for _, c in cases_nat_sub {
-        let n1 = Nat.from_bits(c[0]) else {
-            t.errorf("exception occurs: {}", error)
-            continue
-        }
-        let n2 = Nat.from_bits(c[1]) else {
-            t.errorf("exception occurs: {}", error)
-            continue
-        }
-        let mut r = n1.sub(n2)
-        let cr = c[2]
-        if r.len() != cr.len {
-            t.errorf("{} - {} != {}", c[0], c[1], cr)
-            continue
-        }
-        for i, b in r.bits {
-            let cb = cr[cr.len - 1 - i]
-            if b == 0b1 && cb != '1' ||
-                b == 0b0 && cb != '0' {
-                t.errorf("{} - {} != {}", c[0], c[1], cr)
-                break
-            }
-        }
-    }
+    test_common_nat_op(t, "-", cases_nat_sub)
 }
 
 #test
 fn test_nat_mul(mut t: &T) {
-    for _, c in cases_nat_mul {
-        let n1 = Nat.from_bits(c[0]) else {
-            t.errorf("exception occurs: {}", error)
-            continue
-        }
-        let n2 = Nat.from_bits(c[1]) else {
-            t.errorf("exception occurs: {}", error)
-            continue
-        }
-        let mut r = n1.mul(n2)
-        let cr = c[2]
-        if r.len() != cr.len {
-            t.errorf("{} * {} != {}", c[0], c[1], cr)
-            continue
-        }
-        for i, b in r.bits {
-            let cb = cr[cr.len - 1 - i]
-            if b == 0b1 && cb != '1' ||
-                b == 0b0 && cb != '0' {
-                t.errorf("{} * {} != {}", c[0], c[1], cr)
-                break
-            }
-        }
-    }
+    test_common_nat_op(t, "*", cases_nat_mul)
 }
 
 #test
 fn test_nat_div(mut t: &T) {
-    for _, c in cases_nat_div {
-        let n1 = Nat.from_bits(c[0]) else {
-            t.errorf("exception occurs: {}", error)
-            continue
-        }
-        let n2 = Nat.from_bits(c[1]) else {
-            t.errorf("exception occurs: {}", error)
-            continue
-        }
-        let mut r = n1.div(n2)
-        let cr = c[2]
-        if r.len() != cr.len {
-            t.errorf("{} / {} != {}", c[0], c[1], cr)
-            continue
-        }
-        for i, b in r.bits {
-            let cb = cr[cr.len - 1 - i]
-            if b == 0b1 && cb != '1' ||
-                b == 0b0 && cb != '0' {
-                t.errorf("{} / {} != {}", c[0], c[1], cr)
-                break
-            }
-        }
-    }
+    test_common_nat_op(t, "/", cases_nat_div)
 }
 
 #test
 fn test_nat_mod(mut t: &T) {
-    for _, c in cases_nat_mod {
-        let n1 = Nat.from_bits(c[0]) else {
-            t.errorf("exception occurs: {}", error)
-            continue
-        }
-        let n2 = Nat.from_bits(c[1]) else {
-            t.errorf("exception occurs: {}", error)
-            continue
-        }
-        let mut r = n1.mod(n2)
-        let cr = c[2]
-        if r.len() != cr.len {
-            t.errorf("{} % {} != {}", c[0], c[1], cr)
-            continue
-        }
-        for i, b in r.bits {
-            let cb = cr[cr.len - 1 - i]
-            if b == 0b1 && cb != '1' ||
-                b == 0b0 && cb != '0' {
-                t.errorf("{} % {} != {}", c[0], c[1], cr)
-                break
-            }
-        }
-    }
+    test_common_nat_op(t, "%", cases_nat_mod)
 }
 
 #test
