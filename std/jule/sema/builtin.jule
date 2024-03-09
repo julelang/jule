@@ -216,7 +216,9 @@ fn builtin_caller_common_plain(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Dat
         dynamic_annotation: false,
         error_token:        fc.token,
     }
-    _ = fcac.check()
+    if !fcac.check() {
+        ret nil
+    }
 
     let mut model = &FnCallExprModel{
         func:  f,
@@ -552,7 +554,7 @@ fn builtin_caller_copy(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Dat
         e.push_err(fc.args[0].token, LogMsg.MutOperationOnImmut)
     }
 
-    let mut empty_param = &Param{}
+    let mut empty_param = new(Param)
     let mut f = &FnIns{
         params: [
             &ParamIns{
@@ -564,12 +566,18 @@ fn builtin_caller_copy(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Dat
                 kind: dest.kind,
             },
         ],
-        result: &TypeKind{kind: build_prim_type(PrimKind.Int)},
+        result: &TypeKind{
+            kind: build_prim_type(PrimKind.Int),
+        },
         caller: BUILTIN_CALLER_COMMON_PLAIN,
     }
 
-    d.kind = &TypeKind{kind: f}
-    d.model = &CommonIdentExprModel{ident: "copy"}
+    d.kind = &TypeKind{
+        kind: f,
+    }
+    d.model = &CommonIdentExprModel{
+        ident: "copy",
+    }
     d = builtin_caller_common_plain(e, fc, d)
     if d != nil {
         let mut src = (&Data)((&FnCallExprModel)(d.model).args[1])
