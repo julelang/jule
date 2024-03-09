@@ -364,6 +364,90 @@ fn recursive_div(mut &x: bits, mut &y: bits): bits {
 // Recursion modulo algorithm. It will update left operand if necessary.
 // Uses bit shifting strategy.
 // Returns remainder.
+//
+// The Theory and How it Fast?
+//
+//     In the worst case, the algorithm performs two allocations. One of them is for x.
+//     Because x is used directly and its value is changed. The other one is q, that is,
+//     quotient allocation. This is also used directly and its value changes. The algorithm
+//     only has these potential allocations before it is used, it will  not result in any
+//     additional allocations.
+//
+//     q will be used to find the y<<n which is closest to x at each step.
+//     Therefore it will always be equal or greater than x. q is evaluated to be
+//     equal to x in the worst case. Therefore, before q is used in the algorithm,
+//     it must be allocated the length of x. Its value must be initialized with y.
+//     y will always be less than x. Therefore, there will be a difference in the
+//     number of bits between them. The q << n operation must be applied as much as
+//     the difference in the remaining number of bits. This will produce y<<n which
+//     is greater than or equal to the calculation closest to x.
+//
+//         For example:
+//           x = 1101100110000100101001001111101111000110101
+//           y = 1011001
+//           q = 1011001000000000000000000000000000000000000
+//
+//         For example:
+//           x = 1101100110000100101001001111101111000110101
+//           y = 111
+//           q = 1110000000000000000000000000000000000000000
+//
+//     At each step, the algorithm first makes a comparison for x and y.
+//     If they are equal, it returns zero since there will be no remainder.
+//     In case x < y, it returns x since the remainder will be x.
+//
+//     Then q is calculated for the nearest y<<n that is less than or equal to x.
+//     Since q will always be greater than or equal to x, only the shifted bits should be
+//     shifted to the right until this condition is met. This is faster than starting from y<<1
+//     and going all the way to y<<n at each step. Usually, the peak is at a number close to
+//     the bits of the divisor (x). Therefore, it is wiser to drop back from the total number of bits.
+//
+//     Then q will be subtracted from x, thus reducing the value of x by often more than x/2.
+//     Then the process is repeated. q is left untouched because it satisfies the condition
+//     that it will always be greater than or equal to x. So q can always be shifted to the
+//     right to reach a nearby number.
+//
+//  Proof and Example
+//     Out case: 7473866464821 % 89;
+//     Which is:
+//         x = 7473866464821         | 1101100110000100101001001111101111000110101
+//         y = 89                    | 1011001
+//         q = 6116033429504 (y<<36) | 1011001000000000000000000000000000000000000
+//
+//     q was calculated as described and resulted in exactly y<<36.
+//     This supports the claim that for this case this calculation will always
+//     produce y<<n greater than or exactly closest to x.
+//
+//     The theory then claims that q can be reduced in the same way after each step,
+//     which will be faster because there will often be right shifts are more close
+//     to next closest y<<n to x than starting to compute from y<<1 again.
+//
+//       Execution:
+//
+//                    x          q
+//           1. 7473866464821 - y<<36
+//           2. 1357833035317 - y<<33
+//           3.  593328856629 - y<<32
+//           4.  211076767285 - y<<31
+//           5.   19950722613 - y<<27
+//           6.    8005344821 - y<<26
+//           7.    2032655925 - y<<24
+//           8.     539483701 - y<<22
+//           9.     166190645 - y<<20
+//           10.     72867381 - y<<19
+//           11.     26205749 - y<<18
+//           12.      2874933 - y<<14
+//           13.      1416757 - y<<13
+//           14.       687669 - y<<12
+//           15.       323125 - y<<11
+//           16.       140853 - y<<10
+//           17.        49717 - y<<9
+//           18.         4149 - y<<5
+//           19.         1301 - y<<3
+//           20.          589 - y<<2
+//           21.          233 - y<<1
+//                         55 = remainder, x < y
+//
 fn recursive_mod(mut &x: bits, &y: bits, mut &q: bits): bits {
     match cmp(x, y) {
     | 0:
@@ -371,16 +455,10 @@ fn recursive_mod(mut &x: bits, &y: bits, mut &q: bits): bits {
     | -1:
         ret x
     }
-    q = q[:y.len]
-    _ = copy(q, y)
-    for {
-        q = append(q[:1], q...)
-        q[0] = 0b0
-        if cmp(q, x) != -1 {
-            break
-        }
+    for cmp(q, x) == +1 {
+        q = q[1:]
     }
-    sub_res(x, q[1:])
+    sub_res(x, q)
     fit(x)
     ret recursive_mod(x, y, q)
 }
