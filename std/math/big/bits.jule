@@ -337,50 +337,50 @@ fn recursive_div(mut &x: bits, mut &y: bits): bits {
     | 0:
         ret [1]
     }
-    let mut yq = make(bits, y.len, x.len)
-    _ = copy(yq, y)
+    let mut q = make(bits, y.len, x.len)
+    _ = copy(q, y)
     for {
-        yq = append(yq[:1], yq...)
-        yq[0] = 0b0
-        if cmp(yq, x) != -1 {
+        q = append(q[:1], q...)
+        q[0] = 0b0
+        if cmp(q, x) != -1 {
             break
         }
     }
-    sub_res(x, yq[1:])
+    sub_res(x, q[1:])
     fit(x)
     let mut k = recursive_div(x, y)
-    yq = yq[y.len:]
-    for i in yq {
-        yq[i] = 0b0
+    q = q[y.len:]
+    for i in q {
+        q[i] = 0b0
     }
-    yq[yq.len - 1] = 0b1
+    q[q.len - 1] = 0b1
     if k.len == 0 {
-        ret yq
+        ret q
     }
-    add_res(yq, k)
-    ret yq
+    add_res(q, k)
+    ret q
 }
 
 // Recursion modulo algorithm. It will update left operand if necessary.
 // Uses bit shifting strategy.
 // Returns remainder.
-fn recursive_mod(mut &x: bits, &y: bits): bits {
+fn recursive_mod(mut &x: bits, &y: bits, mut &q: bits): bits {
     match cmp(x, y) {
     | 0:
         ret nil
     | -1:
         ret x
     }
-    let mut yq = make(bits, y.len, x.len)
-    _ = copy(yq, y)
+    q = q[:y.len]
+    _ = copy(q, y)
     for {
-        yq = append(yq[:1], yq...)
-        yq[0] = 0b0
-        if cmp(yq, x) != -1 {
+        q = append(q[:1], q...)
+        q[0] = 0b0
+        if cmp(q, x) != -1 {
             break
         }
     }
-    sub_res(x, yq[1:])
+    sub_res(x, q[1:])
     fit(x)
-    ret recursive_mod(x, y)
+    ret recursive_mod(x, y, q)
 }
