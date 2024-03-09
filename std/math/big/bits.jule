@@ -330,35 +330,118 @@ fn karatsuba(mut x: bits, mut y: bits): bits {
 // Recursion division algorithm. It will update left operand if necessary.
 // Uses bit shifting strategy.
 // Returns quotient.
-fn recursive_div(mut &x: bits, mut &y: bits): bits {
+//
+// The Theory and How it Fast?
+//
+//     In the worst case, the algorithm performs three allocations. One of them is for x.
+//     Because x is used directly and its value is changed. The other one is q, that is,
+//     quotient allocation. This is also used directly and its value changes. The algorithm
+//     only has these potential allocations before it is used, it will  not result in any
+//     additional allocations. The third allocation is s which is stores sum of
+//     quetient parts.
+//
+//     s will be used to collect all quotient parts. It must be allocated beforehand
+//     and must be the same as the bit length of x and initialized with zero.
+//     Thus, the carry check can be skipped because there will never be an overflow
+//     and the total quotient cannot be greater than the dividend. When the algorithm
+//     is completed, s will store the quotient to be calculated.
+//
+//     q will be used to find the y<<n which is closest to x at each step.
+//     Therefore it will always be equal or greater than x. q is evaluated to be
+//     equal to x in the worst case. Therefore, before q is used in the algorithm,
+//     it must be allocated the length of x. Its value must be initialized with y.
+//     y will always be less than x. Therefore, there will be a difference in the
+//     number of bits between them. The q << n operation must be applied as much as
+//     the difference in the remaining number of bits. This will produce y<<n which
+//     is greater than or equal to the calculation closest to x.
+//
+//         For example:
+//           x = 1101100110000100101001001111101111000110101
+//           y = 1011001
+//           q = 1011001000000000000000000000000000000000000
+//
+//         For example:
+//           x = 1101100110000100101001001111101111000110101
+//           y = 111
+//           q = 1110000000000000000000000000000000000000000
+//
+//     To calculate s correctly, the quotient must be summed to the result at
+//     each step. So s += quotient. q is not exactly a quotient. Let's say a y<<36.
+//     q refers to the closest number that can be reached by shifting x from y.
+//     So a q with y<<36 means 36 shifts have been made. But this is not the count of
+//     additions of y with itself 36 times, so it cannot be used as a quotient.
+//     To calculate quotient correctly, 1<<n must be calculated using the number
+//     of shifts of q. This is exactly y<<n equals to how many y's are added together.
+//     So 1<<36 is equals to actual quotient of q which is should add to s.
+//
+//  Proof and Example
+//
+//     Out case: 7473866464821 % 89;
+//     Which is:
+//         x = 7473866464821         | 1101100110000100101001001111101111000110101
+//         y = 89                    | 1011001
+//         q = 6116033429504 (y<<36) | 1011001000000000000000000000000000000000000
+//         s = 0                     | 0000000000000000000000000000000000000000000
+//
+//     q was calculated as described and resulted in exactly y<<36.
+//     This supports the claim that for this case this calculation will always
+//     produce y<<n greater than or exactly closest to x.
+//
+//     The theory then claims that q can be reduced in the same way after each step,
+//     which will be faster because there will often be right shifts are more close
+//     to next closest y<<n to x than starting to compute from y<<1 again.
+//
+//       Execution:
+//
+//           1.       1<<36
+//           2.       1<<33
+//           3.       1<<32
+//           4.       1<<31
+//           5.       1<<27
+//           6.       1<<26
+//           7.       1<<24
+//           8.       1<<22
+//           9.       1<<20
+//           10.      1<<19
+//           11.      1<<18
+//           12.      1<<14
+//           13.      1<<13
+//           14.      1<<12
+//           15.      1<<11
+//           16.      1<<10
+//           17.      1<<9
+//           18.      1<<5
+//           19.      1<<3
+//           20.      1<<2
+//           21.      1<<1
+//                 +
+//                 -----------
+//                 83976027694
+//
+fn recursive_div(mut &x: bits, mut &y: bits, mut &s: bits, mut &q: bits) {
     match cmp(x, y) {
     | -1:
-        ret nil
+        ret
     | 0:
-        ret [1]
+        add_one(s)
+        ret
     }
-    let mut q = make(bits, y.len, x.len)
-    _ = copy(q, y)
-    for {
-        q = append(q[:1], q...)
-        q[0] = 0b0
-        if cmp(q, x) != -1 {
-            break
-        }
+    for cmp(q, x) == +1 {
+        q = q[1:]
     }
-    sub_res(x, q[1:])
+    if q.len == y.len {
+        add_one(s)
+        ret
+    }
+    sub_res(x, q)
     fit(x)
-    let mut k = recursive_div(x, y)
-    q = q[y.len:]
-    for i in q {
-        q[i] = 0b0
-    }
-    q[q.len - 1] = 0b1
-    if k.len == 0 {
-        ret q
-    }
-    add_res(q, k)
-    ret q
+    let mut sq = q[:q.len - y.len + 1]
+    let mut &last = unsafe { *(&sq[sq.len - 1]) }
+    let old = last
+    last = 0b1
+    add_rfast(s, sq)
+    last = old
+    recursive_div(x, y, s, q)
 }
 
 // Recursion modulo algorithm. It will update left operand if necessary.
@@ -408,6 +491,7 @@ fn recursive_div(mut &x: bits, mut &y: bits): bits {
 //     right to reach a nearby number.
 //
 //  Proof and Example
+//
 //     Out case: 7473866464821 % 89;
 //     Which is:
 //         x = 7473866464821         | 1101100110000100101001001111101111000110101
