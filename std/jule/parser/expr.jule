@@ -898,10 +898,22 @@ impl ExprBuilder {
     fn build_indexing(mut self, mut expr_tokens: []Token,
         mut tokens: []Token, mut error_token: Token): &IndexingExpr {
         tokens = tokens[1 : tokens.len-1] // Remove brackets.
+        if tokens.len == 0 {
+            self.push_err(error_token, LogMsg.MissingExpr)
+            ret nil
+        }
+        let mut expr = self.build_from_tokens(expr_tokens)
+        if expr == nil {
+            ret nil
+        }
+        let mut index = self.build_from_tokens(tokens)
+        if index == nil {
+            ret nil
+        }
         ret &IndexingExpr{
             token: error_token,
-            expr:  self.build_from_tokens(expr_tokens).kind,
-            index: self.build_from_tokens(tokens).kind,
+            expr:  expr.kind,
+            index: index.kind,
         }
     }
 
