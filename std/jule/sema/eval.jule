@@ -33,7 +33,12 @@ use std::jule::ast::{
     TernaryExpr,
     NamespaceTypeDecl,
 }
-use std::jule::build::{LogMsg, Directive, PATH_STDLIB, logf}
+use std::jule::build::{
+    LogMsg,
+    Directive,
+    PATH_STDLIB,
+    logf,
+}
 use std::jule::constant::{Const}
 use lit for std::jule::constant::lit
 use lex for std::jule::lex::{
@@ -1716,22 +1721,41 @@ impl Eval {
     }
 
     fn cast_constant(mut self, mut &t: &TypeKind, mut &d: &Data) {
-        let prim = t.prim()
-        if prim == nil || !d.is_const() {
+        if d == nil || !d.is_const() {
             ret
         }
-
+        let prim = t.prim()
         match {
         | types::is_sig_int(prim.kind):
-            d.constant.set_i64(d.constant.as_i64())
-
+            match types::bitsize_of(types::real_kind_of(prim.kind)) {
+            | 1 << 6:
+                d.constant.set_i64(d.constant.as_i64())
+            | 1 << 5:
+                d.constant.set_i64(i64(i32(d.constant.as_i64())))
+            | 1 << 4:
+                d.constant.set_i64(i64(i16(d.constant.as_i64())))
+            | 1 << 3:
+                d.constant.set_i64(i64(i8(d.constant.as_i64())))
+            }
         | types::is_unsig_int(prim.kind):
-            d.constant.set_u64(d.constant.as_u64())
-
+            match types::bitsize_of(types::real_kind_of(prim.kind)) {
+            | 1 << 6:
+                d.constant.set_u64(d.constant.as_u64())
+            | 1 << 5:
+                d.constant.set_u64(u64(u32(d.constant.as_u64())))
+            | 1 << 4:
+                d.constant.set_u64(u64(u16(d.constant.as_u64())))
+            | 1 << 3:
+                d.constant.set_u64(u64(u8(d.constant.as_u64())))
+            }
         | types::is_float(prim.kind):
-            d.constant.set_f64(d.constant.as_f64())
+            match types::bitsize_of(types::real_kind_of(prim.kind)) {
+            | 1 << 6:
+                d.constant.set_f64(d.constant.as_f64())
+            | 1 << 5:
+                d.constant.set_f64(f64(f32(d.constant.as_f64())))
+            }
         }
-
         d.model = d.constant
     }
 
@@ -1747,22 +1771,17 @@ impl Eval {
                 self.push_err(error_token, LogMsg.EnumCastedFromAny)
                 self.push_suggestion(LogMsg.CastToEnumTypeInsteadOfEnum)
             }
-
         | t.ptr() != nil:
             self.cast_ptr(t, d, error_token)
-
         | t.sptr() != nil:
             self.cast_ref(t, d, error_token)
-
         | t.slc() != nil:
             self.cast_slc(t, d, error_token)
-
         | t.strct() != nil:
             self.cast_struct(t, d, error_token)
-
         | t.prim() != nil:
             self.cast_prim(t, d, error_token)
-
+            self.cast_constant(t, d)
         |:
             self.push_err(error_token, LogMsg.TypeNotSupportsCasting, t.to_str())
             d = nil
@@ -1778,7 +1797,6 @@ impl Eval {
 
         d.lvalue = false
         d.decl = false
-        self.cast_constant(t, d)
 
         if d.kind.enm() == nil || !d.kind.enm().kind.kind.equals(t) {
             d.cast_kind = t
