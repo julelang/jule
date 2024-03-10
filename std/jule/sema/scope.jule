@@ -1195,6 +1195,7 @@ impl ScopeChecker {
         } else {
             self.s.eval(self)
         }
+        eval.unsafety = self.is_unsafe()
         let mut r = eval.eval_expr(a.right)
         if r == nil {
             ret
@@ -1238,11 +1239,7 @@ impl ScopeChecker {
             }
 
             a.setter.kind = a.setter.kind[:a.setter.kind.len-1]
-            let mut solver = BinaryEval.new(&Eval{
-                s:        self.s,
-                lookup:   self,
-                unsafety: self.is_unsafe(),
-            }, a.setter)
+            let mut solver = BinaryEval.new(eval, a.setter)
             r = solver.solve_explicit(l, r)
             if r == nil {
                 ret
