@@ -104,6 +104,15 @@ static cases_nat_bit_or: [][]u64 = [
     [97799739579632223, 1234567890, 97799739731806943],
 ]
 
+static cases_nat_bit_and: [][]u64 = [
+    [902984, 24, 8],
+    [24, 902984, 8],
+    [902984, 2434, 256],
+    [2434, 902984, 256],
+    [77786486463864864, 97774749933, 19360907296],
+    [123456789, 987654321, 39471121]
+]
+
 #test
 fn test_nat_from_bits(mut t: &T) {
     for _, c in cases_nat_from_bits {
@@ -189,17 +198,31 @@ fn test_nat_mod(mut t: &T) {
     test_common_nat_op(t, "%", cases_nat_mod)
 }
 
-#test
-fn test_nat_bit_or(mut t: &T) {
-    for _, c in cases_nat_bit_or {
-        let n1 = Nat.new(c[0])
+fn test_nat_bit_binary(mut &t: &T, op: str, &cases: [][]u64) {
+    for _, c in cases {
+        let mut n1 = Nat.new(c[0])
         let n2 = Nat.new(c[1])
-        let r = n1 | n2
-        let u = r.to_u64()!
+        match op {
+        | "|":
+            n1 |= n2
+        | "&":
+            n1 &= n2
+        }
+        let u = n1.to_u64()!
         if u != c[2] {
-            t.errorf("{} | {} != {}", c[0], c[1], c[2])
+            t.errorf("{} {} {} != {}", c[0], op, c[1], c[2])
         }
     }
+}
+
+#test
+fn test_nat_bit_or(mut t: &T) {
+    test_nat_bit_binary(t, "|", cases_nat_bit_or)
+}
+
+#test
+fn test_nat_bit_and(mut t: &T) {
+    test_nat_bit_binary(t, "&", cases_nat_bit_and)
 }
 
 #test

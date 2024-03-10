@@ -82,6 +82,23 @@ static cases_int_bit_or: [][]i64 = [
     [-4, 20, -4],
     [-345, 2, -345],
     [-908474739, 747688553334, -570560513],
+    [-97799739579632223, 1234567890, -97799738497239053],
+]
+
+static cases_int_bit_and: [][]i64 = [
+    [902984, 24, 8],
+    [24, 902984, 8],
+    [902984, 2434, 256],
+    [2434, 902984, 256],
+    [77786486463864864, 97774749933, 19360907296],
+    [123456789, 987654321, 39471121],
+    [5, -3, 5],
+    [-5, 3, 3],
+    [-8884973, 88893, 18705],
+    [88893, -8884973, 18705],
+    [13452, -12345, 1156],
+    [-13452, -12345, -13500],
+    [-12345, -13452, -13500],
 ]
 
 fn test_common_int_op(mut &t: &T, op: str, &cases: [][]str) {
@@ -160,17 +177,31 @@ fn test_int_bit_not(mut t: &T) {
     }
 }
 
-#test
-fn test_int_bit_or(mut t: &T) {
-    for _, c in cases_int_bit_or {
-        let n1 = Int.new(c[0])
+fn test_int_bit_binary(mut &t: &T, op: str, &cases: [][]i64) {
+    for _, c in cases {
+        let mut n1 = Int.new(c[0])
         let n2 = Int.new(c[1])
-        let r = n1 | n2
-        let i = r.to_i64()!
+        match op {
+        | "|":
+            n1 |= n2
+        | "&":
+            n1 &= n2
+        }
+        let i = n1.to_i64()!
         if i != c[2] {
-            t.errorf("{} | {} != {}", c[0], c[1], c[2])
+            t.errorf("{} {} {} != {}", c[0], op, c[1], c[2])
         }
     }
+}
+
+#test
+fn test_int_bit_or(mut t: &T) {
+    test_int_bit_binary(t, "|", cases_int_bit_or)
+}
+
+#test
+fn test_int_bit_and(mut t: &T) {
+    test_int_bit_binary(t, "&", cases_int_bit_and)
 }
 
 #test

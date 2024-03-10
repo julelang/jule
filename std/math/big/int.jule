@@ -228,12 +228,48 @@ impl Int {
             twos_complement(y.nat.bits)
         }
         or(self.nat.bits, y.nat.bits)
+        if self.neg && self.len() >= y.len() {
+            twos_complement(self.nat.bits)
+        }
+        if y.neg {
+            twos_complement(y.nat.bits)
+        }
+        self.nat.fit()
+    }
+
+    // Bitwise and.
+    pub fn bit_and(self, y: Int): Int {
+        let mut r = self
+        r &= y
+        ret r
+    }
+
+    // Bitwise and for assignment.
+    pub fn bit_and_assign(mut self, y: Int) {
+        if self.len() < y.len() {
+            let mut xb = make(bits, y.len())
+            _ = copy(xb, self.nat.bits)
+            self.nat.bits = xb
+        }
         if self.neg {
             twos_complement(self.nat.bits)
         }
         if y.neg {
             twos_complement(y.nat.bits)
         }
+        if !self.neg && y.neg && self.len() > y.len() {
+            let mut x = self.nat.bits[:y.len()]
+            and(x, y.nat.bits)
+        } else {
+            and(self.nat.bits, y.nat.bits)
+        }
+        if y.neg {
+            twos_complement(y.nat.bits)
+            if self.neg {
+                twos_complement(self.nat.bits)
+            }
+        }
+        self.neg = self.neg && y.neg
         self.nat.fit()
     }
 
