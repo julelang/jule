@@ -55,207 +55,6 @@ use lex for std::jule::lex::{
 use types for std::jule::types
 use strings for std::strings
 
-// Returns directive if exist.
-fn find_directive(mut &directives: []&std::jule::ast::Directive, d: Directive): &std::jule::ast::Directive {
-    for (_, mut dr) in directives {
-        if dr.tag.kind == d {
-            ret dr
-        }
-    }
-    ret nil
-}
-
-fn find_builtins_import(ident: str, imp: &ImportInfo): any {
-    ret find_package_builtin_def(imp.link_path, ident)
-}
-
-// If current type is not enough to store constant data, update to minimum type
-// that can store constant data. This function designed for numerical types only.
-// Data should be numerical constant of course.
-fn fit_bitsize(mut &d: &Data) {
-    let mut prim = d.kind.prim()
-    let z = types::bitsize_of(prim.to_str())
-    if z == 1 << 6 {
-        // z is already equals to biggest bitsize.
-        ret
-    }
-    let mut k = 0
-    match {
-    | d.constant.is_i64():
-        k = types::bitsize_of_int(d.constant.read_i64())
-        if k > z {
-            prim.kind = types::int_from_bits(k)
-        }
-    | d.constant.is_u64():
-        k = types::bitsize_of_uint(d.constant.read_u64())
-        if k > z {
-            prim.kind = types::uint_from_bits(k)
-        }
-    | d.constant.is_f64():
-        k = types::bitsize_of_float(d.constant.read_f64())
-        if k > z {
-            prim.kind = types::float_from_bits(k)
-        }
-    }
-}
-
-fn make_struct_lit_alloc(mut &d: &Data, mut &lit: &StructLitExprModel) {
-    d.kind = &TypeKind{
-        kind: &Sptr{
-            elem: &TypeKind{kind: lit.strct},
-        },
-    }
-    d.model = &AllocStructLitExprModel{
-        lit: lit,
-    }
-}
-
-fn build_error_var(mut &s: &Scope, mut &fc: &FnCallExpr): &Var {
-    ret &Var{
-        used:      true,
-        reference: false,
-        mutable:   true,
-        ident:     "error",
-        token:     fc.token,
-        kind:      &TypeSymbol{
-            kind: &TypeKind{
-                kind: build_prim_type(PrimKind.Any),
-            },
-        },
-        scope: s,
-        value: &Value{
-            data: &Data{},
-        },
-    }
-}
-
-fn find_builtins_sema(ident: str, mut s: &Sema): any {
-    for (_, mut imp) in s.file.imports {
-        if imp.import_all || imp.exist_ident(ident) {
-            let mut def = find_builtins_import(ident, imp)
-            if def != nil {
-                ret def
-            }
-        }
-    }
-
-    // If package is std, check for internal builtin defines.
-    let mut ppath = s.file.file.dir()
-    if strings::has_prefix(ppath, PATH_STDLIB) {
-        // Remove STDLIB directory path.
-        ppath = ppath[PATH_STDLIB.len:]
-        // Add "std" to beginning without separator
-        // because path has separator at beginning.
-        ppath = "std" + strings::replace(ppath, str(path::SEPARATOR), "::", -1)
-
-        ret find_package_builtin_def(ppath, ident)
-    }
-
-    ret nil
-}
-
-fn is_ok_for_shifting(mut &d: &Data): bool {
-    if d.is_const() {
-        match {
-        | d.constant.is_i64():
-            ret d.constant.read_i64() >= 0
-        | d.constant.is_u64():
-            ret true
-        | d.constant.is_f64():
-            ret d.constant.read_f64() >= 0
-        |:
-            ret false
-        }
-    }
-    let prim = d.kind.prim()
-    ret prim != nil && types::is_int(prim.to_str())
-}
-
-fn is_instanced_struct(s: &StructIns): bool {
-    ret s.decl.generics.len == s.generics.len
-}
-
-fn is_ptr_arithmetic_compatible_int(mut &d: &Data): bool {
-    if d.is_const() {
-        ret int_assignable(types::TypeKind.Int, d)
-    }
-    let mut tcc = TypeCompatibilityChecker{
-        dest: &TypeKind{
-            kind: build_prim_type(types::TypeKind.Int),
-        },
-        src: d.kind,
-    }
-    ret tcc.check()
-}
-
-fn apply_cast_kind_model(mut &d: &Data) {
-    d.model = &CastingExprModel{
-        expr:      d.model,
-        kind:      d.cast_kind,
-        expr_kind: d.kind,
-    }
-}
-
-fn apply_cast_kind(mut &d: &Data) {
-    if d.cast_kind == nil {
-        ret
-    }
-
-    apply_cast_kind_model(d)
-    d.kind = d.cast_kind
-    d.cast_kind = nil // Ignore, because model added.
-}
-
-fn build_void_data(): &Data {
-    ret &Data{
-        mutable:  false,
-        lvalue:   false,
-        decl:     false,
-        kind: &TypeKind{
-            kind: build_prim_type("void"),
-        },
-    }
-}
-
-fn check_data_for_integer_indexing(mut &d: &Data): (err_fmt: LogMsg) {
-    if d == nil {
-        ret LogMsg.Empty
-    }
-
-    match {
-    | d.kind.prim() == nil:
-        ret LogMsg.InvalidTypeForIndexing
-    | !types::is_int(d.kind.prim().to_str()):
-        ret LogMsg.InvalidTypeForIndexing
-    | d.is_const():
-        if d.constant.as_f64() < 0 {
-            ret LogMsg.OverflowLimits
-        }
-    | d.kind.prim() == nil
-    | d.is_const()
-    | types::real_kind_of(d.kind.prim().to_str()) != types::real_kind_of(PrimKind.Int):
-        d.cast_kind = &TypeKind{kind: build_prim_type(PrimKind.Int)}
-        apply_cast_kind(d)
-    }
-    ret LogMsg.Empty
-}
-
-// Applies casting model to data by enum.
-// This is necessary to keep exact same type of enum's field type.
-// The parameter d should be constant data.
-fn apply_cast_model_by_enum(mut &d: &Data, mut e: &Enum) {
-    if e == nil {
-        ret
-    }
-    let p = e.kind.kind.prim()
-    if p.is_str() {
-        ret
-    }
-    d.cast_kind = e.kind.kind
-    apply_cast_kind_model(d)
-    d.cast_kind = nil
-}
-
 // Value data.
 pub struct Data {
     pub kind:      &TypeKind
@@ -1725,37 +1524,7 @@ impl Eval {
             ret
         }
         let prim = t.prim()
-        match {
-        | types::is_sig_int(prim.kind):
-            match types::bitsize_of(types::real_kind_of(prim.kind)) {
-            | 1 << 6:
-                d.constant.set_i64(d.constant.as_i64())
-            | 1 << 5:
-                d.constant.set_i64(i64(i32(d.constant.as_i64())))
-            | 1 << 4:
-                d.constant.set_i64(i64(i16(d.constant.as_i64())))
-            | 1 << 3:
-                d.constant.set_i64(i64(i8(d.constant.as_i64())))
-            }
-        | types::is_unsig_int(prim.kind):
-            match types::bitsize_of(types::real_kind_of(prim.kind)) {
-            | 1 << 6:
-                d.constant.set_u64(d.constant.as_u64())
-            | 1 << 5:
-                d.constant.set_u64(u64(u32(d.constant.as_u64())))
-            | 1 << 4:
-                d.constant.set_u64(u64(u16(d.constant.as_u64())))
-            | 1 << 3:
-                d.constant.set_u64(u64(u8(d.constant.as_u64())))
-            }
-        | types::is_float(prim.kind):
-            match types::bitsize_of(types::real_kind_of(prim.kind)) {
-            | 1 << 6:
-                d.constant.set_f64(d.constant.as_f64())
-            | 1 << 5:
-                d.constant.set_f64(f64(f32(d.constant.as_f64())))
-            }
-        }
+        cast_const_by_type(prim.kind, d)
         d.model = d.constant
     }
 
@@ -4325,19 +4094,18 @@ impl BinaryEval {
             d.constant = self.l.constant
         }
 
-        d.model = d.constant
         apply_cast_model_by_enum(d, d.kind.enm())
 
         let mut prim = d.kind.prim()
         if prim == nil || !types::is_num(prim.to_str()) {
+            d.model = d.constant
             ret
         }
-        if !self.e.apply_numeric_prefix(d) {
-            // If prefix is not implemented, check constant bitsize.
-            // Current data kind might be insufficient to store constant data.
-            // If this concern is true, set kind to minimum type that has enough bitsize.
-            fit_bitsize(d)
+        if self.l.constant == self.l.model && self.r.constant != self.r.model {
+            // Right constant is not pure, use type r's type.
+            d.kind = self.r.kind
         }
+        cast_const_by_type(prim.kind, d)
     }
 
     fn check_data(mut self, mut &d: &Data) {
@@ -4354,9 +4122,12 @@ impl BinaryEval {
 
     fn set_model(mut self, mut &d: &Data) {
         if d.is_const() {
-            ret
+            if self.l.constant == self.l.model && self.r.constant == self.r.model {
+                // Left and right are pure constant.
+                // Do not break this with changing model.
+                ret
+            }
         }
-
         let (mut l, mut r) = self.l, self.r
         if !l.good_operand(r) {
             l, r = r, l
@@ -4364,11 +4135,11 @@ impl BinaryEval {
 
         d.model = &BinopExprModel{
             left: &OperandExprModel{
-                kind: l.kind,
+                kind:  l.kind,
                 model: l.model,
             },
             right: &OperandExprModel{
-                kind: r.kind,
+                kind:  r.kind,
                 model: r.model,
             },
             op: self.op,
@@ -4430,5 +4201,240 @@ impl BinaryEval {
         }
 
         ret d
+    }
+}
+
+// Returns directive if exist.
+fn find_directive(mut &directives: []&std::jule::ast::Directive, d: Directive): &std::jule::ast::Directive {
+    for (_, mut dr) in directives {
+        if dr.tag.kind == d {
+            ret dr
+        }
+    }
+    ret nil
+}
+
+fn find_builtins_import(ident: str, imp: &ImportInfo): any {
+    ret find_package_builtin_def(imp.link_path, ident)
+}
+
+// If current type is not enough to store constant data, update to minimum type
+// that can store constant data. This function designed for numerical types only.
+// Data should be numerical constant of course.
+fn fit_bitsize(mut &d: &Data) {
+    let mut prim = d.kind.prim()
+    let z = types::bitsize_of(prim.to_str())
+    if z == 1 << 6 {
+        // z is already equals to biggest bitsize.
+        ret
+    }
+    let mut k = 0
+    match {
+    | d.constant.is_i64():
+        k = types::bitsize_of_int(d.constant.read_i64())
+        if k > z {
+            prim.kind = types::int_from_bits(k)
+        }
+    | d.constant.is_u64():
+        k = types::bitsize_of_uint(d.constant.read_u64())
+        if k > z {
+            prim.kind = types::uint_from_bits(k)
+        }
+    | d.constant.is_f64():
+        k = types::bitsize_of_float(d.constant.read_f64())
+        if k > z {
+            prim.kind = types::float_from_bits(k)
+        }
+    }
+}
+
+fn make_struct_lit_alloc(mut &d: &Data, mut &lit: &StructLitExprModel) {
+    d.kind = &TypeKind{
+        kind: &Sptr{
+            elem: &TypeKind{kind: lit.strct},
+        },
+    }
+    d.model = &AllocStructLitExprModel{
+        lit: lit,
+    }
+}
+
+fn build_error_var(mut &s: &Scope, mut &fc: &FnCallExpr): &Var {
+    ret &Var{
+        used:      true,
+        reference: false,
+        mutable:   true,
+        ident:     "error",
+        token:     fc.token,
+        kind:      &TypeSymbol{
+            kind: &TypeKind{
+                kind: build_prim_type(PrimKind.Any),
+            },
+        },
+        scope: s,
+        value: &Value{
+            data: &Data{},
+        },
+    }
+}
+
+fn find_builtins_sema(ident: str, mut s: &Sema): any {
+    for (_, mut imp) in s.file.imports {
+        if imp.import_all || imp.exist_ident(ident) {
+            let mut def = find_builtins_import(ident, imp)
+            if def != nil {
+                ret def
+            }
+        }
+    }
+
+    // If package is std, check for internal builtin defines.
+    let mut ppath = s.file.file.dir()
+    if strings::has_prefix(ppath, PATH_STDLIB) {
+        // Remove STDLIB directory path.
+        ppath = ppath[PATH_STDLIB.len:]
+        // Add "std" to beginning without separator
+        // because path has separator at beginning.
+        ppath = "std" + strings::replace(ppath, str(path::SEPARATOR), "::", -1)
+
+        ret find_package_builtin_def(ppath, ident)
+    }
+
+    ret nil
+}
+
+fn is_ok_for_shifting(mut &d: &Data): bool {
+    if d.is_const() {
+        match {
+        | d.constant.is_i64():
+            ret d.constant.read_i64() >= 0
+        | d.constant.is_u64():
+            ret true
+        | d.constant.is_f64():
+            ret d.constant.read_f64() >= 0
+        |:
+            ret false
+        }
+    }
+    let prim = d.kind.prim()
+    ret prim != nil && types::is_int(prim.to_str())
+}
+
+fn is_instanced_struct(s: &StructIns): bool {
+    ret s.decl.generics.len == s.generics.len
+}
+
+fn is_ptr_arithmetic_compatible_int(mut &d: &Data): bool {
+    if d.is_const() {
+        ret int_assignable(types::TypeKind.Int, d)
+    }
+    let mut tcc = TypeCompatibilityChecker{
+        dest: &TypeKind{
+            kind: build_prim_type(types::TypeKind.Int),
+        },
+        src: d.kind,
+    }
+    ret tcc.check()
+}
+
+fn apply_cast_kind_model(mut &d: &Data) {
+    d.model = &CastingExprModel{
+        expr:      d.model,
+        kind:      d.cast_kind,
+        expr_kind: d.kind,
+    }
+}
+
+fn apply_cast_kind(mut &d: &Data) {
+    if d.cast_kind == nil {
+        ret
+    }
+
+    apply_cast_kind_model(d)
+    d.kind = d.cast_kind
+    d.cast_kind = nil // Ignore, because model added.
+}
+
+fn build_void_data(): &Data {
+    ret &Data{
+        mutable:  false,
+        lvalue:   false,
+        decl:     false,
+        kind: &TypeKind{
+            kind: build_prim_type("void"),
+        },
+    }
+}
+
+fn check_data_for_integer_indexing(mut &d: &Data): (err_fmt: LogMsg) {
+    if d == nil {
+        ret LogMsg.Empty
+    }
+
+    match {
+    | d.kind.prim() == nil:
+        ret LogMsg.InvalidTypeForIndexing
+    | !types::is_int(d.kind.prim().to_str()):
+        ret LogMsg.InvalidTypeForIndexing
+    | d.is_const():
+        if d.constant.as_f64() < 0 {
+            ret LogMsg.OverflowLimits
+        }
+    | d.kind.prim() == nil
+    | d.is_const()
+    | types::real_kind_of(d.kind.prim().to_str()) != types::real_kind_of(PrimKind.Int):
+        d.cast_kind = &TypeKind{kind: build_prim_type(PrimKind.Int)}
+        apply_cast_kind(d)
+    }
+    ret LogMsg.Empty
+}
+
+// Applies casting model to data by enum.
+// This is necessary to keep exact same type of enum's field type.
+// The parameter d should be constant data.
+fn apply_cast_model_by_enum(mut &d: &Data, mut e: &Enum) {
+    if e == nil {
+        ret
+    }
+    let p = e.kind.kind.prim()
+    if p.is_str() {
+        ret
+    }
+    d.cast_kind = e.kind.kind
+    apply_cast_kind_model(d)
+    d.cast_kind = nil
+}
+
+fn cast_const_by_type(&t: str, mut &d: &Data) {
+    match {
+    | types::is_sig_int(t):
+        match types::bitsize_of(types::real_kind_of(t)) {
+        | 1 << 6:
+            d.constant.set_i64(d.constant.as_i64())
+        | 1 << 5:
+            d.constant.set_i64(i64(i32(d.constant.as_i64())))
+        | 1 << 4:
+            d.constant.set_i64(i64(i16(d.constant.as_i64())))
+        | 1 << 3:
+            d.constant.set_i64(i64(i8(d.constant.as_i64())))
+        }
+    | types::is_unsig_int(t):
+        match types::bitsize_of(types::real_kind_of(t)) {
+        | 1 << 6:
+            d.constant.set_u64(d.constant.as_u64())
+        | 1 << 5:
+            d.constant.set_u64(u64(u32(d.constant.as_u64())))
+        | 1 << 4:
+            d.constant.set_u64(u64(u16(d.constant.as_u64())))
+        | 1 << 3:
+            d.constant.set_u64(u64(u8(d.constant.as_u64())))
+        }
+    | types::is_float(t):
+        match types::bitsize_of(types::real_kind_of(t)) {
+        | 1 << 6:
+            d.constant.set_f64(d.constant.as_f64())
+        | 1 << 5:
+            d.constant.set_f64(f64(f32(d.constant.as_f64())))
+        }
     }
 }
