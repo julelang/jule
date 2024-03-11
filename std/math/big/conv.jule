@@ -33,18 +33,46 @@ fn parse_binary(s: str)!: bits {
     ret r
 }
 
-fn format_binary(&b: bits): str {
+fn format_binary(&b: bits): []byte {
     if b.len == 0 {
-        ret "0"
+        ret ['0']
     }
-    let mut s = ""
-    let mut i = b.len - 1
-    for i >= 0; i-- {
-        if b[i] == 0b1 {
-            s += "1"
-        } else {
-            s += "0"
+    let mut buf = make([]byte, b.len)
+    for i in buf {
+        buf[i] = '0' + b[b.len - i - 1]
+    }
+    ret buf
+}
+
+fn format_common_part(mut &buf: []byte, base: byte, m: byte) {
+    let mut carry = ^m & 0b1
+    let n = buf.len
+    for in buf {
+        let digit = buf[n - 1] - '0'
+        let value = (digit << m) + carry
+        buf = append(buf[:1], buf...)
+        buf[0] = '0' + (value % base)
+        carry = value / base
+    }
+    buf = buf[:n]
+    if carry > 0 {
+        buf = append(buf[:1], buf...)
+        buf[0] = '0' + carry
+    }
+}
+
+fn format_common(&b: bits, base: byte): []byte {
+    let mut buf = make([]byte, 1, b.len)
+    buf[0] = '0'
+    for _, bit in format_binary(b) {
+        format_common_part(buf, base, 1)
+        if bit == '1' {
+            format_common_part(buf, base, 0)
         }
     }
-    ret s
+    ret buf
+}
+
+fn format_decimal(&b: bits): []byte {
+    ret format_common(b, 10)
 }
