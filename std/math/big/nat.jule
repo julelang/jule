@@ -63,39 +63,22 @@ impl Nat {
         ret nat
     }
 
-    // Parse Nat from bits that represented in string.
+    // Parse Nat from string. Fmt is the format of string.
     // Results with exceptional if bits are not in the format or empty.
+    // Results with the fmt is not valid.
     // Exceptional is always BigError.Format.
-    static fn from_bits(b: str)!: Nat {
-        if b == "" {
+    //
+    // Valid fmt values are;
+    //   - 2 for binary.
+    static fn parse(s: str, fmt: int)!: Nat {
+        let mut r = Nat{}
+        match fmt {
+        | 2:
+            r.bits = parse_binary(s) else { error(error) }
+        |:
             error(BigError.Format)
         }
-        // Eliminate initial-zeros to normalize and fit minimum mandatory bit-size.
-        let mut j = 0
-        for j < b.len; j++ {
-            if b[j] != '0' {
-                break
-            }
-        }
-        if b.len == j {
-            // All bits are zero.
-            ret Nat.zero()
-        }
-        let mut n = Nat{
-            bits: make(bits, 0, b.len - j),
-        }
-        let mut k = b.len - 1
-        for k >= j; k-- {
-            match b[k] {
-            | '1':
-                n.bits = append(n.bits, 0b1)
-            | '0':
-                n.bits = append(n.bits, 0b0)
-            |:
-                error(BigError.Format)
-            }
-        }
-        ret n
+        ret r
     }
 
     // Returns count of bits.
