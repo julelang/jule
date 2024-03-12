@@ -111,14 +111,19 @@ fn parse_octal(&s: str)!: bits {
 
 fn parse_decimal(&s: str)!: []byte {
     let mut sb = stobs(s)
+    for _, b in sb {
+        if b < '0' || '9' < b {
+            error(BigError.Format)
+        }
+    }
     let mut buf = make([]byte, 0, s.len * 4)
 loop:
     for {
         let d = sb[sb.len-1] - '0'
         buf = append(buf, d%2)
         let mut carry = byte(0)
-        for i, b in sb {
-            let t = carry*10 + (b - '0')
+        for i in sb {
+            let t = carry*10 + (sb[i] - '0')
             sb[i] = '0' + (t >> 1)
             carry = t % 2
         }
