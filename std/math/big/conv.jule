@@ -109,6 +109,31 @@ fn parse_octal(&s: str)!: bits {
     ret buf
 }
 
+fn parse_decimal(&s: str)!: []byte {
+    let mut sb = stobs(s)
+    let mut buf = make([]byte, 0, s.len * 4)
+loop:
+    for {
+        let d = sb[sb.len-1] - '0'
+        buf = append(buf, d%2)
+        let mut carry = byte(0)
+        for i, b in sb {
+            let t = carry*10 + (b - '0')
+            sb[i] = '0' + (t >> 1)
+            carry = t % 2
+        }
+        for i in sb {
+            if sb[i] != '0' {
+                sb = sb[i:]
+                continue loop
+            }
+        }
+        break
+    }
+    fit(buf)
+    ret buf
+}
+
 fn format_binary(&b: bits): []byte {
     if b.len == 0 {
         ret ['0']
@@ -138,7 +163,7 @@ fn format_decimal_part(mut &buf: []byte, m: byte) {
 }
 
 fn format_decimal(&b: bits): []byte {
-    let mut buf = make([]byte, 1, b.len)
+    let mut buf = make([]byte, 1, b.len >> 1)
     buf[0] = '0'
     for _, bit in format_binary(b) {
         format_decimal_part(buf, 1)
