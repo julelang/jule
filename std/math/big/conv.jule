@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 // Parse bits from binary string.
-fn parse_binary(s: str)!: bits {
+fn parse_binary(&s: str)!: bits {
     // Eliminate initial-zeros to normalize and fit minimum mandatory bit-size.
     let mut j = 0
     for j < s.len; j++ {
@@ -32,7 +32,7 @@ fn parse_binary(s: str)!: bits {
 
 // Parse bits from hexadecimal string.
 // Returns normalized bits.
-fn parse_hex(s: str)!: bits {
+fn parse_hex(&s: str)!: bits {
     let mut buf = make(bits, 0, s.len * 4)
     let mut i = s.len - 1
     for i >= 0; i-- {
@@ -70,6 +70,37 @@ fn parse_hex(s: str)!: bits {
             buf = append(buf, 0b0, 0b1, 0b1, 0b1)
         | 'F':
             buf = append(buf, 0b1, 0b1, 0b1, 0b1)
+        |:
+            error(BigError.Format)
+        }
+    }
+    fit(buf)
+    ret buf
+}
+
+// Parse bits from octal string.
+// Returns normalized bits.
+fn parse_octal(&s: str)!: bits {
+    let mut buf = make(bits, 0, s.len * 3)
+    let mut i = s.len - 1
+    for i >= 0; i-- {
+        match s[i] {
+        | '0':
+            buf = append(buf, 0b0, 0b0, 0b0)
+        | '1':
+            buf = append(buf, 0b1, 0b0, 0b0)
+        | '2':
+            buf = append(buf, 0b0, 0b1, 0b0)
+        | '3':
+            buf = append(buf, 0b1, 0b1, 0b0)
+        | '4':
+            buf = append(buf, 0b0, 0b0, 0b1)
+        | '5':
+            buf = append(buf, 0b1, 0b0, 0b1)
+        | '6':
+            buf = append(buf, 0b0, 0b1, 0b1)
+        | '7':
+            buf = append(buf, 0b1, 0b1, 0b1)
         |:
             error(BigError.Format)
         }
@@ -128,7 +159,7 @@ fn format_octal(&b: bits): []byte {
 
 fn format_hex(&b: bits): []byte {
     let n = b.len - b.len%4
-    let mut buf = make([]byte, 1, b.len / 2)
+    let mut buf = make([]byte, 1, b.len / 4 + 1)
     let mut i = 0
     for i < n; i += 4 {
         buf = append(buf[:1], buf...)
