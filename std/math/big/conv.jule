@@ -80,3 +80,74 @@ fn format_decimal(&b: bits): []byte {
 fn format_octal(&b: bits): []byte {
     ret format_common(b, 8)
 }
+
+fn format_hex(&b: bits): []byte {
+    let n = b.len - b.len%4
+    let mut buf = make([]byte, 1, b.len / 2)
+    let mut i = 0
+    for i < n; i += 4 {
+        buf = append(buf[:1], buf...)
+        let c = b[i:i + 4]
+        match {
+        | c[0] == 0b0 && c[1] == 0b0 && c[2] == 0b0 && c[3] == 0b0:
+            buf[0] = '0'
+        | c[0] == 0b1 && c[1] == 0b0 && c[2] == 0b0 && c[3] == 0b0:
+            buf[0] = '1'
+        | c[0] == 0b0 && c[1] == 0b1 && c[2] == 0b0 && c[3] == 0b0:
+            buf[0] = '2'
+        | c[0] == 0b1 && c[1] == 0b1 && c[2] == 0b0 && c[3] == 0b0:
+            buf[0] = '3'
+        | c[0] == 0b0 && c[1] == 0b0 && c[2] == 0b1 && c[3] == 0b0:
+            buf[0] = '4'
+        | c[0] == 0b1 && c[1] == 0b0 && c[2] == 0b1 && c[3] == 0b0:
+            buf[0] = '5'
+        | c[0] == 0b0 && c[1] == 0b1 && c[2] == 0b1 && c[3] == 0b0:
+            buf[0] = '6'
+        | c[0] == 0b1 && c[1] == 0b1 && c[2] == 0b1 && c[3] == 0b0:
+            buf[0] = '7'
+        | c[0] == 0b0 && c[1] == 0b0 && c[2] == 0b0 && c[3] == 0b1:
+            buf[0] = '8'
+        | c[0] == 0b1 && c[1] == 0b0 && c[2] == 0b0 && c[3] == 0b1:
+            buf[0] = '9'
+        | c[0] == 0b0 && c[1] == 0b1 && c[2] == 0b0 && c[3] == 0b1:
+            buf[0] = 'A'
+        | c[0] == 0b1 && c[1] == 0b1 && c[2] == 0b0 && c[3] == 0b1:
+            buf[0] = 'B'
+        | c[0] == 0b0 && c[1] == 0b0 && c[2] == 0b1 && c[3] == 0b1:
+            buf[0] = 'C'
+        | c[0] == 0b1 && c[1] == 0b0 && c[2] == 0b1 && c[3] == 0b1:
+            buf[0] = 'D'
+        | c[0] == 0b0 && c[1] == 0b1 && c[2] == 0b1 && c[3] == 0b1:
+            buf[0] = 'E'
+        | c[0] == 0b1 && c[1] == 0b1 && c[2] == 0b1 && c[3] == 0b1:
+            buf[0] = 'F'
+        }
+    }
+    let c = b[n:]
+    match c.len {
+    | 1:
+        buf = append(buf[:1], buf...)
+        buf[0] = '1'
+    | 2:
+        buf = append(buf[:1], buf...)
+        match {
+        | c[0] == 0b0 && c[1] == 0b1:
+            buf[0] = '2'
+        | c[0] == 0b1 && c[1] == 0b1:
+            buf[0] = '3'
+        }
+    | 3:
+        buf = append(buf[:1], buf...)
+        match {
+        | c[0] == 0b0 && c[1] == 0b0 && c[2] == 0b1:
+            buf[0] = '4'
+        | c[0] == 0b1 && c[1] == 0b0 && c[2] == 0b1:
+            buf[0] = '5'
+        | c[0] == 0b0 && c[1] == 0b1 && c[2] == 0b1:
+            buf[0] = '6'
+        | c[0] == 0b1 && c[1] == 0b1 && c[2] == 0b1:
+            buf[0] = '7'
+        }
+    }
+    ret buf[:buf.len - 1]
+}
