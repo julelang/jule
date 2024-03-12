@@ -120,15 +120,15 @@ fn format_binary(&b: bits): []byte {
     ret buf
 }
 
-fn format_common_part(mut &buf: []byte, base: byte, m: byte) {
+fn format_decimal_part(mut &buf: []byte, m: byte) {
     let mut carry = ^m & 0b1
     let n = buf.len
     for in buf {
         let digit = buf[n - 1] - '0'
         let value = (digit << m) + carry
         buf = append(buf[:1], buf...)
-        buf[0] = '0' + (value % base)
-        carry = value / base
+        buf[0] = '0' + (value % 10)
+        carry = value / 10
     }
     buf = buf[:n]
     if carry > 0 {
@@ -137,24 +137,61 @@ fn format_common_part(mut &buf: []byte, base: byte, m: byte) {
     }
 }
 
-fn format_common(&b: bits, base: byte): []byte {
+fn format_decimal(&b: bits): []byte {
     let mut buf = make([]byte, 1, b.len)
     buf[0] = '0'
     for _, bit in format_binary(b) {
-        format_common_part(buf, base, 1)
+        format_decimal_part(buf, 1)
         if bit == '1' {
-            format_common_part(buf, base, 0)
+            format_decimal_part(buf, 0)
         }
     }
     ret buf
 }
 
-fn format_decimal(&b: bits): []byte {
-    ret format_common(b, 10)
-}
-
 fn format_octal(&b: bits): []byte {
-    ret format_common(b, 8)
+    let n = b.len - b.len%3
+    let mut buf = make([]byte, 1, b.len / 3 + 1)
+    let mut i = 0
+    for i < n; i += 3 {
+        buf = append(buf[:1], buf...)
+        let c = b[i:i + 3]
+        match {
+        | c[0] == 0b0 && c[1] == 0b0 && c[2] == 0b0:
+            buf[0] = '0'
+        | c[0] == 0b1 && c[1] == 0b0 && c[2] == 0b0:
+            buf[0] = '1'
+        | c[0] == 0b0 && c[1] == 0b1 && c[2] == 0b0:
+            buf[0] = '2'
+        | c[0] == 0b1 && c[1] == 0b1 && c[2] == 0b0:
+            buf[0] = '3'
+        | c[0] == 0b0 && c[1] == 0b0 && c[2] == 0b1:
+            buf[0] = '4'
+        | c[0] == 0b1 && c[1] == 0b0 && c[2] == 0b1:
+            buf[0] = '5'
+        | c[0] == 0b0 && c[1] == 0b1 && c[2] == 0b1:
+            buf[0] = '6'
+        | c[0] == 0b1 && c[1] == 0b1 && c[2] == 0b1:
+            buf[0] = '7'
+        }
+    }
+    let c = b[n:]
+    match c.len {
+    | 1:
+        buf = append(buf[:1], buf...)
+        buf[0] = '1'
+    | 2:
+        buf = append(buf[:1], buf...)
+        match {
+        | c[0] == 0b1 && c[1] == 0b0:
+            buf[0] = '1'
+        | c[0] == 0b0 && c[1] == 0b1:
+            buf[0] = '2'
+        | c[0] == 0b1 && c[1] == 0b1:
+            buf[0] = '3'
+        }
+    }
+    ret buf[:buf.len - 1]
 }
 
 fn format_hex(&b: bits): []byte {
