@@ -322,7 +322,7 @@ namespace jule
             if (this->_len == this->_cap)
             {
                 jule::Slice<Item> _new;
-                _new.alloc_new(this->_len + 1, (this->_len + 1) * 2);
+                _new.alloc_new(this->_len + 1, (this->_len + 1) << 1);
                 std::move(
                     this->_slice,
                     this->_slice + this->_len,

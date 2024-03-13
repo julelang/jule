@@ -67,7 +67,7 @@ namespace jule
     {
         if (dest._len + n > dest._cap)
         {
-            const jule::Int alloc_size = (dest._len + n) * 2;
+            const jule::Int alloc_size = (dest._len + n) << 1;
             jule::Slice<Item> buffer = jule::Slice<Item>::alloc(0, alloc_size);
             buffer._len = dest._len;
             std::move(
