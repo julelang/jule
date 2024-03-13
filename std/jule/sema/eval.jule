@@ -690,23 +690,24 @@ impl Eval {
         ta.used = true
 
         let mut kind = ta.kind.kind.kind
+        let mut d: &Data = nil
         match type kind {
         | &StructIns:
-            ret self.__eval_struct((&StructIns)(kind))
+            d = self.__eval_struct((&StructIns)(kind))
         | &Enum:
-            ret self.__eval_enum((&Enum)(kind))
+            d = self.__eval_enum((&Enum)(kind))
         |:
-            let mut d = &Data{
+            d = &Data{
                 decl: true,
                 kind: &TypeKind{
-                    generic:   ta.generic,
                     cpp_ident: if ta.cpp_linked { ta.ident } else { ta.kind.kind.cpp_ident },
                     kind:      ta.kind.kind.kind,
                 },
             }
             d.model = d.kind
-            ret d
         }
+        d.kind.generic = ta.generic
+        ret d
     }
 
     fn eval_def(mut self, mut def: any, ident: Token): &Data {
