@@ -30,6 +30,7 @@ use std::jule::sema::{
     TupleExprModel,
     TypeKind,
     BuiltinAppendCallExprModel,
+    SlicingExprModel,
 }
 
 const MATCH_EXPR = "_match_expr"
@@ -53,7 +54,7 @@ impl ScopeCoder {
         self.oc.add_indent()
         obj += self.oc.indent()
         obj += "auto "
-        if env::OPT_COPY && it.expr.lvalue {
+        if env::OPT_COPY && is_copy_optimizable(it.expr) {
             obj += "&"
         }
         obj += "expr = "
@@ -123,7 +124,7 @@ impl ScopeCoder {
         self.oc.add_indent()
         obj += self.oc.indent()
         obj += "auto "
-        if env::OPT_COPY && it.expr.lvalue {
+        if env::OPT_COPY && is_copy_optimizable(it.expr) {
             obj += "&"
         }
         obj += "expr = "
@@ -455,7 +456,7 @@ impl ScopeCoder {
 
         // Constant expressions generated as literals in conditions.
         if !generic_type_match && !m.expr.is_const() {
-            if m.expr.lvalue && env::OPT_COPY {
+            if env::OPT_COPY && is_copy_optimizable(m.expr) {
                 obj += "auto &_match_expr{ "
             } else {
                 obj += "auto _match_expr{ "
@@ -763,6 +764,17 @@ impl ScopeCoder {
         }
         ret obj
     }
+}
+
+fn is_copy_optimizable(&expr: &Data): bool {
+    if !expr.lvalue {
+        ret false
+    }
+    match type expr.model {
+    | &SlicingExprModel:
+        ret false
+    }
+    ret true
 }
 
 fn is_iter_copy_optimizable(&expr: &Data, &v: &Var): bool {
