@@ -7,6 +7,7 @@ It is also used by the official reference compiler JuleC and is developed in par
 
 - [`ast`](./ast): AST things.
 - [`lex`](./lex): Lexical analyzer.
+- [`importer`](./importer): Default Jule importer.
 - [`parser`](./parser): Parser.
 - [`sema`](./sema): Semantic analyzer.
 - [`types`](./types): Elementary package for type safety.

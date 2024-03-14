@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use importer::{PlainImporter}
-use mod
+use env
 
 use std::jule::build::{Log, LogKind}
+use std::jule::importer::{JuleImporter, CompileInfo, Compiler, CppStd}
 use sema for std::jule::sema
 
 // Intermediate representation of code for compiler.
@@ -26,7 +26,7 @@ impl IR {
     // - Returns nil reference and logs if exist any log.
     // - Returns IR and nil logs if everything is fine.
     pub static fn build(path: str, flags: sema::SemaFlag): (&IR, []Log) {
-        let mut importer = PlainImporter.new()
+        let mut importer = JuleImporter.new(build_compile_info())
         let (mut files, mut logs) = importer.import_package(path, true)
         if logs.len > 0 {
             ret nil, logs
@@ -45,7 +45,7 @@ impl IR {
         let mut ir = &IR{
             root: root,
             main: pkg,
-            used: importer.all_packages,
+            used: importer.all_packages(),
         }
         ir.passes = get_all_unique_passes(ir.main, ir.used)
 
@@ -115,4 +115,29 @@ fn get_all_unique_passes(mut &pkg: &sema::Package, mut uses: []&sema::ImportInfo
     }
 
     ret passes
+}
+
+fn build_compile_info(): CompileInfo {
+    let mut info = CompileInfo{
+        prod: env::PRODUCTION,
+        test: env::TEST,
+    }
+
+    match env::COMPILER {
+    | Compiler.Clang:
+        info.compiler = Compiler.Clang
+    | Compiler.GCC:
+        info.compiler = Compiler.GCC
+    }
+
+    match env::CPP_STD {
+    | CppStd.Cpp14:
+        info.compiler = CppStd.Cpp14
+    | CppStd.Cpp17:
+        info.compiler = CppStd.Cpp17
+    | CppStd.Cpp20:
+        info.compiler = CppStd.Cpp20
+    }
+
+    ret info
 }

@@ -1,0 +1,79 @@
+// Copyright 2023-2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use build for std::jule::build
+
+// Standard back-end compilers.
+pub enum Compiler: str {
+    Clang = "clang",
+    GCC = "gcc",
+}
+
+// Supported C++ standards.
+pub enum CppStd: str {
+    Cpp14 = "cpp14",
+    Cpp17 = "cpp17",
+    Cpp20 = "cpp20",
+}
+
+// Compile information.
+pub struct CompileInfo {
+    // Production compilation.
+    pub prod: bool
+    // Test compilation.
+    pub test: bool
+    // Back-end compiler to use.
+    pub compiler: Compiler
+    // C++ standard to use.
+    pub cpp_std:  CppStd
+}
+
+// Set operating system variables by native operating system.
+fn set_os_vars(mut &vars: []str) {
+    vars = append(vars, build::OS)
+    if build::is_unix(build::OS) {
+        vars = append(vars, "unix")
+    }
+}
+
+// Set architecture variables by native architecture.
+fn set_arch_vars(mut &vars: []str) {
+    vars = append(vars, build::ARCH)
+    if build::is_64bit(build::ARCH) {
+        vars = append(vars, "x64")
+    }
+    if build::is_32bit(build::ARCH) {
+        vars = append(vars, "x32")
+    }
+}
+
+// Initialize directive eval variables by compile info.
+fn init_vars(mut &vars: []str, &info: CompileInfo) {
+    set_os_vars(vars)
+    set_arch_vars(vars)
+
+    if info.prod {
+        vars = append(vars, "production")
+    }
+
+    if info.test {
+        vars = append(vars, "test")
+    }
+
+    match info.compiler {
+    | Compiler.Clang:
+        vars = append(vars, "clang")
+    | Compiler.GCC:
+        vars = append(vars, "gcc")
+    }
+
+    match info.cpp_std {
+    | CppStd.Cpp14:
+        vars = append(vars, "cpp14")
+    | CppStd.Cpp17:
+        vars = append(vars, "cpp17")
+    | CppStd.Cpp20:
+        vars = append(vars, "cpp20")
+    }
+}
