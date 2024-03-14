@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 use ast for std::jule::ast
-use std::jule::build::{Directive, Derive, LogMsg, Log, LogKind, logf}
+use build for std::jule::build::{Directive, Derive, LogMsg, Log, LogKind, logf}
 use std::jule::constant::{Const}
 use std::jule::lex::{File, Token, TokenKind, is_ignore_ident, is_anon_ident}
 use types for std::jule::types
@@ -1909,15 +1909,23 @@ impl Sema {
     fn check_fn_decl(mut &self, mut &f: &Fn) {
         if is_ignore_ident(f.ident) {
             self.push_err(f.token, LogMsg.IgnoreIdent)
-        } else if self.is_duplicated_ident(uintptr(f), f.ident, f.cpp_linked) {
-            self.push_err(f.token, LogMsg.DuplicatedIdent, f.ident)
-            self.push_suggestion(LogMsg.RenameForAvoidDuplication)
         }
 
         self.check_directives(f.directives, f)
 
         f.sema = self
         self.check_fn_decl_prototype(f)
+
+        if self.is_duplicated_ident(uintptr(f), f.ident, f.cpp_linked) {
+            if f.ident == build::INIT_FN {
+                let init = self.find_fn(build::INIT_FN, false)
+                if init != nil {
+                    ret
+                }
+            }
+            self.push_err(f.token, LogMsg.DuplicatedIdent, f.ident)
+            self.push_suggestion(LogMsg.RenameForAvoidDuplication)
+        }
     }
 
     // Checks current package file's function declarations.
