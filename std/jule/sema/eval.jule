@@ -33,7 +33,7 @@ use std::jule::ast::{
     TernaryExpr,
     NamespaceTypeDecl,
 }
-use std::jule::build::{
+use build for std::jule::build::{
     LogMsg,
     Directive,
     PATH_STDLIB,
@@ -719,15 +719,17 @@ impl Eval {
         | &Struct:
             ret self.eval_struct((&Struct)(def).instance(), ident)
         | &Fn:
-            ret self.eval_fn((&Fn)(def), ident)
+            let mut f = (&Fn)(def)
+            if f.ident != build::INIT_FN {
+                ret self.eval_fn(f, ident)
+            }
         | &FnIns:
             ret self.eval_fn_ins((&FnIns)(def))
         | &TypeAlias:
             ret self.eval_type_alias((&TypeAlias)(def), ident)
-        |:
-            self.push_err(ident, LogMsg.IdentNotExist, ident.kind)
-            ret nil
         }
+        self.push_err(ident, LogMsg.IdentNotExist, ident.kind)
+        ret nil
     }
 
     fn eval_ident(mut self, ident: &IdentExpr): &Data {
