@@ -18,107 +18,35 @@ use std::jule::build::{Derive, LogMsg}
 //  d: Data instance for evaluated expression of function.
 type BuiltinCaller: fn(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data
 
-type Caller: byte
-
-const BUILTIN_CALLER_COMMON = Caller(0x1)
-const BUILTIN_CALLER_COMMON_MUT = Caller(0x2)
-const BUILTIN_CALLER_COMMON_PLAIN = Caller(0x3)
-const BUILTIN_CALLER_OUT = Caller(0x4)
-const BUILTIN_CALLER_OUTLN = Caller(0x5)
-const BUILTIN_CALLER_NEW = Caller(0x6)
-const BUILTIN_CALLER_PANIC = Caller(0x7)
-const BUILTIN_CALLER_COPY = Caller(0x8)
-const BUILTIN_CALLER_MAKE = Caller(0x9)
-const BUILTIN_CALLER_APPEND = Caller(0xA)
-const BUILTIN_CALLER_CLONE = Caller(0xB)
-const BUILTIN_CALLER_ASSERT = Caller(0xC)
-const BUILTIN_CALLER_STD_MEM_SIZE_OF = Caller(0xD)
-const BUILTIN_CALLER_STD_MEM_ALIGN_OF = Caller(0xE)
-const BUILTIN_CALLER_STD_MEM_FREE = Caller(0x13)
-const BUILTIN_CALLER_STD_JULE_INTEGRATED_TO_STR = Caller(0xF)
-const BUILTIN_CALLER_STD_JULE_INTEGRATED_EMIT = Caller(0x10)
-const BUILTIN_CALLER_STD_DEBUG_OUT = Caller(0x11)
-const BUILTIN_CALLER_STD_DEBUG_OUTLN = Caller(0x12)
-
-static mut BUILTIN_TYPE_ALIAS_BYTE = &TypeAlias{
-    public: true,
-    kind: &TypeSymbol{
-        kind: &TypeKind{kind: build_prim_type(PrimKind.U8)},
-    },
-}
-
-static mut BUILTIN_TYPE_ALIAS_RUNE = &TypeAlias{
-    public: true,
-    kind: &TypeSymbol{
-        kind: &TypeKind{kind: build_prim_type(PrimKind.I32)},
-    },
-}
-
-fn find_builtin_caller(c: Caller): BuiltinCaller {
-    match c {
-    | BUILTIN_CALLER_COMMON:
-        ret builtin_caller_common
-    | BUILTIN_CALLER_COMMON_MUT:
-        ret builtin_caller_common_mut
-    | BUILTIN_CALLER_COMMON_PLAIN:
-        ret builtin_caller_common_plain
-    | BUILTIN_CALLER_OUT:
-        ret builtin_caller_out
-    | BUILTIN_CALLER_OUTLN:
-        ret builtin_caller_outln
-    | BUILTIN_CALLER_NEW:
-        ret builtin_caller_new
-    | BUILTIN_CALLER_PANIC:
-        ret builtin_caller_panic
-    | BUILTIN_CALLER_COPY:
-        ret builtin_caller_copy
-    | BUILTIN_CALLER_MAKE:
-        ret builtin_caller_make
-    | BUILTIN_CALLER_APPEND:
-        ret builtin_caller_append
-    | BUILTIN_CALLER_CLONE:
-        ret builtin_caller_clone
-    | BUILTIN_CALLER_ASSERT:
-        ret builtin_caller_assert
-    | BUILTIN_CALLER_STD_MEM_SIZE_OF:
-        ret builtin_caller_std_mem_size_of
-    | BUILTIN_CALLER_STD_MEM_ALIGN_OF:
-        ret builtin_caller_std_mem_align_of
-    | BUILTIN_CALLER_STD_MEM_FREE:
-        ret builtin_caller_std_mem_free
-    | BUILTIN_CALLER_STD_JULE_INTEGRATED_TO_STR:
-        ret builtin_caller_std_jule_integrated_to_str
-    | BUILTIN_CALLER_STD_JULE_INTEGRATED_EMIT:
-        ret builtin_caller_std_jule_integrated_emit
-    | BUILTIN_CALLER_STD_DEBUG_OUT:
-        ret builtin_caller_std_debug_out
-    | BUILTIN_CALLER_STD_DEBUG_OUTLN:
-        ret builtin_caller_std_debug_outln
-    |:
-        panic("builtin caller not exist")
-    }
-}
-
 fn find_builtin_fn(ident: str): &FnIns {
     match ident {
     | "out":
-        ret &FnIns{caller: BUILTIN_CALLER_OUT}
+        static mut f = &FnIns{caller: builtin_caller_out}
+        ret f
     | "outln":
-        ret &FnIns{caller: BUILTIN_CALLER_OUTLN}
+        static mut f = &FnIns{caller: builtin_caller_outln}
+        ret f
     | "new":
-        ret &FnIns{caller: BUILTIN_CALLER_NEW}
+        static mut f = &FnIns{caller: builtin_caller_new}
+        ret f
     | "panic":
-        ret &FnIns{caller: BUILTIN_CALLER_PANIC}
+        static mut f = &FnIns{caller: builtin_caller_panic}
+        ret f
     | "make":
-        ret &FnIns{caller: BUILTIN_CALLER_MAKE}
+        static mut f = &FnIns{caller: builtin_caller_make}
+        ret f
     | "append":
-        ret &FnIns{caller: BUILTIN_CALLER_APPEND}
+        static mut f = &FnIns{caller: builtin_caller_append}
+        ret f
     | "copy":
-        ret &FnIns{caller: BUILTIN_CALLER_COPY}
+        static mut f = &FnIns{caller: builtin_caller_copy}
+        ret f
     | "clone":
-        ret &FnIns{caller: BUILTIN_CALLER_CLONE}
+        static mut f = &FnIns{caller: builtin_caller_clone}
+        ret f
     | "assert":
-        ret &FnIns{caller: BUILTIN_CALLER_ASSERT}
+        static mut f = &FnIns{caller: builtin_caller_assert}
+        ret f
     |:
         ret nil
     }
@@ -127,9 +55,25 @@ fn find_builtin_fn(ident: str): &FnIns {
 fn find_builtin_type_alias(ident: str): &TypeAlias {
     match ident {
     | "byte":
-        ret BUILTIN_TYPE_ALIAS_BYTE
+        static mut t = &TypeAlias{
+            public: true,
+            kind: &TypeSymbol{
+                kind: &TypeKind{
+                    kind: build_prim_type(PrimKind.U8),
+                },
+            },
+        }
+        ret t
     | "rune":
-        ret BUILTIN_TYPE_ALIAS_RUNE
+        static mut t = &TypeAlias{
+            public: true,
+            kind: &TypeSymbol{
+                kind: &TypeKind{
+                    kind: build_prim_type(PrimKind.I32),
+                },
+            },
+        }
+        ret t
     |:
         ret nil
     }
@@ -161,9 +105,11 @@ fn find_builtin_def(ident: str): any {
 fn find_builtin_def_std_debug(ident: str): any {
     match ident {
     | "out":
-        ret &FnIns{caller: BUILTIN_CALLER_STD_DEBUG_OUT}
+        static mut f = &FnIns{caller: builtin_caller_std_debug_out}
+        ret f
     | "outln":
-        ret &FnIns{caller: BUILTIN_CALLER_STD_DEBUG_OUTLN}
+        static mut f = &FnIns{caller: builtin_caller_std_debug_outln}
+        ret f
     |:
         ret nil
     }
@@ -172,11 +118,14 @@ fn find_builtin_def_std_debug(ident: str): any {
 fn find_builtin_def_std_mem(ident: str): any {
     match ident {
     | "size_of":
-        ret &FnIns{caller: BUILTIN_CALLER_STD_MEM_SIZE_OF}
+        static mut f = &FnIns{caller: builtin_caller_std_mem_size_of}
+        ret f
     | "align_of":
-        ret &FnIns{caller: BUILTIN_CALLER_STD_MEM_ALIGN_OF}
+        static mut f = &FnIns{caller: builtin_caller_std_mem_align_of}
+        ret f
     | "free":
-        ret &FnIns{caller: BUILTIN_CALLER_STD_MEM_FREE}
+        static mut f = &FnIns{caller: builtin_caller_std_mem_free}
+        ret f
     |:
         ret nil
     }
@@ -185,9 +134,11 @@ fn find_builtin_def_std_mem(ident: str): any {
 fn find_builtin_def_std_jule_integrated(ident: str): any {
     match ident {
     | "to_str":
-        ret &FnIns{caller: BUILTIN_CALLER_STD_JULE_INTEGRATED_TO_STR}
+        static mut f = &FnIns{caller: builtin_caller_std_jule_integrated_to_str}
+        ret f
     | "emit":
-        ret &FnIns{caller: BUILTIN_CALLER_STD_JULE_INTEGRATED_EMIT}
+        static mut f = &FnIns{caller: builtin_caller_std_jule_integrated_emit}
+        ret f
     |:
         ret nil
     }
@@ -351,7 +302,11 @@ fn builtin_caller_new(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data
         ret nil
     }
 
-    d.kind = &TypeKind{kind: &Sptr{elem: t.kind}}
+    d.kind = &TypeKind{
+        kind: &Sptr{
+            elem: t.kind,
+        },
+    }
 
     if fc.args.len == 2 { // Initialize expression.
         let mut old = e.prefix
@@ -506,7 +461,7 @@ fn builtin_caller_append(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &D
             },
         ],
         result: t.kind,
-        caller: BUILTIN_CALLER_COMMON_PLAIN,
+        caller: builtin_caller_common_plain,
     }
     d.kind = &TypeKind{
         kind: f,
@@ -569,7 +524,7 @@ fn builtin_caller_copy(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Dat
         result: &TypeKind{
             kind: build_prim_type(PrimKind.Int),
         },
-        caller: BUILTIN_CALLER_COMMON_PLAIN,
+        caller: builtin_caller_common_plain,
     }
 
     d.kind = &TypeKind{
