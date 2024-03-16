@@ -6,6 +6,7 @@ use env
 use optimizing::{
     UnsafeBinopExprModel,
     UnsafeIndexingExprModel,
+    PushToSliceExprModel,
 }
 
 use conv for std::conv
@@ -820,41 +821,22 @@ impl ExprCoder {
         ret obj
     }
 
-    fn __append_call_assign(mut self, &dest_expr: str, mut &dest_kind: &TypeKind,
-        mut &s: &SliceExprModel, mut &m: &BuiltinAppendCallExprModel): str {
-        let mut obj = dest_expr
+    fn push_to_slice(mut self, mut m: &PushToSliceExprModel): str {
+        let dest = self.model(m.dest)
+        let mut obj = dest
         obj += " = jule::alloc_for_append("
-        obj += self.model(m.dest)
+        obj += dest
         obj += ","
-        obj += conv::itoa(s.elems.len)
+        obj += conv::itoa(m.elems.elems.len)
         obj += ");"
-        for (_, mut e) in s.elems {
-            obj += dest_expr
+        for (_, mut e) in m.elems.elems {
+            obj += dest
             // Use the "__push" function to skip allocation boundary checking.
             obj += ".__push("
             obj += self.model(e)
             obj += ");"
         }
         ret obj
-    }
-
-    fn append_call_assign(mut self, mut dest: ExprModel, mut m: &BuiltinAppendCallExprModel): (str, optimized: bool) {
-        match type m.elements {
-        | &SliceExprModel:
-            match type dest {
-            | &Var:
-                let mut s = (&SliceExprModel)(m.elements)
-                let dest_expr = self.model(dest)
-                let mut dest_var = (&Var)(dest)
-                ret self.__append_call_assign(dest_expr, dest_var.kind.kind, s, m), true
-            | &StructSubIdentExprModel:
-                let mut s = (&SliceExprModel)(m.elements)
-                let dest_expr = self.model(dest)
-                let mut dest_field = (&StructSubIdentExprModel)(dest).field
-                ret self.__append_call_assign(dest_expr, dest_field.kind, s, m), true
-            }
-        }
-        ret self.append_call(m), false
     }
 
     fn append_call(mut self, mut m: &BuiltinAppendCallExprModel): str {

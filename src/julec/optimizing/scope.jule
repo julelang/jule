@@ -26,6 +26,9 @@ use std::jule::sema::{
     RetSt,
     BinopExprModel,
     OperandExprModel,
+    BuiltinAppendCallExprModel,
+    SliceExprModel,
+    StructSubIdentExprModel,
 }
 use strings for std::strings
 
@@ -213,6 +216,7 @@ impl ScopeOptimizer {
     fn optimize_assign(mut self, mut assign: &Assign) {
         ExprOptimizer.optimize(assign.l.model)
         ExprOptimizer.optimize(assign.r.model)
+
         match assign.op.kind {
         | TokenKind.SolidusEq | TokenKind.PercentEq:
             // Do not check division of structures safety.
@@ -232,6 +236,25 @@ impl ScopeOptimizer {
                     ret
                 }
                 assign.op.kind += "="
+                ret
+            }
+        }
+
+        if env::OPT_APPEND {
+            match type assign.r.model {
+            | &BuiltinAppendCallExprModel:
+                let mut m = (&BuiltinAppendCallExprModel)(assign.r.model)
+                match type m.elements {
+                | &SliceExprModel:
+                    match type m.dest {
+                    | &Var
+                    | &StructSubIdentExprModel:
+                        self.set_current_stmt(&PushToSliceExprModel{
+                            dest:  m.dest,
+                            elems: (&SliceExprModel)(m.elements),
+                        })
+                    }
+                }
             }
         }
     }

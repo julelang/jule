@@ -3,6 +3,9 @@
 // license that can be found in the LICENSE file.
 
 use env
+use optimizing::{
+    PushToSliceExprModel,
+}
 
 use std::jule::lex::{TokenKind, is_ignore_ident}
 use std::jule::sema::{
@@ -315,21 +318,7 @@ impl ScopeCoder {
     fn assign(mut self, mut a: &Assign): str {
         let mut obj = self.oc.ec.expr(a.l.model)
         obj += a.op.kind
-        if env::OPT_APPEND {
-            match type a.r.model {
-            | &BuiltinAppendCallExprModel:
-                let mut model = (&BuiltinAppendCallExprModel)(a.r.model)
-                let (expr, optimized) = self.oc.ec.append_call_assign(a.l.model, model)
-                if optimized {
-                    ret expr
-                }
-                obj += expr
-            |:
-                obj += self.oc.ec.expr(a.r.model)
-            }
-        } else {
-            obj += self.oc.ec.expr(a.r.model)
-        }
+        obj += self.oc.ec.expr(a.r.model)
         obj += ";"
         ret obj
     }
@@ -709,6 +698,8 @@ impl ScopeCoder {
             ret self.break_st((&BreakSt)(st))
         | &RetSt:
             ret self.ret_st((&RetSt)(st))
+        | &PushToSliceExprModel:
+            ret self.oc.ec.push_to_slice((&PushToSliceExprModel)(st))
         |:
             ret "<unimplemented_stmt>"
         }
