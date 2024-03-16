@@ -3,6 +3,10 @@
 // license that can be found in the LICENSE file.
 
 use env
+use optimizing::{
+    UnsafeBinopExprModel,
+    UnsafeIndexingExprModel,
+}
 
 use conv for std::conv
 use std::env::{ARCH}
@@ -183,58 +187,39 @@ impl ExprCoder {
     }
 
     fn div_by_zero_binary(mut self, &op: Token, mut &l: &OperandExprModel, mut &r: &OperandExprModel): str {
-        let mut opt = false
-        if env::OPT_MATH {
-            match type r.model {
-            | &Const:
-                opt = true
-            }
-        }
-
         let mut op_func = ""
         match op.kind {
         | TokenKind.Solidus
         | TokenKind.SolidusEq:
-            op_func = if opt { "/" } else { "div" }
+            op_func = "div"
         | TokenKind.Percent
         | TokenKind.PercentEq:
-            op_func = if opt { "%" } else { "mod" }
+            op_func = "mod"
         }
 
-        let mut obj = ""
-        if opt {
-            obj = "("
-            obj += self.expr(l.model)
-            match op.kind {
-            | TokenKind.Solidus:
-                let (ok, x) = check_for_bit_shift_opt(l, r)
-                if ok {
-                    obj += " >> "
-                    obj += utoa(x)
-                    break
-                }
-                fall
-            |:
-                obj += " "
-                obj += op_func
-                obj += " "
-                obj += self.expr(r.model)
-            }
-            obj += ")"
-        } else {
-            obj = "jule::"
-            obj += op_func
-            obj += "("
-            if !env::PRODUCTION {
-                obj += "\""
-                obj += self.oc.loc_info(op)
-                obj += "\","
-            }
-            obj += self.expr(l.model)
-            obj += ","
-            obj += self.expr(r.model)
-            obj += ")"
+        let mut obj = "jule::"
+        obj += op_func
+        obj += "("
+        if !env::PRODUCTION {
+            obj += "\""
+            obj += self.oc.loc_info(op)
+            obj += "\","
         }
+        obj += self.expr(l.model)
+        obj += ","
+        obj += self.expr(r.model)
+        obj += ")"
+        ret obj
+    }
+
+    fn unsafe_binary(mut self, mut m: &BinopExprModel): str {
+        let mut obj = "("
+        obj += self.model(m.left.model)
+        obj += " "
+        obj += m.op.kind
+        obj += " "
+        obj += self.model(m.right.model)
+        obj += ")"
         ret obj
     }
 
@@ -246,30 +231,7 @@ impl ExprCoder {
                 ret self.div_by_zero_binary(m.op, m.left, m.right)
             }
         }
-
-        let mut obj = "("
-        if env::OPT_MATH {
-            match m.op.kind {
-            | TokenKind.Star: // Multiplication
-                let (ok, x) = check_for_bit_shift_opt(m.left, m.right)
-                if !ok {
-                    break
-                }
-                obj += self.model(m.left.model)
-                obj += " << "
-                obj += utoa(x)
-                obj += ")"
-                ret obj
-            }
-        }
-
-        obj += self.model(m.left.model)
-        obj += " "
-        obj += m.op.kind
-        obj += " "
-        obj += self.model(m.right.model)
-        obj += ")"
-        ret obj
+        ret self.unsafe_binary(m)
     }
 
     fn var(self, mut m: &Var): str {
@@ -294,16 +256,6 @@ impl ExprCoder {
     }
 
     fn unary(mut self, mut m: &UnaryExprModel): str {
-        if env::OPT_PTR && m.op.kind == TokenKind.Star {
-            match type m.expr.model {
-            | &UnaryExprModel:
-                let mut um = (&UnaryExprModel)(m.expr.model)
-                if um.op.kind == TokenKind.Amper {
-                    ret self.model(um.expr.model)
-                }
-            }
-        }
-
         match m.op.kind {
         | TokenKind.Caret:
             let mut obj = "(~("
@@ -595,40 +547,6 @@ impl ExprCoder {
 
     fn indexing(mut self, mut m: &IndexingExprModel): str {
         let mut obj = self.model(m.expr.model)
-
-        // Try access optimization.
-        if env::OPT_ACCESS {
-            let array = m.expr.kind.arr() != nil
-
-            // Constants checked by semantic analysis for arrays, safe.
-            if array && m.index.is_const() {
-                obj += ".__at("
-                obj += self.expr(m.index.model)
-                obj += ")"
-                ret obj
-            }
-
-            match type m.index.model {
-            | &Var:
-                let i = (&Var)(m.index.model)
-                if i.mutable || i.iter_relation == nil {
-                    break
-                }
-                match type m.expr.model {
-                | &Var:
-                    let r = (&Var)(m.expr.model)
-
-                    // Iterated variable is indexed variable?
-                    if i.iter_relation.range == r {
-                        obj += ".__at("
-                        obj += self.expr(m.index.model)
-                        obj += ")"
-                        ret obj
-                    }
-                }
-            }
-        }
-
         // Index access with safety measures.
         match {
         | env::PRODUCTION
@@ -644,7 +562,24 @@ impl ExprCoder {
             obj += self.expr(m.index.model)
             obj += ")"
         }
+        ret obj
+    }
 
+    fn unsafe_indexing(mut self, mut m: &UnsafeIndexingExprModel): str {
+        let mut obj = self.model(m.node.expr.model)
+        // Index access with safety measures.
+        match {
+        | env::PRODUCTION
+        | m.node.expr.kind.ptr() != nil
+        | m.node.expr.kind.map() != nil:
+            obj += "["
+            obj += self.expr(m.node.index.model)
+            obj += "]"
+        |:
+            obj += ".__at("
+            obj += self.expr(m.node.index.model)
+            obj += ")"
+        }
         ret obj
     }
 
@@ -1023,6 +958,8 @@ impl ExprCoder {
             ret self.structure_ins((&StructIns)(m))
         | &FnIns:
             ret self.func_ins_common((&FnIns)(m))
+        | &UnsafeBinopExprModel:
+            ret self.unsafe_binary((&UnsafeBinopExprModel)(m).node)
         | &BinopExprModel:
             ret self.binary((&BinopExprModel)(m))
         | &UnaryExprModel:
@@ -1039,6 +976,8 @@ impl ExprCoder {
             ret self.slice((&SliceExprModel)(m))
         | &ArrayExprModel:
             ret self.array((&ArrayExprModel)(m))
+        | &UnsafeIndexingExprModel:
+            ret self.unsafe_indexing((&UnsafeIndexingExprModel)(m))
         | &IndexingExprModel:
             ret self.indexing((&IndexingExprModel)(m))
         | &AnonFnExprModel:
@@ -1134,37 +1073,6 @@ fn concat_all_parts(parts: ...Token): str {
         s += p.kind
     }
     ret s
-}
-
-// Checks for bit-shifting optimizations.
-// Reports true if conditions are:
-//   - l is integer
-//   - r is integer
-//   - r is constant
-//   - r > 0 && r%2 == 0
-//   - log2(r) returns integer without fraction
-//
-// As a result: returns whether bit-shifting is possible and what nth power of 2^r.
-fn check_for_bit_shift_opt(&l: &OperandExprModel, &r: &OperandExprModel): (ok: bool, x: u64) {
-    if !types::is_int(l.kind.to_str()) || !types::is_int(r.kind.to_str()) {
-        ret false, 0
-    }
-    match type r.model {
-    | &Const:
-        break
-    |:
-        ret false, 0
-    }
-    x = (&Const)(r.model).as_u64()
-    if x == 0 || x%2 != 0 {
-        ret false, 0
-    }
-    let j = math::log2(f64(x))
-    let z = u64(j)
-    if f64(z) != j {
-        ret false, 0
-    }
-    ret true, z
 }
 
 fn decompose_common_esq(b: byte): str {

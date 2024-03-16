@@ -312,23 +312,7 @@ impl ScopeCoder {
         ret obj
     }
 
-    fn div_by_zero_assign(mut self, mut a: &Assign): str {
-        let mut obj = self.oc.ec.expr(a.l.model)
-        obj += " = "
-        obj += self.oc.ec.div_by_zero_binary(a.op, a.l, a.r)
-        obj += ";"
-        ret obj
-    }
-
     fn assign(mut self, mut a: &Assign): str {
-        match a.op.kind {
-        | TokenKind.SolidusEq | TokenKind.PercentEq:
-            // Do not check division of structures safety.
-            if a.l.kind.strct() == nil {
-                ret self.div_by_zero_assign(a)
-            }
-        }
-
         let mut obj = self.oc.ec.expr(a.l.model)
         obj += a.op.kind
         if env::OPT_APPEND {
@@ -340,7 +324,6 @@ impl ScopeCoder {
                     ret expr
                 }
                 obj += expr
-
             |:
                 obj += self.oc.ec.expr(a.r.model)
             }

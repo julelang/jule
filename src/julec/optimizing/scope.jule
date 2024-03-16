@@ -7,7 +7,9 @@ use env
 use path for std::fs::path
 use std::jule::build::{PATH_STDLIB}
 use std::jule::constant::{Const}
+use std::jule::lex::{TokenKind}
 use std::jule::sema::{
+    Var,
     Data,
     Scope,
     St,
@@ -16,6 +18,14 @@ use std::jule::sema::{
     If,
     Case,
     Match,
+    RangeIter,
+    WhileIter,
+    InfIter,
+    Assign,
+    MultiAssign,
+    RetSt,
+    BinopExprModel,
+    OperandExprModel,
 }
 use strings for std::strings
 
@@ -36,10 +46,6 @@ impl ScopeOptimizer {
         self.scope.stmts[self.i] = stmt
     }
 
-    fn current_stmt(mut self): any {
-        ret self.scope.stmts[self.i]
-    }
-
     fn optimize_data(mut self, mut d: &Data) {
         match type d.model {
         | &FnCallExprModel:
@@ -47,13 +53,27 @@ impl ScopeOptimizer {
             if env::PRODUCTION {
                 if !m.func.is_builtin() &&
                     is_std_package(m.func.decl.token.file.path(), "debug") {
-                    self.scope.stmts[self.i] = nil
+                    self.set_current_stmt(nil)
+                    ret
                 }
             }
         }
+        ExprOptimizer.optimize(d.model)
+    }
+
+    fn optimize_var(mut self, mut v: &Var) {
+        ExprOptimizer.optimize(v.value.data.model)
     }
 
     fn optimize_conditional(mut self, mut c: &Conditional) {
+        for (_, mut elif) in c.elifs {
+            ExprOptimizer.optimize(elif.expr)
+            self.optimize_child(elif.scope)
+        }
+        if c.default != nil {
+            self.optimize_child(c.default.scope)
+        }
+
         if !env::OPT_COND {
             ret
         }
@@ -112,6 +132,16 @@ impl ScopeOptimizer {
     }
 
     fn optimize_match(mut self, mut m: &Match) {
+        for (_, mut case) in m.cases {
+            for (_, mut expr) in case.exprs {
+                ExprOptimizer.optimize(expr.model)
+            }
+            self.optimize_child(case.scope)
+        }
+        if m.default != nil {
+            self.optimize_child(m.default.scope)
+        }
+
         if !env::OPT_COND {
             ret
         }
@@ -169,12 +199,79 @@ impl ScopeOptimizer {
         }
     }
 
+    fn optimize_range_iter(mut self, mut it: &RangeIter) {
+        ExprOptimizer.optimize(it.expr.model)
+        self.optimize_child(it.scope)
+    }
+
+    fn optimize_while_iter(mut self, mut it: &WhileIter) {
+        ExprOptimizer.optimize(it.expr)
+        self.optimize_stmt(it.next)
+        self.optimize_child(it.scope)
+    }
+
+    fn optimize_assign(mut self, mut assign: &Assign) {
+        ExprOptimizer.optimize(assign.l.model)
+        ExprOptimizer.optimize(assign.r.model)
+        match assign.op.kind {
+        | TokenKind.SolidusEq | TokenKind.PercentEq:
+            // Do not check division of structures safety.
+            if env::OPT_MATH && assign.l.kind.strct() == nil {
+                assign.op.kind = assign.op.kind[:assign.op.kind.len - 1]
+                let mut model = any(&BinopExprModel{
+                    op:    assign.op,
+                    left:  assign.l,
+                    right: assign.r,
+                })
+                ExprOptimizer.optimize(model)
+                match type model {
+                | &BinopExprModel:
+                    assign.r = new(OperandExprModel, *assign.r)
+                    assign.op.kind = TokenKind.Eq
+                    assign.r.model = model
+                    ret
+                }
+                assign.op.kind += "="
+            }
+        }
+    }
+
+    fn optimize_multi_assign(mut self, mut assign: &MultiAssign) {
+        for (i, mut l) in assign.l {
+            ExprOptimizer.optimize(l)
+            assign.l[i] = l
+        }
+        ExprOptimizer.optimize(assign.r)
+    }
+
+    fn optimize_ret(mut self, mut r: &RetSt) {
+        ExprOptimizer.optimize(r.expr)
+    }
+
     fn optimize_stmt(mut self, mut stmt: St) {
         match type stmt {
-        | &Scope:       self.optimize_child((&Scope)(stmt))
-        | &Data:        self.optimize_data((&Data)(stmt))
-        | &Conditional: self.optimize_conditional((&Conditional)(stmt))
-        | &Match:       self.optimize_match((&Match)(stmt))
+        | &Scope:
+            self.optimize_child((&Scope)(stmt))
+        | &Data:
+            self.optimize_data((&Data)(stmt))
+        | &Var:
+            self.optimize_var((&Var)(stmt))
+        | &Conditional:
+            self.optimize_conditional((&Conditional)(stmt))
+        | &RangeIter:
+            self.optimize_range_iter((&RangeIter)(stmt))
+        | &WhileIter:
+            self.optimize_while_iter((&WhileIter)(stmt))
+        | &InfIter:
+            self.optimize_child((&InfIter)(stmt).scope)
+        | &Assign:
+            self.optimize_assign((&Assign)(stmt))
+        | &MultiAssign:
+            self.optimize_multi_assign((&MultiAssign)(stmt))
+        | &Match:
+            self.optimize_match((&Match)(stmt))
+        | &RetSt:
+            self.optimize_ret((&RetSt)(stmt))
         }
     }
 
@@ -185,9 +282,9 @@ impl ScopeOptimizer {
 
     // Optimizes scope by enabled optimizations.
     pub fn optimize(mut self) {
-        self.i = 0
-        for self.i < self.scope.stmts.len; self.i++ {
-            self.optimize_stmt(self.current_stmt())
+        for (i, mut stmt) in self.scope.stmts {
+            self.i = i
+            self.optimize_stmt(stmt)
         }
     }
 }
@@ -202,7 +299,6 @@ fn is_constant_valid_conditional_case(&i: &If): bool {
         let c = (&Const)(i.expr)
         ret c.is_bool() && c.read_bool()
     }
-
     ret false
 }
 
@@ -212,7 +308,6 @@ fn is_constant_valid_match_case(&case: &Case): bool {
             ret true
         }
     }
-
     ret false
 }
 
@@ -222,7 +317,6 @@ fn is_unreachable_conditional_case(&i: &If): bool {
         let c = (&Const)(i.expr)
         ret c.is_bool() && !c.read_bool()
     }
-
     ret false
 }
 
@@ -232,6 +326,5 @@ fn is_unreachable_match_case(&case: &Case): bool {
             ret true
         }
     }
-
     ret false
 }
