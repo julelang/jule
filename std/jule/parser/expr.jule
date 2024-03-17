@@ -107,7 +107,7 @@ fn split_colon(mut &tokens: []Token): ([]Token, []Token) {
             |:
                 range_n--
             }
-        
+
         | TokenId.Colon:
             if range_n < 1 {
                 let mut l = tokens[:i]
@@ -148,29 +148,22 @@ fn find_lowest_prec_op(&tokens: []Token): int {
             | TokenKind.LBrace:
                 skip_to_next_brace_open = false
                 fall
-
             | TokenKind.LParent
             | TokenKind.LBracket:
                 brace_n++
-
             |:
                 brace_n--
             }
             continue
-
         | skip_to_next_brace_open:
             continue
-
         | token.id == TokenId.If:
             skip_to_next_brace_open = true
             continue
-
         | i == 0:
             continue
-
         | token.id != TokenId.Op:
             continue
-
         | brace_n > 0:
             continue
         }
@@ -221,7 +214,6 @@ fn get_range_expr_tokens(mut &tokens: []Token): ([]Token, int) {
             | TokenKind.RBracket
             | TokenKind.RParent:
                 range_n++
-    
             |:
                 range_n--
             }
@@ -273,19 +265,16 @@ impl ExprBuilder {
         match token.id {
         | TokenId.Lit:
             ret self.build_lit(token)
-
         | TokenId.Op:
             if token.kind == TokenKind.TripleDot {
                 ret &VariadicExpr{
                     token: token,
                 }
             }
-
         | TokenId.Ident
         | TokenId.Self
         | TokenId.Error:
             ret build_ident_expr(token)
-
         | TokenId.Prim:
             ret self.build_primitive_type(token)
         }
@@ -387,17 +376,14 @@ impl ExprBuilder {
         match token.id {
         | TokenId.Dot:
             ret self.build_obj_sub_ident(tokens)
-
         | TokenId.DblColon:
             ret self.build_ns_sub_ident(tokens)
-
         | TokenId.Range:
             // Catch slice, and array types.
             if token.kind == TokenKind.RBracket {
                 ret self.build_type(tokens)
             }
         }
-
         self.push_err(token, LogMsg.InvalidSyntax)
         ret nil
     }
@@ -427,10 +413,8 @@ impl ExprBuilder {
                 }
                 ret d
             }
-
         | TokenKind.TripleDot:
             ret self.build_variadic(tokens)
-
         }
         self.push_err(token, LogMsg.InvalidSyntax)
         ret nil
@@ -457,7 +441,6 @@ impl ExprBuilder {
                 | TokenKind.LParent:
                     range_n++
                     continue
-
                 |:
                     range_n--
                 }
@@ -548,7 +531,6 @@ impl ExprBuilder {
                 | TokenKind.LBracket
                 | TokenKind.LParent:
                     range_n++
-
                 |:
                     range_n--
                 }
@@ -660,7 +642,6 @@ impl ExprBuilder {
         | TokenId.Fn:
             // Unsafe anonymous function.
             ret self.build_anon_fn(tokens)
-
         |:
             ret self.build_unsafe_expr(tokens)
         }
@@ -695,7 +676,6 @@ impl ExprBuilder {
                 | TokenKind.LBracket
                 | TokenKind.LParent:
                     range_n++
-
                 |:
                     range_n--
                 }
@@ -735,12 +715,10 @@ impl ExprBuilder {
 
     fn build_struct_lit_expr(mut self, mut &tokens: []Token): ExprData {
         let mut token = tokens[0]
-        if token.id == TokenId.Ident {
-            if tokens.len > 1 {
-                token = tokens[1]
-                if token.id == TokenId.Colon {
-                    ret self.build_field_expr_pair(tokens)
-                }
+        if token.id == TokenId.Ident && tokens.len > 1 {
+            token = tokens[1]
+            if token.id == TokenId.Colon {
+                ret self.build_field_expr_pair(tokens)
             }
         }
         ret self.build_from_tokens(tokens)
@@ -819,7 +797,6 @@ impl ExprBuilder {
         match {
         | expr_tokens.len == 0:
             ret self.build_brace_lit(tokens)
-
         | range_n > 0:
             self.push_err(tokens[0], LogMsg.InvalidSyntax)
             ret nil
@@ -845,7 +822,6 @@ impl ExprBuilder {
                 }
                 model.exception = self.p.build_scope(range_tokens)
                 ret d
-
             |:
                 self.push_err(expr_tokens[0], LogMsg.InvalidSyntax)
                 ret nil
@@ -855,14 +831,11 @@ impl ExprBuilder {
         match expr_tokens[0].id {
         | TokenId.Unsafe:
             ret self.build_unsafe(tokens)
-
         | TokenId.Fn:
             ret self.build_anon_fn(tokens)
-
         | TokenId.Ident
         | TokenId.Cpp:
             ret self.build_typed_struct_literal(tokens)
-
         |:
             self.push_err(expr_tokens[0], LogMsg.InvalidSyntax)
             ret nil
@@ -1027,10 +1000,8 @@ impl ExprBuilder {
         match tokens.len {
         | 0:
             ret nil
-
         | 1:
             ret self.build_single(tokens[0])
-
         | 3:
             if tokens[0].id == TokenId.Cpp {
                 ret self.build_cpp_linked_ident(tokens)
@@ -1041,7 +1012,6 @@ impl ExprBuilder {
         match token.id {
         | TokenId.If:
             ret self.build_ternary(tokens)
-
         | TokenId.Op:
             // Handle pointer to primitive type.
             if tokens.len > 1 && token.kind == TokenKind.Star {
@@ -1052,7 +1022,6 @@ impl ExprBuilder {
             }
 
             ret self.build_unary(tokens)
-
         | TokenId.Range:
             if tokens.len < 3 {
                 break
@@ -1070,7 +1039,6 @@ impl ExprBuilder {
             if next.id != TokenId.Range || next.kind != TokenKind.RBracket {
                 break
             }
-
             ret self.build_type(tokens)
         }
 
@@ -1078,22 +1046,17 @@ impl ExprBuilder {
         match token.id {
         | TokenId.Ident:
             ret self.build_sub_ident(tokens)
-
         | TokenId.Prim:
             // Catch slice, and array types.
             ret self.build_type(tokens)
-
         | TokenId.Op:
             ret self.build_op_right(tokens)
-
         | TokenId.Range:
             match token.kind {
             | TokenKind.RParent:
                 ret self.build_parentheses_range(tokens)
-
             | TokenKind.RBrace:
                 ret self.build_brace_range(tokens)
-
             | TokenKind.RBracket:
                 ret self.build_bracket_range(tokens)
             }
@@ -1106,19 +1069,16 @@ impl ExprBuilder {
     fn build_binop(mut self, mut &tokens: []Token, i: int): &BinopExpr {
         let mut left_tokens = tokens[:i]
         let mut right_tokens = tokens[i+1:]
-
         if left_tokens.len == 0 {
             self.push_err(tokens[i], LogMsg.InvalidSyntax)
             self.push_suggestion(LogMsg.ExpectedLeftOperand)
             ret nil
         }
-
         if right_tokens.len == 0 {
             self.push_err(tokens[i], LogMsg.InvalidSyntax)
             self.push_suggestion(LogMsg.ExpectedRightOperand)
             ret nil
         }
-
         ret &BinopExpr{
             left:  self.build(left_tokens),
             right: self.build(right_tokens),

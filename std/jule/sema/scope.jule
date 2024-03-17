@@ -284,7 +284,9 @@ pub struct WhileIter {
 
 impl WhileIter {
     // Reports whether iteration is while-next kind.
-    pub fn is_while_next(self): bool { ret self.next != nil }
+    pub fn is_while_next(self): bool {
+        ret self.next != nil
+    }
 }
 
 // Range iteration.
@@ -746,7 +748,6 @@ impl ScopeChecker {
             let mut m = (&BuiltinErrorCallExprModel)(d.model)
             self.process_error_call(m, expr.token)
             self.scope.stmts = append(self.scope.stmts, d)
-
         | &BackendEmitExprModel
         | &BuiltinAppendCallExprModel
         | &BuiltinCloneCallExprModel
@@ -757,7 +758,6 @@ impl ScopeChecker {
         | &FreeExprModel
         | &FnCallExprModel:
             self.scope.stmts = append(self.scope.stmts, d)
-
         |:
             self.s.push_err(expr.token, LogMsg.InvalidSyntax)
         }
@@ -781,7 +781,6 @@ impl ScopeChecker {
             model.is_co = true
             eval.check_fn_of_concurrent_call(model.func, expr.expr.token)
             self.scope.stmts = append(self.scope.stmts, d)
-
         |:
             self.s.push_err(expr.token, LogMsg.ExprNotFnCall)
             ret
@@ -955,9 +954,12 @@ impl ScopeChecker {
         }
 
         match type it.kind {
-        | &WhileKind: self.check_while_iter(it)
-        | &RangeKind: self.check_range_iter(it)
-        |:            outln("error <unimplemented iteration kind>")
+        | &WhileKind:
+            self.check_while_iter(it)
+        | &RangeKind:
+            self.check_range_iter(it)
+        |:
+            outln("error <unimplemented iteration kind>")
         }
     }
 
@@ -1016,7 +1018,6 @@ impl ScopeChecker {
         | scope.it == 0 && scope.parent != nil && scope.owner == nil:
             scope = scope.parent
             goto iter
-
         | scope.it != 0:
             ret &ContSt{it: scope.it}
         }
@@ -1051,10 +1052,14 @@ impl ScopeChecker {
             } else {
                 let mut st = label.scope.scope.stmts[i]
                 match type st {
-                | &InfIter:   cont.it = uintptr((&InfIter)(st))
-                | &RangeIter: cont.it = uintptr((&RangeIter)(st))
-                | &WhileIter: cont.it = uintptr((&WhileIter)(st))
-                |:            self.s.push_err(c.label, LogMsg.InvalidLabel, c.label.kind)
+                | &InfIter:
+                    cont.it = uintptr((&InfIter)(st))
+                | &RangeIter:
+                    cont.it = uintptr((&RangeIter)(st))
+                | &WhileIter:
+                    cont.it = uintptr((&WhileIter)(st))
+                |:
+                    self.s.push_err(c.label, LogMsg.InvalidLabel, c.label.kind)
                 }
             }
         }

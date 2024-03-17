@@ -39,7 +39,7 @@ use std::jule::lex::{
 }
 
 fn new_scope(): &ScopeTree {
-    ret &ScopeTree{}
+    ret new(ScopeTree)
 }
 
 // Reports whether token is statement finish point.
@@ -54,7 +54,6 @@ fn prev_is_incomplete_expr(&tokens: []Token, &i: int): bool {
     if i > 1 && tokens[i-2].id == TokenId.DblColon {
         ret false
     }
-
     unsafe {
         let prev = &tokens[i-1]
         ret prev.id == TokenId.Dot ||
@@ -87,7 +86,6 @@ fn next_st_pos(&tokens: []Token, start: int): (int, bool) {
                     }
                 }
                 brace_n++
-
             |:
                 brace_n--
                 if brace_n == 0 && i+1 < tokens.len {
@@ -171,11 +169,25 @@ struct ScopeParser {
 }
 
 impl ScopeParser {
-    fn stop(mut self) { self.pos = -1 }
-    fn stopped(self): bool { ret self.pos == -1 }
-    fn finished(self): bool { ret self.pos >= self.stmts.len }
-    fn is_last_st(self): bool { ret self.pos+1 >= self.stmts.len }
-    fn push_err(mut self, token: Token, fmt: LogMsg) { self.p.push_err(token, fmt) }
+    fn stop(mut self) {
+        self.pos = -1
+    }
+
+    fn stopped(self): bool {
+        ret self.pos == -1
+    }
+
+    fn finished(self): bool {
+        ret self.pos >= self.stmts.len
+    }
+
+    fn is_last_st(self): bool {
+        ret self.pos+1 >= self.stmts.len
+    }
+
+    fn push_err(mut self, token: Token, fmt: LogMsg) {
+        self.p.push_err(token, fmt)
+    }
 
     // Push suggestion to last log.
     fn push_suggestion(mut self, fmt: LogMsg, args: ...any) {
@@ -371,7 +383,6 @@ impl ScopeParser {
                 | TokenKind.LParent:
                     brace_n++
                     continue
-
                 |:
                     brace_n--
                 }
@@ -625,7 +636,6 @@ impl ScopeParser {
                 | TokenKind.LBrace
                 | TokenKind.LBracket:
                     brace_n++
-
                 |:
                     brace_n--
                 }
@@ -642,7 +652,6 @@ impl ScopeParser {
                     self.push_case_expr(tokens[j:i], tok, type_match, exprs)
                 }
                 j = i + 1
-
             | tok.id == TokenId.Colon:
                 self.push_case_expr(tokens[j:i], tok, type_match, exprs)
                 tokens = tokens[i+1:]
@@ -694,7 +703,7 @@ impl ScopeParser {
         let mut def_not_last = false
         for tokens.len > 0 {
             let mut tok = tokens[0]
-            // SKip comments.
+            // Skip comments.
             if tok.id == TokenId.Comment {
                 tokens = tokens[1:]
                 continue
@@ -843,16 +852,18 @@ impl ScopeParser {
                 | TokenKind.LBracket
                 | TokenKind.LParent:
                     brace_n++
-
                 |:
                     brace_n--
                 }
             }
 
             match {
-            | brace_n > 0:               continue
-            | token.id != TokenId.Op:    continue
-            | !is_assign_op(token.kind): continue
+            | brace_n > 0:
+                continue
+            | token.id != TokenId.Op:
+                continue
+            | !is_assign_op(token.kind):
+                continue
             }
 
             info.l = tokens[:i]
@@ -872,7 +883,6 @@ impl ScopeParser {
                     info.r = nil
                 }
             }
-
             break
         }
         ret info
@@ -1004,8 +1014,10 @@ impl ScopeParser {
         }
 
         match tokens[0].id {
-        | TokenId.Let: st, ok = self.build_decl_assign(tokens)
-        |:             st, ok = self.build_plain_assign(tokens)
+        | TokenId.Let:
+            st, ok = self.build_decl_assign(tokens)
+        |:
+            st, ok = self.build_plain_assign(tokens)
         }
 
         ret
@@ -1043,65 +1055,48 @@ impl ScopeParser {
         match token.id {
         | TokenId.Use:
             ret self.build_use_expr(st.tokens)
-
         | TokenId.Static
         | TokenId.Const
         | TokenId.Let
         | TokenId.Mut:
             ret self.build_var_st(st.tokens)
-
         | TokenId.Ret:
             ret self.build_ret_st(st.tokens)
-
         | TokenId.For:
             ret self.buid_iter_st(st)
-
         | TokenId.Break:
             ret self.build_break_st(st.tokens)
-
         | TokenId.Cont:
             ret self.build_cont_st(st.tokens)
-
         | TokenId.If:
             ret self.build_if_else_chain(st.tokens)
-
         | TokenId.Comment:
             // Push first token because this is full text comment.
             // Comments are just single-line.
             // Range comments not accepts by lexer.
             ret self.build_comment_st(token)
-
         | TokenId.Co:
             ret self.build_co_call_st(st.tokens)
-
         | TokenId.Goto:
             ret self.build_goto_st(st.tokens)
-
         | TokenId.Fall:
             ret self.build_fall_st(st.tokens)
-
         | TokenId.Type:
             ret self.build_type_alias_st(st.tokens)
-
         | TokenId.Match:
             ret self.build_match_case(st.tokens)
-
         | TokenId.Unsafe
         | TokenId.Defer:
             ret self.build_scope_st(st.tokens)
-
         | TokenId.Range:
             if token.kind == TokenKind.LBrace {
                 ret self.build_scope_st(st.tokens)
             }
-
-        |:
-            let mut expr = self.p.build_expr(st.tokens)
-            if expr != nil {
-                ret expr
-            }
         }
-
+        let mut expr = self.p.build_expr(st.tokens)
+        if expr != nil {
+            ret expr
+        }
         self.push_err(token, LogMsg.InvalidSyntax)
         ret nil
     }
