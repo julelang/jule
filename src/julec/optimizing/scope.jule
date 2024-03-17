@@ -16,6 +16,7 @@ use std::jule::sema::{
     FnCallExprModel,
     Conditional,
     If,
+    Else,
     Case,
     Match,
     RangeIter,
@@ -89,10 +90,15 @@ impl ScopeOptimizer {
                 continue
             }
             const_case = true
-            c.elifs = c.elifs[:i+1]
-            elif.expr = nil // Remove expression to remove eval overhead.
-            c.default = nil // Remove default case, unreachable.
+            c.elifs = c.elifs[:i]
+            c.default = &Else{
+                scope: elif.scope,
+            }
             break
+        }
+
+        if c.elifs.len == 0 {
+            ret
         }
 
         // Remove unreachable cases.
@@ -100,11 +106,9 @@ impl ScopeOptimizer {
         let end = &c.elifs[c.elifs.len-1]
         for i <= end; i++ {
             unsafe {
-                if !is_unreachable_conditional_case(*i) {
-                    i++
-                    continue
+                if is_unreachable_conditional_case(*i) {
+                    *i = nil
                 }
-                *i = nil
             }
         }
 
@@ -157,9 +161,9 @@ impl ScopeOptimizer {
                 continue
             }
             const_case = true
-            m.cases = m.cases[:i+1]
+            m.cases = m.cases[:i]
             case.exprs = nil // Remove expressions to remove eval overhead.
-            m.default = nil  // Remove default case, unreachable.
+            m.default = case
             break
         }
 
@@ -172,11 +176,9 @@ impl ScopeOptimizer {
         let end = &m.cases[m.cases.len-1]
         for i <= end; i++ {
             unsafe {
-                if !is_unreachable_match_case(*i) {
-                    i++
-                    continue
+                if is_unreachable_match_case(*i) {
+                    *i = nil
                 }
-                *i = nil
             }
         }
 
@@ -345,9 +347,9 @@ fn is_unreachable_conditional_case(&i: &If): bool {
 
 fn is_unreachable_match_case(&case: &Case): bool {
     for _, expr in case.exprs {
-        if expr.is_const() && expr.constant.is_bool() && !expr.constant.read_bool() {
-            ret true
+        if !expr.is_const() || !expr.constant.is_bool() || expr.constant.read_bool() {
+            ret false
         }
     }
-    ret false
+    ret true
 }
