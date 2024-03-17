@@ -13,6 +13,7 @@ use std::jule::sema::{
     Data,
     Scope,
     St,
+    ExprModel,
     FnCallExprModel,
     Conditional,
     If,
@@ -327,6 +328,20 @@ fn is_constant_valid_conditional_case(&i: &If): bool {
     ret false
 }
 
+fn is_unreachable_expr(&expr: ExprModel): bool {
+    match type expr {
+    | &Const:
+        let c = (&Const)(expr)
+        ret c.is_bool() && !c.read_bool()
+    | &BinopExprModel:
+        let m = (&BinopExprModel)(expr)
+        if m.op.kind == TokenKind.DblAmper {
+            ret is_unreachable_expr(m.left.model) || is_unreachable_expr(m.right.model)
+        }
+    }
+    ret false
+}
+
 fn is_constant_valid_match_case(&case: &Case): bool {
     for _, expr in case.exprs {
         if expr.is_const() && expr.constant.is_bool() && expr.constant.read_bool() {
@@ -337,17 +352,12 @@ fn is_constant_valid_match_case(&case: &Case): bool {
 }
 
 fn is_unreachable_conditional_case(&i: &If): bool {
-    match type i.expr {
-    | &Const:
-        let c = (&Const)(i.expr)
-        ret c.is_bool() && !c.read_bool()
-    }
-    ret false
+    ret is_unreachable_expr(i.expr)
 }
 
 fn is_unreachable_match_case(&case: &Case): bool {
     for _, expr in case.exprs {
-        if !expr.is_const() || !expr.constant.is_bool() || expr.constant.read_bool() {
+        if !is_unreachable_expr(expr.model) {
             ret false
         }
     }
