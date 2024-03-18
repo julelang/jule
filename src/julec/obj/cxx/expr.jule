@@ -8,6 +8,7 @@ use optimizing::{
     UnsafeIndexingExprModel,
     PushToSliceExprModel,
     MutSlicingExprModel,
+    StrInsertBeginExprModel,
 }
 
 use conv for std::conv
@@ -924,8 +925,9 @@ impl ExprCoder {
     }
 
     fn mut_slicing(mut self, mut m: &MutSlicingExprModel): str {
-        let mut obj = self.model(m.expr)
-        obj += ".mut_slice("
+        let mut obj = "("
+        obj += self.model(m.expr)
+        obj += ").mut_slice("
         if !env::PRODUCTION {
             obj += "\""
             obj += self.oc.loc_info(m.token)
@@ -937,6 +939,15 @@ impl ExprCoder {
             obj += self.expr(m.right)
         }
         obj += ");"
+        ret obj
+    }
+
+    fn str_insert_begin(mut self, mut m: &StrInsertBeginExprModel): str {
+        let mut obj = "("
+        obj += self.model(m.dest)
+        obj += ").buffer.insert(0, ("
+        obj += self.model(m.expr)
+        obj += "));"
         ret obj
     }
 
@@ -1032,6 +1043,8 @@ impl ExprCoder {
             ret self.free((&FreeExprModel)(m))
         | &MutSlicingExprModel:
             ret self.mut_slicing((&MutSlicingExprModel)(m))
+        | &StrInsertBeginExprModel:
+            ret self.str_insert_begin((&StrInsertBeginExprModel)(m))
         |:
             ret "<unimplemented_expression_model>"
         }
