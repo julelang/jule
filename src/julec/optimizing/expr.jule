@@ -11,6 +11,7 @@ use std::jule::sema::{
     Scope,
     Data,
     Var,
+    FnIns,
     ExprModel,
     BinopExprModel,
     OperandExprModel,
@@ -56,7 +57,8 @@ impl ExprOptimizer {
         match {
         | env::OPT_PTR
         | env::OPT_MATH
-        | env::OPT_ACCESS:
+        | env::OPT_ACCESS
+        | env::OPT_COND:
             let mut exop = &ExprOptimizer{
                 model: unsafe { (&ExprModel)(&model) },
             }
@@ -64,17 +66,68 @@ impl ExprOptimizer {
         }
     }
 
-    fn binary(self, mut m: &BinopExprModel) {
-        ExprOptimizer.optimize(m.left.model)
-        ExprOptimizer.optimize(m.right.model)
-
-        if !env::OPT_MATH {
-            ret
+    fn str_cond(self, mut m: &BinopExprModel): bool {
+        let lp = m.left.kind.prim()
+        if lp == nil || !lp.is_str() {
+            ret false
+        }
+        if m.op.kind != TokenKind.Eqs && m.op.kind != TokenKind.NotEq {
+            ret false
+        }
+        match type m.left.model {
+        | &Const:
+            m.left, m.right = m.right, m.left
+            goto opt
         }
         match type m.right.model {
         | &Const:
             break
         |:
+            ret true
+        }
+    opt:
+        let c = (&Const)(m.right.model)
+        if c.read_str() != "" {
+            ret false
+        }
+        match m.op.kind {
+        | TokenKind.Eqs:
+            *self.model = &CommonSubIdentExprModel{
+                expr:  m.left.model,
+                ident: "empty()",
+            }
+        | TokenKind.NotEq:
+            let mut op = m.op
+            op.kind = TokenKind.Excl
+            *self.model = &UnaryExprModel{
+                op:   op,
+                expr: &Data{
+                    model: &CommonSubIdentExprModel{
+                        expr: m.left.model,
+                        ident: "empty()",
+                    },
+                },
+            }
+        }
+        ret true
+    }
+
+    fn binary(self, mut m: &BinopExprModel) {
+        ExprOptimizer.optimize(m.left.model)
+        ExprOptimizer.optimize(m.right.model)
+
+        match type m.right.model {
+        | &Const:
+            break
+        |:
+            ret
+        }
+
+        if env::OPT_COND && self.str_cond(m) {
+            ret
+        }
+
+        if !env::OPT_MATH {
             ret
         }
         match m.op.kind {
