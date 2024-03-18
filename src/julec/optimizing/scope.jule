@@ -31,6 +31,7 @@ use std::jule::sema::{
     BuiltinAppendCallExprModel,
     SliceExprModel,
     StructSubIdentExprModel,
+    SlicingExprModel,
 }
 use strings for std::strings
 
@@ -218,7 +219,32 @@ impl ScopeOptimizer {
         self.optimize_child(it.scope)
     }
 
+    fn substr(mut self, mut a: &Assign): bool {
+        let lp = a.l.kind.prim()
+        if lp == nil || !lp.is_str() {
+            ret false
+        }
+        match type a.r.model {
+        | &SlicingExprModel:
+            let mut sem = (&SlicingExprModel)(a.r.model)
+            if a.l.model == sem.expr {
+                self.set_current_stmt(&MutSlicingExprModel{
+                    token: sem.token,
+                    expr:  sem.expr,
+                    left:  sem.left,
+                    right: sem.right,
+                })
+                ret true
+            }
+        }
+        ret false
+    }
+
     fn optimize_assign(mut self, mut assign: &Assign) {
+        if env::OPT_COPY && self.substr(assign) {
+            ret
+        }
+
         ExprOptimizer.optimize(assign.l.model)
         ExprOptimizer.optimize(assign.r.model)
 
