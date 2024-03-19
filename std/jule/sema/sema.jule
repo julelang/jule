@@ -2364,7 +2364,7 @@ impl Sema {
         }
     }
 
-    fn check_fn_ins(mut &self, mut &f: &FnIns) {
+    fn check_fn_ins_caller(mut &self, mut &f: &FnIns, mut caller: &Token) {
         if f.decl.cpp_linked {
             ret
         }
@@ -2377,12 +2377,17 @@ impl Sema {
         }
 
         let mut sc = new_scope_checker(f.decl.sema, f)
+        sc.called_from = caller
         self.check_fn_ins_sc(f, sc)
 
         if f.decl.sema != self {
             self.errors = append(self.errors, f.decl.sema.errors...)
             f.decl.sema.errors = nil
         }
+    }
+
+    fn check_fn_ins(mut &self, mut &f: &FnIns) {
+        self.check_fn_ins_caller(f, nil)
     }
 
     fn check_type_fn(mut &self, mut &f: &Fn) {

@@ -393,6 +393,7 @@ struct ScopeGoto {
 
 // Scope checker.
 struct ScopeChecker {
+    called_from: &Token
     s:           &Sema
     owner:       &FnIns // See developer reference (1).
     parent:      &ScopeChecker
@@ -1531,7 +1532,7 @@ impl ScopeChecker {
         ret def
     }
 
-    fn check_comptime_panic(mut self, &s: &Scope, error_token: Token) {
+    fn check_comptime_panic(mut self, &s: &Scope) {
         if s.stmts.len != 1 {
             ret
         }
@@ -1547,7 +1548,7 @@ impl ScopeChecker {
                 | &Const:
                     let c = (&Const)(m.expr)
                     if c.is_str() {
-                        self.s.push_err(error_token, LogMsg.ComptimePanic, c.read_str())
+                        self.s.push_err(*self.called_from, LogMsg.ComptimePanic, c.read_str())
                     }
                 }
             }
@@ -1558,16 +1559,16 @@ impl ScopeChecker {
         // Type kind is generic.
         // Match cases by kind.
         if tm.expr.kind.generic {
-            for (i, mut c) in tm.cases {
+            for (_, mut c) in tm.cases {
                 if c.scope != nil {
                     tm.cases = nil
                     tm.default = c
-                    self.check_comptime_panic(c.scope, m.cases[i].token)
+                    self.check_comptime_panic(c.scope)
                     goto push
                 }
             }
             if tm.default != nil {
-                self.check_comptime_panic(tm.default.scope, m.default.token)
+                self.check_comptime_panic(tm.default.scope)
             }
             tm.cases = nil
         }
