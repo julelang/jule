@@ -40,27 +40,6 @@ fn flat_compiler_err(text: str): Log {
     }
 }
 
-// Reports whether file passes build directives.
-fn is_pass_build_directives(mut &file: &Ast): (bool, []Log) {
-    for (_, mut td) in file.top_directives {
-        if td.tag.kind != Directive.Build {
-            continue
-        }
-
-        let mut de = DirectiveEval{
-            d: td,
-        }
-        let result = de.eval()
-        if de.logs.len > 0 {
-            ret false, de.logs
-        }
-        if !result {
-            ret false, nil
-        }
-    }
-    ret true, nil
-}
-
 // Default importer for the reference Jule compiler.
 pub struct JuleImporter {
     mods: []str
@@ -150,7 +129,7 @@ impl Importer for JuleImporter {
                 continue
             }
 
-            let (r, mut logs) = is_pass_build_directives(finfo.ast)
+            let (r, mut logs) = self.is_pass_build_directives(finfo.ast)
             if logs.len > 0 {
                 ret nil, logs
             }
@@ -187,5 +166,28 @@ impl Importer for JuleImporter {
         }
 
         self.pkgs = append(self.pkgs, imp)
+    }
+}
+
+impl JuleImporter {
+    // Reports whether file passes build directives.
+    fn is_pass_build_directives(mut self, mut &file: &Ast): (bool, []Log) {
+        for (_, mut td) in file.top_directives {
+            if td.tag.kind != Directive.Build {
+                continue
+            }
+            let mut de = DirectiveEval{
+                d:    td,
+                vars: self.vars,
+            }
+            let result = de.eval()
+            if de.logs.len > 0 {
+                ret false, de.logs
+            }
+            if !result {
+                ret false, nil
+            }
+        }
+        ret true, nil
     }
 }
