@@ -1,0 +1,57 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+#build test
+
+use std::testing::{T}
+
+static encode_decode_map = [
+    [[]byte("BOu!rDdP(J/RN^?Ebo7"), []byte("hello_---_world")],
+    [[]byte("@:E_WAS,RgC27X/@q'=mE,W\\\"Fa8(LGB!"), []byte("abcdefghjklvcbnmpoıuytrwq")],
+    [[]byte("E,8HbE,TJF3*13:1GC[HFYcil8j-K93&re5Z\"nA9FD>`2Df>"), []byte("plSfpoj08Wtj3059u3PRJ=^2893ıkr3tjomop")],
+    [[]byte("/lQIPCK\"q:90H?*<-;8<:ae1t8QSl(5>#!UCb00N@kL5bB2qE8934SZ?TgnN85rD]8ln_9"), []byte(".SiDkSiFK=W)TuWOP(5PIWTg?JWSl,f.c.FigUFiKWFP_=GIHTPOJWM)")],
+]
+
+#test
+fn test_encode(mut t: &T) {
+    let mut r = make([]byte, 1 << 8)
+    for _, case in encode_decode_map {
+        let n = encode(r, case[1])
+        let p = r[:n]
+        let d = case[0]
+        if p.len != d.len {
+            t.fail()
+            continue
+        }
+        for i in p {
+            if p[i] != d[i] {
+                t.fail()
+                break
+            }
+        }
+    }
+}
+
+#test
+fn test_decode(mut t: &T) {
+    let mut r = make([]byte, 1 << 8)
+    for _, case in encode_decode_map {
+        let (n, _) = decode(r, case[0], true) else {
+            t.fail()
+            continue
+        }
+        let p = r[:n]
+        let d = case[1]
+        if p.len != d.len {
+            t.fail()
+            continue
+        }
+        for i in p {
+            if p[i] != d[i] {
+                t.fail()
+                break
+            }
+        }
+    }
+}

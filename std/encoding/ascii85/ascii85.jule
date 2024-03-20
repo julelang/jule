@@ -1,0 +1,327 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+// The Jule code is a modified version of the original Go code from
+// https://github.com/golang/go/blob/go1.20/src/encoding/ascii85/ascii85.go and came with this notice.
+//
+// ====================================================
+// Copyright (c) 2009 The Go Authors. All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+//
+//    * Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+//    * Redistributions in binary form must reproduce the above
+// copyright notice, this list of conditions and the following disclaimer
+// in the documentation and/or other materials provided with the
+// distribution.
+//    * Neither the name of Google Inc. nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// ====================================================
+
+use io for std::io
+
+// Returns the maximum length of an encoding of n source bytes.
+pub fn max_encoded_len(n: int): int {
+    ret (n + 3) / 4 * 5
+}
+
+// Returns new Ascii85 encoder for stream.
+// Encoder forwards any exception.
+pub fn new_encoder(mut w: io::Writer): io::WriterCloser {
+    ret Encoder.new(w)
+}
+
+// Returns new Ascii85 decoder for stream.
+// Decoder forwards any exception.
+pub fn new_decoder(mut r: io::Reader): io::Reader {
+    ret Decoder.new(r)
+}
+
+// Encodes src into at most max_encoded_len(src.len)
+// bytes of dest, returning the actual number of bytes written.
+//
+// The encoding handles 4-byte chunks, using a special encoding
+// for the last fragment, so encode is not appropriate for use on
+// individual blocks of a large data stream. Use new_encoder() instead.
+//
+// Often, ascii85-encoded data is wrapped in <~ and ~> symbols.
+// The encode does not add these.
+pub fn encode(mut dest: []byte, src: []byte): int {
+    if src.len == 0 {
+        ret 0
+    }
+
+    let mut n = 0
+    for src.len > 0 {
+        dest[0] = 0
+        dest[1] = 0
+        dest[2] = 0
+        dest[3] = 0
+        dest[4] = 0
+
+        // Unpack 4 bytes into u32 to repack into base 85 5-byte.
+        let mut v = u32(0)
+        match src.len {
+        | 3:
+            v |= u32(src[2]) << 8
+            fall
+        | 2:
+            v |= u32(src[1]) << 16
+            fall
+        | 1:
+            v |= u32(src[0]) << 24
+        |:
+            v |= u32(src[3])
+            v |= u32(src[2]) << 8
+            v |= u32(src[1]) << 16
+            v |= u32(src[0]) << 24
+        }
+
+        // Special case: zero (!!!!!) shortens to z.
+        if v == 0 && src.len >= 4 {
+            dest[0] = 'z'
+            dest = dest[1:]
+            unsafe { *(&src) = (*(&src))[4:] }
+            n++
+            continue
+        }
+
+        // Otherwise, 5 base 85 digits starting at !.
+        let mut i = 4
+        for i >= 0; i-- {
+            dest[i] = '!' + byte(v % 85)
+            v /= 85
+        }
+
+        // If src was short, discard the low destination bytes.
+        let mut m = 5
+        if src.len < 4 {
+            m -= 4 - src.len
+            unsafe { *(&src) = nil }
+        } else {
+            unsafe { *(&src) = (*(&src))[4:] }
+        }
+        dest = dest[m:]
+        n += m
+    }
+    ret n
+}
+
+// Decodes src into dest, returning both the number
+// of bytes written to dest and the number consumed from src.
+// If src contains invalid ascii85 data, eecode will throw exception with DecodeError.Format.
+// Decode ignores space and control characters in src.
+// Often, ascii85-encoded data is wrapped in <~ and ~> symbols.
+// Decode expects these to have been stripped by the caller.
+//
+// If flush is true, decode assumes that src represents the
+// end of the input stream and processes it completely rather
+// than wait for the completion of another 32-bit block.
+//
+// new_decoder wraps an std::io::Reader trait around decode.
+pub fn decode(mut dest: []byte, src: []byte, flush: bool)!: (ndst: int, nsrc: int) {
+    let mut v = u32(0)
+    let mut nb = 0
+    for i, b in src {
+        if dest.len - ndst < 4 {
+            ret
+        }
+        match {
+        | b <= ' ':
+            continue
+        | b == 'z' && nb == 0:
+            nb = 5
+            v = 0
+        | '!' <= b && b <= 'u':
+            v = v*85 + u32(b-'!')
+            nb++
+        |:
+            error(DecodeError.Format)
+        }
+        if nb == 5 {
+            nsrc = i + 1
+            dest[ndst] = byte(v >> 24)
+            dest[ndst+1] = byte(v >> 16)
+            dest[ndst+2] = byte(v >> 8)
+            dest[ndst+3] = byte(v)
+            ndst += 4
+            nb = 0
+            v = 0
+        }
+    }
+    if flush {
+        nsrc = src.len
+        if nb > 0 {
+            // The number of output bytes in the last fragment
+            // is the number of leftover input bytes - 1:
+            // the extra byte provides enough bits to cover
+            // the inefficiency of the encoding for the block.
+            if nb == 1 {
+                error(DecodeError.Format)
+            }
+            let mut j = nb
+            for j < 5; j++ {
+                // The short encoding truncated the output value.
+                // We have to assume the worst case values (digit 84)
+                // in order to ensure that the top bits are correct.
+                v = v * 85 + 84
+            }
+            j = 0
+            for j < nb - 1; j++ {
+                dest[ndst] = byte(v >> 24)
+                v <<= 8
+                ndst++
+            }
+        }
+    }
+    ret
+}
+
+struct Encoder {
+    w:    io::Writer
+    buf:  []byte // buffered data waiting to be encoded
+    nbuf: int    // number of bytes in buf
+    out:  []byte // output buffer
+}
+
+impl io::WriterCloser for Encoder {
+    pub fn write(mut self, dest: []byte)!: (n: int) {
+        // Leading fringe.
+        if self.nbuf > 0 {
+            let mut i = 0
+            for i < dest.len && self.nbuf < 4; i++ {
+                self.buf[self.nbuf] = dest[i]
+                self.nbuf++
+            }
+            n += i
+            unsafe { *(&dest) = (*(&dest))[i:] }
+            if self.nbuf < 4 {
+                ret
+            }
+            let nout = encode(self.out, self.buf)
+            self.w.write(self.out[:nout]) else { error(error) }
+            self.nbuf = 0
+        }
+
+        // Large interior chunks.
+        for dest.len >= 4 {
+            let mut nn = (self.out.len / 5) << 2
+            if nn > dest.len {
+                nn = dest.len
+            }
+            nn -= nn % 4
+            if nn > 0 {
+                let nout = encode(self.out, dest[:nn])
+                self.w.write(self.out[:nout]) else { error(error) }
+            }
+            n += nn
+            unsafe { *(&dest) = (*(&dest))[nn:] }
+        }
+
+        // Trailing fringe.
+        _ = copy(self.buf, dest)
+        self.nbuf = dest.len
+        n += dest.len
+        ret
+    }
+
+    // Close flushes any pending output from the encoder.
+    // It is an error to call write after calling close.
+    pub fn close(mut self)! {
+        // If there's anything left in the buffer, flush it out.
+        if self.nbuf > 0 {
+            let nout = encode(self.out, self.buf[:self.nbuf])
+            self.nbuf = 0
+            self.w.write(self.out[:nout]) else { error(error) }
+        }
+    }
+}
+
+impl Encoder {
+    static fn new(mut w: io::Writer): &Encoder {
+        ret &Encoder{
+            w:   w,
+            buf: make([]byte, 4),
+            out: make([]byte, 1 << 10)
+        }
+    }
+}
+
+struct Decoder {
+    r:       io::Reader
+    buf:     []byte // leftover input
+    nbuf:    int
+    out:     []byte // leftover decoded output
+    outbuf:  []byte
+}
+
+impl io::Reader for Decoder {
+    pub fn read(mut self, mut p: []byte)!: (n: int) {
+        if p.len == 0 {
+            ret 0
+        }
+        for {
+            // Copy leftover output from last decode.
+            if self.out.len > 0 {
+                n = copy(p, self.out)
+                self.out = self.out[n:]
+                ret
+            }
+
+            // Decode leftover input from last read.
+            let (mut nn, mut nsrc, mut ndst) = 0, 0, 0
+            if self.nbuf > 0 {
+                ndst, nsrc = decode(self.outbuf, self.buf[:self.nbuf], true) else { error(error) }
+                if ndst > 0 {
+                    self.out = self.outbuf[:ndst]
+                    self.nbuf = copy(self.buf, self.buf[nsrc:self.nbuf])
+                    continue // copy out and return
+                }
+                if ndst == 0 {
+                    // Special case: input buffer is mostly filled with non-data bytes.
+                    // Filter out such bytes to make room for more input.
+                    let mut off = 0
+                    let mut i = 0
+                    for i < self.nbuf; i++ {
+                        if self.buf[i] > ' ' {
+                            self.buf[off] = self.buf[i]
+                            off++
+                        }
+                    }
+                    self.nbuf = off
+                }
+            }
+
+            // Read more data.
+            nn = self.r.read(self.buf[self.nbuf:]) else { error(error) }
+            self.nbuf += nn
+        }
+    }
+}
+
+impl Decoder {
+    static fn new(mut r: io::Reader): &Decoder {
+        ret &Decoder{
+            r:      r,
+            buf:    make([]byte, 1 << 10),
+            outbuf: make([]byte, 1 << 10),
+        }
+    }
+}
