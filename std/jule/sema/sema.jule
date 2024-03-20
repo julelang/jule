@@ -214,128 +214,6 @@ fn find_file(mut &files: []&SymbolTable, &handler: &File): &SymbolTable {
     ret nil
 }
 
-fn conditional_has_ret(mut c: &Conditional): (ok: bool, breaking: bool) {
-    let mut breaked = false
-    for (_, mut elif) in c.elifs {
-        if elif == nil {
-            ret false, false
-        }
-        ok, _, breaking = __has_ret(elif.scope)
-        breaked = breaked || breaking
-        if !ok {
-            ret false, breaked
-        }
-    }
-
-    if c.default == nil {
-        ret false, breaked
-    }
-
-    ok, _, breaking = __has_ret(c.default.scope)
-    breaked = breaked || breaking
-    ret ok, breaked
-}
-
-fn match_has_ret(mut m: &Match): bool {
-    if m.default == nil {
-        ret false
-    }
-
-    let mut ok = true
-    let mut falled = false
-    let mut breaked = false
-    for (_, mut c) in m.cases {
-        if c == nil {
-            ret false
-        }
-        ok, falled, breaked = __has_ret(c.scope)
-        if !ok && !falled || breaked {
-            ret false
-        }
-
-        match {
-        | !ok:
-            if !falled {
-                ret false
-            }
-            fall
-
-        | falled:
-            if c.next == nil {
-                ret false
-            }
-            continue
-        }
-        falled = false
-    }
-
-    ret has_ret(m.default.scope)
-}
-
-fn __has_ret(mut s: &Scope): (ok: bool, falled: bool, breaked: bool) {
-    if s == nil {
-        ret false, false, false
-    }
-
-    for (_, mut st) in s.stmts {
-        match type st {
-        | &FallSt:
-            falled = true
-
-        | &BreakSt:
-            ret false, false, true
-
-        | &ContSt:
-            ret false, false, true
-
-        | &InfIter:
-            ok = has_ret((&InfIter)(st).scope)
-            if ok {
-                ret true, false, false
-            }
-
-        | &RetSt:
-            ret true, falled, breaked
-
-        | &Scope:
-            ok = has_ret((&Scope)(st))
-            if ok {
-                ret true, false, false
-            }
-
-        | &Data:
-            match type (&Data)(st).model {
-            | &BuiltinPanicCallExprModel
-            | &BuiltinErrorCallExprModel:
-                ret true, falled, breaked
-            }
-
-        | &Conditional:
-            ok, breaked = conditional_has_ret((&Conditional)(st))
-            if ok {
-                ret true, false, false
-            }
-
-            if breaked {
-                ret false, false, breaked
-            }
-
-        | &Match:
-            ok = match_has_ret((&Match)(st))
-            if ok {
-                ret true, false, false
-            }
-        }
-    }
-
-    ret false, falled, breaked
-}
-
-fn has_ret(mut s: &Scope): bool {
-    let (ok, _, _) = __has_ret(s)
-    ret ok
-}
-
 unsafe fn push_suggestion(mut log: *Log, fmt: LogMsg, args: ...any) {
     log.suggestion = logf(fmt, args...)
 }
@@ -2328,7 +2206,8 @@ impl Sema {
         if f.decl.is_void() {
             ret
         }
-        let ok = has_ret(f.scope)
+        let mrc = MissingRetChecker.new()
+        let ok = mrc.check(f.scope)
         if !ok {
             self.push_err(f.decl.token, LogMsg.MissingRet)
         }
@@ -2547,5 +2426,125 @@ impl Sema {
         }
 
         self.check_package_types()
+    }
+}
+
+struct MissingRetChecker {
+    mut breaked: []uintptr
+    mut falled:  bool
+}
+
+impl MissingRetChecker {
+    static fn new(): MissingRetChecker {
+        ret MissingRetChecker{
+            breaked: make([]uintptr, 1 << 4)
+        }
+    }
+
+    fn check_conditional(self, mut c: &Conditional): bool {
+        for (_, mut elif) in c.elifs {
+            if elif == nil {
+                ret false
+            }
+            if !self.check_scope(elif.scope) {
+                ret false
+            }
+        }
+        ret c.default != nil && self.check_scope(c.default.scope)
+    }
+
+    fn check_match(self, mut m: &Match): bool {
+        for (_, mut c) in m.cases {
+            if c == nil {
+                ret false
+            }
+            let n = self.breaked.len
+            let ok = self.check_scope(c.scope)
+            match {
+            | n != self.breaked.len:
+                ret false
+            | !ok:
+                if !self.falled {
+                    ret false
+                }
+                fall
+            | self.falled:
+                self.falled = false
+                if c.next == nil {
+                    ret false
+                }
+                continue
+            }
+        }
+        ret m.default != nil && self.check_scope(m.default.scope)
+    }
+
+    fn check_inf_iter(self, mut it: &InfIter): bool {
+        let n = self.breaked.len
+        if self.check_scope(it.scope) {
+            self.breaked = self.breaked[:n]
+            ret true
+        }
+        if n != self.breaked.len {
+            let itaddr = uintptr(it)
+            for _, addr in self.breaked[n:] {
+                if itaddr == addr {
+                    self.breaked = self.breaked[:n]
+                    ret false
+                }
+            }
+            self.breaked = self.breaked[:n]
+        }
+        ret true
+    }
+
+    fn check_scope(self, mut s: &Scope): bool {
+        if s == nil {
+            ret false
+        }
+        for (_, mut st) in s.stmts {
+            match type st {
+            | &FallSt:
+                self.falled = true
+                ret false
+            | &BreakSt:
+                let addr = (&BreakSt)(st).it
+                if addr != 0 {
+                    self.breaked = append(self.breaked, addr)
+                }
+                ret false
+            | &ContSt:
+                ret false
+            | &InfIter:
+                if self.check_inf_iter((&InfIter)(st)) {
+                    ret true
+                }
+            | &RetSt:
+                ret true
+            | &Scope:
+                if self.check_scope((&Scope)(st)) {
+                    ret true
+                }
+            | &Data:
+                match type (&Data)(st).model {
+                | &BuiltinPanicCallExprModel
+                | &BuiltinErrorCallExprModel:
+                    ret true
+                }
+            | &Conditional:
+                if self.check_conditional((&Conditional)(st)) {
+                    ret true
+                }
+            | &Match:
+                if self.check_match((&Match)(st)) {
+                    ret true
+                }
+            }
+        }
+        ret false
+    }
+
+    fn check(self, mut s: &Scope): bool {
+        ret self.check_scope(s)
     }
 }
