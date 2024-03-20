@@ -7,7 +7,6 @@
 // Does not clearing internal buffer at all.
 // Large buffers can be memory hungry.
 pub struct ByteStream {
-    pos:  int
     buff: []byte
 }
 
@@ -19,16 +18,8 @@ impl Stream for ByteStream {
         if !self.data() {
             ret 0
         }
-
-        let offset = self.buff.len - self.pos
-        if offset < buff.len {
-            n = buff.len - offset
-            _ = copy(buff, self.buff[self.pos:self.pos+n])
-        } else {
-            n = buff.len
-            _ = copy(buff, self.buff[self.pos:self.pos+n])
-        }
-        self.pos += n
+        n = copy(buff, self.buff)
+        self.buff = self.buff[n:]
         ret
     }
 
@@ -47,22 +38,18 @@ impl ByteStream {
 
     // Reports whether buffer have readable data.
     pub fn data(self): bool {
-        ret self.pos < self.buff.len
+        ret self.buff.len != 0
     }
 
     // Removes readed bytes from buffer.
     // Maybe help to reduce memory usage for large buffers.
     pub fn fit(mut self) {
         if !self.data() {
-            self.pos = 0
             self.buff = nil
             ret
         }
-
-        let n = self.buff.len - self.pos
-        let mut buff = make([]byte, n)
-        copy(buff, self.buff[self.pos:])
-        self.pos = 0
+        let mut buff = make([]byte, self.buff.len)
+        _ = copy(buff, self.buff)
         self.buff = buff
     }
 }
