@@ -110,15 +110,16 @@ pub struct Value {
 
 // Evaluator.
 struct Eval {
-    s:             &Sema // Used for error logging.
-    lookup:        Lookup
-    prefix:        &TypeKind
-    unsafety:      bool
-    immutable:     bool // This expression will assigned to immutable memory.
-    ignored:       bool // Evaluated expression is not for assignment or something else.
-    dis_builtin:   bool // Disallow/suppress Jule's built-in defines.
-    owner:         &Var
-    field:         &FieldIns // Field of this default expression. Used for checking cycles.
+    s:           &Sema // Used for error logging.
+    lookup:      Lookup
+    prefix:      &TypeKind
+    unsafety:    bool
+    immutable:   bool // This expression will assigned to immutable memory.
+    ignored:     bool // Evaluated expression is not for assignment or something else.
+    dis_builtin: bool // Disallow/suppress Jule's built-in defines.
+    owner:       &Var
+    field:       &FieldIns // Field of this default expression. Used for checking cycles.
+    arg:         bool // This expression evaluating for argument.
 }
 
 impl Eval {
@@ -1768,7 +1769,7 @@ impl Eval {
     }
 
     fn process_exceptional_handler(mut self, mut &f: &FnIns, mut &fc: &FnCallExpr, mut &d: &Data) {
-        let result_needed = !f.decl.is_void() && !self.ignored
+        let result_needed = !f.decl.is_void() && (self.arg || !self.ignored)
         let mut csc: &ScopeChecker = nil
         let mut ch: &Scope = nil
 
@@ -1912,6 +1913,7 @@ impl Eval {
                 self.push_suggestion(LogMsg.HandleExceptional)
             | fc.ignored():
                 // Ok.
+                break
             |: // Handled with scope.
                 self.process_exceptional_handler(f, fc, d)
             }

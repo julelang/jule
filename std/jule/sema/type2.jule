@@ -633,7 +633,6 @@ impl FnCallArgChecker {
                         elem: p.kind,
                     }
                 }
-
             |:
                 self.e.prefix = p.kind
             }
@@ -651,7 +650,6 @@ impl FnCallArgChecker {
                 | &SliceExprModel:
                     model = (&SliceExprModel)(d.model)
                     model.elem_kind = p.kind
-
                 |:
                     model = nil
                     self.arg_models = append(self.arg_models, d)
@@ -686,6 +684,9 @@ impl FnCallArgChecker {
     }
 
     fn check_args(mut self, mut &params: []&ParamIns): (ok: bool) {
+        let arg = self.e.arg
+        self.e.arg = true
+
         ok = true
         let mut i = 0
     iter:
@@ -694,21 +695,21 @@ impl FnCallArgChecker {
             match {
             | p.decl.is_self():
                 // Ignore self.
-
+                break
             | p.decl.variadic:
                 ok = self.push_variadic(p, i) && ok
-                break iter // Variadiced parameters always last.
-
+                // Variadiced parameters always last.
+                break iter
             | self.args.len <= i:
                 ok = false
                 break iter
-
             |:
                 ok = self.push(p, self.args[i]) && ok
             }
             i++
         }
 
+        self.e.arg = arg
         ret ok
     }
 
