@@ -1799,15 +1799,12 @@ impl Parser {
 
             v.directives = self.directives
             self.directives = nil
-
         | &FnDecl:
             let mut f = (&FnDecl)(node.data)
             if f == nil {
                 ret
             }
-
             self.apply_fn_meta(f, is_pub)
-
         | &TypeAliasDecl:
             let mut tad = (&TypeAliasDecl)(node.data)
             if tad == nil {
@@ -1816,7 +1813,6 @@ impl Parser {
             tad.public = is_pub
             tad.doc_comments = self.comment_group
             self.comment_group = nil
-
         | &EnumDecl:
             let mut ed = (&EnumDecl)(node.data)
             if ed == nil {
@@ -1825,7 +1821,6 @@ impl Parser {
             ed.doc_comments = self.comment_group
             self.comment_group = nil
             ed.public = is_pub
-
         | &StructDecl:
             let mut sd = (&StructDecl)(node.data)
             if sd == nil {
@@ -1836,7 +1831,6 @@ impl Parser {
             sd.doc_comments = self.comment_group
             self.comment_group = nil
             sd.public = is_pub
-
         | &TraitDecl:
             let mut td = (&TraitDecl)(node.data)
             if td == nil {
@@ -1845,7 +1839,6 @@ impl Parser {
             td.doc_comments = self.comment_group
             self.comment_group = nil
             td.public = is_pub
-        
         |:
             if is_pub {
                 self.push_err(node.token, LogMsg.DefNotSupportPub)
@@ -1857,12 +1850,11 @@ impl Parser {
         match type node.data {
         | &UseDecl:
             // Ignore.
-
         |:
             ret
         }
 
-        if self.ast.decls.len > 0 {
+        if self.ast.nodes.len > 0 {
             self.push_err(node.token, LogMsg.UseDeclAtBody)
             self.push_suggestion(LogMsg.MoveUseDeclToTopOfFile)
         }
@@ -1915,23 +1907,16 @@ impl Parser {
         match {
         | node.is_directive():
             self.push_directive((&Directive)(node.data))
-
         | node.is_use_decl():
             self.ast.use_decls = append(self.ast.use_decls, (&UseDecl)(node.data))
-
-        | node.is_decl():
+        | node.is_decl() || node.is_impl():
             // Use declarations eliminated.
-            self.ast.decls = append(self.ast.decls, node)
-
+            self.ast.nodes = append(self.ast.nodes, node)
         | node.is_comment():
             if self.comment_group == nil {
                 self.comment_group = &CommentGroup{}
             }
             self.comment_group.comments = append(self.comment_group.comments, (&Comment)(node.data))
-
-        | node.is_impl():
-            self.ast.impls = append(self.ast.impls, (&Impl)(node.data))
-
         |:
             self.push_err(node.token, LogMsg.InvalidSyntax)
         }
@@ -2047,11 +2032,10 @@ impl Parser {
                 } else {
                     break iter
                 }
-
             | &Comment
             | &CommentGroup:
                 // Ignore.
-
+                break
             |:
                 break iter
             }

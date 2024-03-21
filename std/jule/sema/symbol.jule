@@ -4,7 +4,7 @@
 
 use std::fs::{FsError, Status}
 use std::fs::path::{SEPARATOR, abs, ext, join}
-use std::jule::ast::{
+use ast for std::jule::ast::{
     self,
     Ast,
     CommentGroup,
@@ -45,7 +45,7 @@ pub struct ReferenceStack {
 impl ReferenceStack {
     // Returns new reference stack instance.
     static fn new(): &ReferenceStack {
-        ret &ReferenceStack{}
+        ret new(ReferenceStack)
     }
 }
 
@@ -663,47 +663,36 @@ impl SymbolBuilder {
         }
     }
 
-    fn append_decl(mut self, mut &decl: Node) {
-        match type decl.data {
+    fn append_node(mut self, mut &node: Node) {
+        match type node.data {
+        | &ast::Impl:
+            self.table.impls = append(self.table.impls, build_impl((&ast::Impl)(node.data)))
         | &TypeAliasDecl:
-            let mut ta = build_type_alias((&TypeAliasDecl)(decl.data))
+            let mut ta = build_type_alias((&TypeAliasDecl)(node.data))
             self.table.type_aliases = append(self.table.type_aliases, ta)
-
         | &StructDecl:
-            let mut srct = build_struct((&StructDecl)(decl.data))
+            let mut srct = build_struct((&StructDecl)(node.data))
             self.table.structs = append(self.table.structs, srct)
-
         | &FnDecl:
-            let mut f = build_fn((&FnDecl)(decl.data))
+            let mut f = build_fn((&FnDecl)(node.data))
             self.table.funcs = append(self.table.funcs, f)
-
         | &TraitDecl:
-            let mut t = build_trait((&TraitDecl)(decl.data))
+            let mut t = build_trait((&TraitDecl)(node.data))
             self.table.traits = append(self.table.traits, t)
-
         | &VarDecl:
-            let mut v = build_var((&VarDecl)(decl.data))
+            let mut v = build_var((&VarDecl)(node.data))
             self.table.vars = append(self.table.vars, v)
-
         | &EnumDecl:
-            let mut e = build_enum((&EnumDecl)(decl.data))
+            let mut e = build_enum((&EnumDecl)(node.data))
             self.table.enums = append(self.table.enums, e)
-
         |:
-            self.push_err(decl.token, LogMsg.InvalidSyntax)
+            self.push_err(node.token, LogMsg.InvalidSyntax)
         }
     }
 
-    fn append_decls(mut self) {
-        for (_, mut decl) in self.ast.decls {
-            self.append_decl(decl)
-        }
-    }
-
-    fn append_impls(mut self) {
-        self.table.impls = make([]&Impl, 0, self.ast.impls.len)
-        for (_, mut decl) in self.ast.impls {
-            self.table.impls = append(self.table.impls, build_impl(decl))
+    fn append_nodes(mut self) {
+        for (_, mut node) in self.ast.nodes {
+            self.append_node(node)
         }
     }
 
@@ -755,12 +744,10 @@ impl SymbolBuilder {
             ret
         }
 
-        self.append_decls()
+        self.append_nodes()
         // Break analysis if declarations has error.
         if self.errors.len > 0 {
             ret
         }
-
-        self.append_impls()
     }
 }
