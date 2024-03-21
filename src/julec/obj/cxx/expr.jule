@@ -347,23 +347,22 @@ impl ExprCoder {
         ret obj
     }
 
-    fn alloc_structure(mut self, mut m: &AllocStructLitExprModel): str {
+    fn alloc_structure_call(mut self, mut &s: &StructIns, &lit: str): str {
         let mut obj = "jule::new_struct"
-        if m.lit.strct.decl.has_ref_accessible() {
+        if s.decl.has_ref_accessible() {
             obj += "_ptr"
         }
         obj += "<"
-        obj += IdentCoder.structure_ins(m.lit.strct)
+        obj += IdentCoder.structure_ins(s)
         obj += ">("
-        if !env::PRODUCTION {
-            obj += "\""
-            obj += self.oc.loc_info(m.lit.token)
-            obj += "\","
-        }
-        obj += "new( std::nothrow ) "
-        obj += self.structure_lit(m.lit)
+        obj += lit
         obj += ")"
         ret obj
+    }
+
+    fn alloc_structure(mut self, mut m: &AllocStructLitExprModel): str {
+        let lit = "new (std::nothrow)" + self.structure_lit(m.lit)
+        ret self.alloc_structure_call(m.lit.strct, lit)
     }
 
     fn casting(mut self, mut m: &CastingExprModel): str {
@@ -729,6 +728,19 @@ impl ExprCoder {
     }
 
     fn new_call(mut self, mut m: &BuiltinNewCallExprModel): str {
+        if m.kind.strct() != nil {
+            let mut s = m.kind.strct()
+            let mut lit = "new (std::nothrow) "
+           lit += TypeCoder.structure_ins(s)
+            if m.init != nil {
+                lit += "{"
+                lit += self.expr(m.init)
+                lit += "}"
+            } else {
+                lit += "()"
+            }
+            ret self.alloc_structure_call(s, lit)
+        }
         let mut obj = "jule::new_ptr<"
         obj += TypeCoder.kind(m.kind)
         obj += ">("

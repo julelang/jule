@@ -85,58 +85,28 @@ namespace jule
         }
 
         template <typename T>
-        jule::Ptr<T> new_struct(
-#ifndef __JULE_ENABLE__PRODUCTION
-            const char *file,
-#endif
-            T *ptr) noexcept
+        inline jule::Ptr<T> new_struct(T *p) noexcept
         {
-                if (!ptr)
-                {
-#ifndef __JULE_ENABLE__PRODUCTION
-                        std::string error = __JULE_ERROR__MEMORY_ALLOCATION_FAILED "\nruntime: allocation failed for structure\nfile: ";
-                        error += file;
-                        jule::panic(error);
-#else
-                        jule::panic(__JULE_ERROR__MEMORY_ALLOCATION_FAILED "\nruntime: allocation failed for structure");
-#endif
-                }
-
 #ifndef __JULE_DISABLE__REFERENCE_COUNTING
-                return jule::Ptr<T>::make(ptr);
+                return jule::Ptr<T>::make(p);
+#else
+                return jule::Ptr<T>::make(p, nullptr);
 #endif
-
-                return jule::Ptr<T>::make(ptr, nullptr);
         }
 
         template <typename T>
-        jule::Ptr<T> new_struct_ptr(
-#ifndef __JULE_ENABLE__PRODUCTION
-            const char *file,
-#endif
-            T *ptr) noexcept
+        inline jule::Ptr<T> new_struct_ptr(T *p) noexcept
         {
-                if (!ptr)
-                {
-#ifndef __JULE_ENABLE__PRODUCTION
-                        std::string error = __JULE_ERROR__MEMORY_ALLOCATION_FAILED "\nruntime: allocation failed for structure\nfile: ";
-                        error += file;
-                        jule::panic(error);
-#else
-                        jule::panic(__JULE_ERROR__MEMORY_ALLOCATION_FAILED "\nruntime: allocation failed for structure");
-#endif
-                }
-
 #ifndef __JULE_DISABLE__REFERENCE_COUNTING
-                ptr->self.ref = new (std::nothrow) jule::Uint;
-                if (!ptr->self.ref)
-                        jule::panic(__JULE_ERROR__MEMORY_ALLOCATION_FAILED "\nruntime: allocation failed for structure");
-
-                // Initialize with zero because return reference is counts 1 reference.
-                *ptr->self.ref = 0; // ( jule::REFERENCE_DELTA - jule::REFERENCE_DELTA );
+                p->self = nullptr;
+                jule::Ptr<T> rp = jule::new_struct<T>(p);
+                rp->self.alloc = rp.alloc;
+                rp->self.ref = rp.ref;
+                *rp->self.ref = jule::REFERENCE_DELTA;
+                return rp;
+#else
+                return jule::new_struct<T>(p);
 #endif
-
-                return ptr->self;
         }
 } // namespace jule
 
