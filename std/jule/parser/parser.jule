@@ -5,8 +5,6 @@
 use std::fs::path::{join}
 use std::jule::ast::{
     Ast,
-    Comment,
-    CommentGroup,
     Directive,
     Expr,
     ScopeTree,
@@ -208,15 +206,6 @@ unsafe fn push_suggestion(mut log: *Log, fmt: LogMsg, args: ...any) {
     log.suggestion = logf(fmt, args...)
 }
 
-fn build_comment(mut &token: Token): &Comment {
-    // Remove slashes and trim spaces.
-    token.kind = strings::trim(token.kind[2:], " \n\r\t\v")
-    ret &Comment{
-        token: token,
-        text:  token.kind,
-    }
-}
-
 fn tokstoa(&tokens: []Token): str {
     let mut s = ""
     for _, token in tokens {
@@ -226,10 +215,9 @@ fn tokstoa(&tokens: []Token): str {
 }
 
 struct Parser {
-    ast:           &Ast
-    directives:    []&Directive
-    comment_group: &CommentGroup
-    errors:        []Log
+    ast:        &Ast
+    directives: []&Directive
+    errors:     []Log
 }
 
 impl Parser {
@@ -1697,7 +1685,6 @@ impl Parser {
         | TokenId.Use:
             const CPP_LINKED = false
             ret self.build_use_decl(tokens, CPP_LINKED)
-
         | TokenId.Fn
         | TokenId.Unsafe:
             let mut f = self.build_fn(tokens, false, false)
@@ -1708,54 +1695,30 @@ impl Parser {
                 }
             }
             ret f
-
         | TokenId.Let
         | TokenId.Const
         | TokenId.Mut
         | TokenId.Static:
             ret self.build_var(tokens)
-
         | TokenId.Type:
             ret self.build_type_alias_decl(tokens)
-
         | TokenId.Enum:
             ret self.build_enum_decl(tokens)
-
         | TokenId.Struct:
             ret self.build_struct_decl(tokens)
-
         | TokenId.Trait:
             ret self.build_trait_decl(tokens)
-
         | TokenId.Impl:
             ret self.build_impl(tokens)
-
         | TokenId.Cpp:
             ret self.build_cpp_link(tokens)
-
         | TokenId.Hash:
             ret self.build_directive(tokens)
-
         | TokenId.Comment:
-            ret build_comment(token)
-
+            ret nil
         |:
             self.push_err(token, LogMsg.InvalidSyntax)
             ret nil
-        }
-    }
-
-    fn check_comment_group(mut self, &node: Node) {
-        if self.comment_group == nil {
-            ret
-        }
-        match type node.data {
-        | &Comment
-        | &Directive:
-            // Ignore
-
-        |:
-            self.comment_group = nil
         }
     }
 
@@ -1765,10 +1728,9 @@ impl Parser {
         }
 
         match type node.data {
-        | &Directive
-        | &Comment:
+        | &Directive:
             // Ignore
-
+            break
         |:
             if self.directives.len != 0 {
                 self.push_err(self.directives[0].tag, LogMsg.UnusedDirective)
@@ -1781,8 +1743,6 @@ impl Parser {
         f.public = is_pub
         f.directives = self.directives
         self.directives = nil
-        f.doc_comments = self.comment_group
-        self.comment_group = nil
     }
 
     fn apply_meta(mut self, mut &node: Node, is_pub: bool) {
@@ -1793,10 +1753,6 @@ impl Parser {
                 ret
             }
             v.public = is_pub
-
-            v.doc_comments = self.comment_group
-            self.comment_group = nil
-
             v.directives = self.directives
             self.directives = nil
         | &FnDecl:
@@ -1811,15 +1767,11 @@ impl Parser {
                 ret
             }
             tad.public = is_pub
-            tad.doc_comments = self.comment_group
-            self.comment_group = nil
         | &EnumDecl:
             let mut ed = (&EnumDecl)(node.data)
             if ed == nil {
                 ret
             }
-            ed.doc_comments = self.comment_group
-            self.comment_group = nil
             ed.public = is_pub
         | &StructDecl:
             let mut sd = (&StructDecl)(node.data)
@@ -1828,16 +1780,12 @@ impl Parser {
             }
             sd.directives = self.directives
             self.directives = nil
-            sd.doc_comments = self.comment_group
-            self.comment_group = nil
             sd.public = is_pub
         | &TraitDecl:
             let mut td = (&TraitDecl)(node.data)
             if td == nil {
                 ret
             }
-            td.doc_comments = self.comment_group
-            self.comment_group = nil
             td.public = is_pub
         |:
             if is_pub {
@@ -1850,6 +1798,7 @@ impl Parser {
         match type node.data {
         | &UseDecl:
             // Ignore.
+            break
         |:
             ret
         }
@@ -1888,7 +1837,6 @@ impl Parser {
         node.data = data
 
         self.apply_meta(node, is_pub)
-        self.check_comment_group(node)
         self.check_directive(node)
         self.check_use_decl(node)
         ret node
@@ -1912,11 +1860,6 @@ impl Parser {
         | node.is_decl() || node.is_impl():
             // Use declarations eliminated.
             self.ast.nodes = append(self.ast.nodes, node)
-        | node.is_comment():
-            if self.comment_group == nil {
-                self.comment_group = &CommentGroup{}
-            }
-            self.comment_group.comments = append(self.comment_group.comments, (&Comment)(node.data))
         |:
             self.push_err(node.token, LogMsg.InvalidSyntax)
         }
@@ -1929,7 +1872,6 @@ impl Parser {
             if tok.kind != close {
                 continue
             }
-
             ranges = append(ranges[:i], ranges[i+1:]...)
             break
         }
@@ -1937,9 +1879,12 @@ impl Parser {
 
     fn push_wrong_order_close_err(mut self, &t: Token, &tokens: []Token, &ranges: []int) {
         match tokens[ranges[ranges.len-1]].kind {
-        | TokenKind.LParent:  self.push_err(t, LogMsg.ExpectedParentClose)
-        | TokenKind.LBrace:   self.push_err(t, LogMsg.ExpectedBraceClose)
-        | TokenKind.LBracket: self.push_err(t, LogMsg.ExpectedBracketClose)
+        | TokenKind.LParent:
+            self.push_err(t, LogMsg.ExpectedParentClose)
+        | TokenKind.LBrace:
+            self.push_err(t, LogMsg.ExpectedBraceClose)
+        | TokenKind.LBracket:
+            self.push_err(t, LogMsg.ExpectedBracketClose)
         }
     }
 
@@ -1947,9 +1892,12 @@ impl Parser {
         let n = ranges.len
         if n == 0 {
             match t.kind {
-            | TokenKind.RBracket: self.push_err(t, LogMsg.ExtraClosedBracket)
-            | TokenKind.RBrace:   self.push_err(t, LogMsg.ExtraClosedBrace)
-            | TokenKind.RParent:  self.push_err(t, LogMsg.ExtraClosedParent)
+            | TokenKind.RBracket:
+                self.push_err(t, LogMsg.ExtraClosedBracket)
+            | TokenKind.RBrace:
+                self.push_err(t, LogMsg.ExtraClosedBrace)
+            | TokenKind.RParent:
+                self.push_err(t, LogMsg.ExtraClosedParent)
             }
             ret
         } else if tokens[ranges[n-1]].kind != left {
@@ -1965,19 +1913,15 @@ impl Parser {
             if token.id != TokenId.Range {
                 continue
             }
-
             match token.kind {
             | TokenKind.LParent
             | TokenKind.LBrace
             | TokenKind.LBracket:
                 ranges = append(ranges, i)
-
             | TokenKind.RParent:
                 self.push_range_close(token, TokenKind.LParent, tokens, ranges)
-
             | TokenKind.RBrace:
                 self.push_range_close(token, TokenKind.LBrace, tokens, ranges)
-
             | TokenKind.RBracket:
                 self.push_range_close(token, TokenKind.LBracket, tokens, ranges)
             }
@@ -1986,9 +1930,12 @@ impl Parser {
         for _, i in ranges {
             let token = tokens[i]
             match token.kind {
-            | TokenKind.LParent:  self.push_err(token, LogMsg.WaitCloseParent)
-            | TokenKind.LBrace:   self.push_err(token, LogMsg.WaitCloseBrace)
-            | TokenKind.LBracket: self.push_err(token, LogMsg.WaitCloseBracket)
+            | TokenKind.LParent:
+                self.push_err(token, LogMsg.WaitCloseParent)
+            | TokenKind.LBrace:
+                self.push_err(token, LogMsg.WaitCloseBrace)
+            | TokenKind.LBracket:
+                self.push_err(token, LogMsg.WaitCloseBracket)
             }
         }
     }
@@ -2017,7 +1964,11 @@ impl Parser {
 
             let (_, mut data) = self.build_general_scope_node_data(stmt.tokens)
             if data == nil {
-                break
+                if self.errors.len != 0 {
+                    break
+                }
+                // It's ok. Probably a comment.
+                continue
             }
 
             if self.stopped() {
@@ -2032,10 +1983,6 @@ impl Parser {
                 } else {
                     break iter
                 }
-            | &Comment
-            | &CommentGroup:
-                // Ignore.
-                break
             |:
                 break iter
             }

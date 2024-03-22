@@ -7,7 +7,6 @@ use std::fs::path::{SEPARATOR, abs, ext, join}
 use ast for std::jule::ast::{
     self,
     Ast,
-    CommentGroup,
     TypeDecl,
     TypeAliasDecl,
     FieldDecl,
@@ -82,19 +81,6 @@ pub struct Pass {
     pub text:  str
 }
 
-fn build_doc(mut cg: &CommentGroup): str {
-    if cg == nil {
-        ret ""
-    }
-
-    let mut doc = ""
-    for _, c in cg.comments {
-        doc += c.text
-        doc += " " // Write space for each newline.
-    }
-    ret doc
-}
-
 fn build_type(mut t: &TypeDecl): &TypeSymbol {
     if t == nil {
         ret nil
@@ -108,7 +94,6 @@ fn build_expr(mut expr: &Expr): &Value {
     if expr == nil {
         ret nil
     }
-
     ret &Value{
         expr: expr,
     }
@@ -122,7 +107,6 @@ fn build_type_alias(mut decl: &TypeAliasDecl): &TypeAlias {
         token:      decl.token,
         ident:      decl.ident,
         kind:       build_type(decl.kind),
-        doc:        build_doc(decl.doc_comments),
     }
 }
 
@@ -153,7 +137,6 @@ fn build_struct(mut decl: &StructDecl): &Struct {
         public:     decl.public,
         cpp_linked: decl.cpp_linked,
         directives: decl.directives,
-        doc:        build_doc(decl.doc_comments),
         generics:   decl.generics,
     }
 }
@@ -198,7 +181,6 @@ fn build_fn(mut decl: &FnDecl): &Fn {
         exceptional: decl.exceptional,
         ident:       decl.ident,
         directives:  decl.directives,
-        doc:         build_doc(decl.doc_comments),
         scope:       decl.scope,
         generics:    decl.generics,
         result:      build_ret_type(decl.result),
@@ -219,7 +201,6 @@ fn build_trait(mut decl: &TraitDecl): &Trait {
         token:   decl.token,
         ident:   decl.ident,
         public:  decl.public,
-        doc:     build_doc(decl.doc_comments),
         methods: build_methods(decl.methods),
     }
 }
@@ -247,7 +228,6 @@ fn build_enum(mut decl: &EnumDecl): &Enum {
         ident:  decl.ident,
         kind:   build_type(decl.kind),
         items:  build_enum_items(decl.items),
-        doc:    build_doc(decl.doc_comments),
     }
 }
 
@@ -263,7 +243,6 @@ fn build_var(mut decl: &VarDecl): &Var {
         reference:  decl.reference,
         directives: decl.directives,
         references: ReferenceStack.new(),
-        doc:        build_doc(decl.doc_comments),
         kind:       build_type(decl.kind),
         value:      build_expr(decl.expr),
     }
