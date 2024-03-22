@@ -1158,10 +1158,6 @@ impl Parser {
         let mut i = new(int, 0)
         for *i < tokens.len; *i++ {
             let mut t = tokens[*i]
-            if t.id == TokenId.Comment {
-                continue
-            }
-
             let mut item = &EnumItemDecl{}
             item.token = t
             if item.token.id != TokenId.Ident {
@@ -1300,9 +1296,6 @@ impl Parser {
         let mut stmts = split_stmts(tokens)
         for (_, mut stmt) in stmts {
             tokens = stmt.tokens
-            if tokens[0].id == TokenId.Comment {
-                continue
-            }
             let mut f = self.build_field(tokens)
             fields = append(fields, f)
         }
@@ -1379,7 +1372,7 @@ impl Parser {
         let mut methods: []&FnDecl = nil
         let mut stmts = split_stmts(tokens)
         for (_, mut stmt) in stmts {
-            tokens = eliminate_comments(stmt.tokens)
+            tokens = stmt.tokens
             if tokens.len == 0 {
                 continue
             }
@@ -1562,14 +1555,9 @@ impl Parser {
             let mut token = tokens[0]
             let mut is_pub = false
             match token.id {
-            | TokenId.Comment:
-                // Ignore.
-                continue
-
             | TokenId.Hash:
                 self.push_directive(self.build_directive(tokens))
                 continue
-
             | TokenId.Pub:
                 is_pub = true
                 if tokens.len == 1 {
@@ -1589,7 +1577,6 @@ impl Parser {
                     v.public = is_pub
                     ipl.statics = append(ipl.statics, v)
                 }
-
             | TokenId.Static
             | TokenId.Fn
             | TokenId.Unsafe:
@@ -1599,7 +1586,6 @@ impl Parser {
                     self.apply_fn_meta(f, is_pub)
                     ipl.methods = append(ipl.methods, f)
                 }
-
             |:
                 self.push_err(token, LogMsg.InvalidSyntax)
                 continue
@@ -1714,8 +1700,6 @@ impl Parser {
             ret self.build_cpp_link(tokens)
         | TokenId.Hash:
             ret self.build_directive(tokens)
-        | TokenId.Comment:
-            ret nil
         |:
             self.push_err(token, LogMsg.InvalidSyntax)
             ret nil
@@ -1964,11 +1948,7 @@ impl Parser {
 
             let (_, mut data) = self.build_general_scope_node_data(stmt.tokens)
             if data == nil {
-                if self.errors.len != 0 {
-                    break
-                }
-                // It's ok. Probably a comment.
-                continue
+                break
             }
 
             if self.stopped() {

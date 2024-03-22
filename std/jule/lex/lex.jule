@@ -5,6 +5,12 @@
 use std::jule::build::{logf, LogMsg, Log, LogKind}
 use utf8 for std::unicode::utf8
 
+// Lexer mode.
+pub enum LexMode {
+    Standard = 0 << 0, // Standard mode.
+    Comment  = 1 << 0, // Standard mode + comments.
+}
+
 struct KindPair {
     kind: TokenKind
     id:   TokenId
@@ -441,6 +447,7 @@ fn byte_escape(&txt: []byte): (seq: str) {
 }
 
 struct Lex {
+    mode:   LexMode
     tokens: []Token
     file:   &File
     pos:    int
@@ -528,25 +535,20 @@ impl Lex {
     fn lex_line_comment(mut self, mut &token: Token) {
         let start = self.pos
         self.pos += 2
-
         for self.pos < self.file.data.len; self.pos++ {
             let r = self.file.data[self.pos]
             if r == '\n' || r == '\r' {
-                if self.is_first_token_of_line() {
-                    token.id = TokenId.Comment
-                    token.kind = str(self.file.data[start:self.pos])
-                }
-                ret
+                break
             }
         }
-
-        if self.is_first_token_of_line() {
+        if self.mode & LexMode.Comment == LexMode.Comment {
             token.id = TokenId.Comment
-            token.kind = str(self.file.data[start:])
+            token.kind = str(self.file.data[start:self.pos])
         }
     }
 
-    fn lex_range_comment(mut self) {
+    fn lex_range_comment(mut self, mut &token: Token) {
+        let start = self.pos
         self.pos += 2
         for self.pos < self.file.data.len; self.pos++ {
             let r = self.file.data[self.pos]
@@ -558,9 +560,12 @@ impl Lex {
                 continue
             }
             self.column += 1
-            if self.pos+1 < self.file.data.len &&
-                r == '*' &&
+            if self.pos+1 < self.file.data.len && r == '*' &&
                 self.file.data[self.pos+1] == '/' {
+                if self.mode & LexMode.Comment == LexMode.Comment {
+                    token.id = TokenId.Comment
+                    token.kind = str(self.file.data[start:self.pos])
+                }
                 self.column += 2
                 self.pos += 2
                 ret
@@ -777,25 +782,21 @@ impl Lex {
         match {
         | self.lex_num(txt, t):
             // Pass.
-
+            break
         | txt[0] == '\'':
             t.kind = self.lex_rune(txt)
             t.id = TokenId.Lit
             ret t
-
         | txt[0] == '"' || txt[0] == '`':
             t.kind = self.lex_str()
             t.id = TokenId.Lit
             ret t
-
         | bytes_has_prefix(txt, TokenKind.LnComment):
             self.lex_line_comment(t)
             ret t
-
         | bytes_has_prefix(txt, TokenKind.RangLComment):
-            self.lex_range_comment()
+            self.lex_range_comment(t)
             ret t
-
         | self.is_op(txt, TokenKind.LParent, TokenId.Range, t)
         | self.is_op(txt, TokenKind.RParent, TokenId.Range, t)
         | self.is_op(txt, TokenKind.LBrace, TokenId.Range, t)
@@ -804,7 +805,7 @@ impl Lex {
         | self.is_op(txt, TokenKind.RBracket, TokenId.Range, t)
         | self.lex_basic_ops(txt, t):
             // Pass.
-
+            break
         | self.lex_id(txt, t):
             for _, pair in KEYWORDS {
                 if pair.kind == t.kind {
@@ -812,7 +813,6 @@ impl Lex {
                     break
                 }
             }
-
         |:
             let (r, sz) = utf8::decode_rune(txt)
             self.push_err(LogMsg.InvalidToken, r)
@@ -829,12 +829,13 @@ impl Lex {
 // Lex source code into fileset.
 // Returns nil if f == nil.
 // Returns nil slice for errors if no any error.
-pub fn lex(mut f: &File): []Log {
+pub fn lex(mut f: &File, mode: LexMode): []Log {
     if f == nil {
         ret nil
     }
 
     let mut lex = Lex{
+        mode: mode,
         file: f,
         pos:  0,
         row:  -1, // For true row
