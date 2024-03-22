@@ -51,7 +51,7 @@ fn make_err(row: int, col: int, &f: &File, fmt: LogMsg, args: ...any): Log {
         kind:   LogKind.Error,
         row:    row,
         column: col,
-        path:   f.path(),
+        path:   f.path,
         text:   logf(fmt, args...),
     }
 }
@@ -196,7 +196,7 @@ fn compiler_err(&token: Token, &fmt: LogMsg, args: ...any): Log {
         kind:   LogKind.Error,
         row:    token.row,
         column: token.column,
-        path:   token.file.path(),
+        path:   token.file.path,
         text:   logf(fmt, args...),
         line:   token.file.get_row(token.row),
     }
@@ -1929,13 +1929,12 @@ impl Parser {
             file: f,
         }
 
-        let mut tokens = f.tokens()
-        self.check_ranges(tokens)
+        self.check_ranges(f.tokens)
         if self.errors.len > 0 {
             ret
         }
 
-        let mut stmts = split_stmts(tokens)
+        let mut stmts = split_stmts(f.tokens)
 
         // Get top directives.
         let mut i = 0

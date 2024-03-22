@@ -113,7 +113,7 @@ fn make_err(row: int, col: int, &f: &File, fmt: LogMsg, args: ...any): Log {
         kind:   LogKind.Error,
         row:    row,
         column: col,
-        path:   f.path(),
+        path:   f.path,
         text:   logf(fmt, args...),
     }
 }
@@ -562,12 +562,12 @@ impl Lex {
             self.column += 1
             if self.pos+1 < self.file.data.len && r == '*' &&
                 self.file.data[self.pos+1] == '/' {
+                self.column += 2
+                self.pos += 2
                 if self.mode & LexMode.Comment == LexMode.Comment {
                     token.id = TokenId.Comment
                     token.kind = str(self.file.data[start:self.pos])
                 }
-                self.column += 2
-                self.pos += 2
                 ret
             }
         }
@@ -848,6 +848,6 @@ pub fn lex(mut f: &File, mode: LexMode): []Log {
         ret lex.errors
     }
 
-    f._tokens = lex.tokens
+    f.tokens = lex.tokens
     ret nil
 }
