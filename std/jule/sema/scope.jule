@@ -1210,7 +1210,6 @@ impl ScopeChecker {
             if r.kind.void() {
                 self.s.push_err(a.right.token, LogMsg.InvalidExpr)
             }
-
             self.scope.stmts = append(self.scope.stmts, r)
             ret
         }
@@ -1414,7 +1413,10 @@ impl ScopeChecker {
                 }
             }
 
-            let mut expr = &Expr{kind: right[i], token: a.right.token}
+            let mut expr = &Expr{
+                kind:  right[i],
+                token: a.right.token,
+            }
             let mut eval = if l != nil {
                 self.s.evalp(self, l.kind)
             } else {
@@ -1434,17 +1436,14 @@ impl ScopeChecker {
     }
 
     fn check_assign_st(mut &self, mut a: &AssignSt) {
-        if is_postfix_op(a.setter.kind) {
+        match {
+        | is_postfix_op(a.setter.kind):
             self.check_postfix(a)
-            ret
-        }
-
-        if a.left.len == 1 && !a.declarative {
+        | a.left.len == 1 && !a.declarative:
             self.check_single_assign(a)
-            ret
+        |:
+            self.check_multi_assign(a)
         }
-
-        self.check_multi_assign(a)
     }
 
     fn check_case_scope(mut &self, &c: &Case, mut &tree: &ScopeTree): &Scope {
@@ -1832,16 +1831,14 @@ impl ScopeChecker {
 
     fn check_result(mut &self) {
         let mut stmt = self.tree.stmts[self.tree.stmts.len-1]
-        match type stmt {
+        match type stmt.data {
         | &UseExpr:
-            let mut ue = (&UseExpr)(stmt)
+            let mut ue = (&UseExpr)(stmt.data)
             let mut d = self.s.eval(self).eval_expr(ue.expr)
             if d == nil {
                 ret
             }
-
             self.scope.stmts = append(self.scope.stmts, d)
-
             let mut rtc = &RetTypeChecker{
                 sc:          self,
                 error_token: ue.expr.token,
@@ -1849,19 +1846,16 @@ impl ScopeChecker {
             }
             _ = rtc.check(ue.expr)
         | &Expr:
-            let mut expr = (&Expr)(stmt)
+            let mut expr = (&Expr)(stmt.data)
             let mut d = self.s.eval(self).eval_expr(expr)
             if d == nil {
                 ret
             }
-
             self.scope.stmts = append(self.scope.stmts, d)
-
             match type d.model {
             | &BuiltinErrorCallExprModel:
                 let mut m = (&BuiltinErrorCallExprModel)(d.model)
                 self.process_error_call(m, expr.token)
-
             |:
                 ret
             }
@@ -1869,9 +1863,9 @@ impl ScopeChecker {
         | &std::jule::ast::BreakSt
         | &std::jule::ast::ContSt
         | &std::jule::ast::RetSt:
-            self.check_node(stmt)
+            self.check_node(stmt.data)
         |:
-            self.check_node(stmt)
+            self.check_node(stmt.data)
             ret
         }
 
@@ -1883,7 +1877,7 @@ impl ScopeChecker {
         self.i = 0
         for self.i < self.tree.stmts.len; self.i++ {
             let mut stmt = self.tree.stmts[self.i]
-            self.check_node(stmt)
+            self.check_node(stmt.data)
             if self.stopped() {
                 ret
             }
