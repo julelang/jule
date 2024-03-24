@@ -705,24 +705,27 @@ impl ExprBuilder {
         ret pair
     }
 
-    fn build_struct_lit_expr(mut self, mut &tokens: []Token): ExprData {
+    fn build_struct_lit_expr(mut self, mut &tokens: []Token): &Expr {
         let mut token = tokens[0]
         if token.id == TokenId.Ident && tokens.len > 1 {
             token = tokens[1]
             if token.id == TokenId.Colon {
-                ret self.build_field_expr_pair(tokens)
+                ret &Expr{
+                    token: token,
+                    kind:  self.build_field_expr_pair(tokens),
+                }
             }
         }
         ret self.build_from_tokens(tokens)
     }
 
-    fn build_struct_lit_exprs(mut self, mut &tokens: []Token): []ExprData {
+    fn build_struct_lit_exprs(mut self, mut &tokens: []Token): []&Expr {
         let mut parts = self.get_brace_range_lit_expr_parts(tokens)
         if parts.len == 0 {
             ret nil
         }
 
-        let mut pairs = make([]ExprData, 0, parts.len)
+        let mut pairs = make([]&Expr, 0, parts.len)
         for (_, mut part) in parts {
             pairs = append(pairs, self.build_struct_lit_expr(part))
         }
@@ -752,14 +755,17 @@ impl ExprBuilder {
         }
     }
 
-    fn build_brace_lit_part(mut self, mut &tokens: []Token): ExprData {
+    fn build_brace_lit_part(mut self, mut &tokens: []Token): &Expr {
         let (mut l, mut r) = split_colon(tokens)
         // If left is not nil, colon token found.
         if l != nil {
-            ret &KeyValPair{
-                colon: tokens[l.len],
-                key:   self.build_from_tokens(l),
-                val:   self.build_from_tokens(r),
+            ret &Expr {
+                token: tokens[0],
+                kind:  &KeyValPair{
+                    colon: tokens[l.len],
+                    key:   self.build_from_tokens(l),
+                    val:   self.build_from_tokens(r),
+                },
             }
         }
         ret self.build_from_tokens(tokens)
@@ -775,7 +781,7 @@ impl ExprBuilder {
             ret lit
         }
 
-        lit.exprs = make([]ExprData, 0, parts.len)
+        lit.exprs = make([]&Expr, 0, parts.len)
         for (_, mut part) in parts {
             lit.exprs = append(lit.exprs, self.build_brace_lit_part(part))
         }

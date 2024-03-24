@@ -1622,7 +1622,7 @@ impl Eval {
     }
 
     fn eval_struct_lit_explicit(mut &self, mut s: &StructIns,
-        mut exprs: []ExprData, mut error_token: Token): &Data {
+        mut exprs: []&Expr, mut error_token: Token): &Data {
         let ok = self.s.check_generic_quantity(s.decl.generics.len, s.generics.len, error_token)
         if !ok {
             ret nil
@@ -2791,15 +2791,16 @@ impl Eval {
         }
 
         for (_, mut expr) in lit.exprs {
-            match type expr {
+            match type expr.kind {
             | &KeyValPair:
                 // Ok.
+                break
             |:
                 self.push_err(lit.token, LogMsg.InvalidSyntax)
                 ret nil
             }
 
-            let mut pair = (&KeyValPair)(expr)
+            let mut pair = (&KeyValPair)(expr.kind)
 
             let mut key = self.eval_expr_kind(pair.key)
             if key == nil {

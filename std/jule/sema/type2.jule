@@ -769,7 +769,7 @@ impl StructLitChecker {
         }
     }
 
-    fn check_pair(mut self, mut &pair: &FieldExprPair, mut &exprs: []ExprData) {
+    fn check_pair(mut self, mut &pair: &FieldExprPair, mut &exprs: []&Expr) {
         // Check existing.
         let mut f = self.s.find_field(pair.field.kind)
         if f == nil {
@@ -784,9 +784,9 @@ impl StructLitChecker {
         // Check duplications.
     dup_lookup:
         for (_, mut expr) in exprs {
-            match type expr {
+            match type expr.kind {
             | &FieldExprPair:
-                let mut dpair = (&FieldExprPair)(expr)
+                let mut dpair = (&FieldExprPair)(expr.kind)
                 match {
                 | pair == dpair:
                     break dup_lookup
@@ -808,12 +808,12 @@ impl StructLitChecker {
         self.push_match(f, d, pair.field)
     }
 
-    fn ready_exprs(mut self, mut &exprs: []ExprData): bool {
+    fn ready_exprs(mut self, mut &exprs: []&Expr): bool {
         let mut ok = true
         for (i, mut expr) in exprs {
-            match type expr {
+            match type expr.kind {
             | &KeyValPair:
-                let mut pair = (&KeyValPair)(expr)
+                let mut pair = (&KeyValPair)(expr.kind)
                 match type pair.key.kind {
                 | &IdentExpr:
                     // Ok
@@ -823,7 +823,7 @@ impl StructLitChecker {
                     ok = false
                     continue
                 }
-                exprs[i] = &FieldExprPair{
+                exprs[i].kind = &FieldExprPair{
                     field: pair.key.token,
                     expr:  pair.val,
                 }
@@ -832,7 +832,7 @@ impl StructLitChecker {
         ret ok
     }
 
-    fn check(mut self, mut &exprs: []ExprData) {
+    fn check(mut self, mut &exprs: []&Expr) {
         if exprs.len == 0 {
             ret
         }
@@ -843,21 +843,20 @@ impl StructLitChecker {
 
         let mut paired = false
         for (i, mut expr) in exprs {
-            match type expr {
+            match type expr.kind {
             | &FieldExprPair:
-                let mut pair = (&FieldExprPair)(expr)
+                let mut pair = (&FieldExprPair)(expr.kind)
                 if i > 0 && !paired {
                     self.push_err(pair.field, LogMsg.InvalidSyntax)
                 }
                 paired = true
                 self.check_pair(pair, exprs)
-            | &Expr:
-                let mut e = (&Expr)(expr)
+            |:
                 if paired {
-                    self.push_err(e.token, LogMsg.ArgMustTargetToField)
+                    self.push_err(expr.token, LogMsg.ArgMustTargetToField)
                 }
                 if i >= self.s.fields.len {
-                    self.push_err(e.token, LogMsg.ArgumentOverflow)
+                    self.push_err(expr.token, LogMsg.ArgumentOverflow)
                     continue
                 }
 
@@ -867,12 +866,12 @@ impl StructLitChecker {
                 defer { self.e.prefix = prefix }
                 self.e.prefix = field.kind
 
-                let mut d = self.e.eval_expr_kind(e.kind)
+                let mut d = self.e.eval_expr_kind(expr.kind)
                 if d == nil {
                     continue
                 }
 
-                self.push_match(field, d, e.token)
+                self.push_match(field, d, expr.token)
             }
         }
 
