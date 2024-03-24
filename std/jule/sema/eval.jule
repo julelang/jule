@@ -797,9 +797,9 @@ impl Eval {
         let mut filled = false
 
         if s.elems.len == 2 {
-            match type s.elems[1] {
+            match type s.elems[1].kind {
             | &VariadicExpr:
-                if (&VariadicExpr)(s.elems[1]).expr != nil {
+                if (&VariadicExpr)(s.elems[1].kind).expr != nil {
                     break
                 }
                 // Filled.
@@ -1054,11 +1054,11 @@ impl Eval {
     }
 
     fn push_generics_from_index_data(mut &self, mut &decl: &IdentTypeDecl, mut &i: &IndexingExpr): bool {
-        match type i.index {
+        match type i.index.kind {
         | &UnaryExpr:
             // Unary eval catches type declarations.
             // Therefore use unary eval algorithm for eval related type declarations.
-            let mut d = self.eval_unary((&UnaryExpr)(i.index))
+            let mut d = self.eval_unary((&UnaryExpr)(i.index.kind))
             if !d.decl {
                 self.push_err(i.token, LogMsg.InvalidSyntax)
                 ret false
@@ -1067,9 +1067,9 @@ impl Eval {
                 kind: d.kind,
             })
         | &TypeDecl:
-            decl.generics = append(decl.generics, (&TypeDecl)(i.index))
+            decl.generics = append(decl.generics, (&TypeDecl)(i.index.kind))
         | &IdentExpr:
-            let mut expr = (&IdentExpr)(i.index)
+            let mut expr = (&IdentExpr)(i.index.kind)
             decl.generics = append(decl.generics, &TypeDecl{
                 kind: &IdentTypeDecl{
                     token: expr.token,
@@ -1077,7 +1077,7 @@ impl Eval {
                 }
             })
         | &TupleExpr:
-            for (_, mut expr) in (&TupleExpr)(i.index).expr {
+            for (_, mut expr) in (&TupleExpr)(i.index.kind).expr {
                 match type expr.kind {
                 | &TypeDecl:
                     decl.generics = append(decl.generics, (&TypeDecl)(expr.kind))
@@ -1101,16 +1101,16 @@ impl Eval {
     fn eval_ident_decl_from_indexing(mut &self, mut &d: &Data, mut &i: &IndexingExpr): &Data {
         let mut tdecl = &TypeDecl{}
         let mut decl: &IdentTypeDecl = nil
-        match type i.expr {
+        match type i.expr.kind {
         | &IdentExpr:
-            let mut expr = (&IdentExpr)(i.expr)
+            let mut expr = (&IdentExpr)(i.expr.kind)
             decl = &IdentTypeDecl{
                 token: expr.token,
                 ident: expr.ident,
             }
             tdecl.kind = decl
         | &NsSelectionExpr:
-            let mut expr = (&NsSelectionExpr)(i.expr)
+            let mut expr = (&NsSelectionExpr)(i.expr.kind)
             decl = &IdentTypeDecl{
                 token: expr.ident,
                 ident: expr.ident.kind,
@@ -2964,6 +2964,8 @@ impl Eval {
     fn eval_expr_kind(mut &self, mut kind: ExprData): &Data {
         let mut d: &Data = nil
         match type kind {
+        | &Expr:
+            d = self.eval_expr_kind((&Expr)(kind).kind)
         | &LitExpr:
             d = self.eval_lit((&LitExpr)(kind))
         | &IdentExpr:

@@ -308,7 +308,7 @@ impl ExprBuilder {
 
         ret &UnaryExpr{
             op:   op,
-            expr: self.build(tokens),
+            expr: self.build_from_tokens(tokens),
         }
     }
 
@@ -323,7 +323,7 @@ impl ExprBuilder {
         }
         ret &SubIdentExpr{
             ident: ident_token,
-            expr:  self.build(tokens),
+            expr:  self.build_from_tokens(tokens),
         }
     }
 
@@ -383,7 +383,7 @@ impl ExprBuilder {
         tokens = tokens[:tokens.len-1] // Remove variadic operator token.
         ret &VariadicExpr{
             token: token,
-            expr:  self.build(tokens),
+            expr:  self.build_from_tokens(tokens),
         }
     }
 
@@ -410,7 +410,7 @@ impl ExprBuilder {
         ret nil
     }
 
-    fn build_between_parentheses(mut self, mut tokens: []Token): ExprData {
+    fn build_between_parentheses(mut self, mut tokens: []Token): &Expr {
         let token = tokens[0]
         tokens = tokens[1 : tokens.len-1] // Remove parentheses.
         if tokens.len == 0 {
@@ -418,7 +418,9 @@ impl ExprBuilder {
             self.push_suggestion(LogMsg.EmptyParentNotValid)
             ret nil
         }
-        ret self.build(tokens)
+        let mut expr = self.build_from_tokens(tokens)
+        expr.range = true
+        ret expr
     }
 
     fn try_build_cast(mut self, mut &tokens: []Token): &CastExpr {
@@ -486,7 +488,7 @@ impl ExprBuilder {
                         ret nil
                     }
                     expr_tokens = expr_tokens[:j]
-                    cast.expr = self.build(expr_tokens)
+                    cast.expr = self.build_from_tokens(expr_tokens)
                 }
             }
             ret cast
@@ -614,7 +616,7 @@ impl ExprBuilder {
         }
         ret &UnsafeExpr{
             token: token,
-            expr:  self.build_from_tokens(range_tokens).kind,
+            expr:  self.build_from_tokens(range_tokens),
         }
     }
 
@@ -699,7 +701,7 @@ impl ExprBuilder {
             field: tokens[0],
         }
         tokens = tokens[2:] // Remove field identifier and colon tokens.
-        pair.expr = self.build_from_tokens(tokens).kind
+        pair.expr = self.build_from_tokens(tokens)
         ret pair
     }
 
@@ -756,8 +758,8 @@ impl ExprBuilder {
         if l != nil {
             ret &KeyValPair{
                 colon: tokens[l.len],
-                key:   self.build_from_tokens(l).kind,
-                val:   self.build_from_tokens(r).kind,
+                key:   self.build_from_tokens(l),
+                val:   self.build_from_tokens(r),
             }
         }
         ret self.build_from_tokens(tokens)
@@ -850,12 +852,12 @@ impl ExprBuilder {
             ret slc
         }
 
-        slc.elems = make([]ExprData, 0, parts.len)
+        slc.elems = make([]&Expr, 0, parts.len)
         for (_, mut p) in parts {
             if p.len == 0 {
                 continue
             }
-            slc.elems = append(slc.elems, self.build_from_tokens(p).kind)
+            slc.elems = append(slc.elems, self.build_from_tokens(p))
         }
 
         ret slc
@@ -878,8 +880,8 @@ impl ExprBuilder {
         }
         ret &IndexingExpr{
             token: error_token,
-            expr:  expr.kind,
-            index: index.kind,
+            expr:  expr,
+            index: index,
         }
     }
 
@@ -887,17 +889,17 @@ impl ExprBuilder {
         &colon: int, mut &error_token: Token): &SlicingExpr {
         let mut slc = &SlicingExpr{
             token: error_token,
-            expr:  self.build_from_tokens(expr_tokens).kind,
+            expr:  self.build_from_tokens(expr_tokens),
         }
 
         let mut start_expr_tokens = slicing_tokens[:colon]
         if start_expr_tokens.len > 0 {
-            slc.start = self.build_from_tokens(start_expr_tokens).kind
+            slc.start = self.build_from_tokens(start_expr_tokens)
         }
 
         let mut to_expr_tokens = slicing_tokens[colon+1:]
         if to_expr_tokens.len > 0 {
-            slc.to = self.build_from_tokens(to_expr_tokens).kind
+            slc.to = self.build_from_tokens(to_expr_tokens)
         }
 
         ret slc
@@ -941,7 +943,7 @@ impl ExprBuilder {
             self.push_err(ter.token, LogMsg.MissingExpr)
         }
 
-        ter.condition = self.build_kind(expr_tokens)
+        ter.condition = self.build_from_tokens(expr_tokens)
 
         let mut i = expr_tokens.len
         let mut true_expr = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
@@ -980,8 +982,8 @@ impl ExprBuilder {
             self.push_err(tokens[i], LogMsg.InvalidSyntax)
         }
 
-        ter.true_expr = self.build_kind(true_expr)
-        ter.false_expr = self.build_kind(false_expr)
+        ter.true_expr = self.build_from_tokens(true_expr)
+        ter.false_expr = self.build_from_tokens(false_expr)
 
         ret ter
     }
@@ -1070,8 +1072,8 @@ impl ExprBuilder {
             ret nil
         }
         ret &BinopExpr{
-            left:  self.build(left_tokens),
-            right: self.build(right_tokens),
+            left:  self.build_from_tokens(left_tokens),
+            right: self.build_from_tokens(right_tokens),
             op:    tokens[i],
         }
     }
