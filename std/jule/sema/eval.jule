@@ -796,10 +796,10 @@ impl Eval {
 
         let mut filled = false
 
-        if s.elems.len == 2 {
-            match type s.elems[1].kind {
+        if s.exprs.len == 2 {
+            match type s.exprs[1].kind {
             | &VariadicExpr:
-                if (&VariadicExpr)(s.elems[1].kind).expr != nil {
+                if (&VariadicExpr)(s.exprs[1].kind).expr != nil {
                     break
                 }
                 // Filled.
@@ -810,11 +810,11 @@ impl Eval {
                 }
 
                 filled = true
-                s.elems = s.elems[:1]
+                s.exprs = s.exprs[:1]
             }
         }
 
-        arr.n = s.elems.len
+        arr.n = s.exprs.len
         if !pt.auto {
             if arr.n > pt.n {
                 self.push_err(s.token, LogMsg.OverflowLimits)
@@ -825,12 +825,12 @@ impl Eval {
 
         let mut model = &ArrayExprModel{
             kind:  arr,
-            elems: make([]ExprModel, 0, if filled { 2 } else { s.elems.len }),
+            elems: make([]ExprModel, 0, if filled { 2 } else { s.exprs.len }),
         }
 
         let mut prefix = self.prefix
         self.prefix = arr.elem
-        for (_, mut elem) in s.elems {
+        for (_, mut elem) in s.exprs {
             let mut d = self.eval_expr_kind(elem)
             if d == nil {
                 continue
@@ -862,17 +862,16 @@ impl Eval {
 
         let mut model = &SliceExprModel{
             elem_kind: elem_type,
-            elems:     make([]ExprModel, 0, s.elems.len),
+            elems:     make([]ExprModel, 0, s.exprs.len),
         }
 
         let mut prefix = self.prefix
         self.prefix = slc.elem
-        for (_, mut elem) in s.elems {
+        for (_, mut elem) in s.exprs {
             let mut d = self.eval_expr_kind(elem)
             if d == nil {
                 continue
             }
-
             _ = self.s.check_assign_type(false, slc.elem, d, s.token)
             model.elems = append(model.elems, d.model)
         }
@@ -902,12 +901,12 @@ impl Eval {
         let mut prefix = self.prefix
         self.prefix = nil
 
-        if s.elems.len == 0 {
+        if s.exprs.len == 0 {
             self.push_err(s.token, LogMsg.DynamicTypeAnnotationFailed)
             ret nil
         }
 
-        let mut first_elem = self.eval_expr_kind(s.elems[0])
+        let mut first_elem = self.eval_expr_kind(s.exprs[0])
         if first_elem == nil {
             ret nil
         }
