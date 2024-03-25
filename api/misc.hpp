@@ -13,13 +13,6 @@
 
 namespace jule
 {
-        // Dispose mask for implement dispose functionality.
-        // It's also built-in Dispose trait.
-        struct Dispose
-        {
-                virtual void _method_dispose(void) = 0;
-        };
-
         template <typename T, typename Denominator>
         inline auto div(
 #ifndef __JULE_ENABLE__PRODUCTION
