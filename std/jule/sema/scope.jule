@@ -1553,25 +1553,25 @@ impl ScopeChecker {
         }
     }
 
-    fn push_type_match(mut &self, mut tm: &Match, &m: &MatchCase) {
+    fn push_type_match(mut &self, mut tm: &Match, mut &m: &MatchCase) {
         // Type kind is generic.
         // Match cases by kind.
         if tm.expr.kind.generic {
             for (_, mut c) in tm.cases {
                 if c.scope != nil {
-                    tm.cases = nil
-                    tm.default = c
                     self.check_comptime_panic(c.scope)
-                    goto push
+                    self.scope.stmts = append(self.scope.stmts, c.scope)
+                    ret
                 }
             }
-            if tm.default != nil {
-                self.check_comptime_panic(tm.default.scope)
+            if m.default != nil {
+                tm.default = self.check_default(tm, m.default)
+                if tm.default != nil {
+                    self.check_comptime_panic(tm.default.scope)
+                }
             }
-            tm.cases = nil
+            ret
         }
-
-    push:
         self.scope.stmts = append(self.scope.stmts, tm)
     }
 
@@ -1592,9 +1592,10 @@ impl ScopeChecker {
             expr:       d,
         }
 
-        if m.default != nil {
+        if !tm.expr.kind.generic && m.default != nil {
             tm.default = self.check_default(tm, m.default)
         }
+
         self.check_cases(m, tm, d)
         self.push_type_match(tm, m)
     }
