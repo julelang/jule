@@ -135,7 +135,6 @@ impl Struct {
         let mut ins = &StructIns{
             decl:       self,
             fields:     make([]&FieldIns, 0, self.fields.len),
-            methods:    make([]&Fn, 0, self.methods.len),
             references: ReferenceStack.new(),
         }
 
@@ -146,26 +145,15 @@ impl Struct {
             }
         }
 
-        for (_, mut f) in self.methods {
-            let mut fins = &Fn{
-                sema:        f.sema,
-                token:       f.token,
-                global:      f.global,
-                unsafety:    f.unsafety,
-                public:      f.public,
-                cpp_linked:  f.cpp_linked,
-                statically:  f.statically,
-                exceptional: f.exceptional,
-                ident:       f.ident,
-                directives:  f.directives,
-                scope:       f.scope,
-                generics:    f.generics,
-                result:      f.result,
-                params:      f.params,
-                owner:       f.owner,
-                instances:   nil,
+        if self.generics.len == 0 {
+            ins.methods = self.methods
+        } else {
+            ins.methods = make([]&Fn, 0, self.methods.len)
+            for (_, mut f) in self.methods {
+                let mut fins = new(Fn, *f)
+                fins.instances = nil
+                ins.methods = append(ins.methods, fins)
             }
-            ins.methods = append(ins.methods, fins)
         }
 
         ret ins
