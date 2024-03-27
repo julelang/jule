@@ -25,12 +25,6 @@ namespace jule
         struct DynamicType
         {
         public:
-            static jule::Uintptr *clone(jule::Uintptr *ptr) noexcept
-            {
-                return reinterpret_cast<jule::Uintptr *>(
-                    new (std::nothrow) T(*reinterpret_cast<T *>(ptr)));
-            }
-
             static void dealloc(jule::Ptr<jule::Uintptr> &alloc) noexcept
             {
                 jule::Ptr<T> ptr;
@@ -44,7 +38,6 @@ namespace jule
         {
         public:
             void (*dealloc)(jule::Ptr<jule::Uintptr> &alloc);
-            jule::Uintptr *(*clone)(jule::Uintptr *ptr);
         };
 
         template <typename T>
@@ -53,7 +46,6 @@ namespace jule
             using type = typename std::decay<jule::Trait<Mask>::DynamicType<T>>::type;
             static jule::Trait<Mask>::Type table = {
                 .dealloc = type::dealloc,
-                .clone = type::clone,
             };
             return &table;
         }

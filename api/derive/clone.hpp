@@ -11,7 +11,6 @@
 #include "../ptr.hpp"
 #include "../slice.hpp"
 #include "../str.hpp"
-#include "../trait.hpp"
 #include "../types.hpp"
 
 namespace jule
@@ -35,8 +34,6 @@ namespace jule
     jule::Map<Key, Value> clone(const jule::Map<Key, Value> &m);
     template <typename T>
     jule::Ptr<T> clone(const jule::Ptr<T> &r);
-    template <typename Mask>
-    jule::Trait<Mask> clone(const jule::Trait<Mask> &t);
     template <typename T>
     jule::Fn<T> clone(const jule::Fn<T> &fn) noexcept;
     template <typename T>
@@ -92,17 +89,6 @@ namespace jule
         if (r == nullptr)
             return r;
         return jule::Ptr<T>::make(jule::clone(*r));
-    }
-
-    template <typename Mask>
-    jule::Trait<Mask> clone(const jule::Trait<Mask> &t) {
-        if (t == nullptr)
-            return t;
-        jule::Trait<Mask> clone;
-        clone.type = t.type;
-        clone.type_offset = t.type_offset;
-        clone.data = jule::Ptr<jule::Uintptr>::make(t.type->clone(t.data.alloc));
-        return clone;
     }
 
     template <typename T>

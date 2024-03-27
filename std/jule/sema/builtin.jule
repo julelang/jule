@@ -564,70 +564,27 @@ fn builtin_caller_clone(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Da
         ret nil
     }
 
-    let check_kind = fn(mut k: &TypeKind) {
+    if !d.kind.supports_cloning() {
         match {
-        | k.slc() != nil:
-            if !k.slc().elem.supports_cloning() {
-                unsafe {
-                    e.push_err(fc.args[0].token,
-                        LogMsg.InternalTypeNotSupportsClone, k.to_str())
-                }
+        | d.kind.slc() != nil
+        | d.kind.map() != nil
+        | d.kind.arr() != nil
+        | d.kind.sptr() != nil:
+            unsafe {
+                e.push_err(fc.args[0].token,
+                    LogMsg.InternalTypeNotSupportsClone, d.kind.to_str())
             }
-        | k.map() != nil:
-            let m = k.map()
-            if !m.key.supports_cloning() || !m.val.supports_cloning() {
-                unsafe {
-                    e.push_err(fc.args[0].token,
-                        LogMsg.InternalTypeNotSupportsClone, k.to_str())
-                }
-            }
-        | k.arr() != nil:
-            if !k.arr().elem.supports_cloning() {
-                unsafe {
-                    e.push_err(fc.args[0].token,
-                        LogMsg.InternalTypeNotSupportsClone, k.to_str())
-                }
-            }
-        | k.sptr() != nil:
-            if !k.sptr().elem.supports_cloning() {
-                unsafe {
-                    e.push_err(fc.args[0].token,
-                        LogMsg.InternalTypeNotSupportsClone, k.to_str())
-                }
-            }
-        | k.strct() != nil:
-            let s = d.kind.strct()
-            if !s.mutable {
-                unsafe {
-                    e.push_err(fc.args[0].token,
-                        LogMsg.CloneImmutStruct, d.kind.to_str())
-                }
-            }
-            if s.decl == nil ||
-                s.decl.cpp_linked ||
-                !s.decl.is_derives(Derive.Clone) {
-                unsafe {
-                    e.push_err(fc.args[0].token, LogMsg.TypeIsNotDerives,
-                        d.kind.to_str(), Derive.Clone)
-                }
-            }
-        |:
+        | d.kind.strct() != nil:
             unsafe {
                 e.push_err(fc.args[0].token, LogMsg.TypeIsNotDerives,
                     d.kind.to_str(), Derive.Clone)
             }
+        |:
+            unsafe {
+                e.push_err(fc.args[0].token, LogMsg.TypeNotSupportsClone,
+                    d.kind.to_str(), Derive.Clone)
+            }
         }
-    }
-
-    if d.kind.strct() != nil {
-        let mut s = d.kind.strct()
-        if s.decl != nil && !s.decl.is_derives(Derive.Clone) {
-            e.push_err(fc.args[0].token, LogMsg.TypeIsNotDerives,
-                d.kind.to_str(), Derive.Clone)
-        }
-    }
-    if !d.kind.supports_cloning() {
-        check_kind(d.kind)
     }
 
     d.mutable = true
