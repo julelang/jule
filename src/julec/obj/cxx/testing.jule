@@ -11,10 +11,17 @@ use std::jule::build::{
 use std::jule::sema::{
     ImportInfo,
     Package,
+    Fn,
     FnIns,
+    StructIns,
 }
 
 pub struct TestCoder {
+    t:          &StructIns
+    tm_reset:   &Fn
+    tm_failed:  &Fn
+    tm_skipped: &Fn
+
     oc: &ObjectCoder
 }
 
@@ -36,7 +43,8 @@ impl TestCoder {
 
     fn append_test(mut self, mut &obj: str, mut f: &FnIns) {
         obj += self.oc.indent()
-        obj += "_t->_method_reset();\n"
+        obj += self.call_tm_reset()
+        obj += ";\n"
         obj += self.oc.indent()
         obj += "std::cout << \">>> TEST RUNNING: \";\n"
         obj += self.oc.indent()
@@ -60,6 +68,40 @@ impl TestCoder {
         }
     }
 
+    fn ready_testing_package(mut self): bool {
+        let mut p = self.find_testing_package()
+        if p == nil {
+            // std::testing is not used.
+            // So, developers cannot write valid test functions.
+            ret false
+        }
+
+        self.t = p.find_struct("T", false).instances[0]
+
+        self.tm_reset = self.t.find_method("reset", false)
+        self.tm_failed = self.t.find_method("failed", false)
+        self.tm_skipped = self.t.find_method("skipped", false)
+        ret true
+    }
+
+    fn call_tm_reset(mut self): str {
+        let mut obj = IdentCoder.func(self.tm_reset)
+        obj += "(_t)"
+        ret obj
+    }
+    
+    fn call_tm_failed(mut self): str {
+        let mut obj = IdentCoder.func(self.tm_failed)
+        obj += "(_t)"
+        ret obj
+    }
+
+    fn call_tm_skipped(mut self): str {
+        let mut obj = IdentCoder.func(self.tm_skipped)
+        obj += "(_t)"
+        ret obj
+    }
+
     // Serialize tests and test point.
     // Appends to object code.
     pub fn serialize(mut self, mut &obj: str) {
@@ -67,24 +109,16 @@ impl TestCoder {
         self.oc.add_indent()
         obj += self.oc.indent()
 
-        let mut p = self.find_testing_package()
-        if p == nil {
-            // std::testing is not used.
-            // So, developers cannot write valid test function.
-            // Append empty test point and return.
+        if !self.ready_testing_package() {
             obj += "}"
             self.oc.done_indent()
             ret
         }
 
-        let mut t = p.find_struct("T", false).instances[0]
-
-        obj += TypeCoder.as_sptr(TypeCoder.structure_ins(t))
-        obj += " _t = jule::new_struct<"
-        obj += TypeCoder.structure_ins(t)
-        obj += ">(new(std::nothrow) "
-        obj += TypeCoder.structure_ins(t)
-        obj += "); _t.ref = nullptr;\n"
+        obj += TypeCoder.as_sptr(TypeCoder.structure_ins(self.t))
+        obj += " _t = jule::new_ptr<"
+        obj += TypeCoder.structure_ins(self.t)
+        obj += ">(); _t.ref = nullptr;\n"
 
         obj += self.oc.indent()
         obj += "jule::Uint total = 0, failed = 0, skipped = 0;\n"
@@ -95,9 +129,13 @@ impl TestCoder {
         obj += self.oc.indent()
         obj += "++total;\n"
         obj += self.oc.indent()
-        obj += "if (_t->_method_failed()) { ++failed; std::cout << \"    [*] FAILED\" << std::endl; }\n"
+        obj += "if ("
+        obj += self.call_tm_failed()
+        obj += ") { ++failed; std::cout << \"    [*] FAILED\" << std::endl; }\n"
         obj += self.oc.indent()
-        obj += "else if (_t->_method_skipped()) { ++skipped; std::cout << \"    [*] SKIPPED\" << std::endl; }\n"
+        obj += "else if ("
+        obj += self.call_tm_skipped()
+        obj += ") { ++skipped; std::cout << \"    [*] SKIPPED\" << std::endl; }\n"
         obj += self.oc.indent()
         obj += "else { std::cout << \"    [*] PASSED\" << std::endl; }\n"
         self.oc.done_indent()
