@@ -288,7 +288,7 @@ namespace jule
             if (src.operator!=(nullptr))
                 stream << src.type->to_str(src.data);
             else
-                stream << 0;
+                stream << "<nil>";
             return stream;
         }
     };

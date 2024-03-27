@@ -320,7 +320,7 @@ namespace jule
                                                const jule::Ptr<T> &ref) noexcept
         {
             if (ref == nullptr)
-                stream << "nil";
+                stream << "<nil>";
             else
                 stream << ref.alloc;
             return stream;

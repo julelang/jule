@@ -89,19 +89,19 @@ namespace jule
             return this->_addr;
         }
 
-        inline Fn<Function>& operator=(std::nullptr_t) noexcept
+        inline Fn<Function> &operator=(std::nullptr_t) noexcept
         {
             this->buffer = nullptr;
             return *this;
         }
 
-        inline Fn<Function>& operator=(const std::function<Function> &function)
+        inline Fn<Function> &operator=(const std::function<Function> &function)
         {
             this->buffer = function;
             return *this;
         }
 
-        inline Fn<Function>& operator=(const Function &function)
+        inline Fn<Function> &operator=(const Function &function)
         {
             this->buffer = function;
             return *this;
@@ -130,6 +130,8 @@ namespace jule
         friend std::ostream &operator<<(std::ostream &stream,
                                         const Fn<Function> &src) noexcept
         {
+            if (src == nullptr)
+                return (stream << "<nil>");
             return (stream << (void *)src._addr);
         }
     };

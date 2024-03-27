@@ -276,6 +276,8 @@ namespace jule
         friend inline std::ostream &operator<<(std::ostream &stream,
                                                const jule::Trait<Mask> &src) noexcept
         {
+            if (src == nullptr)
+                return stream << "<nil>";
             return stream << (void *)src.data.alloc;
         }
     };
