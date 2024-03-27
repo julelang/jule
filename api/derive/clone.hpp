@@ -35,10 +35,8 @@ namespace jule
     jule::Map<Key, Value> clone(const jule::Map<Key, Value> &m);
     template <typename T>
     jule::Ptr<T> clone(const jule::Ptr<T> &r);
-    template <typename T>
-    jule::Trait<T> clone(const jule::Trait<T> &t);
     template <typename Mask>
-    jule::Trait2<Mask> clone(const jule::Trait2<Mask> &t);
+    jule::Trait<Mask> clone(const jule::Trait<Mask> &t);
     template <typename T>
     jule::Fn<T> clone(const jule::Fn<T> &fn) noexcept;
     template <typename T>
@@ -96,19 +94,11 @@ namespace jule
         return jule::Ptr<T>::make(jule::clone(*r));
     }
 
-    template <typename T>
-    jule::Trait<T> clone(const jule::Trait<T> &t)
-    {
-        jule::Trait<T> t_clone = t;
-        t_clone.data = jule::clone(t_clone.data);
-        return t;
-    }
-
     template <typename Mask>
-    jule::Trait2<Mask> clone(const jule::Trait2<Mask> &t) {
+    jule::Trait<Mask> clone(const jule::Trait<Mask> &t) {
         if (t == nullptr)
             return t;
-        jule::Trait2<Mask> clone;
+        jule::Trait<Mask> clone;
         clone.type = t.type;
         clone.type_offset = t.type_offset;
         clone.data = jule::Ptr<jule::Uintptr>::make(t.type->clone(t.data.alloc));
