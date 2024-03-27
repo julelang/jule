@@ -476,6 +476,7 @@ impl ExprCoder {
         }
         self.push_call_inf(obj, m)
         let mut locinfo = false
+        let mut wrap_receiver = ""
         if !m.func.is_builtin() && m.func.decl.params.len > 0 && m.func.decl.params[0].is_self() {
             match type m.expr {
             | &StructSubIdentExprModel:
@@ -496,8 +497,15 @@ impl ExprCoder {
                     if ssie.expr.kind.strct() != nil {
                         // Add address taking operation for non-pointers.
                         obj += "&"
+                        if !ssie.expr.lvalue {
+                            wrap_receiver = self.model(ssie.expr)
+                        }
                     }
-                    obj += self.model(ssie.expr)
+                    if wrap_receiver != "" {
+                        obj += "_wrap_copy"
+                    } else {
+                        obj += self.model(ssie.expr)
+                    }
                 }
                 if m.args.len > 0 {
                     obj += ", "
@@ -519,6 +527,11 @@ impl ExprCoder {
             obj += "\""
         }
         obj += ")"
+
+        if wrap_receiver != "" {
+            obj = "({ auto _wrap_copy = " + wrap_receiver + "; " + obj
+            obj += "; })"
+        }
 
         if m.is_co {
             obj = "__JULE_CO(" + obj
