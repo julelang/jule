@@ -347,22 +347,13 @@ impl ExprCoder {
         ret obj
     }
 
-    fn alloc_structure_call(mut self, mut &s: &StructIns, &lit: str): str {
-        let mut obj = "jule::new_struct"
-        if s.decl.has_ref_accessible() {
-            obj += "_ptr"
-        }
-        obj += "<"
-        obj += IdentCoder.structure_ins(s)
+    fn alloc_structure(mut self, mut m: &AllocStructLitExprModel): str {
+        let mut obj = "jule::new_ptr<"
+        obj += IdentCoder.structure_ins(m.lit.strct)
         obj += ">("
-        obj += lit
+        obj += self.structure_lit(m.lit)
         obj += ")"
         ret obj
-    }
-
-    fn alloc_structure(mut self, mut m: &AllocStructLitExprModel): str {
-        let lit = "new (std::nothrow)" + self.structure_lit(m.lit)
-        ret self.alloc_structure_call(m.lit.strct, lit)
     }
 
     fn casting(mut self, mut m: &CastingExprModel): str {
@@ -400,6 +391,13 @@ impl ExprCoder {
                 obj += self.oc.loc_info(m.token)
                 obj += "\")"
             }
+        | m.kind.trt() != nil:
+            obj += TypeCoder.kind(m.kind)
+            obj += "("
+            obj += self.expr(m.expr)
+            obj += ", "
+            obj += conv::itoa(self.oc.find_type_offset(m.kind.trt(), m.expr_kind))
+            obj += ")"
         |:
             obj += "static_cast<"
             obj += TypeCoder.kind(m.kind)
@@ -427,9 +425,13 @@ impl ExprCoder {
         match type expr {
         | &FnIns:
             ret self.func_ins((&FnIns)(expr))
-        |:
-            ret self.model(expr)
+        | &StructSubIdentExprModel:
+            let mut ssie = (&StructSubIdentExprModel)(expr)
+            if ssie.method != nil {
+                ret self.func_ins(ssie.method)
+            }
         }
+        ret self.model(expr)
     }
 
     fn push_call_inf(mut self, mut &obj: str, &m: &FnCallExprModel) {
@@ -473,7 +475,49 @@ impl ExprCoder {
             }
         }
         self.push_call_inf(obj, m)
+        let mut locinfo = false
+        if !m.func.is_builtin() && m.func.decl.params.len > 0 && m.func.decl.params[0].is_self() {
+            match type m.expr {
+            | &StructSubIdentExprModel:
+                let mut ssie = (&StructSubIdentExprModel)(m.expr)
+                match {
+                | m.func.decl.params[0].is_ref():
+                    obj += self.model(ssie.expr)
+                | ssie.expr_kind.sptr() != nil:
+                    obj += self.model(ssie.expr)
+                    obj += ".ptr("
+                    if !env::PRODUCTION {
+                        obj += "\""
+                        obj += self.oc.loc_info(m.token)
+                        obj += "\""
+                    }
+                    obj += ")"
+                |:
+                    if ssie.expr.kind.strct() != nil {
+                        // Add address taking operation for non-pointers.
+                        obj += "&"
+                    }
+                    obj += self.model(ssie.expr)
+                }
+                if m.args.len > 0 {
+                    obj += ", "
+                }
+            | &TraitSubIdentExprModel:
+                obj += self.model((&TraitSubIdentExprModel)(m.expr).expr)
+                if !env::PRODUCTION {
+                    locinfo = true
+                }
+                if m.args.len > 0 {
+                    obj += ", "
+                }
+            }
+        }
         obj += self.args(m.args)
+        if locinfo {
+            obj += ", \""
+            obj += self.oc.loc_info(m.token)
+            obj += "\""
+        }
         obj += ")"
 
         if m.is_co {
@@ -637,25 +681,32 @@ impl ExprCoder {
     }
 
     fn trait_sub(mut self, mut m: &TraitSubIdentExprModel): str {
-        let mut obj = self.model(m.expr)
-        obj += ".get("
-        if !env::PRODUCTION {
-            obj += "\""
-            obj += self.oc.loc_info(m.token)
-            obj += "\""
-        }
-        obj += ")._method_"
-        obj += m.ident
+        let mut obj = IdentCoder.trait_decl(m.trt)
+        obj += "_mptr_data"
+        obj += "[("
+        obj += self.model(m.expr)
+        obj += ").type_offset]."
+        obj += IdentCoder.func(m.method)
         ret obj
     }
 
     fn structure_sub(mut self, mut m: &StructSubIdentExprModel): str {
         let mut obj = self.model(m.expr)
-        obj += "."
         if m.field != nil {
+            if m.expr_kind.ptr() != nil {
+                obj += "->"
+            } else if m.expr_kind.sptr() != nil {
+                obj += ".get("
+                if !env::PRODUCTION {
+                    obj += "\""
+                    obj += self.oc.loc_info(m.token)
+                    obj += "\""
+                }
+                obj += ")."
+            } else {
+                obj += "."
+            }
             obj += IdentCoder.field(m.field.decl)
-        } else {
-            obj += IdentCoder.func_ins(m.method)
         }
         ret obj
     }
@@ -666,7 +717,20 @@ impl ExprCoder {
 
     fn common_sub(mut self, mut m: &CommonSubIdentExprModel): str {
         let mut obj = self.model(m.expr)
-        obj += "."
+        match {
+        | m.expr_kind.ptr() != nil:
+            obj += "->"
+        | m.expr_kind.sptr() != nil:
+            obj += ".get("
+            if !env::PRODUCTION {
+                obj += "\n"
+                obj += self.oc.loc_info(m.token)
+                obj += "\n"
+            }
+            obj += ")."
+        |:
+            obj += "."
+        }
         obj += m.ident
         ret obj
     }
@@ -728,19 +792,6 @@ impl ExprCoder {
     }
 
     fn new_call(mut self, mut m: &BuiltinNewCallExprModel): str {
-        if m.kind.strct() != nil {
-            let mut s = m.kind.strct()
-            let mut lit = "new (std::nothrow) "
-           lit += TypeCoder.structure_ins(s)
-            if m.init != nil {
-                lit += "{"
-                lit += self.expr(m.init)
-                lit += "}"
-            } else {
-                lit += "()"
-            }
-            ret self.alloc_structure_call(s, lit)
-        }
         let mut obj = "jule::new_ptr<"
         obj += TypeCoder.kind(m.kind)
         obj += ">("
@@ -895,10 +946,7 @@ impl ExprCoder {
     }
 
     fn structure_static(self, mut m: &StructStaticIdentExprModel): str {
-        let mut obj = IdentCoder.structure_ins(m.structure)
-        obj += "::"
-        obj += IdentCoder.func_ins(m.method)
-        ret obj
+        ret IdentCoder.func_ins(m.method)
     }
 
     fn integrated_to_str(mut self, mut m: &IntegratedToStrExprModel): str {

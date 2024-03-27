@@ -22,6 +22,7 @@ use std::jule::sema::{
     ParamIns,
     Fn,
     Param,
+    Kind,
 }
 use types for std::jule::types
 
@@ -40,18 +41,33 @@ fn has_directive(&directives: []&ast::Directive, tag: str): bool {
     ret find_directive(unsafe { *(&directives) }, tag) != nil
 }
 
+struct CustomType {
+    kind: str
+}
+
+impl Kind for CustomType {
+    pub fn to_str(self): str {
+        ret self.kind
+    }
+
+    pub fn equals(&self, k: &TypeKind): bool {
+        ret false
+    }
+}
+
 struct TypeCoder {}
 
 impl TypeCoder {
-    const Str   = "jule::Str"
-    const Map   = "jule::Map"
-    const Ptr   = "jule::Ptr"
-    const Sptr  = "jule::Sptr"
-    const Slice = "jule::Slice"
-    const Trait = "jule::Trait"
-    const Array = "jule::Array"
-    const Fn    = "jule::Fn"
-    const Bool  = "jule::Bool"
+    const Str     = "jule::Str"
+    const Map     = "jule::Map"
+    const Ptr     = "jule::Ptr"
+    const Sptr    = "jule::Sptr"
+    const Slice   = "jule::Slice"
+    const Trait   = "jule::Trait2"
+    const Array   = "jule::Array"
+    const Fn      = "jule::Fn"
+    const Bool    = "jule::Bool"
+    const Uintptr = "jule::Uintptr"
 
     // Returns given identifier as Jule type identifier.
     static fn to_type(mut id: str): str {
@@ -85,6 +101,11 @@ impl TypeCoder {
         obj += elem
         obj += ">"
         ret obj
+    }
+
+    // Returns C++ code of pointer type with element type.
+    static fn as_ptr(elem: str): str {
+        ret elem + "*"
     }
 
     // Generates C++ code of smart pointer TypeKind.
@@ -194,6 +215,9 @@ impl TypeCoder {
         } else {
             obj += TypeCoder.kind(p.kind.kind)
         }
+        if p.reference {
+            obj += "&"
+        }
         ret obj
     }
 
@@ -295,6 +319,10 @@ impl TypeCoder {
             ret TypeCoder.array(k.arr())
         | k.fnc() != nil:
             ret TypeCoder.func(k.fnc())
+        }
+        match type k.kind {
+        | &CustomType:
+            ret (&CustomType)(k.kind).kind
         |:
             ret "[<unimplemented_type_kind>]"
         }

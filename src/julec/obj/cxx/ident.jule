@@ -24,6 +24,8 @@ const INIT_CALLER_IDENT = "__jule_call_initializers"
 struct IdentCoder {}
 
 impl IdentCoder {
+    const Self = "_self_"
+
     // Returns specified identifer as JuleC identifer.
     // Equavalents: "JULEC_ID(" + ident + ")" of JuleC API.
     static fn to_ident(ident: str): str {
@@ -72,10 +74,12 @@ impl IdentCoder {
         | f.ident == ENTRY_POINT:
             ret "entry_point"
         | f.is_method():
+            let mut obj = IdentCoder.to_out(f.ident, uintptr(f))
             if f.statically {
-                ret "_static_method_" + f.ident
+                obj = "static_" + obj
+                ret obj
             }
-            ret "_method_" + f.ident
+            ret obj
         |:
             ret IdentCoder.to_out(f.ident, uintptr(f))
         }
@@ -112,6 +116,9 @@ impl IdentCoder {
     static fn param(&p: &Param): str {
         if is_anon_ident(p.ident) || is_ignore_ident(p.ident) {
             ret ""
+        }
+        if p.is_self() {
+            ret IdentCoder.Self
         }
         ret IdentCoder.to_local(p.token.row, p.token.column, p.ident)
     }
@@ -159,10 +166,10 @@ impl IdentCoder {
         | v.ident == TokenKind.Error:
             ret "except.error"
         | v.ident == TokenKind.Self:
-            if v.kind.kind.sptr() != nil {
-                ret "this->self"
+            if v.kind.kind.sptr() == nil {
+                ret "(*" + IdentCoder.Self + ")"
             }
-            ret "(*this)"
+            ret IdentCoder.Self
         | v.scope != nil:
             ret IdentCoder.to_local(v.token.row, v.token.column, v.ident)
         |:

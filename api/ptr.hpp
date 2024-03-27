@@ -224,6 +224,19 @@ namespace jule
             return *this->alloc;
         }
 
+        template <typename T2>
+        jule::Ptr<T2> as(void) const noexcept
+        {
+            jule::Ptr<T2> ptr;
+            ptr.ref = this->ref;
+#ifndef __JULE_DISABLE__REFERENCE_COUNTING
+            if (this->ref)
+                this->add_ref();
+#endif
+            ptr.alloc = reinterpret_cast<T2 *>(this->alloc);
+            return ptr;
+        }
+
         inline T *operator->(void) const noexcept
         {
             return this->ptr(
@@ -272,7 +285,7 @@ namespace jule
             }
         }
 
-        Ptr& operator=(const jule::Ptr<T> &src) noexcept
+        Ptr &operator=(const jule::Ptr<T> &src) noexcept
         {
             // Assignment to itself.
             if (this->alloc != nullptr && this->alloc == src.alloc)

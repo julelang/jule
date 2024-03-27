@@ -2030,16 +2030,19 @@ impl Eval {
             lvalue:  false,
             decl:    false,
             mutable: false,
-            kind:    &TypeKind{kind: f.instance()},
+            kind:    &TypeKind{
+                kind: f.instance(),
+            },
             model:   &TraitSubIdentExprModel{
-                token: ident,
-                expr:  d.model,
-                ident: ident.kind,
+                token:  ident,
+                expr:   d.model,
+                method: f,
+                trt:    trt,
             },
         }
     }
 
-    fn eval_struct_sub_ident(mut self, mut d: &Data, mut s: &StructIns, si: &SubIdentExpr, ref: bool): &Data {
+    fn eval_struct_sub_ident(mut self, mut d: &Data, mut s: &StructIns, mut si: &SubIdentExpr, ref: bool): &Data {
         let mut f = s.find_field(si.ident.kind)
         if f != nil {
             if !self.s.is_accessible_define(f.decl.public, f.decl.token) {
@@ -2048,8 +2051,9 @@ impl Eval {
             }
 
             let mut model = &StructSubIdentExprModel{
+                token:     si.ident,
                 expr_kind: d.kind,
-                expr:      d.model,
+                expr:      new(Data, *d),
                 field:     f,
             }
             d.model = model
@@ -2088,22 +2092,25 @@ impl Eval {
         let mut ins = m.instance()
         ins.owner = s
         self.push_reference_to_fn(ins)
+        let mut model = new(Data, *d)
         d.model = &StructSubIdentExprModel{
+            token:     si.ident,
             expr_kind: d.kind,
-            expr:      d.model,
+            expr:      model,
             method:    ins,
         }
         d.kind = &TypeKind{kind: ins}
         ret d
     }
 
-    fn eval_slice_sub_ident(mut self, mut d: &Data, ident: Token): &Data {
+    fn eval_slice_sub_ident(mut self, mut d: &Data, mut ident: Token): &Data {
         match ident.kind {
         | "len":
             ret &Data{
                 mutable: false,
                 kind:    &TypeKind{kind: build_prim_type(PrimKind.Int)},
                 model:   &CommonSubIdentExprModel{
+                    token:     ident,
                     expr_kind: d.kind,
                     expr:      d.model,
                     ident:     "len()",
@@ -2114,6 +2121,7 @@ impl Eval {
                 mutable: false,
                 kind:    &TypeKind{kind: build_prim_type(PrimKind.Int)},
                 model:   &CommonSubIdentExprModel{
+                    token:     ident,
                     expr_kind: d.kind,
                     expr:      d.model,
                     ident:     "cap()",
@@ -2142,6 +2150,7 @@ impl Eval {
                     },
                 },
                 model: &CommonSubIdentExprModel{
+                    token:     ident,
                     expr_kind: d.kind,
                     expr:      d.model,
                     ident:     "swap",
@@ -2154,7 +2163,7 @@ impl Eval {
         }
     }
 
-    fn eval_array_sub_ident(mut self, mut d: &Data, ident: Token): &Data {
+    fn eval_array_sub_ident(mut self, mut d: &Data, mut ident: Token): &Data {
         match ident.kind {
         | "len":
             let mut c = Const.new_i64(i64(d.kind.arr().n))
@@ -2187,6 +2196,7 @@ impl Eval {
                     },
                 },
                 model: &CommonSubIdentExprModel{
+                    token:     ident,
                     expr_kind: d.kind,
                     expr:      d.model,
                     ident:     "swap",
@@ -2199,7 +2209,7 @@ impl Eval {
         }
     }
 
-    fn eval_map_sub_ident(mut self, mut d: &Data, ident: Token): &Data {
+    fn eval_map_sub_ident(mut self, mut d: &Data, mut ident: Token): &Data {
         let mut map_kind = d.kind.map()
 
         match ident.kind {
@@ -2208,6 +2218,7 @@ impl Eval {
                 mutable: false,
                 kind:    &TypeKind{kind: build_prim_type(PrimKind.Int)},
                 model: &CommonSubIdentExprModel{
+                    token:     ident,
                     expr_kind: d.kind,
                     expr:      d.model,
                     ident:     "len()",
@@ -2222,6 +2233,7 @@ impl Eval {
                     },
                 },
                 model: &CommonSubIdentExprModel{
+                    token:     ident,
                     expr_kind: d.kind,
                     expr:      d.model,
                     ident:     "clear",
@@ -2241,6 +2253,7 @@ impl Eval {
                     },
                 },
                 model: &CommonSubIdentExprModel{
+                    token:     ident,
                     expr_kind: d.kind,
                     expr:      d.model,
                     ident:     "keys",
@@ -2260,6 +2273,7 @@ impl Eval {
                     },
                 },
                 model: &CommonSubIdentExprModel{
+                    token:     ident,
                     expr_kind: d.kind,
                     expr:      d.model,
                     ident:     "values",
@@ -2283,6 +2297,7 @@ impl Eval {
                     },
                 },
                 model: &CommonSubIdentExprModel{
+                    token:     ident,
                     expr_kind: d.kind,
                     expr:      d.model,
                     ident:     "has",
@@ -2305,6 +2320,7 @@ impl Eval {
                     },
                 },
                 model: &CommonSubIdentExprModel{
+                    token:     ident,
                     expr_kind: d.kind,
                     expr:      d.model,
                     ident:     "del",
@@ -2316,7 +2332,7 @@ impl Eval {
         }
     }
 
-    fn eval_str_sub_ident(mut self, mut d: &Data, ident: Token): &Data {
+    fn eval_str_sub_ident(mut self, mut d: &Data, mut ident: Token): &Data {
         let mut str_kind = &TypeKind{kind: build_prim_type(PrimKind.Str)}
         match ident.kind {
         | "len":
@@ -2328,6 +2344,7 @@ impl Eval {
                 sd.model = sd.constant
             } else {
                 sd.model = &CommonSubIdentExprModel{
+                    token:     ident,
                     expr_kind: d.kind,
                     expr:      d.model,
                     ident:     "len()",
@@ -2679,36 +2696,18 @@ impl Eval {
         }
 
         let mut kind = d.kind
-        if d.kind.ptr() != nil {
+        match {
+        | d.kind.ptr() != nil:
             let ptr = d.kind.ptr()
-            if !ptr.is_unsafe() {
-                if !si.is_self && !self.is_unsafe() {
-                    self.push_err(si.ident, LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
-                }
-                kind = d.kind.ptr().elem
-                let mut model = new(Data, *d)
-
-                // Append dereferencing model for pointer.
-                let mut token = si.ident
-                token.id = TokenId.Op
-                token.kind = TokenKind.Star
-                d.model = &UnaryExprModel{
-                   expr: model,
-                   op:   token,
-                }
+            if ptr.is_unsafe() {
+                break
             }
-        } else if d.kind.sptr() != nil {
+            if !si.is_self && !self.is_unsafe() {
+                self.push_err(si.ident, LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
+            }
+            kind = d.kind.ptr().elem
+        | d.kind.sptr() != nil:
             kind = d.kind.sptr().elem
-
-            // Append dereferencing model for pointer.
-            let mut model = new(Data, *d)
-            let mut token = si.ident
-            token.id = TokenId.Op
-            token.kind = TokenKind.Star
-            d.model = &UnaryExprModel{
-               expr: model,
-               op:   token,
-            }
         }
 
         match {

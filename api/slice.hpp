@@ -210,8 +210,8 @@ namespace jule
                 *(this->_slice + i) = def;
         }
 
-        using Iterator = Item*;
-        using ConstIterator = const Item*;
+        using Iterator = Item *;
+        using ConstIterator = const Item *;
 
         constexpr Iterator begin(void) noexcept
         {
@@ -323,10 +323,7 @@ namespace jule
             {
                 jule::Slice<Item> _new;
                 _new.alloc_new(this->_len + 1, (this->_len + 1) << 1);
-                std::move(
-                    this->_slice,
-                    this->_slice + this->_len,
-                    _new._slice);
+                std::move(this->_slice, this->_slice + this->_len, _new._slice);
                 *(_new._slice + this->_len) = item;
 
                 this->operator=(_new);
@@ -441,7 +438,7 @@ namespace jule
                 index);
         }
 
-        Slice& operator=(const jule::Slice<Item> &src) noexcept
+        Slice &operator=(const jule::Slice<Item> &src) noexcept
         {
             // Assignment to itself.
             if (this->data.alloc != nullptr && this->data.alloc == src.data.alloc)
@@ -457,7 +454,7 @@ namespace jule
             return *this;
         }
 
-        inline Slice& operator=(const std::nullptr_t) noexcept
+        inline Slice &operator=(const std::nullptr_t) noexcept
         {
             this->dealloc();
             return *this;
