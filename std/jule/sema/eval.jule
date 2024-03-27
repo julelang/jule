@@ -1815,6 +1815,22 @@ impl Eval {
             ret
         }
 
+        if f.decl.is_method() && !f.decl.statically && !f.decl.params[0].is_ref() {
+            match type d.model {
+            | &Var:
+            | &TraitSubIdentExprModel:
+                goto end
+            | &StructSubIdentExprModel:
+                let mut ssie = (&StructSubIdentExprModel)(d.model)
+                if ssie.expr.lvalue || ssie.expr.kind.strct() == nil {
+                    goto end
+                }
+            }
+            self.push_err(fc.token, LogMsg.ReceiverRequiredLvalue)
+            self.push_suggestion(LogMsg.UseVariableForReceiver)
+        end:
+        }
+
         if !d.mutable && f.decl.is_method() && !f.decl.statically && f.decl.params[0].mutable {
             self.push_err(fc.token, LogMsg.MutOperationOnImmut)
         } else if !self.is_unsafe() && f.decl.unsafety {
@@ -2375,7 +2391,6 @@ impl Eval {
                 model:    c,
                 kind:     &TypeKind{kind: build_prim_type(kind)},
             }
-
         |:
             self.push_err(ident, LogMsg.TypeHaveNotIdent, kind, ident.kind)
             ret nil
