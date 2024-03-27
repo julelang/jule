@@ -297,7 +297,7 @@ impl AssignTypeChecker {
         ret self.dest.prim() != nil && self.d.kind.prim() != nil
     }
 
-    fn check(mut self): bool {
+    fn check_compatibility(mut self): bool {
         match {
         | self.d == nil:
             // Skip Data is nil.
@@ -328,6 +328,14 @@ impl AssignTypeChecker {
             }
         }
         ret self.s.check_type_compatibility(self.dest, self.d.kind, self.error_token)
+    }
+
+    fn check(mut self): bool {
+        let ok = self.check_compatibility()
+        if ok {
+            apply_implicit_cast(self.dest, self.d)
+        }
+        ret ok
     }
 }
 
@@ -665,8 +673,8 @@ impl FnCallArgChecker {
                 break
             }
 
-            model.elems = append(model.elems, d.model)
             ok = ok && self.check_arg(p, d, arg.token)
+            model.elems = append(model.elems, d.model)
         }
         self.e.prefix = old
 
@@ -757,16 +765,16 @@ impl StructLitChecker {
     }
 
     fn push_match(mut self, mut &f: &FieldIns, mut &d: &Data, mut &error_token: Token) {
-        self.args = append(self.args, &StructArgExprModel{
-            field: f,
-            expr:  d.model,
-        })
         const REFERENCE = false
         if self.e.s.check_validity_for_init_expr(!self.e.immutable, REFERENCE, f.kind, d, error_token) {
             // Check type if validity is good.
             // Helps to reduce error logs and duplicated logs.
             _ = self.e.s.check_assign_type(false, f.kind, d, error_token)
         }
+        self.args = append(self.args, &StructArgExprModel{
+            field: f,
+            expr:  d.model,
+        })
     }
 
     fn check_pair(mut self, mut &pair: &FieldExprPair, mut &exprs: []&Expr) {

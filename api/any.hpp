@@ -13,18 +13,12 @@
 #include <ostream>
 
 #include "str.hpp"
-#include "builtin.hpp"
-#include "ptr.hpp"
 
 namespace jule
 {
-
-    // Built-in any type.
-    class Any;
-
     class Any
     {
-    private:
+    public:
         template <typename T>
         struct DynamicType
         {
@@ -135,7 +129,7 @@ namespace jule
         template <typename T>
         void __assign(const T &expr) noexcept
         {
-            T *alloc = new (std::nothrow) T;
+            auto alloc = new (std::nothrow) T;
             if (!alloc)
                 jule::panic(__JULE_ERROR__MEMORY_ALLOCATION_FAILED
                             "\nruntime: memory allocation failed for heap data of type any");
@@ -149,7 +143,6 @@ namespace jule
         {
             if (this->data)
                 this->type->dealloc(this->data);
-
             this->type = nullptr;
             this->data = nullptr;
         }
@@ -167,7 +160,7 @@ namespace jule
         }
 
         template <typename T>
-        Any& operator=(const T &expr) noexcept
+        Any &operator=(const T &expr) noexcept
         {
             jule::Any::Type *type = jule::Any::new_type<T>();
             if (this->type != nullptr && this->type == type)
@@ -181,7 +174,7 @@ namespace jule
             return *this;
         }
 
-        Any& operator=(const jule::Any &src) noexcept
+        Any &operator=(const jule::Any &src) noexcept
         {
             // Assignment to itself.
             if (this->data != nullptr && this->data == src.data)
@@ -192,7 +185,7 @@ namespace jule
             return *this;
         }
 
-        inline Any& operator=(const std::nullptr_t) noexcept
+        inline Any &operator=(const std::nullptr_t) noexcept
         {
             this->dealloc();
             return *this;

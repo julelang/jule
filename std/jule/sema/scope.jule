@@ -1223,17 +1223,15 @@ impl ScopeChecker {
             ret
         }
 
-        self.scope.stmts = append(self.scope.stmts, &Assign{
-            l:  &OperandExprModel{
-                kind: l.kind,
-                model: l.model,
-            },
-            r:  &OperandExprModel{
-                kind: r.kind,
-                model: r.model,
-            },
-            op: a.setter,
-        })
+        let mut lm = &OperandExprModel{
+            kind: l.kind,
+            model: l.model,
+        }
+        let mut rm = &OperandExprModel{
+            kind: r.kind,
+            model: r.model,
+        }
+        self.scope.stmts = append(self.scope.stmts, &Assign{l: lm, r: rm, op: a.setter})
 
         if a.setter.kind != TokenKind.Eq {
             let mut strct = l.kind.strct()
@@ -1258,7 +1256,10 @@ impl ScopeChecker {
             d:           r,
             error_token: a.setter,
         }
-        checker.check()
+        if checker.check() {
+            rm.model = r.model
+            lm.model = l.model
+        }
     }
 
     fn __process_end_part_of_multi_assign(mut self, mut st: &MultiAssign,
@@ -1560,11 +1561,13 @@ impl ScopeChecker {
             for (_, mut c) in tm.cases {
                 if c.scope != nil {
                     self.check_comptime_panic(c.scope)
-                    self.scope.stmts = append(self.scope.stmts, c.scope)
-                    ret
+                    tm.default = c
+                    tm.cases = nil
+                    goto push
                 }
             }
             if m.default != nil {
+                tm.cases = nil
                 tm.default = self.check_default(tm, m.default)
                 if tm.default != nil {
                     self.check_comptime_panic(tm.default.scope)
@@ -1572,6 +1575,7 @@ impl ScopeChecker {
             }
             ret
         }
+    push:
         self.scope.stmts = append(self.scope.stmts, tm)
     }
 

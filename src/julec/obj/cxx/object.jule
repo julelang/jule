@@ -35,6 +35,10 @@ use std::jule::sema::{
     StructIns,
     Fn,
     FnIns,
+    TypeKind,
+    Prim,
+    Sptr,
+    TypeSymbol,
 }
 use path for std::fs::path
 use strings for std::strings
@@ -45,12 +49,24 @@ pub struct SerializationInfo {
     pub compiler_command: str
 }
 
+struct TraitHash {
+    t: &Trait
+    s: &StructIns
+    i: int
+}
+
 pub struct ObjectCoder {
     ir:   &IR
     info: SerializationInfo
 
     // Current indention.
     indent_buffer: str
+
+    trait_declarations: str
+    trait_wrappers:     str
+    trait_data:         str
+    trait_data_t:       str
+    trait_map:          []&TraitHash
 
     ec: &ExprCoder
     sc: &ScopeCoder
@@ -81,6 +97,23 @@ impl ObjectCoder {
     // Returns indention string by indent_buffer.
     fn indent(self): str {
         ret self.indent_buffer
+    }
+
+    fn find_type_offset(self, t: &Trait, mut k: &TypeKind): int {
+        let mut s: &StructIns = nil
+        if k.sptr() != nil {
+            k = k.sptr().elem
+        }
+        if k.strct() == nil {
+            ret -1
+        }
+        s = k.strct()
+        for _, hash in self.trait_map {
+            if hash.t == t && hash.s == s {
+                ret hash.i
+            }
+        }
+        ret -1
     }
 
     // Returns location information of token as cstr bytes.
@@ -154,17 +187,19 @@ impl ObjectCoder {
 
     // Generates C++ code of parameters.
     fn params(mut self, mut &params: []&Param): str {
-        match {
-        | params.len == 0:
-            ret "(void)"
-        | params.len == 1 && params[0].is_self():
+        if params.len == 0 {
             ret "(void)"
         }
         let mut obj = "("
         for (_, mut p) in params {
-            if !p.is_self() {
-                obj += self.param(p) + ","
+            if p.is_self() {
+                if p.is_ref() {
+                    obj += self.param(p)
+                }
+            } else {
+                obj += self.param(p)
             }
+            obj += ","
         }
 
         // Remove comma.
@@ -176,15 +211,12 @@ impl ObjectCoder {
         match {
         | params.len == 0:
             ret "(void)"
-        | params.len == 1 && params[0].decl.is_self():
-            ret "(void)"
         }
 
         let mut obj = "("
         for (_, mut p) in params {
-            if !p.decl.is_self() {
-                obj += self.param_ins(p) + ","
-            }
+            obj += self.param_ins(p)
+            obj += ","
         }
 
         // Remove comma.
@@ -194,19 +226,14 @@ impl ObjectCoder {
 
     // Generates C++ declaration code of parameters.
     fn params_decls(mut self, mut &params: []&ParamIns): str {
-        match {
-        | params.len == 0:
-            ret "(void)"
-        | params.len == 1 && params[0].decl.is_self():
+        if params.len == 0 {
             ret "(void)"
         }
 
         let mut obj = "("
         for (_, mut p) in params {
-            if !p.decl.is_self() {
-                obj += TypeCoder.param_ins(p)
-                obj += ","
-            }
+            obj += TypeCoder.param_ins(p)
+            obj += ","
         }
 
         // Remove comma.
@@ -214,86 +241,183 @@ impl ObjectCoder {
         ret obj + ")"
     }
 
-    // Generates C++ code of trait.
-    fn trait_def(mut self, mut &t: &Trait): str {
-        const INDENTION = "\t"
-        let outid = IdentCoder.trait_decl(t)
-
-        let mut obj = "struct "
-        obj += outid
-        obj += " {\n"
-        obj += INDENTION
-        obj += "virtual ~"
-        obj += outid
-        obj += "(void) {}\n\n"
-        for (_, mut f) in t.methods {
-            obj += INDENTION
-            obj += "virtual "
-            obj += TypeCoder.func_result(f)
-            obj += " _method_"
-            obj += f.ident
-            obj += self.params(f.params)
-            obj += " {"
-            if !f.is_void() {
-                obj += " return {}; "
-            }
-            obj += "}\n"
-        }
-        obj += "};"
-        ret obj
-    }
-
-    // Generates C++ code of SymbolTable's all traits.
-    fn traits_tbl(mut self, mut &tbl: &SymbolTable): str {
-        let mut obj = ""
-        for (_, mut t) in tbl.traits {
-            obj += self.trait_def(t)
-            obj += "\n\n"
-        }
-        ret obj
-    }
-
-    // Generates C++ code of package's all traits.
-    fn traits_pkg(mut self, mut &pkg: &Package): str {
-        let mut obj = ""
-        for (_, mut tbl) in pkg.files {
-            obj += self.traits_tbl(tbl)
-        }
-        ret obj
-    }
-
-    // Generates C++ code of all traits.
-    fn traits(mut self): str {
-        let mut obj = ""
-        for (_, mut u) in self.ir.used {
-            if !u.cpp_linked {
-                obj += self.traits_pkg(u.package)
-            }
-        }
-        obj += self.traits_pkg(self.ir.main)
-        ret obj
-    }
-
-    // Generates C++ declaration code of trait.
-    fn trait_decl(mut self, &t: &Trait): str {
-        let mut obj = "struct "
-        obj += IdentCoder.trait_decl(t)
-        obj += ";"
-        ret obj
-    }
-
-    // Generates C++ declaration code of all traits.
-    fn trait_decls(mut self, mut &p: &Package): str {
-        let mut obj = ""
-        for (_, mut f) in p.files {
-            for _, t in f.traits {
-                if t.token.id != TokenId.Na {
-                    obj += self.trait_decl(t)
-                    obj += "\n"
+    fn prepare_structure(mut self, mut &s: &Struct) {
+        for (_, mut ins) in s.instances {
+            for (_, mut m) in ins.methods {
+                if m.statically {
+                    continue
+                }
+                for (_, mut ins) in m.instances {
+                    let mut p = ins.params[0]
+                    if !p.decl.is_ref() {
+                        p.kind = &TypeKind{
+                            kind: &CustomType{
+                                kind: TypeCoder.as_ptr(TypeCoder.kind(p.kind)),
+                            }
+                        }
+                    } else {
+                        p.kind = &TypeKind{
+                            kind: &CustomType{
+                                kind: TypeCoder.kind(p.kind),
+                            }
+                        }
+                    }
                 }
             }
         }
-        ret obj
+    }
+
+    fn prepare_structures(mut self) {
+        for (_, mut s) in self.ir.ordered.structs {
+            if !s.cpp_linked && s.token.id != TokenId.Na {
+                self.prepare_structure(s)
+            }
+        }
+    }
+
+    fn build_trait_wrapper(mut self, mut &hash: &TraitHash) {
+        for (_, mut m) in hash.t.methods {
+            let ident = m.ident
+            m.instances[0].scope = nil
+            let ptr = !m.params[0].is_ref()
+
+            let mut sm = hash.s.find_method(m.ident, false)
+            if sm == nil || sm.instances.len == 0 {
+                continue
+            }
+
+            m.ident = ident + "_" + conv::itoa(hash.i)
+            self.trait_wrappers += self.func(m)
+            m.ident = ident
+            self.add_indent()
+            self.trait_wrappers += "{\n"
+            self.trait_wrappers += self.indent()
+            if !sm.is_void() {
+                self.trait_wrappers += "return "
+            }
+            self.trait_wrappers += IdentCoder.func(sm)
+            self.trait_wrappers += "("
+            if ptr {
+                self.trait_wrappers += "_self_.safe_ptr<"
+                self.trait_wrappers += TypeCoder.structure_ins(hash.s)
+                self.trait_wrappers += ">("
+                if !env::PRODUCTION {
+                    self.trait_wrappers += "_00___file"
+                }
+                self.trait_wrappers += ")"
+            } else {
+                self.trait_wrappers += "_self_.data.as<"
+                self.trait_wrappers += TypeCoder.structure(sm.owner)
+                self.trait_wrappers += ">()"
+            }
+            for _, mp in m.params[1:] {
+                self.trait_wrappers += ", "
+                self.trait_wrappers += IdentCoder.param(mp)
+            }
+            self.trait_wrappers += ");\n}\n"
+            self.done_indent()
+        }
+    }
+
+    fn trait_decl(mut self, mut &t: &Trait) {
+        let ident = IdentCoder.trait_decl(t)
+
+        let type_data = ident + "MptrData"
+        self.trait_data_t += "struct "
+        self.trait_data_t += type_data
+        self.trait_data_t += " {\n"
+
+        for (_, mut m) in t.methods {
+            let mut ins = m.instances[0]
+            let mut p = ins.params[0]
+            p.kind = &TypeKind{
+                kind: t,
+            }
+            for (i, mut ip) in ins.params[1:] {
+                if is_anon_ident(ip.decl.ident) {
+                    ip.decl.ident = "_" + conv::itoa(i)
+                }
+            }
+            if !env::PRODUCTION {
+                ins.params = append(ins.params, &ParamIns{
+                    decl: &Param{
+                        ident: "__file",
+                    },
+                    kind: &TypeKind{
+                        kind: &CustomType{
+                            kind: "const char*",
+                        },
+                    }
+                })
+            }
+
+            self.add_indent()
+            self.trait_data_t += self.func_decl(m, true)
+            self.done_indent()
+        }
+        self.trait_data_t += self.indent()
+        self.trait_data_t += "};"
+        self.trait_data_t += "\n\n"
+
+        let n = self.trait_map.len
+        let mut i = 0
+        for (_, mut s) in t.implemented {
+            for (_, mut ins) in s.instances {
+                let mut hash = &TraitHash{
+                    t: t,
+                    s: ins,
+                    i: i,
+                }
+                i++
+                self.build_trait_wrapper(hash)
+                self.trait_map = append(self.trait_map, hash)
+            }
+        }
+        self.trait_declarations += "struct "
+        self.trait_declarations += ident
+        self.trait_declarations += " {};\n"
+
+        self.add_indent()
+
+        self.trait_data += "static "
+        self.trait_data += type_data
+        self.trait_data += " "
+        self.trait_data += ident
+        self.trait_data += "_mptr_data[] = {\n"
+
+        for (_, mut hash) in self.trait_map[n:] {
+            self.trait_data += self.indent()
+            self.trait_data += "{\n"
+            self.add_indent()
+            for (_, mut m) in hash.t.methods {
+                let m_ident = IdentCoder.func(m)
+                self.trait_data += self.indent()
+                self.trait_data += "."
+                self.trait_data += m_ident
+                self.trait_data += "="
+                self.trait_data += m_ident
+                self.trait_data += "_"
+                self.trait_data += conv::itoa(hash.i)
+                self.trait_data += ",\n"
+            }
+            self.done_indent()
+            self.trait_data += self.indent()
+            self.trait_data += "},\n"
+        }
+
+        self.done_indent()
+        self.trait_data += self.indent()
+        self.trait_data += "};"
+    }
+
+    fn trait_decls(mut self, mut &p: &Package) {
+        for (_, mut f) in p.files {
+            for (_, mut t) in f.traits {
+                if t.token.id != TokenId.Na {
+                    self.trait_decl(t)
+                }
+            }
+        }
     }
 
     // Generates C++ plain-prototype code of structure.
@@ -316,21 +440,6 @@ impl ObjectCoder {
                 obj += "\n"
             }
         }
-        ret obj
-    }
-
-    // Generates C++ derive code of structure's implemented traits.
-    fn structure_traits(mut self, &s: &Struct): str {
-        if s.implements.len == 0 {
-            ret ""
-        }
-        let mut obj = ": "
-        for _, i in s.implements {
-            obj += "public "
-            obj += IdentCoder.trait_decl(i)
-            obj += ","
-        }
-        obj = obj[:obj.len-1] // Remove last comma.
         ret obj
     }
 
@@ -386,24 +495,6 @@ impl ObjectCoder {
         ret obj
     }
 
-    fn build_structure_self_field_kind(mut self, mut &s: &StructIns): str {
-        ret TypeCoder.as_sptr(TypeCoder.structure_ins(s))
-    }
-
-    // Generates C++ field declaration code of structure's self field.
-    fn structure_self_field(mut self, mut &s: &StructIns): str {
-        let mut obj = self.build_structure_self_field_kind(s)
-        obj += " self;"
-        ret obj
-    }
-
-    fn structure_self_field_init_st(mut self, mut &s: &StructIns): str {
-        let mut obj = "this->self = "
-        obj += self.build_structure_self_field_kind(s)
-        obj += "::make(this, nullptr);"
-        ret obj
-    }
-
     fn structure_constructor(mut self, mut &s: &StructIns): str {
         let mut obj = IdentCoder.structure_ins(s)
 
@@ -433,18 +524,7 @@ impl ObjectCoder {
             obj = obj[:obj.len-2] // Remove trailing comma.
         }
 
-        obj += " {"
-        if s.decl.has_ref_accessible() {
-            obj += "\n"
-            self.add_indent()
-            obj += self.indent()
-            obj += self.structure_self_field_init_st(s)
-            obj += "\n"
-            self.done_indent()
-            obj += "\n"
-            obj += self.indent()
-        }
-        obj += "}"
+        obj += " {}"
         ret obj
     }
 
@@ -452,27 +532,15 @@ impl ObjectCoder {
         const STATIC = false // Dispose method must be non-static
         let dispose_method = s.find_method("dispose", STATIC)
         let mut disposed = FuncPattern.dispose(dispose_method)
-        let ref_access = s.decl.has_ref_accessible()
         // Call destructor if implemented.
-        if !ref_access && !disposed {
+        if !disposed {
             ret ""
         }
-
         let mut obj = "~"
         obj += IdentCoder.structure_ins(s)
         obj += "(void) { "
-
-        if disposed {
-            obj += "this->"
-            obj += IdentCoder.func(dispose_method)
-            obj += "(); "
-        }
-
-        if ref_access {
-            obj += "this->self.ref = nullptr; "
-        }
-
-        obj += "}"
+        obj += IdentCoder.func(dispose_method)
+        obj += "(this); }"
         ret obj
     }
 
@@ -577,16 +645,15 @@ impl ObjectCoder {
         if !assignment {
             obj += "return "
         }
-        obj += "this->"
         obj += IdentCoder.func_ins(f)
         if !unary {
-            obj += "(_other); "
+            obj += "(this, _other); "
             if assignment {
                 obj += "return *this; "
             }
             obj += "}"
         } else {
-            obj += "(); }"
+            obj += "(this); }"
         }
         obj += "\n\n"
     }
@@ -643,21 +710,22 @@ impl ObjectCoder {
     }
 
     fn structure_ins_decl(mut self, mut &s: &StructIns): str {
-        let mut obj = "struct "
+        let mut obj = ""
+
+        if s.methods.len > 0 {
+            for (_, mut m) in s.methods {
+                obj += self.func_decl(m, false)
+            }
+        }
+
+        obj += "struct "
         let out_ident = IdentCoder.structure_ins(s)
 
         obj += out_ident
-        obj += self.structure_traits(s.decl)
         obj += " {\n"
 
-        let ref_access = s.decl.has_ref_accessible()
 
         self.add_indent()
-        if ref_access {
-            obj += self.indent()
-            obj += self.structure_self_field(s)
-            obj += "\n\n"
-        }
         if s.fields.len > 0 {
             for (_, mut f) in s.fields {
                 obj += self.indent()
@@ -677,18 +745,7 @@ impl ObjectCoder {
         // Default constructor.
         obj += self.indent()
         obj += out_ident
-        if ref_access {
-            obj += "(void) { "
-            obj += self.structure_self_field_init_st(s)
-            obj += " }\n\n"
-        } else {
-           obj += "(void) = default;\n\n"
-        }
-
-        for (_, mut f) in s.methods {
-            obj += self.func_decl(f, true)
-            obj += "\n\n"
-        }
+        obj += "(void) = default;\n\n"
 
         obj += self.structure_derive_defs_decls(s)
 
@@ -697,6 +754,7 @@ impl ObjectCoder {
 
         self.done_indent()
         obj += self.indent() + "};"
+
         ret obj
     }
 
@@ -705,7 +763,6 @@ impl ObjectCoder {
         let mut obj = ""
         for (_, mut ins) in s.instances {
             obj += self.structure_ins_decl(ins)
-            obj += "\n\n"
         }
         ret obj
     }
@@ -722,33 +779,29 @@ impl ObjectCoder {
         ret obj
     }
 
-    fn func_head(mut self, mut &f: &FnIns, method: bool): str {
+    fn func_head(mut self, mut &f: &FnIns, ptr: bool): str {
         let mut obj = ""
-
-        if method && f.decl.statically {
-            obj += "static "
-        }
-
-        if env::OPT_INLINE && !f.decl.is_entry_point() {
+        if !ptr && env::OPT_INLINE && !f.decl.is_entry_point() {
             obj += "inline "
         }
-
         obj += TypeCoder.func_ins_result(f)
-        obj += " "
-        if !method && f.decl.owner != nil {
-            obj += IdentCoder.structure_ins(f.owner)
-            obj += "::"
+        if ptr {
+            obj += "(*"
+            obj += IdentCoder.func_ins(f)
+            obj += ")"
+        } else {
+            obj += " "
+            obj += IdentCoder.func_ins(f)
         }
-        obj += IdentCoder.func_ins(f)
         ret obj
     }
 
     // Generates C++ declaration code of function's combinations.
-    fn func_decl(mut self, mut &f: &Fn, method: bool): str {
+    fn func_decl(mut self, mut &f: &Fn, ptr: bool): str {
         let mut obj = ""
         for (_, mut c) in f.instances {
             obj += self.indent()
-            obj += self.func_head(c, method)
+            obj += self.func_head(c, ptr)
             obj += self.params_decls(c.params)
             obj += ";\n"
         }
@@ -768,22 +821,25 @@ impl ObjectCoder {
         ret obj
     }
 
+    fn build_trait_map(mut self) {
+        for (_, mut u) in self.ir.used {
+            if !u.cpp_linked {
+                self.trait_decls(u.package)
+            }
+        }
+        self.trait_decls(self.ir.main)
+    }
+
+    fn process_traits(mut self) {
+        self.build_trait_map()
+    }
+
     // Generates C++ code of all can-be-prototyped declarations.
     fn decls(mut self): str {
         let mut obj = ""
 
-        for (_, mut u) in self.ir.used {
-            if !u.cpp_linked {
-                obj += self.trait_decls(u.package)
-            }
-        }
-        obj += self.trait_decls(self.ir.main)
-
-
+        obj += self.trait_declarations
         obj += self.structure_plain_decls()
-
-        obj += self.traits()
-        obj += "\n"
 
         obj += self.structure_decls()
 
@@ -793,6 +849,15 @@ impl ObjectCoder {
             }
         }
         obj += self.func_decls(self.ir.main)
+
+        if self.trait_map.len > 0 {
+            obj += "\n\n"
+            obj += self.trait_data_t
+            obj += "\n\n"
+            obj += self.trait_wrappers
+            obj += "\n\n"
+            obj += self.trait_data
+        }
 
         ret obj
     }
@@ -850,7 +915,9 @@ impl ObjectCoder {
             obj += self.params_ins(ins.params)
             obj += " "
             obj += self.sc.func_scope(ins)
-            obj += "\n\n"
+            if ins.scope != nil {
+                obj += "\n\n"
+            }
         }
         ret obj
     }
@@ -887,19 +954,17 @@ impl ObjectCoder {
     fn structure_ostream(mut self, mut &s: &StructIns): str {
         let mut obj = ""
         obj += self.indent()
-        obj += "std::ostream &operator<<(std::ostream &_Stream, const "
+        obj += "std::ostream &operator<<(std::ostream &_Stream, "
         obj += IdentCoder.structure_ins(s)
-        obj += " &_Src) {\n"
+        obj += " _Src) {\n"
         self.add_indent()
         obj += self.indent()
 
         let mut fts = s.find_method("to_str", false)
         if FuncPattern.to_str(fts) {
-            obj += "_Stream << (("
-            obj += IdentCoder.structure_ins(s)
-            obj += ")(_Src))."
+            obj += "_Stream << "
             obj += IdentCoder.func(fts)
-            obj += "();\n"
+            obj += "(&_Src);\n"
         } else {
             obj += `_Stream << "`
             obj += s.decl.ident
@@ -1111,6 +1176,8 @@ int main(int argc, char *argv[], char *envp[]) {
     // Returns fully implemented IR in C++.
     // Except standard content, to add standard content, use [ObjectCoder.append_standard].
     pub fn serialize(mut self): str {
+        self.prepare_structures()
+        self.process_traits()
         let mut global_initializers = ""
         let mut obj = ""
         obj += self.links()
