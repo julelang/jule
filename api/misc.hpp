@@ -76,31 +76,6 @@ namespace jule
         {
                 return x % denominator;
         }
-
-        template <typename T>
-        inline jule::Ptr<T> new_struct(T *p) noexcept
-        {
-#ifndef __JULE_DISABLE__REFERENCE_COUNTING
-                return jule::Ptr<T>::make(p);
-#else
-                return jule::Ptr<T>::make(p, nullptr);
-#endif
-        }
-
-        template <typename T>
-        inline jule::Ptr<T> new_struct_ptr(T *p) noexcept
-        {
-#ifndef __JULE_DISABLE__REFERENCE_COUNTING
-                p->self = nullptr;
-                jule::Ptr<T> rp = jule::new_struct<T>(p);
-                rp->self.alloc = rp.alloc;
-                rp->self.ref = rp.ref;
-                *rp->self.ref = jule::REFERENCE_DELTA;
-                return rp;
-#else
-                return jule::new_struct<T>(p);
-#endif
-        }
 } // namespace jule
 
 #endif // ifndef __JULE_MISC_HPP
