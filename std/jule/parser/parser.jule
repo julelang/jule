@@ -271,8 +271,9 @@ impl Parser {
         self.directives = append(self.directives, d)
     }
 
-    fn build_scope(mut &self, mut &tokens: []Token): &ScopeTree {
+    fn build_scope(mut &self, mut &tokens: []Token, mut end: Token): &ScopeTree {
         let mut s = new_scope()
+        s.end = end
         let mut sp = ScopeParser{
             p: self,
         }
@@ -885,7 +886,7 @@ impl Parser {
         }
         let mut block_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
         if block_tokens != nil {
-            f.scope = self.build_scope(block_tokens)
+            f.scope = self.build_scope(block_tokens, tokens[i - 1])
             f.scope.unsafety = f.unsafety
             if i < tokens.len {
                 self.push_err(tokens[i], LogMsg.InvalidSyntax)
@@ -1229,6 +1230,7 @@ impl Parser {
         } else if i < tokens.len {
             self.push_err(tokens[i], LogMsg.InvalidSyntax)
         }
+        e.end = tokens[i - 1]
         e.items = self.build_enum_items(item_tokens)
         ret e
     }
@@ -1345,6 +1347,7 @@ impl Parser {
             self.push_err(tokens[i], LogMsg.InvalidSyntax)
         }
         s.fields = self.build_struct_decl_fields(body_tokens)
+        s.end = tokens[i - 1]
         ret s
     }
 
@@ -1428,6 +1431,7 @@ impl Parser {
             self.push_err(tokens[i], LogMsg.InvalidSyntax)
         }
         t.methods = self.build_trait_methods(body_tokens)
+        t.end = tokens[i - 1]
         ret t
     }
 
@@ -1661,6 +1665,7 @@ impl Parser {
         if i < tokens.len {
             self.push_err(tokens[i], LogMsg.InvalidSyntax)
         }
+        ipl.end = tokens[i - 1]
         self.parse_impl_body(ipl, body_tokens)
         ret ipl
     }

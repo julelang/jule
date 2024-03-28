@@ -205,9 +205,10 @@ impl ScopeParser {
         ret self.stmts[self.pos]
     }
 
-    fn build_scope(mut self, mut &tokens: []Token): &ScopeTree {
+    fn build_scope(mut self, mut &tokens: []Token, mut end: Token): &ScopeTree {
         let mut s = new_scope()
         s.parent = self.s
+        s.end = end
         let mut ssp = ScopeParser{
             p: self.p,
         }
@@ -271,7 +272,7 @@ impl ScopeParser {
             self.push_err(tokens[i], LogMsg.InvalidSyntax)
         }
 
-        it.scope = self.build_scope(block_tokens)
+        it.scope = self.build_scope(block_tokens, tokens[i - 1])
         it.kind = kind
 
         ret it
@@ -427,7 +428,7 @@ impl ScopeParser {
         if i < tokens.len {
             self.push_err(tokens[i], LogMsg.InvalidSyntax)
         }
-        it.scope = self.build_scope(scope_tokens)
+        it.scope = self.build_scope(scope_tokens, tokens[i - 1])
         ret it
     }
 
@@ -493,6 +494,7 @@ impl ScopeParser {
             self.push_suggestion(LogMsg.ExpectedBody)
             ret nil
         }
+        let mut end = tokens[i - 1]
         if i < tokens.len {
             if tokens[i].id == TokenId.Else {
                 tokens = tokens[i:]
@@ -502,7 +504,7 @@ impl ScopeParser {
             }
         }
         model.expr = self.p.build_expr(expr_tokens)
-        model.scope = self.build_scope(scope_tokens)
+        model.scope = self.build_scope(scope_tokens, end)
         ret model
     }
 
@@ -526,7 +528,7 @@ impl ScopeParser {
         if i < tokens.len {
             self.push_err(tokens[i], LogMsg.InvalidSyntax)
         }
-        els.scope = self.build_scope(scope_tokens)
+        els.scope = self.build_scope(scope_tokens, tokens[i - 1])
         ret els
     }
 
@@ -674,11 +676,15 @@ impl ScopeParser {
                 continue
             }
             let mut scope_tokens = tokens[:n]
-            let mut scope = self.build_scope(scope_tokens)
+            let mut scope = self.build_scope(scope_tokens, tokens[n])
             tokens = tokens[n:]
             ret scope
         }
-        let mut scope = self.build_scope(tokens)
+        let mut end: Token
+        if tokens.len > 0 {
+            end = tokens[tokens.len - 1]
+        }
+        let mut scope = self.build_scope(tokens, end)
         tokens = nil
         ret scope
     }
@@ -796,7 +802,7 @@ impl ScopeParser {
         } else if i < tokens.len {
             self.push_err(tokens[i], LogMsg.InvalidSyntax)
         }
-        let mut scope = self.build_scope(scope_tokens)
+        let mut scope = self.build_scope(scope_tokens, tokens[i - 1])
         scope.unsafety = is_unsafe
         scope.deferred = is_deferred
         ret scope
