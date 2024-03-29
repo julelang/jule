@@ -1964,10 +1964,11 @@ impl Sema {
             ret
         }
 
-        let mut eval = if decl.kind != nil {
-            self.evalpd(l, decl.kind.kind, decl)
+        let mut eval: &Eval = nil
+        if decl.kind != nil {
+            eval = self.evalpd(l, decl.kind.kind, decl)
         } else {
-            self.evalpd(l, nil, decl)
+            eval = self.evalpd(l, nil, decl)
         }
         eval.immutable = !decl.mutable
         decl.value.data = eval.eval_expr(decl.value.expr)
@@ -2049,7 +2050,10 @@ impl Sema {
             ret nil
         }
         let mut ins = self.ready_to_check_fn(s, f)
-        ret if p(f) { ins } else { nil }
+        if p(f) {
+            ret ins
+        }
+        ret nil
     }
 
     fn check_struct_ins(mut &self, mut &s: &StructIns) {

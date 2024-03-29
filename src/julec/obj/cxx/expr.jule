@@ -59,7 +59,6 @@ use std::jule::sema::{
     StructStaticIdentExprModel,
     IntegratedToStrExprModel,
     BackendEmitExprModel,
-    TernaryExprModel,
     FreeExprModel,
     OperandExprModel,
     Scope,
@@ -106,7 +105,10 @@ impl ExprCoder {
     }
 
     fn boolean(self, &c: &Const): str {
-        ret if c.read_bool() { "true" } else { "false" }
+        if c.read_bool() {
+            ret "true"
+        }
+        ret "false"
     }
 
     fn nil_lit(self): str {
@@ -969,17 +971,6 @@ impl ExprCoder {
         ret obj
     }
 
-    fn ternary(mut self, mut m: &TernaryExprModel): str {
-        let mut obj = "(("
-        obj += self.model(m.condition)
-        obj += ") ? ("
-        obj += self.model(m.true_expr)
-        obj += ") : ("
-        obj += self.model(m.false_expr)
-        obj += "))"
-        ret obj
-    }
-
     fn backend_emit(mut self, mut m: &BackendEmitExprModel): str {
         if m.exprs.len == 0 {
             ret m.code
@@ -1108,8 +1099,6 @@ impl ExprCoder {
             ret self.structure_static((&StructStaticIdentExprModel)(m))
         | &IntegratedToStrExprModel:
             ret self.integrated_to_str((&IntegratedToStrExprModel)(m))
-        | &TernaryExprModel:
-            ret self.ternary((&TernaryExprModel)(m))
         | &BackendEmitExprModel:
             ret self.backend_emit((&BackendEmitExprModel)(m))
         | &FreeExprModel:

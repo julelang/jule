@@ -25,7 +25,6 @@ use std::jule::ast::{
     IndexingExpr,
     SlicingExpr,
     BinopExpr,
-    TernaryExpr,
     ScopeTree,
 }
 use std::jule::build::{LogMsg}
@@ -945,61 +944,6 @@ impl ExprBuilder {
         ret self.build_indexing(expr_tokens, tokens, error_token)
     }
 
-    fn build_ternary(mut self, mut tokens: []Token): ExprData {
-        let mut ter = &TernaryExpr{}
-        ter.token = tokens[0] // "if" token
-
-        tokens = tokens[1:] // Skip the "if" token
-        let mut expr_tokens = get_block_expr(tokens)
-        if expr_tokens.len == 0 {
-            self.push_err(ter.token, LogMsg.MissingExpr)
-        }
-
-        ter.condition = self.build_from_tokens(expr_tokens)
-
-        let mut i = expr_tokens.len
-        let mut true_expr = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
-        if true_expr == nil {
-            self.push_err(ter.token, LogMsg.BodyNotExist)
-            self.push_suggestion(LogMsg.ExpectedBody)
-            ret ter
-        } else if true_expr.len == 0 {
-            self.push_err(tokens[expr_tokens.len], LogMsg.MissingExpr)
-        }
-
-        if i >= tokens.len {
-            self.push_err(ter.token, LogMsg.MissedTernaryElse)
-            ret ter
-        }
-
-        let else_token = tokens[i]
-        if else_token.id != TokenId.Else {
-            self.push_err(else_token, LogMsg.InvalidSyntax)
-            self.push_suggestion(LogMsg.ExpectedElseKeywordForTernary)
-            ret ter
-        }
-
-        i++
-        let j = i
-        let mut false_expr = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
-        if false_expr == nil {
-            self.push_err(else_token, LogMsg.BodyNotExist)
-            self.push_suggestion(LogMsg.ExpectedBody)
-            ret ter
-        } else if false_expr.len == 0 {
-            self.push_err(tokens[j], LogMsg.MissingExpr)
-        }
-
-        if i < tokens.len {
-            self.push_err(tokens[i], LogMsg.InvalidSyntax)
-        }
-
-        ter.true_expr = self.build_from_tokens(true_expr)
-        ter.false_expr = self.build_from_tokens(false_expr)
-
-        ret ter
-    }
-
     fn build_data(mut self, mut &tokens: []Token): ExprData {
         match tokens.len {
         | 0:
@@ -1014,8 +958,6 @@ impl ExprBuilder {
 
         let mut token = tokens[0]
         match token.id {
-        | TokenId.If:
-            ret self.build_ternary(tokens)
         | TokenId.Op:
             // Handle pointer to primitive type.
             if tokens.len > 1 && token.kind == TokenKind.Star {

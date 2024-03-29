@@ -30,7 +30,6 @@ use std::jule::ast::{
     StructLit,
     KeyValPair,
     IdentTypeDecl,
-    TernaryExpr,
     NamespaceTypeDecl,
 }
 use build for std::jule::build::{
@@ -388,7 +387,10 @@ impl Eval {
                 ret def
             }
         }
-        ret if self.dis_builtin { nil } else { find_builtin_def(ident) }
+        if self.dis_builtin {
+            ret nil
+        }
+        ret find_builtin_def(ident)
     }
 
     fn get_def(mut self, ident: str, cpp_linked: bool): any {
@@ -699,9 +701,13 @@ impl Eval {
             d = &Data{
                 decl: true,
                 kind: &TypeKind{
-                    cpp_ident: if ta.cpp_linked { ta.ident } else { ta.kind.kind.cpp_ident },
-                    kind:      ta.kind.kind.kind,
+                    kind: ta.kind.kind.kind,
                 },
+            }
+            if ta.cpp_linked {
+                d.kind.cpp_ident = ta.ident
+            } else {
+                d.kind.cpp_ident = ta.kind.kind.cpp_ident
             }
             d.model = d.kind
         }
@@ -823,7 +829,11 @@ impl Eval {
 
         let mut model = &ArrayExprModel{
             kind:  arr,
-            elems: make([]ExprModel, 0, if filled { 2 } else { s.exprs.len }),
+        }
+        if filled {
+            model.elems = make([]ExprModel, 0, 2)
+        } else {
+            model.elems = make([]ExprModel, 0, s.exprs.len)
         }
 
         let mut prefix = self.prefix
@@ -2889,74 +2899,6 @@ impl Eval {
         ret bs.eval(op)
     }
 
-    fn eval_ternary(mut &self, mut ter: &TernaryExpr): &Data {
-        let mut d = self.eval_expr_kind(ter.condition)
-        if d == nil {
-            ret nil
-        }
-
-        let prim = d.kind.prim()
-        if prim == nil || !prim.is_bool() {
-            self.push_err(ter.token, LogMsg.IfRequireBoolExpr)
-            ret nil
-        }
-
-        let mut td = self.eval_expr_kind(ter.true_expr)
-        if td == nil {
-            ret nil
-        }
-        self.apply_numeric_prefix(td)
-
-        if td.kind.void() {
-            self.push_err(ter.token, LogMsg.VoidUsedForTernary)
-            ret nil
-        }
-
-        let mut prefix = self.prefix
-        self.prefix = td.kind
-
-        let mut fd = self.eval_expr_kind(ter.false_expr)
-        self.apply_numeric_prefix(fd)
-
-        self.prefix = prefix
-        if fd == nil {
-            ret nil
-        }
-
-        let mut ac = AssignTypeChecker{
-            s:           self.s,
-            error_token: ter.token,
-        }
-        if td.is_const() && !fd.is_const() {
-            ac.dest = fd.kind
-            ac.d = td
-        } else {
-            ac.dest = td.kind
-            ac.d = fd
-        }
-        if !ac.check() {
-            self.push_suggestion(LogMsg.UseCompatibleValuesForTernary)
-        }
-
-        if d.is_const() {
-            if d.constant.read_bool() {
-                ret td
-            }
-            ret fd
-        }
-
-        let mut r = &Data{}
-        r.kind = ac.dest
-        r.lvalue = false
-        r.mutable = r.kind.mutable()
-        r.model = &TernaryExprModel{
-            condition:  d.model,
-            true_expr:  td.model,
-            false_expr: fd.model,
-        }
-        ret r
-    }
-
     fn eval_expr_kind(mut &self, mut kind: ExprData): &Data {
         let mut d: &Data = nil
         match type kind {
@@ -2998,8 +2940,6 @@ impl Eval {
             d = self.eval_anon_fn((&FnDecl)(kind))
         | &BinopExpr:
             d = self.eval_binop((&BinopExpr)(kind))
-        | &TernaryExpr:
-            d = self.eval_ternary((&TernaryExpr)(kind))
         }
 
         if d == nil {
