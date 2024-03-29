@@ -750,6 +750,7 @@ impl ExprBuilder {
         }
 
         ret &StructLit{
+            end:   tokens[tokens.len - 1],
             kind:  t,
             exprs: self.build_struct_lit_exprs(tokens),
         }
@@ -774,6 +775,7 @@ impl ExprBuilder {
     fn build_brace_lit(mut self, mut &tokens: []Token): &BraceLit {
         let mut lit = &BraceLit{
             token: tokens[0],
+            end:   tokens[tokens.len - 1],
         }
 
         let mut parts = self.get_brace_range_lit_expr_parts(tokens)
@@ -851,6 +853,7 @@ impl ExprBuilder {
     fn build_slice(mut self, mut tokens: []Token): &SliceExpr {
         let mut slc = &SliceExpr{
             token: tokens[0],
+            end:   tokens[tokens.len - 1],
         }
 
         let mut parts = self.get_enumerable_parts(tokens)
@@ -871,6 +874,7 @@ impl ExprBuilder {
 
     fn build_indexing(mut self, mut expr_tokens: []Token,
         mut tokens: []Token, mut error_token: Token): &IndexingExpr {
+        let mut end = tokens[tokens.len - 1]
         tokens = tokens[1 : tokens.len-1] // Remove brackets.
         if tokens.len == 0 {
             self.push_err(error_token, LogMsg.MissingExpr)
@@ -886,15 +890,17 @@ impl ExprBuilder {
         }
         ret &IndexingExpr{
             token: error_token,
+            end:   end,
             expr:  expr,
             index: index,
         }
     }
 
     fn build_slicing(mut self, mut &expr_tokens: []Token, mut &slicing_tokens: []Token,
-        &colon: int, mut &error_token: Token): &SlicingExpr {
+        &colon: int, mut &error_token: Token, mut end: Token): &SlicingExpr {
         let mut slc = &SlicingExpr{
             token: error_token,
+            end:   end,
             expr:  self.build_from_tokens(expr_tokens),
         }
 
@@ -934,7 +940,7 @@ impl ExprBuilder {
         let mut i = 0
         let (mut slicing_tokens, colon) = split_map_range(tokens, i)
         if colon != -1 {
-            ret self.build_slicing(expr_tokens, slicing_tokens, colon, error_token)
+            ret self.build_slicing(expr_tokens, slicing_tokens, colon, error_token, tokens[tokens.len - 1])
         }
         ret self.build_indexing(expr_tokens, tokens, error_token)
     }
