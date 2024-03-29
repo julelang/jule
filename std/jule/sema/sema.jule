@@ -73,7 +73,7 @@ fn build_ret_vars(mut &f: &FnIns): []&Var {
     let mut vars: []&Var = nil
     let mut types = get_result_types(f.result)
     for (i, mut ident) in f.decl.result.idents {
-        if is_ignore_ident(ident.kind) {
+        if is_ignore_ident(ident.kind) || is_anon_ident(ident.kind) {
             continue
         }
 
@@ -83,9 +83,11 @@ fn build_ret_vars(mut &f: &FnIns): []&Var {
             ident:   ident.kind,
             token:   ident,
             scope:   f.scope,
-            kind:    &TypeSymbol{kind: types[i]},
+            kind:    &TypeSymbol{
+                kind: types[i],
+            },
             value: &Value{
-                data: &Data{},
+                data: new(Data),
             },
         }
         vars = append(vars, v)
@@ -101,16 +103,20 @@ fn build_param_vars(mut &f: &FnIns): []&Var {
 
     let mut vars = make([]&Var, 0, f.params.len)
     for (_, mut p) in f.params {
+        if is_ignore_ident(p.decl.ident) || is_anon_ident(p.decl.ident) {
+            continue
+        }
+
         let mut v = &Var{
             used:      true,
             reference: p.decl.reference,
             mutable:   p.decl.mutable,
             ident:     p.decl.ident,
             token:     p.decl.token,
-            kind:      &TypeSymbol{},
+            kind:      new(TypeSymbol),
             scope:     f.scope,
             value: &Value{
-                data: &Data{},
+                data: new(Data),
             },
         }
 
@@ -131,7 +137,6 @@ fn build_param_vars(mut &f: &FnIns): []&Var {
                     },
                 }
             }
-
         | p.decl.variadic:
             v.kind.kind = &TypeKind{
                 variadic: false,
@@ -142,7 +147,6 @@ fn build_param_vars(mut &f: &FnIns): []&Var {
                     },
                 },
             }
-
         |:
             v.kind.kind = p.kind
         }
@@ -1228,11 +1232,9 @@ impl Sema {
                 | j >= i:
                     // Skip current and following parameters.
                     break params_lookup
-
                 | is_anon_ident(p.ident) || is_anon_ident(jp.ident):
                     // Skip anonymous parameters.
                     break params_lookup
-
                 | p.ident == jp.ident:
                     ok = false
                     self.push_err(p.token, LogMsg.DuplicatedIdent, p.ident)
@@ -1246,24 +1248,21 @@ impl Sema {
 
     fn check_fn_decl_result_dup(mut self, &f: &Fn): (ok: bool) {
         ok = true
-
         if f.is_void() {
             ret
         }
 
         // Check duplications.
         for i, v in f.result.idents {
-            if is_ignore_ident(v.kind) {
+            if is_ignore_ident(v.kind) || is_anon_ident(v.kind) {
                 continue // Skip anonymous return variables.
             }
-
             // Lookup in generics.
             for _, g in f.generics {
                 if v.kind == g.ident {
                     goto exist
                 }
             }
-
             // Lookup in parameters.
             for _, p in f.params {
                 if v.kind == p.ident {
@@ -1278,7 +1277,6 @@ impl Sema {
                 | j >= i:
                     // Skip current and following identifiers.
                     break itself_lookup
-
                 | jv.kind == v.kind:
                     goto exist
                 }
