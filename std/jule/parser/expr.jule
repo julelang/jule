@@ -410,13 +410,12 @@ impl ExprBuilder {
     }
 
     fn build_between_parentheses(mut self, mut tokens: []Token): &Expr {
-        let token = tokens[0]
-        tokens = tokens[1 : tokens.len-1] // Remove parentheses.
-        if tokens.len == 0 {
-            self.push_err(token, LogMsg.MissingExpr)
+        if tokens.len == 2 {
+            self.push_err(tokens[0], LogMsg.MissingExpr)
             self.push_suggestion(LogMsg.EmptyParentNotValid)
             ret nil
         }
+        tokens = tokens[1 : tokens.len-1] // Remove parentheses.
         let mut expr = self.build_from_tokens(tokens)
         expr.range = true
         ret expr
@@ -972,7 +971,6 @@ impl ExprBuilder {
             if tokens.len < 3 {
                 break
             }
-
             // Catch type casting.
             if tokens.len > 3 {
                 let t = tokens[tokens.len-1]
@@ -1055,10 +1053,16 @@ impl ExprBuilder {
         if tokens.len == 0 {
             ret nil
         }
-        ret &Expr{
-            token: tokens[0],
-            end:   tokens[tokens.len - 1],
-            kind:  self.build_kind(tokens),
+        let mut kind = self.build_kind(tokens)
+        match type kind {
+        | &Expr:
+            ret (&Expr)(kind)
+        |:
+            ret &Expr{
+                token: tokens[0],
+                end:   tokens[tokens.len - 1],
+                kind:  kind,
+            }
         }
     }
 }
