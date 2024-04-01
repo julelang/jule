@@ -31,7 +31,7 @@ type PrimKind: types::TypeKind
 
 // Reports whether directive is exist.
 fn has_directive(mut &directives: []&ast::Directive, tag: str): bool {
-    for _, mut dr in directives {
+    for (_, mut dr) in directives {
         if dr.tag.kind == tag {
             ret true
         }
@@ -49,7 +49,7 @@ pub struct TypeAlias {
     pub token:      Token
     pub ident:      str
     pub kind:       &TypeSymbol
-    pub refers:     []any // Referred identifiers, except cpp-linked ones.
+    pub refers:     []any        // Referred identifiers, except cpp-linked ones.
     pub generics:   []&TypeAlias // See developer reference (1).
 }
 
@@ -176,9 +176,12 @@ impl TypeKind {
             match {
             | _self.prim() != nil:
                 ret !_self.prim().is_any()
-            | _self.enm() != nil: ret true
-            | _self.fnc() != nil: ret true
-            | _self.ptr() != nil: ret true
+            | _self.enm() != nil:
+                ret true
+            | _self.fnc() != nil:
+                ret true
+            | _self.ptr() != nil:
+                ret true
             | _self.slc() != nil:
                 ret _self.slc().elem.supports_cloning()
             | _self.map() != nil:
@@ -210,88 +213,110 @@ impl TypeKind {
     // Returns primitive type if kind is primitive type, nil reference if not.
     pub fn prim(mut self): &Prim {
         match type self.kind {
-        | &Prim: ret (&Prim)(self.kind)
-        |:       ret nil
+        | &Prim:
+            ret (&Prim)(self.kind)
+        |:
+            ret nil
         }
     }
 
     // Returns reference type if kind is smart pointer, nil reference if not.
     pub fn sptr(mut self): &Sptr {
         match type self.kind {
-        | &Sptr: ret (&Sptr)(self.kind)
-        |:      ret nil
+        | &Sptr:
+            ret (&Sptr)(self.kind)
+        |:
+            ret nil
         }
     }
 
     // Returns pointer type if kind is pointer, nil reference if not.
     pub fn ptr(mut self): &Ptr {
         match type self.kind {
-        | &Ptr: ret (&Ptr)(self.kind)
-        |:      ret nil
+        | &Ptr:
+            ret (&Ptr)(self.kind)
+        |:
+            ret nil
         }
     }
 
     // Returns enum type if kind is enum, nil reference if not.
     pub fn enm(mut self): &Enum {
         match type self.kind {
-        | &Enum: ret (&Enum)(self.kind)
-        |:       ret nil
+        | &Enum:
+            ret (&Enum)(self.kind)
+        |:
+            ret nil
         }
     }
 
     // Returns array type if kind is array, nil reference if not.
     pub fn arr(mut self): &Arr {
         match type self.kind {
-        | &Arr: ret (&Arr)(self.kind)
-        |:      ret nil
+        | &Arr:
+            ret (&Arr)(self.kind)
+        |:
+            ret nil
         }
     }
 
     // Returns slice type if kind is slice, nil reference if not.
     pub fn slc(mut self): &Slc {
         match type self.kind {
-        | &Slc: ret (&Slc)(self.kind)
-        |:      ret nil
+        | &Slc:
+            ret (&Slc)(self.kind)
+        |:
+            ret nil
         }
     }
 
     // Returns fn type if kind is function, nil reference if not.
     pub fn fnc(mut self): &FnIns {
         match type self.kind {
-        | &FnIns: ret (&FnIns)(self.kind)
-        |:        ret nil
+        | &FnIns:
+            ret (&FnIns)(self.kind)
+        |:
+            ret nil
         }
     }
 
     // Returns struct type if kind is structure, nil reference if not.
     pub fn strct(mut self): &StructIns {
         match type self.kind {
-        | &StructIns: ret (&StructIns)(self.kind)
-        |:            ret nil
+        | &StructIns:
+            ret (&StructIns)(self.kind)
+        |:
+            ret nil
         }
     }
 
     // Returns trait type if kind is trait, nil reference if not.
     pub fn trt(mut self): &Trait {
         match type self.kind {
-        | &Trait: ret (&Trait)(self.kind)
-        |:        ret nil
+        | &Trait:
+            ret (&Trait)(self.kind)
+        |:
+            ret nil
         }
     }
 
     // Returns map type if kind is map, nil reference if not.
     pub fn map(mut self): &Map {
         match type self.kind {
-        | &Map: ret (&Map)(self.kind)
-        |:      ret nil
+        | &Map:
+            ret (&Map)(self.kind)
+        |:
+            ret nil
         }
     }
 
     // Returns tuple type if kind is tuple, nil reference if not.
     pub fn tup(mut self): &Tuple {
         match type self.kind {
-        | &Tuple: ret (&Tuple)(self.kind)
-        |:        ret nil
+        | &Tuple:
+            ret (&Tuple)(self.kind)
+        |:
+            ret nil
         }
     }
 }
@@ -489,7 +514,7 @@ impl Kind for Map {
 
 // Array type.
 pub struct Arr {
-    pub auto: bool // Auto-sized array.
+    pub auto: bool      // Auto-sized array.
     pub n:    int
     pub elem: &TypeKind
 }
@@ -551,7 +576,6 @@ fn can_get_ptr(mut &d: &Data): bool {
     match {
     | d.kind.fnc() != nil || d.kind.enm() != nil:
         ret false
-
     |:
         ret true
     }
@@ -593,25 +617,19 @@ fn get_struct_from_kind(mut k: &TypeKind): &Struct {
     match {
     | k == nil:
         ret nil
-
     | k.strct() != nil:
         ret k.strct().decl
-
     | k.sptr() != nil:
         ret get_struct_from_kind(k.sptr().elem)
-
     | k.slc() != nil:
         ret get_struct_from_kind(k.slc().elem)
-
     | k.arr() != nil:
         ret get_struct_from_kind(k.arr().elem)
-
     | k.ptr() != nil:
         // Pass pointers.
         // Cloning just copies pointer address.
         // There is no any illegal cycle risk.
         ret nil
-
     |:
         ret nil
     }
@@ -891,7 +909,7 @@ impl TypeChecker {
 
         let mut tk = &TypeKind{
             generic: ta.generic,
-            kind:    ta.kind.kind.kind,
+            kind: ta.kind.kind.kind,
         }
         if ta.cpp_linked {
             tk.cpp_ident = ta.ident
@@ -919,8 +937,8 @@ impl TypeChecker {
             ret nil
         }
         if decl.generics.len > 0 {
-           self.push_err(decl.token, LogMsg.TypeNotSupportsGenerics, decl.ident)
-           ret nil
+            self.push_err(decl.token, LogMsg.TypeNotSupportsGenerics, decl.ident)
+            ret nil
         }
         ret t
     }
@@ -965,9 +983,9 @@ impl TypeChecker {
         }
 
         let mut tc = TypeChecker{
-            s:            ins.decl.sema,
-            lookup:       ins.decl.sema,
-            referencer:   referencer,
+            s: ins.decl.sema,
+            lookup: ins.decl.sema,
+            referencer: referencer,
             use_generics: generics,
         }
 
@@ -1211,7 +1229,6 @@ impl TypeChecker {
         match {
         | elem == nil:
             ret nil
-
         | elem.arr() != nil && elem.arr().auto:
             self.push_err(self.error_token, LogMsg.ArrayAutoSized)
             ret new(Ptr)
@@ -1250,7 +1267,6 @@ impl TypeChecker {
         match {
         | elem == nil:
             ret nil
-
         | elem.arr() != nil && elem.arr().auto:
             self.push_err(decl.elem.token, LogMsg.ArrayAutoSized)
             ret nil
@@ -1305,7 +1321,7 @@ impl TypeChecker {
 
         ret &Arr{
             auto: decl.auto_sized(),
-            n:    n,
+            n: n,
             elem: elem,
         }
     }

@@ -174,7 +174,7 @@ impl Reader {
     pub static fn new(mut r: io::Reader): &Reader {
         ret &Reader{
             comma: ',',
-            s:     io::Scanner.new(r),
+            s: io::Scanner.new(r),
         }
     }
 
@@ -283,7 +283,7 @@ impl Reader {
         // Parse each field in the record.
         const QUOTE_LEN = `"`.len
         let comma_len = utf8::rune_len(self.comma)
-        let mut rec_line = self.num_line // Starting line for record
+        let mut rec_line = self.num_line           // Starting line for record
         self.record_buffer = self.record_buffer[:0]
         self.field_indexes = self.field_indexes[:0]
         self.field_positions = self.field_positions[:0]
@@ -316,9 +316,9 @@ impl Reader {
                     if j >= 0 {
                         error(&ParseError{
                             start_line: rec_line,
-                            line:       self.num_line,
-                            column:     pos.col + j,
-                            err:        CsvError.BareQuote,
+                            line: self.num_line,
+                            column: pos.col + j,
+                            err: CsvError.BareQuote,
                         })
                         break parse_field
                     }
@@ -351,7 +351,6 @@ impl Reader {
                             self.record_buffer = append(self.record_buffer, '"')
                             line = line[QUOTE_LEN:]
                             pos.col += QUOTE_LEN
-
                         | rn == self.comma:
                             // `",` sequence (end of field).
                             line = line[comma_len:]
@@ -359,24 +358,21 @@ impl Reader {
                             self.field_indexes = append(self.field_indexes, self.record_buffer.len)
                             self.field_positions = append(self.field_positions, field_pos)
                             continue parse_field
-
                         | length_nl(line) == line.len:
                             // `"\n` sequence (end of line).
                             self.field_indexes = append(self.field_indexes, self.record_buffer.len)
                             self.field_positions = append(self.field_positions, field_pos)
                             break parse_field
-
                         | self.lazy_quotes:
                             // `"` sequence (bare quote).
                             self.record_buffer = append(self.record_buffer, '"')
-
                         |:
                             // `"*` sequence (invalid non-escaped quote).
                             error(&ParseError{
                                 start_line: rec_line,
-                                line:       self.num_line,
-                                column:     pos.col - QUOTE_LEN,
-                                err:        CsvError.Quote,
+                                line: self.num_line,
+                                column: pos.col - QUOTE_LEN,
+                                err: CsvError.Quote,
                             })
                             break parse_field
                         }
@@ -394,9 +390,9 @@ impl Reader {
                         if !self.lazy_quotes {
                             error(&ParseError{
                                 start_line: rec_line,
-                                line:       pos.line,
-                                column:     pos.col,
-                                err:        CsvError.Quote,
+                                line: pos.line,
+                                column: pos.col,
+                                err: CsvError.Quote,
                             })
                             break parse_field
                         }
@@ -428,9 +424,9 @@ impl Reader {
             if dst.len != self.fields_per_record {
                 error(&ParseError{
                     start_line: rec_line,
-                    line:       rec_line,
-                    column:     1,
-                    err:        CsvError.FieldCount,
+                    line: rec_line,
+                    column: 1,
+                    err: CsvError.FieldCount,
                 })
             }
         } else if self.fields_per_record == 0 {

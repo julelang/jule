@@ -27,10 +27,8 @@ fn get_result_types(mut &result: &TypeKind): []&TypeKind {
     match {
     | result == nil:
         ret nil
-
     | result.tup() == nil:
         ret [result]
-
     |:
         ret result.tup().types
     }
@@ -120,7 +118,7 @@ fn int_assignable(kind: str, &d: &Data): bool {
 }
 
 struct TypeCompatibilityChecker {
-    s:           &Sema // Used for error logging.
+    s:           &Sema     // Used for error logging.
     dest:        &TypeKind
     src:         &TypeKind
     error_token: Token
@@ -146,7 +144,6 @@ impl TypeCompatibilityChecker {
                 ret false
             }
             fall
-
         | self.src.strct() != nil:
             let s = self.src.strct()
             if !s.decl.is_implements(trt) {
@@ -159,10 +156,8 @@ impl TypeCompatibilityChecker {
             }
 
             ret true
-
         | self.src.trt() != nil:
             ret trt == self.src.trt()
-
         |:
             ret false
         }
@@ -215,7 +210,7 @@ impl TypeCompatibilityChecker {
 
 // Checks value and type compatibility for assignment.
 struct AssignTypeChecker {
-    s:           &Sema // Used for error logging and type checking.
+    s:           &Sema     // Used for error logging and type checking.
     dest:        &TypeKind
     d:           &Data
     error_token: Token
@@ -364,7 +359,6 @@ impl DynamicTypeAnnotation {
             match {
             | t == nil:
                 self.push_generic(k, i)
-
             | !t.equals(k):
                 // Generic already pushed but generic type and current kind
                 // is different, so incompatible.
@@ -417,7 +411,6 @@ impl DynamicTypeAnnotation {
         match {
         | pf.params.len != f.params.len:
             ret false
-
         | pf.decl.is_void() != f.decl.is_void():
             ret false
         }
@@ -471,7 +464,6 @@ impl DynamicTypeAnnotation {
             match {
             | t == nil:
                 self.push_generic(k, i)
-
             | !t.equals(k):
                 // Generic already pushed but generic type and current kind
                 // is different, so incompatible.
@@ -490,14 +482,22 @@ impl DynamicTypeAnnotation {
         }
 
         match {
-        | self.annotate_any(k): ret true
-        | k.prim() != nil:      ret self.annotate_prim(k)
-        | k.slc() != nil:       ret self.annotate_slc(k)
-        | k.map() != nil:       ret self.annotate_map(k)
-        | k.fnc() != nil:       ret self.annotate_fn(k)
-        | k.ptr() != nil:       ret self.annotate_ptr(k)
-        | k.sptr() != nil:      ret self.annotate_sptr(k)
-        |:                      ret false
+        | self.annotate_any(k):
+            ret true
+        | k.prim() != nil:
+            ret self.annotate_prim(k)
+        | k.slc() != nil:
+            ret self.annotate_slc(k)
+        | k.map() != nil:
+            ret self.annotate_map(k)
+        | k.fnc() != nil:
+            ret self.annotate_fn(k)
+        | k.ptr() != nil:
+            ret self.annotate_ptr(k)
+        | k.sptr() != nil:
+            ret self.annotate_sptr(k)
+        |:
+            ret false
         }
     }
 
@@ -566,10 +566,10 @@ impl FnCallArgChecker {
             ok = !p.decl.variadic // Accept as fail if parameter is variadic.
             if ok {
                 let mut dta = DynamicTypeAnnotation{
-                    e:           self.e,
-                    f:           self.f,
-                    p:           p,
-                    a:           arg,
+                    e: self.e,
+                    f: self.f,
+                    p: p,
+                    a: arg,
                     error_token: error_token,
                 }
                 ok = unsafe { dta.annotate() }
@@ -639,7 +639,7 @@ impl FnCallArgChecker {
                 self.e.prefix = &TypeKind{
                     kind: &Slc{
                         elem: p.kind,
-                    }
+                    },
                 }
             |:
                 self.e.prefix = p.kind
@@ -665,7 +665,7 @@ impl FnCallArgChecker {
 
                 p.kind.variadic = true
                 ok = ok && self.check_arg(p, d, arg.token)
-                
+
                 // Break iteration early, this argument is variadic, so should be last.
                 // If this argument is not last, following algorithm will create error log for that.
                 // Increase variable i for point to following argument.
@@ -773,7 +773,7 @@ impl StructLitChecker {
         }
         self.args = append(self.args, &StructArgExprModel{
             field: f,
-            expr:  d.model,
+            expr: d.model,
         })
     }
 
@@ -833,7 +833,7 @@ impl StructLitChecker {
                 }
                 exprs[i].kind = &FieldExprPair{
                     field: pair.key.token,
-                    expr:  pair.val,
+                    expr: pair.val,
                 }
             }
         }
@@ -1059,9 +1059,9 @@ impl RangeChecker {
 struct RetTypeChecker {
     sc:          &ScopeChecker
     f:           &FnIns
-    types:       []&TypeKind // Return types.
-    exprs:       []&Expr  // Return expressions.
-    vars:        []&Var      // Return variables.
+    types:       []&TypeKind   // Return types.
+    exprs:       []&Expr       // Return expressions.
+    vars:        []&Var        // Return variables.
     error_token: Token
     model:       ExprModel
 }
@@ -1101,7 +1101,7 @@ impl RetTypeChecker {
             } else {
                 self.vars = append(self.vars, &Var{
                     ident: Ident.Ignore,
-                    kind:  &TypeSymbol{kind: self.types[i]},
+                    kind: &TypeSymbol{kind: self.types[i]},
                 })
             }
         }
@@ -1139,9 +1139,9 @@ impl RetTypeChecker {
             }
 
             let mut ac = AssignTypeChecker{
-                s:           self.sc.s,
-                dest:        t,
-                d:           d,
+                s: self.sc.s,
+                dest: t,
+                d: d,
                 error_token: self.error_token,
             }
             ac.check()

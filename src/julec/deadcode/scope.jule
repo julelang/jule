@@ -3,7 +3,6 @@
 // license that can be found in the LICENSE file.
 
 use obj::{IR}
-
 use std::jule::sema::{
     Package,
     Fn,
@@ -20,15 +19,15 @@ struct ScopeDeadCode {
     parent: &ScopeDeadCode
     s:      &Scope
     stmts:  *[]St
-    i:      int // Position.
+    i:      int            // Position.
 }
 
 impl ScopeDeadCode {
     fn optimize_child(mut &self, mut &s: &Scope) {
-        let mut sdc = &ScopeDeadCode {
+        let mut sdc = &ScopeDeadCode{
             parent: self,
-            s:      s,
-            stmts:  &s.stmts,
+            s: s,
+            stmts: &s.stmts,
         }
         unsafe { sdc.optimize_stmts() }
     }
@@ -51,7 +50,6 @@ impl ScopeDeadCode {
             } else {
                 self.optimize_child(scope)
             }
-
         | &Data:
             match type (&Data)(st).model {
             | &BuiltinErrorCallExprModel
@@ -60,7 +58,6 @@ impl ScopeDeadCode {
                 // Unreachable code.
                 self.eliminate_followed()
             }
-
         | &RetSt:
             // Remove followed statements of the return statement.
             // Unreachable code.
@@ -78,7 +75,7 @@ impl ScopeDeadCode {
 
 fn eliminate_dead_code_of_scope(mut s: &Scope) {
     let mut sdc = &ScopeDeadCode{
-        s:     s,
+        s: s,
         stmts: &s.stmts,
     }
     unsafe { sdc.optimize_stmts() }
@@ -105,8 +102,8 @@ fn eliminate_scope_package(mut &pkg: &Package) {
 
 // Eliminate dead scope codes.
 pub fn eliminate_scopes(mut &ir: &IR) {
-    let mut i = ir.used.len -1 
-    for i >= 0 ; i-- {
+    let mut i = ir.used.len - 1
+    for i >= 0; i-- {
         let mut u = ir.used[i]
         if !u.cpp_linked {
             eliminate_scope_package(u.package)

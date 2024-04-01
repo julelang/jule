@@ -100,8 +100,7 @@ fn special(mut s: str): (f: f64, n: int, ok: bool) {
 // Reads a decimal or hexadecimal mantissa and exponent from a float
 // string representation in s; the number may be followed by other characters.
 // Reports the number of bytes consumed (i), and whether the number is valid (ok).
-fn read_float(s: str): (mantissa: u64, exp: int, neg: bool,
-                        trunc: bool, hex: bool, i: int, ok: bool) {
+fn read_float(s: str): (mantissa: u64, exp: int, neg: bool, trunc: bool, hex: bool, i: int, ok: bool) {
     // optional sign
     if i >= s.len {
         ret
@@ -210,7 +209,7 @@ loop_end:
                 continue
             }
             if e < 10000 {
-                e = e*10 + int(s[i]) - '0'
+                e = e * 10 + int(s[i]) - '0'
             }
         }
         dp += e * esign
@@ -311,7 +310,7 @@ impl Decimal {
                     continue
                 }
                 if e < 10000 {
-                    e = e*10 + int(s[i]) - '0'
+                    e = e * 10 + int(s[i]) - '0'
                 }
             }
             self.dp += e * esign
@@ -402,7 +401,7 @@ impl Decimal {
         }
 
         // Denormalized?
-        if mant&(1<<flt.mantbits) == 0 {
+        if mant&(1 << flt.mantbits) == 0 {
             exp = flt.bias
         }
         goto out
@@ -410,13 +409,13 @@ impl Decimal {
     overflow:
         // ±inf
         mant = 0
-        exp = int(uint(1)<<flt.expbits - 1 + uint(flt.bias))
+        exp = int(uint(1) << flt.expbits - 1 + uint(flt.bias))
         overflow = true
 
     out:
         // Assemble bits.
-        let mut bits = mant & (1<<flt.mantbits - 1)
-        bits |= u64((exp-flt.bias)&int(1<<flt.expbits-1)) << flt.mantbits
+        let mut bits = mant & (1 << flt.mantbits - 1)
+        bits |= u64((exp - flt.bias) & int(1 << flt.expbits - 1)) << flt.mantbits
         if self.neg {
             bits |= 1 << flt.mantbits << flt.expbits
         }
@@ -452,8 +451,8 @@ fn atof64_exact(mantissa: u64, mut exp: int, neg: bool): (f: f64, ok: bool) {
     | exp == 0:
         // an integer.
         ret f, true
-    // Exact integers are <= 10^15.
-    // Exact powers of ten are <= 10^22.
+        // Exact integers are <= 10^15.
+        // Exact powers of ten are <= 10^22.
     | exp > 0 && exp <= 15+22: // int * 10^k
         // If exponent is big but number of digits is not,
         // can move a few zeros into the integer part.
@@ -491,8 +490,8 @@ fn atof64exact(mantissa: u64, mut exp: int, neg: bool): (f: f64, ok: bool) {
     | exp == 0:
         // an integer.
         ret f, true
-    // Exact integers are <= 10^15.
-    // Exact powers of ten are <= 10^22.
+        // Exact integers are <= 10^15.
+        // Exact powers of ten are <= 10^22.
     | exp > 0 && exp <= 15+22: // int * 10^k
         // If exponent is big but number of digits is not,
         // can move a few zeros into the integer part.
@@ -524,8 +523,8 @@ fn atof32exact(mantissa: u64, mut exp: int, mut neg: bool): (f: f32, ok: bool) {
     match {
     | exp == 0:
         ret f, true
-    // Exact integers are <= 10^7.
-    // Exact powers of ten are <= 10^10.
+        // Exact integers are <= 10^7.
+        // Exact powers of ten are <= 10^10.
     | exp > 0 && exp <= 7+10: // int * 10^k
         // If exponent is big but number of digits is not,
         // can move a few zeros into the integer part.
@@ -550,7 +549,7 @@ fn atof32exact(mantissa: u64, mut exp: int, mut neg: bool): (f: f32, ok: bool) {
 // The string s has already been parsed into a mantissa, exponent, and sign (neg==true for negative).
 // If trunc is true, trailing non-zero bits have been omitted from the mantissa.
 fn atof_hex(s: str, &flt: FloatInfo, mut mantissa: u64, mut exp: int, neg: bool, trunc: bool): (f64, ConvError) {
-    let max_exp = int(1<<flt.expbits) + flt.bias - 2
+    let max_exp = int(1 << flt.expbits) + flt.bias - 2
     let min_exp = flt.bias + 1
     exp += int(flt.mantbits) // mantissa now implicitly divided by 2^mantbits.
 
@@ -567,8 +566,8 @@ fn atof_hex(s: str, &flt: FloatInfo, mut mantissa: u64, mut exp: int, neg: bool,
     if trunc {
         mantissa |= 1
     }
-    for mantissa>>(1+flt.mantbits+2) != 0 {
-        mantissa = mantissa>>1 | mantissa&1
+    for mantissa>>(1 + flt.mantbits + 2) != 0 {
+        mantissa = mantissa >> 1 | mantissa & 1
         exp++
     }
 
@@ -576,7 +575,7 @@ fn atof_hex(s: str, &flt: FloatInfo, mut mantissa: u64, mut exp: int, neg: bool,
     // denormalize in hopes of making it representable.
     // (The -2 is for the rounding bits.)
     for mantissa > 1 && exp < min_exp-2 {
-        mantissa = mantissa>>1 | mantissa&1
+        mantissa = mantissa >> 1 | mantissa & 1
         exp++
     }
 
@@ -587,7 +586,7 @@ fn atof_hex(s: str, &flt: FloatInfo, mut mantissa: u64, mut exp: int, neg: bool,
     exp += 2
     if round == 3 {
         mantissa++
-        if mantissa == 1<<(1+flt.mantbits) {
+        if mantissa == 1<<(1 + flt.mantbits) {
             mantissa >>= 1
             exp++
         }
@@ -603,8 +602,8 @@ fn atof_hex(s: str, &flt: FloatInfo, mut mantissa: u64, mut exp: int, neg: bool,
         err = ConvError.OutOfRange
     }
 
-    let mut bits = mantissa & (1<<flt.mantbits - 1)
-    bits |= u64((exp-flt.bias)&int(1<<flt.expbits-1)) << flt.mantbits
+    let mut bits = mantissa & (1 << flt.mantbits - 1)
+    bits |= u64((exp - flt.bias) & int(1 << flt.expbits - 1)) << flt.mantbits
     if neg {
         bits |= 1 << flt.mantbits << flt.expbits
     }
@@ -652,7 +651,7 @@ fn atof32(s: str): (f: f32, n: int, err: ConvError) {
             // have found the correct result. Confirm by
             // converting the upper mantissa bound.
             let mut f_up: f32 = 0
-            f_up, ok = eisel_lemire32(mantissa+1, exp, neg)
+            f_up, ok = eisel_lemire32(mantissa + 1, exp, neg)
             if ok && f == f_up {
                 ret f, n, ConvError.Ok
             }
@@ -709,7 +708,7 @@ fn atof64(s: str): (f: f64, n: int, err: ConvError) {
             // have found the correct result. Confirm by
             // converting the upper mantissa bound.
             let mut f_up: f64 = 0
-            f_up, ok = eisel_lemire64(mantissa+1, exp, neg)
+            f_up, ok = eisel_lemire64(mantissa + 1, exp, neg)
             if ok && f == f_up {
                 ret f, n, ConvError.Ok
             }

@@ -14,48 +14,48 @@ const PADDING_BYTE = '='
 // Returns encoded base32 bytes if success, nil slice if not.
 // Adds padding if pad is true.
 pub fn encode(src: []byte, pad: bool): []byte {
-        let mut dest: []byte = nil
-        let mut bits: u64 = 0
-        let mut buffer: u32 = 0
-        let p = &T32[0]
-        for _, b in src {
-            buffer <<= 8
-            buffer += u32(b)
-            bits += 8
-            for bits >= 5 {
-                dest = append(dest, unsafe { p[(buffer >> (bits - 5)) & 0x3F] })
-                buffer &= ^(0x1F << (bits - 5));
-                bits -= 5
-            }
+    let mut dest: []byte = nil
+    let mut bits: u64 = 0
+    let mut buffer: u32 = 0
+    let p = &T32[0]
+    for _, b in src {
+        buffer <<= 8
+        buffer += u32(b)
+        bits += 8
+        for bits >= 5 {
+            dest = append(dest, unsafe { p[(buffer>>(bits-5))&0x3F] })
+            buffer &= ^(0x1F << (bits - 5))
+            bits -= 5
         }
+    }
 
-        match src.len%5 {
-        | 1:
-            buffer <<= 2
-            dest = append(dest, T32[buffer & 0x1F])
-            if pad {
-                dest = append(dest, PADDING_BYTE, PADDING_BYTE, PADDING_BYTE, PADDING_BYTE, PADDING_BYTE, PADDING_BYTE)
-            }
-        | 2:
-            buffer <<= 4
-            dest = append(dest, T32[buffer & 0x1F])
-            if pad {
-                dest = append(dest, PADDING_BYTE, PADDING_BYTE, PADDING_BYTE, PADDING_BYTE)
-            }
-        | 3:
-            buffer <<= 1
-            if pad {
-                dest = append(dest, T32[buffer & 0x1F])
-            }
-            dest = append(dest, PADDING_BYTE, PADDING_BYTE, PADDING_BYTE)
-        | 4:
-            buffer <<= 3
-            if pad {
-                dest = append(dest, T32[buffer & 0x1F])
-            }
-            dest = append(dest, PADDING_BYTE)
+    match src.len % 5 {
+    | 1:
+        buffer <<= 2
+        dest = append(dest, T32[buffer&0x1F])
+        if pad {
+            dest = append(dest, PADDING_BYTE, PADDING_BYTE, PADDING_BYTE, PADDING_BYTE, PADDING_BYTE, PADDING_BYTE)
         }
-        ret dest
+    | 2:
+        buffer <<= 4
+        dest = append(dest, T32[buffer&0x1F])
+        if pad {
+            dest = append(dest, PADDING_BYTE, PADDING_BYTE, PADDING_BYTE, PADDING_BYTE)
+        }
+    | 3:
+        buffer <<= 1
+        if pad {
+            dest = append(dest, T32[buffer&0x1F])
+        }
+        dest = append(dest, PADDING_BYTE, PADDING_BYTE, PADDING_BYTE)
+    | 4:
+        buffer <<= 3
+        if pad {
+            dest = append(dest, T32[buffer&0x1F])
+        }
+        dest = append(dest, PADDING_BYTE)
+    }
+    ret dest
 }
 
 // Decodes source bytes with standard base32 table.

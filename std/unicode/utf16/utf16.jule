@@ -43,6 +43,7 @@
 
 // Unicode replacement character.
 const REPLACEMENT_CHAR = '\uFFFD'
+
 // Maximum valid Unicode code point.
 const MAX_RUNE = '\U0010FFFF'
 
@@ -66,7 +67,7 @@ pub fn is_surrogate(r: rune): bool {
 // the Unicode replacement code point U+FFFD.
 pub fn decode_rune(r1: rune, r2: rune): rune {
     if SURR1 <= r1 && r1 < SURR2 && SURR2 <= r2 && r2 < SURR3 {
-        ret (r1-SURR1)<<10 | (r2 - SURR2) + SURR_SELF
+        ret (r1 - SURR1) << 10 | (r2 - SURR2) + SURR_SELF
     }
     ret REPLACEMENT_CHAR
 }
@@ -79,7 +80,7 @@ pub fn encode_rune(mut r: rune): (r1: rune, r2: rune) {
         ret REPLACEMENT_CHAR, REPLACEMENT_CHAR
     }
     r -= SURR_SELF
-    ret SURR1 + (r>>10)&0x3ff, SURR2 + r&0x3ff
+    ret SURR1 + (r >> 10) & 0x3ff, SURR2 + r & 0x3ff
 }
 
 // Returns the UTF-16 encoding of the Unicode code point sequence s.
@@ -125,15 +126,14 @@ pub fn decode(s: []u16): []rune {
         | r < SURR1 | SURR3 <= r:
             // normal rune
             a[n] = rune(r)
-
-        // This case requires r >= SURR1 condition is true.
-        // Previous case checks this condition already.
-        // Therefore this case will not check this.
         | r < SURR2 && i+1 < s.len && SURR2 <= s[i+1] && s[i+1] < SURR3:
+            // This case requires r >= SURR1 condition is true.
+            // Previous case checks this condition already.
+            // Therefore this case will not check this.
+
             // valid surrogate sequence
             a[n] = decode_rune(rune(r), rune(s[i+1]))
             i++
-
         |:
             // invalid surrogate sequence
             a[n] = REPLACEMENT_CHAR

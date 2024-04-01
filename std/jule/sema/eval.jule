@@ -3,7 +3,6 @@
 // license that can be found in the LICENSE file.
 
 use integ for std::jule::integrated
-
 use conv for std::conv
 use path for std::fs::path
 use std::jule::ast::{
@@ -109,16 +108,16 @@ pub struct Value {
 
 // Evaluator.
 struct Eval {
-    s:           &Sema // Used for error logging.
+    s:           &Sema     // Used for error logging.
     lookup:      Lookup
     prefix:      &TypeKind
     unsafety:    bool
-    immutable:   bool // This expression will assigned to immutable memory.
-    ignored:     bool // Evaluated expression is not for assignment or something else.
-    dis_builtin: bool // Disallow/suppress Jule's built-in defines.
+    immutable:   bool      // This expression will assigned to immutable memory.
+    ignored:     bool      // Evaluated expression is not for assignment or something else.
+    dis_builtin: bool      // Disallow/suppress Jule's built-in defines.
     owner:       &Var
     field:       &FieldIns // Field of this default expression. Used for checking cycles.
-    arg:         bool // This expression evaluating for argument.
+    arg:         bool      // This expression evaluating for argument.
 }
 
 impl Eval {
@@ -134,7 +133,7 @@ impl Eval {
     fn allow_builtin(mut self) {
         self.dis_builtin = false
     }
-    
+
     fn disallow_builtin(mut self) {
         self.dis_builtin = true
     }
@@ -147,8 +146,10 @@ impl Eval {
     // Reports whether evaluated expression is in global scope.
     fn is_global(self): bool {
         match type self.lookup {
-        | &Sema: ret true
-        |:       ret false
+        | &Sema:
+            ret true
+        |:
+            ret false
         }
     }
 
@@ -191,17 +192,17 @@ impl Eval {
 
         let mut constant = Const.new_nil()
         ret &Data{
-            lvalue:   false,
-            mutable:  false,
+            lvalue: false,
+            mutable: false,
             constant: constant,
-            decl:     false,
-            kind:     &TypeKind{kind: nil},
-            model:    constant,
+            decl: false,
+            kind: &TypeKind{kind: nil},
+            model: constant,
         }
     }
 
     fn lit_str(self, &l: &LitExpr): &Data {
-        let mut s = l.value[1 : l.value.len-1] // Remove quotes.
+        let mut s = l.value[1:l.value.len-1] // Remove quotes.
         if is_raw_str(l.value) {
             s = lit::to_raw_str([]byte(s))
         } else {
@@ -210,10 +211,10 @@ impl Eval {
         let mut constant = Const.new_str(s)
 
         ret &Data{
-            lvalue:   false,
-            mutable:  false,
+            lvalue: false,
+            mutable: false,
             constant: constant,
-            decl:     false,
+            decl: false,
             kind: &TypeKind{
                 kind: build_prim_type(PrimKind.Str),
             },
@@ -224,10 +225,10 @@ impl Eval {
     fn lit_bool(self, &l: &LitExpr): &Data {
         let mut constant = Const.new_bool(l.value == TokenKind.True)
         ret &Data{
-            lvalue:   false,
-            mutable:  false,
+            lvalue: false,
+            mutable: false,
             constant: constant,
-            decl:     false,
+            decl: false,
             kind: &TypeKind{
                 kind: build_prim_type(PrimKind.Bool),
             },
@@ -239,13 +240,14 @@ impl Eval {
         const BYTE_KIND: str = PrimKind.U8
         const RUNE_KIND: str = PrimKind.I32
 
-        let lt = l.value[1 : l.value.len-1] // Remove quotes.
+        let lt = l.value[1:l.value.len-1]
         let r = lit::to_rune([]byte(lt))
         let mut data = &Data{
-            lvalue:   false,
-            mutable:  false,
+            // Remove quotes.
+            lvalue: false,
+            mutable: false,
             constant: Const.new_i64(i64(r)),
-            decl:     false,
+            decl: false,
         }
 
         let is_ascii = lit::is_ascii(r)
@@ -271,10 +273,10 @@ impl Eval {
         let mut constant = Const.new_f64(f)
 
         ret &Data{
-            lvalue:   false,
-            mutable:  false,
+            lvalue: false,
+            mutable: false,
             constant: constant,
-            decl:     false,
+            decl: false,
             kind: &TypeKind{
                 kind: build_prim_type(FLOAT_KIND),
             },
@@ -301,14 +303,15 @@ impl Eval {
         | lit[0] == '0' && lit.len > 1: // Octal
             lit = lit[1:]
             base = 1 << 3
-        |: // Decimal
+        |:
+            // Decimal
             base = 1 << 3 + 2
         }
 
         let mut d = &Data{
-            lvalue:  false,
+            lvalue: false,
             mutable: false,
-            decl:    false,
+            decl: false,
         }
 
         let mut ok = true
@@ -454,10 +457,10 @@ impl Eval {
 
     fn __eval_enum(self, mut enm: &Enum): &Data {
         ret &Data{
-            lvalue:   false,
-            mutable:  false,
+            lvalue: false,
+            mutable: false,
             constant: nil,
-            decl:     true,
+            decl: true,
             kind: &TypeKind{
                 kind: enm,
             },
@@ -476,10 +479,10 @@ impl Eval {
 
     fn __eval_struct(self, mut s: &StructIns): &Data {
         ret &Data{
-            lvalue:   false,
-            mutable:  false,
+            lvalue: false,
+            mutable: false,
             constant: nil,
-            decl:     true,
+            decl: true,
             kind: &TypeKind{
                 kind: s,
             },
@@ -501,10 +504,10 @@ impl Eval {
 
     fn eval_fn_ins(self, mut f: &FnIns): &Data {
         ret &Data{
-            lvalue:   false,
-            mutable:  false,
+            lvalue: false,
+            mutable: false,
             constant: nil,
-            decl:     false,
+            decl: false,
             kind: &TypeKind{
                 kind: f,
             },
@@ -658,11 +661,11 @@ impl Eval {
         }
 
         let mut d = &Data{
-            lvalue:    !v.constant,
-            mutable:   v.mutable,
+            lvalue: !v.constant,
+            mutable: v.mutable,
             reference: v.reference,
-            kind:      v.kind.kind,
-            model:     v,
+            kind: v.kind.kind,
+            model: v,
         }
 
         if !v.cpp_linked && v.is_initialized() && v.value.data != nil {
@@ -769,10 +772,10 @@ impl Eval {
 
         let slc = d.kind.slc()
         d.kind = &TypeKind{
-            variadic:  true,
-            generic:   slc.elem.generic,
+            variadic: true,
+            generic: slc.elem.generic,
             cpp_ident: slc.elem.cpp_ident,
-            kind:      slc.elem.kind,
+            kind: slc.elem.kind,
         }
         ret d
     }
@@ -794,7 +797,7 @@ impl Eval {
 
         let mut arr = &Arr{
             auto: false,
-            n:    0,
+            n: 0,
             elem: pt.elem,
         }
 
@@ -828,7 +831,7 @@ impl Eval {
         }
 
         let mut model = &ArrayExprModel{
-            kind:  arr,
+            kind: arr,
         }
         if filled {
             model.elems = make([]ExprModel, 0, 2)
@@ -870,7 +873,7 @@ impl Eval {
 
         let mut model = &SliceExprModel{
             elem_kind: elem_type,
-            elems:     make([]ExprModel, 0, s.exprs.len),
+            elems: make([]ExprModel, 0, s.exprs.len),
         }
 
         let mut prefix = self.prefix
@@ -899,7 +902,6 @@ impl Eval {
             match {
             | self.prefix.arr() != nil:
                 ret self.eval_arr(s)
-
             | self.prefix.slc() != nil:
                 let mut pt = self.prefix.slc()
                 ret self.eval_exp_slc(s, pt.elem)
@@ -930,10 +932,8 @@ impl Eval {
         match err_key {
         | LogMsg.Empty:
             ret
-
         | LogMsg.InvalidTypeForIndexing:
             self.push_err(token, err_key, d.kind.to_str())
-
         |:
             self.push_err(token, err_key)
         }
@@ -947,7 +947,6 @@ impl Eval {
         | ptr.is_unsafe():
             self.push_err(i.token, LogMsg.UnsafePtrIndexing)
             ret
-
         | !self.is_unsafe():
             self.push_err(i.token, LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
         }
@@ -993,9 +992,9 @@ impl Eval {
 
         let mut m = d.kind.map()
         let mut atc = AssignTypeChecker{
-            s:           self.s,
-            dest:        m.key,
-            d:           index,
+            s: self.s,
+            dest: m.key,
+            d: index,
             error_token: i.token,
         }
         _ = atc.check()
@@ -1035,19 +1034,15 @@ impl Eval {
         | d.kind.ptr() != nil:
             self.indexing_ptr(d, index, i)
             ret
-
         | d.kind.arr() != nil:
             self.indexing_arr(d, index, i)
             ret
-
         | d.kind.slc() != nil:
             self.indexing_slc(d, index, i)
             ret
-
         | d.kind.map() != nil:
             self.indexing_map(d, index, i)
             ret
-
         | d.kind.prim() != nil:
             let prim = d.kind.prim()
             match {
@@ -1081,7 +1076,7 @@ impl Eval {
                 kind: &IdentTypeDecl{
                     token: expr.token,
                     ident: expr.ident,
-                }
+                },
             })
         | &TupleExpr:
             for (_, mut expr) in (&TupleExpr)(i.index.kind).expr {
@@ -1124,7 +1119,7 @@ impl Eval {
             }
             tdecl.kind = &NamespaceTypeDecl{
                 idents: expr.ns,
-                kind:   decl,
+                kind: decl,
             }
         |:
             self.push_err(i.token, LogMsg.InvalidSyntax)
@@ -1172,7 +1167,7 @@ impl Eval {
         } else {
             d.model = &IndexingExprModel{
                 token: i.token,
-                expr:  new(Data, old_d),
+                expr: new(Data, old_d),
                 index: index,
             }
         }
@@ -1202,7 +1197,7 @@ impl Eval {
         } else {
             l = &Data{
                 constant: Const.new_i64(0),
-                kind:     &TypeKind{kind: build_prim_type(PrimKind.Int)},
+                kind: &TypeKind{kind: build_prim_type(PrimKind.Int)},
             }
             l.model = l.constant
         }
@@ -1370,7 +1365,7 @@ impl Eval {
         let mut ptr = d.kind.ptr()
         if ptr != nil && sptr.elem.equals(ptr.elem) {
             if !self.is_unsafe() {
-               self.push_err(error_token, LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
+                self.push_err(error_token, LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
             }
 
             // Ok.
@@ -1438,7 +1433,6 @@ impl Eval {
             match {
             | types::is_sig_int(prim.kind):
                 d.constant.set_i64(d.constant.as_i64())
-
             | types::is_unsig_int(prim.kind):
                 d.constant.set_u64(d.constant.as_u64())
             }
@@ -1644,20 +1638,20 @@ impl Eval {
         self.check_deprecated(s.decl.directives, error_token)
 
         let mut slc = StructLitChecker{
-            e:           self,
+            e: self,
             error_token: error_token,
-            s:           s,
+            s: s,
         }
         slc.check(exprs)
 
         ret &Data{
             mutable: !self.immutable,
-            kind:    &TypeKind{
+            kind: &TypeKind{
                 kind: s,
             },
             model: &StructLitExprModel{
                 strct: s,
-                args:  slc.args,
+                args: slc.args,
             },
         }
     }
@@ -1697,8 +1691,8 @@ impl Eval {
             ret nil
         }
         ret &Data{
-            decl:  true,
-            kind:  tk.kind,
+            decl: true,
+            kind: tk.kind,
             model: tk.kind,
         }
     }
@@ -1862,11 +1856,11 @@ impl Eval {
         }
 
         let mut fcac = FnCallArgChecker{
-            e:                  self,
-            f:                  f,
-            args:               fc.args,
+            e: self,
+            f: f,
+            args: fc.args,
             dynamic_annotation: dynamic_annotation,
-            error_token:        fc.token,
+            error_token: fc.token,
         }
         if f.decl.owner != nil {
             old, self.s = self.s, old // Save current Sema.
@@ -1907,9 +1901,9 @@ impl Eval {
         d.mutable = true
         d.model = &FnCallExprModel{
             token: fc.token,
-            func:  f,
-            expr:  call_model,
-            args:  fcac.arg_models,
+            func: f,
+            expr: call_model,
+            args: fcac.arg_models,
         }
 
         if f.decl.exceptional {
@@ -1920,7 +1914,8 @@ impl Eval {
             | fc.ignored():
                 // Ok.
                 break
-            |: // Handled with scope.
+            |:
+                // Handled with scope.
                 self.process_exceptional_handler(f, fc, d)
             }
         } else if !fc.unhandled() {
@@ -1968,10 +1963,10 @@ impl Eval {
 
     fn eval_enum_static(mut self, mut enm: &Enum, ident: Token): &Data {
         let mut d = &Data{
-            lvalue:  false,
-            decl:    false,
+            lvalue: false,
+            decl: false,
             mutable: false,
-            kind:    &TypeKind{
+            kind: &TypeKind{
                 kind: enm,
             },
         }
@@ -1990,8 +1985,8 @@ impl Eval {
 
     fn eval_struct_static(mut self, mut s: &StructIns, ident: Token): &Data {
         let mut d = &Data{
-            lvalue:  false,
-            decl:    false,
+            lvalue: false,
+            decl: false,
             mutable: false,
         }
 
@@ -2009,8 +2004,8 @@ impl Eval {
             self.push_reference_to_fn(ins)
             d.model = &StructStaticIdentExprModel{
                 structure: s,
-                expr:      d.model,
-                method:    ins,
+                expr: d.model,
+                method: ins,
             }
             d.kind = &TypeKind{
                 kind: ins,
@@ -2035,17 +2030,17 @@ impl Eval {
         }
 
         ret &Data{
-            lvalue:  false,
-            decl:    false,
+            lvalue: false,
+            decl: false,
             mutable: false,
-            kind:    &TypeKind{
+            kind: &TypeKind{
                 kind: f.instance(),
             },
-            model:   &TraitSubIdentExprModel{
-                token:  ident,
-                expr:   d.model,
+            model: &TraitSubIdentExprModel{
+                token: ident,
+                expr: d.model,
                 method: f,
-                trt:    trt,
+                trt: trt,
             },
         }
     }
@@ -2059,10 +2054,10 @@ impl Eval {
             }
 
             let mut model = &StructSubIdentExprModel{
-                token:     si.ident,
+                token: si.ident,
                 expr_kind: d.kind,
-                expr:      new(Data, *d),
-                field:     f,
+                expr: new(Data, *d),
+                field: f,
             }
             d.model = model
             d.kind = f.kind
@@ -2102,10 +2097,10 @@ impl Eval {
         self.push_reference_to_fn(ins)
         let mut model = new(Data, *d)
         d.model = &StructSubIdentExprModel{
-            token:     si.ident,
+            token: si.ident,
             expr_kind: d.kind,
-            expr:      model,
-            method:    ins,
+            expr: model,
+            method: ins,
         }
         d.kind = &TypeKind{kind: ins}
         ret d
@@ -2116,23 +2111,23 @@ impl Eval {
         | "len":
             ret &Data{
                 mutable: false,
-                kind:    &TypeKind{kind: build_prim_type(PrimKind.Int)},
-                model:   &CommonSubIdentExprModel{
-                    token:     ident,
+                kind: &TypeKind{kind: build_prim_type(PrimKind.Int)},
+                model: &CommonSubIdentExprModel{
+                    token: ident,
                     expr_kind: d.kind,
-                    expr:      d.model,
-                    ident:     "len()",
+                    expr: d.model,
+                    ident: "len()",
                 },
             }
         | "cap":
             ret &Data{
                 mutable: false,
-                kind:    &TypeKind{kind: build_prim_type(PrimKind.Int)},
-                model:   &CommonSubIdentExprModel{
-                    token:     ident,
+                kind: &TypeKind{kind: build_prim_type(PrimKind.Int)},
+                model: &CommonSubIdentExprModel{
+                    token: ident,
                     expr_kind: d.kind,
-                    expr:      d.model,
-                    ident:     "cap()",
+                    expr: d.model,
+                    ident: "cap()",
                 },
             }
         | "swap":
@@ -2158,13 +2153,12 @@ impl Eval {
                     },
                 },
                 model: &CommonSubIdentExprModel{
-                    token:     ident,
+                    token: ident,
                     expr_kind: d.kind,
-                    expr:      d.model,
-                    ident:     "swap",
+                    expr: d.model,
+                    ident: "swap",
                 },
             }
-
         |:
             self.push_err(ident, LogMsg.ObjHaveNotIdent, d.kind.to_str(), ident.kind)
             ret nil
@@ -2177,9 +2171,9 @@ impl Eval {
             let mut c = Const.new_i64(i64(d.kind.arr().n))
             ret &Data{
                 constant: c,
-                mutable:  false,
-                kind:     &TypeKind{kind: build_prim_type(PrimKind.Int)},
-                model:    c,
+                mutable: false,
+                kind: &TypeKind{kind: build_prim_type(PrimKind.Int)},
+                model: c,
             }
         | "swap":
             ret &Data{
@@ -2204,13 +2198,12 @@ impl Eval {
                     },
                 },
                 model: &CommonSubIdentExprModel{
-                    token:     ident,
+                    token: ident,
                     expr_kind: d.kind,
-                    expr:      d.model,
-                    ident:     "swap",
+                    expr: d.model,
+                    ident: "swap",
                 },
             }
-
         |:
             self.push_err(ident, LogMsg.ObjHaveNotIdent, d.kind.to_str(), ident.kind)
             ret nil
@@ -2224,12 +2217,12 @@ impl Eval {
         | "len":
             ret &Data{
                 mutable: false,
-                kind:    &TypeKind{kind: build_prim_type(PrimKind.Int)},
+                kind: &TypeKind{kind: build_prim_type(PrimKind.Int)},
                 model: &CommonSubIdentExprModel{
-                    token:     ident,
+                    token: ident,
                     expr_kind: d.kind,
-                    expr:      d.model,
-                    ident:     "len()",
+                    expr: d.model,
+                    ident: "len()",
                 },
             }
         | "clear":
@@ -2241,10 +2234,10 @@ impl Eval {
                     },
                 },
                 model: &CommonSubIdentExprModel{
-                    token:     ident,
+                    token: ident,
                     expr_kind: d.kind,
-                    expr:      d.model,
-                    ident:     "clear",
+                    expr: d.model,
+                    ident: "clear",
                 },
             }
         | "keys":
@@ -2261,10 +2254,10 @@ impl Eval {
                     },
                 },
                 model: &CommonSubIdentExprModel{
-                    token:     ident,
+                    token: ident,
                     expr_kind: d.kind,
-                    expr:      d.model,
-                    ident:     "keys",
+                    expr: d.model,
+                    ident: "keys",
                 },
             }
         | "values":
@@ -2281,10 +2274,10 @@ impl Eval {
                     },
                 },
                 model: &CommonSubIdentExprModel{
-                    token:     ident,
+                    token: ident,
                     expr_kind: d.kind,
-                    expr:      d.model,
-                    ident:     "values",
+                    expr: d.model,
+                    ident: "values",
                 },
             }
         | "has":
@@ -2305,10 +2298,10 @@ impl Eval {
                     },
                 },
                 model: &CommonSubIdentExprModel{
-                    token:     ident,
+                    token: ident,
                     expr_kind: d.kind,
-                    expr:      d.model,
-                    ident:     "has",
+                    expr: d.model,
+                    ident: "has",
                 },
             }
         | "del":
@@ -2328,10 +2321,10 @@ impl Eval {
                     },
                 },
                 model: &CommonSubIdentExprModel{
-                    token:     ident,
+                    token: ident,
                     expr_kind: d.kind,
-                    expr:      d.model,
-                    ident:     "del",
+                    expr: d.model,
+                    ident: "del",
                 },
             }
         |:
@@ -2345,17 +2338,17 @@ impl Eval {
         match ident.kind {
         | "len":
             let mut sd = &Data{
-                kind:    &TypeKind{kind: build_prim_type(PrimKind.Int)},
+                kind: &TypeKind{kind: build_prim_type(PrimKind.Int)},
             }
             if d.is_const() {
                 sd.constant = Const.new_i64(i64(d.constant.read_str().len))
                 sd.model = sd.constant
             } else {
                 sd.model = &CommonSubIdentExprModel{
-                    token:     ident,
+                    token: ident,
                     expr_kind: d.kind,
-                    expr:      d.model,
-                    ident:     "len()",
+                    expr: d.model,
+                    ident: "len()",
                 }
             }
             ret sd
@@ -2373,15 +2366,15 @@ impl Eval {
             let mut c = Const.new_i64(i64(types::max(kind)))
             ret &Data{
                 constant: c,
-                model:    c,
-                kind:     &TypeKind{kind: build_prim_type(kind)},
+                model: c,
+                kind: &TypeKind{kind: build_prim_type(kind)},
             }
         | "MIN":
             let mut c = Const.new_i64(i64(types::min(kind)))
             ret &Data{
                 constant: c,
-                model:    c,
-                kind:     &TypeKind{kind: build_prim_type(kind)},
+                model: c,
+                kind: &TypeKind{kind: build_prim_type(kind)},
             }
         |:
             self.push_err(ident, LogMsg.TypeHaveNotIdent, kind, ident.kind)
@@ -2397,8 +2390,8 @@ impl Eval {
             let mut c = Const.new_u64(u64(types::max(kind)))
             ret &Data{
                 constant: c,
-                model:    c,
-                kind:     &TypeKind{kind: build_prim_type(kind)},
+                model: c,
+                kind: &TypeKind{kind: build_prim_type(kind)},
             }
         |:
             self.push_err(ident, LogMsg.TypeHaveNotIdent, kind, ident.kind)
@@ -2416,15 +2409,15 @@ impl Eval {
             let mut c = Const.new_i64(max)
             ret &Data{
                 constant: c,
-                model:    c,
-                kind:     &TypeKind{kind: build_prim_type(kind)},
+                model: c,
+                kind: &TypeKind{kind: build_prim_type(kind)},
             }
         | "MIN":
             let mut c = Const.new_i64(min)
             ret &Data{
                 constant: c,
-                model:    c,
-                kind:     &TypeKind{kind: build_prim_type(kind)},
+                model: c,
+                kind: &TypeKind{kind: build_prim_type(kind)},
             }
         |:
             self.push_err(ident, LogMsg.TypeHaveNotIdent, kind, ident.kind)
@@ -2442,15 +2435,15 @@ impl Eval {
             let mut c = Const.new_i64(max)
             ret &Data{
                 constant: c,
-                model:    c,
-                kind:     &TypeKind{kind: build_prim_type(kind)},
+                model: c,
+                kind: &TypeKind{kind: build_prim_type(kind)},
             }
         | "MIN":
             let mut c = Const.new_i64(min)
             ret &Data{
                 constant: c,
-                model:    c,
-                kind:     &TypeKind{kind: build_prim_type(kind)},
+                model: c,
+                kind: &TypeKind{kind: build_prim_type(kind)},
             }
         |:
             self.push_err(ident, LogMsg.TypeHaveNotIdent, kind, ident.kind)
@@ -2468,15 +2461,15 @@ impl Eval {
             let mut c = Const.new_i64(max)
             ret &Data{
                 constant: c,
-                model:    c,
-                kind:     &TypeKind{kind: build_prim_type(kind)},
+                model: c,
+                kind: &TypeKind{kind: build_prim_type(kind)},
             }
         | "MIN":
             let mut c = Const.new_i64(min)
             ret &Data{
                 constant: c,
-                model:    c,
-                kind:     &TypeKind{kind: build_prim_type(kind)},
+                model: c,
+                kind: &TypeKind{kind: build_prim_type(kind)},
             }
         |:
             self.push_err(ident, LogMsg.TypeHaveNotIdent, kind, ident.kind)
@@ -2494,15 +2487,15 @@ impl Eval {
             let mut c = Const.new_i64(max)
             ret &Data{
                 constant: c,
-                model:    c,
-                kind:     &TypeKind{kind: build_prim_type(kind)},
+                model: c,
+                kind: &TypeKind{kind: build_prim_type(kind)},
             }
         | "MIN":
             let mut c = Const.new_i64(min)
             ret &Data{
                 constant: c,
-                model:    c,
-                kind:     &TypeKind{kind: build_prim_type(kind)},
+                model: c,
+                kind: &TypeKind{kind: build_prim_type(kind)},
             }
         |:
             self.push_err(ident, LogMsg.TypeHaveNotIdent, kind, ident.kind)
@@ -2519,8 +2512,8 @@ impl Eval {
             let mut c = Const.new_u64(max)
             ret &Data{
                 constant: c,
-                model:    c,
-                kind:     &TypeKind{kind: build_prim_type(kind)},
+                model: c,
+                kind: &TypeKind{kind: build_prim_type(kind)},
             }
         |:
             self.push_err(ident, LogMsg.TypeHaveNotIdent, kind, ident.kind)
@@ -2537,8 +2530,8 @@ impl Eval {
             let mut c = Const.new_u64(max)
             ret &Data{
                 constant: c,
-                model:    c,
-                kind:     &TypeKind{kind: build_prim_type(kind)},
+                model: c,
+                kind: &TypeKind{kind: build_prim_type(kind)},
             }
         |:
             self.push_err(ident, LogMsg.TypeHaveNotIdent, kind, ident.kind)
@@ -2555,8 +2548,8 @@ impl Eval {
             let mut c = Const.new_u64(max)
             ret &Data{
                 constant: c,
-                model:    c,
-                kind:     &TypeKind{kind: build_prim_type(kind)},
+                model: c,
+                kind: &TypeKind{kind: build_prim_type(kind)},
             }
         |:
             self.push_err(ident, LogMsg.TypeHaveNotIdent, kind, ident.kind)
@@ -2573,8 +2566,8 @@ impl Eval {
             let mut c = Const.new_u64(max)
             ret &Data{
                 constant: c,
-                model:    c,
-                kind:     &TypeKind{kind: build_prim_type(kind)},
+                model: c,
+                kind: &TypeKind{kind: build_prim_type(kind)},
             }
         |:
             self.push_err(ident, LogMsg.TypeHaveNotIdent, kind, ident.kind)
@@ -2593,22 +2586,22 @@ impl Eval {
             let mut c = Const.new_f64(max)
             ret &Data{
                 constant: c,
-                model:    c,
-                kind:     &TypeKind{kind: build_prim_type(kind)},
+                model: c,
+                kind: &TypeKind{kind: build_prim_type(kind)},
             }
         | "MIN":
             let mut c = Const.new_f64(min)
             ret &Data{
                 constant: c,
-                model:    c,
-                kind:     &TypeKind{kind: build_prim_type(kind)},
+                model: c,
+                kind: &TypeKind{kind: build_prim_type(kind)},
             }
         | "SMALLEST_NON_ZERO":
             let mut c = Const.new_f64(smallest_non_zero)
             ret &Data{
                 constant: c,
-                model:    c,
-                kind:     &TypeKind{kind: build_prim_type(kind)}
+                model: c,
+                kind: &TypeKind{kind: build_prim_type(kind)},
             }
         |:
             self.push_err(ident, LogMsg.TypeHaveNotIdent, kind, ident.kind)
@@ -2627,22 +2620,22 @@ impl Eval {
             let mut c = Const.new_f64(max)
             ret &Data{
                 constant: c,
-                model:    c,
-                kind:     &TypeKind{kind: build_prim_type(kind)},
+                model: c,
+                kind: &TypeKind{kind: build_prim_type(kind)},
             }
         | "MIN":
             let mut c = Const.new_f64(min)
             ret &Data{
                 constant: c,
-                model:    c,
-                kind:     &TypeKind{kind: build_prim_type(kind)},
+                model: c,
+                kind: &TypeKind{kind: build_prim_type(kind)},
             }
         | "SMALLEST_NON_ZERO":
             let mut c = Const.new_f64(smallest_non_zero)
             ret &Data{
                 constant: c,
-                model:    c,
-                kind:     &TypeKind{kind: build_prim_type(kind)}
+                model: c,
+                kind: &TypeKind{kind: build_prim_type(kind)},
             }
         |:
             self.push_err(ident, LogMsg.TypeHaveNotIdent, kind, ident.kind)
@@ -2784,7 +2777,7 @@ impl Eval {
         }
 
         ret &Data{
-            kind:  &TypeKind{kind: tup_t},
+            kind: &TypeKind{kind: tup_t},
             model: model,
         }
     }
@@ -2827,9 +2820,9 @@ impl Eval {
         }
 
         ret &Data{
-            mutable:    true,
-            kind:       &TypeKind{kind: m},
-            model:      model,
+            mutable: true,
+            kind: &TypeKind{kind: m},
+            model: model,
         }
     }
 
@@ -2850,7 +2843,7 @@ impl Eval {
 
     fn eval_anon_fn(mut self, mut decl: &FnDecl): &Data {
         let mut tc = TypeChecker{
-            s:      self.s,
+            s: self.s,
             lookup: self.lookup,
         }
         let mut ins = tc.build_fn(decl)
@@ -2868,7 +2861,6 @@ impl Eval {
             scc.cse = 0
             scc.owner = ins
             self.s.check_fn_ins_sc(ins, scc)
-
         |:
             self.s.check_fn_ins(ins)
         }
@@ -2876,7 +2868,7 @@ impl Eval {
         ret &Data{
             kind: &TypeKind{kind: ins},
             model: &AnonFnExprModel{
-                func:   ins,
+                func: ins,
                 global: self.is_global(),
             },
         }
@@ -3063,7 +3055,7 @@ impl UnaryEval {
         self.d.lvalue = false
         self.d.model = &UnaryExprModel{
             expr: new(Data, *self.d),
-            op:   self.u.op,
+            op: self.u.op,
         }
     }
 
@@ -3101,7 +3093,7 @@ impl UnaryEval {
         self.d.lvalue = false
         self.d.model = &UnaryExprModel{
             expr: new(Data, *self.d),
-            op:   self.u.op,
+            op: self.u.op,
         }
     }
 
@@ -3137,7 +3129,7 @@ impl UnaryEval {
         self.d.lvalue = false
         self.d.model = &UnaryExprModel{
             expr: new(Data, *self.d),
-            op:   self.u.op,
+            op: self.u.op,
         }
     }
 
@@ -3158,14 +3150,14 @@ impl UnaryEval {
         self.d.lvalue = false
         self.d.model = &UnaryExprModel{
             expr: new(Data, *self.d),
-            op:   self.u.op,
+            op: self.u.op,
         }
     }
 
     fn star(mut self) {
         self.d.model = &UnaryExprModel{
             expr: new(Data, *self.d),
-            op:   self.u.op,
+            op: self.u.op,
         }
 
         match {
@@ -3204,9 +3196,8 @@ impl UnaryEval {
                 }
                 self.d.model = &UnaryExprModel{
                     expr: new(Data, *self.d),
-                    op:   self.u.op,
+                    op: self.u.op,
                 }
-
             |:
                 self.d = nil
             }
@@ -3220,8 +3211,8 @@ impl UnaryEval {
 
     fn type_decl(mut self) {
         let mut tc = TypeChecker{
-            s:           self.e.s,
-            lookup:      self.e.lookup,
+            s: self.e.s,
+            lookup: self.e.lookup,
             error_token: self.u.op,
         }
         match self.u.op.kind {
@@ -3305,13 +3296,13 @@ struct BinaryEval {
 impl BinaryEval {
     static fn new_plain(mut e: &Eval): BinaryEval {
         ret BinaryEval{
-            e:  e,
+            e: e,
         }
     }
 
     static fn new(mut e: &Eval, mut op: Token): BinaryEval {
         ret BinaryEval{
-            e:  e,
+            e: e,
             op: op,
         }
     }
@@ -4058,11 +4049,11 @@ impl BinaryEval {
 
         d.model = &BinopExprModel{
             left: &OperandExprModel{
-                kind:  l.kind,
+                kind: l.kind,
                 model: l.model,
             },
             right: &OperandExprModel{
-                kind:  r.kind,
+                kind: r.kind,
                 model: r.model,
             },
             op: self.op,
@@ -4147,7 +4138,7 @@ fn find_builtins_import(ident: str, imp: &ImportInfo): any {
 fn fit_bitsize(mut &d: &Data) {
     let mut prim = d.kind.prim()
     let z = types::bitsize_of(prim.to_str())
-    if z == 1 << 6 {
+    if z == 1<<6 {
         // z is already equals to biggest bitsize.
         ret
     }
@@ -4184,12 +4175,12 @@ fn make_struct_lit_alloc(mut &d: &Data, mut &lit: &StructLitExprModel) {
 
 fn build_error_var(mut &s: &Scope, mut &fc: &FnCallExpr): &Var {
     ret &Var{
-        used:      true,
+        used: true,
         reference: false,
-        mutable:   true,
-        ident:     "error",
-        token:     fc.token,
-        kind:      &TypeSymbol{
+        mutable: true,
+        ident: "error",
+        token: fc.token,
+        kind: &TypeSymbol{
             kind: &TypeKind{
                 kind: build_prim_type(PrimKind.Any),
             },
@@ -4262,8 +4253,8 @@ fn is_ptr_arithmetic_compatible_int(mut &d: &Data): bool {
 
 fn apply_cast_kind_model(mut &d: &Data) {
     d.model = &CastingExprModel{
-        expr:      d.model,
-        kind:      d.cast_kind,
+        expr: d.model,
+        kind: d.cast_kind,
         expr_kind: d.kind,
     }
 }
@@ -4280,9 +4271,9 @@ fn apply_cast_kind(mut &d: &Data) {
 
 fn build_void_data(): &Data {
     ret &Data{
-        mutable:  false,
-        lvalue:   false,
-        decl:     false,
+        mutable: false,
+        lvalue: false,
+        decl: false,
         kind: &TypeKind{
             kind: build_prim_type("void"),
         },

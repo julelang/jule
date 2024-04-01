@@ -48,11 +48,11 @@ use strings for std::strings
 
 fn make_err(row: int, col: int, &f: &File, fmt: LogMsg, args: ...any): Log {
     ret Log{
-        kind:   LogKind.Error,
-        row:    row,
+        kind: LogKind.Error,
+        row: row,
         column: col,
-        path:   f.path,
-        text:   logf(fmt, args...),
+        path: f.path,
+        text: logf(fmt, args...),
     }
 }
 
@@ -82,13 +82,15 @@ fn range(mut &i: int, open: TokenKind, close: TokenKind, mut &tokens: []Token): 
         let token = tokens[i]
         if token.id == TokenId.Range {
             match token.kind {
-            | open: range_n++
-            | close: range_n--
+            | open:
+                range_n++
+            | close:
+                range_n--
             }
         }
     }
 
-    ret tokens[start : i-1]
+    ret tokens[start:i-1]
 }
 
 // Range_last returns last range from tokens.
@@ -116,7 +118,6 @@ fn range_last(mut &tokens: []Token): (cutted: []Token, cut: []Token) {
             | TokenKind.RParent:
                 brace_n++
                 continue
-
             |:
                 brace_n--
             }
@@ -184,21 +185,25 @@ fn parts(mut &tokens: []Token, id: TokenId, expr_must: bool): ([][]Token, []Log)
 
 fn get_close_kind_of_brace(left: str): str {
     match left {
-        | TokenKind.RParent:  ret TokenKind.LParent
-        | TokenKind.RBrace:   ret TokenKind.LBrace
-        | TokenKind.RBracket: ret TokenKind.LBracket
-        |:                        ret ""
+    | TokenKind.RParent:
+        ret TokenKind.LParent
+    | TokenKind.RBrace:
+        ret TokenKind.LBrace
+    | TokenKind.RBracket:
+        ret TokenKind.LBracket
+    |:
+        ret ""
     }
 }
 
 fn compiler_err(&token: Token, &fmt: LogMsg, args: ...any): Log {
     ret Log{
-        kind:   LogKind.Error,
-        row:    token.row,
+        kind: LogKind.Error,
+        row: token.row,
         column: token.column,
-        path:   token.file.path,
-        text:   logf(fmt, args...),
-        line:   token.file.get_row(token.row),
+        path: token.file.path,
+        text: logf(fmt, args...),
+        line: token.file.get_row(token.row),
     }
 }
 
@@ -252,7 +257,7 @@ impl Parser {
         }
 
         ret &Directive{
-            tag:  tokens[1],
+            tag: tokens[1],
             args: tokens[2:], // Start 2 to skip '#', and tag tokens.
         }
     }
@@ -284,10 +289,10 @@ impl Parser {
     unsafe fn __build_type(mut &self, mut &tokens: []Token,
         mut i: *int, err: bool): (&TypeDecl, bool) {
         let mut tb = TypeBuilder{
-            p:      self,
+            p: self,
             tokens: tokens,
-            i:      i,
-            err:    err,
+            i: i,
+            err: err,
         }
         let (mut decl, ok) = tb.build()
         ret decl, ok
@@ -349,7 +354,7 @@ impl Parser {
         if tok.id == TokenId.Colon {
             i++ // Skip type annotation operator (:)
             if (i >= tokens.len ||
-            (tokens[i].id == TokenId.Op && tokens[i].kind == TokenKind.Eq)) {
+                (tokens[i].id == TokenId.Op && tokens[i].kind == TokenKind.Eq)) {
                 self.push_err(tok, LogMsg.MissingType)
                 ret
             }
@@ -400,7 +405,6 @@ impl Parser {
         | TokenId.Static:
             v.statically = true
             fall
-
         | TokenId.Let:
             // Initialize 1 for skip the let keyword
             *i++
@@ -413,11 +417,9 @@ impl Parser {
                 // Skip the mut keyword
                 *i++
             }
-
         | TokenId.Const:
             *i++
             v.constant = true
-
         |:
             self.push_err(tok, LogMsg.InvalidSyntax)
             ret
@@ -560,7 +562,7 @@ impl Parser {
         // +1 for skip identifier token
         if *i+1 >= tokens.len {
             ret
-        } else if tokens.len - *i - 1 < 2 {
+        } else if tokens.len-*i-1 < 2 {
             self.push_err(tok, LogMsg.MissingType)
             ret
         }
@@ -629,7 +631,7 @@ impl Parser {
             } else {
                 param.kind = &TypeDecl{
                     token: param.token,
-                    kind:  &IdentTypeDecl{
+                    kind: &IdentTypeDecl{
                         token: param.token,
                         ident: param.token.kind,
                     },
@@ -705,7 +707,6 @@ impl Parser {
             token = part[0]
             if offset == 2 {
                 if token.id != TokenId.Ident {
-
                 }
                 t.idents = append(t.idents, token)
             } else {
@@ -723,7 +724,7 @@ impl Parser {
         if types.len > 1 {
             t.kind = &TypeDecl{
                 token: tokens[0],
-                kind:  &TupleTypeDecl{
+                kind: &TupleTypeDecl{
                     types: types,
                 },
             }
@@ -877,7 +878,7 @@ impl Parser {
         }
         let mut block_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
         if block_tokens != nil {
-            f.scope = self.build_scope(block_tokens, tokens[i - 1])
+            f.scope = self.build_scope(block_tokens, tokens[i-1])
             f.scope.unsafety = f.unsafety
             if i < tokens.len {
                 self.push_err(tokens[i], LogMsg.InvalidSyntax)
@@ -926,7 +927,7 @@ impl Parser {
             ret
         }
         decl.cpp_linked = true
-        decl.link_path = token.kind[1 : token.kind.len-1]
+        decl.link_path = token.kind[1:token.kind.len-1]
     }
 
     fn build_std_use_decl(mut self, mut &decl: &UseDecl, mut tokens: []Token) {
@@ -944,7 +945,6 @@ impl Parser {
         | TokenId.DblColon:
             self.push_err(token, LogMsg.InvalidSyntax)
             ret
-
         | TokenId.Range:
             if token.kind != TokenKind.RBrace {
                 self.push_err(token, LogMsg.InvalidSyntax)
@@ -967,7 +967,6 @@ impl Parser {
                 self.push_err(token, LogMsg.InvalidSyntax)
                 ret
             }
-
         | TokenId.Op:
             if token.kind != TokenKind.Star {
                 self.push_err(token, LogMsg.InvalidSyntax)
@@ -1001,7 +1000,6 @@ impl Parser {
         | TokenId.DblColon:
             self.push_err(token, LogMsg.InvalidSyntax)
             ret
-
         | TokenId.Range:
             if token.kind != TokenKind.RBrace {
                 self.push_err(token, LogMsg.InvalidSyntax)
@@ -1027,7 +1025,6 @@ impl Parser {
                 self.push_err(token, LogMsg.InvalidSyntax)
                 ret
             }
-
         | TokenId.Op:
             if token.kind != TokenKind.Star {
                 self.push_err(token, LogMsg.InvalidSyntax)
@@ -1087,7 +1084,6 @@ impl Parser {
         match {
         | token.kind == STD_LIB_PREFIX:
             self.build_std_use_decl(decl, tokens)
-
         |:
             self.build_ident_use_decl(decl, tokens)
         }
@@ -1095,7 +1091,7 @@ impl Parser {
 
     fn build_use_decl(mut self, mut tokens: []Token, cpp_linked: bool): &UseDecl {
         let mut decl = &UseDecl{
-            token:      tokens[0],
+            token: tokens[0],
             cpp_linked: cpp_linked,
         }
         if tokens.len < 2 {
@@ -1119,7 +1115,6 @@ impl Parser {
                 | TokenKind.LParent:
                     brace_n++
                     continue
-
                 |:
                     brace_n--
                 }
@@ -1218,7 +1213,7 @@ impl Parser {
         } else if i < tokens.len {
             self.push_err(tokens[i], LogMsg.InvalidSyntax)
         }
-        e.end = tokens[i - 1]
+        e.end = tokens[i-1]
         e.items = self.build_enum_items(item_tokens)
         ret e
     }
@@ -1335,7 +1330,7 @@ impl Parser {
             self.push_err(tokens[i], LogMsg.InvalidSyntax)
         }
         s.fields = self.build_struct_decl_fields(body_tokens)
-        s.end = tokens[i - 1]
+        s.end = tokens[i-1]
         ret s
     }
 
@@ -1419,7 +1414,7 @@ impl Parser {
             self.push_err(tokens[i], LogMsg.InvalidSyntax)
         }
         t.methods = self.build_trait_methods(body_tokens)
-        t.end = tokens[i - 1]
+        t.end = tokens[i-1]
         ret t
     }
 
@@ -1486,21 +1481,16 @@ impl Parser {
         match token.id {
         | TokenId.Use:
             ret self.build_cpp_link_use(tokens)
-
         | TokenId.Fn
         | TokenId.Unsafe:
             ret self.build_cpp_link_fn(tokens)
-
         | TokenId.Const
         | TokenId.Let:
             ret self.build_cpp_link_var(tokens)
-
         | TokenId.Struct:
             ret self.build_cpp_link_struct(tokens)
-
         | TokenId.Type:
             ret self.build_cpp_link_type_alias(tokens)
-
         |:
             self.push_err(token, LogMsg.InvalidSyntax)
         }
@@ -1653,7 +1643,7 @@ impl Parser {
         if i < tokens.len {
             self.push_err(tokens[i], LogMsg.InvalidSyntax)
         }
-        ipl.end = tokens[i - 1]
+        ipl.end = tokens[i-1]
         self.parse_impl_body(ipl, body_tokens)
         ret ipl
     }
@@ -1880,7 +1870,7 @@ impl Parser {
         } else if tokens[ranges[n-1]].kind != left {
             self.push_wrong_order_close_err(t, tokens, ranges)
         }
-        self.remove_range(n-1, t.kind, tokens, ranges)
+        self.remove_range(n - 1, t.kind, tokens, ranges)
     }
 
     fn check_ranges(mut self, &tokens: []Token) {

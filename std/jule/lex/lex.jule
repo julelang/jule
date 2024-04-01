@@ -8,7 +8,7 @@ use utf8 for std::unicode::utf8
 // Lexer mode.
 pub enum LexMode {
     Standard = 0 << 0, // Standard mode.
-    Comment  = 1 << 0, // Standard mode + comments.
+    Comment = 1 << 0,  // Standard mode + comments.
 }
 
 struct KindPair {
@@ -110,11 +110,11 @@ static BASIC_OPS: [...]KindPair = [
 
 fn make_err(row: int, col: int, &f: &File, fmt: LogMsg, args: ...any): Log {
     ret Log{
-        kind:   LogKind.Error,
-        row:    row,
+        kind: LogKind.Error,
+        row: row,
         column: col,
-        path:   f.path,
-        text:   logf(fmt, args...),
+        path: f.path,
+        text: logf(fmt, args...),
     }
 }
 
@@ -180,10 +180,8 @@ loop:
         match {
         | b == '_' | is_decimal(b):
             continue
-
         | is_float_fmt_p(b, i):
             ret float_fmt_p(txt, i)
-
         |:
             break loop
         }
@@ -513,9 +511,12 @@ impl Lex {
                 const TAB_LEN = 8
                 self.pos++
                 match r {
-                | '\n': self.new_line()
-                | '\t': self.column += TAB_LEN
-                |:      self.column++
+                | '\n':
+                    self.new_line()
+                | '\t':
+                    self.column += TAB_LEN
+                |:
+                    self.column++
                 }
                 continue
             }
@@ -541,7 +542,7 @@ impl Lex {
                 break
             }
         }
-        if self.mode & LexMode.Comment == LexMode.Comment {
+        if self.mode&LexMode.Comment == LexMode.Comment {
             token.id = TokenId.Comment
             token.kind = str(self.file.data[start:self.pos])
         }
@@ -564,7 +565,7 @@ impl Lex {
                 self.file.data[self.pos+1] == '/' {
                 self.column += 2
                 self.pos += 2
-                if self.mode & LexMode.Comment == LexMode.Comment {
+                if self.mode&LexMode.Comment == LexMode.Comment {
                     token.id = TokenId.Comment
                     token.kind = str(self.file.data[start:self.pos])
                 }
@@ -607,16 +608,12 @@ impl Lex {
         | '\\' | '\'' | '"' | 'a' | 'b' | 'f' | 'n' | 'r' | 't' | 'v':
             self.pos += 2
             ret str(txt[:2])
-
         | 'U':
             seq = big_unicode_point_escape(txt)
-
         | 'u':
             seq = little_unicode_point_escape(txt)
-
         | 'x':
             seq = hex_byte_escape(txt)
-
         |:
             seq = byte_escape(txt)
         }
@@ -635,7 +632,7 @@ impl Lex {
         if !raw && txt[0] == '\\' {
             ret self.escape_seq(txt)
         }
-    
+
         let (r, n) = utf8::decode_rune(txt)
         self.pos += n
         ret str(r)
@@ -837,8 +834,8 @@ pub fn lex(mut f: &File, mode: LexMode): []Log {
     let mut lex = Lex{
         mode: mode,
         file: f,
-        pos:  0,
-        row:  -1, // For true row
+        pos: 0,
+        row: -1, // For true row
     }
 
     lex.new_line()

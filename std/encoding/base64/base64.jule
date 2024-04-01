@@ -14,19 +14,19 @@ const PADDING_BYTE = '='
 
 static I64: [123]int = [
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 62, 63, 62, 62, 63, 52, 53, 54, 55,
     56, 57, 58, 59, 60, 61, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6,
     7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 0,
     0, 0, 0, 63, 0, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40,
-    41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51
+    41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51,
 ]
 
 // Encodes source bytes with standard base64 table.
 // Returns encoded base64 bytes if success, nil slice if not.
 // Adds padding if pad is true.
 pub fn encode(src: []byte, pad: bool): []byte {
-    let mut blen = 4*((src.len + 2) / 3)
+    let mut blen = 4 * ((src.len + 2) / 3)
     if pad {
         if blen%4 != 0 { // Padding 1
             blen--
@@ -51,32 +51,32 @@ pub fn encode(src: []byte, pad: bool): []byte {
     let end = i + src.len
     for i+3 <= end; i += 3 {
         unsafe {
-            *j = tp[i[0] >> 2]
+            *j = tp[i[0]>>2]
             j++
-            *j = tp[((i[0] & 0x03) << 4) | (i[1] >> 4)]
+            *j = tp[((i[0]&0x03)<<4)|(i[1]>>4)]
             j++
-            *j = tp[((i[1] & 0x0f) << 2) | (i[2] >> 6)]
+            *j = tp[((i[1]&0x0f)<<2)|(i[2]>>6)]
             j++
-            *j = tp[i[2] & 0x3f]
+            *j = tp[i[2]&0x3f]
             j++
         }
     }
 
     if i < end {
         unsafe {
-            *j = tp[i[0] >> 2]
+            *j = tp[i[0]>>2]
             j++
             if i+1 == end {
-                *j = tp[(i[0] & 0x03) << 4]
+                *j = tp[(i[0]&0x03)<<4]
                 j++
                 if pad {
                     *j = PADDING_BYTE
                     j++
                 }
             } else {
-                *j = tp[((i[0] & 0x03) << 4) | (i[1] >> 4)]
+                *j = tp[((i[0]&0x03)<<4)|(i[1]>>4)]
                 j++
-                *j = tp[(i[1] & 0x0f) << 2]
+                *j = tp[(i[1]&0x0f)<<2]
                 j++
             }
             if pad {
@@ -107,7 +107,7 @@ pub fn decode(src: []byte): []byte {
     }
     l /= 4 << 2
 
-    let mut sz = l/4 * 3
+    let mut sz = l / 4 * 3
     if pad1 {
         sz++
     }
@@ -123,7 +123,7 @@ pub fn decode(src: []byte): []byte {
     let mut i = 0
     for i < l; i += 4 {
         unsafe {
-            let n = ip[p[i]]<<18 | ip[p[i + 1]]<<12 | ip[p[i + 2]]<<6 | ip[p[i + 3]]
+            let n = ip[p[i]] << 18 | ip[p[i+1]] << 12 | ip[p[i+2]] << 6 | ip[p[i+3]]
             d[j] = byte(n >> 16)
             j++
             d[j] = byte(n >> 8 & 0xFF)
@@ -135,11 +135,11 @@ pub fn decode(src: []byte): []byte {
 
     if pad1 {
         unsafe {
-            let mut n = ip[p[l]]<<18 | ip[p[l + 1]]<<12
+            let mut n = ip[p[l]] << 18 | ip[p[l+1]] << 12
             d[j] = byte(n >> 16)
             j++
             if pad2 {
-                n |= ip[p[l + 2]] << 6
+                n |= ip[p[l+2]] << 6
                 d[j] = byte(n >> 8 & 0xFF)
                 j++
             }
@@ -164,8 +164,10 @@ pub fn encode_url(src: []byte): []byte {
     for i < end; i++ {
         unsafe {
             match *i {
-            | '+': *i = '-'
-            | '/': *i = '_'
+            | '+':
+                *i = '-'
+            | '/':
+                *i = '_'
             }
         }
     }
@@ -183,8 +185,10 @@ pub fn decode_url(src: []byte): []byte {
     for i < end; i++ {
         unsafe {
             match *i {
-            | '-': *i = '+'
-            | '_': *i = '/'
+            | '-':
+                *i = '+'
+            | '_':
+                *i = '/'
             // Padding detected by algorithm.
             }
         }

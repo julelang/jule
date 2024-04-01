@@ -5,27 +5,29 @@
 cpp use "<time.h>"
 
 cpp type time_t: u64
+
 cpp unsafe fn time(t: *cpp.time_t): cpp.time_t
 
 const HOUR = 3600
-const DAY  = HOUR * 24
+const DAY = HOUR * 24
 
 // unix-year offset by today
 const UNIX_YEAR_OFFSET = 1900
+
 // unix-month offset by today
 const UNIX_MONTH_OFFSET = 1
 
 const NSEC_PER_MSEC = 1000000
-const NSEC_PER_SEC  = NSEC_PER_MSEC * MSEC_PER_SEC
-const MSEC_PER_SEC  = 1000
-const DAYS_PER_Y    = 365
-const DAYS_PER_400Y = DAYS_PER_Y*400 + 97
-const DAYS_PER_100Y = DAYS_PER_Y*100 + 24
-const DAYS_PER_4Y   = DAYS_PER_Y*4 + 1
+const NSEC_PER_SEC = NSEC_PER_MSEC * MSEC_PER_SEC
+const MSEC_PER_SEC = 1000
+const DAYS_PER_Y = 365
+const DAYS_PER_400Y = DAYS_PER_Y * 400 + 97
+const DAYS_PER_100Y = DAYS_PER_Y * 100 + 24
+const DAYS_PER_4Y = DAYS_PER_Y * 4 + 1
 
 // 2000-03-01 (mod 400 year, immediately after feb29
 const _2000_03_01 = 946684800
-const MOD_APOCH   = _2000_03_01 + DAY*(31+29)
+const MOD_APOCH = _2000_03_01 + DAY * (31 + 29)
 
 // Days in month.
 static MDAYS: [...]u64 = [31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29]
@@ -65,7 +67,7 @@ impl AbsTime {
         }
         let mut t = unix_year_to_seconds(y, leap)
         t += unix_month_to_seconds(m, leap)
-        t += DAY * (self.day-1)
+        t += DAY * (self.day - 1)
         t += HOUR * self.hour
         t += 60 * self.minute
         t += self.second
@@ -170,7 +172,7 @@ impl Time {
         }
 
         let mut t = AbsTime{}
-        t.year = rem_years + 4*q_cycles + 100*c_cycles + 400*qc_cycles + 100
+        t.year = rem_years + 4 * q_cycles + 100 * c_cycles + 400 * qc_cycles + 100
         t.month = months + 2
         if t.month >= 12 {
             t.month -= 12
@@ -179,7 +181,7 @@ impl Time {
         t.month += UNIX_MONTH_OFFSET
         t.year += UNIX_YEAR_OFFSET
         t.day = rem_days + 1
-        t.week_day = (3+days) % 7
+        t.week_day = (3 + days) % 7
         if t.week_day < 0 {
             t.week_day += 7
         }
@@ -254,28 +256,28 @@ impl Duration {
 
 // Returns current unix time UTC.
 fn unix(): UnixTime {
-    ret UnixTime(unsafe{ cpp.time(nil) })
+    ret UnixTime(unsafe { cpp.time(nil) })
 }
 
 fn unix_year_to_seconds(y: TimeData, mut &leap: bool): UnixTime {
     if y-2 <= 136 {
-        let mut leaps = (y-68)>>2
-        leap = (y-68)&3 == 0
+        let mut leaps = (y - 68) >> 2
+        leap = (y - 68)&3 == 0
         if leap {
             leaps--
         }
-        ret 31536000*(y-70) + DAY*leaps
+        ret 31536000 * (y - 70) + DAY * leaps
     }
 
     let mut leaps: TimeData = 0
     let mut centuries: TimeData = 0
-    let mut cycles = (y-100) / 400
-    let mut rem = (y-100) % 400
+    let mut cycles = (y - 100) / 400
+    let mut rem = (y - 100) % 400
     if rem < 0 {
         cycles--
         rem += 400
     }
-    if rem == 0{
+    if rem == 0 {
         leap = true
         centuries = 0
         leaps = 0
@@ -306,29 +308,40 @@ fn unix_year_to_seconds(y: TimeData, mut &leap: bool): UnixTime {
         }
     }
 
-    leaps += 97*cycles + 24*centuries
+    leaps += 97 * cycles + 24 * centuries
     if leap {
         leaps++
     }
 
-    ret (y-100)*31536000 + leaps*DAY + 946684800 + DAY
+    ret (y - 100) * 31536000 + leaps * DAY + 946684800 + DAY
 }
 
 fn unix_month_to_seconds(m: TimeData, leap: bool): UnixTime {
     // Set seconds through month.
     let mut t: UnixTime = 0
     match m {
-    | 1:  t = 31*DAY
-    | 2:  t = 59*DAY
-    | 3:  t = 90*DAY
-    | 4:  t = 120*DAY
-    | 5:  t = 151*DAY
-    | 6:  t = 181*DAY
-    | 7:  t = 212*DAY
-    | 8:  t = 243*DAY
-    | 9:  t = 273*DAY
-    | 10: t = 304*DAY
-    | 11: t = 334*DAY
+    | 1:
+        t = 31 * DAY
+    | 2:
+        t = 59 * DAY
+    | 3:
+        t = 90 * DAY
+    | 4:
+        t = 120 * DAY
+    | 5:
+        t = 151 * DAY
+    | 6:
+        t = 181 * DAY
+    | 7:
+        t = 212 * DAY
+    | 8:
+        t = 243 * DAY
+    | 9:
+        t = 273 * DAY
+    | 10:
+        t = 304 * DAY
+    | 11:
+        t = 334 * DAY
     }
 
     if leap && m >= 2 {

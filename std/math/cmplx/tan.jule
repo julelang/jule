@@ -67,18 +67,18 @@ impl Cmplx {
             | math::is_inf(self.real(), 0) | math::is_nan(self.real()):
                 ret Cmplx.new(math::copysign(0, self.real()), math::copysign(1, self.imag()))
             }
-            ret Cmplx.new(math::copysign(0, math::sin(2*self.real())), math::copysign(1, self.imag()))
+            ret Cmplx.new(math::copysign(0, math::sin(2 * self.real())), math::copysign(1, self.imag()))
         | self.real() == 0 && math::is_nan(self.imag()):
             ret self
         }
-        let mut d = math::cos(2*self.real()) + math::cosh(2*self.imag())
+        let mut d = math::cos(2 * self.real()) + math::cosh(2 * self.imag())
         if math::abs(d) < 0.25 {
             d = tan_series(self)
         }
         if d == 0 {
             ret Cmplx.inf(1)
         }
-        ret Cmplx.new(math::sin(2*self.real())/d, math::sinh(2*self.imag())/d)
+        ret Cmplx.new(math::sin(2 * self.real()) / d, math::sinh(2 * self.imag()) / d)
     }
 
     // Complex hyperbolic tangent
@@ -101,15 +101,15 @@ impl Cmplx {
             | math::is_inf(self.imag(), 0) | math::is_nan(self.imag()):
                 ret Cmplx.new(math::copysign(1, self.real()), math::copysign(0, self.imag()))
             }
-            ret Cmplx.new(math::copysign(1, self.real()), math::copysign(0, math::sin(2*self.imag())))
+            ret Cmplx.new(math::copysign(1, self.real()), math::copysign(0, math::sin(2 * self.imag())))
         | self.imag() == 0 && math::is_nan(self.real()):
             ret self
         }
-        let d = math::cosh(2*self.real()) + math::cos(2*self.imag())
+        let d = math::cosh(2 * self.real()) + math::cos(2 * self.imag())
         if d == 0 {
             ret Cmplx.inf(1)
         }
-        ret Cmplx.new(math::sinh(2*self.real())/d, math::sin(2*self.imag())/d)
+        ret Cmplx.new(math::sinh(2 * self.real()) / d, math::sin(2 * self.imag()) / d)
     }
 
     // Complex circular cotangent
@@ -139,14 +139,14 @@ impl Cmplx {
 
     // Returns the cotangent of complex number.
     pub fn cot(self): Cmplx {
-        let mut d = math::cosh(2*self.imag()) - math::cos(2*self.real())
+        let mut d = math::cosh(2 * self.imag()) - math::cos(2 * self.real())
         if math::abs(d) < 0.25 {
             d = tan_series(self)
         }
         if d == 0 {
             ret Cmplx.inf(1)
         }
-        ret Cmplx.new(math::sin(2*self.real())/d, -math::sinh(2*self.imag())/d)
+        ret Cmplx.new(math::sin(2 * self.real()) / d, -math::sinh(2 * self.imag()) / d)
     }
 }
 
@@ -186,18 +186,18 @@ fn reduce_pi(mut x: f64): f64 {
         let mut t = x / math::PI
         t += 0.5
         t = f64(i64(t)) // i64(t) = the multiple
-        ret ((x - t*PI1) - t*PI2) - t*PI3
+        ret ((x - t * PI1) - t * PI2) - t * PI3
     }
     // Must apply Payne-Hanek range reduction
-    const MASK      = 0x7FF
-    const SHIFT     = 64 - 11 - 1
-    const BIAS      = 1023
-    const FRAC_MASK = 1<<SHIFT - 1
+    const MASK = 0x7FF
+    const SHIFT = 64 - 11 - 1
+    const BIAS = 1023
+    const FRAC_MASK = 1 << SHIFT - 1
 
     // Extract out the integer and exponent such that,
     // x = ix * 2 ** exp.
     let mut ix = math::f64_bits(x)
-    let exp = int(ix>>SHIFT&MASK) - BIAS - SHIFT
+    let exp = int(ix >> SHIFT & MASK) - BIAS - SHIFT
     ix &= FRAC_MASK
     ix |= 1 << SHIFT
 
@@ -230,7 +230,7 @@ fn reduce_pi(mut x: f64): f64 {
     // Use the exponent to extract the 3 appropriate u64 digits from mPi,
     // B ~ (z0, z1, z2), such that the product leading digit has the exponent -64.
     // Note, exp >= 50 since x >= REDUCE_THRESHOLD and exp < 971 for maximum f64.
-    let (digit, bitshift) = uint(exp+64)/64, uint(exp+64)%64
+    let (digit, bitshift) = uint(exp + 64) / 64, uint(exp + 64) % 64
     let z0 = (m_pi[digit] << bitshift) | (m_pi[digit+1] >> (64 - bitshift))
     let z1 = (m_pi[digit+1] << bitshift) | (m_pi[digit+2] >> (64 - bitshift))
     let z2 = (m_pi[digit+2] << bitshift) | (m_pi[digit+3] >> (64 - bitshift))

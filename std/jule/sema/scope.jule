@@ -39,7 +39,7 @@ pub type St: any
 
 fn new_scope_checker_base(mut &s: &Sema, mut owner: &FnIns): &ScopeChecker {
     ret &ScopeChecker{
-        s:     s,
+        s: s,
         owner: owner,
         table: &SymbolTable{},
     }
@@ -73,16 +73,12 @@ fn stmt_is_goto_scope(&stmt: any, &sc: &Scope): bool {
     match type stmt {
     | &Scope:
         ret (&Scope)(stmt) == sc
-
     | &InfIter:
         ret (&InfIter)(stmt).scope == sc
-
     | &RangeIter:
         ret (&RangeIter)(stmt).scope == sc
-
     | &WhileIter:
         ret (&WhileIter)(stmt).scope == sc
-
     | &Match:
         let m = (&Match)(stmt)
         for _, c in m.cases {
@@ -91,7 +87,6 @@ fn stmt_is_goto_scope(&stmt: any, &sc: &Scope): bool {
             }
         }
         ret m.default != nil && m.default.scope == sc
-
     | &Conditional:
         let c = (&Conditional)(stmt)
         for _, elif in c.elifs {
@@ -100,7 +95,6 @@ fn stmt_is_goto_scope(&stmt: any, &sc: &Scope): bool {
             }
         }
         ret c.default != nil && c.default.scope == sc
-
     |:
         ret false
     }
@@ -135,14 +129,13 @@ fn get_datas_from_tuple_data(mut &d: &Data): []&Data {
         match type d.model {
         | &TupleExprModel:
             ret (&TupleExprModel)(d.model).datas
-
         |:
             let mut t = d.kind.tup()
             let mut r = make([]&Data, 0, t.types.len)
             for (_, mut kind) in t.types {
                 r = append(r, &Data{
                     mutable: true, // Function return.
-                    kind:    kind,
+                    kind: kind,
                 })
             }
             ret r
@@ -161,7 +154,6 @@ fn get_expr_models(mut &m: ExprModel): []ExprModel {
             models = append(models, expr.kind)
         }
         ret models
-
     |:
         ret [m]
     }
@@ -229,8 +221,10 @@ fn is_valid_st_for_next_st(&st: St): bool {
         ret true
     | &Data:
         match type (&Data)(st).model {
-        | &FnCallExprModel: ret true
-        |:                  ret false
+        | &FnCallExprModel:
+            ret true
+        |:
+            ret false
         }
     |:
         ret false
@@ -239,8 +233,10 @@ fn is_valid_st_for_next_st(&st: St): bool {
 
 fn st_is_def(&st: St): bool {
     match type st {
-    | &Var: ret true
-    |:      ret false
+    | &Var:
+        ret true
+    |:
+        ret false
     }
 }
 
@@ -372,7 +368,7 @@ pub struct FallSt {
 // Return statement.
 pub struct RetSt {
     pub func: &FnIns
-    pub vars: []&Var // Used "_" identifier to pass ignored vars for ordering.
+    pub vars: []&Var    // Used "_" identifier to pass ignored vars for ordering.
     pub expr: ExprModel
 }
 
@@ -394,13 +390,13 @@ struct ScopeGoto {
 struct ScopeChecker {
     called_from: &Token
     s:           &Sema
-    owner:       &FnIns // See developer reference (1).
+    owner:       &FnIns         // See developer reference (1).
     parent:      &ScopeChecker
-    child_index: int // Index of child scope.
+    child_index: int            // Index of child scope.
     table:       &SymbolTable
     scope:       &Scope
     tree:        &ScopeTree
-    result:      &TypeKind // Result type for last statement.
+    result:      &TypeKind      // Result type for last statement.
     it:          uintptr
     cse:         uintptr
     labels:      &[]&ScopeLabel // All labels of all scopes.
@@ -785,7 +781,6 @@ impl ScopeChecker {
             self.s.push_err(expr.token, LogMsg.ExprNotFnCall)
             ret
         }
-
     }
 
     fn check_if(mut &self, mut i: &std::jule::ast::If): &If {
@@ -803,7 +798,7 @@ impl ScopeChecker {
         }
 
         ret &If{
-            expr:  d.model,
+            expr: d.model,
             scope: s,
         }
     }
@@ -818,7 +813,7 @@ impl ScopeChecker {
         let mut c = &Conditional{}
         self.scope.stmts = append(self.scope.stmts, c)
 
-        c.elifs = make([]&If, 0, conditional.tail.len+1)
+        c.elifs = make([]&If, 0, conditional.tail.len + 1)
 
         c.elifs = append(c.elifs, self.check_if(conditional.head))
         for (_, mut elif) in conditional.tail {
@@ -830,7 +825,7 @@ impl ScopeChecker {
         }
     }
 
-    fn check_iter_scope_sc(mut &self, it :uintptr, mut tree: &ScopeTree, mut ssc: &ScopeChecker): &Scope {
+    fn check_iter_scope_sc(mut &self, it: uintptr, mut tree: &ScopeTree, mut ssc: &ScopeChecker): &Scope {
         ssc.it = it
         ret self.check_child_sc(tree, ssc)
     }
@@ -914,10 +909,10 @@ impl ScopeChecker {
         }
 
         let mut rc = RangeChecker{
-            sc:   self,
+            sc: self,
             kind: kind,
             rang: rang,
-            d:    d,
+            d: d,
         }
         let ok = rc.check()
         if !ok {
@@ -1087,7 +1082,7 @@ impl ScopeChecker {
         *self.labels = append(*self.labels, &ScopeLabel{
             token: l.token,
             label: label,
-            pos:   self.scope.stmts.len - 1,
+            pos: self.scope.stmts.len - 1,
             scope: self,
         })
     }
@@ -1098,8 +1093,8 @@ impl ScopeChecker {
         })
 
         *self.gotos = append(*self.gotos, &ScopeGoto{
-            gt:    gt,
-            pos:   self.scope.stmts.len - 1,
+            gt: gt,
+            pos: self.scope.stmts.len - 1,
             scope: self,
         })
     }
@@ -1133,7 +1128,7 @@ impl ScopeChecker {
 
         self.scope.stmts = append(self.scope.stmts, &Postfix{
             expr: d.model,
-            op:   a.setter.kind,
+            op: a.setter.kind,
         })
     }
 
@@ -1252,9 +1247,9 @@ impl ScopeChecker {
         }
 
         let mut checker = AssignTypeChecker{
-            s:           self.s,
-            dest:        l.kind,
-            d:           r,
+            s: self.s,
+            dest: l.kind,
+            d: r,
             error_token: a.setter,
         }
         if checker.check() {
@@ -1284,11 +1279,11 @@ impl ScopeChecker {
 
             // Add new variable declaration statement.
             let mut v = &Var{
-                ident:     lexpr.ident,
-                token:     lexpr.token,
-                mutable:   lexpr.mutable,
+                ident: lexpr.ident,
+                token: lexpr.token,
+                mutable: lexpr.mutable,
                 reference: lexpr.reference,
-                scope:     self.scope,
+                scope: self.scope,
                 value: &Value{
                     expr: a.right,
                     data: r,
@@ -1319,9 +1314,9 @@ impl ScopeChecker {
         self.s.check_validity_for_init_expr(l.mutable, REFERENCE, l.kind, r, a.setter)
 
         let mut checker = AssignTypeChecker{
-            s:           self.s,
-            dest:        l.kind,
-            d:           r,
+            s: self.s,
+            dest: l.kind,
+            d: r,
             error_token: a.setter,
         }
         checker.check()
@@ -1341,7 +1336,6 @@ impl ScopeChecker {
         | a.left.len > r.len:
             self.s.push_err(a.setter, LogMsg.OverflowMultiAssignIdents)
             ret
-
         | a.left.len < r.len:
             self.s.push_err(a.setter, LogMsg.MissingMultiAssignIdents)
             ret
@@ -1399,7 +1393,7 @@ impl ScopeChecker {
 
         let mut right_tuple = &TupleExprModel{}
 
-        let mut st = &MultiAssign {
+        let mut st = &MultiAssign{
             r: right_tuple,
         }
 
@@ -1416,7 +1410,7 @@ impl ScopeChecker {
             }
 
             let mut expr = &Expr{
-                kind:  right[i],
+                kind: right[i],
                 token: a.right.token,
             }
             let mut eval: &Eval = nil
@@ -1491,9 +1485,9 @@ impl ScopeChecker {
             _case.exprs = append(_case.exprs, d)
 
             let mut checker = AssignTypeChecker{
-                s:           self.s,
-                dest:        expr.kind,
-                d:           d,
+                s: self.s,
+                dest: expr.kind,
+                d: d,
                 error_token: e.token,
             }
             checker.check()
@@ -1594,7 +1588,7 @@ impl ScopeChecker {
 
         let mut tm = &Match{
             type_match: true,
-            expr:       d,
+            expr: d,
         }
 
         if !tm.expr.kind.generic && m.default != nil {
@@ -1610,7 +1604,7 @@ impl ScopeChecker {
         if m.expr == nil {
             d = &Data{
                 constant: Const.new_bool(true),
-                kind:     &TypeKind{kind: build_prim_type(PrimKind.Bool)},
+                kind: &TypeKind{kind: build_prim_type(PrimKind.Bool)},
             }
             d.model = d.constant
         } else {
@@ -1690,11 +1684,16 @@ impl ScopeChecker {
         } else {
             let mut st = label.scope.scope.stmts[i]
             match type st {
-            | &InfIter:   brk.it = uintptr((&InfIter)(st))
-            | &RangeIter: brk.it = uintptr((&RangeIter)(st))
-            | &WhileIter: brk.it = uintptr((&WhileIter)(st))
-            | &Match:     brk.mtch = uintptr((&Match)(st))
-            |:            self.s.push_err(b.label, LogMsg.InvalidLabel, b.label.kind)
+            | &InfIter:
+                brk.it = uintptr((&InfIter)(st))
+            | &RangeIter:
+                brk.it = uintptr((&RangeIter)(st))
+            | &WhileIter:
+                brk.it = uintptr((&WhileIter)(st))
+            | &Match:
+                brk.mtch = uintptr((&Match)(st))
+            |:
+                self.s.push_err(b.label, LogMsg.InvalidLabel, b.label.kind)
             }
         }
 
@@ -1725,10 +1724,8 @@ impl ScopeChecker {
         | scope.it == 0 && scope.cse == 0 && scope.parent != nil && scope.owner == nil:
             scope = scope.parent
             goto iter
-
         | scope.it != 0:
             ret &BreakSt{it: scope.it}
-
         | scope.cse != 0:
             ret &BreakSt{mtch: unsafe { uintptr((*Case)(scope.cse).owner) }}
         }
@@ -1759,8 +1756,8 @@ impl ScopeChecker {
         self.scope.stmts = append(self.scope.stmts, rt)
 
         let mut rtc = &RetTypeChecker{
-            sc:          self,
-            f:           rt.func,
+            sc: self,
+            f: rt.func,
             error_token: r.token,
         }
         let ok = rtc.check(r.expr)
@@ -1792,7 +1789,6 @@ impl ScopeChecker {
         if self.i+1 < self.tree.stmts.len {
             self.s.push_err(ue.token, LogMsg.UseExprNotLast)
         }
-
         // Validated at end of scope's analysis.
     }
 
@@ -1846,9 +1842,9 @@ impl ScopeChecker {
             }
             self.scope.stmts = append(self.scope.stmts, d)
             let mut rtc = &RetTypeChecker{
-                sc:          self,
+                sc: self,
                 error_token: ue.expr.token,
-                types:       get_result_types(self.result),
+                types: get_result_types(self.result),
             }
             _ = rtc.check(ue.expr)
         | &Expr:

@@ -39,17 +39,17 @@ use math for std::math
 
 struct FloatInfo {
     mantbits: uint
-    expbits: uint
-    bias: int
+    expbits:  uint
+    bias:     int
 }
 
 static F32_INFO = FloatInfo{23, 8, -127}
 static F64_INFO = FloatInfo{52, 11, -1023}
 
 struct DecimalSlice {
-    d: []byte
-    nd: int
-    dp: int
+    d:   []byte
+    nd:  int
+    dp:  int
     neg: bool
 }
 
@@ -76,7 +76,7 @@ struct DecimalSlice {
 // The special precision -1 uses the smallest number of digits
 // necessary such that parse_float will return f exactly.
 pub fn fmt_float(f: f64, fmt: byte, prec: int, bit_size: int): str {
-    ret str(generic_ftoa(make([]byte, 0, max(prec+4, 24)), f, fmt, prec, bit_size))
+    ret str(generic_ftoa(make([]byte, 0, max(prec + 4, 24)), f, fmt, prec, bit_size))
 }
 
 fn generic_ftoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bit_size: int): []byte {
@@ -93,12 +93,12 @@ fn generic_ftoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bit_size: i
         panic("std::conv: illegal bit_size")
     }
 
-    let neg = bits>>(flt.expbits+flt.mantbits) != 0
-    let mut exp = int(bits>>flt.mantbits) & int(1<<flt.expbits - 1)
-    let mut mant = bits & (u64(1)<<flt.mantbits - 1)
+    let neg = bits>>(flt.expbits + flt.mantbits) != 0
+    let mut exp = int(bits >> flt.mantbits) & int(1 << flt.expbits - 1)
+    let mut mant = bits & (u64(1) << flt.mantbits - 1)
 
     match exp {
-    | int(1<<flt.expbits - 1):
+    | int(1 << flt.expbits - 1):
         // +inf, nan
         match {
         | mant != 0:
@@ -116,7 +116,7 @@ fn generic_ftoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bit_size: i
         mant |= u64(1) << flt.mantbits
     }
     exp += flt.bias
-    
+
     // Pick off easy binary, hex formats.
     if fmt == 'b' {
         ret fmt_b(dst, neg, mant, exp, *flt)
@@ -136,14 +136,14 @@ fn generic_ftoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bit_size: i
     if shortest {
         // Use Ryu algorithm.
         digs.d = make([]byte, 32)
-        ryu_ftoa_shortest(digs, mant, exp-int(flt.mantbits), *flt)
+        ryu_ftoa_shortest(digs, mant, exp - int(flt.mantbits), *flt)
         ok = true
         // Precision for shortest representation mode.
         match fmt {
         | 'e' | 'E':
-            prec = max(digs.nd-1, 0)
+            prec = max(digs.nd - 1, 0)
         | 'f':
-            prec = max(digs.nd-digs.dp, 0)
+            prec = max(digs.nd - digs.dp, 0)
         | 'g' | 'G':
             prec = digs.nd
         }
@@ -164,11 +164,11 @@ fn generic_ftoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bit_size: i
         }
         if bit_size == 32 && digits <= 9 {
             digs.d = make([]byte, 24)
-            ryu_ftoa_fixed32(digs, u32(mant), exp-int(flt.mantbits), digits)
+            ryu_ftoa_fixed32(digs, u32(mant), exp - int(flt.mantbits), digits)
             ok = true
         } else if digits <= 18 {
             digs.d = make([]byte, 24)
-            ryu_ftoa_fixed64(digs, mant, exp-int(flt.mantbits), digits)
+            ryu_ftoa_fixed64(digs, mant, exp - int(flt.mantbits), digits)
             ok = true
         }
     }
@@ -180,7 +180,7 @@ fn generic_ftoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bit_size: i
 
 // Uses multiprecision computations to format a float.
 fn big_ftoa(mut dst: []byte, mut prec: int, fmt: byte, neg: bool,
-            mant: u64, exp: int, &flt: FloatInfo): []byte {
+    mant: u64, exp: int, &flt: FloatInfo): []byte {
     let mut d = Decimal{}
     d.assign(mant)
     d.shift(exp - int(flt.mantbits))
@@ -194,7 +194,7 @@ fn big_ftoa(mut dst: []byte, mut prec: int, fmt: byte, neg: bool,
         | 'e' | 'E':
             prec = digs.nd - 1
         | 'f':
-            prec = max(digs.nd-digs.dp, 0)
+            prec = max(digs.nd - digs.dp, 0)
         | 'g' | 'G':
             prec = digs.nd
         }
@@ -217,7 +217,7 @@ fn big_ftoa(mut dst: []byte, mut prec: int, fmt: byte, neg: bool,
 }
 
 fn fmt_digits(mut dst: []byte, shortest: bool, neg: bool,
-            digs: DecimalSlice, mut prec: int, fmt: byte): []byte {
+    digs: DecimalSlice, mut prec: int, fmt: byte): []byte {
     match fmt {
     | 'e' | 'E':
         ret fmt_e(dst, neg, digs, prec, fmt)
@@ -240,12 +240,12 @@ fn fmt_digits(mut dst: []byte, shortest: bool, neg: bool,
             if prec > digs.nd {
                 prec = digs.nd
             }
-            ret fmt_e(dst, neg, digs, prec-1, fmt+'e'-'g')
+            ret fmt_e(dst, neg, digs, prec - 1, fmt + 'e' - 'g')
         }
         if prec > digs.dp {
             prec = digs.nd
         }
-        ret fmt_f(dst, neg, digs, max(prec-digs.dp, 0))
+        ret fmt_f(dst, neg, digs, max(prec - digs.dp, 0))
     }
 
     // unknown format
@@ -285,7 +285,7 @@ fn round_shortest(mut &d: Decimal, mant: u64, exp: int, &flt: FloatInfo) {
     // Next highest floating point number is mant+1 << exp-mantbits.
     // Our upper bound is halfway between, mant*2+1 << exp-mantbits-1.
     let mut upper = Decimal{}
-    upper.assign(mant*2 + 1)
+    upper.assign(mant * 2 + 1)
     upper.shift(exp - int(flt.mantbits) - 1)
 
     // d = mant << (exp - mantbits)
@@ -300,11 +300,11 @@ fn round_shortest(mut &d: Decimal, mant: u64, exp: int, &flt: FloatInfo) {
         mantlo = mant - 1
         explo = exp
     } else {
-        mantlo = mant*2 - 1
+        mantlo = mant * 2 - 1
         explo = exp - 1
     }
     let mut lower = Decimal{}
-    lower.assign(mantlo*2 + 1)
+    lower.assign(mantlo * 2 + 1)
     lower.shift(explo - int(flt.mantbits) - 1)
 
     // The upper and lower bounds are possible outputs only if
@@ -337,7 +337,7 @@ fn round_shortest(mut &d: Decimal, mant: u64, exp: int, &flt: FloatInfo) {
             break
         }
         let li = ui - upper.dp + lower.dp
-        let mut l = byte('0') // lower digit
+        let mut l = byte('0')             // lower digit
         if li >= 0 && li < lower.nd {
             l = lower.d[li]
         }
@@ -410,7 +410,7 @@ fn fmt_e(mut dst: []byte, neg: bool, d: DecimalSlice, prec: int, fmt: byte): []b
     if prec > 0 {
         dst = append(dst, '.')
         let mut i = 1
-        let m = min(d.nd, prec+1)
+        let m = min(d.nd, prec + 1)
         if i < m {
             dst = append(dst, d.d[i:m]...)
             i = m
@@ -437,11 +437,11 @@ fn fmt_e(mut dst: []byte, neg: bool, d: DecimalSlice, prec: int, fmt: byte): []b
     // dd or ddd
     match {
     | exp < 10:
-        dst = append(dst, '0', byte(exp)+'0')
+        dst = append(dst, '0', byte(exp) + '0')
     | exp < 100:
-        dst = append(dst, byte(exp/10)+'0', byte(exp%10)+'0')
+        dst = append(dst, byte(exp / 10) + '0', byte(exp % 10) + '0')
     |:
-        dst = append(dst, byte(exp/100)+'0', byte(exp/10)%10+'0', byte(exp%10)+'0')
+        dst = append(dst, byte(exp / 100) + '0', byte(exp / 10) % 10 + '0', byte(exp % 10) + '0')
     }
 
     ret dst
@@ -504,7 +504,7 @@ fn fmt_b(mut dst: []byte, neg: bool, mant: u64, mut exp: int, &flt: FloatInfo): 
 
 // %x: -0x1.yyyyyyyyp±ddd or -0x0p+0. (y is hex digit, d is decimal digit)
 fn fmt_x(mut dst: []byte, prec: int, fmt: byte, neg: bool,
-        mut mant: u64, mut exp: int, &flt: FloatInfo): []byte {
+    mut mant: u64, mut exp: int, &flt: FloatInfo): []byte {
     if mant == 0 {
         exp = 0
     }
@@ -519,13 +519,13 @@ fn fmt_x(mut dst: []byte, prec: int, fmt: byte, neg: bool,
     // Round if requested.
     if prec >= 0 && prec < 15 {
         let shift = uint(prec * 4)
-        let extra = (mant << shift) & (1<<60 - 1)
+        let extra = (mant << shift) & (1 << 60 - 1)
         mant >>= 60 - shift
-        if extra|(mant&1) > 1<<59 {
+        if extra|(mant & 1) > 1<<59 {
             mant++
         }
         mant <<= 60 - shift
-        if mant&(1<<61) != 0 {
+        if mant&(1 << 61) != 0 {
             // Wrapped around.
             mant >>= 1
             exp++
@@ -543,7 +543,7 @@ fn fmt_x(mut dst: []byte, prec: int, fmt: byte, neg: bool,
     if neg {
         dst = append(dst, '-')
     }
-    dst = append(dst, '0', fmt, '0'+byte((mant>>60)&1))
+    dst = append(dst, '0', fmt, '0' + byte((mant >> 60) & 1))
 
     // .fraction
     mant <<= 4 // remove leading 0 or 1
@@ -579,11 +579,11 @@ fn fmt_x(mut dst: []byte, prec: int, fmt: byte, neg: bool,
     // dd or ddd or dddd
     match {
     | exp < 100:
-        dst = append(dst, byte(exp/10)+'0', byte(exp%10)+'0')
+        dst = append(dst, byte(exp / 10) + '0', byte(exp % 10) + '0')
     | exp < 1000:
-        dst = append(dst, byte(exp/100)+'0', byte((exp/10)%10)+'0', byte(exp%10)+'0')
+        dst = append(dst, byte(exp / 100) + '0', byte((exp / 10) % 10) + '0', byte(exp % 10) + '0')
     |:
-        dst = append(dst, byte(exp/1000)+'0', byte(exp/100)%10+'0', byte((exp/10)%10)+'0', byte(exp%10)+'0')
+        dst = append(dst, byte(exp / 1000) + '0', byte(exp / 100) % 10 + '0', byte((exp / 10) % 10) + '0', byte(exp % 10) + '0')
     }
     ret dst
 }
