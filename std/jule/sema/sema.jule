@@ -65,19 +65,17 @@ fn imp_is_lookupable(&i: &ImportInfo, ident: str): bool {
     ret i.import_all
 }
 
-fn build_ret_vars(mut &f: &FnIns): []&Var {
+fn append_ret_vars(mut &dest: []&Var, mut &f: &FnIns) {
     if f.decl.is_void() || f.result == nil {
-        ret nil
+        ret
     }
 
-    let mut vars: []&Var = nil
     let mut types = f.types()
     for (i, mut ident) in f.decl.result.idents {
         if is_ignore_ident(ident.kind) || is_anon_ident(ident.kind) {
             continue
         }
-
-        let mut v = &Var{
+        dest = append(dest, &Var{
             used: true,
             mutable: true,
             ident: ident.kind,
@@ -89,19 +87,15 @@ fn build_ret_vars(mut &f: &FnIns): []&Var {
             value: &Value{
                 data: new(Data),
             },
-        }
-        vars = append(vars, v)
+        })
     }
-
-    ret vars
 }
 
-fn build_param_vars(mut &f: &FnIns): []&Var {
+fn append_param_vars(mut &dest: []&Var, mut &f: &FnIns) {
     if f.params.len == 0 {
-        ret nil
+        ret
     }
 
-    let mut vars = make([]&Var, 0, f.params.len)
     for (_, mut p) in f.params {
         if is_ignore_ident(p.decl.ident) || is_anon_ident(p.decl.ident) {
             continue
@@ -151,29 +145,25 @@ fn build_param_vars(mut &f: &FnIns): []&Var {
             v.kind.kind = p.kind
         }
 
-        vars = append(vars, v)
+        dest = append(dest, v)
     }
-
-    ret vars
 }
 
 // Builds type aliases for generic types of scope.
 // See developer reference (1), and (2).
-fn build_generic_type_aliases(mut &f: &FnIns): []&TypeAlias {
+fn append_generic_type_aliases(mut &dest: []&TypeAlias, mut &f: &FnIns) {
     let mut size = f.generics.len
     if f.decl.owner != nil {
         size += f.decl.owner.generics.len
     }
 
     if size == 0 {
-        ret nil
+        ret
     }
-
-    let mut aliases = make([]&TypeAlias, 0, size)
 
     for (i, mut g) in f.generics {
         let mut decl = f.decl.generics[i]
-        aliases = append(aliases, &TypeAlias{
+        dest = append(dest, &TypeAlias{
             used: true,
             generic: true,
             scope: f.decl.scope,
@@ -189,7 +179,7 @@ fn build_generic_type_aliases(mut &f: &FnIns): []&TypeAlias {
         let mut owner = f.owner
         for (i, mut g) in owner.generics {
             let mut decl = owner.decl.generics[i]
-            aliases = append(aliases, &TypeAlias{
+            dest = append(dest, &TypeAlias{
                 used: true,
                 generic: true,
                 scope: f.decl.scope,
@@ -201,8 +191,6 @@ fn build_generic_type_aliases(mut &f: &FnIns): []&TypeAlias {
             })
         }
     }
-
-    ret aliases
 }
 
 fn find_file(mut &files: []&SymbolTable, &handler: &File): &SymbolTable {
@@ -2191,11 +2179,9 @@ impl Sema {
             ret
         }
 
-        let mut vars = build_ret_vars(f)
-
-        sc.table.vars = append(sc.table.vars, vars...)
-        sc.table.vars = append(sc.table.vars, build_param_vars(f)...)
-        sc.table.type_aliases = append(sc.table.type_aliases, build_generic_type_aliases(f)...)
+        append_ret_vars(sc.table.vars, f)
+        append_param_vars(sc.table.vars, f)
+        append_generic_type_aliases(sc.table.type_aliases, f)
 
         sc.check(f.decl.scope, f.scope)
 
