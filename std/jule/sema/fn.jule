@@ -126,7 +126,7 @@ impl Fn {
     fn instance_force(mut &self): &FnIns {
         let mut ins = &FnIns{
             decl: self,
-            scope: &Scope{},
+            scope: new(Scope),
             references: ReferenceStack.new(),
         }
 
@@ -147,35 +147,36 @@ impl Fn {
         if self.generics.len == 0 && self.instances.len == 1 {
             ret self.instances[0]
         }
-
         ret self.instance_force()
     }
 
-    fn append_instance(mut self, mut &ins: &FnIns): (bool, int) {
+    // Appends function instance.
+    // Returns instance if already instance is already exist, nil if not.
+    fn append_instance(mut self, mut &ins: &FnIns): &FnIns {
         if self.generics.len == 0 {
             // Skip already created instance for just one unique combination.
             if self.instances.len == 1 {
-                ret false, 0
+                ret self.instances[0]
             }
 
             self.instances = append(self.instances, ins)
-            ret true, -1
+            ret nil
         }
 
         if self.instances.len == 0 {
             self.instances = append(self.instances, ins)
-            ret true, -1
+            ret nil
         }
 
-        for j, ains in self.instances {
+        for (_, mut ains) in self.instances {
             if ains.same(ins) {
                 // Instances are same.
-                ret false, j
+                ret ains
             }
         }
 
         self.instances = append(self.instances, ins)
-        ret true, -1
+        ret nil
     }
 }
 
