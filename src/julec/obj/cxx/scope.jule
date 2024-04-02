@@ -8,7 +8,7 @@ use optimizing::{
     MutSlicingExprModel,
     StrInsertBeginExprModel,
 }
-use std::jule::lex::{TokenKind, is_ignore_ident}
+use lex for std::jule::lex::{TokenKind}
 use std::jule::sema::{
     Data,
     St,
@@ -494,7 +494,7 @@ impl ScopeCoder {
     fn ret_with_vars(mut self, mut r: &RetSt): str {
         let mut obj = ""
         for (_, mut v) in r.vars {
-            if is_ignore_ident(v.ident) {
+            if lex::is_ignore_ident(v.ident) {
                 obj += self.oc.ec.init_expr(v.kind.kind)
             } else {
                 obj += IdentCoder.var(v)
@@ -533,7 +533,7 @@ impl ScopeCoder {
         let mut obj = ""
 
         for (i, mut v) in r.vars {
-            if is_ignore_ident(v.ident) {
+            if lex::is_ignore_ident(v.ident) {
                 continue
             }
             let mut model = datas[i].model
@@ -552,7 +552,7 @@ impl ScopeCoder {
         let mut oobj = "std::make_tuple("
         for (i, mut d) in datas {
             let mut v = r.vars[i]
-            if is_ignore_ident(v.ident) {
+            if lex::is_ignore_ident(v.ident) {
                 oobj += self.oc.ec.expr(d.model)
             } else {
                 oobj += IdentCoder.var(v)
@@ -586,7 +586,7 @@ impl ScopeCoder {
         // Ignore self assignments and ignored variables.
         if r.vars.len > 0 {
             let mut v = r.vars[0]
-            if !is_ignore_ident(v.ident) && r.expr != v {
+            if !lex::is_ignore_ident(v.ident) && r.expr != v {
                 let ident = IdentCoder.var(v)
                 let mut obj = ident
                 obj += " = "
@@ -714,11 +714,7 @@ impl ScopeCoder {
         }
     }
 
-    // Generates C++ code of scope.
-    fn scope(mut self, mut s: &Scope): str {
-        let mut obj = "{\n"
-        self.oc.add_indent()
-
+    fn scope_end(mut self, mut &obj: str, mut &s: &Scope) {
         for (_, mut st) in s.stmts {
             obj += self.oc.indent()
             obj += self.st(st)
@@ -732,7 +728,13 @@ impl ScopeCoder {
         if s.deferred {
             obj = "__JULE_DEFER(" + obj + ");"
         }
+    }
 
+    // Generates C++ code of scope.
+    fn scope(mut self, mut s: &Scope): str {
+        self.oc.add_indent()
+        let mut obj = "{\n"
+        self.scope_end(obj, s)
         ret obj
     }
 
@@ -741,10 +743,28 @@ impl ScopeCoder {
         if f.scope == nil {
             ret ""
         }
-        let mut obj = self.scope(f.scope)
+        let mut obj = "{\n"
+        self.oc.add_indent()
+        if !f.decl.is_void() {
+            let mut types = f.types()
+            for i, ident in f.decl.result.idents {
+                if lex::is_ignore_ident(ident.kind) ||
+                    lex::is_anon_ident(ident.kind) {
+                    continue
+                }
+                obj += self.oc.indent()
+                obj += TypeCoder.kind(types[i])
+                obj += " "
+                obj += IdentCoder.to_local(ident.row, ident.column, ident.kind)
+                obj += " = "
+                obj += self.oc.ec.init_expr(types[i])
+                obj += ";\n"
+            }
+        }
+        self.scope_end(obj, f.scope)
         if f.decl.exceptional && f.decl.is_void() {
             // Just for void exceptionals.
-            // Other cases checked by semantic analyzer and disallowed
+            // Other cases checked by semantic analsis and disallowed
             // if they are not returns.
             obj = obj[:obj.len-2] + " return jule::VoidExceptional(); }"
         }

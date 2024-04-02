@@ -71,7 +71,7 @@ fn build_ret_vars(mut &f: &FnIns): []&Var {
     }
 
     let mut vars: []&Var = nil
-    let mut types = get_result_types(f.result)
+    let mut types = f.types()
     for (i, mut ident) in f.decl.result.idents {
         if is_ignore_ident(ident.kind) || is_anon_ident(ident.kind) {
             continue
@@ -2198,17 +2198,6 @@ impl Sema {
         sc.table.type_aliases = append(sc.table.type_aliases, build_generic_type_aliases(f)...)
 
         sc.check(f.decl.scope, f.scope)
-
-        // Append return variables.
-        if vars.len > 0 {
-            let mut stmts = make([]St, 0, f.scope.stmts.len + vars.len)
-            for (_, mut v) in vars {
-                stmts = append(stmts, v)
-            }
-
-            stmts = append(stmts, f.scope.stmts...)
-            f.scope.stmts = stmts
-        }
 
         // Check return statements if ScopeChecker not forced to stop.
         if !sc.stopped() {
