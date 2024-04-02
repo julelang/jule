@@ -31,6 +31,7 @@ use std::jule::sema::{
     SliceExprModel,
     StructSubIdentExprModel,
     SlicingExprModel,
+    FallSt,
 }
 use strings for std::strings
 
@@ -141,6 +142,32 @@ impl ScopeOptimizer {
         }
     }
 
+    fn build_default_constat_true_case(mut self, mut case: &Case, mut &i: int, mut &m: &Match) {
+        case.exprs = nil // Remove expressions to remove eval overhead.
+        let start = i
+    loop:
+        for {
+            if case.scope.stmts.len == 0 {
+                break
+            }
+            let mut &stmt = unsafe { *(&case.scope.stmts[case.scope.stmts.len-1]) }
+            match type stmt {
+            | &FallSt:
+                i++
+                if i >= m.cases.len {
+                    stmt = m.default.scope
+                    break loop
+                }
+                case = m.cases[i]
+                stmt = case.scope
+            |:
+                break loop
+            }
+        }
+        m.default = m.cases[start]
+        m.cases = m.cases[:start]
+    }
+
     fn optimize_match(mut self, mut m: &Match) {
         for (_, mut case) in m.cases {
             for (_, mut expr) in case.exprs {
@@ -159,14 +186,12 @@ impl ScopeOptimizer {
         let mut const_case = false // Has cosntant true case.
 
         // Remove unnecessary trailing cases that comes after constant true case.
-        for (i, mut case) in m.cases {
+        for (mut i, mut case) in m.cases {
             if !is_constant_valid_match_case(case) {
                 continue
             }
             const_case = true
-            m.cases = m.cases[:i]
-            case.exprs = nil // Remove expressions to remove eval overhead.
-            m.default = case
+            self.build_default_constat_true_case(case, i, m)
             break
         }
 
