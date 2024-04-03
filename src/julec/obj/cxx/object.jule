@@ -44,10 +44,17 @@ pub struct SerializationInfo {
     pub compiler_command: str
 }
 
+struct TraitHash {
+    t: &Trait
+    s: &StructIns
+    i: int
+}
+
 pub struct ObjectCoder {
     ir:   &IR
     info: SerializationInfo
     f:    &File
+    tmap: []&TraitHash
 }
 
 impl ObjectCoder {
@@ -114,8 +121,96 @@ impl ObjectCoder {
         }
     }
 
+    fn prepare_structures(mut &self) {
+        for (_, mut s) in self.ir.ordered.structs {
+            if !s.cpp_linked && s.token != nil {
+                prepare_structure(s)
+            }
+        }
+    }
+
+    fn iter_packages(mut &self, f: fn(mut &pkg: &Package)) {
+        for (_, mut used) in self.ir.used {
+            if !used.cpp_linked {
+                f(used.package)
+            }
+        }
+        f(self.ir.main)
+    }
+
+    fn build_trait_map(mut &self) {
+        self.iter_packages(fn(mut &pkg: &Package) {
+            iter_files(pkg, fn(mut &file: &SymbolTable) {
+                for (_, mut t) in file.traits {
+                    if t.token == nil {
+                        ret
+                    }
+                    let mut i = 0
+                    for (_, mut s) in t.implemented {
+                        for (_, mut ins) in s.instances {
+                            self.tmap = append(self.tmap, &TraitHash{
+                                t: t,
+                                s: ins,
+                                i: i,
+                            })
+                            i++
+                        }
+                    }
+                }
+            })
+        })
+    }
+
+    fn decls(mut &self) {
+        
+    }
+
     pub fn serialize(mut &self) {
+        self.prepare_structures()
+        self.build_trait_map()
         self.head()
         self.links()
+        self.decls()
     }
+}
+
+fn iter_files(mut &pkg: &Package, f: fn(mut &f: &SymbolTable)) {
+    for (_, mut file) in pkg.files {
+        f(file)
+    }
+}
+
+fn prepare_structure(mut &s: &Struct) {
+    for (_, mut ins) in s.instances {
+        for (_, mut m) in ins.methods {
+            if m.statically {
+                continue
+            }
+            for (_, mut ins) in m.instances {
+                let mut p = ins.params[0]
+                if !p.decl.is_ref() {
+                    p.kind = &TypeKind{
+                        kind: &CustomType{
+                            kind: TypeCoder.as_ptr(TypeCoder.kind(p.kind)),
+                        },
+                    }
+                } else {
+                    p.kind = &TypeKind{
+                        kind: &CustomType{
+                            kind: TypeCoder.kind(p.kind),
+                        },
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Concatenate all strings into single string.
+fn concat_all_parts(parts: ...&Token): str {
+    let mut s = ""
+    for _, p in parts {
+        s += p.kind
+    }
+    ret s
 }

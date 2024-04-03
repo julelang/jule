@@ -1,0 +1,211 @@
+// Copyright 2023-2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use env
+use conv for std::conv
+use std::jule::build::{ENTRY_POINT, Directive}
+use std::jule::lex::{TokenKind, is_anon_ident, is_ignore_ident}
+use std::jule::sema::{
+    Fn,
+    FnIns,
+    Trait,
+    Struct,
+    StructIns,
+    Field,
+    Var,
+    Param,
+}
+
+// Identifier of initialize function caller function.
+const INIT_CALLER_IDENT = "__jule_call_initializers"
+
+struct IdentCoder {}
+
+impl IdentCoder {
+    const Self = "_self_"
+
+    // Returns specified identifer as JuleC identifer.
+    // Equavalents: "JULEC_ID(" + ident + ")" of JuleC API.
+    static fn to_ident(ident: str): str {
+        ret "_" + ident
+    }
+
+    // Returns cpp output identifier form of pointer address.
+    static fn addr(addr: uintptr): str {
+        ret "_" + conv::fmt_uint(u64(addr), 0xF)
+    }
+
+    // Returns cpp output identifier form of given identifier.
+    //
+    // Parameters:
+    //   - ident: Identifier.
+    //   - addr:  Pointer address of package file handler.
+    static fn to_out(ident: str, addr: uintptr): str {
+        if addr != 0 {
+            let mut obj = IdentCoder.addr(addr)
+            obj += "_"
+            obj += ident
+            ret obj
+        }
+        ret IdentCoder.to_ident(ident)
+    }
+
+    // Returns cpp output local identifier form of fiven identifier.
+    //
+    // Parameters:
+    //   - row:   Row of definition.
+    //   - col:   Column of definition.
+    //   - ident: Identifier of definition.
+    static fn to_local(row: int, col: int, ident: str): str {
+        let mut obj = conv::itoa(row)
+        obj += conv::itoa(col)
+        obj += "_"
+        obj += ident
+        ret IdentCoder.to_ident(obj)
+    }
+
+    // Returns output identifier of function.
+    static fn func(&f: &Fn): str {
+        match {
+        | f.cpp_linked:
+            ret f.ident
+        | f.ident == ENTRY_POINT:
+            ret "entry_point"
+        | f.is_method():
+            let mut obj = IdentCoder.to_out(f.ident, uintptr(f))
+            if f.statically {
+                obj = "static_" + obj
+                ret obj
+            }
+            ret obj
+        |:
+            ret IdentCoder.to_out(f.ident, uintptr(f))
+        }
+    }
+
+    // Returns output identifier of function instance.
+    static fn func_ins(mut &f: &FnIns): str {
+        if f.is_builtin() {
+            ret "jule::" + f.decl.ident
+        }
+        if f.decl.cpp_linked || f.generics.len == 0 {
+            ret IdentCoder.func(f.decl)
+        }
+        for (i, mut ins) in f.decl.instances {
+            if ins.same(f) {
+                let mut obj = IdentCoder.func(f.decl)
+                obj += "_"
+                obj += conv::itoa(i)
+                ret obj
+            }
+        }
+        ret "__?__"
+    }
+
+    // Returns output identifier of trait.
+    static fn trait_decl(t: &Trait): str {
+        if t.is_builtin() {
+            ret "jule::" + t.ident
+        }
+        ret IdentCoder.to_out(t.ident, uintptr(t))
+    }
+
+    // Returns output identifier of parameter.
+    static fn param(&p: &Param): str {
+        if is_anon_ident(p.ident) || is_ignore_ident(p.ident) {
+            ret ""
+        }
+        if p.is_self() {
+            ret IdentCoder.Self
+        }
+        if p.token == nil {
+            ret IdentCoder.to_local(0, 0, p.ident)
+        }
+        ret IdentCoder.to_local(p.token.row, p.token.column, p.ident)
+    }
+
+    // Returns output identifier of structure.
+    static fn structure(&s: &Struct): str {
+        if s.cpp_linked {
+            if has_directive(s.directives, Directive.Typedef) {
+                ret s.ident
+            }
+            ret "struct " + s.ident
+        }
+        ret IdentCoder.to_out(s.ident, uintptr(s))
+    }
+
+    // Returns output identifier of structure instance.
+    static fn structure_ins(mut &s: &StructIns): str {
+        if s.decl.cpp_linked || s.generics.len == 0 {
+            ret IdentCoder.structure(s.decl)
+        }
+        for (i, mut ins) in s.decl.instances {
+            if ins.same(s) {
+                let mut obj = IdentCoder.structure(s.decl)
+                obj += "_"
+                obj += conv::itoa(i)
+                ret obj
+            }
+        }
+        ret "__?__"
+    }
+
+    // Returns output identifier of field.
+    static fn field(&f: &Field): str {
+        if f.owner.cpp_linked {
+            ret f.ident
+        }
+        ret "_field_" + f.ident
+    }
+
+    // Returns output identifier of variable.
+    static fn var(mut v: &Var): str {
+        match {
+        | v.cpp_linked:
+            ret v.ident
+        | v.ident == TokenKind.Error:
+            ret "except.error"
+        | v.ident == TokenKind.Self:
+            if v.kind.kind.sptr() == nil {
+                ret "(*" + IdentCoder.Self + ")"
+            }
+            ret IdentCoder.Self
+        | v.scope != nil:
+            ret IdentCoder.to_local(v.token.row, v.token.column, v.ident)
+        |:
+            ret IdentCoder.to_out(v.ident, uintptr(v))
+        }
+    }
+
+    // Returns begin label identifier of iteration.
+    static fn iter_begin(it: uintptr): str {
+        ret "_iter_begin_" + conv::fmt_uint(u64(it), 0xF)
+    }
+
+    // Returns end label identifier of iteration.
+    static fn iter_end(it: uintptr): str {
+        ret "_iter_end_" + conv::fmt_uint(u64(it), 0xF)
+    }
+
+    // Returns next label identifier of iteration.
+    static fn iter_next(it: uintptr): str {
+        ret "_iter_next_" + conv::fmt_uint(u64(it), 0xF)
+    }
+
+    // Returns label identifier.
+    static fn label(ident: str): str {
+        ret "_julec_label_" + ident
+    }
+
+    // Returns end label identifier of match-case.
+    static fn match_end(m: uintptr): str {
+        ret "_match_end_" + conv::fmt_uint(u64(m), 0xF)
+    }
+
+    // Returns begin label identifier of case.
+    static fn case_begin(c: uintptr): str {
+        ret "_case_begin_" + conv::fmt_uint(u64(c), 0xF)
+    }
+}
