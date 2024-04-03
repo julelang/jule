@@ -135,7 +135,7 @@ impl ObjectCoder {
             |:
                 self.write("#include \"")
                 self.write(used.path)
-                self.write("\n")
+                self.write("\"\n")
             }
         }
     }
@@ -196,8 +196,25 @@ impl ObjectCoder {
         })
     }
 
+    fn structure_plain_decl(mut &self, mut &s: &Struct) {
+        for (_, mut ins) in s.instances {
+            self.write("struct ")
+            self.write(IdentCoder.structure_ins(ins))
+            self.write(";\n")
+        }
+    }
+
+    fn structure_plain_decls(mut &self) {
+        for (_, mut s) in self.ir.ordered.structs {
+            if !s.cpp_linked && s.token != nil {
+                self.structure_plain_decl(s)
+            }
+        }
+    }
+
     fn decls(mut &self) {
         self.trait_decls()
+        self.structure_plain_decls()
     }
 
     pub fn serialize(mut &self) {
