@@ -2,11 +2,42 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use env
 use obj::{IR}
 use conv for std::conv
 use std::fs::{File}
-use std::time::{Time}
 use jule for std::jule
+use build for std::jule::build::{
+    Directive,
+    Derive,
+}
+use std::jule::lex::{
+    Token,
+    TokenId,
+    is_ignore_ident,
+    is_anon_ident,
+}
+use std::jule::sema::{
+    FuncPattern,
+    Package,
+    SymbolTable,
+    Param,
+    ParamIns,
+    Trait,
+    Struct,
+    FieldIns,
+    Var,
+    StructIns,
+    Fn,
+    FnIns,
+    TypeKind,
+    Prim,
+    Sptr,
+    TypeSymbol,
+}
+use path for std::fs::path
+use strings for std::strings
+use std::time::{Time}
 
 pub struct SerializationInfo {
     pub compiler:         str
@@ -51,9 +82,40 @@ impl ObjectCoder {
         self.write(" ")
         self.write(self.info.compiler_command)
         self.write("\n\n")
+
+        if env::PRODUCTION {
+            self.write("#define __JULE_ENABLE__PRODUCTION\n")
+        }
+        if !env::RC {
+            self.write("#define __JULE_DISABLE__REFERENCE_COUNTING\n")
+        }
+        if !env::SAFETY {
+            self.write("#define __JULE_DISABLE__SAFETY\n")
+        }
+        self.write("\n\n#include \"")
+        self.write(build::PATH_API)
+        self.write("\"\n\n")
+    }
+
+    fn links(mut &self) {
+        for _, used in self.ir.used {
+            match {
+            | !used.cpp_linked:
+                continue
+            | build::is_std_header_path(used.path):
+                self.write("#include ")
+                self.write(used.path)
+                self.write("\n")
+            |:
+                self.write("#include \"")
+                self.write(used.path)
+                self.write("\n")
+            }
+        }
     }
 
     pub fn serialize(mut &self) {
         self.head()
+        self.links()
     }
 }
