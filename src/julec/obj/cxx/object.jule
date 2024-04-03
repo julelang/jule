@@ -754,7 +754,7 @@ impl ObjectCoder {
         self.write("\n\n")
         self.globals()
     }
-    
+
     fn structure_methods(mut &self, mut &s: &StructIns) {
         for (_, mut f) in s.methods {
             self.func(f)
@@ -861,6 +861,22 @@ impl ObjectCoder {
         }
     }
 
+    fn funcs(mut &self) {
+        self.iter_packages(fn(mut &pkg: &Package) {
+            iter_files(pkg, fn(mut &file: &SymbolTable) {
+                for (_, mut f) in file.funcs {
+                    if !env::TEST && has_directive(f.directives, Directive.Test) {
+                        continue
+                    }
+                    if !f.cpp_linked && f.token != nil {
+                        self.func(f)
+                        self.write("\n\n")
+                    }
+                }
+            })
+        })
+    }
+
     pub fn serialize(mut &self) {
         self.prepare_structures()
         self.build_trait_map()
@@ -870,6 +886,7 @@ impl ObjectCoder {
         self.decls()
         self.write("\n")
         self.structures()
+        self.funcs()
     }
 }
 
