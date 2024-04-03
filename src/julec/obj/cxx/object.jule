@@ -58,6 +58,8 @@ pub struct ObjectCoder {
 
     // Current indentation.
     indent_buffer: []byte
+
+    ec: &ExprCoder
 }
 
 impl ObjectCoder {
@@ -67,6 +69,7 @@ impl ObjectCoder {
             info: info,
             f: f,
         }
+        oc.ec = ExprCoder.new(oc)
         ret oc
     }
 
@@ -212,9 +215,335 @@ impl ObjectCoder {
         }
     }
 
+    fn field_decl(mut &self, mut &f: &FieldIns) {
+        self.write(TypeCoder.kind(f.kind))
+        self.write(" ")
+        self.write(IdentCoder.field(f.decl))
+        self.write(" = ")
+        if f.default == nil {
+            // No default expression.
+            // Use default expression of data-type.
+            self.ec.init_expr(f.kind)
+        } else {
+            self.ec.expr(f.default.model)
+        }
+        self.write(";")
+    }
+
+    fn structure_constructor(mut &self, mut &s: &StructIns) {
+        self.write(IdentCoder.structure_ins(s))
+        self.write("(")
+        if s.fields.len > 0 {
+            for (i, mut f) in s.fields {
+                self.write(TypeCoder.kind(f.kind))
+                self.write(" __param_")
+                self.write(f.decl.ident)
+                if s.fields.len - i > 1 {
+                    self.write(", ")
+                }
+            }
+        } else {
+            self.write("void")
+        }
+
+        self.write(")")
+        if s.fields.len > 0 {
+            self.write(": ")
+            for i, f in s.fields {
+                self.write(IdentCoder.field(f.decl))
+                self.write("(")
+                self.write("__param_")
+                self.write(f.decl.ident)
+                self.write(")")
+                if s.fields.len - i > 1 {
+                    self.write(", ")
+                }
+            }
+        }
+        self.write(" {}")
+    }
+
+    fn structure_destructor(mut &self, mut &s: &StructIns) {
+        const STATIC = false                                   // Dispose method must be non-static
+        let dispose_method = s.find_method("dispose", STATIC)
+        let mut disposed = FuncPattern.dispose(dispose_method)
+        // Call destructor if implemented.
+        if !disposed {
+            ret
+        }
+        self.write("~")
+        self.write(IdentCoder.structure_ins(s))
+        self.write("(void) { ")
+        self.write(IdentCoder.func(dispose_method))
+        self.write("(this); }")
+    }
+
+    fn structure_derive_defs_decls(mut &self, &s: &StructIns) {
+        if s.decl.is_derives(Derive.Clone) {
+            self.indent()
+            self.write(DeriveCoder.clone_func_decl(s.decl))
+            self.write(";\n\n")
+        }
+    }
+
+    fn structure_operator_eq(mut &self, &ident: str, mut &s: &StructIns) {
+        // Operator overloading.
+        if s.operators.eq != nil {
+            self.structure_operator(ident, s.operators.eq, "==")
+            ret
+        }
+
+        self.indent()
+        if env::OPT_INLINE {
+            self.write("inline ")
+        }
+        self.write("bool operator==(")
+        self.write(ident)
+        self.write(" _other) {")
+        if s.fields.len > 0 {
+            self.add_indent()
+            self.write("\n")
+            self.indent()
+            self.write("return ")
+            self.add_indent()
+            let mut writed = false
+            for (_, mut f) in s.fields {
+                // Skip C++-linked struct kinds.
+                let strct = f.kind.strct()
+                if strct != nil && strct.decl != nil && strct.decl.cpp_linked {
+                    continue
+                }
+
+                if writed {
+                    self.write(" &&")
+                } 
+                writed = true
+                self.write("\n")
+                self.indent()
+                self.write("this->")
+                let f_ident = IdentCoder.field(f.decl)
+                self.write(f_ident)
+                self.write(" == _other.")
+                self.write(f_ident)
+            }
+            self.done_indent()
+            if !writed {
+                self.write("true")
+            }
+            self.write(";\n")
+            self.done_indent()
+            self.indent()
+            self.write("}")
+        } else {
+            self.write(" return true; }")
+        }
+        self.write("\n\n")
+    }
+
+    fn structure_operator_not_eq(mut &self, &ident: str, mut &s: &StructIns) {
+        self.indent()
+        if env::OPT_INLINE {
+            self.write("inline ")
+        }
+        self.write("bool operator!=(")
+        self.write(ident)
+        self.write(" _other) { return !this->operator==(_other); }\n\n")
+    }
+
+    // Write operator overloading forwarding for reserved function.
+    fn structure_operator(mut &self, &ident: str, mut &f: &FnIns, op: str) {
+        if f == nil {
+            ret
+        }
+
+        let unary = f.params.len == 1     // Just self parameter.
+        let assignment = f.decl.is_void()
+
+        self.indent()
+        if env::OPT_INLINE {
+            self.write("inline ")
+        }
+        if assignment {
+            self.write(ident)
+            self.write("&")
+        } else {
+            if f.result.prim() == nil {
+                // If result type is not primitive, always structure's itself.
+                self.write(ident)
+            } else {
+                // Logical.
+                self.write(TypeCoder.Bool)
+            }
+        }
+        self.write(" operator")
+        self.write(op)
+        self.write("(")
+        if !unary {
+            let mut p = f.params[1]
+            self.write(TypeCoder.param_ins(p))
+            self.write(" _other")
+        }
+        self.write(") { ")
+        if !assignment {
+            self.write("return ")
+        }
+        self.write(IdentCoder.func_ins(f))
+        if !unary {
+            self.write("(this, _other); ")
+            if assignment {
+                self.write("return *this; ")
+            }
+            self.write("}")
+        } else {
+            self.write("(this); }")
+        }
+        self.write("\n\n")
+    }
+
+    fn structure_operators(mut &self, mut &s: &StructIns) {
+        let ident = IdentCoder.structure_ins(s)
+
+        // Binary.
+        self.structure_operator_eq(ident, s)
+        self.structure_operator_not_eq(ident, s)
+        self.structure_operator(ident, s.operators.gt, ">")
+        self.structure_operator(ident, s.operators.gt_eq, ">=")
+        self.structure_operator(ident, s.operators.lt, "<")
+        self.structure_operator(ident, s.operators.lt_eq, "<=")
+        self.structure_operator(ident, s.operators.shl, "<<")
+        self.structure_operator(ident, s.operators.shr, ">>")
+        self.structure_operator(ident, s.operators.add, "+")
+        self.structure_operator(ident, s.operators.sub, "-")
+        self.structure_operator(ident, s.operators.div, "/")
+        self.structure_operator(ident, s.operators.mul, "*")
+        self.structure_operator(ident, s.operators.mod, "%")
+        self.structure_operator(ident, s.operators.bit_and, "&")
+        self.structure_operator(ident, s.operators.bit_or, "|")
+        self.structure_operator(ident, s.operators.bit_xor, "^")
+
+        // Unary.
+        self.structure_operator(ident, s.operators.neg, "-")
+        self.structure_operator(ident, s.operators.pos, "+")
+        self.structure_operator(ident, s.operators.bit_not, "~")
+
+        // Assignment.
+        self.structure_operator(ident, s.operators.add_assign, "+=")
+        self.structure_operator(ident, s.operators.sub_assign, "-=")
+        self.structure_operator(ident, s.operators.div_assign, "/=")
+        self.structure_operator(ident, s.operators.mul_assign, "*=")
+        self.structure_operator(ident, s.operators.mod_assign, "%=")
+        self.structure_operator(ident, s.operators.shl_assign, "<<=")
+        self.structure_operator(ident, s.operators.shr_assign, ">>=")
+        self.structure_operator(ident, s.operators.bit_or_assign, "|=")
+        self.structure_operator(ident, s.operators.bit_and_assign, "&=")
+        self.structure_operator(ident, s.operators.bit_xor_assign, "^=")
+    }
+
+    fn structure_ins_decl(mut &self, mut &s: &StructIns) {
+        if s.methods.len > 0 {
+            for (_, mut m) in s.methods {
+                self.func_decl(m, false)
+            }
+        }
+
+        self.write("struct ")
+        let out_ident = IdentCoder.structure_ins(s)
+
+        self.write(out_ident)
+        self.write(" {\n")
+
+        self.add_indent()
+        if s.fields.len > 0 {
+            for (_, mut f) in s.fields {
+                self.indent()
+                self.field_decl(f)
+                self.write("\n")
+            }
+            self.write("\n\n")
+            self.indent()
+            self.structure_constructor(s)
+            self.write("\n\n")
+        }
+
+        self.indent()
+        self.structure_destructor(s)
+        self.write("\n\n")
+
+        // Default constructor.
+        self.indent()
+        self.write(out_ident)
+        self.write("(void) = default;\n\n")
+
+        self.structure_derive_defs_decls(s)
+
+        self.structure_operators(s)
+        self.write("\n")
+
+        self.done_indent()
+        self.indent()
+        self.write("};")
+    }
+
+    fn structure_decl(mut &self, mut &s: &Struct) {
+        for (_, mut ins) in s.instances {
+            self.structure_ins_decl(ins)
+        }
+    }
+
+    fn structure_decls(mut &self) {
+        for (_, mut s) in self.ir.ordered.structs {
+            if !s.cpp_linked && s.token != nil {
+                self.structure_decl(s)
+                self.write("\n")
+            }
+        }
+    }
+
+    fn params_decls(mut &self, mut &params: []&ParamIns) {
+        if params.len == 0 {
+            self.write("(void)")
+            ret
+        }
+
+        self.write("(")
+        for (i, mut p) in params {
+            self.write(TypeCoder.param_ins(p))
+            if params.len - i > 1 {
+                self.write(", ")
+            }
+        }
+
+        self.write(")")
+    }
+
+    fn func_head(mut &self, mut &f: &FnIns, ptr: bool) {
+        if !ptr && env::OPT_INLINE && !f.decl.is_entry_point() {
+            self.write("inline ")
+        }
+        self.write(TypeCoder.func_ins_result(f))
+        if ptr {
+            self.write("(*")
+            self.write(IdentCoder.func_ins(f))
+            self.write(")")
+        } else {
+            self.write(" ")
+            self.write(IdentCoder.func_ins(f))
+        }
+    }
+
+    fn func_decl(mut &self, mut &f: &Fn, ptr: bool) {
+        for (_, mut c) in f.instances {
+            self.indent()
+            self.func_head(c, ptr)
+            self.params_decls(c.params)
+            self.write(";\n")
+        }
+    }
+
     fn decls(mut &self) {
         self.trait_decls()
         self.structure_plain_decls()
+        self.structure_decls()
     }
 
     pub fn serialize(mut &self) {

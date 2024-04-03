@@ -1,0 +1,234 @@
+// Copyright 2023-2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use env
+use optimizing::{
+    UnsafeBinopExprModel,
+    UnsafeIndexingExprModel,
+    PushToSliceExprModel,
+    MutSlicingExprModel,
+    StrInsertBeginExprModel,
+}
+use conv for std::conv
+use std::env::{ARCH}
+use fmt for std::fmt
+use std::jule::build::{Directive, is_64bit}
+use std::jule::constant::{Const}
+use std::jule::lex::{Token, TokenKind}
+use std::jule::sema::{
+    Var,
+    Struct,
+    FnIns,
+    Trait,
+    StructIns,
+    TypeKind,
+    Data,
+    Value,
+    ExprModel,
+    BinopExprModel,
+    UnaryExprModel,
+    StructLitExprModel,
+    AllocStructLitExprModel,
+    CastingExprModel,
+    FnCallExprModel,
+    SliceExprModel,
+    IndexingExprModel,
+    AnonFnExprModel,
+    MapExprModel,
+    SlicingExprModel,
+    TraitSubIdentExprModel,
+    StructSubIdentExprModel,
+    ArrayExprModel,
+    CommonIdentExprModel,
+    CommonSubIdentExprModel,
+    TupleExprModel,
+    BuiltinOutCallExprModel,
+    BuiltinOutlnCallExprModel,
+    BuiltinCloneCallExprModel,
+    BuiltinNewCallExprModel,
+    BuiltinPanicCallExprModel,
+    BuiltinAssertCallExprModel,
+    BuiltinMakeCallExprModel,
+    BuiltinAppendCallExprModel,
+    BuiltinErrorCallExprModel,
+    SizeofExprModel,
+    AlignofExprModel,
+    RuneExprModel,
+    StructStaticIdentExprModel,
+    IntegratedToStrExprModel,
+    BackendEmitExprModel,
+    FreeExprModel,
+    OperandExprModel,
+    Scope,
+}
+use types for std::jule::types::{
+    MAX_F32,
+    MAX_F64,
+    MIN_F32,
+    MIN_F64,
+    MAX_I64,
+    MIN_I64,
+    MAX_U64,
+}
+use math for std::math
+use strings for std::strings
+use utf8 for std::unicode::utf8
+
+// Ignore expression for std::tie function.
+const CPP_IGNORE = "std::ignore"
+
+// Represents default expression for type.
+const CPP_DEFAULT_EXPR = "{}"
+
+struct ExprCoder {
+    oc: &ObjectCoder
+}
+
+impl ExprCoder {
+    static fn new(mut &oc: &ObjectCoder): &ExprCoder {
+        ret &ExprCoder{
+            oc: oc,
+        }
+    }
+
+    fn expr(mut &self, mut e: ExprModel) {
+    }
+
+    fn val(mut &self, mut v: &Value) {
+    }
+
+    fn init_expr(mut &self, mut t: &TypeKind) {
+    }
+}
+
+fn decompose_common_esq(b: byte): str {
+    match b {
+    | '\\':
+        ret "\\\\"
+    | '\'':
+        ret "'"
+    | '"':
+        ret `\"`
+    | '\a':
+        ret `\a`
+    | '\b':
+        ret `\b`
+    | '\f':
+        ret `\f`
+    | '\n':
+        ret `\n`
+    | '\r':
+        ret `\r`
+    | '\t':
+        ret `\t`
+    | '\v':
+        ret `\v`
+    |:
+        ret ""
+    }
+}
+
+fn sbtoa(b: byte): str {
+    if b == 0 {
+        ret "\\x00"
+    }
+    if b < utf8::RUNE_SELF { // ASCII, fast way.
+        let seq = decompose_common_esq(b)
+        if seq != "" {
+            ret seq
+        }
+        if 32 <= b && b <= 126 {
+            ret str(b)
+        }
+    }
+    let seq = conv::fmt_uint(u64(b), 8)
+    if seq.len == 2 {
+        ret "\\0" + seq
+    }
+    ret "\\" + seq
+}
+
+fn cstr_bytes(bytes: []byte): str {
+    let mut lit = ""
+    for _, b in bytes {
+        lit += sbtoa(b)
+    }
+    ret lit
+}
+
+fn cstr_lit(bytes: []byte): str {
+    ret `"` + cstr_bytes(bytes) + `"`
+}
+
+fn ftoa(f: f64, bitsize: int): str {
+    if bitsize != 32 {
+        if f == f64(i64(f)) {
+            ret itoa(i64(f))
+        }
+        if f == f64(u64(f)) {
+            ret utoa(u64(f))
+        }
+    }
+    let mut m = conv::fmt_float(f, 'f', -1, bitsize)
+    if !strings::contains(m, ".") {
+        m += ".0"
+    }
+    ret m
+}
+
+fn itoa(x: i64): str {
+    match {
+    | x == MAX_I64:
+        ret "jule::MAX_I64"
+    | x == MIN_I64:
+        ret "jule::MIN_I64"
+    }
+
+    let fmt = conv::fmt_int(x, 10)
+    if is_64bit(ARCH) {
+        ret fmt + "LL"
+    }
+    ret fmt + "L"
+}
+
+fn utoa(x: u64): str {
+    match {
+    | x == MAX_U64:
+        ret "jule::MAX_U64"
+    }
+
+    let fmt = conv::fmt_uint(x, 10)
+    if is_64bit(ARCH) {
+        ret fmt + "LLU"
+    }
+    ret fmt + "LU"
+}
+
+fn is_forwarded(&s: &Scope): bool {
+    let last = s.stmts[s.stmts.len-1]
+    match type last {
+    | &Data:
+        match type (&Data)(last).model {
+        | &BuiltinErrorCallExprModel:
+            ret true
+        |:
+            ret false
+        }
+    |:
+        ret true
+    }
+}
+
+fn is_builtin_call_has_debuginf(&m: &FnCallExprModel): bool {
+    if !m.func.is_builtin() {
+        ret false
+    }
+    match type m.expr {
+    | &CommonSubIdentExprModel:
+        let csie = (&CommonSubIdentExprModel)(m.expr)
+        ret csie.ident == "swap"
+    |:
+        ret false
+    }
+}
