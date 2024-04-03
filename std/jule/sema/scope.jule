@@ -159,7 +159,7 @@ fn get_expr_models(mut &m: ExprModel): []ExprModel {
     }
 }
 
-fn check_mut(mut &s: &Sema, &left: &Data, mut right: &Data, op: Token): (ok: bool) {
+fn check_mut(mut &s: &Sema, &left: &Data, mut right: &Data, op: &Token): (ok: bool) {
     match {
     | !left.mutable:
         s.push_err(op, LogMsg.AssignToNonMut)
@@ -178,7 +178,7 @@ fn check_mut(mut &s: &Sema, &left: &Data, mut right: &Data, op: Token): (ok: boo
     }
 }
 
-fn check_assign(mut &s: &Sema, mut &left: &Data, mut right: &Data, op: Token): (ok: bool) {
+fn check_assign(mut &s: &Sema, mut &left: &Data, mut right: &Data, op: &Token): (ok: bool) {
     let f = left.kind.fnc()
     if f != nil && f.decl != nil && f.decl.global {
         s.push_err(op, LogMsg.AssignTypeNotSupportValue)
@@ -323,7 +323,7 @@ pub struct Postfix {
 pub struct Assign {
     pub l:  &OperandExprModel
     pub r:  &OperandExprModel
-    pub op: Token
+    pub op: &Token
 }
 
 // Multi-declarative assignment.
@@ -373,7 +373,7 @@ pub struct RetSt {
 }
 
 struct ScopeLabel {
-    token: Token
+    token: &Token
     label: &Label
     pos:   int
     scope: &ScopeChecker
@@ -718,7 +718,7 @@ impl ScopeChecker {
         self.scope.stmts = append(self.scope.stmts, s)
     }
 
-    fn process_error_call(mut &self, mut &m: &BuiltinErrorCallExprModel, err: Token) {
+    fn process_error_call(mut &self, mut &m: &BuiltinErrorCallExprModel, err: &Token) {
         if self.is_deferred() {
             self.s.push_err(err, LogMsg.ErrorInDeferred)
         }
@@ -1003,8 +1003,8 @@ impl ScopeChecker {
             ret nil
         }
 
-        if c.label.id != TokenId.Na {
-            ret &ContSt{}
+        if c.label != nil {
+            ret new(ContSt)
         }
 
         let mut scope = self
@@ -1027,7 +1027,7 @@ impl ScopeChecker {
             ret
         }
 
-        if c.label.id != TokenId.Na { // Label given.
+        if c.label != nil { // Label given.
             let mut label = find_label_parent(c.label.kind, self.parent)
             if label == nil {
                 self.s.push_err(c.label, LogMsg.LabelNotExist, c.label.kind)
@@ -1543,7 +1543,7 @@ impl ScopeChecker {
                 | &Const:
                     let c = (&Const)(m.expr)
                     if c.is_str() {
-                        self.s.push_err(*self.called_from, LogMsg.ComptimePanic, c.read_str())
+                        self.s.push_err(self.called_from, LogMsg.ComptimePanic, c.read_str())
                     }
                 }
             }
@@ -1735,7 +1735,7 @@ impl ScopeChecker {
     }
 
     fn check_break(mut &self, b: &std::jule::ast::BreakSt) {
-        if b.label.id != TokenId.Na { // Label given.
+        if b.label != nil { // Label given.
             let mut brk = self.check_break_with_label(b)
             self.scope.stmts = append(self.scope.stmts, brk)
             ret

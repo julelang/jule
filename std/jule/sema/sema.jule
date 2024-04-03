@@ -38,7 +38,7 @@ fn is_valid_model_for_ref(mut &m: ExprModel): bool {
     }
 }
 
-fn compiler_err(&token: Token, line: bool, fmt: LogMsg, args: ...any): Log {
+fn compiler_err(&token: &Token, line: bool, fmt: LogMsg, args: ...any): Log {
     let mut log = Log{
         kind: LogKind.Error,
         row: token.row,
@@ -404,7 +404,7 @@ impl Sema {
 
     fn set_current_file(mut self, mut f: &SymbolTable) { self.file = f }
 
-    fn push_err(mut self, token: Token, fmt: LogMsg, args: ...any) {
+    fn push_err(mut self, token: &Token, fmt: LogMsg, args: ...any) {
         self.errors = append(self.errors, compiler_err(token, true, fmt, args...))
     }
 
@@ -414,7 +414,7 @@ impl Sema {
     }
 
     // Reports whether define is accessible in the current package.
-    fn is_accessible_define(self, public: bool, token: Token): bool {
+    fn is_accessible_define(self, public: bool, token: &Token): bool {
         ret public || token.file == nil || self.file.file.dir() == token.file.dir()
     }
 
@@ -447,7 +447,7 @@ impl Sema {
         dc.check()
     }
 
-    fn check_generic_quantity(mut self, required: int, given: int, token: Token): (ok: bool) {
+    fn check_generic_quantity(mut self, required: int, given: int, token: &Token): (ok: bool) {
         match {
         | required == 0 && given > 0:
             self.push_err(token, LogMsg.NotHasGenerics)
@@ -727,7 +727,7 @@ impl Sema {
     }
 
     fn check_assign_type(mut &self, dest_is_ref: bool, mut &dest: &TypeKind,
-        mut &d: &Data, mut error_token: Token): bool {
+        mut &d: &Data, mut error_token: &Token): bool {
         if d.decl {
             self.push_err(error_token, LogMsg.InvalidExpr)
             ret false
@@ -769,7 +769,7 @@ impl Sema {
     }
 
     fn check_type_compatibility(mut &self, mut &dest: &TypeKind,
-        mut &src: &TypeKind, mut &error_token: Token): bool {
+        mut &src: &TypeKind, mut &error_token: &Token): bool {
         if src == nil {
             self.push_err(error_token, LogMsg.IncompatibleTypes,
                 dest.to_str(), src.to_str())
@@ -922,7 +922,7 @@ impl Sema {
         ret ok
     }
 
-    fn check_ref_validity_for_init_expr(mut &self, left_mut: bool, mut &d: &Data, mut &error_token: Token): bool {
+    fn check_ref_validity_for_init_expr(mut &self, left_mut: bool, mut &d: &Data, mut &error_token: &Token): bool {
         match type d.model {
         | &Var:
             break
@@ -965,7 +965,7 @@ impl Sema {
     }
 
     fn check_validity_for_init_expr(mut &self, left_mut: bool, left_ref: bool,
-        &left_kind: &TypeKind, mut &d: &Data, mut &error_token: Token): bool {
+        &left_kind: &TypeKind, mut &d: &Data, mut &error_token: &Token): bool {
         if left_mut && !d.mutable && d.kind.mutable() {
             self.push_err(error_token, LogMsg.AssignNonMutToMut, d.kind.to_str())
             ret false
@@ -989,9 +989,11 @@ impl Sema {
         defer {
             self.set_current_file(old)
         }
-        let mut file = find_file(self.files, ta.token.file)
-        if file != nil {
-            self.set_current_file(file)
+        if ta.token != nil {
+            let mut file = find_file(self.files, ta.token.file)
+            if file != nil {
+                self.set_current_file(file)
+            }
         }
         ok = self.check_type_with_refers(ta.kind, l, &Referencer{
             ident: ta.ident,
@@ -1884,7 +1886,7 @@ impl Sema {
         self.check_package_derives()
     }
 
-    fn check_data_for_type_inference(mut self, &d: &Data, &err_token: Token) {
+    fn check_data_for_type_inference(mut self, &d: &Data, &err_token: &Token) {
         match {
         | d.is_nil():
             self.push_err(err_token, LogMsg.NilForTypeInference)

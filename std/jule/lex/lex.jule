@@ -446,7 +446,7 @@ fn byte_escape(&txt: []byte): (seq: str) {
 
 struct Lex {
     mode:   LexMode
-    tokens: []Token
+    tokens: []&Token
     file:   &File
     pos:    int
     column: int
@@ -460,7 +460,7 @@ impl Lex {
             make_err(self.row, self.column, self.file, fmt, args...))
     }
 
-    fn push_err_tok(mut self, &token: Token, fmt: LogMsg) {
+    fn push_err_tok(mut self, &token: &Token, fmt: LogMsg) {
         self.errors = append(self.errors,
             make_err(token.row, token.column, self.file, fmt))
     }
@@ -533,7 +533,7 @@ impl Lex {
         ret nil
     }
 
-    fn lex_line_comment(mut self, mut &token: Token) {
+    fn lex_line_comment(mut self, mut &token: &Token) {
         let start = self.pos
         self.pos += 2
         for self.pos < self.file.data.len; self.pos++ {
@@ -548,7 +548,7 @@ impl Lex {
         }
     }
 
-    fn lex_range_comment(mut self, mut &token: Token) {
+    fn lex_range_comment(mut self, mut &token: &Token) {
         let start = self.pos
         self.pos += 2
         for self.pos < self.file.data.len; self.pos++ {
@@ -719,7 +719,7 @@ impl Lex {
         self.column = 1
     }
 
-    fn is_op(mut self, &txt: []byte, kind: str, id: TokenId, mut &t: Token): bool {
+    fn is_op(mut self, &txt: []byte, kind: str, id: TokenId, mut &t: &Token): bool {
         if !bytes_has_prefix(txt, kind) {
             ret false
         }
@@ -730,7 +730,7 @@ impl Lex {
         ret true
     }
 
-    fn lex_basic_ops(mut self, txt: []byte, mut &tok: Token): bool {
+    fn lex_basic_ops(mut self, txt: []byte, mut &tok: &Token): bool {
         for _, pair in BASIC_OPS {
             if self.is_op(txt, pair.kind, pair.id, tok) {
                 ret true
@@ -740,7 +740,7 @@ impl Lex {
         ret false
     }
 
-    fn lex_id(mut self, &txt: []byte, mut &t: Token): bool {
+    fn lex_id(mut self, &txt: []byte, mut &t: &Token): bool {
         let lex = self.id(txt)
         if lex == "" {
             ret false
@@ -751,7 +751,7 @@ impl Lex {
         ret true
     }
 
-    fn lex_num(mut self, &txt: []byte, mut &t: Token): bool {
+    fn lex_num(mut self, &txt: []byte, mut &t: &Token): bool {
         let lex = self.num(txt)
         if lex == "" {
             ret false
@@ -763,8 +763,11 @@ impl Lex {
     }
 
     // lex.token generates next token from resume at position.
-    fn token(mut self): Token {
-        let mut t = Token{file: self.file, id: TokenId.Na}
+    fn token(mut self): &Token {
+        let mut t = &Token{
+            file: self.file,
+            id: TokenId.Na,
+        }
 
         let txt = self.resume()
         if txt == nil {

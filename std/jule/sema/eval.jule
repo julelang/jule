@@ -121,7 +121,7 @@ struct Eval {
 }
 
 impl Eval {
-    fn push_err(mut self, token: Token, fmt: LogMsg, args: ...any) {
+    fn push_err(mut self, token: &Token, fmt: LogMsg, args: ...any) {
         self.s.push_err(token, fmt, args...)
     }
 
@@ -467,7 +467,7 @@ impl Eval {
         }
     }
 
-    fn eval_enum(mut self, mut enm: &Enum, error_token: Token): &Data {
+    fn eval_enum(mut self, mut enm: &Enum, error_token: &Token): &Data {
         if !self.s.is_accessible_define(enm.public, enm.token) {
             self.push_err(error_token, LogMsg.IdentIsNotAccessible, enm.ident)
             self.push_suggestion(LogMsg.MakePubToAccess)
@@ -490,7 +490,7 @@ impl Eval {
         }
     }
 
-    fn eval_struct(mut self, mut s: &StructIns, error_token: Token): &Data {
+    fn eval_struct(mut self, mut s: &StructIns, error_token: &Token): &Data {
         if !self.s.is_accessible_define(s.decl.public, s.decl.token) {
             self.push_err(error_token, LogMsg.IdentIsNotAccessible, s.decl.ident)
             self.push_suggestion(LogMsg.MakePubToAccess)
@@ -515,7 +515,7 @@ impl Eval {
         }
     }
 
-    fn check_deprecated(mut self, mut &directives: []&std::jule::ast::Directive, tok: Token) {
+    fn check_deprecated(mut self, mut &directives: []&std::jule::ast::Directive, tok: &Token) {
         if self.is_unsafe() {
             ret
         }
@@ -531,7 +531,7 @@ impl Eval {
         }
     }
 
-    fn eval_fn(mut self, mut f: &Fn, error_token: Token): &Data {
+    fn eval_fn(mut self, mut f: &Fn, error_token: &Token): &Data {
         if !self.s.is_accessible_define(f.public, f.token) {
             self.push_err(error_token, LogMsg.IdentIsNotAccessible, f.ident)
             self.push_suggestion(LogMsg.MakePubToAccess)
@@ -571,7 +571,7 @@ impl Eval {
     // Checks owner illegal cycles.
     // Appends depend to depends if there is no illegal cycle.
     // Returns true if e.owner is nil.
-    fn check_illegal_cycles(mut self, mut &v: &Var, decl_token: Token): (ok: bool) {
+    fn check_illegal_cycles(mut self, mut &v: &Var, decl_token: &Token): (ok: bool) {
         if self.owner == nil {
             ret true
         }
@@ -598,7 +598,7 @@ impl Eval {
         ret true
     }
 
-    fn eval_var(mut self, mut v: &Var, error_token: Token): &Data {
+    fn eval_var(mut self, mut v: &Var, error_token: &Token): &Data {
         if !self.s.is_accessible_define(v.public, v.token) {
             self.push_err(error_token, LogMsg.IdentIsNotAccessible, v.ident)
             self.push_suggestion(LogMsg.MakePubToAccess)
@@ -684,7 +684,7 @@ impl Eval {
         ret d
     }
 
-    fn eval_type_alias(mut self, mut ta: &TypeAlias, error_token: Token): &Data {
+    fn eval_type_alias(mut self, mut ta: &TypeAlias, error_token: &Token): &Data {
         if !self.s.is_accessible_define(ta.public, ta.token) {
             self.push_err(error_token, LogMsg.IdentIsNotAccessible, ta.ident)
             self.push_suggestion(LogMsg.MakePubToAccess)
@@ -718,7 +718,7 @@ impl Eval {
         ret d
     }
 
-    fn eval_def(mut self, mut def: any, ident: Token): &Data {
+    fn eval_def(mut self, mut def: any, ident: &Token): &Data {
         match type def {
         | &Var:
             ret self.eval_var((&Var)(def), ident)
@@ -927,7 +927,7 @@ impl Eval {
         ret d
     }
 
-    fn check_integer_indexing_by_data(mut self, mut &d: &Data, token: Token) {
+    fn check_integer_indexing_by_data(mut self, mut &d: &Data, token: &Token) {
         let err_key = check_data_for_integer_indexing(d)
         match err_key {
         | LogMsg.Empty:
@@ -1322,7 +1322,7 @@ impl Eval {
         ret d
     }
 
-    fn cast_ptr(mut self, mut t: &TypeKind, mut d: &Data, error_token: Token) {
+    fn cast_ptr(mut self, mut t: &TypeKind, mut d: &Data, error_token: &Token) {
         let sptr = d.kind.sptr()
         if sptr != nil {
             if !t.ptr().elem.equals(sptr.elem) {
@@ -1344,7 +1344,7 @@ impl Eval {
         d.constant = nil
     }
 
-    fn cast_struct(mut self, mut t: &TypeKind, mut d: &Data, error_token: Token) {
+    fn cast_struct(mut self, mut t: &TypeKind, mut d: &Data, error_token: &Token) {
         let mut tr = d.kind.trt()
         if tr == nil {
             self.push_err(error_token, LogMsg.TypeNotSupportsCastingTo, d.kind.to_str(), t.to_str())
@@ -1359,7 +1359,7 @@ impl Eval {
         }
     }
 
-    fn cast_ref(mut self, mut t: &TypeKind, mut d: &Data, error_token: Token) {
+    fn cast_ref(mut self, mut t: &TypeKind, mut d: &Data, error_token: &Token) {
         let mut sptr = t.sptr()
 
         let mut ptr = d.kind.ptr()
@@ -1381,7 +1381,7 @@ impl Eval {
         self.push_err(error_token, LogMsg.TypeNotSupportsCastingTo, d.kind.to_str(), t.to_str())
     }
 
-    fn cast_slc(mut self, mut t: &TypeKind, mut d: &Data, error_token: Token) {
+    fn cast_slc(mut self, mut t: &TypeKind, mut d: &Data, error_token: &Token) {
         if d.kind.enm() != nil {
             if d.kind.enm().kind.kind.prim() == nil || !d.kind.enm().kind.kind.prim().is_str() {
                 self.push_err(error_token, LogMsg.TypeNotSupportsCastingTo, d.kind.to_str(), t.to_str())
@@ -1399,7 +1399,7 @@ impl Eval {
         }
     }
 
-    fn cast_str(mut self, mut d: &Data, error_token: Token) {
+    fn cast_str(mut self, mut d: &Data, error_token: &Token) {
         if d.kind.enm() != nil {
             let mut e = d.kind.enm()
             if e.kind.kind.prim() != nil && e.kind.kind.prim().is_str() {
@@ -1427,7 +1427,7 @@ impl Eval {
         }
     }
 
-    fn cast_int(mut self, mut t: &TypeKind, mut d: &Data, error_token: Token) {
+    fn cast_int(mut self, mut t: &TypeKind, mut d: &Data, error_token: &Token) {
         if d.is_const() {
             let prim = t.prim()
             match {
@@ -1472,7 +1472,7 @@ impl Eval {
         self.push_err(error_token, LogMsg.TypeNotSupportsCastingTo, d.kind.to_str(), t.to_str())
     }
 
-    fn cast_num(mut self, mut t: &TypeKind, mut d: &Data, error_token: Token) {
+    fn cast_num(mut self, mut t: &TypeKind, mut d: &Data, error_token: &Token) {
         if d.is_const() {
             let prim = t.prim()
             match {
@@ -1500,7 +1500,7 @@ impl Eval {
         self.push_err(error_token, LogMsg.TypeNotSupportsCastingTo, d.kind.to_str(), t.to_str())
     }
 
-    fn cast_prim(mut self, mut t: &TypeKind, mut d: &Data, error_token: Token) {
+    fn cast_prim(mut self, mut t: &TypeKind, mut d: &Data, error_token: &Token) {
         let prim = t.prim()
         match {
         | prim.is_any():
@@ -1525,7 +1525,7 @@ impl Eval {
         d.model = d.constant
     }
 
-    fn eval_cast_by_type_n_data(mut self, mut t: &TypeKind, mut d: &Data, mut error_token: Token): &Data {
+    fn eval_cast_by_type_n_data(mut self, mut t: &TypeKind, mut d: &Data, mut error_token: &Token): &Data {
         if d != nil && d.decl {
             self.push_err(error_token, LogMsg.InvalidExpr)
             ret nil
@@ -1623,7 +1623,7 @@ impl Eval {
     }
 
     fn eval_struct_lit_explicit(mut &self, mut s: &StructIns,
-        mut exprs: []&Expr, mut error_token: Token): &Data {
+        mut exprs: []&Expr, mut error_token: &Token): &Data {
         let ok = self.s.check_generic_quantity(s.decl.generics.len, s.generics.len, error_token)
         if !ok {
             ret nil
@@ -1755,7 +1755,7 @@ impl Eval {
         d.mutable = true
     }
 
-    fn check_fn_of_concurrent_call(mut self, &f: &FnIns, error_token: Token) {
+    fn check_fn_of_concurrent_call(mut self, &f: &FnIns, error_token: &Token) {
         if self.is_unsafe() {
             ret
         }
@@ -1924,7 +1924,7 @@ impl Eval {
 
         if f.generics.len > 0 && exist_instance == nil {
             // Check generic function instance instantly.
-            self.s.check_fn_ins_caller(f, unsafe { (&Token)(&fc.token) })
+            self.s.check_fn_ins_caller(f, fc.token)
         }
     }
 
@@ -1961,7 +1961,7 @@ impl Eval {
         ret d
     }
 
-    fn eval_enum_static(mut self, mut enm: &Enum, ident: Token): &Data {
+    fn eval_enum_static(mut self, mut enm: &Enum, ident: &Token): &Data {
         let mut d = &Data{
             lvalue: false,
             decl: false,
@@ -1983,7 +1983,7 @@ impl Eval {
         ret d
     }
 
-    fn eval_struct_static(mut self, mut s: &StructIns, ident: Token): &Data {
+    fn eval_struct_static(mut self, mut s: &StructIns, ident: &Token): &Data {
         let mut d = &Data{
             lvalue: false,
             decl: false,
@@ -2022,7 +2022,7 @@ impl Eval {
         ret nil
     }
 
-    fn eval_trait_sub_ident(mut self, mut d: &Data, mut trt: &Trait, mut ident: Token): &Data {
+    fn eval_trait_sub_ident(mut self, mut d: &Data, mut trt: &Trait, mut ident: &Token): &Data {
         let mut f = trt.find_method(ident.kind)
         if f == nil {
             self.push_err(ident, LogMsg.ObjHaveNotIdent, trt.ident, ident.kind)
@@ -2106,7 +2106,7 @@ impl Eval {
         ret d
     }
 
-    fn eval_slice_sub_ident(mut self, mut d: &Data, mut ident: Token): &Data {
+    fn eval_slice_sub_ident(mut self, mut d: &Data, mut ident: &Token): &Data {
         match ident.kind {
         | "len":
             ret &Data{
@@ -2165,7 +2165,7 @@ impl Eval {
         }
     }
 
-    fn eval_array_sub_ident(mut self, mut d: &Data, mut ident: Token): &Data {
+    fn eval_array_sub_ident(mut self, mut d: &Data, mut ident: &Token): &Data {
         match ident.kind {
         | "len":
             let mut c = Const.new_i64(i64(d.kind.arr().n))
@@ -2210,7 +2210,7 @@ impl Eval {
         }
     }
 
-    fn eval_map_sub_ident(mut self, mut d: &Data, mut ident: Token): &Data {
+    fn eval_map_sub_ident(mut self, mut d: &Data, mut ident: &Token): &Data {
         let mut map_kind = d.kind.map()
 
         match ident.kind {
@@ -2333,7 +2333,7 @@ impl Eval {
         }
     }
 
-    fn eval_str_sub_ident(mut self, mut d: &Data, mut ident: Token): &Data {
+    fn eval_str_sub_ident(mut self, mut d: &Data, mut ident: &Token): &Data {
         let mut str_kind = &TypeKind{kind: build_prim_type(PrimKind.Str)}
         match ident.kind {
         | "len":
@@ -2358,7 +2358,7 @@ impl Eval {
         }
     }
 
-    fn eval_int_type_static(mut self, ident: Token): &Data {
+    fn eval_int_type_static(mut self, ident: &Token): &Data {
         const kind: str = PrimKind.Int
 
         match ident.kind {
@@ -2382,7 +2382,7 @@ impl Eval {
         }
     }
 
-    fn eval_uint_type_static(mut self, ident: Token): &Data {
+    fn eval_uint_type_static(mut self, ident: &Token): &Data {
         const kind: str = PrimKind.Uint
 
         match ident.kind {
@@ -2399,7 +2399,7 @@ impl Eval {
         }
     }
 
-    fn eval_i8_type_static(mut self, ident: Token): &Data {
+    fn eval_i8_type_static(mut self, ident: &Token): &Data {
         const kind: str = PrimKind.I8
         const min = types::MIN_I8
         const max = types::MAX_I8
@@ -2425,7 +2425,7 @@ impl Eval {
         }
     }
 
-    fn eval_i16_type_static(mut self, ident: Token): &Data {
+    fn eval_i16_type_static(mut self, ident: &Token): &Data {
         const kind: str = PrimKind.I16
         const min = types::MIN_I16
         const max = types::MAX_I16
@@ -2451,7 +2451,7 @@ impl Eval {
         }
     }
 
-    fn eval_i32_type_static(mut self, ident: Token): &Data {
+    fn eval_i32_type_static(mut self, ident: &Token): &Data {
         const kind: str = PrimKind.I32
         const min = types::MIN_I32
         const max = types::MAX_I32
@@ -2477,7 +2477,7 @@ impl Eval {
         }
     }
 
-    fn eval_i64_type_static(mut self, ident: Token): &Data {
+    fn eval_i64_type_static(mut self, ident: &Token): &Data {
         const kind: str = PrimKind.I64
         const min = types::MIN_I64
         const max = types::MAX_I64
@@ -2503,7 +2503,7 @@ impl Eval {
         }
     }
 
-    fn eval_u8_type_static(mut self, ident: Token): &Data {
+    fn eval_u8_type_static(mut self, ident: &Token): &Data {
         const kind: str = PrimKind.U8
         const max = types::MAX_U8
 
@@ -2521,7 +2521,7 @@ impl Eval {
         }
     }
 
-    fn eval_u16_type_static(mut self, ident: Token): &Data {
+    fn eval_u16_type_static(mut self, ident: &Token): &Data {
         const kind: str = PrimKind.U16
         const max = types::MAX_U16
 
@@ -2539,7 +2539,7 @@ impl Eval {
         }
     }
 
-    fn eval_u32_type_static(mut self, ident: Token): &Data {
+    fn eval_u32_type_static(mut self, ident: &Token): &Data {
         const kind: str = PrimKind.U32
         const max = types::MAX_U32
 
@@ -2557,7 +2557,7 @@ impl Eval {
         }
     }
 
-    fn eval_u64_type_static(mut self, ident: Token): &Data {
+    fn eval_u64_type_static(mut self, ident: &Token): &Data {
         const kind: str = PrimKind.U64
         const max = types::MAX_U64
 
@@ -2575,7 +2575,7 @@ impl Eval {
         }
     }
 
-    fn eval_f32_type_tatic(mut self, ident: Token): &Data {
+    fn eval_f32_type_tatic(mut self, ident: &Token): &Data {
         const kind = PrimKind.F32
         const max = types::MAX_F32
         const min = types::MIN_F32
@@ -2609,7 +2609,7 @@ impl Eval {
         }
     }
 
-    fn eval_f64_type_static(mut self, ident: Token): &Data {
+    fn eval_f64_type_static(mut self, ident: &Token): &Data {
         const kind = PrimKind.F64
         const max = types::MAX_F64
         const min = types::MIN_F64
@@ -2643,7 +2643,7 @@ impl Eval {
         }
     }
 
-    fn eval_prim_static(mut self, kind: str, ident: Token): &Data {
+    fn eval_prim_static(mut self, kind: str, ident: &Token): &Data {
         match kind {
         | PrimKind.Int:
             ret self.eval_int_type_static(ident)
@@ -3290,7 +3290,7 @@ struct BinaryEval {
     e:  &Eval
     l:  &Data
     r:  &Data
-    op: Token
+    op: &Token
 }
 
 impl BinaryEval {
@@ -3300,7 +3300,7 @@ impl BinaryEval {
         }
     }
 
-    static fn new(mut e: &Eval, mut op: Token): BinaryEval {
+    static fn new(mut e: &Eval, mut op: &Token): BinaryEval {
         ret BinaryEval{
             e: e,
             op: op,

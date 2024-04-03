@@ -110,7 +110,7 @@ struct TypeCompatibilityChecker {
     s:           &Sema     // Used for error logging.
     dest:        &TypeKind
     src:         &TypeKind
-    error_token: Token
+    error_token: &Token
 }
 
 impl TypeCompatibilityChecker {
@@ -202,7 +202,7 @@ struct AssignTypeChecker {
     s:           &Sema     // Used for error logging and type checking.
     dest:        &TypeKind
     d:           &Data
-    error_token: Token
+    error_token: &Token
 }
 
 impl AssignTypeChecker {
@@ -328,7 +328,7 @@ struct DynamicTypeAnnotation {
     f:           &FnIns
     p:           &ParamIns
     a:           &Data
-    error_token: Token
+    error_token: &Token
     k:           *&TypeKind
 }
 
@@ -499,14 +499,14 @@ impl DynamicTypeAnnotation {
 struct FnCallArgChecker {
     e:                  &Eval
     args:               []&Expr
-    error_token:        Token
+    error_token:        &Token
     f:                  &FnIns
     dynamic_annotation: bool
     arg_models:         []ExprModel
 }
 
 impl FnCallArgChecker {
-    fn push_err_token(mut self, token: Token, fmt: LogMsg, args: ...any) {
+    fn push_err_token(mut self, token: &Token, fmt: LogMsg, args: ...any) {
         self.e.s.push_err(token, fmt, args...)
     }
 
@@ -550,7 +550,7 @@ impl FnCallArgChecker {
         ret false
     }
 
-    fn check_arg(mut self, mut &p: &ParamIns, mut &arg: &Data, mut &error_token: Token): (ok: bool) {
+    fn check_arg(mut self, mut &p: &ParamIns, mut &arg: &Data, mut &error_token: &Token): (ok: bool) {
         if self.dynamic_annotation && parameter_uses_generics(p.decl, self.f.decl.generics) {
             ok = !p.decl.variadic // Accept as fail if parameter is variadic.
             if ok {
@@ -738,13 +738,13 @@ impl FnCallArgChecker {
 
 struct StructLitChecker {
     e:           &Eval
-    error_token: Token
+    error_token: &Token
     s:           &StructIns
     args:        []&StructArgExprModel
 }
 
 impl StructLitChecker {
-    fn push_err(mut self, token: Token, fmt: LogMsg, args: ...any) {
+    fn push_err(mut self, token: &Token, fmt: LogMsg, args: ...any) {
         self.e.push_err(token, fmt, args...)
     }
 
@@ -753,7 +753,7 @@ impl StructLitChecker {
         self.e.push_suggestion(fmt, args...)
     }
 
-    fn push_match(mut self, mut &f: &FieldIns, mut &d: &Data, mut &error_token: Token) {
+    fn push_match(mut self, mut &f: &FieldIns, mut &d: &Data, mut &error_token: &Token) {
         const REFERENCE = false
         if self.e.s.check_validity_for_init_expr(!self.e.immutable, REFERENCE, f.kind, d, error_token) {
             // Check type if validity is good.
@@ -1051,7 +1051,7 @@ struct RetTypeChecker {
     types:       []&TypeKind   // Return types.
     exprs:       []&Expr       // Return expressions.
     vars:        []&Var        // Return variables.
-    error_token: Token
+    error_token: &Token
     model:       ExprModel
 }
 

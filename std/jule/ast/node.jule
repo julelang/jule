@@ -11,7 +11,7 @@ pub type NodeData: any
 
 // AST Node.
 pub struct Node {
-    pub token: Token
+    pub token: &Token
     pub data:  NodeData
 }
 
@@ -67,8 +67,8 @@ impl Node {
 
 // Directive.
 pub struct Directive {
-    pub tag:  Token
-    pub args: []Token
+    pub tag:  &Token
+    pub args: []&Token
 }
 
 // Kind type of type declarations.
@@ -85,13 +85,13 @@ pub type TypeDeclKind: any
 // For function types:
 //  - Function types represented by &FnDecl.
 pub struct TypeDecl {
-    pub token: Token
+    pub token: &Token
     pub kind:  TypeDeclKind
 }
 
 // Identifier type.
 pub struct IdentTypeDecl {
-    pub token:      Token
+    pub token:      &Token
     pub ident:      str
     pub cpp_linked: bool
     pub generics:   []&TypeDecl
@@ -106,7 +106,7 @@ impl IdentTypeDecl {
 
 // Namespace chain type.
 pub struct NamespaceTypeDecl {
-    pub idents: []Token        // Namespace chain with identifier tokens.
+    pub idents: []&Token        // Namespace chain with identifier tokens.
     pub kind:   &IdentTypeDecl // Type of identifier.
 }
 
@@ -161,7 +161,7 @@ pub struct MapTypeDecl {
 // Kind and Idents is nil for void type.
 pub struct RetTypeDecl {
     pub kind:   &TypeDecl
-    pub idents: []Token
+    pub idents: []&Token
 }
 
 // Type of Expr's data.
@@ -169,8 +169,8 @@ pub type ExprData: any
 
 // Expression.
 pub struct Expr {
-    pub token: Token
-    pub end:   Token
+    pub token: &Token
+    pub end:   &Token
     pub range: bool  // Packed in parentheses.
 
     // Possible types:
@@ -198,7 +198,7 @@ pub struct Expr {
 
 // Use expression.
 pub struct UseExpr {
-    pub token: Token
+    pub token: &Token
     pub expr:  &Expr
 }
 
@@ -209,7 +209,7 @@ pub struct TupleExpr {
 
 // Literal expression.
 pub struct LitExpr {
-    pub token: Token
+    pub token: &Token
     pub value: str
 }
 
@@ -222,19 +222,19 @@ impl LitExpr {
 
 // Unsafe expression.
 pub struct UnsafeExpr {
-    pub token: Token // Token of unsafe keyword.
+    pub token: &Token // Token of unsafe keyword.
     pub expr:  &Expr
 }
 
 // Co expression.
 pub struct CoExpr {
-    pub token: Token // Token of co keyword.
+    pub token: &Token // Token of co keyword.
     pub expr:  &Expr
 }
 
 // Identifier expression.
 pub struct IdentExpr {
-    pub token:      Token // Token of identifier.
+    pub token:      &Token // Token of identifier.
     pub ident:      str
     pub cpp_linked: bool
 }
@@ -248,13 +248,13 @@ impl IdentExpr {
 
 // Unary expression.
 pub struct UnaryExpr {
-    pub op:   Token
+    pub op:   &Token
     pub expr: &Expr
 }
 
 // Variadiced expression.
 pub struct VariadicExpr {
-    pub token: Token
+    pub token: &Token
     pub expr:  &Expr
 }
 
@@ -266,27 +266,27 @@ pub struct CastExpr {
 
 // Namespace identifier selection expression.
 pub struct NsSelectionExpr {
-    pub ns:    []Token // Tokens of selected namespace identifier chain.
-    pub ident: Token   // Token of selected identifier.
+    pub ns:    []&Token // Tokens of selected namespace identifier chain.
+    pub ident: &Token   // Token of selected identifier.
 }
 
 // Object sub identifier selection expression.
 pub struct SubIdentExpr {
     pub is_self: bool  // True if root selector is "self" keyword.
     pub expr:    &Expr // Selected object.
-    pub ident:   Token // TOken of selected identifier.
+    pub ident:   &Token // TOken of selected identifier.
 }
 
 // Binary operation.
 pub struct BinopExpr {
     pub left:  &Expr
     pub right: &Expr
-    pub op:    Token
+    pub op:    &Token
 }
 
 // Function call expression kind.
 pub struct FnCallExpr {
-    pub token:     Token
+    pub token:     &Token
     pub expr:      &Expr
     pub generics:  []&TypeDecl
     pub args:      []&Expr
@@ -309,28 +309,28 @@ impl FnCallExpr {
 
 // Field-Expression pair.
 pub struct FieldExprPair {
-    pub field: Token // Field identifier token.
+    pub field: &Token // Field identifier token.
     pub expr:  &Expr
 }
 
 impl FieldExprPair {
     // Reports whether pair targeted field.
     pub fn is_targeted(self): bool {
-        ret self.field.id != TokenId.Na
+        ret self.field != nil
     }
 }
 
 // Struct literal instiating expression.
 pub struct StructLit {
-    pub end:   Token
+    pub end:   &Token
     pub kind:  &TypeDecl
     pub exprs: []&Expr   // Possible types: &FieldExprPair, and other expressions.
 }
 
 // Anonymous brace instiating expression.
 pub struct BraceLit {
-    pub token: Token
-    pub end:   Token
+    pub token: &Token
+    pub end:   &Token
     pub exprs: []&Expr
 }
 
@@ -345,14 +345,14 @@ impl BraceLit {
 pub struct KeyValPair {
     pub key:   &Expr
     pub val:   &Expr
-    pub colon: Token
+    pub colon: &Token
 }
 
 // Slice initiating expression.
 // Also represents array initiating expression.
 pub struct SliceExpr {
-    pub token: Token
-    pub end:   Token
+    pub token: &Token
+    pub end:   &Token
     pub exprs: []&Expr
 }
 
@@ -365,16 +365,16 @@ impl SliceExpr {
 
 // Indexing expression.
 pub struct IndexingExpr {
-    pub token: Token
-    pub end:   Token
+    pub token: &Token
+    pub end:   &Token
     pub expr:  &Expr // Value expression to indexing.
     pub index: &Expr // Index value expression.
 }
 
 // Slicing expression.
 pub struct SlicingExpr {
-    pub token: Token
-    pub end:   Token
+    pub token: &Token
+    pub end:   &Token
     pub expr:  &Expr // Value expression to slicing.
     pub start: &Expr // Start index value expression.
     pub to:    &Expr // To index value expression.
@@ -382,30 +382,30 @@ pub struct SlicingExpr {
 
 // Generic type declaration.
 pub struct GenericDecl {
-    pub token: Token
+    pub token: &Token
     pub ident: str
 }
 
 // Label statement.
 pub struct LabelSt {
-    pub token: Token
+    pub token: &Token
     pub ident: str
 }
 
 // Goto statement.
 pub struct GotoSt {
-    pub token: Token
-    pub label: Token
+    pub token: &Token
+    pub label: &Token
 }
 
 // Fall statement.
 pub struct FallSt {
-    pub token: Token
+    pub token: &Token
 }
 
 // Left expression of assign statement.
 pub struct AssignLeft {
-    pub token:     Token
+    pub token:     &Token
     pub mutable:   bool
     pub reference: bool
     pub ident:     str
@@ -415,7 +415,7 @@ pub struct AssignLeft {
 // Assign statement.
 pub struct AssignSt {
     pub declarative: bool
-    pub setter:      Token
+    pub setter:      &Token
     pub left:        []&AssignLeft
     pub right:       &Expr
 }
@@ -426,12 +426,12 @@ pub struct ScopeTree {
     pub unsafety: bool
     pub deferred: bool
     pub stmts:    []Node     // Statements.
-    pub end:      Token
+    pub end:      &Token
 }
 
 // Parameter.
 pub struct ParamDecl {
-    pub token:     Token
+    pub token:     &Token
     pub mutable:   bool
     pub variadic:  bool
     pub reference: bool
@@ -454,7 +454,7 @@ impl ParamDecl {
 // Function declaration.
 // Also represents anonymous function expression.
 pub struct FnDecl {
-    pub token:       Token
+    pub token:       &Token
     pub global:      bool
     pub unsafety:    bool
     pub public:      bool
@@ -479,7 +479,7 @@ impl FnDecl {
 // Variable declaration.
 pub struct VarDecl {
     pub scope:      &ScopeTree   // nil for global scopes
-    pub token:      Token
+    pub token:      &Token
     pub ident:      str
     pub cpp_linked: bool
     pub public:     bool
@@ -494,7 +494,7 @@ pub struct VarDecl {
 
 // Return statement.
 pub struct RetSt {
-    pub token: Token
+    pub token: &Token
     pub expr:  &Expr
 }
 
@@ -503,7 +503,7 @@ pub type IterKind: any
 
 // Iteration.
 pub struct Iter {
-    pub token: Token
+    pub token: &Token
     pub kind:  IterKind
     pub scope: &ScopeTree
 }
@@ -517,7 +517,7 @@ impl Iter {
 pub struct WhileKind {
     pub expr:       &Expr
     pub next:       NodeData // Nil if kind is while-next iteration.
-    pub next_token: Token
+    pub next_token: &Token
 }
 
 impl WhileKind {
@@ -529,7 +529,7 @@ impl WhileKind {
 
 // Range iteration kind.
 pub struct RangeKind {
-    pub in_token: Token    // Token of "in" keyword
+    pub in_token: &Token   // Token of "in" keyword
     pub expr:     &Expr
     pub key_a:    &VarDecl // first key of range
     pub key_b:    &VarDecl // second key of range
@@ -537,26 +537,26 @@ pub struct RangeKind {
 
 // Break statement.
 pub struct BreakSt {
-    pub token: Token
-    pub label: Token
+    pub token: &Token
+    pub label: &Token
 }
 
 // Continue statement.
 pub struct ContSt {
-    pub token: Token
-    pub label: Token
+    pub token: &Token
+    pub label: &Token
 }
 
 // If condition.
 pub struct If {
-    pub token: Token
+    pub token: &Token
     pub expr:  &Expr
     pub scope: &ScopeTree
 }
 
 // Else condition.
 pub struct Else {
-    pub token: Token
+    pub token: &Token
     pub scope: &ScopeTree
 }
 
@@ -572,14 +572,14 @@ pub struct TypeAliasDecl {
     pub scope:      &ScopeTree
     pub public:     bool
     pub cpp_linked: bool
-    pub token:      Token
+    pub token:      &Token
     pub ident:      str
     pub kind:       &TypeDecl
 }
 
 // Case of match-case.
 pub struct Case {
-    pub token: Token
+    pub token: &Token
     pub scope: &ScopeTree
 
     // Holds expression.
@@ -589,8 +589,8 @@ pub struct Case {
 
 // Match-Case.
 pub struct MatchCase {
-    pub token:      Token
-    pub end:        Token
+    pub token:      &Token
+    pub end:        &Token
     pub type_match: bool
     pub expr:       &Expr
     pub cases:      []&Case
@@ -599,18 +599,18 @@ pub struct MatchCase {
 
 // Use declaration statement.
 pub struct UseDecl {
-    pub token:      Token
-    pub link_path:  str     // Use declaration path string.
+    pub token:      &Token
+    pub link_path:  str      // Use declaration path string.
     pub alias:      str
-    pub full:       bool    // Full implicit import.
-    pub selected:   []Token
-    pub cpp_linked: bool    // Cpp header use declaration.
-    pub std:        bool    // Standard package use declaration.
+    pub full:       bool     // Full implicit import.
+    pub selected:   []&Token
+    pub cpp_linked: bool     // Cpp header use declaration.
+    pub std:        bool     // Standard package use declaration.
 }
 
 // Enum item.
 pub struct EnumItemDecl {
-    pub token: Token
+    pub token: &Token
     pub ident: str
     pub expr:  &Expr // Nil for auto expression.
 }
@@ -624,12 +624,12 @@ impl EnumItemDecl {
 
 // Enum declaration.
 pub struct EnumDecl {
-    pub token:  Token
+    pub token:  &Token
     pub public: bool
     pub ident:  str
     pub kind:   &TypeDecl
     pub items:  []&EnumItemDecl
-    pub end:    Token
+    pub end:    &Token
 }
 
 impl EnumDecl {
@@ -641,7 +641,7 @@ impl EnumDecl {
 
 // Field declaration.
 pub struct FieldDecl {
-    pub token:   Token
+    pub token:   &Token
     pub public:  bool
     pub mutable: bool      // Interior mutability.
     pub ident:   str
@@ -651,8 +651,8 @@ pub struct FieldDecl {
 
 // Structure declaration.
 pub struct StructDecl {
-    pub token:      Token
-    pub end:        Token
+    pub token:      &Token
+    pub end:        &Token
     pub ident:      str
     pub fields:     []&FieldDecl
     pub public:     bool
@@ -663,8 +663,8 @@ pub struct StructDecl {
 
 // Trait declaration.
 pub struct TraitDecl {
-    pub token:   Token
-    pub end:     Token
+    pub token:   &Token
+    pub end:     &Token
     pub ident:   str
     pub public:  bool
     pub methods: []&FnDecl
@@ -672,7 +672,7 @@ pub struct TraitDecl {
 
 // Implementation.
 pub struct Impl {
-    pub end: Token
+    pub end: &Token
 
     // This token available for these cases:
     //  - Implementation trait to structure, represents trait's type.

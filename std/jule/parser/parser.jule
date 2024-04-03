@@ -65,7 +65,7 @@ fn make_err(row: int, col: int, &f: &File, fmt: LogMsg, args: ...any): Log {
 //  range(i, open, close, tokens) = nil if i > tokens.len
 //  range(i, open, close, tokens) = nil if tokens[i].id != TokenId.Range
 //  range(i, open, close, tokens) = nil if tokens[i].kind != open
-fn range(mut &i: int, open: TokenKind, close: TokenKind, mut &tokens: []Token): []Token {
+fn range(mut &i: int, open: TokenKind, close: TokenKind, mut &tokens: []&Token): []&Token {
     if i >= tokens.len {
         ret nil
     }
@@ -100,7 +100,7 @@ fn range(mut &i: int, open: TokenKind, close: TokenKind, mut &tokens: []Token): 
 // Special cases are;
 //  range_last(tokens) = tokens, nil if tokens.len == 0
 //  range_last(tokens) = tokens, nil if tokens is not has range at last
-fn range_last(mut &tokens: []Token): (cutted: []Token, cut: []Token) {
+fn range_last(mut &tokens: []&Token): (cutted: []&Token, cut: []&Token) {
     if tokens.len == 0 {
         ret tokens, nil
     } else if tokens[tokens.len-1].id != TokenId.Range {
@@ -137,12 +137,12 @@ fn range_last(mut &tokens: []Token): (cutted: []Token, cut: []Token) {
 //
 // Special case is;
 //  parts(tokens) = nil if tokens.len == 0
-fn parts(mut &tokens: []Token, id: TokenId, expr_must: bool): ([][]Token, []Log) {
+fn parts(mut &tokens: []&Token, id: TokenId, expr_must: bool): ([][]&Token, []Log) {
     if tokens.len == 0 {
         ret nil, nil
     }
 
-    let mut parts: [][]Token = nil
+    let mut parts: [][]&Token = nil
     let mut errors: []Log = nil
 
     let mut range_n = 0
@@ -196,7 +196,7 @@ fn get_close_kind_of_brace(left: str): str {
     }
 }
 
-fn compiler_err(&token: Token, &fmt: LogMsg, args: ...any): Log {
+fn compiler_err(&token: &Token, &fmt: LogMsg, args: ...any): Log {
     ret Log{
         kind: LogKind.Error,
         row: token.row,
@@ -211,7 +211,7 @@ unsafe fn push_suggestion(mut log: *Log, fmt: LogMsg, args: ...any) {
     log.suggestion = logf(fmt, args...)
 }
 
-fn tokstoa(&tokens: []Token): str {
+fn tokstoa(&tokens: []&Token): str {
     let mut s = ""
     for _, token in tokens {
         s += token.kind
@@ -230,7 +230,7 @@ impl Parser {
     fn stopped(self): bool { ret self.ast == nil }
 
     // Appends error by specified token, key and args.
-    fn push_err(mut self, token: Token, fmt: LogMsg, args: ...any) {
+    fn push_err(mut self, token: &Token, fmt: LogMsg, args: ...any) {
         self.errors = append(self.errors, compiler_err(token, fmt, args...))
     }
 
@@ -239,13 +239,15 @@ impl Parser {
         unsafe { push_suggestion(&self.errors[self.errors.len-1], fmt, args...) }
     }
 
-    fn build_expr(mut &self, mut &tokens: []Token): &Expr {
-        let mut ep = &ExprBuilder{p: self}
+    fn build_expr(mut &self, mut &tokens: []&Token): &Expr {
+        let mut ep = &ExprBuilder{
+            p: self,
+        }
         let mut expr = ep.build_from_tokens(tokens)
         ret expr
     }
 
-    fn build_directive(mut self, mut tokens: []Token): &Directive {
+    fn build_directive(mut self, mut tokens: []&Token): &Directive {
         if tokens.len == 1 {
             self.push_err(tokens[0], LogMsg.InvalidSyntax)
             ret nil
@@ -276,7 +278,7 @@ impl Parser {
         self.directives = append(self.directives, d)
     }
 
-    fn build_scope(mut &self, mut &tokens: []Token, mut end: Token): &ScopeTree {
+    fn build_scope(mut &self, mut &tokens: []&Token, mut end: &Token): &ScopeTree {
         let mut s = new_scope()
         s.end = end
         let mut sp = ScopeParser{
@@ -286,7 +288,7 @@ impl Parser {
         ret s
     }
 
-    unsafe fn __build_type(mut &self, mut &tokens: []Token,
+    unsafe fn __build_type(mut &self, mut &tokens: []&Token,
         mut i: *int, err: bool): (&TypeDecl, bool) {
         let mut tb = TypeBuilder{
             p: self,
@@ -299,7 +301,7 @@ impl Parser {
     }
 
     // build_type builds AST model of data-type.
-    unsafe fn build_type(mut &self, mut &tokens: []Token,
+    unsafe fn build_type(mut &self, mut &tokens: []&Token,
         mut i: *int, err: bool): (&TypeDecl, bool) {
         let token = tokens[*i]
         let (mut t, ok) = self.__build_type(tokens, i, err)
@@ -309,7 +311,7 @@ impl Parser {
         ret t, ok
     }
 
-    fn build_type_alias_decl(mut &self, mut &tokens: []Token): &TypeAliasDecl {
+    fn build_type_alias_decl(mut &self, mut &tokens: []&Token): &TypeAliasDecl {
         let mut i = 1 // Skip "type" keyword.
         if i >= tokens.len {
             self.push_err(tokens[i-1], LogMsg.InvalidSyntax)
@@ -348,7 +350,7 @@ impl Parser {
         ret tad
     }
 
-    fn build_var_type_and_expr(mut &self, mut &v: &VarDecl, mut &tokens: []Token) {
+    fn build_var_type_and_expr(mut &self, mut &v: &VarDecl, mut &tokens: []&Token) {
         let mut i = 0
         let mut tok = tokens[i]
         if tok.id == TokenId.Colon {
@@ -384,7 +386,7 @@ impl Parser {
         }
     }
 
-    fn build_var_common(mut &self, mut &v: &VarDecl, mut tokens: []Token) {
+    fn build_var_common(mut &self, mut &v: &VarDecl, mut tokens: []&Token) {
         v.token = tokens[0]
         if v.token.id != TokenId.Ident {
             self.push_err(v.token, LogMsg.InvalidSyntax)
@@ -399,7 +401,7 @@ impl Parser {
         }
     }
 
-    fn build_var_begin(mut self, mut &v: &VarDecl, mut i: &int, &tokens: []Token) {
+    fn build_var_begin(mut self, mut &v: &VarDecl, mut i: &int, &tokens: []&Token) {
         let tok = tokens[*i]
         match tok.id {
         | TokenId.Static:
@@ -430,7 +432,7 @@ impl Parser {
         }
     }
 
-    fn build_var(mut &self, mut tokens: []Token): &VarDecl {
+    fn build_var(mut &self, mut tokens: []&Token): &VarDecl {
         let mut i = new(int, 0)
         let mut v = &VarDecl{
             token: tokens[*i],
@@ -452,7 +454,7 @@ impl Parser {
         ret v
     }
 
-    fn build_generic(mut self, mut &tokens: []Token): &GenericDecl {
+    fn build_generic(mut self, mut &tokens: []&Token): &GenericDecl {
         if tokens.len > 1 {
             self.push_err(tokens[1], LogMsg.InvalidSyntax)
         }
@@ -467,7 +469,7 @@ impl Parser {
         ret g
     }
 
-    fn build_generics(mut self, mut &tokens: []Token, &error_token: Token): []&GenericDecl {
+    fn build_generics(mut self, mut &tokens: []&Token, &error_token: &Token): []&GenericDecl {
         if tokens.len == 0 {
             self.push_err(error_token, LogMsg.MissingExpr)
             ret nil
@@ -487,12 +489,12 @@ impl Parser {
         ret generics
     }
 
-    fn build_self_param(mut self, mut tokens: []Token): &ParamDecl {
+    fn build_self_param(mut self, mut tokens: []&Token): &ParamDecl {
         if tokens.len == 0 {
             ret nil
         }
 
-        let mut param = &ParamDecl{}
+        let mut param = new(ParamDecl)
 
         // Detects mut keyword.
         let mut i = 0
@@ -526,7 +528,7 @@ impl Parser {
         ret param
     }
 
-    fn param_type_begin(mut self, mut &param: &ParamDecl, mut &i: int, &tokens: []Token) {
+    fn param_type_begin(mut self, mut &param: &ParamDecl, mut &i: int, &tokens: []&Token) {
         for i < tokens.len; i++ {
             let token = tokens[i]
             if token.id != TokenId.Op {
@@ -543,7 +545,7 @@ impl Parser {
         }
     }
 
-    fn build_param_type(mut &self, mut &param: &ParamDecl, mut &tokens: []Token) {
+    fn build_param_type(mut &self, mut &param: &ParamDecl, mut &tokens: []&Token) {
         let mut i = 0
         self.param_type_begin(param, i, tokens)
         if i >= tokens.len {
@@ -556,7 +558,7 @@ impl Parser {
         }
     }
 
-    fn build_param_body(mut &self, mut &param: &ParamDecl, mut i: &int, mut tokens: []Token) {
+    fn build_param_body(mut &self, mut &param: &ParamDecl, mut i: &int, mut tokens: []&Token) {
         let mut tok = tokens[*i]
         param.ident = tok.kind
         // +1 for skip identifier token
@@ -577,7 +579,7 @@ impl Parser {
         self.build_param_type(param, tokens)
     }
 
-    fn build_param(mut &self, mut tokens: []Token): &ParamDecl {
+    fn build_param(mut &self, mut tokens: []&Token): &ParamDecl {
         let mut param = &ParamDecl{
             token: tokens[0],
         }
@@ -626,7 +628,7 @@ impl Parser {
             if param.is_self() || param.kind != nil {
                 continue
             }
-            if param.token.id == TokenId.Na {
+            if param.token == nil {
                 self.push_err(param.token, LogMsg.MissingType)
             } else {
                 param.kind = &TypeDecl{
@@ -641,7 +643,7 @@ impl Parser {
         }
     }
 
-    fn build_params(mut &self, mut &tokens: []Token, method: bool): []&ParamDecl {
+    fn build_params(mut &self, mut &tokens: []&Token, method: bool): []&ParamDecl {
         let (mut parts, errs) = parts(tokens, TokenId.Comma, true)
         self.errors = append(self.errors, errs...)
         if parts.len == 0 {
@@ -668,8 +670,8 @@ impl Parser {
         ret params
     }
 
-    fn build_multi_ret_type(mut &self, mut &tokens: []Token, mut &i: int): (t: &RetTypeDecl, ok: bool) {
-        t = &RetTypeDecl{}
+    fn build_multi_ret_type(mut &self, mut &tokens: []&Token, mut &i: int): (t: &RetTypeDecl, ok: bool) {
+        t = new(RetTypeDecl)
         i++
         if i >= tokens.len {
             i--
@@ -687,7 +689,7 @@ impl Parser {
         }
 
         let mut types = make([]&TypeDecl, 0, parts.len)
-        t.idents = make([]Token, 0, parts.len)
+        t.idents = make([]&Token, 0, parts.len)
         for (_, mut part) in parts {
             let mut token = part[0]
             let mut offset = 0
@@ -705,12 +707,11 @@ impl Parser {
             }
 
             token = part[0]
-            if offset == 2 {
-                if token.id != TokenId.Ident {
-                }
-                t.idents = append(t.idents, token)
+            if offset != 2 {
+                let mut new_token = new(Token, *token)
+                new_token.kind = Ident.Anon
+                t.idents = append(t.idents, new_token)
             } else {
-                token.kind = Ident.Anon
                 t.idents = append(t.idents, token)
             }
 
@@ -737,8 +738,8 @@ impl Parser {
     }
 
     // Builds function return type from tokens.
-    fn build_ret_type(mut &self, mut &tokens: []Token, mut &i: int): (t: &RetTypeDecl, ok: bool) {
-        t = &RetTypeDecl{}
+    fn build_ret_type(mut &self, mut &tokens: []&Token, mut &i: int): (t: &RetTypeDecl, ok: bool) {
+        t = new(RetTypeDecl)
         if i >= tokens.len {
             ret
         }
@@ -782,7 +783,7 @@ impl Parser {
     // Build function prototype.
     // Body is not necessary for successfull parsing.
     // Just declration.
-    fn build_fn_prototype(mut &self, mut &tokens: []Token, mut &i: int, method: bool): &FnDecl {
+    fn build_fn_prototype(mut &self, mut &tokens: []&Token, mut &i: int, method: bool): &FnDecl {
         let mut f = &FnDecl{
             token: tokens[i],
         }
@@ -858,7 +859,7 @@ impl Parser {
 
     // Parses function define.
     // Prototype and body.
-    fn build_fn(mut &self, mut &tokens: []Token, method: bool, prototype: bool): &FnDecl {
+    fn build_fn(mut &self, mut &tokens: []&Token, method: bool, prototype: bool): &FnDecl {
         let mut i = 0
         let mut f = self.build_fn_prototype(tokens, i, method)
         if prototype {
@@ -892,7 +893,7 @@ impl Parser {
         ret f
     }
 
-    fn get_use_decl_selectors(mut self, mut tokens: []Token): []Token {
+    fn get_use_decl_selectors(mut self, mut tokens: []&Token): []&Token {
         let mut i = 0
         tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
         let (mut parts, errs) = parts(tokens, TokenId.Comma, true)
@@ -901,7 +902,7 @@ impl Parser {
             ret nil
         }
 
-        let mut selectors = make([]Token, 0, parts.len)
+        let mut selectors = make([]&Token, 0, parts.len)
         for (_, mut part) in parts {
             if part.len > 1 {
                 self.push_err(part[1], LogMsg.InvalidSyntax)
@@ -917,7 +918,7 @@ impl Parser {
         ret selectors
     }
 
-    fn build_cpp_use_decl(mut self, mut &decl: &UseDecl, &tokens: []Token) {
+    fn build_cpp_use_decl(mut self, mut &decl: &UseDecl, &tokens: []&Token) {
         if tokens.len > 1 {
             self.push_err(tokens[1], LogMsg.InvalidSyntax)
         }
@@ -930,7 +931,7 @@ impl Parser {
         decl.link_path = token.kind[1:token.kind.len-1]
     }
 
-    fn build_std_use_decl(mut self, mut &decl: &UseDecl, mut tokens: []Token) {
+    fn build_std_use_decl(mut self, mut &decl: &UseDecl, mut tokens: []&Token) {
         decl.std = true
 
         let mut token = tokens[0]
@@ -950,7 +951,7 @@ impl Parser {
                 self.push_err(token, LogMsg.InvalidSyntax)
                 ret
             }
-            let mut selectors: []Token = nil
+            let mut selectors: []&Token = nil
             tokens, selectors = range_last(tokens)
             decl.selected = self.get_use_decl_selectors(selectors)
             if tokens.len == 0 {
@@ -992,7 +993,7 @@ impl Parser {
         decl.link_path = "std::" + tokstoa(tokens)
     }
 
-    fn build_ident_use_decl(mut self, mut &decl: &UseDecl, mut tokens: []Token) {
+    fn build_ident_use_decl(mut self, mut &decl: &UseDecl, mut tokens: []&Token) {
         decl.std = false
 
         let mut token = tokens[tokens.len-1]
@@ -1006,7 +1007,7 @@ impl Parser {
                 ret
             }
 
-            let mut selectors: []Token = nil
+            let mut selectors: []&Token = nil
             tokens, selectors = range_last(tokens)
             decl.selected = self.get_use_decl_selectors(selectors)
             if tokens.len == 0 {
@@ -1055,7 +1056,7 @@ impl Parser {
         decl.link_path = tokstoa(tokens)
     }
 
-    fn parse_use_decl(mut self, mut &decl: &UseDecl, mut tokens: []Token) {
+    fn parse_use_decl(mut self, mut &decl: &UseDecl, mut tokens: []&Token) {
         if decl.cpp_linked {
             self.build_cpp_use_decl(decl, tokens)
             ret
@@ -1089,7 +1090,7 @@ impl Parser {
         }
     }
 
-    fn build_use_decl(mut self, mut tokens: []Token, cpp_linked: bool): &UseDecl {
+    fn build_use_decl(mut self, mut tokens: []&Token, cpp_linked: bool): &UseDecl {
         let mut decl = &UseDecl{
             token: tokens[0],
             cpp_linked: cpp_linked,
@@ -1103,7 +1104,7 @@ impl Parser {
         ret decl
     }
 
-    fn build_enum_item_expr(mut &self, mut i: &int, mut &tokens: []Token): &Expr {
+    fn build_enum_item_expr(mut &self, mut i: &int, mut &tokens: []&Token): &Expr {
         let mut brace_n = 0
         let expr_start = *i
         for *i < tokens.len; *i++ {
@@ -1125,7 +1126,7 @@ impl Parser {
             }
 
             if t.id == TokenId.Comma || *i+1 >= tokens.len {
-                let mut expr_tokens: []Token = nil
+                let mut expr_tokens: []&Token = nil
                 if t.id == TokenId.Comma {
                     expr_tokens = tokens[expr_start:*i]
                 } else {
@@ -1137,7 +1138,7 @@ impl Parser {
         ret nil
     }
 
-    fn build_enum_items(mut &self, mut &tokens: []Token): []&EnumItemDecl {
+    fn build_enum_items(mut &self, mut &tokens: []&Token): []&EnumItemDecl {
         let mut items = make([]&EnumItemDecl, 0, 1)
         let mut i = new(int, 0)
         for *i < tokens.len; *i++ {
@@ -1174,7 +1175,7 @@ impl Parser {
         ret items
     }
 
-    fn build_enum_decl(mut &self, mut &tokens: []Token): &EnumDecl {
+    fn build_enum_decl(mut &self, mut &tokens: []&Token): &EnumDecl {
         if tokens.len < 2 || tokens.len < 3 {
             self.push_err(tokens[0], LogMsg.InvalidSyntax)
             ret nil
@@ -1218,7 +1219,7 @@ impl Parser {
         ret e
     }
 
-    fn build_field(mut &self, mut tokens: []Token): &FieldDecl {
+    fn build_field(mut &self, mut tokens: []&Token): &FieldDecl {
         let mut f = &FieldDecl{}
 
         f.public = tokens[0].id == TokenId.Pub
@@ -1276,7 +1277,7 @@ impl Parser {
         ret f
     }
 
-    fn build_struct_decl_fields(mut &self, mut tokens: []Token): []&FieldDecl {
+    fn build_struct_decl_fields(mut &self, mut tokens: []&Token): []&FieldDecl {
         let mut fields: []&FieldDecl = nil
         let mut stmts = split_stmts(tokens)
         for (_, mut stmt) in stmts {
@@ -1287,7 +1288,7 @@ impl Parser {
         ret fields
     }
 
-    fn build_struct_decl(mut &self, mut &tokens: []Token): &StructDecl {
+    fn build_struct_decl(mut &self, mut &tokens: []&Token): &StructDecl {
         if tokens.len < 3 {
             self.push_err(tokens[0], LogMsg.InvalidSyntax)
             ret nil
@@ -1354,7 +1355,7 @@ impl Parser {
         }
     }
 
-    fn build_trait_methods(mut &self, mut tokens: []Token): []&FnDecl {
+    fn build_trait_methods(mut &self, mut tokens: []&Token): []&FnDecl {
         let mut methods: []&FnDecl = nil
         let mut stmts = split_stmts(tokens)
         for (_, mut stmt) in stmts {
@@ -1389,7 +1390,7 @@ impl Parser {
         ret methods
     }
 
-    fn build_trait_decl(mut &self, mut &tokens: []Token): &TraitDecl {
+    fn build_trait_decl(mut &self, mut &tokens: []&Token): &TraitDecl {
         if tokens.len < 3 {
             self.push_err(tokens[0], LogMsg.InvalidSyntax)
             ret nil
@@ -1418,7 +1419,7 @@ impl Parser {
         ret t
     }
 
-    fn build_cpp_link_fn(mut &self, mut tokens: []Token): &FnDecl {
+    fn build_cpp_link_fn(mut &self, mut tokens: []&Token): &FnDecl {
         tokens = tokens[1:] // Remove "cpp" keyword.
         let mut f = self.build_fn(tokens, false, true)
         if f != nil {
@@ -1430,7 +1431,7 @@ impl Parser {
         ret f
     }
 
-    fn build_cpp_link_var(mut &self, mut tokens: []Token): &VarDecl {
+    fn build_cpp_link_var(mut &self, mut tokens: []&Token): &VarDecl {
         tokens = tokens[1:] // Remove "cpp" keyword.
         let mut v = self.build_var(tokens)
         if v != nil {
@@ -1442,7 +1443,7 @@ impl Parser {
         ret v
     }
 
-    fn build_cpp_link_struct(mut &self, mut tokens: []Token): &StructDecl {
+    fn build_cpp_link_struct(mut &self, mut tokens: []&Token): &StructDecl {
         tokens = tokens[1:] // Remove "cpp" keyword.
         let mut s = self.build_struct_decl(tokens)
         if s != nil {
@@ -1451,7 +1452,7 @@ impl Parser {
         ret s
     }
 
-    fn build_cpp_link_type_alias(mut &self, mut tokens: []Token): &TypeAliasDecl {
+    fn build_cpp_link_type_alias(mut &self, mut tokens: []&Token): &TypeAliasDecl {
         tokens = tokens[1:] // Remove "cpp" keyword.
         let mut t = self.build_type_alias_decl(tokens)
         if t != nil {
@@ -1460,7 +1461,7 @@ impl Parser {
         ret t
     }
 
-    fn build_cpp_link_use(mut &self, mut tokens: []Token): &UseDecl {
+    fn build_cpp_link_use(mut &self, mut tokens: []&Token): &UseDecl {
         if tokens.len == 1 {
             self.push_err(tokens[0], LogMsg.InvalidSyntax)
             ret nil
@@ -1471,7 +1472,7 @@ impl Parser {
         ret self.build_use_decl(tokens, CPP_LINKED)
     }
 
-    fn build_cpp_link(mut &self, mut &tokens: []Token): NodeData {
+    fn build_cpp_link(mut &self, mut &tokens: []&Token): NodeData {
         let mut token = tokens[0]
         if tokens.len == 1 {
             self.push_err(token, LogMsg.InvalidSyntax)
@@ -1497,7 +1498,7 @@ impl Parser {
         ret nil
     }
 
-    fn get_method(mut &self, mut &tokens: []Token): &FnDecl {
+    fn get_method(mut &self, mut &tokens: []&Token): &FnDecl {
         let mut i = 0
         let mut token = tokens[i]
         if token.id == TokenId.Static {
@@ -1530,7 +1531,7 @@ impl Parser {
         ret f
     }
 
-    fn parse_impl_body(mut &self, mut &ipl: &Impl, mut &tokens: []Token) {
+    fn parse_impl_body(mut &self, mut &ipl: &Impl, mut &tokens: []&Token) {
         let mut stmts = split_stmts(tokens)
         for (_, mut stmt) in stmts {
             tokens = stmt.tokens
@@ -1575,7 +1576,7 @@ impl Parser {
         }
     }
 
-    fn build_impl(mut &self, mut tokens: []Token): &Impl {
+    fn build_impl(mut &self, mut tokens: []&Token): &Impl {
         let mut token = tokens[0]
         if tokens.len < 2 {
             self.push_err(token, LogMsg.InvalidSyntax)
@@ -1648,7 +1649,7 @@ impl Parser {
         ret ipl
     }
 
-    fn build_node_data(mut &self, mut &tokens: []Token): NodeData {
+    fn build_node_data(mut &self, mut &tokens: []&Token): NodeData {
         let mut token = tokens[0]
         match token.id {
         | TokenId.Use:
@@ -1776,7 +1777,7 @@ impl Parser {
         }
     }
 
-    fn build_general_scope_node_data(mut &self, mut st: []Token): (is_pub: bool, data: NodeData) {
+    fn build_general_scope_node_data(mut &self, mut st: []&Token): (is_pub: bool, data: NodeData) {
         // Detect pub keyword.
         if st[0].id == TokenId.Pub {
             is_pub = true
@@ -1791,7 +1792,7 @@ impl Parser {
         ret is_pub, data
     }
 
-    fn parse_node(mut &self, mut &st: []Token): Node {
+    fn parse_node(mut &self, mut &st: []&Token): Node {
         let mut node = Node{
             token: st[0],
         }
@@ -1809,7 +1810,7 @@ impl Parser {
         ret node
     }
 
-    fn append_node(mut &self, mut &st: []Token) {
+    fn append_node(mut &self, mut &st: []&Token) {
         if st.len == 0 {
             ret
         }
@@ -1832,7 +1833,7 @@ impl Parser {
         }
     }
 
-    fn remove_range(self, mut i: int, kind: str, &tokens: []Token, mut &ranges: []int) {
+    fn remove_range(self, mut i: int, kind: str, &tokens: []&Token, mut &ranges: []int) {
         let close = get_close_kind_of_brace(kind)
         for i >= 0; i-- {
             let tok = tokens[ranges[i]]
@@ -1844,7 +1845,7 @@ impl Parser {
         }
     }
 
-    fn push_wrong_order_close_err(mut self, &t: Token, &tokens: []Token, &ranges: []int) {
+    fn push_wrong_order_close_err(mut self, &t: &Token, &tokens: []&Token, &ranges: []int) {
         match tokens[ranges[ranges.len-1]].kind {
         | TokenKind.LParent:
             self.push_err(t, LogMsg.ExpectedParentClose)
@@ -1855,7 +1856,7 @@ impl Parser {
         }
     }
 
-    fn push_range_close(mut self, t: Token, left: str, &tokens: []Token, mut &ranges: []int) {
+    fn push_range_close(mut self, t: &Token, left: str, &tokens: []&Token, mut &ranges: []int) {
         let n = ranges.len
         if n == 0 {
             match t.kind {
@@ -1873,7 +1874,7 @@ impl Parser {
         self.remove_range(n - 1, t.kind, tokens, ranges)
     }
 
-    fn check_ranges(mut self, &tokens: []Token) {
+    fn check_ranges(mut self, &tokens: []&Token) {
         let mut ranges: []int = nil
 
         for i, token in tokens {

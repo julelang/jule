@@ -19,7 +19,7 @@ fn build_void_type(): &TypeDecl {
     ret new(TypeDecl)
 }
 
-fn build_prim_type(mut t: Token): &TypeDecl {
+fn build_prim_type(mut t: &Token): &TypeDecl {
     ret &TypeDecl{
         token: t,
         kind: &IdentTypeDecl{
@@ -32,7 +32,7 @@ fn build_prim_type(mut t: Token): &TypeDecl {
 // Returns colon index and range tokens.
 // Returns nil slice and -1 if not found.
 // Starts search at i.
-fn split_map_range(mut &tokens: []Token, mut &i: int): (range_tokens: []Token, colon: int) {
+fn split_map_range(mut &tokens: []&Token, mut &i: int): (range_tokens: []&Token, colon: int) {
     colon = -1
     let mut range_n = 0
     let start = i
@@ -68,13 +68,13 @@ fn split_map_range(mut &tokens: []Token, mut &i: int): (range_tokens: []Token, c
 
 struct TypeBuilder {
     p:      &Parser
-    tokens: []Token
+    tokens: []&Token
     i:      *int
     err:    bool
 }
 
 impl TypeBuilder {
-    fn push_err(mut self, token: Token, fmt: LogMsg) {
+    fn push_err(mut self, token: &Token, fmt: LogMsg) {
         if self.err {
             self.p.push_err(token, fmt)
         }
@@ -98,7 +98,7 @@ impl TypeBuilder {
             token: self.tokens[*self.i],
         }
 
-        let mut nst = &NamespaceTypeDecl{}
+        let mut nst = new(NamespaceTypeDecl)
         let mut n = 0
         for *self.i < self.tokens.len; *self.i++ {
             let mut token = self.tokens[*self.i]
@@ -150,7 +150,7 @@ impl TypeBuilder {
         ret types
     }
 
-    unsafe fn ident_generics(mut self): [][]Token {
+    unsafe fn ident_generics(mut self): [][]&Token {
         let first = *self.i
         let mut range_n = 0
         for *self.i < self.tokens.len; *self.i++ {
@@ -342,7 +342,7 @@ impl TypeBuilder {
         }
     }
 
-    fn build_map(mut self, colon: int, mut &tokens: []Token): &TypeDecl {
+    fn build_map(mut self, colon: int, mut &tokens: []&Token): &TypeDecl {
         let mut colon_token = self.tokens[colon]
         if colon == 0 || colon+1 >= tokens.len {
             self.push_err(colon_token, LogMsg.MissingType)
