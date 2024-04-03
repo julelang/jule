@@ -540,10 +540,23 @@ impl ObjectCoder {
         }
     }
 
+    fn func_decls(mut &self) {
+        self.iter_packages(fn(mut &pkg: &Package) {
+            iter_files(pkg, fn(mut &file: &SymbolTable) {
+                for (_, mut f) in file.funcs {
+                    if !f.cpp_linked && f.token != nil {
+                        self.func_decl(f, false)
+                    }
+                }
+            })
+        })
+    }
+
     fn decls(mut &self) {
         self.trait_decls()
         self.structure_plain_decls()
         self.structure_decls()
+        self.func_decls()
     }
 
     pub fn serialize(mut &self) {
