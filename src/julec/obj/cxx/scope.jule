@@ -1,0 +1,76 @@
+// Copyright 2023-2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use env
+use optimizing::{
+    PushToSliceExprModel,
+    MutSlicingExprModel,
+    StrInsertBeginExprModel,
+}
+use lex for std::jule::lex::{TokenKind}
+use std::jule::sema::{
+    Data,
+    St,
+    FnIns,
+    Var,
+    Scope,
+    If,
+    Conditional,
+    InfIter,
+    WhileIter,
+    RangeIter,
+    ContSt,
+    BreakSt,
+    Label,
+    GotoSt,
+    Postfix,
+    Assign,
+    MultiAssign,
+    Match,
+    Case,
+    FallSt,
+    RetSt,
+    TupleExprModel,
+    TypeKind,
+    BuiltinAppendCallExprModel,
+    SlicingExprModel,
+}
+
+const MATCH_EXPR = "_match_expr"
+
+struct ScopeCoder {
+    oc: &ObjectCoder
+}
+
+impl ScopeCoder {
+    static fn new(mut &oc: &ObjectCoder): &ScopeCoder {
+        ret &ScopeCoder{
+            oc: oc,
+        }
+    }
+
+    fn scope(mut &self, mut s: &Scope) {
+    }
+
+    fn func_scope(mut &self, mut f: &FnIns) {
+    }
+}
+
+fn is_copy_optimizable(&expr: &Data): bool {
+    if !expr.lvalue {
+        ret false
+    }
+    match type expr.model {
+    | &SlicingExprModel:
+        ret false
+    }
+    ret true
+}
+
+fn is_iter_copy_optimizable(&expr: &Data, &v: &Var): bool {
+    if !expr.lvalue && !expr.kind.mutable() {
+        ret true
+    }
+    ret !v.mutable && !expr.mutable
+}

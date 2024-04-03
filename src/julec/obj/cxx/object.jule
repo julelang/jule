@@ -60,6 +60,7 @@ pub struct ObjectCoder {
     indent_buffer: []byte
 
     ec: &ExprCoder
+    sc: &ScopeCoder
 }
 
 impl ObjectCoder {
@@ -70,6 +71,7 @@ impl ObjectCoder {
             f: f,
         }
         oc.ec = ExprCoder.new(oc)
+        oc.sc = ScopeCoder.new(oc)
         ret oc
     }
 
@@ -238,7 +240,7 @@ impl ObjectCoder {
                 self.write(TypeCoder.kind(f.kind))
                 self.write(" __param_")
                 self.write(f.decl.ident)
-                if s.fields.len - i > 1 {
+                if s.fields.len-i > 1 {
                     self.write(", ")
                 }
             }
@@ -255,7 +257,7 @@ impl ObjectCoder {
                 self.write("__param_")
                 self.write(f.decl.ident)
                 self.write(")")
-                if s.fields.len - i > 1 {
+                if s.fields.len-i > 1 {
                     self.write(", ")
                 }
             }
@@ -316,7 +318,7 @@ impl ObjectCoder {
 
                 if writed {
                     self.write(" &&")
-                } 
+                }
                 writed = true
                 self.write("\n")
                 self.indent()
@@ -508,7 +510,7 @@ impl ObjectCoder {
         self.write("(")
         for (i, mut p) in params {
             self.write(TypeCoder.param_ins(p))
-            if params.len - i > 1 {
+            if params.len-i > 1 {
                 self.write(", ")
             }
         }
@@ -552,11 +554,181 @@ impl ObjectCoder {
         })
     }
 
+    fn trait_data_types(mut &self) {
+        self.iter_packages(fn(mut &pkg: &Package) {
+            iter_files(pkg, fn(mut &file: &SymbolTable) {
+                for (_, mut t) in file.traits {
+                    if t.token == nil {
+                        ret
+                    }
+                    self.write("struct ")
+                    self.write(IdentCoder.trait_decl(t))
+                    self.write("MptrData")
+                    self.write(" {\n")
+                    self.add_indent()
+                    for (_, mut m) in t.methods {
+                        let mut ins = m.instances[0]
+                        let mut p = ins.params[0]
+                        p.kind = &TypeKind{
+                            kind: t,
+                        }
+                        for (i, mut ip) in ins.params[1:] {
+                            if is_anon_ident(ip.decl.ident) {
+                                ip.decl.ident = "_" + conv::itoa(i)
+                            }
+                        }
+                        if !env::PRODUCTION {
+                            ins.params = append(ins.params, &ParamIns{
+                                decl: &Param{
+                                    ident: "__file",
+                                },
+                                kind: &TypeKind{
+                                    kind: &CustomType{
+                                        kind: "const char*",
+                                    },
+                                },
+                            })
+                        }
+                        self.func_decl(m, true)
+                    }
+                    self.done_indent()
+                    self.indent()
+                    self.write("};\n\n")
+                }
+            })
+        })
+    }
+
+    fn param_ins(mut &self, mut &p: &ParamIns) {
+        self.write(TypeCoder.param_ins(p))
+        self.write(" ")
+        self.write(IdentCoder.param(p.decl))
+    }
+
+    fn params_ins(mut &self, mut &params: []&ParamIns) {
+        if params.len == 0 {
+            self.write("(void)")
+            ret
+        }
+        self.write("(")
+        for (i, mut p) in params {
+            self.param_ins(p)
+            if params.len - i > 1 {
+                self.write(", ")
+            }
+        }
+        self.write(")")
+    }
+
+    fn func(mut &self, mut &f: &Fn) {
+        for (_, mut ins) in f.instances {
+            self.func_head(ins, false)
+            self.params_ins(ins.params)
+            self.write(" ")
+            self.sc.func_scope(ins)
+            if ins.scope != nil {
+                self.write("\n\n")
+            }
+        }
+    }
+
+    fn trait_wrappers(mut &self) {
+        for (_, mut hash) in self.tmap {
+            for (_, mut m) in hash.t.methods {
+                let ident = m.ident
+                m.instances[0].scope = nil
+                let ptr = !m.params[0].is_ref()
+
+                let mut sm = hash.s.find_method(m.ident, false)
+                if sm == nil || sm.instances.len == 0 {
+                    continue
+                }
+
+                m.ident = ident + "_" + conv::itoa(hash.i)
+                self.func(m)
+                m.ident = ident
+                self.add_indent()
+                self.write("{\n")
+                self.indent()
+                if !sm.is_void() {
+                    self.write("return ")
+                }
+                self.write(IdentCoder.func(sm))
+                self.write("(")
+                if ptr {
+                    self.write("_self_.safe_ptr<")
+                    self.write(TypeCoder.structure_ins(hash.s))
+                    self.write(">(")
+                    if !env::PRODUCTION {
+                        self.write("_00___file")
+                    }
+                    self.write(")")
+                } else {
+                    self.write("_self_.data.as<")
+                    self.write(TypeCoder.structure(sm.owner))
+                    self.write(">()")
+                }
+                for _, mp in m.params[1:] {
+                    self.write(", ")
+                    self.write(IdentCoder.param(mp))
+                }
+                self.write(");\n}\n")
+                self.done_indent()
+            }
+        }
+    }
+
+    fn trait_datas(mut &self) {
+        let mut old: &Trait = nil
+        for (_, mut hash) in self.tmap {
+            let ident = IdentCoder.trait_decl(hash.t)
+            if hash.t != old {
+                if old != nil {
+                    self.done_indent()
+                    self.indent()
+                    self.write("};\n")
+                }
+                self.write("static ")
+                self.write(ident)
+                self.write("MptrData ")
+                self.write(ident)
+                self.write("_mptr_data[] = {\n")
+                old = hash.t
+                self.add_indent()
+            }
+            self.indent()
+            self.write("{\n")
+            self.add_indent()
+            for (_, mut m) in hash.t.methods {
+                let m_ident = IdentCoder.func(m)
+                self.indent()
+                self.write(".")
+                self.write(m_ident)
+                self.write("=")
+                self.write(m_ident)
+                self.write("_")
+                self.write(conv::itoa(hash.i))
+                self.write(",\n")
+            }
+            self.done_indent()
+            self.indent()
+            self.write("},\n")
+        }
+        if old != nil {
+            self.done_indent()
+            self.indent()
+            self.write("};\n")
+        }
+    }
+
     fn decls(mut &self) {
         self.trait_decls()
         self.structure_plain_decls()
         self.structure_decls()
         self.func_decls()
+        self.trait_data_types()
+        self.trait_wrappers()
+        self.trait_datas()
     }
 
     pub fn serialize(mut &self) {
