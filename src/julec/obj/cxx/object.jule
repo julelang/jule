@@ -613,7 +613,7 @@ impl ObjectCoder {
         self.write("(")
         for (i, mut p) in params {
             self.param_ins(p)
-            if params.len - i > 1 {
+            if params.len-i > 1 {
                 self.write(", ")
             }
         }
@@ -721,14 +721,40 @@ impl ObjectCoder {
         }
     }
 
+    fn globals(mut &self) {
+        self.add_indent() // For global initializers's function indentation.
+        self.iter_packages(fn(mut &pkg: &Package) {
+            iter_files(pkg, fn(mut &file: &SymbolTable) {
+                for (_, mut v) in file.vars {
+                    if v.token == nil || v.cpp_linked || v.constant {
+                        ret
+                    }
+                    self.write(TypeCoder.kind(v.kind.kind))
+                    self.write(" ")
+                    if v.reference {
+                        self.write("&")
+                    }
+                    self.write(IdentCoder.var(v))
+                    self.write(";\n")
+                }
+            })
+        })
+        self.done_indent()
+    }
+
     fn decls(mut &self) {
         self.trait_decls()
         self.structure_plain_decls()
         self.structure_decls()
         self.func_decls()
+        self.write("\n\n")
         self.trait_data_types()
+        self.write("\n\n")
         self.trait_wrappers()
+        self.write("\n\n")
         self.trait_datas()
+        self.write("\n\n")
+        self.globals()
     }
 
     pub fn serialize(mut &self) {
@@ -738,6 +764,7 @@ impl ObjectCoder {
         self.links()
         self.write("\n")
         self.decls()
+        self.write("\n")
     }
 }
 
