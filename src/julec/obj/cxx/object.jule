@@ -90,9 +90,71 @@ impl ObjectCoder {
         self.indent_buffer = self.indent_buffer[:self.indent_buffer.len-1]
     }
 
-    // Returns indention string by indent_buffer.
-    fn indent(mut &self) {
+    // Writes indention string by indent_buffer.
+    fn indent(mut &self): str {
+        ret str(self.indent_buffer)
         _ = self.f.write(self.indent_buffer)!
+    }
+
+    fn var_init_expr(mut &self, mut &v: &Var, init: str): str {
+        let mut obj = ""
+        if v.statically {
+            obj += "static "
+        }
+
+        obj += TypeCoder.kind(v.kind.kind)
+        obj += " "
+        if v.reference {
+            obj += "&"
+        }
+        obj += IdentCoder.var(v)
+        if init != "" {
+            obj += " = "
+            obj += init
+        }
+        obj += ";"
+        ret obj
+    }
+
+    fn find_type_offset(self, t: &Trait, mut k: &TypeKind): int {
+        let mut s: &StructIns = nil
+        if k.sptr() != nil {
+            k = k.sptr().elem
+        }
+        if k.strct() == nil {
+            ret -1
+        }
+        s = k.strct()
+        for _, hash in self.tmap {
+            if hash.t == t && hash.s == s {
+                ret hash.i
+            }
+        }
+        ret -1
+    }
+
+    // Writes location information of token as cstr bytes.
+    fn loc_info(mut &self, &t: &Token): str {
+        let mut loc = t.file.path
+
+        // Normalize path if production compilation enabled.
+        if env::PRODUCTION {
+            match {
+            | strings::has_prefix(loc, build::PATH_STDLIB):
+                // Remove absolute path prefix of standard library.
+                // Just keeps "std/" prefix.
+                loc = loc[path::dir(build::PATH_STDLIB).len+1:]
+            | strings::has_prefix(loc, self.ir.root):
+                // Remove absolute path prefix of root package.
+                // Just keeps "[package_dir]/" prefix.
+                loc = loc[path::dir(self.ir.root).len+1:]
+            }
+        }
+        loc += ":"
+        loc += conv::itoa(t.row)
+        loc += ":"
+        loc += conv::itoa(t.column)
+        ret cstr_bytes([]byte(loc))
     }
 
     fn head(mut &self) {
@@ -225,9 +287,9 @@ impl ObjectCoder {
         if f.default == nil {
             // No default expression.
             // Use default expression of data-type.
-            self.ec.init_expr(f.kind)
+            self.write(self.ec.init_expr(f.kind))
         } else {
-            self.ec.expr(f.default.model)
+            self.write(self.ec.expr(f.default.model))
         }
         self.write(";")
     }
@@ -599,33 +661,47 @@ impl ObjectCoder {
         })
     }
 
-    fn param_ins(mut &self, mut &p: &ParamIns) {
-        self.write(TypeCoder.param_ins(p))
-        self.write(" ")
-        self.write(IdentCoder.param(p.decl))
+    fn param_ins(mut &self, mut &p: &ParamIns): str {
+        let mut obj = TypeCoder.param_ins(p)
+        obj += " "
+        obj += IdentCoder.param(p.decl)
+        ret obj
     }
 
-    fn params_ins(mut &self, mut &params: []&ParamIns) {
+    fn params_ins(mut &self, mut &params: []&ParamIns): str {
         if params.len == 0 {
-            self.write("(void)")
-            ret
+            ret "(void)"
         }
-        self.write("(")
+        let mut obj = "("
         for (i, mut p) in params {
-            self.param_ins(p)
+            obj += self.param_ins(p)
             if params.len-i > 1 {
-                self.write(", ")
+                obj += ", "
             }
         }
-        self.write(")")
+        obj += ")"
+        ret obj
+    }
+
+    fn var(mut &self, mut v: &Var): str {
+        if is_ignore_ident(v.ident) {
+            ret ""
+        }
+        if v.value != nil && v.value.expr != nil {
+            if v.value.data.model != nil {
+                ret self.var_init_expr(v, self.ec.val(v.value))
+            }
+            ret self.var_init_expr(v, "")
+        }
+        ret self.var_init_expr(v, self.ec.init_expr(v.kind.kind))
     }
 
     fn func(mut &self, mut &f: &Fn) {
         for (_, mut ins) in f.instances {
             self.func_head(ins, false)
-            self.params_ins(ins.params)
+            self.write(self.params_ins(ins.params))
             self.write(" ")
-            self.sc.func_scope(ins)
+            self.write(self.sc.func_scope(ins))
             if ins.scope != nil {
                 self.write("\n\n")
             }
@@ -901,11 +977,11 @@ impl ObjectCoder {
                     if v.value != nil && v.value.expr != nil {
                         if v.value.data.model != nil {
                             self.write(" = ")
-                            self.ec.val(v.value)
+                            self.write(self.ec.val(v.value))
                         }
                     } else {
                         self.write(" = ")
-                        self.ec.init_expr(v.kind.kind)
+                        self.write(self.ec.init_expr(v.kind.kind))
                     }
                     self.write(";\n")
                 }
