@@ -722,7 +722,6 @@ impl ObjectCoder {
     }
 
     fn globals(mut &self) {
-        self.add_indent() // For global initializers's function indentation.
         self.iter_packages(fn(mut &pkg: &Package) {
             iter_files(pkg, fn(mut &file: &SymbolTable) {
                 for (_, mut v) in file.vars {
@@ -739,7 +738,6 @@ impl ObjectCoder {
                 }
             })
         })
-        self.done_indent()
     }
 
     fn decls(mut &self) {
@@ -756,6 +754,112 @@ impl ObjectCoder {
         self.write("\n\n")
         self.globals()
     }
+    
+    fn structure_methods(mut &self, mut &s: &StructIns) {
+        for (_, mut f) in s.methods {
+            self.func(f)
+            self.write("\n\n")
+        }
+    }
+
+    fn structure_derive_defs(mut &self, mut &s: &StructIns) {
+        if s.decl.is_derives(Derive.Clone) {
+            self.write(DeriveCoder.clone_func_def(s.decl))
+            self.write("{\n")
+            self.add_indent()
+            self.indent()
+            self.write(TypeCoder.structure_ins(s))
+            self.write(" clone;\n")
+            for _, f in s.fields {
+                let ident = IdentCoder.field(f.decl)
+                self.indent()
+                self.write("clone.")
+                self.write(ident)
+                self.write(" = jule::clone(this->")
+                self.write(ident)
+                self.write(");\n")
+            }
+            self.indent()
+            self.write("return clone;\n")
+            self.done_indent()
+            self.write("}")
+        }
+    }
+
+    fn structure_ostream(mut &self, mut &s: &StructIns) {
+        self.indent()
+        self.write("std::ostream &operator<<(std::ostream &_Stream, ")
+        self.write(IdentCoder.structure_ins(s))
+        self.write(" _Src) {\n")
+        self.add_indent()
+        self.indent()
+
+        let mut fts = s.find_method("to_str", false)
+        if FuncPattern.to_str(fts) {
+            self.write("_Stream << ")
+            self.write(IdentCoder.func(fts))
+            self.write("(&_Src);\n")
+        } else {
+            self.write(`_Stream << "`)
+            self.write(s.decl.ident)
+            self.write("{\";\n")
+
+            for (i, mut f) in s.fields {
+                self.indent()
+                self.write(`_Stream << "`)
+                self.write(f.decl.ident)
+                self.write(`:`)
+
+                // Skip C++-linked struct kinds.
+                let strct = f.kind.strct()
+                if strct != nil && strct.decl != nil && strct.decl.cpp_linked {
+                    self.write(` cpp.`)
+                    self.write(IdentCoder.field(f.decl))
+                    self.write(`"`)
+                } else {
+                    self.write(`" << _Src.`)
+                    self.write(IdentCoder.field(f.decl))
+                }
+                if i+1 < s.fields.len {
+                    self.write(" << \", \"")
+                }
+                self.write(";\n")
+            }
+
+            self.indent()
+            self.write("_Stream << \"}\";\n")
+        }
+
+        self.indent()
+        self.write("return _Stream;\n")
+
+        self.done_indent()
+        self.write("}")
+    }
+
+    fn structure_ins(mut &self, mut &s: &StructIns) {
+        self.structure_methods(s)
+        self.write("\n\n")
+        self.structure_derive_defs(s)
+        self.write("\n\n")
+        self.structure_ostream(s)
+    }
+
+    fn structure(mut &self, mut &s: &Struct) {
+        for (_, mut ins) in s.instances {
+            self.structure_ins(ins)
+            self.write("\n\n")
+        }
+    }
+
+    fn structures(mut &self) {
+        for (_, mut s) in self.ir.ordered.structs {
+            if !s.cpp_linked && s.token != nil {
+                self.structure(s)
+                self.write("\n\n")
+            }
+        }
+    }
 
     pub fn serialize(mut &self) {
         self.prepare_structures()
@@ -765,6 +869,7 @@ impl ObjectCoder {
         self.write("\n")
         self.decls()
         self.write("\n")
+        self.structures()
     }
 }
 
