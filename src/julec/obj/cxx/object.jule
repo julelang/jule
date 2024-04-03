@@ -55,6 +55,9 @@ pub struct ObjectCoder {
     info: SerializationInfo
     f:    &File
     tmap: []&TraitHash
+
+    // Current indentation.
+    indent_buffer: []byte
 }
 
 impl ObjectCoder {
@@ -69,6 +72,22 @@ impl ObjectCoder {
 
     fn write(mut &self, mut s: str) {
         _ = self.f.write([]byte(s))!
+    }
+
+    // Increase indentation.
+    fn add_indent(mut &self) {
+        const INDENT_KIND = '\t'
+        self.indent_buffer = append(self.indent_buffer, INDENT_KIND)
+    }
+
+    // Decrase indentation.
+    fn done_indent(mut &self) {
+        self.indent_buffer = self.indent_buffer[:self.indent_buffer.len-1]
+    }
+
+    // Returns indention string by indent_buffer.
+    fn indent(mut &self) {
+        _ = self.f.write(self.indent_buffer)!
     }
 
     fn head(mut &self) {
@@ -161,8 +180,24 @@ impl ObjectCoder {
         })
     }
 
+    fn trait_decls(mut &self) {
+        self.iter_packages(fn(mut &pkg: &Package) {
+            iter_files(pkg, fn(mut &file: &SymbolTable) {
+                for (_, mut t) in file.traits {
+                    if t.token == nil {
+                        ret
+                    }
+                    self.indent()
+                    self.write("struct ")
+                    self.write(IdentCoder.trait_decl(t))
+                    self.write("{};\n")
+                }
+            })
+        })
+    }
+
     fn decls(mut &self) {
-        
+        self.trait_decls()
     }
 
     pub fn serialize(mut &self) {
@@ -170,6 +205,7 @@ impl ObjectCoder {
         self.build_trait_map()
         self.head()
         self.links()
+        self.write("\n")
         self.decls()
     }
 }
