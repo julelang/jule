@@ -877,6 +877,73 @@ impl ObjectCoder {
         })
     }
 
+    fn push_init(mut &self, mut &pkg: &Package) {
+        iter_files(pkg, fn(mut &file: &SymbolTable) {
+            for _, f in file.funcs {
+                if f.ident == build::INIT_FN {
+                    self.indent()
+                    self.write(IdentCoder.func(f))
+                    self.write("();\n")
+                }
+            }
+        })
+    }
+
+    fn global_initializers(mut &self) {
+        self.iter_packages(fn(mut &pkg: &Package) {
+            iter_files(pkg, fn(mut &file: &SymbolTable) {
+                for (_, mut v) in file.vars {
+                    if v.token == nil || v.cpp_linked || v.constant {
+                        ret
+                    }
+                    self.indent()
+                    self.write(IdentCoder.var(v))
+                    if v.value != nil && v.value.expr != nil {
+                        if v.value.data.model != nil {
+                            self.write(" = ")
+                            self.ec.val(v.value)
+                        }
+                    } else {
+                        self.write(" = ")
+                        self.ec.init_expr(v.kind.kind)
+                    }
+                    self.write(";\n")
+                }
+            })
+        })
+    }
+
+    fn init_caller(mut &self) {
+        self.write("void " + INIT_CALLER_IDENT + "(void) {\n")
+        self.add_indent()
+        self.global_initializers()
+        self.iter_packages(fn(mut &pkg: &Package) {
+            self.push_init(pkg)
+        })
+        self.done_indent()
+        self.write("\n}")
+    }
+
+    fn end(mut &self) {
+        self.write(`int main(int argc, char *argv[], char *envp[]) {
+    jule::setup_argv(argc, argv);
+    jule::setup_envp(envp);
+
+    __jule_call_initializers();
+    `)
+
+        if env::TEST {
+            self.write("test_point();")
+        } else {
+            self.write("entry_point();")
+        }
+
+        self.write(`
+
+    return EXIT_SUCCESS;
+}`)
+    }
+
     pub fn serialize(mut &self) {
         self.prepare_structures()
         self.build_trait_map()
@@ -887,6 +954,9 @@ impl ObjectCoder {
         self.write("\n")
         self.structures()
         self.funcs()
+        self.init_caller()
+        self.write("\n\n")
+        self.end()
     }
 }
 
