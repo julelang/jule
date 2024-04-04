@@ -909,12 +909,10 @@ impl ExprCoder {
     }
 
     fn push_to_slice(mut &self, mut m: &PushToSliceExprModel) {
-        self.oc.open_buf_mode()
+        let n = self.oc.obj.len
         self.model(m.dest)
-        let dest = *self.oc.buf
-        self.oc.close_buf_mode()
+        let dest = self.oc.obj[n:]
 
-        self.oc.write(dest)
         self.oc.write(" = jule::alloc_for_append(")
         self.oc.write(dest)
         self.oc.write(",")
@@ -981,13 +979,13 @@ impl ExprCoder {
             self.oc.write(m.code)
             ret
         }
-        self.oc.open_buf_mode()
+        let n = self.oc.obj.len
         for (i, mut expr) in m.exprs {
             self.expr(expr)
-            m.exprs[i] = *self.oc.buf
-            *self.oc.buf = ""
+            let expr = self.oc.obj[n:]
+            m.exprs[i] = expr
+            self.oc.obj = self.oc.obj[:n]
         }
-        self.oc.close_buf_mode()
         self.oc.write(fmt::format(m.code, m.exprs...))
     }
 

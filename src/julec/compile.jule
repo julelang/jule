@@ -425,15 +425,17 @@ fn compile_command(mut &args: []str) {
 
     let (compiler, compiler_cmd) = gen_compile_cmd(get_compile_path(), ir)
 
-    let path = get_compile_path()
-    let mut file = open_output(path)
-
-    let mut oc = cxx::ObjectCoder.new(ir, file, cxx::SerializationInfo{
+    let mut oc = cxx::ObjectCoder.new(ir, cxx::SerializationInfo{
         compiler: compiler,
         compiler_command: compiler_cmd,
     })
     oc.serialize()
 
+    let path = get_compile_path()
+    let mut file = open_output(path)
+    file.write([]byte(oc.obj)) else {
+        throw("object code could not write")
+    }
     file.close()!
 
     if !env::TRANSPILATION {

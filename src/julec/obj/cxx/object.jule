@@ -5,7 +5,6 @@
 use env
 use obj::{IR}
 use conv for std::conv
-use std::fs::{File}
 use jule for std::jule
 use build for std::jule::build::{
     Directive,
@@ -51,59 +50,39 @@ struct TraitHash {
 }
 
 pub struct ObjectCoder {
+    // Internal buffer which is commonly used.
+    pub obj: str
+
     ir:   &IR
     info: SerializationInfo
-    f:    &File
     tmap: []&TraitHash
 
     // Current indentation.
-    indent_buffer: []byte
-
-    // Internal buffer which is preferred to write if not nil.
-    // It might be useful to get some part of content which will generate.
-    buf: &str
+    indent_buffer: str
 
     ec: &ExprCoder
     sc: &ScopeCoder
 }
 
 impl ObjectCoder {
-    pub static fn new(mut &ir: &IR, mut &f: &File, info: SerializationInfo): &ObjectCoder {
+    pub static fn new(mut &ir: &IR, info: SerializationInfo): &ObjectCoder {
         let mut oc = &ObjectCoder{
             ir: ir,
             info: info,
-            f: f,
         }
         oc.ec = ExprCoder.new(oc)
         oc.sc = ScopeCoder.new(oc)
         ret oc
     }
 
-    fn open_buf_mode(mut &self) {
-        static mut buf = ""
-        if self.buf == nil {
-            self.buf = unsafe { (&str)(&buf) }
-        }
-    }
-
-    fn close_buf_mode(mut &self) {
-        *self.buf = ""
-        self.buf = nil
-    }
-
     fn write(mut &self, s: str) {
-        if self.buf != nil {
-            *self.buf += s
-            ret
-        }
-        let bytes = []byte(s)
-        _ = self.f.write(bytes)!
+        self.obj += s
     }
 
     // Increase indentation.
     fn add_indent(mut &self) {
-        const INDENT_KIND = '\t'
-        self.indent_buffer = append(self.indent_buffer, INDENT_KIND)
+        const INDENT_KIND = "\t"
+        self.indent_buffer += INDENT_KIND
     }
 
     // Decrase indentation.
@@ -113,7 +92,7 @@ impl ObjectCoder {
 
     // Writes indention string by indent_buffer.
     fn indent(mut &self) {
-        _ = self.f.write(self.indent_buffer)!
+        self.obj += self.indent_buffer
     }
 
     fn find_type_offset(self, t: &Trait, mut k: &TypeKind): int {
