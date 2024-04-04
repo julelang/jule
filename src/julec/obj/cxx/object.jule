@@ -197,7 +197,7 @@ impl ObjectCoder {
 
     fn prepare_structures(mut &self) {
         for (_, mut s) in self.ir.ordered.structs {
-            if !s.cpp_linked && s.token != nil {
+            if s.token != nil {
                 prepare_structure(s)
             }
         }
@@ -269,7 +269,7 @@ impl ObjectCoder {
 
     fn structure_plain_decls(mut &self) {
         for (_, mut s) in self.ir.ordered.structs {
-            if !s.cpp_linked && s.token != nil {
+            if s.token != nil {
                 self.structure_plain_decl(s)
             }
         }
@@ -552,7 +552,7 @@ impl ObjectCoder {
 
     fn structure_decls(mut &self) {
         for (_, mut s) in self.ir.ordered.structs {
-            if !s.cpp_linked && s.token != nil {
+            if s.token != nil {
                 self.structure_decl(s)
                 self.write("\n")
             }
@@ -824,22 +824,17 @@ impl ObjectCoder {
     }
 
     fn globals(mut &self) {
-        self.iter_packages(fn(mut &pkg: &Package) {
-            iter_files(pkg, fn(mut &file: &SymbolTable) {
-                for (_, mut v) in file.vars {
-                    if v.token == nil || v.cpp_linked || v.constant {
-                        continue
-                    }
-                    self.write(TypeCoder.kind(v.kind.kind))
-                    self.write(" ")
-                    if v.reference {
-                        self.write("&")
-                    }
-                    self.write(IdentCoder.var(v))
-                    self.write(";\n")
-                }
-            })
-        })
+        for (_, mut v) in self.ir.ordered.globals {
+            self.write(TypeCoder.kind(v.kind.kind))
+            self.write(" ")
+            if v.reference {
+                self.write("&")
+            }
+            self.write(IdentCoder.var(v))
+            self.write(" = ")
+            self.ec.val(v.value)
+            self.write(";\n")
+        }
     }
 
     fn decls(mut &self) {
@@ -956,7 +951,7 @@ impl ObjectCoder {
 
     fn structures(mut &self) {
         for (_, mut s) in self.ir.ordered.structs {
-            if !s.cpp_linked && s.token != nil {
+            if s.token != nil {
                 self.structure(s)
                 self.write("\n\n")
             }
@@ -991,34 +986,9 @@ impl ObjectCoder {
         })
     }
 
-    fn global_initializers(mut &self) {
-        self.iter_packages(fn(mut &pkg: &Package) {
-            iter_files(pkg, fn(mut &file: &SymbolTable) {
-                for (_, mut v) in file.vars {
-                    if v.token == nil || v.cpp_linked || v.constant {
-                        continue
-                    }
-                    self.indent()
-                    self.write(IdentCoder.var(v))
-                    if v.value != nil && v.value.expr != nil {
-                        if v.value.data.model != nil {
-                            self.write(" = ")
-                            self.ec.val(v.value)
-                        }
-                    } else {
-                        self.write(" = ")
-                        self.ec.init_expr(v.kind.kind)
-                    }
-                    self.write(";\n")
-                }
-            })
-        })
-    }
-
     fn init_caller(mut &self) {
         self.write("void " + INIT_CALLER_IDENT + "(void) {\n")
         self.add_indent()
-        self.global_initializers()
         self.iter_packages(fn(mut &pkg: &Package) {
             self.push_init(pkg)
         })

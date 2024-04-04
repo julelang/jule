@@ -68,22 +68,44 @@ impl IR {
     // Ignores cpp-linked declarations.
     pub fn get_all_structures(mut self): []&sema::Struct {
         let mut buffer: []&sema::Struct = nil
-
         self.append_structs(self.main, buffer)
-
         for (_, mut u) in self.used {
             if !u.cpp_linked {
                 self.append_structs(u.package, buffer)
             }
         }
+        ret buffer
+    }
 
+    fn append_globals(self, mut &p: &sema::Package, mut &buffer: []&sema::Var) {
+        for (_, mut f) in p.files {
+            for (_, mut v) in f.vars {
+                if v.token != nil && !v.cpp_linked && !v.constant {
+                    buffer = append(buffer, v)
+                }
+            }
+        }
+    }
+
+    // Returns all globals of main package and used pakcages.
+    // Ignores cpp-linked declarations and constants.
+    pub fn get_all_globals(mut self): []&sema::Var {
+        let mut buffer: []&sema::Var = nil
+        self.append_globals(self.main, buffer)
+        for (_, mut u) in self.used {
+            if !u.cpp_linked {
+                self.append_globals(u.package, buffer)
+            }
+        }
         ret buffer
     }
 
     // Order defines at update ordered field of instance.
     pub fn order(mut self) {
         self.ordered.structs = self.get_all_structures()
+        self.ordered.globals = self.get_all_globals()
         DefineOrderer.order_structures(self.ordered.structs)
+        DefineOrderer.order_vars(self.ordered.globals)
     }
 }
 
