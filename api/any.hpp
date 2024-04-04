@@ -23,9 +23,9 @@ namespace jule
         struct DynamicType
         {
         public:
-            static const char *type_id(void) noexcept
+            static const std::type_info &type_id(void) noexcept
             {
-                return typeid(T).name();
+                return typeid(T);
             }
 
             static void dealloc(void *alloc) noexcept
@@ -60,7 +60,7 @@ namespace jule
         struct Type
         {
         public:
-            const char *(*type_id)(void);
+            const std::type_info &(*type_id)(void);
             void (*dealloc)(void *alloc);
             jule::Bool (*eq)(void *alloc, void *other);
             jule::Str (*to_str)(const void *alloc);
@@ -156,7 +156,7 @@ namespace jule
             if (this->operator==(nullptr))
                 return false;
 
-            return std::strcmp(this->type->type_id(), typeid(T).name()) == 0;
+            return this->type->type_id() == typeid(T);
         }
 
         template <typename T>
@@ -261,7 +261,7 @@ namespace jule
             if (other.operator==(nullptr))
                 return false;
 
-            if (std::strcmp(this->type->type_id(), other.type->type_id()) != 0)
+            if (this->type->type_id() != other.type->type_id())
                 return false;
 
             return this->type->eq(this->data, other.data);
