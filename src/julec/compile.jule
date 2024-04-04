@@ -46,7 +46,7 @@ fn init() {
     env::COMPILER = "clang"
 }
 
-fn write_output(path: str, content: str) {
+fn open_output(&path: str): &File {
     let dir = dir(path)
 
     Status.of(dir) else {
@@ -55,8 +55,9 @@ fn write_output(path: str, content: str) {
         }
     }
 
-    File.write(path, []byte(content), 0660) else {
+    ret File.create(path) else {
         throw("a problem occurs when code generation")
+        use nil
     }
 }
 
@@ -104,15 +105,6 @@ fn compile_ir(compiler: str, compiler_cmd: str) {
     }
 
     clear_objects()
-}
-
-// Compile.
-fn do_spell(obj: str, compiler: str, compiler_cmd: str) {
-    let path = get_compile_path()
-    write_output(path, obj)
-    if !env::TRANSPILATION {
-        compile_ir(compiler, compiler_cmd)
-    }
 }
 
 fn is_cpp_source_file(path: str): bool {
@@ -415,15 +407,15 @@ fn compile_command(mut &args: []str) {
     const CPP_LINKED = false
 
     if !env::TEST {
-        let mut f = ir.main.find_fn(ENTRY_POINT, CPP_LINKED)
-        if f == nil {
+        let mut main = ir.main.find_fn(ENTRY_POINT, CPP_LINKED)
+        if main == nil {
             throw(logf(LogMsg.NoEntryPoint))
         }
-        f.statically = true // Mark used for deadcode elimination.
+        main.statically = true // Mark used for deadcode elimination.
     }
-    let mut f = ir.main.find_fn(INIT_FN, CPP_LINKED)
-    if f != nil {
-        f.statically = true // Mark used for deadcode elimination.
+    let mut init = ir.main.find_fn(INIT_FN, CPP_LINKED)
+    if init != nil {
+        init.statically = true // Mark used for deadcode elimination.
     }
 
     apply_target_independent_optimizations(ir)
@@ -437,13 +429,21 @@ fn compile_command(mut &args: []str) {
         compiler: compiler,
         compiler_command: compiler_cmd,
     })
-    let mut obj = oc.serialize()
-
     if env::TEST {
         let mut tc = cxx::TestCoder.new(oc)
-        tc.serialize(obj)
+        tc.serialize()
+    } else {
+        oc.serialize()
     }
-    oc.append_standard(obj)
 
-    do_spell(obj, compiler, compiler_cmd)
+    let path = get_compile_path()
+    let mut file = open_output(path)
+    file.write([]byte(oc.obj)) else {
+        throw("object code could not write")
+    }
+    file.close()!
+
+    if !env::TRANSPILATION {
+        compile_ir(compiler, compiler_cmd)
+    }
 }

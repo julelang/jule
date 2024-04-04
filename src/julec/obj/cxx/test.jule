@@ -1,0 +1,158 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use env
+use obj::{IR}
+use std::jule::build::{
+    Directive,
+}
+use std::jule::sema::{
+    ImportInfo,
+    Package,
+    Fn,
+    FnIns,
+    StructIns,
+}
+
+pub struct TestCoder {
+    t:          &StructIns
+    tm_reset:   &Fn
+    tm_failed:  &Fn
+    tm_skipped: &Fn
+
+    oc: &ObjectCoder
+}
+
+impl TestCoder {
+    pub static fn new(mut &oc: &ObjectCoder): &TestCoder {
+        ret &TestCoder{
+            oc: oc,
+        }
+    }
+
+    fn find_testing_package(mut &self): &ImportInfo {
+        for (_, mut imp) in self.oc.ir.used {
+            if imp.link_path == "std::testing" {
+                ret imp
+            }
+        }
+        ret nil
+    }
+
+    fn append_test(mut &self, mut f: &FnIns) {
+        self.oc.indent()
+        self.call_tm_reset()
+        self.oc.write(";\n")
+        self.oc.indent()
+        self.oc.write("std::cout << \">>> TEST RUNNING: \";\n")
+        self.oc.indent()
+        self.oc.write("jule::outln(")
+        self.oc.write(cstr_lit([]byte(f.decl.ident)))
+        self.oc.write(");\n")
+        self.oc.indent()
+        self.oc.write(IdentCoder.func_ins(f))
+        self.oc.write("(_t);\n")
+        self.oc.indent()
+        self.oc.write("post_test();\n")
+    }
+
+    fn append_package_tests(mut &self, mut &p: &Package) {
+        for (_, mut file) in p.files {
+            for (_, mut f) in file.funcs {
+                if has_directive(f.directives, Directive.Test) {
+                    self.append_test(f.instances[0])
+                }
+            }
+        }
+    }
+
+    fn ready_testing_package(mut &self): bool {
+        let mut p = self.find_testing_package()
+        if p == nil {
+            // std::testing is not used.
+            // So, developers cannot write valid test functions.
+            ret false
+        }
+
+        self.t = p.find_struct("T", false).instances[0]
+
+        self.tm_reset = self.t.find_method("reset", false)
+        self.tm_failed = self.t.find_method("failed", false)
+        self.tm_skipped = self.t.find_method("skipped", false)
+        ret true
+    }
+
+    fn call_tm_reset(mut &self) {
+        self.oc.write(IdentCoder.func(self.tm_reset))
+        self.oc.write("(_t)")
+    }
+
+    fn call_tm_failed(mut &self) {
+        self.oc.write(IdentCoder.func(self.tm_failed))
+        self.oc.write("(_t)")
+    }
+
+    fn call_tm_skipped(mut &self) {
+        self.oc.write(IdentCoder.func(self.tm_skipped))
+        self.oc.write("(_t)")
+    }
+
+    // Serialize tests and test point.
+    // Appends to object code.
+    pub fn serialize(mut &self) {
+        self.oc.serialize_head()
+        defer {
+            self.oc.end()
+        }
+
+        self.oc.write("\nvoid test_point(void) {\n")
+        self.oc.add_indent()
+        self.oc.indent()
+
+        if !self.ready_testing_package() {
+            self.oc.write("}")
+            self.oc.done_indent()
+            ret
+        }
+
+        self.oc.write(TypeCoder.as_sptr(TypeCoder.structure_ins(self.t)))
+        self.oc.write(" _t = jule::new_ptr<")
+        self.oc.write(TypeCoder.structure_ins(self.t))
+        self.oc.write(">(); _t.ref = nullptr;\n")
+
+        self.oc.indent()
+        self.oc.write("jule::Uint total = 0, failed = 0, skipped = 0;\n")
+        self.oc.indent()
+
+        self.oc.write("auto post_test = [&](void) {\n")
+        self.oc.add_indent()
+        self.oc.indent()
+        self.oc.write("++total;\n")
+        self.oc.indent()
+        self.oc.write("if (")
+        self.call_tm_failed()
+        self.oc.write(") { ++failed; std::cout << \"    [*] FAILED\" << std::endl; }\n")
+        self.oc.indent()
+        self.oc.write("else if (")
+        self.call_tm_skipped()
+        self.oc.write(") { ++skipped; std::cout << \"    [*] SKIPPED\" << std::endl; }\n")
+        self.oc.indent()
+        self.oc.write("else { std::cout << \"    [*] PASSED\" << std::endl; }\n")
+        self.oc.done_indent()
+        self.oc.indent()
+        self.oc.write("};\n")
+
+        self.append_package_tests(self.oc.ir.main)
+
+        self.oc.write("\n\n")
+        self.oc.indent()
+        self.oc.write("std::cout << std::endl << \"total tests: \" << total << \" skipped: \" << skipped << \" failed: \" << failed << \" pass: \" << total-failed-skipped << std::endl;\n")
+        self.oc.indent()
+        self.oc.write("if (failed != 0) std::exit(1);\n")
+
+        self.oc.done_indent()
+        self.oc.indent()
+        self.oc.write("}\n")
+    }
+}
