@@ -56,7 +56,6 @@ use strings for std::strings
 // Value data.
 pub struct Data {
     pub kind:      &TypeKind
-    pub cast_kind: &TypeKind // This expression should be cast to this kind.
     pub mutable:   bool
     pub reference: bool
     pub lvalue:    bool
@@ -155,7 +154,6 @@ impl Eval {
 
     fn apply_numeric_prefix(mut self, mut &d: &Data): bool {
         if d == nil ||
-            d.cast_kind != nil ||
             !d.is_const() ||
             d.kind.prim() == nil ||
             self.prefix == nil {
@@ -1301,7 +1299,6 @@ impl Eval {
         d.decl = false
 
         self.check_slicing(d, l, r, s)
-        d.cast_kind = nil
 
         if d.is_const() {
             d.decl = false
@@ -1565,8 +1562,7 @@ impl Eval {
         d.decl = false
 
         if d.kind.enm() == nil || !d.kind.enm().kind.kind.equals(t) {
-            d.cast_kind = t
-            apply_cast_kind(d)
+            apply_cast_kind(d, t)
             (&CastingExprModel)(d.model).token = error_token
         } else {
             d.kind = t
@@ -2938,36 +2934,6 @@ impl Eval {
         | &BinopExpr:
             d = self.eval_binop((&BinopExpr)(kind))
         }
-
-        if d == nil {
-            ret nil
-        }
-        if d.kind == nil {
-            ret d
-        }
-
-        if !d.decl && self.prefix != nil {
-            if !d.kind.cpp_linked() &&
-                d.cast_kind == nil &&
-                !d.kind.variadic &&
-                !d.lvalue &&
-                !d.is_const() &&
-                d.kind.prim() != nil &&
-                types::is_num(d.kind.prim().kind) {
-                d.cast_kind = d.kind
-            }
-
-            apply_cast_kind(d)
-
-            if d.kind.prim() == nil || !d.kind.prim().is_any() {
-                if self.prefix.prim() != nil && self.prefix.prim().is_any() {
-                    d.cast_kind = self.prefix
-                    apply_cast_kind_model(d)
-                    d.cast_kind = nil
-                }
-            }
-        }
-
         ret d
     }
 
@@ -3257,7 +3223,6 @@ impl UnaryEval {
             ret self.d
         }
 
-        let mut cast_kind = self.d.cast_kind
         let kind = self.d.kind
         match self.u.op.kind {
         | TokenKind.Minus:
@@ -3282,9 +3247,6 @@ impl UnaryEval {
             ret nil
         | self.d.is_const():
             self.d.model = self.d.constant
-        | cast_kind != nil:
-            self.d.cast_kind = cast_kind
-            apply_cast_kind(self.d)
         }
         self.d.mutable = true
         ret self.d
@@ -4256,22 +4218,17 @@ fn is_ptr_arithmetic_compatible_int(mut &d: &Data): bool {
     ret tcc.check()
 }
 
-fn apply_cast_kind_model(mut &d: &Data) {
+fn apply_cast_kind_model(mut &d: &Data, mut &t: &TypeKind) {
     d.model = &CastingExprModel{
         expr: d.model,
-        kind: d.cast_kind,
+        kind: t,
         expr_kind: d.kind,
     }
 }
 
-fn apply_cast_kind(mut &d: &Data) {
-    if d.cast_kind == nil {
-        ret
-    }
-
-    apply_cast_kind_model(d)
-    d.kind = d.cast_kind
-    d.cast_kind = nil // Ignore, because model added.
+fn apply_cast_kind(mut &d: &Data, mut &t: &TypeKind) {
+    apply_cast_kind_model(d, t)
+    d.kind = t
 }
 
 fn build_void_data(): &Data {
@@ -4302,8 +4259,8 @@ fn check_data_for_integer_indexing(mut &d: &Data): (err_fmt: LogMsg) {
     | d.kind.prim() == nil
     | d.is_const()
     | types::real_kind_of(d.kind.prim().to_str()) != types::real_kind_of(PrimKind.Int):
-        d.cast_kind = &TypeKind{kind: build_prim_type(PrimKind.Int)}
-        apply_cast_kind(d)
+        let mut t = &TypeKind{kind: build_prim_type(PrimKind.Int)}
+        apply_cast_kind(d, t)
     }
     ret LogMsg.Empty
 }
@@ -4319,9 +4276,7 @@ fn apply_cast_model_by_enum(mut &d: &Data, mut e: &Enum) {
     if p.is_str() {
         ret
     }
-    d.cast_kind = e.kind.kind
-    apply_cast_kind_model(d)
-    d.cast_kind = nil
+    apply_cast_kind_model(d, e.kind.kind)
 }
 
 fn cast_const_by_type(&t: str, mut &d: &Data) {

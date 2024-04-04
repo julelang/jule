@@ -1522,9 +1522,26 @@ fn apply_implicit_cast(mut &dest: &TypeKind, mut &d: &Data) {
     if d.kind.is_nil() {
         ret
     }
+
+    let dest_prim = dest.prim()
+    let prim = d.kind.prim()
+    if dest_prim != nil {
+        if dest_prim.is_any() {
+            apply_cast_kind(d, dest)
+            ret
+        }
+        if !d.kind.cpp_linked() &&
+            !d.kind.variadic &&
+            !d.lvalue &&
+            !d.is_const() &&
+            prim != nil &&
+            types::is_num(prim.kind) {
+            apply_cast_kind(d, dest)
+        }
+        ret
+    }
+
     if dest.trt() != nil && d.kind.trt() == nil {
-        d.cast_kind = dest
-        apply_cast_kind_model(d)
-        d.cast_kind = nil
+        apply_cast_kind_model(d, dest)
     }
 }
