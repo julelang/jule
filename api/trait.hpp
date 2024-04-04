@@ -53,7 +53,7 @@ namespace jule
     public:
         mutable jule::Ptr<jule::Uintptr> data;
         mutable jule::Trait<Mask>::Type *type = nullptr;
-        mutable const char *type_id;
+        mutable const std::type_info *type_info = nullptr;
         jule::Uint type_offset = 0;
 
         Trait(void) = default;
@@ -64,7 +64,7 @@ namespace jule
         {
             this->type_offset = type_offset;
             this->type = jule::Trait<Mask>::new_type<T>();
-            this->type_id = typeid(T).name();
+            this->type_info = &typeid(T);
             T *alloc = new (std::nothrow) T;
             if (!alloc)
                 jule::panic(__JULE_ERROR__MEMORY_ALLOCATION_FAILED "\nfile: /api/trait.hpp");
@@ -80,7 +80,7 @@ namespace jule
         template <typename T>
         Trait(const jule::Ptr<T> &ref, const jule::Uint &type_offset) noexcept
         {
-            this->type_id = typeid(jule::Ptr<T>).name();
+            this->type_info = &typeid(jule::Ptr<T>);
             this->type_offset = type_offset;
             this->type = jule::Trait<Mask>::new_type<T>();
             this->data = ref.template as<jule::Uintptr>();
@@ -103,7 +103,7 @@ namespace jule
             this->data.ref = nullptr;
             this->data.alloc = nullptr;
             this->type = nullptr;
-            this->type_id = nullptr;
+            this->type_info = nullptr;
         }
 
         // Copy content from source.
@@ -112,7 +112,7 @@ namespace jule
             this->data = src.data;
             this->type_offset = src.type_offset;
             this->type = src.type;
-            this->type_id = src.type_id;
+            this->type_info = src.type_info;
         }
 
         inline void must_ok(
@@ -140,7 +140,7 @@ namespace jule
         {
             if (this->operator==(nullptr))
                 return false;
-            return std::strcmp(this->type_id, typeid(T).name()) == 0;
+            return *this->type_info == typeid(T);
         }
 
         template <typename T>
@@ -177,7 +177,7 @@ namespace jule
                 file
 #endif
             );
-            if (std::strcmp(this->type_id, typeid(T).name()) != 0)
+            if (*this->type_info != typeid(T))
             {
 #ifndef __JULE_ENABLE__PRODUCTION
                 std::string error = __JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: trait casted to incompatible type\nfile: ";
@@ -206,7 +206,7 @@ namespace jule
                 file
 #endif
             );
-            if (std::strcmp(this->type_id, typeid(jule::Ptr<T>).name()) != 0)
+            if (*this->type_info != typeid(jule::Ptr<T>))
             {
 #ifndef __JULE_ENABLE__PRODUCTION
                 std::string error = __JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: trait casted to incompatible type\nfile: ";

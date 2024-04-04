@@ -9,7 +9,6 @@
 #include <typeinfo>
 #include <cstddef>
 #include <cstdlib>
-#include <cstring>
 #include <ostream>
 
 #include "str.hpp"
