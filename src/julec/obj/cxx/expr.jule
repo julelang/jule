@@ -92,863 +92,870 @@ impl ExprCoder {
         }
     }
 
-    fn string(self, &c: &Const): str {
+    fn string(mut &self, &c: &Const) {
         let content = c.read_str()
         if content.len == 0 { // Empty.
-            ret TypeCoder.Str + "()"
+            self.oc.write(TypeCoder.Str + "()")
+            ret
         }
         let bytes = []byte(content)
         let len = conv::fmt_int(i64(bytes.len), 10)
         let lit = cstr_lit(bytes)
-        ret TypeCoder.Str + "(" + lit + ", " + len + ")"
+        self.oc.write(TypeCoder.Str)
+        self.oc.write("(")
+        self.oc.write(lit)
+        self.oc.write(", ")
+        self.oc.write(len)
+        self.oc.write(")")
     }
 
-    fn boolean(self, &c: &Const): str {
+    fn boolean(mut &self, &c: &Const) {
         if c.read_bool() {
-            ret "true"
+            self.oc.write("true")
+            ret
         }
-        ret "false"
+        self.oc.write("false")
     }
 
-    fn nil_lit(self): str {
-        ret "nullptr"
+    fn nil_lit(mut &self) {
+        self.oc.write("nullptr")
     }
 
-    fn ftoa_special_cases(self, &x: f64): str {
+    fn ftoa_special_cases(mut &self, &x: f64): bool {
         match {
         | math::is_nan(x):
-            ret "NAN"
+            self.oc.write("NAN")
         | math::is_inf(x, 1):
-            ret "INFINITY"
+            self.oc.write("INFINITY")
         | math::is_inf(x, -1):
-            ret "-INFINITY"
+            self.oc.write("-INFINITY")
         |:
-            ret ""
+            ret false
         }
+        ret true
     }
 
-    fn float32(self, &c: &Const): str {
+    fn float32(mut &self, &c: &Const) {
         let x = c.as_f64()
 
         // Special cases.
-        let f = self.ftoa_special_cases(x)
-        if f != "" {
-            ret f
+        if self.ftoa_special_cases(x) {
+            ret
         }
 
         match {
         | x == MAX_F32:
-            ret "jule::MAX_F32"
+            self.oc.write("jule::MAX_F32")
         | x == MIN_F32:
-            ret "jule::MIN_F32"
+            self.oc.write("jule::MIN_F32")
         |:
-            ret ftoa(x, 32) + "f"
+            self.oc.write(ftoa(x, 1 << 5))
+            self.oc.write("f")
         }
     }
 
-    fn float64(self, &c: &Const): str {
+    fn float64(mut &self, &c: &Const) {
         let x = c.as_f64()
 
         // Special cases.
-        let f = self.ftoa_special_cases(x)
-        if f != "" {
-            ret f
+        if self.ftoa_special_cases(x) {
+            ret
         }
 
         match {
         | x == MAX_F64:
-            ret "jule::MAX_F64"
+            self.oc.write("jule::MAX_F64")
         | x == MIN_F64:
-            ret "jule::MIN_F64"
+            self.oc.write("jule::MIN_F64")
         |:
-            ret ftoa(x, 64)
+            self.oc.write(ftoa(x, 1 << 6))
         }
     }
 
     // fx32: 32-bit floating-point
-    fn constant(self, mut c: &Const, fx32: bool): str {
+    fn constant(mut &self, mut c: &Const, fx32: bool) {
         match {
         | c.is_str():
-            ret self.string(c)
+            self.string(c)
         | c.is_bool():
-            ret self.boolean(c)
+            self.boolean(c)
         | c.is_f64():
             match {
             | fx32:
-                ret self.float32(c)
+                self.float32(c)
             |:
-                ret self.float64(c)
+                self.float64(c)
             }
         | c.is_i64():
-            ret itoa(c.read_i64())
+            self.oc.write(itoa(c.read_i64()))
         | c.is_u64():
-            ret utoa(c.read_u64())
+            self.oc.write(utoa(c.read_u64()))
         | c.is_nil():
-            ret self.nil_lit()
+            self.nil_lit()
         |:
-            ret "<unimplemented_constant_expression>"
+            self.oc.write("<unimplemented_constant_expression>")
         }
     }
 
-    fn div_by_zero_binary(mut self, &op: &Token, mut &l: &OperandExprModel, mut &r: &OperandExprModel): str {
-        let mut op_func = ""
+    fn div_by_zero_binary(mut &self, &op: &Token, mut &l: &OperandExprModel, mut &r: &OperandExprModel) {
+        self.oc.write("jule::")
         match op.kind {
         | TokenKind.Solidus
         | TokenKind.SolidusEq:
-            op_func = "div"
+            self.oc.write("div(")
         | TokenKind.Percent
         | TokenKind.PercentEq:
-            op_func = "mod"
+            self.oc.write("mod(")
         }
 
-        let mut obj = "jule::"
-        obj += op_func
-        obj += "("
         if !env::PRODUCTION {
-            obj += "\""
-            obj += self.oc.loc_info(op)
-            obj += "\","
+            self.oc.write("\"")
+            self.oc.loc_info(op)
+            self.oc.write("\",")
         }
-        obj += self.expr(l.model)
-        obj += ","
-        obj += self.expr(r.model)
-        obj += ")"
-        ret obj
+        self.expr(l.model)
+        self.oc.write(",")
+        self.expr(r.model)
+        self.oc.write(")")
     }
 
-    fn unsafe_binary(mut self, mut m: &BinopExprModel): str {
-        let mut obj = "("
-        obj += self.model(m.left.model)
-        obj += " "
-        obj += m.op.kind
-        obj += " "
-        obj += self.model(m.right.model)
-        obj += ")"
-        ret obj
+    fn unsafe_binary(mut &self, mut m: &BinopExprModel) {
+        self.oc.write("(")
+        self.model(m.left.model)
+        self.oc.write(" ")
+        self.oc.write(m.op.kind)
+        self.oc.write(" ")
+        self.model(m.right.model)
+        self.oc.write(")")
     }
 
-    fn binary(mut self, mut m: &BinopExprModel): str {
+    fn binary(mut &self, mut m: &BinopExprModel) {
         match m.op.kind {
         | TokenKind.Solidus | TokenKind.Percent:
             // Do not check division of structures safety.
             if m.left.kind.strct() == nil {
-                ret self.div_by_zero_binary(m.op, m.left, m.right)
+                self.div_by_zero_binary(m.op, m.left, m.right)
+                ret
             }
         }
-        ret self.unsafe_binary(m)
+        self.unsafe_binary(m)
     }
 
-    fn var(self, mut m: &Var): str {
+    fn var(mut &self, mut m: &Var) {
         if m.cpp_linked {
             let d = find_directive(m.directives, Directive.Namespace)
             if d != nil {
-                let mut obj = concat_all_parts(d.args...)
-                obj += "::"
-                obj += IdentCoder.var(m)
-                ret obj
+                self.oc.write(concat_all_parts(d.args...))
+                self.oc.write("::")
             }
         }
-        ret IdentCoder.var(m)
+        self.oc.write(IdentCoder.var(m))
     }
 
-    fn structure(self, m: &Struct): str {
-        ret TypeCoder.structure(m)
+    fn structure(mut &self, m: &Struct) {
+        self.oc.write(TypeCoder.structure(m))
     }
 
-    fn structure_ins(self, mut m: &StructIns): str {
-        ret TypeCoder.structure_ins(m)
+    fn structure_ins(mut &self, mut m: &StructIns) {
+        self.oc.write(TypeCoder.structure_ins(m))
     }
 
-    fn unary(mut self, mut m: &UnaryExprModel): str {
+    fn unary(mut &self, mut m: &UnaryExprModel) {
         match m.op.kind {
         | TokenKind.Caret:
-            let mut obj = "(~("
-            obj += self.expr(m.expr.model)
-            obj += "))"
-            ret obj
+            self.oc.write("(~(")
+            self.expr(m.expr.model)
+            self.oc.write("))")
+            ret
         | TokenKind.Star:
             if env::PRODUCTION || m.expr.kind.sptr() == nil {
                 break
             }
-            let mut obj = self.expr(m.expr.model)
-            obj += ".get(\""
-            obj += self.oc.loc_info(m.op)
-            obj += "\")"
-            ret obj
+            self.expr(m.expr.model)
+            self.oc.write(".get(\"")
+            self.oc.loc_info(m.op)
+            self.oc.write("\")")
+            ret
         }
-
-        let mut obj = "("
-        obj += m.op.kind
-        obj += "("
-        obj += self.expr(m.expr.model)
-        obj += "))"
-        ret obj
+        self.oc.write("(")
+        self.oc.write(m.op.kind)
+        self.oc.write("(")
+        self.expr(m.expr.model)
+        self.oc.write("))")
     }
 
-    fn cpp_structure_lit(mut self, mut m: &StructLitExprModel): str {
-        let mut obj = "(" + TypeCoder.structure_ins(m.strct)
-        obj += "){"
+    fn cpp_structure_lit(mut &self, mut m: &StructLitExprModel) {
+        self.oc.write("(")
+        self.oc.write(TypeCoder.structure_ins(m.strct))
+        self.oc.write("){")
         if m.args.len > 0 {
         iter:
             for (_, mut f) in m.strct.fields {
                 if m.strct.decl.cpp_linked {
-                    for (_, mut arg) in m.args {
+                    for (i, mut arg) in m.args {
                         if arg.field == f {
-                            obj += "."
-                            obj += IdentCoder.field(f.decl)
-                            obj += "="
-                            obj += self.expr(arg.expr)
-                            obj += ","
+                            self.oc.write(".")
+                            self.oc.write(IdentCoder.field(f.decl))
+                            self.oc.write("=")
+                            self.expr(arg.expr)
+                            if m.args.len-i > 1 {
+                                self.oc.write(",")
+                            }
                             continue iter
                         }
                     }
                     continue
                 }
-                obj += IdentCoder.field(f.decl)
-                obj += ": "
-                for (_, mut arg) in m.args {
+                self.oc.write(IdentCoder.field(f.decl))
+                self.oc.write(": ")
+                for (i, mut arg) in m.args {
                     if arg.field == f {
-                        obj += self.expr(arg.expr)
-                        obj += ","
+                        self.expr(arg.expr)
+                        if m.args.len-i > 1 {
+                            self.oc.write(",")
+                        }
                         continue iter
                     }
                 }
-                obj += self.init_expr(f.kind)
-                obj += ","
+                self.init_expr(f.kind)
+                self.oc.write(",")
             }
-            obj = obj[:obj.len-1] // Remove last comma.
         }
-        obj += "}"
-        ret obj
+        self.oc.write("}")
     }
 
-    fn structure_lit(mut self, mut m: &StructLitExprModel): str {
+    fn structure_lit(mut &self, mut m: &StructLitExprModel) {
         if m.strct.decl.cpp_linked {
-            ret self.cpp_structure_lit(m)
+            self.cpp_structure_lit(m)
+            ret
         }
 
-        let mut obj = IdentCoder.structure_ins(m.strct)
-        obj += "("
+        self.oc.write(IdentCoder.structure_ins(m.strct))
+        self.oc.write("(")
         if m.args.len > 0 {
         iter:
-            for (_, mut f) in m.strct.fields {
+            for (i, mut f) in m.strct.fields {
                 for (_, mut arg) in m.args {
                     if arg.field == f {
-                        obj += self.expr(arg.expr)
-                        obj += ","
+                        self.expr(arg.expr)
+                        if m.strct.fields.len-i > 1 {
+                            self.oc.write(",")
+                        }
                         continue iter
                     }
                 }
-                obj += self.init_expr(f.kind)
-                obj += ","
+                self.init_expr(f.kind)
+                if m.strct.fields.len-i > 1 {
+                    self.oc.write(",")
+                }
             }
-            obj = obj[:obj.len-1] // Remove last comma.
         }
-        obj += ")"
-        ret obj
+        self.oc.write(")")
     }
 
-    fn alloc_structure(mut self, mut m: &AllocStructLitExprModel): str {
-        let mut obj = "jule::new_ptr<"
-        obj += IdentCoder.structure_ins(m.lit.strct)
-        obj += ">("
-        obj += self.structure_lit(m.lit)
-        obj += ")"
-        ret obj
+    fn alloc_structure(mut &self, mut m: &AllocStructLitExprModel) {
+        self.oc.write("jule::new_ptr<")
+        self.oc.write(IdentCoder.structure_ins(m.lit.strct))
+        self.oc.write(">(")
+        self.structure_lit(m.lit)
+        self.oc.write(")")
     }
 
-    fn casting(mut self, mut m: &CastingExprModel): str {
-        let mut obj = ""
+    fn casting(mut &self, mut m: &CastingExprModel) {
         match {
         | m.kind.prim() != nil && m.kind.prim().is_any():
-            obj += TypeCoder.kind(m.kind)
-            obj += "("
-            obj += self.model(m.expr)
-            obj += ")"
+            self.oc.write(TypeCoder.kind(m.kind))
+            self.oc.write("(")
+            self.model(m.expr)
+            self.oc.write(")")
         | m.expr_kind.ptr() != nil
         | m.kind.ptr() != nil:
-            obj += "(("
-            obj += TypeCoder.kind(m.kind)
-            obj += ")("
-            obj += self.expr(m.expr)
-            obj += "))"
+            self.oc.write("((")
+            self.oc.write(TypeCoder.kind(m.kind))
+            self.oc.write(")(")
+            self.expr(m.expr)
+            self.oc.write("))")
         | m.expr_kind.trt() != nil
         | m.expr_kind.prim() != nil && m.expr_kind.prim().is_any():
-            obj += self.model(m.expr)
-            obj += "."
+            self.model(m.expr)
+            self.oc.write(".")
             if env::PRODUCTION {
-                obj += "operator "
-                obj += TypeCoder.kind(m.kind)
-                obj += "()"
+                self.oc.write("operator ")
+                self.oc.write(TypeCoder.kind(m.kind))
+                self.oc.write("()")
             } else {
                 if m.expr_kind.trt() != nil && m.kind.sptr() != nil {
-                    obj += "cast_ptr<"
-                    obj += TypeCoder.kind(m.kind.sptr().elem)
+                    self.oc.write("cast_ptr<")
+                    self.oc.write(TypeCoder.kind(m.kind.sptr().elem))
                 } else {
-                    obj += "cast<"
-                    obj += TypeCoder.kind(m.kind)
+                    self.oc.write("cast<")
+                    self.oc.write(TypeCoder.kind(m.kind))
                 }
-                obj += ">(\""
-                obj += self.oc.loc_info(m.token)
-                obj += "\")"
+                self.oc.write(">(\"")
+                self.oc.loc_info(m.token)
+                self.oc.write("\")")
             }
         | m.kind.trt() != nil:
-            obj += TypeCoder.kind(m.kind)
-            obj += "("
-            obj += self.expr(m.expr)
-            obj += ", "
-            obj += conv::itoa(self.oc.find_type_offset(m.kind.trt(), m.expr_kind))
-            obj += ")"
+            self.oc.write(TypeCoder.kind(m.kind))
+            self.oc.write("(")
+            self.expr(m.expr)
+            self.oc.write(", ")
+            self.oc.write(conv::itoa(self.oc.find_type_offset(m.kind.trt(), m.expr_kind)))
+            self.oc.write(")")
         |:
-            obj += "static_cast<"
-            obj += TypeCoder.kind(m.kind)
-            obj += ">("
-            obj += self.expr(m.expr)
-            obj += ")"
+            self.oc.write("static_cast<")
+            self.oc.write(TypeCoder.kind(m.kind))
+            self.oc.write(">(")
+            self.expr(m.expr)
+            self.oc.write(")")
         }
-        ret obj
     }
 
-    fn args(mut self, mut args: []ExprModel): str {
+    fn args(mut &self, mut args: []ExprModel) {
         if args.len == 0 {
-            ret ""
+            ret
         }
-        let mut obj = ""
-        for (_, mut a) in args {
-            obj += self.expr(a)
-            obj += ","
+        for (i, mut a) in args {
+            self.expr(a)
+            if args.len-i > 1 {
+                self.oc.write(",")
+            }
         }
-        obj = obj[:obj.len-1] // Remove last comma.
-        ret obj
     }
 
-    fn model_for_call(mut self, mut expr: ExprModel): str {
+    fn model_for_call(mut &self, mut expr: ExprModel) {
         match type expr {
         | &FnIns:
-            ret self.func_ins((&FnIns)(expr))
+            self.func_ins((&FnIns)(expr))
+            ret
         | &StructSubIdentExprModel:
             let mut ssie = (&StructSubIdentExprModel)(expr)
             if ssie.method != nil {
-                ret self.func_ins(ssie.method)
+                self.func_ins(ssie.method)
+                ret
             }
         }
-        ret self.model(expr)
+        self.model(expr)
     }
 
-    fn push_call_inf(mut self, mut &obj: str, &m: &FnCallExprModel) {
+    fn push_call_inf(mut &self, &m: &FnCallExprModel) {
         if env::PRODUCTION || (!m.func.anon && !is_builtin_call_has_debuginf(m)) {
-            obj += "("
+            self.oc.write("(")
             ret
         }
         if m.func.anon {
             match type m.expr {
             | &StructSubIdentExprModel:
                 if (&StructSubIdentExprModel)(m.expr).field.decl.owner.cpp_linked {
-                    obj += "("
+                    self.oc.write("(")
                     ret
                 }
                 fall
             |:
-                obj += ".call"
+                self.oc.write(".call")
             }
         }
-        obj += "(\""
-        obj += self.oc.loc_info(m.token)
-        obj += "\""
+        self.oc.write("(\"")
+        self.oc.loc_info(m.token)
+        self.oc.write("\"")
         if m.args.len != 0 {
-            obj += ","
+            self.oc.write(",")
         }
     }
 
-    fn pure_func_call(mut self, mut &m: &FnCallExprModel): str {
-        let mut obj = self.model_for_call(m.expr)
-        if !m.func.is_builtin() {
-            if m.func.decl.cpp_linked && m.func.generics.len > 0 {
-                if !has_directive(m.func.decl.directives, Directive.Cdef) {
-                    obj += "<"
-                    for (_, mut g) in m.func.generics {
-                        obj += TypeCoder.kind(g)
-                        obj += ","
+    fn is_wrapped(mut &self, mut &m: &FnCallExprModel): bool {
+        if !m.func.is_builtin() && m.func.decl.params.len > 0 && m.func.decl.params[0].is_self() {
+            match type m.expr {
+            | &StructSubIdentExprModel:
+                let mut ssie = (&StructSubIdentExprModel)(m.expr)
+                match {
+                | m.func.decl.params[0].is_ref()
+                | ssie.expr_kind.sptr() != nil:
+                    break
+                |:
+                    if ssie.expr.kind.strct() != nil {
+                        if !ssie.expr.lvalue {
+                            self.oc.write("({ auto _wrap_copy = ")
+                            self.model(ssie.expr)
+                            self.oc.write("; ")
+                            ret true
+                        }
                     }
-                    obj = obj[:obj.len-1] // Remove last comma.
-                    obj += ">"
                 }
             }
         }
-        self.push_call_inf(obj, m)
+        ret false
+    }
+
+    fn pure_func_call(mut &self, mut &m: &FnCallExprModel) {
+        let wrapped = self.is_wrapped(m)
+        if m.is_co {
+            self.oc.write("__JULE_CO(")
+        }
+        self.model_for_call(m.expr)
+        if !m.func.is_builtin() {
+            if m.func.decl.cpp_linked && m.func.generics.len > 0 {
+                if !has_directive(m.func.decl.directives, Directive.Cdef) {
+                    self.oc.write("<")
+                    for (i, mut g) in m.func.generics {
+                        self.oc.write(TypeCoder.kind(g))
+                        if m.func.generics.len-i > 1 {
+                            self.oc.write(",")
+                        }
+                    }
+                    self.oc.write(">")
+                }
+            }
+        }
+        self.push_call_inf(m)
         let mut locinfo = false
-        let mut wrap_receiver = ""
         if !m.func.is_builtin() && m.func.decl.params.len > 0 && m.func.decl.params[0].is_self() {
             match type m.expr {
             | &StructSubIdentExprModel:
                 let mut ssie = (&StructSubIdentExprModel)(m.expr)
                 match {
                 | m.func.decl.params[0].is_ref():
-                    obj += self.model(ssie.expr)
+                    self.model(ssie.expr)
                 | ssie.expr_kind.sptr() != nil:
-                    obj += self.model(ssie.expr)
-                    obj += ".ptr("
+                    self.model(ssie.expr)
+                    self.oc.write(".ptr(")
                     if !env::PRODUCTION {
-                        obj += "\""
-                        obj += self.oc.loc_info(m.token)
-                        obj += "\""
+                        self.oc.write("\"")
+                        self.oc.loc_info(m.token)
+                        self.oc.write("\"")
                     }
-                    obj += ")"
+                    self.oc.write(")")
                 |:
                     if ssie.expr.kind.strct() != nil {
                         // Add address taking operation for non-pointers.
-                        obj += "&"
-                        if !ssie.expr.lvalue {
-                            wrap_receiver = self.model(ssie.expr)
-                        }
+                        self.oc.write("&")
                     }
-                    if wrap_receiver != "" {
-                        obj += "_wrap_copy"
+                    if wrapped {
+                        self.oc.write("_wrap_copy")
                     } else {
-                        obj += self.model(ssie.expr)
+                        self.model(ssie.expr)
                     }
                 }
                 if m.args.len > 0 {
-                    obj += ", "
+                    self.oc.write(", ")
                 }
             | &TraitSubIdentExprModel:
-                obj += self.model((&TraitSubIdentExprModel)(m.expr).expr)
+                self.model((&TraitSubIdentExprModel)(m.expr).expr)
                 if !env::PRODUCTION {
                     locinfo = true
                 }
                 if m.args.len > 0 {
-                    obj += ", "
+                    self.oc.write(", ")
                 }
             }
         }
-        obj += self.args(m.args)
+        self.args(m.args)
         if locinfo {
-            obj += ", \""
-            obj += self.oc.loc_info(m.token)
-            obj += "\""
+            self.oc.write(", \"")
+            self.oc.loc_info(m.token)
+            self.oc.write("\"")
         }
-        obj += ")"
+        self.oc.write(")")
 
-        if wrap_receiver != "" {
-            obj = "({ auto _wrap_copy = " + wrap_receiver + "; " + obj
-            obj += "; })"
+        if wrapped {
+            self.oc.write("; })")
         }
 
         if m.is_co {
-            obj = "__JULE_CO(" + obj
-            obj += ")"
+            self.oc.write(")")
         }
-
-        ret obj
     }
 
-    fn func_call(mut self, mut m: &FnCallExprModel): str {
+    fn func_call(mut &self, mut m: &FnCallExprModel) {
         if m.func.is_builtin() ||
             !m.func.decl.exceptional ||
             m.except != nil && m.except.stmts.len == 0 {
-            ret self.pure_func_call(m)
+            self.pure_func_call(m)
+            ret
         }
 
         // Generate code for exceptional.
-        let mut obj = "({\n"
+        self.oc.write("({\n")
         self.oc.add_indent()
-        obj += self.oc.indent()
-        obj += "auto except = "
-        obj += self.pure_func_call(m)
-        obj += ";\n"
-        obj += self.oc.indent()
+        self.oc.indent()
+        self.oc.write("auto except = ")
+        self.pure_func_call(m)
+        self.oc.write(";\n")
+        self.oc.indent()
         if m.except != nil {
             if m.func.result == nil || !m.assigned {
-                obj += "if (!except.ok()) "
-                obj += self.oc.sc.scope(m.except)
-                obj += "\n"
+                self.oc.write("if (!except.ok()) ")
+                self.oc.sc.scope(m.except)
+                self.oc.write("\n")
             } else {
                 let forwarded = is_forwarded(m.except)
-                obj += "(except.ok()) ? (except.result) : ("
+                self.oc.write("(except.ok()) ? (except.result) : (")
                 if forwarded {
-                    obj += "{"
+                    self.oc.write("{")
                 }
-                obj += self.oc.sc.scope(m.except)
+                self.oc.sc.scope(m.except)
                 if forwarded {
-                    obj += " "
-                    obj += self.init_expr(m.func.result)
-                    obj += ";}"
+                    self.oc.write(" ")
+                    self.init_expr(m.func.result)
+                    self.oc.write(";}")
                 }
-                obj += ");\n"
+                self.oc.write(");\n")
             }
             self.oc.done_indent()
         } else {
-            obj += `if (!except.ok()) jule::panic(jule::Str("`
-            obj += `unhandled exceptional: ") + except.error.type->to_str(except.error.data) + jule::Str("\nlocation: `
-            obj += self.oc.loc_info(m.token)
-            obj += "\"));\n"
+            self.oc.write(`if (!except.ok()) jule::panic(jule::Str("unhandled exceptional: ") + except.error.type->to_str(except.error.data) + jule::Str("\nlocation: `)
+            self.oc.loc_info(m.token)
+            self.oc.write("\"));\n")
             if !m.func.decl.is_void() {
-                obj += self.oc.indent()
-                obj += "(except.result);\n"
+                self.oc.indent()
+                self.oc.write("(except.result);\n")
             }
             self.oc.done_indent()
         }
 
-        obj += self.oc.indent()
-        obj += "})"
-        ret obj
+        self.oc.indent()
+        self.oc.write("})")
     }
 
-    fn slice(mut self, mut m: &SliceExprModel): str {
+    fn slice(mut &self, mut m: &SliceExprModel) {
         if m.elems.len == 0 {
-            ret TypeCoder.as_slice(m.elem_kind) + "()"
+            self.oc.write(TypeCoder.as_slice(m.elem_kind))
+            self.oc.write("()")
+            ret
         }
-        let mut obj = TypeCoder.as_slice(m.elem_kind)
-        obj += "({"
-        obj += self.args(m.elems)
-        obj += "})"
-        ret obj
+        self.oc.write(TypeCoder.as_slice(m.elem_kind))
+        self.oc.write("({")
+        self.args(m.elems)
+        self.oc.write("})")
     }
 
-    fn indexing(mut self, mut m: &IndexingExprModel): str {
-        let mut obj = self.model(m.expr.model)
+    fn indexing(mut &self, mut m: &IndexingExprModel) {
+        self.model(m.expr.model)
         // Index access with safety measures.
         match {
         | env::PRODUCTION
         | m.expr.kind.ptr() != nil
         | m.expr.kind.map() != nil:
-            obj += "["
-            obj += self.expr(m.index.model)
-            obj += "]"
+            self.oc.write("[")
+            self.expr(m.index.model)
+            self.oc.write("]")
         |:
-            obj += ".at(\""
-            obj += self.oc.loc_info(m.token)
-            obj += "\","
-            obj += self.expr(m.index.model)
-            obj += ")"
+            self.oc.write(".at(\"")
+            self.oc.loc_info(m.token)
+            self.oc.write("\",")
+            self.expr(m.index.model)
+            self.oc.write(")")
         }
-        ret obj
     }
 
-    fn unsafe_indexing(mut self, mut m: &UnsafeIndexingExprModel): str {
-        let mut obj = self.model(m.node.expr.model)
+    fn unsafe_indexing(mut &self, mut m: &UnsafeIndexingExprModel) {
+        self.model(m.node.expr.model)
         // Index access with safety measures.
         match {
         | env::PRODUCTION
         | m.node.expr.kind.ptr() != nil
         | m.node.expr.kind.map() != nil:
-            obj += "["
-            obj += self.expr(m.node.index.model)
-            obj += "]"
+            self.oc.write("[")
+            self.expr(m.node.index.model)
+            self.oc.write("]")
         |:
-            obj += ".__at("
-            obj += self.expr(m.node.index.model)
-            obj += ")"
+            self.oc.write("__at(")
+            self.expr(m.node.index.model)
+            self.oc.write(")")
         }
-        ret obj
     }
 
-    fn anon_func(mut self, mut m: &AnonFnExprModel): str {
-        let mut obj = TypeCoder.func(m.func)
-        obj += "([=]"
-        obj += self.oc.params_ins(m.func.params)
-        obj += " mutable -> "
-        obj += TypeCoder.func_ins_result(m.func)
-        obj += " "
-        obj += self.oc.sc.func_scope(m.func)
-        obj += ")"
-        ret obj
+    fn anon_func(mut &self, mut m: &AnonFnExprModel) {
+        self.oc.write(TypeCoder.func(m.func))
+        self.oc.write("([=]")
+        self.oc.params_ins(m.func.params)
+        self.oc.write(" mutable -> ")
+        self.oc.write(TypeCoder.func_ins_result(m.func))
+        self.oc.write(" ")
+        self.oc.sc.func_scope(m.func)
+        self.oc.write(")")
     }
 
-    fn map(mut self, mut m: &MapExprModel): str {
-        let mut obj = TypeCoder.Map + "<"
-        obj += TypeCoder.kind(m.key_kind)
-        obj += ","
-        obj += TypeCoder.kind(m.val_kind)
-        obj += ">({"
+    fn map(mut &self, mut m: &MapExprModel) {
+        self.oc.write(TypeCoder.Map + "<")
+        self.oc.write(TypeCoder.kind(m.key_kind))
+        self.oc.write(",")
+        self.oc.write(TypeCoder.kind(m.val_kind))
+        self.oc.write(">({")
         if m.entries.len > 0 {
-            for (_, mut pair) in m.entries {
-                let mut pair_obj = "{"
-                pair_obj += self.expr(pair.key)
-                pair_obj += ","
-                pair_obj += self.expr(pair.val)
-                pair_obj += "}"
-                obj += pair_obj
-                obj += ","
+            for (i, mut pair) in m.entries {
+                self.oc.write("{")
+                self.expr(pair.key)
+                self.oc.write(",")
+                self.expr(pair.val)
+                self.oc.write("}")
+                if m.entries.len-i > 1 {
+                    self.oc.write(",")
+                }
             }
-            obj = obj[:obj.len-1] // Remove last comma.
         }
-        obj += "})"
-        ret obj
+        self.oc.write("})")
     }
 
-    fn slicing(mut self, mut m: &SlicingExprModel): str {
-        let mut obj = self.model(m.expr)
-        obj += ".slice("
+    fn slicing(mut &self, mut m: &SlicingExprModel) {
+        self.model(m.expr)
+        self.oc.write(".slice(")
         if !env::PRODUCTION {
-            obj += "\""
-            obj += self.oc.loc_info(m.token)
-            obj += "\","
+            self.oc.write("\"")
+            self.oc.loc_info(m.token)
+            self.oc.write("\",")
         }
-        obj += self.expr(m.left)
+        self.expr(m.left)
         if m.right != nil {
-            obj += ","
-            obj += self.expr(m.right)
+            self.oc.write(",")
+            self.expr(m.right)
         }
-        obj += ")"
-        ret obj
+        self.oc.write(")")
     }
 
-    fn trait_sub(mut self, mut m: &TraitSubIdentExprModel): str {
-        let mut obj = IdentCoder.trait_decl(m.trt)
-        obj += "_mptr_data"
-        obj += "[("
-        obj += self.model(m.expr)
-        obj += ").type_offset]."
-        obj += IdentCoder.func(m.method)
-        ret obj
+    fn trait_sub(mut &self, mut m: &TraitSubIdentExprModel) {
+        self.oc.write(IdentCoder.trait_decl(m.trt))
+        self.oc.write("_mptr_data")
+        self.oc.write("[(")
+        self.model(m.expr)
+        self.oc.write(").type_offset].")
+        self.oc.write(IdentCoder.func(m.method))
     }
 
-    fn structure_sub(mut self, mut m: &StructSubIdentExprModel): str {
-        let mut obj = self.model(m.expr)
+    fn structure_sub(mut &self, mut m: &StructSubIdentExprModel) {
+        self.model(m.expr)
         if m.field != nil {
             if m.expr_kind.ptr() != nil {
-                obj += "->"
+                self.oc.write("->")
             } else if m.expr_kind.sptr() != nil {
-                obj += ".get("
+                self.oc.write(".get(")
                 if !env::PRODUCTION {
-                    obj += "\""
-                    obj += self.oc.loc_info(m.token)
-                    obj += "\""
+                    self.oc.write("\"")
+                    self.oc.loc_info(m.token)
+                    self.oc.write("\"")
                 }
-                obj += ")."
+                self.oc.write(").")
             } else {
-                obj += "."
+                self.oc.write(".")
             }
-            obj += IdentCoder.field(m.field.decl)
+            self.oc.write(IdentCoder.field(m.field.decl))
         }
-        ret obj
     }
 
-    fn common_ident(self, m: &CommonIdentExprModel): str {
-        ret m.ident
+    fn common_ident(mut &self, m: &CommonIdentExprModel) {
+        self.oc.write(m.ident)
     }
 
-    fn common_sub(mut self, mut m: &CommonSubIdentExprModel): str {
-        let mut obj = self.model(m.expr)
+    fn common_sub(mut &self, mut m: &CommonSubIdentExprModel) {
+        self.model(m.expr)
         match {
         | m.expr_kind.ptr() != nil:
-            obj += "->"
+            self.oc.write("->")
         | m.expr_kind.sptr() != nil:
-            obj += ".get("
+            self.oc.write(".get(")
             if !env::PRODUCTION {
-                obj += "\n"
-                obj += self.oc.loc_info(m.token)
-                obj += "\n"
+                self.oc.write("\n")
+                self.oc.loc_info(m.token)
+                self.oc.write("\n")
             }
-            obj += ")."
+            self.oc.write(").")
         |:
-            obj += "."
+            self.oc.write(".")
         }
-        obj += m.ident
-        ret obj
+        self.oc.write(m.ident)
     }
 
-    fn array(mut self, mut m: &ArrayExprModel): str {
-        let mut obj = TypeCoder.array(m.kind)
+    fn array(mut &self, mut m: &ArrayExprModel) {
+        self.oc.write(TypeCoder.array(m.kind))
         if m.elems.len == 0 {
-            obj += "()"
-            ret obj
+            self.oc.write("()")
+            ret
         }
 
         // Filled.
         if m.elems.len == 2 && m.elems[1] == nil {
-            obj += "("
-            obj += self.expr(m.elems[0])
-            obj += ")"
-            ret obj
+            self.oc.write("(")
+            self.expr(m.elems[0])
+            self.oc.write(")")
+            ret
         }
 
-        obj += "({"
-        obj += self.args(m.elems)
-        obj += "})"
-        ret obj
+        self.oc.write("({")
+        self.args(m.elems)
+        self.oc.write("})")
+        ret
     }
 
-    // Returns complete expression model of function instance.
+    // Writes complete expression model of function instance.
     // Usefull for strict type safety.
-    fn func_ins_common(self, mut m: &FnIns): str {
-        let mut obj = TypeCoder.func(m)
-        obj += "("
-        obj += self.func_ins(m)
-        obj += ")"
-        ret obj
+    fn func_ins_common(mut &self, mut m: &FnIns) {
+        self.oc.write(TypeCoder.func(m))
+        self.oc.write("(")
+        self.func_ins(m)
+        self.oc.write(")")
     }
 
-    // Returns elementary expression model of function instance.
-    fn func_ins(self, mut m: &FnIns): str {
+    fn func_ins(mut &self, mut m: &FnIns) {
         if m.decl != nil && m.decl.cpp_linked {
             let d = find_directive(m.decl.directives, Directive.Namespace)
             if d != nil {
-                let mut obj = concat_all_parts(d.args...)
-                obj += "::"
-                obj += IdentCoder.func_ins(m)
-                ret obj
+                self.oc.write(concat_all_parts(d.args...))
+                self.oc.write("::")
             }
         }
-        ret IdentCoder.func_ins(m)
+        self.oc.write(IdentCoder.func_ins(m))
     }
 
-    fn tuple(mut self, mut m: &TupleExprModel): str {
-        let mut obj = "std::make_tuple("
-        for (_, mut d) in m.datas {
-            obj += self.expr(d.model)
-            obj += ","
+    fn tuple(mut &self, mut m: &TupleExprModel) {
+        self.oc.write("std::make_tuple(")
+        for (i, mut d) in m.datas {
+            self.expr(d.model)
+            if m.datas.len-i > 1 {
+                self.oc.write(",")
+            }
         }
-        obj = obj[:obj.len-1] // Remove last comma.
-        obj += ")"
-        ret obj
+        self.oc.write(")")
     }
 
-    fn new_call(mut self, mut m: &BuiltinNewCallExprModel): str {
-        let mut obj = "jule::new_ptr<"
-        obj += TypeCoder.kind(m.kind)
-        obj += ">("
+    fn new_call(mut &self, mut m: &BuiltinNewCallExprModel) {
+        self.oc.write("jule::new_ptr<")
+        self.oc.write(TypeCoder.kind(m.kind))
+        self.oc.write(">(")
         if m.init != nil {
-            obj += self.expr(m.init)
+            self.expr(m.init)
         }
-        obj += ")"
-        ret obj
+        self.oc.write(")")
     }
 
-    fn out_call(mut self, mut m: &BuiltinOutCallExprModel): str {
+    fn out_call(mut &self, mut m: &BuiltinOutCallExprModel) {
         if m.debug && env::PRODUCTION {
-            ret ""
+            ret
         }
-        let mut obj = "jule::out("
-        obj += self.expr(m.expr)
-        obj += ")"
-        ret obj
+        self.oc.write("jule::out(")
+        self.expr(m.expr)
+        self.oc.write(")")
     }
 
-    fn outln_call(mut self, mut m: &BuiltinOutlnCallExprModel): str {
+    fn outln_call(mut &self, mut m: &BuiltinOutlnCallExprModel) {
         if m.debug && env::PRODUCTION {
-            ret ""
+            ret
         }
-        let mut obj = "jule::outln("
-        obj += self.expr(m.expr)
-        obj += ")"
-        ret obj
+        self.oc.write("jule::outln(")
+        self.expr(m.expr)
+        self.oc.write(")")
     }
 
-    fn panic_call(mut self, mut m: &BuiltinPanicCallExprModel): str {
-        let mut obj = "jule::panic("
-        obj += self.expr(m.expr)
-        obj += ` + jule::Str("\nlocation: `
-        obj += self.oc.loc_info(m.token)
-        obj += "\"));"
-        ret obj
+    fn panic_call(mut &self, mut m: &BuiltinPanicCallExprModel) {
+        self.oc.write("jule::panic(")
+        self.expr(m.expr)
+        self.oc.write(` + jule::Str("\nlocation: `)
+        self.oc.loc_info(m.token)
+        self.oc.write("\"));")
     }
 
-    fn assert_call(mut self, mut m: &BuiltinAssertCallExprModel): str {
+    fn assert_call(mut &self, mut m: &BuiltinAssertCallExprModel) {
         if env::PRODUCTION {
-            ret ""
+            ret
         }
-        let mut obj = "if (!("
-        obj += self.expr(m.expr)
-        obj += ")) jule::panic(jule::Str("
-        obj += cstr_lit([]byte(m.log))
-        obj += `) + jule::Str("\nlocation: `
-        obj += self.oc.loc_info(m.token)
-        obj += "\"));"
-        ret obj
+        self.oc.write("if (!(")
+        self.expr(m.expr)
+        self.oc.write(")) jule::panic(jule::Str(")
+        self.oc.write(cstr_lit([]byte(m.log)))
+        self.oc.write(`) + jule::Str("\nlocation: `)
+        self.oc.loc_info(m.token)
+        self.oc.write("\"));")
     }
 
-    fn error_call(mut self, mut m: &BuiltinErrorCallExprModel): str {
-        let mut obj = "return "
+    fn error_call(mut &self, mut m: &BuiltinErrorCallExprModel) {
+        self.oc.write("return ")
         if m.func.decl.is_void() {
-            obj += "jule::VoidExceptional("
+            self.oc.write("jule::VoidExceptional(")
         } else {
-            obj += "jule::Exceptional<"
-            obj += TypeCoder.kind(m.func.result)
-            obj += ">("
+            self.oc.write("jule::Exceptional<")
+            self.oc.write(TypeCoder.kind(m.func.result))
+            self.oc.write(">(")
         }
-        obj += self.expr(m.err)
-        obj += ")"
-        ret obj
+        self.expr(m.err)
+        self.oc.write(")")
     }
 
-    fn make_call(mut self, mut m: &BuiltinMakeCallExprModel): str {
-        let mut obj = ""
-        if m.len != nil {
-            obj += self.expr(m.len)
+    fn make_call(mut &self, mut m: &BuiltinMakeCallExprModel) {
+        self.oc.write(TypeCoder.kind(m.kind))
+        if m.kind.slc().elem.enm() != nil {
+            if m.cap != nil {
+                self.oc.write("::alloc(")
+            } else {
+                self.oc.write("::alloc_def(")
+            }
         } else {
-            obj += "0"
+            self.oc.write("::alloc(")
+        }
+
+        if m.len != nil {
+            self.expr(m.len)
+        } else {
+            self.oc.write("0")
         }
         if m.cap != nil {
-            obj += "," + self.expr(m.cap)
+            self.oc.write(",")
+            self.expr(m.cap)
         }
 
         if m.kind.slc().elem.enm() != nil {
-            obj += ","
-            obj += self.init_expr(m.kind.slc().elem)
-            if m.cap != nil {
-                obj = TypeCoder.kind(m.kind) + "::alloc(" + obj
-            } else {
-                obj = TypeCoder.kind(m.kind) + "::alloc_def(" + obj
-            }
-        } else {
-            obj = TypeCoder.kind(m.kind) + "::alloc(" + obj
+            self.oc.write(",")
+            self.init_expr(m.kind.slc().elem)
         }
-
-        obj += ")"
-        ret obj
+        self.oc.write(")")
     }
 
-    fn push_to_slice(mut self, mut m: &PushToSliceExprModel): str {
-        let dest = self.model(m.dest)
-        let mut obj = dest
-        obj += " = jule::alloc_for_append("
-        obj += dest
-        obj += ","
-        obj += conv::itoa(m.elems.elems.len)
-        obj += ");"
+    fn push_to_slice(mut &self, mut m: &PushToSliceExprModel) {
+        self.oc.open_buf_mode()
+        self.model(m.dest)
+        let dest = *self.oc.buf
+        self.oc.close_buf_mode()
+
+        self.oc.write(dest)
+        self.oc.write(" = jule::alloc_for_append(")
+        self.oc.write(dest)
+        self.oc.write(",")
+        self.oc.write(conv::itoa(m.elems.elems.len))
+        self.oc.write(");")
         for (_, mut e) in m.elems.elems {
-            obj += dest
-            // Use the "__push" function to skip allocation boundary checking.
-            obj += ".__push("
-            obj += self.model(e)
-            obj += ");"
+            self.oc.write(dest)
+            // Use the "__push" method to skip allocation boundary checking.
+            self.oc.write(".__push(")
+            self.model(e)
+            self.oc.write(");")
         }
-        ret obj
     }
 
-    fn append_call(mut self, mut m: &BuiltinAppendCallExprModel): str {
-        let mut obj = "jule::append("
-        obj += self.model(m.dest)
-        obj += ","
-        obj += self.model(m.elements)
-        obj += ")"
-        ret obj
+    fn append_call(mut &self, mut m: &BuiltinAppendCallExprModel) {
+        self.oc.write("jule::append(")
+        self.model(m.dest)
+        self.oc.write(",")
+        self.model(m.elements)
+        self.oc.write(")")
     }
 
-    fn clone_call(mut self, mut m: &BuiltinCloneCallExprModel): str {
-        let mut obj = "jule::clone("
-        obj += self.model(m.expr)
-        obj += ")"
-        ret obj
+    fn clone_call(mut &self, mut m: &BuiltinCloneCallExprModel) {
+        self.oc.write("jule::clone(")
+        self.model(m.expr)
+        self.oc.write(")")
     }
 
-    fn sizeof(mut self, mut m: &SizeofExprModel): str {
-        let mut obj = "sizeof("
-        obj += self.expr(m.expr)
-        obj += ")"
-        ret obj
+    fn sizeof(mut &self, mut m: &SizeofExprModel) {
+        self.oc.write("sizeof(")
+        self.model(m.expr)
+        self.oc.write(")")
     }
 
-    fn alignof(mut self, mut m: &AlignofExprModel): str {
-        let mut obj = "alignof("
-        obj += self.expr(m.expr)
-        obj += ")"
-        ret obj
+    fn alignof(mut &self, mut m: &AlignofExprModel) {
+        self.oc.write("alignof(")
+        self.model(m.expr)
+        self.oc.write(")")
     }
 
-    fn rune_lit(self, m: &RuneExprModel): str {
+    fn rune_lit(mut &self, m: &RuneExprModel): str {
         if m.code <= 127 { // ASCII
             let mut b = sbtoa(byte(m.code))
             if b == "'" {
@@ -959,186 +966,186 @@ impl ExprCoder {
         ret itoa(i64(m.code))
     }
 
-    fn structure_static(self, mut m: &StructStaticIdentExprModel): str {
-        ret IdentCoder.func_ins(m.method)
+    fn structure_static(mut &self, mut m: &StructStaticIdentExprModel) {
+        self.oc.write(IdentCoder.func_ins(m.method))
     }
 
-    fn integrated_to_str(mut self, mut m: &IntegratedToStrExprModel): str {
-        let mut obj = "jule::to_str("
-        obj += self.model(m.expr)
-        obj += ")"
-        ret obj
+    fn integrated_to_str(mut &self, mut m: &IntegratedToStrExprModel) {
+        self.oc.write("jule::to_str(")
+        self.model(m.expr)
+        self.oc.write(")")
     }
 
-    fn backend_emit(mut self, mut m: &BackendEmitExprModel): str {
+    fn backend_emit(mut &self, mut m: &BackendEmitExprModel) {
         if m.exprs.len == 0 {
-            ret m.code
+            self.oc.write(m.code)
+            ret
         }
+        self.oc.open_buf_mode()
         for (i, mut expr) in m.exprs {
-            m.exprs[i] = self.expr(expr)
+            self.expr(expr)
+            m.exprs[i] = *self.oc.buf
+            *self.oc.buf = ""
         }
-        ret fmt::format(m.code, m.exprs...)
+        self.oc.close_buf_mode()
+        self.oc.write(fmt::format(m.code, m.exprs...))
     }
 
-    fn free(mut self, mut m: &FreeExprModel): str {
+    fn free(mut &self, mut m: &FreeExprModel) {
+        self.expr(m.expr)
         if env::RC {
-            ret self.expr(m.expr) + ".dealloc()"
+            self.oc.write(".dealloc()")
+            ret
         }
-        ret self.expr(m.expr) + ".__free()"
+        self.oc.write(".__free()")
     }
 
-    fn mut_slicing(mut self, mut m: &MutSlicingExprModel): str {
-        let mut obj = "("
-        obj += self.model(m.expr)
-        obj += ").mut_slice("
+    fn mut_slicing(mut &self, mut m: &MutSlicingExprModel) {
+        self.oc.write("(")
+        self.model(m.expr)
+        self.oc.write(").mut_slice(")
         if !env::PRODUCTION {
-            obj += "\""
-            obj += self.oc.loc_info(m.token)
-            obj += "\","
+            self.oc.write("\"")
+            self.oc.loc_info(m.token)
+            self.oc.write("\",")
         }
-        obj += self.expr(m.left)
+        self.expr(m.left)
         if m.right != nil {
-            obj += ","
-            obj += self.expr(m.right)
+            self.oc.write(",")
+            self.expr(m.right)
         }
-        obj += ");"
-        ret obj
+        self.oc.write(");")
     }
 
-    fn str_insert_begin(mut self, mut m: &StrInsertBeginExprModel): str {
-        let mut obj = "("
-        obj += self.model(m.dest)
-        obj += ").buffer.insert(0, ("
-        obj += self.model(m.expr)
-        obj += "));"
-        ret obj
+    fn str_insert_begin(mut &self, mut m: &StrInsertBeginExprModel) {
+        self.oc.write("(")
+        self.model(m.dest)
+        self.oc.write(").buffer.insert(0, (")
+        self.model(m.expr)
+        self.oc.write("));")
     }
 
-    fn model(mut self, mut m: ExprModel): str {
+    fn model(mut &self, mut m: ExprModel) {
         match type m {
         | &Data:
-            ret self.model((&Data)(m).model)
+            self.model((&Data)(m).model)
         | &TypeKind:
-            ret TypeCoder.kind((&TypeKind)(m))
+            self.oc.write(TypeCoder.kind((&TypeKind)(m)))
         | &Const:
-            ret self.constant((&Const)(m), false)
+            self.constant((&Const)(m), false)
         | &Var:
-            ret self.var((&Var)(m))
+            self.var((&Var)(m))
         | &Trait:
-            ret IdentCoder.trait_decl((&Trait)(m))
+            IdentCoder.trait_decl((&Trait)(m))
         | &Struct:
-            ret self.structure((&Struct)(m))
+            self.structure((&Struct)(m))
         | &StructIns:
-            ret self.structure_ins((&StructIns)(m))
+            self.structure_ins((&StructIns)(m))
         | &FnIns:
-            ret self.func_ins_common((&FnIns)(m))
+            self.func_ins_common((&FnIns)(m))
         | &UnsafeBinopExprModel:
-            ret self.unsafe_binary((&UnsafeBinopExprModel)(m).node)
+            self.unsafe_binary((&UnsafeBinopExprModel)(m).node)
         | &BinopExprModel:
-            ret self.binary((&BinopExprModel)(m))
+            self.binary((&BinopExprModel)(m))
         | &UnaryExprModel:
-            ret self.unary((&UnaryExprModel)(m))
+            self.unary((&UnaryExprModel)(m))
         | &StructLitExprModel:
-            ret self.structure_lit((&StructLitExprModel)(m))
+            self.structure_lit((&StructLitExprModel)(m))
         | &AllocStructLitExprModel:
-            ret self.alloc_structure((&AllocStructLitExprModel)(m))
+            self.alloc_structure((&AllocStructLitExprModel)(m))
         | &CastingExprModel:
-            ret self.casting((&CastingExprModel)(m))
+            self.casting((&CastingExprModel)(m))
         | &FnCallExprModel:
-            ret self.func_call((&FnCallExprModel)(m))
+            self.func_call((&FnCallExprModel)(m))
         | &SliceExprModel:
-            ret self.slice((&SliceExprModel)(m))
+            self.slice((&SliceExprModel)(m))
         | &ArrayExprModel:
-            ret self.array((&ArrayExprModel)(m))
+            self.array((&ArrayExprModel)(m))
         | &UnsafeIndexingExprModel:
-            ret self.unsafe_indexing((&UnsafeIndexingExprModel)(m))
+            self.unsafe_indexing((&UnsafeIndexingExprModel)(m))
         | &IndexingExprModel:
-            ret self.indexing((&IndexingExprModel)(m))
+            self.indexing((&IndexingExprModel)(m))
         | &AnonFnExprModel:
-            ret self.anon_func((&AnonFnExprModel)(m))
+            self.anon_func((&AnonFnExprModel)(m))
         | &MapExprModel:
-            ret self.map((&MapExprModel)(m))
+            self.map((&MapExprModel)(m))
         | &SlicingExprModel:
-            ret self.slicing((&SlicingExprModel)(m))
+            self.slicing((&SlicingExprModel)(m))
         | &TraitSubIdentExprModel:
-            ret self.trait_sub((&TraitSubIdentExprModel)(m))
+            self.trait_sub((&TraitSubIdentExprModel)(m))
         | &StructSubIdentExprModel:
-            ret self.structure_sub((&StructSubIdentExprModel)(m))
+            self.structure_sub((&StructSubIdentExprModel)(m))
         | &CommonIdentExprModel:
-            ret self.common_ident((&CommonIdentExprModel)(m))
+            self.common_ident((&CommonIdentExprModel)(m))
         | &CommonSubIdentExprModel:
-            ret self.common_sub((&CommonSubIdentExprModel)(m))
+            self.common_sub((&CommonSubIdentExprModel)(m))
         | &TupleExprModel:
-            ret self.tuple((&TupleExprModel)(m))
+            self.tuple((&TupleExprModel)(m))
         | &BuiltinOutCallExprModel:
-            ret self.out_call((&BuiltinOutCallExprModel)(m))
+            self.out_call((&BuiltinOutCallExprModel)(m))
         | &BuiltinOutlnCallExprModel:
-            ret self.outln_call((&BuiltinOutlnCallExprModel)(m))
+            self.outln_call((&BuiltinOutlnCallExprModel)(m))
         | &BuiltinNewCallExprModel:
-            ret self.new_call((&BuiltinNewCallExprModel)(m))
+            self.new_call((&BuiltinNewCallExprModel)(m))
         | &BuiltinPanicCallExprModel:
-            ret self.panic_call((&BuiltinPanicCallExprModel)(m))
+            self.panic_call((&BuiltinPanicCallExprModel)(m))
         | &BuiltinAssertCallExprModel:
-            ret self.assert_call((&BuiltinAssertCallExprModel)(m))
+            self.assert_call((&BuiltinAssertCallExprModel)(m))
         | &BuiltinErrorCallExprModel:
-            ret self.error_call((&BuiltinErrorCallExprModel)(m))
+            self.error_call((&BuiltinErrorCallExprModel)(m))
         | &BuiltinMakeCallExprModel:
-            ret self.make_call((&BuiltinMakeCallExprModel)(m))
+            self.make_call((&BuiltinMakeCallExprModel)(m))
         | &BuiltinAppendCallExprModel:
-            ret self.append_call((&BuiltinAppendCallExprModel)(m))
+            self.append_call((&BuiltinAppendCallExprModel)(m))
         | &BuiltinCloneCallExprModel:
-            ret self.clone_call((&BuiltinCloneCallExprModel)(m))
+            self.clone_call((&BuiltinCloneCallExprModel)(m))
         | &SizeofExprModel:
-            ret self.sizeof((&SizeofExprModel)(m))
+            self.sizeof((&SizeofExprModel)(m))
         | &AlignofExprModel:
-            ret self.alignof((&AlignofExprModel)(m))
+            self.alignof((&AlignofExprModel)(m))
         | &RuneExprModel:
-            ret self.rune_lit((&RuneExprModel)(m))
+            self.oc.write(self.rune_lit((&RuneExprModel)(m)))
         | &StructStaticIdentExprModel:
-            ret self.structure_static((&StructStaticIdentExprModel)(m))
+            self.structure_static((&StructStaticIdentExprModel)(m))
         | &IntegratedToStrExprModel:
-            ret self.integrated_to_str((&IntegratedToStrExprModel)(m))
+            self.integrated_to_str((&IntegratedToStrExprModel)(m))
         | &BackendEmitExprModel:
-            ret self.backend_emit((&BackendEmitExprModel)(m))
+            self.backend_emit((&BackendEmitExprModel)(m))
         | &FreeExprModel:
-            ret self.free((&FreeExprModel)(m))
+            self.free((&FreeExprModel)(m))
         | &MutSlicingExprModel:
-            ret self.mut_slicing((&MutSlicingExprModel)(m))
+            self.mut_slicing((&MutSlicingExprModel)(m))
         | &StrInsertBeginExprModel:
-            ret self.str_insert_begin((&StrInsertBeginExprModel)(m))
+            self.str_insert_begin((&StrInsertBeginExprModel)(m))
         |:
-            ret "<unimplemented_expression_model>"
+            self.oc.write("<unimplemented_expression_model>")
         }
     }
 
-    fn expr(mut self, mut e: ExprModel): str {
-        let mut obj = self.model(e)
-        if obj.len == 0 || obj[0] != '(' {
-            ret obj
-        }
-        match type e {
-        | &BinopExprModel:
-            obj = obj[1:obj.len-1]
-        }
-        ret obj
+    fn expr(mut &self, mut e: ExprModel) {
+        self.model(e)
     }
 
-    fn val(mut self, mut v: &Value): str {
+    fn val(mut &self, mut v: &Value) {
         if v.data.is_const() {
-            ret self.constant(v.data.constant, v.data.kind != nil && v.data.kind.prim().is_f32())
+            self.constant(v.data.constant, v.data.kind != nil && v.data.kind.prim().is_f32())
+            ret
         }
-        ret self.expr(v.data.model)
+        self.expr(v.data.model)
     }
 
-    fn init_expr(mut self, mut t: &TypeKind): str {
+    fn init_expr(mut &self, mut t: &TypeKind) {
         if t.ptr() != nil {
-            ret "nullptr"
+            self.oc.write("nullptr")
+            ret
         }
         let mut enm = t.enm()
         if enm != nil {
-            ret self.val(enm.items[0].value)
+            self.val(enm.items[0].value)
+            ret
         }
-        ret TypeCoder.kind(t) + "()"
+        self.oc.write(TypeCoder.kind(t))
+        self.oc.write("()")
     }
 }
 

@@ -59,6 +59,10 @@ pub struct ObjectCoder {
     // Current indentation.
     indent_buffer: []byte
 
+    // Internal buffer which is preferred to write if not nil.
+    // It might be useful to get some part of content which will generate.
+    buf: &str
+
     ec: &ExprCoder
     sc: &ScopeCoder
 }
@@ -75,8 +79,25 @@ impl ObjectCoder {
         ret oc
     }
 
-    fn write(mut &self, mut s: str) {
-        _ = self.f.write([]byte(s))!
+    fn open_buf_mode(mut &self) {
+        static mut buf = ""
+        if self.buf == nil {
+            self.buf = unsafe { (&str)(&buf) }
+        }
+    }
+
+    fn close_buf_mode(mut &self) {
+        *self.buf = ""
+        self.buf = nil
+    }
+
+    fn write(mut &self, s: str) {
+        if self.buf != nil {
+            *self.buf += s
+            ret
+        }
+        let bytes = []byte(s)
+        _ = self.f.write(bytes)!
     }
 
     // Increase indentation.
@@ -91,29 +112,8 @@ impl ObjectCoder {
     }
 
     // Writes indention string by indent_buffer.
-    fn indent(mut &self): str {
-        ret str(self.indent_buffer)
+    fn indent(mut &self) {
         _ = self.f.write(self.indent_buffer)!
-    }
-
-    fn var_init_expr(mut &self, mut &v: &Var, init: str): str {
-        let mut obj = ""
-        if v.statically {
-            obj += "static "
-        }
-
-        obj += TypeCoder.kind(v.kind.kind)
-        obj += " "
-        if v.reference {
-            obj += "&"
-        }
-        obj += IdentCoder.var(v)
-        if init != "" {
-            obj += " = "
-            obj += init
-        }
-        obj += ";"
-        ret obj
     }
 
     fn find_type_offset(self, t: &Trait, mut k: &TypeKind): int {
@@ -287,9 +287,9 @@ impl ObjectCoder {
         if f.default == nil {
             // No default expression.
             // Use default expression of data-type.
-            self.write(self.ec.init_expr(f.kind))
+            self.ec.init_expr(f.kind)
         } else {
-            self.write(self.ec.expr(f.default.model))
+            self.ec.expr(f.default.model)
         }
         self.write(";")
     }
@@ -661,47 +661,66 @@ impl ObjectCoder {
         })
     }
 
-    fn param_ins(mut &self, mut &p: &ParamIns): str {
-        let mut obj = TypeCoder.param_ins(p)
-        obj += " "
-        obj += IdentCoder.param(p.decl)
-        ret obj
+    fn param_ins(mut &self, mut &p: &ParamIns) {
+        self.write(TypeCoder.param_ins(p))
+        self.write(" ")
+        self.write(IdentCoder.param(p.decl))
     }
 
-    fn params_ins(mut &self, mut &params: []&ParamIns): str {
+    fn params_ins(mut &self, mut &params: []&ParamIns) {
         if params.len == 0 {
-            ret "(void)"
+            self.write("(void)")
+            ret
         }
-        let mut obj = "("
+        self.write("(")
         for (i, mut p) in params {
-            obj += self.param_ins(p)
+            self.param_ins(p)
             if params.len-i > 1 {
-                obj += ", "
+                self.write(", ")
             }
         }
-        obj += ")"
-        ret obj
+        self.write(")")
     }
 
-    fn var(mut &self, mut v: &Var): str {
+    fn var_init_expr(mut &self, mut &v: &Var, init: fn()) {
+        if v.statically {
+            self.write("static ")
+        }
+
+        self.write(TypeCoder.kind(v.kind.kind))
+        self.write(" ")
+        if v.reference {
+            self.write("&")
+        }
+        self.write(IdentCoder.var(v))
+        if init != nil {
+            self.write(" = ")
+            init()
+        }
+        self.write(";")
+    }
+
+    fn var(mut &self, mut v: &Var) {
         if is_ignore_ident(v.ident) {
-            ret ""
+            ret
         }
         if v.value != nil && v.value.expr != nil {
             if v.value.data.model != nil {
-                ret self.var_init_expr(v, self.ec.val(v.value))
+                self.var_init_expr(v, fn() { self.ec.val(v.value) })
+                ret
             }
-            ret self.var_init_expr(v, "")
+            self.var_init_expr(v, nil)
+            ret
         }
-        ret self.var_init_expr(v, self.ec.init_expr(v.kind.kind))
+        self.var_init_expr(v, fn() { self.ec.init_expr(v.kind.kind) })
     }
 
     fn func(mut &self, mut &f: &Fn) {
         for (_, mut ins) in f.instances {
             self.func_head(ins, false)
-            self.write(self.params_ins(ins.params))
+            self.params_ins(ins.params)
             self.write(" ")
-            self.write(self.sc.func_scope(ins))
+            self.sc.func_scope(ins)
             if ins.scope != nil {
                 self.write("\n\n")
             }
@@ -802,7 +821,7 @@ impl ObjectCoder {
             iter_files(pkg, fn(mut &file: &SymbolTable) {
                 for (_, mut v) in file.vars {
                     if v.token == nil || v.cpp_linked || v.constant {
-                        ret
+                        continue
                     }
                     self.write(TypeCoder.kind(v.kind.kind))
                     self.write(" ")
@@ -970,18 +989,18 @@ impl ObjectCoder {
             iter_files(pkg, fn(mut &file: &SymbolTable) {
                 for (_, mut v) in file.vars {
                     if v.token == nil || v.cpp_linked || v.constant {
-                        ret
+                        continue
                     }
                     self.indent()
                     self.write(IdentCoder.var(v))
                     if v.value != nil && v.value.expr != nil {
                         if v.value.data.model != nil {
                             self.write(" = ")
-                            self.write(self.ec.val(v.value))
+                            self.ec.val(v.value)
                         }
                     } else {
                         self.write(" = ")
-                        self.write(self.ec.init_expr(v.kind.kind))
+                        self.ec.init_expr(v.kind.kind)
                     }
                     self.write(";\n")
                 }
