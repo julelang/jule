@@ -38,6 +38,9 @@ use path for std::fs::path
 use strings for std::strings
 use std::time::{Time}
 
+// Data offset of empty trait.
+const EMPTY_TRAIT_OFFSET = 0x0
+
 pub struct SerializationInfo {
     pub compiler:         str
     pub compiler_command: str
@@ -96,6 +99,9 @@ impl ObjectCoder {
     }
 
     fn find_type_offset(self, t: &Trait, mut k: &TypeKind): int {
+        if t.implemented.len == 0 {
+            ret EMPTY_TRAIT_OFFSET
+        }
         let mut s: &StructIns = nil
         if k.sptr() != nil {
             k = k.sptr().elem
@@ -209,6 +215,14 @@ impl ObjectCoder {
                 for (_, mut t) in file.traits {
                     if t.token == nil {
                         ret
+                    }
+                    if t.implemented.len == 0 {
+                        self.tmap = append(self.tmap, &TraitHash{
+                            t: t,
+                            s: nil,
+                            i: EMPTY_TRAIT_OFFSET,
+                        })
+                        continue
                     }
                     let mut i = 0
                     for (_, mut s) in t.implemented {
@@ -710,7 +724,21 @@ impl ObjectCoder {
         for (_, mut hash) in self.tmap {
             for (_, mut m) in hash.t.methods {
                 let ident = m.ident
+
                 m.instances[0].scope = nil
+                m.ident = ident + "_" + conv::itoa(hash.i)
+                self.func(m)
+                m.ident = ident
+
+                if hash.s == nil {
+                    if env::PRODUCTION {
+                        self.write(" { jule::panic(__JULE_ERROR__INVALID_MEMORY); }\n")
+                    } else {
+                        self.write(" { jule::panic(" + TypeCoder.Str + "(__JULE_ERROR__INVALID_MEMORY) + " + TypeCoder.Str + "(_00___file)); }\n")
+                    }
+                    continue
+                }
+
                 let ptr = !m.params[0].is_ref()
 
                 let mut sm = hash.s.find_method(m.ident, false)
@@ -718,9 +746,6 @@ impl ObjectCoder {
                     continue
                 }
 
-                m.ident = ident + "_" + conv::itoa(hash.i)
-                self.func(m)
-                m.ident = ident
                 self.add_indent()
                 self.write("{\n")
                 self.indent()
