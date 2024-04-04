@@ -825,9 +825,15 @@ impl ScopeChecker {
         }
     }
 
-    fn check_iter_scope_sc(mut &self, it: uintptr, mut tree: &ScopeTree, mut ssc: &ScopeChecker): &Scope {
+    fn check_iter_scope_ssc(mut &self, it: uintptr, mut tree: &ScopeTree, mut &s: &Scope, mut ssc: &ScopeChecker) {
         ssc.it = it
-        ret self.check_child_sc(tree, ssc)
+        self.check_child_ssc(tree, s, ssc)
+    }
+
+    fn check_iter_scope_sc(mut &self, it: uintptr, mut tree: &ScopeTree, mut ssc: &ScopeChecker): &Scope {
+        let mut scope = self.get_child()
+        self.check_child_ssc(tree, scope, ssc)
+        ret scope
     }
 
     fn check_iter_scope(mut &self, it: uintptr, mut &tree: &ScopeTree): &Scope {
@@ -836,10 +842,8 @@ impl ScopeChecker {
     }
 
     fn check_inf_iter(mut &self, mut &it: &Iter) {
-        let mut kind = &InfIter{}
-
+        let mut kind = new(InfIter)
         self.scope.stmts = append(self.scope.stmts, kind)
-
         kind.scope = self.check_iter_scope(uintptr(kind), it.scope)
     }
 
@@ -850,10 +854,8 @@ impl ScopeChecker {
             ret
         }
 
-        let mut kind = &WhileIter{}
-
+        let mut kind = new(WhileIter)
         self.scope.stmts = append(self.scope.stmts, kind)
-
         kind.scope = self.check_iter_scope(uintptr(kind), it.scope)
 
         if wh.expr != nil {
@@ -922,12 +924,14 @@ impl ScopeChecker {
         self.scope.stmts = append(self.scope.stmts, kind)
 
         let mut ssc = self.new_child_checker()
+        let mut scope = self.get_child()
 
         if kind.key_a != nil {
             if !self.s.is_flag(SemaFlag.Shadowing) && self.is_duplicated_ident(0, kind.key_a.ident) {
                 self.s.push_err(kind.key_a.token, LogMsg.DuplicatedIdent, kind.key_a.ident)
                 self.s.push_suggestion(LogMsg.RenameForAvoidDuplication)
             }
+            kind.key_a.scope = scope
             ssc.table.vars = append(ssc.table.vars, kind.key_a)
         }
 
@@ -936,10 +940,12 @@ impl ScopeChecker {
                 self.s.push_err(kind.key_b.token, LogMsg.DuplicatedIdent, kind.key_b.ident)
                 self.s.push_suggestion(LogMsg.RenameForAvoidDuplication)
             }
+            kind.key_b.scope = scope
             ssc.table.vars = append(ssc.table.vars, kind.key_b)
         }
 
-        kind.scope = self.check_iter_scope_sc(uintptr(kind), it.scope, ssc)
+        self.check_iter_scope_ssc(uintptr(kind), it.scope, scope, ssc)
+        kind.scope = scope
     }
 
     fn check_iter(mut &self, mut it: &Iter) {
