@@ -290,39 +290,6 @@ impl ObjectCoder {
         self.write(";")
     }
 
-    fn structure_constructor(mut &self, mut &s: &StructIns) {
-        self.write(IdentCoder.structure_ins(s))
-        self.write("(")
-        if s.fields.len > 0 {
-            for (i, mut f) in s.fields {
-                self.write(TypeCoder.kind(f.kind))
-                self.write(" __param_")
-                self.write(f.decl.ident)
-                if s.fields.len-i > 1 {
-                    self.write(", ")
-                }
-            }
-        } else {
-            self.write("void")
-        }
-
-        self.write(")")
-        if s.fields.len > 0 {
-            self.write(": ")
-            for i, f in s.fields {
-                self.write(IdentCoder.field(f.decl))
-                self.write("(")
-                self.write("__param_")
-                self.write(f.decl.ident)
-                self.write(")")
-                if s.fields.len-i > 1 {
-                    self.write(", ")
-                }
-            }
-        }
-        self.write(" {}")
-    }
-
     fn structure_destructor(mut &self, mut &s: &StructIns) {
         const STATIC = false                                   // Dispose method must be non-static
         let dispose_method = s.find_method("dispose", STATIC)
@@ -513,16 +480,10 @@ impl ObjectCoder {
         self.write(" {\n")
 
         self.add_indent()
-        if s.fields.len > 0 {
-            for (_, mut f) in s.fields {
-                self.indent()
-                self.field_decl(f)
-                self.write("\n")
-            }
-            self.write("\n\n")
+        for (_, mut f) in s.fields {
             self.indent()
-            self.structure_constructor(s)
-            self.write("\n\n")
+            self.field_decl(f)
+            self.write("\n")
         }
 
         self.indent()

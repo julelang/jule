@@ -284,73 +284,25 @@ impl ExprCoder {
         self.oc.write("))")
     }
 
-    fn cpp_structure_lit(mut &self, mut m: &StructLitExprModel) {
-        self.oc.write("(")
-        self.oc.write(TypeCoder.structure_ins(m.strct))
-        self.oc.write("){")
-        if m.args.len > 0 {
-        iter:
-            for (_, mut f) in m.strct.fields {
-                if m.strct.decl.cpp_linked {
-                    for (i, mut arg) in m.args {
-                        if arg.field == f {
-                            self.oc.write(".")
-                            self.oc.write(IdentCoder.field(f.decl))
-                            self.oc.write("=")
-                            self.expr(arg.expr)
-                            if m.args.len-i > 1 {
-                                self.oc.write(",")
-                            }
-                            continue iter
-                        }
-                    }
-                    continue
-                }
-                self.oc.write(IdentCoder.field(f.decl))
-                self.oc.write(": ")
-                for (i, mut arg) in m.args {
-                    if arg.field == f {
-                        self.expr(arg.expr)
-                        if m.args.len-i > 1 {
-                            self.oc.write(",")
-                        }
-                        continue iter
-                    }
-                }
-                self.init_expr(f.kind)
-                self.oc.write(",")
+    fn structure_lit(mut &self, mut m: &StructLitExprModel) {
+        if m.strct.decl.cpp_linked {
+            self.oc.write("(")
+        }
+        self.oc.write(IdentCoder.structure_ins(m.strct))
+        if m.strct.decl.cpp_linked {
+            self.oc.write(")")
+        }
+        self.oc.write("{")
+        for (i, mut arg) in m.args {
+            self.oc.write(".")
+            self.oc.write(IdentCoder.field(arg.field.decl))
+            self.oc.write("=")
+            self.expr(arg.expr)
+            if m.args.len-i > 1 {
+                self.oc.write(", ")
             }
         }
         self.oc.write("}")
-    }
-
-    fn structure_lit(mut &self, mut m: &StructLitExprModel) {
-        if m.strct.decl.cpp_linked {
-            self.cpp_structure_lit(m)
-            ret
-        }
-
-        self.oc.write(IdentCoder.structure_ins(m.strct))
-        self.oc.write("(")
-        if m.args.len > 0 {
-        iter:
-            for (i, mut f) in m.strct.fields {
-                for (_, mut arg) in m.args {
-                    if arg.field == f {
-                        self.expr(arg.expr)
-                        if m.strct.fields.len-i > 1 {
-                            self.oc.write(",")
-                        }
-                        continue iter
-                    }
-                }
-                self.init_expr(f.kind)
-                if m.strct.fields.len-i > 1 {
-                    self.oc.write(",")
-                }
-            }
-        }
-        self.oc.write(")")
     }
 
     fn alloc_structure(mut &self, mut m: &AllocStructLitExprModel) {
