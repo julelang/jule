@@ -105,17 +105,6 @@ namespace jule
             this->__get_copy(src);
         }
 
-        Slice(const std::initializer_list<Item> &src)
-        {
-            if (src.size() == 0)
-                return;
-
-            this->alloc_new(src.size(), src.size());
-            const auto src_begin = src.begin();
-            for (jule::Int i = 0; i < this->_len; ++i)
-                this->data.alloc[i] = *static_cast<const Item *>(src_begin + i);
-        }
-
         ~Slice(void) noexcept
         {
             this->dealloc();
