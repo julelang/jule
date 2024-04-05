@@ -79,6 +79,19 @@ namespace jule
             return buffer;
         }
 
+        static jule::Slice<Item> make(const std::initializer_list<Item> &src)
+        {
+            if (src.size() == 0)
+                return nullptr;
+
+            jule::Slice<Item> slice;
+            slice.alloc_new(src.size(), src.size());
+            const auto src_begin = src.begin();
+            for (jule::Int i = 0; i < slice._len; ++i)
+                slice.data.alloc[i] = *static_cast<const Item *>(src_begin + i);
+            return slice;
+        }
+
         Slice(void) = default;
         Slice(const std::nullptr_t) : Slice() {}
 
