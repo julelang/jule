@@ -52,6 +52,7 @@ use std::jule::sema::{
     BuiltinMakeCallExprModel,
     BuiltinAppendCallExprModel,
     BuiltinErrorCallExprModel,
+    BuiltinCopyCallExprModel,
     SizeofExprModel,
     AlignofExprModel,
     RuneExprModel,
@@ -831,6 +832,17 @@ impl ExprCoder {
         self.oc.write(")")
     }
 
+    fn copy_call(mut &self, mut m: &BuiltinCopyCallExprModel) {
+        self.oc.write("jule::copy(")
+        self.model(m.dest.model)
+        self.oc.write(", (")
+        self.model(m.src.model)
+        if m.src.kind.prim() != nil { // String.
+            self.oc.write(").fake_slice()")
+        }
+        self.oc.write(")")
+    }
+
     fn make_call(mut &self, mut m: &BuiltinMakeCallExprModel) {
         self.oc.write(TypeCoder.kind(m.kind))
         if m.kind.slc().elem.enm() != nil {
@@ -1049,6 +1061,8 @@ impl ExprCoder {
             self.append_call((&BuiltinAppendCallExprModel)(m))
         | &BuiltinCloneCallExprModel:
             self.clone_call((&BuiltinCloneCallExprModel)(m))
+        | &BuiltinCopyCallExprModel:
+            self.copy_call((&BuiltinCopyCallExprModel)(m))
         | &SizeofExprModel:
             self.sizeof((&SizeofExprModel)(m))
         | &AlignofExprModel:

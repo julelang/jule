@@ -199,9 +199,24 @@ namespace jule
             return static_cast<jule::Int>(this->buffer.length());
         }
 
+        __JULE_INLINE_BEFORE_CPP20 __JULE_CONSTEXPR_SINCE_CPP20 jule::Int cap(void) const noexcept
+        {
+            return static_cast<jule::Int>(this->buffer.capacity());
+        }
+
         __JULE_INLINE_BEFORE_CPP20 __JULE_CONSTEXPR_SINCE_CPP20 jule::Bool empty(void) const noexcept
         {
             return this->buffer.empty();
+        }
+
+        jule::Slice<jule::U8> fake_slice(void) {
+            jule::Slice<jule::U8> slice;
+            slice.data.alloc = this->begin();
+            slice.data.ref = nullptr;
+            slice._slice = slice.data.alloc;
+            slice._len = this->len();
+            slice._cap = this->cap();
+            return slice;
         }
 
         operator char *(void) const noexcept

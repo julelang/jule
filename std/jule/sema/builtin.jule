@@ -483,6 +483,40 @@ fn builtin_caller_append(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &D
     ret d
 }
 
+fn caller_copy_slice(mut &dest: &Data, mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data {
+    if !dest.mutable {
+        e.push_err(fc.args[0].token, LogMsg.MutOperationOnImmut)
+    }
+
+    let mut src = e.eval_expr(fc.args[1])
+    if src == nil {
+        ret nil
+    }
+    let mut slc = src.kind.slc()
+
+    if slc != nil {
+        if !src.mutable && slc.elem.mutable() {
+            e.push_err(fc.args[1].token, LogMsg.MutOperationOnImmut)
+        }
+        if !dest.kind.equals(src.kind) {
+            e.push_err(fc.args[1].token, LogMsg.IncompatibleTypes, dest.kind.to_str(), src.kind.to_str())
+        }
+    } else {
+        let dest_prim = dest.kind.slc().elem.prim()
+        let prim = src.kind.prim()
+        if  dest_prim == nil || prim == nil || !prim.is_str() || !dest_prim.is_u8() {
+            e.push_err(fc.args[1].token, LogMsg.IncompatibleTypes, dest.kind.to_str(), src.kind.to_str())
+        }
+    }
+
+    d.kind = &TypeKind{kind: build_prim_type(PrimKind.Int)}
+    d.model = &BuiltinCopyCallExprModel{
+        dest: dest,
+        src:  src,
+    }
+    ret d
+}
+
 fn builtin_caller_copy(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data {
     if fc.generics.len > 0 {
         e.push_err(fc.token, LogMsg.NotHasGenerics)
@@ -500,50 +534,15 @@ fn builtin_caller_copy(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Dat
     }
 
     let mut dest = e.eval_expr(fc.args[0])
-    if dest == nil {
+    match {
+    | dest == nil:
+        ret nil
+    | dest.kind.slc() != nil:
+        ret caller_copy_slice(dest, e, fc, d)
+    |:
+        e.push_err(fc.args[0].token, LogMsg.InvalidType)
         ret nil
     }
-    if dest.kind.slc() == nil {
-        e.push_err(fc.args[0].token, LogMsg.InvalidExpr)
-        ret nil
-    }
-    if !dest.mutable {
-        e.push_err(fc.args[0].token, LogMsg.MutOperationOnImmut)
-    }
-
-    let mut empty_param = new(Param)
-    let mut f = &FnIns{
-        params: [
-            &ParamIns{
-                decl: empty_param,
-                kind: dest.kind,
-            },
-            &ParamIns{
-                decl: empty_param,
-                kind: dest.kind,
-            },
-        ],
-        result: &TypeKind{
-            kind: build_prim_type(PrimKind.Int),
-        },
-        caller: builtin_caller_common_plain,
-    }
-
-    d.kind = &TypeKind{
-        kind: f,
-    }
-    d.model = &CommonIdentExprModel{
-        ident: "copy",
-    }
-    d = builtin_caller_common_plain(e, fc, d)
-    if d != nil {
-        let mut src = (&Data)((&FnCallExprModel)(d.model).args[1])
-        let mut slc = src.kind.slc()
-        if !src.mutable && slc.elem.mutable() {
-            e.push_err(fc.args[1].token, LogMsg.MutOperationOnImmut)
-        }
-    }
-    ret d
 }
 
 fn builtin_caller_clone(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data {
