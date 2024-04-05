@@ -517,6 +517,36 @@ fn caller_copy_slice(mut &dest: &Data, mut &e: &Eval, mut &fc: &FnCallExpr, mut 
     ret d
 }
 
+fn caller_copy_str(mut &dest: &Data, mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data {
+    if !dest.mutable {
+        e.push_err(fc.args[0].token, LogMsg.MutOperationOnImmut)
+    }
+
+    let mut src = e.eval_expr(fc.args[1])
+    if src == nil {
+        ret nil
+    }
+    match {
+    | src.kind.prim() != nil:
+        if src.kind.prim().is_str() {
+            goto end
+        }
+    | src.kind.slc() != nil:
+        let mut slc = src.kind.slc()
+        if slc.elem.prim() != nil && slc.elem.prim().is_u8() {
+            goto end
+        }
+    }
+    e.push_err(fc.args[1].token, LogMsg.IncompatibleTypes, dest.kind.to_str(), src.kind.to_str())
+end:
+    d.kind = &TypeKind{kind: build_prim_type(PrimKind.Int)}
+    d.model = &BuiltinCopyCallExprModel{
+        dest: dest,
+        src:  src,
+    }
+    ret d
+}
+
 fn builtin_caller_copy(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data {
     if fc.generics.len > 0 {
         e.push_err(fc.token, LogMsg.NotHasGenerics)
@@ -539,6 +569,8 @@ fn builtin_caller_copy(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Dat
         ret nil
     | dest.kind.slc() != nil:
         ret caller_copy_slice(dest, e, fc, d)
+    | dest.kind.prim() != nil && dest.kind.prim().is_str():
+        ret caller_copy_str(dest, e, fc, d)
     |:
         e.push_err(fc.args[0].token, LogMsg.InvalidType)
         ret nil
