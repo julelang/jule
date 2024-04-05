@@ -294,13 +294,21 @@ impl ExprCoder {
             self.oc.write(")")
         }
         self.oc.write("{")
-        for (i, mut arg) in m.args {
-            self.oc.write(".")
-            self.oc.write(IdentCoder.field(arg.field.decl))
-            self.oc.write("=")
-            self.expr(arg.expr)
-            if m.args.len-i > 1 {
-                self.oc.write(", ")
+        if m.args.len > 1 {
+        iter:
+            for i, f in m.strct.decl.fields {
+                for (_, mut arg) in m.args {
+                    if arg.field.decl == f {
+                        self.oc.write(".")
+                        self.oc.write(IdentCoder.field(arg.field.decl))
+                        self.oc.write("=")
+                        self.expr(arg.expr)
+                        if m.args.len-i > 1 {
+                            self.oc.write(", ")
+                        }
+                        continue iter
+                    }
+                }
             }
         }
         self.oc.write("}")
