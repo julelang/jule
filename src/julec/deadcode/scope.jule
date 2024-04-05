@@ -10,6 +10,8 @@ use std::jule::sema::{
     St,
     Data,
     RetSt,
+    Label,
+    GotoSt,
     BuiltinErrorCallExprModel,
     BuiltinPanicCallExprModel,
 }
@@ -20,6 +22,8 @@ struct ScopeDeadCode {
     s:      &Scope
     stmts:  *[]St
     i:      int            // Position.
+    labels: &[]&Label
+    gotos:  &[]&GotoSt
 }
 
 impl ScopeDeadCode {
@@ -28,17 +32,46 @@ impl ScopeDeadCode {
             parent: self,
             s: s,
             stmts: &s.stmts,
+            labels: self.labels,
+            gotos: self.gotos,
         }
         unsafe { sdc.optimize_stmts() }
     }
 
     unsafe fn eliminate_followed(mut self) {
+        if self.gotos.len != 0 {
+            ret
+        }
         *self.stmts = (*self.stmts)[:self.i+1]
         let mut parent = self.parent
         for parent != nil {
             *parent.stmts = (*parent.stmts)[:parent.i+1]
             parent = parent.parent
         }
+    }
+
+    fn push_goto(mut &self, mut gt: &GotoSt) {
+        let mut i = 0
+        for i < self.labels.len {
+            if gt.ident == (*self.labels)[i].ident {
+                ret
+            }
+            i++
+        }
+        *self.gotos = append(*self.gotos, gt)
+    }
+
+    fn push_label(mut &self, mut l: &Label) {
+        let mut i = 0
+        for i < self.gotos.len {
+            if l.ident == (*self.gotos)[i].ident {
+                copy((*self.gotos)[i:], (*self.gotos)[i+1:])
+                *self.gotos = (*self.gotos)[:self.gotos.len-1]
+                continue
+            }
+            i++
+        }
+        *self.labels = append(*self.labels, l)
     }
 
     unsafe fn optimize_stmt(mut &self, mut st: St) {
@@ -62,6 +95,10 @@ impl ScopeDeadCode {
             // Remove followed statements of the return statement.
             // Unreachable code.
             self.eliminate_followed()
+        | &GotoSt:
+            self.push_goto((&GotoSt)(st))
+        | &Label:
+            self.push_label((&Label)(st))
         }
     }
 
@@ -74,9 +111,13 @@ impl ScopeDeadCode {
 }
 
 fn eliminate_dead_code_of_scope(mut s: &Scope) {
+    let labels = make([]&Label, 0, 1 << 4)
+    let gotos = make([]&GotoSt, 0, 1 << 4)
     let mut sdc = &ScopeDeadCode{
         s: s,
         stmts: &s.stmts,
+        labels: unsafe { (&[]&Label)(&labels) },
+        gotos: unsafe { (&[]&GotoSt)(&gotos) },
     }
     unsafe { sdc.optimize_stmts() }
 }
