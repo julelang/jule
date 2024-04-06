@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use obj::{IR}
 use env
+use obj::{IR}
+use deadcode for optimizing::deadcode
 use std::jule::sema::{
     Package,
     Var,
@@ -90,6 +91,7 @@ impl Optimizer {
     pub fn optimize(mut self) {
         // Do optimizatitons if any enabled.
         match {
+        | env::OPT_DEADCODE
         | env::OPT_COND
         | env::OPT_APPEND
         | env::OPT_COPY:
@@ -97,11 +99,22 @@ impl Optimizer {
         |:
             ret
         }
+
+        // See compiler reference (2)
+        if env::OPT_DEADCODE {
+            deadcode::eliminate_defines(self.ir)
+        }
+
         for (_, mut u) in self.ir.used {
             if !u.cpp_linked {
                 self.optimize_package(u.package)
             }
         }
         self.optimize_package(self.ir.main)
+
+        // See compiler reference (3)
+        if env::OPT_DEADCODE {
+            deadcode::eliminate_scopes(self.ir)
+        }
     }
 }

@@ -1,4 +1,4 @@
-// Copyright 2023-2024 The Jule Programming Language.
+// Copyright 2024 The Jule Programming Language.
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
@@ -14,6 +14,14 @@ use std::jule::sema::{
     GotoSt,
     BuiltinErrorCallExprModel,
     BuiltinPanicCallExprModel,
+    RangeIter,
+    WhileIter,
+    InfIter,
+    Conditional,
+    Match,
+    ExprModel,
+    Assign,
+    MultiAssign,
 }
 
 // Dead code eliminate optimizer for scopes.
@@ -38,25 +46,43 @@ impl ScopeDeadCode {
         unsafe { sdc.optimize_stmts() }
     }
 
-    unsafe fn eliminate_followed(mut self) {
+    fn optimize_body_child(mut &self, mut &s: &Scope) {
+        let mut sdc = &ScopeDeadCode{
+            s: s,
+            stmts: &s.stmts,
+            labels: self.labels,
+            gotos: self.gotos,
+        }
+        unsafe { sdc.optimize_stmts() }
+    }
+
+    fn optimize_expr_model(mut &self, mut &model: ExprModel) {
+        let edc = ExprDeadCode.new(self)
+        edc.optimize(model)
+    }
+
+    fn eliminate_followed(mut self) {
         if self.gotos.len != 0 {
             ret
         }
-        *self.stmts = (*self.stmts)[:self.i+1]
+        unsafe {
+            *self.stmts = (*self.stmts)[:self.i+1]
+        }
         let mut parent = self.parent
         for parent != nil {
-            *parent.stmts = (*parent.stmts)[:parent.i+1]
+            unsafe {
+                *parent.stmts = (*parent.stmts)[:parent.i+1]
+            }
             parent = parent.parent
         }
     }
 
     fn push_goto(mut &self, mut gt: &GotoSt) {
         let mut i = 0
-        for i < self.labels.len {
+        for i < self.labels.len; i++ {
             if gt.ident == (*self.labels)[i].ident {
                 ret
             }
-            i++
         }
         *self.gotos = append(*self.gotos, gt)
     }
@@ -74,7 +100,74 @@ impl ScopeDeadCode {
         *self.labels = append(*self.labels, l)
     }
 
-    unsafe fn optimize_stmt(mut &self, mut st: St) {
+    fn optimize_range_iter(mut &self, mut it: &RangeIter) {
+        self.optimize_expr_model(it.expr.model)
+        self.optimize_body_child(it.scope)
+    }
+
+    fn optimize_while_iter(mut &self, mut it: &WhileIter) {
+        self.optimize_expr_model(it.expr)
+        if it.next != nil {
+            self.optimize_expr_model(it.next)
+        }
+        self.optimize_body_child(it.scope)
+    }
+
+    fn optimize_inf_iter(mut &self, mut it: &InfIter) {
+        self.optimize_body_child(it.scope)
+    }
+
+    fn optimize_conditional(mut &self, mut c: &Conditional) {
+        for (_, mut case) in c.elifs {
+            if case != nil {
+                self.optimize_expr_model(case.expr)
+                self.optimize_body_child(case.scope)
+            }
+        }
+        if c.default != nil {
+            if c.elifs.len == 0 {
+                // Use just child.
+                // There one case, this default scope can accepted as plain anonymous scope.
+                self.optimize_child(c.default.scope)
+            } else {
+                self.optimize_body_child(c.default.scope)
+            }
+        }
+    }
+
+    fn optimize_match(mut &self, mut m: &Match) {
+        for (_, mut case) in m.cases {
+            for (_, mut expr) in case.exprs {
+                self.optimize_expr_model(expr.model)
+            }
+            self.optimize_body_child(case.scope)
+        }
+        if m.default != nil {
+            if m.cases.len == 0 {
+                // Use just child.
+                // There one case, this default scope can accepted as plain anonymous scope.
+                self.optimize_child(m.default.scope)
+            } else {
+                self.optimize_body_child(m.default.scope)
+            }
+        }
+    }
+
+    fn optimize_assign(mut &self, mut assign: &Assign) {
+        self.optimize_expr_model(assign.l.model)
+        self.optimize_expr_model(assign.r.model)
+    }
+
+    fn optimize_multi_assign(mut &self, mut assign: &MultiAssign) {
+        for (_, mut l) in assign.l {
+            if l != nil {
+                self.optimize_expr_model(l)
+            }
+        }
+        self.optimize_expr_model(assign.r)
+    }
+
+    fn optimize_stmt(mut &self, mut st: St) {
         match type st {
         | &Scope:
             let mut scope = (&Scope)(st)
@@ -83,13 +176,30 @@ impl ScopeDeadCode {
             } else {
                 self.optimize_child(scope)
             }
+        | &RangeIter:
+            self.optimize_range_iter((&RangeIter)(st))
+        | &WhileIter:
+            self.optimize_while_iter((&WhileIter)(st))
+        | &InfIter:
+            self.optimize_inf_iter((&InfIter)(st))
+        | &Conditional:
+            self.optimize_conditional((&Conditional)(st))
+        | &Match:
+            self.optimize_match((&Match)(st))
+        | &Assign:
+            self.optimize_assign((&Assign)(st))
+        | &MultiAssign:
+            self.optimize_multi_assign((&MultiAssign)(st))
         | &Data:
-            match type (&Data)(st).model {
+            let mut d = (&Data)(st)
+            match type d.model {
             | &BuiltinErrorCallExprModel
             | &BuiltinPanicCallExprModel:
                 // Remove followed statements of the function call.
                 // Unreachable code.
                 self.eliminate_followed()
+            |:
+                self.optimize_expr_model(d.model)
             }
         | &RetSt:
             // Remove followed statements of the return statement.

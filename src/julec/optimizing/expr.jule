@@ -41,6 +41,8 @@ use std::jule::sema::{
     SizeofExprModel,
     AlignofExprModel,
     IntegratedToStrExprModel,
+    FreeExprModel,
+    BackendEmitExprModel,
 }
 use types for std::jule::types
 
@@ -187,7 +189,7 @@ impl ExprOptimizer {
         ExprOptimizer.optimize(m.expr)
     }
 
-    fn args(self, mut args: []ExprModel) {
+    fn args(self, mut &args: []ExprModel) {
         for (i, mut arg) in args {
             ExprOptimizer.optimize(arg)
             args[i] = arg
@@ -346,6 +348,14 @@ impl ExprOptimizer {
         ExprOptimizer.optimize(m.expr)
     }
 
+    fn free(self, mut m: &FreeExprModel) {
+        ExprOptimizer.optimize(m.expr)
+    }
+
+    fn backend_emit(self, mut m: &BackendEmitExprModel) {
+        self.args(m.exprs)
+    }
+
     fn do(self) {
         match type *self.model {
         | &Data:
@@ -407,6 +417,10 @@ impl ExprOptimizer {
             self.alignof((&AlignofExprModel)(*self.model))
         | &IntegratedToStrExprModel:
             self.integrated_to_str((&IntegratedToStrExprModel)(*self.model))
+        | &FreeExprModel:
+            self.free((&FreeExprModel)(*self.model))
+        | &BackendEmitExprModel:
+            self.backend_emit((&BackendEmitExprModel)(*self.model))
         }
     }
 }

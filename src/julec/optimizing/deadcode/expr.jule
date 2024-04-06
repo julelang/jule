@@ -1,0 +1,274 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use std::jule::sema::{
+    Data,
+    ExprModel,
+    BinopExprModel,
+    OperandExprModel,
+    UnaryExprModel,
+    StructLitExprModel,
+    AllocStructLitExprModel,
+    CastingExprModel,
+    FnCallExprModel,
+    SliceExprModel,
+    ArrayExprModel,
+    IndexingExprModel,
+    AnonFnExprModel,
+    MapExprModel,
+    SlicingExprModel,
+    TraitSubIdentExprModel,
+    StructSubIdentExprModel,
+    CommonSubIdentExprModel,
+    TupleExprModel,
+    BuiltinNewCallExprModel,
+    BuiltinOutCallExprModel,
+    BuiltinOutlnCallExprModel,
+    BuiltinPanicCallExprModel,
+    BuiltinAssertCallExprModel,
+    BuiltinErrorCallExprModel,
+    BuiltinMakeCallExprModel,
+    BuiltinAppendCallExprModel,
+    BuiltinCloneCallExprModel,
+    SizeofExprModel,
+    AlignofExprModel,
+    IntegratedToStrExprModel,
+    FreeExprModel,
+    BackendEmitExprModel,
+}
+
+// Dead code eliminate optimizer for expressions.
+struct ExprDeadCode {
+    mut s: &ScopeDeadCode
+}
+
+impl ExprDeadCode {
+    static fn new(mut &s: &ScopeDeadCode): ExprDeadCode {
+        ret ExprDeadCode{
+            s: s,
+        }
+    }
+
+    fn binary(self, mut m: &BinopExprModel) {
+        self.optimize(m.left.model)
+        self.optimize(m.right.model)
+    }
+
+    fn unary(self, mut m: &UnaryExprModel) {
+        self.optimize(m.expr.model)
+    }
+
+    fn structure_lit(self, mut m: &StructLitExprModel) {
+        for (_, mut arg) in m.args {
+            self.optimize(arg.expr)
+        }
+    }
+
+    fn alloc_structure(self, mut m: &AllocStructLitExprModel) {
+        self.structure_lit(m.lit)
+    }
+
+    fn casting(self, mut m: &CastingExprModel) {
+        self.optimize(m.expr)
+    }
+
+    fn args(self, mut &args: []ExprModel) {
+        for (_, mut arg) in args {
+            self.optimize(arg)
+        }
+    }
+
+    fn func_call(self, mut m: &FnCallExprModel) {
+        self.optimize(m.expr)
+        self.args(m.args)
+        if m.except != nil {
+            self.s.optimize_body_child(m.except)
+        }
+    }
+
+    fn slice(self, mut m: &SliceExprModel) {
+        self.args(m.elems)
+    }
+
+    fn array(self, mut m: &ArrayExprModel) {
+        if m.elems.len == 2 && m.elems[1] == nil {
+            self.optimize(unsafe { *(&m.elems[0]) })
+        }
+        self.args(m.elems)
+    }
+
+    fn indexing(self, mut m: &IndexingExprModel) {
+        self.optimize(m.expr.model)
+        self.optimize(m.index.model)
+    }
+
+    fn anon_func(self, mut m: &AnonFnExprModel) {
+        eliminate_dead_code_of_scope(m.func.scope)
+    }
+
+    fn map(self, mut m: &MapExprModel) {
+        for (_, mut pair) in m.entries {
+            self.optimize(pair.key)
+            self.optimize(pair.val)
+        }
+    }
+
+    fn slicing(self, mut m: &SlicingExprModel) {
+        self.optimize(m.expr)
+        self.optimize(m.left)
+        if m.right != nil {
+            self.optimize(m.right)
+        }
+    }
+
+    fn trait_sub(self, mut m: &TraitSubIdentExprModel) {
+        self.optimize(m.expr)
+    }
+
+    fn structure_sub(self, mut m: &StructSubIdentExprModel) {
+        self.optimize(m.expr.model)
+    }
+
+    fn common_sub(self, mut m: &CommonSubIdentExprModel) {
+        self.optimize(m.expr)
+    }
+
+    fn tuple(self, mut m: &TupleExprModel) {
+        for (_, mut d) in m.datas {
+            self.optimize(d.model)
+        }
+    }
+
+    fn new_call(self, mut m: &BuiltinNewCallExprModel) {
+        if m.init != nil {
+            self.optimize(m.init)
+        }
+    }
+
+    fn out_call(self, mut m: &BuiltinOutCallExprModel) {
+        self.optimize(m.expr)
+    }
+
+    fn outln_call(self, mut m: &BuiltinOutlnCallExprModel) {
+        self.optimize(m.expr)
+    }
+
+    fn panic_call(self, mut m: &BuiltinPanicCallExprModel) {
+        self.optimize(m.expr)
+    }
+
+    fn assert_call(self, mut m: &BuiltinAssertCallExprModel) {
+        self.optimize(m.expr)
+    }
+
+    fn error_call(self, mut m: &BuiltinErrorCallExprModel) {
+        self.optimize(m.err)
+    }
+
+    fn make_call(self, mut m: &BuiltinMakeCallExprModel) {
+        if m.len != nil {
+            self.optimize(m.len)
+        }
+        if m.cap != nil {
+            self.optimize(m.cap)
+        }
+    }
+
+    fn append_call(self, mut m: &BuiltinAppendCallExprModel) {
+        self.optimize(m.dest)
+        self.optimize(m.elements)
+    }
+
+    fn clone_call(self, mut m: &BuiltinCloneCallExprModel) {
+        self.optimize(m.expr)
+    }
+
+    fn sizeof(self, mut m: &SizeofExprModel) {
+        self.optimize(m.expr)
+    }
+
+    fn alignof(self, mut m: &AlignofExprModel) {
+        self.optimize(m.expr)
+    }
+
+    fn integrated_to_str(self, mut m: &IntegratedToStrExprModel) {
+        self.optimize(m.expr)
+    }
+
+    fn free(self, mut m: &FreeExprModel) {
+        self.optimize(m.expr)
+    }
+
+    fn backend_emit(self, mut m: &BackendEmitExprModel) {
+        self.args(m.exprs)
+    }
+
+    fn optimize(self, mut &model: ExprModel) {
+        match type model {
+        | &Data:
+            let mut d = (&Data)(model)
+            self.optimize(d.model)
+        | &BinopExprModel:
+            self.binary((&BinopExprModel)(model))
+        | &UnaryExprModel:
+            self.unary((&UnaryExprModel)(model))
+        | &StructLitExprModel:
+            self.structure_lit((&StructLitExprModel)(model))
+        | &AllocStructLitExprModel:
+            self.alloc_structure((&AllocStructLitExprModel)(model))
+        | &CastingExprModel:
+            self.casting((&CastingExprModel)(model))
+        | &FnCallExprModel:
+            self.func_call((&FnCallExprModel)(model))
+        | &SliceExprModel:
+            self.slice((&SliceExprModel)(model))
+        | &ArrayExprModel:
+            self.array((&ArrayExprModel)(model))
+        | &IndexingExprModel:
+            self.indexing((&IndexingExprModel)(model))
+        | &AnonFnExprModel:
+            self.anon_func((&AnonFnExprModel)(model))
+        | &MapExprModel:
+            self.map((&MapExprModel)(model))
+        | &SlicingExprModel:
+            self.slicing((&SlicingExprModel)(model))
+        | &TraitSubIdentExprModel:
+            self.trait_sub((&TraitSubIdentExprModel)(model))
+        | &StructSubIdentExprModel:
+            self.structure_sub((&StructSubIdentExprModel)(model))
+        | &CommonSubIdentExprModel:
+            self.common_sub((&CommonSubIdentExprModel)(model))
+        | &TupleExprModel:
+            self.tuple((&TupleExprModel)(model))
+        | &BuiltinOutCallExprModel:
+            self.out_call((&BuiltinOutCallExprModel)(model))
+        | &BuiltinOutlnCallExprModel:
+            self.outln_call((&BuiltinOutlnCallExprModel)(model))
+        | &BuiltinNewCallExprModel:
+            self.new_call((&BuiltinNewCallExprModel)(model))
+        | &BuiltinPanicCallExprModel:
+            self.panic_call((&BuiltinPanicCallExprModel)(model))
+        | &BuiltinAssertCallExprModel:
+            self.assert_call((&BuiltinAssertCallExprModel)(model))
+        | &BuiltinErrorCallExprModel:
+            self.error_call((&BuiltinErrorCallExprModel)(model))
+        | &BuiltinMakeCallExprModel:
+            self.make_call((&BuiltinMakeCallExprModel)(model))
+        | &BuiltinAppendCallExprModel:
+            self.append_call((&BuiltinAppendCallExprModel)(model))
+        | &BuiltinCloneCallExprModel:
+            self.clone_call((&BuiltinCloneCallExprModel)(model))
+        | &SizeofExprModel:
+            self.sizeof((&SizeofExprModel)(model))
+        | &AlignofExprModel:
+            self.alignof((&AlignofExprModel)(model))
+        | &IntegratedToStrExprModel:
+            self.integrated_to_str((&IntegratedToStrExprModel)(model))
+        | &FreeExprModel:
+            self.free((&FreeExprModel)(model))
+        | &BackendEmitExprModel:
+            self.backend_emit((&BackendEmitExprModel)(model))
+        }
+    }
+}
