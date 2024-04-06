@@ -54,11 +54,7 @@ struct ExprOptimizer {
 impl ExprOptimizer {
     pub static fn optimize(mut &model: ExprModel) {
         // Do optimizatitons if any enabled.
-        match {
-        | env::OPT_PTR
-        | env::OPT_MATH
-        | env::OPT_ACCESS
-        | env::OPT_COND:
+        if expr_enabled {
             let mut exop = &ExprOptimizer{
                 model: unsafe { (&ExprModel)(&model) },
             }
@@ -125,11 +121,11 @@ impl ExprOptimizer {
             ret
         }
 
-        if env::OPT_COND && self.str_cond(m) {
+        if COND && self.str_cond(m) {
             ret
         }
 
-        if !env::OPT_MATH {
+        if !MATH {
             ret
         }
         match m.op.kind {
@@ -164,7 +160,7 @@ impl ExprOptimizer {
 
     fn unary(self, mut m: &UnaryExprModel) {
         ExprOptimizer.optimize(m.expr.model)
-        if env::OPT_PTR && m.op.kind == TokenKind.Star {
+        if PTR && m.op.kind == TokenKind.Star {
             match type m.expr.model {
             | &UnaryExprModel:
                 let mut um = (&UnaryExprModel)(m.expr.model)
@@ -225,7 +221,7 @@ impl ExprOptimizer {
     fn indexing(self, mut m: &IndexingExprModel) {
         ExprOptimizer.optimize(m.expr.model)
         ExprOptimizer.optimize(m.index.model)
-        if !env::OPT_ACCESS {
+        if !ACCESS {
             ret
         }
         let array = m.expr.kind.arr() != nil

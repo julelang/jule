@@ -4,13 +4,16 @@
 
 use env
 use obj::{IR}
-use deadcode for optimizing::deadcode
+use deadcode for opt::deadcode
 use std::jule::sema::{
     Package,
     Var,
     Fn,
     Struct,
 }
+
+static mut expr_enabled = false
+static mut scope_enabled = false
 
 // Target-independent optimizer for IR.
 pub struct Optimizer {
@@ -89,32 +92,30 @@ impl Optimizer {
 
     // Optimizes IR by enabled optimizations.
     pub fn optimize(mut self) {
-        // Do optimizatitons if any enabled.
-        match {
-        | env::OPT_DEADCODE
-        | env::OPT_COND
-        | env::OPT_APPEND
-        | env::OPT_COPY:
-            break
-        |:
-            ret
-        }
+        detect_enabled()
 
         // See compiler reference (2)
-        if env::OPT_DEADCODE {
+        if DEADCODE {
             deadcode::eliminate_defines(self.ir)
         }
 
-        for (_, mut u) in self.ir.used {
-            if !u.cpp_linked {
-                self.optimize_package(u.package)
+        if scope_enabled || expr_enabled {
+            for (_, mut u) in self.ir.used {
+                if !u.cpp_linked {
+                    self.optimize_package(u.package)
+                }
             }
+            self.optimize_package(self.ir.main)
         }
-        self.optimize_package(self.ir.main)
 
         // See compiler reference (3)
-        if env::OPT_DEADCODE {
+        if DEADCODE {
             deadcode::eliminate_scopes(self.ir)
         }
     }
+}
+
+fn detect_enabled() {
+    expr_enabled = PTR || MATH || ACCESS || COND
+    scope_enabled = COND || APPEND || COPY
 }

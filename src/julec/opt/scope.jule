@@ -82,7 +82,7 @@ impl ScopeOptimizer {
             self.optimize_child(c.default.scope)
         }
 
-        if !env::OPT_COND {
+        if !COND {
             ret
         }
 
@@ -179,7 +179,7 @@ impl ScopeOptimizer {
             self.optimize_child(m.default.scope)
         }
 
-        if !env::OPT_COND {
+        if !COND {
             ret
         }
 
@@ -292,7 +292,7 @@ impl ScopeOptimizer {
     }
 
     fn optimize_assign(mut self, mut assign: &Assign) {
-        if env::OPT_COPY && self.str_assign(assign) {
+        if COPY && self.str_assign(assign) {
             ret
         }
 
@@ -302,7 +302,7 @@ impl ScopeOptimizer {
         match assign.op.kind {
         | TokenKind.SolidusEq | TokenKind.PercentEq:
             // Do not check division of structures safety.
-            if env::OPT_MATH && assign.l.kind.strct() == nil {
+            if MATH && assign.l.kind.strct() == nil {
                 assign.op.kind = assign.op.kind[:assign.op.kind.len-1]
                 let mut model = any(&BinopExprModel{
                     op: assign.op,
@@ -322,7 +322,7 @@ impl ScopeOptimizer {
             }
         }
 
-        if env::OPT_APPEND {
+        if APPEND {
             match type assign.r.model {
             | &BuiltinAppendCallExprModel:
                 let mut m = (&BuiltinAppendCallExprModel)(assign.r.model)

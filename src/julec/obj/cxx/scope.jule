@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use env
-use optimizing::{
+use opt::{
+    self,
     PushToSliceExprModel,
     MutSlicingExprModel,
     StrInsertBeginExprModel,
@@ -58,7 +58,7 @@ impl ScopeCoder {
         self.oc.add_indent()
         self.oc.indent()
         self.oc.write("auto ")
-        if env::OPT_COPY && is_copy_optimizable(it.expr) {
+        if opt::COPY && is_copy_optimizable(it.expr) {
             self.oc.write("&")
         }
         self.oc.write("expr = ")
@@ -79,7 +79,7 @@ impl ScopeCoder {
             self.oc.indent()
         }
         if it.key_b != nil {
-            if env::OPT_COPY {
+            if opt::COPY {
                 it.key_b.reference = is_iter_copy_optimizable(it.expr, it.key_b)
             }
             self.oc.var_init_expr(it.key_b, fn() { self.oc.write("*it") })
@@ -126,7 +126,7 @@ impl ScopeCoder {
         self.oc.add_indent()
         self.oc.indent()
         self.oc.write("auto ")
-        if env::OPT_COPY && is_copy_optimizable(it.expr) {
+        if opt::COPY && is_copy_optimizable(it.expr) {
             self.oc.write("&")
         }
         self.oc.write("expr = ")
@@ -142,7 +142,7 @@ impl ScopeCoder {
         self.oc.add_indent()
         self.oc.indent()
         if it.key_a != nil {
-            if env::OPT_COPY {
+            if opt::COPY {
                 it.key_a.reference = is_iter_copy_optimizable(it.expr, it.key_a)
             }
             self.oc.var_init_expr(it.key_a, fn() { self.oc.write("it->first") })
@@ -150,7 +150,7 @@ impl ScopeCoder {
             self.oc.indent()
         }
         if it.key_b != nil {
-            if env::OPT_COPY {
+            if opt::COPY {
                 it.key_b.reference = is_iter_copy_optimizable(it.expr, it.key_b)
             }
             self.oc.var_init_expr(it.key_b, fn() { self.oc.write("it->second") })
@@ -407,7 +407,7 @@ impl ScopeCoder {
 
         // Constant expressions generated as literals in conditions.
         if !generic_type_match && !m.expr.is_const() {
-            if env::OPT_COPY && is_copy_optimizable(m.expr) {
+            if opt::COPY && is_copy_optimizable(m.expr) {
                 self.oc.write("auto &_match_expr{ ")
             } else {
                 self.oc.write("auto _match_expr{ ")
