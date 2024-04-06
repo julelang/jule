@@ -69,6 +69,20 @@ fn find_label_parent(ident: str, mut scope: &ScopeChecker): &ScopeLabel {
     ret label
 }
 
+fn model_is_goto_scope(&model: any, &sc: &Scope): bool {
+    match type model {
+    | &FnCallExprModel:
+        let fcem = (&FnCallExprModel)(model)
+        if fcem.except == sc {
+            ret true
+        }
+    | &Data:
+        let d = (&Data)(model)
+        ret model_is_goto_scope(d.model, sc)
+    }
+    ret false
+}
+
 fn stmt_is_goto_scope(&stmt: any, &sc: &Scope): bool {
     match type stmt {
     | &Scope:
@@ -76,25 +90,37 @@ fn stmt_is_goto_scope(&stmt: any, &sc: &Scope): bool {
     | &InfIter:
         ret (&InfIter)(stmt).scope == sc
     | &RangeIter:
-        ret (&RangeIter)(stmt).scope == sc
+        let it = (&RangeIter)(stmt)
+        ret it.scope == sc || model_is_goto_scope(it.expr.model, sc)
     | &WhileIter:
-        ret (&WhileIter)(stmt).scope == sc
+        let it = (&WhileIter)(stmt)
+        ret it.scope == sc ||
+            model_is_goto_scope(it.expr, sc) ||
+            model_is_goto_scope(it.next, sc)
     | &Match:
         let m = (&Match)(stmt)
         for _, c in m.cases {
             if c.scope == sc {
                 ret true
             }
+            for _, expr in c.exprs {
+                if model_is_goto_scope(expr.model, sc) {
+                    ret true
+                }
+            }
         }
         ret m.default != nil && m.default.scope == sc
     | &Conditional:
         let c = (&Conditional)(stmt)
         for _, elif in c.elifs {
-            if elif.scope == sc {
+            if elif.scope == sc || model_is_goto_scope(elif.expr, sc) {
                 ret true
             }
         }
         ret c.default != nil && c.default.scope == sc
+    | &Data:
+        let d = (&Data)(stmt)
+        ret model_is_goto_scope(d.model, sc)
     |:
         ret false
     }

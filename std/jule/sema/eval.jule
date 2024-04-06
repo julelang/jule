@@ -1771,26 +1771,17 @@ impl Eval {
 
         let mut model = (&FnCallExprModel)(d.model)
 
-        match type self.lookup {
-        | &Sema:
-            let mut s = (&Sema)(self.lookup)
-            csc = new_scope_checker(s, nil)
-            if result_needed {
-                csc.result = f
-            }
-            ch = new(Scope)
-            csc.table.vars = append(csc.table.vars, build_error_var(ch, fc))
-            csc.check(fc.exception, ch)
-        | &ScopeChecker:
-            let mut sc = (&ScopeChecker)(self.lookup)
-            csc = sc.new_child_checker()
-            if result_needed {
-                csc.result = f
-            }
-            ch = sc.get_child()
-            csc.table.vars = append(csc.table.vars, build_error_var(ch, fc))
-            sc.check_child_ssc(fc.exception, ch, csc)
+        // self.lookup is always ScopeChecker because exceptionals are
+        // not allowed in global scope.
+        let mut sc = (&ScopeChecker)(self.lookup)
+        csc = sc.new_child_checker()
+        if result_needed {
+            csc.result = f
         }
+        ch = sc.get_child()
+        fc.exception.parent = sc.tree
+        csc.table.vars = append(csc.table.vars, build_error_var(ch, fc))
+        sc.check_child_ssc(fc.exception, ch, csc)
 
         model.assigned = result_needed
         model.except = ch
@@ -1805,6 +1796,8 @@ impl Eval {
         if self.is_global() && f.decl.exceptional {
             self.push_err(fc.token, LogMsg.ExceptionalAtGlobalScope)
             self.push_suggestion(LogMsg.WrapExceptional)
+            d = nil
+            ret
         }
 
         if f.is_builtin() {
