@@ -18,13 +18,16 @@ impl FileStream {
     }
 }
 
-// Implemented by Stream trait
 impl Reader for FileStream {}
-
-// Implemented by Stream trait
 impl Writer for FileStream {}
+impl Stream for FileStream {}
 
-impl Stream for FileStream {
+impl FileStream {
+    // Returns internal file buffer.
+    pub fn file(mut self): &File {
+        ret self.buff
+    }
+
     // Read bytes to buffer from stream and returns readed byte count.
     // The number of bytes readed can never exceed the length of the buff.
     // If the buff is larger than the number of bytes that can be read,
@@ -38,13 +41,6 @@ impl Stream for FileStream {
     pub fn write(mut self, buff: []byte)!: (n: int) {
         ret self.buff.write(buff) else { error(error) }
     }
-}
-
-impl FileStream {
-    // Returns internal file buffer.
-    pub fn file(mut self): &File {
-        ret self.buff
-    }
 
     // Same as write, but writes string.
     // This method is more efficient than write method for strings.
@@ -52,14 +48,13 @@ impl FileStream {
         ret self.write(nosafe::stobs(s)) else { error(error) }
     }
 
-    // Reads line from file handle via &File.read method.
-    // Returns bytes until line delimiter (\n) byte.
-    // Returns zero-length byte slice when reached EOF.
-    pub fn read_line(mut self)!: []byte {
+    // Same as read_line method, but returns in bytes.
+    pub fn read_line_bytes(mut self)!: []byte {
         const LINE_DELIMITER = '\n'
 
         let mut buff = make([]byte, 0, 1024)
-        let mut part = make([]byte, 1)
+        let mut part = buff[:1]
+        buff = buff[1:]
         for {
             let n = self.buff.read(part) else { error(error) }
             if n == 0 {
@@ -68,6 +63,30 @@ impl FileStream {
 
             let b = part[0]
             buff = append(buff, b)
+
+            if b == LINE_DELIMITER {
+                break
+            }
+        }
+        ret buff
+    }
+
+    // Reads line from file handle via &File.read method.
+    // Returns bytes until line delimiter (\n) byte.
+    // Returns zero-length string when reached EOF.
+    pub fn read_line(mut self)!: str {
+        const LINE_DELIMITER = '\n'
+
+        let mut buff = make(str, 1024)
+        let mut part = make([]byte, 1)
+        for {
+            let n = self.buff.read(part) else { error(error) }
+            if n == 0 {
+                break
+            }
+
+            let b = part[0]
+            buff += str(b)
 
             if b == LINE_DELIMITER {
                 break
