@@ -378,48 +378,51 @@ fn builtin_caller_make(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Dat
         e.push_err(fc.token, LogMsg.MissingExprFor, "type, size")
         ret nil
     }
-    if fc.args.len > 3 {
-        e.push_err(fc.args[3].token, LogMsg.ArgumentOverflow)
-    }
 
     let mut t = e.eval_expr_kind(fc.args[0].kind)
     if t == nil {
         ret nil
     }
 
-    if !t.decl || t.kind.slc() == nil {
-        e.push_err(fc.args[0].token, LogMsg.InvalidType)
-        ret nil
+    match {
+    | !t.decl:
+        break
+    | t.kind.slc() != nil:
+        if fc.args.len > 3 {
+            e.push_err(fc.args[3].token, LogMsg.ArgumentOverflow)
+        }
+        goto cont
+    | t.kind.prim() != nil && t.kind.prim().is_str():
+        if fc.args.len > 2 {
+            e.push_err(fc.args[2].token, LogMsg.ArgumentOverflow)
+        }
+        goto cont
     }
-
+    e.push_err(fc.args[0].token, LogMsg.InvalidType)
+    ret nil
+cont:
     d.kind = t.kind
 
     let mut len = e.s.evalp(e.lookup, t.kind).eval_expr(fc.args[1])
     if len == nil {
-        ret d
+        ret nil
     }
 
     e.check_integer_indexing_by_data(len, fc.args[1].token)
 
+    let mut model = &BuiltinMakeCallExprModel{
+        kind: t.kind,
+        len: len.model,
+    }
+    d.model = model
     if fc.args.len == 3 {
         let mut cap = e.s.evalp(e.lookup, t.kind).eval_expr(fc.args[2])
         if cap == nil {
             ret d
         }
-
         e.check_integer_indexing_by_data(cap, fc.args[2].token)
-        d.model = &BuiltinMakeCallExprModel{
-            kind: t.kind,
-            len: len.model,
-            cap: cap.model,
-        }
-    } else {
-        d.model = &BuiltinMakeCallExprModel{
-            kind: t.kind,
-            len: len.model,
-        }
+        model.cap = cap.model
     }
-
     ret d
 }
 

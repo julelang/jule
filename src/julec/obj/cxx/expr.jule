@@ -858,9 +858,10 @@ impl ExprCoder {
         self.oc.write(")")
     }
 
-    fn make_call(mut &self, mut m: &BuiltinMakeCallExprModel) {
+    fn make_call_slice(mut &self, mut &m: &BuiltinMakeCallExprModel) {
+        let mut slice = m.kind.slc()
         self.oc.write(TypeCoder.kind(m.kind))
-        if m.kind.slc().elem.enm() != nil {
+        if slice.elem.enm() != nil {
             if m.cap != nil {
                 self.oc.write("::alloc(")
             } else {
@@ -870,21 +871,32 @@ impl ExprCoder {
             self.oc.write("::alloc(")
         }
 
-        if m.len != nil {
-            self.expr(m.len)
-        } else {
-            self.oc.write("0")
-        }
+        self.expr(m.len)
         if m.cap != nil {
             self.oc.write(",")
             self.expr(m.cap)
         }
 
-        if m.kind.slc().elem.enm() != nil {
+        if slice.elem.enm() != nil {
             self.oc.write(",")
-            self.init_expr(m.kind.slc().elem)
+            self.init_expr(slice.elem)
         }
         self.oc.write(")")
+    }
+
+    fn make_call_str(mut &self, mut &m: &BuiltinMakeCallExprModel) {
+        self.oc.write(TypeCoder.Str)
+        self.oc.write("::alloc(")
+        self.expr(m.len)
+        self.oc.write(")")
+    }
+
+    fn make_call(mut &self, mut m: &BuiltinMakeCallExprModel) {
+        if m.kind.slc() != nil {
+            self.make_call_slice(m)
+            ret
+        }
+        self.make_call_str(m)
     }
 
     fn push_to_slice(mut &self, mut m: &PushToSliceExprModel) {

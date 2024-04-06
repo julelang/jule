@@ -39,6 +39,14 @@ namespace jule
     public:
         std::basic_string<jule::U8> buffer;
 
+        static jule::Str alloc(const jule::Int &len) noexcept {
+            if (len < 0)
+                jule::panic("runtime: str: allocation length lower than zero");
+            jule::Str s;
+            s.buffer.reserve(len);
+            return s;
+        }
+
         Str(void) = default;
         Str(const jule::Str &src) = default;
         Str(const std::initializer_list<jule::U8> &src) : buffer(src) {}
