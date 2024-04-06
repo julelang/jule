@@ -15,9 +15,12 @@ pub fn repeat(s: str, mut n: int): str {
     if n <= 0 {
         ret ""
     }
+    if s.len > int.MAX/n {
+        panic("std::strings: repeat: integer buffer size overflow")
+    }
 
-    let mut ss = s
-    for n > 1; n-- {
+    let mut ss = make(str, s.len * n)
+    for n > 0; n-- {
         ss += s
     }
     ret ss
@@ -348,7 +351,7 @@ pub fn replace(s: str, sub: str, new: str, mut n: int): str {
         n = s.len
     }
 
-    let mut ss = ""
+    let mut ss = make(str, s.len)
     let mut i = 0
     for n > 0; n-- {
         let j = find_at(s, sub, i)
@@ -367,7 +370,7 @@ pub fn replace(s: str, sub: str, new: str, mut n: int): str {
 // according to the mapping function. If mapping returns a negative value,
 // the character is dropped from the string with no replacement.
 pub fn map(s: str, mapping: fn(mut rune): rune): str {
-    let mut ss = ""
+    let mut ss = make(str, s.len)
     let mut bytes = nosafe::stobs(s)
     let mut i = 0
     for i < bytes.len {
