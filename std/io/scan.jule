@@ -3,6 +3,7 @@
 // license that can be found in the LICENSE file.
 
 use std::fs::{File}
+use nosafe for std::internal::nosafe
 
 // Scanner for files or etc.
 // Scans bytes line-by-line.
@@ -49,7 +50,8 @@ impl Scanner {
         self.reset()
 
         let mut buff = make([]byte, 0, 1024)
-        let mut part = make([]byte, 1)
+        let mut part_buff: BufferArray
+        let mut part = nosafe::atobs[BufferArray, BufferArrayElem](part_buff)
         for {
             let n = self.r.read(part) else {
                 ret false
@@ -57,17 +59,13 @@ impl Scanner {
             if n == 0 {
                 break
             }
-
-            let b = part[0]
-
-            if b == LINE_DELIMITER {
+            if part[n-1] == LINE_DELIMITER {
+                buff = append(buff, part[:n-1]...)
                 break
             }
-
-            buff = append(buff, b)
+            buff = append(buff, part[:n]...)
         }
-
         self.b = buff
-        ret part[0] != 0
+        ret self.b.len != 0
     }
 }

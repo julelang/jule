@@ -52,19 +52,16 @@ impl FileStream {
     pub fn read_line_bytes(mut self)!: []byte {
         const LINE_DELIMITER = '\n'
 
-        let mut buff = make([]byte, 0, 1024)
-        let mut part = buff[:1]
-        buff = buff[1:]
+        let mut buff = make([]byte, 1, 1024)
+        let mut part_buff: BufferArray
+        let mut part = nosafe::atobs[BufferArray, BufferArrayElem](part_buff)
         for {
             let n = self.buff.read(part) else { error(error) }
             if n == 0 {
                 break
             }
-
-            let b = part[0]
-            buff = append(buff, b)
-
-            if b == LINE_DELIMITER {
+            buff = append(buff, part[:n]...)
+            if part[n-1] == LINE_DELIMITER {
                 break
             }
         }
@@ -78,17 +75,15 @@ impl FileStream {
         const LINE_DELIMITER = '\n'
 
         let mut buff = make(str, 1024)
-        let mut part = make([]byte, 1)
+        let mut part_buff: BufferArray
+        let mut part = nosafe::atobs[BufferArray, BufferArrayElem](part_buff)
         for {
             let n = self.buff.read(part) else { error(error) }
             if n == 0 {
                 break
             }
-
-            let b = part[0]
-            buff += str(b)
-
-            if b == LINE_DELIMITER {
+            nosafe::push_to_str_buffer(buff, part[:n])
+            if part[n-1] == LINE_DELIMITER {
                 break
             }
         }
