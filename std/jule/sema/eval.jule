@@ -424,32 +424,18 @@ impl Eval {
         ret self.find_builtins(ident)
     }
 
-    fn push_reference(mut self, mut &references: &ReferenceStack) {
+    fn push_reference[T](mut self, mut &ref: T) {
         match type self.lookup {
         | &ScopeChecker:
-            let mut sc = (&ScopeChecker)(self.lookup).get_root()
-            if !references.exist[FnIns](sc.owner) {
-                references.push(sc.owner)
+            let mut sc = (&ScopeChecker)(self.lookup).get_hard_root()
+            if !sc.owner.refers.exist[T](ref) {
+                sc.owner.refers.push(ref)
             }
         |:
-            if self.owner != nil && !references.exist[Var](self.owner) {
-                references.push(self.owner)
+            if self.owner != nil && !self.owner.refers.exist[T](ref) {
+                self.owner.refers.push(ref)
             }
         }
-    }
-
-    fn push_reference_to_fn(mut self, mut &f: &FnIns) {
-        self.push_reference(f.references)
-    }
-
-    fn push_reference_to_var(mut self, mut &v: &Var) {
-        if v.references != nil {
-            self.push_reference(v.references)
-        }
-    }
-
-    fn push_reference_to_struct(mut self, mut &s: &StructIns) {
-        self.push_reference(s.references)
     }
 
     fn __eval_enum(self, mut enm: &Enum): &Data {
@@ -538,7 +524,7 @@ impl Eval {
         self.check_deprecated(f.directives, error_token)
 
         let mut ins = f.instance()
-        self.push_reference_to_fn(ins)
+        self.push_reference[&FnIns](ins)
         ret self.eval_fn_ins(ins)
     }
 
@@ -626,7 +612,7 @@ impl Eval {
             }
         }
 
-        self.push_reference_to_var(v)
+        self.push_reference[&Var](v)
 
         if !v.cpp_linked && (v.value == nil || v.value.data == nil) {
             if v.constant {
@@ -1348,7 +1334,7 @@ impl Eval {
         }
 
         let mut s = t.strct()
-        self.push_reference_to_struct(s)
+        self.push_reference[&StructIns](s)
 
         if !s.decl.is_implements(tr) {
             self.push_err(error_token, LogMsg.TypeNotSupportsCastingTo, d.kind.to_str(), t.to_str())
@@ -1629,7 +1615,7 @@ impl Eval {
             self.push_err(error_token, LogMsg.IllegalCycleRefersItself, s.decl.ident)
         }
 
-        self.push_reference_to_struct(s)
+        self.push_reference[&StructIns](s)
         self.check_deprecated(s.decl.directives, error_token)
 
         let mut slc = StructLitChecker{
@@ -2003,7 +1989,7 @@ impl Eval {
 
             let mut ins = method.instance()
             ins.owner = s
-            self.push_reference_to_fn(ins)
+            self.push_reference[&FnIns](ins)
             d.model = &StructStaticIdentExprModel{
                 structure: s,
                 expr: d.model,
@@ -2096,7 +2082,7 @@ impl Eval {
 
         let mut ins = m.instance()
         ins.owner = s
-        self.push_reference_to_fn(ins)
+        self.push_reference[&FnIns](ins)
         let mut model = new(Data, *d)
         d.model = &StructSubIdentExprModel{
             token: si.ident,

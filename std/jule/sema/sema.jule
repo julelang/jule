@@ -673,18 +673,19 @@ impl Sema {
     // Builds type with type aliases for generics.
     // Returns nil if error occur or failed.
     fn build_type_with_generics(mut &self, mut &t: &ast::TypeDecl,
-        mut generics: []&TypeAlias): &TypeKind {
+        mut generics: []&TypeAlias, mut refers: &ReferenceStack): &TypeKind {
         let mut tc = &TypeChecker{
             s: self,
             lookup: self,
             use_generics: generics,
+            refers: refers,
         }
         ret tc.check_decl(t)
     }
 
     // Same as self.build_type_with_generics but not uses any generics.
     fn build_type(mut &self, mut &t: &ast::TypeDecl): &TypeKind {
-        ret self.build_type_with_generics(t, nil)
+        ret self.build_type_with_generics(t, nil, nil)
     }
 
     // Select type with name selection.
@@ -897,7 +898,7 @@ impl Sema {
                     }
                 }
             } else {
-                p.kind = sema.build_type_with_generics(p.decl.kind.decl, generics)
+                p.kind = sema.build_type_with_generics(p.decl.kind.decl, generics, f.refers)
                 if p.kind != nil {
                     p.kind.variadic = p.decl.variadic
                     if p.decl.reference && !is_valid_for_ref(p.kind) {
@@ -910,7 +911,7 @@ impl Sema {
         }
 
         if !f.decl.is_void() {
-            f.result = sema.build_type_with_generics(f.decl.result.kind.decl, generics)
+            f.result = sema.build_type_with_generics(f.decl.result.kind.decl, generics, f.refers)
             ok = f.result != nil && ok
         }
 

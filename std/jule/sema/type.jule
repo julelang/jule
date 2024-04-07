@@ -677,6 +677,9 @@ struct TypeChecker {
     // Also used as checker owner.
     referencer: &Referencer
 
+    // If this not nil, type dependencies will push into stack.
+    refers: &ReferenceStack
+
     error_token: &Token
 
     // This identifiers ignored and
@@ -740,6 +743,16 @@ impl TypeChecker {
         }
 
         ret build_prim_type(decl.ident)
+    }
+
+    fn push_reference[T](mut self, mut &t: T) {
+        if self.refers == nil {
+            ret
+        }
+        if self.refers.exist[T](t) {
+            ret
+        }
+        self.refers.push(t)
     }
 
     fn push_cycle_error(self, def1: any, def2: any, mut &message: str) {
@@ -987,6 +1000,7 @@ impl TypeChecker {
             lookup: ins.decl.sema,
             referencer: referencer,
             use_generics: generics,
+            refers: ins.refers,
         }
 
         // Check field types.
@@ -1113,6 +1127,7 @@ impl TypeChecker {
         if exist_instance != nil {
             // Already checked instance, did not appended.
             // So, this instance is not unqiue.
+            self.push_reference[&StructIns](exist_instance)
             ret exist_instance
         }
 
@@ -1121,6 +1136,7 @@ impl TypeChecker {
             ret nil
         }
 
+        self.push_reference[&StructIns](ins)
         ret ins
     }
 
