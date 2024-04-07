@@ -1889,6 +1889,7 @@ impl ScopeChecker {
             | &BuiltinErrorCallExprModel:
                 let mut m = (&BuiltinErrorCallExprModel)(d.model)
                 self.process_error_call(m, expr.token)
+                self.scope.stmts = append(self.scope.stmts, d)
             |:
                 ret
             }
@@ -1908,7 +1909,14 @@ impl ScopeChecker {
 
     fn check_tree(mut &self) {
         self.i = 0
-        for self.i < self.tree.stmts.len; self.i++ {
+        let mut n = self.tree.stmts.len
+        if self.result != nil {
+            // Skip last statement if result is exist.
+            // Algorithm will check last statement for result.
+            // So, if you check last statement also here, it will duplicate.
+            n--
+        }
+        for self.i < n; self.i++ {
             let mut stmt = self.tree.stmts[self.i]
             self.check_node(stmt.data)
             if self.stopped() {
