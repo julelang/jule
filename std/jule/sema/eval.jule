@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use integ for std::jule::integrated
 use conv for std::conv
 use path for std::fs::path
 use std::jule::ast::{
@@ -1892,13 +1891,14 @@ impl Eval {
             d.lvalue = false
         }
 
-        d.mutable = true
-        d.model = &FnCallExprModel{
+        let mut model = &FnCallExprModel{
             token: fc.token,
             func: f,
             expr: call_model,
             args: fcac.arg_models,
         }
+        d.model = model
+        d.mutable = true
 
         if f.decl.exceptional {
             match {
@@ -1916,9 +1916,17 @@ impl Eval {
             self.push_err(fc.token, LogMsg.HandledUnexceptional)
         }
 
-        if f.generics.len > 0 && exist_instance == nil {
-            // Check generic function instance instantly.
-            self.s.check_fn_ins_caller(f, fc.token)
+        if f.generics.len > 0 {
+            if exist_instance != nil {
+                // Update model by exist function instance.
+                // Because generic functions returns always new instance.
+                // So, if this absolute instance is already exist, update model.
+                // In other words, model's instance will be a dangling instance.
+                update_model_to_generic_ins(model, f)
+            } else {
+                // Check generic function instance instantly.
+                self.s.check_fn_ins_caller(f, fc.token)
+            }
         }
     }
 
@@ -4319,5 +4327,14 @@ fn cast_const_by_type(&t: str, mut &d: &Data) {
         | 1 << 5:
             d.constant.set_f64(f64(f32(d.constant.as_f64())))
         }
+    }
+}
+
+fn update_model_to_generic_ins(mut &m: &FnCallExprModel, mut &f: &FnIns) {
+    match type m.expr {
+    | &FnIns:
+        m.expr = f
+    | &StructSubIdentExprModel:
+        (&StructSubIdentExprModel)(m.expr).method = f
     }
 }
