@@ -25,39 +25,24 @@ struct IdentCoder {}
 impl IdentCoder {
     const Self = "_self_"
 
-    // Returns specified identifer as JuleC identifer.
-    // Equavalents: "JULEC_ID(" + ident + ")" of JuleC API.
-    static fn to_ident(ident: str): str {
-        ret "_" + ident
-    }
-
-    // Returns cpp output identifier form of pointer address.
-    static fn addr(addr: uintptr): str {
-        static mut hash: [uintptr:str] = nil
-        static mut n = u64(0)
-        let z = hash[addr]
-        if z != "" {
-            ret z
-        }
-        let s = "_" + conv::fmt_uint(n, 0xF)
-        hash[addr] = s
-        n++
-        ret s
-    }
-
     // Returns cpp output identifier form of given identifier.
     //
     // Parameters:
     //   - ident: Identifier.
     //   - addr:  Pointer address of package file handler.
-    static fn to_out(ident: str, addr: uintptr): str {
+    static fn to_out(&ident: str, addr: uintptr): str {
         if addr != 0 {
-            let mut obj = IdentCoder.addr(addr)
+            let mut obj = make(str, 40)
+            obj += "_"
+            obj += conv::fmt_uint(u64(addr), 0xF)
             obj += "_"
             obj += ident
             ret obj
         }
-        ret IdentCoder.to_ident(ident)
+        let mut obj = make(str, ident.len + 1)
+        obj += "_"
+        obj += ident
+        ret obj
     }
 
     // Returns cpp output local identifier form of fiven identifier.
@@ -66,12 +51,14 @@ impl IdentCoder {
     //   - row:   Row of definition.
     //   - col:   Column of definition.
     //   - ident: Identifier of definition.
-    static fn to_local(row: int, col: int, ident: str): str {
-        let mut obj = conv::itoa(row)
+    static fn to_local(row: int, col: int, &ident: str): str {
+        let mut obj = make(str, 40)
+        obj += "_"
+        obj += conv::itoa(row)
         obj += conv::itoa(col)
         obj += "_"
         obj += ident
-        ret IdentCoder.to_ident(obj)
+        ret obj
     }
 
     // Returns output identifier of function.
@@ -94,7 +81,7 @@ impl IdentCoder {
     }
 
     // Returns output identifier of function instance.
-    static fn func_ins(mut &f: &FnIns): str {
+    static fn func_ins(&f: &FnIns): str {
         if f.is_builtin() {
             ret "jule::" + f.decl.ident
         }
@@ -138,7 +125,7 @@ impl IdentCoder {
     }
 
     // Returns output identifier of structure instance.
-    static fn structure_ins(mut &s: &StructIns): str {
+    static fn structure_ins(&s: &StructIns): str {
         if s.decl.cpp_linked || s.generics.len == 0 {
             ret IdentCoder.structure(s.decl)
         }
@@ -174,31 +161,49 @@ impl IdentCoder {
 
     // Returns begin label identifier of iteration.
     static fn iter_begin(it: uintptr): str {
-        ret "_iter_begin_" + conv::fmt_uint(u64(it), 0xF)
+        let mut obj = make(str, 30)
+        obj += "_iter_begin_"
+        obj += conv::fmt_uint(u64(it), 0xF)
+        ret obj
     }
 
     // Returns end label identifier of iteration.
     static fn iter_end(it: uintptr): str {
-        ret "_iter_end_" + conv::fmt_uint(u64(it), 0xF)
+        let mut obj = make(str, 30)
+        obj += "_iter_end_"
+        obj += conv::fmt_uint(u64(it), 0xF)
+        ret obj
     }
 
     // Returns next label identifier of iteration.
     static fn iter_next(it: uintptr): str {
-        ret "_iter_next_" + conv::fmt_uint(u64(it), 0xF)
+        let mut obj = make(str, 30)
+        obj += "_iter_next_"
+        obj += conv::fmt_uint(u64(it), 0xF)
+        ret obj
     }
 
     // Returns label identifier.
-    static fn label(ident: str): str {
-        ret "_julec_label_" + ident
+    static fn label(&ident: str): str {
+        let mut obj = make(str, 30)
+        obj += "_julec_label_"
+        obj += ident
+        ret obj
     }
 
     // Returns end label identifier of match-case.
     static fn match_end(m: uintptr): str {
-        ret "_match_end_" + conv::fmt_uint(u64(m), 0xF)
+        let mut obj = make(str, 30)
+        obj += "_match_end_"
+        obj += conv::fmt_uint(u64(m), 0xF)
+        ret obj
     }
 
     // Returns begin label identifier of case.
     static fn case_begin(c: uintptr): str {
-        ret "_case_begin_" + conv::fmt_uint(u64(c), 0xF)
+        let mut obj = make(str, 30)
+        obj += "_case_begin_"
+        obj += conv::fmt_uint(u64(c), 0xF)
+        ret obj
     }
 }
