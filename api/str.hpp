@@ -37,7 +37,7 @@ namespace jule
     class Str
     {
     public:
-        std::basic_string<jule::U8> buffer;
+        mutable std::basic_string<jule::U8> buffer;
 
         static jule::Str alloc(const jule::Int &len) noexcept {
             if (len < 0)
@@ -217,9 +217,9 @@ namespace jule
             return this->buffer.empty();
         }
 
-        jule::Slice<jule::U8> fake_slice(void) {
+        jule::Slice<jule::U8> fake_slice(void) const {
             jule::Slice<jule::U8> slice;
-            slice.data.alloc = this->begin();
+            slice.data.alloc = const_cast<Iterator>(this->begin());
             slice.data.ref = nullptr;
             slice._slice = slice.data.alloc;
             slice._len = this->len();

@@ -24,17 +24,49 @@ namespace jule
 
     class MapKeyHasher
     {
-    public:
-        size_t operator()(const jule::Str &key) const
+    private:
+        class fnv1a
         {
-            size_t hash = 0;
-            for (jule::Int i = 0; i < key.len(); ++i)
-                hash += key.buffer[i] % 7;
-            return hash;
+        public:
+            mutable jule::U64 sum;
+
+            fnv1a(void) noexcept
+            {
+                this->reset();
+            }
+
+            inline void reset(void) const noexcept
+            {
+                this->sum = 14695981039346656037LLU;
+            }
+
+            void write(const jule::Slice<jule::U8> &data) const noexcept
+            {
+                for (const jule::U8 &b : data)
+                {
+                    this->sum ^= static_cast<jule::U64>(b);
+                    this->sum *= 1099511628211LLU;
+                }
+            }
+        };
+
+    private:
+        const jule::MapKeyHasher::fnv1a hasher;
+
+    public:
+        inline size_t operator()(const jule::Slice<jule::U8> &key) const noexcept {
+            this->hasher.reset();
+            this->hasher.write(key);
+            return this->hasher.sum;
+        }
+
+        inline size_t operator()(const jule::Str &key) const noexcept
+        {
+            return this->operator()(key.fake_slice());
         }
 
         template <typename T>
-        inline size_t operator()(const T &obj) const
+        inline size_t operator()(const T &obj) const noexcept
         {
             return this->operator()(jule::to_str<T>(obj));
         }
