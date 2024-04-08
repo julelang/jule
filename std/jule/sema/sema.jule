@@ -834,8 +834,24 @@ impl Sema {
     }
 
     fn get_trait_check_fn_kind(mut &self, mut &f: &Fn): &FnIns {
+        if f.instances.len == 1 {
+            ret f.instances[0]
+        }
         let mut ins = f.instance_force()
-        self.build_fn_non_generic_type_kinds(ins)
+
+        let mut tc = &TypeChecker{
+            s: self,
+            lookup: self,
+        }
+        for (_, mut p) in ins.params {
+            if !p.decl.is_self() {
+                p.kind = tc.check_decl(p.decl.kind.decl)
+            }
+        }
+        if !f.is_void() {
+            ins.result = tc.check_decl(f.result.kind.decl)
+        }
+
         ret ins
     }
 
@@ -1279,25 +1295,6 @@ impl Sema {
         ret
     }
 
-    fn check_fn_decl_types(mut &self, mut &f: &Fn) {
-        let mut generics = f.generics
-        if f.owner != nil && f.owner.generics.len != 0 {
-            generics = append(generics, f.owner.generics...)
-        }
-
-        for (_, mut p) in f.params {
-            if !p.is_self() {
-                let mut kind = self.build_non_generic_type_kind(p.kind.decl, generics)
-                p.kind.kind = kind
-            }
-        }
-
-        if !f.is_void() {
-            let mut kind = self.build_non_generic_type_kind(f.result.kind.decl, generics)
-            f.result.kind.kind = kind
-        }
-    }
-
     // Checks generics, parameters and return type.
     // Not checks scope, and other things.
     fn check_fn_decl_prototype(mut &self, mut &f: &Fn) {
@@ -1319,8 +1316,6 @@ impl Sema {
         | !self.check_fn_decl_params_dup(f):
         | !self.check_fn_decl_result_dup(f):
         }
-
-        self.check_fn_decl_types(f)
     }
 
     fn check_trait_decl_method(mut &self, mut &f: &Fn) {
@@ -1328,8 +1323,12 @@ impl Sema {
             self.push_err(f.token, LogMsg.IgnoreIdent)
         }
 
-        self.check_fn_decl_prototype(f)
         f.sema = self
+        self.check_fn_decl_prototype(f)
+        let mut ins = f.instance()
+        _ = self.reload_fn_ins_types(ins)
+        ins.reloaded = true
+        f.append_instance(ins)
     }
 
     fn check_trait_decl_methods(mut &self, mut &t: &Trait) {
@@ -1629,23 +1628,8 @@ impl Sema {
 
     fn check_struct_fields(mut &self, mut &st: &Struct): (ok: bool) {
         ok = true
-
-        let mut tc = &TypeChecker{
-            s: self,
-            lookup: self,
-            ignore_generics: st.generics,
-            referencer: &Referencer{
-                ident: st.ident,
-                owner: st,
-            },
-        }
-
-        let n = st.instances.len
         for (_, mut f) in st.fields {
             f.owner = st
-            f.kind.kind = tc.check_decl(f.kind.decl)
-            ok = f.kind.kind != nil && ok
-
             for _, cf in st.fields {
                 if f == cf {
                     break
@@ -1656,27 +1640,7 @@ impl Sema {
                 }
             }
         }
-
-        // Save itself for legal cycles like *Struct, or &Struct.
-        if ok && n != st.instances.len {
-            tc.referencer = nil
-            st.instances = st.instances[:n]
-            for (_, mut f) in st.fields {
-                f.kind.kind = tc.check_decl(f.kind.decl)
-            }
-        }
-
         ret ok
-    }
-
-    fn check_struct_decl_methods(mut &self, mut &s: &Struct): (ok: bool) {
-        for (_, mut m) in s.methods {
-            self.check_fn_decl_types(m)
-            if self.errors.len > 0 {
-                ret false
-            }
-        }
-        ret true
     }
 
     fn check_struct_decl(mut &self, mut &s: &Struct) {
@@ -1693,7 +1657,6 @@ impl Sema {
         match {
         | !self.check_decl_generics(s.generics):
         | !self.check_struct_fields(s):
-        | !self.check_struct_decl_methods(s):
         | !self.check_struct_impls(s):
         }
     }
@@ -1820,32 +1783,6 @@ impl Sema {
         ret true
     }
 
-    fn check_struct_derive_clone(mut self, mut &st: &Struct): bool {
-        ret self.check_struct_ins_derive_clone(st.instance())
-    }
-
-    fn check_file_derives(mut self): (ok: bool) {
-        // Check derives.
-        for (_, mut st) in self.file.structs {
-            ok = self.check_struct_derive_clone(st)
-            if !ok {
-                break
-            }
-        }
-
-        ret ok
-    }
-
-    fn check_package_derives(mut self) {
-        for (_, mut f) in self.files {
-            self.set_current_file(f)
-            let ok = self.check_file_derives()
-            if !ok {
-                ret
-            }
-        }
-    }
-
     // Checks declarations of all package files.
     // Breaks checking if checked file failed.
     fn check_package_decls(mut &self) {
@@ -1883,8 +1820,6 @@ impl Sema {
                 ret
             }
         }
-
-        self.check_package_derives()
     }
 
     fn check_data_for_type_inference(mut self, &d: &Data, &err_token: &Token) {
@@ -2011,9 +1946,65 @@ impl Sema {
         }
     }
 
-    fn check_field_defaults(mut &self, mut &ins: &StructIns) {
+    fn check_struct_ins_op(mut &self, mut &s: &StructIns, mut &f: &Fn, p: fn(f: &Fn): bool): &FnIns {
+        if f == nil || f.generics.len > 0 {
+            ret nil
+        }
+        let mut ins = self.ready_to_check_fn(s, f)
+        if p(f) {
+            ret ins
+        }
+        ret nil
+    }
+
+    fn check_fields(mut &self, mut &s: &StructIns): (ok: bool) {
+        let mut tc = TypeChecker{
+            s: s.decl.sema,
+            lookup: s.decl.sema,
+            referencer: &Referencer{
+                ident: s.decl.ident,
+                owner: s.decl,
+            },
+            refers: s.refers,
+        }
+
+        if s.generics.len > 0 {
+            tc.use_generics = make([]&TypeAlias, 0, s.generics.len)
+            for (i, mut g) in s.generics {
+                tc.use_generics = append(tc.use_generics, &TypeAlias{
+                    ident: s.decl.generics[i].ident,
+                    kind: &TypeSymbol{
+                        kind: g,
+                    },
+                })
+            }
+        }
+
+        let mut old_file = self.file
+        defer { self.set_current_file(old_file) }
+
+        if self.file.file != s.decl.token.file {
+            let mut file = find_file(self.files, s.decl.token.file)
+            if file != nil {
+                self.set_current_file(file)
+            }
+        }
+
         let mut eval = self.eval(self)
-        for (_, mut f) in ins.fields {
+        for (_, mut f) in s.fields {
+            let mut kind = tc.check_decl(f.decl.kind.decl)
+            ok = kind != nil && ok
+            if kind == nil {
+                if self != s.decl.sema && s.decl.sema.errors.len > 0 {
+                    self.errors = append(self.errors, s.decl.sema.errors...)
+                    s.decl.sema.errors = nil
+                }
+                continue
+            }
+            f.kind = kind
+            s.mutable = s.mutable || (!f.decl.mutable && f.kind.mutable())
+            _ = self.check_struct_ins_derive_clone(s)
+
             // Skip this field if not has default value.
             if f.decl.default == nil {
                 continue
@@ -2031,21 +2022,14 @@ impl Sema {
             const REFERENCE = false // Fields cannot be reference.
             _ = self.check_assign_type(REFERENCE, f.kind, f.default, f.decl.default.token)
         }
+        ret
     }
 
-    fn check_struct_ins_op(mut &self, mut &s: &StructIns, mut &f: &Fn, p: fn(f: &Fn): bool): &FnIns {
-        if f == nil || f.generics.len > 0 {
-            ret nil
-        }
-        let mut ins = self.ready_to_check_fn(s, f)
-        if p(f) {
-            ret ins
-        }
-        ret nil
+    fn precheck_struct_ins(mut &self, mut &s: &StructIns) {
+        self.check_fields(s)
     }
 
     fn check_struct_ins(mut &self, mut &s: &StructIns) {
-        self.check_field_defaults(s)
         for (_, mut f) in s.methods {
             self.check_type_method(s, f)
         }
@@ -2061,12 +2045,9 @@ impl Sema {
             ret
         }
 
-        if s.instances.len == 0 {
-            let mut ins = s.instance()
-            ins.checked = true
-            s.append_instance(ins)
-        }
-
+        // NOTICE:
+        // Do not check zero instance case, operator overloading
+        // checker will create an instance if not exist.
         for (_, mut ins) in s.instances {
             self.check_struct_ins(ins)
         }
@@ -2154,7 +2135,8 @@ impl Sema {
         if s.instances.len == 0 {
             let mut ins = s.instance()
             ins.checked = true
-            s.append_instance(ins)
+            s.append_instance(ins) // Append instance before precheck.
+            self.precheck_struct_ins(ins)
         }
 
         self.check_struct_ins_operators(s.instances[0])

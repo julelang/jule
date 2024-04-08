@@ -4,8 +4,7 @@
 
 use std::jule::ast::{Directive, GenericDecl, ScopeTree}
 use std::jule::build::{ENTRY_POINT, INIT_FN}
-use std::jule::lex::{Token, TokenKind, is_anon_ident}
-use strings for std::strings
+use std::jule::lex::{Token, is_anon_ident}
 
 // Return type.
 pub struct RetType {
@@ -94,32 +93,6 @@ impl Fn {
     // Reports whether function has return variable(s).
     pub fn any_var(self): bool {
         ret self.result != nil && self.result.idents.len > 0
-    }
-
-    // Reports whether any parameter uses generic types.
-    pub fn parameters_uses_generics(self): bool {
-        if self.generics.len == 0 {
-            ret false
-        }
-
-        for _, p in self.params {
-            if parameter_uses_generics(p, self.generics) {
-                ret true
-            }
-        }
-
-        ret false
-    }
-
-    // Reports whether result type uses generic types.
-    pub fn result_uses_generics(self): bool {
-        if self.is_void() {
-            ret false
-        } else if self.result.kind == nil || self.result.kind.kind == nil {
-            ret false
-        }
-
-        ret kind_uses_generics(self.result.kind.kind, self.generics)
     }
 
     // Force to new instance.
@@ -417,19 +390,9 @@ impl FnIns {
     }
 }
 
-fn kind_uses_generics(k: &TypeKind, &generics: []&GenericDecl): bool {
-    let pk = k.to_str()
-    for _, g in generics {
-        if strings::contains(pk, g.ident) {
-            ret true
-        }
-    }
-    ret false
-}
-
 fn parameter_uses_generics(&p: &Param, &generics: []&GenericDecl): bool {
     if p.is_self() {
         ret false
     }
-    ret kind_uses_generics(p.kind.kind, generics)
+    ret kind_uses_generics(p.kind.decl.kind, generics)
 }

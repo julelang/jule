@@ -29,16 +29,6 @@ use strings for std::strings
 
 type PrimKind: types::TypeKind
 
-// Reports whether directive is exist.
-fn has_directive(mut &directives: []&ast::Directive, tag: str): bool {
-    for (_, mut dr) in directives {
-        if dr.tag.kind == tag {
-            ret true
-        }
-    }
-    ret false
-}
-
 // Type alias.
 pub struct TypeAlias {
     pub scope:      &ScopeTree
@@ -568,93 +558,6 @@ impl Ptr {
     pub fn is_unsafe(self): bool { ret self.elem == nil }
 }
 
-fn can_get_ptr(mut &d: &Data): bool {
-    if !d.lvalue || d.is_const() {
-        ret false
-    }
-
-    match {
-    | d.kind.fnc() != nil || d.kind.enm() != nil:
-        ret false
-    |:
-        ret true
-    }
-}
-
-// Reports kind is valid for smart pointer type such as &T.
-fn is_valid_for_sptr_type(mut &t: &TypeKind): bool {
-    let mut s = t.strct()
-    if s != nil && s.decl != nil && s.decl.cpp_linked {
-        ret false
-    }
-    ret true
-}
-
-// Reports kind is valid for reference such as reference variables.
-fn is_valid_for_ref(mut &t: &TypeKind): bool { ret t.fnc() == nil }
-
-// Reports whether type has built-in string conversion support.
-fn is_builtin_str_convertable(mut &t: &TypeKind): bool {
-    ret !t.void() && t.fnc() == nil && t.tup() == nil
-}
-
-fn build_link_path_by_tokens(&tokens: []&Token): str {
-    let mut s = tokens[0].kind
-    for _, token in tokens[1:] {
-        s += "::"
-        s += token.kind
-    }
-    ret s
-}
-
-fn build_prim_type(kind: str): &Prim {
-    ret &Prim{
-        kind: kind,
-    }
-}
-
-fn get_struct_from_kind(mut k: &TypeKind): &Struct {
-    match {
-    | k == nil:
-        ret nil
-    | k.strct() != nil:
-        ret k.strct().decl
-    | k.sptr() != nil:
-        ret get_struct_from_kind(k.sptr().elem)
-    | k.slc() != nil:
-        ret get_struct_from_kind(k.slc().elem)
-    | k.arr() != nil:
-        ret get_struct_from_kind(k.arr().elem)
-    | k.ptr() != nil:
-        // Pass pointers.
-        // Cloning just copies pointer address.
-        // There is no any illegal cycle risk.
-        ret nil
-    |:
-        ret nil
-    }
-}
-
-// Reports whether kind is primitive type.
-fn is_prim(kind: str): bool {
-    ret kind == TokenKind.I8 ||
-        kind == TokenKind.I16 ||
-        kind == TokenKind.I32 ||
-        kind == TokenKind.I64 ||
-        kind == TokenKind.U8 ||
-        kind == TokenKind.U16 ||
-        kind == TokenKind.U32 ||
-        kind == TokenKind.U64 ||
-        kind == TokenKind.F32 ||
-        kind == TokenKind.F64 ||
-        kind == TokenKind.Int ||
-        kind == TokenKind.Uint ||
-        kind == TokenKind.Uintptr ||
-        kind == TokenKind.Bool ||
-        kind == TokenKind.Str ||
-        kind == TokenKind.Any
-}
-
 struct Referencer {
     ident: str
     owner: any
@@ -960,65 +863,16 @@ impl TypeChecker {
         if ins.checked {
             ret true
         }
-        ins.checked = true
+        defer {
+            ins.checked = true
+        }
 
+        // Break algorithm cycle.
         if self.referencer != nil && self.referencer.owner == ins.decl {
-            // Break algorithm cycle.
             ret true
         }
 
-        let mut old_file = self.s.file
-        defer { self.s.set_current_file(old_file) }
-
-        let mut file = find_file(self.s.files, ins.decl.token.file)
-        if file != nil {
-            self.s.set_current_file(file)
-        }
-
-        let mut referencer = &Referencer{
-            ident: ins.decl.ident,
-            owner: ins.decl,
-        }
-
-        let mut generics = make([]&TypeAlias, 0, ins.generics.len)
-        for (i, mut g) in ins.generics {
-            generics = append(generics, &TypeAlias{
-                ident: ins.decl.generics[i].ident,
-                kind: &TypeSymbol{
-                    kind: g,
-                },
-            })
-        }
-
-        let mut old_sema_file = ins.decl.sema.file
-        defer {
-            ins.decl.sema.set_current_file(old_sema_file)
-        }
-
-        let mut tc = TypeChecker{
-            s: ins.decl.sema,
-            lookup: ins.decl.sema,
-            referencer: referencer,
-            use_generics: generics,
-            refers: ins.refers,
-        }
-
-        // Check field types.
-        for (_, mut field) in ins.fields {
-            let mut kind = tc.check_decl(field.decl.kind.decl)
-            ok = kind != nil
-
-            if ins.decl.sema != nil && self.s != ins.decl.sema && ins.decl.sema.errors.len > 0 {
-                self.s.errors = append(self.s.errors, ins.decl.sema.errors...)
-                ins.decl.sema.errors = nil
-            }
-            if ok {
-                field.kind = kind
-                ins.mutable = ins.mutable || (!field.decl.mutable && field.kind.mutable())
-                _ = self.s.check_struct_ins_derive_clone(ins)
-            }
-        }
-
+        self.s.precheck_struct_ins(ins)
         if ins.generics.len > 0 {
             self.s.check_struct_ins_operators(ins)
             self.s.check_struct_ins(ins)
@@ -1102,11 +956,6 @@ impl TypeChecker {
             }
         }
 
-        if s.generics.len > 0 && self.ignore_generics.len > 0 {
-            // Ignore prototypes.
-            ret nil
-        }
-
         let mut ok = self.not_plain || self.check_illegal_cycles(decl, s)
         if !ok {
             ret nil
@@ -1126,7 +975,7 @@ impl TypeChecker {
         let mut exist_instance = s.append_instance(ins)
         if exist_instance != nil {
             // Already checked instance, did not appended.
-            // So, this instance is not unqiue.
+            // So, this instance is not unique.
             self.push_reference[&StructIns](exist_instance)
             ret exist_instance
         }
@@ -1438,8 +1287,6 @@ impl TypeChecker {
     fn build(mut self, mut &decl_kind: TypeDeclKind): &TypeKind {
         let mut kind: Kind = nil
         match type decl_kind {
-        | &TypeKind:
-            kind = (&TypeKind)(decl_kind)
         | &IdentTypeDecl:
             let mut t = self.build_ident((&IdentTypeDecl)(decl_kind))
             if t != nil {
@@ -1532,6 +1379,166 @@ impl TypeChecker {
         }
         t.kind = kind
     }
+}
+
+struct IdentTypeLookup {}
+
+impl IdentTypeLookup {
+    static fn exist(&ident: str, &k: TypeDeclKind): bool {
+        match type k {
+        | &IdentTypeDecl:
+            ret (&IdentTypeDecl)(k).ident == ident
+        | &SptrTypeDecl:
+            let sptr = (&SptrTypeDecl)(k)
+            ret IdentTypeLookup.exist(ident, sptr.elem.kind)
+        | &PtrTypeDecl:
+            let ptr = (&PtrTypeDecl)(k)
+            ret IdentTypeLookup.exist(ident, ptr.elem.kind)
+        | &SlcTypeDecl:
+            let slc = (&SlcTypeDecl)(k)
+            ret IdentTypeLookup.exist(ident, slc.elem.kind)
+        | &ArrTypeDecl:
+            let arr = (&ArrTypeDecl)(k)
+            ret IdentTypeLookup.exist(ident, arr.elem.kind)
+        | &MapTypeDecl:
+            let map = (&MapTypeDecl)(k)
+            ret IdentTypeLookup.exist(ident, map.key.kind) ||
+                IdentTypeLookup.exist(ident, map.val.kind)
+        | &FnDecl:
+            let f = (&FnDecl)(k)
+            for _, p in f.params {
+                if p.is_self() {
+                    continue
+                }
+                if IdentTypeLookup.exist(ident, p.kind.kind) {
+                    ret true
+                }
+            }
+            if f.result != nil {
+                ret IdentTypeLookup.exist(ident, f.result.kind.kind)
+            }
+            ret false
+        | &TupleTypeDecl:
+            let tup = (&TupleTypeDecl)(k)
+            for _, t in tup.types {
+                if IdentTypeLookup.exist(ident, t.kind) {
+                    ret true
+                }
+            }
+            ret false
+        | &NamespaceTypeDecl:
+            let ns = (&NamespaceTypeDecl)(k)
+            ret ns.kind.ident == ident
+        |:
+            ret false
+        }
+    }
+}
+
+fn kind_uses_generics(&k: TypeDeclKind, &generics: []&GenericDecl): bool {
+    for _, g in generics {
+        if IdentTypeLookup.exist(g.ident, k) {
+            ret true
+        }
+    }
+    ret false
+}
+
+// Reports whether directive is exist.
+fn has_directive(mut &directives: []&ast::Directive, tag: str): bool {
+    for (_, mut dr) in directives {
+        if dr.tag.kind == tag {
+            ret true
+        }
+    }
+    ret false
+}
+
+fn can_get_ptr(mut &d: &Data): bool {
+    if !d.lvalue || d.is_const() {
+        ret false
+    }
+
+    match {
+    | d.kind.fnc() != nil || d.kind.enm() != nil:
+        ret false
+    |:
+        ret true
+    }
+}
+
+// Reports kind is valid for smart pointer type such as &T.
+fn is_valid_for_sptr_type(mut &t: &TypeKind): bool {
+    let mut s = t.strct()
+    if s != nil && s.decl != nil && s.decl.cpp_linked {
+        ret false
+    }
+    ret true
+}
+
+// Reports kind is valid for reference such as reference variables.
+fn is_valid_for_ref(mut &t: &TypeKind): bool { ret t.fnc() == nil }
+
+// Reports whether type has built-in string conversion support.
+fn is_builtin_str_convertable(mut &t: &TypeKind): bool {
+    ret !t.void() && t.fnc() == nil && t.tup() == nil
+}
+
+fn build_link_path_by_tokens(&tokens: []&Token): str {
+    let mut s = tokens[0].kind
+    for _, token in tokens[1:] {
+        s += "::"
+        s += token.kind
+    }
+    ret s
+}
+
+fn build_prim_type(kind: str): &Prim {
+    ret &Prim{
+        kind: kind,
+    }
+}
+
+fn get_struct_from_kind(mut k: &TypeKind): &Struct {
+    match {
+    | k == nil:
+        ret nil
+    | k.strct() != nil:
+        ret k.strct().decl
+    | k.sptr() != nil:
+        ret get_struct_from_kind(k.sptr().elem)
+    | k.slc() != nil:
+        ret get_struct_from_kind(k.slc().elem)
+    | k.arr() != nil:
+        ret get_struct_from_kind(k.arr().elem)
+    | k.ptr() != nil:
+        // Pass pointers.
+        // Cloning just copies pointer address.
+        // There is no any illegal cycle risk.
+        ret nil
+    |:
+        ret nil
+    }
+}
+
+// Reports whether kind is primitive type.
+fn is_prim(kind: str): bool {
+    ret kind == TokenKind.I8 ||
+        kind == TokenKind.I16 ||
+        kind == TokenKind.I32 ||
+        kind == TokenKind.I64 ||
+        kind == TokenKind.U8 ||
+        kind == TokenKind.U16 ||
+        kind == TokenKind.U32 ||
+        kind == TokenKind.U64 ||
+        kind == TokenKind.F32 ||
+        kind == TokenKind.F64 ||
+        kind == TokenKind.Int ||
+        kind == TokenKind.Uint ||
+        kind == TokenKind.Uintptr ||
+        kind == TokenKind.Bool ||
+        kind == TokenKind.Str ||
+        kind == TokenKind.Any
 }
 
 fn apply_implicit_cast(mut &dest: &TypeKind, mut &d: &Data) {
