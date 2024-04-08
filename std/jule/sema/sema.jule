@@ -1653,7 +1653,6 @@ impl Sema {
 
         self.check_directives(s.directives, s)
 
-        s.sema = self
         match {
         | !self.check_decl_generics(s.generics):
         | !self.check_struct_fields(s):
@@ -1788,37 +1787,16 @@ impl Sema {
     fn check_package_decls(mut &self) {
         for (_, mut f) in self.files {
             self.set_current_file(f)
-            if !self.check_type_alias_decls() {
-                ret
+            match {
+            | !self.check_type_alias_decls():
+            | !self.check_trait_decls():
+            | !self.check_global_decls():
+            | !self.check_fn_decls():
+            | !self.check_struct_decls():
+            |:
+                continue
             }
-        }
-
-        for (_, mut f) in self.files {
-            self.set_current_file(f)
-            if !self.check_trait_decls() {
-                ret
-            }
-        }
-
-        for (_, mut f) in self.files {
-            self.set_current_file(f)
-            if !self.check_global_decls() {
-                ret
-            }
-        }
-
-        for (_, mut f) in self.files {
-            self.set_current_file(f)
-            if !self.check_fn_decls() {
-                ret
-            }
-        }
-
-        for (_, mut f) in self.files {
-            self.set_current_file(f)
-            if !self.check_struct_decls() {
-                ret
-            }
+            ret
         }
     }
 
@@ -2122,7 +2100,7 @@ impl Sema {
         }
     }
 
-    fn check_type_struct_operators(mut &self, mut &s: &Struct) {
+    fn precheck_struct_type(mut &self, mut &s: &Struct) {
         if s.cpp_linked {
             ret
         }
@@ -2142,9 +2120,9 @@ impl Sema {
         self.check_struct_ins_operators(s.instances[0])
     }
 
-    fn check_struct_types_operators(mut &self) {
+    fn precheck_struct_types(mut &self) {
         for (_, mut s) in self.file.structs {
-            self.check_type_struct_operators(s)
+            self.precheck_struct_type(s)
         }
     }
 
@@ -2291,27 +2269,16 @@ impl Sema {
     fn check_package_types(mut &self) {
         for (_, mut f) in self.files {
             self.set_current_file(f)
-            self.check_global_types()
-        }
-
-        for (_, mut f) in self.files {
-            self.set_current_file(f)
             self.precheck_fn_types()
+            // Check structures first, see developer reference (7).
+            // Check operators first, see developer reference (7.1), and (7.2).
+            self.precheck_struct_types()
         }
 
-        // Check structures first, see developer reference (7).
-        // Check operators first, see developer reference (7.1), and (7.2).
         for (_, mut f) in self.files {
             self.set_current_file(f)
-            self.check_struct_types_operators()
-        }
-        for (_, mut f) in self.files {
-            self.set_current_file(f)
+            self.check_global_types()
             self.check_struct_types()
-        }
-
-        for (_, mut f) in self.files {
-            self.set_current_file(f)
             self.check_fn_types()
         }
     }
@@ -2342,6 +2309,8 @@ impl Sema {
             ret
         }
 
+        // Check enums here.
+        // See developer reference (8).
         self.check_enums()
         // Break checking if enums has error.
         if self.errors.len != 0 {
