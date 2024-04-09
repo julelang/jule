@@ -2,8 +2,10 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use env
 use obj::{IR}
-use build for std::jule::build
+use build for std::jule::build::{Directive}
+use ast for std::jule::ast
 use std::jule::sema::{
     Package,
     SymbolTable,
@@ -125,13 +127,33 @@ impl ObjectDeadCode {
         }
     }
 
+    fn collect_live_package(mut &self, mut &pkg: &Package) {
+        // Collect live references based on initializer functions.
+        self.inits(pkg)
+
+        // Collect test functions if test compilation is enabled.
+        if env::TEST {
+            for (_, mut file) in pkg.files {
+                for (_, mut f) in file.funcs {
+                    if has_directive(f.directives, Directive.Test) {
+                        let mut ins = f.instances[0]
+                        self.live.fns = append(self.live.fns, ins)
+                        self.set_references_as_live(ins.refers)
+                    }
+                }
+            }
+        }
+    }
+
     fn collect_live(mut &self) {
         for (_, mut used) in self.ir.used {
             if !used.cpp_linked {
-                self.inits(used.package)
+                self.collect_live_package(used.package)
             }
         }
-        self.inits(self.ir.main)
+        self.collect_live_package(self.ir.main)
+
+        // Push live references based on entry point.
         let mut main = self.ir.main.find_fn(build::ENTRY_POINT, false)
         let mut ins = main.instances[0]
         self.live.fns = append(self.live.fns, ins)
@@ -223,4 +245,19 @@ impl ObjectDeadCode {
 pub fn eliminate_defines(mut &ir: &IR) {
     let mut ocd = ObjectDeadCode.new(ir)
     ocd.elimanate()
+}
+
+// Returns directive if exist.
+fn find_directive(mut &directives: []&ast::Directive, tag: str): &ast::Directive {
+    for (_, mut dr) in directives {
+        if dr.tag.kind == tag {
+            ret dr
+        }
+    }
+    ret nil
+}
+
+// Reports whether directive is exist.
+fn has_directive(&directives: []&ast::Directive, tag: str): bool {
+    ret find_directive(unsafe { *(&directives) }, tag) != nil
 }
