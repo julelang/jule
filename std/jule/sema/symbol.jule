@@ -10,6 +10,8 @@ use ast for std::jule::ast::{
     TypeDecl,
     TypeAliasDecl,
     FieldDecl,
+    TypeEnumDecl,
+    TypeEnumItemDecl,
     EnumDecl,
     EnumItemDecl,
     VarDecl,
@@ -237,6 +239,31 @@ fn build_enum(mut decl: &EnumDecl): &Enum {
         ident: decl.ident,
         kind: build_type(decl.kind),
         items: build_enum_items(decl.items),
+    }
+}
+
+fn build_type_enum_item(mut decl: &TypeEnumItemDecl): &TypeEnumItem {
+    ret &TypeEnumItem{
+        token: decl.token,
+        ident: decl.ident,
+        kind: build_type(decl.kind),
+    }
+}
+
+fn build_type_enum_items(mut &decls: []&TypeEnumItemDecl): []&TypeEnumItem {
+    let mut items = make([]&TypeEnumItem, 0, decls.len)
+    for (_, mut decl) in decls {
+        items = append(items, build_type_enum_item(decl))
+    }
+    ret items
+}
+
+fn build_type_enum(mut decl: &TypeEnumDecl): &TypeEnum {
+    ret &TypeEnum{
+        token: decl.token,
+        public: decl.public,
+        ident: decl.ident,
+        items: build_type_enum_items(decl.items),
     }
 }
 
@@ -673,6 +700,9 @@ impl SymbolBuilder {
         | &EnumDecl:
             let mut e = build_enum((&EnumDecl)(node.data))
             self.table.enums = append(self.table.enums, e)
+        | &TypeEnumDecl:
+            let mut e = build_type_enum((&TypeEnumDecl)(node.data))
+            self.table.type_enums = append(self.table.type_enums, e)
         |:
             self.push_err(node.token, LogMsg.InvalidSyntax)
         }

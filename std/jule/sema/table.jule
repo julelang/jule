@@ -16,6 +16,7 @@ pub struct SymbolTable {
     pub funcs:        []&Fn         // Functions.
     pub traits:       []&Trait      // Traits.
     pub enums:        []&Enum       // Enums.
+    pub type_enums:   []&TypeEnum   // Type enums.
     pub impls:        []&Impl       // Implementations.
 }
 
@@ -96,6 +97,17 @@ impl Lookup for SymbolTable {
     // Returns nil reference if not exist any enum in this identifier.
     pub fn find_enum(mut self, ident: str): &Enum {
         for (_, mut e) in self.enums {
+            if e.ident == ident {
+                ret e
+            }
+        }
+        ret nil
+    }
+
+    // Returns type enum by identifier.
+    // Returns nil reference if not exist any type enum in this identifier.
+    pub fn find_type_enum(mut self, ident: str): &TypeEnum {
+        for (_, mut e) in self.type_enums {
             if e.ident == ident {
                 ret e
             }
@@ -186,6 +198,12 @@ impl SymbolTable {
             }
         }
 
+        for (_, mut te) in self.type_enums {
+            if te.ident == ident {
+                ret te
+            }
+        }
+
         ret nil
     }
 
@@ -229,6 +247,12 @@ impl SymbolTable {
 
         for _, e in self.enums {
             if uintptr(e) != itself && e.ident == ident {
+                ret true
+            }
+        }
+
+        for _, te in self.type_enums {
+            if uintptr(te) != itself && te.ident == ident {
                 ret true
             }
         }

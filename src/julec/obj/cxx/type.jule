@@ -12,6 +12,7 @@ use std::jule::sema::{
     Ptr,
     Slc,
     Enum,
+    TypeEnum,
     TypeKind,
     Map,
     Trait,
@@ -43,6 +44,7 @@ impl Kind for CustomType {
 struct TypeCoder {}
 
 impl TypeCoder {
+    const Any = "jule::Any"
     const Str = "jule::Str"
     const Map = "jule::Map"
     const Ptr = "jule::Ptr"
@@ -114,6 +116,11 @@ impl TypeCoder {
     // Generates C++ code of Enum TypeKind.
     static fn enum_decl(mut e: &Enum): str {
         ret TypeCoder.kind(e.kind.kind)
+    }
+
+    // Generates C++ code of TypeEnum TypeKind.
+    static fn type_enum_decl(mut e: &TypeEnum): str {
+        ret TypeCoder.Any
     }
 
     static fn as_slice(mut elem: &TypeKind): str {
@@ -294,6 +301,8 @@ impl TypeCoder {
             ret TypeCoder.ptr(k.ptr())
         | k.enm() != nil:
             ret TypeCoder.enum_decl(k.enm())
+        | k.tenm() != nil:
+            ret TypeCoder.type_enum_decl(k.tenm())
         | k.slc() != nil:
             ret TypeCoder.slice(k.slc())
         | k.map() != nil:

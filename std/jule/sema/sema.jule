@@ -396,6 +396,33 @@ impl Lookup for Sema {
 
         ret nil
     }
+
+    // Returns type enum by identifier.
+    // Returns nil reference if not exist any type enum in this identifier.
+    //
+    // Lookups:
+    //   - Package file's symbol table.
+    //   - Current file's public denifes of imported packages.
+    pub fn find_type_enum(mut self, ident: str): &TypeEnum {
+        // Lookup package files.
+        let mut e = find_type_enum_in_package(self.files, ident)
+        if e != nil {
+            ret e
+        }
+
+        // Lookup current file's public denifes of imported packages.
+        for (_, mut imp) in self.file.imports {
+            if !imp_is_lookupable(imp, ident) {
+                continue
+            }
+            e = imp.find_type_enum(ident)
+            if e != nil && self.is_accessible_define(e.public, e.token) {
+                ret e
+            }
+        }
+
+        ret nil
+    }
 }
 
 impl Sema {
@@ -637,6 +664,7 @@ impl Sema {
         for (_, mut file) in self.files {
             self.set_current_file(file)
             self.check_enum_decls()
+            self.check_type_enum_decls()
         }
     }
 
@@ -663,7 +691,10 @@ impl Sema {
         if referencer != nil && referencer.refs != nil {
             // Set owner alias field of TypeChecker to collect generic dependencies.
             // See developer reference (4).
-            tc.owner_alias = (&TypeAlias)(referencer.owner)
+            match type referencer.owner {
+            | &TypeAlias:
+                tc.owner_alias = (&TypeAlias)(referencer.owner)
+            }
         }
 
         tc.check(t)
@@ -1059,12 +1090,12 @@ impl Sema {
         ret true
     }
 
-    fn check_enum_items_dup(mut self, e: &Enum) {
-        for _, item in e.items {
+    fn check_enum_items_dup[T](mut self, items: []T) {
+        for _, item in items {
             if is_ignore_ident(item.ident) {
                 self.push_err(item.token, LogMsg.IgnoreIdent)
             } else {
-                for _, citem in e.items {
+                for _, citem in items {
                     if item == citem {
                         break
                     } else if item.ident == citem.ident {
@@ -1150,7 +1181,7 @@ impl Sema {
             self.push_err(e.token, LogMsg.NoMemberInEnum, e.ident)
         }
 
-        self.check_enum_items_dup(e)
+        self.check_enum_items_dup[&EnumItem](e.items)
 
         if e.kind != nil {
             if !self.check_type(e.kind, self) {
@@ -1182,10 +1213,62 @@ impl Sema {
         }
     }
 
+    fn check_type_enum_decl(mut &self, mut &e: &TypeEnum) {
+        if is_ignore_ident(e.ident) {
+            self.push_err(e.token, LogMsg.IgnoreIdent)
+        } else if self.is_duplicated_ident(uintptr(e), e.ident, false) {
+            self.push_err(e.token, LogMsg.DuplicatedIdent, e.ident)
+            self.push_suggestion(LogMsg.RenameForAvoidDuplication)
+        }
+
+        if e.items.len == 0 {
+            self.push_err(e.token, LogMsg.NoMemberInEnum, e.ident)
+            ret
+        }
+
+        self.check_enum_items_dup[&TypeEnumItem](e.items)
+        for (_, mut item) in e.items {
+            if item.kind == nil {
+                self.push_err(item.token, LogMsg.MissingType)
+                continue
+            }
+            let ok = self.check_type(item.kind, self)
+            if !ok {
+                continue
+            }
+            let p = item.kind.kind.prim()
+            if p != nil && p.is_any() {
+                self.push_err(item.token, LogMsg.AnyWithTypeEnum)
+            }
+        }
+        if e.items.len == 1 {
+            let mut item = e.items[0]
+            let tk = TypeKind{
+                kind: e,
+            }
+            if item.kind.kind != nil && item.kind.kind.equals(unsafe { (&TypeKind)(&tk) }) {
+                self.push_err(item.token, LogMsg.IllegalCycleRefersItself, e.to_str())
+            }
+        }
+    }
+
     // Checks current package file's enum declarations.
     fn check_enum_decls(mut &self): (ok: bool) {
         for (_, mut e) in self.file.enums {
             self.check_enum_decl(e)
+
+            // Break checking if type alias has error.
+            if self.errors.len > 0 {
+                ret false
+            }
+        }
+        ret true
+    }
+
+    // Checks current package file's type enum declarations.
+    fn check_type_enum_decls(mut &self): (ok: bool) {
+        for (_, mut e) in self.file.type_enums {
+            self.check_type_enum_decl(e)
 
             // Break checking if type alias has error.
             if self.errors.len > 0 {

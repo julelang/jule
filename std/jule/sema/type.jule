@@ -21,6 +21,7 @@ use ast for std::jule::ast::{
     TupleTypeDecl,
     SptrTypeDecl,
     IdentTypeDecl,
+    SubIdentTypeDecl,
 }
 use std::jule::build::{Derive, LogMsg, logf}
 use std::jule::lex::{Token, TokenKind}
@@ -147,7 +148,8 @@ impl TypeKind {
                 _self.ptr() != nil ||
                 _self.trt() != nil ||
                 _self.slc() != nil ||
-                _self.map() != nil
+                _self.map() != nil ||
+                _self.tenm() != nil
         }
     }
 
@@ -235,6 +237,16 @@ impl TypeKind {
         match type self.kind {
         | &Enum:
             ret (&Enum)(self.kind)
+        |:
+            ret nil
+        }
+    }
+
+    // Returns type enum if kind is type enum, nil reference if not.
+    pub fn tenm(mut self): &TypeEnum {
+        match type self.kind {
+        | &TypeEnum:
+            ret (&TypeEnum)(self.kind)
         |:
             ret nil
         }
@@ -667,8 +679,6 @@ impl TypeChecker {
                 ret (&TypeAlias)(def).ident
             | &Struct:
                 ret (&Struct)(def).ident
-            | &Enum:
-                ret (&Enum)(def).ident
             |:
                 ret ""
             }
@@ -847,6 +857,18 @@ impl TypeChecker {
         ret e
     }
 
+    fn from_type_enum(mut self, &decl: &IdentTypeDecl, mut &e: &TypeEnum): &TypeEnum {
+        if !self.s.is_accessible_define(e.public, e.token) {
+            self.push_err(decl.token, LogMsg.IdentNotExist, decl.ident)
+            ret nil
+        }
+        if decl.generics.len > 0 {
+            self.push_err(decl.token, LogMsg.TypeNotSupportsGenerics, decl.ident)
+            ret nil
+        }
+        ret e
+    }
+
     fn from_trait(mut self, &decl: &IdentTypeDecl, mut &t: &Trait): &Trait {
         if !self.s.is_accessible_define(t.public, t.token) {
             self.push_err(decl.token, LogMsg.IdentNotExist, decl.ident)
@@ -997,7 +1019,7 @@ impl TypeChecker {
     // If another lookup nedeed, uses internal lookup, so any generic type build
     // process will use internal lookup. This might be useful for building
     // genericed type from another package.
-    fn get_def(mut self, l: Lookup, mut &decl: &IdentTypeDecl): Kind {
+    fn get_def(mut self, mut &decl: &IdentTypeDecl): Kind {
         for _, g in self.ignore_generics {
             if g.ident == decl.ident {
                 ret build_prim_type(g.ident)
@@ -1018,12 +1040,17 @@ impl TypeChecker {
         }
 
         if !decl.cpp_linked {
-            let mut e = l.find_enum(decl.ident)
+            let mut e = self.lookup.find_enum(decl.ident)
             if e != nil {
                 ret self.from_enum(decl, e)
             }
 
-            let mut t = l.find_trait(decl.ident)
+            let mut te = self.lookup.find_type_enum(decl.ident)
+            if te != nil {
+                ret self.from_type_enum(decl, te)
+            }
+
+            let mut t = self.lookup.find_trait(decl.ident)
             if t == nil && !self.dis_builtin {
                 t = find_builtin_trait(decl.ident)
             }
@@ -1035,12 +1062,12 @@ impl TypeChecker {
             ret nil
         }
 
-        let mut s = l.find_struct(decl.ident, decl.cpp_linked)
+        let mut s = self.lookup.find_struct(decl.ident, decl.cpp_linked)
         if s != nil {
             ret self.from_struct(decl, s)
         }
 
-        let mut ta = l.find_type_alias(decl.ident, decl.cpp_linked)
+        let mut ta = self.lookup.find_type_alias(decl.ident, decl.cpp_linked)
         if ta == nil && !self.dis_builtin {
             ta = find_builtin_type_alias(decl.ident)
         }
@@ -1057,8 +1084,42 @@ impl TypeChecker {
         | is_prim(decl.ident):
             ret self.build_prim(decl)
         |:
-            ret self.get_def(self.lookup, decl)
+            ret self.get_def(decl)
         }
+    }
+
+    fn build_sub_ident(mut self, mut decl: &SubIdentTypeDecl): Kind {
+        let mut ident = self.build_ident(decl.idents[0])
+        if ident == nil {
+            ret nil
+        }
+        match type ident {
+        | &TypeEnum:
+            break
+        |:
+            self.push_err(self.error_token, LogMsg.InvalidSyntax)
+            ret nil
+
+        }
+        let mut t = (&TypeEnum)(ident)
+        let mut idents = decl.idents[1:]
+        for i, id in idents {
+            let mut item = t.find_item(id.ident)
+            if item == nil {
+                self.push_err(id.token, LogMsg.ObjHaveNotIdent, t.ident, id.ident)
+                ret nil
+            }
+            if idents.len - i == 1 {
+                ret item.kind.kind
+            }
+            t = item.kind.kind.tenm()
+            if t == nil {
+                self.push_err(self.error_token, LogMsg.InvalidSyntax)
+                ret nil
+            }
+        }
+        // Should be unreachable.
+        ret nil
     }
 
     fn build_sptr_from_type(mut self, mut &elem: &TypeKind): &Sptr {
@@ -1279,7 +1340,10 @@ impl TypeChecker {
         }
 
         self.disallow_builtin()
-        let mut kind = self.get_def(imp, decl.kind)
+        let mut lookup = self.lookup
+        self.lookup = imp
+        let mut kind = self.check_decl(decl.kind)
+        self.lookup = lookup
         self.allow_builtin()
 
         ret kind
@@ -1290,6 +1354,11 @@ impl TypeChecker {
         match type decl_kind {
         | &IdentTypeDecl:
             let mut t = self.build_ident((&IdentTypeDecl)(decl_kind))
+            if t != nil {
+                kind = t
+            }
+        | &SubIdentTypeDecl:
+            let mut t = self.build_sub_ident((&SubIdentTypeDecl)(decl_kind))
             if t != nil {
                 kind = t
             }
@@ -1385,10 +1454,30 @@ impl TypeChecker {
 struct IdentTypeLookup {}
 
 impl IdentTypeLookup {
+    static fn __ident_type_decl(&ident: str, t: &IdentTypeDecl): bool {
+        if t.ident == ident {
+            ret true
+        }
+        for _, g in t.generics {
+            if IdentTypeLookup.exist(ident, g.kind) {
+                ret true
+            }
+        }
+        ret false
+    }
+
     static fn exist(&ident: str, &k: TypeDeclKind): bool {
         match type k {
         | &IdentTypeDecl:
-            ret (&IdentTypeDecl)(k).ident == ident
+            ret IdentTypeLookup.__ident_type_decl(ident, (&IdentTypeDecl)(k))
+        | &SubIdentTypeDecl:
+            let sit = (&SubIdentTypeDecl)(k)
+            for _, id in sit.idents {
+                if IdentTypeLookup.__ident_type_decl(ident, id) {
+                    ret true
+                }
+            }
+            ret false
         | &SptrTypeDecl:
             let sptr = (&SptrTypeDecl)(k)
             ret IdentTypeLookup.exist(ident, sptr.elem.kind)
@@ -1429,7 +1518,7 @@ impl IdentTypeLookup {
             ret false
         | &NamespaceTypeDecl:
             let ns = (&NamespaceTypeDecl)(k)
-            ret ns.kind.ident == ident
+            ret IdentTypeLookup.exist(ident, ns.kind.kind)
         |:
             ret false
         }

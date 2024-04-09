@@ -539,6 +539,15 @@ impl Lookup for ScopeChecker {
     pub fn find_enum(mut self, ident: str): &Enum {
         ret self.s.find_enum(ident)
     }
+
+    // Returns type enum by identifier.
+    // Returns nil reference if not exist any type enum in this identifier.
+    //
+    // Lookups:
+    //   - Sema.
+    pub fn find_type_enum(mut self, ident: str): &TypeEnum {
+        ret self.s.find_type_enum(ident)
+    }
 }
 
 impl ScopeChecker {
@@ -1499,9 +1508,13 @@ impl ScopeChecker {
                 if expr.kind.generic {
                     generic_matched = generic_matched || expr.kind.equals(d.kind)
                 } else {
-                    let trt = expr.kind.trt()
-                    if trt != nil {
+                    if expr.kind.tenm() != nil {
                         _ = self.s.check_type_compatibility(expr.kind, d.kind, e.token)
+                    } else {
+                        let trt = expr.kind.trt()
+                        if trt != nil {
+                            _ = self.s.check_type_compatibility(expr.kind, d.kind, e.token)
+                        }
                     }
                 }
 
@@ -1613,7 +1626,7 @@ impl ScopeChecker {
         }
 
         if !d.kind.generic &&
-            !((d.kind.prim() != nil && d.kind.prim().is_any()) || d.kind.trt() != nil) {
+            !((d.kind.prim() != nil && d.kind.prim().is_any()) || d.kind.trt() != nil || d.kind.tenm() != nil) {
             self.s.push_err(m.expr.token, LogMsg.TypeCaseHasNotValidExpr)
             ret
         }

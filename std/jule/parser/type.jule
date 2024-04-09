@@ -4,6 +4,7 @@
 
 use std::jule::ast::{
     TypeDecl,
+    SubIdentTypeDecl,
     IdentTypeDecl,
     NamespaceTypeDecl,
     PtrTypeDecl,
@@ -118,7 +119,7 @@ impl TypeBuilder {
         nst.idents = nst.idents[:nst.idents.len-1]
 
         *self.i-- // Set offset to last identifier.
-        nst.kind = (&IdentTypeDecl)(self.build_ident().kind)
+        nst.kind = self.build_ident()
         t.kind = nst
         ret t
     }
@@ -177,7 +178,8 @@ impl TypeBuilder {
     }
 
     unsafe fn build_ident(mut self): &TypeDecl {
-        if *self.i+1 < self.tokens.len && self.tokens[*self.i+1].id == TokenId.DblColon {
+        let mut next = *self.i+1 < self.tokens.len
+        if next && self.tokens[*self.i+1].id == TokenId.DblColon {
             ret self.build_namespace()
         }
         let mut token = self.tokens[*self.i]
@@ -187,10 +189,35 @@ impl TypeBuilder {
             cpp_linked: false,
         }
         *self.i++
-        it.generics = self.build_generics()
-        ret &TypeDecl{
+        let mut itd = &TypeDecl{
             token: token,
             kind: it,
+        }
+        if !next || self.tokens[*self.i].id != TokenId.Dot {
+            it.generics = self.build_generics()
+            ret itd
+        }
+        if self.tokens.len-*self.i == 1 {
+            self.push_err(token, LogMsg.InvalidSyntax)
+            ret itd
+        }
+        *self.i++
+        if self.tokens[*self.i].id != TokenId.Ident {
+            self.push_err(self.tokens[*self.i-1], LogMsg.InvalidSyntax)
+            ret itd
+        }
+        let mut sit = new(SubIdentTypeDecl)
+        sit.idents = append(sit.idents, it)
+        let mut ident = self.build_ident()
+        match type ident.kind {
+        | &IdentTypeDecl:
+            sit.idents = append(sit.idents, (&IdentTypeDecl)(ident.kind))
+        | &SubIdentTypeDecl:
+            sit.idents = append(sit.idents, (&SubIdentTypeDecl)(ident.kind).idents...)
+        }
+        ret &TypeDecl{
+            token: token,
+            kind: sit,
         }
     }
 

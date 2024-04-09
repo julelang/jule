@@ -399,6 +399,11 @@ impl Eval {
             if enm != nil {
                 ret enm
             }
+
+            let mut tenm = self.lookup.find_type_enum(ident)
+            if tenm != nil {
+                ret tenm
+            }
         }
 
         let mut v = self.lookup.find_var(ident, cpp_linked)
@@ -456,8 +461,28 @@ impl Eval {
             self.push_suggestion(LogMsg.MakePubToAccess)
             ret nil
         }
-
         ret self.__eval_enum(enm)
+    }
+
+    fn __eval_type_enum(self, mut enm: &TypeEnum): &Data {
+        ret &Data{
+            lvalue: false,
+            mutable: false,
+            constant: nil,
+            decl: true,
+            kind: &TypeKind{
+                kind: enm,
+            },
+        }
+    }
+
+    fn eval_type_enum(mut self, mut enm: &TypeEnum, error_token: &Token): &Data {
+        if !self.s.is_accessible_define(enm.public, enm.token) {
+            self.push_err(error_token, LogMsg.IdentIsNotAccessible, enm.ident)
+            self.push_suggestion(LogMsg.MakePubToAccess)
+            ret nil
+        }
+        ret self.__eval_type_enum(enm)
     }
 
     fn __eval_struct(self, mut s: &StructIns): &Data {
@@ -686,6 +711,8 @@ impl Eval {
             d = self.__eval_struct((&StructIns)(kind))
         | &Enum:
             d = self.__eval_enum((&Enum)(kind))
+        | &TypeEnum:
+            d = self.__eval_type_enum((&TypeEnum)(kind))
         |:
             d = &Data{
                 decl: true,
@@ -710,6 +737,8 @@ impl Eval {
             ret self.eval_var((&Var)(def), ident)
         | &Enum:
             ret self.eval_enum((&Enum)(def), ident)
+        | &TypeEnum:
+            ret self.eval_type_enum((&TypeEnum)(def), ident)
         | &Struct:
             ret self.eval_struct((&Struct)(def).instance(), ident)
         | &Fn:
@@ -1105,7 +1134,10 @@ impl Eval {
             }
             tdecl.kind = &NamespaceTypeDecl{
                 idents: expr.ns,
-                kind: decl,
+                kind: &TypeDecl{
+                    token: decl.token,
+                    kind: decl,
+                },
             }
         |:
             self.push_err(i.token, LogMsg.InvalidSyntax)
@@ -1510,6 +1542,15 @@ impl Eval {
         d.model = d.constant
     }
 
+    fn cast_type_enum(mut self, mut t: &TypeEnum, mut &dest: &TypeKind, mut error_token: &Token) {
+        for (_, mut item) in t.items {
+            if item.kind.kind.equals(dest) {
+                ret
+            }
+        }
+        self.push_err(error_token, LogMsg.TypeNotSupportsCastingTo, dest.to_str(), t.to_str())
+    }
+
     fn eval_cast_by_type_n_data(mut self, mut t: &TypeKind, mut d: &Data, mut error_token: &Token): &Data {
         if d != nil && d.decl {
             self.push_err(error_token, LogMsg.InvalidExpr)
@@ -1521,6 +1562,8 @@ impl Eval {
             if t.enm() != nil {
                 self.push_err(error_token, LogMsg.EnumCastedFromAny)
                 self.push_suggestion(LogMsg.CastToEnumTypeInsteadOfEnum)
+            } else if t.tenm() != nil {
+                self.push_err(error_token, LogMsg.EnumCastedFromAny)
             }
         | t.ptr() != nil:
             self.cast_ptr(t, d, error_token)
@@ -1530,6 +1573,8 @@ impl Eval {
             self.cast_slc(t, d, error_token)
         | t.strct() != nil:
             self.cast_struct(t, d, error_token)
+        | d.kind.tenm() != nil:
+            self.cast_type_enum(d.kind.tenm(), t, error_token)
         | t.prim() != nil:
             self.cast_prim(t, d, error_token)
             self.cast_constant(t, d)
@@ -1972,6 +2017,29 @@ impl Eval {
         }
 
         ret d
+    }
+
+    fn eval_type_enum_static(mut self, mut enm: &TypeEnum, ident: &Token): &Data {
+        let mut item = enm.find_item(ident.kind)
+        if item == nil {
+            self.push_err(ident, LogMsg.ObjHaveNotIdent, enm.ident, ident.kind)
+            ret nil
+        }
+        match {
+        | item.kind.kind.enm() != nil:
+            ret self.__eval_enum(item.kind.kind.enm())
+        | item.kind.kind.tenm() != nil:
+            ret self.__eval_type_enum(item.kind.kind.tenm())
+        | item.kind.kind.strct() != nil:
+            ret self.__eval_struct(item.kind.kind.strct())
+        |:
+            let mut d = &Data{
+                decl: true,
+                kind: item.kind.kind,
+            }
+            d.model = d.kind
+            ret d
+        }
     }
 
     fn eval_struct_static(mut self, mut s: &StructIns, ident: &Token): &Data {
@@ -2688,6 +2756,8 @@ impl Eval {
             ret self.eval_prim_static(d.kind.prim().to_str(), si.ident)
         | d.kind.enm() != nil:
             ret self.eval_enum_static(d.kind.enm(), si.ident)
+        | d.kind.tenm() != nil:
+            ret self.eval_type_enum_static(d.kind.tenm(), si.ident)
         | d.kind.strct() != nil:
             ret self.eval_struct_static(d.kind.strct(), si.ident)
         |:
@@ -3394,6 +3464,26 @@ impl BinaryEval {
         }
     }
 
+    fn eval_type_enum(mut self): &Data {
+        let mut enm = self.l.kind.tenm()
+        if !self.check_type_compatibility() {
+            ret nil
+        }
+
+        match self.op.kind {
+        | TokenKind.Eqs
+        | TokenKind.NotEq:
+            ret &Data{
+                kind: &TypeKind{
+                    kind: build_prim_type(PrimKind.Bool),
+                },
+            }
+        |:
+            self.e.push_err(self.op, LogMsg.OperatorNotForJuleType, self.op.kind, enm.to_str())
+            ret nil
+        }
+    }
+
     fn eval_sptr(mut self): &Data {
         if !self.check_type_compatibility() {
             ret nil
@@ -3875,6 +3965,8 @@ impl BinaryEval {
             fall
         | self.l.kind.enm() != nil:
             ret self.eval_enum()
+        | self.l.kind.tenm() != nil:
+            ret self.eval_type_enum()
         | self.r.kind.sptr() != nil:
             self.l, self.r = self.r, self.l
             fall

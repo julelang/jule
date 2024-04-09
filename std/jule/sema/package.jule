@@ -113,6 +113,18 @@ fn find_enum_in_package(mut &files: []&SymbolTable, ident: str): &Enum {
     ret nil
 }
 
+// Returns enum by identifier.
+// Returns nil if not exist any type enum in this identifier.
+fn find_type_enum_in_package(mut &files: []&SymbolTable, ident: str): &TypeEnum {
+    for (_, mut f) in files {
+        let mut e = f.find_type_enum(ident)
+        if e != nil {
+            ret e
+        }
+    }
+    ret nil
+}
+
 // Import information.
 // Represents imported package by use declaration.
 pub struct ImportInfo {
@@ -170,7 +182,6 @@ impl Lookup for ImportInfo {
         if !self.is_lookupable(ident) {
             ret nil
         }
-
         ret find_var_in_package(self.package.files, ident, false)
     }
 
@@ -183,7 +194,6 @@ impl Lookup for ImportInfo {
         if !self.is_lookupable(ident) {
             ret nil
         }
-
         ret find_type_alias_in_package(self.package.files, ident, false)
     }
 
@@ -196,7 +206,6 @@ impl Lookup for ImportInfo {
         if !self.is_lookupable(ident) {
             ret nil
         }
-
         ret find_struct_in_package(self.package.files, ident, false)
     }
 
@@ -209,7 +218,6 @@ impl Lookup for ImportInfo {
         if !self.is_lookupable(ident) {
             ret nil
         }
-
         ret find_fn_in_package(self.package.files, ident, false)
     }
 
@@ -221,7 +229,6 @@ impl Lookup for ImportInfo {
         if !self.is_lookupable(ident) {
             ret nil
         }
-
         ret find_trait_in_package(self.package.files, ident)
     }
 
@@ -233,8 +240,18 @@ impl Lookup for ImportInfo {
         if !self.is_lookupable(ident) {
             ret nil
         }
-
         ret find_enum_in_package(self.package.files, ident)
+    }
+
+    // Returns type enum by identifier.
+    // Returns nil reference if not exist any type enum in this identifier.
+    //
+    // Lookups by import way such as identifier selection.
+    pub fn find_type_enum(mut self, ident: str): &TypeEnum {
+        if !self.is_lookupable(ident) {
+            ret nil
+        }
+        ret find_type_enum_in_package(self.package.files, ident)
     }
 }
 
@@ -321,6 +338,12 @@ impl Lookup for Package {
     // Returns nil reference if not exist any enum in this identifier.
     pub fn find_enum(mut self, ident: str): &Enum {
         ret find_enum_in_package(self.files, ident)
+    }
+
+    // Returns type enum by identifier.
+    // Returns nil reference if not exist any type enum in this identifier.
+    pub fn find_type_enum(mut self, ident: str): &TypeEnum {
+        ret find_type_enum_in_package(self.files, ident)
     }
 }
 
