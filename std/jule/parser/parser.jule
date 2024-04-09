@@ -2036,33 +2036,18 @@ impl Parser {
 
         // Get top directives.
         let mut i = 0
-    iter:
         for i < stmts.len; i++ {
             let mut stmt = stmts[i]
-            if stmt.tokens.len == 0 {
+            if stmt.tokens.len < 2 {
                 ret
             }
-
-            let (_, mut data) = self.build_general_scope_node_data(stmt.tokens)
-            if data == nil {
+            if stmt.tokens[0].id != TokenId.Hash {
                 break
             }
-
-            if self.stopped() {
-                ret
+            if !is_top_directive(stmt.tokens[1].kind) {
+                break
             }
-
-            match type data {
-            | &Directive:
-                let mut d = (&Directive)(data)
-                if d != nil && is_top_directive(d.tag.kind) {
-                    self.ast.top_directives = append(self.ast.top_directives, d)
-                } else {
-                    break iter
-                }
-            |:
-                break iter
-            }
+            self.ast.top_directives = append(self.ast.top_directives, self.build_directive(stmt.tokens))
         }
 
         // Remove all errors.
