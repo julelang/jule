@@ -28,6 +28,8 @@ Some commits may not be fully honored due to some compiler/API errors.
 Please report it with the [Jule Issue Tracker](https://github.com/julelang/jule/issues) if you come across something like this.
 You can also [join the Discord community](https://discord.gg/XNSUUDuGGQ) to discuss, helping, and ask more questions about Jule with the community.
 
+![image](https://github.com/julelang/jule/assets/54983926/450f8ce3-c982-4e95-bdc6-952969506276)
+
 ## The Mission
 
 The mission is to develop a reliable and safe programming language that focuses on systems programming. While doing this, performance should not be compromised too much. Jule should be a balanced language that keeping the cost to a minimum for safety purposes. Even if it is a new language design, the popular C and C++ languages, which are frequently used in system programming, should not be ignored. Therefore, good interoperability support should be provided for these languages.
