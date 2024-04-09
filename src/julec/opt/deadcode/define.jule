@@ -22,6 +22,7 @@ struct LiveTable {
     vars:    []&Var
     fns:     []&FnIns
     structs: []&StructIns
+    traits:  []&Trait
 }
 
 pub struct ObjectDeadCode {
@@ -45,6 +46,8 @@ impl ObjectDeadCode {
             live = self.live.vars
         | &StructIns:
             live = self.live.structs
+        | &Trait:
+            live = self.live.traits
         }
         for i in live {
             if live[i] == t {
@@ -55,15 +58,15 @@ impl ObjectDeadCode {
     }
 
     fn push_live[T](mut &self, mut t: T) {
-        if !self.is_live[T](t) {
-            match type T {
-            | &Var:
-                self.live.vars = append(self.live.vars, t)
-            | &FnIns:
-                self.live.fns = append(self.live.fns, t)
-            | &StructIns:
-                self.live.structs = append(self.live.structs, t)
-            }
+        match type T {
+        | &Var:
+            self.live.vars = append(self.live.vars, t)
+        | &FnIns:
+            self.live.fns = append(self.live.fns, t)
+        | &StructIns:
+            self.live.structs = append(self.live.structs, t)
+        | &Trait:
+            self.live.traits = append(self.live.traits, t)
         }
     }
 
@@ -75,6 +78,21 @@ impl ObjectDeadCode {
         for i < rs.len(); i++ {
             let mut ref = rs.at(i)
             match type ref {
+            | &Trait:
+                let mut t = (&Trait)(ref)
+                if self.is_live[&Trait](t) {
+                    continue
+                }
+                self.push_live[&Trait](t)
+                for (_, mut ins) in t.methods {
+                    for (_, mut mins) in ins.instances {
+                        if self.is_live[&FnIns](mins) {
+                            continue
+                        }
+                        self.push_live[&FnIns](mins)
+                        self.set_references_as_live(mins.refers)
+                    }
+                }
             | &FnIns:
                 let mut f = (&FnIns)(ref)
                 if self.is_live[&FnIns](f) {
@@ -215,9 +233,31 @@ impl ObjectDeadCode {
         }
     }
 
+    fn remove_dead_traits(mut &self, mut &traits: []&Trait) {
+        let mut i = 0
+        for i < traits.len {
+            let mut t = traits[i]
+            if !self.is_live[&Trait](t) {
+                traits = append(traits[:i], traits[i+1:]...)
+                continue
+            }
+            let mut j = 0
+            for j < t.implemented.len {
+                let s = t.implemented[j]
+                if s.instances.len > 0 {
+                    j++
+                    continue
+                }
+                t.implemented = append(t.implemented[:j], t.implemented[j+1:]...)
+            }
+            i++
+        }
+    }
+
     fn remove_deads_file(mut &self, mut &file: &SymbolTable) {
         self.remove_dead_fns(file.funcs)
         self.remove_dead_structs(file.structs)
+        self.remove_dead_traits(file.traits)
         self.remove_dead_globals(file.vars)
     }
 
