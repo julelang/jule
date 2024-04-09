@@ -29,6 +29,7 @@ use std::jule::ast::{
     KeyValPair,
     IdentTypeDecl,
     NamespaceTypeDecl,
+    SubIdentTypeDecl,
 }
 use build for std::jule::build::{
     LogMsg,
@@ -1070,6 +1071,19 @@ impl Eval {
         self.push_err(i.token, LogMsg.NotSupportsIndexing, d.kind.to_str())
     }
 
+    fn push_generics_from_indexing_data_sub_ident(mut &self, mut &expr: &SubIdentExpr,
+        mut &decl: &IdentTypeDecl, mut &i: &IndexingExpr): bool {
+        let mut t = new(SubIdentTypeDecl)
+        if !push_sub_ident_from_expr(expr, t) {
+            self.push_err(i.expr.token, LogMsg.InvalidSyntax)
+            ret false
+        }
+        decl.generics = append(decl.generics, &TypeDecl{
+            kind: t,
+        })
+        ret true
+    }
+
     fn push_generics_from_index_data(mut &self, mut &decl: &IdentTypeDecl, mut &i: &IndexingExpr): bool {
         match type i.index.kind {
         | &UnaryExpr:
@@ -1085,6 +1099,9 @@ impl Eval {
             })
         | &TypeDecl:
             decl.generics = append(decl.generics, (&TypeDecl)(i.index.kind))
+        | &SubIdentExpr:
+            let mut expr = (&SubIdentExpr)(i.index.kind)
+            ret self.push_generics_from_indexing_data_sub_ident(expr, decl, i)
         | &IdentExpr:
             let mut expr = (&IdentExpr)(i.index.kind)
             decl.generics = append(decl.generics, &TypeDecl{
@@ -1116,7 +1133,7 @@ impl Eval {
     }
 
     fn eval_ident_decl_from_indexing(mut &self, mut &d: &Data, mut &i: &IndexingExpr): &Data {
-        let mut tdecl = &TypeDecl{}
+        let mut tdecl = new(TypeDecl)
         let mut decl: &IdentTypeDecl = nil
         match type i.expr.kind {
         | &IdentExpr:
@@ -4420,4 +4437,27 @@ fn update_model_to_generic_ins(mut &m: &FnCallExprModel, mut &f: &FnIns) {
     | &StructStaticIdentExprModel:
         (&StructStaticIdentExprModel)(m.expr).method = f
     }
+}
+
+fn push_sub_ident_from_expr(mut expr: ExprData, mut &t: &SubIdentTypeDecl): bool {
+    match type expr {
+    | &IdentExpr:
+        let mut e = (&IdentExpr)(expr)
+        t.idents = append(t.idents, &IdentTypeDecl{
+            token: e.token,
+            ident: e.ident,
+        })
+    | &SubIdentExpr:
+        let mut e = (&SubIdentExpr)(expr)
+        if !push_sub_ident_from_expr(e.expr.kind, t) {
+            ret false
+        }
+        t.idents = append(t.idents, &IdentTypeDecl{
+            token: e.ident,
+            ident: e.ident.kind,
+        })
+    |:
+        ret false
+    }
+    ret true
 }
