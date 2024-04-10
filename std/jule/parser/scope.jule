@@ -28,6 +28,9 @@ use std::jule::ast::{
     AssignSt,
     CoExpr,
     UseExpr,
+    Stmt,
+    StmtData,
+    TypeAliasDecl,
 }
 use std::jule::build::{LogMsg}
 use std::jule::lex::{
@@ -143,18 +146,18 @@ fn skip_st(mut &i: int, mut tokens: []&Token): ([]&Token, bool) {
     ret st_tokens, terminated
 }
 
-struct Stmt {
+struct stmt {
     tokens:     []&Token
     terminated: bool
 }
 
 // Splits all statements.
-fn split_stmts(mut &tokens: []&Token): []&Stmt {
-    let mut stmts: []&Stmt = nil
+fn split_stmts(mut &tokens: []&Token): []&stmt {
+    let mut stmts = make([]&stmt, 0, 20)
     let mut pos = 0
     for pos < tokens.len {
         let (mut stmt, terminated) = skip_st(pos, tokens)
-        stmts = append(stmts, &Stmt{
+        stmts = append(stmts, &stmt{
             tokens: stmt,
             terminated: terminated,
         })
@@ -165,7 +168,7 @@ fn split_stmts(mut &tokens: []&Token): []&Stmt {
 struct ScopeParser {
     p:     &Parser
     s:     &ScopeTree
-    stmts: []&Stmt
+    stmts: []&stmt
     pos:   int
 }
 
@@ -197,10 +200,10 @@ impl ScopeParser {
 
     fn insert_as_next(mut self, mut &tokens: []&Token) {
         self.stmts = append(self.stmts[:self.pos+1], self.stmts[self.pos:]...)
-        self.stmts[self.pos+1] = &Stmt{tokens: tokens}
+        self.stmts[self.pos+1] = &stmt{tokens: tokens}
     }
 
-    fn next(mut self): &Stmt {
+    fn next(mut self): &stmt {
         self.pos++
         ret self.stmts[self.pos]
     }
@@ -216,13 +219,13 @@ impl ScopeParser {
         ret s
     }
 
-    fn build_var_st(mut self, mut &tokens: []&Token): NodeData {
+    fn build_var_st(mut self, mut &tokens: []&Token): &VarDecl {
         let mut v = self.p.build_var(tokens)
         v.scope = self.s
         ret v
     }
 
-    fn build_ret_st(mut self, mut tokens: []&Token): NodeData {
+    fn build_ret_st(mut self, mut tokens: []&Token): &RetSt {
         let mut st = &RetSt{
             token: tokens[0],
         }
@@ -233,7 +236,7 @@ impl ScopeParser {
         ret st
     }
 
-    fn build_while_next_iter(mut self, mut &s: &Stmt): NodeData {
+    fn build_while_next_iter(mut self, mut &s: &stmt): &Iter {
         let mut it = &Iter{
             token: s.tokens[0],
         }
@@ -252,7 +255,7 @@ impl ScopeParser {
         tokens = self.next().tokens
         let mut st_tokens = get_block_expr(tokens)
         if st_tokens.len > 0 {
-            let mut stmt = &Stmt{
+            let mut stmt = &stmt{
                 terminated: s.terminated,
                 tokens: st_tokens,
             }
@@ -402,7 +405,7 @@ impl ScopeParser {
         ret self.build_while_iter_kind(tokens)
     }
 
-    fn build_common_iter(mut self, mut tokens: []&Token): NodeData {
+    fn build_common_iter(mut self, mut tokens: []&Token): &Iter {
         let mut it = &Iter{
             token: tokens[0],
         }
@@ -432,14 +435,14 @@ impl ScopeParser {
         ret it
     }
 
-    fn build_iter_st(mut self, mut &st: &Stmt): NodeData {
+    fn build_iter_st(mut self, mut &st: &stmt): &Iter {
         if st.terminated {
             ret self.build_while_next_iter(st)
         }
         ret self.build_common_iter(st.tokens)
     }
 
-    fn build_break_st(mut self, mut &tokens: []&Token): NodeData {
+    fn build_break_st(mut self, mut &tokens: []&Token): &BreakSt {
         let mut brk = &BreakSt{
             token: tokens[0],
         }
@@ -457,7 +460,7 @@ impl ScopeParser {
         ret brk
     }
 
-    fn build_cont_st(mut self, mut &tokens: []&Token): NodeData {
+    fn build_cont_st(mut self, mut &tokens: []&Token): &ContSt {
         let mut cont = &ContSt{
             token: tokens[0],
         }
@@ -532,7 +535,7 @@ impl ScopeParser {
         ret els
     }
 
-    fn build_if_else_chain(mut self, mut tokens: []&Token): NodeData {
+    fn build_if_else_chain(mut self, mut tokens: []&Token): &Conditional {
         let mut chain = &Conditional{
             head: self.build_if(tokens),
         }
@@ -555,7 +558,7 @@ impl ScopeParser {
         ret chain
     }
 
-    fn build_co_call_st(mut self, mut tokens: []&Token): NodeData {
+    fn build_co_call_st(mut self, mut tokens: []&Token): &CoExpr {
         let mut c = &CoExpr{
             token: tokens[0],
         }
@@ -564,7 +567,7 @@ impl ScopeParser {
         ret c
     }
 
-    fn build_goto_st(mut self, mut &tokens: []&Token): NodeData {
+    fn build_goto_st(mut self, mut &tokens: []&Token): &GotoSt {
         let mut gt = &GotoSt{
             token: tokens[0],
         }
@@ -584,7 +587,7 @@ impl ScopeParser {
         ret gt
     }
 
-    fn build_fall_st(mut self, mut &tokens: []&Token): NodeData {
+    fn build_fall_st(mut self, mut &tokens: []&Token): &FallSt {
         let mut fll = &FallSt{
             token: tokens[0],
         }
@@ -594,7 +597,7 @@ impl ScopeParser {
         ret fll
     }
 
-    fn build_type_alias_st(mut self, mut &tokens: []&Token): NodeData {
+    fn build_type_alias_st(mut self, mut &tokens: []&Token): &TypeAliasDecl {
         let mut tad = self.p.build_type_alias_decl(tokens)
         tad.scope = self.s
         ret tad
@@ -826,7 +829,7 @@ impl ScopeParser {
         ret lbl
     }
 
-    fn build_id_st(mut self, mut &tokens: []&Token): (NodeData, ok: bool) {
+    fn build_id_st(mut self, mut &tokens: []&Token): (StmtData, ok: bool) {
         if tokens.len == 1 {
             ret
         }
@@ -1023,7 +1026,7 @@ impl ScopeParser {
         ret
     }
 
-    fn build_use_expr(mut self, mut &tokens: []&Token): NodeData {
+    fn build_use_expr(mut self, mut &tokens: []&Token): &UseExpr {
         if tokens.len == 1 {
             self.push_err(tokens[0], LogMsg.MissingExpr)
             ret nil
@@ -1038,7 +1041,7 @@ impl ScopeParser {
         ret ue
     }
 
-    fn build_st(mut self, mut &st: &Stmt): NodeData {
+    fn build_st(mut self, mut &st: &stmt): StmtData {
         let mut token = st.tokens[0]
         if token.id == TokenId.Ident {
             let (mut s, ok) = self.build_id_st(st.tokens)
@@ -1108,7 +1111,7 @@ impl ScopeParser {
             let mut st = self.next()
             let mut data = self.build_st(st)
             if data != nil {
-                self.s.stmts = append(self.s.stmts, Node{
+                self.s.stmts = append(self.s.stmts, Stmt{
                     token: st.tokens[0],
                     data: data,
                 })
