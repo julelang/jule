@@ -1570,8 +1570,6 @@ impl Parser {
         }
         token = tokens[1]
         match token.id {
-        | TokenId.Use:
-            ret self.build_cpp_link_use(tokens)
         | TokenId.Fn
         | TokenId.Unsafe:
             ret self.build_cpp_link_fn(tokens)
@@ -1742,9 +1740,6 @@ impl Parser {
     fn build_node_data(mut &self, mut &tokens: []&Token): NodeData {
         let mut token = tokens[0]
         match token.id {
-        | TokenId.Use:
-            const CPP_LINKED = false
-            ret self.build_use_decl(tokens, CPP_LINKED)
         | TokenId.Fn
         | TokenId.Unsafe:
             let mut f = self.build_fn(tokens, false, false)
@@ -1772,28 +1767,9 @@ impl Parser {
             ret self.build_impl(tokens)
         | TokenId.Cpp:
             ret self.build_cpp_link(tokens)
-        | TokenId.Hash:
-            ret self.build_directive(tokens)
         |:
             self.push_err(token, LogMsg.InvalidSyntax)
             ret nil
-        }
-    }
-
-    fn check_directive(mut self, &node: Node) {
-        if self.directives == nil {
-            ret
-        }
-
-        match type node.data {
-        | &Directive:
-            // Ignore
-            break
-        |:
-            if self.directives.len != 0 {
-                self.push_err(self.directives[0].tag, LogMsg.UnusedDirective)
-            }
-            self.directives = nil
         }
     }
 
@@ -1858,21 +1834,6 @@ impl Parser {
         }
     }
 
-    fn check_use_decl(mut self, &node: Node) {
-        match type node.data {
-        | &UseDecl:
-            // Ignore.
-            break
-        |:
-            ret
-        }
-
-        if self.ast.nodes.len > 0 {
-            self.push_err(node.token, LogMsg.UseDeclAtBody)
-            self.push_suggestion(LogMsg.MoveUseDeclToTopOfFile)
-        }
-    }
-
     fn build_general_scope_node_data(mut &self, mut st: []&Token): (is_pub: bool, data: NodeData) {
         // Detect pub keyword.
         if st[0].id == TokenId.Pub {
@@ -1888,9 +1849,41 @@ impl Parser {
         ret is_pub, data
     }
 
+    fn push_use_decl(mut &self, mut &decl: &UseDecl) {
+        self.ast.use_decls = append(self.ast.use_decls, decl)
+        if self.ast.nodes.len > 0 {
+            self.push_err(decl.token, LogMsg.UseDeclAtBody)
+            self.push_suggestion(LogMsg.MoveUseDeclToTopOfFile)
+        }
+    }
+
+    fn push_meta_nodes(mut &self, mut &tokens: []&Token): bool {
+        match tokens[0].id {
+        | TokenId.Use:
+            const CPP_LINKED = false
+            let mut decl = self.build_use_decl(tokens, CPP_LINKED)
+            self.push_use_decl(decl)
+            ret true
+        | TokenId.Cpp:
+            if tokens.len > 1 && tokens[1].id == TokenId.Use {
+                let mut decl = self.build_cpp_link_use(tokens)
+                self.push_use_decl(decl)
+                ret true
+            }
+        | TokenId.Hash:
+            self.push_directive(self.build_directive(tokens))
+            ret true
+        }
+        ret false
+    }
+
     fn parse_node(mut &self, mut &st: []&Token): Node {
         let mut node = Node{
             token: st[0],
+        }
+
+        if self.push_meta_nodes(st) {
+            ret node
         }
 
         let (is_pub, mut data) = self.build_general_scope_node_data(st)
@@ -1901,8 +1894,10 @@ impl Parser {
         node.data = data
 
         self.apply_meta(node, is_pub)
-        self.check_directive(node)
-        self.check_use_decl(node)
+        if self.directives.len != 0 {
+            self.push_err(self.directives[0].tag, LogMsg.UnusedDirective)
+        }
+        self.directives = nil
         ret node
     }
 
@@ -1915,21 +1910,7 @@ impl Parser {
         if node.data == nil || self.stopped() {
             ret
         }
-
-        match {
-        | node.is_use_decl():
-            self.ast.use_decls = append(self.ast.use_decls, (&UseDecl)(node.data))
-        | node.is_decl() || node.is_impl():
-            // Use declarations eliminated.
-            self.ast.nodes = append(self.ast.nodes, node)
-        |:
-            match type node.data {
-            | &Directive:
-                self.push_directive((&Directive)(node.data))
-            |:
-                self.push_err(node.token, LogMsg.InvalidSyntax)
-            }
-        }
+        self.ast.nodes = append(self.ast.nodes, node)
     }
 
     fn remove_range(self, mut i: int, kind: str, &tokens: []&Token, mut &ranges: []int) {
