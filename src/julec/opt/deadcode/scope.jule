@@ -7,7 +7,7 @@ use std::jule::sema::{
     Package,
     Fn,
     Scope,
-    St,
+    Stmt,
     Data,
     RetSt,
     Label,
@@ -28,7 +28,7 @@ use std::jule::sema::{
 struct ScopeDeadCode {
     parent: &ScopeDeadCode
     s:      &Scope
-    stmts:  *[]St
+    stmts:  *[]Stmt
     i:      int            // Position.
     labels: &[]&Label
     gotos:  &[]&GotoSt
@@ -108,7 +108,8 @@ impl ScopeDeadCode {
     fn optimize_while_iter(mut &self, mut it: &WhileIter) {
         self.optimize_expr_model(it.expr)
         if it.next != nil {
-            self.optimize_expr_model(it.next)
+            let mut next: ExprModel = it.next
+            self.optimize_expr_model(next)
         }
         self.optimize_body_child(it.scope)
     }
@@ -167,7 +168,7 @@ impl ScopeDeadCode {
         self.optimize_expr_model(assign.r)
     }
 
-    fn optimize_stmt(mut &self, mut st: St) {
+    fn optimize_stmt(mut &self, mut st: Stmt) {
         match type st {
         | &Scope:
             let mut scope = (&Scope)(st)

@@ -36,7 +36,25 @@ use std::jule::lex::{
 use types for std::jule::types
 
 // Statement type.
-pub type St: any
+pub enum Stmt: type {
+    &Scope,
+    &Var,
+    &Data,
+    &Conditional,
+    &InfIter,
+    &WhileIter,
+    &RangeIter,
+    &ContSt,
+    &Label,
+    &GotoSt,
+    &Postfix,
+    &Assign,
+    &MultiAssign,
+    &Match,
+    &FallSt,
+    &BreakSt,
+    &RetSt,
+}
 
 fn new_scope_checker_base(mut &s: &Sema, mut owner: &FnIns): &ScopeChecker {
     ret &ScopeChecker{
@@ -70,7 +88,7 @@ fn find_label_parent(ident: str, mut scope: &ScopeChecker): &ScopeLabel {
     ret label
 }
 
-fn model_is_goto_scope(&model: any, &sc: &Scope): bool {
+fn model_is_goto_scope(model: any, &sc: &Scope): bool {
     match type model {
     | &FnCallExprModel:
         let fcem = (&FnCallExprModel)(model)
@@ -84,7 +102,7 @@ fn model_is_goto_scope(&model: any, &sc: &Scope): bool {
     ret false
 }
 
-fn stmt_is_goto_scope(&stmt: any, &sc: &Scope): bool {
+fn stmt_is_goto_scope(&stmt: Stmt, &sc: &Scope): bool {
     match type stmt {
     | &Scope:
         ret (&Scope)(stmt) == sc
@@ -238,9 +256,8 @@ fn is_valid_ast_st_for_next_st(mut &n: StmtData): bool {
     }
 }
 
-fn is_valid_st_for_next_st(&st: St): bool {
+fn is_valid_st_for_next_st(&st: Stmt): bool {
     match type st {
-    | &FnCallExprModel
     | &Postfix
     | &Assign
     | &MultiAssign:
@@ -257,7 +274,7 @@ fn is_valid_st_for_next_st(&st: St): bool {
     }
 }
 
-fn st_is_def(&st: St): bool {
+fn stmt_is_def(&st: Stmt): bool {
     match type st {
     | &Var:
         ret true
@@ -271,7 +288,7 @@ pub struct Scope {
     pub parent:   &Scope
     pub unsafety: bool
     pub deferred: bool
-    pub stmts:    []St
+    pub stmts:    []Stmt
 }
 
 // Chain conditional node.
@@ -299,7 +316,7 @@ pub struct InfIter {
 // While iteration.
 pub struct WhileIter {
     pub expr:  ExprModel // Can be nil if iteration is while-next kind.
-    pub next:  St        // Nil if iteration is not while-next kind.
+    pub next:  Stmt      // Nil if iteration is not while-next kind.
     pub scope: &Scope
 }
 
@@ -1974,7 +1991,7 @@ impl ScopeChecker {
 
         for i >= n; i-- {
             let mut stmt = label.scope.scope.stmts[i]
-            if st_is_def(stmt) {
+            if stmt_is_def(stmt) {
                 self.s.push_err(gt.gt.token, LogMsg.GotoJumpsDeclarations, gt.gt.label.kind)
                 ret
             }
