@@ -48,3 +48,5 @@ For example:
     - **(7.2)** Operators must be checkec and assigned to structures before analysis of methods and others. Because problems can occur if you analysis operators structure by structure. Semantic will analyze structures file by file. Therefore if an operator tries to use overloading from other file, one of whose construction methods has not yet been assigned, it will cause analysis errors.
 
 - **(8)** Check `enum` declarations first before using them or any using possibility appears. Enum fields should be evaluated before evaluate algorithms executed. Otherwise, probably program will panic because of unevaluated enum field(s) when tried to use.
+
+    - **(8.1)** This is not apply for type enums. Type enum's fields are type alias actually. They are should anaylsis like type aliases.
