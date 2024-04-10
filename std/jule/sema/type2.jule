@@ -170,17 +170,28 @@ impl TypeCompatibilityChecker {
         ret self.dest.equals(self.src)
     }
 
+    fn __type_enum(self, mut &e: &TypeEnum, mut &t2: &TypeKind): (ok: bool) {
+        for (_, mut item) in e.items {
+            if item.kind.kind.equals(t2) {
+                ret true
+            }
+            let mut ke = item.kind.kind.tenm()
+            if ke == nil {
+                continue
+            }
+            if self.__type_enum(ke, t2) {
+                ret true
+            }
+        }
+        ret false
+    }
+
     fn check_type_enum(mut self): (ok: bool) {
         if self.dest.equals(self.src) {
             ret true
         }
         let mut e = self.dest.tenm()
-        for (_, mut item) in e.items {
-            if item.kind.kind.equals(self.src) {
-                ret true
-            }
-        }
-        ret false
+        ret self.__type_enum(e, self.src)
     }
 
     fn check(mut self): (ok: bool) {
