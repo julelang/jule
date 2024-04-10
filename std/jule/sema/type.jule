@@ -898,21 +898,20 @@ impl TypeChecker {
         if ins.checked {
             ret true
         }
-        defer {
-            ins.checked = true
-        }
+        ins.checked = true
 
         // Break algorithm cycle.
         if self.referencer != nil && self.referencer.owner == ins.decl {
             ret true
         }
 
-        self.s.precheck_struct_ins(ins)
+        if !self.s.precheck_struct_ins(ins) {
+            ret false
+        }
         if ins.generics.len > 0 {
             self.s.check_struct_ins_operators(ins)
             self.s.check_struct_ins(ins)
         }
-
         ret true
     }
 
@@ -1014,12 +1013,9 @@ impl TypeChecker {
             self.push_reference[&StructIns](exist_instance)
             ret exist_instance
         }
-
-        ok = self.check_struct_ins(ins, decl.token)
-        if !ok {
+        if !self.check_struct_ins(ins, decl.token) {
             ret nil
         }
-
         self.push_reference[&StructIns](ins)
         ret ins
     }

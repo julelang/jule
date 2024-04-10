@@ -2006,6 +2006,7 @@ impl Sema {
 
     // Returns new FnIns as ready-to-analysis.
     // If function already has a instance, returns existing instance.
+    // Returns nil if have a problem.
     fn ready_to_check_fn(mut &self, mut &s: &StructIns, mut &f: &Fn): &FnIns {
         let mut ins = f.instance()
         if f.instances.len != 0 {
@@ -2013,40 +2014,31 @@ impl Sema {
         }
         ins.owner = s
         f.append_instance(ins)
-        self.reload_fn_ins_types(ins)
         ins.reloaded = true
-        ret ins
+        if self.reload_fn_ins_types(ins) {
+            ret ins
+        }
+        ret nil
     }
 
     fn check_type_method(mut &self, mut &s: &StructIns, mut &f: &Fn) {
-        if f.cpp_linked {
-            ret
-        }
-
         // Generic instances are checked instantly.
         if f.generics.len > 0 {
             ret
         }
-
-        _ = self.ready_to_check_fn(s, f)
-        for (_, mut ins) in f.instances {
-            if ins.scope.stmts.len > 0 {
-                // Checked
-                continue
-            }
-            self.check_fn_ins(ins)
+        let mut ins = f.instances[0]
+        if ins.scope.stmts.len > 0 {
+            // Checked
+            ret
         }
+        self.check_fn_ins(ins)
     }
 
     fn check_struct_ins_op(mut &self, mut &s: &StructIns, mut &f: &Fn, p: fn(f: &Fn): bool): &FnIns {
-        if f == nil || f.generics.len > 0 {
+        if f == nil || f.generics.len > 0 || !p(f) {
             ret nil
         }
-        let mut ins = self.ready_to_check_fn(s, f)
-        if p(f) {
-            ret ins
-        }
-        ret nil
+        ret f.instances[0]
     }
 
     fn check_fields(mut &self, mut &s: &StructIns): (ok: bool) {
@@ -2083,6 +2075,7 @@ impl Sema {
         }
 
         let mut eval = self.eval(self)
+        ok = true
         for (_, mut f) in s.fields {
             let mut kind = tc.check_decl(f.decl.kind.decl)
             ok = kind != nil && ok
@@ -2117,8 +2110,19 @@ impl Sema {
         ret
     }
 
-    fn precheck_struct_ins(mut &self, mut &s: &StructIns) {
-        self.check_fields(s)
+    fn precheck_struct_ins(mut &self, mut &s: &StructIns): (ok: bool) {
+        ok = self.check_fields(s)
+        if !ok {
+            ret false
+        }
+        for (_, mut f) in s.methods {
+            if f.generics.len == 0 {
+                if self.ready_to_check_fn(s, f) == nil {
+                    ret false
+                }
+            }
+        }
+        ret true
     }
 
     fn check_struct_ins(mut &self, mut &s: &StructIns) {
@@ -2395,12 +2399,6 @@ impl Sema {
         for (_, mut f) in self.files {
             self.set_current_file(f)
             self.check_fn_types()
-        }
-        if self.errors.len > 0 {
-            ret
-        }
-        for (_, mut f) in self.files {
-            self.set_current_file(f)
             self.check_struct_types()
         }
     }
