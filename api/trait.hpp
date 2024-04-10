@@ -27,10 +27,7 @@ namespace jule
         public:
             static void dealloc(jule::Ptr<jule::Uintptr> &alloc) noexcept
             {
-                jule::Ptr<T> ptr;
-                ptr.alloc = reinterpret_cast<T *>(alloc.alloc);
-                ptr.ref = alloc.ref;
-                ptr.dealloc();
+                alloc.__as<T>().dealloc();
             }
         };
 

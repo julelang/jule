@@ -237,6 +237,15 @@ namespace jule
             return ptr;
         }
 
+        template <typename T2>
+        jule::Ptr<T2> __as(void) const noexcept
+        {
+            jule::Ptr<T2> ptr;
+            ptr.ref = this->ref;
+            ptr.alloc = reinterpret_cast<T2 *>(this->alloc);
+            return ptr;
+        }
+
         inline T *operator->(void) const noexcept
         {
             return this->ptr(
