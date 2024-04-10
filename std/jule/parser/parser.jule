@@ -1145,29 +1145,16 @@ impl Parser {
             let mut t = tokens[i]
             let mut item = new(TypeEnumItemDecl)
             item.token = t
-            if item.token.id != TokenId.Ident {
-                self.push_err(item.token, LogMsg.InvalidSyntax)
-                self.push_suggestion(LogMsg.ExpectedIdentifier)
-            }
-            item.ident = item.token.kind
-            if i+1 >= tokens.len || tokens[i+1].id == TokenId.Comma {
-                if i+1 < tokens.len {
-                    i++
+            if item.token.id == TokenId.Ident && tokens.len - i > 2 {
+                item.ident = item.token.kind
+                t = tokens[i+1]
+                if t.id == TokenId.Colon {
+                    i += 2
+                    if i >= tokens.len || tokens[i].id == TokenId.Comma {
+                        self.push_err(t, LogMsg.MissingType)
+                        continue
+                    }
                 }
-                items = append(items, item)
-                continue
-            }
-            i++
-            t = tokens[i]
-            i++
-            if t.id != TokenId.Colon {
-                self.push_err(t, LogMsg.InvalidSyntax)
-                self.push_suggestion(LogMsg.ExpectedEqualsForAssign)
-                continue
-            }
-            if i >= tokens.len || tokens[i].id == TokenId.Comma {
-                self.push_err(t, LogMsg.MissingExpr)
-                continue
             }
             item.kind = self.build_type_enum_item_kind(i, tokens)
             items = append(items, item)
@@ -1256,7 +1243,7 @@ impl Parser {
             i++
             if t.id != TokenId.Colon {
                 self.push_err(t, LogMsg.InvalidSyntax)
-                self.push_suggestion(LogMsg.ExpectedEqualsForAssign)
+                self.push_suggestion(LogMsg.ExpectedColonForAssign)
                 continue
             }
             if i >= tokens.len || tokens[i].id == TokenId.Comma {
