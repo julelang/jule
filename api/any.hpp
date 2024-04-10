@@ -236,6 +236,13 @@ namespace jule
             );
         }
 
+        inline jule::Any &operator=(const jule::Any &src) noexcept
+        {
+            this->dealloc();
+            this->__get_copy(src);
+            return *this;
+        }
+
         template <typename T>
         inline jule::Bool operator==(const T &expr) const noexcept
         {
@@ -246,13 +253,6 @@ namespace jule
         inline jule::Bool operator==(const jule::Ptr<T> &expr) const noexcept
         {
             return this->type_is<jule::Ptr<T>>() && this->operator jule::Ptr<T>() == expr;
-        }
-
-        inline jule::Any &operator=(const jule::Any &src) noexcept
-        {
-            this->dealloc();
-            this->__get_copy(src);
-            return *this;
         }
 
         template <typename T>
@@ -286,7 +286,7 @@ namespace jule
 
         constexpr jule::Bool operator==(std::nullptr_t) const noexcept
         {
-            return !this->data;
+            return !this->data.alloc;
         }
 
         constexpr jule::Bool operator!=(std::nullptr_t) const noexcept
