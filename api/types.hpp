@@ -21,7 +21,6 @@ namespace jule
     using U16 = std::uint16_t;
     using U32 = std::uint32_t;
     using U64 = std::uint64_t;
-    using Uintptr = std::uintptr_t;
     typedef float F32;
     typedef double F64;
     typedef bool Bool;
@@ -29,9 +28,11 @@ namespace jule
 #ifdef ARCH_X32
     using Uint = std::uint32_t;
     using Int = std::int32_t;
+    using Uintptr = std::uint32_t;
 #else
     using Uint = std::uint64_t;
     using Int = std::int64_t;
+    using Uintptr = std::uint64_t;
 #endif
 
     constexpr decltype(nullptr) nil = nullptr;
