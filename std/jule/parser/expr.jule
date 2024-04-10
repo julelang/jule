@@ -26,6 +26,7 @@ use std::jule::ast::{
     SlicingExpr,
     BinopExpr,
     ScopeTree,
+    RangeExpr,
 }
 use std::jule::build::{LogMsg}
 use std::jule::lex::{
@@ -402,16 +403,16 @@ impl ExprBuilder {
         ret nil
     }
 
-    fn build_between_parentheses(mut self, mut tokens: []&Token): &Expr {
+    fn build_between_parentheses(mut self, mut tokens: []&Token): &RangeExpr {
         if tokens.len == 2 {
             self.push_err(tokens[0], LogMsg.MissingExpr)
             self.push_suggestion(LogMsg.EmptyParentNotValid)
             ret nil
         }
         tokens = tokens[1:tokens.len-1] // Remove parentheses.
-        let mut expr = self.build_from_tokens(tokens)
-        expr.range = true
-        ret expr
+        ret &RangeExpr{
+            expr: self.build_from_tokens(tokens),
+        }
     }
 
     fn try_build_cast(mut self, mut &tokens: []&Token): &CastExpr {
@@ -754,6 +755,7 @@ impl ExprBuilder {
         if l != nil {
             ret &Expr{
                 token: tokens[0],
+                end: tokens[tokens.len-1],
                 kind: &KeyValPair{
                     colon: tokens[l.len],
                     key: self.build_from_tokens(l),

@@ -1917,15 +1917,18 @@ impl Parser {
         }
 
         match {
-        | node.is_directive():
-            self.push_directive((&Directive)(node.data))
         | node.is_use_decl():
             self.ast.use_decls = append(self.ast.use_decls, (&UseDecl)(node.data))
         | node.is_decl() || node.is_impl():
             // Use declarations eliminated.
             self.ast.nodes = append(self.ast.nodes, node)
         |:
-            self.push_err(node.token, LogMsg.InvalidSyntax)
+            match type node.data {
+            | &Directive:
+                self.push_directive((&Directive)(node.data))
+            |:
+                self.push_err(node.token, LogMsg.InvalidSyntax)
+            }
         }
     }
 

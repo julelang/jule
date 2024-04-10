@@ -29,6 +29,7 @@ use ast for std::jule::ast::{
     IdentTypeDecl,
     NamespaceTypeDecl,
     SubIdentTypeDecl,
+    RangeExpr,
 }
 use build for std::jule::build::{
     LogMsg,
@@ -772,7 +773,7 @@ impl Eval {
         self.prefix = nil
         defer { self.prefix = prefix }
 
-        let mut d = self.eval_expr_kind(v.expr)
+        let mut d = self.eval_expr_kind(v.expr.kind)
         if d == nil {
             ret nil
         }
@@ -796,7 +797,7 @@ impl Eval {
         let unsafety = self.unsafety
         self.unsafety = true
 
-        let mut d = self.eval_expr_kind(u.expr)
+        let mut d = self.eval_expr_kind(u.expr.kind)
 
         self.unsafety = unsafety
 
@@ -854,7 +855,7 @@ impl Eval {
         let mut prefix = self.prefix
         self.prefix = arr.elem
         for (_, mut elem) in s.exprs {
-            let mut d = self.eval_expr_kind(elem)
+            let mut d = self.eval_expr_kind(elem.kind)
             if d == nil {
                 continue
             }
@@ -891,7 +892,7 @@ impl Eval {
         let mut prefix = self.prefix
         self.prefix = slc.elem
         for (_, mut elem) in s.exprs {
-            let mut d = self.eval_expr_kind(elem)
+            let mut d = self.eval_expr_kind(elem.kind)
             if d == nil {
                 continue
             }
@@ -928,7 +929,7 @@ impl Eval {
             ret nil
         }
 
-        let mut first_elem = self.eval_expr_kind(s.exprs[0])
+        let mut first_elem = self.eval_expr_kind(s.exprs[0].kind)
         if first_elem == nil {
             ret nil
         }
@@ -1167,7 +1168,7 @@ impl Eval {
         self.prefix = nil
         defer { self.prefix = prefix }
 
-        let mut d = self.eval_expr_kind(i.expr)
+        let mut d = self.eval_expr_kind(i.expr.kind)
         if d == nil {
             ret nil
         }
@@ -1179,7 +1180,7 @@ impl Eval {
 
         let mut old_d = *d
 
-        let mut index = self.eval_expr_kind(i.index)
+        let mut index = self.eval_expr_kind(i.index.kind)
         if index == nil {
             ret nil
         }
@@ -1219,7 +1220,7 @@ impl Eval {
         let mut r: &Data = nil
 
         if s.start != nil {
-            l = self.eval_expr_kind(s.start)
+            l = self.eval_expr_kind(s.start.kind)
             if l != nil {
                 self.check_integer_indexing_by_data(l, s.token)
             } else {
@@ -1234,7 +1235,7 @@ impl Eval {
         }
 
         if s.to != nil {
-            r = self.eval_expr_kind(s.to)
+            r = self.eval_expr_kind(s.to.kind)
             if r != nil {
                 self.check_integer_indexing_by_data(r, s.token)
             } else {
@@ -1316,7 +1317,7 @@ impl Eval {
     }
 
     fn eval_slicing(mut &self, mut s: &SlicingExpr): &Data {
-        let mut d = self.eval_expr_kind(s.expr)
+        let mut d = self.eval_expr_kind(s.expr.kind)
         if d == nil {
             ret nil
         }
@@ -1628,7 +1629,7 @@ impl Eval {
         self.prefix = nil
         defer { self.prefix = prefix }
 
-        let mut d = self.eval_expr_kind(c.expr)
+        let mut d = self.eval_expr_kind(c.expr.kind)
         if d == nil {
             ret nil
         }
@@ -2831,7 +2832,7 @@ impl Eval {
         self.prefix = nil
         defer { self.prefix = prefix }
 
-        let mut d = self.eval_expr_kind(si.expr)
+        let mut d = self.eval_expr_kind(si.expr.kind)
         if d == nil {
             ret nil
         }
@@ -2890,12 +2891,12 @@ impl Eval {
 
             let mut pair = (&KeyValPair)(expr.kind)
 
-            let mut key = self.eval_expr_kind(pair.key)
+            let mut key = self.eval_expr_kind(pair.key.kind)
             if key == nil {
                 ret nil
             }
 
-            let mut val = self.eval_expr_kind(pair.val)
+            let mut val = self.eval_expr_kind(pair.val.kind)
             if val == nil {
                 ret nil
             }
@@ -2984,8 +2985,9 @@ impl Eval {
     fn eval_expr_kind(mut &self, mut kind: ExprData): &Data {
         let mut d: &Data = nil
         match type kind {
-        | &Expr:
-            d = self.eval_expr_kind((&Expr)(kind).kind)
+        | &RangeExpr:
+            let mut e = (&RangeExpr)(kind)
+            d = self.eval_expr_kind(e.expr.kind)
         | &LitExpr:
             d = self.eval_lit((&LitExpr)(kind))
         | &IdentExpr:
@@ -3294,10 +3296,10 @@ impl UnaryEval {
         | TokenKind.Amper:
             let mut prefix = self.e.prefix
             self.e.prefix = nil
-            self.d = self.e.eval_expr_kind(self.u.expr)
+            self.d = self.e.eval_expr_kind(self.u.expr.kind)
             self.e.prefix = prefix
         |:
-            self.d = self.e.eval_expr_kind(self.u.expr)
+            self.d = self.e.eval_expr_kind(self.u.expr.kind)
         }
     }
 
@@ -4170,7 +4172,7 @@ impl BinaryEval {
             ret nil
         }
 
-        let mut l = self.e.eval_expr_kind(op.left)
+        let mut l = self.e.eval_expr_kind(op.left.kind)
         if l == nil || l.kind == nil {
             ret nil
         }
@@ -4178,7 +4180,7 @@ impl BinaryEval {
         let mut prefix = self.e.prefix
         self.e.prefix = l.kind
         defer { self.e.prefix = prefix }
-        let mut r = self.e.eval_expr_kind(op.right)
+        let mut r = self.e.eval_expr_kind(op.right.kind)
         if r == nil || r.kind == nil {
             ret nil
         }
