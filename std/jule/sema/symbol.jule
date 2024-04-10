@@ -493,14 +493,17 @@ impl SymbolBuilder {
     }
 
     fn impl_import_selections(mut self, mut &imp: &ImportInfo, mut &decl: &UseDecl) {
-        for (_, mut ident) in decl.selected {
-            if imp.exist_ident(ident.kind) {
-                self.push_err(ident, LogMsg.DuplicatedUseSelection, ident.kind)
-                self.push_suggestion(LogMsg.RemoveUseSelectionAvoidDupliation)
-                continue
+        imp.selected = decl.selected
+        for _, item in imp.selected {
+            for _, citem in imp.selected {
+                if item == citem {
+                    break
+                } else if item.kind == citem.kind {
+                    self.push_err(item, LogMsg.DuplicatedUseSelection, item.kind)
+                    self.push_suggestion(LogMsg.RemoveUseSelectionAvoidDupliation)
+                    break
+                }
             }
-
-            imp.selected = append(imp.selected, ident)
         }
     }
 
