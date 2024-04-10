@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use std::jule::ast::{
-    self,
+use ast for std::jule::ast::{
     Expr,
     ScopeTree,
     TypeAliasDecl,
@@ -407,7 +406,7 @@ struct ScopeLabel {
 }
 
 struct ScopeGoto {
-    gt:    &std::jule::ast::GotoSt
+    gt:    &ast::GotoSt
     scope: &ScopeChecker
     pos:   int
 }
@@ -819,7 +818,7 @@ impl ScopeChecker {
         }
     }
 
-    fn check_if(mut &self, mut i: &std::jule::ast::If): &If {
+    fn check_if(mut &self, mut i: &ast::If): &If {
         let mut s = self.check_child(i.scope)
 
         let mut d = self.s.eval(self).eval_expr(i.expr)
@@ -839,13 +838,13 @@ impl ScopeChecker {
         }
     }
 
-    fn check_else(mut &self, mut e: &std::jule::ast::Else): &Else {
+    fn check_else(mut &self, mut e: &ast::Else): &Else {
         ret &Else{
             scope: self.check_child(e.scope),
         }
     }
 
-    fn check_conditional(mut &self, mut conditional: &std::jule::ast::Conditional) {
+    fn check_conditional(mut &self, mut conditional: &ast::Conditional) {
         let mut c = &Conditional{}
         self.scope.stmts = append(self.scope.stmts, c)
 
@@ -1039,7 +1038,7 @@ impl ScopeChecker {
         ret false
     }
 
-    fn check_cont_valid_scope(mut &self, c: &std::jule::ast::ContSt): &ContSt {
+    fn check_cont_valid_scope(mut &self, c: &ast::ContSt): &ContSt {
         if self.is_deferred() {
             self.s.push_err(c.token, LogMsg.ContinueAtOutOfValidScope)
             ret nil
@@ -1063,7 +1062,7 @@ impl ScopeChecker {
         ret nil
     }
 
-    fn check_cont(mut &self, c: &std::jule::ast::ContSt) {
+    fn check_cont(mut &self, c: &ast::ContSt) {
         let mut cont = self.check_cont_valid_scope(c)
         if cont == nil {
             ret
@@ -1129,7 +1128,7 @@ impl ScopeChecker {
         })
     }
 
-    fn push_goto(mut &self, mut gt: &std::jule::ast::GotoSt) {
+    fn push_goto(mut &self, mut gt: &ast::GotoSt) {
         self.scope.stmts = append(self.scope.stmts, &GotoSt{
             ident: gt.label.kind,
         })
@@ -1490,7 +1489,7 @@ impl ScopeChecker {
         ret self.check_child_sc(tree, ssc)
     }
 
-    fn check_case(mut &self, mut m: &Match, i: int, mut c: &std::jule::ast::Case, mut expr: &Data): &Case {
+    fn check_case(mut &self, mut m: &Match, i: int, mut c: &ast::Case, mut expr: &Data): &Case {
         let mut _case = m.cases[i]
         _case.exprs = make([]&Data, 0, c.exprs.len)
         let mut generic_matched = false
@@ -1564,7 +1563,7 @@ impl ScopeChecker {
         }
     }
 
-    fn check_default(mut &self, mut m: &Match, mut d: &std::jule::ast::Else): &Case {
+    fn check_default(mut &self, mut m: &Match, mut d: &ast::Else): &Case {
         let mut def = &Case{
             owner: m,
         }
@@ -1679,7 +1678,7 @@ impl ScopeChecker {
         self.check_common_match(m)
     }
 
-    fn check_fall(mut &self, f: &std::jule::ast::FallSt) {
+    fn check_fall(mut &self, f: &ast::FallSt) {
         if self.cse == 0 ||
             self.scope.stmts.len+1 < self.scope.stmts.len ||
             self.is_deferred() {
@@ -1699,7 +1698,7 @@ impl ScopeChecker {
         })
     }
 
-    fn check_break_with_label(mut &self, b: &std::jule::ast::BreakSt): &BreakSt {
+    fn check_break_with_label(mut &self, b: &ast::BreakSt): &BreakSt {
         let mut brk = self.check_plain_break(b)
         if brk == nil {
             ret nil
@@ -1757,7 +1756,7 @@ impl ScopeChecker {
         ret brk
     }
 
-    fn check_plain_break(mut &self, b: &std::jule::ast::BreakSt): &BreakSt {
+    fn check_plain_break(mut &self, b: &ast::BreakSt): &BreakSt {
         if self.is_deferred() {
             self.s.push_err(b.token, LogMsg.BreakAtOutOfValidScope)
             ret nil
@@ -1779,7 +1778,7 @@ impl ScopeChecker {
         ret nil
     }
 
-    fn check_break(mut &self, b: &std::jule::ast::BreakSt) {
+    fn check_break(mut &self, b: &ast::BreakSt) {
         if b.label != nil { // Label given.
             let mut brk = self.check_break_with_label(b)
             self.scope.stmts = append(self.scope.stmts, brk)
@@ -1790,7 +1789,7 @@ impl ScopeChecker {
         self.scope.stmts = append(self.scope.stmts, brk)
     }
 
-    fn check_ret(mut &self, mut r: &std::jule::ast::RetSt) {
+    fn check_ret(mut &self, mut r: &ast::RetSt) {
         if self.is_deferred() {
             self.s.push_err(r.token, LogMsg.RetInDeferred)
         }
@@ -1849,26 +1848,26 @@ impl ScopeChecker {
             self.check_expr((&Expr)(node))
         | &CoExpr:
             self.check_co_expr((&CoExpr)(node))
-        | &std::jule::ast::Conditional:
-            self.check_conditional((&std::jule::ast::Conditional)(node))
+        | &ast::Conditional:
+            self.check_conditional((&ast::Conditional)(node))
         | &Iter:
             self.check_iter((&Iter)(node))
-        | &std::jule::ast::ContSt:
-            self.check_cont((&std::jule::ast::ContSt)(node))
+        | &ast::ContSt:
+            self.check_cont((&ast::ContSt)(node))
         | &LabelSt:
             self.check_label((&LabelSt)(node))
-        | &std::jule::ast::GotoSt:
-            self.push_goto((&std::jule::ast::GotoSt)(node))
+        | &ast::GotoSt:
+            self.push_goto((&ast::GotoSt)(node))
         | &AssignSt:
             self.check_assign_st((&AssignSt)(node))
         | &MatchCase:
             self.check_match((&MatchCase)(node))
-        | &std::jule::ast::FallSt:
-            self.check_fall((&std::jule::ast::FallSt)(node))
-        | &std::jule::ast::BreakSt:
-            self.check_break((&std::jule::ast::BreakSt)(node))
-        | &std::jule::ast::RetSt:
-            self.check_ret((&std::jule::ast::RetSt)(node))
+        | &ast::FallSt:
+            self.check_fall((&ast::FallSt)(node))
+        | &ast::BreakSt:
+            self.check_break((&ast::BreakSt)(node))
+        | &ast::RetSt:
+            self.check_ret((&ast::RetSt)(node))
         | &UseExpr:
             self.check_use_expr((&UseExpr)(node))
         |:
@@ -1906,10 +1905,10 @@ impl ScopeChecker {
             |:
                 ret
             }
-        | &std::jule::ast::GotoSt
-        | &std::jule::ast::BreakSt
-        | &std::jule::ast::ContSt
-        | &std::jule::ast::RetSt:
+        | &ast::GotoSt
+        | &ast::BreakSt
+        | &ast::ContSt
+        | &ast::RetSt:
             self.check_node(stmt.data)
         |:
             self.check_node(stmt.data)
