@@ -94,22 +94,9 @@ namespace jule
             this->data = ref.template as<jule::Uintptr>();
         }
 
-        Any(const jule::Any &src) noexcept
-        {
-            this->__get_copy(src);
-        }
-
         ~Any(void)
         {
             this->dealloc();
-        }
-
-        // Copy content from source.
-        void __get_copy(const jule::Any &src) noexcept
-        {
-            this->data = src.data;
-            this->type = src.type;
-            this->type_info = src.type_info;
         }
 
         void dealloc(void) noexcept
@@ -239,7 +226,9 @@ namespace jule
         inline jule::Any &operator=(const jule::Any &src) noexcept
         {
             this->dealloc();
-            this->__get_copy(src);
+            this->data = src.data;
+            this->type = src.type;
+            this->type_info = src.type_info;
             return *this;
         }
 

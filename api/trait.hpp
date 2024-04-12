@@ -83,11 +83,6 @@ namespace jule
             this->data = ref.template as<jule::Uintptr>();
         }
 
-        Trait(const jule::Trait<Mask> &src) noexcept
-        {
-            this->__get_copy(src);
-        }
-
         ~Trait(void) noexcept
         {
             this->dealloc();
@@ -101,15 +96,6 @@ namespace jule
             this->data.alloc = nullptr;
             this->type = nullptr;
             this->type_info = nullptr;
-        }
-
-        // Copy content from source.
-        void __get_copy(const jule::Trait<Mask> &src) noexcept
-        {
-            this->data = src.data;
-            this->type_offset = src.type_offset;
-            this->type = src.type;
-            this->type_info = src.type_info;
         }
 
         inline void must_ok(
@@ -246,7 +232,10 @@ namespace jule
         inline jule::Trait<Mask> &operator=(const jule::Trait<Mask> &src) noexcept
         {
             this->dealloc();
-            this->__get_copy(src);
+            this->data = src.data;
+            this->type_offset = src.type_offset;
+            this->type = src.type;
+            this->type_info = src.type_info;
             return *this;
         }
 
