@@ -880,14 +880,18 @@ impl Eval {
         }
     }
 
-    fn eval_exp_slc(mut &self, mut s: &SliceExpr, mut elem_type: &TypeKind): &Data {
+    fn eval_exp_slc(mut &self, mut s: &SliceExpr, mut t: &TypeKind, mut first: ExprModel): &Data {
         let mut slc = &Slc{
-            elem: elem_type,
+            elem: t,
         }
 
         let mut model = &SliceExprModel{
-            elem_kind: elem_type,
+            elem_kind: t,
             elems: make([]ExprModel, 0, s.exprs.len),
+        }
+        if first != nil {
+            model.elems = append(model.elems, first)
+            s.exprs = s.exprs[1:]
         }
 
         let mut prefix = self.prefix
@@ -918,7 +922,7 @@ impl Eval {
                 ret self.eval_arr(s)
             | self.prefix.slc() != nil:
                 let mut pt = self.prefix.slc()
-                ret self.eval_exp_slc(s, pt.elem)
+                ret self.eval_exp_slc(s, pt.elem, nil)
             }
         }
 
@@ -935,7 +939,7 @@ impl Eval {
             ret nil
         }
 
-        let mut d = self.eval_exp_slc(s, first_elem.kind)
+        let mut d = self.eval_exp_slc(s, first_elem.kind, first_elem.model)
 
         self.prefix = prefix
         ret d
@@ -1399,7 +1403,6 @@ impl Eval {
             if !self.is_unsafe() {
                 self.push_err(error_token, LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
             }
-
             // Ok.
             ret
         }
