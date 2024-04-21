@@ -18,9 +18,7 @@ use std::jule::constant::{Const}
 use std::jule::lex::{Token, TokenKind}
 use std::jule::sema::{
     Var,
-    Struct,
     FnIns,
-    Trait,
     StructIns,
     TypeKind,
     Data,
@@ -81,6 +79,15 @@ const CPP_IGNORE = "std::ignore"
 
 // Represents default expression for type.
 const CPP_DEFAULT_EXPR = "{}"
+
+// Common group of semantic analysis expression model types and optimizer specific types.
+enum CompExprModel: type {
+    ExprModel,
+    &UnsafeBinopExprModel,
+    &UnsafeIndexingExprModel,
+    &MutSlicingExprModel,
+    &StrInsertBeginExprModel,
+}
 
 struct ExprCoder {
     oc: &ObjectCoder
@@ -253,10 +260,6 @@ impl ExprCoder {
         self.oc.write(IdentCoder.var(m))
     }
 
-    fn structure(mut &self, m: &Struct) {
-        self.oc.write(TypeCoder.structure(m))
-    }
-
     fn structure_ins(mut &self, mut m: &StructIns) {
         self.oc.write(TypeCoder.structure_ins(m))
     }
@@ -387,7 +390,7 @@ impl ExprCoder {
         }
     }
 
-    fn model_for_call(mut &self, mut expr: ExprModel) {
+    fn model_for_call(mut &self, mut expr: CompExprModel) {
         match type expr {
         | &FnIns:
             self.func_ins((&FnIns)(expr))
@@ -440,7 +443,7 @@ impl ExprCoder {
                     if ssie.expr.kind.strct() != nil {
                         if !ssie.expr.lvalue {
                             self.oc.write("({ auto _wrap_copy = ")
-                            self.model(ssie.expr)
+                            self.model(ssie.expr.model)
                             self.oc.write("; ")
                             ret true
                         }
@@ -479,9 +482,9 @@ impl ExprCoder {
                 let mut ssie = (&StructSubIdentExprModel)(m.expr)
                 match {
                 | m.func.decl.params[0].is_ref():
-                    self.model(ssie.expr)
+                    self.model(ssie.expr.model)
                 | ssie.expr_kind.sptr() != nil:
-                    self.model(ssie.expr)
+                    self.model(ssie.expr.model)
                     self.oc.write(".ptr(")
                     if !env::PRODUCTION {
                         self.oc.write("\"")
@@ -497,7 +500,7 @@ impl ExprCoder {
                     if wrapped {
                         self.oc.write("_wrap_copy")
                     } else {
-                        self.model(ssie.expr)
+                        self.model(ssie.expr.model)
                     }
                 }
                 if m.args.len > 0 {
@@ -687,7 +690,7 @@ impl ExprCoder {
     }
 
     fn structure_sub(mut &self, mut m: &StructSubIdentExprModel) {
-        self.model(m.expr)
+        self.model(m.expr.model)
         if m.field != nil {
             if m.expr_kind.ptr() != nil {
                 self.oc.write("->")
@@ -972,13 +975,13 @@ impl ExprCoder {
             ret
         }
         let n = self.oc.obj.len
+        let mut args = make([]any, m.exprs.len)
         for (i, mut expr) in m.exprs {
             self.expr(expr)
-            let obj = self.oc.obj[n:]
-            m.exprs[i] = obj
+            args[i] = self.oc.obj[n:]
             self.oc.obj = self.oc.obj[:n]
         }
-        self.oc.write(fmt::format(m.code, m.exprs...))
+        self.oc.write(fmt::format(m.code, args...))
     }
 
     fn free(mut &self, mut m: &FreeExprModel) {
@@ -1015,20 +1018,14 @@ impl ExprCoder {
         self.oc.write("));")
     }
 
-    fn model(mut &self, mut m: ExprModel) {
+    fn model(mut &self, mut m: CompExprModel) {
         match type m {
-        | &Data:
-            self.model((&Data)(m).model)
         | &TypeKind:
             self.oc.write(TypeCoder.kind((&TypeKind)(m)))
         | &Const:
             self.constant((&Const)(m), false)
         | &Var:
             self.var((&Var)(m))
-        | &Trait:
-            IdentCoder.trait_decl((&Trait)(m))
-        | &Struct:
-            self.structure((&Struct)(m))
         | &StructIns:
             self.structure_ins((&StructIns)(m))
         | &FnIns:
@@ -1114,7 +1111,7 @@ impl ExprCoder {
         }
     }
 
-    fn expr(mut &self, mut e: ExprModel) {
+    fn expr(mut &self, mut e: CompExprModel) {
         self.model(e)
     }
 

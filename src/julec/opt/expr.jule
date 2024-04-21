@@ -153,9 +153,8 @@ impl ExprOptimizer {
                 c.set_i64(1)
             }
         }
-        *self.model = &UnsafeBinopExprModel{
-            node: m,
-        }
+        let mut model: any = &UnsafeBinopExprModel{node: m}
+        *self.model = unsafe { *(*ExprModel)(&model) }
     }
 
     fn unary(self, mut m: &UnaryExprModel) {
@@ -227,9 +226,8 @@ impl ExprOptimizer {
         let array = m.expr.kind.arr() != nil
         // Constants checked by semantic analysis for arrays, safe.
         if array && m.index.is_const() {
-            *self.model = &UnsafeIndexingExprModel{
-                node: m,
-            }
+            let mut model: any = &UnsafeIndexingExprModel{node: m}
+            *self.model = unsafe { *(*ExprModel)(&model) }
             ret
         }
         match type m.index.model {
@@ -243,9 +241,8 @@ impl ExprOptimizer {
                 let r = (&Var)(m.expr.model)
                 // Iterated variable is indexed variable?
                 if i.iter_relation.range == r {
-                    *self.model = &UnsafeIndexingExprModel{
-                        node: m,
-                    }
+                    let mut model: any = &UnsafeIndexingExprModel{node: m}
+                    *self.model = unsafe { *(*ExprModel)(&model) }
                 }
             }
         }
@@ -354,9 +351,6 @@ impl ExprOptimizer {
 
     fn do(self) {
         match type *self.model {
-        | &Data:
-            *self.model = unsafe { (&Data)(*self.model).model }
-            self.do()
         | &BinopExprModel:
             self.binary((&BinopExprModel)(*self.model))
         | &UnaryExprModel:
