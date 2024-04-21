@@ -1563,13 +1563,12 @@ impl Eval {
         d.model = d.constant
     }
 
-    fn cast_type_enum(mut self, mut t: &TypeEnum, mut &dest: &TypeKind, mut error_token: &Token) {
-        for (_, mut item) in t.items {
-            if item.kind.kind.equals(dest) {
-                ret
-            }
+    fn cast_type_enum(mut self, mut &t: &TypeKind, mut &d: &Data, mut &error_token: &Token) {
+        let n = self.s.errors.len
+        if !self.s.check_type_compatibility(d.kind, t, error_token) {
+            self.s.errors = self.s.errors[:n]
+            self.push_err(error_token, LogMsg.TypeNotSupportsCastingTo, d.kind.to_str(), t.to_str())
         }
-        self.push_err(error_token, LogMsg.TypeNotSupportsCastingTo, dest.to_str(), t.to_str())
     }
 
     fn eval_cast_by_type_n_data(mut self, mut t: &TypeKind, mut d: &Data, mut error_token: &Token): &Data {
@@ -1587,7 +1586,7 @@ impl Eval {
                 self.push_err(error_token, LogMsg.EnumCastedFromAny)
             }
         | d.kind.tenm() != nil:
-            self.cast_type_enum(d.kind.tenm(), t, error_token)
+            self.cast_type_enum(t, d, error_token)
         | t.ptr() != nil:
             self.cast_ptr(t, d, error_token)
         | t.sptr() != nil:
