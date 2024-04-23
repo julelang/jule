@@ -347,11 +347,15 @@ pub fn replace(s: str, sub: str, new: str, mut n: int): str {
         ret s
     }
 
-    if n < 0 {
-        n = s.len
+    let m = count(s, sub)
+    if m == 0 {
+        ret s
+    }
+    if n < 0 || m < n {
+        n = m
     }
 
-    let mut ss = make(str, s.len)
+    let mut ss = make(str, s.len + n * (new.len - sub.len))
     let mut i = 0
     for n > 0; n-- {
         let j = find_at(s, sub, i)
@@ -454,7 +458,21 @@ pub fn join(parts: []str, sep: str): str {
     if parts.len == 0 {
         ret ""
     }
-    let mut s = parts[0]
+    let mut n = 0
+    if sep.len > 0 {
+        if sep.len >= int.MAX/parts.len-1 {
+            panic("std::strings: join: output length overflow")
+        }
+        n += sep.len * (parts.len - 1)
+    }
+    for _, part in parts {
+        if part.len > int.MAX-n {
+            panic("std::strings: join: output length overflow")
+        }
+        n += part.len
+    }
+    let mut s = make(str, n)
+    s += parts[0]
     for _, part in parts[1:] {
         s += sep
         s += part
