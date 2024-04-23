@@ -6,10 +6,11 @@
 #define __JULE_PANIC_HPP
 
 #include <iostream>
-#include <vector>
+#include "impl_flag.hpp"
 
 #ifdef OS_WINDOWS
 #include "windows.h"
+#include <vector>
 
 #include "types.hpp"
 #include "platform.hpp"
@@ -21,7 +22,8 @@ namespace jule
 {
     constexpr signed int EXIT_PANIC = 2;
 
-    inline void panic(const std::string &expr) noexcept
+    __attribute__((noreturn))
+    void panic(const std::string &expr)
     {
         std::cerr << "panic: ";
 #ifdef OS_WINDOWS
@@ -32,6 +34,7 @@ namespace jule
         std::cerr << expr << std::endl;
 #endif
         std::exit(jule::EXIT_PANIC);
+        __builtin_unreachable();
     }
 
 } // namespace jule
