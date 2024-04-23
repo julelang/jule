@@ -32,6 +32,7 @@ struct ScopeDeadCode {
     i:      int            // Position.
     labels: &[]&Label
     gotos:  &[]&GotoSt
+    except: bool
 }
 
 impl ScopeDeadCode {
@@ -42,6 +43,17 @@ impl ScopeDeadCode {
             stmts: &s.stmts,
             labels: self.labels,
             gotos: self.gotos,
+        }
+        unsafe { sdc.optimize_stmts() }
+    }
+
+    fn optimize_body_child_exceptional(mut &self, mut &s: &Scope) {
+        let mut sdc = &ScopeDeadCode{
+            s: s,
+            stmts: &s.stmts,
+            labels: self.labels,
+            gotos: self.gotos,
+            except: true,
         }
         unsafe { sdc.optimize_stmts() }
     }
@@ -192,6 +204,9 @@ impl ScopeDeadCode {
             self.optimize_multi_assign((&MultiAssign)(st))
         | &Data:
             let mut d = (&Data)(st)
+            if self.except {
+                break
+            }
             match type d.model {
             | &BuiltinErrorCallExprModel
             | &BuiltinPanicCallExprModel:
