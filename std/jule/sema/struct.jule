@@ -5,6 +5,7 @@
 use std::jule::ast::{GenericDecl, Directive, Expr}
 use std::jule::build
 use std::jule::lex::{Token}
+use std::strings::{StrBuilder}
 
 // Field.
 pub struct Field {
@@ -240,18 +241,20 @@ impl Kind for StructIns {
     // Implement: Kind
     // Returns Struct's type kind as string.
     pub fn to_str(self): str {
-        let mut kind = ""
-        kind += self.decl.ident
+        let mut kind = StrBuilder.new()
+        kind.grow(30 * (4 * self.generics.len))
+        kind.write_str(self.decl.ident)
         if self.generics.len > 0 {
-            kind += "["
-            for _, g in self.generics {
-                kind += g.to_str()
-                kind += ","
+            kind.write_byte('[')
+            for i, g in self.generics {
+                kind.write_str(g.to_str())
+                if self.generics.len - i > 1 {
+                    kind.write_byte(',')
+                }
             }
-            kind = kind[:kind.len-1] // Remove comma.
-            kind += "]"
+            kind.write_byte(']')
         }
-        ret kind
+        ret kind.to_str()
     }
 
     // Reports whether types are same.

@@ -1,0 +1,100 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use nosafe for std::internal::nosafe
+use utf8 for std::unicode::utf8
+
+// Mutable string.
+#derive Clone
+pub struct StrBuilder {
+    mut buf: []byte
+}
+
+impl StrBuilder {
+    // Returns new StrBuilder instance.
+    pub static fn new(): StrBuilder {
+        ret StrBuilder{}
+    }
+
+    // Returns length of string.
+    pub fn len(self): int {
+        ret self.buf.len
+    }
+
+    // Returns capacity of string's buffer.
+    pub fn cap(self): int {
+        ret self.buf.cap
+    }
+
+    // Clear buffer.
+    pub fn reset(mut self) {
+        self.buf = nil
+    }
+
+    // Grows buffer's capacity to n.
+    // It will panic if n < self.cap() || n < 0.
+    pub fn grow(mut self, n: int) {
+        match {
+        | n < self.cap():
+            panic("std::strings: StrBuilder.grow: n < self.cap()")
+        | n < 0:
+            panic("std::strings: StrBuilder.grow: n < 0")
+        | n == self.cap():
+            ret
+        }
+        let mut buf = make([]byte, self.len(), n)
+        _ = copy(buf, self.buf)
+        self.buf = buf
+    }
+
+    // Shrinks buffer's length to n.
+    // It will panic if n > self.len() || n < 0.
+    pub fn shrink(mut self, n: int) {
+        match {
+        | n > self.len():
+            panic("std::strings: StrBuilder.grow: n > self.len()")
+        | n < 0:
+            panic("std::strings: StrBuilder.grow: n < 0")
+        |:
+            self.buf = self.buf[:n]
+        }
+    }
+
+    // Get buffer as string.
+    pub fn to_str(self): str {
+        ret str(self.buf)
+    }
+
+    // Returns immutable copy of buffer in bytes.
+    pub fn bytes(self): []byte {
+        ret clone(self.buf)
+    }
+
+    // Returns mutable copy buffer in bytes.
+    // This method designed for efficiency and more low-level access.
+    // If you do not have something like that, use [bytes] method instead.
+    pub fn buffer(self): []byte {
+        ret self.buf
+    }
+
+    // Writes bytes into buffer.
+    pub fn write(mut self, b: []byte) {
+        self.buf = append(self.buf, b...)
+    }
+
+    // Append byte to buffer.
+    pub fn write_byte(mut self, b: byte) {
+        self.buf = append(self.buf, b)
+    }
+
+    // Append rune to buffer.
+    pub fn write_rune(mut self, r: rune) {
+        self.buf = utf8::append_rune(self.buf, r)
+    }
+
+    // Writes string into buffer.
+    pub fn write_str(mut self, s: str) {
+        self.buf = append(self.buf, nosafe::stobs(s)...)
+    }
+}

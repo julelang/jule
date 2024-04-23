@@ -4,6 +4,7 @@
 
 use std::fs::{FsError, File}
 use nosafe for std::internal::nosafe
+use std::strings::{StrBuilder}
 
 // Stream implementation for file handles.
 // Uses internally mutable buffer.
@@ -74,7 +75,8 @@ impl FileStream {
     pub fn read_line(mut self)!: str {
         const LINE_DELIMITER = '\n'
 
-        let mut buff = "" //make(str, 1024)
+        let mut buff = StrBuilder.new()
+        buff.grow(1024)
         let mut part_buff: BufferArray
         let mut part = nosafe::atobs[BufferArray, BufferArrayElem](part_buff)
         for {
@@ -82,11 +84,11 @@ impl FileStream {
             if n == 0 {
                 break
             }
-            buff += str(part[:n])//nosafe::push_to_str_buffer(buff, part[:n])
+            buff.write(part[:n])
             if part[n-1] == LINE_DELIMITER {
                 break
             }
         }
-        ret buff
+        ret buff.to_str()
     }
 }

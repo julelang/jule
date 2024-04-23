@@ -19,11 +19,12 @@ pub fn repeat(s: str, mut n: int): str {
         panic("std::strings: repeat: integer buffer size overflow")
     }
 
-    let mut ss = ""// make(str, s.len * n)
+    let mut ss = StrBuilder.new()
+    ss.grow(s.len * n)
     for n > 0; n-- {
-        ss += s
+        ss.write_str(s)
     }
-    ret ss
+    ret ss.to_str()
 }
 
 fn _has_prefix(&s: str, &sub: str, mut start: int): bool {
@@ -347,30 +348,36 @@ pub fn replace(s: str, sub: str, new: str, mut n: int): str {
         ret s
     }
 
-    if n < 0 {
-        n = s.len
+    let m = count(s, sub)
+    if m == 0 {
+        ret s
+    }
+    if n < 0 || m < n {
+        n = m
     }
 
-    let mut ss = "" //make(str, s.len)
+    let mut ss = StrBuilder.new()
+    ss.grow(s.len + n * (new.len - sub.len))
     let mut i = 0
     for n > 0; n-- {
         let j = find_at(s, sub, i)
         if j == N_INDEX {
             break
         }
-        ss += s[i:j]
-        ss += new
+        ss.write_str(s[i:j])
+        ss.write_str(new)
         i = j + sub.len
     }
-    ss += s[i:]
-    ret ss
+    ss.write_str(s[i:])
+    ret ss.to_str()
 }
 
 // Returns a copy of the string s with all its characters modified
 // according to the mapping function. If mapping returns a negative value,
 // the character is dropped from the string with no replacement.
 pub fn map(s: str, mapping: fn(mut rune): rune): str {
-    let mut ss = "" //make(str, s.len)
+    let mut ss = StrBuilder.new()
+    ss.grow(s.len)
     let mut bytes = nosafe::stobs(s)
     let mut i = 0
     for i < bytes.len {
@@ -378,10 +385,10 @@ pub fn map(s: str, mapping: fn(mut rune): rune): str {
         i += n
         r = mapping(r)
         if r >= 0 {
-            ss += str(r)
+            ss.write_rune(r)
         }
     }
-    ret ss
+    ret ss.to_str()
 }
 
 // Returns s with all Unicode letters mapped to their lower case.
@@ -454,10 +461,25 @@ pub fn join(parts: []str, sep: str): str {
     if parts.len == 0 {
         ret ""
     }
-    let mut s = parts[0]
-    for _, part in parts[1:] {
-        s += sep
-        s += part
+    let mut n = 0
+    if sep.len > 0 {
+        if sep.len >= int.MAX/parts.len-1 {
+            panic("std::strings: join: output length overflow")
+        }
+        n += sep.len * (parts.len - 1)
     }
-    ret s
+    for _, part in parts {
+        if part.len > int.MAX-n {
+            panic("std::strings: join: output length overflow")
+        }
+        n += part.len
+    }
+    let mut s = StrBuilder.new()
+    s.grow(n)
+    s.write_str(parts[0])
+    for _, part in parts[1:] {
+        s.write_str(sep)
+        s.write_str(part)
+    }
+    ret s.to_str()
 }

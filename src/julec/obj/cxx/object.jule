@@ -36,7 +36,7 @@ use std::jule::sema::{
     TypeSymbol,
 }
 use path for std::fs::path
-use strings for std::strings
+use strings for std::strings::{StrBuilder}
 use std::time::{Time}
 
 // Data offset of empty trait.
@@ -55,7 +55,7 @@ struct TraitHash {
 
 pub struct ObjectCoder {
     // Internal buffer which is commonly used.
-    pub obj: []byte
+    pub obj: StrBuilder
 
     ir:   &IR
     info: SerializationInfo
@@ -80,11 +80,11 @@ impl ObjectCoder {
     }
 
     fn write(mut &self, s: str) {
-        self.obj = append(self.obj, []byte(s)...)
+        self.obj.write_str(s)
     }
 
     fn write_bytes(mut &self, s: []byte) {
-        self.obj = append(self.obj, s...)
+        self.obj.write(s)
     }
 
     // Increase indentation.
@@ -100,7 +100,7 @@ impl ObjectCoder {
 
     // Writes indention string by indent_buffer.
     fn indent(mut &self) {
-        self.obj = append(self.obj, self.indent_buffer...)
+        self.obj.write(self.indent_buffer)
     }
 
     fn find_type_offset(self, t: &Trait, mut k: &TypeKind): int {
@@ -1036,9 +1036,17 @@ fn prepare_structure(mut &s: &Struct) {
 
 // Concatenate all strings into single string.
 fn concat_all_parts(parts: ...&Token): str {
-    let mut s = ""
-    for _, p in parts {
-        s += p.kind
+    let mut n = 0
+    for _, part in parts {
+        n += part.kind.len
     }
-    ret s
+    if n == 0 {
+        ret ""
+    }
+    let mut s = StrBuilder.new()
+    s.grow(n)
+    for _, p in parts {
+        s.write_str(p.kind)
+    }
+    ret s.to_str()
 }
