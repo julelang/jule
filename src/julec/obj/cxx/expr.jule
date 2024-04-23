@@ -7,8 +7,6 @@ use opt::{
     UnsafeBinopExprModel,
     UnsafeIndexingExprModel,
     PushToSliceExprModel,
-    MutSlicingExprModel,
-    StrInsertBeginExprModel,
 }
 use conv for std::conv
 use std::env::{ARCH}
@@ -85,8 +83,6 @@ enum CompExprModel: type {
     ExprModel,
     &UnsafeBinopExprModel,
     &UnsafeIndexingExprModel,
-    &MutSlicingExprModel,
-    &StrInsertBeginExprModel,
 }
 
 struct ExprCoder {
@@ -909,12 +905,12 @@ impl ExprCoder {
         let dest = self.oc.obj[n:]
 
         self.oc.write(" = jule::alloc_for_append(")
-        self.oc.write(dest)
+        self.oc.write_bytes(dest)
         self.oc.write(",")
         self.oc.write(conv::itoa(m.elems.elems.len))
         self.oc.write(");")
         for (_, mut e) in m.elems.elems {
-            self.oc.write(dest)
+            self.oc.write_bytes(dest)
             // Use the "__push" method to skip allocation boundary checking.
             self.oc.write(".__push(")
             self.model(e)
@@ -978,7 +974,7 @@ impl ExprCoder {
         let mut args = make([]any, m.exprs.len)
         for (i, mut expr) in m.exprs {
             self.expr(expr)
-            args[i] = self.oc.obj[n:]
+            args[i] = str(self.oc.obj[n:])
             self.oc.obj = self.oc.obj[:n]
         }
         self.oc.write(fmt::format(m.code, args...))
@@ -991,31 +987,6 @@ impl ExprCoder {
             ret
         }
         self.oc.write(".__free()")
-    }
-
-    fn mut_slicing(mut &self, mut m: &MutSlicingExprModel) {
-        self.oc.write("(")
-        self.model(m.expr)
-        self.oc.write(").mut_slice(")
-        if !env::PRODUCTION {
-            self.oc.write("\"")
-            self.oc.loc_info(m.token)
-            self.oc.write("\",")
-        }
-        self.expr(m.left)
-        if m.right != nil {
-            self.oc.write(",")
-            self.expr(m.right)
-        }
-        self.oc.write(");")
-    }
-
-    fn str_insert_begin(mut &self, mut m: &StrInsertBeginExprModel) {
-        self.oc.write("(")
-        self.model(m.dest)
-        self.oc.write(").buffer.insert(0, (")
-        self.model(m.expr)
-        self.oc.write("));")
     }
 
     fn model(mut &self, mut m: CompExprModel) {
@@ -1102,10 +1073,6 @@ impl ExprCoder {
             self.backend_emit((&BackendEmitExprModel)(m))
         | &FreeExprModel:
             self.free((&FreeExprModel)(m))
-        | &MutSlicingExprModel:
-            self.mut_slicing((&MutSlicingExprModel)(m))
-        | &StrInsertBeginExprModel:
-            self.str_insert_begin((&StrInsertBeginExprModel)(m))
         |:
             self.oc.write("<unimplemented_expression_model>")
         }

@@ -243,59 +243,7 @@ impl ScopeOptimizer {
         self.optimize_child(it.scope)
     }
 
-    fn substr(mut self, mut a: &Assign): bool {
-        match type a.r.model {
-        | &SlicingExprModel:
-            let mut sem = (&SlicingExprModel)(a.r.model)
-            if a.l.model == sem.expr {
-                self.set_current_stmt(&MutSlicingExprModel{
-                    token: sem.token,
-                    expr: sem.expr,
-                    left: sem.left,
-                    right: sem.right,
-                })
-                ret true
-            }
-        }
-        ret false
-    }
-
-    fn str_insert(mut self, mut a: &Assign): bool {
-        match type a.r.model {
-        | &BinopExprModel:
-            let mut m = (&BinopExprModel)(a.r.model)
-            if a.l.model == m.right.model {
-                self.set_current_stmt(&StrInsertBeginExprModel{
-                    dest: a.l.model,
-                    expr: m.left.model,
-                })
-                ret true
-            }
-        }
-        ret false
-    }
-
-    fn str_assign(mut self, mut a: &Assign): bool {
-        if a.op.kind != TokenKind.Eq {
-            ret false
-        }
-        let lp = a.l.kind.prim()
-        if lp == nil || !lp.is_str() {
-            ret false
-        }
-        match {
-        | self.substr(a)
-        | self.str_insert(a):
-            ret true
-        }
-        ret false
-    }
-
     fn optimize_assign(mut self, mut assign: &Assign) {
-        if COPY && self.str_assign(assign) {
-            ret
-        }
-
         ExprOptimizer.optimize(assign.l.model)
         ExprOptimizer.optimize(assign.r.model)
 

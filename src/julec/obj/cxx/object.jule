@@ -55,14 +55,14 @@ struct TraitHash {
 
 pub struct ObjectCoder {
     // Internal buffer which is commonly used.
-    pub obj: str
+    pub obj: []byte
 
     ir:   &IR
     info: SerializationInfo
     tmap: []&TraitHash
 
     // Current indentation.
-    indent_buffer: str
+    indent_buffer: []byte
 
     ec: &ExprCoder
     sc: &ScopeCoder
@@ -80,13 +80,17 @@ impl ObjectCoder {
     }
 
     fn write(mut &self, s: str) {
-        self.obj += s
+        self.obj = append(self.obj, []byte(s)...)
+    }
+
+    fn write_bytes(mut &self, s: []byte) {
+        self.obj = append(self.obj, s...)
     }
 
     // Increase indentation.
     fn add_indent(mut &self) {
-        const INDENT_KIND = "\t"
-        self.indent_buffer += INDENT_KIND
+        const INDENT_KIND = '\t'
+        self.indent_buffer = append(self.indent_buffer, INDENT_KIND)
     }
 
     // Decrase indentation.
@@ -96,7 +100,7 @@ impl ObjectCoder {
 
     // Writes indention string by indent_buffer.
     fn indent(mut &self) {
-        self.obj += self.indent_buffer
+        self.obj = append(self.obj, self.indent_buffer...)
     }
 
     fn find_type_offset(self, t: &Trait, mut k: &TypeKind): int {

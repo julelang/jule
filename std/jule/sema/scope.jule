@@ -240,9 +240,18 @@ fn check_assign(mut &s: &Sema, mut &left: &Data, mut right: &Data, op: &Token): 
         ret false
     | !check_mut(s, left, right, op):
         ret false
-    |:
-        ret true
     }
+
+    match type left.model {
+    | &IndexingExprModel:
+        let mut model = (&IndexingExprModel)(left.model)
+        if model.expr.kind.prim() != nil { // String
+            s.push_err(op, LogMsg.AssignRequireLvalue)
+            ret false
+        }
+    }
+
+    ret true
 }
 
 fn is_valid_ast_st_for_next_st(mut &n: StmtData): bool {
