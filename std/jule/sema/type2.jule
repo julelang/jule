@@ -6,7 +6,7 @@
 
 use std::conv::{fmt_float}
 use std::math::{modf}
-use std::jule::ast::{
+use ast for std::jule::ast::{
     Expr,
     KeyValPair,
     FieldExprPair,
@@ -350,34 +350,157 @@ struct DynamicTypeAnnotation {
     a:           &Data
     error_token: &Token
     k:           *&TypeKind
+    c:           &ast::TypeDecl
 }
 
 impl DynamicTypeAnnotation {
+    fn annotate_constraint_elem[T](mut self, mut &k: &TypeKind): bool {
+        match type self.c.kind {
+        | &T:
+            let mut elem: &TypeKind = nil
+            match type T {
+            | ast::ArrTypeDecl:
+                elem = k.arr().elem
+            | ast::SlcTypeDecl:
+                elem = k.slc().elem
+            | ast::PtrTypeDecl:
+                elem = k.ptr().elem
+            | ast::SptrTypeDecl:
+                elem = k.sptr().elem
+            }
+            self.c = (&T)(self.c.kind).elem
+            ret self.annotate_constraint(elem)
+        }
+        ret false
+    }
+
+    fn annotate_constraint_map(mut self, mut &k: &TypeKind): (ok: bool) {
+        match type self.c.kind {
+        | &ast::MapTypeDecl:
+            let mut m = k.map()
+            let mut m2 = (&ast::MapTypeDecl)(self.c.kind)
+            self.c = m2.key
+            if self.annotate_constraint(m.key) {
+                ret true
+            }
+            self.c = m2.val
+            ret self.annotate_constraint(m.val)
+        }
+        ret false
+    }
+
+    fn annotate_constraint_tup(mut self, mut &k: &TypeKind): (ok: bool) {
+        match type self.c.kind {
+        | &ast::TupleTypeDecl:
+            let mut tup = (&ast::TupleTypeDecl)(self.c.kind)
+            let mut tup2 = k.tup()
+            for (_, mut t2) in tup2.types {
+                for (_, mut t) in tup.types {
+                    self.c = t
+                    if self.annotate_constraint(t2) {
+                        ret true
+                    }
+                }
+            }
+        }
+        ret false
+    }
+
+    fn annotate_constraint_fn(mut self, mut &k: &TypeKind): (ok: bool) {
+        match type self.c.kind {
+        | &ast::FnDecl:
+            let mut pf = (&ast::FnDecl)(self.c.kind)
+            let mut f = k.fnc()
+            for (i, mut fp) in f.params {
+                self.c = pf.params[i].kind
+                if self.annotate_constraint(fp.kind) {
+                    ret true
+                }
+            }
+            if pf.result != nil {
+                self.c = pf.result.kind
+                if self.annotate_constraint(f.result) {
+                    ret true
+                }
+            }
+        }
+        ret false
+    }
+
+    fn annotate_constraint_struct(mut self, mut &k: &TypeKind): (ok: bool) {
+        match type self.c.kind {
+        | &ast::IdentTypeDecl:
+
+        }
+        ret false
+    }
+
+    fn annotate_constraint_ident(mut self, mut &k: &TypeKind): bool {
+        let mut ident = (&ast::IdentTypeDecl)(self.c.kind)
+        let mut s = k.strct()
+        for i, g in self.f.decl.generics {
+            if g.ident == ident.ident {
+                let mut fg = self.f.generics[i]
+                if fg != nil {
+                    ret false
+                }
+                self.push_generic(k, i)
+                ret true
+            }
+            if s == nil {
+                continue
+            }
+            let mut c = self.c
+            for (_, mut ig) in ident.generics {
+                self.c = ig
+                for (_, mut sg) in s.generics {
+                    if self.annotate_constraint(sg.kind) {
+                        ret true
+                    }
+                }
+            }
+            self.c = c
+        }
+        ret false
+    }
+
+    fn annotate_constraint(mut self, mut &k: &TypeKind): bool {
+        match type self.c.kind {
+        | &ast::IdentTypeDecl:
+            ret self.annotate_constraint_ident(k)
+        }
+        match {
+         | k.arr() != nil:
+            ret self.annotate_constraint_elem[ast::ArrTypeDecl](k)
+        | k.slc() != nil:
+            ret self.annotate_constraint_elem[ast::SlcTypeDecl](k)
+        | k.ptr() != nil:
+            ret self.annotate_constraint_elem[ast::PtrTypeDecl](k)
+        | k.sptr() != nil:
+            ret self.annotate_constraint_elem[ast::SptrTypeDecl](k)
+        | k.map() != nil:
+            ret self.annotate_constraint_map(k)
+        | k.fnc() != nil:
+            ret self.annotate_constraint_fn(k)
+        | k.tup() != nil:
+            ret self.annotate_constraint_tup(k)
+        |:
+            ret false
+        }
+    }
+
     fn push_generic(mut self, mut &k: &TypeKind, i: int) {
         self.f.generics[i] = &InsGeneric{kind: k}
+        let mut gd = self.f.decl.generics[i]
+        if gd.constraint == nil || gd.constraint.mask.len != 1 {
+            ret
+        }
+        self.c = gd.constraint.mask[0]
+        self.annotate_constraint(k)
     }
 
     unsafe fn annotate_prim(mut self, mut &k: &TypeKind): (ok: bool) {
-        let kind = (*self.k).to_str()
-        for i, g in self.f.decl.generics {
-            if kind != g.ident {
-                continue
-            }
-
-            let t = self.f.generics[i]
-            match {
-            | t == nil | t.kind == nil:
-                self.push_generic(k, i)
-            | !t.kind.equals(k):
-                // Generic already pushed but generic type and current kind
-                // is different, so incompatible.
-                ret false
-            }
-            (*self.k).kind = k.kind
-            ret true
-        }
-
-        ret false
+        ret self.annotate_any(k)
     }
 
     unsafe fn annotate_slc(mut self, mut &k: &TypeKind): (ok: bool) {
@@ -385,7 +508,6 @@ impl DynamicTypeAnnotation {
         if pslc == nil {
             ret false
         }
-
         let mut slc = k.slc()
         self.k = &pslc.elem
         ret self.annotate_kind(slc.elem)
@@ -404,9 +526,7 @@ impl DynamicTypeAnnotation {
         if pmap == nil {
             ret false
         }
-
         let mut m = k.map()
-
         ret self.check_map_key(&pmap.key, m.key) &&
             self.check_map_key(&pmap.val, m.val)
     }
@@ -445,7 +565,6 @@ impl DynamicTypeAnnotation {
         if pptr == nil {
             ret false
         }
-
         let mut ptr = k.ptr()
         self.k = &pptr.elem
         ret self.annotate_kind(ptr.elem)
@@ -456,7 +575,6 @@ impl DynamicTypeAnnotation {
         if ssptr == nil {
             ret false
         }
-
         let mut sptr = k.sptr()
         self.k = &ssptr.elem
         ret self.annotate_kind(sptr.elem)
@@ -489,7 +607,6 @@ impl DynamicTypeAnnotation {
         if self.k == nil || *self.k == nil {
             ret
         }
-
         match {
         | self.annotate_any(k):
             ret true
