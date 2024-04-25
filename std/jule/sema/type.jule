@@ -30,6 +30,12 @@ use strings for std::strings
 
 type PrimKind: types::TypeKind
 
+// Generic type for instance types.
+pub struct InsGeneric {
+    pub kind:       &TypeKind
+    pub constraint: []&TypeKind
+}
+
 // Type alias.
 pub struct TypeAlias {
     pub scope:      &ScopeTree
@@ -360,6 +366,14 @@ impl Kind for Prim {
 }
 
 impl Prim {
+    // Reports whether type is built-in constraint.
+    pub fn is_constraint(self): bool {
+        ret !self.is_str() &&
+            !self.is_any() &&
+            !self.is_bool() &&
+            !types::is_num(self.kind)
+    }
+
     // Reports whether type is primitive i8.
     pub fn is_i8(self): bool { ret self.kind == PrimKind.I8 }
 
@@ -894,7 +908,7 @@ impl TypeChecker {
         ret t
     }
 
-    fn check_struct_ins(mut self, mut &ins: &StructIns, &error_token: &Token): (ok: bool) {
+    fn check_struct_ins(mut self, mut &ins: &StructIns, mut &error_token: &Token): (ok: bool) {
         if ins.checked {
             ret true
         }
@@ -905,7 +919,7 @@ impl TypeChecker {
             ret true
         }
 
-        if !self.s.precheck_struct_ins(ins) {
+        if !self.s.precheck_struct_ins(ins, error_token) {
             ret false
         }
         if ins.generics.len > 0 {
@@ -956,13 +970,13 @@ impl TypeChecker {
 
         // Build generics.
         let mut ins = s.instance()
-        ins.generics = make([]&TypeKind, 0, decl.generics.len)
+        ins.generics = make([]&InsGeneric, 0, decl.generics.len)
         for (_, mut g) in decl.generics {
             let mut kind = self.build(g.kind)
             if kind == nil {
                 ret nil
             }
-            ins.generics = append(ins.generics, kind)
+            ins.generics = append(ins.generics, &InsGeneric{kind: kind})
         }
 
         // Restore configuration.
@@ -1008,6 +1022,9 @@ impl TypeChecker {
 
         let mut exist_instance = s.append_instance(ins)
         if exist_instance != nil {
+            if !self.s.check_constraints_struct(ins, decl.token, exist_instance) {
+                ret nil
+            }
             // Already checked instance, did not appended.
             // So, this instance is not unique.
             self.push_reference[&StructIns](exist_instance)

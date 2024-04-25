@@ -5,6 +5,7 @@
 use std::fs::path::{join}
 use std::jule::ast::{
     Ast,
+    Constraint,
     Directive,
     Expr,
     ScopeTree,
@@ -131,6 +132,53 @@ fn range_last(mut &tokens: []&Token): (cutted: []&Token, cut: []&Token) {
     }
 
     ret tokens, nil
+}
+
+// Same as parts, but uses TokenKind as separator.
+fn parts_kind(mut &tokens: []&Token, kind: TokenKind, expr_must: bool): ([][]&Token, []Log) {
+    if tokens.len == 0 {
+        ret nil, nil
+    }
+
+    let mut parts: [][]&Token = nil
+    let mut errors: []Log = nil
+
+    let mut range_n = 0
+    let mut last = 0
+    for i, token in tokens {
+        if token.id == TokenId.Range {
+            match token.kind {
+            | TokenKind.LBrace
+            | TokenKind.LBracket
+            | TokenKind.LParent:
+                range_n++
+                continue
+            |:
+                range_n--
+            }
+        }
+
+        if range_n > 0 {
+            continue
+        }
+
+        if token.kind == kind {
+            if expr_must && i-last <= 0 {
+                let err = make_err(token.row, token.column, token.file, LogMsg.MissingExpr)
+                errors = append(errors, err)
+            }
+            parts = append(parts, tokens[last:i])
+            last = i + 1
+        }
+    }
+
+    if last < tokens.len {
+        parts = append(parts, tokens[last:])
+    } else if !expr_must {
+        parts = append(parts, [])
+    }
+
+    ret parts, errors
 }
 
 // Returns parts separated by given token identifier.
@@ -459,10 +507,7 @@ impl Parser {
         ret v
     }
 
-    fn build_generic(mut self, mut &tokens: []&Token): &GenericDecl {
-        if tokens.len > 1 {
-            self.push_err(tokens[1], LogMsg.InvalidSyntax)
-        }
+    fn build_generic(mut &self, mut &tokens: []&Token): &GenericDecl {
         let mut g = &GenericDecl{
             token: tokens[0],
         }
@@ -471,10 +516,35 @@ impl Parser {
             self.push_suggestion(LogMsg.ExpectedIdentifier)
         }
         g.ident = g.token.kind
+        if tokens.len > 1 {
+            if tokens[1].id != TokenId.Colon {
+                self.push_err(tokens[1], LogMsg.InvalidSyntax)
+                ret nil
+            }
+            if tokens.len == 2 {
+                self.push_err(tokens[1], LogMsg.MissingExpr)
+                ret nil
+            }
+            let mut constraint_tokens = tokens[2:]
+            let (mut parts, errors) = parts_kind(constraint_tokens, TokenKind.Vline, true)
+            if errors.len > 0 {
+                self.errors = append(self.errors, errors...)
+                ret nil
+            }
+            g.constraint = &Constraint{mask: make([]&TypeDecl, 0, parts.len)}
+            for (_, mut part) in parts {
+                let mut i = 0
+                let (mut kind, _) = unsafe { self.build_type(part, &i, true) }
+                g.constraint.mask = append(g.constraint.mask, kind)
+                if i < part.len {
+                    self.push_err(part[i], LogMsg.InvalidSyntax)
+                }
+            }
+        }
         ret g
     }
 
-    fn build_generics(mut self, mut &tokens: []&Token, &error_token: &Token): []&GenericDecl {
+    fn build_generics(mut &self, mut &tokens: []&Token, &error_token: &Token): []&GenericDecl {
         if tokens.len == 0 {
             self.push_err(error_token, LogMsg.MissingExpr)
             ret nil

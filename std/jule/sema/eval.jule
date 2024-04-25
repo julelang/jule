@@ -1776,20 +1776,20 @@ impl Eval {
         | f.decl.generics.len > 0 && fc.generics.len == 0 && f.params.len > 0:
             dynamic_annotation = true
             // Make empty types to generics for ordering.
-            f.generics = make([]&TypeKind, f.decl.generics.len)
+            f.generics = make([]&InsGeneric, f.decl.generics.len)
             ret true, true
         | !self.s.check_generic_quantity(f.decl.generics.len, fc.generics.len, fc.token):
             ret false, false
         |:
             // Build real kinds of generic types.
-            f.generics = make([]&TypeKind, 0, f.decl.generics.len)
+            f.generics = make([]&InsGeneric, 0, f.decl.generics.len)
             for (_, mut g) in fc.generics {
                 let mut k = build_type(g)
                 ok = self.s.check_type(k, self.lookup)
                 if !ok {
                     ret false, false
                 }
-                f.generics = append(f.generics, k.kind)
+                f.generics = append(f.generics, &InsGeneric{kind: k.kind})
             }
 
             ret true, false
@@ -1889,14 +1889,23 @@ impl Eval {
             self.s = old
         }
 
+        let mut exist_instance: &FnIns = nil
+
         if !dynamic_annotation {
             if !f.reloaded {
                 ok = self.s.reload_fn_ins_types(f)
+                f.reloaded = true
                 if !ok {
                     d = nil
                     ret
                 }
-                f.reloaded = true
+            }
+            exist_instance = f.decl.append_instance(f)
+            if f.generics.len > 0 {
+                if !self.s.check_constraints_fn(f, fc.token, exist_instance) {
+                    d = nil
+                    ret
+                }
             }
         } else if f.generics.len > 0 {
             self.s.build_fn_non_generic_type_kinds(f)
@@ -1924,14 +1933,19 @@ impl Eval {
 
         if dynamic_annotation {
             ok = self.s.reload_fn_ins_types(f)
+            f.reloaded = true
             if !ok {
                 d = nil
                 ret
             }
-            f.reloaded = true
+            exist_instance = f.decl.append_instance(f)
+            if !self.s.check_constraints_fn(f, fc.token, exist_instance) {
+                d = nil
+                ret
+            }
+        } else if f.generics.len == 0 {
+            exist_instance = f.decl.append_instance(f)
         }
-
-        let mut exist_instance = f.decl.append_instance(f)
         if exist_instance != nil {
             f = exist_instance
         }

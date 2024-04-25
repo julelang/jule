@@ -169,9 +169,7 @@ fn append_generic_type_aliases(mut &dest: []&TypeAlias, mut &f: &FnIns) {
             scope: f.decl.scope,
             ident: decl.ident,
             token: decl.token,
-            kind: &TypeSymbol{
-                kind: g,
-            },
+            kind: &TypeSymbol{kind: g.kind},
         })
     }
 
@@ -185,9 +183,7 @@ fn append_generic_type_aliases(mut &dest: []&TypeAlias, mut &f: &FnIns) {
                 scope: f.decl.scope,
                 ident: decl.ident,
                 token: decl.token,
-                kind: &TypeSymbol{
-                    kind: g,
-                },
+                kind: &TypeSymbol{kind: g.kind},
             })
         }
     }
@@ -672,25 +668,20 @@ impl Sema {
         }
     }
 
-    // Checks type, builds result as kind and collects referred type aliases.
-    // Skips already checked types.
-    fn check_type_with_refers(mut &self, mut &t: &TypeSymbol,
-        mut l: Lookup, mut referencer: &Referencer): (ok: bool) {
-        if t.checked() {
-            ret true
-        }
+    // Builds type, builds result as kind and collects referred type aliases.
+    fn build_type_with_refers(mut &self, mut &t: &ast::TypeDecl, mut l: Lookup,
+        mut generics: []&TypeAlias, mut referencer: &Referencer): &TypeKind {
         let mut tc = TypeChecker{
             s: self,
             lookup: l,
             referencer: referencer,
+            use_generics: generics,
         }
-
         match type l {
         | &ScopeChecker:
             let mut hard = (&ScopeChecker)(l).get_hard_root()
             tc.refers = hard.owner.refers
         }
-
         // Referencer's refs field is not nil if owner is type alias.
         if referencer != nil && referencer.refs != nil {
             // Set owner alias field of TypeChecker to collect generic dependencies.
@@ -700,15 +691,28 @@ impl Sema {
                 tc.owner_alias = (&TypeAlias)(referencer.owner)
             }
         }
+        ret tc.check_decl(t)
+    }
 
-        tc.check(t)
+    // Checks type, builds result as kind and collects referred type aliases.
+    // Skips already checked types.
+    fn check_type_with_refers(mut &self, mut &t: &TypeSymbol, mut l: Lookup,
+        mut generics: []&TypeAlias, mut referencer: &Referencer): (ok: bool) {
+        if t.checked() {
+            ret true
+        }
+        t.kind = self.build_type_with_refers(t.decl, l, generics, referencer)
         ret t.checked()
+    }
+
+    fn constraint_checker(mut &self): &ConstraintChecker {
+        ret &ConstraintChecker{s:  self}
     }
 
     // Checks type and builds result as kind.
     // Skips already checked types.
     fn check_type(mut &self, mut &t: &TypeSymbol, mut l: Lookup): bool {
-        ret self.check_type_with_refers(t, l, nil)
+        ret self.check_type_with_refers(t, l, nil, nil)
     }
 
     // Builds type with type aliases for generics.
@@ -896,13 +900,39 @@ impl Sema {
         ret ins
     }
 
-    fn reload_fn_ins_types(mut &self, mut &f: &FnIns): (ok: bool) {
-        if f.is_builtin() || f.is_anon() {
-            ret true
+    fn check_constraints_fn(mut &self, mut &f: &FnIns, mut &et: &Token, mut exist: &FnIns): bool {
+        let mut cc = self.constraint_checker()
+        cc.et = et
+        cc.fi = f
+        if exist != nil {
+            for (i, mut g) in exist.generics {
+                f.generics[i].constraint = g.constraint
+            }
+        } else {
+            cc.uniq = true
         }
+        ret cc.check()
+    }
 
+    fn check_constraints_struct(mut &self, mut &s: &StructIns, mut &et: &Token, mut exist: &StructIns): bool {
+        let mut cc = self.constraint_checker()
+        cc.et = et
+        cc.si = s
+        if exist != nil {
+            for (i, mut g) in exist.generics {
+                s.generics[i].constraint = g.constraint
+            }
+        } else {
+            cc.uniq = true
+        }
+        ret cc.check()
+    }
+
+    // Call algo in the function's native environment.
+    // Errors will be handled.
+    // Returns result of algo.
+    fn fn_environment(mut &self, mut &f: &FnIns, algo: fn(mut &sema: &Sema, mut &generics: []&TypeAlias): bool): bool {
         let mut sema = f.decl.sema
-
         let mut old = f.decl.sema.file
         defer { f.decl.sema.set_current_file(old) }
         let mut file = find_file(f.decl.sema.files, f.decl.token.file)
@@ -916,61 +946,9 @@ impl Sema {
         }
 
         let mut generics = make([]&TypeAlias, 0, size)
+        append_generic_type_aliases(generics, f)
 
-        for (i, mut g) in f.generics {
-            generics = append(generics, &TypeAlias{
-                ident: f.decl.generics[i].ident,
-                kind: &TypeSymbol{
-                    kind: g,
-                },
-            })
-        }
-
-        if f.decl != nil && f.decl.owner != nil {
-            let mut owner = f.owner
-            for (i, mut g) in owner.generics {
-                generics = append(generics, &TypeAlias{
-                    ident: owner.decl.generics[i].ident,
-                    kind: &TypeSymbol{
-                        kind: g,
-                    },
-                })
-            }
-        }
-
-        ok = true
-        for (_, mut p) in f.params {
-            if p.decl.is_self() {
-                if p.decl.is_ref() {
-                    p.kind = &TypeKind{
-                        kind: &Sptr{
-                            elem: &TypeKind{
-                                kind: f.owner,
-                            },
-                        },
-                    }
-                } else {
-                    p.kind = &TypeKind{
-                        kind: f.owner,
-                    }
-                }
-            } else {
-                p.kind = sema.build_type_with_generics(p.decl.kind.decl, generics, f.refers)
-                if p.kind != nil {
-                    p.kind.variadic = p.decl.variadic
-                    if p.decl.reference && !is_valid_for_ref(p.kind) {
-                        self.push_err(p.decl.token, LogMsg.RefPointsToInvalidType, p.kind.to_str())
-                    }
-                } else {
-                    ok = false
-                }
-            }
-        }
-
-        if !f.decl.is_void() {
-            f.result = sema.build_type_with_generics(f.decl.result.kind.decl, generics, f.refers)
-            ok = f.result != nil && ok
-        }
+        let ok = algo(sema, generics)
 
         if sema != self {
             self.errors = append(self.errors, sema.errors...)
@@ -978,6 +956,45 @@ impl Sema {
         }
 
         ret ok
+    }
+
+    fn reload_fn_ins_types(mut &self, mut f: &FnIns): bool {
+        if f.is_builtin() || f.is_anon() {
+            ret true
+        }
+        ret self.fn_environment(f, fn(mut &sema: &Sema, mut &generics: []&TypeAlias): bool {
+            let mut ok = true
+            for (_, mut p) in f.params {
+                if p.decl.is_self() {
+                    if p.decl.is_ref() {
+                        p.kind = &TypeKind{
+                            kind: &Sptr{
+                                elem: &TypeKind{
+                                    kind: f.owner,
+                                },
+                            },
+                        }
+                    } else {
+                        p.kind = &TypeKind{kind: f.owner}
+                    }
+                } else {
+                    p.kind = sema.build_type_with_generics(p.decl.kind.decl, generics, f.refers)
+                    if p.kind != nil {
+                        p.kind.variadic = p.decl.variadic
+                        if p.decl.reference && !is_valid_for_ref(p.kind) {
+                            self.push_err(p.decl.token, LogMsg.RefPointsToInvalidType, p.kind.to_str())
+                        }
+                    } else {
+                        ok = false
+                    }
+                }
+            }
+            if !f.decl.is_void() {
+                f.result = sema.build_type_with_generics(f.decl.result.kind.decl, generics, f.refers)
+                ok = f.result != nil && ok
+            }
+            ret ok
+        })
     }
 
     fn check_ref_validity_for_init_expr(mut &self, left_mut: bool, mut &d: &Data, mut &error_token: &Token): bool {
@@ -1053,7 +1070,7 @@ impl Sema {
                 self.set_current_file(file)
             }
         }
-        ok = self.check_type_with_refers(ta.kind, l, &Referencer{
+        ok = self.check_type_with_refers(ta.kind, l, nil, &Referencer{
             ident: ta.ident,
             owner: ta,
             refs: &ta.refers,
@@ -2046,7 +2063,10 @@ impl Sema {
         ret f.instances[0]
     }
 
-    fn check_fields(mut &self, mut &s: &StructIns): (ok: bool) {
+    // Checks environment-dependent parts of structure instance.
+    // Which is contains fields and generic-type constraints.
+    // If generic instance will be check, error_token should be passed.
+    fn check_struct_env(mut &self, mut &s: &StructIns, mut error_token: &Token): (ok: bool) {
         let mut tc = TypeChecker{
             s: s.decl.sema,
             lookup: s.decl.sema,
@@ -2062,9 +2082,7 @@ impl Sema {
             for (i, mut g) in s.generics {
                 tc.use_generics = append(tc.use_generics, &TypeAlias{
                     ident: s.decl.generics[i].ident,
-                    kind: &TypeSymbol{
-                        kind: g,
-                    },
+                    kind: &TypeSymbol{kind: g.kind},
                 })
             }
         }
@@ -2076,6 +2094,17 @@ impl Sema {
             let mut file = find_file(self.files, s.decl.token.file)
             if file != nil {
                 self.set_current_file(file)
+            }
+        }
+
+        if s.generics.len > 0 {
+            let mut cc = self.constraint_checker()
+            cc.et = error_token
+            cc.si = s
+            cc.generics_a = tc.use_generics
+            cc.uniq = true
+            if !cc.check() {
+                ret
             }
         }
 
@@ -2115,8 +2144,8 @@ impl Sema {
         ret
     }
 
-    fn precheck_struct_ins(mut &self, mut &s: &StructIns): (ok: bool) {
-        ok = self.check_fields(s)
+    fn precheck_struct_ins(mut &self, mut &s: &StructIns, mut error_token: &Token): (ok: bool) {
+        ok = self.check_struct_env(s, error_token)
         if !ok {
             ret false
         }
@@ -2237,7 +2266,7 @@ impl Sema {
             let mut ins = s.instance()
             ins.checked = true
             s.append_instance(ins) // Append instance before precheck.
-            self.precheck_struct_ins(ins)
+            self.precheck_struct_ins(ins, nil)
         }
 
         self.check_struct_ins_operators(s.instances[0])
@@ -2261,10 +2290,6 @@ impl Sema {
     }
 
     fn check_fn_ins_sc(mut self, mut &f: &FnIns, mut &sc: &ScopeChecker) {
-        if f.decl.cpp_linked {
-            ret
-        }
-
         append_ret_vars(sc.table.vars, f)
         append_param_vars(sc.table.vars, f)
         append_generic_type_aliases(sc.table.type_aliases, f)

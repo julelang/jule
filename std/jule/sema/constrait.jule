@@ -1,0 +1,195 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use std::jule::ast::{GenericDecl, IdentTypeDecl}
+use std::jule::build::{LogMsg}
+use std::jule::lex::{Token}
+use types for std::jule::types
+
+enum BuiltinConstraint: str {
+    Signed: "signed",
+    Unsigned: "unsigned",
+    Float: "float",
+    Numeric: "numeric",
+    Immutable: "immutable",
+    Mutable: "mutable",
+    Ordered: "ordered",
+}
+
+static BUILTIN_CONSTRAINTS = [
+    BuiltinConstraint.Signed,
+    BuiltinConstraint.Unsigned,
+    BuiltinConstraint.Float,
+    BuiltinConstraint.Numeric,
+    BuiltinConstraint.Mutable,
+    BuiltinConstraint.Immutable,
+    BuiltinConstraint.Ordered,
+]
+
+struct ConstraintChecker {
+    mut s: &Sema
+    // Declarations of generics.
+    mut generics_d: []&GenericDecl
+    // Generics of instance.
+    mut generics: []&InsGeneric
+    // Type aliases for generics.
+    // It can be nil if environment is not guaranteed.
+    // It will be used for guaranteed environments.
+    mut generics_a: []&TypeAlias
+    // Functions instance.
+    // If this field is not nil, process will be executed by functions.
+    mut fi: &FnIns
+    // Structure instance.
+    // If this field is not nil, process will be executed by structures.
+    mut si: &StructIns
+    // Error that will use as error token.
+    mut et: &Token
+    // Whether instance is unique.
+    mut uniq: bool
+}
+
+impl ConstraintChecker {
+    fn ready_fn(mut &self): fn(mut &sema: &Sema, mut &generics: []&TypeAlias): bool {
+        ret fn(mut &sema: &Sema, mut &generics: []&TypeAlias): bool {
+            for (i, mut g) in self.generics_d {
+                let mut generic = self.generics[i]
+                if g.constraint == nil || g.constraint.mask.len == 0 {
+                    continue
+                }
+                generic.constraint = make([]&TypeKind, 0, g.constraint.mask.len)
+                for (_, mut mask) in g.constraint.mask {
+                    let n = sema.errors.len
+                    let mut kind = sema.build_type_with_refers(mask, sema, generics, nil)
+                    if kind == nil {
+                        match type mask.kind {
+                        | &IdentTypeDecl:
+                            let mut itd = (&IdentTypeDecl)(mask.kind)
+                            if itd.generics.len == 0 && is_builtin_constraint(itd.ident) {
+                                kind = &TypeKind{kind: build_prim_type(itd.ident)}
+                                sema.errors = sema.errors[:n]
+                                goto success
+                            }
+                        }
+                        ret false
+                    }
+                success:
+                    generic.constraint = append(generic.constraint, kind)
+                }
+            }
+            ret true
+        }
+    }
+
+    // Functions will be checked in their environment, because environment is not guaranteed.
+    fn ready_fi(mut &self): bool {
+        self.generics_d = self.fi.decl.generics
+        self.generics = self.fi.generics
+        ret !self.uniq || self.s.fn_environment(self.fi, self.ready_fn())
+    }
+
+    // Structure will be checked in current environment, because environment should be guaranteed.
+    fn ready_si(mut &self): bool {
+        self.generics_d = self.si.decl.generics
+        self.generics = self.si.generics
+        ret !self.uniq || self.ready_fn()(self.s, self.generics_a)
+    }
+
+    fn ready(mut &self): bool {
+        if self.fi != nil {
+            ret self.ready_fi()
+        }
+        ret self.ready_si()
+    }
+
+    fn check(mut &self): bool {
+        if !self.ready() {
+            ret false
+        }
+    lookup:
+        for (i, mut g) in self.generics {
+            if g.constraint == nil {
+                continue
+            }
+            for (_, mut c2) in g.constraint {
+                let mut prim = c2.prim()
+                if prim != nil && prim.is_constraint() {
+                    if match_constraint(prim.kind, g.kind) {
+                        continue lookup
+                    }
+                    continue
+                }
+                if c2.equals(g.kind) {
+                    continue lookup
+                }
+            }
+            self.s.push_err(self.et, LogMsg.ConstraintFailed, g.kind.to_str(), self.generics_d[i].ident)
+            ret false
+        }
+        ret true
+    }
+}
+
+fn match_constraint(&c: str, mut &g: &TypeKind): bool {
+    match c {
+    | BuiltinConstraint.Signed:
+        let prim = g.prim()
+        if prim == nil {
+            ret false
+        }
+        ret types::is_sig_num(prim.kind)
+    | BuiltinConstraint.Unsigned:
+        let prim = g.prim()
+        if prim == nil {
+            ret false
+        }
+        ret types::is_unsig_int(prim.kind)
+    | BuiltinConstraint.Float:
+        let prim = g.prim()
+        if prim == nil {
+            ret false
+        }
+        ret types::is_float(prim.kind)
+    | BuiltinConstraint.Numeric:
+        let prim = g.prim()
+        if prim == nil {
+            ret false
+        }
+        ret types::is_num(prim.kind)
+    | BuiltinConstraint.Mutable:
+        ret g.mutable()
+    | BuiltinConstraint.Immutable:
+        ret !g.mutable()
+    | BuiltinConstraint.Ordered:
+        let prim = g.prim()
+        if prim != nil {
+            ret types::is_num(prim.kind) || prim.is_str()
+        }
+        if g.ptr() != nil {
+            ret true
+        }
+        let s = g.strct()
+        if s != nil {
+            ret s.operators.gt != nil &&
+                s.operators.gt_eq != nil &&
+                s.operators.lt != nil &&
+                s.operators.lt_eq != nil
+        }
+        let enm = g.enm()
+        if enm != nil {
+            ret types::is_num(enm.kind.kind.to_str())
+        }
+        ret false
+    |:
+        ret false
+    }
+}
+
+fn is_builtin_constraint(&ident: str): bool {
+    for _, bc in BUILTIN_CONSTRAINTS {
+        if ident == bc {
+            ret true
+        }
+    }
+    ret false
+}
