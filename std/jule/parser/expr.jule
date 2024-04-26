@@ -915,10 +915,7 @@ impl ExprBuilder {
         let mut error_token = tokens[0]
         let (mut expr_tokens, range_n) = get_range_expr_tokens(tokens)
 
-        match {
-        | expr_tokens.len == 0:
-            ret self.build_slice(tokens)
-        | expr_tokens.len == 0 || range_n > 0:
+        if range_n > 0 {
             self.push_err(error_token, LogMsg.InvalidSyntax)
             ret nil
         }
@@ -928,13 +925,23 @@ impl ExprBuilder {
         // Includes brackets.
         tokens = tokens[expr_tokens.len:]
 
+        // Catch slicing expressions and map types.
         // Use split_map_range because same thing.
         // Map types like: [KEY:VALUE]
         // Slicing expressions like: [START:TO]
         let mut i = 0
-        let (mut slicing_tokens, colon) = split_map_range(tokens, i)
+        let (mut r_tokens, colon) = split_map_range(tokens, i)
+
+        // Catch map type or slice literal.
+        if expr_tokens.len == 0 {
+            if colon == -1 {
+                ret self.build_slice(tokens)
+            }
+            ret self.build_type(tokens)
+        }
+
         if colon != -1 {
-            ret self.build_slicing(expr_tokens, slicing_tokens, colon, error_token, tokens[tokens.len-1])
+            ret self.build_slicing(expr_tokens, r_tokens, colon, error_token, tokens[tokens.len-1])
         }
         ret self.build_indexing(expr_tokens, tokens, error_token)
     }
@@ -958,6 +965,9 @@ impl ExprBuilder {
 
         token = tokens[0]
         match token.id {
+        | TokenId.Fn:
+            // Function types.
+            ret self.build_type(tokens)
         | TokenId.Op:
             // Handle pointer to primitive type.
             if tokens.len > 1 && token.kind == TokenKind.Star {
