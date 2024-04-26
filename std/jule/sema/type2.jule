@@ -427,14 +427,6 @@ impl DynamicTypeAnnotation {
         ret false
     }
 
-    fn annotate_constraint_struct(mut self, mut &k: &TypeKind): (ok: bool) {
-        match type self.c.kind {
-        | &ast::IdentTypeDecl:
-
-        }
-        ret false
-    }
-
     fn annotate_constraint_ident(mut self, mut &k: &TypeKind): bool {
         let mut ident = (&ast::IdentTypeDecl)(self.c.kind)
         let mut s = k.strct()
@@ -580,6 +572,28 @@ impl DynamicTypeAnnotation {
         ret self.annotate_kind(sptr.elem)
     }
 
+    unsafe fn annotate_struct(mut self, mut &k: &TypeKind): (ok: bool) {
+        let mut s = (*self.k).strct()
+        if s == nil {
+            ret false
+        }
+        let mut s2 = k.strct()
+        if s.generics.len != s2.generics.len {
+            ret false
+        }
+        for (i, mut g) in s.generics {
+            let mut g2 = s2.generics[i]
+            if g.kind.equals(g2.kind) {
+                continue
+            }
+            self.k = &g.kind
+            if !self.annotate_kind(g2.kind) {
+                ret false
+            }
+        }
+        ret true
+    }
+
     unsafe fn annotate_any(mut self, mut &k: &TypeKind): (ok: bool) {
         let kind = (*self.k).to_str()
         for i, g in self.f.decl.generics {
@@ -622,6 +636,8 @@ impl DynamicTypeAnnotation {
             ret self.annotate_ptr(k)
         | k.sptr() != nil:
             ret self.annotate_sptr(k)
+        | k.strct() != nil:
+            ret self.annotate_struct(k)
         |:
             ret false
         }
