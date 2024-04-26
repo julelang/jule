@@ -1624,23 +1624,30 @@ impl Eval {
         ret d
     }
 
+    fn eval_cast_t(mut &self, mut &t: &TypeKind, mut &e: &Expr, mut &et: &Token): &Data {
+        let mut prefix = self.prefix
+        self.prefix = nil
+        defer { self.prefix = prefix }
+        if t.slc() != nil {
+            match type e.kind {
+            | &SliceExpr:
+                self.prefix = t
+            }
+        }
+        let mut d = self.eval_expr_kind(e.kind)
+        if d == nil || self.prefix != nil {
+            ret d
+        }
+        ret self.eval_cast_by_type_n_data(t, d, et)
+    }
+
     fn eval_cast(mut &self, mut c: &CastExpr): &Data {
         let mut t = build_type(c.kind)
         let ok = self.s.check_type(t, self.lookup)
         if !ok {
             ret nil
         }
-
-        let mut prefix = self.prefix
-        self.prefix = nil
-        defer { self.prefix = prefix }
-
-        let mut d = self.eval_expr_kind(c.expr.kind)
-        if d == nil {
-            ret nil
-        }
-
-        ret self.eval_cast_by_type_n_data(t.kind, d, c.kind.token)
+        ret self.eval_cast_t(t.kind, c.expr, c.kind.token)
     }
 
     fn eval_ns_selection(mut self, s: &NsSelectionExpr): &Data {
@@ -1756,13 +1763,9 @@ impl Eval {
         }
 
         if fc.args.len > 0 {
-            let mut prefix = self.prefix
-            self.prefix = nil
-            let mut arg = self.eval_expr_kind(fc.args[0].kind)
-            self.prefix = prefix
-            if arg != nil {
-                d = self.eval_cast_by_type_n_data(d.kind, arg, fc.args[0].token)
-            }
+            let mut arg = fc.args[0]
+            d = self.eval_cast_t(d.kind, arg, arg.token)
+            ret
         }
 
         if d != nil {
