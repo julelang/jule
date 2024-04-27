@@ -12,8 +12,6 @@ An effective programming language to build efficient, fast, reliable and safe so
 [Contributing](https://jule.dev/contribute) |
 [Community](https://jule.dev/community)
 
-[![Jule Community](https://dcbadge.vercel.app/api/server/ReWQgPDnP6?style=flat)](https://discord.gg/XNSUUDuGGQ)
-
 </strong>
 
 </div>
@@ -28,7 +26,7 @@ Some commits may not be fully honored due to some compiler/API errors.
 Please report it with the [Jule Issue Tracker](https://github.com/julelang/jule/issues) if you come across something like this.
 You can also [join the Discord community](https://discord.gg/XNSUUDuGGQ) to discuss, helping, and ask more questions about Jule with the community.
 
-![image](https://github.com/julelang/jule/assets/54983926/f0dd591b-816b-44df-92b2-a67e672b1157)
+![image](https://github.com/julelang/jule/assets/54983926/320b4930-7aa8-47c0-bc71-82e2da408014)
 
 ## The Mission
 
