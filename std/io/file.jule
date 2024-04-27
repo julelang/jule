@@ -60,16 +60,18 @@ impl FileStream {
             if n == 0 {
                 break
             }
-            buff = append(buff, part[:n]...)
             if part[n-1] == LINE_DELIMITER {
+                buff = append(buff, part[:n-1]...)
                 break
             }
+            buff = append(buff, part[:n]...)
         }
+        clear_cr(buff)
         ret buff
     }
 
     // Reads line from file handle via &File.read method.
-    // Returns bytes until line delimiter (\n) byte.
+    // Returns bytes until end of the line, line delimiter is not included.
     // Returns zero-length string when reached EOF.
     pub fn read_line(mut self)!: str {
         const LINE_DELIMITER = '\n'
@@ -82,11 +84,13 @@ impl FileStream {
             if n == 0 {
                 break
             }
-            nosafe::push_to_str_buffer(buff, part[:n])
             if part[n-1] == LINE_DELIMITER {
+                nosafe::push_to_str_buffer(buff, part[:n-1])
                 break
             }
+            nosafe::push_to_str_buffer(buff, part[:n])
         }
+        clear_cr(buff)
         ret buff
     }
 }
