@@ -51,7 +51,7 @@ namespace jule
         };
 
     private:
-        const jule::MapKeyHasher::fnv1a hasher;
+        jule::MapKeyHasher::fnv1a hasher;
 
     public:
         inline size_t operator()(const jule::Slice<jule::U8> &key) const noexcept {
