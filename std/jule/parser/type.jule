@@ -30,13 +30,12 @@ fn build_prim_type(mut t: &Token): &TypeDecl {
     }
 }
 
-// Returns colon index and range tokens.
-// Returns nil slice and -1 if not found.
+// Returns delimiter index of the map type.
+// Returns -1 if not found.
 // Starts search at i.
-fn split_map_range(mut &tokens: []&Token, mut &i: int): (range_tokens: []&Token, colon: int) {
-    colon = -1
+fn map_colon(mut &tokens: []&Token, mut &i: int): (delim: int) {
+    delim = -1
     let mut range_n = 0
-    let start = i
     for i < tokens.len; i++ {
         let token = tokens[i]
         if token.id == TokenId.Range {
@@ -50,18 +49,14 @@ fn split_map_range(mut &tokens: []&Token, mut &i: int): (range_tokens: []&Token,
                 range_n--
             }
         }
-
         if range_n == 0 {
-            if start+1 > i {
+            if tokens.len - i == 1 {
                 ret
             }
-            range_tokens = tokens[start+1:i]
+            if tokens[i+1].id == TokenId.Colon {
+                ret i + 1
+            }
             break
-        } else if range_n != 1 {
-            continue
-        }
-        if colon == -1 && token.id == TokenId.Colon {
-            colon = i - start - 1
         }
     }
     ret
@@ -369,18 +364,24 @@ impl TypeBuilder {
         }
     }
 
-    fn build_map(mut self, colon: int, mut &tokens: []&Token): &TypeDecl {
-        let mut colon_token = self.tokens[colon]
-        if colon == 0 || colon+1 >= tokens.len {
-            self.push_err(colon_token, LogMsg.MissingType)
+    unsafe fn build_map(mut self, start: int, delim: int): &TypeDecl {
+        let mut delim_token = self.tokens[delim]
+        if delim == 0 || delim+1 >= self.tokens.len {
+            self.push_err(delim_token, LogMsg.MissingType)
             ret nil
         }
-        let mut key_tokens = tokens[:colon]
-        let mut val_tokens = tokens[colon+1:]
-        let mut mapt = &MapTypeDecl{}
+
+        // Get key type tokens without brackets.
+        let mut key_tokens = self.tokens[start+1:delim-1]
+        if key_tokens.len == 0 {
+            self.push_err(delim_token, LogMsg.MissingType)
+            ret nil
+        }
+
+        let mut mapt = new(MapTypeDecl)
 
         let mut j = 0
-        let (mut keyt, mut ok) = unsafe { self.p.build_type(key_tokens, &j, self.err) }
+        let (mut keyt, mut ok) = self.p.build_type(key_tokens, &j, self.err)
         if !ok {
             ret nil
         } else if j < key_tokens.len {
@@ -388,17 +389,14 @@ impl TypeBuilder {
         }
         mapt.key = keyt
 
-        j = 0
-        let (mut valt, ok) = unsafe { self.p.build_type(val_tokens, &j, self.err) }
+        *self.i++ // Skip delimiter token.
+        let (mut valt, ok) = self.p.build_type(self.tokens, self.i, self.err)
         if !ok {
             ret nil
-        } else if j < val_tokens.len {
-            self.push_err(val_tokens[j], LogMsg.InvalidSyntax)
         }
         mapt.val = valt
-
         ret &TypeDecl{
-            token: colon_token,
+            token: delim_token,
             kind: mapt,
         }
     }
@@ -418,12 +416,13 @@ impl TypeBuilder {
         }
 
         *self.i-- // Point to left bracket for range parsing of split_colon.
-        let (mut map_tokens, colon) = split_map_range(self.tokens, *self.i)
+        let i = *self.i
+        let mut delim = map_colon(self.tokens, *self.i)
         *self.i++
-        if colon == -1 {
+        if delim == -1 {
             ret self.build_arr()
         }
-        ret self.build_map(colon, map_tokens)
+        ret self.build_map(i, delim)
     }
 
     unsafe fn step(mut self): &TypeDecl {

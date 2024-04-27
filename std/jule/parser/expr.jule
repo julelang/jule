@@ -66,9 +66,9 @@ fn get_block_expr(mut &tokens: []&Token): []&Token {
     ret nil
 }
 
-// Returns colon index, left range and right range tokens.
+// Returns delimiter index, left range and right range tokens.
 // Returns nil slice and -1 if not found.
-fn split_colon(mut &tokens: []&Token): ([]&Token, []&Token) {
+fn split_delim(mut &tokens: []&Token, delim: TokenId): ([]&Token, []&Token) {
     let mut range_n = 0
     for i, token in tokens {
         match token.id {
@@ -82,8 +82,8 @@ fn split_colon(mut &tokens: []&Token): ([]&Token, []&Token) {
             |:
                 range_n--
             }
-        | TokenId.Colon:
-            if range_n < 1 {
+        | delim:
+            if range_n == 0 {
                 let mut l = tokens[:i]
                 let mut r = tokens[i+1:]
                 ret l, r
@@ -725,7 +725,7 @@ impl ExprBuilder {
     }
 
     fn build_brace_lit_part(mut self, mut &tokens: []&Token): &Expr {
-        let (mut l, mut r) = split_colon(tokens)
+        let (mut l, mut r) = split_delim(tokens, TokenId.Colon)
         // If left is not nil, colon token found.
         if l != nil {
             ret &Expr{
@@ -865,24 +865,19 @@ impl ExprBuilder {
         }
     }
 
-    fn build_slicing(mut self, mut &expr_tokens: []&Token, mut &slicing_tokens: []&Token,
-        &colon: int, mut &error_token: &Token, mut end: &Token): &SlicingExpr {
+    fn build_slicing(mut self, mut &expr_tokens: []&Token, mut &start: []&Token,
+        mut &to: []&Token, mut &error_token: &Token, mut end: &Token): &SlicingExpr {
         let mut slc = &SlicingExpr{
             token: error_token,
             end: end,
             expr: self.build_from_tokens(expr_tokens),
         }
-
-        let mut start_expr_tokens = slicing_tokens[:colon]
-        if start_expr_tokens.len > 0 {
-            slc.start = self.build_from_tokens(start_expr_tokens)
+        if start.len > 0 {
+            slc.start = self.build_from_tokens(start)
         }
-
-        let mut to_expr_tokens = slicing_tokens[colon+1:]
-        if to_expr_tokens.len > 0 {
-            slc.to = self.build_from_tokens(to_expr_tokens)
+        if to.len > 0 {
+            slc.to = self.build_from_tokens(to)
         }
-
         ret slc
     }
 
@@ -890,7 +885,9 @@ impl ExprBuilder {
         let mut error_token = tokens[0]
         let (mut expr_tokens, range_n) = get_range_expr_tokens(tokens)
 
-        if range_n > 0 {
+        if expr_tokens.len == 0 {
+            ret self.build_slice(tokens)
+        } else if range_n > 0 {
             self.push_err(error_token, LogMsg.InvalidSyntax)
             ret nil
         }
@@ -900,23 +897,11 @@ impl ExprBuilder {
         // Includes brackets.
         tokens = tokens[expr_tokens.len:]
 
-        // Catch slicing expressions and map types.
-        // Use split_map_range because same thing.
-        // Map types like: [KEY:VALUE]
-        // Slicing expressions like: [START:TO]
-        let mut i = 0
-        let (mut r_tokens, colon) = split_map_range(tokens, i)
-
-        // Catch map type or slice literal.
-        if expr_tokens.len == 0 {
-            if colon == -1 {
-                ret self.build_slice(tokens)
-            }
-            ret self.build_type(tokens)
-        }
-
-        if colon != -1 {
-            ret self.build_slicing(expr_tokens, r_tokens, colon, error_token, tokens[tokens.len-1])
+        // Catch slicing expressions.
+        let mut split_tokens = tokens[1:tokens.len-1] // Remove brackets.
+        let (mut start, mut to) = split_delim(split_tokens, TokenId.Colon)
+        if start != nil || to != nil {
+            ret self.build_slicing(expr_tokens, start, to, error_token, tokens[tokens.len-1])
         }
         ret self.build_indexing(expr_tokens, tokens, error_token)
     }
@@ -963,7 +948,12 @@ impl ExprBuilder {
 
             let next = tokens[1]
             if next.id != TokenId.Range || next.kind != TokenKind.RBracket {
-                break
+                // Catch map types.
+                let mut delim = 0
+                delim = map_colon(tokens, delim)
+                if delim == -1 {
+                    break
+                }
             }
             ret self.build_type(tokens)
         }
