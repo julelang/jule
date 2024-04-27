@@ -958,6 +958,13 @@ impl Sema {
         ret ok
     }
 
+    fn check_fn_param_kind(mut &self, mut &p: &ParamIns) {
+        p.kind.variadic = p.decl.variadic
+        if p.decl.reference && !is_valid_for_ref(p.kind) {
+            self.push_err(p.decl.token, LogMsg.RefPointsToInvalidType, p.kind.to_str())
+        }
+    }
+
     fn reload_fn_ins_types(mut &self, mut f: &FnIns): bool {
         if f.is_builtin() || f.is_anon() {
             ret true
@@ -980,10 +987,7 @@ impl Sema {
                 } else {
                     p.kind = sema.build_type_with_generics(p.decl.kind.decl, generics, f.refers)
                     if p.kind != nil {
-                        p.kind.variadic = p.decl.variadic
-                        if p.decl.reference && !is_valid_for_ref(p.kind) {
-                            self.push_err(p.decl.token, LogMsg.RefPointsToInvalidType, p.kind.to_str())
-                        }
+                        self.check_fn_param_kind(p)
                     } else {
                         ok = false
                     }
@@ -2382,7 +2386,7 @@ impl Sema {
         }
 
         if f.instances.len == 0 {
-            let mut ins = f.instance()
+            let mut ins = f.instance_force()
             f.instances = append(f.instances, ins)
             self.reload_fn_ins_types(ins)
             ins.reloaded = true
