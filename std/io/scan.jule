@@ -13,10 +13,13 @@ pub struct Scanner {
 }
 
 impl Scanner {
+    const BufferSize = 1 << 10
+
     // New &Scanner from Reader.
     pub static fn new(mut r: Reader): &Scanner {
         ret &Scanner{
             r: r,
+            b: make([]byte, 0, Scanner.BufferSize),
         }
     }
 
@@ -25,13 +28,14 @@ impl Scanner {
     pub static fn newf(mut f: &File): &Scanner {
         ret &Scanner{
             r: FileStream.new(f),
+            b: make([]byte, 0, Scanner.BufferSize),
         }
     }
 }
 
 impl Scanner {
     fn reset(self) {
-        self.b = nil
+        self.b = self.b[:0]
     }
 
     // Returns bytes of recent scan.
@@ -49,7 +53,6 @@ impl Scanner {
 
         self.reset()
 
-        let mut buff = make([]byte, 0, 1024)
         let mut part_buff: BufferArray
         let mut part = nosafe::atobs[BufferArray, BufferArrayElem](part_buff)
         for {
@@ -60,13 +63,12 @@ impl Scanner {
                 break
             }
             if part[n-1] == LINE_DELIMITER {
-                buff = append(buff, part[:n-1]...)
+                self.b = append(self.b, part[:n-1]...)
                 break
             }
-            buff = append(buff, part[:n]...)
+            self.b = append(self.b, part[:n]...)
         }
-        clear_cr(buff)
-        self.b = buff
+        clear_cr(self.b)
         ret self.b.len != 0
     }
 }
