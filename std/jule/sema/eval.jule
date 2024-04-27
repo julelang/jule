@@ -1075,68 +1075,74 @@ impl Eval {
         self.push_err(i.token, LogMsg.NotSupportsIndexing, d.kind.to_str())
     }
 
-    fn push_generics_from_indexing_data_sub_ident(mut &self, mut &expr: &SubIdentExpr,
-        mut &decl: &IdentTypeDecl, mut &i: &IndexingExpr): bool {
+    fn push_generics_from_expr_sub_ident(mut &self, mut &sexpr: &SubIdentExpr,
+        mut &generics: []&TypeDecl, mut &expr: &Expr): bool {
         let mut t = new(SubIdentTypeDecl)
-        if !push_sub_ident_from_expr(expr, t) {
-            self.push_err(i.expr.token, LogMsg.InvalidSyntax)
+        if !push_sub_ident_from_expr(sexpr, t) {
+            self.push_err(expr.token, LogMsg.InvalidSyntax)
             ret false
         }
-        decl.generics = append(decl.generics, &TypeDecl{
-            kind: t,
-        })
+        generics = append(generics, &TypeDecl{kind: t})
         ret true
     }
 
-    fn push_generics_from_index_data(mut &self, mut &decl: &IdentTypeDecl, mut &i: &IndexingExpr): bool {
-        match type i.index.kind {
+    fn push_generics_from_data(mut &self, mut &generics: []&TypeDecl, mut &expr: &Expr): bool {
+        match type expr.kind {
         | &UnaryExpr:
             // Unary eval catches type declarations.
             // Therefore use unary eval algorithm for eval related type declarations.
-            let mut d = self.eval_unary((&UnaryExpr)(i.index.kind))
+            let mut d = self.eval_unary((&UnaryExpr)(expr.kind))
             if !d.decl {
-                self.push_err(i.token, LogMsg.InvalidSyntax)
+                self.push_err(expr.token, LogMsg.InvalidSyntax)
                 ret false
             }
-            decl.generics = append(decl.generics, &TypeDecl{
+            generics = append(generics, &TypeDecl{
+                token: expr.token,
                 kind: unsafe { *(*TypeDeclKind)(&d.kind.kind) },
             })
         | &TypeDecl:
-            decl.generics = append(decl.generics, (&TypeDecl)(i.index.kind))
+            generics = append(generics, (&TypeDecl)(expr.kind))
         | &SubIdentExpr:
-            let mut expr = (&SubIdentExpr)(i.index.kind)
-            ret self.push_generics_from_indexing_data_sub_ident(expr, decl, i)
+            let mut sexpr = (&SubIdentExpr)(expr.kind)
+            ret self.push_generics_from_expr_sub_ident(sexpr, generics, expr)
         | &IdentExpr:
-            let mut expr = (&IdentExpr)(i.index.kind)
-            decl.generics = append(decl.generics, &TypeDecl{
+            let mut unary = (&IdentExpr)(expr.kind)
+            generics = append(generics, &TypeDecl{
                 kind: &IdentTypeDecl{
-                    token: expr.token,
-                    ident: expr.ident,
+                    token: unary.token,
+                    ident: unary.ident,
                 },
             })
         | &TupleExpr:
-            for (_, mut expr) in (&TupleExpr)(i.index.kind).expr {
-                match type expr.kind {
-                | &TypeDecl:
-                    decl.generics = append(decl.generics, (&TypeDecl)(expr.kind))
-                | &IdentExpr:
-                    let mut idexpr = (&IdentExpr)(expr.kind)
-                    decl.generics = append(decl.generics, &TypeDecl{
-                        kind: &IdentTypeDecl{
-                            token: idexpr.token,
-                            ident: idexpr.ident,
-                        },
-                    })
+            for (_, mut texpr) in (&TupleExpr)(expr.kind).expr {
+                if !self.push_generics_from_data(generics, texpr) {
+                    ret false
                 }
             }
+        | &NsSelectionExpr:
+            let mut ns = (&NsSelectionExpr)(expr.kind)
+            let mut decl = &IdentTypeDecl{
+                token: ns.ident,
+                ident: ns.ident.kind,
+            }
+            generics = append(generics, &TypeDecl{
+                token: decl.token,
+                kind: &NamespaceTypeDecl{
+                    idents: ns.ns,
+                    kind: &TypeDecl{
+                        token: decl.token,
+                        kind: decl,
+                    },
+                }
+            })
         |:
-            self.push_err(i.token, LogMsg.InvalidSyntax)
+            self.push_err(expr.token, LogMsg.InvalidSyntax)
             ret false
         }
         ret true
     }
 
-    fn eval_ident_decl_from_indexing(mut &self, mut &d: &Data, mut &i: &IndexingExpr): &Data {
+    fn eval_ident_decl_from_indexing(mut &self, mut &i: &IndexingExpr): &Data {
         let mut tdecl = new(TypeDecl)
         let mut decl: &IdentTypeDecl = nil
         match type i.expr.kind {
@@ -1164,10 +1170,39 @@ impl Eval {
             self.push_err(i.token, LogMsg.InvalidSyntax)
             ret nil
         }
-        if !self.push_generics_from_index_data(decl, i) {
+        if !self.push_generics_from_data(decl.generics, i.index) {
             ret nil
         }
         ret self.eval_type(tdecl)
+    }
+
+    fn eval_fn_generic_from_indexing(mut &self, mut &d: &Data, mut &i: &IndexingExpr) {
+        let mut generics = make([]&TypeDecl, 0, 1 << 3)
+        if !self.push_generics_from_data(generics, i.index) {
+            d = nil
+            ret
+        }
+
+        let mut f = d.kind.fnc()
+        let mut generics_len = 0
+        if f.decl != nil {
+            generics_len = f.decl.generics.len
+        }
+        if !self.s.check_generic_quantity(generics_len, generics.len, i.expr.token) {
+            d = nil
+            ret
+        }
+
+        // Build real kinds of generic types.
+        f.generics = make([]&InsGeneric, 0, f.decl.generics.len)
+        for (_, mut g) in generics {
+            let mut k = self.eval_type(g)
+            if k == nil {
+                d = nil
+                ret
+            }
+            f.generics = append(f.generics, &InsGeneric{kind: k.kind})
+        }
     }
 
     fn eval_indexing(mut &self, mut i: &IndexingExpr): &Data {
@@ -1182,7 +1217,12 @@ impl Eval {
 
         // Catch types.
         if d.decl {
-            ret self.eval_ident_decl_from_indexing(d, i)
+            ret self.eval_ident_decl_from_indexing(i)
+        }
+
+        if d.kind.fnc() != nil {
+            self.eval_fn_generic_from_indexing(d, i)
+            ret d
         }
 
         let mut old_d = *d
@@ -1753,9 +1793,7 @@ impl Eval {
     }
 
     fn call_type_fn(mut &self, mut &fc: &FnCallExpr, mut &d: &Data) {
-        if fc.generics.len > 0 {
-            self.push_err(fc.token, LogMsg.TypeNotSupportsGenerics, d.kind.to_str())
-        } else if fc.args.len < 1 {
+        if fc.args.len < 1 {
             self.push_err(fc.token, LogMsg.MissingExprFor, "v")
         } else if fc.args.len > 1 {
             self.push_err(fc.args[1].token, LogMsg.ArgumentOverflow)
@@ -1769,32 +1807,6 @@ impl Eval {
 
         if d != nil {
             d.decl = false
-        }
-    }
-
-    fn check_fn_call_generics(mut self, mut f: &FnIns,
-        mut fc: &FnCallExpr): (ok: bool, dynamic_annotation: bool) {
-        match {
-        | f.decl.generics.len > 0 && fc.generics.len == 0 && f.params.len > 0:
-            dynamic_annotation = true
-            // Make empty types to generics for ordering.
-            f.generics = make([]&InsGeneric, f.decl.generics.len)
-            ret true, true
-        | !self.s.check_generic_quantity(f.decl.generics.len, fc.generics.len, fc.token):
-            ret false, false
-        |:
-            // Build real kinds of generic types.
-            f.generics = make([]&InsGeneric, 0, f.decl.generics.len)
-            for (_, mut g) in fc.generics {
-                let mut k = build_type(g)
-                ok = self.s.check_type(k, self.lookup)
-                if !ok {
-                    ret false, false
-                }
-                f.generics = append(f.generics, &InsGeneric{kind: k.kind})
-            }
-
-            ret true, false
         }
     }
 
@@ -1854,7 +1866,6 @@ impl Eval {
             d = nil
             ret
         }
-
         if f.is_builtin() {
             self.call_builtin_fn(fc, d)
             ret
@@ -1872,8 +1883,11 @@ impl Eval {
             self.push_err(fc.token, LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
         }
 
-        let (mut ok, dynamic_annotation) = self.check_fn_call_generics(f, fc)
-        if !ok {
+        let mut dynamic_annotation = f.decl.generics.len > 0 && f.generics.len == 0 && f.params.len > 0
+        if dynamic_annotation {
+            f.generics = make([]&InsGeneric, f.decl.generics.len)
+        } else if f.generics.len != f.decl.generics.len {
+            _ = self.s.check_generic_quantity(f.decl.generics.len, f.generics.len, fc.token)
             d = nil
             ret
         }
@@ -1895,7 +1909,7 @@ impl Eval {
 
         if !dynamic_annotation {
             if !f.reloaded {
-                ok = self.s.reload_fn_ins_types(f)
+                let ok = self.s.reload_fn_ins_types(f)
                 f.reloaded = true
                 if !ok {
                     d = nil
@@ -1920,6 +1934,7 @@ impl Eval {
             dynamic_annotation: dynamic_annotation,
             error_token: fc.token,
         }
+        let mut ok = false
         if f.decl.owner != nil {
             old, self.s = self.s, old // Save current Sema.
             ok = fcac.check()

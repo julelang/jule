@@ -7,6 +7,7 @@ use std::jule::ast::{
     FnCallExpr,
     TypeDecl,
     IdentTypeDecl,
+    GenericDecl,
 }
 use std::jule::build::{Derive, LogMsg}
 
@@ -137,7 +138,12 @@ fn find_builtin_def_std_jule_integrated(ident: str): any {
         static mut f = &FnIns{caller: builtin_caller_std_jule_integrated_to_str}
         ret f
     | "emit":
-        static mut f = &FnIns{caller: builtin_caller_std_jule_integrated_emit}
+        static mut f = &FnIns{
+            decl: &Fn{
+                generics: make([]&GenericDecl, 1),
+            },
+            caller: builtin_caller_std_jule_integrated_emit,
+        }
         ret f
     |:
         ret nil
@@ -191,10 +197,6 @@ fn builtin_caller_common_plain(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Dat
 }
 
 fn builtin_caller_common(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data {
-    if fc.generics.len > 0 {
-        e.push_err(fc.token, LogMsg.NotHasGenerics)
-    }
-
     ret builtin_caller_common_plain(e, fc, d)
 }
 
@@ -206,9 +208,6 @@ fn builtin_caller_common_mut(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data)
 }
 
 fn builtin_caller_error(mut &e: &Eval, mut &fc: &FnCallExpr): &Data {
-    if fc.generics.len > 0 {
-        e.push_err(fc.token, LogMsg.NotHasGenerics)
-    }
     if fc.args.len < 1 {
         e.push_err(fc.token, LogMsg.MissingExprFor, "err")
         ret nil
@@ -234,9 +233,6 @@ fn builtin_caller_error(mut &e: &Eval, mut &fc: &FnCallExpr): &Data {
 }
 
 fn builtin_caller_out(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data {
-    if fc.generics.len > 0 {
-        e.push_err(fc.token, LogMsg.NotHasGenerics)
-    }
     if fc.args.len < 1 {
         e.push_err(fc.token, LogMsg.MissingExprFor, "v")
         ret nil
@@ -273,9 +269,6 @@ fn builtin_caller_outln(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Da
 }
 
 fn builtin_caller_new(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data {
-    if fc.generics.len > 0 {
-        e.push_err(fc.token, LogMsg.NotHasGenerics)
-    }
     if fc.args.len < 1 {
         e.push_err(fc.token, LogMsg.MissingExprFor, "type")
         ret nil
@@ -338,9 +331,6 @@ fn builtin_caller_new(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data
 }
 
 fn builtin_caller_panic(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data {
-    if fc.generics.len > 0 {
-        e.push_err(fc.token, LogMsg.NotHasGenerics)
-    }
     if fc.args.len < 1 {
         e.push_err(fc.token, LogMsg.MissingExprFor, "message")
         ret nil
@@ -367,9 +357,6 @@ fn builtin_caller_panic(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Da
 }
 
 fn builtin_caller_make(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data {
-    if fc.generics.len > 0 {
-        e.push_err(fc.token, LogMsg.NotHasGenerics)
-    }
     if fc.args.len < 2 {
         if fc.args.len == 1 {
             e.push_err(fc.token, LogMsg.MissingExprFor, "size")
@@ -427,9 +414,6 @@ cont:
 }
 
 fn builtin_caller_append(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data {
-    if fc.generics.len > 0 {
-        e.push_err(fc.token, LogMsg.NotHasGenerics)
-    }
     if fc.args.len < 2 {
         if fc.args.len == 1 {
             e.push_err(fc.token, LogMsg.MissingExprFor, "src")
@@ -551,9 +535,6 @@ end:
 }
 
 fn builtin_caller_copy(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data {
-    if fc.generics.len > 0 {
-        e.push_err(fc.token, LogMsg.NotHasGenerics)
-    }
     if fc.args.len < 2 {
         if fc.args.len == 1 {
             e.push_err(fc.token, LogMsg.MissingExprFor, "src")
@@ -581,10 +562,6 @@ fn builtin_caller_copy(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Dat
 }
 
 fn builtin_caller_clone(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data {
-    if fc.generics.len > 0 {
-        e.push_err(fc.token, LogMsg.NotHasGenerics)
-    }
-
     if fc.args.len < 1 {
         e.push_err(fc.token, LogMsg.MissingExprFor, "expr")
         ret nil
@@ -627,9 +604,6 @@ fn builtin_caller_clone(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Da
 }
 
 fn builtin_caller_assert(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data {
-    if fc.generics.len > 0 {
-        e.push_err(fc.token, LogMsg.NotHasGenerics)
-    }
     if fc.args.len < 1 {
         e.push_err(fc.token, LogMsg.MissingExprFor, "expr")
         ret nil
@@ -674,9 +648,6 @@ fn builtin_caller_assert(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &D
 }
 
 fn builtin_caller_std_mem_size_of(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data {
-    if fc.generics.len > 0 {
-        e.push_err(fc.token, LogMsg.NotHasGenerics)
-    }
     let mut result = &Data{
         kind: &TypeKind{kind: build_prim_type(PrimKind.Uint)},
     }
@@ -699,9 +670,6 @@ fn builtin_caller_std_mem_size_of(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &
 }
 
 fn builtin_caller_std_mem_align_of(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data {
-    if fc.generics.len > 0 {
-        e.push_err(fc.token, LogMsg.NotHasGenerics)
-    }
     let mut result = &Data{
         kind: &TypeKind{kind: build_prim_type(PrimKind.Uint)},
     }
@@ -724,10 +692,6 @@ fn builtin_caller_std_mem_align_of(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: 
 }
 
 fn builtin_caller_std_mem_free(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data {
-    if fc.generics.len > 0 {
-        e.push_err(fc.token, LogMsg.NotHasGenerics)
-    }
-
     if fc.args.len < 1 {
         e.push_err(fc.token, LogMsg.MissingExprFor, "h")
         ret nil
@@ -751,10 +715,6 @@ fn builtin_caller_std_mem_free(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Dat
 }
 
 fn builtin_caller_std_jule_integrated_to_str(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data {
-    if fc.generics.len > 0 {
-        e.push_err(fc.token, LogMsg.NotHasGenerics)
-    }
-
     if fc.args.len < 1 {
         e.push_err(fc.token, LogMsg.MissingExprFor, "expr")
         ret nil
@@ -781,7 +741,7 @@ fn builtin_caller_std_jule_integrated_to_str(mut &e: &Eval, mut &fc: &FnCallExpr
     }
 }
 
-fn builtin_caller_std_jule_integrated_emit(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data {
+fn builtin_caller_std_jule_integrated_emit(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data {
     if !e.is_unsafe() {
         e.push_err(fc.token, LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
     }
@@ -791,42 +751,36 @@ fn builtin_caller_std_jule_integrated_emit(mut &e: &Eval, mut &fc: &FnCallExpr, 
         ret nil
     }
 
-    let mut d = e.eval_expr(fc.args[0])
-    if d == nil {
+    let mut argd = e.eval_expr(fc.args[0])
+    if argd == nil {
         ret nil
     }
 
-    if d.kind.prim() == nil || !d.kind.prim().is_str() {
-        e.push_err(fc.args[0].token, LogMsg.IncompatibleTypes, PrimKind.Str, d.kind.to_str())
+    if argd.kind.prim() == nil || !argd.kind.prim().is_str() {
+        e.push_err(fc.args[0].token, LogMsg.IncompatibleTypes, PrimKind.Str, argd.kind.to_str())
         ret nil
     }
 
-    if !d.is_const() || !d.constant.is_str() {
+    if !argd.is_const() || !argd.constant.is_str() {
         e.push_err(fc.args[0].token, LogMsg.ExprNotConst)
         ret nil
     }
 
     let mut r = build_void_data()
 
-    if fc.generics.len != 0 {
-        if !e.s.check_generic_quantity(1, fc.generics.len, fc.token) {
-            ret nil
-        }
-        let mut k = build_type(fc.generics[0])
-        if !e.s.check_type(k, e.lookup) {
-            ret nil
-        }
-        r.kind = k.kind
+    let mut f = d.kind.fnc()
+    if f.generics.len > 0 {
+        r.kind = f.generics[0].kind
     }
 
     let mut model = &BackendEmitExprModel{
-        code: d.constant.read_str(),
+        code: argd.constant.read_str(),
     }
 
     if fc.args.len > 1 {
         model.exprs = make([]ExprModel, 0, fc.args.len - 1)
         for (_, mut arg) in fc.args[1:] {
-            let mut argd = e.eval_expr_kind(arg.kind)
+            argd = e.eval_expr_kind(arg.kind)
             if argd == nil {
                 ret nil
             }

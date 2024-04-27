@@ -1441,8 +1441,16 @@ impl TypeChecker {
                 kind = t
             }
         |:
-            self.push_err(self.error_token, LogMsg.InvalidType)
-            ret nil
+            let mut udecl_kind = unsafe { *(*any)(&decl_kind) }
+            match type udecl_kind {
+            | &Sptr:
+                kind = (&Sptr)(udecl_kind)
+            | &Ptr:
+                kind = (&Ptr)(udecl_kind)
+            |:
+                self.push_err(self.error_token, LogMsg.InvalidType)
+                ret nil
+            }
         }
         if kind == nil {
             ret nil

@@ -36,27 +36,6 @@ use std::jule::lex::{
     is_unary_op,
 }
 
-struct CallData {
-    expr_tokens:     []&Token
-    args_tokens:     []&Token
-    generics_tokens: []&Token
-}
-
-fn get_call_data(mut &tokens: []&Token): &CallData {
-    let mut data = new(CallData)
-    data.expr_tokens, data.args_tokens = range_last(tokens)
-    if data.expr_tokens.len == 0 {
-        ret data
-    }
-
-    // Below is call expression
-    let token = data.expr_tokens[data.expr_tokens.len-1]
-    if token.id == TokenId.Range && token.kind == TokenKind.RBracket {
-        data.expr_tokens, data.generics_tokens = range_last(data.expr_tokens)
-    }
-    ret data
-}
-
 // Returns expression tokens comes before block if exist, nil if not.
 fn get_block_expr(mut &tokens: []&Token): []&Token {
     let mut brace_n = 0
@@ -564,12 +543,11 @@ impl ExprBuilder {
         ret generics
     }
 
-    fn build_fn_call(mut self, mut &token: &Token, mut &data: &CallData): &FnCallExpr {
+    fn build_fn_call(mut self, mut &token: &Token, mut &expr: []&Token, mut &args: []&Token): &FnCallExpr {
         ret &FnCallExpr{
             token: token,
-            expr: self.build_from_tokens(data.expr_tokens),
-            generics: self.build_call_generics(data.generics_tokens),
-            args: self.build_args(data.args_tokens),
+            expr: self.build_from_tokens(expr),
+            args: self.build_args(args),
         }
     }
 
@@ -585,16 +563,13 @@ impl ExprBuilder {
                 }
             }
         }
-
-        let mut data = get_call_data(tokens)
-
+        let (mut expr_tokens, mut args_tokens) = range_last(tokens)
         // Expression is parentheses group if data.expr_tokens is zero.
         // data.args_tokens holds tokens of parentheses range (include parentheses).
-        if data.expr_tokens.len == 0 {
-            ret self.build_between_parentheses(data.args_tokens)
+        if expr_tokens.len == 0 {
+            ret self.build_between_parentheses(args_tokens)
         }
-
-        ret self.build_fn_call(token, data)
+        ret self.build_fn_call(token, expr_tokens, args_tokens)
     }
 
     fn build_unsafe_expr(mut self, mut tokens: []&Token): &UnsafeExpr {
@@ -965,9 +940,6 @@ impl ExprBuilder {
 
         token = tokens[0]
         match token.id {
-        | TokenId.Fn:
-            // Function types.
-            ret self.build_type(tokens)
         | TokenId.Op:
             // Handle pointer to primitive type.
             if tokens.len > 1 && token.kind == TokenKind.Star {
@@ -1014,6 +986,11 @@ impl ExprBuilder {
             | TokenKind.RBracket:
                 ret self.build_bracket_range(tokens)
             }
+        }
+
+        if token.id == TokenId.Fn {
+            // Function types.
+            ret self.build_type(tokens)
         }
 
         self.push_err(token, LogMsg.InvalidSyntax)
