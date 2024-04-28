@@ -1178,6 +1178,33 @@ impl Eval {
         ret self.eval_type(tdecl)
     }
 
+    // Checks new generics function instance.
+    // If instance is already exist, f will point to exist instantantiation.
+    fn check_generic_fn(mut &self, mut &f: &FnIns, mut &et: &Token, mut &model: ExprModel): bool {
+        let ok = self.s.reload_fn_ins_types(f)
+        f.reloaded = true
+        if !ok {
+            ret false
+        }
+        let mut exist_instance = f.decl.append_instance(f)
+        // TODO: [check] is possible to optimize here using same environment with reaload_fn_ins_types?
+        if !self.s.check_constraints_fn(f, et, exist_instance) {
+            ret false
+        }
+        if exist_instance != nil {
+            f = exist_instance
+            // Update model by exist function instance.
+            // Because generic functions returns always new instance.
+            // So, if this absolute instance is already exist, update model.
+            // In other words, model's instance will be a dangling instance.
+            update_model_to_generic_ins(model, exist_instance)
+        } else {
+            // Check generic function instance instantly.
+            self.s.check_fn_ins_caller(f, et)
+        }
+        ret true
+    }
+
     fn eval_fn_generic_from_indexing(mut &self, mut &d: &Data, mut &i: &IndexingExpr) {
         let mut generics = make([]&TypeDecl, 0, 1 << 3)
         if !self.push_generics_from_data(generics, i.index) {
@@ -1204,6 +1231,16 @@ impl Eval {
                 ret
             }
             f.generics = append(f.generics, &InsGeneric{kind: k.kind})
+        }
+
+        if f.is_builtin() {
+            ret
+        }
+
+        if self.check_generic_fn(f, i.expr.token, d.model) {
+            d.kind.kind = f
+        } else {
+            d = nil
         }
     }
 
@@ -1907,8 +1944,6 @@ impl Eval {
             self.s = old
         }
 
-        let mut exist_instance: &FnIns = nil
-
         if !dynamic_annotation {
             if !f.reloaded {
                 let ok = self.s.reload_fn_ins_types(f)
@@ -1918,14 +1953,11 @@ impl Eval {
                     ret
                 }
             }
-            exist_instance = f.decl.append_instance(f)
-            if f.generics.len > 0 {
-                if !self.s.check_constraints_fn(f, fc.token, exist_instance) {
-                    d = nil
-                    ret
-                }
+            let mut exist_instance = f.decl.append_instance(f)
+            if exist_instance != nil {
+                f = exist_instance
             }
-        } else if f.generics.len > 0 {
+        } else {
             self.s.build_fn_non_generic_type_kinds(f)
         }
 
@@ -1945,28 +1977,15 @@ impl Eval {
             ok = fcac.check()
         }
 
-        if !ok && dynamic_annotation {
-            d = nil
-            ret
-        }
-
         if dynamic_annotation {
-            ok = self.s.reload_fn_ins_types(f)
-            f.reloaded = true
             if !ok {
                 d = nil
                 ret
             }
-            exist_instance = f.decl.append_instance(f)
-            if !self.s.check_constraints_fn(f, fc.token, exist_instance) {
+            if !self.check_generic_fn(f, fc.token, d.model) {
                 d = nil
                 ret
             }
-        } else if f.generics.len == 0 {
-            exist_instance = f.decl.append_instance(f)
-        }
-        if exist_instance != nil {
-            f = exist_instance
         }
 
         let mut call_model = d.model
@@ -2001,19 +2020,6 @@ impl Eval {
             }
         } else if !fc.unhandled() {
             self.push_err(fc.token, LogMsg.HandledUnexceptional)
-        }
-
-        if f.generics.len > 0 {
-            if exist_instance != nil {
-                // Update model by exist function instance.
-                // Because generic functions returns always new instance.
-                // So, if this absolute instance is already exist, update model.
-                // In other words, model's instance will be a dangling instance.
-                update_model_to_generic_ins(model, f)
-            } else {
-                // Check generic function instance instantly.
-                self.s.check_fn_ins_caller(f, fc.token)
-            }
         }
     }
 
@@ -4466,14 +4472,14 @@ fn cast_const_by_type(&t: str, mut &d: &Data) {
     }
 }
 
-fn update_model_to_generic_ins(mut &m: &FnCallExprModel, mut &f: &FnIns) {
-    match type m.expr {
+fn update_model_to_generic_ins(mut &m: ExprModel, mut &f: &FnIns) {
+    match type m {
     | &FnIns:
-        m.expr = f
+        m = f
     | &StructSubIdentExprModel:
-        (&StructSubIdentExprModel)(m.expr).method = f
+        (&StructSubIdentExprModel)(m).method = f
     | &StructStaticIdentExprModel:
-        (&StructStaticIdentExprModel)(m.expr).method = f
+        (&StructStaticIdentExprModel)(m).method = f
     }
 }
 
