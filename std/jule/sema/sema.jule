@@ -1961,6 +1961,12 @@ impl Sema {
             v.kind = &TypeSymbol{kind: v.value.data.kind}
 
             self.check_data_for_type_inference(v.value.data, v.value.expr.token)
+            self.check_validity_for_init_expr(
+                v.mutable,
+                v.reference,
+                v.kind.kind,
+                v.value.data,
+                v.value.expr.token)
         } else {
             let mut arr = v.kind.kind.arr()
             if arr != nil {
@@ -1972,19 +1978,19 @@ impl Sema {
                 }
             }
 
-            _ = self.check_assign_type(v.reference, v.kind.kind, v.value.data, v.value.expr.token)
+            if self.check_assign_type(v.reference, v.kind.kind, v.value.data, v.value.expr.token) {
+                self.check_validity_for_init_expr(
+                    v.mutable,
+                    v.reference,
+                    v.kind.kind,
+                    v.value.data,
+                    v.value.expr.token)
+            }
         }
 
         if v.reference && !is_valid_for_ref(v.kind.kind) {
             self.push_err(v.token, LogMsg.RefPointsToInvalidType, v.kind.kind.to_str())
         }
-
-        self.check_validity_for_init_expr(
-            v.mutable,
-            v.reference,
-            v.kind.kind,
-            v.value.data,
-            v.value.expr.token)
 
         if v.constant {
             if !v.value.data.is_const() {
