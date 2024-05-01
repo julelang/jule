@@ -12,45 +12,45 @@ impl Directory {
     // Possible errors:
     //  Denied InvalidDescriptor PerProcessLimit SystemWideLimit
     //  NotExist InsufficientMemory NotDir
-    pub static fn read(path: str)!: (dirents: []&DirEntry) {
-        let mut dir = unsafe { sys::opendir(&path[0]) }
+    pub static fn Read(path: str)!: (dirents: []&DirEntry) {
+        let mut dir = unsafe { sys::Opendir(&path[0]) }
         if dir == nil {
-            error(get_last_fs_error())
+            error(getLastFsError())
         }
         for {
-            let dirent = unsafe { sys::readdir(dir) }
+            let dirent = unsafe { sys::Readdir(dir) }
             if dirent == nil {
                 break
             }
-            let name = unsafe { integrated::byte_ptr_to_str((*u8)(dirent.d_name)) }
-            let mut stat = Status.of(path::join(path, name)) else { error(error) }
+            let name = unsafe { integrated::BytePtrToStr((*u8)(dirent.d_name)) }
+            let mut stat = Status.Of(path::Join(path, name)) else { error(error) }
             dirents = append(dirents, &DirEntry{
-                name: name,
-                stat: stat,
+                Name: name,
+                Stat: stat,
             })
         }
-        _ = unsafe { sys::closedir(dir) }
+        _ = unsafe { sys::Closedir(dir) }
         ret
     }
 
     // Creates directory.
     //
     // Possible errors: Denied Exist ReadOnly NoSpace
-    pub static fn create(path: str)! {
+    pub static fn Create(path: str)! {
         // NOTICE
         // Also can has EMLINK error-code.
         // Make sure this situation should documented or not.
-        if unsafe { sys::mkdir(&path[0], 0700) } != 0 {
-            error(get_last_fs_error())
+        if unsafe { sys::Mkdir(&path[0], 0700) } != 0 {
+            error(getLastFsError())
         }
     }
 
     // Removes empty directory.
     //
     // Possible errors: Denined NotExist NotEmpty SyncIO IO Loop NotDir
-    pub static fn remove(path: str)! {
-        if unsafe { sys::rmdir(&path[0]) } != 0 {
-            error(get_last_fs_error())
+    pub static fn Remove(path: str)! {
+        if unsafe { sys::Rmdir(&path[0]) } != 0 {
+            error(getLastFsError())
         }
     }
 }

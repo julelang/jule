@@ -38,20 +38,20 @@
 use io for std::io
 
 // Returns the maximum length of an encoding of n source bytes.
-pub fn max_encoded_len(n: int): int {
+pub fn MaxEncodedLen(n: int): int {
     ret (n + 3) / 4 * 5
 }
 
 // Returns new Ascii85 encoder for stream.
 // Encoder forwards any exception.
-pub fn new_encoder(mut w: io::Writer): io::WriterCloser {
-    ret Encoder.new(w)
+pub fn NewEncoder(mut w: io::Writer): io::WriterCloser {
+    ret encoder.new(w)
 }
 
 // Returns new Ascii85 decoder for stream.
 // Decoder forwards any exception.
-pub fn new_decoder(mut r: io::Reader): io::Reader {
-    ret Decoder.new(r)
+pub fn NewDecoder(mut r: io::Reader): io::Reader {
+    ret decoder.new(r)
 }
 
 // Encodes src into at most max_encoded_len(src.len)
@@ -63,7 +63,7 @@ pub fn new_decoder(mut r: io::Reader): io::Reader {
 //
 // Often, ascii85-encoded data is wrapped in <~ and ~> symbols.
 // The encode does not add these.
-pub fn encode(mut dest: []byte, src: []byte): int {
+pub fn Encode(mut dest: []byte, src: []byte): int {
     if src.len == 0 {
         ret 0
     }
@@ -136,7 +136,7 @@ pub fn encode(mut dest: []byte, src: []byte): int {
 // than wait for the completion of another 32-bit block.
 //
 // new_decoder wraps an std::io::Reader trait around decode.
-pub fn decode(mut dest: []byte, src: []byte, flush: bool)!: (ndst: int, nsrc: int) {
+pub fn Decode(mut dest: []byte, src: []byte, flush: bool)!: (ndst: int, nsrc: int) {
     let mut v = u32(0)
     let mut nb = 0
     for i, b in src {
@@ -194,15 +194,15 @@ pub fn decode(mut dest: []byte, src: []byte, flush: bool)!: (ndst: int, nsrc: in
     ret
 }
 
-struct Encoder {
+struct encoder {
     w:    io::Writer
     buf:  []byte     // buffered data waiting to be encoded
     nbuf: int        // number of bytes in buf
     out:  []byte     // output buffer
 }
 
-impl io::WriterCloser for Encoder {
-    pub fn write(mut self, dest: []byte)!: (n: int) {
+impl io::WriterCloser for encoder {
+    pub fn Write(mut self, dest: []byte)!: (n: int) {
         // Leading fringe.
         if self.nbuf > 0 {
             let mut i = 0
@@ -215,8 +215,8 @@ impl io::WriterCloser for Encoder {
             if self.nbuf < 4 {
                 ret
             }
-            let nout = encode(self.out, self.buf)
-            self.w.write(self.out[:nout]) else { error(error) }
+            let nout = Encode(self.out, self.buf)
+            self.w.Write(self.out[:nout]) else { error(error) }
             self.nbuf = 0
         }
 
@@ -228,8 +228,8 @@ impl io::WriterCloser for Encoder {
             }
             nn -= nn % 4
             if nn > 0 {
-                let nout = encode(self.out, dest[:nn])
-                self.w.write(self.out[:nout]) else { error(error) }
+                let nout = Encode(self.out, dest[:nn])
+                self.w.Write(self.out[:nout]) else { error(error) }
             }
             n += nn
             unsafe { *(&dest) = (*(&dest))[nn:] }
@@ -244,19 +244,19 @@ impl io::WriterCloser for Encoder {
 
     // Close flushes any pending output from the encoder.
     // It is an error to call write after calling close.
-    pub fn close(mut self)! {
+    pub fn Close(mut self)! {
         // If there's anything left in the buffer, flush it out.
         if self.nbuf > 0 {
-            let nout = encode(self.out, self.buf[:self.nbuf])
+            let nout = Encode(self.out, self.buf[:self.nbuf])
             self.nbuf = 0
-            self.w.write(self.out[:nout]) else { error(error) }
+            self.w.Write(self.out[:nout]) else { error(error) }
         }
     }
 }
 
-impl Encoder {
-    static fn new(mut w: io::Writer): &Encoder {
-        ret &Encoder{
+impl encoder {
+    static fn new(mut w: io::Writer): &encoder {
+        ret &encoder{
             w: w,
             buf: make([]byte, 4),
             out: make([]byte, 1 << 10),
@@ -264,7 +264,7 @@ impl Encoder {
     }
 }
 
-struct Decoder {
+struct decoder {
     r:      io::Reader
     buf:    []byte     // leftover input
     nbuf:   int
@@ -272,8 +272,8 @@ struct Decoder {
     outbuf: []byte
 }
 
-impl io::Reader for Decoder {
-    pub fn read(mut self, mut p: []byte)!: (n: int) {
+impl io::Reader for decoder {
+    pub fn Read(mut self, mut p: []byte)!: (n: int) {
         if p.len == 0 {
             ret 0
         }
@@ -288,7 +288,7 @@ impl io::Reader for Decoder {
             // Decode leftover input from last read.
             let (mut nn, mut nsrc, mut ndst) = 0, 0, 0
             if self.nbuf > 0 {
-                ndst, nsrc = decode(self.outbuf, self.buf[:self.nbuf], true) else { error(error) }
+                ndst, nsrc = Decode(self.outbuf, self.buf[:self.nbuf], true) else { error(error) }
                 if ndst > 0 {
                     self.out = self.outbuf[:ndst]
                     self.nbuf = copy(self.buf, self.buf[nsrc:self.nbuf])
@@ -310,15 +310,15 @@ impl io::Reader for Decoder {
             }
 
             // Read more data.
-            nn = self.r.read(self.buf[self.nbuf:]) else { error(error) }
+            nn = self.r.Read(self.buf[self.nbuf:]) else { error(error) }
             self.nbuf += nn
         }
     }
 }
 
-impl Decoder {
-    static fn new(mut r: io::Reader): &Decoder {
-        ret &Decoder{
+impl decoder {
+    static fn new(mut r: io::Reader): &decoder {
+        ret &decoder{
             r: r,
             buf: make([]byte, 1 << 10),
             outbuf: make([]byte, 1 << 10),

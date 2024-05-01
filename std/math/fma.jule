@@ -69,9 +69,9 @@ fn shr(u1: u64, u2: u64, n: uint): (r1: u64, r2: u64) {
     //
     // TODO: Make sure this computation is fast and efficiency?
     let mut shift = u1
-    let mut shift_n = n - 64
-    for shift > 0 && shift_n > 0 {
-        shift_n--
+    let mut shiftN = n - 64
+    for shift > 0 && shiftN > 0 {
+        shiftN--
         shift >>= 1
     }
 
@@ -103,9 +103,9 @@ fn shrcompress(u1: u64, u2: u64, n: uint): (r1: u64, r2: u64) {
 }
 
 fn lz(u1: u64, u2: u64): (l: i32) {
-    l = i32(bits::leading_zeros64(u1))
+    l = i32(bits::LeadingZeros64(u1))
     if l == 64 {
-        l += i32(bits::leading_zeros64(u2))
+        l += i32(bits::LeadingZeros64(u2))
     }
     ret l
 }
@@ -115,12 +115,12 @@ fn lz(u1: u64, u2: u64): (l: i32) {
 // and normalizes subnormal values.
 fn split(b: u64): (sign: u32, exp: i32, mantissa: u64) {
     sign = u32(b >> 63)
-    exp = i32(b >> 52) & MASK
-    mantissa = b & FRAC_MASK
+    exp = i32(b >> 52) & mask
+    mantissa = b & fracMask
 
     if exp == 0 {
         // Normalize value if subnormal.
-        let shift = uint(bits::leading_zeros64(mantissa) - 11)
+        let shift = uint(bits::LeadingZeros64(mantissa) - 11)
         mantissa <<= shift
         exp = 1 - i32(shift)
     } else {
@@ -131,17 +131,17 @@ fn split(b: u64): (sign: u32, exp: i32, mantissa: u64) {
 }
 
 // Returns x * y + z, computed with only one rounding.
-// (That is, fma returns the fused multiply-add of x, y, and z.)
-pub fn fma(x: f64, y: f64, z: f64): f64 {
-    let (bx, by, bz) = f64_bits(x), f64_bits(y), f64_bits(z)
+// (That is, Fma returns the fused multiply-add of x, y, and z.)
+pub fn Fma(x: f64, y: f64, z: f64): f64 {
+    let (bx, by, bz) = F64Bits(x), F64Bits(y), F64Bits(z)
 
-    // inf or nan or zero involved. At most one rounding will occur.
-    if x == 0.0 || y == 0.0 || z == 0.0 || bx&UVINF == UVINF || by&UVINF == UVINF {
+    // inf or NaN or zero involved. At most one rounding will occur.
+    if x == 0.0 || y == 0.0 || z == 0.0 || bx&uvinf == uvinf || by&uvinf == uvinf {
         ret x * y + z
     }
     // Handle non-finite z separately. Evaluating x*y+z where
     // x and y are finite, but z is infinite, should always result in z.
-    if bz&UVINF == UVINF {
+    if bz&uvinf == uvinf {
         ret z
     }
 
@@ -153,12 +153,12 @@ pub fn fma(x: f64, y: f64, z: f64): f64 {
 
     // Compute product p = x*y as sign, exponent, two-word mantissa.
     // Start with exponent. "is normal" bit isn't subtracted yet.
-    let mut pe = xe + ye - BIAS + 1
+    let mut pe = xe + ye - bias + 1
 
     // pm1:pm2 is the double-word mantissa for the product p.
     // Shift left to leave top bit in product. Effectively
     // shifts the 106-bit product to the left by 21.
-    let (mut pm1, mut pm2) = bits::mul64(xm << 10, ym << 11)
+    let (mut pm1, mut pm2) = bits::Mul64(xm << 10, ym << 11)
     let (mut zm1, mut zm2) = zm << 10, u64(0)
     let mut ps = xs ^ ys // product sign
 
@@ -180,14 +180,14 @@ pub fn fma(x: f64, y: f64, z: f64): f64 {
     let mut c: u64 = 0
     if ps == zs {
         // Adding (pm1:pm2) + (zm1:zm2)
-        pm2, c = bits::add64(pm2, zm2, 0)
-        pm1, _ = bits::add64(pm1, zm1, c)
+        pm2, c = bits::Add64(pm2, zm2, 0)
+        pm1, _ = bits::Add64(pm1, zm1, c)
         pe -= i32(^pm1 >> 63)
         pm1, m = shrcompress(pm1, pm2, uint(64 + pm1 >> 63))
     } else {
         // Subtracting (pm1:pm2) - (zm1:zm2)
-        pm2, c = bits::sub64(pm2, zm2, 0)
-        pm1, _ = bits::sub64(pm1, zm1, c)
+        pm2, c = bits::Sub64(pm2, zm2, 0)
+        pm1, _ = bits::Sub64(pm1, zm1, c)
         let nz = lz(pm1, pm2)
         pe -= nz
         m, pm2 = shl(pm1, pm2, uint(nz - 1))
@@ -195,9 +195,9 @@ pub fn fma(x: f64, y: f64, z: f64): f64 {
     }
 
     // Round and break ties to even
-    if pe > 1022+BIAS || pe == 1022+BIAS && (m+1<<9)>>63 == 1 {
+    if pe > 1022+bias || pe == 1022+bias && (m+1<<9)>>63 == 1 {
         // rounded value overflows exponent range
-        ret f64_from_bits(u64(ps) << 63 | UVINF)
+        ret F64FromBits(u64(ps) << 63 | uvinf)
     }
     if pe < 0 {
         let n = uint(-pe)
@@ -206,5 +206,5 @@ pub fn fma(x: f64, y: f64, z: f64): f64 {
     }
     m = ((m + 1 << 9) >> 10) & ^zero((m & (1 << 10 - 1)) ^ 1 << 9)
     pe &= -i32(nonzero(m))
-    ret f64_from_bits(u64(ps) << 63 + u64(pe) << 52 + m)
+    ret F64FromBits(u64(ps) << 63 + u64(pe) << 52 + m)
 }

@@ -6,67 +6,67 @@ use utf16 for std::unicode::utf16
 
 // Builtin:
 // Returns string converted form of expression.
-// pub fn to_str(expr: any): str
+// pub fn ToStr(expr: any): str
 
 // Returns the UTF-16 encoding of the UTF-8 string
 // s, with a terminating NULL added. If s includes NULL
 // character at any location, ignores followed characters.
-pub fn utf16_from_str(s: str): []u16 {
+pub fn Utf16FromStr(s: str): []u16 {
     // In the worst case all characters require two u16.
     // Also account for the terminating NULL character.
     // See: C Strings and Windows UTF16.
 
-    const NULL_TERMINATION = 0
+    const NullTermination = 0
     let runes = ([]rune)(s)
     let mut buff = make([]u16, 0, runes.len)
     for _, r in runes {
-        if r == NULL_TERMINATION {
+        if r == NullTermination {
             break
         }
-        buff = utf16::append_rune(buff, r)
+        buff = utf16::AppendRune(buff, r)
     }
-    ret utf16::append_rune(buff, NULL_TERMINATION)
+    ret utf16::AppendRune(buff, NullTermination)
 }
 
 // Returns the UTF-8 encoding of the UTF-16 sequence s,
 // with a terminating NULL removed. Returns empty string
 // if s is nil.
-pub fn utf16_to_str(s: []u16): str {
+pub fn Utf16ToStr(s: []u16): str {
     if s == nil {
         ret ""
     }
-    let mut code_page = unsafe { *(&s) }
+    let mut codePage = unsafe { *(&s) }
     for i, v in s {
         if v == 0 {
-            code_page = code_page[:i]
+            codePage = codePage[:i]
             break
         }
     }
-    ret str(utf16::decode(code_page))
+    ret str(utf16::Decode(codePage))
 }
 
 // Returns the UTF-8 encoding of the UTF-16 sequence s in *u16 form,
 // with a terminating NULL removed. Returns empty string if s is nil.
-pub unsafe fn u16_ptr_to_str(s: *u16): str {
+pub unsafe fn U16PtrToStr(s: *u16): str {
     if s == nil {
         ret ""
     }
 
-    let mut code_page: []u16 = nil
+    let mut codePage: []u16 = nil
     let mut i = 0
     for ; i++ {
         let r = s[i]
         if r == 0 {
-            ret str(utf16::decode(code_page))
+            ret str(utf16::Decode(codePage))
         }
-        code_page = append(code_page, r)
+        codePage = append(codePage, r)
     }
     ret ""
 }
 
 // Returns the string of s, with a terminating NULL removed.
 // Returns empty string if pointer is nil.
-pub unsafe fn byte_ptr_to_str(s: *byte): str {
+pub unsafe fn BytePtrToStr(s: *byte): str {
     if s == nil {
         ret ""
     }

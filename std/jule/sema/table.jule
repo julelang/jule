@@ -7,25 +7,25 @@ use std::jule::lex::{File}
 // Symbol table.
 // Builds by semantic analyzer.
 pub struct SymbolTable {
-    pub file:         &File         // Owner fileset of this symbol table.
-    pub passes:       []Pass        // All passed flags with jule:pass directive.
-    pub imports:      []&ImportInfo // Imported packages.
-    pub vars:         []&Var        // Variables.
-    pub type_aliases: []&TypeAlias  // Type aliases.
-    pub structs:      []&Struct     // Structures.
-    pub funcs:        []&Fn         // Functions.
-    pub traits:       []&Trait      // Traits.
-    pub enums:        []&Enum       // Enums.
-    pub type_enums:   []&TypeEnum   // Type enums.
-    pub impls:        []&Impl       // Implementations.
+    pub File:        &File         // Owner fileset of this symbol table.
+    pub Passes:      []Pass        // All passed flags with jule:pass directive.
+    pub Imports:     []&ImportInfo // Imported packages.
+    pub Vars:        []&Var        // Variables.
+    pub TypeAliases: []&TypeAlias  // Type aliases.
+    pub Structs:     []&Struct     // Structures.
+    pub Funcs:       []&Fn         // Functions.
+    pub Traits:      []&Trait      // Traits.
+    pub Enums:       []&Enum       // Enums.
+    pub TypeEnums:   []&TypeEnum   // Type enums.
+    pub Impls:       []&Impl       // Implementations.
 }
 
 impl Lookup for SymbolTable {
     // Returns imported package by identifier.
     // Returns nil reference if not exist any package in this identifier.
-    pub fn find_package(mut self, ident: str): &ImportInfo {
-        for (_, mut pkg) in self.imports {
-            if pkg.ident == ident {
+    pub fn FindPackage(mut self, ident: str): &ImportInfo {
+        for (_, mut pkg) in self.Imports {
+            if pkg.Ident == ident {
                 ret pkg
             }
         }
@@ -35,12 +35,11 @@ impl Lookup for SymbolTable {
     // Returns imported package by selector.
     // Returns nil reference if selector returns false for all packages.
     // Returns nil reference if selector is nil.
-    pub fn select_package(mut self, selector: fn(&ImportInfo): bool): &ImportInfo {
+    pub fn SelectPackage(mut self, selector: fn(&ImportInfo): bool): &ImportInfo {
         if selector == nil {
             ret nil
         }
-
-        for (_, mut pkg) in self.imports {
+        for (_, mut pkg) in self.Imports {
             if selector(pkg) {
                 ret pkg
             }
@@ -50,21 +49,21 @@ impl Lookup for SymbolTable {
 
     // Returns variable by identifier and cpp linked state.
     // Returns nil if refenrece not exist any variable in this identifier.
-    pub fn find_var(mut self, ident: str, cpp_linked: bool): &Var {
-        ret self.__find_var(ident, cpp_linked, false)
+    pub fn FindVar(mut self, ident: str, cppLinked: bool): &Var {
+        ret self.findVar(ident, cppLinked, false)
     }
 
     // Returns type alias by identifier and cpp linked state.
     // Returns nil reference if not exist any type alias in this identifier.
-    pub fn find_type_alias(mut self, ident: str, cpp_linked: bool): &TypeAlias {
-        ret self.__find_type_alias(ident, cpp_linked, false)
+    pub fn FindTypeAlias(mut self, ident: str, cppLinked: bool): &TypeAlias {
+        ret self.findTypeAlias(ident, cppLinked, false)
     }
 
     // Returns struct by identifier and cpp linked state.
     // Returns nil reference if not exist any struct in this identifier.
-    pub fn find_struct(mut self, ident: str, cpp_linked: bool): &Struct {
-        for (_, mut s) in self.structs {
-            if s.ident == ident && s.cpp_linked == cpp_linked {
+    pub fn FindStruct(mut self, ident: str, cppLinked: bool): &Struct {
+        for (_, mut s) in self.Structs {
+            if s.Ident == ident && s.CppLinked == cppLinked {
                 ret s
             }
         }
@@ -73,9 +72,9 @@ impl Lookup for SymbolTable {
 
     // Returns function by identifier and cpp linked state.
     // Returns nil reference if not exist any function in this identifier.
-    pub fn find_fn(mut self, ident: str, cpp_linked: bool): &Fn {
-        for (_, mut f) in self.funcs {
-            if f.ident == ident && f.cpp_linked == cpp_linked {
+    pub fn FindFn(mut self, ident: str, cppLinked: bool): &Fn {
+        for (_, mut f) in self.Funcs {
+            if f.Ident == ident && f.CppLinked == cppLinked {
                 ret f
             }
         }
@@ -84,9 +83,9 @@ impl Lookup for SymbolTable {
 
     // Returns trait by identifier.
     // Returns nil reference if not exist any trait in this identifier.
-    pub fn find_trait(mut self, ident: str): &Trait {
-        for (_, mut t) in self.traits {
-            if t.ident == ident {
+    pub fn FindTrait(mut self, ident: str): &Trait {
+        for (_, mut t) in self.Traits {
+            if t.Ident == ident {
                 ret t
             }
         }
@@ -95,9 +94,9 @@ impl Lookup for SymbolTable {
 
     // Returns enum by identifier.
     // Returns nil reference if not exist any enum in this identifier.
-    pub fn find_enum(mut self, ident: str): &Enum {
-        for (_, mut e) in self.enums {
-            if e.ident == ident {
+    pub fn FindEnum(mut self, ident: str): &Enum {
+        for (_, mut e) in self.Enums {
+            if e.Ident == ident {
                 ret e
             }
         }
@@ -106,9 +105,9 @@ impl Lookup for SymbolTable {
 
     // Returns type enum by identifier.
     // Returns nil reference if not exist any type enum in this identifier.
-    pub fn find_type_enum(mut self, ident: str): &TypeEnum {
-        for (_, mut e) in self.type_enums {
-            if e.ident == ident {
+    pub fn FindTypeEnum(mut self, ident: str): &TypeEnum {
+        for (_, mut e) in self.TypeEnums {
+            if e.Ident == ident {
                 ret e
             }
         }
@@ -117,18 +116,18 @@ impl Lookup for SymbolTable {
 }
 
 impl SymbolTable {
-    fn __find_var(mut self, ident: str, cpp_linked: bool, reverse: bool): &Var {
+    fn findVar(mut self, ident: str, cppLinked: bool, reverse: bool): &Var {
         if reverse {
-            let mut i = self.vars.len - 1
+            let mut i = self.Vars.len - 1
             for i >= 0; i-- {
-                let mut v = self.vars[i]
-                if v.ident == ident && v.cpp_linked == cpp_linked {
+                let mut v = self.Vars[i]
+                if v.Ident == ident && v.CppLinked == cppLinked {
                     ret v
                 }
             }
         } else {
-            for (_, mut v) in self.vars {
-                if v.ident == ident && v.cpp_linked == cpp_linked {
+            for (_, mut v) in self.Vars {
+                if v.Ident == ident && v.CppLinked == cppLinked {
                     ret v
                 }
             }
@@ -136,18 +135,18 @@ impl SymbolTable {
         ret nil
     }
 
-    fn __find_type_alias(mut self, ident: str, cpp_linked: bool, reverse: bool): &TypeAlias {
+    fn findTypeAlias(mut self, ident: str, cppLinked: bool, reverse: bool): &TypeAlias {
         if reverse {
-            let mut i = self.type_aliases.len - 1
+            let mut i = self.TypeAliases.len - 1
             for i >= 0; i-- {
-                let mut ta = self.type_aliases[i]
-                if ta.ident == ident && ta.cpp_linked == cpp_linked {
+                let mut ta = self.TypeAliases[i]
+                if ta.Ident == ident && ta.CppLinked == cppLinked {
                     ret ta
                 }
             }
         } else {
-            for (_, mut ta) in self.type_aliases {
-                if ta.ident == ident && ta.cpp_linked == cpp_linked {
+            for (_, mut ta) in self.TypeAliases {
+                if ta.Ident == ident && ta.CppLinked == cppLinked {
                     ret ta
                 }
             }
@@ -157,49 +156,49 @@ impl SymbolTable {
 
     // Returns define by identifier.
     // Returns nil reference if not exist any define in this identifier.
-    fn def_by_ident(mut self, ident: str, cpp_linked: bool): any {
-        for (_, mut v) in self.vars {
-            if v.ident == ident && v.cpp_linked == cpp_linked {
+    fn defByIdent(mut self, ident: str, cppLinked: bool): any {
+        for (_, mut v) in self.Vars {
+            if v.Ident == ident && v.CppLinked == cppLinked {
                 ret v
             }
         }
 
-        for (_, mut ta) in self.type_aliases {
-            if ta.ident == ident && ta.cpp_linked == cpp_linked {
+        for (_, mut ta) in self.TypeAliases {
+            if ta.Ident == ident && ta.CppLinked == cppLinked {
                 ret ta
             }
         }
 
-        for (_, mut s) in self.structs {
-            if s.ident == ident && s.cpp_linked == cpp_linked {
+        for (_, mut s) in self.Structs {
+            if s.Ident == ident && s.CppLinked == cppLinked {
                 ret s
             }
         }
 
-        for (_, mut f) in self.funcs {
-            if f.ident == ident && f.cpp_linked == cpp_linked {
+        for (_, mut f) in self.Funcs {
+            if f.Ident == ident && f.CppLinked == cppLinked {
                 ret f
             }
         }
 
-        if cpp_linked {
+        if cppLinked {
             ret nil
         }
 
-        for (_, mut t) in self.traits {
-            if t.ident == ident {
+        for (_, mut t) in self.Traits {
+            if t.Ident == ident {
                 ret t
             }
         }
 
-        for (_, mut e) in self.enums {
-            if e.ident == ident {
+        for (_, mut e) in self.Enums {
+            if e.Ident == ident {
                 ret e
             }
         }
 
-        for (_, mut te) in self.type_enums {
-            if te.ident == ident {
+        for (_, mut te) in self.TypeEnums {
+            if te.Ident == ident {
                 ret te
             }
         }
@@ -210,49 +209,49 @@ impl SymbolTable {
     // Reports this identifier duplicated in symbol table.
     // The "self" parameter represents address of exception identifier.
     // If founded identifier address equals to self, will be skipped.
-    fn is_duplicated_ident(self, itself: uintptr, ident: str, cpp_linked: bool): bool {
-        for _, v in self.vars {
-            if uintptr(v) != itself && v.ident == ident && v.cpp_linked == cpp_linked {
+    fn isDuplicatedIdent(self, itself: uintptr, ident: str, cppLinked: bool): bool {
+        for _, v in self.Vars {
+            if uintptr(v) != itself && v.Ident == ident && v.CppLinked == cppLinked {
                 ret true
             }
         }
 
-        for _, ta in self.type_aliases {
-            if uintptr(ta) != itself && ta.ident == ident && ta.cpp_linked == cpp_linked {
+        for _, ta in self.TypeAliases {
+            if uintptr(ta) != itself && ta.Ident == ident && ta.CppLinked == cppLinked {
                 ret true
             }
         }
 
-        for _, s in self.structs {
-            if uintptr(s) != itself && s.ident == ident && s.cpp_linked == cpp_linked {
+        for _, s in self.Structs {
+            if uintptr(s) != itself && s.Ident == ident && s.CppLinked == cppLinked {
                 ret true
             }
         }
 
-        for _, f in self.funcs {
-            if uintptr(f) != itself && f.ident == ident && f.cpp_linked == cpp_linked {
+        for _, f in self.Funcs {
+            if uintptr(f) != itself && f.Ident == ident && f.CppLinked == cppLinked {
                 ret true
             }
         }
 
-        if cpp_linked {
+        if cppLinked {
             ret false
         }
 
-        for _, t in self.traits {
-            if uintptr(t) != itself && t.ident == ident {
+        for _, t in self.Traits {
+            if uintptr(t) != itself && t.Ident == ident {
                 ret true
             }
         }
 
-        for _, e in self.enums {
-            if uintptr(e) != itself && e.ident == ident {
+        for _, e in self.Enums {
+            if uintptr(e) != itself && e.Ident == ident {
                 ret true
             }
         }
 
-        for _, te in self.type_enums {
-            if uintptr(te) != itself && te.ident == ident {
+        for _, te in self.TypeEnums {
+            if uintptr(te) != itself && te.Ident == ident {
                 ret true
             }
         }

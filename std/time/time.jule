@@ -8,29 +8,29 @@ cpp type time_t: u64
 
 cpp unsafe fn time(t: *cpp.time_t): cpp.time_t
 
-const HOUR = 3600
-const DAY = HOUR * 24
+const hour = 3600
+const day = hour * 24
 
 // unix-year offset by today
-const UNIX_YEAR_OFFSET = 1900
+const unixYearOffset = 1900
 
 // unix-month offset by today
-const UNIX_MONTH_OFFSET = 1
+const unixMonthOffset = 1
 
-const NSEC_PER_MSEC = 1000000
-const NSEC_PER_SEC = NSEC_PER_MSEC * MSEC_PER_SEC
-const MSEC_PER_SEC = 1000
-const DAYS_PER_Y = 365
-const DAYS_PER_400Y = DAYS_PER_Y * 400 + 97
-const DAYS_PER_100Y = DAYS_PER_Y * 100 + 24
-const DAYS_PER_4Y = DAYS_PER_Y * 4 + 1
+const nsecPerMsec = 1000000
+const nsecPerSec = nsecPerMsec * msecPerSec
+const msecPerSec = 1000
+const daysPerY = 365
+const daysPer400Y = daysPerY * 400 + 97
+const daysPer100Y = daysPerY * 100 + 24
+const daysPer4Y = daysPerY * 4 + 1
 
 // 2000-03-01 (mod 400 year, immediately after feb29
 const _2000_03_01 = 946684800
-const MOD_APOCH = _2000_03_01 + DAY * (31 + 29)
+const modApoch = _2000_03_01 + day * (31 + 29)
 
 // Days in month.
-static MDAYS: [...]u64 = [31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29]
+static mdays: [...]u64 = [31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29]
 
 // Type of unix-time seconds.
 pub type UnixTime: u64
@@ -40,22 +40,22 @@ pub type TimeData: u64
 
 // Abstract time.
 pub struct AbsTime {
-    pub day:      TimeData
-    pub week_day: TimeData
-    pub year_day: TimeData
-    pub month:    TimeData
-    pub year:     TimeData
-    pub second:   TimeData
-    pub minute:   TimeData
-    pub hour:     TimeData
+    pub Day:     TimeData
+    pub WeekDay: TimeData
+    pub YearDay: TimeData
+    pub Month:   TimeData
+    pub Year:    TimeData
+    pub Second:  TimeData
+    pub Minute:  TimeData
+    pub Hour:    TimeData
 }
 
 impl AbsTime {
     // Returns abstract time as unix-time seconds.
-    pub fn unix(self): UnixTime {
+    pub fn Unix(self): UnixTime {
         let mut leap = false
-        let mut y = self.year - UNIX_YEAR_OFFSET
-        let mut m = self.month - UNIX_MONTH_OFFSET
+        let mut y = self.Year - unixYearOffset
+        let mut m = self.Month - unixMonthOffset
         if m >= 12 || m < 0 {
             let mut adj = m / 12
             m %= 12
@@ -65,12 +65,12 @@ impl AbsTime {
             }
             y += adj
         }
-        let mut t = unix_year_to_seconds(y, leap)
-        t += unix_month_to_seconds(m, leap)
-        t += DAY * (self.day - 1)
-        t += HOUR * self.hour
-        t += 60 * self.minute
-        t += self.second
+        let mut t = unixYearToSeconds(y, leap)
+        t += unixMonthToSeconds(m, leap)
+        t += day * (self.Day - 1)
+        t += hour * self.Hour
+        t += 60 * self.Minute
+        t += self.Second
         ret t
     }
 }
@@ -88,107 +88,107 @@ pub struct Time {
 
 impl Time {
     // Returns new time instance from unix-time.
-    pub static fn unix(sec: UnixTime): Time {
+    pub static fn Unix(sec: UnixTime): Time {
         ret Time{
             sec: sec,
         }
     }
 
     // Returns time instance of the moment.
-    pub static fn now(): Time {
-        ret Time.unix(unix())
+    pub static fn Now(): Time {
+        ret Time.Unix(unix())
     }
 }
 
 impl Time {
     // Returns time as unix-time.
-    pub fn unix(self): UnixTime { ret self.sec }
+    pub fn Unix(self): UnixTime { ret self.sec }
 
     // Returns day of month.
-    pub fn day(self): TimeData { ret self.abs().day }
+    pub fn Day(self): TimeData { ret self.Abs().Day }
 
     // Returns month.
-    pub fn month(self): TimeData { ret self.abs().month }
+    pub fn Month(self): TimeData { ret self.Abs().Month }
 
     // Returns year.
-    pub fn year(self): TimeData { ret self.abs().year }
+    pub fn Year(self): TimeData { ret self.Abs().Year }
 
     // Returns second.
-    pub fn second(self): TimeData { ret self.abs().second }
+    pub fn Second(self): TimeData { ret self.Abs().Second }
 
     // Returns minute.
-    pub fn minute(self): TimeData { ret self.abs().minute }
+    pub fn Minute(self): TimeData { ret self.Abs().Minute }
 
     // Returns hour.
-    pub fn hour(self): TimeData { ret self.abs().hour }
+    pub fn Hour(self): TimeData { ret self.Abs().Hour }
 
     // Returns time as abstract time.
-    pub fn abs(self): AbsTime {
-        let secs = self.sec - MOD_APOCH
-        let mut days = secs / DAY
-        let mut rem_secs = secs % DAY
-        if rem_secs < 0 {
-            rem_secs += DAY
+    pub fn Abs(self): AbsTime {
+        let secs = self.sec - modApoch
+        let mut days = secs / day
+        let mut remSecs = secs % day
+        if remSecs < 0 {
+            remSecs += day
             days--
         }
 
-        let mut qc_cycles = days / DAYS_PER_400Y
-        let mut rem_days = days % DAYS_PER_400Y
-        if rem_days < 0 {
-            rem_days += DAYS_PER_400Y
-            qc_cycles--
+        let mut qcCycles = days / daysPer400Y
+        let mut remDays = days % daysPer400Y
+        if remDays < 0 {
+            remDays += daysPer400Y
+            qcCycles--
         }
 
-        let mut c_cycles = rem_days / DAYS_PER_100Y
-        if c_cycles == 4 {
-            c_cycles--
+        let mut cCycles = remDays / daysPer100Y
+        if cCycles == 4 {
+            cCycles--
         }
-        rem_days -= c_cycles * DAYS_PER_100Y
+        remDays -= cCycles * daysPer100Y
 
-        let mut q_cycles = rem_days / DAYS_PER_4Y
-        if q_cycles == 25 {
-            q_cycles--
+        let mut qCycles = remDays / daysPer4Y
+        if qCycles == 25 {
+            qCycles--
         }
-        rem_days -= q_cycles * DAYS_PER_4Y
+        remDays -= qCycles * daysPer4Y
 
-        let mut rem_years = rem_days / DAYS_PER_Y
-        if rem_years == 4 {
-            rem_years--
+        let mut remYears = remDays / daysPerY
+        if remYears == 4 {
+            remYears--
         }
-        rem_days -= rem_years * DAYS_PER_Y
+        remDays -= remYears * daysPerY
 
         let mut leap = u64(0)
-        if rem_years == 0 && (q_cycles > 0 || c_cycles == 0) {
+        if remYears == 0 && (qCycles > 0 || cCycles == 0) {
             leap = 1
         }
-        let mut y_day = rem_days + 31 + 28 + leap
-        if y_day >= DAYS_PER_Y+leap {
-            y_day -= DAYS_PER_Y + leap
+        let mut yDay = remDays + 31 + 28 + leap
+        if yDay >=daysPerY+leap {
+            yDay -= daysPerY + leap
         }
 
         let mut months: u64 = 0
-        for MDAYS[months] <= rem_days; months++ {
-            rem_days -= MDAYS[months]
+        for mdays[months] <= remDays; months++ {
+            remDays -= mdays[months]
         }
 
         let mut t = AbsTime{}
-        t.year = rem_years + 4 * q_cycles + 100 * c_cycles + 400 * qc_cycles + 100
-        t.month = months + 2
-        if t.month >= 12 {
-            t.month -= 12
-            t.year++
+        t.Year = remYears + 4 * qCycles + 100 * cCycles + 400 * qcCycles + 100
+        t.Month = months + 2
+        if t.Month >= 12 {
+            t.Month -= 12
+            t.Year++
         }
-        t.month += UNIX_MONTH_OFFSET
-        t.year += UNIX_YEAR_OFFSET
-        t.day = rem_days + 1
-        t.week_day = (3 + days) % 7
-        if t.week_day < 0 {
-            t.week_day += 7
+        t.Month += unixMonthOffset
+        t.Year += unixYearOffset
+        t.Day = remDays + 1
+        t.WeekDay = (3 + days) % 7
+        if t.WeekDay < 0 {
+            t.WeekDay += 7
         }
-        t.year_day = y_day
-        t.hour = rem_secs / HOUR
-        t.minute = rem_secs / 60 % 60
-        t.second = rem_secs % 60
+        t.YearDay = yDay
+        t.Hour = remSecs / hour
+        t.Minute = remSecs / 60 % 60
+        t.Second = remSecs % 60
         ret t
     }
 }
@@ -224,32 +224,32 @@ impl Duration {
     pub const Hour: DurInt = 60 * Duration.Minute
 
     // Returns how many nanoseconds are in given nanoseconds.
-    pub static fn nanoseconds(d: DurInt): DurInt {
+    pub static fn Nanoseconds(d: DurInt): DurInt {
         ret d * Duration.Nanosecond
     }
 
     // Returns how many nanoseconds are in given microseconds.
-    pub static fn microseconds(d: DurInt): DurInt {
+    pub static fn Microseconds(d: DurInt): DurInt {
         ret d * Duration.Microsecond
     }
 
     // Returns how many nanoseconds are in given milliseconds.
-    pub static fn milliseconds(d: DurInt): DurInt {
+    pub static fn Milliseconds(d: DurInt): DurInt {
         ret d * Duration.Millisecond
     }
 
     // Returns how many nanoseconds are in given seconds.
-    pub static fn seconds(d: DurInt): DurInt {
+    pub static fn Seconds(d: DurInt): DurInt {
         ret d * Duration.Second
     }
 
     // Returns how many nanoseconds are in given minutes.
-    pub static fn minutes(d: DurInt): DurInt {
+    pub static fn Minutes(d: DurInt): DurInt {
         ret d * Duration.Minute
     }
 
     // Returns how many nanoseconds are in given hours.
-    pub static fn hours(d: DurInt): DurInt {
+    pub static fn Hours(d: DurInt): DurInt {
         ret d * Duration.Hour
     }
 }
@@ -259,14 +259,14 @@ fn unix(): UnixTime {
     ret UnixTime(unsafe { cpp.time(nil) })
 }
 
-fn unix_year_to_seconds(y: TimeData, mut &leap: bool): UnixTime {
+fn unixYearToSeconds(y: TimeData, mut &leap: bool): UnixTime {
     if y-2 <= 136 {
         let mut leaps = (y - 68) >> 2
         leap = (y - 68)&3 == 0
         if leap {
             leaps--
         }
-        ret 31536000 * (y - 70) + DAY * leaps
+        ret 31536000 * (y - 70) + day * leaps
     }
 
     let mut leaps: TimeData = 0
@@ -313,39 +313,38 @@ fn unix_year_to_seconds(y: TimeData, mut &leap: bool): UnixTime {
         leaps++
     }
 
-    ret (y - 100) * 31536000 + leaps * DAY + 946684800 + DAY
+    ret (y - 100) * 31536000 + leaps * day + 946684800 + day
 }
 
-fn unix_month_to_seconds(m: TimeData, leap: bool): UnixTime {
+fn unixMonthToSeconds(m: TimeData, leap: bool): UnixTime {
     // Set seconds through month.
     let mut t: UnixTime = 0
     match m {
     | 1:
-        t = 31 * DAY
+        t = 31 * day
     | 2:
-        t = 59 * DAY
+        t = 59 * day
     | 3:
-        t = 90 * DAY
+        t = 90 * day
     | 4:
-        t = 120 * DAY
+        t = 120 * day
     | 5:
-        t = 151 * DAY
+        t = 151 * day
     | 6:
-        t = 181 * DAY
+        t = 181 * day
     | 7:
-        t = 212 * DAY
+        t = 212 * day
     | 8:
-        t = 243 * DAY
+        t = 243 * day
     | 9:
-        t = 273 * DAY
+        t = 273 * day
     | 10:
-        t = 304 * DAY
+        t = 304 * day
     | 11:
-        t = 334 * DAY
+        t = 334 * day
     }
-
     if leap && m >= 2 {
-        t += DAY
+        t += day
     }
     ret t
 }

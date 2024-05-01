@@ -24,15 +24,15 @@ use ast for std::jule::ast::{
     UseDecl,
 }
 use std::jule::build::{
-    PATH_STDLIB,
+    PathStdlib,
     LogMsg,
     Log,
     LogKind,
     Directive,
-    logf,
-    is_std_header_path,
-    is_valid_header_ext,
-    is_valid_cpp_ext,
+    Logf,
+    IsStdHeaderPath,
+    IsValidHeaderExt,
+    IsValidCppExt,
 }
 use std::jule::lex::{Token, TokenId, TokenKind}
 use strings for std::strings
@@ -53,29 +53,29 @@ impl ReferenceStack {
     // Returns new reference stack instance.
     static fn new(): &ReferenceStack {
         ret &ReferenceStack{
-            buffer: make([]any, 0, 10)
+            buffer: make([]any, 0, 10),
         }
     }
 }
 
 impl ReferenceStack {
     // Returns count of references.
-    pub fn len(self): int {
+    pub fn Len(self): int {
         ret self.buffer.len
     }
 
     // Returns reference by index.
-    pub fn at(mut self, i: int): any {
+    pub fn At(mut self, i: int): any {
         ret self.buffer[i]
     }
 
     // Push new reference to stack.
-    pub fn push(mut self, mut ref: any) {
+    pub fn Push(mut self, mut ref: any) {
         self.buffer = append(self.buffer, ref)
     }
 
     // Reports whether reference is exist.
-    pub fn exist[T](self, t: T): bool {
+    pub fn Exist[T](self, t: T): bool {
         for _, ref in self.buffer {
             if ref == t {
                 ret true
@@ -87,232 +87,232 @@ impl ReferenceStack {
 
 // Directive pass.
 pub struct Pass {
-    pub token: &Token
-    pub text:  str
+    pub Token: &Token
+    pub Text:  str
 }
 
-fn build_type(mut t: &TypeDecl): &TypeSymbol {
+fn buildType(mut t: &TypeDecl): &TypeSymbol {
     if t == nil {
         ret nil
     }
     ret &TypeSymbol{
-        decl: t,
+        Decl: t,
     }
 }
 
-fn build_expr(mut expr: &Expr): &Value {
+fn buildExpr(mut expr: &Expr): &Value {
     if expr == nil {
         ret nil
     }
     ret &Value{
-        expr: expr,
+        Expr: expr,
     }
 }
 
-fn build_type_alias(mut decl: &TypeAliasDecl): &TypeAlias {
+fn buildTypeAlias(mut decl: &TypeAliasDecl): &TypeAlias {
     ret &TypeAlias{
-        scope: decl.scope,
-        public: decl.public,
-        cpp_linked: decl.cpp_linked,
-        token: decl.token,
-        ident: decl.ident,
-        kind: build_type(decl.kind),
+        Scope: decl.Scope,
+        Public: decl.Public,
+        CppLinked: decl.CppLinked,
+        Token: decl.Token,
+        Ident: decl.Ident,
+        Kind: buildType(decl.Kind),
     }
 }
 
-fn build_field(mut decl: &FieldDecl): &Field {
+fn buildField(mut decl: &FieldDecl): &Field {
     ret &Field{
-        token: decl.token,
-        public: decl.public,
-        mutable: decl.mutable,
-        ident: decl.ident,
-        kind: build_type(decl.kind),
-        default: decl.default,
+        Token: decl.Token,
+        Public: decl.Public,
+        Mutable: decl.Mutable,
+        Ident: decl.Ident,
+        Kind: buildType(decl.Kind),
+        Default: decl.Default,
     }
 }
 
-fn build_fields(mut &decls: []&FieldDecl): []&Field {
+fn buildFields(mut &decls: []&FieldDecl): []&Field {
     let mut fields = make([]&Field, 0, decls.len)
     for (_, mut decl) in decls {
-        fields = append(fields, build_field(decl))
+        fields = append(fields, buildField(decl))
     }
     ret fields
 }
 
-fn build_struct(mut decl: &StructDecl): &Struct {
+fn buildStruct(mut decl: &StructDecl): &Struct {
     ret &Struct{
-        token: decl.token,
-        ident: decl.ident,
-        fields: build_fields(decl.fields),
-        public: decl.public,
-        cpp_linked: decl.cpp_linked,
-        directives: decl.directives,
-        generics: decl.generics,
+        Token: decl.Token,
+        Ident: decl.Ident,
+        Fields: buildFields(decl.Fields),
+        Public: decl.Public,
+        CppLinked: decl.CppLinked,
+        Directives: decl.Directives,
+        Generics: decl.Generics,
     }
 }
 
-fn build_param(mut decl: &ParamDecl): &Param {
+fn buildParam(mut decl: &ParamDecl): &Param {
     ret &Param{
-        token: decl.token,
-        mutable: decl.mutable,
-        variadic: decl.variadic,
-        reference: decl.reference,
-        kind: build_type(decl.kind),
-        ident: decl.ident,
+        Token: decl.Token,
+        Mutable: decl.Mutable,
+        Variadic: decl.Variadic,
+        Reference: decl.Reference,
+        Kind: buildType(decl.Kind),
+        Ident: decl.Ident,
     }
 }
 
-fn build_params(mut &decls: []&ParamDecl): []&Param {
+fn buildParams(mut &decls: []&ParamDecl): []&Param {
     let mut params = make([]&Param, 0, decls.len)
     for (_, mut decl) in decls {
-        params = append(params, build_param(decl))
+        params = append(params, buildParam(decl))
     }
     ret params
 }
 
-fn build_ret_type(mut decl: &RetTypeDecl): &RetType {
-    if decl.idents == nil && decl.kind == nil {
+fn buildRetType(mut decl: &RetTypeDecl): &RetType {
+    if decl.Idents == nil && decl.Kind == nil {
         ret nil // Void type.
     }
     ret &RetType{
-        kind: build_type(decl.kind),
-        idents: decl.idents,
+        Kind: buildType(decl.Kind),
+        Idents: decl.Idents,
     }
 }
 
-fn build_fn(mut decl: &FnDecl): &Fn {
+fn buildFn(mut decl: &FnDecl): &Fn {
     ret &Fn{
-        token: decl.token,
-        global: decl.global,
-        unsafety: decl.unsafety,
-        public: decl.public,
-        cpp_linked: decl.cpp_linked,
-        statically: decl.statically,
-        exceptional: decl.exceptional,
-        ident: decl.ident,
-        directives: decl.directives,
-        scope: decl.scope,
-        generics: decl.generics,
-        result: build_ret_type(decl.result),
-        params: build_params(decl.params),
+        Token: decl.Token,
+        Global: decl.Global,
+        Unsafety: decl.Unsafety,
+        Public: decl.Public,
+        CppLinked: decl.CppLinked,
+        Statically: decl.Statically,
+        Exceptional: decl.Exceptional,
+        Ident: decl.Ident,
+        Directives: decl.Directives,
+        Scope: decl.Scope,
+        Generics: decl.Generics,
+        Result: buildRetType(decl.Result),
+        Params: buildParams(decl.Params),
     }
 }
 
-fn build_methods(mut &decls: []&FnDecl): []&Fn {
+fn buildMethods(mut &decls: []&FnDecl): []&Fn {
     let mut methods = make([]&Fn, 0, decls.len)
     for (_, mut decl) in decls {
-        methods = append(methods, build_fn(decl))
+        methods = append(methods, buildFn(decl))
     }
     ret methods
 }
 
-fn build_trait(mut decl: &TraitDecl): &Trait {
+fn buildTrait(mut decl: &TraitDecl): &Trait {
     ret &Trait{
-        token: decl.token,
-        ident: decl.ident,
-        public: decl.public,
-        methods: build_methods(decl.methods),
+        Token: decl.Token,
+        Ident: decl.Ident,
+        Public: decl.Public,
+        Methods: buildMethods(decl.Methods),
     }
 }
 
-fn build_enum_item(mut decl: &EnumItemDecl): &EnumItem {
+fn buildEnumItem(mut decl: &EnumItemDecl): &EnumItem {
     ret &EnumItem{
-        token: decl.token,
-        ident: decl.ident,
-        value: build_expr(decl.expr),
+        Token: decl.Token,
+        Ident: decl.Ident,
+        Value: buildExpr(decl.Expr),
     }
 }
 
-fn build_enum_items(mut &decls: []&EnumItemDecl): []&EnumItem {
+fn buildEnumItems(mut &decls: []&EnumItemDecl): []&EnumItem {
     let mut items = make([]&EnumItem, 0, decls.len)
     for (_, mut decl) in decls {
-        items = append(items, build_enum_item(decl))
+        items = append(items, buildEnumItem(decl))
     }
     ret items
 }
 
-fn build_enum(mut decl: &EnumDecl): &Enum {
+fn buildEnum(mut decl: &EnumDecl): &Enum {
     ret &Enum{
-        token: decl.token,
-        public: decl.public,
-        ident: decl.ident,
-        kind: build_type(decl.kind),
-        items: build_enum_items(decl.items),
+        Token: decl.Token,
+        Public: decl.Public,
+        Ident: decl.Ident,
+        Kind: buildType(decl.Kind),
+        Items: buildEnumItems(decl.Items),
     }
 }
 
-fn build_type_enum_item(mut decl: &TypeEnumItemDecl): &TypeEnumItem {
+fn buildTypeEnumItem(mut decl: &TypeEnumItemDecl): &TypeEnumItem {
     ret &TypeEnumItem{
-        token: decl.token,
-        ident: decl.ident,
-        kind: build_type(decl.kind),
+        Token: decl.Token,
+        Ident: decl.Ident,
+        Kind: buildType(decl.Kind),
     }
 }
 
-fn build_type_enum_items(mut &decls: []&TypeEnumItemDecl): []&TypeEnumItem {
+fn buildTypeEnumItems(mut &decls: []&TypeEnumItemDecl): []&TypeEnumItem {
     let mut items = make([]&TypeEnumItem, 0, decls.len)
     for (_, mut decl) in decls {
-        items = append(items, build_type_enum_item(decl))
+        items = append(items, buildTypeEnumItem(decl))
     }
     ret items
 }
 
-fn build_type_enum(mut decl: &TypeEnumDecl): &TypeEnum {
+fn buildTypeEnum(mut decl: &TypeEnumDecl): &TypeEnum {
     ret &TypeEnum{
-        token: decl.token,
-        public: decl.public,
-        ident: decl.ident,
-        items: build_type_enum_items(decl.items),
+        Token: decl.Token,
+        Public: decl.Public,
+        Ident: decl.Ident,
+        Items: buildTypeEnumItems(decl.Items),
     }
 }
 
-fn build_var(mut decl: &VarDecl): &Var {
+fn buildVar(mut decl: &VarDecl): &Var {
     ret &Var{
-        token: decl.token,
-        ident: decl.ident,
-        cpp_linked: decl.cpp_linked,
-        constant: decl.constant,
-        mutable: decl.mutable,
-        public: decl.public,
-        statically: decl.statically,
-        reference: decl.reference,
-        directives: decl.directives,
-        refers: ReferenceStack.new(),
-        kind: build_type(decl.kind),
-        value: build_expr(decl.expr),
+        Token: decl.Token,
+        Ident: decl.Ident,
+        CppLinked: decl.CppLinked,
+        Constant: decl.Constant,
+        Mutable: decl.Mutable,
+        Public: decl.Public,
+        Statically: decl.Statically,
+        Reference: decl.Reference,
+        Directives: decl.Directives,
+        Refers: ReferenceStack.new(),
+        Kind: buildType(decl.Kind),
+        Value: buildExpr(decl.Expr),
     }
 }
 
-fn build_vars(mut decls: []&VarDecl): []&Var {
+fn buildVars(mut decls: []&VarDecl): []&Var {
     let mut vars = make([]&Var, 0, decls.len)
     for (_, mut decl) in decls {
-        vars = append(vars, build_var(decl))
+        vars = append(vars, buildVar(decl))
     }
     ret vars
 }
 
-fn build_impl(mut decl: &ast::Impl): &Impl {
+fn buildImpl(mut decl: &ast::Impl): &Impl {
     ret &Impl{
-        base: decl.base,
-        dest: decl.dest,
-        methods: build_methods(decl.methods),
-        statics: build_vars(decl.statics),
+        Base: decl.Base,
+        Dest: decl.Dest,
+        Methods: buildMethods(decl.Methods),
+        Statics: buildVars(decl.Statics),
     }
 }
 
 // Symbol table builder.
 // Just builds symbols, not analyze metadatas
 // like struct's implemented traits.
-struct SymbolBuilder {
-    owner:    &SymbolBuilder
+struct symbolBuilder {
+    owner:    &symbolBuilder
     importer: Importer
     errors:   []Log
     ast:      &Ast
     table:    &SymbolTable
 }
 
-impl SymbolBuilder {
-    fn get_root(mut &self): &SymbolBuilder {
+impl symbolBuilder {
+    fn getRoot(mut &self): &symbolBuilder {
         let mut root = self
         for root.owner != nil {
             root = root.owner
@@ -320,230 +320,229 @@ impl SymbolBuilder {
         ret root
     }
 
-    fn push_err(mut self, &token: &Token, fmt: LogMsg, args: ...any) {
-        self.errors = append(self.errors, compiler_err(token, true, fmt, args...))
+    fn pushErr(mut self, &token: &Token, fmt: LogMsg, args: ...any) {
+        self.errors = append(self.errors, compilerErr(token, true, fmt, args...))
     }
 
-    fn push_err_text(mut self, &token: &Token, fmt: LogMsg, args: ...any) {
-        self.errors = append(self.errors, compiler_err(token, false, fmt, args...))
+    fn pushErrText(mut self, &token: &Token, fmt: LogMsg, args: ...any) {
+        self.errors = append(self.errors, compilerErr(token, false, fmt, args...))
     }
 
     // Push suggestion to last log.
-    fn push_suggestion(mut self, fmt: LogMsg, args: ...any) {
-        unsafe { push_suggestion(&self.errors[self.errors.len-1], fmt, args...) }
+    fn pushSuggestion(mut self, fmt: LogMsg, args: ...any) {
+        unsafe { pushSugggestion(&self.errors[self.errors.len-1], fmt, args...) }
     }
 
-    fn check_cpp_use_decl_path(mut self, &decl: &UseDecl, path: str): (ok: bool) {
-        let ext = path::ext(path)
-        if !is_valid_header_ext(ext) && !is_valid_cpp_ext(ext) {
-            self.push_err(decl.token, LogMsg.InvalidCppExt, ext)
+    fn checkCppUseDeclPath(mut self, &decl: &UseDecl, path: str): (ok: bool) {
+        let ext = path::Ext(path)
+        if !IsValidHeaderExt(ext) && !IsValidCppExt(ext) {
+            self.pushErr(decl.Token, LogMsg.InvalidCppExt, ext)
             ret false
         }
 
         // Exist?
-        let info = Status.of(path) else {
-            self.push_err(decl.token, LogMsg.UseNotFound, decl.link_path)
+        let info = Status.Of(path) else {
+            self.pushErr(decl.Token, LogMsg.UseNotFound, decl.LinkPath)
             ret false
         }
-        if info.is_dir() {
-            self.push_err(decl.token, LogMsg.UseNotFound, decl.link_path)
+        if info.IsDir() {
+            self.pushErr(decl.Token, LogMsg.UseNotFound, decl.LinkPath)
             ret false
         }
 
         ret true
     }
 
-    fn build_cpp_header_import(mut self, mut &decl: &UseDecl): &ImportInfo {
-        let mut path = decl.link_path
+    fn buildCppHeaderImport(mut self, mut &decl: &UseDecl): &ImportInfo {
+        let mut path = decl.LinkPath
 
-        if !is_std_header_path(decl.link_path) {
-            path = path::join(decl.token.file.dir(), decl.link_path)
-            let mut ok = self.check_cpp_use_decl_path(decl, path)
+        if !IsStdHeaderPath(decl.LinkPath) {
+            path = path::Join(decl.Token.File.Dir(), decl.LinkPath)
+            let mut ok = self.checkCppUseDeclPath(decl, path)
             if !ok {
                 ret nil
             }
 
             // Set to absolute path for correct include path.
-            path, ok = path::abs(path)
+            path, ok = path::Abs(path)
             if !ok {
-                self.push_err(decl.token, LogMsg.UseNotFound, decl.link_path)
+                self.pushErr(decl.Token, LogMsg.UseNotFound, decl.LinkPath)
             }
         }
 
         ret &ImportInfo{
-            token: decl.token,
-            path: path,
-            link_path: decl.link_path,
-            ident: "", // Cpp headers haven't identifiers.
-            cpp_linked: true,
-            std: false,
-            package: nil, // Cpp headers haven't symbol table.
+            Token: decl.Token,
+            Path: path,
+            LinkPath: decl.LinkPath,
+            Ident: "", // Cpp headers haven't identifiers.
+            CppLinked: true,
+            Std: false,
+            Package: nil, // Cpp headers haven't symbol table.
         }
     }
 
-    fn build_std_import(mut self, mut &decl: &UseDecl): &ImportInfo {
-        let mut path = decl.link_path["std::".len:] // Skip "std::" prefix.
-        path = strings::replace(path, TokenKind.DblColon, str(path::SEPARATOR), -1)
-        path = path::join(PATH_STDLIB, path)
-        let (path, ok) = path::abs(path)
+    fn buildStdImport(mut self, mut &decl: &UseDecl): &ImportInfo {
+        let mut path = decl.LinkPath["std::".len:] // Skip "std::" prefix.
+        path = strings::Replace(path, TokenKind.DblColon, str(path::Separator), -1)
+        path = path::Join(PathStdlib, path)
+        let (path, ok) = path::Abs(path)
         if !ok {
-            self.push_err(decl.token, LogMsg.UseNotFound, decl.link_path)
+            self.pushErr(decl.Token, LogMsg.UseNotFound, decl.LinkPath)
             ret nil
         }
 
         // Exist?
-        let info = Status.of(path) else {
-            self.push_err(decl.token, LogMsg.UseNotFound, decl.link_path)
+        let info = Status.Of(path) else {
+            self.pushErr(decl.Token, LogMsg.UseNotFound, decl.LinkPath)
             ret nil
         }
-        if !info.is_dir() {
-            self.push_err(decl.token, LogMsg.UseNotFound, decl.link_path)
+        if !info.IsDir() {
+            self.pushErr(decl.Token, LogMsg.UseNotFound, decl.LinkPath)
             ret nil
         }
 
         // Select last identifier of namespace chain.
-        let i = strings::find_last(decl.link_path, TokenKind.DblColon) + 1
-        let ident = decl.link_path[i:]
+        let i = strings::FindLast(decl.LinkPath, TokenKind.DblColon) + 1
+        let ident = decl.LinkPath[i:]
 
         ret &ImportInfo{
-            import_all: decl.full,
-            token: decl.token,
-            path: path,
-            link_path: decl.link_path,
-            ident: ident,
-            alias: decl.alias,
-            cpp_linked: false,
-            std: true,
-            package: &Package{
-                files: nil, // Appends by import algorithm.
+            ImportAll: decl.Full,
+            Token: decl.Token,
+            Path: path,
+            LinkPath: decl.LinkPath,
+            Ident: ident,
+            Alias: decl.Alias,
+            CppLinked: false,
+            Std: true,
+            Package: &Package{
+                Files: nil, // Appends by import algorithm.
             },
         }
     }
 
-    fn build_ident_import(mut &self, mut &decl: &UseDecl): &ImportInfo {
-        let mod_path = self.importer.get_mod_path()
-        if mod_path.len == 0 {
-            self.push_err(decl.token, LogMsg.ModuleNotFound)
-            self.push_suggestion(LogMsg.UseModInit)
+    fn buildIdentImport(mut &self, mut &decl: &UseDecl): &ImportInfo {
+        let modPath = self.importer.GetModPath()
+        if modPath.len == 0 {
+            self.pushErr(decl.Token, LogMsg.ModuleNotFound)
+            self.pushSuggestion(LogMsg.UseModInit)
             ret nil
         }
 
-        let mut path = decl.link_path
-        path = strings::replace(path, TokenKind.DblColon, str(path::SEPARATOR), -1)
-        path = path::join(mod_path, path)
+        let mut path = decl.LinkPath
+        path = strings::Replace(path, TokenKind.DblColon, str(path::Separator), -1)
+        path = path::Join(modPath, path)
 
-        let (path, ok) = path::abs(path)
+        let (path, ok) = path::Abs(path)
         if !ok {
-            self.push_err(decl.token, LogMsg.UseNotFound, decl.link_path)
+            self.pushErr(decl.Token, LogMsg.UseNotFound, decl.LinkPath)
             ret nil
         }
 
         // Exist?
-        let info = Status.of(path) else {
-            self.push_err(decl.token, LogMsg.UseNotFound, decl.link_path)
+        let info = Status.Of(path) else {
+            self.pushErr(decl.Token, LogMsg.UseNotFound, decl.LinkPath)
             ret nil
         }
-        if !info.is_dir() {
-            self.push_err(decl.token, LogMsg.UseNotFound, decl.link_path)
+        if !info.IsDir() {
+            self.pushErr(decl.Token, LogMsg.UseNotFound, decl.LinkPath)
             ret nil
         }
 
         // Select last identifier of namespace chain.
-        let i = strings::find_last(decl.link_path, TokenKind.DblColon) + 1
-        let ident = decl.link_path[i:]
+        let i = strings::FindLast(decl.LinkPath, TokenKind.DblColon) + 1
+        let ident = decl.LinkPath[i:]
 
         ret &ImportInfo{
-            import_all: decl.full,
-            token: decl.token,
-            path: path,
-            link_path: decl.link_path,
-            ident: ident,
-            alias: decl.alias,
-            cpp_linked: false,
-            std: false,
-            package: &Package{
-                files: nil, // Appends by import algorithm.
+            ImportAll: decl.Full,
+            Token: decl.Token,
+            Path: path,
+            LinkPath: decl.LinkPath,
+            Ident: ident,
+            Alias: decl.Alias,
+            CppLinked: false,
+            Std: false,
+            Package: &Package{
+                Files: nil, // Appends by import algorithm.
             },
         }
     }
 
-    fn build_import(mut &self, mut &decl: &UseDecl): &ImportInfo {
+    fn buildImport(mut &self, mut &decl: &UseDecl): &ImportInfo {
         match {
-        | decl.cpp_linked:
-            ret self.build_cpp_header_import(decl)
-        | decl.std:
-            ret self.build_std_import(decl)
+        | decl.CppLinked:
+            ret self.buildCppHeaderImport(decl)
+        | decl.Std:
+            ret self.buildStdImport(decl)
         |:
-            ret self.build_ident_import(decl)
+            ret self.buildIdentImport(decl)
         }
     }
 
-    fn check_duplicate_use_decl(mut self, &pkg: &ImportInfo): (ok: bool) {
+    fn checkDuplicateUseDecl(mut self, &pkg: &ImportInfo): (ok: bool) {
         // Find package by path to detect cpp header imports.
-        let lpkg = self.table.select_package(fn(spkg: &ImportInfo): bool {
-            ret unsafe { pkg.path == spkg.path }
+        let lpkg = self.table.SelectPackage(fn(spkg: &ImportInfo): bool {
+            ret unsafe { pkg.Path == spkg.Path }
         })
         if lpkg == nil {
             ret true
         }
 
-        self.push_err(pkg.token, LogMsg.DuplicateUseDecl, pkg.link_path)
-        self.push_suggestion(LogMsg.RemoveUseDeclAvoidDuplication)
+        self.pushErr(pkg.Token, LogMsg.DuplicateUseDecl, pkg.LinkPath)
+        self.pushSuggestion(LogMsg.RemoveUseDeclAvoidDuplication)
         ret false
     }
 
-    fn impl_import_selections(mut self, mut &imp: &ImportInfo, mut &decl: &UseDecl) {
-        imp.selected = decl.selected
-        for _, item in imp.selected {
-            for _, citem in imp.selected {
+    fn implImportSelections(mut self, mut &imp: &ImportInfo, mut &decl: &UseDecl) {
+        imp.Selected = decl.Selected
+        for _, item in imp.Selected {
+            for _, citem in imp.Selected {
                 if item == citem {
                     break
-                } else if item.kind == citem.kind {
-                    self.push_err(item, LogMsg.DuplicatedUseSelection, item.kind)
-                    self.push_suggestion(LogMsg.RemoveUseSelectionAvoidDupliation)
+                } else if item.Kind == citem.Kind {
+                    self.pushErr(item, LogMsg.DuplicatedUseSelection, item.Kind)
+                    self.pushSuggestion(LogMsg.RemoveUseSelectionAvoidDupliation)
                     break
                 }
             }
         }
     }
 
-    fn get_as_link_path(mut &self, mut path: str): str {
-        if strings::has_prefix(path, PATH_STDLIB) {
-            path = path[PATH_STDLIB.len:]
-            ret "std" + strings::replace(path, str(path::SEPARATOR), TokenKind.DblColon, -1)
+    fn getAsLinkPath(mut &self, mut path: str): str {
+        if strings::HasPrefix(path, PathStdlib) {
+            path = path[PathStdlib.len:]
+            ret "std" + strings::Replace(path, str(path::Separator), TokenKind.DblColon, -1)
         }
 
-        let (root, _) = path::abs(self.importer.get_mod_path())
+        let (root, _) = path::Abs(self.importer.GetModPath())
         path = path[root.len:]
-        if path[0] == path::SEPARATOR {
+        if path[0] == path::Separator {
             path = path[1:]
         }
-        ret strings::replace(path, str(path::SEPARATOR), TokenKind.DblColon, -1)
+        ret strings::Replace(path, str(path::Separator), TokenKind.DblColon, -1)
     }
 
-    fn push_cycle_error(mut &self, &sb: &SymbolBuilder, path: str, mut &message: str) {
-        const PADDING = 4
-
-        let refers_to = logf(
+    fn pushCycleError(mut &self, &sb: &symbolBuilder, path: str, mut &message: str) {
+        const Padding = 4
+        let refersTo = Logf(
             LogMsg.RefersTo,
-            self.get_as_link_path(sb.table.file.dir()),
-            self.get_as_link_path(path))
-        message = strings::repeat(" ", PADDING) + refers_to + "\n" + message
+            self.getAsLinkPath(sb.table.File.Dir()),
+            self.getAsLinkPath(path))
+        message = strings::Repeat(" ", Padding) + refersTo + "\n" + message
     }
 
-    fn push_cross_cycle_error(mut &self, &target: &SymbolBuilder, &imp: &ImportInfo, &error_token: &Token) {
+    fn pushCrossCycleError(mut &self, &target: &symbolBuilder, &imp: &ImportInfo, &errorToken: &Token) {
         let mut message = ""
 
-        self.push_cycle_error(self, imp.path, message)
+        self.pushCycleError(self, imp.Path, message)
 
         let mut owner = self.owner
         let mut old = self
 
         for owner.owner != nil {
-            self.push_cycle_error(old.owner, old.table.file.dir(), message)
+            self.pushCycleError(old.owner, old.table.File.Dir(), message)
 
             if owner.owner == target {
-                self.push_cycle_error(target, owner.table.file.dir(), message)
+                self.pushCycleError(target, owner.table.File.Dir(), message)
                 break
             }
 
@@ -551,12 +550,12 @@ impl SymbolBuilder {
             owner = owner.owner
         }
 
-        self.push_err(error_token, LogMsg.PkgIllegalCrossCycle, message)
+        self.pushErr(errorToken, LogMsg.PkgIllegalCrossCycle, message)
     }
 
-    fn check_import_cycles(mut &self, imp: &ImportInfo, &decl: &UseDecl): bool {
-        if imp.path == self.table.file.dir() {
-            self.push_err(decl.token, LogMsg.PkgIllegalCycleRefersItself, self.get_as_link_path(imp.path))
+    fn checkImportCycles(mut &self, imp: &ImportInfo, &decl: &UseDecl): bool {
+        if imp.Path == self.table.File.Dir() {
+            self.pushErr(decl.Token, LogMsg.PkgIllegalCycleRefersItself, self.getAsLinkPath(imp.Path))
             ret false
         }
 
@@ -564,15 +563,15 @@ impl SymbolBuilder {
             ret true
         }
 
-        if self.owner.table.file.dir() == imp.path {
-            self.push_cross_cycle_error(self.owner, imp, decl.token)
+        if self.owner.table.File.Dir() == imp.Path {
+            self.pushCrossCycleError(self.owner, imp, decl.Token)
             ret false
         }
 
         let mut owner = self.owner
     iter:
-        if owner.table.file.dir() == imp.path {
-            self.push_cross_cycle_error(owner, imp, decl.token)
+        if owner.table.File.Dir() == imp.Path {
+            self.pushCrossCycleError(owner, imp, decl.Token)
             ret false
         }
 
@@ -590,89 +589,88 @@ impl SymbolBuilder {
     //  - decl: relevant use declaration.
     //  - mod: module that imports relevant package.
     //  - path: path of package that importing.
-    fn check_package_accessibility(mut self, &decl: &UseDecl, &mod: str, &path: str) {
-        if self.importer.get_mod_path() != mod && strings::contains(path, "internal") {
-            self.push_err(decl.token, LogMsg.UseDeclForInternal)
+    fn checkPackageAccessibility(mut self, &decl: &UseDecl, &mod: str, &path: str) {
+        if self.importer.GetModPath() != mod && strings::Contains(path, "internal") {
+            self.pushErr(decl.Token, LogMsg.UseDeclForInternal)
         }
     }
 
-    fn import_package(mut &self, mut &imp: &ImportInfo, mut &decl: &UseDecl): (ok: bool) {
-        if imp.cpp_linked {
+    fn importPackage(mut &self, mut &imp: &ImportInfo, mut &decl: &UseDecl): (ok: bool) {
+        if imp.CppLinked {
             ret true
         }
 
-        let mut port = self.importer.get_import(imp.path)
+        let mut port = self.importer.GetImport(imp.Path)
         if port != nil {
-            imp.package = port.package
-            imp.duplicate = true
+            imp.Package = port.Package
+            imp.Duplicate = true
 
-            let old_mod = self.importer.get_mod_path()
-            self.importer.set_mod_path(self.importer.mod_by_id(imp.mod_id))
-            self.check_package_accessibility(decl, old_mod, port.path)
-            self.importer.set_mod_path(old_mod)
+            let oldMod = self.importer.GetModPath()
+            self.importer.SetModPath(self.importer.ModById(imp.ModId))
+            self.checkPackageAccessibility(decl, oldMod, port.Path)
+            self.importer.SetModPath(oldMod)
         } else {
-            if !self.check_import_cycles(imp, decl) {
+            if !self.checkImportCycles(imp, decl) {
                 ret false
             }
 
-            let old_mod = self.importer.get_mod_path()
-            defer { self.importer.set_mod_path(old_mod) }
-            if imp.std {
-                self.importer.set_mod_path(PATH_STDLIB)
+            let oldMod = self.importer.GetModPath()
+            defer { self.importer.SetModPath(oldMod) }
+            if imp.Std {
+                self.importer.SetModPath(PathStdlib)
             }
-            let (mut asts, mut errors) = self.importer.import_package(imp.path, !imp.std)
+            let (mut asts, mut errors) = self.importer.ImportPackage(imp.Path, !imp.Std)
             if errors.len > 0 {
                 self.errors = append(self.errors, errors...)
                 ret false
             }
 
-            self.check_package_accessibility(decl, old_mod, imp.path)
+            self.checkPackageAccessibility(decl, oldMod, imp.Path)
 
             for (_, mut ast) in asts {
                 let mut table: &SymbolTable = nil
-                table, errors = build_symbols(ast, self.importer, self)
+                table, errors = buildSymbols(ast, self.importer, self)
 
                 // Break import if file has error(s).
                 if errors.len > 0 {
                     self.errors = append(self.errors, errors...)
-                    self.push_err_text(imp.token, LogMsg.UsedPackageHasErrors, imp.link_path)
+                    self.pushErrText(imp.Token, LogMsg.UsedPackageHasErrors, imp.LinkPath)
                     ret false
                 }
 
-                imp.package.files = append(imp.package.files, table)
+                imp.Package.Files = append(imp.Package.Files, table)
             }
         }
 
-        self.impl_import_selections(imp, decl)
+        self.implImportSelections(imp, decl)
 
         ret true
     }
 
-    fn import_use_decl(mut &self, mut &decl: &UseDecl): &ImportInfo {
-        let mut imp = self.build_import(decl)
+    fn importUseDecl(mut &self, mut &decl: &UseDecl): &ImportInfo {
+        let mut imp = self.buildImport(decl)
         // Break analysis if error occurs.
         if imp == nil {
             ret nil
         }
 
-        let mut ok = self.check_duplicate_use_decl(imp)
+        let mut ok = self.checkDuplicateUseDecl(imp)
         if !ok {
             ret nil
         }
 
-        ok = self.import_package(imp, decl)
-        self.table.imports = append(self.table.imports, imp)
+        ok = self.importPackage(imp, decl)
+        self.table.Imports = append(self.table.Imports, imp)
         if ok {
-            self.importer.imported(imp)
+            self.importer.Imported(imp)
             ret imp
         }
         ret nil
     }
 
-    fn import_use_decls(mut &self) {
-        for (_, mut decl) in self.ast.use_decls {
-            self.import_use_decl(decl)
-
+    fn importUseDecls(mut &self) {
+        for (_, mut decl) in self.ast.UseDecls {
+            self.importUseDecl(decl)
             // Break analysis if error occurs.
             if self.errors.len > 0 {
                 break
@@ -680,91 +678,91 @@ impl SymbolBuilder {
         }
     }
 
-    fn append_node(mut self, mut &node: Node) {
-        match type node.data {
+    fn appendNode(mut self, mut &node: Node) {
+        match type node.Data {
         | &ast::Impl:
-            self.table.impls = append(self.table.impls, build_impl((&ast::Impl)(node.data)))
+            self.table.Impls = append(self.table.Impls, buildImpl((&ast::Impl)(node.Data)))
         | &TypeAliasDecl:
-            let mut ta = build_type_alias((&TypeAliasDecl)(node.data))
-            self.table.type_aliases = append(self.table.type_aliases, ta)
+            let mut ta = buildTypeAlias((&TypeAliasDecl)(node.Data))
+            self.table.TypeAliases = append(self.table.TypeAliases, ta)
         | &StructDecl:
-            let mut srct = build_struct((&StructDecl)(node.data))
-            self.table.structs = append(self.table.structs, srct)
+            let mut srct = buildStruct((&StructDecl)(node.Data))
+            self.table.Structs = append(self.table.Structs, srct)
         | &FnDecl:
-            let mut f = build_fn((&FnDecl)(node.data))
-            self.table.funcs = append(self.table.funcs, f)
+            let mut f = buildFn((&FnDecl)(node.Data))
+            self.table.Funcs = append(self.table.Funcs, f)
         | &TraitDecl:
-            let mut t = build_trait((&TraitDecl)(node.data))
-            self.table.traits = append(self.table.traits, t)
+            let mut t = buildTrait((&TraitDecl)(node.Data))
+            self.table.Traits = append(self.table.Traits, t)
         | &VarDecl:
-            let mut v = build_var((&VarDecl)(node.data))
-            self.table.vars = append(self.table.vars, v)
+            let mut v = buildVar((&VarDecl)(node.Data))
+            self.table.Vars = append(self.table.Vars, v)
         | &EnumDecl:
-            let mut e = build_enum((&EnumDecl)(node.data))
-            self.table.enums = append(self.table.enums, e)
+            let mut e = buildEnum((&EnumDecl)(node.Data))
+            self.table.Enums = append(self.table.Enums, e)
         | &TypeEnumDecl:
-            let mut e = build_type_enum((&TypeEnumDecl)(node.data))
-            self.table.type_enums = append(self.table.type_enums, e)
+            let mut e = buildTypeEnum((&TypeEnumDecl)(node.Data))
+            self.table.TypeEnums = append(self.table.TypeEnums, e)
         |:
-            self.push_err(node.token, LogMsg.InvalidSyntax)
+            self.pushErr(node.Token, LogMsg.InvalidSyntax)
         }
     }
 
-    fn append_nodes(mut self) {
-        for (_, mut node) in self.ast.nodes {
-            self.append_node(node)
+    fn appendNodes(mut self) {
+        for (_, mut node) in self.ast.Nodes {
+            self.appendNode(node)
         }
     }
 
-    fn push_directive_pass(mut self, mut &d: &ast::Directive) {
-        if d.args.len == 0 {
-            self.push_err(d.tag, LogMsg.MissingExpr)
+    fn pushDirectivePass(mut self, mut &d: &ast::Directive) {
+        if d.Args.len == 0 {
+            self.pushErr(d.Tag, LogMsg.MissingExpr)
             ret
-        } else if d.args.len > 1 {
-            let arg = d.args[1]
-            self.push_err(arg, LogMsg.ArgumentOverflow)
+        } else if d.Args.len > 1 {
+            let arg = d.Args[1]
+            self.pushErr(arg, LogMsg.ArgumentOverflow)
         }
 
-        let arg = d.args[0]
-        if arg.id != TokenId.Lit {
-            self.push_err(arg, LogMsg.InvalidSyntax)
-            ret
-        }
-
-        if arg.kind[0] != '"' {
-            self.push_err(arg, LogMsg.InvalidSyntax)
+        let arg = d.Args[0]
+        if arg.Id != TokenId.Lit {
+            self.pushErr(arg, LogMsg.InvalidSyntax)
             ret
         }
 
-        self.table.passes = append(self.table.passes, Pass{
-            token: d.tag,
-            text: arg.kind[1:arg.kind.len-1],
+        if arg.Kind[0] != '"' {
+            self.pushErr(arg, LogMsg.InvalidSyntax)
+            ret
+        }
+
+        self.table.Passes = append(self.table.Passes, Pass{
+            Token: d.Tag,
+            Text: arg.Kind[1:arg.Kind.len-1],
         })
     }
 
-    fn append_top_directives(mut self) {
-        for (_, mut d) in self.ast.top_directives {
-            match d.tag.kind {
+    fn appendTopDirectives(mut self) {
+        for (_, mut d) in self.ast.TopDirectives {
+            match d.Tag.Kind {
             | Directive.Pass:
-                self.push_directive_pass(d)
+                self.pushDirectivePass(d)
             }
         }
     }
 
     fn build(mut &self) {
         self.table = &SymbolTable{
-            file: self.ast.file,
+            File: self.ast.File,
         }
 
-        self.append_top_directives()
+        self.appendTopDirectives()
 
-        self.import_use_decls()
+        self.importUseDecls()
         // Break analysis if use declarations has error.
         if self.errors.len > 0 {
             ret
         }
 
-        self.append_nodes()
+        self.appendNodes()
         // Break analysis if declarations has error.
         if self.errors.len > 0 {
             ret

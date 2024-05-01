@@ -4,7 +4,7 @@
 
 use path for std::fs::path
 use std::jule::ast::{Ast}
-use std::jule::build::{PATH_STDLIB, Log}
+use std::jule::build::{PathStdlib, Log}
 use std::jule::lex::{Token, TokenKind}
 use strings for std::strings
 
@@ -14,38 +14,38 @@ pub trait Importer {
     // Set current module path.
     // Path should be valid directory.
     // Set to empty string if module is not exist.
-    pub fn set_mod_path(mut self, path: str)
+    pub fn SetModPath(mut self, path: str)
 
     // Returns current module path.
     // Path should be valid directory.
     // Returns empty string if module is not exist.
-    pub fn get_mod_path(self): str
+    pub fn GetModPath(self): str
 
     // Returns module path by identity.
-    pub fn mod_by_id(self, id: int): str
+    pub fn ModById(self, id: int): str
 
     // Returns &ImportInfo by path.
     // This function accepted as returns already imported and checked package.
-    // If returns not-nil value, will be used instead of Import_package
+    // If returns not-nil value, will be used instead of ImportPackage
     // if possible and package content is not checked by Sema.
-    pub fn get_import(mut self, path: str): &ImportInfo
+    pub fn GetImport(mut self, path: str): &ImportInfo
 
     // Path is the directory path of package to import.
     // Should return abstract syntax tree of package files.
     // Logs accepts as error.
     // Updated module to package's module if exist when update_mod is true.
-    pub fn import_package(mut self, path: str, update_mod: bool): ([]&Ast, []Log)
+    pub fn ImportPackage(mut self, path: str, update_mod: bool): ([]&Ast, []Log)
 
     // Invoked after the package is imported.
     // Sets module identitity of imported package to current module.
-    pub fn imported(mut self, mut &ImportInfo)
+    pub fn Imported(mut self, mut &ImportInfo)
 }
 
 // Returns variable by identifier and cpp linked state.
 // Returns nil if not exist any variable in this identifier.
-fn find_var_in_package(mut &files: []&SymbolTable, ident: str, cpp_linked: bool): &Var {
+fn findVarInPackage(mut &files: []&SymbolTable, ident: str, cpp_linked: bool): &Var {
     for (_, mut f) in files {
-        let mut v = f.find_var(ident, cpp_linked)
+        let mut v = f.FindVar(ident, cpp_linked)
         if v != nil {
             ret v
         }
@@ -55,9 +55,9 @@ fn find_var_in_package(mut &files: []&SymbolTable, ident: str, cpp_linked: bool)
 
 // Returns type alias by identifier and cpp linked state.
 // Returns nil if not exist any type alias in this identifier.
-fn find_type_alias_in_package(mut &files: []&SymbolTable, ident: str, cpp_linked: bool): &TypeAlias {
+fn findTypeAliasInPackage(mut &files: []&SymbolTable, ident: str, cpp_linked: bool): &TypeAlias {
     for (_, mut f) in files {
-        let mut ta = f.find_type_alias(ident, cpp_linked)
+        let mut ta = f.FindTypeAlias(ident, cpp_linked)
         if ta != nil {
             ret ta
         }
@@ -67,9 +67,9 @@ fn find_type_alias_in_package(mut &files: []&SymbolTable, ident: str, cpp_linked
 
 // Returns struct by identifier and cpp linked state.
 // Returns nil if not exist any struct in this identifier.
-fn find_struct_in_package(mut &files: []&SymbolTable, ident: str, cpp_linked: bool): &Struct {
+fn findStructInPackage(mut &files: []&SymbolTable, ident: str, cpp_linked: bool): &Struct {
     for (_, mut f) in files {
-        let mut s = f.find_struct(ident, cpp_linked)
+        let mut s = f.FindStruct(ident, cpp_linked)
         if s != nil {
             ret s
         }
@@ -79,9 +79,9 @@ fn find_struct_in_package(mut &files: []&SymbolTable, ident: str, cpp_linked: bo
 
 // Returns function by identifier and cpp linked state.
 // Returns nil if not exist any function in this identifier.
-fn find_fn_in_package(mut &files: []&SymbolTable, ident: str, cpp_linked: bool): &Fn {
+fn findFnInPackage(mut &files: []&SymbolTable, ident: str, cpp_linked: bool): &Fn {
     for (_, mut file) in files {
-        let mut f = file.find_fn(ident, cpp_linked)
+        let mut f = file.FindFn(ident, cpp_linked)
         if f != nil {
             ret f
         }
@@ -91,9 +91,9 @@ fn find_fn_in_package(mut &files: []&SymbolTable, ident: str, cpp_linked: bool):
 
 // Returns trait by identifier.
 // Returns nil if not exist any trait in this identifier.
-fn find_trait_in_package(mut &files: []&SymbolTable, ident: str): &Trait {
+fn findTraitInPackage(mut &files: []&SymbolTable, ident: str): &Trait {
     for (_, mut f) in files {
-        let mut t = f.find_trait(ident)
+        let mut t = f.FindTrait(ident)
         if t != nil {
             ret t
         }
@@ -103,9 +103,9 @@ fn find_trait_in_package(mut &files: []&SymbolTable, ident: str): &Trait {
 
 // Returns enum by identifier.
 // Returns nil if not exist any enum in this identifier.
-fn find_enum_in_package(mut &files: []&SymbolTable, ident: str): &Enum {
+fn findEnumInPackage(mut &files: []&SymbolTable, ident: str): &Enum {
     for (_, mut f) in files {
-        let mut e = f.find_enum(ident)
+        let mut e = f.FindEnum(ident)
         if e != nil {
             ret e
         }
@@ -115,9 +115,9 @@ fn find_enum_in_package(mut &files: []&SymbolTable, ident: str): &Enum {
 
 // Returns enum by identifier.
 // Returns nil if not exist any type enum in this identifier.
-fn find_type_enum_in_package(mut &files: []&SymbolTable, ident: str): &TypeEnum {
+fn findTypeEnumInPackage(mut &files: []&SymbolTable, ident: str): &TypeEnum {
     for (_, mut f) in files {
-        let mut e = f.find_type_enum(ident)
+        let mut e = f.FindTypeEnum(ident)
         if e != nil {
             ret e
         }
@@ -129,60 +129,60 @@ fn find_type_enum_in_package(mut &files: []&SymbolTable, ident: str): &TypeEnum 
 // Represents imported package by use declaration.
 pub struct ImportInfo {
     // Use declaration token.
-    pub token: &Token
+    pub Token: &Token
 
     // Absolute path.
-    pub path: str
+    pub Path: str
 
     // Use declaration path string.
-    pub link_path: str
+    pub LinkPath: str
 
     // Package identifier (aka package name).
     // Empty if package is cpp header.
-    pub ident: str
+    pub Ident: str
 
     // Package alias identifier.
-    pub alias: str
+    pub Alias: str
 
     // True if imported with Importer.get_import function.
-    pub duplicate: bool
+    pub Duplicate: bool
 
     // Is cpp use declaration.
-    pub cpp_linked: bool
+    pub CppLinked: bool
 
     // Is standard library package.
-    pub std: bool
+    pub Std: bool
 
     // Is imported all defines implicitly.
-    pub import_all: bool
+    pub ImportAll: bool
 
     // Identifiers of selected definition.
-    pub selected: []&Token
+    pub Selected: []&Token
 
     // Nil if package is cpp header.
-    pub package: &Package
+    pub Package: &Package
 
     // Module identity.
-    pub mod_id: int
+    pub ModId: int
 }
 
 impl Lookup for ImportInfo {
     // Returns always nil reference.
-    pub fn find_package(mut self, str): &ImportInfo { ret nil }
+    pub fn FindPackage(mut self, str): &ImportInfo { ret nil }
 
     // Returns always nil reference.
-    pub fn select_package(mut self, fn(&ImportInfo): bool): &ImportInfo { ret nil }
+    pub fn SelectPackage(mut self, fn(&ImportInfo): bool): &ImportInfo { ret nil }
 
     // Returns variable by identifier and cpp linked state.
     // Returns nil reference if not exist any variable in this identifier.
     //
     // Lookups by import way such as identifier selection.
     // Just lookups non-cpp-linked defines.
-    pub fn find_var(mut self, ident: str, cpp_linked: bool): &Var {
-        if !self.is_lookupable(ident) {
+    pub fn FindVar(mut self, ident: str, _: bool): &Var {
+        if !self.isLookupable(ident) {
             ret nil
         }
-        ret find_var_in_package(self.package.files, ident, false)
+        ret findVarInPackage(self.Package.Files, ident, false)
     }
 
     // Returns type alias by identifier.
@@ -190,11 +190,11 @@ impl Lookup for ImportInfo {
     //
     // Lookups by import way such as identifier selection.
     // Just lookups non-cpp-linked defines.
-    pub fn find_type_alias(mut self, ident: str, cpp_linked: bool): &TypeAlias {
-        if !self.is_lookupable(ident) {
+    pub fn FindTypeAlias(mut self, ident: str, _: bool): &TypeAlias {
+        if !self.isLookupable(ident) {
             ret nil
         }
-        ret find_type_alias_in_package(self.package.files, ident, false)
+        ret findTypeAliasInPackage(self.Package.Files, ident, false)
     }
 
     // Returns struct by identifier and cpp linked state.
@@ -202,11 +202,11 @@ impl Lookup for ImportInfo {
     //
     // Lookups by import way such as identifier selection.
     // Just lookups non-cpp-linked defines.
-    pub fn find_struct(mut self, ident: str, cpp_linked: bool): &Struct {
-        if !self.is_lookupable(ident) {
+    pub fn FindStruct(mut self, ident: str, _: bool): &Struct {
+        if !self.isLookupable(ident) {
             ret nil
         }
-        ret find_struct_in_package(self.package.files, ident, false)
+        ret findStructInPackage(self.Package.Files, ident, false)
     }
 
     // Returns function by identifier and cpp linked state.
@@ -214,60 +214,60 @@ impl Lookup for ImportInfo {
     //
     // Lookups by import way such as identifier selection.
     // Just lookups non-cpp-linked defines.
-    pub fn find_fn(mut self, ident: str, cpp_linked: bool): &Fn {
-        if !self.is_lookupable(ident) {
+    pub fn FindFn(mut self, ident: str, _: bool): &Fn {
+        if !self.isLookupable(ident) {
             ret nil
         }
-        ret find_fn_in_package(self.package.files, ident, false)
+        ret findFnInPackage(self.Package.Files, ident, false)
     }
 
     // Returns trait by identifier.
     // Returns nil reference if not exist any trait in this identifier.
     //
     // Lookups by import way such as identifier selection.
-    pub fn find_trait(mut self, ident: str): &Trait {
-        if !self.is_lookupable(ident) {
+    pub fn FindTrait(mut self, ident: str): &Trait {
+        if !self.isLookupable(ident) {
             ret nil
         }
-        ret find_trait_in_package(self.package.files, ident)
+        ret findTraitInPackage(self.Package.Files, ident)
     }
 
     // Returns enum by identifier.
     // Returns nil reference if not exist any enum in this identifier.
     //
     // Lookups by import way such as identifier selection.
-    pub fn find_enum(mut self, ident: str): &Enum {
-        if !self.is_lookupable(ident) {
+    pub fn FindEnum(mut self, ident: str): &Enum {
+        if !self.isLookupable(ident) {
             ret nil
         }
-        ret find_enum_in_package(self.package.files, ident)
+        ret findEnumInPackage(self.Package.Files, ident)
     }
 
     // Returns type enum by identifier.
     // Returns nil reference if not exist any type enum in this identifier.
     //
     // Lookups by import way such as identifier selection.
-    pub fn find_type_enum(mut self, ident: str): &TypeEnum {
-        if !self.is_lookupable(ident) {
+    pub fn FindTypeEnum(mut self, ident: str): &TypeEnum {
+        if !self.isLookupable(ident) {
             ret nil
         }
-        ret find_type_enum_in_package(self.package.files, ident)
+        ret findTypeEnumInPackage(self.Package.Files, ident)
     }
 }
 
 impl ImportInfo {
-    fn is_lookupable(self, ident: str): bool {
-        if self.cpp_linked {
+    fn isLookupable(self, ident: str): bool {
+        if self.CppLinked {
             ret false
         }
 
-        if !self.import_all {
-            if self.alias.len != 0 || self.exist_ident(TokenKind.Self) {
+        if !self.ImportAll {
+            if self.Alias.len != 0 || self.existIdent(TokenKind.Self) {
                 ret true
             }
 
-            if self.selected.len > 0 {
-                if !self.exist_ident(ident) {
+            if self.Selected.len > 0 {
+                if !self.existIdent(ident) {
                     ret false
                 }
             }
@@ -276,9 +276,9 @@ impl ImportInfo {
     }
 
     // Reports whether identifier is selected.
-    fn exist_ident(self, ident: str): bool {
-        for _, sident in self.selected {
-            if sident.kind == ident {
+    fn existIdent(self, ident: str): bool {
+        for _, sident in self.Selected {
+            if sident.Kind == ident {
                 ret true
             }
         }
@@ -286,67 +286,67 @@ impl ImportInfo {
         ret false
     }
 
-    fn is_accessible_via_selection(self): bool {
-        ret self.import_all || self.selected.len == 0 || self.exist_ident(TokenKind.Self)
+    fn isAccessibleViaSelection(self): bool {
+        ret self.ImportAll || self.Selected.len == 0 || self.existIdent(TokenKind.Self)
     }
 }
 
 // Package.
 pub struct Package {
     // Symbol table for each package's file.
-    pub files: []&SymbolTable
+    pub Files: []&SymbolTable
 }
 
 impl Lookup for Package {
     // Returns always nil reference.
-    pub fn find_package(mut self, str): &ImportInfo { ret nil }
+    pub fn FindPackage(mut self, str): &ImportInfo { ret nil }
 
     // Returns always nil reference.
-    pub fn select_package(mut self, fn(&ImportInfo): bool): &ImportInfo { ret nil }
+    pub fn SelectPackage(mut self, fn(&ImportInfo): bool): &ImportInfo { ret nil }
 
     // Returns variable by identifier and cpp linked state.
     // Returns nil reference if not exist any variable in this identifier.
-    pub fn find_var(mut self, ident: str, cpp_linked: bool): &Var {
-        ret find_var_in_package(self.files, ident, cpp_linked)
+    pub fn FindVar(mut self, ident: str, cpp_linked: bool): &Var {
+        ret findVarInPackage(self.Files, ident, cpp_linked)
     }
 
     // Returns type alias by identifier and cpp linked state.
     // Returns nil reference if not exist any type alias in this identifier.
-    pub fn find_type_alias(mut self, ident: str, cpp_linked: bool): &TypeAlias {
-        ret find_type_alias_in_package(self.files, ident, cpp_linked)
+    pub fn FindTypeAlias(mut self, ident: str, cpp_linked: bool): &TypeAlias {
+        ret findTypeAliasInPackage(self.Files, ident, cpp_linked)
     }
 
     // Returns struct by identifier and cpp linked state.
     // Returns nil reference if not exist any struct in this identifier.
-    pub fn find_struct(mut self, ident: str, cpp_linked: bool): &Struct {
-        ret find_struct_in_package(self.files, ident, cpp_linked)
+    pub fn FindStruct(mut self, ident: str, cpp_linked: bool): &Struct {
+        ret findStructInPackage(self.Files, ident, cpp_linked)
     }
 
     // Returns function by identifier and cpp linked state.
     // Returns nil reference if not exist any function in this identifier.
-    pub fn find_fn(mut self, ident: str, cpp_linked: bool): &Fn {
-        ret find_fn_in_package(self.files, ident, cpp_linked)
+    pub fn FindFn(mut self, ident: str, cpp_linked: bool): &Fn {
+        ret findFnInPackage(self.Files, ident, cpp_linked)
     }
 
     // Returns trait by identifier.
     // Returns nil reference if not exist any trait in this identifier.
-    pub fn find_trait(mut self, ident: str): &Trait {
-        ret find_trait_in_package(self.files, ident)
+    pub fn FindTrait(mut self, ident: str): &Trait {
+        ret findTraitInPackage(self.Files, ident)
     }
 
     // Returns enum by identifier.
     // Returns nil reference if not exist any enum in this identifier.
-    pub fn find_enum(mut self, ident: str): &Enum {
-        ret find_enum_in_package(self.files, ident)
+    pub fn FindEnum(mut self, ident: str): &Enum {
+        ret findEnumInPackage(self.Files, ident)
     }
 
     // Returns type enum by identifier.
     // Returns nil reference if not exist any type enum in this identifier.
-    pub fn find_type_enum(mut self, ident: str): &TypeEnum {
-        ret find_type_enum_in_package(self.files, ident)
+    pub fn FindTypeEnum(mut self, ident: str): &TypeEnum {
+        ret findTypeEnumInPackage(self.Files, ident)
     }
 }
 
-fn is_std_package(f: str, p: str): bool {
-    ret strings::has_prefix(f, path::join(PATH_STDLIB, p))
+fn isStdPackage(f: str, p: str): bool {
+    ret strings::HasPrefix(f, path::Join(PathStdlib, p))
 }

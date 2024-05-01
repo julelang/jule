@@ -145,23 +145,23 @@
 //
 
 // Returns e**x - 1, the base-e exponential of x minus 1.
-// It is more accurate than exp(x) - 1 when x is near zero.
+// It is more accurate than Exp(x) - 1 when x is near zero.
 //
 // Special cases are:
-//  expm1(+inf) = +inf
-//  expm1(-inf) = -1
-//  expm1(nan) = nan
+//  Expm1(+Inf) = +Inf
+//  Expm1(-Inf) = -1
+//  Expm1(NaN) = NaN
 //
-// Very large values overflow to -1 or +inf.
-pub fn expm1(mut x: f64): f64 {
-    const OTHRESHOLD = 7.09782712893383973096e+02  // 0x40862E42FEFA39EF
+// Very large values overflow to -1 or +Inf.
+pub fn Expm1(mut x: f64): f64 {
+    const OTHRESHOLD = 7.09782712893383973096e+02 // 0x40862E42FEFA39EF
     const LN2_X56 = 3.88162421113569373274e+01     // 0x4043687a9f1af2b1
-    const LN2_HALF_X3 = 1.03972077083991796413e+00 // 0x3ff0a2b23f3bab73
+    const LN2_HALF_X3 = 1.03972077083991796413e+00  // 0x3ff0a2b23f3bab73
     const LN2_HALF = 3.46573590279972654709e-01    // 0x3fd62e42fefa39ef
     const LN2_HI = 6.93147180369123816490e-01      // 0x3fe62e42fee00000
     const LN2_LO = 1.90821492927058770002e-10      // 0x3dea39ef35793c76
     const INV_LN2 = 1.44269504088896338700e+00     // 0x3ff71547652b82fe
-    const TINY = 1.0 / (1 << 54)                   // 2**-54 = 0x3c90000000000000
+    const TINY = 1.0 / (1 << 54)                  // 2**-54 = 0x3c90000000000000
     // scaled coefficients related to expm1
     const Q1 = -3.33333333333331316428e-02 // 0xBFA11111111110F4
     const Q2 = 1.58730158725481460165e-03  // 0x3F5A01A019FE5585
@@ -171,9 +171,9 @@ pub fn expm1(mut x: f64): f64 {
 
     // special cases
     match {
-    | is_inf(x, 1) | is_nan(x):
+    | IsInf(x, 1) | IsNaN(x):
         ret x
-    | is_inf(x, -1):
+    | IsInf(x, -1):
         ret -1
     }
 
@@ -190,7 +190,7 @@ pub fn expm1(mut x: f64): f64 {
             ret -1 // x < -56*ln2, return -1
         }
         if absx >= OTHRESHOLD { // if |x| >= 709.78...
-            ret inf(1)
+            ret Inf(1)
         }
     }
 
@@ -249,18 +249,18 @@ pub fn expm1(mut x: f64): f64 {
         ret 1 + 2 * (x - e)
     | k <= -2 | k > 56: // suffice to return exp(x)-1
         let mut y = 1 - (e - x)
-        y = f64_from_bits(f64_bits(y) + u64(k) << 52) // add k to y's exponent
+        y = F64FromBits(F64Bits(y) + u64(k) << 52) // add k to y's exponent
         ret y - 1
     }
     if k < 20 {
-        t = f64_from_bits(u64(0x3ff0000000000000 - (0x20000000000000 >> uint(k)))) // t=1-2**-k
+        t = F64FromBits(u64(0x3ff0000000000000 - (0x20000000000000 >> uint(k)))) // t=1-2**-k
         let mut y = t - (e - x)
-        y = f64_from_bits(f64_bits(y) + u64(k) << 52) // add k to y's exponent
+        y = F64FromBits(F64Bits(y) + u64(k) << 52) // add k to y's exponent
         ret y
     }
-    t = f64_from_bits(u64(0x3ff - k) << 52) // 2**-k
+    t = F64FromBits(u64(0x3ff - k) << 52) // 2**-k
     let mut y = x - (e + t)
     y++
-    y = f64_from_bits(f64_bits(y) + u64(k) << 52) // add k to y's exponent
+    y = F64FromBits(F64Bits(y) + u64(k) << 52) // add k to y's exponent
     ret y
 }

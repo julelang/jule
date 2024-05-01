@@ -47,62 +47,62 @@ use std::jule::sema::{
 use types for std::jule::types
 
 // Expression optimizer that applies target-independent optimizations.
-struct ExprOptimizer {
+struct exprOptimizer {
     mut model: &ExprModel
 }
 
-impl ExprOptimizer {
-    pub static fn optimize(mut &model: ExprModel) {
+impl exprOptimizer {
+    static fn optimize(mut &model: ExprModel) {
         // Do optimizatitons if any enabled.
-        if expr_enabled {
-            let mut exop = &ExprOptimizer{
+        if exprEnabled {
+            let mut exop = &exprOptimizer{
                 model: unsafe { (&ExprModel)(&model) },
             }
             exop.do()
         }
     }
 
-    fn str_cond(self, mut m: &BinopExprModel): bool {
-        let lp = m.left.kind.prim()
-        if lp == nil || !lp.is_str() {
+    fn strCond(self, mut m: &BinopExprModel): bool {
+        let lp = m.Left.Kind.Prim()
+        if lp == nil || !lp.IsStr() {
             ret false
         }
-        if m.op.kind != TokenKind.Eqs && m.op.kind != TokenKind.NotEq {
+        if m.Op.Kind != TokenKind.Eqs && m.Op.Kind != TokenKind.NotEq {
             ret false
         }
-        match type m.left.model {
+        match type m.Left.Model {
         | &Const:
-            m.left, m.right = m.right, m.left
+            m.Left, m.Right = m.Right, m.Left
             goto opt
         }
-        match type m.right.model {
+        match type m.Right.Model {
         | &Const:
             break
         |:
             ret true
         }
     opt:
-        let c = (&Const)(m.right.model)
-        if c.read_str() != "" {
+        let c = (&Const)(m.Right.Model)
+        if c.ReadStr() != "" {
             ret false
         }
-        match m.op.kind {
+        match m.Op.Kind {
         | TokenKind.Eqs:
             *self.model = &CommonSubIdentExprModel{
-                expr_kind: m.left.kind,
-                expr: m.left.model,
-                ident: "empty()",
+                ExprKind: m.Left.Kind,
+                Expr: m.Left.Model,
+                Ident: "empty()",
             }
         | TokenKind.NotEq:
-            let mut op = m.op
-            op.kind = TokenKind.Excl
+            let mut op = m.Op
+            op.Kind = TokenKind.Excl
             *self.model = &UnaryExprModel{
-                op: op,
-                expr: &Data{
-                    model: &CommonSubIdentExprModel{
-                        expr_kind: m.left.kind,
-                        expr: m.left.model,
-                        ident: "empty()",
+                Op: op,
+                Expr: &Data{
+                    Model: &CommonSubIdentExprModel{
+                        ExprKind: m.Left.Kind,
+                        Expr: m.Left.Model,
+                        Ident: "empty()",
                     },
                 },
             }
@@ -111,242 +111,242 @@ impl ExprOptimizer {
     }
 
     fn binary(self, mut m: &BinopExprModel) {
-        ExprOptimizer.optimize(m.left.model)
-        ExprOptimizer.optimize(m.right.model)
+        exprOptimizer.optimize(m.Left.Model)
+        exprOptimizer.optimize(m.Right.Model)
 
-        match type m.right.model {
+        match type m.Right.Model {
         | &Const:
             break
         |:
             ret
         }
 
-        if COND && self.str_cond(m) {
+        if Cond && self.strCond(m) {
             ret
         }
 
-        if !MATH {
+        if !Math {
             ret
         }
-        match m.op.kind {
+        match m.Op.Kind {
         | TokenKind.Star:
-            let (ok, x) = check_for_bit_shift_opt(m.left, m.right)
+            let (ok, x) = checkForBitShiftOpt(m.Left, m.Right)
             if ok {
-                m.op.kind = TokenKind.Lshift
-                let mut c = (&Const)(m.right.model)
-                c.set_u64(x)
+                m.Op.Kind = TokenKind.Lshift
+                let mut c = (&Const)(m.Right.Model)
+                c.SetU64(x)
                 ret
             }
         | TokenKind.Solidus:
-            let (ok, x) = check_for_bit_shift_opt(m.left, m.right)
+            let (ok, x) = checkForBitShiftOpt(m.Left, m.Right)
             if ok {
-                m.op.kind = TokenKind.Rshift
-                let mut c = (&Const)(m.right.model)
-                c.set_u64(x)
+                m.Op.Kind = TokenKind.Rshift
+                let mut c = (&Const)(m.Right.Model)
+                c.SetU64(x)
                 ret
             }
         | TokenKind.Percent:
-            let mut c = (&Const)(m.right.model)
-            let d = c.as_f64()
+            let mut c = (&Const)(m.Right.Model)
+            let d = c.AsF64()
             if d == 2 {
-                m.op.kind = TokenKind.Amper
-                c.set_i64(1)
+                m.Op.Kind = TokenKind.Amper
+                c.SetI64(1)
             }
         }
-        let mut model: any = &UnsafeBinopExprModel{node: m}
+        let mut model: any = &UnsafeBinopExprModel{Node: m}
         *self.model = unsafe { *(*ExprModel)(&model) }
     }
 
     fn unary(self, mut m: &UnaryExprModel) {
-        ExprOptimizer.optimize(m.expr.model)
-        if PTR && m.op.kind == TokenKind.Star {
-            match type m.expr.model {
+        exprOptimizer.optimize(m.Expr.Model)
+        if Ptr && m.Op.Kind == TokenKind.Star {
+            match type m.Expr.Model {
             | &UnaryExprModel:
-                let mut um = (&UnaryExprModel)(m.expr.model)
-                if um.op.kind == TokenKind.Amper {
-                    *self.model = um.expr.model
+                let mut um = (&UnaryExprModel)(m.Expr.Model)
+                if um.Op.Kind == TokenKind.Amper {
+                    *self.model = um.Expr.Model
                 }
             }
         }
     }
 
-    fn structure_lit(self, mut m: &StructLitExprModel) {
-        for (_, mut arg) in m.args {
-            ExprOptimizer.optimize(arg.expr)
+    fn structureLit(self, mut m: &StructLitExprModel) {
+        for (_, mut arg) in m.Args {
+            exprOptimizer.optimize(arg.Expr)
         }
     }
 
-    fn alloc_structure(self, mut m: &AllocStructLitExprModel) {
-        self.structure_lit(m.lit)
+    fn allocStructure(self, mut m: &AllocStructLitExprModel) {
+        self.structureLit(m.Lit)
     }
 
     fn casting(self, mut m: &CastingExprModel) {
-        ExprOptimizer.optimize(m.expr)
+        exprOptimizer.optimize(m.Expr)
     }
 
     fn args(self, mut &args: []ExprModel) {
         for (i, mut arg) in args {
-            ExprOptimizer.optimize(arg)
+            exprOptimizer.optimize(arg)
             args[i] = arg
         }
     }
 
     fn scope(self, mut &s: &Scope) {
-        let mut scopt = ScopeOptimizer.new(s)
+        let mut scopt = scopeOptimizer.new(s)
         scopt.optimize()
     }
 
-    fn func_call(self, mut m: &FnCallExprModel) {
-        ExprOptimizer.optimize(m.expr)
-        self.args(m.args)
-        if m.except != nil {
-            self.scope(m.except)
+    fn funcCall(self, mut m: &FnCallExprModel) {
+        exprOptimizer.optimize(m.Expr)
+        self.args(m.Args)
+        if m.Except != nil {
+            self.scope(m.Except)
         }
     }
 
     fn slice(self, mut m: &SliceExprModel) {
-        self.args(m.elems)
+        self.args(m.Elems)
     }
 
     fn array(self, mut m: &ArrayExprModel) {
-        if m.elems.len == 2 && m.elems[1] == nil {
-            let mut elem = m.elems[0]
-            ExprOptimizer.optimize(elem)
-            m.elems[0] = elem
+        if m.Elems.len == 2 && m.Elems[1] == nil {
+            let mut elem = m.Elems[0]
+            exprOptimizer.optimize(elem)
+            m.Elems[0] = elem
         }
-        self.args(m.elems)
+        self.args(m.Elems)
     }
 
     fn indexing(self, mut m: &IndexingExprModel) {
-        ExprOptimizer.optimize(m.expr.model)
-        ExprOptimizer.optimize(m.index.model)
-        if !ACCESS {
+        exprOptimizer.optimize(m.Expr.Model)
+        exprOptimizer.optimize(m.Index.Model)
+        if !Access {
             ret
         }
-        let array = m.expr.kind.arr() != nil
+        let array = m.Expr.Kind.Arr() != nil
         // Constants checked by semantic analysis for arrays, safe.
-        if array && m.index.is_const() {
-            let mut model: any = &UnsafeIndexingExprModel{node: m}
+        if array && m.Index.IsConst() {
+            let mut model: any = &UnsafeIndexingExprModel{Node: m}
             *self.model = unsafe { *(*ExprModel)(&model) }
             ret
         }
-        match type m.index.model {
+        match type m.Index.Model {
         | &Var:
-            let i = (&Var)(m.index.model)
-            if i.mutable || i.iter_relation == nil {
+            let i = (&Var)(m.Index.Model)
+            if i.Mutable || i.IterRelation == nil {
                 break
             }
-            match type m.expr.model {
+            match type m.Expr.Model {
             | &Var:
-                let r = (&Var)(m.expr.model)
+                let r = (&Var)(m.Expr.Model)
                 // Iterated variable is indexed variable?
-                if i.iter_relation.range == r {
-                    let mut model: any = &UnsafeIndexingExprModel{node: m}
+                if i.IterRelation.Range == r {
+                    let mut model: any = &UnsafeIndexingExprModel{Node: m}
                     *self.model = unsafe { *(*ExprModel)(&model) }
                 }
             }
         }
     }
 
-    fn anon_func(self, mut m: &AnonFnExprModel) {
-        self.scope(m.func.scope)
+    fn anonFunc(self, mut m: &AnonFnExprModel) {
+        self.scope(m.Func.Scope)
     }
 
     fn map(self, mut m: &MapExprModel) {
-        for (_, mut pair) in m.entries {
-            ExprOptimizer.optimize(pair.key)
-            ExprOptimizer.optimize(pair.val)
+        for (_, mut pair) in m.Entries {
+            exprOptimizer.optimize(pair.Key)
+            exprOptimizer.optimize(pair.Val)
         }
     }
 
     fn slicing(self, mut m: &SlicingExprModel) {
-        ExprOptimizer.optimize(m.expr)
-        ExprOptimizer.optimize(m.left)
-        if m.right != nil {
-            ExprOptimizer.optimize(m.right)
+        exprOptimizer.optimize(m.Expr)
+        exprOptimizer.optimize(m.Left)
+        if m.Right != nil {
+            exprOptimizer.optimize(m.Right)
         }
     }
 
-    fn trait_sub(self, mut m: &TraitSubIdentExprModel) {
-        ExprOptimizer.optimize(m.expr)
+    fn traitSub(self, mut m: &TraitSubIdentExprModel) {
+        exprOptimizer.optimize(m.Expr)
     }
 
-    fn structure_sub(self, mut m: &StructSubIdentExprModel) {
-        ExprOptimizer.optimize(m.expr.model)
+    fn structureSub(self, mut m: &StructSubIdentExprModel) {
+        exprOptimizer.optimize(m.Expr.Model)
     }
 
-    fn common_sub(self, mut m: &CommonSubIdentExprModel) {
-        ExprOptimizer.optimize(m.expr)
+    fn commonSub(self, mut m: &CommonSubIdentExprModel) {
+        exprOptimizer.optimize(m.Expr)
     }
 
     fn tuple(self, mut m: &TupleExprModel) {
-        for (_, mut d) in m.datas {
-            ExprOptimizer.optimize(d.model)
+        for (_, mut d) in m.Datas {
+            exprOptimizer.optimize(d.Model)
         }
     }
 
-    fn new_call(self, mut m: &BuiltinNewCallExprModel) {
-        if m.init != nil {
-            ExprOptimizer.optimize(m.init)
+    fn newCall(self, mut m: &BuiltinNewCallExprModel) {
+        if m.Init != nil {
+            exprOptimizer.optimize(m.Init)
         }
     }
 
-    fn out_call(self, mut m: &BuiltinOutCallExprModel) {
-        ExprOptimizer.optimize(m.expr)
+    fn outCall(self, mut m: &BuiltinOutCallExprModel) {
+        exprOptimizer.optimize(m.Expr)
     }
 
-    fn outln_call(self, mut m: &BuiltinOutlnCallExprModel) {
-        ExprOptimizer.optimize(m.expr)
+    fn outlnCall(self, mut m: &BuiltinOutlnCallExprModel) {
+        exprOptimizer.optimize(m.Expr)
     }
 
-    fn panic_call(self, mut m: &BuiltinPanicCallExprModel) {
-        ExprOptimizer.optimize(m.expr)
+    fn panicCall(self, mut m: &BuiltinPanicCallExprModel) {
+        exprOptimizer.optimize(m.Expr)
     }
 
-    fn assert_call(self, mut m: &BuiltinAssertCallExprModel) {
-        ExprOptimizer.optimize(m.expr)
+    fn assertCall(self, mut m: &BuiltinAssertCallExprModel) {
+        exprOptimizer.optimize(m.Expr)
     }
 
-    fn error_call(self, mut m: &BuiltinErrorCallExprModel) {
-        ExprOptimizer.optimize(m.err)
+    fn errorCall(self, mut m: &BuiltinErrorCallExprModel) {
+        exprOptimizer.optimize(m.Err)
     }
 
-    fn make_call(self, mut m: &BuiltinMakeCallExprModel) {
-        if m.len != nil {
-            ExprOptimizer.optimize(m.len)
+    fn makeCall(self, mut m: &BuiltinMakeCallExprModel) {
+        if m.Len != nil {
+            exprOptimizer.optimize(m.Len)
         }
-        if m.cap != nil {
-            ExprOptimizer.optimize(m.cap)
+        if m.Cap != nil {
+            exprOptimizer.optimize(m.Cap)
         }
     }
 
-    fn append_call(self, mut m: &BuiltinAppendCallExprModel) {
-        ExprOptimizer.optimize(m.dest)
-        ExprOptimizer.optimize(m.elements)
+    fn appendCall(self, mut m: &BuiltinAppendCallExprModel) {
+        exprOptimizer.optimize(m.Dest)
+        exprOptimizer.optimize(m.Elements)
     }
 
-    fn clone_call(self, mut m: &BuiltinCloneCallExprModel) {
-        ExprOptimizer.optimize(m.expr)
+    fn cloneCall(self, mut m: &BuiltinCloneCallExprModel) {
+        exprOptimizer.optimize(m.Expr)
     }
 
     fn sizeof(self, mut m: &SizeofExprModel) {
-        ExprOptimizer.optimize(m.expr)
+        exprOptimizer.optimize(m.Expr)
     }
 
     fn alignof(self, mut m: &AlignofExprModel) {
-        ExprOptimizer.optimize(m.expr)
+        exprOptimizer.optimize(m.Expr)
     }
 
-    fn integrated_to_str(self, mut m: &IntegratedToStrExprModel) {
-        ExprOptimizer.optimize(m.expr)
+    fn integratedToStr(self, mut m: &IntegratedToStrExprModel) {
+        exprOptimizer.optimize(m.Expr)
     }
 
     fn free(self, mut m: &FreeExprModel) {
-        ExprOptimizer.optimize(m.expr)
+        exprOptimizer.optimize(m.Expr)
     }
 
-    fn backend_emit(self, mut m: &BackendEmitExprModel) {
-        self.args(m.exprs)
+    fn backendEmit(self, mut m: &BackendEmitExprModel) {
+        self.args(m.Exprs)
     }
 
     fn do(self) {
@@ -356,13 +356,13 @@ impl ExprOptimizer {
         | &UnaryExprModel:
             self.unary((&UnaryExprModel)(*self.model))
         | &StructLitExprModel:
-            self.structure_lit((&StructLitExprModel)(*self.model))
+            self.structureLit((&StructLitExprModel)(*self.model))
         | &AllocStructLitExprModel:
-            self.alloc_structure((&AllocStructLitExprModel)(*self.model))
+            self.allocStructure((&AllocStructLitExprModel)(*self.model))
         | &CastingExprModel:
             self.casting((&CastingExprModel)(*self.model))
         | &FnCallExprModel:
-            self.func_call((&FnCallExprModel)(*self.model))
+            self.funcCall((&FnCallExprModel)(*self.model))
         | &SliceExprModel:
             self.slice((&SliceExprModel)(*self.model))
         | &ArrayExprModel:
@@ -370,47 +370,47 @@ impl ExprOptimizer {
         | &IndexingExprModel:
             self.indexing((&IndexingExprModel)(*self.model))
         | &AnonFnExprModel:
-            self.anon_func((&AnonFnExprModel)(*self.model))
+            self.anonFunc((&AnonFnExprModel)(*self.model))
         | &MapExprModel:
             self.map((&MapExprModel)(*self.model))
         | &SlicingExprModel:
             self.slicing((&SlicingExprModel)(*self.model))
         | &TraitSubIdentExprModel:
-            self.trait_sub((&TraitSubIdentExprModel)(*self.model))
+            self.traitSub((&TraitSubIdentExprModel)(*self.model))
         | &StructSubIdentExprModel:
-            self.structure_sub((&StructSubIdentExprModel)(*self.model))
+            self.structureSub((&StructSubIdentExprModel)(*self.model))
         | &CommonSubIdentExprModel:
-            self.common_sub((&CommonSubIdentExprModel)(*self.model))
+            self.commonSub((&CommonSubIdentExprModel)(*self.model))
         | &TupleExprModel:
             self.tuple((&TupleExprModel)(*self.model))
         | &BuiltinOutCallExprModel:
-            self.out_call((&BuiltinOutCallExprModel)(*self.model))
+            self.outCall((&BuiltinOutCallExprModel)(*self.model))
         | &BuiltinOutlnCallExprModel:
-            self.outln_call((&BuiltinOutlnCallExprModel)(*self.model))
+            self.outlnCall((&BuiltinOutlnCallExprModel)(*self.model))
         | &BuiltinNewCallExprModel:
-            self.new_call((&BuiltinNewCallExprModel)(*self.model))
+            self.newCall((&BuiltinNewCallExprModel)(*self.model))
         | &BuiltinPanicCallExprModel:
-            self.panic_call((&BuiltinPanicCallExprModel)(*self.model))
+            self.panicCall((&BuiltinPanicCallExprModel)(*self.model))
         | &BuiltinAssertCallExprModel:
-            self.assert_call((&BuiltinAssertCallExprModel)(*self.model))
+            self.assertCall((&BuiltinAssertCallExprModel)(*self.model))
         | &BuiltinErrorCallExprModel:
-            self.error_call((&BuiltinErrorCallExprModel)(*self.model))
+            self.errorCall((&BuiltinErrorCallExprModel)(*self.model))
         | &BuiltinMakeCallExprModel:
-            self.make_call((&BuiltinMakeCallExprModel)(*self.model))
+            self.makeCall((&BuiltinMakeCallExprModel)(*self.model))
         | &BuiltinAppendCallExprModel:
-            self.append_call((&BuiltinAppendCallExprModel)(*self.model))
+            self.appendCall((&BuiltinAppendCallExprModel)(*self.model))
         | &BuiltinCloneCallExprModel:
-            self.clone_call((&BuiltinCloneCallExprModel)(*self.model))
+            self.cloneCall((&BuiltinCloneCallExprModel)(*self.model))
         | &SizeofExprModel:
             self.sizeof((&SizeofExprModel)(*self.model))
         | &AlignofExprModel:
             self.alignof((&AlignofExprModel)(*self.model))
         | &IntegratedToStrExprModel:
-            self.integrated_to_str((&IntegratedToStrExprModel)(*self.model))
+            self.integratedToStr((&IntegratedToStrExprModel)(*self.model))
         | &FreeExprModel:
             self.free((&FreeExprModel)(*self.model))
         | &BackendEmitExprModel:
-            self.backend_emit((&BackendEmitExprModel)(*self.model))
+            self.backendEmit((&BackendEmitExprModel)(*self.model))
         }
     }
 }
@@ -424,21 +424,21 @@ impl ExprOptimizer {
 //   - log2(r) returns integer without fraction
 //
 // As a result: returns whether bit-shifting is possible and what nth power of 2^r.
-fn check_for_bit_shift_opt(&l: &OperandExprModel, &r: &OperandExprModel): (ok: bool, x: u64) {
-    if !types::is_int(l.kind.to_str()) || !types::is_int(r.kind.to_str()) {
+fn checkForBitShiftOpt(&l: &OperandExprModel, &r: &OperandExprModel): (ok: bool, x: u64) {
+    if !types::IsInt(l.Kind.Str()) || !types::IsInt(r.Kind.Str()) {
         ret false, 0
     }
-    match type r.model {
+    match type r.Model {
     | &Const:
         break
     |:
         ret false, 0
     }
-    x = (&Const)(r.model).as_u64()
+    x = (&Const)(r.Model).AsU64()
     if x == 0 || x%2 != 0 {
         ret false, 0
     }
-    let j = math::log2(f64(x))
+    let j = math::Log2(f64(x))
     let z = u64(j)
     if f64(z) != j {
         ret false, 0

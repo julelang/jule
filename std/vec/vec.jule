@@ -4,7 +4,7 @@
 
 use std::internal::dynar::{Dynar}
 
-const GROW_FACTOR = 2
+const growFactor = 2
 
 // Wrapper for dynamic array.
 // Uses capacity for performance.
@@ -22,9 +22,9 @@ pub struct Vec[T] {
 
 impl Vec {
     // Allocate new vector with capacity.
-    pub static fn new(cap: int): Vec[T] {
+    pub static fn New(cap: int): Vec[T] {
         let mut vec = Vec[T]{
-            mem: Dynar[T].new(),
+            mem: Dynar[T].New(),
         }
         if cap > 0 {
             vec.resize(cap)
@@ -33,202 +33,202 @@ impl Vec {
     }
 
     fn resize(mut self, n: int) {
-        let ok = self.mem.resize(n)
+        let ok = self.mem.Resize(n)
         if !ok {
             panic("Vec[T]: heap reallocation failed")
         }
     }
 
-    fn calc_grow(self, delta: int): int {
-        let t = self.len() + delta
-        ret t * GROW_FACTOR
+    fn calcGrow(self, delta: int): int {
+        let t = self.Len() + delta
+        ret t * growFactor
     }
 
-    fn review_size(mut self, delta: int) {
-        if self.len()+delta > self.cap() {
-            self.resize(self.calc_grow(delta))
+    fn reviewSize(mut self, delta: int) {
+        if self.Len()+delta > self.Cap() {
+            self.resize(self.calcGrow(delta))
         }
     }
 
     // Deallocate heap.
-    pub fn dispose(mut self) {
-        self.mem.dispose()
+    pub fn Dispose(mut self) {
+        self.mem.Dispose()
     }
 
     // Set capacity to length.
     // Removes additional capacity that waiting to use.
     // Allocates new memory to cut additional capacity.
-    pub fn fit(mut self) {
-        if self.len() != self.cap() {
-            self.resize(self.len())
+    pub fn Fit(mut self) {
+        if self.Len() != self.Cap() {
+            self.resize(self.Len())
         }
     }
 
     // Returns length.
-    pub fn len(self): int {
-        ret self.mem.buff.len
+    pub fn Len(self): int {
+        ret self.mem.Buff.len
     }
 
     // Returns capacity.
-    pub fn cap(self): int {
-        ret self.mem.buff.cap
+    pub fn Cap(self): int {
+        ret self.mem.Buff.cap
     }
 
     // Sets length.
     // Sets length to zero if n < 0.
     // Don't set length if n >= length of vector.
-    pub fn set_len(mut self, n: int) {
+    pub fn SetLen(mut self, n: int) {
         if n < 0 {
-            self.mem.buff.len = 0
+            self.mem.Buff.len = 0
             ret
         }
-        if n >= self.len() {
+        if n >= self.Len() {
             ret
         }
-        self.mem.buff.len = n
+        self.mem.Buff.len = n
     }
 
     // Returns item by index.
-    pub fn at(mut self, i: int): T {
-        if i < 0 || i >= self.len() {
-            panic("Vec[T].at: out of range")
+    pub fn At(mut self, i: int): T {
+        if i < 0 || i >= self.Len() {
+            panic("Vec[T].At: out of range")
         }
         unsafe {
-            ret self.mem.buff.heap[i]
+            ret self.mem.Buff.heap[i]
         }
     }
 
     // Set element by index.
-    pub fn set(mut self, i: int, mut item: T) {
-        if i < 0 || i >= self.len() {
-            panic("Vec[T].set: out of range")
+    pub fn Set(mut self, i: int, mut item: T) {
+        if i < 0 || i >= self.Len() {
+            panic("Vec[T].Set: out of range")
         }
         unsafe {
-            self.mem.buff.heap[i] = item
+            self.mem.Buff.heap[i] = item
         }
     }
 
     // Removes all elements.
     // Does not deallocates buffer, keeps capacity.
-    pub fn clear(mut self) {
-        self.mem.buff.len = 0
+    pub fn Clear(mut self) {
+        self.mem.Buff.len = 0
     }
 
     // Push item to end of heap.
-    pub fn push(mut self, mut item: T) {
-        if self.len() >= self.cap() {
-            self.resize((self.cap() * GROW_FACTOR) + 1)
+    pub fn Push(mut self, mut item: T) {
+        if self.Len() >= self.Cap() {
+            self.resize((self.Cap() * growFactor) + 1)
         }
         unsafe {
-            self.mem.buff.heap[self.len()] = item
+            self.mem.Buff.heap[self.Len()] = item
         }
-        self.mem.buff.len++
+        self.mem.Buff.len++
     }
 
     // Push item to front of heap.
-    pub fn push_front(mut self, mut item: T) {
-        if self.len() >= self.cap() {
-            self.resize((self.cap() * GROW_FACTOR) + 1)
+    pub fn PushFront(mut self, mut item: T) {
+        if self.Len() >= self.Cap() {
+            self.resize((self.Cap() * growFactor) + 1)
         }
-        self.mem.shift_right(0, 1)
+        self.mem.ShiftRight(0, 1)
         unsafe {
-            self.mem.buff.heap[0] = item
+            self.mem.Buff.heap[0] = item
         }
-        self.mem.buff.len++
+        self.mem.Buff.len++
     }
 
     // Push items to end of heap.
-    pub fn append(mut self, mut items: ...T) {
+    pub fn Append(mut self, mut items: ...T) {
         if items.len == 0 {
             ret
         }
-        self.review_size(items.len)
-        self.mem.set(self.len(), &items[0], items.len)
-        self.mem.buff.len += items.len
+        self.reviewSize(items.len)
+        self.mem.Set(self.Len(), &items[0], items.len)
+        self.mem.Buff.len += items.len
     }
 
     // Merge items to end of heap.
-    pub fn merge(mut self, mut vec: Vec[T]) {
-        if vec.len() == 0 {
+    pub fn Merge(mut self, mut vec: Vec[T]) {
+        if vec.Len() == 0 {
             ret
         }
-        self.review_size(vec.len())
-        self.mem.set(self.len(), vec.mem.begin(), vec.len())
-        self.mem.buff.len += vec.len()
+        self.reviewSize(vec.Len())
+        self.mem.Set(self.Len(), vec.mem.Begin(), vec.Len())
+        self.mem.Buff.len += vec.Len()
     }
 
     // Merge items to front of heap.
-    pub fn merge_front(mut self, mut vec: Vec[T]) {
-        if vec.len() == 0 {
+    pub fn MergeFront(mut self, mut vec: Vec[T]) {
+        if vec.Len() == 0 {
             ret
         }
-        self.review_size(vec.len())
-        self.mem.shift_right(0, vec.len())
-        self.mem.set(0, vec.mem.begin(), vec.len())
-        self.mem.buff.len += vec.len()
+        self.reviewSize(vec.Len())
+        self.mem.ShiftRight(0, vec.Len())
+        self.mem.Set(0, vec.mem.Begin(), vec.Len())
+        self.mem.Buff.len += vec.Len()
     }
 
     // Remove range from heap.
-    pub fn remove_range(mut self, start: int, n: int) {
+    pub fn RemoveRange(mut self, start: int, n: int) {
         if n < 1 {
             ret
         }
         if start < -1 {
-            panic("Vec[T].remove_range: removing starts at negative index")
+            panic("Vec[T].RemoveRange: removing starts at negative index")
         }
-        if start >= self.len() {
-            panic("Vec[T].remove_range: removing starts at out of range")
+        if start >= self.Len() {
+            panic("Vec[T].RemoveRange: removing starts at out of range")
         }
-        if self.len()-start-n < 0 {
-            panic("Vec[T].remove_range: removing continues at out of range")
+        if self.Len()-start-n < 0 {
+            panic("Vec[T].RemoveRange: removing continues at out of range")
         }
-        self.mem.shift_left(start + n, self.len(), n)
-        self.mem.buff.len -= n
+        self.mem.ShiftLeft(start + n, self.Len(), n)
+        self.mem.Buff.len -= n
     }
 
     // Insert item by index.
-    pub fn insert(mut self, i: int, mut item: T) {
+    pub fn Insert(mut self, i: int, mut item: T) {
         if i < 0 {
-            panic("Vec[T].insert: insertion starts at negative index")
+            panic("Vec[T].Insert: insertion starts at negative index")
         }
-        if i > self.len() {
-            panic("Vec[T].insert: insertion starts at out of range")
+        if i > self.Len() {
+            panic("Vec[T].Insert: insertion starts at out of range")
         }
-        if self.len() >= self.cap() {
-            self.resize((self.cap() * GROW_FACTOR) + 1)
+        if self.Len() >= self.Cap() {
+            self.resize((self.Cap() * growFactor) + 1)
         }
-        self.mem.shift_right(i, 1)
+        self.mem.ShiftRight(i, 1)
         unsafe {
-            self.mem.buff.heap[i] = item
+            self.mem.Buff.heap[i] = item
         }
-        self.mem.buff.len++
+        self.mem.Buff.len++
     }
 
     // Slice between indexes except end position.
     // Not clones internal buffer, so slice vector can effect
     // to internal buffer if type is mutable.
-    pub fn slice(mut self, start: int, end: int): Vec[T] {
+    pub fn Slice(mut self, start: int, end: int): Vec[T] {
         if start < 0 {
-            panic("Vec[T].slice: slicing starts at negative index")
+            panic("Vec[T].Slice: slicing starts at negative index")
         }
-        if start > self.len() {
-            panic("Vec[T].slice: slicing starts at out of range")
+        if start > self.Len() {
+            panic("Vec[T].Slice: slicing starts at out of range")
         }
-        if end > self.len() {
-            panic("Vec[T].slice: slicing ends at out of range")
+        if end > self.Len() {
+            panic("Vec[T].Slice: slicing ends at out of range")
         }
         if end < 0 {
-            panic("Vec[T].slice: slicing ends at negative index")
+            panic("Vec[T].Slice: slicing ends at negative index")
         }
         if start > end {
-            panic("Vec[T].slice: start point < end point")
+            panic("Vec[T].Slice: start point < end point")
         }
         if start == end {
-            ret Vec[T].new(0)
+            ret Vec[T].New(0)
         }
-        let mut vec = Vec[T].new(end - start)
-        vec.mem.set(0, self.mem.begin() + start, vec.cap())
-        vec.mem.buff.len = vec.cap()
+        let mut vec = Vec[T].New(end - start)
+        vec.mem.Set(0, self.mem.Begin() + start, vec.Cap())
+        vec.mem.Buff.len = vec.Cap()
         ret vec
     }
 }

@@ -14,7 +14,7 @@ cpp fn _wspawnvp(mode: int, file: *integ::Wchar, args: **integ::Wchar): int
 cpp fn _wspawnvpe(mode: int, file: *integ::Wchar, args: **integ::Wchar, env: **integ::Wchar): int
 cpp unsafe fn _cwait(mut status: *integ::Int, pid: int, action: int): int
 
-fn ustr_slice_to_wcstr_slice(us: [][]u16): []*integ::Wchar {
+fn ustrSliceToWcstrSlice(us: [][]u16): []*integ::Wchar {
     let mut wcs = make([]*integ::Wchar, 0, us.len + 1)
     for i in us {
         wcs = append(wcs, unsafe { (*integ::Wchar)(&us[i][0]) })
@@ -23,44 +23,44 @@ fn ustr_slice_to_wcstr_slice(us: [][]u16): []*integ::Wchar {
     ret wcs
 }
 
-fn str_slice_to_ustr_slice(s: []str): [][]u16 {
+fn strSliceToUstrSlice(s: []str): [][]u16 {
     let mut us = make([][]u16, 0, s.len)
     for _, p in s {
-        us = append(us, integ::utf16_from_str(p))
+        us = append(us, integ::Utf16FromStr(p))
     }
     ret us
 }
 
 fn execvp(file: str, argv: []str): int {
-    let utf16_file = integ::utf16_from_str(file)
-    let ucargv = str_slice_to_ustr_slice(argv)
-    let cargv = ustr_slice_to_wcstr_slice(ucargv)
-    ret cpp._wspawnvp(cpp.P_NOWAIT, unsafe { (*integ::Wchar)(&utf16_file[0]) }, &cargv[0])
+    let utf16File = integ::Utf16FromStr(file)
+    let ucargv = strSliceToUstrSlice(argv)
+    let cargv = ustrSliceToWcstrSlice(ucargv)
+    ret cpp._wspawnvp(cpp.P_NOWAIT, unsafe { (*integ::Wchar)(&utf16File[0]) }, &cargv[0])
 }
 
 fn execve(file: str, argv: []str, env: []str): int {
-    let ucargv = str_slice_to_ustr_slice(argv)
-    let cargv = ustr_slice_to_wcstr_slice(ucargv)
-    let ucenv = str_slice_to_ustr_slice(env)
-    let cenv = ustr_slice_to_wcstr_slice(ucenv)
-    let utf16_file = integ::utf16_from_str(file)
-    ret cpp._wspawnvpe(cpp.P_NOWAIT, unsafe { (*integ::Wchar)(&utf16_file[0]) }, &cargv[0], &cenv[0])
+    let ucargv = strSliceToUstrSlice(argv)
+    let cargv = ustrSliceToWcstrSlice(ucargv)
+    let ucenv = strSliceToUstrSlice(env)
+    let cenv = ustrSliceToWcstrSlice(ucenv)
+    let utf16File = integ::Utf16FromStr(file)
+    ret cpp._wspawnvpe(cpp.P_NOWAIT, unsafe { (*integ::Wchar)(&utf16File[0]) }, &cargv[0], &cenv[0])
 }
 
 impl Cmd {
-    fn __spawn(self)!: int {
+    fn spawn(self)!: int {
         let mut pid = 0
-        if self.env == nil {
-            pid = execvp(self.path, self.args)
+        if self.Env == nil {
+            pid = execvp(self.path, self.Args)
         } else {
-            pid = execve(self.path, self.args, self.env)
+            pid = execve(self.path, self.Args, self.Env)
         }
         if pid == -1 {
-            error(get_last_process_error())
+            error(getLastProcessError())
         }
         let status = 0
         if unsafe { cpp._cwait((*integ::Int)(&status), pid, 0) } == -1 {
-            error(get_last_process_error())
+            error(getLastProcessError())
         }
         ret status
     }

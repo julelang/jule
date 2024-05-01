@@ -3,146 +3,145 @@
 // license that can be found in the LICENSE file.
 
 use ast for std::jule::ast
-use build for std::jule::build::{Directive, Derive, LogMsg, Log, LogKind, logf}
+use build for std::jule::build::{Directive, Derive, LogMsg, Log, LogKind, Logf}
 use std::jule::constant::{Const}
-use std::jule::lex::{File, Token, TokenKind, is_ignore_ident, is_anon_ident}
+use std::jule::lex::{File, Token, TokenKind, IsIgnoreIdent, IsAnonIdent}
 use types for std::jule::types
 use strings for std::strings
 
-fn is_valid_model_for_ref(mut &m: ExprModel): bool {
+fn isValidModelForRef(mut &m: ExprModel): bool {
     match type m {
     | &Var:
         ret true
     | &StructSubIdentExprModel:
         let mut model = (&StructSubIdentExprModel)(m)
-        ret is_valid_model_for_ref(model.expr.model)
+        ret isValidModelForRef(model.Expr.Model)
     | &TraitSubIdentExprModel:
         let mut model = (&TraitSubIdentExprModel)(m)
-        ret is_valid_model_for_ref(model.expr)
+        ret isValidModelForRef(model.Expr)
     | &UnaryExprModel:
         let mut unary = (&UnaryExprModel)(m)
-        if unary.op.kind != TokenKind.Star {
+        if unary.Op.Kind != TokenKind.Star {
             ret false
         }
         // Return true because of pointer dereferencing is an Unsafe Jule feature.
-        if unary.expr.kind.ptr() != nil {
+        if unary.Expr.Kind.Ptr() != nil {
             ret true
         }
         // Dereferencing should be smart pointer, in other words return false.
-        if unary.expr.kind.sptr() == nil {
+        if unary.Expr.Kind.Sptr() == nil {
             ret false
         }
-        ret is_valid_model_for_ref(unary.expr.model)
+        ret isValidModelForRef(unary.Expr.Model)
     |:
         ret false
     }
 }
 
-fn compiler_err(&token: &Token, line: bool, fmt: LogMsg, args: ...any): Log {
+fn compilerErr(&token: &Token, line: bool, fmt: LogMsg, args: ...any): Log {
     let mut log = Log{
-        kind: LogKind.Error,
-        row: token.row,
-        column: token.column,
-        path: token.file.path,
-        text: logf(fmt, args...),
+        Kind: LogKind.Error,
+        Row: token.Row,
+        Column: token.Column,
+        Path: token.File.Path,
+        Text: Logf(fmt, args...),
     }
     if line {
-        log.line = token.file.get_row(token.row)
+        log.Line = token.File.GetRow(token.Row)
     }
     ret log
 }
 
-fn imp_is_lookupable(&i: &ImportInfo, ident: str): bool {
-    if i.cpp_linked {
+fn impIsLookupable(&i: &ImportInfo, ident: str): bool {
+    if i.CppLinked {
         ret false
     }
-
-    if !i.import_all {
-        if i.selected.len > 0 {
-            ret i.exist_ident(ident)
+    if !i.ImportAll {
+        if i.Selected.len > 0 {
+            ret i.existIdent(ident)
         }
     }
-    ret i.import_all
+    ret i.ImportAll
 }
 
-fn append_ret_vars(mut &dest: []&Var, mut &f: &FnIns) {
-    if f.decl.is_void() || f.result == nil {
+fn appendRetVars(mut &dest: []&Var, mut &f: &FnIns) {
+    if f.Decl.IsVoid() || f.Result == nil {
         ret
     }
 
-    let mut types = f.types()
-    for (i, mut ident) in f.decl.result.idents {
-        if is_ignore_ident(ident.kind) || is_anon_ident(ident.kind) {
+    let mut types = f.Types()
+    for (i, mut ident) in f.Decl.Result.Idents {
+        if IsIgnoreIdent(ident.Kind) || IsAnonIdent(ident.Kind) {
             continue
         }
         dest = append(dest, &Var{
-            used: true,
-            mutable: true,
-            ident: ident.kind,
-            token: ident,
-            scope: f.scope,
-            kind: &TypeSymbol{
-                kind: types[i],
+            Used: true,
+            Mutable: true,
+            Ident: ident.Kind,
+            Token: ident,
+            Scope: f.Scope,
+            Kind: &TypeSymbol{
+                Kind: types[i],
             },
-            value: &Value{
-                data: new(Data),
+            Value: &Value{
+                Data: new(Data),
             },
         })
     }
 }
 
-fn append_param_vars(mut &dest: []&Var, mut &f: &FnIns) {
-    if f.params.len == 0 {
+fn appendParamVars(mut &dest: []&Var, mut &f: &FnIns) {
+    if f.Params.len == 0 {
         ret
     }
 
-    for (_, mut p) in f.params {
-        if is_ignore_ident(p.decl.ident) || is_anon_ident(p.decl.ident) {
+    for (_, mut p) in f.Params {
+        if IsIgnoreIdent(p.Decl.Ident) || IsAnonIdent(p.Decl.Ident) {
             continue
         }
 
         let mut v = &Var{
-            used: true,
-            reference: p.decl.reference,
-            mutable: p.decl.mutable,
-            ident: p.decl.ident,
-            token: p.decl.token,
-            kind: new(TypeSymbol),
-            scope: f.scope,
-            value: &Value{
-                data: new(Data),
+            Used: true,
+            Reference: p.Decl.Reference,
+            Mutable: p.Decl.Mutable,
+            Ident: p.Decl.Ident,
+            Token: p.Decl.Token,
+            Kind: new(TypeSymbol),
+            Scope: f.Scope,
+            Value: &Value{
+                Data: new(Data),
             },
         }
 
         match {
-        | p.decl.is_self():
-            v.kind.kind = &TypeKind{
-                variadic: false,
-                kind: f.owner,
+        | p.Decl.IsSelf():
+            v.Kind.Kind = &TypeKind{
+                Variadic: false,
+                Kind: f.Owner,
             }
-            v.reference = !p.decl.is_ref()
+            v.Reference = !p.Decl.IsRef()
 
-            if p.decl.is_ref() {
-                v.ident = v.ident[1:] // Remove reference sign.
-                v.kind.kind.kind = &Sptr{
-                    elem: &TypeKind{
-                        cpp_ident: v.kind.kind.cpp_ident,
-                        kind: v.kind.kind.kind,
+            if p.Decl.IsRef() {
+                v.Ident = v.Ident[1:] // Remove reference sign.
+                v.Kind.Kind.Kind = &Sptr{
+                    Elem: &TypeKind{
+                        CppIdent: v.Kind.Kind.CppIdent,
+                        Kind: v.Kind.Kind.Kind,
                     },
                 }
             }
-        | p.decl.variadic:
-            v.kind.kind = &TypeKind{
-                variadic: false,
-                kind: &Slc{
-                    elem: &TypeKind{
-                        cpp_ident: p.kind.cpp_ident,
-                        kind: p.kind.kind,
+        | p.Decl.Variadic:
+            v.Kind.Kind = &TypeKind{
+                Variadic: false,
+                Kind: &Slc{
+                    Elem: &TypeKind{
+                        CppIdent: p.Kind.CppIdent,
+                        Kind: p.Kind.Kind,
                     },
                 },
             }
         |:
-            v.kind.kind = p.kind
+            v.Kind.Kind = p.Kind
         }
 
         dest = append(dest, v)
@@ -151,55 +150,55 @@ fn append_param_vars(mut &dest: []&Var, mut &f: &FnIns) {
 
 // Builds type aliases for generic types of scope.
 // See developer reference (1), and (2).
-fn append_generic_type_aliases(mut &dest: []&TypeAlias, mut &f: &FnIns) {
-    let mut size = f.generics.len
-    if f.decl.owner != nil {
-        size += f.decl.owner.generics.len
+fn appendGenericTypeAliases(mut &dest: []&TypeAlias, mut &f: &FnIns) {
+    let mut size = f.Generics.len
+    if f.Decl.Owner != nil {
+        size += f.Decl.Owner.Generics.len
     }
 
     if size == 0 {
         ret
     }
 
-    for (i, mut g) in f.generics {
-        let mut decl = f.decl.generics[i]
+    for (i, mut g) in f.Generics {
+        let mut decl = f.Decl.Generics[i]
         dest = append(dest, &TypeAlias{
-            used: true,
-            generic: true,
-            scope: f.decl.scope,
-            ident: decl.ident,
-            token: decl.token,
-            kind: &TypeSymbol{kind: g.kind},
+            Used: true,
+            Generic: true,
+            Scope: f.Decl.Scope,
+            Ident: decl.Ident,
+            Token: decl.Token,
+            Kind: &TypeSymbol{Kind: g.Kind},
         })
     }
 
-    if f.decl.owner != nil {
-        let mut owner = f.owner
-        for (i, mut g) in owner.generics {
-            let mut decl = owner.decl.generics[i]
+    if f.Decl.Owner != nil {
+        let mut owner = f.Owner
+        for (i, mut g) in owner.Generics {
+            let mut decl = owner.Decl.Generics[i]
             dest = append(dest, &TypeAlias{
-                used: true,
-                generic: true,
-                scope: f.decl.scope,
-                ident: decl.ident,
-                token: decl.token,
-                kind: &TypeSymbol{kind: g.kind},
+                Used: true,
+                Generic: true,
+                Scope: f.Decl.Scope,
+                Ident: decl.Ident,
+                Token: decl.Token,
+                Kind: &TypeSymbol{Kind: g.Kind},
             })
         }
     }
 }
 
-fn find_file(mut &files: []&SymbolTable, &handler: &File): &SymbolTable {
+fn findFile(mut &files: []&SymbolTable, &handler: &File): &SymbolTable {
     for (_, mut fl) in files {
-        if fl.file == handler {
+        if fl.File == handler {
             ret fl
         }
     }
     ret nil
 }
 
-unsafe fn push_suggestion(mut log: *Log, fmt: LogMsg, args: ...any) {
-    log.suggestion = logf(fmt, args...)
+unsafe fn pushSugggestion(mut log: *Log, fmt: LogMsg, args: ...any) {
+    log.Suggestion = Logf(fmt, args...)
 }
 
 // Semantic analyzer for tables.
@@ -217,8 +216,8 @@ impl Lookup for Sema {
     //
     // Lookups:
     //   - Current file's imported packages.
-    pub fn find_package(mut self, ident: str): &ImportInfo {
-        ret self.file.find_package(ident)
+    pub fn FindPackage(mut self, ident: str): &ImportInfo {
+        ret self.file.FindPackage(ident)
     }
 
     // Returns imported package by selector.
@@ -227,8 +226,8 @@ impl Lookup for Sema {
     //
     // Lookups:
     //   - Current file's imported packages.
-    pub fn select_package(mut self, selector: fn(&ImportInfo): bool): &ImportInfo {
-        ret self.file.select_package(selector)
+    pub fn SelectPackage(mut self, selector: fn(&ImportInfo): bool): &ImportInfo {
+        ret self.file.SelectPackage(selector)
     }
 
     // Returns variable by identifier and cpp linked state.
@@ -237,20 +236,20 @@ impl Lookup for Sema {
     // Lookups:
     //   - Package file's symbol table.
     //   - Current file's public denifes of imported packages.
-    pub fn find_var(mut self, ident: str, cpp_linked: bool): &Var {
+    pub fn FindVar(mut self, ident: str, cpp_linked: bool): &Var {
         // Lookup package files.
-        let mut v = find_var_in_package(self.files, ident, cpp_linked)
+        let mut v = findVarInPackage(self.files, ident, cpp_linked)
         if v != nil {
             ret v
         }
 
         // Lookup current file's public denifes of imported packages.
-        for (_, mut imp) in self.file.imports {
-            if !imp_is_lookupable(imp, ident) {
+        for (_, mut imp) in self.file.Imports {
+            if !impIsLookupable(imp, ident) {
                 continue
             }
-            v = imp.find_var(ident, cpp_linked)
-            if v != nil && self.is_accessible_define(v.public, v.token) {
+            v = imp.FindVar(ident, cpp_linked)
+            if v != nil && self.isAccessibleDefine(v.Public, v.Token) {
                 ret v
             }
         }
@@ -264,20 +263,20 @@ impl Lookup for Sema {
     // Lookups:
     //   - Package file's symbol table.
     //   - Current file's public denifes of imported packages.
-    pub fn find_type_alias(mut self, ident: str, cpp_linked: bool): &TypeAlias {
+    pub fn FindTypeAlias(mut self, ident: str, cpp_linked: bool): &TypeAlias {
         // Lookup package files.
-        let mut ta = find_type_alias_in_package(self.files, ident, cpp_linked)
+        let mut ta = findTypeAliasInPackage(self.files, ident, cpp_linked)
         if ta != nil {
             ret ta
         }
 
         // Lookup current file's public denifes of imported packages.
-        for (_, mut imp) in self.file.imports {
-            if !imp_is_lookupable(imp, ident) {
+        for (_, mut imp) in self.file.Imports {
+            if !impIsLookupable(imp, ident) {
                 continue
             }
-            ta = imp.find_type_alias(ident, cpp_linked)
-            if ta != nil && self.is_accessible_define(ta.public, ta.token) {
+            ta = imp.FindTypeAlias(ident, cpp_linked)
+            if ta != nil && self.isAccessibleDefine(ta.Public, ta.Token) {
                 ret ta
             }
         }
@@ -291,24 +290,22 @@ impl Lookup for Sema {
     // Lookups:
     //   - Package file's symbol table.
     //   - Current file's public denifes of imported packages.
-    pub fn find_struct(mut self, ident: str, cpp_linked: bool): &Struct {
+    pub fn FindStruct(mut self, ident: str, cppLinked: bool): &Struct {
         // Lookup package files.
-        let mut s = find_struct_in_package(self.files, ident, cpp_linked)
+        let mut s = findStructInPackage(self.files, ident, cppLinked)
         if s != nil {
             ret s
         }
-
         // Lookup current file's public denifes of imported packages.
-        for (_, mut imp) in self.file.imports {
-            if !imp_is_lookupable(imp, ident) {
+        for (_, mut imp) in self.file.Imports {
+            if !impIsLookupable(imp, ident) {
                 continue
             }
-            s = imp.find_struct(ident, cpp_linked)
-            if s != nil && self.is_accessible_define(s.public, s.token) {
+            s = imp.FindStruct(ident, cppLinked)
+            if s != nil && self.isAccessibleDefine(s.Public, s.Token) {
                 ret s
             }
         }
-
         ret nil
     }
 
@@ -318,20 +315,20 @@ impl Lookup for Sema {
     // Lookups:
     //   - Package file's symbol table.
     //   - Current file's public denifes of imported packages.
-    pub fn find_fn(mut self, ident: str, cpp_linked: bool): &Fn {
+    pub fn FindFn(mut self, ident: str, cpp_linked: bool): &Fn {
         // Lookup package files.
-        let mut f = find_fn_in_package(self.files, ident, cpp_linked)
+        let mut f = findFnInPackage(self.files, ident, cpp_linked)
         if f != nil {
             ret f
         }
 
         // Lookup current file's public denifes of imported packages.
-        for (_, mut imp) in self.file.imports {
-            if !imp_is_lookupable(imp, ident) {
+        for (_, mut imp) in self.file.Imports {
+            if !impIsLookupable(imp, ident) {
                 continue
             }
-            f = imp.find_fn(ident, cpp_linked)
-            if f != nil && self.is_accessible_define(f.public, f.token) {
+            f = imp.FindFn(ident, cpp_linked)
+            if f != nil && self.isAccessibleDefine(f.Public, f.Token) {
                 ret f
             }
         }
@@ -345,20 +342,20 @@ impl Lookup for Sema {
     // Lookups:
     //   - Package file's symbol table.
     //   - Current file's public denifes of imported packages.
-    pub fn find_trait(mut self, ident: str): &Trait {
+    pub fn FindTrait(mut self, ident: str): &Trait {
         // Lookup package files.
-        let mut t = find_trait_in_package(self.files, ident)
+        let mut t = findTraitInPackage(self.files, ident)
         if t != nil {
             ret t
         }
 
         // Lookup current file's public denifes of imported packages.
-        for (_, mut imp) in self.file.imports {
-            if !imp_is_lookupable(imp, ident) {
+        for (_, mut imp) in self.file.Imports {
+            if !impIsLookupable(imp, ident) {
                 continue
             }
-            t = imp.find_trait(ident)
-            if t != nil && self.is_accessible_define(t.public, t.token) {
+            t = imp.FindTrait(ident)
+            if t != nil && self.isAccessibleDefine(t.Public, t.Token) {
                 ret t
             }
         }
@@ -372,20 +369,20 @@ impl Lookup for Sema {
     // Lookups:
     //   - Package file's symbol table.
     //   - Current file's public denifes of imported packages.
-    pub fn find_enum(mut self, ident: str): &Enum {
+    pub fn FindEnum(mut self, ident: str): &Enum {
         // Lookup package files.
-        let mut e = find_enum_in_package(self.files, ident)
+        let mut e = findEnumInPackage(self.files, ident)
         if e != nil {
             ret e
         }
 
         // Lookup current file's public denifes of imported packages.
-        for (_, mut imp) in self.file.imports {
-            if !imp_is_lookupable(imp, ident) {
+        for (_, mut imp) in self.file.Imports {
+            if !impIsLookupable(imp, ident) {
                 continue
             }
-            e = imp.find_enum(ident)
-            if e != nil && self.is_accessible_define(e.public, e.token) {
+            e = imp.FindEnum(ident)
+            if e != nil && self.isAccessibleDefine(e.Public, e.Token) {
                 ret e
             }
         }
@@ -399,20 +396,20 @@ impl Lookup for Sema {
     // Lookups:
     //   - Package file's symbol table.
     //   - Current file's public denifes of imported packages.
-    pub fn find_type_enum(mut self, ident: str): &TypeEnum {
+    pub fn FindTypeEnum(mut self, ident: str): &TypeEnum {
         // Lookup package files.
-        let mut e = find_type_enum_in_package(self.files, ident)
+        let mut e = findTypeEnumInPackage(self.files, ident)
         if e != nil {
             ret e
         }
 
         // Lookup current file's public denifes of imported packages.
-        for (_, mut imp) in self.file.imports {
-            if !imp_is_lookupable(imp, ident) {
+        for (_, mut imp) in self.file.Imports {
+            if !impIsLookupable(imp, ident) {
                 continue
             }
-            e = imp.find_type_enum(ident)
-            if e != nil && self.is_accessible_define(e.public, e.token) {
+            e = imp.FindTypeEnum(ident)
+            if e != nil && self.isAccessibleDefine(e.Public, e.Token) {
                 ret e
             }
         }
@@ -423,36 +420,36 @@ impl Lookup for Sema {
 
 impl Sema {
     // Reports whether flags has given flag.
-    fn is_flag(self, flags: SemaFlag): bool { ret self.flags&flags == flags }
+    fn isFlag(self, flags: SemaFlag): bool { ret self.flags&flags == flags }
 
-    fn set_current_file(mut self, mut f: &SymbolTable) { self.file = f }
+    fn setCurrentFile(mut self, mut f: &SymbolTable) { self.file = f }
 
-    fn push_err(mut self, token: &Token, fmt: LogMsg, args: ...any) {
-        self.errors = append(self.errors, compiler_err(token, true, fmt, args...))
+    fn pushErr(mut self, token: &Token, fmt: LogMsg, args: ...any) {
+        self.errors = append(self.errors, compilerErr(token, true, fmt, args...))
     }
 
     // Push suggestion to last log.
-    fn push_suggestion(mut self, fmt: LogMsg, args: ...any) {
-        unsafe { push_suggestion(&self.errors[self.errors.len-1], fmt, args...) }
+    fn pushSugggestion(mut self, fmt: LogMsg, args: ...any) {
+        unsafe { pushSugggestion(&self.errors[self.errors.len-1], fmt, args...) }
     }
 
     // Reports whether define is accessible in the current package.
-    fn is_accessible_define(self, public: bool, token: &Token): bool {
-        ret public || token.file == nil || self.file.file.dir() == token.file.dir()
+    fn isAccessibleDefine(self, public: bool, token: &Token): bool {
+        ret public || token.File == nil || self.file.File.Dir() == token.File.Dir()
     }
 
     // Reports this identifier duplicated in package's global scope.
     // The "self" parameter represents address of exception identifier.
     // If founded identifier address equals to self, will be skipped.
-    fn is_duplicated_ident(self, itself: uintptr, ident: str, cpp_linked: bool): bool {
+    fn isDuplicatedIdent(self, itself: uintptr, ident: str, cpp_linked: bool): bool {
         for _, f in self.files {
-            if f.is_duplicated_ident(itself, ident, cpp_linked) {
+            if f.isDuplicatedIdent(itself, ident, cpp_linked) {
                 ret true
             }
 
-            for _, imp in f.imports {
-                for _, selected in imp.selected {
-                    if selected.kind == ident {
+            for _, imp in f.Imports {
+                for _, selected in imp.Selected {
+                    if selected.Kind == ident {
                         ret true
                     }
                 }
@@ -461,8 +458,8 @@ impl Sema {
         ret false
     }
 
-    fn check_directives(mut &self, mut &d: []&ast::Directive, mut o: any) {
-        let mut dc = DirectiveChecker{
+    fn checkDirectives(mut &self, mut &d: []&ast::Directive, mut o: any) {
+        let mut dc = directiveChecker{
             s: self,
             d: unsafe { (&[]&ast::Directive)(&d) },
             o: o,
@@ -470,277 +467,271 @@ impl Sema {
         dc.check()
     }
 
-    fn check_generic_quantity(mut self, required: int, given: int, token: &Token): (ok: bool) {
+    fn checkGenericQuantity(mut self, required: int, given: int, token: &Token): (ok: bool) {
         match {
         | required == 0 && given > 0:
-            self.push_err(token, LogMsg.NotHasGenerics)
+            self.pushErr(token, LogMsg.NotHasGenerics)
             ret false
         | required > 0 && given == 0:
-            self.push_err(token, LogMsg.HasGenerics)
+            self.pushErr(token, LogMsg.HasGenerics)
             ret false
         | required < given:
-            self.push_err(token, LogMsg.GenericsOverflow)
+            self.pushErr(token, LogMsg.GenericsOverflow)
             ret false
         | required > given:
-            self.push_err(token, LogMsg.MissingGenerics)
+            self.pushErr(token, LogMsg.MissingGenerics)
             ret false
         |:
             ret true
         }
     }
 
-    fn is_duplicated_import_selection(self, itself: uintptr, ident: str): bool {
-        for _, imp in self.file.imports {
+    fn isDuplicatedImportSelection(self, itself: uintptr, ident: str): bool {
+        for _, imp in self.file.Imports {
             if uintptr(imp) == itself {
                 // Don't scan trailing imports.
                 break
             }
-
-            if imp.exist_ident(ident) {
+            if imp.existIdent(ident) {
                 ret true
             }
         }
-
         ret false
     }
 
-    fn get_import_def(self, ident: str, mut &imp: &ImportInfo): any {
-        if find_package_builtin_def(imp.link_path, ident) != nil {
+    fn getImportDef(self, ident: str, mut &imp: &ImportInfo): any {
+        if findPackageBuiltinDef(imp.LinkPath, ident) != nil {
             ret true
         }
-
-        for (_, mut f) in imp.package.files {
-            const CPP_LINKED = false                        // C++-linked defines can't export.
-            let mut def = f.def_by_ident(ident, CPP_LINKED)
+        for (_, mut f) in imp.Package.Files {
+            // C++-linked defines can't export.
+            const CppLinked = false
+            let mut def = f.defByIdent(ident, CppLinked)
             if def != nil {
                 ret def
             }
         }
-
         ret nil
     }
 
-    fn check_import_selections(mut self, mut &imp: &ImportInfo): (ok: bool) {
+    fn checkImportSelections(mut self, mut &imp: &ImportInfo): (ok: bool) {
         ok = true
-        for _, ident in imp.selected {
-            if ident.kind == TokenKind.Self {
+        for _, ident in imp.Selected {
+            if ident.Kind == TokenKind.Self {
                 continue
             }
 
-            if self.is_duplicated_import_selection(uintptr(imp), ident.kind) {
-                self.push_err(ident, LogMsg.DuplicatedIdent, ident.kind)
-                self.push_suggestion(LogMsg.RenameForAvoidDuplication)
+            if self.isDuplicatedImportSelection(uintptr(imp), ident.Kind) {
+                self.pushErr(ident, LogMsg.DuplicatedIdent, ident.Kind)
+                self.pushSugggestion(LogMsg.RenameForAvoidDuplication)
                 ok = false
                 continue
             }
 
-            let mut def = self.get_import_def(ident.kind, imp)
+            let mut def = self.getImportDef(ident.Kind, imp)
             match type def {
             | bool:
                 // Pass, built-in.
                 continue
             | &Var:
                 let mut v = (&Var)(def)
-                if self.is_accessible_define(v.public, v.token) {
+                if self.isAccessibleDefine(v.Public, v.Token) {
                     continue
                 }
             | &TypeAlias:
                 let mut ta = (&TypeAlias)(def)
-                if self.is_accessible_define(ta.public, ta.token) {
+                if self.isAccessibleDefine(ta.Public, ta.Token) {
                     continue
                 }
             | &Struct:
                 let mut strct = (&Struct)(def)
-                if self.is_accessible_define(strct.public, strct.token) {
+                if self.isAccessibleDefine(strct.Public, strct.Token) {
                     continue
                 }
             | &Trait:
                 let mut t = (&Trait)(def)
-                if self.is_accessible_define(t.public, t.token) {
+                if self.isAccessibleDefine(t.Public, t.Token) {
                     continue
                 }
             | &Enum:
                 let mut e = (&Enum)(def)
-                if self.is_accessible_define(e.public, e.token) {
+                if self.isAccessibleDefine(e.Public, e.Token) {
                     continue
                 }
             | &TypeEnum:
                 let mut e = (&TypeEnum)(def)
-                if self.is_accessible_define(e.public, e.token) {
+                if self.isAccessibleDefine(e.Public, e.Token) {
                     continue
                 }
             | &Fn:
                 let mut f = (&Fn)(def)
-                if self.is_accessible_define(f.public, f.token) {
+                if self.isAccessibleDefine(f.Public, f.Token) {
                     continue
                 }
             |:
-                self.push_err(ident, LogMsg.IdentNotExist, ident.kind)
+                self.pushErr(ident, LogMsg.IdentNotExist, ident.Kind)
                 ok = false
                 continue
             }
 
-            self.push_err(ident, LogMsg.IdentIsNotAccessible, ident.kind)
-            self.push_suggestion(LogMsg.MakePubToAccess)
+            self.pushErr(ident, LogMsg.IdentIsNotAccessible, ident.Kind)
+            self.pushSugggestion(LogMsg.MakePubToAccess)
             ok = false
         }
         ret
     }
 
-    fn is_use_alias_duplication(mut self, &imp: &ImportInfo): bool {
-        if imp.alias.len == 0 {
+    fn isUseAliasDuplication(mut self, &imp: &ImportInfo): bool {
+        if imp.Alias.len == 0 {
             ret false
         }
 
-        for (_, mut imp2) in self.file.imports {
+        for (_, mut imp2) in self.file.Imports {
             if imp2 == imp {
                 break
             }
-            if imp2.alias == imp.alias {
+            if imp2.Alias == imp.Alias {
                 ret true
             }
-
             // Catch identifiers of other use declarations.
-            if imp2.ident == imp2.link_path && imp2.ident == imp.alias {
+            if imp2.Ident == imp2.LinkPath && imp2.Ident == imp.Alias {
                 ret true
             }
         }
         ret false
     }
 
-    fn check_import(mut self, mut &imp: &ImportInfo): bool {
-        if imp.cpp_linked || imp.package.files.len == 0 {
+    fn checkImport(mut self, mut &imp: &ImportInfo): bool {
+        if imp.CppLinked || imp.Package.Files.len == 0 {
             ret true
         }
 
-        if self.is_use_alias_duplication(imp) {
-            self.push_err(imp.token, LogMsg.DuplicatedUseAlias, imp.alias)
-            self.push_suggestion(LogMsg.RenameUseAliasAvoidDuplication)
+        if self.isUseAliasDuplication(imp) {
+            self.pushErr(imp.Token, LogMsg.DuplicatedUseAlias, imp.Alias)
+            self.pushSugggestion(LogMsg.RenameUseAliasAvoidDuplication)
         }
 
-        if !imp.duplicate {
+        if !imp.Duplicate {
             let mut sema = &Sema{
                 flags: self.flags,
             }
-            sema.check(imp.package.files)
+            sema.check(imp.Package.Files)
             if sema.errors.len != 0 {
                 self.errors = append(self.errors, sema.errors...)
                 sema.errors = nil
                 ret false
             }
         }
-        ret self.check_import_selections(imp)
+        ret self.checkImportSelections(imp)
     }
 
-    fn check_imports(mut self) {
+    fn checkImports(mut self) {
         for (_, mut file) in self.files {
-            self.set_current_file(file)
-
-            for (_, mut imp) in file.imports {
-                let ok = self.check_import(imp)
-
+            self.setCurrentFile(file)
+            for (_, mut imp) in file.Imports {
+                let ok = self.checkImport(imp)
                 // Break checking if package has error.
                 if !ok {
-                    self.push_err(imp.token, LogMsg.UsedPackageHasErrors, imp.link_path)
+                    self.pushErr(imp.Token, LogMsg.UsedPackageHasErrors, imp.LinkPath)
                     ret
                 }
             }
         }
     }
 
-    fn impl_file_impls(mut &self) {
-        for (_, mut imp) in self.file.impls {
-            self.impl_impl(imp)
+    fn implFileImpls(mut &self) {
+        for (_, mut imp) in self.file.Impls {
+            self.implImpl(imp)
         }
     }
 
-    fn impl_impls(mut &self) {
+    fn implImpls(mut &self) {
         for (_, mut file) in self.files {
-            self.set_current_file(file)
-            self.impl_file_impls()
+            self.setCurrentFile(file)
+            self.implFileImpls()
         }
     }
 
-    fn check_enums(mut &self) {
+    fn checkEnums(mut &self) {
         for (_, mut file) in self.files {
-            self.set_current_file(file)
-            self.check_enum_decls()
+            self.setCurrentFile(file)
+            self.checkEnumDecls()
         }
     }
 
     // Builds type, builds result as kind and collects referred type aliases.
-    fn build_type_with_refers(mut &self, mut &t: &ast::TypeDecl, mut l: Lookup,
-        mut generics: []&TypeAlias, mut referencer: &Referencer): &TypeKind {
-        let mut tc = TypeChecker{
+    fn buildTypeWithRefers(mut &self, mut &t: &ast::TypeDecl, mut l: Lookup,
+        mut generics: []&TypeAlias, mut referencer: &referencer): &TypeKind {
+        let mut tc = typeChecker{
             s: self,
             lookup: l,
             referencer: referencer,
-            use_generics: generics,
+            useGenerics: generics,
         }
         match type l {
-        | &ScopeChecker:
-            let mut hard = (&ScopeChecker)(l).get_hard_root()
-            tc.refers = hard.owner.refers
+        | &scopeChecker:
+            let mut hard = (&scopeChecker)(l).getHardRoot()
+            tc.refers = hard.owner.Refers
         }
-        // Referencer's refs field is not nil if owner is type alias.
+        // referencer's refs field is not nil if owner is type alias.
         if referencer != nil && referencer.refs != nil {
             // Set owner alias field of TypeChecker to collect generic dependencies.
             // See developer reference (4).
             match type referencer.owner {
             | &TypeAlias:
-                tc.owner_alias = (&TypeAlias)(referencer.owner)
+                tc.ownerAlias = (&TypeAlias)(referencer.owner)
             }
         }
-        ret tc.check_decl(t)
+        ret tc.checkDecl(t)
     }
 
     // Checks type, builds result as kind and collects referred type aliases.
     // Skips already checked types.
-    fn check_type_with_refers(mut &self, mut &t: &TypeSymbol, mut l: Lookup,
-        mut generics: []&TypeAlias, mut referencer: &Referencer): (ok: bool) {
+    fn checkTypeWithRefers(mut &self, mut &t: &TypeSymbol, mut l: Lookup,
+        mut generics: []&TypeAlias, mut referencer: &referencer): (ok: bool) {
         if t.checked() {
             ret true
         }
-        t.kind = self.build_type_with_refers(t.decl, l, generics, referencer)
+        t.Kind = self.buildTypeWithRefers(t.Decl, l, generics, referencer)
         ret t.checked()
     }
 
-    fn constraint_checker(mut &self): &ConstraintChecker {
-        ret &ConstraintChecker{s:  self}
+    fn constraintChecker(mut &self): &constraintChecker {
+        ret &constraintChecker{s:  self}
     }
 
     // Checks type and builds result as kind.
     // Skips already checked types.
-    fn check_type(mut &self, mut &t: &TypeSymbol, mut l: Lookup): bool {
-        ret self.check_type_with_refers(t, l, nil, nil)
+    fn checkType(mut &self, mut &t: &TypeSymbol, mut l: Lookup): bool {
+        ret self.checkTypeWithRefers(t, l, nil, nil)
     }
 
     // Builds type with type aliases for generics.
     // Returns nil if error occur or failed.
-    fn build_type_with_generics(mut &self, mut &t: &ast::TypeDecl,
+    fn buildTypeWithGenerics(mut &self, mut &t: &ast::TypeDecl,
         mut generics: []&TypeAlias, mut refers: &ReferenceStack): &TypeKind {
-        let mut tc = &TypeChecker{
+        let mut tc = &typeChecker{
             s: self,
             lookup: self,
-            use_generics: generics,
+            useGenerics: generics,
             refers: refers,
         }
-        ret tc.check_decl(t)
+        ret tc.checkDecl(t)
     }
 
     // Same as self.build_type_with_generics but not uses any generics.
-    fn build_type(mut &self, mut &t: &ast::TypeDecl): &TypeKind {
-        ret self.build_type_with_generics(t, nil, nil)
+    fn buildType(mut &self, mut &t: &ast::TypeDecl): &TypeKind {
+        ret self.buildTypeWithGenerics(t, nil, nil)
     }
 
     // Select type with name selection.
-    fn select_type(mut &self, mut &t: &ast::TypeDecl): &TypeKind {
-        let mut tc = &TypeChecker{
+    fn selectType(mut &self, mut &t: &ast::TypeDecl): &TypeKind {
+        let mut tc = &typeChecker{
             s: self,
             lookup: self,
             selection: true,
         }
-        ret tc.check_decl(t)
+        ret tc.checkDecl(t)
     }
 
     // Returns Eval instance for configuration with
@@ -751,14 +742,11 @@ impl Sema {
             lookup: l,
             owner: owner,
         }
-
         match type l {
-        | &ScopeChecker:
-            e.unsafety = (&ScopeChecker)(l).is_unsafe()
+        | &scopeChecker:
+            e.unsafety = (&scopeChecker)(l).isUnsafe()
         }
-
         e.prefix = p
-
         ret e
     }
 
@@ -772,21 +760,21 @@ impl Sema {
         ret self.evalp(l, nil)
     }
 
-    fn check_assign_type(mut &self, dest_is_ref: bool, mut &dest: &TypeKind,
-        mut &d: &Data, mut error_token: &Token): bool {
-        if d.decl {
-            self.push_err(error_token, LogMsg.InvalidExpr)
+    fn checkAssignType(mut &self, destIsRef: bool, mut &dest: &TypeKind,
+        mut &d: &Data, mut errorToken: &Token): bool {
+        if d.Decl {
+            self.pushErr(errorToken, LogMsg.InvalidExpr)
             ret false
         }
-        if dest_is_ref {
-            if !dest.equals(d.kind) {
-                self.push_err(error_token, LogMsg.IncompatibleTypes, dest.to_str(), d.kind.to_str())
+        if destIsRef {
+            if !dest.Equals(d.Kind) {
+                self.pushErr(errorToken, LogMsg.IncompatibleTypes, dest.Str(), d.Kind.Str())
                 ret false
             }
         } else {
-            let mut atc = &AssignTypeChecker{
+            let mut atc = &assignTypeChecker{
                 s: self,
-                error_token: error_token,
+                errorToken: errorToken,
                 dest: dest,
                 d: d,
             }
@@ -796,42 +784,42 @@ impl Sema {
             }
         }
 
-        if !d.is_const() || dest.prim() == nil {
+        if !d.IsConst() || dest.Prim() == nil {
             ret true
         }
 
-        let mut kind = dest.prim().kind
+        let mut kind = dest.Prim().Kind
 
         match {
-        | types::is_sig_int(kind):
-            d.constant.set_i64(d.constant.as_i64())
-        | types::is_unsig_int(kind):
-            d.constant.set_u64(d.constant.as_u64())
-        | types::is_float(kind):
-            d.constant.set_f64(d.constant.as_f64())
+        | types::IsSigInt(kind):
+            d.Constant.SetI64(d.Constant.AsI64())
+        | types::IsUnsigInt(kind):
+            d.Constant.SetU64(d.Constant.AsU64())
+        | types::IsFloat(kind):
+            d.Constant.SetF64(d.Constant.AsF64())
         }
 
         ret true
     }
 
-    fn check_type_compatibility(mut &self, mut &dest: &TypeKind,
-        mut &src: &TypeKind, mut &error_token: &Token): bool {
+    fn checkTypeCompatibility(mut &self, mut &dest: &TypeKind,
+        mut &src: &TypeKind, mut &errorToken: &Token): bool {
         if src == nil {
-            self.push_err(error_token, LogMsg.IncompatibleTypes,
-                dest.to_str(), src.to_str())
+            self.pushErr(errorToken, LogMsg.IncompatibleTypes,
+                dest.Str(), src.Str())
             ret false
         }
 
         // Tuple to single type, always fails.
-        if src.tup() != nil {
-            self.push_err(error_token, LogMsg.IncompatibleTypes,
-                dest.to_str(), src.to_str())
+        if src.Tup() != nil {
+            self.pushErr(errorToken, LogMsg.IncompatibleTypes,
+                dest.Str(), src.Str())
             ret false
         }
 
-        let mut tcc = TypeCompatibilityChecker{
+        let mut tcc = typeCompatibilityChecker{
             s: self,
-            error_token: error_token,
+            errorToken: errorToken,
             dest: dest,
             src: src,
         }
@@ -840,7 +828,7 @@ impl Sema {
             ret true
         }
 
-        self.push_err(error_token, LogMsg.IncompatibleTypes, dest.to_str(), src.to_str())
+        self.pushErr(errorToken, LogMsg.IncompatibleTypes, dest.Str(), src.Str())
         ret false
     }
 
@@ -850,63 +838,63 @@ impl Sema {
     // Useful:
     //   - For non-generic type parsed string type kinds.
     //   - For checking non-generic types.
-    fn build_non_generic_type_kind(mut &self, mut &ast: &ast::TypeDecl,
+    fn buildNonGenericTypeKind(mut &self, mut &ast: &ast::TypeDecl,
         mut &generics: []&ast::GenericDecl): &TypeKind {
-        let mut tc = &TypeChecker{
+        let mut tc = &typeChecker{
             s: self,
             lookup: self,
-            ignore_generics: generics,
+            ignoreGenerics: generics,
         }
-        ret tc.check_decl(ast)
+        ret tc.checkDecl(ast)
     }
 
-    fn build_fn_non_generic_type_kinds(mut &self, mut &f: &FnIns) {
+    fn buildFnNonGenericTypeKinds(mut &self, mut &f: &FnIns) {
         let mut generics: []&ast::GenericDecl = nil
-        if f.decl.is_method() {
-            generics = append(f.decl.generics, f.decl.owner.generics...)
+        if f.Decl.IsMethod() {
+            generics = append(f.Decl.Generics, f.Decl.Owner.Generics...)
         } else {
-            generics = f.decl.generics
+            generics = f.Decl.Generics
         }
 
-        for (_, mut p) in f.params {
-            if !p.decl.is_self() {
-                p.kind = self.build_non_generic_type_kind(p.decl.kind.decl, generics)
+        for (_, mut p) in f.Params {
+            if !p.Decl.IsSelf() {
+                p.Kind = self.buildNonGenericTypeKind(p.Decl.Kind.Decl, generics)
             }
         }
-        if !f.decl.is_void() {
-            f.result = self.build_non_generic_type_kind(f.decl.result.kind.decl, generics)
+        if !f.Decl.IsVoid() {
+            f.Result = self.buildNonGenericTypeKind(f.Decl.Result.Kind.Decl, generics)
         }
     }
 
-    fn get_trait_check_fn_kind(mut &self, mut &f: &Fn): &FnIns {
-        if f.instances.len == 1 {
-            ret f.instances[0]
+    fn getTraitCheckFnKind(mut &self, mut &f: &Fn): &FnIns {
+        if f.Instances.len == 1 {
+            ret f.Instances[0]
         }
-        let mut ins = f.instance_force()
+        let mut ins = f.instanceForce()
 
-        let mut tc = &TypeChecker{
+        let mut tc = &typeChecker{
             s: self,
             lookup: self,
         }
-        for (_, mut p) in ins.params {
-            if !p.decl.is_self() {
-                p.kind = tc.check_decl(p.decl.kind.decl)
+        for (_, mut p) in ins.Params {
+            if !p.Decl.IsSelf() {
+                p.Kind = tc.checkDecl(p.Decl.Kind.Decl)
             }
         }
-        if !f.is_void() {
-            ins.result = tc.check_decl(f.result.kind.decl)
+        if !f.IsVoid() {
+            ins.Result = tc.checkDecl(f.Result.Kind.Decl)
         }
 
         ret ins
     }
 
-    fn check_constraints_fn(mut &self, mut &f: &FnIns, mut &et: &Token, mut exist: &FnIns): bool {
-        let mut cc = self.constraint_checker()
+    fn checkConstraintsFn(mut &self, mut &f: &FnIns, mut &et: &Token, mut exist: &FnIns): bool {
+        let mut cc = self.constraintChecker()
         cc.et = et
         cc.fi = f
         if exist != nil {
-            for (i, mut g) in exist.generics {
-                f.generics[i].constraint = g.constraint
+            for (i, mut g) in exist.Generics {
+                f.Generics[i].Constraint = g.Constraint
             }
         } else {
             cc.uniq = true
@@ -914,13 +902,13 @@ impl Sema {
         ret cc.check()
     }
 
-    fn check_constraints_struct(mut &self, mut &s: &StructIns, mut &et: &Token, mut exist: &StructIns): bool {
-        let mut cc = self.constraint_checker()
+    fn checkConstraintsStruct(mut &self, mut &s: &StructIns, mut &et: &Token, mut exist: &StructIns): bool {
+        let mut cc = self.constraintChecker()
         cc.et = et
         cc.si = s
         if exist != nil {
-            for (i, mut g) in exist.generics {
-                s.generics[i].constraint = g.constraint
+            for (i, mut g) in exist.Generics {
+                s.Generics[i].Constraint = g.Constraint
             }
         } else {
             cc.uniq = true
@@ -931,22 +919,22 @@ impl Sema {
     // Call algo in the function's native environment.
     // Errors will be handled.
     // Returns result of algo.
-    fn fn_environment(mut &self, mut &f: &FnIns, algo: fn(mut &sema: &Sema, mut &generics: []&TypeAlias): bool): bool {
-        let mut sema = f.decl.sema
-        let mut old = f.decl.sema.file
-        defer { f.decl.sema.set_current_file(old) }
-        let mut file = find_file(f.decl.sema.files, f.decl.token.file)
+    fn fnEnvironment(mut &self, mut &f: &FnIns, algo: fn(mut &sema: &Sema, mut &generics: []&TypeAlias): bool): bool {
+        let mut sema = f.Decl.sema
+        let mut old = f.Decl.sema.file
+        defer { f.Decl.sema.setCurrentFile(old) }
+        let mut file = findFile(f.Decl.sema.files, f.Decl.Token.File)
         if file != nil {
-            f.decl.sema.set_current_file(file)
+            f.Decl.sema.setCurrentFile(file)
         }
 
-        let mut size = f.generics.len
-        if f.decl != nil && f.decl.owner != nil {
-            size += f.decl.owner.generics.len
+        let mut size = f.Generics.len
+        if f.Decl != nil && f.Decl.Owner != nil {
+            size += f.Decl.Owner.Generics.len
         }
 
         let mut generics = make([]&TypeAlias, 0, size)
-        append_generic_type_aliases(generics, f)
+        appendGenericTypeAliases(generics, f)
 
         let ok = algo(sema, generics)
 
@@ -958,157 +946,155 @@ impl Sema {
         ret ok
     }
 
-    fn check_fn_param_kind(mut &self, mut &p: &ParamIns) {
-        p.kind.variadic = p.decl.variadic
-        if p.decl.reference && !is_valid_for_ref(p.kind) {
-            self.push_err(p.decl.token, LogMsg.RefPointsToInvalidType, p.kind.to_str())
+    fn checkFnParamKind(mut &self, mut &p: &ParamIns) {
+        p.Kind.Variadic = p.Decl.Variadic
+        if p.Decl.Reference && !isValidForRef(p.Kind) {
+            self.pushErr(p.Decl.Token, LogMsg.RefPointsToInvalidType, p.Kind.Str())
         }
     }
 
-    fn reload_fn_ins_types(mut &self, mut f: &FnIns): bool {
-        if f.is_builtin() || f.is_anon() {
+    fn reloadFnInsTypes(mut &self, mut f: &FnIns): bool {
+        if f.IsBuiltin() || f.IsAnon() {
             ret true
         }
-        ret self.fn_environment(f, fn(mut &sema: &Sema, mut &generics: []&TypeAlias): bool {
+        ret self.fnEnvironment(f, fn(mut &sema: &Sema, mut &generics: []&TypeAlias): bool {
             let mut ok = true
-            for (_, mut p) in f.params {
-                if p.decl.is_self() {
-                    if p.decl.is_ref() {
-                        p.kind = &TypeKind{
-                            kind: &Sptr{
-                                elem: &TypeKind{
-                                    kind: f.owner,
+            for (_, mut p) in f.Params {
+                if p.Decl.IsSelf() {
+                    if p.Decl.IsRef() {
+                        p.Kind = &TypeKind{
+                            Kind: &Sptr{
+                                Elem: &TypeKind{
+                                    Kind: f.Owner,
                                 },
                             },
                         }
                     } else {
-                        p.kind = &TypeKind{kind: f.owner}
+                        p.Kind = &TypeKind{Kind: f.Owner}
                     }
                 } else {
-                    p.kind = sema.build_type_with_generics(p.decl.kind.decl, generics, f.refers)
-                    if p.kind != nil {
-                        self.check_fn_param_kind(p)
+                    p.Kind = sema.buildTypeWithGenerics(p.Decl.Kind.Decl, generics, f.Refers)
+                    if p.Kind != nil {
+                        self.checkFnParamKind(p)
                     } else {
                         ok = false
                     }
                 }
             }
-            if !f.decl.is_void() {
-                f.result = sema.build_type_with_generics(f.decl.result.kind.decl, generics, f.refers)
-                ok = f.result != nil && ok
+            if !f.Decl.IsVoid() {
+                f.Result = sema.buildTypeWithGenerics(f.Decl.Result.Kind.Decl, generics, f.Refers)
+                ok = f.Result != nil && ok
             }
             ret ok
         })
     }
 
-    fn check_ref_validity_for_init_expr(mut &self, left_mut: bool, mut &d: &Data, mut &error_token: &Token): bool {
-        match type d.model {
+    fn checkRefValidityForInitExpr(mut &self, leftMut: bool, mut &d: &Data, mut &errorToken: &Token): bool {
+        match type d.Model {
         | &Var:
             break
         | &TraitSubIdentExprModel:
-            let mut model = (&TraitSubIdentExprModel)(d.model)
-            if !is_valid_model_for_ref(model.expr) {
-                self.push_err(error_token, LogMsg.RefIsDangling, model.method.ident)
+            let mut model = (&TraitSubIdentExprModel)(d.Model)
+            if !isValidModelForRef(model.Expr) {
+                self.pushErr(errorToken, LogMsg.RefIsDangling, model.Method.Ident)
                 ret false
             }
         | &StructSubIdentExprModel:
-            let mut model = (&StructSubIdentExprModel)(d.model)
-            if !is_valid_model_for_ref(model.expr.model) {
-                self.push_err(error_token, LogMsg.RefIsDangling, model.field.decl.ident)
+            let mut model = (&StructSubIdentExprModel)(d.Model)
+            if !isValidModelForRef(model.Expr.Model) {
+                self.pushErr(errorToken, LogMsg.RefIsDangling, model.Field.Decl.Ident)
                 ret false
             }
         | &CommonIdentExprModel
         | &CommonSubIdentExprModel:
-            self.push_err(error_token, LogMsg.BuiltinUsedForRef)
+            self.pushErr(errorToken, LogMsg.BuiltinUsedForRef)
             ret false
         | &UnaryExprModel:
-            let mut unary = (&UnaryExprModel)(d.model)
-            if unary.op.kind == TokenKind.Star {
-                if !is_valid_model_for_ref(d.model) {
-                    self.push_err(error_token, LogMsg.RefIsDangling, "address from * &T")
+            let mut unary = (&UnaryExprModel)(d.Model)
+            if unary.Op.Kind == TokenKind.Star {
+                if !isValidModelForRef(d.Model) {
+                    self.pushErr(errorToken, LogMsg.RefIsDangling, "address from * &T")
                     ret false
                 }
                 break
             }
             fall
         |:
-            self.push_err(error_token, LogMsg.RefAssignNonVar)
+            self.pushErr(errorToken, LogMsg.RefAssignNonVar)
             ret false
         }
-
-        if left_mut && !d.mutable {
-            self.push_err(error_token, LogMsg.MutRefPointsImmut)
+        if leftMut && !d.Mutable {
+            self.pushErr(errorToken, LogMsg.MutRefPointsImmut)
             ret false
         }
         ret true
     }
 
-    fn check_validity_for_init_expr(mut &self, left_mut: bool, left_ref: bool,
-        &left_kind: &TypeKind, mut &d: &Data, mut &error_token: &Token): bool {
-        if left_mut && !d.mutable && d.kind.mutable() {
-            self.push_err(error_token, LogMsg.AssignNonMutToMut, d.kind.to_str())
+    fn checkValidityForInitExpr(mut &self, leftMut: bool, leftRef: bool,
+        &leftKind: &TypeKind, mut &d: &Data, mut &errorToken: &Token): bool {
+        if leftMut && !d.Mutable && d.Kind.Mutable() {
+            self.pushErr(errorToken, LogMsg.AssignNonMutToMut, d.Kind.Str())
             ret false
         }
-        if left_ref {
-            if !self.check_ref_validity_for_init_expr(left_mut, d, error_token) {
+        if leftRef {
+            if !self.checkRefValidityForInitExpr(leftMut, d, errorToken) {
                 ret false
             }
         }
-
-        let mut atc = &AssignTypeChecker{
+        let mut atc = &assignTypeChecker{
             s: self,
             d: d,
-            error_token: error_token,
+            errorToken: errorToken,
         }
-        ret atc.check_validity()
+        ret atc.checkValidity()
     }
 
-    fn check_type_alias_decl_kind(mut &self, mut &ta: &TypeAlias, mut l: Lookup): (ok: bool) {
+    fn checkTypeAliasDeclKind(mut &self, mut &ta: &TypeAlias, mut l: Lookup): (ok: bool) {
         let mut old = self.file
         defer {
-            self.set_current_file(old)
+            self.setCurrentFile(old)
         }
-        if ta.token != nil {
-            let mut file = find_file(self.files, ta.token.file)
+        if ta.Token != nil {
+            let mut file = findFile(self.files, ta.Token.File)
             if file != nil {
-                self.set_current_file(file)
+                self.setCurrentFile(file)
             }
         }
-        ok = self.check_type_with_refers(ta.kind, l, nil, &Referencer{
-            ident: ta.ident,
+        ok = self.checkTypeWithRefers(ta.Kind, l, nil, &referencer{
+            ident: ta.Ident,
             owner: ta,
-            refs: &ta.refers,
+            refs: &ta.Refers,
         })
-        if ok && ta.kind.kind.arr() != nil && ta.kind.kind.arr().auto {
-            self.push_err(ta.kind.decl.token, LogMsg.ArrayAutoSized)
+        if ok && ta.Kind.Kind.Arr() != nil && ta.Kind.Kind.Arr().Auto {
+            self.pushErr(ta.Kind.Decl.Token, LogMsg.ArrayAutoSized)
             ok = false
         }
         ret
     }
 
-    fn check_type_alias_decl(mut &self, mut &ta: &TypeAlias, mut l: Lookup) {
-        if is_ignore_ident(ta.ident) {
-            self.push_err(ta.token, LogMsg.IgnoreIdent)
+    fn checkTypeAliasDecl(mut &self, mut &ta: &TypeAlias, mut l: Lookup) {
+        if IsIgnoreIdent(ta.Ident) {
+            self.pushErr(ta.Token, LogMsg.IgnoreIdent)
         }
-        self.check_type_alias_decl_kind(ta, l)
+        self.checkTypeAliasDeclKind(ta, l)
     }
 
     // Checks type alias declaration with duplicated identifiers.
-    fn check_type_alias_decl_dup(mut &self, mut &ta: &TypeAlias) {
-        if is_ignore_ident(ta.ident) {
-            self.push_err(ta.token, LogMsg.IgnoreIdent)
+    fn checkTypeAliasDeclDup(mut &self, mut &ta: &TypeAlias) {
+        if IsIgnoreIdent(ta.Ident) {
+            self.pushErr(ta.Token, LogMsg.IgnoreIdent)
         }
-        if self.is_duplicated_ident(uintptr(ta), ta.ident, ta.cpp_linked) {
-            self.push_err(ta.token, LogMsg.DuplicatedIdent, ta.ident)
-            self.push_suggestion(LogMsg.RenameForAvoidDuplication)
+        if self.isDuplicatedIdent(uintptr(ta), ta.Ident, ta.CppLinked) {
+            self.pushErr(ta.Token, LogMsg.DuplicatedIdent, ta.Ident)
+            self.pushSugggestion(LogMsg.RenameForAvoidDuplication)
         }
-        self.check_type_alias_decl_kind(ta, self)
+        self.checkTypeAliasDeclKind(ta, self)
     }
 
     // Checks current package file's type alias declarations.
-    fn check_type_alias_decls(mut &self): (ok: bool) {
-        for (_, mut ta) in self.file.type_aliases {
-            self.check_type_alias_decl_dup(ta)
+    fn checkTypeAliasDecls(mut &self): (ok: bool) {
+        for (_, mut ta) in self.file.TypeAliases {
+            self.checkTypeAliasDeclDup(ta)
 
             // Break checking if type alias has error.
             if self.errors.len > 0 {
@@ -1118,19 +1104,19 @@ impl Sema {
         ret true
     }
 
-    fn check_enum_items_dup[T](mut self, items: []T) {
+    fn checkEnumItemsDup[T](mut self, items: []T) {
         for _, item in items {
-            if item.ident == "" {
+            if item.Ident == "" {
                 continue
-            } else if is_ignore_ident(item.ident) {
-                self.push_err(item.token, LogMsg.IgnoreIdent)
+            } else if IsIgnoreIdent(item.Ident) {
+                self.pushErr(item.Token, LogMsg.IgnoreIdent)
             } else {
                 for _, citem in items {
                     if item == citem {
                         break
-                    } else if item.ident == citem.ident {
-                        self.push_err(item.token, LogMsg.DuplicatedIdent, item.ident)
-                        self.push_suggestion(LogMsg.RenameForAvoidDuplication)
+                    } else if item.Ident == citem.Ident {
+                        self.pushErr(item.Token, LogMsg.DuplicatedIdent, item.Ident)
+                        self.pushSugggestion(LogMsg.RenameForAvoidDuplication)
                         break
                     }
                 }
@@ -1138,157 +1124,154 @@ impl Sema {
         }
     }
 
-    fn check_enum_items_str(mut &self, mut &e: &Enum) {
+    fn checkEnumItemsStr(mut &self, mut &e: &Enum) {
         let mut eval = self.eval(self)
-        for (_, mut item) in e.items {
-            if item.auto_expr() {
-                item.value = &Value{
-                    data: &Data{
-                        constant: Const.new_str(item.ident),
+        for (_, mut item) in e.Items {
+            if item.AutoExpr() {
+                item.Value = &Value{
+                    Data: &Data{
+                        Constant: Const.NewStr(item.Ident),
                     },
                 }
-                item.value.data.model = item.value.data.constant
+                item.Value.Data.Model = item.Value.Data.Constant
             } else {
-                let mut d = eval.eval_expr(item.value.expr)
+                let mut d = eval.evalExpr(item.Value.Expr)
                 if d == nil {
                     continue
                 }
 
-                if !d.is_const() {
-                    self.push_err(item.value.expr.token, LogMsg.ExprNotConst)
+                if !d.IsConst() {
+                    self.pushErr(item.Value.Expr.Token, LogMsg.ExprNotConst)
                 }
 
-                _ = self.check_assign_type(false, e.kind.kind, d, item.token)
-                item.value.data = d
+                _ = self.checkAssignType(false, e.Kind.Kind, d, item.Token)
+                item.Value.Data = d
             }
         }
     }
 
-    fn check_enum_items_int(mut &self, mut &e: &Enum) {
-        let prim = e.kind.kind.prim()
-        let mut max = u64(types::max(prim.to_str()))
+    fn checkEnumItemsInt(mut &self, mut &e: &Enum) {
+        let prim = e.Kind.Kind.Prim()
+        let mut max = u64(types::Max(prim.Str()))
         let mut eval = self.eval(self)
-        for (i, mut item) in e.items {
+        for (i, mut item) in e.Items {
             if max == 0 {
-                self.push_err(item.token, LogMsg.OverflowLimits)
+                self.pushErr(item.Token, LogMsg.OverflowLimits)
             } else {
                 max--
             }
-            if item.auto_expr() {
-                item.value = &Value{
-                    data: new(Data),
+            if item.AutoExpr() {
+                item.Value = &Value{
+                    Data: new(Data),
                 }
                 match {
-                | types::is_sig_int(prim.to_str()):
-                    item.value.data.constant = Const.new_i64(i64(max - (max - u64(i))))
+                | types::IsSigInt(prim.Str()):
+                    item.Value.Data.Constant = Const.NewI64(i64(max - (max - u64(i))))
                 |:
-                    item.value.data.constant = Const.new_u64(max - (max - u64(i)))
+                    item.Value.Data.Constant = Const.NewU64(max - (max - u64(i)))
                 }
-                item.value.data.model = item.value.data.constant
+                item.Value.Data.Model = item.Value.Data.Constant
             } else {
-                let mut d = eval.eval_expr(item.value.expr)
+                let mut d = eval.evalExpr(item.Value.Expr)
                 if d == nil {
                     continue
                 }
-
-                if !d.is_const() {
-                    self.push_err(item.value.expr.token, LogMsg.ExprNotConst)
+                if !d.IsConst() {
+                    self.pushErr(item.Value.Expr.Token, LogMsg.ExprNotConst)
                 }
-
-                _ = self.check_assign_type(false, e.kind.kind, d, item.token)
-                item.value.data = d
+                _ = self.checkAssignType(false, e.Kind.Kind, d, item.Token)
+                item.Value.Data = d
             }
         }
     }
 
-    fn check_enum_decl(mut &self, mut &e: &Enum) {
-        if is_ignore_ident(e.ident) {
-            self.push_err(e.token, LogMsg.IgnoreIdent)
-        } else if self.is_duplicated_ident(uintptr(e), e.ident, false) {
-            self.push_err(e.token, LogMsg.DuplicatedIdent, e.ident)
-            self.push_suggestion(LogMsg.RenameForAvoidDuplication)
+    fn checkEnumDecl(mut &self, mut &e: &Enum) {
+        if IsIgnoreIdent(e.Ident) {
+            self.pushErr(e.Token, LogMsg.IgnoreIdent)
+        } else if self.isDuplicatedIdent(uintptr(e), e.Ident, false) {
+            self.pushErr(e.Token, LogMsg.DuplicatedIdent, e.Ident)
+            self.pushSugggestion(LogMsg.RenameForAvoidDuplication)
         }
 
-        if e.items.len == 0 {
-            self.push_err(e.token, LogMsg.NoMemberInEnum, e.ident)
+        if e.Items.len == 0 {
+            self.pushErr(e.Token, LogMsg.NoMemberInEnum, e.Ident)
         }
 
-        self.check_enum_items_dup[&EnumItem](e.items)
+        self.checkEnumItemsDup[&EnumItem](e.Items)
 
-        if e.kind != nil {
-            if !self.check_type(e.kind, self) {
+        if e.Kind != nil {
+            if !self.checkType(e.Kind, self) {
                 ret
             }
         } else {
             // Set to default type.
-            e.kind = &TypeSymbol{
-                kind: &TypeKind{
-                    kind: build_prim_type(PrimKind.Int),
+            e.Kind = &TypeSymbol{
+                Kind: &TypeKind{
+                    Kind: buildPrimType(PrimKind.Int),
                 },
             }
         }
 
-        let mut t = e.kind.kind.prim()
+        let mut t = e.Kind.Kind.Prim()
         if t == nil {
-            self.push_err(e.token, LogMsg.InvalidTypeSource)
+            self.pushErr(e.Token, LogMsg.InvalidTypeSource)
             ret
         }
 
         // Check items.
         match {
-        | t.is_str():
-            self.check_enum_items_str(e)
-        | types::is_int(t.to_str()):
-            self.check_enum_items_int(e)
+        | t.IsStr():
+            self.checkEnumItemsStr(e)
+        | types::IsInt(t.Str()):
+            self.checkEnumItemsInt(e)
         |:
-            self.push_err(e.token, LogMsg.InvalidTypeSource)
+            self.pushErr(e.Token, LogMsg.InvalidTypeSource)
         }
     }
 
-    fn check_type_enum_decl(mut &self, mut &e: &TypeEnum) {
-        if is_ignore_ident(e.ident) {
-            self.push_err(e.token, LogMsg.IgnoreIdent)
-        } else if self.is_duplicated_ident(uintptr(e), e.ident, false) {
-            self.push_err(e.token, LogMsg.DuplicatedIdent, e.ident)
-            self.push_suggestion(LogMsg.RenameForAvoidDuplication)
+    fn checkTypeEnumDecl(mut &self, mut &e: &TypeEnum) {
+        if IsIgnoreIdent(e.Ident) {
+            self.pushErr(e.Token, LogMsg.IgnoreIdent)
+        } else if self.isDuplicatedIdent(uintptr(e), e.Ident, false) {
+            self.pushErr(e.Token, LogMsg.DuplicatedIdent, e.Ident)
+            self.pushSugggestion(LogMsg.RenameForAvoidDuplication)
         }
 
-        if e.items.len == 0 {
-            self.push_err(e.token, LogMsg.NoMemberInEnum, e.ident)
+        if e.Items.len == 0 {
+            self.pushErr(e.Token, LogMsg.NoMemberInEnum, e.Ident)
             ret
         }
 
-        self.check_enum_items_dup[&TypeEnumItem](e.items)
-        for (_, mut item) in e.items {
-            if item.kind == nil {
-                self.push_err(item.token, LogMsg.MissingType)
+        self.checkEnumItemsDup[&TypeEnumItem](e.Items)
+        for (_, mut item) in e.Items {
+            if item.Kind == nil {
+                self.pushErr(item.Token, LogMsg.MissingType)
                 continue
             }
-            let ok = self.check_type(item.kind, self)
+            let ok = self.checkType(item.Kind, self)
             if !ok {
                 continue
             }
-            let p = item.kind.kind.prim()
-            if p != nil && p.is_any() {
-                self.push_err(item.token, LogMsg.AnyWithTypeEnum)
+            let p = item.Kind.Kind.Prim()
+            if p != nil && p.IsAny() {
+                self.pushErr(item.Token, LogMsg.AnyWithTypeEnum)
             }
         }
-        if e.items.len == 1 {
-            let mut item = e.items[0]
+        if e.Items.len == 1 {
+            let mut item = e.Items[0]
             let tk = TypeKind{
-                kind: e,
+                Kind: e,
             }
-            if item.kind.kind != nil && item.kind.kind.equals(unsafe { (&TypeKind)(&tk) }) {
-                self.push_err(item.token, LogMsg.IllegalCycleRefersItself, e.to_str())
+            if item.Kind.Kind != nil && item.Kind.Kind.Equals(unsafe { (&TypeKind)(&tk) }) {
+                self.pushErr(item.Token, LogMsg.IllegalCycleRefersItself, e.Str())
             }
         }
     }
 
     // Checks current package file's enum declarations.
-    fn check_enum_decls(mut &self): (ok: bool) {
-        for (_, mut e) in self.file.enums {
-            self.check_enum_decl(e)
-
+    fn checkEnumDecls(mut &self): (ok: bool) {
+        for (_, mut e) in self.file.Enums {
+            self.checkEnumDecl(e)
             // Break checking if type alias has error.
             if self.errors.len > 0 {
                 ret false
@@ -1298,10 +1281,9 @@ impl Sema {
     }
 
     // Checks current package file's type enum declarations.
-    fn check_type_enum_decls(mut &self): (ok: bool) {
-        for (_, mut e) in self.file.type_enums {
-            self.check_type_enum_decl(e)
-
+    fn checkTypeEnumDecls(mut &self): (ok: bool) {
+        for (_, mut e) in self.file.TypeEnums {
+            self.checkTypeEnumDecl(e)
             // Break checking if type alias has error.
             if self.errors.len > 0 {
                 ret false
@@ -1310,60 +1292,60 @@ impl Sema {
         ret true
     }
 
-    fn check_decl_generics(mut self, &generics: []&ast::GenericDecl): (ok: bool) {
+    fn checkDeclGenerics(mut self, &generics: []&ast::GenericDecl): (ok: bool) {
         ok = true
         for i, g in generics {
-            if is_ignore_ident(g.ident) {
-                self.push_err(g.token, LogMsg.IgnoreIdent)
+            if IsIgnoreIdent(g.Ident) {
+                self.pushErr(g.Token, LogMsg.IgnoreIdent)
                 ok = false
                 continue
             }
 
             // Check duplications.
-        duplication_lookup:
+        duplicationLookup:
             for j, ct in generics {
                 match {
                 | j >= i:
                     // Skip current and following generics.
-                    break duplication_lookup
-                | g.ident == ct.ident:
-                    self.push_err(g.token, LogMsg.DuplicatedIdent, g.ident)
-                    self.push_suggestion(LogMsg.RenameForAvoidDuplication)
+                    break duplicationLookup
+                | g.Ident == ct.Ident:
+                    self.pushErr(g.Token, LogMsg.DuplicatedIdent, g.Ident)
+                    self.pushSugggestion(LogMsg.RenameForAvoidDuplication)
                     ok = false
-                    break duplication_lookup
+                    break duplicationLookup
                 }
             }
         }
         ret
     }
 
-    fn check_fn_decl_params_dup(mut self, &f: &Fn): (ok: bool) {
+    fn checkFnDeclParamsDup(mut self, &f: &Fn): (ok: bool) {
         ok = true
     check:
-        for i, p in f.params {
+        for i, p in f.Params {
             // Lookup in generics.
-            for _, g in f.generics {
-                if p.ident == g.ident {
+            for _, g in f.Generics {
+                if p.Ident == g.Ident {
                     ok = false
-                    self.push_err(p.token, LogMsg.DuplicatedIdent, p.ident)
-                    self.push_suggestion(LogMsg.RenameForAvoidDuplication)
+                    self.pushErr(p.Token, LogMsg.DuplicatedIdent, p.Ident)
+                    self.pushSugggestion(LogMsg.RenameForAvoidDuplication)
                     continue check
                 }
             }
 
-        params_lookup:
-            for j, jp in f.params {
+        paramsLookup:
+            for j, jp in f.Params {
                 match {
                 | j >= i:
                     // Skip current and following parameters.
-                    break params_lookup
-                | is_anon_ident(p.ident) || is_anon_ident(jp.ident):
+                    break paramsLookup
+                | IsAnonIdent(p.Ident) || IsAnonIdent(jp.Ident):
                     // Skip anonymous parameters.
-                    break params_lookup
-                | p.ident == jp.ident:
+                    break paramsLookup
+                | p.Ident == jp.Ident:
                     ok = false
-                    self.push_err(p.token, LogMsg.DuplicatedIdent, p.ident)
-                    self.push_suggestion(LogMsg.RenameForAvoidDuplication)
+                    self.pushErr(p.Token, LogMsg.DuplicatedIdent, p.Ident)
+                    self.pushSugggestion(LogMsg.RenameForAvoidDuplication)
                     continue check
                 }
             }
@@ -1371,45 +1353,45 @@ impl Sema {
         ret
     }
 
-    fn check_fn_decl_result_dup(mut self, &f: &Fn): (ok: bool) {
+    fn checkFnDeclResultDup(mut self, &f: &Fn): (ok: bool) {
         ok = true
-        if f.is_void() {
+        if f.IsVoid() {
             ret
         }
 
         // Check duplications.
-        for i, v in f.result.idents {
-            if is_ignore_ident(v.kind) || is_anon_ident(v.kind) {
+        for i, v in f.Result.Idents {
+            if IsIgnoreIdent(v.Kind) || IsAnonIdent(v.Kind) {
                 continue // Skip anonymous return variables.
             }
             // Lookup in generics.
-            for _, g in f.generics {
-                if v.kind == g.ident {
+            for _, g in f.Generics {
+                if v.Kind == g.Ident {
                     goto exist
                 }
             }
             // Lookup in parameters.
-            for _, p in f.params {
-                if v.kind == p.ident {
+            for _, p in f.Params {
+                if v.Kind == p.Ident {
                     goto exist
                 }
             }
 
             // Lookup in return identifiers.
         itself_lookup:
-            for j, jv in f.result.idents {
+            for j, jv in f.Result.Idents {
                 match {
                 | j >= i:
                     // Skip current and following identifiers.
                     break itself_lookup
-                | jv.kind == v.kind:
+                | jv.Kind == v.Kind:
                     goto exist
                 }
             }
             continue
         exist:
-            self.push_err(v, LogMsg.DuplicatedIdent, v.kind)
-            self.push_suggestion(LogMsg.RenameForAvoidDuplication)
+            self.pushErr(v, LogMsg.DuplicatedIdent, v.Kind)
+            self.pushSugggestion(LogMsg.RenameForAvoidDuplication)
             ok = false
         }
 
@@ -1418,44 +1400,44 @@ impl Sema {
 
     // Checks generics, parameters and return type.
     // Not checks scope, and other things.
-    fn check_fn_decl_prototype(mut &self, mut &f: &Fn) {
-        if f.exceptional && f.cpp_linked {
-            self.push_err(f.token, LogMsg.CDefineExceptional)
+    fn checkFnDeclPrototype(mut &self, mut &f: &Fn) {
+        if f.Exceptional && f.CppLinked {
+            self.pushErr(f.Token, LogMsg.CDefineExceptional)
             ret
         }
 
-        if f.exceptional {
-            if f.is_entry_point() {
-                self.push_err(f.token, LogMsg.ExceptionalEntryPoint)
-            } else if f.is_init() {
-                self.push_err(f.token, LogMsg.ExceptionalInit)
+        if f.Exceptional {
+            if f.IsEntryPoint() {
+                self.pushErr(f.Token, LogMsg.ExceptionalEntryPoint)
+            } else if f.IsInit() {
+                self.pushErr(f.Token, LogMsg.ExceptionalInit)
             }
         }
 
         match {
-        | !self.check_decl_generics(f.generics):
-        | !self.check_fn_decl_params_dup(f):
-        | !self.check_fn_decl_result_dup(f):
+        | !self.checkDeclGenerics(f.Generics):
+        | !self.checkFnDeclParamsDup(f):
+        | !self.checkFnDeclResultDup(f):
         }
     }
 
-    fn check_trait_decl_method(mut &self, mut &f: &Fn) {
-        if is_ignore_ident(f.ident) {
-            self.push_err(f.token, LogMsg.IgnoreIdent)
+    fn checkTraitDeclMethod(mut &self, mut &f: &Fn) {
+        if IsIgnoreIdent(f.Ident) {
+            self.pushErr(f.Token, LogMsg.IgnoreIdent)
         }
 
         f.sema = self
-        self.check_fn_decl_prototype(f)
+        self.checkFnDeclPrototype(f)
         let mut ins = f.instance()
-        _ = self.reload_fn_ins_types(ins)
+        _ = self.reloadFnInsTypes(ins)
         ins.reloaded = true
-        f.append_instance(ins)
+        f.appendInstance(ins)
     }
 
-    fn check_trait_decl_methods(mut &self, mut &t: &Trait) {
-        for (i, mut f) in t.methods {
-            self.check_trait_decl_method(f)
-            t.mutable = t.mutable || f.params[0].mutable
+    fn checkTraitDeclMethods(mut &self, mut &t: &Trait) {
+        for (i, mut f) in t.Methods {
+            self.checkTraitDeclMethod(f)
+            t.Mutable = t.Mutable || f.Params[0].Mutable
 
             // Break checking if type alias has error.
             if self.errors.len > 0 {
@@ -1463,8 +1445,8 @@ impl Sema {
             }
 
             // Check duplications.
-        duplicate_lookup:
-            for j, jf in t.methods {
+        duplicateLookup:
+            for j, jf in t.Methods {
                 // NOTE:
                 //  Ignore identifier checking is unnecessary here.
                 //  Because ignore identifiers logs error.
@@ -1473,32 +1455,31 @@ impl Sema {
                 match {
                 | j >= i:
                     // Skip current and following methods.
-                    break duplicate_lookup
-                | f.ident == jf.ident:
-                    self.push_err(f.token, LogMsg.DuplicatedIdent, f.ident)
-                    self.push_suggestion(LogMsg.RenameForAvoidDuplication)
-                    break duplicate_lookup
+                    break duplicateLookup
+                | f.Ident == jf.Ident:
+                    self.pushErr(f.Token, LogMsg.DuplicatedIdent, f.Ident)
+                    self.pushSugggestion(LogMsg.RenameForAvoidDuplication)
+                    break duplicateLookup
                 }
             }
         }
     }
 
-    fn check_trait_decl(mut &self, mut &t: &Trait) {
-        if is_ignore_ident(t.ident) {
-            self.push_err(t.token, LogMsg.IgnoreIdent)
-        } else if self.is_duplicated_ident(uintptr(t), t.ident, false) {
-            self.push_err(t.token, LogMsg.DuplicatedIdent, t.ident)
-            self.push_suggestion(LogMsg.RenameForAvoidDuplication)
+    fn checkTraitDecl(mut &self, mut &t: &Trait) {
+        if IsIgnoreIdent(t.Ident) {
+            self.pushErr(t.Token, LogMsg.IgnoreIdent)
+        } else if self.isDuplicatedIdent(uintptr(t), t.Ident, false) {
+            self.pushErr(t.Token, LogMsg.DuplicatedIdent, t.Ident)
+            self.pushSugggestion(LogMsg.RenameForAvoidDuplication)
         }
 
-        self.check_trait_decl_methods(t)
+        self.checkTraitDeclMethods(t)
     }
 
     // Checks current package file's trait declarations.
-    fn check_trait_decls(mut &self): (ok: bool) {
-        for (_, mut t) in self.file.traits {
-            self.check_trait_decl(t)
-
+    fn checkTraitDecls(mut &self): (ok: bool) {
+        for (_, mut t) in self.file.Traits {
+            self.checkTraitDecl(t)
             // Break checking if type alias has error.
             if self.errors.len > 0 {
                 ret false
@@ -1507,198 +1488,194 @@ impl Sema {
         ret true
     }
 
-    fn check_trait_impl_methods(mut self, mut &base: &Trait, &ipl: &Impl): (ok: bool) {
+    fn checkTraitImplMethods(mut self, mut &base: &Trait, &ipl: &Impl): (ok: bool) {
         ok = true
-        for _, f in ipl.methods {
-            if base.find_method(f.ident) == nil {
-                self.push_err(f.token, LogMsg.TraitHaveNotIdent, base.ident, f.ident)
+        for _, f in ipl.Methods {
+            if base.FindMethod(f.Ident) == nil {
+                self.pushErr(f.Token, LogMsg.TraitHaveNotIdent, base.Ident, f.Ident)
                 ok = false
             }
         }
         ret
     }
 
-    fn impl_to_struct(mut &self, mut &dest: &Struct, mut &ipl: &Impl): (ok: bool) {
+    fn implToStruct(mut &self, mut &dest: &Struct, mut &ipl: &Impl): (ok: bool) {
         ok = true
 
         // Methods.
-        for (_, mut f) in ipl.methods {
-            if dest.find_method(f.ident, f.statically) != nil || dest.find_field(f.ident) != nil {
-                self.push_err(f.token, LogMsg.StructAlreadyHaveIdent, dest.ident, f.ident)
+        for (_, mut f) in ipl.Methods {
+            if dest.FindMethod(f.Ident, f.Statically) != nil || dest.FindField(f.Ident) != nil {
+                self.pushErr(f.Token, LogMsg.StructAlreadyHaveIdent, dest.Ident, f.Ident)
                 ok = false
                 continue
             }
 
-            if dest.generics.len > 0 && f.generics.len > 0 {
-                for _, fg in f.generics {
-                    for _, dg in dest.generics {
-                        if fg.ident == dg.ident {
-                            self.push_err(fg.token, LogMsg.MethodHasGenericWithSameIdent)
+            if dest.Generics.len > 0 && f.Generics.len > 0 {
+                for _, fg in f.Generics {
+                    for _, dg in dest.Generics {
+                        if fg.Ident == dg.Ident {
+                            self.pushErr(fg.Token, LogMsg.MethodHasGenericWithSameIdent)
                             ok = false
                         }
                     }
                 }
             }
 
-            self.check_directives(f.directives, f)
+            self.checkDirectives(f.Directives, f)
 
             f.sema = self
-            f.owner = dest
-            dest.methods = append(dest.methods, f)
+            f.Owner = dest
+            dest.Methods = append(dest.Methods, f)
         }
 
-        for (_, mut v) in ipl.statics {
-            const STATIC = true
-            if dest.find_method(v.ident, STATIC) != nil || dest.find_static(v.ident) != nil {
-                self.push_err(v.token, LogMsg.StructAlreadyHaveIdent, dest.ident, v.ident)
+        for (_, mut v) in ipl.Statics {
+            const Static = true
+            if dest.FindMethod(v.Ident, Static) != nil || dest.FindStatic(v.Ident) != nil {
+                self.pushErr(v.Token, LogMsg.StructAlreadyHaveIdent, dest.Ident, v.Ident)
                 ok = false
                 continue
             }
-
-            self.check_var_decl(v, self)
-            self.check_type_var(v, self)
-            dest.statics = append(dest.statics, v)
+            self.checkVarDecl(v, self)
+            self.checkTypeVar(v, self)
+            dest.Statics = append(dest.Statics, v)
         }
         ret
     }
 
     // Implement trait to destination.
-    fn impl_trait(mut &self, mut &decl: &Impl) {
-        let mut base_t = self.select_type(decl.base)
+    fn implTrait(mut &self, mut &decl: &Impl) {
+        let mut base_t = self.selectType(decl.Base)
         if base_t == nil {
             ret
         }
-        let mut base = base_t.trt()
+        let mut base = base_t.Trait()
         if base == nil {
-            self.push_err(decl.base.token, LogMsg.ImplInvalidBase, base_t.to_str())
-            self.push_suggestion(LogMsg.ExpectedTrait)
+            self.pushErr(decl.Base.Token, LogMsg.ImplInvalidBase, base_t.Str())
+            self.pushSugggestion(LogMsg.ExpectedTrait)
             ret
         }
 
-        let mut dest_t = self.select_type(decl.dest)
-        if dest_t == nil {
+        let mut destT = self.selectType(decl.Dest)
+        if destT == nil {
             ret
         }
-        let mut dest_s = dest_t.strct()
-        if dest_s == nil {
-            self.push_err(decl.dest.token, LogMsg.ImplInvalidDest, dest_t.to_str())
-            self.push_suggestion(LogMsg.ExpectedStruct)
-            ret
-        }
-
-        let mut dest = dest_s.decl
-
-        if dest.token.file.dir() != self.file.file.dir() {
-            self.push_err(decl.dest.token, LogMsg.IllegalImplOutOfPackage)
+        let mut destS = destT.Struct()
+        if destS == nil {
+            self.pushErr(decl.Dest.Token, LogMsg.ImplInvalidDest, destT.Str())
+            self.pushSugggestion(LogMsg.ExpectedStruct)
             ret
         }
 
-        base.implemented = append(base.implemented, dest)
-        dest.implements = append(dest.implements, base)
+        let mut dest = destS.Decl
 
-        if decl.statics.len > 0 {
-            self.push_err(decl.statics[0].token, LogMsg.TraitImplHasStatic)
+        if dest.Token.File.Dir() != self.file.File.Dir() {
+            self.pushErr(decl.Dest.Token, LogMsg.IllegalImplOutOfPackage)
+            ret
+        }
+
+        base.Implemented = append(base.Implemented, dest)
+        dest.Implements = append(dest.Implements, base)
+
+        if decl.Statics.len > 0 {
+            self.pushErr(decl.Statics[0].Token, LogMsg.TraitImplHasStatic)
         }
 
         match {
-        | !self.check_trait_impl_methods(base, decl):
+        | !self.checkTraitImplMethods(base, decl):
             ret
-        | !self.impl_to_struct(dest, decl):
+        | !self.implToStruct(dest, decl):
             ret
         }
     }
 
-    fn impl_struct(mut &self, mut &decl: &Impl) {
-        let mut dest_t = self.select_type(decl.dest)
-        if dest_t == nil {
+    fn implStruct(mut &self, mut &decl: &Impl) {
+        let mut destT = self.selectType(decl.Dest)
+        if destT == nil {
             ret
         }
-        let mut dest_s = dest_t.strct()
-        if dest_s == nil {
-            self.push_err(decl.dest.token, LogMsg.ImplInvalidDest, dest_t.to_str())
-            self.push_suggestion(LogMsg.ExpectedStruct)
+        let mut destS = destT.Struct()
+        if destS == nil {
+            self.pushErr(decl.Dest.Token, LogMsg.ImplInvalidDest, destT.Str())
+            self.pushSugggestion(LogMsg.ExpectedStruct)
             ret
         }
 
-        let mut dest = dest_s.decl
-        if dest.token.file.dir() != self.file.file.dir() {
-            self.push_err(decl.dest.token, LogMsg.IllegalImplOutOfPackage)
+        let mut dest = destS.Decl
+        if dest.Token.File.Dir() != self.file.File.Dir() {
+            self.pushErr(decl.Dest.Token, LogMsg.IllegalImplOutOfPackage)
             ret
         }
 
         match {
-        | !self.impl_to_struct(dest, decl):
+        | !self.implToStruct(dest, decl):
             ret
         }
     }
 
     // Implement implementation.
-    fn impl_impl(mut &self, mut &decl: &Impl) {
+    fn implImpl(mut &self, mut &decl: &Impl) {
         match {
-        | decl.is_trait_impl():
-            self.impl_trait(decl)
-        | decl.is_struct_impl():
-            self.impl_struct(decl)
+        | decl.IsTraitImpl():
+            self.implTrait(decl)
+        | decl.IsStructImpl():
+            self.implStruct(decl)
         }
     }
 
     // Checks variable declaration.
     // No checks duplicated identifiers.
-    fn check_var_decl(mut &self, mut &decl: &Var, mut l: Lookup) {
-        if is_ignore_ident(decl.ident) {
-            self.push_err(decl.token, LogMsg.IgnoreIdent)
+    fn checkVarDecl(mut &self, mut &decl: &Var, mut l: Lookup) {
+        if IsIgnoreIdent(decl.Ident) {
+            self.pushErr(decl.Token, LogMsg.IgnoreIdent)
         }
 
-        if decl.is_type_inferred() {
-            if !decl.is_initialized() {
-                self.push_err(decl.token, LogMsg.MissingValueForTypeInference)
+        if decl.IsTypeInferred() {
+            if !decl.IsInitialized() {
+                self.pushErr(decl.Token, LogMsg.MissingValueForTypeInference)
             }
         } else {
-            _ = self.check_type(decl.kind, l)
+            _ = self.checkType(decl.Kind, l)
         }
 
-        if decl.constant && decl.reference {
-            self.push_err(decl.token, LogMsg.ConstRef)
+        if decl.Constant && decl.Reference {
+            self.pushErr(decl.Token, LogMsg.ConstRef)
         }
 
-        if !decl.is_initialized() {
-            if decl.constant {
-                self.push_err(decl.token, LogMsg.ConstVarNotHaveExpr)
+        if !decl.IsInitialized() {
+            if decl.Constant {
+                self.pushErr(decl.Token, LogMsg.ConstVarNotHaveExpr)
             }
-            if decl.statically {
-                self.push_err(decl.token, LogMsg.StaticNotHaveExpr)
+            if decl.Statically {
+                self.pushErr(decl.Token, LogMsg.StaticNotHaveExpr)
             }
-            if decl.reference {
-                self.push_err(decl.token, LogMsg.RefNotInited)
+            if decl.Reference {
+                self.pushErr(decl.Token, LogMsg.RefNotInited)
             }
         }
     }
 
     // Checks variable declaration for global scope.
     // Checks duplicated identifiers by Sema.
-    fn check_global_var_decl(mut &self, mut &decl: &Var) {
-        if self.is_duplicated_ident(uintptr(decl), decl.ident, decl.cpp_linked) {
-            self.push_err(decl.token, LogMsg.DuplicatedIdent, decl.ident)
-            self.push_suggestion(LogMsg.RenameForAvoidDuplication)
+    fn checkGlobalVarDecl(mut &self, mut &decl: &Var) {
+        if self.isDuplicatedIdent(uintptr(decl), decl.Ident, decl.CppLinked) {
+            self.pushErr(decl.Token, LogMsg.DuplicatedIdent, decl.Ident)
+            self.pushSugggestion(LogMsg.RenameForAvoidDuplication)
         }
-        if decl.cpp_linked && decl.constant {
-            self.push_err(decl.token, LogMsg.CppLinkedVarIsConst)
+        if decl.CppLinked && decl.Constant {
+            self.pushErr(decl.Token, LogMsg.CppLinkedVarIsConst)
         }
-        if !decl.cpp_linked && !decl.constant && !decl.statically {
-            self.push_err(decl.token, LogMsg.GlobalNotStatic)
-            self.push_suggestion(LogMsg.UseStaticKeywordToDef)
+        if !decl.CppLinked && !decl.Constant && !decl.Statically {
+            self.pushErr(decl.Token, LogMsg.GlobalNotStatic)
+            self.pushSugggestion(LogMsg.UseStaticKeywordToDef)
         }
-
-        self.check_directives(decl.directives, decl)
-
-        self.check_var_decl(decl, self)
+        self.checkDirectives(decl.Directives, decl)
+        self.checkVarDecl(decl, self)
     }
 
     // Checks current package file's global variable declarations.
-    fn check_global_decls(mut &self): (ok: bool) {
-        for (_, mut decl) in self.file.vars {
-            self.check_global_var_decl(decl)
-
+    fn checkGlobalDecls(mut &self): (ok: bool) {
+        for (_, mut decl) in self.file.Vars {
+            self.checkGlobalVarDecl(decl)
             // Break checking if type alias has error.
             if self.errors.len > 0 {
                 ret false
@@ -1707,54 +1684,54 @@ impl Sema {
         ret true
     }
 
-    fn check_struct_trait_impl(mut &self, mut &strct: &Struct, mut &trt: &Trait): (ok: bool) {
-        for (_, mut tf) in trt.methods {
+    fn checkStructTraitImpl(mut &self, mut &strct: &Struct, mut &trt: &Trait): (ok: bool) {
+        for (_, mut tf) in trt.Methods {
             let mut exist = false
-            let mut sf = strct.find_method(tf.ident, tf.statically)
-            let tf_k = self.get_trait_check_fn_kind(tf)
+            let mut sf = strct.FindMethod(tf.Ident, tf.Statically)
+            let tfK = self.getTraitCheckFnKind(tf)
             if sf != nil {
-                let mut sf_k = self.get_trait_check_fn_kind(sf)
-                exist = (tf_k.decl.public == sf_k.decl.public &&
-                    tf_k.decl.ident == sf_k.decl.ident &&
-                    tf_k.equals_trait(sf_k))
+                let mut sfK = self.getTraitCheckFnKind(sf)
+                exist = (tfK.Decl.Public == sfK.Decl.Public &&
+                    tfK.Decl.Ident == sfK.Decl.Ident &&
+                    tfK.equalsTrait(sfK))
             }
             if exist {
-                let d = find_directive(sf.directives, Directive.Deprecated)
+                let d = findDirective(sf.Directives, Directive.Deprecated)
                 if d != nil {
-                    self.push_err(d.tag, LogMsg.TraitImplDeprecated)
+                    self.pushErr(d.Tag, LogMsg.TraitImplDeprecated)
                 }
                 ok = false
             } else {
-                const IDENT = true
-                let mut s = tf_k.get_kind_str(IDENT)
-                if tf.public {
+                const Ident = true
+                let mut s = tfK.GetKindStr(Ident)
+                if tf.Public {
                     s = "pub " + s
                 }
-                self.push_err(strct.token, LogMsg.NotImplTraitDef, trt.ident, s)
+                self.pushErr(strct.Token, LogMsg.NotImplTraitDef, trt.Ident, s)
                 ok = false
             }
         }
         ret
     }
 
-    fn check_struct_impls(mut &self, mut &s: &Struct): (ok: bool) {
+    fn checkStructImpls(mut &self, mut &s: &Struct): (ok: bool) {
         ok = true
-        for (_, mut trt) in s.implements {
-            ok = self.check_struct_trait_impl(s, trt) && ok
+        for (_, mut trt) in s.Implements {
+            ok = self.checkStructTraitImpl(s, trt) && ok
         }
         ret ok
     }
 
-    fn check_struct_fields(mut &self, mut &st: &Struct): (ok: bool) {
+    fn checkStructFields(mut &self, mut &st: &Struct): (ok: bool) {
         ok = true
-        for (_, mut f) in st.fields {
-            f.owner = st
-            for _, cf in st.fields {
+        for (_, mut f) in st.Fields {
+            f.Owner = st
+            for _, cf in st.Fields {
                 if f == cf {
                     break
-                } else if f.ident == cf.ident {
-                    self.push_err(f.token, LogMsg.DuplicatedIdent, f.ident)
-                    self.push_suggestion(LogMsg.RenameForAvoidDuplication)
+                } else if f.Ident == cf.Ident {
+                    self.pushErr(f.Token, LogMsg.DuplicatedIdent, f.Ident)
+                    self.pushSugggestion(LogMsg.RenameForAvoidDuplication)
                     ok = false
                 }
             }
@@ -1762,64 +1739,61 @@ impl Sema {
         ret ok
     }
 
-    fn check_struct_decl(mut &self, mut &s: &Struct) {
-        if is_ignore_ident(s.ident) {
-            self.push_err(s.token, LogMsg.IgnoreIdent)
-        } else if self.is_duplicated_ident(uintptr(s), s.ident, s.cpp_linked) {
-            self.push_err(s.token, LogMsg.DuplicatedIdent, s.ident)
-            self.push_suggestion(LogMsg.RenameForAvoidDuplication)
+    fn checkStructDecl(mut &self, mut &s: &Struct) {
+        if IsIgnoreIdent(s.Ident) {
+            self.pushErr(s.Token, LogMsg.IgnoreIdent)
+        } else if self.isDuplicatedIdent(uintptr(s), s.Ident, s.CppLinked) {
+            self.pushErr(s.Token, LogMsg.DuplicatedIdent, s.Ident)
+            self.pushSugggestion(LogMsg.RenameForAvoidDuplication)
         }
 
-        self.check_directives(s.directives, s)
+        self.checkDirectives(s.Directives, s)
 
         match {
-        | !self.check_decl_generics(s.generics):
-        | !self.check_struct_fields(s):
-        | !self.check_struct_impls(s):
+        | !self.checkDeclGenerics(s.Generics):
+        | !self.checkStructFields(s):
+        | !self.checkStructImpls(s):
         }
     }
 
     // Checks current package file's structure declarations.
-    fn check_struct_decls(mut &self): (ok: bool) {
-        for (_, mut s) in self.file.structs {
-            self.check_struct_decl(s)
-
+    fn checkStructDecls(mut &self): (ok: bool) {
+        for (_, mut s) in self.file.Structs {
+            self.checkStructDecl(s)
             // Break checking if type alias has error.
             if self.errors.len > 0 {
                 ret false
             }
         }
-
         ret true
     }
 
-    fn check_fn_decl(mut &self, mut &f: &Fn) {
-        if is_ignore_ident(f.ident) {
-            self.push_err(f.token, LogMsg.IgnoreIdent)
+    fn checkFnDecl(mut &self, mut &f: &Fn) {
+        if IsIgnoreIdent(f.Ident) {
+            self.pushErr(f.Token, LogMsg.IgnoreIdent)
         }
 
-        self.check_directives(f.directives, f)
+        self.checkDirectives(f.Directives, f)
 
         f.sema = self
-        self.check_fn_decl_prototype(f)
+        self.checkFnDeclPrototype(f)
 
-        if self.is_duplicated_ident(uintptr(f), f.ident, f.cpp_linked) {
-            if f.ident == build::INIT_FN {
-                let init = self.find_fn(build::INIT_FN, false)
+        if self.isDuplicatedIdent(uintptr(f), f.Ident, f.CppLinked) {
+            if f.Ident == build::InitFn {
+                let init = self.FindFn(build::InitFn, false)
                 if init != nil {
                     ret
                 }
             }
-            self.push_err(f.token, LogMsg.DuplicatedIdent, f.ident)
-            self.push_suggestion(LogMsg.RenameForAvoidDuplication)
+            self.pushErr(f.Token, LogMsg.DuplicatedIdent, f.Ident)
+            self.pushSugggestion(LogMsg.RenameForAvoidDuplication)
         }
     }
 
     // Checks current package file's function declarations.
-    fn check_fn_decls(mut &self): (ok: bool) {
-        for (_, mut f) in self.file.funcs {
-            self.check_fn_decl(f)
-
+    fn checkFnDecls(mut &self): (ok: bool) {
+        for (_, mut f) in self.file.Funcs {
+            self.checkFnDecl(f)
             // Break checking if type alias has error.
             if self.errors.len > 0 {
                 ret false
@@ -1828,22 +1802,20 @@ impl Sema {
         ret true
     }
 
-    fn push_cycle_error(self, &st1: &Struct, &st2: &Struct, mut &message: str) {
-        const PADDING = 4
-
-        let refers_to = logf(LogMsg.RefersTo, st1.ident, st2.ident)
-        message = strings::repeat(" ", PADDING) + refers_to + "\n" + message
+    fn pushCycleError(self, &st1: &Struct, &st2: &Struct, mut &message: str) {
+        const Padding = 4
+        let refers_to = Logf(LogMsg.RefersTo, st1.Ident, st2.Ident)
+        message = strings::Repeat(" ", Padding) + refers_to + "\n" + message
     }
 
-    fn check_cross_cycle(self, &st1: &Struct, &st2: &Struct, mut &message: str): bool {
-        for _, u in st2.uses {
+    fn checkCrossCycle(self, &st1: &Struct, &st2: &Struct, mut &message: str): bool {
+        for _, u in st2.Uses {
             if u == st1 {
-                self.push_cycle_error(st2, u, message)
+                self.pushCycleError(st2, u, message)
                 ret false
             }
-
-            if !self.check_cross_cycle(st1, u, message) {
-                self.push_cycle_error(st2, u, message)
+            if !self.checkCrossCycle(st1, u, message) {
+                self.pushCycleError(st2, u, message)
                 ret false
             }
         }
@@ -1851,8 +1823,8 @@ impl Sema {
         ret true
     }
 
-    fn check_struct_derive_illegal_cycles(mut self, derive: str, &st1: &Struct, mut &k: &TypeKind): (ok: bool) {
-        let mut st2 = get_struct_from_kind(k)
+    fn checkStructDeriveIllegalCycles(mut self, derive: str, &st1: &Struct, mut &k: &TypeKind): (ok: bool) {
+        let mut st2 = getStructFromKind(k)
         if st2 == nil {
             ret true
         }
@@ -1860,79 +1832,73 @@ impl Sema {
         // Check illegal cycle for itself.
         // Because refers's owner is ta.
         if st1 == st2 {
-            self.push_err(st1.token, LogMsg.DeriveIllegalCycleRefersItself, derive, st1.ident)
+            self.pushErr(st1.Token, LogMsg.DeriveIllegalCycleRefersItself, derive, st1.Ident)
             ret false
         }
 
         let mut message = ""
-
-        if !self.check_cross_cycle(st1, st2, message) {
-            let mut err_msg = message
+        if !self.checkCrossCycle(st1, st2, message) {
+            let mut errMsg = message
             message = ""
-            self.push_cycle_error(st1, st2, message)
-            err_msg = err_msg + message
-            self.push_err(st1.token, LogMsg.DeriveIllegalCrossCycle, derive, err_msg)
+            self.pushCycleError(st1, st2, message)
+            errMsg = errMsg + message
+            self.pushErr(st1.Token, LogMsg.DeriveIllegalCrossCycle, derive, errMsg)
             ret false
         }
-
         ret true
     }
 
-    fn check_struct_ins_derive_clone(mut self, mut st: &StructIns): (ok: bool) {
-        if !st.decl.is_derives(Derive.Clone) {
+    fn checkStructInsDeriveClone(mut self, mut st: &StructIns): (ok: bool) {
+        if !st.Decl.IsDerives(Derive.Clone) {
             ret true
         }
-
-        for (_, mut f) in st.fields {
-            if f.kind == nil {
+        for (_, mut f) in st.Fields {
+            if f.Kind == nil {
                 continue
             }
-
-            if !f.kind.supports_cloning() {
-                self.push_err(st.decl.token, LogMsg.TypeNotCompatibleForDerive, f.kind.to_str(), Derive.Clone)
+            if !f.Kind.SupportsCloning() {
+                self.pushErr(st.Decl.Token, LogMsg.TypeNotCompatibleForDerive, f.Kind.Str(), Derive.Clone)
                 ret false
             }
-
-            if !self.check_struct_derive_illegal_cycles(Derive.Clone, st.decl, f.kind) {
+            if !self.checkStructDeriveIllegalCycles(Derive.Clone, st.Decl, f.Kind) {
                 ret false
             }
         }
-
         ret true
     }
 
     // Checks declarations of all package files.
     // Breaks checking if checked file failed.
-    fn check_package_decls(mut &self) {
+    fn checkPackageDecls(mut &self) {
         for (_, mut f) in self.files {
-            self.set_current_file(f)
-            if !self.check_type_enum_decls() {
+            self.setCurrentFile(f)
+            if !self.checkTypeEnumDecls() {
                 ret
             }
-            if !self.check_type_alias_decls() {
-                ret
-            }
-        }
-
-        for (_, mut f) in self.files {
-            self.set_current_file(f)
-            if !self.check_trait_decls() {
+            if !self.checkTypeAliasDecls() {
                 ret
             }
         }
 
         for (_, mut f) in self.files {
-            self.set_current_file(f)
-            if !self.check_global_decls() {
+            self.setCurrentFile(f)
+            if !self.checkTraitDecls() {
                 ret
             }
         }
 
         for (_, mut f) in self.files {
-            self.set_current_file(f)
+            self.setCurrentFile(f)
+            if !self.checkGlobalDecls() {
+                ret
+            }
+        }
+
+        for (_, mut f) in self.files {
+            self.setCurrentFile(f)
             match {
-            | !self.check_fn_decls():
-            | !self.check_struct_decls():
+            | !self.checkFnDecls():
+            | !self.checkStructDecls():
             |:
                 continue
             }
@@ -1940,98 +1906,97 @@ impl Sema {
         }
     }
 
-    fn check_data_for_type_inference(mut self, &d: &Data, &err_token: &Token) {
+    fn checkDataForTypeInference(mut self, &d: &Data, &err_token: &Token) {
         match {
-        | d.is_nil():
-            self.push_err(err_token, LogMsg.NilForTypeInference)
-        | d.is_void():
-            self.push_err(err_token, LogMsg.VoidForTypeInference)
-        | d.kind.variadic:
-            self.push_err(err_token, LogMsg.InvalidExprForTypeInference)
+        | d.IsNil():
+            self.pushErr(err_token, LogMsg.NilForTypeInference)
+        | d.IsVoid():
+            self.pushErr(err_token, LogMsg.VoidForTypeInference)
+        | d.Kind.Variadic:
+            self.pushErr(err_token, LogMsg.InvalidExprForTypeInference)
         }
     }
 
-    fn check_var(mut &self, mut &v: &Var) {
-        if v.cpp_linked {
+    fn checkVar(mut &self, mut &v: &Var) {
+        if v.CppLinked {
             ret
         }
 
-        if v.is_type_inferred() {
+        if v.IsTypeInferred() {
             // Build new TypeSymbol because auto-type symbols are nil.
-            v.kind = &TypeSymbol{kind: v.value.data.kind}
+            v.Kind = &TypeSymbol{Kind: v.Value.Data.Kind}
 
-            self.check_data_for_type_inference(v.value.data, v.value.expr.token)
-            self.check_validity_for_init_expr(
-                v.mutable,
-                v.reference,
-                v.kind.kind,
-                v.value.data,
-                v.value.expr.token)
+            self.checkDataForTypeInference(v.Value.Data, v.Value.Expr.Token)
+            self.checkValidityForInitExpr(
+                v.Mutable,
+                v.Reference,
+                v.Kind.Kind,
+                v.Value.Data,
+                v.Value.Expr.Token)
         } else {
-            let mut arr = v.kind.kind.arr()
+            let mut arr = v.Kind.Kind.Arr()
             if arr != nil {
-                if arr.auto {
-                    let data_arr = v.value.data.kind.arr()
-                    if data_arr != nil {
-                        arr.n = data_arr.n
+                if arr.Auto {
+                    let dataArr = v.Value.Data.Kind.Arr()
+                    if dataArr != nil {
+                        arr.N = dataArr.N
                     }
                 }
             }
 
-            if self.check_assign_type(v.reference, v.kind.kind, v.value.data, v.value.expr.token) {
-                self.check_validity_for_init_expr(
-                    v.mutable,
-                    v.reference,
-                    v.kind.kind,
-                    v.value.data,
-                    v.value.expr.token)
+            if self.checkAssignType(v.Reference, v.Kind.Kind, v.Value.Data, v.Value.Expr.Token) {
+                self.checkValidityForInitExpr(
+                    v.Mutable,
+                    v.Reference,
+                    v.Kind.Kind,
+                    v.Value.Data,
+                    v.Value.Expr.Token)
             }
         }
 
-        if v.reference && !is_valid_for_ref(v.kind.kind) {
-            self.push_err(v.token, LogMsg.RefPointsToInvalidType, v.kind.kind.to_str())
+        if v.Reference && !isValidForRef(v.Kind.Kind) {
+            self.pushErr(v.Token, LogMsg.RefPointsToInvalidType, v.Kind.Kind.Str())
         }
 
-        if v.constant {
-            if !v.value.data.is_const() {
-                self.push_err(v.value.expr.token, LogMsg.ExprNotConst)
+        if v.Constant {
+            if !v.Value.Data.IsConst() {
+                self.pushErr(v.Value.Expr.Token, LogMsg.ExprNotConst)
             }
         } else {
-            v.value.data.constant = nil
+            v.Value.Data.Constant = nil
         }
 
         // Remove kind for avoid more tuple-type errors.
-        if v.kind.kind.tup() != nil {
-            v.kind.kind = nil
+        if v.Kind.Kind.Tup() != nil {
+            v.Kind.Kind = nil
         }
     }
 
-    fn check_type_var(mut &self, mut &decl: &Var, mut l: Lookup) {
-        if decl.cpp_linked || !decl.is_initialized() {
+    fn checkTypeVar(mut &self, mut &decl: &Var, mut l: Lookup) {
+        if decl.CppLinked || !decl.IsInitialized() {
             ret
         }
 
         let mut eval: &Eval = nil
-        if decl.kind != nil {
-            eval = self.evalpd(l, decl.kind.kind, decl)
+        if decl.Kind != nil {
+            eval = self.evalpd(l, decl.Kind.Kind, decl)
         } else {
             eval = self.evalpd(l, nil, decl)
         }
-        eval.immutable = !decl.mutable
-        decl.value.data = eval.eval_expr(decl.value.expr)
-        if decl.value.data == nil {
+        eval.immutable = !decl.Mutable
+        decl.Value.Data = eval.evalExpr(decl.Value.Expr)
+        if decl.Value.Data == nil {
             ret // Skip checks if error ocurrs.
         }
-
-        self.check_var(decl)
+        self.checkVar(decl)
     }
 
     // Checks types of current package file's global variables.
-    fn check_global_types(mut &self) {
-        for (_, mut decl) in self.file.vars {
-            if decl.is_initialized() && decl.value.data == nil ||
-                decl.is_type_inferred() && decl.kind.kind == nil {
-                self.check_type_var(decl, self)
+    fn checkGlobalTypes(mut &self) {
+        for (_, mut decl) in self.file.Vars {
+            if decl.IsInitialized() && decl.Value.Data == nil ||
+                decl.IsTypeInferred() && decl.Kind.Kind == nil {
+                self.checkTypeVar(decl, self)
             }
         }
     }
@@ -2039,79 +2004,79 @@ impl Sema {
     // Returns new FnIns as ready-to-analysis.
     // If function already has a instance, returns existing instance.
     // Returns nil if have a problem.
-    fn ready_to_check_fn(mut &self, mut &s: &StructIns, mut &f: &Fn): &FnIns {
+    fn readyToCheckFn(mut &self, mut &s: &StructIns, mut &f: &Fn): &FnIns {
         let mut ins = f.instance()
-        if f.instances.len != 0 {
+        if f.Instances.len != 0 {
             ret ins
         }
-        ins.owner = s
-        f.append_instance(ins)
+        ins.Owner = s
+        f.appendInstance(ins)
         ins.reloaded = true
-        if self.reload_fn_ins_types(ins) {
+        if self.reloadFnInsTypes(ins) {
             ret ins
         }
         ret nil
     }
 
-    fn check_type_method(mut &self, mut &s: &StructIns, mut &f: &Fn) {
+    fn checkTypeMethod(mut &self, mut &s: &StructIns, mut &f: &Fn) {
         // Generic instances are checked instantly.
-        if f.generics.len > 0 {
+        if f.Generics.len > 0 {
             ret
         }
-        let mut ins = f.instances[0]
-        if ins.scope.stmts.len > 0 {
+        let mut ins = f.Instances[0]
+        if ins.Scope.Stmts.len > 0 {
             // Checked
             ret
         }
-        self.check_fn_ins(ins)
+        self.checkFnIns(ins)
     }
 
-    fn check_struct_ins_op(mut &self, mut &s: &StructIns, mut &f: &Fn, p: fn(f: &Fn): bool): &FnIns {
-        if f == nil || f.generics.len > 0 || !p(f) {
+    fn checkStructInsOp(mut &self, mut &s: &StructIns, mut &f: &Fn, p: fn(f: &Fn): bool): &FnIns {
+        if f == nil || f.Generics.len > 0 || !p(f) {
             ret nil
         }
-        ret f.instances[0]
+        ret f.Instances[0]
     }
 
     // Checks environment-dependent parts of structure instance.
     // Which is contains fields and generic-type constraints.
-    // If generic instance will be check, error_token should be passed.
-    fn check_struct_env(mut &self, mut &s: &StructIns, mut error_token: &Token): (ok: bool) {
-        let mut tc = TypeChecker{
-            s: s.decl.sema,
-            lookup: s.decl.sema,
-            referencer: &Referencer{
-                ident: s.decl.ident,
-                owner: s.decl,
+    // If generic instance will be check, errorToken should be passed.
+    fn checkStructEnv(mut &self, mut &s: &StructIns, mut errorToken: &Token): (ok: bool) {
+        let mut tc = typeChecker{
+            s: s.Decl.sema,
+            lookup: s.Decl.sema,
+            referencer: &referencer{
+                ident: s.Decl.Ident,
+                owner: s.Decl,
             },
-            refers: s.refers,
+            refers: s.Refers,
         }
 
-        if s.generics.len > 0 {
-            tc.use_generics = make([]&TypeAlias, 0, s.generics.len)
-            for (i, mut g) in s.generics {
-                tc.use_generics = append(tc.use_generics, &TypeAlias{
-                    ident: s.decl.generics[i].ident,
-                    kind: &TypeSymbol{kind: g.kind},
+        if s.Generics.len > 0 {
+            tc.useGenerics = make([]&TypeAlias, 0, s.Generics.len)
+            for (i, mut g) in s.Generics {
+                tc.useGenerics = append(tc.useGenerics, &TypeAlias{
+                    Ident: s.Decl.Generics[i].Ident,
+                    Kind: &TypeSymbol{Kind: g.Kind},
                 })
             }
         }
 
-        let mut old_file = self.file
-        defer { self.set_current_file(old_file) }
+        let mut oldFile = self.file
+        defer { self.setCurrentFile(oldFile) }
 
-        if self.file.file != s.decl.token.file {
-            let mut file = find_file(self.files, s.decl.token.file)
+        if self.file.File != s.Decl.Token.File {
+            let mut file = findFile(self.files, s.Decl.Token.File)
             if file != nil {
-                self.set_current_file(file)
+                self.setCurrentFile(file)
             }
         }
 
-        if s.generics.len > 0 {
-            let mut cc = self.constraint_checker()
-            cc.et = error_token
+        if s.Generics.len > 0 {
+            let mut cc = self.constraintChecker()
+            cc.et = errorToken
             cc.si = s
-            cc.generics_a = tc.use_generics
+            cc.genericsA = tc.useGenerics
             cc.uniq = true
             if !cc.check() {
                 ret
@@ -2120,48 +2085,48 @@ impl Sema {
 
         let mut eval = self.eval(self)
         ok = true
-        for (_, mut f) in s.fields {
-            let mut kind = tc.check_decl(f.decl.kind.decl)
+        for (_, mut f) in s.Fields {
+            let mut kind = tc.checkDecl(f.Decl.Kind.Decl)
             ok = kind != nil && ok
             if kind == nil {
-                if self != s.decl.sema && s.decl.sema.errors.len > 0 {
-                    self.errors = append(self.errors, s.decl.sema.errors...)
-                    s.decl.sema.errors = nil
+                if self != s.Decl.sema && s.Decl.sema.errors.len > 0 {
+                    self.errors = append(self.errors, s.Decl.sema.errors...)
+                    s.Decl.sema.errors = nil
                 }
                 continue
             }
-            f.kind = kind
-            s.mutable = s.mutable || (!f.decl.mutable && f.kind.mutable())
-            _ = self.check_struct_ins_derive_clone(s)
+            f.Kind = kind
+            s.Mutable = s.Mutable || (!f.Decl.Mutable && f.Kind.Mutable())
+            _ = self.checkStructInsDeriveClone(s)
 
             // Skip this field if not has default value.
-            if f.decl.default == nil {
+            if f.Decl.Default == nil {
                 continue
             }
-            eval.prefix = f.kind
+            eval.prefix = f.Kind
             eval.field = f
-            f.default = eval.eval_expr(f.decl.default)
+            f.Default = eval.evalExpr(f.Decl.Default)
 
             // Skip if eval returned nil.
             // Relevant error(s) logged by eval.
-            if f.default == nil {
+            if f.Default == nil {
                 continue
             }
 
-            const REFERENCE = false // Fields cannot be reference.
-            _ = self.check_assign_type(REFERENCE, f.kind, f.default, f.decl.default.token)
+            const Reference = false // Fields cannot be reference.
+            _ = self.checkAssignType(Reference, f.Kind, f.Default, f.Decl.Default.Token)
         }
         ret
     }
 
-    fn precheck_struct_ins(mut &self, mut &s: &StructIns, mut error_token: &Token): (ok: bool) {
-        ok = self.check_struct_env(s, error_token)
+    fn precheckStructIns(mut &self, mut &s: &StructIns, mut errorToken: &Token): (ok: bool) {
+        ok = self.checkStructEnv(s, errorToken)
         if !ok {
             ret false
         }
-        for (_, mut f) in s.methods {
-            if f.generics.len == 0 {
-                if self.ready_to_check_fn(s, f) == nil {
+        for (_, mut f) in s.Methods {
+            if f.Generics.len == 0 {
+                if self.readyToCheckFn(s, f) == nil {
                     ret false
                 }
             }
@@ -2169,359 +2134,358 @@ impl Sema {
         ret true
     }
 
-    fn check_struct_ins(mut &self, mut &s: &StructIns) {
-        for (_, mut f) in s.methods {
-            self.check_type_method(s, f)
+    fn checkStructIns(mut &self, mut &s: &StructIns) {
+        for (_, mut f) in s.Methods {
+            self.checkTypeMethod(s, f)
         }
     }
 
-    fn check_type_struct(mut &self, mut &s: &Struct) {
-        if s.cpp_linked {
+    fn checkTypeStruct(mut &self, mut &s: &Struct) {
+        if s.CppLinked {
             ret
         }
 
         // Generic instances are checked instantly.
-        if s.generics.len > 0 {
+        if s.Generics.len > 0 {
             ret
         }
 
         // NOTICE:
         // Do not check zero instance case, operator overloading
         // checker will create an instance if not exist.
-        for (_, mut ins) in s.instances {
-            self.check_struct_ins(ins)
+        for (_, mut ins) in s.Instances {
+            self.checkStructIns(ins)
         }
     }
 
-    fn check_struct_types(mut &self) {
-        for (_, mut s) in self.file.structs {
-            self.check_type_struct(s)
+    fn checkStructTypes(mut &self) {
+        for (_, mut s) in self.file.Structs {
+            self.checkTypeStruct(s)
         }
     }
 
-    fn check_struct_ins_operators(mut &self, mut s: &StructIns) {
-        for (_, mut m) in s.methods {
-            match m.ident {
+    fn checkStructInsOperators(mut &self, mut s: &StructIns) {
+        for (_, mut m) in s.Methods {
+            match m.Ident {
             | "eq":
-                s.operators.eq = self.check_struct_ins_op(s, m, fn(f: &Fn): bool { ret FuncPattern.eq(f) })
+                s.Operators.Eq = self.checkStructInsOp(s, m, fn(f: &Fn): bool { ret FuncPattern.Eq(f) })
             | "gt":
-                s.operators.gt = self.check_struct_ins_op(s, m, fn(f: &Fn): bool { ret FuncPattern.gt(f) })
+                s.Operators.Gt = self.checkStructInsOp(s, m, fn(f: &Fn): bool { ret FuncPattern.Gt(f) })
             | "gt_eq":
-                s.operators.gt_eq = self.check_struct_ins_op(s, m, fn(f: &Fn): bool { ret FuncPattern.gt_eq(f) })
+                s.Operators.GtEq = self.checkStructInsOp(s, m, fn(f: &Fn): bool { ret FuncPattern.GtEq(f) })
             | "lt":
-                s.operators.lt = self.check_struct_ins_op(s, m, fn(f: &Fn): bool { ret FuncPattern.lt(f) })
+                s.Operators.Lt = self.checkStructInsOp(s, m, fn(f: &Fn): bool { ret FuncPattern.Lt(f) })
             | "lt_eq":
-                s.operators.lt_eq = self.check_struct_ins_op(s, m, fn(f: &Fn): bool { ret FuncPattern.lt_eq(f) })
+                s.Operators.LtEq = self.checkStructInsOp(s, m, fn(f: &Fn): bool { ret FuncPattern.LtEq(f) })
             | "shl":
-                s.operators.shl = self.check_struct_ins_op(s, m, fn(f: &Fn): bool { ret FuncPattern.shl(f) })
+                s.Operators.Shl = self.checkStructInsOp(s, m, fn(f: &Fn): bool { ret FuncPattern.Shl(f) })
             | "shr":
-                s.operators.shr = self.check_struct_ins_op(s, m, fn(f: &Fn): bool { ret FuncPattern.shr(f) })
+                s.Operators.Shr = self.checkStructInsOp(s, m, fn(f: &Fn): bool { ret FuncPattern.Shr(f) })
             | "add":
-                s.operators.add = self.check_struct_ins_op(s, m, fn(f: &Fn): bool { ret FuncPattern.add(f) })
+                s.Operators.Add = self.checkStructInsOp(s, m, fn(f: &Fn): bool { ret FuncPattern.Add(f) })
             | "sub":
-                s.operators.sub = self.check_struct_ins_op(s, m, fn(f: &Fn): bool { ret FuncPattern.sub(f) })
+                s.Operators.Sub = self.checkStructInsOp(s, m, fn(f: &Fn): bool { ret FuncPattern.Sub(f) })
             | "div":
-                s.operators.div = self.check_struct_ins_op(s, m, fn(f: &Fn): bool { ret FuncPattern.div(f) })
+                s.Operators.Div = self.checkStructInsOp(s, m, fn(f: &Fn): bool { ret FuncPattern.Div(f) })
             | "mul":
-                s.operators.mul = self.check_struct_ins_op(s, m, fn(f: &Fn): bool { ret FuncPattern.mul(f) })
+                s.Operators.Mul = self.checkStructInsOp(s, m, fn(f: &Fn): bool { ret FuncPattern.Mul(f) })
             | "mod":
-                s.operators.mod = self.check_struct_ins_op(s, m, fn(f: &Fn): bool { ret FuncPattern.mod(f) })
+                s.Operators.Mod = self.checkStructInsOp(s, m, fn(f: &Fn): bool { ret FuncPattern.Mod(f) })
             | "bit_and":
-                s.operators.bit_and = self.check_struct_ins_op(s, m, fn(f: &Fn): bool { ret FuncPattern.bit_and(f) })
+                s.Operators.BitAnd = self.checkStructInsOp(s, m, fn(f: &Fn): bool { ret FuncPattern.BitAnd(f) })
             | "bit_or":
-                s.operators.bit_or = self.check_struct_ins_op(s, m, fn(f: &Fn): bool { ret FuncPattern.bit_or(f) })
+                s.Operators.BitOr = self.checkStructInsOp(s, m, fn(f: &Fn): bool { ret FuncPattern.BitOr(f) })
             | "bit_xor":
-                s.operators.bit_xor = self.check_struct_ins_op(s, m, fn(f: &Fn): bool { ret FuncPattern.bit_xor(f) })
+                s.Operators.BitXor = self.checkStructInsOp(s, m, fn(f: &Fn): bool { ret FuncPattern.BitXor(f) })
             | "neg":
-                s.operators.neg = self.check_struct_ins_op(s, m, fn(f: &Fn): bool { ret FuncPattern.neg(f) })
+                s.Operators.Neg = self.checkStructInsOp(s, m, fn(f: &Fn): bool { ret FuncPattern.Neg(f) })
             | "pos":
-                s.operators.pos = self.check_struct_ins_op(s, m, fn(f: &Fn): bool { ret FuncPattern.pos(f) })
+                s.Operators.Pos = self.checkStructInsOp(s, m, fn(f: &Fn): bool { ret FuncPattern.Pos(f) })
             | "bit_not":
-                s.operators.bit_not = self.check_struct_ins_op(s, m, fn(f: &Fn): bool { ret FuncPattern.bit_not(f) })
+                s.Operators.BitNot = self.checkStructInsOp(s, m, fn(f: &Fn): bool { ret FuncPattern.BitNot(f) })
             | "add_assign":
-                s.operators.add_assign = self.check_struct_ins_op(s, m, fn(f: &Fn): bool { ret FuncPattern.add_assign(f) })
+                s.Operators.AddAssign = self.checkStructInsOp(s, m, fn(f: &Fn): bool { ret FuncPattern.AddAssign(f) })
             | "sub_assign":
-                s.operators.sub_assign = self.check_struct_ins_op(s, m, fn(f: &Fn): bool { ret FuncPattern.sub_assign(f) })
+                s.Operators.SubAssign = self.checkStructInsOp(s, m, fn(f: &Fn): bool { ret FuncPattern.SubAssign(f) })
             | "div_assign":
-                s.operators.div_assign = self.check_struct_ins_op(s, m, fn(f: &Fn): bool { ret FuncPattern.div_assign(f) })
+                s.Operators.DivAssign = self.checkStructInsOp(s, m, fn(f: &Fn): bool { ret FuncPattern.DivAssign(f) })
             | "mul_assign":
-                s.operators.mul_assign = self.check_struct_ins_op(s, m, fn(f: &Fn): bool { ret FuncPattern.mul_assign(f) })
+                s.Operators.MulAssign = self.checkStructInsOp(s, m, fn(f: &Fn): bool { ret FuncPattern.MulAssign(f) })
             | "mod_assign":
-                s.operators.mod_assign = self.check_struct_ins_op(s, m, fn(f: &Fn): bool { ret FuncPattern.mod_assign(f) })
+                s.Operators.ModAssign = self.checkStructInsOp(s, m, fn(f: &Fn): bool { ret FuncPattern.ModAssign(f) })
             | "shl_assign":
-                s.operators.shl_assign = self.check_struct_ins_op(s, m, fn(f: &Fn): bool { ret FuncPattern.shl_assign(f) })
+                s.Operators.ShlAssign = self.checkStructInsOp(s, m, fn(f: &Fn): bool { ret FuncPattern.ShlAssign(f) })
             | "shr_assign":
-                s.operators.shr_assign = self.check_struct_ins_op(s, m, fn(f: &Fn): bool { ret FuncPattern.shr_assign(f) })
+                s.Operators.ShrAssign = self.checkStructInsOp(s, m, fn(f: &Fn): bool { ret FuncPattern.ShrAssign(f) })
             | "bit_or_assign":
-                s.operators.bit_or_assign = self.check_struct_ins_op(s, m, fn(f: &Fn): bool { ret FuncPattern.bit_or_assign(f) })
+                s.Operators.BitOrAssign = self.checkStructInsOp(s, m, fn(f: &Fn): bool { ret FuncPattern.BitOrAssign(f) })
             | "bit_and_assign":
-                s.operators.bit_and_assign = self.check_struct_ins_op(s, m, fn(f: &Fn): bool { ret FuncPattern.bit_and_assign(f) })
+                s.Operators.BitAndAssign = self.checkStructInsOp(s, m, fn(f: &Fn): bool { ret FuncPattern.BitAndAssign(f) })
             | "bit_xor_assign":
-                s.operators.bit_xor_assign = self.check_struct_ins_op(s, m, fn(f: &Fn): bool { ret FuncPattern.bit_xor_assign(f) })
+                s.Operators.BitOrAssign = self.checkStructInsOp(s, m, fn(f: &Fn): bool { ret FuncPattern.BitXorAssign(f) })
             }
         }
     }
 
-    fn precheck_struct_type(mut &self, mut &s: &Struct) {
-        if s.cpp_linked {
+    fn precheckStructType(mut &self, mut &s: &Struct) {
+        if s.CppLinked {
             ret
         }
 
         // Generic instances are checked instantly.
-        if s.generics.len > 0 {
+        if s.Generics.len > 0 {
             ret
         }
 
-        if s.instances.len == 0 {
+        if s.Instances.len == 0 {
             let mut ins = s.instance()
-            ins.checked = true
-            s.append_instance(ins) // Append instance before precheck.
-            self.precheck_struct_ins(ins, nil)
+            ins.Checked = true
+            s.appendInstance(ins) // Append instance before precheck.
+            self.precheckStructIns(ins, nil)
         }
 
-        self.check_struct_ins_operators(s.instances[0])
+        self.checkStructInsOperators(s.Instances[0])
     }
 
-    fn precheck_struct_types(mut &self) {
-        for (_, mut s) in self.file.structs {
-            self.precheck_struct_type(s)
+    fn precheckStructTypes(mut &self) {
+        for (_, mut s) in self.file.Structs {
+            self.precheckStructType(s)
         }
     }
 
-    fn check_rets(mut self, mut &f: &FnIns) {
-        if f.decl.is_void() {
+    fn checkRets(mut self, mut &f: &FnIns) {
+        if f.Decl.IsVoid() {
             ret
         }
-        let mrc = MissingRetChecker.new()
-        let ok = mrc.check(f.scope)
+        let mrc = missingRetChecker.new()
+        let ok = mrc.check(f.Scope)
         if !ok {
-            self.push_err(f.decl.token, LogMsg.MissingRet)
+            self.pushErr(f.Decl.Token, LogMsg.MissingRet)
         }
     }
 
-    fn check_fn_ins_sc(mut self, mut &f: &FnIns, mut &sc: &ScopeChecker) {
-        append_ret_vars(sc.table.vars, f)
-        append_param_vars(sc.table.vars, f)
-        append_generic_type_aliases(sc.table.type_aliases, f)
+    fn checkFnInsSc(mut self, mut &f: &FnIns, mut &sc: &scopeChecker) {
+        appendRetVars(sc.table.Vars, f)
+        appendParamVars(sc.table.Vars, f)
+        appendGenericTypeAliases(sc.table.TypeAliases, f)
 
-        sc.check(f.decl.scope, f.scope)
+        sc.check(f.Decl.Scope, f.Scope)
 
-        // Check return statements if ScopeChecker not forced to stop.
+        // Check return statements if scopeChecker not forced to stop.
         if !sc.stopped() {
-            self.check_rets(f)
+            self.checkRets(f)
         }
     }
 
-    fn check_fn_ins_caller(mut &self, mut &f: &FnIns, mut caller: &Token) {
-        if f.decl.cpp_linked {
+    fn checkFnInsCaller(mut &self, mut &f: &FnIns, mut caller: &Token) {
+        if f.Decl.CppLinked {
             ret
         }
 
-        let mut old = f.decl.sema.file
-        defer { f.decl.sema.set_current_file(old) }
-        let mut file = find_file(f.decl.sema.files, f.decl.token.file)
+        let mut old = f.Decl.sema.file
+        defer { f.Decl.sema.setCurrentFile(old) }
+        let mut file = findFile(f.Decl.sema.files, f.Decl.Token.File)
         if file != nil {
-            f.decl.sema.set_current_file(file)
+            f.Decl.sema.setCurrentFile(file)
         }
 
-        let mut sc = new_scope_checker(f.decl.sema, f)
-        sc.called_from = caller
-        self.check_fn_ins_sc(f, sc)
+        let mut sc = newScopeChecker(f.Decl.sema, f)
+        sc.calledFrom = caller
+        self.checkFnInsSc(f, sc)
 
-        if f.decl.sema != self {
-            self.errors = append(self.errors, f.decl.sema.errors...)
-            f.decl.sema.errors = nil
+        if f.Decl.sema != self {
+            self.errors = append(self.errors, f.Decl.sema.errors...)
+            f.Decl.sema.errors = nil
         }
     }
 
-    fn check_fn_ins(mut &self, mut &f: &FnIns) {
-        self.check_fn_ins_caller(f, nil)
+    fn checkFnIns(mut &self, mut &f: &FnIns) {
+        self.checkFnInsCaller(f, nil)
     }
 
-    fn check_type_fn(mut &self, mut &f: &Fn) {
-        if f.cpp_linked {
+    fn checkTypeFn(mut &self, mut &f: &Fn) {
+        if f.CppLinked {
             ret
         }
 
         // Generic instances are checked instantly.
-        if f.generics.len > 0 {
+        if f.Generics.len > 0 {
             ret
         }
 
-        for (_, mut ins) in f.instances {
-            self.check_fn_ins(ins)
+        for (_, mut ins) in f.Instances {
+            self.checkFnIns(ins)
         }
     }
 
-    fn check_test_fn(mut self, mut &f: &FnIns) {
-        if f.decl.public {
-            self.push_err(f.decl.token, LogMsg.PubTestFn)
-            self.push_suggestion(LogMsg.RemovePubModifier)
+    fn checkTestFn(mut self, mut &f: &FnIns) {
+        if f.Decl.Public {
+            self.pushErr(f.Decl.Token, LogMsg.PubTestFn)
+            self.pushSugggestion(LogMsg.RemovePubModifier)
             ret
         }
 
-        if f.params.len != 1 || f.result != nil {
-            self.push_err(f.decl.token, LogMsg.WrongTestFnDecl)
-            self.push_suggestion(LogMsg.UseExpectedTestFnDecl)
+        if f.Params.len != 1 || f.Result != nil {
+            self.pushErr(f.Decl.Token, LogMsg.WrongTestFnDecl)
+            self.pushSugggestion(LogMsg.UseExpectedTestFnDecl)
             ret
         }
 
-        let mut sptr = f.params[0].kind.sptr()
+        let mut sptr = f.Params[0].Kind.Sptr()
         if sptr == nil {
-            self.push_err(f.decl.token, LogMsg.WrongTestFnDecl)
-            self.push_suggestion(LogMsg.UseExpectedTestFnDecl)
+            self.pushErr(f.Decl.Token, LogMsg.WrongTestFnDecl)
+            self.pushSugggestion(LogMsg.UseExpectedTestFnDecl)
             ret
         }
 
-        let s = sptr.elem.strct()
-        if s == nil || !is_std_package(s.decl.token.file.path, "testing") {
-            self.push_err(f.decl.token, LogMsg.WrongTestFnDecl)
-            self.push_suggestion(LogMsg.UseExpectedTestFnDecl)
+        let s = sptr.Elem.Struct()
+        if s == nil || !isStdPackage(s.Decl.Token.File.Path, "testing") {
+            self.pushErr(f.Decl.Token, LogMsg.WrongTestFnDecl)
+            self.pushSugggestion(LogMsg.UseExpectedTestFnDecl)
             ret
         }
     }
 
-    fn precheck_type_fn(mut &self, mut &f: &Fn) {
-        if f.cpp_linked {
+    fn precheckTypeFn(mut &self, mut &f: &Fn) {
+        if f.CppLinked {
             ret
         }
 
         // Generic instances are checked instantly.
-        if f.generics.len > 0 {
+        if f.Generics.len > 0 {
             ret
         }
 
-        if f.instances.len == 0 {
-            let mut ins = f.instance_force()
-            f.instances = append(f.instances, ins)
-            self.reload_fn_ins_types(ins)
+        if f.Instances.len == 0 {
+            let mut ins = f.instanceForce()
+            f.Instances = append(f.Instances, ins)
+            self.reloadFnInsTypes(ins)
             ins.reloaded = true
 
-            if has_directive(f.directives, Directive.Test) {
-                self.check_test_fn(ins)
+            if hasDirective(f.Directives, Directive.Test) {
+                self.checkTestFn(ins)
             }
         }
     }
 
     // Prechecks types of current package file's functions.
-    fn precheck_fn_types(mut &self) {
-        for (_, mut decl) in self.file.traits {
-            for (_, mut m) in decl.methods {
-                self.precheck_type_fn(m)
+    fn precheckFnTypes(mut &self) {
+        for (_, mut decl) in self.file.Traits {
+            for (_, mut m) in decl.Methods {
+                self.precheckTypeFn(m)
             }
         }
-        for (_, mut decl) in self.file.funcs {
-            self.precheck_type_fn(decl)
+        for (_, mut decl) in self.file.Funcs {
+            self.precheckTypeFn(decl)
         }
     }
 
     // Checks types of current package file's functions.
-    fn check_fn_types(mut &self) {
-        for (_, mut decl) in self.file.funcs {
-            self.check_type_fn(decl)
+    fn checkFnTypes(mut &self) {
+        for (_, mut decl) in self.file.Funcs {
+            self.checkTypeFn(decl)
         }
     }
 
     // Checks all types of all package files.
     // Breaks checking if checked file failed.
-    fn check_package_types(mut &self) {
+    fn checkPackageTypes(mut &self) {
         for (_, mut f) in self.files {
-            self.set_current_file(f)
-            self.check_global_types()
-            self.precheck_fn_types()
+            self.setCurrentFile(f)
+            self.checkGlobalTypes()
+            self.precheckFnTypes()
             // Check structures first, see developer reference (7).
             // Check operators first, see developer reference (7.1), and (7.2).
-            self.precheck_struct_types()
+            self.precheckStructTypes()
         }
         if self.errors.len > 0 {
             ret
         }
         for (_, mut f) in self.files {
-            self.set_current_file(f)
-            self.check_fn_types()
-            self.check_struct_types()
+            self.setCurrentFile(f)
+            self.checkFnTypes()
+            self.checkStructTypes()
         }
     }
 
-    fn set_file_sema_fields(mut &self) {
-        for (_, mut f) in self.file.funcs {
+    fn setFileSemaFields(mut &self) {
+        for (_, mut f) in self.file.Funcs {
             f.sema = self
         }
-
-        for (_, mut st) in self.file.structs {
+        for (_, mut st) in self.file.Structs {
             st.sema = self
         }
     }
 
-    fn set_sema_fields(mut &self) {
+    fn setSemaFields(mut &self) {
         for (_, mut file) in self.files {
-            self.set_current_file(file)
-            self.set_file_sema_fields()
+            self.setCurrentFile(file)
+            self.setFileSemaFields()
         }
     }
 
     fn check(mut &self, mut &files: []&SymbolTable) {
         self.files = files
 
-        self.check_imports()
+        self.checkImports()
         if self.errors.len != 0 {
             ret
         }
 
-        self.set_sema_fields()
+        self.setSemaFields()
 
         // Check enums here.
         // See developer reference (8).
-        self.check_enums()
+        self.checkEnums()
         if self.errors.len != 0 {
             ret
         }
 
-        self.impl_impls()
+        self.implImpls()
         if self.errors.len != 0 {
             ret
         }
 
-        self.check_package_decls()
+        self.checkPackageDecls()
         if self.errors.len != 0 {
             ret
         }
 
-        self.check_package_types()
+        self.checkPackageTypes()
     }
 }
 
-struct MissingRetChecker {
+struct missingRetChecker {
     mut breaked: []uintptr
     mut falled:  bool
 }
 
-impl MissingRetChecker {
-    static fn new(): MissingRetChecker {
-        ret MissingRetChecker{
+impl missingRetChecker {
+    static fn new(): missingRetChecker {
+        ret missingRetChecker{
             breaked: make([]uintptr, 1 << 4),
         }
     }
 
-    fn check_conditional(self, mut c: &Conditional): bool {
-        for (_, mut elif) in c.elifs {
+    fn checkConditional(self, mut c: &Conditional): bool {
+        for (_, mut elif) in c.Elifs {
             if elif == nil {
                 ret false
             }
-            if !self.check_scope(elif.scope) {
+            if !self.checkScope(elif.Scope) {
                 ret false
             }
         }
-        ret c.default != nil && self.check_scope(c.default.scope)
+        ret c.Default != nil && self.checkScope(c.Default.Scope)
     }
 
-    fn check_match(self, mut m: &Match): bool {
-        for (_, mut c) in m.cases {
+    fn checkMatch(self, mut m: &Match): bool {
+        for (_, mut c) in m.Cases {
             if c == nil {
                 ret false
             }
             let n = self.breaked.len
-            let ok = self.check_scope(c.scope)
+            let ok = self.checkScope(c.Scope)
             match {
             | n != self.breaked.len:
                 ret false
@@ -2532,18 +2496,18 @@ impl MissingRetChecker {
                 fall
             | self.falled:
                 self.falled = false
-                if c.next == nil {
+                if c.Next == nil {
                     ret false
                 }
                 continue
             }
         }
-        ret m.default != nil && self.check_scope(m.default.scope)
+        ret m.Default != nil && self.checkScope(m.Default.Scope)
     }
 
-    fn check_inf_iter(self, mut it: &InfIter): bool {
+    fn checkInfIter(self, mut it: &InfIter): bool {
         let n = self.breaked.len
-        if self.check_scope(it.scope) {
+        if self.checkScope(it.Scope) {
             self.breaked = self.breaked[:n]
             ret true
         }
@@ -2560,17 +2524,17 @@ impl MissingRetChecker {
         ret true
     }
 
-    fn check_scope(self, mut s: &Scope): bool {
+    fn checkScope(self, mut s: &Scope): bool {
         if s == nil {
             ret false
         }
-        for (_, mut st) in s.stmts {
+        for (_, mut st) in s.Stmts {
             match type st {
             | &FallSt:
                 self.falled = true
                 ret false
             | &BreakSt:
-                let addr = (&BreakSt)(st).it
+                let addr = (&BreakSt)(st).It
                 if addr != 0 {
                     self.breaked = append(self.breaked, addr)
                 }
@@ -2578,27 +2542,27 @@ impl MissingRetChecker {
             | &ContSt:
                 ret false
             | &InfIter:
-                if self.check_inf_iter((&InfIter)(st)) {
+                if self.checkInfIter((&InfIter)(st)) {
                     ret true
                 }
             | &RetSt:
                 ret true
             | &Scope:
-                if self.check_scope((&Scope)(st)) {
+                if self.checkScope((&Scope)(st)) {
                     ret true
                 }
             | &Data:
-                match type (&Data)(st).model {
+                match type (&Data)(st).Model {
                 | &BuiltinPanicCallExprModel
                 | &BuiltinErrorCallExprModel:
                     ret true
                 }
             | &Conditional:
-                if self.check_conditional((&Conditional)(st)) {
+                if self.checkConditional((&Conditional)(st)) {
                     ret true
                 }
             | &Match:
-                if self.check_match((&Match)(st)) {
+                if self.checkMatch((&Match)(st)) {
                     ret true
                 }
             }
@@ -2607,6 +2571,6 @@ impl MissingRetChecker {
     }
 
     fn check(self, mut s: &Scope): bool {
-        ret self.check_scope(s)
+        ret self.checkScope(s)
     }
 }

@@ -39,19 +39,19 @@ use integrated for std::jule::integrated
 use sys for std::sys
 
 // Operating system specific path separator.
-pub const SEPARATOR = '\\'
+pub const Separator = '\\'
 
 // Operating system specific path list separator.
-pub const LIST_SEPARATOR = ';'
+pub const ListSeparator = ';'
 
 // Reports whether c is path separator.
-pub fn is_path_sep(c: u8): bool {
-    ret c == SEPARATOR || c == '/'
+pub fn IsPathSep(c: u8): bool {
+    ret c == Separator || c == '/'
 }
 
-fn is_slash(c: u8): bool { ret c == '\\' || c == '/' }
+fn isSlash(c: u8): bool { ret c == '\\' || c == '/' }
 
-fn to_upper(c: byte): byte {
+fn toUpper(c: byte): byte {
     if 'a' <= c && c <= 'z' {
         ret c - ('a' - 'A')
     }
@@ -59,27 +59,27 @@ fn to_upper(c: byte): byte {
 }
 
 // Reports whether the path is absolute.
-pub fn is_abs(mut path: str): bool {
-    let l = volume_name_len(path)
+pub fn IsAbs(mut path: str): bool {
+    let l = volumeNameLen(path)
     if l == 0 {
         ret false
     }
     // If the volume name starts with a double slash, this is an absolute path.
-    if is_slash(path[0]) && is_slash(path[1]) {
+    if isSlash(path[0]) && isSlash(path[1]) {
         ret true
     }
     path = path[l:]
     if path == "" {
         ret false
     }
-    ret is_slash(path[0])
+    ret isSlash(path[0])
 }
 
 // Returns length of the leading volume name on Windows.
 // It returns 0 elsewhere.
 //
 // See: https://learn.microsoft.com/en-us/dotnet/standard/io/file-path-formats
-fn volume_name_len(path: str): int {
+fn volumeNameLen(path: str): int {
     if path.len < 2 {
         ret 0
     }
@@ -89,13 +89,13 @@ fn volume_name_len(path: str): int {
         ret 2
     }
     // UNC and DOS device paths start with two slashes.
-    if !is_slash(path[0]) || !is_slash(path[1]) {
+    if !isSlash(path[0]) || !isSlash(path[1]) {
         ret 0
     }
-    let (p1, mut rest, _) = cut_path(path[2:])
+    let (p1, mut rest, _) = cutPath(path[2:])
     let mut p2 = ""
     let mut ok = false
-    p2, rest, ok = cut_path(rest)
+    p2, rest, ok = cutPath(rest)
     if !ok {
         ret path.len
     }
@@ -104,10 +104,10 @@ fn volume_name_len(path: str): int {
         ret path.len - rest.len - 1
     }
     // This is a DOS device path.
-    if p2.len == 3 && to_upper(p2[0]) == 'U' && to_upper(p2[1]) == 'N' && to_upper(p2[2]) == 'C' {
+    if p2.len == 3 && toUpper(p2[0]) == 'U' && toUpper(p2[1]) == 'N' && toUpper(p2[2]) == 'C' {
         // This is a DOS device path that links to a UNC: \\.\UNC\${HOST}\${SHARE}\
-        _, rest, _ = cut_path(rest) // host
-        _, rest, ok = cut_path(rest) // share
+        _, rest, _ = cutPath(rest) // host
+        _, rest, ok = cutPath(rest) // share
         if !ok {
             ret path.len
         }
@@ -116,54 +116,54 @@ fn volume_name_len(path: str): int {
 }
 
 // Slices path around the first path separator.
-fn cut_path(path: str): (before: str, after: str, found: bool) {
+fn cutPath(path: str): (before: str, after: str, found: bool) {
     for i in path {
-        if is_slash(path[i]) {
+        if isSlash(path[i]) {
             ret path[:i], path[i+1:], true
         }
     }
     ret path, "", false
 }
 
-fn full_path(name: str): (path: str, ok: bool) {
-    let utf16_name = integrated::utf16_from_str(name)
-    let p = &utf16_name[0]
+fn fullPath(name: str): (path: str, ok: bool) {
+    let utf16Name = integrated::Utf16FromStr(name)
+    let p = &utf16Name[0]
     let mut n: u32 = 100
     for {
         let mut buff = make([]u16, n)
-        n = unsafe { sys::get_full_path_name(p, u32(buff.len), &buff[0], nil) }
+        n = unsafe { sys::GetFullPathName(p, u32(buff.len), &buff[0], nil) }
         if n == 0 {
             ret "", false
         }
         if n <= u32(buff.len) {
-            ret integrated::utf16_to_str(buff[:n]), true
+            ret integrated::Utf16ToStr(buff[:n]), true
         }
     }
     ret "", false
 }
 
-fn __abs(mut path: str): (str, ok: bool) {
+fn abs(mut path: str): (str, ok: bool) {
     if path == "" {
         // full_path returns an error on empty path, because it's not a valid path.
         // To implement Abs behavior of returning working directory on empty string input,
         // special-case empty path by changing it to "." path. See golang.org/issue/24441.
         path = "."
     }
-    path, ok = full_path(path)
+    path, ok = fullPath(path)
     if !ok {
         ret "", false
     }
-    ret clean(path), true
+    ret Clean(path), true
 }
 
-fn __join(mut elem: ...str): str {
+fn join(mut elem: ...str): str {
     let mut s = ""
-    let mut last_char: byte = 0
+    let mut lastChar: byte = 0
     for (_, mut e) in elem {
         match {
         | s.len == 0:
             // Add the first non-empty path element unchanged.
-        | is_slash(last_char):
+        | isSlash(lastChar):
             // If the path ends in a slash, strip any leading slashes from the next
             // path element to avoid creating a UNC path (any path starting with "\\")
             // from non-UNC elements.
@@ -171,10 +171,10 @@ fn __join(mut elem: ...str): str {
             // The correct behavior for join when the first element is an incomplete UNC
             // path (for example, "\\") is underspecified. We currently join subsequent
             // elements so join("\\", "host", "share") produces "\\host\share".
-            for e.len > 0 && is_slash(e[0]) {
+            for e.len > 0 && isSlash(e[0]) {
                 e = e[1:]
             }
-        | last_char == ':':
+        | lastChar == ':':
             // If the path ends in a colon, keep the path relative to the current directory
             // on a drive and don't add a separator. Preserve leading slashes in the next
             // path element, which may make the path absolute.
@@ -184,15 +184,15 @@ fn __join(mut elem: ...str): str {
         |:
             // In all other cases, add a separator between elements.
             s += "\\"
-            last_char = '\\'
+            lastChar = '\\'
         }
         if e.len > 0 {
             s += e
-            last_char = e[e.len-1]
+            lastChar = e[e.len-1]
         }
     }
     if s.len == 0 {
         ret ""
     }
-    ret clean(s)
+    ret Clean(s)
 }

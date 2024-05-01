@@ -6,10 +6,10 @@ use conv for std::conv
 use integrated for std::jule::integrated
 use utf8 for std::unicode::utf8
 
-fn find_format_prefix(&bytes: []byte, &start: int): int {
+fn findFormatPrefix(&bytes: []byte, &start: int): int {
     let mut i = start
     for i < bytes.len {
-        let (r, size) = utf8::decode_rune(bytes[i:])
+        let (r, size) = utf8::DecodeRune(bytes[i:])
         if r == '{' {
             ret i
         }
@@ -23,11 +23,11 @@ fn find_format_prefix(&bytes: []byte, &start: int): int {
 // points to start brace at beginning.
 // i is points to position of last brace and +1 offset in the end.
 // Returns nil slice if there is no match.
-pub fn get_format_range(mut &i: int, mut &bytes: []byte): []byte {
+fn getFormatRange(mut &i: int, mut &bytes: []byte): []byte {
     let start = i
     let mut braces = 0
     for i < bytes.len {
-        let (r, size) = utf8::decode_rune(bytes[i:])
+        let (r, size) = utf8::DecodeRune(bytes[i:])
         i += size
         match r {
         | '{':
@@ -42,32 +42,32 @@ pub fn get_format_range(mut &i: int, mut &bytes: []byte): []byte {
     ret nil
 }
 
-fn fmt_by_default(&arg: any): []byte {
+fn fmtByDefault(&arg: any): []byte {
     if arg == nil {
         ret ['<', 'n', 'i', 'l', '>']
     }
 
     match type arg {
     | f32:
-        ret []byte(conv::fmt_float(f64(f32(arg)), 'g', -1, 32))
+        ret []byte(conv::FmtFloat(f64(f32(arg)), 'g', -1, 32))
     | f64:
-        ret []byte(conv::fmt_float(f64(arg), 'g', -1, 64))
+        ret []byte(conv::FmtFloat(f64(arg), 'g', -1, 64))
     | i8:
-        ret []byte(conv::fmt_int(i8(arg), 10))
+        ret []byte(conv::FmtInt(i8(arg), 10))
     | i16:
-        ret []byte(conv::fmt_int(i16(arg), 10))
+        ret []byte(conv::FmtInt(i16(arg), 10))
     | i32:
-        ret []byte(conv::fmt_int(i32(arg), 10))
+        ret []byte(conv::FmtInt(i32(arg), 10))
     | i64:
-        ret []byte(conv::fmt_int(i64(arg), 10))
+        ret []byte(conv::FmtInt(i64(arg), 10))
     | u8:
-        ret []byte(conv::fmt_uint(u8(arg), 10))
+        ret []byte(conv::FmtUint(u8(arg), 10))
     | u16:
-        ret []byte(conv::fmt_uint(u16(arg), 10))
+        ret []byte(conv::FmtUint(u16(arg), 10))
     | u32:
-        ret []byte(conv::fmt_uint(u32(arg), 10))
+        ret []byte(conv::FmtUint(u32(arg), 10))
     | u64:
-        ret []byte(conv::fmt_uint(u64(arg), 10))
+        ret []byte(conv::FmtUint(u64(arg), 10))
     | str:
         ret []byte(str(arg))
     | bool:
@@ -80,18 +80,18 @@ fn fmt_by_default(&arg: any): []byte {
     }
 }
 
-fn apply_fmt_by_default(mut &j: int, &args: ...any): []byte {
+fn applyFmtByDefault(mut &j: int, &args: ...any): []byte {
     let arg = args[j]
     j++
-    ret fmt_by_default(arg)
+    ret fmtByDefault(arg)
 }
 
 // Returns result of formatting.
 // Parameter j is the position of argument list.
-fn apply_fmt(mut &fmt: []byte, mut &j: int, &args: ...any): []byte {
+fn applyFmt(mut &fmt: []byte, mut &j: int, &args: ...any): []byte {
     // {}
     if fmt.len == 2 {
-        ret apply_fmt_by_default(j, args...)
+        ret applyFmtByDefault(j, args...)
     }
 
     // {{}} = {}
@@ -102,29 +102,29 @@ fn apply_fmt(mut &fmt: []byte, mut &j: int, &args: ...any): []byte {
     ret fmt
 }
 
-fn format_bytes(fmt: str, args: ...any): []byte {
-    let mut fmt_bytes = []byte(fmt)
+fn formatBytes(fmt: str, args: ...any): []byte {
+    let mut fmtBytes = []byte(fmt)
 
     if args.len == 0 {
-        ret fmt_bytes
+        ret fmtBytes
     }
 
     let mut bytes = make([]byte, 0, fmt.len)
 
     let mut j = 0                                   // Args position.
     let mut last = 0
-    let mut i = find_format_prefix(fmt_bytes, last)
-    for i != -1; i = find_format_prefix(fmt_bytes, i) {
-        bytes = append(bytes, fmt_bytes[last:i]...)
-        let mut format = get_format_range(i, fmt_bytes)
+    let mut i = findFormatPrefix(fmtBytes, last)
+    for i != -1; i = findFormatPrefix(fmtBytes, i) {
+        bytes = append(bytes, fmtBytes[last:i]...)
+        let mut format = getFormatRange(i, fmtBytes)
         if format == nil {
             continue
         }
 
-        bytes = append(bytes, apply_fmt(format, j, args...)...)
+        bytes = append(bytes, applyFmt(format, j, args...)...)
         if j >= args.len {
-            bytes = append(bytes, fmt_bytes[i:]...)
-            last = fmt_bytes.len
+            bytes = append(bytes, fmtBytes[i:]...)
+            last = fmtBytes.len
             break
         }
 
@@ -132,8 +132,8 @@ fn format_bytes(fmt: str, args: ...any): []byte {
         last = i
     }
 
-    if last < fmt_bytes.len {
-        bytes = append(bytes, fmt_bytes[last:]...)
+    if last < fmtBytes.len {
+        bytes = append(bytes, fmtBytes[last:]...)
     }
 
     ret bytes
@@ -162,6 +162,6 @@ fn format_bytes(fmt: str, args: ...any): []byte {
 //  - format("{} {}!", "Hello", "World") = "Hello World!"
 //  - format("{} {}") = "{} {}"
 //  - format("{} is the {}", "PI Number") = "PI Number is the {}"
-pub fn format(fmt: str, args: ...any): str {
-    ret str(format_bytes(fmt, args...))
+pub fn Format(fmt: str, args: ...any): str {
+    ret str(formatBytes(fmt, args...))
 }

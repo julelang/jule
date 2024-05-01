@@ -18,7 +18,7 @@ use std::jule::sema::{
     Trait,
 }
 
-struct LiveTable {
+struct liveTable {
     vars:    []&Var
     fns:     []&FnIns
     structs: []&StructIns
@@ -26,7 +26,7 @@ struct LiveTable {
 }
 
 pub struct ObjectDeadCode {
-    live: LiveTable
+    live: liveTable
     ir:   &IR
 }
 
@@ -37,7 +37,7 @@ impl ObjectDeadCode {
         }
     }
 
-    fn is_live[T](mut &self, &t: T): bool {
+    fn isLive[T](mut &self, &t: T): bool {
         let mut live: []T = nil
         match type T {
         | &FnIns:
@@ -57,7 +57,7 @@ impl ObjectDeadCode {
         ret false
     }
 
-    fn push_live[T](mut &self, mut t: T) {
+    fn pushLive[T](mut &self, mut t: T) {
         match type T {
         | &Var:
             self.live.vars = append(self.live.vars, t)
@@ -70,63 +70,63 @@ impl ObjectDeadCode {
         }
     }
 
-    fn set_references_as_live(mut &self, mut &rs: &ReferenceStack) {
+    fn setReferencesAsLive(mut &self, mut &rs: &ReferenceStack) {
         if rs == nil {
             ret
         }
         let mut i = 0
-        for i < rs.len(); i++ {
-            let mut ref = rs.at(i)
+        for i < rs.Len(); i++ {
+            let mut ref = rs.At(i)
             match type ref {
             | &Trait:
                 let mut t = (&Trait)(ref)
-                if self.is_live[&Trait](t) {
+                if self.isLive[&Trait](t) {
                     continue
                 }
-                self.push_live[&Trait](t)
-                for (_, mut ins) in t.methods {
-                    for (_, mut mins) in ins.instances {
-                        if self.is_live[&FnIns](mins) {
+                self.pushLive[&Trait](t)
+                for (_, mut ins) in t.Methods {
+                    for (_, mut mins) in ins.Instances {
+                        if self.isLive[&FnIns](mins) {
                             continue
                         }
-                        self.push_live[&FnIns](mins)
-                        self.set_references_as_live(mins.refers)
+                        self.pushLive[&FnIns](mins)
+                        self.setReferencesAsLive(mins.Refers)
                     }
                 }
             | &FnIns:
                 let mut f = (&FnIns)(ref)
-                if self.is_live[&FnIns](f) {
+                if self.isLive[&FnIns](f) {
                     break
                 }
-                if f.owner != nil && !f.decl.statically {
-                    if !self.is_live[&StructIns](f.owner) {
-                        self.push_live[&StructIns](f.owner)
-                        self.set_references_as_live(f.owner.refers)
+                if f.Owner != nil && !f.Decl.Statically {
+                    if !self.isLive[&StructIns](f.Owner) {
+                        self.pushLive[&StructIns](f.Owner)
+                        self.setReferencesAsLive(f.Owner.Refers)
                     }
                 }
-                self.push_live[&FnIns](f)
-                self.set_references_as_live(f.refers)
+                self.pushLive[&FnIns](f)
+                self.setReferencesAsLive(f.Refers)
             | &Var:
                 let mut v = (&Var)(ref)
-                if self.is_live[&Var](v) {
+                if self.isLive[&Var](v) {
                     break
                 }
-                self.push_live[&Var](v)
-                self.set_references_as_live(v.refers)
+                self.pushLive[&Var](v)
+                self.setReferencesAsLive(v.Refers)
             | &StructIns:
                 let mut s = (&StructIns)(ref)
-                if self.is_live[&StructIns](s) {
+                if self.isLive[&StructIns](s) {
                     break
                 }
-                self.push_live[&StructIns](s)
-                self.set_references_as_live(s.refers)
-                for (_, mut ins) in s.methods {
-                    for (_, mut mins) in ins.instances {
-                        if self.is_live[&FnIns](mins) {
+                self.pushLive[&StructIns](s)
+                self.setReferencesAsLive(s.Refers)
+                for (_, mut ins) in s.Methods {
+                    for (_, mut mins) in ins.Instances {
+                        if self.isLive[&FnIns](mins) {
                             continue
                         }
-                        self.push_live[&FnIns](mins)
-                        self.set_references_as_live(mins.refers)
+                        self.pushLive[&FnIns](mins)
+                        self.setReferencesAsLive(mins.Refers)
                     }
                 }
             }
@@ -134,55 +134,55 @@ impl ObjectDeadCode {
     }
 
     fn inits(mut &self, mut &pkg: &Package) {
-        for (_, mut file) in pkg.files {
-            for (_, mut f) in file.funcs {
-                if f.ident == build::INIT_FN {
-                    let mut ins = f.instances[0]
+        for (_, mut file) in pkg.Files {
+            for (_, mut f) in file.Funcs {
+                if f.Ident == build::InitFn {
+                    let mut ins = f.Instances[0]
                     self.live.fns = append(self.live.fns, ins)
-                    self.set_references_as_live(ins.refers)
+                    self.setReferencesAsLive(ins.Refers)
                 }
             }
         }
     }
 
-    fn collect_live_package(mut &self, mut &pkg: &Package) {
+    fn collectLivePackage(mut &self, mut &pkg: &Package) {
         // Collect live references based on initializer functions.
         self.inits(pkg)
 
         // Collect test functions if test compilation is enabled.
-        if env::TEST {
-            for (_, mut file) in pkg.files {
-                for (_, mut f) in file.funcs {
-                    if has_directive(f.directives, Directive.Test) {
-                        let mut ins = f.instances[0]
+        if env::Test {
+            for (_, mut file) in pkg.Files {
+                for (_, mut f) in file.Funcs {
+                    if hasDirective(f.Directives, Directive.Test) {
+                        let mut ins = f.Instances[0]
                         self.live.fns = append(self.live.fns, ins)
-                        self.set_references_as_live(ins.refers)
+                        self.setReferencesAsLive(ins.Refers)
                     }
                 }
             }
         }
     }
 
-    fn collect_live(mut &self) {
-        for (_, mut used) in self.ir.used {
-            if !used.cpp_linked {
-                self.collect_live_package(used.package)
+    fn collectLive(mut &self) {
+        for (_, mut used) in self.ir.Used {
+            if !used.CppLinked {
+                self.collectLivePackage(used.Package)
             }
         }
-        self.collect_live_package(self.ir.main)
+        self.collectLivePackage(self.ir.Main)
 
         // Push live references based on entry point.
-        let mut main = self.ir.main.find_fn(build::ENTRY_POINT, false)
-        let mut ins = main.instances[0]
+        let mut main = self.ir.Main.FindFn(build::EntryPoint, false)
+        let mut ins = main.Instances[0]
         self.live.fns = append(self.live.fns, ins)
-        self.set_references_as_live(ins.refers)
+        self.setReferencesAsLive(ins.Refers)
     }
 
-    fn remove_dead_globals(mut &self, mut &vars: []&Var) {
+    fn removeDeadGlobals(mut &self, mut &vars: []&Var) {
         let mut i = 0
         for i < vars.len {
             let v = vars[i]
-            if self.is_live[&Var](v) {
+            if self.isLive[&Var](v) {
                 i++
                 continue
             }
@@ -190,20 +190,20 @@ impl ObjectDeadCode {
         }
     }
 
-    fn remove_dead_fns(mut &self, mut &funcs: []&Fn) {
+    fn removeDeadFns(mut &self, mut &funcs: []&Fn) {
         let mut i = 0
         for i < funcs.len {
             let mut f = funcs[i]
             let mut j = 0
-            for j < f.instances.len {
-                let ins = f.instances[j]
-                if self.is_live[&FnIns](ins) {
+            for j < f.Instances.len {
+                let ins = f.Instances[j]
+                if self.isLive[&FnIns](ins) {
                     j++
                     continue
                 }
-                f.instances = append(f.instances[:j], f.instances[j+1:]...)
+                f.Instances = append(f.Instances[:j], f.Instances[j+1:]...)
             }
-            if f.instances.len == 0 {
+            if f.Instances.len == 0 {
                 funcs = append(funcs[:i], funcs[i+1:]...)
                 continue
             }
@@ -211,21 +211,21 @@ impl ObjectDeadCode {
         }
     }
 
-    fn remove_dead_structs(mut &self, mut &structs: []&Struct) {
+    fn removeDeadStructs(mut &self, mut &structs: []&Struct) {
         let mut i = 0
         for i < structs.len {
             let mut s = structs[i]
             let mut j = 0
-            for j < s.instances.len {
-                let mut ins = s.instances[j]
-                self.remove_dead_fns(ins.methods)
-                if ins.methods.len != 0 || self.is_live[&StructIns](ins) {
+            for j < s.Instances.len {
+                let mut ins = s.Instances[j]
+                self.removeDeadFns(ins.Methods)
+                if ins.Methods.len != 0 || self.isLive[&StructIns](ins) {
                     j++
                     continue
                 }
-                s.instances = append(s.instances[:j], s.instances[j+1:]...)
+                s.Instances = append(s.Instances[:j], s.Instances[j+1:]...)
             }
-            if s.instances.len == 0 {
+            if s.Instances.len == 0 {
                 structs = append(structs[:i], structs[i+1:]...)
                 continue
             }
@@ -233,64 +233,64 @@ impl ObjectDeadCode {
         }
     }
 
-    fn remove_dead_traits(mut &self, mut &traits: []&Trait) {
+    fn removeDeadTraits(mut &self, mut &traits: []&Trait) {
         let mut i = 0
         for i < traits.len {
             let mut t = traits[i]
-            if !self.is_live[&Trait](t) {
+            if !self.isLive[&Trait](t) {
                 traits = append(traits[:i], traits[i+1:]...)
                 continue
             }
             let mut j = 0
-            for j < t.implemented.len {
-                let s = t.implemented[j]
-                if s.instances.len > 0 {
+            for j < t.Implemented.len {
+                let s = t.Implemented[j]
+                if s.Instances.len > 0 {
                     j++
                     continue
                 }
-                t.implemented = append(t.implemented[:j], t.implemented[j+1:]...)
+                t.Implemented = append(t.Implemented[:j], t.Implemented[j+1:]...)
             }
             i++
         }
     }
 
-    fn remove_deads_file(mut &self, mut &file: &SymbolTable) {
-        self.remove_dead_fns(file.funcs)
-        self.remove_dead_structs(file.structs)
-        self.remove_dead_traits(file.traits)
-        self.remove_dead_globals(file.vars)
+    fn removeDeadsFile(mut &self, mut &file: &SymbolTable) {
+        self.removeDeadFns(file.Funcs)
+        self.removeDeadStructs(file.Structs)
+        self.removeDeadTraits(file.Traits)
+        self.removeDeadGlobals(file.Vars)
     }
 
-    fn remove_deads_package(mut &self, mut &pkg: &Package) {
-        for (_, mut file) in pkg.files {
-            self.remove_deads_file(file)
+    fn removeDeadsPackage(mut &self, mut &pkg: &Package) {
+        for (_, mut file) in pkg.Files {
+            self.removeDeadsFile(file)
         }
     }
 
-    fn remove_deads(mut &self) {
-        for (_, mut used) in self.ir.used {
-            if !used.cpp_linked {
-                self.remove_deads_package(used.package)
+    fn removeDeads(mut &self) {
+        for (_, mut used) in self.ir.Used {
+            if !used.CppLinked {
+                self.removeDeadsPackage(used.Package)
             }
         }
-        self.remove_deads_package(self.ir.main)
+        self.removeDeadsPackage(self.ir.Main)
     }
 
     fn elimanate(mut &self) {
-        self.collect_live()
-        self.remove_deads()
+        self.collectLive()
+        self.removeDeads()
     }
 }
 
-pub fn eliminate_defines(mut &ir: &IR) {
+pub fn EliminateDefines(mut &ir: &IR) {
     let mut ocd = ObjectDeadCode.new(ir)
     ocd.elimanate()
 }
 
 // Returns directive if exist.
-fn find_directive(mut &directives: []&ast::Directive, tag: str): &ast::Directive {
+fn findDirective(mut &directives: []&ast::Directive, tag: str): &ast::Directive {
     for (_, mut dr) in directives {
-        if dr.tag.kind == tag {
+        if dr.Tag.Kind == tag {
             ret dr
         }
     }
@@ -298,6 +298,6 @@ fn find_directive(mut &directives: []&ast::Directive, tag: str): &ast::Directive
 }
 
 // Reports whether directive is exist.
-fn has_directive(&directives: []&ast::Directive, tag: str): bool {
-    ret find_directive(unsafe { *(&directives) }, tag) != nil
+fn hasDirective(&directives: []&ast::Directive, tag: str): bool {
+    ret findDirective(unsafe { *(&directives) }, tag) != nil
 }

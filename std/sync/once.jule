@@ -51,7 +51,7 @@ pub struct Once {
 
 impl Once {
     // Returns new instance for Once.
-    pub static fn new(): Once {
+    pub static fn New(): Once {
         ret Once{}
     }
 
@@ -75,7 +75,7 @@ impl Once {
     //
     // If f panics, do considers it to have returned; future calls of do return
     // without calling f.
-    pub fn do(self, f: fn()) {
+    pub fn Do(self, f: fn()) {
         // Note: Here is an incorrect implementation of do:
         //
         //  if self.done.compare_swap(0, 1) {
@@ -90,18 +90,18 @@ impl Once {
         // This is why the slow path falls back to a mutex, and why
         // the self.done.store must be delayed until after f returns.
 
-        if self.done.load(MemoryOrder.Relaxed) == 0 {
+        if self.done.Load(MemoryOrder.Relaxed) == 0 {
             // Outlined slow-path to allow inlining of the fast-path.
-            self.do_slow(f)
+            self.doSlow(f)
         }
     }
 
-    fn do_slow(self, f: fn()) {
-        self.m.lock()
-        if self.done.load(MemoryOrder.Relaxed) == 0 {
+    fn doSlow(self, f: fn()) {
+        self.m.Lock()
+        if self.done.Load(MemoryOrder.Relaxed) == 0 {
             f()
-            self.done.store(1, MemoryOrder.Relaxed)
+            self.done.Store(1, MemoryOrder.Relaxed)
         }
-        self.m.unlock()
+        self.m.Unlock()
     }
 }

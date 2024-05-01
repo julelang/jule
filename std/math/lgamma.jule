@@ -194,15 +194,15 @@ static _LGAM_W: [...]f64 = [
     -1.63092934096575273989e-03, // 0xBF5AB89D0B9E43E4
 ]
 
-// Returns the natural logarithm and sign (-1 or +1) of gamma(x).
+// Returns the natural logarithm and sign (-1 or +1) of Gamma(x).
 //
 // Special cases are:
-//  lgamma(+inf) = +inf
-//  lgamma(0) = +inf
-//  lgamma(-integer) = +inf
-//  lgamma(-inf) = -inf
-//  lgamma(nan) = nan
-pub fn lgamma(mut x: f64): (lgamma: f64, sign: int) {
+//  Lgamma(+Inf) = +Inf
+//  Lgamma(0) = +Inf
+//  Lgamma(-integer) = +Inf
+//  Lgamma(-Inf) = -Inf
+//  Lgamma(NaN) = NaN
+pub fn Lgamma(mut x: f64): (lgamma: f64, sign: int) {
     const YMIN = 1.461632144968362245
     const TWO52 = 1 << 52                  // 0x4330000000000000 ~4.5036e+15
     const TWO58 = 1 << 58                  // 0x4390000000000000 ~2.8823e+17
@@ -214,14 +214,14 @@ pub fn lgamma(mut x: f64): (lgamma: f64, sign: int) {
     // special cases
     sign = 1
     match {
-    | is_nan(x):
+    | IsNaN(x):
         lgamma = x
         ret
-    | is_inf(x, 0):
+    | IsInf(x, 0):
         lgamma = x
         ret
     | x == 0:
-        lgamma = inf(1)
+        lgamma = Inf(1)
         ret
     }
 
@@ -235,21 +235,21 @@ pub fn lgamma(mut x: f64): (lgamma: f64, sign: int) {
         if neg {
             sign = -1
         }
-        lgamma = -log(x)
+        lgamma = -Log(x)
         ret
     }
     let mut nadj: f64 = 0
     if neg {
         if x >= TWO52 { // |x| >= 2**52, must be -integer
-            lgamma = inf(1)
+            lgamma = Inf(1)
             ret
         }
-        let t = sin_pi(x)
+        let t = sinPi(x)
         if t == 0 {
-            lgamma = inf(1) // -integer
+            lgamma = Inf(1) // -integer
             ret
         }
-        nadj = log(PI / abs(t * x))
+        nadj = Log(Pi / Abs(t * x))
         if t < 0 {
             sign = -1
         }
@@ -263,7 +263,7 @@ pub fn lgamma(mut x: f64): (lgamma: f64, sign: int) {
         let mut y: f64 = 0
         let mut i: int = 0
         if x <= 0.9 {
-            lgamma = -log(x)
+            lgamma = -Log(x)
             match {
             | x >= (YMIN - 1 + 0.27): // 0.7316 <= x <=  0.9
                 y = 1 - x
@@ -333,17 +333,17 @@ pub fn lgamma(mut x: f64): (lgamma: f64, sign: int) {
             fall
         | 3:
             z *= (y + 2)
-            lgamma += log(z)
+            lgamma += Log(z)
         }
     | x < TWO58: // 8 <= x < 2**58
-        let t = log(x)
+        let t = Log(x)
         let z = 1 / x
         let y = z * z
         let w = _LGAM_W[0] + z * (_LGAM_W[1] + y * (_LGAM_W[2] + y * (_LGAM_W[3] + y * (_LGAM_W[4] + y * (_LGAM_W[5] + y * _LGAM_W[6])))))
         lgamma = (x - 0.5) * (t - 1) + w
     |:
         // 2**58 <= x <= inf
-        lgamma = x * (log(x) - 1)
+        lgamma = x * (Log(x) - 1)
     }
     if neg {
         lgamma = nadj - lgamma
@@ -352,43 +352,43 @@ pub fn lgamma(mut x: f64): (lgamma: f64, sign: int) {
 }
 
 // Is a helper function for negative x
-fn sin_pi(mut x: f64): f64 {
-    const TWO52 = 1 << 52 // 0x4330000000000000 ~4.5036e+15
-    const TWO53 = 1 << 53 // 0x4340000000000000 ~9.0072e+15
+fn sinPi(mut x: f64): f64 {
+    const Two52 = 1 << 52 // 0x4330000000000000 ~4.5036e+15
+    const Two53 = 1 << 53 // 0x4340000000000000 ~9.0072e+15
     if x < 0.25 {
-        ret -sin(PI * x)
+        ret -Sin(Pi * x)
     }
 
     // argument reduction
-    let mut z = floor(x)
+    let mut z = Floor(x)
     let mut n: int = 0
     if z != x { // inexact
-        x = mod(x, 2)
+        x = Mod(x, 2)
         n = int(x * 4)
     } else {
-        if x >= TWO53 { // x must be even
+        if x >= Two53 { // x must be even
             x = 0
             n = 0
         } else {
-            if x < TWO52 {
-                z = x + TWO52 // exact
+            if x < Two52 {
+                z = x + Two52 // exact
             }
-            n = int(1 & f64_bits(z))
+            n = int(1 & F64Bits(z))
             x = f64(n)
             n <<= 2
         }
     }
     match n {
     | 0:
-        x = sin(PI * x)
+        x = Sin(Pi * x)
     | 1 | 2:
-        x = cos(PI * (0.5 - x))
+        x = Cos(Pi * (0.5 - x))
     | 3 | 4:
-        x = sin(PI * (1 - x))
+        x = Sin(Pi * (1 - x))
     | 5 | 6:
-        x = -cos(PI * (x - 1.5))
+        x = -Cos(Pi * (x - 1.5))
     |:
-        x = sin(PI * (x - 2))
+        x = Sin(Pi * (x - 2))
     }
     ret -x
 }

@@ -14,60 +14,60 @@ use std::sync::atomic::{MemoryOrder, AtomicU32}
 // in each parallel job:
 // `wg.done()` when finished
 pub struct WaitGroup {
-    task_n: AtomicU32 // current task count - reading/writing should be atomic
-    wait_n: AtomicU32 // current wait count - reading/writing should be atomic
+    taskN: AtomicU32 // current task count - reading/writing should be atomic
+    waitN: AtomicU32 // current wait count - reading/writing should be atomic
 }
 
 impl WaitGroup {
     // Returns new WaitGroup instance.
-    pub static fn new(): &WaitGroup {
+    pub static fn New(): &WaitGroup {
         ret new(WaitGroup)
     }
 
     // Increments (+delta) or decrements (-delta) task count by delta
     // and unblocks any wait() calls if task count becomes zero.
     // Panics if task count reaches below zero.
-    pub fn add(mut self, delta: int) {
-        let old_task = int(self.task_n.add(u32(delta), MemoryOrder.Relaxed))
-        let n_task = old_task + delta
-        if n_task < 0 {
-            panic("std:sync: WaitGroup.add: negative number of tasks")
+    pub fn Add(mut self, delta: int) {
+        let oldTask = int(self.taskN.Add(u32(delta), MemoryOrder.Relaxed))
+        let nTask = oldTask + delta
+        if nTask < 0 {
+            panic("std:sync: WaitGroup.Add: negative number of tasks")
         }
 
         // Number of tasks still greater than zero.
         // No need to clear waiters.
-        if n_task != 0 {
+        if nTask != 0 {
             ret
         }
 
         // Number of tasks reaches to zero, therefore clear waiters.
         for {
-            let n_waiters = self.wait_n.load(MemoryOrder.Relaxed)
-            if n_waiters == 0 {
+            let nWaiters = self.waitN.Load(MemoryOrder.Relaxed)
+            if nWaiters == 0 {
                 ret
             }
 
-            if self.wait_n.compare_swap(n_waiters, 0, MemoryOrder.Relaxed) {
+            if self.waitN.CompareSwap(nWaiters, 0, MemoryOrder.Relaxed) {
                 ret
             }
         }
     }
 
     // Decrements the WaitGroup counter by one.
-    pub fn done(mut self) { self.add(-1) }
+    pub fn Done(mut self) { self.Add(-1) }
 
     // Blocks until all tasks are done (task count becomes zero)
-    pub fn wait(mut self) {
-        let n_task = self.task_n.load(MemoryOrder.Relaxed)
-        if n_task == 0 {
+    pub fn Wait(mut self) {
+        let nTask = self.taskN.Load(MemoryOrder.Relaxed)
+        if nTask == 0 {
             // No task, no need to wait.
             ret
         }
 
         // Register this wait call to waiters.
-        self.wait_n.add(1, MemoryOrder.Relaxed)
+        self.waitN.Add(1, MemoryOrder.Relaxed)
 
         // Wait for clearing waiters.
-        for self.wait_n.load(MemoryOrder.Relaxed) != 0 {}
+        for self.waitN.Load(MemoryOrder.Relaxed) != 0 {}
     }
 }

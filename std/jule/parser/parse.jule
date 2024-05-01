@@ -8,29 +8,27 @@ use std::jule::lex::{File}
 
 // Stores information about file parsing.
 pub struct FileInfo {
-    pub ast:    &Ast
-    pub errors: []Log
+    pub Ast:    &Ast
+    pub Errors: []Log
 }
 
 // Stores information about package parsing.
 pub struct PackageInfo {
-    pub files: []&FileInfo
+    pub Files: []&FileInfo
 }
 
 // Parses fileset's tokens and builds AST.
 // Returns nil if f is not real.
 // File should not contain comment tokens.
-pub fn parse_file(mut f: &File): &FileInfo {
+pub fn ParseFile(mut f: &File): &FileInfo {
     if f == nil {
         ret nil
     }
-
-    let mut finf = &FileInfo{}
-    finf.ast, finf.errors = parse_fileset(f)
-    if finf.errors.len > 0 {
-        finf.ast = nil
+    let mut finf = new(FileInfo)
+    finf.Ast, finf.Errors = parseFileset(f)
+    if finf.Errors.len > 0 {
+        finf.Ast = nil
     }
-
     ret finf
 }
 
@@ -38,27 +36,24 @@ pub fn parse_file(mut f: &File): &FileInfo {
 // Returns nil if filesets is nil.
 // Skip fileset if nil.
 // Files should not contain comment tokens.
-pub fn parse_package(mut filesets: []&File): &PackageInfo {
+pub fn ParsePackage(mut filesets: []&File): &PackageInfo {
     if filesets == nil {
         ret nil
     }
-
-    let mut pinf = &PackageInfo{}
-    pinf.files = make([]&FileInfo, 0, filesets.len)
+    let mut pinf = new(PackageInfo)
+    pinf.Files = make([]&FileInfo, 0, filesets.len)
     for (_, mut f) in filesets {
         if f == nil {
             continue
         }
-
-        let mut finfo = parse_file(f)
-        pinf.files = append(pinf.files, finfo)
+        let mut finfo = ParseFile(f)
+        pinf.Files = append(pinf.Files, finfo)
     }
-
     ret pinf
 }
 
-fn parse_fileset(mut f: &File): (&Ast, []Log) {
-    let mut p = &Parser{}
+fn parseFileset(mut f: &File): (&Ast, []Log) {
+    let mut p = new(parser)
     p.parse(f)
     ret p.ast, p.errors
 }

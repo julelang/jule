@@ -116,31 +116,31 @@
 // Returns the square root of x.
 //
 // Special cases are:
-//  sqrt(+inf) = +inf
-//  sqrt(±0) = ±0
-//  sqrt(x < 0) = nan
-//  sqrt(nan) = nan
-pub fn sqrt(x: f64): f64 {
+//  Sqrt(+Inf) = +Inf
+//  Sqrt(±0) = ±0
+//  Sqrt(x < 0) = NaN
+//  Sqrt(NaN) = NaN
+pub fn Sqrt(x: f64): f64 {
     // special cases
     match {
-    | x == 0 | is_nan(x) | is_inf(x, 1):
+    | x == 0 | IsNaN(x) | IsInf(x, 1):
         ret x
     | x < 0:
-        ret nan()
+        ret NaN()
     }
-    let mut ix = f64_bits(x)
+    let mut ix = F64Bits(x)
     // normalize x
-    let mut exp = int((ix >> SHIFT) & MASK)
+    let mut exp = int((ix >> shift) & mask)
     if exp == 0 { // subnormal x
-        for ix&(1 << SHIFT) == 0 {
+        for ix&(1 << shift) == 0 {
             ix <<= 1
             exp--
         }
         exp++
     }
-    exp -= BIAS // unbias exponent
-    ix = ix & ^(MASK << SHIFT)
-    ix |= 1 << SHIFT
+    exp -= bias // unbias exponent
+    ix = ix & ^(mask << shift)
+    ix |= 1 << shift
     if exp&1 == 1 { // odd exp, double x to make it even
         ix <<= 1
     }
@@ -149,7 +149,7 @@ pub fn sqrt(x: f64): f64 {
     ix <<= 1
     let mut q: u64 = 0                // q = sqrt(x)
     let mut s: u64 = 0
-    let mut r = u64(1 << (SHIFT + 1)) // r = moving bit from MSB to LSB
+    let mut r = u64(1 << (shift + 1)) // r = moving bit from MSB to LSB
     for r != 0 {
         let t = s + r
         if t <= ix {
@@ -164,6 +164,6 @@ pub fn sqrt(x: f64): f64 {
     if ix != 0 { // remainder, result not exact
         q += q & 1 // round according to extra bit
     }
-    ix = q >> 1 + u64(exp - 1 + BIAS) << SHIFT // significand + biased exponent
-    ret f64_from_bits(ix)
+    ix = q >> 1 + u64(exp - 1 + bias) << shift // significand + biased exponent
+    ret F64FromBits(ix)
 }

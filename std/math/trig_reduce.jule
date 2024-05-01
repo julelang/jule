@@ -48,26 +48,26 @@ use bits for std::math::bits
 //
 // So, conservatively we can take x < 1<<29.
 // Above this threshold Payne-Hanek range reduction must be used.
-const REDUCE_THRESHOLD = 1 << 29
+const reduceThreshold = 1 << 29
 
-// Implements Payne-Hanek range reduction by PI/4
+// Implements Payne-Hanek range reduction by Pi/4
 // for x > 0. It returns the integer part mod 8 (j) and
-// the fractional part (z) of x / (PI/4).
+// the fractional part (z) of x / (Pi/4).
 // The implementation is based on:
 // "ARGUMENT REDUCTION FOR HUGE ARGUMENTS: Good to the Last Bit"
 // K. C. Ng et al, March 24, 1992
 // The simulated multi-precision calculation of x*B uses 64-bit integer arithmetic.
-fn trig_reduce(mut x: f64): (j: u64, z: f64) {
-    const PI4 = PI / 4
+fn trigReduce(mut x: f64): (j: u64, z: f64) {
+    const PI4 = Pi / 4
     if x < PI4 {
         ret 0, x
     }
     // Extract out the integer and exponent such that,
     // x = ix * 2 ** exp.
-    let mut ix = f64_bits(x)
-    let exp = int(ix >> SHIFT & MASK) - BIAS - SHIFT
-    ix = ix & ^(MASK << SHIFT)
-    ix |= 1 << SHIFT
+    let mut ix = F64Bits(x)
+    let exp = int(ix >> shift & mask) - bias - shift
+    ix = ix & ^(mask << shift)
+    ix |= 1 << shift
     // Use the exponent to extract the 3 appropriate uint64 digits from M_PI4,
     // B ~ (z0, z1, z2), such that the product leading digit has the exponent -61.
     // Note, exp >= -53 since x >= PI4 and exp < 971 for maximum f64.
@@ -76,23 +76,23 @@ fn trig_reduce(mut x: f64): (j: u64, z: f64) {
     let z1 = (M_PI4[digit+1] << bitshift) | (M_PI4[digit+2] >> (64 - bitshift))
     let z2 = (M_PI4[digit+2] << bitshift) | (M_PI4[digit+3] >> (64 - bitshift))
     // Multiply mantissa by the digits and extract the upper two digits (hi, lo).
-    let (z2hi, _) = bits::mul64(z2, ix)
-    let (z1hi, z1lo) = bits::mul64(z1, ix)
+    let (z2hi, _) = bits::Mul64(z2, ix)
+    let (z1hi, z1lo) = bits::Mul64(z1, ix)
     let z0lo = z0 * ix
-    let (lo, c) = bits::add64(z1lo, z2hi, 0)
-    let (mut hi, _) = bits::add64(z0lo, z1hi, c)
+    let (lo, c) = bits::Add64(z1lo, z2hi, 0)
+    let (mut hi, _) = bits::Add64(z0lo, z1hi, c)
     // The top 3 bits are j.
     j = hi >> 61
     // Extract the fraction and find its magnitude.
     hi = hi << 3 | lo >> 61
-    let lz = uint(bits::leading_zeros64(hi))
-    let e = u64(BIAS - (lz + 1))
+    let lz = uint(bits::LeadingZeros64(hi))
+    let e = u64(bias - (lz + 1))
     // Clear implicit mantissa bit and shift into place.
     hi = (hi << (lz + 1)) | (lo >> (64 - (lz + 1)))
-    hi >>= 64 - SHIFT
+    hi >>= 64 - shift
     // Include the exponent and convert to a float.
-    hi |= e << SHIFT
-    z = f64_from_bits(hi)
+    hi |= e << shift
+    z = F64FromBits(hi)
     // Map zeros to origin.
     if j&1 == 1 {
         j++

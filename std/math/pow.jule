@@ -41,75 +41,75 @@
 // Returns x**y, the base-x exponential of y.
 //
 // Special cases are (in order):
-//  pow(x, ±0) = 1 for any x
-//  pow(1, y) = 1 for any y
-//  pow(x, 1) = x for any x
-//  pow(nan, y) = nan
-//  pow(x, nan) = nan
-//  pow(±0, y) = ±inf for y an odd integer < 0
-//  pow(±0, -inf) = +inf
-//  pow(±0, +inf) = +0
-//  pow(±0, y) = +inf for finite y < 0 and not an odd integer
-//  pow(±0, y) = ±0 for y an odd integer > 0
-//  pow(±0, y) = +0 for finite y > 0 and not an odd integer
-//  pow(-1, ±inf) = 1
-//  pow(x, +inf) = +inf for |x| > 1
-//  pow(x, -inf) = +0 for |x| > 1
-//  pow(x, +inf) = +0 for |x| < 1
-//  pow(x, -inf) = +inf for |x| < 1
-//  pow(+inf, y) = +inf for y > 0
-//  pow(+inf, y) = +0 for y < 0
-//  pow(-inf, y) = pow(-0, -y)
-//  pow(x, y) = nan for finite x < 0 and finite non-integer y
-pub fn pow(x: f64, y: f64): f64 {
+//  Pow(x, ±0) = 1 for any x
+//  Pow(1, y) = 1 for any y
+//  Pow(x, 1) = x for any x
+//  Pow(NaN, y) = NaN
+//  Pow(x, NaN) = NaN
+//  Pow(±0, y) = ±Inf for y an odd integer < 0
+//  Pow(±0, -Inf) = +Inf
+//  Pow(±0, +Inf) = +0
+//  Pow(±0, y) = +Inf for finite y < 0 and not an odd integer
+//  Pow(±0, y) = ±0 for y an odd integer > 0
+//  Pow(±0, y) = +0 for finite y > 0 and not an odd integer
+//  Pow(-1, ±Inf) = 1
+//  Pow(x, +Inf) = +Inf for |x| > 1
+//  Pow(x, -Inf) = +0 for |x| > 1
+//  Pow(x, +Inf) = +0 for |x| < 1
+//  Pow(x, -Inf) = +Inf for |x| < 1
+//  Pow(+Inf, y) = +Inf for y > 0
+//  Pow(+Inf, y) = +0 for y < 0
+//  Pow(-Inf, y) = Pow(-0, -y)
+//  Pow(x, y) = NaN for finite x < 0 and finite non-integer y
+pub fn Pow(x: f64, y: f64): f64 {
     match {
     | y == 0 | x == 1:
         ret 1
     | y == 1:
         ret x
-    | is_nan(x) | is_nan(y):
-        ret nan()
+    | IsNaN(x) | IsNaN(y):
+        ret NaN()
     | x == 0:
         match {
         | y < 0:
-            if is_odd_int(y) {
-                ret copysign(inf(1), x)
+            if isOddInt(y) {
+                ret Copysign(Inf(1), x)
             }
-            ret inf(1)
+            ret Inf(1)
         | y > 0:
-            if is_odd_int(y) {
+            if isOddInt(y) {
                 ret x
             }
             ret 0
         }
-    | is_inf(y, 0):
+    | IsInf(y, 0):
         match {
         | x == -1:
             ret 1
-        | (abs(x) < 1) == is_inf(y, 1):
+        | (Abs(x) < 1) == IsInf(y, 1):
             ret 0
         |:
-            ret inf(1)
+            ret Inf(1)
         }
-    | is_inf(x, 0):
-        if is_inf(x, -1) {
-            ret pow(1 / x, -y) // pow(-0, -y)
+    | IsInf(x, 0):
+        if IsInf(x, -1) {
+            ret Pow(1 / x, -y) // Pow(-0, -y)
         }
         match {
         | y < 0:
             ret 0
         | y > 0:
-            ret inf(1)
+            ret Inf(1)
         }
     | y == 0.5:
-        ret sqrt(x)
+        ret Sqrt(x)
     | y == -0.5:
-        ret 1 / sqrt(x)
+        ret 1 / Sqrt(x)
     }
 
-    let (mut yi, mut yf) = modf(abs(y))
+    let (mut yi, mut yf) = Modf(Abs(y))
     if yf != 0 && x < 0 {
-        ret nan()
+        ret NaN()
     }
     if yi >= 1<<63 {
         // yi is a large even int that will lead to overflow (or underflow to 0)
@@ -117,10 +117,10 @@ pub fn pow(x: f64, y: f64): f64 {
         match {
         | x == -1:
             ret 1
-        | (abs(x) < 1) == (y > 0):
+        | (Abs(x) < 1) == (y > 0):
             ret 0
         |:
-            ret inf(1)
+            ret Inf(1)
         }
     }
 
@@ -134,14 +134,14 @@ pub fn pow(x: f64, y: f64): f64 {
             yf--
             yi++
         }
-        a1 = exp(yf * log(x))
+        a1 = Exp(yf * Log(x))
     }
 
     // ans *= x**yi
     // by multiplying in successive squarings
     // of x according to bits of yi.
     // accumulate powers of two into exp.
-    let (mut x1, mut xe) = frexp(x)
+    let (mut x1, mut xe) = Frexp(x)
     let mut i = i64(yi)
     for i != 0; i >>= 1 {
         if xe < -1<<12 || 1<<12 < xe {
@@ -172,10 +172,10 @@ pub fn pow(x: f64, y: f64): f64 {
         a1 = 1 / a1
         ae = -ae
     }
-    ret ldexp(a1, ae)
+    ret Ldexp(a1, ae)
 }
 
-fn is_odd_int(x: f64): bool {
-    let (xi, xf) = modf(x)
+fn isOddInt(x: f64): bool {
+    let (xi, xf) = Modf(x)
     ret xf == 0 && i64(xi)&1 == 1
 }

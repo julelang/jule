@@ -37,63 +37,63 @@ use std::jule::lex::{
     Token,
     TokenId,
     TokenKind,
-    is_assign_op,
-    is_postfix_op,
-    is_bin_op,
+    IsAssignOp,
+    IsPostfixOp,
+    IsBinOp,
 }
 
-fn new_scope(): &ScopeTree {
+fn newScope(): &ScopeTree {
     ret new(ScopeTree)
 }
 
 // Reports whether token is statement finish point.
-fn is_st(current: &Token, prev: &Token): (ok: bool, terminated: bool) {
-    ok = current.id == TokenId.Semicolon || prev.row < current.row
-    terminated = current.id == TokenId.Semicolon
+fn isSt(current: &Token, prev: &Token): (ok: bool, terminated: bool) {
+    ok = current.Id == TokenId.Semicolon || prev.Row < current.Row
+    terminated = current.Id == TokenId.Semicolon
     ret
 }
 
-fn prev_is_incomplete_expr(&tokens: []&Token, &i: int): bool {
+fn prevIsIncompleteExpr(&tokens: []&Token, &i: int): bool {
     // Ignore namespaces.
-    if i > 1 && tokens[i-2].id == TokenId.DblColon {
+    if i > 1 && tokens[i-2].Id == TokenId.DblColon {
         ret false
     }
     unsafe {
         let prev = tokens[i-1]
-        ret prev.id == TokenId.Dot ||
-            (prev.id == TokenId.Op &&
-                is_bin_op(prev.kind) &&
-                prev.row < tokens[i].row)
+        ret prev.Id == TokenId.Dot ||
+            (prev.Id == TokenId.Op &&
+                IsBinOp(prev.Kind) &&
+                prev.Row < tokens[i].Row)
     }
 }
 
 // Reports position of the next statement if exist, len(toks) if not.
-fn next_st_pos(&tokens: []&Token, start: int): (int, bool) {
-    let mut brace_n = 0
+fn nextStPos(&tokens: []&Token, start: int): (int, bool) {
+    let mut braceN = 0
     let mut i = start
     for i < tokens.len; i++ {
         let mut ok: bool = false
         let mut terminated: bool = false
         let tok = tokens[i]
-        match tok.id {
+        match tok.Id {
         | TokenId.Range:
-            match tok.kind {
+            match tok.Kind {
             | TokenKind.LBrace
             | TokenKind.LBracket
             | TokenKind.LParent:
-                if brace_n == 0 && i > start {
-                    if !prev_is_incomplete_expr(tokens, i) {
-                        ok, terminated = is_st(tok, tokens[i-1])
+                if braceN == 0 && i > start {
+                    if !prevIsIncompleteExpr(tokens, i) {
+                        ok, terminated = isSt(tok, tokens[i-1])
                         if ok {
                             goto return
                         }
                     }
                 }
-                brace_n++
+                braceN++
             |:
-                brace_n--
-                if brace_n == 0 && i+1 < tokens.len {
-                    ok, terminated = is_st(tokens[i+1], tok)
+                braceN--
+                if braceN == 0 && i+1 < tokens.len {
+                    ok, terminated = isSt(tokens[i+1], tok)
                     if ok {
                         i++
                         goto return
@@ -103,17 +103,17 @@ fn next_st_pos(&tokens: []&Token, start: int): (int, bool) {
             continue
         }
 
-        if brace_n != 0 {
+        if braceN != 0 {
             continue
         }
 
         if i > start {
-            if prev_is_incomplete_expr(tokens, i) {
+            if prevIsIncompleteExpr(tokens, i) {
                 continue
             }
-            ok, terminated = is_st(tok, tokens[i-1])
+            ok, terminated = isSt(tok, tokens[i-1])
         } else {
-            ok, terminated = is_st(tok, tok)
+            ok, terminated = isSt(tok, tok)
         }
         if !ok {
             continue
@@ -130,20 +130,20 @@ fn next_st_pos(&tokens: []&Token, start: int): (int, bool) {
 
 // Returns current statement tokens.
 // Starts selection at i.
-fn skip_st(mut &i: int, mut tokens: []&Token): ([]&Token, bool) {
+fn skipSt(mut &i: int, mut tokens: []&Token): ([]&Token, bool) {
     let start = i
     let mut terminated = false
-    i, terminated = next_st_pos(tokens, start)
-    let mut st_tokens = tokens[start:i]
+    i, terminated = nextStPos(tokens, start)
+    let mut stTokens = tokens[start:i]
     if terminated {
-        if st_tokens.len == 1 {
-            st_tokens, terminated = skip_st(i, tokens)
-            ret st_tokens, terminated
+        if stTokens.len == 1 {
+            stTokens, terminated = skipSt(i, tokens)
+            ret stTokens, terminated
         }
         // -1 for eliminate statement terminator.
-        st_tokens = st_tokens[:st_tokens.len-1]
+        stTokens = stTokens[:stTokens.len-1]
     }
-    ret st_tokens, terminated
+    ret stTokens, terminated
 }
 
 struct stmt {
@@ -152,11 +152,11 @@ struct stmt {
 }
 
 // Splits all statements.
-fn split_stmts(mut &tokens: []&Token): []&stmt {
+fn splitStmts(mut &tokens: []&Token): []&stmt {
     let mut stmts = make([]&stmt, 0, 20)
     let mut pos = 0
     for pos < tokens.len {
-        let (mut stmt, terminated) = skip_st(pos, tokens)
+        let (mut stmt, terminated) = skipSt(pos, tokens)
         stmts = append(stmts, &stmt{
             tokens: stmt,
             terminated: terminated,
@@ -165,14 +165,14 @@ fn split_stmts(mut &tokens: []&Token): []&stmt {
     ret stmts
 }
 
-struct ScopeParser {
-    p:     &Parser
+struct scopeParser {
+    p:     &parser
     s:     &ScopeTree
     stmts: []&stmt
     pos:   int
 }
 
-impl ScopeParser {
+impl scopeParser {
     fn stop(mut self) {
         self.pos = -1
     }
@@ -185,20 +185,20 @@ impl ScopeParser {
         ret self.pos >= self.stmts.len
     }
 
-    fn is_last_st(self): bool {
+    fn isLastSt(self): bool {
         ret self.pos+1 >= self.stmts.len
     }
 
-    fn push_err(mut self, token: &Token, fmt: LogMsg) {
-        self.p.push_err(token, fmt)
+    fn pushErr(mut self, token: &Token, fmt: LogMsg) {
+        self.p.pushErr(token, fmt)
     }
 
     // Push suggestion to last log.
-    fn push_suggestion(mut self, fmt: LogMsg, args: ...any) {
-        self.p.push_suggestion(fmt, args...)
+    fn pushSuggestion(mut self, fmt: LogMsg, args: ...any) {
+        self.p.pushSuggestion(fmt, args...)
     }
 
-    fn insert_as_next(mut self, mut &tokens: []&Token) {
+    fn insertAsNext(mut self, mut &tokens: []&Token) {
         self.stmts = append(self.stmts[:self.pos+1], self.stmts[self.pos:]...)
         self.stmts[self.pos+1] = &stmt{tokens: tokens}
     }
@@ -208,479 +208,479 @@ impl ScopeParser {
         ret self.stmts[self.pos]
     }
 
-    fn build_scope(mut self, mut &tokens: []&Token, mut end: &Token): &ScopeTree {
-        let mut s = new_scope()
-        s.parent = self.s
-        s.end = end
-        let mut ssp = ScopeParser{
+    fn buildScope(mut self, mut &tokens: []&Token, mut end: &Token): &ScopeTree {
+        let mut s = newScope()
+        s.Parent = self.s
+        s.End = end
+        let mut ssp = scopeParser{
             p: self.p,
         }
         ssp.build(tokens, s)
         ret s
     }
 
-    fn build_var_st(mut self, mut &tokens: []&Token): &VarDecl {
-        let mut v = self.p.build_var(tokens)
-        v.scope = self.s
+    fn buildVarSt(mut self, mut &tokens: []&Token): &VarDecl {
+        let mut v = self.p.buildVar(tokens)
+        v.Scope = self.s
         ret v
     }
 
-    fn build_ret_st(mut self, mut tokens: []&Token): &RetSt {
+    fn buildRetSt(mut self, mut tokens: []&Token): &RetSt {
         let mut st = &RetSt{
-            token: tokens[0],
+            Token: tokens[0],
         }
         if tokens.len > 1 {
             tokens = tokens[1:] // Remove ret keyword.
-            st.expr = self.p.build_expr(tokens)
+            st.Expr = self.p.buildExpr(tokens)
         }
         ret st
     }
 
-    fn build_while_next_iter(mut self, mut &s: &stmt): &Iter {
+    fn buildWhileNextIter(mut self, mut &s: &stmt): &Iter {
         let mut it = &Iter{
-            token: s.tokens[0],
+            Token: s.tokens[0],
         }
         let mut tokens = s.tokens[1:] // Skip "iter" keyword.
-        let mut kind = &WhileKind{}
+        let mut kind = new(WhileKind)
 
         if tokens.len > 0 {
-            kind.expr = self.p.build_expr(tokens)
+            kind.Expr = self.p.buildExpr(tokens)
         }
 
-        if self.is_last_st() {
-            self.push_err(it.token, LogMsg.InvalidSyntax)
+        if self.isLastSt() {
+            self.pushErr(it.Token, LogMsg.InvalidSyntax)
             ret nil
         }
 
         tokens = self.next().tokens
-        let mut st_tokens = get_block_expr(tokens)
-        if st_tokens.len > 0 {
+        let mut stTokens = getBlockExpr(tokens)
+        if stTokens.len > 0 {
             let mut stmt = &stmt{
                 terminated: s.terminated,
-                tokens: st_tokens,
+                tokens: stTokens,
             }
-            kind.next_token = st_tokens[0]
-            kind.next = self.build_st(stmt)
+            kind.NextToken = stTokens[0]
+            kind.Next = self.buildSt(stmt)
         }
 
-        let mut i = st_tokens.len
-        let mut block_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
-        if block_tokens == nil {
+        let mut i = stTokens.len
+        let mut blockTokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
+        if blockTokens == nil {
             self.stop()
-            self.push_err(it.token, LogMsg.BodyNotExist)
-            self.push_suggestion(LogMsg.ExpectedBody)
+            self.pushErr(it.Token, LogMsg.BodyNotExist)
+            self.pushSuggestion(LogMsg.ExpectedBody)
             ret nil
         }
         if i < tokens.len {
-            self.push_err(tokens[i], LogMsg.InvalidSyntax)
+            self.pushErr(tokens[i], LogMsg.InvalidSyntax)
         }
 
-        it.scope = self.build_scope(block_tokens, tokens[i-1])
-        it.kind = kind
+        it.Scope = self.buildScope(blockTokens, tokens[i-1])
+        it.Kind = kind
 
         ret it
     }
 
-    fn build_while_iter_kind(mut self, mut &tokens: []&Token): &WhileKind {
+    fn buildWhileIterKind(mut self, mut &tokens: []&Token): &WhileKind {
         ret &WhileKind{
-            expr: self.p.build_expr(tokens),
+            Expr: self.p.buildExpr(tokens),
         }
     }
 
-    fn get_range_kind_keys_tokens(mut self, mut &toks: []&Token): [][]&Token {
+    fn getRangeKindKeysTokens(mut self, mut &toks: []&Token): [][]&Token {
         let (mut vars, errs) = parts(toks, TokenId.Comma, true)
         self.p.errors = append(self.p.errors, errs...)
         ret vars
     }
 
-    fn build_range_kind_key(mut self, mut &tokens: []&Token): &VarDecl {
+    fn buildRangeKindKey(mut self, mut &tokens: []&Token): &VarDecl {
         if tokens.len == 0 {
             ret nil
         }
         let mut key = &VarDecl{
-            token: tokens[0],
+            Token: tokens[0],
         }
-        if key.token.id == TokenId.Mut {
-            key.mutable = true
+        if key.Token.Id == TokenId.Mut {
+            key.Mutable = true
             if tokens.len == 1 {
-                self.push_err(key.token, LogMsg.InvalidSyntax)
+                self.pushErr(key.Token, LogMsg.InvalidSyntax)
             }
-            key.token = tokens[1]
+            key.Token = tokens[1]
         } else if tokens.len > 1 {
-            self.push_err(tokens[1], LogMsg.InvalidSyntax)
+            self.pushErr(tokens[1], LogMsg.InvalidSyntax)
         }
-        if key.token.id != TokenId.Ident {
-            self.push_err(key.token, LogMsg.InvalidSyntax)
-            self.push_suggestion(LogMsg.ExpectedIdentifier)
+        if key.Token.Id != TokenId.Ident {
+            self.pushErr(key.Token, LogMsg.InvalidSyntax)
+            self.pushSuggestion(LogMsg.ExpectedIdentifier)
             ret nil
         }
-        key.ident = key.token.kind
+        key.Ident = key.Token.Kind
         ret key
     }
 
-    fn build_range_kind_keys(mut self, mut &parts: [][]&Token): []&VarDecl {
+    fn buildRangeKindKeys(mut self, mut &parts: [][]&Token): []&VarDecl {
         let mut keys: []&VarDecl = nil
         for (_, mut tokens) in parts {
-            keys = append(keys, self.build_range_kind_key(tokens))
+            keys = append(keys, self.buildRangeKindKey(tokens))
         }
         ret keys
     }
 
-    fn setup_range_kind_keys_plain(mut self, mut &rng: &RangeKind, mut &tokens: []&Token) {
-        let mut key_tokens = self.get_range_kind_keys_tokens(tokens)
-        if key_tokens.len == 0 {
+    fn setupRangeKindKeysPlain(mut self, mut &rng: &RangeKind, mut &tokens: []&Token) {
+        let mut keyTokens = self.getRangeKindKeysTokens(tokens)
+        if keyTokens.len == 0 {
             ret
         }
-        if key_tokens.len > 2 {
-            self.push_err(rng.in_token, LogMsg.MuchRangeVars)
+        if keyTokens.len > 2 {
+            self.pushErr(rng.InToken, LogMsg.MuchRangeVars)
         }
-        let mut keys = self.build_range_kind_keys(key_tokens)
-        rng.key_a = keys[0]
+        let mut keys = self.buildRangeKindKeys(keyTokens)
+        rng.KeyA = keys[0]
         if keys.len > 1 {
-            rng.key_b = keys[1]
+            rng.KeyB = keys[1]
         }
     }
 
-    fn setup_range_kind_keys_explicit(mut self, mut &rng: &RangeKind, mut &tokens: []&Token) {
+    fn setupRangeKindKeysExplicit(mut self, mut &rng: &RangeKind, mut &tokens: []&Token) {
         let mut i = 0
         let mut rang = range(i, TokenKind.LParent, TokenKind.RParent, tokens)
         if i < tokens.len {
-            self.push_err(rng.in_token, LogMsg.InvalidSyntax)
+            self.pushErr(rng.InToken, LogMsg.InvalidSyntax)
         }
-        self.setup_range_kind_keys_plain(rng, rang)
+        self.setupRangeKindKeysPlain(rng, rang)
     }
 
-    fn setup_range_kind_keys(mut self, mut &rng: &RangeKind, mut &tokens: []&Token) {
-        if tokens[0].id == TokenId.Range {
-            if tokens[0].kind != TokenKind.LParent {
-                self.push_err(tokens[0], LogMsg.InvalidSyntax)
+    fn setupRangeKindKeys(mut self, mut &rng: &RangeKind, mut &tokens: []&Token) {
+        if tokens[0].Id == TokenId.Range {
+            if tokens[0].Kind != TokenKind.LParent {
+                self.pushErr(tokens[0], LogMsg.InvalidSyntax)
                 ret
             }
-            self.setup_range_kind_keys_explicit(rng, tokens)
+            self.setupRangeKindKeysExplicit(rng, tokens)
             ret
         }
-        self.setup_range_kind_keys_plain(rng, tokens)
+        self.setupRangeKindKeysPlain(rng, tokens)
     }
 
-    fn build_range_iter_kind(mut self, mut &var_tokens: []&Token,
-        mut &expr_tokens: []&Token, mut &in_token: &Token): &RangeKind {
+    fn buildRangeIterKind(mut self, mut &var_tokens: []&Token,
+        mut &exprTokens: []&Token, mut &inToken: &Token): &RangeKind {
         let mut rng = &RangeKind{
-            in_token: in_token,
+            InToken: inToken,
         }
-        if expr_tokens.len == 0 {
-            self.push_err(rng.in_token, LogMsg.MissingExpr)
+        if exprTokens.len == 0 {
+            self.pushErr(rng.InToken, LogMsg.MissingExpr)
             ret rng
         }
-        rng.expr = self.p.build_expr(expr_tokens)
+        rng.Expr = self.p.buildExpr(exprTokens)
         if var_tokens.len > 0 {
-            self.setup_range_kind_keys(rng, var_tokens)
+            self.setupRangeKindKeys(rng, var_tokens)
         }
         ret rng
     }
 
-    fn build_common_iter_kind(mut self, mut &tokens: []&Token, &err_tok: &Token): IterKind {
-        let mut brace_n = 0
+    fn buildCommonIterKind(mut self, mut &tokens: []&Token, &err_tok: &Token): IterKind {
+        let mut braceN = 0
         for (i, mut tok) in tokens {
-            if tok.id == TokenId.Range {
-                match tok.kind {
+            if tok.Id == TokenId.Range {
+                match tok.Kind {
                 | TokenKind.LBrace
                 | TokenKind.LBracket
                 | TokenKind.LParent:
-                    brace_n++
+                    braceN++
                     continue
                 |:
-                    brace_n--
+                    braceN--
                 }
             }
-            if brace_n != 0 {
+            if braceN != 0 {
                 continue
             }
-            match tok.id {
+            match tok.Id {
             | TokenId.In:
-                let mut decl_tokens = tokens[:i]
-                let mut expr_tokens = tokens[i+1:]
-                ret self.build_range_iter_kind(decl_tokens, expr_tokens, tok)
+                let mut declTokens = tokens[:i]
+                let mut exprTokens = tokens[i+1:]
+                ret self.buildRangeIterKind(declTokens, exprTokens, tok)
             }
         }
-        ret self.build_while_iter_kind(tokens)
+        ret self.buildWhileIterKind(tokens)
     }
 
-    fn build_common_iter(mut self, mut tokens: []&Token): &Iter {
+    fn buildCommonIter(mut self, mut tokens: []&Token): &Iter {
         let mut it = &Iter{
-            token: tokens[0],
+            Token: tokens[0],
         }
         tokens = tokens[1:] // Skip "iter" keyword.
         if tokens.len == 0 {
             self.stop()
-            self.push_err(it.token, LogMsg.BodyNotExist)
-            self.push_suggestion(LogMsg.ExpectedBody)
+            self.pushErr(it.Token, LogMsg.BodyNotExist)
+            self.pushSuggestion(LogMsg.ExpectedBody)
             ret nil
         }
-        let mut expr_tokens = get_block_expr(tokens)
-        if expr_tokens.len > 0 {
-            it.kind = self.build_common_iter_kind(expr_tokens, it.token)
+        let mut exprTokens = getBlockExpr(tokens)
+        if exprTokens.len > 0 {
+            it.Kind = self.buildCommonIterKind(exprTokens, it.Token)
         }
-        let mut i = expr_tokens.len
-        let mut scope_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
-        if scope_tokens == nil {
+        let mut i = exprTokens.len
+        let mut scopeTokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
+        if scopeTokens == nil {
             self.stop()
-            self.push_err(it.token, LogMsg.BodyNotExist)
-            self.push_suggestion(LogMsg.ExpectedBody)
+            self.pushErr(it.Token, LogMsg.BodyNotExist)
+            self.pushSuggestion(LogMsg.ExpectedBody)
             ret nil
         }
         if i < tokens.len {
-            self.push_err(tokens[i], LogMsg.InvalidSyntax)
+            self.pushErr(tokens[i], LogMsg.InvalidSyntax)
         }
-        it.scope = self.build_scope(scope_tokens, tokens[i-1])
+        it.Scope = self.buildScope(scopeTokens, tokens[i-1])
         ret it
     }
 
-    fn build_iter_st(mut self, mut &st: &stmt): &Iter {
+    fn buildIterSt(mut self, mut &st: &stmt): &Iter {
         if st.terminated {
-            ret self.build_while_next_iter(st)
+            ret self.buildWhileNextIter(st)
         }
-        ret self.build_common_iter(st.tokens)
+        ret self.buildCommonIter(st.tokens)
     }
 
-    fn build_break_st(mut self, mut &tokens: []&Token): &BreakSt {
+    fn buildBreakSt(mut self, mut &tokens: []&Token): &BreakSt {
         let mut brk = &BreakSt{
-            token: tokens[0],
+            Token: tokens[0],
         }
         if tokens.len > 1 {
-            if tokens[1].id != TokenId.Ident {
-                self.push_err(tokens[1], LogMsg.InvalidSyntax)
-                self.push_suggestion(LogMsg.ExpectedLabelIdent)
+            if tokens[1].Id != TokenId.Ident {
+                self.pushErr(tokens[1], LogMsg.InvalidSyntax)
+                self.pushSuggestion(LogMsg.ExpectedLabelIdent)
             } else {
-                brk.label = tokens[1]
+                brk.Label = tokens[1]
                 if tokens.len > 2 {
-                    self.push_err(tokens[1], LogMsg.InvalidSyntax)
+                    self.pushErr(tokens[1], LogMsg.InvalidSyntax)
                 }
             }
         }
         ret brk
     }
 
-    fn build_cont_st(mut self, mut &tokens: []&Token): &ContSt {
+    fn buildContSt(mut self, mut &tokens: []&Token): &ContSt {
         let mut cont = &ContSt{
-            token: tokens[0],
+            Token: tokens[0],
         }
         if tokens.len > 1 {
-            if tokens[1].id != TokenId.Ident {
-                self.push_err(tokens[1], LogMsg.InvalidSyntax)
-                self.push_suggestion(LogMsg.ExpectedLabelIdent)
+            if tokens[1].Id != TokenId.Ident {
+                self.pushErr(tokens[1], LogMsg.InvalidSyntax)
+                self.pushSuggestion(LogMsg.ExpectedLabelIdent)
             } else {
-                cont.label = tokens[1]
+                cont.Label = tokens[1]
                 if tokens.len > 2 {
-                    self.push_err(tokens[1], LogMsg.InvalidSyntax)
+                    self.pushErr(tokens[1], LogMsg.InvalidSyntax)
                 }
             }
         }
         ret cont
     }
 
-    fn build_if(mut self, mut &tokens: []&Token): &If {
+    fn buildIf(mut self, mut &tokens: []&Token): &If {
         let mut model = &If{
-            token: tokens[0],
+            Token: tokens[0],
         }
         tokens = tokens[1:]
-        let mut expr_tokens = get_block_expr(tokens)
+        let mut exprTokens = getBlockExpr(tokens)
         let mut i = 0
-        if expr_tokens.len == 0 {
-            self.push_err(model.token, LogMsg.MissingExpr)
+        if exprTokens.len == 0 {
+            self.pushErr(model.Token, LogMsg.MissingExpr)
         } else {
-            i = expr_tokens.len
+            i = exprTokens.len
         }
-        let mut scope_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
-        if scope_tokens == nil {
+        let mut scopeTokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
+        if scopeTokens == nil {
             self.stop()
-            self.push_err(model.token, LogMsg.BodyNotExist)
-            self.push_suggestion(LogMsg.ExpectedBody)
+            self.pushErr(model.Token, LogMsg.BodyNotExist)
+            self.pushSuggestion(LogMsg.ExpectedBody)
             ret nil
         }
         let mut end = tokens[i-1]
         if i < tokens.len {
-            if tokens[i].id == TokenId.Else {
+            if tokens[i].Id == TokenId.Else {
                 tokens = tokens[i:]
             } else {
-                self.push_err(tokens[i], LogMsg.InvalidSyntax)
+                self.pushErr(tokens[i], LogMsg.InvalidSyntax)
                 tokens = nil
             }
         }
-        model.expr = self.p.build_expr(expr_tokens)
-        model.scope = self.build_scope(scope_tokens, end)
+        model.Expr = self.p.buildExpr(exprTokens)
+        model.Scope = self.buildScope(scopeTokens, end)
         ret model
     }
 
-    fn build_else(mut self, mut &tokens: []&Token): &Else {
+    fn buildElse(mut self, mut &tokens: []&Token): &Else {
         let mut els = &Else{
-            token: tokens[0],
+            Token: tokens[0],
         }
         tokens = tokens[1:] // Remove "else" keyword.
         let mut i = 0
-        let mut scope_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
-        if scope_tokens == nil {
+        let mut scopeTokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
+        if scopeTokens == nil {
             if i < tokens.len {
-                self.push_err(els.token, LogMsg.ElseHaveExpr)
+                self.pushErr(els.Token, LogMsg.ElseHaveExpr)
             } else {
                 self.stop()
-                self.push_err(els.token, LogMsg.BodyNotExist)
-                self.push_suggestion(LogMsg.ExpectedBody)
+                self.pushErr(els.Token, LogMsg.BodyNotExist)
+                self.pushSuggestion(LogMsg.ExpectedBody)
             }
             ret nil
         }
         if i < tokens.len {
-            self.push_err(tokens[i], LogMsg.InvalidSyntax)
+            self.pushErr(tokens[i], LogMsg.InvalidSyntax)
         }
-        els.scope = self.build_scope(scope_tokens, tokens[i-1])
+        els.Scope = self.buildScope(scopeTokens, tokens[i-1])
         ret els
     }
 
-    fn build_if_else_chain(mut self, mut tokens: []&Token): &Conditional {
+    fn buildIfElseChain(mut self, mut tokens: []&Token): &Conditional {
         let mut chain = &Conditional{
-            head: self.build_if(tokens),
+            Head: self.buildIf(tokens),
         }
-        if chain.head == nil {
+        if chain.Head == nil {
             ret nil
         }
         for tokens.len != 0 {
-            if tokens[0].id != TokenId.Else {
+            if tokens[0].Id != TokenId.Else {
                 break
             }
-            if tokens.len > 1 && tokens[1].id == TokenId.If {
+            if tokens.len > 1 && tokens[1].Id == TokenId.If {
                 tokens = tokens[1:] // Remove else token
-                let mut elif = self.build_if(tokens)
-                chain.tail = append(chain.tail, elif)
+                let mut elif = self.buildIf(tokens)
+                chain.Tail = append(chain.Tail, elif)
                 continue
             }
-            chain.default = self.build_else(tokens)
+            chain.Default = self.buildElse(tokens)
             break
         }
         ret chain
     }
 
-    fn build_co_call_st(mut self, mut tokens: []&Token): &CoExpr {
+    fn buildCoCallSt(mut self, mut tokens: []&Token): &CoExpr {
         let mut c = &CoExpr{
-            token: tokens[0],
+            Token: tokens[0],
         }
         tokens = tokens[1:] // Start 1 to skip "co" token.
-        c.expr = self.p.build_expr(tokens)
+        c.Expr = self.p.buildExpr(tokens)
         ret c
     }
 
-    fn build_goto_st(mut self, mut &tokens: []&Token): &GotoSt {
+    fn buildGotoSt(mut self, mut &tokens: []&Token): &GotoSt {
         let mut gt = &GotoSt{
-            token: tokens[0],
+            Token: tokens[0],
         }
         if tokens.len == 1 {
-            self.push_err(gt.token, LogMsg.MissingGotoLabel)
+            self.pushErr(gt.Token, LogMsg.MissingGotoLabel)
             ret nil
         } else if tokens.len > 2 {
-            self.push_err(tokens[2], LogMsg.InvalidSyntax)
+            self.pushErr(tokens[2], LogMsg.InvalidSyntax)
         }
-        let mut ident_token = tokens[1]
-        if ident_token.id != TokenId.Ident {
-            self.push_err(ident_token, LogMsg.InvalidSyntax)
-            self.push_suggestion(LogMsg.ExpectedIdentifier)
+        let mut identToken = tokens[1]
+        if identToken.Id != TokenId.Ident {
+            self.pushErr(identToken, LogMsg.InvalidSyntax)
+            self.pushSuggestion(LogMsg.ExpectedIdentifier)
             ret gt
         }
-        gt.label = ident_token
+        gt.Label = identToken
         ret gt
     }
 
-    fn build_fall_st(mut self, mut &tokens: []&Token): &FallSt {
+    fn buildFallSt(mut self, mut &tokens: []&Token): &FallSt {
         let mut fll = &FallSt{
-            token: tokens[0],
+            Token: tokens[0],
         }
         if tokens.len > 1 {
-            self.push_err(tokens[1], LogMsg.InvalidSyntax)
+            self.pushErr(tokens[1], LogMsg.InvalidSyntax)
         }
         ret fll
     }
 
-    fn build_type_alias_st(mut self, mut &tokens: []&Token): &TypeAliasDecl {
-        let mut tad = self.p.build_type_alias_decl(tokens)
-        tad.scope = self.s
+    fn buildTypeAliasSt(mut self, mut &tokens: []&Token): &TypeAliasDecl {
+        let mut tad = self.p.buildTypeAliasDecl(tokens)
+        tad.Scope = self.s
         ret tad
     }
 
-    fn push_case_expr(mut self, mut tokens: []&Token, mut token: &Token,
-        type_match: bool, mut &exprs: []&Expr) {
+    fn pushCaseExpr(mut self, mut tokens: []&Token, mut token: &Token,
+        typeMatch: bool, mut &exprs: []&Expr) {
         if tokens.len == 0 {
             ret
         }
 
-        if type_match {
+        if typeMatch {
             let mut i = 0
-            let (mut t, ok) = unsafe { self.p.build_type(tokens, &i, true) }
+            let (mut t, ok) = unsafe { self.p.buildType(tokens, &i, true) }
             if ok {
                 exprs = append(exprs, &Expr{
-                    token: tokens[0],
-                    end: tokens[tokens.len-1],
-                    kind: t,
+                    Token: tokens[0],
+                    End: tokens[tokens.len-1],
+                    Kind: t,
                 })
                 if i < tokens.len {
-                    self.push_err(tokens[i], LogMsg.InvalidSyntax)
+                    self.pushErr(tokens[i], LogMsg.InvalidSyntax)
                 }
             }
             ret
         }
-        exprs = append(exprs, self.p.build_expr(tokens))
+        exprs = append(exprs, self.p.buildExpr(tokens))
     }
 
-    fn build_case_exprs(mut self, mut &tokens: []&Token, type_match: bool): []&Expr {
+    fn buildCaseExprs(mut self, mut &tokens: []&Token, type_match: bool): []&Expr {
         let mut exprs = make([]&Expr, 0, 1)
 
-        let mut brace_n = 0
+        let mut braceN = 0
         let mut j = 0
         for (i, mut tok) in tokens {
-            if tok.id == TokenId.Range {
-                match tok.kind {
+            if tok.Id == TokenId.Range {
+                match tok.Kind {
                 | TokenKind.LParent
                 | TokenKind.LBrace
                 | TokenKind.LBracket:
-                    brace_n++
+                    braceN++
                 |:
-                    brace_n--
+                    braceN--
                 }
                 continue
-            } else if brace_n != 0 {
+            } else if braceN != 0 {
                 continue
             }
             match {
-            | tok.id == TokenId.Op && tok.kind == TokenKind.Vline:
-                let expr_tokens = tokens[j:i]
-                if expr_tokens.len == 0 {
-                    self.push_err(tok, LogMsg.MissingExpr)
+            | tok.Id == TokenId.Op && tok.Kind == TokenKind.Vline:
+                let exprTokens = tokens[j:i]
+                if exprTokens.len == 0 {
+                    self.pushErr(tok, LogMsg.MissingExpr)
                 } else {
-                    self.push_case_expr(tokens[j:i], tok, type_match, exprs)
+                    self.pushCaseExpr(tokens[j:i], tok, type_match, exprs)
                 }
                 j = i + 1
-            | tok.id == TokenId.Colon:
-                self.push_case_expr(tokens[j:i], tok, type_match, exprs)
+            | tok.Id == TokenId.Colon:
+                self.pushCaseExpr(tokens[j:i], tok, type_match, exprs)
                 tokens = tokens[i+1:]
                 ret exprs
             }
         }
-        self.push_err(tokens[0], LogMsg.InvalidSyntax)
+        self.pushErr(tokens[0], LogMsg.InvalidSyntax)
         tokens = nil
         ret nil
     }
 
-    fn build_case_scope(mut self, mut &tokens: []&Token): &ScopeTree {
+    fn buildCaseScope(mut self, mut &tokens: []&Token): &ScopeTree {
         let mut n = 0
         for {
             let mut i = 0
-            let (mut next, _) = skip_st(i, tokens[n:])
+            let (mut next, _) = skipSt(i, tokens[n:])
             if next.len == 0 {
                 break
             }
             let tok = next[0]
-            if tok.id != TokenId.Op || tok.kind != TokenKind.Vline {
+            if tok.Id != TokenId.Op || tok.Kind != TokenKind.Vline {
                 n += i
                 continue
             }
-            let mut scope_tokens = tokens[:n]
-            let mut scope = self.build_scope(scope_tokens, tokens[n])
+            let mut scopeTokens = tokens[:n]
+            let mut scope = self.buildScope(scopeTokens, tokens[n])
             tokens = tokens[n:]
             ret scope
         }
@@ -688,184 +688,184 @@ impl ScopeParser {
         if tokens.len > 0 {
             end = tokens[tokens.len-1]
         }
-        let mut scope = self.build_scope(tokens, end)
+        let mut scope = self.buildScope(tokens, end)
         tokens = nil
         ret scope
     }
 
-    fn build_case(mut self, mut &tokens: []&Token, type_match: bool): (&Case, bool) {
+    fn buildCase(mut self, mut &tokens: []&Token, typeMatch: bool): (&Case, bool) {
         let mut c = &Case{
-            token: tokens[0],
+            Token: tokens[0],
         }
         tokens = tokens[1:] // Remove case prefix.
-        c.exprs = self.build_case_exprs(tokens, type_match)
-        c.scope = self.build_case_scope(tokens)
-        let is_default = c.exprs.len == 0
-        ret c, is_default
+        c.Exprs = self.buildCaseExprs(tokens, typeMatch)
+        c.Scope = self.buildCaseScope(tokens)
+        let isDefault = c.Exprs.len == 0
+        ret c, isDefault
     }
 
-    fn build_cases(mut self, mut tokens: []&Token, type_match: bool): ([]&Case, &Else) {
+    fn buildCases(mut self, mut tokens: []&Token, type_match: bool): ([]&Case, &Else) {
         let mut cases: []&Case = nil
         let mut def: &Else = nil
-        let mut def_not_last = false
+        let mut defNotLast = false
         for tokens.len > 0 {
             let mut tok = tokens[0]
-            if tok.id != TokenId.Op || tok.kind != TokenKind.Vline {
-                self.push_err(tok, LogMsg.InvalidSyntax)
+            if tok.Id != TokenId.Op || tok.Kind != TokenKind.Vline {
+                self.pushErr(tok, LogMsg.InvalidSyntax)
                 break
             }
-            let (mut c, is_default) = self.build_case(tokens, type_match)
+            let (mut c, is_default) = self.buildCase(tokens, type_match)
             if is_default {
-                c.token = tok
+                c.Token = tok
                 if def == nil {
                     def = &Else{
-                        token: c.token,
-                        scope: c.scope,
+                        Token: c.Token,
+                        Scope: c.Scope,
                     }
                 } else {
-                    self.push_err(tok, LogMsg.InvalidSyntax)
+                    self.pushErr(tok, LogMsg.InvalidSyntax)
                 }
             } else {
-                def_not_last = def_not_last || def != nil
+                defNotLast = defNotLast || def != nil
                 cases = append(cases, c)
             }
         }
 
-        if def_not_last {
-            self.push_err(def.token, LogMsg.DefaultNotLast)
+        if defNotLast {
+            self.pushErr(def.Token, LogMsg.DefaultNotLast)
         }
 
         ret cases, def
     }
 
-    fn build_match_case(mut self, mut tokens: []&Token): &MatchCase {
+    fn buildMatchCase(mut self, mut tokens: []&Token): &MatchCase {
         let mut m = &MatchCase{
-            token: tokens[0],
+            Token: tokens[0],
         }
         tokens = tokens[1:] // Remove "match" keyword.
 
-        if tokens.len > 0 && tokens[0].id == TokenId.Type {
-            m.type_match = true
+        if tokens.len > 0 && tokens[0].Id == TokenId.Type {
+            m.TypeMatch = true
             tokens = tokens[1:] // Skip "type" keyword
         }
 
-        let mut expr_tokens = get_block_expr(tokens)
-        if expr_tokens.len > 0 {
-            m.expr = self.p.build_expr(expr_tokens)
-        } else if m.type_match {
-            self.push_err(m.token, LogMsg.MissingExpr)
+        let mut exprTokens = getBlockExpr(tokens)
+        if exprTokens.len > 0 {
+            m.Expr = self.p.buildExpr(exprTokens)
+        } else if m.TypeMatch {
+            self.pushErr(m.Token, LogMsg.MissingExpr)
         }
 
-        let mut i = expr_tokens.len
-        let mut block_toks = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
-        if block_toks == nil {
+        let mut i = exprTokens.len
+        let mut blockToks = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
+        if blockToks == nil {
             self.stop()
-            self.push_err(m.token, LogMsg.BodyNotExist)
-            self.push_suggestion(LogMsg.ExpectedBody)
+            self.pushErr(m.Token, LogMsg.BodyNotExist)
+            self.pushSuggestion(LogMsg.ExpectedBody)
             ret nil
         } else if i < tokens.len {
-            self.push_err(tokens[i], LogMsg.InvalidSyntax)
+            self.pushErr(tokens[i], LogMsg.InvalidSyntax)
         }
-        m.end = tokens[i-1]
-        m.cases, m.default = self.build_cases(block_toks, m.type_match)
+        m.End = tokens[i-1]
+        m.Cases, m.Default = self.buildCases(blockToks, m.TypeMatch)
         ret m
     }
 
-    fn build_scope_st(mut self, mut tokens: []&Token): &ScopeTree {
-        let mut is_unsafe = false
-        let mut is_deferred = false
+    fn buildScopeSt(mut self, mut tokens: []&Token): &ScopeTree {
+        let mut isUnsafe = false
+        let mut isDeferred = false
         let mut token = tokens[0]
-        if token.id == TokenId.Unsafe {
-            is_unsafe = true
+        if token.Id == TokenId.Unsafe {
+            isUnsafe = true
             tokens = tokens[1:]
             if tokens.len == 0 {
-                self.push_err(token, LogMsg.InvalidSyntax)
+                self.pushErr(token, LogMsg.InvalidSyntax)
                 ret nil
             }
             token = tokens[0]
-            if token.id == TokenId.Defer {
-                is_deferred = true
+            if token.Id == TokenId.Defer {
+                isDeferred = true
                 tokens = tokens[1:]
                 if tokens.len == 0 {
-                    self.push_err(token, LogMsg.InvalidSyntax)
+                    self.pushErr(token, LogMsg.InvalidSyntax)
                     ret nil
                 }
             }
-        } else if token.id == TokenId.Defer {
-            is_deferred = true
+        } else if token.Id == TokenId.Defer {
+            isDeferred = true
             tokens = tokens[1:]
             if tokens.len == 0 {
-                self.push_err(token, LogMsg.InvalidSyntax)
+                self.pushErr(token, LogMsg.InvalidSyntax)
                 ret nil
             }
         }
 
         let mut i = 0
-        let mut scope_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
-        if scope_tokens == nil {
-            self.push_err(token, LogMsg.InvalidSyntax)
+        let mut scopeTokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
+        if scopeTokens == nil {
+            self.pushErr(token, LogMsg.InvalidSyntax)
             ret nil
         } else if i < tokens.len {
-            self.push_err(tokens[i], LogMsg.InvalidSyntax)
+            self.pushErr(tokens[i], LogMsg.InvalidSyntax)
         }
-        let mut scope = self.build_scope(scope_tokens, tokens[i-1])
-        scope.unsafety = is_unsafe
-        scope.deferred = is_deferred
+        let mut scope = self.buildScope(scopeTokens, tokens[i-1])
+        scope.Unsafety = isUnsafe
+        scope.Deferred = isDeferred
         ret scope
     }
 
-    fn build_label_st(mut self, mut &tokens: []&Token): &LabelSt {
+    fn buildLabelSt(mut self, mut &tokens: []&Token): &LabelSt {
         let mut lbl = &LabelSt{
-            token: tokens[0],
-            ident: tokens[0].kind,
+            Token: tokens[0],
+            Ident: tokens[0].Kind,
         }
 
         // Save followed statement
         if tokens.len > 2 {
             tokens = tokens[2:] // Remove goto keyword and label
-            self.insert_as_next(tokens)
+            self.insertAsNext(tokens)
         }
 
         ret lbl
     }
 
-    fn build_id_st(mut self, mut &tokens: []&Token): (StmtData, ok: bool) {
+    fn buildIdSt(mut self, mut &tokens: []&Token): (StmtData, ok: bool) {
         if tokens.len == 1 {
             ret
         }
 
         let mut token = tokens[1]
-        match token.id {
+        match token.Id {
         | TokenId.Colon:
-            ret self.build_label_st(tokens), true
+            ret self.buildLabelSt(tokens), true
         }
 
         ret
     }
 
-    fn build_assign_info(mut self, mut &tokens: []&Token): &AssignInfo {
-        let mut info = &AssignInfo{
+    fn buildAssignInfo(mut self, mut &tokens: []&Token): &assignInfo {
+        let mut info = &assignInfo{
             ok: true,
         }
-        let mut brace_n = 0
+        let mut braceN = 0
         for (i, mut token) in tokens {
-            if token.id == TokenId.Range {
-                match token.kind {
+            if token.Id == TokenId.Range {
+                match token.Kind {
                 | TokenKind.LBrace
                 | TokenKind.LBracket
                 | TokenKind.LParent:
-                    brace_n++
+                    braceN++
                 |:
-                    brace_n--
+                    braceN--
                 }
             }
 
             match {
-            | brace_n > 0:
+            | braceN > 0:
                 continue
-            | token.id != TokenId.Op:
+            | token.Id != TokenId.Op:
                 continue
-            | !is_assign_op(token.kind):
+            | !IsAssignOp(token.Kind):
                 continue
             }
 
@@ -876,13 +876,13 @@ impl ScopeParser {
             info.setter = token
             if i+1 >= tokens.len {
                 info.r = nil
-                info.ok = is_postfix_op(info.setter.kind)
+                info.ok = IsPostfixOp(info.setter.Kind)
                 break
             }
             info.r = tokens[i+1:]
-            if is_postfix_op(info.setter.kind) {
+            if IsPostfixOp(info.setter.Kind) {
                 if info.r.len > 0 {
-                    self.push_err(info.r[0], LogMsg.InvalidSyntax)
+                    self.pushErr(info.r[0], LogMsg.InvalidSyntax)
                     info.r = nil
                 }
             }
@@ -891,37 +891,35 @@ impl ScopeParser {
         ret info
     }
 
-    fn build_assign_l(mut self, mut &tokens: []&Token): &AssignLeft {
+    fn buildAssignL(mut self, mut &tokens: []&Token): &AssignLeft {
         let mut l = &AssignLeft{
-            token: tokens[0],
+            Token: tokens[0],
         }
-
-        if tokens[0].id == TokenId.Ident {
-            l.ident = l.token.kind
+        if tokens[0].Id == TokenId.Ident {
+            l.Ident = l.Token.Kind
         }
-
-        l.expr = self.p.build_expr(tokens)
+        l.Expr = self.p.buildExpr(tokens)
         ret l
     }
 
-    fn build_assign_ls(mut self, mut &parts: [][]&Token): []&AssignLeft {
+    fn buildAssignLs(mut self, mut &parts: [][]&Token): []&AssignLeft {
         let mut lefts: []&AssignLeft = nil
         for (_, mut part) in parts {
-            let mut l = self.build_assign_l(part)
+            let mut l = self.buildAssignL(part)
             lefts = append(lefts, l)
         }
 
         ret lefts
     }
 
-    fn build_plain_assign(mut self, mut &tokens: []&Token): (&AssignSt, bool) {
-        let mut info = self.build_assign_info(tokens)
+    fn buildPlainAssign(mut self, mut &tokens: []&Token): (&AssignSt, bool) {
+        let mut info = self.buildAssignInfo(tokens)
         if !info.ok {
             ret nil, false
         }
 
         let mut assign = &AssignSt{
-            setter: info.setter,
+            Setter: info.setter,
         }
 
         let (mut parts, errs) = parts(info.l, TokenId.Comma, true)
@@ -930,39 +928,39 @@ impl ScopeParser {
             ret nil, false
         }
 
-        assign.left = self.build_assign_ls(parts)
+        assign.Left = self.buildAssignLs(parts)
         if info.r != nil {
-            assign.right = self.p.build_expr(info.r)
+            assign.Right = self.p.buildExpr(info.r)
         }
 
         ret assign, true
     }
 
-    fn build_decl_assign(mut self, mut tokens: []&Token): (&AssignSt, bool) {
+    fn buildDeclAssign(mut self, mut tokens: []&Token): (&AssignSt, bool) {
         if tokens.len < 1 {
             ret nil, false
         }
 
         tokens = tokens[1:] // Skip "let" keyword
         let mut token = tokens[0]
-        if token.id != TokenId.Range || token.kind != TokenKind.LParent {
+        if token.Id != TokenId.Range || token.Kind != TokenKind.LParent {
             ret nil, false
         }
 
         let mut assign = &AssignSt{
-            declarative: true,
+            Declarative: true,
         }
 
         let mut i = 0
         let mut rang = range(i, TokenKind.LParent, TokenKind.RParent, tokens)
         if rang == nil {
-            self.push_err(token, LogMsg.InvalidSyntax)
+            self.pushErr(token, LogMsg.InvalidSyntax)
             ret nil, false
         } else if i+1 < tokens.len {
-            assign.setter = tokens[i]
+            assign.Setter = tokens[i]
             i++
-            let mut expr_tokens = tokens[i:]
-            assign.right = self.p.build_expr(expr_tokens)
+            let mut exprTokens = tokens[i:]
+            assign.Right = self.p.buildExpr(exprTokens)
         }
 
         // Lefts
@@ -973,129 +971,127 @@ impl ScopeParser {
         }
 
         for (_, mut part) in parts {
-            let mut is_mut = false
-            let mut is_ref = false
+            let mut isMut = false
+            let mut isRef = false
 
             token = part[0]
-            if token.id == TokenId.Mut {
-                is_mut = true
+            if token.Id == TokenId.Mut {
+                isMut = true
                 part = part[1:]
                 if part.len == 0 {
-                    self.push_err(token, LogMsg.InvalidSyntax)
+                    self.pushErr(token, LogMsg.InvalidSyntax)
                     continue
                 }
             }
 
-            if part[0].id == TokenId.Op && part[0].kind == TokenKind.Amper {
-                is_ref = true
+            if part[0].Id == TokenId.Op && part[0].Kind == TokenKind.Amper {
+                isRef = true
                 part = part[1:]
                 if part.len == 0 {
-                    self.push_err(token, LogMsg.InvalidSyntax)
+                    self.pushErr(token, LogMsg.InvalidSyntax)
                     continue
                 }
             }
 
-            if (part[0].id != TokenId.Ident &&
-                part[0].id != TokenId.Range &&
-                part[0].kind != TokenKind.LParent) {
-                self.push_err(token, LogMsg.InvalidSyntax)
+            if (part[0].Id != TokenId.Ident &&
+                part[0].Id != TokenId.Range &&
+                part[0].Kind != TokenKind.LParent) {
+                self.pushErr(token, LogMsg.InvalidSyntax)
                 continue
             }
 
-            let mut l = self.build_assign_l(part)
-            l.mutable = is_mut
-            l.reference = is_ref
-            assign.left = append(assign.left, l)
+            let mut l = self.buildAssignL(part)
+            l.Mutable = isMut
+            l.Reference = isRef
+            assign.Left = append(assign.Left, l)
         }
 
         ret assign, true
     }
 
-    fn build_assign_st(mut self, mut &tokens: []&Token): (st: &AssignSt, ok: bool) {
-        if !check_assign_tokens(tokens) {
+    fn buildAssignSt(mut self, mut &tokens: []&Token): (st: &AssignSt, ok: bool) {
+        if !checkAssignTokens(tokens) {
             ret nil, false
         }
 
-        match tokens[0].id {
+        match tokens[0].Id {
         | TokenId.Let:
-            st, ok = self.build_decl_assign(tokens)
+            st, ok = self.buildDeclAssign(tokens)
         |:
-            st, ok = self.build_plain_assign(tokens)
+            st, ok = self.buildPlainAssign(tokens)
         }
 
         ret
     }
 
-    fn build_use_expr(mut self, mut &tokens: []&Token): &UseExpr {
+    fn buildUseExpr(mut self, mut &tokens: []&Token): &UseExpr {
         if tokens.len == 1 {
-            self.push_err(tokens[0], LogMsg.MissingExpr)
+            self.pushErr(tokens[0], LogMsg.MissingExpr)
             ret nil
         }
-
         let mut ue = &UseExpr{
-            token: tokens[0],
+            Token: tokens[0],
         }
-
         tokens = tokens[1:] // Ignore "use" keyword.
-        ue.expr = self.p.build_expr(tokens)
+        ue.Expr = self.p.buildExpr(tokens)
         ret ue
     }
 
-    fn build_st(mut self, mut &st: &stmt): StmtData {
+    fn buildSt(mut self, mut &st: &stmt): StmtData {
         let mut token = st.tokens[0]
-        if token.id == TokenId.Ident {
-            let (mut s, ok) = self.build_id_st(st.tokens)
+        if token.Id == TokenId.Ident {
+            let (mut s, ok) = self.buildIdSt(st.tokens)
             if ok {
                 ret s
             }
         }
 
-        let (mut s, ok) = self.build_assign_st(st.tokens)
+        let (mut s, ok) = self.buildAssignSt(st.tokens)
         if ok {
             ret s
         }
 
-        match token.id {
+        match token.Id {
         | TokenId.Use:
-            ret self.build_use_expr(st.tokens)
+            ret self.buildUseExpr(st.tokens)
         | TokenId.Static
         | TokenId.Const
         | TokenId.Let
         | TokenId.Mut:
-            ret self.build_var_st(st.tokens)
+            ret self.buildVarSt(st.tokens)
         | TokenId.Ret:
-            ret self.build_ret_st(st.tokens)
+            ret self.buildRetSt(st.tokens)
         | TokenId.For:
-            ret self.build_iter_st(st)
+            ret self.buildIterSt(st)
         | TokenId.Break:
-            ret self.build_break_st(st.tokens)
+            ret self.buildBreakSt(st.tokens)
         | TokenId.Cont:
-            ret self.build_cont_st(st.tokens)
+            ret self.buildContSt(st.tokens)
         | TokenId.If:
-            ret self.build_if_else_chain(st.tokens)
+            ret self.buildIfElseChain(st.tokens)
         | TokenId.Co:
-            ret self.build_co_call_st(st.tokens)
+            ret self.buildCoCallSt(st.tokens)
         | TokenId.Goto:
-            ret self.build_goto_st(st.tokens)
+            ret self.buildGotoSt(st.tokens)
         | TokenId.Fall:
-            ret self.build_fall_st(st.tokens)
+            ret self.buildFallSt(st.tokens)
         | TokenId.Type:
-            ret self.build_type_alias_st(st.tokens)
+            ret self.buildTypeAliasSt(st.tokens)
         | TokenId.Match:
-            ret self.build_match_case(st.tokens)
+            ret self.buildMatchCase(st.tokens)
         | TokenId.Unsafe
         | TokenId.Defer:
-            ret self.build_scope_st(st.tokens)
+            ret self.buildScopeSt(st.tokens)
         | TokenId.Range:
-            if token.kind == TokenKind.LBrace {
-                ret self.build_scope_st(st.tokens)
+            if token.Kind == TokenKind.LBrace {
+                ret self.buildScopeSt(st.tokens)
             }
         }
-        let mut expr = self.p.build_expr(st.tokens)
+        let mut expr = self.p.buildExpr(st.tokens)
         if expr != nil {
             ret expr
         }
-        self.push_err(token, LogMsg.InvalidSyntax)
+        self.pushErr(token, LogMsg.InvalidSyntax)
         ret nil
     }
 
@@ -1103,20 +1099,18 @@ impl ScopeParser {
         if s == nil {
             ret
         }
-
-        self.stmts = split_stmts(tokens)
+        self.stmts = splitStmts(tokens)
         self.pos = -1 // sp.next() first increase position
         self.s = s
-        for !self.is_last_st() && !self.finished() {
+        for !self.isLastSt() && !self.finished() {
             let mut st = self.next()
-            let mut data = self.build_st(st)
+            let mut data = self.buildSt(st)
             if data != nil {
-                self.s.stmts = append(self.s.stmts, Stmt{
-                    token: st.tokens[0],
-                    data: data,
+                self.s.Stmts = append(self.s.Stmts, Stmt{
+                    Token: st.tokens[0],
+                    Data: data,
                 })
             }
-
             if self.stopped() {
                 break
             }

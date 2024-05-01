@@ -89,7 +89,7 @@ use unicode for std::unicode
 use utf8 for std::unicode::utf8
 
 // Holds the position of a field in the current line.
-struct Position {
+struct position {
     line: int
     col:  int
 }
@@ -98,7 +98,7 @@ struct Position {
 //
 // As returned by [new], a Reader expects input conforming to RFC 4180.
 // The exported fields can be changed to customize the details before the
-// first call to [Reader.read] or [Reader.read_all].
+// first call to [Reader.Read] or [Reader.ReadAll].
 //
 // The Reader converts all \r\n sequences in its input to plain \n,
 // including in multiline field values, so that the returned data does
@@ -108,7 +108,7 @@ pub struct Reader {
     // It is set to comma (',') by NewReader.
     // Comma must be a valid rune and must not be \r, \n,
     // or the Unicode replacement character (0xFFFD).
-    pub comma: rune
+    pub Comma: rune
 
     // Comment, if not 0, is the comment character. Lines beginning with the
     // Comment character without preceding whitespace are ignored.
@@ -117,7 +117,7 @@ pub struct Reader {
     // Comment must be a valid rune and must not be \r, \n,
     // or the Unicode replacement character (0xFFFD).
     // It must also not be equal to comma.
-    pub comment: rune
+    pub Comment: rune
 
     // The number of expected fields per record.
     // If fields_per_record is positive, read requires each record to
@@ -125,63 +125,63 @@ pub struct Reader {
     // the number of fields in the first record, so that future records must
     // have the same field count. If fields_per_record is negative, no check is
     // made and records may have a variable number of fields.
-    pub fields_per_record: int
+    pub FieldsPerRecord: int
 
     // If it is true, a quote may appear in an unquoted field and a
     // non-doubled quote may appear in a quoted field.
-    pub lazy_quotes: bool
+    pub LazyQuotes: bool
 
     // If it is true, leading white space in a field is ignored.
     // This is done even if the field delimiter, comma, is white space.
-    pub trim_leading_space: bool
+    pub TrimLeadingSpace: bool
 
     // Controls whether calls to read may return a slice sharing
     // the backing array of the previous call's returned slice for performance.
     // By default, each call to read returns newly allocated memory owned by the caller.
-    pub reuse_record: bool
+    pub ReuseRecord: bool
 
     s: &io::Scanner
 
     // The current line being read in the CSV file.
-    num_line: int
+    numLine: int
 
     // The input stream byte offset of the current reader position.
     offset: int
 
     // rawBuffer is a line buffer only used by the readLine method.
-    raw_buffer: []byte
+    rawBuffer: []byte
 
     // Holds the unescaped fields, one after another.
     // The fields can be accessed by using the indexes in field_indexes.
     // E.g., For the row `a,"b","c""d",e`, recordBuffer will contain `abc"de`
     // and field_indexes will contain the indexes [1, 2, 5, 6].
-    record_buffer: []byte
+    recordBuffer: []byte
 
     // Index of fields inside record_buffer.
     // The i'th field ends at offset field_indexes[i] in record_buffer.
-    field_indexes: []int
+    fieldIndexes: []int
 
     // fieldPositions is an index of field positions for the
     // last record returned by Read.
-    field_positions: []Position
+    fieldPositions: []position
 
     // Record cache and only used when reuse_record == true.
-    last_record: []str
+    lastRecord: []str
 }
 
 impl Reader {
     // Returns new Reader instance that reads r.
-    pub static fn new(mut r: io::Reader): &Reader {
+    pub static fn New(mut r: io::Reader): &Reader {
         ret &Reader{
-            comma: ',',
-            s: io::Scanner.new(r),
+            Comma: ',',
+            s: io::Scanner.New(r),
         }
     }
 
     // Returns the input stream byte offset of the current reader
     // position. The offset gives the location of the end of the most recently
     // read row and the beginning of the next row.
-    pub fn input_offset(self): int {
+    pub fn InputOffset(self): int {
         ret self.offset
     }
 
@@ -189,15 +189,15 @@ impl Reader {
     // If the record has an unexpected number of fields,
     // read returns the [CsvError.FieldCount] as exception.
     // If there is no data left to be read, read returns nil.
-    // If [self.reuse_record] is true, the returned slice may be shared
+    // If [self.ReuseRecord] is true, the returned slice may be shared
     // between multiple calls to read.
     // Exception can be CsvError or ParseError, and forwards reader's exceptions.
-    pub fn read(mut self)!: (record: []str) {
-        if self.reuse_record {
-            record = self.read_record(self.last_record) else { error(error) }
-            self.last_record = record
+    pub fn Read(mut self)!: (record: []str) {
+        if self.ReuseRecord {
+            record = self.readRecord(self.lastRecord) else { error(error) }
+            self.lastRecord = record
         } else {
-            record = self.read_record(nil) else { error(error) }
+            record = self.readRecord(nil) else { error(error) }
         }
         ret
     }
@@ -208,11 +208,11 @@ impl Reader {
     // columns are counted in bytes, not runes.
     //
     // If this is called with an out-of-bounds index, it panics.
-    pub fn field_pos(self, field: int): (line: int, column: int) {
-        if field < 0 || field >= self.field_positions.len {
+    pub fn FieldPos(self, field: int): (line: int, column: int) {
+        if field < 0 || field >= self.fieldPositions.len {
             panic("std::encoding::csv: Reader: out of range index passed to field_pos")
         }
-        let p = &self.field_positions[field]
+        let p = &self.fieldPositions[field]
         unsafe {
             ret p.line, p.col
         }
@@ -221,9 +221,9 @@ impl Reader {
     // Reads all the remaining records from r.
     // Each record is a slice of fields.
     // Exception can be CsvError or ParseError, and forwards reader errors.
-    pub fn read_all(mut self)!: (records: [][]str) {
+    pub fn ReadAll(mut self)!: (records: [][]str) {
         for {
-            let mut record = self.read_record(nil) else { error(error) }
+            let mut record = self.readRecord(nil) else { error(error) }
             if record.len == 0 {
                 break
             }
@@ -235,16 +235,16 @@ impl Reader {
     // Reads the next line (with the trailing endline).
     // If EOF is hit without a trailing endline, it will be omitted.
     // The result is only valid until the next call to read_line.
-    fn read_line(mut self)!: []byte {
-        let scan = self.s.scan() else { error(error) }
+    fn readLine(mut self)!: []byte {
+        let scan = self.s.Scan() else { error(error) }
         if !scan {
             ret nil
         }
-        let mut line = self.s.bytes()
+        let mut line = self.s.Bytes()
         if line.len == 0 {
             ret nil
         }
-        self.num_line++
+        self.numLine++
         self.offset += line.len
 
         // Normalize \r\n to \n on all input lines.
@@ -255,25 +255,25 @@ impl Reader {
         ret line
     }
 
-    fn read_record(mut self, mut dst: []str)!: []str {
-        if self.comma == self.comment ||
-            !valid_delim(self.comma) ||
-            (self.comment != 0 && !valid_delim(self.comment)) {
+    fn readRecord(mut self, mut dst: []str)!: []str {
+        if self.Comma == self.Comment ||
+            !validDelim(self.Comma) ||
+            (self.Comment != 0 && !validDelim(self.Comment)) {
             error(CsvError.InvalidDelim)
         }
 
         // Read line (automatically skipping past empty lines and any comments).
         let mut line: []byte
         for {
-            line = self.read_line() else { error(error) }
+            line = self.readLine() else { error(error) }
             if line == nil {
                 ret nil
             }
-            if self.comment != 0 && next_rune(line) == self.comment {
+            if self.Comment != 0 && nextRune(line) == self.Comment {
                 line = nil
                 continue // Skip comment lines
             }
-            if line.len == length_nl(line) {
+            if line.len == lengthNl(line) {
                 line = nil
                 continue // Skip empty lines
             }
@@ -281,178 +281,177 @@ impl Reader {
         }
 
         // Parse each field in the record.
-        const QUOTE_LEN = `"`.len
-        let comma_len = utf8::rune_len(self.comma)
-        let mut rec_line = self.num_line           // Starting line for record
-        self.record_buffer = self.record_buffer[:0]
-        self.field_indexes = self.field_indexes[:0]
-        self.field_positions = self.field_positions[:0]
-        let mut pos = Position{line: self.num_line, col: 1}
-    parse_field:
+        const QuoteLen = `"`.len
+        let commaLen = utf8::RuneLen(self.Comma)
+        let mut recLine = self.numLine           // Starting line for record
+        self.recordBuffer = self.recordBuffer[:0]
+        self.fieldIndexes = self.fieldIndexes[:0]
+        self.fieldPositions = self.fieldPositions[:0]
+        let mut pos = position{line: self.numLine, col: 1}
+    parseField:
         for {
-            if self.trim_leading_space {
-                let mut i = bytes::find_fn(line, fn(mut r: rune): bool {
-                    ret !unicode::is_space(r)
+            if self.TrimLeadingSpace {
+                let mut i = bytes::FindFn(line, fn(mut r: rune): bool {
+                    ret !unicode::IsSpace(r)
                 })
                 if i == -1 {
                     i = line.len
-                    pos.col -= length_nl(line)
+                    pos.col -= lengthNl(line)
                 }
                 line = line[i:]
                 pos.col += i
             }
             if line.len == 0 || line[0] != '"' {
                 // Non-quoted string field
-                let i = bytes::find_rune(line, self.comma)
+                let i = bytes::FindRune(line, self.Comma)
                 let mut field = line
                 if i >= 0 {
                     field = field[:i]
                 } else {
-                    field = field[:field.len-length_nl(field)]
+                    field = field[:field.len-lengthNl(field)]
                 }
                 // Check to make sure a quote does not appear in field.
-                if !self.lazy_quotes {
-                    let j = bytes::find_byte(field, '"')
+                if !self.LazyQuotes {
+                    let j = bytes::FindByte(field, '"')
                     if j >= 0 {
                         error(&ParseError{
-                            start_line: rec_line,
-                            line: self.num_line,
-                            column: pos.col + j,
-                            err: CsvError.BareQuote,
+                            StartLine: recLine,
+                            Line: self.numLine,
+                            Column: pos.col + j,
+                            Err: CsvError.BareQuote,
                         })
-                        break parse_field
+                        break parseField
                     }
                 }
-                self.record_buffer = append(self.record_buffer, field...)
-                self.field_indexes = append(self.field_indexes, self.record_buffer.len)
-                self.field_positions = append(self.field_positions, pos)
+                self.recordBuffer = append(self.recordBuffer, field...)
+                self.fieldIndexes = append(self.fieldIndexes, self.recordBuffer.len)
+                self.fieldPositions = append(self.fieldPositions, pos)
                 if i >= 0 {
-                    line = line[i+comma_len:]
-                    pos.col += i + comma_len
-                    continue parse_field
+                    line = line[i+commaLen:]
+                    pos.col += i + commaLen
+                    continue parseField
                 }
-                break parse_field
+                break parseField
             } else {
                 // Quoted string field
-                let field_pos = pos
-                line = line[QUOTE_LEN:]
-                pos.col += QUOTE_LEN
+                let fieldPos = pos
+                line = line[QuoteLen:]
+                pos.col += QuoteLen
                 for {
-                    let i = bytes::find_byte(line, '"')
+                    let i = bytes::FindByte(line, '"')
                     if i >= 0 {
                         // Hit next quote.
-                        self.record_buffer = append(self.record_buffer, line[:i]...)
-                        line = line[i+QUOTE_LEN:]
-                        pos.col += i + QUOTE_LEN
-                        let rn = next_rune(line)
+                        self.recordBuffer = append(self.recordBuffer, line[:i]...)
+                        line = line[i+QuoteLen:]
+                        pos.col += i + QuoteLen
+                        let rn = nextRune(line)
                         match {
                         | rn == '"':
                             // `""` sequence (append quote).
-                            self.record_buffer = append(self.record_buffer, '"')
-                            line = line[QUOTE_LEN:]
-                            pos.col += QUOTE_LEN
-                        | rn == self.comma:
+                            self.recordBuffer = append(self.recordBuffer, '"')
+                            line = line[QuoteLen:]
+                            pos.col += QuoteLen
+                        | rn == self.Comma:
                             // `",` sequence (end of field).
-                            line = line[comma_len:]
-                            pos.col += comma_len
-                            self.field_indexes = append(self.field_indexes, self.record_buffer.len)
-                            self.field_positions = append(self.field_positions, field_pos)
-                            continue parse_field
-                        | length_nl(line) == line.len:
+                            line = line[commaLen:]
+                            pos.col += commaLen
+                            self.fieldIndexes = append(self.fieldIndexes, self.recordBuffer.len)
+                            self.fieldPositions = append(self.fieldPositions, fieldPos)
+                            continue parseField
+                        | lengthNl(line) == line.len:
                             // `"\n` sequence (end of line).
-                            self.field_indexes = append(self.field_indexes, self.record_buffer.len)
-                            self.field_positions = append(self.field_positions, field_pos)
-                            break parse_field
-                        | self.lazy_quotes:
+                            self.fieldIndexes = append(self.fieldIndexes, self.recordBuffer.len)
+                            self.fieldPositions = append(self.fieldPositions, fieldPos)
+                            break parseField
+                        | self.LazyQuotes:
                             // `"` sequence (bare quote).
-                            self.record_buffer = append(self.record_buffer, '"')
+                            self.recordBuffer = append(self.recordBuffer, '"')
                         |:
                             // `"*` sequence (invalid non-escaped quote).
                             error(&ParseError{
-                                start_line: rec_line,
-                                line: self.num_line,
-                                column: pos.col - QUOTE_LEN,
-                                err: CsvError.Quote,
+                                StartLine: recLine,
+                                Line: self.numLine,
+                                Column: pos.col - QuoteLen,
+                                Err: CsvError.Quote,
                             })
-                            break parse_field
+                            break parseField
                         }
                     } else if line.len > 0 {
                         // Hit end of line (copy all data so far).
-                        self.record_buffer = append(self.record_buffer, line...)
+                        self.recordBuffer = append(self.recordBuffer, line...)
                         pos.col += line.len
-                        line = self.read_line() else { error(error) }
+                        line = self.readLine() else { error(error) }
                         if line.len > 0 {
                             pos.line++
                             pos.col = 1
                         }
                     } else {
                         // Abrupt end of file (EOF or error).
-                        if !self.lazy_quotes {
+                        if !self.LazyQuotes {
                             error(&ParseError{
-                                start_line: rec_line,
-                                line: pos.line,
-                                column: pos.col,
-                                err: CsvError.Quote,
+                                StartLine: recLine,
+                                Line: pos.line,
+                                Column: pos.col,
+                                Err: CsvError.Quote,
                             })
-                            break parse_field
+                            break parseField
                         }
-                        self.field_indexes = append(self.field_indexes, self.record_buffer.len)
-                        self.field_positions = append(self.field_positions, field_pos)
-                        break parse_field
+                        self.fieldIndexes = append(self.fieldIndexes, self.recordBuffer.len)
+                        self.fieldPositions = append(self.fieldPositions, fieldPos)
+                        break parseField
                     }
                 }
             }
         }
-        //error(CsvError.Read)
 
         // Create a single string and create slices out of it.
         // This pins the memory of the fields together, but allocates once.
-        let s = str(self.record_buffer) // Convert to string once to batch allocations
-        if dst.cap < self.field_indexes.len {
-            dst = make([]str, self.field_indexes.len)
+        let s = str(self.recordBuffer) // Convert to string once to batch allocations
+        if dst.cap < self.fieldIndexes.len {
+            dst = make([]str, self.fieldIndexes.len)
         } else {
             dst = dst[:0]
         }
-        let mut pre_idx: int = 0
-        for i, idx in self.field_indexes {
-            dst[i] = s[pre_idx:idx]
-            pre_idx = idx
+        let mut preIdx: int = 0
+        for i, idx in self.fieldIndexes {
+            dst[i] = s[preIdx:idx]
+            preIdx = idx
         }
 
         // Check or update the expected fields per record.
-        if self.fields_per_record > 0 {
-            if dst.len != self.fields_per_record {
+        if self.FieldsPerRecord > 0 {
+            if dst.len != self.FieldsPerRecord {
                 error(&ParseError{
-                    start_line: rec_line,
-                    line: rec_line,
-                    column: 1,
-                    err: CsvError.FieldCount,
+                    StartLine: recLine,
+                    Line: recLine,
+                    Column: 1,
+                    Err: CsvError.FieldCount,
                 })
             }
-        } else if self.fields_per_record == 0 {
-            self.fields_per_record = dst.len
+        } else if self.FieldsPerRecord == 0 {
+            self.FieldsPerRecord = dst.len
         }
         ret dst
     }
 }
 
-fn valid_delim(r: rune): bool {
+fn validDelim(r: rune): bool {
     ret r != 0 &&
         r != '"' &&
         r != '\r' &&
         r != '\n' &&
-        utf8::valid_rune(r) &&
-        r != utf8::RUNE_ERROR
+        utf8::ValidRune(r) &&
+        r != utf8::RuneError
 }
 
-// Returns the next rune in b or utf8::RUNE_ERROR.
-fn next_rune(b: []byte): rune {
-    let (r, _) = utf8::decode_rune(b)
+// Returns the next rune in b or utf8::RuneError.
+fn nextRune(b: []byte): rune {
+    let (r, _) = utf8::DecodeRune(b)
     ret r
 }
 
 // Reports the number of bytes for the trailing \n.
-fn length_nl(b: []byte): int {
+fn lengthNl(b: []byte): int {
     if b.len > 0 && b[b.len-1] == '\n' {
         ret 1
     }

@@ -75,7 +75,7 @@
 //         to compute the worse one.)
 //
 //      3 Special cases
-//              j1(nan)= nan
+//              j1(NaN)= NaN
 //              j1(0) = 0
 //              j1(inf) = 0
 //
@@ -100,10 +100,10 @@
 // Returns the order-one Bessel function of the first kind.
 //
 // Special cases are:
-//  j1(±inf) = 0
-//  j1(nan) = nan
-pub fn j1(mut x: f64): f64 {
-    const TWO_M27 = 1.0 / (1 << 27)   // 2**-27 0x3e40000000000000
+//  J1(±Inf) = 0
+//  J1(NaN) = NaN
+pub fn J1(mut x: f64): f64 {
+    const TWO_M27 = 1.0 / (1 << 27)    // 2**-27 0x3e40000000000000
     const TWO129 = 0x4800000000000000 // 1 << 129 // 2**129 0x4800000000000000
     // R0/S0 on [0, 2]
     const R00 = -6.25000000000000000000e-02 // 0xBFB0000000000000
@@ -117,9 +117,9 @@ pub fn j1(mut x: f64): f64 {
     const S05 = 1.23542274426137913908e-11  // 0x3DAB2ACFCFB97ED8
     // special cases
     match {
-    | is_nan(x):
+    | IsNaN(x):
         ret x
-    | is_inf(x, 0) | x == 0:
+    | IsInf(x, 0) | x == 0:
         ret 0
     }
 
@@ -129,13 +129,13 @@ pub fn j1(mut x: f64): f64 {
         sign = true
     }
     if x >= 2 {
-        let (s, c) = sincos(x)
+        let (s, c) = Sincos(x)
         let mut ss = -s - c
         let mut cc = s - c
 
         // make sure x+x does not overflow
         if x < f64.MAX/2 {
-            let z = cos(x + x)
+            let z = Cos(x + x)
             if s*c > 0 {
                 cc = z / ss
             } else {
@@ -148,11 +148,11 @@ pub fn j1(mut x: f64): f64 {
 
         let mut z: f64 = 0
         if x > TWO129 {
-            z = (1 / SQRT_PI) * cc / sqrt(x)
+            z = (1 / SqrtPi) * cc / Sqrt(x)
         } else {
             let u = pone(x)
             let v = qone(x)
-            z = (1 / SQRT_PI) * (u * cc - v * ss) / sqrt(x)
+            z = (1 / SqrtPi) * (u * cc - v * ss) / Sqrt(x)
         }
         if sign {
             ret -z
@@ -177,12 +177,12 @@ pub fn j1(mut x: f64): f64 {
 // Returns the order-one Bessel function of the second kind.
 //
 // Special cases are:
-//  y1(+inf) = 0
-//  y1(0) = -inf
-//  y1(x < 0) = nan
-//  y1(nan) = nan
-pub fn y1(x: f64): f64 {
-    const TWO_M54 = 1.0 / (1 << 54)         // 2**-54 0x3c90000000000000
+//  Y1(+Inf) = 0
+//  Y1(0) = -Inf
+//  Y1(x < 0) = NaN
+//  Y1(NaN) = NaN
+pub fn Y1(x: f64): f64 {
+    const TWO_M54 = 1.0 / (1 << 54)          // 2**-54 0x3c90000000000000
     const TWO129 = 0x4800000000000000       // 1 << 129 // 2**129 0x4800000000000000
     const U00 = -1.96057090646238940668e-01 // 0xBFC91866143CBC8A
     const U01 = 5.04438716639811282616e-02  // 0x3FA9D3C776292CD1
@@ -196,22 +196,22 @@ pub fn y1(x: f64): f64 {
     const V04 = 1.66559246207992079114e-11  // 0x3DB25039DACA772A
     // special cases
     match {
-    | x < 0 | is_nan(x):
-        ret nan()
-    | is_inf(x, 1):
+    | x < 0 | IsNaN(x):
+        ret NaN()
+    | IsInf(x, 1):
         ret 0
     | x == 0:
-        ret inf(-1)
+        ret Inf(-1)
     }
 
     if x >= 2 {
-        let (s, c) = sincos(x)
+        let (s, c) = Sincos(x)
         let mut ss = -s - c
         let mut cc = s - c
 
         // make sure x+x does not overflow
         if x < f64.MAX/2 {
-            let z = cos(x + x)
+            let z = Cos(x + x)
             if s*c > 0 {
                 cc = z / ss
             } else {
@@ -231,21 +231,21 @@ pub fn y1(x: f64): f64 {
 
         let mut z: f64 = 0
         if x > TWO129 {
-            z = (1 / SQRT_PI) * ss / sqrt(x)
+            z = (1 / SqrtPi) * ss / Sqrt(x)
         } else {
             let u = pone(x)
             let v = qone(x)
-            z = (1 / SQRT_PI) * (u * ss + v * cc) / sqrt(x)
+            z = (1 / SqrtPi) * (u * ss + v * cc) / Sqrt(x)
         }
         ret z
     }
     if x <= TWO_M54 { // x < 2**-54
-        ret -(2 / PI) / x
+        ret -(2 / Pi) / x
     }
     let z = x * x
     let u = U00 + z * (U01 + z * (U02 + z * (U03 + z * U04)))
     let v = 1 + z * (V00 + z * (V01 + z * (V02 + z * (V03 + z * V04))))
-    ret x * (u / v) + (2 / PI) * (j1(x) * log(x) - 1 / x)
+    ret x * (u / v) + (2 / Pi) * (J1(x) * Log(x) - 1 / x)
 }
 
 // For x >= 8, the asymptotic expansions of pone is
@@ -258,7 +258,7 @@ pub fn y1(x: f64): f64 {
 //      | pone(x)-1-R/S | <= 2**(-60.06)
 
 // for x in [+inf, 8]=1/[0,0.125]
-static P_1R8: [6]f64 = [
+static p1r8: [6]f64 = [
     0.00000000000000000000e+00, // 0x0000000000000000
     1.17187499999988647970e-01, // 0x3FBDFFFFFFFFFCCE
     1.32394806593073575129e+01, // 0x402A7A9D357F7FCE
@@ -266,7 +266,7 @@ static P_1R8: [6]f64 = [
     3.87474538913960532227e+03, // 0x40AE457DA3A532CC
     7.91447954031891731574e+03, // 0x40BEEA7AC32782DD
 ]
-static P_1S8: [5]f64 = [
+static p1s8: [5]f64 = [
     1.14207370375678408436e+02, // 0x405C8D458E656CAC
     3.65093083420853463394e+03, // 0x40AC85DC964D274F
     3.69562060269033463555e+04, // 0x40E20B8697C5BB7F
@@ -275,7 +275,7 @@ static P_1S8: [5]f64 = [
 ]
 
 // for x in [8,4.5454] = 1/[0.125,0.22001]
-static P_1R5: [6]f64 = [
+static p1r5: [6]f64 = [
     1.31990519556243522749e-11, // 0x3DAD0667DAE1CA7D
     1.17187493190614097638e-01, // 0x3FBDFFFFE2C10043
     6.80275127868432871736e+00, // 0x401B36046E6315E3
@@ -283,7 +283,7 @@ static P_1R5: [6]f64 = [
     5.17636139533199752805e+02, // 0x40802D16D052D649
     5.28715201363337541807e+02, // 0x408085B8BB7E0CB7
 ]
-static P_1S5: [5]f64 = [
+static p1s5: [5]f64 = [
     5.92805987221131331921e+01, // 0x404DA3EAA8AF633D
     9.91401418733614377743e+02, // 0x408EFB361B066701
     5.35326695291487976647e+03, // 0x40B4E9445706B6FB
@@ -292,7 +292,7 @@ static P_1S5: [5]f64 = [
 ]
 
 // for x in[4.5453,2.8571] = 1/[0.2199,0.35001]
-static P_1R3: [6]f64 = [
+static p1r3: [6]f64 = [
     3.02503916137373618024e-09, // 0x3E29FC21A7AD9EDD
     1.17186865567253592491e-01, // 0x3FBDFFF55B21D17B
     3.93297750033315640650e+00, // 0x400F76BCE85EAD8A
@@ -300,7 +300,7 @@ static P_1R3: [6]f64 = [
     9.10550110750781271918e+01, // 0x4056C3854D2C1837
     4.85590685197364919645e+01, // 0x4048478F8EA83EE5
 ]
-static P_1S3: [5]f64 = [
+static p1s3: [5]f64 = [
     3.47913095001251519989e+01, // 0x40416549A134069C
     3.36762458747825746741e+02, // 0x40750C3307F1A75F
     1.04687139975775130551e+03, // 0x40905B7C5037D523
@@ -309,7 +309,7 @@ static P_1S3: [5]f64 = [
 ]
 
 // for x in [2.8570,2] = 1/[0.3499,0.5]
-static P_1R2: [6]f64 = [
+static p1r2: [6]f64 = [
     1.07710830106873743082e-07, // 0x3E7CE9D4F65544F4
     1.17176219462683348094e-01, // 0x3FBDFF42BE760D83
     2.36851496667608785174e+00, // 0x4002F2B7F98FAEC0
@@ -317,7 +317,7 @@ static P_1R2: [6]f64 = [
     1.76939711271687727390e+01, // 0x4031B1A8177F8EE2
     5.07352312588818499250e+00, // 0x40144B49A574C1FE
 ]
-static P_1S2: [5]f64 = [
+static p1s2: [5]f64 = [
     2.14364859363821409488e+01, // 0x40356FBD8AD5ECDC
     1.25290227168402751090e+02, // 0x405F529314F92CD5
     2.32276469057162813669e+02, // 0x406D08D8D5A2DBD9
@@ -329,17 +329,17 @@ fn pone(x: f64): f64 {
     let mut p: *[6]f64 = nil
     let mut q: *[5]f64 = nil
     if x >= 8 {
-        p = &P_1R8
-        q = &P_1S8
+        p = &p1r8
+        q = &p1s8
     } else if x >= 4.5454 {
-        p = &P_1R5
-        q = &P_1S5
+        p = &p1r5
+        q = &p1s5
     } else if x >= 2.8571 {
-        p = &P_1R3
-        q = &P_1S3
+        p = &p1r3
+        q = &p1s3
     } else if x >= 2 {
-        p = &P_1R2
-        q = &P_1S2
+        p = &p1r2
+        q = &p1s2
     }
     unsafe {
         let z = 1 / (x * x)
@@ -359,7 +359,7 @@ fn pone(x: f64): f64 {
 //      | qone(x)/s -0.375-R/S | <= 2**(-61.13)
 
 // for x in [+inf, 8] = 1/[0,0.125]
-static Q_1R8: [6]f64 = [
+static q1r8: [6]f64 = [
     0.00000000000000000000e+00,  // 0x0000000000000000
     -1.02539062499992714161e-01, // 0xBFBA3FFFFFFFFDF3
     -1.62717534544589987888e+01, // 0xC0304591A26779F7
@@ -367,7 +367,7 @@ static Q_1R8: [6]f64 = [
     -1.18498066702429587167e+04, // 0xC0C724E740F87415
     -4.84385124285750353010e+04, // 0xC0E7A6D065D09C6A
 ]
-static Q_1S8: [6]f64 = [
+static q1s8: [6]f64 = [
     1.61395369700722909556e+02,  // 0x40642CA6DE5BCDE5
     7.82538599923348465381e+03,  // 0x40BE9162D0D88419
     1.33875336287249578163e+05,  // 0x4100579AB0B75E98
@@ -377,7 +377,7 @@ static Q_1S8: [6]f64 = [
 ]
 
 // for x in [8,4.5454] = 1/[0.125,0.22001]
-static Q_1R5: [6]f64 = [
+static q1r5: [6]f64 = [
     -2.08979931141764104297e-11, // 0xBDB6FA431AA1A098
     -1.02539050241375426231e-01, // 0xBFBA3FFFCB597FEF
     -8.05644828123936029840e+00, // 0xC0201CE6CA03AD4B
@@ -385,7 +385,7 @@ static Q_1R5: [6]f64 = [
     -1.37319376065508163265e+03, // 0xC09574C66931734F
     -2.61244440453215656817e+03, // 0xC0A468E388FDA79D
 ]
-static Q_1S5: [6]f64 = [
+static q1s5: [6]f64 = [
     8.12765501384335777857e+01,  // 0x405451B2FF5A11B2
     1.99179873460485964642e+03,  // 0x409F1F31E77BF839
     1.74684851924908907677e+04,  // 0x40D10F1F0D64CE29
@@ -395,7 +395,7 @@ static Q_1S5: [6]f64 = [
 ]
 
 // for x in [4.5454,2.8571] = 1/[0.2199,0.35001] ???
-static Q_1R3: [6]f64 = [
+static q1r3: [6]f64 = [
     -5.07831226461766561369e-09, // 0xBE35CFA9D38FC84F
     -1.02537829820837089745e-01, // 0xBFBA3FEB51AEED54
     -4.61011581139473403113e+00, // 0xC01270C23302D9FF
@@ -403,7 +403,7 @@ static Q_1R3: [6]f64 = [
     -2.28244540737631695038e+02, // 0xC06C87D34718D55F
     -2.19210128478909325622e+02, // 0xC06B66B95F5C1BF6
 ]
-static Q_1S3: [6]f64 = [
+static q1s3: [6]f64 = [
     4.76651550323729509273e+01,  // 0x4047D523CCD367E4
     6.73865112676699709482e+02,  // 0x40850EEBC031EE3E
     3.38015286679526343505e+03,  // 0x40AA684E448E7C9A
@@ -413,7 +413,7 @@ static Q_1S3: [6]f64 = [
 ]
 
 // for x in [2.8570,2] = 1/[0.3499,0.5]
-static Q_1R2: [6]f64 = [
+static q1r2: [6]f64 = [
     -1.78381727510958865572e-07, // 0xBE87F12644C626D2
     -1.02517042607985553460e-01, // 0xBFBA3E8E9148B010
     -2.75220568278187460720e+00, // 0xC006048469BB4EDA
@@ -421,7 +421,7 @@ static Q_1R2: [6]f64 = [
     -4.23253133372830490089e+01, // 0xC04529A3DE104AAA
     -2.13719211703704061733e+01, // 0xC0355F3639CF6E52
 ]
-static Q_1S2: [6]f64 = [
+static q1s2: [6]f64 = [
     2.95333629060523854548e+01,  // 0x403D888A78AE64FF
     2.52981549982190529136e+02,  // 0x406F9F68DB821CBA
     7.57502834868645436472e+02,  // 0x4087AC05CE49A0F7
@@ -434,17 +434,17 @@ fn qone(x: f64): f64 {
     let mut p: *[6]f64 = nil
     let mut q: *[6]f64 = nil
     if x >= 8 {
-        p = &Q_1R8
-        q = &Q_1S8
+        p = &q1r8
+        q = &q1s8
     } else if x >= 4.5454 {
-        p = &Q_1R5
-        q = &Q_1S5
+        p = &q1r5
+        q = &q1s5
     } else if x >= 2.8571 {
-        p = &Q_1R3
-        q = &Q_1S3
+        p = &q1r3
+        q = &q1s3
     } else if x >= 2 {
-        p = &Q_1R2
-        q = &Q_1S2
+        p = &q1r2
+        q = &q1s2
     }
     unsafe {
         let z = 1 / (x * x)

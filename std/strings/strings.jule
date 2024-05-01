@@ -6,12 +6,9 @@ use nosafe for std::internal::nosafe
 use unicode for std::unicode
 use utf8 for std::unicode::utf8
 
-// Negative situation index such as not found, not exist, or etc.
-const N_INDEX = -1
-
 // Returns string that equals to concatenation of n-count s.
 // Returns empty string is n <= 0.
-pub fn repeat(s: str, mut n: int): str {
+pub fn Repeat(s: str, mut n: int): str {
     if n <= 0 {
         ret ""
     }
@@ -26,7 +23,7 @@ pub fn repeat(s: str, mut n: int): str {
     ret ss
 }
 
-fn _has_prefix(&s: str, &sub: str, mut start: int): bool {
+fn hasPrefix(&s: str, &sub: str, mut start: int): bool {
     if sub.len == 0 || s.len-start < sub.len {
         ret false
     }
@@ -41,11 +38,11 @@ fn _has_prefix(&s: str, &sub: str, mut start: int): bool {
 }
 
 // Reports string has prefix as specified substring or not.
-pub fn has_prefix(s: str, sub: str): bool {
-    ret _has_prefix(s, sub, 0)
+pub fn HasPrefix(s: str, sub: str): bool {
+    ret hasPrefix(s, sub, 0)
 }
 
-fn _has_suffix(&s: str, &sub: str, mut start: int): bool {
+fn hasSuffix(&s: str, &sub: str, mut start: int): bool {
     if sub.len == 0 || s.len-start < sub.len {
         ret false
     }
@@ -61,41 +58,41 @@ fn _has_suffix(&s: str, &sub: str, mut start: int): bool {
 }
 
 // Reports string has suffix as specified substring or not.
-pub fn has_suffix(s: str, sub: str): bool {
-    ret _has_suffix(s, sub, 0)
+pub fn HasSuffix(s: str, sub: str): bool {
+    ret hasSuffix(s, sub, 0)
 }
 
 // Returns index of first matched item with specified substring,
 // returns -1 if not exist any match. Starts searching at left
 // of string to right. Starts searching s at given index.
 // Returns -1, if i < 0 || i >= s.len.
-pub fn find_at(s: str, sub: str, mut i: int): int {
+pub fn FindAt(s: str, sub: str, mut i: int): int {
     if i < 0 || s.len < sub.len || sub.len == 0 {
-        ret N_INDEX
+        ret -1
     }
     for i < s.len; i++ {
-        if _has_prefix(s, sub, i) {
+        if hasPrefix(s, sub, i) {
             ret i
         }
     }
-    ret N_INDEX
+    ret -1
 }
 
 // Returns index of first matched item with specified substring,
 // returns -1 if not exist any match. Starts searching at left
 // of string to right.
-pub fn find(s: str, sub: str): int {
-    ret find_at(s, sub, 0)
+pub fn Find(s: str, sub: str): int {
+    ret FindAt(s, sub, 0)
 }
 
 // Returns index of first matched item with specified substring,
 // returns -1 if not exist any match. Starts searching at right
 // of string to left. Starts searching s at given index.
 // Returns -1, if i < 0 || i >= s.len.
-pub fn find_last_at(s: str, sub: str, i: int): int {
+pub fn FindLastAt(s: str, sub: str, i: int): int {
     let mut j = i - sub.len + 1
     if sub.len == 0 || i < 0 || i >= s.len || j < 0 {
-        ret N_INDEX
+        ret -1
     }
 loop:
     for j >= 0; j-- {
@@ -108,171 +105,171 @@ loop:
         }
         ret j
     }
-    ret N_INDEX
+    ret -1
 }
 
 // Returns index of first matched item with specified substring,
 // returns -1 if not exist any match. Starts searching at right
 // of string to left.
-pub fn find_last(s: str, sub: str): int {
-    ret find_last_at(s, sub, s.len - 1)
+pub fn FindLast(s: str, sub: str): int {
+    ret FindLastAt(s, sub, s.len - 1)
 }
 
 // Returns index of first matched item with finder function,
 // returns -1 if not exist any match. Starts searching at left
 // of string to right. Starts searching s at given index.
 // Returns -1, if i < 0.
-pub fn find_fn_at(s: str, mut i: int, f: fn(mut rune): bool): int {
+pub fn FindFnAt(s: str, mut i: int, f: fn(mut rune): bool): int {
     if i < 0 {
-        ret N_INDEX
+        ret -1
     }
-    let bytes = nosafe::stobs(s)
+    let bytes = nosafe::Stobs(s)
     for i < bytes.len {
-        let (r, n) = utf8::decode_rune(bytes[i:])
+        let (r, n) = utf8::DecodeRune(bytes[i:])
         if f(r) {
             ret i
         }
         i += n
     }
-    ret N_INDEX
+    ret -1
 }
 
 // Returns index of first matched item with finder function,
 // returns -1 if not exist any match. Starts searching at left
 // of string to right.
-pub fn find_fn(s: str, f: fn(mut rune): bool): int {
-    ret find_fn_at(s, 0, f)
+pub fn FindFn(s: str, f: fn(mut rune): bool): int {
+    ret FindFnAt(s, 0, f)
 }
 
 // Returns index of first matched item with finder function,
 // returns -1 if not exist any match. Starts searching at right
 // of string to left. Starts searching s at given index.
 // Returns -1, if i < 0 || i >= s.len.
-pub fn find_fn_last_at(s: str, mut i: int, f: fn(mut rune): bool): int {
+pub fn FindFnLastAt(s: str, mut i: int, f: fn(mut rune): bool): int {
     if i < 0 || i >= s.len {
-        ret N_INDEX
+        ret -1
     }
-    let bytes = nosafe::stobs(s)
+    let bytes = nosafe::Stobs(s)
     for i > 0 {
-        let (r, n) = utf8::decode_rune(bytes[i:])
+        let (r, n) = utf8::DecodeRune(bytes[i:])
         if f(r) {
             ret i
         }
         i -= n
     }
-    ret N_INDEX
+    ret -1
 }
 
 // Returns index of first matched item with finder function,
 // returns -1 if not exist any match. Starts searching at right
 // of string to left.
-pub fn find_fn_last(s: str, f: fn(mut rune): bool): int {
-    ret find_fn_last_at(s, s.len - 1, f)
+pub fn FindFnLast(s: str, f: fn(mut rune): bool): int {
+    ret FindFnLastAt(s, s.len - 1, f)
 }
 
-fn _find_rune(&s: []byte, r: rune): int {
+fn findRune(&s: []byte, r: rune): int {
     let mut i = 0
     for i < s.len {
-        let (br, n) = utf8::decode_rune(s[i:])
+        let (br, n) = utf8::DecodeRune(s[i:])
         if r == br {
             ret i
         }
         i += n
     }
-    ret N_INDEX
+    ret -1
 }
 
 // Returns index of first matched item with specified byte,
 // returns -1 if not exist any match. Starts searching at left
 // of string to right.
-pub fn find_byte(s: str, b: byte): int {
+pub fn FindByte(s: str, b: byte): int {
     for i, sb in s {
         if sb == b {
             ret i
         }
     }
-    ret N_INDEX
+    ret -1
 }
 
 // Returns index of first matched item with specified byte,
 // returns -1 if not exist any match. Starts searching at right
 // of string to left.
-pub fn find_last_byte(s: str, b: byte): int {
+pub fn FindLastByte(s: str, b: byte): int {
     let mut i = s.len - 1
     for i >= 0; i-- {
         if s[i] == b {
             ret i
         }
     }
-    ret N_INDEX
+    ret -1
 }
 
 // Returns index of first matched item with specified rune,
 // returns -1 if not exist any match. Starts searching at left
 // of string to right.
-pub fn find_rune(s: str, r: rune): int {
-    let bytes = nosafe::stobs(s)
-    ret _find_rune(bytes, r)
+pub fn FindRune(s: str, r: rune): int {
+    let bytes = nosafe::Stobs(s)
+    ret findRune(bytes, r)
 }
 
-fn _find_last_rune(&s: []byte, r: rune): int {
+fn findLastRune(&s: []byte, r: rune): int {
     let mut i = s.len
     for i > 0 {
-        let (br, n) = utf8::decode_last_rune(s[:i])
+        let (br, n) = utf8::DecodeLastRune(s[:i])
         if r == br {
             ret i - 1
         }
         i -= n
     }
-    ret N_INDEX
+    ret -1
 }
 
 // Returns index of first matched item with specified rune,
 // returns -1 if not exist any match. Starts searching at right
 // of string to left.
-pub fn find_last_rune(s: str, r: rune): int {
-    let bytes = nosafe::stobs(s)
-    ret _find_last_rune(bytes, r)
+pub fn FindLastRune(s: str, r: rune): int {
+    let bytes = nosafe::Stobs(s)
+    ret findLastRune(bytes, r)
 }
 
 // Returns index of first matched item with any of runes,
 // returns -1 if not exist any match. Starts searching at left
 // of string to right.
-pub fn find_any(s: str, runes: str): int {
-    let sb = nosafe::stobs(s)
-    let mut rb = nosafe::stobs(runes)
+pub fn FindAny(s: str, runes: str): int {
+    let sb = nosafe::Stobs(s)
+    let mut rb = nosafe::Stobs(runes)
     let mut i = 0
     for i < sb.len {
-        let (r, n) = utf8::decode_rune(sb[i:])
-        if _find_rune(rb, r) != N_INDEX {
+        let (r, n) = utf8::DecodeRune(sb[i:])
+        if findRune(rb, r) != -1 {
             ret i
         }
         i += n
     }
-    ret N_INDEX
+    ret -1
 }
 
 // Returns index of first matched item with any of runes,
 // returns -1 if not exist any match. Starts searching at right
 // of string to left.
-pub fn find_last_any(s: str, runes: str): int {
-    let sb = nosafe::stobs(s)
-    let mut rb = nosafe::stobs(runes)
+pub fn FindLastAny(s: str, runes: str): int {
+    let sb = nosafe::Stobs(s)
+    let mut rb = nosafe::Stobs(runes)
     let mut i = sb.len
     for i > 0 {
-        let (r, n) = utf8::decode_last_rune(sb[:i])
-        if _find_rune(rb, r) != N_INDEX {
+        let (r, n) = utf8::DecodeLastRune(sb[:i])
+        if findRune(rb, r) != -1 {
             ret i - 1
         }
         i -= n
     }
-    ret N_INDEX
+    ret -1
 }
 
 // Splits the string into the specified number of parts to the specified substring.
 // Returns empty slice if n is equals to zero.
 // Returns all parts if n less than zero.
-pub fn split(s: str, sub: str, mut n: int): []str {
+pub fn Split(s: str, sub: str, mut n: int): []str {
     let mut cap = n
     if n < 0 {
         cap = 1 << 4
@@ -286,8 +283,8 @@ pub fn split(s: str, sub: str, mut n: int): []str {
     }
     let mut i = 0
     for n > 0; n-- {
-        let j = find_at(s, sub, i)
-        if j == N_INDEX {
+        let j = FindAt(s, sub, i)
+        if j == -1 {
             break
         }
         parts = append(parts, s[i:j])
@@ -300,37 +297,37 @@ pub fn split(s: str, sub: str, mut n: int): []str {
 }
 
 // Reports whether string includes substring.
-pub fn contains(s: str, sub: str): bool {
-    ret find_at(s, sub, 0) != N_INDEX
+pub fn Contains(s: str, sub: str): bool {
+    ret FindAt(s, sub, 0) != -1
 }
 
 // Reports whether string includes byte.
-pub fn contains_byte(s: str, b: byte): bool {
-    ret find_byte(s, b) != N_INDEX
+pub fn ContainsByte(s: str, b: byte): bool {
+    ret FindByte(s, b) != -1
 }
 
 // Reports whether string includes rune.
-pub fn contains_rune(s: str, r: rune): bool {
-    let bytes = nosafe::stobs(s)
-    ret _find_rune(bytes, r) != N_INDEX
+pub fn ContainsRune(s: str, r: rune): bool {
+    let bytes = nosafe::Stobs(s)
+    ret findRune(bytes, r) != -1
 }
 
 // Reports whether string includes any of runes.
-pub fn contains_any(s: str, runes: str): bool {
-    ret find_any(s, runes) != N_INDEX
+pub fn ContainsAny(s: str, runes: str): bool {
+    ret FindAny(s, runes) != -1
 }
 
 // Counts the number of non-overlapping instances of substring in s.
 // Returns zero if substring is empty.
-pub fn count(s: str, sub: str): int {
+pub fn Count(s: str, sub: str): int {
     if sub.len == 0 {
         ret 0
     }
     let mut n = 0
     let mut i = 0
     for {
-        let j = find_at(s, sub, i)
-        if j == N_INDEX {
+        let j = FindAt(s, sub, i)
+        if j == -1 {
             break
         }
         n++
@@ -342,12 +339,12 @@ pub fn count(s: str, sub: str): int {
 // Replaces all substrings matching sub in the string with new.
 // Returns same string if n is equals to zero.
 // Replaces all matches if n less than zero.
-pub fn replace(s: str, sub: str, new: str, mut n: int): str {
+pub fn Replace(s: str, sub: str, new: str, mut n: int): str {
     if n == 0 || sub == new {
         ret s
     }
 
-    let m = count(s, sub)
+    let m = Count(s, sub)
     if m == 0 {
         ret s
     }
@@ -358,8 +355,8 @@ pub fn replace(s: str, sub: str, new: str, mut n: int): str {
     let mut ss = make(str, s.len + n * (new.len - sub.len))
     let mut i = 0
     for n > 0; n-- {
-        let j = find_at(s, sub, i)
-        if j == N_INDEX {
+        let j = FindAt(s, sub, i)
+        if j == -1 {
             break
         }
         ss += s[i:j]
@@ -373,12 +370,12 @@ pub fn replace(s: str, sub: str, new: str, mut n: int): str {
 // Returns a copy of the string s with all its characters modified
 // according to the mapping function. If mapping returns a negative value,
 // the character is dropped from the string with no replacement.
-pub fn map(s: str, mapping: fn(mut rune): rune): str {
+pub fn Map(s: str, mapping: fn(mut rune): rune): str {
     let mut ss = make(str, s.len)
-    let mut bytes = nosafe::stobs(s)
+    let mut bytes = nosafe::Stobs(s)
     let mut i = 0
     for i < bytes.len {
-        let (mut r, n) = utf8::decode_rune(bytes[i:])
+        let (mut r, n) = utf8::DecodeRune(bytes[i:])
         i += n
         r = mapping(r)
         if r >= 0 {
@@ -389,20 +386,20 @@ pub fn map(s: str, mapping: fn(mut rune): rune): str {
 }
 
 // Returns s with all Unicode letters mapped to their lower case.
-pub fn to_lower(s: str): str {
-    ret map(s, unicode::to_lower)
+pub fn ToLower(s: str): str {
+    ret Map(s, unicode::ToLower)
 }
 
 // Returns s with all Unicode letters mapped to their upper case.
-pub fn to_upper(s: str): str {
-    ret map(s, unicode::to_upper)
+pub fn ToUpper(s: str): str {
+    ret Map(s, unicode::ToUpper)
 }
 
-fn _trim_left(mut &s: []byte, &cutset: []byte) {
+fn trimLeft(mut &s: []byte, &cutset: []byte) {
     let mut i = 0
     for i < s.len {
-        let (r, n) = utf8::decode_rune(s[i:])
-        if _find_rune(cutset, r) == N_INDEX {
+        let (r, n) = utf8::DecodeRune(s[i:])
+        if findRune(cutset, r) == -1 {
             s = s[i:]
             ret
         }
@@ -413,18 +410,18 @@ fn _trim_left(mut &s: []byte, &cutset: []byte) {
 
 // Trims string by specified runes at left.
 // Cutset should include runes to trim.
-pub fn trim_left(s: str, cutset: str): str {
-    let mut bytes = nosafe::stobs(s)
-    let bcutset = nosafe::stobs(cutset)
-    _trim_left(bytes, bcutset)
+pub fn TrimLeft(s: str, cutset: str): str {
+    let mut bytes = nosafe::Stobs(s)
+    let bcutset = nosafe::Stobs(cutset)
+    trimLeft(bytes, bcutset)
     ret str(bytes)
 }
 
-fn _trim_right(mut &s: []byte, &cutset: []byte) {
+fn trimRight(mut &s: []byte, &cutset: []byte) {
     let mut i = s.len
     for i > 0 {
-        let (r, n) = utf8::decode_last_rune(s[:i])
-        if _find_rune(cutset, r) == N_INDEX {
+        let (r, n) = utf8::DecodeLastRune(s[:i])
+        if findRune(cutset, r) == -1 {
             s = s[:i]
             ret
         }
@@ -435,26 +432,26 @@ fn _trim_right(mut &s: []byte, &cutset: []byte) {
 
 // Trims string by specified runes at right.
 // Cutset should include runes to trim.
-pub fn trim_right(s: str, cutset: str): str {
-    let mut bytes = nosafe::stobs(s)
-    let bcutset = nosafe::stobs(cutset)
-    _trim_right(bytes, bcutset)
+pub fn TrimRight(s: str, cutset: str): str {
+    let mut bytes = nosafe::Stobs(s)
+    let bcutset = nosafe::Stobs(cutset)
+    trimRight(bytes, bcutset)
     ret str(bytes)
 }
 
 // Trims string by specified runes at left and right.
 // Cutset should include runes to trim.
-pub fn trim(s: str, cutset: str): str {
-    let mut bytes = nosafe::stobs(s)
-    let bcutset = nosafe::stobs(cutset)
-    _trim_left(bytes, bcutset)
-    _trim_right(bytes, bcutset)
+pub fn Trim(s: str, cutset: str): str {
+    let mut bytes = nosafe::Stobs(s)
+    let bcutset = nosafe::Stobs(cutset)
+    trimLeft(bytes, bcutset)
+    trimRight(bytes, bcutset)
     ret str(bytes)
 }
 
 // Concatenates the parts of its first argument to create a single string.
 // The separator sep is placed between parts in the resulting string.
-pub fn join(parts: []str, sep: str): str {
+pub fn Join(parts: []str, sep: str): str {
     match parts.len {
     | 0:
         ret ""

@@ -3,7 +3,6 @@
 // license that can be found in the LICENSE file.
 
 use env
-
 use std::jule::build::{Log, LogKind}
 use std::jule::importer::{JuleImporter, CompileInfo, Compiler, CppStd}
 use sema for std::jule::sema
@@ -11,11 +10,11 @@ use sema for std::jule::sema
 // Intermediate representation of code for compiler.
 pub struct IR {
     // Directory of root package.
-    pub root:    str
-    pub passes:  []str
-    pub main:    &sema::Package
-    pub used:    []&sema::ImportInfo
-    pub ordered: OrderedDefines
+    pub Root:    str
+    pub Passes:  []str
+    pub Main:    &sema::Package
+    pub Used:    []&sema::ImportInfo
+    pub Ordered: OrderedDefines
 }
 
 impl IR {
@@ -25,9 +24,9 @@ impl IR {
     // - Returns nil reference and nil logs if path has not any Jule file.
     // - Returns nil reference and logs if exist any log.
     // - Returns IR and nil logs if everything is fine.
-    pub static fn build(path: str, flags: sema::SemaFlag): (&IR, []Log) {
-        let mut importer = JuleImporter.new(build_compile_info())
-        let (mut files, mut logs) = importer.import_package(path, true)
+    pub static fn Build(path: str, flags: sema::SemaFlag): (&IR, []Log) {
+        let mut importer = JuleImporter.New(buildCompileInfo())
+        let (mut files, mut logs) = importer.ImportPackage(path, true)
         if logs.len > 0 {
             ret nil, logs
         }
@@ -37,27 +36,27 @@ impl IR {
             ret nil, nil
         }
 
-        let (mut pkg, logs) = sema::analyze_package(files, importer, flags)
+        let (mut pkg, logs) = sema::AnalyzePackage(files, importer, flags)
         if logs.len > 0 {
             ret nil, logs
         }
 
         let mut ir = &IR{
-            root: root,
-            main: pkg,
-            used: importer.all_packages(),
+            Root: root,
+            Main: pkg,
+            Used: importer.AllPackages(),
         }
-        ir.passes = get_all_unique_passes(ir.main, ir.used)
+        ir.Passes = getAllUniquePasses(ir.Main, ir.Used)
 
         ret ir, nil
     }
 }
 
 impl IR {
-    fn append_structs(self, mut &p: &sema::Package, mut &buffer: []&sema::Struct) {
-        for (_, mut f) in p.files {
-            for (_, mut s) in f.structs {
-                if !s.cpp_linked {
+    fn appendStructs(self, mut &p: &sema::Package, mut &buffer: []&sema::Struct) {
+        for (_, mut f) in p.Files {
+            for (_, mut s) in f.Structs {
+                if !s.CppLinked {
                     buffer = append(buffer, s)
                 }
             }
@@ -66,21 +65,21 @@ impl IR {
 
     // Returns all structures of main package and used pakcages.
     // Ignores cpp-linked declarations.
-    pub fn get_all_structures(mut self): []&sema::Struct {
+    pub fn GetAllStructures(mut self): []&sema::Struct {
         let mut buffer: []&sema::Struct = nil
-        self.append_structs(self.main, buffer)
-        for (_, mut u) in self.used {
-            if !u.cpp_linked {
-                self.append_structs(u.package, buffer)
+        self.appendStructs(self.Main, buffer)
+        for (_, mut u) in self.Used {
+            if !u.CppLinked {
+                self.appendStructs(u.Package, buffer)
             }
         }
         ret buffer
     }
 
-    fn append_globals(self, mut &p: &sema::Package, mut &buffer: []&sema::Var) {
-        for (_, mut f) in p.files {
-            for (_, mut v) in f.vars {
-                if v.token != nil && !v.cpp_linked && !v.constant {
+    fn appendGlobals(self, mut &p: &sema::Package, mut &buffer: []&sema::Var) {
+        for (_, mut f) in p.Files {
+            for (_, mut v) in f.Vars {
+                if v.Token != nil && !v.CppLinked && !v.Constant {
                     buffer = append(buffer, v)
                 }
             }
@@ -89,76 +88,76 @@ impl IR {
 
     // Returns all globals of main package and used pakcages.
     // Ignores cpp-linked declarations and constants.
-    pub fn get_all_globals(mut self): []&sema::Var {
+    pub fn GetAllGlobals(mut self): []&sema::Var {
         let mut buffer: []&sema::Var = nil
-        self.append_globals(self.main, buffer)
-        for (_, mut u) in self.used {
-            if !u.cpp_linked {
-                self.append_globals(u.package, buffer)
+        self.appendGlobals(self.Main, buffer)
+        for (_, mut u) in self.Used {
+            if !u.CppLinked {
+                self.appendGlobals(u.Package, buffer)
             }
         }
         ret buffer
     }
 
     // Order defines at update ordered field of instance.
-    pub fn order(mut self) {
-        self.ordered.structs = self.get_all_structures()
-        self.ordered.globals = self.get_all_globals()
-        DefineOrderer.order_structures(self.ordered.structs)
-        DefineOrderer.order_vars(self.ordered.globals)
+    pub fn Order(mut self) {
+        self.Ordered.Structs = self.GetAllStructures()
+        self.Ordered.Globals = self.GetAllGlobals()
+        defineOrderer.orderStructures(self.Ordered.Structs)
+        defineOrderer.orderVars(self.Ordered.Globals)
     }
 }
 
-fn push_passes(mut &p: &sema::Package, mut &passes: []str) {
-    for (_, mut f) in p.files {
+fn pushPasses(mut &p: &sema::Package, mut &passes: []str) {
+    for (_, mut f) in p.Files {
     push:
-        for _, pass in f.passes {
-            if pass.text == "" {
+        for _, pass in f.Passes {
+            if pass.Text == "" {
                 continue
             }
             for _, cpass in passes {
-                if cpass == pass.text {
+                if cpass == pass.Text {
                     continue push
                 }
             }
-            passes = append(passes, pass.text)
+            passes = append(passes, pass.Text)
         }
     }
 }
 
-fn get_all_unique_passes(mut &pkg: &sema::Package, mut uses: []&sema::ImportInfo): []str {
+fn getAllUniquePasses(mut &pkg: &sema::Package, mut uses: []&sema::ImportInfo): []str {
     let mut passes: []str = nil
 
-    push_passes(pkg, passes)
+    pushPasses(pkg, passes)
     for (_, mut u) in uses {
-        if !u.cpp_linked {
-            push_passes(u.package, passes)
+        if !u.CppLinked {
+            pushPasses(u.Package, passes)
         }
     }
 
     ret passes
 }
 
-fn build_compile_info(): CompileInfo {
+fn buildCompileInfo(): CompileInfo {
     let mut info = CompileInfo{
-        prod: env::PRODUCTION,
-        test: env::TEST,
+        Prod: env::Production,
+        Test: env::Test,
     }
 
-    match env::COMPILER {
+    match env::Compiler {
     | Compiler.Clang:
-        info.compiler = Compiler.Clang
+        info.Compiler = Compiler.Clang
     | Compiler.GCC:
-        info.compiler = Compiler.GCC
+        info.Compiler = Compiler.GCC
     }
 
-    match env::CPP_STD {
+    match env::CppStd {
     | CppStd.Cpp14:
-        info.compiler = CppStd.Cpp14
+        info.Compiler = CppStd.Cpp14
     | CppStd.Cpp17:
-        info.compiler = CppStd.Cpp17
+        info.Compiler = CppStd.Cpp17
     | CppStd.Cpp20:
-        info.compiler = CppStd.Cpp20
+        info.Compiler = CppStd.Cpp20
     }
 
     ret info

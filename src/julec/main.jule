@@ -12,34 +12,34 @@ use std::env
 use strings for std::strings
 
 // Compiler commands.
-const CMD_HELP = "help"
-const CMD_VERSION = "version"
-const CMD_TOOL = "tool"
-const CMD_JULENV = "julenv"
-const CMD_MOD = "mod"
+const CmdHelp = "help"
+const CmdVersion = "version"
+const CmdTool = "tool"
+const CmdJulenv = "julenv"
+const CmdMod = "mod"
 
 // Map for "julec help" command.
-static HELP_MAP: [...][2]str = [
-    [CMD_HELP, "Show help"],
-    [CMD_VERSION, "Show version"],
-    [CMD_TOOL, "Tools for effective Jule"],
-    [CMD_JULENV, "Show information about native jule environment"],
-    [CMD_MOD, "Module management"],
+static HelpMap: [...][2]str = [
+    [CmdHelp, "Show help"],
+    [CmdVersion, "Show version"],
+    [CmdTool, "Tools for effective Jule"],
+    [CmdJulenv, "Show information about native jule environment"],
+    [CmdMod, "Module management"],
 ]
 
-fn print_error_message(msg: str) {
+fn printErrorMessage(msg: str) {
     outln(msg)
 }
 
 // Command: julec help
 fn help(&args: []str) {
     if args.len > 2 {
-        print_error_message("invalid command: " + args[2])
+        printErrorMessage("invalid command: " + args[2])
         ret
     }
 
-    let mut max = HELP_MAP[0][0].len
-    for _, k in HELP_MAP {
+    let mut max = HelpMap[0][0].len
+    for _, k in HelpMap {
         let n = k[0].len
         if n > max {
             max = n
@@ -47,12 +47,12 @@ fn help(&args: []str) {
     }
 
     let mut s = ""
-    const SPACE = 5 // Space of between command name and description.
-    for i, part in HELP_MAP {
+    const Space = 5 // Space of between command name and description.
+    for i, part in HelpMap {
         s += part[0]
-        s += strings::repeat(" ", (max - part[0].len) + SPACE)
+        s += strings::Repeat(" ", (max - part[0].len) + Space)
         s += part[1]
-        if i+1 < HELP_MAP.len {
+        if i+1 < HelpMap.len {
             s += "\n"
         }
     }
@@ -62,29 +62,31 @@ fn help(&args: []str) {
 // Command: julec version
 fn version(&args: []str) {
     if args.len > 2 {
-        print_error_message("invalid command: " + args[2])
+        printErrorMessage("invalid command: " + args[2])
         ret
     }
-    outln(jule::VERSION)
+    outln(jule::Version)
 }
 
 // Command: julec tool distos
-fn tool_distos() {
+fn toolDistos() {
     out("supported operating systems:\n ")
-    for _, os in build::DISTOS {
-        out(os)
-        out(" ")
-    }
+    out(build::DistOs.Windows)
+    out(" ")
+    out(build::DistOs.Linux)
+    out(" ")
+    out(build::DistOs.Darwin)
     outln("")
 }
 
 // Command: julec tool distarch
-fn tool_distarch() {
+fn toolDistarch() {
     out("supported architects:\n ")
-    for _, arch in build::DISTARCH {
-        out(arch)
-        out(" ")
-    }
+    out(build::DistArch.Amd64)
+    out(" ")
+    out(build::DistArch.I386)
+    out(" ")
+    out(build::DistArch.Arm64)
     outln("")
 }
 
@@ -96,32 +98,32 @@ fn tool(&args: []str) {
  distarch   Lists all supported architects`)
         ret
     } else if args.len > 3 {
-        print_error_message("invalid command: " + args[3])
+        printErrorMessage("invalid command: " + args[3])
         ret
     }
 
     let cmd = args[2]
     match cmd {
     | "distos":
-        tool_distos()
+        toolDistos()
     | "distarch":
-        tool_distarch()
+        toolDistarch()
     |:
-        print_error_message("undefined command: " + cmd)
+        printErrorMessage("undefined command: " + cmd)
     }
 }
 
 // Command: julec julenv
 fn julenv(&args: []str) {
     if args.len > 2 {
-        print_error_message("invalid command: " + args[2])
+        printErrorMessage("invalid command: " + args[2])
         ret
     }
-    outln("julec version: " + jule::VERSION)
-    outln("architecture: " + std::env::ARCH)
-    outln("operating system: " + std::env::OS)
-    outln("default compiler: " + env::COMPILER)
-    outln("default C++ standard: " + env::CPP_STD)
+    outln("julec version: " + jule::Version)
+    outln("architecture: " + std::env::Arch)
+    outln("operating system: " + std::env::Os)
+    outln("default compiler: " + env::Compiler)
+    outln("default C++ standard: " + env::CppStd)
 }
 
 // Command: julec mod
@@ -132,33 +134,33 @@ fn mod(&args: []str) {
     }
 
     if args.len > 3 {
-        print_error_message("invalid command: " + args[3])
+        printErrorMessage("invalid command: " + args[3])
         ret
     }
 
     match args[2] {
     | "init": // julec mod init
-        File.write(build::MODULE_FILE, [], 0o660) else {
-            print_error_message("module could not generated because of a problem")
+        File.Write(build::ModuleFile, [], 0o660) else {
+            printErrorMessage("module could not generated because of a problem")
         }
     |:
-        print_error_message("invalid command: " + args[2])
+        printErrorMessage("invalid command: " + args[2])
     }
 }
 
 // Try to process compiler commands.
 // Reports whether "ARGS" is command and processed.
-fn process_command(&args: []str): bool {
+fn processCommand(&args: []str): bool {
     match args[1] {
-    | CMD_HELP:
+    | CmdHelp:
         help(args)
-    | CMD_VERSION:
+    | CmdVersion:
         version(args)
-    | CMD_TOOL:
+    | CmdTool:
         tool(args)
-    | CMD_JULENV:
+    | CmdJulenv:
         julenv(args)
-    | CMD_MOD:
+    | CmdMod:
         mod(args)
     |:
         ret false
@@ -167,7 +169,7 @@ fn process_command(&args: []str): bool {
     ret true
 }
 
-fn show_info() {
+fn showInfo() {
     outln(
         `JuleC is a tool for Jule source code and developers.
 
@@ -184,18 +186,18 @@ Compilation:
 }
 
 fn main() {
-    let mut args = std::env::args()
+    let mut args = std::env::Args()
 
     // Not started with arguments.
     // Here is "2" but "args" always have one element for store program name.
     if args.len < 2 {
-        show_info()
+        showInfo()
         ret
     }
 
-    if process_command(args) {
+    if processCommand(args) {
         ret
     }
 
-    compile_command(args)
+    compileCommand(args)
 }

@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 use std::jule::integrated::{Wchar}
-use std::unicode::utf16::{decode}
+use utf16 for std::unicode::utf16
 cpp use "<dirent.h>"
 
 cpp type DWORD: int
@@ -43,91 +43,91 @@ pub type Wdir: cpp._WDIR
 // C's _wdirent.
 pub type Wdirent: cpp._wdirent
 
-pub type handle: uintptr
+pub type Handle: uintptr
 
-pub const INVALID_HANDLE = ^handle(0)
+pub const InvalidHandle = ^Handle(0)
 
-pub static STDIN = get_std_handle(uintptr(STD_INPUT_HANDLE))
-pub static STDOUT = get_std_handle(uintptr(STD_OUTPUT_HANDLE))
-pub static STDERR = get_std_handle(uintptr(STD_ERROR_HANDLE))
+pub static STDIN = GetStdHandle(uintptr(STD_INPUT_HANDLE))
+pub static STDOUT = GetStdHandle(uintptr(STD_OUTPUT_HANDLE))
+pub static STDERR = GetStdHandle(uintptr(STD_ERROR_HANDLE))
 
-pub fn get_std_handle(stdh: uintptr): handle { ret handle(cpp.GetStdHandle(stdh)) }
-pub unsafe fn close_handle(stdh: handle): bool { ret cpp.CloseHandle(unsafe { (*unsafe)(stdh) }) }
+pub fn GetStdHandle(stdh: uintptr): Handle { ret Handle(cpp.GetStdHandle(stdh)) }
+pub unsafe fn CloseHandle(stdh: Handle): bool { ret cpp.CloseHandle(unsafe { (*unsafe)(stdh) }) }
 
 // Calls C's wstat function.
-pub unsafe fn wstat(path: *u16, mut stat: *Stat): int {
+pub unsafe fn Wstat(path: *u16, mut stat: *SysStat): int {
     ret cpp.wstat((*Wchar)(path), stat)
 }
 
 // Wrapper for C's _wopen function.
-pub unsafe fn _wopen(path: *u16, flag: int, mode: int): int {
+pub unsafe fn Wopen(path: *u16, flag: int, mode: int): int {
     ret cpp._wopen((*Wchar)(&path[0]), flag, mode)
 }
 
 // Returns last Windows error.
-pub fn get_last_error(): u32 { ret cpp.GetLastError() }
+pub fn GetLastError(): u32 { ret cpp.GetLastError() }
 
 // Reads working directory into buff and returns readed
 // rune count of current process. Returns 0 if fail.
-pub unsafe fn get_current_directory(bufflen: u32, mut buff: *u16): u32 {
+pub unsafe fn GetCurrentDirectory(bufflen: u32, mut buff: *u16): u32 {
     ret cpp.GetCurrentDirectoryW(bufflen, (*Wchar)(buff))
 }
 
 // Sets working directory to path.
 // Reports operation is success.
-pub unsafe fn set_current_directory(path: *u16): bool {
+pub unsafe fn SetCurrentDirectory(path: *u16): bool {
     ret cpp.SetCurrentDirectoryW((*Wchar)(path))
 }
 
 // Delete file.
-pub unsafe fn delete_file(path: *u16): bool {
+pub unsafe fn DeleteFile(path: *u16): bool {
     ret cpp.DeleteFileW((*Wchar)(path))
 }
 
 // Creates directory.
-pub unsafe fn create_directory(path: *u16): bool {
+pub unsafe fn CreateDirectory(path: *u16): bool {
     ret cpp.CreateDirectoryW((*Wchar)(path), nil)
 }
 
 // Removes empty directory.
-pub unsafe fn remove_directory(path: *u16): bool {
+pub unsafe fn RemoveDirectory(path: *u16): bool {
     ret cpp.RemoveDirectoryW((*Wchar)(path))
 }
 
 // Calls C's _wopendir function.
-pub unsafe fn _wopendir(path: *u16): *Wdir { ret cpp._wopendir((*Wchar)(path)) }
+pub unsafe fn Wopendir(path: *u16): *Wdir { ret cpp._wopendir((*Wchar)(path)) }
 
 // Calls C's _wreaddir function.
-pub unsafe fn _wreaddir(mut dir: *Wdir): *Wdirent { ret cpp._wreaddir(dir) }
+pub unsafe fn Wreaddir(mut dir: *Wdir): *Wdirent { ret cpp._wreaddir(dir) }
 
 // Calls C's _wclosedir function.
-pub unsafe fn _wclosedir(mut dir: *Wdir): int { ret cpp._wclosedir(dir) }
+pub unsafe fn Wclosedir(mut dir: *Wdir): int { ret cpp._wclosedir(dir) }
 
 // Calls Windows's GetFullPathNameW function.
-pub unsafe fn get_full_path_name(path: *u16, bufflen: u32,
+pub unsafe fn GetFullPathName(path: *u16, bufflen: u32,
     buff: *u16, fname: **u16): u32 {
     ret cpp.GetFullPathNameW((*Wchar)(path), bufflen, (*Wchar)(buff), (**Wchar)(fname))
 }
 
 // Calls Windows's GetConsoleMode function.
-pub fn get_console_mode(handle: handle, mut &mode: int): bool {
+pub fn GetConsoleMode(handle: Handle, mut &mode: int): bool {
     ret unsafe { cpp.GetConsoleMode(cpp.HANDLE(handle), (*cpp.DWORD)(&mode)) }
 }
 
 // Calls Windows's SetConsoleMode function.
-pub fn set_console_mode(handle: handle, mode: int): bool {
+pub fn SetConsoleMode(handle: Handle, mode: int): bool {
     ret unsafe { cpp.SetConsoleMode(cpp.HANDLE(handle), cpp.DWORD(mode)) }
 }
 
 // Calls Windows's WriteConsoleW function.
-pub unsafe fn write_console(handle: handle, buffer: *u16, to_write: int,
+pub unsafe fn WriteConsole(handle: Handle, buffer: *u16, to_write: int,
     mut &written: int, reserved: *unsafe): bool {
     ret cpp.WriteConsoleW(cpp.HANDLE(handle), (*unsafe)(buffer),
         cpp.DWORD(to_write), (*cpp.DWORD)(written), reserved)
 }
 
 // Calls Windows's ReadConsoleW function.
-pub unsafe fn read_console(handle: handle, mut buffer: *u16, to_read: int,
+pub unsafe fn ReadConsole(handle: Handle, mut buffer: *u16, to_read: int,
     mut &readed: int, input_control: *unsafe): bool {
     ret cpp.ReadConsoleW(cpp.HANDLE(handle), (*unsafe)(buffer),
         cpp.DWORD(to_read), (*cpp.DWORD)(&readed), input_control)

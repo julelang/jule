@@ -4,7 +4,7 @@
 
 use env
 use path for std::fs::path
-use std::jule::build::{PATH_STDLIB}
+use std::jule::build::{PathStdlib}
 use std::jule::constant::{Const}
 use std::jule::lex::{TokenKind}
 use std::jule::sema::{
@@ -36,97 +36,97 @@ use std::jule::sema::{
 use strings for std::strings
 
 // Scope optimizer that applies target-independent optimizations.
-struct ScopeOptimizer {
+struct scopeOptimizer {
     i:     int
     scope: &Scope
 }
 
-impl ScopeOptimizer {
-    pub static fn new(mut scope: &Scope): &ScopeOptimizer {
-        ret &ScopeOptimizer{
+impl scopeOptimizer {
+    static fn new(mut scope: &Scope): &scopeOptimizer {
+        ret &scopeOptimizer{
             scope: scope,
         }
     }
 
-    fn set_current_stmt(mut self, mut stmt: any) {
-        self.scope.stmts[self.i] = unsafe { *(*Stmt)(&stmt) }
+    fn setCurrentStmt(mut self, mut stmt: any) {
+        self.scope.Stmts[self.i] = unsafe { *(*Stmt)(&stmt) }
     }
 
-    fn optimize_data(mut self, mut d: &Data) {
-        match type d.model {
+    fn optimizeData(mut self, mut d: &Data) {
+        match type d.Model {
         | &FnCallExprModel:
-            let mut m = (&FnCallExprModel)(d.model)
-            if env::PRODUCTION {
-                if !m.func.is_builtin() &&
-                    is_std_package(m.func.decl.token.file.path, "debug") {
-                    self.set_current_stmt(nil)
+            let mut m = (&FnCallExprModel)(d.Model)
+            if env::Production {
+                if !m.Func.IsBuiltin() &&
+                    isStdPackage(m.Func.Decl.Token.File.Path, "debug") {
+                    self.setCurrentStmt(nil)
                     ret
                 }
             }
         }
-        ExprOptimizer.optimize(d.model)
+        exprOptimizer.optimize(d.Model)
     }
 
-    fn optimize_var(mut self, mut v: &Var) {
-        if v.value != nil {
-            ExprOptimizer.optimize(v.value.data.model)
+    fn optimizeVar(mut self, mut v: &Var) {
+        if v.Value != nil {
+            exprOptimizer.optimize(v.Value.Data.Model)
         }
     }
 
-    fn optimize_conditional(mut self, mut c: &Conditional) {
-        for (_, mut elif) in c.elifs {
-            ExprOptimizer.optimize(elif.expr)
-            self.optimize_child(elif.scope)
+    fn optimizeConditional(mut self, mut c: &Conditional) {
+        for (_, mut elif) in c.Elifs {
+            exprOptimizer.optimize(elif.Expr)
+            self.optimizeChild(elif.Scope)
         }
-        if c.default != nil {
-            self.optimize_child(c.default.scope)
+        if c.Default != nil {
+            self.optimizeChild(c.Default.Scope)
         }
 
-        if !COND {
+        if !Cond {
             ret
         }
 
-        let mut const_case = false // Has cosntant true case.
+        let mut constCase = false // Has cosntant true case.
 
         // Remove unnecessary trailing cases that comes after constant true case.
-        for (i, mut elif) in c.elifs {
-            if !is_constant_valid_conditional_case(elif) {
+        for (i, mut elif) in c.Elifs {
+            if !isConstantValidConditionalCase(elif) {
                 continue
             }
-            const_case = true
-            c.elifs = c.elifs[:i]
-            c.default = &Else{
-                scope: elif.scope,
+            constCase = true
+            c.Elifs = c.Elifs[:i]
+            c.Default = &Else{
+                Scope: elif.Scope,
             }
             break
         }
 
-        if c.elifs.len == 0 {
+        if c.Elifs.len == 0 {
             ret
         }
 
         // Remove unreachable cases.
-        let mut i = &c.elifs[0]
-        let end = &c.elifs[c.elifs.len-1]
+        let mut i = &c.Elifs[0]
+        let end = &c.Elifs[c.Elifs.len-1]
         for i <= end; i++ {
             unsafe {
-                if is_unreachable_conditional_case(*i) {
+                if isUnreachableConditionalCase(*i) {
                     *i = nil
                 }
             }
         }
 
-        if c.elifs.len == 0 {
+        if c.Elifs.len == 0 {
             ret
         }
 
         // Skip one-case checking if const-case is not exist.
-        if !const_case {
+        if !constCase {
             ret
         }
 
         let mut only = -1
-        for j, elif in c.elifs {
+        for j, elif in c.Elifs {
             if elif != nil {
                 if only != -1 {
                     // Break checking, there is more than one case.
@@ -138,85 +138,85 @@ impl ScopeOptimizer {
 
         // Here is one case.
         if only != -1 {
-            self.set_current_stmt(c.elifs[only].scope)
+            self.setCurrentStmt(c.Elifs[only].Scope)
         }
     }
 
-    fn build_default_constat_true_case(mut self, mut case: &Case, mut &i: int, mut &m: &Match) {
-        case.exprs = nil // Remove expressions to remove eval overhead.
+    fn buildDefaultConstatTrueCase(mut self, mut case: &Case, mut &i: int, mut &m: &Match) {
+        case.Exprs = nil // Remove expressions to remove eval overhead.
         let start = i
     loop:
         for {
-            if case.scope.stmts.len == 0 {
+            if case.Scope.Stmts.len == 0 {
                 break
             }
-            let mut &stmt = unsafe { *(&case.scope.stmts[case.scope.stmts.len-1]) }
+            let mut &stmt = unsafe { *(&case.Scope.Stmts[case.Scope.Stmts.len-1]) }
             match type stmt {
             | &FallSt:
                 i++
-                if i >= m.cases.len {
-                    stmt = m.default.scope
+                if i >= m.Cases.len {
+                    stmt = m.Default.Scope
                     break loop
                 }
-                case = m.cases[i]
-                stmt = case.scope
+                case = m.Cases[i]
+                stmt = case.Scope
             |:
                 break loop
             }
         }
-        m.default = m.cases[start]
-        m.cases = m.cases[:start]
+        m.Default = m.Cases[start]
+        m.Cases = m.Cases[:start]
     }
 
-    fn optimize_match(mut self, mut m: &Match) {
-        for (_, mut case) in m.cases {
-            for (_, mut expr) in case.exprs {
-                ExprOptimizer.optimize(expr.model)
+    fn optimizeMatch(mut self, mut m: &Match) {
+        for (_, mut case) in m.Cases {
+            for (_, mut expr) in case.Exprs {
+                exprOptimizer.optimize(expr.Model)
             }
-            self.optimize_child(case.scope)
+            self.optimizeChild(case.Scope)
         }
-        if m.default != nil {
-            self.optimize_child(m.default.scope)
+        if m.Default != nil {
+            self.optimizeChild(m.Default.Scope)
         }
 
-        if !COND {
+        if !Cond {
             ret
         }
 
-        let mut const_case = false // Has cosntant true case.
+        let mut constCase = false // Has cosntant true case.
 
         // Remove unnecessary trailing cases that comes after constant true case.
-        for (mut i, mut case) in m.cases {
-            if !is_constant_valid_match_case(case) {
+        for (mut i, mut case) in m.Cases {
+            if !isConstantValidMatchCase(case) {
                 continue
             }
-            const_case = true
-            self.build_default_constat_true_case(case, i, m)
+            constCase = true
+            self.buildDefaultConstatTrueCase(case, i, m)
             break
         }
 
-        if m.cases.len == 0 {
+        if m.Cases.len == 0 {
             ret
         }
 
         // Remove unreachable cases.
-        let mut i = &m.cases[0]
-        let end = &m.cases[m.cases.len-1]
+        let mut i = &m.Cases[0]
+        let end = &m.Cases[m.Cases.len-1]
         for i <= end; i++ {
             unsafe {
-                if is_unreachable_match_case(*i) {
+                if isUnreachableMatchCase(*i) {
                     *i = nil
                 }
             }
         }
 
         // Skip one-case checking if const-case is not exist.
-        if !const_case {
+        if !constCase {
             ret
         }
 
         let mut only = -1
-        for j, case in m.cases {
+        for j, case in m.Cases {
             if case != nil {
                 if only != -1 {
                     // Break checking, there is more than one case.
@@ -228,31 +228,31 @@ impl ScopeOptimizer {
 
         // Here is one case.
         if only != -1 {
-            self.set_current_stmt(m.cases[only].scope)
+            self.setCurrentStmt(m.Cases[only].Scope)
         }
     }
 
-    fn optimize_range_iter(mut self, mut it: &RangeIter) {
-        ExprOptimizer.optimize(it.expr.model)
-        self.optimize_child(it.scope)
+    fn optimizeRangeIter(mut self, mut it: &RangeIter) {
+        exprOptimizer.optimize(it.Expr.Model)
+        self.optimizeChild(it.Scope)
     }
 
-    fn optimize_while_iter(mut self, mut it: &WhileIter) {
-        ExprOptimizer.optimize(it.expr)
-        self.optimize_stmt(it.next)
-        self.optimize_child(it.scope)
+    fn optimizeWhileIter(mut self, mut it: &WhileIter) {
+        exprOptimizer.optimize(it.Expr)
+        self.optimizeStmt(it.Next)
+        self.optimizeChild(it.Scope)
     }
 
     fn substr(mut self, mut a: &Assign): bool {
-        match type a.r.model {
+        match type a.R.Model {
         | &SlicingExprModel:
-            let mut sem = (&SlicingExprModel)(a.r.model)
-            if a.l.model == sem.expr {
-                self.set_current_stmt(&MutSlicingExprModel{
-                    token: sem.token,
-                    expr: sem.expr,
-                    left: sem.left,
-                    right: sem.right,
+            let mut sem = (&SlicingExprModel)(a.R.Model)
+            if a.L.Model == sem.Expr {
+                self.setCurrentStmt(&MutSlicingExprModel{
+                    Token: sem.Token,
+                    Expr: sem.Expr,
+                    Left: sem.Left,
+                    Right: sem.Right,
                 })
                 ret true
             }
@@ -260,14 +260,14 @@ impl ScopeOptimizer {
         ret false
     }
 
-    fn str_insert(mut self, mut a: &Assign): bool {
-        match type a.r.model {
+    fn strInsert(mut self, mut a: &Assign): bool {
+        match type a.R.Model {
         | &BinopExprModel:
-            let mut m = (&BinopExprModel)(a.r.model)
-            if a.l.model == m.right.model {
-                self.set_current_stmt(&StrInsertBeginExprModel{
-                    dest: a.l.model,
-                    expr: m.left.model,
+            let mut m = (&BinopExprModel)(a.R.Model)
+            if a.L.Model == m.Right.Model {
+                self.setCurrentStmt(&StrInsertBeginExprModel{
+                    Dest: a.L.Model,
+                    Expr: m.Left.Model,
                 })
                 ret true
             }
@@ -275,65 +275,65 @@ impl ScopeOptimizer {
         ret false
     }
 
-    fn str_assign(mut self, mut a: &Assign): bool {
-        if a.op.kind != TokenKind.Eq {
+    fn strAssign(mut self, mut a: &Assign): bool {
+        if a.Op.Kind != TokenKind.Eq {
             ret false
         }
-        let lp = a.l.kind.prim()
-        if lp == nil || !lp.is_str() {
+        let lp = a.L.Kind.Prim()
+        if lp == nil || !lp.IsStr() {
             ret false
         }
         match {
         | self.substr(a)
-        | self.str_insert(a):
+        | self.strInsert(a):
             ret true
         }
         ret false
     }
 
-    fn optimize_assign(mut self, mut assign: &Assign) {
-        if COPY && self.str_assign(assign) {
+    fn optimizeAssign(mut self, mut assign: &Assign) {
+        if Copy && self.strAssign(assign) {
             ret
         }
 
-        ExprOptimizer.optimize(assign.l.model)
-        ExprOptimizer.optimize(assign.r.model)
+        exprOptimizer.optimize(assign.L.Model)
+        exprOptimizer.optimize(assign.R.Model)
 
-        match assign.op.kind {
+        match assign.Op.Kind {
         | TokenKind.SolidusEq | TokenKind.PercentEq:
             // Do not check division of structures safety.
-            if MATH && assign.l.kind.strct() == nil {
-                assign.op.kind = assign.op.kind[:assign.op.kind.len-1]
+            if Math && assign.L.Kind.Struct() == nil {
+                assign.Op.Kind = assign.Op.Kind[:assign.Op.Kind.len-1]
                 let mut model: ExprModel = &BinopExprModel{
-                    op: assign.op,
-                    left: assign.l,
-                    right: assign.r,
+                    Op: assign.Op,
+                    Left: assign.L,
+                    Right: assign.R,
                 }
-                ExprOptimizer.optimize(model)
+                exprOptimizer.optimize(model)
                 match type model {
                 | &BinopExprModel:
-                    assign.r = new(OperandExprModel, *assign.r)
-                    assign.op.kind = TokenKind.Eq
-                    assign.r.model = model
+                    assign.R = new(OperandExprModel, *assign.R)
+                    assign.Op.Kind = TokenKind.Eq
+                    assign.R.Model = model
                     ret
                 }
-                assign.op.kind += "="
+                assign.Op.Kind += "="
                 ret
             }
         }
 
-        if APPEND {
-            match type assign.r.model {
+        if Append {
+            match type assign.R.Model {
             | &BuiltinAppendCallExprModel:
-                let mut m = (&BuiltinAppendCallExprModel)(assign.r.model)
-                match type m.elements {
+                let mut m = (&BuiltinAppendCallExprModel)(assign.R.Model)
+                match type m.Elements {
                 | &SliceExprModel:
-                    match type m.dest {
+                    match type m.Dest {
                     | &Var
                     | &StructSubIdentExprModel:
-                        self.set_current_stmt(&PushToSliceExprModel{
-                            dest: m.dest,
-                            elems: (&SliceExprModel)(m.elements),
+                        self.setCurrentStmt(&PushToSliceExprModel{
+                            Dest: m.Dest,
+                            Elems: (&SliceExprModel)(m.Elements),
                         })
                     }
                 }
@@ -341,104 +341,105 @@ impl ScopeOptimizer {
         }
     }
 
-    fn optimize_multi_assign(mut self, mut assign: &MultiAssign) {
-        for (i, mut l) in assign.l {
+    fn optimizeMultiAssign(mut self, mut assign: &MultiAssign) {
+        for (i, mut l) in assign.L {
             if l != nil {
-                ExprOptimizer.optimize(l)
-                assign.l[i] = l
+                exprOptimizer.optimize(l)
+                assign.L[i] = l
             }
         }
-        ExprOptimizer.optimize(assign.r)
+        exprOptimizer.optimize(assign.R)
     }
 
-    fn optimize_ret(mut self, mut r: &RetSt) {
-        ExprOptimizer.optimize(r.expr)
+    fn optimizeRet(mut self, mut r: &RetSt) {
+        exprOptimizer.optimize(r.Expr)
     }
 
-    fn optimize_stmt(mut self, mut stmt: Stmt) {
+    fn optimizeStmt(mut self, mut stmt: Stmt) {
         match type stmt {
         | &Scope:
-            self.optimize_child((&Scope)(stmt))
+            self.optimizeChild((&Scope)(stmt))
         | &Data:
-            self.optimize_data((&Data)(stmt))
+            self.optimizeData((&Data)(stmt))
         | &Var:
-            self.optimize_var((&Var)(stmt))
+            self.optimizeVar((&Var)(stmt))
         | &Conditional:
-            self.optimize_conditional((&Conditional)(stmt))
+            self.optimizeConditional((&Conditional)(stmt))
         | &RangeIter:
-            self.optimize_range_iter((&RangeIter)(stmt))
+            self.optimizeRangeIter((&RangeIter)(stmt))
         | &WhileIter:
-            self.optimize_while_iter((&WhileIter)(stmt))
+            self.optimizeWhileIter((&WhileIter)(stmt))
         | &InfIter:
-            self.optimize_child((&InfIter)(stmt).scope)
+            self.optimizeChild((&InfIter)(stmt).Scope)
         | &Assign:
-            self.optimize_assign((&Assign)(stmt))
+            self.optimizeAssign((&Assign)(stmt))
         | &MultiAssign:
-            self.optimize_multi_assign((&MultiAssign)(stmt))
+            self.optimizeMultiAssign((&MultiAssign)(stmt))
         | &Match:
-            self.optimize_match((&Match)(stmt))
+            self.optimizeMatch((&Match)(stmt))
         | &RetSt:
-            self.optimize_ret((&RetSt)(stmt))
+            self.optimizeRet((&RetSt)(stmt))
         }
     }
 
-    fn optimize_child(mut self, mut child: &Scope) {
-        let mut so = ScopeOptimizer.new(child)
+    fn optimizeChild(mut self, mut child: &Scope) {
+        let mut so = scopeOptimizer.new(child)
         so.optimize()
     }
 
     // Optimizes scope by enabled optimizations.
-    pub fn optimize(mut self) {
-        for (i, mut stmt) in self.scope.stmts {
+    fn optimize(mut self) {
+        for (i, mut stmt) in self.scope.Stmts {
             self.i = i
-            self.optimize_stmt(stmt)
+            self.optimizeStmt(stmt)
         }
     }
 }
 
-fn is_std_package(f: str, p: str): bool {
-    ret strings::has_prefix(f, path::join(PATH_STDLIB, p))
+fn isStdPackage(f: str, p: str): bool {
+    ret strings::HasPrefix(f, path::Join(PathStdlib, p))
 }
 
-fn is_constant_valid_conditional_case(&i: &If): bool {
-    match type i.expr {
+fn isConstantValidConditionalCase(&i: &If): bool {
+    match type i.Expr {
     | &Const:
-        let c = (&Const)(i.expr)
-        ret c.is_bool() && c.read_bool()
+        let c = (&Const)(i.Expr)
+        ret c.IsBool() && c.ReadBool()
     }
     ret false
 }
 
-fn is_unreachable_expr(&expr: ExprModel): bool {
+fn isUnreachableExpr(&expr: ExprModel): bool {
     match type expr {
     | &Const:
         let c = (&Const)(expr)
-        ret c.is_bool() && !c.read_bool()
+        ret c.IsBool() && !c.ReadBool()
     | &BinopExprModel:
         let m = (&BinopExprModel)(expr)
-        if m.op.kind == TokenKind.DblAmper {
-            ret is_unreachable_expr(m.left.model) || is_unreachable_expr(m.right.model)
+        if m.Op.Kind == TokenKind.DblAmper {
+            ret isUnreachableExpr(m.Left.Model) ||
+                isUnreachableExpr(m.Right.Model)
         }
     }
     ret false
 }
 
-fn is_constant_valid_match_case(&case: &Case): bool {
-    for _, expr in case.exprs {
-        if expr.is_const() && expr.constant.is_bool() && expr.constant.read_bool() {
+fn isConstantValidMatchCase(&case: &Case): bool {
+    for _, expr in case.Exprs {
+        if expr.IsConst() && expr.Constant.IsBool() && expr.Constant.ReadBool() {
             ret true
         }
     }
     ret false
 }
 
-fn is_unreachable_conditional_case(&i: &If): bool {
-    ret is_unreachable_expr(i.expr)
+fn isUnreachableConditionalCase(&i: &If): bool {
+    ret isUnreachableExpr(i.Expr)
 }
 
-fn is_unreachable_match_case(&case: &Case): bool {
-    for _, expr in case.exprs {
-        if !is_unreachable_expr(expr.model) {
+fn isUnreachableMatchCase(&case: &Case): bool {
+    for _, expr in case.Exprs {
+        if !isUnreachableExpr(expr.Model) {
             ret false
         }
     }

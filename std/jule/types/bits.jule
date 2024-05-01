@@ -6,31 +6,31 @@ use conv for std::conv
 use strings for std::strings
 use build for std::jule::build
 
-type BitChecker: fn(v: str, base: int, bit: int): bool
+type bitChecker: fn(v: str, base: int, bit: int): bool
 
 // Bit-size of target architecture.
 // Possible values are: 32, and 64.
-pub static BIT_SIZE = 0
+pub static BitSize = 0
 
 // Signed integer kind of target architecture.
 // Is equavalent to "int", but specific bit-sized integer kind.
-pub static SYS_INT = ""
+pub static SysInt = ""
 
 // Unsigned integer kind of target architecture.
 // Is equavalent to "uint" and "uintptr", but specific bit-sized integer kind.
-pub static SYS_UINT = ""
+pub static SysUint = ""
 
-fn check_bit(v: str, bit: int, checker: BitChecker): bool {
+fn checkBit(v: str, bit: int, checker: bitChecker): bool {
     match {
     | v == "":
         ret false
     | v.len == 1:
         ret true
-    | strings::has_prefix(v, "0x"):
+    | strings::HasPrefix(v, "0x"):
         ret checker(v[2:], 1 << 4, bit) // Hexadecimal
-    | strings::has_prefix(v, "0b"):
+    | strings::HasPrefix(v, "0b"):
         ret checker(v[2:], 1 << 1, bit) // Binary
-    | strings::has_prefix(v, "0o"):
+    | strings::HasPrefix(v, "0o"):
         ret checker(v[2:], 1 << 3, bit) // Octal
     | v[0] == '0':
         ret checker(v[1:], 1 << 3, bit) // Octal
@@ -42,13 +42,13 @@ fn check_bit(v: str, bit: int, checker: BitChecker): bool {
 // Returns kind's bit-specific kind if bit-specific like int, uint, and uintptr.
 // Returns kind if not bit-specific.
 // Bit-size is determined by runtime.
-pub fn real_kind_of(kind: str): str {
+pub fn RealKindOf(kind: str): str {
     match kind {
     | TypeKind.Int:
-        ret SYS_INT
+        ret SysInt
     | TypeKind.Uint
     | TypeKind.Uintptr:
-        ret SYS_UINT
+        ret SysUint
     |:
         ret kind
     }
@@ -56,7 +56,7 @@ pub fn real_kind_of(kind: str): str {
 
 // Returns kind's bit-size.
 // Returns -1 if kind is not numeric.
-pub fn bitsize_of(k: str): int {
+pub fn BitsizeOf(k: str): int {
     match k {
     | TypeKind.I8
     | TypeKind.U8:
@@ -74,7 +74,7 @@ pub fn bitsize_of(k: str): int {
         ret 1 << 6
     | TypeKind.Uint
     | TypeKind.Int:
-        ret BIT_SIZE
+        ret BitSize
     |:
         ret -1
     }
@@ -83,7 +83,7 @@ pub fn bitsize_of(k: str): int {
 // Returns signed integer kind by bit-size.
 // Possible bit-sizes are: 8, 16, 32, and 64.
 // Returns empty string if bits is invalid.
-pub fn int_from_bits(bits: int): str {
+pub fn IntFromBits(bits: int): str {
     match bits {
     | 1 << 3:
         ret TypeKind.I8
@@ -101,7 +101,7 @@ pub fn int_from_bits(bits: int): str {
 // Returns unsigned integer kind by bit-size.
 // Possible bit-sizes are: 8, 16, 32, and 64.
 // Returns empty string if bits is invalid.
-pub fn uint_from_bits(bits: int): str {
+pub fn UintFromBits(bits: int): str {
     match bits {
     | 1 << 3:
         ret TypeKind.U8
@@ -119,7 +119,7 @@ pub fn uint_from_bits(bits: int): str {
 // Returns floating-point kind by bit-size.
 // Possible bit-sizes are: 32, and 64.
 // Returns empty string if bits is invalid.
-pub fn float_from_bits(bits: int): str {
+pub fn FloatFromBits(bits: int): str {
     match bits {
     | 1 << 5:
         ret TypeKind.F32
@@ -131,24 +131,24 @@ pub fn float_from_bits(bits: int): str {
 }
 
 // Reports whether signed integer literal is compatible given bit-size.
-pub fn check_bit_int(v: str, bit: int): bool {
-    ret check_bit(v, bit, fn(v: str, base: int, bit: int): bool {
-        _ = conv::parse_int(v, base, bit) else { ret false }
+pub fn CheckBitInt(v: str, bit: int): bool {
+    ret checkBit(v, bit, fn(v: str, base: int, bit: int): bool {
+        _ = conv::ParseInt(v, base, bit) else { ret false }
         ret true
     })
 }
 
 // Reports whether unsigned integer literal is compatible given bit-size.
-pub fn check_bit_uint(v: str, bit: int): bool {
-    ret check_bit(v, bit, fn(v: str, base: int, bit: int): bool {
-        _ = conv::parse_uint(v, base, bit) else { ret false }
+pub fn CheckBitUint(v: str, bit: int): bool {
+    ret checkBit(v, bit, fn(v: str, base: int, bit: int): bool {
+        _ = conv::ParseUint(v, base, bit) else { ret false }
         ret true
     })
 }
 
 // Reports whether float literal is compatible given bit-size.
-pub fn check_bit_float(val: str, bit: int): bool {
-    _ = conv::parse_float(val, bit) else { ret false }
+pub fn CheckBitFloat(val: str, bit: int): bool {
+    _ = conv::ParseFloat(val, bit) else { ret false }
     ret true
 }
 
@@ -157,9 +157,9 @@ pub fn check_bit_float(val: str, bit: int): bool {
 // Possible values are:
 //  - 32 for 32-bit
 //  - 64 for 64-bit
-pub fn bitsize_of_float(x: f64): int {
+pub fn BitsizeOfFloat(x: f64): int {
     match {
-    | MIN_F32 <= x && x <= MAX_F32:
+    | MinF32 <= x && x <= MaxF32:
         ret 1 << 5
     |:
         ret 1 << 6
@@ -173,13 +173,13 @@ pub fn bitsize_of_float(x: f64): int {
 //  - 16 for 16-bit
 //  - 32 for 32-bit
 //  - 64 for 64-bit
-pub fn bitsize_of_int(x: i64): int {
+pub fn BitsizeOfInt(x: i64): int {
     match {
-    | MIN_I8 <= x && x <= MAX_I8:
+    | MinI8 <= x && x <= MaxI8:
         ret 1 << 3
-    | MIN_I16 <= x && x <= MAX_I16:
+    | MinI16 <= x && x <= MaxI16:
         ret 1 << 4
-    | MIN_I32 <= x && x <= MAX_I32:
+    | MinI32 <= x && x <= MaxI32:
         ret 1 << 5
     |:
         ret 1 << 6
@@ -193,13 +193,13 @@ pub fn bitsize_of_int(x: i64): int {
 //  - 16 for 16-bit
 //  - 32 for 32-bit
 //  - 64 for 64-bit
-pub fn bitsize_of_uint(x: u64): int {
+pub fn BitsizeOfUint(x: u64): int {
     match {
-    | x <= MAX_U8:
+    | x <= MaxU8:
         ret 1 << 3
-    | x <= MAX_U16:
+    | x <= MaxU16:
         ret 1 << 4
-    | x <= MAX_U32:
+    | x <= MaxU32:
         ret 1 << 5
     |:
         ret 1 << 6
@@ -209,21 +209,21 @@ pub fn bitsize_of_uint(x: u64): int {
 // Updates platform-specific informations by target.
 // If you will update target configuration, you should call this function.
 // In other words, new configurations is not applied for types.
-pub fn update_target() {
+pub fn UpdateTarget() {
     unsafe {
-        match build::ARCH {
+        match build::Arch {
         | "arm64" | "amd64":
-            *(&BIT_SIZE) = 1 << 6
-            *(&SYS_INT) = TypeKind.I64
-            *(&SYS_UINT) = TypeKind.U64
+            *(&BitSize) = 1 << 6
+            *(&SysInt) = TypeKind.I64
+            *(&SysUint) = TypeKind.U64
         | "i386":
-            *(&BIT_SIZE) = 1 << 5
-            *(&SYS_INT) = TypeKind.I32
-            *(&SYS_UINT) = TypeKind.U32
+            *(&BitSize) = 1 << 5
+            *(&SysInt) = TypeKind.I32
+            *(&SysUint) = TypeKind.U32
         }
     }
 }
 
 fn init() {
-    update_target()
+    UpdateTarget()
 }

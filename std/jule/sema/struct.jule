@@ -8,19 +8,19 @@ use std::jule::lex::{Token}
 
 // Field.
 pub struct Field {
-    pub owner:   &Struct
-    pub token:   &Token
-    pub public:  bool
-    pub mutable: bool        // Interior mutability.
-    pub ident:   str
-    pub kind:    &TypeSymbol
-    pub default: &Expr       // Nil if not given.
+    pub Owner:   &Struct
+    pub Token:   &Token
+    pub Public:  bool
+    pub Mutable: bool        // Interior mutability.
+    pub Ident:   str
+    pub Kind:    &TypeSymbol
+    pub Default: &Expr       // Nil if not given.
 }
 
 impl Field {
     fn instance(mut &self): &FieldIns {
         ret &FieldIns{
-            decl: self,
+            Decl: self,
         }
     }
 }
@@ -28,34 +28,34 @@ impl Field {
 // Overloaded operators for instance.
 // Patterns are checked.
 pub struct Operators {
-    pub eq:             &FnIns
-    pub gt:             &FnIns
-    pub gt_eq:          &FnIns
-    pub lt:             &FnIns
-    pub lt_eq:          &FnIns
-    pub shl:            &FnIns
-    pub shr:            &FnIns
-    pub add:            &FnIns
-    pub sub:            &FnIns
-    pub div:            &FnIns
-    pub mul:            &FnIns
-    pub mod:            &FnIns
-    pub bit_and:        &FnIns
-    pub bit_or:         &FnIns
-    pub bit_xor:        &FnIns
-    pub neg:            &FnIns
-    pub pos:            &FnIns
-    pub bit_not:        &FnIns
-    pub add_assign:     &FnIns
-    pub sub_assign:     &FnIns
-    pub div_assign:     &FnIns
-    pub mul_assign:     &FnIns
-    pub mod_assign:     &FnIns
-    pub shl_assign:     &FnIns
-    pub shr_assign:     &FnIns
-    pub bit_or_assign:  &FnIns
-    pub bit_and_assign: &FnIns
-    pub bit_xor_assign: &FnIns
+    pub Eq:           &FnIns
+    pub Gt:           &FnIns
+    pub GtEq:         &FnIns
+    pub Lt:           &FnIns
+    pub LtEq:         &FnIns
+    pub Shl:          &FnIns
+    pub Shr:          &FnIns
+    pub Add:          &FnIns
+    pub Sub:          &FnIns
+    pub Div:          &FnIns
+    pub Mul:          &FnIns
+    pub Mod:          &FnIns
+    pub BitAnd:       &FnIns
+    pub BitOr:        &FnIns
+    pub BitXor:       &FnIns
+    pub Neg:          &FnIns
+    pub Pos:          &FnIns
+    pub BitNot:       &FnIns
+    pub AddAssign:    &FnIns
+    pub SubAssign:    &FnIns
+    pub DivAssign:    &FnIns
+    pub MulAssign:    &FnIns
+    pub ModAssign:    &FnIns
+    pub ShlAssign:    &FnIns
+    pub ShrAssign:    &FnIns
+    pub BitOrAssign:  &FnIns
+    pub BitAndAssign: &FnIns
+    pub BitXorAssign: &FnIns
 }
 
 // Structure.
@@ -67,56 +67,56 @@ pub struct Struct {
     // This structure depended to these structures, except cpp-linked ones.
     // Only stores plain identifier references such as A, B, and MyStruct.
     // Not includes non-pain identifier references such as *A, &B, and []MyStruct.
-    pub depends: []&Struct
+    pub Depends: []&Struct
 
     // This structures uses these structures.
     // Stores all referred structures.
-    pub uses: []&Struct
+    pub Uses: []&Struct
 
-    pub token:      &Token
-    pub ident:      str
-    pub fields:     []&Field
-    pub methods:    []&Fn
-    pub statics:    []&Var
-    pub public:     bool
-    pub cpp_linked: bool
-    pub directives: []&Directive
-    pub generics:   []&GenericDecl
-    pub implements: []&Trait
+    pub Token:      &Token
+    pub Ident:      str
+    pub Fields:     []&Field
+    pub Methods:    []&Fn
+    pub Statics:    []&Var
+    pub Public:     bool
+    pub CppLinked:  bool
+    pub Directives: []&Directive
+    pub Generics:   []&GenericDecl
+    pub Implements: []&Trait
 
     // Structure instances for each unique type combination of structure.
     // Nil if structure is never used.
-    pub instances: []&StructIns
+    pub Instances: []&StructIns
 }
 
 impl Struct {
     fn instance(mut &self): &StructIns {
         // Returns already created instance for just one unique combination.
-        if self.generics.len == 0 && self.instances.len == 1 {
-            ret self.instances[0]
+        if self.Generics.len == 0 && self.Instances.len == 1 {
+            ret self.Instances[0]
         }
 
         let mut ins = &StructIns{
-            decl: self,
-            fields: make([]&FieldIns, 0, self.fields.len),
-            refers: ReferenceStack.new(),
+            Decl: self,
+            Fields: make([]&FieldIns, 0, self.Fields.len),
+            Refers: ReferenceStack.new(),
         }
 
-        for (_, mut f) in self.fields {
-            ins.fields = append(ins.fields, f.instance())
-            if !f.mutable && f.kind.kind != nil && f.kind.kind.mutable() {
-                ins.mutable = true
+        for (_, mut f) in self.Fields {
+            ins.Fields = append(ins.Fields, f.instance())
+            if !f.Mutable && f.Kind.Kind != nil && f.Kind.Kind.Mutable() {
+                ins.Mutable = true
             }
         }
 
-        if self.generics.len == 0 {
-            ins.methods = self.methods
+        if self.Generics.len == 0 {
+            ins.Methods = self.Methods
         } else {
-            ins.methods = make([]&Fn, 0, self.methods.len)
-            for (_, mut f) in self.methods {
+            ins.Methods = make([]&Fn, 0, self.Methods.len)
+            for (_, mut f) in self.Methods {
                 let mut fins = new(Fn, *f)
-                fins.instances = nil
-                ins.methods = append(ins.methods, fins)
+                fins.Instances = nil
+                ins.Methods = append(ins.Methods, fins)
             }
         }
 
@@ -125,27 +125,27 @@ impl Struct {
 
     // Appends instance if unique.
     // Returns already exist instance if given insance is not unique.
-    fn append_instance(mut self, mut &ins: &StructIns): &StructIns {
+    fn appendInstance(mut self, mut &ins: &StructIns): &StructIns {
         // Skip already created instance for just one unique combination.
-        if self.generics.len == 0 && self.instances.len == 1 {
-            ret self.instances[0]
+        if self.Generics.len == 0 && self.Instances.len == 1 {
+            ret self.Instances[0]
         }
 
-        for (_, mut ains) in self.instances {
-            if ains.same(ins) {
+        for (_, mut ains) in self.Instances {
+            if ains.Same(ins) {
                 ret ains
             }
         }
 
-        self.instances = append(self.instances, ins)
+        self.Instances = append(self.Instances, ins)
         ret nil
     }
 
     // Returns method by identifier.
     // Returns nil reference if not exist any method in this identifier.
-    pub fn find_method(mut self, ident: str, statically: bool): &Fn {
-        for (_, mut f) in self.methods {
-            if f.statically == statically && f.ident == ident {
+    pub fn FindMethod(mut self, ident: str, statically: bool): &Fn {
+        for (_, mut f) in self.Methods {
+            if f.Statically == statically && f.Ident == ident {
                 ret f
             }
         }
@@ -154,9 +154,9 @@ impl Struct {
 
     // Returns static field by identifier.
     // Returns nil reference if not exist any static field in this identifier.
-    pub fn find_static(mut self, ident: str): &Var {
-        for (_, mut v) in self.statics {
-            if v.ident == ident {
+    pub fn FindStatic(mut self, ident: str): &Var {
+        for (_, mut v) in self.Statics {
+            if v.Ident == ident {
                 ret v
             }
         }
@@ -165,9 +165,9 @@ impl Struct {
 
     // Returns field by identifier.
     // Returns nil reference if not exist any field in this identifier.
-    pub fn find_field(mut self, ident: str): &Field {
-        for (_, mut f) in self.fields {
-            if f.ident == ident {
+    pub fn FindField(mut self, ident: str): &Field {
+        for (_, mut f) in self.Fields {
+            if f.Ident == ident {
                 ret f
             }
         }
@@ -175,8 +175,8 @@ impl Struct {
     }
 
     // Reports whether structure implements given trait.
-    pub fn is_implements(self, t: &Trait): bool {
-        for _, it in self.implements {
+    pub fn IsImplements(self, t: &Trait): bool {
+        for _, it in self.Implements {
             if t == it {
                 ret true
             }
@@ -185,10 +185,10 @@ impl Struct {
     }
 
     // Reports whether structure is derives given derive.
-    pub fn is_derives(self, ident: str): bool {
-        for _, d in self.directives {
-            if d.tag.kind == std::jule::build::Directive.Derive {
-                if d.args.len == 1 && d.args[0].kind == ident {
+    pub fn IsDerives(self, ident: str): bool {
+        for _, d in self.Directives {
+            if d.Tag.Kind == std::jule::build::Directive.Derive {
+                if d.Args.len == 1 && d.Args[0].Kind == ident {
                     ret true
                 }
             }
@@ -197,8 +197,8 @@ impl Struct {
     }
 
     // Reports whether structure is uses given structure.
-    pub fn is_uses(self, s: &Struct): bool {
-        for _, u in self.uses {
+    pub fn IsUses(self, s: &Struct): bool {
+        for _, u in self.Uses {
             for s == u {
                 ret true
             }
@@ -207,9 +207,9 @@ impl Struct {
     }
 
     // Reports whether structure has only reference-type-accessible defines.
-    pub fn has_ref_accessible(self): bool {
-        for _, m in self.methods {
-            if m.params.len > 0 && m.params[0].is_ref() {
+    pub fn HasRefAccessible(self): bool {
+        for _, m in self.Methods {
+            if m.Params.len > 0 && m.Params[0].IsRef() {
                 ret true
             }
         }
@@ -219,33 +219,33 @@ impl Struct {
 
 // Field instance.
 pub struct FieldIns {
-    pub decl:    &Field
-    pub kind:    &TypeKind
-    pub default: &Data     // Nil if not given.
+    pub Decl:    &Field
+    pub Kind:    &TypeKind
+    pub Default: &Data     // Nil if not given.
 }
 
 // Structure instance.
 pub struct StructIns {
-    pub checked:   bool
-    pub decl:      &Struct
-    pub generics:  []&InsGeneric
-    pub fields:    []&FieldIns
-    pub methods:   []&Fn
-    pub mutable:   bool            // This structure has mutable defines.
-    pub refers:    &ReferenceStack
-    pub operators: Operators
+    pub Checked:   bool
+    pub Decl:      &Struct
+    pub Generics:  []&InsGeneric
+    pub Fields:    []&FieldIns
+    pub Methods:   []&Fn
+    pub Mutable:   bool            // This structure has mutable defines.
+    pub Refers:    &ReferenceStack
+    pub Operators: Operators
 }
 
 impl Kind for StructIns {
     // Implement: Kind
     // Returns Struct's type kind as string.
-    pub fn to_str(self): str {
+    pub fn Str(self): str {
         let mut kind = ""
-        kind += self.decl.ident
-        if self.generics.len > 0 {
+        kind += self.Decl.Ident
+        if self.Generics.len > 0 {
             kind += "["
-            for _, g in self.generics {
-                kind += g.kind.to_str()
+            for _, g in self.Generics {
+                kind += g.Kind.Str()
                 kind += ","
             }
             kind = kind[:kind.len-1] // Remove comma.
@@ -255,23 +255,23 @@ impl Kind for StructIns {
     }
 
     // Reports whether types are same.
-    pub fn equals(&self, other: &TypeKind): bool {
-        let s = unsafe { (*(&other)).strct() }
+    pub fn Equals(&self, other: &TypeKind): bool {
+        let s = unsafe { (*(&other)).Struct() }
         if s == nil {
             ret false
         }
 
-        if self.decl != s.decl {
+        if self.Decl != s.Decl {
             ret false
         }
 
-        if self.generics.len != s.generics.len {
+        if self.Generics.len != s.Generics.len {
             ret false
         }
 
         let mut i = 0
-        for i < self.generics.len; i++ {
-            if !self.generics[i].kind.equals(s.generics[i].kind) {
+        for i < self.Generics.len; i++ {
+            if !self.Generics[i].Kind.Equals(s.Generics[i].Kind) {
                 ret false
             }
         }
@@ -283,13 +283,12 @@ impl Kind for StructIns {
 impl StructIns {
     // Reports whether instances are same.
     // Returns true if declarations and generics are same.
-    pub fn same(self, s: &StructIns): bool {
-        if self.decl != s.decl || s.generics.len != self.generics.len {
+    pub fn Same(self, s: &StructIns): bool {
+        if self.Decl != s.Decl || s.Generics.len != self.Generics.len {
             ret false
         }
-
-        for i, g in self.generics {
-            if !g.kind.equals(s.generics[i].kind) {
+        for i, g in self.Generics {
+            if !g.Kind.Equals(s.Generics[i].Kind) {
                 ret false
             }
         }
@@ -298,9 +297,9 @@ impl StructIns {
 
     // Returns method by identifier.
     // Returns nil reference if not exist any method in this identifier.
-    pub fn find_method(mut self, ident: str, statically: bool): &Fn {
-        for (_, mut f) in self.methods {
-            if f.statically == statically && f.ident == ident {
+    pub fn FindMethod(mut self, ident: str, statically: bool): &Fn {
+        for (_, mut f) in self.Methods {
+            if f.Statically == statically && f.Ident == ident {
                 ret f
             }
         }
@@ -309,9 +308,9 @@ impl StructIns {
 
     // Returns field by identifier.
     // Returns nil reference if not exist any field in this identifier.
-    pub fn find_field(mut self, ident: str): &FieldIns {
-        for (_, mut f) in self.fields {
-            if f.decl.ident == ident {
+    pub fn FindField(mut self, ident: str): &FieldIns {
+        for (_, mut f) in self.Fields {
+            if f.Decl.Ident == ident {
                 ret f
             }
         }

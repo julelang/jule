@@ -42,7 +42,7 @@ pub struct File {
 
 impl File {
     // Returns new &File by handle.
-    pub static fn new(handle: uintptr): &File {
+    pub static fn New(handle: uintptr): &File {
         ret &File{
             handle: handle,
         }
@@ -52,8 +52,8 @@ impl File {
     // it is truncated. If the file does not exist, it is created with mode 0666
     // (before umask). If successful, methods on the returned File can
     // be used for I/O; the associated file descriptor has mode OFlag.Rdwr.
-    pub static fn create(path: str)!: &File {
-        ret File.open(path, OFlag.Rdwr | OFlag.Create | OFlag.Trunc, 0666) else { error(error) }
+    pub static fn Create(path: str)!: &File {
+        ret File.Open(path, OFlag.Rdwr | OFlag.Create | OFlag.Trunc, 0666) else { error(error) }
     }
 
     // Reads bytes of file.
@@ -64,22 +64,22 @@ impl File {
     //  Denied Exist Signal SyncIO IO IsDir Loop PerProcessLimit LongPath
     //  SystemWideLimit NotExist UnableStream NoSpace NotDir Device Overflow
     //  ReadOnly Retry Busy Device Seek InsufficientMemory Buffer
-    pub static fn read(path: str)!: []byte {
-        let s = Status.of(path) else { error(error) }
+    pub static fn Read(path: str)!: []byte {
+        let s = Status.Of(path) else { error(error) }
 
-        if !s.is_reg() {
+        if !s.IsReg() {
             error(FsError.IsDir)
         }
 
-        if s.size == 0 {
+        if s.Size == 0 {
             ret make([]byte, 0)
         }
 
-        let mut f = File.open(path, OFlag.Rdonly, 0) else { error(error) }
-        defer { f.close()! }
+        let mut f = File.Open(path, OFlag.Rdonly, 0) else { error(error) }
+        defer { f.Close()! }
 
-        let mut buff = make([]byte, s.size)
-        let n = f.read(buff) else { error(error) }
+        let mut buff = make([]byte, s.Size)
+        let n = f.Read(buff) else { error(error) }
         ret buff[:n]
     }
 
@@ -88,10 +88,10 @@ impl File {
     // otherwise truncates it before writing, without changing permissions.
     // Since requires multiple system calls to complete, a failure mid-operation
     // can leave the file in a partially written state.
-    pub static fn write(path: str, data: []byte, perm: int)! {
-        let mut f = File.open(path, OFlag.Wronly | OFlag.Create | OFlag.Trunc, perm) else { error(error) }
-        f.write(data) else { error(error) }
-        f.close() else { error(error) }
+    pub static fn Write(path: str, data: []byte, perm: int)! {
+        let mut f = File.Open(path, OFlag.Wronly | OFlag.Create | OFlag.Trunc, perm) else { error(error) }
+        f.Write(data) else { error(error) }
+        f.Close() else { error(error) }
     }
 }
 
@@ -102,10 +102,10 @@ impl File {
     //
     // Possible errors:
     //  InvalidDescriptor SyncIO Overflow Seek
-    pub fn seek(mut self, offset: int, origin: Seek)!: int {
-        let pos = sys::seek(int(self.handle), offset, int(origin))
+    pub fn Seek(mut self, offset: int, origin: Seek)!: int {
+        let pos = sys::Seek(int(self.handle), offset, int(origin))
         if pos == -1 {
-            error(get_last_fs_error())
+            error(getLastFsError())
         }
         ret pos
     }
@@ -114,9 +114,9 @@ impl File {
     //
     // Possible errors:
     //  InvalidDescriptor Signal IO
-    pub fn close(mut self)! {
-        if sys::close(int(self.handle)) == -1 {
-            error(get_last_fs_error())
+    pub fn Close(mut self)! {
+        if sys::Close(int(self.handle)) == -1 {
+            error(getLastFsError())
         }
     }
 }

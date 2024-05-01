@@ -37,13 +37,13 @@
 
 // Coefficients _sin[] and _cos[] are found in std/math/sin.jule
 
-// Returns sin(x), cos(x).
+// Returns Sin(x), Cos(x).
 //
 // Special cases are:
-//  sincos(±0) = ±0, 1
-//  sincos(±inf) = nan, nan
-//  sincos(nan) = nan, nan
-pub fn sincos(mut x: f64): (sin: f64, cos: f64) {
+//  Sincos(±0) = ±0, 1
+//  Sincos(±Inf) = NaN, NaN
+//  Sincos(NaN) = NaN, NaN
+pub fn Sincos(mut x: f64): (sin: f64, cos: f64) {
     const PI4A = 7.85398125648498535156e-1  // 0x3fe921fb40000000, Pi/4 split into three parts
     const PI4B = 3.77489470793079817668e-8  // 0x3e64442d00000000,
     const PI4C = 2.69515142907905952645e-15 // 0x3ce8469898cc5170,
@@ -51,24 +51,24 @@ pub fn sincos(mut x: f64): (sin: f64, cos: f64) {
     match {
     | x == 0:
         ret x, 1 // ret ±0.0, 1.0
-    | is_nan(x) | is_inf(x, 0):
-        ret nan(), nan()
+    | IsNaN(x) | IsInf(x, 0):
+        ret NaN(), NaN()
     }
 
     // make argument positive
-    let (mut sin_sign, mut cos_sign) = false, false
+    let (mut sinSign, mut cosSign) = false, false
     if x < 0 {
         x = -x
-        sin_sign = true
+        sinSign = true
     }
 
     let mut j: u64 = 0
     let mut y: f64 = 0
     let mut z: f64 = 0
-    if x >= REDUCE_THRESHOLD {
-        j, z = trig_reduce(x)
+    if x >= reduceThreshold {
+        j, z = trigReduce(x)
     } else {
-        j = u64(x * (4 / PI)) // integer part of x/(PI/4), as integer for tests on the phase angle
+        j = u64(x * (4 / Pi)) // integer part of x/(PI/4), as integer for tests on the phase angle
         y = f64(j) // integer part of x/(PI/4), as float
 
         if j&1 == 1 { // map zeros to origin
@@ -80,10 +80,10 @@ pub fn sincos(mut x: f64): (sin: f64, cos: f64) {
     }
     if j > 3 { // reflect in x axis
         j -= 4
-        sin_sign, cos_sign = !sin_sign, !cos_sign
+        sinSign, cosSign = !sinSign, !cosSign
     }
     if j > 1 {
-        cos_sign = !cos_sign
+        cosSign = !cosSign
     }
 
     let zz = z * z
@@ -92,10 +92,10 @@ pub fn sincos(mut x: f64): (sin: f64, cos: f64) {
     if j == 1 || j == 2 {
         sin, cos = cos, sin
     }
-    if cos_sign {
+    if cosSign {
         cos = -cos
     }
-    if sin_sign {
+    if sinSign {
         sin = -sin
     }
     ret

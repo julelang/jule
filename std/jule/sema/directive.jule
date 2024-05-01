@@ -6,207 +6,207 @@ use ast for std::jule::ast
 use std::jule::build::{Directive, LogMsg, Derive}
 use std::jule::lex::{TokenId}
 
-struct DirectiveChecker {
+struct directiveChecker {
     s: &Sema
     d: &[]&ast::Directive
     o: any
 }
 
-impl DirectiveChecker {
-    fn check_cdef(mut self, &d: &ast::Directive) {
+impl directiveChecker {
+    fn checkCdef(mut self, &d: &ast::Directive) {
         match type self.o {
         | &Fn:
-            if (&Fn)(self.o).cpp_linked {
+            if (&Fn)(self.o).CppLinked {
                 break
             }
             fall
         |:
-            self.s.push_err(d.tag, LogMsg.UnsupportedDirective, d.tag.kind)
+            self.s.pushErr(d.Tag, LogMsg.UnsupportedDirective, d.Tag.Kind)
         }
 
-        if d.args.len > 0 {
-            self.s.push_err(d.args[0], LogMsg.InvalidSyntax)
+        if d.Args.len > 0 {
+            self.s.pushErr(d.Args[0], LogMsg.InvalidSyntax)
         }
     }
 
-    fn check_typedef(mut self, &d: &ast::Directive) {
+    fn checkTypedef(mut self, &d: &ast::Directive) {
         match type self.o {
         | &Struct:
-            if (&Struct)(self.o).cpp_linked {
+            if (&Struct)(self.o).CppLinked {
                 break
             }
             fall
         |:
-            self.s.push_err(d.tag, LogMsg.UnsupportedDirective, d.tag.kind)
+            self.s.pushErr(d.Tag, LogMsg.UnsupportedDirective, d.Tag.Kind)
         }
 
-        if d.args.len > 0 {
-            self.s.push_err(d.args[0], LogMsg.InvalidSyntax)
+        if d.Args.len > 0 {
+            self.s.pushErr(d.Args[0], LogMsg.InvalidSyntax)
         }
     }
 
-    fn check_derive(mut self, &d: &ast::Directive) {
+    fn checkDerive(mut self, &d: &ast::Directive) {
         match type self.o {
         | &Struct:
-            if !(&Struct)(self.o).cpp_linked {
+            if !(&Struct)(self.o).CppLinked {
                 break
             }
             fall
         |:
-            self.s.push_err(d.tag, LogMsg.UnsupportedDirective)
+            self.s.pushErr(d.Tag, LogMsg.UnsupportedDirective)
         }
 
-        if d.args.len == 0 {
-            self.s.push_err(d.tag, LogMsg.MissingExpr)
-            self.s.push_suggestion(LogMsg.ExpectedIdentifier)
+        if d.Args.len == 0 {
+            self.s.pushErr(d.Tag, LogMsg.MissingExpr)
+            self.s.pushSugggestion(LogMsg.ExpectedIdentifier)
             ret
-        } else if d.args.len > 1 {
-            self.s.push_err(d.args[1], LogMsg.ArgumentOverflow)
+        } else if d.Args.len > 1 {
+            self.s.pushErr(d.Args[1], LogMsg.ArgumentOverflow)
         }
 
-        match d.args[0].kind {
+        match d.Args[0].Kind {
         | Derive.Clone:
         |:
-            self.s.push_err(d.args[0], LogMsg.IdentNotExist, d.args[0].kind)
+            self.s.pushErr(d.Args[0], LogMsg.IdentNotExist, d.Args[0].Kind)
         }
     }
 
-    fn check_namespace(mut self, mut &d: &ast::Directive) {
+    fn checkNamespace(mut self, mut &d: &ast::Directive) {
         match type self.o {
         | &Struct:
-            if !(&Struct)(self.o).cpp_linked {
-                self.s.push_err(d.tag, LogMsg.UnsupportedDirective, d.tag.kind)
+            if !(&Struct)(self.o).CppLinked {
+                self.s.pushErr(d.Tag, LogMsg.UnsupportedDirective, d.Tag.Kind)
             }
         | &Fn:
-            if !(&Fn)(self.o).cpp_linked {
-                self.s.push_err(d.tag, LogMsg.UnsupportedDirective, d.tag.kind)
+            if !(&Fn)(self.o).CppLinked {
+                self.s.pushErr(d.Tag, LogMsg.UnsupportedDirective, d.Tag.Kind)
             }
         | &Var:
-            if !(&Var)(self.o).cpp_linked {
-                self.s.push_err(d.tag, LogMsg.UnsupportedDirective, d.tag.kind)
+            if !(&Var)(self.o).CppLinked {
+                self.s.pushErr(d.Tag, LogMsg.UnsupportedDirective, d.Tag.Kind)
             }
         |:
-            self.s.push_err(d.tag, LogMsg.UnsupportedDirective, d.tag.kind)
+            self.s.pushErr(d.Tag, LogMsg.UnsupportedDirective, d.Tag.Kind)
         }
 
-        if d.args.len == 0 {
-            self.s.push_err(d.tag, LogMsg.MissingExpr)
+        if d.Args.len == 0 {
+            self.s.pushErr(d.Tag, LogMsg.MissingExpr)
             ret
-        } else if d.args.len > 1 {
-            self.s.push_err(d.args[1], LogMsg.ArgumentOverflow)
+        } else if d.Args.len > 1 {
+            self.s.pushErr(d.Args[1], LogMsg.ArgumentOverflow)
         }
 
-        let arg = d.args[0]
-        if arg.id != TokenId.Lit {
-            self.s.push_err(arg, LogMsg.InvalidSyntax)
-            ret
-        }
-
-        if arg.kind[0] != '"' {
-            self.s.push_err(arg, LogMsg.InvalidSyntax)
+        let arg = d.Args[0]
+        if arg.Id != TokenId.Lit {
+            self.s.pushErr(arg, LogMsg.InvalidSyntax)
             ret
         }
 
-        d.args[0].kind = arg.kind[1:arg.kind.len-1]
+        if arg.Kind[0] != '"' {
+            self.s.pushErr(arg, LogMsg.InvalidSyntax)
+            ret
+        }
+
+        d.Args[0].Kind = arg.Kind[1:arg.Kind.len-1]
 
         // Push relevant directives.
         match type self.o {
         | &Struct:
-            if find_directive(*self.d, Directive.Typedef) == nil {
+            if findDirective(*self.d, Directive.Typedef) == nil {
                 let mut typedef = &ast::Directive{
-                    tag: d.tag,
+                    Tag: d.Tag,
                 }
-                typedef.tag.kind = Directive.Typedef
+                typedef.Tag.Kind = Directive.Typedef
                 *self.d = append(*self.d, typedef)
             }
         }
     }
 
-    fn check_deprecated(mut self, mut &d: &ast::Directive) {
+    fn checkDeprecated(mut self, mut &d: &ast::Directive) {
         match type self.o {
         | &Struct:
-            if (&Struct)(self.o).cpp_linked {
-                self.s.push_err(d.tag, LogMsg.UnsupportedDirective, d.tag.kind)
+            if (&Struct)(self.o).CppLinked {
+                self.s.pushErr(d.Tag, LogMsg.UnsupportedDirective, d.Tag.Kind)
             }
         | &Fn:
-            if (&Fn)(self.o).cpp_linked {
-                self.s.push_err(d.tag, LogMsg.UnsupportedDirective, d.tag.kind)
+            if (&Fn)(self.o).CppLinked {
+                self.s.pushErr(d.Tag, LogMsg.UnsupportedDirective, d.Tag.Kind)
             }
         | &Var:
-            if (&Var)(self.o).cpp_linked {
-                self.s.push_err(d.tag, LogMsg.UnsupportedDirective, d.tag.kind)
+            if (&Var)(self.o).CppLinked {
+                self.s.pushErr(d.Tag, LogMsg.UnsupportedDirective, d.Tag.Kind)
             }
         |:
-            self.s.push_err(d.tag, LogMsg.UnsupportedDirective, d.tag.kind)
+            self.s.pushErr(d.Tag, LogMsg.UnsupportedDirective, d.Tag.Kind)
         }
 
-        if d.args.len == 0 {
+        if d.Args.len == 0 {
             ret
         }
-        if d.args.len > 1 {
-            self.s.push_err(d.args[1], LogMsg.ArgumentOverflow)
+        if d.Args.len > 1 {
+            self.s.pushErr(d.Args[1], LogMsg.ArgumentOverflow)
         }
 
-        let arg = d.args[0]
-        if arg.id != TokenId.Lit {
-            self.s.push_err(arg, LogMsg.InvalidSyntax)
-            ret
-        }
-
-        if arg.kind[0] != '"' {
-            self.s.push_err(arg, LogMsg.InvalidSyntax)
+        let arg = d.Args[0]
+        if arg.Id != TokenId.Lit {
+            self.s.pushErr(arg, LogMsg.InvalidSyntax)
             ret
         }
 
-        d.args[0].kind = arg.kind[1:arg.kind.len-1]
+        if arg.Kind[0] != '"' {
+            self.s.pushErr(arg, LogMsg.InvalidSyntax)
+            ret
+        }
+
+        d.Args[0].Kind = arg.Kind[1:arg.Kind.len-1]
     }
 
-    fn check_test(mut self, &d: &ast::Directive) {
+    fn checkTest(mut self, &d: &ast::Directive) {
         match type self.o {
         | &Fn:
             let f = (&Fn)(self.o)
-            if !f.cpp_linked && !f.is_init() && !f.is_entry_point() {
+            if !f.CppLinked && !f.IsInit() && !f.IsEntryPoint() {
                 break
             }
-            if f.is_method() {
-                self.s.push_err(f.token, LogMsg.TestMethod)
+            if f.IsMethod() {
+                self.s.pushErr(f.Token, LogMsg.TestMethod)
                 break
             }
             fall
         |:
-            self.s.push_err(d.tag, LogMsg.UnsupportedDirective, d.tag.kind)
+            self.s.pushErr(d.Tag, LogMsg.UnsupportedDirective, d.Tag.Kind)
         }
 
-        if d.args.len > 0 {
-            self.s.push_err(d.args[0], LogMsg.InvalidSyntax)
+        if d.Args.len > 0 {
+            self.s.pushErr(d.Args[0], LogMsg.InvalidSyntax)
         }
     }
 
-    fn check_directive(mut self, mut &d: &ast::Directive) {
-        match d.tag.kind {
+    fn checkDirective(mut self, mut &d: &ast::Directive) {
+        match d.Tag.Kind {
         | Directive.Cdef:
-            self.check_cdef(d)
+            self.checkCdef(d)
         | Directive.Typedef:
-            self.check_typedef(d)
+            self.checkTypedef(d)
         | Directive.Derive:
-            self.check_derive(d)
+            self.checkDerive(d)
         | Directive.Namespace:
-            self.check_namespace(d)
+            self.checkNamespace(d)
         | Directive.Deprecated:
-            self.check_deprecated(d)
+            self.checkDeprecated(d)
         | Directive.Test:
-            self.check_test(d)
+            self.checkTest(d)
         | Directive.Build
         | Directive.Pass:
-            self.s.push_err(d.tag, LogMsg.UnsupportedDirective, d.tag.kind)
+            self.s.pushErr(d.Tag, LogMsg.UnsupportedDirective, d.Tag.Kind)
         |:
-            self.s.push_err(d.tag, LogMsg.InvalidLabel, d.tag.kind)
+            self.s.pushErr(d.Tag, LogMsg.InvalidLabel, d.Tag.Kind)
         }
     }
 
     fn check(mut self) {
         for (_, mut d) in *self.d {
-            self.check_directive(d)
+            self.checkDirective(d)
         }
     }
 }

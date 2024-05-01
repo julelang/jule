@@ -4,8 +4,8 @@
 
 // This file reserved for type compatibility checking.
 
-use std::conv::{fmt_float}
-use std::math::{modf}
+use conv for std::conv
+use math for std::math
 use ast for std::jule::ast::{
     Expr,
     KeyValPair,
@@ -20,267 +20,267 @@ use ast for std::jule::ast::{
 }
 use std::jule::build::{LogMsg}
 use lit for std::jule::constant::lit
-use std::jule::lex::{Token, Ident, is_ignore_ident, is_anon_ident}
+use std::jule::lex::{Token, Ident, IsIgnoreIdent, IsAnonIdent}
 use types for std::jule::types
 
-fn trait_has_reference_receiver(&t: &Trait): bool {
-    for _, f in t.methods {
+fn traitHasReferenceReceiver(&t: &Trait): bool {
+    for _, f in t.Methods {
         // Skip static functions.
-        if f.statically {
+        if f.Statically {
             continue
         }
 
-        let p = f.params[0]
-        if p.is_ref() && p.is_self() {
+        let p = f.Params[0]
+        if p.IsRef() && p.IsSelf() {
             ret true
         }
     }
     ret false
 }
 
-fn float_assignable(kind: str, &d: &Data): bool {
-    let value = fmt_float(d.constant.as_f64(), 'g', -1, 64)
-    ret types::check_bit_float(value, types::bitsize_of(kind))
+fn floatAssignable(kind: str, &d: &Data): bool {
+    let value = conv::FmtFloat(d.Constant.AsF64(), 'g', -1, 64)
+    ret types::CheckBitFloat(value, types::BitsizeOf(kind))
 }
 
-fn sig_assignable(kind: str, &d: &Data): bool {
-    let min = types::min(kind)
-    let max = types::max(kind)
+fn sigAssignable(kind: str, &d: &Data): bool {
+    let min = types::Min(kind)
+    let max = types::Max(kind)
     match {
-    | d.constant.is_f64():
-        let x = d.constant.read_f64()
-        let (i, frac) = modf(x)
+    | d.Constant.IsF64():
+        let x = d.Constant.ReadF64()
+        let (i, frac) = math::Modf(x)
         if frac != 0 {
             ret false
         }
         ret i >= min && i <= max
-    | d.constant.is_u64():
-        let x = d.constant.as_f64()
+    | d.Constant.IsU64():
+        let x = d.Constant.AsF64()
         if x <= max {
             ret true
         }
-    | d.constant.is_i64():
-        let x = d.constant.as_f64()
+    | d.Constant.IsI64():
+        let x = d.Constant.AsF64()
         ret min <= x && x <= max
     }
     ret false
 }
 
-fn unsig_assignable(kind: str, &d: &Data): bool {
-    let max = types::max(kind)
-    if d.is_rune && kind == types::TypeKind.U8 {
-        ret lit::is_ascii(rune(d.constant.read_i64()))
+fn unsigAssignable(kind: str, &d: &Data): bool {
+    let max = types::Max(kind)
+    if d.IsRune && kind == types::TypeKind.U8 {
+        ret lit::IsAscii(rune(d.Constant.ReadI64()))
     }
 
     match {
-    | d.constant.is_f64():
-        let x = d.constant.read_f64()
+    | d.Constant.IsF64():
+        let x = d.Constant.ReadF64()
         if x < 0 {
             ret false
         }
-        let (i, frac) = modf(x)
+        let (i, frac) = math::Modf(x)
         if frac != 0 {
             ret false
         }
         ret i <= max
-    | d.constant.is_u64():
-        let x = d.constant.as_f64()
+    | d.Constant.IsU64():
+        let x = d.Constant.AsF64()
         if x <= max {
             ret true
         }
-    | d.constant.is_i64():
-        let x = d.constant.as_f64()
+    | d.Constant.IsI64():
+        let x = d.Constant.AsF64()
         ret 0 <= x && x <= max
     }
     ret false
 }
 
-fn int_assignable(kind: str, &d: &Data): bool {
+fn intAssignable(kind: str, &d: &Data): bool {
     match {
-    | types::is_sig_int(kind):
-        ret sig_assignable(kind, d)
-    | types::is_unsig_int(kind):
-        ret unsig_assignable(kind, d)
+    | types::IsSigInt(kind):
+        ret sigAssignable(kind, d)
+    | types::IsUnsigInt(kind):
+        ret unsigAssignable(kind, d)
     |:
         ret false
     }
 }
 
-struct TypeCompatibilityChecker {
-    s:           &Sema     // Used for error logging.
-    dest:        &TypeKind
-    src:         &TypeKind
-    error_token: &Token
+struct typeCompatibilityChecker {
+    s:          &Sema     // Used for error logging.
+    dest:       &TypeKind
+    src:        &TypeKind
+    errorToken: &Token
 }
 
-impl TypeCompatibilityChecker {
-    fn push_err(mut self, fmt: LogMsg, args: ...any) {
-        self.s.push_err(self.error_token, fmt, args...)
+impl typeCompatibilityChecker {
+    fn pushErr(mut self, fmt: LogMsg, args: ...any) {
+        self.s.pushErr(self.errorToken, fmt, args...)
     }
 
-    fn check_trait(mut self): (ok: bool) {
-        if self.src.is_nil() {
+    fn checkTrait(mut self): (ok: bool) {
+        if self.src.IsNil() {
             ret true
         }
-        let trt = self.dest.trt()
+        let trt = self.dest.Trait()
         let mut ref = false
         match {
-        | self.src.sptr() != nil:
+        | self.src.Sptr() != nil:
             ref = true
-            self.src = self.src.sptr().elem
-            if self.src.strct() == nil {
+            self.src = self.src.Sptr().Elem
+            if self.src.Struct() == nil {
                 ret false
             }
             fall
-        | self.src.strct() != nil:
-            let s = self.src.strct()
-            if !s.decl.is_implements(trt) {
+        | self.src.Struct() != nil:
+            let s = self.src.Struct()
+            if !s.Decl.IsImplements(trt) {
                 ret false
             }
-            if !ref && trait_has_reference_receiver(trt) {
-                self.push_err(LogMsg.TraitHasRefParamFn)
+            if !ref && traitHasReferenceReceiver(trt) {
+                self.pushErr(LogMsg.TraitHasRefParamFn)
                 ret false
             }
             ret true
-        | self.src.trt() != nil:
-            ret trt == self.src.trt()
+        | self.src.Trait() != nil:
+            ret trt == self.src.Trait()
         |:
             ret false
         }
     }
 
-    fn check_ptr(mut self): (ok: bool) {
-        if self.src.is_nil() {
+    fn checkPtr(mut self): (ok: bool) {
+        if self.src.IsNil() {
             ret true
         }
-        let mut dest = self.dest.ptr()
-        if dest.is_unsafe() {
+        let mut dest = self.dest.Ptr()
+        if dest.IsUnsafe() {
             ret true
         }
-        ret self.dest.equals(self.src)
+        ret self.dest.Equals(self.src)
     }
 
-    fn check_prim(mut self): (ok: bool) {
-        if !self.dest.variadic {
-            let prim = self.dest.prim()
-            if prim != nil && prim.is_any() {
+    fn checkPrim(mut self): (ok: bool) {
+        if !self.dest.Variadic {
+            let prim = self.dest.Prim()
+            if prim != nil && prim.IsAny() {
                 ret true
             }
         }
-        ret self.dest.equals(self.src)
+        ret self.dest.Equals(self.src)
     }
 
-    fn __type_enum(self, mut &e: &TypeEnum, mut &t2: &TypeKind): (ok: bool) {
-        for (_, mut item) in e.items {
-            if item.kind.kind.equals(t2) {
+    fn typeEnum(self, mut &e: &TypeEnum, mut &t2: &TypeKind): (ok: bool) {
+        for (_, mut item) in e.Items {
+            if item.Kind.Kind.Equals(t2) {
                 ret true
             }
-            let mut ke = item.kind.kind.tenm()
+            let mut ke = item.Kind.Kind.TypeEnum()
             if ke == nil {
                 continue
             }
-            if self.__type_enum(ke, t2) {
+            if self.typeEnum(ke, t2) {
                 ret true
             }
         }
         ret false
     }
 
-    fn check_type_enum(mut self): (ok: bool) {
-        if self.dest.equals(self.src) {
+    fn checkTypeEnum(mut self): (ok: bool) {
+        if self.dest.Equals(self.src) {
             ret true
         }
-        let mut e = self.dest.tenm()
-        ret self.__type_enum(e, self.src)
+        let mut e = self.dest.TypeEnum()
+        ret self.typeEnum(e, self.src)
     }
 
     fn check(mut self): (ok: bool) {
-        if self.dest.ptr() != nil {
-            ret self.check_ptr()
+        if self.dest.Ptr() != nil {
+            ret self.checkPtr()
         }
-        if self.dest.nil_compatible() {
-            if self.src.is_nil() {
+        if self.dest.NilCompatible() {
+            if self.src.IsNil() {
                 ret true
             }
         }
 
         match {
-        | self.dest.prim() != nil:
-            ret self.check_prim()
-        | self.dest.tenm() != nil:
-            ret self.check_type_enum()
-        | self.dest.trt() != nil:
-            ret self.check_trait()
+        | self.dest.Prim() != nil:
+            ret self.checkPrim()
+        | self.dest.TypeEnum() != nil:
+            ret self.checkTypeEnum()
+        | self.dest.Trait() != nil:
+            ret self.checkTrait()
         |:
-            ret self.dest.equals(self.src)
+            ret self.dest.Equals(self.src)
         }
     }
 }
 
 // Checks value and type compatibility for assignment.
-struct AssignTypeChecker {
+struct assignTypeChecker {
     s:           &Sema     // Used for error logging and type checking.
     dest:        &TypeKind
     d:           &Data
-    error_token: &Token
+    errorToken: &Token
 }
 
-impl AssignTypeChecker {
-    fn push_err(mut self, fmt: LogMsg, args: ...any) {
-        self.s.push_err(self.error_token, fmt, args...)
+impl assignTypeChecker {
+    fn pushErr(mut self, fmt: LogMsg, args: ...any) {
+        self.s.pushErr(self.errorToken, fmt, args...)
     }
 
-    fn check_validity(mut self): bool {
+    fn checkValidity(mut self): bool {
         let mut valid = true
         match {
-        | self.d.kind.fnc() != nil:
-            let f = self.d.kind.fnc()
+        | self.d.Kind.Fn() != nil:
+            let f = self.d.Kind.Fn()
             match {
-            | f.is_builtin():
-                self.push_err(LogMsg.BuiltinAsNonFn)
+            | f.IsBuiltin():
+                self.pushErr(LogMsg.BuiltinAsNonFn)
                 valid = false
-            | f.decl.cpp_linked:
-                self.push_err(LogMsg.CppFnAsAnonFn)
+            | f.Decl.CppLinked:
+                self.pushErr(LogMsg.CppFnAsAnonFn)
                 valid = false
-            | !f.decl.statically && f.decl.is_method():
-                self.push_err(LogMsg.MethodAsAnonFn)
+            | !f.Decl.Statically && f.Decl.IsMethod():
+                self.pushErr(LogMsg.MethodAsAnonFn)
                 valid = false
-            | f.decl.generics.len > 0 && f.generics.len == 0:
-                self.push_err(LogMsg.GenericedFnAsAnonFn)
-                self.s.push_suggestion(LogMsg.InstantiateGenericFnToUseAsAnon)
+            | f.Decl.Generics.len > 0 && f.Generics.len == 0:
+                self.pushErr(LogMsg.GenericedFnAsAnonFn)
+                self.s.pushSugggestion(LogMsg.InstantiateGenericFnToUseAsAnon)
                 valid = false
             }
-        | self.d.kind.tup() != nil:
-            self.push_err(LogMsg.TupleAssignToSingle)
+        | self.d.Kind.Tup() != nil:
+            self.pushErr(LogMsg.TupleAssignToSingle)
             valid = false
         }
         ret valid
     }
 
-    fn check_const(mut self): bool {
-        if !self.d.is_const() ||
-            self.dest.prim() == nil ||
-            self.d.kind.prim() == nil ||
-            !types::is_num(self.d.kind.prim().kind) {
+    fn checkConst(mut self): bool {
+        if !self.d.IsConst() ||
+            self.dest.Prim() == nil ||
+            self.d.Kind.Prim() == nil ||
+            !types::IsNum(self.d.Kind.Prim().Kind) {
             ret false
         }
-        if self.d.constant != self.d.model {
+        if self.d.Constant != self.d.Model {
             // Model is not equals directly to constant.
             // There is casting or etc.
             // Should be type checked.
             ret false
         }
 
-        let kind = self.dest.prim().kind
+        let kind = self.dest.Prim().Kind
         match {
-        | types::is_float(kind):
-            if !float_assignable(kind, self.d) {
-                self.push_err(LogMsg.OverflowLimits)
+        | types::IsFloat(kind):
+            if !floatAssignable(kind, self.d) {
+                self.pushErr(LogMsg.OverflowLimits)
                 ret false
             }
-        | types::is_int(kind):
-            if !int_assignable(kind, self.d) {
-                self.push_err(LogMsg.OverflowLimits)
+        | types::IsInt(kind):
+            if !intAssignable(kind, self.d) {
+                self.pushErr(LogMsg.OverflowLimits)
                 ret false
             }
         |:
@@ -290,115 +290,115 @@ impl AssignTypeChecker {
     }
 
     // Reports case is good for primitive types.
-    fn is_prim(mut self): bool {
+    fn isPrim(mut self): bool {
         // Ignore variadics.
-        if self.dest.variadic || self.d.kind.variadic {
+        if self.dest.Variadic || self.d.Kind.Variadic {
             ret false
         }
         // Ignore cpp-linked types.
-        if self.dest.cpp_linked() || self.d.kind.cpp_linked() {
+        if self.dest.CppLinked() || self.d.Kind.CppLinked() {
             ret false
         }
-        ret self.dest.prim() != nil && self.d.kind.prim() != nil
+        ret self.dest.Prim() != nil && self.d.Kind.Prim() != nil
     }
 
-    fn check_compatibility(mut self): bool {
+    fn checkCompatibility(mut self): bool {
         match {
         | self.d == nil:
             // Skip Data is nil.
             ret false
-        | !self.check_validity():
+        | !self.checkValidity():
             // Data is invalid and error(s) logged about it.
             ret false
-        | self.check_const():
+        | self.checkConst():
             ret true
-        | self.d.kind.enm() != nil:
+        | self.d.Kind.Enum() != nil:
             let mut dkind = self.dest
-            if self.dest.enm() != nil {
-                dkind = self.dest.enm().kind.kind
-            } else if self.dest.prim() == nil {
+            if self.dest.Enum() != nil {
+                dkind = self.dest.Enum().Kind.Kind
+            } else if self.dest.Prim() == nil {
                 break
             }
-            if types::types_are_compatible(self.d.kind.enm().kind.kind.prim().kind, dkind.prim().kind) {
+            if types::TypesAreCompatible(self.d.Kind.Enum().Kind.Kind.Prim().Kind, dkind.Prim().Kind) {
                 ret true
             }
-        | self.is_prim():
-            let dest = self.dest.prim()
-            if dest.is_any() {
+        | self.isPrim():
+            let dest = self.dest.Prim()
+            if dest.IsAny() {
                 ret true
             }
-            let mut src = self.d.kind.prim()
-            if types::types_are_compatible(dest.kind, src.kind) {
+            let mut src = self.d.Kind.Prim()
+            if types::TypesAreCompatible(dest.Kind, src.Kind) {
                 ret true
             }
         }
-        ret self.s.check_type_compatibility(self.dest, self.d.kind, self.error_token)
+        ret self.s.checkTypeCompatibility(self.dest, self.d.Kind, self.errorToken)
     }
 
     fn check(mut self): bool {
-        let ok = self.check_compatibility()
+        let ok = self.checkCompatibility()
         if ok {
-            apply_implicit_cast(self.dest, self.d)
+            applyImplicitCast(self.dest, self.d)
         }
         ret ok
     }
 }
 
-struct DynamicTypeAnnotation {
-    e:           &Eval
-    f:           &FnIns
-    p:           &ParamIns
-    a:           &Data
-    error_token: &Token
-    k:           *&TypeKind
-    c:           &ast::TypeDecl
+struct dynamicTypeAnnotation {
+    e:          &Eval
+    f:          &FnIns
+    p:          &ParamIns
+    a:          &Data
+    errorToken: &Token
+    k:          *&TypeKind
+    c:          &ast::TypeDecl
 }
 
-impl DynamicTypeAnnotation {
-    fn annotate_constraint_elem[T](mut self, mut &k: &TypeKind): bool {
-        match type self.c.kind {
+impl dynamicTypeAnnotation {
+    fn annotateConstraintElem[T](mut self, mut &k: &TypeKind): bool {
+        match type self.c.Kind {
         | &T:
             let mut elem: &TypeKind = nil
             match type T {
             | ast::ArrTypeDecl:
-                elem = k.arr().elem
+                elem = k.Arr().Elem
             | ast::SlcTypeDecl:
-                elem = k.slc().elem
+                elem = k.Slc().Elem
             | ast::PtrTypeDecl:
-                elem = k.ptr().elem
+                elem = k.Ptr().Elem
             | ast::SptrTypeDecl:
-                elem = k.sptr().elem
+                elem = k.Sptr().Elem
             }
-            self.c = (&T)(self.c.kind).elem
-            ret self.annotate_constraint(elem)
+            self.c = (&T)(self.c.Kind).Elem
+            ret self.annotateConstraint(elem)
         }
         ret false
     }
 
-    fn annotate_constraint_map(mut self, mut &k: &TypeKind): (ok: bool) {
-        match type self.c.kind {
+    fn annotateConstraintMap(mut self, mut &k: &TypeKind): (ok: bool) {
+        match type self.c.Kind {
         | &ast::MapTypeDecl:
-            let mut m = k.map()
-            let mut m2 = (&ast::MapTypeDecl)(self.c.kind)
-            self.c = m2.key
-            if self.annotate_constraint(m.key) {
+            let mut m = k.Map()
+            let mut m2 = (&ast::MapTypeDecl)(self.c.Kind)
+            self.c = m2.Key
+            if self.annotateConstraint(m.Key) {
                 ret true
             }
-            self.c = m2.val
-            ret self.annotate_constraint(m.val)
+            self.c = m2.Val
+            ret self.annotateConstraint(m.Val)
         }
         ret false
     }
 
-    fn annotate_constraint_tup(mut self, mut &k: &TypeKind): (ok: bool) {
-        match type self.c.kind {
+    fn annotateConstraintTup(mut self, mut &k: &TypeKind): (ok: bool) {
+        match type self.c.Kind {
         | &ast::TupleTypeDecl:
-            let mut tup = (&ast::TupleTypeDecl)(self.c.kind)
-            let mut tup2 = k.tup()
-            for (_, mut t2) in tup2.types {
-                for (_, mut t) in tup.types {
+            let mut tup = (&ast::TupleTypeDecl)(self.c.Kind)
+            let mut tup2 = k.Tup()
+            for (_, mut t2) in tup2.Types {
+                for (_, mut t) in tup.Types {
                     self.c = t
-                    if self.annotate_constraint(t2) {
+                    if self.annotateConstraint(t2) {
                         ret true
                     }
                 }
@@ -407,20 +407,20 @@ impl DynamicTypeAnnotation {
         ret false
     }
 
-    fn annotate_constraint_fn(mut self, mut &k: &TypeKind): (ok: bool) {
-        match type self.c.kind {
+    fn annotateConstraintFn(mut self, mut &k: &TypeKind): (ok: bool) {
+        match type self.c.Kind {
         | &ast::FnDecl:
-            let mut pf = (&ast::FnDecl)(self.c.kind)
-            let mut f = k.fnc()
-            for (i, mut fp) in f.params {
-                self.c = pf.params[i].kind
-                if self.annotate_constraint(fp.kind) {
+            let mut pf = (&ast::FnDecl)(self.c.Kind)
+            let mut f = k.Fn()
+            for (i, mut fp) in f.Params {
+                self.c = pf.Params[i].Kind
+                if self.annotateConstraint(fp.Kind) {
                     ret true
                 }
             }
-            if pf.result != nil {
-                self.c = pf.result.kind
-                if self.annotate_constraint(f.result) {
+            if pf.Result != nil {
+                self.c = pf.Result.Kind
+                if self.annotateConstraint(f.Result) {
                     ret true
                 }
             }
@@ -428,26 +428,26 @@ impl DynamicTypeAnnotation {
         ret false
     }
 
-    fn annotate_constraint_ident(mut self, mut &k: &TypeKind): bool {
-        let mut ident = (&ast::IdentTypeDecl)(self.c.kind)
-        let mut s = k.strct()
-        for i, g in self.f.decl.generics {
-            if g.ident == ident.ident {
-                let mut fg = self.f.generics[i]
+    fn annotateConstraintIdent(mut self, mut &k: &TypeKind): bool {
+        let mut ident = (&ast::IdentTypeDecl)(self.c.Kind)
+        let mut s = k.Struct()
+        for i, g in self.f.Decl.Generics {
+            if g.Ident == ident.Ident {
+                let mut fg = self.f.Generics[i]
                 if fg != nil {
                     ret false
                 }
-                self.push_generic(k, i)
+                self.pushGeneric(k, i)
                 ret true
             }
             if s == nil {
                 continue
             }
             let mut c = self.c
-            for (_, mut ig) in ident.generics {
+            for (_, mut ig) in ident.Generics {
                 self.c = ig
-                for (_, mut sg) in s.generics {
-                    if self.annotate_constraint(sg.kind) {
+                for (_, mut sg) in s.Generics {
+                    if self.annotateConstraint(sg.Kind) {
                         ret true
                     }
                 }
@@ -457,241 +457,240 @@ impl DynamicTypeAnnotation {
         ret false
     }
 
-    fn annotate_constraint(mut self, mut &k: &TypeKind): bool {
-        match type self.c.kind {
+    fn annotateConstraint(mut self, mut &k: &TypeKind): bool {
+        match type self.c.Kind {
         | &ast::IdentTypeDecl:
-            ret self.annotate_constraint_ident(k)
+            ret self.annotateConstraintIdent(k)
         }
         match {
-         | k.arr() != nil:
-            ret self.annotate_constraint_elem[ast::ArrTypeDecl](k)
-        | k.slc() != nil:
-            ret self.annotate_constraint_elem[ast::SlcTypeDecl](k)
-        | k.ptr() != nil:
-            ret self.annotate_constraint_elem[ast::PtrTypeDecl](k)
-        | k.sptr() != nil:
-            ret self.annotate_constraint_elem[ast::SptrTypeDecl](k)
-        | k.map() != nil:
-            ret self.annotate_constraint_map(k)
-        | k.fnc() != nil:
-            ret self.annotate_constraint_fn(k)
-        | k.tup() != nil:
-            ret self.annotate_constraint_tup(k)
+         | k.Arr() != nil:
+            ret self.annotateConstraintElem[ast::ArrTypeDecl](k)
+        | k.Slc() != nil:
+            ret self.annotateConstraintElem[ast::SlcTypeDecl](k)
+        | k.Ptr() != nil:
+            ret self.annotateConstraintElem[ast::PtrTypeDecl](k)
+        | k.Sptr() != nil:
+            ret self.annotateConstraintElem[ast::SptrTypeDecl](k)
+        | k.Map() != nil:
+            ret self.annotateConstraintMap(k)
+        | k.Fn() != nil:
+            ret self.annotateConstraintFn(k)
+        | k.Tup() != nil:
+            ret self.annotateConstraintTup(k)
         |:
             ret false
         }
     }
 
-    fn push_generic(mut self, mut &k: &TypeKind, i: int) {
-        self.f.generics[i] = &InsGeneric{kind: k}
-        let mut gd = self.f.decl.generics[i]
-        if gd.constraint == nil || gd.constraint.mask.len != 1 {
+    fn pushGeneric(mut self, mut &k: &TypeKind, i: int) {
+        self.f.Generics[i] = &InsGeneric{Kind: k}
+        let mut gd = self.f.Decl.Generics[i]
+        if gd.Constraint == nil || gd.Constraint.Mask.len != 1 {
             ret
         }
-        self.c = gd.constraint.mask[0]
-        self.annotate_constraint(k)
+        self.c = gd.Constraint.Mask[0]
+        self.annotateConstraint(k)
     }
 
-    unsafe fn annotate_prim(mut self, mut &k: &TypeKind): (ok: bool) {
-        ret self.annotate_any(k)
+    unsafe fn annotatePrim(mut self, mut &k: &TypeKind): (ok: bool) {
+        ret self.annotateAny(k)
     }
 
-    unsafe fn annotate_arr(mut self, mut &k: &TypeKind): (ok: bool) {
-        let mut parr = (*self.k).arr()
+    unsafe fn annotateArr(mut self, mut &k: &TypeKind): (ok: bool) {
+        let mut parr = (*self.k).Arr()
         if parr == nil {
             ret false
         }
-        let mut arr = k.arr()
-        self.k = &parr.elem
-        ret self.annotate_kind(arr.elem)
+        let mut arr = k.Arr()
+        self.k = &parr.Elem
+        ret self.annotateKind(arr.Elem)
     }
 
-    unsafe fn annotate_slc(mut self, mut &k: &TypeKind): (ok: bool) {
-        let mut pslc = (*self.k).slc()
+    unsafe fn annotateSlc(mut self, mut &k: &TypeKind): (ok: bool) {
+        let mut pslc = (*self.k).Slc()
         if pslc == nil {
             ret false
         }
-        let mut slc = k.slc()
-        self.k = &pslc.elem
-        ret self.annotate_kind(slc.elem)
+        let mut slc = k.Slc()
+        self.k = &pslc.Elem
+        ret self.annotateKind(slc.Elem)
     }
 
-    unsafe fn check_map_key(mut self, mut k: *&TypeKind, mut &ck: &TypeKind): (ok: bool) {
+    unsafe fn checkMapKey(mut self, mut k: *&TypeKind, mut &ck: &TypeKind): (ok: bool) {
         let mut old = self.k
         self.k = k
-        ok = self.annotate_kind(ck)
+        ok = self.annotateKind(ck)
         self.k = old
         ret ok
     }
 
-    unsafe fn annotate_map(mut self, mut &k: &TypeKind): (ok: bool) {
-        let mut pmap = (*self.k).map()
+    unsafe fn annotateMap(mut self, mut &k: &TypeKind): (ok: bool) {
+        let mut pmap = (*self.k).Map()
         if pmap == nil {
             ret false
         }
-        let mut m = k.map()
-        ret self.check_map_key(&pmap.key, m.key) &&
-            self.check_map_key(&pmap.val, m.val)
+        let mut m = k.Map()
+        ret self.checkMapKey(&pmap.Key, m.Key) &&
+            self.checkMapKey(&pmap.Val, m.Val)
     }
 
-    unsafe fn annotate_fn(mut self, mut &k: &TypeKind): (ok: bool) {
-        let mut pf = (*self.k).fnc()
+    unsafe fn annotateFn(mut self, mut &k: &TypeKind): (ok: bool) {
+        let mut pf = (*self.k).Fn()
         if pf == nil {
             ret false
         }
-        let mut f = k.fnc()
+        let mut f = k.Fn()
         match {
-        | pf.params.len != f.params.len:
+        | pf.Params.len != f.Params.len:
             ret false
-        | pf.decl.is_void() != f.decl.is_void():
+        | pf.Decl.IsVoid() != f.Decl.IsVoid():
             ret false
         }
 
         ok = true
         let mut old = self.k
-        for (i, mut fp) in f.params {
-            self.k = &pf.params[i].kind
-            ok = self.annotate_kind(fp.kind) && ok
+        for (i, mut fp) in f.Params {
+            self.k = &pf.Params[i].Kind
+            ok = self.annotateKind(fp.Kind) && ok
         }
 
-        if !pf.decl.is_void() {
-            self.k = &pf.result
-            ok = self.annotate_kind(f.result) && ok
+        if !pf.Decl.IsVoid() {
+            self.k = &pf.Result
+            ok = self.annotateKind(f.Result) && ok
         }
 
         self.k = old
         ret ok
     }
 
-    unsafe fn annotate_ptr(mut self, mut &k: &TypeKind): (ok: bool) {
-        let mut pptr = (*self.k).ptr()
+    unsafe fn annotatePtr(mut self, mut &k: &TypeKind): (ok: bool) {
+        let mut pptr = (*self.k).Ptr()
         if pptr == nil {
             ret false
         }
-        let mut ptr = k.ptr()
-        self.k = &pptr.elem
-        ret self.annotate_kind(ptr.elem)
+        let mut ptr = k.Ptr()
+        self.k = &pptr.Elem
+        ret self.annotateKind(ptr.Elem)
     }
 
-    unsafe fn annotate_sptr(mut self, mut &k: &TypeKind): (ok: bool) {
-        let mut ssptr = (*self.k).sptr()
+    unsafe fn annotateSptr(mut self, mut &k: &TypeKind): (ok: bool) {
+        let mut ssptr = (*self.k).Sptr()
         if ssptr == nil {
             ret false
         }
-        let mut sptr = k.sptr()
-        self.k = &ssptr.elem
-        ret self.annotate_kind(sptr.elem)
+        let mut sptr = k.Sptr()
+        self.k = &ssptr.Elem
+        ret self.annotateKind(sptr.Elem)
     }
 
-    unsafe fn annotate_struct(mut self, mut &k: &TypeKind): (ok: bool) {
-        let mut s = (*self.k).strct()
+    unsafe fn annotateStruct(mut self, mut &k: &TypeKind): (ok: bool) {
+        let mut s = (*self.k).Struct()
         if s == nil {
             ret false
         }
-        let mut s2 = k.strct()
-        if s.generics.len != s2.generics.len {
+        let mut s2 = k.Struct()
+        if s.Generics.len != s2.Generics.len {
             ret false
         }
-        for (i, mut g) in s.generics {
-            let mut g2 = s2.generics[i]
-            if g.kind.equals(g2.kind) {
+        for (i, mut g) in s.Generics {
+            let mut g2 = s2.Generics[i]
+            if g.Kind.Equals(g2.Kind) {
                 continue
             }
-            self.k = &g.kind
-            if !self.annotate_kind(g2.kind) {
+            self.k = &g.Kind
+            if !self.annotateKind(g2.Kind) {
                 ret false
             }
         }
         ret true
     }
 
-    unsafe fn annotate_any(mut self, mut &k: &TypeKind): (ok: bool) {
-        let kind = (*self.k).to_str()
-        for i, g in self.f.decl.generics {
-            if kind != g.ident {
+    unsafe fn annotateAny(mut self, mut &k: &TypeKind): (ok: bool) {
+        let kind = (*self.k).Str()
+        for i, g in self.f.Decl.Generics {
+            if kind != g.Ident {
                 continue
             }
-
-            let t = self.f.generics[i]
+            let t = self.f.Generics[i]
             match {
-            | t == nil | t.kind == nil:
-                self.push_generic(k, i)
-            | !t.kind.equals(k):
+            | t == nil | t.Kind == nil:
+                self.pushGeneric(k, i)
+            | !t.Kind.Equals(k):
                 // Generic already pushed but generic type and current kind
                 // is different, so incompatible.
                 ret false
             }
-            (*self.k).kind = k.kind
+            (*self.k).Kind = k.Kind
             ret true
         }
 
         ret false
     }
 
-    unsafe fn annotate_kind(mut self, mut &k: &TypeKind): (ok: bool) {
+    unsafe fn annotateKind(mut self, mut &k: &TypeKind): (ok: bool) {
         if self.k == nil || *self.k == nil {
             ret
         }
         match {
-        | self.annotate_any(k):
+        | self.annotateAny(k):
             ret true
-        | k.prim() != nil:
-            ret self.annotate_prim(k)
-        | k.arr() != nil:
-            ret self.annotate_arr(k)
-        | k.slc() != nil:
-            ret self.annotate_slc(k)
-        | k.map() != nil:
-            ret self.annotate_map(k)
-        | k.fnc() != nil:
-            ret self.annotate_fn(k)
-        | k.ptr() != nil:
-            ret self.annotate_ptr(k)
-        | k.sptr() != nil:
-            ret self.annotate_sptr(k)
-        | k.strct() != nil:
-            ret self.annotate_struct(k)
+        | k.Prim() != nil:
+            ret self.annotatePrim(k)
+        | k.Arr() != nil:
+            ret self.annotateArr(k)
+        | k.Slc() != nil:
+            ret self.annotateSlc(k)
+        | k.Map() != nil:
+            ret self.annotateMap(k)
+        | k.Fn() != nil:
+            ret self.annotateFn(k)
+        | k.Ptr() != nil:
+            ret self.annotatePtr(k)
+        | k.Sptr() != nil:
+            ret self.annotateSptr(k)
+        | k.Struct() != nil:
+            ret self.annotateStruct(k)
         |:
             ret false
         }
     }
 
     unsafe fn annotate(mut self): (ok: bool) {
-        self.k = &self.p.kind
-        ret self.annotate_kind(self.a.kind)
+        self.k = &self.p.Kind
+        ret self.annotateKind(self.a.Kind)
     }
 }
 
-struct FnCallArgChecker {
-    e:                  &Eval
-    args:               []&Expr
-    error_token:        &Token
-    f:                  &FnIns
-    dynamic_annotation: bool
-    arg_models:         []ExprModel
+struct fnCallArgChecker {
+    e:                 &Eval
+    args:              []&Expr
+    errorToken:        &Token
+    f:                 &FnIns
+    dynamicAnnotation: bool
+    argModels:         []ExprModel
 }
 
-impl FnCallArgChecker {
-    fn push_err_token(mut self, token: &Token, fmt: LogMsg, args: ...any) {
-        self.e.s.push_err(token, fmt, args...)
+impl fnCallArgChecker {
+    fn pushErrToken(mut self, token: &Token, fmt: LogMsg, args: ...any) {
+        self.e.s.pushErr(token, fmt, args...)
     }
 
-    fn push_err(mut self, fmt: LogMsg, args: ...any) {
-        self.push_err_token(self.error_token, fmt, args...)
+    fn pushErr(mut self, fmt: LogMsg, args: ...any) {
+        self.pushErrToken(self.errorToken, fmt, args...)
     }
 
-    fn get_params(mut self): []&ParamIns {
-        if self.f.params.len > 0 &&
-            self.f.params[0].decl != nil &&
-            self.f.params[0].decl.is_self() {
-            ret self.f.params[1:] // Remove receiver parameter.
+    fn getParams(mut self): []&ParamIns {
+        if self.f.Params.len > 0 &&
+            self.f.Params[0].Decl != nil &&
+            self.f.Params[0].Decl.IsSelf() {
+            ret self.f.Params[1:] // Remove receiver parameter.
         }
-        ret self.f.params
+        ret self.f.Params
     }
 
-    fn check_counts(mut self, &params: []&ParamIns): (ok: bool) {
+    fn checkCounts(mut self, &params: []&ParamIns): (ok: bool) {
         let mut n = params.len
-        if n > 0 && params[0].decl.is_self() {
+        if n > 0 && params[0].Decl.IsSelf() {
             n--
         }
 
@@ -699,46 +698,46 @@ impl FnCallArgChecker {
         match {
         | diff == 0:
             ret true
-        | n > 0 && params[n-1].decl.variadic:
+        | n > 0 && params[n-1].Decl.Variadic:
             ret true
         | diff < 0 || diff > params.len:
-            self.push_err(LogMsg.ArgumentOverflow)
+            self.pushErr(LogMsg.ArgumentOverflow)
             ret false
         }
 
         let mut idents = ""
         for diff > 0; diff-- {
-            idents += ", " + params[n-diff].decl.ident
+            idents += ", " + params[n-diff].Decl.Ident
         }
         idents = idents[2:] // Remove first separator.
-        self.push_err(LogMsg.MissingExprFor, idents)
+        self.pushErr(LogMsg.MissingExprFor, idents)
 
         ret false
     }
 
-    fn check_arg(mut self, mut &p: &ParamIns, mut &arg: &Data, mut &error_token: &Token): (ok: bool) {
-        if self.dynamic_annotation && parameter_uses_generics(p.decl, self.f.decl.generics) {
-            ok = !p.decl.variadic // Accept as fail if parameter is variadic.
+    fn checkArg(mut self, mut &p: &ParamIns, mut &arg: &Data, mut &errorToken: &Token): (ok: bool) {
+        if self.dynamicAnnotation && parameterUsesGenerics(p.Decl, self.f.Decl.Generics) {
+            ok = !p.Decl.Variadic // Accept as fail if parameter is variadic.
             if ok {
-                let mut dta = DynamicTypeAnnotation{
+                let mut dta = dynamicTypeAnnotation{
                     e: self.e,
                     f: self.f,
                     p: p,
                     a: arg,
-                    error_token: error_token,
+                    errorToken: errorToken,
                 }
                 ok = unsafe { dta.annotate() }
             }
             if !ok {
-                self.push_err_token(error_token, LogMsg.DynamicTypeAnnotationFailed)
+                self.pushErrToken(errorToken, LogMsg.DynamicTypeAnnotationFailed)
                 ret false
             }
         }
 
-        if self.e.s.check_validity_for_init_expr(p.decl.mutable, p.decl.reference, p.kind, arg, error_token) {
+        if self.e.s.checkValidityForInitExpr(p.Decl.Mutable, p.Decl.Reference, p.Kind, arg, errorToken) {
             // Check type if validity is good.
             // Helps to reduce error logs and duplicated logs.
-            _ = self.e.s.check_assign_type(p.decl.reference, p.kind, arg, error_token)
+            _ = self.e.s.checkAssignType(p.Decl.Reference, p.Kind, arg, errorToken)
         }
         ret true
     }
@@ -748,13 +747,13 @@ impl FnCallArgChecker {
         let old_immut = self.e.immutable
         let mut d: &Data = nil
 
-        self.e.immutable = !p.decl.mutable
-        if !self.dynamic_annotation && !p.decl.variadic {
-            self.e.prefix = p.kind
+        self.e.immutable = !p.Decl.Mutable
+        if !self.dynamicAnnotation && !p.Decl.Variadic {
+            self.e.prefix = p.Kind
         } else {
             self.e.prefix = nil
         }
-        d = self.e.eval_expr_kind(arg.kind)
+        d = self.e.evalExprKind(arg.Kind)
 
         self.e.prefix = old
         self.e.immutable = old_immut
@@ -763,17 +762,17 @@ impl FnCallArgChecker {
             ret false
         }
 
-        ok = self.check_arg(p, d, arg.token)
-        self.arg_models = append(self.arg_models, d.model)
+        ok = self.checkArg(p, d, arg.Token)
+        self.argModels = append(self.argModels, d.Model)
         ret
     }
 
-    fn push_variadic(mut self, mut &p: &ParamIns, mut i: int): (ok: bool) {
+    fn pushVariadic(mut self, mut &p: &ParamIns, mut i: int): (ok: bool) {
         ok = true
         let mut variadiced = false
         let more = i+1 < self.args.len
         let mut model = &SliceExprModel{
-            elem_kind: p.kind,
+            ElemKind: p.Kind,
         }
 
         let mut old = self.e.prefix
@@ -781,24 +780,24 @@ impl FnCallArgChecker {
         // Save variadic status into separate variable.
         // Because parameter might be variadic, but type might be not variadic.
         // Some built-in functions passes non-variadic types.
-        let variadic = p.kind.variadic
-        p.kind.variadic = false
+        let variadic = p.Kind.Variadic
+        p.Kind.Variadic = false
         defer {
-            p.kind.variadic = variadic
+            p.Kind.Variadic = variadic
         }
 
         for i < self.args.len; i++ {
             let mut arg = self.args[i]
 
-            match type arg.kind {
+            match type arg.Kind {
             | &VariadicExpr:
                 self.e.prefix = &TypeKind{
-                    kind: &Slc{
-                        elem: p.kind,
+                    Kind: &Slc{
+                        Elem: p.Kind,
                     },
                 }
             |:
-                self.e.prefix = p.kind
+                self.e.prefix = p.Kind
             }
 
             let mut d = self.e.eval(arg)
@@ -807,17 +806,17 @@ impl FnCallArgChecker {
                 continue
             }
 
-            if d.kind.variadic {
+            if d.Kind.Variadic {
                 variadiced = true
-                p.kind.variadic = true
-                ok = ok && self.check_arg(p, d, arg.token)
-                match type d.model {
+                p.Kind.Variadic = true
+                ok = ok && self.checkArg(p, d, arg.Token)
+                match type d.Model {
                 | &SliceExprModel:
-                    model = (&SliceExprModel)(d.model)
-                    model.elem_kind = p.kind
+                    model = (&SliceExprModel)(d.Model)
+                    model.ElemKind = p.Kind
                 |:
                     model = nil
-                    self.arg_models = append(self.arg_models, d.model)
+                    self.argModels = append(self.argModels, d.Model)
                 }
                 // Break iteration early, this argument is variadic, so should be last.
                 // If this argument is not last, following algorithm will create error log for that.
@@ -826,8 +825,8 @@ impl FnCallArgChecker {
                 break
             }
 
-            ok = ok && self.check_arg(p, d, arg.token)
-            model.elems = append(model.elems, d.model)
+            ok = ok && self.checkArg(p, d, arg.Token)
+            model.Elems = append(model.Elems, d.Model)
         }
         self.e.prefix = old
 
@@ -835,22 +834,22 @@ impl FnCallArgChecker {
             // Use variable i because when variadic argument appears iteral will break.
             // And it will increase variable i for point to following argument.
             // Therefore, variable i always points to problematic argument.
-            self.push_err_token(self.args[i].token, LogMsg.MoreArgsWithVariadiced)
+            self.pushErrToken(self.args[i].Token, LogMsg.MoreArgsWithVariadiced)
         }
 
         if model != nil {
-            self.arg_models = append(self.arg_models, model)
+            self.argModels = append(self.argModels, model)
         }
         ret ok
     }
 
-    fn check_args(mut self, mut &params: []&ParamIns): (ok: bool) {
+    fn checkArgs(mut self, mut &params: []&ParamIns): (ok: bool) {
         let arg = self.e.arg
         self.e.arg = true
 
         ok = true
         let mut i = 0
-        if params.len > 0 && params[0].decl.is_self() {
+        if params.len > 0 && params[0].Decl.IsSelf() {
             // Ignore self.
             i++
         }
@@ -858,8 +857,8 @@ impl FnCallArgChecker {
         for i < params.len {
             let mut p = params[i]
             match {
-            | p.decl.variadic:
-                ok = self.push_variadic(p, i) && ok
+            | p.Decl.Variadic:
+                ok = self.pushVariadic(p, i) && ok
                 // Variadiced parameters always last.
                 break iter
             | self.args.len <= i:
@@ -875,10 +874,10 @@ impl FnCallArgChecker {
         ret ok
     }
 
-    fn check_dynamic_type_annotation(mut self): (ok: bool) {
-        for _, g in self.f.generics {
+    fn checkDynamicTypeAnnotation(mut self): (ok: bool) {
+        for _, g in self.f.Generics {
             if g == nil {
-                self.push_err(LogMsg.DynamicTypeAnnotationFailed)
+                self.pushErr(LogMsg.DynamicTypeAnnotationFailed)
                 ret false
             }
         }
@@ -886,74 +885,72 @@ impl FnCallArgChecker {
     }
 
     fn check(mut self): (ok: bool) {
-        let mut params = self.get_params()
-        ok = self.check_counts(params)
+        let mut params = self.getParams()
+        ok = self.checkCounts(params)
         if !ok {
             ret false
         }
-
-        ok = self.check_args(params)
-        if ok && self.dynamic_annotation {
-            ok = self.check_dynamic_type_annotation()
+        ok = self.checkArgs(params)
+        if ok && self.dynamicAnnotation {
+            ok = self.checkDynamicTypeAnnotation()
         }
-
         ret ok
     }
 }
 
-struct StructLitChecker {
-    e:           &Eval
-    error_token: &Token
-    s:           &StructIns
-    args:        []&StructArgExprModel
+struct structLitChecker {
+    e:          &Eval
+    errorToken: &Token
+    s:          &StructIns
+    args:       []&StructArgExprModel
 }
 
-impl StructLitChecker {
-    fn push_err(mut self, token: &Token, fmt: LogMsg, args: ...any) {
-        self.e.push_err(token, fmt, args...)
+impl structLitChecker {
+    fn pushErr(mut self, token: &Token, fmt: LogMsg, args: ...any) {
+        self.e.pushErr(token, fmt, args...)
     }
 
     // Push suggestion to last log.
-    fn push_suggestion(mut self, fmt: LogMsg, args: ...any) {
-        self.e.push_suggestion(fmt, args...)
+    fn pushSugggestion(mut self, fmt: LogMsg, args: ...any) {
+        self.e.pushSugggestion(fmt, args...)
     }
 
-    fn push_match(mut self, mut &f: &FieldIns, mut &d: &Data, mut &error_token: &Token) {
-        const REFERENCE = false
-        if self.e.s.check_validity_for_init_expr(!self.e.immutable, REFERENCE, f.kind, d, error_token) {
+    fn pushMatch(mut self, mut &f: &FieldIns, mut &d: &Data, mut &errorToken: &Token) {
+        const Reference = false
+        if self.e.s.checkValidityForInitExpr(!self.e.immutable, Reference, f.Kind, d, errorToken) {
             // Check type if validity is good.
             // Helps to reduce error logs and duplicated logs.
-            _ = self.e.s.check_assign_type(false, f.kind, d, error_token)
+            _ = self.e.s.checkAssignType(false, f.Kind, d, errorToken)
         }
         self.args = append(self.args, &StructArgExprModel{
-            field: f,
-            expr: d.model,
+            Field: f,
+            Expr: d.Model,
         })
     }
 
-    fn check_pair(mut self, mut &pair: &FieldExprPair, mut &exprs: []&Expr) {
+    fn checkPair(mut self, mut &pair: &FieldExprPair, mut &exprs: []&Expr) {
         // Check existing.
-        let mut f = self.s.find_field(pair.field.kind)
+        let mut f = self.s.FindField(pair.Field.Kind)
         if f == nil {
-            self.push_err(pair.field, LogMsg.IdentNotExist, pair.field.kind)
+            self.pushErr(pair.Field, LogMsg.IdentNotExist, pair.Field.Kind)
             ret
         }
-        if !self.e.s.is_accessible_define(f.decl.public, f.decl.token) {
-            self.push_err(pair.field, LogMsg.IdentIsNotAccessible, pair.field.kind)
-            self.push_suggestion(LogMsg.MakePubToAccess)
+        if !self.e.s.isAccessibleDefine(f.Decl.Public, f.Decl.Token) {
+            self.pushErr(pair.Field, LogMsg.IdentIsNotAccessible, pair.Field.Kind)
+            self.pushSugggestion(LogMsg.MakePubToAccess)
         }
 
         // Check duplications.
     dup_lookup:
         for (_, mut expr) in exprs {
-            match type expr.kind {
+            match type expr.Kind {
             | &FieldExprPair:
-                let mut dpair = (&FieldExprPair)(expr.kind)
+                let mut dpair = (&FieldExprPair)(expr.Kind)
                 match {
                 | pair == dpair:
                     break dup_lookup
-                | pair.field.kind == dpair.field.kind:
-                    self.push_err(pair.field, LogMsg.AlreadyHasExpr, pair.field.kind)
+                | pair.Field.Kind == dpair.Field.Kind:
+                    self.pushErr(pair.Field, LogMsg.AlreadyHasExpr, pair.Field.Kind)
                     break dup_lookup
                 }
             }
@@ -961,33 +958,33 @@ impl StructLitChecker {
 
         let mut prefix = self.e.prefix
         defer { self.e.prefix = prefix }
-        self.e.prefix = f.kind
+        self.e.prefix = f.Kind
 
-        let mut d = self.e.eval_expr_kind(pair.expr.kind)
+        let mut d = self.e.evalExprKind(pair.Expr.Kind)
         if d == nil {
             ret
         }
-        self.push_match(f, d, pair.field)
+        self.pushMatch(f, d, pair.Field)
     }
 
-    fn ready_exprs(mut self, mut &exprs: []&Expr): bool {
+    fn readyExprs(mut self, mut &exprs: []&Expr): bool {
         let mut ok = true
         for (i, mut expr) in exprs {
-            match type expr.kind {
+            match type expr.Kind {
             | &KeyValPair:
-                let mut pair = (&KeyValPair)(expr.kind)
-                match type pair.key.kind {
+                let mut pair = (&KeyValPair)(expr.Kind)
+                match type pair.Key.Kind {
                 | &IdentExpr:
                     // Ok
                     break
                 |:
-                    self.push_err(pair.colon, LogMsg.InvalidSyntax)
+                    self.pushErr(pair.Colon, LogMsg.InvalidSyntax)
                     ok = false
                     continue
                 }
-                exprs[i].kind = &FieldExprPair{
-                    field: pair.key.token,
-                    expr: pair.val,
+                exprs[i].Kind = &FieldExprPair{
+                    Field: pair.Key.Token,
+                    Expr: pair.Val,
                 }
             }
         }
@@ -998,54 +995,52 @@ impl StructLitChecker {
         if exprs.len == 0 {
             ret
         }
-
-        if !self.ready_exprs(exprs) {
+        if !self.readyExprs(exprs) {
             ret
         }
-
         let mut paired = false
         for (i, mut expr) in exprs {
-            match type expr.kind {
+            match type expr.Kind {
             | &FieldExprPair:
-                let mut pair = (&FieldExprPair)(expr.kind)
+                let mut pair = (&FieldExprPair)(expr.Kind)
                 if i > 0 && !paired {
-                    self.push_err(pair.field, LogMsg.InvalidSyntax)
+                    self.pushErr(pair.Field, LogMsg.InvalidSyntax)
                 }
                 paired = true
-                self.check_pair(pair, exprs)
+                self.checkPair(pair, exprs)
             |:
                 if paired {
-                    self.push_err(expr.token, LogMsg.ArgMustTargetToField)
+                    self.pushErr(expr.Token, LogMsg.ArgMustTargetToField)
                 }
-                if i >= self.s.fields.len {
-                    self.push_err(expr.token, LogMsg.ArgumentOverflow)
+                if i >= self.s.Fields.len {
+                    self.pushErr(expr.Token, LogMsg.ArgumentOverflow)
                     continue
                 }
 
-                let mut field = self.s.fields[i]
+                let mut field = self.s.Fields[i]
 
-                if !self.e.s.is_accessible_define(field.decl.public, field.decl.token) {
-                    self.push_err(self.error_token, LogMsg.StructureLitWithPrivFields)
-                    self.push_suggestion(LogMsg.UseFieldPairToInstantiate)
+                if !self.e.s.isAccessibleDefine(field.Decl.Public, field.Decl.Token) {
+                    self.pushErr(self.errorToken, LogMsg.StructureLitWithPrivFields)
+                    self.pushSugggestion(LogMsg.UseFieldPairToInstantiate)
                     ret
                 }
 
                 let mut prefix = self.e.prefix
                 defer { self.e.prefix = prefix }
-                self.e.prefix = field.kind
+                self.e.prefix = field.Kind
 
-                let mut d = self.e.eval_expr_kind(expr.kind)
+                let mut d = self.e.evalExprKind(expr.Kind)
                 if d == nil {
                     continue
                 }
 
-                self.push_match(field, d, expr.token)
+                self.pushMatch(field, d, expr.Token)
             }
         }
 
         // Check missing arguments for fields.
         if !paired {
-            let n = self.s.fields.len
+            let n = self.s.Fields.len
             let mut diff = n - exprs.len
             match {
             | diff <= 0:
@@ -1054,44 +1049,44 @@ impl StructLitChecker {
 
             let mut idents = ""
             for diff > 0; diff-- {
-                idents += ", " + self.s.fields[n-diff].decl.ident
+                idents += ", " + self.s.Fields[n-diff].Decl.Ident
             }
             idents = idents[2:] // Remove first separator.
-            self.push_err(self.error_token, LogMsg.MissingExprFor, idents)
+            self.pushErr(self.errorToken, LogMsg.MissingExprFor, idents)
         }
     }
 }
 
 // Range checker and setter.
-struct RangeChecker {
-    sc:   &ScopeChecker
+struct rangeChecker {
+    sc:   &scopeChecker
     rang: &RangeKind
-    kind: &RangeIter
+    Kind: &RangeIter
     d:    &Data
 }
 
-impl RangeChecker {
-    fn build_var(self, mut &decl: &VarDecl): &Var {
-        let mut v = build_var(decl)
+impl rangeChecker {
+    fn buildVar(self, mut &decl: &VarDecl): &Var {
+        let mut v = buildVar(decl)
         ret v
     }
 
-    fn set_size_key(mut self) {
-        if self.rang.key_a == nil || is_ignore_ident(self.rang.key_a.ident) {
+    fn setSizeKey(mut self) {
+        if self.rang.KeyA == nil || IsIgnoreIdent(self.rang.KeyA.Ident) {
             ret
         }
 
-        self.kind.key_a = self.build_var(self.rang.key_a)
-        self.kind.key_a.kind = &TypeSymbol{
-            kind: &TypeKind{
-                kind: build_prim_type(PrimKind.Int),
+        self.Kind.KeyA = self.buildVar(self.rang.KeyA)
+        self.Kind.KeyA.Kind = &TypeSymbol{
+            Kind: &TypeKind{
+                Kind: buildPrimType(PrimKind.Int),
             },
         }
 
-        match type self.d.model {
+        match type self.d.Model {
         | &Var:
-            self.kind.key_a.iter_relation = &IterRelation{
-                range: (&Var)(self.d.model),
+            self.Kind.KeyA.IterRelation = &IterRelation{
+                Range: (&Var)(self.d.Model),
             }
         }
     }
@@ -1102,166 +1097,165 @@ impl RangeChecker {
     //  - d:   data to check.
     //  - key: data passed to this key.
     //  - k:   element kind of expression.
-    fn check_range_expr_validity(mut self, mut &d: &Data, &key: &Var, mut &k: &TypeKind) {
-        let mut _mut = key.mutable
-        if _mut && !k.mutable() {
+    fn checkRangeExprValidity(mut self, mut &d: &Data, &key: &Var, mut &k: &TypeKind) {
+        let mut _mut = key.Mutable
+        if _mut && !k.Mutable() {
             // Bypass mutability error.
             // Element kind is immutable.
             // There is no mutation.
             _mut = false
         }
 
-        self.sc.s.check_validity_for_init_expr(
-            _mut, key.reference, key.kind.kind, d, self.rang.in_token)
+        self.sc.s.checkValidityForInitExpr(
+            _mut, key.Reference, key.Kind.Kind, d, self.rang.InToken)
     }
 
-    fn check_slice(mut self) {
-        self.set_size_key()
-        if self.rang.key_b == nil || is_ignore_ident(self.rang.key_b.ident) {
+    fn checkSlice(mut self) {
+        self.setSizeKey()
+        if self.rang.KeyB == nil || IsIgnoreIdent(self.rang.KeyB.Ident) {
             ret
         }
 
-        let mut slc = self.d.kind.slc()
-        self.kind.key_b = self.build_var(self.rang.key_b)
-        self.kind.key_b.kind = &TypeSymbol{kind: slc.elem}
+        let mut slc = self.d.Kind.Slc()
+        self.Kind.KeyB = self.buildVar(self.rang.KeyB)
+        self.Kind.KeyB.Kind = &TypeSymbol{Kind: slc.Elem}
 
-        self.check_range_expr_validity(self.d, self.kind.key_b, slc.elem)
+        self.checkRangeExprValidity(self.d, self.Kind.KeyB, slc.Elem)
     }
 
-    fn check_array(mut self) {
-        self.set_size_key()
-        if self.rang.key_b == nil || is_ignore_ident(self.rang.key_b.ident) {
+    fn checkArray(mut self) {
+        self.setSizeKey()
+        if self.rang.KeyB == nil || IsIgnoreIdent(self.rang.KeyB.Ident) {
             ret
         }
 
-        let mut arr = self.d.kind.arr()
-        self.kind.key_b = self.build_var(self.rang.key_b)
-        self.kind.key_b.kind = &TypeSymbol{kind: arr.elem}
+        let mut arr = self.d.Kind.Arr()
+        self.Kind.KeyB = self.buildVar(self.rang.KeyB)
+        self.Kind.KeyB.Kind = &TypeSymbol{Kind: arr.Elem}
 
-        self.check_range_expr_validity(self.d, self.kind.key_b, arr.elem)
+        self.checkRangeExprValidity(self.d, self.Kind.KeyB, arr.Elem)
     }
 
-    fn check_map_key_a(mut self) {
-        if self.rang.key_a == nil || is_ignore_ident(self.rang.key_a.ident) {
+    fn checkMapKeyA(mut self) {
+        if self.rang.KeyA == nil || IsIgnoreIdent(self.rang.KeyA.Ident) {
             ret
         }
 
-        let mut m = self.d.kind.map()
-        self.kind.key_a = self.build_var(self.rang.key_a)
-        self.kind.key_a.kind = &TypeSymbol{kind: m.key}
+        let mut m = self.d.Kind.Map()
+        self.Kind.KeyA = self.buildVar(self.rang.KeyA)
+        self.Kind.KeyA.Kind = &TypeSymbol{Kind: m.Key}
 
         let mut d = new(Data, *self.d)
-        d.kind = m.key
+        d.Kind = m.Key
 
-        self.check_range_expr_validity(d, self.kind.key_a, m.key)
+        self.checkRangeExprValidity(d, self.Kind.KeyA, m.Key)
     }
 
-    fn check_map_key_b(mut self) {
-        if self.rang.key_b == nil || is_ignore_ident(self.rang.key_b.ident) {
+    fn checkMapKeyB(mut self) {
+        if self.rang.KeyB == nil || IsIgnoreIdent(self.rang.KeyB.Ident) {
             ret
         }
 
-        let mut m = self.d.kind.map()
-        self.kind.key_b = self.build_var(self.rang.key_b)
-        self.kind.key_b.kind = &TypeSymbol{kind: m.val}
+        let mut m = self.d.Kind.Map()
+        self.Kind.KeyB = self.buildVar(self.rang.KeyB)
+        self.Kind.KeyB.Kind = &TypeSymbol{Kind: m.Val}
 
         let mut d = new(Data, *self.d)
-        d.kind = m.val
+        d.Kind = m.Val
 
-        self.check_range_expr_validity(d, self.kind.key_b, m.val)
+        self.checkRangeExprValidity(d, self.Kind.KeyB, m.Val)
     }
 
-    fn check_map(mut self) {
-        self.check_map_key_a()
-        self.check_map_key_b()
+    fn checkMap(mut self) {
+        self.checkMapKeyA()
+        self.checkMapKeyB()
     }
 
-    fn check_str(mut self) {
-        self.set_size_key()
-        if self.rang.key_b == nil || is_ignore_ident(self.rang.key_b.ident) {
+    fn checkStr(mut self) {
+        self.setSizeKey()
+        if self.rang.KeyB == nil || IsIgnoreIdent(self.rang.KeyB.Ident) {
             ret
         }
-
-        self.kind.key_b = self.build_var(self.rang.key_b)
-        self.kind.key_b.kind = &TypeSymbol{
-            kind: &TypeKind{
-                kind: build_prim_type(PrimKind.U8),
+        self.Kind.KeyB = self.buildVar(self.rang.KeyB)
+        self.Kind.KeyB.Kind = &TypeSymbol{
+            Kind: &TypeKind{
+                Kind: buildPrimType(PrimKind.U8),
             },
         }
     }
 
     fn check(mut self): bool {
         match {
-        | self.d.kind.variadic:
+        | self.d.Kind.Variadic:
             // Fail.
-        | self.d.kind.slc() != nil:
-            self.check_slice()
+        | self.d.Kind.Slc() != nil:
+            self.checkSlice()
             ret true
-        | self.d.kind.arr() != nil:
-            self.check_array()
+        | self.d.Kind.Arr() != nil:
+            self.checkArray()
             ret true
-        | self.d.kind.map() != nil:
-            self.check_map()
+        | self.d.Kind.Map() != nil:
+            self.checkMap()
             ret true
         |:
-            let prim = self.d.kind.prim()
-            if prim != nil && prim.is_str() {
-                self.check_str()
+            let prim = self.d.Kind.Prim()
+            if prim != nil && prim.IsStr() {
+                self.checkStr()
                 ret true
             }
         }
-        self.sc.s.push_err(self.rang.in_token, LogMsg.IterRangeRequireEnumerableExpr)
+        self.sc.s.pushErr(self.rang.InToken, LogMsg.IterRangeRequireEnumerableExpr)
         ret false
     }
 }
 
 // Return type checker for return statements.
-struct RetTypeChecker {
-    sc:          &ScopeChecker
-    f:           &FnIns
-    types:       []&TypeKind   // Return types.
-    exprs:       []&Expr       // Return expressions.
-    vars:        []&Var        // Return variables.
-    error_token: &Token
-    model:       ExprModel
+struct retTypeChecker {
+    sc:         &scopeChecker
+    f:          &FnIns
+    types:      []&TypeKind   // Return types.
+    exprs:      []&Expr       // Return expressions.
+    vars:       []&Var        // Return variables.
+    errorToken: &Token
+    model:      ExprModel
 }
 
-impl RetTypeChecker {
-    fn prepare_types(mut self) {
+impl retTypeChecker {
+    fn prepareTypes(mut self) {
         if self.f != nil {
-            self.types = self.f.types()
+            self.types = self.f.Types()
         }
     }
 
-    fn prepare_exprs(mut self, mut &e: &Expr) {
+    fn prepareExprs(mut self, mut &e: &Expr) {
         if e == nil {
             ret
         }
-        match type e.kind {
+        match type e.Kind {
         | &TupleExpr:
-            self.exprs = (&TupleExpr)(e.kind).expr
+            self.exprs = (&TupleExpr)(e.Kind).Expr
         |:
             self.exprs = append(self.exprs, e)
         }
     }
 
-    fn ret_vars(mut self) {
-        if self.f == nil || self.f.decl.is_void() {
+    fn retVars(mut self) {
+        if self.f == nil || self.f.Decl.IsVoid() {
             ret
         }
-        self.vars = make([]&Var, 0, self.f.decl.result.idents.len)
+        self.vars = make([]&Var, 0, self.f.Decl.Result.Idents.len)
 
-        let mut root_scope = self.sc.get_root()
+        let mut rootScope = self.sc.getRoot()
 
         let mut j = 0
-        for i, ident in self.f.decl.result.idents {
-            if !is_ignore_ident(ident.kind) && !is_anon_ident(ident.kind) {
-                self.vars = append(self.vars, root_scope.table.vars[j])
+        for i, ident in self.f.Decl.Result.Idents {
+            if !IsIgnoreIdent(ident.Kind) && !IsAnonIdent(ident.Kind) {
+                self.vars = append(self.vars, rootScope.table.Vars[j])
                 j++
             } else {
                 self.vars = append(self.vars, &Var{
-                    ident: Ident.Ignore,
-                    kind: &TypeSymbol{kind: self.types[i]},
+                    Ident: Ident.Ignore,
+                    Kind: &TypeSymbol{Kind: self.types[i]},
                 })
             }
         }
@@ -1272,13 +1266,11 @@ impl RetTypeChecker {
         }
     }
 
-    fn check_exprs(mut self) {
+    fn checkExprs(mut self) {
         if self.exprs.len == 0 {
             ret
         }
-
         let mut datas = make([]&Data, 0, self.exprs.len)
-
         for (i, mut expr) in self.exprs {
             if i >= self.types.len {
                 break
@@ -1286,63 +1278,63 @@ impl RetTypeChecker {
 
             let mut t = self.types[i]
 
-            let mut d = self.sc.s.evalp(self.sc, t).eval_expr(expr)
+            let mut d = self.sc.s.evalp(self.sc, t).evalExpr(expr)
             if d == nil {
                 continue
             }
 
             datas = append(datas, d)
 
-            if !d.mutable && d.kind.mutable() {
-                self.sc.s.push_err(self.error_token, LogMsg.RetWithMutTypedNonMut)
+            if !d.Mutable && d.Kind.Mutable() {
+                self.sc.s.pushErr(self.errorToken, LogMsg.RetWithMutTypedNonMut)
                 ret
             }
 
-            let mut ac = AssignTypeChecker{
+            let mut ac = assignTypeChecker{
                 s: self.sc.s,
                 dest: t,
                 d: d,
-                error_token: self.error_token,
+                errorToken: self.errorToken,
             }
             ac.check()
         }
 
-        // Set model.
+        // Set Model:.
         if datas.len > 1 { // Tuple
             self.model = &TupleExprModel{
-                datas: datas,
+                Datas: datas,
             }
         } else if datas.len == 1 {
-            self.model = datas[0].model
+            self.model = datas[0].Model
         }
     }
 
     fn check(mut self, mut &e: &Expr): bool {
-        self.prepare_types()
-        self.prepare_exprs(e)
-        self.ret_vars()
+        self.prepareTypes()
+        self.prepareExprs(e)
+        self.retVars()
 
         let n = self.exprs.len
         if n == 0 && self.types.len > 0 {
-            if !self.f.decl.any_var() {
-                self.sc.s.push_err(self.error_token, LogMsg.RequireRetExpr)
+            if !self.f.Decl.AnyVar() {
+                self.sc.s.pushErr(self.errorToken, LogMsg.RequireRetExpr)
                 ret false
             }
             ret true
         }
 
-        if n > 0 && self.f != nil && self.f.decl.is_void() {
-            self.sc.s.push_err(self.error_token, LogMsg.VoidFnRetExpr)
+        if n > 0 && self.f != nil && self.f.Decl.IsVoid() {
+            self.sc.s.pushErr(self.errorToken, LogMsg.VoidFnRetExpr)
             ret false
         }
 
         if n > self.types.len {
-            self.sc.s.push_err(self.error_token, LogMsg.OverflowRet)
+            self.sc.s.pushErr(self.errorToken, LogMsg.OverflowRet)
         } else if n < self.types.len {
-            self.sc.s.push_err(self.error_token, LogMsg.MissingMultiRet)
+            self.sc.s.pushErr(self.errorToken, LogMsg.MissingMultiRet)
         }
 
-        self.check_exprs()
+        self.checkExprs()
         ret true
     }
 }

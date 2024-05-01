@@ -4,8 +4,8 @@
 
 use env
 use conv for std::conv
-use std::jule::build::{ENTRY_POINT, Directive}
-use std::jule::lex::{TokenKind, is_anon_ident, is_ignore_ident}
+use std::jule::build::{EntryPoint, Directive}
+use std::jule::lex::{TokenKind, IsAnonIdent, IsIgnoreIdent}
 use std::jule::sema::{
     Fn,
     FnIns,
@@ -18,11 +18,11 @@ use std::jule::sema::{
 }
 
 // Identifier of initialize function caller function.
-const INIT_CALLER_IDENT = "__jule_call_initializers"
+const initCallerIdent = "__jule_call_initializers"
 
-struct IdentCoder {}
+struct identCoder {}
 
-impl IdentCoder {
+impl identCoder {
     const Self = "_self_"
 
     // Returns cpp output identifier form of given identifier.
@@ -30,11 +30,11 @@ impl IdentCoder {
     // Parameters:
     //   - ident: Identifier.
     //   - addr:  Pointer address of package file handler.
-    static fn to_out(&ident: str, addr: uintptr): str {
+    static fn toOut(&ident: str, addr: uintptr): str {
         if addr != 0 {
             let mut obj = make(str, 40)
             obj += "_"
-            obj += conv::fmt_uint(u64(addr), 0xF)
+            obj += conv::FmtUint(u64(addr), 0xF)
             obj += "_"
             obj += ident
             ret obj
@@ -51,11 +51,11 @@ impl IdentCoder {
     //   - row:   Row of definition.
     //   - col:   Column of definition.
     //   - ident: Identifier of definition.
-    static fn to_local(row: int, col: int, &ident: str): str {
+    static fn toLocal(row: int, col: int, &ident: str): str {
         let mut obj = make(str, 40)
         obj += "_"
-        obj += conv::itoa(row)
-        obj += conv::itoa(col)
+        obj += conv::Itoa(row)
+        obj += conv::Itoa(col)
         obj += "_"
         obj += ident
         ret obj
@@ -64,122 +64,122 @@ impl IdentCoder {
     // Returns output identifier of function.
     static fn func(&f: &Fn): str {
         match {
-        | f.cpp_linked:
-            ret f.ident
-        | f.ident == ENTRY_POINT:
+        | f.CppLinked:
+            ret f.Ident
+        | f.Ident == EntryPoint:
             ret "entry_point"
-        | f.is_method():
-            let mut obj = IdentCoder.to_out(f.ident, uintptr(f))
-            if f.statically {
+        | f.IsMethod():
+            let mut obj = identCoder.toOut(f.Ident, uintptr(f))
+            if f.Statically {
                 obj = "static_" + obj
                 ret obj
             }
             ret obj
         |:
-            ret IdentCoder.to_out(f.ident, uintptr(f))
+            ret identCoder.toOut(f.Ident, uintptr(f))
         }
     }
 
     // Returns output identifier of function instance.
-    static fn func_ins(&f: &FnIns): str {
-        if f.is_builtin() {
-            ret "jule::" + f.decl.ident
+    static fn funcIns(&f: &FnIns): str {
+        if f.IsBuiltin() {
+            ret "jule::" + f.Decl.Ident
         }
-        if f.decl.cpp_linked || f.generics.len == 0 {
-            ret IdentCoder.func(f.decl)
+        if f.Decl.CppLinked || f.Generics.len == 0 {
+            ret identCoder.func(f.Decl)
         }
-        ret IdentCoder.to_out(f.decl.ident, uintptr(f))
+        ret identCoder.toOut(f.Decl.Ident, uintptr(f))
     }
 
     // Returns output identifier of trait.
-    static fn trait_decl(t: &Trait): str {
-        if t.is_builtin() {
-            ret "jule::" + t.ident
+    static fn traitDecl(t: &Trait): str {
+        if t.IsBuiltin() {
+            ret "jule::" + t.Ident
         }
-        ret IdentCoder.to_out(t.ident, uintptr(t))
+        ret identCoder.toOut(t.Ident, uintptr(t))
     }
 
     // Returns output identifier of parameter.
     static fn param(&p: &Param): str {
-        if is_anon_ident(p.ident) || is_ignore_ident(p.ident) {
+        if IsAnonIdent(p.Ident) || IsIgnoreIdent(p.Ident) {
             ret ""
         }
-        if p.is_self() {
-            ret IdentCoder.Self
+        if p.IsSelf() {
+            ret identCoder.Self
         }
-        if p.token == nil {
-            ret IdentCoder.to_local(0, 0, p.ident)
+        if p.Token == nil {
+            ret identCoder.toLocal(0, 0, p.Ident)
         }
-        ret IdentCoder.to_local(p.token.row, p.token.column, p.ident)
+        ret identCoder.toLocal(p.Token.Row, p.Token.Column, p.Ident)
     }
 
     // Returns output identifier of structure.
     static fn structure(&s: &Struct): str {
-        if s.cpp_linked {
-            if has_directive(s.directives, Directive.Typedef) {
-                ret s.ident
+        if s.CppLinked {
+            if hasDirective(s.Directives, Directive.Typedef) {
+                ret s.Ident
             }
-            ret "struct " + s.ident
+            ret "struct " + s.Ident
         }
-        ret IdentCoder.to_out(s.ident, uintptr(s))
+        ret identCoder.toOut(s.Ident, uintptr(s))
     }
 
     // Returns output identifier of structure instance.
-    static fn structure_ins(&s: &StructIns): str {
-        if s.decl.cpp_linked || s.generics.len == 0 {
-            ret IdentCoder.structure(s.decl)
+    static fn structureIns(&s: &StructIns): str {
+        if s.Decl.CppLinked || s.Generics.len == 0 {
+            ret identCoder.structure(s.Decl)
         }
-        ret IdentCoder.to_out(s.decl.ident, uintptr(s))
+        ret identCoder.toOut(s.Decl.Ident, uintptr(s))
     }
 
     // Returns output identifier of field.
     static fn field(&f: &Field): str {
-        if f.owner.cpp_linked {
-            ret f.ident
+        if f.Owner.CppLinked {
+            ret f.Ident
         }
-        ret "_field_" + f.ident
+        ret "_field_" + f.Ident
     }
 
     // Returns output identifier of variable.
     static fn var(mut v: &Var): str {
         match {
-        | v.cpp_linked:
-            ret v.ident
-        | v.ident == TokenKind.Error:
+        | v.CppLinked:
+            ret v.Ident
+        | v.Ident == TokenKind.Error:
             ret "except.error"
-        | v.ident == TokenKind.Self:
-            if v.kind.kind.sptr() == nil {
-                ret "(*" + IdentCoder.Self + ")"
+        | v.Ident == TokenKind.Self:
+            if v.Kind.Kind.Sptr() == nil {
+                ret "(*" + identCoder.Self + ")"
             }
-            ret IdentCoder.Self
-        | v.scope != nil:
-            ret IdentCoder.to_local(v.token.row, v.token.column, v.ident)
+            ret identCoder.Self
+        | v.Scope != nil:
+            ret identCoder.toLocal(v.Token.Row, v.Token.Column, v.Ident)
         |:
-            ret IdentCoder.to_out(v.ident, uintptr(v))
+            ret identCoder.toOut(v.Ident, uintptr(v))
         }
     }
 
     // Returns begin label identifier of iteration.
-    static fn iter_begin(it: uintptr): str {
+    static fn iterBegin(it: uintptr): str {
         let mut obj = make(str, 30)
         obj += "_iter_begin_"
-        obj += conv::fmt_uint(u64(it), 0xF)
+        obj += conv::FmtUint(u64(it), 0xF)
         ret obj
     }
 
     // Returns end label identifier of iteration.
-    static fn iter_end(it: uintptr): str {
+    static fn iterEnd(it: uintptr): str {
         let mut obj = make(str, 30)
         obj += "_iter_end_"
-        obj += conv::fmt_uint(u64(it), 0xF)
+        obj += conv::FmtUint(u64(it), 0xF)
         ret obj
     }
 
     // Returns next label identifier of iteration.
-    static fn iter_next(it: uintptr): str {
+    static fn iterNext(it: uintptr): str {
         let mut obj = make(str, 30)
         obj += "_iter_next_"
-        obj += conv::fmt_uint(u64(it), 0xF)
+        obj += conv::FmtUint(u64(it), 0xF)
         ret obj
     }
 
@@ -192,18 +192,18 @@ impl IdentCoder {
     }
 
     // Returns end label identifier of match-case.
-    static fn match_end(m: uintptr): str {
+    static fn matchEnd(m: uintptr): str {
         let mut obj = make(str, 30)
         obj += "_match_end_"
-        obj += conv::fmt_uint(u64(m), 0xF)
+        obj += conv::FmtUint(u64(m), 0xF)
         ret obj
     }
 
     // Returns begin label identifier of case.
-    static fn case_begin(c: uintptr): str {
+    static fn caseBegin(c: uintptr): str {
         let mut obj = make(str, 30)
         obj += "_case_begin_"
-        obj += conv::fmt_uint(u64(c), 0xF)
+        obj += conv::FmtUint(u64(c), 0xF)
         ret obj
     }
 }

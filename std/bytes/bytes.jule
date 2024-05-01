@@ -10,12 +10,9 @@
 use unicode for std::unicode
 use utf8 for std::unicode::utf8
 
-// Negative situation index such as not found, not exist, or etc.
-const N_INDEX = -1
-
 // Returns bytes that equals to concatenation of n-count s.
 // Returns nil slice is n <= 0.
-pub fn repeat(s: []byte, mut n: int): []byte {
+pub fn Repeat(s: []byte, mut n: int): []byte {
     if n <= 0 {
         ret nil
     }
@@ -31,7 +28,7 @@ pub fn repeat(s: []byte, mut n: int): []byte {
     ret buff
 }
 
-fn _has_prefix(&s: []byte, &sub: []byte, mut start: int): bool {
+fn hasPrefix(&s: []byte, &sub: []byte, mut start: int): bool {
     if sub.len == 0 || s.len-start < sub.len {
         ret false
     }
@@ -45,11 +42,11 @@ fn _has_prefix(&s: []byte, &sub: []byte, mut start: int): bool {
 }
 
 // Reports byte slice has prefix as specified sub-slice or not.
-pub fn has_prefix(s: []byte, sub: []byte): bool {
-    ret _has_prefix(s, sub, 0)
+pub fn HasPrefix(s: []byte, sub: []byte): bool {
+    ret hasPrefix(s, sub, 0)
 }
 
-fn _has_suffix(&s: []byte, &sub: []byte, mut start: int): bool {
+fn hasSuffix(&s: []byte, &sub: []byte, mut start: int): bool {
     if sub.len == 0 || s.len-start < sub.len {
         ret false
     }
@@ -64,41 +61,41 @@ fn _has_suffix(&s: []byte, &sub: []byte, mut start: int): bool {
 }
 
 // Reports byte slice has suffix as specified sub-slice or not.
-pub fn has_suffix(s: []byte, sub: []byte): bool {
-    ret _has_suffix(s, sub, 0)
+pub fn HasSuffix(s: []byte, sub: []byte): bool {
+    ret hasSuffix(s, sub, 0)
 }
 
 // Returns index of first matched item with specified sub-slice,
 // returns -1 if not exist any match. Starts searching at left
 // of slice to right. Starts searching s at given index.
 // Returns -1, if i < 0 || i >= s.len.
-pub fn find_at(s: []byte, sub: []byte, mut i: int): int {
+pub fn FindAt(s: []byte, sub: []byte, mut i: int): int {
     if i < 0 || s.len < sub.len || sub.len == 0 {
-        ret N_INDEX
+        ret -1
     }
     for i < s.len; i++ {
-        if _has_prefix(s, sub, i) {
+        if hasPrefix(s, sub, i) {
             ret i
         }
     }
-    ret N_INDEX
+    ret -1
 }
 
 // Returns index of first matched item with specified sub-slice,
 // returns -1 if not exist any match. Starts searching at left
 // of slice to right.
-pub fn find(s: []byte, sub: []byte): int {
-    ret find_at(s, sub, 0)
+pub fn Find(s: []byte, sub: []byte): int {
+    ret FindAt(s, sub, 0)
 }
 
 // Returns index of first matched item with specified sub-slice,
 // returns -1 if not exist any match. Starts searching at right
 // of slice to left. Starts searching s at given index.
 // Returns -1, if i < 0 || i >= s.len.
-pub fn find_last_at(s: []byte, sub: []byte, i: int): int {
+pub fn FindLastAt(s: []byte, sub: []byte, i: int): int {
     let mut j = i - sub.len + 1
     if sub.len == 0 || i < 0 || i >= s.len || j < 0 {
-        ret N_INDEX
+        ret -1
     }
 loop:
     for j >= 0; j-- {
@@ -111,156 +108,156 @@ loop:
         }
         ret j
     }
-    ret N_INDEX
+    ret -1
 }
 
 // Returns index of first matched item with specified sub-slice,
 // returns -1 if not exist any match. Starts searching at right
 // of slice to left.
-pub fn find_last(s: []byte, sub: []byte): int {
-    ret find_last_at(s, sub, s.len - 1)
+pub fn FindLast(s: []byte, sub: []byte): int {
+    ret FindLastAt(s, sub, s.len - 1)
 }
 
 // Returns index of first matched item with specified byte,
 // returns -1 if not exist any match. Starts searching at left
 // of slice to right.
-pub fn find_byte(s: []byte, b: byte): int {
+pub fn FindByte(s: []byte, b: byte): int {
     for i, se in s {
         if se == b {
             ret i
         }
     }
-    ret N_INDEX
+    ret -1
 }
 
 // Returns index of first matched item with specified byte,
 // returns -1 if not exist any match. Starts searching at right
 // of slice to left.
-pub fn find_last_byte(s: []byte, b: byte): int {
+pub fn FindLastByte(s: []byte, b: byte): int {
     let mut i = s.len - 1
     for i >= 0; i-- {
         if s[i] == b {
             ret i
         }
     }
-    ret N_INDEX
+    ret -1
 }
 
 // Returns index of first matched item with specified rune,
 // returns -1 if not exist any match. Starts searching at left
 // of slice to right.
-pub fn find_rune(s: []byte, r: rune): int {
+pub fn FindRune(s: []byte, r: rune): int {
     let mut i = 0
     for i < s.len {
-        let (br, n) = utf8::decode_rune(s[i:])
+        let (br, n) = utf8::DecodeRune(s[i:])
         if r == br {
             ret i
         }
         i += n
     }
-    ret N_INDEX
+    ret -1
 }
 
 // Returns index of first matched item with specified rune,
 // returns -1 if not exist any match. Starts searching at right
 // of slice to left.
-pub fn find_last_rune(s: []byte, r: rune): int {
+pub fn FindLastRune(s: []byte, r: rune): int {
     let mut i = s.len
     for i > 0 {
-        let (br, n) = utf8::decode_last_rune(s[:i])
+        let (br, n) = utf8::DecodeLastRune(s[:i])
         if r == br {
             ret i - 1
         }
         i -= n
     }
-    ret N_INDEX
+    ret -1
 }
 
 // Returns index of first matched item with finder function,
 // returns -1 if not exist any match. Starts searching at left
 // of slice to right. Starts searching s at given index.
 // Returns -1, if i < 0.
-pub fn find_fn_at(s: []byte, mut i: int, f: fn(mut rune): bool): int {
+pub fn FindFnAt(s: []byte, mut i: int, f: fn(mut rune): bool): int {
     if i < 0 {
-        ret N_INDEX
+        ret -1
     }
     for i < s.len {
-        let (r, n) = utf8::decode_rune(s[i:])
+        let (r, n) = utf8::DecodeRune(s[i:])
         if f(r) {
             ret i
         }
         i += n
     }
-    ret N_INDEX
+    ret -1
 }
 
 // Returns index of first matched item with finder function,
 // returns -1 if not exist any match. Starts searching at left
 // of slice to right.
-pub fn find_fn(s: []byte, f: fn(mut rune): bool): int {
-    ret find_fn_at(s, 0, f)
+pub fn FindFn(s: []byte, f: fn(mut rune): bool): int {
+    ret FindFnAt(s, 0, f)
 }
 
 // Returns index of first matched item with finder function,
 // returns -1 if not exist any match. Starts searching at right
 // of slice to left. Starts searching s at given index.
 // Returns -1, if i < 0 || i >= s.len.
-pub fn find_fn_last_at(s: []byte, mut i: int, f: fn(mut rune): bool): int {
+pub fn FindFnLastAt(s: []byte, mut i: int, f: fn(mut rune): bool): int {
     if i < 0 || i >= s.len {
-        ret N_INDEX
+        ret -1
     }
     for i > 0 {
-        let (r, n) = utf8::decode_rune(s[i:])
+        let (r, n) = utf8::DecodeRune(s[i:])
         if f(r) {
             ret i
         }
         i -= n
     }
-    ret N_INDEX
+    ret -1
 }
 
 // Returns index of first matched item with finder function,
 // returns -1 if not exist any match. Starts searching at right
 // of slice to left.
-pub fn find_fn_last(s: []byte, f: fn(mut rune): bool): int {
-    ret find_fn_last_at(s, s.len - 1, f)
+pub fn FindFnLast(s: []byte, f: fn(mut rune): bool): int {
+    ret FindFnLastAt(s, s.len - 1, f)
 }
 
 // Returns index of first matched item with any of runes,
 // returns -1 if not exist any match. Starts searching at left
 // of slice to right.
-pub fn find_any(s: []byte, runes: []byte): int {
+pub fn FindAny(s: []byte, runes: []byte): int {
     let mut i = 0
     for i < s.len {
-        let (r, n) = utf8::decode_rune(s[i:])
-        if find_rune(runes, r) != N_INDEX {
+        let (r, n) = utf8::DecodeRune(s[i:])
+        if FindRune(runes, r) != -1 {
             ret i
         }
         i += n
     }
-    ret N_INDEX
+    ret -1
 }
 
 // Returns index of first matched item with any of runes,
 // returns -1 if not exist any match. Starts searching at right
 // of slice to left.
-pub fn find_last_any(s: []byte, runes: []byte): int {
+pub fn FindLastAny(s: []byte, runes: []byte): int {
     let mut i = s.len
     for i > 0 {
-        let (r, n) = utf8::decode_last_rune(s[:i])
-        if find_rune(runes, r) != N_INDEX {
+        let (r, n) = utf8::DecodeLastRune(s[:i])
+        if FindRune(runes, r) != -1 {
             ret i - 1
         }
         i -= n
     }
-    ret N_INDEX
+    ret -1
 }
 
 // Splits the slice into the specified number of parts to the specified sub-slice.
 // Appends parts as immutable slice.
 // Returns empty slice if n is equals to zero.
 // Returns all parts if n less than zero.
-pub fn split(mut s: []byte, sub: []byte, mut n: int): [][]byte {
+pub fn Split(mut s: []byte, sub: []byte, mut n: int): [][]byte {
     let mut cap = n
     if n < 0 {
         cap = 1 << 3
@@ -274,8 +271,8 @@ pub fn split(mut s: []byte, sub: []byte, mut n: int): [][]byte {
     }
     let mut i = 0
     for n > 0; n-- {
-        let j = find_at(s, sub, i)
-        if j == N_INDEX {
+        let j = FindAt(s, sub, i)
+        if j == -1 {
             break
         }
         parts = append(parts, s[i:j])
@@ -288,36 +285,36 @@ pub fn split(mut s: []byte, sub: []byte, mut n: int): [][]byte {
 }
 
 // Reports whether slice includes sub-slice.
-pub fn contains(s: []byte, sub: []byte): bool {
-    ret find_at(s, sub, 0) != N_INDEX
+pub fn Contains(s: []byte, sub: []byte): bool {
+    ret FindAt(s, sub, 0) != -1
 }
 
 // Reports whether slice includes byte.
-pub fn contains_byte(s: []byte, b: byte): bool {
-    ret find_byte(s, b) != N_INDEX
+pub fn ContainsByte(s: []byte, b: byte): bool {
+    ret FindByte(s, b) != -1
 }
 
 // Reports whether slice includes rune.
-pub fn contains_rune(s: []byte, r: rune): bool {
-    ret find_rune(s, r) != N_INDEX
+pub fn ContainsRune(s: []byte, r: rune): bool {
+    ret FindRune(s, r) != -1
 }
 
 // Reports whether slice includes any of runes.
-pub fn contains_any(s: []byte, runes: []byte): bool {
-    ret find_any(s, runes) != N_INDEX
+pub fn ContainsAny(s: []byte, runes: []byte): bool {
+    ret FindAny(s, runes) != -1
 }
 
 // Counts the number of non-overlapping instances of sub-slice in s.
 // Returns zero if sub-slice is empty.
-pub fn count(s: []byte, sub: []byte): int {
+pub fn Count(s: []byte, sub: []byte): int {
     if sub.len == 0 {
         ret 0
     }
     let mut n = 0
     let mut i = 0
     for {
-        let j = find_at(s, sub, i)
-        if j == N_INDEX {
+        let j = FindAt(s, sub, i)
+        if j == -1 {
             break
         }
         n++
@@ -330,12 +327,12 @@ pub fn count(s: []byte, sub: []byte): int {
 // Returns same slice if n is equals to zero.
 // Replaces all matches if n less than zero.
 // This function may return mutable copy of s, of new slice allocation.
-pub fn replace(mut s: []byte, sub: []byte, new: []byte, mut n: int): []byte {
+pub fn Replace(mut s: []byte, sub: []byte, new: []byte, mut n: int): []byte {
     if n == 0 || sub == new {
         ret s
     }
 
-    let m = count(s, sub)
+    let m = Count(s, sub)
     if m == 0 {
         ret s
     }
@@ -346,8 +343,8 @@ pub fn replace(mut s: []byte, sub: []byte, new: []byte, mut n: int): []byte {
     let mut ss = make([]byte, 0, s.len + n * (new.len - sub.len))
     let mut i = 0
     for n > 0; n-- {
-        let j = find_at(s, sub, i)
-        if j == N_INDEX {
+        let j = FindAt(s, sub, i)
+        if j == -1 {
             break
         }
         ss = append(ss, s[i:j]...)
@@ -361,15 +358,15 @@ pub fn replace(mut s: []byte, sub: []byte, new: []byte, mut n: int): []byte {
 // Returns a immutable copy of the slice s with all its characters modified
 // according to the mapping function. If mapping returns a negative value,
 // the character is dropped from the slice with no replacement.
-pub fn map(s: []byte, mapping: fn(mut rune): rune): []byte {
+pub fn Map(s: []byte, mapping: fn(mut rune): rune): []byte {
     let mut ss = make([]byte, 0, s.len)
     let mut i = 0
     for i < s.len {
-        let (mut r, n) = utf8::decode_rune(s[i:])
+        let (mut r, n) = utf8::DecodeRune(s[i:])
         i += n
         r = mapping(r)
         if r >= 0 {
-            ss = utf8::append_rune(ss, r)
+            ss = utf8::AppendRune(ss, r)
         }
     }
     ret ss
@@ -377,24 +374,24 @@ pub fn map(s: []byte, mapping: fn(mut rune): rune): []byte {
 
 // Returns s with all Unicode letters mapped to their lower case.
 // Returns immutable new slice allocation.
-pub fn to_lower(s: []byte): []byte {
-    ret map(s, unicode::to_lower)
+pub fn ToLower(s: []byte): []byte {
+    ret Map(s, unicode::ToLower)
 }
 
 // Returns s with all Unicode letters mapped to their upper case.
 // Returns immutable new slice allocation.
-pub fn to_upper(s: []byte): []byte {
-    ret map(s, unicode::to_upper)
+pub fn ToUpper(s: []byte): []byte {
+    ret Map(s, unicode::ToUpper)
 }
 
 // Trims slice by specified runes at left.
 // Cutset should include runes to trim.
 // Returns mutable copy of s.
-pub fn trim_left(mut s: []byte, cutset: []byte): []byte {
+pub fn TrimLeft(mut s: []byte, cutset: []byte): []byte {
     let mut i = 0
     for i < s.len {
-        let (r, n) = utf8::decode_rune(s[i:])
-        if find_rune(cutset, r) == N_INDEX {
+        let (r, n) = utf8::DecodeRune(s[i:])
+        if FindRune(cutset, r) == -1 {
             s = s[i:]
             break
         }
@@ -406,11 +403,11 @@ pub fn trim_left(mut s: []byte, cutset: []byte): []byte {
 // Trims slice by specified runes at right.
 // Cutset should include runes to trim.
 // Returns mutable copy of s.
-pub fn trim_right(mut s: []byte, cutset: []byte): []byte {
+pub fn TrimRight(mut s: []byte, cutset: []byte): []byte {
     let mut i = s.len
     for i > 0 {
-        let (r, n) = utf8::decode_last_rune(s[:i])
-        if find_rune(cutset, r) == N_INDEX {
+        let (r, n) = utf8::DecodeLastRune(s[:i])
+        if FindRune(cutset, r) == -1 {
             s = s[:i]
             break
         }
@@ -422,13 +419,13 @@ pub fn trim_right(mut s: []byte, cutset: []byte): []byte {
 // Trims slice by specified runes at left and right.
 // Cutset should include runes to trim.
 // Returns mutable copy of s.
-pub fn trim(mut s: []byte, cutset: []byte): []byte {
-    ret trim_right(trim_left(s, cutset), cutset)
+pub fn Trim(mut s: []byte, cutset: []byte): []byte {
+    ret TrimRight(TrimLeft(s, cutset), cutset)
 }
 
 // Concatenates the parts of its first argument to create a single slice.
 // The separator sep is placed between parts in the resulting slice.
-pub fn join(parts: [][]byte, sep: []byte): []byte {
+pub fn Join(parts: [][]byte, sep: []byte): []byte {
     if parts.len == 0 {
         ret make([]byte, 0)
     }
@@ -442,11 +439,11 @@ pub fn join(parts: [][]byte, sep: []byte): []byte {
 }
 
 // Returns runes from UTF-8 encoded bytes.
-pub fn runes(s: []byte): []rune {
-    let mut runes = make([]rune, 0, utf8::rune_count(s))
+pub fn Runes(s: []byte): []rune {
+    let mut runes = make([]rune, 0, utf8::RuneCount(s))
     let mut i = 0
     for i < s.len {
-        let (r, n) = utf8::decode_rune(s[i:])
+        let (r, n) = utf8::DecodeRune(s[i:])
         i += n
         runes = append(runes, r)
     }

@@ -12,8 +12,8 @@ pub enum SemaFlag {
 }
 
 // Builds symbol table of AST.
-fn build_symbols(mut &ast: &Ast, mut &importer: Importer, mut owner: &SymbolBuilder): (&SymbolTable, []Log) {
-    let mut sb = &SymbolBuilder{
+fn buildSymbols(mut &ast: &Ast, mut &importer: Importer, mut owner: &symbolBuilder): (&SymbolTable, []Log) {
+    let mut sb = &symbolBuilder{
         ast: ast,
         importer: importer,
         owner: owner,
@@ -26,11 +26,11 @@ fn build_symbols(mut &ast: &Ast, mut &importer: Importer, mut owner: &SymbolBuil
     ret nil, sb.errors
 }
 
-fn __analyze_package(mut &files: []&Ast, mut &importer: Importer, &flags: SemaFlag): (&Package, []Log) {
+fn analyzePackage(mut &files: []&Ast, mut &importer: Importer, &flags: SemaFlag): (&Package, []Log) {
     // Build symbol tables of files.
     let mut tables = make([]&SymbolTable, 0, files.len)
     for (_, mut f) in files {
-        let (mut table, mut errors) = build_symbols(f, importer, nil)
+        let (mut table, mut errors) = buildSymbols(f, importer, nil)
         if errors.len > 0 {
             ret nil, errors
         }
@@ -46,7 +46,7 @@ fn __analyze_package(mut &files: []&Ast, mut &importer: Importer, &flags: SemaFl
     }
 
     let mut pkg = &Package{
-        files: sema.files,
+        Files: sema.files,
     }
 
     ret pkg, nil
@@ -69,12 +69,11 @@ fn __analyze_package(mut &files: []&Ast, mut &importer: Importer, &flags: SemaFl
 // Risks:
 //   - You can pass nil to importer, but panics if importer is nil and
 //     semantic analyzer used nil importer.
-pub fn analyze_package(mut files: []&Ast, mut importer: Importer, flags: SemaFlag): (&Package, []Log) {
+pub fn AnalyzePackage(mut files: []&Ast, mut importer: Importer, flags: SemaFlag): (&Package, []Log) {
     if files.len == 0 {
         ret nil, nil
     }
-
-    let (mut package, mut logs) = __analyze_package(files, importer, flags)
+    let (mut package, mut logs) = analyzePackage(files, importer, flags)
     ret package, logs
 }
 
@@ -95,15 +94,14 @@ pub fn analyze_package(mut files: []&Ast, mut importer: Importer, flags: SemaFla
 // Risks:
 //   - You can pass nil to importer, but panics if importer is nil and
 //     semantic analyzer used nil importer.
-pub fn analyze_file(mut f: &Ast, mut importer: Importer, flags: SemaFlag): (&SymbolTable, []Log) {
+pub fn AnalyzeFile(mut f: &Ast, mut importer: Importer, flags: SemaFlag): (&SymbolTable, []Log) {
     let mut files: []&Ast = [f]
-    let (mut pkg, mut errors) = analyze_package(files, importer, flags)
+    let (mut pkg, mut errors) = AnalyzePackage(files, importer, flags)
     if errors.len > 0 {
         ret nil, errors
     }
-
     // Select first table, because package has only one file.
     // We give just one file.
-    let mut table = pkg.files[0]
+    let mut table = pkg.Files[0]
     ret table, nil
 }

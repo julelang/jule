@@ -115,53 +115,53 @@
 //       See HP-15C Advanced Functions Handbook, p.193.
 
 // Returns the natural logarithm of 1 plus its argument x.
-// It is more accurate than log(1 + x) when x is near zero.
+// It is more accurate than Log(1 + x) when x is near zero.
 //
 // Special cases are:
-//  log1p(+inf) = +inf
-//  log1p(±0) = ±0
-//  log1p(-1) = -inf
-//  log1p(x < -1) = nan
-//  log1p(nan) = nan
-pub fn log1p(x: f64): f64 {
-    const SQRT2_M1 = 4.142135623730950488017e-01       // sqrt(2)-1 = 0x3fda827999fcef34
-    const SQRT2_HALF_M1 = -2.928932188134524755992e-01 // sqrt(2)/2-1 = 0xbfd2bec333018866
-    const SMALL = 1.0 / (1 << 29)                      // 2**-29 = 0x3e20000000000000
-    const TINY = 1.0 / (1 << 54)                       // 2**-54
-    const TWO53 = 1 << 53                              // 2**53
-    const LN2_HI = 6.93147180369123816490e-01          // 3fe62e42fee00000
-    const LN2_LO = 1.90821492927058770002e-10          // 3dea39ef35793c76
-    const LP1 = 6.666666666666735130e-01               // 3FE5555555555593
-    const LP2 = 3.999999999940941908e-01               // 3FD999999997FA04
-    const LP3 = 2.857142874366239149e-01               // 3FD2492494229359
-    const LP4 = 2.222219843214978396e-01               // 3FCC71C51D8E78AF
-    const LP5 = 1.818357216161805012e-01               // 3FC7466496CB03DE
-    const LP6 = 1.531383769920937332e-01               // 3FC39A09D078C69F
-    const LP7 = 1.479819860511658591e-01               // 3FC2F112DF3E5244
+//  Log1p(+Inf) = +Inf
+//  Log1p(±0) = ±0
+//  Log1p(-1) = -Inf
+//  Log1p(x < -1) = NaN
+//  Log1p(NaN) = NaN
+pub fn Log1p(x: f64): f64 {
+    const Sqrt2m1 = 4.142135623730950488017e-01      // sqrt(2)-1 = 0x3fda827999fcef34
+    const Sqrt2Halfm1 = -2.928932188134524755992e-01 // sqrt(2)/2-1 = 0xbfd2bec333018866
+    const Small = 1.0 / (1 << 29)                    // 2**-29 = 0x3e20000000000000
+    const Tiny = 1.0 / (1 << 54)                     // 2**-54
+    const Two53 = 1 << 53                            // 2**53
+    const Ln2Hi = 6.93147180369123816490e-01         // 3fe62e42fee00000
+    const Ln2Lo = 1.90821492927058770002e-10         // 3dea39ef35793c76
+    const LP1 = 6.666666666666735130e-01             // 3FE5555555555593
+    const LP2 = 3.999999999940941908e-01             // 3FD999999997FA04
+    const LP3 = 2.857142874366239149e-01             // 3FD2492494229359
+    const LP4 = 2.222219843214978396e-01             // 3FCC71C51D8E78AF
+    const LP5 = 1.818357216161805012e-01             // 3FC7466496CB03DE
+    const LP6 = 1.531383769920937332e-01             // 3FC39A09D078C69F
+    const LP7 = 1.479819860511658591e-01             // 3FC2F112DF3E5244
 
     // special cases
     match {
-    | x < -1 | is_nan(x): // includes -inf
-        ret nan()
+    | x < -1 | IsNaN(x): // includes -inf
+        ret NaN()
     | x == -1:
-        ret inf(-1)
-    | is_inf(x, 1):
-        ret inf(1)
+        ret Inf(-1)
+    | IsInf(x, 1):
+        ret Inf(1)
     }
 
-    let absx = abs(x)
+    let absx = Abs(x)
 
     let mut f: f64 = 0
     let mut iu: u64 = 0
     let mut k = 1
-    if absx < SQRT2_M1 { //  |x| < sqrt(2)-1
-        if absx < SMALL { // |x| < 2**-29
-            if absx < TINY { // |x| < 2**-54
+    if absx < Sqrt2m1 { //  |x| < sqrt(2)-1
+        if absx < Small { // |x| < 2**-29
+            if absx < Tiny { // |x| < 2**-54
                 ret x
             }
             ret x - x * x * 0.5
         }
-        if x > SQRT2_HALF_M1 { // sqrt(2)/2-1 < x
+        if x > Sqrt2Halfm1 { // sqrt(2)/2-1 < x
             // (sqrt(2)/2-1) < x < (sqrt(2)-1)
             k = 0
             f = x
@@ -171,9 +171,9 @@ pub fn log1p(x: f64): f64 {
     let mut c: f64 = 0
     if k != 0 {
         let mut u: f64 = 0
-        if absx < TWO53 { // 1<<53
+        if absx < Two53 { // 1<<53
             u = 1.0 + x
-            iu = f64_bits(u)
+            iu = F64Bits(u)
             k = int((iu >> 52) - 1023)
             // correction term
             if k > 0 {
@@ -184,17 +184,17 @@ pub fn log1p(x: f64): f64 {
             c /= u
         } else {
             u = x
-            iu = f64_bits(u)
+            iu = F64Bits(u)
             k = int((iu >> 52) - 1023)
             c = 0
         }
         iu &= 0x000fffffffffffff
 
         if iu < 0x0006a09e667f3bcd { // mantissa of sqrt(2)
-            u = f64_from_bits(iu | 0x3ff0000000000000) // normalize u
+            u = F64FromBits(iu | 0x3ff0000000000000) // normalize u
         } else {
             k++
-            u = f64_from_bits(iu | 0x3fe0000000000000) // normalize u/2
+            u = F64FromBits(iu | 0x3fe0000000000000) // normalize u/2
             iu = (0x0010000000000000 - iu) >> 2
         }
         f = u - 1.0 // sqrt(2)/2 < u < sqrt(2)
@@ -208,14 +208,14 @@ pub fn log1p(x: f64): f64 {
             if k == 0 {
                 ret 0
             }
-            c += f64(k) * LN2_LO
-            ret f64(k) * LN2_HI + c
+            c += f64(k) * Ln2Lo
+            ret f64(k) * Ln2Hi + c
         }
         R = hfsq * (1.0 - 0.66666666666666666 * f) // avoid division
         if k == 0 {
             ret f - R
         }
-        ret f64(k) * LN2_HI - ((R - (f64(k) * LN2_LO + c)) - f)
+        ret f64(k) * Ln2Hi - ((R - (f64(k) * Ln2Lo + c)) - f)
     }
     s = f / (2.0 + f)
     z = s * s
@@ -223,5 +223,5 @@ pub fn log1p(x: f64): f64 {
     if k == 0 {
         ret f - (hfsq - s * (hfsq + R))
     }
-    ret f64(k) * LN2_HI - ((hfsq - (s * (hfsq + R) + (f64(k) * LN2_LO + c))) - f)
+    ret f64(k) * Ln2Hi - ((hfsq - (s * (hfsq + R) + (f64(k) * Ln2Lo + c))) - f)
 }

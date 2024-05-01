@@ -31,70 +31,70 @@ unsafe fn copy[T](mut dest: *T, mut buff: *T, len: int) {
 // However, this functions have not any safet checks for performance purposes.
 // Use this structure carefully.
 pub struct Dynar[T] {
-    pub buff: cpp.DynarBuffer[T]
+    pub Buff: cpp.DynarBuffer[T]
 }
 
 impl Dynar {
-    pub static fn new(): Dynar[T] {
+    pub static fn New(): Dynar[T] {
         ret Dynar[T]{}
     }
 
     // Deallocate heap.
-    pub fn dispose(mut self) {
-        self.buff.len = 0
-        self.buff.cap = 0
+    pub fn Dispose(mut self) {
+        self.Buff.len = 0
+        self.Buff.cap = 0
         unsafe {
-            integ::delete_array[T](self.buff.heap)
+            integ::DeleteArray[T](self.Buff.heap)
         }
-        self.buff.heap = nil
+        self.Buff.heap = nil
     }
 
     // Resizes heap. It will allocate new allocation by size and
     // copies old elements into new heap after allocation, then
     // deallocates old heap allocation.
     // Reports whether process completed successfuly.
-    pub fn resize(mut self, n: int): bool {
-        let mut new_heap = integ::new_array[T](n)
-        if new_heap == nil {
+    pub fn Resize(mut self, n: int): bool {
+        let mut newHeap = integ::NewArray[T](n)
+        if newHeap == nil {
             ret false
         }
-        if self.buff.heap == nil {
-            self.buff.heap = new_heap
-            self.buff.cap = n
+        if self.Buff.heap == nil {
+            self.Buff.heap = newHeap
+            self.Buff.cap = n
             ret true
         }
         unsafe {
             let mut size = n
-            if self.buff.len <= n {
-                size = self.buff.len
+            if self.Buff.len <= n {
+                size = self.Buff.len
             }
-            if self.buff.len > 0 {
-                copy[T](new_heap, self.buff.heap, size)
+            if self.Buff.len > 0 {
+                copy[T](newHeap, self.Buff.heap, size)
             }
             unsafe {
-                integ::delete_array[T](self.buff.heap)
+                integ::DeleteArray[T](self.Buff.heap)
             }
-            self.buff.heap = new_heap
+            self.Buff.heap = newHeap
         }
-        self.buff.cap = n
+        self.Buff.cap = n
         ret true
     }
 
     // Returns pointer that points to first element of buffer.
-    pub fn begin(mut self): *T {
-        ret self.buff.heap
+    pub fn Begin(mut self): *T {
+        ret self.Buff.heap
     }
 
     // Returns pointer that points to end of the last element of buffer.
-    pub fn end(mut self): *T {
-        ret self.buff.heap + self.buff.len
+    pub fn End(mut self): *T {
+        ret self.Buff.heap + self.Buff.len
     }
 
     // Shift elements to right by n until reach i (including i).
     // Starts at end of buffer, goes to left step by step.
-    pub fn shift_right(mut self, i: int, n: int) {
-        let mut j = self.end() - 1
-        let k = self.begin() + i
+    pub fn ShiftRight(mut self, i: int, n: int) {
+        let mut j = self.End() - 1
+        let k = self.Begin() + i
         for j >= k; j-- {
             unsafe {
                 *(j + n) = *j
@@ -103,9 +103,9 @@ impl Dynar {
     }
 
     // Shift elements to left by n until reach j (excluding j), start at i.
-    pub fn shift_left(mut self, i: int, j: int, n: int) {
-        let mut k = self.begin() + i
-        let l = self.begin() + j
+    pub fn ShiftLeft(mut self, i: int, j: int, n: int) {
+        let mut k = self.Begin() + i
+        let l = self.Begin() + j
         for k < l; k++ {
             unsafe {
                 *(k - n) = *k
@@ -115,9 +115,9 @@ impl Dynar {
 
     // Set buffer elements, starts at i.
     // Uses p for read data, reads n elements and assigns to buffer.
-    pub fn set(mut self, i: int, mut p: *T, n: int) {
+    pub fn Set(mut self, i: int, mut p: *T, n: int) {
         unsafe {
-            copy[T](self.begin() + i, p, n)
+            copy[T](self.Begin() + i, p, n)
         }
     }
 }

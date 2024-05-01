@@ -6,24 +6,24 @@ use std::jule::sema::{Struct, Var}
 
 // Collection for ordered defines.
 pub struct OrderedDefines {
-    pub structs: []&Struct
-    pub globals: []&Var
+    pub Structs: []&Struct
+    pub Globals: []&Var
 }
 
-pub struct DefineOrderer {}
+struct defineOrderer {}
 
-impl DefineOrderer {
+impl defineOrderer {
     // Reports whether type in correct order by dependencies.
     // Checked "t" should have minimum 1 dependency.
-    static fn is_common_ordered[T](&s: []&T, t: &T): bool {
-        let mut p = &t.depends[0]
-        let end = p + t.depends.len
+    static fn isCommonOrdered[T](&s: []&T, t: &T): bool {
+        let mut p = &t.Depends[0]
+        let end = p + t.Depends.len
         for _, tt in s {
             unsafe {
                 if tt == t {
                     break
                 }
-                if (*p).cpp_linked || (*p).depends.len == 0 || tt == *p {
+                if (*p).CppLinked || (*p).Depends.len == 0 || tt == *p {
                     p++
                     if p == end {
                         ret true
@@ -36,10 +36,10 @@ impl DefineOrderer {
 
     // Orders common types by their dependencies.
     // Type's dependencies always comes first itself.
-    pub static fn order_common[T](mut &s: []&T) {
+    static fn orderCommon[T](mut &s: []&T) {
         let mut i = 0
         for (j, mut t) in s {
-            if t.cpp_linked || t.depends.len == 0 {
+            if t.CppLinked || t.Depends.len == 0 {
                 s.swap(i, j)
                 i++
             }
@@ -49,8 +49,8 @@ impl DefineOrderer {
         for j < s.len; j++ {
             let mut k = i
             for k < s.len-1; k++ {
-                if !DefineOrderer.is_common_ordered[T](s, s[k]) {
-                    s.swap(k, k+1)
+                if !defineOrderer.isCommonOrdered[T](s, s[k]) {
+                    s.swap(k, k + 1)
                 }
             }
         }
@@ -58,13 +58,13 @@ impl DefineOrderer {
 
     // Orders structures by their dependencies.
     // Struct's dependencies always comes first itself.
-    pub static fn order_structures(mut &structs: []&Struct) {
-        DefineOrderer.order_common[Struct](structs)
+    static fn orderStructures(mut &structs: []&Struct) {
+        defineOrderer.orderCommon[Struct](structs)
     }
 
     // Orders variables by their dependencies.
     // Var's dependencies always comes first itself.
-    pub static fn order_vars(mut &vars: []&Var) {
-        DefineOrderer.order_common[Var](vars)
+    static fn orderVars(mut &vars: []&Var) {
+        defineOrderer.orderCommon[Var](vars)
     }
 }

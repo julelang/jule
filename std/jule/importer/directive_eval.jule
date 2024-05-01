@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 use std::jule::ast::{Directive}
-use std::jule::build::{Log, LogKind, LogMsg, logf}
+use std::jule::build::{Log, LogKind, LogMsg, Logf}
 use std::jule::lex::{Token, TokenId, TokenKind}
 
 // Eval directive expression.
@@ -11,48 +11,48 @@ use std::jule::lex::{Token, TokenId, TokenKind}
 //
 // Read manual for more information about syntax or etc:
 // https://manual.jule.dev/compiler/directives.html#directive-expressions
-struct DirectiveEval {
+struct directiveEval {
     logs: []Log
     d:    &Directive
     vars: []str
 }
 
-impl DirectiveEval {
-    fn push_err(mut self, t: &Token, fmt: LogMsg, args: ...any) {
+impl directiveEval {
+    fn pushErr(mut self, t: &Token, fmt: LogMsg, args: ...any) {
         self.logs = append(self.logs, Log{
-            kind: LogKind.Error,
-            row: t.row,
-            column: t.column,
-            path: t.file.path,
-            text: logf(fmt, args...),
+            Kind: LogKind.Error,
+            Row: t.Row,
+            Column: t.Column,
+            Path: t.File.Path,
+            Text: Logf(fmt, args...),
         })
     }
 
     // Split operans by binary operators.
     // Skips range of parentheses.
-    fn split_operans(mut self, op: TokenKind, mut &tokens: []&Token): [][]&Token {
+    fn splitOperans(mut self, op: TokenKind, mut &tokens: []&Token): [][]&Token {
         let mut parts = make([][]&Token, 0, 10)
 
         let mut i = 0
-        let mut range_n = 0
+        let mut rangeN = 0
         let mut last = 0
         for i < tokens.len-1; i++ {
             let b = tokens[i]
-            if b.id == TokenId.Range {
-                match b.kind {
+            if b.Id == TokenId.Range {
+                match b.Kind {
                 | TokenKind.LParent:
-                    range_n++
+                    rangeN++
                     continue
                 | TokenKind.RParent:
-                    range_n--
+                    rangeN--
                 }
             }
 
-            if range_n > 0 || b.id != TokenId.Op {
+            if rangeN > 0 || b.Id != TokenId.Op {
                 continue
             }
 
-            if b.kind == op {
+            if b.Kind == op {
                 parts = append(parts, tokens[last:i])
                 last = i + 1
             }
@@ -62,7 +62,7 @@ impl DirectiveEval {
             parts = append(parts, tokens[last:])
         } else {
             // Missing operand.
-            self.push_err(tokens[last-1], LogMsg.MissingExpr)
+            self.pushErr(tokens[last-1], LogMsg.MissingExpr)
             ret nil
         }
 
@@ -70,7 +70,7 @@ impl DirectiveEval {
     }
 
     // Eval directive variable.
-    fn eval_directive_ident(self, ident: str): bool {
+    fn evalDirectiveIdent(self, ident: str): bool {
         if ident == "" {
             ret false
         }
@@ -84,58 +84,58 @@ impl DirectiveEval {
 
     // Eval directive expression part.
     // Accepts unary operators.
-    fn eval_directive_part(mut self, mut part: []&Token): bool {
-        let logical_not = part[0].id == TokenId.Op && part[0].kind == TokenKind.Excl
-        if logical_not {
+    fn evalDirectivePart(mut self, mut part: []&Token): bool {
+        let logicalNot = part[0].Id == TokenId.Op && part[0].Kind == TokenKind.Excl
+        if logicalNot {
             part = part[1:]
         }
 
         if part.len > 1 {
-            self.push_err(part[1], LogMsg.InvalidSyntax)
+            self.pushErr(part[1], LogMsg.InvalidSyntax)
             ret false
         }
 
-        let mut result = self.eval_directive_ident(part[0].kind)
-        if logical_not {
+        let mut result = self.evalDirectiveIdent(part[0].Kind)
+        if logicalNot {
             result = !result
         }
         ret result
     }
 
     fn eval(mut self): bool {
-        if self.d.args.len == 0 {
-            self.push_err(self.d.tag, LogMsg.MissingExpr)
+        if self.d.Args.len == 0 {
+            self.pushErr(self.d.Tag, LogMsg.MissingExpr)
             ret false
         }
 
         let mut result = false
 
-        let mut logical_or_parts = self.split_operans(TokenKind.DblVline, self.d.args)
-        if logical_or_parts == nil {
+        let mut logicalOrParts = self.splitOperans(TokenKind.DblVline, self.d.Args)
+        if logicalOrParts == nil {
             ret false
         }
 
-        for (_, mut part) in logical_or_parts {
+        for (_, mut part) in logicalOrParts {
             let mut and = true
-            let mut logical_and_parts = self.split_operans(TokenKind.DblAmper, part)
-            if logical_and_parts == nil {
+            let mut logicalAndParts = self.splitOperans(TokenKind.DblAmper, part)
+            if logicalAndParts == nil {
                 ret false
             }
 
-            for (_, mut and_part) in logical_and_parts {
-                let first = and_part[0]
-                if first.id == TokenId.Range && first.kind == TokenKind.LParent {
-                    let end = and_part[and_part.len-1]
+            for (_, mut andPart) in logicalAndParts {
+                let first = andPart[0]
+                if first.Id == TokenId.Range && first.Kind == TokenKind.LParent {
+                    let end = andPart[andPart.len-1]
 
                     // Missing close.
-                    if end.id != TokenId.Range || end.kind != TokenKind.RParent {
-                        self.push_err(first, LogMsg.WaitCloseParent)
+                    if end.Id != TokenId.Range || end.Kind != TokenKind.RParent {
+                        self.pushErr(first, LogMsg.WaitCloseParent)
                         ret false
                     }
 
-                    and_part = and_part[1:and_part.len-1] // Remove parentheses.
+                    andPart = andPart[1:andPart.len-1] // Remove parentheses.
                 }
-                and = and && self.eval_directive_part(and_part)
+                and = and && self.evalDirectivePart(andPart)
             }
 
             result = result || and

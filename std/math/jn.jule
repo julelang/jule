@@ -79,23 +79,23 @@
 // Returns the order-n Bessel function of the first kind.
 //
 // Special cases are:
-//  jn(n, ±inf) = 0
-//  jn(n, nan) = nan
-pub fn jn(mut n: int, mut x: f64): f64 {
-    const TWO_M29 = 1.0 / (1 << 29)   // 2**-29 0x3e10000000000000
-    const TWO302 = 0x52D0000000000000 //1 << 302 // 2**302 0x52D0000000000000
+//  Jn(n, ±Inf) = 0
+//  Jn(n, NaN) = NaN
+pub fn Jn(mut n: int, mut x: f64): f64 {
+    const twoM29 = 1.0 / (1 << 29)    // 2**-29 0x3e10000000000000
+    const two302 = 0x52D0000000000000 //1 << 302 // 2**302 0x52D0000000000000
     // special cases
     match {
-    | is_nan(x):
+    | IsNaN(x):
         ret x
-    | is_inf(x, 0):
+    | IsInf(x, 0):
         ret 0
     }
     // J(-n, x) = (-1)**n * J(n, x), J(n, -x) = (-1)**n * J(n, x)
     // Thus, J(-n, x) = J(n, -x)
 
     if n == 0 {
-        ret j0(x)
+        ret J0(x)
     }
     if x == 0 {
         ret 0
@@ -104,7 +104,7 @@ pub fn jn(mut n: int, mut x: f64): f64 {
         n, x = -n, -x
     }
     if n == 1 {
-        ret j1(x)
+        ret J1(x)
     }
     let mut sign = false
     if x < 0 {
@@ -116,7 +116,7 @@ pub fn jn(mut n: int, mut x: f64): f64 {
     let mut b: f64 = 0
     if f64(n) <= x {
         // Safe to use J(n+1,x)=2n/x *J(n,x)-J(n-1,x)
-        if x >= TWO302 { // x > 2**302
+        if x >= two302 { // x > 2**302
             // (x >> n**2)
             //          Jn(x) = cos(x-(2n+1)*pi/4)*sqrt(2/x*pi)
             //          Yn(x) = sin(x-(2n+1)*pi/4)*sqrt(2/x*pi)
@@ -131,7 +131,7 @@ pub fn jn(mut n: int, mut x: f64): f64 {
             //                 3     s+c             c-s
 
             let mut temp: f64 = 0
-            let (s, c) = sincos(x)
+            let (s, c) = Sincos(x)
             match n & 3 {
             | 0:
                 temp = c + s
@@ -142,16 +142,16 @@ pub fn jn(mut n: int, mut x: f64): f64 {
             | 3:
                 temp = c - s
             }
-            b = (1 / SQRT_PI) * temp / sqrt(x)
+            b = (1 / SqrtPi) * temp / Sqrt(x)
         } else {
-            b = j1(x)
-            let (mut i, mut a) = 1, j0(x)
+            b = J1(x)
+            let (mut i, mut a) = 1, J0(x)
             for i < n; i++ {
                 a, b = b, b * (f64(i + i) / x) - a // avoid underflow
             }
         }
     } else {
-        if x < TWO_M29 { // x < 2**-29
+        if x < twoM29 { // x < 2**-29
             // x is tiny, return the first Taylor expansion of J(n,x)
             // J(n,x) = 1/n!*(x/2)**n  - ...
 
@@ -227,7 +227,7 @@ pub fn jn(mut n: int, mut x: f64): f64 {
 
             let mut tmp = f64(n)
             let v = 2 / x
-            tmp = tmp * log(abs(v * tmp))
+            tmp = tmp * Log(Abs(v * tmp))
             if tmp < 7.09782712893383973096e+02 {
                 i = n - 1
                 for i > 0; i-- {
@@ -247,7 +247,7 @@ pub fn jn(mut n: int, mut x: f64): f64 {
                     }
                 }
             }
-            b = t * j0(x) / b
+            b = t * J0(x) / b
         }
     }
     if sign {
@@ -259,29 +259,29 @@ pub fn jn(mut n: int, mut x: f64): f64 {
 // Returns the order-n Bessel function of the second kind.
 //
 // Special cases are:
-//  yn(n, +inf) = 0
-//  yn(n ≥ 0, 0) = -inf
-//  yn(n < 0, 0) = +inf if n is odd, -inf if n is even
-//  yn(n, x < 0) = nan
-//  yn(n, nan) = nan
-pub fn yn(mut n: int, x: f64): f64 {
-    const TWO302 = 0x52D0000000000000 // 1 << 302 // 2**302 0x52D0000000000000
+//  Yn(n, +Inf) = 0
+//  Yn(n ≥ 0, 0) = -Inf
+//  Yn(n < 0, 0) = +Inf if n is odd, -Inf if n is even
+//  Yn(n, x < 0) = NaN
+//  Yn(n, NaN) = NaN
+pub fn Yn(mut n: int, x: f64): f64 {
+    const two302 = 0x52D0000000000000 // 1 << 302 // 2**302 0x52D0000000000000
     // special cases
     match {
-    | x < 0 | is_nan(x):
-        ret nan()
-    | is_inf(x, 1):
+    | x < 0 | IsNaN(x):
+        ret NaN()
+    | IsInf(x, 1):
         ret 0
     }
 
     if n == 0 {
-        ret y0(x)
+        ret Y0(x)
     }
     if x == 0 {
         if n < 0 && n&1 == 1 {
-            ret inf(1)
+            ret Inf(1)
         }
-        ret inf(-1)
+        ret Inf(-1)
     }
     let mut sign = false
     if n < 0 {
@@ -292,12 +292,12 @@ pub fn yn(mut n: int, x: f64): f64 {
     }
     if n == 1 {
         if sign {
-            ret -y1(x)
+            ret -Y1(x)
         }
-        ret y1(x)
+        ret Y1(x)
     }
     let mut b: f64 = 0
-    if x >= TWO302 { // x > 2**302
+    if x >= two302 { // x > 2**302
         // (x >> n**2)
         //	    Jn(x) = cos(x-(2n+1)*pi/4)*sqrt(2/x*pi)
         //	    Yn(x) = sin(x-(2n+1)*pi/4)*sqrt(2/x*pi)
@@ -312,7 +312,7 @@ pub fn yn(mut n: int, x: f64): f64 {
         //		   3	 s+c		 c-s
 
         let mut temp: f64 = 0
-        let (s, c) = sincos(x)
+        let (s, c) = Sincos(x)
         match n & 3 {
         | 0:
             temp = s - c
@@ -323,13 +323,13 @@ pub fn yn(mut n: int, x: f64): f64 {
         | 3:
             temp = s + c
         }
-        b = (1 / SQRT_PI) * temp / sqrt(x)
+        b = (1 / SqrtPi) * temp / Sqrt(x)
     } else {
-        let mut a = y0(x)
-        b = y1(x)
+        let mut a = Y0(x)
+        b = Y1(x)
         // quit if b is -inf
         let mut i = 1
-        for i < n && !is_inf(b, -1); i++ {
+        for i < n && !IsInf(b, -1); i++ {
             a, b = b, (f64(i + i) / x) * b - a
         }
     }

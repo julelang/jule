@@ -38,53 +38,53 @@
 // Returns the greatest integer value less than or equal to x.
 //
 // Special cases are:
-//  floor(±0) = ±0
-//  floor(±inf) = ±inf
-//  floor(nan) = nan
-pub fn floor(x: f64): f64 {
-    if x == 0 || is_nan(x) || is_inf(x, 0) {
+//  Floor(±0) = ±0
+//  Floor(±Inf) = ±Inf
+//  Floor(NaN) = NaN
+pub fn Floor(x: f64): f64 {
+    if x == 0 || IsNaN(x) || IsInf(x, 0) {
         ret x
     }
     if x < 0 {
-        let (mut d, fract) = modf(-x)
+        let (mut d, fract) = Modf(-x)
         if fract != 0.0 {
             d = d + 1
         }
         ret -d
     }
-    let (d, _) = modf(x)
+    let (d, _) = Modf(x)
     ret d
 }
 
 // Returns the least integer value greater than or equal to x.
 //
 // Special cases are:
-//  ceil(±0) = ±0
-//  ceil(±inf) = ±inf
-//  ceil(nan) = nan
-pub fn ceil(x: f64): f64 { ret -floor(-x) }
+//  Ceil(±0) = ±0
+//  Ceil(±Inf) = ±Inf
+//  Ceil(NaN) = NaN
+pub fn Ceil(x: f64): f64 { ret -Floor(-x) }
 
 // Returns the integer value of x.
 //
 // Special cases are:
-//  trunc(±0) = ±0
-//  trunc(±inf) = ±inf
-//  trunc(nan) = nan
-pub fn trunc(x: f64): f64 {
-    if x == 0 || is_nan(x) || is_inf(x, 0) {
+//  Trunc(±0) = ±0
+//  Trunc(±Inf) = ±Inf
+//  Trunc(NaN) = NaN
+pub fn Trunc(x: f64): f64 {
+    if x == 0 || IsNaN(x) || IsInf(x, 0) {
         ret x
     }
-    let (d, _) = modf(x)
+    let (d, _) = Modf(x)
     ret d
 }
 
 // Returns the nearest integer, rounding half away from zero.
 //
 // Special cases are:
-//  round(±0) = ±0
-//  round(±inf) = ±inf
-//  round(nan) = nan
-pub fn round(x: f64): f64 {
+//  Round(±0) = ±0
+//  Round(±Inf) = ±Inf
+//  Round(NaN) = NaN
+pub fn Round(x: f64): f64 {
     // round is a faster implementation of:
     //
     // pub round(x f64) f64 {
@@ -94,34 +94,34 @@ pub fn round(x: f64): f64 {
     //   }
     //   ret t
     // }
-    let mut bits = f64_bits(x)
-    let mut e = uint(bits >> SHIFT) & MASK
-    if e < BIAS {
+    let mut bits = F64Bits(x)
+    let mut e = uint(bits >> shift) & mask
+    if e < bias {
         // Round abs(x) < 1 including denormals.
-        bits &= SIGN_MASK // +-0
-        if e == BIAS-1 {
-            bits |= UVONE // +-1
+        bits &= signMask // +-0
+        if e == bias-1 {
+            bits |= uvone // +-1
         }
-    } else if e < BIAS+SHIFT {
+    } else if e < bias+shift {
         // Round any abs(x) >= 1 containing a fractional component [0,1).
         //
         // Numbers with larger exponents are returned unchanged since they
         // must be either an integer, infinity, or NaN.
-        const HALF = 1 << (SHIFT - 1)
-        e -= BIAS
+        const HALF = 1 << (shift - 1)
+        e -= bias
         bits += HALF >> e
-        bits &= ^(FRAC_MASK >> e)
+        bits &= ^(fracMask >> e)
     }
-    ret f64_from_bits(bits)
+    ret F64FromBits(bits)
 }
 
 // Returns the nearest integer, rounding ties to even.
 //
 // Special cases are:
-//  round_even(±0) = ±0
-//  round_even(±inf) = ±inf
-//  round_even(nan) = nan
-pub fn round_even(x: f64): f64 {
+//  RoundEven(±0) = ±0
+//  RoundEven(±Inf) = ±Inf
+//  RoundEven(NaN) = NaN
+pub fn RoundEven(x: f64): f64 {
     // round_even is a faster implementation of:
     //
     // pub round_even(x f64) f64 {
@@ -133,23 +133,23 @@ pub fn round_even(x: f64): f64 {
     //   }
     //   ret t
     // }
-    let mut bits = f64_bits(x)
-    let mut e = uint(bits >> SHIFT) & MASK
-    if e >= BIAS {
+    let mut bits = F64Bits(x)
+    let mut e = uint(bits >> shift) & mask
+    if e >= bias {
         // Round abs(x) >= 1.
         // - Large numbers without fractional components, infinity, and NaN are unchanged.
         // - Add 0.499.. or 0.5 before truncating depending on whether the truncated
         //   number is even or odd (respectively).
-        const half_minus_ULP = (1 << (SHIFT - 1)) - 1
-        e -= BIAS
-        bits += (half_minus_ULP + (bits >> (SHIFT - e)) & 1) >> e
-        bits &= ^(FRAC_MASK >> e)
-    } else if e == BIAS-1 && bits&FRAC_MASK != 0 {
+        const halfMinusUlp = (1 << (shift - 1)) - 1
+        e -= bias
+        bits += (halfMinusUlp + (bits >> (shift - e)) & 1) >> e
+        bits &= ^(fracMask >> e)
+    } else if e == bias-1 && bits&fracMask != 0 {
         // Round 0.5 < abs(x) < 1.
-        bits = bits & SIGN_MASK | UVONE // +-1
+        bits = bits & signMask | uvone // +-1
     } else {
         // Round abs(x) <= 0.5 including denormals.
-        bits &= SIGN_MASK // +-0
+        bits &= signMask // +-0
     }
-    ret f64_from_bits(bits)
+    ret F64FromBits(bits)
 }

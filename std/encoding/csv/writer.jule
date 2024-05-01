@@ -55,17 +55,17 @@ use utf8 for std::unicode::utf8
 // Flush method to guarantee all data has been forwarded to
 // the underlying io::Writer.
 pub struct Writer {
-    pub comma:    rune // Field delimiter (set to ',' by new)
-    pub use_crlf: bool // True to use \r\n as the line terminator
+    pub Comma:   rune // Field delimiter (set to ',' by new)
+    pub UseCrlf: bool // True to use \r\n as the line terminator
 
     w: io::Writer
 }
 
 impl Writer {
     // Returns new Writer instance that writes w.
-    pub static fn new(mut w: io::Writer): &Writer {
+    pub static fn New(mut w: io::Writer): &Writer {
         ret &Writer{
-            comma: ',',
+            Comma: ',',
             w: w,
         }
     }
@@ -82,7 +82,7 @@ impl Writer {
     // Not quoting the empty string also makes this package match the behavior
     // of Microsoft Excel and Google Drive.
     // For Postgres, quote the data terminating string `\.`.
-    fn field_needs_quotes(self, field: str): bool {
+    fn fieldNeedsQuotes(self, field: str): bool {
         if field.len == 0 {
             ret false
         }
@@ -91,92 +91,92 @@ impl Writer {
             ret true
         }
 
-        if self.comma < utf8::RUNE_SELF {
+        if self.Comma < utf8::RuneSelf {
             let mut i = 0
             for i < field.len; i++ {
                 let c = field[i]
-                if c == '\n' || c == '\r' || c == '"' || c == byte(self.comma) {
+                if c == '\n' || c == '\r' || c == '"' || c == byte(self.Comma) {
                     ret true
                 }
             }
         } else {
-            if strings::contains_rune(field, self.comma) || strings::contains_any(field, "\"\r\n") {
+            if strings::ContainsRune(field, self.Comma) || strings::ContainsAny(field, "\"\r\n") {
                 ret true
             }
         }
 
-        let (r1, _) = utf8::decode_rune_str(field)
-        ret unicode::is_space(r1)
+        let (r1, _) = utf8::DecodeRuneStr(field)
+        ret unicode::IsSpace(r1)
     }
 
     // Writes a single CSV record along with any necessary quoting.
     // A record is a slice of strings with each string being one field.
     // Forwards any exceptional from internal objects such as writer.
-    pub fn write(mut self, record: []str)! {
-        if !valid_delim(self.comma) {
+    pub fn Write(mut self, record: []str)! {
+        if !validDelim(self.Comma) {
             error(CsvError.InvalidDelim)
         }
         for (n, mut field) in record {
             if n > 0 {
-                let mut bytes = make([]byte, utf8::UTF_MAX)
-                let j = utf8::encode_rune(bytes, self.comma)
-                self.w.write(bytes[:j]) else { error(error) }
+                let mut bytes = make([]byte, utf8::UtfMax)
+                let j = utf8::EncodeRune(bytes, self.Comma)
+                self.w.Write(bytes[:j]) else { error(error) }
             }
 
             // If we don't have to have a quoted field then just
             // write out the field and continue to the next field.
-            if !self.field_needs_quotes(field) {
-                self.w.write([]byte(field)) else { error(error) }
+            if !self.fieldNeedsQuotes(field) {
+                self.w.Write([]byte(field)) else { error(error) }
                 continue
             }
 
-            self.w.write(['"']) else { error(error) }
+            self.w.Write(['"']) else { error(error) }
 
             for field.len > 0 {
                 // Search for special characters.
-                let mut i = strings::find_any(field, "\"\r\n")
+                let mut i = strings::FindAny(field, "\"\r\n")
                 if i < 0 {
                     i = field.len
                 }
 
                 // Copy verbatim everything before the special character.
-                self.w.write([]byte(field[:i])) else { error(error) }
+                self.w.Write([]byte(field[:i])) else { error(error) }
                 field = field[i:]
 
                 // Encode the special character.
                 if field.len > 0 {
                     match field[0] {
                     | '"':
-                        self.w.write(['"', '"']) else { error(error) }
+                        self.w.Write(['"', '"']) else { error(error) }
                     | '\r':
-                        if !self.use_crlf {
-                            self.w.write(['\r']) else { error(error) }
+                        if !self.UseCrlf {
+                            self.w.Write(['\r']) else { error(error) }
                         }
                     | '\n':
-                        if self.use_crlf {
-                            self.w.write(['\r', '\n']) else { error(error) }
+                        if self.UseCrlf {
+                            self.w.Write(['\r', '\n']) else { error(error) }
                         } else {
-                            self.w.write(['\n']) else { error(error) }
+                            self.w.Write(['\n']) else { error(error) }
                         }
                     }
                     field = field[1:]
                 }
             }
 
-            self.w.write(['"']) else { error(error) }
+            self.w.Write(['"']) else { error(error) }
         }
-        if self.use_crlf {
-            self.w.write(['\r', '\n']) else { error(error) }
+        if self.UseCrlf {
+            self.w.Write(['\r', '\n']) else { error(error) }
         } else {
-            self.w.write(['\n']) else { error(error) }
+            self.w.Write(['\n']) else { error(error) }
         }
     }
 
-    // Writes multiple CSV records using [Writer.write] and
+    // Writes multiple CSV records using [Writer.Write] and
     // forwording any exception.
-    pub fn write_all(mut self, records: [][]str)! {
+    pub fn WriteAll(mut self, records: [][]str)! {
         for _, record in records {
-            self.write(record) else { error(error) }
+            self.Write(record) else { error(error) }
         }
     }
 }

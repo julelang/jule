@@ -7,34 +7,34 @@
 #derive Clone
 pub struct Int {
     minus:   bool
-    mut nat: Nat
+    mut nat: nat
 }
 
 impl Int {
     // Returns big integer that represents zero.
-    pub static fn zero(): Int {
+    pub static fn Zero(): Int {
         ret Int{
-            nat: Nat.zero(),
+            nat: nat.zero(),
         }
     }
 
     // Returns big integer that represents one.
-    pub static fn one(): Int {
+    pub static fn One(): Int {
         ret Int{
-            nat: Nat.one(),
+            nat: nat.one(),
         }
     }
 
     // Returns big integer that initialized by integer value.
     // T can only be signed or unsigned integer types.
-    pub static fn new[T](i: T): Int {
+    pub static fn New[T](i: T): Int {
         match type T {
         | Int:
             ret i
         | i8 | i16 | i32 | i64 | u8 | u16 | u32 | u64 | int | uint:
             ret Int{
                 minus: i < 0,
-                nat: Nat.new[T](i),
+                nat: nat.new[T](i),
             }
         |:
             panic("std::math::big: Int.new[T]: T is should be signed or unsigned integer type")
@@ -51,7 +51,7 @@ impl Int {
     //   - 8 for octal.
     //   - 10 for decimal.
     //   - 16 for hexadecimal.
-    pub static fn parse(mut s: str, fmt: int)!: Int {
+    pub static fn Parse(mut s: str, fmt: int)!: Int {
         let mut r = Int{}
         if s.len > 0 {
             match s[0] {
@@ -62,14 +62,14 @@ impl Int {
                 s = s[1:]
             }
         }
-        r.nat = Nat.parse(s, fmt) else { error(error) }
+        r.nat = nat.parse(s, fmt) else { error(error) }
         r.minus = r.minus && r.nat.len() != 0
         ret r
     }
 
     // Returns count of bits except sign-bit.
     // Return value also means the minimum number of bits that can represent the integer.
-    pub fn len(self): int {
+    pub fn Len(self): int {
         ret self.nat.len()
     }
 
@@ -83,7 +83,7 @@ impl Int {
     // Adds Int.
     pub fn add_assign(mut self, y: Int) {
         match {
-        | y.len() == 0:
+        | y.Len() == 0:
             ret
         | self.minus == y.minus:
             self.nat += y.nat
@@ -91,7 +91,7 @@ impl Int {
             let mut cmp = self.nat.cmp(y.nat)
             if cmp == 0 {
                 self.minus = false
-                self.nat = Nat.zero()
+                self.nat = nat.zero()
                 ret
             }
             if y.minus {
@@ -116,13 +116,13 @@ impl Int {
 
     // Subtracts Int.
     pub fn sub_assign(mut self, y: Int) {
-        if y.len() == 0 {
+        if y.Len() == 0 {
             ret
         }
-        let mut cmp = self.cmp(y)
+        let mut cmp = self.Cmp(y)
         if cmp == 0 {
             self.minus = false
-            self.nat = Nat.zero()
+            self.nat = nat.zero()
             ret
         }
         if self.minus == y.minus {
@@ -149,7 +149,7 @@ impl Int {
     // Multiplies Int.
     pub fn mul_assign(mut self, y: Int) {
         self.nat *= y.nat
-        self.minus = self.len() > 0 && self.minus != y.minus
+        self.minus = self.Len() > 0 && self.minus != y.minus
     }
 
     // Divides two Int and returns result.
@@ -162,7 +162,7 @@ impl Int {
     // Divides Int.
     pub fn div_assign(mut self, y: Int) {
         self.nat /= y.nat
-        if self.len() == 0 {
+        if self.Len() == 0 {
             self.minus = false
         } else {
             self.minus = self.minus != y.minus
@@ -180,16 +180,16 @@ impl Int {
     pub fn mod_assign(mut self, y: Int) {
         if self.minus == y.minus {
             self.nat %= y.nat
-            self.minus = self.len() > 0 && y.minus
+            self.minus = self.Len() > 0 && y.minus
             ret
         }
         self.nat %= y.nat
-        if self.len() == 0 {
+        if self.Len() == 0 {
             self.minus = false
             ret
         }
         self.nat -= y.nat
-        self.minus = self.len() > 0 && y.minus
+        self.minus = self.Len() > 0 && y.minus
     }
 
     // Bitwise left shift.
@@ -214,7 +214,7 @@ impl Int {
     // Bitwise right shift for assignment.
     pub fn shr_assign(mut self, y: uint) {
         self.nat >>= y
-        if self.len() == 0 {
+        if self.Len() == 0 {
             self.minus = false
         }
     }
@@ -228,23 +228,23 @@ impl Int {
 
     // Bitwise or for assignment.
     pub fn bit_or_assign(mut self, y: Int) {
-        if self.len() < y.len() {
-            let mut xb = make(bits, y.len())
+        if self.Len() < y.Len() {
+            let mut xb = make(bits, y.Len())
             _ = copy(xb, self.nat.bits)
             self.nat.bits = xb
         }
         if self.minus {
-            twos_complement(self.nat.bits)
+            twosComplement(self.nat.bits)
         }
         if y.minus {
-            twos_complement(y.nat.bits)
+            twosComplement(y.nat.bits)
         }
         or(self.nat.bits, y.nat.bits)
-        if self.minus && self.len() >= y.len() {
-            twos_complement(self.nat.bits)
+        if self.minus && self.Len() >= y.Len() {
+            twosComplement(self.nat.bits)
         }
         if y.minus {
-            twos_complement(y.nat.bits)
+            twosComplement(y.nat.bits)
         }
         self.nat.fit()
     }
@@ -258,27 +258,27 @@ impl Int {
 
     // Bitwise and for assignment.
     pub fn bit_and_assign(mut self, y: Int) {
-        if self.len() < y.len() {
-            let mut xb = make(bits, y.len())
+        if self.Len() < y.Len() {
+            let mut xb = make(bits, y.Len())
             _ = copy(xb, self.nat.bits)
             self.nat.bits = xb
         }
         if self.minus {
-            twos_complement(self.nat.bits)
+            twosComplement(self.nat.bits)
         }
         if y.minus {
-            twos_complement(y.nat.bits)
+            twosComplement(y.nat.bits)
         }
-        if !self.minus && y.minus && self.len() > y.len() {
-            let mut x = self.nat.bits[:y.len()]
+        if !self.minus && y.minus && self.Len() > y.Len() {
+            let mut x = self.nat.bits[:y.Len()]
             and(x, y.nat.bits)
         } else {
             and(self.nat.bits, y.nat.bits)
         }
         if y.minus {
-            twos_complement(y.nat.bits)
+            twosComplement(y.nat.bits)
             if self.minus {
-                twos_complement(self.nat.bits)
+                twosComplement(self.nat.bits)
             }
         }
         self.minus = self.minus && y.minus
@@ -298,23 +298,23 @@ impl Int {
             self = y ^ self
             ret
         }
-        if self.len() < y.len() {
-            let mut xb = make(bits, y.len())
+        if self.Len() < y.Len() {
+            let mut xb = make(bits, y.Len())
             _ = copy(xb, self.nat.bits)
             self.nat.bits = xb
         }
         if self.minus {
-            twos_complement(self.nat.bits)
+            twosComplement(self.nat.bits)
         }
         if y.minus {
-            twos_complement(y.nat.bits)
+            twosComplement(y.nat.bits)
         }
         xor(self.nat.bits, y.nat.bits)
-        if self.minus && self.len() >= y.len() {
-            twos_complement(self.nat.bits)
+        if self.minus && self.Len() >= y.Len() {
+            twosComplement(self.nat.bits)
         }
         if y.minus {
-            twos_complement(y.nat.bits)
+            twosComplement(y.nat.bits)
         }
         self.minus = self.minus != y.minus
         self.nat.fit()
@@ -324,7 +324,7 @@ impl Int {
     // Returns +1 if self > y.
     // Returns 0 if self == y.
     // Returns -1 if self < y.
-    pub fn cmp(self, y: Int): int {
+    pub fn Cmp(self, y: Int): int {
         match {
         | self.minus && !y.minus:
             ret -1
@@ -346,37 +346,37 @@ impl Int {
 
     // Reports whether integer less than other.
     pub fn lt(self, y: Int): bool {
-        ret self.cmp(y) == -1
+        ret self.Cmp(y) == -1
     }
 
     // Reports whether integer less than or equals to other.
     pub fn lt_eq(self, y: Int): bool {
-        ret self.cmp(y) < +1
+        ret self.Cmp(y) < +1
     }
 
     // Reports whether integer greater than other.
     pub fn gt(self, y: Int): bool {
-        ret self.cmp(y) == +1
+        ret self.Cmp(y) == +1
     }
 
     // Reports whether integer greater than or equals to other.
     pub fn gt_eq(self, y: Int): bool {
-        ret self.cmp(y) > -1
+        ret self.Cmp(y) > -1
     }
 
     // Reports whether integers are equals.
     pub fn eq(self, y: Int): bool {
-        ret self.cmp(y) == 0
+        ret self.Cmp(y) == 0
     }
 
     // Bitwise not.
     pub fn bit_not(self): Int {
         let mut r = clone(self)
         if r.minus {
-            sub_one(r.nat.bits)
+            subOne(r.nat.bits)
             r.nat.fit()
         } else {
-            let carry = add_one(r.nat.bits)
+            let carry = addOne(r.nat.bits)
             if carry == 0b1 {
                 r.nat.bits = append(r.nat.bits, 0b1)
             }
@@ -386,7 +386,7 @@ impl Int {
     }
 
     // Returns +1 if integer is positive or zero, -1 otherwise.
-    pub fn sign(self): int {
+    pub fn Sign(self): int {
         if self.minus {
             ret -1
         }
@@ -406,36 +406,36 @@ impl Int {
     }
 
     // Reports whether number is odd.
-    pub fn odd(self): bool {
+    pub fn Odd(self): bool {
         ret self.nat.odd()
     }
 
     // Reports whether number is even.
-    pub fn even(self): bool {
+    pub fn Even(self): bool {
         ret self.nat.even()
     }
 
     // Returns bit by index.
     // The index zero means first bit at right.
-    pub fn bit(self, i: int): int {
+    pub fn Bit(self, i: int): int {
         ret self.nat.bit(i)
     }
 
     // Returns immutable copy of internal little-endian bits.
-    pub fn bits(self): []byte {
+    pub fn Bits(self): []byte {
         ret clone(self.nat.bits)
     }
 
     // Returns absolute value of integer.
-    pub fn abs(self): Int {
+    pub fn Abs(self): Int {
         let mut r = self
         r.minus = false
         ret r
     }
 
     // Returns count of absolute's trailing zeros.
-    pub fn trailing_zeros(self): int {
-        ret self.nat.trailing_zeros()
+    pub fn TrailingZeros(self): int {
+        ret self.nat.trailingZeros()
     }
 
     // Format number into string. Fmt is the format of number.
@@ -447,7 +447,7 @@ impl Int {
     //   - 8 for octal.
     //   - 10 for decimal.
     //   - 16 for hexadecimal.
-    pub fn format(self, fmt: int)!: str {
+    pub fn Format(self, fmt: int)!: str {
         let mut s = self.nat.format(fmt) else { error(error) }
         if self.minus && s != "0" {
             s = "-" + s
@@ -457,15 +457,15 @@ impl Int {
 
     // Returns integer in i64.
     // Causes exception if nuber large than capacity of i64.
-    // Exception is equals to i64.MIN constant if integer is negative, else i64.MAX.
-    pub fn to_i64(self)!: i64 {
-        if self.len() > 63 {
+    // Exception is equals to i64.Min constant if integer is negative, else i64.Max.
+    pub fn ToI64(self)!: i64 {
+        if self.Len() > 63 {
             if self.minus {
                 error(i64.MIN)
             }
             error(i64.MAX)
         }
-        let x = i64(u64_from_bits(self.nat.bits))
+        let x = i64(u64FromBits(self.nat.bits))
         if self.minus {
             if x == 0 {
                 ret i64.MIN
@@ -477,18 +477,18 @@ impl Int {
 
     // Returns integer in u64.
     // Causes exception if nuber large than capacity of u64.
-    // Exception is always equals to u64.MAX constant.
-    pub fn to_u64(self)!: u64 {
-        let x = self.nat.to_u64() else { error(error) }
+    // Exception is always equals to u64.Max constant.
+    pub fn ToU64(self)!: u64 {
+        let x = self.nat.toU64() else { error(error) }
         if self.minus {
             ret -x
         }
         ret x
     }
 
-    // Formats number with self.format(10) by default.
-    pub fn to_str(self): str {
-        ret self.format(10)!
+    // Formats number with self.Format(10) by default.
+    pub fn ToStr(self): str {
+        ret self.Format(10)!
     }
 }
 

@@ -3,22 +3,22 @@
 // license that can be found in the LICENSE file.
 
 use std::fs::{OFlag, FsError, DirEntry, File, Directory}
-use std::fs::path::{join}
+use std::fs::path::{Join}
 use std::jule::ast::{Ast}
 use build for std::jule::build::{
     Directive,
     LogKind,
     Log,
-    EXT,
+    Ext,
 }
 use mod for std::jule::internal::mod
 use std::jule::lex::{
     LexMode,
     Token,
-    new_file_set,
-    lex,
+    NewFileSet,
+    Lex,
 }
-use std::jule::parser::{parse_file}
+use std::jule::parser::{ParseFile}
 use std::jule::sema::{
     Importer,
     ImportInfo,
@@ -27,21 +27,21 @@ use process for std::process
 use strings for std::strings
 
 // Read buffer by file path.
-fn read_buff(path: str): []byte {
-    ret File.read(path) else {
+fn readBuff(path: str): []byte {
+    ret File.Read(path) else {
         outln("error: file cannot read")
-        const ERROR_EXIT_CODE = 1
-        process::exit(ERROR_EXIT_CODE)
+        const ErrorExitCode = 1
+        process::Exit(ErrorExitCode)
         ret nil // Avoid error
     }
 }
 
 // Make compiler error, just text.
 // Not includes row, column, and etc. informations.
-fn flat_compiler_err(text: str): Log {
+fn flatCompilerErr(text: str): Log {
     ret Log{
-        kind: LogKind.Error,
-        text: text,
+        Kind: LogKind.Error,
+        Text: text,
     }
 }
 
@@ -55,54 +55,54 @@ pub struct JuleImporter {
 
 impl JuleImporter {
     // Returns new importer instance by compile information.
-    pub static fn new(info: CompileInfo): &JuleImporter {
+    pub static fn New(info: CompileInfo): &JuleImporter {
         let mut imp = &JuleImporter{
-            mods: [build::PATH_STDLIB],
+            mods: [build::PathStdlib],
         }
-        init_vars(imp.vars, info)
+        initVars(imp.vars, info)
         ret imp
     }
 
     // Returns all imported packages.
     // The return value is mutable reference to internal buffer.
     // You should be care about using that copy.
-    pub fn all_packages(mut self): []&ImportInfo {
+    pub fn AllPackages(mut self): []&ImportInfo {
         ret self.pkgs
     }
 }
 
 impl Importer for JuleImporter {
-    pub fn set_mod_path(mut self, path: str) {
+    pub fn SetModPath(mut self, path: str) {
         self.mod = path
     }
 
-    pub fn get_mod_path(self): str {
+    pub fn GetModPath(self): str {
         ret self.mod
     }
 
-    pub fn mod_by_id(self, id: int): str {
+    pub fn ModById(self, id: int): str {
         ret self.mods[id]
     }
 
-    pub fn get_import(mut self, path: str): &ImportInfo {
+    pub fn GetImport(mut self, path: str): &ImportInfo {
         for (_, mut p) in self.pkgs {
-            if p.path == path {
+            if p.Path == path {
                 ret p
             }
         }
         ret nil
     }
 
-    pub fn import_package(mut self, path: str, update_mod: bool): ([]&Ast, []Log) {
-        let mut dirents = Directory.read(path) else {
-            ret nil, [flat_compiler_err("connot read package directory: " + path)]
+    pub fn ImportPackage(mut self, path: str, update_mod: bool): ([]&Ast, []Log) {
+        let mut dirents = Directory.Read(path) else {
+            ret nil, [flatCompilerErr("connot read package directory: " + path)]
         }
 
         if update_mod {
-            let new_mod = mod::find_module_file_deep(path)
-            if new_mod != self.mod {
-                self.mod = new_mod
-                let mut errs = mod::check_module_file(self.mod)
+            let newMod = mod::FindModuleFileDeep(path)
+            if newMod != self.mod {
+                self.mod = newMod
+                let mut errs = mod::CheckModuleFile(self.mod)
                 if errs.len != 0 {
                     ret nil, errs
                 }
@@ -112,29 +112,29 @@ impl Importer for JuleImporter {
         let mut asts = make([]&Ast, 0, dirents.len)
         for _, dirent in dirents {
             // Skip directories, and non-jule files.
-            if dirent.stat.is_dir() || !strings::has_suffix(dirent.name, EXT) {
+            if dirent.Stat.IsDir() || !strings::HasSuffix(dirent.Name, build::Ext) {
                 continue
             }
 
-            let _path = join(path, dirent.name)
-            let mut file = new_file_set(_path)
-            file.fill(read_buff(file.path))
-            let mut errors = lex(file, LexMode.Standard)
+            let _path = Join(path, dirent.Name)
+            let mut file = NewFileSet(_path)
+            file.Fill(readBuff(file.Path))
+            let mut errors = Lex(file, LexMode.Standard)
             if errors.len > 0 {
                 ret nil, errors
             }
 
-            let mut finfo = parse_file(file)
-            if finfo.errors.len > 0 {
-                ret nil, finfo.errors
+            let mut finfo = ParseFile(file)
+            if finfo.Errors.len > 0 {
+                ret nil, finfo.Errors
             }
 
             // Skip this source file if file annotation is failed.
-            if !is_pass_file_annotation(dirent.name) {
+            if !isPassFileAnnotation(dirent.Name) {
                 continue
             }
 
-            let (r, mut logs) = self.is_pass_build_directives(finfo.ast)
+            let (r, mut logs) = self.isPassBuildDirectives(finfo.Ast)
             if logs.len > 0 {
                 ret nil, logs
             }
@@ -144,16 +144,16 @@ impl Importer for JuleImporter {
                 continue
             }
 
-            asts = append(asts, finfo.ast)
+            asts = append(asts, finfo.Ast)
         }
 
         ret asts, nil
     }
 
-    pub fn imported(mut self, mut imp: &ImportInfo) {
+    pub fn Imported(mut self, mut imp: &ImportInfo) {
         // Already imported?
         for _, p in self.pkgs {
-            if p.cpp_linked == imp.cpp_linked && p.link_path == imp.link_path {
+            if p.CppLinked == imp.CppLinked && p.LinkPath == imp.LinkPath {
                 ret
             }
         }
@@ -161,11 +161,11 @@ impl Importer for JuleImporter {
         if self.mod.len != 0 {
             for i, mod in self.mods {
                 if self.mod == mod {
-                    imp.mod_id = i
+                    imp.ModId = i
                     goto setted
                 }
             }
-            imp.mod_id = self.mods.len
+            imp.ModId = self.mods.len
             self.mods = append(self.mods, self.mod)
         setted:
         }
@@ -176,12 +176,12 @@ impl Importer for JuleImporter {
 
 impl JuleImporter {
     // Reports whether file passes build directives.
-    fn is_pass_build_directives(mut self, mut &file: &Ast): (bool, []Log) {
-        for (_, mut td) in file.top_directives {
-            if td.tag.kind != Directive.Build {
+    fn isPassBuildDirectives(mut self, mut &file: &Ast): (bool, []Log) {
+        for (_, mut td) in file.TopDirectives {
+            if td.Tag.Kind != Directive.Build {
                 continue
             }
-            let mut de = DirectiveEval{
+            let mut de = directiveEval{
                 d: td,
                 vars: self.vars,
             }

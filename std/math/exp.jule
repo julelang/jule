@@ -114,31 +114,31 @@
 // Returns e**x, the base-e exponential of x.
 //
 // Special cases are:
-//  exp(inf) = inf
-//  exp(nan) = nan
+//  Exp(Inf) = Inf
+//  Exp(NaN) = NaN
 //
-// Very large values overflow to 0 or inf.
+// Very large values overflow to 0 or Inf.
 // Very small values underflow to 1.
-pub fn exp(x: f64): f64 {
-    const LN2_HI = 6.93147180369123816490e-01
-    const LN2_LO = 1.90821492927058770002e-10
-    const LOG2_E = 1.44269504088896338700e+00
+pub fn Exp(x: f64): f64 {
+    const Ln2Hi = 6.93147180369123816490e-01
+    const Ln2Lo = 1.90821492927058770002e-10
+    const Log2E = 1.44269504088896338700e+00
 
-    const OVERFLOW = 7.09782712893383973096e+02
-    const UNDERFLOW = -7.45133219101941108420e+02
-    const NEAR_ZERO = 1.0 / (1 << 28)             // 2**-28
+    const Overflow = 7.09782712893383973096e+02
+    const Underflow = -7.45133219101941108420e+02
+    const NearZero = 1.0 / (1 << 28)              // 2**-28
 
     // special cases
     match {
-    | is_nan(x) | is_inf(x, 1):
+    | IsNaN(x) | IsInf(x, 1):
         ret x
-    | is_inf(x, -1):
+    | IsInf(x, -1):
         ret 0
-    | x > OVERFLOW:
-        ret inf(1)
-    | x < UNDERFLOW:
+    | x > Overflow:
+        ret Inf(1)
+    | x < Underflow:
         ret 0
-    | -NEAR_ZERO < x && x < NEAR_ZERO:
+    | -NearZero < x && x < NearZero:
         ret 1 + x
     }
 
@@ -146,35 +146,35 @@ pub fn exp(x: f64): f64 {
     let mut k: int = 0
     match {
     | x < 0:
-        k = int(LOG2_E * x - 0.5)
+        k = int(Log2E * x - 0.5)
     | x > 0:
-        k = int(LOG2_E * x + 0.5)
+        k = int(Log2E * x + 0.5)
     }
-    let hi = x - f64(k) * LN2_HI
-    let lo = f64(k) * LN2_LO
+    let hi = x - f64(k) * Ln2Hi
+    let lo = f64(k) * Ln2Lo
 
     // compute
     ret expmulti(hi, lo, k)
 }
 
 // Returns 2**x, the base-2 exponential of x.
-// Special cases are the same as exp.
-pub fn exp2(x: f64): f64 {
-    const LN2_HI = 6.93147180369123816490e-01
-    const LN2_LO = 1.90821492927058770002e-10
+// Special cases are the same as Exp.
+pub fn Exp2(x: f64): f64 {
+    const Ln2Hi = 6.93147180369123816490e-01
+    const Ln2Lo = 1.90821492927058770002e-10
 
-    const OVERFLOW = 1.0239999999999999e+03
-    const UNDERFLOW = -1.0740e+03
+    const Overflow = 1.0239999999999999e+03
+    const Underflow = -1.0740e+03
 
     // special cases
     match {
-    | is_nan(x) | is_inf(x, 1):
+    | IsNaN(x) | IsInf(x, 1):
         ret x
-    | is_inf(x, -1):
+    | IsInf(x, -1):
         ret 0
-    | x > OVERFLOW:
-        ret inf(1)
-    | x < UNDERFLOW:
+    | x > Overflow:
+        ret Inf(1)
+    | x < Underflow:
         ret 0
     }
 
@@ -188,8 +188,8 @@ pub fn exp2(x: f64): f64 {
         k = int(x - 0.5)
     }
     let t = x - f64(k)
-    let hi = t * LN2_HI
-    let lo = -t * LN2_LO
+    let hi = t * Ln2Hi
+    let lo = -t * Ln2Lo
 
     // compute
     ret expmulti(hi, lo, k)
@@ -197,16 +197,16 @@ pub fn exp2(x: f64): f64 {
 
 // Returns e**r × 2**k where r = hi - lo and |r| ≤ ln(2)/2.
 fn expmulti(hi: f64, lo: f64, k: int): f64 {
-    const P1 = 1.66666666666666657415e-01  /* 0x3FC55555; 0x55555555 */
-    const P2 = -2.77777777770155933842e-03 /* 0xBF66C16C; 0x16BEBD93 */
-    const P3 = 6.61375632143793436117e-05  /* 0x3F11566A; 0xAF25DE2C */
-    const P4 = -1.65339022054652515390e-06 /* 0xBEBBBD41; 0xC5D26BF1 */
-    const P5 = 4.13813679705723846039e-08  /* 0x3E663769; 0x72BEA4D0 */
+    const p1 = 1.66666666666666657415e-01  /* 0x3FC55555; 0x55555555 */
+    const p2 = -2.77777777770155933842e-03 /* 0xBF66C16C; 0x16BEBD93 */
+    const p3 = 6.61375632143793436117e-05  /* 0x3F11566A; 0xAF25DE2C */
+    const p4 = -1.65339022054652515390e-06 /* 0xBEBBBD41; 0xC5D26BF1 */
+    const p5 = 4.13813679705723846039e-08  /* 0x3E663769; 0x72BEA4D0 */
 
     let r = hi - lo
     let t = r * r
-    let c = r - t * (P1 + t * (P2 + t * (P3 + t * (P4 + t * P5))))
+    let c = r - t * (p1 + t * (p2 + t * (p3 + t * (p4 + t * p5))))
     let y = 1 - ((lo - (r * c) / (2 - c)) - hi)
     // TODO(rsc): make sure ldexp can handle boundary k
-    ret ldexp(y, k)
+    ret Ldexp(y, k)
 }

@@ -5,7 +5,7 @@
 use nosafe for std::internal::nosafe
 
 // Parse bits from binary string.
-fn parse_binary(&s: str)!: bits {
+fn parseBinary(&s: str)!: bits {
     // Eliminate initial-zeros to normalize and fit minimum mandatory bit-size.
     let mut j = 0
     for j < s.len; j++ {
@@ -34,7 +34,7 @@ fn parse_binary(&s: str)!: bits {
 
 // Parse bits from hexadecimal string.
 // Returns normalized bits.
-fn parse_hex(&s: str)!: bits {
+fn parseHex(&s: str)!: bits {
     let mut buf = make(bits, 0, s.len * 4)
     let mut i = s.len - 1
     for i >= 0; i-- {
@@ -82,7 +82,7 @@ fn parse_hex(&s: str)!: bits {
 
 // Parse bits from octal string.
 // Returns normalized bits.
-fn parse_octal(&s: str)!: bits {
+fn parseOctal(&s: str)!: bits {
     let mut buf = make(bits, 0, s.len * 3)
     let mut i = s.len - 1
     for i >= 0; i-- {
@@ -111,8 +111,8 @@ fn parse_octal(&s: str)!: bits {
     ret buf
 }
 
-fn parse_decimal(&s: str)!: []byte {
-    let mut sb = nosafe::stobs(s)
+fn parseDecimal(&s: str)!: []byte {
+    let mut sb = nosafe::Stobs(s)
     for _, b in sb {
         if b < '0' || '9' < b {
             error(BigError.Format)
@@ -141,7 +141,7 @@ loop:
     ret buf
 }
 
-fn format_binary(&b: bits): []byte {
+fn formatBinary(&b: bits): []byte {
     if b.len == 0 {
         ret ['0']
     }
@@ -152,7 +152,7 @@ fn format_binary(&b: bits): []byte {
     ret buf
 }
 
-fn format_decimal_part(mut &buf: []byte, m: byte) {
+fn formatDecimalPart(mut &buf: []byte, m: byte) {
     let mut carry = ^m & 0b1
     let n = buf.len
     for in buf {
@@ -169,19 +169,19 @@ fn format_decimal_part(mut &buf: []byte, m: byte) {
     }
 }
 
-fn format_decimal(&b: bits): []byte {
+fn formatDecimal(&b: bits): []byte {
     let mut buf = make([]byte, 1, b.len >> 1 + 1)
     buf[0] = '0'
-    for _, bit in format_binary(b) {
-        format_decimal_part(buf, 1)
+    for _, bit in formatBinary(b) {
+        formatDecimalPart(buf, 1)
         if bit == '1' {
-            format_decimal_part(buf, 0)
+            formatDecimalPart(buf, 0)
         }
     }
     ret buf
 }
 
-fn format_octal(&b: bits): []byte {
+fn formatOctal(&b: bits): []byte {
     let n = b.len - b.len % 3
     let mut buf = make([]byte, 1, b.len / 3 + 1)
     let mut i = 0
@@ -226,7 +226,7 @@ fn format_octal(&b: bits): []byte {
     ret buf[:buf.len-1]
 }
 
-fn format_hex(&b: bits): []byte {
+fn formatHex(&b: bits): []byte {
     let n = b.len - b.len % 4
     let mut buf = make([]byte, 1, b.len / 4 + 1)
     let mut i = 0

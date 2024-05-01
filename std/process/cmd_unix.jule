@@ -17,7 +17,7 @@ cpp unsafe fn waitpid(pid: int, mut status: *integ::Int, options: int): int
 cpp fn WEXITSTATUS(status: int): int
 cpp fn kill(pid: int, sig: int): int
 
-fn str_slice_to_cstr_slice(s: []str): []*integ::Char {
+fn strSliceToCstrSlice(s: []str): []*integ::Char {
     let mut cs = make([]*integ::Char, 0, s.len + 1)
     for i in s {
         cs = append(cs, unsafe { (*integ::Char)(&s[i][0]) })
@@ -27,22 +27,22 @@ fn str_slice_to_cstr_slice(s: []str): []*integ::Char {
 }
 
 fn execvp(file: str, argv: []str): int {
-    let cargv = str_slice_to_cstr_slice(argv)
+    let cargv = strSliceToCstrSlice(argv)
     unsafe {
         ret integ::emit[int]("execvp({}, (char*const*){})", (*integ::Char)(&file[0]), &cargv[0])
     }
 }
 
 fn execve(file: str, argv: []str, env: []str): int {
-    let cargv = str_slice_to_cstr_slice(argv)
-    let cenv = str_slice_to_cstr_slice(env)
+    let cargv = strSliceToCstrSlice(argv)
+    let cenv = strSliceToCstrSlice(env)
     unsafe {
         ret integ::emit[int]("execve({}, (char*const*){}, (char*const*)({}))", (*integ::Char)(&file[0]), &cargv[0], &cenv[0])
     }
 }
 
 impl Cmd {
-    fn __spawn(self)!: int {
+    fn spawn(self)!: int {
         if self.path == "" {
             error(ProcessError.NotExist)
         }
@@ -52,19 +52,19 @@ impl Cmd {
             error(ProcessError.Fork)
         | 0:
             let mut status = 0
-            if self.env == nil {
-                status = execvp(self.path, self.args)
+            if self.Env == nil {
+                status = execvp(self.path, self.Args)
             } else {
-                status = execve(self.path, self.args, self.env)
+                status = execve(self.path, self.Args, self.Env)
             }
             if status == -1 {
                 cpp.kill(cpp.getpid(), cpp.SIGTERM)
             }
-            exit(255)
+            Exit(255)
         }
         let status = 0
         if unsafe { cpp.waitpid(pid, (*integ::Int)(&status), cpp.WUNTRACED) == -1 } {
-            error(get_last_process_error())
+            error(getLastProcessError())
         }
         if cpp.WIFSIGNALED(status) {
             error(ProcessError.Fork)

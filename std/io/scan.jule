@@ -13,22 +13,22 @@ pub struct Scanner {
 }
 
 impl Scanner {
-    const BufferSize = 1 << 10
+    const bufferSize = 1 << 10
 
     // New &Scanner from Reader.
-    pub static fn new(mut r: Reader): &Scanner {
+    pub static fn New(mut r: Reader): &Scanner {
         ret &Scanner{
             r: r,
-            b: make([]byte, 0, Scanner.BufferSize),
+            b: make([]byte, 0, Scanner.bufferSize),
         }
     }
 
     // New &Scanner from &File.
     // Uses &FileStream for Reader trait compatibility.
-    pub static fn newf(mut f: &File): &Scanner {
+    pub static fn Newf(mut f: &File): &Scanner {
         ret &Scanner{
-            r: FileStream.new(f),
-            b: make([]byte, 0, Scanner.BufferSize),
+            r: FileStream.New(f),
+            b: make([]byte, 0, Scanner.bufferSize),
         }
     }
 }
@@ -40,23 +40,23 @@ impl Scanner {
 
     // Returns bytes of recent scan.
     // Returned slice is mutable copy of buffer.
-    pub fn bytes(self): []byte { ret self.b }
+    pub fn Bytes(self): []byte { ret self.b }
 
     // Returns text from bytes of recent scan.
-    pub fn text(self): str { ret str(self.b) }
+    pub fn Text(self): str { ret str(self.b) }
 
     // Scans line from handle via read method.
     // Scans bytes until end of the line, line delimiter is not included.
     // Reports whether readed byte into buffer.
-    pub fn scan(self)!: bool {
+    pub fn Scan(self)!: bool {
         const LINE_DELIMITER = '\n'
 
         self.reset()
 
-        let mut part_buff: BufferArray
-        let mut part = nosafe::atobs[BufferArray, BufferArrayElem](part_buff)
+        let mut partBuff: bufferArray
+        let mut part = nosafe::Atobs[bufferArray, bufferArrayElem](partBuff)
         for {
-            let n = self.r.read(part) else {
+            let n = self.r.Read(part) else {
                 ret false
             }
             if n == 0 {
@@ -68,13 +68,13 @@ impl Scanner {
             }
             self.b = append(self.b, part[:n]...)
         }
-        clear_cr(self.b)
+        clearCr(self.b)
         ret self.b.len != 0
     }
 }
 
 // Clear last carriage return from buff if exist.
-fn clear_cr[T](mut &buf: T) {
+fn clearCr[T](mut &buf: T) {
     if buf.len > 0 && buf[buf.len-1] == '\r' {
         buf = buf[:buf.len-1]
     }

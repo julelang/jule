@@ -18,23 +18,23 @@ impl File {
     //  Denied Exist Signal SyncIO IO IsDir Loop PerProcessLimit LongPath
     //  SystemWideLimit NotExist UnableStream NoSpace NotDir Device Overflow
     //  ReadOnly Retry Busy
-    pub static fn open(path: str, flag: OFlag, mode: int)!: &File {
-        let utf16_path = integrated::utf16_from_str(path)
-        let handle = unsafe { sys::_wopen(&utf16_path[0], int(flag), mode) }
+    pub static fn Open(path: str, flag: OFlag, mode: int)!: &File {
+        let utf16Path = integrated::Utf16FromStr(path)
+        let handle = unsafe { sys::Wopen(&utf16Path[0], int(flag), mode) }
         if handle == -1 {
-            error(get_last_fs_error())
+            error(getLastFsError())
         }
-        ret File.new(uintptr(handle))
+        ret File.New(uintptr(handle))
     }
 
     // Removes named file.
     //
     // Possible errors:
     //  Denined Busy LongPath NotExist InsufficientMemory NotDir
-    pub static fn remove(path: str)! {
-        let utf16_path = integrated::utf16_from_str(path)
-        if unsafe { !sys::delete_file(&utf16_path[0]) } {
-            error(get_last_fs_error())
+    pub static fn Remove(path: str)! {
+        let utf16Path = integrated::Utf16FromStr(path)
+        if unsafe { !sys::DeleteFile(&utf16Path[0]) } {
+            error(getLastFsError())
         }
     }
 }
@@ -46,26 +46,25 @@ impl File {
     // Possible errors:
     //  Retry InvalidDescriptor Big Signal IO NoSpace Pipe Range SyncIO
     //  Seek Device Buffer
-    pub fn write(mut self, buff: []byte)!: (n: int) {
+    pub fn Write(mut self, buff: []byte)!: (n: int) {
         if buff.len == 0 {
             ret 0
         }
 
-        if is_console_handle(self.handle) {
-            let utf16_buff = integrated::utf16_from_str(str(buff))
+        if isConsoleHandle(self.handle) {
+            let utf16Buff = integrated::Utf16FromStr(str(buff))
             let ok = unsafe {
-                sys::write_console(self.handle, &utf16_buff[0],
-                    utf16_buff.len, n, nil)
+                sys::WriteConsole(self.handle, &utf16Buff[0], utf16Buff.len, n, nil)
             }
             if !ok {
-                error(get_last_fs_error())
+                error(getLastFsError())
             }
             ret n
         }
 
-        n = unsafe { sys::write(int(self.handle), &buff[0], uint(buff.len)) }
+        n = unsafe { sys::Write(int(self.handle), &buff[0], uint(buff.len)) }
         if n == -1 {
-            error(get_last_fs_error())
+            error(getLastFsError())
         }
         ret n
     }
@@ -79,41 +78,41 @@ impl File {
     // Possible errors:
     //  Retry InvalidDescriptor Signal SyncIO IO IsDir Overflow Buffer
     //  InsufficientMemory Device Seek
-    pub fn read(mut self, mut buff: []byte)!: (n: int) {
+    pub fn Read(mut self, mut buff: []byte)!: (n: int) {
         if buff.len == 0 {
             ret 0
         }
 
-        if is_console_handle(self.handle) {
+        if isConsoleHandle(self.handle) {
             let mut codepage = make([]u16, buff.len)
-            let ok = unsafe { sys::read_console(self.handle, &codepage[0], buff.len, n, nil) }
+            let ok = unsafe { sys::ReadConsole(self.handle, &codepage[0], buff.len, n, nil) }
             if !ok {
-                error(get_last_fs_error())
+                error(getLastFsError())
             }
 
-            let runes = utf16::decode(codepage[:n])
+            let runes = utf16::Decode(codepage[:n])
             n = 0
             for _, r in runes {
-                let size = utf8::rune_len(r)
+                let size = utf8::RuneLen(r)
                 if n+size > buff.len {
                     break
                 }
-                _ = utf8::encode_rune(buff[n:], r)
+                _ = utf8::EncodeRune(buff[n:], r)
                 n += size
             }
 
             ret n
         }
 
-        n = unsafe { sys::read(int(self.handle), &buff[0], uint(buff.len)) }
+        n = unsafe { sys::Read(int(self.handle), &buff[0], uint(buff.len)) }
         if n == -1 {
-            error(get_last_fs_error())
+            error(getLastFsError())
         }
         ret n
     }
 }
 
-fn is_console_handle(handle: uintptr): bool {
+fn isConsoleHandle(handle: uintptr): bool {
     ret handle == sys::STDIN ||
         handle == sys::STDOUT ||
         handle == sys::STDERR

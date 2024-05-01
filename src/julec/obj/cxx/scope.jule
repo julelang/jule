@@ -37,40 +37,40 @@ use std::jule::sema::{
     SlicingExprModel,
 }
 
-const MATCH_EXPR = "_match_expr"
+const matchExpr = "_match_expr"
 
 // Common group of semantic analysis stmt types and optimizer specific types.
-enum CompStmt: type {
-    Stmt,
+enum compStmt: type {
+    Stmt: Stmt,
     &StrInsertBeginExprModel,
     &MutSlicingExprModel,
     &PushToSliceExprModel,
 }
 
-struct ScopeCoder {
+struct scopeCoder {
     oc: &ObjectCoder
 }
 
-impl ScopeCoder {
-    static fn new(mut &oc: &ObjectCoder): &ScopeCoder {
-        ret &ScopeCoder{
+impl scopeCoder {
+    static fn new(mut &oc: &ObjectCoder): &scopeCoder {
+        ret &scopeCoder{
             oc: oc,
         }
     }
 
-    fn range_index_iter(mut &self, mut &it: &RangeIter) {
-        let begin = IdentCoder.iter_begin(uintptr(it))
-        let next = IdentCoder.iter_next(uintptr(it))
+    fn rangeIndexIter(mut &self, mut &it: &RangeIter) {
+        let begin = identCoder.iterBegin(uintptr(it))
+        let next = identCoder.iterNext(uintptr(it))
 
         self.oc.write("{\n")
-        self.oc.add_indent()
+        self.oc.addIndent()
         self.oc.indent()
         self.oc.write("auto ")
-        if opt::COPY && is_copy_optimizable(it.expr) {
+        if opt::Copy && isCopyOptimizable(it.Expr) {
             self.oc.write("&")
         }
         self.oc.write("expr = ")
-        self.oc.ec.model(it.expr.model)
+        self.oc.ec.model(it.Expr.Model)
         self.oc.write(";\n")
         self.oc.indent()
         self.oc.write("auto it = expr.begin();\n")
@@ -79,22 +79,22 @@ impl ScopeCoder {
         self.oc.write(":;\n")
         self.oc.indent()
         self.oc.write("if (it != expr.end()) {\n")
-        self.oc.add_indent()
+        self.oc.addIndent()
         self.oc.indent()
-        if it.key_a != nil {
-            self.oc.var_init_expr(it.key_a, fn() { self.oc.write("it - expr.begin()") })
+        if it.KeyA != nil {
+            self.oc.varInitExpr(it.KeyA, fn() { self.oc.write("it - expr.begin()") })
             self.oc.write("\n")
             self.oc.indent()
         }
-        if it.key_b != nil {
-            if opt::COPY {
-                it.key_b.reference = is_iter_copy_optimizable(it.expr, it.key_b)
+        if it.KeyB != nil {
+            if opt::Copy {
+                it.KeyB.Reference = isIterCopyOptimizable(it.Expr, it.KeyB)
             }
-            self.oc.var_init_expr(it.key_b, fn() { self.oc.write("*it") })
+            self.oc.varInitExpr(it.KeyB, fn() { self.oc.write("*it") })
             self.oc.write("\n")
             self.oc.indent()
         }
-        self.scope(it.scope)
+        self.scope(it.Scope)
         self.oc.write("\n")
         self.oc.indent()
         self.oc.write(next)
@@ -102,8 +102,8 @@ impl ScopeCoder {
         self.oc.indent()
         self.oc.write("++it;\n")
         self.oc.indent()
-        if it.key_a != nil {
-            self.oc.write(IdentCoder.var(it.key_a))
+        if it.KeyA != nil {
+            self.oc.write(identCoder.var(it.KeyA))
             self.oc.write("++;\n")
             self.oc.indent()
         }
@@ -112,33 +112,33 @@ impl ScopeCoder {
         self.oc.write(";\n")
 
         // Close if.
-        self.oc.done_indent()
+        self.oc.doneIndent()
         self.oc.indent()
         self.oc.write("}\n")
 
         self.oc.indent()
-        self.oc.write(IdentCoder.iter_end(uintptr(it)))
+        self.oc.write(identCoder.iterEnd(uintptr(it)))
         self.oc.write(":;\n")
 
         // Close scope.
-        self.oc.done_indent()
+        self.oc.doneIndent()
         self.oc.indent()
         self.oc.write("}")
     }
 
-    fn range_hashmap_iter(mut &self, mut &it: &RangeIter) {
-        let begin = IdentCoder.iter_begin(uintptr(it))
-        let next = IdentCoder.iter_next(uintptr(it))
+    fn rangeHashmapIter(mut &self, mut &it: &RangeIter) {
+        let begin = identCoder.iterBegin(uintptr(it))
+        let next = identCoder.iterNext(uintptr(it))
 
         self.oc.write("{\n")
-        self.oc.add_indent()
+        self.oc.addIndent()
         self.oc.indent()
         self.oc.write("auto ")
-        if opt::COPY && is_copy_optimizable(it.expr) {
+        if opt::Copy && isCopyOptimizable(it.Expr) {
             self.oc.write("&")
         }
         self.oc.write("expr = ")
-        self.oc.ec.model(it.expr.model)
+        self.oc.ec.model(it.Expr.Model)
         self.oc.write(";\n")
         self.oc.indent()
         self.oc.write("auto it = expr.begin();\n")
@@ -147,25 +147,25 @@ impl ScopeCoder {
         self.oc.write(":;\n")
         self.oc.indent()
         self.oc.write("if (it != expr.end()) {\n")
-        self.oc.add_indent()
+        self.oc.addIndent()
         self.oc.indent()
-        if it.key_a != nil {
-            if opt::COPY {
-                it.key_a.reference = is_iter_copy_optimizable(it.expr, it.key_a)
+        if it.KeyA != nil {
+            if opt::Copy {
+                it.KeyA.Reference = isIterCopyOptimizable(it.Expr, it.KeyA)
             }
-            self.oc.var_init_expr(it.key_a, fn() { self.oc.write("it->first") })
+            self.oc.varInitExpr(it.KeyA, fn() { self.oc.write("it->first") })
             self.oc.write("\n")
             self.oc.indent()
         }
-        if it.key_b != nil {
-            if opt::COPY {
-                it.key_b.reference = is_iter_copy_optimizable(it.expr, it.key_b)
+        if it.KeyB != nil {
+            if opt::Copy {
+                it.KeyB.Reference = isIterCopyOptimizable(it.Expr, it.KeyB)
             }
-            self.oc.var_init_expr(it.key_b, fn() { self.oc.write("it->second") })
+            self.oc.varInitExpr(it.KeyB, fn() { self.oc.write("it->second") })
             self.oc.write("\n")
             self.oc.indent()
         }
-        self.scope(it.scope)
+        self.scope(it.Scope)
         self.oc.write("\n")
         self.oc.indent()
         self.oc.write(next)
@@ -178,32 +178,32 @@ impl ScopeCoder {
         self.oc.write(";\n")
 
         // Close if.
-        self.oc.done_indent()
+        self.oc.doneIndent()
         self.oc.indent()
         self.oc.write("}\n")
 
         self.oc.indent()
-        self.oc.write(IdentCoder.iter_end(uintptr(it)))
+        self.oc.write(identCoder.iterEnd(uintptr(it)))
         self.oc.write(":;\n")
 
         // Close scope.
-        self.oc.done_indent()
+        self.oc.doneIndent()
         self.oc.indent()
         self.oc.write("}")
     }
 
-    fn if_case(mut &self, mut i: &If) {
-        if i.expr != nil {
+    fn ifCase(mut &self, mut i: &If) {
+        if i.Expr != nil {
             self.oc.write("if (")
-            self.oc.ec.expr(i.expr)
+            self.oc.ec.expr(i.Expr)
             self.oc.write(") ")
         }
-        self.scope(i.scope)
+        self.scope(i.Scope)
     }
 
     fn conditional(mut &self, mut c: &Conditional) {
         let mut writed = false
-        for (_, mut elif) in c.elifs {
+        for (_, mut elif) in c.Elifs {
             if elif == nil {
                 continue
             }
@@ -211,222 +211,222 @@ impl ScopeCoder {
                 self.oc.write(" else ")
             }
             writed = true
-            self.if_case(elif)
+            self.ifCase(elif)
         }
-        if c.default != nil {
+        if c.Default != nil {
             if writed {
                 self.oc.write(" else ")
             }
-            self.scope(c.default.scope)
+            self.scope(c.Default.Scope)
         }
     }
 
-    fn inf_iter(mut &self, mut it: &InfIter) {
+    fn infIter(mut &self, mut it: &InfIter) {
         self.oc.write("for (;;) {\n")
-        self.oc.add_indent() // Indent scope.
+        self.oc.addIndent() // Indent scope.
         self.oc.indent()
-        self.scope(it.scope)
-        self.oc.done_indent()
+        self.scope(it.Scope)
+        self.oc.doneIndent()
         self.oc.write("\n")
         self.oc.indent()
-        self.oc.write(IdentCoder.iter_next(uintptr(it)))
+        self.oc.write(identCoder.iterNext(uintptr(it)))
         self.oc.write(":;\n")
         self.oc.indent()
         self.oc.write("}\n")
         self.oc.indent()
-        self.oc.write(IdentCoder.iter_end(uintptr(it)))
+        self.oc.write(identCoder.iterEnd(uintptr(it)))
         self.oc.write(":;")
     }
 
-    fn while_iter(mut &self, mut it: &WhileIter) {
-        if it.expr != nil && it.next == nil {
+    fn whileIter(mut &self, mut it: &WhileIter) {
+        if it.Expr != nil && it.Next == nil {
             self.oc.write("while (")
-            self.oc.ec.expr(it.expr)
+            self.oc.ec.expr(it.Expr)
             self.oc.write(") {\n")
         } else {
             self.oc.write("for (; ")
-            if it.expr != nil {
-                self.oc.ec.expr(it.expr)
+            if it.Expr != nil {
+                self.oc.ec.expr(it.Expr)
             }
             self.oc.write("; ")
-            if it.next != nil {
-                self.st(it.next)
+            if it.Next != nil {
+                self.st(it.Next)
             }
             self.oc.write(") {\n")
         }
 
-        self.oc.add_indent()
+        self.oc.addIndent()
         self.oc.indent()
-        self.scope(it.scope)
+        self.scope(it.Scope)
         self.oc.write("\n")
-        self.oc.done_indent()
+        self.oc.doneIndent()
         self.oc.indent()
 
-        self.oc.write(IdentCoder.iter_next(uintptr(it)))
+        self.oc.write(identCoder.iterNext(uintptr(it)))
         self.oc.write(":;\n")
         self.oc.indent()
         self.oc.write("}\n")
         self.oc.indent()
-        self.oc.write(IdentCoder.iter_end(uintptr(it)))
+        self.oc.write(identCoder.iterEnd(uintptr(it)))
         self.oc.write(":;")
     }
 
-    fn range_iter(mut &self, mut it: &RangeIter) {
+    fn rangeIter(mut &self, mut it: &RangeIter) {
         match {
-        | it.expr.kind.slc() != nil:
-            self.range_index_iter(it)
-        | it.expr.kind.arr() != nil:
-            self.range_index_iter(it)
-        | it.expr.kind.map() != nil:
-            self.range_hashmap_iter(it)
+        | it.Expr.Kind.Slc() != nil:
+            self.rangeIndexIter(it)
+        | it.Expr.Kind.Arr() != nil:
+            self.rangeIndexIter(it)
+        | it.Expr.Kind.Map() != nil:
+            self.rangeHashmapIter(it)
         |:
-            self.range_index_iter(it) // Str
+            self.rangeIndexIter(it) // Str
         }
     }
 
     fn cont(mut &self, c: &ContSt) {
         self.oc.write("goto ")
-        self.oc.write(IdentCoder.iter_next(c.it))
+        self.oc.write(identCoder.iterNext(c.It))
     }
 
     fn label(mut &self, l: &Label) {
-        self.oc.write(IdentCoder.label(l.ident))
+        self.oc.write(identCoder.label(l.Ident))
         self.oc.write(":")
     }
 
-    fn goto_st(mut &self, gt: &GotoSt) {
+    fn gotoSt(mut &self, gt: &GotoSt) {
         self.oc.write("goto ")
-        self.oc.write(IdentCoder.label(gt.ident))
+        self.oc.write(identCoder.label(gt.Ident))
     }
 
     fn postfix(mut &self, mut p: &Postfix) {
         self.oc.write("(")
-        self.oc.ec.expr(p.expr)
+        self.oc.ec.expr(p.Expr)
         self.oc.write(")")
-        self.oc.write(p.op)
+        self.oc.write(p.Op)
     }
 
     fn assign(mut &self, mut a: &Assign) {
-        self.oc.ec.expr(a.l.model)
-        self.oc.write(a.op.kind)
-        self.oc.ec.expr(a.r.model)
+        self.oc.ec.expr(a.L.Model)
+        self.oc.write(a.Op.Kind)
+        self.oc.ec.expr(a.R.Model)
     }
 
-    fn multi_assign(mut &self, mut a: &MultiAssign) {
+    fn multiAssign(mut &self, mut a: &MultiAssign) {
         self.oc.write("std::tie(")
-        for (i, mut l) in a.l {
+        for (i, mut l) in a.L {
             if l == nil {
-                self.oc.write(CPP_IGNORE)
+                self.oc.write(cppIgnore)
             } else {
                 self.oc.ec.expr(l)
             }
-            if a.l.len-i > 1 {
+            if a.L.len-i > 1 {
                 self.oc.write(",")
             }
         }
         self.oc.write(") = ")
-        self.oc.ec.expr(a.r)
+        self.oc.ec.expr(a.R)
     }
 
-    fn match_expr(mut &self, mut m: &Match): fn() {
-        if !m.expr.is_const() {
-            ret fn() { self.oc.write(MATCH_EXPR) }
+    fn matchExpr(mut &self, mut m: &Match): fn() {
+        if !m.Expr.IsConst() {
+            ret fn() { self.oc.write(matchExpr) }
         }
-        if !m.expr.constant.is_bool() || !m.expr.constant.read_bool() {
-            ret fn() { self.oc.ec.model(m.expr.model) }
+        if !m.Expr.Constant.IsBool() || !m.Expr.Constant.ReadBool() {
+            ret fn() { self.oc.ec.model(m.Expr.Model) }
         }
         ret nil
     }
 
     fn case(mut &self, mut m: &Match, mut c: &Case) {
-        if c.exprs.len != 0 && !m.is_generic_type_match() {
-            if m.cases.len > 0 && m.cases[0] == c {
+        if c.Exprs.len != 0 && !m.IsGenericTypeMatch() {
+            if m.Cases.len > 0 && m.Cases[0] == c {
                 self.oc.write("if (")
             } else {
                 self.oc.write("else if (")
             }
-            for (i, mut expr) in c.exprs {
+            for (i, mut expr) in c.Exprs {
                 match {
-                | !m.type_match:
-                    let case_expr = self.match_expr(m)
-                    if m.expr.good_operand(expr) {
-                        if case_expr != nil {
-                            case_expr()
+                | !m.TypeMatch:
+                    let caseExpr = self.matchExpr(m)
+                    if m.Expr.GoodOperand(expr) {
+                        if caseExpr != nil {
+                            caseExpr()
                             self.oc.write(" == ")
                         }
-                        self.oc.ec.expr(expr.model)
+                        self.oc.ec.expr(expr.Model)
                     } else {
-                        self.oc.ec.expr(expr.model)
-                        if case_expr != nil {
+                        self.oc.ec.expr(expr.Model)
+                        if caseExpr != nil {
                             self.oc.write(" == ")
-                            case_expr()
+                            caseExpr()
                         }
                     }
                 |:
-                    self.oc.write(MATCH_EXPR)
+                    self.oc.write(matchExpr)
                     self.oc.write(".type_is<")
-                    self.oc.ec.expr(expr.model)
+                    self.oc.ec.expr(expr.Model)
                     self.oc.write(">()")
                 }
 
-                if c.exprs.len-i > 1 {
+                if c.Exprs.len-i > 1 {
                     self.oc.write(" || ")
                 }
             }
             self.oc.write(") ")
-        } else if m.default == c && m.cases.len != 0 {
+        } else if m.Default == c && m.Cases.len != 0 {
             self.oc.indent()
             self.oc.write("else ")
         }
 
-        self.oc.add_indent()
+        self.oc.addIndent()
 
         self.oc.write("{\n")
         self.oc.indent()
-        self.oc.write(IdentCoder.case_begin(uintptr(c)))
+        self.oc.write(identCoder.caseBegin(uintptr(c)))
         self.oc.write(":;\n")
-        if c.scope.stmts.len > 0 {
+        if c.Scope.Stmts.len > 0 {
             self.oc.indent()
-            self.scope(c.scope)
+            self.scope(c.Scope)
             self.oc.write("\n")
         }
 
-        self.oc.done_indent()
+        self.oc.doneIndent()
 
         self.oc.indent()
         self.oc.write("}")
     }
 
-    fn match_st(mut &self, mut m: &Match) {
-        if m.cases.len == 0 && m.default == nil {
+    fn matchSt(mut &self, mut m: &Match) {
+        if m.Cases.len == 0 && m.Default == nil {
             ret
         }
 
-        let generic_type_match = m.is_generic_type_match()
-        if generic_type_match && (m.default == nil || m.default.scope.stmts.len == 0) {
+        let genericTypeMatch = m.IsGenericTypeMatch()
+        if genericTypeMatch && (m.Default == nil || m.Default.Scope.Stmts.len == 0) {
             ret
         }
 
         self.oc.write("{\n")
 
-        self.oc.add_indent()
+        self.oc.addIndent()
 
         self.oc.indent()
 
         // Constant expressions generated as literals in conditions.
-        if !generic_type_match && !m.expr.is_const() {
-            if opt::COPY && is_copy_optimizable(m.expr) {
+        if !genericTypeMatch && !m.Expr.IsConst() {
+            if opt::Copy && isCopyOptimizable(m.Expr) {
                 self.oc.write("auto &_match_expr{ ")
             } else {
                 self.oc.write("auto _match_expr{ ")
             }
-            self.oc.ec.expr(m.expr.model)
+            self.oc.ec.expr(m.Expr.Model)
             self.oc.write(" };\n")
             self.oc.indent()
         }
 
-        if m.cases.len > 0 {
-            for (_, mut c) in m.cases {
+        if m.Cases.len > 0 {
+            for (_, mut c) in m.Cases {
                 if c == nil {
                     continue
                 }
@@ -436,88 +436,88 @@ impl ScopeCoder {
             }
         }
 
-        if m.default != nil {
+        if m.Default != nil {
             self.oc.write("\n")
-            self.case(m, m.default)
+            self.case(m, m.Default)
         }
 
         self.oc.write("\n")
         self.oc.indent()
-        self.oc.write(IdentCoder.match_end(uintptr(m)))
+        self.oc.write(identCoder.matchEnd(uintptr(m)))
         self.oc.write(":;")
         self.oc.write("\n")
 
-        self.oc.done_indent()
+        self.oc.doneIndent()
 
         self.oc.indent()
         self.oc.write("}")
     }
 
-    fn fall_st(mut &self, f: &FallSt) {
+    fn fallSt(mut &self, f: &FallSt) {
         self.oc.write("goto ")
-        self.oc.write(IdentCoder.case_begin(f.dest_case))
+        self.oc.write(identCoder.caseBegin(f.DestCase))
     }
 
-    fn break_st(mut &self, b: &BreakSt) {
+    fn breakSt(mut &self, b: &BreakSt) {
         self.oc.write("goto ")
-        if b.it != 0 {
-            self.oc.write(IdentCoder.iter_end(b.it))
+        if b.It != 0 {
+            self.oc.write(identCoder.iterEnd(b.It))
         } else {
-            self.oc.write(IdentCoder.match_end(b.mtch))
+            self.oc.write(identCoder.matchEnd(b.Mtch))
         }
     }
 
-    fn ret_with_vars(mut &self, mut r: &RetSt) {
+    fn retWithVars(mut &self, mut r: &RetSt) {
         self.oc.write("return ")
-        if r.func.decl.exceptional {
+        if r.Func.Decl.Exceptional {
             self.oc.write("jule::Exceptional<")
-            self.oc.write(TypeCoder.kind(r.func.result))
+            self.oc.write(typeCoder.kind(r.Func.Result))
             self.oc.write(">(jule::Any(), ")
         }
-        if r.vars.len > 1 {
+        if r.Vars.len > 1 {
             self.oc.write("std::make_tuple(")
         }
-        for (i, mut v) in r.vars {
-            if lex::is_ignore_ident(v.ident) {
-                self.oc.ec.init_expr(v.kind.kind)
+        for (i, mut v) in r.Vars {
+            if lex::IsIgnoreIdent(v.Ident) {
+                self.oc.ec.initExpr(v.Kind.Kind)
             } else {
-                self.oc.write(IdentCoder.var(v))
+                self.oc.write(identCoder.var(v))
             }
-            if r.vars.len-i > 1 {
+            if r.Vars.len-i > 1 {
                 self.oc.write(",")
             }
         }
 
-        if r.vars.len > 1 {
+        if r.Vars.len > 1 {
             self.oc.write(")")
         }
 
-        if r.func.decl.exceptional {
+        if r.Func.Decl.Exceptional {
             self.oc.write(")")
         }
     }
 
-    fn ret_tuple(mut &self, mut r: &RetSt) {
-        let mut datas = (&TupleExprModel)(r.expr).datas
-        for (i, mut v) in r.vars {
-            if lex::is_ignore_ident(v.ident) {
+    fn retTuple(mut &self, mut r: &RetSt) {
+        let mut datas = (&TupleExprModel)(r.Expr).Datas
+        for (i, mut v) in r.Vars {
+            if lex::IsIgnoreIdent(v.Ident) {
                 continue
             }
-            let mut model = datas[i].model
+            let mut model = datas[i].Model
             // Ignore self assignment.
             if model == v {
                 continue
             }
-            self.oc.write(IdentCoder.var(v))
+            self.oc.write(identCoder.var(v))
             self.oc.write(" = ")
             self.oc.ec.expr(model)
             self.oc.write(";\n")
             self.oc.indent()
         }
 
-        if r.func.decl.exceptional {
+        if r.Func.Decl.Exceptional {
             self.oc.write("return jule::Exceptional<")
-            self.oc.write(TypeCoder.kind(r.func.result))
+            self.oc.write(typeCoder.kind(r.Func.Result))
             self.oc.write(">(jule::Any(),")
         } else {
             self.oc.write("return ")
@@ -525,11 +525,11 @@ impl ScopeCoder {
 
         self.oc.write("std::make_tuple(")
         for (i, mut d) in datas {
-            let mut v = r.vars[i]
-            if lex::is_ignore_ident(v.ident) {
-                self.oc.ec.expr(d.model)
+            let mut v = r.Vars[i]
+            if lex::IsIgnoreIdent(v.Ident) {
+                self.oc.ec.expr(d.Model)
             } else {
-                self.oc.write(IdentCoder.var(v))
+                self.oc.write(identCoder.var(v))
             }
             if datas.len-i > 1 {
                 self.oc.write(",")
@@ -537,30 +537,30 @@ impl ScopeCoder {
         }
         self.oc.write(")")
 
-        if r.func.decl.exceptional {
+        if r.Func.Decl.Exceptional {
             self.oc.write(")")
         }
     }
 
-    fn ret_with_exprs(mut &self, mut r: &RetSt) {
-        if r.vars.len > 1 {
-            self.ret_tuple(r)
+    fn retWithExprs(mut &self, mut r: &RetSt) {
+        if r.Vars.len > 1 {
+            self.retTuple(r)
             ret
         }
 
         // Ignore self assignments and ignored variables.
-        if r.vars.len > 0 {
-            let mut v = r.vars[0]
-            if !lex::is_ignore_ident(v.ident) && r.expr != v {
-                let ident = IdentCoder.var(v)
+        if r.Vars.len > 0 {
+            let mut v = r.Vars[0]
+            if !lex::IsIgnoreIdent(v.Ident) && r.Expr != v {
+                let ident = identCoder.var(v)
                 self.oc.write(ident)
                 self.oc.write(" = ")
-                self.oc.ec.expr(r.expr)
+                self.oc.ec.expr(r.Expr)
                 self.oc.write(";\n")
                 self.oc.indent()
-                if r.func.decl.exceptional {
+                if r.Func.Decl.Exceptional {
                     self.oc.write("return jule::Exceptional<")
-                    self.oc.write(TypeCoder.kind(r.func.result))
+                    self.oc.write(typeCoder.kind(r.Func.Result))
                     self.oc.write(">(jule::Any(),")
                     self.oc.write(ident)
                     self.oc.write(")")
@@ -572,24 +572,24 @@ impl ScopeCoder {
             }
         }
 
-        if r.func.decl.exceptional {
+        if r.Func.Decl.Exceptional {
             self.oc.write("return jule::Exceptional<")
-            self.oc.write(TypeCoder.kind(r.func.result))
+            self.oc.write(typeCoder.kind(r.Func.Result))
             self.oc.write(">(jule::Any(),")
-            self.oc.ec.expr(r.expr)
+            self.oc.ec.expr(r.Expr)
             self.oc.write(")")
             ret
         }
 
         self.oc.write("return ")
-        self.oc.ec.expr(r.expr)
+        self.oc.ec.expr(r.Expr)
         ret
     }
 
-    fn ret_st(mut &self, mut r: &RetSt) {
+    fn retSt(mut &self, mut r: &RetSt) {
         // Void.
-        if r.expr == nil && r.vars.len == 0 {
-            if r.func.decl.exceptional {
+        if r.Expr == nil && r.Vars.len == 0 {
+            if r.Func.Decl.Exceptional {
                 self.oc.write("return jule::VoidExceptional();")
                 ret
             }
@@ -597,38 +597,38 @@ impl ScopeCoder {
             ret
         }
 
-        if r.expr == nil {
-            self.ret_with_vars(r)
+        if r.Expr == nil {
+            self.retWithVars(r)
             ret
         }
-        self.ret_with_exprs(r)
+        self.retWithExprs(r)
     }
 
-    fn ret_with_defaults(mut &self, mut result: &TypeKind) {
+    fn retWithDefaults(mut &self, mut result: &TypeKind) {
         self.oc.write("return ")
-        if result.tup() != nil {
+        if result.Tup() != nil {
             self.oc.write("std::make_tuple(")
-            let mut types = result.tup().types
+            let mut types = result.Tup().Types
             for (i, mut t) in types {
-                self.oc.ec.init_expr(t)
+                self.oc.ec.initExpr(t)
                 if types.len-i > 1 {
                     self.oc.write(",")
                 }
             }
             self.oc.write(")")
         } else {
-            self.oc.ec.init_expr(result)
+            self.oc.ec.initExpr(result)
         }
     }
 
     fn var(mut &self, mut v: &Var) {
-        if !v.constant {
+        if !v.Constant {
             self.oc.var(v)
         }
     }
 
     // Generates C++ code of statement.
-    fn st(mut &self, mut st: CompStmt) {
+    fn st(mut &self, mut st: compStmt) {
         if st == nil {
             ret
         }
@@ -638,48 +638,48 @@ impl ScopeCoder {
         | &Var:
             self.var((&Var)(st))
         | &Data:
-            self.oc.ec.expr((&Data)(st).model)
+            self.oc.ec.expr((&Data)(st).Model)
         | &Conditional:
             self.conditional((&Conditional)(st))
         | &InfIter:
-            self.inf_iter((&InfIter)(st))
+            self.infIter((&InfIter)(st))
         | &WhileIter:
-            self.while_iter((&WhileIter)(st))
+            self.whileIter((&WhileIter)(st))
         | &RangeIter:
-            self.range_iter((&RangeIter)(st))
+            self.rangeIter((&RangeIter)(st))
         | &ContSt:
             self.cont((&ContSt)(st))
         | &Label:
             self.label((&Label)(st))
         | &GotoSt:
-            self.goto_st((&GotoSt)(st))
+            self.gotoSt((&GotoSt)(st))
         | &Postfix:
             self.postfix((&Postfix)(st))
         | &Assign:
             self.assign((&Assign)(st))
         | &MultiAssign:
-            self.multi_assign((&MultiAssign)(st))
+            self.multiAssign((&MultiAssign)(st))
         | &Match:
-            self.match_st((&Match)(st))
+            self.matchSt((&Match)(st))
         | &FallSt:
-            self.fall_st((&FallSt)(st))
+            self.fallSt((&FallSt)(st))
         | &BreakSt:
-            self.break_st((&BreakSt)(st))
+            self.breakSt((&BreakSt)(st))
         | &RetSt:
-            self.ret_st((&RetSt)(st))
+            self.retSt((&RetSt)(st))
         | &PushToSliceExprModel:
-            self.oc.ec.push_to_slice((&PushToSliceExprModel)(st))
+            self.oc.ec.pushToSlice((&PushToSliceExprModel)(st))
         | &MutSlicingExprModel:
-            self.oc.ec.mut_slicing((&MutSlicingExprModel)(st))
+            self.oc.ec.mutSlicing((&MutSlicingExprModel)(st))
         | &StrInsertBeginExprModel:
-            self.oc.ec.str_insert_begin((&StrInsertBeginExprModel)(st))
+            self.oc.ec.strInsertBegin((&StrInsertBeginExprModel)(st))
         |:
             self.oc.write("<unimplemented_stmt>")
         }
     }
 
-    fn scope_stmts(mut &self, mut &s: &Scope) {
-        for (_, mut st) in s.stmts {
+    fn scopeStmts(mut &self, mut &s: &Scope) {
+        for (_, mut st) in s.Stmts {
             self.oc.indent()
             self.st(st)
             self.oc.write(";\n")
@@ -688,70 +688,70 @@ impl ScopeCoder {
 
     // Generates C++ code of scope.
     fn scope(mut &self, mut s: &Scope) {
-        self.oc.add_indent()
-        if s.deferred {
+        self.oc.addIndent()
+        if s.Deferred {
             self.oc.write("__JULE_DEFER(")
         }
         self.oc.write("{\n")
-        self.scope_stmts(s)
-        self.oc.done_indent()
+        self.scopeStmts(s)
+        self.oc.doneIndent()
         self.oc.indent()
         self.oc.write("}")
-        if s.deferred {
+        if s.Deferred {
             self.oc.write(");")
         }
     }
 
     // Generates C++ code of function's scope.
-    fn func_scope(mut &self, mut f: &FnIns) {
-        if f.scope == nil {
+    fn funcScope(mut &self, mut f: &FnIns) {
+        if f.Scope == nil {
             ret
         }
         self.oc.write("{\n")
-        self.oc.add_indent()
-        if !f.decl.is_void() {
-            let mut types = f.types()
-            for i, ident in f.decl.result.idents {
-                if lex::is_ignore_ident(ident.kind) ||
-                    lex::is_anon_ident(ident.kind) {
+        self.oc.addIndent()
+        if !f.Decl.IsVoid() {
+            let mut types = f.Types()
+            for i, ident in f.Decl.Result.Idents {
+                if lex::IsIgnoreIdent(ident.Kind) ||
+                    lex::IsAnonIdent(ident.Kind) {
                     continue
                 }
                 self.oc.indent()
-                self.oc.write(TypeCoder.kind(types[i]))
+                self.oc.write(typeCoder.kind(types[i]))
                 self.oc.write(" ")
-                self.oc.write(IdentCoder.to_local(ident.row, ident.column, ident.kind))
+                self.oc.write(identCoder.toLocal(ident.Row, ident.Column, ident.Kind))
                 self.oc.write(" = ")
-                self.oc.ec.init_expr(types[i])
+                self.oc.ec.initExpr(types[i])
                 self.oc.write(";\n")
             }
         }
-        self.scope_stmts(f.scope)
-        if f.decl.exceptional && f.decl.is_void() {
+        self.scopeStmts(f.Scope)
+        if f.Decl.Exceptional && f.Decl.IsVoid() {
             // Just for void exceptionals.
             // Other cases checked by semantic analsis and disallowed
             // if they are not returns.
             self.oc.write(" return jule::VoidExceptional();\n")
         }
-        self.oc.done_indent()
+        self.oc.doneIndent()
         self.oc.indent()
         self.oc.write("}")
     }
 }
 
-fn is_copy_optimizable(&expr: &Data): bool {
-    if !expr.lvalue {
+fn isCopyOptimizable(&expr: &Data): bool {
+    if !expr.Lvalue {
         ret false
     }
-    match type expr.model {
+    match type expr.Model {
     | &SlicingExprModel:
         ret false
     }
     ret true
 }
 
-fn is_iter_copy_optimizable(&expr: &Data, &v: &Var): bool {
-    if !expr.lvalue && !expr.kind.mutable() {
+fn isIterCopyOptimizable(&expr: &Data, &v: &Var): bool {
+    if !expr.Lvalue && !expr.Kind.Mutable() {
         ret true
     }
-    ret !v.mutable && !expr.mutable
+    ret !v.Mutable && !expr.Mutable
 }
