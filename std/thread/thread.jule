@@ -20,14 +20,14 @@ cpp struct __jule_thread_handle {
     drop:      fn()
 }
 
-// Safe mask for std::chrono::NaNoseconds type.
+// Safe mask for std::chrono::nanoseconds type.
 // Used for avoid implicit casting for numeric types.
 cpp type chrono_ns: u64
 
-// Safe mask for std::chrono::NaNoseconds type.
+// Safe mask for std::chrono::nanoseconds type.
 // Used for casting.
 #namespace "std::chrono"
-cpp fn NaNoseconds(x: u64): cpp.chrono_ns
+cpp fn nanoseconds(x: u64): cpp.chrono_ns
 
 #namespace "std::this_thread"
 cpp fn sleep_for(x: cpp.chrono_ns)
@@ -53,17 +53,17 @@ impl Thread {
     // Thread starts execution of routine when spawned.
     pub static fn Spawn(routine: fn()): &Thread {
         if routine == nil {
-            panic("std::thread Thread.spawn: routine is nil")
+            panic("std::thread Thread.Spawn: routine is nil")
         }
         ret &Thread{
             handle: cpp.__jule_spawn_thread(routine),
         }
     }
 
-    // Stop execution of caller thread by NaNoseconds.
+    // Stop execution of caller thread by nanoseconds.
     // This functions only affects execution of caller thread, not process.
     pub static fn Sleep(ns: u64) {
-        cpp.sleep_for(cpp.NaNoseconds(ns))
+        cpp.sleep_for(cpp.nanoseconds(ns))
     }
 }
 
@@ -75,7 +75,7 @@ impl Thread {
     // Panics if thread is not active.
     pub fn Wait(self) {
         if !self.Active() {
-            panic("std::thread Thread.wait: thread is not active")
+            panic("std::thread Thread.Wait: thread is not active")
         }
         unsafe { self.handle.thread().join() }
         self.handle.drop()
@@ -85,7 +85,7 @@ impl Thread {
     // After this, this thread object can no longer identify thread.
     pub fn Detach(self) {
         if !self.Active() {
-            panic("std::thread Thread.detach: thread is not active")
+            panic("std::thread Thread.Detach: thread is not active")
         }
         unsafe { self.handle.thread().detach() }
         self.handle.drop()
