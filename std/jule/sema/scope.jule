@@ -36,7 +36,7 @@ use std::jule::lex::{
 use types for std::jule::types
 
 // Statement type.
-pub enum Stmt: type {
+enum Stmt: type {
     &Scope,
     &Var,
     &Data,
@@ -284,118 +284,118 @@ fn stmtIsDef(&st: Stmt): bool {
 }
 
 // Scope.
-pub struct Scope {
-    pub Parent:   &Scope
-    pub Unsafety: bool
-    pub Deferred: bool
-    pub Stmts:    []Stmt
+struct Scope {
+    Parent:   &Scope
+    Unsafety: bool
+    Deferred: bool
+    Stmts:    []Stmt
 }
 
 // Chain conditional node.
-pub struct If {
-    pub Expr:  ExprModel
-    pub Scope: &Scope
+struct If {
+    Expr:  ExprModel
+    Scope: &Scope
 }
 
 // Default scope of conditional chain.
-pub struct Else {
-    pub Scope: &Scope
+struct Else {
+    Scope: &Scope
 }
 
 // Conditional chain.
-pub struct Conditional {
-    pub Elifs:   []&If // First not is root condition.
-    pub Default: &Else
+struct Conditional {
+    Elifs:   []&If // First not is root condition.
+    Default: &Else
 }
 
 // Infinity iteration.
-pub struct InfIter {
-    pub Scope: &Scope
+struct InfIter {
+    Scope: &Scope
 }
 
 // While iteration.
-pub struct WhileIter {
-    pub Expr:  ExprModel // Can be nil if iteration is while-next kind.
-    pub Next:  Stmt      // Nil if iteration is not while-next kind.
-    pub Scope: &Scope
+struct WhileIter {
+    Expr:  ExprModel // Can be nil if iteration is while-next kind.
+    Next:  Stmt      // Nil if iteration is not while-next kind.
+    Scope: &Scope
 }
 
 impl WhileIter {
     // Reports whether iteration is while-next kind.
-    pub fn IsWhileNext(self): bool {
+    fn IsWhileNext(self): bool {
         ret self.Next != nil
     }
 }
 
 // Range iteration.
-pub struct RangeIter {
-    pub Expr:  &Data
-    pub Scope: &Scope
-    pub KeyA:  &Var
-    pub KeyB:  &Var
+struct RangeIter {
+    Expr:  &Data
+    Scope: &Scope
+    KeyA:  &Var
+    KeyB:  &Var
 }
 
 // Continue statement.
-pub struct ContSt {
-    pub It: uintptr
+struct ContSt {
+    It: uintptr
 }
 
 // Break statement.
-pub struct BreakSt {
-    pub It:   uintptr
-    pub Mtch: uintptr
+struct BreakSt {
+    It:   uintptr
+    Mtch: uintptr
 }
 
 // Label.
-pub struct Label {
-    pub Ident: str
+struct Label {
+    Ident: str
 }
 
 // Goto statement.
-pub struct GotoSt {
-    pub Ident: str
+struct GotoSt {
+    Ident: str
 }
 
 // Postfix assignment.
-pub struct Postfix {
-    pub Expr: ExprModel
-    pub Op:   str
+struct Postfix {
+    Expr: ExprModel
+    Op:   str
 }
 
 // Assigment.
-pub struct Assign {
-    pub L:  &OperandExprModel
-    pub R:  &OperandExprModel
-    pub Op: &Token
+struct Assign {
+    L:  &OperandExprModel
+    R:  &OperandExprModel
+    Op: &Token
 }
 
 // Multi-declarative assignment.
-pub struct MultiAssign {
-    pub L: []ExprModel // Nil Model:s represents ingored expressions.
-    pub R: ExprModel
+struct MultiAssign {
+    L: []ExprModel // Nil Model:s represents ingored expressions.
+    R: ExprModel
 }
 
 // Match-Case.
-pub struct Match {
-    pub Expr:      &Data
-    pub TypeMatch: bool
-    pub Cases:     []&Case
-    pub Default:   &Case
+struct Match {
+    Expr:      &Data
+    TypeMatch: bool
+    Cases:     []&Case
+    Default:   &Case
 }
 
 impl Match {
     // Reports whether match is type-match for generic type.
-    pub fn IsGenericTypeMatch(self): bool {
+    fn IsGenericTypeMatch(self): bool {
         ret self.TypeMatch && self.Expr != nil && self.Expr.Kind.Generic
     }
 }
 
 // Match-Case case.
-pub struct Case {
-    pub Owner: &Match
-    pub Scope: &Scope
-    pub Exprs: []&Data
-    pub Next:  &Case
+struct Case {
+    Owner: &Match
+    Scope: &Scope
+    Exprs: []&Data
+    Next:  &Case
 }
 
 impl Case {
@@ -404,15 +404,15 @@ impl Case {
 }
 
 // Fall statement.
-pub struct FallSt {
-    pub DestCase: uintptr
+struct FallSt {
+    DestCase: uintptr
 }
 
 // Return statement.
-pub struct RetSt {
-    pub Func: &FnIns
-    pub Vars: []&Var    // Used "_" identifier to pass ignored vars for ordering.
-    pub Expr: ExprModel
+struct RetSt {
+    Func: &FnIns
+    Vars: []&Var    // Used "_" identifier to pass ignored vars for ordering.
+    Expr: ExprModel
 }
 
 struct scopeLabel {
@@ -453,7 +453,7 @@ impl Lookup for scopeChecker {
     //
     // Lookups:
     //   - Sema.
-    pub fn FindPackage(mut self, ident: str): &ImportInfo {
+    fn FindPackage(mut self, ident: str): &ImportInfo {
         ret self.s.FindPackage(ident)
     }
 
@@ -463,7 +463,7 @@ impl Lookup for scopeChecker {
     //
     // Lookups:
     //   - Sema.
-    pub fn SelectPackage(mut self, selector: fn(&ImportInfo): bool): &ImportInfo {
+    fn SelectPackage(mut self, selector: fn(&ImportInfo): bool): &ImportInfo {
         ret self.s.SelectPackage(selector)
     }
 
@@ -474,7 +474,7 @@ impl Lookup for scopeChecker {
     //   - Current scope.
     //   - Parent scopes.
     //   - Sema.
-    pub fn FindVar(mut self, ident: str, cpp_linked: bool): &Var {
+    fn FindVar(mut self, ident: str, cpp_linked: bool): &Var {
         // Search reverse for correct shadowing.
         const Reverse = true
         let mut v = self.table.findVar(ident, cpp_linked, Reverse)
@@ -501,7 +501,7 @@ impl Lookup for scopeChecker {
     //   - Current scope.
     //   - Parent scopes.
     //   - Sema.
-    pub fn FindTypeAlias(mut self, ident: str, cppLinked: bool): &TypeAlias {
+    fn FindTypeAlias(mut self, ident: str, cppLinked: bool): &TypeAlias {
         // Search reverse for correct shadowing.
         const Reverse = true
         let mut ta = self.table.findTypeAlias(ident, cppLinked, Reverse)
@@ -526,7 +526,7 @@ impl Lookup for scopeChecker {
     //
     // Lookups:
     //   - Sema.
-    pub fn FindStruct(mut self, ident: str, cppLinked: bool): &Struct {
+    fn FindStruct(mut self, ident: str, cppLinked: bool): &Struct {
         ret self.s.FindStruct(ident, cppLinked)
     }
 
@@ -535,7 +535,7 @@ impl Lookup for scopeChecker {
     //
     // Lookups:
     //   - Sema.
-    pub fn FindFn(mut self, ident: str, cppLinked: bool): &Fn {
+    fn FindFn(mut self, ident: str, cppLinked: bool): &Fn {
         ret self.s.FindFn(ident, cppLinked)
     }
 
@@ -544,7 +544,7 @@ impl Lookup for scopeChecker {
     //
     // Lookups:
     //   - Sema.
-    pub fn FindTrait(mut self, ident: str): &Trait {
+    fn FindTrait(mut self, ident: str): &Trait {
         ret self.s.FindTrait(ident)
     }
 
@@ -553,7 +553,7 @@ impl Lookup for scopeChecker {
     //
     // Lookups:
     //   - Sema.
-    pub fn FindEnum(mut self, ident: str): &Enum {
+    fn FindEnum(mut self, ident: str): &Enum {
         ret self.s.FindEnum(ident)
     }
 
@@ -562,7 +562,7 @@ impl Lookup for scopeChecker {
     //
     // Lookups:
     //   - Sema.
-    pub fn FindTypeEnum(mut self, ident: str): &TypeEnum {
+    fn FindTypeEnum(mut self, ident: str): &TypeEnum {
         ret self.s.FindTypeEnum(ident)
     }
 }

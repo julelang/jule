@@ -46,16 +46,16 @@
 // Numbers fundamental to the encoding.
 
 // The "error" rune or "Unicode replacement character"
-pub const RuneError = '\uFFFD'
+const RuneError = '\uFFFD'
 
 // Characters below RuneSelf are represented as themselves in a single byte.
-pub const RuneSelf = 0x80
+const RuneSelf = 0x80
 
 // Maximum valid Unicode code point.
-pub const MaxRune = '\U0010FFFF'
+const MaxRune = '\U0010FFFF'
 
 // Maximum number of bytes of a UTF-8 encoded Unicode character.
-pub const UtfMax = 4
+const UtfMax = 4
 
 // Code points in the surrogate range are not valid for UTF-8.
 const surrogateMin = 0xD800
@@ -134,7 +134,7 @@ static acceptRanges: [16]acceptRange = [
 
 // Reports whether the bytes in p begin with a full UTF-8 encoding of a rune.
 // An invalid encoding is considered a full Rune since it will convert as a width-1 error rune.
-pub fn FullRune(p: []byte): bool {
+fn FullRune(p: []byte): bool {
     if p.len == 0 {
         ret false
     }
@@ -153,7 +153,7 @@ pub fn FullRune(p: []byte): bool {
 }
 
 // Is like FullRune but its input is a string.
-pub fn FullRuneStr(s: str): bool {
+fn FullRuneStr(s: str): bool {
     if s.len == 0 {
         ret false
     }
@@ -179,7 +179,7 @@ pub fn FullRuneStr(s: str): bool {
 // An encoding is invalid if it is incorrect UTF-8, encodes a rune that is
 // out of range, or is not the shortest possible UTF-8 encoding for the
 // value. No other validation is performed.
-pub fn DecodeRune(p: []byte): (r: rune, size: int) {
+fn DecodeRune(p: []byte): (r: rune, size: int) {
     if p.len < 1 {
         ret RuneError, 0
     }
@@ -226,7 +226,7 @@ pub fn DecodeRune(p: []byte): (r: rune, size: int) {
 // An encoding is invalid if it is incorrect UTF-8, encodes a rune that is
 // out of range, or is not the shortest possible UTF-8 encoding for the
 // value. No other validation is performed.
-pub fn DecodeRuneStr(s: str): (r: rune, size: int) {
+fn DecodeRuneStr(s: str): (r: rune, size: int) {
     if s.len < 1 {
         ret RuneError, 0
     }
@@ -273,7 +273,7 @@ pub fn DecodeRuneStr(s: str): (r: rune, size: int) {
 // An encoding is invalid if it is incorrect UTF-8, encodes a rune that is
 // out of range, or is not the shortest possible UTF-8 encoding for the
 // value. No other validation is performed.
-pub fn DecodeLastRune(p: []byte): (r: rune, size: int) {
+fn DecodeLastRune(p: []byte): (r: rune, size: int) {
     if p.len == 0 {
         ret RuneError, 0
     }
@@ -314,7 +314,7 @@ pub fn DecodeLastRune(p: []byte): (r: rune, size: int) {
 // An encoding is invalid if it is incorrect UTF-8, encodes a rune that is
 // out of range, or is not the shortest possible UTF-8 encoding for the
 // value. No other validation is performed.
-pub fn DecodeLastRuneStr(s: str): (r: rune, size: int) {
+fn DecodeLastRuneStr(s: str): (r: rune, size: int) {
     if s.len == 0 {
         ret RuneError, 0
     }
@@ -349,7 +349,7 @@ pub fn DecodeLastRuneStr(s: str): (r: rune, size: int) {
 
 // Returns the number of bytes required to encode the rune.
 // It returns -1 if the rune is not a valid value to encode in UTF-8.
-pub fn RuneLen(r: rune): int {
+fn RuneLen(r: rune): int {
     match {
     | r < 0:
         ret -1
@@ -371,7 +371,7 @@ pub fn RuneLen(r: rune): int {
 // Writes into p (which must be large enough) the UTF-8 encoding of the rune.
 // If the rune is out of range, it writes the encoding of RuneError.
 // It returns the number of bytes written.
-pub fn EncodeRune(mut p: []byte, mut r: rune): int {
+fn EncodeRune(mut p: []byte, mut r: rune): int {
     // Negative values are erroneous. Making it unsigned addresses the problem.
     let i = u32(r)
     match {
@@ -402,7 +402,7 @@ pub fn EncodeRune(mut p: []byte, mut r: rune): int {
 // Appends the UTF-8 encoding of r to the end of p and
 // returns the extended buffer. If the rune is out of range,
 // it appends the encoding of RuneError.
-pub fn AppendRune(mut p: []byte, r: rune): []byte {
+fn AppendRune(mut p: []byte, r: rune): []byte {
     if r <= rune1max {
         ret append(p, byte(r))
     }
@@ -427,7 +427,7 @@ fn appendRuneNonASCII(mut p: []byte, mut r: rune): []byte {
 
 // Returns the number of runes in p. Erroneous and short
 // encodings are treated as single runes of width 1 byte.
-pub fn RuneCount(p: []byte): (n: int) {
+fn RuneCount(p: []byte): (n: int) {
     let mut i = 0
     for i < p.len {
         n++
@@ -470,7 +470,7 @@ pub fn RuneCount(p: []byte): (n: int) {
 }
 
 // Is like RuneCount but its input is a string.
-pub fn RuneCountStr(s: str): (n: int) {
+fn RuneCountStr(s: str): (n: int) {
     let mut i = 0
     for i < s.len; n++ {
         let mut c = s[i]
@@ -514,10 +514,10 @@ pub fn RuneCountStr(s: str): (n: int) {
 // Reports whether the byte could be the first byte of an encoded,
 // possibly invalid rune. Second and subsequent bytes always have the top two
 // bits set to 10.
-pub fn RuneStart(b: byte): bool { ret b&0xC0 != 0x80 }
+fn RuneStart(b: byte): bool { ret b&0xC0 != 0x80 }
 
 // Reports whether p consists entirely of valid UTF-8-encoded runes.
-pub fn Valid(p: []byte): bool {
+fn Valid(p: []byte): bool {
     // Break immutability, it is safe because
     // p's content is not changed by this function.
     let mut cp = unsafe { *(&p) }
@@ -572,7 +572,7 @@ pub fn Valid(p: []byte): bool {
 }
 
 // Reports whether s consists entirely of valid UTF-8-encoded runes.
-pub fn ValidStr(mut s: str): bool {
+fn ValidStr(mut s: str): bool {
     // Fast path. Check for and skip 8 bytes of ASCII characters per iteration.
     for s.len >= 8 {
         // Combining two 32 bit loads allows the same code to be used
@@ -624,7 +624,7 @@ pub fn ValidStr(mut s: str): bool {
 
 // Reports whether r can be legally encoded as UTF-8.
 // Code points that are out of range or a surrogate half are illegal.
-pub fn ValidRune(r: rune): bool {
+fn ValidRune(r: rune): bool {
     match {
     | 0 <= r && r < surrogateMin:
         ret true

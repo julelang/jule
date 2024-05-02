@@ -46,6 +46,8 @@ use std::jule::build::{
     IsTopDirective,
 }
 use strings for std::strings
+use utf8 for std::unicode::utf8
+use unicode for std::unicode
 
 fn makeErr(row: int, col: int, &f: &File, fmt: LogMsg, args: ...any): Log {
     ret Log{
@@ -396,6 +398,7 @@ impl parser {
         if ok && i < tokens.len {
             self.pushErr(tokens[i], LogMsg.InvalidSyntax)
         }
+        tad.Public = isPub(tad.Ident)
         ret tad
     }
 
@@ -443,6 +446,7 @@ impl parser {
             ret
         }
         v.Ident = v.Token.Kind
+        v.Public = isPub(v.Ident)
         v.Kind = nil // For auto-type.
         if tokens.len > 1 {
             tokens = tokens[1:] // Remove identifier.
@@ -919,6 +923,7 @@ impl parser {
             }
         }
 
+        f.Public = isPub(f.Ident)
         f.Result, _ = self.buildRetType(tokens, i)
         ret f
     }
@@ -1252,6 +1257,7 @@ impl parser {
         } else if i < tokens.len {
             self.pushErr(tokens[i], LogMsg.InvalidSyntax)
         }
+        e.Public = isPub(e.Ident)
         e.End = tokens[i-1]
         e.Items = self.buildTypeEnumItems(itemTokens)
         ret e
@@ -1365,6 +1371,7 @@ impl parser {
         } else if i < tokens.len {
             self.pushErr(tokens[i], LogMsg.InvalidSyntax)
         }
+        e.Public = isPub(e.Ident)
         e.End = tokens[i-1]
         e.Items = self.buildEnumItems(itemTokens)
         ret e
@@ -1381,15 +1388,6 @@ impl parser {
 
     fn buildField(mut &self, mut tokens: []&Token): &FieldDecl {
         let mut f = new(FieldDecl)
-
-        f.Public = tokens[0].Id == TokenId.Pub
-        if f.Public {
-            if tokens.len == 1 {
-                self.pushErr(tokens[0], LogMsg.InvalidSyntax)
-                ret nil
-            }
-            tokens = tokens[1:]
-        }
 
         f.Mutable = tokens[0].Id == TokenId.Mut
         if f.Mutable {
@@ -1433,7 +1431,7 @@ impl parser {
             tokens = tokens[i:]
             f.Default = self.buildExpr(tokens)
         }
-
+        f.Public = isPub(f.Ident)
         ret f
     }
 
@@ -1490,6 +1488,7 @@ impl parser {
         if i < tokens.len {
             self.pushErr(tokens[i], LogMsg.InvalidSyntax)
         }
+        s.Public = isPub(s.Ident)
         s.Fields = self.buildStructDeclFields(bodyTokens)
         s.End = tokens[i-1]
         ret s
@@ -1503,7 +1502,6 @@ impl parser {
             }
             ret
         }
-
         if f.Params.len == 0 {
             self.pushErr(f.Token, LogMsg.MissingReceiver)
             ret
@@ -1523,17 +1521,6 @@ impl parser {
             if tokens.len == 0 {
                 continue
             }
-
-            let mut isPub = false
-            if tokens[0].Id == TokenId.Pub {
-                isPub = true
-                if tokens.len == 1 {
-                    self.pushErr(tokens[0], LogMsg.InvalidSyntax)
-                    continue
-                }
-                tokens = tokens[1:]
-            }
-
             let mut f = self.buildFn(tokens, true, true)
             if f != nil {
                 if f.IsAnon() {
@@ -1543,7 +1530,6 @@ impl parser {
                 if f.Generics.len > 0 {
                     self.pushErr(f.Token, LogMsg.TraitMethodHasGenerics)
                 }
-                f.Public = isPub
                 methods = append(methods, f)
             }
         }
@@ -1574,6 +1560,7 @@ impl parser {
         if i < tokens.len {
             self.pushErr(tokens[i], LogMsg.InvalidSyntax)
         }
+        t.Public = isPub(t.Ident)
         t.Methods = self.buildTraitMethods(bodyTokens)
         t.End = tokens[i-1]
         ret t
@@ -1586,6 +1573,7 @@ impl parser {
             if f.IsAnon() {
                 self.pushErr(f.Token, LogMsg.InvalidSyntax)
             }
+            f.Public = false
             f.CppLinked = true
         }
         ret f
@@ -1595,6 +1583,7 @@ impl parser {
         tokens = tokens[1:] // Remove "cpp" keyword.
         let mut v = self.buildVar(tokens)
         if v != nil {
+            v.Public = false
             v.CppLinked = true
             if v.Expr != nil {
                 self.pushErr(v.Token, LogMsg.CppLinkedVarHasExpr)
@@ -1607,6 +1596,11 @@ impl parser {
         tokens = tokens[1:] // Remove "cpp" keyword.
         let mut s = self.buildStructDecl(tokens)
         if s != nil {
+            s.Public = false
+            for (_, mut f) in s.Fields {
+                // Linked structure's fields are always public by default.
+                f.Public = true
+            }
             s.CppLinked = true
         }
         ret s
@@ -1616,6 +1610,7 @@ impl parser {
         tokens = tokens[1:] // Remove "cpp" keyword.
         let mut t = self.buildTypeAliasDecl(tokens)
         if t != nil {
+            t.Public = false
             t.CppLinked = true
         }
         ret t
@@ -1694,28 +1689,16 @@ impl parser {
         for (_, mut stmt) in stmts {
             tokens = stmt.tokens
             let mut token = tokens[0]
-            let mut isPub = false
             match token.Id {
             | TokenId.Hash:
                 self.pushDirective(self.buildDirective(tokens))
                 continue
-            | TokenId.Pub:
-                isPub = true
-                if tokens.len == 1 {
-                    self.pushErr(tokens[0], LogMsg.InvalidSyntax)
-                    continue
-                }
-                tokens = tokens[1:]
-                if tokens.len > 0 {
-                    token = tokens[0]
-                }
             }
 
             match token.Id {
             | TokenId.Const:
                 let mut v = self.buildVar(tokens)
                 if v != nil {
-                    v.Public = isPub
                     ipl.Statics = append(ipl.Statics, v)
                 }
             | TokenId.Static
@@ -1724,7 +1707,7 @@ impl parser {
                 let mut f = self.getMethod(tokens)
                 if f != nil {
                     self.checkMethodReceiver(f)
-                    self.applyFnMeta(f, isPub)
+                    self.applyFnMeta(f)
                     ipl.Methods = append(ipl.Methods, f)
                 }
             |:
@@ -1841,20 +1824,18 @@ impl parser {
         }
     }
 
-    fn applyFnMeta(mut self, mut &f: &FnDecl, isPub: bool) {
-        f.Public = isPub
+    fn applyFnMeta(mut self, mut &f: &FnDecl) {
         f.Directives = self.directives
         self.directives = nil
     }
 
-    fn applyMeta(mut self, mut &node: Node, isPub: bool) {
+    fn applyMeta(mut self, mut &node: Node) {
         match type node.Data {
         | &VarDecl:
             let mut v = (&VarDecl)(node.Data)
             if v == nil {
                 ret
             }
-            v.Public = isPub
             v.Directives = self.directives
             self.directives = nil
         | &FnDecl:
@@ -1862,25 +1843,7 @@ impl parser {
             if f == nil {
                 ret
             }
-            self.applyFnMeta(f, isPub)
-        | &TypeAliasDecl:
-            let mut tad = (&TypeAliasDecl)(node.Data)
-            if tad == nil {
-                ret
-            }
-            tad.Public = isPub
-        | &EnumDecl:
-            let mut ed = (&EnumDecl)(node.Data)
-            if ed == nil {
-                ret
-            }
-            ed.Public = isPub
-        | &TypeEnumDecl:
-            let mut ted = (&TypeEnumDecl)(node.Data)
-            if ted == nil {
-                ret
-            }
-            ted.Public = isPub
+            self.applyFnMeta(f)
         | &StructDecl:
             let mut sd = (&StructDecl)(node.Data)
             if sd == nil {
@@ -1888,33 +1851,7 @@ impl parser {
             }
             sd.Directives = self.directives
             self.directives = nil
-            sd.Public = isPub
-        | &TraitDecl:
-            let mut td = (&TraitDecl)(node.Data)
-            if td == nil {
-                ret
-            }
-            td.Public = isPub
-        |:
-            if isPub {
-                self.pushErr(node.Token, LogMsg.DefNotSupportPub)
-            }
         }
-    }
-
-    fn buildGeneralScopeNodeData(mut &self, mut st: []&Token): (isPub: bool, data: NodeData) {
-        // Detect pub keyword.
-        if st[0].Id == TokenId.Pub {
-            isPub = true
-            st = st[1:]
-            if st.len == 0 {
-                self.pushErr(st[0], LogMsg.InvalidSyntax)
-                ret
-            }
-        }
-
-        data = self.buildNodeData(st)
-        ret isPub, data
     }
 
     fn pushUseDecl(mut &self, mut &decl: &UseDecl) {
@@ -1954,14 +1891,14 @@ impl parser {
             ret node
         }
 
-        let (isPub, mut data) = self.buildGeneralScopeNodeData(st)
+        let mut data = self.buildNodeData(st)
         if data == nil {
             ret node
         }
 
         node.Data = data
 
-        self.applyMeta(node, isPub)
+        self.applyMeta(node)
         if self.directives.len != 0 {
             self.pushErr(self.directives[0].Tag, LogMsg.UnusedDirective)
         }
@@ -2099,4 +2036,9 @@ impl parser {
             self.pushErr(self.directives[0].Tag, LogMsg.UnusedDirective)
         }
     }
+}
+
+fn isPub(&ident: str): bool {
+    let (r, _) =utf8::DecodeRuneStr(ident)
+    ret unicode::IsUpper(r)
 }

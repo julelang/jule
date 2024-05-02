@@ -43,7 +43,7 @@ cpp fn __jule_spawn_thread(routine: fn()): cpp.__jule_thread_handle
 // thread instances point to the same allocation.
 //
 // It is experimental.
-pub struct Thread {
+struct Thread {
     handle: cpp.__jule_thread_handle
 }
 
@@ -51,7 +51,7 @@ impl Thread {
     // Spawns new thread by routine.
     // Panics if routine is nil.
     // Thread starts execution of routine when spawned.
-    pub static fn Spawn(routine: fn()): &Thread {
+    static fn Spawn(routine: fn()): &Thread {
         if routine == nil {
             panic("std::thread Thread.Spawn: routine is nil")
         }
@@ -62,7 +62,7 @@ impl Thread {
 
     // Stop execution of caller thread by nanoseconds.
     // This functions only affects execution of caller thread, not process.
-    pub static fn Sleep(ns: u64) {
+    static fn Sleep(ns: u64) {
         cpp.sleep_for(cpp.nanoseconds(ns))
     }
 }
@@ -73,7 +73,7 @@ impl Thread {
     // So program stops execution until thread's execution has completed.
     //
     // Panics if thread is not active.
-    pub fn Wait(self) {
+    fn Wait(self) {
         if !self.Active() {
             panic("std::thread Thread.Wait: thread is not active")
         }
@@ -83,7 +83,7 @@ impl Thread {
 
     // Detach thread and make it independent.
     // After this, this thread object can no longer identify thread.
-    pub fn Detach(self) {
+    fn Detach(self) {
         if !self.Active() {
             panic("std::thread Thread.Detach: thread is not active")
         }
@@ -93,7 +93,7 @@ impl Thread {
 
     // Reports whether thread object identifies an active
     // thread of execution.
-    pub fn Active(self): bool {
+    fn Active(self): bool {
         if self.handle.thread() == nil {
             ret false
         }
@@ -101,7 +101,7 @@ impl Thread {
     }
 
     // Detaches thread if thread is still executing.
-    pub fn Dispose(mut self) {
+    fn Dispose(mut self) {
         if self.Active() && self.handle.ref_count() == 1 {
             unsafe { self.handle.thread().detach() }
         }

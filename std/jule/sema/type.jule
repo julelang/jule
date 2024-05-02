@@ -31,42 +31,42 @@ use strings for std::strings
 type PrimKind: types::TypeKind
 
 // Generic type for instance types.
-pub struct InsGeneric {
-    pub Kind:       &TypeKind
-    pub Constraint: []&TypeKind
+struct InsGeneric {
+    Kind:       &TypeKind
+    Constraint: []&TypeKind
 }
 
 // Type alias.
-pub struct TypeAlias {
-    pub Scope:      &ScopeTree
-    pub Public:     bool
-    pub CppLinked: bool
-    pub Used:       bool
-    pub Generic:    bool
-    pub Token:      &Token
-    pub Ident:      str
-    pub Kind:       &TypeSymbol
-    pub Refers:     []any        // Referred identifiers, except cpp-linked ones.
-    pub Generics:   []&TypeAlias // See developer reference (1).
+struct TypeAlias {
+    Scope:      &ScopeTree
+    Public:     bool
+    CppLinked: bool
+    Used:       bool
+    Generic:    bool
+    Token:      &Token
+    Ident:      str
+    Kind:       &TypeSymbol
+    Refers:     []any        // Referred identifiers, except cpp-linked ones.
+    Generics:   []&TypeAlias // See developer reference (1).
 }
 
 // Kind of type declaration.
-pub trait Kind {
-    pub fn Str(self): str
-    pub fn Equals(&self, other: &TypeKind): bool
+trait Kind {
+    fn Str(self): str
+    fn Equals(&self, other: &TypeKind): bool
 }
 
 // Evaluated type declaration.
-pub struct TypeKind {
-    pub CppIdent: str
-    pub Generic:   bool
-    pub Variadic:  bool
-    pub Kind:      Kind
+struct TypeKind {
+    CppIdent: str
+    Generic:   bool
+    Variadic:  bool
+    Kind:      Kind
 }
 
 impl Kind for TypeKind {
     // Returns kind as string.
-    pub fn Str(self): str {
+    fn Str(self): str {
         if self.IsNil() {
             ret "nil"
         }
@@ -87,7 +87,7 @@ impl Kind for TypeKind {
     }
 
     // Reports whether types are same.
-    pub fn Equals(&self, other: &TypeKind): bool {
+    fn Equals(&self, other: &TypeKind): bool {
         if self.IsNil() {
             ret other.IsNil()
         }
@@ -101,19 +101,19 @@ impl Kind for TypeKind {
 
 impl TypeKind {
     // Reports whether type is cpp-linked kind.
-    pub fn CppLinked(self): bool { ret self.CppIdent.len != 0 }
+    fn CppLinked(self): bool { ret self.CppIdent.len != 0 }
 
     // Reports whether kind is "nil".
-    pub fn IsNil(self): bool { ret self.Kind == nil }
+    fn IsNil(self): bool { ret self.Kind == nil }
 
     // Reports whether kind is "void".
-    pub fn Void(self): bool {
+    fn Void(self): bool {
         let prim = unsafe { (*(&self)).Prim() }
         ret prim != nil && prim.Kind == "void"
     }
 
     // Reports whether kind is mutable.
-    pub fn Mutable(self): bool {
+    fn Mutable(self): bool {
         unsafe {
             let mut _self = &self
 
@@ -137,7 +137,7 @@ impl TypeKind {
     }
 
     // Reports whether kind is nil compatible.
-    pub fn NilCompatible(self): bool {
+    fn NilCompatible(self): bool {
         unsafe {
             let mut _self = &self
 
@@ -158,7 +158,7 @@ impl TypeKind {
     }
 
     // Reports whether kind performs reference-counting.
-    pub fn PerformsRC(self): bool {
+    fn PerformsRC(self): bool {
         unsafe {
             let mut _self = &self
             ret _self.Sptr() != nil || _self.Slc() != nil || _self.Trait() != nil
@@ -166,7 +166,7 @@ impl TypeKind {
     }
 
     // Reports whether kind supports clonning via jule::Clone derive.
-    pub fn SupportsCloning(self): bool {
+    fn SupportsCloning(self): bool {
         unsafe {
             let mut _self = &self
             match {
@@ -199,7 +199,7 @@ impl TypeKind {
     }
 
     // Reports whether kind is variadicable.
-    pub fn Variadicable(self): bool {
+    fn Variadicable(self): bool {
         unsafe {
             let mut _self = &self
             ret _self.Slc() != nil
@@ -207,7 +207,7 @@ impl TypeKind {
     }
 
     // Returns primitive type if kind is primitive type, nil reference if not.
-    pub fn Prim(mut self): &Prim {
+    fn Prim(mut self): &Prim {
         match type self.Kind {
         | &Prim:
             ret (&Prim)(self.Kind)
@@ -217,7 +217,7 @@ impl TypeKind {
     }
 
     // Returns reference type if kind is smart pointer, nil reference if not.
-    pub fn Sptr(mut self): &Sptr {
+    fn Sptr(mut self): &Sptr {
         match type self.Kind {
         | &Sptr:
             ret (&Sptr)(self.Kind)
@@ -227,7 +227,7 @@ impl TypeKind {
     }
 
     // Returns pointer type if kind is pointer, nil reference if not.
-    pub fn Ptr(mut self): &Ptr {
+    fn Ptr(mut self): &Ptr {
         match type self.Kind {
         | &Ptr:
             ret (&Ptr)(self.Kind)
@@ -237,7 +237,7 @@ impl TypeKind {
     }
 
     // Returns enum type if kind is enum, nil reference if not.
-    pub fn Enum(mut self): &Enum {
+    fn Enum(mut self): &Enum {
         match type self.Kind {
         | &Enum:
             ret (&Enum)(self.Kind)
@@ -247,7 +247,7 @@ impl TypeKind {
     }
 
     // Returns type enum if kind is type enum, nil reference if not.
-    pub fn TypeEnum(mut self): &TypeEnum {
+    fn TypeEnum(mut self): &TypeEnum {
         match type self.Kind {
         | &TypeEnum:
             ret (&TypeEnum)(self.Kind)
@@ -257,7 +257,7 @@ impl TypeKind {
     }
 
     // Returns array type if kind is array, nil reference if not.
-    pub fn Arr(mut self): &Arr {
+    fn Arr(mut self): &Arr {
         match type self.Kind {
         | &Arr:
             ret (&Arr)(self.Kind)
@@ -267,7 +267,7 @@ impl TypeKind {
     }
 
     // Returns slice type if kind is slice, nil reference if not.
-    pub fn Slc(mut self): &Slc {
+    fn Slc(mut self): &Slc {
         match type self.Kind {
         | &Slc:
             ret (&Slc)(self.Kind)
@@ -277,7 +277,7 @@ impl TypeKind {
     }
 
     // Returns fn type if kind is function, nil reference if not.
-    pub fn Fn(mut self): &FnIns {
+    fn Fn(mut self): &FnIns {
         match type self.Kind {
         | &FnIns:
             ret (&FnIns)(self.Kind)
@@ -287,7 +287,7 @@ impl TypeKind {
     }
 
     // Returns struct type if kind is structure, nil reference if not.
-    pub fn Struct(mut self): &StructIns {
+    fn Struct(mut self): &StructIns {
         match type self.Kind {
         | &StructIns:
             ret (&StructIns)(self.Kind)
@@ -297,7 +297,7 @@ impl TypeKind {
     }
 
     // Returns trait type if kind is trait, nil reference if not.
-    pub fn Trait(mut self): &Trait {
+    fn Trait(mut self): &Trait {
         match type self.Kind {
         | &Trait:
             ret (&Trait)(self.Kind)
@@ -307,7 +307,7 @@ impl TypeKind {
     }
 
     // Returns map type if kind is map, nil reference if not.
-    pub fn Map(mut self): &Map {
+    fn Map(mut self): &Map {
         match type self.Kind {
         | &Map:
             ret (&Map)(self.Kind)
@@ -317,7 +317,7 @@ impl TypeKind {
     }
 
     // Returns tuple type if kind is tuple, nil reference if not.
-    pub fn Tup(mut self): &Tuple {
+    fn Tup(mut self): &Tuple {
         match type self.Kind {
         | &Tuple:
             ret (&Tuple)(self.Kind)
@@ -328,9 +328,9 @@ impl TypeKind {
 }
 
 // Type.
-pub struct TypeSymbol {
-    pub Decl: &TypeDecl // Never changed by semantic analyzer.
-    pub Kind: &TypeKind
+struct TypeSymbol {
+    Decl: &TypeDecl // Never changed by semantic analyzer.
+    Kind: &TypeKind
 }
 
 impl TypeSymbol {
@@ -343,18 +343,18 @@ impl TypeSymbol {
 }
 
 // Primitive type.
-pub struct Prim {
-    pub Kind: str
+struct Prim {
+    Kind: str
 }
 
 impl Kind for Prim {
     // Returns kind.
-    pub fn Str(self): str {
+    fn Str(self): str {
         ret self.Kind
     }
 
     // Reports whether types are same.
-    pub fn Equals(&self, other: &TypeKind): bool {
+    fn Equals(&self, other: &TypeKind): bool {
         let prim = unsafe { (*(&other)).Prim() }
         if prim == nil {
             ret false
@@ -365,7 +365,7 @@ impl Kind for Prim {
 
 impl Prim {
     // Reports whether type is built-in constraint.
-    pub fn IsConstraint(self): bool {
+    fn IsConstraint(self): bool {
         ret !self.IsStr() &&
             !self.IsAny() &&
             !self.IsBool() &&
@@ -373,65 +373,65 @@ impl Prim {
     }
 
     // Reports whether type is primitive i8.
-    pub fn IsI8(self): bool { ret self.Kind == PrimKind.I8 }
+    fn IsI8(self): bool { ret self.Kind == PrimKind.I8 }
 
     // Reports whether type is primitive i16.
-    pub fn IsI16(self): bool { ret self.Kind == PrimKind.I16 }
+    fn IsI16(self): bool { ret self.Kind == PrimKind.I16 }
 
     // Reports whether type is primitive i32.
-    pub fn IsI32(self): bool { ret self.Kind == PrimKind.I32 }
+    fn IsI32(self): bool { ret self.Kind == PrimKind.I32 }
 
     // Reports whether type is primitive i64.
-    pub fn IsI64(self): bool { ret self.Kind == PrimKind.I64 }
+    fn IsI64(self): bool { ret self.Kind == PrimKind.I64 }
 
     // Reports whether type is primitive u8.
-    pub fn IsU8(self): bool { ret self.Kind == PrimKind.U8 }
+    fn IsU8(self): bool { ret self.Kind == PrimKind.U8 }
 
     // Reports whether type is primitive u16.
-    pub fn IsU16(self): bool { ret self.Kind == PrimKind.U16 }
+    fn IsU16(self): bool { ret self.Kind == PrimKind.U16 }
 
     // Reports whether type is primitive u32.
-    pub fn IsU32(self): bool { ret self.Kind == PrimKind.U32 }
+    fn IsU32(self): bool { ret self.Kind == PrimKind.U32 }
 
     // Reports whether type is primitive u64.
-    pub fn IsU64(self): bool { ret self.Kind == PrimKind.U64 }
+    fn IsU64(self): bool { ret self.Kind == PrimKind.U64 }
 
     // Reports whether type is primitive f32.
-    pub fn IsF32(self): bool { ret self.Kind == PrimKind.F32 }
+    fn IsF32(self): bool { ret self.Kind == PrimKind.F32 }
 
     // Reports whether type is primitive f64.
-    pub fn IsF64(self): bool { ret self.Kind == PrimKind.F64 }
+    fn IsF64(self): bool { ret self.Kind == PrimKind.F64 }
 
     // Reports whether type is primitive int.
-    pub fn IsInt(self): bool { ret self.Kind == PrimKind.Int }
+    fn IsInt(self): bool { ret self.Kind == PrimKind.Int }
 
     // Reports whether type is primitive uint.
-    pub fn IsUint(self): bool { ret self.Kind == PrimKind.Uint }
+    fn IsUint(self): bool { ret self.Kind == PrimKind.Uint }
 
     // Reports whether type is primitive uintptr.
-    pub fn IsUintptr(self): bool { ret self.Kind == PrimKind.Uintptr }
+    fn IsUintptr(self): bool { ret self.Kind == PrimKind.Uintptr }
 
     // Reports whether type is primitive bool.
-    pub fn IsBool(self): bool { ret self.Kind == PrimKind.Bool }
+    fn IsBool(self): bool { ret self.Kind == PrimKind.Bool }
 
     // Reports whether type is primitive str.
-    pub fn IsStr(self): bool { ret self.Kind == PrimKind.Str }
+    fn IsStr(self): bool { ret self.Kind == PrimKind.Str }
 
     // Reports whether type is primitive any.
-    pub fn IsAny(self): bool { ret self.Kind == PrimKind.Any }
+    fn IsAny(self): bool { ret self.Kind == PrimKind.Any }
 }
 
 // Smart pointer.
-pub struct Sptr {
-    pub Elem: &TypeKind
+struct Sptr {
+    Elem: &TypeKind
 }
 
 impl Kind for Sptr {
     // Returns smart pointer kind as string.
-    pub fn Str(self): str { ret "&" + self.Elem.Str() }
+    fn Str(self): str { ret "&" + self.Elem.Str() }
 
     // Reports whether types are same.
-    pub fn Equals(&self, other: &TypeKind): bool {
+    fn Equals(&self, other: &TypeKind): bool {
         let sptr = unsafe { (*(&other)).Sptr() }
         if sptr == nil {
             ret false
@@ -441,16 +441,16 @@ impl Kind for Sptr {
 }
 
 // Slice type.
-pub struct Slc {
-    pub Elem: &TypeKind
+struct Slc {
+    Elem: &TypeKind
 }
 
 impl Kind for Slc {
     // Returns slice kind as string.
-    pub fn Str(self): str { ret "[]" + self.Elem.Str() }
+    fn Str(self): str { ret "[]" + self.Elem.Str() }
 
     // Reports whether types are same.
-    pub fn Equals(&self, other: &TypeKind): bool {
+    fn Equals(&self, other: &TypeKind): bool {
         let slc = unsafe { (*(&other)).Slc() }
         if slc == nil {
             ret false
@@ -460,13 +460,13 @@ impl Kind for Slc {
 }
 
 // Tuple type.
-pub struct Tuple {
-    pub Types: []&TypeKind
+struct Tuple {
+    Types: []&TypeKind
 }
 
 impl Kind for Tuple {
     // Returns tuple kind as string.
-    pub fn Str(self): str {
+    fn Str(self): str {
         let mut s = "("
         s += self.Types[0].Str()
         for _, t in self.Types[1:] {
@@ -478,7 +478,7 @@ impl Kind for Tuple {
     }
 
     // Reports whether types are same.
-    pub fn Equals(&self, other: &TypeKind): bool {
+    fn Equals(&self, other: &TypeKind): bool {
         let tup = unsafe { (*(&other)).Tup() }
         if tup == nil {
             ret false
@@ -498,14 +498,14 @@ impl Kind for Tuple {
 }
 
 // Map type.
-pub struct Map {
-    pub Key: &TypeKind
-    pub Val: &TypeKind
+struct Map {
+    Key: &TypeKind
+    Val: &TypeKind
 }
 
 impl Kind for Map {
     // Returns map kind as string.
-    pub fn Str(self): str {
+    fn Str(self): str {
         let mut s = "["
         s += self.Key.Str()
         s += ":"
@@ -515,7 +515,7 @@ impl Kind for Map {
     }
 
     // Reports whether types are same.
-    pub fn Equals(&self, other: &TypeKind): bool {
+    fn Equals(&self, other: &TypeKind): bool {
         let map = unsafe { (*(&other)).Map() }
         if map == nil {
             ret false
@@ -525,15 +525,15 @@ impl Kind for Map {
 }
 
 // Array type.
-pub struct Arr {
-    pub Auto: bool      // Auto-sized array.
-    pub N:    int
-    pub Elem: &TypeKind
+struct Arr {
+    Auto: bool      // Auto-sized array.
+    N:    int
+    Elem: &TypeKind
 }
 
 impl Kind for Arr {
     // Returns array kind as string.
-    pub fn Str(self): str {
+    fn Str(self): str {
         let mut s = "["
         s += conv::Itoa(self.N)
         s += "]"
@@ -542,7 +542,7 @@ impl Kind for Arr {
     }
 
     // Reports whether types are same.
-    pub fn Equals(&self, other: &TypeKind): bool {
+    fn Equals(&self, other: &TypeKind): bool {
         let arr = unsafe { (*(&other)).Arr() }
         if arr == nil {
             ret false
@@ -552,13 +552,13 @@ impl Kind for Arr {
 }
 
 // Pointer type.
-pub struct Ptr {
-    pub Elem: &TypeKind
+struct Ptr {
+    Elem: &TypeKind
 }
 
 impl Kind for Ptr {
     // Returns pointer kind as string.
-    pub fn Str(self): str {
+    fn Str(self): str {
         if self.IsUnsafe() {
             ret "*unsafe"
         }
@@ -566,7 +566,7 @@ impl Kind for Ptr {
     }
 
     // Reports whether types are same.
-    pub fn Equals(&self, other: &TypeKind): bool {
+    fn Equals(&self, other: &TypeKind): bool {
         let ptr = unsafe { (*(&other)).Ptr() }
         if ptr == nil {
             ret false
@@ -577,7 +577,7 @@ impl Kind for Ptr {
 
 impl Ptr {
     // Reports whether pointer is unsafe pointer (*unsafe).
-    pub fn IsUnsafe(self): bool { ret self.Elem == nil }
+    fn IsUnsafe(self): bool { ret self.Elem == nil }
 }
 
 struct referencer {

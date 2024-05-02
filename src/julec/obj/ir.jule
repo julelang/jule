@@ -8,13 +8,13 @@ use std::jule::importer::{JuleImporter, CompileInfo, Compiler, CppStd}
 use sema for std::jule::sema
 
 // Intermediate representation of code for compiler.
-pub struct IR {
+struct IR {
     // Directory of root package.
-    pub Root:    str
-    pub Passes:  []str
-    pub Main:    &sema::Package
-    pub Used:    []&sema::ImportInfo
-    pub Ordered: OrderedDefines
+    Root:    str
+    Passes:  []str
+    Main:    &sema::Package
+    Used:    []&sema::ImportInfo
+    Ordered: OrderedDefines
 }
 
 impl IR {
@@ -24,7 +24,7 @@ impl IR {
     // - Returns nil reference and nil logs if path has not any Jule file.
     // - Returns nil reference and logs if exist any log.
     // - Returns IR and nil logs if everything is fine.
-    pub static fn Build(path: str, flags: sema::SemaFlag): (&IR, []Log) {
+    static fn Build(path: str, flags: sema::SemaFlag): (&IR, []Log) {
         let mut importer = JuleImporter.New(buildCompileInfo())
         let (mut files, mut logs) = importer.ImportPackage(path, true)
         if logs.len > 0 {
@@ -65,7 +65,7 @@ impl IR {
 
     // Returns all structures of main package and used pakcages.
     // Ignores cpp-linked declarations.
-    pub fn GetAllStructures(mut self): []&sema::Struct {
+    fn GetAllStructures(mut self): []&sema::Struct {
         let mut buffer: []&sema::Struct = nil
         self.appendStructs(self.Main, buffer)
         for (_, mut u) in self.Used {
@@ -88,7 +88,7 @@ impl IR {
 
     // Returns all globals of main package and used pakcages.
     // Ignores cpp-linked declarations and constants.
-    pub fn GetAllGlobals(mut self): []&sema::Var {
+    fn GetAllGlobals(mut self): []&sema::Var {
         let mut buffer: []&sema::Var = nil
         self.appendGlobals(self.Main, buffer)
         for (_, mut u) in self.Used {
@@ -100,7 +100,7 @@ impl IR {
     }
 
     // Order defines at update ordered field of instance.
-    pub fn Order(mut self) {
+    fn Order(mut self) {
         self.Ordered.Structs = self.GetAllStructures()
         self.Ordered.Globals = self.GetAllGlobals()
         defineOrderer.orderStructures(self.Ordered.Structs)

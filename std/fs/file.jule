@@ -6,7 +6,7 @@ use integrated for std::jule::integrated
 use sys for std::sys
 
 // Seek whence values.
-pub enum Seek: int {
+enum Seek: int {
     Set: 0, // Seek relative to the origin of the file
     Cur: 1, // Seek relative to the current offset
     End: 2, // Seek relative to the end
@@ -15,7 +15,7 @@ pub enum Seek: int {
 // Flags to open wrapping those of the underlying system.
 // Not all flags may be implemented on a given system.
 // Exactly one of Rdonly, Wronly, or Rdwr must be specified.
-pub enum OFlag: int {
+enum OFlag: int {
     Rdonly: sys::O_RDONLY, // Open the file read-only
     Wronly: sys::O_WRONLY, // Open the file write-only
     Rdwr: sys::O_RDWR,     // Open the file read-write
@@ -36,13 +36,13 @@ pub enum OFlag: int {
 // There may be system call differences and performance differences
 // for console handlers depending on the operating system.
 // For example, Windows has an overhead for UTF-16 processing.
-pub struct File {
+struct File {
     handle: uintptr
 }
 
 impl File {
     // Returns new &File by handle.
-    pub static fn New(handle: uintptr): &File {
+    static fn New(handle: uintptr): &File {
         ret &File{
             handle: handle,
         }
@@ -52,7 +52,7 @@ impl File {
     // it is truncated. If the file does not exist, it is created with mode 0666
     // (before umask). If successful, methods on the returned File can
     // be used for I/O; the associated file descriptor has mode OFlag.Rdwr.
-    pub static fn Create(path: str)!: &File {
+    static fn Create(path: str)!: &File {
         ret File.Open(path, OFlag.Rdwr | OFlag.Create | OFlag.Trunc, 0666) else { error(error) }
     }
 
@@ -64,7 +64,7 @@ impl File {
     //  Denied Exist Signal SyncIO IO IsDir Loop PerProcessLimit LongPath
     //  SystemWideLimit NotExist UnableStream NoSpace NotDir Device Overflow
     //  ReadOnly Retry Busy Device Seek InsufficientMemory Buffer
-    pub static fn Read(path: str)!: []byte {
+    static fn Read(path: str)!: []byte {
         let s = Status.Of(path) else { error(error) }
 
         if !s.IsReg() {
@@ -88,7 +88,7 @@ impl File {
     // otherwise truncates it before writing, without changing permissions.
     // Since requires multiple system calls to complete, a failure mid-operation
     // can leave the file in a partially written state.
-    pub static fn Write(path: str, data: []byte, perm: int)! {
+    static fn Write(path: str, data: []byte, perm: int)! {
         let mut f = File.Open(path, OFlag.Wronly | OFlag.Create | OFlag.Trunc, perm) else { error(error) }
         f.Write(data) else { error(error) }
         f.Close() else { error(error) }
@@ -102,7 +102,7 @@ impl File {
     //
     // Possible errors:
     //  InvalidDescriptor SyncIO Overflow Seek
-    pub fn Seek(mut self, offset: int, origin: Seek)!: int {
+    fn Seek(mut self, offset: int, origin: Seek)!: int {
         let pos = sys::Seek(int(self.handle), offset, int(origin))
         if pos == -1 {
             error(getLastFsError())
@@ -114,7 +114,7 @@ impl File {
     //
     // Possible errors:
     //  InvalidDescriptor Signal IO
-    pub fn Close(mut self)! {
+    fn Close(mut self)! {
         if sys::Close(int(self.handle)) == -1 {
             error(getLastFsError())
         }

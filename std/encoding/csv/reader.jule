@@ -103,12 +103,12 @@ struct position {
 // The Reader converts all \r\n sequences in its input to plain \n,
 // including in multiline field values, so that the returned data does
 // not depend on which line-ending convention an input file uses.
-pub struct Reader {
+struct Reader {
     // The field delimiter.
     // It is set to comma (',') by NewReader.
     // Comma must be a valid rune and must not be \r, \n,
     // or the Unicode replacement character (0xFFFD).
-    pub Comma: rune
+    Comma: rune
 
     // Comment, if not 0, is the comment character. Lines beginning with the
     // Comment character without preceding whitespace are ignored.
@@ -117,7 +117,7 @@ pub struct Reader {
     // Comment must be a valid rune and must not be \r, \n,
     // or the Unicode replacement character (0xFFFD).
     // It must also not be equal to comma.
-    pub Comment: rune
+    Comment: rune
 
     // The number of expected fields per record.
     // If fields_per_record is positive, read requires each record to
@@ -125,20 +125,20 @@ pub struct Reader {
     // the number of fields in the first record, so that future records must
     // have the same field count. If fields_per_record is negative, no check is
     // made and records may have a variable number of fields.
-    pub FieldsPerRecord: int
+    FieldsPerRecord: int
 
     // If it is true, a quote may appear in an unquoted field and a
     // non-doubled quote may appear in a quoted field.
-    pub LazyQuotes: bool
+    LazyQuotes: bool
 
     // If it is true, leading white space in a field is ignored.
     // This is done even if the field delimiter, comma, is white space.
-    pub TrimLeadingSpace: bool
+    TrimLeadingSpace: bool
 
     // Controls whether calls to read may return a slice sharing
     // the backing array of the previous call's returned slice for performance.
     // By default, each call to read returns newly allocated memory owned by the caller.
-    pub ReuseRecord: bool
+    ReuseRecord: bool
 
     s: &io::Scanner
 
@@ -171,7 +171,7 @@ pub struct Reader {
 
 impl Reader {
     // Returns new Reader instance that reads r.
-    pub static fn New(mut r: io::Reader): &Reader {
+    static fn New(mut r: io::Reader): &Reader {
         ret &Reader{
             Comma: ',',
             s: io::Scanner.New(r),
@@ -181,7 +181,7 @@ impl Reader {
     // Returns the input stream byte offset of the current reader
     // position. The offset gives the location of the end of the most recently
     // read row and the beginning of the next row.
-    pub fn InputOffset(self): int {
+    fn InputOffset(self): int {
         ret self.offset
     }
 
@@ -192,7 +192,7 @@ impl Reader {
     // If [self.ReuseRecord] is true, the returned slice may be shared
     // between multiple calls to read.
     // Exception can be CsvError or ParseError, and forwards reader's exceptions.
-    pub fn Read(mut self)!: (record: []str) {
+    fn Read(mut self)!: (record: []str) {
         if self.ReuseRecord {
             record = self.readRecord(self.lastRecord) else { error(error) }
             self.lastRecord = record
@@ -208,7 +208,7 @@ impl Reader {
     // columns are counted in bytes, not runes.
     //
     // If this is called with an out-of-bounds index, it panics.
-    pub fn FieldPos(self, field: int): (line: int, column: int) {
+    fn FieldPos(self, field: int): (line: int, column: int) {
         if field < 0 || field >= self.fieldPositions.len {
             panic("std::encoding::csv: Reader: out of range index passed to field_pos")
         }
@@ -221,7 +221,7 @@ impl Reader {
     // Reads all the remaining records from r.
     // Each record is a slice of fields.
     // Exception can be CsvError or ParseError, and forwards reader errors.
-    pub fn ReadAll(mut self)!: (records: [][]str) {
+    fn ReadAll(mut self)!: (records: [][]str) {
         for {
             let mut record = self.readRecord(nil) else { error(error) }
             if record.len == 0 {

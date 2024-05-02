@@ -38,19 +38,19 @@
 use io for std::io
 
 // Returns the maximum length of an encoding of n source bytes.
-pub fn MaxEncodedLen(n: int): int {
+fn MaxEncodedLen(n: int): int {
     ret (n + 3) / 4 * 5
 }
 
 // Returns new Ascii85 encoder for stream.
 // Encoder forwards any exception.
-pub fn NewEncoder(mut w: io::Writer): io::WriterCloser {
+fn NewEncoder(mut w: io::Writer): io::WriterCloser {
     ret encoder.new(w)
 }
 
 // Returns new Ascii85 decoder for stream.
 // Decoder forwards any exception.
-pub fn NewDecoder(mut r: io::Reader): io::Reader {
+fn NewDecoder(mut r: io::Reader): io::Reader {
     ret decoder.new(r)
 }
 
@@ -63,7 +63,7 @@ pub fn NewDecoder(mut r: io::Reader): io::Reader {
 //
 // Often, ascii85-encoded data is wrapped in <~ and ~> symbols.
 // The encode does not add these.
-pub fn Encode(mut dest: []byte, src: []byte): int {
+fn Encode(mut dest: []byte, src: []byte): int {
     if src.len == 0 {
         ret 0
     }
@@ -136,7 +136,7 @@ pub fn Encode(mut dest: []byte, src: []byte): int {
 // than wait for the completion of another 32-bit block.
 //
 // new_decoder wraps an std::io::Reader trait around decode.
-pub fn Decode(mut dest: []byte, src: []byte, flush: bool)!: (ndst: int, nsrc: int) {
+fn Decode(mut dest: []byte, src: []byte, flush: bool)!: (ndst: int, nsrc: int) {
     let mut v = u32(0)
     let mut nb = 0
     for i, b in src {
@@ -202,7 +202,7 @@ struct encoder {
 }
 
 impl io::WriterCloser for encoder {
-    pub fn Write(mut self, dest: []byte)!: (n: int) {
+    fn Write(mut self, dest: []byte)!: (n: int) {
         // Leading fringe.
         if self.nbuf > 0 {
             let mut i = 0
@@ -244,7 +244,7 @@ impl io::WriterCloser for encoder {
 
     // Close flushes any pending output from the encoder.
     // It is an error to call write after calling close.
-    pub fn Close(mut self)! {
+    fn Close(mut self)! {
         // If there's anything left in the buffer, flush it out.
         if self.nbuf > 0 {
             let nout = Encode(self.out, self.buf[:self.nbuf])
@@ -273,7 +273,7 @@ struct decoder {
 }
 
 impl io::Reader for decoder {
-    pub fn Read(mut self, mut p: []byte)!: (n: int) {
+    fn Read(mut self, mut p: []byte)!: (n: int) {
         if p.len == 0 {
             ret 0
         }

@@ -8,7 +8,7 @@ use utf8 for std::unicode::utf8
 use strings for std::strings
 
 // Punctuations.
-pub static Puncts: [...]rune = [
+static Puncts: [...]rune = [
     '!',
     '#',
     '$',
@@ -45,7 +45,7 @@ pub static Puncts: [...]rune = [
 ]
 
 // Space characters.
-pub static Spaces: [...]rune = [
+static Spaces: [...]rune = [
     ' ',
     '\t',
     '\v',
@@ -54,7 +54,7 @@ pub static Spaces: [...]rune = [
 ]
 
 // Kind list of unary operators.
-pub static UnaryOps: [...]TokenKind = [
+static UnaryOps: [...]TokenKind = [
     TokenKind.Minus,
     TokenKind.Plus,
     TokenKind.Caret,
@@ -64,7 +64,7 @@ pub static UnaryOps: [...]TokenKind = [
 ]
 
 // Kind list of binary operators.
-pub static BinOps: [...]TokenKind = [
+static BinOps: [...]TokenKind = [
     TokenKind.Plus,
     TokenKind.Minus,
     TokenKind.Star,
@@ -81,19 +81,19 @@ pub static BinOps: [...]TokenKind = [
 
 // Kind list of weak operators.
 // These operators are weak, can used as part of expression.
-pub static WeakOps: [...]TokenKind = [
+static WeakOps: [...]TokenKind = [
     TokenKind.TripleDot,
     TokenKind.Colon,
 ]
 
 // List of postfix operators.
-pub static PostfixOps: [...]TokenKind = [
+static PostfixOps: [...]TokenKind = [
     TokenKind.DblPlus,
     TokenKind.DblMinus,
 ]
 
 // List of assign operators.
-pub static AssignOps: [...]TokenKind = [
+static AssignOps: [...]TokenKind = [
     TokenKind.Eq,
     TokenKind.PlusEq,
     TokenKind.MinusEq,
@@ -108,13 +108,13 @@ pub static AssignOps: [...]TokenKind = [
 ]
 
 // Special identifiers.
-pub enum Ident: str {
+enum Ident: str {
     Ignore: "_",         // Ignore
     Anon: "<anonymous>", // Anonymous
 }
 
 // Token identities.
-pub enum TokenId: uint {
+enum TokenId: uint {
     Na,
     Prim,
     Ident,
@@ -136,7 +136,6 @@ pub enum TokenId: uint {
     Comment,
     Use,
     Dot,
-    Pub,
     Goto,
     DblColon,
     Enum,
@@ -159,7 +158,7 @@ pub enum TokenId: uint {
 }
 
 // Token kinds.
-pub enum TokenKind: str {
+enum TokenKind: str {
     DblColon: "::",
     Colon: ":",
     Semicolon: ";",
@@ -237,7 +236,6 @@ pub enum TokenKind: str {
     If: "if",
     Else: "else",
     Use: "use",
-    Pub: "pub",
     Goto: "goto",
     Enum: "enum",
     Struct: "struct",
@@ -258,12 +256,12 @@ pub enum TokenKind: str {
 }
 
 // Token is lexer token.
-pub struct Token {
-    pub File:   &File
-    pub Row:    int
-    pub Column: int
-    pub Kind:   str
-    pub Id:     TokenId
+struct Token {
+    File:   &File
+    Row:    int
+    Column: int
+    Kind:   str
+    Id:     TokenId
 }
 
 impl Token {
@@ -273,7 +271,7 @@ impl Token {
     //
     // Accepts assignment tokens (like equals [=]) as precedenced operator
     // to handle expression assignments.
-    pub fn Prec(self): byte {
+    fn Prec(self): byte {
         if self.Id != TokenId.Op {
             ret 0
         }
@@ -309,7 +307,7 @@ impl Token {
 }
 
 // Reports whether kind is unary operator.
-pub fn IsUnaryOp(kind: str): bool {
+fn IsUnaryOp(kind: str): bool {
     for _, op in UnaryOps {
         if kind == op {
             ret true
@@ -319,7 +317,7 @@ pub fn IsUnaryOp(kind: str): bool {
 }
 
 // Reports whether kind is binary operator.
-pub fn IsBinOp(kind: str): bool {
+fn IsBinOp(kind: str): bool {
     for _, op in BinOps {
         if kind == op {
             ret true
@@ -329,7 +327,7 @@ pub fn IsBinOp(kind: str): bool {
 }
 
 // Reports whether kind is weak operator.
-pub fn IsWeakOp(kind: str): bool {
+fn IsWeakOp(kind: str): bool {
     for _, op in WeakOps {
         if kind == op {
             ret true
@@ -339,23 +337,23 @@ pub fn IsWeakOp(kind: str): bool {
 }
 
 // Reports whether kind is string literal.
-pub fn IsStr(k: str): bool { ret k != "" && (k[0] == '"' || IsRawStr(k)) }
+fn IsStr(k: str): bool { ret k != "" && (k[0] == '"' || IsRawStr(k)) }
 
 // Reports whether kind is raw string literal.
-pub fn IsRawStr(k: str): bool { ret k != "" && k[0] == '`' }
+fn IsRawStr(k: str): bool { ret k != "" && k[0] == '`' }
 
 // Reports whether kind is rune literal.
 // Literal value can be byte or rune.
-pub fn IsRune(k: str): bool { ret k != "" && k[0] == '\'' }
+fn IsRune(k: str): bool { ret k != "" && k[0] == '\'' }
 
 // Reports whether kind is nil literal.
-pub fn IsNil(k: str): bool { ret k == TokenKind.Nil }
+fn IsNil(k: str): bool { ret k == TokenKind.Nil }
 
 // Reports whether kind is boolean literal.
-pub fn IsBool(k: str): bool { ret k == TokenKind.True || k == TokenKind.False }
+fn IsBool(k: str): bool { ret k == TokenKind.True || k == TokenKind.False }
 
 // Reports whether kind is float.
-pub fn IsFloat(k: str): bool {
+fn IsFloat(k: str): bool {
     if strings::HasPrefix(k, "0x") {
         ret strings::ContainsAny(k, ".pP")
     }
@@ -363,7 +361,7 @@ pub fn IsFloat(k: str): bool {
 }
 
 // Reports whether kind is numeric.
-pub fn IsNum(k: str): bool {
+fn IsNum(k: str): bool {
     if k == "" {
         ret false
     }
@@ -373,18 +371,18 @@ pub fn IsNum(k: str): bool {
 }
 
 // Reports whether kind is literal.
-pub fn IsLit(k: str): bool {
+fn IsLit(k: str): bool {
     ret IsNum(k) || IsStr(k) || IsRune(k) || IsNil(k) || IsBool(k)
 }
 
 // Reports whether identifier is ignore.
-pub fn IsIgnoreIdent(ident: str): bool { ret ident == Ident.Ignore }
+fn IsIgnoreIdent(ident: str): bool { ret ident == Ident.Ignore }
 
 // Reports whether identifier is anonymous.
-pub fn IsAnonIdent(ident: str): bool { ret ident == Ident.Anon }
+fn IsAnonIdent(ident: str): bool { ret ident == Ident.Anon }
 
 // Reports whether rune is punctuation.
-pub fn IsPunct(r: rune): bool {
+fn IsPunct(r: rune): bool {
     for _, cr in Puncts {
         if r == cr {
             ret true
@@ -394,7 +392,7 @@ pub fn IsPunct(r: rune): bool {
 }
 
 // Reports wheter byte is whitespace.
-pub fn IsSpace(r: rune): bool {
+fn IsSpace(r: rune): bool {
     for _, cr in Spaces {
         if r == cr {
             ret true
@@ -404,13 +402,13 @@ pub fn IsSpace(r: rune): bool {
 }
 
 // Reports whether rune is letter.
-pub fn IsLetter(r: rune): bool {
+fn IsLetter(r: rune): bool {
     ret unicode::IsLetter(r)
 }
 
 // Reports whether firs rune of string is allowed
 // to first rune for identifier.
-pub fn IsIdentRune(s: str): bool {
+fn IsIdentRune(s: str): bool {
     if s == "" {
         ret false
     }
@@ -424,16 +422,16 @@ pub fn IsIdentRune(s: str): bool {
 }
 
 // Reports whether byte is decimal sequence.
-pub fn IsDecimal(b: byte): bool { ret '0' <= b && b <= '9' }
+fn IsDecimal(b: byte): bool { ret '0' <= b && b <= '9' }
 
 // Reports whether byte is binary sequence.
-pub fn IsBinary(b: byte): bool { ret b == '0' || b == '1' }
+fn IsBinary(b: byte): bool { ret b == '0' || b == '1' }
 
 // Reports whether byte is octal sequence.
-pub fn IsOctal(b: byte): bool { ret '0' <= b && b <= '7' }
+fn IsOctal(b: byte): bool { ret '0' <= b && b <= '7' }
 
 // Reports whether byte is hexadecimal sequence.
-pub fn IsHex(b: byte): bool {
+fn IsHex(b: byte): bool {
     match {
     | '0' <= b && b <= '9':
         ret true
@@ -448,7 +446,7 @@ pub fn IsHex(b: byte): bool {
 
 // Reports given token id is allow for
 // assignment left-expression or not.
-pub fn IsAssign(id: TokenId): bool {
+fn IsAssign(id: TokenId): bool {
     ret (id == TokenId.Ident ||
         id == TokenId.Cpp ||
         id == TokenId.Let ||
@@ -459,7 +457,7 @@ pub fn IsAssign(id: TokenId): bool {
 }
 
 // Reports whether operator kind is postfix operator.
-pub fn IsPostfixOp(kind: str): bool {
+fn IsPostfixOp(kind: str): bool {
     for _, op in PostfixOps {
         if kind == op {
             ret true
@@ -469,7 +467,7 @@ pub fn IsPostfixOp(kind: str): bool {
 }
 
 // Reports whether operator kind is assignment operator.
-pub fn IsAssignOp(kind: str): bool {
+fn IsAssignOp(kind: str): bool {
     if IsPostfixOp(kind) {
         ret true
     }

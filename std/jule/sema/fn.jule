@@ -7,19 +7,19 @@ use std::jule::build::{EntryPoint, InitFn}
 use std::jule::lex::{Token, IsAnonIdent}
 
 // Return type.
-pub struct RetType {
-    pub Kind:   &TypeSymbol
-    pub Idents: []&Token
+struct RetType {
+    Kind:   &TypeSymbol
+    Idents: []&Token
 }
 
 // Parameter.
-pub struct Param {
-    pub Token:     &Token
-    pub Mutable:   bool
-    pub Variadic:  bool
-    pub Reference: bool
-    pub Kind:      &TypeSymbol
-    pub Ident:     str
+struct Param {
+    Token:     &Token
+    Mutable:   bool
+    Variadic:  bool
+    Reference: bool
+    Kind:      &TypeSymbol
+    Ident:     str
 }
 
 impl Param {
@@ -30,68 +30,68 @@ impl Param {
     }
 
     // Reports whether parameter is self (receiver) parameter.
-    pub fn IsSelf(self): bool {
+    fn IsSelf(self): bool {
         ret self.Ident == "&self" || self.Ident == "self"
     }
 
     // Reports whether self (receiver) parameter is reference.
-    pub fn IsRef(self): bool {
+    fn IsRef(self): bool {
         ret self.Ident != "" && self.Ident[0] == '&'
     }
 }
 
 // Function.
-pub struct Fn {
+struct Fn {
     sema: &Sema
 
-    pub Token:       &Token
-    pub Global:      bool
-    pub Unsafety:    bool
-    pub Public:      bool
-    pub CppLinked:   bool
-    pub Statically:  bool
-    pub Exceptional: bool
-    pub Ident:       str
-    pub Directives:  []&Directive
-    pub Scope:       &ScopeTree
-    pub Generics:    []&GenericDecl
-    pub Result:      &RetType
-    pub Params:      []&Param
-    pub Owner:       &Struct
+    Token:       &Token
+    Global:      bool
+    Unsafety:    bool
+    Public:      bool
+    CppLinked:   bool
+    Statically:  bool
+    Exceptional: bool
+    Ident:       str
+    Directives:  []&Directive
+    Scope:       &ScopeTree
+    Generics:    []&GenericDecl
+    Result:      &RetType
+    Params:      []&Param
+    Owner:       &Struct
 
     // Function instances for each unique type combination of function call.
     // Nil if function is never used.
-    pub Instances: []&FnIns
+    Instances: []&FnIns
 }
 
 impl Fn {
     // Reports whether return type is void.
-    pub fn IsVoid(self): bool {
+    fn IsVoid(self): bool {
         ret self.Result == nil
     }
 
     // Reports whether function is method.
-    pub fn IsMethod(self): bool {
+    fn IsMethod(self): bool {
         ret self.Owner != nil
     }
 
     // Reports whether function is entry point.
-    pub fn IsEntryPoint(self): bool {
+    fn IsEntryPoint(self): bool {
         ret self.Ident == EntryPoint
     }
 
     // Reports whether function is initializer function.
-    pub fn IsInit(self): bool {
+    fn IsInit(self): bool {
         ret self.Ident == InitFn
     }
 
     // Reports whether function is anonymous function.
-    pub fn IsAnon(self): bool {
+    fn IsAnon(self): bool {
         ret IsAnonIdent(self.Ident)
     }
 
     // Reports whether function has return variable(s).
-    pub fn AnyVar(self): bool {
+    fn AnyVar(self): bool {
         ret self.Result != nil && self.Result.Idents.len > 0
     }
 
@@ -154,9 +154,9 @@ impl Fn {
 }
 
 // Parameter instance.
-pub struct ParamIns {
-    pub Decl: &Param
-    pub Kind: &TypeKind
+struct ParamIns {
+    Decl: &Param
+    Kind: &TypeKind
 }
 
 impl ParamIns {
@@ -191,15 +191,15 @@ impl ParamIns {
 }
 
 // Function instance.
-pub struct FnIns {
-    pub Owner:    &StructIns
-    pub Decl:     &Fn
-    pub Generics: []&InsGeneric
-    pub Params:   []&ParamIns
-    pub Result:   &TypeKind
-    pub Scope:    &Scope
-    pub Refers:   &ReferenceStack
-    pub Anon:     bool
+struct FnIns {
+    Owner:    &StructIns
+    Decl:     &Fn
+    Generics: []&InsGeneric
+    Params:   []&ParamIns
+    Result:   &TypeKind
+    Scope:    &Scope
+    Refers:   &ReferenceStack
+    Anon:     bool
 
     caller:   builtinCaller
     reloaded: bool
@@ -208,13 +208,13 @@ pub struct FnIns {
 impl Kind for FnIns {
     // Implement: Kind
     // Returns Fn's type kind as string.
-    pub fn Str(self): str {
+    fn Str(self): str {
         const Ident = false
         ret self.GetKindStr(Ident)
     }
 
     // Reports whether types are same.
-    pub fn Equals(&self, other: &TypeKind): bool {
+    fn Equals(&self, other: &TypeKind): bool {
         let f = unsafe { (*(&other)).Fn() }
         if f == nil {
             ret false
@@ -225,7 +225,7 @@ impl Kind for FnIns {
 
 impl FnIns {
     // Reports whether functions are equals.
-    pub fn EqualsFn(&self, &f: &FnIns): bool {
+    fn EqualsFn(&self, &f: &FnIns): bool {
         if self.Decl.Exceptional != f.Decl.Exceptional {
             ret false
         }
@@ -297,7 +297,7 @@ impl FnIns {
     // Returns all types of result.
     // Returns nil if result is nil.
     // Returns mutable slice if returns internal slice.
-    pub fn Types(mut self): []&TypeKind {
+    fn Types(mut self): []&TypeKind {
         match {
         | self.Result == nil:
             ret nil
@@ -309,19 +309,19 @@ impl FnIns {
     }
 
     // Reports whether instance is built-in.
-    pub fn IsBuiltin(self): bool {
+    fn IsBuiltin(self): bool {
         ret self.caller != nil
     }
 
     // Reports whether instance is anonymous function.
-    pub fn IsAnon(self): bool {
+    fn IsAnon(self): bool {
         ret self.Anon ||
             self.Decl != nil && self.Decl.IsAnon()
     }
 
     // Reports whether instances are same.
     // Returns true if declarations and generics are same.
-    pub fn Same(self, f: &FnIns): bool {
+    fn Same(self, f: &FnIns): bool {
         if self.Decl != f.Decl || f.Generics.len != self.Generics.len {
             ret false
         }
@@ -337,7 +337,7 @@ impl FnIns {
     // Returns kind string of function instance.
     // Appends identifier to kind of this instance.
     // Does not appends identifier of this instance to kind if self.Decl is nil reference.
-    pub fn GetKindStr(self, ident: bool): str {
+    fn GetKindStr(self, ident: bool): str {
         let mut s = ""
 
         if self.Decl.Unsafety {

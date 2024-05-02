@@ -13,21 +13,21 @@ use std::sync::atomic::{MemoryOrder, AtomicU32}
 //
 // in each parallel job:
 // `wg.done()` when finished
-pub struct WaitGroup {
+struct WaitGroup {
     taskN: AtomicU32 // current task count - reading/writing should be atomic
     waitN: AtomicU32 // current wait count - reading/writing should be atomic
 }
 
 impl WaitGroup {
     // Returns new WaitGroup instance.
-    pub static fn New(): &WaitGroup {
+    static fn New(): &WaitGroup {
         ret new(WaitGroup)
     }
 
     // Increments (+delta) or decrements (-delta) task count by delta
     // and unblocks any wait() calls if task count becomes zero.
     // Panics if task count reaches below zero.
-    pub fn Add(mut self, delta: int) {
+    fn Add(mut self, delta: int) {
         let oldTask = int(self.taskN.Add(u32(delta), MemoryOrder.Relaxed))
         let nTask = oldTask + delta
         if nTask < 0 {
@@ -54,10 +54,10 @@ impl WaitGroup {
     }
 
     // Decrements the WaitGroup counter by one.
-    pub fn Done(mut self) { self.Add(-1) }
+    fn Done(mut self) { self.Add(-1) }
 
     // Blocks until all tasks are done (task count becomes zero)
-    pub fn Wait(mut self) {
+    fn Wait(mut self) {
         let nTask = self.taskN.Load(MemoryOrder.Relaxed)
         if nTask == 0 {
             // No task, no need to wait.
