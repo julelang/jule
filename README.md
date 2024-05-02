@@ -26,7 +26,7 @@ Some commits may not be fully honored due to some compiler/API errors.
 Please report it with the [Jule Issue Tracker](https://github.com/julelang/jule/issues) if you come across something like this.
 You can also [join the Discord community](https://discord.gg/XNSUUDuGGQ) to discuss, helping, and ask more questions about Jule with the community.
 
-![image](https://github.com/julelang/jule/assets/54983926/320b4930-7aa8-47c0-bc71-82e2da408014)
+![image](https://github.com/julelang/jule/assets/54983926/c2075b04-c077-4933-a6ba-4100c717cf7d)
 
 ## The Mission
 
