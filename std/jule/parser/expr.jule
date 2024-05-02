@@ -36,159 +36,6 @@ use std::jule::lex::{
     IsUnaryOp,
 }
 
-// Returns expression tokens comes before block if exist, nil if not.
-fn getBlockExpr(mut &tokens: []&Token): []&Token {
-    let mut braceN = 0
-    let mut skipToNextBraceClose = 0
-    for i, tok in tokens {
-        match tok.Id {
-        | TokenId.If | TokenId.Else | TokenId.Unsafe:
-            skipToNextBraceClose++
-        | TokenId.Range:
-            match tok.Kind {
-            | TokenKind.LBrace:
-                if braceN > 0 || skipToNextBraceClose > 0 {
-                    if skipToNextBraceClose > 0 {
-                        skipToNextBraceClose--
-                    }
-                    braceN++
-                    break
-                }
-                ret tokens[:i]
-            | TokenKind.LBracket
-            | TokenKind.LParent:
-                braceN++
-            |:
-                braceN--
-            }
-        }
-    }
-    ret nil
-}
-
-// Returns delimiter index, left range and right range tokens.
-// Returns nil slice and -1 if not found.
-fn splitDelim(mut &tokens: []&Token, delim: TokenId): ([]&Token, []&Token) {
-    let mut rangeN = 0
-    for i, token in tokens {
-        match token.Id {
-        | TokenId.Range:
-            match token.Kind {
-            | TokenKind.LBrace
-            | TokenKind.LBracket
-            | TokenKind.LParent:
-                rangeN++
-                continue
-            |:
-                rangeN--
-            }
-        | delim:
-            if rangeN == 0 {
-                let mut l = tokens[:i]
-                let mut r = tokens[i+1:]
-                ret l, r
-            }
-        }
-    }
-    ret nil, nil
-}
-
-// Finds index of priority operator and returns index of operator
-// if found, returns -1 if not.
-fn findLowestPrecOp(&tokens: []&Token): int {
-    // Set to 255, there is nothing for precedence 255.
-    // It's provides optimization, avoid prec != -1 (if not setted) checking.
-    // Always greater than actual precedences.
-    // So, It's will initialized by first precedence without any checking that if not setted.
-    let mut prec: byte = 255
-    let mut precPos = -1
-
-    let mut braceN = 0
-    let mut skipToNextBraceOpen = false
-    for i, token in tokens {
-        match {
-        | token.Id == TokenId.Range:
-            match token.Kind {
-            | TokenKind.LBrace:
-                skipToNextBraceOpen = false
-                fall
-            | TokenKind.LParent
-            | TokenKind.LBracket:
-                braceN++
-            |:
-                braceN--
-            }
-            continue
-        | skipToNextBraceOpen:
-            continue
-        | token.Id == TokenId.If:
-            skipToNextBraceOpen = true
-            continue
-        | i == 0:
-            continue
-        | token.Id != TokenId.Op:
-            continue
-        | braceN > 0:
-            continue
-        }
-
-        let left = tokens[i-1]
-
-        // Skip unary operator or type annotation.
-        if left.Id == TokenId.Op || left.Id == TokenId.Colon {
-            continue
-        }
-
-        if i > 1 && left.Id == TokenId.Range && left.Kind == TokenKind.RBracket {
-            let lleft = tokens[i-2]
-            if lleft.Id == TokenId.Range && lleft.Kind == TokenKind.LBracket {
-                // Skip potential type annotations.
-                if token.Kind == TokenKind.Amper || token.Kind == TokenKind.Star {
-                    continue
-                }
-            }
-        }
-
-        let p = token.Prec()
-        if p != 0 && p <= prec {
-            prec = p
-            precPos = i
-        }
-    }
-    ret precPos
-}
-
-fn buildIdentExpr(mut &token: &Token): &IdentExpr {
-    ret &IdentExpr{
-        Token: token,
-        Ident: token.Kind,
-        CppLinked: false,
-    }
-}
-
-fn getRangeExprTokens(mut &tokens: []&Token): ([]&Token, int) {
-    let mut rangeN = 0
-    let mut i = tokens.len - 1
-    for i >= 0; i-- {
-        let tok = tokens[i]
-        if tok.Id == TokenId.Range {
-            match tok.Kind {
-            | TokenKind.RBrace
-            | TokenKind.RBracket
-            | TokenKind.RParent:
-                rangeN++
-            |:
-                rangeN--
-            }
-        }
-
-        if rangeN == 0 {
-            ret tokens[:i], rangeN
-        }
-    }
-    ret nil, rangeN
-}
-
 struct exprBuilder {
     p: &parser
 }
@@ -986,8 +833,13 @@ impl exprBuilder {
         ret nil
     }
 
-    fn buildBinop(mut self, mut &tokens: []&Token, i: int): &BinopExpr {
+    fn buildBinop(mut self, mut &tokens: []&Token, i: int): ExprData {
+        let mut op = tokens[i]
         let mut leftTokens = tokens[:i]
+        if isTypeOp(op.Kind) && isTypeRange(leftTokens) {
+            // Catch slice and array types.
+            ret self.buildType(tokens)
+        }
         let mut rightTokens = tokens[i+1:]
         if leftTokens.len == 0 {
             self.pushErr(tokens[i], LogMsg.InvalidSyntax)
@@ -1002,7 +854,7 @@ impl exprBuilder {
         ret &BinopExpr{
             Left: self.buildFromTokens(leftTokens),
             Right: self.buildFromTokens(rightTokens),
-            Op: tokens[i],
+            Op: op,
         }
     }
 
@@ -1035,4 +887,202 @@ impl exprBuilder {
             Kind: self.buildKind(tokens),
         }
     }
+}
+
+// Reports whether kind is potentially part of a type declaration.
+fn isTypeOp(&kind: str): bool {
+    ret kind == TokenKind.Amper ||
+        kind == TokenKind.DblAmper ||
+        kind == TokenKind.Star
+}
+
+// Reports whether range is potentially part of a type declaration.
+fn isTypeRange(mut &tokens: []&Token): bool {
+    let mut op = false
+    for i, token in tokens {
+        if token.Id == TokenId.Range {
+            if token.Kind == TokenKind.LBracket {
+                if op {
+                    ret true
+                }
+                let mut rangeN = 0
+                let mut lTokens = tokens[i:]
+                for _, lToken in lTokens {
+                    match lToken.Id {
+                    | TokenId.Range:
+                        match lToken.Kind {
+                        | TokenKind.LBracket:
+                            rangeN++
+                            continue
+                        | TokenKind.RBracket:
+                            rangeN--
+                            continue
+                        }
+                    }
+                    if rangeN == 0 {
+                        ret isTypeOp(lToken.Kind)
+                    }
+                }
+                ret true
+            }
+        }
+        if !isTypeOp(token.Kind) {
+            ret false
+        }
+        op = true
+    }
+    ret true
+}
+
+// Returns expression tokens comes before block if exist, nil if not.
+fn getBlockExpr(mut &tokens: []&Token): []&Token {
+    let mut braceN = 0
+    let mut skipToNextBraceClose = 0
+    for i, tok in tokens {
+        match tok.Id {
+        | TokenId.If | TokenId.Else | TokenId.Unsafe:
+            skipToNextBraceClose++
+        | TokenId.Range:
+            match tok.Kind {
+            | TokenKind.LBrace:
+                if braceN > 0 || skipToNextBraceClose > 0 {
+                    if skipToNextBraceClose > 0 {
+                        skipToNextBraceClose--
+                    }
+                    braceN++
+                    break
+                }
+                ret tokens[:i]
+            | TokenKind.LBracket
+            | TokenKind.LParent:
+                braceN++
+            |:
+                braceN--
+            }
+        }
+    }
+    ret nil
+}
+
+// Returns delimiter index, left range and right range tokens.
+// Returns nil slice and -1 if not found.
+fn splitDelim(mut &tokens: []&Token, delim: TokenId): ([]&Token, []&Token) {
+    let mut rangeN = 0
+    for i, token in tokens {
+        match token.Id {
+        | TokenId.Range:
+            match token.Kind {
+            | TokenKind.LBrace
+            | TokenKind.LBracket
+            | TokenKind.LParent:
+                rangeN++
+                continue
+            |:
+                rangeN--
+            }
+        | delim:
+            if rangeN == 0 {
+                let mut l = tokens[:i]
+                let mut r = tokens[i+1:]
+                ret l, r
+            }
+        }
+    }
+    ret nil, nil
+}
+
+// Finds index of priority operator and returns index of operator
+// if found, returns -1 if not.
+fn findLowestPrecOp(&tokens: []&Token): int {
+    // Set to 255, there is nothing for precedence 255.
+    // It's provides optimization, avoid prec != -1 (if not setted) checking.
+    // Always greater than actual precedences.
+    // So, It's will initialized by first precedence without any checking that if not setted.
+    let mut prec: byte = 255
+    let mut precPos = -1
+
+    let mut braceN = 0
+    let mut skipToNextBraceOpen = false
+    for i, token in tokens {
+        match {
+        | token.Id == TokenId.Range:
+            match token.Kind {
+            | TokenKind.LBrace:
+                skipToNextBraceOpen = false
+                fall
+            | TokenKind.LParent
+            | TokenKind.LBracket:
+                braceN++
+            |:
+                braceN--
+            }
+            continue
+        | skipToNextBraceOpen:
+            continue
+        | token.Id == TokenId.If:
+            skipToNextBraceOpen = true
+            continue
+        | i == 0:
+            continue
+        | token.Id != TokenId.Op:
+            continue
+        | braceN > 0:
+            continue
+        }
+
+        let left = tokens[i-1]
+
+        // Skip unary operator or type annotation.
+        if left.Id == TokenId.Op || left.Id == TokenId.Colon {
+            continue
+        }
+
+        if i > 1 && left.Id == TokenId.Range && left.Kind == TokenKind.RBracket {
+            let lleft = tokens[i-2]
+            if lleft.Id == TokenId.Range && lleft.Kind == TokenKind.LBracket {
+                // Skip potential type annotations.
+                if token.Kind == TokenKind.Amper || token.Kind == TokenKind.Star {
+                    continue
+                }
+            }
+        }
+
+        let p = token.Prec()
+        if p != 0 && p <= prec {
+            prec = p
+            precPos = i
+        }
+    }
+    ret precPos
+}
+
+fn buildIdentExpr(mut &token: &Token): &IdentExpr {
+    ret &IdentExpr{
+        Token: token,
+        Ident: token.Kind,
+        CppLinked: false,
+    }
+}
+
+fn getRangeExprTokens(mut &tokens: []&Token): ([]&Token, int) {
+    let mut rangeN = 0
+    let mut i = tokens.len - 1
+    for i >= 0; i-- {
+        let tok = tokens[i]
+        if tok.Id == TokenId.Range {
+            match tok.Kind {
+            | TokenKind.RBrace
+            | TokenKind.RBracket
+            | TokenKind.RParent:
+                rangeN++
+            |:
+                rangeN--
+            }
+        }
+
+        if rangeN == 0 {
+            ret tokens[:i], rangeN
+        }
+    }
+    ret nil, rangeN
 }
