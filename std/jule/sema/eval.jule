@@ -1106,8 +1106,14 @@ impl Eval {
         ret true
     }
 
-    fn evalIdentDeclFromIndexing(mut &self, mut &i: &IndexingExpr): &Data {
-        let mut tdecl = new(TypeDecl)
+    fn evalIdentDeclFromIndexing(mut &self, mut &d: &Data, mut &i: &IndexingExpr) {
+        let mut s = d.Kind.Struct()
+        if s == nil {
+            self.pushErr(i.Expr.Token, LogMsg.TypeNotSupportsGenerics, d.Kind.Str())
+            d = nil
+            ret
+        }
+
         let mut decl: &IdentTypeDecl = nil
         match type i.Expr.Kind {
         | &IdentExpr:
@@ -1117,28 +1123,28 @@ impl Eval {
                 Token: expr.Token,
                 Ident: expr.Ident,
             }
-            tdecl.Kind = decl
         | &NsSelectionExpr:
             let mut expr = (&NsSelectionExpr)(i.Expr.Kind)
             decl = &IdentTypeDecl{
                 Token: expr.Ident,
                 Ident: expr.Ident.Kind,
             }
-            tdecl.Kind = &NamespaceTypeDecl{
-                Idents: expr.Ns,
-                Kind: &TypeDecl{
-                    Token: decl.Token,
-                    Kind: decl,
-                },
-            }
         |:
             self.pushErr(i.Token, LogMsg.InvalidSyntax)
-            ret nil
+            d = nil
+            ret
         }
         if !self.pushGenericsFromData(decl.Generics, i.Index) {
-            ret nil
+            d = nil
+            ret
         }
-        ret self.evalType(tdecl)
+
+        s = self.typeChecker().fromStruct(decl, s.Decl)
+        if s == nil {
+            d = nil
+            ret
+        }
+        d.Kind.Kind = s
     }
 
     // Checks new generics function instance.
@@ -1219,7 +1225,8 @@ impl Eval {
 
         // Catch types.
         if d.Decl {
-            ret self.evalIdentDeclFromIndexing(i)
+            self.evalIdentDeclFromIndexing(d, i)
+            ret d
         }
 
         if d.Kind.Fn() != nil {
@@ -1701,7 +1708,7 @@ impl Eval {
         })
 
         if imp == nil {
-            self.pushErr(s.Ident, LogMsg.NamespaceNotExist, path)
+            self.pushErr(s.Ns[0], LogMsg.NamespaceNotExist, path)
             ret nil
         }
 
@@ -1777,6 +1784,10 @@ impl Eval {
             makeStructLitAlloc(d, model)
         }
         ret d
+    }
+
+    fn typeChecker(mut self): typeChecker {
+        ret self.s.typeChecker(self.lookup, nil, nil)
     }
 
     fn evalType(mut self, mut t: &TypeDecl): &Data {
@@ -2927,6 +2938,7 @@ impl Eval {
     fn evalAnonFn(mut &self, mut decl: &FnDecl): &Data {
         let mut tc = typeChecker{
             s: self.s,
+            rootLookup: self.lookup,
             lookup: self.lookup,
         }
         let mut ins = tc.buildFn(decl)
@@ -3262,6 +3274,7 @@ impl unaryEval {
     fn typeDecl(mut self) {
         let mut tc = typeChecker{
             s: self.e.s,
+            rootLookup: self.e.lookup,
             lookup: self.e.lookup,
             errorToken: self.u.Op,
         }

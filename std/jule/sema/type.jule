@@ -595,7 +595,12 @@ struct typeChecker {
     s: &Sema
 
     // Uses Lookup for:
-    //  - Lookup symbol tables.
+    //  - Lookup symbol tables for root specific.
+    rootLookup: Lookup
+
+    // Uses Lookup for:
+    //  - Lookup symbol tables for current.
+    //  - It might be change when evaluation of namespace selection or etc.
     lookup: Lookup
 
     // If this is not nil, appends referred ident types.
@@ -961,6 +966,10 @@ impl typeChecker {
             self.inscatch = true
         }
 
+        // Use rootLookup to parse generics with current current.
+        let mut lookup = self.lookup
+        self.lookup = self.rootLookup
+
         // Build generics.
         let mut ins = s.instance()
         ins.Generics = make([]&InsGeneric, 0, decl.Generics.len)
@@ -973,6 +982,7 @@ impl typeChecker {
         }
 
         // Restore configuration.
+        self.lookup = lookup
         self.bannedGenerics = bannedGenerics
         self.referencer = referencer
 
@@ -1373,7 +1383,6 @@ impl typeChecker {
         let mut kind = self.checkDecl(decl.Kind)
         self.lookup = lookup
         self.allowBuiltin()
-
         ret kind
     }
 

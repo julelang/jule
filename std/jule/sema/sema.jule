@@ -659,11 +659,11 @@ impl Sema {
         }
     }
 
-    // Builds type, builds result as kind and collects referred type aliases.
-    fn buildTypeWithRefers(mut &self, mut &t: &ast::TypeDecl, mut l: Lookup,
-        mut generics: []&TypeAlias, mut referencer: &referencer): &TypeKind {
+    fn typeChecker(mut &self, mut l: Lookup, mut generics: []&TypeAlias,
+        mut referencer: &referencer): typeChecker {
         let mut tc = typeChecker{
             s: self,
+            rootLookup: l,
             lookup: l,
             referencer: referencer,
             useGenerics: generics,
@@ -682,7 +682,13 @@ impl Sema {
                 tc.ownerAlias = (&TypeAlias)(referencer.owner)
             }
         }
-        ret tc.checkDecl(t)
+        ret tc
+    }
+
+    // Builds type, builds result as kind and collects referred type aliases.
+    fn buildTypeWithRefers(mut &self, mut &t: &ast::TypeDecl, mut l: Lookup,
+        mut generics: []&TypeAlias, mut referencer: &referencer): &TypeKind {
+        ret self.typeChecker(l, generics, referencer).checkDecl(t)
     }
 
     // Checks type, builds result as kind and collects referred type aliases.
@@ -712,6 +718,7 @@ impl Sema {
         mut generics: []&TypeAlias, mut refers: &ReferenceStack): &TypeKind {
         let mut tc = &typeChecker{
             s: self,
+            rootLookup: self,
             lookup: self,
             useGenerics: generics,
             refers: refers,
@@ -728,6 +735,7 @@ impl Sema {
     fn selectType(mut &self, mut &t: &ast::TypeDecl): &TypeKind {
         let mut tc = &typeChecker{
             s: self,
+            rootLookup: self,
             lookup: self,
             selection: true,
         }
@@ -842,6 +850,7 @@ impl Sema {
         mut &generics: []&ast::GenericDecl): &TypeKind {
         let mut tc = &typeChecker{
             s: self,
+            rootLookup: self,
             lookup: self,
             ignoreGenerics: generics,
         }
@@ -874,6 +883,7 @@ impl Sema {
 
         let mut tc = &typeChecker{
             s: self,
+            rootLookup: self,
             lookup: self,
         }
         for (_, mut p) in ins.Params {
@@ -2044,6 +2054,7 @@ impl Sema {
     fn checkStructEnv(mut &self, mut &s: &StructIns, mut errorToken: &Token): (ok: bool) {
         let mut tc = typeChecker{
             s: s.Decl.sema,
+            rootLookup: s.Decl.sema,
             lookup: s.Decl.sema,
             referencer: &referencer{
                 ident: s.Decl.Ident,
