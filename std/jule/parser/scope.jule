@@ -627,7 +627,7 @@ impl scopeParser {
         exprs = append(exprs, self.p.buildExpr(tokens))
     }
 
-    fn buildCaseExprs(mut self, mut &tokens: []&Token, type_match: bool): []&Expr {
+    fn buildCaseExprs(mut self, mut &tokens: []&Token, mut &colon: &Token, typeMatch: bool): []&Expr {
         let mut exprs = make([]&Expr, 0, 1)
 
         let mut braceN = 0
@@ -652,11 +652,12 @@ impl scopeParser {
                 if exprTokens.len == 0 {
                     self.pushErr(tok, LogMsg.MissingExpr)
                 } else {
-                    self.pushCaseExpr(tokens[j:i], tok, type_match, exprs)
+                    self.pushCaseExpr(tokens[j:i], tok, typeMatch, exprs)
                 }
                 j = i + 1
             | tok.Id == TokenId.Colon:
-                self.pushCaseExpr(tokens[j:i], tok, type_match, exprs)
+                colon = tok
+                self.pushCaseExpr(tokens[j:i], tok, typeMatch, exprs)
                 tokens = tokens[i+1:]
                 ret exprs
             }
@@ -698,13 +699,17 @@ impl scopeParser {
             Token: tokens[0],
         }
         tokens = tokens[1:] // Remove case prefix.
-        c.Exprs = self.buildCaseExprs(tokens, typeMatch)
+        let mut colon: &Token = nil
+        c.Exprs = self.buildCaseExprs(tokens, colon, typeMatch)
         c.Scope = self.buildCaseScope(tokens)
+        if c.Scope.End == nil {
+            c.Scope.End = colon
+        }
         let isDefault = c.Exprs.len == 0
         ret c, isDefault
     }
 
-    fn buildCases(mut self, mut tokens: []&Token, type_match: bool): ([]&Case, &Else) {
+    fn buildCases(mut self, mut tokens: []&Token, typeMatch: bool): ([]&Case, &Else) {
         let mut cases: []&Case = nil
         let mut def: &Else = nil
         let mut defNotLast = false
@@ -714,8 +719,8 @@ impl scopeParser {
                 self.pushErr(tok, LogMsg.InvalidSyntax)
                 break
             }
-            let (mut c, is_default) = self.buildCase(tokens, type_match)
-            if is_default {
+            let (mut c, isDefault) = self.buildCase(tokens, typeMatch)
+            if isDefault {
                 c.Token = tok
                 if def == nil {
                     def = &Else{
