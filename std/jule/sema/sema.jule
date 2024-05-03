@@ -514,7 +514,7 @@ impl Sema {
         ret nil
     }
 
-    fn checkImportSelection[T](mut self, &ident: &Token, mut &s: T): bool {
+    fn checkImportSelection[T](mut self, &ident: &Token, &s: T): bool {
         if !self.isAccessibleDefine(s.Public, s.Token) {
             self.pushErr(ident, LogMsg.IdentIsNotAccessible, ident.Kind)
             self.pushSugggestion(LogMsg.MakePubToAccess)
@@ -528,7 +528,7 @@ impl Sema {
         ret true
     }
 
-    fn checkImportSelections(mut self, mut &imp: &ImportInfo): (ok: bool) {
+    fn checkImportSelectedSelections(mut self, mut &imp: &ImportInfo): (ok: bool) {
         ok = true
         for _, ident in imp.Selected {
             if ident.Kind == TokenKind.Self {
@@ -575,6 +575,39 @@ impl Sema {
             }
         }
         ret
+    }
+
+    fn checkImportsAllSelectionsFromCollection[T](mut self, &s: []T, &et: &Token): bool {
+        let mut ok = true
+        for _, d in s {
+            if d.Public {
+                ok = self.checkImportSelection(et, d) && ok
+            }
+        }
+        ret ok
+    }
+
+    fn checkImportAllSelections(mut self, &imp: &ImportInfo): (ok: bool) {
+        ok = true
+        for _, file in imp.Package.Files {
+            ok = self.checkImportsAllSelectionsFromCollection(file.Vars, imp.Token) && ok
+            ok = self.checkImportsAllSelectionsFromCollection(file.TypeAliases, imp.Token) && ok
+            ok = self.checkImportsAllSelectionsFromCollection(file.Structs, imp.Token) && ok
+            ok = self.checkImportsAllSelectionsFromCollection(file.Funcs, imp.Token) && ok
+            ok = self.checkImportsAllSelectionsFromCollection(file.Traits, imp.Token) && ok
+            ok = self.checkImportsAllSelectionsFromCollection(file.Enums, imp.Token) && ok
+            ok = self.checkImportsAllSelectionsFromCollection(file.TypeEnums, imp.Token) && ok
+        }
+        ret
+    }
+
+    fn checkImportSelections(mut self, mut &imp: &ImportInfo): (ok: bool) {
+        if imp.Selected.len > 0 {
+            ret self.checkImportSelectedSelections(imp)
+        } else if imp.ImportAll {
+            ret self.checkImportAllSelections(imp)
+        }
+        ret true
     }
 
     fn isUseAliasDuplication(mut self, &imp: &ImportInfo): bool {
