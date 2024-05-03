@@ -514,6 +514,20 @@ impl Sema {
         ret nil
     }
 
+    fn checkImportSelection[T](mut self, &ident: &Token, mut &s: T): bool {
+        if !self.isAccessibleDefine(s.Public, s.Token) {
+            self.pushErr(ident, LogMsg.IdentIsNotAccessible, ident.Kind)
+            self.pushSugggestion(LogMsg.MakePubToAccess)
+            ret false
+        }
+        const CppLinked = false // Exported defines cannot be linked.
+        if defByIdentPackage(self.files, s.Ident, CppLinked) != nil {
+            self.pushErr(ident, LogMsg.SelectedImportExistInPackage, s.Ident)
+            ret false
+        }
+        ret true
+    }
+
     fn checkImportSelections(mut self, mut &imp: &ImportInfo): (ok: bool) {
         ok = true
         for _, ident in imp.Selected {
@@ -535,48 +549,30 @@ impl Sema {
                 continue
             | &Var:
                 let mut v = (&Var)(def)
-                if self.isAccessibleDefine(v.Public, v.Token) {
-                    continue
-                }
+                ok = self.checkImportSelection(ident, v) && ok
             | &TypeAlias:
                 let mut ta = (&TypeAlias)(def)
-                if self.isAccessibleDefine(ta.Public, ta.Token) {
-                    continue
-                }
+                ok = self.checkImportSelection(ident, ta) && ok
             | &Struct:
-                let mut strct = (&Struct)(def)
-                if self.isAccessibleDefine(strct.Public, strct.Token) {
-                    continue
-                }
+                let mut s = (&Struct)(def)
+                ok = self.checkImportSelection(ident, s) && ok
             | &Trait:
                 let mut t = (&Trait)(def)
-                if self.isAccessibleDefine(t.Public, t.Token) {
-                    continue
-                }
+                ok = self.checkImportSelection(ident, t) && ok
             | &Enum:
                 let mut e = (&Enum)(def)
-                if self.isAccessibleDefine(e.Public, e.Token) {
-                    continue
-                }
+                ok = self.checkImportSelection(ident, e) && ok
             | &TypeEnum:
                 let mut e = (&TypeEnum)(def)
-                if self.isAccessibleDefine(e.Public, e.Token) {
-                    continue
-                }
+                ok = self.checkImportSelection(ident, e) && ok
             | &Fn:
                 let mut f = (&Fn)(def)
-                if self.isAccessibleDefine(f.Public, f.Token) {
-                    continue
-                }
+                ok = self.checkImportSelection(ident, f) && ok
             |:
                 self.pushErr(ident, LogMsg.IdentNotExist, ident.Kind)
                 ok = false
                 continue
             }
-
-            self.pushErr(ident, LogMsg.IdentIsNotAccessible, ident.Kind)
-            self.pushSugggestion(LogMsg.MakePubToAccess)
-            ok = false
         }
         ret
     }
