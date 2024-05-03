@@ -1574,8 +1574,6 @@ impl Sema {
                 ok = false
                 continue
             }
-            self.checkVarDecl(v, self)
-            self.checkTypeVar(v, self)
             dest.Statics = append(dest.Statics, v)
         }
         ret
@@ -2095,8 +2093,10 @@ impl Sema {
         if s.Generics.len > 0 {
             tc.useGenerics = make([]&TypeAlias, 0, s.Generics.len)
             for (i, mut g) in s.Generics {
+                let mut decl = s.Decl.Generics[i]
                 tc.useGenerics = append(tc.useGenerics, &TypeAlias{
-                    Ident: s.Decl.Generics[i].Ident,
+                    Ident: decl.Ident,
+                    Token: decl.Token,
                     Kind: &TypeSymbol{Kind: g.Kind},
                 })
             }
@@ -2123,8 +2123,23 @@ impl Sema {
             }
         }
 
-        let mut eval = self.eval(self)
         ok = true
+
+        if s.Statics.len > 0 {
+            let mut n = self.errors.len
+            self.files[0].TypeAliases = append(tc.useGenerics, self.files[0].TypeAliases...)
+            for (_, mut v) in s.Statics {
+                self.checkVarDecl(v, self)
+                self.checkTypeVar(v, self)
+                ok = self.errors.len-n == 0 && ok
+            }
+            self.files[0].TypeAliases = self.files[0].TypeAliases[tc.useGenerics.len:]
+            if !ok {
+                ret false
+            }
+        }
+
+        let mut eval = self.eval(self)
         for (_, mut f) in s.Fields {
             let mut kind = tc.checkDecl(f.Decl.Kind.Decl)
             ok = kind != nil && ok

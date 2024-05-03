@@ -99,7 +99,12 @@ impl Struct {
         let mut ins = &StructIns{
             Decl: self,
             Fields: make([]&FieldIns, 0, self.Fields.len),
+            Statics: make([]&Var, 0, self.Statics.len),
             Refers: ReferenceStack.new(),
+        }
+
+        for (_, mut s) in self.Statics {
+            ins.Statics = append(ins.Statics, new(Var, *s))
         }
 
         for (_, mut f) in self.Fields {
@@ -230,6 +235,7 @@ struct StructIns {
     Decl:      &Struct
     Generics:  []&InsGeneric
     Fields:    []&FieldIns
+    Statics:   []&Var
     Methods:   []&Fn
     Mutable:   bool            // This structure has mutable defines.
     Refers:    &ReferenceStack
@@ -312,6 +318,17 @@ impl StructIns {
         for (_, mut f) in self.Fields {
             if f.Decl.Ident == ident {
                 ret f
+            }
+        }
+        ret nil
+    }
+
+    // Returns static field by identifier.
+    // Returns nil reference if not exist any static field in this identifier.
+    fn FindStatic(mut self, ident: str): &Var {
+        for (_, mut v) in self.Statics {
+            if v.Ident == ident {
+                ret v
             }
         }
         ret nil
