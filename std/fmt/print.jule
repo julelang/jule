@@ -4,14 +4,18 @@
 
 use std::fs::{File}
 use io for std::io
+use nosafe for std::internal::nosafe
 
 // Prints arguments to file by default formatting.
 // See documentation of format function for formatting.
 fn Fprint(mut f: &File, args: ...any) {
+    let mut buf = make(str, 20)
     for _, arg in args {
-        f.Write(fmtByDefault(arg)) else {
+        fmtByDefault(buf, arg)
+        f.Write(nosafe::Stobs(buf)) else {
             panic("std::fmt: Fprint: error occurs when printing")
         }
+        nosafe::ClearStr(buf)
     }
 }
 
@@ -26,7 +30,8 @@ fn Fprintln(mut f: &File, args: ...any) {
 // Prints result of formatting to file.
 // See documentation of format function for formatting.
 fn Fprintf(mut f: &File, fmt: str, args: ...any) {
-    f.Write(formatBytes(fmt, args...)) else {
+    let format = format(fmt, args...)
+    f.Write(nosafe::Stobs(format)) else {
         panic("std::fmt: Fprintf: error occurs when printing")
     }
 }
@@ -50,9 +55,9 @@ fn Println(args: ...any) {
 
 // Returns string result of arguments by default formatting.
 fn Sprint(args: ...any): str {
-    let mut bytes: []byte = nil
+    let mut buf = make(str, 100)
     for _, arg in args {
-        bytes = append(bytes, fmtByDefault(arg)...)
+        fmtByDefault(buf, arg)
     }
-    ret str(bytes)
+    ret buf
 }

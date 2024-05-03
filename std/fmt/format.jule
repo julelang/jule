@@ -5,6 +5,7 @@
 use conv for std::conv
 use integrated for std::jule::integrated
 use utf8 for std::unicode::utf8
+use nosafe for std::internal::nosafe
 
 fn findFormatPrefix(&bytes: []byte, &start: int): int {
     let mut i = start
@@ -42,88 +43,91 @@ fn getFormatRange(mut &i: int, mut &bytes: []byte): []byte {
     ret nil
 }
 
-fn fmtByDefault(&arg: any): []byte {
+fn fmtByDefault(mut &buf: str, &arg: any) {
     if arg == nil {
-        ret ['<', 'n', 'i', 'l', '>']
+        buf += "<nil>"
+        ret
     }
 
     match type arg {
     | f32:
-        ret []byte(conv::FmtFloat(f64(f32(arg)), 'g', -1, 32))
+        buf += conv::FmtFloat(f64(f32(arg)), 'g', -1, 32)
     | f64:
-        ret []byte(conv::FmtFloat(f64(arg), 'g', -1, 64))
+        buf += conv::FmtFloat(f64(arg), 'g', -1, 64)
     | i8:
-        ret []byte(conv::FmtInt(i8(arg), 10))
+        buf += conv::FmtInt(i8(arg), 10)
     | i16:
-        ret []byte(conv::FmtInt(i16(arg), 10))
+        buf += conv::FmtInt(i16(arg), 10)
     | i32:
-        ret []byte(conv::FmtInt(i32(arg), 10))
+        buf += conv::FmtInt(i32(arg), 10)
     | i64:
-        ret []byte(conv::FmtInt(i64(arg), 10))
+        buf += conv::FmtInt(i64(arg), 10)
     | u8:
-        ret []byte(conv::FmtUint(u8(arg), 10))
+        buf += conv::FmtUint(u8(arg), 10)
     | u16:
-        ret []byte(conv::FmtUint(u16(arg), 10))
+        buf += conv::FmtUint(u16(arg), 10)
     | u32:
-        ret []byte(conv::FmtUint(u32(arg), 10))
+        buf += conv::FmtUint(u32(arg), 10)
     | u64:
-        ret []byte(conv::FmtUint(u64(arg), 10))
+        buf += conv::FmtUint(u64(arg), 10)
     | str:
-        ret []byte(str(arg))
+        buf += str(arg)
     | bool:
         if bool(arg) {
-            ret ['t', 'r', 'u', 'e']
+            buf += "true"
+        } else {
+            buf += "false"
         }
-        ret ['f', 'a', 'l', 's', 'e']
     |:
-        ret []byte(integrated::ToStr(arg))
+        buf += integrated::ToStr(arg)
     }
 }
 
-fn applyFmtByDefault(mut &j: int, &args: ...any): []byte {
+fn applyFmtByDefault(mut &buf: str, mut &j: int, &args: ...any) {
     let arg = args[j]
     j++
-    ret fmtByDefault(arg)
+    fmtByDefault(buf, arg)
 }
 
 // Returns result of formatting.
 // Parameter j is the position of argument list.
-fn applyFmt(mut &fmt: []byte, mut &j: int, &args: ...any): []byte {
+fn applyFmt(mut &fmt: []byte, mut &buf: str, mut &j: int, &args: ...any) {
     // {}
     if fmt.len == 2 {
-        ret applyFmtByDefault(j, args...)
+        applyFmtByDefault(buf, j, args...)
+        ret
     }
 
     // {{}} = {}
     if fmt.len == 4 && fmt == ['{', '{', '}', '}'] {
-        ret ['{', '}']
+        buf += "{}"
+        ret
     }
 
-    ret fmt
+    nosafe::PushToStrBuffer(buf, fmt)
 }
 
-fn formatBytes(fmt: str, args: ...any): []byte {
-    let mut fmtBytes = []byte(fmt)
-
+fn format(&fmt: str, args: ...any): str {
     if args.len == 0 {
-        ret fmtBytes
+        ret fmt
     }
 
-    let mut bytes = make([]byte, 0, fmt.len)
+    let mut fmtBytes = nosafe::Stobs(fmt)
+    let mut buf = make(str, fmt.len)
 
     let mut j = 0                                   // Args position.
     let mut last = 0
     let mut i = findFormatPrefix(fmtBytes, last)
     for i != -1; i = findFormatPrefix(fmtBytes, i) {
-        bytes = append(bytes, fmtBytes[last:i]...)
+        nosafe::PushToStrBuffer(buf, fmtBytes[last:i])
         let mut format = getFormatRange(i, fmtBytes)
         if format == nil {
             continue
         }
 
-        bytes = append(bytes, applyFmt(format, j, args...)...)
+        applyFmt(format, buf, j, args...)
         if j >= args.len {
-            bytes = append(bytes, fmtBytes[i:]...)
+            nosafe::PushToStrBuffer(buf, fmtBytes[i:])
             last = fmtBytes.len
             break
         }
@@ -133,10 +137,10 @@ fn formatBytes(fmt: str, args: ...any): []byte {
     }
 
     if last < fmtBytes.len {
-        bytes = append(bytes, fmtBytes[last:]...)
+        nosafe::PushToStrBuffer(buf, fmtBytes[last:])
     }
 
-    ret bytes
+    ret buf
 }
 
 // It places the passes arguments in the string relative to the corresponding
@@ -161,7 +165,7 @@ fn formatBytes(fmt: str, args: ...any): []byte {
 // Examples:
 //  - format("{} {}!", "Hello", "World") = "Hello World!"
 //  - format("{} {}") = "{} {}"
-//  - format("{} is the {}", "PI Number") = "PI Number is the {}"
+//  - format("{} is the {}", "Pi Number") = "Pi Number is the {}"
 fn Format(fmt: str, args: ...any): str {
-    ret str(formatBytes(fmt, args...))
+    ret format(fmt, args...)
 }
