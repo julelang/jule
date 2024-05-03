@@ -4090,23 +4090,8 @@ impl binaryEval {
             _ = self.l.Constant.Rshift(*self.r.Constant)
             d.Constant = self.l.Constant
         }
-
+        d.Model = d.Constant
         applyCastModelByEnum(d, d.Kind.Enum())
-
-        let mut prim = d.Kind.Prim()
-        if prim == nil || !types::IsNum(prim.Str()) {
-            d.Model = d.Constant
-            ret
-        }
-        if self.op.Kind != TokenKind.Lshift && self.op.Kind != TokenKind.Rshift {
-            if self.l.Constant == self.l.Model && self.r.Constant != self.r.Model {
-                // Right constant is not pure, use type r's type.
-                d.Kind = self.r.Kind
-                prim = d.Kind.Prim()
-            }
-        }
-        fitBitsize(d)
-        castConstByType(prim.Kind, d)
     }
 
     fn checkData(mut self, mut &d: &Data) {
@@ -4123,9 +4108,9 @@ impl binaryEval {
 
     fn setModel(mut self, mut &d: &Data) {
         if d.IsConst() {
-            if self.l.Constant == self.l.Model && self.r.Constant == self.r.Model {
+            if self.l.IsConst() && self.r.IsConst() {
                 // Left and right are pure constant.
-                // Do not break this with changing Model:.
+                // Do not break this with changing Model.
                 ret
             }
         }
