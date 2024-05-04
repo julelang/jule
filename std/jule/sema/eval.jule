@@ -3556,7 +3556,7 @@ impl binaryEval {
             if self.l.Kind.Ptr().IsUnsafe() {
                 self.e.pushErr(self.op, LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Kind.Str())
             }
-            if !isPtrArithmeticCompatibleInt(self.r) {
+            if !isPtrArithmeticCompatible(self.l, self.r) {
                 self.e.pushErr(self.op, LogMsg.IncompatibleTypeForPtrArithmetic, self.r.Kind.Str())
                 ret nil
             }
@@ -4320,15 +4320,19 @@ fn isInstancedStruct(s: &StructIns): bool {
     ret s.Decl.Generics.len == s.Generics.len
 }
 
-fn isPtrArithmeticCompatibleInt(mut &d: &Data): bool {
-    if d.IsConst() {
-        ret intAssignable(types::TypeKind.Int, d)
+fn isPtrArithmeticCompatible(mut &l: &Data, mut &r: &Data): bool {
+    let ptr = r.Kind.Ptr()
+    if ptr != nil {
+        ret l.Kind.Ptr().Elem.Equals(ptr.Elem)
+    }
+    if r.IsConst() {
+        ret intAssignable(types::TypeKind.Int, r)
     }
     let mut tcc = typeCompatibilityChecker{
         dest: &TypeKind{
             Kind: buildPrimType(types::TypeKind.Int),
         },
-        src: d.Kind,
+        src: r.Kind,
     }
     ret tcc.check()
 }
