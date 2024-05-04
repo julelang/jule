@@ -1,0 +1,47 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+// Package fastbytes implements fast algorithms for byte stacks with
+// a minor dependencies, what a cheap algorithm package for byte stack functionalities.
+
+use nosafe for std::internal::nosafe
+
+// Returns index of first matched item with specified byte,
+// returns -1 if not exist any match. Starts searching at left
+// of slice to right.
+fn FindByte(s: []byte, b: byte): int {
+    // Trust optimizations of compiler.
+    for i, se in s {
+        if se == b {
+            ret i
+        }
+    }
+    ret -1
+}
+
+// Returns index of first matched item with specified byte,
+// returns -1 if not exist any match. Starts searching at right
+// of slice to left.
+fn FindLastByte(s: []byte, b: byte): int {
+    let first = &s[0]
+    let mut it = &s[s.len - 1]
+    for it >= first; it-- {
+        unsafe {
+            if (*it == b) {
+                ret int(it - first)
+            }
+        }
+    }
+    ret -1
+}
+
+// Same as FindByte, but takes string as byte stack.
+fn FindByteStr(&s: str, b: byte): int {
+    ret FindByte(nosafe::Stobs(s), b)
+}
+
+// Same as FindLastByte, but takes string as byte stack.
+fn FindLastByteStr(&s: str, b: byte): int {
+    ret FindLastByte(nosafe::Stobs(s), b)
+}
