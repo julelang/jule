@@ -602,7 +602,8 @@ impl exprCoder {
         match {
         | env::Production
         | m.Expr.Kind.Ptr() != nil
-        | m.Expr.Kind.Map() != nil:
+        | m.Expr.Kind.Map() != nil
+        | isExprComesFromBind(m.Expr):
             self.oc.write("[")
             self.expr(m.Index.Model)
             self.oc.write("]")
@@ -1264,6 +1265,17 @@ fn isBuiltinCallHasDebuginf(&m: &FnCallExprModel): bool {
     | &CommonSubIdentExprModel:
         let csie = (&CommonSubIdentExprModel)(m.Expr)
         ret csie.Ident == "swap"
+    |:
+        ret false
+    }
+}
+
+fn isExprComesFromBind(&d: &Data): bool {
+    match type d.Model {
+    | &Var:
+        ret (&Var)(d.Model).CppLinked
+    | &StructSubIdentExprModel:
+        ret (&StructSubIdentExprModel)(d.Model).Owner.Decl.CppLinked
     |:
         ret false
     }
