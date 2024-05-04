@@ -1410,6 +1410,7 @@ impl Eval {
     }
 
     fn castPtr(mut self, mut t: &TypeKind, mut d: &Data, errorToken: &Token) {
+        d.Constant = nil
         let sptr = d.Kind.Sptr()
         if sptr != nil {
             if !t.Ptr().Elem.Equals(sptr.Elem) {
@@ -1427,11 +1428,10 @@ impl Eval {
         if d.Kind.Ptr() == nil && (prim == nil || !types::IsInt(prim.Str())) {
             self.pushErr(errorToken, LogMsg.TypeNotSupportsCastingTo, d.Kind.Str(), t.Str())
         }
-
-        d.Constant = nil
     }
 
     fn castStruct(mut self, mut t: &TypeKind, mut d: &Data, errorToken: &Token) {
+        d.Constant = nil
         let mut tr = d.Kind.Trait()
         if tr == nil {
             self.pushErr(errorToken, LogMsg.TypeNotSupportsCastingTo, d.Kind.Str(), t.Str())
@@ -1447,6 +1447,7 @@ impl Eval {
     }
 
     fn castRef(mut self, mut t: &TypeKind, mut d: &Data, errorToken: &Token) {
+        d.Constant = nil
         let mut sptr = t.Sptr()
 
         let mut ptr = d.Kind.Ptr()
@@ -1468,6 +1469,7 @@ impl Eval {
     }
 
     fn castSlc(mut self, mut t: &TypeKind, mut d: &Data, errorToken: &Token) {
+        d.Constant = nil
         if d.Kind.Enum() != nil {
             if d.Kind.Enum().Kind.Kind.Prim() == nil || !d.Kind.Enum().Kind.Kind.Prim().IsStr() {
                 self.pushErr(errorToken, LogMsg.TypeNotSupportsCastingTo, d.Kind.Str(), t.Str())
@@ -1486,6 +1488,7 @@ impl Eval {
     }
 
     fn castStr(mut self, mut d: &Data, errorToken: &Token) {
+        d.Constant = nil
         if d.Kind.Enum() != nil {
             let mut e = d.Kind.Enum()
             if e.Kind.Kind.Prim() != nil && e.Kind.Kind.Prim().IsStr() {
@@ -1522,6 +1525,8 @@ impl Eval {
             | types::IsUnsigInt(prim.Kind):
                 d.Constant.SetU64(d.Constant.AsU64())
             }
+        } else {
+            d.Constant = nil
         }
 
         if d.Kind.Enum() != nil {
@@ -1569,6 +1574,8 @@ impl Eval {
             | types::IsUnsigInt(prim.Kind):
                 d.Constant.SetU64(d.Constant.AsU64())
             }
+        } else {
+            d.Constant = nil
         }
 
         if d.Kind.Enum() != nil {
@@ -1591,6 +1598,7 @@ impl Eval {
         match {
         | prim.IsAny():
             // The any type supports casting to any data type.
+            d.Constant = nil
         | prim.IsStr():
             self.castStr(d, errorToken)
         | types::IsInt(prim.Str()):
@@ -1617,6 +1625,7 @@ impl Eval {
             self.s.errors = self.s.errors[:n]
             self.pushErr(errorToken, LogMsg.TypeNotSupportsCastingTo, d.Kind.Str(), t.Str())
         }
+        d.Constant = nil
     }
 
     fn evalCastByTypeNData(mut self, mut t: &TypeKind, mut d: &Data, mut errorToken: &Token): &Data {
@@ -1633,6 +1642,7 @@ impl Eval {
             } else if t.TypeEnum() != nil {
                 self.pushErr(errorToken, LogMsg.EnumCastedFromAny)
             }
+            d.Constant = nil
         | d.Kind.TypeEnum() != nil:
             self.castTypeEnum(t, d, errorToken)
         | t.Ptr() != nil:
