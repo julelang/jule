@@ -141,34 +141,34 @@ fn parseIPv4Fields(&addr: str, off: int, end: int, mut fields: []byte)! {
     for i < s.len; i++ {
         if s[i] >= '0' && s[i] <= '9' {
             if digLen == 1 && val == 0 {
-                error(AddrParseError.IPv4FieldOctetWithLeadingZero)
+                error(AddrError.IPv4FieldOctetWithLeadingZero)
             }
             val = val * 10 + int(s[i]) - '0'
             digLen++
             if val > 255 {
-                error(AddrParseError.IPv4FieldValueOverflow)
+                error(AddrError.IPv4FieldValueOverflow)
             }
         } else if s[i] == '.' {
             // .1.2.3
             // 1.2.3.
             // 1..2.3
             if i == 0 || i == s.len-1 || s[i-1] == '.' {
-                error(AddrParseError.EmptyField)
+                error(AddrError.EmptyField)
             }
             // 1.2.3.4.5
             if pos == 3 {
-                error(AddrParseError.TooLong)
+                error(AddrError.TooLong)
             }
             fields[pos] = byte(val)
             pos++
             val = 0
             digLen = 0
         } else {
-            error(AddrParseError.UnexpectedToken)
+            error(AddrError.UnexpectedToken)
         }
     }
     if pos < 3 {
-        error(AddrParseError.TooShort)
+        error(AddrError.TooShort)
     }
     fields[3] = byte(val)
 }
@@ -193,7 +193,7 @@ fn parseIPv6(&addr: str)!: &TcpAddr {
         s, zone = s[:i], s[i+1:]
         if zone.len == 0 {
             // Not allowed to have an empty zone if explicitly specified.
-            error(AddrParseError.EmptyZone)
+            error(AddrError.EmptyZone)
         }
     }
 
@@ -234,27 +234,27 @@ fn parseIPv6(&addr: str)!: &TcpAddr {
             }
             if off > 3 {
                 // More than 4 digits in group, fail.
-                error(AddrParseError.IPv6FieldValueOverflow)
+                error(AddrError.IPv6FieldValueOverflow)
             }
             if acc > u16.Max {
                 // Overflow, fail.
-                error(AddrParseError.IPv6FieldValueOverflow)
+                error(AddrError.IPv6FieldValueOverflow)
             }
         }
         if off == 0 {
             // No digits found, fail.
-            error(AddrParseError.EmptyField)
+            error(AddrError.EmptyField)
         }
 
         // If followed by dot, might be in trailing IPv4.
         if off < s.len && s[off] == '.' {
             if ellipsis < 0 && i != 12 {
                 // Not the right place.
-                error(AddrParseError.UnexpectedToken)
+                error(AddrError.UnexpectedToken)
             }
             if i+4 > 16 {
                 // Not enough room.
-                error(AddrParseError.TooLong)
+                error(AddrError.TooLong)
             }
 
             let mut end = addr.len
@@ -280,16 +280,16 @@ fn parseIPv6(&addr: str)!: &TcpAddr {
 
         // Otherwise must be followed by colon and more.
         if s[0] != ':' {
-            error(AddrParseError.UnexpectedToken)
+            error(AddrError.UnexpectedToken)
         } else if s.len == 1 {
-            error(AddrParseError.IPv6ShortColon)
+            error(AddrError.IPv6ShortColon)
         }
         s = s[1:]
 
         // Look for ellipsis.
         if s[0] == ':' {
             if ellipsis >= 0 { // already have one
-                error(AddrParseError.UnexpectedToken)
+                error(AddrError.UnexpectedToken)
             }
             ellipsis = i
             s = s[1:]
@@ -300,13 +300,13 @@ fn parseIPv6(&addr: str)!: &TcpAddr {
     }
     // Must have used entire string.
     if s.len != 0 {
-        error(AddrParseError.UnexpectedToken)
+        error(AddrError.UnexpectedToken)
     }
 
     // If didn't parse enough, expand ellipsis.
     if i < 16 {
         if ellipsis < 0 {
-            error(AddrParseError.TooShort)
+            error(AddrError.TooShort)
         }
         let n = 16 - i
         let mut j = i - 1
@@ -319,7 +319,7 @@ fn parseIPv6(&addr: str)!: &TcpAddr {
         }
     } else if ellipsis >= 0 {
         // Ellipsis must represent at least one 0 group.
-        error(AddrParseError.TooShort)
+        error(AddrError.TooShort)
     }
 
     // Parse IP address.

@@ -2,8 +2,8 @@ use fastbytes for std::internal::fastbytes
 use nosafe for std::internal::nosafe
 use conv for std::internal::conv
 
-// Address parsing errors.
-enum AddrParseError {
+// Address errors.
+enum AddrError {
     NoSuitable,                    // No suitable address.
     Unable,                        // Unable to parse IP.
     MissingIPv6,                   // IPv6 address is missing.
@@ -59,46 +59,46 @@ fn JoinHostPort(host: str, port: str): str {
 // See the [Connect] function for a description of the hostport parameter, and host
 // and port results.
 //
-// Exceptionals are always will be AddrParseError.
+// Exceptionals are always will be AddrError.
 fn SplitHostPort(hostport: str)!: (host: str, port: str) {
     let (mut j, mut k) = 0, 0
     let i = fastbytes::FindLastByteStr(hostport, ':')
     if i == -1 {
-        error(AddrParseError.MissingPort)
+        error(AddrError.MissingPort)
     }
     if hostport[0] == '[' {
         // Expect the first ']' just before the last ':'.
         let end = fastbytes::FindByteStr(hostport, ']')
         if end == -1 {
-            error(AddrParseError.MissingRBracket)
+            error(AddrError.MissingRBracket)
         }
         match end + 1 {
         | hostport.len:
-            error(AddrParseError.MissingPort)
+            error(AddrError.MissingPort)
         | i:
             // Expected result, it's fine.
         |:
             // Either ']' isn't followed by a colon, or it is
             // followed by a colon that is not the last one.
             if hostport[end+1] == ':' {
-                error(AddrParseError.TooManyColons)
+                error(AddrError.TooManyColons)
             }
-            error(AddrParseError.MissingPort)
+            error(AddrError.MissingPort)
         }
         host = hostport[1:end]
         j, k = 1, end + 1 // There can't be a '[' resp. ']' before these positions.
     } else {
         host = hostport[:i]
         if fastbytes::FindByteStr(host, ':') != -1 {
-            error(AddrParseError.TooManyColons)
+            error(AddrError.TooManyColons)
         }
     }
     let bytesHostport = nosafe::Stobs(hostport)
     if fastbytes::FindByte(bytesHostport[j:], '[') != -1 {
-        error(AddrParseError.UnexpectedLBracket)
+        error(AddrError.UnexpectedLBracket)
     }
     if fastbytes::FindByte(bytesHostport[k:], ']') != -1 {
-        error(AddrParseError.UnexpectedRBracket)
+        error(AddrError.UnexpectedRBracket)
     }
     port = hostport[i+1:]
     ret
@@ -122,7 +122,7 @@ enum ipAddr: type {
 // addr can be in dotted decimal ("192.0.2.1"), IPv6 ("2001:db8::68"),
 // or IPv6 with a scoped addressing zone ("fe80::1cc0:3e8c:119f:c2e1%ens18").
 //
-// Exceptionals are always will be AddrParseError.
+// Exceptionals are always will be AddrError.
 fn parseAddr(addr: str)!: ipAddr {
     for _, b in addr {
         match b {
@@ -133,10 +133,10 @@ fn parseAddr(addr: str)!: ipAddr {
         | '%':
             // Assume that this was trying to be an IPv6 address with
             // a zone specifier, but the address is missing.
-            error(AddrParseError.MissingIPv6)
+            error(AddrError.MissingIPv6)
         }
     }
-    error(AddrParseError.Unable)
+    error(AddrError.Unable)
 }
 
 // Resolvers addr which may be aliteral IP address and
@@ -145,7 +145,7 @@ fn parseAddr(addr: str)!: ipAddr {
 // Forwards any exceptional from used methods.
 fn resolveInternetAddr(&net: Network, &addr: str)!: Addr {
     if addr == "" {
-        error(AddrParseError.MissingPort)
+        error(AddrError.MissingPort)
     }
     let (mut host, mut port) = "", ""
     let mut portnum = 0
@@ -154,10 +154,10 @@ fn resolveInternetAddr(&net: Network, &addr: str)!: Addr {
         host, port = SplitHostPort(addr) else { error(error) }
         let ((portnum), ok) = conv::Atoi(port)
         if !ok {
-            error(AddrParseError.InvalidPort)
+            error(AddrError.InvalidPort)
         }
     |:
-        error(AddrParseError.UnknownNetwork)
+        error(AddrError.UnknownNetwork)
     }
     if host == "" {
         ret internetAddr(net, Ip.Empty(), portnum, "")
