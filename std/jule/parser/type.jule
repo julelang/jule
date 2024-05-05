@@ -30,38 +30,6 @@ fn buildPrimType(mut t: &Token): &TypeDecl {
     }
 }
 
-// Returns delimiter index of the map type.
-// Returns -1 if not found.
-// Starts search at i.
-fn mapColon(mut &tokens: []&Token, mut &i: int): (delim: int) {
-    delim = -1
-    let mut rangeN = 0
-    for i < tokens.len; i++ {
-        let token = tokens[i]
-        if token.Id == TokenId.Range {
-            match token.Kind {
-            | TokenKind.LBrace
-            | TokenKind.LBracket
-            | TokenKind.LParent:
-                rangeN++
-                continue
-            |:
-                rangeN--
-            }
-        }
-        if rangeN == 0 {
-            if tokens.len-i == 1 {
-                ret
-            }
-            if tokens[i+1].Id == TokenId.Colon {
-                ret i + 1
-            }
-            break
-        }
-    }
-    ret
-}
-
 struct typeBuilder {
     p:      &parser
     tokens: []&Token
@@ -329,15 +297,11 @@ impl typeBuilder {
     }
 
     unsafe fn buildArr(mut self): &TypeDecl {
-        // *self.i points to element type of array.
-        // Brackets places at ... < *self.i offset.
-
+        let mut exprTokens = range(*self.i, TokenKind.LBracket, TokenKind.RBracket, self.tokens)
         if *self.i >= self.tokens.len {
             self.pushErr(self.tokens[*self.i-1], LogMsg.MissingType)
             ret nil
         }
-
-        let exprDelta = *self.i
 
         let mut elem = self.step()
         if elem == nil {
@@ -348,9 +312,6 @@ impl typeBuilder {
             Elem: elem,
         }
 
-        let mut exprTokens = self.tokens[:exprDelta]
-        _, exprTokens = rangeLast(exprTokens)
-        exprTokens = exprTokens[1:exprTokens.len-1] // Remove brackets.
         let mut token = exprTokens[0]
         if exprTokens.len == 1 && token.Id == TokenId.Op && token.Kind == TokenKind.TripleDot {
             // Ignore.
@@ -364,22 +325,25 @@ impl typeBuilder {
         }
     }
 
-    unsafe fn buildMap(mut self, start: int, delim: int): &TypeDecl {
-        let mut delimToken = self.tokens[delim]
-        if delim == 0 || delim+1 >= self.tokens.len {
-            self.pushErr(delimToken, LogMsg.MissingType)
+    unsafe fn buildMap(mut self): &TypeDecl {
+        let mut mapToken = self.tokens[*self.i]
+        *self.i++ // Skip map token.
+        if *self.i >= self.tokens.len {
+            self.pushErr(mapToken, LogMsg.MissingType)
             ret nil
         }
 
         // Get key type tokens without brackets.
-        let mut keyTokens = self.tokens[start+1 : delim-1]
-        if keyTokens.len == 0 {
-            self.pushErr(delimToken, LogMsg.MissingType)
+        let mut keyTokens = range(*self.i, TokenKind.LBracket, TokenKind.RBracket, self.tokens)
+        if *self.i >= self.tokens.len {
+            self.pushErr(self.tokens[*self.i-1], LogMsg.MissingType)
+            ret nil
+        } else if keyTokens.len == 0 {
+            self.pushErr(self.tokens[*self.i-2], LogMsg.MissingType)
             ret nil
         }
 
         let mut mapt = new(MapTypeDecl)
-
         let mut j = 0
         let (mut keyt, mut ok) = self.p.buildType(keyTokens, &j, self.err)
         if !ok {
@@ -389,14 +353,13 @@ impl typeBuilder {
         }
         mapt.Key = keyt
 
-        *self.i++ // Skip delimiter token.
         let (mut valt, ok) = self.p.buildType(self.tokens, self.i, self.err)
         if !ok {
             ret nil
         }
         mapt.Val = valt
         ret &TypeDecl{
-            Token: delimToken,
+            Token: mapToken,
             Kind: mapt,
         }
     }
@@ -414,15 +377,8 @@ impl typeBuilder {
         if token.Id == TokenId.Range && token.Kind == TokenKind.RBracket {
             ret self.buildSlc()
         }
-
-        *self.i-- // Point to left bracket for range parsing of split_colon.
-        let i = *self.i
-        let mut delim = mapColon(self.tokens, *self.i)
-        *self.i++
-        if delim == -1 {
-            ret self.buildArr()
-        }
-        ret self.buildMap(i, delim)
+        *self.i-- // Point to left bracket.
+        ret self.buildArr()
     }
 
     unsafe fn step(mut self): &TypeDecl {
@@ -440,6 +396,8 @@ impl typeBuilder {
             ret self.buildOp()
         | TokenId.Range:
             ret self.buildEnumerable()
+        | TokenId.Map:
+            ret self.buildMap()
         |:
             *self.i++
             self.pushErr(token, LogMsg.InvalidSyntax)
