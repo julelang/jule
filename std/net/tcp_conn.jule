@@ -1,0 +1,76 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use io for std::io
+use sys for std::sys
+
+// TCP connection.
+struct TcpConn {
+    mut handle: netHandle = sys::INVALID_SOCKET
+    mut Addr:   &TcpAddr
+}
+
+impl Conn for TcpConn {}
+
+impl io::Reader for TcpConn {}
+
+impl io::Writer for TcpConn {}
+
+impl io::Stream for TcpConn {}
+
+impl io::WriterCloser for TcpConn {}
+
+impl TcpConn {
+    // Read bytes to buffer from connection and returns readed byte count.
+    // The number of bytes readed can never exceed the length of the buffer.
+    // If the buffer is larger than the number of bytes that can be read,
+    // the buffer will not cause an overflow.
+    // All exceptionals are error code of implementation.
+    fn Read(mut self, mut buf: []byte)!: int {
+        if self.handle == sys::INVALID_SOCKET {
+            panic("std::net: Conn.Read: connection is closed")
+        }
+        if buf.len == 0 {
+            ret 0
+        }
+        let n = unsafe { sys::Recv(self.handle, &buf[0], uint(buf.len), 0) }
+        if n > 0 {
+            ret n
+        } else if n == 0 {
+            self.Close()!
+            ret 0
+        }
+        error(sys::GetLastErrno())
+    }
+
+    // Writes bytes to connection and returns writed byte count.
+    // The number of bytes written can never exceed the length of the buffer.
+    // All exceptionals are error code of implementation.
+    fn Write(mut self, buf: []byte)!: int {
+        if self.handle == sys::INVALID_SOCKET {
+            panic("std::net: Conn.Write: connection is closed")
+        }
+        if buf.len == 0 {
+            ret 0
+        }
+        let n = unsafe { sys::Send(self.handle, &buf[0], uint(buf.len), 0) }
+        if n < 0 {
+            error(sys::GetLastErrno())
+        }
+        ret n
+    }
+
+    // Closes connection.
+    // All exceptionals are error code of implementation.
+    // Panics if connection is already closed.
+    fn Close(mut self)! {
+        if self.handle == sys::INVALID_SOCKET {
+            panic("std::net: Conn.Close: connection is already closed")
+        }
+        if !closeSocket(self.handle) {
+            error(sys::GetLastErrno())
+        }
+        self.handle = sys::INVALID_SOCKET
+    }
+}
