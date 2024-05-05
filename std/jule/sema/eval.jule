@@ -380,6 +380,20 @@ impl Eval {
     }
 
     fn getDef(mut self, ident: str, cppLinked: bool): any {
+        // Find variables and type aliases first.
+        // Because self.lookup might be a scopeChecker, and shadowing may occurred.
+        // If any variable or type aliases is shadowing other declarations such us structure,
+        // it will result as wrong expression evaluation.
+        let mut v = self.lookup.FindVar(ident, cppLinked)
+        if v != nil {
+            ret v
+        }
+
+        let mut ta = self.lookup.FindTypeAlias(ident, cppLinked)
+        if ta != nil {
+            ret ta
+        }
+
         if !cppLinked {
             let mut enm = self.lookup.FindEnum(ident)
             if enm != nil {
@@ -392,11 +406,6 @@ impl Eval {
             }
         }
 
-        let mut v = self.lookup.FindVar(ident, cppLinked)
-        if v != nil {
-            ret v
-        }
-
         let mut f = self.lookup.FindFn(ident, cppLinked)
         if f != nil {
             ret f
@@ -405,11 +414,6 @@ impl Eval {
         let mut s = self.lookup.FindStruct(ident, cppLinked)
         if s != nil {
             ret s
-        }
-
-        let mut ta = self.lookup.FindTypeAlias(ident, cppLinked)
-        if ta != nil {
-            ret ta
         }
 
         ret self.findBuiltins(ident)
