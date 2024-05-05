@@ -1,0 +1,217 @@
+use fastbytes for std::internal::fastbytes
+use nosafe for std::internal::nosafe
+use conv for std::internal::conv
+
+// Address parsing errors.
+enum AddrParseError {
+    NoSuitable,                    // No suitable address.
+    Unable,                        // Unable to parse IP.
+    MissingIPv6,                   // IPv6 address is missing.
+    UnexpectedToken,               // Address have unexpected token(s).
+    TooShort,                      // Address is too short.
+    TooLong,                       // Address is too long.
+    IPv4FieldValueOverflow,        // IPv4 address field has value > 255.
+    EmptyField,                    // IPv4 address field must have at least one digit.
+    IPv4FieldOctetWithLeadingZero, // IPv4 field has octet with leading zero.
+    EmptyZone,                     // Zone must be a non-empty string.
+    IPv6FieldValueOverflow,        // Each group must have 4 or less digits or field has value >=2^16.
+    IPv6ShortColon,                // Colon must be followed by more characters.
+    MissingPort,                   // Port is missing.
+    InvalidPort,                   // Port is invalid.
+    TooManyColons,                 // There is too many colons.
+    MissingRBracket,               // There is missing right bracket "]".
+    UnexpectedLBracket,            // Address have unexpected left bracket "[".
+    UnexpectedRBracket,            // Address have unexpected right bracket "]".
+    UnknownNetwork,                // Unknown network name.
+}
+
+const localhost = "localhost"
+
+// Represents a network end point address.
+trait Addr {
+    // Returns name of the network.
+    fn Network(self): str
+
+    // String form of address.
+    fn Str(self): str
+}
+
+// Combines host and port into a network address of the
+// form "host:port". If host contains a colon, as found in literal
+// IPv6 addresses, then JoinHostPort returns "[host]:port".
+//
+// See the [Connect] function for a description of the host and port parameters.
+fn JoinHostPort(host: str, port: str): str {
+    // We assume that host is a literal IPv6 address if host has colons.
+    if fastbytes::FindByteStr(host, ':') >= 0 {
+        ret "[" + host + "]:" + port
+    }
+    ret host + ":" + port
+}
+
+// Splits a network address of the form "host:port",
+// "host%zone:port", "[host]:port" or "[host%zone]:port" into host or
+// host%zone and port.
+//
+// A literal IPv6 address in hostport must be enclosed in square
+// brackets, as in "[::1]:80", "[::1%lo0]:80".
+//
+// See the [Connect] function for a description of the hostport parameter, and host
+// and port results.
+//
+// Exceptionals are always will be AddrParseError.
+fn SplitHostPort(hostport: str)!: (host: str, port: str) {
+    let (mut j, mut k) = 0, 0
+    let i = fastbytes::FindLastByteStr(hostport, ':')
+    if i == -1 {
+        error(AddrParseError.MissingPort)
+    }
+    if hostport[0] == '[' {
+        // Expect the first ']' just before the last ':'.
+        let end = fastbytes::FindByteStr(hostport, ']')
+        if end == -1 {
+            error(AddrParseError.MissingRBracket)
+        }
+        match end + 1 {
+        | hostport.len:
+            error(AddrParseError.MissingPort)
+        | i:
+            // Expected result, it's fine.
+        |:
+            // Either ']' isn't followed by a colon, or it is
+            // followed by a colon that is not the last one.
+            if hostport[end+1] == ':' {
+                error(AddrParseError.TooManyColons)
+            }
+            error(AddrParseError.MissingPort)
+        }
+        host = hostport[1:end]
+        j, k = 1, end + 1 // There can't be a '[' resp. ']' before these positions.
+    } else {
+        host = hostport[:i]
+        if fastbytes::FindByteStr(host, ':') != -1 {
+            error(AddrParseError.TooManyColons)
+        }
+    }
+    let bytesHostport = nosafe::Stobs(hostport)
+    if fastbytes::FindByte(bytesHostport[j:], '[') != -1 {
+        error(AddrParseError.UnexpectedLBracket)
+    }
+    if fastbytes::FindByte(bytesHostport[k:], ']') != -1 {
+        error(AddrParseError.UnexpectedRBracket)
+    }
+    port = hostport[i+1:]
+    ret
+}
+
+fn internetAddr(&net: Network, mut ip: Ip, port: int, zone: str): Addr {
+    match net {
+    | Network.Tcp | Network.Tcp4 | Network.Tcp6:
+        ret &TcpAddr{Ip: ip, Port: port, Zone: zone}
+    |:
+        panic("unexpected network: " + str(net))
+    }
+}
+
+enum ipAddr: type {
+    Ip: Ip,
+    &TcpAddr,
+}
+
+// Parses addr as an IP address, returning the result. The string
+// addr can be in dotted decimal ("192.0.2.1"), IPv6 ("2001:db8::68"),
+// or IPv6 with a scoped addressing zone ("fe80::1cc0:3e8c:119f:c2e1%ens18").
+//
+// Exceptionals are always will be AddrParseError.
+fn parseAddr(addr: str)!: ipAddr {
+    for _, b in addr {
+        match b {
+        | '.':
+            ret parseIPv4(addr) else { error(error) }
+        | ':':
+            ret parseIPv6(addr) else { error(error) }
+        | '%':
+            // Assume that this was trying to be an IPv6 address with
+            // a zone specifier, but the address is missing.
+            error(AddrParseError.MissingIPv6)
+        }
+    }
+    error(AddrParseError.Unable)
+}
+
+// Resolvers addr which may be aliteral IP address and
+// returns internal protocol family address.
+//
+// Forwards any exceptional from used methods.
+fn resolveInternetAddr(&net: Network, &addr: str)!: Addr {
+    if addr == "" {
+        error(AddrParseError.MissingPort)
+    }
+    let (mut host, mut port) = "", ""
+    let mut portnum = 0
+    match net {
+    | Network.Tcp | Network.Tcp4 | Network.Tcp6:
+        host, port = SplitHostPort(addr) else { error(error) }
+        let ((portnum), ok) = conv::Atoi(port)
+        if !ok {
+            error(AddrParseError.InvalidPort)
+        }
+    |:
+        error(AddrParseError.UnknownNetwork)
+    }
+    if host == "" {
+        ret internetAddr(net, Ip.Empty(), portnum, "")
+    }
+    if host == localhost {
+        ret buildLocalhostAddr(net, portnum)
+    }
+    let mut ip = parseAddr(host) else { error(error) }
+    match type ip {
+    | Ip:
+        if net == Network.Tcp6 {
+            ret nil
+        }
+        ret &TcpAddr{
+            Ip: (Ip)(ip),
+            Port: portnum,
+        }
+    | &TcpAddr:
+        let mut tcpAddr = (&TcpAddr)(ip)
+        match net {
+        | Network.Tcp:
+            tcpAddr.Port = portnum
+            ret tcpAddr
+        | Network.Tcp4:
+            if tcpAddr.Ip.To4().Empty() {
+                ret nil
+            }
+            tcpAddr.Port = portnum
+            ret tcpAddr
+        | Network.Tcp6:
+            if tcpAddr.Ip.Addr.len == Ipv6.Len && tcpAddr.Ip.To4().Empty() {
+                tcpAddr.Port = portnum
+                ret tcpAddr
+            }
+            ret nil
+        |:
+            ret nil
+        }
+    |:
+        ret nil
+    }
+}
+
+fn buildLocalhostAddr(&net: Network, port: int): Addr {
+    if net == Network.Tcp || net == Network.Tcp4 {
+        ret &TcpAddr{
+            Ip: Ipv4.Addr(127, 0, 0, 1),
+            Port: port,
+        }
+    }
+    let mut addr = make([]byte, Ipv6.Len)
+    addr[addr.len-1] = 1
+    ret &TcpAddr{
+        Ip: Ip{Addr: addr},
+        Port: port,
+    }
+}

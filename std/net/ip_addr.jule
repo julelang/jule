@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use nosafe for std::internal::nosafe
+use fastbytes for std::internal::fastbytes
+
 // Returns the address of the IPv4 address given by the 4-bytes representation.
 fn ipAddrFrom4(addr: []byte): u128 {
     ret u128{
@@ -21,6 +24,21 @@ fn ipAddrFrom16(addr: []byte): u128 {
 fn beU64(b: []byte): u64 {
     ret u64(b[7]) | u64(b[6]) << 8 | u64(b[5]) << 16 | u64(b[4]) << 24 |
         u64(b[3]) << 32 | u64(b[2]) << 40 | u64(b[1]) << 48 | u64(b[0]) << 56
+}
+
+fn beU64v4(b: []byte): u64 {
+    ret u64(b[3]) << 24 | u64(b[2]) << 16 | u64(b[1]) << 8 | u64(b[0])
+}
+
+fn bePutU64(mut b: []byte, v: u64) {
+    b[7] = byte(v)
+    b[6] = byte(v >> 8)
+    b[5] = byte(v >> 16)
+    b[4] = byte(v >> 24)
+    b[3] = byte(v >> 32)
+    b[2] = byte(v >> 40)
+    b[1] = byte(v >> 48)
+    b[0] = byte(v >> 56)
 }
 
 // Returns the i'th byte of ip. If ip is not an IPv4, v4 returns
@@ -113,4 +131,205 @@ fn str16(ip: u128): str {
     }
 
     ret s
+}
+
+fn parseIPv4Fields(&addr: str, off: int, end: int, mut fields: []byte)! {
+    let (mut val, mut pos) = 0, 0
+    let mut digLen = 0                   // number of digits in current octet
+    let s = nosafe::Stobs(addr)[off:end]
+    let mut i = 0
+    for i < s.len; i++ {
+        if s[i] >= '0' && s[i] <= '9' {
+            if digLen == 1 && val == 0 {
+                error(AddrParseError.IPv4FieldOctetWithLeadingZero)
+            }
+            val = val * 10 + int(s[i]) - '0'
+            digLen++
+            if val > 255 {
+                error(AddrParseError.IPv4FieldValueOverflow)
+            }
+        } else if s[i] == '.' {
+            // .1.2.3
+            // 1.2.3.
+            // 1..2.3
+            if i == 0 || i == s.len-1 || s[i-1] == '.' {
+                error(AddrParseError.EmptyField)
+            }
+            // 1.2.3.4.5
+            if pos == 3 {
+                error(AddrParseError.TooLong)
+            }
+            fields[pos] = byte(val)
+            pos++
+            val = 0
+            digLen = 0
+        } else {
+            error(AddrParseError.UnexpectedToken)
+        }
+    }
+    if pos < 3 {
+        error(AddrParseError.TooShort)
+    }
+    fields[3] = byte(val)
+}
+
+fn parseIPv4(&addr: str)!: Ip {
+    let mut fields = make([]byte, 4)
+    parseIPv4Fields(addr, 0, addr.len, fields) else { error(error) }
+    ret Ip{Addr: fields}
+}
+
+// Parses addr as an IPv6 address (in form "2001:db8::68").
+fn parseIPv6(&addr: str)!: &TcpAddr {
+    let mut s = nosafe::Stobs(addr)
+
+    // Split off the zone right from the start. Yes it's a second scan
+    // of the string, but trying to handle it inline makes a bunch of
+    // other inner loop conditionals more expensive, and it ends up
+    // being slower.
+    let mut zone: []byte = nil
+    let mut i = fastbytes::FindByte(s, '%')
+    if i != -1 {
+        s, zone = s[:i], s[i+1:]
+        if zone.len == 0 {
+            // Not allowed to have an empty zone if explicitly specified.
+            error(AddrParseError.EmptyZone)
+        }
+    }
+
+    let mut ip = make([]byte, 16)
+    let mut ellipsis = -1         // Position of ellipsis in IP.
+
+    // Might have leading ellipsis.
+    if s.len >= 2 && s[0] == ':' && s[1] == ':' {
+        ellipsis = 0
+        s = s[2:]
+        // Might be only ellipsis.
+        if s.len == 0 {
+            let mut tcpAddr = &TcpAddr{
+                Ip: Ipv6.Unspecified().To16(),
+                Zone: str(zone),
+            }
+            ret tcpAddr
+        }
+    }
+
+    // Loop, parsing hex numbers followed by colon.
+    i = 0
+    for i < 16 {
+        // Hex number. Similar to parseIPv4, inlining the hex number
+        // parsing yields a significant performance increase.
+        let mut off = 0
+        let mut acc = u32(0)
+        for off < s.len; off++ {
+            let c = s[off]
+            if c >= '0' && c <= '9' {
+                acc = (acc << 4) + u32(c - '0')
+            } else if c >= 'a' && c <= 'f' {
+                acc = (acc << 4) + u32(c - 'a' + 10)
+            } else if c >= 'A' && c <= 'F' {
+                acc = (acc << 4) + u32(c - 'A' + 10)
+            } else {
+                break
+            }
+            if off > 3 {
+                // More than 4 digits in group, fail.
+                error(AddrParseError.IPv6FieldValueOverflow)
+            }
+            if acc > u16.Max {
+                // Overflow, fail.
+                error(AddrParseError.IPv6FieldValueOverflow)
+            }
+        }
+        if off == 0 {
+            // No digits found, fail.
+            error(AddrParseError.EmptyField)
+        }
+
+        // If followed by dot, might be in trailing IPv4.
+        if off < s.len && s[off] == '.' {
+            if ellipsis < 0 && i != 12 {
+                // Not the right place.
+                error(AddrParseError.UnexpectedToken)
+            }
+            if i+4 > 16 {
+                // Not enough room.
+                error(AddrParseError.TooLong)
+            }
+
+            let mut end = addr.len
+            if zone.len > 0 {
+                end -= zone.len + 1
+            }
+            parseIPv4Fields(addr, end - s.len, end, ip[i:i+4]) else { error(error) }
+            s = s[:0]
+            i += 4
+            break
+        }
+
+        // Save this 16-bit chunk.
+        ip[i] = byte(acc >> 8)
+        ip[i+1] = byte(acc)
+        i += 2
+
+        // Stop at end of string.
+        s = s[off:]
+        if s.len == 0 {
+            break
+        }
+
+        // Otherwise must be followed by colon and more.
+        if s[0] != ':' {
+            error(AddrParseError.UnexpectedToken)
+        } else if s.len == 1 {
+            error(AddrParseError.IPv6ShortColon)
+        }
+        s = s[1:]
+
+        // Look for ellipsis.
+        if s[0] == ':' {
+            if ellipsis >= 0 { // already have one
+                error(AddrParseError.UnexpectedToken)
+            }
+            ellipsis = i
+            s = s[1:]
+            if s.len == 0 { // can be at end
+                break
+            }
+        }
+    }
+    // Must have used entire string.
+    if s.len != 0 {
+        error(AddrParseError.UnexpectedToken)
+    }
+
+    // If didn't parse enough, expand ellipsis.
+    if i < 16 {
+        if ellipsis < 0 {
+            error(AddrParseError.TooShort)
+        }
+        let n = 16 - i
+        let mut j = i - 1
+        for j >= ellipsis; j-- {
+            ip[j+n] = ip[j]
+        }
+        j = ellipsis
+        for j < ellipsis+n; j++ {
+            ip[j] = 0
+        }
+    } else if ellipsis >= 0 {
+        // Ellipsis must represent at least one 0 group.
+        error(AddrParseError.TooShort)
+    }
+
+    // Parse IP address.
+    let u128addr = ipAddrFrom16(ip)
+    bePutU64(ip[:8], u128addr.hi)
+    bePutU64(ip[8:], u128addr.lo)
+    let mut tcpAddr = &TcpAddr{
+        Ip: Ip{Addr: ip},
+        Zone: str(zone),
+    }
+    tcpAddr.Ip = tcpAddr.Ip.To16()
+    ret tcpAddr
 }

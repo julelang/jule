@@ -1,0 +1,50 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use conv for std::internal::conv
+
+// Represents the address of a TCP end point.
+struct TcpAddr {
+    Ip:   Ip
+    Port: int
+    Zone: str // IPv6 scoped addressing zone.
+}
+
+impl Addr for TcpAddr {
+    // Returns the address's netword name.
+    fn Network(self): str {
+        ret "tcp"
+    }
+
+    // Returns string form of address.
+    fn Str(self): str {
+        let ip = self.Ip.ipEmptyStr()
+        if self.Zone != "" {
+            ret JoinHostPort(ip + "%" + self.Zone, conv::Itoa(self.Port))
+        }
+        ret JoinHostPort(ip, conv::Itoa(self.Port))
+    }
+}
+
+impl TcpAddr {
+    // Returns an address of TCP end point.
+    // The network must be a TCP network name.
+    //
+    // See the [Connect] function for a description of the network and addr parameters.
+    //
+    // Exceptionals are always will be AddrParseError.
+    static fn Resolve(mut network: Network, addr: str)!: &TcpAddr {
+        match network {
+        | Network.Tcp | Network.Tcp4 | Network.Tcp6:
+            break
+        |:
+            error(AddrParseError.UnknownNetwork)
+        }
+        let mut intAddr = resolveInternetAddr(network, addr) else { error(error) }
+        if intAddr == nil {
+            error(AddrParseError.NoSuitable)
+        }
+        ret (&TcpAddr)(intAddr)
+    }
+}
