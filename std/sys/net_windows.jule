@@ -1,0 +1,102 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+#pass "-lws2_32"
+
+use std::jule::integrated::{Char, Int}
+
+cpp use "<winsock2.h>"
+cpp use "<ws2ipdef.h>"
+
+#typedef
+cpp struct WSADATA {}
+
+#cdef
+cpp fn MAKEWORD(a: int, b: int): u16
+
+cpp fn socket(int, int, int): uint
+cpp unsafe fn bind(uint, *cpp.sockaddr, uint): int
+cpp unsafe fn connect(uint, *cpp.sockaddr, uint): int
+cpp fn listen(uint, int): int
+cpp unsafe fn accept(uint, *cpp.sockaddr, len: *Int): uint
+cpp unsafe fn send(uint, *Char, uint, int): int
+cpp unsafe fn recv(uint, *Char, uint, int): int
+cpp fn closesocket(uint): int
+cpp unsafe fn WSAStartup(u16, mut _: *cpp.WSADATA): int
+
+// C's WSADATA struct.
+type WsaData: cpp.WSADATA
+
+const INVALID_SOCKET = uint(^0)
+const SOCKET_ERROR = -1
+
+// Socket types
+const SOCK_STREAM = 1
+const SOCK_DGRAM = 2
+const SOCK_RAW = 3
+const SOCK_RDM = 4
+const SOCK_SEQPACKET = 5
+
+// Address families.
+const AF_UNSPEC = 0
+const AF_UNIX = 1
+const AF_INET = 2
+const AF_INET6 = 23
+
+// IP protocols.
+const IPPROTO_IP = 0
+const IPPROTO_TCP = 6
+const IPPROTO_UDP = 17
+
+const INADDR_ANY = 0
+
+// C's socket function.
+fn Socket(domain: int, t: int, protocol: int): uint {
+    ret cpp.socket(domain, t, protocol)
+}
+
+// C's bind function.
+unsafe fn Bind(handle: uint, addr: *Sockaddr, len: uint): int {
+    ret cpp.bind(handle, addr, len)
+}
+
+// C's connect function.
+unsafe fn Connect(handle: uint, addr: *Sockaddr, len: uint): int {
+    ret cpp.connect(handle, addr, len)
+}
+
+// C's listen function.
+fn Listen(handle: uint, backlog: int): int {
+    ret cpp.listen(handle, backlog)
+}
+
+// C's accept function.
+unsafe fn Accept(handle: uint, addr: *Sockaddr, len: *Int): uint {
+    ret cpp.accept(handle, addr, len)
+}
+
+// C's recv function.
+unsafe fn Recv(handle: uint, mut buf: *byte, len: uint, flags: int): int {
+    ret cpp.recv(handle, (*Char)(buf), len, flags)
+}
+
+// C's send function.
+unsafe fn Send(handle: uint, mut buf: *byte, len: uint, flags: int): int {
+    ret cpp.send(handle, (*Char)(buf), len, flags)
+}
+
+// C's closesocket function.
+fn CloseSocket(handle: uint): int {
+    ret cpp.closesocket(handle)
+}
+
+// C's WSAStartup function.
+unsafe fn WSAStartup(verReq: u16, mut data: *WsaData): int {
+    ret cpp.WSAStartup(verReq, data)
+}
+
+// C's MAKEWORD macro.
+fn MakeWord(a: int, b: int): u16 {
+    ret cpp.MAKEWORD(a, b)
+}
