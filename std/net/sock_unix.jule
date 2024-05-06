@@ -2,11 +2,84 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use mem for std::mem
 use sys for std::sys
+use time for std::time
+use std::jule::integrated::{UnsignedInt}
 
 type netHandle: int
 type clientAddrLenInt: u32
 
+fn lastErrorCode(): int {
+    ret sys::GetLastErrno()
+}
+
 fn closeSocket(handle: netHandle): bool {
     ret sys::Close(handle) >= 0
+}
+
+fn closeSocketBlockingMode(handle: netHandle)! {
+    let mut arg = sys::Fcntl(handle, sys::F_GETFL, 0)
+    if arg < 0 {
+        error(lastErrorCode())
+    }
+    arg |= sys::O_NONBLOCK
+    if sys::Fcntl(handle, sys::F_SETFL, arg) < 0 {
+        error(lastErrorCode())
+    }
+}
+
+fn openSocketBlockingMode(handle: netHandle)! {
+    let mut arg = sys::Fcntl(handle, sys::F_GETFL, 0)
+    if arg < 0 {
+        error(lastErrorCode())
+    }
+    arg &= ^sys::O_NONBLOCK
+    if sys::Fcntl(handle, sys::F_SETFL, arg) < 0 {
+        error(lastErrorCode())
+    }
+}
+
+unsafe fn connectSocket(handle: netHandle, sockAddr: *sys::Sockaddr, sockLen: uint, timeout: time::DurInt)! {
+    if timeout == 0 {
+        connectSocketNoTimeout(handle, sockAddr, sockLen) else { error(error) }
+        ret
+    }
+    closeSocketBlockingMode(handle) else { error(error) }
+    let mut res = sys::Connect(handle, sockAddr, sockLen)
+    if res < 0 {
+        let err = lastErrorCode()
+        if err != sys::EINPROGRESS {
+            error(err)
+        }
+    } else {
+        ret
+    }
+    let tv = timevalFromDuration(timeout)
+    let mut fd = sys::Fd{}
+    sys::FdZero(&fd)
+    sys::FdSet(handle, &fd)
+lookup:
+    for {
+        res = sys::Select(handle+1, nil, &fd, nil, &tv)
+        let err = lastErrorCode()
+        match {
+        | res < 0 && err != sys::EINTR:
+            error(err)
+        | res > 0:
+            let len2 = UnsignedInt(mem::SizeOf(int))
+            let opt = 0
+            if sys::Getsockopt(handle, sys::SOL_SOCKET, sys::SO_ERROR, &opt, &len2) < 0 {
+                error(lastErrorCode())
+            }
+            if opt != 0 {
+                error(opt)
+            }
+            break lookup
+        |:
+            // Timeout.
+            error(-1)
+        }
+    }
+    openSocketBlockingMode(handle) else { error(error) }
 }

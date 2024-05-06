@@ -2,10 +2,13 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+// Useful links;
+// - https://github.com/wine-mirror/wine/blob/master/include/winsock2.h
+
 #pass "-lws2_32"
 
-use std::jule::integrated::{Char, Int}
-
+use mem for std::mem
+use std::jule::integrated::{Char, Int, Long, UnsignedLong}
 cpp use "<winsock2.h>"
 cpp use "<ws2ipdef.h>"
 
@@ -14,6 +17,15 @@ cpp struct WSADATA {}
 
 #cdef
 cpp fn MAKEWORD(a: int, b: int): u16
+
+#cdef
+cpp fn FD_ZERO(*cpp.fd_set)
+
+#cdef
+cpp fn FD_SET(uint, *cpp.fd_set)
+
+#cdef
+cpp fn FD_ISSET(uint, *cpp.fd_set): int
 
 cpp fn socket(int, int, int): uint
 cpp unsafe fn bind(uint, *cpp.sockaddr, uint): int
@@ -24,6 +36,9 @@ cpp unsafe fn send(uint, *Char, uint, int): int
 cpp unsafe fn recv(uint, *Char, uint, int): int
 cpp fn closesocket(uint): int
 cpp unsafe fn WSAStartup(u16, mut _: *cpp.WSADATA): int
+cpp unsafe fn getsockopt(uint, int, int, *Char, *Int): int
+cpp unsafe fn setsockopt(uint, int, int, *Char, int): int
+cpp unsafe fn ioctlsocket(uint, Long, *UnsignedLong): int
 
 // C's WSADATA struct.
 type WsaData: cpp.WSADATA
@@ -50,6 +65,27 @@ const IPPROTO_TCP = 6
 const IPPROTO_UDP = 17
 
 const INADDR_ANY = 0
+
+const SOL_SOCKET = 0xFFFF
+
+const SO_ERROR = 0x1007
+const SO_RCVTIMEO = 0x1006
+const SO_SNDTIMEO = 0x1005
+
+// C's FD_ZERO macro.
+unsafe fn FdZero(mut fd: *Fd) {
+    cpp.FD_ZERO(fd)
+}
+
+// C's FD_SET macro.
+unsafe fn FdSet(handle: uint, mut fd: *Fd) {
+    cpp.FD_SET(handle, fd)
+}
+
+// C's FD_ISSET macro.
+unsafe fn FdIsset(handle: uint, mut fd: *Fd): int {
+    ret cpp.FD_ISSET(handle, fd)
+}
 
 // C's socket function.
 fn Socket(domain: int, t: int, protocol: int): uint {
@@ -99,4 +135,19 @@ unsafe fn WSAStartup(verReq: u16, mut data: *WsaData): int {
 // C's MAKEWORD macro.
 fn MakeWord(a: int, b: int): u16 {
     ret cpp.MAKEWORD(a, b)
+}
+
+// C's getsockopt function.
+unsafe fn Getsockopt(handle: uint, level: int, option: int, buf: *Char, len: *Int): int {
+    ret cpp.getsockopt(handle, level, option, buf, len)
+}
+
+// C's setsockopt function.
+unsafe fn Setsockopt(handle: uint, level: int, option: int, buf: *Char, len: int): int {
+    ret cpp.setsockopt(handle, level, option, buf, len)
+}
+
+// C's ioctlsocket function.
+unsafe fn Ioctlsocket(handle: uint, cmd: Long, arg: *UnsignedLong): int {
+    ret cpp.ioctlsocket(handle, cmd, arg)
 }

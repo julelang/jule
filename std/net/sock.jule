@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use time for std::time
+use sys for std::sys
+
 // Listens the address on the named network.
 // It will forward any exceptional from network connectors.
 //
@@ -32,10 +35,29 @@ fn Listen(network: Network, addr: str)!: Listener {
 //
 // It will forward any exceptional from network connectors.
 fn Connect(network: Network, addr: str)!: Conn {
+    ret ConnectTimeout(network, addr, 0) else { error(error) }
+}
+
+// Same as Connect, but uses timeout.
+fn ConnectTimeout(network: Network, addr: str, timeout: time::DurInt)!: Conn {
     match network {
     | Network.Tcp | Network.Tcp4 | Network.Tcp6:
-        ret TcpListener.Connect(addr) else { error(error) }
+        ret TcpListener.ConnectTimeout(addr, timeout) else { error(error) }
     |:
         error(AddrError.UnknownNetwork)
     }
+}
+
+unsafe fn connectSocketNoTimeout(handle: netHandle, sockAddr: *sys::Sockaddr, sockLen: uint)! {
+    if sys::Connect(handle, sockAddr, sockLen) < 0 {
+        error(lastErrorCode())
+    }
+}
+
+fn timevalFromDuration(timeout: time::DurInt): sys::Timeval {
+    let sec = i64(time::Duration.Seconds(timeout))
+    let mut tv = sys::Timeval{}
+    tv.tv_sec = sec
+    tv.tv_usec = time::Duration.Microseconds(timeout - (time::Duration.Second * sec))
+    ret tv
 }

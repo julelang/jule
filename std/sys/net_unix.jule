@@ -2,9 +2,18 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use std::jule::integrated::{UnsignedInt}
+
+cpp use "<sys/time.h>"
 cpp use "<sys/socket.h>"
 cpp use "<netinet/in.h>"
 cpp use "<arpa/inet.h>"
+
+#cdef
+cpp fn FD_ZERO(*cpp.fd_set)
+
+#cdef
+cpp fn FD_SET(int, *cpp.fd_set)
 
 cpp fn socket(int, int, int): int
 cpp unsafe fn bind(int, *cpp.sockaddr, uint): int
@@ -13,8 +22,20 @@ cpp fn listen(int, int): int
 cpp unsafe fn accept(int, *cpp.sockaddr, len: *u32): int
 cpp unsafe fn send(int, *unsafe, uint, int): int
 cpp unsafe fn recv(int, *unsafe, uint, int): int
+cpp unsafe fn getsockopt(int, int, int, *unsafe, *UnsignedInt): int
+cpp unsafe fn setsockopt(int, int, int, *unsafe, uint): int
 
 const INVALID_SOCKET = -1
+
+// C's FD_ZERO macro.
+unsafe fn FdZero(mut fd: *Fd) {
+    cpp.FD_ZERO(fd)
+}
+
+// C's FD_SET macro.
+unsafe fn FdSet(handle: int, mut fd: *Fd) {
+    cpp.FD_SET(handle, fd)
+}
 
 // C's socket function.
 fn Socket(domain: int, t: int, protocol: int): int {
@@ -49,4 +70,14 @@ unsafe fn Recv(handle: int, mut buf: *unsafe, len: uint, flags: int): int {
 // C's send function.
 unsafe fn Send(handle: int, mut buf: *unsafe, len: uint, flags: int): int {
     ret cpp.send(handle, buf, len, flags)
+}
+
+// C's getsockopt function.
+unsafe fn Getsockopt(handle: int, level: int, option: int, buf: *unsafe, len: *UnsignedInt): int {
+    ret cpp.getsockopt(handle, level, option, buf, len)
+}
+
+// C's setsockopt function.
+unsafe fn Setsockopt(handle: int, level: int, option: int, buf: *unsafe, len: uint): int {
+    ret cpp.setsockopt(handle, level, option, buf, len)
 }

@@ -4,6 +4,15 @@
 
 use integ for std::jule::integrated::{Char}
 
+#typedef
+cpp struct fd_set {}
+
+#typedef
+cpp struct timeval {
+    tv_sec:  i64 // Seconds.
+    tv_usec: i64 // Microseconds.
+}
+
 cpp struct in_addr {
     s_addr: u32
 }
@@ -30,17 +39,27 @@ cpp struct sockaddr_in6 {
 }
 
 #cdef
-cpp fn htons(x: int): u16
+cpp fn htons(int): u16
 
 #cdef
-cpp fn ntohs(x: int): u16
+cpp fn ntohs(int): u16
+
+cpp unsafe fn select(int, *cpp.fd_set, *cpp.fd_set, *cpp.fd_set, *cpp.timeval): int
 
 // C's sockaddr structure.
 type Sockaddr: cpp.sockaddr
+
 // C's sockaddr_in structure.
 type SockaddrIn: cpp.sockaddr_in
+
 // C's sockaddr_in6 structure.
 type SockaddrIn6: cpp.sockaddr_in6
+
+// C's timeval structure.
+type Timeval: cpp.timeval
+
+// C's fd_set structure.
+type Fd: cpp.fd_set
 
 // C's htons macro.
 fn Htons(x: int): u16 {
@@ -50,4 +69,9 @@ fn Htons(x: int): u16 {
 // C's ntohs macro.
 fn Ntohs(x: int): u16 {
     ret cpp.ntohs(x)
+}
+
+// C's select function.
+unsafe fn Select(nfds: int, mut read: *Fd, mut write: *Fd, mut err: *Fd, mut timeout: *Timeval): int {
+    ret cpp.select(nfds, read, write, err, timeout)
 }
