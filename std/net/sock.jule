@@ -12,7 +12,7 @@ use sys for std::sys
 fn Listen(network: Network, addr: str)!: Listener {
     match network {
     | Network.Tcp | Network.Tcp4 | Network.Tcp6:
-        ret TcpListener.Bind(addr) else { error(error) }
+        ret tcpBind(network, addr) else { error(error) }
     |:
         error(AddrError.UnknownNetwork)
     }
@@ -33,6 +33,12 @@ fn Listen(network: Network, addr: str)!: Listener {
 //  in RFC 4007. The functions [JoinHostPort] and [SplitHostPort] manipulate
 //  a pair of host and port in this form.
 //
+//  If network is Tcp4, it will accept only IPv4 addresses and if address is IPv6,
+//  will try to convert IPv4. If network is Tcp6, it will accept only IPv6 address and
+//  address is IPv4, will not try to convert IPv6. If network is Tcp, it will use Tcp4
+//  for empty addresses and try for IPv4 if possible. If address is IPv4 or IPv6 which
+//  is converted to IPv4 successfully, will use Tcp4, otherwise IPv6 and Tcp6 preferred.
+//
 // It will forward any exceptional from network connectors.
 fn Connect(network: Network, addr: str)!: Conn {
     ret ConnectTimeout(network, addr, 0) else { error(error) }
@@ -42,7 +48,7 @@ fn Connect(network: Network, addr: str)!: Conn {
 fn ConnectTimeout(network: Network, addr: str, timeout: time::DurInt)!: Conn {
     match network {
     | Network.Tcp | Network.Tcp4 | Network.Tcp6:
-        ret TcpListener.ConnectTimeout(addr, timeout) else { error(error) }
+        ret tcpConnect(network, addr, timeout) else { error(error) }
     |:
         error(AddrError.UnknownNetwork)
     }

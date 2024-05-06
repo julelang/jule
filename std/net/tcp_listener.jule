@@ -8,7 +8,7 @@ use time for std::time
 
 struct TcpListener {
     addr:       &TcpAddr
-    v6:         bool
+    mut v6:     bool
     mut handle: netHandle = sys::INVALID_SOCKET
 }
 
@@ -22,72 +22,7 @@ impl TcpListener {
     //
     // See the [Connect] function for a description of the addr parameter.
     static fn Bind(addr: str)!: &TcpListener {
-        let mut tcpAddr = TcpAddr.Resolve(Network.Tcp, addr) else { error(error) }
-        let mut handle = netHandle(sys::INVALID_SOCKET)
-        let mut v6 = false
-        if tcpAddr.Ip.Empty() {
-            handle = sys::Socket(sys::AF_INET, sys::SOCK_STREAM, sys::IPPROTO_TCP)
-            if handle < 0 {
-                error(lastErrorCode())
-            }
-            let mut sockAddr = sys::SockaddrIn{}
-            sockAddr.sin_family = sys::AF_INET
-            sockAddr.sin_port = sys::Htons(tcpAddr.Port)
-            sockAddr.sin_addr.s_addr = sys::INADDR_ANY
-            unsafe {
-                if sys::Bind(handle, (*sys::Sockaddr)(&sockAddr), mem::SizeOf(sockAddr)) != 0 {
-                    closeSocket(handle)
-                    error(lastErrorCode())
-                }
-            }
-        } else {
-            let mut ipv4 = tcpAddr.Ip.To4()
-            if ipv4.Empty() {
-                v6 = true
-                handle = sys::Socket(sys::AF_INET6, sys::SOCK_STREAM, sys::IPPROTO_TCP)
-                if handle < 0 {
-                    error(lastErrorCode())
-                }
-                let mut sockAddr = sys::SockaddrIn6{}
-                sockAddr.sin6_family = sys::AF_INET6
-                for i, b in tcpAddr.Ip.Addr {
-                    sockAddr.sin6_addr.s6_addr[i] = b
-                }
-                sockAddr.sin6_port = sys::Htons(tcpAddr.Port)
-                unsafe {
-                    if sys::Bind(handle, (*sys::Sockaddr)(&sockAddr), mem::SizeOf(sockAddr)) != 0 {
-                        closeSocket(handle)
-                        error(lastErrorCode())
-                    }
-                }
-            } else {
-                tcpAddr.Ip = ipv4
-                handle = sys::Socket(sys::AF_INET, sys::SOCK_STREAM, sys::IPPROTO_TCP)
-                if handle < 0 {
-                    error(lastErrorCode())
-                }
-                let mut sockAddr = sys::SockaddrIn{}
-                sockAddr.sin_family = sys::AF_INET
-                sockAddr.sin_port = sys::Htons(tcpAddr.Port)
-                sockAddr.sin_addr.s_addr = u32(beU64v4(tcpAddr.Ip.Addr))
-                unsafe {
-                    if sys::Bind(handle, (*sys::Sockaddr)(&sockAddr), mem::SizeOf(sockAddr)) != 0 {
-                        closeSocket(handle)
-                        error(lastErrorCode())
-                    }
-                }
-            }
-        }
-        const MaxQueueLength = 10 // Length of maximum connection waiters.
-        if sys::Listen(handle, MaxQueueLength) < 0 {
-            closeSocket(handle)
-            error(lastErrorCode())
-        }
-        ret &TcpListener{
-            v6: v6,
-            addr: tcpAddr,
-            handle: handle,
-        }
+        ret tcpBind(Network.Tcp, addr) else { error(error) }
     }
 
     // Connects to TCP Listener by given address.
@@ -97,69 +32,12 @@ impl TcpListener {
     //
     // See the [Connect] function for a description of the addr parameter.
     static fn Connect(addr: str)!: &TcpConn {
-        ret TcpListener.ConnectTimeout(addr, 0) else { error(error) }
+        ret tcpConnect(Network.Tcp, addr, 0) else { error(error) }
     }
 
     // Same as TcpListener.Connect, but uses timeout.
     static fn ConnectTimeout(addr: str, timeout: time::DurInt)!: &TcpConn {
-        let mut tcpAddr = TcpAddr.Resolve(Network.Tcp, addr) else { error(error) }
-        let mut handle = netHandle(sys::INVALID_SOCKET)
-        if tcpAddr.Ip.Empty() {
-            handle = sys::Socket(sys::AF_INET, sys::SOCK_STREAM, sys::IPPROTO_TCP)
-            if handle < 0 {
-                error(lastErrorCode())
-            }
-            let mut sockAddr = sys::SockaddrIn{}
-            sockAddr.sin_family = sys::AF_INET
-            sockAddr.sin_port = sys::Htons(tcpAddr.Port)
-            sockAddr.sin_addr.s_addr = sys::INADDR_ANY
-            unsafe {
-                connectSocket(handle, (*sys::Sockaddr)(&sockAddr), mem::SizeOf(sockAddr), timeout) else {
-                    closeSocket(handle)
-                    error(error)
-                }
-            }
-        } else {
-            let mut ipv4 = tcpAddr.Ip.To4()
-            if ipv4.Empty() {
-                handle = sys::Socket(sys::AF_INET6, sys::SOCK_STREAM, sys::IPPROTO_TCP)
-                if handle < 0 {
-                    error(lastErrorCode())
-                }
-                let mut sockAddr = sys::SockaddrIn6{}
-                sockAddr.sin6_family = sys::AF_INET6
-                for i, b in tcpAddr.Ip.Addr {
-                    sockAddr.sin6_addr.s6_addr[i] = b
-                }
-                sockAddr.sin6_port = sys::Htons(tcpAddr.Port)
-                unsafe {
-                    connectSocket(handle, (*sys::Sockaddr)(&sockAddr), mem::SizeOf(sockAddr), timeout) else {
-                        closeSocket(handle)
-                        error(error)
-                    }
-                }
-            } else {
-                tcpAddr.Ip = ipv4
-                handle = sys::Socket(sys::AF_INET, sys::SOCK_STREAM, sys::IPPROTO_TCP)
-                if handle < 0 {
-                    error(lastErrorCode())
-                }
-                let mut sockAddr = sys::SockaddrIn{}
-                sockAddr.sin_family = sys::AF_INET
-                sockAddr.sin_port = sys::Htons(tcpAddr.Port)
-                sockAddr.sin_addr.s_addr = u32(beU64v4(tcpAddr.Ip.Addr))
-                unsafe {
-                    connectSocket(handle, (*sys::Sockaddr)(&sockAddr), mem::SizeOf(sockAddr), timeout) else {
-                        closeSocket(handle)
-                        error(error)
-                    }
-                }
-            }
-        }
-        ret &TcpConn{
-            Addr: tcpAddr,
-            handle: handle,
-        }
+        ret tcpConnect(Network.Tcp, addr, timeout) else { error(error) }
     }
 
     // Accepts incoming connection, returns &TcpConn.
@@ -241,5 +119,186 @@ impl TcpListener {
         }
         self.handle = sys::INVALID_SOCKET
         self.v6 = false
+    }
+}
+
+fn tcpBind(network: Network, &addr: str)!: &TcpListener {
+    let mut tcpAddr = TcpAddr.Resolve(network, addr) else { error(error) }
+    let mut handle = netHandle(sys::INVALID_SOCKET)
+    let mut v6 = false
+    if tcpAddr.Ip.Empty() {
+        handle = sys::Socket(sys::AF_INET, sys::SOCK_STREAM, sys::IPPROTO_TCP)
+        if handle < 0 {
+            error(lastErrorCode())
+        }
+        match network {
+        | Network.Tcp | Network.Tcp4:
+            let mut sockAddr = sys::SockaddrIn{}
+            sockAddr.sin_family = sys::AF_INET
+            sockAddr.sin_port = sys::Htons(tcpAddr.Port)
+            sockAddr.sin_addr.s_addr = sys::INADDR_ANY
+            unsafe {
+                if sys::Bind(handle, (*sys::Sockaddr)(&sockAddr), mem::SizeOf(sockAddr)) != 0 {
+                    closeSocket(handle)
+                    error(lastErrorCode())
+                }
+            }
+        | Network.Tcp6:
+            v6 = true
+            handle = sys::Socket(sys::AF_INET6, sys::SOCK_STREAM, sys::IPPROTO_TCP)
+            if handle < 0 {
+                error(lastErrorCode())
+            }
+            let mut sockAddr = sys::SockaddrIn6{}
+            sockAddr.sin6_family = sys::AF_INET6
+            sockAddr.sin6_port = sys::Htons(tcpAddr.Port)
+            unsafe {
+                if sys::Bind(handle, (*sys::Sockaddr)(&sockAddr), mem::SizeOf(sockAddr)) != 0 {
+                    closeSocket(handle)
+                    error(lastErrorCode())
+                }
+            }
+        |:
+            error(AddrError.UnknownNetwork)
+        }
+    } else {
+        let mut ipv4 = tcpAddr.Ip.To4()
+        if ipv4.Empty() {
+            if network == Network.Tcp4 {
+                error(AddrError.NoSuitable)
+            }
+            v6 = true
+            handle = sys::Socket(sys::AF_INET6, sys::SOCK_STREAM, sys::IPPROTO_TCP)
+            if handle < 0 {
+                error(lastErrorCode())
+            }
+            let mut sockAddr = sys::SockaddrIn6{}
+            sockAddr.sin6_family = sys::AF_INET6
+            for i, b in tcpAddr.Ip.Addr {
+                sockAddr.sin6_addr.s6_addr[i] = b
+            }
+            sockAddr.sin6_port = sys::Htons(tcpAddr.Port)
+            unsafe {
+                if sys::Bind(handle, (*sys::Sockaddr)(&sockAddr), mem::SizeOf(sockAddr)) != 0 {
+                    closeSocket(handle)
+                    error(lastErrorCode())
+                }
+            }
+        } else {
+            if network == Network.Tcp6 {
+                error(AddrError.NoSuitable)
+            }
+            tcpAddr.Ip = ipv4
+            handle = sys::Socket(sys::AF_INET, sys::SOCK_STREAM, sys::IPPROTO_TCP)
+            if handle < 0 {
+                error(lastErrorCode())
+            }
+            let mut sockAddr = sys::SockaddrIn{}
+            sockAddr.sin_family = sys::AF_INET
+            sockAddr.sin_port = sys::Htons(tcpAddr.Port)
+            sockAddr.sin_addr.s_addr = u32(beU64v4(tcpAddr.Ip.Addr))
+            unsafe {
+                if sys::Bind(handle, (*sys::Sockaddr)(&sockAddr), mem::SizeOf(sockAddr)) != 0 {
+                    closeSocket(handle)
+                    error(lastErrorCode())
+                }
+            }
+        }
+    }
+    const MaxQueueLength = 10 // Length of maximum connection waiters.
+    if sys::Listen(handle, MaxQueueLength) < 0 {
+        closeSocket(handle)
+        error(lastErrorCode())
+    }
+    ret &TcpListener{
+        v6: v6,
+        addr: tcpAddr,
+        handle: handle,
+    }
+}
+
+fn tcpConnect(network: Network, &addr: str, timeout: time::DurInt)!: &TcpConn {
+    let mut tcpAddr = TcpAddr.Resolve(network, addr) else { error(error) }
+    let mut handle = netHandle(sys::INVALID_SOCKET)
+    if tcpAddr.Ip.Empty() {
+        handle = sys::Socket(sys::AF_INET, sys::SOCK_STREAM, sys::IPPROTO_TCP)
+        if handle < 0 {
+            error(lastErrorCode())
+        }
+        match network {
+        | Network.Tcp | Network.Tcp4:
+            let mut sockAddr = sys::SockaddrIn{}
+            sockAddr.sin_family = sys::AF_INET
+            sockAddr.sin_port = sys::Htons(tcpAddr.Port)
+            sockAddr.sin_addr.s_addr = sys::INADDR_ANY
+            unsafe {
+                connectSocket(handle, (*sys::Sockaddr)(&sockAddr), mem::SizeOf(sockAddr), timeout) else {
+                    closeSocket(handle)
+                    error(error)
+                }
+            }
+        | Network.Tcp6:
+            handle = sys::Socket(sys::AF_INET6, sys::SOCK_STREAM, sys::IPPROTO_TCP)
+            if handle < 0 {
+                error(lastErrorCode())
+            }
+            let mut sockAddr = sys::SockaddrIn6{}
+            sockAddr.sin6_family = sys::AF_INET6
+            sockAddr.sin6_port = sys::Htons(tcpAddr.Port)
+            unsafe {
+                connectSocket(handle, (*sys::Sockaddr)(&sockAddr), mem::SizeOf(sockAddr), timeout) else {
+                    closeSocket(handle)
+                    error(error)
+                }
+            }
+        |:
+            error(AddrError.UnknownNetwork)
+        }
+    } else {
+        let mut ipv4 = tcpAddr.Ip.To4()
+        if ipv4.Empty() {
+            if network == Network.Tcp4 {
+                error(AddrError.NoSuitable)
+            }
+            handle = sys::Socket(sys::AF_INET6, sys::SOCK_STREAM, sys::IPPROTO_TCP)
+            if handle < 0 {
+                error(lastErrorCode())
+            }
+            let mut sockAddr = sys::SockaddrIn6{}
+            sockAddr.sin6_family = sys::AF_INET6
+            for i, b in tcpAddr.Ip.Addr {
+                sockAddr.sin6_addr.s6_addr[i] = b
+            }
+            sockAddr.sin6_port = sys::Htons(tcpAddr.Port)
+            unsafe {
+                connectSocket(handle, (*sys::Sockaddr)(&sockAddr), mem::SizeOf(sockAddr), timeout) else {
+                    closeSocket(handle)
+                    error(error)
+                }
+            }
+        } else {
+            if network == Network.Tcp6 {
+                error(AddrError.NoSuitable)
+            }
+            tcpAddr.Ip = ipv4
+            handle = sys::Socket(sys::AF_INET, sys::SOCK_STREAM, sys::IPPROTO_TCP)
+            if handle < 0 {
+                error(lastErrorCode())
+            }
+            let mut sockAddr = sys::SockaddrIn{}
+            sockAddr.sin_family = sys::AF_INET
+            sockAddr.sin_port = sys::Htons(tcpAddr.Port)
+            sockAddr.sin_addr.s_addr = u32(beU64v4(tcpAddr.Ip.Addr))
+            unsafe {
+                connectSocket(handle, (*sys::Sockaddr)(&sockAddr), mem::SizeOf(sockAddr), timeout) else {
+                    closeSocket(handle)
+                    error(error)
+                }
+            }
+        }
+    }
+    ret &TcpConn{
+        Addr: tcpAddr,
+        handle: handle,
     }
 }
