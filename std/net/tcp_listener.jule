@@ -8,6 +8,7 @@ use time for std::time
 
 struct TcpListener {
     addr:       &TcpAddr
+    v6:         bool
     mut handle: netHandle = sys::INVALID_SOCKET
 }
 
@@ -23,6 +24,7 @@ impl TcpListener {
     static fn Bind(addr: str)!: &TcpListener {
         let mut tcpAddr = TcpAddr.Resolve(Network.Tcp, addr) else { error(error) }
         let mut handle = netHandle(sys::INVALID_SOCKET)
+        let mut v6 = false
         if tcpAddr.Ip.Empty() {
             handle = sys::Socket(sys::AF_INET, sys::SOCK_STREAM, sys::IPPROTO_TCP)
             if handle < 0 {
@@ -41,14 +43,19 @@ impl TcpListener {
         } else {
             let mut ipv4 = tcpAddr.Ip.To4()
             if ipv4.Empty() {
+                v6 = true
                 handle = sys::Socket(sys::AF_INET6, sys::SOCK_STREAM, sys::IPPROTO_TCP)
                 if handle < 0 {
                     error(lastErrorCode())
                 }
                 let mut sockAddr = sys::SockaddrIn6{}
                 sockAddr.sin6_family = sys::AF_INET6
-                for i, b in tcpAddr.Ip.Addr {
-                    sockAddr.sin6_addr.s6_addr[i] = b
+                if tcpAddr.Ip.IsUnspecified() {
+                    sockAddr.sin6_addr = sys::In6addrAny
+                } else {
+                    for i, b in tcpAddr.Ip.Addr {
+                        sockAddr.sin6_addr.s6_addr[i] = b
+                    }
                 }
                 sockAddr.sin6_port = sys::Htons(tcpAddr.Port)
                 unsafe {
@@ -81,6 +88,7 @@ impl TcpListener {
             error(lastErrorCode())
         }
         ret &TcpListener{
+            v6: v6,
             addr: tcpAddr,
             handle: handle,
         }
@@ -124,8 +132,12 @@ impl TcpListener {
                 }
                 let mut sockAddr = sys::SockaddrIn6{}
                 sockAddr.sin6_family = sys::AF_INET6
-                for i, b in tcpAddr.Ip.Addr {
-                    sockAddr.sin6_addr.s6_addr[i] = b
+                if tcpAddr.Ip.IsUnspecified() {
+                    sockAddr.sin6_addr = sys::In6addrAny
+                } else {
+                    for i, b in tcpAddr.Ip.Addr {
+                        sockAddr.sin6_addr.s6_addr[i] = b
+                    }
                 }
                 sockAddr.sin6_port = sys::Htons(tcpAddr.Port)
                 unsafe {
@@ -165,32 +177,50 @@ impl TcpListener {
         if self.handle == sys::INVALID_SOCKET {
             panic("std::net: TcpListener.Accept: connection is not open")
         }
-        let mut clientAddr = sys::SockaddrIn6{}
-        let clientAddrLen = addrLen(mem::SizeOf(clientAddr))
-        let handle = unsafe { sys::Accept(self.handle, (*sys::Sockaddr)(&clientAddr), &clientAddrLen) }
-        if handle < 0 {
-            error(lastErrorCode())
-        }
-        let mut ip = Ip{
-            Addr: make([]byte, Ipv6.Len),
-        }
-        for i in ip.Addr {
-            ip.Addr[i] = clientAddr.sin6_addr.s6_addr[i]
-        }
-        if ip.IsUnspecified() {
-            ip = Ipv4.Addr(127, 0, 0, 1)
-        } else {
-            let mut ipv4 = ip.To4()
-            if !ipv4.Empty() {
-                ip = ipv4
+        if self.v6 { // IPv6
+            let mut clientAddr = sys::SockaddrIn6{}
+            let clientAddrLen = addrLen(mem::SizeOf(clientAddr))
+            let handle = unsafe { sys::Accept(self.handle, (*sys::Sockaddr)(&clientAddr), &clientAddrLen) }
+            if handle < 0 {
+                error(lastErrorCode())
             }
-        }
-        ret &TcpConn{
-            Addr: &TcpAddr{
-                Ip: ip,
-                Port: int(sys::Ntohs(int(clientAddr.sin6_port))),
-            },
-            handle: handle,
+            let mut ip = Ip{
+                Addr: make([]byte, Ipv6.Len),
+            }
+            unsafe {
+                getSocketAddr(handle, (*sys::Sockaddr)(&clientAddr), clientAddrLen) else { error(error) }
+            }
+            for i in ip.Addr {
+                ip.Addr[i] = clientAddr.sin6_addr.s6_addr[i]
+            }
+            ret &TcpConn{
+                Addr: &TcpAddr{
+                    Ip: ip,
+                    Port: int(sys::Ntohs(int(clientAddr.sin6_port))),
+                },
+                handle: handle,
+            }
+        } else { // IPv4
+            let mut clientAddr = sys::SockaddrIn{}
+            let clientAddrLen = addrLen(mem::SizeOf(clientAddr))
+            let handle = unsafe { sys::Accept(self.handle, (*sys::Sockaddr)(&clientAddr), &clientAddrLen) }
+            if handle < 0 {
+                error(lastErrorCode())
+            }
+            let mut ip = Ip{
+                Addr: make([]byte, Ipv4.Len),
+            }
+            unsafe {
+                getSocketAddr(handle, (*sys::Sockaddr)(&clientAddr), clientAddrLen) else { error(error) }
+            }
+            bePutU64v4(ip.Addr, clientAddr.sin_addr.s_addr)
+            ret &TcpConn{
+                Addr: &TcpAddr{
+                    Ip: ip,
+                    Port: int(sys::Ntohs(int(clientAddr.sin_port))),
+                },
+                handle: handle,
+            }
         }
     }
 
