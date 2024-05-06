@@ -56,6 +56,8 @@ use strings for std::strings
 
 // Value data.
 struct Data {
+    untyped: bool
+
     Kind:      &TypeKind
     Mutable:   bool
     Reference: bool
@@ -253,16 +255,16 @@ impl Eval {
 
         data.Model = &RuneExprModel{Code: r}
         data.IsRune = true
+        data.untyped = true
         ret data
     }
 
     fn litFloat(self, &l: &LitExpr): &Data {
         const FloatKind: str = PrimKind.F64
-
         let f = conv::ParseFloat(l.Value, 64) else { use f64.Max }
         let mut constant = Const.NewF64(f)
-
         ret &Data{
+            untyped: true,
             Constant: constant,
             Kind: &TypeKind{
                 Kind: buildPrimType(FloatKind),
@@ -326,6 +328,7 @@ impl Eval {
             // If this concern is true, set kind to minimum type that has enough bitsize.
             fitBitsize(d)
         }
+        d.untyped = true
         ret d
     }
 
@@ -660,10 +663,10 @@ impl Eval {
         if v.Constant && v.Value.Data.Constant != nil {
             d.Constant = new(Const, *v.Value.Data.Constant)
             d.Model = d.Constant
-        }
-
-        if d.IsConst() {
-            self.applyNumericPrefix(d)
+            if v.untypedConstant() {
+                self.applyNumericPrefix(d)
+                d.untyped = true
+            }
         }
 
         ret d
@@ -1680,6 +1683,7 @@ impl Eval {
         } else {
             d.Kind = t
         }
+        d.untyped = false
 
         ret d
     }
@@ -3778,7 +3782,14 @@ impl binaryEval {
             ret
         }
     set:
-        if types::IsGreater(self.r.Kind.Prim().Kind, self.l.Kind.Prim().Kind) {
+        if self.l.untyped && !self.r.untyped {
+            self.l.Kind = self.r.Kind
+            self.l.untyped = false
+            ret
+        }
+        let lp = self.l.Kind.Prim()
+        let rp = self.r.Kind.Prim()
+        if types::IsGreater(rp.Kind, lp.Kind) {
             self.l.Kind = self.r.Kind
         }
     }
@@ -3809,28 +3820,24 @@ impl binaryEval {
         if !types::IsNum(rk) {
             ret false
         }
-
-        if self.l.IsConst() {
+        if self.l.IsConst() && self.l.untyped {
             ret true
         }
-
         if lk == types::TypeKind.F32 {
-            if self.r.IsConst() {
+            if self.r.IsConst() && self.r.untyped {
                 ret true
             }
             ret rk == types::TypeKind.F32
         }
         if lk == types::TypeKind.F64 {
-            if self.r.IsConst() {
+            if self.r.IsConst() && self.r.untyped {
                 ret true
             }
             ret rk == types::TypeKind.F64
         }
-
-        if self.r.IsConst() {
+        if self.r.IsConst() && self.r.untyped {
             ret true
         }
-
         ret lk == rk
     }
 
