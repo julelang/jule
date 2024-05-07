@@ -44,6 +44,7 @@ namespace jule
                 jule::panic("runtime: str: allocation length lower than zero");
             jule::Str s;
             s.buffer.reserve(len);
+            s.buffer.resize(len);
             return s;
         }
 
