@@ -1,0 +1,103 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+#build test
+
+use std::testing::{T}
+use strings for std::strings
+
+struct caseMacParse {
+    s:    str
+    addr: HardwareAddr
+    ok:   bool
+}
+
+static casesMacParse: []caseMacParse = [
+    // See RFC 7042, Section 2.1.1.
+    {"00:00:5e:00:53:01", {Addr: [0x00, 0x00, 0x5e, 0x00, 0x53, 0x01]}, true},
+    {"00-00-5e-00-53-01", {Addr: [0x00, 0x00, 0x5e, 0x00, 0x53, 0x01]}, true},
+    {"0000.5e00.5301", {Addr: [0x00, 0x00, 0x5e, 0x00, 0x53, 0x01]}, true},
+
+    // See RFC 7042, Section 2.2.2.
+    {"02:00:5e:10:00:00:00:01", {Addr: [0x02, 0x00, 0x5e, 0x10, 0x00, 0x00, 0x00, 0x01]}, true},
+    {"02-00-5e-10-00-00-00-01", {Addr: [0x02, 0x00, 0x5e, 0x10, 0x00, 0x00, 0x00, 0x01]}, true},
+    {"0200.5e10.0000.0001", {Addr: [0x02, 0x00, 0x5e, 0x10, 0x00, 0x00, 0x00, 0x01]}, true},
+
+    // See RFC 4391, Section 9.1.1.
+    {
+        "00:00:00:00:fe:80:00:00:00:00:00:00:02:00:5e:10:00:00:00:01",
+        {
+            Addr: [
+                0x00, 0x00, 0x00, 0x00,
+                0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x02, 0x00, 0x5e, 0x10, 0x00, 0x00, 0x00, 0x01,
+            ],
+        },
+        true,
+    },
+    {
+        "00-00-00-00-fe-80-00-00-00-00-00-00-02-00-5e-10-00-00-00-01",
+        {
+            Addr: [
+                0x00, 0x00, 0x00, 0x00,
+                0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x02, 0x00, 0x5e, 0x10, 0x00, 0x00, 0x00, 0x01,
+            ],
+        },
+        true,
+    },
+    {
+        "0000.0000.fe80.0000.0000.0000.0200.5e10.0000.0001",
+        {
+            Addr: [
+                0x00, 0x00, 0x00, 0x00,
+                0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x02, 0x00, 0x5e, 0x10, 0x00, 0x00, 0x00, 0x01,
+            ],
+        },
+        true,
+    },
+
+    {"ab:cd:ef:AB:CD:EF", {Addr: [0xab, 0xcd, 0xef, 0xab, 0xcd, 0xef]}, true},
+    {"ab:cd:ef:AB:CD:EF:ab:cd", {Addr: [0xab, 0xcd, 0xef, 0xab, 0xcd, 0xef, 0xab, 0xcd]}, true},
+    {
+        "ab:cd:ef:AB:CD:EF:ab:cd:ef:AB:CD:EF:ab:cd:ef:AB:CD:EF:ab:cd",
+        {
+            Addr: [
+                0xab, 0xcd, 0xef, 0xab,
+                0xcd, 0xef, 0xab, 0xcd, 0xef, 0xab, 0xcd, 0xef,
+                0xab, 0xcd, 0xef, 0xab, 0xcd, 0xef, 0xab, 0xcd,
+            ],
+        },
+        true,
+    },
+
+    {"01.02.03.04.05.06", {}, false},
+    {"01:02:03:04:05:06:", {}, false},
+    {"x1:02:03:04:05:06", {}, false},
+    {"01002:03:04:05:06", {}, false},
+    {"01:02003:04:05:06", {}, false},
+    {"01:02:03004:05:06", {}, false},
+    {"01:02:03:04005:06", {}, false},
+    {"01:02:03:04:05006", {}, false},
+    {"01-02:03:04:05:06", {}, false},
+    {"01:02-03-04-05-06", {}, false},
+    {"0123:4567:89AF", {}, false},
+    {"0123-4567-89AF", {}, false},
+]
+
+#test
+fn testParseMac(mut t: &T) {
+    for _, case in casesMacParse {
+        HardwareAddr.Parse(case.s) else {
+            if case.ok {
+                t.Errorf("expected success parsing for {}, but failed", case.s)
+            }
+            continue
+        }
+        if !case.ok {
+            t.Errorf("expected fail parsing for {}, but success", case.s)
+        }
+    }
+}
