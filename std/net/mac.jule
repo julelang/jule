@@ -2,4 +2,97 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use nosafe for std::internal::nosafe
+
 const hexDigit = "0123456789abcdef"
+
+// Physical hardware address.
+struct HardwareAddr {
+    Addr: []byte
+}
+
+impl HardwareAddr {
+    // Parses s as an IEEE 802 MAC-48, EUI-48, EUI-64, or a 20-octet
+    // IP over InfiniBand link-layer address using one of the following formats:
+    //  00:00:5e:00:53:01
+    //  02:00:5e:10:00:00:00:01
+    //  00:00:00:00:fe:80:00:00:00:00:00:00:02:00:5e:10:00:00:00:01
+    //  00-00-5e-00-53-01
+    //  02-00-5e-10-00-00-00-01
+    //  00-00-00-00-fe-80-00-00-00-00-00-00-02-00-5e-10-00-00-00-01
+    //  0000.5e00.5301
+    //  0200.5e10.0000.0001
+    //  0000.0000.fe80.0000.0000.0000.0200.5e10.0000.0001
+    //
+    // Exceptional is always will be AddrError.Unable.
+    static fn Parse(addr: str)!: HardwareAddr {
+        if addr.len < 14 {
+            error(AddrError.Unable)
+        }
+        let mut addrB = nosafe::Stobs(addr)
+        if addr[2] == ':' || addr[2] == '-' {
+            if (addr.len + 1)%3 != 0 {
+                error(AddrError.Unable)
+            }
+            let n = (addr.len + 1) / 3
+            if n != 6 && n != 8 && n != 20 {
+                error(AddrError.Unable)
+            }
+            let mut hAddr = make([]byte, n)
+            let (mut x, mut i) = 0, 0
+            for i < n {
+                let ((hAddr[i]), ok) = xtoi(addrB[x:], addr[2])
+                if !ok {
+                    error(AddrError.Unable)
+                }
+                i++
+                x += 3
+            }
+            ret HardwareAddr{
+                Addr: hAddr,
+            }
+        } else if addr[4] == '.' {
+            if (addr.len + 1)%5 != 0 {
+                error(AddrError.Unable)
+            }
+            let n = ((addr.len + 1) << 1) / 5
+            if n != 6 && n != 8 && n != 20 {
+                error(AddrError.Unable)
+            }
+            let mut hAddr = make([]byte, n)
+            let (mut x, mut i) = 0, 0
+            for i < n {
+                let ((hAddr[i]), mut ok) = xtoi(addrB[x:x+2], 0)
+                if !ok {
+                    error(AddrError.Unable)
+                }
+                hAddr[i+1], ok = xtoi(addrB[x+2:], addr[4])
+                if !ok {
+                    error(AddrError.Unable)
+                }
+                i += 2
+                x += 5
+            }
+            ret HardwareAddr{
+                Addr: hAddr,
+            }
+        }
+        error(AddrError.Unable)
+    }
+
+    // Returns address in string form.
+    fn Str(self): str {
+        if self.Addr.len == 0 {
+            ret ""
+        }
+        let mut buf = make(str, self.Addr.len * 3 - 1)
+        for i, b in self.Addr {
+            if i > 0 {
+                buf += str(':')
+            }
+            buf += str(hexDigit[b>>4])
+            buf += str(hexDigit[b&0xF])
+        }
+        ret buf
+    }
+}
