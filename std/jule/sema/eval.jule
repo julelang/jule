@@ -2204,17 +2204,6 @@ impl Eval {
 
     fn evalSliceSubIdent(mut self, mut d: &Data, mut ident: &Token): &Data {
         match ident.Kind {
-        | "cap":
-            ret &Data{
-                Mutable: false,
-                Kind: &TypeKind{Kind: buildPrimType(PrimKind.Int)},
-                Model: &CommonSubIdentExprModel{
-                    Token: ident,
-                    ExprKind: d.Kind,
-                    Expr: d.Model,
-                    Ident: "cap()",
-                },
-            }
         | "swap":
             ret &Data{
                 Mutable: d.Mutable,
@@ -2399,34 +2388,8 @@ Kind: mapKind.Key,
         }
     }
 
-    fn evalStrSubIdent(mut self, mut d: &Data, mut ident: &Token): &Data {
-        let mut strKind = &TypeKind{Kind: buildPrimType(PrimKind.Str)}
-        match ident.Kind {
-        | "cap":
-            let mut sd = &Data{
-                Kind: &TypeKind{Kind: buildPrimType(PrimKind.Int)},
-            }
-            if d.IsConst() {
-                sd.Constant = Const.NewI64(i64(d.Constant.ReadStr().cap))
-                sd.Model = sd.Constant
-            } else {
-                sd.Model = &CommonSubIdentExprModel{
-                    Token: ident,
-                    ExprKind: d.Kind,
-                    Expr: d.Model,
-                    Ident: "cap()",
-                }
-            }
-            ret sd
-        |:
-            self.pushErr(ident, LogMsg.ObjHaveNotIdent, strKind.Str(), ident.Kind)
-            ret nil
-        }
-    }
-
     fn evalIntTypeStatic(mut self, ident: &Token): &Data {
         const kind: str = PrimKind.Int
-
         match ident.Kind {
         | "Max":
             let mut c = Const.NewI64(i64(types::Max(kind)))
@@ -2450,7 +2413,6 @@ Kind: mapKind.Key,
 
     fn evalUintTypeStatic(mut self, ident: &Token): &Data {
         const kind: str = PrimKind.Uint
-
         match ident.Kind {
         | "Max":
             let mut c = Const.NewU64(u64(types::Max(kind)))
@@ -2469,7 +2431,6 @@ Kind: mapKind.Key,
         const kind: str = PrimKind.I8
         const min = types::MinI8
         const max = types::MaxI8
-
         match ident.Kind {
         | "Max":
             let mut c = Const.NewI64(max)
@@ -2495,7 +2456,6 @@ Kind: mapKind.Key,
         const kind: str = PrimKind.I16
         const min = types::MinI16
         const max = types::MaxI16
-
         match ident.Kind {
         | "Max":
             let mut c = Const.NewI64(max)
@@ -2521,7 +2481,6 @@ Kind: mapKind.Key,
         const kind: str = PrimKind.I32
         const min = types::MinI32
         const max = types::MaxI32
-
         match ident.Kind {
         | "Max":
             let mut c = Const.NewI64(max)
@@ -2547,7 +2506,6 @@ Kind: mapKind.Key,
         const kind: str = PrimKind.I64
         const min = types::MinI64
         const max = types::MaxI64
-
         match ident.Kind {
         | "Max":
             let mut c = Const.NewI64(max)
@@ -2572,7 +2530,6 @@ Kind: mapKind.Key,
     fn evalU8TypeStatic(mut self, ident: &Token): &Data {
         const kind: str = PrimKind.U8
         const max = types::MaxU8
-
         match ident.Kind {
         | "Max":
             let mut c = Const.NewU64(max)
@@ -2590,7 +2547,6 @@ Kind: mapKind.Key,
     fn evalU16TypeStatic(mut self, ident: &Token): &Data {
         const kind: str = PrimKind.U16
         const max = types::MaxU16
-
         match ident.Kind {
         | "Max":
             let mut c = Const.NewU64(max)
@@ -2608,7 +2564,6 @@ Kind: mapKind.Key,
     fn evalU32TypeStatic(mut self, ident: &Token): &Data {
         const kind: str = PrimKind.U32
         const max = types::MaxU32
-
         match ident.Kind {
         | "Max":
             let mut c = Const.NewU64(max)
@@ -2626,7 +2581,6 @@ Kind: mapKind.Key,
     fn evalU64TypeStatic(mut self, ident: &Token): &Data {
         const kind: str = PrimKind.U64
         const max = types::MaxU64
-
         match ident.Kind {
         | "Max":
             let mut c = Const.NewU64(max)
@@ -2646,7 +2600,6 @@ Kind: mapKind.Key,
         const max = types::MaxF32
         const min = types::MinF32
         const smallestNonZero = types::SmallestNonZeroF32
-
         match ident.Kind {
         | "Max":
             let mut c = Const.NewF64(max)
@@ -2680,7 +2633,6 @@ Kind: mapKind.Key,
         const max = types::MaxF64
         const min = types::MinF64
         const smallestNonZero = types::SmallestNonZeroF64
-
         match ident.Kind {
         | "Max":
             let mut c = Const.NewF64(max)
@@ -2793,12 +2745,6 @@ Kind: mapKind.Key,
             ret self.evalArraySubIdent(d, si.Ident)
         | kind.Map() != nil:
             ret self.evalMapSubIdent(d, si.Ident)
-        | kind.Prim() != nil:
-            let p = kind.Prim()
-            match p.Kind {
-            | PrimKind.Str:
-                ret self.evalStrSubIdent(d, si.Ident)
-            }
         }
         self.pushErr(si.Ident, LogMsg.ObjNotSupportSubFields, d.Kind.Str())
         ret nil

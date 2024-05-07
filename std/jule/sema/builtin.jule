@@ -46,6 +46,9 @@ fn findBuiltinFn(ident: str): &FnIns {
     | "len":
         static mut f = &FnIns{caller: builtinCallerLen}
         ret f
+    | "cap":
+        static mut f = &FnIns{caller: builtinCallerCap}
+        ret f
     | "clone":
         static mut f = &FnIns{caller: builtinCallerClone}
         ret f
@@ -611,6 +614,52 @@ fn builtinCallerLen(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data {
     }
 }
 
+fn callerCapSlice(mut &expr: &Data, mut &d: &Data): &Data {
+    d.Kind = lenKind()
+    d.Model = &BuiltinCapCallExprModel{
+        Expr: expr,
+    }
+    ret d
+}
+
+fn callerCapStr(mut &expr: &Data, mut &d: &Data): &Data {
+    d.Kind = lenKind()
+    if expr.IsConst() {
+        d.Constant = Const.NewI64(i64(cap(expr.Constant.ReadStr())))
+        d.Model = d.Constant
+    } else {
+        d.Model = &BuiltinCapCallExprModel{
+            Expr: expr,
+        }
+    }
+    ret d
+}
+
+fn builtinCallerCap(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data {
+    if len(fc.Args) < 1 {
+        e.pushErr(fc.Token, LogMsg.MissingExprFor, "obj")
+        ret nil
+    }
+    if len(fc.Args) > 1 {
+        e.pushErr(fc.Args[1].Token, LogMsg.ArgumentOverflow)
+    }
+    let mut dest = e.evalExpr(fc.Args[0])
+    match {
+    | dest == nil:
+        ret nil
+    | dest.Decl:
+        e.pushErr(fc.Args[0].Token, LogMsg.InvalidExpr)
+        ret nil
+    | dest.Kind.Slc() != nil:
+        ret callerCapSlice(dest, d)
+    | dest.Kind.Prim() != nil && dest.Kind.Prim().IsStr():
+        ret callerCapStr(dest, d)
+    |:
+        e.pushErr(fc.Args[0].Token, LogMsg.InvalidExpr)
+        ret nil
+    }
+}
+
 fn builtinCallerClone(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data {
     if len(fc.Args) < 1 {
         e.pushErr(fc.Token, LogMsg.MissingExprFor, "expr")
@@ -674,7 +723,7 @@ fn builtinCallerAssert(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Dat
     let mut model = &BuiltinAssertCallExprModel{
         Token: fc.Token,
         Expr: expr.Model,
-        Log: "assertion failed",// Default log message. 
+        Log: "assertion failed",// Default log message.  
     }
 
     // Custom log message is exist.
