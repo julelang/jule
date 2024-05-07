@@ -1,0 +1,137 @@
+// Copyright 2023-2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use conv for std::conv
+use integrated for std::jule::integrated
+use utf8 for std::unicode::utf8
+use nosafe for std::internal::nosafe
+
+fn findFormatPrefix(&bytes: []byte, &start: int): int {
+    let mut i = start
+    for i < bytes.len {
+        let (r, size) = utf8::DecodeRune(bytes[i:])
+        if r == '{' {
+            ret i
+        }
+        i += size
+    }
+    ret -1
+}
+
+// Returns range of {...}, included braces.
+// Parameter i is the start point to selected and should
+// points to start brace at beginning.
+// i is points to position of last brace and +1 offset in the end.
+// Returns nil slice if there is no match.
+fn getFormatRange(mut &i: int, mut &bytes: []byte): []byte {
+    let start = i
+    let mut braces = 0
+    for i < bytes.len {
+        let (r, size) = utf8::DecodeRune(bytes[i:])
+        i += size
+        match r {
+        | '{':
+            braces++
+        | '}':
+            braces--
+            if braces == 0 {
+                ret bytes[start:i]
+            }
+        }
+    }
+    ret nil
+}
+
+// Formats arg by default format and appends to buf.
+fn FmtByDefault(mut &buf: str, &arg: any) {
+    if arg == nil {
+        buf += "<nil>"
+        ret
+    }
+    match type arg {
+    | f32:
+        buf += conv::FmtFloat(f64(f32(arg)), 'g', -1, 32)
+    | f64:
+        buf += conv::FmtFloat(f64(arg), 'g', -1, 64)
+    | i8:
+        buf += conv::FmtInt(i8(arg), 10)
+    | i16:
+        buf += conv::FmtInt(i16(arg), 10)
+    | i32:
+        buf += conv::FmtInt(i32(arg), 10)
+    | i64:
+        buf += conv::FmtInt(i64(arg), 10)
+    | u8:
+        buf += conv::FmtUint(u8(arg), 10)
+    | u16:
+        buf += conv::FmtUint(u16(arg), 10)
+    | u32:
+        buf += conv::FmtUint(u32(arg), 10)
+    | u64:
+        buf += conv::FmtUint(u64(arg), 10)
+    | str:
+        buf += str(arg)
+    | bool:
+        if bool(arg) {
+            buf += "true"
+        } else {
+            buf += "false"
+        }
+    |:
+        buf += integrated::ToStr(arg)
+    }
+}
+
+fn applyFmtByDefault(mut &buf: str, mut &j: int, &args: ...any) {
+    let arg = args[j]
+    j++
+    FmtByDefault(buf, arg)
+}
+
+// Returns result of formatting.
+// Parameter j is the position of argument list.
+fn applyFmt(mut &fmt: []byte, mut &buf: str, mut &j: int, &args: ...any) {
+    // {}
+    if fmt.len == 2 {
+        applyFmtByDefault(buf, j, args...)
+        ret
+    }
+    // {{}} = {}
+    if fmt.len == 4 && fmt == ['{', '{', '}', '}'] {
+        buf += "{}"
+        ret
+    }
+    nosafe::PushToStrBuffer(buf, fmt)
+}
+
+// See the [std::fmt::Format] function.
+fn Format(&fmt: str, args: ...any): str {
+    if args.len == 0 {
+        ret fmt
+    }
+    let mut fmtBytes = nosafe::Stobs(fmt)
+    let mut buf = make(str, fmt.len)
+    let mut j = 0
+    let mut last = 0
+    let mut i = findFormatPrefix(fmtBytes, last)
+    for i != -1; i = findFormatPrefix(fmtBytes, i) {
+        nosafe::PushToStrBuffer(buf, fmtBytes[last:i])
+        let mut format = getFormatRange(i, fmtBytes)
+        if format == nil {
+            continue
+        }
+        applyFmt(format, buf, j, args...)
+        if j >= args.len {
+            nosafe::PushToStrBuffer(buf, fmtBytes[i:])
+            last = fmtBytes.len
+            break
+        }
+        // Set last positioning to latest value of i.
+        last = i
+    }
+    if last < fmtBytes.len {
+        nosafe::PushToStrBuffer(buf, fmtBytes[last:])
+    }
+    ret buf
+}
