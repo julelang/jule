@@ -47,6 +47,19 @@ namespace jule
             return s;
         }
 
+        static jule::Str alloc(const jule::Int &len, const jule::Int &cap) noexcept {
+            if (len < 0)
+                jule::panic("runtime: str: allocation length lower than zero");
+            if (cap < 0)
+                jule::panic("runtime: str: allocation capacity lower than zero");
+            if (len > cap)
+                jule::panic("runtime: str: allocation length greater than capacity");
+            jule::Str s;
+            s.buffer.reserve(len);
+            s.buffer.resize(len);
+            return s;
+        }
+
         Str(void) = default;
         Str(const jule::Str &src) = default;
         Str(const std::initializer_list<jule::U8> &src) : buffer(src) {}

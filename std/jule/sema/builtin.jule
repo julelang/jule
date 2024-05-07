@@ -360,23 +360,15 @@ fn builtinCallerMake(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data 
         ret nil
     }
 
-    match {
-    | !t.Decl:
-        break
-    | t.Kind.Slc() != nil:
-        if fc.Args.len > 3 {
-            e.pushErr(fc.Args[3].Token, LogMsg.ArgumentOverflow)
-        }
-        goto cont
-    | t.Kind.Prim() != nil && t.Kind.Prim().IsStr():
-        if fc.Args.len > 2 {
-            e.pushErr(fc.Args[2].Token, LogMsg.ArgumentOverflow)
-        }
-        goto cont
+    if !t.Decl {
+        e.pushErr(fc.Args[0].Token, LogMsg.InvalidType)
+        ret nil
     }
-    e.pushErr(fc.Args[0].Token, LogMsg.InvalidType)
-    ret nil
-cont:
+    if fc.Args.len > 3 {
+        e.pushErr(fc.Args[3].Token, LogMsg.ArgumentOverflow)
+        ret nil
+    }
+
     d.Kind = t.Kind
 
     let mut len = e.s.evalp(e.lookup, t.Kind).evalExpr(fc.Args[1])
