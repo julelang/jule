@@ -176,10 +176,10 @@ fn getDatasFromTupleData(mut &d: &Data): []&Data {
             ret (&TupleExprModel)(d.Model).Datas
         |:
             let mut t = d.Kind.Tup()
-            let mut r = make([]&Data, 0, t.Types.len)
+            let mut r = make([]&Data, 0, len(t.Types))
             for (_, mut kind) in t.Types {
                 r = append(r, &Data{
-                    Mutable: true, // Function return.
+                    Mutable: true,// Function return.  
                     Kind: kind,
                 })
             }
@@ -194,7 +194,7 @@ fn getExprModels(mut &m: ExprData): []ExprData {
     match type m {
     | &TupleExpr:
         let mut tup = (&TupleExpr)(m)
-        let mut models = make([]ExprData, 0, tup.Expr.len)
+        let mut models = make([]ExprData, 0, len(tup.Expr))
         for (_, mut expr) in tup.Expr {
             models = append(models, expr.Kind)
         }
@@ -866,7 +866,7 @@ impl scopeChecker {
         let mut c = new(Conditional)
         self.scope.Stmts = append(self.scope.Stmts, c)
 
-        c.Elifs = make([]&If, 0, conditional.Tail.len + 1)
+        c.Elifs = make([]&If, 0, len(conditional.Tail) + 1)
 
         c.Elifs = append(c.Elifs, self.checkIf(conditional.Head))
         for (_, mut elif) in conditional.Tail {
@@ -937,9 +937,9 @@ impl scopeChecker {
                 ret
             }
 
-            let n = self.scope.Stmts.len
+            let n = len(self.scope.Stmts)
             self.checkNode(wh.Next)
-            if n < self.scope.Stmts.len {
+            if n < len(self.scope.Stmts) {
                 let mut st = self.scope.Stmts[n]
                 self.scope.Stmts = self.scope.Stmts[:n] // Remove trailing statements.
                 if !isValidStForNextSt(st) {
@@ -1094,13 +1094,13 @@ impl scopeChecker {
 
             label.used = true
 
-            if label.pos+1 >= label.scope.scope.Stmts.len {
+            if label.pos+1 >= len(label.scope.scope.Stmts) {
                 self.s.pushErr(c.Label, LogMsg.InvalidLabel, c.Label.Kind)
                 ret
             }
 
             let i = label.pos + 1
-            if i >= label.scope.scope.Stmts.len {
+            if i >= len(label.scope.scope.Stmts) {
                 self.s.pushErr(c.Label, LogMsg.InvalidLabel)
             } else {
                 let mut st = label.scope.scope.Stmts[i]
@@ -1140,7 +1140,7 @@ impl scopeChecker {
         *self.labels = append(*self.labels, &scopeLabel{
             token: l.Token,
             label: label,
-            pos: self.scope.Stmts.len - 1,
+            pos: len(self.scope.Stmts) - 1,
             scope: self,
         })
     }
@@ -1152,13 +1152,13 @@ impl scopeChecker {
 
         *self.gotos = append(*self.gotos, &scopeGoto{
             gt: gt,
-            pos: self.scope.Stmts.len - 1,
+            pos: len(self.scope.Stmts) - 1,
             scope: self,
         })
     }
 
     fn checkPostfix(mut &self, mut a: &AssignSt) {
-        if a.Left.len > 1 {
+        if len(a.Left) > 1 {
             self.s.pushErr(a.Setter, LogMsg.InvalidSyntax)
             ret
         }
@@ -1293,7 +1293,7 @@ impl scopeChecker {
                 ret
             }
 
-            a.Setter.Kind = a.Setter.Kind[:a.Setter.Kind.len-1]
+            a.Setter.Kind = a.Setter.Kind[:len(a.Setter.Kind)-1]
             let mut solver = binaryEval.new(eval, a.Setter)
             r = solver.solveExplicit(l, r)
             if r == nil {
@@ -1389,10 +1389,10 @@ impl scopeChecker {
         let mut r = getDatasFromTupleData(rd)
 
         match {
-        | a.Left.len > r.len:
+        | len(a.Left) > len(r):
             self.s.pushErr(a.Setter, LogMsg.OverflowMultiAssignIdents)
             ret
-        | a.Left.len < r.len:
+        | len(a.Left) < len(r):
             self.s.pushErr(a.Setter, LogMsg.MissingMultiAssignIdents)
             ret
         }
@@ -1439,10 +1439,10 @@ impl scopeChecker {
         let mut right = getExprModels(a.Right.Kind)
 
         match {
-        | a.Left.len > right.len:
+        | len(a.Left) > len(right):
             self.s.pushErr(a.Setter, LogMsg.OverflowMultiAssignIdents)
             ret
-        | a.Left.len < right.len:
+        | len(a.Left) < len(right):
             self.s.pushErr(a.Setter, LogMsg.MissingMultiAssignIdents)
             ret
         }
@@ -1492,7 +1492,7 @@ impl scopeChecker {
         match {
         | IsPostfixOp(a.Setter.Kind):
             self.checkPostfix(a)
-        | a.Left.len == 1 && !a.Declarative:
+        | len(a.Left) == 1 && !a.Declarative:
             self.checkSingleAssign(a)
         |:
             self.checkMultiAssign(a)
@@ -1507,7 +1507,7 @@ impl scopeChecker {
 
     fn checkCase(mut &self, mut m: &Match, i: int, mut c: &ast::Case, mut expr: &Data): &Case {
         let mut case = m.Cases[i]
-        case.Exprs = make([]&Data, 0, c.Exprs.len)
+        case.Exprs = make([]&Data, 0, len(c.Exprs))
         let mut genericMatched = false
         let mut eval = self.s.eval(self)
         for (_, mut e) in c.Exprs {
@@ -1559,7 +1559,7 @@ impl scopeChecker {
     }
 
     fn checkCases(mut &self, mut &m: &MatchCase, mut rm: &Match, mut expr: &Data) {
-        rm.Cases = make([]&Case, 0, m.Cases.len)
+        rm.Cases = make([]&Case, 0, len(m.Cases))
         for i in m.Cases {
             let mut case = &Case{
                 Owner: rm,
@@ -1570,8 +1570,8 @@ impl scopeChecker {
             rm.Cases = append(rm.Cases, case)
         }
 
-        if rm.Default != nil && m.Cases.len > 0 {
-            rm.Cases[rm.Cases.len-1].Next = rm.Default
+        if rm.Default != nil && len(m.Cases) > 0 {
+            rm.Cases[len(rm.Cases)-1].Next = rm.Default
         }
 
         for (i, mut c) in m.Cases {
@@ -1588,7 +1588,7 @@ impl scopeChecker {
     }
 
     fn checkComptimePanic(mut self, &s: &Scope) {
-        if s.Stmts.len != 1 {
+        if len(s.Stmts) != 1 {
             ret
         }
 
@@ -1696,7 +1696,7 @@ impl scopeChecker {
 
     fn checkFall(mut &self, f: &ast::FallSt) {
         if self.cse == 0 ||
-            self.scope.Stmts.len+1 < self.scope.Stmts.len ||
+            len(self.scope.Stmts)+1 < len(self.scope.Stmts) ||
             self.isDeferred() {
             self.s.pushErr(f.Token, LogMsg.FalltroughWrongUse)
             ret
@@ -1733,13 +1733,13 @@ impl scopeChecker {
 
         label.used = true
 
-        if label.pos+1 >= label.scope.scope.Stmts.len {
+        if label.pos+1 >= len(label.scope.scope.Stmts) {
             self.s.pushErr(b.Label, LogMsg.InvalidLabel, b.Label.Kind)
             ret nil
         }
 
         let i = label.pos + 1
-        if i >= label.scope.scope.Stmts.len {
+        if i >= len(label.scope.scope.Stmts) {
             self.s.pushErr(b.Label, LogMsg.InvalidLabel, b.Label.Kind)
         } else {
             let mut st = label.scope.scope.Stmts[i]
@@ -1825,7 +1825,7 @@ impl scopeChecker {
             ret
         }
 
-        if r.Expr == nil && rtc.vars.len == 0 {
+        if r.Expr == nil && len(rtc.vars) == 0 {
             ret
         }
 
@@ -1846,7 +1846,7 @@ impl scopeChecker {
             self.s.pushErr(ue.Token, LogMsg.UseExprInDeferred)
         }
 
-        if self.i+1 < self.tree.Stmts.len {
+        if self.i+1 < len(self.tree.Stmts) {
             self.s.pushErr(ue.Token, LogMsg.UseExprNotLast)
         }
         // Validated at end of scope's analysis.
@@ -1892,7 +1892,7 @@ impl scopeChecker {
     }
 
     fn checkResult(mut &self) {
-        let mut stmt = self.tree.Stmts[self.tree.Stmts.len-1]
+        let mut stmt = self.tree.Stmts[len(self.tree.Stmts)-1]
         match type stmt.Data {
         | &UseExpr:
             let mut ue = (&UseExpr)(stmt.Data)
@@ -1937,7 +1937,7 @@ impl scopeChecker {
 
     fn checkTree(mut &self) {
         self.i = 0
-        let mut n = self.tree.Stmts.len
+        let mut n = len(self.tree.Stmts)
         if self.result != nil {
             // Skip last statement if result is exist.
             // Algorithm will check last statement for result.
@@ -1951,7 +1951,7 @@ impl scopeChecker {
                 ret
             }
         }
-        if self.result != nil && self.tree.Stmts.len != 0 {
+        if self.result != nil && len(self.tree.Stmts) != 0 {
             self.checkResult()
         }
     }
@@ -2038,7 +2038,7 @@ impl scopeChecker {
         s.Deferred = tree.Deferred
         s.Unsafety = tree.Unsafety
 
-        let errors = self.s.errors.len
+        let errors = len(self.s.errors)
 
         self.tree = tree
         self.scope = s
@@ -2046,7 +2046,7 @@ impl scopeChecker {
         self.checkTree()
 
         // If we have new errors, don't check unused declarations.
-        if errors == self.s.errors.len {
+        if errors == len(self.s.errors) {
             self.checkVars()
             self.checkAliases()
 

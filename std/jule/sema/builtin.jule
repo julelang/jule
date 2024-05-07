@@ -10,6 +10,7 @@ use std::jule::ast::{
     GenericDecl,
 }
 use std::jule::build::{Derive, LogMsg}
+use std::jule::constant::{Const}
 
 // Type alias for built-in function callers.
 //
@@ -41,6 +42,9 @@ fn findBuiltinFn(ident: str): &FnIns {
         ret f
     | "copy":
         static mut f = &FnIns{caller: builtinCallerCopy}
+        ret f
+    | "len":
+        static mut f = &FnIns{caller: builtinCallerLen}
         ret f
     | "clone":
         static mut f = &FnIns{caller: builtinCallerClone}
@@ -197,11 +201,11 @@ fn builtinCallerCommonMut(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &
 }
 
 fn builtinCallerError(mut &e: &Eval, mut &fc: &FnCallExpr): &Data {
-    if fc.Args.len < 1 {
+    if len(fc.Args) < 1 {
         e.pushErr(fc.Token, LogMsg.MissingExprFor, "err")
         ret nil
     }
-    if fc.Args.len > 1 {
+    if len(fc.Args) > 1 {
         e.pushErr(fc.Args[1].Token, LogMsg.ArgumentOverflow)
     }
     let mut expr = e.evalExpr(fc.Args[0])
@@ -222,11 +226,11 @@ fn builtinCallerError(mut &e: &Eval, mut &fc: &FnCallExpr): &Data {
 }
 
 fn builtinCallerOut(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data {
-    if fc.Args.len < 1 {
+    if len(fc.Args) < 1 {
         e.pushErr(fc.Token, LogMsg.MissingExprFor, "v")
         ret nil
     }
-    if fc.Args.len > 1 {
+    if len(fc.Args) > 1 {
         e.pushErr(fc.Args[1].Token, LogMsg.ArgumentOverflow)
     }
 
@@ -258,11 +262,11 @@ fn builtinCallerOutln(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data
 }
 
 fn builtinCallerNew(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data {
-    if fc.Args.len < 1 {
+    if len(fc.Args) < 1 {
         e.pushErr(fc.Token, LogMsg.MissingExprFor, "type")
         ret nil
     }
-    if fc.Args.len > 2 {
+    if len(fc.Args) > 2 {
         e.pushErr(fc.Args[2].Token, LogMsg.ArgumentOverflow)
     }
 
@@ -290,7 +294,7 @@ fn builtinCallerNew(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data {
         },
     }
 
-    if fc.Args.len == 2 { // Initialize expression.
+    if len(fc.Args) == 2 { // Initialize expression.
         let mut old = e.prefix
         e.prefix = t.Kind
 
@@ -320,11 +324,11 @@ fn builtinCallerNew(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data {
 }
 
 fn builtinCallerPanic(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data {
-    if fc.Args.len < 1 {
+    if len(fc.Args) < 1 {
         e.pushErr(fc.Token, LogMsg.MissingExprFor, "message")
         ret nil
     }
-    if fc.Args.len > 1 {
+    if len(fc.Args) > 1 {
         e.pushErr(fc.Args[2].Token, LogMsg.ArgumentOverflow)
     }
 
@@ -346,8 +350,8 @@ fn builtinCallerPanic(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data
 }
 
 fn builtinCallerMake(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data {
-    if fc.Args.len < 2 {
-        if fc.Args.len == 1 {
+    if len(fc.Args) < 2 {
+        if len(fc.Args) == 1 {
             e.pushErr(fc.Token, LogMsg.MissingExprFor, "size")
             ret nil
         }
@@ -364,39 +368,39 @@ fn builtinCallerMake(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data 
         e.pushErr(fc.Args[0].Token, LogMsg.InvalidType)
         ret nil
     }
-    if fc.Args.len > 3 {
+    if len(fc.Args) > 3 {
         e.pushErr(fc.Args[3].Token, LogMsg.ArgumentOverflow)
         ret nil
     }
 
     d.Kind = t.Kind
 
-    let mut len = e.s.evalp(e.lookup, t.Kind).evalExpr(fc.Args[1])
-    if len == nil {
+    let mut lenExpr = e.s.evalp(e.lookup, t.Kind).evalExpr(fc.Args[1])
+    if lenExpr == nil {
         ret nil
     }
 
-    e.checkIntegerIndexingByData(len, fc.Args[1].Token)
+    e.checkIntegerIndexingByData(lenExpr, fc.Args[1].Token)
 
     let mut model = &BuiltinMakeCallExprModel{
         Kind: t.Kind,
-        Len: len.Model,
+        Len: lenExpr.Model,
     }
     d.Model = model
-    if fc.Args.len == 3 {
-        let mut cap = e.s.evalp(e.lookup, t.Kind).evalExpr(fc.Args[2])
-        if cap == nil {
+    if len(fc.Args) == 3 {
+        let mut capExpr = e.s.evalp(e.lookup, t.Kind).evalExpr(fc.Args[2])
+        if capExpr == nil {
             ret d
         }
-        e.checkIntegerIndexingByData(cap, fc.Args[2].Token)
-        model.Cap = cap.Model
+        e.checkIntegerIndexingByData(capExpr, fc.Args[2].Token)
+        model.Cap = capExpr.Model
     }
     ret d
 }
 
 fn builtinCallerAppend(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data {
-    if fc.Args.len < 2 {
-        if fc.Args.len == 1 {
+    if len(fc.Args) < 2 {
+        if len(fc.Args) == 1 {
             e.pushErr(fc.Token, LogMsg.MissingExprFor, "src")
             ret nil
         }
@@ -417,17 +421,17 @@ fn builtinCallerAppend(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Dat
     let mut f = &FnIns{
         Params: [
             &ParamIns{
-                Decl: &Param{
-                    Mutable: true,
+Decl: &Param{
+Mutable: true,
                 },
-                Kind: t.Kind,
+Kind: t.Kind,
             },
             &ParamIns{
-                Decl: &Param{
-                    Mutable: true,
-                    Variadic: true,
+Decl: &Param{
+Mutable: true,
+Variadic: true,
                 },
-                Kind: t.Kind.Slc().Elem,
+Kind: t.Kind.Slc().Elem,
             },
         ],
         Result: t.Kind,
@@ -516,15 +520,15 @@ end:
 }
 
 fn builtinCallerCopy(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data {
-    if fc.Args.len < 2 {
-        if fc.Args.len == 1 {
+    if len(fc.Args) < 2 {
+        if len(fc.Args) == 1 {
             e.pushErr(fc.Token, LogMsg.MissingExprFor, "src")
             ret nil
         }
         e.pushErr(fc.Token, LogMsg.MissingExprFor, "src, values")
         ret nil
     }
-    if fc.Args.len > 2 {
+    if len(fc.Args) > 2 {
         e.pushErr(fc.Args[2].Token, LogMsg.ArgumentOverflow)
     }
 
@@ -542,12 +546,77 @@ fn builtinCallerCopy(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data 
     }
 }
 
+fn callerLenSlice(mut &expr: &Data, mut &d: &Data): &Data {
+    d.Kind = lenKind()
+    d.Model = &BuiltinLenCallExprModel{
+        Expr: expr,
+    }
+    ret d
+}
+
+fn callerLenMap(mut &expr: &Data, mut &d: &Data): &Data {
+    d.Kind = lenKind()
+    d.Model = &BuiltinLenCallExprModel{
+        Expr: expr,
+    }
+    ret d
+}
+
+fn callerLenArr(mut &expr: &Data, mut &d: &Data): &Data {
+    d.Kind = lenKind()
+    d.Constant = Const.NewI64(i64(expr.Kind.Arr().N))
+    d.Model = d.Constant
+    ret d
+}
+
+fn callerLenStr(mut &expr: &Data, mut &d: &Data): &Data {
+    d.Kind = lenKind()
+    if expr.IsConst() {
+        d.Constant = Const.NewI64(i64(len(expr.Constant.ReadStr())))
+        d.Model = d.Constant
+    } else {
+        d.Model = &BuiltinLenCallExprModel{
+            Expr: expr,
+        }
+    }
+    ret d
+}
+
+fn builtinCallerLen(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data {
+    if len(fc.Args) < 1 {
+        e.pushErr(fc.Token, LogMsg.MissingExprFor, "obj")
+        ret nil
+    }
+    if len(fc.Args) > 1 {
+        e.pushErr(fc.Args[1].Token, LogMsg.ArgumentOverflow)
+    }
+    let mut dest = e.evalExpr(fc.Args[0])
+    match {
+    | dest == nil:
+        ret nil
+    | dest.Decl:
+        e.pushErr(fc.Args[0].Token, LogMsg.InvalidExpr)
+        ret nil
+    | dest.Kind.Slc() != nil:
+        ret callerLenSlice(dest, d)
+    | dest.Kind.Arr() != nil:
+        ret callerLenArr(dest, d)
+    | dest.Kind.Map() != nil:
+        ret callerLenMap(dest, d)
+    | dest.Kind.Prim() != nil && dest.Kind.Prim().IsStr():
+        ret callerLenStr(dest, d)
+    |:
+        e.pushErr(fc.Args[0].Token, LogMsg.InvalidExpr)
+        ret nil
+    }
+}
+
 fn builtinCallerClone(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data {
-    if fc.Args.len < 1 {
+    if len(fc.Args) < 1 {
         e.pushErr(fc.Token, LogMsg.MissingExprFor, "expr")
         ret nil
     }
-    if fc.Args.len > 1 {
+    if len(fc.Args) > 1 {
         e.pushErr(fc.Args[1].Token, LogMsg.ArgumentOverflow)
     }
 
@@ -585,11 +654,11 @@ fn builtinCallerClone(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data
 }
 
 fn builtinCallerAssert(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data {
-    if fc.Args.len < 1 {
+    if len(fc.Args) < 1 {
         e.pushErr(fc.Token, LogMsg.MissingExprFor, "expr")
         ret nil
     }
-    if fc.Args.len > 2 {
+    if len(fc.Args) > 2 {
         e.pushErr(fc.Args[2].Token, LogMsg.ArgumentOverflow)
     }
 
@@ -605,11 +674,11 @@ fn builtinCallerAssert(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Dat
     let mut model = &BuiltinAssertCallExprModel{
         Token: fc.Token,
         Expr: expr.Model,
-        Log: "assertion failed", // Default log message.
+        Log: "assertion failed",// Default log message. 
     }
 
     // Custom log message is exist.
-    if fc.Args.len == 2 {
+    if len(fc.Args) == 2 {
         let mut log = e.evalExpr(fc.Args[1])
         if log == nil {
             ret nil
@@ -633,11 +702,11 @@ fn builtinCallerStdMemSizeOf(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data)
         Kind: &TypeKind{Kind: buildPrimType(PrimKind.Uint)},
     }
 
-    if fc.Args.len < 1 {
+    if len(fc.Args) < 1 {
         e.pushErr(fc.Token, LogMsg.MissingExprFor, "type|expr")
         ret result
     }
-    if fc.Args.len > 1 {
+    if len(fc.Args) > 1 {
         e.pushErr(fc.Args[1].Token, LogMsg.ArgumentOverflow)
     }
 
@@ -655,11 +724,11 @@ fn builtinCallerStdMemAlignOf(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data
         Kind: &TypeKind{Kind: buildPrimType(PrimKind.Uint)},
     }
 
-    if fc.Args.len < 1 {
+    if len(fc.Args) < 1 {
         e.pushErr(fc.Token, LogMsg.MissingExprFor, "type|expr")
         ret result
     }
-    if fc.Args.len > 1 {
+    if len(fc.Args) > 1 {
         e.pushErr(fc.Args[1].Token, LogMsg.ArgumentOverflow)
     }
 
@@ -673,11 +742,11 @@ fn builtinCallerStdMemAlignOf(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data
 }
 
 fn builtinCallerStdMemFree(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data {
-    if fc.Args.len < 1 {
+    if len(fc.Args) < 1 {
         e.pushErr(fc.Token, LogMsg.MissingExprFor, "h")
         ret nil
     }
-    if fc.Args.len > 1 {
+    if len(fc.Args) > 1 {
         e.pushErr(fc.Args[1].Token, LogMsg.ArgumentOverflow)
     }
 
@@ -696,11 +765,11 @@ fn builtinCallerStdMemFree(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): 
 }
 
 fn builtinCallerStdJuleIntegratedToStr(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data {
-    if fc.Args.len < 1 {
+    if len(fc.Args) < 1 {
         e.pushErr(fc.Token, LogMsg.MissingExprFor, "expr")
         ret nil
     }
-    if fc.Args.len > 1 {
+    if len(fc.Args) > 1 {
         e.pushErr(fc.Args[1].Token, LogMsg.ArgumentOverflow)
     }
 
@@ -727,7 +796,7 @@ fn builtinCallerStdJuleIntegratedEmit(mut &e: &Eval, mut &fc: &FnCallExpr, mut &
         e.pushErr(fc.Token, LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
     }
 
-    if fc.Args.len < 1 {
+    if len(fc.Args) < 1 {
         e.pushErr(fc.Token, LogMsg.MissingExprFor, "code")
         ret nil
     }
@@ -750,7 +819,7 @@ fn builtinCallerStdJuleIntegratedEmit(mut &e: &Eval, mut &fc: &FnCallExpr, mut &
     let mut r = buildVoidData()
 
     let mut f = d.Kind.Fn()
-    if f.Generics.len > 0 {
+    if len(f.Generics) > 0 {
         r.Kind = f.Generics[0].Kind
     }
 
@@ -758,8 +827,8 @@ fn builtinCallerStdJuleIntegratedEmit(mut &e: &Eval, mut &fc: &FnCallExpr, mut &
         Code: argd.Constant.ReadStr(),
     }
 
-    if fc.Args.len > 1 {
-        model.Exprs = make([]ExprModel, 0, fc.Args.len - 1)
+    if len(fc.Args) > 1 {
+        model.Exprs = make([]ExprModel, 0, len(fc.Args) - 1)
         for (_, mut arg) in fc.Args[1:] {
             argd = e.evalExprKind(arg.Kind)
             if argd == nil {

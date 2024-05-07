@@ -92,14 +92,14 @@ struct Struct {
 impl Struct {
     fn instance(mut &self): &StructIns {
         // Returns already created instance for just one unique combination.
-        if self.Generics.len == 0 && self.Instances.len == 1 {
+        if len(self.Generics) == 0 && len(self.Instances) == 1 {
             ret self.Instances[0]
         }
 
         let mut ins = &StructIns{
             Decl: self,
-            Fields: make([]&FieldIns, 0, self.Fields.len),
-            Statics: make([]&Var, 0, self.Statics.len),
+            Fields: make([]&FieldIns, 0, len(self.Fields)),
+            Statics: make([]&Var, 0, len(self.Statics)),
             Refers: ReferenceStack.new(),
         }
 
@@ -114,10 +114,10 @@ impl Struct {
             }
         }
 
-        if self.Generics.len == 0 {
+        if len(self.Generics) == 0 {
             ins.Methods = self.Methods
         } else {
-            ins.Methods = make([]&Fn, 0, self.Methods.len)
+            ins.Methods = make([]&Fn, 0, len(self.Methods))
             for (_, mut f) in self.Methods {
                 let mut fins = new(Fn, *f)
                 fins.Instances = nil
@@ -132,7 +132,7 @@ impl Struct {
     // Returns already exist instance if given insance is not unique.
     fn appendInstance(mut self, mut &ins: &StructIns): &StructIns {
         // Skip already created instance for just one unique combination.
-        if self.Generics.len == 0 && self.Instances.len == 1 {
+        if len(self.Generics) == 0 && len(self.Instances) == 1 {
             ret self.Instances[0]
         }
 
@@ -193,7 +193,7 @@ impl Struct {
     fn IsDerives(self, ident: str): bool {
         for _, d in self.Directives {
             if d.Tag.Kind == std::jule::build::Directive.Derive {
-                if d.Args.len == 1 && d.Args[0].Kind == ident {
+                if len(d.Args) == 1 && d.Args[0].Kind == ident {
                     ret true
                 }
             }
@@ -214,7 +214,7 @@ impl Struct {
     // Reports whether structure has only reference-type-accessible defines.
     fn HasRefAccessible(self): bool {
         for _, m in self.Methods {
-            if m.Params.len > 0 && m.Params[0].IsRef() {
+            if len(m.Params) > 0 && m.Params[0].IsRef() {
                 ret true
             }
         }
@@ -248,13 +248,13 @@ impl Kind for StructIns {
     fn Str(self): str {
         let mut kind = ""
         kind += self.Decl.Ident
-        if self.Generics.len > 0 {
+        if len(self.Generics) > 0 {
             kind += "["
             for _, g in self.Generics {
                 kind += g.Kind.Str()
                 kind += ","
             }
-            kind = kind[:kind.len-1] // Remove comma.
+            kind = kind[:len(kind)-1] // Remove comma.
             kind += "]"
         }
         ret kind
@@ -271,12 +271,12 @@ impl Kind for StructIns {
             ret false
         }
 
-        if self.Generics.len != s.Generics.len {
+        if len(self.Generics) != len(s.Generics) {
             ret false
         }
 
         let mut i = 0
-        for i < self.Generics.len; i++ {
+        for i < len(self.Generics); i++ {
             if !self.Generics[i].Kind.Equals(s.Generics[i].Kind) {
                 ret false
             }
@@ -290,7 +290,7 @@ impl StructIns {
     // Reports whether instances are same.
     // Returns true if declarations and generics are same.
     fn Same(self, s: &StructIns): bool {
-        if self.Decl != s.Decl || s.Generics.len != self.Generics.len {
+        if self.Decl != s.Decl || len(s.Generics) != len(self.Generics) {
             ret false
         }
         for i, g in self.Generics {

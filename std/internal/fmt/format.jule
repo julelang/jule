@@ -9,7 +9,7 @@ use nosafe for std::internal::nosafe
 
 fn findFormatPrefix(&bytes: []byte, &start: int): int {
     let mut i = start
-    for i < bytes.len {
+    for i < len(bytes) {
         let (r, size) = utf8::DecodeRune(bytes[i:])
         if r == '{' {
             ret i
@@ -27,7 +27,7 @@ fn findFormatPrefix(&bytes: []byte, &start: int): int {
 fn getFormatRange(mut &i: int, mut &bytes: []byte): []byte {
     let start = i
     let mut braces = 0
-    for i < bytes.len {
+    for i < len(bytes) {
         let (r, size) = utf8::DecodeRune(bytes[i:])
         i += size
         match r {
@@ -93,12 +93,12 @@ fn applyFmtByDefault(mut &buf: str, mut &j: int, &args: ...any) {
 // Parameter j is the position of argument list.
 fn applyFmt(mut &fmt: []byte, mut &buf: str, mut &j: int, &args: ...any) {
     // {}
-    if fmt.len == 2 {
+    if len(fmt) == 2 {
         applyFmtByDefault(buf, j, args...)
         ret
     }
     // {{}} = {}
-    if fmt.len == 4 && fmt == ['{', '{', '}', '}'] {
+    if len(fmt) == 4 && fmt == ['{', '{', '}', '}'] {
         buf += "{}"
         ret
     }
@@ -107,11 +107,11 @@ fn applyFmt(mut &fmt: []byte, mut &buf: str, mut &j: int, &args: ...any) {
 
 // See the [std::fmt::Format] function.
 fn Format(&fmt: str, args: ...any): str {
-    if args.len == 0 {
+    if len(args) == 0 {
         ret fmt
     }
     let mut fmtBytes = nosafe::Stobs(fmt)
-    let mut buf = make(str, 0, fmt.len)
+    let mut buf = make(str, 0, len(fmt))
     let mut j = 0
     let mut last = 0
     let mut i = findFormatPrefix(fmtBytes, last)
@@ -122,15 +122,15 @@ fn Format(&fmt: str, args: ...any): str {
             continue
         }
         applyFmt(format, buf, j, args...)
-        if j >= args.len {
+        if j >= len(args) {
             nosafe::PushToStrBuffer(buf, fmtBytes[i:])
-            last = fmtBytes.len
+            last = len(fmtBytes)
             break
         }
         // Set last positioning to latest value of i.
         last = i
     }
-    if last < fmtBytes.len {
+    if last < len(fmtBytes) {
         nosafe::PushToStrBuffer(buf, fmtBytes[last:])
     }
     ret buf

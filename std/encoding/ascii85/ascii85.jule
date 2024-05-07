@@ -54,22 +54,22 @@ fn NewDecoder(mut r: io::Reader): io::Reader {
     ret decoder.new(r)
 }
 
-// Encodes src into at most max_encoded_len(src.len)
+// Encodes src into at most MaxEncodedLen(len(src))
 // bytes of dest, returning the actual number of bytes written.
 //
 // The encoding handles 4-byte chunks, using a special encoding
 // for the last fragment, so encode is not appropriate for use on
-// individual blocks of a large data stream. Use new_encoder() instead.
+// individual blocks of a large data stream. Use NewEncoder() instead.
 //
 // Often, ascii85-encoded data is wrapped in <~ and ~> symbols.
 // The encode does not add these.
 fn Encode(mut dest: []byte, src: []byte): int {
-    if src.len == 0 {
+    if len(src) == 0 {
         ret 0
     }
 
     let mut n = 0
-    for src.len > 0 {
+    for len(src) > 0 {
         dest[0] = 0
         dest[1] = 0
         dest[2] = 0
@@ -78,7 +78,7 @@ fn Encode(mut dest: []byte, src: []byte): int {
 
         // Unpack 4 bytes into u32 to repack into base 85 5-byte.
         let mut v = u32(0)
-        match src.len {
+        match len(src) {
         | 3:
             v |= u32(src[2]) << 8
             fall
@@ -95,7 +95,7 @@ fn Encode(mut dest: []byte, src: []byte): int {
         }
 
         // Special case: zero (!!!!!) shortens to z.
-        if v == 0 && src.len >= 4 {
+        if v == 0 && len(src) >= 4 {
             dest[0] = 'z'
             dest = dest[1:]
             unsafe { *(&src) = (*(&src))[4:] }
@@ -112,8 +112,8 @@ fn Encode(mut dest: []byte, src: []byte): int {
 
         // If src was short, discard the low destination bytes.
         let mut m = 5
-        if src.len < 4 {
-            m -= 4 - src.len
+        if len(src) < 4 {
+            m -= 4 - len(src)
             unsafe { *(&src) = nil }
         } else {
             unsafe { *(&src) = (*(&src))[4:] }
@@ -135,12 +135,12 @@ fn Encode(mut dest: []byte, src: []byte): int {
 // end of the input stream and processes it completely rather
 // than wait for the completion of another 32-bit block.
 //
-// new_decoder wraps an std::io::Reader trait around decode.
+// NewDecoder wraps an std::io::Reader trait around decode.
 fn Decode(mut dest: []byte, src: []byte, flush: bool)!: (ndst: int, nsrc: int) {
     let mut v = u32(0)
     let mut nb = 0
     for i, b in src {
-        if dest.len-ndst < 4 {
+        if len(dest)-ndst < 4 {
             ret
         }
         match {
@@ -167,7 +167,7 @@ fn Decode(mut dest: []byte, src: []byte, flush: bool)!: (ndst: int, nsrc: int) {
         }
     }
     if flush {
-        nsrc = src.len
+        nsrc = len(src)
         if nb > 0 {
             // The number of output bytes in the last fragment
             // is the number of leftover input bytes - 1:
@@ -206,7 +206,7 @@ impl io::WriterCloser for encoder {
         // Leading fringe.
         if self.nbuf > 0 {
             let mut i = 0
-            for i < dest.len && self.nbuf < 4; i++ {
+            for i < len(dest) && self.nbuf < 4; i++ {
                 self.buf[self.nbuf] = dest[i]
                 self.nbuf++
             }
@@ -221,10 +221,10 @@ impl io::WriterCloser for encoder {
         }
 
         // Large interior chunks.
-        for dest.len >= 4 {
-            let mut nn = (self.out.len / 5) << 2
-            if nn > dest.len {
-                nn = dest.len
+        for len(dest) >= 4 {
+            let mut nn = (len(self.out) / 5) << 2
+            if nn > len(dest) {
+                nn = len(dest)
             }
             nn -= nn % 4
             if nn > 0 {
@@ -237,8 +237,8 @@ impl io::WriterCloser for encoder {
 
         // Trailing fringe.
         _ = copy(self.buf, dest)
-        self.nbuf = dest.len
-        n += dest.len
+        self.nbuf = len(dest)
+        n += len(dest)
         ret
     }
 
@@ -274,12 +274,12 @@ struct decoder {
 
 impl io::Reader for decoder {
     fn Read(mut self, mut p: []byte)!: (n: int) {
-        if p.len == 0 {
+        if len(p) == 0 {
             ret 0
         }
         for {
             // Copy leftover output from last decode.
-            if self.out.len > 0 {
+            if len(self.out) > 0 {
                 n = copy(p, self.out)
                 self.out = self.out[n:]
                 ret

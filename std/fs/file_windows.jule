@@ -47,22 +47,20 @@ impl File {
     //  Retry InvalidDescriptor Big Signal IO NoSpace Pipe Range SyncIO
     //  Seek Device Buffer
     fn Write(mut self, buff: []byte)!: (n: int) {
-        if buff.len == 0 {
+        if len(buff) == 0 {
             ret 0
         }
 
         if isConsoleHandle(self.handle) {
             let utf16Buff = integrated::Utf16FromStr(str(buff))
-            let ok = unsafe {
-                sys::WriteConsole(self.handle, &utf16Buff[0], utf16Buff.len, n, nil)
-            }
+            let ok = unsafe { sys::WriteConsole(self.handle, &utf16Buff[0], len(utf16Buff), n, nil) }
             if !ok {
                 error(getLastFsError())
             }
             ret n
         }
 
-        n = unsafe { sys::Write(int(self.handle), &buff[0], uint(buff.len)) }
+        n = unsafe { sys::Write(int(self.handle), &buff[0], uint(len(buff))) }
         if n == -1 {
             error(getLastFsError())
         }
@@ -79,13 +77,13 @@ impl File {
     //  Retry InvalidDescriptor Signal SyncIO IO IsDir Overflow Buffer
     //  InsufficientMemory Device Seek
     fn Read(mut self, mut buff: []byte)!: (n: int) {
-        if buff.len == 0 {
+        if len(buff) == 0 {
             ret 0
         }
 
         if isConsoleHandle(self.handle) {
-            let mut codepage = make([]u16, buff.len)
-            let ok = unsafe { sys::ReadConsole(self.handle, &codepage[0], buff.len, n, nil) }
+            let mut codepage = make([]u16, len(buff))
+            let ok = unsafe { sys::ReadConsole(self.handle, &codepage[0], len(buff), n, nil) }
             if !ok {
                 error(getLastFsError())
             }
@@ -94,7 +92,7 @@ impl File {
             n = 0
             for _, r in runes {
                 let size = utf8::RuneLen(r)
-                if n+size > buff.len {
+                if n+size > len(buff) {
                     break
                 }
                 _ = utf8::EncodeRune(buff[n:], r)
@@ -104,7 +102,7 @@ impl File {
             ret n
         }
 
-        n = unsafe { sys::Read(int(self.handle), &buff[0], uint(buff.len)) }
+        n = unsafe { sys::Read(int(self.handle), &buff[0], uint(len(buff))) }
         if n == -1 {
             error(getLastFsError())
         }

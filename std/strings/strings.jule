@@ -13,11 +13,11 @@ fn Repeat(s: str, mut n: int): str {
     if n <= 0 {
         ret ""
     }
-    if s.len > int.Max/n {
+    if len(s) > int.Max/n {
         panic("std::strings: repeat: integer buffer size overflow")
     }
 
-    let mut ss = make(str, 0, s.len * n)
+    let mut ss = make(str, 0, len(s) * n)
     for n > 0; n-- {
         ss += s
     }
@@ -25,12 +25,12 @@ fn Repeat(s: str, mut n: int): str {
 }
 
 fn hasPrefix(&s: str, &sub: str, mut start: int): bool {
-    if sub.len == 0 || s.len-start < sub.len {
+    if len(sub) == 0 || len(s)-start < len(sub) {
         ret false
     }
 
     let mut i = 0
-    for i < sub.len; i, start = i + 1, start + 1 {
+    for i < len(sub); i, start = i + 1, start + 1 {
         if s[start] != sub[i] {
             ret false
         }
@@ -44,14 +44,14 @@ fn HasPrefix(s: str, sub: str): bool {
 }
 
 fn hasSuffix(&s: str, &sub: str, mut start: int): bool {
-    if sub.len == 0 || s.len-start < sub.len {
+    if len(sub) == 0 || len(s)-start < len(sub) {
         ret false
     }
 
-    start = s.len - start
+    start = len(s) - start
     let mut i = 0
-    for i < sub.len; i++ {
-        if s[start-i-1] != sub[sub.len-i-1] {
+    for i < len(sub); i++ {
+        if s[start-i-1] != sub[len(sub)-i-1] {
             ret false
         }
     }
@@ -66,12 +66,12 @@ fn HasSuffix(s: str, sub: str): bool {
 // Returns index of first matched item with specified substring,
 // returns -1 if not exist any match. Starts searching at left
 // of string to right. Starts searching s at given index.
-// Returns -1, if i < 0 || i >= s.len.
+// Returns -1, if i < 0 || i >= len(s).
 fn FindAt(s: str, sub: str, mut i: int): int {
-    if i < 0 || s.len < sub.len || sub.len == 0 {
+    if i < 0 || len(s) < len(sub) || len(sub) == 0 {
         ret -1
     }
-    for i < s.len; i++ {
+    for i < len(s); i++ {
         if hasPrefix(s, sub, i) {
             ret i
         }
@@ -89,17 +89,17 @@ fn Find(s: str, sub: str): int {
 // Returns index of first matched item with specified substring,
 // returns -1 if not exist any match. Starts searching at right
 // of string to left. Starts searching s at given index.
-// Returns -1, if i < 0 || i >= s.len.
+// Returns -1, if i < 0 || i >= len(s).
 fn FindLastAt(s: str, sub: str, i: int): int {
-    let mut j = i - sub.len + 1
-    if sub.len == 0 || i < 0 || i >= s.len || j < 0 {
+    let mut j = i - len(sub) + 1
+    if len(sub) == 0 || i < 0 || i >= len(s) || j < 0 {
         ret -1
     }
 loop:
     for j >= 0; j-- {
         let mut k = j
         let mut z = 0
-        for z < sub.len; k, z = k + 1, z + 1 {
+        for z < len(sub); k, z = k + 1, z + 1 {
             if s[k] != sub[z] {
                 continue loop
             }
@@ -113,7 +113,7 @@ loop:
 // returns -1 if not exist any match. Starts searching at right
 // of string to left.
 fn FindLast(s: str, sub: str): int {
-    ret FindLastAt(s, sub, s.len - 1)
+    ret FindLastAt(s, sub, len(s) - 1)
 }
 
 // Returns index of first matched item with finder function,
@@ -125,7 +125,7 @@ fn FindFnAt(s: str, mut i: int, f: fn(mut rune): bool): int {
         ret -1
     }
     let bytes = nosafe::Stobs(s)
-    for i < bytes.len {
+    for i < len(bytes) {
         let (r, n) = utf8::DecodeRune(bytes[i:])
         if f(r) {
             ret i
@@ -145,9 +145,9 @@ fn FindFn(s: str, f: fn(mut rune): bool): int {
 // Returns index of first matched item with finder function,
 // returns -1 if not exist any match. Starts searching at right
 // of string to left. Starts searching s at given index.
-// Returns -1, if i < 0 || i >= s.len.
+// Returns -1, if i < 0 || i >= len(s).
 fn FindFnLastAt(s: str, mut i: int, f: fn(mut rune): bool): int {
-    if i < 0 || i >= s.len {
+    if i < 0 || i >= len(s) {
         ret -1
     }
     let bytes = nosafe::Stobs(s)
@@ -165,12 +165,12 @@ fn FindFnLastAt(s: str, mut i: int, f: fn(mut rune): bool): int {
 // returns -1 if not exist any match. Starts searching at right
 // of string to left.
 fn FindFnLast(s: str, f: fn(mut rune): bool): int {
-    ret FindFnLastAt(s, s.len - 1, f)
+    ret FindFnLastAt(s, len(s) - 1, f)
 }
 
 fn findRune(&s: []byte, r: rune): int {
     let mut i = 0
-    for i < s.len {
+    for i < len(s) {
         let (br, n) = utf8::DecodeRune(s[i:])
         if r == br {
             ret i
@@ -203,7 +203,7 @@ fn FindRune(s: str, r: rune): int {
 }
 
 fn findLastRune(&s: []byte, r: rune): int {
-    let mut i = s.len
+    let mut i = len(s)
     for i > 0 {
         let (br, n) = utf8::DecodeLastRune(s[:i])
         if r == br {
@@ -229,7 +229,7 @@ fn FindAny(s: str, runes: str): int {
     let sb = nosafe::Stobs(s)
     let mut rb = nosafe::Stobs(runes)
     let mut i = 0
-    for i < sb.len {
+    for i < len(sb) {
         let (r, n) = utf8::DecodeRune(sb[i:])
         if findRune(rb, r) != -1 {
             ret i
@@ -245,7 +245,7 @@ fn FindAny(s: str, runes: str): int {
 fn FindLastAny(s: str, runes: str): int {
     let sb = nosafe::Stobs(s)
     let mut rb = nosafe::Stobs(runes)
-    let mut i = sb.len
+    let mut i = len(sb)
     for i > 0 {
         let (r, n) = utf8::DecodeLastRune(sb[:i])
         if findRune(rb, r) != -1 {
@@ -269,7 +269,7 @@ fn Split(s: str, sub: str, mut n: int): []str {
         ret parts
     }
     if n < 0 {
-        n = s.len
+        n = len(s)
     }
     let mut i = 0
     for n > 0; n-- {
@@ -278,9 +278,9 @@ fn Split(s: str, sub: str, mut n: int): []str {
             break
         }
         parts = append(parts, s[i:j])
-        i = j + sub.len
+        i = j + len(sub)
     }
-    if n > 0 && i < s.len {
+    if n > 0 && i < len(s) {
         parts = append(parts, s[i:])
     }
     ret parts
@@ -310,7 +310,7 @@ fn ContainsAny(s: str, runes: str): bool {
 // Counts the number of non-overlapping instances of substring in s.
 // Returns zero if substring is empty.
 fn Count(s: str, sub: str): int {
-    if sub.len == 0 {
+    if len(sub) == 0 {
         ret 0
     }
     let mut n = 0
@@ -321,7 +321,7 @@ fn Count(s: str, sub: str): int {
             break
         }
         n++
-        i = j + sub.len
+        i = j + len(sub)
     }
     ret n
 }
@@ -342,7 +342,7 @@ fn Replace(s: str, sub: str, new: str, mut n: int): str {
         n = m
     }
 
-    let mut ss = make(str, 0, s.len + n * (new.len - sub.len))
+    let mut ss = make(str, 0, len(s) + n * (len(new) - len(sub)))
     let mut i = 0
     for n > 0; n-- {
         let j = FindAt(s, sub, i)
@@ -351,7 +351,7 @@ fn Replace(s: str, sub: str, new: str, mut n: int): str {
         }
         ss += s[i:j]
         ss += new
-        i = j + sub.len
+        i = j + len(sub)
     }
     ss += s[i:]
     ret ss
@@ -361,10 +361,10 @@ fn Replace(s: str, sub: str, new: str, mut n: int): str {
 // according to the mapping function. If mapping returns a negative value,
 // the character is dropped from the string with no replacement.
 fn Map(s: str, mapping: fn(mut rune): rune): str {
-    let mut ss = make(str, 0, s.len)
+    let mut ss = make(str, 0, len(s))
     let mut bytes = nosafe::Stobs(s)
     let mut i = 0
-    for i < bytes.len {
+    for i < len(bytes) {
         let (mut r, n) = utf8::DecodeRune(bytes[i:])
         i += n
         r = mapping(r)
@@ -387,7 +387,7 @@ fn ToUpper(s: str): str {
 
 fn trimLeft(mut &s: []byte, &cutset: []byte) {
     let mut i = 0
-    for i < s.len {
+    for i < len(s) {
         let (r, n) = utf8::DecodeRune(s[i:])
         if findRune(cutset, r) == -1 {
             s = s[i:]
@@ -408,7 +408,7 @@ fn TrimLeft(s: str, cutset: str): str {
 }
 
 fn trimRight(mut &s: []byte, &cutset: []byte) {
-    let mut i = s.len
+    let mut i = len(s)
     for i > 0 {
         let (r, n) = utf8::DecodeLastRune(s[:i])
         if findRune(cutset, r) == -1 {
@@ -442,7 +442,7 @@ fn Trim(s: str, cutset: str): str {
 // Concatenates the parts of its first argument to create a single string.
 // The separator sep is placed between parts in the resulting string.
 fn Join(parts: []str, sep: str): str {
-    match parts.len {
+    match len(parts) {
     | 0:
         ret ""
     | 1:

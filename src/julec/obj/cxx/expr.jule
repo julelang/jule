@@ -51,6 +51,7 @@ use std::jule::sema::{
     BuiltinAppendCallExprModel,
     BuiltinErrorCallExprModel,
     BuiltinCopyCallExprModel,
+    BuiltinLenCallExprModel,
     SizeofExprModel,
     AlignofExprModel,
     RuneExprModel,
@@ -102,12 +103,12 @@ impl exprCoder {
 
     fn string(mut &self, &c: &Const) {
         let content = c.ReadStr()
-        if content.len == 0 { // Empty.
+        if len(content) == 0 { // Empty.
             self.oc.write(typeCoder.Str + "()")
             ret
         }
         let bytes = []byte(content)
-        let len = conv::FmtInt(i64(bytes.len), 10)
+        let len = conv::FmtInt(i64(len(bytes)), 10)
         let lit = cstrLit(bytes)
         self.oc.write(typeCoder.Str)
         self.oc.write("(")
@@ -297,7 +298,7 @@ impl exprCoder {
             self.oc.write(")")
         }
         self.oc.write("{")
-        if m.Args.len > 0 {
+        if len(m.Args) > 0 {
             // Fields are should be in order.
             // In other words, GCC will produce error(s).
         iter:
@@ -308,7 +309,7 @@ impl exprCoder {
                         self.oc.write(identCoder.field(arg.Field.Decl))
                         self.oc.write("=")
                         self.expr(arg.Expr)
-                        if m.Strct.Fields.len-i > 1 {
+                        if len(m.Strct.Fields)-i > 1 {
                             self.oc.write(", ")
                         }
                         continue iter
@@ -379,12 +380,12 @@ impl exprCoder {
     }
 
     fn args(mut &self, mut args: []ExprModel) {
-        if args.len == 0 {
+        if len(args) == 0 {
             ret
         }
         for (i, mut a) in args {
             self.expr(a)
-            if args.len-i > 1 {
+            if len(args)-i > 1 {
                 self.oc.write(",")
             }
         }
@@ -425,13 +426,13 @@ impl exprCoder {
         self.oc.write("(\"")
         self.oc.locInfo(m.Token)
         self.oc.write("\"")
-        if m.Args.len != 0 {
+        if len(m.Args) != 0 {
             self.oc.write(",")
         }
     }
 
     fn isWrapped(mut &self, mut &m: &FnCallExprModel): bool {
-        if !m.Func.IsBuiltin() && m.Func.Decl.Params.len > 0 && m.Func.Decl.Params[0].IsSelf() {
+        if !m.Func.IsBuiltin() && len(m.Func.Decl.Params) > 0 && m.Func.Decl.Params[0].IsSelf() {
             match type m.Expr {
             | &StructSubIdentExprModel:
                 let mut ssie = (&StructSubIdentExprModel)(m.Expr)
@@ -461,12 +462,12 @@ impl exprCoder {
         }
         self.modelForCall(m.Expr)
         if !m.Func.IsBuiltin() {
-            if m.Func.Decl.CppLinked && m.Func.Generics.len > 0 {
+            if m.Func.Decl.CppLinked && len(m.Func.Generics) > 0 {
                 if !hasDirective(m.Func.Decl.Directives, Directive.Cdef) {
                     self.oc.write("<")
                     for (i, mut g) in m.Func.Generics {
                         self.oc.write(typeCoder.kind(g.Kind))
-                        if m.Func.Generics.len-i > 1 {
+                        if len(m.Func.Generics)-i > 1 {
                             self.oc.write(",")
                         }
                     }
@@ -476,7 +477,7 @@ impl exprCoder {
         }
         self.pushCallInf(m)
         let mut locinfo = false
-        if !m.Func.IsBuiltin() && m.Func.Decl.Params.len > 0 && m.Func.Decl.Params[0].IsSelf() {
+        if !m.Func.IsBuiltin() && len(m.Func.Decl.Params) > 0 && m.Func.Decl.Params[0].IsSelf() {
             match type m.Expr {
             | &StructSubIdentExprModel:
                 let mut ssie = (&StructSubIdentExprModel)(m.Expr)
@@ -503,7 +504,7 @@ impl exprCoder {
                         self.model(ssie.Expr.Model)
                     }
                 }
-                if m.Args.len > 0 {
+                if len(m.Args) > 0 {
                     self.oc.write(", ")
                 }
             | &TraitSubIdentExprModel:
@@ -511,7 +512,7 @@ impl exprCoder {
                 if !env::Production {
                     locinfo = true
                 }
-                if m.Args.len > 0 {
+                if len(m.Args) > 0 {
                     self.oc.write(", ")
                 }
             }
@@ -536,7 +537,7 @@ impl exprCoder {
     fn funcCall(mut &self, mut m: &FnCallExprModel) {
         if m.Func.IsBuiltin() ||
             !m.Func.Decl.Exceptional ||
-            m.Except != nil && m.Except.Stmts.len == 0 {
+            m.Except != nil && len(m.Except.Stmts) == 0 {
             self.pureFuncCall(m)
             ret
         }
@@ -585,7 +586,7 @@ impl exprCoder {
     }
 
     fn slice(mut &self, mut m: &SliceExprModel) {
-        if m.Elems.len == 0 {
+        if len(m.Elems) == 0 {
             self.oc.write(typeCoder.asSlice(m.ElemKind))
             self.oc.write("()")
             ret
@@ -650,14 +651,14 @@ impl exprCoder {
         self.oc.write(",")
         self.oc.write(typeCoder.kind(m.ValKind))
         self.oc.write(">({")
-        if m.Entries.len > 0 {
+        if len(m.Entries) > 0 {
             for (i, mut pair) in m.Entries {
                 self.oc.write("{")
                 self.expr(pair.Key)
                 self.oc.write(",")
                 self.expr(pair.Val)
                 self.oc.write("}")
-                if m.Entries.len-i > 1 {
+                if len(m.Entries)-i > 1 {
                     self.oc.write(",")
                 }
             }
@@ -735,13 +736,13 @@ impl exprCoder {
 
     fn array(mut &self, mut m: &ArrayExprModel) {
         self.oc.write(typeCoder.array(m.Kind))
-        if m.Elems.len == 0 {
+        if len(m.Elems) == 0 {
             self.oc.write("()")
             ret
         }
 
         // Filled.
-        if m.Elems.len == 2 && m.Elems[1] == nil {
+        if len(m.Elems) == 2 && m.Elems[1] == nil {
             self.oc.write("(")
             self.expr(m.Elems[0])
             self.oc.write(")")
@@ -778,7 +779,7 @@ impl exprCoder {
         self.oc.write("std::make_tuple(")
         for (i, mut d) in m.Datas {
             self.expr(d.Model)
-            if m.Datas.len-i > 1 {
+            if len(m.Datas)-i > 1 {
                 self.oc.write(",")
             }
         }
@@ -863,6 +864,11 @@ impl exprCoder {
         self.oc.write(")")
     }
 
+    fn lenCall(mut &self, mut m: &BuiltinLenCallExprModel) {
+        self.model(m.Expr.Model)
+        self.oc.write(".len()")
+    }
+
     fn makeCallSlice(mut &self, mut &m: &BuiltinMakeCallExprModel) {
         let mut slice = m.Kind.Slc()
         self.oc.write(typeCoder.kind(m.Kind))
@@ -909,14 +915,14 @@ impl exprCoder {
     }
 
     fn pushToSlice(mut &self, mut m: &PushToSliceExprModel) {
-        let n = self.oc.Obj.len
+        let n = len(self.oc.Obj)
         self.model(m.Dest)
         let dest = self.oc.Obj[n:]
 
         self.oc.write(" = jule::alloc_for_append(")
         self.oc.write(dest)
         self.oc.write(",")
-        self.oc.write(conv::Itoa(m.Elems.Elems.len))
+        self.oc.write(conv::Itoa(len(m.Elems.Elems)))
         self.oc.write(");")
         for (_, mut e) in m.Elems.Elems {
             self.oc.write(dest)
@@ -975,12 +981,12 @@ impl exprCoder {
     }
 
     fn backendEmit(mut &self, mut m: &BackendEmitExprModel) {
-        if m.Exprs.len == 0 {
+        if len(m.Exprs) == 0 {
             self.oc.write(m.Code)
             ret
         }
-        let n = self.oc.Obj.len
-        let mut args = make([]any, m.Exprs.len)
+        let n = len(self.oc.Obj)
+        let mut args = make([]any, len(m.Exprs))
         for (i, mut expr) in m.Exprs {
             self.expr(expr)
             args[i] = self.oc.Obj[n:]
@@ -1093,6 +1099,8 @@ impl exprCoder {
             self.cloneCall((&BuiltinCloneCallExprModel)(m))
         | &BuiltinCopyCallExprModel:
             self.copyCall((&BuiltinCopyCallExprModel)(m))
+        | &BuiltinLenCallExprModel:
+            self.lenCall((&BuiltinLenCallExprModel)(m))
         | &SizeofExprModel:
             self.sizeof((&SizeofExprModel)(m))
         | &AlignofExprModel:
@@ -1184,14 +1192,14 @@ fn sbtoa(b: byte): str {
         }
     }
     let seq = conv::FmtUint(u64(b), 8)
-    if seq.len == 2 {
+    if len(seq) == 2 {
         ret "\\0" + seq
     }
     ret "\\" + seq
 }
 
 fn cstrBytes(bytes: []byte): str {
-    let mut lit = make(str, 0, bytes.len)
+    let mut lit = make(str, 0, len(bytes))
     for _, b in bytes {
         lit += sbtoa(b)
     }
@@ -1247,7 +1255,7 @@ fn utoa(x: u64): str {
 }
 
 fn isForwarded(&s: &Scope): bool {
-    let last = s.Stmts[s.Stmts.len-1]
+    let last = s.Stmts[len(s.Stmts)-1]
     match type last {
     | &Data:
         match type (&Data)(last).Model {

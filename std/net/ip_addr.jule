@@ -94,7 +94,7 @@ fn appendHex(mut &s: str, x: u16) {
 }
 
 fn str4(ip: u128): str {
-    const Max = "255.255.255.255".len
+    const Max = len("255.255.255.255")
     let mut s = make(str, 0, Max)
     appendDecimal(s, v4(ip, 0))
     s += "."
@@ -107,7 +107,7 @@ fn str4(ip: u128): str {
 }
 
 fn str16(ip: u128): str {
-    const Max = "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff%enp5s0".len
+    const Max = len("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff%enp5s0")
     let mut s = make(str, 0, Max)
 
     let (mut zeroStart, mut zeroEnd) = byte(255), byte(255)
@@ -145,7 +145,7 @@ fn parseIPv4Fields(&addr: str, off: int, end: int, mut fields: []byte)! {
     let mut digLen = 0                   // number of digits in current octet
     let s = nosafe::Stobs(addr)[off:end]
     let mut i = 0
-    for i < s.len; i++ {
+    for i < len(s); i++ {
         if s[i] >= '0' && s[i] <= '9' {
             if digLen == 1 && val == 0 {
                 error(AddrError.IPv4FieldOctetWithLeadingZero)
@@ -159,7 +159,7 @@ fn parseIPv4Fields(&addr: str, off: int, end: int, mut fields: []byte)! {
             // .1.2.3
             // 1.2.3.
             // 1..2.3
-            if i == 0 || i == s.len-1 || s[i-1] == '.' {
+            if i == 0 || i == len(s)-1 || s[i-1] == '.' {
                 error(AddrError.EmptyField)
             }
             // 1.2.3.4.5
@@ -182,7 +182,7 @@ fn parseIPv4Fields(&addr: str, off: int, end: int, mut fields: []byte)! {
 
 fn parseIPv4(&addr: str)!: Ip {
     let mut fields = make([]byte, 4)
-    parseIPv4Fields(addr, 0, addr.len, fields) else { error(error) }
+    parseIPv4Fields(addr, 0, len(addr), fields) else { error(error) }
     ret Ip{Addr: fields}
 }
 
@@ -198,7 +198,7 @@ fn parseIPv6(&addr: str)!: &TcpAddr {
     let mut i = fastbytes::FindByte(s, '%')
     if i != -1 {
         s, zone = s[:i], s[i+1:]
-        if zone.len == 0 {
+        if len(zone) == 0 {
             // Not allowed to have an empty zone if explicitly specified.
             error(AddrError.EmptyZone)
         }
@@ -208,11 +208,11 @@ fn parseIPv6(&addr: str)!: &TcpAddr {
     let mut ellipsis = -1         // Position of ellipsis in IP.
 
     // Might have leading ellipsis.
-    if s.len >= 2 && s[0] == ':' && s[1] == ':' {
+    if len(s) >= 2 && s[0] == ':' && s[1] == ':' {
         ellipsis = 0
         s = s[2:]
         // Might be only ellipsis.
-        if s.len == 0 {
+        if len(s) == 0 {
             let mut tcpAddr = &TcpAddr{
                 Ip: Ipv6.Unspecified().To16(),
                 Zone: str(zone),
@@ -228,7 +228,7 @@ fn parseIPv6(&addr: str)!: &TcpAddr {
         // parsing yields a significant performance increase.
         let mut off = 0
         let mut acc = u32(0)
-        for off < s.len; off++ {
+        for off < len(s); off++ {
             let c = s[off]
             if c >= '0' && c <= '9' {
                 acc = (acc << 4) + u32(c - '0')
@@ -254,7 +254,7 @@ fn parseIPv6(&addr: str)!: &TcpAddr {
         }
 
         // If followed by dot, might be in trailing IPv4.
-        if off < s.len && s[off] == '.' {
+        if off < len(s) && s[off] == '.' {
             if ellipsis < 0 && i != 12 {
                 // Not the right place.
                 error(AddrError.UnexpectedToken)
@@ -264,11 +264,11 @@ fn parseIPv6(&addr: str)!: &TcpAddr {
                 error(AddrError.TooLong)
             }
 
-            let mut end = addr.len
-            if zone.len > 0 {
-                end -= zone.len + 1
+            let mut end = len(addr)
+            if len(zone) > 0 {
+                end -= len(zone) + 1
             }
-            parseIPv4Fields(addr, end - s.len, end, ip[i:i+4]) else { error(error) }
+            parseIPv4Fields(addr, end - len(s), end, ip[i:i+4]) else { error(error) }
             s = s[:0]
             i += 4
             break
@@ -281,14 +281,14 @@ fn parseIPv6(&addr: str)!: &TcpAddr {
 
         // Stop at end of string.
         s = s[off:]
-        if s.len == 0 {
+        if len(s) == 0 {
             break
         }
 
         // Otherwise must be followed by colon and more.
         if s[0] != ':' {
             error(AddrError.UnexpectedToken)
-        } else if s.len == 1 {
+        } else if len(s) == 1 {
             error(AddrError.IPv6ShortColon)
         }
         s = s[1:]
@@ -300,13 +300,13 @@ fn parseIPv6(&addr: str)!: &TcpAddr {
             }
             ellipsis = i
             s = s[1:]
-            if s.len == 0 { // can be at end
+            if len(s) == 0 { // can be at end
                 break
             }
         }
     }
     // Must have used entire string.
-    if s.len != 0 {
+    if len(s) != 0 {
         error(AddrError.UnexpectedToken)
     }
 

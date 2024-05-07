@@ -80,7 +80,7 @@ fn IsAbs(mut path: str): bool {
 //
 // See: https://learn.microsoft.com/en-us/dotnet/standard/io/file-path-formats
 fn volumeNameLen(path: str): int {
-    if path.len < 2 {
+    if len(path) < 2 {
         ret 0
     }
     // with drive letter
@@ -97,22 +97,22 @@ fn volumeNameLen(path: str): int {
     let mut ok = false
     p2, rest, ok = cutPath(rest)
     if !ok {
-        ret path.len
+        ret len(path)
     }
     if p1 != "." && p1 != "?" {
         // This is a UNC path: \\${HOST}\${SHARE}\
-        ret path.len - rest.len - 1
+        ret len(path) - len(rest) - 1
     }
     // This is a DOS device path.
-    if p2.len == 3 && toUpper(p2[0]) == 'U' && toUpper(p2[1]) == 'N' && toUpper(p2[2]) == 'C' {
+    if len(p2) == 3 && toUpper(p2[0]) == 'U' && toUpper(p2[1]) == 'N' && toUpper(p2[2]) == 'C' {
         // This is a DOS device path that links to a UNC: \\.\UNC\${HOST}\${SHARE}\
         _, rest, _ = cutPath(rest) // host
         _, rest, ok = cutPath(rest) // share
         if !ok {
-            ret path.len
+            ret len(path)
         }
     }
-    ret path.len - rest.len - 1
+    ret len(path) - len(rest) - 1
 }
 
 // Slices path around the first path separator.
@@ -131,11 +131,11 @@ fn fullPath(name: str): (path: str, ok: bool) {
     let mut n: u32 = 100
     for {
         let mut buff = make([]u16, n)
-        n = unsafe { sys::GetFullPathName(p, u32(buff.len), &buff[0], nil) }
+        n = unsafe { sys::GetFullPathName(p, u32(len(buff)), &buff[0], nil) }
         if n == 0 {
             ret "", false
         }
-        if n <= u32(buff.len) {
+        if n <= u32(len(buff)) {
             ret integrated::Utf16ToStr(buff[:n]), true
         }
     }
@@ -161,7 +161,7 @@ fn join(mut elem: ...str): str {
     let mut lastChar: byte = 0
     for (_, mut e) in elem {
         match {
-        | s.len == 0:
+        | len(s) == 0:
             // Add the first non-empty path element unchanged.
         | isSlash(lastChar):
             // If the path ends in a slash, strip any leading slashes from the next
@@ -171,7 +171,7 @@ fn join(mut elem: ...str): str {
             // The correct behavior for join when the first element is an incomplete UNC
             // path (for example, "\\") is underspecified. We currently join subsequent
             // elements so join("\\", "host", "share") produces "\\host\share".
-            for e.len > 0 && isSlash(e[0]) {
+            for len(e) > 0 && isSlash(e[0]) {
                 e = e[1:]
             }
         | lastChar == ':':
@@ -186,12 +186,12 @@ fn join(mut elem: ...str): str {
             s += "\\"
             lastChar = '\\'
         }
-        if e.len > 0 {
+        if len(e) > 0 {
             s += e
-            lastChar = e[e.len-1]
+            lastChar = e[len(e)-1]
         }
     }
-    if s.len == 0 {
+    if len(s) == 0 {
         ret ""
     }
     ret Clean(s)

@@ -101,7 +101,7 @@ impl Kind for TypeKind {
 
 impl TypeKind {
     // Reports whether type is cpp-linked kind.
-    fn CppLinked(self): bool { ret self.CppIdent.len != 0 }
+    fn CppLinked(self): bool { ret len(self.CppIdent) != 0 }
 
     // Reports whether kind is "nil".
     fn IsNil(self): bool { ret self.Kind == nil }
@@ -483,11 +483,11 @@ impl Kind for Tuple {
         if tup == nil {
             ret false
         }
-        if self.Types.len != tup.Types.len {
+        if len(self.Types) != len(tup.Types) {
             ret false
         }
         let mut i = 0
-        for i < self.Types.len; i++ {
+        for i < len(self.Types); i++ {
             if !self.Types[i].Equals(tup.Types[i]) {
                 ret false
             }
@@ -667,7 +667,7 @@ impl typeChecker {
             ret nil
         }
 
-        if decl.Generics.len > 0 {
+        if len(decl.Generics) > 0 {
             self.pushErr(decl.Token, LogMsg.TypeNotSupportsGenerics, decl.Ident)
             ret nil
         }
@@ -806,7 +806,7 @@ impl typeChecker {
 
         ta.Used = true
 
-        if decl.Generics.len > 0 {
+        if len(decl.Generics) > 0 {
             self.pushErr(decl.Token, LogMsg.TypeNotSupportsGenerics, decl.Ident)
             ret nil
         }
@@ -875,7 +875,7 @@ impl typeChecker {
             self.pushErr(decl.Token, LogMsg.IdentNotExist, decl.Ident)
             ret nil
         }
-        if decl.Generics.len > 0 {
+        if len(decl.Generics) > 0 {
             self.pushErr(decl.Token, LogMsg.TypeNotSupportsGenerics, decl.Ident)
             ret nil
         }
@@ -887,7 +887,7 @@ impl typeChecker {
             self.pushErr(decl.Token, LogMsg.IdentNotExist, decl.Ident)
             ret nil
         }
-        if decl.Generics.len > 0 {
+        if len(decl.Generics) > 0 {
             self.pushErr(decl.Token, LogMsg.TypeNotSupportsGenerics, decl.Ident)
             ret nil
         }
@@ -899,7 +899,7 @@ impl typeChecker {
             self.pushErr(decl.Token, LogMsg.IdentNotExist, decl.Ident)
             ret nil
         }
-        if decl.Generics.len > 0 {
+        if len(decl.Generics) > 0 {
             self.pushErr(decl.Token, LogMsg.TypeNotSupportsGenerics, decl.Ident)
             ret nil
         }
@@ -921,7 +921,7 @@ impl typeChecker {
         if !self.s.precheckStructIns(ins, errorToken) {
             ret false
         }
-        if ins.Generics.len > 0 {
+        if len(ins.Generics) > 0 {
             self.s.checkStructInsOperators(ins)
             self.s.checkStructIns(ins)
         }
@@ -957,7 +957,7 @@ impl typeChecker {
                 if hard.owner.Owner == nil || hard.owner.Owner.Decl != s {
                     break
                 }
-                let n = hard.owner.Generics.len + hard.owner.Owner.Generics.len
+                let n = len(hard.owner.Generics) + len(hard.owner.Owner.Generics)
                 // Add scope generics to to catch instantiation cycles.
                 // See developer reference (5).
                 self.bannedGenerics = hard.table.TypeAliases[:n]
@@ -972,7 +972,7 @@ impl typeChecker {
 
         // Build generics.
         let mut ins = s.instance()
-        ins.Generics = make([]&InsGeneric, 0, decl.Generics.len)
+        ins.Generics = make([]&InsGeneric, 0, len(decl.Generics))
         for (_, mut g) in decl.Generics {
             let mut kind = self.build(g.Kind)
             if kind == nil {
@@ -998,7 +998,7 @@ impl typeChecker {
         // Name selection.
         // Return instance instantly.
         if self.selection {
-            if decl.Generics.len > 0 {
+            if len(decl.Generics) > 0 {
                 self.pushErr(decl.Token, LogMsg.GenericsNotAllowed)
                 ret nil
             }
@@ -1018,7 +1018,7 @@ impl typeChecker {
             ret nil
         }
 
-        ok = self.s.checkGenericQuantity(ins.Decl.Generics.len, ins.Generics.len, decl.Token)
+        ok = self.s.checkGenericQuantity(len(ins.Decl.Generics), len(ins.Generics), decl.Token)
         if !ok {
             ret nil
         }
@@ -1056,7 +1056,7 @@ impl typeChecker {
 
         for (_, mut g) in self.useGenerics {
             if g.Ident == decl.Ident {
-                if decl.Generics.len > 0 {
+                if len(decl.Generics) > 0 {
                     self.pushErr(decl.Token, LogMsg.TypeNotSupportsGenerics, decl.Ident)
                     ret nil
                 }
@@ -1137,7 +1137,7 @@ impl typeChecker {
                 self.pushErr(id.Token, LogMsg.ObjHaveNotIdent, t.Ident, id.Ident)
                 ret nil
             }
-            if idents.len-i == 1 {
+            if len(idents)-i == 1 {
                 self.pushReferenceByKind(item.Kind.Kind)
                 ret item.Kind.Kind
             }
@@ -1307,7 +1307,7 @@ impl typeChecker {
     }
 
     fn buildTuple(mut self, mut decl: &TupleTypeDecl): &Tuple {
-        let mut types = make([]&TypeKind, 0, decl.Types.len)
+        let mut types = make([]&TypeKind, 0, len(decl.Types))
         for (_, mut t) in decl.Types {
             let mut kind = self.checkDecl(t)
             if kind == nil {
@@ -1338,16 +1338,16 @@ impl typeChecker {
     }
 
     fn buildFn(mut self, mut decl: &FnDecl): &FnIns {
-        if decl.Generics.len > 0 {
+        if len(decl.Generics) > 0 {
             self.pushErr(decl.Token, LogMsg.GenericedFnAsAnonFn)
             ret nil
         }
 
         let mut f = buildFn(decl)
 
-        let n = self.s.errors.len
+        let n = len(self.s.errors)
         self.s.checkFnDecl(f)
-        if n != self.s.errors.len {
+        if n != len(self.s.errors) {
             ret nil
         }
 
@@ -1365,7 +1365,7 @@ impl typeChecker {
     fn buildByNamespace(mut self, mut decl: &NamespaceTypeDecl): Kind {
         let path = buildLinkPathByTokens(decl.Idents)
         let mut imp = self.lookup.SelectPackage(fn(imp: &ImportInfo): bool {
-            if decl.Idents.len == 1 && imp.Alias == path {
+            if len(decl.Idents) == 1 && imp.Alias == path {
                 ret true
             }
             ret imp.LinkPath == path && imp.isAccessibleViaSelection()

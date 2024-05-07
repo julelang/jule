@@ -135,18 +135,18 @@ static acceptRanges: [16]acceptRange = [
 // Reports whether the bytes in p begin with a full UTF-8 encoding of a rune.
 // An invalid encoding is considered a full Rune since it will convert as a width-1 error rune.
 fn FullRune(p: []byte): bool {
-    if p.len == 0 {
+    if len(p) == 0 {
         ret false
     }
     let x = first[p[0]]
-    if p.len >= int(x&7) {
+    if len(p) >= int(x&7) {
         ret true // ASCII, invalid or valid.
     }
     // Must be short or invalid.
     let accept = acceptRanges[x>>4]
-    if p.len > 1 && (p[1] < accept.lo || accept.hi < p[1]) {
+    if len(p) > 1 && (p[1] < accept.lo || accept.hi < p[1]) {
         ret true
-    } else if p.len > 2 && (p[2] < locb || hicb < p[2]) {
+    } else if len(p) > 2 && (p[2] < locb || hicb < p[2]) {
         ret true
     }
     ret false
@@ -154,18 +154,18 @@ fn FullRune(p: []byte): bool {
 
 // Is like FullRune but its input is a string.
 fn FullRuneStr(s: str): bool {
-    if s.len == 0 {
+    if len(s) == 0 {
         ret false
     }
     let x = first[s[0]]
-    if s.len >= int(x&7) {
+    if len(s) >= int(x&7) {
         ret true // ASCII, invalid, or valid.
     }
     // Must be short or invalid.
     let accept = acceptRanges[x>>4]
-    if s.len > 1 && (s[1] < accept.lo || accept.hi < s[1]) {
+    if len(s) > 1 && (s[1] < accept.lo || accept.hi < s[1]) {
         ret true
-    } else if s.len > 2 && (s[2] < locb || hicb < s[2]) {
+    } else if len(s) > 2 && (s[2] < locb || hicb < s[2]) {
         ret true
     }
     ret false
@@ -180,7 +180,7 @@ fn FullRuneStr(s: str): bool {
 // out of range, or is not the shortest possible UTF-8 encoding for the
 // value. No other validation is performed.
 fn DecodeRune(p: []byte): (r: rune, size: int) {
-    if p.len < 1 {
+    if len(p) < 1 {
         ret RuneError, 0
     }
     let p0 = p[0]
@@ -194,7 +194,7 @@ fn DecodeRune(p: []byte): (r: rune, size: int) {
     }
     let sz = int(x & 7)
     let accept = acceptRanges[x>>4]
-    if p.len < sz {
+    if len(p) < sz {
         ret RuneError, 1
     }
     let b1 = p[1]
@@ -227,7 +227,7 @@ fn DecodeRune(p: []byte): (r: rune, size: int) {
 // out of range, or is not the shortest possible UTF-8 encoding for the
 // value. No other validation is performed.
 fn DecodeRuneStr(s: str): (r: rune, size: int) {
-    if s.len < 1 {
+    if len(s) < 1 {
         ret RuneError, 0
     }
     let s0 = s[0]
@@ -241,7 +241,7 @@ fn DecodeRuneStr(s: str): (r: rune, size: int) {
     }
     let sz = int(x & 7)
     let accept = acceptRanges[x>>4]
-    if s.len < sz {
+    if len(s) < sz {
         ret RuneError, 1
     }
     let s1 = s[1]
@@ -274,10 +274,10 @@ fn DecodeRuneStr(s: str): (r: rune, size: int) {
 // out of range, or is not the shortest possible UTF-8 encoding for the
 // value. No other validation is performed.
 fn DecodeLastRune(p: []byte): (r: rune, size: int) {
-    if p.len == 0 {
+    if len(p) == 0 {
         ret RuneError, 0
     }
-    let end = p.len
+    let end = len(p)
     let mut start = end - 1
     r = rune(p[start])
     if r < RuneSelf {
@@ -315,10 +315,10 @@ fn DecodeLastRune(p: []byte): (r: rune, size: int) {
 // out of range, or is not the shortest possible UTF-8 encoding for the
 // value. No other validation is performed.
 fn DecodeLastRuneStr(s: str): (r: rune, size: int) {
-    if s.len == 0 {
+    if len(s) == 0 {
         ret RuneError, 0
     }
-    let end = s.len
+    let end = len(s)
     let mut start = end - 1
     r = rune(s[start])
     if r < RuneSelf {
@@ -429,7 +429,7 @@ fn appendRuneNonASCII(mut p: []byte, mut r: rune): []byte {
 // encodings are treated as single runes of width 1 byte.
 fn RuneCount(p: []byte): (n: int) {
     let mut i = 0
-    for i < p.len {
+    for i < len(p) {
         n++
         let mut c = p[i]
         if c < RuneSelf {
@@ -443,7 +443,7 @@ fn RuneCount(p: []byte): (n: int) {
             continue
         }
         let mut size = int(x & 7)
-        if i+size > p.len {
+        if i+size > len(p) {
             i++ // Short or invalid.
             continue
         }
@@ -472,7 +472,7 @@ fn RuneCount(p: []byte): (n: int) {
 // Is like RuneCount but its input is a string.
 fn RuneCountStr(s: str): (n: int) {
     let mut i = 0
-    for i < s.len; n++ {
+    for i < len(s); n++ {
         let mut c = s[i]
         if c < RuneSelf {
             // ASCII fast path
@@ -485,7 +485,7 @@ fn RuneCountStr(s: str): (n: int) {
             continue
         }
         let mut size = int(x & 7)
-        if i+size > s.len {
+        if i+size > len(s) {
             i++ // Short or invalid.
             continue
         }
@@ -523,7 +523,7 @@ fn Valid(p: []byte): bool {
     let mut cp = unsafe { *(&p) }
 
     // Fast path. Check for and skip 8 bytes of ASCII characters per iteration.
-    for cp.len >= 8 {
+    for len(cp) >= 8 {
         // Combining two 32 bit loads allows the same code to be used
         // for 32 and 64 bit platforms.
         let first32 = u32(cp[0]) | u32(cp[1]) << 8 | u32(cp[2]) << 16 | u32(cp[3]) << 24
@@ -535,7 +535,7 @@ fn Valid(p: []byte): bool {
         cp = cp[8:]
     }
     let mut i = 0
-    for i < cp.len {
+    for i < len(cp) {
         let pi = cp[i]
         if pi < RuneSelf {
             i++
@@ -546,7 +546,7 @@ fn Valid(p: []byte): bool {
             ret false // Illegal starter byte.
         }
         let size = int(x & 7)
-        if i+size > cp.len {
+        if i+size > len(cp) {
             ret false // Short or invalid.
         }
         let accept = acceptRanges[x>>4]
@@ -574,7 +574,7 @@ fn Valid(p: []byte): bool {
 // Reports whether s consists entirely of valid UTF-8-encoded runes.
 fn ValidStr(mut s: str): bool {
     // Fast path. Check for and skip 8 bytes of ASCII characters per iteration.
-    for s.len >= 8 {
+    for len(s) >= 8 {
         // Combining two 32 bit loads allows the same code to be used
         // for 32 and 64 bit platforms.
         let first32 = u32(s[0]) | u32(s[1]) << 8 | u32(s[2]) << 16 | u32(s[3]) << 24
@@ -586,7 +586,7 @@ fn ValidStr(mut s: str): bool {
         s = s[8:]
     }
     let mut i = 0
-    for i < s.len {
+    for i < len(s) {
         let si = s[i]
         if si < RuneSelf {
             i++
@@ -597,7 +597,7 @@ fn ValidStr(mut s: str): bool {
             ret false // Illegal starter byte.
         }
         let size = int(x & 7)
-        if i+size > s.len {
+        if i+size > len(s) {
             ret false // Short or invalid.
         }
         let accept = acceptRanges[x>>4]

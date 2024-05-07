@@ -37,6 +37,7 @@ use std::jule::sema::{
     BuiltinErrorCallExprModel,
     BuiltinMakeCallExprModel,
     BuiltinAppendCallExprModel,
+    BuiltinLenCallExprModel,
     BuiltinCloneCallExprModel,
     SizeofExprModel,
     AlignofExprModel,
@@ -209,7 +210,7 @@ impl exprOptimizer {
     }
 
     fn array(self, mut m: &ArrayExprModel) {
-        if m.Elems.len == 2 && m.Elems[1] == nil {
+        if len(m.Elems) == 2 && m.Elems[1] == nil {
             let mut elem = m.Elems[0]
             exprOptimizer.optimize(elem)
             m.Elems[0] = elem
@@ -325,6 +326,10 @@ impl exprOptimizer {
         exprOptimizer.optimize(m.Elements)
     }
 
+    fn lenCall(self, mut m: &BuiltinLenCallExprModel) {
+        exprOptimizer.optimize(m.Expr.Model)
+    }
+
     fn cloneCall(self, mut m: &BuiltinCloneCallExprModel) {
         exprOptimizer.optimize(m.Expr)
     }
@@ -399,6 +404,8 @@ impl exprOptimizer {
             self.makeCall((&BuiltinMakeCallExprModel)(*self.model))
         | &BuiltinAppendCallExprModel:
             self.appendCall((&BuiltinAppendCallExprModel)(*self.model))
+        | &BuiltinLenCallExprModel:
+            self.lenCall((&BuiltinLenCallExprModel)(*self.model))
         | &BuiltinCloneCallExprModel:
             self.cloneCall((&BuiltinCloneCallExprModel)(*self.model))
         | &SizeofExprModel:

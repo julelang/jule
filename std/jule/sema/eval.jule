@@ -203,7 +203,7 @@ impl Eval {
     }
 
     fn litStr(self, &l: &LitExpr): &Data {
-        let mut s = l.Value[1:l.Value.len-1] // Remove quotes.
+        let mut s = l.Value[1:len(l.Value)-1] // Remove quotes.
         if IsRawStr(l.Value) {
             s = lit::ToRawStr([]byte(s))
         } else {
@@ -236,7 +236,7 @@ impl Eval {
         const RUNE_KIND: str = PrimKind.I32
 
         // Remove quotes.
-        let lt = l.Value[1:l.Value.len-1]
+        let lt = l.Value[1:len(l.Value)-1]
         let r = lit::ToRune([]byte(lt))
         let mut data = &Data{
             Constant: Const.NewI64(i64(r)),
@@ -289,7 +289,7 @@ impl Eval {
         | strings::HasPrefix(lit, "0o"): // Ocatal
             lit = lit[2:]
             base = 1 << 3
-        | lit[0] == '0' && lit.len > 1: // Octal
+        | lit[0] == '0' && len(lit) > 1: // Octal
             lit = lit[1:]
             base = 1 << 3
         |:
@@ -508,7 +508,7 @@ impl Eval {
 
         let d = findDirective(directives, Directive.Deprecated)
         if d != nil {
-            if d.Args.len == 0 {
+            if len(d.Args) == 0 {
                 self.pushErr(tok, LogMsg.UsingDeprecated, "this code is deprecated")
             } else {
                 self.pushErr(tok, LogMsg.UsingDeprecated, d.Args[0].Kind)
@@ -792,7 +792,7 @@ impl Eval {
 
         let mut filled = false
 
-        if s.Exprs.len == 2 {
+        if len(s.Exprs) == 2 {
             match type s.Exprs[1].Kind {
             | &VariadicExpr:
                 if (&VariadicExpr)(s.Exprs[1].Kind).Expr != nil {
@@ -810,7 +810,7 @@ impl Eval {
             }
         }
 
-        arr.N = s.Exprs.len
+        arr.N = len(s.Exprs)
         if !pt.Auto {
             if arr.N > pt.N {
                 self.pushErr(s.Token, LogMsg.OverflowLimits)
@@ -825,7 +825,7 @@ impl Eval {
         if filled {
             model.Elems = make([]ExprModel, 0, 2)
         } else {
-            model.Elems = make([]ExprModel, 0, s.Exprs.len)
+            model.Elems = make([]ExprModel, 0, len(s.Exprs))
         }
 
         let mut prefix = self.prefix
@@ -862,7 +862,7 @@ impl Eval {
 
         let mut model = &SliceExprModel{
             ElemKind: t,
-            Elems: make([]ExprModel, 0, s.Exprs.len),
+            Elems: make([]ExprModel, 0, len(s.Exprs)),
         }
         if first != nil {
             model.Elems = append(model.Elems, first)
@@ -904,7 +904,7 @@ impl Eval {
         let mut prefix = self.prefix
         self.prefix = nil
 
-        if s.Exprs.len == 0 {
+        if len(s.Exprs) == 0 {
             self.pushErr(s.Token, LogMsg.DynamicTypeAnnotationFailed)
             ret nil
         }
@@ -969,7 +969,7 @@ impl Eval {
         | &SliceExprModel:
             let mut m = (&SliceExprModel)(d.Model)
             let indx = index.Constant.AsF64()
-            if indx >= f64(m.Elems.len) {
+            if indx >= f64(len(m.Elems)) {
                 self.pushErr(i.Token, LogMsg.OverflowLimits)
             } else {
                 d.Model = m.Elems[u64(indx)]
@@ -1012,7 +1012,7 @@ impl Eval {
             let errorToken = i.Token
             let j = index.Constant.AsI64()
             let s = d.Constant.ReadStr()
-            if int(j) >= s.len {
+            if int(j) >= len(s) {
                 self.pushErr(errorToken, LogMsg.OverflowLimits)
             } else {
                 d.Constant.SetU64(u64(s[j]))
@@ -1191,15 +1191,15 @@ impl Eval {
         let mut f = d.Kind.Fn()
         let mut genericsLen = 0
         if f.Decl != nil {
-            genericsLen = f.Decl.Generics.len
+            genericsLen = len(f.Decl.Generics)
         }
-        if !self.s.checkGenericQuantity(genericsLen, generics.len, i.Expr.Token) {
+        if !self.s.checkGenericQuantity(genericsLen, len(generics), i.Expr.Token) {
             d = nil
             ret
         }
 
         // Build real kinds of generic types.
-        f.Generics = make([]&InsGeneric, 0, f.Decl.Generics.len)
+        f.Generics = make([]&InsGeneric, 0, len(f.Decl.Generics))
         for (_, mut g) in generics {
             let mut k = self.evalType(g)
             if k == nil {
@@ -1345,7 +1345,7 @@ impl Eval {
             let s = d.Constant.ReadStr()
             let mut right: i64 = 0
             if r == nil {
-                right = i64(s.len)
+                right = i64(len(s))
             } else {
                 right = r.Constant.AsI64()
             }
@@ -1625,7 +1625,7 @@ impl Eval {
     }
 
     fn castTypeEnum(mut self, mut &t: &TypeKind, mut &d: &Data, mut &errorToken: &Token) {
-        let n = self.s.errors.len
+        let n = len(self.s.errors)
         if !self.s.checkTypeCompatibility(d.Kind, t, errorToken) {
             self.s.errors = self.s.errors[:n]
             self.pushErr(errorToken, LogMsg.TypeNotSupportsCastingTo, d.Kind.Str(), t.Str())
@@ -1717,7 +1717,7 @@ impl Eval {
     fn evalNsSelection(mut self, s: &NsSelectionExpr): &Data {
         let path = buildLinkPathByTokens(s.Ns)
         let mut imp = self.lookup.SelectPackage(fn(imp: &ImportInfo): bool {
-            if s.Ns.len == 1 && imp.Alias == path {
+            if len(s.Ns) == 1 && imp.Alias == path {
                 ret true
             }
             ret imp.LinkPath == path && imp.isAccessibleViaSelection()
@@ -1742,7 +1742,7 @@ impl Eval {
 
     fn evalStructLitExplicit(mut &self, mut s: &StructIns,
         mut exprs: []&Expr, mut errorToken: &Token): &Data {
-        let ok = self.s.checkGenericQuantity(s.Decl.Generics.len, s.Generics.len, errorToken)
+        let ok = self.s.checkGenericQuantity(len(s.Decl.Generics), len(s.Generics), errorToken)
         if !ok {
             ret nil
         }
@@ -1820,13 +1820,13 @@ impl Eval {
     }
 
     fn callTypeFn(mut &self, mut &fc: &FnCallExpr, mut &d: &Data) {
-        if fc.Args.len < 1 {
+        if len(fc.Args) < 1 {
             self.pushErr(fc.Token, LogMsg.MissingExprFor, "v")
-        } else if fc.Args.len > 1 {
+        } else if len(fc.Args) > 1 {
             self.pushErr(fc.Args[1].Token, LogMsg.ArgumentOverflow)
         }
 
-        if fc.Args.len > 0 {
+        if len(fc.Args) > 0 {
             let mut arg = fc.Args[0]
             d = self.evalCastT(d.Kind, arg, arg.Token)
             ret
@@ -1909,11 +1909,11 @@ impl Eval {
             self.pushErr(fc.Token, LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
         }
 
-        let mut dynamicAnnotation = f.Decl.Generics.len > 0 && f.Generics.len == 0 && f.Params.len > 0
+        let mut dynamicAnnotation = len(f.Decl.Generics) > 0 && len(f.Generics) == 0 && len(f.Params) > 0
         if dynamicAnnotation {
-            f.Generics = make([]&InsGeneric, f.Decl.Generics.len)
-        } else if f.Generics.len != f.Decl.Generics.len {
-            _ = self.s.checkGenericQuantity(f.Decl.Generics.len, f.Generics.len, fc.Token)
+            f.Generics = make([]&InsGeneric, len(f.Decl.Generics))
+        } else if len(f.Generics) != len(f.Decl.Generics) {
+            _ = self.s.checkGenericQuantity(len(f.Decl.Generics), len(f.Generics), fc.Token)
             d = nil
             ret
         }
@@ -2204,17 +2204,6 @@ impl Eval {
 
     fn evalSliceSubIdent(mut self, mut d: &Data, mut ident: &Token): &Data {
         match ident.Kind {
-        | "len":
-            ret &Data{
-                Mutable: false,
-                Kind: &TypeKind{Kind: buildPrimType(PrimKind.Int)},
-                Model: &CommonSubIdentExprModel{
-                    Token: ident,
-                    ExprKind: d.Kind,
-                    Expr: d.Model,
-                    Ident: "len()",
-                },
-            }
         | "cap":
             ret &Data{
                 Mutable: false,
@@ -2234,16 +2223,16 @@ impl Eval {
                         caller: builtinCallerCommonMut,
                         Params: [
                             &ParamIns{
-                                Decl: &Param{
-                                    Ident: "i",
+Decl: &Param{
+Ident: "i",
                                 },
-                                Kind: &TypeKind{Kind: buildPrimType(PrimKind.Int)},
+Kind: &TypeKind{Kind: buildPrimType(PrimKind.Int)},
                             },
                             &ParamIns{
-                                Decl: &Param{
-                                    Ident: "j",
+Decl: &Param{
+Ident: "j",
                                 },
-                                Kind: &TypeKind{Kind: buildPrimType(PrimKind.Int)},
+Kind: &TypeKind{Kind: buildPrimType(PrimKind.Int)},
                             },
                         ],
                     },
@@ -2263,13 +2252,6 @@ impl Eval {
 
     fn evalArraySubIdent(mut self, mut d: &Data, mut ident: &Token): &Data {
         match ident.Kind {
-        | "len":
-            let mut c = Const.NewI64(i64(d.Kind.Arr().N))
-            ret &Data{
-                Constant: c,
-                Kind: &TypeKind{Kind: buildPrimType(PrimKind.Int)},
-                Model: c,
-            }
         | "swap":
             ret &Data{
                 Mutable: d.Mutable,
@@ -2278,16 +2260,16 @@ impl Eval {
                         caller: builtinCallerCommonMut,
                         Params: [
                             &ParamIns{
-                                Decl: &Param{
-                                    Ident: "i",
+Decl: &Param{
+Ident: "i",
                                 },
-                                Kind: &TypeKind{Kind: buildPrimType(PrimKind.Int)},
+Kind: &TypeKind{Kind: buildPrimType(PrimKind.Int)},
                             },
                             &ParamIns{
-                                Decl: &Param{
-                                    Ident: "j",
+Decl: &Param{
+Ident: "j",
                                 },
-                                Kind: &TypeKind{Kind: buildPrimType(PrimKind.Int)},
+Kind: &TypeKind{Kind: buildPrimType(PrimKind.Int)},
                             },
                         ],
                     },
@@ -2309,16 +2291,6 @@ impl Eval {
         let mut mapKind = d.Kind.Map()
 
         match ident.Kind {
-        | "len":
-            ret &Data{
-                Kind: &TypeKind{Kind: buildPrimType(PrimKind.Int)},
-                Model: &CommonSubIdentExprModel{
-                    Token: ident,
-                    ExprKind: d.Kind,
-                    Expr: d.Model,
-                    Ident: "len()",
-                },
-            }
         | "clear":
             ret &Data{
                 Mutable: d.Mutable,
@@ -2382,10 +2354,10 @@ impl Eval {
                         caller: builtinCallerCommon,
                         Params: [
                             &ParamIns{
-                                Decl: &Param{
-                                    Ident: "key",
+Decl: &Param{
+Ident: "key",
                                 },
-                                Kind: mapKind.Key,
+Kind: mapKind.Key,
                             },
                         ],
                         Result: &TypeKind{Kind: buildPrimType(PrimKind.Bool)},
@@ -2406,10 +2378,10 @@ impl Eval {
                         caller: builtinCallerCommonMut,
                         Params: [
                             &ParamIns{
-                                Decl: &Param{
-                                    Ident: "key",
+Decl: &Param{
+Ident: "key",
                                 },
-                                Kind: mapKind.Key,
+Kind: mapKind.Key,
                             },
                         ],
                     },
@@ -2430,22 +2402,6 @@ impl Eval {
     fn evalStrSubIdent(mut self, mut d: &Data, mut ident: &Token): &Data {
         let mut strKind = &TypeKind{Kind: buildPrimType(PrimKind.Str)}
         match ident.Kind {
-        | "len":
-            let mut sd = &Data{
-                Kind: &TypeKind{Kind: buildPrimType(PrimKind.Int)},
-            }
-            if d.IsConst() {
-                sd.Constant = Const.NewI64(i64(d.Constant.ReadStr().len))
-                sd.Model = sd.Constant
-            } else {
-                sd.Model = &CommonSubIdentExprModel{
-                    Token: ident,
-                    ExprKind: d.Kind,
-                    Expr: d.Model,
-                    Ident: "len()",
-                }
-            }
-            ret sd
         | "cap":
             let mut sd = &Data{
                 Kind: &TypeKind{Kind: buildPrimType(PrimKind.Int)},
@@ -2867,10 +2823,10 @@ impl Eval {
 
     fn evalTuple(mut &self, mut tup: &TupleExpr): &Data {
         let mut tupT = new(Tuple)
-        tupT.Types = make([]&TypeKind, 0, tup.Expr.len)
+        tupT.Types = make([]&TypeKind, 0, len(tup.Expr))
 
         let mut model = &TupleExprModel{
-            Datas: make([]&Data, 0, tup.Expr.len),
+            Datas: make([]&Data, 0, len(tup.Expr)),
         }
 
         let mut ok = true
@@ -3063,7 +3019,7 @@ impl Eval {
             if f.IsBuiltin() {
                 break
             }
-            if f.Generics.len != f.Decl.Generics.len {
+            if len(f.Generics) != len(f.Decl.Generics) {
                 self.s.pushErr(expr.Token, LogMsg.HasGenerics)
             }
             if !f.Decl.Statically && f.Decl.IsMethod() {
@@ -4299,7 +4255,7 @@ fn findBuiltinsSema(ident: str, mut s: &Sema): any {
     let mut ppath = s.file.File.Dir()
     if strings::HasPrefix(ppath, PathStdlib) {
         // Remove STDLIB directory path.
-        ppath = ppath[PathStdlib.len:]
+        ppath = ppath[len(PathStdlib):]
         // Add "std" to beginning without separator
         // because path has separator at beginning.
         ppath = "std" + strings::Replace(ppath, str(path::Separator), "::", -1)
@@ -4328,7 +4284,7 @@ fn isOkForShifting(mut &d: &Data): bool {
 }
 
 fn isInstancedStruct(s: &StructIns): bool {
-    ret s.Decl.Generics.len == s.Generics.len
+    ret len(s.Decl.Generics) == len(s.Generics)
 }
 
 fn isPtrArithmeticCompatible(mut &l: &Data, mut &r: &Data): bool {

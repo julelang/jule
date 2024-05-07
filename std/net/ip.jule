@@ -35,18 +35,18 @@ impl Ip {
 
     // Reports whether IP is empty.
     fn Empty(self): bool {
-        ret self.Addr.len == 0
+        ret len(self.Addr) == 0
     }
 
     // Reports wherher IPs are points to the same address.
     // An IPv4 address and that same address in IPv6 from are considered to be equal.
     fn Eq(self, other: Ip): bool {
         match {
-        | self.Addr.len == other.Addr.len:
+        | len(self.Addr) == len(other.Addr):
             ret self.Addr == other.Addr
-        | self.Addr.len == Ipv4.Len && other.Addr.len == Ipv6.Len:
+        | len(self.Addr) == Ipv4.Len && len(other.Addr) == Ipv6.Len:
             ret other.Addr[:12] == v4InV6Prefix && self.Addr == other.Addr[12:]
-        | self.Addr.len == Ipv6.Len && other.Addr.len == Ipv4.Len:
+        | len(self.Addr) == Ipv6.Len && len(other.Addr) == Ipv4.Len:
             ret self.Addr[:12] == v4InV6Prefix && self.Addr[12:] == other.Addr
         |:
             ret false
@@ -85,16 +85,16 @@ impl Ip {
         }
         // Following RFC 4193, Section 8. IANA Considerations which says:
         //   The IANA has assigned the FC00::/7 prefix to "Unique Local Unicast".
-        ret self.Addr.len == Ipv6.Len && self.Addr[0]&0xFE == 0xFC
+        ret len(self.Addr) == Ipv6.Len && self.Addr[0]&0xFE == 0xFC
     }
 
     // Converts the IPv4 address to a 4-byte representation.
     // Returns empty if UP is not an Ipv4 address.
     fn To4(mut self): Ip {
-        if self.Addr.len == Ipv4.Len {
+        if len(self.Addr) == Ipv4.Len {
             ret self
         }
-        if self.Addr.len == Ipv6.Len &&
+        if len(self.Addr) == Ipv6.Len &&
             isZeros(self.Addr[:10]) &&
             self.Addr[10] == 0xFF &&
             self.Addr[11] == 0xFF {
@@ -107,9 +107,9 @@ impl Ip {
     // Returns empty if address is not an IP address (it is the wrong length).
     fn To16(mut self): Ip {
         match {
-        | self.Addr.len == Ipv4.Len:
+        | len(self.Addr) == Ipv4.Len:
             ret Ipv4.Addr(self.Addr[0], self.Addr[1], self.Addr[2], self.Addr[3])
-        | self.Addr.len == Ipv6.Len:
+        | len(self.Addr) == Ipv6.Len:
             ret self
         |:
             ret Ip.Empty()
@@ -126,11 +126,11 @@ impl Ip {
         if self.Empty() {
             ret "<nil>"
         }
-        if self.Addr.len != Ipv4.Len && self.Addr.len != Ipv6.Len {
+        if len(self.Addr) != Ipv4.Len && len(self.Addr) != Ipv6.Len {
             ret "?" + hexStr(self.Addr)
         }
         let ip4 = unsafe { (*(&self)).To4() }
-        if ip4.Addr.len == Ipv4.Len {
+        if len(ip4.Addr) == Ipv4.Len {
             ret str4(ipAddrFrom4(ip4.Addr))
         }
         ret str16(ipAddrFrom16(self.Addr))
@@ -248,7 +248,7 @@ fn isZeros(addr: []byte): bool {
 }
 
 fn hexStr(b: []byte): str {
-    let mut s = make([]byte, b.len << 1)
+    let mut s = make([]byte, len(b) << 1)
     for i, tn in b {
         s[i<<1], s[i<<1+1] = hexDigit[tn>>4], hexDigit[tn&0xF]
     }

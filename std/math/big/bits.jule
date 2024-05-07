@@ -50,8 +50,8 @@ fn subOne(mut &b: bits) {
 
 fn reverse(mut &b: bits) {
     let mut i = 0
-    for i < b.len>>1; i++ {
-        b.swap(i, b.len - 1 - i)
+    for i < len(b)>>1; i++ {
+        b.swap(i, len(b) - 1 - i)
     }
 }
 
@@ -59,11 +59,11 @@ fn reverse(mut &b: bits) {
 fn addRes(mut &x: bits, &y: bits) {
     let mut carry = bit(0)
     match {
-    | y.len == 1:
+    | len(y) == 1:
         carry = addOne(x)
-    | x.len == y.len:
+    | len(x) == len(y):
         carry = addFast(x, y)
-    | x.len > y.len:
+    | len(x) > len(y):
         carry = addRfast(x, y)
     |:
         x, carry = add(y, x)
@@ -77,17 +77,17 @@ fn addRes(mut &x: bits, &y: bits) {
 fn subRes(mut &x: bits, y: bits) {
     let mut carry = bit(0)
     match {
-    | y.len == 1:
+    | len(y) == 1:
         twosComplement(x)
         carry = addOne(x)
-    | x.len == y.len:
+    | len(x) == len(y):
         twosComplement(x)
         carry = addFast(x, y)
-    | x.len > y.len:
+    | len(x) > len(y):
         twosComplement(x)
         carry = addRfast(x, y)
     |:
-        let mut xn = make(bits, y.len)
+        let mut xn = make(bits, len(y))
         _ = copy(xn, x)
         x = xn
         twosComplement(x)
@@ -121,8 +121,8 @@ fn and(mut &a: bits, &b: bits) {
         a[i] &= b[i]
     }
     // Clean trailing bits.
-    if a.len > b.len {
-        let mut trail = a[b.len:]
+    if len(a) > len(b) {
+        let mut trail = a[len(b):]
         for i in trail {
             trail[i] = 0b0
         }
@@ -164,7 +164,7 @@ fn addFast(mut &x: bits, &y: bits): (carry: bit) {
 fn addRfast(mut &x: bits, &y: bits): (carry: bit) {
     for i, xbit in x {
         let mut ybit = bit(0b0)
-        if i < y.len {
+        if i < len(y) {
             ybit = y[i]
         }
         x[i] = xbit ^ ybit ^ carry
@@ -178,10 +178,10 @@ fn addRfast(mut &x: bits, &y: bits): (carry: bit) {
 // Carry is guaranteed to be 0b0 or 0b1.
 // y implies imaginary zero-bits for missing part if y.bit-size < x.bit-size.
 fn add(&x: bits, &y: bits): (r: bits, carry: bit) {
-    r = make(bits, 0, x.len)
+    r = make(bits, 0, len(x))
     for i, xbit in x {
         let mut ybit = bit(0b0)
-        if i < y.len {
+        if i < len(y) {
             ybit = y[i]
         }
         r = append(r, xbit ^ ybit ^ carry)
@@ -192,7 +192,7 @@ fn add(&x: bits, &y: bits): (r: bits, carry: bit) {
 
 // Eliminates initial-zeros, normalizes bits.
 fn fit(mut &b: bits) {
-    let mut i = b.len - 1
+    let mut i = len(b) - 1
     for i >= 0; i-- {
         if b[i] != 0b0 {
             break
@@ -217,12 +217,12 @@ fn fitRev(mut &b: bits) {
 // Returns -1 if x < y.
 fn cmp(x: bits, &y: bits): int {
     match {
-    | x.len < y.len:
+    | len(x) < len(y):
         ret -1
-    | x.len > y.len:
+    | len(x) > len(y):
         ret +1
     }
-    let mut i = x.len - 1
+    let mut i = len(x) - 1
     for i >= 0; i-- {
         let xbit = x[i]
         let ybit = y[i]
@@ -239,9 +239,9 @@ fn cmp(x: bits, &y: bits): int {
 // Same as cmp, but designed for normal order bits.
 fn cmpRev(mut &x: bits, mut &y: bits): int {
     match {
-    | x.len < y.len:
+    | len(x) < len(y):
         ret -1
-    | x.len > y.len:
+    | len(x) > len(y):
         ret +1
     }
     for i in x {
@@ -259,23 +259,23 @@ fn cmpRev(mut &x: bits, mut &y: bits): int {
 
 // Reports whether number is odd that represented by bits.
 fn isOdd(&b: bits): bool {
-    ret b.len > 0 && b[0] == 0b1
+    ret len(b) > 0 && b[0] == 0b1
 }
 
 // Reports whether number is even that represented by bits.
 fn isEven(&b: bits): bool {
-    ret b.len > 0 && b[0] == 0b0
+    ret len(b) > 0 && b[0] == 0b0
 }
 
 // Basic multiplication algorithm for bits.
 fn basicMul(mut &x: bits, mut y: bits): bits {
-    if y.len == 1 {
+    if len(y) == 1 {
         ret x
     }
     let mut r: bits = nil
-    let mut m = make(bits, x.len, x.len << 1)
+    let mut m = make(bits, len(x), len(x) << 1)
     _ = copy(m, x)
-    for y.len > 0 {
+    for len(y) > 0 {
         if isOdd(y) {
             addRes(r, m)
         }
@@ -297,9 +297,9 @@ fn karatsubaAdd(mut x: bits, mut y: bits): bits {
     let mut carry = bit(0)
     let mut r: bits = nil
     match {
-    | x.len == y.len:
+    | len(x) == len(y):
         r, carry = add(x, y)
-    | x.len > y.len:
+    | len(x) > len(y):
         r, carry = add(x, y)
     |:
         r, carry = add(y, x)
@@ -331,15 +331,15 @@ fn karatsubaShl(mut s: bits, n: int): bits {
 const karatsubaThreshold = 1 << 5 + 8
 
 fn karatsuba(mut x: bits, mut y: bits): bits {
-    let n = max(x.len, y.len)
+    let n = max(len(x), len(y))
     if n == 1 {
-        if x.len == 0 || y.len == 0 || x[0] == 0b0 || y[0] == 0b0 {
+        if len(x) == 0 || len(y) == 0 || x[0] == 0b0 || y[0] == 0b0 {
             ret nil
         }
         ret [1]
     }
 
-    if y.len < karatsubaThreshold {
+    if len(y) < karatsubaThreshold {
         reverse(x)
         reverse(y)
         let mut r = basicMul(x, y)
@@ -466,14 +466,14 @@ fn recursiveDiv(mut &x: bits, mut &y: bits, mut &s: bits, mut &q: bits) {
     for cmp(q, x) == +1 {
         q = q[1:]
     }
-    if q.len == y.len {
+    if len(q) == len(y) {
         addOne(s)
         ret
     }
     subRes(x, q)
     fit(x)
-    let mut sq = q[:q.len-y.len+1]
-    let mut &last = unsafe { *(&sq[sq.len-1]) }
+    let mut sq = q[:len(q)-len(y)+1]
+    let mut &last = unsafe { *(&sq[len(sq)-1]) }
     let old = last
     last = 0b1
     addRfast(s, sq)

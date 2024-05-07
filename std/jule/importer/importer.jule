@@ -103,13 +103,13 @@ impl Importer for JuleImporter {
             if newMod != self.mod {
                 self.mod = newMod
                 let mut errs = mod::CheckModuleFile(self.mod)
-                if errs.len != 0 {
+                if len(errs) != 0 {
                     ret nil, errs
                 }
             }
         }
 
-        let mut asts = make([]&Ast, 0, dirents.len)
+        let mut asts = make([]&Ast, 0, len(dirents))
         for _, dirent in dirents {
             // Skip directories, and non-jule files.
             if dirent.Stat.IsDir() || !strings::HasSuffix(dirent.Name, build::Ext) {
@@ -120,12 +120,12 @@ impl Importer for JuleImporter {
             let mut file = NewFileSet(_path)
             file.Fill(readBuff(file.Path))
             let mut errors = Lex(file, LexMode.Standard)
-            if errors.len > 0 {
+            if len(errors) > 0 {
                 ret nil, errors
             }
 
             let mut finfo = ParseFile(file)
-            if finfo.Errors.len > 0 {
+            if len(finfo.Errors) > 0 {
                 ret nil, finfo.Errors
             }
 
@@ -135,7 +135,7 @@ impl Importer for JuleImporter {
             }
 
             let (r, mut logs) = self.isPassBuildDirectives(finfo.Ast)
-            if logs.len > 0 {
+            if len(logs) > 0 {
                 ret nil, logs
             }
 
@@ -158,14 +158,14 @@ impl Importer for JuleImporter {
             }
         }
 
-        if self.mod.len != 0 {
+        if len(self.mod) != 0 {
             for i, mod in self.mods {
                 if self.mod == mod {
                     imp.ModId = i
                     goto setted
                 }
             }
-            imp.ModId = self.mods.len
+            imp.ModId = len(self.mods)
             self.mods = append(self.mods, self.mod)
         setted:
         }
@@ -186,7 +186,7 @@ impl JuleImporter {
                 vars: self.vars,
             }
             let result = de.eval()
-            if de.logs.len > 0 {
+            if len(de.logs) > 0 {
                 ret false, de.logs
             }
             if !result {

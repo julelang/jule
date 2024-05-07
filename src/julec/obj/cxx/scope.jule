@@ -320,7 +320,7 @@ impl scopeCoder {
             } else {
                 self.oc.ec.expr(l)
             }
-            if a.L.len-i > 1 {
+            if len(a.L)-i > 1 {
                 self.oc.write(",")
             }
         }
@@ -339,8 +339,8 @@ impl scopeCoder {
     }
 
     fn case(mut &self, mut m: &Match, mut c: &Case) {
-        if c.Exprs.len != 0 && !m.IsGenericTypeMatch() {
-            if m.Cases.len > 0 && m.Cases[0] == c {
+        if len(c.Exprs) != 0 && !m.IsGenericTypeMatch() {
+            if len(m.Cases) > 0 && m.Cases[0] == c {
                 self.oc.write("if (")
             } else {
                 self.oc.write("else if (")
@@ -369,12 +369,12 @@ impl scopeCoder {
                     self.oc.write(">()")
                 }
 
-                if c.Exprs.len-i > 1 {
+                if len(c.Exprs)-i > 1 {
                     self.oc.write(" || ")
                 }
             }
             self.oc.write(") ")
-        } else if m.Default == c && m.Cases.len != 0 {
+        } else if m.Default == c && len(m.Cases) != 0 {
             self.oc.indent()
             self.oc.write("else ")
         }
@@ -385,7 +385,7 @@ impl scopeCoder {
         self.oc.indent()
         self.oc.write(identCoder.caseBegin(uintptr(c)))
         self.oc.write(":;\n")
-        if c.Scope.Stmts.len > 0 {
+        if len(c.Scope.Stmts) > 0 {
             self.oc.indent()
             self.scope(c.Scope)
             self.oc.write("\n")
@@ -398,12 +398,12 @@ impl scopeCoder {
     }
 
     fn matchSt(mut &self, mut m: &Match) {
-        if m.Cases.len == 0 && m.Default == nil {
+        if len(m.Cases) == 0 && m.Default == nil {
             ret
         }
 
         let genericTypeMatch = m.IsGenericTypeMatch()
-        if genericTypeMatch && (m.Default == nil || m.Default.Scope.Stmts.len == 0) {
+        if genericTypeMatch && (m.Default == nil || len(m.Default.Scope.Stmts) == 0) {
             ret
         }
 
@@ -425,7 +425,7 @@ impl scopeCoder {
             self.oc.indent()
         }
 
-        if m.Cases.len > 0 {
+        if len(m.Cases) > 0 {
             for (_, mut c) in m.Cases {
                 if c == nil {
                     continue
@@ -474,7 +474,7 @@ impl scopeCoder {
             self.oc.write(typeCoder.kind(r.Func.Result))
             self.oc.write(">(jule::Any(), ")
         }
-        if r.Vars.len > 1 {
+        if len(r.Vars) > 1 {
             self.oc.write("std::make_tuple(")
         }
         for (i, mut v) in r.Vars {
@@ -483,12 +483,12 @@ impl scopeCoder {
             } else {
                 self.oc.write(identCoder.var(v))
             }
-            if r.Vars.len-i > 1 {
+            if len(r.Vars)-i > 1 {
                 self.oc.write(",")
             }
         }
 
-        if r.Vars.len > 1 {
+        if len(r.Vars) > 1 {
             self.oc.write(")")
         }
 
@@ -531,7 +531,7 @@ impl scopeCoder {
             } else {
                 self.oc.write(identCoder.var(v))
             }
-            if datas.len-i > 1 {
+            if len(datas)-i > 1 {
                 self.oc.write(",")
             }
         }
@@ -543,13 +543,13 @@ impl scopeCoder {
     }
 
     fn retWithExprs(mut &self, mut r: &RetSt) {
-        if r.Vars.len > 1 {
+        if len(r.Vars) > 1 {
             self.retTuple(r)
             ret
         }
 
         // Ignore self assignments and ignored variables.
-        if r.Vars.len > 0 {
+        if len(r.Vars) > 0 {
             let mut v = r.Vars[0]
             if !lex::IsIgnoreIdent(v.Ident) && r.Expr != v {
                 let ident = identCoder.var(v)
@@ -588,7 +588,7 @@ impl scopeCoder {
 
     fn retSt(mut &self, mut r: &RetSt) {
         // Void.
-        if r.Expr == nil && r.Vars.len == 0 {
+        if r.Expr == nil && len(r.Vars) == 0 {
             if r.Func.Decl.Exceptional {
                 self.oc.write("return jule::VoidExceptional();")
                 ret
@@ -611,7 +611,7 @@ impl scopeCoder {
             let mut types = result.Tup().Types
             for (i, mut t) in types {
                 self.oc.ec.initExpr(t)
-                if types.len-i > 1 {
+                if len(types)-i > 1 {
                     self.oc.write(",")
                 }
             }

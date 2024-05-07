@@ -26,7 +26,7 @@ static _i64: [123]int = [
 // Returns encoded base64 bytes if success, nil slice if not.
 // Adds padding if pad is true.
 fn Encode(src: []byte, pad: bool): []byte {
-    let mut blen = 4 * ((src.len + 2) / 3)
+    let mut blen = 4 * ((len(src) + 2) / 3)
     if pad {
         if blen%4 != 0 { // Padding 1
             blen--
@@ -36,7 +36,7 @@ fn Encode(src: []byte, pad: bool): []byte {
         }
     }
 
-    if blen < src.len {
+    if blen < len(src) {
         ret nil
     }
 
@@ -48,7 +48,7 @@ fn Encode(src: []byte, pad: bool): []byte {
     let mut j = &dest[0]
 
     let mut i = &src[0]
-    let end = i + src.len
+    let end = i + len(src)
     for i+3 <= end; i += 3 {
         unsafe {
             *j = tp[i[0]>>2]
@@ -93,15 +93,15 @@ fn Encode(src: []byte, pad: bool): []byte {
 // Returns decoded bytes if success, nil slice if not.
 // Detects padding by default, no required padding specification.
 fn Decode(src: []byte): []byte {
-    if src.len == 0 {
+    if len(src) == 0 {
         ret nil
     }
 
     let p = &src[0]
     let mut j = 0
-    let pad1 = src.len%4 != 0 || unsafe { *(p+src.len-1) } == paddingByte
-    let pad2 = pad1 && (src.len%4 > 2 || unsafe { *(p+src.len-2) } != paddingByte)
-    let mut l = src.len
+    let pad1 = len(src)%4 != 0 || unsafe { *(p+len(src)-1) } == paddingByte
+    let pad2 = pad1 && (len(src)%4 > 2 || unsafe { *(p+len(src)-2) } != paddingByte)
+    let mut l = len(src)
     if pad1 {
         l--
     }
@@ -160,7 +160,7 @@ fn EncodeUrl(src: []byte): []byte {
 
     // Process URL table.
     let mut i = &dest[0]
-    let end = i + dest.len
+    let end = i + len(dest)
     for i < end; i++ {
         unsafe {
             match *i {
@@ -181,7 +181,7 @@ fn DecodeUrl(src: []byte): []byte {
     // Process URL table.
     let mut dest = clone(src)
     let mut i = &dest[0]
-    let end = i + dest.len
+    let end = i + len(dest)
     for i < end; i++ {
         unsafe {
             match *i {

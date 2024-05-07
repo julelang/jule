@@ -60,11 +60,11 @@ impl lazyBuff {
 
     fn append(mut self, c: byte) {
         if self.buff == nil {
-            if self.w < self.path.len && self.path[self.w] == c {
+            if self.w < len(self.path) && self.path[self.w] == c {
                 self.w++
                 ret
             }
-            self.buff = make([]byte, self.path.len)
+            self.buff = make([]byte, len(self.path))
             copy(self.buff, []byte(self.path[:self.w]))
         }
         self.buff[self.w] = c
@@ -123,7 +123,7 @@ fn Clean(mut path: str): str {
     //  writing to buf; w is index of next byte to write.
     //  dotdot is index in buf where .. must stop, either because
     //      it is the leading slash or it is a leading ../../.. prefix.
-    let n = path.len
+    let n = len(path)
     let mut out = lazyBuff{
         path: path,
         volAndPath: originalPath,
@@ -228,7 +228,7 @@ fn Join(elem: ...str): str { ret join(elem...) }
 // The extension is the suffix beginning at the final dot
 // in the final element of path; it is empty if there is no dot.
 fn Ext(path: str): str {
-    let mut i = path.len - 1
+    let mut i = len(path) - 1
     for i >= 0 && !IsPathSep(path[i]); i-- {
         if path[i] == '.' {
             ret path[i:]
@@ -256,13 +256,13 @@ fn Base(mut path: str): str {
         ret "."
     }
     // Strip trailing slashes.
-    for path.len > 0 && IsPathSep(path[path.len-1]) {
-        path = path[0:path.len-1]
+    for len(path) > 0 && IsPathSep(path[len(path)-1]) {
+        path = path[0:len(path)-1]
     }
     // Throw away volume name
-    path = path[VolumeName(path).len:]
+    path = path[len(VolumeName(path)):]
     // Find the last element
-    let mut i = path.len - 1
+    let mut i = len(path) - 1
     for i >= 0 && !IsPathSep(path[i]) {
         i--
     }
@@ -284,12 +284,12 @@ fn Base(mut path: str): str {
 // The returned path does not end in a separator unless it is the root directory.
 fn Dir(path: str): str {
     let vol = VolumeName(path)
-    let mut i = path.len - 1
-    for i >= vol.len && !IsPathSep(path[i]) {
+    let mut i = len(path) - 1
+    for i >= len(vol) && !IsPathSep(path[i]) {
         i--
     }
-    let dir = Clean(path[vol.len:i+1])
-    if dir == "." && vol.len > 2 {
+    let dir = Clean(path[len(vol):i+1])
+    if dir == "." && len(vol) > 2 {
         // must be UNC
         ret vol
     }

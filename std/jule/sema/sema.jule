@@ -57,7 +57,7 @@ fn impIsLookupable(&i: &ImportInfo, ident: str): bool {
         ret false
     }
     if !i.ImportAll {
-        if i.Selected.len > 0 {
+        if len(i.Selected) > 0 {
             ret i.existIdent(ident)
         }
     }
@@ -91,7 +91,7 @@ fn appendRetVars(mut &dest: []&Var, mut &f: &FnIns) {
 }
 
 fn appendParamVars(mut &dest: []&Var, mut &f: &FnIns) {
-    if f.Params.len == 0 {
+    if len(f.Params) == 0 {
         ret
     }
 
@@ -151,9 +151,9 @@ fn appendParamVars(mut &dest: []&Var, mut &f: &FnIns) {
 // Builds type aliases for generic types of scope.
 // See developer reference (1), and (2).
 fn appendGenericTypeAliases(mut &dest: []&TypeAlias, mut &f: &FnIns) {
-    let mut size = f.Generics.len
+    let mut size = len(f.Generics)
     if f.Decl.Owner != nil {
-        size += f.Decl.Owner.Generics.len
+        size += len(f.Decl.Owner.Generics)
     }
 
     if size == 0 {
@@ -430,7 +430,7 @@ impl Sema {
 
     // Push suggestion to last log.
     fn pushSugggestion(mut self, fmt: LogMsg, args: ...any) {
-        unsafe { pushSugggestion(&self.errors[self.errors.len-1], fmt, args...) }
+        unsafe { pushSugggestion(&self.errors[len(self.errors)-1], fmt, args...) }
     }
 
     // Reports whether define is accessible in the current package.
@@ -602,7 +602,7 @@ impl Sema {
     }
 
     fn checkImportSelections(mut self, mut &imp: &ImportInfo): (ok: bool) {
-        if imp.Selected.len > 0 {
+        if len(imp.Selected) > 0 {
             ret self.checkImportSelectedSelections(imp)
         } else if imp.ImportAll {
             ret self.checkImportAllSelections(imp)
@@ -611,7 +611,7 @@ impl Sema {
     }
 
     fn isUseAliasDuplication(mut self, &imp: &ImportInfo): bool {
-        if imp.Alias.len == 0 {
+        if len(imp.Alias) == 0 {
             ret false
         }
 
@@ -631,7 +631,7 @@ impl Sema {
     }
 
     fn checkImport(mut self, mut &imp: &ImportInfo): bool {
-        if imp.CppLinked || imp.Package.Files.len == 0 {
+        if imp.CppLinked || len(imp.Package.Files) == 0 {
             ret true
         }
 
@@ -645,7 +645,7 @@ impl Sema {
                 flags: self.flags,
             }
             sema.check(imp.Package.Files)
-            if sema.errors.len != 0 {
+            if len(sema.errors) != 0 {
                 self.errors = append(self.errors, sema.errors...)
                 sema.errors = nil
                 ret false
@@ -905,7 +905,7 @@ impl Sema {
     }
 
     fn getTraitCheckFnKind(mut &self, mut &f: &Fn): &FnIns {
-        if f.Instances.len == 1 {
+        if len(f.Instances) == 1 {
             ret f.Instances[0]
         }
         let mut ins = f.instanceForce()
@@ -967,9 +967,9 @@ impl Sema {
             f.Decl.sema.setCurrentFile(file)
         }
 
-        let mut size = f.Generics.len
+        let mut size = len(f.Generics)
         if f.Decl != nil && f.Decl.Owner != nil {
-            size += f.Decl.Owner.Generics.len
+            size += len(f.Decl.Owner.Generics)
         }
 
         let mut generics = make([]&TypeAlias, 0, size)
@@ -1136,7 +1136,7 @@ impl Sema {
             self.checkTypeAliasDeclDup(ta)
 
             // Break checking if type alias has error.
-            if self.errors.len > 0 {
+            if len(self.errors) > 0 {
                 ret false
             }
         }
@@ -1232,7 +1232,7 @@ impl Sema {
             self.pushSugggestion(LogMsg.RenameForAvoidDuplication)
         }
 
-        if e.Items.len == 0 {
+        if len(e.Items) == 0 {
             self.pushErr(e.Token, LogMsg.NoMemberInEnum, e.Ident)
         }
 
@@ -1276,7 +1276,7 @@ impl Sema {
             self.pushSugggestion(LogMsg.RenameForAvoidDuplication)
         }
 
-        if e.Items.len == 0 {
+        if len(e.Items) == 0 {
             self.pushErr(e.Token, LogMsg.NoMemberInEnum, e.Ident)
             ret
         }
@@ -1296,7 +1296,7 @@ impl Sema {
                 self.pushErr(item.Token, LogMsg.AnyWithTypeEnum)
             }
         }
-        if e.Items.len == 1 {
+        if len(e.Items) == 1 {
             let mut item = e.Items[0]
             let tk = TypeKind{
                 Kind: e,
@@ -1312,7 +1312,7 @@ impl Sema {
         for (_, mut e) in self.file.Enums {
             self.checkEnumDecl(e)
             // Break checking if type alias has error.
-            if self.errors.len > 0 {
+            if len(self.errors) > 0 {
                 ret false
             }
         }
@@ -1324,7 +1324,7 @@ impl Sema {
         for (_, mut e) in self.file.TypeEnums {
             self.checkTypeEnumDecl(e)
             // Break checking if type alias has error.
-            if self.errors.len > 0 {
+            if len(self.errors) > 0 {
                 ret false
             }
         }
@@ -1479,7 +1479,7 @@ impl Sema {
             t.Mutable = t.Mutable || f.Params[0].Mutable
 
             // Break checking if type alias has error.
-            if self.errors.len > 0 {
+            if len(self.errors) > 0 {
                 ret
             }
 
@@ -1520,7 +1520,7 @@ impl Sema {
         for (_, mut t) in self.file.Traits {
             self.checkTraitDecl(t)
             // Break checking if type alias has error.
-            if self.errors.len > 0 {
+            if len(self.errors) > 0 {
                 ret false
             }
         }
@@ -1549,7 +1549,7 @@ impl Sema {
                 continue
             }
 
-            if dest.Generics.len > 0 && f.Generics.len > 0 {
+            if len(dest.Generics) > 0 && len(f.Generics) > 0 {
                 for _, fg in f.Generics {
                     for _, dg in dest.Generics {
                         if fg.Ident == dg.Ident {
@@ -1613,7 +1613,7 @@ impl Sema {
         base.Implemented = append(base.Implemented, dest)
         dest.Implements = append(dest.Implements, base)
 
-        if decl.Statics.len > 0 {
+        if len(decl.Statics) > 0 {
             self.pushErr(decl.Statics[0].Token, LogMsg.TraitImplHasStatic)
         }
 
@@ -1714,7 +1714,7 @@ impl Sema {
         for (_, mut decl) in self.file.Vars {
             self.checkGlobalVarDecl(decl)
             // Break checking if type alias has error.
-            if self.errors.len > 0 {
+            if len(self.errors) > 0 {
                 ret false
             }
         }
@@ -1798,7 +1798,7 @@ impl Sema {
         for (_, mut s) in self.file.Structs {
             self.checkStructDecl(s)
             // Break checking if type alias has error.
-            if self.errors.len > 0 {
+            if len(self.errors) > 0 {
                 ret false
             }
         }
@@ -1832,7 +1832,7 @@ impl Sema {
         for (_, mut f) in self.file.Funcs {
             self.checkFnDecl(f)
             // Break checking if type alias has error.
-            if self.errors.len > 0 {
+            if len(self.errors) > 0 {
                 ret false
             }
         }
@@ -2043,7 +2043,7 @@ impl Sema {
     // Returns nil if have a problem.
     fn readyToCheckFn(mut &self, mut &s: &StructIns, mut &f: &Fn): &FnIns {
         let mut ins = f.instance()
-        if f.Instances.len != 0 {
+        if len(f.Instances) != 0 {
             ret ins
         }
         ins.Owner = s
@@ -2057,11 +2057,11 @@ impl Sema {
 
     fn checkTypeMethod(mut &self, mut &s: &StructIns, mut &f: &Fn) {
         // Generic instances are checked instantly.
-        if f.Generics.len > 0 {
+        if len(f.Generics) > 0 {
             ret
         }
         let mut ins = f.Instances[0]
-        if ins.Scope.Stmts.len > 0 {
+        if len(ins.Scope.Stmts) > 0 {
             // Checked
             ret
         }
@@ -2069,7 +2069,7 @@ impl Sema {
     }
 
     fn checkStructInsOp(mut &self, mut &s: &StructIns, mut &f: &Fn, p: fn(f: &Fn): bool): &FnIns {
-        if f == nil || f.Generics.len > 0 || !p(f) {
+        if f == nil || len(f.Generics) > 0 || !p(f) {
             ret nil
         }
         ret f.Instances[0]
@@ -2090,8 +2090,8 @@ impl Sema {
             refers: s.Refers,
         }
 
-        if s.Generics.len > 0 {
-            tc.useGenerics = make([]&TypeAlias, 0, s.Generics.len)
+        if len(s.Generics) > 0 {
+            tc.useGenerics = make([]&TypeAlias, 0, len(s.Generics))
             for (i, mut g) in s.Generics {
                 let mut decl = s.Decl.Generics[i]
                 tc.useGenerics = append(tc.useGenerics, &TypeAlias{
@@ -2112,7 +2112,7 @@ impl Sema {
             }
         }
 
-        if s.Generics.len > 0 {
+        if len(s.Generics) > 0 {
             let mut cc = self.constraintChecker()
             cc.et = errorToken
             cc.si = s
@@ -2125,15 +2125,15 @@ impl Sema {
 
         ok = true
 
-        if s.Statics.len > 0 {
-            let mut n = self.errors.len
+        if len(s.Statics) > 0 {
+            let mut n = len(self.errors)
             self.files[0].TypeAliases = append(tc.useGenerics, self.files[0].TypeAliases...)
             for (_, mut v) in s.Statics {
                 self.checkVarDecl(v, self)
                 self.checkTypeVar(v, self)
-                ok = self.errors.len-n == 0 && ok
+                ok = len(self.errors)-n == 0 && ok
             }
-            self.files[0].TypeAliases = self.files[0].TypeAliases[tc.useGenerics.len:]
+            self.files[0].TypeAliases = self.files[0].TypeAliases[len(tc.useGenerics):]
             if !ok {
                 ret false
             }
@@ -2144,7 +2144,7 @@ impl Sema {
             let mut kind = tc.checkDecl(f.Decl.Kind.Decl)
             ok = kind != nil && ok
             if kind == nil {
-                if self != s.Decl.sema && s.Decl.sema.errors.len > 0 {
+                if self != s.Decl.sema && len(s.Decl.sema.errors) > 0 {
                     self.errors = append(self.errors, s.Decl.sema.errors...)
                     s.Decl.sema.errors = nil
                 }
@@ -2180,7 +2180,7 @@ impl Sema {
             ret false
         }
         for (_, mut f) in s.Methods {
-            if f.Generics.len == 0 {
+            if len(f.Generics) == 0 {
                 if self.readyToCheckFn(s, f) == nil {
                     ret false
                 }
@@ -2201,7 +2201,7 @@ impl Sema {
         }
 
         // Generic instances are checked instantly.
-        if s.Generics.len > 0 {
+        if len(s.Generics) > 0 {
             ret
         }
 
@@ -2288,11 +2288,11 @@ impl Sema {
         }
 
         // Generic instances are checked instantly.
-        if s.Generics.len > 0 {
+        if len(s.Generics) > 0 {
             ret
         }
 
-        if s.Instances.len == 0 {
+        if len(s.Instances) == 0 {
             let mut ins = s.instance()
             ins.Checked = true
             s.appendInstance(ins) // Append instance before precheck.
@@ -2364,7 +2364,7 @@ impl Sema {
         }
 
         // Generic instances are checked instantly.
-        if f.Generics.len > 0 {
+        if len(f.Generics) > 0 {
             ret
         }
 
@@ -2380,7 +2380,7 @@ impl Sema {
             ret
         }
 
-        if f.Params.len != 1 || f.Result != nil {
+        if len(f.Params) != 1 || f.Result != nil {
             self.pushErr(f.Decl.Token, LogMsg.WrongTestFnDecl)
             self.pushSugggestion(LogMsg.UseExpectedTestFnDecl)
             ret
@@ -2407,11 +2407,11 @@ impl Sema {
         }
 
         // Generic instances are checked instantly.
-        if f.Generics.len > 0 {
+        if len(f.Generics) > 0 {
             ret
         }
 
-        if f.Instances.len == 0 {
+        if len(f.Instances) == 0 {
             let mut ins = f.instanceForce()
             f.Instances = append(f.Instances, ins)
             self.reloadFnInsTypes(ins)
@@ -2453,7 +2453,7 @@ impl Sema {
             // Check operators first, see developer reference (7.1), and (7.2).
             self.precheckStructTypes()
         }
-        if self.errors.len > 0 {
+        if len(self.errors) > 0 {
             ret
         }
         for (_, mut f) in self.files {
@@ -2483,7 +2483,7 @@ impl Sema {
         self.files = files
 
         self.checkImports()
-        if self.errors.len != 0 {
+        if len(self.errors) != 0 {
             ret
         }
 
@@ -2492,17 +2492,17 @@ impl Sema {
         // Check enums here.
         // See developer reference (8).
         self.checkEnums()
-        if self.errors.len != 0 {
+        if len(self.errors) != 0 {
             ret
         }
 
         self.implImpls()
-        if self.errors.len != 0 {
+        if len(self.errors) != 0 {
             ret
         }
 
         self.checkPackageDecls()
-        if self.errors.len != 0 {
+        if len(self.errors) != 0 {
             ret
         }
 
@@ -2539,10 +2539,10 @@ impl missingRetChecker {
             if c == nil {
                 ret false
             }
-            let n = self.breaked.len
+            let n = len(self.breaked)
             let ok = self.checkScope(c.Scope)
             match {
-            | n != self.breaked.len:
+            | n != len(self.breaked):
                 ret false
             | !ok:
                 if !self.falled {
@@ -2561,12 +2561,12 @@ impl missingRetChecker {
     }
 
     fn checkInfIter(self, mut it: &InfIter): bool {
-        let n = self.breaked.len
+        let n = len(self.breaked)
         if self.checkScope(it.Scope) {
             self.breaked = self.breaked[:n]
             ret true
         }
-        if n != self.breaked.len {
+        if n != len(self.breaked) {
             let itaddr = uintptr(it)
             for _, addr in self.breaked[n:] {
                 if itaddr == addr {

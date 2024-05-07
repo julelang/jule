@@ -245,7 +245,7 @@ impl assignTypeChecker {
             | !f.Decl.Statically && f.Decl.IsMethod():
                 self.pushErr(LogMsg.MethodAsAnonFn)
                 valid = false
-            | f.Decl.Generics.len > 0 && f.Generics.len == 0:
+            | len(f.Decl.Generics) > 0 && len(f.Generics) == 0:
                 self.pushErr(LogMsg.GenericedFnAsAnonFn)
                 self.s.pushSugggestion(LogMsg.InstantiateGenericFnToUseAsAnon)
                 valid = false
@@ -485,7 +485,7 @@ impl dynamicTypeAnnotation {
     fn pushGeneric(mut self, mut &k: &TypeKind, i: int) {
         self.f.Generics[i] = &InsGeneric{Kind: k}
         let mut gd = self.f.Decl.Generics[i]
-        if gd.Constraint == nil || gd.Constraint.Mask.len != 1 {
+        if gd.Constraint == nil || len(gd.Constraint.Mask) != 1 {
             ret
         }
         self.c = gd.Constraint.Mask[0]
@@ -541,7 +541,7 @@ impl dynamicTypeAnnotation {
         }
         let mut f = k.Fn()
         match {
-        | pf.Params.len != f.Params.len:
+        | len(pf.Params) != len(f.Params):
             ret false
         | pf.Decl.IsVoid() != f.Decl.IsVoid():
             ret false
@@ -589,7 +589,7 @@ impl dynamicTypeAnnotation {
             ret false
         }
         let mut s2 = k.Struct()
-        if s.Generics.len != s2.Generics.len {
+        if len(s.Generics) != len(s2.Generics) {
             ret false
         }
         for (i, mut g) in s.Generics {
@@ -680,7 +680,7 @@ impl fnCallArgChecker {
     }
 
     fn getParams(mut self): []&ParamIns {
-        if self.f.Params.len > 0 &&
+        if len(self.f.Params) > 0 &&
             self.f.Params[0].Decl != nil &&
             self.f.Params[0].Decl.IsSelf() {
             ret self.f.Params[1:] // Remove receiver parameter.
@@ -689,18 +689,18 @@ impl fnCallArgChecker {
     }
 
     fn checkCounts(mut self, &params: []&ParamIns): (ok: bool) {
-        let mut n = params.len
+        let mut n = len(params)
         if n > 0 && params[0].Decl.IsSelf() {
             n--
         }
 
-        let mut diff = n - self.args.len
+        let mut diff = n - len(self.args)
         match {
         | diff == 0:
             ret true
         | n > 0 && params[n-1].Decl.Variadic:
             ret true
-        | diff < 0 || diff > params.len:
+        | diff < 0 || diff > len(params):
             self.pushErr(LogMsg.ArgumentOverflow)
             ret false
         }
@@ -770,7 +770,7 @@ impl fnCallArgChecker {
     fn pushVariadic(mut self, mut &p: &ParamIns, mut i: int): (ok: bool) {
         ok = true
         let mut variadiced = false
-        let more = i+1 < self.args.len
+        let more = i+1 < len(self.args)
         let mut model = &SliceExprModel{
             ElemKind: p.Kind,
         }
@@ -786,7 +786,7 @@ impl fnCallArgChecker {
             p.Kind.Variadic = variadic
         }
 
-        for i < self.args.len; i++ {
+        for i < len(self.args); i++ {
             let mut arg = self.args[i]
 
             match type arg.Kind {
@@ -849,19 +849,19 @@ impl fnCallArgChecker {
 
         ok = true
         let mut i = 0
-        if params.len > 0 && params[0].Decl.IsSelf() {
+        if len(params) > 0 && params[0].Decl.IsSelf() {
             // Ignore self.
             i++
         }
     iter:
-        for i < params.len {
+        for i < len(params) {
             let mut p = params[i]
             match {
             | p.Decl.Variadic:
                 ok = self.pushVariadic(p, i) && ok
                 // Variadiced parameters always last.
                 break iter
-            | self.args.len <= i:
+            | len(self.args) <= i:
                 ok = false
                 break iter
             |:
@@ -992,7 +992,7 @@ impl structLitChecker {
     }
 
     fn check(mut self, mut &exprs: []&Expr) {
-        if exprs.len == 0 {
+        if len(exprs) == 0 {
             ret
         }
         if !self.readyExprs(exprs) {
@@ -1012,7 +1012,7 @@ impl structLitChecker {
                 if paired {
                     self.pushErr(expr.Token, LogMsg.ArgMustTargetToField)
                 }
-                if i >= self.s.Fields.len {
+                if i >= len(self.s.Fields) {
                     self.pushErr(expr.Token, LogMsg.ArgumentOverflow)
                     continue
                 }
@@ -1040,8 +1040,8 @@ impl structLitChecker {
 
         // Check missing arguments for fields.
         if !paired {
-            let n = self.s.Fields.len
-            let mut diff = n - exprs.len
+            let n = len(self.s.Fields)
+            let mut diff = n - len(exprs)
             match {
             | diff <= 0:
                 ret
@@ -1243,7 +1243,7 @@ impl retTypeChecker {
         if self.f == nil || self.f.Decl.IsVoid() {
             ret
         }
-        self.vars = make([]&Var, 0, self.f.Decl.Result.Idents.len)
+        self.vars = make([]&Var, 0, len(self.f.Decl.Result.Idents))
 
         let mut rootScope = self.sc.getRoot()
 
@@ -1267,12 +1267,12 @@ impl retTypeChecker {
     }
 
     fn checkExprs(mut self) {
-        if self.exprs.len == 0 {
+        if len(self.exprs) == 0 {
             ret
         }
-        let mut datas = make([]&Data, 0, self.exprs.len)
+        let mut datas = make([]&Data, 0, len(self.exprs))
         for (i, mut expr) in self.exprs {
-            if i >= self.types.len {
+            if i >= len(self.types) {
                 break
             }
 
@@ -1300,11 +1300,11 @@ impl retTypeChecker {
         }
 
         // Set Model:.
-        if datas.len > 1 { // Tuple
+        if len(datas) > 1 { // Tuple
             self.model = &TupleExprModel{
                 Datas: datas,
             }
-        } else if datas.len == 1 {
+        } else if len(datas) == 1 {
             self.model = datas[0].Model
         }
     }
@@ -1314,8 +1314,8 @@ impl retTypeChecker {
         self.prepareExprs(e)
         self.retVars()
 
-        let n = self.exprs.len
-        if n == 0 && self.types.len > 0 {
+        let n = len(self.exprs)
+        if n == 0 && len(self.types) > 0 {
             if !self.f.Decl.AnyVar() {
                 self.sc.s.pushErr(self.errorToken, LogMsg.RequireRetExpr)
                 ret false
@@ -1328,13 +1328,17 @@ impl retTypeChecker {
             ret false
         }
 
-        if n > self.types.len {
+        if n > len(self.types) {
             self.sc.s.pushErr(self.errorToken, LogMsg.OverflowRet)
-        } else if n < self.types.len {
+        } else if n < len(self.types) {
             self.sc.s.pushErr(self.errorToken, LogMsg.MissingMultiRet)
         }
 
         self.checkExprs()
         ret true
     }
+}
+
+fn lenKind(): &TypeKind {
+    ret &TypeKind{Kind: buildPrimType(PrimKind.Int)}
 }

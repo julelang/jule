@@ -92,7 +92,7 @@ impl Fn {
 
     // Reports whether function has return variable(s).
     fn AnyVar(self): bool {
-        ret self.Result != nil && self.Result.Idents.len > 0
+        ret self.Result != nil && len(self.Result.Idents) > 0
     }
 
     // Force to new instance.
@@ -103,7 +103,7 @@ impl Fn {
             Refers: ReferenceStack.new(),
         }
 
-        ins.Params = make([]&ParamIns, 0, self.Params.len)
+        ins.Params = make([]&ParamIns, 0, len(self.Params))
         for (_, mut p) in self.Params {
             ins.Params = append(ins.Params, p.instance())
         }
@@ -117,7 +117,7 @@ impl Fn {
 
     fn instance(mut &self): &FnIns {
         // Returns already created instance for just one unique combination.
-        if self.Generics.len == 0 && self.Instances.len == 1 {
+        if len(self.Generics) == 0 && len(self.Instances) == 1 {
             ret self.Instances[0]
         }
         ret self.instanceForce()
@@ -126,9 +126,9 @@ impl Fn {
     // Appends function instance.
     // Returns instance if already instance is already exist, nil if not.
     fn appendInstance(mut self, mut &ins: &FnIns): &FnIns {
-        if self.Generics.len == 0 {
+        if len(self.Generics) == 0 {
             // Skip already created instance for just one unique combination.
-            if self.Instances.len == 1 {
+            if len(self.Instances) == 1 {
                 ret self.Instances[0]
             }
 
@@ -136,7 +136,7 @@ impl Fn {
             ret nil
         }
 
-        if self.Instances.len == 0 {
+        if len(self.Instances) == 0 {
             self.Instances = append(self.Instances, ins)
             ret nil
         }
@@ -263,12 +263,12 @@ impl FnIns {
             ret p1.Kind.Equals(p2.Kind)
         }
 
-        if f.Params.len != self.Params.len {
+        if len(f.Params) != len(self.Params) {
             ret false
         }
 
         let mut i = 0
-        for i < self.Params.len; i++ {
+        for i < len(self.Params); i++ {
             if !checkParams(self.Params[i], f.Params[i]) {
                 ret false
             }
@@ -288,7 +288,7 @@ impl FnIns {
         if !self.EqualsFn(other) {
             ret false
         }
-        if self.Decl.Generics.len != other.Decl.Generics.len {
+        if len(self.Decl.Generics) != len(other.Decl.Generics) {
             ret false
         }
         ret true
@@ -322,7 +322,7 @@ impl FnIns {
     // Reports whether instances are same.
     // Returns true if declarations and generics are same.
     fn Same(self, f: &FnIns): bool {
-        if self.Decl != f.Decl || f.Generics.len != self.Generics.len {
+        if self.Decl != f.Decl || len(f.Generics) != len(self.Generics) {
             ret false
         }
 
@@ -351,13 +351,13 @@ impl FnIns {
         }
 
         s += "("
-        let n = self.Params.len
+        let n = len(self.Params)
         if n > 0 {
             for _, p in self.Params {
                 s += p.Str()
                 s += ","
             }
-            s = s[:s.len-1] // Remove comma.
+            s = s[:len(s)-1] // Remove comma.
         }
         s += ")"
         if self.Decl.Exceptional {

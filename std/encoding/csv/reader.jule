@@ -209,7 +209,7 @@ impl Reader {
     //
     // If this is called with an out-of-bounds index, it panics.
     fn FieldPos(self, field: int): (line: int, column: int) {
-        if field < 0 || field >= self.fieldPositions.len {
+        if field < 0 || field >= len(self.fieldPositions) {
             panic("std::encoding::csv: Reader: out of range index passed to field_pos")
         }
         let p = &self.fieldPositions[field]
@@ -224,7 +224,7 @@ impl Reader {
     fn ReadAll(mut self)!: (records: [][]str) {
         for {
             let mut record = self.readRecord(nil) else { error(error) }
-            if record.len == 0 {
+            if len(record) == 0 {
                 break
             }
             records = append(records, record)
@@ -241,16 +241,16 @@ impl Reader {
             ret nil
         }
         let mut line = self.s.Bytes()
-        if line.len == 0 {
+        if len(line) == 0 {
             ret nil
         }
         self.numLine++
-        self.offset += line.len
+        self.offset += len(line)
 
         // Normalize \r\n to \n on all input lines.
-        if line.len >= 2 && line[line.len-2] == '\r' && line[line.len-1] == '\n' {
-            line[line.len-2] = '\n'
-            line = line[:line.len-1]
+        if len(line) >= 2 && line[len(line)-2] == '\r' && line[len(line)-1] == '\n' {
+            line[len(line)-2] = '\n'
+            line = line[:len(line)-1]
         }
         ret line
     }
@@ -273,7 +273,7 @@ impl Reader {
                 line = nil
                 continue // Skip comment lines
             }
-            if line.len == lengthNl(line) {
+            if len(line) == lengthNl(line) {
                 line = nil
                 continue // Skip empty lines
             }
@@ -281,7 +281,7 @@ impl Reader {
         }
 
         // Parse each field in the record.
-        const QuoteLen = `"`.len
+        const QuoteLen = len(`"`)
         let commaLen = utf8::RuneLen(self.Comma)
         let mut recLine = self.numLine           // Starting line for record
         self.recordBuffer = self.recordBuffer[:0]
@@ -295,20 +295,20 @@ impl Reader {
                     ret !unicode::IsSpace(r)
                 })
                 if i == -1 {
-                    i = line.len
+                    i = len(line)
                     pos.col -= lengthNl(line)
                 }
                 line = line[i:]
                 pos.col += i
             }
-            if line.len == 0 || line[0] != '"' {
+            if len(line) == 0 || line[0] != '"' {
                 // Non-quoted string field
                 let i = bytes::FindRune(line, self.Comma)
                 let mut field = line
                 if i >= 0 {
                     field = field[:i]
                 } else {
-                    field = field[:field.len-lengthNl(field)]
+                    field = field[:len(field)-lengthNl(field)]
                 }
                 // Check to make sure a quote does not appear in field.
                 if !self.LazyQuotes {
@@ -324,7 +324,7 @@ impl Reader {
                     }
                 }
                 self.recordBuffer = append(self.recordBuffer, field...)
-                self.fieldIndexes = append(self.fieldIndexes, self.recordBuffer.len)
+                self.fieldIndexes = append(self.fieldIndexes, len(self.recordBuffer))
                 self.fieldPositions = append(self.fieldPositions, pos)
                 if i >= 0 {
                     line = line[i+commaLen:]
@@ -355,12 +355,12 @@ impl Reader {
                             // `",` sequence (end of field).
                             line = line[commaLen:]
                             pos.col += commaLen
-                            self.fieldIndexes = append(self.fieldIndexes, self.recordBuffer.len)
+                            self.fieldIndexes = append(self.fieldIndexes, len(self.recordBuffer))
                             self.fieldPositions = append(self.fieldPositions, fieldPos)
                             continue parseField
-                        | lengthNl(line) == line.len:
+                        | lengthNl(line) == len(line):
                             // `"\n` sequence (end of line).
-                            self.fieldIndexes = append(self.fieldIndexes, self.recordBuffer.len)
+                            self.fieldIndexes = append(self.fieldIndexes, len(self.recordBuffer))
                             self.fieldPositions = append(self.fieldPositions, fieldPos)
                             break parseField
                         | self.LazyQuotes:
@@ -376,12 +376,12 @@ impl Reader {
                             })
                             break parseField
                         }
-                    } else if line.len > 0 {
+                    } else if len(line) > 0 {
                         // Hit end of line (copy all data so far).
                         self.recordBuffer = append(self.recordBuffer, line...)
-                        pos.col += line.len
+                        pos.col += len(line)
                         line = self.readLine() else { error(error) }
-                        if line.len > 0 {
+                        if len(line) > 0 {
                             pos.line++
                             pos.col = 1
                         }
@@ -396,7 +396,7 @@ impl Reader {
                             })
                             break parseField
                         }
-                        self.fieldIndexes = append(self.fieldIndexes, self.recordBuffer.len)
+                        self.fieldIndexes = append(self.fieldIndexes, len(self.recordBuffer))
                         self.fieldPositions = append(self.fieldPositions, fieldPos)
                         break parseField
                     }
@@ -407,8 +407,8 @@ impl Reader {
         // Create a single string and create slices out of it.
         // This pins the memory of the fields together, but allocates once.
         let s = str(self.recordBuffer) // Convert to string once to batch allocations
-        if dst.cap < self.fieldIndexes.len {
-            dst = make([]str, self.fieldIndexes.len)
+        if dst.cap < len(self.fieldIndexes) {
+            dst = make([]str, len(self.fieldIndexes))
         } else {
             dst = dst[:0]
         }
@@ -420,7 +420,7 @@ impl Reader {
 
         // Check or update the expected fields per record.
         if self.FieldsPerRecord > 0 {
-            if dst.len != self.FieldsPerRecord {
+            if len(dst) != self.FieldsPerRecord {
                 error(&ParseError{
                     StartLine: recLine,
                     Line: recLine,
@@ -429,7 +429,7 @@ impl Reader {
                 })
             }
         } else if self.FieldsPerRecord == 0 {
-            self.FieldsPerRecord = dst.len
+            self.FieldsPerRecord = len(dst)
         }
         ret dst
     }
@@ -452,7 +452,7 @@ fn nextRune(b: []byte): rune {
 
 // Reports the number of bytes for the trailing \n.
 fn lengthNl(b: []byte): int {
-    if b.len > 0 && b[b.len-1] == '\n' {
+    if len(b) > 0 && b[len(b)-1] == '\n' {
         ret 1
     }
     ret 0

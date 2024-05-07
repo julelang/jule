@@ -119,7 +119,7 @@ fn makeErr(row: int, col: int, &f: &File, fmt: LogMsg, args: ...any): Log {
 }
 
 fn bytesHasPrefix(&bytes: []byte, prefix: str): bool {
-    if bytes.len < prefix.len {
+    if len(bytes) < len(prefix) {
         ret false
     }
     for i in prefix {
@@ -132,7 +132,7 @@ fn bytesHasPrefix(&bytes: []byte, prefix: str): bool {
 
 fn floatFmtE(&txt: []byte, mut i: int): (lit: str) {
     i++ // Skip E | e
-    if i >= txt.len {
+    if i >= len(txt) {
         ret
     }
 
@@ -142,7 +142,7 @@ fn floatFmtE(&txt: []byte, mut i: int): (lit: str) {
     }
     if b == '+' || b == '-' {
         i++ // Skip operator
-        if i >= txt.len {
+        if i >= len(txt) {
             ret
         }
         if txt[i] == '_' {
@@ -151,7 +151,7 @@ fn floatFmtE(&txt: []byte, mut i: int): (lit: str) {
     }
 
     let first = i
-    for i < txt.len; i++ {
+    for i < len(txt); i++ {
         b = txt[i]
         if b != '_' && !IsDecimal(b) {
             break
@@ -175,7 +175,7 @@ fn floatFmtDotnp(&txt: []byte, mut i: int): str {
 
     i++
 loop:
-    for i < txt.len; i++ {
+    for i < len(txt); i++ {
         let b = txt[i]
         match {
         | b == '_' | IsDecimal(b):
@@ -201,14 +201,14 @@ fn floatFmtDotp(&txt: []byte, mut i: int): str {
 
 fn floatNum(&txt: []byte, mut i: int): (lit: str) {
     i++ // Skip dot
-    if i >= txt.len {
+    if i >= len(txt) {
         ret str(txt)
     }
     if txt[i] == '_' {
         i--
         ret str(txt[:i])
     }
-    for i < txt.len; i++ {
+    for i < len(txt); i++ {
         let b = txt[i]
         if i > 1 && (b == 'e' || b == 'E') {
             ret floatFmtE(txt, i)
@@ -227,7 +227,7 @@ fn floatNum(&txt: []byte, mut i: int): (lit: str) {
 fn commonNum(&txt: []byte): (lit: str) {
     let mut i = 0
 loop:
-    for i < txt.len; i++ {
+    for i < len(txt); i++ {
         let b = txt[i]
         match {
         | b == '.':
@@ -251,13 +251,13 @@ fn binaryNum(&txt: []byte): (lit: str) {
     if !bytesHasPrefix(txt, "0b") {
         ret ""
     }
-    if txt.len < 2 {
+    if len(txt) < 2 {
         ret
     }
 
     const BinaryStart = 2
     let mut i = BinaryStart
-    for i < txt.len; i++ {
+    for i < len(txt); i++ {
         if txt[i] != '_' && !IsBinary(txt[i]) {
             break
         }
@@ -283,7 +283,7 @@ fn isFloatFmtDotnp(&txt: []byte, mut i: int): bool {
     }
     i++
 loop:
-    for i < txt.len; i++ {
+    for i < len(txt); i++ {
         let b = txt[i]
         match {
         | b == '_' | IsDecimal(b):
@@ -300,7 +300,7 @@ loop:
 
 fn isFloatFmtDotp(&txt: []byte, i: int): bool {
     match {
-    | txt.len < 3:
+    | len(txt) < 3:
         fall
     | txt[i] != '.':
         fall
@@ -313,7 +313,7 @@ fn isFloatFmtDotp(&txt: []byte, i: int): bool {
 
 fn isFloatFmtDotfp(&txt: []byte, i: int): bool {
     match {
-    | txt.len < 4:
+    | len(txt) < 4:
         fall
     | txt[i] != '.':
         fall
@@ -330,7 +330,7 @@ fn octalNum(&txt: []byte): (lit: str) {
     if txt[0] != '0' {
         ret ""
     }
-    if txt.len < 2 {
+    if len(txt) < 2 {
         ret
     }
 
@@ -338,7 +338,7 @@ fn octalNum(&txt: []byte): (lit: str) {
 
     let mut o = false
     if txt[1] == 'o' {
-        if txt.len < 3 {
+        if len(txt) < 3 {
             ret
         }
         octalStart++
@@ -346,7 +346,7 @@ fn octalNum(&txt: []byte): (lit: str) {
     }
 
     let mut i = octalStart
-    for i < txt.len; i++ {
+    for i < len(txt); i++ {
         let b = txt[i]
         if b == '.' {
             if o {
@@ -369,7 +369,7 @@ fn octalNum(&txt: []byte): (lit: str) {
 }
 
 fn hexNum(&txt: []byte): (lit: str) {
-    if txt.len < 3 {
+    if len(txt) < 3 {
         ret
     }
     if txt[0] != '0' || (txt[1] != 'x' && txt[1] != 'X') {
@@ -379,7 +379,7 @@ fn hexNum(&txt: []byte): (lit: str) {
     const HexStart = 2
     let mut i = HexStart
 loop:
-    for i < txt.len; i++ {
+    for i < len(txt); i++ {
         let b = txt[i]
         match {
         | isFloatFmtDotp(txt, i):
@@ -402,7 +402,7 @@ loop:
 }
 
 fn hexEscape(&txt: []byte, n: int): (seq: str) {
-    if txt.len < n {
+    if len(txt) < n {
         ret
     }
 
@@ -435,7 +435,7 @@ fn hexByteEscape(&txt: []byte): str {
 
 // Patter (RegEx): ^\\[0-7]{3}
 fn byteEscape(&txt: []byte): (seq: str) {
-    if txt.len < 4 {
+    if len(txt) < 4 {
         ret
     }
     if !IsOctal(txt[1]) || !IsOctal(txt[2]) || !IsOctal(txt[3]) {
@@ -469,7 +469,7 @@ impl lex {
     fn lex(mut self) {
         self.errors = nil
         self.newLine()
-        for self.pos < self.file.Data.len {
+        for self.pos < len(self.file.Data) {
             let mut token = self.token()
             if token.Id != TokenId.Na {
                 self.tokens = append(self.tokens, token)
@@ -480,7 +480,7 @@ impl lex {
     // Returns identifer if next token is identifer,
     // returns empty string if not.
     fn id(mut self, &ln: []byte): str {
-        if ln.len == 0 {
+        if len(ln) == 0 {
             ret ""
         }
         let (r, mut i) = utf8::DecodeRune(ln)
@@ -488,7 +488,7 @@ impl lex {
             ret ""
         }
 
-        for i < ln.len {
+        for i < len(ln) {
             let (pr, n) = utf8::DecodeRune(ln[i:])
             if pr != '_' && !IsDecimal(byte(pr)) && !IsLetter(pr) {
                 self.pos += i
@@ -497,7 +497,7 @@ impl lex {
             i += n
         }
 
-        self.pos += ln.len
+        self.pos += len(ln)
         ret str(ln)
     }
 
@@ -505,7 +505,7 @@ impl lex {
     fn resume(mut self): []byte {
         // Skip spaces.
         let mut i = self.pos
-        for i < self.file.Data.len; i++ {
+        for i < len(self.file.Data); i++ {
             let r = rune(self.file.Data[i])
             if IsSpace(r) {
                 const TabLen = 8
@@ -522,7 +522,7 @@ impl lex {
             }
 
             let mut j = i
-            for j < self.file.Data.len; j++ {
+            for j < len(self.file.Data); j++ {
                 if self.file.Data[j] == '\n' {
                     break
                 }
@@ -535,7 +535,7 @@ impl lex {
     fn lexLineComment(mut self, mut &token: &Token) {
         let start = self.pos
         self.pos += 2
-        for self.pos < self.file.Data.len; self.pos++ {
+        for self.pos < len(self.file.Data); self.pos++ {
             let r = self.file.Data[self.pos]
             if r == '\n' || r == '\r' {
                 break
@@ -550,7 +550,7 @@ impl lex {
     fn lexRangeComment(mut self, mut &token: &Token) {
         let start = self.pos
         self.pos += 2
-        for self.pos < self.file.Data.len; self.pos++ {
+        for self.pos < len(self.file.Data); self.pos++ {
             let r = self.file.Data[self.pos]
             if r == '\r' {
                 continue
@@ -560,7 +560,7 @@ impl lex {
                 continue
             }
             self.column += 1
-            if self.pos+1 < self.file.Data.len && r == '*' &&
+            if self.pos+1 < len(self.file.Data) && r == '*' &&
                 self.file.Data[self.pos+1] == '/' {
                 self.column += 2
                 self.pos += 2
@@ -593,13 +593,13 @@ impl lex {
         }
         lit = commonNum(txt)
     end:
-        self.pos += lit.len
+        self.pos += len(lit)
         ret
     }
 
     fn escapeSeq(mut self, &txt: []byte): str {
         let mut seq = ""
-        if txt.len < 2 {
+        if len(txt) < 2 {
             goto end
         }
 
@@ -623,7 +623,7 @@ impl lex {
             self.pushErr(LogMsg.InvalidEscapeSeq)
             ret ""
         }
-        self.pos += seq.len
+        self.pos += len(seq)
         ret seq
     }
 
@@ -641,7 +641,7 @@ impl lex {
         self.column++
         let mut n = 0
         let mut i = 1
-        for i < txt.len; i++ {
+        for i < len(txt); i++ {
             if txt[i] == '\r' {
                 continue
             }
@@ -660,8 +660,8 @@ impl lex {
                 self.pos++
                 break
             }
-            if r.len > 1 {
-                i += r.len - 1
+            if len(r) > 1 {
+                i += len(r) - 1
             }
             n++
         }
@@ -683,7 +683,7 @@ impl lex {
         s += str(mark)
         self.column++
 
-        for self.pos < self.file.Data.len {
+        for self.pos < len(self.file.Data) {
             let ch = self.file.Data[self.pos]
             if ch == '\r' {
                 continue
@@ -723,7 +723,7 @@ impl lex {
         }
         t.Kind = kind
         t.Id = id
-        self.pos += kind.len
+        self.pos += len(kind)
         ret true
     }
 
@@ -832,13 +832,13 @@ fn Lex(mut f: &File, mode: LexMode): []Log {
         mode: mode,
         file: f,
         pos: 0,
-        row: -1, // For true row
+        row: -1,// For true row 
     }
 
     lex.newLine()
     lex.lex()
 
-    if lex.errors.len > 0 {
+    if len(lex.errors) > 0 {
         ret lex.errors
     }
 

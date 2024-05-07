@@ -64,7 +64,7 @@ impl typeBuilder {
 
         let mut nst = new(NamespaceTypeDecl)
         let mut n = 0
-        for *self.i < self.tokens.len; *self.i++ {
+        for *self.i < len(self.tokens); *self.i++ {
             let mut token = self.tokens[*self.i]
             if n%2 == 0 {
                 if token.Id != TokenId.Ident {
@@ -79,7 +79,7 @@ impl typeBuilder {
         }
 
         // Remove selected identifier token.
-        nst.Idents = nst.Idents[:nst.Idents.len-1]
+        nst.Idents = nst.Idents[:len(nst.Idents)-1]
 
         *self.i-- // Set offset to last identifier.
         nst.Kind = self.buildIdent()
@@ -88,7 +88,7 @@ impl typeBuilder {
     }
 
     unsafe fn buildGenerics(mut self): []&TypeDecl {
-        if *self.i >= self.tokens.len {
+        if *self.i >= len(self.tokens) {
             ret nil
         }
         let token = self.tokens[*self.i]
@@ -97,16 +97,16 @@ impl typeBuilder {
         }
 
         let mut parts = self.identGenerics()
-        if parts.len == 0 {
+        if len(parts) == 0 {
             self.pushErr(token, LogMsg.InvalidSyntax)
             ret nil
         }
 
-        let mut types = make([]&TypeDecl, 0, parts.len)
+        let mut types = make([]&TypeDecl, 0, len(parts))
         for (_, mut part) in parts {
             let mut j = 0
             let (mut t, _) = unsafe { self.p.buildType(part, &j, true) }
-            if j < part.len {
+            if j < len(part) {
                 self.pushErr(part[j], LogMsg.InvalidSyntax)
             }
             types = append(types, t)
@@ -117,7 +117,7 @@ impl typeBuilder {
     unsafe fn identGenerics(mut self): [][]&Token {
         let first = *self.i
         let mut rangeN = 0
-        for *self.i < self.tokens.len; *self.i++ {
+        for *self.i < len(self.tokens); *self.i++ {
             let token = self.tokens[*self.i]
             if token.Id == TokenId.Range {
                 match token.Kind {
@@ -141,7 +141,7 @@ impl typeBuilder {
     }
 
     unsafe fn buildIdent(mut self): &TypeDecl {
-        let mut next = *self.i+1 < self.tokens.len
+        let mut next = *self.i+1 < len(self.tokens)
         if next && self.tokens[*self.i+1].Id == TokenId.DblColon {
             ret self.buildNamespace()
         }
@@ -160,7 +160,7 @@ impl typeBuilder {
             it.Generics = self.buildGenerics()
             ret itd
         }
-        if self.tokens.len-*self.i == 1 {
+        if len(self.tokens)-*self.i == 1 {
             self.pushErr(token, LogMsg.InvalidSyntax)
             ret itd
         }
@@ -185,7 +185,7 @@ impl typeBuilder {
     }
 
     unsafe fn buildCppLink(mut self): &TypeDecl {
-        if *self.i+1 >= self.tokens.len || self.tokens[*self.i+1].Id != TokenId.Dot {
+        if *self.i+1 >= len(self.tokens) || self.tokens[*self.i+1].Id != TokenId.Dot {
             self.pushErr(self.tokens[*self.i], LogMsg.InvalidSyntax)
             ret nil
         }
@@ -212,7 +212,7 @@ impl typeBuilder {
 
     unsafe fn buildPtr(mut self): &TypeDecl {
         let mut token = self.tokens[*self.i]
-        if *self.i+1 >= self.tokens.len {
+        if *self.i+1 >= len(self.tokens) {
             self.pushErr(token, LogMsg.InvalidSyntax)
             ret nil
         }
@@ -223,7 +223,7 @@ impl typeBuilder {
             ret &TypeDecl{
                 Token: token,
                 Kind: &PtrTypeDecl{
-                    Elem: nil, // Set Elem as nil for unsafe pointer (*unsafe) type.
+                    Elem: nil,// Set Elem as nil for unsafe pointer (*unsafe) type. 
                 },
             }
         }
@@ -243,7 +243,7 @@ impl typeBuilder {
 
     unsafe fn buildSptr(mut self): &TypeDecl {
         let mut token = self.tokens[*self.i]
-        if *self.i+1 >= self.tokens.len {
+        if *self.i+1 >= len(self.tokens) {
             self.pushErr(token, LogMsg.InvalidSyntax)
             ret nil
         }
@@ -298,7 +298,7 @@ impl typeBuilder {
 
     unsafe fn buildArr(mut self): &TypeDecl {
         let mut exprTokens = range(*self.i, TokenKind.LBracket, TokenKind.RBracket, self.tokens)
-        if *self.i >= self.tokens.len {
+        if *self.i >= len(self.tokens) {
             self.pushErr(self.tokens[*self.i-1], LogMsg.MissingType)
             ret nil
         }
@@ -313,7 +313,7 @@ impl typeBuilder {
         }
 
         let mut token = exprTokens[0]
-        if exprTokens.len == 1 && token.Id == TokenId.Op && token.Kind == TokenKind.TripleDot {
+        if len(exprTokens) == 1 && token.Id == TokenId.Op && token.Kind == TokenKind.TripleDot {
             // Ignore.
         } else {
             arrt.Size = self.p.buildExpr(exprTokens)
@@ -328,17 +328,17 @@ impl typeBuilder {
     unsafe fn buildMap(mut self): &TypeDecl {
         let mut mapToken = self.tokens[*self.i]
         *self.i++ // Skip map token.
-        if *self.i >= self.tokens.len {
+        if *self.i >= len(self.tokens) {
             self.pushErr(mapToken, LogMsg.MissingType)
             ret nil
         }
 
         // Get key type tokens without brackets.
         let mut keyTokens = range(*self.i, TokenKind.LBracket, TokenKind.RBracket, self.tokens)
-        if *self.i >= self.tokens.len {
+        if *self.i >= len(self.tokens) {
             self.pushErr(self.tokens[*self.i-1], LogMsg.MissingType)
             ret nil
-        } else if keyTokens.len == 0 {
+        } else if len(keyTokens) == 0 {
             self.pushErr(mapToken, LogMsg.MissingType)
             ret nil
         }
@@ -348,7 +348,7 @@ impl typeBuilder {
         let (mut keyt, mut ok) = self.p.buildType(keyTokens, &j, self.err)
         if !ok {
             ret nil
-        } else if j < keyTokens.len {
+        } else if j < len(keyTokens) {
             self.pushErr(keyTokens[j], LogMsg.InvalidSyntax)
         }
         mapt.Key = keyt
@@ -366,7 +366,7 @@ impl typeBuilder {
 
     unsafe fn buildEnumerable(mut self): &TypeDecl {
         let mut token = self.tokens[*self.i]
-        if *self.i+2 >= self.tokens.len ||
+        if *self.i+2 >= len(self.tokens) ||
             token.Id != TokenId.Range ||
             token.Kind != TokenKind.LBracket {
             self.pushErr(token, LogMsg.InvalidSyntax)
