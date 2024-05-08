@@ -33,8 +33,8 @@ use std::jule::sema::{
     RetSt,
     TupleExprModel,
     TypeKind,
-    BuiltinAppendCallExprModel,
     SlicingExprModel,
+    IndexingExprModel,
 }
 
 const matchExpr = "_match_expr"
@@ -312,7 +312,37 @@ impl scopeCoder {
         self.oc.ec.expr(a.R.Model)
     }
 
+    fn mapLookupAssign(mut &self, mut &a: &MultiAssign) {
+        let mut iem = (&IndexingExprModel)(a.R)
+        self.oc.ec.expr(iem.Expr.Model)
+        self.oc.write(".lookup(")
+        self.oc.ec.expr(iem.Index.Model)
+        self.oc.write(", ")
+        if a.L[0] != nil {
+            self.oc.write("&(")
+            self.oc.ec.expr(a.L[0])
+            self.oc.write("), ")
+        } else {
+            self.oc.write("nullptr, ")
+        }
+        if a.L[1] != nil {
+            self.oc.write("&(")
+            self.oc.ec.expr(a.L[1])
+            self.oc.write(")")
+        } else {
+            self.oc.write("nullptr")
+        }
+        self.oc.write(")")
+    }
+
     fn multiAssign(mut &self, mut a: &MultiAssign) {
+        // Special cases.
+        match type a.R {
+        | &IndexingExprModel: // Map lookup.
+            self.mapLookupAssign(a)
+            ret
+        }
+
         self.oc.write("std::tie(")
         for (i, mut l) in a.L {
             if l == nil {

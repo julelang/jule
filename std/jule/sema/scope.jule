@@ -1315,8 +1315,8 @@ impl scopeChecker {
         }
     }
 
-    fn processEndPartOfMultiAssign(mut self, mut st: &MultiAssign,
-        mut a: &AssignSt, mut lexpr: &AssignLeft, mut l: &Data, mut r: &Data) {
+    fn processEndPartOfMultiAssign(mut self, mut &st: &MultiAssign,
+        mut &a: &AssignSt, mut &lexpr: &AssignLeft, mut &l: &Data, mut &r: &Data) {
         if IsIgnoreIdent(lexpr.Ident) {
             if r.Kind.Void() {
                 self.s.pushErr(a.Right.Token, LogMsg.InvalidExpr)
@@ -1351,7 +1351,6 @@ impl scopeChecker {
             st.L = append(st.L, v)
             self.table.Vars = append(self.table.Vars, v)
             self.scope.Stmts = append(self.scope.Stmts, v)
-
             ret
         }
 
@@ -1376,7 +1375,6 @@ impl scopeChecker {
             errorToken: a.Setter,
         }
         checker.check()
-
         st.L = append(st.L, l.Model)
     }
 
@@ -1386,6 +1384,19 @@ impl scopeChecker {
             ret
         }
         let mut right = getDatasFromTupleData(rd)
+        if len(right) == 1 {
+            match type right[0].Model {
+            | &IndexingExprModel:
+                let mut iem = (&IndexingExprModel)(right[0].Model)
+                if iem.Expr.Kind.Map() != nil { // Is map lookup.
+                    right = [
+                        &Data{Kind: iem.Expr.Kind.Map().Val},
+                        &Data{Kind: &TypeKind{Kind: buildPrimType(PrimKind.Bool)}},
+                    ]
+                }
+            }
+        }
+
         match {
         | len(a.Left) > len(right):
             self.s.pushErr(a.Setter, LogMsg.OverflowMultiAssignIdents)
@@ -1394,6 +1405,7 @@ impl scopeChecker {
             self.s.pushErr(a.Setter, LogMsg.MissingMultiAssignIdents)
             ret
         }
+
         let mut st = &MultiAssign{
             R: rd.Model,
         }

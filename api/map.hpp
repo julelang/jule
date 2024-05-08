@@ -135,6 +135,19 @@ namespace jule
             return this->buffer.find(key) != this->end();
         }
 
+        inline void lookup(const Key &key, Value *value, jule::Bool *ok) const {
+            auto it = this->buffer.find(key);
+            if (it == this->end()) {
+                if (ok)
+                    *ok = false;
+            } else {
+                if (value)
+                    *value = it->second;
+                if (ok)
+                    *ok = true;
+            }
+        }
+
         constexpr jule::Int len(void) const noexcept
         {
             return this->buffer.size();
