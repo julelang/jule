@@ -83,6 +83,8 @@ const cppIgnore = "std::ignore"
 // Represents default expression for type.
 const cPpDefaultExpr = "{}"
 
+type PrimKind: types::TypeKind
+
 // Common group of semantic analysis expression model types and optimizer specific types.
 enum compExprModel: type {
     ExprModel: ExprModel,
@@ -183,8 +185,7 @@ impl exprCoder {
         }
     }
 
-    // fx32: 32-bit floating-point
-    fn constant(mut &self, mut c: &Const, fx32: bool) {
+    fn constant(mut &self, mut c: &Const) {
         match {
         | c.IsStr():
             self.string(c)
@@ -192,7 +193,7 @@ impl exprCoder {
             self.boolean(c)
         | c.IsF64():
             match {
-            | fx32:
+            | c.Kind == PrimKind.F32:
                 self.float32(c)
             |:
                 self.float64(c)
@@ -1052,7 +1053,7 @@ impl exprCoder {
         | &TypeKind:
             self.oc.write(typeCoder.kind((&TypeKind)(m)))
         | &Const:
-            self.constant((&Const)(m), false)
+            self.constant((&Const)(m))
         | &Var:
             self.var((&Var)(m))
         | &StructIns:
@@ -1152,7 +1153,7 @@ impl exprCoder {
 
     fn val(mut &self, mut v: &Value) {
         if v.Data.IsConst() {
-            self.constant(v.Data.Constant, v.Data.Kind != nil && v.Data.Kind.Prim().IsF32())
+            self.constant(v.Data.Constant)
             ret
         }
         self.expr(v.Data.Model)

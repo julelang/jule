@@ -1684,6 +1684,9 @@ impl Eval {
             d.Kind = t
         }
         d.untyped = false
+        if d.IsConst() {
+            d.Constant.Kind = t.Prim().Kind
+        }
 
         ret d
     }
@@ -2281,6 +2284,7 @@ impl Eval {
         match ident.Kind {
         | "Max":
             let mut c = Const.NewI64(i64(types::Max(kind)))
+            c.Kind = kind
             ret &Data{
                 Constant: c,
                 Model: c,
@@ -2288,6 +2292,7 @@ impl Eval {
             }
         | "Min":
             let mut c = Const.NewI64(i64(types::Min(kind)))
+            c.Kind = kind
             ret &Data{
                 Constant: c,
                 Model: c,
@@ -2304,6 +2309,7 @@ impl Eval {
         match ident.Kind {
         | "Max":
             let mut c = Const.NewU64(u64(types::Max(kind)))
+            c.Kind = kind
             ret &Data{
                 Constant: c,
                 Model: c,
@@ -2322,6 +2328,7 @@ impl Eval {
         match ident.Kind {
         | "Max":
             let mut c = Const.NewI64(max)
+            c.Kind = kind
             ret &Data{
                 Constant: c,
                 Model: c,
@@ -2329,6 +2336,7 @@ impl Eval {
             }
         | "Min":
             let mut c = Const.NewI64(min)
+            c.Kind = kind
             ret &Data{
                 Constant: c,
                 Model: c,
@@ -2347,6 +2355,7 @@ impl Eval {
         match ident.Kind {
         | "Max":
             let mut c = Const.NewI64(max)
+            c.Kind = kind
             ret &Data{
                 Constant: c,
                 Model: c,
@@ -2354,6 +2363,7 @@ impl Eval {
             }
         | "Min":
             let mut c = Const.NewI64(min)
+            c.Kind = kind
             ret &Data{
                 Constant: c,
                 Model: c,
@@ -2372,6 +2382,7 @@ impl Eval {
         match ident.Kind {
         | "Max":
             let mut c = Const.NewI64(max)
+            c.Kind = kind
             ret &Data{
                 Constant: c,
                 Model: c,
@@ -2379,6 +2390,7 @@ impl Eval {
             }
         | "Min":
             let mut c = Const.NewI64(min)
+            c.Kind = kind
             ret &Data{
                 Constant: c,
                 Model: c,
@@ -2397,6 +2409,7 @@ impl Eval {
         match ident.Kind {
         | "Max":
             let mut c = Const.NewI64(max)
+            c.Kind = kind
             ret &Data{
                 Constant: c,
                 Model: c,
@@ -2404,6 +2417,7 @@ impl Eval {
             }
         | "Min":
             let mut c = Const.NewI64(min)
+            c.Kind = kind
             ret &Data{
                 Constant: c,
                 Model: c,
@@ -2421,6 +2435,7 @@ impl Eval {
         match ident.Kind {
         | "Max":
             let mut c = Const.NewU64(max)
+            c.Kind = kind
             ret &Data{
                 Constant: c,
                 Model: c,
@@ -2438,6 +2453,7 @@ impl Eval {
         match ident.Kind {
         | "Max":
             let mut c = Const.NewU64(max)
+            c.Kind = kind
             ret &Data{
                 Constant: c,
                 Model: c,
@@ -2455,6 +2471,7 @@ impl Eval {
         match ident.Kind {
         | "Max":
             let mut c = Const.NewU64(max)
+            c.Kind = kind
             ret &Data{
                 Constant: c,
                 Model: c,
@@ -2472,6 +2489,7 @@ impl Eval {
         match ident.Kind {
         | "Max":
             let mut c = Const.NewU64(max)
+            c.Kind = kind
             ret &Data{
                 Constant: c,
                 Model: c,
@@ -2491,6 +2509,7 @@ impl Eval {
         match ident.Kind {
         | "Max":
             let mut c = Const.NewF64(max)
+            c.Kind = kind
             ret &Data{
                 Constant: c,
                 Model: c,
@@ -2498,6 +2517,7 @@ impl Eval {
             }
         | "Min":
             let mut c = Const.NewF64(min)
+            c.Kind = kind
             ret &Data{
                 Constant: c,
                 Model: c,
@@ -2505,6 +2525,7 @@ impl Eval {
             }
         | "SmallestNonZero":
             let mut c = Const.NewF64(smallestNonZero)
+            c.Kind = kind
             ret &Data{
                 Constant: c,
                 Model: c,
@@ -2524,6 +2545,7 @@ impl Eval {
         match ident.Kind {
         | "Max":
             let mut c = Const.NewF64(max)
+            c.Kind = kind
             ret &Data{
                 Constant: c,
                 Model: c,
@@ -2531,6 +2553,7 @@ impl Eval {
             }
         | "Min":
             let mut c = Const.NewF64(min)
+            c.Kind = kind
             ret &Data{
                 Constant: c,
                 Model: c,
@@ -2538,6 +2561,7 @@ impl Eval {
             }
         | "SmallestNonZero":
             let mut c = Const.NewF64(smallestNonZero)
+            c.Kind = kind
             ret &Data{
                 Constant: c,
                 Model: c,
@@ -3559,26 +3583,36 @@ impl binaryEval {
     }
 
     fn setTypeToGreater(mut self) {
+        let lp = self.l.Kind.Prim()
+        let rp = self.r.Kind.Prim()
         if self.l.IsConst() {
             if !self.r.IsConst() {
                 self.l.Kind = self.r.Kind
+                self.l.Constant.Kind = rp.Kind
                 ret
             }
             goto set
         }
         if self.r.IsConst() {
+            self.r.Constant.Kind = lp.Kind
             ret
         }
     set:
         if self.l.untyped && !self.r.untyped {
             self.l.Kind = self.r.Kind
+            if self.l.IsConst() {
+                self.l.Constant.Kind = rp.Kind
+            }
             self.l.untyped = false
             ret
+        } else if !self.l.untyped && self.r.untyped {
+            ret
         }
-        let lp = self.l.Kind.Prim()
-        let rp = self.r.Kind.Prim()
         if types::IsGreater(rp.Kind, lp.Kind) {
             self.l.Kind = self.r.Kind
+            if self.l.IsConst() {
+                self.l.Constant.Kind = rp.Kind
+            }
         }
     }
 
@@ -3665,6 +3699,7 @@ impl binaryEval {
         | TokenKind.Gt
         | TokenKind.GreatEq
         | TokenKind.LessEq:
+            self.setTypeToGreater()
             ret &Data{
                 Kind: &TypeKind{
                     Kind: buildPrimType(PrimKind.Bool),
@@ -3686,6 +3721,7 @@ impl binaryEval {
                 ret nil
             }
             self.mod()
+            self.setTypeToGreater()
             ret self.r
         |:
             self.e.pushErr(self.op, LogMsg.OperatorNotForFloat, self.op.Kind)
