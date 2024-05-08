@@ -112,29 +112,6 @@ namespace jule
             this->buffer.clear();
         }
 
-        jule::Slice<Key> keys(void) const noexcept
-        {
-            jule::Slice<Key> keys = jule::Slice<Key>::alloc(this->len());
-            jule::Uint index = 0;
-            for (const auto &pair : *this)
-                keys._slice[index++] = pair.first;
-            return keys;
-        }
-
-        jule::Slice<Value> values(void) const noexcept
-        {
-            jule::Slice<Value> keys = jule::Slice<Value>::alloc(this->len());
-            jule::Uint index = 0;
-            for (const auto &pair : *this)
-                keys._slice[index++] = pair.second;
-            return keys;
-        }
-
-        constexpr jule::Bool has(const Key &key) const
-        {
-            return this->buffer.find(key) != this->end();
-        }
-
         inline void lookup(const Key &key, Value *value, jule::Bool *ok) const {
             auto it = this->buffer.find(key);
             if (it == this->end()) {
