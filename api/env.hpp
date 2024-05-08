@@ -113,8 +113,8 @@ namespace jule
         char result[PATH_MAX];
         const ssize_t count = readlink("/proc/self/exe", result, PATH_MAX);
         if (count != -1)
-            return jule::Str(result);
-        return {};
+            return jule::Str(result, count);
+        return jule::Str();
 #endif
     }
 } // namespace jule
