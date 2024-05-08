@@ -49,6 +49,9 @@ fn findBuiltinFn(ident: str): &FnIns {
     | "cap":
         static mut f = &FnIns{caller: builtinCallerCap}
         ret f
+    | "delete":
+        static mut f = &FnIns{caller: builtinCallerDelete}
+        ret f
     | "clone":
         static mut f = &FnIns{caller: builtinCallerClone}
         ret f
@@ -654,6 +657,55 @@ fn builtinCallerCap(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data {
         ret callerCapSlice(dest, d)
     | dest.Kind.Prim() != nil && dest.Kind.Prim().IsStr():
         ret callerCapStr(dest, d)
+    |:
+        e.pushErr(fc.Args[0].Token, LogMsg.InvalidExpr)
+        ret nil
+    }
+}
+
+fn callerDeleteMap(mut &e: &Eval, mut &fc: &FnCallExpr, mut &expr: &Data, mut &d: &Data): &Data {
+    if !expr.Mutable {
+        e.pushErr(fc.Args[0].Token, LogMsg.MutOperationOnImmut)
+    }
+    d = buildVoidData()
+    let mut model = &BuiltinDeleteCallExprModel{
+        Dest: expr,
+    }
+    if len(fc.Args) == 2 {
+        let mut key = e.evalExpr(fc.Args[1])
+        match {
+        | key == nil:
+            ret nil
+        | key.Decl:
+            e.pushErr(fc.Args[1].Token, LogMsg.InvalidExpr)
+            ret nil
+        | !key.Kind.Equals(expr.Kind.Map().Key):
+            e.pushErr(fc.Args[1].Token, LogMsg.IncompatibleTypes, expr.Kind.Map().Key.Str(), key.Kind.Str())
+            ret nil
+        }
+        model.Key = key
+    }
+    d.Model = model
+    ret d
+}
+
+fn builtinCallerDelete(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data {
+    if len(fc.Args) < 1 {
+        e.pushErr(fc.Token, LogMsg.MissingExprFor, "map")
+        ret nil
+    }
+    if len(fc.Args) > 2 {
+        e.pushErr(fc.Args[1].Token, LogMsg.ArgumentOverflow)
+    }
+    let mut dest = e.evalExpr(fc.Args[0])
+    match {
+    | dest == nil:
+        ret nil
+    | dest.Decl:
+        e.pushErr(fc.Args[0].Token, LogMsg.InvalidExpr)
+        ret nil
+    | dest.Kind.Map() != nil:
+        ret callerDeleteMap(e, fc, dest, d)
     |:
         e.pushErr(fc.Args[0].Token, LogMsg.InvalidExpr)
         ret nil

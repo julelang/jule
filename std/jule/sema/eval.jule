@@ -2276,54 +2276,6 @@ impl Eval {
         }
     }
 
-    fn evalMapSubIdent(mut self, mut d: &Data, mut ident: &Token): &Data {
-        let mut mapKind = d.Kind.Map()
-
-        match ident.Kind {
-        | "clear":
-            ret &Data{
-                Mutable: d.Mutable,
-                Kind: &TypeKind{
-                    Kind: &FnIns{
-                        caller: builtinCallerCommonMut,
-                    },
-                },
-                Model: &CommonSubIdentExprModel{
-                    Token: ident,
-                    ExprKind: d.Kind,
-                    Expr: d.Model,
-                    Ident: "clear",
-                },
-            }
-        | "del":
-            ret &Data{
-                Mutable: d.Mutable,
-                Kind: &TypeKind{
-                    Kind: &FnIns{
-                        caller: builtinCallerCommonMut,
-                        Params: [
-                            &ParamIns{
-                                Decl: &Param{
-                                    Ident: "key",
-                                },
-                                Kind: mapKind.Key,
-                            },
-                        ],
-                    },
-                },
-                Model: &CommonSubIdentExprModel{
-                    Token: ident,
-                    ExprKind: d.Kind,
-                    Expr: d.Model,
-                    Ident: "del",
-                },
-            }
-        |:
-            self.pushErr(ident, LogMsg.ObjHaveNotIdent, mapKind.Str(), ident.Kind)
-            ret nil
-        }
-    }
-
     fn evalIntTypeStatic(mut self, ident: &Token): &Data {
         const kind: str = PrimKind.Int
         match ident.Kind {
@@ -2679,8 +2631,6 @@ impl Eval {
             ret self.evalSliceSubIdent(d, si.Ident)
         | kind.Arr() != nil:
             ret self.evalArraySubIdent(d, si.Ident)
-        | kind.Map() != nil:
-            ret self.evalMapSubIdent(d, si.Ident)
         }
         self.pushErr(si.Ident, LogMsg.ObjNotSupportSubFields, d.Kind.Str())
         ret nil

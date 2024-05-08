@@ -53,6 +53,7 @@ use std::jule::sema::{
     BuiltinCopyCallExprModel,
     BuiltinLenCallExprModel,
     BuiltinCapCallExprModel,
+    BuiltinDeleteCallExprModel,
     SizeofExprModel,
     AlignofExprModel,
     RuneExprModel,
@@ -875,6 +876,17 @@ impl exprCoder {
         self.oc.write(".cap()")
     }
 
+    fn deleteCall(mut &self, mut m: &BuiltinDeleteCallExprModel) {
+        self.model(m.Dest.Model)
+        if m.Key != nil {
+            self.oc.write(".del(")
+            self.model(m.Key.Model)
+            self.oc.write(")")
+        } else {
+            self.oc.write(".clear()")
+        }
+    }
+
     fn makeCallSlice(mut &self, mut &m: &BuiltinMakeCallExprModel) {
         let mut slice = m.Kind.Slc()
         self.oc.write(typeCoder.kind(m.Kind))
@@ -1109,6 +1121,8 @@ impl exprCoder {
             self.lenCall((&BuiltinLenCallExprModel)(m))
         | &BuiltinCapCallExprModel:
             self.capCall((&BuiltinCapCallExprModel)(m))
+        | &BuiltinDeleteCallExprModel:
+            self.deleteCall((&BuiltinDeleteCallExprModel)(m))
         | &SizeofExprModel:
             self.sizeof((&SizeofExprModel)(m))
         | &AlignofExprModel:

@@ -33,6 +33,7 @@ use std::jule::sema::{
     BuiltinCloneCallExprModel,
     BuiltinLenCallExprModel,
     BuiltinCapCallExprModel,
+    BuiltinDeleteCallExprModel,
     SizeofExprModel,
     AlignofExprModel,
     IntegratedToStrExprModel,
@@ -194,6 +195,13 @@ impl exprDeadCode {
         self.optimize(m.Expr)
     }
 
+    fn deleteCall(self, mut m: &BuiltinDeleteCallExprModel) {
+        self.optimize(m.Dest.Model)
+        if m.Key != nil {
+            self.optimize(m.Key.Model)
+        }
+    }
+
     fn sizeof(self, mut m: &SizeofExprModel) {
         self.optimize(m.Expr)
     }
@@ -270,6 +278,8 @@ impl exprDeadCode {
             self.capCall((&BuiltinCapCallExprModel)(model))
         | &BuiltinCloneCallExprModel:
             self.cloneCall((&BuiltinCloneCallExprModel)(model))
+        | &BuiltinDeleteCallExprModel:
+            self.deleteCall((&BuiltinDeleteCallExprModel)(model))
         | &SizeofExprModel:
             self.sizeof((&SizeofExprModel)(model))
         | &AlignofExprModel:
