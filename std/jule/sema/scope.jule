@@ -1380,64 +1380,12 @@ impl scopeChecker {
         st.L = append(st.L, l.Model)
     }
 
-    fn checkRetMultiAssign(mut &self, mut &a: &AssignSt) {
+    fn checkMultiAssign(mut &self, mut &a: &AssignSt) {
         let mut rd = self.s.eval(self).evalExpr(a.Right)
         if rd == nil {
             ret
         }
-
-        let mut r = getDatasFromTupleData(rd)
-
-        match {
-        | len(a.Left) > len(r):
-            self.s.pushErr(a.Setter, LogMsg.OverflowMultiAssignIdents)
-            ret
-        | len(a.Left) < len(r):
-            self.s.pushErr(a.Setter, LogMsg.MissingMultiAssignIdents)
-            ret
-        }
-
-        let mut st = &MultiAssign{
-            R: rd.Model,
-        }
-
-        if rd.Kind.Tup() == nil {
-            st.R = &TupleExprModel{Datas: r}
-        }
-
-        for i in a.Left {
-            let mut lexpr = a.Left[i]
-            let mut l: &Data = nil
-
-            if !IsIgnoreIdent(lexpr.Ident) &&
-                (!a.Declarative || !self.isNewAssignIdent(lexpr.Ident)) {
-                l = self.s.eval(self).evalExpr(lexpr.Expr)
-                if l == nil {
-                    continue
-                }
-            }
-
-            self.processEndPartOfMultiAssign(st, a, lexpr, l, r[i])
-        }
-
-        self.scope.Stmts = append(self.scope.Stmts, st)
-    }
-
-    fn checkMultiAssign(mut &self, mut &a: &AssignSt) {
-        match type a.Right.Kind {
-        | &FnCallExpr:
-            self.checkRetMultiAssign(a)
-            ret
-        | &UnsafeExpr:
-            match type (&UnsafeExpr)(a.Right.Kind).Expr.Kind {
-            | &FnCallExpr:
-                self.checkRetMultiAssign(a)
-                ret
-            }
-        }
-
-        let mut right = getExprModels(a.Right.Kind)
-
+        let mut right = getDatasFromTupleData(rd)
         match {
         | len(a.Left) > len(right):
             self.s.pushErr(a.Setter, LogMsg.OverflowMultiAssignIdents)
@@ -1446,17 +1394,12 @@ impl scopeChecker {
             self.s.pushErr(a.Setter, LogMsg.MissingMultiAssignIdents)
             ret
         }
-
-        let mut rightTuple = new(TupleExprModel)
-
         let mut st = &MultiAssign{
-            R: rightTuple,
+            R: rd.Model,
         }
-
         for i in a.Left {
             let mut lexpr = a.Left[i]
             let mut l: &Data = nil
-
             if !IsIgnoreIdent(lexpr.Ident) &&
                 (!a.Declarative || !self.isNewAssignIdent(lexpr.Ident)) {
                 l = self.s.eval(self).evalExpr(lexpr.Expr)
@@ -1464,27 +1407,9 @@ impl scopeChecker {
                     continue
                 }
             }
-
-            let mut expr = &Expr{
-                Kind: right[i],
-                Token: a.Right.Token,
-            }
-            let mut eval: &Eval = nil
-            if l != nil {
-                eval = self.s.evalp(self, l.Kind)
-            } else {
-                eval = self.s.eval(self)
-            }
-            let mut r = eval.evalExpr(expr)
-            if r == nil {
-                continue
-            }
-
-            rightTuple.Datas = append(rightTuple.Datas, r)
-
+            let mut r = right[i]
             self.processEndPartOfMultiAssign(st, a, lexpr, l, r)
         }
-
         self.scope.Stmts = append(self.scope.Stmts, st)
     }
 
