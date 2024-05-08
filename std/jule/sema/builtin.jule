@@ -679,9 +679,12 @@ fn callerDeleteMap(mut &e: &Eval, mut &fc: &FnCallExpr, mut &expr: &Data, mut &d
         | key.Decl:
             e.pushErr(fc.Args[1].Token, LogMsg.InvalidExpr)
             ret nil
-        | !key.Kind.Equals(expr.Kind.Map().Key):
-            e.pushErr(fc.Args[1].Token, LogMsg.IncompatibleTypes, expr.Kind.Map().Key.Str(), key.Kind.Str())
-            ret nil
+        |:
+            const Reference = false
+            let mut keyType = expr.Kind.Map().Key
+            if !e.s.checkAssignType(Reference, keyType, key, fc.Args[1].Token) {
+                ret nil
+            }
         }
         model.Key = key
     }
