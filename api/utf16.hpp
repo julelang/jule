@@ -46,8 +46,8 @@ namespace jule
             r1 < jule::UTF16_SURR2 &&
             jule::UTF16_SURR2 <= r2 &&
             r2 < jule::UTF16_SURR3)
-            return (r1 - jule::UTF16_SURR1) << 10 |
-                   (r2 - jule::UTF16_SURR2) + jule::UTF16_SURR_SELF;
+            return ((r1 - jule::UTF16_SURR1) << 10) |
+                   ((r2 - jule::UTF16_SURR2) + jule::UTF16_SURR_SELF);
 
         return jule::UTF16_REPLACEMENT_CHAR;
     }
@@ -113,7 +113,7 @@ namespace jule
 
         r -= jule::UTF16_SURR_SELF;
         return std::make_tuple(
-            jule::UTF16_SURR1 + (r >> 10) & 0x3ff, jule::UTF16_SURR2 + r & 0x3ff);
+            jule::UTF16_SURR1 + ((r >> 10) & 0x3ff), jule::UTF16_SURR2 + (r & 0x3ff));
     }
 
     std::vector<jule::U16> utf16_encode(const std::vector<jule::I32> &runes) noexcept
@@ -158,7 +158,7 @@ namespace jule
 
     void utf16_append_rune(std::vector<jule::U16> &a, const jule::I32 &r) noexcept
     {
-        if (0 <= r && r < jule::UTF16_SURR1 | jule::UTF16_SURR3 <= r && r < jule::UTF16_SURR_SELF)
+        if ((0 <= r && r < jule::UTF16_SURR1) || (jule::UTF16_SURR3 <= r && r < jule::UTF16_SURR_SELF))
         {
             a.push_back(static_cast<jule::U16>(r));
             return;
