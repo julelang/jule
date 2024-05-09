@@ -26,25 +26,21 @@ Some commits may not be fully honored due to some compiler/API errors.
 Please report it with the [Jule Issue Tracker](https://github.com/julelang/jule/issues) if you come across something like this.
 You can also [join the Discord community](https://discord.gg/XNSUUDuGGQ) to discuss, helping, and ask more questions about Jule with the community.
 
-![image](https://github.com/julelang/jule/assets/54983926/c2075b04-c077-4933-a6ba-4100c717cf7d)
+### Key Features
 
-## The Mission
+- Optimized for fast and safe programs
+- Empowered compile-time: evalutation of constants, zero runtime-cost generics
+- Hands-free deterministic memory management with reference-counting, manual memory management is optional
+- Easy cross compilation, generate IR for target platform and imitate target architecture
+- Cross platform implemented standard library
+- Built-in support to write tests
+- Built-in support for concurrent programming, empowered by standard library
+- Easy error-handling with exceptionals, very like optional types
+- Easy low-level programming
+- High interoperability with C, C++, Objective-C and Objective-C++
+- Disable variable shadowing by default, boundary checking, no uninitialized memory
 
-The mission is to develop a reliable and safe programming language that focuses on systems programming. While doing this, performance should not be compromised too much. Jule should be a balanced language that keeping the cost to a minimum for safety purposes. Even if it is a new language design, the popular C and C++ languages, which are frequently used in system programming, should not be ignored. Therefore, good interoperability support should be provided for these languages.
-
-To be safe, Jule should adopt approaches that serve the purpose in a balanced way, rather than having a design that contains a lot of complexity in the language. It should be a language that is significantly safe as well as being satisfactorily efficient and performant for developers.
-
-- **Simplicity and Maintainability**: Jule's design should to be such that it avoids imposing constraints that increase time costs of developers, or having to think about the rules they must frequently follow when designing their algorithms. As much as possible, Jule's safety design and experience should be such that it prevents developers from thinking the way Jule wants them to and not the way they do. Design choices for safety or performance must be made without adding significant complexity to the Jule at the same time.
-
-- **Safety**: Jule code must be safe at both compile time and runtime. This requires measures such as bounds checking and nil dereferencing checking at compile time and runtime. Jule also should adopt immutability and disallow shadowing by default as safety measures. Anything that might be unsafe should be blocked or checked. If unsafe behavior is desired, this should be clearly stated and awareness should be made.
-
-- **Efficiency and Performance**: To be efficient, Jule should try to behave in a way that uses the least memory consumption. In addition, it should be high-performance and be able to create fast software. Instead of relying entirely on the backend compiler that will be used when the IR is created, it should have an optimizing reference compiler to generate the best IR.
-
-- **High C/C++ Interoperability**: C and C++ are languages ​​that are popular in system programming, widely used and have a wide ecosystem. Therefore, Jule should embrace and collaborate with the existing ecosystem rather than completely ignoring it. Jule developers should also be able to use and interoperate with C/C++ within Jule if they wish. Therefore, Jule is compiled by creating C++ IR. It supports different compilers such as Clang, GNU GCC. It has an API developed in C++ to make things easier for Jule developers and make things more standardized.
-
-- **Compile Time**: Jule should have a good compile time that serves the mission. For this, it must have capabilities such as having compile-time constants, avoiding repetitive checks by checking generics once for each instance, and performing safety-related checks whenever possible. The compiler should support developers with safety checks at compile-time and give some optimization options such as constant evaluations.
-
-- **Brand-New**: Jule should be like a truly brand-new language. For example, it should have UTF-8 strings, support Unicode and type inference, and a cross-platform portable standard library. Unless the developer really wants to do platform specific programming, shouldn't worry about the portability of the standard library, should have Unicode support and a common standard like UTF-8 should be easy to handle.
+![image](https://github.com/julelang/jule/assets/54983926/e8b28748-9212-4db8-9f7b-0b0d33dc878b)
 
 ## Community
 
