@@ -30,15 +30,16 @@ You can also [join the Discord community](https://discord.gg/XNSUUDuGGQ) to disc
 
 - Optimized for fast and safe programs
 - Empowered compile-time: evalutation of constants, zero runtime-cost generics
-- Hands-free deterministic memory management with reference-counting, manual memory management is optional
-- Easy cross compilation, generate IR for target platform and imitate target architecture
+- Hands-free deterministic memory management with reference-counting, manual management is optional
+- [Easy cross compilation](https://manual.jule.dev/compiler/cross-compilation), generate IR for target platform and imitate target architecture
 - Cross platform implemented standard library
 - Built-in support to write tests
-- Built-in support for concurrent programming, empowered by standard library
-- Easy error-handling with exceptionals, very like optional types
+- Built-in support for [concurrent programming](https://manual.jule.dev/concurrency/), empowered by standard library
+- Easy error-handling with [exceptionals](https://manual.jule.dev/error-handling/exceptionals), very like optional types
 - Easy low-level programming
-- High interoperability with C, C++, Objective-C and Objective-C++
-- Disable variable shadowing by default, boundary checking, no uninitialized memory
+- High [interoperability](https://manual.jule.dev/integrated-jule/interoperability/) with C, C++, Objective-C and Objective-C++
+- Disable variable shadowing by default, immutability by default, boundary checking, no uninitialized memory
+- The [API](https://manual.jule.dev/api/) written in C++ and allows extend Jule thanks to interoperability
 
 ![image](https://github.com/julelang/jule/assets/54983926/e8b28748-9212-4db8-9f7b-0b0d33dc878b)
 
