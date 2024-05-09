@@ -17,7 +17,7 @@
 #define __JULE_CO_SPAWN(ROUTINE) \
     (std::thread{ROUTINE})
 #define __JULE_CO(EXPR) \
-    (__JULE_CO_SPAWN([&](void) mutable -> void { EXPR; }).detach())
+    (__JULE_CO_SPAWN([=](void) mutable -> void { EXPR; }).detach())
 
 namespace jule
 {
