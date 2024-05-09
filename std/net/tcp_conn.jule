@@ -22,6 +22,10 @@ impl TcpConn {
     // The number of bytes readed can never exceed the length of the buffer.
     // If the buffer is larger than the number of bytes that can be read,
     // the buffer will not cause an overflow.
+    // It will panic if connection is closed.
+    // If connection is closed by server, it returns zero and sets connection
+    // state as closed. So if you try read again, function will panic because of
+    // connection state is closed.
     // All exceptionals are error code of implementation.
     fn Read(mut self, mut buf: []byte)!: int {
         if self.handle == sys::INVALID_SOCKET {
@@ -59,10 +63,9 @@ impl TcpConn {
 
     // Closes connection.
     // All exceptionals are error code of implementation.
-    // Panics if connection is already closed.
     fn Close(mut self)! {
         if self.handle == sys::INVALID_SOCKET {
-            panic("std::net: Conn.Close: connection is already closed")
+            ret
         }
         if !closeSocket(self.handle) {
             error(lastErrorCode())
