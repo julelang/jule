@@ -1827,6 +1827,14 @@ impl Eval {
             self.pushErr(fc.Token, LogMsg.MissingExprFor, "v")
         } else if len(fc.Args) > 1 {
             self.pushErr(fc.Args[1].Token, LogMsg.ArgumentOverflow)
+        } else if fc.IsCo {
+            self.pushErr(fc.Token, LogMsg.CoForCastingCall)
+            d = nil
+            ret
+        } else if fc.Exception != nil {
+            self.pushErr(fc.Token, LogMsg.TypeCallWithExceptional)
+            d = nil
+            ret
         }
 
         if len(fc.Args) > 0 {
@@ -1853,8 +1861,15 @@ impl Eval {
             ret
         }
         for _, p in f.Params {
+            if p.Decl.IsSelf() {
+                if !p.Decl.IsRef() {
+                    self.pushErr(errorToken, LogMsg.ConcurrenctCallWithSelfParam)
+                    self.pushSugggestion(LogMsg.UseUnsafeJuleToCallCoSelf)
+                }
+            }
             if p.Decl.Reference {
                 self.pushErr(errorToken, LogMsg.ConcurrenctCallWithRefParam)
+                self.pushSugggestion(LogMsg.UseUnsafeJuleToCallCo)
                 ret
             }
         }
@@ -1992,11 +2007,16 @@ impl Eval {
             Func: f,
             Expr: callModel,
             Args: fcac.argModels,
+            IsCo: fc.IsCo,
         }
         d.Model = model
         d.Mutable = true
 
         if f.Decl.Exceptional {
+            if fc.IsCo {
+                self.s.pushErr(fc.Token, LogMsg.CoForExceptional)
+                self.s.pushSugggestion(LogMsg.HandleInFn)
+            }
             match {
             | fc.Unhandled():
                 self.pushErr(fc.Token, LogMsg.UnhandledExceptional)
@@ -2010,6 +2030,10 @@ impl Eval {
             }
         } else if !fc.Unhandled() {
             self.pushErr(fc.Token, LogMsg.HandledUnexceptional)
+        }
+
+        if fc.IsCo {
+            self.checkFnOfConcurrentCall(model.Func, fc.Token)
         }
     }
 

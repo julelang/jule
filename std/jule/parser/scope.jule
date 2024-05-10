@@ -26,7 +26,6 @@ use std::jule::ast::{
     LabelSt,
     AssignLeft,
     AssignSt,
-    CoExpr,
     UseExpr,
     Stmt,
     StmtData,
@@ -558,13 +557,20 @@ impl scopeParser {
         ret chain
     }
 
-    fn buildCoCallSt(mut self, mut tokens: []&Token): &CoExpr {
-        let mut c = &CoExpr{
-            Token: tokens[0],
-        }
+    fn buildCoCallSt(mut self, mut tokens: []&Token): &Expr {
+        let token = tokens[0]
         tokens = tokens[1:] // Start 1 to skip "co" token.
-        c.Expr = self.p.buildExpr(tokens)
-        ret c
+        let mut e = self.p.buildExpr(tokens)
+        if e == nil {
+            ret e
+        }
+        match type e.Kind {
+        | &FnCallExpr:
+            (&FnCallExpr)(e.Kind).IsCo = true
+        |:
+            self.pushErr(token, LogMsg.ExprNotFnCall)
+        }
+        ret e
     }
 
     fn buildGotoSt(mut self, mut &tokens: []&Token): &GotoSt {

@@ -18,7 +18,6 @@ use ast for std::jule::ast::{
     UnsafeExpr,
     AssignLeft,
     MatchCase,
-    CoExpr,
     UseExpr,
     ExprData,
     StmtData,
@@ -810,30 +809,6 @@ impl scopeChecker {
             self.scope.Stmts = append(self.scope.Stmts, d)
         |:
             self.s.pushErr(expr.Token, LogMsg.InvalidSyntax)
-        }
-    }
-
-    fn checkCoExpr(mut &self, mut expr: &CoExpr) {
-        let mut eval = self.s.eval(self)
-        eval.ignored = true
-        let mut d = eval.evalExpr(expr.Expr)
-        if d == nil {
-            ret
-        }
-
-        match type d.Model {
-        | &FnCallExprModel:
-            let mut model = (&FnCallExprModel)(d.Model)
-            if model.Func.Decl.Exceptional {
-                self.s.pushErr(expr.Token, LogMsg.CoForExceptional)
-                self.s.pushSugggestion(LogMsg.HandleInFn)
-            }
-            model.IsCo = true
-            eval.checkFnOfConcurrentCall(model.Func, expr.Expr.Token)
-            self.scope.Stmts = append(self.scope.Stmts, d)
-        |:
-            self.s.pushErr(expr.Token, LogMsg.ExprNotFnCall)
-            ret
         }
     }
 
@@ -1801,8 +1776,6 @@ impl scopeChecker {
             self.checkTypeAliasDecl((&TypeAliasDecl)(node))
         | &Expr:
             self.checkExpr((&Expr)(node))
-        | &CoExpr:
-            self.checkCoExpr((&CoExpr)(node))
         | &ast::Conditional:
             self.checkConditional((&ast::Conditional)(node))
         | &Iter:

@@ -88,6 +88,7 @@ type PrimKind: types::TypeKind
 // Common group of semantic analysis expression model types and optimizer specific types.
 enum compExprModel: type {
     ExprModel: ExprModel,
+    str, // For built-in expressions.
     &UnsafeBinopExprModel,
     &UnsafeIndexingExprModel,
     &MutSlicingExprModel,
@@ -460,9 +461,6 @@ impl exprCoder {
 
     fn pureFuncCall(mut &self, mut &m: &FnCallExprModel) {
         let wrapped = self.isWrapped(m)
-        if m.IsCo {
-            self.oc.write("__JULE_CO(")
-        }
         self.modelForCall(m.Expr)
         if !m.Func.IsBuiltin() {
             if m.Func.Decl.CppLinked && len(m.Func.Generics) > 0 {
@@ -531,13 +529,63 @@ impl exprCoder {
         if wrapped {
             self.oc.write("; })")
         }
+    }
 
-        if m.IsCo {
-            self.oc.write(")")
+    fn coFuncCall(mut &self, mut &m: &FnCallExprModel) {
+        self.oc.write("{\n")
+        self.oc.addIndent()
+        let mut head = "std::thread(["
+        if m.Func.Owner != nil {
+            head += identCoder.Self
+            if len(m.Args) > 0 {
+                head += ", "
+            }
         }
+        for i, arg in m.Args {
+            if i > 0 {
+                head += ", "
+            }
+            match type arg {
+            | &Var:
+                let mut v = (&Var)(arg)
+                head += identCoder.var(v)
+                continue
+            }
+            let name = "_co_arg_" + conv::Itoa(i)
+            head += name
+            self.oc.indent()
+            self.oc.write(typeCoder.kind(m.Func.Params[i].Kind))
+            self.oc.write(" ")
+            if m.Func.Params[i].Decl.Reference {
+                self.oc.write("&")
+            }
+            self.oc.write(name)
+            self.oc.write(" = ")
+            self.expr(arg)
+            self.oc.write(";\n")
+            let argS: any = name
+            m.Args[i] = unsafe { *(*ExprModel)(&argS) }
+        }
+        self.oc.indent()
+        self.oc.write(head)
+        self.oc.write("](void) mutable -> void {\n")
+        self.oc.addIndent()
+        self.oc.indent()
+        self.pureFuncCall(m)
+        self.oc.write(";\n")
+        self.oc.doneIndent()
+        self.oc.indent()
+        self.oc.write("}).detach();\n")
+        self.oc.doneIndent()
+        self.oc.indent()
+        self.oc.write("}")
     }
 
     fn funcCall(mut &self, mut m: &FnCallExprModel) {
+        if m.IsCo {
+            self.coFuncCall(m)
+            ret
+        }
         if m.Func.IsBuiltin() ||
             !m.Func.Decl.Exceptional ||
             m.Except != nil && len(m.Except.Stmts) == 0 {
@@ -1050,6 +1098,8 @@ impl exprCoder {
 
     fn model(mut &self, mut m: compExprModel) {
         match type m {
+        | str:
+            self.oc.write(str(m))
         | &TypeKind:
             self.oc.write(typeCoder.kind((&TypeKind)(m)))
         | &Const:
