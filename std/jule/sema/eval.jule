@@ -1639,6 +1639,15 @@ impl Eval {
         d.Constant = nil
     }
 
+    fn castTypeEnumT(mut self, mut &t: &TypeKind, mut &d: &Data, mut &errorToken: &Token) {
+        let n = len(self.s.errors)
+        if !self.s.checkTypeCompatibility(t, d.Kind, errorToken) {
+            self.s.errors = self.s.errors[:n]
+            self.pushErr(errorToken, LogMsg.TypeNotSupportsCastingTo, d.Kind.Str(), t.Str())
+        }
+        d.Constant = nil
+    }
+
     fn evalCastByTypeNData(mut self, mut t: &TypeKind, mut d: &Data, mut errorToken: &Token): &Data {
         if d != nil && d.Decl {
             self.pushErr(errorToken, LogMsg.InvalidExpr)
@@ -1661,6 +1670,8 @@ impl Eval {
             d.Constant = nil
         | d.Kind.TypeEnum() != nil:
             self.castTypeEnum(t, d, errorToken)
+        | t.TypeEnum() != nil:
+            self.castTypeEnumT(t, d, errorToken)
         | t.Ptr() != nil:
             self.castPtr(t, d, errorToken)
         | t.Sptr() != nil:
