@@ -108,14 +108,16 @@ fn internetAddr(&net: Network, mut ip: Ip, port: int, zone: str): Addr {
     match net {
     | Network.Tcp | Network.Tcp4 | Network.Tcp6:
         ret &TcpAddr{Ip: ip, Port: port, Zone: zone}
+    | Network.Udp | Network.Udp4 | Network.Udp6:
+        ret &UdpAddr{Ip: ip, Port: port, Zone: zone}
     |:
         panic("unexpected network: " + str(net))
     }
 }
 
 enum ipAddr: type {
-    Ip: Ip,
-    &TcpAddr,
+    Ip,
+    TcpAddr,
 }
 
 // Parses addr as an IP address, returning the result. The string
@@ -150,7 +152,8 @@ fn resolveInternetAddr(&net: Network, &addr: str)!: Addr {
     let (mut host, mut port) = "", ""
     let mut portnum = 0
     match net {
-    | Network.Tcp | Network.Tcp4 | Network.Tcp6:
+    | Network.Tcp | Network.Tcp4 | Network.Tcp6
+    | Network.Udp | Network.Udp4 | Network.Udp6:
         host, port = SplitHostPort(addr) else { error(error) }
         let ((portnum), ok) = conv::Atoi(port)
         if !ok {
@@ -168,50 +171,94 @@ fn resolveInternetAddr(&net: Network, &addr: str)!: Addr {
     let mut ip = parseAddr(host) else { error(error) }
     match type ip {
     | Ip:
-        if net == Network.Tcp6 {
+        match net {
+        | Network.Tcp6 | Network.Udp6:
             ret nil
+        | Network.Tcp | Network.Tcp4:
+            ret &TcpAddr{
+                Ip: (Ip)(ip),
+                Port: portnum,
+            }
+        | Network.Udp | Network.Udp4:
+            ret &UdpAddr{
+                Ip: (Ip)(ip),
+                Port: portnum,
+            }
+        |:
+            panic("implementation bug, this panic should be unreachable")
         }
-        ret &TcpAddr{
-            Ip: (Ip)(ip),
-            Port: portnum,
-        }
-    | &TcpAddr:
-        let mut tcpAddr = (&TcpAddr)(ip)
+    | TcpAddr:
+        let mut ipAddr = (TcpAddr)(ip)
         match net {
         | Network.Tcp:
-            tcpAddr.Port = portnum
-            ret tcpAddr
+            ipAddr.Port = portnum
+            ret new(TcpAddr, ipAddr)
+        | Network.Udp:
+            ret &UdpAddr{
+                Ip: ipAddr.Ip,
+                Zone: ipAddr.Zone,
+                Port: portnum,
+            }
         | Network.Tcp4:
-            if tcpAddr.Ip.To4().Empty() {
-                ret nil
+            if !ipAddr.Ip.To4().Empty() {
+                ipAddr.Port = portnum
+                ret new(TcpAddr, ipAddr)
             }
-            tcpAddr.Port = portnum
-            ret tcpAddr
+        | Network.Udp4:
+            if !ipAddr.Ip.To4().Empty() {
+                ret &UdpAddr{
+                    Ip: ipAddr.Ip,
+                    Zone: ipAddr.Zone,
+                    Port: portnum,
+                }
+            }
         | Network.Tcp6:
-            if len(tcpAddr.Ip.Addr) == Ipv6.Len && tcpAddr.Ip.To4().Empty() {
-                tcpAddr.Port = portnum
-                ret tcpAddr
+            if len(ipAddr.Ip.Addr) == Ipv6.Len && ipAddr.Ip.To4().Empty() {
+                ipAddr.Port = portnum
+                ret new(TcpAddr, ipAddr)
             }
-            ret nil
-        |:
-            ret nil
+        | Network.Udp6:
+            if len(ipAddr.Ip.Addr) == Ipv6.Len && ipAddr.Ip.To4().Empty() {
+                ret &UdpAddr{
+                    Ip: ipAddr.Ip,
+                    Zone: ipAddr.Zone,
+                    Port: portnum,
+                }
+            }
         }
-    |:
-        ret nil
     }
+    ret nil
 }
 
 fn buildLocalhostAddr(&net: Network, port: int): Addr {
-    if net == Network.Tcp || net == Network.Tcp4 {
+    match net {
+    | Network.Tcp | Network.Tcp4:
         ret &TcpAddr{
             Ip: Ipv4.Addr(127, 0, 0, 1),
             Port: port,
         }
+    | Network.Udp | Network.Udp4:
+        ret &UdpAddr{
+            Ip: Ipv4.Addr(127, 0, 0, 1),
+            Port: port,
+        }
     }
-    let mut addr = make([]byte, Ipv6.Len)
-    addr[len(addr)-1] = 1
-    ret &TcpAddr{
-        Ip: Ip{Addr: addr},
-        Port: port,
+    match net {
+    | Network.Tcp6:
+        let mut addr = make([]byte, Ipv6.Len)
+        addr[len(addr)-1] = 1
+        ret &TcpAddr{
+            Ip: Ip{Addr: addr},
+            Port: port,
+        }
+    | Network.Udp6:
+        let mut addr = make([]byte, Ipv6.Len)
+        addr[len(addr)-1] = 1
+        ret &UdpAddr{
+            Ip: Ip{Addr: addr},
+            Port: port,
+        }
+    |:
+        panic("implementation bug, this panic should be unreachable")
     }
 }

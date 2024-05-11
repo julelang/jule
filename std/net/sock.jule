@@ -8,6 +8,9 @@ use sys for std::sys
 // Listens the address on the named network.
 // It will forward any exceptional from network connectors.
 //
+// For UDP network, the [ListenUDP] function should be used.
+// If the network parameter is points udp network, function will panic.
+//
 // See the [Connect] function for a description of the network and addr parameters.
 fn Listen(network: Network, addr: str)!: Listener {
     match network {
@@ -16,6 +19,15 @@ fn Listen(network: Network, addr: str)!: Listener {
     |:
         error(AddrError.UnknownNetwork)
     }
+}
+
+// Listens the address on the named network.
+// It will forward any exceptional from network connectors.
+// Just for UDP networks.
+//
+// See the [Connect] function for a description of the network and addr parameters.
+fn ListenUDP(network: Network, addr: str)!: &UdpConn {
+    ret udpBind(network, addr) else { error(error) }
 }
 
 // Connects to the address on the named network.
@@ -39,16 +51,36 @@ fn Listen(network: Network, addr: str)!: Listener {
 //  for empty addresses and try for IPv4 if possible. If address is IPv4 or IPv6 which
 //  is converted to IPv4 successfully, will use Tcp4, otherwise IPv6 and Tcp6 preferred.
 //
+// For UDP:
+//  The address has the form "host:port".
+//  The host must be a literal IP address, or a host name that can be
+//  resolved to IP addresses such as "localhost".
+//  The port must be a literal port number or a service name.
+//  If the host is a literal IPv6 address it must be enclosed in brackets,
+//  as in "[2001:db8::1]:80" or "[fe80::1%zone]:80".
+//  The zone specifies the scope of the literal IPv6 address as defined
+//  in RFC 4007. The functions [JoinHostPort] and [SplitHostPort] manipulate
+//  a pair of host and port in this form.
+//
+//  If network is Udp4, it will accept only IPv4 addresses and if address is IPv6,
+//  will try to convert IPv4. If network is Udp6, it will accept only IPv6 address and
+//  address is IPv4, will not try to convert IPv6. If network is Udp, it will use Udp4
+//  for empty addresses and try for IPv4 if possible. If address is IPv4 or IPv6 which
+//  is converted to IPv4 successfully, will use Udp4, otherwise IPv6 and Udp6 preferred.
+//
 // It will forward any exceptional from network connectors.
 fn Connect(network: Network, addr: str)!: Conn {
     ret ConnectTimeout(network, addr, 0) else { error(error) }
 }
 
 // Same as Connect, but uses timeout.
+// For UDP networks, timeout will be ignored.
 fn ConnectTimeout(network: Network, addr: str, timeout: time::DurInt)!: Conn {
     match network {
     | Network.Tcp | Network.Tcp4 | Network.Tcp6:
         ret tcpConnect(network, addr, timeout) else { error(error) }
+    | Network.Udp | Network.Udp4 | Network.Udp6:
+        ret udpConnect(network, addr) else { error(error) }
     |:
         error(AddrError.UnknownNetwork)
     }

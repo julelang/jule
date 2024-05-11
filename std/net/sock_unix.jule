@@ -83,3 +83,37 @@ lookup:
     }
     openSocketBlockingMode(handle) else { error(error) }
 }
+
+fn recvfrom(&conn: UdpConn, mut &buf: []byte)!: int {
+    if conn.v6 {
+        let addrLen = addrLen(mem::SizeOf(conn.sockaddr6))
+        let n = unsafe { sys::Recvfrom(conn.handle, &buf[0], uint(len(buf)), 0, (*sys::Sockaddr)(&conn.sockaddr6), &addrLen) }
+        if n >= 0 {
+            ret int(n)
+        }
+    } else {
+        let addrLen = addrLen(mem::SizeOf(conn.sockaddr4))
+        let n = unsafe { sys::Recvfrom(conn.handle, &buf[0], uint(len(buf)), 0, (*sys::Sockaddr)(&conn.sockaddr4), &addrLen) }
+        if n >= 0 {
+            ret int(n)
+        }
+    }
+    error(lastErrorCode())
+}
+
+fn sendto(&conn: UdpConn, &buf: []byte)!: int {
+    if conn.v6 {
+        let addrLen = addrLen(mem::SizeOf(conn.sockaddr6))
+        let n = unsafe { sys::Sendto(conn.handle, &buf[0], uint(len(buf)), 0, (*sys::Sockaddr)(&conn.sockaddr6), addrLen) }
+        if n >= 0 {
+            ret int(n)
+        }
+    } else {
+        let addrLen = addrLen(mem::SizeOf(conn.sockaddr4))
+        let n = unsafe { sys::Sendto(conn.handle, &buf[0], uint(len(buf)), 0, (*sys::Sockaddr)(&conn.sockaddr4), addrLen) }
+        if n >= 0 {
+            ret int(n)
+        }
+    }
+    error(lastErrorCode())
+}
