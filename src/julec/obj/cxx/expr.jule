@@ -1210,7 +1210,7 @@ impl exprCoder {
     }
 
     fn initExpr(mut &self, mut t: &TypeKind) {
-        if t.Ptr() != nil {
+        if t.NilCompatible() {
             self.oc.write("nullptr")
             ret
         }
@@ -1219,8 +1219,19 @@ impl exprCoder {
             self.val(enm.Items[0].Value)
             ret
         }
-        let s = t.Struct()
-        if s != nil && s.Decl.CppLinked {
+        let prim = t.Prim()
+        if prim != nil {
+            if types::IsNum(prim.Kind) {
+                self.oc.write("0")
+            } else if prim.IsBool() {
+                self.oc.write("false")
+            } else if prim.IsStr() {
+                self.oc.write(typeCoder.Str + "()")
+            }
+            ret
+        }
+        let mut s = t.Struct()
+        if s != nil && s.Decl.CppLinked && findDirective(s.Decl.Directives, Directive.Typedef) == nil {
             self.oc.write("(")
             self.oc.write(typeCoder.kind(t))
             self.oc.write("){}")
