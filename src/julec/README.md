@@ -74,3 +74,5 @@ Actually, JuleC just generates C++ code for now.
 - **(2)** Definition elemination can performed before other optimizations. Because it's independent from other optimizations. It might be increase performance because of eliminated definitions if performed before other optimizations.
 
 - **(3)** Scope part of deadcoe elimination optimizations, should be executed after other optimizations. Because other optimzations may will change code structure, so some scope deadcode elimination cases may occur. This possible optimizations cannot catched by scope optimizer if scope deadcode elimination optimizations applied before other independent middle-end optimizations.
+
+- **(4)** For C/C++ IRs, include linked headers before the API. Otherwise it may cause compilation errors. For example, on Windows, `winsock2.h` must be included before `windows.h`. In a case where the API includes `windows.h` it is against this to later include `winsock2.h`.
