@@ -71,6 +71,7 @@ impl TcpListener {
                     Port: int(sys::Ntohs(int(clientAddr.sin6_port))),
                 },
                 handle: handle,
+                v6: true,
             }
         } else { // IPv4
             let mut clientAddr = sys::SockaddrIn{}
@@ -221,6 +222,7 @@ fn tcpBind(network: Network, &addr: str)!: &TcpListener {
 fn tcpConnect(network: Network, &addr: str, timeout: time::DurInt)!: &TcpConn {
     let mut tcpAddr = TcpAddr.Resolve(network, addr) else { error(error) }
     let mut handle = netHandle(sys::INVALID_SOCKET)
+    let mut v6 = false
     if tcpAddr.Ip.Empty() {
         handle = sys::Socket(sys::AF_INET, sys::SOCK_STREAM, sys::IPPROTO_TCP)
         if handle < 0 {
@@ -261,6 +263,7 @@ fn tcpConnect(network: Network, &addr: str, timeout: time::DurInt)!: &TcpConn {
             if network == Network.Tcp4 {
                 error(AddrError.NoSuitable)
             }
+            v6 = true
             handle = sys::Socket(sys::AF_INET6, sys::SOCK_STREAM, sys::IPPROTO_TCP)
             if handle < 0 {
                 error(lastErrorCode())
@@ -301,5 +304,6 @@ fn tcpConnect(network: Network, &addr: str, timeout: time::DurInt)!: &TcpConn {
     ret &TcpConn{
         Addr: tcpAddr,
         handle: handle,
+        v6: v6,
     }
 }

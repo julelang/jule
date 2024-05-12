@@ -9,6 +9,7 @@ use sys for std::sys
 // In most cases, represents TCP client.
 struct TcpConn {
     mut handle: netHandle = sys::INVALID_SOCKET
+    v6:         bool
     Addr:       &TcpAddr
 }
 
@@ -62,6 +63,19 @@ impl TcpConn {
         ret n
     }
 
+    // Returns network name which is connected.
+    // If connection closed, returns Network.Tcp as a general network.
+    fn Network(self): Network {
+        match {
+        | self.handle == sys::INVALID_SOCKET:
+            ret Network.Tcp
+        | self.v6:
+            ret Network.Tcp6
+        |:
+            ret Network.Tcp4
+        }
+    }
+
     // Closes connection.
     // All exceptionals are error code of implementation.
     fn Close(mut self)! {
@@ -72,5 +86,6 @@ impl TcpConn {
             error(lastErrorCode())
         }
         self.handle = sys::INVALID_SOCKET
+        self.v6 = false
     }
 }

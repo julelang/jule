@@ -72,6 +72,19 @@ impl UdpConn {
         ret sendto(self, buf) else { error(error) }
     }
 
+    // Returns network name which is connected or listening.
+    // If connection closed, returns Network.Udp as a general network.
+    fn Network(self): Network {
+        match {
+        | self.handle == sys::INVALID_SOCKET:
+            ret Network.Udp
+        | self.v6:
+            ret Network.Udp6
+        |:
+            ret Network.Udp4
+        }
+    }
+
     // Closes connection.
     // All exceptionals are error code of implementation.
     fn Close(mut self)! {
@@ -82,6 +95,7 @@ impl UdpConn {
             error(lastErrorCode())
         }
         self.handle = sys::INVALID_SOCKET
+        self.v6 = false
     }
 }
 
@@ -205,6 +219,7 @@ fn udpConnect(network: Network, &addr: str)!: &UdpConn {
             if network == Network.Udp4 {
                 error(AddrError.NoSuitable)
             }
+            conn.v6 = true
             conn.handle = sys::Socket(sys::AF_INET6, sys::SOCK_DGRAM, sys::IPPROTO_UDP)
             if conn.handle < 0 {
                 error(lastErrorCode())
