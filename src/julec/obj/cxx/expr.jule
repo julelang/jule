@@ -939,24 +939,16 @@ impl exprCoder {
     fn makeCallSlice(mut &self, mut &m: &BuiltinMakeCallExprModel) {
         let mut slice = m.Kind.Slc()
         self.oc.write(typeCoder.kind(m.Kind))
-        if slice.Elem.Enum() != nil {
-            if m.Cap != nil {
-                self.oc.write("::alloc(")
-            } else {
-                self.oc.write("::alloc_def(")
-            }
-        } else {
-            self.oc.write("::alloc(")
-        }
-
+        self.oc.write("::alloc(")
         self.expr(m.Len)
+        self.oc.write(", ")
         if m.Cap != nil {
-            self.oc.write(",")
             self.expr(m.Cap)
+        } else {
+            self.expr(m.Len)
         }
-
-        if slice.Elem.Enum() != nil {
-            self.oc.write(",")
+        if shouldInitialized(slice.Elem) {
+            self.oc.write(", ")
             self.initExpr(slice.Elem)
         }
         self.oc.write(")")
