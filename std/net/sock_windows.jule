@@ -110,6 +110,15 @@ fn sendto(&conn: UdpConn, &buf: []byte)!: int {
     error(lastErrorCode())
 }
 
+fn setSocketTimeout(handle: netHandle, scope: int, timeout: time::DurInt)! {
+    let tv = timevalFromDuration(timeout)
+    unsafe {
+        if sys::Setsockopt(handle, sys::SOL_SOCKET, scope, (*Char)(&tv), int(mem::SizeOf(tv))) < 0 {
+            error(lastErrorCode())
+        }
+    }
+}
+
 fn init() {
     let mut wsaData = sys::WsaData{}
     let verReq = sys::MakeWord(2, 2)

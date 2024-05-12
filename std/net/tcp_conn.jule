@@ -3,6 +3,7 @@
 // license that can be found in the LICENSE file.
 
 use io for std::io
+use time for std::time
 use sys for std::sys
 
 // TCP connection.
@@ -31,7 +32,7 @@ impl TcpConn {
     // All exceptionals are error code of implementation.
     fn Read(mut self, mut buf: []byte)!: int {
         if self.handle == sys::INVALID_SOCKET {
-            panic("std::net: Conn.Read: connection is closed")
+            panic("std::net: TcpConn.Read: connection is closed")
         }
         if len(buf) == 0 {
             ret 0
@@ -51,7 +52,7 @@ impl TcpConn {
     // All exceptionals are error code of implementation.
     fn Write(mut self, buf: []byte)!: int {
         if self.handle == sys::INVALID_SOCKET {
-            panic("std::net: Conn.Write: connection is closed")
+            panic("std::net: TcpConn.Write: connection is closed")
         }
         if len(buf) == 0 {
             ret 0
@@ -61,6 +62,30 @@ impl TcpConn {
             error(lastErrorCode())
         }
         ret n
+    }
+
+    // Sets read timeout for connection.
+    // Timeout precision is microseconds.
+    // If the timeout is below one microsecond it will be accepted as zero.
+    // The zero timeout, clears current timeout if exist.
+    // All exceptionals are error code of implementation.
+    fn SetReadTimeout(mut self, timeout: time::DurInt)! {
+        if self.handle == sys::INVALID_SOCKET {
+            panic("std::net: TcpConn.SetReadTimeout: connection is closed")
+        }
+        setSocketTimeout(self.handle, sys::SO_RCVTIMEO, timeout) else { error(error) }
+    }
+
+    // Sets write timeout for connection.
+    // Timeout precision is microseconds.
+    // If the timeout is below one microsecond it will be accepted as zero.
+    // The zero timeout, clears current timeout if exist.
+    // All exceptionals are error code of implementation.
+    fn SetWriteTimeout(mut self, timeout: time::DurInt)! {
+        if self.handle == sys::INVALID_SOCKET {
+            panic("std::net: TcpConn.SetReadTimeout: connection is closed")
+        }
+        setSocketTimeout(self.handle, sys::SO_SNDTIMEO, timeout) else { error(error) }
     }
 
     // Returns network name which is connected.
