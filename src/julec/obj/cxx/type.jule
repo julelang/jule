@@ -339,3 +339,27 @@ fn findDirective(mut &directives: []&ast::Directive, tag: str): &ast::Directive 
 fn hasDirective(&directives: []&ast::Directive, tag: str): bool {
     ret findDirective(unsafe { *(&directives) }, tag) != nil
 }
+
+// Reports whether type should initialized.
+// If the type API implemented structure of something like that, initialization is redundant.
+// Let the constructor do it's job.
+fn shouldInitialized(mut &t: &TypeKind): bool {
+    let prim = t.Prim()
+    if prim != nil {
+        ret !prim.IsAny() && !prim.IsStr()
+    }
+    match {
+    | t.Sptr() != nil:
+        ret false
+    | t.Map() != nil:
+        ret false
+    | t.Slc() != nil:
+        ret false
+    | t.Trait() != nil:
+        ret false
+    | t.Fn() != nil:
+        ret false
+    |:
+        ret true
+    }
+}

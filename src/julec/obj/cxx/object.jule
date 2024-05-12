@@ -280,12 +280,15 @@ impl ObjectCoder {
         self.write(typeCoder.kind(f.Kind))
         self.write(" ")
         self.write(identCoder.field(f.Decl))
-        self.write(" = ")
         if f.Default == nil {
-            // No default expression.
-            // Use default expression of data-type.
-            self.ec.initExpr(f.Kind)
+            if shouldInitialized(f.Kind) {
+                self.write(" = ")
+                // No default expression.
+                // Use default expression of data-type.
+                self.ec.initExpr(f.Kind)
+            }
         } else {
+            self.write(" = ")
             self.ec.expr(f.Default.Model)
         }
         self.write(";")
@@ -671,7 +674,11 @@ impl ObjectCoder {
             self.varInitExpr(v, nil)
             ret
         }
-        self.varInitExpr(v, fn() { self.ec.initExpr(v.Kind.Kind) })
+        if shouldInitialized(v.Kind.Kind) {
+            self.varInitExpr(v, fn() { self.ec.initExpr(v.Kind.Kind) })
+            ret
+        }
+        self.varInitExpr(v, nil)
     }
 
     fn func(mut &self, mut &f: &Fn) {
