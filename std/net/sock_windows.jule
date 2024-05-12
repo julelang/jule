@@ -40,6 +40,11 @@ unsafe fn connectSocket(handle: netHandle, sockAddr: *sys::Sockaddr, sockLen: ui
         connectSocketNoTimeout(handle, sockAddr, sockLen) else { error(error) }
         ret
     }
+    let tv = timevalFromDuration(timeout)
+    if tv.tv_sec == 0 && tv.tv_usec == 0 {
+        connectSocketNoTimeout(handle, sockAddr, sockLen) else { error(error) }
+        ret
+    }
     closeSocketBlockingMode(handle) else { error(error) }
     if sys::Connect(handle, sockAddr, sockLen) != sys::SOCKET_ERROR {
         ret
@@ -54,7 +59,6 @@ unsafe fn connectSocket(handle: netHandle, sockAddr: *sys::Sockaddr, sockLen: ui
     sys::FdSet(handle, &fdW)
     sys::FdZero(&fdE)
     sys::FdSet(handle, &fdE)
-    let tv = timevalFromDuration(timeout)
     let res = sys::Select(0, nil, &fdW, &fdE, &tv)
     if res <= 0 {
         if res == 0 {
