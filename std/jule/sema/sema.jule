@@ -2143,6 +2143,7 @@ impl Sema {
         }
 
         let mut eval = self.eval(self)
+        s.Comparable = true
         for (_, mut f) in s.Fields {
             let mut kind = tc.checkDecl(f.Decl.Kind.Decl)
             ok = kind != nil && ok
@@ -2155,6 +2156,7 @@ impl Sema {
             }
             f.Kind = kind
             s.Mutable = s.Mutable || (!f.Decl.Mutable && f.Kind.Mutable())
+            s.Comparable = s.Comparable && f.Kind.Comparable()
             _ = self.checkStructInsDeriveClone(s)
 
             // Skip this field if not has default value.
@@ -2227,6 +2229,7 @@ impl Sema {
             match m.Ident {
             | "Eq":
                 s.Operators.Eq = self.checkStructInsOp(s, m, fn(f: &Fn): bool { ret FuncPattern.Eq(f) })
+                s.Comparable = s.Operators.Eq != nil
             | "Gt":
                 s.Operators.Gt = self.checkStructInsOp(s, m, fn(f: &Fn): bool { ret FuncPattern.Gt(f) })
             | "GtEq":
