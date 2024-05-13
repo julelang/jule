@@ -246,21 +246,27 @@ impl typeCoder {
     }
 
     // Generates C++ code of function instance's result type.
-    static fn funcInsResult(mut &f: &FnIns): str {
+    static fn funcInsResult(mut &s: str, mut &f: &FnIns) {
         if f.Decl.IsVoid() {
             if f.Decl.Exceptional {
-                ret "jule::VoidExceptional"
+                s += "jule::VoidExceptional"
+            } else {
+                s += "void"
             }
-            ret "void"
+            ret
         }
         if f.Decl.Exceptional {
-            ret "jule::Exceptional<" + typeCoder.kind(f.Result) + ">"
+            s += "jule::Exceptional<"
+            resultCoder.codeMut1(s, f.Result)
+            s += ">"
+            ret
         }
-        ret typeCoder.kind(f.Result)
+        resultCoder.codeMut1(s, f.Result)
     }
 
     static fn anonFunc(mut f: &FnIns): str {
-        let mut decl = typeCoder.funcInsResult(f)
+        let mut decl = ""
+        typeCoder.funcInsResult(decl, f)
         decl += "("
         if len(f.Params) > 0 {
             for (_, mut param) in f.Params {
@@ -322,6 +328,115 @@ impl typeCoder {
         |:
             ret "[<unimplemented_type_kind>]"
         }
+    }
+}
+
+struct resultCoder {}
+
+impl resultCoder {
+    const Map = "m"
+    const Slice = "s"
+    const Ptr = "p"
+    const Sptr = "x"
+    const Array = "a"
+    const Reference = "r"
+    const Fn = "f"
+
+    static fn ptr(mut &s: str, mut p: &Ptr) {
+        s += resultCoder.Ptr
+        resultCoder.codeMut(s, p.Elem)
+    }
+
+    static fn sptr(mut &s: str, mut p: &Sptr) {
+        s += resultCoder.Sptr
+        resultCoder.codeMut(s, p.Elem)
+    }
+
+    static fn mapType(mut &s: str, mut p: &Map) {
+        s += resultCoder.Map
+        resultCoder.codeMut(s, p.Key)
+        resultCoder.codeMut(s, p.Val)
+    }
+
+    static fn slice(mut &s: str, mut slc: &Slc) {
+        s += resultCoder.Slice
+        resultCoder.codeMut(s, slc.Elem)
+    }
+
+    static fn arr(mut &s: str, mut arr: &Arr) {
+        s += resultCoder.Array
+        s += conv::FmtInt(i64(arr.N), 16)
+        resultCoder.codeMut(s, arr.Elem)
+    }
+
+    static fn func(mut &s: str, mut f: &FnIns) {
+        s += resultCoder.Fn
+        for (_, mut p) in f.Params {
+            if p.Decl.Reference {
+                s += resultCoder.Reference
+            }
+            resultCoder.codeMut(s, p.Kind)
+        }
+        if f.Result != nil {
+            resultCoder.codeMut(s, f.Result)
+        }
+    }
+
+    static fn tup(mut &s: str, mut tup: &Tuple) {
+        for (_, mut t) in tup.Types {
+            s += "_"
+            resultCoder.codeMut(s, t)
+        }
+    }
+
+    static fn codeMut(mut &s: str, mut &t: &TypeKind) {
+        match type t.Kind {
+        | &Ptr:
+            resultCoder.ptr(s, (&Ptr)(t.Kind))
+        | &Sptr:
+            resultCoder.sptr(s, (&Sptr)(t.Kind))
+        | &Map:
+            resultCoder.mapType(s, (&Map)(t.Kind))
+        | &Slc:
+            resultCoder.slice(s, (&Slc)(t.Kind))
+        | &Arr:
+            resultCoder.arr(s, (&Arr)(t.Kind))
+        | &FnIns:
+            resultCoder.func(s, (&FnIns)(t.Kind))
+        | &Enum:
+            let te = (&Enum)(t.Kind)
+            s += identCoder.toOut(te.Ident, uintptr(te))
+        | &TypeEnum:
+            let te = (&TypeEnum)(t.Kind)
+            s += identCoder.toOut(te.Ident, uintptr(te))
+        | &StructIns:
+            let mut si = (&StructIns)(t.Kind)
+            s += identCoder.structureIns(si)
+        | &Trait:
+            let mut trt = (&Trait)(t.Kind)
+            s += identCoder.traitDecl(trt)
+        | &Prim:
+            s += (&Prim)(t.Kind).Kind
+        | &Tuple:
+            resultCoder.tup(s, (&Tuple)(t.Kind))
+        |:
+            panic("this panic call should be unreachable")
+        }
+    }
+
+    static fn codeMut1(mut &s: str, mut &t: &TypeKind) {
+        let mut tup = t.Tup()
+        if tup != nil {
+            resultCoder.tup(s, tup)
+        } else {
+            s += typeCoder.kind(t)
+        }
+    }
+
+    static fn code(mut &t: &TypeKind): str {
+        let mut s = make(str, 0, 20)
+        resultCoder.codeMut(s, t)
+        ret s
     }
 }
 

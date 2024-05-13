@@ -64,6 +64,8 @@ struct ObjectCoder {
     // Current indentation.
     indentBuffer: str
 
+    resultMap: map[str]bool
+
     ec: &exprCoder
     sc: &scopeCoder
 }
@@ -97,6 +99,41 @@ impl ObjectCoder {
     // Writes indention string by indentBuffer.
     fn indent(mut &self) {
         self.Obj += self.indentBuffer
+    }
+
+    fn pushResult(mut &self, mut &f: &Fn) {
+        if f.IsVoid() || len(f.Result.Idents) <= 1 {
+            ret
+        }
+
+        let mut n = len(f.Instances)
+        if len(f.Generics) == 0 {
+            n = 1
+        }
+        for (_, mut ins) in f.Instances[:n] {
+            let s = resultCoder.code(ins.Result)
+            let (_, ok) = self.resultMap[s]
+            if ok {
+                continue
+            }
+            self.resultMap[s] = false
+            self.write("struct ")
+            self.write(s)
+            self.write(" {\n")
+            self.addIndent()
+            for (i, mut t) in ins.Result.Tup().Types {
+                self.indent()
+                self.write(typeCoder.kind(t))
+                self.write(" ")
+                self.write(resultArgName)
+                self.write(conv::Itoa(i))
+                self.write(";\n")
+            }
+            self.doneIndent()
+            self.indent()
+            self.write("};\n")
+            self.indent()
+        }
     }
 
     fn findTypeOffset(self, t: &Trait, mut k: &TypeKind): int {
@@ -350,7 +387,6 @@ impl ObjectCoder {
                 if strct != nil && strct.Decl != nil && strct.Decl.CppLinked {
                     continue
                 }
-
                 if writed {
                     self.write(" &&")
                 }
@@ -479,6 +515,7 @@ impl ObjectCoder {
     fn structureInsDecl(mut &self, mut &s: &StructIns) {
         if len(s.Methods) > 0 {
             for (_, mut m) in s.Methods {
+                self.pushResult(m)
                 self.funcDecl(m, false)
             }
         }
@@ -551,7 +588,7 @@ impl ObjectCoder {
         if !ptr && opt::Inline && !f.Decl.IsEntryPoint() {
             self.write("inline ")
         }
-        self.write(typeCoder.funcInsResult(f))
+        typeCoder.funcInsResult(self.Obj, f)
         if ptr {
             self.write("(*")
             self.write(identCoder.funcIns(f))
@@ -576,6 +613,7 @@ impl ObjectCoder {
             iterFiles(pkg, fn(mut &file: &SymbolTable) {
                 for (_, mut f) in file.Funcs {
                     if !f.CppLinked && f.Token != nil {
+                        self.pushResult(f)
                         self.funcDecl(f, false)
                     }
                 }

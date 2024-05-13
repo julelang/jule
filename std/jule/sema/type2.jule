@@ -1215,9 +1215,8 @@ impl rangeChecker {
 struct retTypeChecker {
     sc:         &scopeChecker
     f:          &FnIns
-    types:      []&TypeKind   // Return types.
-    exprs:      []&Expr       // Return expressions.
-    vars:       []&Var        // Return variables.
+    types:      []&TypeKind  // Return types.
+    exprs:      []&Expr      // Return expressions.
     errorToken: &Token
     model:      ExprModel
 }
@@ -1238,33 +1237,6 @@ impl retTypeChecker {
             self.exprs = (&TupleExpr)(e.Kind).Expr
         |:
             self.exprs = append(self.exprs, e)
-        }
-    }
-
-    fn retVars(mut self) {
-        if self.f == nil || self.f.Decl.IsVoid() {
-            ret
-        }
-        self.vars = make([]&Var, 0, len(self.f.Decl.Result.Idents))
-
-        let mut rootScope = self.sc.getRoot()
-
-        let mut j = 0
-        for i, ident in self.f.Decl.Result.Idents {
-            if !IsIgnoreIdent(ident.Kind) && !IsAnonIdent(ident.Kind) {
-                self.vars = append(self.vars, rootScope.table.Vars[j])
-                j++
-            } else {
-                self.vars = append(self.vars, &Var{
-                    Ident: Ident.Ignore,
-                    Kind: &TypeSymbol{Kind: self.types[i]},
-                })
-            }
-        }
-
-        // Not exist any real variable.
-        if j == 0 {
-            self.vars = nil
         }
     }
 
@@ -1314,7 +1286,6 @@ impl retTypeChecker {
     fn check(mut self, mut &e: &Expr): bool {
         self.prepareTypes()
         self.prepareExprs(e)
-        self.retVars()
 
         let n = len(self.exprs)
         if n == 0 && len(self.types) > 0 {

@@ -5,8 +5,6 @@
 #ifndef __JULE_EXCEPTIONAL_HPP
 #define __JULE_EXCEPTIONAL_HPP
 
-#include <tuple>
-
 #include "any.hpp"
 
 namespace jule

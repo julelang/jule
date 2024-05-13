@@ -8,6 +8,7 @@ use opt::{
     MutSlicingExprModel,
     StrInsertBeginExprModel,
 }
+use conv for std::conv
 use lex for std::jule::lex::{TokenKind}
 use std::jule::sema::{
     Data,
@@ -35,9 +36,14 @@ use std::jule::sema::{
     TypeKind,
     SlicingExprModel,
     IndexingExprModel,
+    FnCallExprModel,
 }
 
 const matchExpr = "_match_expr"
+const resultName = "__jule_func_result"
+const assignResultName = "__jule_assign_result"
+const resultArgName = "__jule_result_arg"
+static assignArgName = "__jule_assign_arg"
 
 // Common group of semantic analysis stmt types and optimizer specific types.
 enum compStmt: type {
@@ -336,7 +342,6 @@ impl scopeCoder {
     }
 
     fn multiAssignTup(mut &self, mut &a: &MultiAssign) {
-        static ArgName = "__jule_assign_arg"
         self.oc.write("({\n")
         self.oc.addIndent()
 
@@ -348,7 +353,7 @@ impl scopeCoder {
             if l != nil {
                 self.oc.write(typeCoder.kind(l.Kind))
                 self.oc.write(" ")
-                self.oc.write(identCoder.toOut(ArgName, uintptr(i)))
+                self.oc.write(identCoder.toOut(assignArgName, uintptr(i)))
                 self.oc.write(" = ")
             }
             self.oc.ec.expr(r.Model)
@@ -360,7 +365,33 @@ impl scopeCoder {
                 self.oc.indent()
                 self.oc.ec.expr(l.Model)
                 self.oc.write(" = ")
-                self.oc.write(identCoder.toOut(ArgName, uintptr(i)))
+                self.oc.write(identCoder.toOut(assignArgName, uintptr(i)))
+                self.oc.write(";\n")
+            }
+        }
+
+        self.oc.doneIndent()
+        self.oc.indent()
+        self.oc.write("})")
+    }
+
+    fn multiAssignFn(mut &self, mut &a: &MultiAssign) {
+        self.oc.write("({\n")
+        self.oc.addIndent()
+        self.oc.indent()
+
+        let mut f = (&FnCallExprModel)(a.R)
+        resultCoder.codeMut1(self.oc.Obj, f.Func.Result)
+        self.oc.write(" " + assignResultName + " = ")
+        self.oc.ec.expr(a.R)
+        self.oc.write(";\n")
+
+        for (i, mut l) in a.L {
+            if l != nil {
+                self.oc.indent()
+                self.oc.ec.expr(l.Model)
+                self.oc.write(" = " + assignResultName + "." + resultArgName)
+                self.oc.write(conv::Itoa(i))
                 self.oc.write(";\n")
             }
         }
@@ -381,22 +412,11 @@ impl scopeCoder {
         match type a.R {
         | &TupleExprModel:
             self.multiAssignTup(a)
-            ret
+        | &FnCallExprModel:
+            self.multiAssignFn(a)
+        |:
+            panic("this panic call should be unreachable")
         }
-
-        self.oc.write("std::tie(")
-        for (i, mut l) in a.L {
-            if l == nil {
-                self.oc.write(cppIgnore)
-            } else {
-                self.oc.ec.expr(l.Model)
-            }
-            if len(a.L)-i > 1 {
-                self.oc.write(",")
-            }
-        }
-        self.oc.write(") = ")
-        self.oc.ec.expr(a.R)
     }
 
     fn matchExpr(mut &self, mut m: &Match): fn() {
@@ -538,157 +558,59 @@ impl scopeCoder {
         }
     }
 
-    fn retWithVars(mut &self, mut r: &RetSt) {
-        self.oc.write("return ")
-        if r.Func.Decl.Exceptional {
-            self.oc.write("jule::Exceptional<")
-            self.oc.write(typeCoder.kind(r.Func.Result))
-            self.oc.write(">(jule::Any(), ")
+    fn setResult(mut &self, mut r: &RetSt) {
+        if len(r.Func.Decl.Result.Idents) == 1 {
+            self.oc.write(resultName + " = ")
+            self.oc.ec.expr(r.Expr)
+            self.oc.write(";\n")
+            self.oc.indent()
+            ret
         }
-        if len(r.Vars) > 1 {
-            self.oc.write("std::make_tuple(")
-        }
-        for (i, mut v) in r.Vars {
-            if lex::IsIgnoreIdent(v.Ident) {
-                self.oc.ec.initExpr(v.Kind.Kind)
-            } else {
-                self.oc.write(identCoder.var(v))
-            }
-            if len(r.Vars)-i > 1 {
-                self.oc.write(",")
-            }
-        }
-
-        if len(r.Vars) > 1 {
-            self.oc.write(")")
-        }
-
-        if r.Func.Decl.Exceptional {
-            self.oc.write(")")
-        }
-    }
-
-    fn retTuple(mut &self, mut r: &RetSt) {
         let mut datas = (&TupleExprModel)(r.Expr).Datas
-        for (i, mut v) in r.Vars {
-            if lex::IsIgnoreIdent(v.Ident) {
-                continue
-            }
-            let mut model = datas[i].Model
-            // Ignore self assignment.
-            if model == v {
-                continue
-            }
-            self.oc.write(identCoder.var(v))
+        for i, data in datas {
+            let mut model = data.Model
+            self.oc.write(resultName + "." + resultArgName)
+            self.oc.write(conv::Itoa(i))
             self.oc.write(" = ")
             self.oc.ec.expr(model)
             self.oc.write(";\n")
             self.oc.indent()
         }
-
-        if r.Func.Decl.Exceptional {
-            self.oc.write("return jule::Exceptional<")
-            self.oc.write(typeCoder.kind(r.Func.Result))
-            self.oc.write(">(jule::Any(),")
-        } else {
-            self.oc.write("return ")
-        }
-
-        self.oc.write("std::make_tuple(")
-        for (i, mut d) in datas {
-            let mut v = r.Vars[i]
-            if lex::IsIgnoreIdent(v.Ident) {
-                self.oc.ec.expr(d.Model)
-            } else {
-                self.oc.write(identCoder.var(v))
-            }
-            if len(datas)-i > 1 {
-                self.oc.write(",")
-            }
-        }
-        self.oc.write(")")
-
-        if r.Func.Decl.Exceptional {
-            self.oc.write(")")
-        }
-    }
-
-    fn retWithExprs(mut &self, mut r: &RetSt) {
-        if len(r.Vars) > 1 {
-            self.retTuple(r)
-            ret
-        }
-
-        // Ignore self assignments and ignored variables.
-        if len(r.Vars) > 0 {
-            let mut v = r.Vars[0]
-            if !lex::IsIgnoreIdent(v.Ident) && r.Expr != v {
-                let ident = identCoder.var(v)
-                self.oc.write(ident)
-                self.oc.write(" = ")
-                self.oc.ec.expr(r.Expr)
-                self.oc.write(";\n")
-                self.oc.indent()
-                if r.Func.Decl.Exceptional {
-                    self.oc.write("return jule::Exceptional<")
-                    self.oc.write(typeCoder.kind(r.Func.Result))
-                    self.oc.write(">(jule::Any(),")
-                    self.oc.write(ident)
-                    self.oc.write(")")
-                } else {
-                    self.oc.write("return ")
-                    self.oc.write(ident)
-                }
-                ret
-            }
-        }
-
-        if r.Func.Decl.Exceptional {
-            self.oc.write("return jule::Exceptional<")
-            self.oc.write(typeCoder.kind(r.Func.Result))
-            self.oc.write(">(jule::Any(),")
-            self.oc.ec.expr(r.Expr)
-            self.oc.write(")")
-            ret
-        }
-
-        self.oc.write("return ")
-        self.oc.ec.expr(r.Expr)
-        ret
     }
 
     fn retSt(mut &self, mut r: &RetSt) {
         // Void.
-        if r.Expr == nil && len(r.Vars) == 0 {
+        if r.Func.Decl.IsVoid() {
             if r.Func.Decl.Exceptional {
                 self.oc.write("return jule::VoidExceptional();")
                 ret
             }
             self.oc.write("return;")
             ret
-        }
-
-        if r.Expr == nil {
-            self.retWithVars(r)
+        } else if len(r.Func.Decl.Result.Idents) == 0 {
+            if r.Func.Decl.Exceptional {
+                self.oc.write("return jule::Exceptional<")
+                self.oc.write(typeCoder.kind(r.Func.Result))
+                self.oc.write(">(jule::Any(), ")
+                self.oc.ec.expr(r.Expr)
+                self.oc.write(");")
+            } else {
+                self.oc.write("return ")
+                self.oc.ec.expr(r.Expr)
+                self.oc.write(";")
+            }
             ret
         }
-        self.retWithExprs(r)
-    }
 
-    fn retWithDefaults(mut &self, mut result: &TypeKind) {
-        self.oc.write("return ")
-        if result.Tup() != nil {
-            self.oc.write("std::make_tuple(")
-            let mut types = result.Tup().Types
-            for (i, mut t) in types {
-                self.oc.ec.initExpr(t)
-                if len(types)-i > 1 {
-                    self.oc.write(",")
-                }
-            }
-            self.oc.write(")")
+        if r.Expr != nil {
+            self.setResult(r)
+        }
+        if r.Func.Decl.Exceptional {
+            self.oc.write("return jule::Exceptional<")
+            resultCoder.codeMut1(self.oc.Obj, r.Func.Result)
+            self.oc.write(">(jule::Any(), " + resultName + ");")
         } else {
-            self.oc.ec.initExpr(result)
+            self.oc.write("return " + resultName + ";")
         }
     }
 
@@ -781,18 +703,29 @@ impl scopeCoder {
         self.oc.write("{\n")
         self.oc.addIndent()
         if !f.Decl.IsVoid() {
-            let mut types = f.Types()
-            for i, ident in f.Decl.Result.Idents {
-                if lex::IsIgnoreIdent(ident.Kind) ||
-                    lex::IsAnonIdent(ident.Kind) {
-                    continue
-                }
+            let mut tup = f.Result.Tup()
+            if tup != nil {
                 self.oc.indent()
-                self.oc.write(typeCoder.kind(types[i]))
-                self.oc.write(" ")
-                self.oc.write(identCoder.toLocal(ident.Row, ident.Column, ident.Kind))
-                self.oc.write(" = ")
-                self.oc.ec.initExpr(types[i])
+                resultCoder.tup(self.oc.Obj, tup)
+                self.oc.write(" " + resultName + ";\n")
+                for (i, mut t) in tup.Types {
+                    if shouldInitialized(t) {
+                        self.oc.indent()
+                        self.oc.write(resultName + "." + resultArgName)
+                        self.oc.write(conv::Itoa(i))
+                        self.oc.write(" = ")
+                        self.oc.ec.initExpr(t)
+                        self.oc.write(";\n")
+                    }
+                }
+            } else if len(f.Decl.Result.Idents) == 1 {
+                self.oc.indent()
+                self.oc.write(typeCoder.kind(f.Result))
+                self.oc.write(" " + resultName)
+                if shouldInitialized(f.Result) {
+                    self.oc.write(" = ")
+                    self.oc.ec.initExpr(f.Result)
+                }
                 self.oc.write(";\n")
             }
         }
@@ -801,7 +734,8 @@ impl scopeCoder {
             // Just for void exceptionals.
             // Other cases checked by semantic analsis and disallowed
             // if they are not returns.
-            self.oc.write(" return jule::VoidExceptional();\n")
+            self.oc.indent()
+            self.oc.write("return jule::VoidExceptional();\n")
         }
         self.oc.doneIndent()
         self.oc.indent()
