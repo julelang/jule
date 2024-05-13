@@ -320,19 +320,54 @@ impl scopeCoder {
         self.oc.write(", ")
         if a.L[0] != nil {
             self.oc.write("&(")
-            self.oc.ec.expr(a.L[0])
+            self.oc.ec.expr(a.L[0].Model)
             self.oc.write("), ")
         } else {
             self.oc.write("nullptr, ")
         }
         if a.L[1] != nil {
             self.oc.write("&(")
-            self.oc.ec.expr(a.L[1])
+            self.oc.ec.expr(a.L[1].Model)
             self.oc.write(")")
         } else {
             self.oc.write("nullptr")
         }
         self.oc.write(")")
+    }
+
+    fn multiAssignTup(mut &self, mut &a: &MultiAssign) {
+        static ArgName = "__jule_assign_arg"
+        self.oc.write("({\n")
+        self.oc.addIndent()
+
+        let mut tup = (&TupleExprModel)(a.R)
+
+        for (i, mut r) in tup.Datas {
+            self.oc.indent()
+            let mut l = a.L[i]
+            if l != nil {
+                self.oc.write(typeCoder.kind(l.Kind))
+                self.oc.write(" ")
+                self.oc.write(identCoder.toOut(ArgName, uintptr(i)))
+                self.oc.write(" = ")
+            }
+            self.oc.ec.expr(r.Model)
+            self.oc.write(";\n")
+        }
+
+        for (i, mut l) in a.L {
+            if l != nil {
+                self.oc.indent()
+                self.oc.ec.expr(l.Model)
+                self.oc.write(" = ")
+                self.oc.write(identCoder.toOut(ArgName, uintptr(i)))
+                self.oc.write(";\n")
+            }
+        }
+
+        self.oc.doneIndent()
+        self.oc.indent()
+        self.oc.write("})")
     }
 
     fn multiAssign(mut &self, mut a: &MultiAssign) {
@@ -343,12 +378,18 @@ impl scopeCoder {
             ret
         }
 
+        match type a.R {
+        | &TupleExprModel:
+            self.multiAssignTup(a)
+            ret
+        }
+
         self.oc.write("std::tie(")
         for (i, mut l) in a.L {
             if l == nil {
                 self.oc.write(cppIgnore)
             } else {
-                self.oc.ec.expr(l)
+                self.oc.ec.expr(l.Model)
             }
             if len(a.L)-i > 1 {
                 self.oc.write(",")

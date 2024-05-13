@@ -370,7 +370,7 @@ struct Assign {
 
 // Multi-declarative assignment.
 struct MultiAssign {
-    L: []ExprModel // Nil Model:s represents ingored expressions.
+    L: []&Data // Nil Model:s represents ingored expressions.
     R: ExprModel
 }
 
@@ -1327,7 +1327,13 @@ impl scopeChecker {
             // Otherwise, code generation needs more analysis.
             v.Value = nil
 
-            st.L = append(st.L, v)
+            st.L = append(st.L, &Data{
+                Lvalue: !v.Constant,
+                Mutable: v.Mutable,
+                Reference: v.Reference,
+                Kind: v.Kind.Kind,
+                Model: v,
+            })
             self.table.Vars = append(self.table.Vars, v)
             self.scope.Stmts = append(self.scope.Stmts, v)
             ret
@@ -1354,7 +1360,7 @@ impl scopeChecker {
             errorToken: a.Setter,
         }
         checker.check()
-        st.L = append(st.L, l.Model)
+        st.L = append(st.L, l)
     }
 
     fn checkMultiAssign(mut &self, mut &a: &AssignSt) {
