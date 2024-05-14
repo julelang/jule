@@ -19,27 +19,35 @@ namespace jule
     {
     public:
         template <typename T>
-        struct DynamicType
+        static void dealloc(jule::Ptr<jule::Uintptr> &alloc) noexcept
         {
-        public:
-            static void dealloc(jule::Ptr<jule::Uintptr> &alloc) noexcept
-            {
-                alloc.__as<T>().dealloc();
-            }
+            alloc.__as<T>().dealloc();
+        }
 
-            static jule::Bool eq(void *alloc, void *other)
-            {
-                T *l = static_cast<T *>(alloc);
-                T *r = static_cast<T *>(other);
-                return *l == *r;
-            }
+        template <typename T>
+        static jule::Bool eq(void *alloc, void *other)
+        {
+            T *l = static_cast<T *>(alloc);
+            T *r = static_cast<T *>(other);
+            return *l == *r;
+        }
 
-            static jule::Str to_str(const void *alloc) noexcept
-            {
-                const T *v = static_cast<const T *>(alloc);
-                return jule::to_str(*v);
-            }
-        };
+        static jule::Bool eq_ptr(void *alloc, void *other)
+        {
+            return alloc == other;
+        }
+
+        static jule::Str to_str_ptr(const void *alloc) noexcept
+        {
+            return jule::to_str(alloc);
+        }
+
+        template <typename T>
+        static jule::Str to_str(const void *alloc) noexcept
+        {
+            const T *v = static_cast<const T *>(alloc);
+            return jule::to_str(*v);
+        }
 
         struct Type
         {
@@ -52,11 +60,21 @@ namespace jule
         template <typename T>
         static jule::Any::Type *new_type(void) noexcept
         {
-            using type = typename std::decay<DynamicType<T>>::type;
             static jule::Any::Type table = {
-                .dealloc = type::dealloc,
-                .eq = type::eq,
-                .to_str = type::to_str,
+                .dealloc = jule::Any::dealloc<T>,
+                .eq = jule::Any::eq<T>,
+                .to_str = jule::Any::to_str<T>,
+            };
+            return &table;
+        }
+
+        template <typename T>
+        static jule::Any::Type *new_type_ptr(void) noexcept
+        {
+            static jule::Any::Type table = {
+                .dealloc = jule::Any::dealloc<T>,
+                .eq = jule::Any::eq_ptr,
+                .to_str = jule::Any::to_str_ptr,
             };
             return &table;
         }
@@ -90,7 +108,7 @@ namespace jule
         Any(const jule::Ptr<T> &ref) noexcept
         {
             this->type_info = &typeid(jule::Ptr<T>);
-            this->type = jule::Any::new_type<T>();
+            this->type = jule::Any::new_type_ptr<T>();
             this->data = ref.template as<jule::Uintptr>();
         }
 
