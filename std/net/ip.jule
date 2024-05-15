@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use fastbytes for std::internal::fastbytes
+
 // An IP is a single IP address, wrapper for a slice of bytes.
 // Functions in this package accept either 4-byte (IPv4)
 // or 16-byte (IPv6) slices as input.
@@ -43,11 +45,11 @@ impl Ip {
     fn Eq(self, other: Ip): bool {
         match {
         | len(self.Addr) == len(other.Addr):
-            ret self.Addr == other.Addr
+            ret fastbytes::Equal(self.Addr, other.Addr)
         | len(self.Addr) == Ipv4.Len && len(other.Addr) == Ipv6.Len:
-            ret other.Addr[:12] == v4InV6Prefix && self.Addr == other.Addr[12:]
+            ret fastbytes::Equal(other.Addr[:12], v4InV6Prefix) && fastbytes::Equal(self.Addr, other.Addr[12:])
         | len(self.Addr) == Ipv6.Len && len(other.Addr) == Ipv4.Len:
-            ret self.Addr[:12] == v4InV6Prefix && self.Addr[12:] == other.Addr
+            ret fastbytes::Equal(self.Addr[:12], v4InV6Prefix) && fastbytes::Equal(self.Addr[12:], other.Addr)
         |:
             ret false
         }
