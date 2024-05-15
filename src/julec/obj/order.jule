@@ -15,28 +15,25 @@ struct defineOrderer {}
 impl defineOrderer {
     // Reports whether type in correct order by dependencies.
     // Checked "t" should have minimum 1 dependency.
-    static fn isCommonOrdered[T](&s: []&T, t: &T): bool {
-        let mut p = &t.Depends[0]
-        let end = p + len(t.Depends)
-        for _, tt in s {
-            unsafe {
-                if tt == t {
+    static fn isCommonOrdered[T](&s: []T, t: T): bool {
+        for _, d in t.Depends {
+            if d.CppLinked {
+                continue
+            }
+            for _, t2 in s {
+                if d == t2 {
                     break
-                }
-                if (*p).CppLinked || len((*p).Depends) == 0 || tt == *p {
-                    p++
-                    if p == end {
-                        ret true
-                    }
+                } else if t2 == t {
+                    ret false
                 }
             }
         }
-        ret false
+        ret true
     }
 
     // Orders common types by their dependencies.
     // Type's dependencies always comes first itself.
-    static fn orderCommon[T](mut &s: []&T) {
+    static fn orderCommon[T](mut &s: []T) {
         let mut i = 0
         for (j, mut t) in s {
             if t.CppLinked || len(t.Depends) == 0 {
@@ -59,12 +56,12 @@ impl defineOrderer {
     // Orders structures by their dependencies.
     // Struct's dependencies always comes first itself.
     static fn orderStructures(mut &structs: []&Struct) {
-        defineOrderer.orderCommon[Struct](structs)
+        defineOrderer.orderCommon[&Struct](structs)
     }
 
     // Orders variables by their dependencies.
     // Var's dependencies always comes first itself.
     static fn orderVars(mut &vars: []&Var) {
-        defineOrderer.orderCommon[Var](vars)
+        defineOrderer.orderCommon[&Var](vars)
     }
 }
