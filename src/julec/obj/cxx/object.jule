@@ -42,6 +42,9 @@ use std::time::{Time}
 // Data offset of empty trait.
 const emptyTraitOffset = 0x0
 
+const anyTypeIdent = "__jule_any_type"
+const indentKind = "\t"
+
 struct SerializationInfo {
     Compiler:        str
     CompilerCommand: str
@@ -57,6 +60,8 @@ struct ObjectCoder {
     // Internal buffer which is commonly used.
     Obj: str
 
+    anyObj: str
+
     ir:   &IR
     info: SerializationInfo
     tmap: []&traitHash
@@ -65,9 +70,12 @@ struct ObjectCoder {
     indentBuffer: str
 
     resultMap: map[str]bool
+    anyTypeMap: []&TypeKind
 
     ec: &exprCoder
     sc: &scopeCoder
+
+    declPos: int
 }
 
 impl ObjectCoder {
@@ -87,8 +95,7 @@ impl ObjectCoder {
 
     // Increase indentation.
     fn addIndent(mut &self) {
-        const IndentKind = "\t"
-        self.indentBuffer += IndentKind
+        self.indentBuffer += indentKind
     }
 
     // Decrase indentation.
@@ -99,6 +106,114 @@ impl ObjectCoder {
     // Writes indention string by indentBuffer.
     fn indent(mut &self) {
         self.Obj += self.indentBuffer
+    }
+
+    fn findAnyType(mut &self, mut &t: &TypeKind): int {
+        for (i, mut at) in self.anyTypeMap {
+            if at.Equals(t) {
+                ret i
+            }
+        }
+        ret -1
+    }
+
+    fn pushAnyType(mut &self, mut &t: &TypeKind): int {
+        let mut i = self.findAnyType(t)
+        if i != -1 {
+            ret i
+        }
+        i = len(self.anyTypeMap)
+        self.anyTypeMap = append(self.anyTypeMap, t)
+        let si = conv::Itoa(i)
+        if t.Sptr() != nil {
+            let elem_kind = typeCoder.kind(t.Sptr().Elem)
+            let kind = typeCoder.asSptr(elem_kind)
+
+            // dealloc function.
+            self.anyObj += "void " + anyTypeIdent
+            self.anyObj += si
+            self.anyObj += "_dealloc(jule::Ptr<jule::Uintptr> &alloc) noexcept { alloc.__as<"
+            self.anyObj += elem_kind
+            self.anyObj += ">().dealloc(); }\n"
+
+            // Type structure.
+            self.anyObj += "struct " + typeCoder.Any + "::Type "
+            self.anyObj += anyTypeIdent
+            self.anyObj += si
+            self.anyObj += "{.dealloc=" + anyTypeIdent
+            self.anyObj += si
+            self.anyObj += "_dealloc, .eq=jule::ptr_equal, .to_str=jule::ptr_to_str};\n"
+
+            // comparison function.
+            self.anyObj += typeCoder.Bool + " " + anyTypeIdent
+            self.anyObj += si
+            self.anyObj += "_compare(const " + typeCoder.Any + " &any, const "
+            self.anyObj += kind
+            self.anyObj += " &other) { return any.type == &" + anyTypeIdent
+            self.anyObj += si
+            self.anyObj += " && jule::ptr_equal(any.data.alloc, other.alloc); }\n"
+        } else {
+            let s = t.Struct()
+            let kind = typeCoder.kind(t)
+            if kind == "[<unimplemented_type_kind>]" {
+                outln(t.Str())
+            }
+
+            // dealloc function.
+            self.anyObj += "void " + anyTypeIdent
+            self.anyObj += si
+            self.anyObj += "_dealloc(jule::Ptr<jule::Uintptr> &alloc) noexcept { alloc.__as<"
+            self.anyObj += kind
+            self.anyObj += ">().dealloc(); }\n"
+
+            if s == nil || s.Comparable {
+                // eq function.
+                self.anyObj += typeCoder.Bool + " " + anyTypeIdent
+                self.anyObj += si
+                self.anyObj += "_eq(void *alloc, void *other) noexcept { return *static_cast<"
+                self.anyObj += kind
+                self.anyObj += "*>(alloc) == *static_cast<"
+                self.anyObj += kind
+                self.anyObj += "*>(other); }\n"
+            }
+
+            // to_str function.
+            self.anyObj += typeCoder.Str + " " + anyTypeIdent
+            self.anyObj += si
+            self.anyObj += "_to_str(const void *alloc) noexcept { return jule::to_str(*static_cast<const "
+            self.anyObj += kind
+            self.anyObj += "*>(alloc)); }\n"
+
+            // Type structure.
+            self.anyObj += "struct " + typeCoder.Any + "::Type "
+            self.anyObj += anyTypeIdent
+            self.anyObj += si
+            self.anyObj += "{.dealloc=" + anyTypeIdent
+            self.anyObj += si
+            self.anyObj += "_dealloc, "
+            if s == nil || s.Comparable {
+                self.anyObj += ".eq=" + anyTypeIdent
+                self.anyObj += si
+                self.anyObj += "_eq, "
+            }
+            self.anyObj += ".to_str=" + anyTypeIdent
+            self.anyObj += si
+            self.anyObj += "_to_str};\n"
+
+            if s == nil || s.Comparable {
+                // compare function.
+                self.anyObj += typeCoder.Bool + " " + anyTypeIdent
+                self.anyObj += si
+                self.anyObj += "_compare(const " + typeCoder.Any + " &any, const "
+                self.anyObj += kind
+                self.anyObj += " &other) { return any.type == &" + anyTypeIdent
+                self.anyObj += si
+                self.anyObj += " && " + anyTypeIdent
+                self.anyObj += si
+                self.anyObj += "_eq(any.data.alloc, (void*)&other); }\n"
+            }
+        }
+        ret i
     }
 
     fn pushResult(mut &self, mut &f: &Fn) {
@@ -868,6 +983,7 @@ impl ObjectCoder {
         self.write("\n\n")
         self.traitDatas()
         self.write("\n\n")
+        self.declPos = len(self.Obj)
         self.globals()
     }
 
@@ -1051,6 +1167,11 @@ impl ObjectCoder {
     fn Serialize(mut &self) {
         self.serializeHead()
         self.end()
+
+        let mut head = self.Obj[:self.declPos]
+        head += self.anyObj
+        head += self.Obj[self.declPos:]
+        self.Obj = head
     }
 }
 

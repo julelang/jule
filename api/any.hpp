@@ -32,11 +32,6 @@ namespace jule
             return *l == *r;
         }
 
-        static jule::Bool eq_ptr(void *alloc, void *other)
-        {
-            return alloc == other;
-        }
-
         static jule::Str to_str_ptr(const void *alloc) noexcept
         {
             return jule::to_str(alloc);
@@ -73,7 +68,7 @@ namespace jule
         {
             static jule::Any::Type table = {
                 .dealloc = jule::Any::dealloc<T>,
-                .eq = jule::Any::eq_ptr,
+                .eq = jule::ptr_equal,
                 .to_str = jule::Any::to_str_ptr,
             };
             return &table;
@@ -85,6 +80,22 @@ namespace jule
 
         Any(void) = default;
         Any(const std::nullptr_t) : Any() {}
+
+        template <typename T>
+        Any(const T &data, jule::Any::Type *type) noexcept
+        {
+            this->type = type;
+            T *alloc = new (std::nothrow) T;
+            if (!alloc)
+                jule::panic(__JULE_ERROR__MEMORY_ALLOCATION_FAILED "\nfile: /api/any.hpp");
+
+            *alloc = data;
+#ifdef __JULE_DISABLE__REFERENCE_COUNTING
+            this->data = jule::Ptr<jule::Uintptr>::make(reinterpret_cast<jule::Uintptr *>(alloc), nullptr);
+#else
+            this->data = jule::Ptr<jule::Uintptr>::make(reinterpret_cast<jule::Uintptr *>(alloc));
+#endif
+        }
 
         template <typename T>
         Any(const T &data) noexcept
@@ -103,6 +114,13 @@ namespace jule
         }
 
         template <typename T>
+        Any(const jule::Ptr<T> &ref, jule::Any::Type *type) noexcept
+        {
+            this->type = type;
+            this->data = ref.template as<jule::Uintptr>();
+        }
+
+        template <typename T>
         Any(const jule::Ptr<T> &ref) noexcept
         {
             this->type = jule::Any::new_type_ptr<T>();
@@ -116,11 +134,12 @@ namespace jule
 
         void dealloc(void) noexcept
         {
-            if (this->type)
+            if (this->type) {
                 this->type->dealloc(this->data);
+                this->type = nullptr;
+            }
             this->data.ref = nullptr;
             this->data.alloc = nullptr;
-            this->type = nullptr;
         }
 
         template <typename T>
@@ -206,6 +225,60 @@ namespace jule
 #endif
             );
             if (this->type != jule::Any::new_type_ptr<T>())
+            {
+#ifndef __JULE_ENABLE__PRODUCTION
+                std::string error = __JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: <any> casted to incompatible type\nfile: ";
+                error += file;
+                jule::panic(error);
+#else
+                jule::panic(__JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: <any> casted to incompatible type");
+#endif
+            }
+#endif
+            return this->data.template as<T>();
+        }
+
+        template <typename T>
+        inline T cast(
+#ifndef __JULE_ENABLE__PRODUCTION
+            const char *file,
+#endif
+        jule::Any::Type *type) const noexcept
+        {
+#ifndef __JULE_DISABLE__SAFETY
+            this->must_ok(
+#ifndef __JULE_ENABLE__PRODUCTION
+                file
+#endif
+            );
+            if (this->type != type)
+            {
+#ifndef __JULE_ENABLE__PRODUCTION
+                std::string error = __JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: <any> casted to incompatible type\nfile: ";
+                error += file;
+                jule::panic(error);
+#else
+                jule::panic(__JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: <any> casted to incompatible type");
+#endif
+            }
+#endif
+            return *reinterpret_cast<T *>(this->data.alloc);
+        }
+
+        template <typename T>
+        jule::Ptr<T> cast_ptr(
+#ifndef __JULE_ENABLE__PRODUCTION
+            const char *file,
+#endif
+        jule::Any::Type *type) const noexcept
+        {
+#ifndef __JULE_DISABLE__SAFETY
+            this->must_ok(
+#ifndef __JULE_ENABLE__PRODUCTION
+                file
+#endif
+            );
+            if (this->type != type)
             {
 #ifndef __JULE_ENABLE__PRODUCTION
                 std::string error = __JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: <any> casted to incompatible type\nfile: ";

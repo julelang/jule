@@ -34,6 +34,9 @@ namespace jule
     template <typename T>
     inline jule::Ptr<T> new_ptr(const T &init) noexcept;
 
+    // Reports whether pointer allocations are points to same address.
+    inline jule::Bool ptr_equal(void *alloc, void *other);
+
     template <typename T>
     struct Ptr
     {
@@ -317,7 +320,7 @@ namespace jule
 
         inline jule::Bool operator==(const jule::Ptr<T> &ref) const noexcept
         {
-            return this->alloc == ref.alloc;
+            return jule::ptr_equal(this->alloc, ref.alloc);
         }
 
         inline jule::Bool operator!=(const jule::Ptr<T> &ref) const noexcept
@@ -352,6 +355,10 @@ namespace jule
 #endif
     }
 
+    inline jule::Bool ptr_equal(void *alloc, void *other)
+    {
+        return alloc == other;
+    }
 } // namespace jule
 
 #endif // ifndef __JULE_PTR_HPP

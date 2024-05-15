@@ -455,17 +455,16 @@ impl scopeCoder {
                     }
                 |:
                     self.oc.write(matchExpr)
-                    // For smart pointers, use different algorithm to check.
-                    // Just for the <any> type.
                     let mut tk = (&TypeKind)(expr.Model)
-                    if m.Expr.Kind.Trait() == nil && expr.Kind.Sptr() != nil {
-                        self.oc.write(".type_is_ptr<")
-                        self.oc.write(typeCoder.kind(tk.Sptr().Elem))
-                    } else {
+                    if m.Expr.Kind.Trait() != nil {
                         self.oc.write(".type_is<")
                         self.oc.write(typeCoder.kind(tk))
+                        self.oc.write(">()")
+                    } else { // Any type.
+                        let j = self.oc.pushAnyType(tk)
+                        self.oc.write(".type == &" + anyTypeIdent)
+                        self.oc.write(conv::Itoa(j))
                     }
-                    self.oc.write(">()")
                 }
 
                 if len(c.Exprs)-i > 1 {

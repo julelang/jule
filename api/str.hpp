@@ -409,6 +409,11 @@ namespace jule
         return jule::Str(s);
     }
 
+    inline jule::Str ptr_to_str(const void *alloc)
+    {
+        return jule::to_str(alloc);
+    }
+
 } // namespace jule
 
 #endif // #ifndef __JULE_STR_HPP

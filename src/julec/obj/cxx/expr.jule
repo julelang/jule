@@ -233,6 +233,27 @@ impl exprCoder {
     }
 
     fn unsafeBinary(mut &self, mut m: &BinopExprModel) {
+        if m.Op.Kind == TokenKind.Eqs || m.Op.Kind == TokenKind.NotEq {
+            // If this binary operator comparing <any> type.
+            // The m.Left is will be <any> one always.
+            if isAny(m.Left.Kind) {
+                if !m.Right.Kind.IsNil() && !isAny(m.Right.Kind) {
+                    self.oc.write("(")
+                    if m.Op.Kind == TokenKind.NotEq {
+                        self.oc.write("!")
+                    }
+                    let i = self.oc.pushAnyType(m.Right.Kind)
+                    self.oc.write(anyTypeIdent)
+                    self.oc.write(conv::Itoa(i))
+                    self.oc.write("_compare(")
+                    self.model(m.Left.Model)
+                    self.oc.write(", ")
+                    self.model(m.Right.Model)
+                    self.oc.write("))")
+                    ret
+                }
+            }
+        }
         self.oc.write("(")
         self.model(m.Left.Model)
         self.oc.write(" ")
@@ -334,10 +355,20 @@ impl exprCoder {
 
     fn casting(mut &self, mut m: &CastingExprModel) {
         match {
-        | m.Kind.Prim() != nil && m.Kind.Prim().IsAny():
-            self.oc.write(typeCoder.kind(m.Kind))
-            self.oc.write("(")
+        | isAny(m.Kind):
+            if m.ExprKind.IsNil() {
+                self.oc.write(typeCoder.Any + "()")
+                ret
+            }
+            if m.ExprKind.TypeEnum() != nil {
+                self.model(m.Expr)
+                ret
+            }
+            let i = self.oc.pushAnyType(m.ExprKind)
+            self.oc.write(typeCoder.Any + "(")
             self.model(m.Expr)
+            self.oc.write(", &" + anyTypeIdent)
+            self.oc.write(conv::Itoa(i))
             self.oc.write(")")
         | m.ExprKind.Ptr() != nil
         | m.Kind.Ptr() != nil:
@@ -346,9 +377,26 @@ impl exprCoder {
             self.oc.write(")(")
             self.expr(m.Expr)
             self.oc.write("))")
-        | m.ExprKind.Trait() != nil
-        | m.ExprKind.Prim() != nil && m.ExprKind.Prim().IsAny()
-        | m.ExprKind.TypeEnum() != nil:
+        | isAny(m.ExprKind):
+            self.model(m.Expr)
+            self.oc.write(".")
+            if m.Kind.Sptr() != nil {
+                self.oc.write("cast_ptr<")
+                self.oc.write(typeCoder.kind(m.Kind.Sptr().Elem))
+            } else {
+                self.oc.write("cast<")
+                self.oc.write(typeCoder.kind(m.Kind))
+            }
+            self.oc.write(">(")
+            if !env::Production {
+                self.oc.write("\"")
+                self.oc.locInfo(m.Token)
+                self.oc.write("\", ")
+            }
+            self.oc.write("&" + anyTypeIdent)
+            self.oc.write(conv::Itoa(self.oc.pushAnyType(m.Kind)))
+            self.oc.write(")")
+        | m.ExprKind.Trait() != nil:
             self.model(m.Expr)
             self.oc.write(".")
             if env::Production {
@@ -1406,4 +1454,13 @@ fn isExprComesFromBind(&d: &Data): bool {
     |:
         ret false
     }
+}
+
+// Reports whether type is handled as <any> type.
+fn isAny(mut &t: &TypeKind): bool {
+    if t.TypeEnum() != nil {
+        ret true
+    }
+    let prim = t.Prim()
+    ret prim != nil && prim.IsAny()
 }
