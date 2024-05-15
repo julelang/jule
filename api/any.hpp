@@ -82,7 +82,6 @@ namespace jule
     public:
         mutable jule::Ptr<jule::Uintptr> data;
         mutable jule::Any::Type *type = nullptr;
-        mutable const std::type_info *type_info = nullptr;
 
         Any(void) = default;
         Any(const std::nullptr_t) : Any() {}
@@ -91,7 +90,6 @@ namespace jule
         Any(const T &data) noexcept
         {
             this->type = jule::Any::new_type<T>();
-            this->type_info = &typeid(T);
             T *alloc = new (std::nothrow) T;
             if (!alloc)
                 jule::panic(__JULE_ERROR__MEMORY_ALLOCATION_FAILED "\nfile: /api/any.hpp");
@@ -107,7 +105,6 @@ namespace jule
         template <typename T>
         Any(const jule::Ptr<T> &ref) noexcept
         {
-            this->type_info = &typeid(jule::Ptr<T>);
             this->type = jule::Any::new_type_ptr<T>();
             this->data = ref.template as<jule::Uintptr>();
         }
@@ -124,17 +121,18 @@ namespace jule
             this->data.ref = nullptr;
             this->data.alloc = nullptr;
             this->type = nullptr;
-            this->type_info = nullptr;
         }
 
         template <typename T>
         inline jule::Bool type_is(void) const noexcept
         {
-            if (std::is_same<typename std::decay<T>::type, std::nullptr_t>::value)
-                return false;
-            if (this->operator==(nullptr))
-                return false;
-            return *this->type_info == typeid(T);
+            return this->type == jule::Any::new_type<T>();
+        }
+
+        template <typename T>
+        inline jule::Bool type_is_ptr(void) const noexcept
+        {
+            return this->type == jule::Any::new_type_ptr<T>();
         }
 
         inline void must_ok(
@@ -178,7 +176,7 @@ namespace jule
                 file
 #endif
             );
-            if (*this->type_info != typeid(T))
+            if (this->type != jule::Any::new_type<T>())
             {
 #ifndef __JULE_ENABLE__PRODUCTION
                 std::string error = __JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: <any> casted to incompatible type\nfile: ";
@@ -207,7 +205,7 @@ namespace jule
                 file
 #endif
             );
-            if (*this->type_info != typeid(jule::Ptr<T>))
+            if (this->type != jule::Any::new_type_ptr<T>())
             {
 #ifndef __JULE_ENABLE__PRODUCTION
                 std::string error = __JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: <any> casted to incompatible type\nfile: ";
@@ -246,7 +244,6 @@ namespace jule
             this->dealloc();
             this->data = src.data;
             this->type = src.type;
-            this->type_info = src.type_info;
             return *this;
         }
 
@@ -259,7 +256,7 @@ namespace jule
         template <typename T>
         inline jule::Bool operator==(const jule::Ptr<T> &expr) const noexcept
         {
-            return this->type_is<jule::Ptr<T>>() && this->operator jule::Ptr<T>() == expr;
+            return this->type_is_ptr<T>() && this->operator jule::Ptr<T>() == expr;
         }
 
         template <typename T>
@@ -280,7 +277,7 @@ namespace jule
             if (other.operator==(nullptr))
                 return false;
 
-            if (*this->type_info != *other.type_info)
+            if (this->type != other.type)
                 return false;
 
             return this->type->eq(this->data.alloc, other.data.alloc);

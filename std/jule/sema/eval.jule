@@ -31,6 +31,8 @@ use ast for std::jule::ast::{
     SubIdentTypeDecl,
     RangeExpr,
     TypeDeclKind,
+    SptrTypeDecl,
+    PtrTypeDecl,
 }
 use build for std::jule::build::{
     LogMsg,
@@ -1065,17 +1067,30 @@ impl Eval {
     fn pushGenericsFromData(mut &self, mut &generics: []&TypeDecl, mut &expr: &Expr): bool {
         match type expr.Kind {
         | &UnaryExpr:
-            // Unary eval catches type declarations.
-            // Therefore use unary eval algorithm for eval related type declarations.
-            let mut d = self.evalUnary((&UnaryExpr)(expr.Kind))
-            if !d.Decl {
-                self.pushErr(expr.Token, LogMsg.InvalidSyntax)
+            let mut u = (&UnaryExpr)(expr.Kind)
+            match u.Op.Kind {
+            | TokenKind.Star:
+                let mut kind = new(PtrTypeDecl)
+                let mut _generics = make([]&TypeDecl, 0, 1)
+                self.pushGenericsFromData(_generics, u.Expr)
+                kind.Elem = _generics[0]
+                generics = append(generics, &TypeDecl{
+                    Token: expr.Token,
+                    Kind: kind,
+                })
+            | TokenKind.Amper:
+                let mut kind = new(SptrTypeDecl)
+                let mut _generics = make([]&TypeDecl, 0, 1)
+                self.pushGenericsFromData(_generics, u.Expr)
+                kind.Elem = _generics[0]
+                generics = append(generics, &TypeDecl{
+                    Token: expr.Token,
+                    Kind: kind,
+                })
+            |:
+                self.pushErr(u.Op, LogMsg.InvalidType)
                 ret false
             }
-            generics = append(generics, &TypeDecl{
-                Token: expr.Token,
-                Kind: unsafe { *(*TypeDeclKind)(&d.Kind.Kind) },
-            })
         | &TypeDecl:
             generics = append(generics, (&TypeDecl)(expr.Kind))
         | &SubIdentExpr:
@@ -1169,7 +1184,7 @@ impl Eval {
             ret false
         }
         let mut existInstance = f.Decl.appendInstance(f)
-        // TODO: [check] is possible to optimize here using same environment with reaload_fn_ins_types?
+        // TODO: [check] is possible to optimize here using same environment with realoadFnInsTypes?
         if !self.s.checkConstraintsFn(f, et, existInstance) {
             ret false
         }
