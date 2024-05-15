@@ -15,15 +15,10 @@ struct defineOrderer {}
 impl defineOrderer {
     // Reports whether type in correct order by dependencies.
     // Checked "t" should have minimum 1 dependency.
-    static fn isCommonOrdered[T](&s: []T, t: T): bool {
+    static fn isCommonOrdered[T](s: []T, t: T): bool {
         for _, d in t.Depends {
-            if d.CppLinked {
-                continue
-            }
             for _, t2 in s {
                 if d == t2 {
-                    break
-                } else if t2 == t {
                     ret false
                 }
             }
@@ -42,14 +37,21 @@ impl defineOrderer {
             }
         }
 
-        let mut j = i
-        for j < len(s); j++ {
-            let mut k = i
-            for k < len(s)-1; k++ {
-                if !defineOrderer.isCommonOrdered[T](s, s[k]) {
-                    s.swap(k, k + 1)
+        let mut sp = s[i:]
+        let mut n = len(sp) - 1
+        for in sp {
+            let mut swapped = false
+            let mut k = 0
+            for k < n; k++ {
+                if !defineOrderer.isCommonOrdered[T](sp[k+1:], sp[k]) {
+                    sp.swap(k, k + 1)
+                    swapped = true
                 }
             }
+            if !swapped {
+                break
+            }
+            n--
         }
     }
 
