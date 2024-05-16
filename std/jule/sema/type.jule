@@ -53,7 +53,7 @@ struct TypeAlias {
 // Kind of type declaration.
 trait Kind {
     fn Str(self): str
-    fn Equals(&self, other: &TypeKind): bool
+    fn Equal(&self, other: &TypeKind): bool
 }
 
 // Evaluated type declaration.
@@ -87,7 +87,7 @@ impl Kind for TypeKind {
     }
 
     // Reports whether types are same.
-    fn Equals(&self, other: &TypeKind): bool {
+    fn Equal(&self, other: &TypeKind): bool {
         if self.IsNil() {
             ret other.IsNil()
         }
@@ -95,7 +95,7 @@ impl Kind for TypeKind {
             ret other.CppLinked() &&
                 self.CppIdent == other.CppIdent
         }
-        ret self.Kind.Equals(other)
+        ret self.Kind.Equal(other)
     }
 }
 
@@ -368,7 +368,7 @@ impl Kind for Prim {
     }
 
     // Reports whether types are same.
-    fn Equals(&self, other: &TypeKind): bool {
+    fn Equal(&self, other: &TypeKind): bool {
         let prim = unsafe { (*(&other)).Prim() }
         if prim == nil {
             ret false
@@ -445,12 +445,12 @@ impl Kind for Sptr {
     fn Str(self): str { ret "&" + self.Elem.Str() }
 
     // Reports whether types are same.
-    fn Equals(&self, other: &TypeKind): bool {
+    fn Equal(&self, other: &TypeKind): bool {
         let sptr = unsafe { (*(&other)).Sptr() }
         if sptr == nil {
             ret false
         }
-        ret self.Elem.Equals(sptr.Elem)
+        ret self.Elem.Equal(sptr.Elem)
     }
 }
 
@@ -464,12 +464,12 @@ impl Kind for Slc {
     fn Str(self): str { ret "[]" + self.Elem.Str() }
 
     // Reports whether types are same.
-    fn Equals(&self, other: &TypeKind): bool {
+    fn Equal(&self, other: &TypeKind): bool {
         let slc = unsafe { (*(&other)).Slc() }
         if slc == nil {
             ret false
         }
-        ret self.Elem.Equals(slc.Elem)
+        ret self.Elem.Equal(slc.Elem)
     }
 }
 
@@ -492,7 +492,7 @@ impl Kind for Tuple {
     }
 
     // Reports whether types are same.
-    fn Equals(&self, other: &TypeKind): bool {
+    fn Equal(&self, other: &TypeKind): bool {
         let tup = unsafe { (*(&other)).Tup() }
         if tup == nil {
             ret false
@@ -502,7 +502,7 @@ impl Kind for Tuple {
         }
         let mut i = 0
         for i < len(self.Types); i++ {
-            if !self.Types[i].Equals(tup.Types[i]) {
+            if !self.Types[i].Equal(tup.Types[i]) {
                 ret false
             }
         }
@@ -529,12 +529,12 @@ impl Kind for Map {
     }
 
     // Reports whether types are same.
-    fn Equals(&self, other: &TypeKind): bool {
+    fn Equal(&self, other: &TypeKind): bool {
         let m = unsafe { (*(&other)).Map() }
         if m == nil {
             ret false
         }
-        ret self.Key.Equals(m.Key) && self.Val.Equals(m.Val)
+        ret self.Key.Equal(m.Key) && self.Val.Equal(m.Val)
     }
 }
 
@@ -556,12 +556,12 @@ impl Kind for Arr {
     }
 
     // Reports whether types are same.
-    fn Equals(&self, other: &TypeKind): bool {
+    fn Equal(&self, other: &TypeKind): bool {
         let arr = unsafe { (*(&other)).Arr() }
         if arr == nil {
             ret false
         }
-        ret self.N == arr.N && self.Elem.Equals(arr.Elem)
+        ret self.N == arr.N && self.Elem.Equal(arr.Elem)
     }
 }
 
@@ -580,12 +580,12 @@ impl Kind for Ptr {
     }
 
     // Reports whether types are same.
-    fn Equals(&self, other: &TypeKind): bool {
+    fn Equal(&self, other: &TypeKind): bool {
         let ptr = unsafe { (*(&other)).Ptr() }
         if ptr == nil {
             ret false
         }
-        ret self.Elem.Equals(ptr.Elem)
+        ret self.Elem.Equal(ptr.Elem)
     }
 }
 
@@ -833,7 +833,7 @@ impl typeChecker {
         if !self.inscatch && self.bannedGenerics != nil {
             self.inscatch = true
             for _, bg in self.bannedGenerics {
-                if bg == ta || ta.Kind.Kind != nil && ta.Kind.Kind.Equals(bg.Kind.Kind) {
+                if bg == ta || ta.Kind.Kind != nil && ta.Kind.Kind.Equal(bg.Kind.Kind) {
                     self.inscatch = false
                     break
                 }
