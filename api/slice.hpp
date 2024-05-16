@@ -313,23 +313,6 @@ namespace jule
             this->__push(item);
         }
 
-        jule::Bool operator==(const jule::Slice<Item> &src) const
-        {
-            if (this->_len != src._len)
-                return false;
-
-            for (jule::Int index = 0; index < this->_len; ++index)
-                if (this->_slice[index] != src._slice[index])
-                    return false;
-
-            return true;
-        }
-
-        constexpr jule::Bool operator!=(const jule::Slice<Item> &src) const
-        {
-            return !this->operator==(src);
-        }
-
         constexpr jule::Bool operator==(const std::nullptr_t) const noexcept
         {
             return !this->_slice;

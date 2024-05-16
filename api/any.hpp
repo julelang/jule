@@ -18,32 +18,6 @@ namespace jule
     class Any
     {
     public:
-        template <typename T>
-        static void dealloc(jule::Ptr<jule::Uintptr> &alloc) noexcept
-        {
-            alloc.__as<T>().dealloc();
-        }
-
-        template <typename T>
-        static jule::Bool eq(void *alloc, void *other)
-        {
-            T *l = static_cast<T *>(alloc);
-            T *r = static_cast<T *>(other);
-            return *l == *r;
-        }
-
-        static jule::Str to_str_ptr(const void *alloc) noexcept
-        {
-            return jule::to_str(alloc);
-        }
-
-        template <typename T>
-        static jule::Str to_str(const void *alloc) noexcept
-        {
-            const T *v = static_cast<const T *>(alloc);
-            return jule::to_str(*v);
-        }
-
         struct Type
         {
         public:
@@ -52,29 +26,6 @@ namespace jule
             jule::Str (*to_str)(const void *alloc);
         };
 
-        template <typename T>
-        static jule::Any::Type *new_type(void) noexcept
-        {
-            static jule::Any::Type table = {
-                .dealloc = jule::Any::dealloc<T>,
-                .eq = jule::Any::eq<T>,
-                .to_str = jule::Any::to_str<T>,
-            };
-            return &table;
-        }
-
-        template <typename T>
-        static jule::Any::Type *new_type_ptr(void) noexcept
-        {
-            static jule::Any::Type table = {
-                .dealloc = jule::Any::dealloc<T>,
-                .eq = jule::ptr_equal,
-                .to_str = jule::Any::to_str_ptr,
-            };
-            return &table;
-        }
-
-    public:
         mutable jule::Ptr<jule::Uintptr> data;
         mutable jule::Any::Type *type = nullptr;
 
@@ -98,32 +49,9 @@ namespace jule
         }
 
         template <typename T>
-        Any(const T &data) noexcept
-        {
-            this->type = jule::Any::new_type<T>();
-            T *alloc = new (std::nothrow) T;
-            if (!alloc)
-                jule::panic(__JULE_ERROR__MEMORY_ALLOCATION_FAILED "\nfile: /api/any.hpp");
-
-            *alloc = data;
-#ifdef __JULE_DISABLE__REFERENCE_COUNTING
-            this->data = jule::Ptr<jule::Uintptr>::make(reinterpret_cast<jule::Uintptr *>(alloc), nullptr);
-#else
-            this->data = jule::Ptr<jule::Uintptr>::make(reinterpret_cast<jule::Uintptr *>(alloc));
-#endif
-        }
-
-        template <typename T>
         Any(const jule::Ptr<T> &ref, jule::Any::Type *type) noexcept
         {
             this->type = type;
-            this->data = ref.template as<jule::Uintptr>();
-        }
-
-        template <typename T>
-        Any(const jule::Ptr<T> &ref) noexcept
-        {
-            this->type = jule::Any::new_type_ptr<T>();
             this->data = ref.template as<jule::Uintptr>();
         }
 
@@ -140,18 +68,6 @@ namespace jule
             }
             this->data.ref = nullptr;
             this->data.alloc = nullptr;
-        }
-
-        template <typename T>
-        inline jule::Bool type_is(void) const noexcept
-        {
-            return this->type == jule::Any::new_type<T>();
-        }
-
-        template <typename T>
-        inline jule::Bool type_is_ptr(void) const noexcept
-        {
-            return this->type == jule::Any::new_type_ptr<T>();
         }
 
         inline void must_ok(
@@ -183,64 +99,6 @@ namespace jule
         template <typename T>
         inline T cast(
 #ifndef __JULE_ENABLE__PRODUCTION
-            const char *file
-#else
-            void
-#endif
-        ) const noexcept
-        {
-#ifndef __JULE_DISABLE__SAFETY
-            this->must_ok(
-#ifndef __JULE_ENABLE__PRODUCTION
-                file
-#endif
-            );
-            if (this->type != jule::Any::new_type<T>())
-            {
-#ifndef __JULE_ENABLE__PRODUCTION
-                std::string error = __JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: <any> casted to incompatible type\nfile: ";
-                error += file;
-                jule::panic(error);
-#else
-                jule::panic(__JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: <any> casted to incompatible type");
-#endif
-            }
-#endif
-            return *reinterpret_cast<T *>(this->data.alloc);
-        }
-
-        template <typename T>
-        jule::Ptr<T> cast_ptr(
-#ifndef __JULE_ENABLE__PRODUCTION
-            const char *file
-#else
-            void
-#endif
-        ) const noexcept
-        {
-#ifndef __JULE_DISABLE__SAFETY
-            this->must_ok(
-#ifndef __JULE_ENABLE__PRODUCTION
-                file
-#endif
-            );
-            if (this->type != jule::Any::new_type_ptr<T>())
-            {
-#ifndef __JULE_ENABLE__PRODUCTION
-                std::string error = __JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: <any> casted to incompatible type\nfile: ";
-                error += file;
-                jule::panic(error);
-#else
-                jule::panic(__JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: <any> casted to incompatible type");
-#endif
-            }
-#endif
-            return this->data.template as<T>();
-        }
-
-        template <typename T>
-        inline T cast(
-#ifndef __JULE_ENABLE__PRODUCTION
             const char *file,
 #endif
         jule::Any::Type *type) const noexcept
@@ -290,26 +148,6 @@ namespace jule
             }
 #endif
             return this->data.template as<T>();
-        }
-
-        template <typename T>
-        inline operator T(void) const noexcept
-        {
-            return this->cast<T>(
-#ifndef __JULE_ENABLE__PRODUCTION
-                "/api/any.hpp"
-#endif
-            );
-        }
-
-        template <typename T>
-        inline operator jule::Ptr<T>(void) const noexcept
-        {
-            return this->cast_ptr<T>(
-#ifndef __JULE_ENABLE__PRODUCTION
-                "/api/any.hpp"
-#endif
-            );
         }
 
         inline jule::Any &operator=(const jule::Any &src) noexcept
@@ -318,24 +156,6 @@ namespace jule
             this->data = src.data;
             this->type = src.type;
             return *this;
-        }
-
-        template <typename T>
-        inline jule::Bool operator==(const T &expr) const noexcept
-        {
-            return this->type_is<T>() && this->operator T() == expr;
-        }
-
-        template <typename T>
-        inline jule::Bool operator==(const jule::Ptr<T> &expr) const noexcept
-        {
-            return this->type_is_ptr<T>() && this->operator jule::Ptr<T>() == expr;
-        }
-
-        template <typename T>
-        constexpr jule::Bool operator!=(const T &expr) const noexcept
-        {
-            return !this->operator==(expr);
         }
 
         inline jule::Bool operator==(const jule::Any &other) const noexcept

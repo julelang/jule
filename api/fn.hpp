@@ -107,16 +107,6 @@ namespace jule
             return *this;
         }
 
-        constexpr jule::Bool operator==(const Fn<Function> &fn) const noexcept
-        {
-            return this->addr() == fn.addr();
-        }
-
-        constexpr jule::Bool operator!=(const Fn<Function> &fn) const noexcept
-        {
-            return !this->operator==(fn);
-        }
-
         constexpr jule::Bool operator==(std::nullptr_t) const noexcept
         {
             return this->buffer == nullptr;
