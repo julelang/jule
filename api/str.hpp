@@ -26,7 +26,7 @@ namespace jule
     // Built-in str type.
     class Str;
 
-    // Libraries uses this function for UTf-8 encoded Jule strings.
+    // Libraries uses this function for UTF-8 encoded Jule strings.
     // Also it is builtin str type constructor.
     template <typename T>
     jule::Str to_str(const T &obj);
