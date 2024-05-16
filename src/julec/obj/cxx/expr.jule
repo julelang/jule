@@ -937,14 +937,17 @@ impl exprCoder {
     fn errorCall(mut &self, mut m: &BuiltinErrorCallExprModel) {
         self.oc.write("return ")
         if m.Func.Decl.IsVoid() {
-            self.oc.write("jule::VoidExceptional(")
+            self.oc.write("jule::VoidExceptional(" + typeCoder.Any + "(")
         } else {
             self.oc.write("jule::Exceptional<")
             resultCoder.codeMut1(self.oc.Obj, m.Func.Result)
-            self.oc.write(">(")
+            self.oc.write(">(" + typeCoder.Any + "(")
         }
-        self.expr(m.Err)
-        self.oc.write(")")
+        self.expr(m.Err.Model)
+        let i = self.oc.pushAnyType(m.Err.Kind)
+        self.oc.write(", &" + anyTypeIdent)
+        self.oc.write(conv::Itoa(i))
+        self.oc.write("))")
     }
 
     fn copyCall(mut &self, mut m: &BuiltinCopyCallExprModel) {
