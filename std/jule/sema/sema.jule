@@ -889,7 +889,8 @@ impl Sema {
         ret tc.checkDecl(ast)
     }
 
-    fn buildFnNonGenericTypeKinds(mut &self, mut &f: &FnIns) {
+    fn buildFnNonGenericTypeKinds(mut &self, mut &f: &FnIns): (ok: bool) {
+        ok = true
         let mut generics: []&ast::GenericDecl = nil
         if f.Decl.IsMethod() {
             generics = append(f.Decl.Generics, f.Decl.Owner.Generics...)
@@ -900,11 +901,14 @@ impl Sema {
         for (_, mut p) in f.Params {
             if !p.Decl.IsSelf() {
                 p.Kind = self.buildNonGenericTypeKind(p.Decl.Kind.Decl, generics)
+                ok = ok && p.Kind != nil
             }
         }
         if !f.Decl.IsVoid() {
             f.Result = self.buildNonGenericTypeKind(f.Decl.Result.Kind.Decl, generics)
+            ok = ok && f.Result != nil
         }
+        ret
     }
 
     fn getTraitCheckFnKind(mut &self, mut &f: &Fn): &FnIns {
