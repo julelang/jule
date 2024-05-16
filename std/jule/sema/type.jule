@@ -632,6 +632,9 @@ struct typeChecker {
     // Each dimension 2 array accepted as identifier group.
     ignoreGenerics: []&GenericDecl
 
+    // Relevant type kinds that contains an ignored generic type.
+    ignoredGenerics: *[]&TypeKind
+
     // This generics used as type alias for real kind.
     useGenerics: []&TypeAlias
 
@@ -1470,10 +1473,14 @@ impl typeChecker {
         match type kind {
         | &TypeKind:
             ret (&TypeKind)(kind)
-        |:
-            ret &TypeKind{
-                Kind: kind,
+        | &Prim:
+            let mut tk = &TypeKind{Kind: kind}
+            if self.ignoredGenerics != nil {
+                unsafe { *self.ignoredGenerics = append(*self.ignoredGenerics, tk) }
             }
+            ret tk
+        |:
+            ret &TypeKind{Kind: kind}
         }
     }
 
@@ -1504,78 +1511,67 @@ impl typeChecker {
 struct identTypeLookup {}
 
 impl identTypeLookup {
-    static fn identTypeDecl(&ident: str, t: &IdentTypeDecl): bool {
-        if t.Ident == ident {
-            ret true
-        }
-        for _, g in t.Generics {
-            if identTypeLookup.exist(ident, g.Kind) {
-                ret true
-            }
-        }
-        ret false
+    static fn prim(&ident: str, t: &Prim): bool {
+        ret t.Kind == ident
     }
 
-    static fn exist(&ident: str, &k: TypeDeclKind): bool {
-        match type k {
-        | &IdentTypeDecl:
-            ret identTypeLookup.identTypeDecl(ident, (&IdentTypeDecl)(k))
-        | &SubIdentTypeDecl:
-            let sit = (&SubIdentTypeDecl)(k)
-            for _, id in sit.Idents {
-                if identTypeLookup.identTypeDecl(ident, id) {
+    static fn exist(&ident: str, mut &k: &TypeKind): bool {
+        match {
+        | k.Prim() != nil:
+            ret identTypeLookup.prim(ident, k.Prim())
+        | k.Sptr() != nil:
+            let mut sptr = k.Sptr()
+            ret identTypeLookup.exist(ident, sptr.Elem)
+        | k.Ptr() != nil:
+            let mut ptr = k.Ptr()
+            ret identTypeLookup.exist(ident, ptr.Elem)
+        | k.Slc() != nil:
+            let mut slc = k.Slc()
+            ret identTypeLookup.exist(ident, slc.Elem)
+        | k.Arr() != nil:
+            let mut arr = k.Arr()
+            ret identTypeLookup.exist(ident, arr.Elem)
+        | k.Map() != nil:
+            let mut m = k.Map()
+            ret identTypeLookup.exist(ident, m.Key) ||
+                identTypeLookup.exist(ident, m.Val)
+        | k.Struct() != nil:
+            let mut s = k.Struct()
+            for (_, mut g) in s.Generics {
+                if identTypeLookup.exist(ident, g.Kind) {
                     ret true
                 }
             }
             ret false
-        | &SptrTypeDecl:
-            let sptr = (&SptrTypeDecl)(k)
-            ret identTypeLookup.exist(ident, sptr.Elem.Kind)
-        | &PtrTypeDecl:
-            let ptr = (&PtrTypeDecl)(k)
-            ret identTypeLookup.exist(ident, ptr.Elem.Kind)
-        | &SlcTypeDecl:
-            let slc = (&SlcTypeDecl)(k)
-            ret identTypeLookup.exist(ident, slc.Elem.Kind)
-        | &ArrTypeDecl:
-            let arr = (&ArrTypeDecl)(k)
-            ret identTypeLookup.exist(ident, arr.Elem.Kind)
-        | &MapTypeDecl:
-            let m = (&MapTypeDecl)(k)
-            ret identTypeLookup.exist(ident, m.Key.Kind) ||
-                identTypeLookup.exist(ident, m.Val.Kind)
-        | &FnDecl:
-            let f = (&FnDecl)(k)
-            for _, p in f.Params {
-                if p.IsSelf() {
+        | k.Fn() != nil:
+            let mut f = k.Fn()
+            for (_, mut p) in f.Params {
+                if p.Decl.IsSelf() {
                     continue
                 }
-                if identTypeLookup.exist(ident, p.Kind.Kind) {
+                if identTypeLookup.exist(ident, p.Kind) {
                     ret true
                 }
             }
             if f.Result != nil {
-                ret identTypeLookup.exist(ident, f.Result.Kind.Kind)
+                ret identTypeLookup.exist(ident, f.Result)
             }
             ret false
-        | &TupleTypeDecl:
-            let tup = (&TupleTypeDecl)(k)
-            for _, t in tup.Types {
-                if identTypeLookup.exist(ident, t.Kind) {
+        | k.Tup() != nil:
+            let mut tup = k.Tup()
+            for (_, mut t) in tup.Types {
+                if identTypeLookup.exist(ident, t) {
                     ret true
                 }
             }
             ret false
-        | &NamespaceTypeDecl:
-            let ns = (&NamespaceTypeDecl)(k)
-            ret identTypeLookup.exist(ident, ns.Kind.Kind)
         |:
             ret false
         }
     }
 }
 
-fn kindUsesGenerics(&k: TypeDeclKind, &generics: []&GenericDecl): bool {
+fn kindUsesGenerics(mut &k: &TypeKind, &generics: []&GenericDecl): bool {
     for _, g in generics {
         if identTypeLookup.exist(g.Ident, k) {
             ret true

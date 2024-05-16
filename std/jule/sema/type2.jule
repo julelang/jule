@@ -354,6 +354,7 @@ struct dynamicTypeAnnotation {
     errorToken: &Token
     k:          *&TypeKind
     c:          &ast::TypeDecl
+    ignored:    []&TypeKind // Ignored generics.
 }
 
 impl dynamicTypeAnnotation {
@@ -487,6 +488,11 @@ impl dynamicTypeAnnotation {
     fn pushGeneric(mut self, mut &k: &TypeKind, i: int) {
         self.f.Generics[i] = &InsGeneric{Kind: k}
         let mut gd = self.f.Decl.Generics[i]
+        for (_, mut ignored) in self.ignored {
+            if gd.Ident == ignored.Str() {
+                ignored.Kind = k.Kind
+            }
+        }
         if gd.Constraint == nil || len(gd.Constraint.Mask) != 1 {
             ret
         }
@@ -625,7 +631,6 @@ impl dynamicTypeAnnotation {
             (*self.k).Kind = k.Kind
             ret true
         }
-
         ret false
     }
 
@@ -670,6 +675,7 @@ struct fnCallArgChecker {
     f:                 &FnIns
     dynamicAnnotation: bool
     argModels:         []ExprModel
+    ignored:           []&TypeKind // Ignored generics.
 }
 
 impl fnCallArgChecker {
@@ -718,7 +724,7 @@ impl fnCallArgChecker {
     }
 
     fn checkArg(mut self, mut &p: &ParamIns, mut &arg: &Data, mut &errorToken: &Token): (ok: bool) {
-        if self.dynamicAnnotation && parameterUsesGenerics(p.Decl, self.f.Decl.Generics) {
+        if self.dynamicAnnotation && parameterUsesGenerics(p, self.f.Decl.Generics) {
             ok = !p.Decl.Variadic // Accept as fail if parameter is variadic.
             if ok {
                 let mut dta = dynamicTypeAnnotation{
@@ -727,6 +733,7 @@ impl fnCallArgChecker {
                     p: p,
                     a: arg,
                     errorToken: errorToken,
+                    ignored: self.ignored,
                 }
                 ok = unsafe { dta.annotate() }
             }

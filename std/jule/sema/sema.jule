@@ -879,17 +879,18 @@ impl Sema {
     //   - For non-generic type parsed string type kinds.
     //   - For checking non-generic types.
     fn buildNonGenericTypeKind(mut &self, mut &ast: &ast::TypeDecl,
-        mut &generics: []&ast::GenericDecl): &TypeKind {
+        mut &generics: []&ast::GenericDecl, mut &ignored: []&TypeKind): &TypeKind {
         let mut tc = &typeChecker{
             s: self,
             rootLookup: self,
             lookup: self,
             ignoreGenerics: generics,
+            ignoredGenerics: &ignored,
         }
         ret tc.checkDecl(ast)
     }
 
-    fn buildFnNonGenericTypeKinds(mut &self, mut &f: &FnIns): (ok: bool) {
+    fn buildFnNonGenericTypeKinds(mut &self, mut &f: &FnIns, mut &ignored: []&TypeKind): (ok: bool) {
         ok = true
         let mut generics: []&ast::GenericDecl = nil
         if f.Decl.IsMethod() {
@@ -900,12 +901,12 @@ impl Sema {
 
         for (_, mut p) in f.Params {
             if !p.Decl.IsSelf() {
-                p.Kind = self.buildNonGenericTypeKind(p.Decl.Kind.Decl, generics)
+                p.Kind = self.buildNonGenericTypeKind(p.Decl.Kind.Decl, generics, ignored)
                 ok = ok && p.Kind != nil
             }
         }
         if !f.Decl.IsVoid() {
-            f.Result = self.buildNonGenericTypeKind(f.Decl.Result.Kind.Decl, generics)
+            f.Result = self.buildNonGenericTypeKind(f.Decl.Result.Kind.Decl, generics, ignored)
             ok = ok && f.Result != nil
         }
         ret

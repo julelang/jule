@@ -1986,6 +1986,13 @@ impl Eval {
             self.s = old
         }
 
+        let mut fcac = fnCallArgChecker{
+            e: self,
+            args: fc.Args,
+            dynamicAnnotation: dynamicAnnotation,
+            errorToken: fc.Token,
+        }
+
         if !dynamicAnnotation {
             if !f.reloaded {
                 let ok = self.s.reloadFnInsTypes(f)
@@ -1999,18 +2006,13 @@ impl Eval {
             if existInstance != nil {
                 f = existInstance
             }
-        } else if !self.s.buildFnNonGenericTypeKinds(f) {
+        } else if !self.s.buildFnNonGenericTypeKinds(f, fcac.ignored) {
             d = nil
             ret
         }
 
-        let mut fcac = fnCallArgChecker{
-            e: self,
-            f: f,
-            args: fc.Args,
-            dynamicAnnotation: dynamicAnnotation,
-            errorToken: fc.Token,
-        }
+        fcac.f = f
+
         let mut ok = false
         if f.Decl.Owner != nil {
             old, self.s = self.s, old // Save current Sema.
