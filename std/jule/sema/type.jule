@@ -1473,14 +1473,20 @@ impl typeChecker {
         match type kind {
         | &TypeKind:
             ret (&TypeKind)(kind)
-        | &Prim:
+        |:
             let mut tk = &TypeKind{Kind: kind}
-            if self.ignoredGenerics != nil {
-                unsafe { *self.ignoredGenerics = append(*self.ignoredGenerics, tk) }
+            match type kind {
+            | &Prim:
+                if self.ignoredGenerics != nil {
+                    unsafe { *self.ignoredGenerics = append(*self.ignoredGenerics, tk) }
+                }
+            | &StructIns:
+                let s = (&StructIns)(kind)
+                if s.Decl != nil && s.Decl.CppLinked {
+                    tk.CppIdent = s.Decl.Ident
+                }
             }
             ret tk
-        |:
-            ret &TypeKind{Kind: kind}
         }
     }
 
