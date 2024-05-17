@@ -1,0 +1,137 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+#build test
+
+use std::testing::{T}
+
+struct equalCase {
+    m1: map[int]str
+    m2: map[int]str
+    eq: bool
+}
+
+struct keysCase {
+    m: map[int]str
+    s: []int
+}
+
+struct valuesCase {
+    m: map[int]str
+    s: []str
+}
+
+static equalCases: []equalCase = [
+    {
+        m1: {},
+        m2: {},
+        eq: true
+    },
+    {
+        m1: {},
+        m2: nil,
+        eq: true
+    },
+    {
+        m1: nil,
+        m2: {},
+        eq: true
+    },
+    {
+        m1: {0: "Hello", 1: ", ", 2: "World", 3: "!"},
+        m2: {0: "Hello", 1: ", ", 2: "World", 3: "!"},
+        eq: true
+    },
+    {
+        m1: {10: "Foo", 13: "Bar", 22: "Baz", 34: "..."},
+        m2: {10: "Foo", 13: "Bar", 22: "Baz", 34: "..."},
+        eq: true,
+    },
+    {
+        m1: {0: "Hello", 1: ", ", 2: "World", 3: "!"},
+        m2: {0: "Hello", 1: ", ", 2: "World", 3: "!!"},
+        eq: false
+    },
+    {
+        m1: {10: "Foo", 13: "Bar", 22: "Baz"},
+        m2: {10: "Foo", 13: "Bar", 22: "Baz", 34: "..."},
+        eq: false,
+    },
+    {
+        m1: {10: "Foo", 13: "Bar", 22: "Baz"},
+        m2: {},
+        eq: false,
+    },
+    {
+        m1: {10: "Foo", 13: "Bar", 22: "Baz"},
+        m2: nil,
+        eq: false,
+    },
+]
+
+static keysCases: []keysCase = [
+    {
+        m: {0: "Hello", 1: ", ", 2: "World", 3: "!"},
+        s: [0, 1, 2, 3],
+    },
+    {
+        m: {10: "Foo", 13: "Bar", 22: "Baz", 34: "..."},
+        s: [10, 13, 22, 34],
+    },
+]
+
+static valuesCases: []valuesCase = [
+    {
+        m: {0: "Hello", 1: ", ", 2: "World", 3: "!"},
+        s: ["Hello", ", ", "World", "!"],
+    },
+    {
+        m: {10: "Foo", 13: "Bar", 22: "Baz", 34: "..."},
+        s: ["Foo", "Bar", "Baz", "..."],
+    },
+]
+
+#test
+fn equalKeys(mut t: &T) {
+    for i, case in equalCases {
+        let eq = Equal(case.m1, case.m2)
+        if eq != case.eq {
+            t.Errorf("Equal test case {} failed, expected {} found {}", i, case.eq, eq)
+        }
+    }
+}
+
+#test
+fn testKeys(mut t: &T) {
+    for i, case in keysCases {
+        let keys = Keys(case.m)
+    lookup:
+        for _, key in keys {
+            for _, ckey in case.s {
+                if key == ckey {
+                    continue lookup
+                }
+            }
+            t.Errorf("Keys test case {} failed", i)
+            break
+        }
+    }
+}
+
+#test
+fn testValues(mut t: &T) {
+    for i, case in valuesCases {
+        let values = Values(case.m)
+    lookup:
+        for _, value in values {
+            for _, cvalue in case.s {
+                if value == cvalue {
+                    continue lookup
+                }
+            }
+            t.Errorf("Values test case {} failed", i)
+            break
+        }
+    }
+}
