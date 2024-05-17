@@ -41,7 +41,10 @@ impl Kind for customType {
     }
 }
 
-struct typeCoder {}
+struct typeCoder {
+    oc: &ObjectCoder
+    rc: &resultCoder
+}
 
 impl typeCoder {
     const Any = "jule::Any"
@@ -56,8 +59,14 @@ impl typeCoder {
     const Bool = "jule::Bool"
     const Uintptr = "jule::Uintptr"
 
+    static fn new(mut &oc: &ObjectCoder): &typeCoder {
+        let mut tc = &typeCoder{oc: oc}
+        tc.rc = resultCoder.new(tc)
+        ret tc
+    }
+
     // Returns given identifier as Jule type identifier.
-    static fn toType(mut id: str): str {
+    fn toType(mut self, mut id: str): str {
         if id != types::TypeKind.Uintptr {
             id = types::RealKindOf(id)
         }
@@ -68,15 +77,15 @@ impl typeCoder {
     }
 
     // Generates C++ code of Prim TypeKind.
-    static fn prim(p: &Prim): str {
-        ret typeCoder.toType(p.Str())
+    fn prim(mut self, p: &Prim): str {
+        ret self.toType(p.Str())
     }
 
     // Generates C++ code of Tupe TypeKind.
-    static fn tuple(mut t: &Tuple): str {
+    fn tuple(mut self, mut t: &Tuple): str {
         let mut obj = "std::tuple<"
         for (_, mut tk) in t.Types {
-            obj += typeCoder.kind(tk)
+            obj += self.kind(tk)
             obj += ","
         }
         obj = obj[:len(obj)-1] // Remove comma
@@ -85,7 +94,7 @@ impl typeCoder {
     }
 
     // Returns C++ code of smart pointer type with element type.
-    static fn asSptr(elem: str): str {
+    fn asSptr(mut self, elem: str): str {
         let mut obj = typeCoder.Ptr + "<"
         obj += elem
         obj += ">"
@@ -93,59 +102,59 @@ impl typeCoder {
     }
 
     // Returns C++ code of pointer type with element type.
-    static fn asPtr(elem: str): str {
+    fn asPtr(mut self, elem: str): str {
         ret elem + "*"
     }
 
     // Generates C++ code of smart pointer TypeKind.
-    static fn sptr(mut sptr: &Sptr): str {
-        ret typeCoder.asSptr(typeCoder.kind(sptr.Elem))
+    fn sptr(mut self, mut sptr: &Sptr): str {
+        ret self.asSptr(self.kind(sptr.Elem))
     }
 
     // Generates C++ code of Ptr TypeKind.
-    static fn ptr(mut p: &Ptr): str {
+    fn ptr(mut self, mut p: &Ptr): str {
         const CppPointerMask = "*"
         if p.IsUnsafe() {
             ret "void" + CppPointerMask
         }
-        let mut elem = typeCoder.kind(p.Elem)
+        let mut elem = self.kind(p.Elem)
         elem += CppPointerMask
         ret elem
     }
 
     // Generates C++ code of Enum TypeKind.
-    static fn enumDecl(mut e: &Enum): str {
-        ret typeCoder.kind(e.Kind.Kind)
+    fn enumDecl(mut self, mut e: &Enum): str {
+        ret self.kind(e.Kind.Kind)
     }
 
     // Generates C++ code of TypeEnum TypeKind.
-    static fn typeEnumDecl(mut e: &TypeEnum): str {
+    fn typeEnumDecl(mut self, mut e: &TypeEnum): str {
         ret typeCoder.Any
     }
 
-    static fn asSlice(mut elem: &TypeKind): str {
+    fn asSlice(mut self, mut elem: &TypeKind): str {
         let mut obj = typeCoder.Slice + "<"
-        obj += typeCoder.kind(elem)
+        obj += self.kind(elem)
         obj += ">"
         ret obj
     }
 
     // Generates C++ code of Slc TypeKind.
-    static fn slice(mut s: &Slc): str {
-        ret typeCoder.asSlice(s.Elem)
+    fn slice(mut self, mut s: &Slc): str {
+        ret self.asSlice(s.Elem)
     }
 
     // Generates C++ code of Map TypeKind.
-    static fn mapType(mut m: &Map): str {
+    fn mapType(mut self, mut m: &Map): str {
         let mut obj = typeCoder.Map + "<"
-        obj += typeCoder.kind(m.Key)
+        obj += self.kind(m.Key)
         obj += ","
-        obj += typeCoder.kind(m.Val)
+        obj += self.kind(m.Val)
         obj += ">"
         ret obj
     }
 
-    static fn traitIdent(ident: str): str {
+    fn traitIdent(mut self, ident: str): str {
         let mut obj = typeCoder.Trait + "<"
         obj += ident
         obj += ">"
@@ -153,12 +162,12 @@ impl typeCoder {
     }
 
     // Generates C++ code of Trait TypeKind.
-    static fn traitDecl(t: &Trait): str {
-        ret typeCoder.traitIdent(identCoder.traitDecl(t))
+    fn traitDecl(mut self, t: &Trait): str {
+        ret self.traitIdent(identCoder.traitDecl(t))
     }
 
     // Generates C++ code of Struct TypeKind.
-    static fn structure(s: &Struct): str {
+    fn structure(mut self, s: &Struct): str {
         let mut rep = ""
         if s.CppLinked && !hasDirective(s.Directives, Directive.Typedef) {
             rep += "struct "
@@ -168,13 +177,13 @@ impl typeCoder {
     }
 
     // Generates C++ code of Struct instance TypeKind.
-    static fn structureIns(mut s: &StructIns): str {
+    fn structureIns(mut self, mut s: &StructIns): str {
         if s.Decl.CppLinked {
             let mut ident = identCoder.structureIns(s)
             if len(s.Generics) > 0 {
                 ident += "<"
                 for (_, mut g) in s.Generics {
-                    ident += typeCoder.kind(g.Kind)
+                    ident += self.kind(g.Kind)
                     ident += ","
                 }
                 ident = ident[:len(ident)-1] // Remove last comma.
@@ -190,9 +199,9 @@ impl typeCoder {
     }
 
     // Generates C++ code of Arr TypeKind.
-    static fn array(mut a: &Arr): str {
+    fn array(mut self, mut a: &Arr): str {
         let mut obj = typeCoder.Array + "<"
-        obj += typeCoder.kind(a.Elem)
+        obj += self.kind(a.Elem)
         obj += ","
         obj += conv::Itoa(a.N)
         obj += ">"
@@ -200,14 +209,14 @@ impl typeCoder {
     }
 
     // Generates C++ prototype code of parameter.
-    static fn param(mut &p: &Param): str {
+    fn param(mut self, mut &p: &Param): str {
         let mut obj = ""
         if p.Variadic {
             obj += typeCoder.Slice + "<"
-            obj += typeCoder.kind(p.Kind.Kind)
+            obj += self.kind(p.Kind.Kind)
             obj += ">"
         } else {
-            obj += typeCoder.kind(p.Kind.Kind)
+            obj += self.kind(p.Kind.Kind)
         }
         if p.Reference {
             obj += "&"
@@ -216,14 +225,14 @@ impl typeCoder {
     }
 
     // Generates C++ prototype code of parameter instance.
-    static fn paramIns(mut &p: &ParamIns): str {
+    fn paramIns(mut self, mut &p: &ParamIns): str {
         let mut obj = ""
         if p.Decl.Variadic {
             obj += typeCoder.Slice + "<"
-            obj += typeCoder.kind(p.Kind)
+            obj += self.kind(p.Kind)
             obj += ">"
         } else {
-            obj += typeCoder.kind(p.Kind)
+            obj += self.kind(p.Kind)
         }
         if p.Decl.Reference {
             obj += "&"
@@ -232,7 +241,7 @@ impl typeCoder {
     }
 
     // Generates C++ code of function's result type.
-    static fn funcResult(mut &f: &Fn): str {
+    fn funcResult(mut self, mut &f: &Fn): str {
         if f.IsVoid() {
             if f.Exceptional {
                 ret "jule::VoidExceptional"
@@ -240,13 +249,13 @@ impl typeCoder {
             ret "void"
         }
         if f.Exceptional {
-            ret "jule::Exceptional<" + typeCoder.kind(f.Result.Kind.Kind) + ">"
+            ret "jule::Exceptional<" + self.kind(f.Result.Kind.Kind) + ">"
         }
-        ret typeCoder.kind(f.Result.Kind.Kind)
+        ret self.kind(f.Result.Kind.Kind)
     }
 
     // Generates C++ code of function instance's result type.
-    static fn funcInsResult(mut &s: str, mut &f: &FnIns) {
+    fn funcInsResult(mut self, mut &s: str, mut &f: &FnIns) {
         if f.Decl.IsVoid() {
             if f.Decl.Exceptional {
                 s += "jule::VoidExceptional"
@@ -257,23 +266,26 @@ impl typeCoder {
         }
         if f.Decl.Exceptional {
             s += "jule::Exceptional<"
-            resultCoder.codeMut1(s, f.Result)
+            self.rc.codeMut1(s, f.Result)
             s += ">"
             ret
         }
-        resultCoder.codeMut1(s, f.Result)
+        self.rc.codeMut1(s, f.Result)
     }
 
-    static fn anonFunc(mut f: &FnIns): str {
+    fn anonFunc(mut self, mut f: &FnIns): str {
+        if f.Result != nil && f.Result.Tup() != nil {
+            self.oc.pushResultIns(f)
+        }
         let mut decl = ""
-        typeCoder.funcInsResult(decl, f)
+        self.funcInsResult(decl, f)
         decl += "("
         if len(f.Params) > 0 {
             for (_, mut param) in f.Params {
                 if param.Decl.IsSelf() {
                     continue
                 }
-                decl += typeCoder.paramIns(param)
+                decl += self.paramIns(param)
                 decl += ","
             }
             decl = decl[:len(decl)-1] // Remove last comma.
@@ -285,42 +297,42 @@ impl typeCoder {
     }
 
     // Generates C++ code of Fn TypeKind.
-    static fn func(mut f: &FnIns): str {
+    fn func(mut self, mut f: &FnIns): str {
         let mut obj = typeCoder.Fn + "<"
-        obj += typeCoder.anonFunc(f)
+        obj += self.anonFunc(f)
         obj += ">"
         ret obj
     }
 
     // Generates C++ code of TypeKind.
-    static fn kind(mut k: &TypeKind): str {
+    fn kind(mut self, mut k: &TypeKind): str {
         match {
         | k.CppLinked():
             ret k.CppIdent
         | k.Prim() != nil:
-            ret typeCoder.prim(k.Prim())
+            ret self.prim(k.Prim())
         | k.Tup() != nil:
-            ret typeCoder.tuple(k.Tup())
+            ret self.tuple(k.Tup())
         | k.Sptr() != nil:
-            ret typeCoder.sptr(k.Sptr())
+            ret self.sptr(k.Sptr())
         | k.Ptr() != nil:
-            ret typeCoder.ptr(k.Ptr())
+            ret self.ptr(k.Ptr())
         | k.Enum() != nil:
-            ret typeCoder.enumDecl(k.Enum())
+            ret self.enumDecl(k.Enum())
         | k.TypeEnum() != nil:
-            ret typeCoder.typeEnumDecl(k.TypeEnum())
+            ret self.typeEnumDecl(k.TypeEnum())
         | k.Slc() != nil:
-            ret typeCoder.slice(k.Slc())
+            ret self.slice(k.Slc())
         | k.Map() != nil:
-            ret typeCoder.mapType(k.Map())
+            ret self.mapType(k.Map())
         | k.Trait() != nil:
-            ret typeCoder.traitDecl(k.Trait())
+            ret self.traitDecl(k.Trait())
         | k.Struct() != nil:
-            ret typeCoder.structureIns(k.Struct())
+            ret self.structureIns(k.Struct())
         | k.Arr() != nil:
-            ret typeCoder.array(k.Arr())
+            ret self.array(k.Arr())
         | k.Fn() != nil:
-            ret typeCoder.func(k.Fn())
+            ret self.func(k.Fn())
         }
         match type k.Kind {
         | &customType:
@@ -331,7 +343,9 @@ impl typeCoder {
     }
 }
 
-struct resultCoder {}
+struct resultCoder {
+    tc: &typeCoder
+}
 
 impl resultCoder {
     const Map = "m"
@@ -342,67 +356,71 @@ impl resultCoder {
     const Reference = "r"
     const Fn = "f"
 
-    static fn ptr(mut &s: str, mut p: &Ptr) {
+    static fn new(mut &tc: &typeCoder): &resultCoder {
+        ret &resultCoder{tc: tc}
+    }
+
+    fn ptr(mut self, mut &s: str, mut p: &Ptr) {
         s += resultCoder.Ptr
-        resultCoder.codeMut(s, p.Elem)
+        self.codeMut(s, p.Elem)
     }
 
-    static fn sptr(mut &s: str, mut p: &Sptr) {
+    fn sptr(mut self, mut &s: str, mut p: &Sptr) {
         s += resultCoder.Sptr
-        resultCoder.codeMut(s, p.Elem)
+        self.codeMut(s, p.Elem)
     }
 
-    static fn mapType(mut &s: str, mut p: &Map) {
+    fn mapType(mut self, mut &s: str, mut p: &Map) {
         s += resultCoder.Map
-        resultCoder.codeMut(s, p.Key)
-        resultCoder.codeMut(s, p.Val)
+        self.codeMut(s, p.Key)
+        self.codeMut(s, p.Val)
     }
 
-    static fn slice(mut &s: str, mut slc: &Slc) {
+    fn slice(mut self, mut &s: str, mut slc: &Slc) {
         s += resultCoder.Slice
-        resultCoder.codeMut(s, slc.Elem)
+        self.codeMut(s, slc.Elem)
     }
 
-    static fn arr(mut &s: str, mut arr: &Arr) {
+    fn arr(mut self, mut &s: str, mut arr: &Arr) {
         s += resultCoder.Array
         s += conv::FmtInt(i64(arr.N), 16)
-        resultCoder.codeMut(s, arr.Elem)
+        self.codeMut(s, arr.Elem)
     }
 
-    static fn func(mut &s: str, mut f: &FnIns) {
+    fn func(mut self, mut &s: str, mut f: &FnIns) {
         s += resultCoder.Fn
         for (_, mut p) in f.Params {
             if p.Decl.Reference {
                 s += resultCoder.Reference
             }
-            resultCoder.codeMut(s, p.Kind)
+            self.codeMut(s, p.Kind)
         }
         if f.Result != nil {
-            resultCoder.codeMut(s, f.Result)
+            self.codeMut(s, f.Result)
         }
     }
 
-    static fn tup(mut &s: str, mut tup: &Tuple) {
+    fn tup(mut self, mut &s: str, mut tup: &Tuple) {
         for (_, mut t) in tup.Types {
             s += "__jule_tuple_"
-            resultCoder.codeMut(s, t)
+            self.codeMut(s, t)
         }
     }
 
-    static fn codeMut(mut &s: str, mut &t: &TypeKind) {
+    fn codeMut(mut self, mut &s: str, mut &t: &TypeKind) {
         match type t.Kind {
         | &Ptr:
-            resultCoder.ptr(s, (&Ptr)(t.Kind))
+            self.ptr(s, (&Ptr)(t.Kind))
         | &Sptr:
-            resultCoder.sptr(s, (&Sptr)(t.Kind))
+            self.sptr(s, (&Sptr)(t.Kind))
         | &Map:
-            resultCoder.mapType(s, (&Map)(t.Kind))
+            self.mapType(s, (&Map)(t.Kind))
         | &Slc:
-            resultCoder.slice(s, (&Slc)(t.Kind))
+            self.slice(s, (&Slc)(t.Kind))
         | &Arr:
-            resultCoder.arr(s, (&Arr)(t.Kind))
+            self.arr(s, (&Arr)(t.Kind))
         | &FnIns:
-            resultCoder.func(s, (&FnIns)(t.Kind))
+            self.func(s, (&FnIns)(t.Kind))
         | &Enum:
             let te = (&Enum)(t.Kind)
             s += identCoder.toOut(te.Ident, uintptr(te))
@@ -418,24 +436,24 @@ impl resultCoder {
         | &Prim:
             s += (&Prim)(t.Kind).Kind
         | &Tuple:
-            resultCoder.tup(s, (&Tuple)(t.Kind))
+            self.tup(s, (&Tuple)(t.Kind))
         |:
             panic("this panic call should be unreachable")
         }
     }
 
-    static fn codeMut1(mut &s: str, mut &t: &TypeKind) {
+    fn codeMut1(mut self, mut &s: str, mut &t: &TypeKind) {
         let mut tup = t.Tup()
         if tup != nil {
-            resultCoder.tup(s, tup)
+            self.tup(s, tup)
         } else {
-            s += typeCoder.kind(t)
+            s += self.tc.kind(t)
         }
     }
 
-    static fn code(mut &t: &TypeKind): str {
+    fn code(mut self, mut &t: &TypeKind): str {
         let mut s = make(str, 0, 20)
-        resultCoder.codeMut(s, t)
+        self.codeMut(s, t)
         ret s
     }
 }

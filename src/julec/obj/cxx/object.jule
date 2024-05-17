@@ -60,6 +60,7 @@ struct ObjectCoder {
     // Internal buffer which is commonly used.
     Obj: str
 
+    resultDecls: []str
     anyObj: str
 
     ir:   &IR
@@ -74,7 +75,10 @@ struct ObjectCoder {
 
     ec: &exprCoder
     sc: &scopeCoder
+    tc: &typeCoder
+    dc: &deriveCoder
 
+    headPos: int
     declPos: int
 }
 
@@ -86,6 +90,8 @@ impl ObjectCoder {
         }
         oc.ec = exprCoder.new(oc)
         oc.sc = scopeCoder.new(oc)
+        oc.tc = typeCoder.new(oc)
+        oc.dc = deriveCoder.new(oc)
         ret oc
     }
 
@@ -126,8 +132,8 @@ impl ObjectCoder {
         self.anyTypeMap = append(self.anyTypeMap, t)
         let si = conv::Itoa(i)
         if t.Sptr() != nil {
-            let elem_kind = typeCoder.kind(t.Sptr().Elem)
-            let kind = typeCoder.asSptr(elem_kind)
+            let elem_kind = self.tc.kind(t.Sptr().Elem)
+            let kind = self.tc.asSptr(elem_kind)
 
             // dealloc function.
             self.anyObj += "void " + anyTypeIdent
@@ -154,7 +160,7 @@ impl ObjectCoder {
             self.anyObj += " && jule::ptr_equal(any.data.alloc, other.alloc); }\n"
         } else {
             let comparable = t.Comparable()
-            let kind = typeCoder.kind(t)
+            let kind = self.tc.kind(t)
             if kind == "[<unimplemented_type_kind>]" {
                 outln(t.Str())
             }
@@ -216,38 +222,39 @@ impl ObjectCoder {
         ret i
     }
 
+    fn pushResultIns(mut &self, mut &f: &FnIns) {
+        let s = self.tc.rc.code(f.Result)
+        let (_, ok) = self.resultMap[s]
+        if ok {
+            ret
+        }
+        self.resultMap[s] = false
+        let mut obj = make(str, 0, 128)
+        obj += "struct "
+        obj += s
+        obj += " {\n"
+        for (i, mut t) in f.Result.Tup().Types {
+            obj += indentKind
+            obj += self.tc.kind(t)
+            obj += " "
+            obj += resultArgName
+            obj += conv::Itoa(i)
+            obj += ";\n"
+        }
+        obj += "};\n"
+        self.resultDecls = append(self.resultDecls, obj)
+    }
+
     fn pushResult(mut &self, mut &f: &Fn) {
         if f.IsVoid() || len(f.Result.Idents) <= 1 {
             ret
         }
-
         let mut n = len(f.Instances)
         if len(f.Generics) == 0 {
             n = 1
         }
         for (_, mut ins) in f.Instances[:n] {
-            let s = resultCoder.code(ins.Result)
-            let (_, ok) = self.resultMap[s]
-            if ok {
-                continue
-            }
-            self.resultMap[s] = false
-            self.write("struct ")
-            self.write(s)
-            self.write(" {\n")
-            self.addIndent()
-            for (i, mut t) in ins.Result.Tup().Types {
-                self.indent()
-                self.write(typeCoder.kind(t))
-                self.write(" ")
-                self.write(resultArgName)
-                self.write(conv::Itoa(i))
-                self.write(";\n")
-            }
-            self.doneIndent()
-            self.indent()
-            self.write("};\n")
-            self.indent()
+            self.pushResultIns(ins)
         }
     }
 
@@ -353,10 +360,36 @@ impl ObjectCoder {
         }
     }
 
+    fn prepareStructure(mut self, mut &s: &Struct) {
+        for (_, mut ins) in s.Instances {
+            for (_, mut m) in ins.Methods {
+                if m.Statically {
+                    continue
+                }
+                for (_, mut mins) in m.Instances {
+                    let mut p = mins.Params[0]
+                    if !p.Decl.IsRef() {
+                        p.Kind = &TypeKind{
+                            Kind: &customType{
+                                kind: self.tc.asPtr(self.tc.kind(p.Kind)),
+                            },
+                        }
+                    } else {
+                        p.Kind = &TypeKind{
+                            Kind: &customType{
+                                kind: self.tc.kind(p.Kind),
+                            },
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     fn prepareStructures(mut &self) {
         for (_, mut s) in self.ir.Ordered.Structs {
             if s.Token != nil {
-                prepareStructure(s)
+                self.prepareStructure(s)
             }
         }
     }
@@ -434,7 +467,7 @@ impl ObjectCoder {
     }
 
     fn fieldDecl(mut &self, mut &f: &FieldIns) {
-        self.write(typeCoder.kind(f.Kind))
+        self.write(self.tc.kind(f.Kind))
         self.write(" ")
         self.write(identCoder.field(f.Decl))
         if f.Default == nil {
@@ -470,7 +503,7 @@ impl ObjectCoder {
     fn structureDeriveDefsDecls(mut &self, &s: &StructIns) {
         if s.Decl.IsDerives(Derive.Clone) {
             self.indent()
-            self.write(deriveCoder.cloneFuncDecl(s.Decl))
+            self.write(self.dc.cloneFuncDecl(s.Decl))
             self.write(";\n\n")
         }
     }
@@ -574,7 +607,7 @@ impl ObjectCoder {
         self.write("(")
         if !unary {
             let mut p = f.Params[1]
-            self.write(typeCoder.paramIns(p))
+            self.write(self.tc.paramIns(p))
             self.write(" _other")
         }
         self.write(") { ")
@@ -696,7 +729,7 @@ impl ObjectCoder {
 
         self.write("(")
         for (i, mut p) in params {
-            self.write(typeCoder.paramIns(p))
+            self.write(self.tc.paramIns(p))
             if len(params)-i > 1 {
                 self.write(", ")
             }
@@ -709,7 +742,7 @@ impl ObjectCoder {
         if !ptr && opt::Inline && !f.Decl.IsEntryPoint() {
             self.write("inline ")
         }
-        typeCoder.funcInsResult(self.Obj, f)
+        self.tc.funcInsResult(self.Obj, f)
         if ptr {
             self.write("(*")
             self.write(identCoder.funcIns(f))
@@ -788,7 +821,7 @@ impl ObjectCoder {
     }
 
     fn paramIns(mut &self, mut &p: &ParamIns) {
-        self.write(typeCoder.paramIns(p))
+        self.write(self.tc.paramIns(p))
         self.write(" ")
         self.write(identCoder.param(p.Decl))
     }
@@ -813,7 +846,7 @@ impl ObjectCoder {
             self.write("static ")
         }
 
-        self.write(typeCoder.kind(v.Kind.Kind))
+        self.write(self.tc.kind(v.Kind.Kind))
         self.write(" ")
         if v.Reference {
             self.write("&")
@@ -893,7 +926,7 @@ impl ObjectCoder {
                 self.write("(")
                 if ptr {
                     self.write("_self_.safe_ptr<")
-                    self.write(typeCoder.structureIns(hash.s))
+                    self.write(self.tc.structureIns(hash.s))
                     self.write(">(")
                     if !env::Production {
                         self.write("_00___file")
@@ -901,7 +934,7 @@ impl ObjectCoder {
                     self.write(")")
                 } else {
                     self.write("_self_.data.as<")
-                    self.write(typeCoder.structure(sm.Owner))
+                    self.write(self.tc.structure(sm.Owner))
                     self.write(">()")
                 }
                 for _, mp in m.Params[1:] {
@@ -959,7 +992,7 @@ impl ObjectCoder {
 
     fn globals(mut &self) {
         for (_, mut v) in self.ir.Ordered.Globals {
-            self.write(typeCoder.kind(v.Kind.Kind))
+            self.write(self.tc.kind(v.Kind.Kind))
             self.write(" ")
             if v.Reference {
                 self.write("&")
@@ -974,6 +1007,7 @@ impl ObjectCoder {
     fn decls(mut &self) {
         self.traitDecls()
         self.structurePlainDecls()
+        self.headPos = len(self.Obj)
         self.structureDecls()
         self.funcDecls()
         self.write("\n\n")
@@ -996,11 +1030,11 @@ impl ObjectCoder {
 
     fn structureDeriveDefs(mut &self, mut &s: &StructIns) {
         if s.Decl.IsDerives(Derive.Clone) {
-            self.write(deriveCoder.cloneFuncDef(s.Decl))
+            self.write(self.dc.cloneFuncDef(s.Decl))
             self.write("{\n")
             self.addIndent()
             self.indent()
-            self.write(typeCoder.structureIns(s))
+            self.write(self.tc.structureIns(s))
             self.write(" clone;\n")
             for _, f in s.Fields {
                 let ident = identCoder.field(f.Decl)
@@ -1157,16 +1191,29 @@ impl ObjectCoder {
         self.head()
         self.write("\n")
         self.decls()
+
+        if len(self.resultDecls) > 0 {
+            let mut head = self.Obj[:self.headPos]
+            for _, decl in self.resultDecls {
+                head += decl
+                self.declPos += len(decl)
+            }
+            head += self.Obj[self.headPos:]
+            self.Obj = head
+        }
+
         self.write("\n")
         self.structures()
         self.funcs()
         self.initCaller()
         self.write("\n\n")
 
-        let mut head = self.Obj[:self.declPos]
-        head += self.anyObj
-        head += self.Obj[self.declPos:]
-        self.Obj = head
+        if len(self.anyObj) > 0 {
+            let mut head = self.Obj[:self.declPos]
+            head += self.anyObj
+            head += self.Obj[self.declPos:]
+            self.Obj = head
+        }
     }
 
     fn Serialize(mut &self) {
@@ -1178,32 +1225,6 @@ impl ObjectCoder {
 fn iterFiles(mut &pkg: &Package, f: fn(mut &f: &SymbolTable)) {
     for (_, mut file) in pkg.Files {
         f(file)
-    }
-}
-
-fn prepareStructure(mut &s: &Struct) {
-    for (_, mut ins) in s.Instances {
-        for (_, mut m) in ins.Methods {
-            if m.Statically {
-                continue
-            }
-            for (_, mut mins) in m.Instances {
-                let mut p = mins.Params[0]
-                if !p.Decl.IsRef() {
-                    p.Kind = &TypeKind{
-                        Kind: &customType{
-                            kind: typeCoder.asPtr(typeCoder.kind(p.Kind)),
-                        },
-                    }
-                } else {
-                    p.Kind = &TypeKind{
-                        Kind: &customType{
-                            kind: typeCoder.kind(p.Kind),
-                        },
-                    }
-                }
-            }
-        }
     }
 }
 

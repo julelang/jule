@@ -288,7 +288,7 @@ impl exprCoder {
     }
 
     fn structureIns(mut &self, mut m: &StructIns) {
-        self.oc.write(typeCoder.structureIns(m))
+        self.oc.write(self.oc.tc.structureIns(m))
     }
 
     fn unary(mut &self, mut m: &UnaryExprModel) {
@@ -374,7 +374,7 @@ impl exprCoder {
         | m.ExprKind.Ptr() != nil
         | m.Kind.Ptr() != nil:
             self.oc.write("((")
-            self.oc.write(typeCoder.kind(m.Kind))
+            self.oc.write(self.oc.tc.kind(m.Kind))
             self.oc.write(")(")
             self.expr(m.Expr)
             self.oc.write("))")
@@ -383,10 +383,10 @@ impl exprCoder {
             self.oc.write(".")
             if m.Kind.Sptr() != nil {
                 self.oc.write("cast_ptr<")
-                self.oc.write(typeCoder.kind(m.Kind.Sptr().Elem))
+                self.oc.write(self.oc.tc.kind(m.Kind.Sptr().Elem))
             } else {
                 self.oc.write("cast<")
-                self.oc.write(typeCoder.kind(m.Kind))
+                self.oc.write(self.oc.tc.kind(m.Kind))
             }
             self.oc.write(">(")
             if !env::Production {
@@ -402,22 +402,22 @@ impl exprCoder {
             self.oc.write(".")
             if env::Production {
                 self.oc.write("operator ")
-                self.oc.write(typeCoder.kind(m.Kind))
+                self.oc.write(self.oc.tc.kind(m.Kind))
                 self.oc.write("()")
             } else {
                 if m.Kind.Sptr() != nil {
                     self.oc.write("cast_ptr<")
-                    self.oc.write(typeCoder.kind(m.Kind.Sptr().Elem))
+                    self.oc.write(self.oc.tc.kind(m.Kind.Sptr().Elem))
                 } else {
                     self.oc.write("cast<")
-                    self.oc.write(typeCoder.kind(m.Kind))
+                    self.oc.write(self.oc.tc.kind(m.Kind))
                 }
                 self.oc.write(">(\"")
                 self.oc.locInfo(m.Token)
                 self.oc.write("\")")
             }
         | m.Kind.Trait() != nil:
-            self.oc.write(typeCoder.kind(m.Kind))
+            self.oc.write(self.oc.tc.kind(m.Kind))
             self.oc.write("(")
             self.expr(m.Expr)
             self.oc.write(", ")
@@ -425,7 +425,7 @@ impl exprCoder {
             self.oc.write(")")
         |:
             self.oc.write("static_cast<")
-            self.oc.write(typeCoder.kind(m.Kind))
+            self.oc.write(self.oc.tc.kind(m.Kind))
             self.oc.write(">(")
             self.expr(m.Expr)
             self.oc.write(")")
@@ -516,7 +516,7 @@ impl exprCoder {
                 if !hasDirective(m.Func.Decl.Directives, Directive.Cdef) {
                     self.oc.write("<")
                     for (i, mut g) in m.Func.Generics {
-                        self.oc.write(typeCoder.kind(g.Kind))
+                        self.oc.write(self.oc.tc.kind(g.Kind))
                         if len(m.Func.Generics)-i > 1 {
                             self.oc.write(",")
                         }
@@ -603,7 +603,7 @@ impl exprCoder {
             let name = "_co_arg_" + conv::Itoa(i)
             head += name
             self.oc.indent()
-            self.oc.write(typeCoder.kind(m.Func.Params[i].Kind))
+            self.oc.write(self.oc.tc.kind(m.Func.Params[i].Kind))
             self.oc.write(" ")
             if m.Func.Params[i].Decl.Reference {
                 self.oc.write("&")
@@ -637,7 +637,7 @@ impl exprCoder {
             ret
         }
         let mut tup = (&TupleExprModel)(d.Model)
-        resultCoder.tup(self.oc.Obj, f.Result.Tup())
+        self.oc.tc.rc.tup(self.oc.Obj, f.Result.Tup())
         self.oc.write("{")
         for i, data in tup.Datas {
             self.oc.write("." + resultArgName)
@@ -724,11 +724,11 @@ impl exprCoder {
 
     fn slice(mut &self, mut m: &SliceExprModel) {
         if len(m.Elems) == 0 {
-            self.oc.write(typeCoder.asSlice(m.ElemKind))
+            self.oc.write(self.oc.tc.asSlice(m.ElemKind))
             self.oc.write("()")
             ret
         }
-        self.oc.write(typeCoder.asSlice(m.ElemKind))
+        self.oc.write(self.oc.tc.asSlice(m.ElemKind))
         self.oc.write("::make({")
         self.args(m.Elems)
         self.oc.write("})")
@@ -772,11 +772,11 @@ impl exprCoder {
     }
 
     fn anonFunc(mut &self, mut m: &AnonFnExprModel) {
-        self.oc.write(typeCoder.func(m.Func))
+        self.oc.write(self.oc.tc.func(m.Func))
         self.oc.write("([=]")
         self.oc.paramsIns(m.Func.Params)
         self.oc.write(" mutable -> ")
-        typeCoder.funcInsResult(self.oc.Obj, m.Func)
+        self.oc.tc.funcInsResult(self.oc.Obj, m.Func)
         self.oc.write(" ")
         self.oc.sc.funcScope(m.Func)
         self.oc.write(")")
@@ -784,9 +784,9 @@ impl exprCoder {
 
     fn mapExpr(mut &self, mut m: &MapExprModel) {
         self.oc.write(typeCoder.Map + "<")
-        self.oc.write(typeCoder.kind(m.KeyKind))
+        self.oc.write(self.oc.tc.kind(m.KeyKind))
         self.oc.write(",")
-        self.oc.write(typeCoder.kind(m.ValKind))
+        self.oc.write(self.oc.tc.kind(m.ValKind))
         self.oc.write(">({")
         if len(m.Entries) > 0 {
             for (i, mut pair) in m.Entries {
@@ -872,7 +872,7 @@ impl exprCoder {
     }
 
     fn array(mut &self, mut m: &ArrayExprModel) {
-        self.oc.write(typeCoder.array(m.Kind))
+        self.oc.write(self.oc.tc.array(m.Kind))
         if len(m.Elems) == 0 {
             self.oc.write("()")
             ret
@@ -895,7 +895,7 @@ impl exprCoder {
     // Writes complete expression model of function instance.
     // Usefull for strict type safety.
     fn funcInsCommon(mut &self, mut m: &FnIns) {
-        self.oc.write(typeCoder.func(m))
+        self.oc.write(self.oc.tc.func(m))
         self.oc.write("(")
         self.funcIns(m)
         self.oc.write(")")
@@ -925,7 +925,7 @@ impl exprCoder {
 
     fn newCall(mut &self, mut m: &BuiltinNewCallExprModel) {
         self.oc.write("jule::new_ptr<")
-        self.oc.write(typeCoder.kind(m.Kind))
+        self.oc.write(self.oc.tc.kind(m.Kind))
         self.oc.write(">(")
         if m.Init != nil {
             self.expr(m.Init)
@@ -978,7 +978,7 @@ impl exprCoder {
             self.oc.write("jule::VoidExceptional(" + typeCoder.Any + "(")
         } else {
             self.oc.write("jule::Exceptional<")
-            resultCoder.codeMut1(self.oc.Obj, m.Func.Result)
+            self.oc.tc.rc.codeMut1(self.oc.Obj, m.Func.Result)
             self.oc.write(">(" + typeCoder.Any + "(")
         }
         self.expr(m.Err.Model)
@@ -1027,7 +1027,7 @@ impl exprCoder {
 
     fn makeCallSlice(mut &self, mut &m: &BuiltinMakeCallExprModel) {
         let mut slice = m.Kind.Slc()
-        self.oc.write(typeCoder.kind(m.Kind))
+        self.oc.write(self.oc.tc.kind(m.Kind))
         self.oc.write("::alloc(")
         self.expr(m.Len)
         self.oc.write(", ")
@@ -1182,7 +1182,7 @@ impl exprCoder {
         | str:
             self.oc.write(str(m))
         | &TypeKind:
-            self.oc.write(typeCoder.kind((&TypeKind)(m)))
+            self.oc.write(self.oc.tc.kind((&TypeKind)(m)))
         | &Const:
             self.constant((&Const)(m))
         | &Var:
@@ -1295,14 +1295,14 @@ impl exprCoder {
             if t.Ptr() != nil {
                 self.oc.write("nullptr")
             } else {
-                self.oc.write(typeCoder.kind(t))
+                self.oc.write(self.oc.tc.kind(t))
                 self.oc.write("(nullptr)")
             }
             ret
         }
         let mut tup = t.Tup()
         if tup != nil {
-            resultCoder.tup(self.oc.Obj, tup)
+            self.oc.tc.rc.tup(self.oc.Obj, tup)
             self.oc.write("{")
             for (i, mut tt) in tup.Types {
                 if !shouldInitialized(tt) {
@@ -1337,7 +1337,7 @@ impl exprCoder {
         }
         if t.Arr() != nil {
             let mut arr = t.Arr()
-            self.oc.write(typeCoder.kind(t))
+            self.oc.write(self.oc.tc.kind(t))
             self.oc.write("(")
             self.initExpr(arr.Elem)
             self.oc.write(")")
@@ -1346,11 +1346,11 @@ impl exprCoder {
         let mut s = t.Struct()
         if s != nil && s.Decl.CppLinked && findDirective(s.Decl.Directives, Directive.Typedef) == nil {
             self.oc.write("(")
-            self.oc.write(typeCoder.kind(t))
+            self.oc.write(self.oc.tc.kind(t))
             self.oc.write("){}")
             ret
         }
-        self.oc.write(typeCoder.kind(t))
+        self.oc.write(self.oc.tc.kind(t))
         self.oc.write("()")
     }
 }

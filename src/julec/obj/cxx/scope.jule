@@ -351,7 +351,7 @@ impl scopeCoder {
             self.oc.indent()
             let mut l = a.L[i]
             if l != nil {
-                self.oc.write(typeCoder.kind(l.Kind))
+                self.oc.write(self.oc.tc.kind(l.Kind))
                 self.oc.write(" ")
                 self.oc.write(identCoder.toOut(assignArgName, uintptr(i)))
                 self.oc.write(" = ")
@@ -381,7 +381,7 @@ impl scopeCoder {
         self.oc.indent()
 
         let mut f = (&FnCallExprModel)(a.R)
-        resultCoder.codeMut1(self.oc.Obj, f.Func.Result)
+        self.oc.tc.rc.codeMut1(self.oc.Obj, f.Func.Result)
         self.oc.write(" " + assignResultName + " = ")
         self.oc.ec.expr(a.R)
         self.oc.write(";\n")
@@ -458,7 +458,7 @@ impl scopeCoder {
                     let mut tk = (&TypeKind)(expr.Model)
                     if m.Expr.Kind.Trait() != nil {
                         self.oc.write(".type_is<")
-                        self.oc.write(typeCoder.kind(tk))
+                        self.oc.write(self.oc.tc.kind(tk))
                         self.oc.write(">()")
                     } else { // Any type.
                         let j = self.oc.pushAnyType(tk)
@@ -596,7 +596,7 @@ impl scopeCoder {
         } else if len(r.Func.Decl.Result.Idents) == 0 {
             if r.Func.Decl.Exceptional {
                 self.oc.write("return jule::Exceptional<")
-                self.oc.write(typeCoder.kind(r.Func.Result))
+                self.oc.write(self.oc.tc.kind(r.Func.Result))
                 self.oc.write(">(jule::Any(), ")
                 self.oc.ec.expr(r.Expr)
                 self.oc.write(");")
@@ -613,7 +613,7 @@ impl scopeCoder {
         }
         if r.Func.Decl.Exceptional {
             self.oc.write("return jule::Exceptional<")
-            resultCoder.codeMut1(self.oc.Obj, r.Func.Result)
+            self.oc.tc.rc.codeMut1(self.oc.Obj, r.Func.Result)
             self.oc.write(">(jule::Any(), " + resultName + ");")
         } else {
             self.oc.write("return " + resultName + ";")
@@ -712,7 +712,7 @@ impl scopeCoder {
             let mut tup = f.Result.Tup()
             if tup != nil {
                 self.oc.indent()
-                resultCoder.tup(self.oc.Obj, tup)
+                self.oc.tc.rc.tup(self.oc.Obj, tup)
                 self.oc.write(" " + resultName + ";\n")
                 for (i, mut t) in tup.Types {
                     if shouldInitialized(t) {
@@ -726,7 +726,7 @@ impl scopeCoder {
                 }
             } else if len(f.Decl.Result.Idents) == 1 {
                 self.oc.indent()
-                self.oc.write(typeCoder.kind(f.Result))
+                self.oc.write(self.oc.tc.kind(f.Result))
                 self.oc.write(" " + resultName)
                 if shouldInitialized(f.Result) {
                     self.oc.write(" = ")
