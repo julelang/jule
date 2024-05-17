@@ -481,13 +481,17 @@ impl Eval {
     }
 
     fn _evalStruct(self, mut s: &StructIns): &Data {
-        ret &Data{
+        let mut d = &Data{
             Decl: true,
             Kind: &TypeKind{
                 Kind: s,
             },
             Model: s,
         }
+        if s.Decl != nil && s.Decl.CppLinked {
+            d.Kind.CppIdent = s.Decl.Ident
+        }
+        ret d
     }
 
     fn evalStruct(mut self, mut s: &StructIns, errorToken: &Token): &Data {
@@ -1802,7 +1806,7 @@ impl Eval {
         }
         slc.check(exprs)
 
-        ret &Data{
+        let mut d = &Data{
             Mutable: !self.immutable,
             Kind: &TypeKind{
                 Kind: s,
@@ -1812,6 +1816,10 @@ impl Eval {
                 Args: slc.args,
             },
         }
+        if s.Decl.CppLinked {
+            d.Kind.CppIdent = s.Decl.Ident
+        }
+        ret d
     }
 
     fn evalStructLit(mut &self, mut lit: &StructLit): &Data {
