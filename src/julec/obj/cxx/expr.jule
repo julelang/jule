@@ -29,6 +29,7 @@ use std::jule::sema::{
     StructLitExprModel,
     AllocStructLitExprModel,
     CastingExprModel,
+    Stmt,
     FnCallExprModel,
     SliceExprModel,
     IndexingExprModel,
@@ -629,6 +630,27 @@ impl exprCoder {
         self.oc.write("}")
     }
 
+    fn writeUseExpr(mut &self, mut &f: &FnIns, mut d: &Data) {
+        if d.Kind.Tup() == nil {
+            self.expr(d.Model)
+            self.oc.write(";")
+            ret
+        }
+        let mut tup = (&TupleExprModel)(d.Model)
+        resultCoder.tup(self.oc.Obj, f.Result.Tup())
+        self.oc.write("{")
+        for i, data in tup.Datas {
+            self.oc.write("." + resultArgName)
+            self.oc.write(conv::Itoa(i))
+            self.oc.write("=")
+            self.oc.ec.expr(data.Model)
+            if len(tup.Datas)-i > 1 {
+                self.oc.write(", ")
+            }
+        }
+        self.oc.write("};")
+    }
+
     fn funcCall(mut &self, mut m: &FnCallExprModel) {
         if m.IsCo {
             self.coFuncCall(m)
@@ -660,7 +682,23 @@ impl exprCoder {
                 if forwarded {
                     self.oc.write("{")
                 }
-                self.oc.sc.scope(m.Except)
+                let mut stmt = m.Except.Stmts[len(m.Except.Stmts)-1]
+                match type stmt {
+                | &Data:
+                    m.Except.Stmts = m.Except.Stmts[:len(m.Except.Stmts)-1]
+                    self.oc.write("{\n")
+                    self.oc.addIndent()
+                    self.oc.sc.scopeStmts(m.Except)
+                    self.oc.write("\n")
+                    self.oc.indent()
+                    self.writeUseExpr(m.Func, (&Data)(stmt))
+                    self.oc.write("\n")
+                    self.oc.doneIndent()
+                    self.oc.indent()
+                    self.oc.write("}")
+                |:
+                    self.oc.sc.scope(m.Except)
+                }
                 if forwarded {
                     self.oc.write(" ")
                     self.initExpr(m.Func.Result)
