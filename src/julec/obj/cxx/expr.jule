@@ -367,7 +367,21 @@ impl exprCoder {
             }
             let i = self.oc.pushAnyType(m.ExprKind)
             self.oc.write(typeCoder.Any + "(")
-            self.model(m.Expr)
+            match type m.Expr {
+            | &Const:
+                let prim = m.ExprKind.Prim()
+                if prim != nil && types::IsInt(prim.Kind) {
+                    self.oc.write("static_cast<")
+                    self.oc.write(self.oc.tc.prim(prim))
+                    self.oc.write(">(")
+                    self.model(m.Expr)
+                    self.oc.write(")")
+                    break
+                }
+                fall
+            |:
+                self.model(m.Expr)
+            }
             self.oc.write(", &" + anyTypeIdent)
             self.oc.write(conv::Itoa(i))
             self.oc.write(")")
