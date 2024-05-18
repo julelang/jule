@@ -43,8 +43,8 @@ namespace jule
             std::fill(this->begin(), this->end(), def);
         }
 
-        using Iterator = Item*;
-        using ConstIterator = const Item*;
+        using Iterator = Item *;
+        using ConstIterator = const Item *;
 
         constexpr Iterator begin(void) noexcept
         {

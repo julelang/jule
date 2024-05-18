@@ -62,7 +62,8 @@ namespace jule
 
         void dealloc(void) noexcept
         {
-            if (this->type) {
+            if (this->type)
+            {
                 this->type->dealloc(this->data);
                 this->type = nullptr;
             }
@@ -101,7 +102,7 @@ namespace jule
 #ifndef __JULE_ENABLE__PRODUCTION
             const char *file,
 #endif
-        jule::Any::Type *type) const noexcept
+            jule::Any::Type *type) const noexcept
         {
 #ifndef __JULE_DISABLE__SAFETY
             this->must_ok(
@@ -128,7 +129,7 @@ namespace jule
 #ifndef __JULE_ENABLE__PRODUCTION
             const char *file,
 #endif
-        jule::Any::Type *type) const noexcept
+            jule::Any::Type *type) const noexcept
         {
 #ifndef __JULE_DISABLE__SAFETY
             this->must_ok(

@@ -22,8 +22,7 @@ namespace jule
 {
     constexpr signed int EXIT_PANIC = 2;
 
-    __attribute__((noreturn))
-    void panic(const std::string &expr)
+    __attribute__((noreturn)) void panic(const std::string &expr)
     {
         std::cerr << "panic: ";
 #ifdef OS_WINDOWS

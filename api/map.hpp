@@ -54,7 +54,8 @@ namespace jule
         jule::MapKeyHasher::fnv1a hasher;
 
     public:
-        inline size_t operator()(const jule::Slice<jule::U8> &key) const noexcept {
+        inline size_t operator()(const jule::Slice<jule::U8> &key) const noexcept
+        {
             this->hasher.reset();
             this->hasher.write(key);
             return this->hasher.sum;
@@ -112,12 +113,16 @@ namespace jule
             this->buffer.clear();
         }
 
-        inline void lookup(const Key &key, Value *value, jule::Bool *ok) const {
+        inline void lookup(const Key &key, Value *value, jule::Bool *ok) const
+        {
             auto it = this->buffer.find(key);
-            if (it == this->end()) {
+            if (it == this->end())
+            {
                 if (ok)
                     *ok = false;
-            } else {
+            }
+            else
+            {
                 if (value)
                     *value = it->second;
                 if (ok)

@@ -39,7 +39,8 @@ namespace jule
     public:
         mutable std::basic_string<jule::U8> buffer;
 
-        static jule::Str alloc(const jule::Int &len) noexcept {
+        static jule::Str alloc(const jule::Int &len) noexcept
+        {
             if (len < 0)
                 jule::panic("runtime: str: allocation length lower than zero");
             jule::Str s;
@@ -48,7 +49,8 @@ namespace jule
             return s;
         }
 
-        static jule::Str alloc(const jule::Int &len, const jule::Int &cap) noexcept {
+        static jule::Str alloc(const jule::Int &len, const jule::Int &cap) noexcept
+        {
             if (len < 0)
                 jule::panic("runtime: str: allocation length lower than zero");
             if (cap < 0)
@@ -231,7 +233,8 @@ namespace jule
             return this->buffer.empty();
         }
 
-        jule::Slice<jule::U8> fake_slice(void) const {
+        jule::Slice<jule::U8> fake_slice(void) const
+        {
             jule::Slice<jule::U8> slice;
             slice.data.alloc = const_cast<Iterator>(this->begin());
             slice.data.ref = nullptr;
