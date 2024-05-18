@@ -50,18 +50,18 @@ namespace jule
     public:
         mutable jule::Ptr<jule::Uintptr> data;
         mutable jule::Trait<Mask>::Type *type = nullptr;
-        mutable const std::type_info *type_info = nullptr;
-        jule::Uint type_offset = 0;
+        mutable jule::Int type_offset = -1;
+        mutable jule::Bool ptr = false;
 
         Trait(void) = default;
         Trait(std::nullptr_t) : Trait() {}
 
         template <typename T>
-        Trait(const T &data, const jule::Uint &type_offset) noexcept
+        Trait(const T &data, const jule::Int &type_offset) noexcept
         {
             this->type_offset = type_offset;
             this->type = jule::Trait<Mask>::new_type<T>();
-            this->type_info = &typeid(T);
+            this->ptr = false;
             T *alloc = new (std::nothrow) T;
             if (!alloc)
                 jule::panic(__JULE_ERROR__MEMORY_ALLOCATION_FAILED "\nfile: /api/trait.hpp");
@@ -75,11 +75,11 @@ namespace jule
         }
 
         template <typename T>
-        Trait(const jule::Ptr<T> &ref, const jule::Uint &type_offset) noexcept
+        Trait(const jule::Ptr<T> &ref, const jule::Int &type_offset) noexcept
         {
-            this->type_info = &typeid(jule::Ptr<T>);
             this->type_offset = type_offset;
             this->type = jule::Trait<Mask>::new_type<T>();
+            this->ptr = true;
             this->data = ref.template as<jule::Uintptr>();
         }
 
@@ -91,11 +91,14 @@ namespace jule
         void dealloc(void) const noexcept
         {
             if (this->type)
+            {
                 this->type->dealloc(this->data);
+                this->type = nullptr;
+            }
             this->data.ref = nullptr;
             this->data.alloc = nullptr;
-            this->type = nullptr;
-            this->type_info = nullptr;
+            this->type_offset = -1;
+            this->ptr = false;
         }
 
         inline void must_ok(
@@ -118,12 +121,9 @@ namespace jule
             }
         }
 
-        template <typename T>
-        inline jule::Bool type_is(void) const noexcept
+        inline jule::Bool type_is(const jule::Bool &ptr, const jule::Int &type_offset) const noexcept
         {
-            if (this->operator==(nullptr))
-                return false;
-            return *this->type_info == typeid(T);
+            return this->ptr == ptr && this->type_offset == type_offset;
         }
 
         template <typename T>
@@ -148,11 +148,9 @@ namespace jule
         template <typename T>
         inline T cast(
 #ifndef __JULE_ENABLE__PRODUCTION
-            const char *file
-#else
-            void
+            const char *file,
 #endif
-            ) noexcept
+            const jule::Int &type_offset) noexcept
         {
 #ifndef __JULE_DISABLE__SAFETY
             this->must_ok(
@@ -160,7 +158,7 @@ namespace jule
                 file
 #endif
             );
-            if (*this->type_info != typeid(T))
+            if (!this->type_is(false, type_offset))
             {
 #ifndef __JULE_ENABLE__PRODUCTION
                 std::string error = __JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: trait casted to incompatible type\nfile: ";
@@ -177,11 +175,9 @@ namespace jule
         template <typename T>
         jule::Ptr<T> cast_ptr(
 #ifndef __JULE_ENABLE__PRODUCTION
-            const char *file
-#else
-            void
+            const char *file,
 #endif
-            ) noexcept
+            const jule::Int &type_offset) noexcept
         {
 #ifndef __JULE_DISABLE__SAFETY
             this->must_ok(
@@ -189,7 +185,7 @@ namespace jule
                 file
 #endif
             );
-            if (*this->type_info != typeid(jule::Ptr<T>))
+            if (!this->type_is(true, type_offset))
             {
 #ifndef __JULE_ENABLE__PRODUCTION
                 std::string error = __JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: trait casted to incompatible type\nfile: ";
@@ -201,26 +197,6 @@ namespace jule
             }
 #endif
             return this->data.template as<T>();
-        }
-
-        template <typename T>
-        inline operator T(void) noexcept
-        {
-            return this->cast<T>(
-#ifndef __JULE_ENABLE__PRODUCTION
-                "/api/trait.hpp"
-#endif
-            );
-        }
-
-        template <typename T>
-        inline operator jule::Ptr<T>(void) noexcept
-        {
-            return this->cast_ptr<T>(
-#ifndef __JULE_ENABLE__PRODUCTION
-                "/api/trait.hpp"
-#endif
-            );
         }
 
         inline jule::Trait<Mask> &operator=(const std::nullptr_t) noexcept
@@ -235,7 +211,7 @@ namespace jule
             this->data = src.data;
             this->type_offset = src.type_offset;
             this->type = src.type;
-            this->type_info = src.type_info;
+            this->ptr = src.ptr;
             return *this;
         }
 

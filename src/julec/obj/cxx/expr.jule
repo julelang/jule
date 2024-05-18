@@ -124,12 +124,12 @@ impl exprCoder {
         self.oc.write(")")
     }
 
-    fn boolean(mut &self, &c: &Const) {
-        if c.ReadBool() {
+    fn boolean(mut &self, b: bool) {
+        if b {
             self.oc.write("true")
-            ret
+        } else {
+            self.oc.write("false")
         }
-        self.oc.write("false")
     }
 
     fn nilLit(mut &self) {
@@ -192,7 +192,7 @@ impl exprCoder {
         | c.IsStr():
             self.string(c)
         | c.IsBool():
-            self.boolean(c)
+            self.boolean(c.ReadBool())
         | c.IsF64():
             match {
             | c.Kind == PrimKind.F32:
@@ -400,22 +400,21 @@ impl exprCoder {
         | m.ExprKind.Trait() != nil:
             self.model(m.Expr)
             self.oc.write(".")
-            if env::Production {
-                self.oc.write("operator ")
-                self.oc.write(self.oc.tc.kind(m.Kind))
-                self.oc.write("()")
+            if m.Kind.Sptr() != nil {
+                self.oc.write("cast_ptr<")
+                self.oc.write(self.oc.tc.kind(m.Kind.Sptr().Elem))
             } else {
-                if m.Kind.Sptr() != nil {
-                    self.oc.write("cast_ptr<")
-                    self.oc.write(self.oc.tc.kind(m.Kind.Sptr().Elem))
-                } else {
-                    self.oc.write("cast<")
-                    self.oc.write(self.oc.tc.kind(m.Kind))
-                }
-                self.oc.write(">(\"")
-                self.oc.locInfo(m.Token)
-                self.oc.write("\")")
+                self.oc.write("cast<")
+                self.oc.write(self.oc.tc.kind(m.Kind))
             }
+            self.oc.write(">(")
+            if !env::Production {
+                self.oc.write("\"")
+                self.oc.locInfo(m.Token)
+                self.oc.write("\", ")
+            }
+            self.oc.write(conv::Itoa(self.oc.findTypeOffset(m.ExprKind.Trait(), m.Kind)))
+            self.oc.write(")")
         | m.Kind.Trait() != nil:
             self.oc.write(self.oc.tc.kind(m.Kind))
             self.oc.write("(")
