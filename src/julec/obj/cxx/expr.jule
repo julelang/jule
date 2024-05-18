@@ -975,10 +975,26 @@ impl exprCoder {
     fn errorCall(mut &self, mut m: &BuiltinErrorCallExprModel) {
         self.oc.write("return ")
         if m.Func.Decl.IsVoid() {
+            match type m.Err.Model {
+            | &Var:
+                let v = (&Var)(m.Err.Model)
+                if v.Ident == TokenKind.Error {
+                    self.oc.write("jule::VoidExceptional(except.error)")
+                    ret
+                }
+            }
             self.oc.write("jule::VoidExceptional(" + typeCoder.Any + "(")
         } else {
             self.oc.write("jule::Exceptional<")
             self.oc.tc.rc.codeMut1(self.oc.Obj, m.Func.Result)
+            match type m.Err.Model {
+            | &Var:
+                let v = (&Var)(m.Err.Model)
+                if v.Ident == TokenKind.Error {
+                    self.oc.write(">(except.error)")
+                    ret
+                }
+            }
             self.oc.write(">(" + typeCoder.Any + "(")
         }
         self.expr(m.Err.Model)
