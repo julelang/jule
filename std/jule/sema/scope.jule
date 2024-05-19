@@ -1292,7 +1292,7 @@ impl scopeChecker {
 
     fn processEndPartOfMultiAssign(mut self, mut &st: &MultiAssign,
         mut &a: &AssignSt, mut &lexpr: &AssignLeft, mut &l: &Data, mut &r: &Data) {
-        if IsIgnoreIdent(lexpr.Ident) {
+        if !lexpr.Reference && IsIgnoreIdent(lexpr.Ident) {
             if r.Kind.Void() {
                 self.s.pushErr(a.Right.Token, LogMsg.InvalidExpr)
             }
@@ -1300,12 +1300,15 @@ impl scopeChecker {
             ret
         }
 
-        if a.Declarative && self.isNewAssignIdent(lexpr.Ident) {
+        if a.Declarative && (lexpr.Reference || self.isNewAssignIdent(lexpr.Ident)) {
             if self.isDuplicatedIdent(0, lexpr.Ident) {
                 self.s.pushErr(lexpr.Token, LogMsg.DuplicatedIdent, lexpr.Ident)
                 self.s.pushSugggestion(LogMsg.RenameForAvoidDuplication)
                 self.stop()
                 ret
+            }
+            if IsIgnoreIdent(lexpr.Ident) {
+                self.s.pushErr(lexpr.Token, LogMsg.IgnoreIdent)
             }
 
             // Add new variable declaration statement.
