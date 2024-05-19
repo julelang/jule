@@ -89,7 +89,7 @@ type PrimKind: types::TypeKind
 // Common group of semantic analysis expression model types and optimizer specific types.
 enum compExprModel: type {
     ExprModel: ExprModel,
-    str, // For built-in expressions.
+    str,                      // For built-in expressions.
     &UnsafeBinopExprModel,
     &UnsafeIndexingExprModel,
     &MutSlicingExprModel,
@@ -227,9 +227,9 @@ impl exprCoder {
             self.oc.locInfo(op)
             self.oc.write("\",")
         }
-        self.expr(l.Model)
+        self.possibleRefExpr(l.Model)
         self.oc.write(",")
-        self.expr(r.Model)
+        self.possibleRefExpr(r.Model)
         self.oc.write(")")
     }
 
@@ -247,20 +247,20 @@ impl exprCoder {
                     self.oc.write(anyTypeIdent)
                     self.oc.write(conv::Itoa(i))
                     self.oc.write("_compare(")
-                    self.model(m.Left.Model)
+                    self.possibleRefExpr(m.Left.Model)
                     self.oc.write(", ")
-                    self.model(m.Right.Model)
+                    self.possibleRefExpr(m.Right.Model)
                     self.oc.write("))")
                     ret
                 }
             }
         }
         self.oc.write("(")
-        self.model(m.Left.Model)
+        self.possibleRefExpr(m.Left.Model)
         self.oc.write(" ")
         self.oc.write(m.Op.Kind)
         self.oc.write(" ")
-        self.model(m.Right.Model)
+        self.possibleRefExpr(m.Right.Model)
         self.oc.write(")")
     }
 
@@ -295,14 +295,14 @@ impl exprCoder {
         match m.Op.Kind {
         | TokenKind.Caret:
             self.oc.write("(~(")
-            self.expr(m.Expr.Model)
+            self.possibleRefExpr(m.Expr.Model)
             self.oc.write("))")
             ret
         | TokenKind.Star:
             if env::Production || m.Expr.Kind.Sptr() == nil {
                 break
             }
-            self.expr(m.Expr.Model)
+            self.possibleRefExpr(m.Expr.Model)
             self.oc.write(".get(\"")
             self.oc.locInfo(m.Op)
             self.oc.write("\")")
@@ -311,7 +311,7 @@ impl exprCoder {
         self.oc.write("(")
         self.oc.write(m.Op.Kind)
         self.oc.write("(")
-        self.expr(m.Expr.Model)
+        self.possibleRefExpr(m.Expr.Model)
         self.oc.write("))")
     }
 
@@ -334,7 +334,7 @@ impl exprCoder {
                         self.oc.write(".")
                         self.oc.write(identCoder.field(arg.Field.Decl))
                         self.oc.write("=")
-                        self.expr(arg.Expr)
+                        self.possibleRefExpr(arg.Expr)
                         if len(m.Strct.Fields)-i > 1 {
                             self.oc.write(", ")
                         }
@@ -354,6 +354,20 @@ impl exprCoder {
         self.oc.write(")")
     }
 
+    fn possibleRefExpr(mut &self, expr: compExprModel) {
+        match type expr {
+        | &Var:
+            let v = (&Var)(expr)
+            if v.Reference {
+                self.oc.write("(*(")
+                self.model(expr)
+                self.oc.write("))")
+                ret
+            }
+        }
+        self.model(expr)
+    }
+
     fn casting(mut &self, mut m: &CastingExprModel) {
         match {
         | isAny(m.Kind):
@@ -362,7 +376,7 @@ impl exprCoder {
                 ret
             }
             if m.ExprKind.TypeEnum() != nil {
-                self.model(m.Expr)
+                self.possibleRefExpr(m.Expr)
                 ret
             }
             let i = self.oc.pushAnyType(m.ExprKind)
@@ -374,13 +388,13 @@ impl exprCoder {
                     self.oc.write("static_cast<")
                     self.oc.write(self.oc.tc.prim(prim))
                     self.oc.write(">(")
-                    self.model(m.Expr)
+                    self.possibleRefExpr(m.Expr)
                     self.oc.write(")")
                     break
                 }
                 fall
             |:
-                self.model(m.Expr)
+                self.possibleRefExpr(m.Expr)
             }
             self.oc.write(", &" + anyTypeIdent)
             self.oc.write(conv::Itoa(i))
@@ -390,10 +404,10 @@ impl exprCoder {
             self.oc.write("((")
             self.oc.write(self.oc.tc.kind(m.Kind))
             self.oc.write(")(")
-            self.expr(m.Expr)
+            self.possibleRefExpr(m.Expr)
             self.oc.write("))")
         | isAny(m.ExprKind):
-            self.model(m.Expr)
+            self.possibleRefExpr(m.Expr)
             self.oc.write(".")
             if m.Kind.Sptr() != nil {
                 self.oc.write("cast_ptr<")
@@ -412,7 +426,7 @@ impl exprCoder {
             self.oc.write(conv::Itoa(self.oc.pushAnyType(m.Kind)))
             self.oc.write(")")
         | m.ExprKind.Trait() != nil:
-            self.model(m.Expr)
+            self.possibleRefExpr(m.Expr)
             self.oc.write(".")
             if m.Kind.Sptr() != nil {
                 self.oc.write("cast_ptr<")
@@ -432,7 +446,7 @@ impl exprCoder {
         | m.Kind.Trait() != nil:
             self.oc.write(self.oc.tc.kind(m.Kind))
             self.oc.write("(")
-            self.expr(m.Expr)
+            self.possibleRefExpr(m.Expr)
             self.oc.write(", ")
             self.oc.write(conv::Itoa(self.oc.findTypeOffset(m.Kind.Trait(), m.ExprKind)))
             self.oc.write(")")
@@ -440,20 +454,50 @@ impl exprCoder {
             self.oc.write("static_cast<")
             self.oc.write(self.oc.tc.kind(m.Kind))
             self.oc.write(">(")
-            self.expr(m.Expr)
+            self.possibleRefExpr(m.Expr)
             self.oc.write(")")
         }
     }
 
-    fn args(mut &self, mut args: []ExprModel) {
+    fn models(mut &self, mut args: []ExprModel) {
         if len(args) == 0 {
             ret
         }
         for (i, mut a) in args {
-            self.expr(a)
+            self.possibleRefExpr(a)
             if len(args)-i > 1 {
                 self.oc.write(",")
             }
+        }
+    }
+
+    fn args(mut &self, mut &m: &FnCallExprModel) {
+        let mut j = 0
+        if m.Func.Owner != nil && !m.Func.Decl.Statically {
+            j++ // Skip receiver parameter.
+        }
+        for i, arg in m.Args {
+            let p = m.Func.Params[j]
+            if p.Decl != nil && p.Decl.Reference {
+                match type arg {
+                | &Var:
+                    let v = (&Var)(arg)
+                    if v.Reference {
+                        self.model(arg)
+                        goto end
+                    }
+                }
+                self.oc.write("&(")
+                self.model(arg)
+                self.oc.write(")")
+                goto end
+            }
+            self.possibleRefExpr(arg)
+        end:
+            if len(m.Args)-i > 1 {
+                self.oc.write(", ")
+            }
+            j++
         }
     }
 
@@ -469,7 +513,7 @@ impl exprCoder {
                 ret
             }
         }
-        self.model(expr)
+        self.possibleRefExpr(expr)
     }
 
     fn pushCallInf(mut &self, &m: &FnCallExprModel) {
@@ -493,7 +537,7 @@ impl exprCoder {
         self.oc.locInfo(m.Token)
         self.oc.write("\"")
         if len(m.Args) != 0 {
-            self.oc.write(",")
+            self.oc.write(", ")
         }
     }
 
@@ -531,7 +575,7 @@ impl exprCoder {
                     for (i, mut g) in m.Func.Generics {
                         self.oc.write(self.oc.tc.kind(g.Kind))
                         if len(m.Func.Generics)-i > 1 {
-                            self.oc.write(",")
+                            self.oc.write(", ")
                         }
                     }
                     self.oc.write(">")
@@ -546,9 +590,9 @@ impl exprCoder {
                 let mut ssie = (&StructSubIdentExprModel)(m.Expr)
                 match {
                 | m.Func.Decl.Params[0].IsRef():
-                    self.model(ssie.Expr.Model)
+                    self.possibleRefExpr(ssie.Expr.Model)
                 | ssie.ExprKind.Sptr() != nil:
-                    self.model(ssie.Expr.Model)
+                    self.possibleRefExpr(ssie.Expr.Model)
                     self.oc.write(".ptr(")
                     if !env::Production {
                         self.oc.write("\"")
@@ -558,8 +602,17 @@ impl exprCoder {
                     self.oc.write(")")
                 |:
                     if ssie.Expr.Kind.Struct() != nil {
-                        // Add address taking operation for non-pointers.
-                        self.oc.write("&")
+                        match type ssie.Expr.Model {
+                        | &Var:
+                            let v = (&Var)(ssie.Expr.Model)
+                            if v.Reference {
+                                break
+                            }
+                            fall
+                        |:
+                            // Add address taking operation for non-pointers.
+                            self.oc.write("&")
+                        }
                     }
                     if wrapped {
                         self.oc.write("_wrap_copy")
@@ -571,7 +624,7 @@ impl exprCoder {
                     self.oc.write(", ")
                 }
             | &TraitSubIdentExprModel:
-                self.model((&TraitSubIdentExprModel)(m.Expr).Expr)
+                self.possibleRefExpr((&TraitSubIdentExprModel)(m.Expr).Expr)
                 if !env::Production {
                     locinfo = true
                 }
@@ -580,7 +633,7 @@ impl exprCoder {
                 }
             }
         }
-        self.args(m.Args)
+        self.args(m)
         if locinfo {
             self.oc.write(", \"")
             self.oc.locInfo(m.Token)
@@ -623,7 +676,7 @@ impl exprCoder {
             }
             self.oc.write(name)
             self.oc.write(" = ")
-            self.expr(arg)
+            self.possibleRefExpr(arg)
             self.oc.write(";\n")
             let argS: any = name
             m.Args[i] = unsafe { *(*ExprModel)(&argS) }
@@ -645,7 +698,7 @@ impl exprCoder {
 
     fn writeUseExpr(mut &self, mut &f: &FnIns, mut d: &Data) {
         if d.Kind.Tup() == nil {
-            self.expr(d.Model)
+            self.possibleRefExpr(d.Model)
             self.oc.write(";")
             ret
         }
@@ -656,7 +709,7 @@ impl exprCoder {
             self.oc.write("." + resultArgName)
             self.oc.write(conv::Itoa(i))
             self.oc.write("=")
-            self.oc.ec.expr(data.Model)
+            self.possibleRefExpr(data.Model)
             if len(tup.Datas)-i > 1 {
                 self.oc.write(", ")
             }
@@ -743,12 +796,12 @@ impl exprCoder {
         }
         self.oc.write(self.oc.tc.asSlice(m.ElemKind))
         self.oc.write("::make({")
-        self.args(m.Elems)
+        self.models(m.Elems)
         self.oc.write("})")
     }
 
     fn indexing(mut &self, mut m: &IndexingExprModel) {
-        self.model(m.Expr.Model)
+        self.possibleRefExpr(m.Expr.Model)
         // Index access with safety measures.
         match {
         | env::Production
@@ -756,30 +809,30 @@ impl exprCoder {
         | m.Expr.Kind.Map() != nil
         | isExprComesFromBind(m.Expr):
             self.oc.write("[")
-            self.expr(m.Index.Model)
+            self.possibleRefExpr(m.Index.Model)
             self.oc.write("]")
         |:
             self.oc.write(".at(\"")
             self.oc.locInfo(m.Token)
-            self.oc.write("\",")
-            self.expr(m.Index.Model)
+            self.oc.write("\", ")
+            self.possibleRefExpr(m.Index.Model)
             self.oc.write(")")
         }
     }
 
     fn unsafeIndexing(mut &self, mut m: &UnsafeIndexingExprModel) {
-        self.model(m.Node.Expr.Model)
+        self.possibleRefExpr(m.Node.Expr.Model)
         // Index access with safety measures.
         match {
         | env::Production
         | m.Node.Expr.Kind.Ptr() != nil
         | m.Node.Expr.Kind.Map() != nil:
             self.oc.write("[")
-            self.expr(m.Node.Index.Model)
+            self.possibleRefExpr(m.Node.Index.Model)
             self.oc.write("]")
         |:
             self.oc.write(".__at(")
-            self.expr(m.Node.Index.Model)
+            self.possibleRefExpr(m.Node.Index.Model)
             self.oc.write(")")
         }
     }
@@ -798,15 +851,15 @@ impl exprCoder {
     fn mapExpr(mut &self, mut m: &MapExprModel) {
         self.oc.write(typeCoder.Map + "<")
         self.oc.write(self.oc.tc.kind(m.KeyKind))
-        self.oc.write(",")
+        self.oc.write(", ")
         self.oc.write(self.oc.tc.kind(m.ValKind))
         self.oc.write(">({")
         if len(m.Entries) > 0 {
             for (i, mut pair) in m.Entries {
                 self.oc.write("{")
-                self.expr(pair.Key)
+                self.possibleRefExpr(pair.Key)
                 self.oc.write(",")
-                self.expr(pair.Val)
+                self.possibleRefExpr(pair.Val)
                 self.oc.write("}")
                 if len(m.Entries)-i > 1 {
                     self.oc.write(",")
@@ -817,17 +870,17 @@ impl exprCoder {
     }
 
     fn slicing(mut &self, mut m: &SlicingExprModel) {
-        self.model(m.Expr)
+        self.possibleRefExpr(m.Expr)
         self.oc.write(".slice(")
         if !env::Production {
             self.oc.write("\"")
             self.oc.locInfo(m.Token)
-            self.oc.write("\",")
+            self.oc.write("\", ")
         }
-        self.expr(m.Left)
+        self.possibleRefExpr(m.Left)
         if m.Right != nil {
-            self.oc.write(",")
-            self.expr(m.Right)
+            self.oc.write(", ")
+            self.possibleRefExpr(m.Right)
         }
         self.oc.write(")")
     }
@@ -836,29 +889,30 @@ impl exprCoder {
         self.oc.write(identCoder.traitDecl(m.Trt))
         self.oc.write("_mptr_data")
         self.oc.write("[(")
-        self.model(m.Expr)
+        self.possibleRefExpr(m.Expr)
         self.oc.write(").type_offset].")
         self.oc.write(identCoder.func(m.Method))
     }
 
     fn structureSub(mut &self, mut m: &StructSubIdentExprModel) {
-        self.model(m.Expr.Model)
-        if m.Field != nil {
-            if m.ExprKind.Ptr() != nil {
-                self.oc.write("->")
-            } else if m.ExprKind.Sptr() != nil {
-                self.oc.write(".get(")
-                if !env::Production {
-                    self.oc.write("\"")
-                    self.oc.locInfo(m.Token)
-                    self.oc.write("\"")
-                }
-                self.oc.write(").")
-            } else {
-                self.oc.write(".")
-            }
-            self.oc.write(identCoder.field(m.Field.Decl))
+       self.possibleRefExpr(m.Expr.Model)
+        if m.Field == nil {
+            ret
         }
+        if m.ExprKind.Ptr() != nil {
+            self.oc.write("->")
+        } else if m.ExprKind.Sptr() != nil {
+            self.oc.write(".get(")
+            if !env::Production {
+                self.oc.write("\"")
+                self.oc.locInfo(m.Token)
+                self.oc.write("\"")
+            }
+            self.oc.write(").")
+        } else {
+            self.oc.write(".")
+        }
+        self.oc.write(identCoder.field(m.Field.Decl))
     }
 
     fn commonIdent(mut &self, m: &CommonIdentExprModel) {
@@ -866,7 +920,7 @@ impl exprCoder {
     }
 
     fn commonSub(mut &self, mut m: &CommonSubIdentExprModel) {
-        self.model(m.Expr)
+        self.possibleRefExpr(m.Expr)
         match {
         | m.ExprKind.Ptr() != nil:
             self.oc.write("->")
@@ -894,13 +948,13 @@ impl exprCoder {
         // Filled.
         if len(m.Elems) == 2 && m.Elems[1] == nil {
             self.oc.write("(")
-            self.expr(m.Elems[0])
+            self.possibleRefExpr(m.Elems[0])
             self.oc.write(")")
             ret
         }
 
         self.oc.write("({")
-        self.args(m.Elems)
+        self.models(m.Elems)
         self.oc.write("})")
         ret
     }
@@ -927,7 +981,7 @@ impl exprCoder {
 
     fn tuple(mut &self, mut m: &TupleExprModel) {
         for (i, mut d) in m.Datas {
-            self.expr(d.Model)
+            self.possibleRefExpr(d.Model)
             self.oc.write(";")
             if len(m.Datas)-i > 1 {
                 self.oc.write("\n")
@@ -941,7 +995,7 @@ impl exprCoder {
         self.oc.write(self.oc.tc.kind(m.Kind))
         self.oc.write(">(")
         if m.Init != nil {
-            self.expr(m.Init)
+            self.possibleRefExpr(m.Init)
         }
         self.oc.write(")")
     }
@@ -951,7 +1005,7 @@ impl exprCoder {
             ret
         }
         self.oc.write("jule::out(")
-        self.expr(m.Expr)
+        self.possibleRefExpr(m.Expr)
         self.oc.write(")")
     }
 
@@ -960,13 +1014,13 @@ impl exprCoder {
             ret
         }
         self.oc.write("jule::outln(")
-        self.expr(m.Expr)
+        self.possibleRefExpr(m.Expr)
         self.oc.write(")")
     }
 
     fn panicCall(mut &self, mut m: &BuiltinPanicCallExprModel) {
         self.oc.write("jule::panic(")
-        self.expr(m.Expr)
+        self.possibleRefExpr(m.Expr)
         self.oc.write(` + jule::Str("\nlocation: `)
         self.oc.locInfo(m.Token)
         self.oc.write("\"));")
@@ -977,7 +1031,7 @@ impl exprCoder {
             ret
         }
         self.oc.write("if (!(")
-        self.expr(m.Expr)
+        self.possibleRefExpr(m.Expr)
         self.oc.write(")) jule::panic(jule::Str(")
         self.oc.write(cstrLit([]byte(m.Log)))
         self.oc.write(`) + jule::Str("\nlocation: `)
@@ -1010,7 +1064,7 @@ impl exprCoder {
             }
             self.oc.write(">(" + typeCoder.Any + "(")
         }
-        self.expr(m.Err.Model)
+        self.possibleRefExpr(m.Err.Model)
         let i = self.oc.pushAnyType(m.Err.Kind)
         self.oc.write(", &" + anyTypeIdent)
         self.oc.write(conv::Itoa(i))
@@ -1019,13 +1073,13 @@ impl exprCoder {
 
     fn copyCall(mut &self, mut m: &BuiltinCopyCallExprModel) {
         self.oc.write("jule::copy((")
-        self.model(m.Dest.Model)
+        self.possibleRefExpr(m.Dest.Model)
         self.oc.write(")")
         if m.Dest.Kind.Prim() != nil { // String destination.
             self.oc.write(".fake_slice()")
         }
         self.oc.write(", (")
-        self.model(m.Src.Model)
+        self.possibleRefExpr(m.Src.Model)
         self.oc.write(")")
         if m.Src.Kind.Prim() != nil { // String source.
             self.oc.write(".fake_slice()")
@@ -1034,20 +1088,20 @@ impl exprCoder {
     }
 
     fn lenCall(mut &self, mut m: &BuiltinLenCallExprModel) {
-        self.model(m.Expr.Model)
+        self.possibleRefExpr(m.Expr.Model)
         self.oc.write(".len()")
     }
 
     fn capCall(mut &self, mut m: &BuiltinCapCallExprModel) {
-        self.model(m.Expr.Model)
+        self.possibleRefExpr(m.Expr.Model)
         self.oc.write(".cap()")
     }
 
     fn deleteCall(mut &self, mut m: &BuiltinDeleteCallExprModel) {
-        self.model(m.Dest.Model)
+        self.possibleRefExpr(m.Dest.Model)
         if m.Key != nil {
             self.oc.write(".del(")
-            self.model(m.Key.Model)
+            self.possibleRefExpr(m.Key.Model)
             self.oc.write(")")
         } else {
             self.oc.write(".clear()")
@@ -1058,12 +1112,12 @@ impl exprCoder {
         let mut slice = m.Kind.Slc()
         self.oc.write(self.oc.tc.kind(m.Kind))
         self.oc.write("::alloc(")
-        self.expr(m.Len)
+        self.possibleRefExpr(m.Len)
         self.oc.write(", ")
         if m.Cap != nil {
-            self.expr(m.Cap)
+            self.possibleRefExpr(m.Cap)
         } else {
-            self.expr(m.Len)
+            self.possibleRefExpr(m.Len)
         }
         if shouldInitialized(slice.Elem) {
             self.oc.write(", ")
@@ -1075,10 +1129,10 @@ impl exprCoder {
     fn makeCallStr(mut &self, mut &m: &BuiltinMakeCallExprModel) {
         self.oc.write(typeCoder.Str)
         self.oc.write("::alloc(")
-        self.expr(m.Len)
+        self.possibleRefExpr(m.Len)
         if m.Cap != nil {
             self.oc.write(", ")
-            self.expr(m.Cap)
+            self.possibleRefExpr(m.Cap)
         }
         self.oc.write(")")
     }
@@ -1093,7 +1147,7 @@ impl exprCoder {
 
     fn pushToSlice(mut &self, mut m: &PushToSliceExprModel) {
         let n = len(self.oc.Obj)
-        self.model(m.Dest)
+        self.possibleRefExpr(m.Dest)
         let dest = self.oc.Obj[n:]
 
         self.oc.write(" = jule::alloc_for_append(")
@@ -1105,34 +1159,34 @@ impl exprCoder {
             self.oc.write(dest)
             // Use the "__push" method to skip allocation boundary checking.
             self.oc.write(".__push(")
-            self.model(e)
+            self.possibleRefExpr(e)
             self.oc.write(");")
         }
     }
 
     fn appendCall(mut &self, mut m: &BuiltinAppendCallExprModel) {
         self.oc.write("jule::append(")
-        self.model(m.Dest)
+        self.possibleRefExpr(m.Dest)
         self.oc.write(",")
-        self.model(m.Elements)
+        self.possibleRefExpr(m.Elements)
         self.oc.write(")")
     }
 
     fn cloneCall(mut &self, mut m: &BuiltinCloneCallExprModel) {
         self.oc.write("jule::clone(")
-        self.model(m.Expr)
+        self.possibleRefExpr(m.Expr)
         self.oc.write(")")
     }
 
     fn sizeof(mut &self, mut m: &SizeofExprModel) {
         self.oc.write("sizeof(")
-        self.model(m.Expr)
+        self.possibleRefExpr(m.Expr)
         self.oc.write(")")
     }
 
     fn alignof(mut &self, mut m: &AlignofExprModel) {
         self.oc.write("alignof(")
-        self.model(m.Expr)
+        self.possibleRefExpr(m.Expr)
         self.oc.write(")")
     }
 
@@ -1153,7 +1207,7 @@ impl exprCoder {
 
     fn integratedToStr(mut &self, mut m: &IntegratedToStrExprModel) {
         self.oc.write("jule::to_str(")
-        self.model(m.Expr)
+        self.possibleRefExpr(m.Expr)
         self.oc.write(")")
     }
 
@@ -1165,7 +1219,7 @@ impl exprCoder {
         let n = len(self.oc.Obj)
         let mut args = make([]any, len(m.Exprs))
         for (i, mut expr) in m.Exprs {
-            self.expr(expr)
+            self.possibleRefExpr(expr)
             args[i] = self.oc.Obj[n:]
             self.oc.Obj = self.oc.Obj[:n]
         }
@@ -1173,7 +1227,7 @@ impl exprCoder {
     }
 
     fn free(mut &self, mut m: &FreeExprModel) {
-        self.expr(m.Expr)
+        self.possibleRefExpr(m.Expr)
         if env::RC {
             self.oc.write(".dealloc()")
             ret
@@ -1183,26 +1237,26 @@ impl exprCoder {
 
     fn mutSlicing(mut &self, mut m: &MutSlicingExprModel) {
         self.oc.write("(")
-        self.model(m.Expr)
+        self.possibleRefExpr(m.Expr)
         self.oc.write(").mut_slice(")
         if !env::Production {
             self.oc.write("\"")
             self.oc.locInfo(m.Token)
-            self.oc.write("\",")
+            self.oc.write("\", ")
         }
-        self.expr(m.Left)
+        self.possibleRefExpr(m.Left)
         if m.Right != nil {
-            self.oc.write(",")
-            self.expr(m.Right)
+            self.oc.write(", ")
+            self.possibleRefExpr(m.Right)
         }
         self.oc.write(");")
     }
 
     fn strInsertBegin(mut &self, mut m: &StrInsertBeginExprModel) {
         self.oc.write("(")
-        self.model(m.Dest)
+        self.possibleRefExpr(m.Dest)
         self.oc.write(").buffer.insert(0, (")
-        self.model(m.Expr)
+        self.possibleRefExpr(m.Expr)
         self.oc.write("));")
     }
 
@@ -1307,18 +1361,6 @@ impl exprCoder {
         }
     }
 
-    fn expr(mut &self, mut e: compExprModel) {
-        self.model(e)
-    }
-
-    fn val(mut &self, mut v: &Value) {
-        if v.Data.IsConst() {
-            self.constant(v.Data.Constant)
-            ret
-        }
-        self.expr(v.Data.Model)
-    }
-
     fn initExpr(mut &self, mut t: &TypeKind) {
         if t.NilCompatible() {
             if t.Ptr() != nil {
@@ -1350,7 +1392,7 @@ impl exprCoder {
         }
         let mut enm = t.Enum()
         if enm != nil {
-            self.val(enm.Items[0].Value)
+            self.model(enm.Items[0].Value.Data.Model)
             ret
         }
         let prim = t.Prim()

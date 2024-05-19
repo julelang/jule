@@ -61,7 +61,7 @@ struct ObjectCoder {
     Obj: str
 
     resultDecls: []str
-    anyObj: str
+    anyObj:      str
 
     ir:   &IR
     info: SerializationInfo
@@ -70,7 +70,7 @@ struct ObjectCoder {
     // Current indentation.
     indentBuffer: str
 
-    resultMap: map[str]bool
+    resultMap:  map[str]bool
     anyTypeMap: []&TypeKind
 
     ec: &exprCoder
@@ -479,7 +479,7 @@ impl ObjectCoder {
             }
         } else {
             self.write(" = ")
-            self.ec.expr(f.Default.Model)
+            self.ec.possibleRefExpr(f.Default.Model)
         }
         self.write(";")
     }
@@ -850,7 +850,7 @@ impl ObjectCoder {
         self.write(self.tc.kind(v.Kind.Kind))
         self.write(" ")
         if v.Reference {
-            self.write("&")
+            self.write("*")
         }
         self.write(identCoder.var(v))
         if init != nil {
@@ -866,10 +866,22 @@ impl ObjectCoder {
         }
         if v.Value != nil && v.Value.Expr != nil {
             if v.Value.Data.Model != nil {
-                self.varInitExpr(v, fn() { self.ec.val(v.Value) })
+                if v.Reference {
+                    self.varInitExpr(v, fn() {
+                        self.write("&(")
+                        self.ec.model(v.Value.Data.Model)
+                        self.write(")")
+                    })
+                } else {
+                    self.varInitExpr(v, fn() { self.ec.possibleRefExpr(v.Value.Data.Model) })
+                }
                 ret
             }
             self.varInitExpr(v, nil)
+            ret
+        }
+        if v.Reference {
+            self.varInitExpr(v, fn() { self.write("nullptr") })
             ret
         }
         if shouldInitialized(v.Kind.Kind) {
@@ -995,12 +1007,9 @@ impl ObjectCoder {
         for (_, mut v) in self.ir.Ordered.Globals {
             self.write(self.tc.kind(v.Kind.Kind))
             self.write(" ")
-            if v.Reference {
-                self.write("&")
-            }
             self.write(identCoder.var(v))
             self.write(" = ")
-            self.ec.val(v.Value)
+            self.ec.model(v.Value.Data.Model)
             self.write(";\n")
         }
     }

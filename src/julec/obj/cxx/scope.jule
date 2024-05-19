@@ -71,32 +71,71 @@ impl scopeCoder {
         self.oc.write("{\n")
         self.oc.addIndent()
         self.oc.indent()
-        self.oc.write("auto ")
-        if opt::Copy && isCopyOptimizable(it.Expr) {
-            self.oc.write("&")
+        self.oc.write("auto expr = ")
+        let mut ref = false
+        match type it.Expr.Model {
+        | &Var:
+            let v = (&Var)(it.Expr.Model)
+            if v.Reference {
+                ref = true
+                self.oc.ec.model(it.Expr.Model)
+                break
+            }
+            fall
+        |:
+            if opt::Copy && isCopyOptimizable(it.Expr) {
+                ref = true
+                self.oc.write("&(")
+                self.oc.ec.model(it.Expr.Model)
+                self.oc.write(")")
+            } else {
+                self.oc.ec.model(it.Expr.Model)
+            }
         }
-        self.oc.write("expr = ")
-        self.oc.ec.model(it.Expr.Model)
         self.oc.write(";\n")
         self.oc.indent()
-        self.oc.write("auto it = expr.begin();\n")
+        self.oc.write("auto it = expr")
+        if ref {
+            self.oc.write("->")
+        } else {
+            self.oc.write(".")
+        }
+        self.oc.write("begin();\n")
         self.oc.indent()
         self.oc.write(begin)
         self.oc.write(":;\n")
         self.oc.indent()
-        self.oc.write("if (it != expr.end()) {\n")
+        self.oc.write("if (it != expr")
+        if ref {
+            self.oc.write("->")
+        } else {
+            self.oc.write(".")
+        }
+        self.oc.write("end()) {\n")
         self.oc.addIndent()
         self.oc.indent()
         if it.KeyA != nil {
-            self.oc.varInitExpr(it.KeyA, fn() { self.oc.write("it - expr.begin()") })
+            self.oc.varInitExpr(it.KeyA, fn() {
+                if ref {
+                    self.oc.write("it - expr->begin()")
+                } else {
+                    self.oc.write("it - expr.begin()")
+                }
+            })
             self.oc.write("\n")
             self.oc.indent()
         }
         if it.KeyB != nil {
-            if opt::Copy {
-                it.KeyB.Reference = isIterCopyOptimizable(it.Expr, it.KeyB)
-            }
-            self.oc.varInitExpr(it.KeyB, fn() { self.oc.write("*it") })
+            it.KeyB.Reference = opt::Copy && isIterCopyOptimizable(it.Expr, it.KeyB)
+            self.oc.varInitExpr(it.KeyB, fn() {
+                unsafe {
+                    if it.KeyB.Reference {
+                        self.oc.write("it")
+                    } else {
+                        self.oc.write("*it")
+                    }
+                }
+            })
             self.oc.write("\n")
             self.oc.indent()
         }
@@ -139,34 +178,55 @@ impl scopeCoder {
         self.oc.write("{\n")
         self.oc.addIndent()
         self.oc.indent()
-        self.oc.write("auto ")
-        if opt::Copy && isCopyOptimizable(it.Expr) {
-            self.oc.write("&")
+        self.oc.write("auto expr = ")
+        let mut ref = false
+        match type it.Expr.Model {
+        | &Var:
+            let v = (&Var)(it.Expr.Model)
+            if v.Reference {
+                ref = true
+                self.oc.ec.model(it.Expr.Model)
+                break
+            }
+            fall
+        |:
+            if opt::Copy && isCopyOptimizable(it.Expr) {
+                ref = true
+                self.oc.write("&(")
+                self.oc.ec.model(it.Expr.Model)
+                self.oc.write(")")
+            } else {
+                self.oc.ec.model(it.Expr.Model)
+            }
         }
-        self.oc.write("expr = ")
-        self.oc.ec.model(it.Expr.Model)
         self.oc.write(";\n")
         self.oc.indent()
-        self.oc.write("auto it = expr.begin();\n")
+        self.oc.write("auto it = expr")
+        if ref {
+            self.oc.write("->")
+        } else {
+            self.oc.write(".")
+        }
+        self.oc.write("begin();\n")
         self.oc.indent()
         self.oc.write(begin)
         self.oc.write(":;\n")
         self.oc.indent()
-        self.oc.write("if (it != expr.end()) {\n")
+        self.oc.write("if (it != expr")
+        if ref {
+            self.oc.write("->")
+        } else {
+            self.oc.write(".")
+        }
+        self.oc.write("end()) {\n")
         self.oc.addIndent()
         self.oc.indent()
         if it.KeyA != nil {
-            if opt::Copy {
-                it.KeyA.Reference = isIterCopyOptimizable(it.Expr, it.KeyA)
-            }
             self.oc.varInitExpr(it.KeyA, fn() { self.oc.write("it->first") })
             self.oc.write("\n")
             self.oc.indent()
         }
         if it.KeyB != nil {
-            if opt::Copy {
-                it.KeyB.Reference = isIterCopyOptimizable(it.Expr, it.KeyB)
-            }
             self.oc.varInitExpr(it.KeyB, fn() { self.oc.write("it->second") })
             self.oc.write("\n")
             self.oc.indent()
@@ -201,7 +261,7 @@ impl scopeCoder {
     fn ifCase(mut &self, mut i: &If) {
         if i.Expr != nil {
             self.oc.write("if (")
-            self.oc.ec.expr(i.Expr)
+            self.oc.ec.possibleRefExpr(i.Expr)
             self.oc.write(") ")
         }
         self.scope(i.Scope)
@@ -247,12 +307,12 @@ impl scopeCoder {
     fn whileIter(mut &self, mut it: &WhileIter) {
         if it.Expr != nil && it.Next == nil {
             self.oc.write("while (")
-            self.oc.ec.expr(it.Expr)
+            self.oc.ec.possibleRefExpr(it.Expr)
             self.oc.write(") {\n")
         } else {
             self.oc.write("for (; ")
             if it.Expr != nil {
-                self.oc.ec.expr(it.Expr)
+                self.oc.ec.possibleRefExpr(it.Expr)
             }
             self.oc.write("; ")
             if it.Next != nil {
@@ -307,33 +367,33 @@ impl scopeCoder {
 
     fn postfix(mut &self, mut p: &Postfix) {
         self.oc.write("(")
-        self.oc.ec.expr(p.Expr)
+        self.oc.ec.possibleRefExpr(p.Expr)
         self.oc.write(")")
         self.oc.write(p.Op)
     }
 
     fn assign(mut &self, mut a: &Assign) {
-        self.oc.ec.expr(a.L.Model)
+        self.oc.ec.possibleRefExpr(a.L.Model)
         self.oc.write(a.Op.Kind)
-        self.oc.ec.expr(a.R.Model)
+        self.oc.ec.possibleRefExpr(a.R.Model)
     }
 
     fn mapLookupAssign(mut &self, mut &a: &MultiAssign) {
         let mut iem = (&IndexingExprModel)(a.R)
-        self.oc.ec.expr(iem.Expr.Model)
+        self.oc.ec.possibleRefExpr(iem.Expr.Model)
         self.oc.write(".lookup(")
-        self.oc.ec.expr(iem.Index.Model)
+        self.oc.ec.possibleRefExpr(iem.Index.Model)
         self.oc.write(", ")
         if a.L[0] != nil {
             self.oc.write("&(")
-            self.oc.ec.expr(a.L[0].Model)
+            self.oc.ec.possibleRefExpr(a.L[0].Model)
             self.oc.write("), ")
         } else {
             self.oc.write("nullptr, ")
         }
         if a.L[1] != nil {
             self.oc.write("&(")
-            self.oc.ec.expr(a.L[1].Model)
+            self.oc.ec.possibleRefExpr(a.L[1].Model)
             self.oc.write(")")
         } else {
             self.oc.write("nullptr")
@@ -351,23 +411,38 @@ impl scopeCoder {
             self.oc.indent()
             let mut l = a.L[i]
             if l != nil {
+                match type l.Model {
+                | &Var:
+                    let mut v = (&Var)(l.Model)
+                    // If variable is reference and uninitialized,
+                    // it should be declared in this multiple-assignment.
+                    if v.Reference && !v.IsInitialized() {
+                        self.oc.write(identCoder.var(v))
+                        self.oc.write(" = &(")
+                        self.oc.ec.possibleRefExpr(r.Model)
+                        self.oc.write(");\n")
+                        a.L[i] = nil // Ignore handling for following statements.
+                        continue
+                    }
+                }
                 self.oc.write(self.oc.tc.kind(l.Kind))
                 self.oc.write(" ")
                 self.oc.write(identCoder.toOut(assignArgName, uintptr(i)))
                 self.oc.write(" = ")
             }
-            self.oc.ec.expr(r.Model)
+            self.oc.ec.possibleRefExpr(r.Model)
             self.oc.write(";\n")
         }
 
         for (i, mut l) in a.L {
-            if l != nil {
-                self.oc.indent()
-                self.oc.ec.expr(l.Model)
-                self.oc.write(" = ")
-                self.oc.write(identCoder.toOut(assignArgName, uintptr(i)))
-                self.oc.write(";\n")
+            if l == nil {
+                continue
             }
+            self.oc.indent()
+            self.oc.ec.possibleRefExpr(l.Model)
+            self.oc.write(" = ")
+            self.oc.write(identCoder.toOut(assignArgName, uintptr(i)))
+            self.oc.write(";\n")
         }
 
         self.oc.doneIndent()
@@ -383,13 +458,13 @@ impl scopeCoder {
         let mut f = (&FnCallExprModel)(a.R)
         self.oc.tc.rc.codeMut1(self.oc.Obj, f.Func.Result)
         self.oc.write(" " + assignResultName + " = ")
-        self.oc.ec.expr(a.R)
+        self.oc.ec.possibleRefExpr(a.R)
         self.oc.write(";\n")
 
         for (i, mut l) in a.L {
             if l != nil {
                 self.oc.indent()
-                self.oc.ec.expr(l.Model)
+                self.oc.ec.possibleRefExpr(l.Model)
                 self.oc.write(" = " + assignResultName + "." + resultArgName)
                 self.oc.write(conv::Itoa(i))
                 self.oc.write(";\n")
@@ -424,7 +499,7 @@ impl scopeCoder {
             ret fn() { self.oc.write(matchExpr) }
         }
         if !m.Expr.Constant.IsBool() || !m.Expr.Constant.ReadBool() {
-            ret fn() { self.oc.ec.model(m.Expr.Model) }
+            ret fn() { self.oc.ec.possibleRefExpr(m.Expr.Model) }
         }
         ret nil
     }
@@ -445,9 +520,9 @@ impl scopeCoder {
                             caseExpr()
                             self.oc.write(" == ")
                         }
-                        self.oc.ec.expr(expr.Model)
+                        self.oc.ec.possibleRefExpr(expr.Model)
                     } else {
-                        self.oc.ec.expr(expr.Model)
+                        self.oc.ec.possibleRefExpr(expr.Model)
                         if caseExpr != nil {
                             self.oc.write(" == ")
                             caseExpr()
@@ -520,7 +595,7 @@ impl scopeCoder {
             } else {
                 self.oc.write("auto _match_expr{ ")
             }
-            self.oc.ec.expr(m.Expr.Model)
+            self.oc.ec.possibleRefExpr(m.Expr.Model)
             self.oc.write(" };\n")
             self.oc.indent()
         }
@@ -570,7 +645,7 @@ impl scopeCoder {
     fn setResult(mut &self, mut r: &RetSt) {
         if len(r.Func.Decl.Result.Idents) == 1 {
             self.oc.write(resultName + " = ")
-            self.oc.ec.expr(r.Expr)
+            self.oc.ec.possibleRefExpr(r.Expr)
             self.oc.write(";\n")
             self.oc.indent()
             ret
@@ -580,7 +655,7 @@ impl scopeCoder {
             self.oc.write(resultName + "." + resultArgName)
             self.oc.write(conv::Itoa(i))
             self.oc.write(" = ")
-            self.oc.ec.expr(data.Model)
+            self.oc.ec.possibleRefExpr(data.Model)
             self.oc.write(";\n")
             self.oc.indent()
         }
@@ -600,11 +675,11 @@ impl scopeCoder {
                 self.oc.write("return jule::Exceptional<")
                 self.oc.write(self.oc.tc.kind(r.Func.Result))
                 self.oc.write(">(jule::Any(), ")
-                self.oc.ec.expr(r.Expr)
+                self.oc.ec.possibleRefExpr(r.Expr)
                 self.oc.write(");")
             } else {
                 self.oc.write("return ")
-                self.oc.ec.expr(r.Expr)
+                self.oc.ec.possibleRefExpr(r.Expr)
                 self.oc.write(";")
             }
             ret
@@ -639,7 +714,7 @@ impl scopeCoder {
         | &Var:
             self.var((&Var)(st))
         | &Data:
-            self.oc.ec.expr((&Data)(st).Model)
+            self.oc.ec.model((&Data)(st).Model)
         | &Conditional:
             self.conditional((&Conditional)(st))
         | &InfIter:
