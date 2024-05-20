@@ -73,24 +73,23 @@ impl scopeCoder {
         self.oc.indent()
         self.oc.write("auto expr = ")
         let mut ref = false
-        match type it.Expr.Model {
-        | &Var:
-            let v = (&Var)(it.Expr.Model)
-            if v.Reference {
-                ref = true
-                self.oc.ec.model(it.Expr.Model)
-                break
-            }
-            fall
-        |:
-            if opt::Copy && isCopyOptimizable(it.Expr) {
-                ref = true
+        if opt::Copy && isCopyOptimizable(it.Expr) {
+            ref = true
+            match type it.Expr.Model {
+            | &Var:
+                let v = (&Var)(it.Expr.Model)
+                if v.Reference {
+                    self.oc.ec.model(it.Expr.Model)
+                    break
+                }
+                fall
+            |:
                 self.oc.write("&(")
                 self.oc.ec.model(it.Expr.Model)
                 self.oc.write(")")
-            } else {
-                self.oc.ec.model(it.Expr.Model)
             }
+        } else {
+            self.oc.ec.possibleRefExpr(it.Expr.Model)
         }
         self.oc.write(";\n")
         self.oc.indent()
@@ -102,16 +101,18 @@ impl scopeCoder {
         }
         self.oc.write("begin();\n")
         self.oc.indent()
-        self.oc.write(begin)
-        self.oc.write(":;\n")
-        self.oc.indent()
-        self.oc.write("if (it != expr")
+        self.oc.write("auto expr_end = expr")
         if ref {
             self.oc.write("->")
         } else {
             self.oc.write(".")
         }
-        self.oc.write("end()) {\n")
+        self.oc.write("end();\n")
+        self.oc.indent()
+        self.oc.write(begin)
+        self.oc.write(":;\n")
+        self.oc.indent()
+        self.oc.write("if (it != expr_end) {\n")
         self.oc.addIndent()
         self.oc.indent()
         if it.KeyA != nil {
@@ -180,24 +181,23 @@ impl scopeCoder {
         self.oc.indent()
         self.oc.write("auto expr = ")
         let mut ref = false
-        match type it.Expr.Model {
-        | &Var:
-            let v = (&Var)(it.Expr.Model)
-            if v.Reference {
-                ref = true
-                self.oc.ec.model(it.Expr.Model)
-                break
-            }
-            fall
-        |:
-            if opt::Copy && isCopyOptimizable(it.Expr) {
-                ref = true
+        if opt::Copy && isCopyOptimizable(it.Expr) {
+            ref = true
+            match type it.Expr.Model {
+            | &Var:
+                let v = (&Var)(it.Expr.Model)
+                if v.Reference {
+                    self.oc.ec.model(it.Expr.Model)
+                    break
+                }
+                fall
+            |:
                 self.oc.write("&(")
                 self.oc.ec.model(it.Expr.Model)
                 self.oc.write(")")
-            } else {
-                self.oc.ec.model(it.Expr.Model)
             }
+        } else {
+            self.oc.ec.possibleRefExpr(it.Expr.Model)
         }
         self.oc.write(";\n")
         self.oc.indent()
@@ -209,16 +209,18 @@ impl scopeCoder {
         }
         self.oc.write("begin();\n")
         self.oc.indent()
-        self.oc.write(begin)
-        self.oc.write(":;\n")
-        self.oc.indent()
-        self.oc.write("if (it != expr")
+        self.oc.write("auto expr_end = expr")
         if ref {
             self.oc.write("->")
         } else {
             self.oc.write(".")
         }
-        self.oc.write("end()) {\n")
+        self.oc.write("end();\n")
+        self.oc.indent()
+        self.oc.write(begin)
+        self.oc.write(":;\n")
+        self.oc.indent()
+        self.oc.write("if (it != expr_end) {\n")
         self.oc.addIndent()
         self.oc.indent()
         if it.KeyA != nil {
