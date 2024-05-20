@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD 3-Clause
 # license that can be found in the LICENSE file.
 
-FROM --platform=arm64 ubuntu:latest
+FROM --platform=arm64 ubuntu:23.10
 
 RUN apt-get update -y
 RUN apt-get install -y clang
