@@ -89,8 +89,9 @@ namespace jule
         }
         FreeEnvironmentStringsW(env_s);
 #else
-        for (; *jule::envp != 0; ++jule::envp)
-            env.push(jule::Str(*envp));
+        char **it = jule::envp;
+        for (; *it != NULL; ++it)
+            env.push(jule::Str(*it));
 #endif
         return env;
     }
