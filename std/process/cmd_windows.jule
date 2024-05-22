@@ -3,65 +3,197 @@
 // license that can be found in the LICENSE file.
 
 use integ for std::jule::integrated
-cpp use "<fcntl.h>"
-cpp use "<unistd.h>"
+use fastbytes for std::internal::fastbytes
+use mem for std::mem
+use sys for std::sys
+use utf16 for std::unicode::utf16
 
 cpp type HANDLE: *unsafe
 
-cpp let P_NOWAIT: int
+cpp let INFINITE: int
 
-cpp fn _wspawnvp(mode: int, file: *integ::Wchar, args: **integ::Wchar): int
-cpp fn _wspawnvpe(mode: int, file: *integ::Wchar, args: **integ::Wchar, env: **integ::Wchar): int
-cpp unsafe fn _cwait(mut status: *integ::Int, pid: int, action: int): int
-
-fn ustrSliceToWcstrSlice(us: [][]u16): []*integ::Wchar {
-    let mut wcs = make([]*integ::Wchar, 0, len(us) + 1)
-    for i in us {
-        wcs = append(wcs, unsafe { (*integ::Wchar)(&us[i][0]) })
-    }
-    wcs = append(wcs, nil)
-    ret wcs
+#typedef
+cpp struct STARTUPINFOW {
+    cb: uint
 }
 
-fn strSliceToUstrSlice(s: []str): [][]u16 {
-    let mut us = make([][]u16, 0, len(s))
-    for _, p in s {
-        us = append(us, integ::Utf16FromStr(p))
-    }
-    ret us
+#typedef
+cpp struct PROCESS_INFORMATION {
+    hProcess: cpp.HANDLE
+    hThread:  cpp.HANDLE
 }
 
-fn execvp(file: str, argv: []str): int {
-    let utf16File = integ::Utf16FromStr(file)
-    let ucargv = strSliceToUstrSlice(argv)
-    let cargv = ustrSliceToWcstrSlice(ucargv)
-    ret cpp._wspawnvp(cpp.P_NOWAIT, unsafe { (*integ::Wchar)(&utf16File[0]) }, &cargv[0])
-}
+cpp unsafe fn CreateProcessW(*u16, *u16, *unsafe, *unsafe, int, integ: integ::LongLong, *unsafe, *u16, *cpp.STARTUPINFOW, *cpp.PROCESS_INFORMATION): int
+cpp unsafe fn ZeroMemory(*unsafe, uint)
+cpp unsafe fn TerminateProcess(pid: cpp.HANDLE, code: int): bool
+cpp unsafe fn GetExitCodeProcess(cpp.HANDLE, mut *integ::LongLong): bool
+cpp unsafe fn WaitForSingleObject(cpp.HANDLE, int)
 
-fn execve(file: str, argv: []str, env: []str): int {
-    let ucargv = strSliceToUstrSlice(argv)
-    let cargv = ustrSliceToWcstrSlice(ucargv)
-    let ucenv = strSliceToUstrSlice(env)
-    let cenv = ustrSliceToWcstrSlice(ucenv)
-    let utf16File = integ::Utf16FromStr(file)
-    ret cpp._wspawnvpe(cpp.P_NOWAIT, unsafe { (*integ::Wchar)(&utf16File[0]) }, &cargv[0], &cenv[0])
+const _CREATE_UNICODE_ENVIRONMENT = 0x00000400
+
+struct cmdAttrs {
+    hProcess: cpp.HANDLE
+    hThread:  cpp.HANDLE
 }
 
 impl Cmd {
-    fn spawn(self)!: int {
-        let mut pid = 0
-        if self.Env == nil {
-            pid = execvp(self.path, self.Args)
-        } else {
-            pid = execve(self.path, self.Args, self.Env)
+    fn spawn(self)! {
+        if self.attrs.hProcess != nil {
+            panic("command is already spawned")
         }
-        if pid == -1 {
-            error(getLastProcessError())
+        let mut startupInfo = cpp.STARTUPINFOW{}
+        let mut processInfo = cpp.PROCESS_INFORMATION{}
+        unsafe {
+            cpp.ZeroMemory(&startupInfo, mem::SizeOf(startupInfo))
+            cpp.ZeroMemory(&processInfo, mem::SizeOf(processInfo))
         }
-        let status = 0
-        if unsafe { cpp._cwait((*integ::Int)(&status), pid, 0) } == -1 {
-            error(getLastProcessError())
+        startupInfo.cb = mem::SizeOf(startupInfo)
+        let mut args = make([]str, 1, 1 + len(self.Args))
+        args[0] = self.path
+        args = append(args, self.Args...)
+        let argv = integ::Utf16FromStr(makeCmdLine(args))
+        let env = createEnvBlock(self.Env) else { error(error) }
+        let mut envp = &env[0]
+        if len(self.Env) == 0 {
+            envp = nil
         }
-        ret status
+        const flags = _CREATE_UNICODE_ENVIRONMENT
+        unsafe {
+            if cpp.CreateProcessW(nil, (*integ::Wchar)(&argv[0]), nil, nil, 0,
+                flags, envp, nil, &startupInfo, &processInfo) == 0 {
+                error(getLastProcessError())
+            }
+        }
+        self.attrs.hProcess = processInfo.hProcess
+        self.attrs.hThread = processInfo.hThread
     }
+
+    fn kill(self)! {
+        if self.attrs.hProcess == nil {
+            panic("command is not spawned")
+        }
+        if unsafe { cpp.TerminateProcess(self.attrs.hProcess, 0) } {
+            self.attrs.hProcess = nil
+            self.attrs.hThread = nil
+            ret
+        }
+        error(-1)
+    }
+
+    fn wait(self)!: int {
+        if self.attrs.hProcess == nil {
+            panic("command is not spawned")
+        }
+        unsafe { cpp.WaitForSingleObject(self.attrs.hProcess, cpp.INFINITE) }
+        let mut exitCode = integ::LongLong(-1)
+        unsafe {
+            cpp.GetExitCodeProcess(self.attrs.hProcess, &exitCode)
+            sys::CloseHandle(uintptr(self.attrs.hProcess))
+            sys::CloseHandle(uintptr(self.attrs.hThread))
+        }
+        self.attrs.hProcess = nil
+        self.attrs.hThread = nil
+        ret int(exitCode)
+    }
+}
+
+// Escapes the string s, as per escapeArg, appends the result to s.
+fn appendEscapeArg(mut &s: str, arg: str) {
+    if len(arg) == 0 {
+        s += `""`
+        ret
+    }
+
+    let mut needsBackslash = false
+    let mut hasSpace = false
+    let mut i = 0
+    for i < len(arg); i++ {
+        match arg[i] {
+        | '"' | '\\':
+            needsBackslash = true
+        | ' ' | '\t':
+            hasSpace = true
+        }
+    }
+
+    if !needsBackslash && !hasSpace {
+        // No special handling required; normal case.
+        s += arg
+        ret
+    }
+    if !needsBackslash {
+        // hasSpace is true, so we need to quote the string.
+        s += "\""
+        s += arg
+        s += "\""
+        ret
+    }
+
+    if hasSpace {
+        s += "\""
+    }
+    let mut slashes = 0
+    i = 0
+    for i < len(arg); i++ {
+        let c = arg[i]
+        match c {
+        | '\\':
+            slashes++
+        | '"':
+            for slashes > 0; slashes-- {
+                s += "\\"
+            }
+            s += "\\"
+        |:
+            slashes = 0
+        }
+        s += str(c)
+    }
+    if hasSpace {
+        for slashes > 0; slashes-- {
+            s += "\\"
+        }
+        s += "\""
+    }
+}
+
+// Builds a command line out of args by escaping "special"
+// characters and joining the arguments with spaces.
+fn makeCmdLine(args: []str): str {
+    let mut s = ""
+    for _, arg in args {
+        if len(s) > 0 {
+            s += " "
+        }
+        appendEscapeArg(s, arg)
+    }
+    ret s
+}
+
+// Converts an array of environment strings into
+// the representation required by CreateProcess: a sequence of NULL
+// terminated strings followed by a nil.
+// Last bytes are two UCS-2 NULLs, or four NULL bytes.
+// If any string contains a NULL, it returns (nil, EINVAL).
+fn createEnvBlock(env: []str)!: []u16 {
+    if len(env) == 0 {
+        ret utf16::Encode([]rune("\x00\x00"))
+    }
+    let mut n = 0
+    for _, s in env {
+        if fastbytes::FindByteStr(s, 0) != -1 {
+            error(ProcessError.Env)
+        }
+        n += len(s) + 1
+    }
+    n++
+    let mut b = make([]u16, 0, n)
+    for _, s in env {
+        for _, c in []rune(s) {
+            b = utf16::AppendRune(b, c)
+        }
+        b = utf16::AppendRune(b, 0)
+    }
+    b = utf16::AppendRune(b, 0)
+    ret b
 }

@@ -2,13 +2,19 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-// Type of a process id.
-type Pid: int
-
 // Cmd runs a command in the operating system.
 // There is no pipe for the output of the command,
-// so any output will appear on the screen.
+// so any output will appear on the standard output.
+//
+// The Args stores command-line arguments. The first argument is not should to be
+// the path of the executable. Just pass necessary arguments.
+//
+// The Env stores environment variables. If Env is nil or len(Env) == 0, child process
+// will use copy of the parent process's environment variables. Environment variables
+// should be in the "KEY=value" format.
 struct Cmd {
+    mut attrs: cmdAttrs
+
     path: str
 
     Args: []str
@@ -24,8 +30,23 @@ impl Cmd {
     }
 
     // Spawns new child-process and executes command.
-    // Returns exist code of child-process.
-    fn Spawn(self)!: int {
-        ret self.spawn() else { error(error) }
+    // Panics if command is already spawned.
+    // Use the [Wait] or [Kill] method to make respawnable.
+    fn Spawn(self)! {
+        self.spawn() else { error(error) }
+    }
+
+    // Kills process.
+    // Fails if process is not alive.
+    // Panics if command is not spawned.
+    fn Kill(self)! {
+        self.kill() else { error(error) }
+    }
+
+    // Waits complete for running of process.
+    // Returns exit code of process.
+    // Panics if command is not spawned.
+    fn Wait(self)!: int {
+        ret self.wait() else { error(error) }
     }
 }

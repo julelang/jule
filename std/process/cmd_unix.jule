@@ -3,72 +3,140 @@
 // license that can be found in the LICENSE file.
 
 use integ for std::jule::integrated
+use fastbytes for std::internal::fastbytes
+use conv for std::internal::conv
+use sys for std::sys
 cpp use "<signal.h>"
 cpp use "<sys/wait.h>"
 cpp use "<unistd.h>"
 
-cpp let SIGTERM: int
-cpp let WUNTRACED: int
-
-cpp fn WIFSIGNALED(status: int): bool
 cpp fn getpid(): int
 cpp fn fork(): int
 cpp unsafe fn waitpid(pid: int, mut status: *integ::Int, options: int): int
 cpp fn WEXITSTATUS(status: int): int
 cpp fn kill(pid: int, sig: int): int
+cpp unsafe fn setenv(*integ::Char, *integ::Char, int): int
+cpp fn fcntl(int, int): int
+cpp unsafe fn pipe(mut *integ::Int): int
 
-fn strSliceToCstrSlice(s: []str): []*integ::Char {
-    let mut cs = make([]*integ::Char, 0, len(s) + 1)
+cpp let X_OK: int
+cpp let F_GETFD: int
+cpp let F_SETFD: int
+cpp let FD_CLOEXEC: int
+
+// Type of a process id.
+type pid: int
+
+const invalidPid = -1
+
+struct cmdAttrs {
+    pid: pid = invalidPid
+}
+
+fn strSliceToCstrSlice(&s: []str): []*integ::Char {
+    let mut cs = make([]*integ::Char, len(s) + 1)
     for i in s {
-        cs = append(cs, unsafe { (*integ::Char)(&s[i][0]) })
+        cs[i] = unsafe { (*integ::Char)(&s[i][0]) }
     }
-    cs = append(cs, nil)
+    cs[len(cs)-1] = nil
     ret cs
 }
 
-fn execvp(file: str, argv: []str): int {
+fn execvp(&file: str, &argv: []str): int {
     let cargv = strSliceToCstrSlice(argv)
     unsafe {
         ret integ::Emit[int]("execvp({}, (char*const*){})", (*integ::Char)(&file[0]), &cargv[0])
     }
 }
 
-fn execve(file: str, argv: []str, env: []str): int {
-    let cargv = strSliceToCstrSlice(argv)
-    let cenv = strSliceToCstrSlice(env)
-    unsafe {
-        ret integ::Emit[int]("execve({}, (char*const*){}, (char*const*)({}))", (*integ::Char)(&file[0]), &cargv[0], &cenv[0])
+fn setenv(&envv: []str)! {
+    const Overwrite = 1
+    for _, env in envv {
+        let i = fastbytes::FindByteStr(env, '=')
+        if i == -1 {
+            error(ProcessError.Env)
+        }
+        unsafe {
+            let key = env[:i]
+            if len(env)-i == 1 {
+                let val = "\x00"
+                if cpp.setenv((*integ::Char)(&key[0]), (*integ::Char)(&val[0]), Overwrite) == -1 {
+                    error(ProcessError.Env)
+                }
+            } else {
+                let val = env[i+1:]
+                if cpp.setenv((*integ::Char)(&key[0]), (*integ::Char)(&val[0]), Overwrite) == -1 {
+                    error(ProcessError.Env)
+                }
+            }
+        }
     }
 }
 
 impl Cmd {
-    fn spawn(self)!: int {
-        if self.path == "" {
-            error(ProcessError.NotExist)
+    fn spawn(self)! {
+        if self.attrs.pid != invalidPid {
+            panic("command is already spawned")
         }
-        let pid = cpp.fork()
-        match pid {
+        let path = self.path    //readyPath(self.path) else { error(error) }
+        let pipe: [2]integ::Int
+        if unsafe { cpp.pipe(&pipe[0]) } == -1 {
+            error(ProcessError.Spawn)
+        }
+        if sys::Fcntl(int(pipe[1]), cpp.F_SETFD, cpp.fcntl(int(pipe[1]), cpp.F_GETFD)|cpp.FD_CLOEXEC) == -1 {
+            sys::Close(int(pipe[0]))
+            sys::Close(int(pipe[1]))
+            error(ProcessError.Spawn)
+        }
+        self.attrs.pid = cpp.fork()
+        match self.attrs.pid {
         | -1:
-            error(ProcessError.Fork)
+            error(ProcessError.Spawn)
         | 0:
-            let mut status = 0
-            if self.Env == nil {
-                status = execvp(self.path, self.Args)
-            } else {
-                status = execve(self.path, self.Args, self.Env)
+            sys::Close(int(pipe[0]))
+            let mut args = make([]str, 1, 1 + len(self.Args))
+            args[0] = path
+            args = append(args, self.Args...)
+            setenv(self.Env) else { error(error) }
+            execvp(path, args)
+            let code = conv::Itoa(sys::GetLastErrno())
+            unsafe { sys::Write(int(pipe[1]), &code[0], uint(len(code))) }
+            sys::Close(int(pipe[1]))
+            Exit(1)
+        |:
+            sys::Close(int(pipe[1]))
+            let mut buf: [16]byte
+            let n = unsafe { sys::Read(int(pipe[0]), &buf[0], len(buf)) }
+            sys::Close(int(pipe[0]))
+            if n != 0 {
+                self.attrs.pid = invalidPid
+                let (code, _) = unsafe { conv::AtoiBp(&buf[0], n) }
+                error(processErrorFromCode(code))
             }
-            if status == -1 {
-                cpp.kill(cpp.getpid(), cpp.SIGTERM)
-            }
-            Exit(255)
         }
-        let status = 0
-        if unsafe { cpp.waitpid(pid, (*integ::Int)(&status), cpp.WUNTRACED) == -1 } {
+    }
+
+    fn kill(self)! {
+        if self.attrs.pid == invalidPid {
+            panic("command is not spawned")
+        }
+        if cpp.kill(self.attrs.pid, 1) != 0 {
             error(getLastProcessError())
         }
-        if cpp.WIFSIGNALED(status) {
-            error(ProcessError.Fork)
+        self.attrs.pid = invalidPid
+    }
+
+    fn wait(self)!: int {
+        if self.attrs.pid == invalidPid {
+            panic("command is not spawned")
         }
-        ret cpp.WEXITSTATUS(status)
+        let mut stat = 0
+        unsafe {
+            if cpp.waitpid(self.attrs.pid, (*integ::Int)(&stat), 0) == -1 {
+                error(getLastProcessError())
+            }
+        }
+        self.attrs.pid = invalidPid
+        ret cpp.WEXITSTATUS(stat)
     }
 }

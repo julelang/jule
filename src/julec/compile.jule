@@ -71,24 +71,19 @@ fn clearObjects() {
 // Compie generated IR.
 fn compileIr(compiler: str, compilerCmd: str) {
     let mut cmd = Cmd.New(compiler)
-    cmd.Args = [compiler]
-    cmd.Args = append(cmd.Args, strings::Split(compilerCmd, " ", -1)...)
-    let status = cmd.Spawn() else {
+    cmd.Args = strings::Split(compilerCmd, " ", -1)
+    cmd.Spawn() else {
         match error {
-        | ProcessError.Fork:
-            AnsiEscape.Print(AnsiEscape.RedSeq, "back-end compiler could not used because of fork problem")
         | ProcessError.NotExist:
             AnsiEscape.Print(AnsiEscape.RedSeq, "back-end compiler could not used because of compiler path is not exist")
-        | ProcessError.NotExec:
-            AnsiEscape.Print(AnsiEscape.RedSeq, "back-end compiler could not used because of compiler path is not in the proper format")
         | ProcessError.Denied:
             AnsiEscape.Print(AnsiEscape.RedSeq, "back-end compiler could not used because of permission denied")
         |:
             AnsiEscape.Print(AnsiEscape.RedSeq, "back-end compiler could not used because of unkown problem")
         }
         Throw("")
-        use 0
     }
+    let status = cmd.Wait()!
     if status != 0 {
         let errorMessage = "\n>>> your backend compiler (" + env::Compiler + `) reports problems
 >>> please check errors above

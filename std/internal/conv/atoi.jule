@@ -4,28 +4,36 @@
 
 use nosafe for std::internal::nosafe
 
-// Converts decimal string to int.
+// Converts decimal byte pointer to int.
 // Return integer and success state.
-fn Atoi(&s: str): (i: int, ok: bool) {
-    let mut bs = nosafe::Stobs(s)
-    if bs[0] == '-' {
-        if len(bs) == 1 {
+unsafe fn AtoiBp(mut b: *byte, mut n: int): (i: int, ok: bool) {
+    let mut neg = *b == '-'
+    if neg {
+        if n == 1 {
             ret
         }
-        bs = bs[1:]
+        n--
+        b++
     }
-    for _, b in bs {
-        if '0' <= b && b <= '9' {
+    for n > 0; n-- {
+        if '0' <= *b && *b <= '9' {
             i *= 10
-            i += int(b - '0')
+            i += int(*b - '0')
         } else {
             ret
         }
+        b++
     }
     ok = true
-    if s[0] == '-' {
+    if neg {
         i = -i
     }
+    ret
+}
+
+// Same as AtoiBp.
+fn Atoi(&s: str): (i: int, ok: bool) {
+    i, ok = unsafe { AtoiBp(&s[0], len(s)) }
     ret
 }
 
