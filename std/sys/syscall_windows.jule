@@ -3,25 +3,26 @@
 // license that can be found in the LICENSE file.
 
 use std::jule::integrated::{Wchar}
-use utf16 for std::unicode::utf16
-cpp use "<dirent.h>"
 
-cpp type DWORD: int
+cpp type DWORD: uint
 cpp type HANDLE: *unsafe
 
-#typedef
-cpp struct _WDIR {}
+cpp type _mode_t: uint
+cpp type _off_t: uint
 
-cpp struct _wdirent {
-    d_name: *Wchar
+cpp struct _stat {
+    st_mode: cpp._mode_t
+    st_size: cpp._off_t
+}
+
+#typedef
+cpp struct WIN32_FIND_DATAW {
+    cFileName: *Wchar
 }
 
 cpp fn GetStdHandle(stdh: uintptr): *unsafe
 cpp unsafe fn CloseHandle(stdh: *unsafe): bool
-cpp unsafe fn wstat(path: *Wchar, mut handle: *cpp.stat): int
-cpp unsafe fn _wopendir(path: *Wchar): *cpp._WDIR
-cpp unsafe fn _wclosedir(mut dir: *cpp._WDIR): int
-cpp unsafe fn _wreaddir(mut dir: *cpp._WDIR): *cpp._wdirent
+cpp unsafe fn _wstat(path: *Wchar, mut handle: *cpp._stat): int
 cpp unsafe fn _wopen(path: *Wchar, flag: int, mode: int): int
 cpp fn GetLastError(): u32
 cpp unsafe fn GetCurrentDirectoryW(bufflen: u32, buff: *Wchar): u32
@@ -37,12 +38,15 @@ cpp unsafe fn WriteConsoleW(handle: cpp.HANDLE, buffer: *unsafe,
 cpp unsafe fn ReadConsoleW(handle: cpp.HANDLE, mut buffer: *unsafe,
     to_read: cpp.DWORD, readed: *cpp.DWORD, input_control: *unsafe): bool
 cpp fn WSAGetLastError(): int
+cpp unsafe fn FindFirstFileW(*Wchar, *cpp.WIN32_FIND_DATAW): cpp.HANDLE
+cpp unsafe fn FindNextFileW(cpp.HANDLE, *cpp.WIN32_FIND_DATAW): int
+cpp fn FindClose(cpp.HANDLE): int
 
-// C's _WDIR.
-type Wdir: cpp._WDIR
+// C's stat.
+type SysStat: cpp._stat
 
-// C's _wdirent.
-type Wdirent: cpp._wdirent
+// C's WIN32_FIND_DATAW structure.
+type Win32FindData: cpp.WIN32_FIND_DATAW
 
 type Handle: uintptr
 
@@ -55,9 +59,9 @@ static STDERR = GetStdHandle(uintptr(STD_ERROR_HANDLE))
 fn GetStdHandle(stdh: uintptr): Handle { ret Handle(cpp.GetStdHandle(stdh)) }
 unsafe fn CloseHandle(stdh: Handle): bool { ret cpp.CloseHandle(unsafe { (*unsafe)(stdh) }) }
 
-// Calls C's wstat function.
+// Calls C's _wstat function.
 unsafe fn Wstat(path: *u16, mut stat: *SysStat): int {
-    ret cpp.wstat((*Wchar)(path), stat)
+    ret cpp._wstat((*Wchar)(path), stat)
 }
 
 // Wrapper for C's _wopen function.
@@ -95,15 +99,6 @@ unsafe fn RemoveDirectory(path: *u16): bool {
     ret cpp.RemoveDirectoryW((*Wchar)(path))
 }
 
-// Calls C's _wopendir function.
-unsafe fn Wopendir(path: *u16): *Wdir { ret cpp._wopendir((*Wchar)(path)) }
-
-// Calls C's _wreaddir function.
-unsafe fn Wreaddir(mut dir: *Wdir): *Wdirent { ret cpp._wreaddir(dir) }
-
-// Calls C's _wclosedir function.
-unsafe fn Wclosedir(mut dir: *Wdir): int { ret cpp._wclosedir(dir) }
-
 // Calls Windows's GetFullPathNameW function.
 unsafe fn GetFullPathName(path: *u16, bufflen: u32,
     buff: *u16, fname: **u16): u32 {
@@ -137,4 +132,19 @@ unsafe fn ReadConsole(handle: Handle, mut buffer: *u16, to_read: int,
 // Calls Windows's WSAGetLastError function.
 fn WSAGetLastError(): int {
     ret cpp.WSAGetLastError()
+}
+
+// Call's Windows FindFirstFileW function.
+unsafe fn FindFirstFile(path: *u16, mut data: *Win32FindData): Handle {
+    ret Handle(cpp.FindFirstFileW((*Wchar)(path), data))
+}
+
+// Call's Windows FindNextFileW function.
+unsafe fn FindNextFile(h: Handle, mut data: *Win32FindData): int {
+    ret cpp.FindNextFileW(cpp.HANDLE(h), data)
+}
+
+// Call's Windows FindClose function.
+fn FindClose(h: Handle): int {
+    ret unsafe { cpp.FindClose(cpp.HANDLE(h)) }
 }
