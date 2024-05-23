@@ -2,7 +2,13 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+#pass "-lshell32" // Link shell32.lib
+
 use std::jule::integrated::{Wchar}
+
+cpp use "<windows.h>"
+cpp use "<fcntl.h>"
+cpp use "<io.h>"
 
 cpp type DWORD: uint
 cpp type HANDLE: *unsafe
@@ -29,14 +35,14 @@ cpp unsafe fn GetCurrentDirectoryW(bufflen: u32, buff: *Wchar): u32
 cpp unsafe fn SetCurrentDirectoryW(path: *Wchar): bool
 cpp unsafe fn GetFullPathNameW(path: *Wchar, bufflen: u32, buff: *Wchar, fname: **Wchar): u32
 cpp unsafe fn DeleteFileW(path: *Wchar): bool
-cpp unsafe fn CreateDirectoryW(path: *Wchar, pass_null_here: *bool): bool
+cpp unsafe fn CreateDirectoryW(path: *Wchar, passNullHere: *bool): bool
 cpp unsafe fn RemoveDirectoryW(path: *Wchar): bool
 cpp unsafe fn GetConsoleMode(handle: cpp.HANDLE, mut mode: *cpp.DWORD): bool
 cpp unsafe fn SetConsoleMode(handle: cpp.HANDLE, mode: cpp.DWORD): bool
 cpp unsafe fn WriteConsoleW(handle: cpp.HANDLE, buffer: *unsafe,
-    to_write: cpp.DWORD, written: *cpp.DWORD, reserved: *unsafe): bool
+    toWrite: cpp.DWORD, written: *cpp.DWORD, reserved: *unsafe): bool
 cpp unsafe fn ReadConsoleW(handle: cpp.HANDLE, mut buffer: *unsafe,
-    to_read: cpp.DWORD, readed: *cpp.DWORD, input_control: *unsafe): bool
+    toRead: cpp.DWORD, readed: *cpp.DWORD, inputControl: *unsafe): bool
 cpp fn WSAGetLastError(): int
 cpp unsafe fn FindFirstFileW(*Wchar, *cpp.WIN32_FIND_DATAW): cpp.HANDLE
 cpp unsafe fn FindNextFileW(cpp.HANDLE, *cpp.WIN32_FIND_DATAW): int
@@ -116,17 +122,18 @@ fn SetConsoleMode(handle: Handle, mode: int): bool {
 }
 
 // Calls Windows's WriteConsoleW function.
-unsafe fn WriteConsole(handle: Handle, buffer: *u16, to_write: int,
+unsafe fn WriteConsole(handle: Handle, buffer: *u16, toWrite: int,
     mut &written: int, reserved: *unsafe): bool {
     ret cpp.WriteConsoleW(cpp.HANDLE(handle), (*unsafe)(buffer),
-        cpp.DWORD(to_write), (*cpp.DWORD)(written), reserved)
+        cpp.DWORD(toWrite), (*cpp.DWORD)(written), reserved)
 }
 
 // Calls Windows's ReadConsoleW function.
-unsafe fn ReadConsole(handle: Handle, mut buffer: *u16, to_read: int,
-    mut &readed: int, input_control: *unsafe): bool {
+// Passes nil pointer for input control.
+unsafe fn ReadConsole(handle: Handle, mut buffer: *u16, toRead: int,
+    mut &readed: int): bool {
     ret cpp.ReadConsoleW(cpp.HANDLE(handle), (*unsafe)(buffer),
-        cpp.DWORD(to_read), (*cpp.DWORD)(&readed), input_control)
+        cpp.DWORD(toRead), (*cpp.DWORD)(&readed), nil)
 }
 
 // Calls Windows's WSAGetLastError function.
