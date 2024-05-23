@@ -64,15 +64,12 @@ impl scopeCoder {
         }
     }
 
-    fn rangeIndexIter(mut &self, mut &it: &RangeIter) {
-        let begin = identCoder.iterBegin(uintptr(it))
-        let next = identCoder.iterNext(uintptr(it))
-
+    // Common head object-code for iterations of all kind.
+    fn iterHead[T](mut &self, &it: T, mut &ref: bool, &begin: str) {
         self.oc.write("{\n")
         self.oc.addIndent()
         self.oc.indent()
         self.oc.write("auto expr = ")
-        let mut ref = false
         if opt::Copy && isCopyOptimizable(it.Expr) {
             ref = true
             match type it.Expr.Model {
@@ -115,6 +112,14 @@ impl scopeCoder {
         self.oc.write("if (it != expr_end) {\n")
         self.oc.addIndent()
         self.oc.indent()
+    }
+
+    fn rangeIndexIter(mut &self, mut &it: &RangeIter) {
+        let begin = identCoder.iterBegin(uintptr(it))
+        let next = identCoder.iterNext(uintptr(it))
+
+        let mut ref = false
+        self.iterHead(it, ref, begin)
         if it.KeyA != nil {
             self.oc.varInitExpr(it.KeyA, fn() {
                 if ref {
@@ -176,53 +181,8 @@ impl scopeCoder {
         let begin = identCoder.iterBegin(uintptr(it))
         let next = identCoder.iterNext(uintptr(it))
 
-        self.oc.write("{\n")
-        self.oc.addIndent()
-        self.oc.indent()
-        self.oc.write("auto expr = ")
         let mut ref = false
-        if opt::Copy && isCopyOptimizable(it.Expr) {
-            ref = true
-            match type it.Expr.Model {
-            | &Var:
-                let v = (&Var)(it.Expr.Model)
-                if v.Reference {
-                    self.oc.ec.model(it.Expr.Model)
-                    break
-                }
-                fall
-            |:
-                self.oc.write("&(")
-                self.oc.ec.model(it.Expr.Model)
-                self.oc.write(")")
-            }
-        } else {
-            self.oc.ec.possibleRefExpr(it.Expr.Model)
-        }
-        self.oc.write(";\n")
-        self.oc.indent()
-        self.oc.write("auto it = expr")
-        if ref {
-            self.oc.write("->")
-        } else {
-            self.oc.write(".")
-        }
-        self.oc.write("begin();\n")
-        self.oc.indent()
-        self.oc.write("auto expr_end = expr")
-        if ref {
-            self.oc.write("->")
-        } else {
-            self.oc.write(".")
-        }
-        self.oc.write("end();\n")
-        self.oc.indent()
-        self.oc.write(begin)
-        self.oc.write(":;\n")
-        self.oc.indent()
-        self.oc.write("if (it != expr_end) {\n")
-        self.oc.addIndent()
-        self.oc.indent()
+        self.iterHead(it, ref, begin)
         if it.KeyA != nil {
             self.oc.varInitExpr(it.KeyA, fn() { self.oc.write("it->first") })
             self.oc.write("\n")
