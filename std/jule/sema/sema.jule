@@ -1197,38 +1197,74 @@ impl Sema {
         }
     }
 
+    fn checkEnumItemInt[Int](mut &self, mut &eval: &Eval, mut &e: &Enum, &prim: &Prim, mut &item: &EnumItem, mut &n: Int) {
+        if item.AutoExpr() {
+            item.Value = &Value{
+                Data: new(Data),
+            }
+            match type Int {
+            | i64:
+                item.Value.Data.Constant = Const.NewI64(n)
+            | u64:
+                item.Value.Data.Constant = Const.NewU64(n)
+            |:
+                panic("unimplemented enum int type, this panic call should be unreachable")
+            }
+            item.Value.Data.Model = item.Value.Data.Constant
+        } else {
+            let mut d = eval.evalExpr(item.Value.Expr)
+            if d == nil {
+                ret
+            }
+            if !d.IsConst() {
+                self.pushErr(item.Value.Expr.Token, LogMsg.ExprNotConst)
+            }
+            _ = self.checkAssignType(false, e.Kind.Kind, d, item.Token)
+            item.Value.Data = d
+            match type Int {
+            | i64:
+                n = item.Value.Data.Constant.ReadI64()
+            | u64:
+                n = item.Value.Data.Constant.ReadU64()
+            |:
+                panic("unimplemented enum int type, this panic call should be unreachable")
+            }
+        }
+    }
+
+    fn checkEnumItemsInt1[Int](mut &self, &prim: &Prim, mut &e: &Enum) {
+        let max = Int(types::Max(prim.Str()))
+        let mut eval = self.eval(self)
+        let mut n = Int(0)
+        let mut first = e.Items[0]
+        self.checkEnumItemInt(eval, e, prim, first, n)
+        if first.Value.Data != nil {
+            match type Int {
+            | i64:
+                n = first.Value.Data.Constant.AsI64()
+            | u64:
+                n = first.Value.Data.Constant.AsU64()
+            |:
+                panic("unimplemented enum int type, this panic call should be unreachable")
+            }
+        }
+        for (_, mut item) in e.Items[1:] {
+            if item.AutoExpr() && n > 0 && max-n <= 0 {
+                self.pushErr(item.Token, LogMsg.OverflowLimits)
+                break
+            }
+            n++
+            self.checkEnumItemInt(eval, e, prim, item, n)
+        }
+    }
+
     fn checkEnumItemsInt(mut &self, mut &e: &Enum) {
         let prim = e.Kind.Kind.Prim()
-        let mut max = u64(types::Max(prim.Str()))
-        let mut eval = self.eval(self)
-        for (i, mut item) in e.Items {
-            if max == 0 {
-                self.pushErr(item.Token, LogMsg.OverflowLimits)
-            } else {
-                max--
-            }
-            if item.AutoExpr() {
-                item.Value = &Value{
-                    Data: new(Data),
-                }
-                match {
-                | types::IsSigInt(prim.Str()):
-                    item.Value.Data.Constant = Const.NewI64(i64(max - (max - u64(i))))
-                |:
-                    item.Value.Data.Constant = Const.NewU64(max - (max - u64(i)))
-                }
-                item.Value.Data.Model = item.Value.Data.Constant
-            } else {
-                let mut d = eval.evalExpr(item.Value.Expr)
-                if d == nil {
-                    continue
-                }
-                if !d.IsConst() {
-                    self.pushErr(item.Value.Expr.Token, LogMsg.ExprNotConst)
-                }
-                _ = self.checkAssignType(false, e.Kind.Kind, d, item.Token)
-                item.Value.Data = d
-            }
+        match {
+        | types::IsSigInt(prim.Kind):
+            self.checkEnumItemsInt1[i64](prim, e)
+        |:
+            self.checkEnumItemsInt1[u64](prim, e)
         }
     }
 
@@ -1242,6 +1278,7 @@ impl Sema {
 
         if len(e.Items) == 0 {
             self.pushErr(e.Token, LogMsg.NoMemberInEnum, e.Ident)
+            ret
         }
 
         self.checkEnumItemsDup[&EnumItem](e.Items)

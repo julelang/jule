@@ -3374,7 +3374,27 @@ impl binaryEval {
                     Kind: buildPrimType(PrimKind.Bool),
                 },
             }
-        | TokenKind.Amper
+        | TokenKind.Amper:
+            let first = enm.Items[0]
+            match {
+            | first.Value.Data.Constant.IsI64():
+                if first.Value.Data.Constant.ReadI64() == 0 {
+                    goto next
+                }
+                goto err
+            | first.Value.Data.Constant.IsU64():
+                if first.Value.Data.Constant.ReadU64() == 0 {
+                    goto next
+                }
+                goto err
+            |:
+                panic("unimplemented enum type, this panic call should be unreachable")
+            }
+        err:
+            self.e.pushErr(self.op, LogMsg.AmperOpForEnum, enm.Ident, self.op.Kind)
+            self.e.pushSugggestion(LogMsg.DefineZeroDefaultToUseAmper)
+        next:
+            fall
         | TokenKind.Vline
         | TokenKind.Caret:
             if enm.Kind.Kind.Prim() == nil || !types::IsInt(enm.Kind.Kind.Prim().Str()) {
