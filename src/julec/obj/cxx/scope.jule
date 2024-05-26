@@ -7,6 +7,7 @@ use opt::{
     PushToSliceExprModel,
     MutSlicingExprModel,
     StrInsertBeginExprModel,
+    StrAppendExprModel,
 }
 use conv for std::conv
 use lex for std::jule::lex::{TokenKind}
@@ -51,6 +52,7 @@ enum compStmt: type {
     &StrInsertBeginExprModel,
     &MutSlicingExprModel,
     &PushToSliceExprModel,
+    &StrAppendExprModel,
 }
 
 struct scopeCoder {
@@ -665,6 +667,14 @@ impl scopeCoder {
         }
     }
 
+    fn strAppend(mut &self, mut m: &StrAppendExprModel) {
+        self.oc.write("(")
+        self.oc.ec.possibleRefExpr(m.Str)
+        self.oc.write(").append(")
+        self.oc.ec.possibleRefExpr(m.Expr)
+        self.oc.write(")")
+    }
+
     // Generates C++ code of statement.
     fn st(mut &self, mut st: compStmt) {
         if st == nil {
@@ -711,6 +721,8 @@ impl scopeCoder {
             self.oc.ec.mutSlicing((&MutSlicingExprModel)(st))
         | &StrInsertBeginExprModel:
             self.oc.ec.strInsertBegin((&StrInsertBeginExprModel)(st))
+        | &StrAppendExprModel:
+            self.strAppend((&StrAppendExprModel)(st))
         |:
             self.oc.write("<unimplemented_stmt>")
         }

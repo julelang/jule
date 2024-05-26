@@ -108,6 +108,10 @@ namespace jule
             return this->begin() + this->len();
         }
 
+        inline void append(const jule::I32 &r) noexcept {
+            jule::utf8_push_rune_bytes<std::basic_string<jule::U8>>(r, this->buffer);
+        }
+
         void mut_slice(
 #ifndef __JULE_ENABLE__PRODUCTION
             const char *file,

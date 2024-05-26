@@ -15,6 +15,7 @@ use std::jule::sema::{
     ExprModel,
     FnCallExprModel,
     Conditional,
+    CastingExprModel,
     If,
     Else,
     Case,
@@ -244,6 +245,9 @@ impl scopeOptimizer {
     }
 
     fn substr(mut self, mut a: &Assign): bool {
+        if a.Op.Kind != TokenKind.Eq {
+            ret false
+        }
         match type a.R.Model {
         | &SlicingExprModel:
             let mut sem = (&SlicingExprModel)(a.R.Model)
@@ -261,6 +265,9 @@ impl scopeOptimizer {
     }
 
     fn strInsert(mut self, mut a: &Assign): bool {
+        if a.Op.Kind != TokenKind.Eq {
+            ret false
+        }
         match type a.R.Model {
         | &BinopExprModel:
             let mut m = (&BinopExprModel)(a.R.Model)
@@ -275,8 +282,28 @@ impl scopeOptimizer {
         ret false
     }
 
+    fn strAppend(mut self, mut a: &Assign): bool {
+        if a.Op.Kind != TokenKind.PlusEq {
+            ret false
+        }
+        match type a.R.Model {
+        | &CastingExprModel:
+            let mut c = (&CastingExprModel)(a.R.Model)
+            let prim = c.ExprKind.Prim()
+            if prim == nil || (!prim.IsU8() && !prim.IsI32()) {
+                break
+            }
+            self.setCurrentStmt(&StrAppendExprModel{
+                Str: a.L.Model,
+                Expr: c.Expr,
+            })
+            ret true
+        }
+        ret false
+    }
+
     fn strAssign(mut self, mut a: &Assign): bool {
-        if a.Op.Kind != TokenKind.Eq {
+        if !Str {
             ret false
         }
         let lp = a.L.Kind.Prim()
@@ -285,14 +312,15 @@ impl scopeOptimizer {
         }
         match {
         | self.substr(a)
-        | self.strInsert(a):
+        | self.strInsert(a)
+        | self.strAppend(a):
             ret true
         }
         ret false
     }
 
     fn optimizeAssign(mut self, mut assign: &Assign) {
-        if Copy && self.strAssign(assign) {
+        if self.strAssign(assign) {
             ret
         }
 

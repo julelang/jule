@@ -393,6 +393,39 @@ namespace jule
                                4);
     }
 
+    template<typename Dest>
+    void utf8_push_rune_bytes(const jule::I32 &r, Dest &dest) {
+        if (static_cast<jule::U32>(r) <= jule::UTF8_RUNE1_MAX) {
+            dest.push_back(static_cast<jule::U8>(r));
+            return;
+        }
+
+        const auto i = static_cast<jule::U32>(r);
+        if (i < jule::UTF8_RUNE2_MAX)
+        {
+            dest.push_back(static_cast<jule::U8>(jule::UTF8_T2 | static_cast<jule::U8>(r >> 6)));
+            dest.push_back(static_cast<jule::U8>(jule::UTF8_TX | (static_cast<jule::U8>(r) & jule::UTF8_MASKX)));
+            return;
+        }
+
+        jule::I32 _r = r;
+        if (i > jule::UTF8_MAX_RUNE ||
+            (jule::UTF8_SURROGATE_MIN <= i && i <= jule::UTF8_SURROGATE_MAX))
+            _r = jule::UTF8_RUNE_ERROR;
+
+        if (i <= jule::UTF8_RUNE3_MAX) {
+            dest.push_back(static_cast<jule::U8>(jule::UTF8_T3 | static_cast<jule::U8>(_r >> 12)));
+            dest.push_back(static_cast<jule::U8>(jule::UTF8_TX | (static_cast<jule::U8>(_r >> 6) & jule::UTF8_MASKX)));
+            dest.push_back(static_cast<jule::U8>(jule::UTF8_TX | (static_cast<jule::U8>(_r) & jule::UTF8_MASKX)));
+            return;
+        }
+
+        dest.push_back(static_cast<jule::U8>(jule::UTF8_T4 | static_cast<jule::U8>(_r >> 18)));
+        dest.push_back(static_cast<jule::U8>(jule::UTF8_TX | (static_cast<jule::U8>(_r >> 12) & jule::UTF8_MASKX)));
+        dest.push_back(static_cast<jule::U8>(jule::UTF8_TX | (static_cast<jule::U8>(_r >> 6) & jule::UTF8_MASKX)));
+        dest.push_back(static_cast<jule::U8>(jule::UTF8_TX | (static_cast<jule::U8>(_r) & jule::UTF8_MASKX)));
+    }
+
     std::vector<jule::U8> utf8_rune_to_bytes(const jule::I32 &r)
     {
         if (static_cast<jule::U32>(r) <= jule::UTF8_RUNE1_MAX)
