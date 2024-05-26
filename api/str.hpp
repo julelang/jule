@@ -9,7 +9,6 @@
 #include <ostream>
 #include <string>
 #include <cstring>
-#include <vector>
 
 #include "impl_flag.hpp"
 #include "panic.hpp"
@@ -66,23 +65,22 @@ namespace jule
         Str(void) = default;
         Str(const jule::Str &src) = default;
         Str(const std::initializer_list<jule::U8> &src) : buffer(src) {}
-        Str(const jule::I32 &rune) : Str(jule::utf8_rune_to_bytes(rune)) {}
         Str(const std::basic_string<jule::U8> &src) : buffer(src) {}
         Str(const char *src, const jule::Int &len) : buffer(src, src + len) {}
         Str(const jule::U8 *src, const jule::Int &len) : buffer(src, src + len) {}
         Str(const char *src) : buffer(src, src + std::strlen(src)) {}
         Str(const std::string &src) : buffer(src.begin(), src.end()) {}
         Str(const jule::Slice<U8> &src) : buffer(src.begin(), src.end()) {}
-        Str(const std::vector<U8> &src) : buffer(src.begin(), src.end()) {}
+
+        Str(const jule::I32 &rune) {
+            jule::utf8_push_rune_bytes<std::basic_string<jule::U8>>(rune, this->buffer);
+        }
 
         Str(const jule::Slice<jule::I32> &src)
         {
             this->buffer.reserve(src.len() * 4);
             for (const jule::I32 &r : src)
-            {
-                const std::vector<jule::U8> bytes = jule::utf8_rune_to_bytes(r);
-                this->buffer.append(bytes.begin(), bytes.end());
-            }
+                jule::utf8_push_rune_bytes<std::basic_string<jule::U8>>(r, this->buffer);
         }
 
         using Iterator = jule::U8 *;
