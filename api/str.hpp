@@ -72,7 +72,8 @@ namespace jule
         Str(const std::string &src) : buffer(src.begin(), src.end()) {}
         Str(const jule::Slice<U8> &src) : buffer(src.begin(), src.end()) {}
 
-        Str(const jule::I32 &rune) {
+        Str(const jule::I32 &rune)
+        {
             jule::utf8_push_rune_bytes<std::basic_string<jule::U8>>(rune, this->buffer);
         }
 
@@ -106,8 +107,20 @@ namespace jule
             return this->begin() + this->len();
         }
 
-        inline void append(const jule::I32 &r) noexcept {
+        inline void append(const jule::I32 &r) noexcept
+        {
             jule::utf8_push_rune_bytes<std::basic_string<jule::U8>>(r, this->buffer);
+        }
+
+        inline void append(const jule::Slice<jule::U8> &s) noexcept
+        {
+            this->buffer.append(s.begin(), s.end());
+        }
+
+        inline void append(const jule::Slice<jule::I32> &s) noexcept
+        {
+            for (const jule::I32 &r : s)
+                jule::utf8_push_rune_bytes<std::basic_string<jule::U8>>(r, this->buffer);
         }
 
         void mut_slice(
