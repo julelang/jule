@@ -18,7 +18,7 @@ use ast for std::jule::ast::{
     VariadicExpr,
     TupleExpr,
 }
-use std::jule::build::{LogMsg}
+use std::jule::build::{LogMsg, Logf}
 use lit for std::jule::constant::lit
 use std::jule::lex::{Token, Ident, IsIgnoreIdent, IsAnonIdent}
 use types for std::jule::types
@@ -703,23 +703,27 @@ impl fnCallArgChecker {
         }
 
         let mut diff = n - len(self.args)
+        let mut log = LogMsg.Empty
         match {
         | diff == 0:
             ret true
         | n > 0 && params[n-1].Decl.Variadic:
             ret true
         | diff < 0 || diff > len(params):
-            self.pushErr(LogMsg.ArgumentOverflow)
-            ret false
+            log = LogMsg.ArgumentOverflow
+        |:
+            log = LogMsg.MissingArgs
         }
-
-        let mut idents = ""
-        for diff > 0; diff-- {
-            idents += ", " + params[n-diff].Decl.Ident
+        let mut err = self.f.Decl.Ident
+        err += "\n       wanted ("
+        for i, p in params {
+            err += p.Kind.Str()
+            if len(params)-i > 1 {
+                err += ", "
+            }
         }
-        idents = idents[2:] // Remove first separator.
-        self.pushErr(LogMsg.MissingExprFor, idents)
-
+        err += ")"
+        self.pushErr(log, err)
         ret false
     }
 
