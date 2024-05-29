@@ -11,6 +11,7 @@ use opt::{
 }
 use conv for std::conv
 use lex for std::jule::lex::{TokenKind}
+use std::jule::constant::{Const}
 use std::jule::sema::{
     Data,
     Stmt,
@@ -671,7 +672,16 @@ impl scopeCoder {
         self.oc.write("(")
         self.oc.ec.possibleRefExpr(m.Str)
         self.oc.write(").append(")
-        self.oc.ec.possibleRefExpr(m.Expr)
+        match type m.Expr {
+        | &Const:
+            let c = (&Const)(m.Expr)
+            let bytes = []byte(c.ReadStr())
+            self.oc.write(cstrLit(bytes))
+            self.oc.write(", ")
+            self.oc.write(conv::FmtInt(i64(len(bytes)), 10))
+        |:
+            self.oc.ec.possibleRefExpr(m.Expr)
+        }
         self.oc.write(")")
     }
 

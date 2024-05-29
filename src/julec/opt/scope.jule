@@ -287,7 +287,16 @@ impl scopeOptimizer {
             ret false
         }
         match type a.R.Model {
+        | &Const:
+            // Constant string literal appending to string.
+            self.setCurrentStmt(&StrAppendExprModel{
+                Str: a.L.Model,
+                Expr: a.R.Model,
+            })
+            ret true
         | &CastingExprModel:
+            // Casting byte literal, rune literal, byte slices and rune slices
+            // then appending to string.
             let mut c = (&CastingExprModel)(a.R.Model)
             let mut prim = c.ExprKind.Prim()
             if prim == nil && c.ExprKind.Slc() != nil {

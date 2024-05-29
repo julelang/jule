@@ -123,6 +123,11 @@ namespace jule
                 jule::utf8_push_rune_bytes<std::basic_string<jule::U8>>(r, this->buffer);
         }
 
+        inline void append(const char *s, const jule::Int n) noexcept
+        {
+            this->buffer.append(s, s + n);
+        }
+
         void mut_slice(
 #ifndef __JULE_ENABLE__PRODUCTION
             const char *file,
