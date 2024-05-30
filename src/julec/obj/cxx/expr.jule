@@ -10,6 +10,7 @@ use opt::{
     MutSlicingExprModel,
     StrInsertBeginExprModel,
     StrAppendExprModel,
+    StrCompExprModel,
 }
 use conv for std::conv
 use std::env::{Arch}
@@ -96,6 +97,7 @@ enum compExprModel: type {
     &MutSlicingExprModel,
     &StrInsertBeginExprModel,
     &StrAppendExprModel,
+    &StrCompExprModel,
 }
 
 struct exprCoder {
@@ -1262,6 +1264,22 @@ impl exprCoder {
         self.oc.write("));")
     }
 
+    fn strComp(mut &self, mut m: &StrCompExprModel) {
+        if m.NotEq {
+            self.oc.write("(!")
+        }
+        let bytes = []byte(m.Right.ReadStr())
+        self.possibleRefExpr(m.Left)
+        self.oc.write(".equal(")
+        self.oc.write(cstrLit(bytes))
+        self.oc.write(", ")
+        self.oc.write(conv::Itoa(len(bytes)))
+        self.oc.write(")")
+        if m.NotEq {
+            self.oc.write(")")
+        }
+    }
+
     fn model(mut &self, mut m: compExprModel) {
         match type m {
         | str:
@@ -1358,6 +1376,8 @@ impl exprCoder {
             self.mutSlicing((&MutSlicingExprModel)(m))
         | &StrInsertBeginExprModel:
             self.strInsertBegin((&StrInsertBeginExprModel)(m))
+        | &StrCompExprModel:
+            self.strComp((&StrCompExprModel)(m))
         |:
             self.oc.write("<unimplemented_expression_model>")
         }

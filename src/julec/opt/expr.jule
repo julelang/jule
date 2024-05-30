@@ -85,30 +85,45 @@ impl exprOptimizer {
             ret true
         }
     opt:
-        let c = (&Const)(m.Right.Model)
-        if c.ReadStr() != "" {
-            ret false
-        }
+        let mut c = (&Const)(m.Right.Model)
         match m.Op.Kind {
         | TokenKind.Eqs:
-            *self.model = &CommonSubIdentExprModel{
-                ExprKind: m.Left.Kind,
-                Expr: m.Left.Model,
-                Ident: "empty()",
+            if c.ReadStr() == "" {
+                *self.model = &CommonSubIdentExprModel{
+                    ExprKind: m.Left.Kind,
+                    Expr: m.Left.Model,
+                    Ident: "empty()",
+                }
+                break
             }
+            let mut model = any(&StrCompExprModel{
+                Left: m.Left.Model,
+                Right: c,
+                NotEq: false,
+            })
+            *self.model = unsafe { *(*ExprModel)(&model) }
         | TokenKind.NotEq:
-            let mut op = m.Op
-            op.Kind = TokenKind.Excl
-            *self.model = &UnaryExprModel{
-                Op: op,
-                Expr: &Data{
-                    Model: &CommonSubIdentExprModel{
-                        ExprKind: m.Left.Kind,
-                        Expr: m.Left.Model,
-                        Ident: "empty()",
+            if c.ReadStr() == "" {
+                let mut op = m.Op
+                op.Kind = TokenKind.Excl
+                *self.model = &UnaryExprModel{
+                    Op: op,
+                    Expr: &Data{
+                        Model: &CommonSubIdentExprModel{
+                            ExprKind: m.Left.Kind,
+                            Expr: m.Left.Model,
+                            Ident: "empty()",
+                        },
                     },
-                },
+                }
+                break
             }
+            let mut model = any(&StrCompExprModel{
+                Left: m.Left.Model,
+                Right: c,
+                NotEq: true,
+            })
+            *self.model = unsafe { *(*ExprModel)(&model) }
         }
         ret true
     }

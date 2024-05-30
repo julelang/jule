@@ -358,6 +358,13 @@ namespace jule
             return jule::Str(this->buffer + str.buffer);
         }
 
+        inline jule::Bool equal(const char *s, const jule::Int n) const noexcept
+        {
+            if (this->len() != n)
+                return false;
+            return std::strcmp(reinterpret_cast<const char *>(this->buffer.c_str()), s) == 0;
+        }
+
         inline jule::Bool operator==(const jule::Str &str) const noexcept
         {
             return this->buffer == str.buffer;
