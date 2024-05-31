@@ -176,9 +176,9 @@ impl ObjectCoder {
                 // eq function.
                 self.anyObj += typeCoder.Bool + " " + anyTypeIdent
                 self.anyObj += si
-                self.anyObj += "_eq(void *alloc, void *other) noexcept { return *static_cast<"
+                self.anyObj += "_eq(void *alloc, void *other) noexcept { return *reinterpret_cast<"
                 self.anyObj += kind
-                self.anyObj += "*>(alloc) == *static_cast<"
+                self.anyObj += "*>(alloc) == *reinterpret_cast<"
                 self.anyObj += kind
                 self.anyObj += "*>(other); }\n"
             }
@@ -186,8 +186,14 @@ impl ObjectCoder {
             // to_str function.
             self.anyObj += typeCoder.Str + " " + anyTypeIdent
             self.anyObj += si
-            self.anyObj += "_to_str(const void *alloc) noexcept { return jule::to_str(*static_cast<const "
-            self.anyObj += kind
+            self.anyObj += "_to_str(const void *alloc) noexcept { return jule::to_str(*reinterpret_cast<"
+            if t.Ptr() == nil {
+                self.anyObj += "const "
+                self.anyObj += kind
+            } else {
+                self.anyObj += kind
+                self.anyObj += "* const"
+            }
             self.anyObj += "*>(alloc)); }\n"
 
             // Type structure.
