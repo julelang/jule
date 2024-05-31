@@ -372,6 +372,12 @@ impl exprCoder {
         self.model(expr)
     }
 
+    // Casting expression.
+    //
+    // Special cases:
+    //  - The any type castings should be came first than others.
+    //    Otherwise, code generation might be wrong because <any> the
+    //    uses special casting algorithms.
     fn casting(mut &self, mut m: &CastingExprModel) {
         match {
         | isAny(m.Kind):
@@ -403,13 +409,6 @@ impl exprCoder {
             self.oc.write(", &" + anyTypeIdent)
             self.oc.write(conv::Itoa(i))
             self.oc.write(")")
-        | m.ExprKind.Ptr() != nil
-        | m.Kind.Ptr() != nil:
-            self.oc.write("((")
-            self.oc.write(self.oc.tc.kind(m.Kind))
-            self.oc.write(")(")
-            self.possibleRefExpr(m.Expr)
-            self.oc.write("))")
         | isAny(m.ExprKind):
             self.possibleRefExpr(m.Expr)
             self.oc.write(".")
@@ -429,6 +428,13 @@ impl exprCoder {
             self.oc.write("&" + anyTypeIdent)
             self.oc.write(conv::Itoa(self.oc.pushAnyType(m.Kind)))
             self.oc.write(")")
+        | m.ExprKind.Ptr() != nil
+        | m.Kind.Ptr() != nil:
+            self.oc.write("((")
+            self.oc.write(self.oc.tc.kind(m.Kind))
+            self.oc.write(")(")
+            self.possibleRefExpr(m.Expr)
+            self.oc.write("))")
         | m.ExprKind.Trait() != nil:
             self.possibleRefExpr(m.Expr)
             self.oc.write(".")
