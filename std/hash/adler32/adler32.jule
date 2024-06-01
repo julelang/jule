@@ -1,0 +1,146 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+// Package adler32 implements the Adler-32 checksum.
+//
+// It is defined in RFC 1950:
+//
+//  Adler-32 is composed of two sums accumulated per byte: s1 is
+//  the sum of all bytes, s2 is the sum of all s1 values. Both sums
+//  are done modulo 65521. s1 is initialized to 1, s2 to zero.  The
+//  Adler-32 checksum is stored as s2*65536 + s1 in most-
+//  significant-byte first (network) order.
+
+// The Jule code is a modified version of the original Go code from
+// https://github.com/golang/go/blob/0700bcfa2e997118f82c6c441406e4ff0a573571/src/hash/adler32/adler32.go and came with this notice.
+//
+// ====================================================
+// Copyright (c) 2009 The Go Authors. All rights reserved.
+// 
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+// 
+//    * Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+//    * Redistributions in binary form must reproduce the above
+// copyright notice, this list of conditions and the following disclaimer
+// in the documentation and/or other materials provided with the
+// distribution.
+//    * Neither the name of Google Inc. nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+// 
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// ====================================================
+
+use io for std::io
+use hash for std::hash
+
+// Largest prime that is less than 65536.
+const mod = 65521
+
+// Largest n such that
+// 255 * n * (n+1) / 2 + (n+1) * (mod-1) <= 2^32-1.
+// It is mentioned in RFC 1950 (search for "5552").
+const nmax = 5552
+
+const magic         = "adl\x01"
+const marshaledSize = len(magic) + 4
+
+// Represents the partial evaluation of a checksum.
+// The low 16 bits are s1, the high 16 bits are s2.
+type digest: u32
+
+struct Adler32 {
+    d: digest
+}
+
+impl hash::Hash for Adler32 {}
+impl hash::Hash32 for Adler32 {}
+impl io::Writer for Adler32 {}
+
+impl Adler32 {
+    // The size of an Adler-32 checksum in bytes.
+    const Size = 4
+
+    // Returns a new hash::Hash32 computing the Adler-32 checksum. Its
+    // Sum method will lay the value out in big-endian byte order.
+    static fn New(): hash::Hash32 {
+        let mut d = new(Adler32)
+        d.Reset()
+        ret d
+    }
+
+    // Returns the Adler-32 checksum of data.
+    static fn Checksum(data: []byte): u32 {
+        let mut d = Adler32{d: 1}
+        d.update(data)
+        ret u32(d.d)
+    }
+
+    // Add p to the running checksum.
+    fn update(mut self, p: []byte) {
+        let mut s1 = u32(self.d&0xffff)
+        let mut s2 = u32(self.d>>16)
+        for len(p) > 0 {
+            let mut q: []byte = nil
+            if len(p) > nmax {
+                unsafe {
+                    // Break immutability for p.
+                    *(&p), q = (*(&p))[:nmax], (*(&p))[nmax:]
+                }
+            }
+            for len(p) >= 4 {
+                s1 += u32(p[0])
+                s2 += s1
+                s1 += u32(p[1])
+                s2 += s1
+                s1 += u32(p[2])
+                s2 += s1
+                s1 += u32(p[3])
+                s2 += s1
+                unsafe { *(&p) = (*(&p))[4:] }
+            }
+            for _, x in p {
+                s1 += u32(x)
+                s2 += s1
+            }
+            s1 %= mod
+            s2 %= mod
+            unsafe { *(&p) = q }
+        }
+        self.d = digest(s2<<16 | s1)
+    }
+
+    fn Reset(mut self) {
+        self.d = 1
+    }
+
+    fn Size(self): int { ret Adler32.Size }
+
+    fn BlockSize(self): int { ret 4 }
+
+    fn Sum(self, mut dest: []byte): []byte {
+        let s = u32(self.d)
+        ret append(dest, byte(s>>24), byte(s>>16), byte(s>>8), byte(s))
+    }
+
+    fn Sum32(self): u32 { ret u32(self.d) }
+
+    fn Write(mut self, p: []byte)!: (n: int) {
+        self.update(p)
+        ret len(p)
+    }
+}
