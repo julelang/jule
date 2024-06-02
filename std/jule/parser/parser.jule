@@ -1509,16 +1509,19 @@ impl parser {
         }
     }
 
-    fn buildTraitMethods(mut &self, mut tokens: []&Token): []&FnDecl {
-        let mut methods: []&FnDecl = nil
+    fn buildTraitBody(mut &self, mut &t: &TraitDecl, mut tokens: []&Token) {
         let mut stmts = splitStmts(tokens)
         for (_, mut stmt) in stmts {
             tokens = stmt.tokens
             if len(tokens) == 0 {
                 continue
             }
-            let mut f = self.buildFn(tokens, true, true)
-            if f != nil {
+            match tokens[0].Id {
+            | TokenId.Fn:
+                let mut f = self.buildFn(tokens, true, true)
+                if f == nil {
+                    break
+                }
                 if f.IsAnon() {
                     self.pushErr(f.Token, LogMsg.InvalidSyntax)
                 }
@@ -1526,10 +1529,19 @@ impl parser {
                 if len(f.Generics) > 0 {
                     self.pushErr(f.Token, LogMsg.TraitMethodHasGenerics)
                 }
-                methods = append(methods, f)
+                t.Methods = append(t.Methods, f)
+            |:
+                let mut i = 0
+                let (mut ti, ok) = unsafe { self.buildType(tokens, &i, true) }
+                if !ok {
+                    break
+                }
+                if i < len(tokens) {
+                    self.pushErr(tokens[i], LogMsg.InvalidSyntax)
+                }
+                t.Inherits = append(t.Inherits, ti)
             }
         }
-        ret methods
     }
 
     fn buildTraitDecl(mut &self, mut &tokens: []&Token): &TraitDecl {
@@ -1557,7 +1569,7 @@ impl parser {
             self.pushErr(tokens[i], LogMsg.InvalidSyntax)
         }
         t.Public = isPub(t.Ident)
-        t.Methods = self.buildTraitMethods(bodyTokens)
+        self.buildTraitBody(t, bodyTokens)
         t.End = tokens[i-1]
         ret t
     }

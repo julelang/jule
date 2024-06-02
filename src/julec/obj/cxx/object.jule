@@ -759,12 +759,25 @@ impl ObjectCoder {
         }
     }
 
+    fn funcDeclIns(mut &self, mut &f: &FnIns, ptr: bool) {
+        self.indent()
+        self.funcHead(f, ptr)
+        self.paramsDecls(f.Params)
+        self.write(";\n")
+    }
+
     fn funcDecl(mut &self, mut &f: &Fn, ptr: bool) {
         for (_, mut c) in f.Instances {
-            self.indent()
-            self.funcHead(c, ptr)
-            self.paramsDecls(c.Params)
-            self.write(";\n")
+            self.funcDeclIns(c, ptr)
+        }
+    }
+
+    fn funcDeclTrait(mut &self, mut &t: &Trait, mut &f: &Fn, ptr: bool) {
+        for (_, mut c) in f.Instances {
+            let mut k = c.Params[0].Kind
+            c.Params[0].Kind = &TypeKind{Kind: t}
+            self.funcDeclIns(c, ptr)
+            c.Params[0].Kind = k
         }
     }
 
@@ -781,6 +794,49 @@ impl ObjectCoder {
         })
     }
 
+    fn traitDataTypeInherits(mut &self, mut &owner: &Trait, mut &t: &Trait) {
+        for (_, mut i) in t.Inherits {
+            let mut t2 = i.Kind.Trait()
+            self.traitDataTypeInherits(owner, t2)
+            self.traitDataTypeMethods(owner, t2)
+        }
+    }
+
+    fn traitDataTypeMethods(mut &self, mut &owner: &Trait, mut &t: &Trait) {
+        for (_, mut m) in t.Methods {
+            let mut ins = m.Instances[0]
+            let mut p = ins.Params[0]
+            p.Kind = &TypeKind{
+                Kind: t,
+            }
+            for (i, mut ip) in ins.Params[1:] {
+                if IsAnonIdent(ip.Decl.Ident) {
+                    ip.Decl.Ident = "_" + conv::Itoa(i)
+                }
+            }
+            if !env::Production {
+                let mut lp = ins.Params[len(ins.Params)-1]
+                match type lp.Kind.Kind {
+                | &customType:
+                    break
+                |:
+                    ins.Params = append(ins.Params, &ParamIns{
+                        Decl: &Param{
+                            Ident: "__file",
+                        },
+                        Kind: &TypeKind{
+                            Kind: &customType{
+                                kind: "const char*",
+                            },
+                        },
+                    })
+                }
+            }
+            self.pushResult(m)
+            self.funcDeclTrait(owner, m, true)
+        }
+    }
+
     fn traitDataTypes(mut &self) {
         self.iterPackages(fn(mut &pkg: &Package) {
             iterFiles(pkg, fn(mut &file: &SymbolTable) {
@@ -793,32 +849,8 @@ impl ObjectCoder {
                     self.write("MptrData")
                     self.write(" {\n")
                     self.addIndent()
-                    for (_, mut m) in t.Methods {
-                        let mut ins = m.Instances[0]
-                        let mut p = ins.Params[0]
-                        p.Kind = &TypeKind{
-                            Kind: t,
-                        }
-                        for (i, mut ip) in ins.Params[1:] {
-                            if IsAnonIdent(ip.Decl.Ident) {
-                                ip.Decl.Ident = "_" + conv::Itoa(i)
-                            }
-                        }
-                        if !env::Production {
-                            ins.Params = append(ins.Params, &ParamIns{
-                                Decl: &Param{
-                                    Ident: "__file",
-                                },
-                                Kind: &TypeKind{
-                                    Kind: &customType{
-                                        kind: "const char*",
-                                    },
-                                },
-                            })
-                        }
-                        self.pushResult(m)
-                        self.funcDecl(m, true)
-                    }
+                    self.traitDataTypeInherits(t, t)
+                    self.traitDataTypeMethods(t, t)
                     self.doneIndent()
                     self.indent()
                     self.write("};\n\n")
@@ -897,110 +929,162 @@ impl ObjectCoder {
         self.varInitExpr(v, nil)
     }
 
+    fn funcIns(mut &self, mut &f: &FnIns) {
+        self.funcHead(f, false)
+        self.paramsIns(f.Params)
+        self.write(" ")
+        self.sc.funcScope(f)
+        if f.Scope != nil {
+            self.write("\n\n")
+        }
+    }
+
     fn func(mut &self, mut &f: &Fn) {
         for (_, mut ins) in f.Instances {
-            self.funcHead(ins, false)
-            self.paramsIns(ins.Params)
-            self.write(" ")
-            self.sc.funcScope(ins)
-            if ins.Scope != nil {
-                self.write("\n\n")
+            self.funcIns(ins)
+        }
+    }
+
+    fn funcTrait(mut &self, mut &hash: &traitHash, mut &f: &Fn) {
+        let ident = f.Ident
+        for (_, mut ins) in f.Instances {
+            ins.Scope = nil
+
+            f.Ident = ident
+            f.Ident += "_"
+            f.Ident += hash.t.Ident
+            f.Ident += "_"
+            f.Ident += conv::Itoa(hash.i)
+
+            let mut k = ins.Params[0].Kind
+            ins.Params[0].Kind = &TypeKind{Kind: hash.t}
+            self.funcIns(ins)
+            ins.Params[0].Kind = k
+        }
+        f.Ident = ident
+    }
+
+    fn traitWrapper(mut &self, mut &m: &Fn, mut &hash: &traitHash) {
+        self.funcTrait(hash, m)
+
+        if hash.s == nil {
+            if env::Production {
+                self.write(" { jule::panic(__JULE_ERROR__INVALID_MEMORY); }\n")
+            } else {
+                self.write(" { jule::panic(" + typeCoder.Str + "(__JULE_ERROR__INVALID_MEMORY \"\\nlocation: \") + " + typeCoder.Str + "(_00___file)); }\n")
+            }
+            ret
+        }
+
+        let ptr = !m.Params[0].IsRef()
+
+        let mut sm = hash.s.FindMethod(m.Ident, false)
+        if sm == nil || len(sm.Instances) == 0 {
+            ret
+        }
+
+        self.addIndent()
+        self.write("{\n")
+        self.indent()
+        if sm.Exceptional || !sm.IsVoid() {
+            self.write("return ")
+        }
+        self.write(identCoder.func(sm))
+        self.write("(")
+        if ptr {
+            self.write("_self_.safe_ptr<")
+            self.write(self.tc.structureIns(hash.s))
+            self.write(">(")
+            if !env::Production {
+                self.write("_00___file")
+            }
+            self.write(")")
+        } else {
+            self.write("_self_.data.as<")
+            self.write(self.tc.structure(sm.Owner))
+            self.write(">()")
+        }
+        for _, mp in m.Params[1:] {
+            self.write(", ")
+            self.write(identCoder.param(mp))
+        }
+        self.write(");\n}\n")
+        self.doneIndent()
+    }
+
+    fn traitWrapperInherit(mut &self, mut t: &Trait, mut &hash: &traitHash) {
+        for (_, mut i) in t.Inherits {
+            let mut t2 = i.Kind.Trait()
+            self.traitWrapperInherit(t2, hash)
+            for (_, mut m) in t2.Methods {
+                self.traitWrapper(m, hash)
             }
         }
     }
 
     fn traitWrappers(mut &self) {
         for (_, mut hash) in self.tmap {
+            self.traitWrapperInherit(hash.t, hash)
             for (_, mut m) in hash.t.Methods {
-                let ident = m.Ident
-
-                m.Instances[0].Scope = nil
-                m.Ident = ident + "_" + conv::Itoa(hash.i)
-                self.func(m)
-                m.Ident = ident
-
-                if hash.s == nil {
-                    if env::Production {
-                        self.write(" { jule::panic(__JULE_ERROR__INVALID_MEMORY); }\n")
-                    } else {
-                        self.write(" { jule::panic(" + typeCoder.Str + "(__JULE_ERROR__INVALID_MEMORY \"\\nlocation: \") + " + typeCoder.Str + "(_00___file)); }\n")
-                    }
-                    continue
-                }
-
-                let ptr = !m.Params[0].IsRef()
-
-                let mut sm = hash.s.FindMethod(m.Ident, false)
-                if sm == nil || len(sm.Instances) == 0 {
-                    continue
-                }
-
-                self.addIndent()
-                self.write("{\n")
-                self.indent()
-                if sm.Exceptional || !sm.IsVoid() {
-                    self.write("return ")
-                }
-                self.write(identCoder.func(sm))
-                self.write("(")
-                if ptr {
-                    self.write("_self_.safe_ptr<")
-                    self.write(self.tc.structureIns(hash.s))
-                    self.write(">(")
-                    if !env::Production {
-                        self.write("_00___file")
-                    }
-                    self.write(")")
-                } else {
-                    self.write("_self_.data.as<")
-                    self.write(self.tc.structure(sm.Owner))
-                    self.write(">()")
-                }
-                for _, mp in m.Params[1:] {
-                    self.write(", ")
-                    self.write(identCoder.param(mp))
-                }
-                self.write(");\n}\n")
-                self.doneIndent()
+                self.traitWrapper(m, hash)
             }
         }
+    }
+
+    fn traitDataInherits(mut &self, mut &t: &Trait, &hash: &traitHash) {
+        for (_, mut i) in t.Inherits {
+            let mut t2 = i.Kind.Trait()
+            self.traitDataInherits(t2, hash)
+            self.traitDataMethods(t2, hash)
+        }
+    }
+
+    fn traitDataMethods(mut &self, mut &t: &Trait, &hash: &traitHash) {
+        for (_, mut m) in t.Methods {
+            let mIdent = identCoder.func(m)
+            self.indent()
+            self.write(".")
+            self.write(mIdent)
+            self.write("=")
+            self.write(mIdent)
+            self.write("_")
+            self.write(hash.t.Ident)
+            self.write("_")
+            self.write(conv::Itoa(hash.i))
+            self.write(",\n")
+        }
+    }
+
+    fn traitData(mut &self, mut &hash: &traitHash, mut &old: &Trait) {
+        let ident = identCoder.traitDecl(hash.t)
+        if hash.t != old {
+            if old != nil {
+                self.doneIndent()
+                self.indent()
+                self.write("};\n")
+            }
+            self.write("static ")
+            self.write(ident)
+            self.write("MptrData ")
+            self.write(ident)
+            self.write("_mptr_data[] = {\n")
+            old = hash.t
+            self.addIndent()
+        }
+        self.indent()
+        self.write("{\n")
+        self.addIndent()
+        self.traitDataInherits(hash.t, hash)
+        self.traitDataMethods(hash.t, hash)
+        self.doneIndent()
+        self.indent()
+        self.write("},\n")
     }
 
     fn traitDatas(mut &self) {
         let mut old: &Trait = nil
         for (_, mut hash) in self.tmap {
-            let ident = identCoder.traitDecl(hash.t)
-            if hash.t != old {
-                if old != nil {
-                    self.doneIndent()
-                    self.indent()
-                    self.write("};\n")
-                }
-                self.write("static ")
-                self.write(ident)
-                self.write("MptrData ")
-                self.write(ident)
-                self.write("_mptr_data[] = {\n")
-                old = hash.t
-                self.addIndent()
-            }
-            self.indent()
-            self.write("{\n")
-            self.addIndent()
-            for (_, mut m) in hash.t.Methods {
-                let mIdent = identCoder.func(m)
-                self.indent()
-                self.write(".")
-                self.write(mIdent)
-                self.write("=")
-                self.write(mIdent)
-                self.write("_")
-                self.write(conv::Itoa(hash.i))
-                self.write(",\n")
-            }
-            self.doneIndent()
-            self.indent()
-            self.write("},\n")
+            self.traitData(hash, old)
         }
         if old != nil {
             self.doneIndent()

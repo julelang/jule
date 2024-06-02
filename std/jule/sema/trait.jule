@@ -10,6 +10,7 @@ struct Trait {
     Ident:       str
     Public:      bool
     Mutable:     bool
+    Inherits:    []&TypeSymbol
     Methods:     []&Fn
     Implemented: []&Struct
 }
@@ -40,6 +41,22 @@ impl Trait {
         for (_, mut f) in self.Methods {
             if f.Ident == ident {
                 ret f
+            }
+        }
+        ret self.findMethodInherit(ident)
+    }
+
+    fn findMethodInherit(mut self, &ident: str): &Fn {
+        for (_, mut i) in self.Inherits {
+            if i.Kind == nil {
+                continue
+            }
+            let mut t = i.Kind.Trait()
+            if t != nil {
+                let mut f2 = t.FindMethod(ident)
+                if f2 != nil {
+                    ret f2
+                }
             }
         }
         ret nil

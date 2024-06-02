@@ -691,6 +691,22 @@ impl Sema {
         }
     }
 
+    fn checkFileInherits(mut &self) {
+        for (_, mut t) in self.file.Traits {
+            let ok = self._checkTraitDeclInherits(t)
+            if !ok {
+                ret
+            }
+        }
+    }
+
+    fn checkInherits(mut &self) {
+        for (_, mut file) in self.files {
+            self.setCurrentFile(file)
+            self.checkFileInherits()
+        }
+    }
+
     fn typeChecker(mut &self, mut l: Lookup, mut generics: []&TypeAlias,
         mut referencer: &referencer): typeChecker {
         let mut tc = typeChecker{
@@ -1517,11 +1533,62 @@ impl Sema {
         }
     }
 
+    fn _checkTraitDeclInherits(mut &self, mut &t: &Trait): (ok: bool) {
+        ok = true
+        for (i, mut it) in t.Inherits {
+            if !self.checkType(it, self) {
+                ok = false
+                continue
+            }
+            let mut t2 = it.Kind.Trait()
+            if t2 == nil {
+                self.pushErr(it.Decl.Token, LogMsg.InheritedNonTrait, t.Ident, it.Kind.Str())
+                ok = false
+                continue
+            }
+            for j, it2 in t.Inherits {
+                if j >= i {
+                    break
+                }
+                if it2.Kind != nil && it.Kind.Equal(it2.Kind) {
+                    self.pushErr(it.Decl.Token, LogMsg.DuplicatedIdent, t2.Ident)
+                    ok = false
+                    break
+                }
+            }
+        }
+        ret ok
+    }
+
+    fn checkTraitDeclInherits(mut &self, mut &t: &Trait) {
+        for (i, mut it) in t.Inherits {
+            let mut t1 = it.Kind.Trait()
+            for (j, mut it2) in t.Inherits {
+                if j == i {
+                    continue
+                }
+                let mut t2 = it2.Kind.Trait()
+                for (_, mut t1m) in t1.Methods {
+                    let mut t2m = t2.FindMethod(t1m.Ident)
+                    if t2m == nil {
+                        continue
+                    }
+                    let t1f = self.getTraitCheckFnKind(t1m)
+                    let t2f = self.getTraitCheckFnKind(t2m)
+                    if !t1f.equalTrait(t2f) {
+                        self.pushErr(it.Decl.Token, LogMsg.IncompatibleInherit,
+                            t.Ident, t2.Ident, t1f.GetKindStr(true), t2f.GetKindStr(true))
+                        ret
+                    }
+                }
+            }
+        }
+    }
+
     fn checkTraitDeclMethod(mut &self, mut &f: &Fn) {
         if IsIgnoreIdent(f.Ident) {
             self.pushErr(f.Token, LogMsg.IgnoreIdent)
         }
-
         f.sema = self
         self.checkFnDeclPrototype(f)
         let mut ins = f.instance()
@@ -1538,6 +1605,12 @@ impl Sema {
             // Break checking if type alias has error.
             if len(self.errors) > 0 {
                 ret
+            }
+
+            if t.findMethodInherit(f.Ident) != nil {
+                self.pushErr(f.Token, LogMsg.DuplicatedIdent, f.Ident)
+                self.pushSugggestion(LogMsg.RenameForAvoidDuplication)
+                continue
             }
 
             // Check duplications.
@@ -1569,6 +1642,7 @@ impl Sema {
             self.pushSugggestion(LogMsg.RenameForAvoidDuplication)
         }
 
+        self.checkTraitDeclInherits(t)
         self.checkTraitDeclMethods(t)
     }
 
@@ -1667,8 +1741,8 @@ impl Sema {
             ret
         }
 
-        base.Implemented = append(base.Implemented, dest)
-        dest.Implements = append(dest.Implements, base)
+        pushImplemented(base, dest)
+        pushImplements(dest, base)
 
         if len(decl.Statics) > 0 {
             self.pushErr(decl.Statics[0].Token, LogMsg.TraitImplHasStatic)
@@ -1785,9 +1859,7 @@ impl Sema {
             let tfK = self.getTraitCheckFnKind(tf)
             if sf != nil {
                 let mut sfK = self.getTraitCheckFnKind(sf)
-                exist = (tfK.Decl.Public == sfK.Decl.Public &&
-                    tfK.Decl.Ident == sfK.Decl.Ident &&
-                    tfK.equalTrait(sfK))
+                exist = tfK.equalTrait(sfK)
             }
             if exist {
                 let d = findDirective(sf.Directives, Directive.Deprecated)
@@ -2561,6 +2633,11 @@ impl Sema {
             ret
         }
 
+        self.checkInherits()
+        if len(self.errors) != 0 {
+            ret
+        }
+
         self.implImpls()
         if len(self.errors) != 0 {
             ret
@@ -2692,5 +2769,19 @@ impl missingRetChecker {
 
     fn check(self, mut s: &Scope): bool {
         ret self.checkScope(s)
+    }
+}
+
+fn pushImplemented(mut t: &Trait, mut &d: &Struct) {
+    t.Implemented = append(t.Implemented, d)
+    for (_, mut i) in t.Inherits {
+        pushImplemented(i.Kind.Trait(), d)
+    }
+}
+
+fn pushImplements(mut &s: &Struct, mut t: &Trait) {
+    s.Implements = append(s.Implements, t)
+    for (_, mut i) in t.Inherits {
+        pushImplements(s, i.Kind.Trait())
     }
 }
