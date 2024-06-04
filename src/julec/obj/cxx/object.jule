@@ -56,6 +56,11 @@ struct traitHash {
     i: int
 }
 
+struct traitCast {
+    t1: &Trait
+    t2: &Trait
+}
+
 struct ObjectCoder {
     // Internal buffer which is commonly used.
     Obj: str
@@ -70,8 +75,9 @@ struct ObjectCoder {
     // Current indentation.
     indentBuffer: str
 
-    resultMap:  map[str]bool
-    anyTypeMap: []&TypeKind
+    resultMap:    map[str]bool
+    anyTypeMap:   []&TypeKind
+    traitCastMap: []traitCast
 
     ec: &exprCoder
     sc: &scopeCoder
@@ -264,6 +270,18 @@ impl ObjectCoder {
         }
     }
 
+    fn findTypeOffsetS(self, t: &Trait, mut s: &StructIns): int {
+        if len(t.Implemented) == 0 {
+            ret emptyTraitOffset
+        }
+        for _, hash in self.tmap {
+            if hash.t == t && hash.s == s {
+                ret hash.i
+            }
+        }
+        ret -1
+    }
+
     fn findTypeOffset(self, t: &Trait, mut k: &TypeKind): int {
         if len(t.Implemented) == 0 {
             ret emptyTraitOffset
@@ -272,16 +290,56 @@ impl ObjectCoder {
         if k.Sptr() != nil {
             k = k.Sptr().Elem
         }
-        if k.Struct() == nil {
+        s = k.Struct()
+        if s == nil {
             ret -1
         }
-        s = k.Struct()
-        for _, hash in self.tmap {
-            if hash.t == t && hash.s == s {
-                ret hash.i
+        ret self.findTypeOffsetS(t, s)
+    }
+
+    fn pushAndWriteMaskMapper(mut &self, mut t1: &Trait, mut t2: &Trait) {
+        let mut ident = "__jule_trait_offset_mapper_"
+        ident += conv::FmtUint(u64(uintptr(t1)), 0xF)
+        ident += "_to_"
+        ident += conv::FmtUint(u64(uintptr(t2)), 0xF)
+        self.write(ident)
+
+        // Lookup and push if this match is not exist.
+        for _, m in self.traitCastMap {
+            if m.t1 == t1 && m.t2 == t2 {
+                ret
             }
         }
-        ret -1
+
+        // Not exist, push.
+        //
+        // TODO:
+        //  As partially confirmed by the experiments, the same mapping conditions
+        //  apply for two traits that casting into each other. It was decided that
+        //  additional investigation was needed to conclusively confirm this.
+        const offset = "offset"
+        self.anyObj += typeCoder.Int
+        self.anyObj += " "
+        self.anyObj += ident
+        self.anyObj += "(const " + typeCoder.Int + " " + offset + ") noexcept { "
+        for (_, mut s1) in t1.Implemented {
+            for _, s2 in t2.Implemented {
+                if s1 == s2 {
+                    for (_, mut s1i) in s1.Instances {
+                        let i1 = self.findTypeOffsetS(t1, s1i)
+                        let i2 = self.findTypeOffsetS(t2, s1i)
+                        self.anyObj += "if (offset == "
+                        self.anyObj += conv::Itoa(i1)
+                        self.anyObj += ") return "
+                        self.anyObj += conv::Itoa(i2)
+                        self.anyObj += "; "
+                    }
+                }
+            }
+        }
+        self.anyObj += " return "
+        self.anyObj += conv::Itoa(emptyTraitOffset)
+        self.anyObj += "; }\n"
     }
 
     // Writes location information of token as cstr bytes.

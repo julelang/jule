@@ -17,39 +17,38 @@
 
 namespace jule
 {
+    template <typename T>
+    struct TraitDynamicType
+    {
+    public:
+        static void dealloc(jule::Ptr<jule::Uintptr> &alloc) noexcept
+        {
+            alloc.__as<T>().dealloc();
+        }
+    };
+
+    struct TraitType
+    {
+    public:
+        void (*dealloc)(jule::Ptr<jule::Uintptr> &alloc);
+    };
+
+    template <typename T>
+    static jule::TraitType *new_trait_type(void) noexcept
+    {
+        using type = typename std::decay<jule::TraitDynamicType<T>>::type;
+        static jule::TraitType table = {
+            .dealloc = type::dealloc,
+        };
+        return &table;
+    }
+
     template <typename Mask>
     struct Trait
     {
     public:
-        template <typename T>
-        struct DynamicType
-        {
-        public:
-            static void dealloc(jule::Ptr<jule::Uintptr> &alloc) noexcept
-            {
-                alloc.__as<T>().dealloc();
-            }
-        };
-
-        struct Type
-        {
-        public:
-            void (*dealloc)(jule::Ptr<jule::Uintptr> &alloc);
-        };
-
-        template <typename T>
-        static jule::Trait<Mask>::Type *new_type(void) noexcept
-        {
-            using type = typename std::decay<jule::Trait<Mask>::DynamicType<T>>::type;
-            static jule::Trait<Mask>::Type table = {
-                .dealloc = type::dealloc,
-            };
-            return &table;
-        }
-
-    public:
         mutable jule::Ptr<jule::Uintptr> data;
-        mutable jule::Trait<Mask>::Type *type = nullptr;
+        mutable jule::TraitType *type = nullptr;
         mutable jule::Int type_offset = -1;
         mutable jule::Bool ptr = false;
 
@@ -60,7 +59,7 @@ namespace jule
         Trait(const T &data, const jule::Int &type_offset) noexcept
         {
             this->type_offset = type_offset;
-            this->type = jule::Trait<Mask>::new_type<T>();
+            this->type = jule::new_trait_type<T>();
             this->ptr = false;
             T *alloc = new (std::nothrow) T;
             if (!alloc)
@@ -78,7 +77,7 @@ namespace jule
         Trait(const jule::Ptr<T> &ref, const jule::Int &type_offset) noexcept
         {
             this->type_offset = type_offset;
-            this->type = jule::Trait<Mask>::new_type<T>();
+            this->type = jule::new_trait_type<T>();
             this->ptr = true;
             this->data = ref.template as<jule::Uintptr>();
         }
@@ -197,6 +196,17 @@ namespace jule
             }
 #endif
             return this->data.template as<T>();
+        }
+
+        template <typename NewMask>
+        inline jule::Trait<NewMask> mask(jule::Int (*offsetMapper)(const jule::Int)) noexcept
+        {
+            jule::Trait<NewMask> newTrait;
+            newTrait.type = this->type;
+            newTrait.ptr = this->ptr;
+            newTrait.data = this->data;
+            newTrait.type_offset = offsetMapper(this->type_offset);
+            return newTrait;
         }
 
         inline jule::Trait<Mask> &operator=(const std::nullptr_t) noexcept

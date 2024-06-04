@@ -19,6 +19,7 @@ use std::jule::build::{Directive, Is64Bit}
 use std::jule::constant::{Const}
 use std::jule::lex::{Token, TokenKind}
 use std::jule::sema::{
+    Trait,
     Var,
     FnIns,
     StructIns,
@@ -372,6 +373,15 @@ impl exprCoder {
         self.model(expr)
     }
 
+    fn castTraitFromTrait(mut &self, mut &m: &CastingExprModel, mut t1: &Trait, mut t2: &Trait) {
+        self.possibleRefExpr(m.Expr)
+        self.oc.write(".mask<")
+        self.oc.write(identCoder.traitDecl(t1))
+        self.oc.write(">(")
+        self.oc.pushAndWriteMaskMapper(t1, t2)
+        self.oc.write(")")
+    }
+
     // Casting expression.
     //
     // Special cases:
@@ -436,6 +446,10 @@ impl exprCoder {
             self.possibleRefExpr(m.Expr)
             self.oc.write("))")
         | m.ExprKind.Trait() != nil:
+            if m.Kind.Trait() != nil {
+                self.castTraitFromTrait(m, m.Kind.Trait(), m.ExprKind.Trait())
+                ret
+            }
             self.possibleRefExpr(m.Expr)
             self.oc.write(".")
             if m.Kind.Sptr() != nil {
