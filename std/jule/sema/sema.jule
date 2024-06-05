@@ -1533,6 +1533,25 @@ impl Sema {
         }
     }
 
+    fn catchTraitInheritCycle(mut &self, t1: &Trait, mut t2: &Trait, mut &message: str): (ok: bool) {
+        ok = true
+        for (_, mut i) in t2.Inherits {
+            if i.Kind == nil {
+                continue
+            }
+            let mut t3 = i.Kind.Trait()
+            if t1 == t3 {
+                self.pushCycleError(t2.Ident, t3.Ident, message)
+                ret false
+            }
+            if !self.catchTraitInheritCycle(t1, t3, message) {
+                self.pushCycleError(t2.Ident, t3.Ident, message)
+                ret false
+            }
+        }
+        ret
+    }
+
     fn _checkTraitDeclInherits(mut &self, mut &t: &Trait): (ok: bool) {
         ok = true
         for (i, mut it) in t.Inherits {
@@ -1554,6 +1573,20 @@ impl Sema {
                     self.pushErr(it.Decl.Token, LogMsg.DuplicatedIdent, t2.Ident)
                     ok = false
                     break
+                }
+            }
+            if t == t2 {
+                self.pushErr(it.Decl.Token, LogMsg.IllegalCycleRefersItself, t.Ident)
+                ok = false
+            } else {
+                let mut message = ""
+                ok = ok && self.catchTraitInheritCycle(t, t2, message)
+                if len(message) > 0 {
+                    let mut errMsg = message
+                    message = ""
+                    self.pushCycleError(t.Ident, t2.Ident, message)
+                    errMsg += message
+                    self.pushErr(it.Decl.Token, LogMsg.IllegalCrossCycle, errMsg)
                 }
             }
         }
@@ -1964,24 +1997,23 @@ impl Sema {
         ret true
     }
 
-    fn pushCycleError(self, &st1: &Struct, &st2: &Struct, mut &message: str) {
-        const Padding = 4
-        let refers_to = Logf(LogMsg.RefersTo, st1.Ident, st2.Ident)
+    fn pushCycleError(self, &st1: str, &st2: str, mut &message: str) {
+        const Padding = 7
+        let refers_to = Logf(LogMsg.RefersTo, st1, st2)
         message = strings::Repeat(" ", Padding) + refers_to + "\n" + message
     }
 
     fn checkCrossCycle(self, &st1: &Struct, &st2: &Struct, mut &message: str): bool {
         for _, u in st2.Uses {
             if u == st1 {
-                self.pushCycleError(st2, u, message)
+                self.pushCycleError(st2.Ident, u.Ident, message)
                 ret false
             }
             if !self.checkCrossCycle(st1, u, message) {
-                self.pushCycleError(st2, u, message)
+                self.pushCycleError(st2.Ident, u.Ident, message)
                 ret false
             }
         }
-
         ret true
     }
 
@@ -2002,7 +2034,7 @@ impl Sema {
         if !self.checkCrossCycle(st1, st2, message) {
             let mut errMsg = message
             message = ""
-            self.pushCycleError(st1, st2, message)
+            self.pushCycleError(st1.Ident, st2.Ident, message)
             errMsg += message
             self.pushErr(st1.Token, LogMsg.DeriveIllegalCrossCycle, derive, errMsg)
             ret false
