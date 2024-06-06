@@ -493,6 +493,9 @@ impl ObjectCoder {
                             i++
                         }
                     }
+                    // Push all methods to t from t's inheritances.
+                    // Because they will be used for trait data generation.
+                    pushMethodsFromInherits(t, t)
                 }
             })
         })
@@ -852,14 +855,6 @@ impl ObjectCoder {
         })
     }
 
-    fn traitDataTypeInherits(mut &self, mut &owner: &Trait, mut &t: &Trait) {
-        for (_, mut i) in t.Inherits {
-            let mut t2 = i.Kind.Trait()
-            self.traitDataTypeInherits(owner, t2)
-            self.traitDataTypeMethods(owner, t2)
-        }
-    }
-
     fn traitDataTypeMethods(mut &self, mut &owner: &Trait, mut &t: &Trait) {
         for (_, mut m) in t.Methods {
             let mut ins = m.Instances[0]
@@ -907,7 +902,6 @@ impl ObjectCoder {
                     self.write("MptrData")
                     self.write(" {\n")
                     self.addIndent()
-                    self.traitDataTypeInherits(t, t)
                     self.traitDataTypeMethods(t, t)
                     self.doneIndent()
                     self.indent()
@@ -1070,30 +1064,11 @@ impl ObjectCoder {
         self.doneIndent()
     }
 
-    fn traitWrapperInherit(mut &self, mut t: &Trait, mut &hash: &traitHash) {
-        for (_, mut i) in t.Inherits {
-            let mut t2 = i.Kind.Trait()
-            self.traitWrapperInherit(t2, hash)
-            for (_, mut m) in t2.Methods {
-                self.traitWrapper(m, hash)
-            }
-        }
-    }
-
     fn traitWrappers(mut &self) {
         for (_, mut hash) in self.tmap {
-            self.traitWrapperInherit(hash.t, hash)
             for (_, mut m) in hash.t.Methods {
                 self.traitWrapper(m, hash)
             }
-        }
-    }
-
-    fn traitDataInherits(mut &self, mut &t: &Trait, &hash: &traitHash) {
-        for (_, mut i) in t.Inherits {
-            let mut t2 = i.Kind.Trait()
-            self.traitDataInherits(t2, hash)
-            self.traitDataMethods(t2, hash)
         }
     }
 
@@ -1132,7 +1107,6 @@ impl ObjectCoder {
         self.indent()
         self.write("{\n")
         self.addIndent()
-        self.traitDataInherits(hash.t, hash)
         self.traitDataMethods(hash.t, hash)
         self.doneIndent()
         self.indent()
@@ -1400,4 +1374,35 @@ fn concatAllParts(parts: ...&Token): str {
         s += p.Kind
     }
     ret s
+}
+
+// Reports whether trait have method in this identifier.
+fn containsTraitMethod(mut &t: &Trait, &ident: str): bool {
+    for _, m in t.Methods {
+        if m.Ident == ident {
+            ret true
+        }
+    }
+    ret false
+}
+
+// Pushes src methods to dest if not exist any method with relevant identifier.
+// Also it uses deep walk algorithm for inheritances.
+// So it will pushes inheritances of src trait to dest.
+fn pushMethodsFromInherit(mut &dest: &Trait, mut &src: &Trait) {
+    pushMethodsFromInherits(dest, src)
+    for (_, mut m) in src.Methods {
+        if !containsTraitMethod(dest, m.Ident) {
+            dest.Methods = append(dest.Methods, m)
+        }
+    }
+}
+
+// Pushes inheritances of src to dest.
+// Call pushMethodsFromInherit method per inheritance of src.
+fn pushMethodsFromInherits(mut &dest: &Trait, mut &src: &Trait) {
+    for (_, mut inh) in src.Inherits {
+        let mut t2 = inh.Kind.Trait()
+        pushMethodsFromInherit(dest, t2)
+    }
 }
