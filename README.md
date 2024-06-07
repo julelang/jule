@@ -4,7 +4,10 @@
 </p>
 <h1>The Jule Programming Language</h1>
 
-An effective programming language to build efficient, fast, reliable and safe software.
+An effective programming language to build efficient, fast, reliable and safe software while maintaining simplicity.
+
+This repository is the main source tree of the Jule. \
+It contains the reference compiler, API, and standard library.
 
 [Website](https://jule.dev) |
 [Manual](https://manual.jule.dev) |
@@ -15,16 +18,6 @@ An effective programming language to build efficient, fast, reliable and safe so
 </strong>
 
 </div>
-
-## Introduction
-
-This repository is the main source tree of the Jule. \
-It contains the reference compiler, API, and standard library.
-
-Jule does not have a stable version yet and is still being developed to become more stable.
-Some commits may not be fully honored due to some compiler/API errors.
-Please report it with the [Jule Issue Tracker](https://github.com/julelang/jule/issues) if you come across something like this.
-You can also [join the Discord community](https://discord.gg/XNSUUDuGGQ) to discuss, helping, and ask more questions about Jule with the community.
 
 ### Key Features
 
@@ -43,6 +36,13 @@ You can also [join the Discord community](https://discord.gg/XNSUUDuGGQ) to disc
 
 ![image](https://github.com/julelang/jule/assets/54983926/e8b28748-9212-4db8-9f7b-0b0d33dc878b)
 
+> [!IMPORTANT]
+> Jule does not have a stable version yet and is still being developed to become more stable.
+> Some commits may not be fully honored due to some compiler/API errors.
+> Please report it with the [Jule Issue Tracker](https://github.com/julelang/jule/issues) if you come across something like this.
+> You can also [join the Discord community](https://discord.gg/XNSUUDuGGQ) to discuss, helping, and ask more questions about Jule with the community.
+
+
 ## Community
 
 Contribute and get involved in our community.
@@ -53,7 +53,7 @@ Our main community platforms:
 - [Official Discord Server of The Jule Community](https://discord.gg/XNSUUDuGGQ)
 - [GitHub Discussions](https://github.com/jule-lang/jule/discussions)
 
-## Compile from Source
+## Build from Source
 
 If you want to get Jule from the source, there are many ways to do so.
 Jule has a bootstrapped compiler, so you'll need to get one first if you don't have one.
@@ -65,7 +65,7 @@ If you already have a compiler, you can use build scripts designed for developer
 But remember, these are for developers and they compile the compiler for debugging new source code, not for production use. So you can get an inefficient and slow version.
 
 - Learn about: [compile from IR](https://manual.jule.dev/getting-started/install-from-source/compile-from-ir.html)
-- Learn about: [build Scripts](https://manual.jule.dev/getting-started/install-from-source/build-scripts.html)
+- Learn about: [build scripts](https://manual.jule.dev/getting-started/install-from-source/build-scripts.html)
 
 ## Contributing
 
