@@ -45,7 +45,6 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // ====================================================
 
-use io for std::io
 use hash for std::hash
 
 // Largest prime that is less than 65536.
@@ -56,7 +55,7 @@ const mod = 65521
 // It is mentioned in RFC 1950 (search for "5552").
 const nmax = 5552
 
-const magic         = "adl\x01"
+const magic = "adl\x01"
 const marshaledSize = len(magic) + 4
 
 // Represents the partial evaluation of a checksum.
@@ -67,9 +66,7 @@ struct Adler32 {
     d: digest
 }
 
-impl hash::Hash for Adler32 {}
 impl hash::Hash32 for Adler32 {}
-impl io::Writer for Adler32 {}
 
 impl Adler32 {
     // The size of an Adler-32 checksum in bytes.
@@ -92,8 +89,8 @@ impl Adler32 {
 
     // Add p to the running checksum.
     fn update(mut self, p: []byte) {
-        let mut s1 = u32(self.d&0xffff)
-        let mut s2 = u32(self.d>>16)
+        let mut s1 = u32(self.d & 0xffff)
+        let mut s2 = u32(self.d >> 16)
         for len(p) > 0 {
             let mut q: []byte = nil
             if len(p) > nmax {
@@ -121,7 +118,7 @@ impl Adler32 {
             s2 %= mod
             unsafe { *(&p) = q }
         }
-        self.d = digest(s2<<16 | s1)
+        self.d = digest(s2 << 16 | s1)
     }
 
     fn Reset(mut self) {
@@ -134,7 +131,7 @@ impl Adler32 {
 
     fn Sum(self, mut dest: []byte): []byte {
         let s = u32(self.d)
-        ret append(dest, byte(s>>24), byte(s>>16), byte(s>>8), byte(s))
+        ret append(dest, byte(s >> 24), byte(s >> 16), byte(s >> 8), byte(s))
     }
 
     fn Sum32(self): u32 { ret u32(self.d) }
