@@ -1,0 +1,257 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+// Package fnv implements FNV-1 and FNV-1a, non-cryptographic hash functions
+// created by Glenn Fowler, Landon Curt Noll, and Phong Vo.
+// See
+// https://en.wikipedia.org/wiki/Fowler-Noll-Vo_hash_function.
+//
+// All the hash.Hash implementations returned by this package also
+// implement encoding.BinaryMarshaler and encoding.BinaryUnmarshaler to
+// marshal and unmarshal the internal state of the hash.
+
+// The Jule code is a modified version of the original Go code from
+// https://github.com/golang/go/blob/e3d87d19320001e6081449550292d76ef660ab03/src/hash/fnv/fnv.go go and came with this notice.
+//
+// ====================================================
+// Copyright (c) 2009 The Go Authors. All rights reserved.
+// 
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+// 
+//    * Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+//    * Redistributions in binary form must reproduce the above
+// copyright notice, this list of conditions and the following disclaimer
+// in the documentation and/or other materials provided with the
+// distribution.
+//    * Neither the name of Google Inc. nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+// 
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// ====================================================
+
+use bits for std::math::bits
+use hash for std::hash
+use byteorder for std::internal::byteorder
+
+const offset32        = 2166136261
+const offset64        = 14695981039346656037
+const offset128Lower  = 0x62b821756295c58d
+const offset128Higher = 0x6c62272e07bb0142
+const prime32         = 16777619
+const prime64         = 1099511628211
+const prime128Lower   = 0x13b
+const prime128Shift   = 24
+
+struct fnv32 {
+    s: u32
+}
+
+impl hash::Hash32 for fnv32 {
+    fn Sum32(self): u32 { ret self.s }
+    fn Size(self): int { ret 4 }
+    fn BlockSize(self): int { ret 1 }
+    fn Reset(mut self) { self.s = offset32 }
+
+    fn Write(mut self, d: []byte)!: int {
+        for _, c in d {
+            self.s *= prime32
+            self.s ^= u32(c)
+        }
+        ret len(d)
+    }
+
+    fn Sum(self, mut d: []byte): []byte {
+        ret byteorder::BeAppendU32(d, self.s)
+    }
+}
+
+struct fnv32a {
+    s: u32
+}
+
+impl hash::Hash32 for fnv32a {
+    fn Sum32(self): u32 { ret self.s }
+    fn Size(self): int { ret 4 }
+    fn BlockSize(self): int { ret 1 }
+    fn Reset(mut self) { self.s = offset32 }
+
+    fn Write(mut self, d: []byte)!: int {
+        for _, c in d {
+            self.s ^= u32(c)
+            self.s *= prime32
+        }
+        ret len(d)
+    }
+
+    fn Sum(self, mut d: []byte): []byte {
+        ret byteorder::BeAppendU32(d, self.s)
+    }
+}
+
+struct fnv64 {
+    s: u64
+}
+
+impl hash::Hash64 for fnv64 {
+    fn Sum64(self): u64 { ret self.s }
+    fn Size(self): int { ret 8 }
+    fn BlockSize(self): int { ret 1 }
+    fn Reset(mut self) { self.s = offset64 }
+
+    fn Write(mut self, d: []byte)!: int {
+        for _, c in d {
+            self.s *= prime64
+            self.s ^= u64(c)
+        }
+        ret len(d)
+    }
+
+    fn Sum(self, mut d: []byte): []byte {
+        ret byteorder::BeAppendU64(d, self.s)
+    }
+}
+
+struct fnv64a {
+    s: u64
+}
+
+impl hash::Hash64 for fnv64a {
+    fn Sum64(self): u64 { ret self.s }
+    fn Size(self): int { ret 8 }
+    fn BlockSize(self): int { ret 1 }
+    fn Reset(mut self) { self.s = offset64 }
+
+    fn Write(mut self, d: []byte)!: int {
+        for _, c in d {
+            self.s ^= u64(c)
+            self.s *= prime64
+        }
+        ret len(d)
+    }
+
+    fn Sum(self, mut d: []byte): []byte {
+        ret byteorder::BeAppendU64(d, self.s)
+    }
+}
+
+struct fnv128 {
+    s: [2]u64
+}
+
+impl hash::Hash for fnv128 {
+    fn Size(self): int { ret 16 }
+    fn BlockSize(self): int { ret 1 }
+
+    fn Reset(mut self) {
+        self.s[0] = offset128Higher
+        self.s[1] = offset128Lower
+    }
+
+    fn Write(mut self, d: []byte)!: int {
+        for _, c in d {
+            let (mut s0, s1) = bits::Mul64(prime128Lower, self.s[1])
+            s0 += self.s[1]<<prime128Shift + prime128Lower*self.s[0]
+            self.s[1] = s1
+            self.s[0] = s0
+            self.s[1] ^= u64(c)
+        }
+        ret len(d)
+    }
+
+    fn Sum(self, mut d: []byte): []byte {
+        let mut r = byteorder::BeAppendU64(d, self.s[0])
+        ret byteorder::BeAppendU64(r, self.s[1])
+    }
+}
+
+struct fnv128a {
+    s: [2]u64
+}
+
+impl hash::Hash for fnv128a {
+    fn Size(self): int { ret 16 }
+    fn BlockSize(self): int { ret 1 }
+
+    fn Reset(mut self) {
+        self.s[0] = offset128Higher
+        self.s[1] = offset128Lower
+    }
+
+    fn Write(mut self, d: []byte)!: int {
+        for _, c in d {
+            self.s[1] ^= u64(c)
+            let (mut s0, s1) = bits::Mul64(prime128Lower, self.s[1])
+            s0 += self.s[1]<<prime128Shift + prime128Lower*self.s[0]
+            self.s[1] = s1
+            self.s[0] = s0
+        }
+        ret len(d)
+    }
+
+    fn Sum(self, mut d: []byte): []byte {
+        let mut r = byteorder::BeAppendU64(d, self.s[0])
+        ret byteorder::BeAppendU64(r, self.s[1])
+    }
+}
+
+// Static method wrapper for FNV-1 algorithms.
+struct Fnv {}
+
+impl Fnv {
+    // Returns a new 32-bit FNV-1 [hash::Hash].
+    // Its Sum method will lay the value out in big-endian byte order.
+    static fn New32(): hash::Hash32 {
+        ret fnv32{s: offset32}
+    }
+
+    // Returns a new 64-bit FNV-1 [hash::Hash].
+    // Its Sum method will lay the value out in big-endian byte order.
+    static fn New64(): hash::Hash64 {
+        ret fnv64{s: offset64}
+    }
+
+    // Returns a new 128-bit FNV-1 [hash::Hash].
+    // Its Sum method will lay the value out in big-endian byte order.
+    static fn New128(): hash::Hash {
+        let mut h = fnv128{}
+        h.s[0] = offset128Higher
+        h.s[1] = offset128Lower
+        ret h
+    }
+
+    // Returns a new 32-bit FNV-1a [hash::Hash].
+    // Its Sum method will lay the value out in big-endian byte order.
+    static fn New32a(): hash::Hash32 {
+        ret fnv32a{s: offset32}
+    }
+
+    // Returns a new 64-bit FNV-1a [hash::Hash].
+    // Its Sum method will lay the value out in big-endian byte order.
+    static fn New64a(): hash::Hash64 {
+        ret fnv64a{s: offset64}
+    }
+
+    // Returns a new 128-bit FNV-1a [hash::Hash].
+    // Its Sum method will lay the value out in big-endian byte order.
+    static fn New128a(): hash::Hash {
+        let mut h = fnv128a{}
+        h.s[0] = offset128Higher
+        h.s[1] = offset128Lower
+        ret h
+    }
+}
