@@ -7,14 +7,13 @@
 
 #include <iostream>
 #include "impl_flag.hpp"
+#include "platform.hpp"
 
 #ifdef OS_WINDOWS
 #include "windows.h"
 #include <vector>
 
 #include "types.hpp"
-#include "platform.hpp"
-#include "str.hpp"
 #include "utf16.hpp"
 #endif
 
