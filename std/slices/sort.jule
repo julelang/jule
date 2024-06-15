@@ -1,0 +1,379 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+// The Jule code is a modified version of the original Go code from
+// https://github.com/golang/go/blob/0df681248862a34ff1233cdc4cf0b036e4761652/src/slices/zsortordered.go and came with this notice.
+//
+// ====================================================
+// Copyright (c) 2009 The Go Authors. All rights reserved.
+// 
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+// 
+//    * Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+//    * Redistributions in binary form must reproduce the above
+// copyright notice, this list of conditions and the following disclaimer
+// in the documentation and/or other materials provided with the
+// distribution.
+//    * Neither the name of Google Inc. nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+// 
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// ====================================================
+
+use bits for std::math::bits
+use cmp for std::internal::cmp
+
+enum sortedHint {
+    Unknown,
+    Increasing,
+    Decreasing,
+}
+
+// xorshift paper: https://www.jstatsoft.org/article/view/v008i14/xorshift.pdf
+type xorshift: u64
+
+fn xorshiftNext(mut &r: xorshift): u64 {
+    r ^= r << 13
+    r ^= r >> 17
+    r ^= r << 5
+    ret u64(r)
+}
+
+fn nextPowerOfTwo(length: int): uint {
+    ret 1 << bits::Len(uint(length))
+}
+
+// Sorts data[a:b] using insertion sort.
+fn insertionSort[E: ordered](mut &data: []E, a: int, b: int) {
+    let mut i = a + 1
+    for i < b; i++ {
+        let mut j = i
+        for j > a && cmp::Less(data[j], data[j-1]); j-- {
+            data.swap(j, j-1)
+        }
+    }
+}
+
+// Implements the heap property on data[lo:hi].
+// first is an offset into the array where the root of the heap lies.
+fn siftDown[E: ordered](mut &data: []E, lo: int, hi: int, first: int) {
+    let mut root = lo
+    for {
+        let mut child = 2*root + 1
+        if child >= hi {
+            break
+        }
+        if child+1 < hi && cmp::Less(data[first+child], data[first+child+1]) {
+            child++
+        }
+        if !cmp::Less(data[first+root], data[first+child]) {
+            ret
+        }
+        data.swap(first+root, first+child)
+        root = child
+    }
+}
+
+fn heapSort[E: ordered](mut &data: []E, a: int, b: int) {
+    let first = a
+    let lo = 0
+    let hi = b - a
+
+    // Build heap with greatest element at top.
+    let mut i = (hi - 1) >> 1
+    for i >= 0; i-- {
+        siftDown(data, i, hi, first)
+    }
+
+    // Pop elements, largest first, into end of data.
+    i = hi - 1
+    for i >= 0; i-- {
+        data.swap(first, first+i)
+        siftDown(data, lo, i, first)
+    }
+}
+
+// breakPatternsOrdered scatters some elements around in an attempt to break some patterns
+// that might cause imbalanced partitions in quicksort.
+fn breakPatterns[E: ordered](mut &data: []E, a: int, b: int) {
+    let length = b - a
+    if length >= 8 {
+        let mut random = xorshift(length)
+        let modulus = nextPowerOfTwo(length)
+
+        let mut idx = a + (length/4)*2 - 1
+        for idx <= a+(length/4)*2+1; idx++ {
+            let mut other = int(uint(xorshiftNext(random)) & (modulus - 1))
+            if other >= length {
+                other -= length
+            }
+            data.swap(idx, a+other)
+        }
+    }
+}
+
+// Returns x,y where data[x] <= data[y], where x,y=a,b or x,y=b,a.
+fn order2O[E: ordered](data: []E, a: int, b: int, mut &swaps: int): (int, int) {
+    if cmp::Less(data[b], data[a]) {
+        swaps++
+        ret b, a
+    }
+    ret a, b
+}
+
+// Returns x where data[x] is the median of data[a],data[b],data[c], where x is a, b, or c.
+fn median[E: ordered](data: []E, mut a: int, mut b: int, mut c: int, mut &swaps: int): int {
+    a, b = order2O(data, a, b, swaps)
+    b, c = order2O(data, b, c, swaps)
+    a, b = order2O(data, a, b, swaps)
+    ret b
+}
+
+// Finds the median of data[a - 1], data[a], data[a + 1] and stores the index into a.
+fn medianAdjacent[E: ordered](data: []E, a: int, mut &swaps: int): int {
+    ret median(data, a-1, a, a+1, swaps)
+}
+
+// Chooses a pivot in data[a:b].
+//
+// [0,8): chooses a static pivot.
+// [8,shortestNinther): uses the simple median-of-three method.
+// [shortestNinther,∞): uses the Tukey ninther method.
+fn choosePivot[E: ordered](mut &data: []E, a: int, b: int): (pivot: int, hint: sortedHint) {
+    const shortestNinther = 50
+    const maxSwaps        = 4 * 3
+
+    let l = b - a
+
+    let mut swaps: int = 0
+    let mut i     = a + l/4*1
+    let mut j     = a + l/4*2
+    let mut k     = a + l/4*3
+
+    if l >= 8 {
+        if l >= shortestNinther {
+            // Tukey ninther method, the idea came from Rust's implementation.
+            i = medianAdjacent(data, i, swaps)
+            j = medianAdjacent(data, j, swaps)
+            k = medianAdjacent(data, k, swaps)
+        }
+        // Find the median among i, j, k and stores it into j.
+        j = median(data, i, j, k, swaps)
+    }
+
+    match swaps {
+    | 0:
+        ret j, sortedHint.Increasing
+    | maxSwaps:
+        ret j, sortedHint.Decreasing
+    |:
+        ret j, sortedHint.Unknown
+    }
+}
+
+fn reverseRange[E: ordered](mut &data: []E, a: int, b: int) {
+    let mut i = a
+    let mut j = b - 1
+    for i < j {
+        data.swap(i, j)
+        i++
+        j--
+    }
+}
+
+// Partially sorts a slice, returns true if the slice is sorted at the end.
+fn partialInsertionSort[E: ordered](mut &data: []E, a: int, b: int): bool {
+    const maxSteps         = 5  // maximum number of adjacent out-of-order pairs that will get shifted
+    const shortestShifting = 50 // don't shift any elements on short arrays
+    let mut i = a + 1
+    let mut j = 0
+    for j < maxSteps; j++ {
+        for i < b && !cmp::Less(data[i], data[i-1]) {
+            i++
+        }
+
+        if i == b {
+            ret true
+        }
+
+        if b-a < shortestShifting {
+            ret false
+        }
+
+        data.swap(i, i-1)
+
+        // Shift the smaller one to the left.
+        if i-a >= 2 {
+            let mut z = i - 1
+            for z >= 1; j-- {
+                if !cmp::Less(data[z], data[z-1]) {
+                    break
+                }
+                data.swap(z, z-1)
+            }
+        }
+        // Shift the greater one to the right.
+        if b-i >= 2 {
+            let mut z = i + 1
+            for z < b; z++ {
+                if !cmp::Less(data[z], data[z-1]) {
+                    break
+                }
+                data.swap(z, z-1)
+            }
+        }
+    }
+    ret false
+}
+
+// Partitions data[a:b] into elements equal to data[pivot] followed by elements greater than data[pivot].
+// It assumed that data[a:b] does not contain elements smaller than the data[pivot].
+fn partitionEqual[E: ordered](mut &data: []E, a: int, b: int, pivot: int): (newpivot: int) {
+    data.swap(a, pivot)
+    let (mut i, mut j) = a+1, b-1 // i and j are inclusive of the elements remaining to be partitioned
+
+    for {
+        for i <= j && !cmp::Less(data[a], data[i]) {
+            i++
+        }
+        for i <= j && cmp::Less(data[a], data[j]) {
+            j--
+        }
+        if i > j {
+            break
+        }
+        data.swap(i, j)
+        i++
+        j--
+    }
+    ret i
+}
+
+// Does one quicksort partition.
+// Let p = data[pivot]
+// Moves elements in data[a:b] around, so that data[i]<p and data[j]>=p for i<newpivot and j>newpivot.
+// On return, data[newpivot] = p
+fn partition[E: ordered](mut &data: []E, a: int, b: int, pivot: int): (newpivot: int, alreadyPartitioned: bool) {
+    data.swap(a, pivot)
+    let (mut i, mut j) = a+1, b-1 // i and j are inclusive of the elements remaining to be partitioned
+
+    for i <= j && cmp::Less(data[i], data[a]) {
+        i++
+    }
+    for i <= j && !cmp::Less(data[j], data[a]) {
+        j--
+    }
+    if i > j {
+        data.swap(j, a)
+        ret j, true
+    }
+    data.swap(i, j)
+    i++
+    j--
+
+    for {
+        for i <= j && cmp::Less(data[i], data[a]) {
+            i++
+        }
+        for i <= j && !cmp::Less(data[j], data[a]) {
+            j--
+        }
+        if i > j {
+            break
+        }
+        data.swap(i, j)
+        i++
+        j--
+    }
+    data.swap(j, a)
+    ret j, false
+}
+
+// Sorts data[a:b].
+// The algorithm based on pattern-defeating quicksort(pdqsort), but without the optimizations from BlockQuicksort.
+// pdqsort paper: https://arxiv.org/pdf/2106.05123.pdf
+// C++ implementation: https://github.com/orlp/pdqsort
+// Rust implementation: https://docs.rs/pdqsort/latest/pdqsort/
+// limit is the number of allowed bad (very unbalanced) pivots before falling back to heapsort.
+fn pdqsort[E: ordered](mut &data: []E, mut a: int, mut b: int, mut limit: int) {
+    const maxInsertion = 12
+
+    let mut wasBalanced = true // whether the last partitioning was reasonably balanced
+    let mut wasPartitioned = true // whether the slice was already partitioned
+
+    for {
+        let length = b - a
+
+        if length <= maxInsertion {
+            insertionSort(data, a, b)
+            ret
+        }
+
+        // Fall back to heapsort if too many bad choices were made.
+        if limit == 0 {
+            heapSort(data, a, b)
+            ret
+        }
+
+        // If the last partitioning was imbalanced, we need to breaking patterns.
+        if !wasBalanced {
+            breakPatterns(data, a, b)
+            limit--
+        }
+
+        let (mut pivot, mut hint) = choosePivot(data, a, b)
+        if hint == sortedHint.Decreasing {
+            reverseRange(data, a, b)
+            // The chosen pivot was pivot-a elements after the start of the array.
+            // After reversing it is pivot-a elements before the end of the array.
+            // The idea came from Rust's implementation.
+            pivot = (b - 1) - (pivot - a)
+            hint = sortedHint.Increasing
+        }
+
+        // The slice is likely already sorted.
+        if wasBalanced && wasPartitioned && hint == sortedHint.Increasing {
+            if partialInsertionSort(data, a, b) {
+                ret
+            }
+        }
+
+        // Probably the slice contains many duplicate elements, partition the slice into
+        // elements equal to and elements greater than the pivot.
+        if a > 0 && !cmp::Less(data[a-1], data[pivot]) {
+            let mid = partitionEqual(data, a, b, pivot)
+            a = mid
+            continue
+        }
+
+        let (mid, alreadyPartitioned) = partition(data, a, b, pivot)
+        wasPartitioned = alreadyPartitioned
+
+        let (leftLen, rightLen) = mid-a, b-mid
+        let balanceThreshold = length / 8
+        if leftLen < rightLen {
+            wasBalanced = leftLen >= balanceThreshold
+            pdqsort(data, a, mid, limit)
+            a = mid + 1
+        } else {
+            wasBalanced = rightLen >= balanceThreshold
+            pdqsort(data, mid+1, b, limit)
+            b = mid
+        }
+    }
+}
