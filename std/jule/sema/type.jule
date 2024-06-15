@@ -1277,9 +1277,13 @@ impl typeChecker {
             if n < 0 {
                 self.pushErr(decl.Elem.Token, LogMsg.ArraySizeIsNeg)
                 ret nil
-            } else if types::BitSize != 64 && f64(n) > types::Max(PrimKind.Int) {
-                self.pushErr(decl.Size.Token, LogMsg.OverflowLimits)
-                ret nil
+            } else {
+                let max = types::MaxI(PrimKind.Int)
+                if types::BitSize != 64 && i64(n) > max {
+                    self.pushErr(decl.Size.Token, LogMsg.ArraySizeOverflow,
+                        constoa(size.Constant), conv::FmtInt(max, 10))
+                    ret nil
+                }
             }
         }
 
