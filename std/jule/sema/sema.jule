@@ -201,7 +201,7 @@ fn findFile(mut &files: []&SymbolTable, &handler: &File): &SymbolTable {
     ret nil
 }
 
-unsafe fn pushSugggestion(mut log: *Log, fmt: LogMsg, args: ...any) {
+unsafe fn pushSuggestion(mut log: *Log, fmt: LogMsg, args: ...any) {
     log.Suggestion = Logf(fmt, args...)
 }
 
@@ -433,8 +433,8 @@ impl Sema {
     }
 
     // Push suggestion to last log.
-    fn pushSugggestion(mut self, fmt: LogMsg, args: ...any) {
-        unsafe { pushSugggestion(&self.errors[len(self.errors)-1], fmt, args...) }
+    fn pushSuggestion(mut self, fmt: LogMsg, args: ...any) {
+        unsafe { pushSuggestion(&self.errors[len(self.errors)-1], fmt, args...) }
     }
 
     // Reports whether define is accessible in the current package.
@@ -521,7 +521,7 @@ impl Sema {
     fn checkImportSelection[T](mut self, &ident: &Token, &s: T): bool {
         if !self.isAccessibleDefine(s.Public, s.Token) {
             self.pushErr(ident, LogMsg.IdentIsNotAccessible, ident.Kind)
-            self.pushSugggestion(LogMsg.MakePubToAccess)
+            self.pushSuggestion(LogMsg.MakePubToAccess)
             ret false
         }
         const CppLinked = false // Exported defines cannot be linked.
@@ -541,7 +541,7 @@ impl Sema {
 
             if self.isDuplicatedImportSelection(uintptr(imp), ident.Kind) {
                 self.pushErr(ident, LogMsg.DuplicatedIdent, ident.Kind)
-                self.pushSugggestion(LogMsg.RenameForAvoidDuplication)
+                self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
                 ok = false
                 continue
             }
@@ -641,7 +641,7 @@ impl Sema {
 
         if self.isUseAliasDuplication(imp) {
             self.pushErr(imp.Token, LogMsg.DuplicatedUseAlias, imp.Alias)
-            self.pushSugggestion(LogMsg.RenameUseAliasAvoidDuplication)
+            self.pushSuggestion(LogMsg.RenameUseAliasAvoidDuplication)
         }
 
         if !imp.Duplicate {
@@ -1149,7 +1149,7 @@ impl Sema {
         }
         if self.isDuplicatedIdent(uintptr(ta), ta.Ident, ta.CppLinked) {
             self.pushErr(ta.Token, LogMsg.DuplicatedIdent, ta.Ident)
-            self.pushSugggestion(LogMsg.RenameForAvoidDuplication)
+            self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
         }
         self.checkTypeAliasDeclKind(ta, self)
     }
@@ -1179,7 +1179,7 @@ impl Sema {
                         break
                     } else if item.Ident == citem.Ident {
                         self.pushErr(item.Token, LogMsg.DuplicatedIdent, item.Ident)
-                        self.pushSugggestion(LogMsg.RenameForAvoidDuplication)
+                        self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
                         break
                     }
                 }
@@ -1298,7 +1298,7 @@ impl Sema {
             self.pushErr(e.Token, LogMsg.IgnoreIdent)
         } else if self.isDuplicatedIdent(uintptr(e), e.Ident, false) {
             self.pushErr(e.Token, LogMsg.DuplicatedIdent, e.Ident)
-            self.pushSugggestion(LogMsg.RenameForAvoidDuplication)
+            self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
         }
 
         if len(e.Items) == 0 {
@@ -1343,7 +1343,7 @@ impl Sema {
             self.pushErr(e.Token, LogMsg.IgnoreIdent)
         } else if self.isDuplicatedIdent(uintptr(e), e.Ident, false) {
             self.pushErr(e.Token, LogMsg.DuplicatedIdent, e.Ident)
-            self.pushSugggestion(LogMsg.RenameForAvoidDuplication)
+            self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
         }
 
         if len(e.Items) == 0 {
@@ -1419,7 +1419,7 @@ impl Sema {
                     break duplicationLookup
                 | g.Ident == ct.Ident:
                     self.pushErr(g.Token, LogMsg.DuplicatedIdent, g.Ident)
-                    self.pushSugggestion(LogMsg.RenameForAvoidDuplication)
+                    self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
                     ok = false
                     break duplicationLookup
                 }
@@ -1437,7 +1437,7 @@ impl Sema {
                 if p.Ident == g.Ident {
                     ok = false
                     self.pushErr(p.Token, LogMsg.DuplicatedIdent, p.Ident)
-                    self.pushSugggestion(LogMsg.RenameForAvoidDuplication)
+                    self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
                     continue check
                 }
             }
@@ -1457,7 +1457,7 @@ impl Sema {
                 | p.Ident == jp.Ident:
                     ok = false
                     self.pushErr(p.Token, LogMsg.DuplicatedIdent, p.Ident)
-                    self.pushSugggestion(LogMsg.RenameForAvoidDuplication)
+                    self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
                     continue check
                 }
             }
@@ -1503,7 +1503,7 @@ impl Sema {
             continue
         exist:
             self.pushErr(v, LogMsg.DuplicatedIdent, v.Kind)
-            self.pushSugggestion(LogMsg.RenameForAvoidDuplication)
+            self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
             ok = false
         }
 
@@ -1642,7 +1642,7 @@ impl Sema {
 
             if t.findMethodInherit(f.Ident) != nil {
                 self.pushErr(f.Token, LogMsg.DuplicatedIdent, f.Ident)
-                self.pushSugggestion(LogMsg.RenameForAvoidDuplication)
+                self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
                 continue
             }
 
@@ -1660,7 +1660,7 @@ impl Sema {
                     break duplicateLookup
                 | f.Ident == jf.Ident:
                     self.pushErr(f.Token, LogMsg.DuplicatedIdent, f.Ident)
-                    self.pushSugggestion(LogMsg.RenameForAvoidDuplication)
+                    self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
                     break duplicateLookup
                 }
             }
@@ -1672,7 +1672,7 @@ impl Sema {
             self.pushErr(t.Token, LogMsg.IgnoreIdent)
         } else if self.isDuplicatedIdent(uintptr(t), t.Ident, false) {
             self.pushErr(t.Token, LogMsg.DuplicatedIdent, t.Ident)
-            self.pushSugggestion(LogMsg.RenameForAvoidDuplication)
+            self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
         }
 
         self.checkTraitDeclInherits(t)
@@ -1752,7 +1752,7 @@ impl Sema {
         let mut base = base_t.Trait()
         if base == nil {
             self.pushErr(decl.Base.Token, LogMsg.ImplInvalidBase, base_t.Str())
-            self.pushSugggestion(LogMsg.ExpectedTrait)
+            self.pushSuggestion(LogMsg.ExpectedTrait)
             ret
         }
 
@@ -1763,7 +1763,7 @@ impl Sema {
         let mut destS = destT.Struct()
         if destS == nil {
             self.pushErr(decl.Dest.Token, LogMsg.ImplInvalidDest, destT.Str())
-            self.pushSugggestion(LogMsg.ExpectedStruct)
+            self.pushSuggestion(LogMsg.ExpectedStruct)
             ret
         }
 
@@ -1797,7 +1797,7 @@ impl Sema {
         let mut destS = destT.Struct()
         if destS == nil {
             self.pushErr(decl.Dest.Token, LogMsg.ImplInvalidDest, destT.Str())
-            self.pushSugggestion(LogMsg.ExpectedStruct)
+            self.pushSuggestion(LogMsg.ExpectedStruct)
             ret
         }
 
@@ -1860,14 +1860,14 @@ impl Sema {
     fn checkGlobalVarDecl(mut &self, mut &decl: &Var) {
         if self.isDuplicatedIdent(uintptr(decl), decl.Ident, decl.CppLinked) {
             self.pushErr(decl.Token, LogMsg.DuplicatedIdent, decl.Ident)
-            self.pushSugggestion(LogMsg.RenameForAvoidDuplication)
+            self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
         }
         if decl.CppLinked && decl.Constant {
             self.pushErr(decl.Token, LogMsg.CppLinkedVarIsConst)
         }
         if !decl.CppLinked && !decl.Constant && !decl.Statically {
             self.pushErr(decl.Token, LogMsg.GlobalNotStatic)
-            self.pushSugggestion(LogMsg.UseStaticKeywordToDef)
+            self.pushSuggestion(LogMsg.UseStaticKeywordToDef)
         }
         self.checkDirectives(decl.Directives, decl)
         self.checkVarDecl(decl, self)
@@ -1926,7 +1926,7 @@ impl Sema {
                     break
                 } else if f.Ident == cf.Ident {
                     self.pushErr(f.Token, LogMsg.DuplicatedIdent, f.Ident)
-                    self.pushSugggestion(LogMsg.RenameForAvoidDuplication)
+                    self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
                     ok = false
                 }
             }
@@ -1939,7 +1939,7 @@ impl Sema {
             self.pushErr(s.Token, LogMsg.IgnoreIdent)
         } else if self.isDuplicatedIdent(uintptr(s), s.Ident, s.CppLinked) {
             self.pushErr(s.Token, LogMsg.DuplicatedIdent, s.Ident)
-            self.pushSugggestion(LogMsg.RenameForAvoidDuplication)
+            self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
         }
 
         self.checkDirectives(s.Directives, s)
@@ -1981,7 +1981,7 @@ impl Sema {
                 }
             }
             self.pushErr(f.Token, LogMsg.DuplicatedIdent, f.Ident)
-            self.pushSugggestion(LogMsg.RenameForAvoidDuplication)
+            self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
         }
     }
 
@@ -2536,7 +2536,7 @@ impl Sema {
     fn checkTestFn(mut self, mut &f: &FnIns) {
         if f.Decl.Public {
             self.pushErr(f.Decl.Token, LogMsg.PubTestFn)
-            self.pushSugggestion(LogMsg.RemovePubModifier)
+            self.pushSuggestion(LogMsg.RemovePubModifier)
             ret
         }
 
@@ -2547,21 +2547,21 @@ impl Sema {
             f.Decl.Params[0].Mutable ||
             f.Decl.Params[0].Reference {
             self.pushErr(f.Decl.Token, LogMsg.WrongTestFnDecl)
-            self.pushSugggestion(LogMsg.UseExpectedTestFnDecl)
+            self.pushSuggestion(LogMsg.UseExpectedTestFnDecl)
             ret
         }
 
         let mut sptr = f.Params[0].Kind.Sptr()
         if sptr == nil {
             self.pushErr(f.Decl.Token, LogMsg.WrongTestFnDecl)
-            self.pushSugggestion(LogMsg.UseExpectedTestFnDecl)
+            self.pushSuggestion(LogMsg.UseExpectedTestFnDecl)
             ret
         }
 
         let s = sptr.Elem.Struct()
         if s == nil || !isStdPackage(s.Decl.Token.File.Path, "testing") {
             self.pushErr(f.Decl.Token, LogMsg.WrongTestFnDecl)
-            self.pushSugggestion(LogMsg.UseExpectedTestFnDecl)
+            self.pushSuggestion(LogMsg.UseExpectedTestFnDecl)
             ret
         }
     }

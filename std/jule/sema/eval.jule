@@ -133,8 +133,8 @@ impl Eval {
     }
 
     // Push suggestion to last log.
-    fn pushSugggestion(mut self, fmt: LogMsg, args: ...any) {
-        self.s.pushSugggestion(fmt, args...)
+    fn pushSuggestion(mut self, fmt: LogMsg, args: ...any) {
+        self.s.pushSuggestion(fmt, args...)
     }
 
     fn allowBuiltin(mut self) {
@@ -322,7 +322,7 @@ impl Eval {
         } else {
             let unsig = conv::ParseUint(lit, base, BitSize) else {
                 self.pushErr(l.Token, LogMsg.InvalidNumericRange)
-                self.pushSugggestion(LogMsg.TryFloatingPoint)
+                self.pushSuggestion(LogMsg.TryFloatingPoint)
                 use u64.Max
             }
             d.Constant = Const.NewU64(unsig)
@@ -459,7 +459,7 @@ impl Eval {
     fn evalEnum(mut self, mut enm: &Enum, errorToken: &Token): &Data {
         if !self.s.isAccessibleDefine(enm.Public, enm.Token) {
             self.pushErr(errorToken, LogMsg.IdentIsNotAccessible, enm.Ident)
-            self.pushSugggestion(LogMsg.MakePubToAccess)
+            self.pushSuggestion(LogMsg.MakePubToAccess)
             ret nil
         }
         ret self._evalEnum(enm)
@@ -477,7 +477,7 @@ impl Eval {
     fn evalTypeEnum(mut self, mut enm: &TypeEnum, errorToken: &Token): &Data {
         if !self.s.isAccessibleDefine(enm.Public, enm.Token) {
             self.pushErr(errorToken, LogMsg.IdentIsNotAccessible, enm.Ident)
-            self.pushSugggestion(LogMsg.MakePubToAccess)
+            self.pushSuggestion(LogMsg.MakePubToAccess)
             ret nil
         }
         ret self._evalTypeEnum(enm)
@@ -500,7 +500,7 @@ impl Eval {
     fn evalStruct(mut self, mut s: &StructIns, errorToken: &Token): &Data {
         if !self.s.isAccessibleDefine(s.Decl.Public, s.Decl.Token) {
             self.pushErr(errorToken, LogMsg.IdentIsNotAccessible, s.Decl.Ident)
-            self.pushSugggestion(LogMsg.MakePubToAccess)
+            self.pushSuggestion(LogMsg.MakePubToAccess)
             ret nil
         }
         self.checkDeprecated(s.Decl.Directives, errorToken)
@@ -528,14 +528,14 @@ impl Eval {
             } else {
                 self.pushErr(tok, LogMsg.UsingDeprecated, d.Args[0].Kind)
             }
-            self.pushSugggestion(LogMsg.UseUnsafeForDeprecated)
+            self.pushSuggestion(LogMsg.UseUnsafeForDeprecated)
         }
     }
 
     fn evalFn(mut self, mut f: &Fn, errorToken: &Token): &Data {
         if !self.s.isAccessibleDefine(f.Public, f.Token) {
             self.pushErr(errorToken, LogMsg.IdentIsNotAccessible, f.Ident)
-            self.pushSugggestion(LogMsg.MakePubToAccess)
+            self.pushSuggestion(LogMsg.MakePubToAccess)
             ret nil
         }
 
@@ -601,7 +601,7 @@ impl Eval {
     fn evalVar(mut self, mut v: &Var, errorToken: &Token): &Data {
         if !self.s.isAccessibleDefine(v.Public, v.Token) {
             self.pushErr(errorToken, LogMsg.IdentIsNotAccessible, v.Ident)
-            self.pushSugggestion(LogMsg.MakePubToAccess)
+            self.pushSuggestion(LogMsg.MakePubToAccess)
             ret nil
         }
 
@@ -690,7 +690,7 @@ impl Eval {
     fn evalTypeAlias(mut self, mut ta: &TypeAlias, errorToken: &Token): &Data {
         if !self.s.isAccessibleDefine(ta.Public, ta.Token) {
             self.pushErr(errorToken, LogMsg.IdentIsNotAccessible, ta.Ident)
-            self.pushSugggestion(LogMsg.MakePubToAccess)
+            self.pushSuggestion(LogMsg.MakePubToAccess)
             ret nil
         }
 
@@ -1686,7 +1686,7 @@ impl Eval {
         | d.Kind.Prim() != nil && d.Kind.Prim().IsAny():
             if t.Enum() != nil {
                 self.pushErr(errorToken, LogMsg.EnumCastedFromAny)
-                self.pushSugggestion(LogMsg.CastToEnumTypeInsteadOfEnum)
+                self.pushSuggestion(LogMsg.CastToEnumTypeInsteadOfEnum)
             } else if t.TypeEnum() != nil {
                 self.pushErr(errorToken, LogMsg.EnumCastedFromAny)
             }
@@ -1913,12 +1913,12 @@ impl Eval {
             if p.Decl.IsSelf() {
                 if !p.Decl.IsRef() {
                     self.pushErr(errorToken, LogMsg.ConcurrentCallWithSelfParam)
-                    self.pushSugggestion(LogMsg.UseUnsafeJuleToCallCoSelf)
+                    self.pushSuggestion(LogMsg.UseUnsafeJuleToCallCoSelf)
                 }
             }
             if p.Decl.Reference {
                 self.pushErr(errorToken, LogMsg.ConcurrentCallWithRefParam)
-                self.pushSugggestion(LogMsg.UseUnsafeJuleToCallCo)
+                self.pushSuggestion(LogMsg.UseUnsafeJuleToCallCo)
                 ret
             }
         }
@@ -1959,7 +1959,7 @@ impl Eval {
         }
         if self.isGlobal() && f.Decl.Exceptional {
             self.pushErr(fc.Token, LogMsg.ExceptionalAtGlobalScope)
-            self.pushSugggestion(LogMsg.WrapExceptional)
+            self.pushSuggestion(LogMsg.WrapExceptional)
             d = nil
             ret
         }
@@ -2067,12 +2067,12 @@ impl Eval {
         if f.Decl.Exceptional {
             if fc.IsCo {
                 self.s.pushErr(fc.Token, LogMsg.CoForExceptional)
-                self.s.pushSugggestion(LogMsg.HandleInFn)
+                self.s.pushSuggestion(LogMsg.HandleInFn)
             }
             match {
             | fc.Unhandled():
                 self.pushErr(fc.Token, LogMsg.UnhandledExceptional)
-                self.pushSugggestion(LogMsg.HandleExceptional)
+                self.pushSuggestion(LogMsg.HandleExceptional)
             | fc.Ignored():
                 // Ok.
                 break
@@ -2173,7 +2173,7 @@ impl Eval {
         if method != nil {
             if !self.s.isAccessibleDefine(method.Public, method.Token) {
                 self.pushErr(ident, LogMsg.IdentIsNotAccessible, ident.Kind)
-                self.pushSugggestion(LogMsg.MakePubToAccess)
+                self.pushSuggestion(LogMsg.MakePubToAccess)
             }
 
             let mut ins = method.instance()
@@ -2223,7 +2223,7 @@ impl Eval {
         if f != nil {
             if !self.s.isAccessibleDefine(f.Decl.Public, f.Decl.Token) {
                 self.pushErr(si.Ident, LogMsg.IdentIsNotAccessible, f.Decl.Ident)
-                self.pushSugggestion(LogMsg.MakePubToAccess)
+                self.pushSuggestion(LogMsg.MakePubToAccess)
             }
 
             let mut model = &StructSubIdentExprModel{
@@ -2256,7 +2256,7 @@ impl Eval {
         }
         if !self.s.isAccessibleDefine(m.Public, m.Token) {
             self.pushErr(si.Ident, LogMsg.IdentIsNotAccessible, m.Ident)
-            self.pushSugggestion(LogMsg.MakePubToAccess)
+            self.pushSuggestion(LogMsg.MakePubToAccess)
         }
 
         if m.Params[0].IsRef() && !ref {
@@ -3392,7 +3392,7 @@ impl binaryEval {
             }
         err:
             self.e.pushErr(self.op, LogMsg.AmperOpForEnum, enm.Ident, self.op.Kind)
-            self.e.pushSugggestion(LogMsg.DefineZeroDefaultToUseAmper)
+            self.e.pushSuggestion(LogMsg.DefineZeroDefaultToUseAmper)
         next:
             fall
         | TokenKind.Vline
@@ -4108,7 +4108,7 @@ impl binaryEval {
     fn eval(mut self, mut &op: &BinopExpr): &Data {
         if op.Op.Kind == TokenKind.Eq {
             self.e.pushErr(op.Op, LogMsg.AssignInExpr)
-            self.e.pushSugggestion(LogMsg.UseImperative)
+            self.e.pushSuggestion(LogMsg.UseImperative)
             ret nil
         }
 
