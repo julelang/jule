@@ -2123,22 +2123,11 @@ impl Eval {
     }
 
     fn evalEnumStatic(mut self, mut enm: &Enum, ident: &Token): &Data {
-        let mut d = &Data{
-            Kind: &TypeKind{
-                Kind: enm,
-            },
-        }
-
         let mut item = enm.FindItem(ident.Kind)
         if item == nil {
             self.pushErr(ident, LogMsg.ObjHaveNotIdent, enm.Ident, ident.Kind)
-        } else {
-            d.Constant = new(Const, *item.Value.Data.Constant)
-            d.Model = d.Constant
-            applyCastModelByEnum(d, enm)
         }
-
-        ret d
+        ret evalEnumStatic(enm, item)
     }
 
     fn evalTypeEnumStatic(mut self, mut enm: &TypeEnum, ident: &Token): &Data {
@@ -2701,6 +2690,15 @@ impl Eval {
             ret nil
         }
 
+        let mut comptimeType = d.Kind.comptimeType()
+        if comptimeType != nil {
+            let mut cd = comptimeType.subIdent(si.Ident.Kind)
+            if cd == nil {
+                self.pushErr(si.Ident, LogMsg.ObjHaveNotIdent, d.Kind.Str(), si.Ident.Kind)
+            }
+            ret cd
+        }
+
         let mut kind = d.Kind
         match {
         | d.Kind.Ptr() != nil:
@@ -2944,6 +2942,9 @@ impl Eval {
         }
 
         match {
+        | (self.owner == nil || !self.owner.Constant) && d.Kind.comptime():
+            self.s.pushErr(expr.Token, LogMsg.ComptimeAsExpr)
+            ret nil
         | d.Kind.Fn() != nil:
             let mut f = d.Kind.Fn()
             if f.IsBuiltin() {
@@ -4410,4 +4411,18 @@ fn constoa(&c: &Const): str {
     |:
         ret ""
     }
+}
+
+fn evalEnumStatic(mut &enm: &Enum, mut &item: &EnumItem): &Data {
+    let mut d = &Data{
+        Kind: &TypeKind{
+            Kind: enm,
+        },
+    }
+    if item != nil {
+        d.Constant = new(Const, *item.Value.Data.Constant)
+        d.Model = d.Constant
+        applyCastModelByEnum(d, enm)
+    }
+    ret d
 }

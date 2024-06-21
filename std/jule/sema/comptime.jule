@@ -1,0 +1,123 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use ast for std::jule::ast
+use std::jule::constant::{Const}
+
+// Comtpile-time type information data.
+struct comptimeType {
+    Base: &TypeKind
+}
+
+impl Kind for comptimeType {
+    fn Str(self): str {
+        ret "comptime::type[" + self.Base.Str() + "]"
+    }
+
+    fn Equal(&self, other: &TypeKind): bool {
+        let ct = unsafe { (*(&other)).comptimeType() }
+        if ct == nil {
+            ret false
+        }
+        ret self.Base.Equal(ct.Base)
+    }
+}
+
+impl comptimeType {
+    fn Kind(mut &self, mut &e: &Eval): &Data {
+        let mut enm = findComptimePackage(e.s).FindEnum("Kind")
+        let mut item: &EnumItem = nil
+        match {
+        | self.Base.Void():
+            item = enm.FindItem("Void")
+        | self.Base.Struct() != nil:
+            item = enm.FindItem("Struct")
+        | self.Base.Trait() != nil:
+            item = enm.FindItem("Trait")
+        | self.Base.Ptr() != nil:
+            if self.Base.Ptr().IsUnsafe() {
+                item = enm.FindItem("UnsafePtr")
+            } else {
+                item = enm.FindItem("Ptr")
+            }
+        | self.Base.Sptr() != nil:
+            item = enm.FindItem("Ref")
+        | self.Base.Enum() != nil:
+            item = enm.FindItem("Enum")
+        | self.Base.Map() != nil:
+            item = enm.FindItem("Map")
+        | self.Base.Slc() != nil:
+            item = enm.FindItem("Slice")
+        | self.Base.Arr() != nil:
+            item = enm.FindItem("Array")
+        | self.Base.Fn() != nil:
+            item = enm.FindItem("Func")
+        | self.Base.Prim() != nil:
+            let prim = self.Base.Prim()
+            match {
+            | prim.IsAny():
+                item = enm.FindItem("Any")
+            | prim.IsBool():
+                item = enm.FindItem("Bool")
+            | prim.IsStr():
+                item = enm.FindItem("Str")
+            | prim.IsF32():
+                item = enm.FindItem("F32")
+            | prim.IsF64():
+                item = enm.FindItem("F64")
+            | prim.IsI8():
+                item = enm.FindItem("I8")
+            | prim.IsI16():
+                item = enm.FindItem("I16")
+            | prim.IsI32():
+                item = enm.FindItem("I32")
+            | prim.IsI64():
+                item = enm.FindItem("I64")
+            | prim.IsU8():
+                item = enm.FindItem("U8")
+            | prim.IsU16():
+                item = enm.FindItem("U16")
+            | prim.IsU32():
+                item = enm.FindItem("U32")
+            | prim.IsU64():
+                item = enm.FindItem("U64")
+            | prim.IsInt():
+                item = enm.FindItem("Int")
+            | prim.IsUint():
+                item = enm.FindItem("Uint")
+            | prim.IsUintptr():
+                item = enm.FindItem("Uintptr")
+            |:
+                panic("Kind(): unimplemented type for std::comptime: " + self.Base.Str())
+            }
+        |:
+            panic("Kind(): unimplemented type for std::comptime: " + self.Base.Str())
+        }
+        ret evalEnumStatic(enm, item)
+    }
+
+    fn subIdent(mut &self, ident: str): &Data {
+        match ident {
+        | "Kind":
+            let mut method = &FnIns{
+                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+                    ret self.Kind(e)
+                },
+            }
+            ret &Data{
+                Kind: &TypeKind{
+                    Kind: method,
+                },
+            }
+        |:
+            ret nil
+        }
+    }
+}
+
+fn findComptimePackage(mut &s: &Sema): &ImportInfo {
+    ret s.SelectPackage(fn(pkg: &ImportInfo): bool {
+        ret pkg.LinkPath == "std::comptime"
+    })
+}

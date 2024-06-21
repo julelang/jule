@@ -205,6 +205,23 @@ unsafe fn pushSuggestion(mut log: *Log, fmt: LogMsg, args: ...any) {
     log.Suggestion = Logf(fmt, args...)
 }
 
+struct commonSemaMeta {
+    comptimeTypes: []&comptimeType
+}
+
+impl commonSemaMeta {
+    fn pushComptimeType(mut self, mut &t: &TypeKind): &comptimeType {
+        for (_, mut t2) in self.comptimeTypes {
+            if t2.Base.Equal(t) {
+                ret t2
+            }
+        }
+        let mut t1 = &comptimeType{Base: t}
+        self.comptimeTypes = append(self.comptimeTypes, t1)
+        ret t1
+    }
+}
+
 // Semantic analyzer for tables.
 // Accepts tables as files of package.
 struct Sema {
@@ -212,6 +229,7 @@ struct Sema {
     files:  []&SymbolTable // Package files.
     file:   &SymbolTable   // Current package file.
     flags:  SemaFlag
+    meta:   &commonSemaMeta
 }
 
 impl Lookup for Sema {
@@ -647,6 +665,7 @@ impl Sema {
         if !imp.Duplicate {
             let mut sema = &Sema{
                 flags: self.flags,
+                meta: self.meta,
             }
             sema.check(imp.Package.Files)
             if len(sema.errors) != 0 {
@@ -2153,7 +2172,7 @@ impl Sema {
         }
 
         if v.Constant {
-            if !v.Value.Data.IsConst() {
+            if !v.Value.Data.IsConst() && !v.Value.Data.Kind.comptime() {
                 self.pushErr(v.Value.Expr.Token, LogMsg.ExprNotConst)
             }
         } else {

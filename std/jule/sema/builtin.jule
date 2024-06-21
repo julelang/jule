@@ -131,6 +131,16 @@ fn findBuiltinDefStdMem(ident: str): any {
     }
 }
 
+fn findBuiltinDefStdComptime(ident: str): any {
+    match ident {
+    | "TypeOf":
+        static mut f = &FnIns{caller: builtinCallerStdComptimeTypeOf}
+        ret f
+    |:
+        ret nil
+    }
+}
+
 fn findBuiltinDefStdJuleIntegrated(ident: str): any {
     match ident {
     | "ToStr":
@@ -151,6 +161,8 @@ fn findBuiltinDefStdJuleIntegrated(ident: str): any {
 
 fn findPackageBuiltinDef(link_path: str, ident: str): any {
     match link_path {
+    | "std::comptime":
+        ret findBuiltinDefStdComptime(ident)
     | "std::debug":
         ret findBuiltinDefStdDebug(ident)
     | "std::mem":
@@ -796,6 +808,31 @@ fn builtinCallerAssert(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Dat
     let mut d = buildVoidData()
     d.Model = model
     ret d
+}
+
+fn builtinCallerStdComptimeTypeOf(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data {
+    if len(fc.Args) < 1 {
+        e.pushErr(fc.Token, LogMsg.MissingExprFor, "type|expr")
+        ret nil
+    }
+    if len(fc.Args) > 1 {
+        e.pushErr(fc.Args[1].Token, LogMsg.ArgumentOverflow, "TypeOf")
+    }
+
+    let mut d = e.evalExprKind(fc.Args[0].Kind)
+    if d == nil {
+        ret nil
+    }
+    if d.Kind.comptime() {
+        e.pushErr(fc.Token, LogMsg.InvalidTypeForTypeOf, d.Kind.Str())
+        ret nil
+    }
+
+    ret &Data{
+        Kind: &TypeKind{
+            Kind: e.s.meta.pushComptimeType(d.Kind)
+        },
+    }
 }
 
 fn builtinCallerStdMemSizeOf(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data {
