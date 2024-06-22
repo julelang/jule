@@ -387,6 +387,17 @@ impl Match {
     fn IsGenericTypeMatch(self): bool {
         ret self.TypeMatch && self.Expr != nil && self.Expr.Kind.Generic
     }
+
+    // Reports whether match is compile-time matching.
+    fn IsComptime(self): bool {
+        if self.IsGenericTypeMatch() {
+            ret true
+        }
+        ret self.Expr != nil &&
+            self.Expr.IsConst() &&
+            self.Expr.Constant.IsBool() &&
+            self.Expr.Constant.ReadBool()
+    }
 }
 
 // Match-Case case.
@@ -1420,10 +1431,10 @@ impl scopeChecker {
         ret self.checkChildSc(tree, ssc)
     }
 
-    fn checkCase(mut &self, mut m: &Match, i: int, mut c: &ast::Case, mut expr: &Data): &Case {
+    fn checkCase(mut &self, mut m: &Match, i: int, mut c: &ast::Case, mut expr: &Data, constMatch: bool): &Case {
         let mut case = m.Cases[i]
         case.Exprs = make([]&Data, 0, len(c.Exprs))
-        let mut genericMatched = false
+        let mut constMatched = false
         let mut eval = self.s.eval(self)
         for (_, mut e) in c.Exprs {
             let mut d = eval.evalExprKind(e.Kind)
@@ -1436,7 +1447,7 @@ impl scopeChecker {
                     self.s.pushErr(e.Token, LogMsg.DuplicateMatchType, d.Kind.Str())
                 }
                 if expr.Kind.Generic {
-                    genericMatched = genericMatched || expr.Kind.Equal(d.Kind)
+                    constMatched = constMatched || expr.Kind.Equal(d.Kind)
                 } else {
                     if expr.Kind.TypeEnum() != nil {
                         _ = self.s.checkTypeCompatibility(expr.Kind, d.Kind, e.Token)
@@ -1447,8 +1458,13 @@ impl scopeChecker {
                         }
                     }
                 }
-
                 continue
+            } else if constMatch {
+                if !d.IsConst() {
+                    self.s.pushErr(e.Token, LogMsg.InvalidExprForConstMatch)
+                } else {
+                    constMatched = constMatched || d.Constant.ReadBool()
+                }
             }
 
             if d.Decl {
@@ -1467,13 +1483,13 @@ impl scopeChecker {
             }
             checker.check()
         }
-        if !m.TypeMatch || !expr.Kind.Generic || genericMatched {
+        if !constMatch || constMatched {
             case.Scope = self.checkCaseScope(case, c.Scope)
         }
         ret case
     }
 
-    fn checkCases(mut &self, mut &m: &MatchCase, mut rm: &Match, mut expr: &Data) {
+    fn checkCases(mut &self, mut &m: &MatchCase, mut rm: &Match, mut expr: &Data, constMatch: bool) {
         rm.Cases = make([]&Case, 0, len(m.Cases))
         for i in m.Cases {
             let mut case = &Case{
@@ -1490,7 +1506,7 @@ impl scopeChecker {
         }
 
         for (i, mut c) in m.Cases {
-            self.checkCase(rm, i, c, expr)
+            self.checkCase(rm, i, c, expr, constMatch)
         }
     }
 
@@ -1502,7 +1518,7 @@ impl scopeChecker {
         ret def
     }
 
-    fn checkComptimePanic(mut &self, &s: &Scope) {
+    fn checkComptimePanic(mut &self, callToken: &Token, &s: &Scope, ) {
         if len(s.Stmts) != 1 {
             ret
         }
@@ -1518,36 +1534,42 @@ impl scopeChecker {
                 | &Const:
                     let c = (&Const)(m.Expr)
                     if c.IsStr() {
-                        let mut root = self.getHardRoot()
-                        self.s.pushErr(root.calledFrom, LogMsg.ComptimePanic, c.ReadStr())
+                        if callToken == nil {
+                            let mut root = self.getHardRoot()
+                            self.s.pushErr(root.calledFrom, LogMsg.ComptimePanic, c.ReadStr())
+                        } else {
+                            self.s.pushErr(callToken, LogMsg.ComptimePanic, c.ReadStr())
+                        }
                     }
                 }
             }
         }
     }
 
-    fn pushTypeMatch(mut &self, mut tm: &Match, mut &m: &MatchCase) {
-        // Type kind is generic.
-        // Match cases by kind.
-        if tm.Expr.Kind.Generic {
-            for (_, mut c) in tm.Cases {
-                if c.Scope != nil {
-                    self.checkComptimePanic(c.Scope)
-                    tm.Default = c
-                    tm.Cases = nil
-                    goto push
+    fn processConstMatch(mut &self, mut tm: &Match, mut &m: &MatchCase) {
+        for (i, mut c) in tm.Cases {
+            if c.Scope != nil {
+                let mut token: &Token = nil
+                if !tm.TypeMatch {
+                    token = m.Cases[i].Scope.Stmts[0].Token
                 }
-            }
-            if m.Default != nil {
+                self.checkComptimePanic(token, c.Scope)
+                tm.Default = c
                 tm.Cases = nil
-                tm.Default = self.checkDefault(tm, m.Default)
-                if tm.Default != nil {
-                    self.checkComptimePanic(tm.Default.Scope)
-                }
+                ret
             }
         }
-    push:
-        self.scope.Stmts = append(self.scope.Stmts, tm)
+        if m.Default != nil {
+            tm.Cases = nil
+            tm.Default = self.checkDefault(tm, m.Default)
+            if tm.Default != nil {
+                let mut token: &Token = nil
+                if !tm.TypeMatch {
+                    token = m.Default.Scope.Stmts[0].Token
+                }
+                self.checkComptimePanic(token, tm.Default.Scope)
+            }
+        }
     }
 
     fn checkTypeMatch(mut &self, mut &m: &MatchCase) {
@@ -1566,13 +1588,15 @@ impl scopeChecker {
             TypeMatch: true,
             Expr: d,
         }
-
+        let constMatch = tm.Expr.Kind.Generic
         if !tm.Expr.Kind.Generic && m.Default != nil {
             tm.Default = self.checkDefault(tm, m.Default)
         }
-
-        self.checkCases(m, tm, d)
-        self.pushTypeMatch(tm, m)
+        self.checkCases(m, tm, d, constMatch)
+        if constMatch {
+            self.processConstMatch(tm, m)
+        }
+        self.scope.Stmts = append(self.scope.Stmts, tm)
     }
 
     fn checkCommonMatch(mut &self, mut &m: &MatchCase) {
@@ -1593,13 +1617,15 @@ impl scopeChecker {
         let mut mc = &Match{
             Expr: d,
         }
-
-        self.scope.Stmts = append(self.scope.Stmts, mc)
-
+        let constMatch = d.IsConst() && d.Constant.IsBool() && d.Constant.ReadBool()
         if m.Default != nil {
             mc.Default = self.checkDefault(mc, m.Default)
         }
-        self.checkCases(m, mc, d)
+        self.checkCases(m, mc, d, constMatch)
+        if constMatch {
+            self.processConstMatch(mc, m)
+        }
+        self.scope.Stmts = append(self.scope.Stmts, mc)
     }
 
     fn checkMatch(mut &self, mut m: &MatchCase) {
