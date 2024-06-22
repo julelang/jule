@@ -1645,7 +1645,10 @@ impl scopeChecker {
         }
 
         let mut case = unsafe { (*Case)(self.cse) }
-        if unsafe { case.Next } == nil {
+        if unsafe { case.Owner.IsComptime() } {
+            self.s.pushErr(f.Token, LogMsg.ComptimeFallthrough)
+            ret
+        } else if unsafe { case.Next } == nil {
             self.s.pushErr(f.Token, LogMsg.FallthroughIntoFinalCase)
             self.s.pushSuggestion(LogMsg.RemoveFallthroughFromFinalCase)
             ret
