@@ -441,7 +441,10 @@ impl Eval {
                 sc.owner.Refers.Push(ref)
             }
         |:
-            if self.owner != nil && !self.owner.Refers.Exist[T](ref) {
+            // Push reference to owner if global.
+            if self.owner != nil &&
+                self.owner.Scope == nil &&
+                !self.owner.Refers.Exist[T](ref) {
                 self.owner.Refers.Push(ref)
             }
         }
@@ -572,7 +575,8 @@ impl Eval {
     // Appends depend to depends if there is no illegal cycle.
     // Returns true if e.owner is nil.
     fn checkIllegalCycles(mut self, mut &v: &Var, decl_token: &Token): (ok: bool) {
-        if self.owner == nil {
+        // Skip cycle checking if owner is nil or not global.
+        if self.owner == nil || self.owner.Scope != nil {
             ret true
         }
 
