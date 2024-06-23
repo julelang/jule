@@ -1608,6 +1608,11 @@ impl scopeChecker {
             Expr: d,
             Comptime: m.Expr != nil && d.IsConst() && d.Constant.IsBool() && d.Constant.ReadBool(),
         }
+
+        // Push into stmts here. Otherwise, labeled break statements and others
+        // will may log error(s) event semantic is good.
+        self.scope.Stmts = append(self.scope.Stmts, mc)
+
         if m.Default != nil {
             mc.Default = self.checkDefault(mc, m.Default)
         }
@@ -1615,7 +1620,6 @@ impl scopeChecker {
         if mc.Comptime {
             self.processConstMatch(mc, m)
         }
-        self.scope.Stmts = append(self.scope.Stmts, mc)
     }
 
     fn checkMatch(mut &self, mut m: &MatchCase) {
