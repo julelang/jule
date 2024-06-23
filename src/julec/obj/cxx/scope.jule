@@ -470,7 +470,7 @@ impl scopeCoder {
     }
 
     fn case(mut &self, mut m: &Match, mut c: &Case) {
-        if len(c.Exprs) != 0 && !m.IsComptime() {
+        if len(c.Exprs) != 0 && !m.Comptime {
             if len(m.Cases) > 0 && m.Cases[0] == c {
                 self.oc.write("if (")
             } else {
@@ -542,8 +542,7 @@ impl scopeCoder {
             ret
         }
 
-        let comptime = m.IsComptime()
-        if comptime && (m.Default == nil || len(m.Default.Scope.Stmts) == 0) {
+        if m.Comptime && (m.Default == nil || len(m.Default.Scope.Stmts) == 0) {
             ret
         }
 
@@ -554,7 +553,7 @@ impl scopeCoder {
         self.oc.indent()
 
         // Constant expressions generated as literals in conditions.
-        if !comptime && !m.Expr.IsConst() {
+        if !m.Comptime && !m.Expr.IsConst() {
             if opt::Copy && isCopyOptimizable(m.Expr) {
                 self.oc.write("auto &_match_expr{ ")
             } else {
