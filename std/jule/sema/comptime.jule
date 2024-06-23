@@ -3,7 +3,9 @@
 // license that can be found in the LICENSE file.
 
 use ast for std::jule::ast
+use std::jule::build::{LogMsg}
 use std::jule::constant::{Const}
+use types for std::jule::types
 
 // All comptime-structure methods starts with underscore (_).
 
@@ -110,6 +112,27 @@ impl comptimeType {
         ret evalEnumStatic(enm, item)
     }
 
+    fn _Bits(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+        let prim = self.Base.Prim()
+        if prim == nil {
+            e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.Base.Str(), "Bits")
+            ret nil
+        }
+        let n = types::BitsizeOf(prim.Kind)
+        if n == -1 {
+            e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.Base.Str(), "Bits")
+            ret nil
+        }
+        let mut constant = Const.NewI64(i64(n))
+        ret &Data{
+            Kind: &TypeKind{
+                Kind: buildPrimType(PrimKind.Int),
+            },
+            Constant: constant,
+            Model: constant,
+        }
+    }
+
     fn subIdent(mut &self, ident: str): &Data {
         match ident {
         | "Str":
@@ -118,25 +141,32 @@ impl comptimeType {
                     ret self._Str()
                 },
             }
-            ret &Data{
-                Kind: &TypeKind{
-                    Kind: method,
+            ret buildAsComptimeMethodData(method)
+        | "Bits":
+            let mut method = &FnIns{
+                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+                    ret self._Bits(e, fc)
                 },
             }
+            ret buildAsComptimeMethodData(method)
         | "Kind":
             let mut method = &FnIns{
                 caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
                     ret self._Kind(e)
                 },
             }
-            ret &Data{
-                Kind: &TypeKind{
-                    Kind: method,
-                },
-            }
+            ret buildAsComptimeMethodData(method)
         |:
             ret nil
         }
+    }
+}
+
+fn buildAsComptimeMethodData(mut &f: &FnIns): &Data {
+    ret &Data{
+        Kind: &TypeKind{
+            Kind: f,
+        },
     }
 }
 
