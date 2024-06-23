@@ -5,6 +5,8 @@
 use ast for std::jule::ast
 use std::jule::constant::{Const}
 
+// All comptime-structure methods starts with underscore (_).
+
 // Comtpile-time type information data.
 struct comptimeType {
     Base: &TypeKind
@@ -25,7 +27,18 @@ impl Kind for comptimeType {
 }
 
 impl comptimeType {
-    fn Kind(mut &self, mut &e: &Eval): &Data {
+    fn _Str(&self): &Data {
+        let mut constant = Const.NewStr(self.Base.Str())
+        ret &Data{
+            Kind: &TypeKind{
+                Kind: buildPrimType(PrimKind.Str),
+            },
+            Constant: constant,
+            Model: constant,
+        }
+    }
+
+    fn _Kind(mut &self, mut &e: &Eval): &Data {
         let mut enm = findComptimePackage(e.s).FindEnum("Kind")
         let mut item: &EnumItem = nil
         match {
@@ -99,10 +112,21 @@ impl comptimeType {
 
     fn subIdent(mut &self, ident: str): &Data {
         match ident {
+        | "Str":
+            let mut method = &FnIns{
+                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+                    ret self._Str()
+                },
+            }
+            ret &Data{
+                Kind: &TypeKind{
+                    Kind: method,
+                },
+            }
         | "Kind":
             let mut method = &FnIns{
                 caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
-                    ret self.Kind(e)
+                    ret self._Kind(e)
                 },
             }
             ret &Data{
