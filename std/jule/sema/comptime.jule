@@ -133,6 +133,31 @@ impl comptimeType {
         }
     }
 
+    fn _Elem(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+        let mut ptr = self.Base.Ptr()
+        if ptr != nil {
+            if ptr.IsUnsafe() {
+                e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.Base.Str(), "Elem")
+                ret nil
+            }
+            ret buildComptimeTypeInfoData(e.s, ptr.Elem)
+        }
+        let mut sptr = self.Base.Sptr()
+        if sptr != nil {
+            ret buildComptimeTypeInfoData(e.s, sptr.Elem)
+        }
+        let mut slice = self.Base.Slc()
+        if slice != nil {
+            ret buildComptimeTypeInfoData(e.s, slice.Elem)
+        }
+        let mut array = self.Base.Arr()
+        if array != nil {
+            ret buildComptimeTypeInfoData(e.s, array.Elem)
+        }
+        e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.Base.Str(), "Elem")
+        ret nil
+    }
+
     fn subIdent(mut &self, ident: str): &Data {
         match ident {
         | "Str":
@@ -146,6 +171,13 @@ impl comptimeType {
             let mut method = &FnIns{
                 caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
                     ret self._Bits(e, fc)
+                },
+            }
+            ret buildAsComptimeMethodData(method)
+        | "Elem":
+            let mut method = &FnIns{
+                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+                    ret self._Elem(e, fc)
                 },
             }
             ret buildAsComptimeMethodData(method)
@@ -174,4 +206,12 @@ fn findComptimePackage(mut &s: &Sema): &ImportInfo {
     ret s.SelectPackage(fn(pkg: &ImportInfo): bool {
         ret pkg.LinkPath == "std::comptime"
     })
+}
+
+fn buildComptimeTypeInfoData(mut &s: &Sema, mut &t: &TypeKind): &Data {
+    ret &Data{
+        Kind: &TypeKind{
+            Kind: s.meta.pushComptimeType(t)
+        },
+    }
 }
