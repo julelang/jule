@@ -158,6 +158,22 @@ impl comptimeType {
         ret nil
     }
 
+    fn _Size(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+        let mut arr = self.Base.Arr()
+        if arr == nil {
+            e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.Base.Str(), "Size")
+            ret nil
+        }
+        let mut constant = Const.NewI64(i64(arr.N))
+        ret &Data{
+            Kind: &TypeKind{
+                Kind: buildPrimType(PrimKind.Int),
+            },
+            Constant: constant,
+            Model: constant,
+        }
+    }
+
     fn subIdent(mut &self, ident: str): &Data {
         match ident {
         | "Str":
@@ -178,6 +194,13 @@ impl comptimeType {
             let mut method = &FnIns{
                 caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
                     ret self._Elem(e, fc)
+                },
+            }
+            ret buildAsComptimeMethodData(method)
+        | "Size":
+            let mut method = &FnIns{
+                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+                    ret self._Size(e, fc)
                 },
             }
             ret buildAsComptimeMethodData(method)
