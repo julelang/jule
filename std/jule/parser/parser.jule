@@ -271,6 +271,8 @@ struct parser {
     ast:        &Ast
     directives: []&Directive
     errors:     []Log
+
+    ep: &exprBuilder
 }
 
 impl parser {
@@ -288,11 +290,7 @@ impl parser {
     }
 
     fn buildExpr(mut &self, mut &tokens: []&Token): &Expr {
-        let mut ep = &exprBuilder{
-            p: self,
-        }
-        let mut expr = ep.buildFromTokens(tokens)
-        ret expr
+        ret self.ep.buildFromTokens(tokens)
     }
 
     fn buildDirective(mut self, mut tokens: []&Token): &Directive {
@@ -2003,6 +2001,9 @@ impl parser {
     fn parse(mut &self, mut &f: &File) {
         self.ast = &Ast{
             File: f,
+        }
+        self.ep = &exprBuilder{
+            p: self,
         }
 
         self.checkRanges(f.Tokens)
