@@ -2163,8 +2163,12 @@ impl Sema {
         }
 
         if v.Constant {
-            if !v.Value.Data.IsConst() && !v.Value.Data.Kind.comptime() {
+            let comptime = v.Value.Data.Kind.comptime() 
+            if !v.Value.Data.IsConst() && !comptime {
                 self.pushErr(v.Value.Expr.Token, LogMsg.ExprNotConst)
+            }
+            if comptime && v.Value.Data.Kind.comptimeRange() != nil {
+                self.pushErr(v.Value.Expr.Token, LogMsg.InvalidTypeForConst, v.Value.Data.Kind.Str())
             }
         } else {
             v.Value.Data.Constant = nil

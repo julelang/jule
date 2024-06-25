@@ -1220,6 +1220,32 @@ impl rangeChecker {
         }
     }
 
+    fn checkComptimeStructFields(mut self, mut data: &comptimeStructFields) {
+        self.setSizeKey()
+        if self.rang.KeyA != nil && self.rang.KeyA.Mutable {
+            self.sc.s.pushErr(self.rang.KeyA.Token, LogMsg.CannotBeMut, self.rang.KeyA.Ident)
+        }
+        if self.rang.KeyB != nil && self.rang.KeyB.Mutable {
+            self.sc.s.pushErr(self.rang.KeyB.Token, LogMsg.CannotBeMut, self.rang.KeyB.Ident)
+        }
+        if self.rang.KeyB == nil || IsIgnoreIdent(self.rang.KeyB.Ident) {
+            ret
+        }
+        self.Kind.KeyB = self.buildVar(self.rang.KeyB)
+    }
+
+    fn checkComptimeRange(mut self): bool {
+        let mut range = self.d.Kind.comptimeRange()
+        match type range.kind {
+        | &comptimeStructFields:
+            self.checkComptimeStructFields((&comptimeStructFields)(range.kind))
+            ret true
+        |:
+            self.sc.s.pushErr(self.rang.InToken, LogMsg.IterRangeRequireEnumerableExpr)
+            ret false
+        }
+    }
+
     fn check(mut self): bool {
         match {
         | self.d.Kind.Variadic:
@@ -1233,6 +1259,8 @@ impl rangeChecker {
         | self.d.Kind.Map() != nil:
             self.checkMap()
             ret true
+        | self.d.Kind.comptimeRange() != nil:
+            ret self.checkComptimeRange()
         |:
             let prim = self.d.Kind.Prim()
             if prim != nil && prim.IsStr() {

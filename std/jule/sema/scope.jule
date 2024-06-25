@@ -917,10 +917,49 @@ impl scopeChecker {
         }
     }
 
+    fn checkComptimeRangeIter(mut &self, mut &it: &Iter, mut &kind: &RangeIter, mut &d: &Data) {
+        if kind.KeyA != nil {
+            if !self.s.isFlag(SemaFlag.Shadowing) && self.isDuplicatedIdent(0, kind.KeyA.Ident) {
+                self.s.pushErr(kind.KeyA.Token, LogMsg.DuplicatedIdent, kind.KeyA.Ident)
+                self.s.pushSuggestion(LogMsg.RenameForAvoidDuplication)
+            }
+        }
+        if kind.KeyB != nil {
+            if !self.s.isFlag(SemaFlag.Shadowing) && self.isDuplicatedIdent(0, kind.KeyB.Ident) {
+                self.s.pushErr(kind.KeyB.Token, LogMsg.DuplicatedIdent, kind.KeyB.Ident)
+                self.s.pushSuggestion(LogMsg.RenameForAvoidDuplication)
+            }
+        }
+
+        let mut comptime = d.Kind.comptimeRange()
+        comptime.kind.ready(kind.KeyA, kind.KeyB)
+        let mut i = 0
+        let errors = len(self.s.errors)
+        for i < comptime.kind.len(); i++ {
+            let mut ssc = self.newChildChecker()
+            let mut scope = self.getChild()
+            if kind.KeyA != nil {
+                kind.KeyA.Scope = scope
+                ssc.table.Vars = append(ssc.table.Vars, kind.KeyA)
+            }
+            if kind.KeyB != nil {
+                kind.KeyB.Scope = scope
+                ssc.table.Vars = append(ssc.table.Vars, kind.KeyB)
+            }
+            comptime.kind.step(i, kind.KeyA, kind.KeyB)
+            self.checkChildSsc(it.Scope, scope, ssc)
+            if errors != len(self.s.errors) {
+                // Stop execution if new error occurred.
+                break
+            }
+            self.scope.Stmts = append(self.scope.Stmts, scope)
+        }
+    }
+
     fn checkRangeIter(mut &self, mut &it: &Iter) {
         let mut rang = (&RangeKind)(it.Kind)
 
-        let mut d = self.s.eval(self).evalExpr(rang.Expr)
+        let mut d = self.s.eval(self).evalExprKind(rang.Expr.Kind)
         if d == nil {
             ret
         }
@@ -937,6 +976,12 @@ impl scopeChecker {
         }
         let ok = rc.check()
         if !ok {
+            ret
+        }
+
+        let mut comptimeRange = d.Kind.comptimeRange()
+        if comptimeRange != nil {
+            self.checkComptimeRangeIter(it, kind, d)
             ret
         }
 

@@ -9,23 +9,121 @@ use types for std::jule::types
 
 // All comptime-structure methods starts with underscore (_).
 
+trait comptimeRangeKind {
+    fn ready(mut self, mut keyA: &Var, mut keyB: &Var)
+    fn step(mut self, i: int, mut keyA: &Var, mut keyB: &Var)
+    fn len(self): int
+}
+
+// Compile-time ranges.
+struct comptimeRange {
+    kind: comptimeRangeKind
+}
+
+impl Kind for comptimeRange {
+    fn Str(self): str { ret "comptimeRange" }
+    fn Equal(&self, other: &TypeKind): bool { ret false }
+}
+
+// Compile-time field for structure.
+struct comptimeStructField {
+    field: &FieldIns
+}
+
+impl Kind for comptimeStructField {
+    fn Str(self): str { ret "comptimeField" }
+    fn Equal(&self, other: &TypeKind): bool { ret false }
+}
+
+impl comptimeStructField {
+    fn _Name(&self): &Data {
+        let mut constant = Const.NewStr(self.field.Decl.Ident)
+        ret &Data{
+            Kind: &TypeKind{
+                Kind: buildPrimType(PrimKind.Str),
+            },
+            Constant: constant,
+            Model: constant,
+        }
+    }
+
+    fn subIdent(mut &self, ident: str): &Data {
+        match ident {
+        | "Name":
+            let mut method = &FnIns{
+                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+                    ret self._Name()
+                },
+            }
+            ret buildAsComptimeMethodData(method)
+        |:
+            ret nil
+        }
+    }
+}
+
+// Compile-time fields range for structure.
+struct comptimeStructFields {
+    fields: []&FieldIns
+}
+
+impl Kind for comptimeStructFields {
+    fn Str(self): str { ret "comptimeStructFields" }
+    fn Equal(&self, other: &TypeKind): bool { ret false }
+}
+
+impl comptimeRangeKind for comptimeStructFields {
+    fn ready(mut self, mut keyA: &Var, mut keyB: &Var) {
+        if keyA != nil {
+            keyA.Constant = true
+            keyA.Value = &Value{
+                Data: new(Data),
+            }
+            keyA.Value.Data.Constant = nil
+            keyA.Kind = &TypeSymbol{
+                Kind: &TypeKind{
+                    Kind: buildPrimType(PrimKind.Int),
+                },
+            }
+        }
+        if keyB != nil {
+            keyB.Constant = true
+            keyB.Value = &Value{
+                Data: new(Data),
+            }
+            keyB.Kind = &TypeSymbol{
+                Kind: &TypeKind{
+                    Kind: new(comptimeStructField),
+                },
+            }
+        }
+    }
+
+    fn step(mut self, i: int, mut keyA: &Var, mut keyB: &Var) {
+        if keyA != nil {
+            // Kind should be assigned by caller.
+            keyA.Value.Data.Constant = Const.NewI64(i64(i))
+            keyA.Value.Data.Model = keyA.Value.Data.Constant
+        }
+        if keyB != nil {
+            // Kind should be assigned by caller.
+            keyB.Kind.Kind.comptimeStructField().field = self.fields[i]
+        }
+    }
+
+    fn len(self): int {
+        ret len(self.fields)
+    }
+}
+
 // Comtpile-time type information data.
 struct comptimeType {
     Base: &TypeKind
 }
 
 impl Kind for comptimeType {
-    fn Str(self): str {
-        ret "comptime::type[" + self.Base.Str() + "]"
-    }
-
-    fn Equal(&self, other: &TypeKind): bool {
-        let ct = unsafe { (*(&other)).comptimeType() }
-        if ct == nil {
-            ret false
-        }
-        ret self.Base.Equal(ct.Base)
-    }
+    fn Str(self): str { ret "comptimeTypeInfo" }
+    fn Equal(&self, other: &TypeKind): bool { ret false }
 }
 
 impl comptimeType {
@@ -192,6 +290,21 @@ impl comptimeType {
         ret buildComptimeTypeInfoData(e.s, m.Val)
     }
 
+    fn _Fields(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+        let mut s = self.Base.Struct()
+        if s == nil {
+            e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.Base.Str(), "Fields")
+            ret nil
+        }
+        ret &Data{
+            Kind: &TypeKind{
+                Kind: &comptimeStructFields{
+                    fields: s.Fields,
+                }
+            },
+        }
+    }
+
     fn subIdent(mut &self, ident: str): &Data {
         match ident {
         | "Str":
@@ -233,6 +346,13 @@ impl comptimeType {
             let mut method = &FnIns{
                 caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
                     ret self._Value(e, fc)
+                },
+            }
+            ret buildAsComptimeMethodData(method)
+        | "Fields":
+            let mut method = &FnIns{
+                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+                    ret self._Fields(e, fc)
                 },
             }
             ret buildAsComptimeMethodData(method)

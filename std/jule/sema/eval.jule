@@ -642,7 +642,7 @@ impl Eval {
             if v.Constant {
                 // Eval constant dependent variable.
                 self.s.checkTypeVar(v, self.s)
-                if v.Value.Data == nil {
+                if v.Value == nil || v.Value.Data == nil {
                     // Skip error.
                     ret nil
                 }
@@ -2694,9 +2694,17 @@ impl Eval {
             ret nil
         }
 
-        let mut comptimeType = d.Kind.comptimeType()
-        if comptimeType != nil {
+        match {
+        | d.Kind.comptimeType() != nil:
+            let mut comptimeType = d.Kind.comptimeType()
             let mut cd = comptimeType.subIdent(si.Ident.Kind)
+            if cd == nil {
+                self.pushErr(si.Ident, LogMsg.ObjHaveNotIdent, d.Kind.Str(), si.Ident.Kind)
+            }
+            ret cd
+        | d.Kind.comptimeStructField() != nil:
+            let mut comptimeSF = d.Kind.comptimeStructField()
+            let mut cd = comptimeSF.subIdent(si.Ident.Kind)
             if cd == nil {
                 self.pushErr(si.Ident, LogMsg.ObjHaveNotIdent, d.Kind.Str(), si.Ident.Kind)
             }
