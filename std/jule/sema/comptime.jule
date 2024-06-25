@@ -147,7 +147,7 @@ impl comptimeRangeKind for comptimeStructFields {
 
 // Compile-time type information data.
 struct comptimeType {
-    Base: &TypeKind
+    base: &TypeKind
 }
 
 impl Kind for comptimeType {
@@ -157,7 +157,7 @@ impl Kind for comptimeType {
 
 impl comptimeType {
     fn _Str(&self): &Data {
-        let mut constant = Const.NewStr(self.Base.Str())
+        let mut constant = Const.NewStr(self.base.Str())
         ret &Data{
             Kind: &TypeKind{
                 Kind: buildPrimType(PrimKind.Str),
@@ -171,32 +171,32 @@ impl comptimeType {
         let mut enm = findComptimePackage(e.s).FindEnum("Kind")
         let mut item: &EnumItem = nil
         match {
-        | self.Base.Void():
+        | self.base.Void():
             item = enm.FindItem("Void")
-        | self.Base.Struct() != nil:
+        | self.base.Struct() != nil:
             item = enm.FindItem("Struct")
-        | self.Base.Trait() != nil:
+        | self.base.Trait() != nil:
             item = enm.FindItem("Trait")
-        | self.Base.Ptr() != nil:
-            if self.Base.Ptr().IsUnsafe() {
+        | self.base.Ptr() != nil:
+            if self.base.Ptr().IsUnsafe() {
                 item = enm.FindItem("UnsafePtr")
             } else {
                 item = enm.FindItem("Ptr")
             }
-        | self.Base.Sptr() != nil:
+        | self.base.Sptr() != nil:
             item = enm.FindItem("Ref")
-        | self.Base.Enum() != nil:
+        | self.base.Enum() != nil:
             item = enm.FindItem("Enum")
-        | self.Base.Map() != nil:
+        | self.base.Map() != nil:
             item = enm.FindItem("Map")
-        | self.Base.Slc() != nil:
+        | self.base.Slc() != nil:
             item = enm.FindItem("Slice")
-        | self.Base.Arr() != nil:
+        | self.base.Arr() != nil:
             item = enm.FindItem("Array")
-        | self.Base.Fn() != nil:
+        | self.base.Fn() != nil:
             item = enm.FindItem("Func")
-        | self.Base.Prim() != nil:
-            let prim = self.Base.Prim()
+        | self.base.Prim() != nil:
+            let prim = self.base.Prim()
             match {
             | prim.IsAny():
                 item = enm.FindItem("Any")
@@ -231,23 +231,23 @@ impl comptimeType {
             | prim.IsUintptr():
                 item = enm.FindItem("Uintptr")
             |:
-                panic("Kind(): unimplemented type for std::comptime: " + self.Base.Str())
+                panic("Kind(): unimplemented type for std::comptime: " + self.base.Str())
             }
         |:
-            panic("Kind(): unimplemented type for std::comptime: " + self.Base.Str())
+            panic("Kind(): unimplemented type for std::comptime: " + self.base.Str())
         }
         ret evalEnumStatic(enm, item)
     }
 
     fn _Bits(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
-        let prim = self.Base.Prim()
+        let prim = self.base.Prim()
         if prim == nil {
-            e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.Base.Str(), "Bits")
+            e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.base.Str(), "Bits")
             ret nil
         }
         let n = types::BitsizeOf(prim.Kind)
         if n == -1 {
-            e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.Base.Str(), "Bits")
+            e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.base.Str(), "Bits")
             ret nil
         }
         let mut constant = Const.NewI64(i64(n))
@@ -261,34 +261,34 @@ impl comptimeType {
     }
 
     fn _Elem(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
-        let mut ptr = self.Base.Ptr()
+        let mut ptr = self.base.Ptr()
         if ptr != nil {
             if ptr.IsUnsafe() {
-                e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.Base.Str(), "Elem")
+                e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.base.Str(), "Elem")
                 ret nil
             }
             ret buildComptimeTypeInfoData(e.s, ptr.Elem)
         }
-        let mut sptr = self.Base.Sptr()
+        let mut sptr = self.base.Sptr()
         if sptr != nil {
             ret buildComptimeTypeInfoData(e.s, sptr.Elem)
         }
-        let mut slice = self.Base.Slc()
+        let mut slice = self.base.Slc()
         if slice != nil {
             ret buildComptimeTypeInfoData(e.s, slice.Elem)
         }
-        let mut array = self.Base.Arr()
+        let mut array = self.base.Arr()
         if array != nil {
             ret buildComptimeTypeInfoData(e.s, array.Elem)
         }
-        e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.Base.Str(), "Elem")
+        e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.base.Str(), "Elem")
         ret nil
     }
 
     fn _Size(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
-        let mut arr = self.Base.Arr()
+        let mut arr = self.base.Arr()
         if arr == nil {
-            e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.Base.Str(), "Size")
+            e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.base.Str(), "Size")
             ret nil
         }
         let mut constant = Const.NewI64(i64(arr.N))
@@ -302,27 +302,27 @@ impl comptimeType {
     }
 
     fn _Key(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
-        let mut m = self.Base.Map()
+        let mut m = self.base.Map()
         if m == nil {
-            e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.Base.Str(), "Key")
+            e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.base.Str(), "Key")
             ret nil
         }
         ret buildComptimeTypeInfoData(e.s, m.Key)
     }
 
     fn _Value(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
-        let mut m = self.Base.Map()
+        let mut m = self.base.Map()
         if m == nil {
-            e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.Base.Str(), "Value")
+            e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.base.Str(), "Value")
             ret nil
         }
         ret buildComptimeTypeInfoData(e.s, m.Val)
     }
 
     fn _Fields(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
-        let mut s = self.Base.Struct()
+        let mut s = self.base.Struct()
         if s == nil {
-            e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.Base.Str(), "Fields")
+            e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.base.Str(), "Fields")
             ret nil
         }
         ret &Data{
@@ -331,6 +331,31 @@ impl comptimeType {
                     fields: s.Fields,
                 }
             },
+        }
+    }
+
+    fn _Public(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+        let mut public = false
+        match {
+        | self.base.Struct() != nil:
+            public = self.base.Struct().Decl.Public
+        | self.base.Trait() != nil:
+            public = self.base.Trait().Public
+        | self.base.Enum() != nil:
+            public = self.base.Enum().Public
+        | self.base.TypeEnum() != nil:
+            public = self.base.TypeEnum().Public
+        |:
+            e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.base.Str(), "Public")
+            ret nil
+        }
+        let mut constant = Const.NewBool(public)
+        ret &Data{
+            Kind: &TypeKind{
+                Kind: buildPrimType(PrimKind.Bool),
+            },
+            Constant: constant,
+            Model: constant,
         }
     }
 
@@ -382,6 +407,13 @@ impl comptimeType {
             let mut method = &FnIns{
                 caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
                     ret self._Fields(e, fc)
+                },
+            }
+            ret buildAsComptimeMethodData(method)
+        | "Public":
+            let mut method = &FnIns{
+                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+                    ret self._Public(e, fc)
                 },
             }
             ret buildAsComptimeMethodData(method)
