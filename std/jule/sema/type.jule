@@ -146,6 +146,32 @@ impl TypeKind {
         }
     }
 
+    // Reports whether kind supports ordered constrait.
+    fn Ordered(self): bool {
+        unsafe {
+            let mut _self = &self
+            let prim = _self.Prim()
+            if prim != nil {
+                ret types::IsNum(prim.Kind) || prim.IsStr()
+            }
+            if _self.Ptr() != nil {
+                ret true
+            }
+            let s = _self.Struct()
+            if s != nil {
+                ret s.Operators.Gt != nil &&
+                    s.Operators.GtEq != nil &&
+                    s.Operators.Lt != nil &&
+                    s.Operators.LtEq != nil
+            }
+            let enm = _self.Enum()
+            if enm != nil {
+                ret types::IsNum(enm.Kind.Kind.Str())
+            }
+            ret false
+        }
+    }
+
     // Reports whether kind is nil compatible.
     fn NilCompatible(self): bool {
         unsafe {
