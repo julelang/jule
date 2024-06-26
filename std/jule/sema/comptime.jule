@@ -31,7 +31,7 @@ struct comptimeStructField {
 }
 
 impl Kind for comptimeStructField {
-    fn Str(self): str { ret "comptimeField" }
+    fn Str(self): str { ret "comptimeStructField" }
     fn Equal(&self, other: &TypeKind): bool { ret false }
 }
 
@@ -137,6 +137,97 @@ impl comptimeRangeKind for comptimeStructFields {
         if keyB != nil {
             // Kind should be assigned by caller.
             keyB.Kind.Kind.comptimeStructField().field = self.fields[i]
+        }
+    }
+
+    fn len(self): int {
+        ret len(self.fields)
+    }
+}
+
+// Compile-time field for enum.
+struct comptimeEnumField {
+    field: &EnumItem
+}
+
+impl Kind for comptimeEnumField {
+    fn Str(self): str { ret "comptimeEnumField" }
+    fn Equal(&self, other: &TypeKind): bool { ret false }
+}
+
+impl comptimeEnumField {
+    fn _Name(&self): &Data {
+        let mut constant = Const.NewStr(self.field.Ident)
+        ret &Data{
+            Kind: &TypeKind{
+                Kind: buildPrimType(PrimKind.Str),
+            },
+            Constant: constant,
+            Model: constant,
+        }
+    }
+
+    fn subIdent(mut &self, ident: str): &Data {
+        match ident {
+        | "Name":
+            let mut method = &FnIns{
+                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+                    ret self._Name()
+                },
+            }
+            ret buildAsComptimeMethodData(method)
+        |:
+            ret nil
+        }
+    }
+}
+
+// Compile-time fields range for enum.
+struct comptimeEnumFields {
+    fields: []&EnumItem
+}
+
+impl Kind for comptimeEnumFields {
+    fn Str(self): str { ret "comptimeEnumFields" }
+    fn Equal(&self, other: &TypeKind): bool { ret false }
+}
+
+impl comptimeRangeKind for comptimeEnumFields {
+    fn ready(mut self, mut &keyA: &Var, mut &keyB: &Var) {
+        if keyA != nil {
+            keyA.Constant = true
+            keyA.Value = &Value{
+                Data: new(Data),
+            }
+            keyA.Value.Data.Constant = nil
+            keyA.Kind = &TypeSymbol{
+                Kind: &TypeKind{
+                    Kind: buildPrimType(PrimKind.Int),
+                },
+            }
+        }
+        if keyB != nil {
+            keyB.Constant = true
+            keyB.Value = &Value{
+                Data: new(Data),
+            }
+            keyB.Kind = &TypeSymbol{
+                Kind: &TypeKind{
+                    Kind: new(comptimeEnumField),
+                },
+            }
+        }
+    }
+
+    fn step(mut self, i: int, mut &keyA: &Var, mut &keyB: &Var) {
+        if keyA != nil {
+            // Kind should be assigned by caller.
+            keyA.Value.Data.Constant = Const.NewI64(i64(i))
+            keyA.Value.Data.Model = keyA.Value.Data.Constant
+        }
+        if keyB != nil {
+            // Kind should be assigned by caller.
+            keyB.Kind.Kind.comptimeEnumField().field = self.fields[i]
         }
     }
 
@@ -325,17 +416,27 @@ impl comptimeType {
 
     fn _Fields(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
         let mut s = self.base.Struct()
-        if s == nil {
-            e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.base.Str(), "Fields")
-            ret nil
+        if s != nil {
+            ret &Data{
+                Kind: &TypeKind{
+                    Kind: &comptimeStructFields{
+                        fields: s.Fields,
+                    }
+                },
+            }
         }
-        ret &Data{
-            Kind: &TypeKind{
-                Kind: &comptimeStructFields{
-                    fields: s.Fields,
-                }
-            },
+        let mut enm = self.base.Enum()
+        if enm != nil {
+            ret &Data{
+                Kind: &TypeKind{
+                    Kind: &comptimeEnumFields{
+                        fields: enm.Items,
+                    }
+                },
+            }
         }
+        e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.base.Str(), "Fields")
+        ret nil
     }
 
     fn _Public(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
