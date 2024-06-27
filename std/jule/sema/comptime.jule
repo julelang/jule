@@ -599,6 +599,19 @@ impl comptimeType {
         }
     }
 
+    fn _Result(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+        let mut f = self.base.Fn()
+        if f == nil {
+            e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.base.Str(), "Result")
+            ret nil
+        }
+        if f.Result == nil {
+            let mut void = buildVoidType()
+            ret buildComptimeTypeInfoData(e.s, void)
+        }
+        ret buildComptimeTypeInfoData(e.s, f.Result)
+    }
+
     fn subIdent(mut &self, ident: str): &Data {
         match ident {
         | "Str":
@@ -696,6 +709,13 @@ impl comptimeType {
             let mut method = &FnIns{
                 caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
                     ret self._Exceptional(e, fc)
+                },
+            }
+            ret buildAsComptimeMethodData(method)
+        | "Result":
+            let mut method = &FnIns{
+                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+                    ret self._Result(e, fc)
                 },
             }
             ret buildAsComptimeMethodData(method)
