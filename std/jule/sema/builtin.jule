@@ -633,6 +633,11 @@ fn builtinCallerLen(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data {
         d.Constant = Const.NewI64(i64(len(dest.Kind.comptimeEnumFields().fields)))
         d.Model = d.Constant
         ret d
+    | dest.Kind.comptimeTypeInfos() != nil:
+        d.Kind = lenKind()
+        d.Constant = Const.NewI64(i64(len(dest.Kind.comptimeTypeInfos().types)))
+        d.Model = d.Constant
+        ret d
     |:
         e.pushErr(fc.Args[0].Token, LogMsg.InvalidExpr)
         ret nil
@@ -870,6 +875,14 @@ fn builtinCallerStdComptimeRange(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &D
             Kind: &TypeKind{
                 Kind: &comptimeRange{
                     kind: d.Kind.comptimeEnumFields(),
+                },
+            },
+        }
+    | d.Kind.comptimeTypeInfos() != nil:
+        ret &Data{
+            Kind: &TypeKind{
+                Kind: &comptimeRange{
+                    kind: d.Kind.comptimeTypeInfos(),
                 },
             },
         }
