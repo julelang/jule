@@ -238,7 +238,7 @@ impl comptimeRangeKind for comptimeEnumFields {
 
 // Compile-time type info range.
 struct comptimeTypeInfos {
-    types: []&comptimeType
+    types: []&comptimeTypeInfo
 }
 
 impl Kind for comptimeTypeInfos {
@@ -267,7 +267,7 @@ impl comptimeRangeKind for comptimeTypeInfos {
             }
             keyB.Kind = &TypeSymbol{
                 Kind: &TypeKind{
-                    Kind: new(comptimeType),
+                    Kind: new(comptimeTypeInfo),
                 },
             }
         }
@@ -291,16 +291,16 @@ impl comptimeRangeKind for comptimeTypeInfos {
 }
 
 // Compile-time type information data.
-struct comptimeType {
+struct comptimeTypeInfo {
     base: &TypeKind
 }
 
-impl Kind for comptimeType {
-    fn Str(self): str { ret "comptimeTypeInfo" }
+impl Kind for comptimeTypeInfo {
+    fn Str(self): str { ret "comptimeTypeInfo[" + self.base.Str() + "]" }
     fn Equal(&self, other: &TypeKind): bool { ret false }
 }
 
-impl comptimeType {
+impl comptimeTypeInfo {
     fn _Str(&self): &Data {
         let mut constant = Const.NewStr(self.base.Str())
         ret &Data{
@@ -571,10 +571,10 @@ impl comptimeType {
             ret nil
         }
         let mut infos = &comptimeTypeInfos{
-            types: make([]&comptimeType, 0, len(tup.Types)),
+            types: make([]&comptimeTypeInfo, 0, len(tup.Types)),
         }
         for (_, mut t) in tup.Types {
-            infos.types = append(infos.types, e.s.meta.pushComptimeType(t))
+            infos.types = append(infos.types, e.s.meta.pushComptimeTypeInfo(t))
         }
         ret &Data{
             Kind: &TypeKind{
@@ -749,7 +749,7 @@ fn findComptimePackage(mut &s: &Sema): &ImportInfo {
 fn buildComptimeTypeInfoData(mut &s: &Sema, mut &t: &TypeKind): &Data {
     ret &Data{
         Kind: &TypeKind{
-            Kind: s.meta.pushComptimeType(t),
+            Kind: s.meta.pushComptimeTypeInfo(t),
         },
     }
 }
