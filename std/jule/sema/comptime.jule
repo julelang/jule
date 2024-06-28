@@ -236,6 +236,101 @@ impl comptimeRangeKind for comptimeEnumFields {
     }
 }
 
+// Compile-time parameter for functions.
+struct comptimeParam {
+    param: &ParamIns
+}
+
+impl Kind for comptimeParam {
+    fn Str(self): str { ret "comptimeParam" }
+    fn Equal(&self, other: &TypeKind): bool { ret false }
+}
+
+impl comptimeParam {
+    fn _Name(&self): &Data {
+        let mut constant = Const.NewStr(self.param.Decl.Ident)
+        ret &Data{
+            Kind: &TypeKind{
+                Kind: buildPrimType(PrimKind.Str),
+            },
+            Constant: constant,
+            Model: constant,
+        }
+    }
+
+    fn _Type(mut &self, mut &e: &Eval): &Data {
+        ret buildComptimeTypeInfoData(e.s, self.param.Kind)
+    }
+
+    fn subIdent(mut &self, ident: str): &Data {
+        match ident {
+        | "Name":
+            let mut method = &FnIns{
+                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+                    ret self._Name()
+                },
+            }
+            ret buildAsComptimeMethodData(method)
+        |:
+            ret nil
+        }
+    }
+}
+
+// Compile-time parameters range for function.
+struct comptimeParams {
+    params: []&ParamIns
+}
+
+impl Kind for comptimeParams {
+    fn Str(self): str { ret "comptimeParams" }
+    fn Equal(&self, other: &TypeKind): bool { ret false }
+}
+
+impl comptimeRangeKind for comptimeParams {
+    fn ready(mut self, mut &keyA: &Var, mut &keyB: &Var) {
+        if keyA != nil {
+            keyA.Constant = true
+            keyA.Value = &Value{
+                Data: new(Data),
+            }
+            keyA.Value.Data.Constant = nil
+            keyA.Kind = &TypeSymbol{
+                Kind: &TypeKind{
+                    Kind: buildPrimType(PrimKind.Int),
+                },
+            }
+        }
+        if keyB != nil {
+            keyB.Constant = true
+            keyB.Value = &Value{
+                Data: new(Data),
+            }
+            keyB.Kind = &TypeSymbol{
+                Kind: &TypeKind{
+                    Kind: new(comptimeParam),
+                },
+            }
+        }
+    }
+
+    fn step(mut self, i: int, mut &keyA: &Var, mut &keyB: &Var) {
+        if keyA != nil {
+            // Kind should be assigned by caller.
+            keyA.Value.Data.Constant = Const.NewI64(i64(i))
+            keyA.Value.Data.Model = keyA.Value.Data.Constant
+        }
+        if keyB != nil {
+            // Kind should be assigned by caller.
+            keyB.Kind.Kind.comptimeParam().param = self.params[i]
+        }
+    }
+
+    fn len(self): int {
+        ret len(self.params)
+    }
+}
+
 // Compile-time type info range.
 struct comptimeTypeInfos {
     types: []&comptimeTypeInfo
@@ -612,6 +707,19 @@ impl comptimeTypeInfo {
         ret buildComptimeTypeInfoData(e.s, f.Result)
     }
 
+    fn _Params(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+        let mut f = self.base.Fn()
+        if f == nil {
+            e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.base.Str(), "Result")
+            ret nil
+        }
+        ret &Data{
+            Kind: &TypeKind{
+                Kind: &comptimeParams{params: f.Params},
+            }
+        }
+    }
+
     fn subIdent(mut &self, ident: str): &Data {
         match ident {
         | "Str":
@@ -660,6 +768,13 @@ impl comptimeTypeInfo {
             let mut method = &FnIns{
                 caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
                     ret self._Fields(e, fc)
+                },
+            }
+            ret buildAsComptimeMethodData(method)
+        | "Params":
+            let mut method = &FnIns{
+                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+                    ret self._Params(e, fc)
                 },
             }
             ret buildAsComptimeMethodData(method)
