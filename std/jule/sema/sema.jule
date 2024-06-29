@@ -1970,6 +1970,7 @@ impl Sema {
         | !self.checkDeclGenerics(s.Generics):
         | !self.checkStructFields(s):
         | !self.checkStructImpls(s):
+        | !self.checkFuncDecls(s.Methods):
         }
     }
 
@@ -1995,7 +1996,7 @@ impl Sema {
         f.sema = self
         self.checkFnDeclPrototype(f)
 
-        if self.isDuplicatedIdent(uintptr(f), f.Ident, f.CppLinked) {
+        if f.Owner == nil && self.isDuplicatedIdent(uintptr(f), f.Ident, f.CppLinked) {
             if f.Ident == build::InitFn {
                 let init = self.FindFn(build::InitFn, false)
                 if init != nil {
@@ -2007,16 +2008,20 @@ impl Sema {
         }
     }
 
-    // Checks current package file's function declarations.
-    fn checkFnDecls(mut &self): (ok: bool) {
-        for (_, mut f) in self.file.Funcs {
+    fn checkFuncDecls(mut &self, mut &funcs: []&Fn): bool {
+        for (_, mut f) in funcs {
             self.checkFnDecl(f)
-            // Break checking if type alias has error.
+            // Break checking if error occurs.
             if len(self.errors) > 0 {
                 ret false
             }
         }
         ret true
+    }
+
+    // Checks current package file's function declarations.
+    fn checkFnDecls(mut &self): (ok: bool) {
+        ret self.checkFuncDecls(self.file.Funcs)
     }
 
     fn pushCycleError(self, &st1: str, &st2: str, mut &message: str) {
