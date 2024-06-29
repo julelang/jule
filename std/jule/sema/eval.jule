@@ -771,7 +771,7 @@ impl Eval {
         self.prefix = nil
         defer { self.prefix = prefix }
 
-        let mut d = self.evalExprKind(v.Expr.Kind)
+        let mut d = self.evalExpr(v.Expr)
         if d == nil {
             ret nil
         }
@@ -794,7 +794,7 @@ impl Eval {
     fn evalUnsafe(mut &self, mut u: &UnsafeExpr): &Data {
         let unsafety = self.unsafety
         self.unsafety = true
-        let mut d = self.evalExprKind(u.Expr.Kind)
+        let mut d = self.evalExpr(u.Expr)
         self.unsafety = unsafety
         ret d
     }
@@ -850,11 +850,10 @@ impl Eval {
         let mut prefix = self.prefix
         self.prefix = arr.Elem
         for (_, mut elem) in s.Exprs {
-            let mut d = self.evalExprKind(elem.Kind)
+            let mut d = self.evalExpr(elem)
             if d == nil {
                 continue
             }
-
             _ = self.s.checkAssignType(false, arr.Elem, d, s.Token)
             model.Elems = append(model.Elems, d.Model)
         }
@@ -892,7 +891,7 @@ impl Eval {
         let mut prefix = self.prefix
         self.prefix = slc.Elem
         for (_, mut elem) in s.Exprs[i:] {
-            let mut d = self.evalExprKind(elem.Kind)
+            let mut d = self.evalExpr(elem)
             if d == nil {
                 continue
             }
@@ -929,7 +928,7 @@ impl Eval {
             ret nil
         }
 
-        let mut firstElem = self.evalExprKind(s.Exprs[0].Kind)
+        let mut firstElem = self.evalExpr(s.Exprs[0])
         if firstElem == nil {
             ret nil
         }
@@ -1276,7 +1275,7 @@ impl Eval {
 
         let mut old_d = *d
 
-        let mut index = self.evalExprKind(i.Index.Kind)
+        let mut index = self.evalExpr(i.Index)
         if index == nil {
             ret nil
         }
@@ -1316,7 +1315,7 @@ impl Eval {
         let mut r: &Data = nil
 
         if s.Start != nil {
-            l = self.evalExprKind(s.Start.Kind)
+            l = self.evalExpr(s.Start)
             if l != nil {
                 self.checkIntegerIndexingByData(l, s.Token)
             } else {
@@ -1331,7 +1330,7 @@ impl Eval {
         }
 
         if s.To != nil {
-            r = self.evalExprKind(s.To.Kind)
+            r = self.evalExpr(s.To)
             if r != nil {
                 self.checkIntegerIndexingByData(r, s.Token)
             } else {
@@ -1413,7 +1412,7 @@ impl Eval {
     }
 
     fn evalSlicing(mut &self, mut s: &SlicingExpr): &Data {
-        let mut d = self.evalExprKind(s.Expr.Kind)
+        let mut d = self.evalExpr(s.Expr)
         if d == nil {
             ret nil
         }
@@ -1750,7 +1749,7 @@ impl Eval {
                 self.prefix = t
             }
         }
-        let mut d = self.evalExprKind(e.Kind)
+        let mut d = self.evalExpr(e)
         if d == nil || self.prefix != nil {
             ret d
         }
@@ -2762,16 +2761,13 @@ impl Eval {
         let mut prefix = self.prefix
         self.prefix = nil
         defer { self.prefix = prefix }
-
         let mut d = self.evalExprKind(si.Expr.Kind)
         if d == nil {
             ret nil
         }
-
         if d.Decl {
             ret self.evalTypeStatic(d, si)
         }
-
         ret self.evalObjSubIdent(d, si)
     }
 
@@ -2785,7 +2781,7 @@ impl Eval {
 
         let mut ok = true
         for (_, mut expr) in tup.Expr {
-            let mut d = self.evalExprKind(expr.Kind)
+            let mut d = self.evalExpr(expr)
             if d == nil {
                 ok = false
                 continue
@@ -2822,12 +2818,12 @@ impl Eval {
 
             let mut pair = (&KeyValPair)(expr.Kind)
 
-            let mut key = self.evalExprKind(pair.Key.Kind)
+            let mut key = self.evalExpr(pair.Key)
             if key == nil {
                 ret nil
             }
 
-            let mut val = self.evalExprKind(pair.Val.Kind)
+            let mut val = self.evalExpr(pair.Val)
             if val == nil {
                 ret nil
             }
@@ -2961,16 +2957,13 @@ impl Eval {
 
     // Returns value data of evaluated expression.
     // Returns nil if error occurs.
-    fn eval(mut &self, mut expr: &Expr): &Data {
+    fn eval1(mut &self, mut expr: &Expr): &Data {
         let mut d = self.evalExprKind(expr.Kind)
         if d == nil || d.Kind == nil {
             ret nil
         }
 
         match {
-        | (self.owner == nil || !self.owner.Constant) && d.Kind.comptime():
-            self.s.pushErr(expr.Token, LogMsg.ComptimeAsExpr)
-            ret nil
         | d.Kind.Fn() != nil:
             let mut f = d.Kind.Fn()
             if f.IsBuiltin() {
@@ -2986,6 +2979,37 @@ impl Eval {
         }
 
         ret d
+    }
+
+    // Returns value data of evaluated expression.
+    // Returns nil if error occurs.
+    // Accepts comptime expressions as invalid.
+    fn eval(mut &self, mut expr: &Expr): &Data {
+        let mut d = self.eval1(expr)
+        if d == nil {
+            ret nil
+        }
+        if (self.owner == nil || !self.owner.Constant) && d.Kind.comptime() {
+            self.s.pushErr(expr.Token, LogMsg.ComptimeAsExpr)
+            ret nil
+        }
+        ret d
+    }
+
+    // Returns value data of evaluated expression.
+    // Returns nil if error occurs.
+    // Accepts decls as invalid expression.
+    fn evalExpr1(mut &self, mut expr: &Expr): &Data {
+        let mut d = self.eval1(expr)
+        match {
+        | d == nil:
+            ret nil
+        | d.Decl:
+            self.pushErr(expr.Token, LogMsg.InvalidExpr)
+            ret nil
+        |:
+            ret d
+        }
     }
 
     // Returns value data of evaluated expression.
@@ -3232,10 +3256,10 @@ impl unaryEval {
         | TokenKind.Amper:
             let mut prefix = self.e.prefix
             self.e.prefix = nil
-            self.d = self.e.evalExprKind(self.u.Expr.Kind)
+            self.d = self.e.evalExpr(self.u.Expr)
             self.e.prefix = prefix
         |:
-            self.d = self.e.evalExprKind(self.u.Expr.Kind)
+            self.d = self.e.evalExpr(self.u.Expr)
         }
     }
 
@@ -4140,7 +4164,7 @@ impl binaryEval {
             ret nil
         }
 
-        let mut l = self.e.evalExprKind(op.Left.Kind)
+        let mut l = self.e.evalExpr(op.Left)
         if l == nil || l.Kind == nil {
             ret nil
         }
@@ -4148,7 +4172,7 @@ impl binaryEval {
         let mut prefix = self.e.prefix
         self.e.prefix = l.Kind
         defer { self.e.prefix = prefix }
-        let mut r = self.e.evalExprKind(op.Right.Kind)
+        let mut r = self.e.evalExpr(op.Right)
         if r == nil || r.Kind == nil {
             ret nil
         }

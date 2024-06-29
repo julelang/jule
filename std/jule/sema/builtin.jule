@@ -608,12 +608,9 @@ fn builtinCallerLen(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data {
     if len(fc.Args) > 1 {
         e.pushErr(fc.Args[1].Token, LogMsg.ArgumentOverflow, "len")
     }
-    let mut dest = e.evalExprKind(fc.Args[0].Kind)
+    let mut dest = e.evalExpr1(fc.Args[0])
     match {
     | dest == nil:
-        ret nil
-    | dest.Decl:
-        e.pushErr(fc.Args[0].Token, LogMsg.InvalidExpr)
         ret nil
     | dest.Kind.Slc() != nil:
         ret callerLenSlice(dest, d)
@@ -756,7 +753,7 @@ fn builtinCallerClone(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data
         e.pushErr(fc.Args[1].Token, LogMsg.ArgumentOverflow, "clone")
     }
 
-    let mut d = e.evalExprKind(fc.Args[0].Kind)
+    let mut d = e.evalExpr(fc.Args[0])
     if d == nil {
         ret nil
     }
@@ -969,7 +966,7 @@ fn builtinCallerStdMemFree(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): 
         e.pushErr(fc.Args[1].Token, LogMsg.ArgumentOverflow, "Free")
     }
 
-    let mut d = e.evalExprKind(fc.Args[0].Kind)
+    let mut d = e.evalExpr(fc.Args[0])
     if d == nil {
         ret nil
     }
@@ -992,7 +989,7 @@ fn builtinCallerStdJuleIntegratedToStr(mut &e: &Eval, mut &fc: &FnCallExpr, mut 
         e.pushErr(fc.Args[1].Token, LogMsg.ArgumentOverflow, "ToStr")
     }
 
-    let mut d = e.evalExprKind(fc.Args[0].Kind)
+    let mut d = e.evalExpr(fc.Args[0])
     if d == nil {
         ret nil
     }
@@ -1049,7 +1046,7 @@ fn builtinCallerStdJuleIntegratedEmit(mut &e: &Eval, mut &fc: &FnCallExpr, mut &
     if len(fc.Args) > 1 {
         model.Exprs = make([]ExprModel, 0, len(fc.Args) - 1)
         for (_, mut arg) in fc.Args[1:] {
-            argd = e.evalExprKind(arg.Kind)
+            argd = e.eval1(arg)
             if argd == nil {
                 ret nil
             }
