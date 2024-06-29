@@ -22,7 +22,7 @@ It contains the reference compiler, API, and standard library.
 ### Key Features
 
 - Optimized for fast and safe programs
-- Empowered compile-time: evalutation of constants, zero runtime-cost generics
+- Empowered compile-time: compile-time reflection, evalutation of constants, zero runtime-cost generics, constant matching, and much more feature empowered by the standard comptime library
 - Hands-free deterministic memory management with reference-counting, manual management is optional
 - [Easy cross compilation](https://manual.jule.dev/compiler/cross-compilation), generate IR for target platform and imitate target architecture
 - Cross platform implemented standard library
