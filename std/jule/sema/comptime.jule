@@ -145,6 +145,126 @@ impl comptimeRangeKind for comptimeStructFields {
     }
 }
 
+// Compile-time static field for structure.
+struct comptimeStatic {
+    field: &Var
+}
+
+impl Kind for comptimeStatic {
+    fn Str(self): str { ret "comptimeStatic" }
+    fn Equal(&self, other: &TypeKind): bool { ret false }
+}
+
+impl comptimeStatic {
+    fn _Name(&self): &Data {
+        let mut constant = Const.NewStr(self.field.Ident)
+        ret &Data{
+            Kind: &TypeKind{
+                Kind: buildPrimType(PrimKind.Str),
+            },
+            Constant: constant,
+            Model: constant,
+        }
+    }
+
+    fn _Type(mut &self, mut &e: &Eval): &Data {
+        ret buildComptimeTypeInfoData(e.s, self.field.Kind.Kind)
+    }
+
+    fn _Public(mut &self): &Data {
+        let mut constant = Const.NewBool(self.field.Public)
+        ret &Data{
+            Kind: &TypeKind{
+                Kind: buildPrimType(PrimKind.Bool),
+            },
+            Constant: constant,
+            Model: constant,
+        }
+    }
+
+    fn subIdent(mut &self, ident: str): &Data {
+        match ident {
+        | "Name":
+            let mut method = &FnIns{
+                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+                    ret self._Name()
+                },
+            }
+            ret buildAsComptimeMethodData(method)
+        | "Public":
+            let mut method = &FnIns{
+                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+                    ret self._Public()
+                },
+            }
+            ret buildAsComptimeMethodData(method)
+        | "Type":
+            let mut method = &FnIns{
+                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+                    ret self._Type(e)
+                },
+            }
+            ret buildAsComptimeMethodData(method)
+        |:
+            ret nil
+        }
+    }
+}
+
+// Compile-time static fields range for structure.
+struct comptimeStatics {
+    fields: []&Var
+}
+
+impl Kind for comptimeStatics {
+    fn Str(self): str { ret "comptimeStatics" }
+    fn Equal(&self, other: &TypeKind): bool { ret false }
+}
+
+impl comptimeRangeKind for comptimeStatics {
+    fn ready(mut self, mut &keyA: &Var, mut &keyB: &Var) {
+        if keyA != nil {
+            keyA.Constant = true
+            keyA.Value = &Value{
+                Data: new(Data),
+            }
+            keyA.Value.Data.Constant = nil
+            keyA.Kind = &TypeSymbol{
+                Kind: &TypeKind{
+                    Kind: buildPrimType(PrimKind.Int),
+                },
+            }
+        }
+        if keyB != nil {
+            keyB.Constant = true
+            keyB.Value = &Value{
+                Data: new(Data),
+            }
+            keyB.Kind = &TypeSymbol{
+                Kind: &TypeKind{
+                    Kind: new(comptimeStatic),
+                },
+            }
+        }
+    }
+
+    fn step(mut self, i: int, mut &keyA: &Var, mut &keyB: &Var) {
+        if keyA != nil {
+            // Kind should be assigned by caller.
+            keyA.Value.Data.Constant = Const.NewI64(i64(i))
+            keyA.Value.Data.Model = keyA.Value.Data.Constant
+        }
+        if keyB != nil {
+            // Kind should be assigned by caller.
+            keyB.Kind.Kind.comptimeStatic().field = self.fields[i]
+        }
+    }
+
+    fn len(self): int {
+        ret len(self.fields)
+    }
+}
+
 // Compile-time field for enum.
 struct comptimeEnumField {
     field: &EnumItem
@@ -633,6 +753,21 @@ impl comptimeTypeInfo {
         ret nil
     }
 
+    fn _Statics(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+        let mut s = self.base.Struct()
+        if s == nil {
+            e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.base.Str(), "Fields")
+            ret nil
+        }
+        ret &Data{
+            Kind: &TypeKind{
+                Kind: &comptimeStatics{
+                    fields: s.Statics,
+                }
+            },
+        }
+    }
+
     fn _Public(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
         let mut public = false
         match {
@@ -811,6 +946,13 @@ impl comptimeTypeInfo {
             let mut method = &FnIns{
                 caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
                     ret self._Fields(e, fc)
+                },
+            }
+            ret buildAsComptimeMethodData(method)
+        | "Statics":
+            let mut method = &FnIns{
+                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+                    ret self._Statics(e, fc)
                 },
             }
             ret buildAsComptimeMethodData(method)
