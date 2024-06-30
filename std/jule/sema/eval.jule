@@ -2687,6 +2687,14 @@ impl Eval {
         }
     }
 
+    fn comptimeObjSubIdent[ComptimeType](mut self, mut &ct: &ComptimeType, &d: &Data, &si: &SubIdentExpr): &Data {
+        let mut cd = ct.subIdent(si.Ident.Kind)
+        if cd == nil {
+            self.pushErr(si.Ident, LogMsg.ObjHaveNotIdent, d.Kind.Str(), si.Ident.Kind)
+        }
+        ret cd
+    }
+
     fn evalObjSubIdent(mut self, mut d: &Data, mut si: &SubIdentExpr): &Data {
         if IsIgnoreIdent(si.Ident.Kind) {
             self.pushErr(si.Ident, LogMsg.InvalidSyntax)
@@ -2695,40 +2703,20 @@ impl Eval {
 
         match {
         | d.Kind.comptimeTypeInfo() != nil:
-            let mut cti = d.Kind.comptimeTypeInfo()
-            let mut cd = cti.subIdent(si.Ident.Kind)
-            if cd == nil {
-                self.pushErr(si.Ident, LogMsg.ObjHaveNotIdent, d.Kind.Str(), si.Ident.Kind)
-            }
-            ret cd
+            let mut ct = d.Kind.comptimeTypeInfo()
+            ret self.comptimeObjSubIdent(ct, d, si)
         | d.Kind.comptimeStructField() != nil:
-            let mut comptimeSF = d.Kind.comptimeStructField()
-            let mut cd = comptimeSF.subIdent(si.Ident.Kind)
-            if cd == nil {
-                self.pushErr(si.Ident, LogMsg.ObjHaveNotIdent, d.Kind.Str(), si.Ident.Kind)
-            }
-            ret cd
+            let mut ct = d.Kind.comptimeStructField()
+            ret self.comptimeObjSubIdent(ct, d, si)
         | d.Kind.comptimeEnumField() != nil:
-            let mut comptimeEF = d.Kind.comptimeEnumField()
-            let mut cd = comptimeEF.subIdent(si.Ident.Kind)
-            if cd == nil {
-                self.pushErr(si.Ident, LogMsg.ObjHaveNotIdent, d.Kind.Str(), si.Ident.Kind)
-            }
-            ret cd
+            let mut ct = d.Kind.comptimeEnumField()
+            ret self.comptimeObjSubIdent(ct, d, si)
         | d.Kind.comptimeParam() != nil:
-            let mut comptimeP = d.Kind.comptimeParam()
-            let mut cd = comptimeP.subIdent(si.Ident.Kind)
-            if cd == nil {
-                self.pushErr(si.Ident, LogMsg.ObjHaveNotIdent, d.Kind.Str(), si.Ident.Kind)
-            }
-            ret cd
+            let mut ct = d.Kind.comptimeParam()
+            ret self.comptimeObjSubIdent(ct, d, si)
         | d.Kind.comptimeStatic() != nil:
-            let mut comptimeS = d.Kind.comptimeStatic()
-            let mut cd = comptimeS.subIdent(si.Ident.Kind)
-            if cd == nil {
-                self.pushErr(si.Ident, LogMsg.ObjHaveNotIdent, d.Kind.Str(), si.Ident.Kind)
-            }
-            ret cd
+            let mut ct = d.Kind.comptimeStatic()
+            ret self.comptimeObjSubIdent(ct, d, si)
         }
 
         let mut kind = d.Kind
