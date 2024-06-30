@@ -844,12 +844,23 @@ fn builtinCallerStdComptimeTypeOf(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &
         ret nil
     }
     let f = d.Kind.Fn()
-    if f != nil && f.IsBuiltin() {
-        e.pushErr(fc.Token, LogMsg.InvalidTypeForTypeOf, "<built-in fn>")
+    if f != nil {
+        if f.IsBuiltin() {
+            e.pushErr(fc.Args[0].Token, LogMsg.InvalidTypeForTypeOf, "<built-in fn>")
+            ret nil
+        }
+        if len(f.Generics) != len(f.Decl.Generics) {
+            e.pushErr(fc.Args[0].Token, LogMsg.HasGenerics)
+            ret nil
+        }
+    }
+    let s = d.Kind.Struct()
+    if s != nil && len(s.Generics) != len(s.Decl.Generics) {
+        e.pushErr(fc.Args[0].Token, LogMsg.HasGenerics)
         ret nil
     }
     if d.Kind.comptime() {
-        e.pushErr(fc.Token, LogMsg.InvalidTypeForTypeOf, d.Kind.Str())
+        e.pushErr(fc.Args[0].Token, LogMsg.InvalidTypeForTypeOf, d.Kind.Str())
         ret nil
     }
     ret buildComptimeTypeInfoData(e.s, d.Kind)
