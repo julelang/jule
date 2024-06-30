@@ -3368,6 +3368,38 @@ impl binaryEval {
         ret self.e.s.checkAssignType(p.Decl.Reference, p.Kind, self.r, self.op)
     }
 
+    fn evalComptimeTypeInfo(mut self): &Data {
+        let mut r = self.r.Kind.comptimeTypeInfo()
+        if r == nil {
+            self.e.pushErr(self.op, LogMsg.IncompatibleTypes, "comptimeTypeInfo", self.r.Kind.Str())
+            ret nil
+        }
+        let mut l = self.l.Kind.comptimeTypeInfo()
+        match self.op.Kind {
+        | TokenKind.Eqs:
+            let mut constant = Const.NewBool(l.base.Equal(r.base))
+            ret &Data{
+                Kind: &TypeKind{
+                    Kind: buildPrimType(PrimKind.Bool),
+                },
+                Constant: constant,
+                Model: constant,
+            }
+        | TokenKind.NotEq:
+            let mut constant = Const.NewBool(!l.base.Equal(r.base))
+            ret &Data{
+                Kind: &TypeKind{
+                    Kind: buildPrimType(PrimKind.Bool),
+                },
+                Constant: constant,
+                Model: constant,
+            }
+        |:
+            self.e.pushErr(self.op, LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Kind.Str())
+            ret nil
+        }
+    }
+
     fn evalNil(mut self): &Data {
         if !self.r.Kind.NilCompatible() {
             self.e.pushErr(self.op, LogMsg.IncompatibleTypes, TokenKind.Nil, self.r.Kind.Str())
@@ -3972,6 +4004,11 @@ impl binaryEval {
         | self.l.Kind.Void():
             self.e.pushErr(self.op, LogMsg.OperatorNotForJuleType, self.op.Kind, "void")
             ret nil
+        | self.r.Kind.comptimeTypeInfo() != nil:
+            self.l, self.r = self.r, self.l
+            fall
+        | self.l.Kind.comptimeTypeInfo() != nil:
+            ret self.evalComptimeTypeInfo()
         | self.r.Kind.Prim() != nil && self.r.Kind.Prim().IsAny():
             self.l, self.r = self.r, self.l
             fall
@@ -4021,7 +4058,9 @@ impl binaryEval {
 
     fn evalConst(mut self, mut &d: &Data) {
         match {
-        | d == nil:
+        | d == nil
+        | self.l.Model == nil
+        | self.r.Model == nil:
             ret
         | !self.l.IsConst()
         | !self.r.IsConst():
@@ -4108,8 +4147,9 @@ impl binaryEval {
 
     fn setModel(mut self, mut &d: &Data) {
         if d.IsConst() {
-            if self.l.IsConst() && self.r.IsConst() {
-                // Left and right are pure constant.
+            if self.l.IsConst() && self.r.IsConst() ||
+                self.l.Model == nil && self.r.Model == nil {
+                // Left and right are pure constant or comptime expression.
                 // Do not break this with changing Model.
                 ret
             }
@@ -4164,7 +4204,7 @@ impl binaryEval {
             ret nil
         }
 
-        let mut l = self.e.evalExpr(op.Left)
+        let mut l = self.e.evalExpr1(op.Left)
         if l == nil || l.Kind == nil {
             ret nil
         }
@@ -4172,7 +4212,7 @@ impl binaryEval {
         let mut prefix = self.e.prefix
         self.e.prefix = l.Kind
         defer { self.e.prefix = prefix }
-        let mut r = self.e.evalExpr(op.Right)
+        let mut r = self.e.evalExpr1(op.Right)
         if r == nil || r.Kind == nil {
             ret nil
         }
