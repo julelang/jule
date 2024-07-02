@@ -1032,6 +1032,36 @@ impl comptimeTypeInfo {
     }
 }
 
+// Compile-time value information data.
+struct comptimeValue {
+    data: &Data
+}
+
+impl Kind for comptimeValue {
+    fn Str(self): str { ret "comptimeValue" }
+    fn Equal(&self, other: &TypeKind): bool { ret false }
+}
+
+impl comptimeValue {
+    fn _Type(mut &self, mut &e: &Eval): &Data {
+        ret buildComptimeTypeInfoData(e.s, self.data.Kind)
+    }
+
+    fn subIdent(mut &self, ident: str): &Data {
+        match ident {
+        | "Type":
+            let mut method = &FnIns{
+                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+                    ret self._Type(e)
+                },
+            }
+            ret buildAsComptimeMethodData(method)
+        |:
+            ret nil
+        }
+    }
+}
+
 fn buildAsComptimeMethodData(mut &f: &FnIns): &Data {
     ret &Data{
         Kind: &TypeKind{
@@ -1050,6 +1080,16 @@ fn buildComptimeTypeInfoData(mut &s: &Sema, mut &t: &TypeKind): &Data {
     ret &Data{
         Kind: &TypeKind{
             Kind: s.meta.pushComptimeTypeInfo(t),
+        },
+    }
+}
+
+fn buildComptimeValue(mut &d: &Data): &Data {
+    ret &Data{
+        Kind: &TypeKind{
+            Kind: &comptimeValue{
+                data: d,
+            },
         },
     }
 }

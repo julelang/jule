@@ -136,6 +136,9 @@ fn findBuiltinDefStdComptime(ident: str): any {
     | "TypeOf":
         static mut f = &FnIns{caller: builtinCallerStdComptimeTypeOf}
         ret f
+    | "ValueOf":
+        static mut f = &FnIns{caller: builtinCallerStdComptimeValueOf}
+        ret f
     | "Range":
         static mut f = &FnIns{caller: builtinCallerStdComptimeRange}
         ret f
@@ -869,6 +872,21 @@ fn builtinCallerStdComptimeTypeOf(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &
         ret nil
     }
     ret buildComptimeTypeInfoData(e.s, d.Kind)
+}
+
+fn builtinCallerStdComptimeValueOf(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data {
+    if len(fc.Args) < 1 {
+        e.pushErr(fc.Token, LogMsg.MissingExprFor, "expr")
+        ret nil
+    }
+    if len(fc.Args) > 1 {
+        e.pushErr(fc.Args[1].Token, LogMsg.ArgumentOverflow, "ValueOf")
+    }
+    let mut d = e.evalExpr(fc.Args[0])
+    if d == nil {
+        ret nil
+    }
+    ret buildComptimeValue(d)
 }
 
 fn builtinCallerStdComptimeRange(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data {
