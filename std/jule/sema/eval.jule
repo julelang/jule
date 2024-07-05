@@ -2210,34 +2210,38 @@ impl Eval {
         }
     }
 
+    fn evalStructSubIdentField(mut self, mut &d: &Data, mut &s: &StructIns, mut &tok: &Token, mut &f: &FieldIns): &Data {
+        if !self.s.isAccessibleDefine(f.Decl.Public, f.Decl.Token) {
+            self.pushErr(tok, LogMsg.IdentIsNotAccessible, f.Decl.Ident)
+            self.pushSuggestion(LogMsg.MakePubToAccess)
+        }
+
+        let mut model = &StructSubIdentExprModel{
+            Token: tok,
+            Expr: new(Data, *d),
+            Field: f,
+            Owner: s,
+        }
+        d.Model = model
+        d.Kind = f.Kind
+        d.Lvalue = true
+
+        if f.Decl.Mutable && !d.Mutable {
+            // Interior mutability.
+            match type self.lookup {
+            | &scopeChecker:
+                let scope = (&scopeChecker)(self.lookup).getRoot()
+                d.Mutable = scope.owner != nil && scope.owner.Owner == s
+            }
+        }
+
+        ret d
+    }
+
     fn evalStructSubIdent(mut self, mut d: &Data, mut s: &StructIns, mut si: &SubIdentExpr, ref: bool): &Data {
         let mut f = s.FindField(si.Ident.Kind)
         if f != nil {
-            if !self.s.isAccessibleDefine(f.Decl.Public, f.Decl.Token) {
-                self.pushErr(si.Ident, LogMsg.IdentIsNotAccessible, f.Decl.Ident)
-                self.pushSuggestion(LogMsg.MakePubToAccess)
-            }
-
-            let mut model = &StructSubIdentExprModel{
-                Token: si.Ident,
-                Expr: new(Data, *d),
-                Field: f,
-                Owner: s,
-            }
-            d.Model = model
-            d.Kind = f.Kind
-            d.Lvalue = true
-
-            if f.Decl.Mutable && !d.Mutable {
-                // Interior mutability.
-                match type self.lookup {
-                | &scopeChecker:
-                    let scope = (&scopeChecker)(self.lookup).getRoot()
-                    d.Mutable = scope.owner != nil && scope.owner.Owner == s
-                }
-            }
-
-            ret d
+            ret self.evalStructSubIdentField(d, s, si.Ident, f)
         }
 
         const Static = false

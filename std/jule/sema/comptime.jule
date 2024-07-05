@@ -1062,6 +1062,40 @@ impl comptimeValue {
         }
     }
 
+    fn _Field(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+        let mut s = self.data.Kind.Struct()
+        if s == nil {
+            e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.data.Kind.Str(), "Field")
+            ret nil
+        }
+        if len(fc.Args) > 1 {
+            e.pushErr(fc.Args[1].Token, LogMsg.ArgumentOverflow, "Field")
+        }
+        let mut arg = fc.Args[0]
+        let mut d = e.evalExpr(arg)
+        if d == nil {
+            ret nil
+        }
+        if !d.IsConst() {
+            e.pushErr(arg.Token, LogMsg.ExprNotConst)
+            ret nil
+        }
+        let prim = d.Kind.Prim()
+        if prim == nil || !prim.IsStr() {
+            e.pushErr(arg.Token, LogMsg.IncompatibleTypes, PrimKind.Str, d.Kind.Str())
+            ret nil
+        }
+        let ident = d.Constant.ReadStr()
+        let mut f = s.FindField(ident)
+        if f == nil {
+            e.pushErr(arg.Token, LogMsg.ObjHaveNotIdent, self.data.Kind.Str(), ident)
+            ret nil
+        }
+        d = new(Data, *self.data)
+        d = e.evalStructSubIdentField(d, s, arg.Token, f)
+        ret buildComptimeValue(d)
+    }
+
     fn subIdent(mut &self, ident: str): &Data {
         match ident {
         | "Unwrap":
@@ -1082,6 +1116,13 @@ impl comptimeValue {
             let mut method = &FnIns{
                 caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
                     ret self._Lvalue()
+                },
+            }
+            ret buildAsComptimeMethodData(method)
+        | "Field":
+            let mut method = &FnIns{
+                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+                    ret self._Field(e, fc)
                 },
             }
             ret buildAsComptimeMethodData(method)
