@@ -1205,6 +1205,21 @@ impl comptimeValue {
         }
     }
 
+    fn _Const(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+        if len(fc.Args) > 0 {
+            e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Const")
+            ret nil
+        }
+        let mut constant = Const.NewBool(self.data.IsConst())
+        ret &Data{
+            Kind: &TypeKind{
+                Kind: buildPrimType(PrimKind.Bool),
+            },
+            Constant: constant,
+            Model: constant,
+        }
+    }
+
     fn _Field(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
         if len(fc.Args) > 1 {
             e.pushErr(fc.Args[1].Token, LogMsg.ArgumentOverflow, "Field")
@@ -1267,6 +1282,13 @@ impl comptimeValue {
             let mut method = &FnIns{
                 caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
                     ret self._Mutable(e, fc)
+                },
+            }
+            ret buildAsComptimeMethodData(method)
+        | "Const":
+            let mut method = &FnIns{
+                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+                    ret self._Const(e, fc)
                 },
             }
             ret buildAsComptimeMethodData(method)
