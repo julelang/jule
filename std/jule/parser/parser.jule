@@ -1520,9 +1520,6 @@ impl parser {
                 if f == nil {
                     break
                 }
-                if f.IsAnon() {
-                    self.pushErr(f.Token, LogMsg.InvalidSyntax)
-                }
                 self.checkMethodReceiver(f)
                 if len(f.Generics) > 0 {
                     self.pushErr(f.Token, LogMsg.TraitMethodHasGenerics)
@@ -1576,9 +1573,6 @@ impl parser {
         tokens = tokens[1:] // Remove "cpp" keyword.
         let mut f = self.buildFn(tokens, false, true)
         if f != nil {
-            if f.IsAnon() {
-                self.pushErr(f.Token, LogMsg.InvalidSyntax)
-            }
             f.Public = false
             f.CppLinked = true
         }
@@ -1683,11 +1677,7 @@ impl parser {
             ret nil
         }
 
-        let mut f = self.buildFn(tokens, true, false)
-        if f != nil && f.IsAnon() {
-            self.pushErr(f.Token, LogMsg.InvalidSyntax)
-        }
-        ret f
+        ret self.buildFn(tokens, true, false)
     }
 
     fn parseImplBody(mut &self, mut &ipl: &Impl, mut &tokens: []&Token) {
@@ -1802,9 +1792,6 @@ impl parser {
             let mut f = self.buildFn(tokens, false, false)
             if f != nil {
                 f.Global = true
-                if f.IsAnon() {
-                    self.pushErr(f.Token, LogMsg.InvalidSyntax)
-                }
             }
             ret f
         | TokenId.Let
