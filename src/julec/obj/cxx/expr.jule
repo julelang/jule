@@ -419,6 +419,7 @@ impl exprCoder {
             self.oc.write(", &" + anyTypeIdent)
             self.oc.write(conv::Itoa(i))
             self.oc.write(")")
+            ret
         | isAny(m.ExprKind):
             self.possibleRefExpr(m.Expr)
             self.oc.write(".")
@@ -438,6 +439,7 @@ impl exprCoder {
             self.oc.write("&" + anyTypeIdent)
             self.oc.write(conv::Itoa(self.oc.pushAnyType(m.Kind)))
             self.oc.write(")")
+            ret
         | m.ExprKind.Ptr() != nil
         | m.Kind.Ptr() != nil:
             self.oc.write("((")
@@ -445,6 +447,7 @@ impl exprCoder {
             self.oc.write(")(")
             self.possibleRefExpr(m.Expr)
             self.oc.write("))")
+            ret
         | m.ExprKind.Trait() != nil:
             if m.Kind.Trait() != nil {
                 self.castTraitFromTrait(m, m.Kind.Trait(), m.ExprKind.Trait())
@@ -467,6 +470,7 @@ impl exprCoder {
             }
             self.oc.write(conv::Itoa(self.oc.findTypeOffset(m.ExprKind.Trait(), m.Kind)))
             self.oc.write(")")
+            ret
         | m.Kind.Trait() != nil:
             self.oc.write(self.oc.tc.kind(m.Kind))
             self.oc.write("(")
@@ -474,13 +478,25 @@ impl exprCoder {
             self.oc.write(", ")
             self.oc.write(conv::Itoa(self.oc.findTypeOffset(m.Kind.Trait(), m.ExprKind)))
             self.oc.write(")")
-        |:
-            self.oc.write("static_cast<")
-            self.oc.write(self.oc.tc.kind(m.Kind))
-            self.oc.write(">(")
+            ret
+        }
+        let prim = m.Kind.Prim()
+        let eprim = m.ExprKind.Prim()
+        if eprim != nil && prim != nil && prim.IsStr() {
+            if eprim.IsU8() {
+                self.oc.write(typeCoder.Str + "::from_byte(")
+            } else {
+                self.oc.write(typeCoder.Str + "::from_rune(")
+            }
             self.possibleRefExpr(m.Expr)
             self.oc.write(")")
+            ret
         }
+        self.oc.write("static_cast<")
+        self.oc.write(self.oc.tc.kind(m.Kind))
+        self.oc.write(">(")
+        self.possibleRefExpr(m.Expr)
+        self.oc.write(")")
     }
 
     fn models(mut &self, mut args: []ExprModel) {

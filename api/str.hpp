@@ -64,6 +64,18 @@ namespace jule
             return s;
         }
 
+        static jule::Str from_rune(const jule::I32 r) noexcept {
+            jule::Str s;
+            jule::utf8_push_rune_bytes<std::basic_string<jule::U8>>(r, s.buffer);
+            return s;
+        }
+
+        static jule::Str from_byte(const jule::U8 b) noexcept {
+            jule::Str s;
+            s.buffer.push_back(b);
+            return s;
+        }
+
         Str(void) = default;
         Str(const jule::Str &src) = default;
         Str(const std::initializer_list<jule::U8> &src) : buffer(src) {}
