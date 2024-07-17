@@ -980,6 +980,21 @@ impl comptimeTypeInfo {
         }
     }
 
+    fn _CanNil(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+        if len(fc.Args) > 0 {
+            e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "CanNil")
+            ret nil
+        }
+        let mut constant = Const.NewBool(self.base.NilCompatible())
+        ret &Data{
+            Kind: &TypeKind{
+                Kind: buildPrimType(PrimKind.Bool),
+            },
+            Constant: constant,
+            Model: constant,
+        }
+    }
+
     fn _Result(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
         if len(fc.Args) > 0 {
             e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Result")
@@ -1125,6 +1140,13 @@ impl comptimeTypeInfo {
             let mut method = &FnIns{
                 caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
                     ret self._Exceptional(e, fc)
+                },
+            }
+            ret buildAsComptimeMethodData(method)
+        | "CanNil":
+            let mut method = &FnIns{
+                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+                    ret self._CanNil(e, fc)
                 },
             }
             ret buildAsComptimeMethodData(method)
