@@ -1988,6 +1988,11 @@ impl Sema {
         ret true
     }
 
+    fn checkAnonFnDecl(mut &self, mut &f: &Fn) {
+        f.sema = self
+        self.checkFnDeclPrototype(f)
+    }
+
     fn checkFnDecl(mut &self, mut &f: &Fn) {
         if IsIgnoreIdent(f.Ident) {
             self.pushErr(f.Token, LogMsg.IgnoreIdent)
@@ -1996,9 +2001,7 @@ impl Sema {
         }
 
         self.checkDirectives(f.Directives, f)
-
-        f.sema = self
-        self.checkFnDeclPrototype(f)
+        self.checkAnonFnDecl(f)
 
         if f.Owner == nil && self.isDuplicatedIdent(uintptr(f), f.Ident, f.CppLinked) {
             if f.Ident == build::InitFn {
