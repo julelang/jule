@@ -1327,6 +1327,47 @@ impl comptimeValue {
     }
 }
 
+// Compile-time file information data.
+struct comptimeFile {
+    file: &SymbolTable
+}
+
+impl Kind for comptimeFile {
+    fn Str(self): str { ret "comptimeFile" }
+    fn Equal(&self, other: &TypeKind): bool { ret false }
+}
+
+impl comptimeFile {
+    fn _Path(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+        if len(fc.Args) > 0 {
+            e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Comparable")
+            ret nil
+        }
+        let mut constant = Const.NewStr(self.file.File.Path)
+        ret &Data{
+            Kind: &TypeKind{
+                Kind: buildPrimType(PrimKind.Str),
+            },
+            Constant: constant,
+            Model: constant,
+        }
+    }
+
+    fn subIdent(mut &self, ident: str): &Data {
+        match ident {
+        | "Path":
+            let mut method = &FnIns{
+                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+                    ret self._Path(e, fc)
+                },
+            }
+            ret buildAsComptimeMethodData(method)
+        |:
+            ret nil
+        }
+    }
+}
+
 fn buildAsComptimeMethodData(mut &f: &FnIns): &Data {
     ret &Data{
         Kind: &TypeKind{

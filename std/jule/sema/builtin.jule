@@ -145,6 +145,9 @@ fn findBuiltinDefStdComptime(ident: str): any {
     | "Line":
         static mut f = &FnIns{caller: builtinCallerStdComptimeLine}
         ret f
+    | "File":
+        static mut f = &FnIns{caller: builtinCallerStdComptimeFile}
+        ret f
     |:
         ret nil
     }
@@ -963,6 +966,19 @@ fn builtinCallerStdComptimeLine(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Da
         },
         Constant: constant,
         Model: constant,
+    }
+}
+
+fn builtinCallerStdComptimeFile(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data {
+    if len(fc.Args) > 0 {
+        e.pushErr(fc.Args[1].Token, LogMsg.ArgumentOverflow, "File")
+    }
+    ret &Data{
+        Kind: &TypeKind{
+            Kind: &comptimeFile{
+                file: e.s.file,
+            },
+        },
     }
 }
 
