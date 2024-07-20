@@ -282,7 +282,7 @@ impl exprCoder {
     }
 
     fn var(mut &self, mut m: &Var) {
-        if m.CppLinked {
+        if m.Binded {
             let d = findDirective(m.Directives, Directive.Namespace)
             if d != nil {
                 self.oc.write(concatAllParts(d.Args...))
@@ -321,11 +321,11 @@ impl exprCoder {
     }
 
     fn structureLit(mut &self, mut m: &StructLitExprModel) {
-        if m.Strct.Decl.CppLinked {
+        if m.Strct.Decl.Binded {
             self.oc.write("(")
         }
         self.oc.write(identCoder.structureIns(m.Strct))
-        if m.Strct.Decl.CppLinked {
+        if m.Strct.Decl.Binded {
             self.oc.write(")")
         }
         self.oc.write("{")
@@ -565,7 +565,7 @@ impl exprCoder {
         if m.Func.Anon {
             match type m.Expr {
             | &StructSubIdentExprModel:
-                if (&StructSubIdentExprModel)(m.Expr).Field.Decl.Owner.CppLinked {
+                if (&StructSubIdentExprModel)(m.Expr).Field.Decl.Owner.Binded {
                     self.oc.write("(")
                     ret
                 }
@@ -610,7 +610,7 @@ impl exprCoder {
         let wrapped = self.isWrapped(m)
         self.modelForCall(m.Expr)
         if !m.Func.IsBuiltin() {
-            if m.Func.Decl.CppLinked && len(m.Func.Generics) > 0 {
+            if m.Func.Decl.Binded && len(m.Func.Generics) > 0 {
                 if !hasDirective(m.Func.Decl.Directives, Directive.Cdef) {
                     self.oc.write("<")
                     for (i, mut g) in m.Func.Generics {
@@ -1010,7 +1010,7 @@ impl exprCoder {
     }
 
     fn funcIns(mut &self, mut m: &FnIns) {
-        if m.Decl != nil && m.Decl.CppLinked {
+        if m.Decl != nil && m.Decl.Binded {
             let d = findDirective(m.Decl.Directives, Directive.Namespace)
             if d != nil {
                 self.oc.write(concatAllParts(d.Args...))
@@ -1474,7 +1474,7 @@ impl exprCoder {
             ret
         }
         let mut s = t.Struct()
-        if s != nil && s.Decl.CppLinked && findDirective(s.Decl.Directives, Directive.Typedef) == nil {
+        if s != nil && s.Decl.Binded && findDirective(s.Decl.Directives, Directive.Typedef) == nil {
             self.oc.write("(")
             self.oc.write(self.oc.tc.kind(t))
             self.oc.write("){}")
@@ -1619,9 +1619,9 @@ fn isBuiltinCallHasDebuginf(&m: &FnCallExprModel): bool {
 fn isExprComesFromBind(&d: &Data): bool {
     match type d.Model {
     | &Var:
-        ret (&Var)(d.Model).CppLinked
+        ret (&Var)(d.Model).Binded
     | &StructSubIdentExprModel:
-        ret (&StructSubIdentExprModel)(d.Model).Owner.Decl.CppLinked
+        ret (&StructSubIdentExprModel)(d.Model).Owner.Decl.Binded
     |:
         ret false
     }

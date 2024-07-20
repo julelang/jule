@@ -53,7 +53,7 @@ fn compilerErr(&token: &Token, line: bool, fmt: LogMsg, args: ...any): Log {
 }
 
 fn impIsLookupable(&i: &ImportInfo, ident: str): bool {
-    if i.CppLinked {
+    if i.Binded {
         ret false
     }
     if !i.ImportAll {
@@ -129,7 +129,7 @@ fn appendParamVars(mut &dest: []&Var, mut &f: &FnIns) {
                 v.Ident = v.Ident[1:] // Remove reference sign.
                 v.Kind.Kind.Kind = &Sptr{
                     Elem: &TypeKind{
-                        CppIdent: v.Kind.Kind.CppIdent,
+                        BindIdent: v.Kind.Kind.BindIdent,
                         Kind: v.Kind.Kind.Kind,
                     },
                 }
@@ -139,7 +139,7 @@ fn appendParamVars(mut &dest: []&Var, mut &f: &FnIns) {
                 Variadic: false,
                 Kind: &Slc{
                     Elem: &TypeKind{
-                        CppIdent: p.Kind.CppIdent,
+                        BindIdent: p.Kind.BindIdent,
                         Kind: p.Kind.Kind,
                     },
                 },
@@ -212,7 +212,7 @@ struct commonSemaMeta {
 impl commonSemaMeta {
     fn pushComptimeTypeInfo(mut self, mut &t: &TypeKind): &comptimeTypeInfo {
         for (_, mut t2) in self.comptimeTypeInfos {
-            if t2.base.CppIdent == t.CppIdent && t2.base.Equal(t) {
+            if t2.base.BindIdent == t.BindIdent && t2.base.Equal(t) {
                 ret t2
             }
         }
@@ -243,15 +243,15 @@ impl Lookup for Sema {
         ret self.file.SelectPackage(selector)
     }
 
-    // Returns variable by identifier and cpp linked state.
+    // Returns variable by identifier and binded state.
     // Returns nil reference if not exist any variable in this identifier.
     //
     // Lookups:
     //   - Package file's symbol table.
     //   - Current file's public denifes of imported packages.
-    fn FindVar(mut self, ident: str, cpp_linked: bool): &Var {
+    fn FindVar(mut self, ident: str, binded: bool): &Var {
         // Lookup package files.
-        let mut v = findVarInPackage(self.files, ident, cpp_linked)
+        let mut v = findVarInPackage(self.files, ident, binded)
         if v != nil {
             ret v
         }
@@ -261,7 +261,7 @@ impl Lookup for Sema {
             if !impIsLookupable(imp, ident) {
                 continue
             }
-            v = imp.FindVar(ident, cpp_linked)
+            v = imp.FindVar(ident, binded)
             if v != nil && self.isAccessibleDefine(v.Public, v.Token) {
                 ret v
             }
@@ -270,15 +270,15 @@ impl Lookup for Sema {
         ret nil
     }
 
-    // Returns type alias by identifier and cpp linked state.
+    // Returns type alias by identifier and binded state.
     // Returns nil reference if not exist any type alias in this identifier.
     //
     // Lookups:
     //   - Package file's symbol table.
     //   - Current file's public denifes of imported packages.
-    fn FindTypeAlias(mut self, ident: str, cpp_linked: bool): &TypeAlias {
+    fn FindTypeAlias(mut self, ident: str, binded: bool): &TypeAlias {
         // Lookup package files.
-        let mut ta = findTypeAliasInPackage(self.files, ident, cpp_linked)
+        let mut ta = findTypeAliasInPackage(self.files, ident, binded)
         if ta != nil {
             ret ta
         }
@@ -288,7 +288,7 @@ impl Lookup for Sema {
             if !impIsLookupable(imp, ident) {
                 continue
             }
-            ta = imp.FindTypeAlias(ident, cpp_linked)
+            ta = imp.FindTypeAlias(ident, binded)
             if ta != nil && self.isAccessibleDefine(ta.Public, ta.Token) {
                 ret ta
             }
@@ -297,15 +297,15 @@ impl Lookup for Sema {
         ret nil
     }
 
-    // Returns struct by identifier and cpp linked state.
+    // Returns struct by identifier and binded state.
     // Returns nil reference if not exist any struct in this identifier.
     //
     // Lookups:
     //   - Package file's symbol table.
     //   - Current file's public denifes of imported packages.
-    fn FindStruct(mut self, ident: str, cppLinked: bool): &Struct {
+    fn FindStruct(mut self, ident: str, binded: bool): &Struct {
         // Lookup package files.
-        let mut s = findStructInPackage(self.files, ident, cppLinked)
+        let mut s = findStructInPackage(self.files, ident, binded)
         if s != nil {
             ret s
         }
@@ -314,7 +314,7 @@ impl Lookup for Sema {
             if !impIsLookupable(imp, ident) {
                 continue
             }
-            s = imp.FindStruct(ident, cppLinked)
+            s = imp.FindStruct(ident, binded)
             if s != nil && self.isAccessibleDefine(s.Public, s.Token) {
                 ret s
             }
@@ -322,15 +322,15 @@ impl Lookup for Sema {
         ret nil
     }
 
-    // Returns function by identifier and cpp linked state.
+    // Returns function by identifier and binded state.
     // Returns nil reference if not exist any function in this identifier.
     //
     // Lookups:
     //   - Package file's symbol table.
     //   - Current file's public denifes of imported packages.
-    fn FindFn(mut self, ident: str, cpp_linked: bool): &Fn {
+    fn FindFn(mut self, ident: str, binded: bool): &Fn {
         // Lookup package files.
-        let mut f = findFnInPackage(self.files, ident, cpp_linked)
+        let mut f = findFnInPackage(self.files, ident, binded)
         if f != nil {
             ret f
         }
@@ -340,7 +340,7 @@ impl Lookup for Sema {
             if !impIsLookupable(imp, ident) {
                 continue
             }
-            f = imp.FindFn(ident, cpp_linked)
+            f = imp.FindFn(ident, binded)
             if f != nil && self.isAccessibleDefine(f.Public, f.Token) {
                 ret f
             }
@@ -454,9 +454,9 @@ impl Sema {
     // Reports this identifier duplicated in package's global scope.
     // The "self" parameter represents address of exception identifier.
     // If founded identifier address equals to self, will be skipped.
-    fn isDuplicatedIdent(self, itself: uintptr, ident: str, cpp_linked: bool): bool {
+    fn isDuplicatedIdent(self, itself: uintptr, ident: str, binded: bool): bool {
         for _, f in self.files {
-            if f.isDuplicatedIdent(itself, ident, cpp_linked) {
+            if f.isDuplicatedIdent(itself, ident, binded) {
                 ret true
             }
 
@@ -517,9 +517,9 @@ impl Sema {
             ret true
         }
         for (_, mut f) in imp.Package.Files {
-            // C++-linked defines can't export.
-            const CppLinked = false
-            let mut def = f.defByIdent(ident, CppLinked)
+            // Binded defines can't export.
+            const Binded = false
+            let mut def = f.defByIdent(ident, Binded)
             if def != nil {
                 ret def
             }
@@ -533,8 +533,8 @@ impl Sema {
             self.pushSuggestion(LogMsg.MakePubToAccess)
             ret false
         }
-        const CppLinked = false // Exported defines cannot be linked.
-        if defByIdentPackage(self.files, s.Ident, CppLinked) != nil {
+        const Binded = false // Exported defines cannot be binded.
+        if defByIdentPackage(self.files, s.Ident, Binded) != nil {
             self.pushErr(ident, LogMsg.SelectedImportExistInPackage, s.Ident)
             ret false
         }
@@ -644,7 +644,7 @@ impl Sema {
     }
 
     fn checkImport(mut self, mut &imp: &ImportInfo): bool {
-        if imp.CppLinked || len(imp.Package.Files) == 0 {
+        if imp.Binded || len(imp.Package.Files) == 0 {
             ret true
         }
 
@@ -1160,7 +1160,7 @@ impl Sema {
         if IsIgnoreIdent(ta.Ident) {
             self.pushErr(ta.Token, LogMsg.IgnoreIdent)
         }
-        if self.isDuplicatedIdent(uintptr(ta), ta.Ident, ta.CppLinked) {
+        if self.isDuplicatedIdent(uintptr(ta), ta.Ident, ta.Binded) {
             self.pushErr(ta.Token, LogMsg.DuplicatedIdent, ta.Ident)
             self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
         }
@@ -1537,8 +1537,8 @@ impl Sema {
     // Checks generics, parameters and return type.
     // Not checks scope, and other things.
     fn checkFnDeclPrototype(mut &self, mut &f: &Fn) {
-        if f.Exceptional && f.CppLinked {
-            self.pushErr(f.Token, LogMsg.CDefineExceptional)
+        if f.Exceptional && f.Binded {
+            self.pushErr(f.Token, LogMsg.BindedExceptional)
             ret
         }
 
@@ -1882,14 +1882,14 @@ impl Sema {
     // Checks variable declaration for global scope.
     // Checks duplicated identifiers by Sema.
     fn checkGlobalVarDecl(mut &self, mut &decl: &Var) {
-        if self.isDuplicatedIdent(uintptr(decl), decl.Ident, decl.CppLinked) {
+        if self.isDuplicatedIdent(uintptr(decl), decl.Ident, decl.Binded) {
             self.pushErr(decl.Token, LogMsg.DuplicatedIdent, decl.Ident)
             self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
         }
-        if decl.CppLinked && decl.Constant {
-            self.pushErr(decl.Token, LogMsg.CppLinkedVarIsConst)
+        if decl.Binded && decl.Constant {
+            self.pushErr(decl.Token, LogMsg.BindedVarIsConst)
         }
-        if !decl.CppLinked && !decl.Constant && !decl.Statically {
+        if !decl.Binded && !decl.Constant && !decl.Statically {
             self.pushErr(decl.Token, LogMsg.GlobalNotStatic)
             self.pushSuggestion(LogMsg.UseStaticKeywordToDef)
         }
@@ -1961,7 +1961,7 @@ impl Sema {
     fn checkStructDecl(mut &self, mut &s: &Struct) {
         if IsIgnoreIdent(s.Ident) {
             self.pushErr(s.Token, LogMsg.IgnoreIdent)
-        } else if self.isDuplicatedIdent(uintptr(s), s.Ident, s.CppLinked) {
+        } else if self.isDuplicatedIdent(uintptr(s), s.Ident, s.Binded) {
             self.pushErr(s.Token, LogMsg.DuplicatedIdent, s.Ident)
             self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
         }
@@ -2003,7 +2003,7 @@ impl Sema {
         self.checkDirectives(f.Directives, f)
         self.checkAnonFnDecl(f)
 
-        if f.Owner == nil && self.isDuplicatedIdent(uintptr(f), f.Ident, f.CppLinked) {
+        if f.Owner == nil && self.isDuplicatedIdent(uintptr(f), f.Ident, f.Binded) {
             if f.Ident == build::InitFn {
                 let init = self.FindFn(build::InitFn, false)
                 if init != nil {
@@ -2143,7 +2143,7 @@ impl Sema {
     }
 
     fn checkVar(mut &self, mut &v: &Var) {
-        if v.CppLinked {
+        if v.Binded {
             ret
         }
 
@@ -2202,7 +2202,7 @@ impl Sema {
     }
 
     fn checkTypeVar(mut &self, mut &decl: &Var, mut l: Lookup) {
-        if decl.CppLinked || !decl.IsInitialized() {
+        if decl.Binded || !decl.IsInitialized() {
             ret
         }
 
@@ -2332,7 +2332,7 @@ impl Sema {
         }
 
         let mut eval = self.eval(self)
-        s.Comparable = !s.Decl.CppLinked
+        s.Comparable = !s.Decl.Binded
         for (_, mut f) in s.Fields {
             let mut kind = tc.checkDecl(f.Decl.Kind.Decl)
             ok = kind != nil && ok
@@ -2390,7 +2390,7 @@ impl Sema {
     }
 
     fn checkTypeStruct(mut &self, mut &s: &Struct) {
-        if s.CppLinked {
+        if s.Binded {
             ret
         }
 
@@ -2478,7 +2478,7 @@ impl Sema {
     }
 
     fn precheckStructType(mut &self, mut &s: &Struct) {
-        if s.CppLinked {
+        if s.Binded {
             ret
         }
 
@@ -2528,7 +2528,7 @@ impl Sema {
     }
 
     fn checkFnInsCaller(mut &self, mut &f: &FnIns, mut caller: &Token) {
-        if f.Decl.CppLinked {
+        if f.Decl.Binded {
             ret
         }
 
@@ -2554,7 +2554,7 @@ impl Sema {
     }
 
     fn checkTypeFn(mut &self, mut &f: &Fn) {
-        if f.CppLinked {
+        if f.Binded {
             ret
         }
 
@@ -2602,7 +2602,7 @@ impl Sema {
     }
 
     fn precheckTypeFn(mut &self, mut &f: &Fn) {
-        if f.CppLinked {
+        if f.Binded {
             ret
         }
 

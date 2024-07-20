@@ -56,7 +56,7 @@ impl IR {
     fn appendStructs(self, mut &p: &sema::Package, mut &buffer: []&sema::Struct) {
         for (_, mut f) in p.Files {
             for (_, mut s) in f.Structs {
-                if !s.CppLinked {
+                if !s.Binded {
                     buffer = append(buffer, s)
                 }
             }
@@ -64,12 +64,12 @@ impl IR {
     }
 
     // Returns all structures of main package and used pakcages.
-    // Ignores cpp-linked declarations.
+    // Ignores binded declarations.
     fn GetAllStructures(mut self): []&sema::Struct {
         let mut buffer: []&sema::Struct = nil
         self.appendStructs(self.Main, buffer)
         for (_, mut u) in self.Used {
-            if !u.CppLinked {
+            if !u.Binded {
                 self.appendStructs(u.Package, buffer)
             }
         }
@@ -79,7 +79,7 @@ impl IR {
     fn appendGlobals(self, mut &p: &sema::Package, mut &buffer: []&sema::Var) {
         for (_, mut f) in p.Files {
             for (_, mut v) in f.Vars {
-                if v.Token != nil && !v.CppLinked && !v.Constant {
+                if v.Token != nil && !v.Binded && !v.Constant {
                     buffer = append(buffer, v)
                 }
             }
@@ -87,12 +87,12 @@ impl IR {
     }
 
     // Returns all globals of main package and used pakcages.
-    // Ignores cpp-linked declarations and constants.
+    // Ignores binded declarations and constants.
     fn GetAllGlobals(mut self): []&sema::Var {
         let mut buffer: []&sema::Var = nil
         self.appendGlobals(self.Main, buffer)
         for (_, mut u) in self.Used {
-            if !u.CppLinked {
+            if !u.Binded {
                 self.appendGlobals(u.Package, buffer)
             }
         }
@@ -130,7 +130,7 @@ fn getAllUniquePasses(mut &pkg: &sema::Package, mut uses: []&sema::ImportInfo): 
 
     pushPasses(pkg, passes)
     for (_, mut u) in uses {
-        if !u.CppLinked {
+        if !u.Binded {
             pushPasses(u.Package, passes)
         }
     }

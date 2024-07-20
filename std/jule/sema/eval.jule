@@ -393,22 +393,22 @@ impl Eval {
         ret findBuiltinDef(ident)
     }
 
-    fn getDef(mut self, ident: str, cppLinked: bool): any {
+    fn getDef(mut self, ident: str, binded: bool): any {
         // Find variables and type aliases first.
         // Because self.lookup might be a scopeChecker, and shadowing may occurred.
         // If any variable or type aliases is shadowing other declarations such us structure,
         // it will result as wrong expression evaluation.
-        let mut v = self.lookup.FindVar(ident, cppLinked)
+        let mut v = self.lookup.FindVar(ident, binded)
         if v != nil {
             ret v
         }
 
-        let mut ta = self.lookup.FindTypeAlias(ident, cppLinked)
+        let mut ta = self.lookup.FindTypeAlias(ident, binded)
         if ta != nil {
             ret ta
         }
 
-        if !cppLinked {
+        if !binded {
             let mut enm = self.lookup.FindEnum(ident)
             if enm != nil {
                 ret enm
@@ -420,12 +420,12 @@ impl Eval {
             }
         }
 
-        let mut f = self.lookup.FindFn(ident, cppLinked)
+        let mut f = self.lookup.FindFn(ident, binded)
         if f != nil {
             ret f
         }
 
-        let mut s = self.lookup.FindStruct(ident, cppLinked)
+        let mut s = self.lookup.FindStruct(ident, binded)
         if s != nil {
             ret s
         }
@@ -494,8 +494,8 @@ impl Eval {
             },
             Model: s,
         }
-        if s.Decl != nil && s.Decl.CppLinked {
-            d.Kind.CppIdent = s.Decl.Ident
+        if s.Decl != nil && s.Decl.Binded {
+            d.Kind.BindIdent = s.Decl.Ident
         }
         ret d
     }
@@ -638,7 +638,7 @@ impl Eval {
             self.pushReference[&Var](v)
         }
 
-        if !v.CppLinked && (v.Value == nil || v.Value.Data == nil) {
+        if !v.Binded && (v.Value == nil || v.Value.Data == nil) {
             if v.Constant {
                 // Eval constant dependent variable.
                 self.s.checkTypeVar(v, self.s)
@@ -675,7 +675,7 @@ impl Eval {
             Model: v,
         }
 
-        if !v.CppLinked && v.IsInitialized() && v.Value.Data != nil {
+        if !v.Binded && v.IsInitialized() && v.Value.Data != nil {
             d.IsRune = v.Value.Data.IsRune
         }
 
@@ -716,10 +716,10 @@ impl Eval {
                     Kind: ta.Kind.Kind.Kind,
                 },
             }
-            if ta.CppLinked {
-                d.Kind.CppIdent = ta.Ident
+            if ta.Binded {
+                d.Kind.BindIdent = ta.Ident
             } else {
-                d.Kind.CppIdent = ta.Kind.Kind.CppIdent
+                d.Kind.BindIdent = ta.Kind.Kind.BindIdent
             }
             d.Model = d.Kind
         }
@@ -752,7 +752,7 @@ impl Eval {
     }
 
     fn evalIdent(mut self, ident: &IdentExpr): &Data {
-        let mut def = self.getDef(ident.Ident, ident.CppLinked)
+        let mut def = self.getDef(ident.Ident, ident.Binded)
         ret self.evalDef(def, ident.Token)
     }
 
@@ -785,7 +785,7 @@ impl Eval {
         d.Kind = &TypeKind{
             Variadic: true,
             Generic: slc.Elem.Generic,
-            CppIdent: slc.Elem.CppIdent,
+            BindIdent: slc.Elem.BindIdent,
             Kind: slc.Elem.Kind,
         }
         ret d
@@ -1111,7 +1111,7 @@ impl Eval {
             let mut ident = (&IdentExpr)(expr.Kind)
             generics = append(generics, &TypeDecl{
                 Kind: &IdentTypeDecl{
-                    CppLinked: ident.CppLinked,
+                    Binded: ident.Binded,
                     Token: ident.Token,
                     Ident: ident.Ident,
                 },
@@ -1158,7 +1158,7 @@ impl Eval {
         | &IdentExpr:
             let mut expr = (&IdentExpr)(i.Expr.Kind)
             decl = &IdentTypeDecl{
-                CppLinked: expr.CppLinked,
+                Binded: expr.Binded,
                 Token: expr.Token,
                 Ident: expr.Ident,
             }
@@ -1782,9 +1782,9 @@ impl Eval {
         let mut lookup = self.lookup
         self.lookup = imp
 
-        const CppLinked = false
+        const Binded = false
         self.disallowBuiltin()
-        let mut def = self.getDef(s.Ident.Kind, CppLinked)
+        let mut def = self.getDef(s.Ident.Kind, Binded)
         self.allowBuiltin()
         self.lookup = lookup
         let mut d = self.evalDef(def, s.Ident)
@@ -1823,8 +1823,8 @@ impl Eval {
                 Args: slc.args,
             },
         }
-        if s.Decl.CppLinked {
-            d.Kind.CppIdent = s.Decl.Ident
+        if s.Decl.Binded {
+            d.Kind.BindIdent = s.Decl.Ident
         }
         ret d
     }

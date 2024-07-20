@@ -403,7 +403,7 @@ impl ObjectCoder {
             self.write("#define __JULE_DISABLE__SAFETY\n")
         }
 
-        // Include linked libraries here, before the API header.
+        // Include binded libraries here, before the API header.
         // See developer reference (4).
         self.links()
 
@@ -415,7 +415,7 @@ impl ObjectCoder {
     fn links(mut &self) {
         for _, used in self.ir.Used {
             match {
-            | !used.CppLinked:
+            | !used.Binded:
                 continue
             | build::IsStdHeaderPath(used.Path):
                 self.write("#include ")
@@ -465,7 +465,7 @@ impl ObjectCoder {
 
     fn iterPackages(mut &self, f: fn(mut &pkg: &Package)) {
         for (_, mut used) in self.ir.Used {
-            if !used.CppLinked {
+            if !used.Binded {
                 f(used.Package)
             }
         }
@@ -605,9 +605,9 @@ impl ObjectCoder {
             self.addIndent()
             let mut writed = false
             for (_, mut f) in s.Fields {
-                // Skip C++-linked struct kinds.
+                // Skip binded struct kinds.
                 let strct = f.Kind.Struct()
-                if strct != nil && strct.Decl != nil && strct.Decl.CppLinked {
+                if strct != nil && strct.Decl != nil && strct.Decl.Binded {
                     continue
                 }
                 if writed {
@@ -851,7 +851,7 @@ impl ObjectCoder {
         self.iterPackages(fn(mut &pkg: &Package) {
             iterFiles(pkg, fn(mut &file: &SymbolTable) {
                 for (_, mut f) in file.Funcs {
-                    if !f.CppLinked && f.Token != nil {
+                    if !f.Binded && f.Token != nil {
                         self.pushResult(f)
                         self.funcDecl(f, false)
                     }
@@ -1219,9 +1219,9 @@ impl ObjectCoder {
                 self.write(f.Decl.Ident)
                 self.write(`:`)
 
-                // Skip C++-linked struct kinds.
+                // Skip binded struct kinds.
                 let strct = f.Kind.Struct()
-                if strct != nil && strct.Decl != nil && strct.Decl.CppLinked {
+                if strct != nil && strct.Decl != nil && strct.Decl.Binded {
                     self.write(` cpp.`)
                     self.write(identCoder.field(f.Decl))
                     self.write(`"`)
@@ -1277,7 +1277,7 @@ impl ObjectCoder {
                     if !env::Test && hasDirective(f.Directives, Directive.Test) {
                         continue
                     }
-                    if !f.CppLinked && f.Token != nil {
+                    if !f.Binded && f.Token != nil {
                         self.func(f)
                         self.write("\n\n")
                     }

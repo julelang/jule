@@ -38,16 +38,16 @@ struct InsGeneric {
 
 // Type alias.
 struct TypeAlias {
-    Scope:     &ScopeTree
-    Public:    bool
-    CppLinked: bool
-    Used:      bool
-    Generic:   bool
-    Token:     &Token
-    Ident:     str
-    Kind:      &TypeSymbol
-    Refers:    []any        // Referred identifiers, except cpp-linked ones.
-    Generics:  []&TypeAlias // See developer reference (1).
+    Scope:    &ScopeTree
+    Public:   bool
+    Binded:   bool
+    Used:     bool
+    Generic:  bool
+    Token:    &Token
+    Ident:    str
+    Kind:     &TypeSymbol
+    Refers:   []any        // Referred identifiers, except binded ones.
+    Generics: []&TypeAlias // See developer reference (1).
 }
 
 // Kind of type declaration.
@@ -58,10 +58,10 @@ trait Kind {
 
 // Evaluated type declaration.
 struct TypeKind {
-    CppIdent: str
-    Generic:  bool
-    Variadic: bool
-    Kind:     Kind
+    BindIdent: str
+    Generic:   bool
+    Variadic:  bool
+    Kind:      Kind
 }
 
 impl Kind for TypeKind {
@@ -77,9 +77,9 @@ impl Kind for TypeKind {
             kind += "..."
         }
 
-        if self.CppLinked() {
+        if self.Binded() {
             kind += "cpp."
-            kind += self.CppIdent
+            kind += self.BindIdent
         } else {
             kind += self.Kind.Str()
         }
@@ -91,17 +91,16 @@ impl Kind for TypeKind {
         if self.IsNil() {
             ret other.IsNil()
         }
-        if self.CppLinked() {
-            ret other.CppLinked() &&
-                self.CppIdent == other.CppIdent
+        if self.Binded() {
+            ret other.Binded() && self.BindIdent == other.BindIdent
         }
         ret self.Kind.Equal(other)
     }
 }
 
 impl TypeKind {
-    // Reports whether type is cpp-linked kind.
-    fn CppLinked(self): bool { ret len(self.CppIdent) != 0 }
+    // Reports whether type is binded kind.
+    fn Binded(self): bool { ret len(self.BindIdent) != 0 }
 
     // Reports whether kind is "nil".
     fn IsNil(self): bool { ret self.Kind == nil }
@@ -229,9 +228,7 @@ impl TypeKind {
                 ret _self.Sptr().Elem.SupportsCloning()
             | _self.Struct() != nil:
                 let mut s = _self.Struct()
-                ret s.Decl != nil &&
-                    !s.Decl.CppLinked &&
-                    s.Decl.IsDerives(Derive.Clone)
+                ret s.Decl != nil && !s.Decl.Binded && s.Decl.IsDerives(Derive.Clone)
             |:
                 ret false
             }
@@ -805,7 +802,7 @@ struct typeChecker {
     disBuiltin: bool
 
     // Name selection is enabled.
-    // No cpp-linked definitions, no generic type representation.
+    // No binded definitions, no generic type representation.
     // Only typename selection.
     //
     // If selection is a struct, returns invalid instance that only has decl field.
@@ -931,11 +928,11 @@ impl typeChecker {
 
         match type decl {
         | &Struct:
-            if self.notPlain || (&Struct)(decl).CppLinked {
+            if self.notPlain || (&Struct)(decl).Binded {
                 ret true
             }
         | &TypeAlias:
-            if (&TypeAlias)(decl).CppLinked {
+            if (&TypeAlias)(decl).Binded {
                 ret true
             }
         }
@@ -1040,10 +1037,10 @@ impl typeChecker {
             Kind: ta.Kind.Kind.Kind,
         }
         self.pushReferenceByKind(tk)
-        if ta.CppLinked {
-            tk.CppIdent = ta.Ident
+        if ta.Binded {
+            tk.BindIdent = ta.Ident
         } else {
-            tk.CppIdent = ta.Kind.Kind.CppIdent
+            tk.BindIdent = ta.Kind.Kind.BindIdent
         }
         ret tk
     }
@@ -1249,7 +1246,7 @@ impl typeChecker {
             }
         }
 
-        if !decl.CppLinked {
+        if !decl.Binded {
             let mut e = self.lookup.FindEnum(decl.Ident)
             if e != nil {
                 ret self.fromEnum(decl, e)
@@ -1265,16 +1262,16 @@ impl typeChecker {
                 ret self.fromTrait(decl, t)
             }
         } else if self.selection {
-            self.pushErr(decl.Token, LogMsg.CppLinkedTypeNotAllowed)
+            self.pushErr(decl.Token, LogMsg.BindedTypeNotAllowed)
             ret nil
         }
 
-        let mut s = self.lookup.FindStruct(decl.Ident, decl.CppLinked)
+        let mut s = self.lookup.FindStruct(decl.Ident, decl.Binded)
         if s != nil {
             ret self.fromStruct(decl, s)
         }
 
-        let mut ta = self.lookup.FindTypeAlias(decl.Ident, decl.CppLinked)
+        let mut ta = self.lookup.FindTypeAlias(decl.Ident, decl.Binded)
         if ta == nil && !self.disBuiltin {
             ta = findBuiltinTypeAlias(decl.Ident)
         }
@@ -1336,8 +1333,8 @@ impl typeChecker {
             ret nil
         | elem.Struct() != nil:
             let s = elem.Struct()
-            if s.Decl != nil && s.Decl.CppLinked {
-                self.pushErr(self.errorToken, LogMsg.CppLinkedStructForRef)
+            if s.Decl != nil && s.Decl.Binded {
+                self.pushErr(self.errorToken, LogMsg.BindedStructForRef)
                 ret nil
             }
         | elem.Arr() != nil && elem.Arr().Auto:
@@ -1647,8 +1644,8 @@ impl typeChecker {
                 }
             | &StructIns:
                 let s = (&StructIns)(kind)
-                if s.Decl != nil && s.Decl.CppLinked {
-                    tk.CppIdent = s.Decl.Ident
+                if s.Decl != nil && s.Decl.Binded {
+                    tk.BindIdent = s.Decl.Ident
                 }
             }
             ret tk
@@ -1776,7 +1773,7 @@ fn canGetPtr(mut &d: &Data): bool {
 // Reports kind is valid for smart pointer type such as &T.
 fn isValidForSptrType(mut &t: &TypeKind): bool {
     let mut s = t.Struct()
-    if s != nil && s.Decl != nil && s.Decl.CppLinked {
+    if s != nil && s.Decl != nil && s.Decl.Binded {
         ret false
     }
     ret true
@@ -1860,7 +1857,7 @@ fn applyImplicitCast(mut &dest: &TypeKind, mut &d: &Data) {
             }
             ret
         }
-        if !d.Kind.CppLinked() &&
+        if !d.Kind.Binded() &&
             !d.Kind.Variadic &&
             !d.Lvalue &&
             !d.IsConst() &&

@@ -983,7 +983,7 @@ impl parser {
         ret selectors
     }
 
-    fn buildCppUseDecl(mut self, mut &decl: &UseDecl, &tokens: []&Token) {
+    fn buildBindUseDecl(mut self, mut &decl: &UseDecl, &tokens: []&Token) {
         if len(tokens) > 1 {
             self.pushErr(tokens[1], LogMsg.InvalidSyntax)
         }
@@ -992,7 +992,7 @@ impl parser {
             self.pushErr(token, LogMsg.InvalidExpr)
             ret
         }
-        decl.CppLinked = true
+        decl.Binded = true
         decl.LinkPath = token.Kind[1:len(token.Kind)-1]
     }
 
@@ -1122,8 +1122,8 @@ impl parser {
     }
 
     fn parseUseDecl(mut self, mut &decl: &UseDecl, mut tokens: []&Token) {
-        if decl.CppLinked {
-            self.buildCppUseDecl(decl, tokens)
+        if decl.Binded {
+            self.buildBindUseDecl(decl, tokens)
             ret
         }
 
@@ -1155,10 +1155,10 @@ impl parser {
         }
     }
 
-    fn buildUseDecl(mut self, mut tokens: []&Token, cpp_linked: bool): &UseDecl {
+    fn buildUseDecl(mut self, mut tokens: []&Token, binded: bool): &UseDecl {
         let mut decl = &UseDecl{
             Token: tokens[0],
-            CppLinked: cpp_linked,
+            Binded: binded,
         }
         if len(tokens) < 2 {
             self.pushErr(decl.Token, LogMsg.MissingUsePath)
@@ -1569,65 +1569,65 @@ impl parser {
         ret t
     }
 
-    fn buildCppLinkFn(mut &self, mut tokens: []&Token): &FnDecl {
+    fn buildBindFn(mut &self, mut tokens: []&Token): &FnDecl {
         tokens = tokens[1:] // Remove "cpp" keyword.
         let mut f = self.buildFn(tokens, false, true)
         if f != nil {
             f.Public = false
-            f.CppLinked = true
+            f.Binded = true
         }
         ret f
     }
 
-    fn buildCppLinkVar(mut &self, mut tokens: []&Token): &VarDecl {
+    fn buildBindVar(mut &self, mut tokens: []&Token): &VarDecl {
         tokens = tokens[1:] // Remove "cpp" keyword.
         let mut v = self.buildVar(tokens)
         if v != nil {
             v.Public = false
-            v.CppLinked = true
+            v.Binded = true
             if v.Expr != nil {
-                self.pushErr(v.Token, LogMsg.CppLinkedVarHasExpr)
+                self.pushErr(v.Token, LogMsg.BindedVarHasExpr)
             }
         }
         ret v
     }
 
-    fn buildCppLinkStruct(mut &self, mut tokens: []&Token): &StructDecl {
+    fn buildBindStruct(mut &self, mut tokens: []&Token): &StructDecl {
         tokens = tokens[1:] // Remove "cpp" keyword.
         let mut s = self.buildStructDecl(tokens)
         if s != nil {
             s.Public = false
             for (_, mut f) in s.Fields {
-                // Linked structure's fields are always public by default.
+                // Binded structure's fields are always public by default.
                 f.Public = true
             }
-            s.CppLinked = true
+            s.Binded = true
         }
         ret s
     }
 
-    fn buildCppLinkTypeAlias(mut &self, mut tokens: []&Token): &TypeAliasDecl {
+    fn buildBindTypeAlias(mut &self, mut tokens: []&Token): &TypeAliasDecl {
         tokens = tokens[1:] // Remove "cpp" keyword.
         let mut t = self.buildTypeAliasDecl(tokens)
         if t != nil {
             t.Public = false
-            t.CppLinked = true
+            t.Binded = true
         }
         ret t
     }
 
-    fn buildCppLinkUse(mut &self, mut tokens: []&Token): &UseDecl {
+    fn buildBindUse(mut &self, mut tokens: []&Token): &UseDecl {
         if len(tokens) == 1 {
             self.pushErr(tokens[0], LogMsg.InvalidSyntax)
             ret nil
         }
-        tokens = tokens[1:] // Remove the "cpp" keyword.
+        tokens = tokens[1:] // Remove the bind keyword.
 
-        const CppLinked = true
-        ret self.buildUseDecl(tokens, CppLinked)
+        const Binded = true
+        ret self.buildUseDecl(tokens, Binded)
     }
 
-    fn buildCppLink(mut &self, mut &tokens: []&Token): NodeData {
+    fn buildBind(mut &self, mut &tokens: []&Token): NodeData {
         let mut token = tokens[0]
         if len(tokens) == 1 {
             self.pushErr(token, LogMsg.InvalidSyntax)
@@ -1637,14 +1637,14 @@ impl parser {
         match token.Id {
         | TokenId.Fn
         | TokenId.Unsafe:
-            ret self.buildCppLinkFn(tokens)
+            ret self.buildBindFn(tokens)
         | TokenId.Const
         | TokenId.Let:
-            ret self.buildCppLinkVar(tokens)
+            ret self.buildBindVar(tokens)
         | TokenId.Struct:
-            ret self.buildCppLinkStruct(tokens)
+            ret self.buildBindStruct(tokens)
         | TokenId.Type:
-            ret self.buildCppLinkTypeAlias(tokens)
+            ret self.buildBindTypeAlias(tokens)
         |:
             self.pushErr(token, LogMsg.InvalidSyntax)
         }
@@ -1810,7 +1810,7 @@ impl parser {
         | TokenId.Impl:
             ret self.buildImpl(tokens)
         | TokenId.Cpp:
-            ret self.buildCppLink(tokens)
+            ret self.buildBind(tokens)
         |:
             self.pushErr(token, LogMsg.InvalidSyntax)
             ret nil
@@ -1858,13 +1858,13 @@ impl parser {
     fn pushMetaNodes(mut &self, mut &tokens: []&Token): bool {
         match tokens[0].Id {
         | TokenId.Use:
-            const CppLinked = false
-            let mut decl = self.buildUseDecl(tokens, CppLinked)
+            const Binded = false
+            let mut decl = self.buildUseDecl(tokens, Binded)
             self.pushUseDecl(decl)
             ret true
         | TokenId.Cpp:
             if len(tokens) > 1 && tokens[1].Id == TokenId.Use {
-                let mut decl = self.buildCppLinkUse(tokens)
+                let mut decl = self.buildBindUse(tokens)
                 self.pushUseDecl(decl)
                 ret true
             }
