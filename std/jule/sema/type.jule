@@ -834,20 +834,6 @@ impl typeChecker {
         self.disBuiltin = true
     }
 
-    fn buildPrim(mut self, &decl: &IdentTypeDecl): &Prim {
-        if !isPrim(decl.Ident) {
-            self.pushErr(self.errorToken, LogMsg.InvalidType)
-            ret nil
-        }
-
-        if len(decl.Generics) > 0 {
-            self.pushErr(decl.Token, LogMsg.TypeNotSupportsGenerics, decl.Ident)
-            ret nil
-        }
-
-        ret buildPrimType(decl.Ident)
-    }
-
     fn pushReference[T](mut self, mut &t: T) {
         if self.refers == nil {
             ret
@@ -1284,12 +1270,7 @@ impl typeChecker {
     }
 
     fn buildIdent(mut self, mut decl: &IdentTypeDecl): Kind {
-        match {
-        | isPrim(decl.Ident):
-            ret self.buildPrim(decl)
-        |:
-            ret self.getDef(decl)
-        }
+        ret self.getDef(decl)
     }
 
     fn buildSubIdent(mut self, mut decl: &SubIdentTypeDecl): Kind {
@@ -1822,26 +1803,6 @@ fn getStructFromKind(mut k: &TypeKind): &Struct {
     |:
         ret nil
     }
-}
-
-// Reports whether kind is primitive type.
-fn isPrim(kind: str): bool {
-    ret kind == TokenKind.I8 ||
-        kind == TokenKind.I16 ||
-        kind == TokenKind.I32 ||
-        kind == TokenKind.I64 ||
-        kind == TokenKind.U8 ||
-        kind == TokenKind.U16 ||
-        kind == TokenKind.U32 ||
-        kind == TokenKind.U64 ||
-        kind == TokenKind.F32 ||
-        kind == TokenKind.F64 ||
-        kind == TokenKind.Int ||
-        kind == TokenKind.Uint ||
-        kind == TokenKind.Uintptr ||
-        kind == TokenKind.Bool ||
-        kind == TokenKind.Str ||
-        kind == TokenKind.Any
 }
 
 fn applyImplicitCast(mut &dest: &TypeKind, mut &d: &Data) {
