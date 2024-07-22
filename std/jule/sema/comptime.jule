@@ -1327,6 +1327,60 @@ impl comptimeValue {
     }
 }
 
+// Compile-time file info range.
+struct comptimeFiles {
+    files: []&SymbolTable
+}
+
+impl Kind for comptimeFiles {
+    fn Str(self): str { ret "comptimeFiles" }
+    fn Equal(&self, other: &TypeKind): bool { ret false }
+}
+
+impl comptimeRangeKind for comptimeFiles {
+    fn ready(mut self, mut &keyA: &Var, mut &keyB: &Var) {
+        if keyA != nil {
+            keyA.Constant = true
+            keyA.Value = &Value{
+                Data: new(Data),
+            }
+            keyA.Value.Data.Constant = nil
+            keyA.Kind = &TypeSymbol{
+                Kind: &TypeKind{
+                    Kind: buildPrimType(PrimKind.Int),
+                },
+            }
+        }
+        if keyB != nil {
+            keyB.Constant = true
+            keyB.Value = &Value{
+                Data: new(Data),
+            }
+            keyB.Kind = &TypeSymbol{
+                Kind: &TypeKind{
+                    Kind: new(comptimeFile),
+                },
+            }
+        }
+    }
+
+    fn step(mut self, i: int, mut &keyA: &Var, mut &keyB: &Var) {
+        if keyA != nil {
+            // Kind should be assigned by caller.
+            keyA.Value.Data.Constant = Const.NewI64(i64(i))
+            keyA.Value.Data.Model = keyA.Value.Data.Constant
+        }
+        if keyB != nil {
+            // Kind should be assigned by caller.
+            (&comptimeFile)(keyB.Kind.Kind.Kind).file = self.files[i]
+        }
+    }
+
+    fn len(self): int {
+        ret len(self.files)
+    }
+}
+
 // Compile-time file information data.
 struct comptimeFile {
     file: &SymbolTable

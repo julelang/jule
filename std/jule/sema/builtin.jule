@@ -187,6 +187,9 @@ fn findBuiltinDefStdComptime(ident: str): any {
     | "File":
         static mut f = &FnIns{caller: builtinCallerStdComptimeFile}
         ret f
+    | "Files":
+        static mut f = &FnIns{caller: builtinCallerStdComptimeFiles}
+        ret f
     |:
         ret nil
     }
@@ -693,6 +696,11 @@ fn builtinCallerLen(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data {
         d.Constant = Const.NewI64(i64(len(dest.Kind.comptimeStatics().fields)))
         d.Model = d.Constant
         ret d
+    | dest.Kind.comptimeFiles() != nil:
+        d.Kind = lenKind()
+        d.Constant = Const.NewI64(i64(len(dest.Kind.comptimeFiles().files)))
+        d.Model = d.Constant
+        ret d
     |:
         e.pushErr(fc.Args[0].Token, LogMsg.InvalidExpr)
         ret nil
@@ -988,6 +996,14 @@ fn builtinCallerStdComptimeRange(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &D
                 },
             },
         }
+    | d.Kind.comptimeFiles() != nil:
+        ret &Data{
+            Kind: &TypeKind{
+                Kind: &comptimeRange{
+                    kind: d.Kind.comptimeFiles(),
+                },
+            },
+        }
     |:
         e.pushErr(fc.Token, LogMsg.InvalidTypeForTypeOf, d.Kind.Str())
         ret nil
@@ -1016,6 +1032,19 @@ fn builtinCallerStdComptimeFile(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Da
         Kind: &TypeKind{
             Kind: &comptimeFile{
                 file: e.s.file,
+            },
+        },
+    }
+}
+
+fn builtinCallerStdComptimeFiles(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data {
+    if len(fc.Args) > 0 {
+        e.pushErr(fc.Args[1].Token, LogMsg.ArgumentOverflow, "Files")
+    }
+    ret &Data{
+        Kind: &TypeKind{
+            Kind: &comptimeFiles{
+                files: e.s.files,
             },
         },
     }
