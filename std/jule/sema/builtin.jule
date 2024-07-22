@@ -942,6 +942,16 @@ fn builtinCallerStdComptimeValueOf(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: 
     ret buildComptimeValue(d)
 }
 
+fn rangeData(mut kind: comptimeRangeKind): &Data {
+    ret &Data{
+        Kind: &TypeKind{
+            Kind: &comptimeRange{
+                kind: kind,
+            },
+        },
+    }
+}
+
 fn builtinCallerStdComptimeRange(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data {
     if len(fc.Args) < 1 {
         e.pushErr(fc.Token, LogMsg.MissingExprFor, "expr")
@@ -957,53 +967,17 @@ fn builtinCallerStdComptimeRange(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &D
     }
     match {
     | d.Kind.comptimeStructFields() != nil:
-        ret &Data{
-            Kind: &TypeKind{
-                Kind: &comptimeRange{
-                    kind: d.Kind.comptimeStructFields(),
-                },
-            },
-        }
+        ret rangeData(d.Kind.comptimeStructFields())
     | d.Kind.comptimeEnumFields() != nil:
-        ret &Data{
-            Kind: &TypeKind{
-                Kind: &comptimeRange{
-                    kind: d.Kind.comptimeEnumFields(),
-                },
-            },
-        }
+        ret rangeData(d.Kind.comptimeEnumFields())
     | d.Kind.comptimeTypeInfos() != nil:
-        ret &Data{
-            Kind: &TypeKind{
-                Kind: &comptimeRange{
-                    kind: d.Kind.comptimeTypeInfos(),
-                },
-            },
-        }
+        ret rangeData(d.Kind.comptimeTypeInfos())
     | d.Kind.comptimeParams() != nil:
-        ret &Data{
-            Kind: &TypeKind{
-                Kind: &comptimeRange{
-                    kind: d.Kind.comptimeParams(),
-                },
-            },
-        }
+        ret rangeData(d.Kind.comptimeParams())
     | d.Kind.comptimeStatics() != nil:
-        ret &Data{
-            Kind: &TypeKind{
-                Kind: &comptimeRange{
-                    kind: d.Kind.comptimeStatics(),
-                },
-            },
-        }
+        ret rangeData(d.Kind.comptimeStatics())
     | d.Kind.comptimeFiles() != nil:
-        ret &Data{
-            Kind: &TypeKind{
-                Kind: &comptimeRange{
-                    kind: d.Kind.comptimeFiles(),
-                },
-            },
-        }
+        ret rangeData(d.Kind.comptimeFiles())
     |:
         e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, d.Kind.Str(), "Range")
         ret nil
