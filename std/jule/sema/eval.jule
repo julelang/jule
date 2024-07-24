@@ -1755,6 +1755,10 @@ impl Eval {
             ret nil
         }
 
+        // Keep mutability if data is already mutable.
+        // Even if the data is not mutable, set as mutable if the type is not mutable-type.
+        d.Mutable = d.Mutable || (!d.Kind.Mutable() && t.Mutable())
+
         if !d.Decl && (d.Kind.Enum() == nil || !d.Kind.Enum().Kind.Kind.Equal(t)) {
             applyCastKind(d, t)
             (&CastingExprModel)(d.Model).Token = errorToken
@@ -1767,10 +1771,6 @@ impl Eval {
         // Therefore this field used as flag to say "do not touch to expression model".
         // So, if d.Decl is true, model will not be changed.
         d.Decl = false
-
-        // Keep mutability if data is already mutable.
-        // Even if the data is not mutable, set as mutable if the type is not mutable-type.
-        d.Mutable = d.Mutable || (!d.Kind.Mutable() && t.Mutable())
 
         d.Lvalue = false
         d.untyped = false
