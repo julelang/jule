@@ -1508,7 +1508,9 @@ impl Eval {
     }
 
     fn castSlc(mut self, mut t: &TypeKind, mut d: &Data, errorToken: &Token) {
+        let c = d.Constant
         d.Constant = nil
+
         if d.Kind.Enum() != nil {
             if d.Kind.Enum().Kind.Kind.Prim() == nil || !d.Kind.Enum().Kind.Kind.Prim().IsStr() {
                 self.pushErr(errorToken, LogMsg.TypeNotSupportsCastingTo, d.Kind.Str(), t.Str())
@@ -1523,6 +1525,26 @@ impl Eval {
         let prim = t.Prim()
         if prim == nil || (!prim.IsU8() && !prim.IsI32()) {
             self.pushErr(errorToken, LogMsg.TypeNotSupportsCastingTo, d.Kind.Str(), t.Str())
+            ret
+        }
+
+        // Cast constant expressions.
+        if c != nil {
+            match {
+            | prim.IsU8():
+                let bytes = []byte(c.ReadStr())
+                let mut model = &SliceExprModel{
+                    ElemKind: t,
+                    Elems: make([]ExprModel, 0, len(bytes)),
+                }
+                for _, b in bytes {
+                    let mut bc = Const.NewU64(u64(b))
+                    bc.Kind = prim.Kind
+                    model.Elems = append(model.Elems, bc)
+                }
+                d.Model = model
+                d.Decl = true // Prevent model changing.
+            }
         }
     }
 
@@ -1543,15 +1565,17 @@ impl Eval {
             ret
         }
 
-        if d.Kind.Slc() == nil {
+        let mut s = d.Kind.Slc()
+        if s == nil {
             self.pushErr(errorToken, LogMsg.TypeNotSupportsCastingTo, PrimKind.Str, d.Kind.Str())
             ret
         }
 
-        let mut t = d.Kind.Slc().Elem
+        let mut t = s.Elem
         let prim = t.Prim()
         if prim == nil || (!prim.IsU8() && !prim.IsI32()) {
             self.pushErr(errorToken, LogMsg.TypeNotSupportsCastingTo, PrimKind.Str, d.Kind.Str())
+            ret
         }
     }
 
@@ -1718,20 +1742,26 @@ impl Eval {
             ret nil
         }
 
-        // Keep mutability if data is already mutable.
-        // Even if the data is not mutable, set as mutable if the type is not mutable-type.
-        d.Mutable = d.Mutable || (!d.Kind.Mutable() && t.Mutable())
-
-        d.Lvalue = false
-        d.Decl = false
-
-        if d.Kind.Enum() == nil || !d.Kind.Enum().Kind.Kind.Equal(t) {
+        if !d.Decl && (d.Kind.Enum() == nil || !d.Kind.Enum().Kind.Kind.Equal(t)) {
             applyCastKind(d, t)
             (&CastingExprModel)(d.Model).Token = errorToken
         } else {
             d.Kind = t
         }
+
+        // Remove flag.
+        // The variable d cannot be d.Decl true because of checked already.
+        // Therefore this field used as flag to say "do not touch to expression model".
+        // So, if d.Decl is true, model will not be changed.
+        d.Decl = false
+
+        // Keep mutability if data is already mutable.
+        // Even if the data is not mutable, set as mutable if the type is not mutable-type.
+        d.Mutable = d.Mutable || (!d.Kind.Mutable() && t.Mutable())
+
+        d.Lvalue = false
         d.untyped = false
+
         if d.IsConst() {
             d.Constant.Kind = t.Prim().Kind
         }
