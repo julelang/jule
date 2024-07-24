@@ -220,9 +220,7 @@ impl Eval {
         ret &Data{
             Mutable: true,
             Constant: constant,
-            Kind: &TypeKind{
-                Kind: buildPrimType(PrimKind.Str),
-            },
+            Kind: primStr,
             Model: constant,
         }
     }
@@ -232,17 +230,12 @@ impl Eval {
         ret &Data{
             Mutable: true,
             Constant: constant,
-            Kind: &TypeKind{
-                Kind: buildPrimType(PrimKind.Bool),
-            },
+            Kind: primBool,
             Model: constant,
         }
     }
 
     fn litRune(self, &l: &LitExpr): &Data {
-        const BYTE_KIND: str = PrimKind.U8
-        const RUNE_KIND: str = PrimKind.I32
-
         // Remove quotes.
         let lt = l.Value[1:len(l.Value)-1]
         let r = lit::ToRune([]byte(lt))
@@ -252,13 +245,9 @@ impl Eval {
 
         let isAscii = lit::IsAscii(r)
         if isAscii {
-            data.Kind = &TypeKind{
-                Kind: buildPrimType(BYTE_KIND),
-            }
+            data.Kind = primU8 // Byte
         } else {
-            data.Kind = &TypeKind{
-                Kind: buildPrimType(RUNE_KIND),
-            }
+            data.Kind = primI32 // Rune
         }
 
         data.Mutable = true
@@ -269,16 +258,13 @@ impl Eval {
     }
 
     fn litFloat(self, &l: &LitExpr): &Data {
-        const FloatKind: str = PrimKind.F64
         let f = conv::ParseFloat(l.Value, 64) else { use f64.Max }
         let mut constant = Const.NewF64(f)
         ret &Data{
             untyped: true,
             Mutable: true,
             Constant: constant,
-            Kind: &TypeKind{
-                Kind: buildPrimType(FloatKind),
-            },
+            Kind: primF64,
             Model: constant,
         }
     }
@@ -316,9 +302,7 @@ impl Eval {
         }
         if ok {
             d.Constant = Const.NewI64(sig)
-            d.Kind = &TypeKind{
-                Kind: buildPrimType(PrimKind.Int),
-            }
+            d.Kind = primInt
         } else {
             let unsig = conv::ParseUint(lit, base, BitSize) else {
                 self.pushErr(l.Token, LogMsg.InvalidNumericRange)
@@ -326,9 +310,7 @@ impl Eval {
                 use u64.Max
             }
             d.Constant = Const.NewU64(unsig)
-            d.Kind = &TypeKind{
-                Kind: buildPrimType(PrimKind.Uint),
-            }
+            d.Kind = primUint
         }
 
         d.Model = d.Constant
@@ -1013,8 +995,7 @@ impl Eval {
     }
 
     fn indexingStr(mut self, mut &d: &Data, mut &index: &Data, &i: &IndexingExpr) {
-        const ByteKind: str = PrimKind.U8
-        d.Kind = &TypeKind{Kind: buildPrimType(ByteKind)}
+        d.Kind = primU8 // Byte
 
         if index == nil {
             ret
@@ -1324,8 +1305,9 @@ impl Eval {
         } else {
             l = &Data{
                 Constant: Const.NewI64(0),
-                Kind: &TypeKind{Kind: buildPrimType(PrimKind.Int)},
+                Kind: primInt,
             }
+            l.Constant.Kind = PrimKind.Int
             l.Model = l.Constant
         }
 
@@ -2346,13 +2328,13 @@ impl Eval {
                                 Decl: &Param{
                                     Ident: "i",
                                 },
-                                Kind: &TypeKind{Kind: buildPrimType(PrimKind.Int)},
+                                Kind: lenKind(),
                             },
                             &ParamIns{
                                 Decl: &Param{
                                     Ident: "j",
                                 },
-                                Kind: &TypeKind{Kind: buildPrimType(PrimKind.Int)},
+                                Kind: lenKind(),
                             },
                         ],
                     },
@@ -2383,13 +2365,13 @@ impl Eval {
                                 Decl: &Param{
                                     Ident: "i",
                                 },
-                                Kind: &TypeKind{Kind: buildPrimType(PrimKind.Int)},
+                                Kind: lenKind(),
                             },
                             &ParamIns{
                                 Decl: &Param{
                                     Ident: "j",
                                 },
-                                Kind: &TypeKind{Kind: buildPrimType(PrimKind.Int)},
+                                Kind: lenKind(),
                             },
                         ],
                     },
@@ -2416,7 +2398,7 @@ impl Eval {
             ret &Data{
                 Constant: c,
                 Model: c,
-                Kind: &TypeKind{Kind: buildPrimType(kind)},
+                Kind: primInt,
             }
         | "Min":
             let mut c = Const.NewI64(i64(types::Min(kind)))
@@ -2424,7 +2406,7 @@ impl Eval {
             ret &Data{
                 Constant: c,
                 Model: c,
-                Kind: &TypeKind{Kind: buildPrimType(kind)},
+                Kind: primInt,
             }
         |:
             self.pushErr(ident, LogMsg.TypeHaveNotIdent, kind, ident.Kind)
@@ -2441,7 +2423,7 @@ impl Eval {
             ret &Data{
                 Constant: c,
                 Model: c,
-                Kind: &TypeKind{Kind: buildPrimType(kind)},
+                Kind: primUint,
             }
         |:
             self.pushErr(ident, LogMsg.TypeHaveNotIdent, kind, ident.Kind)
@@ -2460,7 +2442,7 @@ impl Eval {
             ret &Data{
                 Constant: c,
                 Model: c,
-                Kind: &TypeKind{Kind: buildPrimType(kind)},
+                Kind: primI8,
             }
         | "Min":
             let mut c = Const.NewI64(min)
@@ -2468,7 +2450,7 @@ impl Eval {
             ret &Data{
                 Constant: c,
                 Model: c,
-                Kind: &TypeKind{Kind: buildPrimType(kind)},
+                Kind: primI8,
             }
         |:
             self.pushErr(ident, LogMsg.TypeHaveNotIdent, kind, ident.Kind)
@@ -2487,7 +2469,7 @@ impl Eval {
             ret &Data{
                 Constant: c,
                 Model: c,
-                Kind: &TypeKind{Kind: buildPrimType(kind)},
+                Kind: primI16,
             }
         | "Min":
             let mut c = Const.NewI64(min)
@@ -2495,7 +2477,7 @@ impl Eval {
             ret &Data{
                 Constant: c,
                 Model: c,
-                Kind: &TypeKind{Kind: buildPrimType(kind)},
+                Kind: primI16,
             }
         |:
             self.pushErr(ident, LogMsg.TypeHaveNotIdent, kind, ident.Kind)
@@ -2514,7 +2496,7 @@ impl Eval {
             ret &Data{
                 Constant: c,
                 Model: c,
-                Kind: &TypeKind{Kind: buildPrimType(kind)},
+                Kind: primI32,
             }
         | "Min":
             let mut c = Const.NewI64(min)
@@ -2522,7 +2504,7 @@ impl Eval {
             ret &Data{
                 Constant: c,
                 Model: c,
-                Kind: &TypeKind{Kind: buildPrimType(kind)},
+                Kind: primI32,
             }
         |:
             self.pushErr(ident, LogMsg.TypeHaveNotIdent, kind, ident.Kind)
@@ -2541,7 +2523,7 @@ impl Eval {
             ret &Data{
                 Constant: c,
                 Model: c,
-                Kind: &TypeKind{Kind: buildPrimType(kind)},
+                Kind: primI64,
             }
         | "Min":
             let mut c = Const.NewI64(min)
@@ -2549,7 +2531,7 @@ impl Eval {
             ret &Data{
                 Constant: c,
                 Model: c,
-                Kind: &TypeKind{Kind: buildPrimType(kind)},
+                Kind: primI64,
             }
         |:
             self.pushErr(ident, LogMsg.TypeHaveNotIdent, kind, ident.Kind)
@@ -2567,7 +2549,7 @@ impl Eval {
             ret &Data{
                 Constant: c,
                 Model: c,
-                Kind: &TypeKind{Kind: buildPrimType(kind)},
+                Kind: primU8,
             }
         |:
             self.pushErr(ident, LogMsg.TypeHaveNotIdent, kind, ident.Kind)
@@ -2585,7 +2567,7 @@ impl Eval {
             ret &Data{
                 Constant: c,
                 Model: c,
-                Kind: &TypeKind{Kind: buildPrimType(kind)},
+                Kind: primU16,
             }
         |:
             self.pushErr(ident, LogMsg.TypeHaveNotIdent, kind, ident.Kind)
@@ -2603,7 +2585,7 @@ impl Eval {
             ret &Data{
                 Constant: c,
                 Model: c,
-                Kind: &TypeKind{Kind: buildPrimType(kind)},
+                Kind: primU32,
             }
         |:
             self.pushErr(ident, LogMsg.TypeHaveNotIdent, kind, ident.Kind)
@@ -2621,7 +2603,7 @@ impl Eval {
             ret &Data{
                 Constant: c,
                 Model: c,
-                Kind: &TypeKind{Kind: buildPrimType(kind)},
+                Kind: primU64,
             }
         |:
             self.pushErr(ident, LogMsg.TypeHaveNotIdent, kind, ident.Kind)
@@ -2641,7 +2623,7 @@ impl Eval {
             ret &Data{
                 Constant: c,
                 Model: c,
-                Kind: &TypeKind{Kind: buildPrimType(kind)},
+                Kind: primF32,
             }
         | "Min":
             let mut c = Const.NewF64(min)
@@ -2649,7 +2631,7 @@ impl Eval {
             ret &Data{
                 Constant: c,
                 Model: c,
-                Kind: &TypeKind{Kind: buildPrimType(kind)},
+                Kind: primF32,
             }
         | "SmallestNonZero":
             let mut c = Const.NewF64(smallestNonZero)
@@ -2657,7 +2639,7 @@ impl Eval {
             ret &Data{
                 Constant: c,
                 Model: c,
-                Kind: &TypeKind{Kind: buildPrimType(kind)},
+                Kind: primF32,
             }
         |:
             self.pushErr(ident, LogMsg.TypeHaveNotIdent, kind, ident.Kind)
@@ -2677,7 +2659,7 @@ impl Eval {
             ret &Data{
                 Constant: c,
                 Model: c,
-                Kind: &TypeKind{Kind: buildPrimType(kind)},
+                Kind: primF64,
             }
         | "Min":
             let mut c = Const.NewF64(min)
@@ -2685,7 +2667,7 @@ impl Eval {
             ret &Data{
                 Constant: c,
                 Model: c,
-                Kind: &TypeKind{Kind: buildPrimType(kind)},
+                Kind: primF64,
             }
         | "SmallestNonZero":
             let mut c = Const.NewF64(smallestNonZero)
@@ -2693,7 +2675,7 @@ impl Eval {
             ret &Data{
                 Constant: c,
                 Model: c,
-                Kind: &TypeKind{Kind: buildPrimType(kind)},
+                Kind: primF64,
             }
         |:
             self.pushErr(ident, LogMsg.TypeHaveNotIdent, kind, ident.Kind)
@@ -3442,18 +3424,14 @@ impl binaryEval {
         | TokenKind.Eqs:
             let mut constant = Const.NewBool(l.base.Equal(r.base))
             ret &Data{
-                Kind: &TypeKind{
-                    Kind: buildPrimType(PrimKind.Bool),
-                },
+                Kind: primBool,
                 Constant: constant,
                 Model: constant,
             }
         | TokenKind.NotEq:
             let mut constant = Const.NewBool(!l.base.Equal(r.base))
             ret &Data{
-                Kind: &TypeKind{
-                    Kind: buildPrimType(PrimKind.Bool),
-                },
+                Kind: primBool,
                 Constant: constant,
                 Model: constant,
             }
@@ -3473,9 +3451,7 @@ impl binaryEval {
         | TokenKind.Eqs
         | TokenKind.NotEq:
             ret &Data{
-                Kind: &TypeKind{
-                    Kind: buildPrimType(PrimKind.Bool),
-                },
+                Kind: primBool
             }
         |:
             self.e.pushErr(self.op, LogMsg.OperatorNotForJuleType, self.op.Kind, TokenKind.Nil)
@@ -3496,9 +3472,7 @@ impl binaryEval {
                 ret nil
             }
             ret &Data{
-                Kind: &TypeKind{
-                    Kind: buildPrimType(PrimKind.Bool),
-                },
+                Kind: primBool,
             }
         }
 
@@ -3517,9 +3491,7 @@ impl binaryEval {
                 ret nil
             }
             ret &Data{
-                Kind: &TypeKind{
-                    Kind: buildPrimType(PrimKind.Bool),
-                },
+                Kind: primBool,
             }
         | TokenKind.Amper:
             let first = enm.Items[0]
@@ -3564,9 +3536,7 @@ impl binaryEval {
         | TokenKind.Eqs
         | TokenKind.NotEq:
             ret &Data{
-                Kind: &TypeKind{
-                    Kind: buildPrimType(PrimKind.Bool),
-                },
+                Kind: primBool,
             }
         |:
             self.e.pushErr(self.op, LogMsg.OperatorNotForJuleType, self.op.Kind, enm.Str())
@@ -3583,9 +3553,7 @@ impl binaryEval {
         | TokenKind.Eqs
         | TokenKind.NotEq:
             ret &Data{
-                Kind: &TypeKind{
-                    Kind: buildPrimType(PrimKind.Bool),
-                },
+                Kind: primBool,
             }
         |:
             self.e.pushErr(self.op, LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Kind.Str())
@@ -3605,9 +3573,7 @@ impl binaryEval {
                 ret nil
             }
             ret &Data{
-                Kind: &TypeKind{
-                    Kind: buildPrimType(PrimKind.Bool),
-                },
+                Kind: primBool,
             }
         | TokenKind.Plus
         | TokenKind.Minus:
@@ -3637,9 +3603,7 @@ impl binaryEval {
         | TokenKind.Eqs
         | TokenKind.NotEq:
             ret &Data{
-                Kind: &TypeKind{
-                    Kind: buildPrimType(PrimKind.Bool),
-                },
+                Kind: primBool,
             }
         |:
             self.e.pushErr(self.op, LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Kind.Str())
@@ -3656,9 +3620,7 @@ impl binaryEval {
         | TokenKind.Eqs
         | TokenKind.NotEq:
             ret &Data{
-                Kind: &TypeKind{
-                    Kind: buildPrimType(PrimKind.Bool),
-                },
+                Kind: primBool,
             }
         |:
             self.e.pushErr(self.op, LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Kind.Str())
@@ -3674,9 +3636,7 @@ impl binaryEval {
                 ret nil
             }
             ret &Data{
-                Kind: &TypeKind{
-                    Kind: buildPrimType(PrimKind.Bool),
-                },
+                Kind: primBool,
             }
         | TokenKind.GreatEq:
             if self.l.Kind.Struct().Operators.GtEq == nil {
@@ -3684,9 +3644,7 @@ impl binaryEval {
                 ret nil
             }
             ret &Data{
-                Kind: &TypeKind{
-                    Kind: buildPrimType(PrimKind.Bool),
-                },
+                Kind: primBool,
             }
         | TokenKind.Lt:
             if self.l.Kind.Struct().Operators.Lt == nil {
@@ -3694,9 +3652,7 @@ impl binaryEval {
                 ret nil
             }
             ret &Data{
-                Kind: &TypeKind{
-                    Kind: buildPrimType(PrimKind.Bool),
-                },
+                Kind: primBool,
             }
         | TokenKind.LessEq:
             if self.l.Kind.Struct().Operators.LtEq == nil {
@@ -3704,9 +3660,7 @@ impl binaryEval {
                 ret nil
             }
             ret &Data{
-                Kind: &TypeKind{
-                    Kind: buildPrimType(PrimKind.Bool),
-                },
+                Kind: primBool,
             }
         | TokenKind.Eqs
         | TokenKind.NotEq:
@@ -3714,9 +3668,7 @@ impl binaryEval {
                 ret nil
             }
             ret &Data{
-                Kind: &TypeKind{
-                    Kind: buildPrimType(PrimKind.Bool),
-                },
+                Kind: primBool,
             }
         }
 
@@ -3735,9 +3687,7 @@ impl binaryEval {
         | TokenKind.Eqs
         | TokenKind.NotEq:
             ret &Data{
-                Kind: &TypeKind{
-                    Kind: buildPrimType(PrimKind.Bool),
-                },
+                Kind: primBool,
             }
         |:
             self.e.pushErr(self.op, LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Kind.Str())
@@ -3750,9 +3700,7 @@ impl binaryEval {
         | TokenKind.Eqs
         | TokenKind.NotEq:
             ret &Data{
-                Kind: &TypeKind{
-                    Kind: buildPrimType(PrimKind.Bool),
-                },
+                Kind: primBool,
             }
         |:
             self.e.pushErr(self.op, LogMsg.OperatorNotForJuleType, self.op.Kind, PrimKind.Any)
@@ -3794,9 +3742,7 @@ impl binaryEval {
         | TokenKind.GreatEq
         | TokenKind.LessEq:
             ret &Data{
-                Kind: &TypeKind{
-                    Kind: buildPrimType(PrimKind.Bool),
-                },
+                Kind: primBool,
             }
         |:
             self.e.pushErr(self.op, LogMsg.OperatorNotForJuleType, self.op.Kind, PrimKind.Str)
@@ -3923,9 +3869,7 @@ impl binaryEval {
         | TokenKind.LessEq:
             self.setTypeToGreater()
             ret &Data{
-                Kind: &TypeKind{
-                    Kind: buildPrimType(PrimKind.Bool),
-                },
+                Kind: primBool,
             }
         }
 
@@ -3983,9 +3927,7 @@ impl binaryEval {
         | TokenKind.GreatEq
         | TokenKind.LessEq:
             ret &Data{
-                Kind: &TypeKind{
-                    Kind: buildPrimType(PrimKind.Bool),
-                },
+                Kind: primBool,
             }
         }
 
@@ -4305,17 +4247,17 @@ fn fitBitsize(mut &d: &Data) {
     | d.Constant.IsI64():
         k = types::BitsizeOfInt(d.Constant.ReadI64())
         if k > z {
-            prim.Kind = types::IntFromBits(k)
+            d.Kind = findBuiltinTypeAlias(types::IntFromBits(k)).Kind.Kind
         }
     | d.Constant.IsU64():
         k = types::BitsizeOfUint(d.Constant.ReadU64())
         if k > z {
-            prim.Kind = types::UintFromBits(k)
+            d.Kind = findBuiltinTypeAlias(types::UintFromBits(k)).Kind.Kind
         }
     | d.Constant.IsF64():
         k = types::BitsizeOfFloat(d.Constant.ReadF64())
         if k > z {
-            prim.Kind = types::FloatFromBits(k)
+            d.Kind = findBuiltinTypeAlias(types::FloatFromBits(k)).Kind.Kind
         }
     }
 }
@@ -4338,11 +4280,7 @@ fn buildErrorVar(mut &s: &Scope, mut &fc: &FnCallExpr): &Var {
         Mutable: true,
         Ident: "error",
         Token: fc.Token,
-        Kind: &TypeSymbol{
-            Kind: &TypeKind{
-                Kind: buildPrimType(PrimKind.Any),
-            },
-        },
+        Kind: findBuiltinTypeAlias(PrimKind.Any).Kind,
         Scope: s,
         Value: &Value{
             Data: new(Data),
@@ -4405,9 +4343,7 @@ fn isPtrArithmeticCompatible(mut &l: &Data, mut &r: &Data): bool {
         ret intAssignable(types::TypeKind.Int, r)
     }
     let mut tcc = typeCompatibilityChecker{
-        dest: &TypeKind{
-            Kind: buildPrimType(types::TypeKind.Int),
-        },
+        dest: primInt,
         src: r.Kind,
     }
     ret tcc.check()
@@ -4428,7 +4364,7 @@ fn applyCastKind(mut &d: &Data, mut &t: &TypeKind) {
 
 fn buildVoidData(): &Data {
     ret &Data{
-        Kind: buildVoidType(),
+        Kind: primVoid,
     }
 }
 
@@ -4449,8 +4385,7 @@ fn checkDataForIntegerIndexing(mut &d: &Data): (err_fmt: LogMsg) {
     | d.Kind.Prim() == nil
     | d.IsConst()
     | types::RealKindOf(d.Kind.Prim().Str()) != types::RealKindOf(PrimKind.Int):
-        let mut t = &TypeKind{Kind: buildPrimType(PrimKind.Int)}
-        applyCastKind(d, t)
+        applyCastKind(d, primInt)
     }
     ret LogMsg.Empty
 }

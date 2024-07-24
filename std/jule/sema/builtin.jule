@@ -63,66 +63,82 @@ fn findBuiltinFn(ident: str): &FnIns {
     }
 }
 
-fn primTypeAlias(k: PrimKind): &TypeAlias {
+fn primTypeAlias(mut &k: &TypeKind): &TypeAlias {
     ret &TypeAlias{
         Public: true,
         Kind: &TypeSymbol{
-            Kind: &TypeKind{
-                Kind: buildPrimType(k),
-            },
+            Kind: k,
         },
     }
 }
 
+static mut primVoid = &TypeKind{Kind: buildPrimType("void")}
+static mut primAny = &TypeKind{Kind: buildPrimType(PrimKind.Any)}
+static mut primStr = &TypeKind{Kind: buildPrimType(PrimKind.Str)}
+static mut primBool = &TypeKind{Kind: buildPrimType(PrimKind.Bool)}
+static mut primUintptr = &TypeKind{Kind: buildPrimType(PrimKind.Uintptr)}
+static mut primUint = &TypeKind{Kind: buildPrimType(PrimKind.Uint)}
+static mut primInt = &TypeKind{Kind: buildPrimType(PrimKind.Int)}
+static mut primI8 = &TypeKind{Kind: buildPrimType(PrimKind.I8)}
+static mut primI16 = &TypeKind{Kind: buildPrimType(PrimKind.I16)}
+static mut primI32 = &TypeKind{Kind: buildPrimType(PrimKind.I32)}
+static mut primI64 = &TypeKind{Kind: buildPrimType(PrimKind.I64)}
+static mut primU8 = &TypeKind{Kind: buildPrimType(PrimKind.U8)}
+static mut primU16 = &TypeKind{Kind: buildPrimType(PrimKind.U16)}
+static mut primU32 = &TypeKind{Kind: buildPrimType(PrimKind.U32)}
+static mut primU64 = &TypeKind{Kind: buildPrimType(PrimKind.U64)}
+static mut primF32 = &TypeKind{Kind: buildPrimType(PrimKind.F32)}
+static mut primF64 = &TypeKind{Kind: buildPrimType(PrimKind.F64)}
+
 fn findBuiltinTypeAlias(ident: str): &TypeAlias {
     match ident {
     | "any":
-        static mut t = primTypeAlias(PrimKind.Any)
+        static mut t = primTypeAlias(primAny)
         ret t
     | "str":
-        static mut t = primTypeAlias(PrimKind.Str)
+        static mut t = primTypeAlias(primStr)
         ret t
     | "bool":
-        static mut t = primTypeAlias(PrimKind.Bool)
+        static mut t = primTypeAlias(primBool)
         ret t
     | "uintptr":
-        static mut t = primTypeAlias(PrimKind.Uintptr)
+        static mut t = primTypeAlias(primUintptr)
         ret t
     | "uint":
-        static mut t = primTypeAlias(PrimKind.Uint)
+        static mut t = primTypeAlias(primUint)
         ret t
     | "int":
-        static mut t = primTypeAlias(PrimKind.Int)
+        static mut t = primTypeAlias(primInt)
         ret t
     | "i8":
-        static mut t = primTypeAlias(PrimKind.I8)
+        static mut t = primTypeAlias(primI8)
         ret t
     | "i16":
-        static mut t = primTypeAlias(PrimKind.I16)
+        static mut t = primTypeAlias(primI16)
         ret t
     | "i64":
-        static mut t = primTypeAlias(PrimKind.I64)
+        static mut t = primTypeAlias(primI64)
         ret t
     | "u16":
-        static mut t = primTypeAlias(PrimKind.U16)
+        static mut t = primTypeAlias(primU16)
         ret t
     | "u32":
-        static mut t = primTypeAlias(PrimKind.U32)
+        static mut t = primTypeAlias(primU32)
         ret t
     | "u64":
-        static mut t = primTypeAlias(PrimKind.U64)
+        static mut t = primTypeAlias(primU64)
         ret t
     | "f32":
-        static mut t = primTypeAlias(PrimKind.F32)
+        static mut t = primTypeAlias(primF32)
         ret t
     | "f64":
-        static mut t = primTypeAlias(PrimKind.F64)
+        static mut t = primTypeAlias(primF64)
         ret t
     | "byte" | "u8":
-        static mut t = primTypeAlias(PrimKind.U8)
+        static mut t = primTypeAlias(primU8)
         ret t
     | "rune" | "i32":
-        static mut t = primTypeAlias(PrimKind.I32)
+        static mut t = primTypeAlias(primI32)
         ret t
     |:
         ret nil
@@ -550,7 +566,7 @@ fn callerCopySlice(mut &dest: &Data, mut &e: &Eval, mut &fc: &FnCallExpr, mut &d
         }
     }
 
-    d.Kind = &TypeKind{Kind: buildPrimType(PrimKind.Int)}
+    d.Kind = lenKind()
     d.Model = &BuiltinCopyCallExprModel{
         Dest: dest,
         Src: src,
@@ -580,7 +596,7 @@ fn callerCopyStr(mut &dest: &Data, mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: 
     }
     e.pushErr(fc.Args[1].Token, LogMsg.IncompatibleTypes, dest.Kind.Str(), src.Kind.Str())
 end:
-    d.Kind = &TypeKind{Kind: buildPrimType(PrimKind.Int)}
+    d.Kind = lenKind()
     d.Model = &BuiltinCopyCallExprModel{
         Dest: dest,
         Src: src,
@@ -990,9 +1006,7 @@ fn builtinCallerStdComptimeLine(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Da
     }
     let mut constant = Const.NewI64(i64(fc.Token.Row))
     ret &Data{
-        Kind: &TypeKind{
-            Kind: buildPrimType(PrimKind.Int),
-        },
+        Kind: primInt,
         Constant: constant,
         Model: constant,
     }
@@ -1026,7 +1040,7 @@ fn builtinCallerStdComptimeFiles(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &D
 
 fn builtinCallerStdMemSizeOf(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data {
     let mut result = &Data{
-        Kind: &TypeKind{Kind: buildPrimType(PrimKind.Uint)},
+        Kind: primUint,
     }
 
     if len(fc.Args) < 1 {
@@ -1051,7 +1065,7 @@ fn builtinCallerStdMemSizeOf(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data)
 
 fn builtinCallerStdMemAlignOf(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data {
     let mut result = &Data{
-        Kind: &TypeKind{Kind: buildPrimType(PrimKind.Uint)},
+        Kind: primUint,
     }
 
     if len(fc.Args) < 1 {
@@ -1117,7 +1131,7 @@ fn builtinCallerStdJuleIntegratedToStr(mut &e: &Eval, mut &fc: &FnCallExpr, mut 
     }
 
     ret &Data{
-        Kind: &TypeKind{Kind: buildPrimType(PrimKind.Str)},
+        Kind: primStr,
         Model: &IntegratedToStrExprModel{
             Expr: d.Model,
         },
