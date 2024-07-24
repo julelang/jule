@@ -1569,11 +1569,21 @@ impl Eval {
             }
         }
 
+        let c = d.Constant
         d.Constant = nil
         if d.Kind.Prim() != nil {
             let prim = d.Kind.Prim()
             if !prim.IsU8() && !prim.IsI32() {
                 self.pushErr(errorToken, LogMsg.TypeNotSupportsCastingTo, PrimKind.Str, d.Kind.Str())
+                ret
+            }
+            // Cast constant expressions.
+            if c != nil {
+                match {
+                | prim.IsU8():
+                    d.Constant = Const.NewStr(str(byte(c.AsU64())))
+                    d.Model = d.Constant
+                }
             }
             ret
         }
