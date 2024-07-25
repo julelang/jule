@@ -313,6 +313,20 @@ namespace jule
             this->__push(item);
         }
 
+        void append(const jule::Slice<Item> &items)
+        {
+            if (this->_cap - this->_len < items._len)
+            {
+                jule::Slice<Item> _new;
+                _new.alloc_new(this->_len + 1, (this->_len + items._len) << 1);
+                std::move(this->_slice, this->_slice + this->_len, _new._slice);
+                std::copy(items._slice, items._slice + items._len, _new._slice + _new._len);
+                this->operator=(_new);
+                return;
+            }
+            std::copy(items._slice, items._slice + items._len, this->_slice + this->_len);
+        }
+
         constexpr jule::Bool operator==(const std::nullptr_t) const noexcept
         {
             return !this->_slice;
