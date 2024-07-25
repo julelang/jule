@@ -325,6 +325,7 @@ namespace jule
                 return;
             }
             std::copy(items._slice, items._slice + items._len, this->_slice + this->_len);
+            this->_len += items._len;
         }
 
         constexpr jule::Bool operator==(const std::nullptr_t) const noexcept
