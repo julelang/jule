@@ -492,6 +492,23 @@ fn areSameLvalueExprModel(&l: ExprModel, &r: ExprModel): bool {
         // Compare values directly.
         // If the l and r have same pointers, means same variable.
         ret l == r
+    | &StructSubIdentExprModel:
+        match type r {
+        | &StructSubIdentExprModel:
+            break
+        |:
+            ret false
+        }
+        let lsi = (&StructSubIdentExprModel)(l)
+        let rsi = (&StructSubIdentExprModel)(r)
+        // Compare fields directly.
+        // If the l and r have same pointers,
+        // means same variable of same struct instance.
+        if lsi.Field != rsi.Field {
+            ret false
+        }
+        // Check head expressions used for field access.
+        ret areSameLvalueExprModel(lsi.Expr.Model, rsi.Expr.Model)
     }
     ret false
 }
