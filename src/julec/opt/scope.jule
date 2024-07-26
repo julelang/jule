@@ -366,21 +366,18 @@ impl scopeOptimizer {
             match type assign.R.Model {
             | &BuiltinAppendCallExprModel:
                 let mut m = (&BuiltinAppendCallExprModel)(assign.R.Model)
-                // Push items one-by-one for self-appended variables and struct fields.
-                match type m.Dest {
-                | &Var
-                | &StructSubIdentExprModel:
-                    match type m.Elements {
-                    | &SliceExprModel:
-                        self.setCurrentStmt(&PushToSliceExprModel{
-                            Dest: m.Dest,
-                            Elems: (&SliceExprModel)(m.Elements),
-                        })
-                        ret
-                    }
+                if !areSameLvalueExprModel(assign.L.Model, m.Dest) {
+                    ret
                 }
-                // Append directly if appended to slice and assigned to the same memory.
-                if areSameLvalueExprModel(assign.L.Model, m.Dest) {
+                match type m.Elements {
+                | &SliceExprModel:
+                    // Push items one-by-one for self-appended memory.
+                    self.setCurrentStmt(&PushToSliceExprModel{
+                        Dest: m.Dest,
+                        Elems: (&SliceExprModel)(m.Elements),
+                    })
+                |:
+                    // Append directly if appended to slice and assigned to the same memory.
                     self.setCurrentStmt(&AppendToSliceExprModel{
                         Dest: assign.L.Model,
                         Slice: m.Elements,
