@@ -1627,9 +1627,15 @@ impl scopeChecker {
             Expr: d,
         }
         tm.Comptime = tm.Expr.Kind.Generic
-        if !tm.Expr.Kind.Generic && m.Default != nil {
+
+        // Do not check default if comptime matching enabled.
+        // We do not know any case will be matched yet.
+        // The [self.processConstMatch] will check cases and if not exist
+        // any matching, will check default case if exist and handle it.
+        if !tm.Comptime && m.Default != nil {
             tm.Default = self.checkDefault(tm, m.Default)
         }
+
         self.checkCases(m, tm, d)
         if tm.Comptime {
             self.processConstMatch(tm, m)
@@ -1661,9 +1667,14 @@ impl scopeChecker {
         // will may log error(s) event semantic is good.
         self.scope.Stmts = append(self.scope.Stmts, mc)
 
-        if m.Default != nil {
+        // Do not check default if comptime matching enabled.
+        // We do not know any case will be matched yet.
+        // The [self.processConstMatch] will check cases and if not exist
+        // any matching, will check default case if exist and handle it.
+        if !mc.Comptime && m.Default != nil {
             mc.Default = self.checkDefault(mc, m.Default)
         }
+
         self.checkCases(m, mc, d)
         if mc.Comptime {
             self.processConstMatch(mc, m)
