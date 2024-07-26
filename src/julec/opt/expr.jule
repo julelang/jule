@@ -486,7 +486,7 @@ fn checkForBitShiftOpt(&l: &OperandExprModel, &r: &OperandExprModel): (ok: bool,
 }
 
 // Reports l and r the same lvalue expression.
-fn areSameLvalueExprModel(mut &l: ExprModel, &r: ExprModel): bool {
+fn areSameLvalueExprModel(&l: ExprModel, &r: ExprModel): bool {
     match type l {
     | &Var:
         // Compare values directly.
@@ -499,7 +499,7 @@ fn areSameLvalueExprModel(mut &l: ExprModel, &r: ExprModel): bool {
         |:
             ret false
         }
-        let mut lsi = (&StructSubIdentExprModel)(l)
+        let lsi = (&StructSubIdentExprModel)(l)
         let rsi = (&StructSubIdentExprModel)(r)
         // Compare fields directly.
         // If the l and r have same pointers,
@@ -509,6 +509,19 @@ fn areSameLvalueExprModel(mut &l: ExprModel, &r: ExprModel): bool {
         }
         // Check head expressions used for field access.
         ret areSameLvalueExprModel(lsi.Expr.Model, rsi.Expr.Model)
+    | &UnaryExprModel:
+        match type r {
+        | &UnaryExprModel:
+            let ul = (&UnaryExprModel)(l)
+            let ur = (&UnaryExprModel)(r)
+            // Unary operators should have the same operator.
+            // The operator does not matter.
+            if ul.Op.Id != ur.Op.Id || ul.Op.Kind != ur.Op.Kind {
+                ret false
+            }
+            // Check expressions used for unary.
+            ret areSameLvalueExprModel(ul.Expr.Model, ur.Expr.Model)
+        }
     }
     ret false
 }

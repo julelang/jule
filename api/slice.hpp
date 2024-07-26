@@ -407,15 +407,6 @@ namespace jule
 
         Slice &operator=(const jule::Slice<Item> &src) noexcept
         {
-            // Assignment to itself.
-            if (this->data.alloc != nullptr && this->data.alloc == src.data.alloc)
-            {
-                this->_len = src._len;
-                this->_cap = src._cap;
-                this->_slice = src._slice;
-                return *this;
-            }
-
             this->dealloc();
             this->__get_copy(src);
             return *this;

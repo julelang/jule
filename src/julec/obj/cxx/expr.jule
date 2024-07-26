@@ -1194,15 +1194,53 @@ impl exprCoder {
 
         self.oc.write("{ ")
         self.oc.write(self.oc.tc.asSlice(m.Elems.ElemKind))
-        self.oc.write(" &" + destIdent + " = ")
-        self.possibleRefExpr(m.Dest)
-        self.oc.write("; " + destIdent + ".alloc_for_append(")
+
+        let mut ptr = false
+        match type m.Dest {
+        | &UnaryExprModel:
+            // Use raw pointer directly if exist.
+            let mut u = (&UnaryExprModel)(m.Dest)
+            if u.Expr.Kind.Ptr() != nil {
+                self.oc.write(" *" + destIdent + " = ")
+                self.possibleRefExpr(u.Expr.Model)
+                self.oc.write("; ")
+                ptr = true
+                break
+            }
+            fall
+        |:
+            self.oc.write(" &" + destIdent + " = ")
+            self.possibleRefExpr(m.Dest)
+            self.oc.write("; ")
+        }
+        // Pushed single item.
+        if len(m.Elems.Elems) == 1 {
+            if ptr {
+                self.oc.write(destIdent + "->push(")
+            } else {
+                self.oc.write(destIdent + ".push(")
+            }
+            self.possibleRefExpr(m.Elems.Elems[0])
+            self.oc.write("); }")
+            ret
+        }
+        // Pushed more than single item.
+        // Pre-allocate enough capacity if not exist for appendation.
+        if ptr {
+            self.oc.write(destIdent + "->alloc_for_append(")
+        } else {
+            self.oc.write(destIdent + ".alloc_for_append(")
+        }
         self.oc.write(conv::Itoa(len(m.Elems.Elems)))
         self.oc.write("); ")
         for (_, mut e) in m.Elems.Elems {
             self.oc.write(destIdent)
             // Use the "__push" method to skip allocation boundary checking.
-            self.oc.write(".__push(")
+            if ptr {
+                self.oc.write("->__push(")
+            } else {
+                self.oc.write(".__push(")
+            }
             self.possibleRefExpr(e)
             self.oc.write("); ")
         }
