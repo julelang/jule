@@ -1188,22 +1188,25 @@ impl exprCoder {
     }
 
     fn pushToSlice(mut &self, mut m: &PushToSliceExprModel) {
-        let n = len(self.oc.Obj)
-        self.possibleRefExpr(m.Dest)
-        let dest = self.oc.Obj[n:]
+        // Use l-value advantage and define reference variable to destination
+        // in the child scope to avoid potential repeated high-cost memory access overhead.
+        const destIdent = "__jule_push_dest"
 
-        self.oc.write(" = jule::alloc_for_append(")
-        self.oc.write(dest)
-        self.oc.write(",")
+        self.oc.write("{ ")
+        self.oc.write(self.oc.tc.asSlice(m.Elems.ElemKind))
+        self.oc.write(" &" + destIdent + " = ")
+        self.possibleRefExpr(m.Dest)
+        self.oc.write("; " + destIdent + ".alloc_for_append(")
         self.oc.write(conv::Itoa(len(m.Elems.Elems)))
-        self.oc.write(");")
+        self.oc.write("); ")
         for (_, mut e) in m.Elems.Elems {
-            self.oc.write(dest)
+            self.oc.write(destIdent)
             // Use the "__push" method to skip allocation boundary checking.
             self.oc.write(".__push(")
             self.possibleRefExpr(e)
-            self.oc.write(");")
+            self.oc.write("); ")
         }
+        self.oc.write("}")
     }
 
     fn appendToSlice(mut &self, mut m: &AppendToSliceExprModel) {

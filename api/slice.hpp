@@ -89,11 +89,8 @@ namespace jule
         }
 
         // Copy content from source.
-        void __get_copy(const jule::Slice<Item> &src) noexcept
+        inline void __get_copy(const jule::Slice<Item> &src) noexcept
         {
-            if (src == nullptr)
-                return;
-
             this->_len = src._len;
             this->_cap = src._cap;
             this->data = src.data;
@@ -132,14 +129,11 @@ namespace jule
 
         void dealloc(void) noexcept
         {
-#ifdef __JULE_DISABLE__REFERENCE_COUNTING
             this->_len = 0;
             this->_cap = 0;
+#ifdef __JULE_DISABLE__REFERENCE_COUNTING
             this->data.dealloc();
 #else
-            this->_len = 0;
-            this->_cap = 0;
-
             if (!this->data.ref)
             {
                 this->data.alloc = nullptr;
@@ -291,39 +285,34 @@ namespace jule
             return !this->_slice || this->_len == 0 || this->_cap == 0;
         }
 
+        // If capacity is not enough for newItems, allocates new slice and assigns
+        // to itself. Length will not be changed.
+        void alloc_for_append(const jule::Int newItems) noexcept
+        {
+            if (this->_cap - this->_len >= newItems)
+                return;
+            jule::Slice<Item> _new;
+            _new.alloc_new(this->_len, (this->_len + newItems) << 1);
+            std::move(this->_slice, this->_slice + this->_len, _new._slice);
+            this->dealloc();
+            this->__get_copy(_new);
+        }
+
         // Push item to last without allocation checks.
         inline void __push(const Item &item)
         {
             this->_slice[this->_len++] = item;
         }
 
-        void push(const Item &item)
+        inline void push(const Item &item)
         {
-            if (this->_len == this->_cap)
-            {
-                jule::Slice<Item> _new;
-                _new.alloc_new(this->_len + 1, (this->_len + 1) << 1);
-                std::move(this->_slice, this->_slice + this->_len, _new._slice);
-                *(_new._slice + this->_len) = item;
-
-                this->operator=(_new);
-                return;
-            }
-
+            this->alloc_for_append(1);
             this->__push(item);
         }
 
         void append(const jule::Slice<Item> &items)
         {
-            if (this->_cap - this->_len < items._len)
-            {
-                jule::Slice<Item> _new;
-                _new.alloc_new(this->_len + 1, (this->_len + items._len) << 1);
-                std::move(this->_slice, this->_slice + this->_len, _new._slice);
-                std::copy(items._slice, items._slice + items._len, _new._slice + _new._len);
-                this->operator=(_new);
-                return;
-            }
+            this->alloc_for_append(items._len);
             std::copy(items._slice, items._slice + items._len, this->_slice + this->_len);
             this->_len += items._len;
         }
