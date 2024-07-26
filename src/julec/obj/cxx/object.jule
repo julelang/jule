@@ -105,6 +105,10 @@ impl ObjectCoder {
         self.Obj += s
     }
 
+    fn writeR(mut &self, &s: str) {
+        self.Obj += s
+    }
+
     // Increase indentation.
     fn addIndent(mut &self) {
         self.indentBuffer += indentKind
@@ -305,7 +309,7 @@ impl ObjectCoder {
         ident += conv::FmtUint(u64(uintptr(t2)), 0xF)
         ident += "_to_"
         ident += conv::FmtUint(u64(uintptr(t1)), 0xF)
-        self.write(ident)
+        self.writeR(ident)
 
         // Lookup and push if this match is not exist.
         for _, m in self.traitCastMap {
@@ -388,9 +392,9 @@ impl ObjectCoder {
         self.write("/")
         self.write(conv::FmtUint(abs.Year, 10))
         self.write(" (DD/MM/YYYY) UTC\n//\n// Recomended Compile Command;\n// ")
-        self.write(self.info.Compiler)
+        self.writeR(self.info.Compiler)
         self.write(" ")
-        self.write(self.info.CompilerCommand)
+        self.writeR(self.info.CompilerCommand)
         self.write("\n\n")
 
         if env::Production {
@@ -408,7 +412,7 @@ impl ObjectCoder {
         self.links()
 
         self.write("\n\n#include \"")
-        self.write(build::PathApi)
+        self.writeR(build::PathApi)
         self.write("\"\n\n")
     }
 
@@ -419,11 +423,11 @@ impl ObjectCoder {
                 continue
             | build::IsStdHeaderPath(used.Path):
                 self.write("#include ")
-                self.write(used.Path)
+                self.writeR(used.Path)
                 self.write("\n")
             | build::IsValidHeaderExt(path::Ext(used.Path)):
                 self.write("#include \"")
-                self.write(used.Path)
+                self.writeR(used.Path)
                 self.write("\"\n")
             }
         }
@@ -595,7 +599,7 @@ impl ObjectCoder {
             self.write("inline ")
         }
         self.write("bool operator==(")
-        self.write(ident)
+        self.writeR(ident)
         self.write(" _other) {")
         if len(s.Fields) > 0 {
             self.addIndent()
@@ -618,9 +622,9 @@ impl ObjectCoder {
                 self.indent()
                 self.write("this->")
                 let fIdent = identCoder.field(f.Decl)
-                self.write(fIdent)
+                self.writeR(fIdent)
                 self.write(" == _other.")
-                self.write(fIdent)
+                self.writeR(fIdent)
             }
             self.doneIndent()
             if !writed {
@@ -645,7 +649,7 @@ impl ObjectCoder {
             self.write("inline ")
         }
         self.write("bool operator!=(")
-        self.write(ident)
+        self.writeR(ident)
         self.write(" _other) { return !this->operator==(_other); }\n\n")
     }
 
@@ -663,19 +667,19 @@ impl ObjectCoder {
             self.write("inline ")
         }
         if assignment {
-            self.write(ident)
+            self.writeR(ident)
             self.write("&")
         } else {
             if f.Result.Prim() == nil {
                 // If result type is not primitive, always structure's itself.
-                self.write(ident)
+                self.writeR(ident)
             } else {
                 // Logical.
                 self.write(typeCoder.Bool)
             }
         }
         self.write(" operator")
-        self.write(op)
+        self.writeR(op)
         self.write("(")
         if !unary {
             let mut p = f.Params[1]
@@ -749,7 +753,7 @@ impl ObjectCoder {
         self.write("struct ")
         let outIdent = identCoder.structureIns(s)
 
-        self.write(outIdent)
+        self.writeR(outIdent)
         self.write(" {\n")
 
         self.addIndent()
@@ -765,7 +769,7 @@ impl ObjectCoder {
 
         // Default constructor.
         self.indent()
-        self.write(outIdent)
+        self.writeR(outIdent)
         self.write("(void) = default;\n\n")
 
         self.structureDeriveDefsDecls(s)
@@ -1085,11 +1089,11 @@ impl ObjectCoder {
             let mIdent = identCoder.func(m)
             self.indent()
             self.write(".")
-            self.write(mIdent)
+            self.writeR(mIdent)
             self.write("=")
-            self.write(mIdent)
+            self.writeR(mIdent)
             self.write("_")
-            self.write(hash.t.Ident)
+            self.writeR(hash.t.Ident)
             self.write("_")
             self.write(conv::Itoa(hash.i))
             self.write(",\n")
@@ -1108,9 +1112,9 @@ impl ObjectCoder {
                 self.write("};\n")
             }
             self.write("static ")
-            self.write(ident)
+            self.writeR(ident)
             self.write("MptrData ")
-            self.write(ident)
+            self.writeR(ident)
             self.write("_mptr_data[] = {\n")
             old = hash.t
             self.addIndent()
@@ -1183,9 +1187,9 @@ impl ObjectCoder {
                 let ident = identCoder.field(f.Decl)
                 self.indent()
                 self.write("clone.")
-                self.write(ident)
+                self.writeR(ident)
                 self.write(" = jule::clone(this->")
-                self.write(ident)
+                self.writeR(ident)
                 self.write(");\n")
             }
             self.indent()
@@ -1210,13 +1214,13 @@ impl ObjectCoder {
             self.write("(&_Src);\n")
         } else {
             self.write(`_Stream << "`)
-            self.write(s.Decl.Ident)
+            self.writeR(s.Decl.Ident)
             self.write("{\";\n")
 
             for (i, mut f) in s.Fields {
                 self.indent()
                 self.write(`_Stream << "`)
-                self.write(f.Decl.Ident)
+                self.writeR(f.Decl.Ident)
                 self.write(`:`)
 
                 // Skip binded struct kinds.
