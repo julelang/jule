@@ -21,16 +21,10 @@ const paddingByte = '='
 
 // Returns length of encoded bytes of b.
 fn EncodeLen(b: []byte, pad: bool): int {
-    let mut n = (len(b) + 2) / 3 << 2
-    if pad {
-        if n%4 != 0 { // Padding 1
-            n--
-            if n%4 > 2 { // Padding 2
-                n--
-            }
-        }
+    if !pad {
+        ret len(b)/3*4 + (len(b)%3*8+5)/6
     }
-    ret n
+    ret (len(b) + 2) / 3 << 2
 }
 
 fn encode(&src: []byte, pad: bool): []byte {
@@ -110,20 +104,19 @@ fn decode(&src: []byte): []byte {
         ret nil
     }
     let p = &src[0]
-    let mut j = 0
-    let pad1 = len(src)%4 != 0 || unsafe { *(p+len(src)-1) } == paddingByte
-    let pad2 = pad1 && (len(src)%4 > 2 || unsafe { *(p+len(src)-2) } != paddingByte)
-    let mut l = len(src)
+    let pad1 = len(src) > 0 && (len(src) % 4 != 0 || unsafe { p[len(src)-1] } == paddingByte)
+    let mut l = (len(src) + 3) / 4
     if pad1 {
         l--
     }
-    l = l / 4 << 2
-    let mut sz = l / 4 * 3
+    l = l << 2
+    let pad2 = pad1 && len(src) > l + 2 && unsafe { p[l+2] } != paddingByte
+    let mut sz = l >> 2 * 3
     if pad1 {
         sz++
-    }
-    if pad2 {
-        sz++
+        if pad2 {
+            sz++
+        }
     }
     let mut dest = make([]byte, sz)
     let mut d = &dest[0]
@@ -132,6 +125,7 @@ fn decode(&src: []byte): []byte {
     let ip = &t64d[0]
 
     let mut i = 0
+    let mut j = 0
     for i < l; i += 4 {
         unsafe {
             let n = ip[p[i]] << 18 | ip[p[i+1]] << 12 | ip[p[i+2]] << 6 | ip[p[i+3]]
@@ -151,7 +145,6 @@ fn decode(&src: []byte): []byte {
             if pad2 {
                 n |= ip[p[l+2]] << 6
                 d[j] = byte(n >> 8 & 0xFF)
-                j++
             }
         }
     }
