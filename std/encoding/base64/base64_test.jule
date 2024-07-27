@@ -1,0 +1,68 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+#build test
+
+use std::testing::{T}
+
+static encodeDecodeMap = [
+    // RFC 3548 examples.
+    [[]byte("\x14\xfb\x9c\x03\xd9\x7e"), []byte("FPucA9l+")],
+    [[]byte("\x14\xfb\x9c\x03\xd9"), []byte("FPucA9k=")],
+    [[]byte("\x14\xfb\x9c\x03"), []byte("FPucAw==")],
+
+    // RFC 4648 examples.
+    [[]byte(""), []byte("")],
+    [[]byte("f"), []byte("Zg==")],
+    [[]byte("fo"), []byte("Zm8=")],
+    [[]byte("foo"), []byte("Zm9v")],
+    [[]byte("foob"), []byte("Zm9vYg==")],
+    [[]byte("fooba"), []byte("Zm9vYmE=")],
+    [[]byte("foobar"), []byte("Zm9vYmFy")],
+
+    // Wikipedia examples.
+    [[]byte("sure."), []byte("c3VyZS4=")],
+    [[]byte("sure"), []byte("c3VyZQ==")],
+    [[]byte("sur"), []byte("c3Vy")],
+    [[]byte("su"), []byte("c3U=")],
+    [[]byte("leasure."), []byte("bGVhc3VyZS4=")],
+    [[]byte("easure."), []byte("ZWFzdXJlLg==")],
+    [[]byte("asure."), []byte("YXN1cmUu")],
+]
+
+#test
+fn testEncode(t: &T) {
+    for _, case in encodeDecodeMap {
+        let r = Encode(case[0], true)
+        let d = case[1]
+        if len(r) != len(d) {
+            t.Fail()
+            continue
+        }
+        for i in r {
+            if r[i] != d[i] {
+                t.Fail()
+                break
+            }
+        }
+    }
+}
+
+#test
+fn testDecode(t: &T) {
+    for _, case in encodeDecodeMap {
+        let r = Decode(case[1])
+        let d = case[0]
+        if len(r) != len(d) {
+            t.Fail()
+            continue
+        }
+        for i in r {
+            if r[i] != d[i] {
+                t.Fail()
+                break
+            }
+        }
+    }
+}
