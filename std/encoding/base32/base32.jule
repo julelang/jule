@@ -18,14 +18,14 @@ fn lenNoPad(b: []byte): int {
     ret i + 1
 }
 
-fn encodedLen(n: int, pad: bool): int {
+fn encodeLen(n: int, pad: bool): int {
     if pad {
         ret (n + 4) / 5 << 3
     }
     ret n / 5 << 3 + (n % 5 << 3 + 4) / 5
 }
 
-fn decodedLen(&b: []byte): int {
+fn decodeLen(&b: []byte): int {
     if len(b) == 0 {
         ret 0
     }
@@ -33,12 +33,17 @@ fn decodedLen(&b: []byte): int {
     ret n >> 3 * 5 + n % 8 * 5 >> 3
 }
 
+// Returns length of encoded bytes of b.
+fn EncodeLen(b: []byte, pad: bool): int {
+    ret encodeLen(len(b), pad)
+}
+
 // Encodes source bytes into dest with standard base32 table.
 // Returns encoded base32 bytes if success, nil slice if not.
 // Adds padding if pad is true.
 // Algorithm will call the append function to append dest.
 fn Encode(src: []byte, pad: bool): []byte {
-    let n = encodedLen(len(src), pad)
+    let n = encodeLen(len(src), pad)
     if n == 0 {
         ret nil
     }
@@ -116,7 +121,7 @@ fn Encode(src: []byte, pad: bool): []byte {
 // Detects padding by default, no required padding specification.
 // Algorithm will call the append function to append dest.
 fn Decode(src: []byte): []byte {
-    let n = decodedLen(src)
+    let n = decodeLen(src)
     if n == 0 {
         ret nil
     }
