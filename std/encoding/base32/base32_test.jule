@@ -61,3 +61,46 @@ fn testDecode(t: &T) {
         }
     }
 }
+
+fn removePad(b: []byte): []byte {
+    let mut bm = unsafe { *(&b) }
+    let mut i = len(b) - 1
+    for i >= 0 && b[i] == paddingByte; i-- {}
+    ret bm[:i+1]
+}
+
+#test
+fn testEncodeNoPad(t: &T) {
+    for _, case in encodeDecodeMap {
+        let r = Encode(nil, case[0], false)
+        let d = removePad(case[1])
+        if len(r) != len(d) {
+            t.Fail()
+            continue
+        }
+        for i in r {
+            if r[i] != d[i] {
+                t.Fail()
+                break
+            }
+        }
+    }
+}
+
+#test
+fn testDecodeNoPad(t: &T) {
+    for _, case in encodeDecodeMap {
+        let r = Decode(nil, case[1])
+        let d = removePad(case[0])
+        if len(r) != len(d) {
+            t.Fail()
+            continue
+        }
+        for i in r {
+            if r[i] != d[i] {
+                t.Fail()
+                break
+            }
+        }
+    }
+}
