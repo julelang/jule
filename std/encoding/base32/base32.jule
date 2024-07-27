@@ -2,28 +2,55 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use strings for std::strings
+use fastbytes for std::internal::fastbytes
 
 // Table for standard base32 encoding.
-static t32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
+static t32 = []byte("ABCDEFGHIJKLMNOPQRSTUVWXYZ234567")
 
 // Standard byte for padding.
 const paddingByte = '='
+
+fn lenNoPad(b: []byte): int {
+    let mut i = len(b) - 1
+    for i >= 0 && b[i] == paddingByte; i-- {}
+    ret i + 1
+}
+
+fn encodedLen(n: int, pad: bool): int {
+    if pad {
+        ret (n + 4) / 5 << 3
+    }
+    ret n / 5 << 3 + (n % 5 << 3 + 4) / 5
+}
+
+fn decodedLen(&b: []byte): int {
+    if len(b) == 0 {
+        ret 0
+    }
+    let n = lenNoPad(b)
+    ret n >> 3 * 5 + n % 8 * 5 >> 3
+}
 
 // Encodes source bytes into dest with standard base32 table.
 // Returns encoded base32 bytes if success, nil slice if not.
 // Adds padding if pad is true.
 // Algorithm will call the append function to append dest.
-fn Encode(mut dest: []byte, src: []byte, pad: bool): []byte {
+fn Encode(src: []byte, pad: bool): []byte {
+    let n = encodedLen(len(src), pad)
+    if n == 0 {
+        ret nil
+    }
+    let t = &t32[0]
     let mut bits: u64 = 0
     let mut buffer: u32 = 0
-    let p = &t32[0]
+    let mut dest = make([]byte, n)
+    let mut p = &dest[0]
     for _, b in src {
         buffer <<= 8
         buffer += u32(b)
         bits += 8
-        for bits >= 5 {
-            dest = append(dest, unsafe { p[(buffer>>(bits-5))&0x3F] })
+        for bits >= 5; p++ {
+            unsafe { *p = t[(buffer>>(bits-5))&0x3F] }
             buffer &= ^(0x1F << (bits - 5))
             bits -= 5
         }
@@ -32,27 +59,51 @@ fn Encode(mut dest: []byte, src: []byte, pad: bool): []byte {
     match len(src) % 5 {
     | 1:
         buffer <<= 2
-        dest = append(dest, unsafe { p[buffer&0x1F] })
+        unsafe { *p = t[buffer&0x1F] }
         if pad {
-            dest = append(dest, paddingByte, paddingByte, paddingByte, paddingByte, paddingByte, paddingByte)
+            p++
+            unsafe { *p = paddingByte }
+            p++
+            unsafe { *p = paddingByte }
+            p++
+            unsafe { *p = paddingByte }
+            p++
+            unsafe { *p = paddingByte }
+            p++
+            unsafe { *p = paddingByte }
+            p++
+            unsafe { *p = paddingByte }
         }
     | 2:
         buffer <<= 4
-        dest = append(dest, unsafe { p[buffer&0x1F] })
+        unsafe { *p = t[buffer&0x1F] }
         if pad {
-            dest = append(dest, paddingByte, paddingByte, paddingByte, paddingByte)
+            p++
+            unsafe { *p = paddingByte }
+            p++
+            unsafe { *p = paddingByte }
+            p++
+            unsafe { *p = paddingByte }
+            p++
+            unsafe { *p = paddingByte }
         }
     | 3:
         buffer <<= 1
-        dest = append(dest, unsafe { p[buffer&0x1F] })
+        unsafe { *p = t[buffer&0x1F] }
         if pad {
-            dest = append(dest, paddingByte, paddingByte, paddingByte)
+            p++
+            unsafe { *p = paddingByte }
+            p++
+            unsafe { *p = paddingByte }
+            p++
+            unsafe { *p = paddingByte }
         }
     | 4:
         buffer <<= 3
-        dest = append(dest, unsafe { p[buffer&0x1F] })
+        unsafe { *p = t[buffer&0x1F] }
         if pad {
-            dest = append(dest, paddingByte)
+            p++
+            unsafe { *p = paddingByte }
         }
     }
     ret dest
@@ -62,21 +113,26 @@ fn Encode(mut dest: []byte, src: []byte, pad: bool): []byte {
 // Returns decoded bytes if success, nil slice if not.
 // Detects padding by default, no required padding specification.
 // Algorithm will call the append function to append dest.
-fn Decode(mut dest: []byte, src: []byte): []byte {
+fn Decode(src: []byte): []byte {
+    let n = decodedLen(src)
+    if n == 0 {
+        ret nil
+    }
     let mut buffer: u32 = 0
     let mut bits: u64 = 0
+    let mut dest = make([]byte, n)
+    let mut p = &dest[0]
     for _, b in src {
-        let i = strings::FindByte(t32, b)
-        let mut group = u32(0)
-        if i != -1 {
-            group = u32(31 - (31 - i))
-        }
+        let i = fastbytes::FindByte(t32, b)
         buffer <<= 5
         bits += 5
-        buffer += group
+        if i != -1 {
+            buffer += u32(31 - (31 - i))
+        }
         if bits >= 8 {
             if b != paddingByte {
-                dest = append(dest, byte(buffer >> (bits - 8)))
+                unsafe { *p = byte(buffer >> (bits - 8)) }
+                p++
             }
             buffer &= ^(0xFF << (bits - 8))
             bits -= 8
