@@ -27,6 +27,28 @@ fn EncodeLen(b: []byte, pad: bool): int {
     ret (len(b) + 2) / 3 << 2
 }
 
+fn decodeLen(&b: []byte): (n: int, l: int, pad1: bool, pad2: bool) {
+    if len(b) == 0 {
+        ret
+    }
+    let p = &b[0]
+    pad1 = len(b) > 0 && (len(b)%4 != 0 || unsafe { p[len(b)-1] } == paddingByte)
+    l = (len(b) + 3) / 4
+    if pad1 {
+        l--
+    }
+    l = l << 2
+    pad2 = pad1 && len(b) > l+2 && unsafe { p[l+2] } != paddingByte
+    n = l >> 2 * 3
+    if pad1 {
+        n++
+        if pad2 {
+            n++
+        }
+    }
+    ret
+}
+
 fn encode(&src: []byte, pad: bool): []byte {
     let n = EncodeLen(src, pad)
     if n <= len(src) {
@@ -100,51 +122,38 @@ fn EncodeUrl(src: []byte): []byte {
 }
 
 fn decode(&src: []byte): []byte {
-    if len(src) == 0 {
+    let (n, l, pad1, pad2) = decodeLen(src)
+    if n == 0 {
         ret nil
     }
-    let p = &src[0]
-    let pad1 = len(src) > 0 && (len(src)%4 != 0 || unsafe { p[len(src)-1] } == paddingByte)
-    let mut l = (len(src) + 3) / 4
-    if pad1 {
-        l--
-    }
-    l = l << 2
-    let pad2 = pad1 && len(src) > l+2 && unsafe { p[l+2] } != paddingByte
-    let mut sz = l >> 2 * 3
-    if pad1 {
-        sz++
-        if pad2 {
-            sz++
-        }
-    }
-    let mut dest = make([]byte, sz)
+    let mut dest = make([]byte, n)
+
     let mut d = &dest[0]
+    let p = &src[0]
 
     // Use pointer for table to skip boundary-checking cost.
     let ip = &t64d[0]
 
     let mut i = 0
-    let mut j = 0
     for i < l; i += 4 {
         unsafe {
-            let n = ip[p[i]] << 18 | ip[p[i+1]] << 12 | ip[p[i+2]] << 6 | ip[p[i+3]]
-            d[j] = byte(n >> 16)
-            j++
-            d[j] = byte(n >> 8 & 0xFF)
-            j++
-            d[j] = byte(n & 0xFF)
-            j++
+            let k = ip[p[i]] << 18 | ip[p[i+1]] << 12 | ip[p[i+2]] << 6 | ip[p[i+3]]
+            *d = byte(k >> 16)
+            d++
+            *d = byte(k >> 8 & 0xFF)
+            d++
+            *d = byte(k & 0xFF)
+            d++
         }
     }
     if pad1 {
         unsafe {
-            let mut n = ip[p[l]] << 18 | ip[p[l+1]] << 12
-            d[j] = byte(n >> 16)
-            j++
+            let mut k = ip[p[l]] << 18 | ip[p[l+1]] << 12
+            *d = byte(k >> 16)
             if pad2 {
-                n |= ip[p[l+2]] << 6
-                d[j] = byte(n >> 8 & 0xFF)
+                d++
+                k |= ip[p[l+2]] << 6
+                *d = byte(k >> 8 & 0xFF)
             }
         }
     }
