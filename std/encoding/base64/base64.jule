@@ -19,20 +19,26 @@ static t64d: [...]i32 = [
 // Standard byte for padding.
 const paddingByte = '='
 
-fn encode(&src: []byte, pad: bool): []byte {
-    let mut blen = 4 * ((len(src) + 2) / 3)
+// Returns length of encoded bytes of b.
+fn EncodeLen(b: []byte, pad: bool): int {
+    let mut n = (len(b) + 2) / 3 << 2
     if pad {
-        if blen%4 != 0 { // Padding 1
-            blen--
-            if blen%4 > 2 { // Padding 2
-                blen--
+        if n%4 != 0 { // Padding 1
+            n--
+            if n%4 > 2 { // Padding 2
+                n--
             }
         }
     }
-    if blen <= len(src) {
+    ret n
+}
+
+fn encode(&src: []byte, pad: bool): []byte {
+    let n = EncodeLen(src, pad)
+    if n <= len(src) {
         ret nil
     }
-    let mut dest = make([]byte, blen)
+    let mut dest = make([]byte, n)
     let mut j = &dest[0]
     let mut i = &src[0]
     let end = i + len(src)
