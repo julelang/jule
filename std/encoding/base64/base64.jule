@@ -3,16 +3,10 @@
 // license that can be found in the LICENSE file.
 
 // Table for standard base64 encoding, as defined in RFC 4648.
-const t64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+static t64e = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 
-// Table for url base64 encoding, as defined in RFC 4648.
-// It is typically used for URLs and file names.
-const ut64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
-
-// Standard byte for padding.
-const paddingByte = '='
-
-static _i64: [123]int = [
+// Decoding table for t64e.
+static t64d: [...]i32 = [
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 62, 63, 62, 62, 63, 52, 53, 54, 55,
@@ -22,10 +16,10 @@ static _i64: [123]int = [
     41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51,
 ]
 
-// Encodes source bytes with standard base64 table.
-// Returns encoded base64 bytes if success, nil slice if not.
-// Adds padding if pad is true.
-fn Encode(src: []byte, pad: bool): []byte {
+// Standard byte for padding.
+const paddingByte = '='
+
+fn encode(&src: []byte, pad: bool): []byte {
     let mut blen = 4 * ((len(src) + 2) / 3)
     if pad {
         if blen%4 != 0 { // Padding 1
@@ -35,48 +29,41 @@ fn Encode(src: []byte, pad: bool): []byte {
             }
         }
     }
-
     if blen <= len(src) {
         ret nil
     }
-
-    // Use temporary compile-time stored table to skip boundary-checking cost.
-    let t = t64
-    let tp = &t[0]
-
     let mut dest = make([]byte, blen)
     let mut j = &dest[0]
-
     let mut i = &src[0]
     let end = i + len(src)
+    let table = &t64e[0]
     for i+3 <= end; i += 3 {
         unsafe {
-            *j = tp[i[0]>>2]
+            *j = table[i[0]>>2]
             j++
-            *j = tp[((i[0]&0x03)<<4)|(i[1]>>4)]
+            *j = table[((i[0]&0x03)<<4)|(i[1]>>4)]
             j++
-            *j = tp[((i[1]&0x0f)<<2)|(i[2]>>6)]
+            *j = table[((i[1]&0x0f)<<2)|(i[2]>>6)]
             j++
-            *j = tp[i[2]&0x3f]
+            *j = table[i[2]&0x3f]
             j++
         }
     }
-
     if i < end {
         unsafe {
-            *j = tp[i[0]>>2]
+            *j = table[i[0]>>2]
             j++
             if i+1 == end {
-                *j = tp[(i[0]&0x03)<<4]
+                *j = table[(i[0]&0x03)<<4]
                 j++
                 if pad {
                     *j = paddingByte
                     j++
                 }
             } else {
-                *j = tp[((i[0]&0x03)<<4)|(i[1]>>4)]
+                *j = table[((i[0]&0x03)<<4)|(i[1]>>4)]
                 j++
-                *j = tp[(i[1]&0x0f)<<2]
+                *j = table[(i[1]&0x0f)<<2]
                 j++
             }
             if pad {
@@ -85,18 +72,37 @@ fn Encode(src: []byte, pad: bool): []byte {
             }
         }
     }
-
     ret dest
 }
 
-// Decodes source bytes with standard base64 table.
-// Returns decoded bytes if success, nil slice if not.
-// Detects padding by default, no required padding specification.
-fn Decode(src: []byte): []byte {
+// Encodes source bytes with standard base64 table.
+// Returns encoded base64 bytes if success, nil slice if not.
+// Adds padding if pad is true.
+fn Encode(src: []byte, pad: bool): []byte {
+    ret encode(src, pad)
+}
+
+// Encodes source bytes with url base64 table.
+// It is typically used for URLs and file names.
+// Returns encoded base64 bytes if success, nil slice if not.
+fn EncodeUrl(src: []byte): []byte {
+    const Padding = false
+    let mut r = encode(src, Padding)
+    for i, b in r {
+        match b {
+        | '+':
+            r[i] = '-'
+        | '/':
+            r[i] = '_'
+        }
+    }
+    ret r
+}
+
+fn decode(&src: []byte): []byte {
     if len(src) == 0 {
         ret nil
     }
-
     let p = &src[0]
     let mut j = 0
     let pad1 = len(src)%4 != 0 || unsafe { *(p+len(src)-1) } == paddingByte
@@ -117,7 +123,7 @@ fn Decode(src: []byte): []byte {
     let mut d = &dest[0]
 
     // Use pointer for table to skip boundary-checking cost.
-    let ip = &_i64[0]
+    let ip = &t64d[0]
 
     let mut i = 0
     for i < l; i += 4 {
@@ -131,7 +137,6 @@ fn Decode(src: []byte): []byte {
             j++
         }
     }
-
     if pad1 {
         unsafe {
             let mut n = ip[p[l]] << 18 | ip[p[l+1]] << 12
@@ -147,50 +152,16 @@ fn Decode(src: []byte): []byte {
     ret dest
 }
 
-// Encodes source bytes with url base64 table.
-// It is typically used for URLs and file names.
-// Returns encoded base64 bytes if success, nil slice if not.
-fn EncodeUrl(src: []byte): []byte {
-    const Padding = false
-    let mut dest = Encode(src, Padding)
-    if dest == nil {
-        ret nil
-    }
-
-    // Process URL table.
-    let mut i = &dest[0]
-    let end = i + len(dest)
-    for i < end; i++ {
-        unsafe {
-            match *i {
-            | '+':
-                *i = '-'
-            | '/':
-                *i = '_'
-            }
-        }
-    }
-    ret dest
+// Decodes source bytes with standard base64 table.
+// Returns decoded bytes if success, nil slice if not.
+// Detects padding by default, no required padding specification.
+fn Decode(src: []byte): []byte {
+    ret decode(src)
 }
 
 // Decodes source bytes with url base64 table.
 // It is typically used for URLs and file names.
 // Returns decoded bytes if success, nil slice if not.
 fn DecodeUrl(src: []byte): []byte {
-    // Process URL table.
-    let mut dest = clone(src)
-    let mut i = &dest[0]
-    let end = i + len(dest)
-    for i < end; i++ {
-        unsafe {
-            match *i {
-            | '-':
-                *i = '+'
-            | '_':
-                *i = '/'
-            // Padding detected by algorithm.
-            }
-        }
-    }
-    ret Decode(dest)
+    ret decode(src)
 }
