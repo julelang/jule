@@ -804,9 +804,9 @@ struct typeChecker {
     // This generics used as type alias for real kind.
     useGenerics: []&TypeAlias
 
-    // Current checked type is not plain type.
-    // Type is pointer, reference, slice or similar.
-    notPlain: bool
+    // Current checked type is risky for cycles.
+    // If this field is true, cycle analysis will be executed for type.
+    cycleRisk: bool = true
 
     // Disallow/suppress Jule's built-in defines.
     disBuiltin: bool
@@ -918,13 +918,13 @@ impl typeChecker {
     // Returns true if self.referencer is nil reference.
     // Returns true if refers is nil.
     fn checkIllegalCycles(mut self, &ident: &IdentTypeDecl, mut decl: any): (ok: bool) {
-        if self.referencer == nil {
+        if self.referencer == nil || !self.cycleRisk {
             ret true
         }
 
         match type decl {
         | &Struct:
-            if self.notPlain || (&Struct)(decl).Binded {
+            if (&Struct)(decl).Binded {
                 ret true
             }
         | &TypeAlias:
@@ -1178,7 +1178,7 @@ impl typeChecker {
             }
         }
 
-        let mut ok = self.notPlain || self.checkIllegalCycles(decl, s)
+        let mut ok = self.checkIllegalCycles(decl, s)
         if !ok {
             ret nil
         }
@@ -1338,9 +1338,9 @@ impl typeChecker {
     }
 
     fn buildSptr(mut self, mut decl: &SptrTypeDecl): &Sptr {
-        let notPlain = self.notPlain
-        self.notPlain = true
-        defer { self.notPlain = notPlain }
+        let cycleRisk = self.cycleRisk
+        self.cycleRisk = false
+        defer { self.cycleRisk = cycleRisk }
 
         let mut elem = self.checkDecl(decl.Elem)
         ret self.buildSptrFromType(elem)
@@ -1362,9 +1362,9 @@ impl typeChecker {
     }
 
     fn buildPtr(mut self, mut decl: &PtrTypeDecl): &Ptr {
-        let notPlain = self.notPlain
-        self.notPlain = true
-        defer { self.notPlain = notPlain }
+        let cycleRisk = self.cycleRisk
+        self.cycleRisk = false
+        defer { self.cycleRisk = cycleRisk }
 
         let mut elem: &TypeKind = nil
 
@@ -1379,9 +1379,9 @@ impl typeChecker {
     }
 
     fn buildSlc(mut self, mut decl: &SlcTypeDecl): &Slc {
-        let notPlain = self.notPlain
-        self.notPlain = true
-        defer { self.notPlain = notPlain }
+        let cycleRisk = self.cycleRisk
+        self.cycleRisk = false
+        defer { self.cycleRisk = cycleRisk }
 
         let mut elem = self.checkDecl(decl.Elem)
 
@@ -1400,10 +1400,6 @@ impl typeChecker {
     }
 
     fn buildArr(mut self, mut decl: &ArrTypeDecl): &Arr {
-        let notPlain = self.notPlain
-        self.notPlain = true
-        defer { self.notPlain = notPlain }
-
         let mut n = 0
 
         if !decl.AutoSized() {
@@ -1453,9 +1449,9 @@ impl typeChecker {
     }
 
     fn buildMap(mut self, mut decl: &MapTypeDecl): &Map {
-        let notPlain = self.notPlain
-        self.notPlain = true
-        defer { self.notPlain = notPlain }
+        let cycleRisk = self.cycleRisk
+        self.cycleRisk = false
+        defer { self.cycleRisk = cycleRisk }
 
         let mut key = self.checkDecl(decl.Key)
         if key == nil {
@@ -1508,6 +1504,10 @@ impl typeChecker {
     }
 
     fn buildFn(mut self, mut decl: &FnDecl): &FnIns {
+        let cycleRisk = self.cycleRisk
+        self.cycleRisk = false
+        defer { self.cycleRisk = cycleRisk }
+
         if len(decl.Generics) > 0 {
             self.pushErr(decl.Token, LogMsg.GenericedFnAsAnonFn)
             ret nil
