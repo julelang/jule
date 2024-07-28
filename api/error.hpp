@@ -13,12 +13,12 @@
 #define __JULE_ERROR__INDEX_OUT_OF_RANGE "index out of range"
 #define __JULE_ERROR__DIVIDE_BY_ZERO "divide by zero"
 
-#define __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(STR, START, END, LEN) \
-    STR += __JULE_ERROR__INDEX_OUT_OF_RANGE " [";                           \
-    __jule_push_int_to_str(STR, START);                                     \
-    STR += ":";                                                             \
-    __jule_push_int_to_str(STR, END);                                       \
-    STR += "] with length ";                                                \
+#define __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(STR, START, END, LEN, SIZE_TYPE) \
+    STR += __JULE_ERROR__INDEX_OUT_OF_RANGE " [";                                      \
+    __jule_push_int_to_str(STR, START);                                                \
+    STR += ":";                                                                        \
+    __jule_push_int_to_str(STR, END);                                                  \
+    STR += "] with " SIZE_TYPE " ";                                                    \
     STR += std::to_string(LEN)
 
 #define __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(STR, INDEX, LEN) \
