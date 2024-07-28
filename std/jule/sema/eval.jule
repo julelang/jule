@@ -3111,6 +3111,9 @@ impl unaryEval {
             ret
         }
 
+        self.d.Lvalue = false
+        self.d.Mutable = true
+
         if self.d.IsConst() {
             match {
             | self.d.Constant.IsF64():
@@ -3120,10 +3123,11 @@ impl unaryEval {
             | self.d.Constant.IsU64():
                 self.d.Constant.SetI64(-self.d.Constant.AsI64())
             }
+            // Do not self model for constant expressions. It's a overhead,
+            // because model will be changed to constant by following algorithm.
+            ret
         }
 
-        self.d.Lvalue = false
-        self.d.Mutable = true
         self.d.Model = &UnaryExprModel{
             Expr: new(Data, *self.d),
             Op: self.u.Op,
@@ -3150,6 +3154,9 @@ impl unaryEval {
             ret
         }
 
+        self.d.Lvalue = false
+        self.d.Mutable = true
+
         if self.d.IsConst() {
             match {
             | self.d.Constant.IsF64():
@@ -3159,10 +3166,11 @@ impl unaryEval {
             | self.d.Constant.IsU64():
                 self.d.Constant.SetI64(+self.d.Constant.AsI64())
             }
+            // Do not self model for constant expressions. It's a overhead,
+            // because model will be changed to constant by following algorithm.
+            ret
         }
 
-        self.d.Lvalue = false
-        self.d.Mutable = true
         self.d.Model = &UnaryExprModel{
             Expr: new(Data, *self.d),
             Op: self.u.Op,
@@ -3189,6 +3197,9 @@ impl unaryEval {
             ret
         }
 
+        self.d.Lvalue = false
+        self.d.Mutable = true
+
         if self.d.IsConst() {
             match {
             | self.d.Constant.IsI64():
@@ -3196,10 +3207,11 @@ impl unaryEval {
             | self.d.Constant.IsU64():
                 self.d.Constant.SetU64(^self.d.Constant.ReadU64())
             }
+            // Do not self model for constant expressions. It's a overhead,
+            // because model will be changed to constant by following algorithm.
+            ret
         }
 
-        self.d.Lvalue = false
-        self.d.Mutable = true
         self.d.Model = &UnaryExprModel{
             Expr: new(Data, *self.d),
             Op: self.u.Op,
@@ -3213,15 +3225,19 @@ impl unaryEval {
             ret
         }
 
+        self.d.Lvalue = false
+        self.d.Mutable = true
+
         if self.d.IsConst() {
             match {
             | self.d.Constant.IsBool():
                 self.d.Constant.SetBool(!self.d.Constant.ReadBool())
             }
+            // Do not self model for constant expressions. It's a overhead,
+            // because model will be changed to constant by following algorithm.
+            ret
         }
 
-        self.d.Lvalue = false
-        self.d.Mutable = true
         self.d.Model = &UnaryExprModel{
             Expr: new(Data, *self.d),
             Op: self.u.Op,
@@ -3275,14 +3291,13 @@ impl unaryEval {
                 }
             |:
                 self.d = nil
+                ret
             }
         }
 
-        if self.d != nil {
-            self.d.Constant = nil
-            self.d.Lvalue = false
-            self.d.Mutable = true
-        }
+        self.d.Constant = nil
+        self.d.Lvalue = false
+        self.d.Mutable = true
     }
 
     fn typeDecl(mut self) {
