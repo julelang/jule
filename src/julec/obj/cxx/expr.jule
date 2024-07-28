@@ -12,6 +12,7 @@ use opt::{
     StrInsertBeginExprModel,
     StrAppendExprModel,
     StrCompExprModel,
+    InlineStdInternalNosafeStobs,
 }
 use conv for std::conv
 use std::env::{Arch}
@@ -100,6 +101,7 @@ enum compExprModel: type {
     &StrInsertBeginExprModel,
     &StrAppendExprModel,
     &StrCompExprModel,
+    &InlineStdInternalNosafeStobs,
 }
 
 struct exprCoder {
@@ -1367,6 +1369,11 @@ impl exprCoder {
         }
     }
 
+    fn inlineStdInternalNosafeStobs(mut &self, mut m: &InlineStdInternalNosafeStobs) {
+        self.possibleRefExpr(m.Str)
+        self.oc.write(".fake_slice()")
+    }
+
     fn model(mut &self, mut m: compExprModel) {
         match type m {
         | str:
@@ -1465,6 +1472,8 @@ impl exprCoder {
             self.strInsertBegin((&StrInsertBeginExprModel)(m))
         | &StrCompExprModel:
             self.strComp((&StrCompExprModel)(m))
+        | &InlineStdInternalNosafeStobs:
+            self.inlineStdInternalNosafeStobs((&InlineStdInternalNosafeStobs)(m))
         |:
             self.oc.write("<unimplemented_expression_model>")
         }
