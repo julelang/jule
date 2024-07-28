@@ -753,7 +753,8 @@ impl fnCallArgChecker {
 
     fn checkArg(mut self, mut &p: &ParamIns, mut &arg: &Data, mut &errorToken: &Token): (ok: bool) {
         if self.dynamicAnnotation && parameterUsesGenerics(p, self.f.Decl.Generics) {
-            ok = !p.Decl.Variadic // Accept as fail if parameter is variadic.
+            // Accept as fail if parameter is variadic or expression is invalid.
+            ok = !p.Decl.Variadic && isGoodValueToInfer(arg)
             if ok {
                 let mut dta = dynamicTypeAnnotation{
                     e: self.e,
@@ -1375,4 +1376,9 @@ impl retTypeChecker {
 
 fn lenKind(): &TypeKind {
     ret primInt
+}
+
+// Reports whether d is good for dynamic type infer.
+fn isGoodValueToInfer(&d: &Data): bool {
+    ret !d.IsNil()
 }
