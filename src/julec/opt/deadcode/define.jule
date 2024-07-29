@@ -120,13 +120,18 @@ impl ObjectDeadCode {
                 }
                 self.pushLive[&StructIns](s)
                 self.setReferencesAsLive(s.Refers)
-                for (_, mut ins) in s.Methods {
-                    for (_, mut mins) in ins.Instances {
-                        if self.isLive[&FnIns](mins) {
+                for (_, mut m) in s.Methods {
+                    for (_, mut ins) in m.Instances {
+                        if self.isLive[&FnIns](ins) {
                             continue
                         }
-                        self.pushLive[&FnIns](mins)
-                        self.setReferencesAsLive(mins.Refers)
+                        // Push as live the method if implements a trait's method.
+                        // Other methods will be marked as live by referenced defines,
+                        // no need for special tracking algorithm to caught.
+                        if isTraitMethod(s, ins) {
+                            self.pushLive[&FnIns](ins)
+                            self.setReferencesAsLive(ins.Refers)
+                        }
                     }
                 }
             }
@@ -300,4 +305,14 @@ fn findDirective(mut &directives: []&ast::Directive, tag: str): &ast::Directive 
 // Reports whether directive is exist.
 fn hasDirective(&directives: []&ast::Directive, tag: str): bool {
     ret findDirective(unsafe { *(&directives) }, tag) != nil
+}
+
+// Reports the f function of owner is implements a trait's method.
+fn isTraitMethod(mut &owner: &StructIns, &f: &FnIns): bool {
+    for (_, mut t) in owner.Decl.Implements {
+        if t.FindMethod(f.Decl.Ident) != nil {
+            ret true
+        }
+    }
+    ret false
 }
