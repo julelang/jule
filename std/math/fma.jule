@@ -62,20 +62,12 @@ fn shl(u1: u64, u2: u64, n: uint): (r1: u64, r2: u64) {
 }
 
 fn shr(u1: u64, u2: u64, n: uint): (r1: u64, r2: u64) {
-    // Compute shift for correct FMA computing.
-    // Actually: r2 = u2>>n | u1<<(64-n) | u1>>(n-64)
-    // But u1>>(n-64) is bad computation, but why: ?
-    // For this reason, compute this shifting manually.
-    //
-    // TODO: Make sure this computation is fast and efficiency?
-    let mut shift = u1
-    let mut shiftN = n - 64
-    for shift > 0 && shiftN > 0 {
-        shiftN--
-        shift >>= 1
+    r2 = u2 >> n | u1 << (64 - n)
+    // Avoid overflow value of: u1>>(n-64)
+    let shift = n - 64
+    if shift < 64 {
+        r2 |= u1 >> shift
     }
-
-    r2 = u2 >> n | u1 << (64 - n) | shift
     r1 = u1 >> n
     ret
 }
