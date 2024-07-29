@@ -6,6 +6,7 @@ use env
 use opt
 use obj::{IR}
 use conv for std::conv
+use comptime for std::comptime
 use jule for std::jule
 use build for std::jule::build::{
     Directive,
@@ -34,6 +35,7 @@ use std::jule::sema::{
     Prim,
     Sptr,
     TypeSymbol,
+    Operators,
 }
 use path for std::fs::path
 use strings for std::strings
@@ -743,13 +745,12 @@ impl ObjectCoder {
     }
 
     fn structureInsDecl(mut &self, mut &s: &StructIns) {
-        if len(s.Methods) > 0 {
-            for (_, mut m) in s.Methods {
-                self.pushResult(m)
+        for (_, mut m) in s.Methods {
+            // Operator methods are declared by [structureDecl].
+            if isOpMethod(m) {
                 self.funcDecl(m, false)
             }
         }
-
         self.write("struct ")
         let outIdent = identCoder.structureIns(s)
 
@@ -788,6 +789,22 @@ impl ObjectCoder {
             if s.Token != nil {
                 self.structureDecl(s)
                 self.write("\n")
+            }
+        }
+    }
+
+    fn structureMethodDecls(mut &self) {
+        for (_, mut s) in self.ir.Ordered.Structs {
+            if s.Token != nil {
+                for (_, mut ins) in s.Instances {
+                    for (_, mut m) in ins.Methods {
+                        // Operator methods are declared by [structureDecl].
+                        if !isOpMethod(m) {
+                            self.pushResult(m)
+                            self.funcDecl(m, false)
+                        }
+                    }
+                }
             }
         }
     }
@@ -1149,8 +1166,9 @@ impl ObjectCoder {
     fn decls(mut &self) {
         self.traitDecls()
         self.structurePlainDecls()
-        self.headPos = len(self.Obj)
         self.structureDecls()
+        self.headPos = len(self.Obj)
+        self.structureMethodDecls()
         self.funcDecls()
         self.write("\n\n")
         self.traitDataTypes()
@@ -1415,4 +1433,20 @@ fn pushMethodsFromInherits(mut &dest: &Trait, mut &src: &Trait) {
         let mut t2 = inh.Kind.Trait()
         pushMethodsFromInherit(dest, t2)
     }
+}
+
+// Reports whtehr the m is operator overloading function.
+fn isOpMethod(&m: &Fn): bool {
+    if m == nil || len(m.Generics) > 0 || len(m.Instances) == 0 {
+        ret false
+    }
+    let mi = m.Instances[0]
+    const tableT = comptime::TypeOf(Operators)
+    const tableV = comptime::ValueOf(mi.Owner.Operators)
+    for _, field in comptime::Range(tableT.Fields()) {
+        if mi == tableV.Field(field.Name()).Unwrap() {
+            ret true
+        }
+    }
+    ret false
 }
