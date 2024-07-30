@@ -128,60 +128,13 @@ fn rangeLast(mut &tokens: []&Token): (cutted: []&Token, cut: []&Token) {
     ret tokens, nil
 }
 
-// Same as parts, but uses TokenKind as separator.
-fn partsKind(mut &tokens: []&Token, kind: TokenKind, exprMust: bool): ([][]&Token, []Log) {
-    if len(tokens) == 0 {
-        ret nil, nil
-    }
-
-    let mut parts: [][]&Token = nil
-    let mut errors: []Log = nil
-
-    let mut rangeN = 0
-    let mut last = 0
-    for i, token in tokens {
-        if token.Id == TokenId.Range {
-            match token.Kind {
-            | TokenKind.LBrace
-            | TokenKind.LBracket
-            | TokenKind.LParent:
-                rangeN++
-                continue
-            |:
-                rangeN--
-            }
-        }
-
-        if rangeN > 0 {
-            continue
-        }
-
-        if token.Kind == kind {
-            if exprMust && i-last <= 0 {
-                let err = makeErr(token.Row, token.Column, token.File, LogMsg.MissingExpr)
-                errors = append(errors, err)
-            }
-            parts = append(parts, tokens[last:i])
-            last = i + 1
-        }
-    }
-
-    if last < len(tokens) {
-        parts = append(parts, tokens[last:])
-    } else if !exprMust {
-        parts = append(parts, [])
-    }
-
-    ret parts, errors
-}
-
 // Returns parts separated by given token identifier.
 // It's skips parentheses ranges.
-// Logs missing_expr if expr_must == true and not exist any expression for part.
+// Logs missing_expr if exprMust == true and not exist any expression for part.
 //
 // Special case is;
 //  parts(tokens) = nil if len(tokens) == 0
-fn parts(mut &tokens: []&Token, id: TokenId, expr_must: bool): ([][]&Token, []Log) {
+fn parts(mut &tokens: []&Token, id: TokenId, exprMust: bool): ([][]&Token, []Log) {
     if len(tokens) == 0 {
         ret nil, nil
     }
@@ -209,7 +162,7 @@ fn parts(mut &tokens: []&Token, id: TokenId, expr_must: bool): ([][]&Token, []Lo
         }
 
         if token.Id == id {
-            if expr_must && i-last <= 0 {
+            if exprMust && i-last <= 0 {
                 let err = makeErr(token.Row, token.Column, token.File, LogMsg.MissingExpr)
                 errors = append(errors, err)
             }
@@ -220,7 +173,7 @@ fn parts(mut &tokens: []&Token, id: TokenId, expr_must: bool): ([][]&Token, []Lo
 
     if last < len(tokens) {
         parts = append(parts, tokens[last:])
-    } else if !expr_must {
+    } else if !exprMust {
         parts = append(parts, [])
     }
 
@@ -513,7 +466,7 @@ impl parser {
                 ret nil
             }
             let mut constraintTokens = tokens[2:]
-            let (mut parts, errors) = partsKind(constraintTokens, TokenKind.Vline, true)
+            let (mut parts, errors) = parts(constraintTokens, TokenId.Vline, true)
             if len(errors) > 0 {
                 self.errors = append(self.errors, errors...)
                 ret nil
