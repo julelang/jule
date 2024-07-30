@@ -973,7 +973,9 @@ impl structLitChecker {
         const Reference = false
         // If evaluated for the immutable memory, check as immutable.
         // But if field in scope of the interior mutability, check as mutable.
-        let mutable = f.Decl.Mutable || !self.e.immutable
+        // Do not accept as risky if structure is not have any method.
+        // Because if there is not method, no risk for interior mutability.
+        let mutable = !self.e.immutable || (f.Decl.Mutable && len(self.s.Methods) > 0)
         if self.e.s.checkValidityForInitExpr(mutable, Reference, f.Kind, d, errorToken) {
             // Check type if validity is good.
             // Helps to reduce error logs and duplicated logs.
