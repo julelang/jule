@@ -73,28 +73,28 @@ fn nextStPos(&tokens: []&Token, start: int): (int, bool) {
         let mut terminated: bool = false
         let tok = tokens[i]
         match tok.Id {
-        | TokenId.Range:
-            match tok.Kind {
-            | TokenKind.LBrace
-            | TokenKind.LBracket
-            | TokenKind.LParent:
-                if braceN == 0 && i > start {
-                    if !prevIsIncompleteExpr(tokens, i) {
-                        ok, terminated = isSt(tok, tokens[i-1])
-                        if ok {
-                            goto return
-                        }
-                    }
-                }
-                braceN++
-            |:
-                braceN--
-                if braceN == 0 && i+1 < len(tokens) {
-                    ok, terminated = isSt(tokens[i+1], tok)
+        | TokenId.LBrace
+        | TokenId.LBracket
+        | TokenId.LParent:
+            if braceN == 0 && i > start {
+                if !prevIsIncompleteExpr(tokens, i) {
+                    ok, terminated = isSt(tok, tokens[i-1])
                     if ok {
-                        i++
                         goto return
                     }
+                }
+            }
+            braceN++
+            continue
+        | TokenId.RBrace
+        | TokenId.RBracket
+        | TokenId.RParent:
+            braceN--
+            if braceN == 0 && i+1 < len(tokens) {
+                ok, terminated = isSt(tokens[i+1], tok)
+                if ok {
+                    i++
+                    goto return
                 }
             }
             continue
@@ -261,7 +261,7 @@ impl scopeParser {
         }
 
         let mut i = len(stTokens)
-        let mut blockTokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
+        let mut blockTokens = range(i, TokenId.LBrace, TokenId.RBrace, tokens)
         if blockTokens == nil {
             self.stop()
             self.pushErr(it.Token, LogMsg.BodyNotExist)
@@ -340,7 +340,7 @@ impl scopeParser {
 
     fn setupRangeKindKeysExplicit(mut self, mut &rng: &RangeKind, mut &tokens: []&Token) {
         let mut i = 0
-        let mut rang = range(i, TokenKind.LParent, TokenKind.RParent, tokens)
+        let mut rang = range(i, TokenId.LParent, TokenId.RParent, tokens)
         if i < len(tokens) {
             self.pushErr(rng.InToken, LogMsg.InvalidSyntax)
         }
@@ -348,11 +348,7 @@ impl scopeParser {
     }
 
     fn setupRangeKindKeys(mut self, mut &rng: &RangeKind, mut &tokens: []&Token) {
-        if tokens[0].Id == TokenId.Range {
-            if tokens[0].Kind != TokenKind.LParent {
-                self.pushErr(tokens[0], LogMsg.InvalidSyntax)
-                ret
-            }
+        if tokens[0].Id == TokenId.LParent {
             self.setupRangeKindKeysExplicit(rng, tokens)
             ret
         }
@@ -378,16 +374,16 @@ impl scopeParser {
     fn buildCommonIterKind(mut self, mut &tokens: []&Token, &err_tok: &Token): IterKind {
         let mut braceN = 0
         for (i, mut tok) in tokens {
-            if tok.Id == TokenId.Range {
-                match tok.Kind {
-                | TokenKind.LBrace
-                | TokenKind.LBracket
-                | TokenKind.LParent:
-                    braceN++
-                    continue
-                |:
-                    braceN--
-                }
+            match tok.Id {
+            | TokenId.LBrace
+            | TokenId.LBracket
+            | TokenId.LParent:
+                braceN++
+                continue
+            | TokenId.RBrace
+            | TokenId.RBracket
+            | TokenId.RParent:
+                braceN--
             }
             if braceN != 0 {
                 continue
@@ -418,7 +414,7 @@ impl scopeParser {
             it.Kind = self.buildCommonIterKind(exprTokens, it.Token)
         }
         let mut i = len(exprTokens)
-        let mut scopeTokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
+        let mut scopeTokens = range(i, TokenId.LBrace, TokenId.RBrace, tokens)
         if scopeTokens == nil {
             self.stop()
             self.pushErr(it.Token, LogMsg.BodyNotExist)
@@ -487,7 +483,7 @@ impl scopeParser {
         } else {
             i = len(exprTokens)
         }
-        let mut scopeTokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
+        let mut scopeTokens = range(i, TokenId.LBrace, TokenId.RBrace, tokens)
         if scopeTokens == nil {
             self.stop()
             self.pushErr(model.Token, LogMsg.BodyNotExist)
@@ -514,7 +510,7 @@ impl scopeParser {
         }
         tokens = tokens[1:] // Remove "else" keyword.
         let mut i = 0
-        let mut scopeTokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
+        let mut scopeTokens = range(i, TokenId.LBrace, TokenId.RBrace, tokens)
         if scopeTokens == nil {
             if i < len(tokens) {
                 self.pushErr(els.Token, LogMsg.ElseHaveExpr)
@@ -637,17 +633,20 @@ impl scopeParser {
         let mut braceN = 0
         let mut j = 0
         for (i, mut tok) in tokens {
-            if tok.Id == TokenId.Range {
-                match tok.Kind {
-                | TokenKind.LParent
-                | TokenKind.LBrace
-                | TokenKind.LBracket:
-                    braceN++
-                |:
-                    braceN--
-                }
+            match tok.Id {
+            | TokenId.LParent
+            | TokenId.LBrace
+            | TokenId.LBracket:
+                braceN++
                 continue
-            } else if braceN != 0 {
+            | TokenId.RParent
+            | TokenId.RBrace
+            | TokenId.RBracket:
+                braceN--
+                continue
+            }
+
+            if braceN != 0 {
                 continue
             }
             match {
@@ -766,7 +765,7 @@ impl scopeParser {
         }
 
         let mut i = len(exprTokens)
-        let mut blockToks = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
+        let mut blockToks = range(i, TokenId.LBrace, TokenId.RBrace, tokens)
         if blockToks == nil {
             self.stop()
             self.pushErr(m.Token, LogMsg.BodyNotExist)
@@ -810,7 +809,7 @@ impl scopeParser {
         }
 
         let mut i = 0
-        let mut scopeTokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
+        let mut scopeTokens = range(i, TokenId.LBrace, TokenId.RBrace, tokens)
         if scopeTokens == nil {
             self.pushErr(token, LogMsg.InvalidSyntax)
             ret nil
@@ -858,15 +857,15 @@ impl scopeParser {
         }
         let mut braceN = 0
         for (i, mut token) in tokens {
-            if token.Id == TokenId.Range {
-                match token.Kind {
-                | TokenKind.LBrace
-                | TokenKind.LBracket
-                | TokenKind.LParent:
-                    braceN++
-                |:
-                    braceN--
-                }
+            match token.Id {
+            | TokenId.LBrace
+            | TokenId.LBracket
+            | TokenId.LParent:
+                braceN++
+            | TokenId.RBrace
+            | TokenId.RBracket
+            | TokenId.RParent:
+                braceN--
             }
             match {
             | braceN > 0:
@@ -981,9 +980,7 @@ impl scopeParser {
                 }
             }
 
-            if (part[0].Id != TokenId.Ident &&
-                part[0].Id != TokenId.Range &&
-                part[0].Kind != TokenKind.LParent) {
+            if part[0].Id != TokenId.Ident && part[0].Id != TokenId.LParent {
                 self.pushErr(token, LogMsg.InvalidSyntax)
                 continue
             }
@@ -1004,7 +1001,7 @@ impl scopeParser {
 
         tokens = tokens[1:] // Skip "let" keyword
         let mut token = tokens[0]
-        if token.Id != TokenId.Range || token.Kind != TokenKind.LParent {
+        if token.Id != TokenId.LParent {
             ret nil, false
         }
 
@@ -1013,7 +1010,7 @@ impl scopeParser {
         }
 
         let mut i = 0
-        let mut rang = range(i, TokenKind.LParent, TokenKind.RParent, tokens)
+        let mut rang = range(i, TokenId.LParent, TokenId.RParent, tokens)
         if rang == nil {
             self.pushErr(token, LogMsg.InvalidSyntax)
             ret nil, false
@@ -1104,10 +1101,8 @@ impl scopeParser {
         | TokenId.Unsafe
         | TokenId.Defer:
             ret self.buildScopeSt(st.tokens)
-        | TokenId.Range:
-            if token.Kind == TokenKind.LBrace {
-                ret self.buildScopeSt(st.tokens)
-            }
+        | TokenId.LBrace:
+            ret self.buildScopeSt(st.tokens)
         }
         let mut expr = self.p.buildExpr(st.tokens)
         if expr != nil {

@@ -185,11 +185,9 @@ impl exprBuilder {
             ret self.buildObjSubIdent(tokens)
         | TokenId.DblColon:
             ret self.buildNsSubIdent(tokens)
-        | TokenId.Range:
+        | TokenId.RBracket:
             // Catch slice, array, and map types.
-            if token.Kind == TokenKind.RBracket {
-                ret self.buildType(tokens)
-            }
+            ret self.buildType(tokens)
         }
         self.pushErr(token, LogMsg.InvalidSyntax)
         ret nil
@@ -219,16 +217,16 @@ impl exprBuilder {
     fn tryBuildCast(mut self, mut &tokens: []&Token): &CastExpr {
         let mut rangeN = 0
         for i, token in tokens {
-            if token.Id == TokenId.Range {
-                match token.Kind {
-                | TokenKind.LBrace
-                | TokenKind.LBracket
-                | TokenKind.LParent:
-                    rangeN++
-                    continue
-                |:
-                    rangeN--
-                }
+            match token.Id {
+            | TokenId.LBrace
+            | TokenId.LBracket
+            | TokenId.LParent:
+                rangeN++
+                continue
+            | TokenId.RBrace
+            | TokenId.RBracket
+            | TokenId.RParent:
+                rangeN--
             }
 
             if rangeN > 0 {
@@ -246,7 +244,7 @@ impl exprBuilder {
             }
 
             let tok = exprTokens[0]
-            if tok.Id != TokenId.Range || tok.Kind != TokenKind.LParent {
+            if tok.Id != TokenId.LParent {
                 ret nil
             }
 
@@ -276,7 +274,7 @@ impl exprBuilder {
                 if len(exprTokens) > 2 {
                     // Remove parentheses.
                     let mut j = 0
-                    _ = range(j, TokenKind.LParent, TokenKind.RParent, exprTokens)
+                    _ = range(j, TokenId.LParent, TokenId.RParent, exprTokens)
                     if j < len(exprTokens) {
                         ret nil
                     }
@@ -310,15 +308,15 @@ impl exprBuilder {
         let mut rangeN = 0
         tokens = tokens[1:len(tokens)-1] // Remove parentheses.
         for i, token in tokens {
-            if token.Id == TokenId.Range {
-                match token.Kind {
-                | TokenKind.LBrace
-                | TokenKind.LBracket
-                | TokenKind.LParent:
-                    rangeN++
-                |:
-                    rangeN--
-                }
+            match token.Id {
+            | TokenId.LBrace
+            | TokenId.LBracket
+            | TokenId.LParent:
+                rangeN++
+            | TokenId.RBrace
+            | TokenId.RBracket
+            | TokenId.RParent:
+                rangeN--
             }
             if rangeN > 0 || token.Id != TokenId.Comma {
                 continue
@@ -375,14 +373,10 @@ impl exprBuilder {
 
     fn buildParenthesesRange(mut self, mut &tokens: []&Token): ExprData {
         let mut token = tokens[0]
-        match token.Id {
-        | TokenId.Range:
-            match token.Kind {
-            | TokenKind.LParent:
-                let mut expr = self.tryBuildCast(tokens)
-                if expr != nil {
-                    ret expr
-                }
+        if token.Id == TokenId.LParent {
+            let mut expr = self.tryBuildCast(tokens)
+            if expr != nil {
+                ret expr
             }
         }
         let (mut exprTokens, mut args_tokens) = rangeLast(tokens)
@@ -398,7 +392,7 @@ impl exprBuilder {
         let mut token = tokens[0]
         tokens = tokens[1:] // Remove unsafe keyword.
         let mut i = 0
-        let mut rangeTokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
+        let mut rangeTokens = range(i, TokenId.LBrace, TokenId.RBrace, tokens)
         if len(rangeTokens) == 0 {
             self.pushErr(tokens[0], LogMsg.MissingExpr)
             ret nil
@@ -451,15 +445,15 @@ impl exprBuilder {
         let mut rangeN = 0
         tokens = tokens[1:len(tokens)-1] // Remove parentheses.
         for i, token in tokens {
-            if token.Id == TokenId.Range {
-                match token.Kind {
-                | TokenKind.LBrace
-                | TokenKind.LBracket
-                | TokenKind.LParent:
-                    rangeN++
-                |:
-                    rangeN--
-                }
+            match token.Id {
+            | TokenId.LBrace
+            | TokenId.LBracket
+            | TokenId.LParent:
+                rangeN++
+            | TokenId.RBrace
+            | TokenId.RBracket
+            | TokenId.RParent:
+                rangeN--
             }
             if rangeN > 0 || token.Id != TokenId.Comma {
                 continue
@@ -534,7 +528,7 @@ impl exprBuilder {
 
         tokens = tokens[i:] // Remove type tokens.
         let token = tokens[0]
-        if token.Id != TokenId.Range || token.Kind != TokenKind.LBrace {
+        if token.Id != TokenId.LBrace {
             self.pushErr(token, LogMsg.InvalidSyntax)
             ret nil
         }
@@ -605,7 +599,7 @@ impl exprBuilder {
             | &FnCallExpr:
                 tokens = tokens[len(exprTokens)+1:] // Get range: {...}
                 let mut i = 0
-                let mut rangeTokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
+                let mut rangeTokens = range(i, TokenId.LBrace, TokenId.RBrace, tokens)
                 let mut model = (&FnCallExpr)(d)
                 if model.Ignored() {
                     self.pushErr(elseToken, LogMsg.InvalidSyntax)
@@ -777,24 +771,25 @@ impl exprBuilder {
             ret self.buildUnary(tokens)
         }
 
-        match token.Id {
-        | TokenId.Range:
-            if len(tokens) < 3 {
-                break
-            }
-            // Catch type casting.
-            if len(tokens) > 3 {
-                let t = tokens[len(tokens)-1]
-                if t.Id == TokenId.Range && t.Kind == TokenKind.RParent {
+        if len(tokens) >= 3 {
+            match token.Id {
+            | TokenId.LParent
+            | TokenId.LBrace
+            | TokenId.LBracket:
+                // Catch type casting.
+                if len(tokens) > 3 {
+                    let t = tokens[len(tokens)-1]
+                    if t.Id == TokenId.RParent {
+                        break
+                    }
+                }
+
+                let next = tokens[1]
+                if next.Id != TokenId.RBracket {
                     break
                 }
+                ret self.buildType(tokens)
             }
-
-            let next = tokens[1]
-            if next.Id != TokenId.Range || next.Kind != TokenKind.RBracket {
-                break
-            }
-            ret self.buildType(tokens)
         }
 
         token = tokens[len(tokens)-1]
@@ -803,15 +798,12 @@ impl exprBuilder {
             ret self.buildSubIdent(tokens)
         | TokenId.Excl:
             ret self.buildExclRight(tokens)
-        | TokenId.Range:
-            match token.Kind {
-            | TokenKind.RParent:
-                ret self.buildParenthesesRange(tokens)
-            | TokenKind.RBrace:
-                ret self.buildBraceRange(tokens)
-            | TokenKind.RBracket:
-                ret self.buildBracketRange(tokens)
-            }
+        | TokenId.RParent:
+            ret self.buildParenthesesRange(tokens)
+        | TokenId.RBrace:
+            ret self.buildBraceRange(tokens)
+        | TokenId.RBracket:
+            ret self.buildBracketRange(tokens)
         }
 
         if token.Id == TokenId.Fn {
@@ -897,31 +889,26 @@ fn isTypeOp(&id: TokenId): bool {
 fn isTypeRange(mut &tokens: []&Token): bool {
     let mut op = false
     for i, token in tokens {
-        if token.Id == TokenId.Range {
-            if token.Kind == TokenKind.LBracket {
-                if op {
-                    ret true
-                }
-                let mut rangeN = 0
-                let mut lTokens = tokens[i:]
-                for _, lToken in lTokens {
-                    match lToken.Id {
-                    | TokenId.Range:
-                        match lToken.Kind {
-                        | TokenKind.LBracket:
-                            rangeN++
-                            continue
-                        | TokenKind.RBracket:
-                            rangeN--
-                            continue
-                        }
-                    }
-                    if rangeN == 0 {
-                        ret isTypeOp(lToken.Id)
-                    }
-                }
+        if token.Id == TokenId.LBracket {
+            if op {
                 ret true
             }
+            let mut rangeN = 0
+            let mut lTokens = tokens[i:]
+            for _, lToken in lTokens {
+                match lToken.Id {
+                | TokenId.LBracket:
+                    rangeN++
+                    continue
+                | TokenId.RBracket:
+                    rangeN--
+                    continue
+                }
+                if rangeN == 0 {
+                    ret isTypeOp(lToken.Id)
+                }
+            }
+            ret true
         }
         if !isTypeOp(token.Id) {
             ret false
@@ -939,23 +926,22 @@ fn getBlockExpr(mut &tokens: []&Token): []&Token {
         match tok.Id {
         | TokenId.If | TokenId.Else | TokenId.Unsafe:
             skipToNextBraceClose++
-        | TokenId.Range:
-            match tok.Kind {
-            | TokenKind.LBrace:
-                if braceN > 0 || skipToNextBraceClose > 0 {
-                    if skipToNextBraceClose > 0 {
-                        skipToNextBraceClose--
-                    }
-                    braceN++
-                    break
+        | TokenId.LBrace:
+            if braceN > 0 || skipToNextBraceClose > 0 {
+                if skipToNextBraceClose > 0 {
+                    skipToNextBraceClose--
                 }
-                ret tokens[:i]
-            | TokenKind.LBracket
-            | TokenKind.LParent:
                 braceN++
-            |:
-                braceN--
+                break
             }
+            ret tokens[:i]
+        | TokenId.LBracket
+        | TokenId.LParent:
+            braceN++
+        | TokenId.RBrace
+        | TokenId.RBracket
+        | TokenId.RParent:
+            braceN--
         }
     }
     ret nil
@@ -967,16 +953,15 @@ fn splitDelim(mut &tokens: []&Token, delim: TokenId): ([]&Token, []&Token) {
     let mut rangeN = 0
     for i, token in tokens {
         match token.Id {
-        | TokenId.Range:
-            match token.Kind {
-            | TokenKind.LBrace
-            | TokenKind.LBracket
-            | TokenKind.LParent:
-                rangeN++
-                continue
-            |:
-                rangeN--
-            }
+        | TokenId.LBrace
+        | TokenId.LBracket
+        | TokenId.LParent:
+            rangeN++
+            continue
+        | TokenId.RBrace
+        | TokenId.RBracket
+        | TokenId.RParent:
+            rangeN--
         | delim:
             if rangeN == 0 {
                 let mut l = tokens[:i]
@@ -1001,23 +986,25 @@ fn findLowestPrecOp(&tokens: []&Token): int {
     let mut braceN = 0
     let mut skipToNextBraceOpen = false
     for i, token in tokens {
-        match {
-        | token.Id == TokenId.Range:
-            match token.Kind {
-            | TokenKind.LBrace:
-                skipToNextBraceOpen = false
-                fall
-            | TokenKind.LParent
-            | TokenKind.LBracket:
-                braceN++
-            |:
-                braceN--
-            }
+        match token.Id {
+        | TokenId.LBrace:
+            skipToNextBraceOpen = false
+            fall
+        | TokenId.LParent
+        | TokenId.LBracket:
+            braceN++
             continue
-        | skipToNextBraceOpen:
+        | TokenId.RBrace
+        | TokenId.RParent
+        | TokenId.RBracket:
+            braceN--
             continue
-        | token.Id == TokenId.If:
+        | TokenId.If:
             skipToNextBraceOpen = true
+            continue
+        }
+        match {
+        | skipToNextBraceOpen:
             continue
         | i == 0:
             continue
@@ -1034,9 +1021,9 @@ fn findLowestPrecOp(&tokens: []&Token): int {
             continue
         }
 
-        if i > 1 && left.Id == TokenId.Range && left.Kind == TokenKind.RBracket {
+        if i > 1 && left.Id == TokenId.RBracket {
             let lleft = tokens[i-2]
-            if lleft.Id == TokenId.Range && lleft.Kind == TokenKind.LBracket {
+            if lleft.Id == TokenId.LBracket {
                 // Skip potential type annotations.
                 if token.Id == TokenId.Amper || token.Id == TokenId.Star {
                     continue
@@ -1066,15 +1053,15 @@ fn getRangeExprTokens(mut &tokens: []&Token): ([]&Token, int) {
     let mut i = len(tokens) - 1
     for i >= 0; i-- {
         let tok = tokens[i]
-        if tok.Id == TokenId.Range {
-            match tok.Kind {
-            | TokenKind.RBrace
-            | TokenKind.RBracket
-            | TokenKind.RParent:
-                rangeN++
-            |:
-                rangeN--
-            }
+        match tok.Id {
+        | TokenId.RBrace
+        | TokenId.RBracket
+        | TokenId.RParent:
+            rangeN++
+        | TokenId.LBrace
+        | TokenId.LBracket
+        | TokenId.LParent:
+            rangeN--
         }
 
         if rangeN == 0 {

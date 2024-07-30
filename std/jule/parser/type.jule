@@ -86,7 +86,7 @@ impl typeBuilder {
             ret nil
         }
         let token = self.tokens[*self.i]
-        if token.Id != TokenId.Range || token.Kind != TokenKind.LBracket {
+        if token.Id != TokenId.LBracket {
             ret nil
         }
 
@@ -113,13 +113,11 @@ impl typeBuilder {
         let mut rangeN = 0
         for *self.i < len(self.tokens); *self.i++ {
             let token = self.tokens[*self.i]
-            if token.Id == TokenId.Range {
-                match token.Kind {
-                | TokenKind.LBracket:
-                    rangeN++
-                | TokenKind.RBracket:
-                    rangeN--
-                }
+            match token.Id {
+            | TokenId.LBracket:
+                rangeN++
+            | TokenId.RBracket:
+                rangeN--
             }
             if rangeN == 0 {
                 *self.i++ // Skip right bracket
@@ -272,7 +270,7 @@ impl typeBuilder {
     }
 
     unsafe fn buildArr(mut self): &TypeDecl {
-        let mut exprTokens = range(*self.i, TokenKind.LBracket, TokenKind.RBracket, self.tokens)
+        let mut exprTokens = range(*self.i, TokenId.LBracket, TokenId.RBracket, self.tokens)
         if *self.i >= len(self.tokens) {
             self.pushErr(self.tokens[*self.i-1], LogMsg.MissingType)
             ret nil
@@ -309,7 +307,7 @@ impl typeBuilder {
         }
 
         // Get key type tokens without brackets.
-        let mut keyTokens = range(*self.i, TokenKind.LBracket, TokenKind.RBracket, self.tokens)
+        let mut keyTokens = range(*self.i, TokenId.LBracket, TokenId.RBracket, self.tokens)
         if *self.i >= len(self.tokens) {
             self.pushErr(self.tokens[*self.i-1], LogMsg.MissingType)
             ret nil
@@ -341,15 +339,13 @@ impl typeBuilder {
 
     unsafe fn buildEnumerable(mut self): &TypeDecl {
         let mut token = self.tokens[*self.i]
-        if *self.i+2 >= len(self.tokens) ||
-            token.Id != TokenId.Range ||
-            token.Kind != TokenKind.LBracket {
+        if *self.i+2 >= len(self.tokens) {
             self.pushErr(token, LogMsg.InvalidSyntax)
             ret nil
         }
         *self.i++
         token = self.tokens[*self.i]
-        if token.Id == TokenId.Range && token.Kind == TokenKind.RBracket {
+        if token.Id == TokenId.RBracket {
             ret self.buildSlc()
         }
         *self.i-- // Point to left bracket.
@@ -375,7 +371,7 @@ impl typeBuilder {
                     Elem: self.buildSptr(),
                 },
             }
-        | TokenId.Range:
+        | TokenId.LBracket:
             ret self.buildEnumerable()
         | TokenId.Map:
             ret self.buildMap()

@@ -66,14 +66,13 @@ fn makeErr(row: int, col: int, &f: &File, fmt: LogMsg, args: ...any): Log {
 //
 // Special cases are:
 //  range(i, open, close, tokens) = nil if i > len(tokens)
-//  range(i, open, close, tokens) = nil if tokens[i].Id != TokenId.Range
-//  range(i, open, close, tokens) = nil if tokens[i].Kind != open
-fn range(mut &i: int, open: TokenKind, close: TokenKind, mut &tokens: []&Token): []&Token {
+//  range(i, open, close, tokens) = nil if tokens[i].Id != open
+fn range(mut &i: int, open: TokenId, close: TokenId, mut &tokens: []&Token): []&Token {
     if i >= len(tokens) {
         ret nil
     }
     let tok = tokens[i]
-    if tok.Id != TokenId.Range || tok.Kind != open {
+    if tok.Id != open {
         ret nil
     }
     i++
@@ -81,13 +80,11 @@ fn range(mut &i: int, open: TokenKind, close: TokenKind, mut &tokens: []&Token):
     let start = i
     for rangeN != 0 && i < len(tokens); i++ {
         let token = tokens[i]
-        if token.Id == TokenId.Range {
-            match token.Kind {
-            | open:
-                rangeN++
-            | close:
-                rangeN--
-            }
+        match token.Id {
+        | open:
+            rangeN++
+        | close:
+            rangeN--
         }
     }
     ret tokens[start:i-1]
@@ -103,23 +100,27 @@ fn range(mut &i: int, open: TokenKind, close: TokenKind, mut &tokens: []&Token):
 fn rangeLast(mut &tokens: []&Token): (cutted: []&Token, cut: []&Token) {
     if len(tokens) == 0 {
         ret tokens, nil
-    } else if tokens[len(tokens)-1].Id != TokenId.Range {
+    }
+    let first = tokens[len(tokens)-1].Id
+    if first != TokenId.RBrace &&
+        first != TokenId.LBracket &&
+        first != TokenId.RParent {
         ret tokens, nil
     }
     let mut braceN = 0
     let mut i = len(tokens) - 1
     for i >= 0; i-- {
         let token = tokens[i]
-        if token.Id == TokenId.Range {
-            match token.Kind {
-            | TokenKind.RBrace
-            | TokenKind.RBracket
-            | TokenKind.RParent:
-                braceN++
-                continue
-            |:
-                braceN--
-            }
+        match token.Id {
+        | TokenId.RBrace
+        | TokenId.RBracket
+        | TokenId.RParent:
+            braceN++
+            continue
+        | TokenId.LBrace
+        | TokenId.LBracket
+        | TokenId.LParent:
+            braceN--
         }
         if braceN == 0 {
             ret tokens[:i], tokens[i:]
@@ -145,16 +146,16 @@ fn parts(mut &tokens: []&Token, id: TokenId, exprMust: bool): ([][]&Token, []Log
     let mut rangeN = 0
     let mut last = 0
     for i, token in tokens {
-        if token.Id == TokenId.Range {
-            match token.Kind {
-            | TokenKind.LBrace
-            | TokenKind.LBracket
-            | TokenKind.LParent:
-                rangeN++
-                continue
-            |:
-                rangeN--
-            }
+        match token.Id {
+        | TokenId.LBrace
+        | TokenId.LBracket
+        | TokenId.LParent:
+            rangeN++
+            continue
+        | TokenId.RBrace
+        | TokenId.RBracket
+        | TokenId.RParent:
+            rangeN--
         }
 
         if rangeN > 0 {
@@ -180,16 +181,16 @@ fn parts(mut &tokens: []&Token, id: TokenId, exprMust: bool): ([][]&Token, []Log
     ret parts, errors
 }
 
-fn getCloseKindOfBrace(left: str): str {
+fn getCloseOfBrace(left: TokenId): TokenId {
     match left {
-    | TokenKind.RParent:
-        ret TokenKind.LParent
-    | TokenKind.RBrace:
-        ret TokenKind.LBrace
-    | TokenKind.RBracket:
-        ret TokenKind.LBracket
+    | TokenId.RParent:
+        ret TokenId.LParent
+    | TokenId.RBrace:
+        ret TokenId.LBrace
+    | TokenId.RBracket:
+        ret TokenId.LBracket
     |:
-        ret ""
+        ret left
     }
 }
 
@@ -691,7 +692,7 @@ impl parser {
         }
 
         i-- // For point to parentheses - ( -
-        let mut rangeTokens = range(i, TokenKind.LParent, TokenKind.RParent, tokens)
+        let mut rangeTokens = range(i, TokenId.LParent, TokenId.RParent, tokens)
 
         let (mut parts, errs) = parts(rangeTokens, TokenId.Comma, true)
         self.errors = append(self.errors, errs...)
@@ -757,10 +758,8 @@ impl parser {
 
         let mut token = tokens[i]
         match token.Id {
-        | TokenId.Range:
-            if token.Kind == TokenKind.LBrace {
-                ret
-            }
+        | TokenId.LBrace:
+            ret
         | TokenId.Eq:
             ret
         | TokenId.Colon:
@@ -771,15 +770,13 @@ impl parser {
 
             i++
             token = tokens[i]
-            if token.Id == TokenId.Range {
-                match token.Kind {
-                | TokenKind.LParent:
-                    t, ok = self.buildMultiRetType(tokens, i)
-                    ret
-                | TokenKind.LBrace:
-                    self.pushErr(token, LogMsg.MissingType)
-                    ret
-                }
+            match token.Id {
+            | TokenId.LParent:
+                t, ok = self.buildMultiRetType(tokens, i)
+                ret
+            | TokenId.LBrace:
+                self.pushErr(token, LogMsg.MissingType)
+                ret
             }
             t.Kind, ok = unsafe { self.buildType(tokens, &i, true) }
             ret
@@ -839,17 +836,17 @@ impl parser {
         }
 
         let errorToken = tokens[i]
-        let mut genericsTokens = range(i, TokenKind.LBracket, TokenKind.RBracket, tokens)
+        let mut genericsTokens = range(i, TokenId.LBracket, TokenId.RBracket, tokens)
         if genericsTokens != nil {
             f.Generics = self.buildGenerics(genericsTokens, errorToken)
         }
 
-        if tokens[i].Kind != TokenKind.LParent {
+        if tokens[i].Id != TokenId.LParent {
             self.pushErr(tokens[i], LogMsg.MissingFnParentheses)
             ret nil
         }
 
-        let mut paramsToks = range(i, TokenKind.LParent, TokenKind.RParent, tokens)
+        let mut paramsToks = range(i, TokenId.LParent, TokenId.RParent, tokens)
         if len(paramsToks) > 0 {
             f.Params = self.buildParams(paramsToks, method)
         }
@@ -887,7 +884,7 @@ impl parser {
             self.pushSuggestion(LogMsg.ExpectedBody)
             ret nil
         }
-        let mut blockTokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
+        let mut blockTokens = range(i, TokenId.LBrace, TokenId.RBrace, tokens)
         if blockTokens != nil {
             f.Scope = self.buildScope(blockTokens, tokens[i-1])
             f.Scope.Unsafety = f.Unsafety
@@ -905,7 +902,7 @@ impl parser {
 
     fn getUseDeclSelectors(mut self, mut tokens: []&Token): []&Token {
         let mut i = 0
-        tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
+        tokens = range(i, TokenId.LBrace, TokenId.RBrace, tokens)
         let (mut parts, errs) = parts(tokens, TokenId.Comma, true)
         if len(errs) > 0 {
             self.errors = append(self.errors, errs...)
@@ -956,11 +953,7 @@ impl parser {
         | TokenId.DblColon:
             self.pushErr(token, LogMsg.InvalidSyntax)
             ret
-        | TokenId.Range:
-            if token.Kind != TokenKind.RBrace {
-                self.pushErr(token, LogMsg.InvalidSyntax)
-                ret
-            }
+        | TokenId.RBrace:
             let mut selectors: []&Token = nil
             tokens, selectors = rangeLast(tokens)
             decl.Selected = self.getUseDeclSelectors(selectors)
@@ -1007,12 +1000,7 @@ impl parser {
         | TokenId.DblColon:
             self.pushErr(token, LogMsg.InvalidSyntax)
             ret
-        | TokenId.Range:
-            if token.Kind != TokenKind.RBrace {
-                self.pushErr(token, LogMsg.InvalidSyntax)
-                ret
-            }
-
+        | TokenId.RBrace:
             let mut selectors: []&Token = nil
             tokens, selectors = rangeLast(tokens)
             decl.Selected = self.getUseDeclSelectors(selectors)
@@ -1020,13 +1008,11 @@ impl parser {
                 self.pushErr(token, LogMsg.InvalidSyntax)
                 ret
             }
-
             token = tokens[len(tokens)-1]
             if token.Id != TokenId.DblColon {
                 self.pushErr(token, LogMsg.InvalidSyntax)
                 ret
             }
-
             tokens = tokens[:len(tokens)-1]
             if len(tokens) == 0 {
                 self.pushErr(token, LogMsg.InvalidSyntax)
@@ -1107,16 +1093,16 @@ impl parser {
         let exprStart = i
         for i < len(tokens); i++ {
             let t = tokens[i]
-            if t.Id == TokenId.Range {
-                match t.Kind {
-                | TokenKind.LBrace
-                | TokenKind.LBracket
-                | TokenKind.LParent:
-                    braceN++
-                    continue
-                |:
-                    braceN--
-                }
+            match t.Id {
+            | TokenId.LBrace
+            | TokenId.LBracket
+            | TokenId.LParent:
+                braceN++
+                continue
+            | TokenId.RBrace
+            | TokenId.RBracket
+            | TokenId.RParent:
+                braceN--
             }
             if braceN > 0 {
                 continue
@@ -1175,7 +1161,7 @@ impl parser {
         }
         e.Ident = e.Token.Kind
         i += 3 // Skip "identifier: type" tokens.
-        let mut itemTokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
+        let mut itemTokens = range(i, TokenId.LBrace, TokenId.RBrace, tokens)
         if itemTokens == nil {
             self.stop()
             self.pushErr(e.Token, LogMsg.BodyNotExist)
@@ -1195,16 +1181,16 @@ impl parser {
         let exprStart = i
         for i < len(tokens); i++ {
             let t = tokens[i]
-            if t.Id == TokenId.Range {
-                match t.Kind {
-                | TokenKind.LBrace
-                | TokenKind.LBracket
-                | TokenKind.LParent:
-                    braceN++
-                    continue
-                |:
-                    braceN--
-                }
+            match t.Id {
+            | TokenId.LBrace
+            | TokenId.LBracket
+            | TokenId.LParent:
+                braceN++
+                continue
+            | TokenId.RBrace
+            | TokenId.RBracket
+            | TokenId.RParent:
+                braceN--
             }
             if braceN > 0 {
                 continue
@@ -1289,7 +1275,7 @@ impl parser {
         } else {
             e.Kind = nil
         }
-        let mut itemTokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
+        let mut itemTokens = range(i, TokenId.LBrace, TokenId.RBrace, tokens)
         if itemTokens == nil {
             self.stop()
             self.pushErr(e.Token, LogMsg.BodyNotExist)
@@ -1395,7 +1381,7 @@ impl parser {
         s.Ident = s.Token.Kind
 
         let errorToken = tokens[i]
-        let mut genericsTokens = range(i, TokenKind.LBracket, TokenKind.RBracket, tokens)
+        let mut genericsTokens = range(i, TokenId.LBracket, TokenId.RBracket, tokens)
         if genericsTokens != nil {
             s.Generics = self.buildGenerics(genericsTokens, errorToken)
         }
@@ -1405,7 +1391,7 @@ impl parser {
             ret s
         }
 
-        let mut bodyTokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
+        let mut bodyTokens = range(i, TokenId.LBrace, TokenId.RBrace, tokens)
         if bodyTokens == nil {
             self.stop()
             self.pushErr(s.Token, LogMsg.BodyNotExist)
@@ -1486,7 +1472,7 @@ impl parser {
         }
         t.Ident = t.Token.Kind
         let mut i = 2
-        let mut bodyTokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
+        let mut bodyTokens = range(i, TokenId.LBrace, TokenId.RBrace, tokens)
         if bodyTokens == nil {
             self.stop()
             self.pushErr(t.Token, LogMsg.BodyNotExist)
@@ -1670,7 +1656,7 @@ impl parser {
 
         token = tokens[i]
         if token.Id != TokenId.For {
-            if token.Id == TokenId.Range && token.Kind == TokenKind.LBrace {
+            if token.Id == TokenId.LBrace {
                 // This implementation is single.
                 // Just implements to destination.
                 // Therefore, swap Base and Dest tokens.
@@ -1702,7 +1688,7 @@ impl parser {
         }
 
     body:
-        let mut bodyTokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
+        let mut bodyTokens = range(i, TokenId.LBrace, TokenId.RBrace, tokens)
         if bodyTokens == nil {
             self.stop()
             self.pushErr(token, LogMsg.BodyNotExist)
@@ -1843,11 +1829,11 @@ impl parser {
         self.ast.Nodes = append(self.ast.Nodes, node)
     }
 
-    fn removeRange(self, mut i: int, kind: str, &tokens: []&Token, mut &ranges: []int) {
-        let close = getCloseKindOfBrace(kind)
+    fn removeRange(self, mut i: int, id: TokenId, &tokens: []&Token, mut &ranges: []int) {
+        let close = getCloseOfBrace(id)
         for i >= 0; i-- {
             let tok = tokens[ranges[i]]
-            if tok.Kind != close {
+            if tok.Id != close {
                 continue
             }
             ranges = append(ranges[:i], ranges[i+1:]...)
@@ -1856,63 +1842,60 @@ impl parser {
     }
 
     fn pushWrongOrderCloseErr(mut self, &t: &Token, &tokens: []&Token, &ranges: []int) {
-        match tokens[ranges[len(ranges)-1]].Kind {
-        | TokenKind.LParent:
+        match tokens[ranges[len(ranges)-1]].Id {
+        | TokenId.LParent:
             self.pushErr(t, LogMsg.ExpectedParentClose)
-        | TokenKind.LBrace:
+        | TokenId.LBrace:
             self.pushErr(t, LogMsg.ExpectedBraceClose)
-        | TokenKind.LBracket:
+        | TokenId.LBracket:
             self.pushErr(t, LogMsg.ExpectedBracketClose)
         }
     }
 
-    fn pushRangeClose(mut self, t: &Token, left: str, &tokens: []&Token, mut &ranges: []int) {
+    fn pushRangeClose(mut self, t: &Token, left: TokenId, &tokens: []&Token, mut &ranges: []int) {
         let n = len(ranges)
         if n == 0 {
-            match t.Kind {
-            | TokenKind.RBracket:
+            match t.Id {
+            | TokenId.RBracket:
                 self.pushErr(t, LogMsg.ExtraClosedBracket)
-            | TokenKind.RBrace:
+            | TokenId.RBrace:
                 self.pushErr(t, LogMsg.ExtraClosedBrace)
-            | TokenKind.RParent:
+            | TokenId.RParent:
                 self.pushErr(t, LogMsg.ExtraClosedParent)
             }
             ret
-        } else if tokens[ranges[n-1]].Kind != left {
+        } else if tokens[ranges[n-1]].Id != left {
             self.pushWrongOrderCloseErr(t, tokens, ranges)
         }
-        self.removeRange(n - 1, t.Kind, tokens, ranges)
+        self.removeRange(n - 1, t.Id, tokens, ranges)
     }
 
     fn checkRanges(mut self, &tokens: []&Token) {
         let mut ranges: []int = nil
 
         for i, token in tokens {
-            if token.Id != TokenId.Range {
-                continue
-            }
-            match token.Kind {
-            | TokenKind.LParent
-            | TokenKind.LBrace
-            | TokenKind.LBracket:
+            match token.Id {
+            | TokenId.LParent
+            | TokenId.LBrace
+            | TokenId.LBracket:
                 ranges = append(ranges, i)
-            | TokenKind.RParent:
-                self.pushRangeClose(token, TokenKind.LParent, tokens, ranges)
-            | TokenKind.RBrace:
-                self.pushRangeClose(token, TokenKind.LBrace, tokens, ranges)
-            | TokenKind.RBracket:
-                self.pushRangeClose(token, TokenKind.LBracket, tokens, ranges)
+            | TokenId.RParent:
+                self.pushRangeClose(token, TokenId.LParent, tokens, ranges)
+            | TokenId.RBrace:
+                self.pushRangeClose(token, TokenId.LBrace, tokens, ranges)
+            | TokenId.RBracket:
+                self.pushRangeClose(token, TokenId.LBracket, tokens, ranges)
             }
         }
 
         for _, i in ranges {
             let token = tokens[i]
-            match token.Kind {
-            | TokenKind.LParent:
+            match token.Id {
+            | TokenId.LParent:
                 self.pushErr(token, LogMsg.WaitCloseParent)
-            | TokenKind.LBrace:
+            | TokenId.LBrace:
                 self.pushErr(token, LogMsg.WaitCloseBrace)
-            | TokenKind.LBracket:
+            | TokenId.LBracket:
                 self.pushErr(token, LogMsg.WaitCloseBracket)
             }
         }
