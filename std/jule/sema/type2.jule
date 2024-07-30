@@ -935,6 +935,14 @@ impl fnCallArgChecker {
     }
 }
 
+fn checkMutRiskOfStructLit(mut &s: &Sema, &m: &StructLitExprModel) {
+    for _, arg in m.Args {
+        if !arg.Expr.Mutable && arg.Expr.Kind.Mutable() {
+            s.pushErr(arg.Token, LogMsg.AssignNonMutToMut, arg.Expr.Kind.Str())
+        }
+    }
+}
+
 struct structLitChecker {
     e:          &Eval
     errorToken: &Token
@@ -960,8 +968,9 @@ impl structLitChecker {
             _ = self.e.s.checkAssignType(false, f.Kind, d, errorToken)
         }
         self.args = append(self.args, &StructArgExprModel{
+            Token: errorToken,
             Field: f,
-            Expr: d.Model,
+            Expr: d,
         })
     }
 

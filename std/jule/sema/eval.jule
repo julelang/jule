@@ -2018,11 +2018,20 @@ impl Eval {
         }
 
         if !d.Mutable && f.Decl.IsMethod() && !f.Decl.Statically && f.Decl.Params[0].Mutable {
-            // Ignore immutable literals.
-            // Literal will not be assignted to immutable memory, used to call method.
-            // Assume literal as mutable.
-            if !isLitBased(d.Model) {
+            if !self.immutable {
                 self.pushErr(fc.Token, LogMsg.MutOperationOnImmut)
+            } else {
+                // Caught mutability risk of immutable literals.
+                // Literal will not be assigned to immutable memory,
+                // used to call method with mutable receiver.
+                // Assume literal as mutable and check accordingly.
+                let lit = isLitBased(d.Model)
+                if lit == nil {
+                    // Expression is not literal based, so data is strictly immutable.
+                    self.pushErr(fc.Token, LogMsg.MutOperationOnImmut)
+                } else {
+                    checkMutRiskOfStructLit(self.s, lit)
+                }
             }
         } else if !self.isUnsafe() && f.Decl.Unsafety {
             self.pushErr(fc.Token, LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
@@ -4539,18 +4548,20 @@ fn evalEnumStatic(mut &enm: &Enum, mut &item: &EnumItem): &Data {
 
 // Reports whether expression model is literal-based.
 // Works for literals, sub-idents and castings.
-fn isLitBased(&m: ExprModel): bool {
+// Returns nil if not, otherwise returns the literal model.
+fn isLitBased(mut &m: ExprModel): &StructLitExprModel {
     match type m {
-    | &StructLitExprModel
+    | &StructLitExprModel:
+        ret (&StructLitExprModel)(m)
     | &AllocStructLitExprModel:
-        ret true
+        ret (&AllocStructLitExprModel)(m).Lit
     | &StructSubIdentExprModel:
-        let ssi = (&StructSubIdentExprModel)(m)
+        let mut ssi = (&StructSubIdentExprModel)(m)
         ret isLitBased(ssi.Expr.Model)
     | &CastingExprModel:
-        let c = (&CastingExprModel)(m)
+        let mut c = (&CastingExprModel)(m)
         ret isLitBased(c.Expr)
     |:
-        ret false
+        ret nil
     }
 }
