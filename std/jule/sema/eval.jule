@@ -2018,7 +2018,12 @@ impl Eval {
         }
 
         if !d.Mutable && f.Decl.IsMethod() && !f.Decl.Statically && f.Decl.Params[0].Mutable {
-            self.pushErr(fc.Token, LogMsg.MutOperationOnImmut)
+            // Ignore immutable literals.
+            // Literal will not be assignted to immutable memory, used to call method.
+            // Assume literal as mutable.
+            if !isLitBased(d.Model) {
+                self.pushErr(fc.Token, LogMsg.MutOperationOnImmut)
+            }
         } else if !self.isUnsafe() && f.Decl.Unsafety {
             self.pushErr(fc.Token, LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
         }
@@ -4530,4 +4535,22 @@ fn evalEnumStatic(mut &enm: &Enum, mut &item: &EnumItem): &Data {
         applyCastModelByEnum(d, enm)
     }
     ret d
+}
+
+// Reports whether expression model is literal-based.
+// Works for literals, sub-idents and castings.
+fn isLitBased(&m: ExprModel): bool {
+    match type m {
+    | &StructLitExprModel
+    | &AllocStructLitExprModel:
+        ret true
+    | &StructSubIdentExprModel:
+        let ssi = (&StructSubIdentExprModel)(m)
+        ret isLitBased(ssi.Expr.Model)
+    | &CastingExprModel:
+        let c = (&CastingExprModel)(m)
+        ret isLitBased(c.Expr)
+    |:
+        ret false
+    }
 }
