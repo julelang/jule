@@ -6,7 +6,7 @@ use env
 use path for std::fs::path
 use std::jule::build::{PathStdlib}
 use std::jule::constant::{Const}
-use std::jule::lex::{TokenKind}
+use std::jule::lex::{TokenId, TokenKind}
 use std::jule::sema::{
     Var,
     Data,
@@ -245,7 +245,7 @@ impl scopeOptimizer {
     }
 
     fn substr(mut self, mut a: &Assign): bool {
-        if a.Op.Kind != TokenKind.Eq {
+        if a.Op.Id != TokenId.Eq {
             ret false
         }
         match type a.R.Model {
@@ -265,7 +265,7 @@ impl scopeOptimizer {
     }
 
     fn strInsert(mut self, mut a: &Assign): bool {
-        if a.Op.Kind != TokenKind.Eq {
+        if a.Op.Id != TokenId.Eq {
             ret false
         }
         match type a.R.Model {
@@ -283,7 +283,7 @@ impl scopeOptimizer {
     }
 
     fn strAppend(mut self, mut a: &Assign): bool {
-        if a.Op.Kind != TokenKind.PlusEq {
+        if a.Op.Id != TokenId.PlusEq {
             ret false
         }
         match type a.R.Model {
@@ -339,8 +339,8 @@ impl scopeOptimizer {
         exprOptimizer.optimize(assign.L.Model)
         exprOptimizer.optimize(assign.R.Model)
 
-        match assign.Op.Kind {
-        | TokenKind.SolidusEq | TokenKind.PercentEq:
+        match assign.Op.Id {
+        | TokenId.SolidusEq | TokenId.PercentEq:
             // Do not check division of structures safety.
             if Math && assign.L.Kind.Struct() == nil {
                 assign.Op.Kind = assign.Op.Kind[:len(assign.Op.Kind)-1]
@@ -353,6 +353,7 @@ impl scopeOptimizer {
                 match type model {
                 | &BinopExprModel:
                     assign.R = new(OperandExprModel, *assign.R)
+                    assign.Op.Id = TokenId.Eq
                     assign.Op.Kind = TokenKind.Eq
                     assign.R.Model = model
                     ret
@@ -461,7 +462,7 @@ fn isUnreachableExpr(&expr: ExprModel): bool {
         ret c.IsBool() && !c.ReadBool()
     | &BinopExprModel:
         let m = (&BinopExprModel)(expr)
-        if m.Op.Kind == TokenKind.DblAmper {
+        if m.Op.Id == TokenId.DblAmper {
             ret isUnreachableExpr(m.Left.Model) ||
                 isUnreachableExpr(m.Right.Model)
         }

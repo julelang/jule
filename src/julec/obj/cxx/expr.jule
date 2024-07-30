@@ -19,7 +19,7 @@ use std::env::{Arch}
 use fmt for std::fmt
 use std::jule::build::{Directive, Is64Bit}
 use std::jule::constant::{Const}
-use std::jule::lex::{Token, TokenKind}
+use std::jule::lex::{Token, TokenId, TokenKind}
 use std::jule::sema::{
     Trait,
     Var,
@@ -221,12 +221,12 @@ impl exprCoder {
 
     fn divByZeroBinary(mut &self, &op: &Token, mut &l: &OperandExprModel, mut &r: &OperandExprModel) {
         self.oc.write("jule::")
-        match op.Kind {
-        | TokenKind.Solidus
-        | TokenKind.SolidusEq:
+        match op.Id {
+        | TokenId.Solidus
+        | TokenId.SolidusEq:
             self.oc.write("div(")
-        | TokenKind.Percent
-        | TokenKind.PercentEq:
+        | TokenId.Percent
+        | TokenId.PercentEq:
             self.oc.write("mod(")
         }
 
@@ -242,13 +242,13 @@ impl exprCoder {
     }
 
     fn unsafeBinary(mut &self, mut m: &BinopExprModel) {
-        if m.Op.Kind == TokenKind.Eqs || m.Op.Kind == TokenKind.NotEq {
+        if m.Op.Id == TokenId.Eqs || m.Op.Id == TokenId.NotEq {
             // If this binary operator comparing <any> type.
             // The m.Left is will be <any> one always.
             if isAny(m.Left.Kind) {
                 if !m.Right.Kind.IsNil() && !isAny(m.Right.Kind) {
                     self.oc.write("(")
-                    if m.Op.Kind == TokenKind.NotEq {
+                    if m.Op.Id == TokenId.NotEq {
                         self.oc.write("!")
                     }
                     let i = self.oc.pushAnyType(m.Right.Kind)
@@ -273,8 +273,8 @@ impl exprCoder {
     }
 
     fn binary(mut &self, mut m: &BinopExprModel) {
-        match m.Op.Kind {
-        | TokenKind.Solidus | TokenKind.Percent:
+        match m.Op.Id {
+        | TokenId.Solidus | TokenId.Percent:
             // Do not check division of structures safety.
             if m.Left.Kind.Struct() == nil {
                 self.divByZeroBinary(m.Op, m.Left, m.Right)
@@ -300,13 +300,13 @@ impl exprCoder {
     }
 
     fn unary(mut &self, mut m: &UnaryExprModel) {
-        match m.Op.Kind {
-        | TokenKind.Caret:
+        match m.Op.Id {
+        | TokenId.Caret:
             self.oc.write("(~(")
             self.possibleRefExpr(m.Expr.Model)
             self.oc.write("))")
             ret
-        | TokenKind.Star:
+        | TokenId.Star:
             if env::Production || m.Expr.Kind.Sptr() == nil {
                 break
             }

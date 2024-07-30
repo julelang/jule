@@ -30,9 +30,8 @@ impl directiveEval {
 
     // Split operans by binary operators.
     // Skips range of parentheses.
-    fn splitOperans(mut self, op: TokenKind, mut &tokens: []&Token): [][]&Token {
+    fn splitOperans(mut self, op: TokenId, mut &tokens: []&Token): [][]&Token {
         let mut parts = make([][]&Token, 0, 10)
-
         let mut i = 0
         let mut rangeN = 0
         let mut last = 0
@@ -47,17 +46,12 @@ impl directiveEval {
                     rangeN--
                 }
             }
-
-            if rangeN > 0 || b.Id != TokenId.Op {
+            if rangeN > 0 || b.Id != op {
                 continue
             }
-
-            if b.Kind == op {
-                parts = append(parts, tokens[last:i])
-                last = i + 1
-            }
+            parts = append(parts, tokens[last:i])
+            last = i + 1
         }
-
         if last < len(tokens) {
             parts = append(parts, tokens[last:])
         } else {
@@ -65,7 +59,6 @@ impl directiveEval {
             self.pushErr(tokens[last-1], LogMsg.MissingExpr)
             ret nil
         }
-
         ret parts
     }
 
@@ -85,7 +78,7 @@ impl directiveEval {
     // Eval directive expression part.
     // Accepts unary operators.
     fn evalDirectivePart(mut self, mut part: []&Token): bool {
-        let logicalNot = part[0].Id == TokenId.Op && part[0].Kind == TokenKind.Excl
+        let logicalNot = part[0].Id == TokenId.Excl
         if logicalNot {
             part = part[1:]
         }
@@ -110,14 +103,14 @@ impl directiveEval {
 
         let mut result = false
 
-        let mut logicalOrParts = self.splitOperans(TokenKind.DblVline, self.d.Args)
+        let mut logicalOrParts = self.splitOperans(TokenId.DblVline, self.d.Args)
         if logicalOrParts == nil {
             ret false
         }
 
         for (_, mut part) in logicalOrParts {
             let mut and = true
-            let mut logicalAndParts = self.splitOperans(TokenKind.DblAmper, part)
+            let mut logicalAndParts = self.splitOperans(TokenId.DblAmper, part)
             if logicalAndParts == nil {
                 ret false
             }

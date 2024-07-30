@@ -34,6 +34,7 @@ use std::jule::lex::{
     TokenId,
     TokenKind,
     IsUnaryOp,
+    IsBinOp,
 }
 
 struct exprBuilder {
@@ -75,11 +76,9 @@ impl exprBuilder {
         match token.Id {
         | TokenId.Lit:
             ret self.buildLit(token)
-        | TokenId.Op:
-            if token.Kind == TokenKind.TripleDot {
-                ret &VariadicExpr{
-                    Token: token,
-                }
+        | TokenId.TripleDot:
+            ret &VariadicExpr{
+                Token: token,
             }
         | TokenId.Ident
         | TokenId.Self
@@ -114,7 +113,7 @@ impl exprBuilder {
         if len(tokens) == 1 {
             self.pushErr(op, LogMsg.MissingExprForUnary)
             ret nil
-        } else if !IsUnaryOp(op.Kind) {
+        } else if !IsUnaryOp(op.Id) {
             self.pushErr(op, LogMsg.InvalidOpForUnary, op.Kind)
             ret nil
         }
@@ -203,27 +202,6 @@ impl exprBuilder {
             Token: token,
             Expr: self.buildFromTokens(tokens),
         }
-    }
-
-    fn buildOpRight(mut self, mut &tokens: []&Token): ExprData {
-        let mut token = tokens[len(tokens)-1]
-        match token.Kind {
-        | TokenKind.Excl:
-            tokens = tokens[:len(tokens)-1] // Ignore "!" token.
-            let mut d = self.build(tokens)
-            if d == nil {
-                ret nil
-            }
-            match type d {
-            | &FnCallExpr:
-                (&FnCallExpr)(d).Exception = &ScopeTree{
-                    Deferred: true,
-                }
-                ret d
-            }
-        }
-        self.pushErr(token, LogMsg.InvalidSyntax)
-        ret nil
     }
 
     fn buildBetweenParentheses(mut self, mut tokens: []&Token): &RangeExpr {
@@ -750,6 +728,24 @@ impl exprBuilder {
         ret self.buildIndexing(exprTokens, tokens, errorToken)
     }
 
+    fn buildExclRight(mut self, mut &tokens: []&Token): ExprData {
+        let token = tokens[len(tokens)-1]
+        tokens = tokens[:len(tokens)-1] // Ignore "!" token.
+        let mut d = self.build(tokens)
+        if d == nil {
+            ret nil
+        }
+        match type d {
+        | &FnCallExpr:
+            (&FnCallExpr)(d).Exception = &ScopeTree{
+                Deferred: true,
+            }
+            ret d
+        }
+        self.pushErr(token, LogMsg.InvalidSyntax)
+        ret nil
+    }
+
     fn buildData(mut self, mut &tokens: []&Token): ExprData {
         match len(tokens) {
         | 0:
@@ -763,21 +759,25 @@ impl exprBuilder {
         }
 
         let mut token = tokens[len(tokens)-1]
-        if token.Id == TokenId.Op && token.Kind == TokenKind.TripleDot {
+        if token.Id == TokenId.TripleDot {
             ret self.buildVariadic(tokens)
         }
 
         token = tokens[0]
-        match token.Id {
-        | TokenId.Op:
+
+        // Unary operators.
+        if IsUnaryOp(token.Id) {
             // Handle pointer to primitive type.
-            if len(tokens) > 1 && token.Kind == TokenKind.Star {
+            if len(tokens) > 1 {
                 token = tokens[1]
                 if token.Id == TokenId.Unsafe {
                     ret self.buildType(tokens)
                 }
             }
             ret self.buildUnary(tokens)
+        }
+
+        match token.Id {
         | TokenId.Range:
             if len(tokens) < 3 {
                 break
@@ -801,8 +801,8 @@ impl exprBuilder {
         match token.Id {
         | TokenId.Ident:
             ret self.buildSubIdent(tokens)
-        | TokenId.Op:
-            ret self.buildOpRight(tokens)
+        | TokenId.Excl:
+            ret self.buildExclRight(tokens)
         | TokenId.Range:
             match token.Kind {
             | TokenKind.RParent:
@@ -826,7 +826,7 @@ impl exprBuilder {
     fn buildBinop(mut self, mut &tokens: []&Token, i: int): ExprData {
         let mut op = tokens[i]
         let mut leftTokens = tokens[:i]
-        if isTypeOp(op.Kind) && isTypeRange(leftTokens) {
+        if isTypeOp(op.Id) && isTypeRange(leftTokens) {
             // Catch slice and array types.
             ret self.buildType(tokens)
         }
@@ -887,10 +887,10 @@ impl exprBuilder {
 }
 
 // Reports whether kind is potentially part of a type declaration.
-fn isTypeOp(&kind: str): bool {
-    ret kind == TokenKind.Amper ||
-        kind == TokenKind.DblAmper ||
-        kind == TokenKind.Star
+fn isTypeOp(&id: TokenId): bool {
+    ret id == TokenId.Amper ||
+        id == TokenId.DblAmper ||
+        id == TokenId.Star
 }
 
 // Reports whether range is potentially part of a type declaration.
@@ -917,13 +917,13 @@ fn isTypeRange(mut &tokens: []&Token): bool {
                         }
                     }
                     if rangeN == 0 {
-                        ret isTypeOp(lToken.Kind)
+                        ret isTypeOp(lToken.Id)
                     }
                 }
                 ret true
             }
         }
-        if !isTypeOp(token.Kind) {
+        if !isTypeOp(token.Id) {
             ret false
         }
         op = true
@@ -1021,16 +1021,16 @@ fn findLowestPrecOp(&tokens: []&Token): int {
             continue
         | i == 0:
             continue
-        | token.Id != TokenId.Op:
-            continue
         | braceN > 0:
+            continue
+        | !IsBinOp(token.Id):
             continue
         }
 
         let left = tokens[i-1]
 
         // Skip unary operator or type annotation.
-        if left.Id == TokenId.Op || left.Id == TokenId.Colon {
+        if IsUnaryOp(left.Id) || left.Id == TokenId.Colon {
             continue
         }
 
@@ -1038,7 +1038,7 @@ fn findLowestPrecOp(&tokens: []&Token): int {
             let lleft = tokens[i-2]
             if lleft.Id == TokenId.Range && lleft.Kind == TokenKind.LBracket {
                 // Skip potential type annotations.
-                if token.Kind == TokenKind.Amper || token.Kind == TokenKind.Star {
+                if token.Id == TokenId.Amper || token.Id == TokenId.Star {
                     continue
                 }
             }

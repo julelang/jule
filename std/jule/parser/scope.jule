@@ -60,9 +60,7 @@ fn prevIsIncompleteExpr(&tokens: []&Token, &i: int): bool {
     unsafe {
         let prev = tokens[i-1]
         ret prev.Id == TokenId.Dot ||
-            (prev.Id == TokenId.Op &&
-                IsBinOp(prev.Kind) &&
-                prev.Row < tokens[i].Row)
+            (IsBinOp(prev.Id) && prev.Row < tokens[i].Row)
     }
 }
 
@@ -653,7 +651,7 @@ impl scopeParser {
                 continue
             }
             match {
-            | tok.Id == TokenId.Op && tok.Kind == TokenKind.Vline:
+            | tok.Id == TokenId.Vline:
                 let exprTokens = tokens[j:i]
                 if len(exprTokens) == 0 {
                     self.pushErr(tok, LogMsg.MissingExpr)
@@ -682,7 +680,7 @@ impl scopeParser {
                 break
             }
             let tok = next[0]
-            if tok.Id != TokenId.Op || tok.Kind != TokenKind.Vline {
+            if tok.Id != TokenId.Vline {
                 n += i
                 continue
             }
@@ -721,7 +719,7 @@ impl scopeParser {
         let mut defNotLast = false
         for len(tokens) > 0 {
             let mut tok = tokens[0]
-            if tok.Id != TokenId.Op || tok.Kind != TokenKind.Vline {
+            if tok.Id != TokenId.Vline {
                 self.pushErr(tok, LogMsg.InvalidSyntax)
                 break
             }
@@ -873,9 +871,7 @@ impl scopeParser {
             match {
             | braceN > 0:
                 continue
-            | token.Id != TokenId.Op:
-                continue
-            | !IsAssignOp(token.Kind) && token.Kind != TokenKind.ColonEq:
+            | !IsAssignOp(token.Id) && token.Id != TokenId.ColonEq:
                 continue
             }
 
@@ -886,11 +882,11 @@ impl scopeParser {
             info.setter = token
             if i+1 >= len(tokens) {
                 info.r = nil
-                info.ok = IsPostfixOp(info.setter.Kind)
+                info.ok = IsPostfixOp(info.setter.Id)
                 break
             }
             info.r = tokens[i+1:]
-            if IsPostfixOp(info.setter.Kind) {
+            if IsPostfixOp(info.setter.Id) {
                 if len(info.r) > 0 {
                     self.pushErr(info.r[0], LogMsg.InvalidSyntax)
                     info.r = nil
@@ -933,7 +929,7 @@ impl scopeParser {
         }
 
         // Caught declaration assignments.
-        if info.setter.Kind == TokenKind.ColonEq {
+        if info.setter.Id == TokenId.ColonEq {
             assign.Declarative = true
             assign.Right = self.p.buildExpr(info.r)
             let ok = self.buildDeclAssign1(info.l, assign)
@@ -976,7 +972,7 @@ impl scopeParser {
                 }
             }
 
-            if part[0].Id == TokenId.Op && part[0].Kind == TokenKind.Amper {
+            if part[0].Id == TokenId.Amper {
                 isRef = true
                 part = part[1:]
                 if len(part) == 0 {
@@ -1023,7 +1019,7 @@ impl scopeParser {
             ret nil, false
         } else if i+1 < len(tokens) {
             assign.Setter = tokens[i]
-            if assign.Setter.Id != TokenId.Op || assign.Setter.Kind != TokenKind.Eq {
+            if assign.Setter.Id != TokenId.Eq {
                 self.pushErr(assign.Setter, LogMsg.InvalidSyntax)
             }
             i++

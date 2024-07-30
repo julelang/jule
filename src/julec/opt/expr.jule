@@ -5,7 +5,7 @@
 use env
 use math for std::math
 use std::jule::constant::{Const}
-use std::jule::lex::{TokenKind}
+use std::jule::lex::{TokenId, TokenKind}
 use std::jule::sema::{
     Scope,
     Data,
@@ -70,7 +70,7 @@ impl exprOptimizer {
         if lp == nil || !lp.IsStr() {
             ret false
         }
-        if m.Op.Kind != TokenKind.Eqs && m.Op.Kind != TokenKind.NotEq {
+        if m.Op.Id != TokenId.Eqs && m.Op.Id != TokenId.NotEq {
             ret false
         }
         match type m.Left.Model {
@@ -86,8 +86,8 @@ impl exprOptimizer {
         }
     opt:
         let mut c = (&Const)(m.Right.Model)
-        match m.Op.Kind {
-        | TokenKind.Eqs:
+        match m.Op.Id {
+        | TokenId.Eqs:
             if c.ReadStr() == "" {
                 *self.model = &CommonSubIdentExprModel{
                     ExprKind: m.Left.Kind,
@@ -102,9 +102,10 @@ impl exprOptimizer {
                 NotEq: false,
             })
             *self.model = unsafe { *(*ExprModel)(&model) }
-        | TokenKind.NotEq:
+        | TokenId.NotEq:
             if c.ReadStr() == "" {
                 let mut op = m.Op
+                op.Id = TokenId.Excl
                 op.Kind = TokenKind.Excl
                 *self.model = &UnaryExprModel{
                     Op: op,
@@ -146,27 +147,30 @@ impl exprOptimizer {
         if !Math {
             ret
         }
-        match m.Op.Kind {
-        | TokenKind.Star:
+        match m.Op.Id {
+        | TokenId.Star:
             let (ok, x) = checkForBitShiftOpt(m.Left, m.Right)
             if ok {
+                m.Op.Id = TokenId.Lshift
                 m.Op.Kind = TokenKind.Lshift
                 let mut c = (&Const)(m.Right.Model)
                 c.SetU64(x)
                 ret
             }
-        | TokenKind.Solidus:
+        | TokenId.Solidus:
             let (ok, x) = checkForBitShiftOpt(m.Left, m.Right)
             if ok {
+                m.Op.Id = TokenId.Rshift
                 m.Op.Kind = TokenKind.Rshift
                 let mut c = (&Const)(m.Right.Model)
                 c.SetU64(x)
                 ret
             }
-        | TokenKind.Percent:
+        | TokenId.Percent:
             let mut c = (&Const)(m.Right.Model)
             let d = c.AsF64()
             if d == 2 {
+                m.Op.Id = TokenId.Amper
                 m.Op.Kind = TokenKind.Amper
                 c.SetI64(1)
             }
@@ -177,11 +181,11 @@ impl exprOptimizer {
 
     fn unary(self, mut m: &UnaryExprModel) {
         exprOptimizer.optimize(m.Expr.Model)
-        if Ptr && m.Op.Kind == TokenKind.Star {
+        if Ptr && m.Op.Id == TokenId.Star {
             match type m.Expr.Model {
             | &UnaryExprModel:
                 let mut um = (&UnaryExprModel)(m.Expr.Model)
-                if um.Op.Kind == TokenKind.Amper {
+                if um.Op.Id == TokenId.Amper {
                     *self.model = um.Expr.Model
                 }
             }

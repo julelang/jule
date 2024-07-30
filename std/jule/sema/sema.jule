@@ -5,7 +5,7 @@
 use ast for std::jule::ast
 use build for std::jule::build::{Directive, Derive, LogMsg, Log, LogKind, Logf}
 use std::jule::constant::{Const}
-use std::jule::lex::{File, Token, TokenKind, IsIgnoreIdent, IsAnonIdent}
+use std::jule::lex::{File, Token, TokenId, TokenKind, IsIgnoreIdent, IsAnonIdent}
 use types for std::jule::types
 use strings for std::strings
 
@@ -21,7 +21,7 @@ fn isValidModelForRef(mut &m: ExprModel): bool {
         ret isValidModelForRef(model.Expr)
     | &UnaryExprModel:
         let mut unary = (&UnaryExprModel)(m)
-        if unary.Op.Kind != TokenKind.Star {
+        if unary.Op.Id != TokenId.Star {
             ret false
         }
         // Return true because of pointer dereferencing is an Unsafe Jule feature.
@@ -1087,7 +1087,7 @@ impl Sema {
             ret false
         | &UnaryExprModel:
             let mut unary = (&UnaryExprModel)(d.Model)
-            if unary.Op.Kind == TokenKind.Star {
+            if unary.Op.Id == TokenId.Star {
                 if !isValidModelForRef(d.Model) {
                     self.pushErr(errorToken, LogMsg.RefIsDangling, "address from * &T")
                     ret false

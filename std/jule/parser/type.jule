@@ -256,25 +256,6 @@ impl typeBuilder {
         }
     }
 
-    unsafe fn buildOp(mut self): &TypeDecl {
-        let mut token = self.tokens[*self.i]
-        match token.Kind {
-        | TokenKind.Star:
-            ret self.buildPtr()
-        | TokenKind.Amper:
-            ret self.buildSptr()
-        | TokenKind.DblAmper:
-            ret &TypeDecl{
-                Kind: &SptrTypeDecl{
-                    Elem: self.buildSptr(),
-                },
-            }
-        |:
-            self.pushErr(token, LogMsg.InvalidSyntax)
-            ret nil
-        }
-    }
-
     unsafe fn buildSlc(mut self): &TypeDecl {
         let mut token = self.tokens[*self.i]
         *self.i++ // skip right bracket
@@ -307,7 +288,7 @@ impl typeBuilder {
         }
 
         let mut token = exprTokens[0]
-        if len(exprTokens) == 1 && token.Id == TokenId.Op && token.Kind == TokenKind.TripleDot {
+        if len(exprTokens) == 1 && token.Id == TokenId.TripleDot {
             // Ignore.
         } else {
             arrt.Size = self.p.buildExpr(exprTokens)
@@ -384,8 +365,16 @@ impl typeBuilder {
             ret self.buildCppLink()
         | TokenId.Fn:
             ret self.buildFn()
-        | TokenId.Op:
-            ret self.buildOp()
+        | TokenId.Star:
+            ret self.buildPtr()
+        | TokenId.Amper:
+            ret self.buildSptr()
+        | TokenId.DblAmper:
+            ret &TypeDecl{
+                Kind: &SptrTypeDecl{
+                    Elem: self.buildSptr(),
+                },
+            }
         | TokenId.Range:
             ret self.buildEnumerable()
         | TokenId.Map:

@@ -54,57 +54,63 @@ static Spaces: [...]rune = [
 ]
 
 // Kind list of unary operators.
-static UnaryOps: [...]TokenKind = [
-    TokenKind.Minus,
-    TokenKind.Plus,
-    TokenKind.Caret,
-    TokenKind.Excl,
-    TokenKind.Star,
-    TokenKind.Amper,
+static UnaryOps: [...]TokenId = [
+    TokenId.Minus,
+    TokenId.Plus,
+    TokenId.Caret,
+    TokenId.Excl,
+    TokenId.Star,
+    TokenId.Amper,
 ]
 
 // Kind list of binary operators.
-static BinOps: [...]TokenKind = [
-    TokenKind.Plus,
-    TokenKind.Minus,
-    TokenKind.Star,
-    TokenKind.Solidus,
-    TokenKind.Percent,
-    TokenKind.Amper,
-    TokenKind.Vline,
-    TokenKind.Caret,
-    TokenKind.Lt,
-    TokenKind.Gt,
-    TokenKind.DblAmper,
-    TokenKind.DblVline,
+static BinOps: [...]TokenId = [
+    TokenId.Plus,
+    TokenId.Minus,
+    TokenId.Star,
+    TokenId.Solidus,
+    TokenId.Percent,
+    TokenId.Amper,
+    TokenId.Vline,
+    TokenId.Caret,
+    TokenId.Lshift,
+    TokenId.Rshift,
+    TokenId.Lt,
+    TokenId.Gt,
+    TokenId.LessEq,
+    TokenId.GreatEq,
+    TokenId.DblAmper,
+    TokenId.DblVline,
+    TokenId.Eqs,
+    TokenId.NotEq,
 ]
 
 // Kind list of weak operators.
 // These operators are weak, can used as part of expression.
-static WeakOps: [...]TokenKind = [
-    TokenKind.TripleDot,
-    TokenKind.Colon,
+static WeakOps: [...]TokenId = [
+    TokenId.TripleDot,
+    TokenId.Colon,
 ]
 
 // List of postfix operators.
-static PostfixOps: [...]TokenKind = [
-    TokenKind.DblPlus,
-    TokenKind.DblMinus,
+static PostfixOps: [...]TokenId = [
+    TokenId.DblPlus,
+    TokenId.DblMinus,
 ]
 
 // List of assign operators.
-static AssignOps: [...]TokenKind = [
-    TokenKind.Eq,
-    TokenKind.PlusEq,
-    TokenKind.MinusEq,
-    TokenKind.SolidusEq,
-    TokenKind.StarEq,
-    TokenKind.PercentEq,
-    TokenKind.RshiftEq,
-    TokenKind.LshiftEq,
-    TokenKind.VlineEq,
-    TokenKind.AmperEq,
-    TokenKind.CaretEq,
+static AssignOps: [...]TokenId = [
+    TokenId.Eq,
+    TokenId.PlusEq,
+    TokenId.MinusEq,
+    TokenId.SolidusEq,
+    TokenId.StarEq,
+    TokenId.PercentEq,
+    TokenId.RshiftEq,
+    TokenId.LshiftEq,
+    TokenId.VlineEq,
+    TokenId.AmperEq,
+    TokenId.CaretEq,
 ]
 
 // Special identifiers.
@@ -121,7 +127,6 @@ enum TokenId: uint {
     Ret,
     Semicolon,
     Lit,
-    Op,
     Comma,
     Const,
     Type,
@@ -155,6 +160,40 @@ enum TokenId: uint {
     Hash,
     Error,
     Map,
+    ColonEq,
+    TripleDot,
+    PlusEq,
+    MinusEq,
+    StarEq,
+    SolidusEq,
+    PercentEq,
+    LshiftEq,
+    RshiftEq,
+    CaretEq,
+    AmperEq,
+    VlineEq,
+    Eqs,
+    NotEq,
+    GreatEq,
+    LessEq,
+    DblAmper,
+    DblVline,
+    Lshift,
+    Rshift,
+    DblPlus,
+    DblMinus,
+    Plus,
+    Minus,
+    Star,
+    Solidus,
+    Percent,
+    Amper,
+    Vline,
+    Caret,
+    Excl,
+    Lt,
+    Gt,
+    Eq,
 }
 
 // Token kinds.
@@ -258,33 +297,30 @@ impl Token {
     // Accepts assignment tokens (like equals [=]) as precedenced operator
     // to handle expression assignments.
     fn Prec(self): byte {
-        if self.Id != TokenId.Op {
-            ret 0
-        }
-        match self.Kind {
-        | TokenKind.Star
-        | TokenKind.Percent
-        | TokenKind.Solidus
-        | TokenKind.Rshift
-        | TokenKind.Lshift
-        | TokenKind.Amper:
+        match self.Id {
+        | TokenId.Star
+        | TokenId.Percent
+        | TokenId.Solidus
+        | TokenId.Rshift
+        | TokenId.Lshift
+        | TokenId.Amper:
             ret 5
-        | TokenKind.Plus
-        | TokenKind.Minus
-        | TokenKind.Vline
-        | TokenKind.Caret:
+        | TokenId.Plus
+        | TokenId.Minus
+        | TokenId.Vline
+        | TokenId.Caret:
             ret 4
-        | TokenKind.Eqs
-        | TokenKind.NotEq
-        | TokenKind.Eq
-        | TokenKind.Lt
-        | TokenKind.LessEq
-        | TokenKind.Gt
-        | TokenKind.GreatEq:
+        | TokenId.Eqs
+        | TokenId.NotEq
+        | TokenId.Eq
+        | TokenId.Lt
+        | TokenId.LessEq
+        | TokenId.Gt
+        | TokenId.GreatEq:
             ret 3
-        | TokenKind.DblAmper:
+        | TokenId.DblAmper:
             ret 2
-        | TokenKind.DblVline:
+        | TokenId.DblVline:
             ret 1
         |:
             ret 0
@@ -293,9 +329,9 @@ impl Token {
 }
 
 // Reports whether kind is unary operator.
-fn IsUnaryOp(kind: str): bool {
+fn IsUnaryOp(id: TokenId): bool {
     for _, op in UnaryOps {
-        if kind == op {
+        if id == op {
             ret true
         }
     }
@@ -303,9 +339,9 @@ fn IsUnaryOp(kind: str): bool {
 }
 
 // Reports whether kind is binary operator.
-fn IsBinOp(kind: str): bool {
+fn IsBinOp(id: TokenId): bool {
     for _, op in BinOps {
-        if kind == op {
+        if id == op {
             ret true
         }
     }
@@ -313,9 +349,9 @@ fn IsBinOp(kind: str): bool {
 }
 
 // Reports whether kind is weak operator.
-fn IsWeakOp(kind: str): bool {
+fn IsWeakOp(id: TokenId): bool {
     for _, op in WeakOps {
-        if kind == op {
+        if id == op {
             ret true
         }
     }
@@ -439,13 +475,13 @@ fn IsAssign(id: TokenId): bool {
         id == TokenId.Mut ||
         id == TokenId.Self ||
         id == TokenId.Range ||
-        id == TokenId.Op)
+        id == TokenId.Star)
 }
 
 // Reports whether operator kind is postfix operator.
-fn IsPostfixOp(kind: str): bool {
+fn IsPostfixOp(id: TokenId): bool {
     for _, op in PostfixOps {
-        if kind == op {
+        if id == op {
             ret true
         }
     }
@@ -453,12 +489,12 @@ fn IsPostfixOp(kind: str): bool {
 }
 
 // Reports whether operator kind is assignment operator.
-fn IsAssignOp(kind: str): bool {
-    if IsPostfixOp(kind) {
+fn IsAssignOp(id: TokenId): bool {
+    if IsPostfixOp(id) {
         ret true
     }
     for _, op in AssignOps {
-        if kind == op {
+        if id == op {
             ret true
         }
     }

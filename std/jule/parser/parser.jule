@@ -129,7 +129,7 @@ fn rangeLast(mut &tokens: []&Token): (cutted: []&Token, cut: []&Token) {
 }
 
 // Same as parts, but uses TokenKind as separator.
-fn partsKind(mut &tokens: []&Token, kind: TokenKind, expr_must: bool): ([][]&Token, []Log) {
+fn partsKind(mut &tokens: []&Token, kind: TokenKind, exprMust: bool): ([][]&Token, []Log) {
     if len(tokens) == 0 {
         ret nil, nil
     }
@@ -157,7 +157,7 @@ fn partsKind(mut &tokens: []&Token, kind: TokenKind, expr_must: bool): ([][]&Tok
         }
 
         if token.Kind == kind {
-            if expr_must && i-last <= 0 {
+            if exprMust && i-last <= 0 {
                 let err = makeErr(token.Row, token.Column, token.File, LogMsg.MissingExpr)
                 errors = append(errors, err)
             }
@@ -168,7 +168,7 @@ fn partsKind(mut &tokens: []&Token, kind: TokenKind, expr_must: bool): ([][]&Tok
 
     if last < len(tokens) {
         parts = append(parts, tokens[last:])
-    } else if !expr_must {
+    } else if !exprMust {
         parts = append(parts, [])
     }
 
@@ -399,8 +399,7 @@ impl parser {
         let mut tok = tokens[i]
         if tok.Id == TokenId.Colon {
             i++ // Skip type annotation operator (:)
-            if (i >= len(tokens) ||
-                (tokens[i].Id == TokenId.Op && tokens[i].Kind == TokenKind.Eq)) {
+            if i >= len(tokens) || tokens[i].Id == TokenId.Eq {
                 self.pushErr(tok, LogMsg.MissingType)
                 ret
             }
@@ -414,20 +413,17 @@ impl parser {
             }
         }
 
-        if tok.Id == TokenId.Op {
-            if tok.Kind != TokenKind.Eq {
-                self.pushErr(tok, LogMsg.InvalidSyntax)
-                ret
-            }
-            let mut exprTokens = tokens[i+1:]
-            if len(exprTokens) == 0 {
-                self.pushErr(tok, LogMsg.MissingExpr)
-                ret
-            }
-            v.Expr = self.buildExpr(exprTokens)
-        } else {
+        if tok.Id != TokenId.Eq {
             self.pushErr(tok, LogMsg.InvalidSyntax)
+            ret
         }
+
+        let mut exprTokens = tokens[i+1:]
+        if len(exprTokens) == 0 {
+            self.pushErr(tok, LogMsg.MissingExpr)
+            ret
+        }
+        v.Expr = self.buildExpr(exprTokens)
     }
 
     fn buildVarCommon(mut &self, mut &v: &VarDecl, mut tokens: []&Token) {
@@ -487,7 +483,7 @@ impl parser {
         }
 
         tokens = tokens[i:]
-        if tokens[0].Id == TokenId.Op && tokens[0].Kind == TokenKind.Amper {
+        if tokens[0].Id == TokenId.Amper {
             v.Reference = true
             if len(tokens) == 1 {
                 ret nil
@@ -573,7 +569,7 @@ impl parser {
             }
         }
 
-        if tokens[i].Kind == TokenKind.Amper {
+        if tokens[i].Id == TokenId.Amper {
             param.Ident = TokenKind.Amper
             i++
             if i >= len(tokens) {
@@ -597,9 +593,7 @@ impl parser {
     fn paramTypeBegin(mut self, mut &param: &ParamDecl, mut &i: int, &tokens: []&Token) {
         for i < len(tokens); i++ {
             let token = tokens[i]
-            if token.Id != TokenId.Op {
-                ret
-            } else if token.Kind != TokenKind.TripleDot {
+            if token.Id != TokenId.TripleDot {
                 ret
             }
 
@@ -662,7 +656,7 @@ impl parser {
 
         // Catch reference parameters.
         if len(tokens) >= 3 {
-            if param.Token.Id == TokenId.Op && param.Token.Kind == TokenKind.Amper {
+            if param.Token.Id == TokenId.Amper {
                 if len(tokens) == 1 {
                     self.pushErr(tokens[0], LogMsg.InvalidSyntax)
                     ret nil
@@ -814,10 +808,8 @@ impl parser {
             if token.Kind == TokenKind.LBrace {
                 ret
             }
-        | TokenId.Op:
-            if token.Kind == TokenKind.Eq {
-                ret
-            }
+        | TokenId.Eq:
+            ret
         | TokenId.Colon:
             if i+1 >= len(tokens) {
                 self.pushErr(token, LogMsg.MissingType)
@@ -911,7 +903,7 @@ impl parser {
 
         if i < len(tokens) {
             let token = tokens[i]
-            if token.Id == TokenId.Op && token.Kind == TokenKind.Excl {
+            if token.Id == TokenId.Excl {
                 f.Exceptional = true
                 i++
             }
@@ -1033,11 +1025,7 @@ impl parser {
                 self.pushErr(token, LogMsg.InvalidSyntax)
                 ret
             }
-        | TokenId.Op:
-            if token.Kind != TokenKind.Star {
-                self.pushErr(token, LogMsg.InvalidSyntax)
-                ret
-            }
+        | TokenId.Star:
             tokens = tokens[:len(tokens)-1]
             if len(tokens) == 0 {
                 self.pushErr(token, LogMsg.InvalidSyntax)
@@ -1091,30 +1079,22 @@ impl parser {
                 self.pushErr(token, LogMsg.InvalidSyntax)
                 ret
             }
-        | TokenId.Op:
-            if token.Kind != TokenKind.Star {
-                self.pushErr(token, LogMsg.InvalidSyntax)
-                ret
-            }
-
+        | TokenId.Star:
             tokens = tokens[:len(tokens)-1]
             if len(tokens) == 0 {
                 self.pushErr(token, LogMsg.InvalidSyntax)
                 ret
             }
-
             token = tokens[len(tokens)-1]
             if token.Id != TokenId.DblColon {
                 self.pushErr(token, LogMsg.InvalidSyntax)
                 ret
             }
-
             tokens = tokens[:len(tokens)-1]
             if len(tokens) == 0 {
                 self.pushErr(token, LogMsg.InvalidSyntax)
                 ret
             }
-
             decl.Full = true
         }
 
@@ -1413,7 +1393,7 @@ impl parser {
         f.Kind, _ = unsafe { self.buildType(tokens, &i, true) }
         if i < len(tokens) {
             let token = tokens[i]
-            if token.Id != TokenId.Op || token.Kind != TokenKind.Eq {
+            if token.Id != TokenId.Eq {
                 self.pushErr(tokens[i], LogMsg.InvalidSyntax)
                 ret nil
             }

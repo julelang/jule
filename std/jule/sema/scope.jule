@@ -209,7 +209,7 @@ fn checkMut(mut &s: &Sema, &left: &Data, mut right: &Data, op: &Token): (ok: boo
         s.pushErr(op, LogMsg.AssignToNonMut)
         ret false
     | right != nil && !right.Mutable && right.Kind.Mutable():
-        if op.Kind != TokenKind.Eq && right.Kind.Struct() != nil {
+        if op.Id != TokenId.Eq && right.Kind.Struct() != nil {
             // If operator is not assignment, and kind is structure, allow.
             // Operator overloading uses immutable copy of right operand.
             // It's safe.
@@ -1213,26 +1213,26 @@ impl scopeChecker {
         // This method adopted from [BinaryEval.checkStructCommonOperatorCompatibility].
         // Should follow this method.
         let mut overload: &FnIns = nil
-        match a.Setter.Kind {
-        | TokenKind.PlusEq:
+        match a.Setter.Id {
+        | TokenId.PlusEq:
             overload = s.Operators.AddAssign
-        | TokenKind.MinusEq:
+        | TokenId.MinusEq:
             overload = s.Operators.SubAssign
-        | TokenKind.SolidusEq:
+        | TokenId.SolidusEq:
             overload = s.Operators.DivAssign
-        | TokenKind.StarEq:
+        | TokenId.StarEq:
             overload = s.Operators.MulAssign
-        | TokenKind.PercentEq:
+        | TokenId.PercentEq:
             overload = s.Operators.ModAssign
-        | TokenKind.LshiftEq:
+        | TokenId.LshiftEq:
             overload = s.Operators.ShlAssign
-        | TokenKind.RshiftEq:
+        | TokenId.RshiftEq:
             overload = s.Operators.ShrAssign
-        | TokenKind.VlineEq:
+        | TokenId.VlineEq:
             overload = s.Operators.BitOrAssign
-        | TokenKind.AmperEq:
+        | TokenId.AmperEq:
             overload = s.Operators.BitAndAssign
-        | TokenKind.CaretEq:
+        | TokenId.CaretEq:
             overload = s.Operators.BitXorAssign
         |:
             self.s.pushErr(a.Setter, LogMsg.OperatorNotForJuleType, a.Setter.Kind, s.Str())
@@ -1298,20 +1298,20 @@ impl scopeChecker {
         }
         self.scope.Stmts = append(self.scope.Stmts, &Assign{L: lm, R: rm, Op: a.Setter})
 
-        if a.Setter.Kind != TokenKind.Eq {
+        if a.Setter.Id != TokenId.Eq {
             let mut strct = l.Kind.Struct()
             if strct != nil {
                 self.checkStructureAssignOp(strct, a, r)
                 ret
             }
-
-            a.Setter.Kind = a.Setter.Kind[:len(a.Setter.Kind)-1]
+            let id = a.Setter.Id
+            a.Setter.Id = removeEqFromOp(a.Setter.Id)
             let mut solver = binaryEval.new(eval, a.Setter)
             r = solver.solveExplicit(l, r)
+            a.Setter.Id = id
             if r == nil {
                 ret
             }
-            a.Setter.Kind += str(TokenKind.Eq)
             ret
         }
 
@@ -1485,7 +1485,7 @@ impl scopeChecker {
 
     fn checkAssignSt(mut &self, mut a: &AssignSt) {
         match {
-        | IsPostfixOp(a.Setter.Kind):
+        | IsPostfixOp(a.Setter.Id):
             self.checkPostfix(a)
         | len(a.Left) == 1:
             if a.Declarative {
@@ -2092,5 +2092,32 @@ impl scopeChecker {
         base.gotos = self.gotos
         base.childIndex = self.childIndex + 1
         ret base
+    }
+}
+
+fn removeEqFromOp(op: TokenId): TokenId {
+    match op {
+    | TokenId.PlusEq:
+        ret TokenId.Plus
+    | TokenId.MinusEq:
+        ret TokenId.Minus
+    | TokenId.StarEq:
+        ret TokenId.Star
+    | TokenId.SolidusEq:
+        ret TokenId.Solidus
+    | TokenId.PercentEq:
+        ret TokenId.Percent
+    | TokenId.LshiftEq:
+        ret TokenId.Lshift
+    | TokenId.RshiftEq:
+        ret TokenId.Rshift
+    | TokenId.CaretEq:
+        ret TokenId.Caret
+    | TokenId.AmperEq:
+        ret TokenId.Amper
+    | TokenId.VlineEq:
+        ret TokenId.Vline
+    |:
+        ret op
     }
 }
