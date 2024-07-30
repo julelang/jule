@@ -870,13 +870,12 @@ impl scopeParser {
                     braceN--
                 }
             }
-
             match {
             | braceN > 0:
                 continue
             | token.Id != TokenId.Op:
                 continue
-            | !IsAssignOp(token.Kind):
+            | !IsAssignOp(token.Kind) && token.Kind != TokenKind.ColonEq:
                 continue
             }
 
@@ -933,6 +932,14 @@ impl scopeParser {
             Setter: info.setter,
         }
 
+        // Caught declaration assignments.
+        if info.setter.Kind == TokenKind.ColonEq {
+            assign.Declarative = true
+            assign.Right = self.p.buildExpr(info.r)
+            let ok = self.buildDeclAssign1(info.l, assign)
+            ret assign, ok
+        }
+
         let (mut parts, errs) = parts(info.l, TokenId.Comma, true)
         if len(errs) > 0 {
             self.p.errors = append(self.p.errors, errs...)
@@ -947,45 +954,19 @@ impl scopeParser {
         ret assign, true
     }
 
-    fn buildDeclAssign(mut self, mut tokens: []&Token): (&AssignSt, bool) {
-        if len(tokens) < 1 {
-            ret nil, false
-        }
-
-        tokens = tokens[1:] // Skip "let" keyword
-        let mut token = tokens[0]
-        if token.Id != TokenId.Range || token.Kind != TokenKind.LParent {
-            ret nil, false
-        }
-
-        let mut assign = &AssignSt{
-            Declarative: true,
-        }
-
-        let mut i = 0
-        let mut rang = range(i, TokenKind.LParent, TokenKind.RParent, tokens)
-        if rang == nil {
-            self.pushErr(token, LogMsg.InvalidSyntax)
-            ret nil, false
-        } else if i+1 < len(tokens) {
-            assign.Setter = tokens[i]
-            i++
-            let mut exprTokens = tokens[i:]
-            assign.Right = self.p.buildExpr(exprTokens)
-        }
-
+    fn buildDeclAssign1(mut self, mut &lefts: []&Token, mut &assign: &AssignSt): bool {
         // Lefts
-        let (mut parts, errs) = parts(rang, TokenId.Comma, true)
+        let (mut parts, errs) = parts(lefts, TokenId.Comma, true)
         if len(errs) > 0 {
             self.p.errors = append(self.p.errors, errs...)
-            ret nil, false
+            ret false
         }
 
         for (_, mut part) in parts {
             let mut isMut = false
             let mut isRef = false
 
-            token = part[0]
+            let token = part[0]
             if token.Id == TokenId.Mut {
                 isMut = true
                 part = part[1:]
@@ -1017,7 +998,41 @@ impl scopeParser {
             assign.Left = append(assign.Left, l)
         }
 
-        ret assign, true
+        ret true
+    }
+
+    fn buildDeclAssign(mut self, mut tokens: []&Token): (&AssignSt, bool) {
+        if len(tokens) < 1 {
+            ret nil, false
+        }
+
+        tokens = tokens[1:] // Skip "let" keyword
+        let mut token = tokens[0]
+        if token.Id != TokenId.Range || token.Kind != TokenKind.LParent {
+            ret nil, false
+        }
+
+        let mut assign = &AssignSt{
+            Declarative: true,
+        }
+
+        let mut i = 0
+        let mut rang = range(i, TokenKind.LParent, TokenKind.RParent, tokens)
+        if rang == nil {
+            self.pushErr(token, LogMsg.InvalidSyntax)
+            ret nil, false
+        } else if i+1 < len(tokens) {
+            assign.Setter = tokens[i]
+            if assign.Setter.Id != TokenId.Op || assign.Setter.Kind != TokenKind.Eq {
+                self.pushErr(assign.Setter, LogMsg.InvalidSyntax)
+            }
+            i++
+            let mut exprTokens = tokens[i:]
+            assign.Right = self.p.buildExpr(exprTokens)
+        }
+
+        let ok = self.buildDeclAssign1(rang, assign)
+        ret assign, ok
     }
 
     fn buildAssignSt(mut self, mut &tokens: []&Token): (st: &AssignSt, ok: bool) {
