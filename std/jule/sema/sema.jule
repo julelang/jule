@@ -1106,11 +1106,52 @@ impl Sema {
         ret true
     }
 
+    // Reports whether struct is risky for mutability.
+    // Designed for copy assignments.
+    // It will not check mutability risk of the internal mutable data or etc.
+    // It will check interior mutability risk of the new copy.
+    // Assumes the assigned memory is mutable.
+    fn isMutRiskyStruct(self, &s: &StructIns): bool {
+        for _, f in s.Fields {
+            // Inerior mutability enables to copy internal mutable data with safety.
+            // If field is interior mutable and their kind is mutable,
+            // check whether the field accessible. If field is not accessible,
+            // there is no problem, because no risk for mutability.
+            //
+            // For example:
+            //  We have a Foo struct. The Foo struct have the x field which is
+            //  interior mutable with mutable kind. So the following code is risky:
+            //
+            //    let a = Foo{}
+            //    let mut b = a
+            //
+            //  The example code above will create new copy of variable a, which is
+            //  instance of struct Foo. If the field x is accessible, the variable
+            //  b can mutate it, since it is mutable and can access to field x.
+            //  Therefore, copying interior mutable fields with mutable kind
+            //  must be disallowed if field is accessible for safety reasons.
+            if f.Decl.Mutable && f.Kind.Mutable() &&
+                self.isAccessibleDefine(f.Decl.Public, f.Decl.Token) {
+                ret true
+            }
+        }
+        ret false
+    }
+
     fn checkValidityForInitExpr(mut &self, leftMut: bool, leftRef: bool,
         &leftKind: &TypeKind, mut &d: &Data, mut &errorToken: &Token): bool {
-        if leftMut && !d.Mutable && d.Kind.Mutable() {
-            self.pushErr(errorToken, LogMsg.AssignNonMutToMut, d.Kind.Str())
-            ret false
+        if leftMut && !d.Mutable {
+            // Check classical assignment mutability.
+            if d.Kind.Mutable() {
+                self.pushErr(errorToken, LogMsg.AssignNonMutToMut, d.Kind.Str())
+                ret false
+            }
+            // Check interior mutability risk for the struct copy.
+            let s = d.Kind.Struct()
+            if s != nil && self.isMutRiskyStruct(s) {
+                self.pushErr(errorToken, LogMsg.CopyWithMutableData, d.Kind.Str())
+                ret false
+            }
         }
         if leftRef {
             if !self.checkRefValidityForInitExpr(leftMut, d, errorToken) {
@@ -2138,10 +2179,6 @@ impl Sema {
     }
 
     fn checkVar(mut &self, mut &v: &Var) {
-        if v.Binded {
-            ret
-        }
-
         if v.IsTypeInferred() {
             // Build new TypeSymbol because auto-type symbols are nil.
             v.Kind = &TypeSymbol{Kind: v.Value.Data.Kind}
@@ -2196,8 +2233,8 @@ impl Sema {
         }
     }
 
-    fn checkTypeVar(mut &self, mut &decl: &Var, mut l: Lookup) {
-        if decl.Binded || !decl.IsInitialized() {
+    fn evalTypeVarValue(mut &self, mut &decl: &Var, mut l: Lookup) {
+        if !decl.IsInitialized() {
             ret
         }
 
@@ -2209,6 +2246,10 @@ impl Sema {
         }
         eval.immutable = !decl.Mutable
         decl.Value.Data = eval.evalExpr(decl.Value.Expr)
+    }
+
+    fn checkTypeVar(mut &self, mut &decl: &Var, mut l: Lookup) {
+        self.evalTypeVarValue(decl, l)
         if decl.Value.Data == nil {
             ret // Skip checks if error ocurrs.
         }
@@ -2218,6 +2259,9 @@ impl Sema {
     // Checks types of current package file's global variables.
     fn checkGlobalTypes(mut &self) {
         for (_, mut decl) in self.file.Vars {
+            if decl.Binded {
+                continue
+            }
             if decl.IsInitialized() && decl.Value.Data == nil ||
                 decl.IsTypeInferred() && decl.Kind.Kind == nil {
                 self.checkTypeVar(decl, self)

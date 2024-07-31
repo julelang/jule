@@ -712,7 +712,12 @@ impl scopeChecker {
             ret
         }
 
-        self.s.checkTypeVar(v, self)
+        self.s.evalTypeVarValue(v, self)
+        if v.Value.Data == nil {
+            ret // Skip checks if error ocurrs.
+        }
+        self.removeInteriorMutRisk(v.Value.Data)
+        self.s.checkVar(v)
     }
 
     fn checkTypeAliasDecl(mut &self, mut decl: &TypeAliasDecl) {
@@ -1209,8 +1214,28 @@ impl scopeChecker {
         ret self.table.defByIdent(ident, false) == nil
     }
 
+    // Remove the interior mutability risk if the d represents a structure and
+    // this scope is owned by method which is owned by the relevant structure.
+    // In this case we should remove the interior mutability risk of data to allow copying.
+    // Otherwise assign analysis will complain and copy operation will not be allowed.
+    //
+    // See also documentation of the [sema.isMutRiskyStruct] method.
+    fn removeInteriorMutRisk(mut &self, mut &d: &Data) {
+        let s = d.Kind.Struct()
+        if s == nil {
+            ret
+        }
+        let root = self.getHardRoot()
+        if root.owner.Owner != s {
+            ret
+        }
+        // Mark data as mutable.
+        // Mutable data is not occurs mutability risk for analysis.
+        d.Mutable = true
+    }
+
     fn checkStructureAssignOp(mut &self, mut &s: &StructIns, mut &a: &AssignSt, mut &r: &Data): bool {
-        // This method adopted from [BinaryEval.checkStructCommonOperatorCompatibility].
+        // This method adopted from [binaryEval.checkStructCommonOperatorCompatibility].
         // Should follow this method.
         let mut overload: &FnIns = nil
         match a.Setter.Id {
@@ -1270,6 +1295,8 @@ impl scopeChecker {
         if r == nil {
             ret
         }
+
+        self.removeInteriorMutRisk(r)
 
         if l == nil {
             if r.Kind.Void() {
@@ -1444,6 +1471,7 @@ impl scopeChecker {
                 }
             }
             let mut r = right[i]
+            self.removeInteriorMutRisk(r)
             self.processEndPartOfMultiAssign(st, a, lexpr, l, r)
         }
         self.scope.Stmts = append(self.scope.Stmts, st)
@@ -1465,6 +1493,8 @@ impl scopeChecker {
         if r == nil {
             ret
         }
+
+        self.removeInteriorMutRisk(r)
 
         // Add new variable declaration statement.
         let mut v = &Var{
