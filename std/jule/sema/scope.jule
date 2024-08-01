@@ -353,6 +353,7 @@ struct Label {
 // Goto statement.
 struct GotoSt {
     Ident: str
+    Label: &Label
 }
 
 // Postfix assignment.
@@ -423,6 +424,7 @@ struct scopeLabel {
 }
 
 struct scopeGoto {
+    st:    &GotoSt
     gt:    &ast::GotoSt
     scope: &scopeChecker
     pos:   int
@@ -1165,11 +1167,13 @@ impl scopeChecker {
     }
 
     fn pushGoto(mut &self, mut gt: &ast::GotoSt) {
-        self.scope.Stmts = append(self.scope.Stmts, &GotoSt{
+        let mut st = &GotoSt{
             Ident: gt.Label.Kind,
-        })
+        }
+        self.scope.Stmts = append(self.scope.Stmts, st)
 
         *self.gotos = append(*self.gotos, &scopeGoto{
+            st: st,
             gt: gt,
             pos: len(self.scope.Stmts) - 1,
             scope: self,
@@ -2063,7 +2067,7 @@ impl scopeChecker {
                 self.s.pushErr(gt.gt.Token, LogMsg.LabelNotExist, gt.gt.Label.Kind)
                 continue
             }
-
+            gt.st.Label = label.label
             label.used = true
             self.checkGoto(gt, label)
         }
