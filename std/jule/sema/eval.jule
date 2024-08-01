@@ -51,6 +51,7 @@ use lex for std::jule::lex::{
     IsBool,
     IsRune,
     IsRawStr,
+    IsNil,
     IsIgnoreIdent,
 }
 use types for std::jule::types
@@ -198,7 +199,6 @@ impl Eval {
     fn litNil(self): &Data {
         // Return new Data with nil kind.
         // Nil kind represents "nil" literal.
-
         let mut constant = Const.NewNil()
         ret &Data{
             Mutable: true,
@@ -226,7 +226,7 @@ impl Eval {
     }
 
     fn litBool(self, &l: &LitExpr): &Data {
-        let mut constant = Const.NewBool(l.Value == TokenKind.True)
+        let mut constant = Const.NewBool(l.Value == "true")
         ret &Data{
             Mutable: true,
             Constant: constant,
@@ -336,7 +336,7 @@ impl Eval {
 
     fn evalLit(mut self, lit: &LitExpr): &Data {
         match {
-        | lit.IsNil():
+        | IsNil(lit.Value):
             ret self.litNil()
         | IsStr(lit.Value):
             ret self.litStr(lit)
@@ -3489,7 +3489,7 @@ impl binaryEval {
 
     fn evalNil(mut self): &Data {
         if !self.r.Kind.NilCompatible() {
-            self.e.pushErr(self.op, LogMsg.IncompatibleTypes, TokenKind.Nil, self.r.Kind.Str())
+            self.e.pushErr(self.op, LogMsg.IncompatibleTypes, "nil", self.r.Kind.Str())
             ret nil
         }
 
@@ -3500,7 +3500,7 @@ impl binaryEval {
                 Kind: primBool,
             }
         |:
-            self.e.pushErr(self.op, LogMsg.OperatorNotForJuleType, self.op.Kind, TokenKind.Nil)
+            self.e.pushErr(self.op, LogMsg.OperatorNotForJuleType, self.op.Kind, "nil")
             ret nil
         }
     }

@@ -20,7 +20,7 @@ use std::jule::constant::{Const}
 //  d: Data instance for evaluated expression of function.
 type builtinCaller: fn(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data
 
-fn findBuiltinFn(ident: str): &FnIns {
+fn findBuiltinFunc(&ident: str): &FnIns {
     match ident {
     | "out":
         static mut f = &FnIns{caller: builtinCallerOut}
@@ -90,6 +90,54 @@ static mut primU64 = &TypeKind{Kind: buildPrimType(PrimKind.U64)}
 static mut primF32 = &TypeKind{Kind: buildPrimType(PrimKind.F32)}
 static mut primF64 = &TypeKind{Kind: buildPrimType(PrimKind.F64)}
 
+fn findBuiltinVar(&ident: str): &Var {
+    match ident {
+    | "nil":
+        static mut v = &Var{
+            Public: true,
+            Mutable: false,
+            Kind: &TypeSymbol{
+                Kind: &TypeKind{Kind: nil},
+            },
+            Constant: true,
+            Value: &Value{
+                Data: &Data{
+                    Constant: Const.NewNil(),
+                },
+            }
+        }
+        ret v
+    | "true":
+        static mut v = &Var{
+            Public: true,
+            Mutable: false,
+            Kind: findBuiltinTypeAlias("bool").Kind,
+            Constant: true,
+            Value: &Value{
+                Data: &Data{
+                    Constant: Const.NewBool(true),
+                },
+            }
+        }
+        ret v
+    | "false":
+        static mut v = &Var{
+            Public: true,
+            Mutable: false,
+            Kind: findBuiltinTypeAlias("bool").Kind,
+            Constant: true,
+            Value: &Value{
+                Data: &Data{
+                    Constant: Const.NewBool(false),
+                },
+            }
+        }
+        ret v
+    |:
+        ret nil
+    }
+}
+
 fn findBuiltinTypeAlias(ident: str): &TypeAlias {
     match ident {
     | "any":
@@ -146,7 +194,11 @@ fn findBuiltinTypeAlias(ident: str): &TypeAlias {
 }
 
 fn findBuiltinDef(&ident: str): any {
-    let mut f = findBuiltinFn(ident)
+    let mut v = findBuiltinVar(ident)
+    if v != nil {
+        ret v
+    }
+    let mut f = findBuiltinFunc(ident)
     if f != nil {
         ret f
     }
