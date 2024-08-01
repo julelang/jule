@@ -53,9 +53,10 @@ struct SerializationInfo {
 }
 
 struct traitHash {
-    t: &Trait
-    s: &StructIns
-    i: int
+    t:  &Trait
+    ti: str        // ASCII-safe identifier of trait.
+    s:  &StructIns
+    i:  int
 }
 
 struct traitCast {
@@ -486,21 +487,25 @@ impl ObjectCoder {
                         ret
                     }
                     if len(t.Implemented) == 0 {
-                        self.tmap = append(self.tmap, &traitHash{
+                        let mut hash = &traitHash{
                             t: t,
                             s: nil,
                             i: emptyTraitOffset,
-                        })
+                        }
+                        identCoder.writeIdentTo(hash.ti, t.Ident)
+                        self.tmap = append(self.tmap, hash)
                         continue
                     }
                     let mut i = 0
                     for (_, mut s) in t.Implemented {
                         for (_, mut ins) in s.Instances {
-                            self.tmap = append(self.tmap, &traitHash{
+                            let mut hash = &traitHash{
                                 t: t,
                                 s: ins,
                                 i: i,
-                            })
+                            }
+                            identCoder.writeIdentTo(hash.ti, t.Ident)
+                            self.tmap = append(self.tmap, hash)
                             i++
                         }
                     }
@@ -1028,7 +1033,7 @@ impl ObjectCoder {
 
             f.Ident = ident
             f.Ident += "_"
-            f.Ident += hash.t.Ident
+            f.Ident += hash.ti
             f.Ident += "_"
             f.Ident += conv::Itoa(hash.i)
 
@@ -1105,7 +1110,7 @@ impl ObjectCoder {
             self.write("=")
             self.writeR(mIdent)
             self.write("_")
-            self.writeR(hash.t.Ident)
+            self.writeR(hash.ti)
             self.write("_")
             self.write(conv::Itoa(hash.i))
             self.write(",\n")
