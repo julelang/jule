@@ -36,8 +36,9 @@
 // ====================================================
 
 use io for std::io
-use strings for std::strings
+use bytes for std::bytes
 use unicode for std::unicode
+use nosafe for std::internal::nosafe
 use utf8 for std::unicode::utf8
 
 // A Writer writes records using CSV encoding.
@@ -82,15 +83,13 @@ impl Writer {
     // Not quoting the empty string also makes this package match the behavior
     // of Microsoft Excel and Google Drive.
     // For Postgres, quote the data terminating string `\.`.
-    fn fieldNeedsQuotes(self, field: str): bool {
+    fn fieldNeedsQuotes(self, field: []byte): bool {
         if len(field) == 0 {
             ret false
         }
-
-        if field == `\.` {
+        if len(field) == 2 && field[0] == '\\' && field[1] == '.' {
             ret true
         }
-
         if self.Comma < utf8::RuneSelf {
             let mut i = 0
             for i < len(field); i++ {
@@ -99,13 +98,11 @@ impl Writer {
                     ret true
                 }
             }
-        } else {
-            if strings::ContainsRune(field, self.Comma) || strings::ContainsAny(field, "\"\r\n") {
-                ret true
-            }
+        } else if bytes::ContainsRune(field, self.Comma) ||
+            bytes::ContainsAny(field, []byte("\"\r\n")) {
+            ret true
         }
-
-        let (r1, _) = utf8::DecodeRuneStr(field)
+        let (r1, _) = utf8::DecodeRune(field)
         ret unicode::IsSpace(r1)
     }
 
@@ -123,50 +120,53 @@ impl Writer {
                 self.w.Write(bytes[:j]) else { error(error) }
             }
 
+            // Use fb instead of field to avoid copying.
+            let mut fb = nosafe::Stobs(field)
+
             // If we don't have to have a quoted field then just
             // write out the field and continue to the next field.
-            if !self.fieldNeedsQuotes(field) {
-                self.w.Write([]byte(field)) else { error(error) }
+            if !self.fieldNeedsQuotes(fb) {
+                self.w.Write(fb) else { error(error) }
                 continue
             }
 
             self.w.Write(['"']) else { error(error) }
 
-            for len(field) > 0 {
+            for len(fb) > 0 {
                 // Search for special characters.
-                let mut i = strings::FindAny(field, "\"\r\n")
+                let mut i = bytes::FindAny(fb, []byte("\"\r\n"))
                 if i < 0 {
-                    i = len(field)
+                    i = len(fb)
                 }
 
                 // Copy verbatim everything before the special character.
-                self.w.Write([]byte(field[:i])) else { error(error) }
-                field = field[i:]
+                self.w.Write(fb[:i]) else { error(error) }
+                fb = fb[i:]
 
                 // Encode the special character.
-                if len(field) > 0 {
-                    match field[0] {
+                if len(fb) > 0 {
+                    match fb[0] {
                     | '"':
-                        self.w.Write(['"', '"']) else { error(error) }
+                        self.w.Write([]byte(`""`)) else { error(error) }
                     | '\r':
                         if !self.UseCrlf {
                             self.w.Write(['\r']) else { error(error) }
                         }
                     | '\n':
                         if self.UseCrlf {
-                            self.w.Write(['\r', '\n']) else { error(error) }
+                            self.w.Write([]byte("\r\n")) else { error(error) }
                         } else {
                             self.w.Write(['\n']) else { error(error) }
                         }
                     }
-                    field = field[1:]
+                    fb = fb[1:]
                 }
             }
 
             self.w.Write(['"']) else { error(error) }
         }
         if self.UseCrlf {
-            self.w.Write(['\r', '\n']) else { error(error) }
+            self.w.Write([]byte("\r\n")) else { error(error) }
         } else {
             self.w.Write(['\n']) else { error(error) }
         }
