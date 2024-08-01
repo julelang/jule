@@ -2008,7 +2008,7 @@ impl Sema {
         | !self.checkDeclGenerics(s.Generics):
         | !self.checkStructFields(s):
         | !self.checkStructImpls(s):
-        | !self.checkFuncDecls(s.Methods):
+        | !self.checkFuncDeclsBy(s.Methods):
         }
     }
 
@@ -2024,12 +2024,12 @@ impl Sema {
         ret true
     }
 
-    fn checkAnonFnDecl(mut &self, mut &f: &Fn) {
+    fn checkAnonFuncDecl(mut &self, mut &f: &Fn) {
         f.sema = self
         self.checkFnDeclPrototype(f)
     }
 
-    fn checkFnDecl(mut &self, mut &f: &Fn) {
+    fn checkFuncDecl(mut &self, mut &f: &Fn) {
         if IsIgnoreIdent(f.Ident) {
             self.pushErr(f.Token, LogMsg.IgnoreIdent)
         } else if f.IsAnon() {
@@ -2037,7 +2037,7 @@ impl Sema {
         }
 
         self.checkDirectives(f.Directives, f)
-        self.checkAnonFnDecl(f)
+        self.checkAnonFuncDecl(f)
 
         if f.Owner == nil && self.isDuplicatedIdent(uintptr(f), f.Ident, f.Binded) {
             if f.Ident == build::InitFn {
@@ -2051,9 +2051,9 @@ impl Sema {
         }
     }
 
-    fn checkFuncDecls(mut &self, mut &funcs: []&Fn): bool {
+    fn checkFuncDeclsBy(mut &self, mut &funcs: []&Fn): bool {
         for (_, mut f) in funcs {
-            self.checkFnDecl(f)
+            self.checkFuncDecl(f)
             // Break checking if error occurs.
             if len(self.errors) > 0 {
                 ret false
@@ -2063,8 +2063,8 @@ impl Sema {
     }
 
     // Checks current package file's function declarations.
-    fn checkFnDecls(mut &self): (ok: bool) {
-        ret self.checkFuncDecls(self.file.Funcs)
+    fn checkFuncDecls(mut &self): (ok: bool) {
+        ret self.checkFuncDeclsBy(self.file.Funcs)
     }
 
     fn pushCycleError(self, &st1: str, &st2: str, mut &message: str) {
@@ -2158,7 +2158,7 @@ impl Sema {
         for (_, mut f) in self.files {
             self.setCurrentFile(f)
             match {
-            | !self.checkFnDecls():
+            | !self.checkFuncDecls():
             | !self.checkStructDecls():
             |:
                 continue
@@ -2178,7 +2178,8 @@ impl Sema {
         }
     }
 
-    fn checkVar(mut &self, mut &v: &Var) {
+    // Checks value of variable.
+    fn checkVarValue(mut &self, mut &v: &Var) {
         if v.IsTypeInferred() {
             // Build new TypeSymbol because auto-type symbols are nil.
             v.Kind = &TypeSymbol{Kind: v.Value.Data.Kind}
@@ -2233,7 +2234,8 @@ impl Sema {
         }
     }
 
-    fn evalTypeVarValue(mut &self, mut &decl: &Var, mut l: Lookup) {
+    // Evaluates value of variable if initialized.
+    fn evalVarValue(mut &self, mut &decl: &Var, mut l: Lookup) {
         if !decl.IsInitialized() {
             ret
         }
@@ -2248,23 +2250,25 @@ impl Sema {
         decl.Value.Data = eval.evalExpr(decl.Value.Expr)
     }
 
-    fn checkTypeVar(mut &self, mut &decl: &Var, mut l: Lookup) {
-        self.evalTypeVarValue(decl, l)
+    // Evaluateds value of variable and checks.
+    // Assumes the variable is global.
+    fn checkVar(mut &self, mut &decl: &Var, mut l: Lookup) {
+        self.evalVarValue(decl, l)
         if decl.Value.Data == nil {
             ret // Skip checks if error ocurrs.
         }
-        self.checkVar(decl)
+        self.checkVarValue(decl)
     }
 
-    // Checks types of current package file's global variables.
-    fn checkGlobalTypes(mut &self) {
+    // Checks current package file's global variables.
+    fn checkGlobals(mut &self) {
         for (_, mut decl) in self.file.Vars {
             if decl.Binded {
                 continue
             }
             if decl.IsInitialized() && decl.Value.Data == nil ||
                 decl.IsTypeInferred() && decl.Kind.Kind == nil {
-                self.checkTypeVar(decl, self)
+                self.checkVar(decl, self)
             }
         }
     }
@@ -2361,7 +2365,7 @@ impl Sema {
             self.files[0].TypeAliases = append(tc.useGenerics, self.files[0].TypeAliases...)
             for (_, mut v) in s.Statics {
                 self.checkVarDecl(v, self)
-                self.checkTypeVar(v, self)
+                self.checkVar(v, self)
                 ok = len(self.errors)-n == 0 && ok
             }
             self.files[0].TypeAliases = self.files[0].TypeAliases[len(tc.useGenerics):]
@@ -2592,7 +2596,7 @@ impl Sema {
         self.checkFnInsCaller(f, nil)
     }
 
-    fn checkTypeFn(mut &self, mut &f: &Fn) {
+    fn checkFunc(mut &self, mut &f: &Fn) {
         if f.Binded {
             ret
         }
@@ -2640,7 +2644,7 @@ impl Sema {
         }
     }
 
-    fn precheckTypeFn(mut &self, mut &f: &Fn) {
+    fn precheckFunc(mut &self, mut &f: &Fn) {
         if f.Binded {
             ret
         }
@@ -2663,21 +2667,21 @@ impl Sema {
     }
 
     // Prechecks types of current package file's functions.
-    fn precheckFnTypes(mut &self) {
+    fn precheckFuncs(mut &self) {
         for (_, mut decl) in self.file.Traits {
             for (_, mut m) in decl.Methods {
-                self.precheckTypeFn(m)
+                self.precheckFunc(m)
             }
         }
         for (_, mut decl) in self.file.Funcs {
-            self.precheckTypeFn(decl)
+            self.precheckFunc(decl)
         }
     }
 
     // Checks types of current package file's functions.
-    fn checkFnTypes(mut &self) {
+    fn checkFuncs(mut &self) {
         for (_, mut decl) in self.file.Funcs {
-            self.checkTypeFn(decl)
+            self.checkFunc(decl)
         }
     }
 
@@ -2686,8 +2690,8 @@ impl Sema {
     fn checkPackageTypes(mut &self) {
         for (_, mut f) in self.files {
             self.setCurrentFile(f)
-            self.checkGlobalTypes()
-            self.precheckFnTypes()
+            self.checkGlobals()
+            self.precheckFuncs()
             // Check structures first, see developer reference (7).
             // Check operators first, see developer reference (7.1), and (7.2).
             self.precheckStructTypes()
@@ -2697,7 +2701,7 @@ impl Sema {
         }
         for (_, mut f) in self.files {
             self.setCurrentFile(f)
-            self.checkFnTypes()
+            self.checkFuncs()
             self.checkStructTypes()
         }
     }
