@@ -196,18 +196,6 @@ impl Eval {
         ret true
     }
 
-    fn litNil(self): &Data {
-        // Return new Data with nil kind.
-        // Nil kind represents "nil" literal.
-        let mut constant = Const.NewNil()
-        ret &Data{
-            Mutable: true,
-            Constant: constant,
-            Kind: &TypeKind{Kind: nil},
-            Model: constant,
-        }
-    }
-
     fn litStr(self, &l: &LitExpr): &Data {
         let mut s = l.Value[1:len(l.Value)-1] // Remove quotes.
         if IsRawStr(l.Value) {
@@ -221,16 +209,6 @@ impl Eval {
             Mutable: true,
             Constant: constant,
             Kind: primStr,
-            Model: constant,
-        }
-    }
-
-    fn litBool(self, &l: &LitExpr): &Data {
-        let mut constant = Const.NewBool(l.Value == "true")
-        ret &Data{
-            Mutable: true,
-            Constant: constant,
-            Kind: primBool,
             Model: constant,
         }
     }
@@ -336,12 +314,8 @@ impl Eval {
 
     fn evalLit(mut self, lit: &LitExpr): &Data {
         match {
-        | IsNil(lit.Value):
-            ret self.litNil()
         | IsStr(lit.Value):
             ret self.litStr(lit)
-        | IsBool(lit.Value):
-            ret self.litBool(lit)
         | IsRune(lit.Value):
             ret self.litRune(lit)
         | lex::IsNum(lit.Value):
@@ -593,6 +567,11 @@ impl Eval {
 
         self.checkDeprecated(v.Directives, errorToken)
 
+        if v.Token == nil {
+            // Variable is built-in.
+            goto data
+        }
+
         v.Used = true
 
         match type self.lookup {
@@ -649,6 +628,7 @@ impl Eval {
             }
         }
 
+    data:
         let mut d = &Data{
             Lvalue: !v.Constant,
             Mutable: v.Mutable,
