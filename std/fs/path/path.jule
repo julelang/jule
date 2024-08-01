@@ -37,13 +37,14 @@
 
 use env for std::env
 use strings for std::strings
+use nosafe for std::internal::nosafe
 
 // A LazyBuff is a lazily constructed path buffer.
 // It supports append, reading previously appended bytes,
 // and retrieving the final string. It does not allocate a buffer
 // to hold the output until that output diverges from s.
 struct lazyBuff {
-    path:       str
+    path:       []byte
     buff:       []byte
     w:          int
     volAndPath: str
@@ -65,7 +66,7 @@ impl lazyBuff {
                 ret
             }
             self.buff = make([]byte, len(self.path))
-            copy(self.buff, []byte(self.path[:self.w]))
+            copy(self.buff, self.path[:self.w])
         }
         self.buff[self.w] = c
         self.w++
@@ -125,7 +126,7 @@ fn Clean(mut path: str): str {
     //      it is the leading slash or it is a leading ../../.. prefix.
     let n = len(path)
     let mut out = lazyBuff{
-        path: path,
+        path: nosafe::Stobs(path), // Avoid copying string.
         volAndPath: originalPath,
         volLen: volLen,
     }
