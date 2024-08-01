@@ -6,6 +6,7 @@ use ast for std::jule::ast
 use build for std::jule::build::{Directive, Derive, LogMsg, Log, LogKind, Logf}
 use std::jule::constant::{Const}
 use std::jule::lex::{File, Token, TokenId, TokenKind, IsIgnoreIdent, IsAnonIdent}
+use mod for std::jule::internal::mod
 use types for std::jule::types
 use strings for std::strings
 
@@ -256,6 +257,11 @@ impl Lookup for Sema {
             ret v
         }
 
+        // If identifier is not public, it should be built-in or package define.
+        if !mod::IsPub(ident) {
+            ret nil
+        }
+
         // Lookup current file's public denifes of imported packages.
         for (_, mut imp) in self.file.Imports {
             if !impIsLookupable(imp, ident) {
@@ -281,6 +287,11 @@ impl Lookup for Sema {
         let mut ta = findTypeAliasInPackage(self.files, ident, binded)
         if ta != nil {
             ret ta
+        }
+
+        // If identifier is not public, it should be built-in or package define.
+        if !mod::IsPub(ident) {
+            ret nil
         }
 
         // Lookup current file's public denifes of imported packages.
@@ -309,6 +320,12 @@ impl Lookup for Sema {
         if s != nil {
             ret s
         }
+
+        // If identifier is not public, it should be built-in or package define.
+        if !mod::IsPub(ident) {
+            ret nil
+        }
+
         // Lookup current file's public denifes of imported packages.
         for (_, mut imp) in self.file.Imports {
             if !impIsLookupable(imp, ident) {
@@ -333,6 +350,11 @@ impl Lookup for Sema {
         let mut f = findFnInPackage(self.files, ident, binded)
         if f != nil {
             ret f
+        }
+
+        // If identifier is not public, it should be built-in or package define.
+        if !mod::IsPub(ident) {
+            ret nil
         }
 
         // Lookup current file's public denifes of imported packages.
@@ -362,6 +384,11 @@ impl Lookup for Sema {
             ret t
         }
 
+        // If identifier is not public, it should be built-in or package define.
+        if !mod::IsPub(ident) {
+            ret nil
+        }
+
         // Lookup current file's public denifes of imported packages.
         for (_, mut imp) in self.file.Imports {
             if !impIsLookupable(imp, ident) {
@@ -389,6 +416,11 @@ impl Lookup for Sema {
             ret e
         }
 
+        // If identifier is not public, it should be built-in or package define.
+        if !mod::IsPub(ident) {
+            ret nil
+        }
+
         // Lookup current file's public denifes of imported packages.
         for (_, mut imp) in self.file.Imports {
             if !impIsLookupable(imp, ident) {
@@ -414,6 +446,11 @@ impl Lookup for Sema {
         let mut e = findTypeEnumInPackage(self.files, ident)
         if e != nil {
             ret e
+        }
+
+        // If identifier is not public, it should be built-in or package define.
+        if !mod::IsPub(ident) {
+            ret nil
         }
 
         // Lookup current file's public denifes of imported packages.

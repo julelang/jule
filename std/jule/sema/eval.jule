@@ -55,6 +55,7 @@ use lex for std::jule::lex::{
     IsIgnoreIdent,
 }
 use types for std::jule::types
+use mod for std::jule::internal::mod
 use strings for std::strings
 
 // Value data.
@@ -326,22 +327,25 @@ impl Eval {
     }
 
     fn findBuiltins(mut self, &ident: str): any {
-        match type self.lookup {
-        | &ImportInfo:
-            let mut def = findBuiltinsImport(ident, (&ImportInfo)(self.lookup))
-            if def != nil {
-                ret def
+        if mod::IsPub(ident) {
+            match type self.lookup {
+            | &ImportInfo:
+                let mut def = findBuiltinsImport(ident, (&ImportInfo)(self.lookup))
+                if def != nil {
+                    ret def
+                }
+            | &Sema:
+                let mut def = findBuiltinsSema(ident, (&Sema)(self.lookup))
+                if def != nil {
+                    ret def
+                }
+            | &scopeChecker:
+                let mut def = findBuiltinsSema(ident, (&scopeChecker)(self.lookup).s)
+                if def != nil {
+                    ret def
+                }
             }
-        | &Sema:
-            let mut def = findBuiltinsSema(ident, (&Sema)(self.lookup))
-            if def != nil {
-                ret def
-            }
-        | &scopeChecker:
-            let mut def = findBuiltinsSema(ident, (&scopeChecker)(self.lookup).s)
-            if def != nil {
-                ret def
-            }
+            ret nil
         }
         if self.disBuiltin {
             ret nil
