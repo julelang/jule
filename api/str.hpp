@@ -99,14 +99,12 @@ namespace jule
 
         Str(const jule::Slice<jule::I32> &src)
         {
-            this->_len = src.len() * 4;
+            this->_len = src.len() << 2;
             this->buffer = jule::Str::buffer_t::make(jule::Str::alloc(this->_len));
             this->_slice = this->buffer.alloc;
             jule::Int n = 0;
             for (const jule::I32 &r : src)
-            {
                 jule::utf8_push_rune_bytes(r, *this);
-            }
         }
 
         using Iterator = jule::U8 *;
@@ -207,11 +205,6 @@ namespace jule
                 jule::panic(error);
             }
 #endif
-            if (start == end)
-            {
-                this->buffer.dealloc();
-                return;
-            }
             this->_slice += start;
             this->_len = end - start;
         }
@@ -226,7 +219,7 @@ namespace jule
 #ifndef __JULE_ENABLE__PRODUCTION
                 file,
 #endif
-                start, this->len());
+                start, this->_len);
         }
 
         inline void mut_slice(
@@ -241,7 +234,7 @@ namespace jule
 #ifndef __JULE_ENABLE__PRODUCTION
                 file,
 #endif
-                0, this->len());
+                0, this->_len);
         }
 
         jule::Str slice(
@@ -530,7 +523,7 @@ namespace jule
 
     inline jule::Str to_str(char *s) noexcept
     {
-        return jule::to_str(const_cast<const char*>(s));
+        return jule::to_str(const_cast<const char *>(s));
     }
 
     inline jule::Str ptr_to_str(const void *alloc)
