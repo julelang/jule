@@ -118,9 +118,9 @@ impl exprCoder {
         let lit = cstrLit(bytes)
         self.oc.write(typeCoder.Str)
         self.oc.write("(")
-        self.oc.writeR(lit)
+        self.oc.write(lit)
         self.oc.write(", ")
-        self.oc.writeR(len)
+        self.oc.write(len)
         self.oc.write(")")
     }
 
@@ -258,7 +258,7 @@ impl exprCoder {
         self.oc.write("(")
         self.possibleRefExpr(m.Left.Model)
         self.oc.write(" ")
-        self.oc.writeR(m.Op.Kind)
+        self.oc.write(m.Op.Kind)
         self.oc.write(" ")
         self.possibleRefExpr(m.Right.Model)
         self.oc.write(")")
@@ -309,7 +309,7 @@ impl exprCoder {
             ret
         }
         self.oc.write("(")
-        self.oc.writeR(m.Op.Kind)
+        self.oc.write(m.Op.Kind)
         self.oc.write("(")
         self.possibleRefExpr(m.Expr.Model)
         self.oc.write("))")
@@ -711,7 +711,7 @@ impl exprCoder {
             if m.Func.Params[i].Decl.Reference {
                 self.oc.write("&")
             }
-            self.oc.writeR(name)
+            self.oc.write(name)
             self.oc.write(" = ")
             self.possibleRefExpr(arg)
             self.oc.write(";\n")
@@ -719,7 +719,7 @@ impl exprCoder {
             m.Args[i] = unsafe { *(*ExprModel)(&argS) }
         }
         self.oc.indent()
-        self.oc.Obj = append(self.oc.Obj, unsafe { head.Buf() }...)
+        self.oc.Obj.Write(unsafe{ head.Buf() })
         self.oc.write("](void) mutable -> void {\n")
         self.oc.addIndent()
         self.oc.indent()
@@ -953,7 +953,7 @@ impl exprCoder {
     }
 
     fn commonIdent(mut &self, m: &CommonIdentExprModel) {
-        self.oc.writeR(m.Ident)
+        self.oc.write(m.Ident)
     }
 
     fn commonSub(mut &self, mut m: &CommonSubIdentExprModel) {
@@ -972,7 +972,7 @@ impl exprCoder {
         |:
             self.oc.write(".")
         }
-        self.oc.writeR(m.Ident)
+        self.oc.write(m.Ident)
     }
 
     fn array(mut &self, mut m: &ArrayExprModel) {
@@ -1299,15 +1299,16 @@ impl exprCoder {
 
     fn backendEmit(mut &self, mut m: &BackendEmitExprModel) {
         if len(m.Exprs) == 0 {
-            self.oc.writeR(m.Code)
+            self.oc.write(m.Code)
             ret
         }
-        let n = len(self.oc.Obj)
+        let n = self.oc.Obj.Len()
         let mut args = make([]any, len(m.Exprs))
         for (i, mut expr) in m.Exprs {
             self.possibleRefExpr(expr)
-            args[i] = str(self.oc.Obj[n:])
-            self.oc.Obj = self.oc.Obj[:n]
+            let mut buf = unsafe { self.oc.Obj.Buf() }
+            args[i] = str(buf[n:])
+            unsafe { self.oc.Obj.SetBuf(buf[:n]) }
         }
         self.oc.write(fmt::Format(m.Code, args...))
     }
