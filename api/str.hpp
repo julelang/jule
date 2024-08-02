@@ -697,6 +697,63 @@ namespace jule
             this->dealloc();
         }
 
+        void mut_slice(
+#ifndef __JULE_ENABLE__PRODUCTION
+            const char *file,
+#endif
+            const jule::Int &start,
+            const jule::Int &end) noexcept
+        {
+#ifndef __JULE_DISABLE__SAFETY
+            if (start < 0 || end < 0 || start > end || end > this->len())
+            {
+                std::string error;
+                __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(error, start, end, this->len(), "length");
+                error += "\nruntime: string slicing with out of range indexes";
+#ifndef __JULE_ENABLE__PRODUCTION
+                error += "\nfile:";
+                error += file;
+#endif
+                jule::panic(error);
+            }
+#endif
+            if (start == end)
+            {
+                this->buffer.dealloc();
+                return;
+            }
+            this->_slice += start;
+            this->_len = end - start;
+        }
+
+        inline void mut_slice(
+#ifndef __JULE_ENABLE__PRODUCTION
+            const char *file,
+#endif
+            const jule::Int &start) noexcept
+        {
+            this->mut_slice(
+#ifndef __JULE_ENABLE__PRODUCTION
+                file,
+#endif
+                start, this->len());
+        }
+
+        inline void mut_slice(
+#ifndef __JULE_ENABLE__PRODUCTION
+            const char *file
+#else
+            void
+#endif
+            ) noexcept
+        {
+            this->mut_slice(
+#ifndef __JULE_ENABLE__PRODUCTION
+                file,
+#endif
+                0, this->len());
+        }
+
         jule::Str slice(
 #ifndef __JULE_ENABLE__PRODUCTION
             const char *file,

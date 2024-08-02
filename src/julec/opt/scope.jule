@@ -244,7 +244,42 @@ impl scopeOptimizer {
         self.optimizeChild(it.Scope)
     }
 
+    fn substr(mut self, mut a: &Assign): bool {
+        if a.Op.Id != TokenId.Eq {
+            ret false
+        }
+        match type a.R.Model {
+        | &SlicingExprModel:
+            let mut sem = (&SlicingExprModel)(a.R.Model)
+            if a.L.Model == sem.Expr {
+                self.setCurrentStmt(&MutSlicingExprModel{
+                    Token: sem.Token,
+                    Expr: sem.Expr,
+                    Left: sem.Left,
+                    Right: sem.Right,
+                })
+                ret true
+            }
+        }
+        ret false
+    }
+
+    fn strAssign(mut self, mut a: &Assign): bool {
+        if !Str {
+            ret false
+        }
+        let lp = a.L.Kind.Prim()
+        if lp == nil || !lp.IsStr() {
+            ret false
+        }
+        ret self.substr(a)
+    }
+
     fn optimizeAssign(mut self, mut assign: &Assign) {
+        if self.strAssign(assign) {
+            ret
+        }
+
         exprOptimizer.optimize(assign.L.Model)
         exprOptimizer.optimize(assign.R.Model)
 

@@ -2,10 +2,12 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use env
 use opt::{
     self,
     PushToSliceExprModel,
     AppendToSliceExprModel,
+    MutSlicingExprModel,
 }
 use conv for std::conv
 use lex for std::jule::lex::{TokenKind}
@@ -50,6 +52,7 @@ enum compStmt: type {
     Stmt: Stmt,
     &PushToSliceExprModel,
     &AppendToSliceExprModel,
+    &MutSlicingExprModel,
 }
 
 struct scopeCoder {
@@ -663,6 +666,23 @@ impl scopeCoder {
         }
     }
 
+    fn mutSlicing(mut &self, mut m: &MutSlicingExprModel) {
+        self.oc.write("(")
+        self.oc.ec.possibleRefExpr(m.Expr)
+        self.oc.write(").mut_slice(")
+        if !env::Production {
+            self.oc.write("\"")
+            self.oc.locInfo(m.Token)
+            self.oc.write("\", ")
+        }
+        self.oc.ec.possibleRefExpr(m.Left)
+        if m.Right != nil {
+            self.oc.write(", ")
+            self.oc.ec.possibleRefExpr(m.Right)
+        }
+        self.oc.write(");")
+    }
+
     // Generates C++ code of statement.
     fn st(mut &self, mut st: compStmt) {
         if st == nil {
@@ -707,6 +727,8 @@ impl scopeCoder {
             self.oc.ec.pushToSlice((&PushToSliceExprModel)(st))
         | &AppendToSliceExprModel:
             self.oc.ec.appendToSlice((&AppendToSliceExprModel)(st))
+        | &MutSlicingExprModel:
+            self.mutSlicing((&MutSlicingExprModel)(st))
         |:
             self.oc.write("<unimplemented_stmt>")
         }
