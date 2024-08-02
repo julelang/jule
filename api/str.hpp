@@ -102,7 +102,6 @@ namespace jule
             this->_len = src.len() << 2;
             this->buffer = jule::Str::buffer_t::make(jule::Str::alloc(this->_len));
             this->_slice = this->buffer.alloc;
-            jule::Int n = 0;
             for (const jule::I32 &r : src)
                 jule::utf8_push_rune_bytes(r, *this);
         }
