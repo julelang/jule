@@ -35,7 +35,7 @@ use std::jule::build::{
     IsValidCppExt,
 }
 use std::jule::lex::{Token, TokenId, TokenKind}
-use strings for std::strings
+use strings for std::strings::{StrBuilder}
 
 // Stack for symbol references.
 // It used by Sema to store necessary references.
@@ -530,17 +530,21 @@ impl symbolBuilder {
         ret strings::Replace(path, str(path::Separator), TokenKind.DblColon, -1)
     }
 
-    fn pushCycleError(mut &self, &sb: &symbolBuilder, path: str, mut &message: str) {
+    fn pushCycleError(mut &self, &sb: &symbolBuilder, path: str, mut &message: StrBuilder) {
         const Padding = 7
         let refersTo = Logf(
             LogMsg.RefersTo,
             self.getAsLinkPath(sb.table.File.Dir()),
             self.getAsLinkPath(path))
-        message = strings::Repeat(" ", Padding) + refersTo + "\n" + message
+        let buf = unsafe { message.Buf() }
+        message.WriteStr(strings::Repeat(" ", Padding))
+        message.WriteStr(refersTo)
+        message.WriteByte('\n')
+        message.Write(buf)
     }
 
     fn pushCrossCycleError(mut &self, &target: &symbolBuilder, &imp: &ImportInfo, &errorToken: &Token) {
-        let mut message = ""
+        let mut message = StrBuilder.New(1 << 5)
 
         self.pushCycleError(self, imp.Path, message)
 
@@ -559,7 +563,7 @@ impl symbolBuilder {
             owner = owner.owner
         }
 
-        self.pushErr(errorToken, LogMsg.PkgIllegalCrossCycle, message)
+        self.pushErr(errorToken, LogMsg.PkgIllegalCrossCycle, message.Str())
     }
 
     fn checkImportCycles(mut &self, imp: &ImportInfo, &decl: &UseDecl): bool {

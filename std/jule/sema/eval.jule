@@ -56,7 +56,7 @@ use lex for std::jule::lex::{
 }
 use types for std::jule::types
 use mod for std::jule::internal::mod
-use strings for std::strings
+use strings for std::strings::{StrBuilder}
 
 // Value data.
 struct Data {
@@ -509,32 +509,34 @@ impl Eval {
         ret self.evalFnIns(ins)
     }
 
-    fn pushIllegalCycleError(mut self, &v1: &Var, &v2: &Var, mut &message: str) {
+    fn pushIllegalCycleError(mut self, &v1: &Var, &v2: &Var, mut &message: StrBuilder) {
         const Padding = 7
         let refers_to = Logf(LogMsg.RefersTo, v1.Ident, v2.Ident)
-        message = strings::Repeat(" ", Padding) + refers_to + "\n" + message
+        let buf = unsafe { message.Buf() }
+        message.WriteStr(strings::Repeat(" ", Padding))
+        message.WriteStr(refers_to)
+        message.WriteByte('\n')
+        message.Write(buf)
     }
 
-    fn checkCrossCycle(mut self, &v: &Var, mut &message: str): bool {
+    fn checkCrossCycle(mut self, &v: &Var, mut &message: StrBuilder): bool {
         for _, d in v.Depends {
             if d == self.owner {
                 self.pushIllegalCycleError(v, d, message)
                 ret false
             }
-
             if !self.checkCrossCycle(d, message) {
                 self.pushIllegalCycleError(v, d, message)
                 ret false
             }
         }
-
         ret true
     }
 
     // Checks owner illegal cycles.
     // Appends depend to depends if there is no illegal cycle.
     // Returns true if e.owner is nil.
-    fn checkIllegalCycles(mut self, mut &v: &Var, decl_token: &Token): (ok: bool) {
+    fn checkIllegalCycles(mut self, mut &v: &Var, declToken: &Token): (ok: bool) {
         // Skip cycle checking if owner is nil or not global.
         if self.owner == nil || self.owner.Scope != nil {
             ret true
@@ -547,14 +549,14 @@ impl Eval {
             ret false
         }
 
-        let mut message = ""
+        let mut message = StrBuilder.New(1 << 5)
 
         if !self.checkCrossCycle(v, message) {
-            let mut errMsg = message
-            message = ""
+            let mut errMsg = message.Str()
+            message.Clear()
             self.pushIllegalCycleError(self.owner, v, message)
-            errMsg += message
-            self.pushErr(decl_token, LogMsg.IllegalCrossCycle, errMsg)
+            errMsg += message.Str()
+            self.pushErr(declToken, LogMsg.IllegalCrossCycle, errMsg)
             ret false
         }
 

@@ -359,16 +359,16 @@ impl ObjectCoder {
             | strings::HasPrefix(loc, build::PathStdlib):
                 // Remove absolute path prefix of standard library.
                 // Just keeps "std/" prefix.
-                self.write(cstrBytes([]byte(loc[len(path::Dir(build::PathStdlib))+1:])))
+                cstrBytes(self.Obj, loc[len(path::Dir(build::PathStdlib))+1:])
             | strings::HasPrefix(loc, self.ir.Root):
                 // Remove absolute path prefix of root package.
                 // Just keeps "[package_dir]/" prefix.
-                self.write(cstrBytes([]byte(loc[len(path::Dir(self.ir.Root))+1:])))
+                cstrBytes(self.Obj, loc[len(path::Dir(self.ir.Root))+1:])
             |:
-                self.write(cstrBytes([]byte(loc)))
+                cstrBytes(self.Obj, loc)
             }
         } else {
-            self.write(cstrBytes([]byte(loc)))
+            cstrBytes(self.Obj, loc)
         }
         self.write(":")
         self.write(conv::Itoa(t.Row))
@@ -1234,13 +1234,13 @@ impl ObjectCoder {
             self.write("(&_Src);\n")
         } else {
             self.write(`_Stream << "`)
-            self.write(cstrBytes([]byte(s.Decl.Ident)))
+            cstrBytes(self.Obj, s.Decl.Ident)
             self.write("{\";\n")
 
             for (i, mut f) in s.Fields {
                 self.indent()
                 self.write(`_Stream << "`)
-                self.write(cstrBytes([]byte(f.Decl.Ident)))
+                cstrBytes(self.Obj, f.Decl.Ident)
                 self.write(`:`)
 
                 // Skip binded struct kinds.
