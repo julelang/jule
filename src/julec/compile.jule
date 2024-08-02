@@ -28,7 +28,7 @@ use build for std::jule::build::{
 }
 use types for std::jule::types
 use std::process::{ProcessError, Cmd}
-use strings for std::strings
+use strings for std::strings::{StrBuilder}
 
 static mut OutDir = "dist"
 static mut OutName = "ir.cpp"
@@ -104,61 +104,61 @@ fn isCppSourceFile(path: str): bool {
     ret IsValidCppExt(path[offset:])
 }
 
-fn pushCompCmdClang(mut &cmd: str) {
+fn pushCompCmdClang(mut &cmd: StrBuilder) {
     // Disable all warnings.
-    cmd += "-Wno-everything "
+    cmd.WriteStr("-Wno-everything ")
 
     // Set C++ standard.
-    cmd += "--std="
+    cmd.WriteStr("--std=")
     match env::CppStd {
     | "cpp14":
-        cmd += "c++14"
+        cmd.WriteStr("c++14")
     | "cpp17":
-        cmd += "c++17"
+        cmd.WriteStr("c++17")
     | "cpp20":
-        cmd += "c++20"
+        cmd.WriteStr("c++20")
     }
-    cmd += " "
+    cmd.WriteByte(' ')
 
     if env::Production {
-        cmd += "-O3 " // Enable all optimizations.
-        cmd += "-flto " // Enable LTO.
-        cmd += "-DNDEBUG " // Define NDEBUG, turn off assertions.
-        cmd += "-fomit-frame-pointer " // Do not use frame pointer.
+        cmd.WriteStr("-O3 ") // Enable all optimizations.
+        cmd.WriteStr("-flto ") // Enable LTO.
+        cmd.WriteStr("-DNDEBUG ") // Define NDEBUG, turn off assertions.
+        cmd.WriteStr("-fomit-frame-pointer ") // Do not use frame pointer.
     } else {
-        cmd += "-O0 " // No optimization.
+        cmd.WriteStr("-O0 ") // No optimization.
     }
 }
 
-fn pushCompCmdGcc(mut &cmd: str) {
+fn pushCompCmdGcc(mut &cmd: StrBuilder) {
     // Disable all warnings.
-    cmd += "-w "
+    cmd.WriteStr("-w ")
 
     // Set C++ standard.
-    cmd += "--std="
+    cmd.WriteStr("--std=")
     match env::CppStd {
     | "cpp14":
-        cmd += "c++14"
+        cmd.WriteStr("c++14")
     | "cpp17":
-        cmd += "c++17"
+        cmd.WriteStr("c++17")
     | "cpp20":
-        cmd += "c++20"
+        cmd.WriteStr("c++20")
     }
-    cmd += " "
+    cmd.WriteByte(' ')
 
     if env::Production {
-        cmd += "-O3 " // Enable all optimizations.
-        cmd += "-DNDEBUG " // Define NDEBUG, turn off assertions.
-        cmd += "-fomit-frame-pointer " // Do not use frame pointer.
+        cmd.WriteStr("-O3 ") // Enable all optimizations.
+        cmd.WriteStr("-DNDEBUG ") // Define NDEBUG, turn off assertions.
+        cmd.WriteStr("-fomit-frame-pointer ") // Do not use frame pointer.
     } else {
-        cmd += "-O0 " // No optimization.
+        cmd.WriteStr("-O0 ") // No optimization.
     }
 }
 
 // Generate compile command for backend-compiler.
 fn genCompileCmd(sourcePath: str, &ir: &IR): (str, str) {
     let &compiler = env::CompilerPath
-    let mut cmd = ""//make(str, 0, 1 << 6)
+    let mut cmd = StrBuilder.New(1 << 6)
 
     match env::Compiler {
     | "gcc":
@@ -170,30 +170,30 @@ fn genCompileCmd(sourcePath: str, &ir: &IR): (str, str) {
     // Push binded source files.
     for _, u in ir.Used {
         if u.Binded && isCppSourceFile(u.Path) {
-            cmd += u.Path
-            cmd += " "
+            cmd.WriteStr(u.Path)
+            cmd.WriteByte(' ')
         }
     }
 
     if Out != "" {
-        cmd += "-o "
-        cmd += Out
-        cmd += " "
+        cmd.WriteStr("-o ")
+        cmd.WriteStr(Out)
+        cmd.WriteByte(' ')
     }
-    cmd += sourcePath
+    cmd.WriteStr(sourcePath)
 
     // Push passes.
     for _, pass in ir.Passes {
-        cmd += " "
-        cmd += pass
+        cmd.WriteByte(' ')
+        cmd.WriteStr(pass)
     }
 
     // Link necessary libraries for Windows.
     if build::Os == build::DistOs.Windows {
-        cmd += " -lshell32"
+        cmd.WriteStr(" -lshell32")
     }
 
-    ret compiler, cmd
+    ret compiler, cmd.Str()
 }
 
 fn getCompilePath(): str {

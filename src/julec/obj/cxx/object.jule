@@ -38,7 +38,7 @@ use std::jule::sema::{
     Operators,
 }
 use path for std::fs::path
-use strings for std::strings
+use strings for std::strings::{StrBuilder}
 use std::time::{Time}
 
 // Data offset of empty trait.
@@ -251,20 +251,20 @@ impl ObjectCoder {
             ret
         }
         self.resultMap[s] = false
-        let mut obj = ""//make(str, 0, 128)
-        obj += "struct "
-        obj += s
-        obj += " {\n"
+        let mut obj = StrBuilder.New(1 << 7)
+        obj.WriteStr("struct ")
+        obj.WriteStr(s)
+        obj.WriteStr(" {\n")
         for (i, mut t) in f.Result.Tup().Types {
-            obj += indentKind
-            obj += self.tc.kind(t)
-            obj += " "
-            obj += resultArgName
-            obj += conv::Itoa(i)
-            obj += ";\n"
+            obj.WriteStr(indentKind)
+            obj.WriteStr(self.tc.kind(t))
+            obj.WriteByte(' ')
+            obj.WriteStr(resultArgName)
+            obj.WriteStr(conv::Itoa(i))
+            obj.WriteStr(";\n")
         }
-        obj += "};\n"
-        self.resultDecls = append(self.resultDecls, obj)
+        obj.WriteStr("};\n")
+        self.resultDecls = append(self.resultDecls, obj.Str())
     }
 
     fn pushResult(mut &self, mut &f: &Fn) {
@@ -492,7 +492,9 @@ impl ObjectCoder {
                             s: nil,
                             i: emptyTraitOffset,
                         }
-                        identCoder.writeIdentTo(hash.ti, t.Ident)
+                        let mut b = StrBuilder.New(len(t.Ident))
+                        identCoder.writeIdentTo(b, t.Ident)
+                        hash.ti = b.Str()
                         self.tmap = append(self.tmap, hash)
                         continue
                     }
@@ -504,7 +506,9 @@ impl ObjectCoder {
                                 s: ins,
                                 i: i,
                             }
-                            identCoder.writeIdentTo(hash.ti, t.Ident)
+                            let mut b = StrBuilder.New(len(t.Ident))
+                            identCoder.writeIdentTo(b, t.Ident)
+                            hash.ti = b.Str()
                             self.tmap = append(self.tmap, hash)
                             i++
                         }
@@ -1402,11 +1406,11 @@ fn concatAllParts(parts: ...&Token): str {
     if n == 0 {
         ret ""
     }
-    let mut s = ""//make(str, 0, n)
+    let mut s = StrBuilder.New(n)
     for _, p in parts {
-        s += p.Kind
+        s.WriteStr(p.Kind)
     }
-    ret s
+    ret s.Str()
 }
 
 // Reports whether trait have method in this identifier.
