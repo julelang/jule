@@ -5,6 +5,7 @@
 use std::jule::ast::{Directive, GenericDecl, ScopeTree}
 use std::jule::build::{EntryPoint, InitFn}
 use std::jule::lex::{Token, IsAnonIdent}
+use std::strings::{StrBuilder}
 
 // Return type.
 struct RetType {
@@ -163,30 +164,30 @@ impl ParamIns {
     // Implement: Kind
     // Returns ParamIns's type kind as string.
     fn Str(self): str {
-        let mut s = ""
+        let mut s = StrBuilder.New(1 << 5)
         if self.Decl.Mutable {
-            s += "mut "
+            s.WriteStr("mut ")
         }
 
         if self.Decl.Reference {
-            s += "&_:"
+            s.WriteStr("&_:")
         }
 
         if self.Decl.IsSelf() {
             if self.Decl.IsRef() {
-                s += "&"
+                s.WriteByte('&')
             }
-            s += "self"
-            ret s
+            s.WriteStr("self")
+            ret s.Str()
         }
 
         if self.Decl.Variadic {
-            s += "..."
+            s.WriteStr("...")
         }
         if self.Kind != nil {
-            s += self.Kind.Str()
+            s.WriteStr(self.Kind.Str())
         }
-        ret s
+        ret s.Str()
     }
 }
 
@@ -345,36 +346,38 @@ impl FnIns {
     // Appends identifier to kind of this instance.
     // Does not appends identifier of this instance to kind if self.Decl is nil reference.
     fn GetKindStr(self, ident: bool): str {
-        let mut s = ""
+        let mut s = StrBuilder.New(1 << 5)
 
         if self.Decl.Unsafety {
-            s += "unsafe "
+            s.WriteStr("unsafe ")
         }
 
-        s += "fn"
+        s.WriteStr("fn")
 
         if ident && self.Decl != nil {
-            s += " " + self.Decl.Ident
+            s.WriteByte(' ')
+            s.WriteStr(self.Decl.Ident)
         }
 
-        s += "("
+        s.WriteByte('(')
         let n = len(self.Params)
         if n > 0 {
-            for _, p in self.Params {
-                s += p.Str()
-                s += ","
+            for i, p in self.Params {
+                s.WriteStr(p.Str())
+                if i < len(self.Params)-1 {
+                    s.WriteByte(',')
+                }
             }
-            s = s[:len(s)-1] // Remove comma.
         }
-        s += ")"
+        s.WriteByte(')')
         if self.Decl.Exceptional {
-            s += "!"
+            s.WriteByte('!')
         }
         if !self.Decl.IsVoid() {
-            s += ":"
-            s += self.Result.Str()
+            s.WriteByte(':')
+            s.WriteStr(self.Result.Str())
         }
-        ret s
+        ret s.Str()
     }
 }
 

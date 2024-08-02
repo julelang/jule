@@ -8,7 +8,7 @@ use std::jule::constant::{Const}
 use std::jule::lex::{File, Token, TokenId, TokenKind, IsIgnoreIdent, IsAnonIdent}
 use mod for std::jule::internal::mod
 use types for std::jule::types
-use strings for std::strings
+use strings for std::strings::{StrBuilder}
 
 fn isValidModelForRef(mut &m: ExprModel): bool {
     match type m {
@@ -1632,7 +1632,7 @@ impl Sema {
         }
     }
 
-    fn catchTraitInheritCycle(mut &self, t1: &Trait, mut t2: &Trait, mut &message: str): (ok: bool) {
+    fn catchTraitInheritCycle(mut &self, t1: &Trait, mut t2: &Trait, mut &message: StrBuilder): (ok: bool) {
         ok = true
         for (_, mut i) in t2.Inherits {
             if i.Kind == nil {
@@ -1678,13 +1678,13 @@ impl Sema {
                 self.pushErr(it.Decl.Token, LogMsg.IllegalCycleRefersItself, t.Ident)
                 ok = false
             } else {
-                let mut message = ""
+                let mut message = StrBuilder.New(1 << 6)
                 ok = ok && self.catchTraitInheritCycle(t, t2, message)
-                if len(message) > 0 {
-                    let mut errMsg = message
-                    message = ""
+                if message.Len() > 0 {
+                    let mut errMsg = message.Str()
+                    message.Clear()
                     self.pushCycleError(t.Ident, t2.Ident, message)
-                    errMsg += message
+                    errMsg += message.Str()
                     self.pushErr(it.Decl.Token, LogMsg.IllegalCrossCycle, errMsg)
                 }
             }
@@ -2104,13 +2104,17 @@ impl Sema {
         ret self.checkFuncDeclsBy(self.file.Funcs)
     }
 
-    fn pushCycleError(self, &st1: str, &st2: str, mut &message: str) {
+    fn pushCycleError(self, &st1: str, &st2: str, mut &message: StrBuilder) {
         const Padding = 7
-        let refers_to = Logf(LogMsg.RefersTo, st1, st2)
-        message = strings::Repeat(" ", Padding) + refers_to + "\n" + message
+        let refersTo = Logf(LogMsg.RefersTo, st1, st2)
+        let mut buf = unsafe { message.Buf() }
+        message.WriteStr(strings::Repeat(" ", Padding))
+        message.WriteStr(refersTo)
+        message.WriteByte('\n')
+        message.Write(buf)
     }
 
-    fn checkCrossCycle(self, &st1: &Struct, &st2: &Struct, mut &message: str): bool {
+    fn checkCrossCycle(self, &st1: &Struct, &st2: &Struct, mut &message: StrBuilder): bool {
         for _, u in st2.Uses {
             if u == st1 {
                 self.pushCycleError(st2.Ident, u.Ident, message)
@@ -2137,12 +2141,12 @@ impl Sema {
             ret false
         }
 
-        let mut message = ""
+        let mut message = StrBuilder.New(1 << 5)
         if !self.checkCrossCycle(st1, st2, message) {
-            let mut errMsg = message
-            message = ""
+            let mut errMsg = message.Str()
+            message.Clear()
             self.pushCycleError(st1.Ident, st2.Ident, message)
-            errMsg += message
+            errMsg += message.Str()
             self.pushErr(st1.Token, LogMsg.DeriveIllegalCrossCycle, derive, errMsg)
             ret false
         }

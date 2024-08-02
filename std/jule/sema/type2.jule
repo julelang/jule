@@ -21,6 +21,7 @@ use ast for std::jule::ast::{
 use std::jule::build::{LogMsg, Logf}
 use lit for std::jule::constant::lit
 use std::jule::lex::{Token, Ident, IsIgnoreIdent, IsAnonIdent}
+use std::strings::{StrBuilder}
 use types for std::jule::types
 
 fn traitHasReferenceReceiver(&t: &Trait): bool {
@@ -738,15 +739,16 @@ impl fnCallArgChecker {
         |:
             log = LogMsg.MissingArgs
         }
-        let mut err = self.f.Decl.Ident
-        err += "\n       wanted ("
+        let mut err = StrBuilder.New(1 << 5)
+        err.WriteStr(self.f.Decl.Ident)
+        err.WriteStr("\n       wanted (")
         for i, p in params {
-            err += p.Kind.Str()
+            err.WriteStr(p.Kind.Str())
             if len(params)-i > 1 {
-                err += ", "
+                err.WriteStr(", ")
             }
         }
-        err += ")"
+        err.WriteByte(')')
         self.pushErr(log, err)
         ret false
     }
@@ -1107,12 +1109,13 @@ impl structLitChecker {
                 ret
             }
 
-            let mut idents = ""
+            let mut idents = StrBuilder.New(1 << 5)
             for diff > 0; diff-- {
-                idents += ", " + self.s.Fields[n-diff].Decl.Ident
+                idents.WriteStr(", ")
+                idents.WriteStr(self.s.Fields[n-diff].Decl.Ident)
             }
-            idents = idents[2:] // Remove first separator.
-            self.pushErr(self.errorToken, LogMsg.MissingExprFor, idents)
+            self.pushErr(self.errorToken, LogMsg.MissingExprFor,
+                str(unsafe { idents.Buf() }[2:]) /* Remove first separator. */)
         }
     }
 }

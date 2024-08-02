@@ -685,25 +685,26 @@ impl exprCoder {
     fn coFuncCall(mut &self, mut &m: &FnCallExprModel) {
         self.oc.write("{\n")
         self.oc.addIndent()
-        let mut head = "std::thread(["
+        let mut head = StrBuilder.New(1 << 5)
+        head.WriteStr("std::thread([")
         if m.Func.Owner != nil {
-            head += identCoder.Self
+            head.WriteStr(identCoder.Self)
             if len(m.Args) > 0 {
-                head += ", "
+                head.WriteStr(", ")
             }
         }
         for i, arg in m.Args {
             if i > 0 {
-                head += ", "
+                head.WriteStr(", ")
             }
             match type arg {
             | &Var:
                 let mut v = (&Var)(arg)
-                head += identCoder.var(v)
+                head.WriteStr(identCoder.var(v))
                 continue
             }
             let name = "_co_arg_" + conv::Itoa(i)
-            head += name
+            head.WriteStr(name)
             self.oc.indent()
             self.oc.write(self.oc.tc.kind(m.Func.Params[i].Kind))
             self.oc.write(" ")
@@ -718,7 +719,7 @@ impl exprCoder {
             m.Args[i] = unsafe { *(*ExprModel)(&argS) }
         }
         self.oc.indent()
-        self.oc.writeR(head)
+        self.oc.Obj = append(self.oc.Obj, unsafe { head.Buf() }...)
         self.oc.write("](void) mutable -> void {\n")
         self.oc.addIndent()
         self.oc.indent()

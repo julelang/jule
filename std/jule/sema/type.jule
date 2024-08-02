@@ -26,7 +26,7 @@ use ast for std::jule::ast::{
 use std::jule::build::{Derive, LogMsg, Logf}
 use std::jule::lex::{Token, TokenKind}
 use types for std::jule::types
-use strings for std::strings
+use strings for std::strings::{StrBuilder}
 
 type PrimKind: types::TypeKind
 
@@ -71,19 +71,19 @@ impl Kind for TypeKind {
             ret "nil"
         }
 
-        let mut kind = ""
+        let mut kind = StrBuilder.New(1 << 4)
 
         if self.Variadic {
-            kind += "..."
+            kind.WriteStr("...")
         }
 
         if self.Binded() {
-            kind += "cpp."
-            kind += self.BindIdent
+            kind.WriteStr("cpp.")
+            kind.WriteStr(self.BindIdent)
         } else {
-            kind += self.Kind.Str()
+            kind.WriteStr(self.Kind.Str())
         }
-        ret kind
+        ret kind.Str()
     }
 
     // Reports whether types are same.
@@ -648,14 +648,15 @@ struct Tuple {
 impl Kind for Tuple {
     // Returns tuple kind as string.
     fn Str(self): str {
-        let mut s = "("
-        s += self.Types[0].Str()
+        let mut s = StrBuilder.New(1 << 4)
+        s.WriteByte('(')
+        s.WriteStr(self.Types[0].Str())
         for _, t in self.Types[1:] {
-            s += ","
-            s += t.Str()
+            s.WriteByte(',')
+            s.WriteStr(t.Str())
         }
-        s += ")"
-        ret s
+        s.WriteByte(')')
+        ret s.Str()
     }
 
     // Reports whether types are same.
@@ -687,11 +688,12 @@ struct Map {
 impl Kind for Map {
     // Returns map kind as string.
     fn Str(self): str {
-        let mut s = "map["
-        s += self.Key.Str()
-        s += "]"
-        s += self.Val.Str()
-        ret s
+        let mut s = StrBuilder.New(1 << 4)
+        s.WriteStr("map[")
+        s.WriteStr(self.Key.Str())
+        s.WriteByte(']')
+        s.WriteStr(self.Val.Str())
+        ret s.Str()
     }
 
     // Reports whether types are same.
@@ -714,11 +716,12 @@ struct Arr {
 impl Kind for Arr {
     // Returns array kind as string.
     fn Str(self): str {
-        let mut s = "["
-        s += conv::Itoa(self.N)
-        s += "]"
-        s += self.Elem.Str()
-        ret s
+        let mut s = StrBuilder.New(1 << 4)
+        s.WriteByte('[')
+        s.WriteStr(conv::Itoa(self.N))
+        s.WriteByte(']')
+        s.WriteStr(self.Elem.Str())
+        ret s.Str()
     }
 
     // Reports whether types are same.
@@ -865,7 +868,7 @@ impl typeChecker {
         }
     }
 
-    fn pushCycleError(self, def1: any, def2: any, mut &message: str) {
+    fn pushCycleError(self, def1: any, def2: any, mut &message: StrBuilder) {
         const Padding = 7
         let getIdent = fn(&def: any): str {
             match type def {
@@ -877,13 +880,17 @@ impl typeChecker {
                 ret ""
             }
         }
+        let buf = unsafe { message.Buf() }
         let def1Ident = getIdent(def1)
         let def2Ident = getIdent(def2)
         let refersTo = Logf(LogMsg.RefersTo, def1Ident, def2Ident)
-        message = strings::Repeat(" ", Padding) + refersTo + "\n" + message
+        message.WriteStr(strings::Repeat(" ", Padding))
+        message.WriteStr(refersTo)
+        message.WriteByte('\n')
+        message.Write(buf)
     }
 
-    fn checkCrossCycle(self, decl: any, mut &message: str): bool {
+    fn checkCrossCycle(self, decl: any, mut &message: StrBuilder): bool {
         match type decl {
         | &TypeAlias:
             let ta = (&TypeAlias)(decl)
@@ -940,13 +947,13 @@ impl typeChecker {
             ret false
         }
 
-        let mut message = ""
+        let mut message = StrBuilder.New(1 << 5)
 
         if !self.checkCrossCycle(decl, message) {
-            let mut errMsg = message
-            message = ""
+            let mut errMsg = message.Str()
+            message.Clear()
             self.pushCycleError(self.referencer.owner, decl, message)
-            errMsg += message
+            errMsg += message.Str()
             self.pushErr(ident.Token, LogMsg.IllegalCrossCycle, errMsg)
             ret false
         }
@@ -1780,12 +1787,19 @@ fn isBuiltinStrConvertable(mut &t: &TypeKind): bool {
 }
 
 fn buildLinkPathByTokens(&tokens: []&Token): str {
-    let mut s = tokens[0].Kind
-    for _, token in tokens[1:] {
-        s += "::"
-        s += token.Kind
+    let mut n = 0
+    for _, token in tokens {
+        n += len(token.Kind)
+        n += 2
     }
-    ret s
+    let mut s = StrBuilder.New(n)
+    for i, token in tokens {
+        s.WriteStr(token.Kind)
+        if len(tokens)-i > 1 {
+            s.WriteStr("::")
+        }
+    }
+    ret s.Str()
 }
 
 fn buildPrimType(kind: str): &Prim {

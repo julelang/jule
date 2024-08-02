@@ -582,7 +582,7 @@ namespace jule
             return s;
         }
 
-        Str(void): _len(0) {};
+        Str(void) : _len(0) {};
         Str(const jule::Str &src) = default;
         Str(const std::basic_string<jule::U8> &src) : Str(src.begin().base(), src.end().base()) {}
         Str(const char *src, const jule::Int &len) : Str(reinterpret_cast<const jule::U8 *>(src), len) {}
@@ -717,9 +717,9 @@ namespace jule
                 jule::panic(error);
             }
 #endif
-            if (start == end)
-                return jule::Str();
             jule::Str s;
+            if (start == end)
+                return s;
             s._len = end - start;
             if (end == this->_len)
             {
@@ -899,13 +899,10 @@ namespace jule
                 return false;
             if (this->_len == 0)
                 return true;
-            const auto end = this->end();
-            auto it = this->begin();
-            auto it2 = str.begin();
-            while (it < end)
-                if (*it++ != *it2++)
-                    return false;
-            return true;
+            return std::strncmp(
+                       reinterpret_cast<const char *>(this->begin()),
+                       reinterpret_cast<const char *>(str.begin()),
+                       this->_len) == 0;
         }
 
         inline jule::Bool operator!=(const jule::Str &str) const noexcept

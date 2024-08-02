@@ -306,11 +306,12 @@ impl ObjectCoder {
     }
 
     fn pushAndWriteMaskMapper(mut &self, mut t1: &Trait, mut t2: &Trait) {
-        let mut ident = "__jule_trait_offset_mapper_"
-        ident += conv::FmtUint(u64(uintptr(t2)), 0xF)
-        ident += "_to_"
-        ident += conv::FmtUint(u64(uintptr(t1)), 0xF)
-        self.writeR(ident)
+        let mut ident = StrBuilder.New(1 << 5)
+        ident.WriteStr("__jule_trait_offset_mapper_")
+        ident.WriteStr(conv::FmtUint(u64(uintptr(t2)), 0xF))
+        ident.WriteStr("_to_")
+        ident.WriteStr(conv::FmtUint(u64(uintptr(t1)), 0xF))
+        self.Obj = append(self.Obj, unsafe { ident.Buf() }...)
 
         // Lookup and push if this match is not exist.
         for _, m in self.traitCastMap {
@@ -330,7 +331,7 @@ impl ObjectCoder {
         const offset = "offset"
         self.anyObj.WriteStr(typeCoder.Int)
         self.anyObj.WriteByte(' ')
-        self.anyObj.WriteStr(ident)
+        self.anyObj.Write(unsafe { ident.Buf() })
         self.anyObj.WriteStr("(const " + typeCoder.Int + " " + offset + ") noexcept { ")
         for (_, mut s1) in t1.Implemented {
             for _, s2 in t2.Implemented {
@@ -445,7 +446,7 @@ impl ObjectCoder {
                     if !p.Decl.IsRef() {
                         p.Kind = &TypeKind{
                             Kind: &customType{
-                                kind: self.tc.asPtr(self.tc.kind(p.Kind)),
+                                kind: self.tc.kind(p.Kind) + "*",
                             },
                         }
                     } else {
@@ -1033,11 +1034,14 @@ impl ObjectCoder {
         for (_, mut ins) in f.Instances {
             ins.Scope = nil
 
-            f.Ident = ident
-            f.Ident += "_"
-            f.Ident += hash.ti
-            f.Ident += "_"
-            f.Ident += conv::Itoa(hash.i)
+            let mut s = StrBuilder.New(len(f.Ident) + len(ident) + len(hash.ti) + len("__") + (1 << 2))
+            s.WriteStr(ident)
+            s.WriteByte('_')
+            s.WriteStr(hash.ti)
+            s.WriteByte('_')
+            s.WriteStr(conv::Itoa(hash.i))
+
+            f.Ident = s.Str()
 
             let mut k = ins.Params[0].Kind
             ins.Params[0].Kind = &TypeKind{Kind: hash.t}

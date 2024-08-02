@@ -36,6 +36,7 @@
 // ====================================================
 
 use integrated for std::jule::integrated
+use std::strings::{StrBuilder}
 use sys for std::sys
 
 // Operating system specific path separator.
@@ -157,11 +158,11 @@ fn abs(mut path: str): (str, ok: bool) {
 }
 
 fn join(mut elem: ...str): str {
-    let mut s = ""
+    let mut s = StrBuilder.New(1 << 4)
     let mut lastChar: byte = 0
     for (_, mut e) in elem {
         match {
-        | len(s) == 0:
+        | s.Len() == 0:
             // Add the first non-empty path element unchanged.
         | isSlash(lastChar):
             // If the path ends in a slash, strip any leading slashes from the next
@@ -183,16 +184,16 @@ fn join(mut elem: ...str): str {
             //  join(`C:`, `\f`) = `C:\f`
         |:
             // In all other cases, add a separator between elements.
-            s += "\\"
+            s.WriteByte('\\')
             lastChar = '\\'
         }
         if len(e) > 0 {
-            s += e
+            s.WriteStr(e)
             lastChar = e[len(e)-1]
         }
     }
-    if len(s) == 0 {
+    if s.Len() == 0 {
         ret ""
     }
-    ret Clean(s)
+    ret Clean(s.Str())
 }

@@ -6,6 +6,7 @@ use integ for std::jule::integrated
 use fastbytes for std::internal::fastbytes
 use mem for std::mem
 use sys for std::sys
+use std::strings::{StrBuilder}
 use utf16 for std::unicode::utf16
 
 cpp type HANDLE: *unsafe
@@ -98,9 +99,9 @@ impl Cmd {
 }
 
 // Escapes the string s, as per escapeArg, appends the result to s.
-fn appendEscapeArg(mut &s: str, arg: str) {
+fn appendEscapeArg(mut &s: StrBuilder, arg: str) {
     if len(arg) == 0 {
-        s += `""`
+        s.WriteStr(`""`)
         ret
     }
 
@@ -118,19 +119,19 @@ fn appendEscapeArg(mut &s: str, arg: str) {
 
     if !needsBackslash && !hasSpace {
         // No special handling required; normal case.
-        s += arg
+        s.WriteStr(arg)
         ret
     }
     if !needsBackslash {
         // hasSpace is true, so we need to quote the string.
-        s += "\""
-        s += arg
-        s += "\""
+        s.WriteByte('"')
+        s.WriteStr(arg)
+        s.WriteByte('"')
         ret
     }
 
     if hasSpace {
-        s += "\""
+        s.WriteByte('"')
     }
     let mut slashes = 0
     i = 0
@@ -141,33 +142,33 @@ fn appendEscapeArg(mut &s: str, arg: str) {
             slashes++
         | '"':
             for slashes > 0; slashes-- {
-                s += "\\"
+                s.WriteByte('\\')
             }
-            s += "\\"
+            s.WriteByte('\\')
         |:
             slashes = 0
         }
-        s += str(c)
+        s.WriteByte(c)
     }
     if hasSpace {
         for slashes > 0; slashes-- {
-            s += "\\"
+            s.WriteByte('\\')
         }
-        s += "\""
+        s.WriteByte('"')
     }
 }
 
 // Builds a command line out of args by escaping "special"
 // characters and joining the arguments with spaces.
 fn makeCmdLine(args: []str): str {
-    let mut s = ""
+    let mut s = StrBuilder.New(1 << 4)
     for _, arg in args {
-        if len(s) > 0 {
-            s += " "
+        if s.Len() > 0 {
+            s.WriteByte(' ')
         }
         appendEscapeArg(s, arg)
     }
-    ret s
+    ret s.Str()
 }
 
 // Converts an array of environment strings into
