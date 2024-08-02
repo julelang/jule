@@ -29,7 +29,7 @@ namespace jule
     // Libraries uses this function for UTf-8 encoded Jule strings.
     // Also it is builtin str type constructor.
     template <typename T>
-    jule::Str to_str2(const T &obj);
+    jule::Str to_str(const T &obj);
     inline jule::Str to_str(const jule::Str &s) noexcept;
     inline jule::Str to_str(const char *s) noexcept;
     inline jule::Str to_str(char *s) noexcept;
