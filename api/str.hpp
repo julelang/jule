@@ -1030,12 +1030,17 @@ namespace jule
 
     inline jule::Str to_str(const char *s) noexcept
     {
-        return jule::Str(s);
+        jule::Str s2;
+        s2._len = std::strlen(s);
+        auto buf = jule::Str::alloc(s2._len);
+        s2.buffer = jule::Str::buffer_t::make(buf);
+        s2._slice = s2.buffer.alloc;
+        return s2;
     }
 
     inline jule::Str to_str(char *s) noexcept
     {
-        return jule::Str(s);
+        return jule::to_str(const_cast<const char*>(s));
     }
 
     inline jule::Str ptr_to_str(const void *alloc)
