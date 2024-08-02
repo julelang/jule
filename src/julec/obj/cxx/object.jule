@@ -66,7 +66,7 @@ struct traitCast {
 
 struct ObjectCoder {
     // Internal buffer which is commonly used.
-    Obj: str
+    Obj: []byte
 
     resultDecls: []str
     anyObj:      str
@@ -105,11 +105,11 @@ impl ObjectCoder {
     }
 
     fn write(mut &self, s: str) {
-        self.Obj += s
+        self.Obj = append(self.Obj, []byte(s)...)
     }
 
     fn writeR(mut &self, &s: str) {
-        self.Obj += s
+        self.Obj = append(self.Obj, []byte(s)...)
     }
 
     // Increase indentation.
@@ -124,7 +124,7 @@ impl ObjectCoder {
 
     // Writes indention string by indentBuffer.
     fn indent(mut &self) {
-        self.Obj += self.indentBuffer
+        self.Obj = append(self.Obj, []byte(self.indentBuffer)...)
     }
 
     fn findAnyType(mut &self, mut &t: &TypeKind): int {
@@ -251,7 +251,7 @@ impl ObjectCoder {
             ret
         }
         self.resultMap[s] = false
-        let mut obj = make(str, 0, 128)
+        let mut obj = ""//make(str, 0, 128)
         obj += "struct "
         obj += s
         obj += " {\n"
@@ -1358,12 +1358,12 @@ impl ObjectCoder {
         self.decls()
 
         if len(self.resultDecls) > 0 {
-            let mut head = self.Obj[:self.headPos]
+            let mut head = clone(self.Obj[:self.headPos])
             for _, decl in self.resultDecls {
-                head += decl
+                head = append(head, []byte(decl)...)
                 self.declPos += len(decl)
             }
-            head += self.Obj[self.headPos:]
+            head = append(head, self.Obj[self.headPos:]...)
             self.Obj = head
         }
 
@@ -1374,9 +1374,9 @@ impl ObjectCoder {
         self.write("\n\n")
 
         if len(self.anyObj) > 0 {
-            let mut head = self.Obj[:self.declPos]
-            head += self.anyObj
-            head += self.Obj[self.declPos:]
+            let mut head = clone(self.Obj[:self.declPos])
+            head = append(head, []byte(self.anyObj)...)
+            head = append(head, self.Obj[self.declPos:]...)
             self.Obj = head
         }
     }
@@ -1402,7 +1402,7 @@ fn concatAllParts(parts: ...&Token): str {
     if n == 0 {
         ret ""
     }
-    let mut s = make(str, 0, n)
+    let mut s = ""//make(str, 0, n)
     for _, p in parts {
         s += p.Kind
     }

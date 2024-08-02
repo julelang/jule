@@ -8,10 +8,6 @@ use opt::{
     UnsafeIndexingExprModel,
     PushToSliceExprModel,
     AppendToSliceExprModel,
-    MutSlicingExprModel,
-    StrInsertBeginExprModel,
-    StrAppendExprModel,
-    StrCompExprModel,
     InlineStdInternalNosafeStobs,
 }
 use conv for std::conv
@@ -97,10 +93,6 @@ enum compExprModel: type {
     str,                      // For built-in expressions.
     &UnsafeBinopExprModel,
     &UnsafeIndexingExprModel,
-    &MutSlicingExprModel,
-    &StrInsertBeginExprModel,
-    &StrAppendExprModel,
-    &StrCompExprModel,
     &InlineStdInternalNosafeStobs,
 }
 
@@ -1313,7 +1305,7 @@ impl exprCoder {
         let mut args = make([]any, len(m.Exprs))
         for (i, mut expr) in m.Exprs {
             self.possibleRefExpr(expr)
-            args[i] = self.oc.Obj[n:]
+            args[i] = str(self.oc.Obj[n:])
             self.oc.Obj = self.oc.Obj[:n]
         }
         self.oc.write(fmt::Format(m.Code, args...))
@@ -1326,47 +1318,6 @@ impl exprCoder {
             ret
         }
         self.oc.write(".__free()")
-    }
-
-    fn mutSlicing(mut &self, mut m: &MutSlicingExprModel) {
-        self.oc.write("(")
-        self.possibleRefExpr(m.Expr)
-        self.oc.write(").mut_slice(")
-        if !env::Production {
-            self.oc.write("\"")
-            self.oc.locInfo(m.Token)
-            self.oc.write("\", ")
-        }
-        self.possibleRefExpr(m.Left)
-        if m.Right != nil {
-            self.oc.write(", ")
-            self.possibleRefExpr(m.Right)
-        }
-        self.oc.write(");")
-    }
-
-    fn strInsertBegin(mut &self, mut m: &StrInsertBeginExprModel) {
-        self.oc.write("(")
-        self.possibleRefExpr(m.Dest)
-        self.oc.write(").buffer.insert(0, (")
-        self.possibleRefExpr(m.Expr)
-        self.oc.write("));")
-    }
-
-    fn strComp(mut &self, mut m: &StrCompExprModel) {
-        if m.NotEq {
-            self.oc.write("(!")
-        }
-        let bytes = []byte(m.Right.ReadStr())
-        self.possibleRefExpr(m.Left)
-        self.oc.write(".equal(")
-        self.oc.write(cstrLit(bytes))
-        self.oc.write(", ")
-        self.oc.write(conv::Itoa(len(bytes)))
-        self.oc.write(")")
-        if m.NotEq {
-            self.oc.write(")")
-        }
     }
 
     fn inlineStdInternalNosafeStobs(mut &self, mut m: &InlineStdInternalNosafeStobs) {
@@ -1466,12 +1417,6 @@ impl exprCoder {
             self.backendEmit((&BackendEmitExprModel)(m))
         | &FreeExprModel:
             self.free((&FreeExprModel)(m))
-        | &MutSlicingExprModel:
-            self.mutSlicing((&MutSlicingExprModel)(m))
-        | &StrInsertBeginExprModel:
-            self.strInsertBegin((&StrInsertBeginExprModel)(m))
-        | &StrCompExprModel:
-            self.strComp((&StrCompExprModel)(m))
         | &InlineStdInternalNosafeStobs:
             self.inlineStdInternalNosafeStobs((&InlineStdInternalNosafeStobs)(m))
         |:
@@ -1592,7 +1537,7 @@ fn sbtoa(b: byte): str {
 }
 
 fn cstrBytes(bytes: []byte): str {
-    let mut lit = make(str, 0, len(bytes))
+    let mut lit = ""//make(str, 0, len(bytes))
     for _, b in bytes {
         lit += sbtoa(b)
     }

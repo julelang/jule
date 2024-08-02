@@ -6,9 +6,6 @@ use opt::{
     self,
     PushToSliceExprModel,
     AppendToSliceExprModel,
-    MutSlicingExprModel,
-    StrInsertBeginExprModel,
-    StrAppendExprModel,
 }
 use conv for std::conv
 use lex for std::jule::lex::{TokenKind}
@@ -51,11 +48,8 @@ static assignArgName = "__jule_assign_arg"
 // Common group of semantic analysis stmt types and optimizer specific types.
 enum compStmt: type {
     Stmt: Stmt,
-    &StrInsertBeginExprModel,
-    &MutSlicingExprModel,
     &PushToSliceExprModel,
     &AppendToSliceExprModel,
-    &StrAppendExprModel,
 }
 
 struct scopeCoder {
@@ -669,23 +663,6 @@ impl scopeCoder {
         }
     }
 
-    fn strAppend(mut &self, mut m: &StrAppendExprModel) {
-        self.oc.write("(")
-        self.oc.ec.possibleRefExpr(m.Str)
-        self.oc.write(").append(")
-        match type m.Expr {
-        | &Const:
-            let c = (&Const)(m.Expr)
-            let bytes = []byte(c.ReadStr())
-            self.oc.write(cstrLit(bytes))
-            self.oc.write(", ")
-            self.oc.write(conv::FmtInt(i64(len(bytes)), 10))
-        |:
-            self.oc.ec.possibleRefExpr(m.Expr)
-        }
-        self.oc.write(")")
-    }
-
     // Generates C++ code of statement.
     fn st(mut &self, mut st: compStmt) {
         if st == nil {
@@ -730,12 +707,6 @@ impl scopeCoder {
             self.oc.ec.pushToSlice((&PushToSliceExprModel)(st))
         | &AppendToSliceExprModel:
             self.oc.ec.appendToSlice((&AppendToSliceExprModel)(st))
-        | &MutSlicingExprModel:
-            self.oc.ec.mutSlicing((&MutSlicingExprModel)(st))
-        | &StrInsertBeginExprModel:
-            self.oc.ec.strInsertBegin((&StrInsertBeginExprModel)(st))
-        | &StrAppendExprModel:
-            self.strAppend((&StrAppendExprModel)(st))
         |:
             self.oc.write("<unimplemented_stmt>")
         }

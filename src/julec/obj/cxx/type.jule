@@ -71,10 +71,14 @@ impl typeCoder {
         if id != types::TypeKind.Uintptr {
             id = types::RealKindOf(id)
         }
+        let mut obj = "jule::"
         if 97 <= id[0] && id[0] <= 122 {
-            id[0] -= 32 // To upper first byte.
+            obj += str(id[0] - 32) // To upper first byte.
+        } else {
+            obj += str(id[0])
         }
-        ret "jule::" + id
+        obj += id[1:]
+        ret obj
     }
 
     // Generates C++ code of Prim TypeKind.
@@ -256,19 +260,19 @@ impl typeCoder {
     }
 
     // Generates C++ code of function instance's result type.
-    fn funcInsResult(mut self, mut &s: str, mut &f: &FnIns) {
+    fn funcInsResult(mut self, mut &s: []byte, mut &f: &FnIns) {
         if f.Decl.IsVoid() {
             if f.Decl.Exceptional {
-                s += "jule::VoidExceptional"
+                s = append(s, []byte("jule::VoidExceptional")...)
             } else {
-                s += "void"
+                s = append(s, []byte("void")...)
             }
             ret
         }
         if f.Decl.Exceptional {
-            s += "jule::Exceptional<"
+            s = append(s, []byte("jule::Exceptional<")...)
             self.rc.codeMut1(s, f.Result)
-            s += ">"
+            s = append(s, '>')
             ret
         }
         self.rc.codeMut1(s, f.Result)
@@ -278,23 +282,23 @@ impl typeCoder {
         if f.Result != nil && f.Result.Tup() != nil {
             self.oc.pushResultIns(f)
         }
-        let mut decl = ""
+        let mut decl = make([]byte, 0, 20)
         self.funcInsResult(decl, f)
-        decl += "("
+        decl = append(decl, '(')
         if len(f.Params) > 0 {
             for (_, mut param) in f.Params {
                 if param.Decl.IsSelf() {
                     continue
                 }
-                decl += self.paramIns(param)
-                decl += ","
+                decl = append(decl, []byte(self.paramIns(param))...)
+                decl = append(decl, ',')
             }
             decl = decl[:len(decl)-1] // Remove last comma.
         } else {
-            decl += "void"
+            decl = append(decl, []byte("void")...)
         }
-        decl += ")"
-        ret decl
+        decl = append(decl, ')')
+        ret str(decl)
     }
 
     // Generates C++ code of Fn TypeKind.
@@ -364,38 +368,38 @@ impl resultCoder {
         ret &resultCoder{tc: tc}
     }
 
-    fn ptr(mut self, mut &s: str, mut p: &Ptr) {
-        s += resultCoder.Ptr
+    fn ptr(mut self, mut &s: []byte, mut p: &Ptr) {
+        s = append(s, []byte(resultCoder.Ptr)...)
         self.codeMut(s, p.Elem)
     }
 
-    fn sptr(mut self, mut &s: str, mut p: &Sptr) {
-        s += resultCoder.Sptr
+    fn sptr(mut self, mut &s: []byte, mut p: &Sptr) {
+        s = append(s, []byte(resultCoder.Sptr)...)
         self.codeMut(s, p.Elem)
     }
 
-    fn mapType(mut self, mut &s: str, mut p: &Map) {
-        s += resultCoder.Map
+    fn mapType(mut self, mut &s: []byte, mut p: &Map) {
+        s = append(s, []byte(resultCoder.Map)...)
         self.codeMut(s, p.Key)
         self.codeMut(s, p.Val)
     }
 
-    fn slice(mut self, mut &s: str, mut slc: &Slc) {
-        s += resultCoder.Slice
+    fn slice(mut self, mut &s: []byte, mut slc: &Slc) {
+        s = append(s, []byte(resultCoder.Slice)...)
         self.codeMut(s, slc.Elem)
     }
 
-    fn arr(mut self, mut &s: str, mut arr: &Arr) {
-        s += resultCoder.Array
-        s += conv::FmtInt(i64(arr.N), 16)
+    fn arr(mut self, mut &s: []byte, mut arr: &Arr) {
+        s = append(s, []byte(resultCoder.Array)...)
+        s = append(s, []byte(conv::FmtInt(i64(arr.N), 16))...)
         self.codeMut(s, arr.Elem)
     }
 
-    fn func(mut self, mut &s: str, mut f: &FnIns) {
-        s += resultCoder.Fn
+    fn func(mut self, mut &s: []byte, mut f: &FnIns) {
+        s = append(s, []byte(resultCoder.Fn)...)
         for (_, mut p) in f.Params {
             if p.Decl.Reference {
-                s += resultCoder.Reference
+                s = append(s, []byte(resultCoder.Reference)...)
             }
             self.codeMut(s, p.Kind)
         }
@@ -404,14 +408,14 @@ impl resultCoder {
         }
     }
 
-    fn tup(mut self, mut &s: str, mut tup: &Tuple) {
+    fn tup(mut self, mut &s: []byte, mut tup: &Tuple) {
         for (_, mut t) in tup.Types {
-            s += "__jule_tuple_"
+            s = append(s, []byte("__jule_tuple_")...)
             self.codeMut(s, t)
         }
     }
 
-    fn codeMut(mut self, mut &s: str, mut &t: &TypeKind) {
+    fn codeMut(mut self, mut &s: []byte, mut &t: &TypeKind) {
         match type t.Kind {
         | &Ptr:
             self.ptr(s, (&Ptr)(t.Kind))
@@ -427,18 +431,18 @@ impl resultCoder {
             self.func(s, (&FnIns)(t.Kind))
         | &Enum:
             let te = (&Enum)(t.Kind)
-            s += identCoder.toOut(te.Ident, uintptr(te))
+            s = append(s, []byte(identCoder.toOut(te.Ident, uintptr(te)))...)
         | &TypeEnum:
             let te = (&TypeEnum)(t.Kind)
-            s += identCoder.toOut(te.Ident, uintptr(te))
+            s = append(s, []byte(identCoder.toOut(te.Ident, uintptr(te)))...)
         | &StructIns:
             let mut si = (&StructIns)(t.Kind)
-            s += identCoder.structureIns(si)
+            s = append(s, []byte(identCoder.structureIns(si))...)
         | &Trait:
             let mut trt = (&Trait)(t.Kind)
-            s += identCoder.traitDecl(trt)
+            s = append(s, []byte(identCoder.traitDecl(trt))...)
         | &Prim:
-            s += (&Prim)(t.Kind).Kind
+            s = append(s, []byte((&Prim)(t.Kind).Kind)...)
         | &Tuple:
             self.tup(s, (&Tuple)(t.Kind))
         |:
@@ -446,19 +450,19 @@ impl resultCoder {
         }
     }
 
-    fn codeMut1(mut self, mut &s: str, mut &t: &TypeKind) {
+    fn codeMut1(mut self, mut &s: []byte, mut &t: &TypeKind) {
         let mut tup = t.Tup()
         if tup != nil {
             self.tup(s, tup)
         } else {
-            s += self.tc.kind(t)
+            s = append(s, []byte(self.tc.kind(t))...)
         }
     }
 
     fn code(mut self, mut &t: &TypeKind): str {
-        let mut s = make(str, 0, 20)
+        let mut s = make([]byte, 0, 20)//make(str, 0, 20)
         self.codeMut(s, t)
-        ret s
+        ret str(s)
     }
 }
 

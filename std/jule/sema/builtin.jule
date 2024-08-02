@@ -773,19 +773,6 @@ fn callerCapSlice(mut &expr: &Data, mut &d: &Data): &Data {
     ret d
 }
 
-fn callerCapStr(mut &expr: &Data, mut &d: &Data): &Data {
-    d.Kind = lenKind()
-    if expr.IsConst() {
-        d.Constant = Const.NewI64(i64(cap(expr.Constant.ReadStr())))
-        d.Model = d.Constant
-    } else {
-        d.Model = &BuiltinCapCallExprModel{
-            Expr: expr,
-        }
-    }
-    ret d
-}
-
 fn builtinCallerCap(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data {
     if len(fc.Args) < 1 {
         e.pushErr(fc.Token, LogMsg.MissingExprFor, "obj")
@@ -803,8 +790,6 @@ fn builtinCallerCap(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data {
         ret nil
     | dest.Kind.Slc() != nil:
         ret callerCapSlice(dest, d)
-    | dest.Kind.Prim() != nil && dest.Kind.Prim().IsStr():
-        ret callerCapStr(dest, d)
     |:
         e.pushErr(fc.Args[0].Token, LogMsg.InvalidExpr)
         ret nil

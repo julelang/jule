@@ -65,70 +65,6 @@ impl exprOptimizer {
         }
     }
 
-    fn strCond(self, mut m: &BinopExprModel): bool {
-        let lp = m.Left.Kind.Prim()
-        if lp == nil || !lp.IsStr() {
-            ret false
-        }
-        if m.Op.Id != TokenId.Eqs && m.Op.Id != TokenId.NotEq {
-            ret false
-        }
-        match type m.Left.Model {
-        | &Const:
-            m.Left, m.Right = m.Right, m.Left
-            goto opt
-        }
-        match type m.Right.Model {
-        | &Const:
-            break
-        |:
-            ret true
-        }
-    opt:
-        let mut c = (&Const)(m.Right.Model)
-        match m.Op.Id {
-        | TokenId.Eqs:
-            if c.ReadStr() == "" {
-                *self.model = &CommonSubIdentExprModel{
-                    ExprKind: m.Left.Kind,
-                    Expr: m.Left.Model,
-                    Ident: "empty()",
-                }
-                break
-            }
-            let mut model = any(&StrCompExprModel{
-                Left: m.Left.Model,
-                Right: c,
-                NotEq: false,
-            })
-            *self.model = unsafe { *(*ExprModel)(&model) }
-        | TokenId.NotEq:
-            if c.ReadStr() == "" {
-                let mut op = m.Op
-                op.Id = TokenId.Excl
-                op.Kind = TokenKind.Excl
-                *self.model = &UnaryExprModel{
-                    Op: op,
-                    Expr: &Data{
-                        Model: &CommonSubIdentExprModel{
-                            ExprKind: m.Left.Kind,
-                            Expr: m.Left.Model,
-                            Ident: "empty()",
-                        },
-                    },
-                }
-                break
-            }
-            let mut model = any(&StrCompExprModel{
-                Left: m.Left.Model,
-                Right: c,
-                NotEq: true,
-            })
-            *self.model = unsafe { *(*ExprModel)(&model) }
-        }
-        ret true
-    }
-
     fn binary(self, mut m: &BinopExprModel) {
         exprOptimizer.optimize(m.Left.Model)
         exprOptimizer.optimize(m.Right.Model)
@@ -137,10 +73,6 @@ impl exprOptimizer {
         | &Const:
             break
         |:
-            ret
-        }
-
-        if Cond && self.strCond(m) {
             ret
         }
 
