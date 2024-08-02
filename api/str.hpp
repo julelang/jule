@@ -870,6 +870,13 @@ namespace jule
             return this->__at(index);
         }
 
+        inline jule::Bool equal(const char *s, const jule::Int n) const noexcept
+        {
+            if (this->_len != n)
+                return false;
+            return std::strncmp(reinterpret_cast<const char *>(this->begin()), s, this->_len) == 0;
+        }
+
         inline jule::U8 &operator[](const jule::Int &index) noexcept
         {
 #ifndef __JULE_ENABLE__PRODUCTION

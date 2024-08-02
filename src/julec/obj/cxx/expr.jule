@@ -9,6 +9,7 @@ use opt::{
     PushToSliceExprModel,
     AppendToSliceExprModel,
     InlineStdInternalNosafeStobs,
+    StrCompExprModel,
 }
 use conv for std::conv
 use std::env::{Arch}
@@ -94,6 +95,7 @@ enum compExprModel: type {
     &UnsafeBinopExprModel,
     &UnsafeIndexingExprModel,
     &InlineStdInternalNosafeStobs,
+    &StrCompExprModel,
 }
 
 struct exprCoder {
@@ -1322,6 +1324,22 @@ impl exprCoder {
         self.oc.write(".__free()")
     }
 
+    fn strComp(mut &self, mut m: &StrCompExprModel) {
+        if m.NotEq {
+            self.oc.write("(!")
+        }
+        let bytes = []byte(m.Right.ReadStr())
+        self.possibleRefExpr(m.Left)
+        self.oc.write(".equal(")
+        self.oc.write(cstrLit(bytes))
+        self.oc.write(", ")
+        self.oc.write(conv::Itoa(len(bytes)))
+        self.oc.write(")")
+        if m.NotEq {
+            self.oc.write(")")
+        }
+    }
+
     fn inlineStdInternalNosafeStobs(mut &self, mut m: &InlineStdInternalNosafeStobs) {
         self.possibleRefExpr(m.Str)
         self.oc.write(".fake_slice()")
@@ -1419,6 +1437,8 @@ impl exprCoder {
             self.backendEmit((&BackendEmitExprModel)(m))
         | &FreeExprModel:
             self.free((&FreeExprModel)(m))
+        | &StrCompExprModel:
+            self.strComp((&StrCompExprModel)(m))
         | &InlineStdInternalNosafeStobs:
             self.inlineStdInternalNosafeStobs((&InlineStdInternalNosafeStobs)(m))
         |:
