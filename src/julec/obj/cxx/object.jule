@@ -45,7 +45,7 @@ use std::time::{Time}
 const emptyTraitOffset = 0x0
 
 const anyTypeIdent = "__jule_any_type"
-const indentKind = "\t"
+const indentKind = '\t'
 
 struct SerializationInfo {
     Compiler:        str
@@ -68,15 +68,15 @@ struct ObjectCoder {
     // Internal buffer which is commonly used.
     Obj: []byte
 
-    resultDecls: []str
-    anyObj:      str
+    resultDecls: StrBuilder
+    anyObj:      StrBuilder
 
     ir:   &IR
     info: SerializationInfo
     tmap: []&traitHash
 
     // Current indentation.
-    indentBuffer: str
+    indentBuffer: []byte
 
     resultMap:    map[str]bool
     anyTypeMap:   []&TypeKind
@@ -114,7 +114,7 @@ impl ObjectCoder {
 
     // Increase indentation.
     fn addIndent(mut &self) {
-        self.indentBuffer += indentKind
+        self.indentBuffer = append(self.indentBuffer, indentKind)
     }
 
     // Decrase indentation.
@@ -124,7 +124,7 @@ impl ObjectCoder {
 
     // Writes indention string by indentBuffer.
     fn indent(mut &self) {
-        self.Obj = append(self.Obj, []byte(self.indentBuffer)...)
+        self.Obj = append(self.Obj, self.indentBuffer...)
     }
 
     fn findAnyType(mut &self, mut &t: &TypeKind): int {
@@ -152,28 +152,28 @@ impl ObjectCoder {
             let kind = self.tc.asSptr(elem_kind)
 
             // dealloc function.
-            self.anyObj += "void " + anyTypeIdent
-            self.anyObj += si
-            self.anyObj += "_dealloc(jule::Ptr<jule::Uintptr> &alloc) noexcept { alloc.__as<"
-            self.anyObj += elem_kind
-            self.anyObj += ">().dealloc(); }\n"
+            self.anyObj.WriteStr("void " + anyTypeIdent)
+            self.anyObj.WriteStr(si)
+            self.anyObj.WriteStr("_dealloc(jule::Ptr<jule::Uintptr> &alloc) noexcept { alloc.__as<")
+            self.anyObj.WriteStr(elem_kind)
+            self.anyObj.WriteStr(">().dealloc(); }\n")
 
             // Type structure.
-            self.anyObj += "struct " + typeCoder.Any + "::Type "
-            self.anyObj += anyTypeIdent
-            self.anyObj += si
-            self.anyObj += "{.dealloc=" + anyTypeIdent
-            self.anyObj += si
-            self.anyObj += "_dealloc, .eq=jule::ptr_equal, .to_str=jule::ptr_to_str};\n"
+            self.anyObj.WriteStr("struct " + typeCoder.Any + "::Type ")
+            self.anyObj.WriteStr(anyTypeIdent)
+            self.anyObj.WriteStr(si)
+            self.anyObj.WriteStr("{.dealloc=" + anyTypeIdent)
+            self.anyObj.WriteStr(si)
+            self.anyObj.WriteStr("_dealloc, .eq=jule::ptr_equal, .to_str=jule::ptr_to_str};\n")
 
             // comparison function.
-            self.anyObj += typeCoder.Bool + " " + anyTypeIdent
-            self.anyObj += si
-            self.anyObj += "_compare(const " + typeCoder.Any + " &any, const "
-            self.anyObj += kind
-            self.anyObj += " &other) { return any.type == &" + anyTypeIdent
-            self.anyObj += si
-            self.anyObj += " && jule::ptr_equal(any.data.alloc, other.alloc); }\n"
+            self.anyObj.WriteStr(typeCoder.Bool + " " + anyTypeIdent)
+            self.anyObj.WriteStr(si)
+            self.anyObj.WriteStr("_compare(const " + typeCoder.Any + " &any, const ")
+            self.anyObj.WriteStr(kind)
+            self.anyObj.WriteStr(" &other) { return any.type == &" + anyTypeIdent)
+            self.anyObj.WriteStr(si)
+            self.anyObj.WriteStr(" && jule::ptr_equal(any.data.alloc, other.alloc); }\n")
         } else {
             let comparable = t.Comparable()
             let kind = self.tc.kind(t)
@@ -182,63 +182,63 @@ impl ObjectCoder {
             }
 
             // dealloc function.
-            self.anyObj += "void " + anyTypeIdent
-            self.anyObj += si
-            self.anyObj += "_dealloc(jule::Ptr<jule::Uintptr> &alloc) noexcept { alloc.__as<"
-            self.anyObj += kind
-            self.anyObj += ">().dealloc(); }\n"
+            self.anyObj.WriteStr("void " + anyTypeIdent)
+            self.anyObj.WriteStr(si)
+            self.anyObj.WriteStr("_dealloc(jule::Ptr<jule::Uintptr> &alloc) noexcept { alloc.__as<")
+            self.anyObj.WriteStr(kind)
+            self.anyObj.WriteStr(">().dealloc(); }\n")
 
             if comparable {
                 // eq function.
-                self.anyObj += typeCoder.Bool + " " + anyTypeIdent
-                self.anyObj += si
-                self.anyObj += "_eq(void *alloc, void *other) noexcept { return *reinterpret_cast<"
-                self.anyObj += kind
-                self.anyObj += "*>(alloc) == *reinterpret_cast<"
-                self.anyObj += kind
-                self.anyObj += "*>(other); }\n"
+                self.anyObj.WriteStr(typeCoder.Bool + " " + anyTypeIdent)
+                self.anyObj.WriteStr(si)
+                self.anyObj.WriteStr("_eq(void *alloc, void *other) noexcept { return *reinterpret_cast<")
+                self.anyObj.WriteStr(kind)
+                self.anyObj.WriteStr("*>(alloc) == *reinterpret_cast<")
+                self.anyObj.WriteStr(kind)
+                self.anyObj.WriteStr("*>(other); }\n")
             }
 
             // to_str function.
-            self.anyObj += typeCoder.Str + " " + anyTypeIdent
-            self.anyObj += si
-            self.anyObj += "_to_str(const void *alloc) noexcept { return jule::to_str(*reinterpret_cast<"
+            self.anyObj.WriteStr(typeCoder.Str + " " + anyTypeIdent)
+            self.anyObj.WriteStr(si)
+            self.anyObj.WriteStr("_to_str(const void *alloc) noexcept { return jule::to_str(*reinterpret_cast<")
             if t.Ptr() == nil {
-                self.anyObj += "const "
-                self.anyObj += kind
+                self.anyObj.WriteStr("const ")
+                self.anyObj.WriteStr(kind)
             } else {
-                self.anyObj += kind
-                self.anyObj += "* const"
+                self.anyObj.WriteStr(kind)
+                self.anyObj.WriteStr("* const")
             }
-            self.anyObj += "*>(alloc)); }\n"
+            self.anyObj.WriteStr("*>(alloc)); }\n")
 
             // Type structure.
-            self.anyObj += "struct " + typeCoder.Any + "::Type "
-            self.anyObj += anyTypeIdent
-            self.anyObj += si
-            self.anyObj += "{.dealloc=" + anyTypeIdent
-            self.anyObj += si
-            self.anyObj += "_dealloc, "
+            self.anyObj.WriteStr("struct " + typeCoder.Any + "::Type ")
+            self.anyObj.WriteStr(anyTypeIdent)
+            self.anyObj.WriteStr(si)
+            self.anyObj.WriteStr("{.dealloc=" + anyTypeIdent)
+            self.anyObj.WriteStr(si)
+            self.anyObj.WriteStr("_dealloc, ")
             if comparable {
-                self.anyObj += ".eq=" + anyTypeIdent
-                self.anyObj += si
-                self.anyObj += "_eq, "
+                self.anyObj.WriteStr(".eq=" + anyTypeIdent)
+                self.anyObj.WriteStr(si)
+                self.anyObj.WriteStr("_eq, ")
             }
-            self.anyObj += ".to_str=" + anyTypeIdent
-            self.anyObj += si
-            self.anyObj += "_to_str};\n"
+            self.anyObj.WriteStr(".to_str=" + anyTypeIdent)
+            self.anyObj.WriteStr(si)
+            self.anyObj.WriteStr("_to_str};\n")
 
             if comparable {
                 // compare function.
-                self.anyObj += typeCoder.Bool + " " + anyTypeIdent
-                self.anyObj += si
-                self.anyObj += "_compare(const " + typeCoder.Any + " &any, const "
-                self.anyObj += kind
-                self.anyObj += " &other) { return any.type == &" + anyTypeIdent
-                self.anyObj += si
-                self.anyObj += " && " + anyTypeIdent
-                self.anyObj += si
-                self.anyObj += "_eq(any.data.alloc, (void*)&other); }\n"
+                self.anyObj.WriteStr(typeCoder.Bool + " " + anyTypeIdent)
+                self.anyObj.WriteStr(si)
+                self.anyObj.WriteStr("_compare(const " + typeCoder.Any + " &any, const ")
+                self.anyObj.WriteStr(kind)
+                self.anyObj.WriteStr(" &other) { return any.type == &" + anyTypeIdent)
+                self.anyObj.WriteStr(si)
+                self.anyObj.WriteStr(" && " + anyTypeIdent)
+                self.anyObj.WriteStr(si)
+                self.anyObj.WriteStr("_eq(any.data.alloc, (void*)&other); }\n")
             }
         }
         ret i
@@ -251,20 +251,18 @@ impl ObjectCoder {
             ret
         }
         self.resultMap[s] = false
-        let mut obj = StrBuilder.New(1 << 7)
-        obj.WriteStr("struct ")
-        obj.WriteStr(s)
-        obj.WriteStr(" {\n")
+        self.resultDecls.WriteStr("struct ")
+        self.resultDecls.WriteStr(s)
+        self.resultDecls.WriteStr(" {\n")
         for (i, mut t) in f.Result.Tup().Types {
-            obj.WriteStr(indentKind)
-            obj.WriteStr(self.tc.kind(t))
-            obj.WriteByte(' ')
-            obj.WriteStr(resultArgName)
-            obj.WriteStr(conv::Itoa(i))
-            obj.WriteStr(";\n")
+            self.resultDecls.WriteByte(indentKind)
+            self.resultDecls.WriteStr(self.tc.kind(t))
+            self.resultDecls.WriteByte(' ')
+            self.resultDecls.WriteStr(resultArgName)
+            self.resultDecls.WriteStr(conv::Itoa(i))
+            self.resultDecls.WriteStr(";\n")
         }
-        obj.WriteStr("};\n")
-        self.resultDecls = append(self.resultDecls, obj.Str())
+        self.resultDecls.WriteStr("};\n")
     }
 
     fn pushResult(mut &self, mut &f: &Fn) {
@@ -330,28 +328,28 @@ impl ObjectCoder {
         //  apply for two traits that casting into each other. It was decided that
         //  additional investigation was needed to conclusively confirm this.
         const offset = "offset"
-        self.anyObj += typeCoder.Int
-        self.anyObj += " "
-        self.anyObj += ident
-        self.anyObj += "(const " + typeCoder.Int + " " + offset + ") noexcept { "
+        self.anyObj.WriteStr(typeCoder.Int)
+        self.anyObj.WriteByte(' ')
+        self.anyObj.WriteStr(ident)
+        self.anyObj.WriteStr("(const " + typeCoder.Int + " " + offset + ") noexcept { ")
         for (_, mut s1) in t1.Implemented {
             for _, s2 in t2.Implemented {
                 if s1 == s2 {
                     for (_, mut s1i) in s1.Instances {
                         let i1 = self.findTypeOffsetS(t1, s1i)
                         let i2 = self.findTypeOffsetS(t2, s1i)
-                        self.anyObj += "if (offset == "
-                        self.anyObj += conv::Itoa(i2)
-                        self.anyObj += ") return "
-                        self.anyObj += conv::Itoa(i1)
-                        self.anyObj += "; "
+                        self.anyObj.WriteStr("if (offset == ")
+                        self.anyObj.WriteStr(conv::Itoa(i2))
+                        self.anyObj.WriteStr(") return ")
+                        self.anyObj.WriteStr(conv::Itoa(i1))
+                        self.anyObj.WriteStr("; ")
                     }
                 }
             }
         }
-        self.anyObj += " return "
-        self.anyObj += conv::Itoa(emptyTraitOffset)
-        self.anyObj += "; }\n"
+        self.anyObj.WriteStr(" return ")
+        self.anyObj.WriteStr(conv::Itoa(emptyTraitOffset))
+        self.anyObj.WriteStr("; }\n")
     }
 
     // Writes location information of token as cstr bytes.
@@ -1361,12 +1359,10 @@ impl ObjectCoder {
         self.write("\n")
         self.decls()
 
-        if len(self.resultDecls) > 0 {
+        if self.resultDecls.Len() > 0 {
             let mut head = clone(self.Obj[:self.headPos])
-            for _, decl in self.resultDecls {
-                head = append(head, []byte(decl)...)
-                self.declPos += len(decl)
-            }
+            head = append(head, unsafe { self.resultDecls.Buf() }...)
+            self.declPos += self.resultDecls.Len()
             head = append(head, self.Obj[self.headPos:]...)
             self.Obj = head
         }
@@ -1377,9 +1373,9 @@ impl ObjectCoder {
         self.initCaller()
         self.write("\n\n")
 
-        if len(self.anyObj) > 0 {
+        if self.anyObj.Len() > 0 {
             let mut head = clone(self.Obj[:self.declPos])
-            head = append(head, []byte(self.anyObj)...)
+            head = append(head, unsafe { self.anyObj.Buf() }...)
             head = append(head, self.Obj[self.declPos:]...)
             self.Obj = head
         }
