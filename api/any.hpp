@@ -60,6 +60,11 @@ namespace jule
             this->dealloc();
         }
 
+        void __free(void) noexcept {
+            this->data.ref = nullptr;
+            this->data.alloc = nullptr;
+        }
+
         void dealloc(void) noexcept
         {
             if (this->type)
@@ -67,8 +72,7 @@ namespace jule
                 this->type->dealloc(this->data);
                 this->type = nullptr;
             }
-            this->data.ref = nullptr;
-            this->data.alloc = nullptr;
+            this->__free();
         }
 
         inline void must_ok(
