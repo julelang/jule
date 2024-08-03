@@ -74,16 +74,16 @@ namespace jule
 
         Str(void) : _len(0) {};
         Str(const jule::Str &src) = default;
-        Str(const std::basic_string<jule::U8> &src) : Str(src.begin().base(), src.end().base()) {}
+        Str(const std::basic_string<jule::U8> &src) : Str(src.c_str(), src.c_str() + src.size()) {}
         Str(const char *src, const jule::Int &len) : Str(reinterpret_cast<const jule::U8 *>(src), len) {}
         Str(const jule::U8 *src, const jule::Int &len) : buffer(jule::Str::buffer_t::make(const_cast<jule::U8 *>(src), nullptr)),
                                                          _slice(const_cast<jule::U8 *>(src)),
                                                          _len(len) {}
         Str(const jule::U8 *src) : Str(src, src + std::strlen(reinterpret_cast<const char *>(src))) {}
-        Str(const std::string &src) : Str(reinterpret_cast<const jule::U8 *>(src.begin().base()),
-                                          reinterpret_cast<const jule::U8 *>(src.end().base())) {}
+        Str(const std::string &src) : Str(reinterpret_cast<const jule::U8 *>(src.c_str()),
+                                          reinterpret_cast<const jule::U8 *>(src.c_str() + src.size())) {}
         Str(const jule::Slice<U8> &src) : Str(src.begin(), src.end()) {}
-        Str(const std::vector<U8> &src) : Str(src.begin().base(), src.end().base()) {}
+        Str(const std::vector<U8> &src) : Str(src.data(), src.data() + src.size()) {}
 
         Str(const char *src) : Str(reinterpret_cast<const jule::U8 *>(src),
                                    reinterpret_cast<const jule::U8 *>(src) + std::strlen(reinterpret_cast<const char *>(src))) {}
