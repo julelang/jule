@@ -56,6 +56,7 @@ namespace jule
         static jule::Str from_rune(const jule::I32 r) noexcept
         {
             jule::Str s;
+            s._len = 0;
             s.buffer = jule::Str::buffer_t::make(jule::Str::alloc(4));
             s._slice = s.buffer.alloc;
             jule::utf8_push_rune_bytes(r, s);
@@ -99,8 +100,8 @@ namespace jule
 
         Str(const jule::Slice<jule::I32> &src)
         {
-            this->_len = src.len() << 2;
-            this->buffer = jule::Str::buffer_t::make(jule::Str::alloc(this->_len));
+            this->_len = 0;
+            this->buffer = jule::Str::buffer_t::make(jule::Str::alloc(src.len() << 2));
             this->_slice = this->buffer.alloc;
             for (const jule::I32 &r : src)
                 jule::utf8_push_rune_bytes(r, *this);
