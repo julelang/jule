@@ -207,6 +207,66 @@ namespace jule
             return this->_slice + this->_len;
         }
 
+        inline void mut_slice(
+#ifndef __JULE_ENABLE__PRODUCTION
+            const char *file,
+#endif
+            const jule::Int &start,
+            const jule::Int &end) const noexcept
+        {
+#ifndef __JULE_DISABLE__SAFETY
+            if (start != 0 && end != 0)
+                this->check(
+#ifndef __JULE_ENABLE__PRODUCTION
+                    file
+#endif
+                );
+            if (start < 0 || end < 0 || start > end || end > this->_cap)
+            {
+                std::string error;
+                __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(error, start, end, this->len(), "capacity");
+                error += "\nruntime: slice slicing with out of range indexes";
+#ifndef __JULE_ENABLE__PRODUCTION
+                error += "\nfile: ";
+                error += file;
+#endif
+                jule::panic(error);
+            }
+#endif
+            this->_slice += start;
+            this->_cap -= start;
+            this->_len = end - start;
+        }
+
+        inline void mut_slice(
+#ifndef __JULE_ENABLE__PRODUCTION
+            const char *file,
+#endif
+            const jule::Int &start) const noexcept
+        {
+            this->mut_slice(
+#ifndef __JULE_ENABLE__PRODUCTION
+                file,
+#endif
+                start, this->len());
+        }
+
+        inline void mut_slice(
+#ifndef __JULE_ENABLE__PRODUCTION
+            const char *file
+#else
+            void
+#endif
+        ) const noexcept
+        {
+            return this->mut_slice(
+#ifndef __JULE_ENABLE__PRODUCTION
+                file,
+#endif
+                0,
+                this->len());
+        }
+
         inline Slice<Item> slice(
 #ifndef __JULE_ENABLE__PRODUCTION
             const char *file,
