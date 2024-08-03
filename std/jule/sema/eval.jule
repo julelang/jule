@@ -921,6 +921,7 @@ impl Eval {
 
     fn indexingPtr(mut self, mut &d: &Data, mut &index: &Data, &i: &IndexingExpr) {
         self.checkIntegerIndexingByData(index, i.Token)
+        d.Lvalue = true
 
         let mut ptr = d.Kind.Ptr()
         match {
@@ -938,6 +939,7 @@ impl Eval {
         let mut arr = d.Kind.Arr()
         d.Kind = arr.Elem
         self.checkIntegerIndexingByData(index, i.Token)
+        d.Lvalue = true
         if index.IsConst() && index.Constant.AsF64() >= f64(arr.N) {
             self.pushErr(i.Token, LogMsg.OverflowLimits)
         }
@@ -947,6 +949,7 @@ impl Eval {
         let mut slc = d.Kind.Slc()
         d.Kind = slc.Elem
         self.checkIntegerIndexingByData(index, i.Token)
+        d.Lvalue = true
 
         // Check compile-time bounds.
         if !index.IsConst() {
@@ -966,6 +969,7 @@ impl Eval {
     }
 
     fn indexingMap(mut self, mut &d: &Data, mut &index: &Data, mut &i: &IndexingExpr) {
+        d.Lvalue = true
         if index == nil {
             ret
         }
@@ -983,6 +987,7 @@ impl Eval {
     fn indexingStr(mut self, mut &d: &Data, mut &index: &Data, &i: &IndexingExpr) {
         d.Kind = primU8 // Byte
         d.Mutable = false
+        d.Lvalue = true
 
         if index == nil {
             ret
@@ -1241,7 +1246,7 @@ impl Eval {
             ret d
         }
 
-        let mut old_d = *d
+        let mut oldData = *d
 
         let mut index = self.evalExpr(i.Index)
         if index == nil {
@@ -1262,7 +1267,7 @@ impl Eval {
         } else {
             d.Model = &IndexingExprModel{
                 Token: i.Token,
-                Expr: new(Data, old_d),
+                Expr: new(Data, oldData),
                 Index: index,
             }
         }
