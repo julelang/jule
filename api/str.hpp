@@ -156,7 +156,7 @@ namespace jule
         {
             this->_len = 0;
 #ifdef __JULE_DISABLE__REFERENCE_COUNTING
-            this->data.dealloc();
+            this->buffer.dealloc();
 #else
             if (!this->buffer.ref)
             {
