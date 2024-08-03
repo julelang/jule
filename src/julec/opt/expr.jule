@@ -89,11 +89,11 @@ impl exprOptimizer {
         match m.Op.Id {
         | TokenId.Eqs:
             if c.ReadStr() == "" {
-                *self.model = &CommonSubIdentExprModel{
-                    ExprKind: m.Left.Kind,
+                let mut model = any(&EmptyCompareExprModel{
                     Expr: m.Left.Model,
-                    Ident: "empty()",
-                }
+                    Neg: false,
+                })
+                *self.model = unsafe { *(*ExprModel)(&model) }
                 break
             }
             let mut model = any(&StrCompExprModel{
@@ -104,19 +104,11 @@ impl exprOptimizer {
             *self.model = unsafe { *(*ExprModel)(&model) }
         | TokenId.NotEq:
             if c.ReadStr() == "" {
-                let mut op = m.Op
-                op.Id = TokenId.Excl
-                op.Kind = TokenKind.Excl
-                *self.model = &UnaryExprModel{
-                    Op: op,
-                    Expr: &Data{
-                        Model: &CommonSubIdentExprModel{
-                            ExprKind: m.Left.Kind,
-                            Expr: m.Left.Model,
-                            Ident: "empty()",
-                        },
-                    },
-                }
+                let mut model = any(&EmptyCompareExprModel{
+                    Expr: m.Left.Model,
+                    Neg: true,
+                })
+                *self.model = unsafe { *(*ExprModel)(&model) }
                 break
             }
             let mut model = any(&StrCompExprModel{

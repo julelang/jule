@@ -11,6 +11,7 @@ use opt::{
     AppendToSliceExprModel,
     InlineStdInternalNosafeStobs,
     StrCompExprModel,
+    EmptyCompareExprModel,
 }
 use conv for std::conv
 use std::env::{Arch}
@@ -98,6 +99,7 @@ enum compExprModel: type {
     &InlineStdInternalNosafeStobs,
     &StrCompExprModel,
     &RefExprModel,
+    &EmptyCompareExprModel,
 }
 
 struct exprCoder {
@@ -1328,6 +1330,15 @@ impl exprCoder {
         self.oc.write(".fake_slice()")
     }
 
+    fn emptyCompare(mut &self, mut m: &EmptyCompareExprModel) {
+        if m.Neg {
+            self.oc.write("!")
+        }
+        self.oc.write("(")
+        self.possibleRefExpr(m.Expr)
+        self.oc.write(").empty()")
+    }
+
     fn model(mut &self, mut m: compExprModel) {
         match type m {
         | str:
@@ -1426,6 +1437,8 @@ impl exprCoder {
             self.inlineStdInternalNosafeStobs((&InlineStdInternalNosafeStobs)(m))
         | &RefExprModel:
             self.var((&RefExprModel)(m).Var)
+        | &EmptyCompareExprModel:
+            self.emptyCompare((&EmptyCompareExprModel)(m))
         |:
             self.oc.write("<unimplemented_expression_model>")
         }
