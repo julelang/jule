@@ -627,36 +627,6 @@ fn callerCopySlice(mut &dest: &Data, mut &e: &Eval, mut &fc: &FnCallExpr, mut &d
     ret d
 }
 
-fn callerCopyStr(mut &dest: &Data, mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data {
-    if !dest.Mutable {
-        e.pushErr(fc.Args[0].Token, LogMsg.MutOperationOnImmut)
-    }
-
-    let mut src = e.evalExpr(fc.Args[1])
-    if src == nil {
-        ret nil
-    }
-    match {
-    | src.Kind.Prim() != nil:
-        if src.Kind.Prim().IsStr() {
-            goto end
-        }
-    | src.Kind.Slc() != nil:
-        let mut slc = src.Kind.Slc()
-        if slc.Elem.Prim() != nil && slc.Elem.Prim().IsU8() {
-            goto end
-        }
-    }
-    e.pushErr(fc.Args[1].Token, LogMsg.IncompatibleTypes, dest.Kind.Str(), src.Kind.Str())
-end:
-    d.Kind = lenKind()
-    d.Model = &BuiltinCopyCallExprModel{
-        Dest: dest,
-        Src: src,
-    }
-    ret d
-}
-
 fn builtinCallerCopy(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data {
     if len(fc.Args) < 2 {
         if len(fc.Args) == 1 {
@@ -676,8 +646,6 @@ fn builtinCallerCopy(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data 
         ret nil
     | dest.Kind.Slc() != nil:
         ret callerCopySlice(dest, e, fc, d)
-    | dest.Kind.Prim() != nil && dest.Kind.Prim().IsStr():
-        ret callerCopyStr(dest, e, fc, d)
     |:
         e.pushErr(fc.Args[0].Token, LogMsg.InvalidType)
         ret nil
@@ -773,19 +741,6 @@ fn callerCapSlice(mut &expr: &Data, mut &d: &Data): &Data {
     ret d
 }
 
-fn callerCapStr(mut &expr: &Data, mut &d: &Data): &Data {
-    d.Kind = lenKind()
-    if expr.IsConst() {
-        d.Constant = Const.NewI64(i64(cap(expr.Constant.ReadStr())))
-        d.Model = d.Constant
-    } else {
-        d.Model = &BuiltinCapCallExprModel{
-            Expr: expr,
-        }
-    }
-    ret d
-}
-
 fn builtinCallerCap(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data {
     if len(fc.Args) < 1 {
         e.pushErr(fc.Token, LogMsg.MissingExprFor, "obj")
@@ -803,8 +758,6 @@ fn builtinCallerCap(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data {
         ret nil
     | dest.Kind.Slc() != nil:
         ret callerCapSlice(dest, d)
-    | dest.Kind.Prim() != nil && dest.Kind.Prim().IsStr():
-        ret callerCapStr(dest, d)
     |:
         e.pushErr(fc.Args[0].Token, LogMsg.InvalidExpr)
         ret nil

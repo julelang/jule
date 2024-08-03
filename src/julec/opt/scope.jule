@@ -264,56 +264,6 @@ impl scopeOptimizer {
         ret false
     }
 
-    fn strInsert(mut self, mut a: &Assign): bool {
-        if a.Op.Id != TokenId.Eq {
-            ret false
-        }
-        match type a.R.Model {
-        | &BinopExprModel:
-            let mut m = (&BinopExprModel)(a.R.Model)
-            if a.L.Model == m.Right.Model {
-                self.setCurrentStmt(&StrInsertBeginExprModel{
-                    Dest: a.L.Model,
-                    Expr: m.Left.Model,
-                })
-                ret true
-            }
-        }
-        ret false
-    }
-
-    fn strAppend(mut self, mut a: &Assign): bool {
-        if a.Op.Id != TokenId.PlusEq {
-            ret false
-        }
-        match type a.R.Model {
-        | &Const:
-            // Constant string literal appending to string.
-            self.setCurrentStmt(&StrAppendExprModel{
-                Str: a.L.Model,
-                Expr: a.R.Model,
-            })
-            ret true
-        | &CastingExprModel:
-            // Casting byte literal, rune literal, byte slices and rune slices
-            // then appending to string.
-            let mut c = (&CastingExprModel)(a.R.Model)
-            let mut prim = c.ExprKind.Prim()
-            if prim == nil && c.ExprKind.Slc() != nil {
-                prim = c.ExprKind.Slc().Elem.Prim()
-            }
-            if prim == nil || (!prim.IsU8() && !prim.IsI32()) {
-                break
-            }
-            self.setCurrentStmt(&StrAppendExprModel{
-                Str: a.L.Model,
-                Expr: c.Expr,
-            })
-            ret true
-        }
-        ret false
-    }
-
     fn strAssign(mut self, mut a: &Assign): bool {
         if !Str {
             ret false
@@ -322,13 +272,7 @@ impl scopeOptimizer {
         if lp == nil || !lp.IsStr() {
             ret false
         }
-        match {
-        | self.substr(a)
-        | self.strInsert(a)
-        | self.strAppend(a):
-            ret true
-        }
-        ret false
+        ret self.substr(a)
     }
 
     fn optimizeAssign(mut self, mut assign: &Assign) {

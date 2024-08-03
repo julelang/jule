@@ -17,6 +17,7 @@ use std::jule::sema::{
     Param,
 }
 use utf8 for std::unicode::utf8
+use std::strings::{StrBuilder}
 
 // Identifier of initialize function caller function.
 const initCallerIdent = "__jule_call_initializers"
@@ -29,7 +30,7 @@ impl identCoder {
     // Write identifiers to buf. If identifier contains unicode runes,
     // handle as ASCII characters. Some backend compilers are not supports
     // unicode identifiers and causes compile errors.
-    static fn writeIdentTo(mut &buf: str, &ident: str) {
+    static fn writeIdentTo(mut &buf: StrBuilder, &ident: str) {
         for _, b in ident {
             if b >= utf8::RuneSelf {
                 // ident contains unicode runes.
@@ -37,18 +38,18 @@ impl identCoder {
             }
         }
         // ident is ASCII, append directly.
-        buf += ident
+        buf.WriteStr(ident)
         ret
     unicode:
         for _, r in []rune(ident) {
             if r < utf8::RuneSelf { // ASCII
                 // Cast to byte to enable compiler optimization.
                 // Append directy to buf.
-                buf += str(byte(r))
+                buf.WriteByte(byte(r))
                 continue
             }
             // Unicode, handle as ASCII.
-            buf += conv::FmtInt(i64(r), 0xF)
+            buf.WriteStr(conv::FmtInt(i64(r), 0xF))
         }
     }
 
@@ -59,18 +60,17 @@ impl identCoder {
     //   - addr:  Pointer address of package file handler.
     static fn toOut(&ident: str, addr: uintptr): str {
         if addr != 0 {
-            let mut obj = make(str, 0, 40)
-            obj += "_"
-            obj += conv::FmtUint(u64(addr), 0xF)
-            obj += "_"
+            let mut obj = StrBuilder.New(40)
+            obj.WriteByte('_')
+            obj.WriteStr(conv::FmtUint(u64(addr), 0xF))
+            obj.WriteByte('_')
             identCoder.writeIdentTo(obj, ident)
-            ret obj
+            ret obj.Str()
         }
-        let mut obj = make(str, 0, len(ident) + 1)
-        obj += "_"
+        let mut obj = StrBuilder.New(len(ident) + 1)
+        obj.WriteByte('_')
         identCoder.writeIdentTo(obj, ident)
-        obj += ident
-        ret obj
+        ret obj.Str()
     }
 
     // Returns cpp output local identifier form of fiven identifier.
@@ -80,13 +80,13 @@ impl identCoder {
     //   - col:   Column of definition.
     //   - ident: Identifier of definition.
     static fn toLocal(row: int, col: int, &ident: str): str {
-        let mut obj = make(str, 0, 40)
-        obj += "_"
-        obj += conv::Itoa(row)
-        obj += conv::Itoa(col)
-        obj += "_"
+        let mut obj = StrBuilder.New(40)
+        obj.WriteByte('_')
+        obj.WriteStr(conv::Itoa(row))
+        obj.WriteStr(conv::Itoa(col))
+        obj.WriteByte('_')
         identCoder.writeIdentTo(obj, ident)
-        ret obj
+        ret obj.Str()
     }
 
     // Returns output identifier of function.
@@ -164,9 +164,10 @@ impl identCoder {
         if f.Owner.Binded {
             ret f.Ident
         }
-        let mut obj = "_field_"
+        let mut obj = StrBuilder.New(7 + len(f.Ident))
+        obj.WriteStr("_field_")
         identCoder.writeIdentTo(obj, f.Ident)
-        ret obj
+        ret obj.Str()
     }
 
     // Returns output identifier of variable.
@@ -193,49 +194,49 @@ impl identCoder {
 
     // Returns begin label identifier of iteration.
     static fn iterBegin(it: uintptr): str {
-        let mut obj = make(str, 0, 30)
-        obj += "_iter_begin_"
-        obj += conv::FmtUint(u64(it), 0xF)
-        ret obj
+        let mut obj = StrBuilder.New(30)
+        obj.WriteStr("_iter_begin_")
+        obj.WriteStr(conv::FmtUint(u64(it), 0xF))
+        ret obj.Str()
     }
 
     // Returns end label identifier of iteration.
     static fn iterEnd(it: uintptr): str {
-        let mut obj = make(str, 0, 30)
-        obj += "_iter_end_"
-        obj += conv::FmtUint(u64(it), 0xF)
-        ret obj
+        let mut obj = StrBuilder.New(30)
+        obj.WriteStr("_iter_end_")
+        obj.WriteStr(conv::FmtUint(u64(it), 0xF))
+        ret obj.Str()
     }
 
     // Returns next label identifier of iteration.
     static fn iterNext(it: uintptr): str {
-        let mut obj = make(str, 0, 30)
-        obj += "_iter_next_"
-        obj += conv::FmtUint(u64(it), 0xF)
-        ret obj
+        let mut obj = StrBuilder.New(30)
+        obj.WriteStr("_iter_next_")
+        obj.WriteStr(conv::FmtUint(u64(it), 0xF))
+        ret obj.Str()
     }
 
     // Returns label identifier.
     static fn label(u: uintptr): str {
-        let mut obj = make(str, 0, 30)
-        obj += "_julec_label_"
-        obj += conv::FmtUint(u64(u), 0xF)
-        ret obj
+        let mut obj = StrBuilder.New(30)
+        obj.WriteStr("_julec_label_")
+        obj.WriteStr(conv::FmtUint(u64(u), 0xF))
+        ret obj.Str()
     }
 
     // Returns end label identifier of match-case.
     static fn matchEnd(m: uintptr): str {
-        let mut obj = make(str, 0, 30)
-        obj += "_match_end_"
-        obj += conv::FmtUint(u64(m), 0xF)
-        ret obj
+        let mut obj = StrBuilder.New(30)
+        obj.WriteStr("_match_end_")
+        obj.WriteStr(conv::FmtUint(u64(m), 0xF))
+        ret obj.Str()
     }
 
     // Returns begin label identifier of case.
     static fn caseBegin(c: uintptr): str {
-        let mut obj = make(str, 0, 30)
-        obj += "_case_begin_"
-        obj += conv::FmtUint(u64(c), 0xF)
-        ret obj
+        let mut obj = StrBuilder.New(30)
+        obj.WriteStr("_case_begin_")
+        obj.WriteStr(conv::FmtUint(u64(c), 0xF))
+        ret obj.Str()
     }
 }

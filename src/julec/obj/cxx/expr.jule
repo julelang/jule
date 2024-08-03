@@ -8,11 +8,8 @@ use opt::{
     UnsafeIndexingExprModel,
     PushToSliceExprModel,
     AppendToSliceExprModel,
-    MutSlicingExprModel,
-    StrInsertBeginExprModel,
-    StrAppendExprModel,
-    StrCompExprModel,
     InlineStdInternalNosafeStobs,
+    StrCompExprModel,
 }
 use conv for std::conv
 use std::env::{Arch}
@@ -80,7 +77,7 @@ use types for std::jule::types::{
     MaxU64,
 }
 use math for std::math
-use strings for std::strings
+use strings for std::strings::{StrBuilder}
 use utf8 for std::unicode::utf8
 
 // Ignore expression for std::tie function.
@@ -97,11 +94,8 @@ enum compExprModel: type {
     str,                      // For built-in expressions.
     &UnsafeBinopExprModel,
     &UnsafeIndexingExprModel,
-    &MutSlicingExprModel,
-    &StrInsertBeginExprModel,
-    &StrAppendExprModel,
-    &StrCompExprModel,
     &InlineStdInternalNosafeStobs,
+    &StrCompExprModel,
 }
 
 struct exprCoder {
@@ -121,14 +115,12 @@ impl exprCoder {
             self.oc.write(typeCoder.Str + "()")
             ret
         }
-        let bytes = []byte(content)
-        let len = conv::FmtInt(i64(len(bytes)), 10)
-        let lit = cstrLit(bytes)
+        let len = conv::FmtInt(i64(len(content)), 10)
         self.oc.write(typeCoder.Str)
         self.oc.write("(")
-        self.oc.writeR(lit)
+        cstrLit(self.oc.Obj, content)
         self.oc.write(", ")
-        self.oc.writeR(len)
+        self.oc.write(len)
         self.oc.write(")")
     }
 
@@ -172,7 +164,7 @@ impl exprCoder {
         | x == MinF32:
             self.oc.write("jule::MIN_F32")
         |:
-            self.oc.write(ftoa(x, 1 << 5))
+            ftoa(self.oc.Obj, x, 1 << 5)
             self.oc.write("f")
         }
     }
@@ -191,7 +183,7 @@ impl exprCoder {
         | x == MinF64:
             self.oc.write("jule::MIN_F64")
         |:
-            self.oc.write(ftoa(x, 1 << 6))
+            ftoa(self.oc.Obj, x, 1 << 6)
         }
     }
 
@@ -209,9 +201,9 @@ impl exprCoder {
                 self.float64(c)
             }
         | c.IsI64():
-            self.oc.write(itoa(c.ReadI64()))
+            itoa(self.oc.Obj, c.ReadI64())
         | c.IsU64():
-            self.oc.write(utoa(c.ReadU64()))
+            utoa(self.oc.Obj, c.ReadU64())
         | c.IsNil():
             self.nilLit()
         |:
@@ -266,7 +258,7 @@ impl exprCoder {
         self.oc.write("(")
         self.possibleRefExpr(m.Left.Model)
         self.oc.write(" ")
-        self.oc.writeR(m.Op.Kind)
+        self.oc.write(m.Op.Kind)
         self.oc.write(" ")
         self.possibleRefExpr(m.Right.Model)
         self.oc.write(")")
@@ -317,7 +309,7 @@ impl exprCoder {
             ret
         }
         self.oc.write("(")
-        self.oc.writeR(m.Op.Kind)
+        self.oc.write(m.Op.Kind)
         self.oc.write("(")
         self.possibleRefExpr(m.Expr.Model)
         self.oc.write("))")
@@ -693,32 +685,33 @@ impl exprCoder {
     fn coFuncCall(mut &self, mut &m: &FnCallExprModel) {
         self.oc.write("{\n")
         self.oc.addIndent()
-        let mut head = "std::thread(["
+        let mut head = StrBuilder.New(1 << 5)
+        head.WriteStr("std::thread([")
         if m.Func.Owner != nil {
-            head += identCoder.Self
+            head.WriteStr(identCoder.Self)
             if len(m.Args) > 0 {
-                head += ", "
+                head.WriteStr(", ")
             }
         }
         for i, arg in m.Args {
             if i > 0 {
-                head += ", "
+                head.WriteStr(", ")
             }
             match type arg {
             | &Var:
                 let mut v = (&Var)(arg)
-                head += identCoder.var(v)
+                head.WriteStr(identCoder.var(v))
                 continue
             }
             let name = "_co_arg_" + conv::Itoa(i)
-            head += name
+            head.WriteStr(name)
             self.oc.indent()
             self.oc.write(self.oc.tc.kind(m.Func.Params[i].Kind))
             self.oc.write(" ")
             if m.Func.Params[i].Decl.Reference {
                 self.oc.write("&")
             }
-            self.oc.writeR(name)
+            self.oc.write(name)
             self.oc.write(" = ")
             self.possibleRefExpr(arg)
             self.oc.write(";\n")
@@ -726,7 +719,7 @@ impl exprCoder {
             m.Args[i] = unsafe { *(*ExprModel)(&argS) }
         }
         self.oc.indent()
-        self.oc.writeR(head)
+        self.oc.Obj.Write(unsafe{ head.Buf() })
         self.oc.write("](void) mutable -> void {\n")
         self.oc.addIndent()
         self.oc.indent()
@@ -960,7 +953,7 @@ impl exprCoder {
     }
 
     fn commonIdent(mut &self, m: &CommonIdentExprModel) {
-        self.oc.writeR(m.Ident)
+        self.oc.write(m.Ident)
     }
 
     fn commonSub(mut &self, mut m: &CommonSubIdentExprModel) {
@@ -979,7 +972,7 @@ impl exprCoder {
         |:
             self.oc.write(".")
         }
-        self.oc.writeR(m.Ident)
+        self.oc.write(m.Ident)
     }
 
     fn array(mut &self, mut m: &ArrayExprModel) {
@@ -1077,7 +1070,7 @@ impl exprCoder {
         self.oc.write("if (!(")
         self.possibleRefExpr(m.Expr)
         self.oc.write(")) jule::panic(jule::Str(")
-        self.oc.write(cstrLit([]byte(m.Log)))
+        cstrLit(self.oc.Obj, m.Log)
         self.oc.write(`) + jule::Str("\nlocation: `)
         self.oc.locInfo(m.Token)
         self.oc.write("\"));")
@@ -1283,15 +1276,18 @@ impl exprCoder {
         self.oc.write(")")
     }
 
-    fn runeLit(mut &self, m: &RuneExprModel): str {
-        if m.Code <= 127 { // ASCII
+    fn runeLit(mut &self, m: &RuneExprModel) {
+        if m.Code <= 127 { // ASCII.
+            self.oc.Obj.WriteByte('\'')
             let mut b = sbtoa(byte(m.Code))
             if b == "'" {
-                b = "\\'"
+                self.oc.Obj.WriteByte('\\')
             }
-            ret "'" + b + "'"
+            self.oc.Obj.WriteStr(b)
+            self.oc.Obj.WriteByte('\'')
+            ret
         }
-        ret itoa(i64(m.Code))
+        itoa(self.oc.Obj, i64(m.Code))
     }
 
     fn structureStatic(mut &self, mut m: &StructStaticIdentExprModel) {
@@ -1306,15 +1302,16 @@ impl exprCoder {
 
     fn backendEmit(mut &self, mut m: &BackendEmitExprModel) {
         if len(m.Exprs) == 0 {
-            self.oc.writeR(m.Code)
+            self.oc.write(m.Code)
             ret
         }
-        let n = len(self.oc.Obj)
+        let n = self.oc.Obj.Len()
         let mut args = make([]any, len(m.Exprs))
         for (i, mut expr) in m.Exprs {
             self.possibleRefExpr(expr)
-            args[i] = self.oc.Obj[n:]
-            self.oc.Obj = self.oc.Obj[:n]
+            let mut buf = unsafe { self.oc.Obj.Buf() }
+            args[i] = str(buf[n:])
+            unsafe { self.oc.Obj.SetBuf(buf[:n]) }
         }
         self.oc.write(fmt::Format(m.Code, args...))
     }
@@ -1328,41 +1325,16 @@ impl exprCoder {
         self.oc.write(".__free()")
     }
 
-    fn mutSlicing(mut &self, mut m: &MutSlicingExprModel) {
-        self.oc.write("(")
-        self.possibleRefExpr(m.Expr)
-        self.oc.write(").mut_slice(")
-        if !env::Production {
-            self.oc.write("\"")
-            self.oc.locInfo(m.Token)
-            self.oc.write("\", ")
-        }
-        self.possibleRefExpr(m.Left)
-        if m.Right != nil {
-            self.oc.write(", ")
-            self.possibleRefExpr(m.Right)
-        }
-        self.oc.write(");")
-    }
-
-    fn strInsertBegin(mut &self, mut m: &StrInsertBeginExprModel) {
-        self.oc.write("(")
-        self.possibleRefExpr(m.Dest)
-        self.oc.write(").buffer.insert(0, (")
-        self.possibleRefExpr(m.Expr)
-        self.oc.write("));")
-    }
-
     fn strComp(mut &self, mut m: &StrCompExprModel) {
         if m.NotEq {
             self.oc.write("(!")
         }
-        let bytes = []byte(m.Right.ReadStr())
+        let s = m.Right.ReadStr()
         self.possibleRefExpr(m.Left)
         self.oc.write(".equal(")
-        self.oc.write(cstrLit(bytes))
+        cstrLit(self.oc.Obj, s)
         self.oc.write(", ")
-        self.oc.write(conv::Itoa(len(bytes)))
+        self.oc.write(conv::Itoa(len(s)))
         self.oc.write(")")
         if m.NotEq {
             self.oc.write(")")
@@ -1457,7 +1429,7 @@ impl exprCoder {
         | &AlignofExprModel:
             self.alignof((&AlignofExprModel)(m))
         | &RuneExprModel:
-            self.oc.write(self.runeLit((&RuneExprModel)(m)))
+            self.runeLit((&RuneExprModel)(m))
         | &StructStaticIdentExprModel:
             self.structureStatic((&StructStaticIdentExprModel)(m))
         | &IntegratedToStrExprModel:
@@ -1466,10 +1438,6 @@ impl exprCoder {
             self.backendEmit((&BackendEmitExprModel)(m))
         | &FreeExprModel:
             self.free((&FreeExprModel)(m))
-        | &MutSlicingExprModel:
-            self.mutSlicing((&MutSlicingExprModel)(m))
-        | &StrInsertBeginExprModel:
-            self.strInsertBegin((&StrInsertBeginExprModel)(m))
         | &StrCompExprModel:
             self.strComp((&StrCompExprModel)(m))
         | &InlineStdInternalNosafeStobs:
@@ -1591,60 +1559,65 @@ fn sbtoa(b: byte): str {
     ret "\\" + seq
 }
 
-fn cstrBytes(bytes: []byte): str {
-    let mut lit = make(str, 0, len(bytes))
-    for _, b in bytes {
-        lit += sbtoa(b)
+fn cstrBytes(mut &s: StrBuilder, ctx: str) {
+    for _, b in ctx {
+        s.WriteStr(sbtoa(b))
     }
-    ret lit
 }
 
-fn cstrLit(bytes: []byte): str {
-    ret `"` + cstrBytes(bytes) + `"`
+fn cstrLit(mut &s: StrBuilder, ctx: str) {
+    s.WriteByte('"')
+    cstrBytes(s, ctx)
+    s.WriteByte('"')
 }
 
-fn ftoa(f: f64, bitsize: int): str {
+fn ftoa(mut &s: StrBuilder, f: f64, bitsize: int) {
     if bitsize != 32 {
         if f == f64(i64(f)) {
-            ret itoa(i64(f))
+            itoa(s, i64(f))
+            ret
         }
         if f == f64(u64(f)) {
-            ret utoa(u64(f))
+            utoa(s, u64(f))
+            ret
         }
     }
-    let mut m = conv::FmtFloat(f, 'f', -1, bitsize)
+    let m = conv::FmtFloat(f, 'f', -1, bitsize)
+    s.WriteStr(m)
     if !strings::Contains(m, ".") {
-        m += ".0"
+        s.WriteStr(".0")
     }
-    ret m
 }
 
-fn itoa(x: i64): str {
+fn itoa(mut &s: StrBuilder, x: i64) {
     match {
     | x == MaxI64:
-        ret "jule::MAX_I64"
+        s.WriteStr("jule::MAX_I64")
+        ret
     | x == MinI64:
-        ret "jule::MIN_I64"
+        s.WriteStr("jule::MIN_I64")
+        ret
     }
 
-    let fmt = conv::FmtInt(x, 10)
+    s.WriteStr(conv::FmtInt(x, 10))
     if Is64Bit(Arch) {
-        ret fmt + "LL"
+        s.WriteByte('L')
     }
-    ret fmt + "L"
+    s.WriteByte('L')
 }
 
-fn utoa(x: u64): str {
+fn utoa(mut &s: StrBuilder, x: u64) {
     match {
     | x == MaxU64:
-        ret "jule::MAX_U64"
+        s.WriteStr("jule::MAX_U64")
+        ret
     }
 
-    let fmt = conv::FmtUint(x, 10)
+    s.WriteStr(conv::FmtUint(x, 10))
     if Is64Bit(Arch) {
-        ret fmt + "LLU"
+        s.WriteByte('L')
     }
-    ret fmt + "LU"
+    s.WriteStr("LU")
 }
 
 fn isForwarded(&s: &Scope): bool {
@@ -1668,8 +1641,7 @@ fn isBuiltinCallHasDebuginf(&m: &FnCallExprModel): bool {
     }
     match type m.Expr {
     | &CommonSubIdentExprModel:
-        let csie = (&CommonSubIdentExprModel)(m.Expr)
-        ret csie.Ident == "swap"
+        ret (&CommonSubIdentExprModel)(m.Expr).Ident == "swap"
     |:
         ret false
     }

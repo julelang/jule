@@ -9,6 +9,7 @@
 #include <ostream>
 #include <string>
 #include <cstring>
+#include <vector>
 
 #include "impl_flag.hpp"
 #include "panic.hpp"
@@ -18,19 +19,17 @@
 #include "types.hpp"
 #include "error.hpp"
 #include "panic.hpp"
+#include "ptr.hpp"
 
 namespace jule
 {
-
     // Built-in str type.
     class Str;
 
-    // Libraries uses this function for UTF-8 encoded Jule strings.
+    // Libraries uses this function for UTf-8 encoded Jule strings.
     // Also it is builtin str type constructor.
     template <typename T>
     jule::Str to_str(const T &obj);
-    template <typename T>
-    jule::Str to_str(const T *ptr);
     inline jule::Str to_str(const jule::Str &s) noexcept;
     inline jule::Str to_str(const char *s) noexcept;
     inline jule::Str to_str(char *s) noexcept;
@@ -38,108 +37,151 @@ namespace jule
     class Str
     {
     public:
-        mutable std::basic_string<jule::U8> buffer;
+        using buffer_t = jule::Ptr<jule::U8>;
 
-        static jule::Str alloc(const jule::Int &len) noexcept
+        mutable jule::Str::buffer_t buffer;
+        mutable jule::U8 *_slice;
+        mutable jule::Int _len;
+
+        static jule::U8 *alloc(const jule::Int len) noexcept
         {
-            if (len < 0)
-                jule::panic("runtime: str: allocation length lower than zero");
-            jule::Str s;
-            s.buffer.reserve(len);
-            s.buffer.resize(len);
-            return s;
+            auto buf = new (std::nothrow) jule::U8[len + 1];
+            if (!buf)
+                jule::panic(__JULE_ERROR__MEMORY_ALLOCATION_FAILED
+                            "\nruntime: memory allocation failed for string");
+            std::memset(buf, 0, len + 1);
+            return buf;
         }
 
-        static jule::Str alloc(const jule::Int &len, const jule::Int &cap) noexcept
+        static jule::Str from_rune(const jule::I32 r) noexcept
         {
-            if (len < 0)
-                jule::panic("runtime: str: allocation length lower than zero");
-            if (cap < 0)
-                jule::panic("runtime: str: allocation capacity lower than zero");
-            if (len > cap)
-                jule::panic("runtime: str: allocation length greater than capacity");
             jule::Str s;
-            s.buffer.reserve(len);
-            s.buffer.resize(len);
+            s.buffer = jule::Str::buffer_t::make(jule::Str::alloc(4));
+            s._slice = s.buffer.alloc;
+            jule::utf8_push_rune_bytes(r, s);
             return s;
         }
 
-        static jule::Str from_rune(const jule::I32 r) noexcept {
+        static jule::Str from_byte(const jule::U8 b) noexcept
+        {
             jule::Str s;
-            jule::utf8_push_rune_bytes<std::basic_string<jule::U8>>(r, s.buffer);
+            s._len = 1;
+            s.buffer = jule::Str::buffer_t::make(jule::Str::alloc(s._len));
+            s._slice = s.buffer.alloc;
+            s._slice[0] = b;
             return s;
         }
 
-        static jule::Str from_byte(const jule::U8 b) noexcept {
-            jule::Str s;
-            s.buffer.push_back(b);
-            return s;
-        }
-
-        Str(void) = default;
+        Str(void) : _len(0) {};
         Str(const jule::Str &src) = default;
-        Str(const std::initializer_list<jule::U8> &src) : buffer(src) {}
-        Str(const std::basic_string<jule::U8> &src) : buffer(src) {}
-        Str(const char *src, const jule::Int &len) : buffer(src, src + len) {}
-        Str(const jule::U8 *src, const jule::Int &len) : buffer(src, src + len) {}
-        Str(const char *src) : buffer(src, src + std::strlen(src)) {}
-        Str(const std::string &src) : buffer(src.begin(), src.end()) {}
-        Str(const jule::Slice<U8> &src) : buffer(src.begin(), src.end()) {}
+        Str(const std::basic_string<jule::U8> &src) : Str(src.begin().base(), src.end().base()) {}
+        Str(const char *src, const jule::Int &len) : Str(reinterpret_cast<const jule::U8 *>(src), len) {}
+        Str(const jule::U8 *src, const jule::Int &len) : buffer(jule::Str::buffer_t::make(const_cast<jule::U8 *>(src), nullptr)),
+                                                         _slice(const_cast<jule::U8 *>(src)),
+                                                         _len(len) {}
+        Str(const jule::U8 *src) : Str(src, src + std::strlen(reinterpret_cast<const char *>(src))) {}
+        Str(const std::string &src) : Str(reinterpret_cast<const jule::U8 *>(src.begin().base()),
+                                          reinterpret_cast<const jule::U8 *>(src.end().base())) {}
+        Str(const jule::Slice<U8> &src) : Str(src.begin(), src.end()) {}
+        Str(const std::vector<U8> &src) : Str(src.begin().base(), src.end().base()) {}
 
-        Str(const jule::I32 &rune)
+        Str(const char *src) : Str(reinterpret_cast<const jule::U8 *>(src),
+                                   reinterpret_cast<const jule::U8 *>(src) + std::strlen(reinterpret_cast<const char *>(src))) {}
+
+        Str(const jule::U8 *begin, const jule::U8 *end)
         {
-            jule::utf8_push_rune_bytes<std::basic_string<jule::U8>>(rune, this->buffer);
+            this->_len = end - begin;
+            auto buf = jule::Str::alloc(this->_len);
+            this->buffer = jule::Str::buffer_t::make(buf);
+            this->_slice = buf;
+            std::copy(begin, end, this->_slice);
         }
 
         Str(const jule::Slice<jule::I32> &src)
         {
-            this->buffer.reserve(src.len() * 4);
+            this->_len = src.len() << 2;
+            this->buffer = jule::Str::buffer_t::make(jule::Str::alloc(this->_len));
+            this->_slice = this->buffer.alloc;
             for (const jule::I32 &r : src)
-                jule::utf8_push_rune_bytes<std::basic_string<jule::U8>>(r, this->buffer);
+                jule::utf8_push_rune_bytes(r, *this);
         }
 
         using Iterator = jule::U8 *;
         using ConstIterator = const jule::U8 *;
 
-        __JULE_INLINE_BEFORE_CPP20 __JULE_CONSTEXPR_SINCE_CPP20 Iterator begin(void) noexcept
+        constexpr Iterator begin(void) noexcept
         {
-            return const_cast<Iterator>(this->buffer.data());
+            return this->_slice;
         }
 
-        __JULE_INLINE_BEFORE_CPP20 __JULE_CONSTEXPR_SINCE_CPP20 ConstIterator begin(void) const noexcept
+        constexpr ConstIterator begin(void) const noexcept
         {
-            return static_cast<ConstIterator>(this->buffer.data());
+            return this->_slice;
         }
 
-        __JULE_INLINE_BEFORE_CPP20 __JULE_CONSTEXPR_SINCE_CPP20 Iterator end(void) noexcept
+        constexpr Iterator end(void) noexcept
         {
-            return this->begin() + this->len();
+            return this->_slice + this->_len;
         }
 
-        __JULE_INLINE_BEFORE_CPP20 __JULE_CONSTEXPR_SINCE_CPP20 ConstIterator end(void) const noexcept
+        constexpr ConstIterator end(void) const noexcept
         {
-            return this->begin() + this->len();
+            return this->_slice + this->_len;
         }
 
-        inline void append(const jule::I32 &r) noexcept
+        constexpr jule::Int len(void) const noexcept
         {
-            jule::utf8_push_rune_bytes<std::basic_string<jule::U8>>(r, this->buffer);
+            return this->_len;
         }
 
-        inline void append(const jule::Slice<jule::U8> &s) noexcept
+        constexpr jule::Bool empty(void) const noexcept
         {
-            this->buffer.append(s.begin(), s.end());
+            return this->_len == 0;
         }
 
-        inline void append(const jule::Slice<jule::I32> &s) noexcept
+        // Frees memory. Unsafe function, not includes any safety checking for
+        // heap allocations are valid or something like that.
+        void __free(void) noexcept
         {
-            for (const jule::I32 &r : s)
-                jule::utf8_push_rune_bytes<std::basic_string<jule::U8>>(r, this->buffer);
+            delete this->buffer.ref;
+            this->buffer.ref = nullptr;
+
+            delete[] this->buffer.alloc;
+            this->buffer.alloc = nullptr;
+            this->_slice = nullptr;
         }
 
-        inline void append(const char *s, const jule::Int n) noexcept
+        void dealloc(void) noexcept
         {
-            this->buffer.append(s, s + n);
+            this->_len = 0;
+#ifdef __JULE_DISABLE__REFERENCE_COUNTING
+            this->data.dealloc();
+#else
+            if (!this->buffer.ref)
+            {
+                this->buffer.alloc = nullptr;
+                return;
+            }
+
+            // Use jule::REFERENCE_DELTA, DON'T USE drop_ref METHOD BECAUSE
+            // jule_ref does automatically this.
+            // If not in this case:
+            //   if this is method called from destructor, reference count setted to
+            //   negative integer but reference count is unsigned, for this reason
+            //   allocation is not deallocated.
+            if (this->buffer.get_ref_n() != jule::REFERENCE_DELTA)
+            {
+                this->buffer.alloc = nullptr;
+                return;
+            }
+
+            this->__free();
+#endif // __JULE_DISABLE__REFERENCE_COUNTING
+        }
+
+        ~Str(void) noexcept
+        {
+            this->dealloc();
         }
 
         void mut_slice(
@@ -162,13 +204,8 @@ namespace jule
                 jule::panic(error);
             }
 #endif
-            if (start == end)
-            {
-                this->buffer.clear();
-                return;
-            }
-            this->buffer.erase(0, start);
-            this->buffer.erase(end - start);
+            this->_slice += start;
+            this->_len = end - start;
         }
 
         inline void mut_slice(
@@ -181,7 +218,7 @@ namespace jule
 #ifndef __JULE_ENABLE__PRODUCTION
                 file,
 #endif
-                start, this->len());
+                start, this->_len);
         }
 
         inline void mut_slice(
@@ -196,7 +233,7 @@ namespace jule
 #ifndef __JULE_ENABLE__PRODUCTION
                 file,
 #endif
-                0, this->len());
+                0, this->_len);
         }
 
         jule::Str slice(
@@ -207,10 +244,10 @@ namespace jule
             const jule::Int &end) const noexcept
         {
 #ifndef __JULE_DISABLE__SAFETY
-            if (start < 0 || end < 0 || start > end || end > this->len())
+            if (start < 0 || end < 0 || start > end || end > this->_len)
             {
                 std::string error;
-                __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(error, start, end, this->len(), "length");
+                __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(error, start, end, this->_len, "length");
                 error += "\nruntime: string slicing with out of range indexes";
 #ifndef __JULE_ENABLE__PRODUCTION
                 error += "\nfile:";
@@ -219,9 +256,30 @@ namespace jule
                 jule::panic(error);
             }
 #endif
+            jule::Str s;
             if (start == end)
-                return {};
-            return jule::Str(this->buffer.substr(start, end - start));
+                return s;
+            s._len = end - start;
+            if (end == this->_len)
+            {
+                s.buffer = this->buffer;
+                s._slice = this->_slice + start;
+            }
+            else
+            {
+                s.buffer = jule::Str::buffer_t::make(jule::Str::alloc(s._len));
+                s._slice = s.buffer.alloc;
+                std::copy(this->begin() + start, this->begin() + end, s._slice);
+            }
+            return s;
+        }
+
+        // Low-level access to buffer.
+        // No boundary checking, push byte to end of the buffer.
+        // It will increase length.
+        constexpr void push_back(const jule::U8 b) noexcept
+        {
+            this->_slice[this->_len++] = b;
         }
 
         inline jule::Str slice(
@@ -234,7 +292,7 @@ namespace jule
 #ifndef __JULE_ENABLE__PRODUCTION
                 file,
 #endif
-                start, this->len());
+                start, this->_len);
         }
 
         inline jule::Str slice(
@@ -249,22 +307,7 @@ namespace jule
 #ifndef __JULE_ENABLE__PRODUCTION
                 file,
 #endif
-                0, this->len());
-        }
-
-        __JULE_INLINE_BEFORE_CPP20 __JULE_CONSTEXPR_SINCE_CPP20 jule::Int len(void) const noexcept
-        {
-            return static_cast<jule::Int>(this->buffer.length());
-        }
-
-        __JULE_INLINE_BEFORE_CPP20 __JULE_CONSTEXPR_SINCE_CPP20 jule::Int cap(void) const noexcept
-        {
-            return static_cast<jule::Int>(this->buffer.capacity());
-        }
-
-        __JULE_INLINE_BEFORE_CPP20 __JULE_CONSTEXPR_SINCE_CPP20 jule::Bool empty(void) const noexcept
-        {
-            return this->buffer.empty();
+                0, this->_len);
         }
 
         jule::Slice<jule::U8> fake_slice(void) const
@@ -273,24 +316,71 @@ namespace jule
             slice.data.alloc = const_cast<Iterator>(this->begin());
             slice.data.ref = nullptr;
             slice._slice = slice.data.alloc;
-            slice._len = this->len();
-            slice._cap = this->cap();
+            slice._len = this->_len;
+            slice._cap = this->_len;
             return slice;
+        }
+
+        // Returns element by index.
+        // Not includes safety checking.
+        constexpr jule::U8 &__at(const jule::Int &index) noexcept
+        {
+            return this->_slice[index];
+        }
+
+        // Returns element by index.
+        // Includes safety checking.
+        inline jule::U8 &at(
+#ifndef __JULE_ENABLE__PRODUCTION
+            const char *file,
+#endif
+            const jule::Int &index) noexcept
+        {
+#ifndef __JULE_DISABLE__SAFETY
+            if (this->empty() || index < 0 || this->len() <= index)
+            {
+                std::string error;
+                __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(error, index, this->len());
+                error += "\nruntime: string indexing with out of range index";
+#ifndef __JULE_ENABLE__PRODUCTION
+                error += "\nfile: ";
+                error += file;
+#endif
+                jule::panic(error);
+            }
+#endif
+            return this->__at(index);
+        }
+
+        inline jule::Bool equal(const char *s, const jule::Int n) const noexcept
+        {
+            if (this->_len != n)
+                return false;
+            return std::strncmp(reinterpret_cast<const char *>(this->begin()), s, this->_len) == 0;
+        }
+
+        inline jule::U8 &operator[](const jule::Int &index) noexcept
+        {
+#ifndef __JULE_ENABLE__PRODUCTION
+            return this->at("/api/str.hpp", index);
+#else
+            return this->at(index);
+#endif
         }
 
         operator char *(void) const noexcept
         {
-            return const_cast<char *>(reinterpret_cast<const char *>(this->buffer.c_str()));
+            return reinterpret_cast<char *>(this->_slice);
         }
 
         operator const char *(void) const noexcept
         {
-            return reinterpret_cast<const char *>(this->buffer.c_str());
+            return reinterpret_cast<char *>(this->_slice);
         }
 
         inline operator const std::basic_string<jule::U8>(void) const
         {
-            return this->buffer;
+            return this->_slice;
         }
 
         inline operator const std::basic_string<char>(void) const
@@ -322,66 +412,43 @@ namespace jule
             return runes;
         }
 
-        // Returns element by index.
-        // Not includes safety checking.
-        __JULE_INLINE_BEFORE_CPP20 __JULE_CONSTEXPR_SINCE_CPP20 jule::U8 &__at(const jule::Int &index) noexcept
+        jule::Str &operator+=(const jule::Str &str)
         {
-            return this->buffer[index];
+            if (str._len == 0)
+                return *this;
+            auto buf = jule::Str::alloc(this->_len + str._len);
+            std::copy(this->begin(), this->end(), buf);
+            std::copy(str.begin(), str.end(), buf + this->_len);
+            this->buffer = jule::Str::buffer_t::make(buf);
+            this->_slice = buf;
+            this->_len += str._len;
+            return *this;
         }
 
-        // Returns element by index.
-        // Includes safety checking.
-        inline jule::U8 &at(
-#ifndef __JULE_ENABLE__PRODUCTION
-            const char *file,
-#endif
-            const jule::Int &index) noexcept
+        jule::Str operator+(const jule::Str &str) const
         {
-#ifndef __JULE_DISABLE__SAFETY
-            if (this->empty() || index < 0 || this->len() <= index)
-            {
-                std::string error;
-                __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(error, index, this->len());
-                error += "\nruntime: string indexing with out of range index";
-#ifndef __JULE_ENABLE__PRODUCTION
-                error += "\nfile: ";
-                error += file;
-#endif
-                jule::panic(error);
-            }
-#endif
-            return this->__at(index);
+            if (str._len == 0)
+                return *this;
+            jule::Str s;
+            s._len = this->_len + str._len;
+            auto buf = jule::Str::alloc(s._len);
+            s.buffer = jule::Str::buffer_t::make(buf);
+            s._slice = buf;
+            std::copy(this->begin(), this->end(), s._slice);
+            std::copy(str.begin(), str.end(), s._slice + this->_len);
+            return s;
         }
 
-        inline jule::U8 &operator[](const jule::Int &index) noexcept
+        jule::Bool operator==(const jule::Str &str) const noexcept
         {
-#ifndef __JULE_ENABLE__PRODUCTION
-            return this->at("/api/str.hpp", index);
-#else
-            return this->at(index);
-#endif
-        }
-
-        inline void operator+=(const jule::Str &str)
-        {
-            this->buffer += str.buffer;
-        }
-
-        inline jule::Str operator+(const jule::Str &str) const
-        {
-            return jule::Str(this->buffer + str.buffer);
-        }
-
-        inline jule::Bool equal(const char *s, const jule::Int n) const noexcept
-        {
-            if (this->len() != n)
+            if (this->_len != str._len)
                 return false;
-            return std::strcmp(reinterpret_cast<const char *>(this->buffer.c_str()), s) == 0;
-        }
-
-        inline jule::Bool operator==(const jule::Str &str) const noexcept
-        {
-            return this->buffer == str.buffer;
+            if (this->_len == 0)
+                return true;
+            return std::strncmp(
+                       reinterpret_cast<const char *>(this->begin()),
+                       reinterpret_cast<const char *>(str.begin()),
+                       this->_len) == 0;
         }
 
         inline jule::Bool operator!=(const jule::Str &str) const noexcept
@@ -400,7 +467,7 @@ namespace jule
             return thisr.len() < strr.len();
         }
 
-        jule::Bool operator<=(const jule::Str &str) const noexcept
+        inline jule::Bool operator<=(const jule::Str &str) const noexcept
         {
             return this->operator==(str) || this->operator<(str);
         }
@@ -416,7 +483,7 @@ namespace jule
             return thisr.len() > strr.len();
         }
 
-        jule::Bool operator>=(const jule::Str &str) const noexcept
+        inline jule::Bool operator>=(const jule::Str &str) const noexcept
         {
             return this->operator==(str) || this->operator>(str);
         }
@@ -438,14 +505,6 @@ namespace jule
         return jule::Str(stream.str());
     }
 
-    template <typename T>
-    jule::Str to_str(const T *ptr)
-    {
-        std::stringstream stream;
-        stream << ptr;
-        return jule::Str(stream.str());
-    }
-
     inline jule::Str to_str(const jule::Str &s) noexcept
     {
         return s;
@@ -453,19 +512,23 @@ namespace jule
 
     inline jule::Str to_str(const char *s) noexcept
     {
-        return jule::Str(s);
+        jule::Str s2;
+        s2._len = std::strlen(s);
+        auto buf = jule::Str::alloc(s2._len);
+        s2.buffer = jule::Str::buffer_t::make(buf);
+        s2._slice = s2.buffer.alloc;
+        return s2;
     }
 
     inline jule::Str to_str(char *s) noexcept
     {
-        return jule::Str(s);
+        return jule::to_str(const_cast<const char *>(s));
     }
 
     inline jule::Str ptr_to_str(const void *alloc)
     {
         return jule::to_str(alloc);
     }
-
 } // namespace jule
 
 #endif // #ifndef __JULE_STR_HPP

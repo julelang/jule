@@ -5,6 +5,7 @@
 use conv for std::conv
 use integrated for std::jule::integrated
 use utf8 for std::unicode::utf8
+use std::strings::{StrBuilder}
 use nosafe for std::internal::nosafe
 
 fn findFormatPrefix(&bytes: []byte, &start: int): int {
@@ -44,46 +45,46 @@ fn getFormatRange(mut &i: int, mut &bytes: []byte): []byte {
 }
 
 // Formats arg by default format and appends to buf.
-fn FmtByDefault(mut &buf: str, &arg: any) {
+fn FmtByDefault(mut &buf: StrBuilder, &arg: any) {
     if arg == nil {
-        buf += "<nil>"
+        buf.WriteStr("<nil>")
         ret
     }
     match type arg {
     | f32:
-        buf += conv::FmtFloat(f64(f32(arg)), 'g', -1, 32)
+        buf.WriteStr(conv::FmtFloat(f64(f32(arg)), 'g', -1, 32))
     | f64:
-        buf += conv::FmtFloat(f64(arg), 'g', -1, 64)
+        buf.WriteStr(conv::FmtFloat(f64(arg), 'g', -1, 64))
     | i8:
-        buf += conv::FmtInt(i8(arg), 10)
+        buf.WriteStr(conv::FmtInt(i8(arg), 10))
     | i16:
-        buf += conv::FmtInt(i16(arg), 10)
+        buf.WriteStr(conv::FmtInt(i16(arg), 10))
     | i32:
-        buf += conv::FmtInt(i32(arg), 10)
+        buf.WriteStr(conv::FmtInt(i32(arg), 10))
     | i64:
-        buf += conv::FmtInt(i64(arg), 10)
+        buf.WriteStr(conv::FmtInt(i64(arg), 10))
     | u8:
-        buf += conv::FmtUint(u8(arg), 10)
+        buf.WriteStr(conv::FmtUint(u8(arg), 10))
     | u16:
-        buf += conv::FmtUint(u16(arg), 10)
+        buf.WriteStr(conv::FmtUint(u16(arg), 10))
     | u32:
-        buf += conv::FmtUint(u32(arg), 10)
+        buf.WriteStr(conv::FmtUint(u32(arg), 10))
     | u64:
-        buf += conv::FmtUint(u64(arg), 10)
+        buf.WriteStr(conv::FmtUint(u64(arg), 10))
     | str:
-        buf += str(arg)
+        buf.WriteStr(str(arg))
     | bool:
         if bool(arg) {
-            buf += "true"
+            buf.WriteStr("true")
         } else {
-            buf += "false"
+            buf.WriteStr("false")
         }
     |:
-        buf += integrated::ToStr(arg)
+        buf.WriteStr(integrated::ToStr(arg))
     }
 }
 
-fn applyFmtByDefault(mut &buf: str, mut &j: int, args: ...any) {
+fn applyFmtByDefault(mut &buf: StrBuilder, mut &j: int, args: ...any) {
     let arg = args[j]
     j++
     FmtByDefault(buf, arg)
@@ -91,7 +92,7 @@ fn applyFmtByDefault(mut &buf: str, mut &j: int, args: ...any) {
 
 // Returns result of formatting.
 // Parameter j is the position of argument list.
-fn applyFmt(mut &fmt: []byte, mut &buf: str, mut &j: int, args: ...any) {
+fn applyFmt(mut &fmt: []byte, mut &buf: StrBuilder, mut &j: int, args: ...any) {
     // {}
     if len(fmt) == 2 {
         applyFmtByDefault(buf, j, args...)
@@ -103,10 +104,10 @@ fn applyFmt(mut &fmt: []byte, mut &buf: str, mut &j: int, args: ...any) {
         fmt[1] == '{' &&
         fmt[2] == '}' &&
         fmt[3] == '}' {
-        buf += "{}"
+        buf.WriteStr("{}")
         ret
     }
-    nosafe::PushToStrBuffer(buf, fmt)
+    buf.Write(fmt)
 }
 
 // See the [std::fmt::Format] function.
@@ -115,19 +116,19 @@ fn Format(&fmt: str, args: ...any): str {
         ret fmt
     }
     let mut fmtBytes = nosafe::Stobs(fmt)
-    let mut buf = make(str, 0, len(fmt))
+    let mut buf = StrBuilder.New(len(fmt))
     let mut j = 0
     let mut last = 0
     let mut i = findFormatPrefix(fmtBytes, last)
     for i != -1; i = findFormatPrefix(fmtBytes, i) {
-        nosafe::PushToStrBuffer(buf, fmtBytes[last:i])
+        buf.Write(fmtBytes[last:i])
         let mut format = getFormatRange(i, fmtBytes)
         if format == nil {
             continue
         }
         applyFmt(format, buf, j, args...)
         if j >= len(args) {
-            nosafe::PushToStrBuffer(buf, fmtBytes[i:])
+            buf.Write(fmtBytes[i:])
             last = len(fmtBytes)
             break
         }
@@ -135,7 +136,7 @@ fn Format(&fmt: str, args: ...any): str {
         last = i
     }
     if last < len(fmtBytes) {
-        nosafe::PushToStrBuffer(buf, fmtBytes[last:])
+        buf.Write(fmtBytes[last:])
     }
-    ret buf
+    ret buf.Str()
 }

@@ -17,11 +17,11 @@ fn Repeat(s: str, mut n: int): str {
         panic("std::strings: repeat: integer buffer size overflow")
     }
 
-    let mut ss = make(str, 0, len(s) * n)
+    let mut ss = StrBuilder.New(len(s) * n)
     for n > 0; n-- {
-        ss += s
+        ss.WriteStr(s)
     }
-    ret ss
+    ret ss.Str()
 }
 
 fn hasPrefix(&s: str, &sub: str, mut start: int): bool {
@@ -342,26 +342,26 @@ fn Replace(s: str, sub: str, new: str, mut n: int): str {
         n = m
     }
 
-    let mut ss = make(str, 0, len(s) + n * (len(new) - len(sub)))
+    let mut ss = StrBuilder.New(len(s) + n * (len(new) - len(sub)))
     let mut i = 0
     for n > 0; n-- {
         let j = FindAt(s, sub, i)
         if j == -1 {
             break
         }
-        ss += s[i:j]
-        ss += new
+        ss.WriteStr(s[i:j])
+        ss.WriteStr(new)
         i = j + len(sub)
     }
-    ss += s[i:]
-    ret ss
+    ss.WriteStr(s[i:])
+    ret ss.Str()
 }
 
 // Returns a copy of the string s with all its characters modified
 // according to the mapping function. If mapping returns a negative value,
 // the character is dropped from the string with no replacement.
 fn Map(s: str, mapping: fn(mut rune): rune): str {
-    let mut ss = make(str, 0, len(s))
+    let mut ss = StrBuilder.New(len(s))
     let mut bytes = nosafe::Stobs(s)
     let mut i = 0
     for i < len(bytes) {
@@ -369,10 +369,10 @@ fn Map(s: str, mapping: fn(mut rune): rune): str {
         i += n
         r = mapping(r)
         if r >= 0 {
-            ss += str(r)
+            ss.WriteRune(r)
         }
     }
-    ret ss
+    ret ss.Str()
 }
 
 // Returns s with all Unicode letters mapped to their lower case.
@@ -448,12 +448,18 @@ fn Join(parts: []str, sep: str): str {
     | 1:
         ret parts[0]
     }
-    let mut s = parts[0]
-    for _, part in parts[1:] {
-        s += sep
-        s += part
+    let mut n = 0
+    for _, part in parts {
+        n += len(part)
+        n++
     }
-    ret s
+    let mut s = StrBuilder.New(n)
+    s.WriteStr(parts[0])
+    for _, part in parts[1:] {
+        s.WriteStr(sep)
+        s.WriteStr(part)
+    }
+    ret s.Str()
 }
 
 // Cut slices s around the first instance of sep,

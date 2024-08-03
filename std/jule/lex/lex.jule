@@ -3,6 +3,7 @@
 // license that can be found in the LICENSE file.
 
 use std::jule::build::{Logf, LogMsg, Log, LogKind}
+use std::strings::{StrBuilder}
 use utf8 for std::unicode::utf8
 
 // Lexer mode.
@@ -625,7 +626,8 @@ impl lex {
     }
 
     fn lexRune(mut self, &txt: []byte): str {
-        let mut run = "'"
+        let mut run = StrBuilder.New(1 << 3)
+        run.WriteByte('\'')
         self.column++
         let mut n = 0
         let mut i = 1
@@ -642,7 +644,7 @@ impl lex {
 
             let part = txt[i:]
             let r = self.getRune(part, false)
-            run += r
+            run.WriteStr(r)
             self.column += utf8::RuneCountStr(r)
             if r == "'" {
                 self.pos++
@@ -660,15 +662,15 @@ impl lex {
             self.pushErr(LogMsg.RuneOverflow)
         }
 
-        ret run
+        ret run.Str()
     }
 
     fn lexStr(mut self): str {
-        let mut s = ""
+        let mut s = StrBuilder.New(1 << 4)
         let mark = self.file.Data[self.pos]
         self.pos++ // Skip mark
         let raw = mark == '`'
-        s += str(mark)
+        s.WriteByte(mark)
         self.column++
 
         for self.pos < len(self.file.Data) {
@@ -686,14 +688,14 @@ impl lex {
             }
             let mut part = self.file.Data[self.pos:]
             let r = self.getRune(part, raw)
-            s += r
+            s.WriteStr(r)
             self.column += utf8::RuneCountStr(r)
             if ch == mark {
                 break
             }
         }
 
-        ret s
+        ret s.Str()
     }
 
     fn isFirstTokenOfLine(self): bool {

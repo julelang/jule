@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use env
 use opt::{
     self,
     PushToSliceExprModel,
     AppendToSliceExprModel,
     MutSlicingExprModel,
-    StrInsertBeginExprModel,
-    StrAppendExprModel,
 }
 use conv for std::conv
 use lex for std::jule::lex::{TokenKind}
@@ -51,11 +50,9 @@ static assignArgName = "__jule_assign_arg"
 // Common group of semantic analysis stmt types and optimizer specific types.
 enum compStmt: type {
     Stmt: Stmt,
-    &StrInsertBeginExprModel,
-    &MutSlicingExprModel,
     &PushToSliceExprModel,
     &AppendToSliceExprModel,
-    &StrAppendExprModel,
+    &MutSlicingExprModel,
 }
 
 struct scopeCoder {
@@ -111,7 +108,7 @@ impl scopeCoder {
         }
         self.oc.write("end();\n")
         self.oc.indent()
-        self.oc.writeR(begin)
+        self.oc.write(begin)
         self.oc.write(":;\n")
         self.oc.indent()
         self.oc.write("if (it != expr_end) {\n")
@@ -153,7 +150,7 @@ impl scopeCoder {
         self.scope(it.Scope)
         self.oc.write("\n")
         self.oc.indent()
-        self.oc.writeR(next)
+        self.oc.write(next)
         self.oc.write(":;\n")
         self.oc.indent()
         self.oc.write("++it;\n")
@@ -164,7 +161,7 @@ impl scopeCoder {
             self.oc.indent()
         }
         self.oc.write("goto ")
-        self.oc.writeR(begin)
+        self.oc.write(begin)
         self.oc.write(";\n")
 
         // Close if.
@@ -201,13 +198,13 @@ impl scopeCoder {
         self.scope(it.Scope)
         self.oc.write("\n")
         self.oc.indent()
-        self.oc.writeR(next)
+        self.oc.write(next)
         self.oc.write(":;\n")
         self.oc.indent()
         self.oc.write("++it;\n")
         self.oc.indent()
         self.oc.write("goto ")
-        self.oc.writeR(begin)
+        self.oc.write(begin)
         self.oc.write(";\n")
 
         // Close if.
@@ -336,12 +333,12 @@ impl scopeCoder {
         self.oc.write("(")
         self.oc.ec.possibleRefExpr(p.Expr)
         self.oc.write(")")
-        self.oc.writeR(p.Op)
+        self.oc.write(p.Op)
     }
 
     fn assign(mut &self, mut a: &Assign) {
         self.oc.ec.possibleRefExpr(a.L.Model)
-        self.oc.writeR(a.Op.Kind)
+        self.oc.write(a.Op.Kind)
         self.oc.ec.possibleRefExpr(a.R.Model)
     }
 
@@ -669,21 +666,21 @@ impl scopeCoder {
         }
     }
 
-    fn strAppend(mut &self, mut m: &StrAppendExprModel) {
+    fn mutSlicing(mut &self, mut m: &MutSlicingExprModel) {
         self.oc.write("(")
-        self.oc.ec.possibleRefExpr(m.Str)
-        self.oc.write(").append(")
-        match type m.Expr {
-        | &Const:
-            let c = (&Const)(m.Expr)
-            let bytes = []byte(c.ReadStr())
-            self.oc.write(cstrLit(bytes))
-            self.oc.write(", ")
-            self.oc.write(conv::FmtInt(i64(len(bytes)), 10))
-        |:
-            self.oc.ec.possibleRefExpr(m.Expr)
+        self.oc.ec.possibleRefExpr(m.Expr)
+        self.oc.write(").mut_slice(")
+        if !env::Production {
+            self.oc.write("\"")
+            self.oc.locInfo(m.Token)
+            self.oc.write("\", ")
         }
-        self.oc.write(")")
+        self.oc.ec.possibleRefExpr(m.Left)
+        if m.Right != nil {
+            self.oc.write(", ")
+            self.oc.ec.possibleRefExpr(m.Right)
+        }
+        self.oc.write(");")
     }
 
     // Generates C++ code of statement.
@@ -731,11 +728,7 @@ impl scopeCoder {
         | &AppendToSliceExprModel:
             self.oc.ec.appendToSlice((&AppendToSliceExprModel)(st))
         | &MutSlicingExprModel:
-            self.oc.ec.mutSlicing((&MutSlicingExprModel)(st))
-        | &StrInsertBeginExprModel:
-            self.oc.ec.strInsertBegin((&StrInsertBeginExprModel)(st))
-        | &StrAppendExprModel:
-            self.strAppend((&StrAppendExprModel)(st))
+            self.mutSlicing((&MutSlicingExprModel)(st))
         |:
             self.oc.write("<unimplemented_stmt>")
         }

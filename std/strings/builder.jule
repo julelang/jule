@@ -1,0 +1,78 @@
+// Copyright 2023-2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use utf8 for std::unicode::utf8
+use nosafe for std::internal::nosafe
+
+// String builder for efficient concatenation.
+struct StrBuilder {
+    buf: []byte
+}
+
+impl StrBuilder {
+    // Returns new string builder with capacity.
+    static fn New(cap: int): StrBuilder {
+        if cap < 0 {
+            panic("std::strings: StrBuilder.New: cap < 0")
+        }
+        ret StrBuilder{
+            buf: make([]byte, 0, cap)
+        }
+    }
+
+    // Writes bytes to buffer.
+    fn Write(mut self, b: []byte) {
+        self.buf = append(self.buf, b...)
+    }
+
+    // Writes bytes to buffer.
+    fn WriteStr(mut self, s: str) {
+        self.buf = append(self.buf, nosafe::Stobs(s)...)
+    }
+
+    // Writes byte to buffer.
+    fn WriteByte(mut self, b: byte) {
+        self.buf = append(self.buf, b)
+    }
+
+    // Writes rune into buffer.
+    fn WriteRune(mut self, r: rune) {
+        if r < utf8::RuneSelf { // ASCII, fast way.
+            self.buf = append(self.buf, byte(r))
+            ret
+        }
+        self.WriteStr(str(r))
+    }
+
+    // Returns as string.
+    fn Str(self): str {
+        ret str(self.buf)
+    }
+
+    // Clears buffer.
+    // Capacity will not be changed.
+    fn Clear(mut self) {
+        self.buf = self.buf[:0]
+    }
+
+    // Returns length of buffer.
+    fn Len(self): int {
+        ret len(self.buf)
+    }
+
+    // Returns capacity of buffer.
+    fn Cap(self): int {
+        ret cap(self.buf)
+    }
+
+    // Returns mutable buffer for low-level interactions.
+    unsafe fn Buf(mut self): []byte {
+        ret self.buf
+    }
+
+    // Sets mutable internal buffer for low-level interactions.
+    unsafe fn SetBuf(mut self, mut buf: []byte) {
+        self.buf = buf
+    }
+}
