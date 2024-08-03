@@ -626,9 +626,11 @@ impl exprCoder {
                 let mut ssie = (&StructSubIdentExprModel)(m.Expr)
                 match {
                 | m.Func.Decl.Params[0].IsRef():
-                    self.possibleRefExpr(ssie.Expr.Model)
+                    // Ignore dereferencing, use data directly to call method.
+                    self.possibleRefExpr((&UnaryExprModel)(ssie.Expr.Model).Expr.Model)
                 | ssie.Expr.Kind.Sptr() != nil:
-                    self.possibleRefExpr(ssie.Expr.Model)
+                    // Ignore dereferencing, use data directly to call [ptr] method.
+                    self.possibleRefExpr((&UnaryExprModel)(ssie.Expr.Model).Expr.Model)
                     self.oc.write(".ptr(")
                     if !env::Production {
                         self.oc.write("\"")
@@ -652,8 +654,11 @@ impl exprCoder {
                     }
                     if wrapped {
                         self.oc.write("_wrap_copy")
-                    } else {
+                    } else if ssie.Expr.Kind.Ptr() == nil {
                         self.model(ssie.Expr.Model)
+                    } else {
+                        // Ignore dereferencing, use data directly to call method.
+                        self.possibleRefExpr((&UnaryExprModel)(ssie.Expr.Model).Expr.Model)
                     }
                 }
                 if len(m.Args) > 0 {
@@ -936,19 +941,7 @@ impl exprCoder {
         if m.Field == nil {
             ret
         }
-        if m.Expr.Kind.Ptr() != nil {
-            self.oc.write("->")
-        } else if m.Expr.Kind.Sptr() != nil {
-            self.oc.write(".get(")
-            if !env::Production {
-                self.oc.write("\"")
-                self.oc.locInfo(m.Token)
-                self.oc.write("\"")
-            }
-            self.oc.write(").")
-        } else {
-            self.oc.write(".")
-        }
+        self.oc.write(".")
         self.oc.write(identCoder.field(m.Field.Decl))
     }
 
@@ -958,20 +951,7 @@ impl exprCoder {
 
     fn commonSub(mut &self, mut m: &CommonSubIdentExprModel) {
         self.possibleRefExpr(m.Expr)
-        match {
-        | m.ExprKind.Ptr() != nil:
-            self.oc.write("->")
-        | m.ExprKind.Sptr() != nil:
-            self.oc.write(".get(")
-            if !env::Production {
-                self.oc.write("\"")
-                self.oc.locInfo(m.Token)
-                self.oc.write("\"")
-            }
-            self.oc.write(").")
-        |:
-            self.oc.write(".")
-        }
+        self.oc.write(".")
         self.oc.write(m.Ident)
     }
 

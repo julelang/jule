@@ -2325,7 +2325,7 @@ impl Eval {
         ret d
     }
 
-    fn evalSliceSubIdent(mut self, mut d: &Data, mut ident: &Token): &Data {
+    fn evalSliceSubIdent(mut self, mut &d: &Data, mut &kind: &TypeKind, mut ident: &Token): &Data {
         match ident.Kind {
         | "swap":
             ret &Data{
@@ -2351,7 +2351,7 @@ impl Eval {
                 },
                 Model: &CommonSubIdentExprModel{
                     Token: ident,
-                    ExprKind: d.Kind,
+                    ExprKind: kind,
                     Expr: d.Model,
                     Ident: "swap",
                 },
@@ -2362,7 +2362,7 @@ impl Eval {
         }
     }
 
-    fn evalArraySubIdent(mut self, mut d: &Data, mut ident: &Token): &Data {
+    fn evalArraySubIdent(mut self, mut &d: &Data, mut &kind: &TypeKind, mut ident: &Token): &Data {
         match ident.Kind {
         | "swap":
             ret &Data{
@@ -2388,7 +2388,7 @@ impl Eval {
                 },
                 Model: &CommonSubIdentExprModel{
                     Token: ident,
-                    ExprKind: d.Kind,
+                    ExprKind: kind,
                     Expr: d.Model,
                     Ident: "swap",
                 },
@@ -2749,34 +2749,45 @@ impl Eval {
         ret cd
     }
 
+    fn tryComptimeObjSubIdent(mut self, mut &d: &Data, mut si: &SubIdentExpr): (&Data, bool) {
+        match {
+        | d.Kind.comptimeTypeInfo() != nil:
+            let mut ct = d.Kind.comptimeTypeInfo()
+            ret self.comptimeObjSubIdent(ct, d, si), true
+        | d.Kind.comptimeStructField() != nil:
+            let mut ct = d.Kind.comptimeStructField()
+            ret self.comptimeObjSubIdent(ct, d, si), true
+        | d.Kind.comptimeEnumField() != nil:
+            let mut ct = d.Kind.comptimeEnumField()
+            ret self.comptimeObjSubIdent(ct, d, si), true
+        | d.Kind.comptimeParam() != nil:
+            let mut ct = d.Kind.comptimeParam()
+            ret self.comptimeObjSubIdent(ct, d, si), true
+        | d.Kind.comptimeStatic() != nil:
+            let mut ct = d.Kind.comptimeStatic()
+            ret self.comptimeObjSubIdent(ct, d, si), true
+        | d.Kind.comptimeValue() != nil:
+            let mut ct = d.Kind.comptimeValue()
+            ret self.comptimeObjSubIdent(ct, d, si), true
+        | d.Kind.comptimeFile() != nil:
+            let mut ct = d.Kind.comptimeFile()
+            ret self.comptimeObjSubIdent(ct, d, si), true
+        |:
+            ret nil, false
+        }
+    }
+
     fn evalObjSubIdent(mut self, mut d: &Data, mut si: &SubIdentExpr): &Data {
         if IsIgnoreIdent(si.Ident.Kind) {
             self.pushErr(si.Ident, LogMsg.InvalidSyntax)
             ret nil
         }
 
-        match {
-        | d.Kind.comptimeTypeInfo() != nil:
-            let mut ct = d.Kind.comptimeTypeInfo()
-            ret self.comptimeObjSubIdent(ct, d, si)
-        | d.Kind.comptimeStructField() != nil:
-            let mut ct = d.Kind.comptimeStructField()
-            ret self.comptimeObjSubIdent(ct, d, si)
-        | d.Kind.comptimeEnumField() != nil:
-            let mut ct = d.Kind.comptimeEnumField()
-            ret self.comptimeObjSubIdent(ct, d, si)
-        | d.Kind.comptimeParam() != nil:
-            let mut ct = d.Kind.comptimeParam()
-            ret self.comptimeObjSubIdent(ct, d, si)
-        | d.Kind.comptimeStatic() != nil:
-            let mut ct = d.Kind.comptimeStatic()
-            ret self.comptimeObjSubIdent(ct, d, si)
-        | d.Kind.comptimeValue() != nil:
-            let mut ct = d.Kind.comptimeValue()
-            ret self.comptimeObjSubIdent(ct, d, si)
-        | d.Kind.comptimeFile() != nil:
-            let mut ct = d.Kind.comptimeFile()
-            ret self.comptimeObjSubIdent(ct, d, si)
+        {
+            let (mut compData, ok) = self.tryComptimeObjSubIdent(d, si)
+            if ok {
+                ret compData
+            }
         }
 
         let mut kind = d.Kind
@@ -2790,8 +2801,10 @@ impl Eval {
                 self.pushErr(si.Ident, LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
             }
             kind = d.Kind.Ptr().Elem
+            makeImplicitDeref(d, si.Ident)
         | d.Kind.Sptr() != nil:
             kind = d.Kind.Sptr().Elem
+            makeImplicitDeref(d, si.Ident)
         }
 
         match {
@@ -2804,9 +2817,9 @@ impl Eval {
                 ret self.evalStructSubIdent(d, kind.Struct(), si, usedReferenceElem)
             }
         | kind.Slc() != nil:
-            ret self.evalSliceSubIdent(d, si.Ident)
+            ret self.evalSliceSubIdent(d, kind, si.Ident)
         | kind.Arr() != nil:
-            ret self.evalArraySubIdent(d, si.Ident)
+            ret self.evalArraySubIdent(d, kind, si.Ident)
         }
         self.pushErr(si.Ident, LogMsg.ObjNotSupportSubFields, d.Kind.Str())
         ret nil
@@ -4556,4 +4569,14 @@ fn isLitBased(mut &m: ExprModel): &StructLitExprModel {
     |:
         ret nil
     }
+}
+
+fn makeImplicitDeref(mut &d: &Data, mut baseToken: &Token) {
+    let mut unary = &UnaryExprModel{
+        Expr: new(Data, *d),
+        Op: new(Token, *baseToken),
+    }
+    unary.Op.Id = TokenId.Star
+    unary.Op.Kind = TokenKind.Star
+    d.Model = unary
 }
