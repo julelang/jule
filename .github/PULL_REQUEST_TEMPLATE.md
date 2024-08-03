@@ -1,8 +1,8 @@
 <!--
-    Thank you for contributing to our project, JuleLang!
+    Thank you for contributing to Jule project!
     Be sure to follow our Code of Conduct and contributing guidelines, and fill in the details below.
 
-    Contributing guidelines: https://github.com/julelang/jule/blob/master/CONTRIBUTING.md
+    Contributing guidelines: https://jule.dev/contribute
 -->
 
 ### Description
