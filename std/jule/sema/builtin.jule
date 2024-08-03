@@ -495,6 +495,9 @@ fn builtinCallerMake(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data 
         }
         e.pushErr(fc.Token, LogMsg.MissingExprFor, "type, size")
         ret nil
+    } else if len(fc.Args) > 3 {
+        e.pushErr(fc.Args[3].Token, LogMsg.ArgumentOverflow, "make")
+        ret nil
     }
 
     let mut t = e.evalExprKind(fc.Args[0].Kind)
@@ -505,9 +508,8 @@ fn builtinCallerMake(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data 
     if !t.Decl {
         e.pushErr(fc.Args[0].Token, LogMsg.InvalidType)
         ret nil
-    }
-    if len(fc.Args) > 3 {
-        e.pushErr(fc.Args[3].Token, LogMsg.ArgumentOverflow, "make")
+    } else if t.Kind.Slc() == nil {
+        e.pushErr(fc.Args[0].Token, LogMsg.InvalidTypeForFn, t.Kind.Str(), "make")
         ret nil
     }
 
