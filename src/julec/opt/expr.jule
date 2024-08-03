@@ -181,12 +181,25 @@ impl exprOptimizer {
 
     fn unary(self, mut m: &UnaryExprModel) {
         exprOptimizer.optimize(m.Expr.Model)
-        if Ptr && m.Op.Id == TokenId.Star {
+        if !Ptr {
+            ret
+        }
+        match m.Op.Id {
+        | TokenId.Star:
             match type m.Expr.Model {
             | &UnaryExprModel:
                 let mut um = (&UnaryExprModel)(m.Expr.Model)
                 if um.Op.Id == TokenId.Amper {
                     *self.model = um.Expr.Model
+                }
+            }
+        | TokenId.Amper:
+            match type m.Expr.Model {
+            | &Var:
+                let mut v = (&Var)(m.Expr.Model)
+                if v.Reference {
+                    let mut model = any(&RefExprModel{Var: v})
+                    *self.model = unsafe{ *(*ExprModel)(&model) }
                 }
             }
         }
