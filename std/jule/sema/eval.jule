@@ -2325,80 +2325,6 @@ impl Eval {
         ret d
     }
 
-    fn evalSliceSubIdent(mut self, mut &d: &Data, mut &kind: &TypeKind, mut ident: &Token): &Data {
-        match ident.Kind {
-        | "swap":
-            ret &Data{
-                Mutable: d.Mutable,
-                Kind: &TypeKind{
-                    Kind: &FnIns{
-                        caller: builtinCallerCommonMut,
-                        Params: [
-                            &ParamIns{
-                                Decl: &Param{
-                                    Ident: "i",
-                                },
-                                Kind: lenKind(),
-                            },
-                            &ParamIns{
-                                Decl: &Param{
-                                    Ident: "j",
-                                },
-                                Kind: lenKind(),
-                            },
-                        ],
-                    },
-                },
-                Model: &CommonSubIdentExprModel{
-                    Token: ident,
-                    ExprKind: kind,
-                    Expr: d.Model,
-                    Ident: "swap",
-                },
-            }
-        |:
-            self.pushErr(ident, LogMsg.ObjHaveNotIdent, d.Kind.Str(), ident.Kind)
-            ret nil
-        }
-    }
-
-    fn evalArraySubIdent(mut self, mut &d: &Data, mut &kind: &TypeKind, mut ident: &Token): &Data {
-        match ident.Kind {
-        | "swap":
-            ret &Data{
-                Mutable: d.Mutable,
-                Kind: &TypeKind{
-                    Kind: &FnIns{
-                        caller: builtinCallerCommonMut,
-                        Params: [
-                            &ParamIns{
-                                Decl: &Param{
-                                    Ident: "i",
-                                },
-                                Kind: lenKind(),
-                            },
-                            &ParamIns{
-                                Decl: &Param{
-                                    Ident: "j",
-                                },
-                                Kind: lenKind(),
-                            },
-                        ],
-                    },
-                },
-                Model: &CommonSubIdentExprModel{
-                    Token: ident,
-                    ExprKind: kind,
-                    Expr: d.Model,
-                    Ident: "swap",
-                },
-            }
-        |:
-            self.pushErr(ident, LogMsg.ObjHaveNotIdent, d.Kind.Str(), ident.Kind)
-            ret nil
-        }
-    }
-
     fn evalIntTypeStatic(mut self, ident: &Token): &Data {
         const kind: str = PrimKind.Int
         match ident.Kind {
@@ -2816,10 +2742,6 @@ impl Eval {
                 let mut usedReferenceElem = d.Kind.Sptr() != nil
                 ret self.evalStructSubIdent(d, kind.Struct(), si, usedReferenceElem)
             }
-        | kind.Slc() != nil:
-            ret self.evalSliceSubIdent(d, kind, si.Ident)
-        | kind.Arr() != nil:
-            ret self.evalArraySubIdent(d, kind, si.Ident)
         }
         self.pushErr(si.Ident, LogMsg.ObjNotSupportSubFields, d.Kind.Str())
         ret nil

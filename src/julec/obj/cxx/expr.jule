@@ -43,8 +43,6 @@ use std::jule::sema::{
     TraitSubIdentExprModel,
     StructSubIdentExprModel,
     ArrayExprModel,
-    CommonIdentExprModel,
-    CommonSubIdentExprModel,
     TupleExprModel,
     BuiltinOutCallExprModel,
     BuiltinOutlnCallExprModel,
@@ -557,7 +555,7 @@ impl exprCoder {
     }
 
     fn pushCallInf(mut &self, &m: &FnCallExprModel) {
-        if env::Production || (!m.Func.Anon && !isBuiltinCallHasDebuginf(m)) {
+        if env::Production || !m.Func.Anon {
             self.oc.write("(")
             ret
         }
@@ -568,10 +566,8 @@ impl exprCoder {
                     self.oc.write("(")
                     ret
                 }
-                fall
-            |:
-                self.oc.write(".call")
             }
+            self.oc.write(".call")
         }
         self.oc.write("(\"")
         self.oc.locInfo(m.Token)
@@ -947,16 +943,6 @@ impl exprCoder {
         }
         self.oc.write(".")
         self.oc.write(identCoder.field(m.Field.Decl))
-    }
-
-    fn commonIdent(mut &self, m: &CommonIdentExprModel) {
-        self.oc.write(m.Ident)
-    }
-
-    fn commonSub(mut &self, mut m: &CommonSubIdentExprModel) {
-        self.possibleRefExpr(m.Expr)
-        self.oc.write(".")
-        self.oc.write(m.Ident)
     }
 
     fn array(mut &self, mut m: &ArrayExprModel) {
@@ -1385,10 +1371,6 @@ impl exprCoder {
             self.traitSub((&TraitSubIdentExprModel)(m))
         | &StructSubIdentExprModel:
             self.structureSub((&StructSubIdentExprModel)(m))
-        | &CommonIdentExprModel:
-            self.commonIdent((&CommonIdentExprModel)(m))
-        | &CommonSubIdentExprModel:
-            self.commonSub((&CommonSubIdentExprModel)(m))
         | &TupleExprModel:
             self.tuple((&TupleExprModel)(m))
         | &BuiltinOutCallExprModel:
@@ -1629,18 +1611,6 @@ fn isForwarded(&s: &Scope): bool {
         }
     |:
         ret true
-    }
-}
-
-fn isBuiltinCallHasDebuginf(&m: &FnCallExprModel): bool {
-    if !m.Func.IsBuiltin() {
-        ret false
-    }
-    match type m.Expr {
-    | &CommonSubIdentExprModel:
-        ret (&CommonSubIdentExprModel)(m.Expr).Ident == "swap"
-    |:
-        ret false
     }
 }
 
