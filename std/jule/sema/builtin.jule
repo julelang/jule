@@ -8,7 +8,9 @@ use std::jule::ast::{
     TypeDecl,
     IdentTypeDecl,
     GenericDecl,
+    IdentExpr,
 }
+use mod for std::jule::internal::mod
 use std::jule::build::{Derive, LogMsg}
 use std::jule::constant::{Const}
 
@@ -258,6 +260,9 @@ fn findBuiltinDefStdComptime(&ident: str): any {
         ret f
     | "Files":
         static mut f = &FnIns{caller: builtinCallerStdComptimeFiles}
+        ret f
+    | "TypeAlias":
+        static mut f = &FnIns{caller: builtinCallerStdComptimeTypeAlias}
         ret f
     |:
         ret nil
@@ -1038,6 +1043,66 @@ fn builtinCallerStdComptimeFiles(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &D
             },
         },
     }
+}
+
+fn builtinCallerStdComptimeTypeAlias(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data {
+    if len(fc.Args) > 2 {
+        e.pushErr(fc.Args[1].Token, LogMsg.ArgumentOverflow, "TypeAlias")
+        ret nil
+    }
+    if len(fc.Args) == 0 {
+        e.pushErr(fc.Token, LogMsg.MissingExprFor, "ident, type")
+        ret nil
+    }
+    if len(fc.Args) == 1 {
+        e.pushErr(fc.Token, LogMsg.MissingExprFor, "type")
+        ret nil
+    }
+    match type fc.Args[0].Kind {
+    | &IdentExpr:
+        break
+    |:
+        e.pushErr(fc.Args[0].Token, LogMsg.InvalidSyntax)
+        e.pushSuggestion(LogMsg.ExpectedIdentifier)
+        ret nil
+    }
+    let mut ident = (&IdentExpr)(fc.Args[0].Kind).Token
+    match type e.lookup {
+    | &scopeChecker:
+        break
+    |:
+        e.pushErr(fc.Token, LogMsg.CalledOutOfScope, "TypeAlias")
+        ret nil
+    }
+
+    let mut sc = (&scopeChecker)(e.lookup)
+    let mut alias = &TypeAlias{
+        Scope: sc.tree,
+        Public: mod::IsPub(ident.Kind),
+        Binded: false,
+        Used: false,
+        Generic: false,
+        Token: ident,
+        Ident: ident.Kind,
+        Kind: new(TypeSymbol),
+    }
+    let mut t = e.eval1(fc.Args[1])
+    if t == nil {
+        ret nil
+    }
+    if t.Decl {
+        alias.Kind.Kind = t.Kind
+    } else {
+        let mut cti = t.Kind.comptimeTypeInfo()
+        if cti == nil {
+            e.pushErr(fc.Args[1].Token, LogMsg.InvalidSyntax)
+            e.pushSuggestion(LogMsg.ExpectedType)
+            ret nil
+        }
+        alias.Kind.Kind = cti.base
+    }
+    sc.checkTypeAlias(alias)
+    ret buildVoidData()
 }
 
 fn builtinCallerStdMemSizeOf(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data {

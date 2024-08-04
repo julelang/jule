@@ -724,8 +724,7 @@ impl scopeChecker {
         self.s.checkVarValue(v)
     }
 
-    fn checkTypeAliasDecl(mut &self, mut decl: &TypeAliasDecl) {
-        let mut ta = buildTypeAlias(decl)
+    fn checkTypeAlias(mut &self, mut &ta: &TypeAlias) {
         if self.isDuplicatedIdent(uintptr(ta), ta.Ident) {
             self.s.pushErr(ta.Token, LogMsg.DuplicatedIdent, ta.Ident)
             self.s.pushSuggestion(LogMsg.RenameForAvoidDuplication)
@@ -733,13 +732,17 @@ impl scopeChecker {
             ret
         }
         self.s.checkTypeAliasDecl(ta, self)
-
         self.table.TypeAliases = append(self.table.TypeAliases, ta)
 
         // Stop immediately if destination type is could not evaluated.
         if ta.Kind.Kind == nil {
             self.stop()
         }
+    }
+
+    fn checkTypeAliasDecl(mut &self, mut decl: &TypeAliasDecl) {
+        let mut ta = buildTypeAlias(decl)
+        self.checkTypeAlias(ta)
     }
 
     fn getChild(mut self): &Scope {
@@ -786,7 +789,9 @@ impl scopeChecker {
         let mut eval = self.s.eval(self)
         eval.ignored = true
         let mut d = eval.evalExpr(expr)
-        if d == nil {
+        if d == nil || d.Model == nil {
+            // Skip nil data, because evaluation failed and error documented (it should be) already.
+            // Skip nil modeled data, this return only caused by built-in functions and it should be safe.
             ret
         }
 
