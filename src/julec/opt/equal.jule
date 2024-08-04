@@ -1,0 +1,92 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use integ for std::jule::integrated
+use std::jule::constant::{Const}
+use std::jule::sema::{
+    ExprModel,
+    Var,
+    CastingExprModel,
+    UnaryExprModel,
+    IndexingExprModel,
+    BinopExprModel,
+    StructSubIdentExprModel,
+}
+
+fn typeData(&m: ExprModel): uintptr {
+    ret unsafe { uintptr(integ::Emit[*unsafe]("({}).type", m)) }
+}
+
+fn equalConst(l: &Const, r: &Const): bool {
+    match {
+    | l.IsI64():
+        ret r.IsI64() && l.ReadI64() == r.ReadI64()
+    | l.IsU64():
+        ret r.IsU64() && l.ReadU64() == r.ReadU64()
+    | l.IsF64():
+        ret r.IsF64() && l.ReadF64() == r.ReadF64()
+    | l.IsStr():
+        ret r.IsStr() && l.ReadStr() == r.ReadStr()
+    | l.IsBool():
+        ret r.IsBool() && l.ReadBool() == r.ReadBool()
+    | l.IsNil():
+        ret r.IsNil()
+    |:
+        ret false
+    }
+}
+
+fn equalCasting(l: &CastingExprModel, r: &CastingExprModel): bool {
+    if !l.Kind.Equal(r.Kind) {
+        ret false
+    }
+    ret equalModels(l.Expr, r.Expr)
+}
+
+fn equalUnary(l: &UnaryExprModel, r: &UnaryExprModel): bool {
+    if l.Op.Id != r.Op.Id || l.Op.Kind != r.Op.Kind {
+        ret false
+    }
+    ret equalModels(l.Expr.Model, r.Expr.Model)
+}
+
+fn equalIndexing(l: &IndexingExprModel, r: &IndexingExprModel): bool {
+    ret equalModels(l.Expr.Model, r.Expr.Model) &&
+        equalModels(l.Index.Model, r.Index.Model)
+}
+
+fn equalBinary(l: &BinopExprModel, r: &BinopExprModel): bool {
+    if l.Op.Id != r.Op.Id || l.Op.Kind != r.Op.Kind {
+        ret false
+    }
+    ret equalModels(l.Left.Model, r.Left.Model) &&
+        equalModels(l.Right.Model, r.Right.Model)
+}
+
+// Reports whether expressions are equal.
+// Designed lvalue equality comparison oriented,
+// such as swap statement value comparisons.
+fn equalModels(l: ExprModel, r: ExprModel): bool {
+    if typeData(l) != typeData(r) {
+        ret false
+    }
+    match type l {
+    | &Var:
+        ret (&Var)(l) == (&Var)(r)
+    | &StructSubIdentExprModel:
+        ret (&StructSubIdentExprModel)(l).Field == (&StructSubIdentExprModel)(r).Field
+    | &Const:
+        ret equalConst((&Const)(l), (&Const)(r))
+    | &CastingExprModel:
+        ret equalCasting((&CastingExprModel)(l), (&CastingExprModel)(r))
+    | &UnaryExprModel:
+        ret equalUnary((&UnaryExprModel)(l), (&UnaryExprModel)(r))
+    | &IndexingExprModel:
+        ret equalIndexing((&IndexingExprModel)(l), (&IndexingExprModel)(r))
+    | &BinopExprModel:
+        ret equalBinary((&BinopExprModel)(l), (&BinopExprModel)(r))
+    |:
+        ret false
+    }
+}
