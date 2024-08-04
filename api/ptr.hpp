@@ -111,10 +111,9 @@ namespace jule
             this->__get_copy(src);
         }
 
-        Ptr(jule::Ptr<T> &&src) noexcept : alloc(src.alloc), ref(src.ref)
+        Ptr(jule::Ptr<T> &&src) noexcept
         {
-            // Avoid deallocation.
-            src.ref = nullptr;
+            this->__get_copy(src);
         }
 
         Ptr(T *src) noexcept
@@ -132,7 +131,13 @@ namespace jule
         {
             if (src.ref)
                 src.add_ref();
+            this->ref = src.ref;
+            this->alloc = src.alloc;
+        }
 
+        // Copy content from source.
+        void __get_copy(jule::Ptr<T> &&src) noexcept
+        {
             this->ref = src.ref;
             this->alloc = src.alloc;
         }
@@ -297,12 +302,18 @@ namespace jule
             }
         }
 
-        Ptr &operator=(const jule::Ptr<T> &src) noexcept
+        jule::Ptr<T> &operator=(const jule::Ptr<T> &src) noexcept
         {
             // Assignment to itself.
             if (this->alloc != nullptr && this->alloc == src.alloc)
                 return *this;
+            this->dealloc();
+            this->__get_copy(src);
+            return *this;
+        }
 
+        jule::Ptr<T> &operator=(jule::Ptr<T> &&src) noexcept
+        {
             this->dealloc();
             this->__get_copy(src);
             return *this;

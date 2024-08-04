@@ -32,6 +32,9 @@ namespace jule
         Any(void) = default;
         Any(const std::nullptr_t) : Any() {}
 
+        Any(const jule::Any &any) : data(any.data), type(any.type) {}
+        Any(jule::Any &&any) : data(std::move(any.data)), type(any.type) {}
+
         template <typename T>
         Any(const T &data, jule::Any::Type *type) noexcept
         {
@@ -60,7 +63,8 @@ namespace jule
             this->dealloc();
         }
 
-        void __free(void) noexcept {
+        void __free(void) noexcept
+        {
             this->data.ref = nullptr;
             this->data.alloc = nullptr;
         }
@@ -159,6 +163,14 @@ namespace jule
         {
             this->dealloc();
             this->data = src.data;
+            this->type = src.type;
+            return *this;
+        }
+
+        inline jule::Any &operator=(jule::Any &&src) noexcept
+        {
+            this->dealloc();
+            this->data = std::move(src.data);
             this->type = src.type;
             return *this;
         }

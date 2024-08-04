@@ -97,6 +97,15 @@ namespace jule
             this->_slice = src._slice;
         }
 
+        // Copy content from source.
+        inline void __get_copy(jule::Slice<Item> &&src) noexcept
+        {
+            this->_len = src._len;
+            this->_cap = src._cap;
+            this->data = std::move(src.data);
+            this->_slice = src._slice;
+        }
+
         inline void check(
 #ifndef __JULE_ENABLE__PRODUCTION
             const char *file
@@ -465,14 +474,21 @@ namespace jule
                 index);
         }
 
-        Slice &operator=(const jule::Slice<Item> &src) noexcept
+        jule::Slice<Item> &operator=(const jule::Slice<Item> &src) noexcept
         {
             this->dealloc();
             this->__get_copy(src);
             return *this;
         }
 
-        inline Slice &operator=(const std::nullptr_t) noexcept
+        jule::Slice<Item> &operator=(jule::Slice<Item> &&src) noexcept
+        {
+            this->dealloc();
+            this->__get_copy(src);
+            return *this;
+        }
+
+        inline jule::Slice<Item> &operator=(const std::nullptr_t) noexcept
         {
             this->dealloc();
             return *this;

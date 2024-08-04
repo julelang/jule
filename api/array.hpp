@@ -31,8 +31,6 @@ namespace jule
 
         Array(void) = default;
 
-        Array(const jule::Array<Item, N> &) = default;
-
         Array(const std::initializer_list<Item> &src)
         {
             std::copy(src.begin(), src.end(), this->begin());

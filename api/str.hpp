@@ -74,7 +74,8 @@ namespace jule
         }
 
         Str(void) : _len(0) {};
-        Str(const jule::Str &src) = default;
+        Str(const jule::Str &src) : buffer(src.buffer), _len(src._len), _slice(src._slice) {}
+        Str(jule::Str &&src) : buffer(std::move(src.buffer)), _len(src._len), _slice(src._slice) {}
         Str(const std::basic_string<jule::U8> &src) : Str(src.c_str(), src.c_str() + src.size()) {}
         Str(const char *src, const jule::Int &len) : Str(reinterpret_cast<const jule::U8 *>(src), len) {}
         Str(const jule::U8 *src, const jule::Int &len) : buffer(jule::Str::buffer_t::make(const_cast<jule::U8 *>(src), nullptr)),
@@ -438,6 +439,22 @@ namespace jule
             std::copy(this->begin(), this->end(), s._slice);
             std::copy(str.begin(), str.end(), s._slice + this->_len);
             return s;
+        }
+
+        jule::Str &operator=(const jule::Str &str)
+        {
+            this->buffer = str.buffer;
+            this->_slice = str._slice;
+            this->_len = str._len;
+            return *this;
+        }
+
+        jule::Str &operator=(jule::Str &&str)
+        {
+            this->buffer = std::move(str.buffer);
+            this->_slice = str._slice;
+            this->_len = str._len;
+            return *this;
         }
 
         jule::Bool operator==(const jule::Str &str) const noexcept
