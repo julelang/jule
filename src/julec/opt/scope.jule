@@ -53,6 +53,11 @@ impl scopeOptimizer {
         self.scope.Stmts[self.i] = unsafe { *(*Stmt)(&stmt) }
     }
 
+    // Removes current statement.
+    fn removeCurrent(mut self) {
+        self.scope.Stmts = append(self.scope.Stmts[:self.i], self.scope.Stmts[self.i+1:]...)
+    }
+
     fn optimizeData(mut self, mut d: &Data) {
         match type d.Model {
         | &FnCallExprModel:
@@ -354,6 +359,16 @@ impl scopeOptimizer {
         if tup == nil || len(tup.Datas) != 2 {
             ret false
         }
+
+        // Catch self assignments.
+        if equalModels(assign.L[0].Model, tup.Datas[0].Model) &&
+            equalModels(assign.L[1].Model, tup.Datas[1].Model) {
+            self.removeCurrent()
+            self.i-- // In next iteration, point to correct statement.
+            ret true
+        }
+
+        // Catch swaps.
         if !equalModels(assign.L[0].Model, tup.Datas[1].Model) ||
             !equalModels(assign.L[1].Model, tup.Datas[0].Model) {
             ret false
@@ -419,9 +434,9 @@ impl scopeOptimizer {
 
     // Optimizes scope by enabled optimizations.
     fn optimize(mut self) {
-        for (i, mut stmt) in self.scope.Stmts {
-            self.i = i
-            self.optimizeStmt(stmt)
+        self.i = 0
+        for self.i < len(self.scope.Stmts); self.i++ {
+            self.optimizeStmt(self.scope.Stmts[self.i])
         }
     }
 }
