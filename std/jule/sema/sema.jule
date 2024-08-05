@@ -1917,7 +1917,7 @@ impl Sema {
     }
 
     // Checks variable declaration.
-    // No checks duplicated identifiers.
+    // Will not check duplicated identifiers.
     fn checkVarDecl(mut &self, mut &decl: &Var, mut l: Lookup) {
         if IsIgnoreIdent(decl.Ident) {
             self.pushErr(decl.Token, LogMsg.IgnoreIdent)
@@ -1931,8 +1931,13 @@ impl Sema {
             _ = self.checkType(decl.Kind, l)
         }
 
-        if decl.Constant && decl.Reference {
-            self.pushErr(decl.Token, LogMsg.ConstRef)
+        if decl.Reference {
+            if decl.Constant {
+                self.pushErr(decl.Token, LogMsg.ConstRef)
+            }
+            if decl.Statically {
+                self.pushErr(decl.Token, LogMsg.StaticReference)
+            }
         }
 
         if !decl.IsInitialized() {
