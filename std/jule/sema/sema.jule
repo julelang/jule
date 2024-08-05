@@ -25,15 +25,18 @@ fn isValidModelForRef(mut &m: ExprModel): bool {
         if unary.Op.Id != TokenId.Star {
             ret false
         }
-        // Return true because of pointer dereferencing is an Unsafe Jule feature.
+        // Return true because of raw pointer dereferencing is an Unsafe Jule feature.
         if unary.Expr.Kind.Ptr() != nil {
             ret true
         }
-        // Dereferencing should be smart pointer, in other words return false.
+        // Dereferencing should be smart pointer, otherwise return false.
         if unary.Expr.Kind.Sptr() == nil {
             ret false
         }
         ret isValidModelForRef(unary.Expr.Model)
+    | &IndexingExprModel:
+        let mut indexing = (&IndexingExprModel)(m)
+        ret isValidModelForRef(indexing.Expr.Model)
     |:
         ret false
     }
@@ -1103,32 +1106,7 @@ impl Sema {
     }
 
     fn checkRefValidityForInitExpr(mut &self, leftMut: bool, mut &d: &Data, mut &errorToken: &Token): bool {
-        match type d.Model {
-        | &Var:
-            break
-        | &TraitSubIdentExprModel:
-            let mut model = (&TraitSubIdentExprModel)(d.Model)
-            if !isValidModelForRef(model.Expr) {
-                self.pushErr(errorToken, LogMsg.RefIsDangling, model.Method.Ident)
-                ret false
-            }
-        | &StructSubIdentExprModel:
-            let mut model = (&StructSubIdentExprModel)(d.Model)
-            if !isValidModelForRef(model.Expr.Model) {
-                self.pushErr(errorToken, LogMsg.RefIsDangling, model.Field.Decl.Ident)
-                ret false
-            }
-        | &UnaryExprModel:
-            let mut unary = (&UnaryExprModel)(d.Model)
-            if unary.Op.Id == TokenId.Star {
-                if !isValidModelForRef(d.Model) {
-                    self.pushErr(errorToken, LogMsg.RefIsDangling, "address from * &T")
-                    ret false
-                }
-                break
-            }
-            fall
-        |:
+        if !isValidModelForRef(d.Model) {
             self.pushErr(errorToken, LogMsg.RefAssignNonVar)
             ret false
         }
