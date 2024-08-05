@@ -23,7 +23,7 @@ use ast for std::jule::ast::{
     IdentTypeDecl,
     SubIdentTypeDecl,
 }
-use std::jule::build::{Derive, LogMsg, Logf}
+use std::jule::build::{LogMsg, Logf}
 use std::jule::lex::{Token, TokenKind}
 use types for std::jule::types
 use strings for std::strings::{StrBuilder}
@@ -201,37 +201,6 @@ impl TypeKind {
                 ret prim.IsAny() || prim.IsStr()
             }
             ret _self.Sptr() != nil || _self.Slc() != nil || _self.Trait() != nil
-        }
-    }
-
-    // Reports whether kind supports clonning via jule::Clone derive.
-    fn SupportsCloning(self): bool {
-        unsafe {
-            let mut _self = &self
-            match {
-            | _self.Prim() != nil:
-                ret !_self.Prim().IsAny()
-            | _self.Enum() != nil:
-                ret true
-            | _self.Fn() != nil:
-                ret true
-            | _self.Ptr() != nil:
-                ret true
-            | _self.Slc() != nil:
-                ret _self.Slc().Elem.SupportsCloning()
-            | _self.Map() != nil:
-                let m = _self.Map()
-                ret m.Key.SupportsCloning() && m.Val.SupportsCloning()
-            | _self.Arr() != nil:
-                ret _self.Arr().Elem.SupportsCloning()
-            | _self.Sptr() != nil:
-                ret _self.Sptr().Elem.SupportsCloning()
-            | _self.Struct() != nil:
-                let mut s = _self.Struct()
-                ret s.Decl != nil && !s.Decl.Binded && s.Decl.IsDerives(Derive.Clone)
-            |:
-                ret false
-            }
         }
     }
 

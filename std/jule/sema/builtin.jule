@@ -11,7 +11,7 @@ use std::jule::ast::{
     IdentExpr,
 }
 use mod for std::jule::internal::mod
-use std::jule::build::{Derive, LogMsg}
+use std::jule::build::{LogMsg}
 use std::jule::constant::{Const}
 
 // Type alias for built-in function callers.
@@ -53,9 +53,6 @@ fn findBuiltinFunc(&ident: str): &FnIns {
         ret f
     | "delete":
         static mut f = &FnIns{caller: builtinCallerDelete}
-        ret f
-    | "clone":
-        static mut f = &FnIns{caller: builtinCallerClone}
         ret f
     | "assert":
         static mut f = &FnIns{caller: builtinCallerAssert}
@@ -806,48 +803,6 @@ fn builtinCallerDelete(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Dat
         e.pushErr(fc.Args[0].Token, LogMsg.InvalidExpr)
         ret nil
     }
-}
-
-fn builtinCallerClone(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data {
-    if len(fc.Args) < 1 {
-        e.pushErr(fc.Token, LogMsg.MissingExprFor, "expr")
-        ret nil
-    }
-    if len(fc.Args) > 1 {
-        e.pushErr(fc.Args[1].Token, LogMsg.ArgumentOverflow, "clone")
-    }
-
-    let mut d = e.evalExpr(fc.Args[0])
-    if d == nil {
-        ret nil
-    }
-
-    if !d.Kind.SupportsCloning() {
-        match {
-        | d.Kind.Slc() != nil
-        | d.Kind.Map() != nil
-        | d.Kind.Arr() != nil
-        | d.Kind.Sptr() != nil:
-            unsafe {
-                e.pushErr(fc.Args[0].Token,
-                    LogMsg.InternalTypeNotSupportsClone, d.Kind.Str())
-            }
-        | d.Kind.Struct() != nil:
-            unsafe {
-                e.pushErr(fc.Args[0].Token, LogMsg.TypeIsNotDerives,
-                    d.Kind.Str(), Derive.Clone)
-            }
-        |:
-            unsafe {
-                e.pushErr(fc.Args[0].Token, LogMsg.TypeNotSupportsClone,
-                    d.Kind.Str(), Derive.Clone)
-            }
-        }
-    }
-
-    d.Mutable = true
-    d.Model = &BuiltinCloneCallExprModel{Expr: d.Model}
-    ret d
 }
 
 fn builtinCallerAssert(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data {

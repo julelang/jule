@@ -10,7 +10,6 @@ use comptime for std::comptime
 use jule for std::jule
 use build for std::jule::build::{
     Directive,
-    Derive,
 }
 use std::jule::lex::{
     Token,
@@ -85,7 +84,6 @@ struct ObjectCoder {
     ec: &exprCoder
     sc: &scopeCoder
     tc: &typeCoder
-    dc: &deriveCoder
 
     headPos: int
     declPos: int
@@ -100,7 +98,6 @@ impl ObjectCoder {
         oc.ec = exprCoder.new(oc)
         oc.sc = scopeCoder.new(oc)
         oc.tc = typeCoder.new(oc)
-        oc.dc = deriveCoder.new(oc)
         ret oc
     }
 
@@ -582,14 +579,6 @@ impl ObjectCoder {
         self.write("(this); }")
     }
 
-    fn structureDeriveDefsDecls(mut &self, &s: &StructIns) {
-        if s.Decl.IsDerives(Derive.Clone) {
-            self.indent()
-            self.write(self.dc.cloneFuncDecl(s.Decl))
-            self.write(";\n\n")
-        }
-    }
-
     fn structureOperatorEq(mut &self, &ident: str, mut &s: &StructIns) {
         if !s.Comparable {
             ret
@@ -771,8 +760,6 @@ impl ObjectCoder {
         self.indent()
         self.structureDestructor(s)
         self.write("\n\n")
-
-        self.structureDeriveDefsDecls(s)
 
         self.structureOperators(s)
         self.write("\n")
@@ -1195,30 +1182,6 @@ impl ObjectCoder {
         }
     }
 
-    fn structureDeriveDefs(mut &self, mut &s: &StructIns) {
-        if s.Decl.IsDerives(Derive.Clone) {
-            self.write(self.dc.cloneFuncDef(s.Decl))
-            self.write("{\n")
-            self.addIndent()
-            self.indent()
-            self.write(self.tc.structureIns(s))
-            self.write(" clone;\n")
-            for _, f in s.Fields {
-                let ident = identCoder.field(f.Decl)
-                self.indent()
-                self.write("clone.")
-                self.write(ident)
-                self.write(" = jule::clone(this->")
-                self.write(ident)
-                self.write(");\n")
-            }
-            self.indent()
-            self.write("return clone;\n")
-            self.doneIndent()
-            self.write("}")
-        }
-    }
-
     fn structureOstream(mut &self, mut &s: &StructIns) {
         self.indent()
         self.write("std::ostream &operator<<(std::ostream &_Stream, ")
@@ -1272,8 +1235,6 @@ impl ObjectCoder {
 
     fn structureIns(mut &self, mut &s: &StructIns) {
         self.structureMethods(s)
-        self.write("\n\n")
-        self.structureDeriveDefs(s)
         self.write("\n\n")
         self.structureOstream(s)
     }
@@ -1360,7 +1321,7 @@ impl ObjectCoder {
         self.decls()
 
         if self.resultDecls.Len() > 0 {
-            let mut head = clone(unsafe { self.Obj.Buf() }[:self.headPos])
+            let mut head = append(make([]byte, 0), unsafe { self.Obj.Buf() }[:self.headPos]...)
             head = append(head, unsafe { self.resultDecls.Buf() }...)
             self.declPos += self.resultDecls.Len()
             head = append(head, unsafe { self.Obj.Buf() }[self.headPos:]...)
@@ -1374,7 +1335,7 @@ impl ObjectCoder {
         self.write("\n\n")
 
         if self.anyObj.Len() > 0 {
-            let mut head = clone(unsafe { self.Obj.Buf() }[:self.declPos])
+            let mut head = append(make([]byte, 0), unsafe { self.Obj.Buf() }[:self.declPos]...)
             head = append(head, unsafe { self.anyObj.Buf() }...)
             head = append(head, unsafe { self.Obj.Buf() }[self.declPos:]...)
             unsafe { self.Obj.SetBuf(head) }

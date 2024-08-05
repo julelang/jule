@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 use ast for std::jule::ast
-use build for std::jule::build::{Directive, Derive, LogMsg, Log, LogKind, Logf}
+use build for std::jule::build::{Directive, LogMsg, Log, LogKind, Logf}
 use std::jule::constant::{Const}
 use std::jule::lex::{File, Token, TokenId, TokenKind, IsIgnoreIdent, IsAnonIdent}
 use mod for std::jule::internal::mod
@@ -2107,50 +2107,6 @@ impl Sema {
         ret true
     }
 
-    fn checkStructDeriveIllegalCycles(mut self, derive: str, &st1: &Struct, mut &k: &TypeKind): (ok: bool) {
-        let mut st2 = getStructFromKind(k)
-        if st2 == nil {
-            ret true
-        }
-
-        // Check illegal cycle for itself.
-        // Because refers's owner is ta.
-        if st1 == st2 {
-            self.pushErr(st1.Token, LogMsg.DeriveIllegalCycleRefersItself, derive, st1.Ident)
-            ret false
-        }
-
-        let mut message = StrBuilder.New(1 << 5)
-        if !self.checkCrossCycle(st1, st2, message) {
-            let mut errMsg = message.Str()
-            message.Clear()
-            self.pushCycleError(st1.Ident, st2.Ident, message)
-            errMsg += message.Str()
-            self.pushErr(st1.Token, LogMsg.DeriveIllegalCrossCycle, derive, errMsg)
-            ret false
-        }
-        ret true
-    }
-
-    fn checkStructInsDeriveClone(mut self, mut st: &StructIns): (ok: bool) {
-        if !st.Decl.IsDerives(Derive.Clone) {
-            ret true
-        }
-        for (_, mut f) in st.Fields {
-            if f.Kind == nil {
-                continue
-            }
-            if !f.Kind.SupportsCloning() {
-                self.pushErr(st.Decl.Token, LogMsg.TypeNotCompatibleForDerive, f.Kind.Str(), Derive.Clone)
-                ret false
-            }
-            if !self.checkStructDeriveIllegalCycles(Derive.Clone, st.Decl, f.Kind) {
-                ret false
-            }
-        }
-        ret true
-    }
-
     // Checks declarations of all package files.
     // Breaks checking if checked file failed.
     fn checkPackageDecls(mut &self) {
@@ -2409,7 +2365,6 @@ impl Sema {
             f.Kind = kind
             s.Mutable = s.Mutable || (!f.Decl.Mutable && f.Kind.Mutable())
             s.Comparable = s.Comparable && f.Kind.Comparable()
-            _ = self.checkStructInsDeriveClone(s)
 
             // Skip this field if not has default value.
             if f.Decl.Default == nil {
