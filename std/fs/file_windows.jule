@@ -19,8 +19,8 @@ impl File {
     //  SystemWideLimit NotExist UnableStream NoSpace NotDir Device Overflow
     //  ReadOnly Retry Busy
     static fn Open(path: str, flag: OFlag, mode: int)!: &File {
-        let utf16Path = integrated::Utf16FromStr(path)
-        let handle = unsafe { sys::Wopen(&utf16Path[0], int(flag), mode) }
+        utf16Path := integrated::Utf16FromStr(path)
+        handle := unsafe { sys::Wopen(&utf16Path[0], int(flag), mode) }
         if handle == -1 {
             error(getLastFsError())
         }
@@ -32,7 +32,7 @@ impl File {
     // Possible errors:
     //  Denined Busy LongPath NotExist InsufficientMemory NotDir
     static fn Remove(path: str)! {
-        let utf16Path = integrated::Utf16FromStr(path)
+        utf16Path := integrated::Utf16FromStr(path)
         if unsafe { !sys::DeleteFile(&utf16Path[0]) } {
             error(getLastFsError())
         }
@@ -52,8 +52,8 @@ impl File {
         }
 
         if isConsoleHandle(self.handle) {
-            let utf16Buff = integrated::Utf16FromStr(str(buff))
-            let ok = unsafe { sys::WriteConsole(self.handle, &utf16Buff[0], len(utf16Buff), n, nil) }
+            utf16Buff := integrated::Utf16FromStr(str(buff))
+            ok := unsafe { sys::WriteConsole(self.handle, &utf16Buff[0], len(utf16Buff), n, nil) }
             if !ok {
                 error(getLastFsError())
             }
@@ -82,16 +82,16 @@ impl File {
         }
 
         if isConsoleHandle(self.handle) {
-            let mut codepage = make([]u16, len(buff))
-            let ok = unsafe { sys::ReadConsole(self.handle, &codepage[0], len(buff), n) }
+            mut codepage := make([]u16, len(buff))
+            ok := unsafe { sys::ReadConsole(self.handle, &codepage[0], len(buff), n) }
             if !ok {
                 error(getLastFsError())
             }
 
-            let runes = utf16::Decode(codepage[:n])
+            runes := utf16::Decode(codepage[:n])
             n = 0
             for _, r in runes {
-                let size = utf8::RuneLen(r)
+                size := utf8::RuneLen(r)
                 if n+size > len(buff) {
                     break
                 }

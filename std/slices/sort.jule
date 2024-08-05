@@ -60,11 +60,11 @@ fn nextPowerOfTwo(length: int): uint {
 
 // Sorts data[a:b] using insertion sort.
 fn insertionSort[E: ordered](mut &data: []E, a: int, b: int) {
-    let mut i = a + 1
+    mut i := a + 1
     for i < b; i++ {
-        let mut j = i
+        mut j := i
         for j > a && cmp::Less(data[j], data[j-1]); j-- {
-            data[j], data[j - 1] = data[j - 1], data[j]
+            data[j], data[j-1] = data[j-1], data[j]
         }
     }
 }
@@ -72,9 +72,9 @@ fn insertionSort[E: ordered](mut &data: []E, a: int, b: int) {
 // Implements the heap property on data[lo:hi].
 // first is an offset into the array where the root of the heap lies.
 fn siftDown[E: ordered](mut &data: []E, lo: int, hi: int, first: int) {
-    let mut root = lo
+    mut root := lo
     for {
-        let mut child = 2 * root + 1
+        mut child := 2 * root + 1
         if child >= hi {
             break
         }
@@ -84,18 +84,18 @@ fn siftDown[E: ordered](mut &data: []E, lo: int, hi: int, first: int) {
         if !cmp::Less(data[first+root], data[first+child]) {
             ret
         }
-        data[first + root], data[first + child] = data[first + child], data[first + root]
+        data[first+root], data[first+child] = data[first+child], data[first+root]
         root = child
     }
 }
 
 fn heapSort[E: ordered](mut &data: []E, a: int, b: int) {
-    let first = a
-    let lo = 0
-    let hi = b - a
+    first := a
+    lo := 0
+    hi := b - a
 
     // Build heap with greatest element at top.
-    let mut i = (hi - 1) >> 1
+    mut i := (hi - 1) >> 1
     for i >= 0; i-- {
         siftDown(data, i, hi, first)
     }
@@ -103,7 +103,7 @@ fn heapSort[E: ordered](mut &data: []E, a: int, b: int) {
     // Pop elements, largest first, into end of data.
     i = hi - 1
     for i >= 0; i-- {
-        data[first], data[first + 1] = data[first + 1], data[first]
+        data[first], data[first+1] = data[first+1], data[first]
         siftDown(data, lo, i, first)
     }
 }
@@ -111,18 +111,18 @@ fn heapSort[E: ordered](mut &data: []E, a: int, b: int) {
 // breakPatternsOrdered scatters some elements around in an attempt to break some patterns
 // that might cause imbalanced partitions in quicksort.
 fn breakPatterns[E: ordered](mut &data: []E, a: int, b: int) {
-    let length = b - a
+    length := b - a
     if length >= 8 {
-        let mut random = xorshift(length)
-        let modulus = nextPowerOfTwo(length)
+        mut random := xorshift(length)
+        modulus := nextPowerOfTwo(length)
 
-        let mut idx = a + (length / 4) * 2 - 1
+        mut idx := a + (length / 4) * 2 - 1
         for idx <= a+(length / 4)*2+1; idx++ {
-            let mut other = int(uint(xorshiftNext(random)) & (modulus - 1))
+            mut other := int(uint(xorshiftNext(random)) & (modulus - 1))
             if other >= length {
                 other -= length
             }
-            data[idx], data[a + other] = data[a + other], data[idx]
+            data[idx], data[a+other] = data[a+other], data[idx]
         }
     }
 }
@@ -158,12 +158,12 @@ fn choosePivot[E: ordered](mut &data: []E, a: int, b: int): (pivot: int, hint: s
     const shortestNinther = 50
     const maxSwaps = 4 * 3
 
-    let l = b - a
+    l := b - a
 
-    let mut swaps: int = 0
-    let mut i = a + l / 4 * 1
-    let mut j = a + l / 4 * 2
-    let mut k = a + l / 4 * 3
+    mut swaps := 0
+    mut i := a + l / 4 * 1
+    mut j := a + l / 4 * 2
+    mut k := a + l / 4 * 3
 
     if l >= 8 {
         if l >= shortestNinther {
@@ -187,8 +187,8 @@ fn choosePivot[E: ordered](mut &data: []E, a: int, b: int): (pivot: int, hint: s
 }
 
 fn reverseRange[E: ordered](mut &data: []E, a: int, b: int) {
-    let mut i = a
-    let mut j = b - 1
+    mut i := a
+    mut j := b - 1
     for i < j {
         data[i], data[j] = data[j], data[i]
         i++
@@ -200,8 +200,8 @@ fn reverseRange[E: ordered](mut &data: []E, a: int, b: int) {
 fn partialInsertionSort[E: ordered](mut &data: []E, a: int, b: int): bool {
     const maxSteps = 5          // maximum number of adjacent out-of-order pairs that will get shifted
     const shortestShifting = 50 // don't shift any elements on short arrays
-    let mut i = a + 1
-    let mut j = 0
+    mut i := a + 1
+    mut j := 0
     for j < maxSteps; j++ {
         for i < b && !cmp::Less(data[i], data[i-1]) {
             i++
@@ -215,26 +215,26 @@ fn partialInsertionSort[E: ordered](mut &data: []E, a: int, b: int): bool {
             ret false
         }
 
-        data[i], data[i - 1] = data[i - 1], data[i]
+        data[i], data[i-1] = data[i-1], data[i]
 
         // Shift the smaller one to the left.
         if i-a >= 2 {
-            let mut z = i - 1
+            mut z := i - 1
             for z >= 1; j-- {
                 if !cmp::Less(data[z], data[z-1]) {
                     break
                 }
-                data[z], data[z - 1] = data[z - 1], data[z]
+                data[z], data[z-1] = data[z-1], data[z]
             }
         }
         // Shift the greater one to the right.
         if b-i >= 2 {
-            let mut z = i + 1
+            mut z := i + 1
             for z < b; z++ {
                 if !cmp::Less(data[z], data[z-1]) {
                     break
                 }
-                data[z], data[z - 1] = data[z - 1], data[z]
+                data[z], data[z-1] = data[z-1], data[z]
             }
         }
     }
@@ -245,7 +245,7 @@ fn partialInsertionSort[E: ordered](mut &data: []E, a: int, b: int): bool {
 // It assumed that data[a:b] does not contain elements smaller than the data[pivot].
 fn partitionEqual[E: ordered](mut &data: []E, a: int, b: int, pivot: int): (newpivot: int) {
     data[a], data[pivot] = data[pivot], data[a]
-    let (mut i, mut j) = a + 1, b - 1 // i and j are inclusive of the elements remaining to be partitioned
+    mut i, mut j := a + 1, b - 1 // i and j are inclusive of the elements remaining to be partitioned
 
     for {
         for i <= j && !cmp::Less(data[a], data[i]) {
@@ -265,12 +265,12 @@ fn partitionEqual[E: ordered](mut &data: []E, a: int, b: int, pivot: int): (newp
 }
 
 // Does one quicksort partition.
-// Let p = data[pivot]
+// let p = data[pivot]
 // Moves elements in data[a:b] around, so that data[i]<p and data[j]>=p for i<newpivot and j>newpivot.
 // On return, data[newpivot] = p
 fn partition[E: ordered](mut &data: []E, a: int, b: int, pivot: int): (newpivot: int, alreadyPartitioned: bool) {
     data[a], data[pivot] = data[pivot], data[a]
-    let (mut i, mut j) = a + 1, b - 1 // i and j are inclusive of the elements remaining to be partitioned
+    mut i, mut j := a + 1, b - 1 // i and j are inclusive of the elements remaining to be partitioned
 
     for i <= j && cmp::Less(data[i], data[a]) {
         i++
@@ -313,11 +313,11 @@ fn partition[E: ordered](mut &data: []E, a: int, b: int, pivot: int): (newpivot:
 fn pdqsort[E: ordered](mut &data: []E, mut a: int, mut b: int, mut limit: int) {
     const maxInsertion = 12
 
-    let mut wasBalanced = true    // whether the last partitioning was reasonably balanced
-    let mut wasPartitioned = true // whether the slice was already partitioned
+    mut wasBalanced := true    // whether the last partitioning was reasonably balanced
+    mut wasPartitioned := true // whether the slice was already partitioned
 
     for {
-        let length = b - a
+        length := b - a
 
         if length <= maxInsertion {
             insertionSort(data, a, b)
@@ -336,7 +336,7 @@ fn pdqsort[E: ordered](mut &data: []E, mut a: int, mut b: int, mut limit: int) {
             limit--
         }
 
-        let (mut pivot, mut hint) = choosePivot(data, a, b)
+        mut pivot, mut hint := choosePivot(data, a, b)
         if hint == sortedHint.Decreasing {
             reverseRange(data, a, b)
             // The chosen pivot was pivot-a elements after the start of the array.
@@ -356,16 +356,16 @@ fn pdqsort[E: ordered](mut &data: []E, mut a: int, mut b: int, mut limit: int) {
         // Probably the slice contains many duplicate elements, partition the slice into
         // elements equal to and elements greater than the pivot.
         if a > 0 && !cmp::Less(data[a-1], data[pivot]) {
-            let mid = partitionEqual(data, a, b, pivot)
+            mid := partitionEqual(data, a, b, pivot)
             a = mid
             continue
         }
 
-        let (mid, alreadyPartitioned) = partition(data, a, b, pivot)
+        mid, alreadyPartitioned := partition(data, a, b, pivot)
         wasPartitioned = alreadyPartitioned
 
-        let (leftLen, rightLen) = mid - a, b - mid
-        let balanceThreshold = length / 8
+        leftLen, rightLen := mid - a, b - mid
+        balanceThreshold := length / 8
         if leftLen < rightLen {
             wasBalanced = leftLen >= balanceThreshold
             pdqsort(data, a, mid, limit)

@@ -85,14 +85,14 @@ fn EncodeRune(mut r: rune): (r1: rune, r2: rune) {
 
 // Returns the UTF-16 encoding of the Unicode code point sequence s.
 fn Encode(s: []rune): []u16 {
-    let mut n = len(s)
+    mut n := len(s)
     for _, v in s {
         if v >= surrSelf {
             n++
         }
     }
 
-    let mut a = make([]u16, n)
+    mut a := make([]u16, n)
     n = 0
     for _, v in s {
         match {
@@ -102,7 +102,7 @@ fn Encode(s: []rune): []u16 {
             n++
         | surrSelf <= v && v <= MaxRune:
             // needs surrogate sequence
-            let (r1, r2) = EncodeRune(v)
+            r1, r2 := EncodeRune(v)
             a[n] = u16(r1)
             a[n+1] = u16(r2)
             n += 2
@@ -117,11 +117,11 @@ fn Encode(s: []rune): []u16 {
 // Returns the Unicode code point sequence
 // represented by the UTF-16 encoding s.
 fn Decode(s: []u16): []rune {
-    let mut a = make([]rune, len(s))
-    let mut n = 0
-    let mut i = 0
+    mut a := make([]rune, len(s))
+    mut n := 0
+    mut i := 0
     for i < len(s); i++ {
-        let r = s[i]
+        r := s[i]
         match {
         | r < surr1 | surr3 <= r:
             // normal rune
@@ -153,7 +153,7 @@ fn AppendRune(mut a: []u16, r: rune): []u16 {
         ret append(a, u16(r))
     | surrSelf <= r && r <= MaxRune:
         // needs surrogate sequence
-        let (r1, r2) = EncodeRune(r)
+        r1, r2 := EncodeRune(r)
         ret append(a, u16(r1), u16(r2))
     }
     ret append(a, replacementChar)

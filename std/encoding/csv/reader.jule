@@ -212,7 +212,7 @@ impl Reader {
         if field < 0 || field >= len(self.fieldPositions) {
             panic("std::encoding::csv: Reader: out of range index passed to field_pos")
         }
-        let p = &self.fieldPositions[field]
+        p := &self.fieldPositions[field]
         unsafe {
             ret p.line, p.col
         }
@@ -223,7 +223,7 @@ impl Reader {
     // Exception can be CsvError or ParseError, and forwards reader errors.
     fn ReadAll(mut self)!: (records: [][]str) {
         for {
-            let mut record = self.readRecord(nil) else { error(error) }
+            mut record := self.readRecord(nil) else { error(error) }
             if len(record) == 0 {
                 break
             }
@@ -236,11 +236,11 @@ impl Reader {
     // If EOF is hit without a trailing endline, it will be omitted.
     // The result is only valid until the next call to read_line.
     fn readLine(mut self)!: []byte {
-        let scan = self.s.Scan() else { error(error) }
+        scan := self.s.Scan() else { error(error) }
         if !scan {
             ret nil
         }
-        let mut line = self.s.Bytes()
+        mut line := self.s.Bytes()
         if len(line) == 0 {
             ret nil
         }
@@ -282,16 +282,16 @@ impl Reader {
 
         // Parse each field in the record.
         const QuoteLen = len(`"`)
-        let commaLen = utf8::RuneLen(self.Comma)
-        let mut recLine = self.numLine           // Starting line for record
+        commaLen := utf8::RuneLen(self.Comma)
+        mut recLine := self.numLine           // Starting line for record
         self.recordBuffer = self.recordBuffer[:0]
         self.fieldIndexes = self.fieldIndexes[:0]
         self.fieldPositions = self.fieldPositions[:0]
-        let mut pos = position{line: self.numLine, col: 1}
+        mut pos := position{line: self.numLine, col: 1}
     parseField:
         for {
             if self.TrimLeadingSpace {
-                let mut i = bytes::FindFn(line, fn(mut r: rune): bool {
+                mut i := bytes::FindFn(line, fn(mut r: rune): bool {
                     ret !unicode::IsSpace(r)
                 })
                 if i == -1 {
@@ -303,8 +303,8 @@ impl Reader {
             }
             if len(line) == 0 || line[0] != '"' {
                 // Non-quoted string field
-                let i = bytes::FindRune(line, self.Comma)
-                let mut field = line
+                i := bytes::FindRune(line, self.Comma)
+                mut field := line
                 if i >= 0 {
                     field = field[:i]
                 } else {
@@ -312,7 +312,7 @@ impl Reader {
                 }
                 // Check to make sure a quote does not appear in field.
                 if !self.LazyQuotes {
-                    let j = bytes::FindByte(field, '"')
+                    j := bytes::FindByte(field, '"')
                     if j >= 0 {
                         error(&ParseError{
                             StartLine: recLine,
@@ -334,17 +334,17 @@ impl Reader {
                 break parseField
             } else {
                 // Quoted string field
-                let fieldPos = pos
+                fieldPos := pos
                 line = line[QuoteLen:]
                 pos.col += QuoteLen
                 for {
-                    let i = bytes::FindByte(line, '"')
+                    i := bytes::FindByte(line, '"')
                     if i >= 0 {
                         // Hit next quote.
                         self.recordBuffer = append(self.recordBuffer, line[:i]...)
                         line = line[i+QuoteLen:]
                         pos.col += i + QuoteLen
-                        let rn = nextRune(line)
+                        rn := nextRune(line)
                         match {
                         | rn == '"':
                             // `""` sequence (append quote).
@@ -406,13 +406,13 @@ impl Reader {
 
         // Create a single string and create slices out of it.
         // This pins the memory of the fields together, but allocates once.
-        let s = str(self.recordBuffer) // Convert to string once to batch allocations
+        s := str(self.recordBuffer) // Convert to string once to batch allocations
         if cap(dst) < len(self.fieldIndexes) {
             dst = make([]str, len(self.fieldIndexes))
         } else {
             dst = dst[:0]
         }
-        let mut preIdx: int = 0
+        mut preIdx := 0
         for i, idx in self.fieldIndexes {
             dst[i] = s[preIdx:idx]
             preIdx = idx
@@ -446,7 +446,7 @@ fn validDelim(r: rune): bool {
 
 // Returns the next rune in b or utf8::RuneError.
 fn nextRune(b: []byte): rune {
-    let (r, _) = utf8::DecodeRune(b)
+    r, _ := utf8::DecodeRune(b)
     ret r
 }
 

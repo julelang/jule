@@ -13,17 +13,17 @@ impl Directory {
     //  Denied InvalidDescriptor PerProcessLimit SystemWideLimit
     //  NotExist InsufficientMemory NotDir
     static fn Read(path: str)!: (dirents: []&DirEntry) {
-        let mut dir = unsafe { sys::Opendir(&path[0]) }
+        mut dir := unsafe { sys::Opendir(&path[0]) }
         if dir == nil {
             error(getLastFsError())
         }
         for {
-            let dirent = unsafe { sys::Readdir(dir) }
+            dirent := unsafe { sys::Readdir(dir) }
             if dirent == nil {
                 break
             }
-            let name = unsafe { integrated::BytePtrToStr((*u8)(dirent.d_name)) }
-            let mut stat = Status.Of(path::Join(path, name)) else { error(error) }
+            name := unsafe { integrated::BytePtrToStr((*u8)(dirent.d_name)) }
+            mut stat := Status.Of(path::Join(path, name)) else { error(error) }
             dirents = append(dirents, &DirEntry{
                 Name: name,
                 Stat: stat,

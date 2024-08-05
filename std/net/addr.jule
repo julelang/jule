@@ -65,14 +65,14 @@ fn JoinHostPort(host: str, port: str): str {
 //
 // Exceptionals are always will be AddrError.
 fn SplitHostPort(hostport: str)!: (host: str, port: str) {
-    let (mut j, mut k) = 0, 0
-    let i = fastbytes::FindLastByteStr(hostport, ':')
+    mut j, mut k := 0, 0
+    i := fastbytes::FindLastByteStr(hostport, ':')
     if i == -1 {
         error(AddrError.MissingPort)
     }
     if hostport[0] == '[' {
         // Expect the first ']' just before the last ':'.
-        let end = fastbytes::FindByteStr(hostport, ']')
+        end := fastbytes::FindByteStr(hostport, ']')
         if end == -1 {
             error(AddrError.MissingRBracket)
         }
@@ -97,7 +97,7 @@ fn SplitHostPort(hostport: str)!: (host: str, port: str) {
             error(AddrError.TooManyColons)
         }
     }
-    let bytesHostport = nosafe::Stobs(hostport)
+    bytesHostport := nosafe::Stobs(hostport)
     if fastbytes::FindByte(bytesHostport[j:], '[') != -1 {
         error(AddrError.UnexpectedLBracket)
     }
@@ -153,13 +153,13 @@ fn resolveInternetAddr(&net: Network, &addr: str)!: Addr {
     if addr == "" {
         error(AddrError.MissingPort)
     }
-    let (mut host, mut port) = "", ""
-    let mut portnum = 0
+    mut host, mut port := "", ""
+    mut portnum := 0
     match net {
     | Network.Tcp | Network.Tcp4 | Network.Tcp6
     | Network.Udp | Network.Udp4 | Network.Udp6:
         host, port = SplitHostPort(addr) else { error(error) }
-        let ((portnum), ok) = conv::Atoi(port)
+        (portnum), ok := conv::Atoi(port)
         if !ok {
             error(AddrError.InvalidPort)
         }
@@ -172,7 +172,7 @@ fn resolveInternetAddr(&net: Network, &addr: str)!: Addr {
     if host == localhost {
         ret buildLocalhostAddr(net, portnum)
     }
-    let mut ip = parseAddr(host) else { error(error) }
+    mut ip := parseAddr(host) else { error(error) }
     match type ip {
     | Ip:
         match net {
@@ -192,7 +192,7 @@ fn resolveInternetAddr(&net: Network, &addr: str)!: Addr {
             panic("implementation bug, this panic should be unreachable")
         }
     | TcpAddr:
-        let mut ipAddr = (TcpAddr)(ip)
+        mut ipAddr := (TcpAddr)(ip)
         match net {
         | Network.Tcp:
             ipAddr.Port = portnum
@@ -249,14 +249,14 @@ fn buildLocalhostAddr(&net: Network, port: int): Addr {
     }
     match net {
     | Network.Tcp6:
-        let mut addr = make([]byte, Ipv6.Len)
+        mut addr := make([]byte, Ipv6.Len)
         addr[len(addr)-1] = 1
         ret &TcpAddr{
             Ip: Ip{Addr: addr},
             Port: port,
         }
     | Network.Udp6:
-        let mut addr = make([]byte, Ipv6.Len)
+        mut addr := make([]byte, Ipv6.Len)
         addr[len(addr)-1] = 1
         ret &UdpAddr{
             Ip: Ip{Addr: addr},

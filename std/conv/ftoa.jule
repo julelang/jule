@@ -80,7 +80,7 @@ fn FmtFloat(f: f64, fmt: byte, prec: int, bit_size: int): str {
 }
 
 fn genericFtoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bit_size: int): []byte {
-    let mut bits: u64 = 0
+    mut bits := u64(0)
     let mut flt: &floatInfo = nil
     match bit_size {
     | 32:
@@ -93,9 +93,9 @@ fn genericFtoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bit_size: in
         panic("std::conv: illegal bit_size")
     }
 
-    let neg = bits>>(flt.expbits + flt.mantbits) != 0
-    let mut exp = int(bits >> flt.mantbits) & int(1 << flt.expbits - 1)
-    let mut mant = bits & (u64(1) << flt.mantbits - 1)
+    neg := bits>>(flt.expbits + flt.mantbits) != 0
+    mut exp := int(bits >> flt.mantbits) & int(1 << flt.expbits - 1)
+    mut mant := bits & (u64(1) << flt.mantbits - 1)
 
     match exp {
     | int(1 << flt.expbits - 1):
@@ -129,10 +129,10 @@ fn genericFtoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bit_size: in
         ret bigFtoa(dst, prec, fmt, neg, mant, exp, *flt)
     }
 
-    let mut digs = decimalSlice{}
-    let mut ok = false
+    mut digs := decimalSlice{}
+    mut ok := false
     // Negative precision means "only as much as needed to be exact."
-    let shortest = prec < 0
+    shortest := prec < 0
     if shortest {
         // Use Ryu algorithm.
         digs.d = make([]byte, 32)
@@ -149,7 +149,7 @@ fn genericFtoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bit_size: in
         }
     } else if fmt != 'f' {
         // Fixed number of digits.
-        let mut digits = prec
+        mut digits := prec
         match fmt {
         | 'e' | 'E':
             digits++
@@ -181,11 +181,11 @@ fn genericFtoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bit_size: in
 // Uses multiprecision computations to format a float.
 fn bigFtoa(mut dst: []byte, mut prec: int, fmt: byte, neg: bool,
     mant: u64, exp: int, &flt: floatInfo): []byte {
-    let mut d = decimal{}
+    mut d := decimal{}
     d.assign(mant)
     d.shift(exp - int(flt.mantbits))
-    let mut digs = decimalSlice{}
-    let shortest = prec < 0
+    mut digs := decimalSlice{}
+    shortest := prec < 0
     if shortest {
         roundShortest(d, mant, exp, flt)
         digs = decimalSlice{d: d.d[:], nd: d.nd, dp: d.dp}
@@ -225,7 +225,7 @@ fn fmtDigits(mut dst: []byte, shortest: bool, neg: bool,
         ret fmtF(dst, neg, digs, prec)
     | 'g' | 'G':
         // trailing fractional zeros in 'e' form will be trimmed.
-        let mut eprec = prec
+        mut eprec := prec
         if eprec > digs.nd && digs.nd >= digs.dp {
             eprec = digs.nd
         }
@@ -235,7 +235,7 @@ fn fmtDigits(mut dst: []byte, shortest: bool, neg: bool,
         if shortest {
             eprec = 6
         }
-        let exp = digs.dp - 1
+        exp := digs.dp - 1
         if exp < -4 || exp >= eprec {
             if prec > digs.nd {
                 prec = digs.nd
@@ -275,7 +275,7 @@ fn roundShortest(mut &d: decimal, mant: u64, exp: int, &flt: floatInfo) {
     // So the number is already shortest if 10^(dp-nd) > 2^(exp-mantbits),
     // or equivalently log2(10)*(dp-nd) > exp-mantbits.
     // It is true if 332/100*(dp-nd) >= exp-mantbits (log2(10) > 3.32).
-    let minexp = flt.bias + 1 // minimum possible exponent
+    minexp := flt.bias + 1 // minimum possible exponent
     if exp > minexp && 332*(d.dp-d.nd) >= 100*(exp-int(flt.mantbits)) {
         // The number is already shortest.
         ret
@@ -284,7 +284,7 @@ fn roundShortest(mut &d: decimal, mant: u64, exp: int, &flt: floatInfo) {
     // d = mant << (exp - mantbits)
     // Next highest floating point number is mant+1 << exp-mantbits.
     // Our upper bound is halfway between, mant*2+1 << exp-mantbits-1.
-    let mut upper = decimal{}
+    mut upper := decimal{}
     upper.assign(mant * 2 + 1)
     upper.shift(exp - int(flt.mantbits) - 1)
 
@@ -294,8 +294,8 @@ fn roundShortest(mut &d: decimal, mant: u64, exp: int, &flt: floatInfo) {
     // in which case the next lowest is mant*2-1 << exp-mantbits-1.
     // Either way, call it mantlo << explo-mantbits.
     // Our lower bound is halfway between, mantlo*2+1 << explo-mantbits-1.
-    let mut mantlo: u64 = 0
-    let mut explo: int = 0
+    mut mantlo := u64(0)
+    mut explo := 0
     if mant > 1<<flt.mantbits || exp == minexp {
         mantlo = mant - 1
         explo = exp
@@ -303,14 +303,14 @@ fn roundShortest(mut &d: decimal, mant: u64, exp: int, &flt: floatInfo) {
         mantlo = mant * 2 - 1
         explo = exp - 1
     }
-    let mut lower = decimal{}
+    mut lower := decimal{}
     lower.assign(mantlo * 2 + 1)
     lower.shift(explo - int(flt.mantbits) - 1)
 
     // The upper and lower bounds are possible outputs only if
     // the original mantissa is even, so that IEEE round-to-even
     // would round to the original mantissa and not the neighbors.
-    let inclusive = mant%2 == 0
+    inclusive := mant%2 == 0
 
     // As we walk the digits we want to know whether rounding up would fall
     // within the upper bound. This is tracked by upperdelta:
@@ -323,29 +323,29 @@ fn roundShortest(mut &d: decimal, mant: u64, exp: int, &flt: floatInfo) {
     //
     // If upperdelta == 2, then the difference is greater than 1
     // and we know that rounding up falls within the bound.
-    let mut upperdelta: u8 = 0
+    mut upperdelta := u8(0)
 
     // Now we can figure out the minimum number of digits required.
     // Walk along until d has distinguished itself from upper and lower.
-    let mut ui = 0
+    mut ui := 0
     for ; ui++ {
         // lower, d, and upper may have the decimal points at different
         // places. In this case upper is the longest, so we iterate from
         // ui==0 and start li and mi at (possibly) -1.
-        let mi = ui - upper.dp + d.dp
+        mi := ui - upper.dp + d.dp
         if mi >= d.nd {
             break
         }
-        let li = ui - upper.dp + lower.dp
-        let mut l = byte('0')             // lower digit
+        li := ui - upper.dp + lower.dp
+        mut l := byte('0')             // lower digit
         if li >= 0 && li < lower.nd {
             l = lower.d[li]
         }
-        let mut m = byte('0') // middle digit
+        mut m := byte('0') // middle digit
         if mi >= 0 {
             m = d.d[mi]
         }
-        let mut u = byte('0') // upper digit
+        mut u := byte('0') // upper digit
         if ui < upper.nd {
             u = upper.d[ui]
         }
@@ -353,7 +353,7 @@ fn roundShortest(mut &d: decimal, mant: u64, exp: int, &flt: floatInfo) {
         // Okay to round down (truncate) if lower has a different digit
         // or if lower is inclusive and is exactly the result of rounding
         // down (i.e., and we have reached the final digit of lower).
-        let okdown = l != m || inclusive && li+1 == lower.nd
+        okdown := l != m || inclusive && li+1 == lower.nd
 
         match {
         | upperdelta == 0 && m+1 < u:
@@ -374,7 +374,7 @@ fn roundShortest(mut &d: decimal, mant: u64, exp: int, &flt: floatInfo) {
         }
         // Okay to round up if upper has a different digit and either upper
         // is inclusive or upper is bigger than the result of rounding up.
-        let okup = upperdelta > 0 && (inclusive || upperdelta > 1 || ui+1 < upper.nd)
+        okup := upperdelta > 0 && (inclusive || upperdelta > 1 || ui+1 < upper.nd)
 
         // If it's okay to do either, then round to the nearest one.
         // If it's okay to do only one, do it.
@@ -400,7 +400,7 @@ fn fmtE(mut dst: []byte, neg: bool, d: decimalSlice, prec: int, fmt: byte): []by
     }
 
     // first digit
-    let mut ch: byte = '0'
+    mut ch := '0'
     if d.nd != 0 {
         ch = d.d[0]
     }
@@ -409,8 +409,8 @@ fn fmtE(mut dst: []byte, neg: bool, d: decimalSlice, prec: int, fmt: byte): []by
     // .moredigits
     if prec > 0 {
         dst = append(dst, '.')
-        let mut i = 1
-        let m = min(d.nd, prec + 1)
+        mut i := 1
+        m := min(d.nd, prec + 1)
         if i < m {
             dst = append(dst, d.d[i:m]...)
             i = m
@@ -422,7 +422,7 @@ fn fmtE(mut dst: []byte, neg: bool, d: decimalSlice, prec: int, fmt: byte): []by
 
     // e±
     dst = append(dst, fmt)
-    let mut exp = d.dp - 1
+    mut exp := d.dp - 1
     if d.nd == 0 { // special case: 0 has exponent 0
         exp = 0
     }
@@ -456,7 +456,7 @@ fn fmtF(mut dst: []byte, neg: bool, d: decimalSlice, prec: int): []byte {
 
     // integer, padded with zeros as needed.
     if d.dp > 0 {
-        let mut m = min(d.nd, d.dp)
+        mut m := min(d.nd, d.dp)
         dst = append(dst, d.d[:m]...)
         for m < d.dp; m++ {
             dst = append(dst, '0')
@@ -467,10 +467,10 @@ fn fmtF(mut dst: []byte, neg: bool, d: decimalSlice, prec: int): []byte {
     // fraction
     if prec > 0 {
         dst = append(dst, '.')
-        let mut i = 0
+        mut i := 0
         for i < prec; i++ {
-            let mut ch = byte('0')
-            let j = d.dp + i
+            mut ch := byte('0')
+            j := d.dp + i
             if 0 <= j && j < d.nd {
                 ch = d.d[j]
             }
@@ -518,8 +518,8 @@ fn fmtX(mut dst: []byte, prec: int, fmt: byte, neg: bool,
 
     // Round if requested.
     if prec >= 0 && prec < 15 {
-        let shift = uint(prec * 4)
-        let extra = (mant << shift) & (1 << 60 - 1)
+        shift := uint(prec * 4)
+        extra := (mant << shift) & (1 << 60 - 1)
         mant >>= 60 - shift
         if extra|(mant & 1) > 1<<59 {
             mant++
@@ -532,7 +532,7 @@ fn fmtX(mut dst: []byte, prec: int, fmt: byte, neg: bool,
         }
     }
 
-    let mut hex = ""
+    mut hex := ""
     if fmt == 'X' {
         hex = upperhex
     } else {
@@ -555,7 +555,7 @@ fn fmtX(mut dst: []byte, prec: int, fmt: byte, neg: bool,
         }
     } else if prec > 0 {
         dst = append(dst, '.')
-        let mut i = 0
+        mut i := 0
         for i < prec; i++ {
             dst = append(dst, hex[(mant>>60)&15])
             mant <<= 4
@@ -563,7 +563,7 @@ fn fmtX(mut dst: []byte, prec: int, fmt: byte, neg: bool,
     }
 
     // p±
-    let mut ch = byte('P')
+    mut ch := byte('P')
     if fmt == lower(fmt) {
         ch = 'p'
     }

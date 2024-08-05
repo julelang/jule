@@ -33,7 +33,7 @@ struct cmdAttrs {
 }
 
 fn strSliceToCstrSlice(&s: []str): []*integ::Char {
-    let mut cs = make([]*integ::Char, len(s) + 1)
+    mut cs := make([]*integ::Char, len(s) + 1)
     for i in s {
         cs[i] = unsafe { (*integ::Char)(&s[i][0]) }
     }
@@ -42,7 +42,7 @@ fn strSliceToCstrSlice(&s: []str): []*integ::Char {
 }
 
 fn execvp(&file: str, &argv: []str): int {
-    let cargv = strSliceToCstrSlice(argv)
+    cargv := strSliceToCstrSlice(argv)
     unsafe {
         ret integ::Emit[int]("execvp({}, (char*const*){})", (*integ::Char)(&file[0]), &cargv[0])
     }
@@ -51,19 +51,19 @@ fn execvp(&file: str, &argv: []str): int {
 fn setenv(&envv: []str)! {
     const Overwrite = 1
     for _, env in envv {
-        let i = fastbytes::FindByteStr(env, '=')
+        i := fastbytes::FindByteStr(env, '=')
         if i == -1 {
             error(ProcessError.Env)
         }
         unsafe {
-            let key = env[:i]
+            key := env[:i]
             if len(env)-i == 1 {
-                let val = "\x00"
+                val := "\x00"
                 if cpp.setenv((*integ::Char)(&key[0]), (*integ::Char)(&val[0]), Overwrite) == -1 {
                     error(ProcessError.Env)
                 }
             } else {
-                let val = env[i+1:]
+                val := env[i+1:]
                 if cpp.setenv((*integ::Char)(&key[0]), (*integ::Char)(&val[0]), Overwrite) == -1 {
                     error(ProcessError.Env)
                 }
@@ -77,7 +77,7 @@ impl Cmd {
         if self.attrs.pid != invalidPid {
             panic("command is already spawned")
         }
-        let path = self.path    //readyPath(self.path) else { error(error) }
+        path := self.path       //readyPath(self.path) else { error(error) }
         let pipe: [2]integ::Int
         if unsafe { cpp.pipe(&pipe[0]) } == -1 {
             error(ProcessError.Spawn)
@@ -93,23 +93,23 @@ impl Cmd {
             error(ProcessError.Spawn)
         | 0:
             sys::Close(int(pipe[0]))
-            let mut args = make([]str, 1, 1 + len(self.Args))
+            mut args := make([]str, 1, 1 + len(self.Args))
             args[0] = path
             args = append(args, self.Args...)
             setenv(self.Env) else { error(error) }
             execvp(path, args)
-            let code = conv::Itoa(sys::GetLastErrno())
+            code := conv::Itoa(sys::GetLastErrno())
             unsafe { sys::Write(int(pipe[1]), &code[0], uint(len(code))) }
             sys::Close(int(pipe[1]))
             Exit(1)
         |:
             sys::Close(int(pipe[1]))
             let mut buf: [16]byte
-            let n = unsafe { sys::Read(int(pipe[0]), &buf[0], len(buf)) }
+            n := unsafe { sys::Read(int(pipe[0]), &buf[0], len(buf)) }
             sys::Close(int(pipe[0]))
             if n != 0 {
                 self.attrs.pid = invalidPid
-                let (code, _) = unsafe { conv::AtoiBp(&buf[0], n) }
+                code, _ := unsafe { conv::AtoiBp(&buf[0], n) }
                 error(processErrorFromCode(code))
             }
         }
@@ -129,7 +129,7 @@ impl Cmd {
         if self.attrs.pid == invalidPid {
             panic("command is not spawned")
         }
-        let mut stat = 0
+        mut stat := 0
         unsafe {
             if cpp.waitpid(self.attrs.pid, (*integ::Int)(&stat), 0) == -1 {
                 error(getLastProcessError())

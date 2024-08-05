@@ -78,7 +78,7 @@ impl scopeCoder {
             ref = true
             match type it.Expr.Model {
             | &Var:
-                let v = (&Var)(it.Expr.Model)
+                v := (&Var)(it.Expr.Model)
                 if v.Reference {
                     self.oc.ec.model(it.Expr.Model)
                     break
@@ -119,10 +119,10 @@ impl scopeCoder {
     }
 
     fn rangeIndexIter(mut &self, mut &it: &RangeIter) {
-        let begin = identCoder.iterBegin(uintptr(it))
-        let next = identCoder.iterNext(uintptr(it))
+        begin := identCoder.iterBegin(uintptr(it))
+        next := identCoder.iterNext(uintptr(it))
 
-        let mut ref = false
+        mut ref := false
         self.iterHead(it, ref, begin)
         if it.KeyA != nil {
             self.oc.varInitExpr(it.KeyA, fn() {
@@ -182,10 +182,10 @@ impl scopeCoder {
     }
 
     fn rangeHashmapIter(mut &self, mut &it: &RangeIter) {
-        let begin = identCoder.iterBegin(uintptr(it))
-        let next = identCoder.iterNext(uintptr(it))
+        begin := identCoder.iterBegin(uintptr(it))
+        next := identCoder.iterNext(uintptr(it))
 
-        let mut ref = false
+        mut ref := false
         self.iterHead(it, ref, begin)
         if it.KeyA != nil {
             self.oc.varInitExpr(it.KeyA, fn() { self.oc.write("it->first") })
@@ -234,7 +234,7 @@ impl scopeCoder {
     }
 
     fn conditional(mut &self, mut c: &Conditional) {
-        let mut writed = false
+        mut writed := false
         for (_, mut elif) in c.Elifs {
             if elif == nil {
                 continue
@@ -345,7 +345,7 @@ impl scopeCoder {
     }
 
     fn mapLookupAssign(mut &self, mut &a: &MultiAssign) {
-        let mut iem = (&IndexingExprModel)(a.R)
+        mut iem := (&IndexingExprModel)(a.R)
         self.oc.ec.possibleRefExpr(iem.Expr.Model)
         self.oc.write(".lookup(")
         self.oc.ec.possibleRefExpr(iem.Index.Model)
@@ -371,15 +371,15 @@ impl scopeCoder {
         self.oc.write("({\n")
         self.oc.addIndent()
 
-        let mut tup = (&TupleExprModel)(a.R)
+        mut tup := (&TupleExprModel)(a.R)
 
         for (i, mut r) in tup.Datas {
             self.oc.indent()
-            let mut l = a.L[i]
+            mut l := a.L[i]
             if l != nil {
                 match type l.Model {
                 | &Var:
-                    let mut v = (&Var)(l.Model)
+                    mut v := (&Var)(l.Model)
                     // If variable is reference and uninitialized,
                     // it should be declared in this multiple-assignment.
                     if v.Reference && !v.IsInitialized() {
@@ -421,7 +421,7 @@ impl scopeCoder {
         self.oc.addIndent()
         self.oc.indent()
 
-        let mut f = (&FnCallExprModel)(a.R)
+        mut f := (&FnCallExprModel)(a.R)
         self.oc.tc.rc.codeMut1(self.oc.Obj, f.Func.Result)
         self.oc.write(" " + assignResultName + " = ")
         self.oc.ec.possibleRefExpr(a.R)
@@ -480,7 +480,7 @@ impl scopeCoder {
             for (i, mut expr) in c.Exprs {
                 match {
                 | !m.TypeMatch:
-                    let caseExpr = self.matchExpr(m)
+                    caseExpr := self.matchExpr(m)
                     if m.Expr.GoodOperand(expr) {
                         if caseExpr != nil {
                             caseExpr()
@@ -496,7 +496,7 @@ impl scopeCoder {
                     }
                 |:
                     self.oc.write(matchExpr)
-                    let mut tk = (&TypeKind)(expr.Model)
+                    mut tk := (&TypeKind)(expr.Model)
                     if m.Expr.Kind.Trait() != nil {
                         self.oc.write(".type_is(")
                         self.oc.ec.boolean(expr.Kind.Sptr() != nil)
@@ -504,7 +504,7 @@ impl scopeCoder {
                         self.oc.write(conv::Itoa(self.oc.findTypeOffset(m.Expr.Kind.Trait(), expr.Kind)))
                         self.oc.write(")")
                     } else { // Any type.
-                        let j = self.oc.pushAnyType(tk)
+                        j := self.oc.pushAnyType(tk)
                         self.oc.write(".type == &" + anyTypeIdent)
                         self.oc.write(conv::Itoa(j))
                     }
@@ -615,7 +615,7 @@ impl scopeCoder {
             self.oc.indent()
             ret
         }
-        let mut datas = (&TupleExprModel)(r.Expr).Datas
+        mut datas := (&TupleExprModel)(r.Expr).Datas
         for i, data in datas {
             self.oc.write(resultName + "." + resultArgName)
             self.oc.write(conv::Itoa(i))
@@ -778,7 +778,7 @@ impl scopeCoder {
         self.oc.write("{\n")
         self.oc.addIndent()
         if !f.Decl.IsVoid() {
-            let mut tup = f.Result.Tup()
+            mut tup := f.Result.Tup()
             if tup != nil {
                 self.oc.indent()
                 self.oc.tc.rc.tup(self.oc.Obj, tup)

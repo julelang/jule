@@ -90,7 +90,7 @@ type PrimKind: types::TypeKind
 // Common group of semantic analysis expression model types and optimizer specific types.
 enum compExprModel: type {
     ExprModel: ExprModel,
-    str,                      // For built-in expressions.
+    str,                           // For built-in expressions.
     &UnsafeBinopExprModel,
     &UnsafeIndexingExprModel,
     &InlineStdInternalNosafeStobs,
@@ -111,12 +111,12 @@ impl exprCoder {
     }
 
     fn string(mut &self, &c: &Const) {
-        let content = c.ReadStr()
+        content := c.ReadStr()
         if len(content) == 0 { // Empty.
             self.oc.write(typeCoder.Str + "()")
             ret
         }
-        let len = conv::FmtInt(i64(len(content)), 10)
+        len := conv::FmtInt(i64(len(content)), 10)
         self.oc.write(typeCoder.Str)
         self.oc.write("(")
         cstrLit(self.oc.Obj, content)
@@ -152,7 +152,7 @@ impl exprCoder {
     }
 
     fn float32(mut &self, &c: &Const) {
-        let x = c.AsF64()
+        x := c.AsF64()
 
         // Special cases.
         if self.ftoaSpecialCases(x) {
@@ -171,7 +171,7 @@ impl exprCoder {
     }
 
     fn float64(mut &self, &c: &Const) {
-        let x = c.AsF64()
+        x := c.AsF64()
 
         // Special cases.
         if self.ftoaSpecialCases(x) {
@@ -244,7 +244,7 @@ impl exprCoder {
                     if m.Op.Id == TokenId.NotEq {
                         self.oc.write("!")
                     }
-                    let i = self.oc.pushAnyType(m.Right.Kind)
+                    i := self.oc.pushAnyType(m.Right.Kind)
                     self.oc.write(anyTypeIdent)
                     self.oc.write(conv::Itoa(i))
                     self.oc.write("_compare(")
@@ -279,7 +279,7 @@ impl exprCoder {
 
     fn var(mut &self, mut m: &Var) {
         if m.Binded {
-            let d = findDirective(m.Directives, Directive.Namespace)
+            d := findDirective(m.Directives, Directive.Namespace)
             if d != nil {
                 self.oc.write(concatAllParts(d.Args...))
                 self.oc.write("::")
@@ -358,7 +358,7 @@ impl exprCoder {
     fn possibleRefExpr(mut &self, expr: compExprModel) {
         match type expr {
         | &Var:
-            let v = (&Var)(expr)
+            v := (&Var)(expr)
             if v.Reference {
                 self.oc.write("(*(")
                 self.model(expr)
@@ -395,11 +395,11 @@ impl exprCoder {
                 self.possibleRefExpr(m.Expr)
                 ret
             }
-            let i = self.oc.pushAnyType(m.ExprKind)
+            i := self.oc.pushAnyType(m.ExprKind)
             self.oc.write(typeCoder.Any + "(")
             match type m.Expr {
             | &Const:
-                let prim = m.ExprKind.Prim()
+                prim := m.ExprKind.Prim()
                 if prim != nil && types::IsInt(prim.Kind) {
                     self.oc.write("static_cast<")
                     self.oc.write(self.oc.tc.prim(prim))
@@ -476,8 +476,8 @@ impl exprCoder {
             self.oc.write(")")
             ret
         }
-        let prim = m.Kind.Prim()
-        let eprim = m.ExprKind.Prim()
+        prim := m.Kind.Prim()
+        eprim := m.ExprKind.Prim()
         if eprim != nil && prim != nil && prim.IsStr() {
             if eprim.IsU8() {
                 self.oc.write(typeCoder.Str + "::from_byte(")
@@ -508,17 +508,17 @@ impl exprCoder {
     }
 
     fn args(mut &self, mut &m: &FnCallExprModel) {
-        let mut j = 0
+        mut j := 0
         if m.Func.Owner != nil && !m.Func.Decl.Statically ||
             len(m.Func.Params) > 0 && m.Func.Params[0].Decl.IsSelf() {
             j++ // Skip receiver parameter.
         }
         for i, arg in m.Args {
-            let p = m.Func.Params[j]
+            p := m.Func.Params[j]
             if p.Decl != nil && p.Decl.Reference {
                 match type arg {
                 | &Var:
-                    let v = (&Var)(arg)
+                    v := (&Var)(arg)
                     if v.Reference {
                         self.model(arg)
                         goto end
@@ -544,7 +544,7 @@ impl exprCoder {
             self.funcIns((&FnIns)(expr))
             ret
         | &StructSubIdentExprModel:
-            let mut ssie = (&StructSubIdentExprModel)(expr)
+            mut ssie := (&StructSubIdentExprModel)(expr)
             if ssie.Method != nil {
                 self.funcIns(ssie.Method)
                 ret
@@ -580,7 +580,7 @@ impl exprCoder {
         if !m.Func.IsBuiltin() && len(m.Func.Decl.Params) > 0 && m.Func.Decl.Params[0].IsSelf() {
             match type m.Expr {
             | &StructSubIdentExprModel:
-                let mut ssie = (&StructSubIdentExprModel)(m.Expr)
+                mut ssie := (&StructSubIdentExprModel)(m.Expr)
                 match {
                 | m.Func.Decl.Params[0].IsRef()
                 | ssie.Expr.Kind.Sptr() != nil:
@@ -601,7 +601,7 @@ impl exprCoder {
     }
 
     fn pureFuncCall(mut &self, mut &m: &FnCallExprModel) {
-        let wrapped = self.isWrapped(m)
+        wrapped := self.isWrapped(m)
         self.modelForCall(m.Expr)
         if !m.Func.IsBuiltin() {
             if m.Func.Decl.Binded && len(m.Func.Generics) > 0 {
@@ -618,11 +618,11 @@ impl exprCoder {
             }
         }
         self.pushCallInf(m)
-        let mut locinfo = false
+        mut locinfo := false
         if !m.Func.IsBuiltin() && len(m.Func.Decl.Params) > 0 && m.Func.Decl.Params[0].IsSelf() {
             match type m.Expr {
             | &StructSubIdentExprModel:
-                let mut ssie = (&StructSubIdentExprModel)(m.Expr)
+                mut ssie := (&StructSubIdentExprModel)(m.Expr)
                 match {
                 | m.Func.Decl.Params[0].IsRef():
                     // Ignore dereferencing, use data directly to call method.
@@ -641,7 +641,7 @@ impl exprCoder {
                     if ssie.Expr.Kind.Struct() != nil {
                         match type ssie.Expr.Model {
                         | &Var:
-                            let v = (&Var)(ssie.Expr.Model)
+                            v := (&Var)(ssie.Expr.Model)
                             if v.Reference {
                                 break
                             }
@@ -689,7 +689,7 @@ impl exprCoder {
     fn coFuncCall(mut &self, mut &m: &FnCallExprModel) {
         self.oc.write("{\n")
         self.oc.addIndent()
-        let mut head = StrBuilder.New(1 << 5)
+        mut head := StrBuilder.New(1 << 5)
         head.WriteStr("std::thread([")
         if m.Func.Owner != nil {
             head.WriteStr(identCoder.Self)
@@ -703,11 +703,11 @@ impl exprCoder {
             }
             match type arg {
             | &Var:
-                let mut v = (&Var)(arg)
+                mut v := (&Var)(arg)
                 head.WriteStr(identCoder.var(v))
                 continue
             }
-            let name = "_co_arg_" + conv::Itoa(i)
+            name := "_co_arg_" + conv::Itoa(i)
             head.WriteStr(name)
             self.oc.indent()
             self.oc.write(self.oc.tc.kind(m.Func.Params[i].Kind))
@@ -719,11 +719,11 @@ impl exprCoder {
             self.oc.write(" = ")
             self.possibleRefExpr(arg)
             self.oc.write(";\n")
-            let argS: any = name
+            argS := any(name)
             m.Args[i] = unsafe { *(*ExprModel)(&argS) }
         }
         self.oc.indent()
-        self.oc.Obj.Write(unsafe{ head.Buf() })
+        self.oc.Obj.Write(unsafe { head.Buf() })
         self.oc.write("](void) mutable -> void {\n")
         self.oc.addIndent()
         self.oc.indent()
@@ -743,7 +743,7 @@ impl exprCoder {
             self.oc.write(";")
             ret
         }
-        let mut tup = (&TupleExprModel)(d.Model)
+        mut tup := (&TupleExprModel)(d.Model)
         self.oc.tc.rc.tup(self.oc.Obj, f.Result.Tup())
         self.oc.write("{")
         for i, data in tup.Datas {
@@ -784,12 +784,12 @@ impl exprCoder {
                 self.oc.sc.scope(m.Except)
                 self.oc.write("\n")
             } else {
-                let forwarded = isForwarded(m.Except)
+                forwarded := isForwarded(m.Except)
                 self.oc.write("(except.ok()) ? (except.result) : (")
                 if forwarded {
                     self.oc.write("{")
                 }
-                let mut stmt = m.Except.Stmts[len(m.Except.Stmts)-1]
+                mut stmt := m.Except.Stmts[len(m.Except.Stmts)-1]
                 match type stmt {
                 | &Data:
                     m.Except.Stmts = m.Except.Stmts[:len(m.Except.Stmts)-1]
@@ -976,7 +976,7 @@ impl exprCoder {
 
     fn funcIns(mut &self, mut m: &FnIns) {
         if m.Decl != nil && m.Decl.Binded {
-            let d = findDirective(m.Decl.Directives, Directive.Namespace)
+            d := findDirective(m.Decl.Directives, Directive.Namespace)
             if d != nil {
                 self.oc.write(concatAllParts(d.Args...))
                 self.oc.write("::")
@@ -1050,7 +1050,7 @@ impl exprCoder {
         if m.Func.Decl.IsVoid() {
             match type m.Err.Model {
             | &Var:
-                let v = (&Var)(m.Err.Model)
+                v := (&Var)(m.Err.Model)
                 if v.Ident == TokenKind.Error {
                     self.oc.write("jule::VoidExceptional(except.error)")
                     ret
@@ -1062,7 +1062,7 @@ impl exprCoder {
             self.oc.tc.rc.codeMut1(self.oc.Obj, m.Func.Result)
             match type m.Err.Model {
             | &Var:
-                let v = (&Var)(m.Err.Model)
+                v := (&Var)(m.Err.Model)
                 if v.Ident == TokenKind.Error {
                     self.oc.write(">(except.error)")
                     ret
@@ -1071,7 +1071,7 @@ impl exprCoder {
             self.oc.write(">(" + typeCoder.Any + "(")
         }
         self.possibleRefExpr(m.Err.Model)
-        let i = self.oc.pushAnyType(m.Err.Kind)
+        i := self.oc.pushAnyType(m.Err.Kind)
         self.oc.write(", &" + anyTypeIdent)
         self.oc.write(conv::Itoa(i))
         self.oc.write("))")
@@ -1115,7 +1115,7 @@ impl exprCoder {
     }
 
     fn makeCallSlice(mut &self, mut &m: &BuiltinMakeCallExprModel) {
-        let mut slice = m.Kind.Slc()
+        mut slice := m.Kind.Slc()
         self.oc.write(self.oc.tc.kind(m.Kind))
         self.oc.write("::alloc(")
         self.possibleRefExpr(m.Len)
@@ -1159,11 +1159,11 @@ impl exprCoder {
         self.oc.write("{ ")
         self.oc.write(self.oc.tc.asSlice(m.Elems.ElemKind))
 
-        let mut ptr = false
+        mut ptr := false
         match type m.Dest {
         | &UnaryExprModel:
             // Use raw pointer directly if exist.
-            let mut u = (&UnaryExprModel)(m.Dest)
+            mut u := (&UnaryExprModel)(m.Dest)
             if u.Expr.Kind.Ptr() != nil {
                 self.oc.write(" *" + destIdent + " = ")
                 self.possibleRefExpr(u.Expr.Model)
@@ -1242,7 +1242,7 @@ impl exprCoder {
     fn runeLit(mut &self, m: &RuneExprModel) {
         if m.Code <= 127 { // ASCII.
             self.oc.Obj.WriteByte('\'')
-            let mut b = sbtoa(byte(m.Code))
+            mut b := sbtoa(byte(m.Code))
             if b == "'" {
                 self.oc.Obj.WriteByte('\\')
             }
@@ -1268,11 +1268,11 @@ impl exprCoder {
             self.oc.write(m.Code)
             ret
         }
-        let n = self.oc.Obj.Len()
-        let mut args = make([]any, len(m.Exprs))
+        n := self.oc.Obj.Len()
+        mut args := make([]any, len(m.Exprs))
         for (i, mut expr) in m.Exprs {
             self.possibleRefExpr(expr)
-            let mut buf = unsafe { self.oc.Obj.Buf() }
+            mut buf := unsafe { self.oc.Obj.Buf() }
             args[i] = str(buf[n:])
             unsafe { self.oc.Obj.SetBuf(buf[:n]) }
         }
@@ -1292,7 +1292,7 @@ impl exprCoder {
         if m.NotEq {
             self.oc.write("(!")
         }
-        let s = m.Right.ReadStr()
+        s := m.Right.ReadStr()
         self.possibleRefExpr(m.Left)
         self.oc.write(".equal(")
         cstrLit(self.oc.Obj, s)
@@ -1427,7 +1427,7 @@ impl exprCoder {
             }
             ret
         }
-        let mut tup = t.Tup()
+        mut tup := t.Tup()
         if tup != nil {
             self.oc.tc.rc.tup(self.oc.Obj, tup)
             self.oc.write("{")
@@ -1446,12 +1446,12 @@ impl exprCoder {
             self.oc.write("}")
             ret
         }
-        let mut enm = t.Enum()
+        mut enm := t.Enum()
         if enm != nil {
             self.model(enm.Items[0].Value.Data.Model)
             ret
         }
-        let prim = t.Prim()
+        prim := t.Prim()
         if prim != nil {
             if types::IsNum(prim.Kind) {
                 self.oc.write("0")
@@ -1463,14 +1463,14 @@ impl exprCoder {
             ret
         }
         if t.Arr() != nil {
-            let mut arr = t.Arr()
+            mut arr := t.Arr()
             self.oc.write(self.oc.tc.kind(t))
             self.oc.write("(")
             self.initExpr(arr.Elem)
             self.oc.write(")")
             ret
         }
-        let mut s = t.Struct()
+        mut s := t.Struct()
         if s != nil && s.Decl.Binded && findDirective(s.Decl.Directives, Directive.Typedef) == nil {
             self.oc.write("(")
             self.oc.write(self.oc.tc.kind(t))
@@ -1514,7 +1514,7 @@ fn sbtoa(b: byte): str {
         ret "\\x00"
     }
     if b < utf8::RuneSelf { // ASCII, fast way.
-        let seq = decomposeCommonEsq(b)
+        seq := decomposeCommonEsq(b)
         if seq != "" {
             ret seq
         }
@@ -1522,7 +1522,7 @@ fn sbtoa(b: byte): str {
             ret str(b)
         }
     }
-    let seq = conv::FmtUint(u64(b), 8)
+    seq := conv::FmtUint(u64(b), 8)
     if len(seq) == 2 {
         ret "\\0" + seq
     }
@@ -1552,7 +1552,7 @@ fn ftoa(mut &s: StrBuilder, f: f64, bitsize: int) {
             ret
         }
     }
-    let m = conv::FmtFloat(f, 'f', -1, bitsize)
+    m := conv::FmtFloat(f, 'f', -1, bitsize)
     s.WriteStr(m)
     if !strings::Contains(m, ".") {
         s.WriteStr(".0")
@@ -1591,7 +1591,7 @@ fn utoa(mut &s: StrBuilder, x: u64) {
 }
 
 fn isForwarded(&s: &Scope): bool {
-    let last = s.Stmts[len(s.Stmts)-1]
+    last := s.Stmts[len(s.Stmts)-1]
     match type last {
     | &Data:
         match type (&Data)(last).Model {
@@ -1621,6 +1621,6 @@ fn isAny(mut &t: &TypeKind): bool {
     if t.TypeEnum() != nil {
         ret true
     }
-    let prim = t.Prim()
+    prim := t.Prim()
     ret prim != nil && prim.IsAny()
 }

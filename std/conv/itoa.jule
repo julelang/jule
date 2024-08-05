@@ -61,7 +61,7 @@ fn FmtUint(i: u64, base: int): str {
     if fastSmalls && i < nSmalls && base == 10 {
         ret small(int(i))
     }
-    let (_, s) = fmtBits(nil, i, base, false, false)
+    _, s := fmtBits(nil, i, base, false, false)
     ret s
 }
 
@@ -72,7 +72,7 @@ fn FmtInt(i: i64, base: int): str {
     if fastSmalls && 0 <= i && i < nSmalls && base == 10 {
         ret small(int(i))
     }
-    let (_, s) = fmtBits(nil, u64(i), base, i < 0, false)
+    _, s := fmtBits(nil, u64(i), base, i < 0, false)
     ret s
 }
 
@@ -104,8 +104,8 @@ fn fmtBits(mut dst: []byte, mut u: u64, base: int, neg: bool, append_: bool): (d
     }
     // 2 <= base && base <= len(digits)
 
-    let mut a = make([]byte, 64 + 1) // +1 for sign of 64bit value in base 2
-    let mut i = len(a)
+    mut a := make([]byte, 64 + 1) // +1 for sign of 64bit value in base 2
+    mut i := len(a)
 
     if neg {
         u = -u
@@ -124,11 +124,11 @@ fn fmtBits(mut dst: []byte, mut u: u64, base: int, neg: bool, append_: bool): (d
                 // Avoid using r = a%b in addition to q = a/b
                 // since 64bit division and modulo operations
                 // are calculated by runtime functions on 32bit machines.
-                let q = u / 1e9
-                let mut us = uint(u - q * 1e9) // u % 1e9 fits into a uint
-                let mut j = 4
+                q := u / 1e9
+                mut us := uint(u - q * 1e9) // u % 1e9 fits into a uint
+                mut j := 4
                 for j > 0; j-- {
-                    let is = us % 100 * 2
+                    is := us % 100 * 2
                     us /= 100
                     i -= 2
                     a[i+1] = smallsStr[is+1]
@@ -146,9 +146,9 @@ fn fmtBits(mut dst: []byte, mut u: u64, base: int, neg: bool, append_: bool): (d
         }
 
         // u guaranteed to fit into a uint
-        let mut us = uint(u)
+        mut us := uint(u)
         for us >= 100 {
-            let is = us % 100 * 2
+            is := us % 100 * 2
             us /= 100
             i -= 2
             a[i+1] = smallsStr[is+1]
@@ -156,7 +156,7 @@ fn fmtBits(mut dst: []byte, mut u: u64, base: int, neg: bool, append_: bool): (d
         }
 
         // us < 100
-        let is = us * 2
+        is := us * 2
         i--
         a[i] = smallsStr[is+1]
         if us >= 10 {
@@ -171,9 +171,9 @@ fn fmtBits(mut dst: []byte, mut u: u64, base: int, neg: bool, append_: bool): (d
         // the constant 7 we tell the compiler that the shift count is always
         // less than 8 which is smaller than any register width. This allows
         // the compiler to generate better code for the shift operation.
-        let shift = uint(bits::TrailingZeros(uint(base))) & 0b111
-        let b = u64(base)
-        let m = uint(base) - 1                                    // == 1<<shift - 1
+        shift := uint(bits::TrailingZeros(uint(base))) & 0b111
+        b := u64(base)
+        m := uint(base) - 1                                    // == 1<<shift - 1
         for u >= b {
             i--
             a[i] = digits[uint(u)&m]
@@ -184,13 +184,13 @@ fn fmtBits(mut dst: []byte, mut u: u64, base: int, neg: bool, append_: bool): (d
         a[i] = digits[uint(u)]
     } else {
         // general case
-        let b = u64(base)
+        b := u64(base)
         for u >= b {
             i--
             // Avoid using r = a%b in addition to q = a/b
             // since 64bit division and modulo operations
             // are calculated by runtime functions on 32bit machines.
-            let q = u / b
+            q := u / b
             a[i] = digits[uint(u-q*b)]
             u = q
         }

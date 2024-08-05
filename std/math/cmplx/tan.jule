@@ -71,7 +71,7 @@ impl Cmplx {
         | self.Real() == 0 && math::IsNaN(self.Imag()):
             ret self
         }
-        let mut d = math::Cos(2 * self.Real()) + math::Cosh(2 * self.Imag())
+        mut d := math::Cos(2 * self.Real()) + math::Cosh(2 * self.Imag())
         if math::Abs(d) < 0.25 {
             d = tanSeries(self)
         }
@@ -105,7 +105,7 @@ impl Cmplx {
         | self.Imag() == 0 && math::IsNaN(self.Real()):
             ret self
         }
-        let d = math::Cosh(2 * self.Real()) + math::Cos(2 * self.Imag())
+        d := math::Cosh(2 * self.Real()) + math::Cos(2 * self.Imag())
         if d == 0 {
             ret Cmplx.Inf(1)
         }
@@ -139,7 +139,7 @@ impl Cmplx {
 
     // Returns the cotangent of complex number.
     fn Cot(self): Cmplx {
-        let mut d = math::Cosh(2 * self.Imag()) - math::Cos(2 * self.Real())
+        mut d := math::Cosh(2 * self.Imag()) - math::Cos(2 * self.Real())
         if math::Abs(d) < 0.25 {
             d = tanSeries(self)
         }
@@ -183,7 +183,7 @@ fn reducePi(mut x: f64): f64 {
         const PI2 = 1.5099578831723193e-07 // 0x3e84442d00000000
         const PI3 = 1.0780605716316238e-14 // 0x3d08469898cc5170
 
-        let mut t = x / math::Pi
+        mut t := x / math::Pi
         t += 0.5
         t = f64(i64(t)) // i64(t) = the multiple
         ret ((x - t * PI1) - t * PI2) - t * PI3
@@ -196,8 +196,8 @@ fn reducePi(mut x: f64): f64 {
 
     // Extract out the integer and exponent such that,
     // x = ix * 2 ** exp.
-    let mut ix = math::F64Bits(x)
-    let exp = int(ix >> SHIFT & MASK) - BIAS - SHIFT
+    mut ix := math::F64Bits(x)
+    exp := int(ix >> SHIFT & MASK) - BIAS - SHIFT
     ix &= FRAC_MASK
     ix |= 1 << SHIFT
 
@@ -230,19 +230,19 @@ fn reducePi(mut x: f64): f64 {
     // Use the exponent to extract the 3 appropriate u64 digits from mPi,
     // B ~ (z0, z1, z2), such that the product leading digit has the exponent -64.
     // Note, exp >= 50 since x >= REDUCE_THRESHOLD and exp < 971 for maximum f64.
-    let (digit, bitshift) = uint(exp + 64) / 64, uint(exp + 64) % 64
-    let z0 = (mPi[digit] << bitshift) | (mPi[digit+1] >> (64 - bitshift))
-    let z1 = (mPi[digit+1] << bitshift) | (mPi[digit+2] >> (64 - bitshift))
-    let z2 = (mPi[digit+2] << bitshift) | (mPi[digit+3] >> (64 - bitshift))
+    digit, bitshift := uint(exp + 64) / 64, uint(exp + 64) % 64
+    z0 := (mPi[digit] << bitshift) | (mPi[digit+1] >> (64 - bitshift))
+    z1 := (mPi[digit+1] << bitshift) | (mPi[digit+2] >> (64 - bitshift))
+    z2 := (mPi[digit+2] << bitshift) | (mPi[digit+3] >> (64 - bitshift))
     // Multiply mantissa by the digits and extract the upper two digits (hi, lo).
-    let (z2hi, _) = bits::Mul64(z2, ix)
-    let (z1hi, z1lo) = bits::Mul64(z1, ix)
-    let z0lo = z0 * ix
-    let (lo, c) = bits::Add64(z1lo, z2hi, 0)
-    let (mut hi, _) = bits::Add64(z0lo, z1hi, c)
+    z2hi, _ := bits::Mul64(z2, ix)
+    z1hi, z1lo := bits::Mul64(z1, ix)
+    z0lo := z0 * ix
+    lo, c := bits::Add64(z1lo, z2hi, 0)
+    mut hi, _ := bits::Add64(z0lo, z1hi, c)
     // Find the magnitude of the fraction.
-    let lz = uint(bits::LeadingZeros64(hi))
-    let e = u64(BIAS - (lz + 1))
+    lz := uint(bits::LeadingZeros64(hi))
+    e := u64(BIAS - (lz + 1))
     // Clear implicit mantissa bit and shift into place.
     hi = (hi << (lz + 1)) | (lo >> (64 - (lz + 1)))
     hi >>= 64 - SHIFT
@@ -260,15 +260,15 @@ fn reducePi(mut x: f64): f64 {
 fn tanSeries(z: Cmplx): f64 {
     const MACHEP = 1.0 / (1 << 53)
 
-    let mut x = reducePi(math::Abs(2 * z.Real()))
+    mut x := reducePi(math::Abs(2 * z.Real()))
     x = x * x
-    let mut y = math::Abs(2 * z.Imag())
+    mut y := math::Abs(2 * z.Imag())
     y = y * y
-    let mut x2 = 1.0
-    let mut y2 = 1.0
-    let mut f = 1.0
-    let mut rn = 0.0
-    let mut d = 0.0
+    mut x2 := 1.0
+    mut y2 := 1.0
+    mut f := 1.0
+    mut rn := 0.0
+    mut d := 0.0
     for {
         rn++
         f *= rn
@@ -276,7 +276,7 @@ fn tanSeries(z: Cmplx): f64 {
         f *= rn
         x2 *= x
         y2 *= y
-        let mut t = y2 + x2
+        mut t := y2 + x2
         t /= f
         d += t
 

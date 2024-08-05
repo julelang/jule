@@ -52,14 +52,14 @@ impl typeBuilder {
     }
 
     unsafe fn buildNamespace(mut self): &TypeDecl {
-        let mut t = &TypeDecl{
+        mut t := &TypeDecl{
             Token: self.tokens[*self.i],
         }
 
-        let mut nst = new(NamespaceTypeDecl)
-        let mut n = 0
+        mut nst := new(NamespaceTypeDecl)
+        mut n := 0
         for *self.i < len(self.tokens); *self.i++ {
-            let mut token = self.tokens[*self.i]
+            mut token := self.tokens[*self.i]
             if n%2 == 0 {
                 if token.Id != TokenId.Ident {
                     self.pushErr(token, LogMsg.InvalidSyntax)
@@ -85,21 +85,21 @@ impl typeBuilder {
         if *self.i >= len(self.tokens) {
             ret nil
         }
-        let token = self.tokens[*self.i]
+        token := self.tokens[*self.i]
         if token.Id != TokenId.LBracket {
             ret nil
         }
 
-        let mut parts = self.identGenerics()
+        mut parts := self.identGenerics()
         if len(parts) == 0 {
             self.pushErr(token, LogMsg.InvalidSyntax)
             ret nil
         }
 
-        let mut types = make([]&TypeDecl, 0, len(parts))
+        mut types := make([]&TypeDecl, 0, len(parts))
         for (_, mut part) in parts {
-            let mut j = 0
-            let (mut t, _) = unsafe { self.p.buildType(part, &j, true) }
+            mut j := 0
+            mut t, _ := unsafe { self.p.buildType(part, &j, true) }
             if j < len(part) {
                 self.pushErr(part[j], LogMsg.InvalidSyntax)
             }
@@ -109,10 +109,10 @@ impl typeBuilder {
     }
 
     unsafe fn identGenerics(mut self): [][]&Token {
-        let first = *self.i
-        let mut rangeN = 0
+        first := *self.i
+        mut rangeN := 0
         for *self.i < len(self.tokens); *self.i++ {
-            let token = self.tokens[*self.i]
+            token := self.tokens[*self.i]
             match token.Id {
             | TokenId.LBracket:
                 rangeN++
@@ -124,8 +124,8 @@ impl typeBuilder {
                 break
             }
         }
-        let mut tokens = self.tokens[first+1 : *self.i-1] // Take range of brackets.
-        let (mut parts, errors) = parts(tokens, TokenId.Comma, true)
+        mut tokens := self.tokens[first+1 : *self.i-1] // Take range of brackets.
+        mut parts, errors := parts(tokens, TokenId.Comma, true)
         if self.err {
             self.p.errors = append(self.p.errors, errors...)
         }
@@ -133,18 +133,18 @@ impl typeBuilder {
     }
 
     unsafe fn buildIdent(mut self): &TypeDecl {
-        let mut next = *self.i+1 < len(self.tokens)
+        mut next := *self.i+1 < len(self.tokens)
         if next && self.tokens[*self.i+1].Id == TokenId.DblColon {
             ret self.buildNamespace()
         }
-        let mut token = self.tokens[*self.i]
-        let mut it = &IdentTypeDecl{
+        mut token := self.tokens[*self.i]
+        mut it := &IdentTypeDecl{
             Token: token,
             Ident: token.Kind,
             Binded: false,
         }
         *self.i++
-        let mut itd = &TypeDecl{
+        mut itd := &TypeDecl{
             Token: token,
             Kind: it,
         }
@@ -161,9 +161,9 @@ impl typeBuilder {
             self.pushErr(self.tokens[*self.i-1], LogMsg.InvalidSyntax)
             ret itd
         }
-        let mut sit = new(SubIdentTypeDecl)
+        mut sit := new(SubIdentTypeDecl)
         sit.Idents = append(sit.Idents, it)
-        let mut ident = self.buildIdent()
+        mut ident := self.buildIdent()
         match type ident.Kind {
         | &IdentTypeDecl:
             sit.Idents = append(sit.Idents, (&IdentTypeDecl)(ident.Kind))
@@ -182,14 +182,14 @@ impl typeBuilder {
             ret nil
         }
         *self.i += 2 // Skip the bind keyword and dot token.
-        let mut t = self.buildIdent()
+        mut t := self.buildIdent()
         (&IdentTypeDecl)(t.Kind).Binded = true
         ret t
     }
 
     unsafe fn buildFn(mut self): &TypeDecl {
-        let mut token = self.tokens[*self.i]
-        let mut f = self.p.buildFnPrototype(self.tokens, *self.i, false)
+        mut token := self.tokens[*self.i]
+        mut f := self.p.buildFnPrototype(self.tokens, *self.i, false)
         if f == nil {
             ret nil
         }
@@ -203,7 +203,7 @@ impl typeBuilder {
     }
 
     unsafe fn buildPtr(mut self): &TypeDecl {
-        let mut token = self.tokens[*self.i]
+        mut token := self.tokens[*self.i]
         if *self.i+1 >= len(self.tokens) {
             self.pushErr(token, LogMsg.InvalidSyntax)
             ret nil
@@ -220,7 +220,7 @@ impl typeBuilder {
             }
         }
 
-        let mut elem = self.step()
+        mut elem := self.step()
         if elem == nil {
             ret nil
         }
@@ -234,14 +234,14 @@ impl typeBuilder {
     }
 
     unsafe fn buildSptr(mut self): &TypeDecl {
-        let mut token = self.tokens[*self.i]
+        mut token := self.tokens[*self.i]
         if *self.i+1 >= len(self.tokens) {
             self.pushErr(token, LogMsg.InvalidSyntax)
             ret nil
         }
 
         *self.i++
-        let mut elem = self.step()
+        mut elem := self.step()
         if elem == nil {
             ret nil
         }
@@ -255,9 +255,9 @@ impl typeBuilder {
     }
 
     unsafe fn buildSlc(mut self): &TypeDecl {
-        let mut token = self.tokens[*self.i]
+        mut token := self.tokens[*self.i]
         *self.i++ // skip right bracket
-        let mut elem = self.step()
+        mut elem := self.step()
         if elem == nil {
             ret nil
         }
@@ -270,22 +270,22 @@ impl typeBuilder {
     }
 
     unsafe fn buildArr(mut self): &TypeDecl {
-        let mut exprTokens = range(*self.i, TokenId.LBracket, TokenId.RBracket, self.tokens)
+        mut exprTokens := range(*self.i, TokenId.LBracket, TokenId.RBracket, self.tokens)
         if *self.i >= len(self.tokens) {
             self.pushErr(self.tokens[*self.i-1], LogMsg.MissingType)
             ret nil
         }
 
-        let mut elem = self.step()
+        mut elem := self.step()
         if elem == nil {
             ret nil
         }
 
-        let mut arrt = &ArrTypeDecl{
+        mut arrt := &ArrTypeDecl{
             Elem: elem,
         }
 
-        let mut token = exprTokens[0]
+        mut token := exprTokens[0]
         if len(exprTokens) == 1 && token.Id == TokenId.TripleDot {
             // Ignore.
         } else {
@@ -299,7 +299,7 @@ impl typeBuilder {
     }
 
     unsafe fn buildMap(mut self): &TypeDecl {
-        let mut mapToken = self.tokens[*self.i]
+        mut mapToken := self.tokens[*self.i]
         *self.i++ // Skip map token.
         if *self.i >= len(self.tokens) {
             self.pushErr(mapToken, LogMsg.MissingType)
@@ -307,7 +307,7 @@ impl typeBuilder {
         }
 
         // Get key type tokens without brackets.
-        let mut keyTokens = range(*self.i, TokenId.LBracket, TokenId.RBracket, self.tokens)
+        mut keyTokens := range(*self.i, TokenId.LBracket, TokenId.RBracket, self.tokens)
         if *self.i >= len(self.tokens) {
             self.pushErr(self.tokens[*self.i-1], LogMsg.MissingType)
             ret nil
@@ -316,9 +316,9 @@ impl typeBuilder {
             ret nil
         }
 
-        let mut mapt = new(MapTypeDecl)
-        let mut j = 0
-        let (mut keyt, mut ok) = self.p.buildType(keyTokens, &j, self.err)
+        mut mapt := new(MapTypeDecl)
+        mut j := 0
+        mut keyt, mut ok := self.p.buildType(keyTokens, &j, self.err)
         if !ok {
             ret nil
         } else if j < len(keyTokens) {
@@ -326,7 +326,7 @@ impl typeBuilder {
         }
         mapt.Key = keyt
 
-        let (mut valt, ok) = self.p.buildType(self.tokens, self.i, self.err)
+        mut valt, ok := self.p.buildType(self.tokens, self.i, self.err)
         if !ok {
             ret nil
         }
@@ -338,7 +338,7 @@ impl typeBuilder {
     }
 
     unsafe fn buildEnumerable(mut self): &TypeDecl {
-        let mut token = self.tokens[*self.i]
+        mut token := self.tokens[*self.i]
         if *self.i+2 >= len(self.tokens) {
             self.pushErr(token, LogMsg.InvalidSyntax)
             ret nil
@@ -353,7 +353,7 @@ impl typeBuilder {
     }
 
     unsafe fn step(mut self): &TypeDecl {
-        let token = self.tokens[*self.i]
+        token := self.tokens[*self.i]
         match token.Id {
         | TokenId.Ident:
             ret self.buildIdent()
@@ -385,7 +385,7 @@ impl typeBuilder {
     // Builds type.
     // Returns void if error occurs.
     unsafe fn build(mut self): (&TypeDecl, ok: bool) {
-        let mut root = self.step()
+        mut root := self.step()
         if root == nil {
             ret buildVoidType(), false
         }

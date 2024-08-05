@@ -61,7 +61,7 @@ impl scopeOptimizer {
     fn optimizeData(mut self, mut d: &Data) {
         match type d.Model {
         | &FnCallExprModel:
-            let mut m = (&FnCallExprModel)(d.Model)
+            mut m := (&FnCallExprModel)(d.Model)
             if env::Production {
                 if !m.Func.IsBuiltin() &&
                     isStdPackage(m.Func.Decl.Token.File.Path, "debug") {
@@ -92,7 +92,7 @@ impl scopeOptimizer {
             ret
         }
 
-        let mut constCase = false // Has cosntant true case.
+        mut constCase := false // Has cosntant true case.
 
         // Remove unnecessary trailing cases that comes after constant true case.
         for (i, mut elif) in c.Elifs {
@@ -112,8 +112,8 @@ impl scopeOptimizer {
         }
 
         // Remove unreachable cases.
-        let mut i = &c.Elifs[0]
-        let end = &c.Elifs[len(c.Elifs)-1]
+        mut i := &c.Elifs[0]
+        end := &c.Elifs[len(c.Elifs)-1]
         for i <= end; i++ {
             unsafe {
                 if isUnreachableConditionalCase(*i) {
@@ -131,7 +131,7 @@ impl scopeOptimizer {
             ret
         }
 
-        let mut only = -1
+        mut only := -1
         for j, elif in c.Elifs {
             if elif != nil {
                 if only != -1 {
@@ -150,13 +150,13 @@ impl scopeOptimizer {
 
     fn buildDefaultConstantTrueCase(mut self, mut case: &Case, mut &i: int, mut &m: &Match) {
         case.Exprs = nil // Remove expressions to remove eval overhead.
-        let start = i
+        start := i
     loop:
         for {
             if len(case.Scope.Stmts) == 0 {
                 break
             }
-            let mut &stmt = unsafe { *(&case.Scope.Stmts[len(case.Scope.Stmts)-1]) }
+            mut &stmt := unsafe { *(&case.Scope.Stmts[len(case.Scope.Stmts)-1]) }
             match type stmt {
             | &FallSt:
                 i++
@@ -189,7 +189,7 @@ impl scopeOptimizer {
             ret
         }
 
-        let mut constCase = false // Has cosntant true case.
+        mut constCase := false // Has cosntant true case.
 
         // Remove unnecessary trailing cases that comes after constant true case.
         for (mut i, mut case) in m.Cases {
@@ -206,8 +206,8 @@ impl scopeOptimizer {
         }
 
         // Remove unreachable cases.
-        let mut i = &m.Cases[0]
-        let end = &m.Cases[len(m.Cases)-1]
+        mut i := &m.Cases[0]
+        end := &m.Cases[len(m.Cases)-1]
         for i <= end; i++ {
             unsafe {
                 if isUnreachableMatchCase(*i) {
@@ -221,7 +221,7 @@ impl scopeOptimizer {
             ret
         }
 
-        let mut only = -1
+        mut only := -1
         for j, case in m.Cases {
             if case != nil {
                 if only != -1 {
@@ -255,7 +255,7 @@ impl scopeOptimizer {
         }
         match type a.R.Model {
         | &SlicingExprModel:
-            let mut sem = (&SlicingExprModel)(a.R.Model)
+            mut sem := (&SlicingExprModel)(a.R.Model)
             if a.L.Model == sem.Expr {
                 self.setCurrentStmt(&MutSlicingExprModel{
                     Token: sem.Token,
@@ -273,7 +273,7 @@ impl scopeOptimizer {
         if !Str {
             ret false
         }
-        let lp = a.L.Kind.Prim()
+        lp := a.L.Kind.Prim()
         if lp == nil || !lp.IsStr() {
             ret false
         }
@@ -310,11 +310,11 @@ impl scopeOptimizer {
             // Do not check division of structures safety.
             if Math && assign.L.Kind.Struct() == nil {
                 assign.Op.Kind = assign.Op.Kind[:len(assign.Op.Kind)-1]
-                let mut model: ExprModel = &BinopExprModel{
+                mut model := ExprModel(&BinopExprModel{
                     Op: assign.Op,
                     Left: assign.L,
                     Right: assign.R,
-                }
+                })
                 exprOptimizer.optimize(model)
                 match type model {
                 | &BinopExprModel:
@@ -332,7 +332,7 @@ impl scopeOptimizer {
         if Append {
             match type assign.R.Model {
             | &BuiltinAppendCallExprModel:
-                let mut m = (&BuiltinAppendCallExprModel)(assign.R.Model)
+                mut m := (&BuiltinAppendCallExprModel)(assign.R.Model)
                 if !areSameLvalueExprModel(assign.L.Model, m.Dest) {
                     ret
                 }
@@ -380,7 +380,7 @@ impl scopeOptimizer {
             !equalModels(assign.L[1].Model, tup.Datas[0].Model) {
             ret false
         }
-        let mut model = &SwapExprModel{
+        mut model := &SwapExprModel{
             Left: assign.L[0],
             Right: assign.L[1],
         }
@@ -435,7 +435,7 @@ impl scopeOptimizer {
     }
 
     fn optimizeChild(mut self, mut child: &Scope) {
-        let mut so = scopeOptimizer.new(child)
+        mut so := scopeOptimizer.new(child)
         so.optimize()
     }
 
@@ -455,7 +455,7 @@ fn isStdPackage(&f: str, p: str): bool {
 fn isConstantValidConditionalCase(&i: &If): bool {
     match type i.Expr {
     | &Const:
-        let c = (&Const)(i.Expr)
+        c := (&Const)(i.Expr)
         ret c.IsBool() && c.ReadBool()
     }
     ret false
@@ -464,10 +464,10 @@ fn isConstantValidConditionalCase(&i: &If): bool {
 fn isUnreachableExpr(&expr: ExprModel): bool {
     match type expr {
     | &Const:
-        let c = (&Const)(expr)
+        c := (&Const)(expr)
         ret c.IsBool() && !c.ReadBool()
     | &BinopExprModel:
-        let m = (&BinopExprModel)(expr)
+        m := (&BinopExprModel)(expr)
         if m.Op.Id == TokenId.DblAmper {
             ret isUnreachableExpr(m.Left.Model) ||
                 isUnreachableExpr(m.Right.Model)

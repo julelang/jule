@@ -132,7 +132,7 @@ fn buildField(mut decl: &FieldDecl): &Field {
 }
 
 fn buildFields(mut &decls: []&FieldDecl): []&Field {
-    let mut fields = make([]&Field, 0, len(decls))
+    mut fields := make([]&Field, 0, len(decls))
     for (_, mut decl) in decls {
         fields = append(fields, buildField(decl))
     }
@@ -163,7 +163,7 @@ fn buildParam(mut decl: &ParamDecl): &Param {
 }
 
 fn buildParams(mut &decls: []&ParamDecl): []&Param {
-    let mut params = make([]&Param, 0, len(decls))
+    mut params := make([]&Param, 0, len(decls))
     for (_, mut decl) in decls {
         params = append(params, buildParam(decl))
     }
@@ -199,7 +199,7 @@ fn buildFunc(mut decl: &FnDecl): &Fn {
 }
 
 fn buildMethods(mut &decls: []&FnDecl): []&Fn {
-    let mut methods = make([]&Fn, 0, len(decls))
+    mut methods := make([]&Fn, 0, len(decls))
     for (_, mut decl) in decls {
         methods = append(methods, buildFunc(decl))
     }
@@ -207,7 +207,7 @@ fn buildMethods(mut &decls: []&FnDecl): []&Fn {
 }
 
 fn buildTraitInherits(mut &inherits: []&TypeDecl): []&TypeSymbol {
-    let mut symbols = make([]&TypeSymbol, 0, len(inherits))
+    mut symbols := make([]&TypeSymbol, 0, len(inherits))
     for (_, mut it) in inherits {
         symbols = append(symbols, buildType(it))
     }
@@ -233,7 +233,7 @@ fn buildEnumItem(mut decl: &EnumItemDecl): &EnumItem {
 }
 
 fn buildEnumItems(mut &decls: []&EnumItemDecl): []&EnumItem {
-    let mut items = make([]&EnumItem, 0, len(decls))
+    mut items := make([]&EnumItem, 0, len(decls))
     for (_, mut decl) in decls {
         items = append(items, buildEnumItem(decl))
     }
@@ -259,7 +259,7 @@ fn buildTypeEnumItem(mut decl: &TypeEnumItemDecl): &TypeEnumItem {
 }
 
 fn buildTypeEnumItems(mut &decls: []&TypeEnumItemDecl): []&TypeEnumItem {
-    let mut items = make([]&TypeEnumItem, 0, len(decls))
+    mut items := make([]&TypeEnumItem, 0, len(decls))
     for (_, mut decl) in decls {
         items = append(items, buildTypeEnumItem(decl))
     }
@@ -293,7 +293,7 @@ fn buildVar(mut decl: &VarDecl): &Var {
 }
 
 fn buildVars(mut decls: []&VarDecl): []&Var {
-    let mut vars = make([]&Var, 0, len(decls))
+    mut vars := make([]&Var, 0, len(decls))
     for (_, mut decl) in decls {
         vars = append(vars, buildVar(decl))
     }
@@ -322,7 +322,7 @@ struct symbolBuilder {
 
 impl symbolBuilder {
     fn getRoot(mut &self): &symbolBuilder {
-        let mut root = self
+        mut root := self
         for root.owner != nil {
             root = root.owner
         }
@@ -343,14 +343,14 @@ impl symbolBuilder {
     }
 
     fn checkCppUseDeclPath(mut self, &decl: &UseDecl, &path: str): (ok: bool) {
-        let ext = path::Ext(path)
+        ext := path::Ext(path)
         if !IsValidHeaderExt(ext) && !IsValidCppExt(ext) {
             self.pushErr(decl.Token, LogMsg.InvalidCppExt, ext)
             ret false
         }
 
         // Exist?
-        let info = Status.Of(path) else {
+        info := Status.Of(path) else {
             self.pushErr(decl.Token, LogMsg.UseNotFound, decl.LinkPath)
             ret false
         }
@@ -363,11 +363,11 @@ impl symbolBuilder {
     }
 
     fn buildCppHeaderImport(mut self, mut &decl: &UseDecl): &ImportInfo {
-        let mut path = decl.LinkPath
+        mut path := decl.LinkPath
 
         if !IsStdHeaderPath(decl.LinkPath) {
             path = path::Join(decl.Token.File.Dir(), decl.LinkPath)
-            let mut ok = self.checkCppUseDeclPath(decl, path)
+            mut ok := self.checkCppUseDeclPath(decl, path)
             if !ok {
                 ret nil
             }
@@ -391,17 +391,17 @@ impl symbolBuilder {
     }
 
     fn buildStdImport(mut self, mut &decl: &UseDecl): &ImportInfo {
-        let mut path = decl.LinkPath[len("std::"):] // Skip "std::" prefix.
+        mut path := decl.LinkPath[len("std::"):] // Skip "std::" prefix.
         path = strings::Replace(path, TokenKind.DblColon, str(path::Separator), -1)
         path = path::Join(PathStdlib, path)
-        let (path, ok) = path::Abs(path)
+        path, ok := path::Abs(path)
         if !ok {
             self.pushErr(decl.Token, LogMsg.UseNotFound, decl.LinkPath)
             ret nil
         }
 
         // Exist?
-        let info = Status.Of(path) else {
+        info := Status.Of(path) else {
             self.pushErr(decl.Token, LogMsg.UseNotFound, decl.LinkPath)
             ret nil
         }
@@ -411,8 +411,8 @@ impl symbolBuilder {
         }
 
         // Select last identifier of namespace chain.
-        let i = strings::FindLast(decl.LinkPath, TokenKind.DblColon) + 1
-        let ident = decl.LinkPath[i:]
+        i := strings::FindLast(decl.LinkPath, TokenKind.DblColon) + 1
+        ident := decl.LinkPath[i:]
 
         ret &ImportInfo{
             ImportAll: decl.Full,
@@ -430,25 +430,25 @@ impl symbolBuilder {
     }
 
     fn buildIdentImport(mut &self, mut &decl: &UseDecl): &ImportInfo {
-        let modPath = self.importer.GetModPath()
+        modPath := self.importer.GetModPath()
         if len(modPath) == 0 {
             self.pushErr(decl.Token, LogMsg.ModuleNotFound)
             self.pushSuggestion(LogMsg.UseModInit)
             ret nil
         }
 
-        let mut path = decl.LinkPath
+        mut path := decl.LinkPath
         path = strings::Replace(path, TokenKind.DblColon, str(path::Separator), -1)
         path = path::Join(modPath, path)
 
-        let (path, ok) = path::Abs(path)
+        path, ok := path::Abs(path)
         if !ok {
             self.pushErr(decl.Token, LogMsg.UseNotFound, decl.LinkPath)
             ret nil
         }
 
         // Exist?
-        let info = Status.Of(path) else {
+        info := Status.Of(path) else {
             self.pushErr(decl.Token, LogMsg.UseNotFound, decl.LinkPath)
             ret nil
         }
@@ -458,8 +458,8 @@ impl symbolBuilder {
         }
 
         // Select last identifier of namespace chain.
-        let i = strings::FindLast(decl.LinkPath, TokenKind.DblColon) + 1
-        let ident = decl.LinkPath[i:]
+        i := strings::FindLast(decl.LinkPath, TokenKind.DblColon) + 1
+        ident := decl.LinkPath[i:]
 
         ret &ImportInfo{
             ImportAll: decl.Full,
@@ -489,7 +489,7 @@ impl symbolBuilder {
 
     fn checkDuplicateUseDecl(mut self, &pkg: &ImportInfo): (ok: bool) {
         // Find package by path to detect cpp header imports.
-        let lpkg = self.table.SelectPackage(fn(spkg: &ImportInfo): bool {
+        lpkg := self.table.SelectPackage(fn(spkg: &ImportInfo): bool {
             ret unsafe { pkg.Path == spkg.Path }
         })
         if lpkg == nil {
@@ -522,7 +522,7 @@ impl symbolBuilder {
             ret "std" + strings::Replace(path, str(path::Separator), TokenKind.DblColon, -1)
         }
 
-        let (root, _) = path::Abs(self.importer.GetModPath())
+        root, _ := path::Abs(self.importer.GetModPath())
         path = path[len(root):]
         if path[0] == path::Separator {
             path = path[1:]
@@ -532,11 +532,11 @@ impl symbolBuilder {
 
     fn pushCycleError(mut &self, &sb: &symbolBuilder, path: str, mut &message: StrBuilder) {
         const Padding = 7
-        let refersTo = Logf(
+        refersTo := Logf(
             LogMsg.RefersTo,
             self.getAsLinkPath(sb.table.File.Dir()),
             self.getAsLinkPath(path))
-        let buf = unsafe { message.Buf() }
+        buf := unsafe { message.Buf() }
         message.WriteStr(strings::Repeat(" ", Padding))
         message.WriteStr(refersTo)
         message.WriteByte('\n')
@@ -544,12 +544,12 @@ impl symbolBuilder {
     }
 
     fn pushCrossCycleError(mut &self, &target: &symbolBuilder, &imp: &ImportInfo, &errorToken: &Token) {
-        let mut message = StrBuilder.New(1 << 5)
+        mut message := StrBuilder.New(1 << 5)
 
         self.pushCycleError(self, imp.Path, message)
 
-        let mut owner = self.owner
-        let mut old = self
+        mut owner := self.owner
+        mut old := self
 
         for owner.owner != nil {
             self.pushCycleError(old.owner, old.table.File.Dir(), message)
@@ -581,7 +581,7 @@ impl symbolBuilder {
             ret false
         }
 
-        let mut owner = self.owner
+        mut owner := self.owner
     iter:
         if owner.table.File.Dir() == imp.Path {
             self.pushCrossCycleError(owner, imp, decl.Token)
@@ -613,12 +613,12 @@ impl symbolBuilder {
             ret true
         }
 
-        let mut port = self.importer.GetImport(imp.Path)
+        mut port := self.importer.GetImport(imp.Path)
         if port != nil {
             imp.Package = port.Package
             imp.Duplicate = true
 
-            let oldMod = self.importer.GetModPath()
+            oldMod := self.importer.GetModPath()
             self.importer.SetModPath(self.importer.ModById(imp.ModId))
             self.checkPackageAccessibility(decl, oldMod, port.Path)
             self.importer.SetModPath(oldMod)
@@ -627,12 +627,12 @@ impl symbolBuilder {
                 ret false
             }
 
-            let oldMod = self.importer.GetModPath()
+            oldMod := self.importer.GetModPath()
             defer { self.importer.SetModPath(oldMod) }
             if imp.Std {
                 self.importer.SetModPath(PathStdlib)
             }
-            let (mut asts, mut errors) = self.importer.ImportPackage(imp.Path, !imp.Std)
+            mut asts, mut errors := self.importer.ImportPackage(imp.Path, !imp.Std)
             if len(errors) > 0 {
                 self.errors = append(self.errors, errors...)
                 ret false
@@ -656,13 +656,13 @@ impl symbolBuilder {
     }
 
     fn importUseDecl(mut &self, mut &decl: &UseDecl): &ImportInfo {
-        let mut imp = self.buildImport(decl)
+        mut imp := self.buildImport(decl)
         // Break analysis if error occurs.
         if imp == nil {
             ret nil
         }
 
-        let mut ok = self.checkDuplicateUseDecl(imp)
+        mut ok := self.checkDuplicateUseDecl(imp)
         if !ok {
             ret nil
         }
@@ -691,25 +691,25 @@ impl symbolBuilder {
         | &ast::Impl:
             self.table.Impls = append(self.table.Impls, buildImpl((&ast::Impl)(node.Data)))
         | &TypeAliasDecl:
-            let mut ta = buildTypeAlias((&TypeAliasDecl)(node.Data))
+            mut ta := buildTypeAlias((&TypeAliasDecl)(node.Data))
             self.table.TypeAliases = append(self.table.TypeAliases, ta)
         | &StructDecl:
-            let mut srct = buildStruct((&StructDecl)(node.Data))
+            mut srct := buildStruct((&StructDecl)(node.Data))
             self.table.Structs = append(self.table.Structs, srct)
         | &FnDecl:
-            let mut f = buildFunc((&FnDecl)(node.Data))
+            mut f := buildFunc((&FnDecl)(node.Data))
             self.table.Funcs = append(self.table.Funcs, f)
         | &TraitDecl:
-            let mut t = buildTrait((&TraitDecl)(node.Data))
+            mut t := buildTrait((&TraitDecl)(node.Data))
             self.table.Traits = append(self.table.Traits, t)
         | &VarDecl:
-            let mut v = buildVar((&VarDecl)(node.Data))
+            mut v := buildVar((&VarDecl)(node.Data))
             self.table.Vars = append(self.table.Vars, v)
         | &EnumDecl:
-            let mut e = buildEnum((&EnumDecl)(node.Data))
+            mut e := buildEnum((&EnumDecl)(node.Data))
             self.table.Enums = append(self.table.Enums, e)
         | &TypeEnumDecl:
-            let mut e = buildTypeEnum((&TypeEnumDecl)(node.Data))
+            mut e := buildTypeEnum((&TypeEnumDecl)(node.Data))
             self.table.TypeEnums = append(self.table.TypeEnums, e)
         |:
             self.pushErr(node.Token, LogMsg.InvalidSyntax)
@@ -727,11 +727,11 @@ impl symbolBuilder {
             self.pushErr(d.Tag, LogMsg.MissingExpr)
             ret
         } else if len(d.Args) > 1 {
-            let arg = d.Args[1]
+            arg := d.Args[1]
             self.pushErr(arg, LogMsg.ArgumentOverflow, d.Tag.Kind)
         }
 
-        let arg = d.Args[0]
+        arg := d.Args[0]
         if arg.Id != TokenId.Lit {
             self.pushErr(arg, LogMsg.InvalidSyntax)
             ret

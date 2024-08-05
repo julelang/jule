@@ -64,29 +64,29 @@ fn trigReduce(mut x: f64): (j: u64, z: f64) {
     }
     // Extract out the integer and exponent such that,
     // x = ix * 2 ** exp.
-    let mut ix = F64Bits(x)
-    let exp = int(ix >> shift & mask) - bias - shift
+    mut ix := F64Bits(x)
+    exp := int(ix >> shift & mask) - bias - shift
     ix = ix & ^(mask << shift)
     ix |= 1 << shift
     // Use the exponent to extract the 3 appropriate uint64 digits from M_PI4,
     // B ~ (z0, z1, z2), such that the product leading digit has the exponent -61.
     // Note, exp >= -53 since x >= PI4 and exp < 971 for maximum f64.
-    let (digit, bitshift) = uint(exp + 61) / 64, uint(exp + 61) % 64
-    let z0 = (M_PI4[digit] << bitshift) | (M_PI4[digit+1] >> (64 - bitshift))
-    let z1 = (M_PI4[digit+1] << bitshift) | (M_PI4[digit+2] >> (64 - bitshift))
-    let z2 = (M_PI4[digit+2] << bitshift) | (M_PI4[digit+3] >> (64 - bitshift))
+    digit, bitshift := uint(exp + 61) / 64, uint(exp + 61) % 64
+    z0 := (M_PI4[digit] << bitshift) | (M_PI4[digit+1] >> (64 - bitshift))
+    z1 := (M_PI4[digit+1] << bitshift) | (M_PI4[digit+2] >> (64 - bitshift))
+    z2 := (M_PI4[digit+2] << bitshift) | (M_PI4[digit+3] >> (64 - bitshift))
     // Multiply mantissa by the digits and extract the upper two digits (hi, lo).
-    let (z2hi, _) = bits::Mul64(z2, ix)
-    let (z1hi, z1lo) = bits::Mul64(z1, ix)
-    let z0lo = z0 * ix
-    let (lo, c) = bits::Add64(z1lo, z2hi, 0)
-    let (mut hi, _) = bits::Add64(z0lo, z1hi, c)
+    z2hi, _ := bits::Mul64(z2, ix)
+    z1hi, z1lo := bits::Mul64(z1, ix)
+    z0lo := z0 * ix
+    lo, c := bits::Add64(z1lo, z2hi, 0)
+    mut hi, _ := bits::Add64(z0lo, z1hi, c)
     // The top 3 bits are j.
     j = hi >> 61
     // Extract the fraction and find its magnitude.
     hi = hi << 3 | lo >> 61
-    let lz = uint(bits::LeadingZeros64(hi))
-    let e = u64(bias - (lz + 1))
+    lz := uint(bits::LeadingZeros64(hi))
+    e := u64(bias - (lz + 1))
     // Clear implicit mantissa bit and shift into place.
     hi = (hi << (lz + 1)) | (lo >> (64 - (lz + 1)))
     hi >>= 64 - shift

@@ -54,18 +54,18 @@ fn eiselLemire64(mut man: u64, exp10: int, neg: bool): (f: f64, ok: bool) {
     }
 
     // Normalization.
-    let clz = bits::LeadingZeros64(man)
+    clz := bits::LeadingZeros64(man)
     man <<= uint(clz)
     const f64ExponentBias = 1023
-    let mut retExp2 = u64(217706 * exp10 >> 16 + 64 + f64ExponentBias) - u64(clz)
+    mut retExp2 := u64(217706 * exp10 >> 16 + 64 + f64ExponentBias) - u64(clz)
 
     // Multiplication.
-    let (mut xHi, mut xLo) = bits::Mul64(man, detailedPowsOfTen[exp10-detailedPowsOfTenMinExp10][1])
+    mut xHi, mut xLo := bits::Mul64(man, detailedPowsOfTen[exp10-detailedPowsOfTenMinExp10][1])
 
     // Wider Approximation.
     if xHi&0x1FF == 0x1FF && xLo+man < man {
-        let (yHi, yLo) = bits::Mul64(man, detailedPowsOfTen[exp10-detailedPowsOfTenMinExp10][0])
-        let (mut mergedHi, mergedLo) = xHi, xLo + yHi
+        yHi, yLo := bits::Mul64(man, detailedPowsOfTen[exp10-detailedPowsOfTenMinExp10][0])
+        mut mergedHi, mergedLo := xHi, xLo + yHi
         if mergedLo < xLo {
             mergedHi++
         }
@@ -76,8 +76,8 @@ fn eiselLemire64(mut man: u64, exp10: int, neg: bool): (f: f64, ok: bool) {
     }
 
     // Shifting to 54 Bits.
-    let msb = xHi >> 63
-    let mut retMantissa = xHi >> (msb + 9)
+    msb := xHi >> 63
+    mut retMantissa := xHi >> (msb + 9)
     retExp2 -= 1 ^ msb
 
     // Half-way Ambiguity.
@@ -100,7 +100,7 @@ fn eiselLemire64(mut man: u64, exp10: int, neg: bool): (f: f64, ok: bool) {
     if retExp2-1 >= 0x7FF-1 {
         ret 0, false
     }
-    let mut retBits = retExp2 << 52 | retMantissa & 0x000FFFFFFFFFFFFF
+    mut retBits := retExp2 << 52 | retMantissa & 0x000FFFFFFFFFFFFF
     if neg {
         retBits |= 0x8000000000000000
     }
@@ -129,18 +129,18 @@ fn eiselLemire32(mut man: u64, exp10: int, neg: bool): (f: f32, ok: bool) {
     }
 
     // Normalization.
-    let clz = bits::LeadingZeros64(man)
+    clz := bits::LeadingZeros64(man)
     man <<= uint(clz)
     const f32ExponentBias = 127
-    let mut retExp2 = u64(217706 * exp10 >> 16 + 64 + f32ExponentBias) - u64(clz)
+    mut retExp2 := u64(217706 * exp10 >> 16 + 64 + f32ExponentBias) - u64(clz)
 
     // Multiplication.
-    let (mut x_hi, mut x_lo) = bits::Mul64(man, detailedPowsOfTen[exp10-detailedPowsOfTenMinExp10][1])
+    mut x_hi, mut x_lo := bits::Mul64(man, detailedPowsOfTen[exp10-detailedPowsOfTenMinExp10][1])
 
     // Wider Approximation.
     if x_hi&0x3FFFFFFFFF == 0x3FFFFFFFFF && x_lo+man < man {
-        let (y_hi, y_lo) = bits::Mul64(man, detailedPowsOfTen[exp10-detailedPowsOfTenMinExp10][0])
-        let (mut merged_hi, merged_lo) = x_hi, x_lo + y_hi
+        y_hi, y_lo := bits::Mul64(man, detailedPowsOfTen[exp10-detailedPowsOfTenMinExp10][0])
+        mut merged_hi, merged_lo := x_hi, x_lo + y_hi
         if merged_lo < x_lo {
             merged_hi++
         }
@@ -151,8 +151,8 @@ fn eiselLemire32(mut man: u64, exp10: int, neg: bool): (f: f32, ok: bool) {
     }
 
     // Shifting to 54 Bits (and for float32, it's shifting to 25 bits).
-    let msb = x_hi >> 63
-    let mut retMantissa = x_hi >> (msb + 38)
+    msb := x_hi >> 63
+    mut retMantissa := x_hi >> (msb + 38)
     retExp2 -= 1 ^ msb
 
     // Half-way Ambiguity.
@@ -175,7 +175,7 @@ fn eiselLemire32(mut man: u64, exp10: int, neg: bool): (f: f32, ok: bool) {
     if retExp2-1 >= 0xFF-1 {
         ret 0, false
     }
-    let mut retBits = retExp2 << 23 | retMantissa & 0x007FFFFF
+    mut retBits := retExp2 << 23 | retMantissa & 0x007FFFFF
     if neg {
         retBits |= 0x80000000
     }

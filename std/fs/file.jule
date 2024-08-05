@@ -66,7 +66,7 @@ impl File {
     //  SystemWideLimit NotExist UnableStream NoSpace NotDir Device Overflow
     //  ReadOnly Retry Busy Device Seek InsufficientMemory Buffer
     static fn Read(path: str)!: []byte {
-        let s = Status.Of(path) else { error(error) }
+        s := Status.Of(path) else { error(error) }
 
         if !s.IsReg() {
             error(FsError.IsDir)
@@ -76,11 +76,11 @@ impl File {
             ret make([]byte, 0)
         }
 
-        let mut f = File.Open(path, OFlag.Rdonly, 0) else { error(error) }
+        mut f := File.Open(path, OFlag.Rdonly, 0) else { error(error) }
         defer { f.Close()! }
 
-        let mut buff = make([]byte, s.Size())
-        let n = f.Read(buff) else { error(error) }
+        mut buff := make([]byte, s.Size())
+        n := f.Read(buff) else { error(error) }
         ret buff[:n]
     }
 
@@ -90,7 +90,7 @@ impl File {
     // Since requires multiple system calls to complete, a failure mid-operation
     // can leave the file in a partially written state.
     static fn Write(path: str, data: []byte, perm: int)! {
-        let mut f = File.Open(path, OFlag.Wronly | OFlag.Create | OFlag.Trunc, perm) else { error(error) }
+        mut f := File.Open(path, OFlag.Wronly | OFlag.Create | OFlag.Trunc, perm) else { error(error) }
         f.Write(data) else { error(error) }
         f.Close() else { error(error) }
     }
@@ -109,7 +109,7 @@ impl File {
     // Possible errors:
     //  InvalidDescriptor SyncIO Overflow Seek
     fn Seek(mut self, offset: int, origin: Seek)!: int {
-        let pos = sys::Seek(int(self.handle), offset, int(origin))
+        pos := sys::Seek(int(self.handle), offset, int(origin))
         if pos == -1 {
             error(getLastFsError())
         }

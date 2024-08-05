@@ -230,13 +230,13 @@ fn Erf(mut x: f64): f64 {
     | IsInf(x, -1):
         ret -1
     }
-    let mut sign = false
+    mut sign := false
     if x < 0 {
         x = -x
         sign = true
     }
     if x < 0.84375 { // |x| < 0.84375
-        let mut temp: f64 = 0
+        mut temp := 0.
         if x < Small { // |x| < 2**-28
             if x < VeryTiny {
                 temp = 0.125 * (8.0 * x + efx8 * x) // avoid underflow
@@ -244,10 +244,10 @@ fn Erf(mut x: f64): f64 {
                 temp = x + efx * x
             }
         } else {
-            let z = x * x
-            let r = pp0 + z * (pp1 + z * (pp2 + z * (pp3 + z * pp4)))
-            let s = 1 + z * (qq1 + z * (qq2 + z * (qq3 + z * (qq4 + z * qq5))))
-            let y = r / s
+            z := x * x
+            r := pp0 + z * (pp1 + z * (pp2 + z * (pp3 + z * pp4)))
+            s := 1 + z * (qq1 + z * (qq2 + z * (qq3 + z * (qq4 + z * qq5))))
+            y := r / s
             temp = x + x * y
         }
         if sign {
@@ -256,9 +256,9 @@ fn Erf(mut x: f64): f64 {
         ret temp
     }
     if x < 1.25 { // 0.84375 <= |x| < 1.25
-        let s = x - 1
-        let P = pa0 + s * (pa1 + s * (pa2 + s * (pa3 + s * (pa4 + s * (pa5 + s * pa6)))))
-        let Q = 1 + s * (qa1 + s * (qa2 + s * (qa3 + s * (qa4 + s * (qa5 + s * qa6)))))
+        s := x - 1
+        P := pa0 + s * (pa1 + s * (pa2 + s * (pa3 + s * (pa4 + s * (pa5 + s * pa6)))))
+        Q := 1 + s * (qa1 + s * (qa2 + s * (qa3 + s * (qa4 + s * (qa5 + s * qa6)))))
         if sign {
             ret -erx - P / Q
         }
@@ -270,9 +270,9 @@ fn Erf(mut x: f64): f64 {
         }
         ret 1
     }
-    let s = 1 / (x * x)
-    let mut R: f64 = 0
-    let mut S: f64 = 0
+    s := 1 / (x * x)
+    mut R := 0.
+    mut S := 0.
     if x < 1/0.35 { // |x| < 1 / 0.35  ~ 2.857143
         R = ra0 + s * (ra1 + s * (ra2 + s * (ra3 + s * (ra4 + s * (ra5 + s * (ra6 + s * ra7))))))
         S = 1 + s * (sa1 + s * (sa2 + s * (sa3 + s * (sa4 + s * (sa5 + s * (sa6 + s * (sa7 + s * sa8)))))))
@@ -280,8 +280,8 @@ fn Erf(mut x: f64): f64 {
         R = ra0 + s * (rb1 + s * (rb2 + s * (rb3 + s * (rb4 + s * (rb5 + s * rb6)))))
         S = 1 + s * (sb1 + s * (sb2 + s * (sb3 + s * (sb4 + s * (sb5 + s * (sb6 + s * sb7))))))
     }
-    let z = F64FromBits(F64Bits(x) & 0xffffffff00000000)          // pseudo-single (20-bit) precision x
-    let r = Exp(-z * z - 0.5625) * Exp((z - x) * (z + x) + R / S)
+    z := F64FromBits(F64Bits(x) & 0xffffffff00000000)          // pseudo-single (20-bit) precision x
+    r := Exp(-z * z - 0.5625) * Exp((z - x) * (z + x) + R / S)
     if sign {
         ret r / x - 1
     }
@@ -305,20 +305,20 @@ fn Erfc(mut x: f64): f64 {
     | IsInf(x, -1):
         ret 2
     }
-    let mut sign = false
+    mut sign := false
     if x < 0 {
         x = -x
         sign = true
     }
     if x < 0.84375 { // |x| < 0.84375
-        let mut temp: f64 = 0
+        mut temp := 0.
         if x < Tiny { // |x| < 2**-56
             temp = x
         } else {
-            let z = x * x
-            let r = pp0 + z * (pp1 + z * (pp2 + z * (pp3 + z * pp4)))
-            let s = 1 + z * (qq1 + z * (qq2 + z * (qq3 + z * (qq4 + z * qq5))))
-            let y = r / s
+            z := x * x
+            r := pp0 + z * (pp1 + z * (pp2 + z * (pp3 + z * pp4)))
+            s := 1 + z * (qq1 + z * (qq2 + z * (qq3 + z * (qq4 + z * qq5))))
+            y := r / s
             if x < 0.25 { // |x| < 1/4
                 temp = x + x * y
             } else {
@@ -331,18 +331,18 @@ fn Erfc(mut x: f64): f64 {
         ret 1 - temp
     }
     if x < 1.25 { // 0.84375 <= |x| < 1.25
-        let s = x - 1
-        let P = pa0 + s * (pa1 + s * (pa2 + s * (pa3 + s * (pa4 + s * (pa5 + s * pa6)))))
-        let Q = 1 + s * (qa1 + s * (qa2 + s * (qa3 + s * (qa4 + s * (qa5 + s * qa6)))))
+        s := x - 1
+        P := pa0 + s * (pa1 + s * (pa2 + s * (pa3 + s * (pa4 + s * (pa5 + s * pa6)))))
+        Q := 1 + s * (qa1 + s * (qa2 + s * (qa3 + s * (qa4 + s * (qa5 + s * qa6)))))
         if sign {
             ret 1 + erx + Q / P
         }
         ret 1 - erx - Q / P
     }
     if x < 28 { // |x| < 28
-        let s = 1 / (x * x)
-        let mut R: f64 = 0
-        let mut S: f64 = 0
+        s := 1 / (x * x)
+        mut R := 0.
+        mut S := 0.
         if x < 1/0.35 { // |x| < 1 / 0.35 ~ 2.857143
             R = ra0 + s * (ra1 + s * (ra2 + s * (ra3 + s * (ra4 + s * (ra5 + s * (ra6 + s * ra7))))))
             S = 1 + s * (sa1 + s * (sa2 + s * (sa3 + s * (sa4 + s * (sa5 + s * (sa6 + s * (sa7 + s * sa8)))))))
@@ -353,8 +353,8 @@ fn Erfc(mut x: f64): f64 {
             R = rb0 + s * (rb1 + s * (rb2 + s * (rb3 + s * (rb4 + s * (rb5 + s * rb6)))))
             S = 1 + s * (sb1 + s * (sb2 + s * (sb3 + s * (sb4 + s * (sb5 + s * (sb6 + s * sb7))))))
         }
-        let z = F64FromBits(F64Bits(x) & 0xffffffff00000000)          // pseudo-single (20-bit) precision x
-        let r = Exp(-z * z - 0.5625) * Exp((z - x) * (z + x) + R / S)
+        z := F64FromBits(F64Bits(x) & 0xffffffff00000000)          // pseudo-single (20-bit) precision x
+        r := Exp(-z * z - 0.5625) * Exp((z - x) * (z + x) + R / S)
         if sign {
             ret 2 - r / x
         }

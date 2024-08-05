@@ -7,7 +7,7 @@ use nosafe for std::internal::nosafe
 // Parse bits from binary string.
 fn parseBinary(&s: str)!: bits {
     // Eliminate initial-zeros to normalize and fit minimum mandatory bit-size.
-    let mut j = 0
+    mut j := 0
     for j < len(s); j++ {
         if s[j] != '0' {
             break
@@ -17,8 +17,8 @@ fn parseBinary(&s: str)!: bits {
         // All bits are zero.
         ret nil
     }
-    let mut r = make(bits, 0, len(s) - j)
-    let mut k = len(s) - 1
+    mut r := make(bits, 0, len(s) - j)
+    mut k := len(s) - 1
     for k >= j; k-- {
         match s[k] {
         | '1':
@@ -35,10 +35,10 @@ fn parseBinary(&s: str)!: bits {
 // Parse bits from hexadecimal string.
 // Returns normalized bits.
 fn parseHex(&s: str)!: bits {
-    let mut buf = make(bits, 0, len(s) * 4)
-    let mut i = len(s) - 1
+    mut buf := make(bits, 0, len(s) * 4)
+    mut i := len(s) - 1
     for i >= 0; i-- {
-        let h = s[i]
+        h := s[i]
         match h {
         | '0':
             buf = append(buf, 0b0, 0b0, 0b0, 0b0)
@@ -83,8 +83,8 @@ fn parseHex(&s: str)!: bits {
 // Parse bits from octal string.
 // Returns normalized bits.
 fn parseOctal(&s: str)!: bits {
-    let mut buf = make(bits, 0, len(s) * 3)
-    let mut i = len(s) - 1
+    mut buf := make(bits, 0, len(s) * 3)
+    mut i := len(s) - 1
     for i >= 0; i-- {
         match s[i] {
         | '0':
@@ -112,20 +112,20 @@ fn parseOctal(&s: str)!: bits {
 }
 
 fn parseDecimal(&s: str)!: []byte {
-    let mut sb = nosafe::Stobs(s)
+    mut sb := nosafe::Stobs(s)
     for _, b in sb {
         if b < '0' || '9' < b {
             error(BigError.Format)
         }
     }
-    let mut buf = make([]byte, 0, len(s) * 4)
+    mut buf := make([]byte, 0, len(s) * 4)
 loop:
     for {
-        let d = sb[len(sb)-1] - '0'
+        d := sb[len(sb)-1] - '0'
         buf = append(buf, d % 2)
-        let mut carry = byte(0)
+        mut carry := byte(0)
         for i in sb {
-            let t = carry * 10 + (sb[i] - '0')
+            t := carry * 10 + (sb[i] - '0')
             sb[i] = '0' + (t >> 1)
             carry = t & 0b1
         }
@@ -145,7 +145,7 @@ fn formatBinary(&b: bits): []byte {
     if len(b) == 0 {
         ret ['0']
     }
-    let mut buf = make([]byte, len(b))
+    mut buf := make([]byte, len(b))
     for i in buf {
         buf[i] = '0' + b[len(b)-i-1]
     }
@@ -153,11 +153,11 @@ fn formatBinary(&b: bits): []byte {
 }
 
 fn formatDecimalPart(mut &buf: []byte, m: byte) {
-    let mut carry = ^m & 0b1
-    let n = len(buf)
+    mut carry := ^m & 0b1
+    n := len(buf)
     for in buf {
-        let digit = buf[n-1] - '0'
-        let value = (digit << m) + carry
+        digit := buf[n-1] - '0'
+        value := (digit << m) + carry
         buf = append(buf[:1], buf...)
         buf[0] = '0' + (value % 10)
         carry = value / 10
@@ -170,7 +170,7 @@ fn formatDecimalPart(mut &buf: []byte, m: byte) {
 }
 
 fn formatDecimal(&b: bits): []byte {
-    let mut buf = make([]byte, 1, len(b) >> 1 + 1)
+    mut buf := make([]byte, 1, len(b) >> 1 + 1)
     buf[0] = '0'
     for _, bit in formatBinary(b) {
         formatDecimalPart(buf, 1)
@@ -182,12 +182,12 @@ fn formatDecimal(&b: bits): []byte {
 }
 
 fn formatOctal(&b: bits): []byte {
-    let n = len(b) - len(b) % 3
-    let mut buf = make([]byte, 1, len(b) / 3 + 1)
-    let mut i = 0
+    n := len(b) - len(b) % 3
+    mut buf := make([]byte, 1, len(b) / 3 + 1)
+    mut i := 0
     for i < n; i += 3 {
         buf = append(buf[:1], buf...)
-        let c = b[i:i+3]
+        c := b[i:i+3]
         match {
         | c[0] == 0b0 && c[1] == 0b0 && c[2] == 0b0:
             buf[0] = '0'
@@ -207,7 +207,7 @@ fn formatOctal(&b: bits): []byte {
             buf[0] = '7'
         }
     }
-    let c = b[n:]
+    c := b[n:]
     match len(c) {
     | 1:
         buf = append(buf[:1], buf...)
@@ -227,12 +227,12 @@ fn formatOctal(&b: bits): []byte {
 }
 
 fn formatHex(&b: bits): []byte {
-    let n = len(b) - len(b) % 4
-    let mut buf = make([]byte, 1, len(b) / 4 + 1)
-    let mut i = 0
+    n := len(b) - len(b) % 4
+    mut buf := make([]byte, 1, len(b) / 4 + 1)
+    mut i := 0
     for i < n; i += 4 {
         buf = append(buf[:1], buf...)
-        let c = b[i:i+4]
+        c := b[i:i+4]
         match {
         | c[0] == 0b0 && c[1] == 0b0 && c[2] == 0b0 && c[3] == 0b0:
             buf[0] = '0'
@@ -268,7 +268,7 @@ fn formatHex(&b: bits): []byte {
             buf[0] = 'F'
         }
     }
-    let c = b[n:]
+    c := b[n:]
     match len(c) {
     | 1:
         buf = append(buf[:1], buf...)

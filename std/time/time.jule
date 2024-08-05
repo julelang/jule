@@ -53,11 +53,11 @@ struct AbsTime {
 impl AbsTime {
     // Returns abstract time as unix-time seconds.
     fn Unix(self): UnixTime {
-        let mut leap = false
-        let mut y = self.Year - unixYearOffset
-        let mut m = self.Month - unixMonthOffset
+        mut leap := false
+        mut y := self.Year - unixYearOffset
+        mut m := self.Month - unixMonthOffset
         if m >= 12 || m < 0 {
-            let mut adj = m / 12
+            mut adj := m / 12
             m %= 12
             if m < 0 {
                 adj--
@@ -65,7 +65,7 @@ impl AbsTime {
             }
             y += adj
         }
-        let mut t = unixYearToSeconds(y, leap)
+        mut t := unixYearToSeconds(y, leap)
         t += unixMonthToSeconds(m, leap)
         t += day * (self.Day - 1)
         t += hour * self.Hour
@@ -124,54 +124,54 @@ impl Time {
 
     // Returns time as abstract time.
     fn Abs(self): AbsTime {
-        let secs = self.sec - modApoch
-        let mut days = secs / day
-        let mut remSecs = secs % day
+        secs := self.sec - modApoch
+        mut days := secs / day
+        mut remSecs := secs % day
         if remSecs < 0 {
             remSecs += day
             days--
         }
 
-        let mut qcCycles = days / daysPer400Y
-        let mut remDays = days % daysPer400Y
+        mut qcCycles := days / daysPer400Y
+        mut remDays := days % daysPer400Y
         if remDays < 0 {
             remDays += daysPer400Y
             qcCycles--
         }
 
-        let mut cCycles = remDays / daysPer100Y
+        mut cCycles := remDays / daysPer100Y
         if cCycles == 4 {
             cCycles--
         }
         remDays -= cCycles * daysPer100Y
 
-        let mut qCycles = remDays / daysPer4Y
+        mut qCycles := remDays / daysPer4Y
         if qCycles == 25 {
             qCycles--
         }
         remDays -= qCycles * daysPer4Y
 
-        let mut remYears = remDays / daysPerY
+        mut remYears := remDays / daysPerY
         if remYears == 4 {
             remYears--
         }
         remDays -= remYears * daysPerY
 
-        let mut leap = u64(0)
+        mut leap := u64(0)
         if remYears == 0 && (qCycles > 0 || cCycles == 0) {
             leap = 1
         }
-        let mut yDay = remDays + 31 + 28 + leap
+        mut yDay := remDays + 31 + 28 + leap
         if yDay >= daysPerY+leap {
             yDay -= daysPerY + leap
         }
 
-        let mut months: u64 = 0
+        mut months := u64(0)
         for mdays[months] <= remDays; months++ {
             remDays -= mdays[months]
         }
 
-        let mut t = AbsTime{}
+        mut t := AbsTime{}
         t.Year = remYears + 4 * qCycles + 100 * cCycles + 400 * qcCycles + 100
         t.Month = months + 2
         if t.Month >= 12 {
@@ -200,7 +200,7 @@ fn unix(): UnixTime {
 
 fn unixYearToSeconds(y: TimeData, mut &leap: bool): UnixTime {
     if y-2 <= 136 {
-        let mut leaps = (y - 68) >> 2
+        mut leaps := (y - 68) >> 2
         leap = (y - 68)&3 == 0
         if leap {
             leaps--
@@ -208,10 +208,10 @@ fn unixYearToSeconds(y: TimeData, mut &leap: bool): UnixTime {
         ret 31536000 * (y - 70) + day * leaps
     }
 
-    let mut leaps: TimeData = 0
-    let mut centuries: TimeData = 0
-    let mut cycles = (y - 100) / 400
-    let mut rem = (y - 100) % 400
+    mut leaps := TimeData(0)
+    mut centuries := TimeData(0)
+    mut cycles := (y - 100) / 400
+    mut rem := (y - 100) % 400
     if rem < 0 {
         cycles--
         rem += 400
@@ -257,7 +257,7 @@ fn unixYearToSeconds(y: TimeData, mut &leap: bool): UnixTime {
 
 fn unixMonthToSeconds(m: TimeData, leap: bool): UnixTime {
     // Set seconds through month.
-    let mut t: UnixTime = 0
+    mut t := UnixTime(0)
     match m {
     | 1:
         t = 31 * day

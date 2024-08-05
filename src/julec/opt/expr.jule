@@ -56,7 +56,7 @@ impl exprOptimizer {
     static fn optimize(mut &model: ExprModel) {
         // Do optimizatitons if any enabled.
         if exprEnabled {
-            let mut exop = &exprOptimizer{
+            mut exop := &exprOptimizer{
                 model: unsafe { (&ExprModel)(&model) },
             }
             exop.do()
@@ -64,7 +64,7 @@ impl exprOptimizer {
     }
 
     fn strCond(self, mut m: &BinopExprModel): bool {
-        let lp = m.Left.Kind.Prim()
+        lp := m.Left.Kind.Prim()
         if lp == nil || !lp.IsStr() {
             ret false
         }
@@ -83,18 +83,18 @@ impl exprOptimizer {
             ret false
         }
     opt:
-        let mut c = (&Const)(m.Right.Model)
+        mut c := (&Const)(m.Right.Model)
         match m.Op.Id {
         | TokenId.Eqs:
             if c.ReadStr() == "" {
-                let mut model = any(&EmptyCompareExprModel{
+                mut model := any(&EmptyCompareExprModel{
                     Expr: m.Left.Model,
                     Neg: false,
                 })
                 *self.model = unsafe { *(*ExprModel)(&model) }
                 break
             }
-            let mut model = any(&StrCompExprModel{
+            mut model := any(&StrCompExprModel{
                 Left: m.Left.Model,
                 Right: c,
                 NotEq: false,
@@ -102,14 +102,14 @@ impl exprOptimizer {
             *self.model = unsafe { *(*ExprModel)(&model) }
         | TokenId.NotEq:
             if c.ReadStr() == "" {
-                let mut model = any(&EmptyCompareExprModel{
+                mut model := any(&EmptyCompareExprModel{
                     Expr: m.Left.Model,
                     Neg: true,
                 })
                 *self.model = unsafe { *(*ExprModel)(&model) }
                 break
             }
-            let mut model = any(&StrCompExprModel{
+            mut model := any(&StrCompExprModel{
                 Left: m.Left.Model,
                 Right: c,
                 NotEq: true,
@@ -139,33 +139,33 @@ impl exprOptimizer {
         }
         match m.Op.Id {
         | TokenId.Star:
-            let (ok, x) = checkForBitShiftOpt(m.Left, m.Right)
+            ok, x := checkForBitShiftOpt(m.Left, m.Right)
             if ok {
                 m.Op.Id = TokenId.Lshift
                 m.Op.Kind = TokenKind.Lshift
-                let mut c = (&Const)(m.Right.Model)
+                mut c := (&Const)(m.Right.Model)
                 c.SetU64(x)
                 ret
             }
         | TokenId.Solidus:
-            let (ok, x) = checkForBitShiftOpt(m.Left, m.Right)
+            ok, x := checkForBitShiftOpt(m.Left, m.Right)
             if ok {
                 m.Op.Id = TokenId.Rshift
                 m.Op.Kind = TokenKind.Rshift
-                let mut c = (&Const)(m.Right.Model)
+                mut c := (&Const)(m.Right.Model)
                 c.SetU64(x)
                 ret
             }
         | TokenId.Percent:
-            let mut c = (&Const)(m.Right.Model)
-            let d = c.AsF64()
+            mut c := (&Const)(m.Right.Model)
+            d := c.AsF64()
             if d == 2 {
                 m.Op.Id = TokenId.Amper
                 m.Op.Kind = TokenKind.Amper
                 c.SetI64(1)
             }
         }
-        let mut model: any = &UnsafeBinopExprModel{Node: m}
+        mut model := any(&UnsafeBinopExprModel{Node: m})
         *self.model = unsafe { *(*ExprModel)(&model) }
     }
 
@@ -178,7 +178,7 @@ impl exprOptimizer {
         | TokenId.Star:
             match type m.Expr.Model {
             | &UnaryExprModel:
-                let mut um = (&UnaryExprModel)(m.Expr.Model)
+                mut um := (&UnaryExprModel)(m.Expr.Model)
                 if um.Op.Id == TokenId.Amper {
                     *self.model = um.Expr.Model
                 }
@@ -186,10 +186,10 @@ impl exprOptimizer {
         | TokenId.Amper:
             match type m.Expr.Model {
             | &Var:
-                let mut v = (&Var)(m.Expr.Model)
+                mut v := (&Var)(m.Expr.Model)
                 if v.Reference {
-                    let mut model = any(&RefExprModel{Var: v})
-                    *self.model = unsafe{ *(*ExprModel)(&model) }
+                    mut model := any(&RefExprModel{Var: v})
+                    *self.model = unsafe { *(*ExprModel)(&model) }
                 }
             }
         }
@@ -217,12 +217,12 @@ impl exprOptimizer {
     }
 
     fn scope(self, mut &s: &Scope) {
-        let mut scopt = scopeOptimizer.new(s)
+        mut scopt := scopeOptimizer.new(s)
         scopt.optimize()
     }
 
     fn optimizeSpecialFuncCalls(self, mut &m: &FnCallExprModel): bool {
-        let (data, ok) = stdCache[uintptr(m.Func)]
+        data, ok := stdCache[uintptr(m.Func)]
         if !ok {
             ret false
         }
@@ -247,7 +247,7 @@ impl exprOptimizer {
 
     fn array(self, mut m: &ArrayExprModel) {
         if len(m.Elems) == 2 && m.Elems[1] == nil {
-            let mut elem = m.Elems[0]
+            mut elem := m.Elems[0]
             exprOptimizer.optimize(elem)
             m.Elems[0] = elem
         }
@@ -260,25 +260,25 @@ impl exprOptimizer {
         if !Access {
             ret
         }
-        let array = m.Expr.Kind.Arr() != nil
+        array := m.Expr.Kind.Arr() != nil
         // Constants checked by semantic analysis for arrays, safe.
         if array && m.Index.IsConst() {
-            let mut model: any = &UnsafeIndexingExprModel{Node: m}
+            mut model := any(&UnsafeIndexingExprModel{Node: m})
             *self.model = unsafe { *(*ExprModel)(&model) }
             ret
         }
         match type m.Index.Model {
         | &Var:
-            let i = (&Var)(m.Index.Model)
+            i := (&Var)(m.Index.Model)
             if i.Mutable || i.IterRelation == nil {
                 break
             }
             match type m.Expr.Model {
             | &Var:
-                let r = (&Var)(m.Expr.Model)
+                r := (&Var)(m.Expr.Model)
                 // Iterated variable is indexed variable?
                 if i.IterRelation.Range == r {
-                    let mut model: any = &UnsafeIndexingExprModel{Node: m}
+                    mut model := any(&UnsafeIndexingExprModel{Node: m})
                     *self.model = unsafe { *(*ExprModel)(&model) }
                 }
             }
@@ -484,8 +484,8 @@ fn checkForBitShiftOpt(&l: &OperandExprModel, &r: &OperandExprModel): (ok: bool,
     if x == 0 || x%2 != 0 {
         ret false, 0
     }
-    let j = math::Log2(f64(x))
-    let z = u64(j)
+    j := math::Log2(f64(x))
+    z := u64(j)
     if f64(z) != j {
         ret false, 0
     }
@@ -506,8 +506,8 @@ fn areSameLvalueExprModel(&l: ExprModel, &r: ExprModel): bool {
         |:
             ret false
         }
-        let lsi = (&StructSubIdentExprModel)(l)
-        let rsi = (&StructSubIdentExprModel)(r)
+        lsi := (&StructSubIdentExprModel)(l)
+        rsi := (&StructSubIdentExprModel)(r)
         // Compare fields directly.
         // If the l and r have same pointers,
         // means same variable of same struct instance.
@@ -519,8 +519,8 @@ fn areSameLvalueExprModel(&l: ExprModel, &r: ExprModel): bool {
     | &UnaryExprModel:
         match type r {
         | &UnaryExprModel:
-            let ul = (&UnaryExprModel)(l)
-            let ur = (&UnaryExprModel)(r)
+            ul := (&UnaryExprModel)(l)
+            ur := (&UnaryExprModel)(r)
             // Unary operators should have the same operator.
             // The operator does not matter.
             if ul.Op.Id != ur.Op.Id || ul.Op.Kind != ur.Op.Kind {

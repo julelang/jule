@@ -41,7 +41,7 @@ fn init() {
 }
 
 fn openOutput(&path: str): &File {
-    let dir = path::Dir(path)
+    dir := path::Dir(path)
 
     Status.Of(dir) else {
         Directory.Create(dir) else {
@@ -70,7 +70,7 @@ fn clearObjects() {
 
 // Compie generated IR.
 fn compileIr(compiler: str, compilerCmd: str) {
-    let mut cmd = Cmd.New(compiler)
+    mut cmd := Cmd.New(compiler)
     cmd.Args = strings::Split(compilerCmd, " ", -1)
     cmd.Spawn() else {
         match error {
@@ -83,9 +83,9 @@ fn compileIr(compiler: str, compilerCmd: str) {
         }
         Throw("")
     }
-    let status = cmd.Wait()!
+    status := cmd.Wait()!
     if status != 0 {
-        let errorMessage = "\n>>> your backend compiler (" + env::Compiler + `) reports problems
+        errorMessage := "\n>>> your backend compiler (" + env::Compiler + `) reports problems
 >>> please check errors above
 >>> is this a compiler problem, please report us: https://github.com/julelang/jule/issues/new/choose`
 
@@ -97,7 +97,7 @@ fn compileIr(compiler: str, compilerCmd: str) {
 }
 
 fn isCppSourceFile(path: str): bool {
-    let offset = strings::FindLastByte(path, '.')
+    offset := strings::FindLastByte(path, '.')
     if offset == -1 {
         ret false
     }
@@ -157,8 +157,8 @@ fn pushCompCmdGcc(mut &cmd: StrBuilder) {
 
 // Generate compile command for backend-compiler.
 fn genCompileCmd(sourcePath: str, &ir: &IR): (str, str) {
-    let &compiler = env::CompilerPath
-    let mut cmd = StrBuilder.New(1 << 6)
+    &compiler := env::CompilerPath
+    mut cmd := StrBuilder.New(1 << 6)
 
     match env::Compiler {
     | "gcc":
@@ -203,7 +203,7 @@ fn getCompilePath(): str {
 }
 
 fn applyTargetIndependentOptimizations(mut &ir: &IR) {
-    let mut opt = Optimizer.New(ir)
+    mut opt := Optimizer.New(ir)
     opt.Optimize()
 }
 
@@ -245,12 +245,12 @@ fn checkTargetFlag(&target: str) {
         Throw("missing option value: --target")
     }
 
-    let parts = strings::Split(target, "-", -1)
+    parts := strings::Split(target, "-", -1)
     if len(parts) != 2 {
         Throw("--target: undefined platform target format: " + target)
     }
 
-    let (os, arch) = parts[0], parts[1]
+    os, arch := parts[0], parts[1]
 
     if os != "native" {
         checkTargetOs(os)
@@ -292,10 +292,10 @@ fn checkCppStdFlag() {
 }
 
 fn checkFlags(&args: []str): []str {
-    let mut opt: str = "L0"
-    let mut target: str = "native-native"
+    mut opt := "L0"
+    mut target := "native-native"
 
-    let mut fs = FlagSet.New()
+    mut fs := FlagSet.New()
 
     fs.AddVar[str](unsafe { (&str)(&opt) }, "opt", 0, "Optimization level")
     fs.AddVar[str](unsafe { (&str)(&target) }, "target", 0, "Target system")
@@ -321,7 +321,7 @@ fn checkFlags(&args: []str): []str {
     fs.AddVar[bool](unsafe { (&bool)(&opt::Assign) }, "opt-assign", 0, "Assignment optimizations")
     fs.AddVar[bool](unsafe { (&bool)(&opt::StdInternalNosafe) }, "opt-internal-nosafe", 0, "Special optimizations for std::internal::nosafe")
 
-    let mut content = fs.Parse(args) else {
+    mut content := fs.Parse(args) else {
         Throw(str(error))
         use nil // Avoid error.
     }
@@ -341,9 +341,9 @@ fn setupSemaFlags(mut &flags: SemaFlag) {
 }
 
 fn buildIr(&args: []str): &IR {
-    let content = checkFlags(args)
+    content := checkFlags(args)
 
-    let mut semaFlags = SemaFlag.Default
+    mut semaFlags := SemaFlag.Default
     setupSemaFlags(semaFlags)
 
     if len(content) == 0 {
@@ -351,13 +351,13 @@ fn buildIr(&args: []str): &IR {
     } else if len(content) > 1 {
         Throw("undefined content: " + content[1])
     }
-    let (mut path, ok) = path::Abs(content[0])
+    mut path, ok := path::Abs(content[0])
     if !ok {
         Throw("compile path could not processed because of a problem")
     }
 
     // Check standard library.
-    let inf = Status.Of(PathStdlib) else {
+    inf := Status.Of(PathStdlib) else {
         Throw(Logf(LogMsg.StdlibNotExist))
         ret nil // Avoid error.
     }
@@ -365,7 +365,7 @@ fn buildIr(&args: []str): &IR {
         Throw(Logf(LogMsg.StdlibNotExist))
     }
 
-    let (mut ir, logs) = IR.Build(path, semaFlags)
+    mut ir, logs := IR.Build(path, semaFlags)
 
     if ir == nil && logs == nil {
         Throw(Logf(LogMsg.NoFileInEntryPackage, path))
@@ -386,12 +386,12 @@ fn compileCommand(mut &args: []str) {
         env::Test = true
         args = args[1:]
     }
-    let mut ir = buildIr(args)
+    mut ir := buildIr(args)
 
     const Cpp = false
 
     if !env::Test {
-        let mut main = ir.Main.FindFn(EntryPoint, Cpp)
+        mut main := ir.Main.FindFn(EntryPoint, Cpp)
         if main == nil {
             Throw(Logf(LogMsg.NoEntryPoint))
         }
@@ -402,21 +402,21 @@ fn compileCommand(mut &args: []str) {
     // See compiler reference (1)
     ir.Order()
 
-    let compPath = getCompilePath()
-    let (compiler, compilerCmd) = genCompileCmd(compPath, ir)
+    compPath := getCompilePath()
+    compiler, compilerCmd := genCompileCmd(compPath, ir)
 
-    let mut oc = cxx::ObjectCoder.New(ir, cxx::SerializationInfo{
+    mut oc := cxx::ObjectCoder.New(ir, cxx::SerializationInfo{
         Compiler: compiler,
         CompilerCommand: compilerCmd,
     })
     if env::Test {
-        let mut tc = cxx::TestCoder.New(oc)
+        mut tc := cxx::TestCoder.New(oc)
         tc.Serialize()
     } else {
         oc.Serialize()
     }
 
-    let mut file = openOutput(compPath)
+    mut file := openOutput(compPath)
     file.Write(unsafe { oc.Obj.Buf() }) else {
         Throw("object code could not write")
     }

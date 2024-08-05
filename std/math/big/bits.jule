@@ -11,7 +11,7 @@ type bits: []bit
 const _INT_SIZE = 32 << (^uint(0) >> 63)
 
 fn u64FromBits(b: bits): u64 {
-    let mut u = u64(0)
+    mut u := u64(0)
     for i, bit in b {
         u |= u64(bit) << i
     }
@@ -34,7 +34,7 @@ fn addOne(mut &b: bits): (carry: bit) {
 // Subrract one from bits.
 // Equals to x-- operator.
 fn subOne(mut &b: bits) {
-    let mut j = 0
+    mut j := 0
     for i, x in b {
         if x == 0b1 {
             b[i] = 0b0
@@ -49,15 +49,15 @@ fn subOne(mut &b: bits) {
 }
 
 fn reverse(mut &b: bits) {
-    let mut i = 0
+    mut i := 0
     for i < len(b)>>1; i++ {
-        b[i], b[len(b) - 1 - i] = b[len(b) - 1 - i], b[i]
+        b[i], b[len(b)-1-i] = b[len(b)-1-i], b[i]
     }
 }
 
 // Add bits with size responsive.
 fn addRes(mut &x: bits, &y: bits) {
-    let mut carry = bit(0)
+    mut carry := bit(0)
     match {
     | len(y) == 1:
         carry = addOne(x)
@@ -75,7 +75,7 @@ fn addRes(mut &x: bits, &y: bits) {
 
 // Subtract bits with size responsive.
 fn subRes(mut &x: bits, y: bits) {
-    let mut carry = bit(0)
+    mut carry := bit(0)
     match {
     | len(y) == 1:
         twosComplement(x)
@@ -87,7 +87,7 @@ fn subRes(mut &x: bits, y: bits) {
         twosComplement(x)
         carry = addRfast(x, y)
     |:
-        let mut xn = make(bits, len(y))
+        mut xn := make(bits, len(y))
         _ = copy(xn, x)
         x = xn
         twosComplement(x)
@@ -122,7 +122,7 @@ fn and(mut &a: bits, &b: bits) {
     }
     // Clean trailing bits.
     if len(a) > len(b) {
-        let mut trail = a[len(b):]
+        mut trail := a[len(b):]
         for i in trail {
             trail[i] = 0b0
         }
@@ -149,7 +149,7 @@ fn twosComplement(mut &b: bits) {
 // x and y should be have same bitsize.
 fn addFast(mut &x: bits, &y: bits): (carry: bit) {
     for i, xbit in x {
-        let ybit = y[i]
+        ybit := y[i]
         x[i] = xbit ^ ybit ^ carry
         carry = (xbit & ybit) | (xbit & carry) | (ybit & carry)
     }
@@ -163,7 +163,7 @@ fn addFast(mut &x: bits, &y: bits): (carry: bit) {
 // y implies imaginary zero-bits for missing part if y.bit-size < x.bit-size.
 fn addRfast(mut &x: bits, &y: bits): (carry: bit) {
     for i, xbit in x {
-        let mut ybit = bit(0b0)
+        mut ybit := bit(0b0)
         if i < len(y) {
             ybit = y[i]
         }
@@ -180,7 +180,7 @@ fn addRfast(mut &x: bits, &y: bits): (carry: bit) {
 fn add(&x: bits, &y: bits): (r: bits, carry: bit) {
     r = make(bits, 0, len(x))
     for i, xbit in x {
-        let mut ybit = bit(0b0)
+        mut ybit := bit(0b0)
         if i < len(y) {
             ybit = y[i]
         }
@@ -192,7 +192,7 @@ fn add(&x: bits, &y: bits): (r: bits, carry: bit) {
 
 // Eliminates initial-zeros, normalizes bits.
 fn fit(mut &b: bits) {
-    let mut i = len(b) - 1
+    mut i := len(b) - 1
     for i >= 0; i-- {
         if b[i] != 0b0 {
             break
@@ -222,10 +222,10 @@ fn cmp(x: bits, &y: bits): int {
     | len(x) > len(y):
         ret +1
     }
-    let mut i = len(x) - 1
+    mut i := len(x) - 1
     for i >= 0; i-- {
-        let xbit = x[i]
-        let ybit = y[i]
+        xbit := x[i]
+        ybit := y[i]
         match {
         | xbit > ybit:
             ret +1
@@ -245,8 +245,8 @@ fn cmpRev(mut &x: bits, mut &y: bits): int {
         ret +1
     }
     for i in x {
-        let xbit = x[i]
-        let ybit = y[i]
+        xbit := x[i]
+        ybit := y[i]
         match {
         | xbit > ybit:
             ret +1
@@ -273,7 +273,7 @@ fn basicMul(mut &x: bits, mut y: bits): bits {
         ret x
     }
     let mut r: bits = nil
-    let mut m = make(bits, len(x), len(x) << 1)
+    mut m := make(bits, len(x), len(x) << 1)
     _ = copy(m, x)
     for len(y) > 0 {
         if isOdd(y) {
@@ -294,7 +294,7 @@ fn karatsubaAdd(mut x: bits, mut y: bits): bits {
         reverse(y)
     }
 
-    let mut carry = bit(0)
+    mut carry := bit(0)
     let mut r: bits = nil
     match {
     | len(x) == len(y):
@@ -335,7 +335,7 @@ fn karatsubaShl(mut s: bits, n: int): bits {
 const karatsubaThreshold = 1 << 5 + 8
 
 fn karatsuba(mut x: bits, mut y: bits): bits {
-    let n = max(len(x), len(y))
+    n := max(len(x), len(y))
     if n == 1 {
         if len(x) == 0 || len(y) == 0 || x[0] == 0b0 || y[0] == 0b0 {
             ret nil
@@ -346,25 +346,25 @@ fn karatsuba(mut x: bits, mut y: bits): bits {
     if len(y) < karatsubaThreshold {
         reverse(x)
         reverse(y)
-        let mut r = basicMul(x, y)
+        mut r := basicMul(x, y)
         reverse(x)
         reverse(y)
         reverse(r)
         ret r
     }
 
-    let m = n >> 1
-    let mut xl = x[:m]
-    let mut xr = x[m:]
-    let mut yl = y[:m]
-    let mut yr = y[m:]
+    m := n >> 1
+    mut xl := x[:m]
+    mut xr := x[m:]
+    mut yl := y[:m]
+    mut yr := y[m:]
 
-    let mut p1 = karatsuba(xl, yl)
-    let mut p2 = karatsuba(xr, yr)
-    let mut p3 = karatsuba(karatsubaAdd(xl, xr), karatsubaAdd(yl, yr))
+    mut p1 := karatsuba(xl, yl)
+    mut p2 := karatsuba(xr, yr)
+    mut p3 := karatsuba(karatsubaAdd(xl, xr), karatsubaAdd(yl, yr))
 
-    let mut c2 = karatsubaShl(karatsubaSub(p3, karatsubaAdd(p1, p2)), n - m)
-    let mut c1 = karatsubaShl(p1, (n - m) << 1)
+    mut c2 := karatsubaShl(karatsubaSub(p3, karatsubaAdd(p1, p2)), n - m)
+    mut c1 := karatsubaShl(p1, (n - m) << 1)
     ret karatsubaAdd(karatsubaAdd(c1, c2), p2)
 }
 
@@ -476,9 +476,9 @@ fn recursiveDiv(mut &x: bits, mut &y: bits, mut &s: bits, mut &q: bits) {
     }
     subRes(x, q)
     fit(x)
-    let mut sq = q[:len(q)-len(y)+1]
-    let mut &last = unsafe { *(&sq[len(sq)-1]) }
-    let old = last
+    mut sq := q[:len(q)-len(y)+1]
+    mut &last := unsafe { *(&sq[len(sq)-1]) }
+    old := last
     last = 0b1
     addRfast(s, sq)
     last = old

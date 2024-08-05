@@ -113,7 +113,7 @@ impl FlagSet {
     //   use is allowed. If the short name flags used need values, the values ​
     //   should follow respectively.
     fn Parse(mut self, args: []str)!: []str {
-        let mut ap = argParser{
+        mut ap := argParser{
             set: self,
             args: unsafe { *(&args) },
         }
@@ -145,7 +145,7 @@ impl FlagSet {
             panic("std::flag: FlagSet.Add[T]: flag is already exist in this short name: " + str(short))
         }
 
-        let mut flag = &Flag[T]{
+        mut flag := &Flag[T]{
             name: name,
             short: short,
             what: what,
@@ -166,14 +166,14 @@ impl FlagSet {
     //  - str
     //  - bool
     fn Add[T](mut self, name: str, short: rune, default: T, what: str): &T {
-        let mut flag = self.addFlagCommon[T](name, short, what)
+        mut flag := self.addFlagCommon[T](name, short, what)
         flag.data = new(T, default)
         ret flag.data
     }
 
     // Same with add method but do not allocates new reference, uses existing.
     fn AddVar[T](mut self, mut var: &T, name: str, short: rune, what: str) {
-        let mut flag = self.addFlagCommon[T](name, short, what)
+        mut flag := self.addFlagCommon[T](name, short, what)
         flag.default = *var
         flag.data = var
     }
@@ -217,35 +217,35 @@ impl argParser {
     fn processFlag(mut self, mut &flag: CommonFlag)! {
         match type flag {
         | BoolFlag:
-            let mut bf = BoolFlag(flag)
+            mut bf := BoolFlag(flag)
             *bf.data = !bf.default
             ret
         }
 
-        let data = self.getData()
+        data := self.getData()
         if data == "" {
             error("--" + flag.Name() + ": expression missing")
         }
 
         match type flag {
         | IntFlag:
-            let mut intf = IntFlag(flag)
-            let ((*intf.data), ok) = self.parseInteger[i64](data, fn(s: str, base: int): (i64, bool) {
+            mut intf := IntFlag(flag)
+            (*intf.data), ok := self.parseInteger[i64](data, fn(s: str, base: int): (i64, bool) {
                 ret conv::ParseInt(s, base, bitSize) else { ret 0, false }, true
             })
             if !ok {
                 error("--" + flag.Name() + ": expression must be valid signed integer")
             }
         | UintFlag:
-            let mut uintf = UintFlag(flag)
-            let ((*uintf.data), ok) = self.parseInteger[u64](data, fn(s: str, base: int): (u64, bool) {
+            mut uintf := UintFlag(flag)
+            (*uintf.data), ok := self.parseInteger[u64](data, fn(s: str, base: int): (u64, bool) {
                 ret conv::ParseUint(s, base, bitSize) else { ret 0, false }, true
             })
             if !ok {
                 error("--" + flag.Name() + ": expression must be valid unsigned integer")
             }
         | FloatFlag:
-            let mut ff = FloatFlag(flag)
+            mut ff := FloatFlag(flag)
             *ff.data = conv::ParseFloat(data, bitSize) else {
                 error("--" + flag.Name() + ": expression must be valid floating-point")
             }
@@ -258,9 +258,9 @@ impl argParser {
         if len(arg) == 1 { // Just dash.
             error(arg + ": missing argument")
         }
-        let rarg = ([]rune(arg))[1:] // Start at 1 to skip dash.
+        rarg := ([]rune(arg))[1:] // Start at 1 to skip dash.
         for _, r in rarg {
-            let mut flag = self.set.FindFlagShort(r)
+            mut flag := self.set.FindFlagShort(r)
             if flag == nil {
                 error(arg + ": flag is not exist: " + str(r))
             }
@@ -273,7 +273,7 @@ impl argParser {
         if len(arg) == 2 { // Just dash.
             error(arg + ": missing argument")
         }
-        let mut flag = self.set.FindFlag(arg[2:]) // Start at 2 to skip dashes.
+        mut flag := self.set.FindFlag(arg[2:]) // Start at 2 to skip dashes.
         if flag == nil {
             error(arg + ": flag is not exist")
         }
@@ -281,7 +281,7 @@ impl argParser {
     }
 
     fn tryArg(mut self)! {
-        let arg = self.args[self.i]
+        arg := self.args[self.i]
         if len(self.args) == 0 {
             ret
         }

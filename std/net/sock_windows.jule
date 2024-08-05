@@ -19,7 +19,7 @@ fn closeSocket(handle: netHandle): bool {
 }
 
 fn setSocketBlockingMode(handle: netHandle, mode: UnsignedLong)! {
-    let FIONBIO = 0x80000000 | (Long(mem::SizeOf(UnsignedLong) & 0x7F) << 16) | ('f' << 8) | 126
+    FIONBIO := 0x80000000 | (Long(mem::SizeOf(UnsignedLong) & 0x7F) << 16) | ('f' << 8) | 126
     unsafe {
         if sys::Ioctlsocket(handle, FIONBIO, &mode) == sys::SOCKET_ERROR {
             error(lastErrorCode())
@@ -40,7 +40,7 @@ unsafe fn connectSocket(handle: netHandle, sockAddr: *sys::Sockaddr, sockLen: ui
         connectSocketNoTimeout(handle, sockAddr, sockLen) else { error(error) }
         ret
     }
-    let tv = timevalFromDuration(timeout)
+    tv := timevalFromDuration(timeout)
     if tv.tv_sec == 0 && tv.tv_usec == 0 {
         connectSocketNoTimeout(handle, sockAddr, sockLen) else { error(error) }
         ret
@@ -49,17 +49,17 @@ unsafe fn connectSocket(handle: netHandle, sockAddr: *sys::Sockaddr, sockLen: ui
     if sys::Connect(handle, sockAddr, sockLen) != sys::SOCKET_ERROR {
         ret
     }
-    let err = lastErrorCode()
+    err := lastErrorCode()
     if err != sys::WSAEWOULDBLOCK {
         error(err)
     }
-    let fdW = sys::Fd{}
-    let mut fdE = sys::Fd{}
+    fdW := sys::Fd{}
+    mut fdE := sys::Fd{}
     sys::FdZero(&fdW)
     sys::FdSet(handle, &fdW)
     sys::FdZero(&fdE)
     sys::FdSet(handle, &fdE)
-    let res = sys::Select(0, nil, &fdW, &fdE, &tv)
+    res := sys::Select(0, nil, &fdW, &fdE, &tv)
     if res <= 0 {
         if res == 0 {
             // Timeout.
@@ -68,8 +68,8 @@ unsafe fn connectSocket(handle: netHandle, sockAddr: *sys::Sockaddr, sockLen: ui
         error(lastErrorCode())
     }
     if sys::FdIsset(handle, &fdE) != 0 {
-        let mut opt = Int(0)
-        let mut optLen = Int(mem::SizeOf(opt))
+        mut opt := Int(0)
+        mut optLen := Int(mem::SizeOf(opt))
         sys::Getsockopt(handle, sys::SOL_SOCKET, sys::SO_ERROR, (*Char)(&opt), &optLen)
         error(int(opt))
     }
@@ -78,14 +78,14 @@ unsafe fn connectSocket(handle: netHandle, sockAddr: *sys::Sockaddr, sockLen: ui
 
 fn recvfrom(&conn: UdpConn, mut &buf: []byte)!: int {
     if conn.v6 {
-        let addrLen = addrLen(mem::SizeOf(conn.sockaddr6))
-        let n = unsafe { sys::Recvfrom(conn.handle, &buf[0], len(buf), 0, (*sys::Sockaddr)(&conn.sockaddr6), &addrLen) }
+        addrLen := addrLen(mem::SizeOf(conn.sockaddr6))
+        n := unsafe { sys::Recvfrom(conn.handle, &buf[0], len(buf), 0, (*sys::Sockaddr)(&conn.sockaddr6), &addrLen) }
         if n >= 0 {
             ret int(n)
         }
     } else {
-        let addrLen = addrLen(mem::SizeOf(conn.sockaddr4))
-        let n = unsafe { sys::Recvfrom(conn.handle, &buf[0], len(buf), 0, (*sys::Sockaddr)(&conn.sockaddr4), &addrLen) }
+        addrLen := addrLen(mem::SizeOf(conn.sockaddr4))
+        n := unsafe { sys::Recvfrom(conn.handle, &buf[0], len(buf), 0, (*sys::Sockaddr)(&conn.sockaddr4), &addrLen) }
         if n >= 0 {
             ret int(n)
         }
@@ -95,14 +95,14 @@ fn recvfrom(&conn: UdpConn, mut &buf: []byte)!: int {
 
 fn sendto(&conn: UdpConn, &buf: []byte)!: int {
     if conn.v6 {
-        let addrLen = addrLen(mem::SizeOf(conn.sockaddr6))
-        let n = unsafe { sys::Sendto(conn.handle, &buf[0], len(buf), 0, (*sys::Sockaddr)(&conn.sockaddr6), addrLen) }
+        addrLen := addrLen(mem::SizeOf(conn.sockaddr6))
+        n := unsafe { sys::Sendto(conn.handle, &buf[0], len(buf), 0, (*sys::Sockaddr)(&conn.sockaddr6), addrLen) }
         if n >= 0 {
             ret int(n)
         }
     } else {
-        let addrLen = addrLen(mem::SizeOf(conn.sockaddr4))
-        let n = unsafe { sys::Sendto(conn.handle, &buf[0], len(buf), 0, (*sys::Sockaddr)(&conn.sockaddr4), addrLen) }
+        addrLen := addrLen(mem::SizeOf(conn.sockaddr4))
+        n := unsafe { sys::Sendto(conn.handle, &buf[0], len(buf), 0, (*sys::Sockaddr)(&conn.sockaddr4), addrLen) }
         if n >= 0 {
             ret int(n)
         }
@@ -111,7 +111,7 @@ fn sendto(&conn: UdpConn, &buf: []byte)!: int {
 }
 
 fn setSocketTimeout(handle: netHandle, scope: int, timeout: time::DurInt)! {
-    let tv = timevalFromDuration(timeout)
+    tv := timevalFromDuration(timeout)
     unsafe {
         if sys::Setsockopt(handle, sys::SOL_SOCKET, scope, (*Char)(&tv), int(mem::SizeOf(tv))) < 0 {
             error(lastErrorCode())
@@ -120,9 +120,9 @@ fn setSocketTimeout(handle: netHandle, scope: int, timeout: time::DurInt)! {
 }
 
 fn init() {
-    let mut wsaData = sys::WsaData{}
-    let verReq = sys::MakeWord(2, 2)
-    let r = unsafe { sys::WSAStartup(verReq, &wsaData) }
+    mut wsaData := sys::WsaData{}
+    verReq := sys::MakeWord(2, 2)
+    r := unsafe { sys::WSAStartup(verReq, &wsaData) }
     if r != 0 {
         panic("syd::net [windows specific]: WSAStartup failed")
     }

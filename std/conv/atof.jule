@@ -44,13 +44,13 @@ const optimize = true
 // prefix of s and prefix, with the character case of s ignored.
 // The prefix argument must be all lower-case.
 fn commonPrefixLenIgnoreCase(&s: []byte, prefix: str): int {
-    let mut n = len(prefix)
+    mut n := len(prefix)
     if n > len(s) {
         n = len(s)
     }
-    let mut i = 0
+    mut i := 0
     for i < n; i++ {
-        let mut c = s[i]
+        mut c := s[i]
         if 'A' <= c && c <= 'Z' {
             c += 'a' - 'A'
         }
@@ -70,8 +70,8 @@ fn special(s: []byte): (f: f64, n: int, ok: bool) {
     if len(s) == 0 {
         ret 0, 0, false
     }
-    let mut sign = 1
-    let mut nsign = 0
+    mut sign := 1
+    mut nsign := 0
     match s[0] {
     | '+' | '-':
         if s[0] == '-' {
@@ -80,12 +80,12 @@ fn special(s: []byte): (f: f64, n: int, ok: bool) {
         nsign = 1
         unsafe {
             // Break immutabilty, do not change content, just slicing.
-            let mut sp = &s
+            mut sp := &s
             *sp = (*sp)[1:]
         }
         fall
     | 'i' | 'I':
-        let mut caseN = commonPrefixLenIgnoreCase(s, "infinity")
+        mut caseN := commonPrefixLenIgnoreCase(s, "infinity")
         // Anything longer than "inf" is ok, but if we
         // don't have "infinity", only consume "inf".
         if 3 < caseN && caseN < 8 {
@@ -119,9 +119,9 @@ fn readFloat(&s: str): (mantissa: u64, exp: int, neg: bool, trunc: bool, hex: bo
     }
 
     // digits
-    let mut base: u64 = 10
-    let mut maxMantDigits = 19 // 10^19 fits in u64
-    let mut expChar = 'e'
+    mut base := u64(10)
+    mut maxMantDigits := 19 // 10^19 fits in u64
+    mut expChar := 'e'
     if i+2 < len(s) && s[i] == '0' && lower(s[i+1]) == 'x' {
         base = 16
         maxMantDigits = 16 // 16^16 fits in u64
@@ -129,13 +129,13 @@ fn readFloat(&s: str): (mantissa: u64, exp: int, neg: bool, trunc: bool, hex: bo
         expChar = 'p'
         hex = true
     }
-    let mut sawdot = false
-    let mut sawdigits = false
-    let mut nd = 0
-    let mut ndMant = 0
-    let mut dp = 0
+    mut sawdot := false
+    mut sawdigits := false
+    mut nd := 0
+    mut ndMant := 0
+    mut dp := 0
     for i < len(s); i++ {
-        let c = s[i]
+        c := s[i]
         match {
         | c == '_':
             continue
@@ -198,7 +198,7 @@ loop_end:
         if i >= len(s) {
             ret
         }
-        let mut esign = 1
+        mut esign := 1
         if s[i] == '+' {
             i++
         } else if s[i] == '-' {
@@ -208,7 +208,7 @@ loop_end:
         if i >= len(s) || s[i] < '0' || s[i] > '9' {
             ret
         }
-        let mut e = 0
+        mut e := 0
         for i < len(s) && ('0' <= s[i] && s[i] <= '9' || s[i] == '_'); i++ {
             if s[i] == '_' {
                 continue
@@ -236,7 +236,7 @@ static powtab = [1, 3, 6, 9, 13, 16, 19, 23, 26]
 
 impl decimal {
     fn set(mut self, s: []byte): (ok: bool) {
-        let mut i = 0
+        mut i := 0
         self.neg = false
         self.trunc = false
 
@@ -253,8 +253,8 @@ impl decimal {
         }
 
         // digits
-        let mut sawdot = false
-        let mut sawdigits = false
+        mut sawdot := false
+        mut sawdigits := false
         for i < len(s); i++ {
             match {
             | s[i] == '_':
@@ -299,7 +299,7 @@ impl decimal {
             if i >= len(s) {
                 ret
             }
-            let mut esign = 1
+            mut esign := 1
             if s[i] == '+' {
                 i++
             } else if s[i] == '-' {
@@ -309,7 +309,7 @@ impl decimal {
             if i >= len(s) || s[i] < '0' || s[i] > '9' {
                 ret
             }
-            let mut e = 0
+            mut e := 0
             for i < len(s) && ('0' <= s[i] && s[i] <= '9' || s[i] == '_'); i++ {
                 if s[i] == '_' {
                     continue
@@ -330,8 +330,8 @@ impl decimal {
     }
 
     fn floatBits(mut self, &flt: floatInfo): (b: u64, overflow: bool) {
-        let mut exp: int = 0
-        let mut mant: u64 = 0
+        mut exp := 0
+        mut mant := u64(0)
 
         // Zero is always a special case.
         if self.nd == 0 {
@@ -356,7 +356,7 @@ impl decimal {
         // Scale by powers of two until in range [0.5, 1.0)
         exp = 0
         for self.dp > 0 {
-            let mut n: int = 0
+            mut n := 0
             if self.dp >= len(powtab) {
                 n = 27
             } else {
@@ -366,7 +366,7 @@ impl decimal {
             exp += n
         }
         for self.dp < 0 || self.dp == 0 && self.d[0] < '5' {
-            let mut n: int = 0
+            mut n := 0
             if -self.dp >= len(powtab) {
                 n = 27
             } else {
@@ -383,7 +383,7 @@ impl decimal {
         // If the exponent is smaller, move it up and
         // adjust d accordingly.
         if exp < flt.bias+1 {
-            let n = flt.bias + 1 - exp
+            n := flt.bias + 1 - exp
             self.shift(-n)
             exp += n
         }
@@ -419,7 +419,7 @@ impl decimal {
 
     out:
         // Assemble bits.
-        let mut bits = mant & (1 << flt.mantbits - 1)
+        mut bits := mant & (1 << flt.mantbits - 1)
         bits |= u64((exp - flt.bias) & int(1 << flt.expbits - 1)) << flt.mantbits
         if self.neg {
             bits |= 1 << flt.mantbits << flt.expbits
@@ -554,8 +554,8 @@ fn atof32exact(mantissa: u64, mut exp: int, mut neg: bool): (f: f32, ok: bool) {
 // The string s has already been parsed into a mantissa, exponent, and sign (neg==true for negative).
 // If trunc is true, trailing non-zero bits have been omitted from the mantissa.
 fn atofHex(&flt: floatInfo, mut mantissa: u64, mut exp: int, neg: bool, trunc: bool): (f64, ConvError) {
-    let maxExp = int(1 << flt.expbits) + flt.bias - 2
-    let minExp = flt.bias + 1
+    maxExp := int(1 << flt.expbits) + flt.bias - 2
+    minExp := flt.bias + 1
     exp += int(flt.mantbits) // mantissa now implicitly divided by 2^mantbits.
 
     // Shift mantissa and exponent to bring representation into float range.
@@ -585,7 +585,7 @@ fn atofHex(&flt: floatInfo, mut mantissa: u64, mut exp: int, neg: bool, trunc: b
     }
 
     // Round using two bottom bits.
-    let mut round = mantissa & 3
+    mut round := mantissa & 3
     mantissa >>= 2
     round |= mantissa & 1 // round to even (round up if mantissa is odd)
     exp += 2
@@ -600,14 +600,14 @@ fn atofHex(&flt: floatInfo, mut mantissa: u64, mut exp: int, neg: bool, trunc: b
     if mantissa>>flt.mantbits == 0 { // Denormal or zero.
         exp = flt.bias
     }
-    let mut err: ConvError = ConvError.Ok
+    mut err := ConvError.Ok
     if exp > maxExp { // infinity and range error
         mantissa = u64(1 << flt.mantbits)
         exp = maxExp + 1
         err = ConvError.OutOfRange
     }
 
-    let mut bits = mantissa & (1 << flt.mantbits - 1)
+    mut bits := mantissa & (1 << flt.mantbits - 1)
     bits |= u64((exp - flt.bias) & int(1 << flt.expbits - 1)) << flt.mantbits
     if neg {
         bits |= 1 << flt.mantbits << flt.expbits
@@ -620,20 +620,20 @@ fn atofHex(&flt: floatInfo, mut mantissa: u64, mut exp: int, neg: bool, trunc: b
 
 fn atof32(&s: str): (f: f32, n: int, err: ConvError) {
     {
-        let (val, _n, ok) = special(nosafe::Stobs(s))
+        val, _n, ok := special(nosafe::Stobs(s))
         if ok {
             ret f32(val), _n, ConvError.Ok
         }
     }
 
-    let (mantissa, exp, neg, trunc, hex, _n, mut ok) = readFloat(s)
+    mantissa, exp, neg, trunc, hex, _n, mut ok := readFloat(s)
     n = _n
     if !ok {
         ret 0, n, ConvError.InvalidSyntax
     }
 
     if hex {
-        let mut ff: f64 = 0
+        mut ff := 0.
         ff, err = atofHex(f32info, mantissa, exp, neg, trunc)
         ret f32(ff), n, err
     }
@@ -655,7 +655,7 @@ fn atof32(&s: str): (f: f32, n: int, err: ConvError) {
             // Even if the mantissa was truncated, we may
             // have found the correct result. Confirm by
             // converting the upper mantissa bound.
-            let mut fUp: f32 = 0
+            mut fUp := f32(0)
             fUp, ok = eiselLemire32(mantissa + 1, exp, neg)
             if ok && f == fUp {
                 ret f, n, ConvError.Ok
@@ -664,11 +664,11 @@ fn atof32(&s: str): (f: f32, n: int, err: ConvError) {
     }
 
     // Slow fallback.
-    let mut d = decimal{}
+    mut d := decimal{}
     if !d.set(nosafe::Stobs(s)[:n]) {
         ret 0, n, ConvError.InvalidSyntax
     }
-    let (b, ovf) = d.floatBits(f32info)
+    b, ovf := d.floatBits(f32info)
     f = math::F32FromBits(u32(b))
     if ovf {
         err = ConvError.OutOfRange
@@ -678,13 +678,13 @@ fn atof32(&s: str): (f: f32, n: int, err: ConvError) {
 
 fn atof64(&s: str): (f: f64, n: int, err: ConvError) {
     {
-        let (val, _n, ok) = special(nosafe::Stobs(s))
+        val, _n, ok := special(nosafe::Stobs(s))
         if ok {
             ret val, _n, ConvError.Ok
         }
     }
 
-    let (mantissa, exp, neg, trunc, hex, _n, mut ok) = readFloat(s)
+    mantissa, exp, neg, trunc, hex, _n, mut ok := readFloat(s)
     n = _n
     if !ok {
         ret 0, n, ConvError.InvalidSyntax
@@ -712,7 +712,7 @@ fn atof64(&s: str): (f: f64, n: int, err: ConvError) {
             // Even if the mantissa was truncated, we may
             // have found the correct result. Confirm by
             // converting the upper mantissa bound.
-            let mut fUp: f64 = 0
+            mut fUp := 0.
             fUp, ok = eiselLemire64(mantissa + 1, exp, neg)
             if ok && f == fUp {
                 ret f, n, ConvError.Ok
@@ -721,11 +721,11 @@ fn atof64(&s: str): (f: f64, n: int, err: ConvError) {
     }
 
     // Slow fallback.
-    let mut d = decimal{}
+    mut d := decimal{}
     if !d.set(nosafe::Stobs(s)[:n]) {
         ret 0, n, ConvError.InvalidSyntax
     }
-    let (b, ovf) = d.floatBits(f64info)
+    b, ovf := d.floatBits(f64info)
     f = math::F64FromBits(b)
     if ovf {
         err = ConvError.OutOfRange
@@ -735,10 +735,10 @@ fn atof64(&s: str): (f: f64, n: int, err: ConvError) {
 
 fn parseFloatPrefix(&s: str, bitSize: int): (f64, int, ConvError) {
     if bitSize == 32 {
-        let (f, n, err) = atof32(s)
+        f, n, err := atof32(s)
         ret f64(f), n, err
     }
-    let (f, n, err) = atof64(s)
+    f, n, err := atof64(s)
     ret f, n, err
 }
 
@@ -767,7 +767,7 @@ fn parseFloatPrefix(&s: str, bitSize: int): (f64, int, ConvError) {
 // Recognizes the string "NaN", and the (possibly signed) strings "inf" and "infinity"
 // as their respective special floating point values. It ignores case when matching.
 fn ParseFloat(s: str, bitSize: int)!: f64 {
-    let (f, n, err) = parseFloatPrefix(s, bitSize)
+    f, n, err := parseFloatPrefix(s, bitSize)
     if n != len(s) && (err == ConvError.Ok || err != ConvError.InvalidSyntax) {
         error(ConvError.InvalidSyntax)
     }

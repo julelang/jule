@@ -21,8 +21,8 @@ fn Repeat(s: []byte, mut n: int): []byte {
         panic("std::bytes: repeat: integer buffer size overflow")
     }
 
-    let mut buff = make([]byte, len(s) * n)
-    let mut i = 0
+    mut buff := make([]byte, len(s) * n)
+    mut i := 0
     for n > 0; n-- {
         i += copy(buff[i:], s)
     }
@@ -94,14 +94,14 @@ fn Find(s: []byte, sub: []byte): int {
 // of slice to left. Starts searching s at given index.
 // Returns -1, if i < 0 || i >= len(s).
 fn FindLastAt(s: []byte, sub: []byte, i: int): int {
-    let mut j = i - len(sub) + 1
+    mut j := i - len(sub) + 1
     if len(sub) == 0 || i < 0 || i >= len(s) || j < 0 {
         ret -1
     }
 loop:
     for j >= 0; j-- {
-        let mut k = j
-        let mut z = 0
+        mut k := j
+        mut z := 0
         for z < len(sub); k, z = k + 1, z + 1 {
             if s[k] != sub[z] {
                 continue loop
@@ -137,9 +137,9 @@ fn FindLastByte(s: []byte, b: byte): int {
 // returns -1 if not exist any match. Starts searching at left
 // of slice to right.
 fn FindRune(s: []byte, r: rune): int {
-    let mut i = 0
+    mut i := 0
     for i < len(s) {
-        let (br, n) = utf8::DecodeRune(s[i:])
+        br, n := utf8::DecodeRune(s[i:])
         if r == br {
             ret i
         }
@@ -152,9 +152,9 @@ fn FindRune(s: []byte, r: rune): int {
 // returns -1 if not exist any match. Starts searching at right
 // of slice to left.
 fn FindLastRune(s: []byte, r: rune): int {
-    let mut i = len(s)
+    mut i := len(s)
     for i > 0 {
-        let (br, n) = utf8::DecodeLastRune(s[:i])
+        br, n := utf8::DecodeLastRune(s[:i])
         if r == br {
             ret i - 1
         }
@@ -172,7 +172,7 @@ fn FindFnAt(s: []byte, mut i: int, f: fn(mut rune): bool): int {
         ret -1
     }
     for i < len(s) {
-        let (r, n) = utf8::DecodeRune(s[i:])
+        r, n := utf8::DecodeRune(s[i:])
         if f(r) {
             ret i
         }
@@ -197,7 +197,7 @@ fn FindFnLastAt(s: []byte, mut i: int, f: fn(mut rune): bool): int {
         ret -1
     }
     for i > 0 {
-        let (r, n) = utf8::DecodeRune(s[i:])
+        r, n := utf8::DecodeRune(s[i:])
         if f(r) {
             ret i
         }
@@ -217,9 +217,9 @@ fn FindFnLast(s: []byte, f: fn(mut rune): bool): int {
 // returns -1 if not exist any match. Starts searching at left
 // of slice to right.
 fn FindAny(s: []byte, runes: []byte): int {
-    let mut i = 0
+    mut i := 0
     for i < len(s) {
-        let (r, n) = utf8::DecodeRune(s[i:])
+        r, n := utf8::DecodeRune(s[i:])
         if FindRune(runes, r) != -1 {
             ret i
         }
@@ -232,9 +232,9 @@ fn FindAny(s: []byte, runes: []byte): int {
 // returns -1 if not exist any match. Starts searching at right
 // of slice to left.
 fn FindLastAny(s: []byte, runes: []byte): int {
-    let mut i = len(s)
+    mut i := len(s)
     for i > 0 {
-        let (r, n) = utf8::DecodeLastRune(s[:i])
+        r, n := utf8::DecodeLastRune(s[:i])
         if FindRune(runes, r) != -1 {
             ret i - 1
         }
@@ -248,20 +248,20 @@ fn FindLastAny(s: []byte, runes: []byte): int {
 // Returns empty slice if n is equals to zero.
 // Returns all parts if n less than zero.
 fn Split(mut s: []byte, sub: []byte, mut n: int): [][]byte {
-    let mut cap = n
+    mut cap := n
     if n < 0 {
         cap = 1 << 3
     }
-    let mut parts = make([][]byte, 0, cap)
+    mut parts := make([][]byte, 0, cap)
     if n == 0 {
         ret parts
     }
     if n < 0 {
         n = len(s)
     }
-    let mut i = 0
+    mut i := 0
     for n > 0; n-- {
-        let j = FindAt(s, sub, i)
+        j := FindAt(s, sub, i)
         if j == -1 {
             break
         }
@@ -300,10 +300,10 @@ fn Count(s: []byte, sub: []byte): int {
     if len(sub) == 0 {
         ret 0
     }
-    let mut n = 0
-    let mut i = 0
+    mut n := 0
+    mut i := 0
     for {
-        let j = FindAt(s, sub, i)
+        j := FindAt(s, sub, i)
         if j == -1 {
             break
         }
@@ -328,7 +328,7 @@ fn Replace(mut s: []byte, sub: []byte, new: []byte, mut n: int): []byte {
         ret s
     }
 
-    let m = Count(s, sub)
+    m := Count(s, sub)
     if m == 0 {
         ret s
     }
@@ -336,10 +336,10 @@ fn Replace(mut s: []byte, sub: []byte, new: []byte, mut n: int): []byte {
         n = m
     }
 
-    let mut ss = make([]byte, 0, len(s) + n * (len(new) - len(sub)))
-    let mut i = 0
+    mut ss := make([]byte, 0, len(s) + n * (len(new) - len(sub)))
+    mut i := 0
     for n > 0; n-- {
-        let j = FindAt(s, sub, i)
+        j := FindAt(s, sub, i)
         if j == -1 {
             break
         }
@@ -355,10 +355,10 @@ fn Replace(mut s: []byte, sub: []byte, new: []byte, mut n: int): []byte {
 // according to the mapping function. If mapping returns a negative value,
 // the character is dropped from the slice with no replacement.
 fn Map(s: []byte, mapping: fn(mut rune): rune): []byte {
-    let mut ss = make([]byte, 0, len(s))
-    let mut i = 0
+    mut ss := make([]byte, 0, len(s))
+    mut i := 0
     for i < len(s) {
-        let (mut r, n) = utf8::DecodeRune(s[i:])
+        mut r, n := utf8::DecodeRune(s[i:])
         i += n
         r = mapping(r)
         if r >= 0 {
@@ -384,9 +384,9 @@ fn ToUpper(s: []byte): []byte {
 // Cutset should include runes to trim.
 // Returns mutable copy of s.
 fn TrimLeft(mut s: []byte, cutset: []byte): []byte {
-    let mut i = 0
+    mut i := 0
     for i < len(s) {
-        let (r, n) = utf8::DecodeRune(s[i:])
+        r, n := utf8::DecodeRune(s[i:])
         if FindRune(cutset, r) == -1 {
             s = s[i:]
             break
@@ -400,9 +400,9 @@ fn TrimLeft(mut s: []byte, cutset: []byte): []byte {
 // Cutset should include runes to trim.
 // Returns mutable copy of s.
 fn TrimRight(mut s: []byte, cutset: []byte): []byte {
-    let mut i = len(s)
+    mut i := len(s)
     for i > 0 {
-        let (r, n) = utf8::DecodeLastRune(s[:i])
+        r, n := utf8::DecodeLastRune(s[:i])
         if FindRune(cutset, r) == -1 {
             s = s[:i]
             break
@@ -425,7 +425,7 @@ fn Join(parts: [][]byte, sep: []byte): []byte {
     if len(parts) == 0 {
         ret make([]byte, 0)
     }
-    let mut s = make([]byte, len(parts[0]))
+    mut s := make([]byte, len(parts[0]))
     copy(s, parts[0])
     for _, part in parts[1:] {
         s = append(s, sep...)
@@ -436,10 +436,10 @@ fn Join(parts: [][]byte, sep: []byte): []byte {
 
 // Returns runes from UTF-8 encoded bytes.
 fn Runes(s: []byte): []rune {
-    let mut runes = make([]rune, 0, utf8::RuneCount(s))
-    let mut i = 0
+    mut runes := make([]rune, 0, utf8::RuneCount(s))
+    mut i := 0
     for i < len(s) {
-        let (r, n) = utf8::DecodeRune(s[i:])
+        r, n := utf8::DecodeRune(s[i:])
         i += n
         runes = append(runes, r)
     }
@@ -453,7 +453,7 @@ fn Runes(s: []byte): []rune {
 //
 // Cut returns slices of the original slice s, not copies.
 fn Cut(mut s: []byte, sep: []byte): (before: []byte, after: []byte, found: bool) {
-    let i = Find(s, sep)
+    i := Find(s, sep)
     if i >= 0 {
         ret s[:i], s[i+len(sep):], true
     }

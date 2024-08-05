@@ -15,13 +15,13 @@ fn isValidModelForRef(mut &m: ExprModel): bool {
     | &Var:
         ret true
     | &StructSubIdentExprModel:
-        let mut model = (&StructSubIdentExprModel)(m)
+        mut model := (&StructSubIdentExprModel)(m)
         ret isValidModelForRef(model.Expr.Model)
     | &TraitSubIdentExprModel:
-        let mut model = (&TraitSubIdentExprModel)(m)
+        mut model := (&TraitSubIdentExprModel)(m)
         ret isValidModelForRef(model.Expr)
     | &UnaryExprModel:
-        let mut unary = (&UnaryExprModel)(m)
+        mut unary := (&UnaryExprModel)(m)
         if unary.Op.Id != TokenId.Star {
             ret false
         }
@@ -35,7 +35,7 @@ fn isValidModelForRef(mut &m: ExprModel): bool {
         }
         ret isValidModelForRef(unary.Expr.Model)
     | &IndexingExprModel:
-        let mut indexing = (&IndexingExprModel)(m)
+        mut indexing := (&IndexingExprModel)(m)
         ret isValidModelForRef(indexing.Expr.Model)
     |:
         ret false
@@ -43,7 +43,7 @@ fn isValidModelForRef(mut &m: ExprModel): bool {
 }
 
 fn compilerErr(&token: &Token, line: bool, fmt: LogMsg, args: ...any): Log {
-    let mut log = Log{
+    mut log := Log{
         Kind: LogKind.Error,
         Row: token.Row,
         Column: token.Column,
@@ -73,7 +73,7 @@ fn appendRetVars(mut &dest: []&Var, mut &f: &FnIns) {
         ret
     }
 
-    let mut types = f.Types()
+    mut types := f.Types()
     for (i, mut ident) in f.Decl.Result.Idents {
         if IsIgnoreIdent(ident.Kind) || IsAnonIdent(ident.Kind) {
             continue
@@ -108,7 +108,7 @@ fn appendParamVars(mut &dest: []&Var, mut &f: &FnIns) {
             continue
         }
 
-        let mut v = &Var{
+        mut v := &Var{
             Used: true,
             Reference: p.Decl.Reference,
             Mutable: p.Decl.Mutable,
@@ -159,7 +159,7 @@ fn appendParamVars(mut &dest: []&Var, mut &f: &FnIns) {
 // Builds type aliases for generic types of scope.
 // See developer reference (1), and (2).
 fn appendGenericTypeAliases(mut &dest: []&TypeAlias, mut &f: &FnIns) {
-    let mut size = len(f.Generics)
+    mut size := len(f.Generics)
     if f.Decl.Owner != nil {
         size += len(f.Decl.Owner.Generics)
     }
@@ -169,7 +169,7 @@ fn appendGenericTypeAliases(mut &dest: []&TypeAlias, mut &f: &FnIns) {
     }
 
     for (i, mut g) in f.Generics {
-        let mut decl = f.Decl.Generics[i]
+        mut decl := f.Decl.Generics[i]
         dest = append(dest, &TypeAlias{
             Used: true,
             Generic: true,
@@ -181,9 +181,9 @@ fn appendGenericTypeAliases(mut &dest: []&TypeAlias, mut &f: &FnIns) {
     }
 
     if f.Decl.Owner != nil {
-        let mut owner = f.Owner
+        mut owner := f.Owner
         for (i, mut g) in owner.Generics {
-            let mut decl = owner.Decl.Generics[i]
+            mut decl := owner.Decl.Generics[i]
             dest = append(dest, &TypeAlias{
                 Used: true,
                 Generic: true,
@@ -220,7 +220,7 @@ impl commonSemaMeta {
                 ret t2
             }
         }
-        let mut t1 = &comptimeTypeInfo{base: t}
+        mut t1 := &comptimeTypeInfo{base: t}
         self.comptimeTypeInfos = append(self.comptimeTypeInfos, t1)
         ret t1
     }
@@ -255,7 +255,7 @@ impl Lookup for Sema {
     //   - Current file's public denifes of imported packages.
     fn FindVar(mut self, ident: str, binded: bool): &Var {
         // Lookup package files.
-        let mut v = findVarInPackage(self.files, ident, binded)
+        mut v := findVarInPackage(self.files, ident, binded)
         if v != nil {
             ret v
         }
@@ -287,7 +287,7 @@ impl Lookup for Sema {
     //   - Current file's public denifes of imported packages.
     fn FindTypeAlias(mut self, ident: str, binded: bool): &TypeAlias {
         // Lookup package files.
-        let mut ta = findTypeAliasInPackage(self.files, ident, binded)
+        mut ta := findTypeAliasInPackage(self.files, ident, binded)
         if ta != nil {
             ret ta
         }
@@ -319,7 +319,7 @@ impl Lookup for Sema {
     //   - Current file's public denifes of imported packages.
     fn FindStruct(mut self, ident: str, binded: bool): &Struct {
         // Lookup package files.
-        let mut s = findStructInPackage(self.files, ident, binded)
+        mut s := findStructInPackage(self.files, ident, binded)
         if s != nil {
             ret s
         }
@@ -350,7 +350,7 @@ impl Lookup for Sema {
     //   - Current file's public denifes of imported packages.
     fn FindFn(mut self, ident: str, binded: bool): &Fn {
         // Lookup package files.
-        let mut f = findFnInPackage(self.files, ident, binded)
+        mut f := findFnInPackage(self.files, ident, binded)
         if f != nil {
             ret f
         }
@@ -382,7 +382,7 @@ impl Lookup for Sema {
     //   - Current file's public denifes of imported packages.
     fn FindTrait(mut self, ident: str): &Trait {
         // Lookup package files.
-        let mut t = findTraitInPackage(self.files, ident)
+        mut t := findTraitInPackage(self.files, ident)
         if t != nil {
             ret t
         }
@@ -414,7 +414,7 @@ impl Lookup for Sema {
     //   - Current file's public denifes of imported packages.
     fn FindEnum(mut self, ident: str): &Enum {
         // Lookup package files.
-        let mut e = findEnumInPackage(self.files, ident)
+        mut e := findEnumInPackage(self.files, ident)
         if e != nil {
             ret e
         }
@@ -446,7 +446,7 @@ impl Lookup for Sema {
     //   - Current file's public denifes of imported packages.
     fn FindTypeEnum(mut self, ident: str): &TypeEnum {
         // Lookup package files.
-        let mut e = findTypeEnumInPackage(self.files, ident)
+        mut e := findTypeEnumInPackage(self.files, ident)
         if e != nil {
             ret e
         }
@@ -512,7 +512,7 @@ impl Sema {
     }
 
     fn checkDirectives(mut &self, mut &d: []&ast::Directive, mut o: any) {
-        let mut dc = directiveChecker{
+        mut dc := directiveChecker{
             s: self,
             d: unsafe { (&[]&ast::Directive)(&d) },
             o: o,
@@ -559,7 +559,7 @@ impl Sema {
         for (_, mut f) in imp.Package.Files {
             // Binded defines can't export.
             const Binded = false
-            let mut def = f.defByIdent(ident, Binded)
+            mut def := f.defByIdent(ident, Binded)
             if def != nil {
                 ret def
             }
@@ -595,31 +595,31 @@ impl Sema {
                 continue
             }
 
-            let mut def = self.getImportDef(ident.Kind, imp)
+            mut def := self.getImportDef(ident.Kind, imp)
             match type def {
             | bool:
                 // Pass, built-in.
                 continue
             | &Var:
-                let mut v = (&Var)(def)
+                mut v := (&Var)(def)
                 ok = self.checkImportSelection(ident, v) && ok
             | &TypeAlias:
-                let mut ta = (&TypeAlias)(def)
+                mut ta := (&TypeAlias)(def)
                 ok = self.checkImportSelection(ident, ta) && ok
             | &Struct:
-                let mut s = (&Struct)(def)
+                mut s := (&Struct)(def)
                 ok = self.checkImportSelection(ident, s) && ok
             | &Trait:
-                let mut t = (&Trait)(def)
+                mut t := (&Trait)(def)
                 ok = self.checkImportSelection(ident, t) && ok
             | &Enum:
-                let mut e = (&Enum)(def)
+                mut e := (&Enum)(def)
                 ok = self.checkImportSelection(ident, e) && ok
             | &TypeEnum:
-                let mut e = (&TypeEnum)(def)
+                mut e := (&TypeEnum)(def)
                 ok = self.checkImportSelection(ident, e) && ok
             | &Fn:
-                let mut f = (&Fn)(def)
+                mut f := (&Fn)(def)
                 ok = self.checkImportSelection(ident, f) && ok
             |:
                 self.pushErr(ident, LogMsg.IdentNotExist, ident.Kind)
@@ -631,7 +631,7 @@ impl Sema {
     }
 
     fn checkImportsAllSelectionsFromCollection[T](mut self, &s: []T, &et: &Token): bool {
-        let mut ok = true
+        mut ok := true
         for _, d in s {
             if d.Public {
                 ok = self.checkImportSelection(et, d) && ok
@@ -694,7 +694,7 @@ impl Sema {
         }
 
         if !imp.Duplicate {
-            let mut sema = &Sema{
+            mut sema := &Sema{
                 flags: self.flags,
                 meta: self.meta,
             }
@@ -712,7 +712,7 @@ impl Sema {
         for (_, mut file) in self.files {
             self.setCurrentFile(file)
             for (_, mut imp) in file.Imports {
-                let ok = self.checkImport(imp)
+                ok := self.checkImport(imp)
                 // Break checking if package has error.
                 if !ok {
                     ret
@@ -746,7 +746,7 @@ impl Sema {
 
     fn checkFileInherits(mut &self) {
         for (_, mut t) in self.file.Traits {
-            let ok = self._checkTraitDeclInherits(t)
+            ok := self._checkTraitDeclInherits(t)
             if !ok {
                 ret
             }
@@ -762,7 +762,7 @@ impl Sema {
 
     fn typeChecker(mut &self, mut l: Lookup, mut generics: []&TypeAlias,
         mut referencer: &referencer): typeChecker {
-        let mut tc = typeChecker{
+        mut tc := typeChecker{
             s: self,
             rootLookup: l,
             lookup: l,
@@ -771,7 +771,7 @@ impl Sema {
         }
         match type l {
         | &scopeChecker:
-            let mut hard = (&scopeChecker)(l).getHardRoot()
+            mut hard := (&scopeChecker)(l).getHardRoot()
             tc.refers = hard.owner.Refers
         }
         // referencer's refs field is not nil if owner is type alias.
@@ -817,7 +817,7 @@ impl Sema {
     // Returns nil if error occur or failed.
     fn buildTypeWithGenerics(mut &self, mut &t: &ast::TypeDecl,
         mut generics: []&TypeAlias, mut refers: &ReferenceStack): &TypeKind {
-        let mut tc = &typeChecker{
+        mut tc := &typeChecker{
             s: self,
             rootLookup: self,
             lookup: self,
@@ -834,7 +834,7 @@ impl Sema {
 
     // Select type with name selection.
     fn selectType(mut &self, mut &t: &ast::TypeDecl): &TypeKind {
-        let mut tc = &typeChecker{
+        mut tc := &typeChecker{
             s: self,
             rootLookup: self,
             lookup: self,
@@ -846,7 +846,7 @@ impl Sema {
     // Returns Eval instance for configuration with
     // type prefix and checks var dependencies.
     fn evalpd(mut &self, mut l: Lookup, mut p: &TypeKind, mut owner: &Var): &Eval {
-        let mut e = &Eval{
+        mut e := &Eval{
             s: self,
             lookup: l,
             owner: owner,
@@ -881,13 +881,13 @@ impl Sema {
                 ret false
             }
         } else {
-            let mut atc = &assignTypeChecker{
+            mut atc := &assignTypeChecker{
                 s: self,
                 errorToken: errorToken,
                 dest: dest,
                 d: d,
             }
-            let ok = atc.check()
+            ok := atc.check()
             if !ok {
                 ret false
             }
@@ -897,7 +897,7 @@ impl Sema {
             ret true
         }
 
-        let mut kind = dest.Prim().Kind
+        mut kind := dest.Prim().Kind
 
         match {
         | types::IsSigInt(kind):
@@ -926,7 +926,7 @@ impl Sema {
             ret false
         }
 
-        let mut tcc = typeCompatibilityChecker{
+        mut tcc := typeCompatibilityChecker{
             s: self,
             errorToken: errorToken,
             dest: dest,
@@ -949,7 +949,7 @@ impl Sema {
     //   - For checking non-generic types.
     fn buildNonGenericTypeKind(mut &self, mut &ast: &ast::TypeDecl,
         mut &generics: []&ast::GenericDecl, mut &ignored: []&TypeKind): &TypeKind {
-        let mut tc = &typeChecker{
+        mut tc := &typeChecker{
             s: self,
             rootLookup: self,
             lookup: self,
@@ -985,9 +985,9 @@ impl Sema {
         if len(f.Instances) == 1 {
             ret f.Instances[0]
         }
-        let mut ins = f.instanceForce()
+        mut ins := f.instanceForce()
 
-        let mut tc = &typeChecker{
+        mut tc := &typeChecker{
             s: self,
             rootLookup: self,
             lookup: self,
@@ -1005,7 +1005,7 @@ impl Sema {
     }
 
     fn checkConstraintsFn(mut &self, mut &f: &FnIns, mut &et: &Token, mut exist: &FnIns): bool {
-        let mut cc = self.constraintChecker()
+        mut cc := self.constraintChecker()
         cc.et = et
         cc.fi = f
         if exist != nil {
@@ -1019,7 +1019,7 @@ impl Sema {
     }
 
     fn checkConstraintsStruct(mut &self, mut &s: &StructIns, mut &et: &Token, mut exist: &StructIns): bool {
-        let mut cc = self.constraintChecker()
+        mut cc := self.constraintChecker()
         cc.et = et
         cc.si = s
         if exist != nil {
@@ -1036,23 +1036,23 @@ impl Sema {
     // Errors will be handled.
     // Returns result of algo.
     fn fnEnvironment(mut &self, mut &f: &FnIns, algo: fn(mut &sema: &Sema, mut &generics: []&TypeAlias): bool): bool {
-        let mut sema = f.Decl.sema
-        let mut old = f.Decl.sema.file
+        mut sema := f.Decl.sema
+        mut old := f.Decl.sema.file
         defer { f.Decl.sema.setCurrentFile(old) }
-        let mut file = findFile(f.Decl.sema.files, f.Decl.Token.File)
+        mut file := findFile(f.Decl.sema.files, f.Decl.Token.File)
         if file != nil {
             f.Decl.sema.setCurrentFile(file)
         }
 
-        let mut size = len(f.Generics)
+        mut size := len(f.Generics)
         if f.Decl != nil && f.Decl.Owner != nil {
             size += len(f.Decl.Owner.Generics)
         }
 
-        let mut generics = make([]&TypeAlias, 0, size)
+        mut generics := make([]&TypeAlias, 0, size)
         appendGenericTypeAliases(generics, f)
 
-        let ok = algo(sema, generics)
+        ok := algo(sema, generics)
 
         if sema != self {
             self.errors = append(self.errors, sema.errors...)
@@ -1074,7 +1074,7 @@ impl Sema {
             ret true
         }
         ret self.fnEnvironment(f, fn(mut &sema: &Sema, mut &generics: []&TypeAlias): bool {
-            let mut ok = true
+            mut ok := true
             for (_, mut p) in f.Params {
                 if p.Decl.IsSelf() {
                     if p.Decl.IsRef() {
@@ -1133,8 +1133,8 @@ impl Sema {
             //  We have a Foo struct. The Foo struct have the x field which is
             //  interior mutable with mutable kind. So the following code is risky:
             //
-            //    let a = Foo{}
-            //    let mut b = a
+            //    a := Foo{}
+            //    mut b := a
             //
             //  The example code above will create new copy of variable a, which is
             //  instance of struct Foo. If the field x is accessible, the variable
@@ -1158,7 +1158,7 @@ impl Sema {
                 ret false
             }
             // Check interior mutability risk for the struct copy.
-            let s = d.Kind.Struct()
+            s := d.Kind.Struct()
             if s != nil && self.isMutRiskyStruct(s) {
                 self.pushErr(errorToken, LogMsg.CopyWithMutableData, d.Kind.Str())
                 ret false
@@ -1169,7 +1169,7 @@ impl Sema {
                 ret false
             }
         }
-        let mut atc = &assignTypeChecker{
+        mut atc := &assignTypeChecker{
             s: self,
             d: d,
             errorToken: errorToken,
@@ -1178,12 +1178,12 @@ impl Sema {
     }
 
     fn checkTypeAliasDeclKind(mut &self, mut &ta: &TypeAlias, mut l: Lookup): (ok: bool) {
-        let mut old = self.file
+        mut old := self.file
         defer {
             self.setCurrentFile(old)
         }
         if ta.Token != nil {
-            let mut file = findFile(self.files, ta.Token.File)
+            mut file := findFile(self.files, ta.Token.File)
             if file != nil {
                 self.setCurrentFile(file)
             }
@@ -1253,7 +1253,7 @@ impl Sema {
     }
 
     fn checkEnumItemsStr(mut &self, mut &e: &Enum) {
-        let mut eval = self.eval(self)
+        mut eval := self.eval(self)
         for (_, mut item) in e.Items {
             if item.AutoExpr() {
                 item.Value = &Value{
@@ -1263,7 +1263,7 @@ impl Sema {
                 }
                 item.Value.Data.Model = item.Value.Data.Constant
             } else {
-                let mut d = eval.evalExpr(item.Value.Expr)
+                mut d := eval.evalExpr(item.Value.Expr)
                 if d == nil {
                     continue
                 }
@@ -1293,7 +1293,7 @@ impl Sema {
             }
             item.Value.Data.Model = item.Value.Data.Constant
         } else {
-            let mut d = eval.evalExpr(item.Value.Expr)
+            mut d := eval.evalExpr(item.Value.Expr)
             if d == nil {
                 ret
             }
@@ -1314,7 +1314,7 @@ impl Sema {
     }
 
     fn checkEnumItemsInt1[Int](mut &self, &prim: &Prim, mut &e: &Enum) {
-        let mut max: Int = 0
+        mut max := Int(0)
         match type Int {
         | i64:
             max = types::MaxI(prim.Str())
@@ -1324,9 +1324,9 @@ impl Sema {
             panic("unimplemented enum int type, this panic call should be unrechable")
         }
 
-        let mut eval = self.eval(self)
-        let mut n = Int(0)
-        let mut first = e.Items[0]
+        mut eval := self.eval(self)
+        mut n := Int(0)
+        mut first := e.Items[0]
         self.checkEnumItemInt(eval, e, prim, first, n)
         if first.Value.Data != nil {
             match type Int {
@@ -1349,7 +1349,7 @@ impl Sema {
     }
 
     fn checkEnumItemsInt(mut &self, mut &e: &Enum) {
-        let prim = e.Kind.Kind.Prim()
+        prim := e.Kind.Kind.Prim()
         match {
         | types::IsSigInt(prim.Kind):
             self.checkEnumItemsInt1[i64](prim, e)
@@ -1382,7 +1382,7 @@ impl Sema {
             e.Kind = findBuiltinTypeAlias(PrimKind.Int).Kind
         }
 
-        let mut t = e.Kind.Kind.Prim()
+        mut t := e.Kind.Kind.Prim()
         if t == nil {
             self.pushErr(e.Token, LogMsg.InvalidTypeSource)
             ret
@@ -1418,18 +1418,18 @@ impl Sema {
                 self.pushErr(item.Token, LogMsg.MissingType)
                 continue
             }
-            let ok = self.checkType(item.Kind, self)
+            ok := self.checkType(item.Kind, self)
             if !ok {
                 continue
             }
-            let p = item.Kind.Kind.Prim()
+            p := item.Kind.Kind.Prim()
             if p != nil && p.IsAny() {
                 self.pushErr(item.Token, LogMsg.AnyWithTypeEnum)
             }
         }
         if len(e.Items) == 1 {
-            let mut item = e.Items[0]
-            let tk = TypeKind{
+            mut item := e.Items[0]
+            tk := TypeKind{
                 Kind: e,
             }
             if item.Kind.Kind != nil && item.Kind.Kind.Equal(unsafe { (&TypeKind)(&tk) }) {
@@ -1575,7 +1575,7 @@ impl Sema {
         if len(f.Params) == 0 {
             ret false
         }
-        let mut param = f.Params[len(f.Params)-1]
+        mut param := f.Params[len(f.Params)-1]
         if param.Variadic && param.Reference {
             self.pushErr(param.Token, LogMsg.VariadicReference)
         }
@@ -1612,7 +1612,7 @@ impl Sema {
             if i.Kind == nil {
                 continue
             }
-            let mut t3 = i.Kind.Trait()
+            mut t3 := i.Kind.Trait()
             if t1 == t3 {
                 self.pushCycleError(t2.Ident, t3.Ident, message)
                 ret false
@@ -1632,7 +1632,7 @@ impl Sema {
                 ok = false
                 continue
             }
-            let mut t2 = it.Kind.Trait()
+            mut t2 := it.Kind.Trait()
             if t2 == nil {
                 self.pushErr(it.Decl.Token, LogMsg.InheritedNonTrait, t.Ident, it.Kind.Str())
                 ok = false
@@ -1652,10 +1652,10 @@ impl Sema {
                 self.pushErr(it.Decl.Token, LogMsg.IllegalCycleRefersItself, t.Ident)
                 ok = false
             } else {
-                let mut message = StrBuilder.New(1 << 6)
+                mut message := StrBuilder.New(1 << 6)
                 ok = ok && self.catchTraitInheritCycle(t, t2, message)
                 if message.Len() > 0 {
-                    let mut errMsg = message.Str()
+                    mut errMsg := message.Str()
                     message.Clear()
                     self.pushCycleError(t.Ident, t2.Ident, message)
                     errMsg += message.Str()
@@ -1668,19 +1668,19 @@ impl Sema {
 
     fn checkTraitDeclInherits(mut &self, mut &t: &Trait) {
         for (i, mut it) in t.Inherits {
-            let mut t1 = it.Kind.Trait()
+            mut t1 := it.Kind.Trait()
             for (j, mut it2) in t.Inherits {
                 if j == i {
                     continue
                 }
-                let mut t2 = it2.Kind.Trait()
+                mut t2 := it2.Kind.Trait()
                 for (_, mut t1m) in t1.Methods {
-                    let mut t2m = t2.FindMethod(t1m.Ident)
+                    mut t2m := t2.FindMethod(t1m.Ident)
                     if t2m == nil {
                         continue
                     }
-                    let t1f = self.getTraitCheckFnKind(t1m)
-                    let t2f = self.getTraitCheckFnKind(t2m)
+                    t1f := self.getTraitCheckFnKind(t1m)
+                    t2f := self.getTraitCheckFnKind(t2m)
                     if !t1f.equalTrait(t2f) {
                         self.pushErr(it.Decl.Token, LogMsg.IncompatibleInherit,
                             t.Ident, t2.Ident, t1f.GetKindStr(true), t2f.GetKindStr(true))
@@ -1699,7 +1699,7 @@ impl Sema {
         }
         f.sema = self
         self.checkFnDeclPrototype(f)
-        let mut ins = f.instance()
+        mut ins := f.instance()
         _ = self.reloadFnInsTypes(ins)
         ins.reloaded = true
         f.appendInstance(ins)
@@ -1819,29 +1819,29 @@ impl Sema {
 
     // Implement trait to destination.
     fn implTrait(mut &self, mut &decl: &Impl) {
-        let mut base_t = self.selectType(decl.Base)
+        mut base_t := self.selectType(decl.Base)
         if base_t == nil {
             ret
         }
-        let mut base = base_t.Trait()
+        mut base := base_t.Trait()
         if base == nil {
             self.pushErr(decl.Base.Token, LogMsg.ImplInvalidBase, base_t.Str())
             self.pushSuggestion(LogMsg.ExpectedTrait)
             ret
         }
 
-        let mut destT = self.selectType(decl.Dest)
+        mut destT := self.selectType(decl.Dest)
         if destT == nil {
             ret
         }
-        let mut destS = destT.Struct()
+        mut destS := destT.Struct()
         if destS == nil {
             self.pushErr(decl.Dest.Token, LogMsg.ImplInvalidDest, destT.Str())
             self.pushSuggestion(LogMsg.ExpectedStruct)
             ret
         }
 
-        let mut dest = destS.Decl
+        mut dest := destS.Decl
 
         if dest.Token.File.Dir() != self.file.File.Dir() {
             self.pushErr(decl.Dest.Token, LogMsg.IllegalImplOutOfPackage)
@@ -1862,18 +1862,18 @@ impl Sema {
     }
 
     fn implStruct(mut &self, mut &decl: &Impl) {
-        let mut destT = self.selectType(decl.Dest)
+        mut destT := self.selectType(decl.Dest)
         if destT == nil {
             ret
         }
-        let mut destS = destT.Struct()
+        mut destS := destT.Struct()
         if destS == nil {
             self.pushErr(decl.Dest.Token, LogMsg.ImplInvalidDest, destT.Str())
             self.pushSuggestion(LogMsg.ExpectedStruct)
             ret
         }
 
-        let mut dest = destS.Decl
+        mut dest := destS.Decl
         if dest.Token.File.Dir() != self.file.File.Dir() {
             self.pushErr(decl.Dest.Token, LogMsg.IllegalImplOutOfPackage)
             ret
@@ -1963,15 +1963,15 @@ impl Sema {
 
     fn checkStructTraitImpl(mut &self, mut &strct: &Struct, mut &trt: &Trait): (ok: bool) {
         for (_, mut tf) in trt.Methods {
-            let mut exist = false
-            let mut sf = strct.FindMethod(tf.Ident, tf.Statically)
-            let tfK = self.getTraitCheckFnKind(tf)
+            mut exist := false
+            mut sf := strct.FindMethod(tf.Ident, tf.Statically)
+            tfK := self.getTraitCheckFnKind(tf)
             if sf != nil {
-                let mut sfK = self.getTraitCheckFnKind(sf)
+                mut sfK := self.getTraitCheckFnKind(sf)
                 exist = tfK.equalTrait(sfK)
             }
             if exist {
-                let d = findDirective(sf.Directives, Directive.Deprecated)
+                d := findDirective(sf.Directives, Directive.Deprecated)
                 if d != nil {
                     self.pushErr(d.Tag, LogMsg.TraitImplDeprecated)
                 }
@@ -2057,7 +2057,7 @@ impl Sema {
 
         if f.Owner == nil && self.isDuplicatedIdent(uintptr(f), f.Ident, f.Binded) {
             if f.Ident == build::InitFn {
-                let init = self.FindFn(build::InitFn, false)
+                init := self.FindFn(build::InitFn, false)
                 if init != nil {
                     ret
                 }
@@ -2085,8 +2085,8 @@ impl Sema {
 
     fn pushCycleError(self, &st1: str, &st2: str, mut &message: StrBuilder) {
         const Padding = 7
-        let refersTo = Logf(LogMsg.RefersTo, st1, st2)
-        let mut buf = unsafe { message.Buf() }
+        refersTo := Logf(LogMsg.RefersTo, st1, st2)
+        mut buf := unsafe { message.Buf() }
         message.WriteStr(strings::Repeat(" ", Padding))
         message.WriteStr(refersTo)
         message.WriteByte('\n')
@@ -2168,10 +2168,10 @@ impl Sema {
                 v.Value.Data,
                 v.Value.Expr.Token)
         } else {
-            let mut arr = v.Kind.Kind.Arr()
+            mut arr := v.Kind.Kind.Arr()
             if arr != nil {
                 if arr.Auto {
-                    let dataArr = v.Value.Data.Kind.Arr()
+                    dataArr := v.Value.Data.Kind.Arr()
                     if dataArr != nil {
                         arr.N = dataArr.N
                     }
@@ -2193,7 +2193,7 @@ impl Sema {
         }
 
         if v.Constant {
-            let comptime = v.Value.Data.Kind.comptime()
+            comptime := v.Value.Data.Kind.comptime()
             if !v.Value.Data.IsConst() && !comptime {
                 self.pushErr(v.Value.Expr.Token, LogMsg.ExprNotConst)
             }
@@ -2253,7 +2253,7 @@ impl Sema {
     // If function already has a instance, returns existing instance.
     // Returns nil if have a problem.
     fn readyToCheckFn(mut &self, mut &s: &StructIns, mut &f: &Fn): &FnIns {
-        let mut ins = f.instance()
+        mut ins := f.instance()
         if len(f.Instances) != 0 {
             ret ins
         }
@@ -2271,7 +2271,7 @@ impl Sema {
         if len(f.Generics) > 0 {
             ret
         }
-        let mut ins = f.Instances[0]
+        mut ins := f.Instances[0]
         if len(ins.Scope.Stmts) > 0 {
             // Checked
             ret
@@ -2290,7 +2290,7 @@ impl Sema {
     // Which is contains fields and generic-type constraints.
     // If generic instance will be check, errorToken should be passed.
     fn checkStructEnv(mut &self, mut &s: &StructIns, mut errorToken: &Token): (ok: bool) {
-        let mut tc = typeChecker{
+        mut tc := typeChecker{
             s: s.Decl.sema,
             rootLookup: s.Decl.sema,
             lookup: s.Decl.sema,
@@ -2304,7 +2304,7 @@ impl Sema {
         if len(s.Generics) > 0 {
             tc.useGenerics = make([]&TypeAlias, 0, len(s.Generics))
             for (i, mut g) in s.Generics {
-                let mut decl = s.Decl.Generics[i]
+                mut decl := s.Decl.Generics[i]
                 tc.useGenerics = append(tc.useGenerics, &TypeAlias{
                     Ident: decl.Ident,
                     Token: decl.Token,
@@ -2313,18 +2313,18 @@ impl Sema {
             }
         }
 
-        let mut oldFile = self.file
+        mut oldFile := self.file
         defer { self.setCurrentFile(oldFile) }
 
         if self.file.File != s.Decl.Token.File {
-            let mut file = findFile(self.files, s.Decl.Token.File)
+            mut file := findFile(self.files, s.Decl.Token.File)
             if file != nil {
                 self.setCurrentFile(file)
             }
         }
 
         if len(s.Generics) > 0 {
-            let mut cc = self.constraintChecker()
+            mut cc := self.constraintChecker()
             cc.et = errorToken
             cc.si = s
             cc.genericsA = tc.useGenerics
@@ -2337,7 +2337,7 @@ impl Sema {
         ok = true
 
         if len(s.Statics) > 0 {
-            let mut n = len(self.errors)
+            mut n := len(self.errors)
             self.files[0].TypeAliases = append(tc.useGenerics, self.files[0].TypeAliases...)
             for (_, mut v) in s.Statics {
                 self.checkVarDecl(v, self)
@@ -2350,10 +2350,10 @@ impl Sema {
             }
         }
 
-        let mut eval = self.eval(self)
+        mut eval := self.eval(self)
         s.Comparable = !s.Decl.Binded
         for (_, mut f) in s.Fields {
-            let mut kind = tc.checkDecl(f.Decl.Kind.Decl)
+            mut kind := tc.checkDecl(f.Decl.Kind.Decl)
             ok = kind != nil && ok
             if kind == nil {
                 if self != s.Decl.sema && len(s.Decl.sema.errors) > 0 {
@@ -2506,7 +2506,7 @@ impl Sema {
         }
 
         if len(s.Instances) == 0 {
-            let mut ins = s.instance()
+            mut ins := s.instance()
             ins.Checked = true
             s.appendInstance(ins) // Append instance before precheck.
             self.precheckStructIns(ins, nil)
@@ -2525,8 +2525,8 @@ impl Sema {
         if f.Decl.IsVoid() {
             ret
         }
-        let mrc = missingRetChecker.new()
-        let ok = mrc.check(f.Scope)
+        mrc := missingRetChecker.new()
+        ok := mrc.check(f.Scope)
         if !ok {
             self.pushErr(f.Decl.Token, LogMsg.MissingRet)
         }
@@ -2550,14 +2550,14 @@ impl Sema {
             ret
         }
 
-        let mut old = f.Decl.sema.file
+        mut old := f.Decl.sema.file
         defer { f.Decl.sema.setCurrentFile(old) }
-        let mut file = findFile(f.Decl.sema.files, f.Decl.Token.File)
+        mut file := findFile(f.Decl.sema.files, f.Decl.Token.File)
         if file != nil {
             f.Decl.sema.setCurrentFile(file)
         }
 
-        let mut sc = newScopeChecker(f.Decl.sema, f)
+        mut sc := newScopeChecker(f.Decl.sema, f)
         sc.calledFrom = caller
         self.checkFnInsSc(f, sc)
 
@@ -2604,14 +2604,14 @@ impl Sema {
             ret
         }
 
-        let mut sptr = f.Params[0].Kind.Sptr()
+        mut sptr := f.Params[0].Kind.Sptr()
         if sptr == nil {
             self.pushErr(f.Decl.Token, LogMsg.WrongTestFnDecl)
             self.pushSuggestion(LogMsg.UseExpectedTestFnDecl)
             ret
         }
 
-        let s = sptr.Elem.Struct()
+        s := sptr.Elem.Struct()
         if s == nil || !isStdPackage(s.Decl.Token.File.Path, "testing") {
             self.pushErr(f.Decl.Token, LogMsg.WrongTestFnDecl)
             self.pushSuggestion(LogMsg.UseExpectedTestFnDecl)
@@ -2630,9 +2630,9 @@ impl Sema {
         }
 
         if len(f.Instances) == 0 {
-            let mut ins = f.instanceForce()
+            mut ins := f.instanceForce()
             f.Instances = append(f.Instances, ins)
-            let ok = self.reloadFnInsTypes(ins)
+            ok := self.reloadFnInsTypes(ins)
             ins.reloaded = true
 
             if ok && hasDirective(f.Directives, Directive.Test) {
@@ -2762,8 +2762,8 @@ impl missingRetChecker {
             if c == nil {
                 ret false
             }
-            let n = len(self.breaked)
-            let ok = self.checkScope(c.Scope)
+            n := len(self.breaked)
+            ok := self.checkScope(c.Scope)
             match {
             | n != len(self.breaked):
                 ret false
@@ -2784,13 +2784,13 @@ impl missingRetChecker {
     }
 
     fn checkInfIter(self, mut it: &InfIter): bool {
-        let n = len(self.breaked)
+        n := len(self.breaked)
         if self.checkScope(it.Scope) {
             self.breaked = self.breaked[:n]
             ret true
         }
         if n != len(self.breaked) {
-            let itaddr = uintptr(it)
+            itaddr := uintptr(it)
             for _, addr in self.breaked[n:] {
                 if itaddr == addr {
                     self.breaked = self.breaked[:n]
@@ -2812,7 +2812,7 @@ impl missingRetChecker {
                 self.falled = true
                 ret false
             | &BreakSt:
-                let addr = (&BreakSt)(st).It
+                addr := (&BreakSt)(st).It
                 if addr != 0 {
                     self.breaked = append(self.breaked, addr)
                 }

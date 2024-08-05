@@ -123,19 +123,19 @@ fn J1(mut x: f64): f64 {
         ret 0
     }
 
-    let mut sign = false
+    mut sign := false
     if x < 0 {
         x = -x
         sign = true
     }
     if x >= 2 {
-        let (s, c) = Sincos(x)
-        let mut ss = -s - c
-        let mut cc = s - c
+        s, c := Sincos(x)
+        mut ss := -s - c
+        mut cc := s - c
 
         // make sure x+x does not overflow
         if x < f64.Max/2 {
-            let z = Cos(x + x)
+            z := Cos(x + x)
             if s*c > 0 {
                 cc = z / ss
             } else {
@@ -146,12 +146,12 @@ fn J1(mut x: f64): f64 {
         // j1(x) = 1/sqrt(pi) * (P(1,x)*cc - Q(1,x)*ss) / sqrt(x)
         // y1(x) = 1/sqrt(pi) * (P(1,x)*ss + Q(1,x)*cc) / sqrt(x)
 
-        let mut z: f64 = 0
+        mut z := 0.
         if x > TWO129 {
             z = (1 / SqrtPi) * cc / Sqrt(x)
         } else {
-            let u = pone(x)
-            let v = qone(x)
+            u := pone(x)
+            v := qone(x)
             z = (1 / SqrtPi) * (u * cc - v * ss) / Sqrt(x)
         }
         if sign {
@@ -163,9 +163,9 @@ fn J1(mut x: f64): f64 {
     if x < TWO_M27 { // |x|<2**-27
         ret 0.5 * x // inexact if x!=0 necessary
     }
-    let mut z = x * x
-    let mut r = z * (R00 + z * (R01 + z * (R02 + z * R03)))
-    let s = 1.0 + z * (S01 + z * (S02 + z * (S03 + z * (S04 + z * S05))))
+    mut z := x * x
+    mut r := z * (R00 + z * (R01 + z * (R02 + z * R03)))
+    s := 1.0 + z * (S01 + z * (S02 + z * (S03 + z * (S04 + z * S05))))
     r *= x
     z = 0.5 * x + r / s
     if sign {
@@ -205,13 +205,13 @@ fn Y1(x: f64): f64 {
     }
 
     if x >= 2 {
-        let (s, c) = Sincos(x)
-        let mut ss = -s - c
-        let mut cc = s - c
+        s, c := Sincos(x)
+        mut ss := -s - c
+        mut cc := s - c
 
         // make sure x+x does not overflow
         if x < f64.Max/2 {
-            let z = Cos(x + x)
+            z := Cos(x + x)
             if s*c > 0 {
                 cc = z / ss
             } else {
@@ -229,12 +229,12 @@ fn Y1(x: f64): f64 {
         //     sin(x) +- cos(x) = -cos(2x)/(sin(x) -+ cos(x))
         // to compute the worse one.
 
-        let mut z: f64 = 0
+        mut z := 0.
         if x > TWO129 {
             z = (1 / SqrtPi) * ss / Sqrt(x)
         } else {
-            let u = pone(x)
-            let v = qone(x)
+            u := pone(x)
+            v := qone(x)
             z = (1 / SqrtPi) * (u * ss + v * cc) / Sqrt(x)
         }
         ret z
@@ -242,9 +242,9 @@ fn Y1(x: f64): f64 {
     if x <= TWO_M54 { // x < 2**-54
         ret -(2 / Pi) / x
     }
-    let z = x * x
-    let u = U00 + z * (U01 + z * (U02 + z * (U03 + z * U04)))
-    let v = 1 + z * (V00 + z * (V01 + z * (V02 + z * (V03 + z * V04))))
+    z := x * x
+    u := U00 + z * (U01 + z * (U02 + z * (U03 + z * U04)))
+    v := 1 + z * (V00 + z * (V01 + z * (V02 + z * (V03 + z * V04))))
     ret x * (u / v) + (2 / Pi) * (J1(x) * Log(x) - 1 / x)
 }
 
@@ -342,9 +342,9 @@ fn pone(x: f64): f64 {
         q = &p1s2
     }
     unsafe {
-        let z = 1 / (x * x)
-        let r = (*p)[0] + z * ((*p)[1] + z * ((*p)[2] + z * ((*p)[3] + z * ((*p)[4] + z * (*p)[5]))))
-        let s = 1.0 + z * ((*q)[0] + z * ((*q)[1] + z * ((*q)[2] + z * ((*q)[3] + z * (*q)[4]))))
+        z := 1 / (x * x)
+        r := (*p)[0] + z * ((*p)[1] + z * ((*p)[2] + z * ((*p)[3] + z * ((*p)[4] + z * (*p)[5]))))
+        s := 1.0 + z * ((*q)[0] + z * ((*q)[1] + z * ((*q)[2] + z * ((*q)[3] + z * (*q)[4]))))
         ret 1 + r / s
     }
 }
@@ -447,9 +447,9 @@ fn qone(x: f64): f64 {
         q = &q1s2
     }
     unsafe {
-        let z = 1 / (x * x)
-        let r = (*p)[0] + z * ((*p)[1] + z * ((*p)[2] + z * ((*p)[3] + z * ((*p)[4] + z * (*p)[5]))))
-        let s = 1 + z * ((*q)[0] + z * ((*q)[1] + z * ((*q)[2] + z * ((*q)[3] + z * ((*q)[4] + z * (*q)[5])))))
+        z := 1 / (x * x)
+        r := (*p)[0] + z * ((*p)[1] + z * ((*p)[2] + z * ((*p)[3] + z * ((*p)[4] + z * (*p)[5]))))
+        s := 1 + z * ((*q)[0] + z * ((*q)[1] + z * ((*q)[2] + z * ((*q)[3] + z * ((*q)[4] + z * (*q)[5])))))
         ret (0.375 + r / s) / x
     }
 }

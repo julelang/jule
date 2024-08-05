@@ -42,19 +42,19 @@ impl Cmd {
         if self.attrs.hProcess != nil {
             panic("command is already spawned")
         }
-        let mut startupInfo = cpp.STARTUPINFOW{}
-        let mut processInfo = cpp.PROCESS_INFORMATION{}
+        mut startupInfo := cpp.STARTUPINFOW{}
+        mut processInfo := cpp.PROCESS_INFORMATION{}
         unsafe {
             cpp.ZeroMemory(&startupInfo, mem::SizeOf(startupInfo))
             cpp.ZeroMemory(&processInfo, mem::SizeOf(processInfo))
         }
         startupInfo.cb = mem::SizeOf(startupInfo)
-        let mut args = make([]str, 1, 1 + len(self.Args))
+        mut args := make([]str, 1, 1 + len(self.Args))
         args[0] = self.path
         args = append(args, self.Args...)
-        let argv = integ::Utf16FromStr(makeCmdLine(args))
-        let env = createEnvBlock(self.Env) else { error(error) }
-        let mut envp = &env[0]
+        argv := integ::Utf16FromStr(makeCmdLine(args))
+        env := createEnvBlock(self.Env) else { error(error) }
+        mut envp := &env[0]
         if len(self.Env) == 0 {
             envp = nil
         }
@@ -86,7 +86,7 @@ impl Cmd {
             panic("command is not spawned")
         }
         unsafe { cpp.WaitForSingleObject(self.attrs.hProcess, cpp.INFINITE) }
-        let mut exitCode = integ::LongLong(-1)
+        mut exitCode := integ::LongLong(-1)
         unsafe {
             cpp.GetExitCodeProcess(self.attrs.hProcess, &exitCode)
             sys::CloseHandle(uintptr(self.attrs.hProcess))
@@ -105,9 +105,9 @@ fn appendEscapeArg(mut &s: StrBuilder, arg: str) {
         ret
     }
 
-    let mut needsBackslash = false
-    let mut hasSpace = false
-    let mut i = 0
+    mut needsBackslash := false
+    mut hasSpace := false
+    mut i := 0
     for i < len(arg); i++ {
         match arg[i] {
         | '"' | '\\':
@@ -133,10 +133,10 @@ fn appendEscapeArg(mut &s: StrBuilder, arg: str) {
     if hasSpace {
         s.WriteByte('"')
     }
-    let mut slashes = 0
+    mut slashes := 0
     i = 0
     for i < len(arg); i++ {
-        let c = arg[i]
+        c := arg[i]
         match c {
         | '\\':
             slashes++
@@ -161,7 +161,7 @@ fn appendEscapeArg(mut &s: StrBuilder, arg: str) {
 // Builds a command line out of args by escaping "special"
 // characters and joining the arguments with spaces.
 fn makeCmdLine(args: []str): str {
-    let mut s = StrBuilder.New(1 << 4)
+    mut s := StrBuilder.New(1 << 4)
     for _, arg in args {
         if s.Len() > 0 {
             s.WriteByte(' ')
@@ -180,7 +180,7 @@ fn createEnvBlock(env: []str)!: []u16 {
     if len(env) == 0 {
         ret utf16::Encode([]rune("\x00\x00"))
     }
-    let mut n = 0
+    mut n := 0
     for _, s in env {
         if fastbytes::FindByteStr(s, 0) != -1 {
             error(ProcessError.Env)
@@ -188,7 +188,7 @@ fn createEnvBlock(env: []str)!: []u16 {
         n += len(s) + 1
     }
     n++
-    let mut b = make([]u16, 0, n)
+    mut b := make([]u16, 0, n)
     for _, s in env {
         for _, c in []rune(s) {
             b = utf16::AppendRune(b, c)

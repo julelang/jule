@@ -177,8 +177,8 @@ fn Expm1(mut x: f64): f64 {
         ret -1
     }
 
-    let mut absx = x
-    let mut sign = false
+    mut absx := x
+    mut sign := false
     if x < 0 {
         absx = -absx
         sign = true
@@ -195,11 +195,11 @@ fn Expm1(mut x: f64): f64 {
     }
 
     // argument reduction
-    let mut c: f64 = 0
-    let mut k: int = 0
+    mut c := 0.
+    mut k := 0
     if absx > LN2_HALF { // if  |x| > 0.5 * ln2
-        let mut hi: f64 = 0
-        let mut lo: f64 = 0
+        mut hi := 0.
+        mut lo := 0.
         if absx < LN2_HALF_X3 { // and |x| < 1.5 * ln2
             if !sign {
                 hi = x - LN2_HI
@@ -216,7 +216,7 @@ fn Expm1(mut x: f64): f64 {
             } else {
                 k = int(INV_LN2 * x - 0.5)
             }
-            let t = f64(k)
+            t := f64(k)
             hi = x - t * LN2_HI // t * LN2_HI is exact here
             lo = t * LN2_LO
         }
@@ -229,11 +229,11 @@ fn Expm1(mut x: f64): f64 {
     }
 
     // x is now in primary range
-    let hfx = 0.5 * x
-    let hxs = x * hfx
-    let r1 = 1 + hxs * (Q1 + hxs * (Q2 + hxs * (Q3 + hxs * (Q4 + hxs * Q5))))
-    let mut t = 3 - r1 * hfx
-    let mut e = hxs * ((r1 - t) / (6.0 - x * t))
+    hfx := 0.5 * x
+    hxs := x * hfx
+    r1 := 1 + hxs * (Q1 + hxs * (Q2 + hxs * (Q3 + hxs * (Q4 + hxs * Q5))))
+    mut t := 3 - r1 * hfx
+    mut e := hxs * ((r1 - t) / (6.0 - x * t))
     if k == 0 {
         ret x - (x * e - hxs) // c is 0
     }
@@ -248,18 +248,18 @@ fn Expm1(mut x: f64): f64 {
         }
         ret 1 + 2 * (x - e)
     | k <= -2 | k > 56: // suffice to return exp(x)-1
-        let mut y = 1 - (e - x)
+        mut y := 1 - (e - x)
         y = F64FromBits(F64Bits(y) + u64(k) << 52) // add k to y's exponent
         ret y - 1
     }
     if k < 20 {
         t = F64FromBits(u64(0x3ff0000000000000 - (0x20000000000000 >> uint(k)))) // t=1-2**-k
-        let mut y = t - (e - x)
+        mut y := t - (e - x)
         y = F64FromBits(F64Bits(y) + u64(k) << 52) // add k to y's exponent
         ret y
     }
     t = F64FromBits(u64(0x3ff - k) << 52) // 2**-k
-    let mut y = x - (e + t)
+    mut y := x - (e + t)
     y++
     y = F64FromBits(F64Bits(y) + u64(k) << 52) // add k to y's exponent
     ret y

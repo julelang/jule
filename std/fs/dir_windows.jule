@@ -13,14 +13,14 @@ impl Directory {
     //  Denied InvalidDescriptor PerProcessLimit SystemWideLimit
     //  NotExist InsufficientMemory NotDir
     static fn Read(path: str)!: (dirents: []&DirEntry) {
-        let utf16Path = integ::Utf16FromStr(path::Join(path, "*"))
-        let mut data = sys::Win32FindData{}
-        let handle = unsafe { sys::FindFirstFile(&utf16Path[0], &data) }
+        utf16Path := integ::Utf16FromStr(path::Join(path, "*"))
+        mut data := sys::Win32FindData{}
+        handle := unsafe { sys::FindFirstFile(&utf16Path[0], &data) }
         if handle == sys::InvalidHandle {
             ret
         }
         for {
-            let mut entry = &DirEntry{
+            mut entry := &DirEntry{
                 Name: unsafe { integ::U16PtrToStr((*u16)(data.cFileName)) },
             }
             entry.Stat = Status.Of(path::Join(path, entry.Name)) else { error(error) }
@@ -41,7 +41,7 @@ impl Directory {
         // Also can has EMLINK error-code.
         // Make sure this situation should documented or not.
 
-        let utf16Path = integ::Utf16FromStr(path)
+        utf16Path := integ::Utf16FromStr(path)
         if unsafe { !std::sys::CreateDirectory(&utf16Path[0]) } {
             error(getLastFsError())
         }
@@ -51,7 +51,7 @@ impl Directory {
     //
     // Possible errors: Denined NotExist NotEmpty SyncIO IO Loop NotDir
     static fn Remove(path: str)! {
-        let utf16Path = integ::Utf16FromStr(path)
+        utf16Path := integ::Utf16FromStr(path)
         if unsafe { !std::sys::RemoveDirectory(&utf16Path[0]) } {
             error(getLastFsError())
         }

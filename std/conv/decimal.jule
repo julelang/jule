@@ -149,12 +149,12 @@ struct decimal {
 impl decimal {
     // Assign v.
     fn assign(mut self, mut v: u64) {
-        let mut buf: [24]byte = []
+        let mut buf: [24]byte
 
         // Write reversed decimal in buf.
-        let mut n = 0
+        mut n := 0
         for v > 0 {
-            let v1 = v / 10
+            v1 := v / 10
             v -= 10 * v1
             buf[n] = byte(v + '0')
             n++
@@ -208,9 +208,9 @@ impl decimal {
         }
 
         // round up
-        let mut i = nd - 1
+        mut i := nd - 1
         for i >= 0; i-- {
-            let c = self.d[i]
+            c := self.d[i]
             if c < '9' { // can stop after this digit
                 self.d[i]++
                 self.nd = i + 1
@@ -246,8 +246,8 @@ impl decimal {
         if self.dp > 20 {
             ret 0xFFFFFFFFFFFFFFFF
         }
-        let mut i: int = 0
-        let mut n: u64 = 0
+        mut i := 0
+        mut n := u64(0)
         for i < self.dp && i < self.nd; i++ {
             n = n * 10 + u64(self.d[i] - '0')
         }
@@ -282,11 +282,11 @@ fn trim(mut &a: decimal) {
 
 // Binary shift right (/ 2) by k bits.  k <= maxShift to avoid overflow.
 fn rightShift(mut &a: decimal, k: uint) {
-    let mut r = 0 // read pointer
-    let mut w = 0 // write pointer
+    mut r := 0 // read pointer
+    mut w := 0 // write pointer
 
     // Pick up enough leading digits to cover first shift.
-    let mut n: uint = 0
+    mut n := uint(0)
     for n>>k == 0; r++ {
         if r >= a.nd {
             if n == 0 {
@@ -300,17 +300,17 @@ fn rightShift(mut &a: decimal, k: uint) {
             }
             break
         }
-        let c = uint(a.d[r])
+        c := uint(a.d[r])
         n = n * 10 + c - '0'
     }
     a.dp -= r - 1
 
-    let mask: uint = uint(1 << k) - 1
+    mask := uint(1 << k) - 1
 
     // Pick up a digit, put down a digit.
     for r < a.nd; r++ {
-        let c = uint(a.d[r])
-        let dig = n >> k
+        c := uint(a.d[r])
+        dig := n >> k
         n &= mask
         a.d[w] = byte(dig + '0')
         w++
@@ -319,7 +319,7 @@ fn rightShift(mut &a: decimal, k: uint) {
 
     // Put down extra digits.
     for n > 0 {
-        let dig = n >> k
+        dig := n >> k
         n &= mask
         if w < len(a.d) {
             a.d[w] = byte(dig + '0')
@@ -336,7 +336,7 @@ fn rightShift(mut &a: decimal, k: uint) {
 
 // Is the leading prefix of b lexicographically less than s?
 fn prefixIsLessThan(b: [800]byte, end: int, &s: str): bool {
-    let mut i = 0
+    mut i := 0
     for i < len(s); i++ {
         if i >= end {
             ret true
@@ -350,21 +350,21 @@ fn prefixIsLessThan(b: [800]byte, end: int, &s: str): bool {
 
 // Binary shift left (* 2) by k bits.  k <= maxShift to avoid overflow.
 fn leftShift(mut &a: decimal, k: uint) {
-    let mut delta = leftCheats[k].delta
+    mut delta := leftCheats[k].delta
     if prefixIsLessThan(a.d, a.nd, unsafe { *(&leftCheats[k].cutoff) }) {
         delta--
     }
 
-    let mut r = a.nd         // read index
-    let mut w = a.nd + delta // write index
+    mut r := a.nd         // read index
+    mut w := a.nd + delta // write index
 
     // Pick up a digit, put down a digit.
-    let mut n: uint = 0
+    mut n := uint(0)
     r--
     for r >= 0; r-- {
         n += (uint(a.d[r]) - '0') << k
-        let quo = n / 10
-        let rem = n - 10 * quo
+        quo := n / 10
+        rem := n - 10 * quo
         w--
         if w < len(a.d) {
             a.d[w] = byte(rem + '0')
@@ -376,8 +376,8 @@ fn leftShift(mut &a: decimal, k: uint) {
 
     // Put down extra digits.
     for n > 0 {
-        let quo = n / 10
-        let rem = n - 10 * quo
+        quo := n / 10
+        rem := n - 10 * quo
         w--
         if w < len(a.d) {
             a.d[w] = byte(rem + '0')

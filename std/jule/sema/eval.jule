@@ -169,7 +169,7 @@ impl Eval {
             self.prefix == nil {
             ret false
         }
-        let prim = self.prefix.Prim()
+        prim := self.prefix.Prim()
         if prim == nil {
             ret false
         }
@@ -198,13 +198,13 @@ impl Eval {
     }
 
     fn litStr(self, &l: &LitExpr): &Data {
-        let mut s = l.Value[1:len(l.Value)-1] // Remove quotes.
+        mut s := l.Value[1:len(l.Value)-1] // Remove quotes.
         if IsRawStr(l.Value) {
             s = lit::ToRawStr([]byte(s))
         } else {
             s = lit::ToStr([]byte(s))
         }
-        let mut constant = Const.NewStr(s)
+        mut constant := Const.NewStr(s)
 
         ret &Data{
             Mutable: true,
@@ -216,13 +216,13 @@ impl Eval {
 
     fn litRune(self, &l: &LitExpr): &Data {
         // Remove quotes.
-        let lt = l.Value[1:len(l.Value)-1]
-        let r = lit::ToRune([]byte(lt))
-        let mut data = &Data{
+        lt := l.Value[1:len(l.Value)-1]
+        r := lit::ToRune([]byte(lt))
+        mut data := &Data{
             Constant: Const.NewI64(i64(r)),
         }
 
-        let isAscii = lit::IsAscii(r)
+        isAscii := lit::IsAscii(r)
         if isAscii {
             data.Kind = primU8 // Byte
         } else {
@@ -237,8 +237,8 @@ impl Eval {
     }
 
     fn litFloat(self, &l: &LitExpr): &Data {
-        let f = conv::ParseFloat(l.Value, 64) else { use f64.Max }
-        let mut constant = Const.NewF64(f)
+        f := conv::ParseFloat(l.Value, 64) else { use f64.Max }
+        mut constant := Const.NewF64(f)
         ret &Data{
             untyped: true,
             Mutable: true,
@@ -251,8 +251,8 @@ impl Eval {
     fn litInt(mut self, &l: &LitExpr): &Data {
         const BitSize = 1 << 6
 
-        let mut lit = l.Value
-        let mut base = 0
+        mut lit := l.Value
+        mut base := 0
 
         match {
         | strings::HasPrefix(lit, "0x"): // Hexadecimal
@@ -272,10 +272,10 @@ impl Eval {
             base = 1 << 3 + 2
         }
 
-        let mut d = new(Data)
+        mut d := new(Data)
 
-        let mut ok = true
-        let sig = conv::ParseInt(lit, base, BitSize) else {
+        mut ok := true
+        sig := conv::ParseInt(lit, base, BitSize) else {
             ok = false
             use 0
         }
@@ -283,7 +283,7 @@ impl Eval {
             d.Constant = Const.NewI64(sig)
             d.Kind = primInt
         } else {
-            let unsig = conv::ParseUint(lit, base, BitSize) else {
+            unsig := conv::ParseUint(lit, base, BitSize) else {
                 self.pushErr(l.Token, LogMsg.InvalidNumericRange)
                 self.pushSuggestion(LogMsg.TryFloatingPoint)
                 use u64.Max
@@ -330,17 +330,17 @@ impl Eval {
         if mod::IsPub(ident) {
             match type self.lookup {
             | &ImportInfo:
-                let mut def = findBuiltinsImport(ident, (&ImportInfo)(self.lookup))
+                mut def := findBuiltinsImport(ident, (&ImportInfo)(self.lookup))
                 if def != nil {
                     ret def
                 }
             | &Sema:
-                let mut def = findBuiltinsSema(ident, (&Sema)(self.lookup))
+                mut def := findBuiltinsSema(ident, (&Sema)(self.lookup))
                 if def != nil {
                     ret def
                 }
             | &scopeChecker:
-                let mut def = findBuiltinsSema(ident, (&scopeChecker)(self.lookup).s)
+                mut def := findBuiltinsSema(ident, (&scopeChecker)(self.lookup).s)
                 if def != nil {
                     ret def
                 }
@@ -358,34 +358,34 @@ impl Eval {
         // Because self.lookup might be a scopeChecker, and shadowing may occurred.
         // If any variable or type aliases is shadowing other declarations such us structure,
         // it will result as wrong expression evaluation.
-        let mut v = self.lookup.FindVar(ident, binded)
+        mut v := self.lookup.FindVar(ident, binded)
         if v != nil {
             ret v
         }
 
-        let mut ta = self.lookup.FindTypeAlias(ident, binded)
+        mut ta := self.lookup.FindTypeAlias(ident, binded)
         if ta != nil {
             ret ta
         }
 
         if !binded {
-            let mut enm = self.lookup.FindEnum(ident)
+            mut enm := self.lookup.FindEnum(ident)
             if enm != nil {
                 ret enm
             }
 
-            let mut tenm = self.lookup.FindTypeEnum(ident)
+            mut tenm := self.lookup.FindTypeEnum(ident)
             if tenm != nil {
                 ret tenm
             }
         }
 
-        let mut f = self.lookup.FindFn(ident, binded)
+        mut f := self.lookup.FindFn(ident, binded)
         if f != nil {
             ret f
         }
 
-        let mut s = self.lookup.FindStruct(ident, binded)
+        mut s := self.lookup.FindStruct(ident, binded)
         if s != nil {
             ret s
         }
@@ -396,7 +396,7 @@ impl Eval {
     fn pushReference[T](mut self, mut &ref: T) {
         match type self.lookup {
         | &scopeChecker:
-            let mut sc = (&scopeChecker)(self.lookup).getHardRoot()
+            mut sc := (&scopeChecker)(self.lookup).getHardRoot()
             if !sc.owner.Refers.Exist[T](ref) {
                 sc.owner.Refers.Push(ref)
             }
@@ -447,7 +447,7 @@ impl Eval {
     }
 
     fn _evalStruct(self, mut s: &StructIns): &Data {
-        let mut d = &Data{
+        mut d := &Data{
             Decl: true,
             Kind: &TypeKind{
                 Kind: s,
@@ -484,7 +484,7 @@ impl Eval {
             ret
         }
 
-        let d = findDirective(directives, Directive.Deprecated)
+        d := findDirective(directives, Directive.Deprecated)
         if d != nil {
             if len(d.Args) == 0 {
                 self.pushErr(tok, LogMsg.UsingDeprecated, "this code is deprecated")
@@ -504,15 +504,15 @@ impl Eval {
 
         self.checkDeprecated(f.Directives, errorToken)
 
-        let mut ins = f.instance()
+        mut ins := f.instance()
         self.pushReference[&FnIns](ins)
         ret self.evalFnIns(ins)
     }
 
     fn pushIllegalCycleError(mut self, &v1: &Var, &v2: &Var, mut &message: StrBuilder) {
         const Padding = 7
-        let refers_to = Logf(LogMsg.RefersTo, v1.Ident, v2.Ident)
-        let buf = unsafe { message.Buf() }
+        refers_to := Logf(LogMsg.RefersTo, v1.Ident, v2.Ident)
+        buf := unsafe { message.Buf() }
         message.WriteStr(strings::Repeat(" ", Padding))
         message.WriteStr(refers_to)
         message.WriteByte('\n')
@@ -549,10 +549,10 @@ impl Eval {
             ret false
         }
 
-        let mut message = StrBuilder.New(1 << 5)
+        mut message := StrBuilder.New(1 << 5)
 
         if !self.checkCrossCycle(v, message) {
-            let mut errMsg = message.Str()
+            mut errMsg := message.Str()
             message.Clear()
             self.pushIllegalCycleError(self.owner, v, message)
             errMsg += message.Str()
@@ -583,7 +583,7 @@ impl Eval {
         match type self.lookup {
         | &Sema:
             // Check cycles for global scope.
-            let ok = self.checkIllegalCycles(v, errorToken)
+            ok := self.checkIllegalCycles(v, errorToken)
             if !ok {
                 ret nil
             }
@@ -591,7 +591,7 @@ impl Eval {
             if !v.Reference || self.isUnsafe() {
                 break
             }
-            let mut s = (&scopeChecker)(self.lookup)
+            mut s := (&scopeChecker)(self.lookup)
             for s.owner == nil && s.parent != nil {
                 s = s.parent
             }
@@ -635,7 +635,7 @@ impl Eval {
         }
 
     data:
-        let mut d = &Data{
+        mut d := &Data{
             Lvalue: !v.Constant,
             Mutable: v.Mutable,
             Reference: v.Reference,
@@ -668,7 +668,7 @@ impl Eval {
 
         ta.Used = true
 
-        let mut kind = ta.Kind.Kind.Kind
+        mut kind := ta.Kind.Kind.Kind
         let mut d: &Data = nil
         match type kind {
         | &StructIns:
@@ -706,7 +706,7 @@ impl Eval {
         | &Struct:
             ret self.evalStruct((&Struct)(def).instance(), ident)
         | &Fn:
-            let mut f = (&Fn)(def)
+            mut f := (&Fn)(def)
             if f.Ident != build::InitFn {
                 ret self.evalFn(f, ident)
             }
@@ -720,12 +720,12 @@ impl Eval {
     }
 
     fn evalIdent(mut self, ident: &IdentExpr): &Data {
-        let mut def = self.getDef(ident.Ident, ident.Binded)
+        mut def := self.getDef(ident.Ident, ident.Binded)
         ret self.evalDef(def, ident.Token)
     }
 
     fn evalUnary(mut &self, mut u: &UnaryExpr): &Data {
-        let mut unary = unaryEval.new(self)
+        mut unary := unaryEval.new(self)
         ret unary.eval(u)
     }
 
@@ -735,11 +735,11 @@ impl Eval {
             ret nil
         }
 
-        let mut prefix = self.prefix
+        mut prefix := self.prefix
         self.prefix = nil
         defer { self.prefix = prefix }
 
-        let mut d = self.evalExpr(v.Expr)
+        mut d := self.evalExpr(v.Expr)
         if d == nil {
             ret nil
         }
@@ -749,7 +749,7 @@ impl Eval {
             ret nil
         }
 
-        let mut slc = d.Kind.Slc()
+        mut slc := d.Kind.Slc()
         d.Kind = &TypeKind{
             Variadic: true,
             Generic: slc.Elem.Generic,
@@ -760,24 +760,24 @@ impl Eval {
     }
 
     fn evalUnsafe(mut &self, mut u: &UnsafeExpr): &Data {
-        let unsafety = self.unsafety
+        unsafety := self.unsafety
         self.unsafety = true
-        let mut d = self.evalExpr(u.Expr)
+        mut d := self.evalExpr(u.Expr)
         self.unsafety = unsafety
         ret d
     }
 
     fn evalArr(mut &self, mut s: &SliceExpr): &Data {
         // Arrays always has type prefixes.
-        let mut pt = self.prefix.Arr()
+        mut pt := self.prefix.Arr()
 
-        let mut arr = &Arr{
+        mut arr := &Arr{
             Auto: false,
             N: 0,
             Elem: pt.Elem,
         }
 
-        let mut filled = false
+        mut filled := false
 
         if len(s.Exprs) == 2 {
             match type s.Exprs[1].Kind {
@@ -806,7 +806,7 @@ impl Eval {
             }
         }
 
-        let mut model = &ArrayExprModel{
+        mut model := &ArrayExprModel{
             Kind: arr,
         }
         if filled {
@@ -815,10 +815,10 @@ impl Eval {
             model.Elems = make([]ExprModel, 0, len(s.Exprs))
         }
 
-        let mut prefix = self.prefix
+        mut prefix := self.prefix
         self.prefix = arr.Elem
         for (_, mut elem) in s.Exprs {
-            let mut d = self.evalExpr(elem)
+            mut d := self.evalExpr(elem)
             if d == nil {
                 continue
             }
@@ -842,12 +842,12 @@ impl Eval {
     }
 
     fn evalExpSlc(mut &self, mut s: &SliceExpr, mut t: &TypeKind, mut first: ExprModel): &Data {
-        let mut slc = &Slc{
+        mut slc := &Slc{
             Elem: t,
         }
 
-        let mut i = 0
-        let mut model = &SliceExprModel{
+        mut i := 0
+        mut model := &SliceExprModel{
             ElemKind: t,
             Elems: make([]ExprModel, 0, len(s.Exprs)),
         }
@@ -856,10 +856,10 @@ impl Eval {
             i = 1
         }
 
-        let mut prefix = self.prefix
+        mut prefix := self.prefix
         self.prefix = slc.Elem
         for (_, mut elem) in s.Exprs[i:] {
-            let mut d = self.evalExpr(elem)
+            mut d := self.evalExpr(elem)
             if d == nil {
                 continue
             }
@@ -883,12 +883,12 @@ impl Eval {
             | self.prefix.Arr() != nil:
                 ret self.evalArr(s)
             | self.prefix.Slc() != nil:
-                let mut pt = self.prefix.Slc()
+                mut pt := self.prefix.Slc()
                 ret self.evalExpSlc(s, pt.Elem, nil)
             }
         }
 
-        let mut prefix = self.prefix
+        mut prefix := self.prefix
         self.prefix = nil
 
         if len(s.Exprs) == 0 {
@@ -896,19 +896,19 @@ impl Eval {
             ret nil
         }
 
-        let mut firstElem = self.evalExpr(s.Exprs[0])
+        mut firstElem := self.evalExpr(s.Exprs[0])
         if firstElem == nil {
             ret nil
         }
 
-        let mut d = self.evalExpSlc(s, firstElem.Kind, firstElem.Model)
+        mut d := self.evalExpSlc(s, firstElem.Kind, firstElem.Model)
 
         self.prefix = prefix
         ret d
     }
 
     fn checkIntegerIndexingByData(mut self, mut &d: &Data, token: &Token) {
-        let err_key = checkDataForIntegerIndexing(d)
+        err_key := checkDataForIntegerIndexing(d)
         match err_key {
         | LogMsg.Empty:
             ret
@@ -923,7 +923,7 @@ impl Eval {
         self.checkIntegerIndexingByData(index, i.Token)
         d.Lvalue = true
 
-        let mut ptr = d.Kind.Ptr()
+        mut ptr := d.Kind.Ptr()
         match {
         | ptr.IsUnsafe():
             self.pushErr(i.Token, LogMsg.UnsafePtrIndexing)
@@ -936,7 +936,7 @@ impl Eval {
     }
 
     fn indexingArr(mut self, mut &d: &Data, mut &index: &Data, &i: &IndexingExpr) {
-        let mut arr = d.Kind.Arr()
+        mut arr := d.Kind.Arr()
         d.Kind = arr.Elem
         self.checkIntegerIndexingByData(index, i.Token)
         d.Lvalue = true
@@ -946,7 +946,7 @@ impl Eval {
     }
 
     fn indexingSlc(mut self, mut &d: &Data, mut &index: &Data, &i: &IndexingExpr) {
-        let mut slc = d.Kind.Slc()
+        mut slc := d.Kind.Slc()
         d.Kind = slc.Elem
         self.checkIntegerIndexingByData(index, i.Token)
         d.Lvalue = true
@@ -957,8 +957,8 @@ impl Eval {
         }
         match type d.Model {
         | &SliceExprModel:
-            let mut m = (&SliceExprModel)(d.Model)
-            let indx = index.Constant.AsF64()
+            mut m := (&SliceExprModel)(d.Model)
+            indx := index.Constant.AsF64()
             if indx >= f64(len(m.Elems)) {
                 self.pushErr(i.Token, LogMsg.OverflowLimits)
             } else {
@@ -973,8 +973,8 @@ impl Eval {
         if index == nil {
             ret
         }
-        let mut m = d.Kind.Map()
-        let mut atc = assignTypeChecker{
+        mut m := d.Kind.Map()
+        mut atc := assignTypeChecker{
             s: self.s,
             dest: m.Key,
             d: index,
@@ -1001,9 +1001,9 @@ impl Eval {
         }
 
         if d.IsConst() {
-            let errorToken = i.Token
-            let j = index.Constant.AsI64()
-            let s = d.Constant.ReadStr()
+            errorToken := i.Token
+            j := index.Constant.AsI64()
+            s := d.Constant.ReadStr()
             if int(j) >= len(s) {
                 self.pushErr(errorToken, LogMsg.OverflowLimits)
             } else {
@@ -1027,7 +1027,7 @@ impl Eval {
             self.indexingMap(d, index, i)
             ret
         | d.Kind.Prim() != nil:
-            let prim = d.Kind.Prim()
+            prim := d.Kind.Prim()
             match {
             | prim.IsStr():
                 self.indexingStr(d, index, i)
@@ -1039,7 +1039,7 @@ impl Eval {
 
     fn pushGenericsFromExprSubIdent(mut &self, mut &sexpr: &SubIdentExpr,
         mut &generics: []&TypeDecl, mut &expr: &Expr): bool {
-        let mut t = new(SubIdentTypeDecl)
+        mut t := new(SubIdentTypeDecl)
         if !pushSubIdentFromExpr(sexpr, t) {
             self.pushErr(expr.Token, LogMsg.InvalidSyntax)
             ret false
@@ -1051,11 +1051,11 @@ impl Eval {
     fn pushGenericsFromData(mut &self, mut &generics: []&TypeDecl, mut &expr: &Expr): bool {
         match type expr.Kind {
         | &UnaryExpr:
-            let mut u = (&UnaryExpr)(expr.Kind)
+            mut u := (&UnaryExpr)(expr.Kind)
             match u.Op.Id {
             | TokenId.Star:
-                let mut kind = new(PtrTypeDecl)
-                let mut _generics = make([]&TypeDecl, 0, 1)
+                mut kind := new(PtrTypeDecl)
+                mut _generics := make([]&TypeDecl, 0, 1)
                 self.pushGenericsFromData(_generics, u.Expr)
                 kind.Elem = _generics[0]
                 generics = append(generics, &TypeDecl{
@@ -1063,8 +1063,8 @@ impl Eval {
                     Kind: kind,
                 })
             | TokenId.Amper:
-                let mut kind = new(SptrTypeDecl)
-                let mut _generics = make([]&TypeDecl, 0, 1)
+                mut kind := new(SptrTypeDecl)
+                mut _generics := make([]&TypeDecl, 0, 1)
                 self.pushGenericsFromData(_generics, u.Expr)
                 kind.Elem = _generics[0]
                 generics = append(generics, &TypeDecl{
@@ -1078,10 +1078,10 @@ impl Eval {
         | &TypeDecl:
             generics = append(generics, (&TypeDecl)(expr.Kind))
         | &SubIdentExpr:
-            let mut sexpr = (&SubIdentExpr)(expr.Kind)
+            mut sexpr := (&SubIdentExpr)(expr.Kind)
             ret self.pushGenericsFromExprSubIdent(sexpr, generics, expr)
         | &IdentExpr:
-            let mut ident = (&IdentExpr)(expr.Kind)
+            mut ident := (&IdentExpr)(expr.Kind)
             generics = append(generics, &TypeDecl{
                 Kind: &IdentTypeDecl{
                     Binded: ident.Binded,
@@ -1096,8 +1096,8 @@ impl Eval {
                 }
             }
         | &NsSelectionExpr:
-            let mut ns = (&NsSelectionExpr)(expr.Kind)
-            let mut decl = &IdentTypeDecl{
+            mut ns := (&NsSelectionExpr)(expr.Kind)
+            mut decl := &IdentTypeDecl{
                 Token: ns.Ident,
                 Ident: ns.Ident.Kind,
             }
@@ -1119,7 +1119,7 @@ impl Eval {
     }
 
     fn evalIdentDeclFromIndexing(mut &self, mut &d: &Data, mut &i: &IndexingExpr) {
-        let mut s = d.Kind.Struct()
+        mut s := d.Kind.Struct()
         if s == nil {
             self.pushErr(i.Expr.Token, LogMsg.TypeNotSupportsGenerics, d.Kind.Str())
             d = nil
@@ -1129,14 +1129,14 @@ impl Eval {
         let mut decl: &IdentTypeDecl = nil
         match type i.Expr.Kind {
         | &IdentExpr:
-            let mut expr = (&IdentExpr)(i.Expr.Kind)
+            mut expr := (&IdentExpr)(i.Expr.Kind)
             decl = &IdentTypeDecl{
                 Binded: expr.Binded,
                 Token: expr.Token,
                 Ident: expr.Ident,
             }
         | &NsSelectionExpr:
-            let mut expr = (&NsSelectionExpr)(i.Expr.Kind)
+            mut expr := (&NsSelectionExpr)(i.Expr.Kind)
             decl = &IdentTypeDecl{
                 Token: expr.Ident,
                 Ident: expr.Ident.Kind,
@@ -1162,12 +1162,12 @@ impl Eval {
     // Checks new generics function instance.
     // If instance is already exist, f will point to exist instantantiation.
     fn checkGenericFn(mut &self, mut &f: &FnIns, mut &et: &Token, mut &model: ExprModel): bool {
-        let ok = self.s.reloadFnInsTypes(f)
+        ok := self.s.reloadFnInsTypes(f)
         f.reloaded = true
         if !ok {
             ret false
         }
-        let mut existInstance = f.Decl.appendInstance(f)
+        mut existInstance := f.Decl.appendInstance(f)
         // TODO: [check] is possible to optimize here using same environment with realoadFnInsTypes?
         if !self.s.checkConstraintsFn(f, et, existInstance) {
             ret false
@@ -1187,14 +1187,14 @@ impl Eval {
     }
 
     fn evalFnGenericFromIndexing(mut &self, mut &d: &Data, mut &i: &IndexingExpr) {
-        let mut generics = make([]&TypeDecl, 0, 1 << 3)
+        mut generics := make([]&TypeDecl, 0, 1 << 3)
         if !self.pushGenericsFromData(generics, i.Index) {
             d = nil
             ret
         }
 
-        let mut f = d.Kind.Fn()
-        let mut genericsLen = 0
+        mut f := d.Kind.Fn()
+        mut genericsLen := 0
         if f.Decl != nil {
             genericsLen = len(f.Decl.Generics)
         }
@@ -1206,7 +1206,7 @@ impl Eval {
         // Build real kinds of generic types.
         f.Generics = make([]&InsGeneric, 0, len(f.Decl.Generics))
         for (_, mut g) in generics {
-            let mut k = self.evalType(g)
+            mut k := self.evalType(g)
             if k == nil {
                 d = nil
                 ret
@@ -1226,11 +1226,11 @@ impl Eval {
     }
 
     fn evalIndexing(mut &self, mut i: &IndexingExpr): &Data {
-        let mut prefix = self.prefix
+        mut prefix := self.prefix
         self.prefix = nil
         defer { self.prefix = prefix }
 
-        let mut d = self.evalExprKind(i.Expr.Kind)
+        mut d := self.evalExprKind(i.Expr.Kind)
         if d == nil {
             ret nil
         }
@@ -1246,9 +1246,9 @@ impl Eval {
             ret d
         }
 
-        let mut oldData = *d
+        mut oldData := *d
 
-        let mut index = self.evalExpr(i.Index)
+        mut index := self.evalExpr(i.Index)
         if index == nil {
             ret nil
         }
@@ -1280,7 +1280,7 @@ impl Eval {
     // So, left index always represents an expression.
     // Left data is nil if expression eval failed.
     fn evalSlicingExprs(mut &self, mut &s: &SlicingExpr): (&Data, &Data) {
-        let mut prefix = self.prefix
+        mut prefix := self.prefix
         self.prefix = nil
         defer { self.prefix = prefix }
 
@@ -1316,7 +1316,7 @@ impl Eval {
     }
 
     fn slicingArr(self, mut &d: &Data) {
-        let mut elemType = d.Kind.Arr().Elem
+        mut elemType := d.Kind.Arr().Elem
         d.Kind = &TypeKind{
             Kind: &Slc{
                 Elem: elemType,
@@ -1343,13 +1343,13 @@ impl Eval {
         }
 
         if l.IsConst() && r.IsConst() {
-            let left = l.Constant.AsI64()
+            left := l.Constant.AsI64()
             if left < 0 {
                 ret
             }
 
-            let s = d.Constant.ReadStr()
-            let mut right: i64 = 0
+            s := d.Constant.ReadStr()
+            mut right := i64(0)
             if r == nil {
                 right = i64(len(s))
             } else {
@@ -1374,7 +1374,7 @@ impl Eval {
         | d.Kind.Slc() != nil:
             ret
         | d.Kind.Prim() != nil:
-            let prim = d.Kind.Prim()
+            prim := d.Kind.Prim()
             match {
             | prim.IsStr():
                 self.slicingStr(d, l, r)
@@ -1386,12 +1386,12 @@ impl Eval {
     }
 
     fn evalSlicing(mut &self, mut s: &SlicingExpr): &Data {
-        let mut d = self.evalExpr(s.Expr)
+        mut d := self.evalExpr(s.Expr)
         if d == nil {
             ret nil
         }
 
-        let (mut l, mut r) = self.evalSlicingExprs(s)
+        mut l, mut r := self.evalSlicingExprs(s)
         if l == nil {
             ret d
         }
@@ -1409,7 +1409,7 @@ impl Eval {
         } else if d.Decl {
             d.Decl = false
         } else {
-            let mut model = &SlicingExprModel{
+            mut model := &SlicingExprModel{
                 Token: s.Token,
                 Expr: d.Model,
                 Left: l.Model,
@@ -1424,7 +1424,7 @@ impl Eval {
 
     fn castPtr(mut self, mut t: &TypeKind, mut d: &Data, errorToken: &Token) {
         d.Constant = nil
-        let sptr = d.Kind.Sptr()
+        sptr := d.Kind.Sptr()
         if sptr != nil {
             if !t.Ptr().Elem.Equal(sptr.Elem) {
                 self.pushErr(errorToken, LogMsg.TypeNotSupportsCastingTo, d.Kind.Str(), t.Str())
@@ -1437,7 +1437,7 @@ impl Eval {
             ret
         }
 
-        let prim = d.Kind.Prim()
+        prim := d.Kind.Prim()
         if d.Kind.Ptr() == nil && (prim == nil || !types::IsInt(prim.Str())) {
             self.pushErr(errorToken, LogMsg.TypeNotSupportsCastingTo, d.Kind.Str(), t.Str())
         }
@@ -1445,13 +1445,13 @@ impl Eval {
 
     fn castStruct(mut self, mut t: &TypeKind, mut d: &Data, errorToken: &Token) {
         d.Constant = nil
-        let mut tr = d.Kind.Trait()
+        mut tr := d.Kind.Trait()
         if tr == nil {
             self.pushErr(errorToken, LogMsg.TypeNotSupportsCastingTo, d.Kind.Str(), t.Str())
             ret
         }
 
-        let mut s = t.Struct()
+        mut s := t.Struct()
         self.pushReference[&StructIns](s)
 
         if !s.Decl.IsImplements(tr) {
@@ -1461,9 +1461,9 @@ impl Eval {
 
     fn castRef(mut self, mut t: &TypeKind, mut d: &Data, errorToken: &Token) {
         d.Constant = nil
-        let mut sptr = t.Sptr()
+        mut sptr := t.Sptr()
 
-        let mut ptr = d.Kind.Ptr()
+        mut ptr := d.Kind.Ptr()
         if ptr != nil && sptr.Elem.Equal(ptr.Elem) {
             if !self.isUnsafe() {
                 self.pushErr(errorToken, LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
@@ -1482,7 +1482,7 @@ impl Eval {
     }
 
     fn castSlc(mut self, mut t: &TypeKind, mut d: &Data, errorToken: &Token) {
-        let c = d.Constant
+        c := d.Constant
         d.Constant = nil
 
         if d.Kind.Enum() != nil {
@@ -1496,7 +1496,7 @@ impl Eval {
         }
 
         t = t.Slc().Elem
-        let prim = t.Prim()
+        prim := t.Prim()
         if prim == nil || (!prim.IsU8() && !prim.IsI32()) {
             self.pushErr(errorToken, LogMsg.TypeNotSupportsCastingTo, d.Kind.Str(), t.Str())
             ret
@@ -1506,26 +1506,26 @@ impl Eval {
         if c != nil {
             match {
             | prim.IsU8():
-                let s = c.ReadStr()
-                let mut model = &SliceExprModel{
+                s := c.ReadStr()
+                mut model := &SliceExprModel{
                     ElemKind: t,
                     Elems: make([]ExprModel, 0, len(s)),
                 }
                 for _, b in s {
-                    let mut bc = Const.NewU64(u64(b))
+                    mut bc := Const.NewU64(u64(b))
                     bc.Kind = prim.Kind
                     model.Elems = append(model.Elems, bc)
                 }
                 d.Model = model
                 d.Decl = true // Prevent model changing.
             | prim.IsI32():
-                let runes = []rune(c.ReadStr())
-                let mut model = &SliceExprModel{
+                runes := []rune(c.ReadStr())
+                mut model := &SliceExprModel{
                     ElemKind: t,
                     Elems: make([]ExprModel, 0, len(runes)),
                 }
                 for _, r in runes {
-                    let mut rc = Const.NewI64(i64(r))
+                    mut rc := Const.NewI64(i64(r))
                     rc.Kind = prim.Kind
                     model.Elems = append(model.Elems, rc)
                 }
@@ -1537,16 +1537,16 @@ impl Eval {
 
     fn castStr(mut self, mut d: &Data, errorToken: &Token) {
         if d.Kind.Enum() != nil {
-            let mut e = d.Kind.Enum()
+            mut e := d.Kind.Enum()
             if e.Kind.Kind.Prim() != nil && e.Kind.Kind.Prim().IsStr() {
                 ret
             }
         }
 
-        let c = d.Constant
+        c := d.Constant
         d.Constant = nil
         if d.Kind.Prim() != nil {
-            let prim = d.Kind.Prim()
+            prim := d.Kind.Prim()
             if !prim.IsU8() && !prim.IsI32() {
                 self.pushErr(errorToken, LogMsg.TypeNotSupportsCastingTo, PrimKind.Str, d.Kind.Str())
                 ret
@@ -1567,14 +1567,14 @@ impl Eval {
             ret
         }
 
-        let mut s = d.Kind.Slc()
+        mut s := d.Kind.Slc()
         if s == nil {
             self.pushErr(errorToken, LogMsg.TypeNotSupportsCastingTo, PrimKind.Str, d.Kind.Str())
             ret
         }
 
-        let mut t = s.Elem
-        let prim = t.Prim()
+        mut t := s.Elem
+        prim := t.Prim()
         if prim == nil || (!prim.IsU8() && !prim.IsI32()) {
             self.pushErr(errorToken, LogMsg.TypeNotSupportsCastingTo, PrimKind.Str, d.Kind.Str())
             ret
@@ -1583,7 +1583,7 @@ impl Eval {
 
     fn castInt(mut self, mut t: &TypeKind, mut d: &Data, errorToken: &Token) {
         if d.IsConst() {
-            let prim = t.Prim()
+            prim := t.Prim()
             match {
             | types::IsSigInt(prim.Kind):
                 d.Constant.SetI64(d.Constant.AsI64())
@@ -1595,21 +1595,21 @@ impl Eval {
         }
 
         if d.Kind.Enum() != nil {
-            let e = d.Kind.Enum()
+            e := d.Kind.Enum()
             if types::IsNum(e.Kind.Kind.Str()) {
                 ret
             }
         }
 
         if d.Kind.Sptr() != nil {
-            let prim = t.Prim()
+            prim := t.Prim()
             if !prim.IsUintptr() {
                 self.pushErr(errorToken, LogMsg.TypeNotSupportsCastingTo, d.Kind.Str(), t.Str())
             }
             ret
         }
         if d.Kind.Ptr() != nil {
-            let prim = t.Prim()
+            prim := t.Prim()
             if prim.IsUintptr() {
                 // Ignore case.
             } else if !self.isUnsafe() {
@@ -1618,7 +1618,7 @@ impl Eval {
             ret
         }
 
-        let prim = d.Kind.Prim()
+        prim := d.Kind.Prim()
         if prim != nil && types::IsNum(prim.Str()) {
             ret
         }
@@ -1628,7 +1628,7 @@ impl Eval {
 
     fn castNum(mut self, mut t: &TypeKind, mut d: &Data, errorToken: &Token) {
         if d.IsConst() {
-            let prim = t.Prim()
+            prim := t.Prim()
             match {
             | types::IsFloat(prim.Kind):
                 d.Constant.SetF64(d.Constant.AsF64())
@@ -1642,13 +1642,13 @@ impl Eval {
         }
 
         if d.Kind.Enum() != nil {
-            let e = d.Kind.Enum()
+            e := d.Kind.Enum()
             if types::IsNum(e.Kind.Kind.Str()) {
                 ret
             }
         }
 
-        let prim = d.Kind.Prim()
+        prim := d.Kind.Prim()
         if prim != nil && types::IsNum(prim.Str()) {
             ret
         }
@@ -1657,7 +1657,7 @@ impl Eval {
     }
 
     fn castPrim(mut self, mut t: &TypeKind, mut d: &Data, errorToken: &Token) {
-        let prim = t.Prim()
+        prim := t.Prim()
         match {
         | prim.IsAny():
             // The any type supports casting to any data type.
@@ -1677,13 +1677,13 @@ impl Eval {
         if d == nil || !d.IsConst() {
             ret
         }
-        let prim = t.Prim()
+        prim := t.Prim()
         castConstByType(prim.Kind, d)
         d.Model = d.Constant
     }
 
     fn castTypeEnum(mut self, mut &t: &TypeKind, mut &d: &Data, mut &errorToken: &Token) {
-        let n = len(self.s.errors)
+        n := len(self.s.errors)
         if !self.s.checkTypeCompatibility(d.Kind, t, errorToken) {
             self.s.errors = self.s.errors[:n]
             self.pushErr(errorToken, LogMsg.TypeNotSupportsCastingTo, d.Kind.Str(), t.Str())
@@ -1692,7 +1692,7 @@ impl Eval {
     }
 
     fn castTypeEnumT(mut self, mut &t: &TypeKind, mut &d: &Data, mut &errorToken: &Token) {
-        let n = len(self.s.errors)
+        n := len(self.s.errors)
         if !self.s.checkTypeCompatibility(t, d.Kind, errorToken) {
             self.s.errors = self.s.errors[:n]
             self.pushErr(errorToken, LogMsg.TypeNotSupportsCastingTo, d.Kind.Str(), t.Str())
@@ -1772,7 +1772,7 @@ impl Eval {
     }
 
     fn evalCastT(mut &self, mut &t: &TypeKind, mut &e: &Expr, mut &et: &Token): &Data {
-        let mut prefix = self.prefix
+        mut prefix := self.prefix
         self.prefix = nil
         defer { self.prefix = prefix }
         if t.Slc() != nil {
@@ -1781,7 +1781,7 @@ impl Eval {
                 self.prefix = t
             }
         }
-        let mut d = self.evalExpr(e)
+        mut d := self.evalExpr(e)
         if d == nil || self.prefix != nil {
             ret d
         }
@@ -1789,8 +1789,8 @@ impl Eval {
     }
 
     fn evalCast(mut &self, mut c: &CastExpr): &Data {
-        let mut t = buildType(c.Kind)
-        let ok = self.s.checkType(t, self.lookup)
+        mut t := buildType(c.Kind)
+        ok := self.s.checkType(t, self.lookup)
         if !ok {
             ret nil
         }
@@ -1798,8 +1798,8 @@ impl Eval {
     }
 
     fn evalNsSelection(mut self, s: &NsSelectionExpr): &Data {
-        let path = buildLinkPathByTokens(s.Ns)
-        let mut imp = self.lookup.SelectPackage(fn(imp: &ImportInfo): bool {
+        path := buildLinkPathByTokens(s.Ns)
+        mut imp := self.lookup.SelectPackage(fn(imp: &ImportInfo): bool {
             if len(s.Ns) == 1 && imp.Alias == path {
                 ret true
             }
@@ -1811,21 +1811,21 @@ impl Eval {
             ret nil
         }
 
-        let mut lookup = self.lookup
+        mut lookup := self.lookup
         self.lookup = imp
 
         const Binded = false
         self.disallowBuiltin()
-        let mut def = self.getDef(s.Ident.Kind, Binded)
+        mut def := self.getDef(s.Ident.Kind, Binded)
         self.allowBuiltin()
         self.lookup = lookup
-        let mut d = self.evalDef(def, s.Ident)
+        mut d := self.evalDef(def, s.Ident)
         ret d
     }
 
     fn evalStructLitExplicit(mut &self, mut s: &StructIns,
         mut exprs: []&Expr, mut errorToken: &Token): &Data {
-        let ok = self.s.checkGenericQuantity(len(s.Decl.Generics), len(s.Generics), errorToken)
+        ok := self.s.checkGenericQuantity(len(s.Decl.Generics), len(s.Generics), errorToken)
         if !ok {
             ret nil
         }
@@ -1838,14 +1838,14 @@ impl Eval {
         self.pushReference[&StructIns](s)
         self.checkDeprecated(s.Decl.Directives, errorToken)
 
-        let mut slc = structLitChecker{
+        mut slc := structLitChecker{
             e: self,
             errorToken: errorToken,
             s: s,
         }
         slc.check(exprs)
 
-        let mut d = &Data{
+        mut d := &Data{
             Mutable: !self.immutable,
             Kind: &TypeKind{
                 Kind: s,
@@ -1862,13 +1862,13 @@ impl Eval {
     }
 
     fn evalStructLit(mut &self, mut lit: &StructLit): &Data {
-        let mut t = buildType(lit.Kind)
-        let ok = self.s.checkType(t, self.lookup)
+        mut t := buildType(lit.Kind)
+        ok := self.s.checkType(t, self.lookup)
         if !ok {
             ret nil
         }
 
-        let mut s = t.Kind.Struct()
+        mut s := t.Kind.Struct()
         if s == nil {
             if t.Kind.Sptr() != nil {
                 s = t.Kind.Sptr().Elem.Struct()
@@ -1881,9 +1881,9 @@ impl Eval {
         }
 
     eval:
-        let mut d = self.evalStructLitExplicit(s, lit.Exprs, lit.Kind.Token)
+        mut d := self.evalStructLitExplicit(s, lit.Exprs, lit.Kind.Token)
         if t.Kind.Sptr() != nil {
-            let mut model = (&StructLitExprModel)(d.Model)
+            mut model := (&StructLitExprModel)(d.Model)
             makeStructLitAlloc(d, model)
         }
         ret d
@@ -1894,8 +1894,8 @@ impl Eval {
     }
 
     fn evalType(mut self, mut t: &TypeDecl): &Data {
-        let mut tk = buildType(t)
-        let ok = self.s.checkType(tk, self.lookup)
+        mut tk := buildType(t)
+        ok := self.s.checkType(tk, self.lookup)
         if !ok {
             ret nil
         }
@@ -1922,7 +1922,7 @@ impl Eval {
         }
 
         if len(fc.Args) > 0 {
-            let mut arg = fc.Args[0]
+            mut arg := fc.Args[0]
             d = self.evalCastT(d.Kind, arg, arg.Token)
             ret
         }
@@ -1964,15 +1964,15 @@ impl Eval {
     }
 
     fn processExceptionalHandler(mut self, mut &f: &FnIns, mut &fc: &FnCallExpr, mut &d: &Data) {
-        let resultNeeded = !f.Decl.IsVoid() && (self.arg || !self.ignored)
+        resultNeeded := !f.Decl.IsVoid() && (self.arg || !self.ignored)
         let mut csc: &scopeChecker = nil
         let mut ch: &Scope = nil
 
-        let mut model = (&FnCallExprModel)(d.Model)
+        mut model := (&FnCallExprModel)(d.Model)
 
         // self.lookup is always scopeChecker because exceptionals are
         // not allowed in global scope.
-        let mut sc = (&scopeChecker)(self.lookup)
+        mut sc := (&scopeChecker)(self.lookup)
         csc = sc.newChildChecker()
         if resultNeeded {
             csc.result = f
@@ -1991,7 +1991,7 @@ impl Eval {
     }
 
     fn callFn(mut &self, mut &fc: &FnCallExpr, mut &d: &Data) {
-        let mut f = d.Kind.Fn()
+        mut f := d.Kind.Fn()
         if f.IsBuiltin() {
             self.callBuiltinFn(fc, d)
             ret
@@ -2017,7 +2017,7 @@ impl Eval {
                 // Literal will not be assigned to immutable memory,
                 // used to call method with mutable receiver.
                 // Assume literal as mutable and check accordingly.
-                let lit = isLitBased(d.Model)
+                lit := isLitBased(d.Model)
                 if lit == nil {
                     // Expression is not literal based, so data is strictly immutable.
                     self.pushErr(fc.Token, LogMsg.MutOperationOnImmut)
@@ -2029,7 +2029,7 @@ impl Eval {
             self.pushErr(fc.Token, LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
         }
 
-        let mut dynamicAnnotation = len(f.Decl.Generics) > 0 && len(f.Generics) == 0 && len(f.Params) > 0
+        mut dynamicAnnotation := len(f.Decl.Generics) > 0 && len(f.Generics) == 0 && len(f.Params) > 0
         if dynamicAnnotation {
             f.Generics = make([]&InsGeneric, len(f.Decl.Generics))
         } else if len(f.Generics) != len(f.Decl.Generics) {
@@ -2038,7 +2038,7 @@ impl Eval {
             ret
         }
 
-        let mut old = self.s
+        mut old := self.s
         if f.Decl.Owner != nil {
             self.s = f.Decl.Owner.sema
         }
@@ -2051,7 +2051,7 @@ impl Eval {
             self.s = old
         }
 
-        let mut fcac = fnCallArgChecker{
+        mut fcac := fnCallArgChecker{
             e: self,
             args: fc.Args,
             dynamicAnnotation: dynamicAnnotation,
@@ -2060,14 +2060,14 @@ impl Eval {
 
         if !dynamicAnnotation {
             if !f.reloaded {
-                let ok = self.s.reloadFnInsTypes(f)
+                ok := self.s.reloadFnInsTypes(f)
                 f.reloaded = true
                 if !ok {
                     d = nil
                     ret
                 }
             }
-            let mut existInstance = f.Decl.appendInstance(f)
+            mut existInstance := f.Decl.appendInstance(f)
             if existInstance != nil {
                 f = existInstance
             }
@@ -2078,7 +2078,7 @@ impl Eval {
 
         fcac.f = f
 
-        let mut ok = false
+        mut ok := false
         if f.Decl.Owner != nil {
             old, self.s = self.s, old // Save current Sema.
             ok = fcac.check()
@@ -2098,7 +2098,7 @@ impl Eval {
             }
         }
 
-        let mut callModel = d.Model
+        mut callModel := d.Model
 
         if f.Decl.IsVoid() {
             d = buildVoidData()
@@ -2107,7 +2107,7 @@ impl Eval {
             d.Lvalue = false
         }
 
-        let mut model = &FnCallExprModel{
+        mut model := &FnCallExprModel{
             Token: fc.Token,
             Func: f,
             Expr: callModel,
@@ -2143,7 +2143,7 @@ impl Eval {
     }
 
     fn evalFnCall(mut &self, mut fc: &FnCallExpr): &Data {
-        let mut prefix = self.prefix
+        mut prefix := self.prefix
         self.prefix = nil
         defer { self.prefix = prefix }
 
@@ -2156,7 +2156,7 @@ impl Eval {
             }
         }
 
-        let mut d = self.evalExprKind(fc.Expr.Kind)
+        mut d := self.evalExprKind(fc.Expr.Kind)
         if d == nil {
             ret nil
         }
@@ -2176,7 +2176,7 @@ impl Eval {
     }
 
     fn evalEnumStatic(mut self, mut enm: &Enum, ident: &Token): &Data {
-        let mut item = enm.FindItem(ident.Kind)
+        mut item := enm.FindItem(ident.Kind)
         if item == nil {
             self.pushErr(ident, LogMsg.ObjHaveNotIdent, enm.Ident, ident.Kind)
         }
@@ -2184,7 +2184,7 @@ impl Eval {
     }
 
     fn evalTypeEnumStatic(mut self, mut enm: &TypeEnum, ident: &Token): &Data {
-        let mut item = enm.FindItem(ident.Kind)
+        mut item := enm.FindItem(ident.Kind)
         if item == nil {
             self.pushErr(ident, LogMsg.ObjHaveNotIdent, enm.Ident, ident.Kind)
             ret nil
@@ -2197,7 +2197,7 @@ impl Eval {
         | item.Kind.Kind.Struct() != nil:
             ret self._evalStruct(item.Kind.Kind.Struct())
         |:
-            let mut d = &Data{
+            mut d := &Data{
                 Decl: true,
                 Kind: item.Kind.Kind,
             }
@@ -2207,18 +2207,18 @@ impl Eval {
     }
 
     fn evalStructStatic(mut self, mut s: &StructIns, ident: &Token): &Data {
-        let mut d = new(Data)
+        mut d := new(Data)
 
         // Method.
         const Static = true
-        let mut method = s.FindMethod(ident.Kind, Static)
+        mut method := s.FindMethod(ident.Kind, Static)
         if method != nil {
             if !self.s.isAccessibleDefine(method.Public, method.Token) {
                 self.pushErr(ident, LogMsg.IdentIsNotAccessible, ident.Kind)
                 self.pushSuggestion(LogMsg.MakePubToAccess)
             }
 
-            let mut ins = method.instance()
+            mut ins := method.instance()
             ins.Owner = s
             self.pushReference[&FnIns](ins)
             d.Model = &StructStaticIdentExprModel{
@@ -2232,7 +2232,7 @@ impl Eval {
             ret d
         }
 
-        let mut sttc = s.FindStatic(ident.Kind)
+        mut sttc := s.FindStatic(ident.Kind)
         if sttc != nil {
             ret self.evalVar(sttc, ident)
         }
@@ -2242,7 +2242,7 @@ impl Eval {
     }
 
     fn evalTraitSubIdent(mut self, mut d: &Data, mut trt: &Trait, mut ident: &Token): &Data {
-        let mut f = trt.FindMethod(ident.Kind)
+        mut f := trt.FindMethod(ident.Kind)
         if f == nil {
             self.pushErr(ident, LogMsg.ObjHaveNotIdent, trt.Ident, ident.Kind)
             ret nil
@@ -2262,7 +2262,7 @@ impl Eval {
 
     // This method evaluates expressions, will not check public availability.
     fn evalStructSubIdentField(mut self, mut &d: &Data, mut &s: &StructIns, mut &tok: &Token, mut &f: &FieldIns): &Data {
-        let mut model = &StructSubIdentExprModel{
+        mut model := &StructSubIdentExprModel{
             Token: tok,
             Expr: new(Data, *d),
             Field: f,
@@ -2276,7 +2276,7 @@ impl Eval {
             // Interior mutability.
             match type self.lookup {
             | &scopeChecker:
-                let scope = (&scopeChecker)(self.lookup).getRoot()
+                scope := (&scopeChecker)(self.lookup).getRoot()
                 d.Mutable = scope.owner != nil && scope.owner.Owner == s
             }
         }
@@ -2285,7 +2285,7 @@ impl Eval {
     }
 
     fn evalStructSubIdent(mut self, mut d: &Data, mut s: &StructIns, mut si: &SubIdentExpr, ref: bool): &Data {
-        let mut f = s.FindField(si.Ident.Kind)
+        mut f := s.FindField(si.Ident.Kind)
         if f != nil {
             if !self.s.isAccessibleDefine(f.Decl.Public, f.Decl.Token) {
                 self.pushErr(si.Ident, LogMsg.IdentIsNotAccessible, f.Decl.Ident)
@@ -2295,7 +2295,7 @@ impl Eval {
         }
 
         const Static = false
-        let mut m = s.FindMethod(si.Ident.Kind, Static)
+        mut m := s.FindMethod(si.Ident.Kind, Static)
         if m == nil {
             self.pushErr(si.Ident, LogMsg.ObjHaveNotIdent, s.Decl.Ident, si.Ident.Kind)
             ret nil
@@ -2311,10 +2311,10 @@ impl Eval {
 
         self.checkDeprecated(m.Directives, si.Ident)
 
-        let mut ins = m.instance()
+        mut ins := m.instance()
         ins.Owner = s
         self.pushReference[&FnIns](ins)
-        let mut model = new(Data, *d)
+        mut model := new(Data, *d)
         d.Model = &StructSubIdentExprModel{
             Token: si.Ident,
             Expr: model,
@@ -2329,7 +2329,7 @@ impl Eval {
         const kind: str = PrimKind.Int
         match ident.Kind {
         | "Max":
-            let mut c = Const.NewI64(types::MaxI(kind))
+            mut c := Const.NewI64(types::MaxI(kind))
             c.Kind = kind
             ret &Data{
                 Constant: c,
@@ -2337,7 +2337,7 @@ impl Eval {
                 Kind: primInt,
             }
         | "Min":
-            let mut c = Const.NewI64(i64(types::Min(kind)))
+            mut c := Const.NewI64(i64(types::Min(kind)))
             c.Kind = kind
             ret &Data{
                 Constant: c,
@@ -2354,7 +2354,7 @@ impl Eval {
         const kind: str = PrimKind.Uint
         match ident.Kind {
         | "Max":
-            let mut c = Const.NewU64(types::MaxU(kind))
+            mut c := Const.NewU64(types::MaxU(kind))
             c.Kind = kind
             ret &Data{
                 Constant: c,
@@ -2373,7 +2373,7 @@ impl Eval {
         const max = types::MaxI8
         match ident.Kind {
         | "Max":
-            let mut c = Const.NewI64(max)
+            mut c := Const.NewI64(max)
             c.Kind = kind
             ret &Data{
                 Constant: c,
@@ -2381,7 +2381,7 @@ impl Eval {
                 Kind: primI8,
             }
         | "Min":
-            let mut c = Const.NewI64(min)
+            mut c := Const.NewI64(min)
             c.Kind = kind
             ret &Data{
                 Constant: c,
@@ -2400,7 +2400,7 @@ impl Eval {
         const max = types::MaxI16
         match ident.Kind {
         | "Max":
-            let mut c = Const.NewI64(max)
+            mut c := Const.NewI64(max)
             c.Kind = kind
             ret &Data{
                 Constant: c,
@@ -2408,7 +2408,7 @@ impl Eval {
                 Kind: primI16,
             }
         | "Min":
-            let mut c = Const.NewI64(min)
+            mut c := Const.NewI64(min)
             c.Kind = kind
             ret &Data{
                 Constant: c,
@@ -2427,7 +2427,7 @@ impl Eval {
         const max = types::MaxI32
         match ident.Kind {
         | "Max":
-            let mut c = Const.NewI64(max)
+            mut c := Const.NewI64(max)
             c.Kind = kind
             ret &Data{
                 Constant: c,
@@ -2435,7 +2435,7 @@ impl Eval {
                 Kind: primI32,
             }
         | "Min":
-            let mut c = Const.NewI64(min)
+            mut c := Const.NewI64(min)
             c.Kind = kind
             ret &Data{
                 Constant: c,
@@ -2454,7 +2454,7 @@ impl Eval {
         const max = types::MaxI64
         match ident.Kind {
         | "Max":
-            let mut c = Const.NewI64(max)
+            mut c := Const.NewI64(max)
             c.Kind = kind
             ret &Data{
                 Constant: c,
@@ -2462,7 +2462,7 @@ impl Eval {
                 Kind: primI64,
             }
         | "Min":
-            let mut c = Const.NewI64(min)
+            mut c := Const.NewI64(min)
             c.Kind = kind
             ret &Data{
                 Constant: c,
@@ -2480,7 +2480,7 @@ impl Eval {
         const max = types::MaxU8
         match ident.Kind {
         | "Max":
-            let mut c = Const.NewU64(max)
+            mut c := Const.NewU64(max)
             c.Kind = kind
             ret &Data{
                 Constant: c,
@@ -2498,7 +2498,7 @@ impl Eval {
         const max = types::MaxU16
         match ident.Kind {
         | "Max":
-            let mut c = Const.NewU64(max)
+            mut c := Const.NewU64(max)
             c.Kind = kind
             ret &Data{
                 Constant: c,
@@ -2516,7 +2516,7 @@ impl Eval {
         const max = types::MaxU32
         match ident.Kind {
         | "Max":
-            let mut c = Const.NewU64(max)
+            mut c := Const.NewU64(max)
             c.Kind = kind
             ret &Data{
                 Constant: c,
@@ -2534,7 +2534,7 @@ impl Eval {
         const max = types::MaxU64
         match ident.Kind {
         | "Max":
-            let mut c = Const.NewU64(max)
+            mut c := Const.NewU64(max)
             c.Kind = kind
             ret &Data{
                 Constant: c,
@@ -2554,7 +2554,7 @@ impl Eval {
         const smallestNonZero = types::SmallestNonZeroF32
         match ident.Kind {
         | "Max":
-            let mut c = Const.NewF64(max)
+            mut c := Const.NewF64(max)
             c.Kind = kind
             ret &Data{
                 Constant: c,
@@ -2562,7 +2562,7 @@ impl Eval {
                 Kind: primF32,
             }
         | "Min":
-            let mut c = Const.NewF64(min)
+            mut c := Const.NewF64(min)
             c.Kind = kind
             ret &Data{
                 Constant: c,
@@ -2570,7 +2570,7 @@ impl Eval {
                 Kind: primF32,
             }
         | "SmallestNonZero":
-            let mut c = Const.NewF64(smallestNonZero)
+            mut c := Const.NewF64(smallestNonZero)
             c.Kind = kind
             ret &Data{
                 Constant: c,
@@ -2590,7 +2590,7 @@ impl Eval {
         const smallestNonZero = types::SmallestNonZeroF64
         match ident.Kind {
         | "Max":
-            let mut c = Const.NewF64(max)
+            mut c := Const.NewF64(max)
             c.Kind = kind
             ret &Data{
                 Constant: c,
@@ -2598,7 +2598,7 @@ impl Eval {
                 Kind: primF64,
             }
         | "Min":
-            let mut c = Const.NewF64(min)
+            mut c := Const.NewF64(min)
             c.Kind = kind
             ret &Data{
                 Constant: c,
@@ -2606,7 +2606,7 @@ impl Eval {
                 Kind: primF64,
             }
         | "SmallestNonZero":
-            let mut c = Const.NewF64(smallestNonZero)
+            mut c := Const.NewF64(smallestNonZero)
             c.Kind = kind
             ret &Data{
                 Constant: c,
@@ -2668,7 +2668,7 @@ impl Eval {
     }
 
     fn comptimeObjSubIdent[ComptimeType](mut self, mut &ct: &ComptimeType, &d: &Data, &si: &SubIdentExpr): &Data {
-        let mut cd = ct.subIdent(si.Ident.Kind)
+        mut cd := ct.subIdent(si.Ident.Kind)
         if cd == nil {
             self.pushErr(si.Ident, LogMsg.ObjHaveNotIdent, d.Kind.Str(), si.Ident.Kind)
         }
@@ -2678,25 +2678,25 @@ impl Eval {
     fn tryComptimeObjSubIdent(mut self, mut &d: &Data, mut si: &SubIdentExpr): (&Data, bool) {
         match {
         | d.Kind.comptimeTypeInfo() != nil:
-            let mut ct = d.Kind.comptimeTypeInfo()
+            mut ct := d.Kind.comptimeTypeInfo()
             ret self.comptimeObjSubIdent(ct, d, si), true
         | d.Kind.comptimeStructField() != nil:
-            let mut ct = d.Kind.comptimeStructField()
+            mut ct := d.Kind.comptimeStructField()
             ret self.comptimeObjSubIdent(ct, d, si), true
         | d.Kind.comptimeEnumField() != nil:
-            let mut ct = d.Kind.comptimeEnumField()
+            mut ct := d.Kind.comptimeEnumField()
             ret self.comptimeObjSubIdent(ct, d, si), true
         | d.Kind.comptimeParam() != nil:
-            let mut ct = d.Kind.comptimeParam()
+            mut ct := d.Kind.comptimeParam()
             ret self.comptimeObjSubIdent(ct, d, si), true
         | d.Kind.comptimeStatic() != nil:
-            let mut ct = d.Kind.comptimeStatic()
+            mut ct := d.Kind.comptimeStatic()
             ret self.comptimeObjSubIdent(ct, d, si), true
         | d.Kind.comptimeValue() != nil:
-            let mut ct = d.Kind.comptimeValue()
+            mut ct := d.Kind.comptimeValue()
             ret self.comptimeObjSubIdent(ct, d, si), true
         | d.Kind.comptimeFile() != nil:
-            let mut ct = d.Kind.comptimeFile()
+            mut ct := d.Kind.comptimeFile()
             ret self.comptimeObjSubIdent(ct, d, si), true
         |:
             ret nil, false
@@ -2710,16 +2710,16 @@ impl Eval {
         }
 
         {
-            let (mut compData, ok) = self.tryComptimeObjSubIdent(d, si)
+            mut compData, ok := self.tryComptimeObjSubIdent(d, si)
             if ok {
                 ret compData
             }
         }
 
-        let mut kind = d.Kind
+        mut kind := d.Kind
         match {
         | d.Kind.Ptr() != nil:
-            let ptr = d.Kind.Ptr()
+            ptr := d.Kind.Ptr()
             if ptr.IsUnsafe() {
                 break
             }
@@ -2737,9 +2737,9 @@ impl Eval {
         | d.Kind.Trait() != nil:
             ret self.evalTraitSubIdent(d, d.Kind.Trait(), si.Ident)
         | kind.Struct() != nil:
-            let s = kind.Struct()
+            s := kind.Struct()
             if isInstancedStruct(s) {
-                let mut usedReferenceElem = d.Kind.Sptr() != nil
+                mut usedReferenceElem := d.Kind.Sptr() != nil
                 ret self.evalStructSubIdent(d, kind.Struct(), si, usedReferenceElem)
             }
         }
@@ -2748,10 +2748,10 @@ impl Eval {
     }
 
     fn evalSubIdent(mut &self, mut si: &SubIdentExpr): &Data {
-        let mut prefix = self.prefix
+        mut prefix := self.prefix
         self.prefix = nil
         defer { self.prefix = prefix }
-        let mut d = self.evalExprKind(si.Expr.Kind)
+        mut d := self.evalExprKind(si.Expr.Kind)
         if d == nil {
             ret nil
         }
@@ -2762,16 +2762,16 @@ impl Eval {
     }
 
     fn evalTuple(mut &self, mut tup: &TupleExpr): &Data {
-        let mut tupT = new(Tuple)
+        mut tupT := new(Tuple)
         tupT.Types = make([]&TypeKind, 0, len(tup.Expr))
 
-        let mut model = &TupleExprModel{
+        mut model := &TupleExprModel{
             Datas: make([]&Data, 0, len(tup.Expr)),
         }
 
-        let mut ok = true
+        mut ok := true
         for (_, mut expr) in tup.Expr {
-            let mut d = self.evalExpr(expr)
+            mut d := self.evalExpr(expr)
             if d == nil {
                 ok = false
                 continue
@@ -2791,7 +2791,7 @@ impl Eval {
     }
 
     fn evalMap(mut &self, mut m: &Map, mut lit: &BraceLit): &Data {
-        let mut model = &MapExprModel{
+        mut model := &MapExprModel{
             KeyKind: m.Key,
             ValKind: m.Val,
         }
@@ -2806,14 +2806,14 @@ impl Eval {
                 ret nil
             }
 
-            let mut pair = (&KeyValPair)(expr.Kind)
+            mut pair := (&KeyValPair)(expr.Kind)
 
-            let mut key = self.evalExpr(pair.Key)
+            mut key := self.evalExpr(pair.Key)
             if key == nil {
                 ret nil
             }
 
-            let mut val = self.evalExpr(pair.Val)
+            mut val := self.evalExpr(pair.Val)
             if val == nil {
                 ret nil
             }
@@ -2850,19 +2850,19 @@ impl Eval {
     }
 
     fn evalAnonFunc(mut &self, mut decl: &FnDecl): &Data {
-        let mut tc = typeChecker{
+        mut tc := typeChecker{
             s: self.s,
             rootLookup: self.lookup,
             lookup: self.lookup,
         }
-        let mut ins = tc.buildFunc(decl)
+        mut ins := tc.buildFunc(decl)
         if ins == nil {
             ret nil
         }
         match type self.lookup {
         | &scopeChecker:
-            let mut sc = (&scopeChecker)(self.lookup)
-            let mut scc = sc.newChildChecker()
+            mut sc := (&scopeChecker)(self.lookup)
+            mut scc := sc.newChildChecker()
             scc.labels = new([]&scopeLabel, nil)
             scc.gotos = new([]&scopeGoto, nil)
             scc.owner = nil
@@ -2885,12 +2885,12 @@ impl Eval {
     }
 
     fn evalBinop(mut &self, mut op: &BinopExpr): &Data {
-        let mut bs = binaryEval.newPlain(self)
+        mut bs := binaryEval.newPlain(self)
         // Apply prefix for just numericals.
         if self.prefix != nil {
-            let prim = self.prefix.Prim()
+            prim := self.prefix.Prim()
             if prim == nil || !types::IsNum(prim.Str()) {
-                let mut prefix = self.prefix
+                mut prefix := self.prefix
                 self.prefix = nil
                 defer { self.prefix = prefix }
                 ret bs.eval(op)
@@ -2902,7 +2902,7 @@ impl Eval {
     fn evalExprKind(mut &self, mut kind: ExprData): &Data {
         match type kind {
         | &RangeExpr:
-            let mut e = (&RangeExpr)(kind)
+            mut e := (&RangeExpr)(kind)
             ret self.evalExprKind(e.Expr.Kind)
         | &LitExpr:
             ret self.evalLit((&LitExpr)(kind))
@@ -2948,14 +2948,14 @@ impl Eval {
     // Returns value data of evaluated expression.
     // Returns nil if error occurs.
     fn eval1(mut &self, mut expr: &Expr): &Data {
-        let mut d = self.evalExprKind(expr.Kind)
+        mut d := self.evalExprKind(expr.Kind)
         if d == nil || d.Kind == nil {
             ret nil
         }
 
         match {
         | d.Kind.Fn() != nil:
-            let mut f = d.Kind.Fn()
+            mut f := d.Kind.Fn()
             if f.IsBuiltin() {
                 self.s.pushErr(expr.Token, LogMsg.BuiltinNotInvoked)
                 break
@@ -2975,7 +2975,7 @@ impl Eval {
     // Returns nil if error occurs.
     // Accepts comptime expressions as invalid.
     fn eval(mut &self, mut expr: &Expr): &Data {
-        let mut d = self.eval1(expr)
+        mut d := self.eval1(expr)
         if d == nil {
             ret nil
         }
@@ -2990,7 +2990,7 @@ impl Eval {
     // Returns nil if error occurs.
     // Accepts decls as invalid expression.
     fn evalExpr1(mut &self, mut expr: &Expr): &Data {
-        let mut d = self.eval1(expr)
+        mut d := self.eval1(expr)
         match {
         | d == nil:
             ret nil
@@ -3006,7 +3006,7 @@ impl Eval {
     // Returns nil if error occurs.
     // Accepts decls as invalid expression.
     fn evalExpr(mut &self, mut expr: &Expr): &Data {
-        let mut d = self.eval(expr)
+        mut d := self.eval(expr)
         match {
         | d == nil:
             ret nil
@@ -3166,7 +3166,7 @@ impl unaryEval {
     }
 
     fn excl(mut self) {
-        let t = self.d.Kind.Prim()
+        t := self.d.Kind.Prim()
         if t == nil || !t.IsBool() {
             self.d = nil
             ret
@@ -3205,7 +3205,7 @@ impl unaryEval {
                 self.e.pushErr(self.u.Op, LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
             }
 
-            let mut t = self.d.Kind.Ptr()
+            mut t := self.d.Kind.Ptr()
             if t.IsUnsafe() {
                 self.d = nil
                 ret
@@ -3226,7 +3226,7 @@ impl unaryEval {
     fn amper(mut self) {
         match type self.d.Model {
         | &StructLitExprModel:
-            let mut lit = (&StructLitExprModel)(self.d.Model)
+            mut lit := (&StructLitExprModel)(self.d.Model)
             makeStructLitAlloc(self.d, lit)
         |:
             match {
@@ -3250,7 +3250,7 @@ impl unaryEval {
     }
 
     fn typeDecl(mut self) {
-        let mut tc = typeChecker{
+        mut tc := typeChecker{
             s: self.e.s,
             rootLookup: self.e.lookup,
             lookup: self.e.lookup,
@@ -3273,7 +3273,7 @@ impl unaryEval {
         match self.u.Op.Id {
         | TokenId.Star
         | TokenId.Amper:
-            let mut prefix = self.e.prefix
+            mut prefix := self.e.prefix
             self.e.prefix = nil
             self.d = self.e.eval(self.u.Expr)
             self.e.prefix = prefix
@@ -3293,7 +3293,7 @@ impl unaryEval {
             ret self.d
         }
 
-        let kind = self.d.Kind
+        kind := self.d.Kind
         match self.u.Op.Id {
         | TokenId.Minus:
             self.minus()
@@ -3382,27 +3382,27 @@ impl binaryEval {
             ret false
         }
 
-        let mut p = overload.Params[1]
+        mut p := overload.Params[1]
         ret self.e.s.checkAssignType(p.Decl.Reference, p.Kind, self.r, self.op)
     }
 
     fn evalComptimeTypeInfo(mut self): &Data {
-        let mut r = self.r.Kind.comptimeTypeInfo()
+        mut r := self.r.Kind.comptimeTypeInfo()
         if r == nil {
             self.e.pushErr(self.op, LogMsg.IncompatibleTypes, "comptimeTypeInfo", self.r.Kind.Str())
             ret nil
         }
-        let mut l = self.l.Kind.comptimeTypeInfo()
+        mut l := self.l.Kind.comptimeTypeInfo()
         match self.op.Id {
         | TokenId.Eqs:
-            let mut constant = Const.NewBool(l.base.Equal(r.base))
+            mut constant := Const.NewBool(l.base.Equal(r.base))
             ret &Data{
                 Kind: primBool,
                 Constant: constant,
                 Model: constant,
             }
         | TokenId.NotEq:
-            let mut constant = Const.NewBool(!l.base.Equal(r.base))
+            mut constant := Const.NewBool(!l.base.Equal(r.base))
             ret &Data{
                 Kind: primBool,
                 Constant: constant,
@@ -3433,11 +3433,11 @@ impl binaryEval {
     }
 
     fn evalEnum(mut self): &Data {
-        let mut enm = self.l.Kind.Enum()
+        mut enm := self.l.Kind.Enum()
         match self.op.Id {
         | TokenId.Eqs
         | TokenId.NotEq:
-            let mut rkind = self.r.Kind
+            mut rkind := self.r.Kind
             if self.r.Kind.Enum() != nil {
                 rkind = self.r.Kind.Enum().Kind.Kind
             }
@@ -3467,7 +3467,7 @@ impl binaryEval {
                 Kind: primBool,
             }
         | TokenId.Amper:
-            let first = enm.Items[0]
+            first := enm.Items[0]
             match {
             | first.Value.Data.Constant.IsI64():
                 if first.Value.Data.Constant.ReadI64() == 0 {
@@ -3500,7 +3500,7 @@ impl binaryEval {
     }
 
     fn evalTypeEnum(mut self): &Data {
-        let mut enm = self.l.Kind.TypeEnum()
+        mut enm := self.l.Kind.TypeEnum()
         if !self.checkTypeCompatibility() {
             ret nil
         }
@@ -3699,7 +3699,7 @@ impl binaryEval {
     }
 
     fn evalStr(mut self): &Data {
-        let mut rk = self.r.Kind.Str()
+        mut rk := self.r.Kind.Str()
         if rk != PrimKind.Str {
             self.e.pushErr(self.op, LogMsg.IncompatibleTypes, PrimKind.Str, rk)
             ret nil
@@ -3724,8 +3724,8 @@ impl binaryEval {
     }
 
     fn setTypeToGreater(mut self) {
-        let lp = self.l.Kind.Prim()
-        let rp = self.r.Kind.Prim()
+        lp := self.l.Kind.Prim()
+        rp := self.r.Kind.Prim()
         if self.l.IsConst() {
             if !self.r.IsConst() {
                 self.l.Kind = self.r.Kind
@@ -3805,8 +3805,8 @@ impl binaryEval {
     }
 
     fn evalFloat(mut self): &Data {
-        let lk = self.l.Kind.Prim().Kind // Float guaranteed.
-        let rk = self.r.Kind.Prim().Kind // Primitive guaranteed.
+        lk := self.l.Kind.Prim().Kind // Float guaranteed.
+        rk := self.r.Kind.Prim().Kind // Primitive guaranteed.
         if !self.numbersAreCompatibile(lk, rk) {
             self.e.pushErr(self.op, LogMsg.IncompatibleTypes, lk, rk)
             ret nil
@@ -3869,8 +3869,8 @@ impl binaryEval {
     }
 
     fn evalInt(mut self): &Data {
-        let lk = self.l.Kind.Prim().Kind // Integer guaranteed.
-        let rk = self.r.Kind.Prim().Kind // Primitive guaranteed.
+        lk := self.l.Kind.Prim().Kind // Integer guaranteed.
+        rk := self.r.Kind.Prim().Kind // Primitive guaranteed.
 
         match self.op.Id {
         | TokenId.Lshift
@@ -3926,7 +3926,7 @@ impl binaryEval {
     }
 
     fn evalPrim(mut self): &Data {
-        let prim = self.l.Kind.Prim()
+        prim := self.l.Kind.Prim()
         match {
         | prim.IsBool():
             ret self.evalBool()
@@ -4056,12 +4056,12 @@ impl binaryEval {
             _ = self.l.Constant.Mul(*self.r.Constant)
             d.Constant = self.l.Constant
         | TokenId.Solidus:
-            let ok = self.l.Constant.Div(*self.r.Constant)
+            ok := self.l.Constant.Div(*self.r.Constant)
             if !ok && self.r.Constant.AsF64() == 0 {
                 self.e.pushErr(self.op, LogMsg.DivByZero)
             }
             d.Constant = self.l.Constant
-            let mut prim = d.Kind.Prim()
+            mut prim := d.Kind.Prim()
             match {
             | types::IsSigInt(prim.Kind):
                 d.Constant.SetI64(d.Constant.AsI64())
@@ -4069,7 +4069,7 @@ impl binaryEval {
                 d.Constant.SetU64(d.Constant.AsU64())
             }
         | TokenId.Percent:
-            let ok = self.l.Constant.Mod(*self.r.Constant)
+            ok := self.l.Constant.Mod(*self.r.Constant)
             if !ok && self.r.Constant.AsF64() == 0 {
                 self.e.pushErr(self.op, LogMsg.DivByZero)
             }
@@ -4095,7 +4095,7 @@ impl binaryEval {
     }
 
     fn checkData(mut self, mut &d: &Data) {
-        let f = d.Kind.Fn()
+        f := d.Kind.Fn()
         if f != nil && f.Decl != nil && f.Decl.IsMethod() {
             self.e.pushErr(self.op, LogMsg.InvalidExprForBinop)
         }
@@ -4115,7 +4115,7 @@ impl binaryEval {
                 ret
             }
         }
-        let (mut l, mut r) = self.l, self.r
+        mut l, mut r := self.l, self.r
         if !l.GoodOperand(r) {
             l, r = r, l
         }
@@ -4143,7 +4143,7 @@ impl binaryEval {
 
         self.checkDatas()
 
-        let mut d = self.evalOp()
+        mut d := self.evalOp()
 
         // Save normal order
         self.l, self.r = l, r
@@ -4165,22 +4165,22 @@ impl binaryEval {
             ret nil
         }
 
-        let mut l = self.e.evalExpr1(op.Left)
+        mut l := self.e.evalExpr1(op.Left)
         if l == nil || l.Kind == nil {
             ret nil
         }
 
-        let mut prefix = self.e.prefix
+        mut prefix := self.e.prefix
         self.e.prefix = l.Kind
         defer { self.e.prefix = prefix }
-        let mut r = self.e.evalExpr1(op.Right)
+        mut r := self.e.evalExpr1(op.Right)
         if r == nil || r.Kind == nil {
             ret nil
         }
 
         self.op = op.Op
 
-        let mut d = self.solveExplicit(l, r)
+        mut d := self.solveExplicit(l, r)
 
         // Save rune type.
         if d != nil && l.IsRune && r.IsRune {
@@ -4209,13 +4209,13 @@ fn findBuiltinsImport(&ident: str, imp: &ImportInfo): any {
 // that can store constant data. This function designed for numerical types only.
 // Data should be numerical constant of course.
 fn fitBitsize(mut &d: &Data) {
-    let mut prim = d.Kind.Prim()
-    let z = types::BitsizeOf(prim.Str())
+    mut prim := d.Kind.Prim()
+    z := types::BitsizeOf(prim.Str())
     if z == 1<<6 {
         // z is already equals to biggest bitsize.
         ret
     }
-    let mut k = 0
+    mut k := 0
     match {
     | d.Constant.IsI64():
         k = types::BitsizeOfInt(d.Constant.ReadI64())
@@ -4267,7 +4267,7 @@ fn buildErrorVar(mut &s: &Scope, mut &fc: &FnCallExpr): &Var {
 fn findBuiltinsSema(&ident: str, mut s: &Sema): any {
     for (_, mut imp) in s.file.Imports {
         if imp.ImportAll || imp.existIdent(ident) {
-            let mut def = findBuiltinsImport(ident, imp)
+            mut def := findBuiltinsImport(ident, imp)
             if def != nil {
                 ret def
             }
@@ -4275,7 +4275,7 @@ fn findBuiltinsSema(&ident: str, mut s: &Sema): any {
     }
 
     // If package is std, check for internal builtin defines.
-    let mut ppath = s.file.File.Dir()
+    mut ppath := s.file.File.Dir()
     if strings::HasPrefix(ppath, PathStdlib) {
         // Remove STDLIB directory path.
         ppath = ppath[len(PathStdlib):]
@@ -4302,7 +4302,7 @@ fn isOkForShifting(mut &d: &Data): bool {
             ret false
         }
     }
-    let prim = d.Kind.Prim()
+    prim := d.Kind.Prim()
     ret prim != nil && types::IsInt(prim.Str())
 }
 
@@ -4311,14 +4311,14 @@ fn isInstancedStruct(s: &StructIns): bool {
 }
 
 fn isPtrArithmeticCompatible(mut &l: &Data, mut &r: &Data): bool {
-    let ptr = r.Kind.Ptr()
+    ptr := r.Kind.Ptr()
     if ptr != nil {
         ret l.Kind.Ptr().Elem.Equal(ptr.Elem)
     }
     if r.IsConst() {
         ret intAssignable(types::TypeKind.Int, r)
     }
-    let mut tcc = typeCompatibilityChecker{
+    mut tcc := typeCompatibilityChecker{
         dest: primInt,
         src: r.Kind,
     }
@@ -4373,7 +4373,7 @@ fn applyCastModelByEnum(mut &d: &Data, mut e: &Enum) {
     if e == nil {
         ret
     }
-    let p = e.Kind.Kind.Prim()
+    p := e.Kind.Kind.Prim()
     if p.IsStr() {
         ret
     }
@@ -4428,13 +4428,13 @@ fn updateModelToGenericIns(mut &m: ExprModel, mut &f: &FnIns) {
 fn pushSubIdentFromExpr(mut expr: ExprData, mut &t: &SubIdentTypeDecl): bool {
     match type expr {
     | &IdentExpr:
-        let mut e = (&IdentExpr)(expr)
+        mut e := (&IdentExpr)(expr)
         t.Idents = append(t.Idents, &IdentTypeDecl{
             Token: e.Token,
             Ident: e.Ident,
         })
     | &SubIdentExpr:
-        let mut e = (&SubIdentExpr)(expr)
+        mut e := (&SubIdentExpr)(expr)
         if !pushSubIdentFromExpr(e.Expr.Kind, t) {
             ret false
         }
@@ -4460,7 +4460,7 @@ fn constoa(&c: &Const): str {
 }
 
 fn evalEnumStatic(mut &enm: &Enum, mut &item: &EnumItem): &Data {
-    let mut d = &Data{
+    mut d := &Data{
         Kind: &TypeKind{
             Kind: enm,
         },
@@ -4483,10 +4483,10 @@ fn isLitBased(mut &m: ExprModel): &StructLitExprModel {
     | &AllocStructLitExprModel:
         ret (&AllocStructLitExprModel)(m).Lit
     | &StructSubIdentExprModel:
-        let mut ssi = (&StructSubIdentExprModel)(m)
+        mut ssi := (&StructSubIdentExprModel)(m)
         ret isLitBased(ssi.Expr.Model)
     | &CastingExprModel:
-        let mut c = (&CastingExprModel)(m)
+        mut c := (&CastingExprModel)(m)
         ret isLitBased(c.Expr)
     |:
         ret nil
@@ -4494,7 +4494,7 @@ fn isLitBased(mut &m: ExprModel): &StructLitExprModel {
 }
 
 fn makeImplicitDeref(mut &d: &Data, mut baseToken: &Token) {
-    let mut unary = &UnaryExprModel{
+    mut unary := &UnaryExprModel{
         Expr: new(Data, *d),
         Op: new(Token, *baseToken),
     }

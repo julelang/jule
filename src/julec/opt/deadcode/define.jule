@@ -74,12 +74,12 @@ impl ObjectDeadCode {
         if rs == nil {
             ret
         }
-        let mut i = 0
+        mut i := 0
         for i < rs.Len(); i++ {
-            let mut ref = rs.At(i)
+            mut ref := rs.At(i)
             match type ref {
             | &Trait:
-                let mut t = (&Trait)(ref)
+                mut t := (&Trait)(ref)
                 if self.isLive[&Trait](t) {
                     continue
                 }
@@ -94,7 +94,7 @@ impl ObjectDeadCode {
                     }
                 }
             | &FnIns:
-                let mut f = (&FnIns)(ref)
+                mut f := (&FnIns)(ref)
                 if self.isLive[&FnIns](f) {
                     break
                 }
@@ -107,14 +107,14 @@ impl ObjectDeadCode {
                 self.pushLive[&FnIns](f)
                 self.setReferencesAsLive(f.Refers)
             | &Var:
-                let mut v = (&Var)(ref)
+                mut v := (&Var)(ref)
                 if self.isLive[&Var](v) {
                     break
                 }
                 self.pushLive[&Var](v)
                 self.setReferencesAsLive(v.Refers)
             | &StructIns:
-                let mut s = (&StructIns)(ref)
+                mut s := (&StructIns)(ref)
                 if self.isLive[&StructIns](s) {
                     break
                 }
@@ -142,7 +142,7 @@ impl ObjectDeadCode {
         for (_, mut file) in pkg.Files {
             for (_, mut f) in file.Funcs {
                 if f.Ident == build::InitFn {
-                    let mut ins = f.Instances[0]
+                    mut ins := f.Instances[0]
                     self.live.fns = append(self.live.fns, ins)
                     self.setReferencesAsLive(ins.Refers)
                 }
@@ -159,7 +159,7 @@ impl ObjectDeadCode {
             for (_, mut file) in pkg.Files {
                 for (_, mut f) in file.Funcs {
                     if hasDirective(f.Directives, Directive.Test) {
-                        let mut ins = f.Instances[0]
+                        mut ins := f.Instances[0]
                         self.live.fns = append(self.live.fns, ins)
                         self.setReferencesAsLive(ins.Refers)
                     }
@@ -177,16 +177,16 @@ impl ObjectDeadCode {
         self.collectLivePackage(self.ir.Main)
 
         // Push live references based on entry point.
-        let mut main = self.ir.Main.FindFn(build::EntryPoint, false)
-        let mut ins = main.Instances[0]
+        mut main := self.ir.Main.FindFn(build::EntryPoint, false)
+        mut ins := main.Instances[0]
         self.live.fns = append(self.live.fns, ins)
         self.setReferencesAsLive(ins.Refers)
     }
 
     fn removeDeadGlobals(mut &self, mut &vars: []&Var) {
-        let mut i = 0
+        mut i := 0
         for i < len(vars) {
-            let v = vars[i]
+            v := vars[i]
             if self.isLive[&Var](v) {
                 i++
                 continue
@@ -196,12 +196,12 @@ impl ObjectDeadCode {
     }
 
     fn removeDeadFns(mut &self, mut &funcs: []&Fn) {
-        let mut i = 0
+        mut i := 0
         for i < len(funcs) {
-            let mut f = funcs[i]
-            let mut j = 0
+            mut f := funcs[i]
+            mut j := 0
             for j < len(f.Instances) {
-                let ins = f.Instances[j]
+                ins := f.Instances[j]
                 if self.isLive[&FnIns](ins) {
                     j++
                     continue
@@ -217,12 +217,12 @@ impl ObjectDeadCode {
     }
 
     fn removeDeadStructs(mut &self, mut &structs: []&Struct) {
-        let mut i = 0
+        mut i := 0
         for i < len(structs) {
-            let mut s = structs[i]
-            let mut j = 0
+            mut s := structs[i]
+            mut j := 0
             for j < len(s.Instances) {
-                let mut ins = s.Instances[j]
+                mut ins := s.Instances[j]
                 self.removeDeadFns(ins.Methods)
                 if len(ins.Methods) != 0 || self.isLive[&StructIns](ins) {
                     j++
@@ -239,16 +239,16 @@ impl ObjectDeadCode {
     }
 
     fn removeDeadTraits(mut &self, mut &traits: []&Trait) {
-        let mut i = 0
+        mut i := 0
         for i < len(traits) {
-            let mut t = traits[i]
+            mut t := traits[i]
             if !self.isLive[&Trait](t) {
                 traits = append(traits[:i], traits[i+1:]...)
                 continue
             }
-            let mut j = 0
+            mut j := 0
             for j < len(t.Implemented) {
-                let s = t.Implemented[j]
+                s := t.Implemented[j]
                 if len(s.Instances) > 0 {
                     j++
                     continue
@@ -288,7 +288,7 @@ impl ObjectDeadCode {
 }
 
 fn EliminateDefines(mut &ir: &IR) {
-    let mut ocd = ObjectDeadCode.new(ir)
+    mut ocd := ObjectDeadCode.new(ir)
     ocd.elimanate()
 }
 

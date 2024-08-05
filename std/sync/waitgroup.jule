@@ -28,8 +28,8 @@ impl WaitGroup {
     // and unblocks any wait() calls if task count becomes zero.
     // Panics if task count reaches below zero.
     fn Add(mut self, delta: int) {
-        let oldTask = int(self.taskN.Add(u32(delta), MemoryOrder.Relaxed))
-        let nTask = oldTask + delta
+        oldTask := int(self.taskN.Add(u32(delta), MemoryOrder.Relaxed))
+        nTask := oldTask + delta
         if nTask < 0 {
             panic("std:sync: WaitGroup.Add: negative number of tasks")
         }
@@ -42,7 +42,7 @@ impl WaitGroup {
 
         // Number of tasks reaches to zero, therefore clear waiters.
         for {
-            let nWaiters = self.waitN.Load(MemoryOrder.Relaxed)
+            nWaiters := self.waitN.Load(MemoryOrder.Relaxed)
             if nWaiters == 0 {
                 ret
             }
@@ -58,7 +58,7 @@ impl WaitGroup {
 
     // Blocks until all tasks are done (task count becomes zero)
     fn Wait(mut self) {
-        let nTask = self.taskN.Load(MemoryOrder.Relaxed)
+        nTask := self.taskN.Load(MemoryOrder.Relaxed)
         if nTask == 0 {
             // No task, no need to wait.
             ret

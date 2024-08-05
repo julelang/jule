@@ -50,13 +50,13 @@ impl TcpListener {
             panic("std::net: TcpListener.Accept: connection is not open")
         }
         if self.v6 { // IPv6
-            let mut clientAddr = sys::SockaddrIn6{}
-            let clientAddrLen = addrLen(mem::SizeOf(clientAddr))
-            let handle = unsafe { sys::Accept(self.handle, (*sys::Sockaddr)(&clientAddr), &clientAddrLen) }
+            mut clientAddr := sys::SockaddrIn6{}
+            clientAddrLen := addrLen(mem::SizeOf(clientAddr))
+            handle := unsafe { sys::Accept(self.handle, (*sys::Sockaddr)(&clientAddr), &clientAddrLen) }
             if handle < 0 {
                 error(lastErrorCode())
             }
-            let mut ip = Ip{
+            mut ip := Ip{
                 Addr: make([]byte, Ipv6.Len),
             }
             unsafe {
@@ -74,13 +74,13 @@ impl TcpListener {
                 v6: true,
             }
         } else { // IPv4
-            let mut clientAddr = sys::SockaddrIn{}
-            let clientAddrLen = addrLen(mem::SizeOf(clientAddr))
-            let handle = unsafe { sys::Accept(self.handle, (*sys::Sockaddr)(&clientAddr), &clientAddrLen) }
+            mut clientAddr := sys::SockaddrIn{}
+            clientAddrLen := addrLen(mem::SizeOf(clientAddr))
+            handle := unsafe { sys::Accept(self.handle, (*sys::Sockaddr)(&clientAddr), &clientAddrLen) }
             if handle < 0 {
                 error(lastErrorCode())
             }
-            let mut ip = Ip{
+            mut ip := Ip{
                 Addr: make([]byte, Ipv4.Len),
             }
             unsafe {
@@ -125,9 +125,9 @@ impl TcpListener {
 }
 
 fn tcpBind(network: Network, &addr: str)!: &TcpListener {
-    let mut tcpAddr = TcpAddr.Resolve(network, addr) else { error(error) }
-    let mut handle = netHandle(sys::INVALID_SOCKET)
-    let mut v6 = false
+    mut tcpAddr := TcpAddr.Resolve(network, addr) else { error(error) }
+    mut handle := netHandle(sys::INVALID_SOCKET)
+    mut v6 := false
     if tcpAddr.Ip.Empty() {
         handle = sys::Socket(sys::AF_INET, sys::SOCK_STREAM, sys::IPPROTO_TCP)
         if handle < 0 {
@@ -135,7 +135,7 @@ fn tcpBind(network: Network, &addr: str)!: &TcpListener {
         }
         match network {
         | Network.Tcp | Network.Tcp4:
-            let mut sockAddr = sys::SockaddrIn{}
+            mut sockAddr := sys::SockaddrIn{}
             sockAddr.sin_family = sys::AF_INET
             sockAddr.sin_port = sys::Htons(tcpAddr.Port)
             sockAddr.sin_addr.s_addr = sys::INADDR_ANY
@@ -151,7 +151,7 @@ fn tcpBind(network: Network, &addr: str)!: &TcpListener {
             if handle < 0 {
                 error(lastErrorCode())
             }
-            let mut sockAddr = sys::SockaddrIn6{}
+            mut sockAddr := sys::SockaddrIn6{}
             sockAddr.sin6_family = sys::AF_INET6
             sockAddr.sin6_port = sys::Htons(tcpAddr.Port)
             unsafe {
@@ -164,7 +164,7 @@ fn tcpBind(network: Network, &addr: str)!: &TcpListener {
             error(AddrError.UnknownNetwork)
         }
     } else {
-        let mut ipv4 = tcpAddr.Ip.To4()
+        mut ipv4 := tcpAddr.Ip.To4()
         if ipv4.Empty() {
             if network == Network.Tcp4 {
                 error(AddrError.NoSuitable)
@@ -174,7 +174,7 @@ fn tcpBind(network: Network, &addr: str)!: &TcpListener {
             if handle < 0 {
                 error(lastErrorCode())
             }
-            let mut sockAddr = sys::SockaddrIn6{}
+            mut sockAddr := sys::SockaddrIn6{}
             sockAddr.sin6_family = sys::AF_INET6
             for i, b in tcpAddr.Ip.Addr {
                 sockAddr.sin6_addr.s6_addr[i] = b
@@ -195,7 +195,7 @@ fn tcpBind(network: Network, &addr: str)!: &TcpListener {
             if handle < 0 {
                 error(lastErrorCode())
             }
-            let mut sockAddr = sys::SockaddrIn{}
+            mut sockAddr := sys::SockaddrIn{}
             sockAddr.sin_family = sys::AF_INET
             sockAddr.sin_port = sys::Htons(tcpAddr.Port)
             sockAddr.sin_addr.s_addr = u32(beU64v4(tcpAddr.Ip.Addr))
@@ -220,9 +220,9 @@ fn tcpBind(network: Network, &addr: str)!: &TcpListener {
 }
 
 fn tcpConnect(network: Network, &addr: str, timeout: time::DurInt)!: &TcpConn {
-    let mut tcpAddr = TcpAddr.Resolve(network, addr) else { error(error) }
-    let mut handle = netHandle(sys::INVALID_SOCKET)
-    let mut v6 = false
+    mut tcpAddr := TcpAddr.Resolve(network, addr) else { error(error) }
+    mut handle := netHandle(sys::INVALID_SOCKET)
+    mut v6 := false
     if tcpAddr.Ip.Empty() {
         handle = sys::Socket(sys::AF_INET, sys::SOCK_STREAM, sys::IPPROTO_TCP)
         if handle < 0 {
@@ -230,7 +230,7 @@ fn tcpConnect(network: Network, &addr: str, timeout: time::DurInt)!: &TcpConn {
         }
         match network {
         | Network.Tcp | Network.Tcp4:
-            let mut sockAddr = sys::SockaddrIn{}
+            mut sockAddr := sys::SockaddrIn{}
             sockAddr.sin_family = sys::AF_INET
             sockAddr.sin_port = sys::Htons(tcpAddr.Port)
             sockAddr.sin_addr.s_addr = sys::INADDR_ANY
@@ -245,7 +245,7 @@ fn tcpConnect(network: Network, &addr: str, timeout: time::DurInt)!: &TcpConn {
             if handle < 0 {
                 error(lastErrorCode())
             }
-            let mut sockAddr = sys::SockaddrIn6{}
+            mut sockAddr := sys::SockaddrIn6{}
             sockAddr.sin6_family = sys::AF_INET6
             sockAddr.sin6_port = sys::Htons(tcpAddr.Port)
             unsafe {
@@ -258,7 +258,7 @@ fn tcpConnect(network: Network, &addr: str, timeout: time::DurInt)!: &TcpConn {
             error(AddrError.UnknownNetwork)
         }
     } else {
-        let mut ipv4 = tcpAddr.Ip.To4()
+        mut ipv4 := tcpAddr.Ip.To4()
         if ipv4.Empty() {
             if network == Network.Tcp4 {
                 error(AddrError.NoSuitable)
@@ -268,7 +268,7 @@ fn tcpConnect(network: Network, &addr: str, timeout: time::DurInt)!: &TcpConn {
             if handle < 0 {
                 error(lastErrorCode())
             }
-            let mut sockAddr = sys::SockaddrIn6{}
+            mut sockAddr := sys::SockaddrIn6{}
             sockAddr.sin6_family = sys::AF_INET6
             for i, b in tcpAddr.Ip.Addr {
                 sockAddr.sin6_addr.s6_addr[i] = b
@@ -289,7 +289,7 @@ fn tcpConnect(network: Network, &addr: str, timeout: time::DurInt)!: &TcpConn {
             if handle < 0 {
                 error(lastErrorCode())
             }
-            let mut sockAddr = sys::SockaddrIn{}
+            mut sockAddr := sys::SockaddrIn{}
             sockAddr.sin_family = sys::AF_INET
             sockAddr.sin_port = sys::Htons(tcpAddr.Port)
             sockAddr.sin_addr.s_addr = u32(beU64v4(tcpAddr.Ip.Addr))

@@ -14,7 +14,7 @@ enum SemaFlag {
 
 // Builds symbol table of AST.
 fn buildSymbols(mut &ast: &Ast, mut &importer: Importer, mut owner: &symbolBuilder): (&SymbolTable, []Log) {
-    let mut sb = &symbolBuilder{
+    mut sb := &symbolBuilder{
         ast: ast,
         importer: importer,
         owner: owner,
@@ -29,16 +29,16 @@ fn buildSymbols(mut &ast: &Ast, mut &importer: Importer, mut owner: &symbolBuild
 
 fn analyzePackage(mut &files: []&Ast, mut &importer: Importer, &flags: SemaFlag): (&Package, []Log) {
     // Build symbol tables of files.
-    let mut tables = make([]&SymbolTable, 0, len(files))
+    mut tables := make([]&SymbolTable, 0, len(files))
     for (_, mut f) in files {
-        let (mut table, mut errors) = buildSymbols(f, importer, nil)
+        mut table, mut errors := buildSymbols(f, importer, nil)
         if len(errors) > 0 {
             ret nil, errors
         }
         tables = append(tables, table)
     }
 
-    let mut sema = &Sema{
+    mut sema := &Sema{
         flags: flags,
         meta: new(commonSemaMeta),
     }
@@ -47,7 +47,7 @@ fn analyzePackage(mut &files: []&Ast, mut &importer: Importer, &flags: SemaFlag)
         ret nil, sema.errors
     }
 
-    let mut pkg = &Package{
+    mut pkg := &Package{
         Files: sema.files,
     }
 
@@ -75,7 +75,7 @@ fn AnalyzePackage(mut files: []&Ast, mut importer: Importer, flags: SemaFlag): (
     if len(files) == 0 {
         ret nil, nil
     }
-    let (mut package, mut logs) = analyzePackage(files, importer, flags)
+    mut package, mut logs := analyzePackage(files, importer, flags)
     ret package, logs
 }
 
@@ -98,12 +98,12 @@ fn AnalyzePackage(mut files: []&Ast, mut importer: Importer, flags: SemaFlag): (
 //     semantic analyzer used nil importer.
 fn AnalyzeFile(mut f: &Ast, mut importer: Importer, flags: SemaFlag): (&SymbolTable, []Log) {
     let mut files: [1]&Ast = [f]
-    let (mut pkg, mut errors) = AnalyzePackage(nosafe::Atobs[[1]&Ast, &Ast](files), importer, flags)
+    mut pkg, mut errors := AnalyzePackage(nosafe::Atobs[[1]&Ast, &Ast](files), importer, flags)
     if len(errors) > 0 {
         ret nil, errors
     }
     // Select first table, because package has only one file.
     // We give just one file.
-    let mut table = pkg.Files[0]
+    mut table := pkg.Files[0]
     ret table, nil
 }

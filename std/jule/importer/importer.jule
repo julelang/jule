@@ -56,7 +56,7 @@ struct JuleImporter {
 impl JuleImporter {
     // Returns new importer instance by compile information.
     static fn New(info: CompileInfo): &JuleImporter {
-        let mut imp = &JuleImporter{
+        mut imp := &JuleImporter{
             mods: [build::PathStdlib],
         }
         initVars(imp.vars, info)
@@ -94,37 +94,37 @@ impl Importer for JuleImporter {
     }
 
     fn ImportPackage(mut self, path: str, update_mod: bool): ([]&Ast, []Log) {
-        let mut dirents = Directory.Read(path) else {
+        mut dirents := Directory.Read(path) else {
             ret nil, [flatCompilerErr("connot read package directory: " + path)]
         }
 
         if update_mod {
-            let newMod = mod::FindModuleFileDeep(path)
+            newMod := mod::FindModuleFileDeep(path)
             if newMod != self.mod {
                 self.mod = newMod
-                let mut errs = mod::CheckModuleFile(self.mod)
+                mut errs := mod::CheckModuleFile(self.mod)
                 if len(errs) != 0 {
                     ret nil, errs
                 }
             }
         }
 
-        let mut asts = make([]&Ast, 0, len(dirents))
+        mut asts := make([]&Ast, 0, len(dirents))
         for _, dirent in dirents {
             // Skip directories, and non-jule files.
             if dirent.Stat.IsDir() || !strings::HasSuffix(dirent.Name, build::Ext) {
                 continue
             }
 
-            let _path = Join(path, dirent.Name)
-            let mut file = NewFileSet(_path)
+            _path := Join(path, dirent.Name)
+            mut file := NewFileSet(_path)
             file.Fill(readBuff(file.Path))
-            let mut errors = Lex(file, LexMode.Standard)
+            mut errors := Lex(file, LexMode.Standard)
             if len(errors) > 0 {
                 ret nil, errors
             }
 
-            let mut finfo = ParseFile(file)
+            mut finfo := ParseFile(file)
             if len(finfo.Errors) > 0 {
                 ret nil, finfo.Errors
             }
@@ -134,7 +134,7 @@ impl Importer for JuleImporter {
                 continue
             }
 
-            let (r, mut logs) = self.isPassBuildDirectives(finfo.Ast)
+            r, mut logs := self.isPassBuildDirectives(finfo.Ast)
             if len(logs) > 0 {
                 ret nil, logs
             }
@@ -181,11 +181,11 @@ impl JuleImporter {
             if td.Tag.Kind != Directive.Build {
                 continue
             }
-            let mut de = directiveEval{
+            mut de := directiveEval{
                 d: td,
                 vars: self.vars,
             }
-            let result = de.eval()
+            result := de.eval()
             if len(de.logs) > 0 {
                 ret false, de.logs
             }

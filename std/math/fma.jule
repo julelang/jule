@@ -64,7 +64,7 @@ fn shl(u1: u64, u2: u64, n: uint): (r1: u64, r2: u64) {
 fn shr(u1: u64, u2: u64, n: uint): (r1: u64, r2: u64) {
     r2 = u2 >> n | u1 << (64 - n)
     // Avoid overflow value of: u1>>(n-64)
-    let shift = n - 64
+    shift := n - 64
     if shift < 64 {
         r2 |= u1 >> shift
     }
@@ -112,7 +112,7 @@ fn split(b: u64): (sign: u32, exp: i32, mantissa: u64) {
 
     if exp == 0 {
         // Normalize value if subnormal.
-        let shift = uint(bits::LeadingZeros64(mantissa) - 11)
+        shift := uint(bits::LeadingZeros64(mantissa) - 11)
         mantissa <<= shift
         exp = 1 - i32(shift)
     } else {
@@ -125,7 +125,7 @@ fn split(b: u64): (sign: u32, exp: i32, mantissa: u64) {
 // Returns x * y + z, computed with only one rounding.
 // (That is, FMA returns the fused multiply-add of x, y, and z.)
 fn FMA(x: f64, y: f64, z: f64): f64 {
-    let (bx, by, bz) = F64Bits(x), F64Bits(y), F64Bits(z)
+    bx, by, bz := F64Bits(x), F64Bits(y), F64Bits(z)
 
     // inf or NaN or zero involved. At most one rounding will occur.
     if x == 0.0 || y == 0.0 || z == 0.0 || bx&uvinf == uvinf || by&uvinf == uvinf {
@@ -139,23 +139,23 @@ fn FMA(x: f64, y: f64, z: f64): f64 {
 
     // Inputs are (sub)normal.
     // Split x, y, z into sign, exponent, mantissa.
-    let (xs, xe, xm) = split(bx)
-    let (ys, ye, ym) = split(by)
-    let (mut zs, mut ze, zm) = split(bz)
+    xs, xe, xm := split(bx)
+    ys, ye, ym := split(by)
+    mut zs, mut ze, zm := split(bz)
 
     // Compute product p = x*y as sign, exponent, two-word mantissa.
     // Start with exponent. "is normal" bit isn't subtracted yet.
-    let mut pe = xe + ye - bias + 1
+    mut pe := xe + ye - bias + 1
 
     // pm1:pm2 is the double-word mantissa for the product p.
     // Shift left to leave top bit in product. Effectively
     // shifts the 106-bit product to the left by 21.
-    let (mut pm1, mut pm2) = bits::Mul64(xm << 10, ym << 11)
-    let (mut zm1, mut zm2) = zm << 10, u64(0)
-    let mut ps = xs ^ ys // product sign
+    mut pm1, mut pm2 := bits::Mul64(xm << 10, ym << 11)
+    mut zm1, mut zm2 := zm << 10, u64(0)
+    mut ps := xs ^ ys // product sign
 
     // normalize to 62nd bit
-    let is62zero = uint((^pm1 >> 62) & 1)
+    is62zero := uint((^pm1 >> 62) & 1)
     pm1, pm2 = shl(pm1, pm2, is62zero)
     pe -= i32(is62zero)
 
@@ -168,8 +168,8 @@ fn FMA(x: f64, y: f64, z: f64): f64 {
     zm1, zm2 = shrcompress(zm1, zm2, uint(pe - ze))
 
     // Compute resulting significands, normalizing if necessary.
-    let mut m: u64 = 0
-    let mut c: u64 = 0
+    mut m := u64(0)
+    mut c := u64(0)
     if ps == zs {
         // Adding (pm1:pm2) + (zm1:zm2)
         pm2, c = bits::Add64(pm2, zm2, 0)
@@ -180,7 +180,7 @@ fn FMA(x: f64, y: f64, z: f64): f64 {
         // Subtracting (pm1:pm2) - (zm1:zm2)
         pm2, c = bits::Sub64(pm2, zm2, 0)
         pm1, _ = bits::Sub64(pm1, zm1, c)
-        let nz = lz(pm1, pm2)
+        nz := lz(pm1, pm2)
         pe -= nz
         m, pm2 = shl(pm1, pm2, uint(nz - 1))
         m |= nonzero(pm2)
@@ -192,7 +192,7 @@ fn FMA(x: f64, y: f64, z: f64): f64 {
         ret F64FromBits(u64(ps) << 63 | uvinf)
     }
     if pe < 0 {
-        let n = uint(-pe)
+        n := uint(-pe)
         m = m >> n | nonzero(m & (1 << n - 1))
         pe = 0
     }

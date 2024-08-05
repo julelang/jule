@@ -62,7 +62,7 @@ impl typeCoder {
     const Uintptr = "jule::Uintptr"
 
     static fn new(mut &oc: &ObjectCoder): &typeCoder {
-        let mut tc = &typeCoder{oc: oc}
+        mut tc := &typeCoder{oc: oc}
         tc.rc = resultCoder.new(tc)
         ret tc
     }
@@ -72,7 +72,7 @@ impl typeCoder {
         if id != types::TypeKind.Uintptr {
             id = types::RealKindOf(id)
         }
-        let mut obj = StrBuilder.New(1 << 5)
+        mut obj := StrBuilder.New(1 << 5)
         obj.WriteStr("jule::")
         if 97 <= id[0] && id[0] <= 122 {
             obj.WriteByte(id[0] - 32) // To upper first byte.
@@ -90,7 +90,7 @@ impl typeCoder {
 
     // Generates C++ code of Tupe TypeKind.
     fn tuple(mut self, mut t: &Tuple): str {
-        let mut obj = StrBuilder.New(1 << 5)
+        mut obj := StrBuilder.New(1 << 5)
         obj.WriteStr("std::tuple<")
         for (i, mut tk) in t.Types {
             obj.WriteStr(self.kind(tk))
@@ -104,7 +104,7 @@ impl typeCoder {
 
     // Returns C++ code of smart pointer type with element type.
     fn asSptr(mut self, elem: str): str {
-        let mut obj = StrBuilder.New(len(typeCoder.Ptr + "<>") + len(elem))
+        mut obj := StrBuilder.New(len(typeCoder.Ptr + "<>") + len(elem))
         obj.WriteStr(typeCoder.Ptr + "<")
         obj.WriteStr(elem)
         obj.WriteByte('>')
@@ -136,7 +136,7 @@ impl typeCoder {
     }
 
     fn asSlice(mut self, mut elem: &TypeKind): str {
-        let mut obj = StrBuilder.New(len(typeCoder.Slice + "<>") + (1 << 5))
+        mut obj := StrBuilder.New(len(typeCoder.Slice + "<>") + (1 << 5))
         obj.WriteStr(typeCoder.Slice + "<")
         obj.WriteStr(self.kind(elem))
         obj.WriteByte('>')
@@ -150,7 +150,7 @@ impl typeCoder {
 
     // Generates C++ code of Map TypeKind.
     fn mapType(mut self, mut m: &Map): str {
-        let mut obj = StrBuilder.New(len(typeCoder.Map + "<>") + (1 << 5))
+        mut obj := StrBuilder.New(len(typeCoder.Map + "<>") + (1 << 5))
         obj.WriteStr(typeCoder.Map + "<")
         obj.WriteStr(self.kind(m.Key))
         obj.WriteByte(',')
@@ -160,7 +160,7 @@ impl typeCoder {
     }
 
     fn traitIdent(mut self, ident: str): str {
-        let mut obj = StrBuilder.New(len(typeCoder.Trait + "<>") + len(ident))
+        mut obj := StrBuilder.New(len(typeCoder.Trait + "<>") + len(ident))
         obj.WriteStr(typeCoder.Trait + "<")
         obj.WriteStr(ident)
         obj.WriteByte('>')
@@ -174,7 +174,7 @@ impl typeCoder {
 
     // Generates C++ code of Struct TypeKind.
     fn structure(mut self, s: &Struct): str {
-        let mut rep = StrBuilder.New(1 << 5)
+        mut rep := StrBuilder.New(1 << 5)
         if s.Binded && !hasDirective(s.Directives, Directive.Typedef) {
             rep.WriteStr("struct ")
         }
@@ -185,7 +185,7 @@ impl typeCoder {
     // Generates C++ code of Struct instance TypeKind.
     fn structureIns(mut self, mut s: &StructIns): str {
         if s.Decl.Binded {
-            let mut ident = StrBuilder.New(1 << 5)
+            mut ident := StrBuilder.New(1 << 5)
             ident.WriteStr(identCoder.structureIns(s))
             if len(s.Generics) > 0 {
                 ident.WriteByte('<')
@@ -197,9 +197,9 @@ impl typeCoder {
                 }
                 ident.WriteByte('>')
             }
-            let d = findDirective(s.Decl.Directives, Directive.Namespace)
+            d := findDirective(s.Decl.Directives, Directive.Namespace)
             if d != nil {
-                let mut buf = ident.Str()
+                mut buf := ident.Str()
                 ident.Clear()
                 ident.WriteStr(concatAllParts(d.Args...))
                 ident.WriteStr("::")
@@ -212,7 +212,7 @@ impl typeCoder {
 
     // Generates C++ code of Arr TypeKind.
     fn array(mut self, mut a: &Arr): str {
-        let mut obj = StrBuilder.New(len(typeCoder.Array + "<>") + (1 << 5))
+        mut obj := StrBuilder.New(len(typeCoder.Array + "<>") + (1 << 5))
         obj.WriteStr(typeCoder.Array + "<")
         obj.WriteStr(self.kind(a.Elem))
         obj.WriteByte(',')
@@ -223,7 +223,7 @@ impl typeCoder {
 
     // Generates C++ prototype code of parameter.
     fn param(mut self, mut &p: &Param): str {
-        let mut obj = StrBuilder.New(1 << 5)
+        mut obj := StrBuilder.New(1 << 5)
         if p.Variadic {
             obj.WriteStr(typeCoder.Slice + "<")
             obj.WriteStr(self.kind(p.Kind.Kind))
@@ -239,7 +239,7 @@ impl typeCoder {
 
     // Generates C++ prototype code of parameter instance.
     fn paramIns(mut self, mut &p: &ParamIns): str {
-        let mut obj = StrBuilder.New(1 << 5)
+        mut obj := StrBuilder.New(1 << 5)
         if p.Decl.Variadic {
             obj.WriteStr(typeCoder.Slice + "<")
             obj.WriteStr(self.kind(p.Kind))
@@ -290,7 +290,7 @@ impl typeCoder {
         if f.Result != nil && f.Result.Tup() != nil {
             self.oc.pushResultIns(f)
         }
-        let mut decl = StrBuilder.New(20)
+        mut decl := StrBuilder.New(20)
         self.funcInsResult(decl, f)
         decl.WriteByte('(')
         if len(f.Params) > 0 {
@@ -312,7 +312,7 @@ impl typeCoder {
 
     // Generates C++ code of Fn TypeKind.
     fn func(mut self, mut f: &FnIns): str {
-        let mut obj = StrBuilder.New(len(typeCoder.Fn + "<>") + (1 << 5))
+        mut obj := StrBuilder.New(len(typeCoder.Fn + "<>") + (1 << 5))
         obj.WriteStr(typeCoder.Fn + "<")
         obj.WriteStr(self.anonFunc(f))
         obj.WriteByte('>')
@@ -440,16 +440,16 @@ impl resultCoder {
         | &FnIns:
             self.func(s, (&FnIns)(t.Kind))
         | &Enum:
-            let te = (&Enum)(t.Kind)
+            te := (&Enum)(t.Kind)
             s.WriteStr(identCoder.toOut(te.Ident, uintptr(te)))
         | &TypeEnum:
-            let te = (&TypeEnum)(t.Kind)
+            te := (&TypeEnum)(t.Kind)
             s.WriteStr(identCoder.toOut(te.Ident, uintptr(te)))
         | &StructIns:
-            let mut si = (&StructIns)(t.Kind)
+            mut si := (&StructIns)(t.Kind)
             s.WriteStr(identCoder.structureIns(si))
         | &Trait:
-            let mut trt = (&Trait)(t.Kind)
+            mut trt := (&Trait)(t.Kind)
             s.WriteStr(identCoder.traitDecl(trt))
         | &Prim:
             s.WriteStr((&Prim)(t.Kind).Kind)
@@ -461,7 +461,7 @@ impl resultCoder {
     }
 
     fn codeMut1(mut self, mut &s: StrBuilder, mut &t: &TypeKind) {
-        let mut tup = t.Tup()
+        mut tup := t.Tup()
         if tup != nil {
             self.tup(s, tup)
         } else {
@@ -470,7 +470,7 @@ impl resultCoder {
     }
 
     fn code(mut self, mut &t: &TypeKind): str {
-        let mut s = StrBuilder.New(20)
+        mut s := StrBuilder.New(20)
         self.codeMut(s, t)
         ret s.Str()
     }
@@ -495,7 +495,7 @@ fn hasDirective(&directives: []&ast::Directive, tag: str): bool {
 // If the type API implemented structure of something like that, initialization is redundant.
 // Let the constructor do it's job.
 fn shouldInitialized(mut &t: &TypeKind): bool {
-    let prim = t.Prim()
+    prim := t.Prim()
     if prim != nil {
         ret !prim.IsAny() && !prim.IsStr()
     }
@@ -511,7 +511,7 @@ fn shouldInitialized(mut &t: &TypeKind): bool {
     | t.Fn() != nil:
         ret false
     | t.Arr() != nil:
-        let mut arr = t.Arr()
+        mut arr := t.Arr()
         ret shouldInitialized(arr.Elem)
     | t.Struct() != nil:
         ret false
