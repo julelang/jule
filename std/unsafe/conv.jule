@@ -58,8 +58,10 @@ fn BytesStr(b: []byte): str {
 fn StrFromBytes(b: []byte): str {
     s := BytesStr(b)
     unsafe {
-        integ::Emit("{}.buffer.ref = {}.data.ref", s, b)
-        integ::Emit("{}.buffer.add_ref()", s)
+        if integ::Emit[bool]("{}.data.ref != {}", b, nil) {
+            integ::Emit("{}.buffer.ref = {}.data.ref", s, b)
+            integ::Emit("{}.buffer.add_ref()", s)
+        }
     }
     ret s
 }
@@ -68,8 +70,10 @@ fn StrFromBytes(b: []byte): str {
 fn BytesFromStr(s: str): []byte {
     mut b := StrBytes(s)
     unsafe {
-        integ::Emit("{}.data.ref = {}.buffer.ref", b, s)
-        integ::Emit("{}.data.add_ref()", b)
+        if integ::Emit[bool]("{}.buffer.ref != {}", s, nil) {
+            integ::Emit("{}.data.ref = {}.buffer.ref", b, s)
+            integ::Emit("{}.data.add_ref()", b)
+        }
     }
     ret b
 }
