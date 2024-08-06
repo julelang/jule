@@ -35,10 +35,10 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // ====================================================
 
+use std::unsafe
 use io for std::io
 use bytes for std::bytes
 use unicode for std::unicode
-use nosafe for std::internal::nosafe
 use utf8 for std::unicode::utf8
 
 // A Writer writes records using CSV encoding.
@@ -99,7 +99,7 @@ impl Writer {
                 }
             }
         } else if bytes::ContainsRune(field, self.Comma) ||
-            bytes::ContainsAny(field, []byte("\"\r\n")) {
+            bytes::ContainsAny(field, unsafe::StrBytes("\"\r\n")) {
             ret true
         }
         r1, _ := utf8::DecodeRune(field)
@@ -121,7 +121,7 @@ impl Writer {
             }
 
             // Use fb instead of field to avoid copying.
-            mut fb := nosafe::Stobs(field)
+            mut fb := unsafe::StrBytes(field)
 
             // If we don't have to have a quoted field then just
             // write out the field and continue to the next field.
@@ -134,7 +134,7 @@ impl Writer {
 
             for len(fb) > 0 {
                 // Search for special characters.
-                mut i := bytes::FindAny(fb, []byte("\"\r\n"))
+                mut i := bytes::FindAny(fb, unsafe::StrBytes("\"\r\n"))
                 if i < 0 {
                     i = len(fb)
                 }
@@ -147,28 +147,28 @@ impl Writer {
                 if len(fb) > 0 {
                     match fb[0] {
                     | '"':
-                        self.w.Write([]byte(`""`)) else { error(error) }
+                        self.w.Write(unsafe::StrBytes(`""`)) else { error(error) }
                     | '\r':
                         if !self.UseCrlf {
                             self.w.Write(['\r']) else { error(error) }
                         }
                     | '\n':
                         if self.UseCrlf {
-                            self.w.Write([]byte("\r\n")) else { error(error) }
+                            self.w.Write(unsafe::StrBytes("\r\n")) else { error(error) }
                         } else {
-                            self.w.Write(['\n']) else { error(error) }
+                            self.w.Write(unsafe::StrBytes("\n")) else { error(error) }
                         }
                     }
                     fb = fb[1:]
                 }
             }
 
-            self.w.Write(['"']) else { error(error) }
+            self.w.Write(unsafe::StrBytes("\"")) else { error(error) }
         }
         if self.UseCrlf {
-            self.w.Write([]byte("\r\n")) else { error(error) }
+            self.w.Write(unsafe::StrBytes("\r\n")) else { error(error) }
         } else {
-            self.w.Write(['\n']) else { error(error) }
+            self.w.Write(unsafe::StrBytes("\n")) else { error(error) }
         }
     }
 
