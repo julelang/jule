@@ -3,6 +3,7 @@
 // license that can be found in the LICENSE file.
 
 use env
+use std::unsafe
 use conv for std::conv
 use std::jule::build::{EntryPoint, Directive}
 use std::jule::lex::{TokenKind, IsAnonIdent, IsIgnoreIdent}
@@ -53,24 +54,30 @@ impl identCoder {
         }
     }
 
+    // Same as [toOut], but takes external buffer.
+    static fn toOutBuf(mut &buf: StrBuilder, ident: str, addr: uintptr) {
+        buf.WriteByte('_')
+        if addr != 0 {
+            buf.WriteStr(conv::FmtUint(u64(addr), 0xF))
+            buf.WriteByte('_')
+        }
+        identCoder.writeIdentTo(buf, ident)
+    }
+
     // Returns cpp output identifier form of given identifier.
     //
     // Parameters:
     //   - ident: Identifier.
     //   - addr:  Pointer address of package file handler.
-    static fn toOut(&ident: str, addr: uintptr): str {
+    static fn toOut(ident: str, addr: uintptr): []byte {
         if addr != 0 {
             mut obj := StrBuilder.New(40)
-            obj.WriteByte('_')
-            obj.WriteStr(conv::FmtUint(u64(addr), 0xF))
-            obj.WriteByte('_')
-            identCoder.writeIdentTo(obj, ident)
-            ret obj.Str()
+            identCoder.toOutBuf(obj, ident, addr)
+            ret unsafe { obj.Buf() }
         }
         mut obj := StrBuilder.New(len(ident) + 1)
-        obj.WriteByte('_')
-        identCoder.writeIdentTo(obj, ident)
-        ret obj.Str()
+        identCoder.toOutBuf(obj, ident, 0)
+        ret unsafe { obj.Buf() }
     }
 
     // Returns cpp output local identifier form of fiven identifier.
@@ -79,41 +86,42 @@ impl identCoder {
     //   - row:   Row of definition.
     //   - col:   Column of definition.
     //   - ident: Identifier of definition.
-    static fn toLocal(row: int, col: int, &ident: str): str {
+    static fn toLocal(row: int, col: int, &ident: str): []byte {
         mut obj := StrBuilder.New(40)
         obj.WriteByte('_')
         obj.WriteStr(conv::Itoa(row))
         obj.WriteStr(conv::Itoa(col))
         obj.WriteByte('_')
         identCoder.writeIdentTo(obj, ident)
-        ret obj.Str()
+        ret unsafe { obj.Buf() }
     }
 
     // Returns output identifier of function.
-    static fn func(&f: &Fn): str {
+    static fn func(&f: &Fn): []byte {
         match {
         | f.Binded:
-            ret f.Ident
+            ret unsafe::BytesFromStr(f.Ident)
         | f.Ident == EntryPoint:
-            ret "entry_point"
+            ret unsafe::BytesFromStr("entry_point")
         | f.IsMethod():
-            mut obj := identCoder.toOut(f.Ident, uintptr(f))
-            if f.Statically {
-                obj = "static_" + obj
-                ret obj
+            if !f.Statically {
+                ret identCoder.toOut(f.Ident, uintptr(f))
             }
-            ret obj
+            mut obj := StrBuilder.New(40 + len("static_"))
+            obj.WriteStr("static_")
+            identCoder.toOutBuf(obj, f.Ident, uintptr(f))
+            ret unsafe { obj.Buf() }
         |:
             ret identCoder.toOut(f.Ident, uintptr(f))
         }
     }
 
     // Returns output identifier of function instance.
-    static fn funcIns(&f: &FnIns): str {
+    static fn funcIns(&f: &FnIns): []byte {
         if f.IsBuiltin() {
             // Do not use [identCoder.writeIdentTo] for this.
             // Built-in functions are always ASCII.
-            ret "jule::" + f.Decl.Ident
+            ret unsafe::BytesFromStr("jule::" + f.Decl.Ident)
         }
         if f.Decl.Binded || len(f.Generics) == 0 {
             ret identCoder.func(f.Decl)
@@ -122,17 +130,17 @@ impl identCoder {
     }
 
     // Returns output identifier of trait.
-    static fn traitDecl(t: &Trait): str {
+    static fn traitDecl(t: &Trait): []byte {
         ret identCoder.toOut(t.Ident, uintptr(t))
     }
 
     // Returns output identifier of parameter.
-    static fn param(&p: &Param): str {
+    static fn param(&p: &Param): []byte {
         if IsAnonIdent(p.Ident) || IsIgnoreIdent(p.Ident) {
-            ret ""
+            ret nil
         }
         if p.IsSelf() {
-            ret identCoder.Self
+            ret unsafe::BytesFromStr(identCoder.Self)
         }
         if p.Token == nil {
             ret identCoder.toLocal(0, 0, p.Ident)
@@ -141,18 +149,18 @@ impl identCoder {
     }
 
     // Returns output identifier of structure.
-    static fn structure(&s: &Struct): str {
+    static fn structure(&s: &Struct): []byte {
         if s.Binded {
             if hasDirective(s.Directives, Directive.Typedef) {
-                ret s.Ident
+                ret unsafe::BytesFromStr(s.Ident)
             }
-            ret "struct " + s.Ident
+            ret unsafe::BytesFromStr("struct " + s.Ident)
         }
         ret identCoder.toOut(s.Ident, uintptr(s))
     }
 
     // Returns output identifier of structure instance.
-    static fn structureIns(&s: &StructIns): str {
+    static fn structureIns(&s: &StructIns): []byte {
         if s.Decl.Binded || len(s.Generics) == 0 {
             ret identCoder.structure(s.Decl)
         }
@@ -160,31 +168,31 @@ impl identCoder {
     }
 
     // Returns output identifier of field.
-    static fn field(&f: &Field): str {
+    static fn field(&f: &Field): []byte {
         if f.Owner.Binded {
-            ret f.Ident
+            ret unsafe::BytesFromStr(f.Ident)
         }
         mut obj := StrBuilder.New(7 + len(f.Ident))
         obj.WriteStr("_field_")
         identCoder.writeIdentTo(obj, f.Ident)
-        ret obj.Str()
+        ret unsafe { obj.Buf() }
     }
 
     // Returns output identifier of variable.
-    static fn var(mut v: &Var): str {
+    static fn var(mut v: &Var): []byte {
         match {
         | v.Binded:
-            ret v.Ident
+            ret unsafe::BytesFromStr(v.Ident)
         | v.Ident == TokenKind.Error:
-            ret "except.error"
+            ret unsafe::BytesFromStr("except.error")
         | v.Ident == TokenKind.Self:
-            ret identCoder.Self
+            ret unsafe::BytesFromStr(identCoder.Self)
         | v.RetOrder == -1:
             // The single return variable is just this one.
             // Return directly [resultName] because of generated with this identifier.
-            ret resultName
+            ret unsafe::BytesFromStr(resultName)
         | v.RetOrder >= 0:
-            ret resultName + "." + resultArgName + conv::Itoa(v.RetOrder)
+            ret unsafe::BytesFromStr(resultName + "." + resultArgName + conv::Itoa(v.RetOrder))
         | v.Scope != nil:
             ret identCoder.toLocal(v.Token.Row, v.Token.Column, v.Ident)
         |:
@@ -193,50 +201,50 @@ impl identCoder {
     }
 
     // Returns begin label identifier of iteration.
-    static fn iterBegin(it: uintptr): str {
+    static fn iterBegin(it: uintptr): []byte {
         mut obj := StrBuilder.New(30)
         obj.WriteStr("_iter_begin_")
         obj.WriteStr(conv::FmtUint(u64(it), 0xF))
-        ret obj.Str()
+        ret unsafe { obj.Buf() }
     }
 
     // Returns end label identifier of iteration.
-    static fn iterEnd(it: uintptr): str {
+    static fn iterEnd(it: uintptr): []byte {
         mut obj := StrBuilder.New(30)
         obj.WriteStr("_iter_end_")
         obj.WriteStr(conv::FmtUint(u64(it), 0xF))
-        ret obj.Str()
+        ret unsafe { obj.Buf() }
     }
 
     // Returns next label identifier of iteration.
-    static fn iterNext(it: uintptr): str {
+    static fn iterNext(it: uintptr): []byte {
         mut obj := StrBuilder.New(30)
         obj.WriteStr("_iter_next_")
         obj.WriteStr(conv::FmtUint(u64(it), 0xF))
-        ret obj.Str()
+        ret unsafe { obj.Buf() }
     }
 
     // Returns label identifier.
-    static fn label(u: uintptr): str {
+    static fn label(u: uintptr): []byte {
         mut obj := StrBuilder.New(30)
         obj.WriteStr("_julec_label_")
         obj.WriteStr(conv::FmtUint(u64(u), 0xF))
-        ret obj.Str()
+        ret unsafe { obj.Buf() }
     }
 
     // Returns end label identifier of match-case.
-    static fn matchEnd(m: uintptr): str {
+    static fn matchEnd(m: uintptr): []byte {
         mut obj := StrBuilder.New(30)
         obj.WriteStr("_match_end_")
         obj.WriteStr(conv::FmtUint(u64(m), 0xF))
-        ret obj.Str()
+        ret unsafe { obj.Buf() }
     }
 
     // Returns begin label identifier of case.
-    static fn caseBegin(c: uintptr): str {
+    static fn caseBegin(c: uintptr): []byte {
         mut obj := StrBuilder.New(30)
         obj.WriteStr("_case_begin_")
         obj.WriteStr(conv::FmtUint(u64(c), 0xF))
-        ret obj.Str()
+        ret unsafe { obj.Buf() }
     }
 }

@@ -5,6 +5,7 @@
 use env
 use opt
 use obj::{IR}
+use std::unsafe
 use conv for std::conv
 use comptime for std::comptime
 use jule for std::jule
@@ -105,6 +106,10 @@ impl ObjectCoder {
         self.Obj.WriteStr(s)
     }
 
+    fn writeBytes(mut &self, b: []byte) {
+        self.Obj.Write(b)
+    }
+
     // Increase indentation.
     fn addIndent(mut &self) {
         self.indentBuffer = append(self.indentBuffer, indentKind)
@@ -141,14 +146,14 @@ impl ObjectCoder {
         self.anyTypeMap = append(self.anyTypeMap, t)
         si := conv::Itoa(i)
         if t.Sptr() != nil {
-            elem_kind := self.tc.kind(t.Sptr().Elem)
-            kind := self.tc.asSptr(elem_kind)
+            elemKind := self.tc.kind(t.Sptr().Elem)
+            kind := self.tc.asSptr(elemKind)
 
             // dealloc function.
             self.anyObj.WriteStr("void " + anyTypeIdent)
             self.anyObj.WriteStr(si)
             self.anyObj.WriteStr("_dealloc(jule::Ptr<jule::Uintptr> &alloc) noexcept { alloc.__as<")
-            self.anyObj.WriteStr(elem_kind)
+            self.anyObj.Write(elemKind)
             self.anyObj.WriteStr(">().dealloc(); }\n")
 
             // Type structure.
@@ -163,14 +168,14 @@ impl ObjectCoder {
             self.anyObj.WriteStr(typeCoder.Bool + " " + anyTypeIdent)
             self.anyObj.WriteStr(si)
             self.anyObj.WriteStr("_compare(const " + typeCoder.Any + " &any, const ")
-            self.anyObj.WriteStr(kind)
+            self.anyObj.Write(kind)
             self.anyObj.WriteStr(" &other) { return any.type == &" + anyTypeIdent)
             self.anyObj.WriteStr(si)
             self.anyObj.WriteStr(" && jule::ptr_equal(any.data.alloc, other.alloc); }\n")
         } else {
             comparable := t.Comparable()
             kind := self.tc.kind(t)
-            if kind == "[<unimplemented_type_kind>]" {
+            if unsafe::BytesStr(kind) == "[<unimplemented_type_kind>]" {
                 outln(t.Str())
             }
 
@@ -178,7 +183,7 @@ impl ObjectCoder {
             self.anyObj.WriteStr("void " + anyTypeIdent)
             self.anyObj.WriteStr(si)
             self.anyObj.WriteStr("_dealloc(jule::Ptr<jule::Uintptr> &alloc) noexcept { alloc.__as<")
-            self.anyObj.WriteStr(kind)
+            self.anyObj.Write(kind)
             self.anyObj.WriteStr(">().dealloc(); }\n")
 
             if comparable {
@@ -186,9 +191,9 @@ impl ObjectCoder {
                 self.anyObj.WriteStr(typeCoder.Bool + " " + anyTypeIdent)
                 self.anyObj.WriteStr(si)
                 self.anyObj.WriteStr("_eq(void *alloc, void *other) noexcept { return *reinterpret_cast<")
-                self.anyObj.WriteStr(kind)
+                self.anyObj.Write(kind)
                 self.anyObj.WriteStr("*>(alloc) == *reinterpret_cast<")
-                self.anyObj.WriteStr(kind)
+                self.anyObj.Write(kind)
                 self.anyObj.WriteStr("*>(other); }\n")
             }
 
@@ -198,9 +203,9 @@ impl ObjectCoder {
             self.anyObj.WriteStr("_to_str(const void *alloc) noexcept { return jule::to_str(*reinterpret_cast<")
             if t.Ptr() == nil {
                 self.anyObj.WriteStr("const ")
-                self.anyObj.WriteStr(kind)
+                self.anyObj.Write(kind)
             } else {
-                self.anyObj.WriteStr(kind)
+                self.anyObj.Write(kind)
                 self.anyObj.WriteStr("* const")
             }
             self.anyObj.WriteStr("*>(alloc)); }\n")
@@ -226,7 +231,7 @@ impl ObjectCoder {
                 self.anyObj.WriteStr(typeCoder.Bool + " " + anyTypeIdent)
                 self.anyObj.WriteStr(si)
                 self.anyObj.WriteStr("_compare(const " + typeCoder.Any + " &any, const ")
-                self.anyObj.WriteStr(kind)
+                self.anyObj.Write(kind)
                 self.anyObj.WriteStr(" &other) { return any.type == &" + anyTypeIdent)
                 self.anyObj.WriteStr(si)
                 self.anyObj.WriteStr(" && " + anyTypeIdent)
@@ -238,7 +243,7 @@ impl ObjectCoder {
     }
 
     fn pushResultIns(mut &self, mut &f: &FnIns) {
-        s := self.tc.rc.code(f.Result)
+        s := str(self.tc.rc.code(f.Result))
         _, ok := self.resultMap[s]
         if ok {
             ret
@@ -249,7 +254,7 @@ impl ObjectCoder {
         self.resultDecls.WriteStr(" {\n")
         for (i, mut t) in f.Result.Tup().Types {
             self.resultDecls.WriteByte(indentKind)
-            self.resultDecls.WriteStr(self.tc.kind(t))
+            self.resultDecls.Write(self.tc.kind(t))
             self.resultDecls.WriteByte(' ')
             self.resultDecls.WriteStr(resultArgName)
             self.resultDecls.WriteStr(conv::Itoa(i))
@@ -439,13 +444,13 @@ impl ObjectCoder {
                     if !p.Decl.IsRef() {
                         p.Kind = &TypeKind{
                             Kind: &customType{
-                                kind: self.tc.kind(p.Kind) + "*",
+                                kind: str(self.tc.kind(p.Kind)) + "*",
                             },
                         }
                     } else {
                         p.Kind = &TypeKind{
                             Kind: &customType{
-                                kind: self.tc.kind(p.Kind),
+                                kind: str(self.tc.kind(p.Kind)),
                             },
                         }
                     }
@@ -522,7 +527,7 @@ impl ObjectCoder {
                     }
                     self.indent()
                     self.write("struct ")
-                    self.write(identCoder.traitDecl(t))
+                    self.writeBytes(identCoder.traitDecl(t))
                     self.write("{};\n")
                 }
             })
@@ -532,7 +537,7 @@ impl ObjectCoder {
     fn structurePlainDecl(mut &self, mut &s: &Struct) {
         for (_, mut ins) in s.Instances {
             self.write("struct ")
-            self.write(identCoder.structureIns(ins))
+            self.writeBytes(identCoder.structureIns(ins))
             self.write(";\n")
         }
     }
@@ -546,9 +551,9 @@ impl ObjectCoder {
     }
 
     fn fieldDecl(mut &self, mut &f: &FieldIns) {
-        self.write(self.tc.kind(f.Kind))
+        self.writeBytes(self.tc.kind(f.Kind))
         self.write(" ")
-        self.write(identCoder.field(f.Decl))
+        self.writeBytes(identCoder.field(f.Decl))
         if f.Default == nil {
             if shouldInitialized(f.Kind) {
                 self.write(" = ")
@@ -573,13 +578,13 @@ impl ObjectCoder {
             ret
         }
         self.write("~")
-        self.write(identCoder.structureIns(s))
+        self.writeBytes(identCoder.structureIns(s))
         self.write("(void) { ")
-        self.write(identCoder.func(disposeMethod))
+        self.writeBytes(identCoder.func(disposeMethod))
         self.write("(this); }")
     }
 
-    fn structureOperatorEq(mut &self, &ident: str, mut &s: &StructIns) {
+    fn structureOperatorEq(mut &self, ident: []byte, mut &s: &StructIns) {
         if !s.Comparable {
             ret
         }
@@ -594,7 +599,7 @@ impl ObjectCoder {
             self.write("inline ")
         }
         self.write("bool operator==(")
-        self.write(ident)
+        self.writeBytes(ident)
         self.write(" _other) {")
         if len(s.Fields) > 0 {
             self.addIndent()
@@ -617,9 +622,9 @@ impl ObjectCoder {
                 self.indent()
                 self.write("this->")
                 fIdent := identCoder.field(f.Decl)
-                self.write(fIdent)
+                self.writeBytes(fIdent)
                 self.write(" == _other.")
-                self.write(fIdent)
+                self.writeBytes(fIdent)
             }
             self.doneIndent()
             if !writed {
@@ -635,7 +640,7 @@ impl ObjectCoder {
         self.write("\n\n")
     }
 
-    fn structureOperatorNotEq(mut &self, &ident: str, mut &s: &StructIns) {
+    fn structureOperatorNotEq(mut &self, ident: []byte, mut &s: &StructIns) {
         if !s.Comparable {
             ret
         }
@@ -644,12 +649,12 @@ impl ObjectCoder {
             self.write("inline ")
         }
         self.write("bool operator!=(")
-        self.write(ident)
+        self.writeBytes(ident)
         self.write(" _other) { return !this->operator==(_other); }\n\n")
     }
 
     // Write operator overloading forwarding for reserved function.
-    fn structureOperator(mut &self, &ident: str, mut &f: &FnIns, op: str) {
+    fn structureOperator(mut &self, ident: []byte, mut &f: &FnIns, op: str) {
         if f == nil {
             ret
         }
@@ -662,12 +667,12 @@ impl ObjectCoder {
             self.write("inline ")
         }
         if assignment {
-            self.write(ident)
+            self.writeBytes(ident)
             self.write("&")
         } else {
             if f.Result.Prim() == nil {
                 // If result type is not primitive, always structure's itself.
-                self.write(ident)
+                self.writeBytes(ident)
             } else {
                 // Logical.
                 self.write(typeCoder.Bool)
@@ -678,14 +683,14 @@ impl ObjectCoder {
         self.write("(")
         if !unary {
             mut p := f.Params[1]
-            self.write(self.tc.paramIns(p))
+            self.writeBytes(self.tc.paramIns(p))
             self.write(" _other")
         }
         self.write(") { ")
         if !assignment {
             self.write("return ")
         }
-        self.write(identCoder.funcIns(f))
+        self.writeBytes(identCoder.funcIns(f))
         if !unary {
             self.write("(this, _other); ")
             if assignment {
@@ -745,9 +750,7 @@ impl ObjectCoder {
             }
         }
         self.write("struct ")
-        outIdent := identCoder.structureIns(s)
-
-        self.write(outIdent)
+        self.writeBytes(identCoder.structureIns(s))
         self.write(" {\n")
 
         self.addIndent()
@@ -808,7 +811,7 @@ impl ObjectCoder {
 
         self.write("(")
         for (i, mut p) in params {
-            self.write(self.tc.paramIns(p))
+            self.writeBytes(self.tc.paramIns(p))
             if len(params)-i > 1 {
                 self.write(", ")
             }
@@ -824,11 +827,11 @@ impl ObjectCoder {
         self.tc.funcInsResult(self.Obj, f)
         if ptr {
             self.write("(*")
-            self.write(identCoder.funcIns(f))
+            self.writeBytes(identCoder.funcIns(f))
             self.write(")")
         } else {
             self.write(" ")
-            self.write(identCoder.funcIns(f))
+            self.writeBytes(identCoder.funcIns(f))
         }
     }
 
@@ -913,7 +916,7 @@ impl ObjectCoder {
                         continue
                     }
                     self.write("struct ")
-                    self.write(identCoder.traitDecl(t))
+                    self.writeBytes(identCoder.traitDecl(t))
                     self.write("MptrData")
                     self.write(" {\n")
                     self.addIndent()
@@ -927,9 +930,9 @@ impl ObjectCoder {
     }
 
     fn paramIns(mut &self, mut &p: &ParamIns) {
-        self.write(self.tc.paramIns(p))
+        self.writeBytes(self.tc.paramIns(p))
         self.write(" ")
-        self.write(identCoder.param(p.Decl))
+        self.writeBytes(identCoder.param(p.Decl))
     }
 
     fn paramsIns(mut &self, mut &params: []&ParamIns) {
@@ -952,12 +955,12 @@ impl ObjectCoder {
             self.write("static ")
         }
 
-        self.write(self.tc.kind(v.Kind.Kind))
+        self.writeBytes(self.tc.kind(v.Kind.Kind))
         self.write(" ")
         if v.Reference {
             self.write("*")
         }
-        self.write(identCoder.var(v))
+        self.writeBytes(identCoder.var(v))
         if init != nil {
             self.write(" = ")
             init()
@@ -1059,11 +1062,11 @@ impl ObjectCoder {
         if sm.Exceptional || !sm.IsVoid() {
             self.write("return ")
         }
-        self.write(identCoder.func(sm))
+        self.writeBytes(identCoder.func(sm))
         self.write("(")
         if ptr {
             self.write("_self_.safe_ptr<")
-            self.write(self.tc.structureIns(hash.s))
+            self.writeBytes(self.tc.structureIns(hash.s))
             self.write(">(")
             if !env::Production {
                 self.write("_00___file")
@@ -1071,12 +1074,12 @@ impl ObjectCoder {
             self.write(")")
         } else {
             self.write("_self_.data.as<")
-            self.write(self.tc.structure(sm.Owner))
+            self.writeBytes(self.tc.structure(sm.Owner))
             self.write(">()")
         }
         for _, mp in m.Params[1:] {
             self.write(", ")
-            self.write(identCoder.param(mp))
+            self.writeBytes(identCoder.param(mp))
         }
         self.write(");\n}\n")
         self.doneIndent()
@@ -1095,9 +1098,9 @@ impl ObjectCoder {
             mIdent := identCoder.func(m)
             self.indent()
             self.write(".")
-            self.write(mIdent)
+            self.writeBytes(mIdent)
             self.write("=")
-            self.write(mIdent)
+            self.writeBytes(mIdent)
             self.write("_")
             self.write(hash.ti)
             self.write("_")
@@ -1118,9 +1121,9 @@ impl ObjectCoder {
                 self.write("};\n")
             }
             self.write("static ")
-            self.write(ident)
+            self.writeBytes(ident)
             self.write("MptrData ")
-            self.write(ident)
+            self.writeBytes(ident)
             self.write("_mptr_data[] = {\n")
             old = hash.t
             self.addIndent()
@@ -1148,9 +1151,9 @@ impl ObjectCoder {
 
     fn globals(mut &self) {
         for (_, mut v) in self.ir.Ordered.Globals {
-            self.write(self.tc.kind(v.Kind.Kind))
+            self.writeBytes(self.tc.kind(v.Kind.Kind))
             self.write(" ")
-            self.write(identCoder.var(v))
+            self.writeBytes(identCoder.var(v))
             self.write(" = ")
             self.ec.model(v.Value.Data.Model)
             self.write(";\n")
@@ -1185,7 +1188,7 @@ impl ObjectCoder {
     fn structureOstream(mut &self, mut &s: &StructIns) {
         self.indent()
         self.write("std::ostream &operator<<(std::ostream &_Stream, ")
-        self.write(identCoder.structureIns(s))
+        self.writeBytes(identCoder.structureIns(s))
         self.write(" _Src) {\n")
         self.addIndent()
         self.indent()
@@ -1193,7 +1196,7 @@ impl ObjectCoder {
         mut fts := s.FindMethod("Str", false)
         if FuncPattern.Str(fts) {
             self.write("_Stream << ")
-            self.write(identCoder.func(fts))
+            self.writeBytes(identCoder.func(fts))
             self.write("(&_Src);\n")
         } else {
             self.write(`_Stream << "`)
@@ -1210,11 +1213,11 @@ impl ObjectCoder {
                 strct := f.Kind.Struct()
                 if strct != nil && strct.Decl != nil && strct.Decl.Binded {
                     self.write(` cpp.`)
-                    self.write(identCoder.field(f.Decl))
+                    self.writeBytes(identCoder.field(f.Decl))
                     self.write(`"`)
                 } else {
                     self.write(`" << _Src.`)
-                    self.write(identCoder.field(f.Decl))
+                    self.writeBytes(identCoder.field(f.Decl))
                 }
                 if i+1 < len(s.Fields) {
                     self.write(" << \", \"")
@@ -1276,7 +1279,7 @@ impl ObjectCoder {
             for _, f in file.Funcs {
                 if f.Ident == build::InitFn {
                     self.indent()
-                    self.write(identCoder.func(f))
+                    self.writeBytes(identCoder.func(f))
                     self.write("();\n")
                 }
             }
@@ -1321,7 +1324,8 @@ impl ObjectCoder {
         self.decls()
 
         if self.resultDecls.Len() > 0 {
-            mut head := append(make([]byte, 0), unsafe { self.Obj.Buf() }[:self.headPos]...)
+            mut head := make([]byte, 0, self.Obj.Len() + self.resultDecls.Len())
+            head = append(head, unsafe { self.Obj.Buf() }[:self.headPos]...)
             head = append(head, unsafe { self.resultDecls.Buf() }...)
             self.declPos += self.resultDecls.Len()
             head = append(head, unsafe { self.Obj.Buf() }[self.headPos:]...)
@@ -1335,7 +1339,8 @@ impl ObjectCoder {
         self.write("\n\n")
 
         if self.anyObj.Len() > 0 {
-            mut head := append(make([]byte, 0), unsafe { self.Obj.Buf() }[:self.declPos]...)
+            mut head := make([]byte, 0, self.Obj.Len() + self.anyObj.Len())
+            head = append(head, unsafe { self.Obj.Buf() }[:self.declPos]...)
             head = append(head, unsafe { self.anyObj.Buf() }...)
             head = append(head, unsafe { self.Obj.Buf() }[self.declPos:]...)
             unsafe { self.Obj.SetBuf(head) }
@@ -1355,19 +1360,19 @@ fn iterFiles(mut &pkg: &Package, f: fn(mut &f: &SymbolTable)) {
 }
 
 // Concatenate all strings into single string.
-fn concatAllParts(parts: ...&Token): str {
+fn concatAllParts(parts: ...&Token): []byte {
     mut n := 0
     for _, part in parts {
         n += len(part.Kind)
     }
     if n == 0 {
-        ret ""
+        ret nil
     }
     mut s := StrBuilder.New(n)
     for _, p in parts {
         s.WriteStr(p.Kind)
     }
-    ret s.Str()
+    ret unsafe { s.Buf() }
 }
 
 // Reports whether trait have method in this identifier.

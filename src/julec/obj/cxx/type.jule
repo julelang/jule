@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use std::unsafe
 use ast for std::jule::ast
 use conv for std::conv
 use std::jule::build::{Directive}
@@ -68,7 +69,7 @@ impl typeCoder {
     }
 
     // Returns given identifier as Jule type identifier.
-    fn toType(mut self, mut id: str): str {
+    fn toType(mut self, mut id: str): []byte {
         if id != types::TypeKind.Uintptr {
             id = types::RealKindOf(id)
         }
@@ -80,117 +81,117 @@ impl typeCoder {
             obj.WriteByte(id[0])
         }
         obj.WriteStr(id[1:])
-        ret obj.Str()
+        ret unsafe { obj.Buf() }
     }
 
     // Generates C++ code of Prim TypeKind.
-    fn prim(mut self, p: &Prim): str {
-        ret self.toType(p.Str())
+    fn prim(mut self, p: &Prim): []byte {
+        ret self.toType(p.Kind)
     }
 
     // Generates C++ code of Tupe TypeKind.
-    fn tuple(mut self, mut t: &Tuple): str {
+    fn tuple(mut self, mut t: &Tuple): []byte {
         mut obj := StrBuilder.New(1 << 5)
         obj.WriteStr("std::tuple<")
         for (i, mut tk) in t.Types {
-            obj.WriteStr(self.kind(tk))
+            obj.Write(self.kind(tk))
             if len(t.Types)-i > 1 {
                 obj.WriteByte(',')
             }
         }
         obj.WriteByte('>')
-        ret obj.Str()
+        ret unsafe { obj.Buf() }
     }
 
     // Returns C++ code of smart pointer type with element type.
-    fn asSptr(mut self, elem: str): str {
+    fn asSptr(mut self, elem: []byte): []byte {
         mut obj := StrBuilder.New(len(typeCoder.Ptr + "<>") + len(elem))
         obj.WriteStr(typeCoder.Ptr + "<")
-        obj.WriteStr(elem)
+        obj.Write(elem)
         obj.WriteByte('>')
-        ret obj.Str()
+        ret unsafe { obj.Buf() }
     }
 
     // Generates C++ code of smart pointer TypeKind.
-    fn sptr(mut self, mut sptr: &Sptr): str {
+    fn sptr(mut self, mut sptr: &Sptr): []byte {
         ret self.asSptr(self.kind(sptr.Elem))
     }
 
     // Generates C++ code of Ptr TypeKind.
-    fn ptr(mut self, mut p: &Ptr): str {
+    fn ptr(mut self, mut p: &Ptr): []byte {
         const CppPointerMask = "*"
         if p.IsUnsafe() {
-            ret "void" + CppPointerMask
+            ret unsafe::StrBytes("void" + CppPointerMask)
         }
-        ret self.kind(p.Elem) + CppPointerMask
+        ret append(self.kind(p.Elem), '*')
     }
 
     // Generates C++ code of Enum TypeKind.
-    fn enumDecl(mut self, mut e: &Enum): str {
+    fn enumDecl(mut self, mut e: &Enum): []byte {
         ret self.kind(e.Kind.Kind)
     }
 
     // Generates C++ code of TypeEnum TypeKind.
-    fn typeEnumDecl(mut self, mut e: &TypeEnum): str {
-        ret typeCoder.Any
+    fn typeEnumDecl(mut self, mut e: &TypeEnum): []byte {
+        ret unsafe::StrBytes(typeCoder.Any)
     }
 
-    fn asSlice(mut self, mut elem: &TypeKind): str {
+    fn asSlice(mut self, mut elem: &TypeKind): []byte {
         mut obj := StrBuilder.New(len(typeCoder.Slice + "<>") + (1 << 5))
         obj.WriteStr(typeCoder.Slice + "<")
-        obj.WriteStr(self.kind(elem))
+        obj.Write(self.kind(elem))
         obj.WriteByte('>')
-        ret obj.Str()
+        ret unsafe { obj.Buf() }
     }
 
     // Generates C++ code of Slc TypeKind.
-    fn slice(mut self, mut s: &Slc): str {
+    fn slice(mut self, mut s: &Slc): []byte {
         ret self.asSlice(s.Elem)
     }
 
     // Generates C++ code of Map TypeKind.
-    fn mapType(mut self, mut m: &Map): str {
+    fn mapType(mut self, mut m: &Map): []byte {
         mut obj := StrBuilder.New(len(typeCoder.Map + "<>") + (1 << 5))
         obj.WriteStr(typeCoder.Map + "<")
-        obj.WriteStr(self.kind(m.Key))
+        obj.Write(self.kind(m.Key))
         obj.WriteByte(',')
-        obj.WriteStr(self.kind(m.Val))
+        obj.Write(self.kind(m.Val))
         obj.WriteByte('>')
-        ret obj.Str()
+        ret unsafe { obj.Buf() }
     }
 
-    fn traitIdent(mut self, ident: str): str {
+    fn traitIdent(mut self, ident: []byte): []byte {
         mut obj := StrBuilder.New(len(typeCoder.Trait + "<>") + len(ident))
         obj.WriteStr(typeCoder.Trait + "<")
-        obj.WriteStr(ident)
+        obj.Write(ident)
         obj.WriteByte('>')
-        ret obj.Str()
+        ret unsafe { obj.Buf() }
     }
 
     // Generates C++ code of Trait TypeKind.
-    fn traitDecl(mut self, t: &Trait): str {
+    fn traitDecl(mut self, t: &Trait): []byte {
         ret self.traitIdent(identCoder.traitDecl(t))
     }
 
     // Generates C++ code of Struct TypeKind.
-    fn structure(mut self, s: &Struct): str {
+    fn structure(mut self, s: &Struct): []byte {
         mut rep := StrBuilder.New(1 << 5)
         if s.Binded && !hasDirective(s.Directives, Directive.Typedef) {
             rep.WriteStr("struct ")
         }
-        rep.WriteStr(identCoder.structure(s))
-        ret rep.Str()
+        rep.Write(identCoder.structure(s))
+        ret unsafe { rep.Buf() }
     }
 
     // Generates C++ code of Struct instance TypeKind.
-    fn structureIns(mut self, mut s: &StructIns): str {
+    fn structureIns(mut self, mut s: &StructIns): []byte {
         if s.Decl.Binded {
             mut ident := StrBuilder.New(1 << 5)
-            ident.WriteStr(identCoder.structureIns(s))
+            ident.Write(identCoder.structureIns(s))
             if len(s.Generics) > 0 {
                 ident.WriteByte('<')
                 for (i, mut g) in s.Generics {
-                    ident.WriteStr(self.kind(g.Kind))
+                    ident.Write(self.kind(g.Kind))
                     if len(s.Generics)-i > 1 {
                         ident.WriteByte(',')
                     }
@@ -201,68 +202,68 @@ impl typeCoder {
             if d != nil {
                 mut buf := ident.Str()
                 ident.Clear()
-                ident.WriteStr(concatAllParts(d.Args...))
+                ident.Write(concatAllParts(d.Args...))
                 ident.WriteStr("::")
                 ident.WriteStr(buf)
             }
-            ret ident.Str()
+            ret unsafe { ident.Buf() }
         }
         ret identCoder.structureIns(s)
     }
 
     // Generates C++ code of Arr TypeKind.
-    fn array(mut self, mut a: &Arr): str {
+    fn array(mut self, mut a: &Arr): []byte {
         mut obj := StrBuilder.New(len(typeCoder.Array + "<>") + (1 << 5))
         obj.WriteStr(typeCoder.Array + "<")
-        obj.WriteStr(self.kind(a.Elem))
+        obj.Write(self.kind(a.Elem))
         obj.WriteByte(',')
         obj.WriteStr(conv::Itoa(a.N))
         obj.WriteByte('>')
-        ret obj.Str()
+        ret unsafe { obj.Buf() }
     }
 
     // Generates C++ prototype code of parameter.
-    fn param(mut self, mut &p: &Param): str {
+    fn param(mut self, mut &p: &Param): []byte {
         mut obj := StrBuilder.New(1 << 5)
         if p.Variadic {
             obj.WriteStr(typeCoder.Slice + "<")
-            obj.WriteStr(self.kind(p.Kind.Kind))
+            obj.Write(self.kind(p.Kind.Kind))
             obj.WriteByte('>')
         } else {
-            obj.WriteStr(self.kind(p.Kind.Kind))
+            obj.Write(self.kind(p.Kind.Kind))
         }
         if p.Reference {
             obj.WriteByte('*')
         }
-        ret obj.Str()
+        ret unsafe { obj.Buf() }
     }
 
     // Generates C++ prototype code of parameter instance.
-    fn paramIns(mut self, mut &p: &ParamIns): str {
+    fn paramIns(mut self, mut &p: &ParamIns): []byte {
         mut obj := StrBuilder.New(1 << 5)
         if p.Decl.Variadic {
             obj.WriteStr(typeCoder.Slice + "<")
-            obj.WriteStr(self.kind(p.Kind))
+            obj.Write(self.kind(p.Kind))
             obj.WriteByte('>')
         } else {
-            obj.WriteStr(self.kind(p.Kind))
+            obj.Write(self.kind(p.Kind))
         }
         if p.Decl.Reference {
             obj.WriteByte('*')
         }
-        ret obj.Str()
+        ret unsafe { obj.Buf() }
     }
 
     // Generates C++ code of function's result type.
-    fn funcResult(mut self, mut &f: &Fn): str {
+    fn funcResult(mut self, mut &f: &Fn): []byte {
         if f.IsVoid() {
             if f.Exceptional {
-                ret "jule::VoidExceptional"
+                ret unsafe::StrBytes("jule::VoidExceptional")
             }
-            ret "void"
+            ret unsafe::StrBytes("void")
         }
         if f.Exceptional {
-            ret "jule::Exceptional<" + self.kind(f.Result.Kind.Kind) + ">"
+            ret unsafe::BytesFromStr("jule::Exceptional<" + str(self.kind(f.Result.Kind.Kind)) + ">")
         }
         ret self.kind(f.Result.Kind.Kind)
     }
@@ -286,7 +287,7 @@ impl typeCoder {
         self.rc.codeMut1(s, f.Result)
     }
 
-    fn anonFunc(mut self, mut f: &FnIns): str {
+    fn anonFunc(mut self, mut f: &FnIns): []byte {
         if f.Result != nil && f.Result.Tup() != nil {
             self.oc.pushResultIns(f)
         }
@@ -298,7 +299,7 @@ impl typeCoder {
                 if param.Decl.IsSelf() {
                     continue
                 }
-                decl.WriteStr(self.paramIns(param))
+                decl.Write(self.paramIns(param))
                 if len(f.Params)-i > 1 {
                     decl.WriteByte(',')
                 }
@@ -307,20 +308,20 @@ impl typeCoder {
             decl.WriteStr("void")
         }
         decl.WriteByte(')')
-        ret decl.Str()
+        ret unsafe { decl.Buf() }
     }
 
     // Generates C++ code of Fn TypeKind.
-    fn func(mut self, mut f: &FnIns): str {
+    fn func(mut self, mut f: &FnIns): []byte {
         mut obj := StrBuilder.New(len(typeCoder.Fn + "<>") + (1 << 5))
         obj.WriteStr(typeCoder.Fn + "<")
-        obj.WriteStr(self.anonFunc(f))
+        obj.Write(self.anonFunc(f))
         obj.WriteByte('>')
-        ret obj.Str()
+        ret unsafe { obj.Buf() }
     }
 
     // Generates C++ code of TypeKind.
-    fn kind(mut self, mut k: &TypeKind): str {
+    fn kind(mut self, mut k: &TypeKind): []byte {
         match {
         | k.Struct() != nil:
             ret self.structureIns(k.Struct())
@@ -328,7 +329,7 @@ impl typeCoder {
             // As we can see here, bind defines use pure identifiers directly.
             // So, if you hesitate about a type that causes wrong code generation,
             // write relevant algorithms above this case.
-            ret k.BindIdent
+            ret unsafe::BytesFromStr(k.BindIdent)
         | k.Prim() != nil:
             ret self.prim(k.Prim())
         | k.Tup() != nil:
@@ -354,9 +355,9 @@ impl typeCoder {
         }
         match type k.Kind {
         | &customType:
-            ret (&customType)(k.Kind).kind
+            ret unsafe::StrBytes((&customType)(k.Kind).kind)
         |:
-            ret "[<unimplemented_type_kind>]"
+            ret unsafe::StrBytes("[<unimplemented_type_kind>]")
         }
     }
 }
@@ -441,16 +442,16 @@ impl resultCoder {
             self.func(s, (&FnIns)(t.Kind))
         | &Enum:
             te := (&Enum)(t.Kind)
-            s.WriteStr(identCoder.toOut(te.Ident, uintptr(te)))
+            s.Write(identCoder.toOut(te.Ident, uintptr(te)))
         | &TypeEnum:
             te := (&TypeEnum)(t.Kind)
-            s.WriteStr(identCoder.toOut(te.Ident, uintptr(te)))
+            s.Write(identCoder.toOut(te.Ident, uintptr(te)))
         | &StructIns:
             mut si := (&StructIns)(t.Kind)
-            s.WriteStr(identCoder.structureIns(si))
+            s.Write(identCoder.structureIns(si))
         | &Trait:
             mut trt := (&Trait)(t.Kind)
-            s.WriteStr(identCoder.traitDecl(trt))
+            s.Write(identCoder.traitDecl(trt))
         | &Prim:
             s.WriteStr((&Prim)(t.Kind).Kind)
         | &Tuple:
@@ -465,14 +466,14 @@ impl resultCoder {
         if tup != nil {
             self.tup(s, tup)
         } else {
-            s.WriteStr(self.tc.kind(t))
+            s.Write(self.tc.kind(t))
         }
     }
 
-    fn code(mut self, mut &t: &TypeKind): str {
+    fn code(mut self, mut &t: &TypeKind): []byte {
         mut s := StrBuilder.New(20)
         self.codeMut(s, t)
-        ret s.Str()
+        ret unsafe { s.Buf() }
     }
 }
 

@@ -69,7 +69,7 @@ impl scopeCoder {
     }
 
     // Common head object-code for iterations of all kind.
-    fn iterHead[T](mut &self, &it: T, mut &ref: bool, &begin: str) {
+    fn iterHead[T](mut &self, &it: T, mut &ref: bool, begin: []byte) {
         self.oc.write("{\n")
         self.oc.addIndent()
         self.oc.indent()
@@ -110,7 +110,7 @@ impl scopeCoder {
         }
         self.oc.write("end();\n")
         self.oc.indent()
-        self.oc.write(begin)
+        self.oc.writeBytes(begin)
         self.oc.write(":;\n")
         self.oc.indent()
         self.oc.write("if (it != expr_end) {\n")
@@ -152,18 +152,18 @@ impl scopeCoder {
         self.scope(it.Scope)
         self.oc.write("\n")
         self.oc.indent()
-        self.oc.write(next)
+        self.oc.writeBytes(next)
         self.oc.write(":;\n")
         self.oc.indent()
         self.oc.write("++it;\n")
         self.oc.indent()
         if it.KeyA != nil {
-            self.oc.write(identCoder.var(it.KeyA))
+            self.oc.writeBytes(identCoder.var(it.KeyA))
             self.oc.write("++;\n")
             self.oc.indent()
         }
         self.oc.write("goto ")
-        self.oc.write(begin)
+        self.oc.writeBytes(begin)
         self.oc.write(";\n")
 
         // Close if.
@@ -172,7 +172,7 @@ impl scopeCoder {
         self.oc.write("}\n")
 
         self.oc.indent()
-        self.oc.write(identCoder.iterEnd(uintptr(it)))
+        self.oc.writeBytes(identCoder.iterEnd(uintptr(it)))
         self.oc.write(":;\n")
 
         // Close scope.
@@ -200,13 +200,13 @@ impl scopeCoder {
         self.scope(it.Scope)
         self.oc.write("\n")
         self.oc.indent()
-        self.oc.write(next)
+        self.oc.writeBytes(next)
         self.oc.write(":;\n")
         self.oc.indent()
         self.oc.write("++it;\n")
         self.oc.indent()
         self.oc.write("goto ")
-        self.oc.write(begin)
+        self.oc.writeBytes(begin)
         self.oc.write(";\n")
 
         // Close if.
@@ -215,7 +215,7 @@ impl scopeCoder {
         self.oc.write("}\n")
 
         self.oc.indent()
-        self.oc.write(identCoder.iterEnd(uintptr(it)))
+        self.oc.writeBytes(identCoder.iterEnd(uintptr(it)))
         self.oc.write(":;\n")
 
         // Close scope.
@@ -261,12 +261,12 @@ impl scopeCoder {
         self.oc.doneIndent()
         self.oc.write("\n")
         self.oc.indent()
-        self.oc.write(identCoder.iterNext(uintptr(it)))
+        self.oc.writeBytes(identCoder.iterNext(uintptr(it)))
         self.oc.write(":;\n")
         self.oc.indent()
         self.oc.write("}\n")
         self.oc.indent()
-        self.oc.write(identCoder.iterEnd(uintptr(it)))
+        self.oc.writeBytes(identCoder.iterEnd(uintptr(it)))
         self.oc.write(":;")
     }
 
@@ -294,12 +294,12 @@ impl scopeCoder {
         self.oc.doneIndent()
         self.oc.indent()
 
-        self.oc.write(identCoder.iterNext(uintptr(it)))
+        self.oc.writeBytes(identCoder.iterNext(uintptr(it)))
         self.oc.write(":;\n")
         self.oc.indent()
         self.oc.write("}\n")
         self.oc.indent()
-        self.oc.write(identCoder.iterEnd(uintptr(it)))
+        self.oc.writeBytes(identCoder.iterEnd(uintptr(it)))
         self.oc.write(":;")
     }
 
@@ -318,17 +318,17 @@ impl scopeCoder {
 
     fn cont(mut &self, c: &ContSt) {
         self.oc.write("goto ")
-        self.oc.write(identCoder.iterNext(c.It))
+        self.oc.writeBytes(identCoder.iterNext(c.It))
     }
 
     fn label(mut &self, l: &Label) {
-        self.oc.write(identCoder.label(uintptr(l)))
+        self.oc.writeBytes(identCoder.label(uintptr(l)))
         self.oc.write(":")
     }
 
     fn gotoSt(mut &self, gt: &GotoSt) {
         self.oc.write("goto ")
-        self.oc.write(identCoder.label(uintptr(gt.Label)))
+        self.oc.writeBytes(identCoder.label(uintptr(gt.Label)))
     }
 
     fn postfix(mut &self, mut p: &Postfix) {
@@ -383,7 +383,7 @@ impl scopeCoder {
                     // If variable is reference and uninitialized,
                     // it should be declared in this multiple-assignment.
                     if v.Reference && !v.IsInitialized() {
-                        self.oc.write(identCoder.var(v))
+                        self.oc.writeBytes(identCoder.var(v))
                         self.oc.write(" = &(")
                         self.oc.ec.possibleRefExpr(r.Model)
                         self.oc.write(");\n")
@@ -391,9 +391,9 @@ impl scopeCoder {
                         continue
                     }
                 }
-                self.oc.write(self.oc.tc.kind(l.Kind))
+                self.oc.writeBytes(self.oc.tc.kind(l.Kind))
                 self.oc.write(" ")
-                self.oc.write(identCoder.toOut(assignArgName, uintptr(i)))
+                self.oc.writeBytes(identCoder.toOut(assignArgName, uintptr(i)))
                 self.oc.write(" = ")
             }
             self.oc.ec.possibleRefExpr(r.Model)
@@ -407,7 +407,7 @@ impl scopeCoder {
             self.oc.indent()
             self.oc.ec.possibleRefExpr(l.Model)
             self.oc.write(" = ")
-            self.oc.write(identCoder.toOut(assignArgName, uintptr(i)))
+            self.oc.writeBytes(identCoder.toOut(assignArgName, uintptr(i)))
             self.oc.write(";\n")
         }
 
@@ -524,7 +524,7 @@ impl scopeCoder {
 
         self.oc.write("{\n")
         self.oc.indent()
-        self.oc.write(identCoder.caseBegin(uintptr(c)))
+        self.oc.writeBytes(identCoder.caseBegin(uintptr(c)))
         self.oc.write(":;\n")
         if len(c.Scope.Stmts) > 0 {
             self.oc.indent()
@@ -583,7 +583,7 @@ impl scopeCoder {
 
         self.oc.write("\n")
         self.oc.indent()
-        self.oc.write(identCoder.matchEnd(uintptr(m)))
+        self.oc.writeBytes(identCoder.matchEnd(uintptr(m)))
         self.oc.write(":;")
         self.oc.write("\n")
 
@@ -595,15 +595,15 @@ impl scopeCoder {
 
     fn fallSt(mut &self, f: &FallSt) {
         self.oc.write("goto ")
-        self.oc.write(identCoder.caseBegin(f.DestCase))
+        self.oc.writeBytes(identCoder.caseBegin(f.DestCase))
     }
 
     fn breakSt(mut &self, b: &BreakSt) {
         self.oc.write("goto ")
         if b.It != 0 {
-            self.oc.write(identCoder.iterEnd(b.It))
+            self.oc.writeBytes(identCoder.iterEnd(b.It))
         } else {
-            self.oc.write(identCoder.matchEnd(b.Mtch))
+            self.oc.writeBytes(identCoder.matchEnd(b.Mtch))
         }
     }
 
@@ -638,7 +638,7 @@ impl scopeCoder {
         } else if len(r.Func.Decl.Result.Idents) == 0 {
             if r.Func.Decl.Exceptional {
                 self.oc.write("return jule::Exceptional<")
-                self.oc.write(self.oc.tc.kind(r.Func.Result))
+                self.oc.writeBytes(self.oc.tc.kind(r.Func.Result))
                 self.oc.write(">(jule::Any(), ")
                 self.oc.ec.possibleRefExpr(r.Expr)
                 self.oc.write(");")
@@ -797,7 +797,7 @@ impl scopeCoder {
                 // Non-tuple signle return type with identifier.
                 // Use [resultName] as identifier.
                 self.oc.indent()
-                self.oc.write(self.oc.tc.kind(f.Result))
+                self.oc.writeBytes(self.oc.tc.kind(f.Result))
                 self.oc.write(" " + resultName)
                 if shouldInitialized(f.Result) {
                     self.oc.write(" = ")
