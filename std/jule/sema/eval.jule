@@ -393,20 +393,25 @@ impl Eval {
         ret self.findBuiltins(ident)
     }
 
-    fn pushReference[T](mut self, mut &ref: T) {
+    fn getOwnerRefers(mut self): &ReferenceStack {
         match type self.lookup {
         | &scopeChecker:
             mut sc := (&scopeChecker)(self.lookup).getHardRoot()
-            if !sc.owner.Refers.Exist[T](ref) {
-                sc.owner.Refers.Push(ref)
-            }
+            ret sc.owner.Refers
         |:
             // Push reference to owner if global.
             if self.owner != nil &&
-                self.owner.Scope == nil &&
-                !self.owner.Refers.Exist[T](ref) {
-                self.owner.Refers.Push(ref)
+                self.owner.Scope == nil {
+                ret self.owner.Refers
             }
+        }
+        ret nil
+    }
+
+    fn pushReference[T](mut self, mut &ref: T) {
+        mut refers := self.getOwnerRefers()
+        if refers != nil && !refers.Exist[T](ref) {
+            refers.Push(ref)
         }
     }
 
@@ -1173,12 +1178,16 @@ impl Eval {
             ret false
         }
         if existInstance != nil {
-            f = existInstance
-            // Update Model: by exist function instance.
-            // Because generic functions returns always new instance.
-            // So, if this absolute instance is already exist, update Model:.
-            // In other words, Model:'s instance will be a dangling instance.
+            // Update model and references by exist function instance.
+            // Generic functions returns always new instance, because might be
+            // generics are inferred. Therefore, always returns new instance for requests.
+            // So, if this absolute instance is already exist, update model.
+            // Otherwise, model's instance will be a dangling, because it never
+            // be appended into instances of function declaration since already exist.
             updateModelToGenericIns(model, existInstance)
+            updateRefer(self.getOwnerRefers(), f, existInstance)
+            // Set f to exist one.
+            f = existInstance
         } else {
             // Check generic function instance instantly.
             self.s.checkFnInsCaller(f, et)
@@ -4503,4 +4512,13 @@ fn makeImplicitDeref(mut &d: &Data, mut baseToken: &Token) {
     unary.Op.Id = TokenId.Star
     unary.Op.Kind = TokenKind.Star
     d.Model = unary
+}
+
+// Updates ref's old references to new.
+fn updateRefer[T](mut ref: &ReferenceStack, &old: T, mut &new: T) {
+    for i, sym in ref.buffer {
+        if sym == old {
+            ref.buffer[i] = new
+        }
+    }
 }
