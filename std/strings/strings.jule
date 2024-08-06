@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use std::unsafe
 use unicode for std::unicode
 use utf8 for std::unicode::utf8
 use fastbytes for std::internal::fastbytes
-use nosafe for std::internal::nosafe
 
 // Returns string that equals to concatenation of n-count s.
 // Returns empty string is n <= 0.
@@ -124,9 +124,8 @@ fn FindFnAt(s: str, mut i: int, f: fn(mut rune): bool): int {
     if i < 0 {
         ret -1
     }
-    bytes := nosafe::Stobs(s)
-    for i < len(bytes) {
-        r, n := utf8::DecodeRune(bytes[i:])
+    for i < len(s) {
+        r, n := utf8::DecodeRuneStr(s[i:])
         if f(r) {
             ret i
         }
@@ -150,9 +149,8 @@ fn FindFnLastAt(s: str, mut i: int, f: fn(mut rune): bool): int {
     if i < 0 || i >= len(s) {
         ret -1
     }
-    bytes := nosafe::Stobs(s)
     for i > 0 {
-        r, n := utf8::DecodeRune(bytes[i:])
+        r, n := utf8::DecodeRuneStr(s[i:])
         if f(r) {
             ret i
         }
@@ -166,18 +164,6 @@ fn FindFnLastAt(s: str, mut i: int, f: fn(mut rune): bool): int {
 // of string to left.
 fn FindFnLast(s: str, f: fn(mut rune): bool): int {
     ret FindFnLastAt(s, len(s) - 1, f)
-}
-
-fn findRune(&s: []byte, r: rune): int {
-    mut i := 0
-    for i < len(s) {
-        br, n := utf8::DecodeRune(s[i:])
-        if r == br {
-            ret i
-        }
-        i += n
-    }
-    ret -1
 }
 
 // Returns index of first matched item with specified byte,
@@ -198,18 +184,13 @@ fn FindLastByte(s: str, b: byte): int {
 // returns -1 if not exist any match. Starts searching at left
 // of string to right.
 fn FindRune(s: str, r: rune): int {
-    bytes := nosafe::Stobs(s)
-    ret findRune(bytes, r)
-}
-
-fn findLastRune(&s: []byte, r: rune): int {
-    mut i := len(s)
-    for i > 0 {
-        br, n := utf8::DecodeLastRune(s[:i])
+    mut i := 0
+    for i < len(s) {
+        br, n := utf8::DecodeRuneStr(s[i:])
         if r == br {
-            ret i - 1
+            ret i
         }
-        i -= n
+        i += n
     }
     ret -1
 }
@@ -218,20 +199,26 @@ fn findLastRune(&s: []byte, r: rune): int {
 // returns -1 if not exist any match. Starts searching at right
 // of string to left.
 fn FindLastRune(s: str, r: rune): int {
-    bytes := nosafe::Stobs(s)
-    ret findLastRune(bytes, r)
+    sb := unsafe::StrBytes(s)
+    mut i := len(sb)
+    for i > 0 {
+        br, n := utf8::DecodeLastRune(sb[:i])
+        if r == br {
+            ret i - 1
+        }
+        i -= n
+    }
+    ret -1
 }
 
 // Returns index of first matched item with any of runes,
 // returns -1 if not exist any match. Starts searching at left
 // of string to right.
 fn FindAny(s: str, runes: str): int {
-    sb := nosafe::Stobs(s)
-    mut rb := nosafe::Stobs(runes)
     mut i := 0
-    for i < len(sb) {
-        r, n := utf8::DecodeRune(sb[i:])
-        if findRune(rb, r) != -1 {
+    for i < len(s) {
+        r, n := utf8::DecodeRuneStr(s[i:])
+        if FindRune(runes, r) != -1 {
             ret i
         }
         i += n
@@ -243,12 +230,11 @@ fn FindAny(s: str, runes: str): int {
 // returns -1 if not exist any match. Starts searching at right
 // of string to left.
 fn FindLastAny(s: str, runes: str): int {
-    sb := nosafe::Stobs(s)
-    mut rb := nosafe::Stobs(runes)
-    mut i := len(sb)
+    sb := unsafe::StrBytes(s)
+    mut i := len(s)
     for i > 0 {
         r, n := utf8::DecodeLastRune(sb[:i])
-        if findRune(rb, r) != -1 {
+        if FindRune(runes, r) != -1 {
             ret i - 1
         }
         i -= n
@@ -298,8 +284,7 @@ fn ContainsByte(s: str, b: byte): bool {
 
 // Reports whether string includes rune.
 fn ContainsRune(s: str, r: rune): bool {
-    bytes := nosafe::Stobs(s)
-    ret findRune(bytes, r) != -1
+    ret FindRune(s, r) != -1
 }
 
 // Reports whether string includes any of runes.
@@ -362,10 +347,9 @@ fn Replace(s: str, sub: str, new: str, mut n: int): str {
 // the character is dropped from the string with no replacement.
 fn Map(s: str, mapping: fn(mut rune): rune): str {
     mut ss := StrBuilder.New(len(s))
-    mut bytes := nosafe::Stobs(s)
     mut i := 0
-    for i < len(bytes) {
-        mut r, n := utf8::DecodeRune(bytes[i:])
+    for i < len(s) {
+        mut r, n := utf8::DecodeRuneStr(s[i:])
         i += n
         r = mapping(r)
         if r >= 0 {
@@ -385,11 +369,11 @@ fn ToUpper(s: str): str {
     ret Map(s, unicode::ToUpper)
 }
 
-fn trimLeft(mut &s: []byte, &cutset: []byte) {
+fn trimLeft(mut &s: []byte, cutset: str) {
     mut i := 0
     for i < len(s) {
         r, n := utf8::DecodeRune(s[i:])
-        if findRune(cutset, r) == -1 {
+        if FindRune(cutset, r) == -1 {
             s = s[i:]
             ret
         }
@@ -401,17 +385,16 @@ fn trimLeft(mut &s: []byte, &cutset: []byte) {
 // Trims string by specified runes at left.
 // Cutset should include runes to trim.
 fn TrimLeft(s: str, cutset: str): str {
-    mut bytes := nosafe::Stobs(s)
-    bcutset := nosafe::Stobs(cutset)
-    trimLeft(bytes, bcutset)
+    mut bytes := unsafe::StrBytes(s)
+    trimLeft(bytes, cutset)
     ret str(bytes)
 }
 
-fn trimRight(mut &s: []byte, &cutset: []byte) {
+fn trimRight(mut &s: []byte, cutset: str) {
     mut i := len(s)
     for i > 0 {
         r, n := utf8::DecodeLastRune(s[:i])
-        if findRune(cutset, r) == -1 {
+        if FindRune(cutset, r) == -1 {
             s = s[:i]
             ret
         }
@@ -423,19 +406,17 @@ fn trimRight(mut &s: []byte, &cutset: []byte) {
 // Trims string by specified runes at right.
 // Cutset should include runes to trim.
 fn TrimRight(s: str, cutset: str): str {
-    mut bytes := nosafe::Stobs(s)
-    bcutset := nosafe::Stobs(cutset)
-    trimRight(bytes, bcutset)
+    mut bytes := unsafe::StrBytes(s)
+    trimRight(bytes, cutset)
     ret str(bytes)
 }
 
 // Trims string by specified runes at left and right.
 // Cutset should include runes to trim.
 fn Trim(s: str, cutset: str): str {
-    mut bytes := nosafe::Stobs(s)
-    bcutset := nosafe::Stobs(cutset)
-    trimLeft(bytes, bcutset)
-    trimRight(bytes, bcutset)
+    mut bytes := unsafe::StrBytes(s)
+    trimLeft(bytes, cutset)
+    trimRight(bytes, cutset)
     ret str(bytes)
 }
 

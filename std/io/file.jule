@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use std::unsafe
 use std::fs::{FsError, File}
 use std::internal::strings::{StrBuilder}
-use nosafe for std::internal::nosafe
 
 // Stream implementation for file handles.
 // Uses internally mutable buffer.
@@ -49,7 +49,7 @@ impl FileStream {
 
         mut buff := make([]byte, 1, 1024)
         let mut partBuff: bufferArray
-        mut part := nosafe::Atobs[bufferArray, bufferArrayElem](partBuff)
+        mut part := unsafe::Slice(&partBuff[0], len(partBuff))
         for {
             n := self.buff.Read(part) else { error(error) }
             if n == 0 {
@@ -73,7 +73,7 @@ impl FileStream {
 
         mut buf := StrBuilder.New(1 << 10)
         let mut partBuff: bufferArray
-        mut part := nosafe::Atobs[bufferArray, bufferArrayElem](partBuff)
+        mut part := unsafe::Slice(&partBuff[0], len(partBuff))
         for {
             n := self.buff.Read(part) else { error(error) }
             if n == 0 {

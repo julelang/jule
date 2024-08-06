@@ -35,15 +35,15 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // ====================================================
 
+use std::unsafe
 use math for std::math
-use nosafe for std::internal::nosafe
 
 const optimize = true
 
 // Returns the length of the common
 // prefix of s and prefix, with the character case of s ignored.
 // The prefix argument must be all lower-case.
-fn commonPrefixLenIgnoreCase(&s: []byte, prefix: str): int {
+fn commonPrefixLenIgnoreCase(s: str, prefix: str): int {
     mut n := len(prefix)
     if n > len(s) {
         n = len(s)
@@ -66,7 +66,7 @@ fn commonPrefixLenIgnoreCase(&s: []byte, prefix: str): int {
 // and NaN. The result is ok if a prefix of s contains one
 // of these representations and n is the length of that prefix.
 // The character case is ignored.
-fn special(s: []byte): (f: f64, n: int, ok: bool) {
+fn special(s: str): (f: f64, n: int, ok: bool) {
     if len(s) == 0 {
         ret 0, 0, false
     }
@@ -618,9 +618,9 @@ fn atofHex(&flt: floatInfo, mut mantissa: u64, mut exp: int, neg: bool, trunc: b
     ret math::F64FromBits(bits), err
 }
 
-fn atof32(&s: str): (f: f32, n: int, err: ConvError) {
+fn atof32(s: str): (f: f32, n: int, err: ConvError) {
     {
-        val, _n, ok := special(nosafe::Stobs(s))
+        val, _n, ok := special(s)
         if ok {
             ret f32(val), _n, ConvError.Ok
         }
@@ -665,7 +665,7 @@ fn atof32(&s: str): (f: f32, n: int, err: ConvError) {
 
     // Slow fallback.
     mut d := decimal{}
-    if !d.set(nosafe::Stobs(s)[:n]) {
+    if !d.set(unsafe::StrBytes(s)[:n]) {
         ret 0, n, ConvError.InvalidSyntax
     }
     b, ovf := d.floatBits(f32info)
@@ -676,9 +676,9 @@ fn atof32(&s: str): (f: f32, n: int, err: ConvError) {
     ret f, n, err
 }
 
-fn atof64(&s: str): (f: f64, n: int, err: ConvError) {
+fn atof64(s: str): (f: f64, n: int, err: ConvError) {
     {
-        val, _n, ok := special(nosafe::Stobs(s))
+        val, _n, ok := special(s)
         if ok {
             ret val, _n, ConvError.Ok
         }
@@ -722,7 +722,7 @@ fn atof64(&s: str): (f: f64, n: int, err: ConvError) {
 
     // Slow fallback.
     mut d := decimal{}
-    if !d.set(nosafe::Stobs(s)[:n]) {
+    if !d.set(unsafe::StrBytes(s)[:n]) {
         ret 0, n, ConvError.InvalidSyntax
     }
     b, ovf := d.floatBits(f64info)
