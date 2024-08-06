@@ -35,6 +35,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // ====================================================
 
+use std::unsafe
 use math for std::math
 
 struct floatInfo {
@@ -76,7 +77,10 @@ struct decimalSlice {
 // The special precision -1 uses the smallest number of digits
 // necessary such that parse_float will return f exactly.
 fn FmtFloat(f: f64, fmt: byte, prec: int, bit_size: int): str {
-    ret str(genericFtoa(make([]byte, 0, max(prec + 4, 24)), f, fmt, prec, bit_size))
+    // Return value of [genericFtoa] can be converted with [unsafe::StrFromBytes] safely.
+    // It returns always head pointer of slice, so deallocation is safe.
+    // There is no need to make new allocation for string.
+    ret unsafe::StrFromBytes(genericFtoa(make([]byte, 0, max(prec + 4, 24)), f, fmt, prec, bit_size))
 }
 
 fn genericFtoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bit_size: int): []byte {
@@ -102,11 +106,11 @@ fn genericFtoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bit_size: in
         // +inf, NaN
         match {
         | mant != 0:
-            ret append(dst, ['n', 'a', 'n']...)
+            ret append(dst, unsafe::StrBytes("nan")...)
         | neg:
-            ret append(dst, ['-', 'i', 'n', 'f']...)
+            ret append(dst, unsafe::StrBytes("-inf")...)
         |:
-            ret append(dst, ['+', 'i', 'n', 'f']...)
+            ret append(dst, unsafe::StrBytes("+inf")...)
         }
     | 0:
         // denormalized
