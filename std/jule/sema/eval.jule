@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use std::unsafe
 use conv for std::conv
 use path for std::fs::path
 use ast for std::jule::ast::{
@@ -198,11 +199,11 @@ impl Eval {
     }
 
     fn litStr(self, &l: &LitExpr): &Data {
-        mut s := l.Value[1:len(l.Value)-1] // Remove quotes.
+        mut s := ""
         if IsRawStr(l.Value) {
-            s = lit::ToRawStr([]byte(s))
+            s = lit::ToRawStr(l.Value)
         } else {
-            s = lit::ToStr([]byte(s))
+            s = lit::ToStr(l.Value)
         }
         mut constant := Const.NewStr(s)
 
@@ -215,9 +216,7 @@ impl Eval {
     }
 
     fn litRune(self, &l: &LitExpr): &Data {
-        // Remove quotes.
-        lt := l.Value[1:len(l.Value)-1]
-        r := lit::ToRune([]byte(lt))
+        r := lit::ToRune(l.Value)
         mut data := &Data{
             Constant: Const.NewI64(i64(r)),
         }

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use std::unsafe
 use conv for std::conv
 use utf8 for std::unicode::utf8
 
@@ -12,38 +13,58 @@ fn IsAscii(r: rune): bool {
     ret r <= MaxAscii
 }
 
-// Returns rune value string from bytes, not includes quotes.
+// Returns rune value string from literal, includes quotes.
 // Bytes are represents rune literal, allows escape sequences.
-// Returns empty string if len(bytes) == 0
-fn ToRune(bytes: []byte): rune {
-    if len(bytes) == 0 {
-        ret 0
-    }
-
+// Returns zero rune if len(lit) == 0.
+// Assumes lit is syntaticaly and semantically correct.
+fn ToRune(lit: str): rune {
     mut r := rune(0)
+    bytes := unsafe::StrBytes(lit)[1:len(lit)-1]
     if bytes[0] == '\\' && len(bytes) > 1 {
         mut i := 0
         r = runeFromEsqSeq(bytes, i)
     } else {
         r, _ = utf8::DecodeRune(bytes)
     }
-
     ret r
 }
 
-// Returns raw-string value string from bytes, not includes quotes.
+// Returns raw-string value string from literal, includes quotes.
 // Bytes are represents string characters.
-// Returns empty string if len(bytes) == 0
-fn ToRawStr(bytes: []byte): str { ret str(bytes) }
+// Returns empty string if len(lit) == 0.
+// Assumes lit is syntaticaly and semantically correct.
+fn ToRawStr(lit: str): str {
+    if len(lit) == 2 {
+        ret ""
+    }
+    ret lit[1:len(lit)-1]
+}
 
-// Returns string value string from bytes, not includes quotes.
+// Returns string value string from literal, includes quotes.
 // Bytes are represents string characters, allows escape sequences.
-// Returns empty string if len(bytes) == 0
-fn ToStr(bytes: []byte): str {
-    if len(bytes) == 0 {
+// Returns empty string if len(lit) == 0.
+// Assumes lit is syntaticaly and semantically correct.
+fn ToStr(lit: str): str {
+    if len(lit) == 2 {
         ret ""
     }
 
+    // Means string is just ASCII text without escape sequences.
+    mut isPure := true
+    for _, b in lit {
+        if b >= utf8::RuneSelf || b == '\\' {
+            isPure = false
+            break
+        }
+    }
+
+    if isPure {
+        ret lit[1:len(lit)-1]
+    }
+
+    // String is not pure.
+    // Handle unicode characters and escape sequences.
+    bytes := unsafe::StrBytes(lit)[1:len(lit)-1]
     mut s := make([]byte, 0, len(bytes))
     mut i := 0
     for i < len(bytes) {
