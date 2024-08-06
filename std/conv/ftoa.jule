@@ -57,7 +57,7 @@ struct decimalSlice {
 // Converts the floating-point number f to a string,
 // according to the format fmt and precision prec. It rounds the
 // result assuming that the original was obtained from a floating-point
-// value of bit_size bits (32 for f32, 64 for f64).
+// value of bitSize bits (32 for f32, 64 for f64).
 //
 // The format fmt is one of
 // 'b' (-ddddp±ddd, a binary exponent),
@@ -76,17 +76,19 @@ struct decimalSlice {
 // zeros are removed).
 // The special precision -1 uses the smallest number of digits
 // necessary such that parse_float will return f exactly.
-fn FmtFloat(f: f64, fmt: byte, prec: int, bit_size: int): str {
+fn FmtFloat(f: f64, fmt: byte, prec: int, bitSize: int): str {
     // Return value of [genericFtoa] can be converted with [unsafe::StrFromBytes] safely.
     // It returns always head pointer of slice, so deallocation is safe.
     // There is no need to make new allocation for string.
-    ret unsafe::StrFromBytes(genericFtoa(make([]byte, 0, max(prec + 4, 24)), f, fmt, prec, bit_size))
+    mut bytes := genericFtoa(make([]byte, 0, max(prec + 4 + 1, 24 + 1)), f, fmt, prec, bitSize)
+    bytes = append(bytes, 0) // NULL termination.
+    ret unsafe::StrFromBytes(bytes[:len(bytes)-1])
 }
 
-fn genericFtoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bit_size: int): []byte {
+fn genericFtoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bitSize: int): []byte {
     mut bits := u64(0)
     let mut flt: &floatInfo = nil
-    match bit_size {
+    match bitSize {
     | 32:
         bits = u64(math::F32Bits(f32(val)))
         flt = unsafe { (&floatInfo)(&f32info) }
@@ -94,7 +96,7 @@ fn genericFtoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bit_size: in
         bits = math::F64Bits(val)
         flt = unsafe { (&floatInfo)(&f64info) }
     |:
-        panic("std::conv: illegal bit_size")
+        panic("std::conv: illegal bitSize")
     }
 
     neg := bits>>(flt.expbits + flt.mantbits) != 0
@@ -166,7 +168,7 @@ fn genericFtoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bit_size: in
             // Invalid mode.
             digits = 1
         }
-        if bit_size == 32 && digits <= 9 {
+        if bitSize == 32 && digits <= 9 {
             digs.d = make([]byte, 24)
             ryuFtoaFixed32(digs, u32(mant), exp - int(flt.mantbits), digits)
             ok = true

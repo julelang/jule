@@ -21,7 +21,8 @@ fn Repeat(s: str, mut n: int): str {
     for n > 0; n-- {
         ss.WriteStr(s)
     }
-    ret unsafe::StrFromBytes(unsafe { ss.Buf() })
+    ss.WriteByte(0) // NULL termination.
+    ret unsafe::StrFromBytes(unsafe { ss.Buf() }[:ss.Len()-1])
 }
 
 fn hasPrefix(&s: str, &sub: str, mut start: int): bool {
@@ -339,14 +340,15 @@ fn Replace(s: str, sub: str, new: str, mut n: int): str {
         i = j + len(sub)
     }
     ss.WriteStr(s[i:])
-    ret unsafe::StrFromBytes(unsafe { ss.Buf() })
+    ss.WriteByte(0) // NULL termination.
+    ret unsafe::StrFromBytes(unsafe { ss.Buf() }[:ss.Len()-1])
 }
 
 // Returns a copy of the string s with all its characters modified
 // according to the mapping function. If mapping returns a negative value,
 // the character is dropped from the string with no replacement.
 fn Map(s: str, mapping: fn(mut rune): rune): str {
-    mut ss := StrBuilder.New(len(s))
+    mut ss := StrBuilder.New(len(s) + 1)
     mut i := 0
     for i < len(s) {
         mut r, n := utf8::DecodeRuneStr(s[i:])
@@ -356,7 +358,8 @@ fn Map(s: str, mapping: fn(mut rune): rune): str {
             ss.WriteRune(r)
         }
     }
-    ret unsafe::StrFromBytes(unsafe { ss.Buf() })
+    ss.WriteByte(0) // NULL termination.
+    ret unsafe::StrFromBytes(unsafe { ss.Buf() }[:ss.Len()-1])
 }
 
 // Returns s with all Unicode letters mapped to their lower case.
@@ -440,7 +443,8 @@ fn Join(parts: []str, sep: str): str {
         s.WriteStr(sep)
         s.WriteStr(part)
     }
-    ret unsafe::StrFromBytes(unsafe { s.Buf() })
+    s.WriteByte(0) // NULL termination.
+    ret unsafe::StrFromBytes(unsafe { s.Buf() }[:s.Len()-1])
 }
 
 // Cut slices s around the first instance of sep,
