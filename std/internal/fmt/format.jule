@@ -8,8 +8,7 @@ use integrated for std::jule::integrated
 use utf8 for std::unicode::utf8
 use std::internal::strings::{StrBuilder}
 
-fn findFormatPrefix(&bytes: []byte, &start: int): int {
-    mut i := start
+fn findFormatPrefix(&bytes: []byte, mut i: int): int {
     for i < len(bytes) {
         r, size := utf8::DecodeRune(bytes[i:])
         if r == '{' {
@@ -111,15 +110,20 @@ fn applyFmt(mut &fmt: []byte, mut &buf: StrBuilder, mut &j: int, args: ...any) {
 }
 
 // See the [std::fmt::Format] function.
-fn Format(fmt: str, args: ...any): str {
+// For this function, returned []byte is might be string literal actually.
+// Be careful about mutating it.
+fn Format(fmt: str, args: ...any): []byte {
+    mut fmtBytes := unsafe::BytesFromStr(fmt)
     if len(args) == 0 {
-        ret fmt
+        ret fmtBytes
     }
-    mut fmtBytes := unsafe::StrBytes(fmt)
-    mut buf := StrBuilder.New(len(fmt))
+    mut i := findFormatPrefix(fmtBytes, 0)
+    if i == -1 {
+        ret fmtBytes
+    }
     mut j := 0
     mut last := 0
-    mut i := findFormatPrefix(fmtBytes, last)
+    mut buf := StrBuilder.New(len(fmt))
     for i != -1; i = findFormatPrefix(fmtBytes, i) {
         buf.Write(fmtBytes[last:i])
         mut format := getFormatRange(i, fmtBytes)
@@ -138,5 +142,5 @@ fn Format(fmt: str, args: ...any): str {
     if last < len(fmtBytes) {
         buf.Write(fmtBytes[last:])
     }
-    ret buf.Str()
+    ret unsafe { buf.Buf() }
 }
