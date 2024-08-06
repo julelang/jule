@@ -53,6 +53,15 @@ namespace jule
             return buf;
         }
 
+        static jule::Str lit(const char *s, const jule::Int n) noexcept {
+            jule::Str str;
+            str.buffer = jule::Str::buffer_t::make(
+                const_cast<jule::U8*>(reinterpret_cast<const jule::U8*>(s)), nullptr);
+            str._slice = str.buffer.alloc;
+            str._len = n;
+            return str;
+        }
+
         static jule::Str from_rune(const jule::I32 r) noexcept
         {
             jule::Str s;
@@ -78,9 +87,7 @@ namespace jule
         Str(jule::Str &&src) : buffer(std::move(src.buffer)), _len(src._len), _slice(src._slice) {}
         Str(const std::basic_string<jule::U8> &src) : Str(src.c_str(), src.c_str() + src.size()) {}
         Str(const char *src, const jule::Int &len) : Str(reinterpret_cast<const jule::U8 *>(src), len) {}
-        Str(const jule::U8 *src, const jule::Int &len) : buffer(jule::Str::buffer_t::make(const_cast<jule::U8 *>(src), nullptr)),
-                                                         _slice(const_cast<jule::U8 *>(src)),
-                                                         _len(len) {}
+        Str(const jule::U8 *src, const jule::Int &len) : jule::Str(src, src + len) {}
         Str(const jule::U8 *src) : Str(src, src + std::strlen(reinterpret_cast<const char *>(src))) {}
         Str(const std::string &src) : Str(reinterpret_cast<const jule::U8 *>(src.c_str()),
                                           reinterpret_cast<const jule::U8 *>(src.c_str() + src.size())) {}

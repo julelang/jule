@@ -61,7 +61,7 @@ namespace jule
             const LPWSTR warg = argvw[i];
             args._slice[i] = jule::utf16_to_utf8_str(warg, std::wcslen(warg));
 #else
-            args._slice[i] = jule::argv[i];
+            args._slice[i] = jule::Str::lit(jule::argv[i], std::strlen(jule::argv[i]));
 #endif
         }
 #ifdef OS_WINDOWS
@@ -91,7 +91,7 @@ namespace jule
 #else
         char **it = jule::envp;
         for (; *it != NULL; ++it)
-            env.push(jule::Str(*it));
+            env.push(jule::Str(*it, std::strlen(*it)));
 #endif
         return env;
     }
