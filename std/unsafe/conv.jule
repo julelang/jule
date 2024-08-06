@@ -53,3 +53,23 @@ fn BytesStr(b: []byte): str {
     }
     ret Str(&b[0], len(b))
 }
+
+// Same as [BytesStr] but keeps garbage collection.
+fn StrFromBytes(b: []byte): str {
+    s := BytesStr(b)
+    unsafe {
+        integ::Emit("{}.buffer.ref = {}.data.ref", s, b)
+        integ::Emit("{}.buffer.add_ref()", s)
+    }
+    ret s
+}
+
+// Same as [StrBytes] but keeps garbage collection.
+fn BytesFromStr(s: str): []byte {
+    mut b := StrBytes(s)
+    unsafe {
+        integ::Emit("{}.data.ref = {}.buffer.ref", b, s)
+        integ::Emit("{}.data.add_ref()", b)
+    }
+    ret b
+}
