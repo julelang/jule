@@ -77,7 +77,7 @@ fn ToStr(lit: str): str {
             s = utf8::AppendRune(s, r)
         }
     }
-    ret str(s)
+    ret unsafe::StrFromBytes(s)
 }
 
 fn tryBtoaCommonEsq(bytes: []byte): (seq: byte, ok: bool) {
@@ -121,24 +121,24 @@ fn runeFromEsqSeq(bytes: []byte, mut &i: int): rune {
     match bytes[i] {
     | 'u':
         const SeqLen = 5
-        r := rune(conv::ParseUint(str(bytes[i+1 : i+SeqLen]), 16, 64)!)
+        r := rune(conv::ParseUint(unsafe::BytesStr(bytes[i+1 : i+SeqLen]), 16, 64)!)
         i += SeqLen
         ret r
     | 'U':
         const SeqLen = 9
-        r := rune(conv::ParseUint(str(bytes[i+1 : i+SeqLen]), 16, 64)!)
+        r := rune(conv::ParseUint(unsafe::BytesStr(bytes[i+1 : i+SeqLen]), 16, 64)!)
         i += SeqLen
         ret r
     | 'x':
         const SeqLen = 3
         seq := bytes[i+1 : i+SeqLen]
         i += SeqLen
-        ret rune(conv::ParseUint(str(seq), 16, 64)!)
+        ret rune(conv::ParseUint(unsafe::BytesStr(seq), 16, 64)!)
     |:
         const SeqLen = 3
         seq := bytes[i:i+SeqLen]
         i += SeqLen
-        ret rune(conv::ParseUint(str(seq[1:]), 8, 64)!)
+        ret rune(conv::ParseUint(unsafe::BytesStr(seq[1:]), 8, 64)!)
     }
 }
 
@@ -147,5 +147,5 @@ fn strEsqSeq(bytes: []byte, mut &i: int): []byte {
     if r <= 255 {
         ret [byte(r)]
     }
-    ret []byte(str(r))
+    ret unsafe::BytesFromStr(str(r))
 }
