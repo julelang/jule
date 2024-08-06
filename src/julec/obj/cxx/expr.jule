@@ -9,7 +9,6 @@ use opt::{
     UnsafeIndexingExprModel,
     PushToSliceExprModel,
     AppendToSliceExprModel,
-    InlineStdInternalNosafeStobs,
     StrCompExprModel,
     EmptyCompareExprModel,
 }
@@ -93,7 +92,6 @@ enum compExprModel: type {
     str,                           // For built-in expressions.
     &UnsafeBinopExprModel,
     &UnsafeIndexingExprModel,
-    &InlineStdInternalNosafeStobs,
     &StrCompExprModel,
     &RefExprModel,
     &EmptyCompareExprModel,
@@ -1304,11 +1302,6 @@ impl exprCoder {
         }
     }
 
-    fn inlineStdInternalNosafeStobs(mut &self, mut m: &InlineStdInternalNosafeStobs) {
-        self.possibleRefExpr(m.Str)
-        self.oc.write(".fake_slice()")
-    }
-
     fn emptyCompare(mut &self, mut m: &EmptyCompareExprModel) {
         if m.Neg {
             self.oc.write("!")
@@ -1406,8 +1399,6 @@ impl exprCoder {
             self.free((&FreeExprModel)(m))
         | &StrCompExprModel:
             self.strComp((&StrCompExprModel)(m))
-        | &InlineStdInternalNosafeStobs:
-            self.inlineStdInternalNosafeStobs((&InlineStdInternalNosafeStobs)(m))
         | &RefExprModel:
             self.var((&RefExprModel)(m).Var)
         | &EmptyCompareExprModel:
