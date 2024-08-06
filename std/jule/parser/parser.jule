@@ -208,18 +208,6 @@ unsafe fn pushSuggestion(mut log: *Log, fmt: LogMsg, args: ...any) {
     log.Suggestion = Logf(fmt, args...)
 }
 
-fn tokstoa(&tokens: []&Token): str {
-    mut n := 0
-    for _, token in tokens {
-        n += len(token.Kind)
-    }
-    mut s := StrBuilder.New(n)
-    for _, token in tokens {
-        s.WriteStr(token.Kind)
-    }
-    ret s.Str()
-}
-
 struct parser {
     ast:        &Ast
     directives: []&Directive
@@ -940,6 +928,21 @@ impl parser {
         decl.LinkPath = token.Kind[1:len(token.Kind)-1]
     }
 
+    fn useDeclTokstoa(mut self, &tokens: []&Token): str {
+        mut n := 0
+        for _, token in tokens {
+            if token.Id != TokenId.Ident && token.Id != TokenId.DblColon {
+                self.pushErr(token, LogMsg.InvalidSyntax)
+            }
+            n += len(token.Kind)
+        }
+        mut s := StrBuilder.New(n)
+        for _, token in tokens {
+            s.WriteStr(token.Kind)
+        }
+        ret s.Str()
+    }
+
     fn buildStdUseDecl(mut self, mut &decl: &UseDecl, mut tokens: []&Token) {
         decl.Std = true
 
@@ -991,7 +994,11 @@ impl parser {
             }
             decl.Full = true
         }
-        decl.LinkPath = "std::" + tokstoa(tokens)
+        if len(tokens) == 1 && tokens[0].Id == TokenId.Unsafe { // Is std::unsafe?
+            decl.LinkPath = "std::unsafe"
+        } else {
+            decl.LinkPath = "std::" + self.useDeclTokstoa(tokens)
+        }
     }
 
     fn buildIdentUseDecl(mut self, mut &decl: &UseDecl, mut tokens: []&Token) {
@@ -1039,7 +1046,7 @@ impl parser {
             decl.Full = true
         }
 
-        decl.LinkPath = tokstoa(tokens)
+        decl.LinkPath = self.useDeclTokstoa(tokens)
     }
 
     fn parseUseDecl(mut self, mut &decl: &UseDecl, mut tokens: []&Token) {

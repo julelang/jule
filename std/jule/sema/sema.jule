@@ -688,6 +688,14 @@ impl Sema {
             ret true
         }
 
+        // Check special cases for std::unsafe.
+        if imp.LinkPath == "std::unsafe" {
+            if imp.ImportAll || imp.Alias != "" || len(imp.Selected) > 0 {
+                self.pushErr(imp.Token, LogMsg.ExpectedPlainUseDecl, "use std::unsafe")
+                ret false
+            }
+        }
+
         if self.isUseAliasDuplication(imp) {
             self.pushErr(imp.Token, LogMsg.DuplicatedUseAlias, imp.Alias)
             self.pushSuggestion(LogMsg.RenameUseAliasAvoidDuplication)

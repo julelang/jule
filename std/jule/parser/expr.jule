@@ -146,20 +146,26 @@ impl exprBuilder {
 
     fn buildNsSubIdent(mut self, mut &tokens: []&Token): &NsSelectionExpr {
         mut ns := new(NsSelectionExpr)
-        for (i, mut token) in tokens {
-            if i%2 == 0 {
-                if token.Id != TokenId.Ident {
+        if len(tokens) == 3 && tokens[0].Id == TokenId.Unsafe {
+            // Check unsafe scope selection.
+            ns.Ns = tokens[:1]
+            ns.Ident = tokens[2]
+        } else {
+            for (i, mut token) in tokens {
+                if i%2 == 0 {
+                    if token.Id != TokenId.Ident {
+                        self.pushErr(token, LogMsg.InvalidSyntax)
+                        self.pushSuggestion(LogMsg.ExpectedIdentifier)
+                    }
+                    ns.Ns = append(ns.Ns, token)
+                } else if token.Id != TokenId.DblColon {
                     self.pushErr(token, LogMsg.InvalidSyntax)
-                    self.pushSuggestion(LogMsg.ExpectedIdentifier)
+                    self.pushSuggestion(LogMsg.ExpectedDblColon)
                 }
-                ns.Ns = append(ns.Ns, token)
-            } else if token.Id != TokenId.DblColon {
-                self.pushErr(token, LogMsg.InvalidSyntax)
-                self.pushSuggestion(LogMsg.ExpectedDblColon)
             }
+            ns.Ident = ns.Ns[len(ns.Ns)-1]
+            ns.Ns = ns.Ns[:len(ns.Ns)-1]
         }
-        ns.Ident = ns.Ns[len(ns.Ns)-1]
-        ns.Ns = ns.Ns[:len(ns.Ns)-1]
         ret ns
     }
 
@@ -804,13 +810,10 @@ impl exprBuilder {
             ret self.buildBraceRange(tokens)
         | TokenId.RBracket:
             ret self.buildBracketRange(tokens)
-        }
-
-        if token.Id == TokenId.Fn {
+        | TokenId.Fn:
             // Function types.
             ret self.buildType(tokens)
         }
-
         self.pushErr(token, LogMsg.InvalidSyntax)
         ret nil
     }

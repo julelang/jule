@@ -1,0 +1,47 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use integ for std::jule::integrated
+
+// Returns string based on b, the parameter b means first byte of string.
+// The returned string uses n as length.
+// Will not perform garbage collection.
+fn Str(b: *byte, n: int): str {
+    mut s := ""
+    unsafe {
+        integ::Emit("{}.buffer = {}::make({}, {})", s, &byte, b, nil)
+        integ::Emit("{}._len = {}", s, n)
+        integ::Emit("{}._slice = {}", s, b)
+    }
+    ret s
+}
+
+// Returns slice based on e, the parameter e means first element of slice.
+// The returned slice uses n as length and capacity.
+// Will not perform garbage collection.
+fn Slice[Elem](e: *Elem, n: int): []Elem {
+    mut buf := []Elem(nil)
+    unsafe {
+        integ::Emit("{}.data = {}::make({}, {})", buf, &Elem, e, nil)
+        integ::Emit("{}._len = {}", buf, n)
+        integ::Emit("{}._cap = {}", buf, n)
+        integ::Emit("{}._slice = {}", buf, e)
+    }
+    ret buf
+}
+
+// Alias for Slice(b, n).
+fn Bytes(b: *byte, n: int): []byte {
+    ret Slice(b, n)
+}
+
+// Alias for Slice(&s[0], len(s)).
+fn StrBytes(s: str): []byte {
+    ret Slice(&s[0], len(s))
+}
+
+// Alias for Str(&b[0], len(b)).
+fn BytesStr(b: []byte): str {
+    ret Str(&b[0], len(b))
+}
