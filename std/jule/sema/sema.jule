@@ -665,10 +665,6 @@ impl Sema {
     }
 
     fn isUseAliasDuplication(mut self, &imp: &ImportInfo): bool {
-        if len(imp.Alias) == 0 {
-            ret false
-        }
-
         for (_, mut imp2) in self.file.Imports {
             if imp2 == imp {
                 break
@@ -697,9 +693,13 @@ impl Sema {
             }
         }
 
-        if self.isUseAliasDuplication(imp) {
-            self.pushErr(imp.Token, LogMsg.DuplicatedUseAlias, imp.Alias)
-            self.pushSuggestion(LogMsg.RenameUseAliasAvoidDuplication)
+        if len(imp.Alias) != 0 {
+            if IsIgnoreIdent(imp.Alias) {
+                self.pushErr(imp.Token, LogMsg.IgnoreIdent)
+            } else if self.isUseAliasDuplication(imp) {
+                self.pushErr(imp.Token, LogMsg.DuplicatedUseAlias, imp.Alias)
+                self.pushSuggestion(LogMsg.RenameUseAliasAvoidDuplication)
+            }
         }
 
         if !imp.Duplicate {
