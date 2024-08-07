@@ -17,6 +17,7 @@
 #include <cstddef>
 #include <tuple>
 #include <string>
+#include <vector>
 
 #include "types.hpp"
 #include "utf8.hpp"
