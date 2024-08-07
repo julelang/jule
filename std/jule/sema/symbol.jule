@@ -391,6 +391,11 @@ impl symbolBuilder {
     }
 
     fn buildStdImport(mut self, mut &decl: &UseDecl): &ImportInfo {
+        if strings::Find(decl.LinkPath, "::_") != -1 {
+            self.pushErr(decl.Token, LogMsg.BlankIdentInUseDecl)
+            ret nil
+        }
+
         mut path := decl.LinkPath[len("std::"):] // Skip "std::" prefix.
         path = strings::Replace(path, TokenKind.DblColon, str(path::Separator), -1)
         path = path::Join(PathStdlib, path)
@@ -430,6 +435,13 @@ impl symbolBuilder {
     }
 
     fn buildIdentImport(mut &self, mut &decl: &UseDecl): &ImportInfo {
+        if decl.LinkPath == "_" ||
+            strings::Find(decl.LinkPath, "::_") != -1 ||
+            strings::Find(decl.LinkPath, "_::") != -1 {
+            self.pushErr(decl.Token, LogMsg.BlankIdentInUseDecl)
+            ret nil
+        }
+
         modPath := self.importer.GetModPath()
         if len(modPath) == 0 {
             self.pushErr(decl.Token, LogMsg.ModuleNotFound)
