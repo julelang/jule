@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use comptime for std::comptime
 use conv for std::conv
 use strings for std::strings
 
@@ -130,14 +129,6 @@ impl FlagSet {
     }
 
     fn addFlagCommon[T](mut self, name: str, short: rune, what: str): &Flag[T] {
-        match type comptime::Match(T) {
-        | i64 | u64 | f64 | bool | str:
-            // Ok
-            break
-        |:
-            panic("std::flag: FlagSet.Add[T]: unsupported typed for flag")
-        }
-
         if self.FindFlag(name) != nil {
             panic("std::flag: FlagSet.Add[T]: flag is already exist in this name: " + name)
         }
@@ -166,14 +157,14 @@ impl FlagSet {
     //  - f64
     //  - str
     //  - bool
-    fn Add[T](mut self, name: str, short: rune, default: T, what: str): &T {
+    fn Add[T: i64 | u64 | f64 | bool | str](mut self, name: str, short: rune, default: T, what: str): &T {
         mut flag := self.addFlagCommon[T](name, short, what)
         flag.data = new(T, default)
         ret flag.data
     }
 
     // Same with add method but do not allocates new reference, uses existing.
-    fn AddVar[T](mut self, mut var: &T, name: str, short: rune, what: str) {
+    fn AddVar[T: i64 | u64 | f64 | bool | str](mut self, mut var: &T, name: str, short: rune, what: str) {
         mut flag := self.addFlagCommon[T](name, short, what)
         flag.default = *var
         flag.data = var
