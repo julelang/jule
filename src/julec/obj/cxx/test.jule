@@ -14,6 +14,7 @@ use std::jule::sema::{
     FnIns,
     StructIns,
 }
+use std::strings::{StrBuilder}
 
 struct TestCoder {
     t:         &StructIns
@@ -46,10 +47,10 @@ impl TestCoder {
         self.oc.write(";\n")
         self.oc.indent()
         self.oc.write("std::cout << \">>> TEST RUNNING: \" ")
-        cstrLit(self.oc.Obj, f.Decl.Ident)
+        cstrLit(self.oc.Buf, f.Decl.Ident)
         self.oc.write(" << std::endl;\n")
         self.oc.indent()
-        self.oc.writeBytes(identCoder.funcIns(f))
+        identCoder.funcIns(self.oc.Buf, f)
         self.oc.write("(_t);\n")
         self.oc.indent()
         self.oc.write("post_test();\n")
@@ -82,17 +83,17 @@ impl TestCoder {
     }
 
     fn callTmReset(mut &self) {
-        self.oc.writeBytes(identCoder.func(self.tmReset))
+        identCoder.func(self.oc.Buf, self.tmReset)
         self.oc.write("(_t)")
     }
 
     fn callTmFailed(mut &self) {
-        self.oc.writeBytes(identCoder.func(self.tmFailed))
+        identCoder.func(self.oc.Buf, self.tmFailed)
         self.oc.write("(_t)")
     }
 
     fn callTmSkipped(mut &self) {
-        self.oc.writeBytes(identCoder.func(self.tmSkipped))
+        identCoder.func(self.oc.Buf, self.tmSkipped)
         self.oc.write("(_t)")
     }
 
@@ -114,9 +115,11 @@ impl TestCoder {
             ret
         }
 
-        self.oc.writeBytes(self.oc.tc.asSptr(self.oc.tc.structureIns(self.t)))
+        mut tb := StrBuilder.New(40)
+        self.oc.tc.structureIns(tb, self.t)
+        self.oc.tc.asSptr(self.oc.Buf, unsafe { tb.Buf() })
         self.oc.write(" _t = jule::new_ptr<")
-        self.oc.writeBytes(self.oc.tc.structureIns(self.t))
+        self.oc.writeBytes(unsafe { tb.Buf() })
         self.oc.write(">(); _t.ref = nullptr;\n")
 
         self.oc.indent()

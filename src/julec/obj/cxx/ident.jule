@@ -54,8 +54,12 @@ impl identCoder {
         }
     }
 
-    // Same as [toOut], but takes external buffer.
-    static fn toOutBuf(mut &buf: StrBuilder, ident: str, addr: uintptr) {
+    // Writes cpp output identifier form of given identifier.
+    //
+    // Parameters:
+    //   - ident: Identifier.
+    //   - addr:  Pointer address of package file handler.
+    static fn toOut(mut &buf: StrBuilder, ident: str, addr: uintptr) {
         buf.WriteByte('_')
         if addr != 0 {
             buf.WriteStr(conv::FmtUint(u64(addr), 0xF))
@@ -64,187 +68,148 @@ impl identCoder {
         identCoder.writeIdentTo(buf, ident)
     }
 
-    // Returns cpp output identifier form of given identifier.
-    //
-    // Parameters:
-    //   - ident: Identifier.
-    //   - addr:  Pointer address of package file handler.
-    static fn toOut(ident: str, addr: uintptr): []byte {
-        if addr != 0 {
-            mut obj := StrBuilder.New(40)
-            identCoder.toOutBuf(obj, ident, addr)
-            ret unsafe { obj.Buf() }
-        }
-        mut obj := StrBuilder.New(len(ident) + 1)
-        identCoder.toOutBuf(obj, ident, 0)
-        ret unsafe { obj.Buf() }
-    }
-
-    // Returns cpp output local identifier form of fiven identifier.
+    // Writes cpp output local identifier form of given identifier.
     //
     // Parameters:
     //   - row:   Row of definition.
     //   - col:   Column of definition.
     //   - ident: Identifier of definition.
-    static fn toLocal(row: int, col: int, &ident: str): []byte {
-        mut obj := StrBuilder.New(40)
-        obj.WriteByte('_')
-        obj.WriteStr(conv::Itoa(row))
-        obj.WriteStr(conv::Itoa(col))
-        obj.WriteByte('_')
-        identCoder.writeIdentTo(obj, ident)
-        ret unsafe { obj.Buf() }
+    static fn toLocal(mut &buf: StrBuilder, row: int, col: int, &ident: str) {
+        buf.WriteByte('_')
+        buf.WriteStr(conv::Itoa(row))
+        buf.WriteStr(conv::Itoa(col))
+        buf.WriteByte('_')
+        identCoder.writeIdentTo(buf, ident)
     }
 
-    // Returns output identifier of function.
-    static fn func(&f: &Fn): []byte {
+    static fn func(mut &buf: StrBuilder, &f: &Fn) {
         match {
         | f.Binded:
-            ret unsafe::BytesFromStr(f.Ident)
+            buf.WriteStr(f.Ident)
+            ret
         | f.Ident == EntryPoint:
-            ret unsafe::BytesFromStr("entry_point")
+            buf.WriteStr("entry_point")
+            ret
         | f.IsMethod():
-            if !f.Statically {
-                ret identCoder.toOut(f.Ident, uintptr(f))
+            if f.Statically {
+                buf.WriteStr("static_")
             }
-            mut obj := StrBuilder.New(40 + len("static_"))
-            obj.WriteStr("static_")
-            identCoder.toOutBuf(obj, f.Ident, uintptr(f))
-            ret unsafe { obj.Buf() }
-        |:
-            ret identCoder.toOut(f.Ident, uintptr(f))
         }
+        identCoder.toOut(buf, f.Ident, uintptr(f))
     }
 
-    // Returns output identifier of function instance.
-    static fn funcIns(&f: &FnIns): []byte {
+    static fn funcIns(mut &buf: StrBuilder, &f: &FnIns) {
         if f.IsBuiltin() {
             // Do not use [identCoder.writeIdentTo] for this.
             // Built-in functions are always ASCII.
-            ret unsafe::BytesFromStr("jule::" + f.Decl.Ident)
+            buf.WriteStr("jule::")
+            buf.WriteStr(f.Decl.Ident)
+            ret
         }
         if f.Decl.Binded || len(f.Generics) == 0 {
-            ret identCoder.func(f.Decl)
+            identCoder.func(buf, f.Decl)
+            ret
         }
-        ret identCoder.toOut(f.Decl.Ident, uintptr(f))
+        identCoder.toOut(buf, f.Decl.Ident, uintptr(f))
     }
 
-    // Returns output identifier of trait.
-    static fn traitDecl(t: &Trait): []byte {
-        ret identCoder.toOut(t.Ident, uintptr(t))
+    static fn traitDecl(mut &buf: StrBuilder, t: &Trait) {
+        identCoder.toOut(buf, t.Ident, uintptr(t))
     }
 
-    // Returns output identifier of parameter.
-    static fn param(&p: &Param): []byte {
+    static fn param(mut &buf: StrBuilder, &p: &Param) {
         if IsAnonIdent(p.Ident) || IsIgnoreIdent(p.Ident) {
-            ret nil
+            ret
         }
         if p.IsSelf() {
-            ret unsafe::BytesFromStr(identCoder.Self)
+            buf.WriteStr(identCoder.Self)
+            ret
         }
         if p.Token == nil {
-            ret identCoder.toLocal(0, 0, p.Ident)
+            identCoder.toLocal(buf, 0, 0, p.Ident)
+            ret
         }
-        ret identCoder.toLocal(p.Token.Row, p.Token.Column, p.Ident)
+        identCoder.toLocal(buf, p.Token.Row, p.Token.Column, p.Ident)
     }
 
-    // Returns output identifier of structure.
-    static fn structure(&s: &Struct): []byte {
+    static fn structure(mut &buf: StrBuilder, &s: &Struct) {
         if s.Binded {
-            if hasDirective(s.Directives, Directive.Typedef) {
-                ret unsafe::BytesFromStr(s.Ident)
+            if !hasDirective(s.Directives, Directive.Typedef) {
+                buf.WriteStr("struct ")
             }
-            ret unsafe::BytesFromStr("struct " + s.Ident)
+            buf.WriteStr(s.Ident)
+            ret
         }
-        ret identCoder.toOut(s.Ident, uintptr(s))
+        identCoder.toOut(buf, s.Ident, uintptr(s))
     }
 
-    // Returns output identifier of structure instance.
-    static fn structureIns(&s: &StructIns): []byte {
+    static fn structureIns(mut &buf: StrBuilder, &s: &StructIns) {
         if s.Decl.Binded || len(s.Generics) == 0 {
-            ret identCoder.structure(s.Decl)
+            identCoder.structure(buf, s.Decl)
+            ret
         }
-        ret identCoder.toOut(s.Decl.Ident, uintptr(s))
+        identCoder.toOut(buf, s.Decl.Ident, uintptr(s))
     }
 
-    // Returns output identifier of field.
-    static fn field(&f: &Field): []byte {
+    static fn field(mut &buf: StrBuilder, &f: &Field) {
         if f.Owner.Binded {
-            ret unsafe::BytesFromStr(f.Ident)
+            buf.WriteStr(f.Ident)
+            ret
         }
-        mut obj := StrBuilder.New(7 + len(f.Ident))
-        obj.WriteStr("_field_")
-        identCoder.writeIdentTo(obj, f.Ident)
-        ret unsafe { obj.Buf() }
+        buf.WriteStr("_field_")
+        identCoder.writeIdentTo(buf, f.Ident)
     }
 
     // Returns output identifier of variable.
-    static fn var(mut v: &Var): []byte {
+    static fn var(mut &buf: StrBuilder, mut v: &Var) {
         match {
         | v.Binded:
-            ret unsafe::BytesFromStr(v.Ident)
+            buf.WriteStr(v.Ident)
         | v.Ident == TokenKind.Error:
-            ret unsafe::BytesFromStr("except.error")
+            buf.WriteStr("except.error")
         | v.Ident == TokenKind.Self:
-            ret unsafe::BytesFromStr(identCoder.Self)
+            buf.WriteStr(identCoder.Self)
         | v.RetOrder == -1:
             // The single return variable is just this one.
             // Return directly [resultName] because of generated with this identifier.
-            ret unsafe::BytesFromStr(resultName)
+            buf.WriteStr(resultName)
         | v.RetOrder >= 0:
-            ret unsafe::BytesFromStr(resultName + "." + resultArgName + conv::Itoa(v.RetOrder))
+            buf.WriteStr(resultName + "." + resultArgName)
+            buf.WriteStr(conv::Itoa(v.RetOrder))
         | v.Scope != nil:
-            ret identCoder.toLocal(v.Token.Row, v.Token.Column, v.Ident)
+            identCoder.toLocal(buf, v.Token.Row, v.Token.Column, v.Ident)
         |:
-            ret identCoder.toOut(v.Ident, uintptr(v))
+            identCoder.toOut(buf, v.Ident, uintptr(v))
         }
     }
 
-    // Returns begin label identifier of iteration.
-    static fn iterBegin(it: uintptr): []byte {
-        mut obj := StrBuilder.New(30)
-        obj.WriteStr("_iter_begin_")
-        obj.WriteStr(conv::FmtUint(u64(it), 0xF))
-        ret unsafe { obj.Buf() }
+    static fn iterBegin(mut &buf: StrBuilder, it: uintptr) {
+        buf.WriteStr("_iter_begin_")
+        buf.WriteStr(conv::FmtUint(u64(it), 0xF))
     }
 
-    // Returns end label identifier of iteration.
-    static fn iterEnd(it: uintptr): []byte {
-        mut obj := StrBuilder.New(30)
-        obj.WriteStr("_iter_end_")
-        obj.WriteStr(conv::FmtUint(u64(it), 0xF))
-        ret unsafe { obj.Buf() }
+    static fn iterEnd(mut &buf: StrBuilder, it: uintptr) {
+        buf.WriteStr("_iter_end_")
+        buf.WriteStr(conv::FmtUint(u64(it), 0xF))
     }
 
-    // Returns next label identifier of iteration.
-    static fn iterNext(it: uintptr): []byte {
-        mut obj := StrBuilder.New(30)
-        obj.WriteStr("_iter_next_")
-        obj.WriteStr(conv::FmtUint(u64(it), 0xF))
-        ret unsafe { obj.Buf() }
+    static fn iterNext(mut &buf: StrBuilder, it: uintptr) {
+        buf.WriteStr("_iter_next_")
+        buf.WriteStr(conv::FmtUint(u64(it), 0xF))
     }
 
-    // Returns label identifier.
-    static fn label(u: uintptr): []byte {
-        mut obj := StrBuilder.New(30)
-        obj.WriteStr("_julec_label_")
-        obj.WriteStr(conv::FmtUint(u64(u), 0xF))
-        ret unsafe { obj.Buf() }
+    static fn label(mut &buf: StrBuilder, u: uintptr) {
+        buf.WriteStr("_julec_label_")
+        buf.WriteStr(conv::FmtUint(u64(u), 0xF))
     }
 
-    // Returns end label identifier of match-case.
-    static fn matchEnd(m: uintptr): []byte {
-        mut obj := StrBuilder.New(30)
-        obj.WriteStr("_match_end_")
-        obj.WriteStr(conv::FmtUint(u64(m), 0xF))
-        ret unsafe { obj.Buf() }
+    static fn matchEnd(mut &buf: StrBuilder, m: uintptr) {
+        buf.WriteStr("_match_end_")
+        buf.WriteStr(conv::FmtUint(u64(m), 0xF))
     }
 
-    // Returns begin label identifier of case.
-    static fn caseBegin(c: uintptr): []byte {
-        mut obj := StrBuilder.New(30)
-        obj.WriteStr("_case_begin_")
-        obj.WriteStr(conv::FmtUint(u64(c), 0xF))
-        ret unsafe { obj.Buf() }
+    static fn caseBegin(mut &buf: StrBuilder, c: uintptr) {
+        buf.WriteStr("_case_begin_")
+        buf.WriteStr(conv::FmtUint(u64(c), 0xF))
     }
 }
