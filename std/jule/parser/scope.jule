@@ -608,7 +608,6 @@ impl scopeParser {
         if len(tokens) == 0 {
             ret
         }
-
         if typeMatch {
             mut i := 0
             mut t, ok := unsafe { self.p.buildType(tokens, &i, true) }
@@ -627,9 +626,8 @@ impl scopeParser {
         exprs = append(exprs, self.p.buildExpr(tokens))
     }
 
-    fn buildCaseExprs(mut self, mut &tokens: []&Token, mut &colon: &Token, typeMatch: bool): []&Expr {
+    fn buildCaseExprs(mut self, mut &tokens: []&Token, mut &colon: &Token, typeMatch: bool): ([]&Expr, bool) {
         mut exprs := make([]&Expr, 0, 1)
-
         mut braceN := 0
         mut j := 0
         for (i, mut tok) in tokens {
@@ -662,12 +660,12 @@ impl scopeParser {
                 colon = tok
                 self.pushCaseExpr(tokens[j:i], tok, typeMatch, exprs)
                 tokens = tokens[i+1:]
-                ret exprs
+                ret exprs, i-j == 0 || len(exprs) != 0
             }
         }
         self.pushErr(tokens[0], LogMsg.InvalidSyntax)
         tokens = nil
-        ret nil
+        ret nil, false
     }
 
     fn buildCaseScope(mut self, mut &tokens: []&Token): &ScopeTree {
@@ -703,12 +701,12 @@ impl scopeParser {
         }
         tokens = tokens[1:] // Remove case prefix.
         let mut colon: &Token = nil
-        c.Exprs = self.buildCaseExprs(tokens, colon, typeMatch)
+        c.Exprs, ok := self.buildCaseExprs(tokens, colon, typeMatch)
         c.Scope = self.buildCaseScope(tokens)
         if c.Scope.End == nil {
             c.Scope.End = colon
         }
-        isDefault := len(c.Exprs) == 0
+        isDefault := ok && len(c.Exprs) == 0
         ret c, isDefault
     }
 
