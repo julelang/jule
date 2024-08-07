@@ -6,6 +6,7 @@ use std::jule::ast::{GenericDecl, IdentTypeDecl}
 use std::jule::build::{LogMsg}
 use std::jule::lex::{Token}
 use types for std::jule::types
+use std::strings::{StrBuilder}
 
 enum builtinConstraint: str {
     Signed: "signed",
@@ -132,11 +133,22 @@ impl constraintChecker {
                     continue lookup
                 }
             }
-            self.s.pushErr(self.et, LogMsg.ConstraintFailed, g.Kind.Str(), self.genericsD[i].Ident)
+            self.s.pushErr(self.et, LogMsg.ConstraintFailed, g.Kind.Str(), self.genericsD[i].Ident, toStrConstraints(g))
             ret false
         }
         ret true
     }
+}
+
+fn toStrConstraints(g: &InsGeneric): str {
+    mut sb := StrBuilder.New(1 << 7)
+    for i, c in g.Constraint {
+        sb.WriteStr(c.Str())
+        if len(g.Constraint)-i > 1 {
+            sb.WriteStr(" | ")
+        }
+    }
+    ret sb.Str()
 }
 
 fn matchConstraint(&c: str, mut &g: &TypeKind): bool {
