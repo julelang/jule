@@ -246,6 +246,9 @@ fn findBuiltinDefStdComptime(&ident: str): any {
     | "ValueOf":
         static mut f = &FnIns{caller: builtinCallerStdComptimeValueOf}
         ret f
+    | "Match":
+        static mut f = &FnIns{caller: builtinCallerStdComptimeMatch}
+        ret f
     | "Range":
         static mut f = &FnIns{caller: builtinCallerStdComptimeRange}
         ret f
@@ -903,6 +906,38 @@ fn builtinCallerStdComptimeValueOf(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: 
         ret nil
     }
     ret buildComptimeValue(d)
+}
+
+fn builtinCallerStdComptimeMatch(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data {
+    if len(fc.Args) < 1 {
+        e.pushErr(fc.Token, LogMsg.MissingExprFor, "expr")
+        ret nil
+    }
+    if len(fc.Args) > 1 {
+        e.pushErr(fc.Args[1].Token, LogMsg.ArgumentOverflow, "Match")
+    }
+    mut d := e.eval1(fc.Args[0])
+    if d == nil {
+        ret nil
+    }
+    // Do not allow value if has unsupported type for type infer.
+    if !isGoodValueToInfer(d) {
+        e.pushErr(fc.Args[0].Token, LogMsg.InvalidTypeForFn, d.Kind.Str(), "Match")
+        ret nil
+    }
+    // Disallow comptime expressions except type info.
+    if d.Kind.comptimeTypeInfo() == nil && d.Kind.comptime() {
+        e.pushErr(fc.Args[0].Token, LogMsg.InvalidTypeForFn, d.Kind.Str(), "Match")
+        ret nil
+    }
+    ret &Data{
+        Kind: &TypeKind{
+            Kind: &comptimeMatch{
+                data: d,
+                exprToken: fc.Args[0].Token,
+            },
+        },
+    }
 }
 
 fn rangeData(mut kind: comptimeRangeKind): &Data {

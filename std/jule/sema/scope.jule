@@ -1554,12 +1554,16 @@ impl scopeChecker {
             if d == nil {
                 continue
             }
+
             if m.TypeMatch {
+                // Match types. There is not need to check whether d.Decl is true.
+                // Parser always tries to build type declarations for type-match cases.
+                // So, d is should be type declaration already.
                 case.Exprs = append(case.Exprs, d)
                 if countMatchType(m, d.Kind) > 1 {
                     self.s.pushErr(e.Token, LogMsg.DuplicateMatchType, d.Kind.Str())
                 }
-                if expr.Kind.Generic {
+                if m.Comptime {
                     constMatched = constMatched || expr.Kind.Equal(d.Kind)
                 } else {
                     if expr.Kind.TypeEnum() != nil {
@@ -1572,12 +1576,6 @@ impl scopeChecker {
                     }
                 }
                 continue
-            } else if m.Comptime {
-                if !d.IsConst() {
-                    self.s.pushErr(e.Token, LogMsg.InvalidExprForConstMatch)
-                } else {
-                    constMatched = constMatched || d.Constant.ReadBool()
-                }
             }
 
             if d.Decl {
@@ -1586,15 +1584,34 @@ impl scopeChecker {
                 continue
             }
 
-            case.Exprs = append(case.Exprs, d)
-
-            mut checker := assignTypeChecker{
-                s: self.s,
-                dest: expr.Kind,
-                d: d,
-                errorToken: e.Token,
+            if m.Comptime {
+                if !d.IsConst() && d.Kind.comptimeTypeInfo() == nil {
+                    self.s.pushErr(e.Token, LogMsg.ExprNotConst)
+                    self.s.pushSuggestion(LogMsg.InvalidExprForConstMatch)
+                    continue
+                }
+                if !constMatched {
+                    if d.IsConst() {
+                        constMatched = expr.IsConst() && d.Constant.Eq(*expr.Constant)
+                    } else {
+                        exprCti := expr.Kind.comptimeTypeInfo()
+                        constMatched = exprCti != nil && d.Kind.comptimeTypeInfo().base.Equal(exprCti.base)
+                    }
+                }
             }
-            checker.check()
+
+            case.Exprs = append(case.Exprs, d)
+            if !m.Comptime ||
+                expr.Kind.comptimeTypeInfo() == nil ||
+                d.Kind.comptimeTypeInfo() == nil {
+                mut checker := assignTypeChecker{
+                    s: self.s,
+                    dest: expr.Kind,
+                    d: d,
+                    errorToken: e.Token,
+                }
+                checker.check()
+            }
         }
         if !m.Comptime || constMatched {
             case.Scope = self.checkCaseScope(case, c.Scope)
@@ -1631,7 +1648,7 @@ impl scopeChecker {
         ret def
     }
 
-    fn checkComptimePanic(mut &self, callToken: &Token, &s: &Scope) {
+    fn checkComptimePanic(mut &self, mut callToken: &Token, &s: &Scope) {
         if len(s.Stmts) != 1 {
             ret
         }
@@ -1641,19 +1658,23 @@ impl scopeChecker {
             d := (&Data)(stmt)
             match type d.Model {
             | &BuiltinPanicCallExprModel:
-                m := (&BuiltinPanicCallExprModel)(d.Model)
+                mut m := (&BuiltinPanicCallExprModel)(d.Model)
                 match type m.Expr {
                 | &Const:
                     c := (&Const)(m.Expr)
-                    if c.IsStr() {
-                        if callToken == nil {
-                            mut root := self.getHardRoot()
-                            self.s.pushErr(root.calledFrom, LogMsg.ComptimePanic, c.ReadStr())
-                        } else {
-                            self.s.pushErr(callToken, LogMsg.ComptimePanic, c.ReadStr())
-                        }
-                        self.stop()
+                    if !c.IsStr() {
+                        break
                     }
+                    if callToken == nil {
+                        mut root := self.getHardRoot()
+                        if root.calledFrom == nil {
+                            callToken = m.Token
+                        } else {
+                            callToken = root.calledFrom
+                        }
+                    }
+                    self.s.pushErr(callToken, LogMsg.ComptimePanic, c.ReadStr())
+                    self.stop()
                 }
             }
         }
@@ -1689,13 +1710,19 @@ impl scopeChecker {
     }
 
     fn checkTypeMatch(mut &self, mut &m: &MatchCase) {
-        mut d := self.s.eval(self).eval(m.Expr)
+        mut d := self.s.eval(self).evalExpr1(m.Expr)
         if d == nil {
             ret
         }
 
-        if !d.Kind.Generic &&
-            !((d.Kind.Prim() != nil && d.Kind.Prim().IsAny()) || d.Kind.Trait() != nil || d.Kind.TypeEnum() != nil) {
+        mut comptime := d.Kind.comptimeMatch()
+        if comptime != nil {
+            d = comptime.data
+            mut cti := d.Kind.comptimeTypeInfo()
+            if cti != nil {
+                d.Kind = cti.base
+            }
+        } else if !((d.Kind.Prim() != nil && d.Kind.Prim().IsAny()) || d.Kind.Trait() != nil || d.Kind.TypeEnum() != nil) {
             self.s.pushErr(m.Expr.Token, LogMsg.TypeCaseHasNotValidExpr)
             ret
         }
@@ -1703,8 +1730,8 @@ impl scopeChecker {
         mut tm := &Match{
             TypeMatch: true,
             Expr: d,
+            Comptime: comptime != nil,
         }
-        tm.Comptime = tm.Expr.Kind.Generic
 
         // Do not check default if comptime matching enabled.
         // We do not know any case will be matched yet.
@@ -1730,15 +1757,29 @@ impl scopeChecker {
             }
             d.Model = d.Constant
         } else {
-            d = self.s.eval(self).evalExpr(m.Expr)
+            d = self.s.eval(self).evalExpr1(m.Expr)
             if d == nil {
                 ret
             }
         }
 
+        mut comptime := d.Kind.comptimeMatch()
+        if comptime != nil {
+            d = comptime.data
+            if !d.IsConst() && d.Kind.comptimeTypeInfo() == nil {
+                self.s.pushErr(comptime.exprToken, LogMsg.ExprNotConst)
+                self.s.pushSuggestion(LogMsg.InvalidExprForConstMatch)
+                ret
+            }
+        } else if d.Kind.comptime() {
+            self.s.pushErr(comptime.exprToken, LogMsg.ExprNotConst)
+            self.s.pushSuggestion(LogMsg.InvalidExprForConstMatch)
+            ret
+        }
+
         mut mc := &Match{
             Expr: d,
-            Comptime: m.Expr != nil && d.IsConst() && d.Constant.IsBool() && d.Constant.ReadBool(),
+            Comptime: comptime != nil,
         }
 
         // Push into stmts here. Otherwise, labeled break statements and others
