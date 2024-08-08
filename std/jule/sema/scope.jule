@@ -944,6 +944,24 @@ impl scopeChecker {
             }
         }
 
+        mut rang := (&RangeKind)(it.Kind)
+        makeComptimeRange(d)
+        if d.Decl {
+            self.s.pushErr(rang.Expr.Token, LogMsg.InvalidTypeForComptimeIter, d.Kind.Str())
+            ret
+        }
+
+        mut rc := rangeChecker{
+            sc: self,
+            Kind: kind,
+            rang: rang,
+            d: d,
+        }
+        ok := rc.check()
+        if !ok {
+            ret
+        }
+
         mut comptime := d.Kind.comptimeRange()
         comptime.kind.ready(kind.KeyA, kind.KeyB)
         mut i := 0
@@ -981,6 +999,16 @@ impl scopeChecker {
             Expr: d,
         }
 
+        if it.Comptime {
+            self.checkComptimeRangeIter(it, kind, d)
+            ret
+        }
+        if d.Kind.comptime() {
+            self.s.pushErr(rang.Expr.Token, LogMsg.ComptimeExprForRuntimeIteration)
+            self.s.pushSuggestion(LogMsg.DeclareComptimeForeach)
+            ret
+        }
+
         mut rc := rangeChecker{
             sc: self,
             Kind: kind,
@@ -989,12 +1017,6 @@ impl scopeChecker {
         }
         ok := rc.check()
         if !ok {
-            ret
-        }
-
-        mut comptimeRange := d.Kind.comptimeRange()
-        if comptimeRange != nil {
-            self.checkComptimeRangeIter(it, kind, d)
             ret
         }
 
@@ -1027,12 +1049,20 @@ impl scopeChecker {
 
     fn checkIter(mut &self, mut it: &Iter) {
         if it.IsInf() {
+            if it.Comptime {
+                self.s.pushErr(it.Token, LogMsg.InvalidComptimeIter)
+                ret
+            }
             self.checkInfIter(it)
             ret
         }
 
         match type it.Kind {
         | &WhileKind:
+            if it.Comptime {
+                self.s.pushErr(it.Token, LogMsg.InvalidComptimeIter)
+                ret
+            }
             self.checkWhileIter(it)
         | &RangeKind:
             self.checkRangeIter(it)
@@ -2200,5 +2230,27 @@ fn removeEqFromOp(op: TokenId): TokenId {
         ret TokenId.Vline
     |:
         ret op
+    }
+}
+
+// Makes data d as comptimeRange.
+// If type is not supported, d.Decl will be true.
+fn makeComptimeRange(mut &d: &Data) {
+    match {
+    | d.Kind.comptimeStructFields() != nil:
+        d.Kind = &TypeKind{Kind: &comptimeRange{d.Kind.comptimeStructFields()}}
+    | d.Kind.comptimeEnumFields() != nil:
+        d.Kind = &TypeKind{Kind: &comptimeRange{d.Kind.comptimeEnumFields()}}
+    | d.Kind.comptimeTypeInfos() != nil:
+        d.Kind = &TypeKind{Kind: &comptimeRange{d.Kind.comptimeTypeInfos()}}
+    | d.Kind.comptimeParams() != nil:
+        d.Kind = &TypeKind{Kind: &comptimeRange{d.Kind.comptimeParams()}}
+    | d.Kind.comptimeStatics() != nil:
+        d.Kind = &TypeKind{Kind: &comptimeRange{d.Kind.comptimeStatics()}}
+    | d.Kind.comptimeFiles() != nil:
+        d.Kind = &TypeKind{Kind: &comptimeRange{d.Kind.comptimeFiles()}}
+    |:
+        // Flag for failure.
+        d.Decl = true
     }
 }

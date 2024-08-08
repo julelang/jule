@@ -249,9 +249,6 @@ fn findBuiltinDefStdComptime(&ident: str): any {
     | "Match":
         static mut f = &FnIns{caller: builtinCallerStdComptimeMatch}
         ret f
-    | "Range":
-        static mut f = &FnIns{caller: builtinCallerStdComptimeRange}
-        ret f
     | "Line":
         static mut f = &FnIns{caller: builtinCallerStdComptimeLine}
         ret f
@@ -937,48 +934,6 @@ fn builtinCallerStdComptimeMatch(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &D
                 exprToken: fc.Args[0].Token,
             },
         },
-    }
-}
-
-fn rangeData(mut kind: comptimeRangeKind): &Data {
-    ret &Data{
-        Kind: &TypeKind{
-            Kind: &comptimeRange{
-                kind: kind,
-            },
-        },
-    }
-}
-
-fn builtinCallerStdComptimeRange(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data {
-    if len(fc.Args) < 1 {
-        e.pushErr(fc.Token, LogMsg.MissingExprFor, "expr")
-        ret nil
-    }
-    if len(fc.Args) > 1 {
-        e.pushErr(fc.Args[1].Token, LogMsg.ArgumentOverflow, "Range")
-    }
-
-    mut d := e.evalExprKind(fc.Args[0].Kind)
-    if d == nil {
-        ret nil
-    }
-    match {
-    | d.Kind.comptimeStructFields() != nil:
-        ret rangeData(d.Kind.comptimeStructFields())
-    | d.Kind.comptimeEnumFields() != nil:
-        ret rangeData(d.Kind.comptimeEnumFields())
-    | d.Kind.comptimeTypeInfos() != nil:
-        ret rangeData(d.Kind.comptimeTypeInfos())
-    | d.Kind.comptimeParams() != nil:
-        ret rangeData(d.Kind.comptimeParams())
-    | d.Kind.comptimeStatics() != nil:
-        ret rangeData(d.Kind.comptimeStatics())
-    | d.Kind.comptimeFiles() != nil:
-        ret rangeData(d.Kind.comptimeFiles())
-    |:
-        e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, d.Kind.Str(), "Range")
-        ret nil
     }
 }
 

@@ -1053,6 +1053,24 @@ impl scopeParser {
         ret ue
     }
 
+    fn buildConstSt(mut self, mut &st: &stmt): StmtData {
+        if len(st.tokens) == 1 {
+            self.pushErr(st.tokens[0], LogMsg.InvalidSyntax)
+            ret nil
+        }
+        match st.tokens[1].Id {
+        | TokenId.For:
+            st.tokens = st.tokens[1:]
+            mut iter := self.buildIterSt(st)
+            if iter != nil {
+                iter.Comptime = true
+            }
+            ret iter
+        |:
+            ret self.buildVarSt(st.tokens)
+        }
+    }
+
     fn buildSt(mut self, mut &st: &stmt): StmtData {
         mut token := st.tokens[0]
         if token.Id == TokenId.Ident {
@@ -1070,8 +1088,9 @@ impl scopeParser {
         match token.Id {
         | TokenId.Use:
             ret self.buildUseExpr(st.tokens)
+        | TokenId.Const:
+            ret self.buildConstSt(st)
         | TokenId.Static
-        | TokenId.Const
         | TokenId.Let
         | TokenId.Mut:
             ret self.buildVarSt(st.tokens)
