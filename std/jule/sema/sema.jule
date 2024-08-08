@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use comptime for std::comptime
 use ast for std::jule::ast
 use build for std::jule::build::{Directive, LogMsg, Log, LogKind, Logf}
 use std::jule::constant::{Const}
@@ -1292,7 +1291,7 @@ impl Sema {
             item.Value = &Value{
                 Data: new(Data),
             }
-            match type comptime::Match(Int) {
+            const match type Int {
             | i64:
                 item.Value.Data.Constant = Const.NewI64(n)
             | u64:
@@ -1311,7 +1310,7 @@ impl Sema {
             }
             _ = self.checkAssignType(false, e.Kind.Kind, d, item.Token)
             item.Value.Data = d
-            match type comptime::Match(Int) {
+            const match type Int {
             | i64:
                 n = item.Value.Data.Constant.ReadI64()
             | u64:
@@ -1324,7 +1323,7 @@ impl Sema {
 
     fn checkEnumItemsInt1[Int](mut &self, &prim: &Prim, mut &e: &Enum) {
         mut max := Int(0)
-        match type comptime::Match(Int) {
+        const match type Int {
         | i64:
             max = types::MaxI(prim.Str())
         | u64:
@@ -1338,7 +1337,7 @@ impl Sema {
         mut first := e.Items[0]
         self.checkEnumItemInt(eval, e, prim, first, n)
         if first.Value.Data != nil {
-            match type comptime::Match(Int) {
+            const match type Int {
             | i64:
                 n = first.Value.Data.Constant.AsI64()
             | u64:
@@ -2206,9 +2205,7 @@ impl Sema {
             if !v.Value.Data.IsConst() && !comptime {
                 self.pushErr(v.Value.Expr.Token, LogMsg.ExprNotConst)
             }
-            if comptime && (
-                v.Value.Data.Kind.comptimeRange() != nil ||
-                v.Value.Data.Kind.comptimeMatch() != nil) {
+            if comptime && v.Value.Data.Kind.comptimeRange() != nil {
                 self.pushErr(v.Value.Expr.Token, LogMsg.InvalidTypeForConst, v.Value.Data.Kind.Str())
             }
         } else {
