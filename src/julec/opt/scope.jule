@@ -25,7 +25,7 @@ use sema for std::jule::sema::{
     InfIter,
     MultiAssign,
     RetSt,
-    BinopExprModel,
+    BinaryExprModel,
     OperandExprModel,
     BuiltinAppendCallExprModel,
     SliceExprModel,
@@ -310,14 +310,14 @@ impl scopeOptimizer {
             // Do not check division of structures safety.
             if Math && assign.L.Kind.Struct() == nil {
                 assign.Op.Kind = assign.Op.Kind[:len(assign.Op.Kind)-1]
-                mut model := ExprModel(&BinopExprModel{
+                mut model := ExprModel(&BinaryExprModel{
                     Op: assign.Op,
                     Left: assign.L,
                     Right: assign.R,
                 })
                 exprOptimizer.optimize(model)
                 match type model {
-                | &BinopExprModel:
+                | &BinaryExprModel:
                     assign.R = new(OperandExprModel, *assign.R)
                     assign.Op.Id = TokenId.Eq
                     assign.Op.Kind = TokenKind.Eq
@@ -466,8 +466,8 @@ fn isUnreachableExpr(&expr: ExprModel): bool {
     | &Const:
         c := (&Const)(expr)
         ret c.IsBool() && !c.ReadBool()
-    | &BinopExprModel:
-        m := (&BinopExprModel)(expr)
+    | &BinaryExprModel:
+        m := (&BinaryExprModel)(expr)
         if m.Op.Id == TokenId.DblAmper {
             ret isUnreachableExpr(m.Left.Model) ||
                 isUnreachableExpr(m.Right.Model)

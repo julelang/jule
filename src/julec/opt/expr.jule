@@ -12,7 +12,7 @@ use std::jule::sema::{
     Var,
     FnIns,
     ExprModel,
-    BinopExprModel,
+    BinaryExprModel,
     OperandExprModel,
     UnaryExprModel,
     StructLitExprModel,
@@ -63,7 +63,7 @@ impl exprOptimizer {
         }
     }
 
-    fn strCond(self, mut m: &BinopExprModel): bool {
+    fn strCond(self, mut m: &BinaryExprModel): bool {
         lp := m.Left.Kind.Prim()
         if lp == nil || !lp.IsStr() {
             ret false
@@ -119,7 +119,7 @@ impl exprOptimizer {
         ret true
     }
 
-    fn binary(self, mut m: &BinopExprModel) {
+    fn binary(self, mut m: &BinaryExprModel) {
         exprOptimizer.optimize(m.Left.Model)
         exprOptimizer.optimize(m.Right.Model)
 
@@ -165,7 +165,7 @@ impl exprOptimizer {
                 c.SetI64(1)
             }
         }
-        mut model := any(&UnsafeBinopExprModel{Node: m})
+        mut model := any(&UnsafeBinaryExprModel{Node: m})
         *self.model = unsafe { *(*ExprModel)(&model) }
     }
 
@@ -383,8 +383,8 @@ impl exprOptimizer {
 
     fn do(self) {
         match type *self.model {
-        | &BinopExprModel:
-            self.binary((&BinopExprModel)(*self.model))
+        | &BinaryExprModel:
+            self.binary((&BinaryExprModel)(*self.model))
         | &UnaryExprModel:
             self.unary((&UnaryExprModel)(*self.model))
         | &StructLitExprModel:

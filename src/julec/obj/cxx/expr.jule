@@ -5,7 +5,7 @@
 use env
 use opt::{
     RefExprModel,
-    UnsafeBinopExprModel,
+    UnsafeBinaryExprModel,
     UnsafeIndexingExprModel,
     PushToSliceExprModel,
     AppendToSliceExprModel,
@@ -27,7 +27,7 @@ use std::jule::sema::{
     Data,
     Value,
     ExprModel,
-    BinopExprModel,
+    BinaryExprModel,
     UnaryExprModel,
     StructLitExprModel,
     AllocStructLitExprModel,
@@ -90,7 +90,7 @@ type PrimKind: types::TypeKind
 enum compExprModel: type {
     ExprModel: ExprModel,
     str,                           // For built-in expressions.
-    &UnsafeBinopExprModel,
+    &UnsafeBinaryExprModel,
     &UnsafeIndexingExprModel,
     &StrCompExprModel,
     &RefExprModel,
@@ -232,7 +232,7 @@ impl exprCoder {
         self.oc.write(")")
     }
 
-    fn unsafeBinary(mut &self, mut m: &BinopExprModel) {
+    fn unsafeBinary(mut &self, mut m: &BinaryExprModel) {
         if m.Op.Id == TokenId.Eqs || m.Op.Id == TokenId.NotEq {
             // If this binary operator comparing <any> type.
             // The m.Left is will be <any> one always.
@@ -263,7 +263,7 @@ impl exprCoder {
         self.oc.write(")")
     }
 
-    fn binary(mut &self, mut m: &BinopExprModel) {
+    fn binary(mut &self, mut m: &BinaryExprModel) {
         match m.Op.Id {
         | TokenId.Solidus | TokenId.Percent:
             // Do not check division of structures safety.
@@ -1325,10 +1325,10 @@ impl exprCoder {
             self.structureIns((&StructIns)(m))
         | &FnIns:
             self.funcInsCommon((&FnIns)(m))
-        | &UnsafeBinopExprModel:
-            self.unsafeBinary((&UnsafeBinopExprModel)(m).Node)
-        | &BinopExprModel:
-            self.binary((&BinopExprModel)(m))
+        | &UnsafeBinaryExprModel:
+            self.unsafeBinary((&UnsafeBinaryExprModel)(m).Node)
+        | &BinaryExprModel:
+            self.binary((&BinaryExprModel)(m))
         | &UnaryExprModel:
             self.unary((&UnaryExprModel)(m))
         | &StructLitExprModel:

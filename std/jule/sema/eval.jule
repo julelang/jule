@@ -15,7 +15,7 @@ use ast for std::jule::ast::{
     SliceExpr,
     ExprData,
     FnDecl,
-    BinopExpr,
+    BinaryExpr,
     BraceLit,
     TupleExpr,
     SubIdentExpr,
@@ -2892,7 +2892,7 @@ impl Eval {
         }
     }
 
-    fn evalBinop(mut &self, mut op: &BinopExpr): &Data {
+    fn evalBinary(mut &self, mut op: &BinaryExpr): &Data {
         mut bs := binaryEval.newPlain(self)
         // Apply prefix for just numericals.
         if self.prefix != nil {
@@ -2946,8 +2946,8 @@ impl Eval {
             ret self.evalBraceLit((&BraceLit)(kind))
         | &FnDecl:
             ret self.evalAnonFunc((&FnDecl)(kind))
-        | &BinopExpr:
-            ret self.evalBinop((&BinopExpr)(kind))
+        | &BinaryExpr:
+            ret self.evalBinary((&BinaryExpr)(kind))
         |:
             ret nil
         }
@@ -4107,7 +4107,7 @@ impl binaryEval {
     fn checkData(mut self, mut &d: &Data) {
         f := d.Kind.Fn()
         if f != nil && f.Decl != nil && f.Decl.IsMethod() {
-            self.e.pushErr(self.op, LogMsg.InvalidExprForBinop)
+            self.e.pushErr(self.op, LogMsg.InvalidExprForBinary)
         }
     }
 
@@ -4130,7 +4130,7 @@ impl binaryEval {
             l, r = r, l
         }
 
-        d.Model = &BinopExprModel{
+        d.Model = &BinaryExprModel{
             Left: &OperandExprModel{
                 Kind: l.Kind,
                 Model: l.Model,
@@ -4168,7 +4168,7 @@ impl binaryEval {
         ret d
     }
 
-    fn eval(mut self, mut &op: &BinopExpr): &Data {
+    fn eval(mut self, mut &op: &BinaryExpr): &Data {
         if op.Op.Id == TokenId.Eq {
             self.e.pushErr(op.Op, LogMsg.AssignInExpr)
             self.e.pushSuggestion(LogMsg.UseImperative)
