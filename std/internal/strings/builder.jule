@@ -5,7 +5,7 @@
 use std::unsafe
 use utf8 for std::unicode::utf8
 
-// String builder for efficient concatenation.
+// See [std::strings] for documentation.
 struct StrBuilder {
     buf: []byte
 }
@@ -45,15 +45,19 @@ impl StrBuilder {
         self.WriteStr(str(r))
     }
 
-    // Returns as string.
-    fn Str(self): str {
-        ret str(self.buf)
+    // Returns as string, then calls the [Clear] method.
+    fn Str(mut self): str {
+        mut buf := self.buf
+        self.Clear() // Clear common buffer for safety.
+        buf = append(buf, 0) // NULL termination.
+        buf = buf[:len(buf)-1]
+        ret unsafe::StrFromBytes(buf)
     }
 
     // Clears buffer.
-    // Capacity will not be changed.
+    // After calling this function, write calls will allocate new buffer.
     fn Clear(mut self) {
-        self.buf = self.buf[:0]
+        self.buf = nil
     }
 
     // Returns length of buffer.
