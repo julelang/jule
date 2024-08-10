@@ -53,10 +53,11 @@ namespace jule
             return buf;
         }
 
-        static jule::Str lit(const char *s, const jule::Int n) noexcept {
+        static jule::Str lit(const char *s, const jule::Int n) noexcept
+        {
             jule::Str str;
             str.buffer = jule::Str::buffer_t::make(
-                const_cast<jule::U8*>(reinterpret_cast<const jule::U8*>(s)), nullptr);
+                const_cast<jule::U8 *>(reinterpret_cast<const jule::U8 *>(s)), nullptr);
             str._slice = str.buffer.alloc;
             str._len = n;
             return str;
@@ -213,8 +214,35 @@ namespace jule
                 jule::panic(error);
             }
 #endif
-            this->_slice += start;
-            this->_len = end - start;
+            // For interoperability, we should keep NULL termination.
+            // So, allocate new string if inevitable.
+            if (end == this->_len)
+            {
+                // The last element, so NULL termination is still there.
+                // Just slicing from head, safe.
+                this->_slice += start;
+                this->_len = end - start;
+            }
+            else if (this->buffer.ref != nullptr &&
+                     this->buffer.get_ref_n() == jule::REFERENCE_DELTA)
+            {
+                // The string allocation is already heap-allocated and
+                // there is no more reference, so mutating the buffer is safe.
+                // Avoid making allocation, just move NULL termination.
+                this->_slice += start;
+                this->_len = end - start;
+                this->_slice[this->_len] = 0;
+            }
+            else
+            {
+                // Make new heap allocation, mutating is not safe.
+                auto old_buffer = std::move(this->buffer);
+                auto old_slice = this->_slice;
+                this->_len = end - start;
+                this->buffer = jule::Str::buffer_t::make(jule::Str::alloc(this->_len));
+                this->_slice = this->buffer.alloc;
+                std::copy(old_slice + start, old_slice + end, this->_slice);
+            }
         }
 
         inline void mut_slice(
