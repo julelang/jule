@@ -840,6 +840,26 @@ impl exprCoder {
     }
 
     fn indexing(mut &self, mut m: &IndexingExprModel) {
+        match type m.Expr.Model {
+        | &Const:
+            // Cosntant string indexed. Use fast way, avoid making literal.
+            self.oc.write(typeCoder.Str + "::at(")
+            if !env::Production {
+                self.oc.write("\"")
+                self.oc.locInfo(m.Token)
+                self.oc.write("\", ")
+            }
+            self.oc.write("reinterpret_cast<const " + typeCoder.U8 + "*>(")
+            s := (&Const)(m.Expr.Model).ReadStr()
+            cstrLit(self.oc.Buf, s)
+            self.oc.write("), ")
+            self.oc.write(conv::Itoa(len(s)))
+            self.oc.write(", ")
+            self.possibleRefExpr(m.Index.Model)
+            self.oc.write(")")
+            ret
+        }
+
         self.possibleRefExpr(m.Expr.Model)
         // Index access with safety measures.
         match {

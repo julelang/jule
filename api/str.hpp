@@ -83,6 +83,31 @@ namespace jule
             return s;
         }
 
+        // Returns element by index.
+        // Includes safety checking.
+        // Designed for constant strings.
+        static jule::U8 at(
+#ifndef __JULE_ENABLE__PRODUCTION
+            const char *file,
+#endif
+            const jule::U8 *s, const jule::Int n, const jule::Int i) noexcept
+        {
+#ifndef __JULE_DISABLE__SAFETY
+            if (n == 0 || i < 0 || n <= i)
+            {
+                std::string error;
+                __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(error, i, n);
+                error += "\nruntime: string indexing with out of range index";
+#ifndef __JULE_ENABLE__PRODUCTION
+                error += "\nfile: ";
+                error += file;
+#endif
+                jule::panic(error);
+            }
+#endif
+            return s[i];
+        }
+
         Str(void) : _len(0) {};
         Str(const jule::Str &src) : buffer(src.buffer), _len(src._len), _slice(src._slice) {}
         Str(jule::Str &&src) : buffer(std::move(src.buffer)), _len(src._len), _slice(src._slice) {}
