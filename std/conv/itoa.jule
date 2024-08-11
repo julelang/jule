@@ -35,6 +35,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // ====================================================
 
+use std::unsafe
 use bits for std::math::bits
 
 // enable fast path for small integers
@@ -84,9 +85,12 @@ fn Itoa(i: int): str {
 // Returns the string for an i with 0 <= i < nSmalls.
 fn small(i: int): str {
     if i < 10 {
-        ret digits[i:i+1]
+        ret str(byte('0' + i))
     }
-    ret smallsStr[i*2 : i*2+2]
+    mut buf := make([]byte, 3) // Digits + NULL termination.
+    buf[0] = smallsStr[i<<1]
+    buf[1] = smallsStr[i<<1+1]
+    ret unsafe::StrFromBytes(buf[:2])
 }
 
 fn isPowerOfTwo(x: int): bool {
@@ -114,7 +118,8 @@ fn fmtBits(mut dst: []byte, mut u: u64, base: int, neg: bool, append_: bool): (d
     // convert bits
     // We use uint values where we can because those will
     // fit into a single register even on a 32bit machine.
-    if base == 10 {
+    match {
+    | base == 10:
         // common case: use constants for / because
         // the compiler can optimize it into a multiply+shift
 
@@ -163,7 +168,7 @@ fn fmtBits(mut dst: []byte, mut u: u64, base: int, neg: bool, append_: bool): (d
             i--
             a[i] = smallsStr[is]
         }
-    } else if isPowerOfTwo(base) {
+    | isPowerOfTwo(base):
         // Use shifts and masks instead of / and %.
         // Base is a power of 2 and 2 <= base <= len(digits) where len(digits) is 36.
         // The largest power of 2 below or equal to 36 is 32, which is 1 << 5;
@@ -182,7 +187,7 @@ fn fmtBits(mut dst: []byte, mut u: u64, base: int, neg: bool, append_: bool): (d
         // u < base
         i--
         a[i] = digits[uint(u)]
-    } else {
+    |:
         // general case
         b := u64(base)
         for u >= b {
@@ -209,6 +214,8 @@ fn fmtBits(mut dst: []byte, mut u: u64, base: int, neg: bool, append_: bool): (d
         d = append(dst, a[i:]...)
         ret
     }
-    s = str(a[i:])
+    n := copy(a, a[i:])
+    a[n] = 0 // NULL termination.
+    s = unsafe::StrFromBytes(a[:n])
     ret
 }
