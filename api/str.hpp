@@ -56,9 +56,7 @@ namespace jule
         static jule::Str lit(const char *s, const jule::Int n) noexcept
         {
             jule::Str str;
-            str.buffer = jule::Str::buffer_t::make(
-                const_cast<jule::U8 *>(reinterpret_cast<const jule::U8 *>(s)), nullptr);
-            str._slice = str.buffer.alloc;
+            str._slice = const_cast<jule::U8 *>(reinterpret_cast<const jule::U8 *>(s));
             str._len = n;
             return str;
         }
