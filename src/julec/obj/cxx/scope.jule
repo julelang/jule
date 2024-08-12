@@ -436,12 +436,44 @@ impl scopeCoder {
         self.oc.ec.possibleRefExpr(a.R)
         self.oc.write(";\n")
 
+        mut tup := f.Func.Result.Tup()
         for (i, mut l) in a.L {
             if l != nil {
+                const r = assignResultName + "." + resultArgName
                 self.oc.indent()
                 self.oc.ec.possibleRefExpr(l.Model)
-                self.oc.write(" = " + assignResultName + "." + resultArgName)
-                self.oc.write(conv::Itoa(i))
+                match {
+                | tup.Types[i].Equal(l.Kind):
+                    self.oc.write(" = " + r)
+                    self.oc.write(conv::Itoa(i))
+                | isAny(l.Kind):
+                    self.oc.write(" = " + typeCoder.Any + "(" + r)
+                    self.oc.write(conv::Itoa(i))
+                    self.oc.write(", &" + anyTypeIdent)
+                    self.oc.write(conv::Itoa(self.oc.pushAnyType(tup.Types[i])))
+                    self.oc.write(")")
+                |: // It should be trait.
+                    self.oc.write(" = ")
+                    if tup.Types[i].Trait() != nil { // Different traits, cast.
+                        mut t1 := l.Kind.Trait()
+                        mut t2 := tup.Types[i].Trait()
+                        self.oc.write(r)
+                        self.oc.write(conv::Itoa(i))
+                        self.oc.write(".mask<")
+                        identCoder.traitDecl(self.oc.Buf, t1)
+                        self.oc.write(">(")
+                        self.oc.pushAndWriteMaskMapper(t1, t2)
+                        self.oc.write(")")
+                        break
+                    }
+                    self.oc.tc.kind(self.oc.Buf, l.Kind)
+                    self.oc.write("(")
+                    self.oc.write(r)
+                    self.oc.write(conv::Itoa(i))
+                    self.oc.write(", ")
+                    self.oc.write(conv::Itoa(self.oc.findTypeOffset(l.Kind.Trait(), tup.Types[i])))
+                    self.oc.write(")")
+                }
                 self.oc.write(";\n")
             }
         }
