@@ -1365,33 +1365,30 @@ impl scopeChecker {
         }
         self.scope.Stmts = append(self.scope.Stmts, &Assign{L: lm, R: rm, Op: a.Setter})
 
-        if a.Setter.Id != TokenId.Eq {
-            mut strct := l.Kind.Struct()
-            if strct != nil {
-                self.checkStructureAssignOp(strct, a, r)
-                ret
+        if a.Setter.Id == TokenId.Eq {
+            mut checker := assignTypeChecker{
+                s: self.s,
+                dest: l.Kind,
+                d: r,
+                errorToken: a.Setter,
             }
-            id := a.Setter.Id
-            a.Setter.Id = removeEqFromOp(a.Setter.Id)
-            mut solver := binaryEval.new(eval, a.Setter)
-            r = solver.solveExplicit(l, r)
-            a.Setter.Id = id
-            if r == nil {
-                ret
+            if checker.check() {
+                rm.Model = r.Model
+                lm.Model = l.Model
             }
             ret
         }
-
-        mut checker := assignTypeChecker{
-            s: self.s,
-            dest: l.Kind,
-            d: r,
-            errorToken: a.Setter,
+        mut strct := l.Kind.Struct()
+        if strct != nil {
+            self.checkStructureAssignOp(strct, a, r)
+            ret
         }
-        if checker.check() {
-            rm.Model = r.Model
-            lm.Model = l.Model
-        }
+        id := a.Setter.Id
+        a.Setter.Id = removeEqFromOp(a.Setter.Id)
+        mut solver := binaryEval.new(eval, a.Setter)
+        solver.l, solver.r = l, r
+        _ = solver.evalOp()
+        a.Setter.Id = id
     }
 
     fn processEndPartOfMultiAssign(mut self, mut &st: &MultiAssign,
