@@ -914,7 +914,7 @@ impl scopeParser {
         ret lefts
     }
 
-    fn buildPlainAssign(mut self, mut &tokens: []&Token): (&AssignSt, bool) {
+    fn buildPlainAssign(mut self, mut &tokens: []&Token): (StmtData, bool) {
         mut info := self.buildAssignInfo(tokens)
         if !info.ok {
             ret nil, false
@@ -929,7 +929,23 @@ impl scopeParser {
             assign.Declarative = true
             assign.Right = self.p.buildExpr(info.r)
             ok := self.buildDeclAssign1(info.l, assign)
-            ret assign, ok
+            if !ok {
+                ret nil, false
+            }
+            if len(assign.Left) > 1 {
+                ret assign, true
+            }
+            // Single left, use &VarDecl intead.
+            mut left := assign.Left[0]
+            mut decl := &VarDecl{
+                Token: left.Token,
+                Ident: left.Ident,
+                Mutable: left.Mutable,
+                Reference: left.Reference,
+                Scope: self.s,
+                Expr: assign.Right,
+            }
+            ret decl, true
         }
 
         mut parts, errs := parts(info.l, TokenId.Comma, true)
@@ -1025,18 +1041,16 @@ impl scopeParser {
         ret assign, ok
     }
 
-    fn buildAssignSt(mut self, mut &tokens: []&Token): (st: &AssignSt, ok: bool) {
+    fn buildAssignSt(mut self, mut &tokens: []&Token): (st: StmtData, ok: bool) {
         if !checkAssignTokens(tokens) {
             ret nil, false
         }
-
         match tokens[0].Id {
         | TokenId.Let:
             st, ok = self.buildDeclAssign(tokens)
         |:
             st, ok = self.buildPlainAssign(tokens)
         }
-
         ret
     }
 

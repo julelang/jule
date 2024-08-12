@@ -1517,52 +1517,12 @@ impl scopeChecker {
         self.scope.Stmts = append(self.scope.Stmts, st)
     }
 
-    fn singleDeclAssign(mut &self, mut &a: &AssignSt) {
-        mut lexpr := a.Left[0]
-        if self.isDuplicatedIdent(0, lexpr.Ident) {
-            self.s.pushErr(lexpr.Token, LogMsg.DuplicatedIdent, lexpr.Ident)
-            self.s.pushSuggestion(LogMsg.RenameForAvoidDuplication)
-            self.stop()
-            ret
-        }
-        if IsIgnoreIdent(lexpr.Ident) {
-            self.s.pushErr(lexpr.Token, LogMsg.IgnoreIdent)
-        }
-
-        mut r := self.s.eval(self).evalExpr(a.Right)
-        if r == nil {
-            ret
-        }
-
-        self.removeInteriorMutRisk(r)
-
-        // Add new variable declaration statement.
-        mut v := &Var{
-            Ident: lexpr.Ident,
-            Token: lexpr.Token,
-            Mutable: lexpr.Mutable,
-            Reference: lexpr.Reference,
-            Scope: self.scope,
-            Value: &Value{
-                Expr: a.Right,
-                Data: r,
-            },
-        }
-        self.s.checkVarValue(v)
-        self.table.Vars = append(self.table.Vars, v)
-        self.scope.Stmts = append(self.scope.Stmts, v)
-    }
-
     fn checkAssignSt(mut &self, mut a: &AssignSt) {
         match {
         | IsPostfixOp(a.Setter.Id):
             self.checkPostfix(a)
         | len(a.Left) == 1:
-            if a.Declarative {
-                self.singleDeclAssign(a)
-            } else {
-                self.checkSingleAssign(a)
-            }
+            self.checkSingleAssign(a)
         |:
             self.checkMultiAssign(a)
         }
