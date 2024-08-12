@@ -73,6 +73,8 @@ impl exprOptimizer {
         }
         match type m.Left.Model {
         | &Const:
+            // Equality comparison, swap operation is safe and will not change
+            // the behavior of the program.
             m.Left, m.Right = m.Right, m.Left
             goto opt
         }
@@ -119,11 +121,74 @@ impl exprOptimizer {
         ret true
     }
 
+    fn tryNeutralElement1(self, mut &m: &BinaryExprModel, mut c: &Const, &nc: &OperandExprModel): bool {
+        if c.IsStr() { // Constant is string, check for string optimizations.
+            if !Str {
+                ret false
+            }
+            if c.ReadStr() == "" && m.Op.Id == TokenId.Plus {
+                // Concatenation with empty string, use the non-constnat operand's model.
+                *self.model = nc.Model
+                ret true
+            }
+            ret false
+        }
+
+        // Following algoritms are designed for zero-constant math operations.
+        // So make required conditions are guaranteed.
+        if !Math || c.AsF64() != 0 {
+            ret false
+        }
+        match m.Op.Id {
+        | TokenId.Shl
+        | TokenId.Shr:
+            // If the constant expression is shifter, use the right operand's model.
+            if nc == m.Left {
+                *self.model = nc.Model
+                ret true
+            }
+            // If the shifter expression is non-constant, shifted value is constant-zero.
+            // Use zero-constant directly.
+            *self.model = c
+            ret true
+        | TokenId.Star:
+            c.SetI64(0)
+            *self.model = c
+            ret true
+        | TokenId.Plus
+        | TokenId.Minus:
+            *self.model = nc.Model
+            ret true
+        }
+        ret false
+    }
+
+    // Tries optimize binary expression for neutral elements.
+    // Specialized in math optimizations.
+    fn tryNeutralElement(self, mut &m: &BinaryExprModel): bool {
+        // For netural element optimization, one of the operands should be constant.
+        match type m.Left.Model {
+        | &Const:
+            mut c := (&Const)(m.Left.Model)
+            ret self.tryNeutralElement1(m, c, m.Right)
+        }
+        match type m.Right.Model {
+        | &Const:
+            mut c := (&Const)(m.Right.Model)
+            ret self.tryNeutralElement1(m, c, m.Left)
+        }
+        ret false
+    }
+
     fn binary(self, mut m: &BinaryExprModel) {
         exprOptimizer.optimize(m.Left.Model)
         exprOptimizer.optimize(m.Right.Model)
 
         if Cond && self.strCond(m) {
+            ret
+        }
+
+        if self.tryNeutralElement(m) {
             ret
         }
 
