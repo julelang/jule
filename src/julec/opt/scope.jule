@@ -308,25 +308,37 @@ impl scopeOptimizer {
         match assign.Op.Id {
         | TokenId.SolidusEq | TokenId.PercentEq:
             // Do not check division of structures safety.
-            if Math && assign.L.Kind.Struct() == nil {
-                assign.Op.Kind = assign.Op.Kind[:len(assign.Op.Kind)-1]
-                mut model := ExprModel(&BinaryExprModel{
-                    Op: assign.Op,
-                    Left: assign.L,
-                    Right: assign.R,
-                })
-                exprOptimizer.optimize(model)
-                match type model {
-                | &BinaryExprModel:
-                    assign.R = new(OperandExprModel, *assign.R)
-                    assign.Op.Id = TokenId.Eq
-                    assign.Op.Kind = TokenKind.Eq
-                    assign.R.Model = model
-                    ret
-                }
-                assign.Op.Kind += "="
+            if !Math || assign.L.Kind.Struct() != nil {
+                break
+            }
+            oldId, oldKind := assign.Op.Id, assign.Op.Kind
+            match assign.Op.Id {
+            | TokenId.SolidusEq:
+                assign.Op.Id = TokenId.Solidus
+                assign.Op.Kind = TokenKind.Solidus
+            | TokenId.PercentEq:
+                assign.Op.Id = TokenId.Percent
+                assign.Op.Kind = TokenKind.Percent
+            |:
+                panic("implementation mistake, this panic call should be unreachable")
+            }
+            mut model := ExprModel(&BinaryExprModel{
+                Op: assign.Op,
+                Left: assign.L,
+                Right: assign.R,
+            })
+            exprOptimizer.optimize(model)
+            match type model {
+            | &BinaryExprModel:
+                assign.R = new(OperandExprModel, *assign.R)
+                assign.Op.Id = TokenId.Eq
+                assign.Op.Kind = TokenKind.Eq
+                assign.R.Model = model
                 ret
             }
+            assign.Op.Id = oldId
+            assign.Op.Kind = oldKind
+            ret
         }
 
         if Append {
