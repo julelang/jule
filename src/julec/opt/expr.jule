@@ -137,6 +137,19 @@ impl exprOptimizer {
         if !Math {
             ret
         }
+
+        // Break optimizations if types are not primitive.
+        // No need for checking whether types are arithmetic,
+        // because relevant operators are conly avaliable for arithmetic primitives.
+        lp := m.Left.Kind.Prim()
+        if lp == nil {
+            ret
+        }
+        rp := m.Right.Kind.Prim()
+        if rp == nil {
+            ret
+        }
+
         match m.Op.Id {
         | TokenId.Star:
             ok, x := checkForBitShiftOpt(m.Left, m.Right)
@@ -145,6 +158,8 @@ impl exprOptimizer {
                 m.Op.Kind = TokenKind.Shl
                 mut c := (&Const)(m.Right.Model)
                 c.SetU64(x)
+                // No need to set model as UnsafeBinaryExprModel,
+                // shl is not checked at runtime, so it is optimize enough.
                 ret
             }
         | TokenId.Solidus:
@@ -154,17 +169,26 @@ impl exprOptimizer {
                 m.Op.Kind = TokenKind.Shr
                 mut c := (&Const)(m.Right.Model)
                 c.SetU64(x)
+                // No need to set model as UnsafeBinaryExprModel,
+                // shr is not checked at runtime, so it is optimize enough.
                 ret
             }
         | TokenId.Percent:
             mut c := (&Const)(m.Right.Model)
-            d := c.AsF64()
-            if d == 2 {
+            if c.AsF64() == 0b10 {
                 m.Op.Id = TokenId.Amper
                 m.Op.Kind = TokenKind.Amper
                 c.SetI64(1)
+                // No need to set model as UnsafeBinaryExprModel,
+                // bitwise and is not checked at runtime, so it is optimize enough.
+                ret
             }
+        |:
+            // Eliminate unsupported operators.
+            ret
         }
+        // Update model as UnsafeBinaryExprModel because it is safe, comptime checked.
+        // There is no risk like zero-division.
         mut model := any(&UnsafeBinaryExprModel{Node: m})
         *self.model = unsafe { *(*ExprModel)(&model) }
     }
@@ -458,14 +482,9 @@ impl exprOptimizer {
 //   - log2(r) returns integer without fraction
 //
 // As a result: returns whether bit-shifting is possible and what nth power of 2^r.
+// Assumes the model r is constant.
 fn checkForBitShiftOpt(&l: &OperandExprModel, &r: &OperandExprModel): (ok: bool, x: u64) {
     if !types::IsInt(l.Kind.Str()) || !types::IsInt(r.Kind.Str()) {
-        ret false, 0
-    }
-    match type r.Model {
-    | &Const:
-        break
-    |:
         ret false, 0
     }
     x = (&Const)(r.Model).AsU64()
