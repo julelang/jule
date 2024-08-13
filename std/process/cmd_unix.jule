@@ -32,17 +32,21 @@ struct cmdAttrs {
     pid: pid = invalidPid
 }
 
-fn strSliceToCstrSlice(&s: []str): []*integ::Char {
+fn strSliceToCstrSlice(&s: []str, mut &bargs: [][]byte): []*integ::Char {
     mut cs := make([]*integ::Char, len(s) + 1)
-    for i in s {
-        cs[i] = unsafe { (*integ::Char)(&s[i][0]) }
+    bargs = make([][]byte, len(s))
+    for i, arg in s {
+        mut barg := integ::StrToBytes(arg)
+        bargs[i] = barg
+        cs[i] = unsafe { (*integ::Char)(&barg[0]) }
     }
     cs[len(cs)-1] = nil
     ret cs
 }
 
 fn execvp(&file: str, &argv: []str): int {
-    cargv := strSliceToCstrSlice(argv)
+    mut bargs := [][]byte(nil) // Avoid deallocation of converted args for safety.
+    cargv := strSliceToCstrSlice(argv, bargs)
     s := integ::StrToBytes(file)
     unsafe {
         ret integ::Emit[int]("execvp({}, (char*const*){})", (*integ::Char)(&s[0]), &cargv[0])
