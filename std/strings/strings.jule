@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use std::unsafe
 use unicode for std::unicode
 use utf8 for std::unicode::utf8
 use fastbytes for std::internal::fastbytes
@@ -16,13 +15,11 @@ fn Repeat(s: str, mut n: int): str {
     if len(s) > int.Max/n {
         panic("std::strings: repeat: integer buffer size overflow")
     }
-
     mut ss := StrBuilder.New(len(s) * n)
     for n > 0; n-- {
         ss.WriteStr(s)
     }
-    ss.WriteByte(0) // NULL termination.
-    ret unsafe::StrFromBytes(unsafe { ss.Buf() }[:ss.Len()-1])
+    ret ss.Str()
 }
 
 fn hasPrefix(&s: str, &sub: str, mut start: int): bool {
@@ -200,10 +197,9 @@ fn FindRune(s: str, r: rune): int {
 // returns -1 if not exist any match. Starts searching at right
 // of string to left.
 fn FindLastRune(s: str, r: rune): int {
-    sb := unsafe::StrBytes(s)
-    mut i := len(sb)
+    mut i := len(s)
     for i > 0 {
-        br, n := utf8::DecodeLastRune(sb[:i])
+        br, n := utf8::DecodeLastRuneStr(s[:i])
         if r == br {
             ret i - 1
         }
@@ -231,10 +227,9 @@ fn FindAny(s: str, runes: str): int {
 // returns -1 if not exist any match. Starts searching at right
 // of string to left.
 fn FindLastAny(s: str, runes: str): int {
-    sb := unsafe::StrBytes(s)
     mut i := len(s)
     for i > 0 {
-        r, n := utf8::DecodeLastRune(sb[:i])
+        r, n := utf8::DecodeLastRuneStr(s[:i])
         if FindRune(runes, r) != -1 {
             ret i - 1
         }
@@ -340,8 +335,7 @@ fn Replace(s: str, sub: str, new: str, mut n: int): str {
         i = j + len(sub)
     }
     ss.WriteStr(s[i:])
-    ss.WriteByte(0) // NULL termination.
-    ret unsafe::StrFromBytes(unsafe { ss.Buf() }[:ss.Len()-1])
+    ret ss.Str()
 }
 
 // Returns a copy of the string s with all its characters modified
@@ -358,8 +352,7 @@ fn Map(s: str, mapping: fn(mut rune): rune): str {
             ss.WriteRune(r)
         }
     }
-    ss.WriteByte(0) // NULL termination.
-    ret unsafe::StrFromBytes(unsafe { ss.Buf() }[:ss.Len()-1])
+    ret ss.Str()
 }
 
 // Returns s with all Unicode letters mapped to their lower case.
@@ -372,55 +365,38 @@ fn ToUpper(s: str): str {
     ret Map(s, unicode::ToUpper)
 }
 
-fn trimLeft(mut &s: []byte, cutset: str) {
+// Trims string by specified runes at left.
+// Cutset should include runes to trim.
+fn TrimLeft(mut s: str, cutset: str): str {
     mut i := 0
     for i < len(s) {
-        r, n := utf8::DecodeRune(s[i:])
+        r, n := utf8::DecodeRuneStr(s[i:])
         if FindRune(cutset, r) == -1 {
-            s = s[i:]
-            ret
+            ret s[i:]
         }
         i += n
     }
-    s = nil
-}
-
-// Trims string by specified runes at left.
-// Cutset should include runes to trim.
-fn TrimLeft(s: str, cutset: str): str {
-    mut bytes := unsafe::StrBytes(s)
-    trimLeft(bytes, cutset)
-    ret str(bytes)
-}
-
-fn trimRight(mut &s: []byte, cutset: str) {
-    mut i := len(s)
-    for i > 0 {
-        r, n := utf8::DecodeLastRune(s[:i])
-        if FindRune(cutset, r) == -1 {
-            s = s[:i]
-            ret
-        }
-        i -= n
-    }
-    s = nil
+    ret ""
 }
 
 // Trims string by specified runes at right.
 // Cutset should include runes to trim.
 fn TrimRight(s: str, cutset: str): str {
-    mut bytes := unsafe::StrBytes(s)
-    trimRight(bytes, cutset)
-    ret str(bytes)
+    mut i := len(s)
+    for i > 0 {
+        r, n := utf8::DecodeLastRuneStr(s[:i])
+        if FindRune(cutset, r) == -1 {
+            ret s[:i]
+        }
+        i -= n
+    }
+    ret ""
 }
 
 // Trims string by specified runes at left and right.
 // Cutset should include runes to trim.
 fn Trim(s: str, cutset: str): str {
-    mut bytes := unsafe::StrBytes(s)
-    trimLeft(bytes, cutset)
-    trimRight(bytes, cutset)
-    ret str(bytes)
+    ret TrimLeft(TrimRight(s, cutset), cutset)
 }
 
 // Concatenates the parts of its first argument to create a single string.
@@ -443,8 +419,7 @@ fn Join(parts: []str, sep: str): str {
         s.WriteStr(sep)
         s.WriteStr(part)
     }
-    s.WriteByte(0) // NULL termination.
-    ret unsafe::StrFromBytes(unsafe { s.Buf() }[:s.Len()-1])
+    ret s.Str()
 }
 
 // Cut slices s around the first instance of sep,

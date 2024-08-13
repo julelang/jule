@@ -17,14 +17,14 @@ fn IsAscii(r: rune): bool {
 // Bytes are represents rune literal, allows escape sequences.
 // Returns zero rune if len(lit) == 0.
 // Assumes lit is syntaticaly and semantically correct.
-fn ToRune(lit: str): rune {
+fn ToRune(mut lit: str): rune {
     mut r := rune(0)
-    bytes := unsafe::StrBytes(lit)[1:len(lit)-1]
-    if bytes[0] == '\\' && len(bytes) > 1 {
+    lit = lit[1:len(lit)-1]
+    if lit[0] == '\\' && len(lit) > 1 {
         mut i := 0
-        r = runeFromEsqSeq(bytes, i)
+        r = runeFromEsqSeq(lit, i)
     } else {
-        r, _ = utf8::DecodeRune(bytes)
+        r, _ = utf8::DecodeRuneStr(lit)
     }
     ret r
 }
@@ -44,7 +44,7 @@ fn ToRawStr(lit: str): str {
 // Bytes are represents string characters, allows escape sequences.
 // Returns empty string if len(lit) == 0.
 // Assumes lit is syntaticaly and semantically correct.
-fn ToStr(lit: str): str {
+fn ToStr(mut lit: str): str {
     if len(lit) == 2 {
         ret ""
     }
@@ -64,28 +64,27 @@ fn ToStr(lit: str): str {
 
     // String is not pure.
     // Handle unicode characters and escape sequences.
-    bytes := unsafe::StrBytes(lit)[1:len(lit)-1]
-    mut s := make([]byte, 0, len(bytes))
+    lit = lit[1:len(lit)-1]
+    mut s := make([]byte, 0, len(lit))
     mut i := 0
-    for i < len(bytes) {
-        b := bytes[i]
+    for i < len(lit) {
+        b := lit[i]
         if b == '\\' {
-            s = append(s, strEsqSeq(bytes, i)...)
+            strEsqSeq(s, lit, i)
         } else {
-            r, size := utf8::DecodeRune(bytes[i:])
+            r, size := utf8::DecodeRuneStr(lit[i:])
             i += size
             s = utf8::AppendRune(s, r)
         }
     }
-    s = append(s, 0) // NULL termination.
-    ret unsafe::StrFromBytes(s[:len(s)-1])
+    ret unsafe::StrFromBytes(s)
 }
 
-fn tryBtoaCommonEsq(bytes: []byte): (seq: byte, ok: bool) {
-    if len(bytes) < 2 || bytes[0] != '\\' {
+fn tryBtoaCommonEsq(s: str): (seq: byte, ok: bool) {
+    if len(s) < 2 || s[0] != '\\' {
         ret
     }
-    match bytes[1] {
+    match s[1] {
     | '\\':
         seq = '\\'
     | '\'':
@@ -111,42 +110,44 @@ fn tryBtoaCommonEsq(bytes: []byte): (seq: byte, ok: bool) {
     ret
 }
 
-fn runeFromEsqSeq(bytes: []byte, mut &i: int): rune {
-    b, ok := tryBtoaCommonEsq(bytes[i:])
+fn runeFromEsqSeq(s: str, mut &i: int): rune {
+    b, ok := tryBtoaCommonEsq(s[i:])
     i++ // Skip escape sequence solidus.
     if ok {
         i++ // Skip sequence specifier.
         ret rune(b)
     }
 
-    match bytes[i] {
+    match s[i] {
     | 'u':
         const SeqLen = 5
-        r := rune(conv::ParseUint(unsafe::BytesStr(bytes[i+1 : i+SeqLen]), 16, 64)!)
+        r := rune(conv::ParseUint(s[i+1 : i+SeqLen], 16, 64)!)
         i += SeqLen
         ret r
     | 'U':
         const SeqLen = 9
-        r := rune(conv::ParseUint(unsafe::BytesStr(bytes[i+1 : i+SeqLen]), 16, 64)!)
+        r := rune(conv::ParseUint(s[i+1 : i+SeqLen], 16, 64)!)
         i += SeqLen
         ret r
     | 'x':
         const SeqLen = 3
-        seq := bytes[i+1 : i+SeqLen]
+        seq := s[i+1 : i+SeqLen]
         i += SeqLen
-        ret rune(conv::ParseUint(unsafe::BytesStr(seq), 16, 64)!)
+        ret rune(conv::ParseUint(seq, 16, 64)!)
     |:
         const SeqLen = 3
-        seq := bytes[i:i+SeqLen]
+        seq := s[i:i+SeqLen]
         i += SeqLen
-        ret rune(conv::ParseUint(unsafe::BytesStr(seq[1:]), 8, 64)!)
+        ret rune(conv::ParseUint(seq[1:], 8, 64)!)
     }
 }
 
-fn strEsqSeq(bytes: []byte, mut &i: int): []byte {
-    r := runeFromEsqSeq(bytes, i)
+fn strEsqSeq(mut &buf: []byte, s: str, mut &i: int) {
+    r := runeFromEsqSeq(s, i)
     if r <= 255 {
-        ret [byte(r)]
+        buf = append(buf, byte(r))
+        ret
     }
-    ret unsafe::BytesFromStr(str(r))
+    sr := str(r)
+    buf = append(buf, unsafe::StrBytes(sr)...)
 }
