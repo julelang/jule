@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use integ for std::jule::integrated
 use sys for std::sys
 
 impl File {
@@ -16,7 +17,8 @@ impl File {
     //  SystemWideLimit NotExist UnableStream NoSpace NotDir Device Overflow
     //  ReadOnly Retry Busy
     static fn Open(path: str, flag: OFlag, mode: int)!: &File {
-        handle := unsafe { sys::Open(&path[0], int(flag), mode) }
+        s := integ::StrToBytes(path)
+        handle := unsafe { sys::Open(&s[0], int(flag), mode) }
         if handle == -1 {
             error(getLastFsError())
         }
@@ -28,7 +30,8 @@ impl File {
     // Possible errors:
     //  Denined Busy LongPath NotExist InsufficientMemory NotDir
     static fn Remove(path: str)! {
-        if unsafe { sys::Unlink(&path[0]) } != 0 {
+        s := integ::StrToBytes(path)
+        if unsafe { sys::Unlink(&s[0]) } != 0 {
             error(getLastFsError())
         }
     }
@@ -36,16 +39,16 @@ impl File {
 
 impl File {
     // Writes bytes to handle and returns writed byte count.
-    // The number of bytes written can never exceed the length of the buff.
+    // The number of bytes written can never exceed the length of the buf.
     //
     // Possible errors:
     //  Retry InvalidDescriptor Big Signal IO NoSpace Pipe Range SyncIO
     //  Seek Device Buffer
-    fn Write(mut self, buff: []byte)!: (n: int) {
-        if len(buff) == 0 {
+    fn Write(mut self, buf: []byte)!: (n: int) {
+        if len(buf) == 0 {
             ret 0
         }
-        n = unsafe { sys::Write(int(self.handle), &buff[0], uint(len(buff))) }
+        n = unsafe { sys::Write(int(self.handle), &buf[0], uint(len(buf))) }
         if n == -1 {
             error(getLastFsError())
         }
@@ -53,19 +56,19 @@ impl File {
     }
 
     // Read bytes to buffer from handle and returns readed byte count.
-    // The number of bytes readed can never exceed the length of the buff.
-    // If the buff is larger than the number of bytes that can be read,
+    // The number of bytes readed can never exceed the length of the buf.
+    // If the buf is larger than the number of bytes that can be read,
     // the buffer will not cause an overflow. Offset will be shifted
     // by the number of bytes read.
     //
     // Possible errors:
     //  Retry InvalidDescriptor Signal SyncIO IO IsDir Overflow Buffer
     //  InsufficientMemory Device Seek
-    fn Read(mut self, mut buff: []byte)!: (n: int) {
-        if len(buff) == 0 {
+    fn Read(mut self, mut buf: []byte)!: (n: int) {
+        if len(buf) == 0 {
             ret 0
         }
-        n = unsafe { sys::Read(int(self.handle), &buff[0], uint(len(buff))) }
+        n = unsafe { sys::Read(int(self.handle), &buf[0], uint(len(buf))) }
         if n == -1 {
             error(getLastFsError())
         }

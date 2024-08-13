@@ -43,8 +43,9 @@ fn strSliceToCstrSlice(&s: []str): []*integ::Char {
 
 fn execvp(&file: str, &argv: []str): int {
     cargv := strSliceToCstrSlice(argv)
+    s := integ::StrToBytes(file)
     unsafe {
-        ret integ::Emit[int]("execvp({}, (char*const*){})", (*integ::Char)(&file[0]), &cargv[0])
+        ret integ::Emit[int]("execvp({}, (char*const*){})", (*integ::Char)(&s[0]), &cargv[0])
     }
 }
 
@@ -56,14 +57,14 @@ fn setenv(&envv: []str)! {
             error(ProcessError.Env)
         }
         unsafe {
-            key := env[:i]
+            key := integ::StrToBytes(env[:i])
             if len(env)-i == 1 {
                 val := "\x00"
                 if cpp.setenv((*integ::Char)(&key[0]), (*integ::Char)(&val[0]), Overwrite) == -1 {
                     error(ProcessError.Env)
                 }
             } else {
-                val := env[i+1:]
+                val := integ::StrToBytes(env[i+1:])
                 if cpp.setenv((*integ::Char)(&key[0]), (*integ::Char)(&val[0]), Overwrite) == -1 {
                     error(ProcessError.Env)
                 }

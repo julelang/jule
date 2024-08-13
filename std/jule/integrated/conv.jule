@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use fastbytes for std::internal::fastbytes
 use utf16 for std::unicode::utf16
 
 // Builtin:
@@ -11,7 +12,7 @@ use utf16 for std::unicode::utf16
 // Returns the UTF-16 encoding of the UTF-8 string
 // s, with a terminating NULL added. If s includes NULL
 // character at any location, ignores followed characters.
-fn Utf16FromStr(s: str): []u16 {
+fn UTF16FromStr(s: str): []u16 {
     // In the worst case all characters require two u16.
     // Also account for the terminating NULL character.
     // See: C Strings and Windows UTF16.
@@ -31,7 +32,7 @@ fn Utf16FromStr(s: str): []u16 {
 // Returns the UTF-8 encoding of the UTF-16 sequence s,
 // with a terminating NULL removed. Returns empty string
 // if s is nil.
-fn Utf16ToStr(s: []u16): str {
+fn UTF16ToStr(s: []u16): str {
     if s == nil {
         ret ""
     }
@@ -85,4 +86,19 @@ unsafe fn BytePtrToStr(s: *byte): str {
         }
     }
     ret str(buf)
+}
+
+// Returns s as NULL terminated byte slice which is able to be used safely as
+// NULL terminated string pointer. If s contatins NULL termination at any location,
+// accepts NULL termination is the end of s and skips following bytes.
+fn StrToBytes(s: str): []byte {
+    mut i := fastbytes::FindByteStr(s, 0)
+    if i != -1 {
+        mut bytes := make([]byte, i+1)
+        copy(bytes, s[:len(bytes)])
+        ret bytes
+    }
+    mut bytes := make([]byte, len(s)+1)
+    copy(bytes, s)
+    ret bytes
 }

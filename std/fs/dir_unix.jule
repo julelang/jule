@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 use path for std::fs::path
-use integrated for std::jule::integrated
+use integ for std::jule::integrated
 use sys for std::sys
 
 impl Directory {
@@ -13,7 +13,8 @@ impl Directory {
     //  Denied InvalidDescriptor PerProcessLimit SystemWideLimit
     //  NotExist InsufficientMemory NotDir
     static fn Read(path: str)!: (dirents: []&DirEntry) {
-        mut dir := unsafe { sys::Opendir(&path[0]) }
+        s := integ::StrToBytes(path)
+        mut dir := unsafe { sys::Opendir(&s[0]) }
         if dir == nil {
             error(getLastFsError())
         }
@@ -22,7 +23,7 @@ impl Directory {
             if dirent == nil {
                 break
             }
-            name := unsafe { integrated::BytePtrToStr((*u8)(dirent.d_name)) }
+            name := unsafe { integ::BytePtrToStr((*u8)(dirent.d_name)) }
             mut stat := Status.Of(path::Join(path, name)) else { error(error) }
             dirents = append(dirents, &DirEntry{
                 Name: name,
@@ -40,7 +41,8 @@ impl Directory {
         // NOTICE
         // Also can has EMLINK error-code.
         // Make sure this situation should documented or not.
-        if unsafe { sys::Mkdir(&path[0], 0700) } != 0 {
+        s := integ::StrToBytes(path)
+        if unsafe { sys::Mkdir(&s[0], 0700) } != 0 {
             error(getLastFsError())
         }
     }
@@ -49,7 +51,8 @@ impl Directory {
     //
     // Possible errors: Denined NotExist NotEmpty SyncIO IO Loop NotDir
     static fn Remove(path: str)! {
-        if unsafe { sys::Rmdir(&path[0]) } != 0 {
+        s := integ::StrToBytes(path)
+        if unsafe { sys::Rmdir(&s[0]) } != 0 {
             error(getLastFsError())
         }
     }
