@@ -45,11 +45,11 @@ namespace jule
 
         static jule::U8 *alloc(const jule::Int len) noexcept
         {
-            auto buf = new (std::nothrow) jule::U8[len + 1];
+            auto buf = new (std::nothrow) jule::U8[len];
             if (!buf)
                 jule::panic(__JULE_ERROR__MEMORY_ALLOCATION_FAILED
                             "\nruntime: memory allocation failed for string");
-            std::memset(buf, 0, len + 1);
+            std::memset(buf, 0, len);
             return buf;
         }
 
@@ -237,35 +237,8 @@ namespace jule
                 jule::panic(error);
             }
 #endif
-            // For interoperability, we should keep NULL termination.
-            // So, allocate new string if inevitable.
-            if (end == this->_len)
-            {
-                // The last element, so NULL termination is still there.
-                // Just slicing from head, safe.
-                this->_slice += start;
-                this->_len = end - start;
-            }
-            else if (this->buffer.ref != nullptr &&
-                     this->buffer.get_ref_n() == jule::REFERENCE_DELTA)
-            {
-                // The string allocation is already heap-allocated and
-                // there is no more reference, so mutating the buffer is safe.
-                // Avoid making allocation, just move NULL termination.
-                this->_slice += start;
-                this->_len = end - start;
-                this->_slice[this->_len] = 0;
-            }
-            else
-            {
-                // Make new heap allocation, mutating is not safe.
-                auto old_buffer = std::move(this->buffer);
-                auto old_slice = this->_slice;
-                this->_len = end - start;
-                this->buffer = jule::Str::buffer_t::make(jule::Str::alloc(this->_len));
-                this->_slice = this->buffer.alloc;
-                std::copy(old_slice + start, old_slice + end, this->_slice);
-            }
+            this->_slice += start;
+            this->_len = end - start;
         }
 
         inline void mut_slice(
@@ -317,20 +290,9 @@ namespace jule
             }
 #endif
             jule::Str s;
-            if (start == end)
-                return s;
+            s.buffer = this->buffer;
             s._len = end - start;
-            if (end == this->_len)
-            {
-                s.buffer = this->buffer;
-                s._slice = this->_slice + start;
-            }
-            else
-            {
-                s.buffer = jule::Str::buffer_t::make(jule::Str::alloc(s._len));
-                s._slice = s.buffer.alloc;
-                std::copy(this->begin() + start, this->begin() + end, s._slice);
-            }
+            s._slice = this->_slice + start;
             return s;
         }
 
