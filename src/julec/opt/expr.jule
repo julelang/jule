@@ -63,6 +63,59 @@ impl exprOptimizer {
         }
     }
 
+    fn boolCond(self, mut &m: &BinaryExprModel): bool {
+        lp := m.Left.Kind.Prim()
+        if lp == nil || !lp.IsBool() {
+            ret false
+        }
+        match type m.Left.Model {
+        | &Const:
+            // Equality comparison, swap operation is safe and will not change
+            // the behavior of the program.
+            m.Left, m.Right = m.Right, m.Left
+        |:
+            match type m.Right.Model {
+            | &Const:
+                break
+            |:
+                ret false
+            }
+        }
+        mut c := (&Const)(m.Right.Model)
+        match m.Op.Id {
+        | TokenId.DblAmper:
+            if c.ReadBool() {
+                // Use left operand as model directly.
+                // Logical and with constant true exprssion is always will be true.
+                // The non-constant left operand should be true,
+                // this is the only important thing. So eliminate constant true.
+                *self.model = m.Left.Model
+            } else {
+                // Logical and with constant false expression.
+                // Binary expression is always will be false.
+                c.SetBool(false)
+                *self.model = c
+            }
+            ret true
+        | TokenId.DblVline:
+            if c.ReadBool() {
+                // Logical or with constant true expression.
+                // Binary expression is always will be true.
+                c.SetBool(true)
+                *self.model = c
+            } else {
+                // Use left operand as model directly.
+                // Logical or with constant false exprssion is always will be false.
+                // The non-constant left operand should be true,
+                // this is the only important thing. So eliminate constant false.
+                *self.model = m.Left.Model
+            }
+            ret true
+        |:
+        }
+        ret false
+    }
+
     fn strCond(self, mut m: &BinaryExprModel): bool {
         lp := m.Left.Kind.Prim()
         if lp == nil || !lp.IsStr() {
@@ -76,15 +129,14 @@ impl exprOptimizer {
             // Equality comparison, swap operation is safe and will not change
             // the behavior of the program.
             m.Left, m.Right = m.Right, m.Left
-            goto opt
-        }
-        match type m.Right.Model {
-        | &Const:
-            break
         |:
-            ret false
+            match type m.Right.Model {
+            | &Const:
+                break
+            |:
+                ret false
+            }
         }
-    opt:
         mut c := (&Const)(m.Right.Model)
         match m.Op.Id {
         | TokenId.Eqs:
@@ -184,8 +236,12 @@ impl exprOptimizer {
         exprOptimizer.optimize(m.Left.Model)
         exprOptimizer.optimize(m.Right.Model)
 
-        if Cond && self.strCond(m) {
-            ret
+        if Cond {
+            match {
+            | self.strCond(m)
+            | self.boolCond(m):
+                ret
+            }
         }
 
         if self.tryNeutralElement(m) {
