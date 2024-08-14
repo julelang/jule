@@ -63,6 +63,34 @@ impl exprOptimizer {
         }
     }
 
+    fn selfCmpCond(self, mut &m: &BinaryExprModel): bool {
+        lp := m.Left.Kind.Prim()
+        if lp == nil {
+            ret false
+        }
+        if !equalModels(m.Left.Model, m.Right.Model) {
+            ret false
+        }
+        match m.Op.Id {
+        | TokenId.Eqs
+        | TokenId.LtEq
+        | TokenId.GtEq:
+            // Operators used with itself: ==, <=, >=.
+            // Evaluation will be always true.
+            *self.model = Const.NewBool(true)
+            ret true
+        | TokenId.NotEq
+        | TokenId.Lt
+        | TokenId.Gt:
+            // Operators used with itself: !=, <, >.
+            // Evaluation will be always false.
+            *self.model = Const.NewBool(false)
+            ret true
+        |:
+            ret false
+        }
+    }
+
     fn boolCond(self, mut &m: &BinaryExprModel): bool {
         lp := m.Left.Kind.Prim()
         if lp == nil || !lp.IsBool() {
@@ -239,7 +267,8 @@ impl exprOptimizer {
         if Cond {
             match {
             | self.strCond(m)
-            | self.boolCond(m):
+            | self.boolCond(m)
+            | self.selfCmpCond(m):
                 ret
             }
         }
