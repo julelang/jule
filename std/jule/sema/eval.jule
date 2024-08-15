@@ -61,6 +61,8 @@ use strings for std::strings::{StrBuilder}
 
 // Value data.
 struct Data {
+    // Means data is constant numeric and have not any exact type.
+    // Since data is constant numeric, it also implies kind is primitive.
     untyped: bool
 
     Kind:      &TypeKind
@@ -228,8 +230,8 @@ impl Eval {
             data.Kind = primI32 // Rune
         }
 
-        data.Mutable = true
         data.Model = &RuneExprModel{Code: r}
+        data.Mutable = true
         data.IsRune = true
         data.untyped = true
         ret data
@@ -292,14 +294,13 @@ impl Eval {
         }
 
         d.Model = d.Constant
+        d.untyped = true
         if !self.applyNumericPrefix(d) {
             // If prefix is not implemented, check constant bitsize.
             // Arcihtecture bitsize type might be insufficient to store constant data.
             // If this concern is true, set kind to minimum type that has enough bitsize.
             fitBitsize(d)
         }
-        d.Mutable = true
-        d.untyped = true
         ret d
     }
 
@@ -1001,6 +1002,7 @@ impl Eval {
 
         if !index.IsConst() {
             d.Constant = nil
+            d.untyped = false
             ret
         }
 
@@ -1347,6 +1349,7 @@ impl Eval {
 
         if l == nil || r == nil {
             d.Constant = nil
+            d.untyped = false
             ret
         }
 
@@ -1371,6 +1374,7 @@ impl Eval {
             d.Decl = true // Set Model: flag.
         } else {
             d.Constant = nil
+            d.untyped = false
         }
     }
 
@@ -1432,6 +1436,7 @@ impl Eval {
 
     fn castPtr(mut self, mut t: &TypeKind, mut d: &Data, errorToken: &Token) {
         d.Constant = nil
+        d.untyped = false
         sptr := d.Kind.Sptr()
         if sptr != nil {
             if !t.Ptr().Elem.Equal(sptr.Elem) {
@@ -1453,6 +1458,7 @@ impl Eval {
 
     fn castStruct(mut self, mut t: &TypeKind, mut d: &Data, errorToken: &Token) {
         d.Constant = nil
+        d.untyped = false
         mut tr := d.Kind.Trait()
         if tr == nil {
             self.pushErr(errorToken, LogMsg.TypeNotSupportsCastingTo, d.Kind.Str(), t.Str())
@@ -1469,6 +1475,7 @@ impl Eval {
 
     fn castRef(mut self, mut t: &TypeKind, mut d: &Data, errorToken: &Token) {
         d.Constant = nil
+        d.untyped = false
         mut sptr := t.Sptr()
 
         mut ptr := d.Kind.Ptr()
@@ -1492,6 +1499,7 @@ impl Eval {
     fn castSlc(mut self, mut t: &TypeKind, mut d: &Data, errorToken: &Token) {
         c := d.Constant
         d.Constant = nil
+        d.untyped = false
 
         if d.Kind.Enum() != nil {
             if d.Kind.Enum().Kind.Kind.Prim() == nil || !d.Kind.Enum().Kind.Kind.Prim().IsStr() {
@@ -1553,6 +1561,7 @@ impl Eval {
 
         c := d.Constant
         d.Constant = nil
+        d.untyped = false
         if d.Kind.Prim() != nil {
             prim := d.Kind.Prim()
             if !prim.IsU8() && !prim.IsI32() {
@@ -1600,6 +1609,7 @@ impl Eval {
             }
         } else {
             d.Constant = nil
+            d.untyped = false
         }
 
         if d.Kind.Enum() != nil {
@@ -1647,6 +1657,7 @@ impl Eval {
             }
         } else {
             d.Constant = nil
+            d.untyped = false
         }
 
         if d.Kind.Enum() != nil {
@@ -1670,6 +1681,7 @@ impl Eval {
         | prim.IsAny():
             // The any type supports casting to any data type.
             d.Constant = nil
+            d.untyped = false
         | prim.IsStr():
             self.castStr(d, errorToken)
         | types::IsInt(prim.Str()):
@@ -1697,6 +1709,7 @@ impl Eval {
             self.pushErr(errorToken, LogMsg.TypeNotSupportsCastingTo, d.Kind.Str(), t.Str())
         }
         d.Constant = nil
+        d.untyped = false
     }
 
     fn castTypeEnumT(mut self, mut &t: &TypeKind, mut &d: &Data, mut &errorToken: &Token) {
@@ -1706,6 +1719,7 @@ impl Eval {
             self.pushErr(errorToken, LogMsg.TypeNotSupportsCastingTo, d.Kind.Str(), t.Str())
         }
         d.Constant = nil
+        d.untyped = false
     }
 
     fn evalCastByTypeNData(mut self, mut t: &TypeKind, mut d: &Data, mut errorToken: &Token): &Data {
@@ -1720,6 +1734,7 @@ impl Eval {
                 self.pushErr(errorToken, LogMsg.TypeNotSupportsCastingTo, "<nil>", t.Str())
             }
             d.Constant = nil // Remove nil constant.
+            d.untyped = false
         | d.Kind.Prim() != nil && d.Kind.Prim().IsAny():
             if t.Enum() != nil {
                 self.pushErr(errorToken, LogMsg.EnumCastedFromAny)
@@ -1728,6 +1743,7 @@ impl Eval {
                 self.pushErr(errorToken, LogMsg.EnumCastedFromAny)
             }
             d.Constant = nil
+            d.untyped = false
         | d.Kind.TypeEnum() != nil:
             self.castTypeEnum(t, d, errorToken)
         | t.TypeEnum() != nil:
@@ -2343,6 +2359,7 @@ impl Eval {
                 Constant: c,
                 Model: c,
                 Kind: primInt,
+                untyped: true,
             }
         | "Min":
             mut c := Const.NewI64(i64(types::Min(kind)))
@@ -2351,6 +2368,7 @@ impl Eval {
                 Constant: c,
                 Model: c,
                 Kind: primInt,
+                untyped: true,
             }
         |:
             self.pushErr(ident, LogMsg.TypeHaveNotIdent, kind, ident.Kind)
@@ -2368,6 +2386,7 @@ impl Eval {
                 Constant: c,
                 Model: c,
                 Kind: primUint,
+                untyped: true,
             }
         |:
             self.pushErr(ident, LogMsg.TypeHaveNotIdent, kind, ident.Kind)
@@ -2387,6 +2406,7 @@ impl Eval {
                 Constant: c,
                 Model: c,
                 Kind: primI8,
+                untyped: true,
             }
         | "Min":
             mut c := Const.NewI64(min)
@@ -2395,6 +2415,7 @@ impl Eval {
                 Constant: c,
                 Model: c,
                 Kind: primI8,
+                untyped: true,
             }
         |:
             self.pushErr(ident, LogMsg.TypeHaveNotIdent, kind, ident.Kind)
@@ -2414,6 +2435,7 @@ impl Eval {
                 Constant: c,
                 Model: c,
                 Kind: primI16,
+                untyped: true,
             }
         | "Min":
             mut c := Const.NewI64(min)
@@ -2422,6 +2444,7 @@ impl Eval {
                 Constant: c,
                 Model: c,
                 Kind: primI16,
+                untyped: true,
             }
         |:
             self.pushErr(ident, LogMsg.TypeHaveNotIdent, kind, ident.Kind)
@@ -2441,6 +2464,7 @@ impl Eval {
                 Constant: c,
                 Model: c,
                 Kind: primI32,
+                untyped: true,
             }
         | "Min":
             mut c := Const.NewI64(min)
@@ -2449,6 +2473,7 @@ impl Eval {
                 Constant: c,
                 Model: c,
                 Kind: primI32,
+                untyped: true,
             }
         |:
             self.pushErr(ident, LogMsg.TypeHaveNotIdent, kind, ident.Kind)
@@ -2468,6 +2493,7 @@ impl Eval {
                 Constant: c,
                 Model: c,
                 Kind: primI64,
+                untyped: true,
             }
         | "Min":
             mut c := Const.NewI64(min)
@@ -2476,6 +2502,7 @@ impl Eval {
                 Constant: c,
                 Model: c,
                 Kind: primI64,
+                untyped: true,
             }
         |:
             self.pushErr(ident, LogMsg.TypeHaveNotIdent, kind, ident.Kind)
@@ -2494,6 +2521,7 @@ impl Eval {
                 Constant: c,
                 Model: c,
                 Kind: primU8,
+                untyped: true,
             }
         |:
             self.pushErr(ident, LogMsg.TypeHaveNotIdent, kind, ident.Kind)
@@ -2512,6 +2540,7 @@ impl Eval {
                 Constant: c,
                 Model: c,
                 Kind: primU16,
+                untyped: true,
             }
         |:
             self.pushErr(ident, LogMsg.TypeHaveNotIdent, kind, ident.Kind)
@@ -2530,6 +2559,7 @@ impl Eval {
                 Constant: c,
                 Model: c,
                 Kind: primU32,
+                untyped: true,
             }
         |:
             self.pushErr(ident, LogMsg.TypeHaveNotIdent, kind, ident.Kind)
@@ -2548,6 +2578,7 @@ impl Eval {
                 Constant: c,
                 Model: c,
                 Kind: primU64,
+                untyped: true,
             }
         |:
             self.pushErr(ident, LogMsg.TypeHaveNotIdent, kind, ident.Kind)
@@ -2568,6 +2599,7 @@ impl Eval {
                 Constant: c,
                 Model: c,
                 Kind: primF32,
+                untyped: true,
             }
         | "Min":
             mut c := Const.NewF64(min)
@@ -2576,6 +2608,7 @@ impl Eval {
                 Constant: c,
                 Model: c,
                 Kind: primF32,
+                untyped: true,
             }
         | "SmallestNonZero":
             mut c := Const.NewF64(smallestNonZero)
@@ -2584,6 +2617,7 @@ impl Eval {
                 Constant: c,
                 Model: c,
                 Kind: primF32,
+                untyped: true,
             }
         |:
             self.pushErr(ident, LogMsg.TypeHaveNotIdent, kind, ident.Kind)
@@ -2604,6 +2638,7 @@ impl Eval {
                 Constant: c,
                 Model: c,
                 Kind: primF64,
+                untyped: true,
             }
         | "Min":
             mut c := Const.NewF64(min)
@@ -2612,6 +2647,7 @@ impl Eval {
                 Constant: c,
                 Model: c,
                 Kind: primF64,
+                untyped: true,
             }
         | "SmallestNonZero":
             mut c := Const.NewF64(smallestNonZero)
@@ -2620,6 +2656,7 @@ impl Eval {
                 Constant: c,
                 Model: c,
                 Kind: primF64,
+                untyped: true,
             }
         |:
             self.pushErr(ident, LogMsg.TypeHaveNotIdent, kind, ident.Kind)
@@ -3228,6 +3265,7 @@ impl unaryEval {
         }
 
         self.d.Constant = nil
+        self.d.untyped = false
         self.d.Lvalue = true
     }
 
@@ -3253,6 +3291,7 @@ impl unaryEval {
         }
 
         self.d.Constant = nil
+        self.d.untyped = false
         self.d.Lvalue = false
         self.d.Mutable = true
     }
@@ -3356,7 +3395,7 @@ impl binaryEval {
     // Reports whether types are compatible.
     // Also logs error message about incompatibility if types are incompatible.
     fn checkTypeCompatibility(mut self): bool {
-        ret self.e.s.checkTypeCompatibility(self.l.Kind, self.r.Kind, self.op)
+        ret self.e.s.checkTypeCompatibility1(self.l.Kind, self.r, self.op)
     }
 
     fn checkStructCommonOperatorCompatibility(mut self): bool {
@@ -3798,18 +3837,18 @@ impl binaryEval {
         }
         if lk == types::TypeKind.F32 {
             if self.r.IsConst() && self.r.untyped {
-                ret true
+                ret floatAssignable(lk, self.r)
             }
             ret rk == types::TypeKind.F32
         }
         if lk == types::TypeKind.F64 {
             if self.r.IsConst() && self.r.untyped {
-                ret true
+                ret floatAssignable(lk, self.r)
             }
             ret rk == types::TypeKind.F64
         }
         if self.r.IsConst() && self.r.untyped {
-            ret true
+            ret intAssignable(lk, self.r)
         }
         ret lk == rk
     }
@@ -3818,7 +3857,7 @@ impl binaryEval {
         lk := self.l.Kind.Prim().Kind // Float guaranteed.
         rk := self.r.Kind.Prim().Kind // Primitive guaranteed.
         if !self.numbersAreCompatibile(lk, rk) {
-            self.e.pushErr(self.op, LogMsg.IncompatibleTypes, lk, rk)
+            self.e.s.pushCompatiblityError(self.l.Kind, self.r, self.op)
             ret nil
         }
 
@@ -3897,7 +3936,7 @@ impl binaryEval {
         }
 
         if !self.numbersAreCompatibile(lk, rk) {
-            self.e.pushErr(self.op, LogMsg.IncompatibleTypes, lk, rk)
+            self.e.s.pushCompatiblityError(self.l.Kind, self.r, self.op)
             ret nil
         }
 
@@ -4036,6 +4075,7 @@ impl binaryEval {
         | !self.l.IsConst()
         | !self.r.IsConst():
             d.Constant = nil
+            d.untyped = false
             ret
         }
 
@@ -4217,30 +4257,31 @@ fn findBuiltinsImport(&ident: str, imp: &ImportInfo): any {
 
 // If current type is not enough to store constant data, update to minimum type
 // that can store constant data. This function designed for numerical types only.
-// Data should be numerical constant of course.
+// Data should be numerical constant of course. Also fits types for integers.
+// If data is signed but kind is unsigned, type will be fit to signed and same
+// thing for unsigned data and signed kinds.
 fn fitBitsize(mut &d: &Data) {
     mut prim := d.Kind.Prim()
     z := types::BitsizeOf(prim.Str())
-    if z == 1<<6 {
-        // z is already equals to biggest bitsize.
-        ret
-    }
-    mut k := 0
     match {
     | d.Constant.IsI64():
-        k = types::BitsizeOfInt(d.Constant.ReadI64())
-        if k > z {
+        k := types::BitsizeOfInt(d.Constant.ReadI64())
+        if k > z || types::IsUnsigInt(prim.Kind) {
             d.Constant.Kind = types::IntFromBits(k)
             d.Kind = findBuiltinTypeAlias(d.Constant.Kind).Kind.Kind
         }
     | d.Constant.IsU64():
-        k = types::BitsizeOfUint(d.Constant.ReadU64())
-        if k > z {
+        k := types::BitsizeOfUint(d.Constant.ReadU64())
+        if k > z || types::IsSigInt(prim.Kind) {
             d.Constant.Kind = types::UintFromBits(k)
             d.Kind = findBuiltinTypeAlias(d.Constant.Kind).Kind.Kind
         }
     | d.Constant.IsF64():
-        k = types::BitsizeOfFloat(d.Constant.ReadF64())
+        if z == 1<<6 {
+            // z is already equals to biggest bitsize.
+            ret
+        }
+        k := types::BitsizeOfFloat(d.Constant.ReadF64())
         if k > z {
             d.Constant.Kind = types::FloatFromBits(k)
             d.Kind = findBuiltinTypeAlias(d.Constant.Kind).Kind.Kind

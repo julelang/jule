@@ -283,30 +283,20 @@ impl assignTypeChecker {
     }
 
     fn checkConst(mut self): bool {
-        if !self.d.IsConst() ||
-            self.dest.Prim() == nil ||
-            self.d.Kind.Prim() == nil ||
-            !types::IsNum(self.d.Kind.Prim().Kind) {
+        // Since untyped literals only can be primitive numeric types and constants,
+        // do not check this cases, just check whether self.d is untyped literal.
+        if !self.d.untyped || self.dest.Prim() == nil {
             ret false
         }
-        if self.d.Constant != self.d.Model {
-            // Model is not equals directly to constant.
-            // There is casting or etc.
-            // Should be type checked.
-            ret false
-        }
-
         kind := self.dest.Prim().Kind
         match {
         | types::IsFloat(kind):
             if !floatAssignable(kind, self.d) {
-                self.pushErr(LogMsg.OverflowLimits)
                 ret false
             }
             self.d.Constant.Kind = kind
         | types::IsInt(kind):
             if !intAssignable(kind, self.d) {
-                self.pushErr(LogMsg.OverflowLimits)
                 ret false
             }
             self.d.Constant.Kind = kind
@@ -314,19 +304,6 @@ impl assignTypeChecker {
             ret false
         }
         ret true
-    }
-
-    // Reports case is good for primitive types.
-    fn isPrim(mut self): bool {
-        // Ignore variadics.
-        if self.dest.Variadic || self.d.Kind.Variadic {
-            ret false
-        }
-        // Ignore binded types.
-        if self.dest.Binded() || self.d.Kind.Binded() {
-            ret false
-        }
-        ret self.dest.Prim() != nil && self.d.Kind.Prim() != nil
     }
 
     fn checkCompatibility(mut self): bool {
@@ -343,23 +320,16 @@ impl assignTypeChecker {
             mut dkind := self.dest
             if self.dest.Enum() != nil {
                 dkind = self.dest.Enum().Kind.Kind
-            } else if self.dest.Prim() == nil {
+            }
+            prim := self.dest.Prim()
+            if prim == nil || prim.IsAny() {
+                // Ignore direct comparison if prim is nil or any.
                 break
             }
-            if types::TypesAreCompatible(self.d.Kind.Enum().Kind.Kind.Prim().Kind, dkind.Prim().Kind) {
-                ret true
-            }
-        | self.isPrim():
-            dest := self.dest.Prim()
-            if dest.IsAny() {
-                ret true
-            }
-            mut src := self.d.Kind.Prim()
-            if types::TypesAreCompatible(dest.Kind, src.Kind) {
-                ret true
-            }
+            mut dest := self.d.Kind.Enum().Kind.Kind
+            ret self.s.checkTypeCompatibility(dest, dkind, self.errorToken)
         }
-        ret self.s.checkTypeCompatibility(self.dest, self.d.Kind, self.errorToken)
+        ret self.s.checkTypeCompatibility1(self.dest, self.d, self.errorToken)
     }
 
     fn check(mut self): bool {

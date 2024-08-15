@@ -919,33 +919,57 @@ impl Sema {
         ret true
     }
 
-    fn checkTypeCompatibility(mut &self, mut &dest: &TypeKind,
-        mut &src: &TypeKind, mut &errorToken: &Token): bool {
+    fn _checkTypeCompatibility(mut &self, mut &dest: &TypeKind, mut &src: &TypeKind,
+        mut errorToken: &Token): bool {
         if src == nil {
-            self.pushErr(errorToken, LogMsg.IncompatibleTypes,
-                dest.Str(), src.Str())
             ret false
         }
-
         // Tuple to single type, always fails.
         if src.Tup() != nil {
-            self.pushErr(errorToken, LogMsg.IncompatibleTypes,
-                dest.Str(), src.Str())
             ret false
         }
-
         mut tcc := typeCompatibilityChecker{
             s: self,
             errorToken: errorToken,
             dest: dest,
             src: src,
         }
+        ret tcc.check()
+    }
 
-        if tcc.check() {
+    fn checkTypeCompatibility(mut &self, mut &dest: &TypeKind,
+        mut &src: &TypeKind, mut &errorToken: &Token): bool {
+        if self._checkTypeCompatibility(dest, src, errorToken) {
             ret true
         }
-
         self.pushErr(errorToken, LogMsg.IncompatibleTypes, dest.Str(), src.Str())
+        ret false
+    }
+
+    fn pushCompatiblityError(mut self, mut &dest: &TypeKind, mut &src: &Data,
+        mut &errorToken: &Token) {
+        if src.untyped {
+            match {
+            | src.Constant.IsI64():
+                self.pushErr(errorToken, LogMsg.IncompatibleTypes, dest.Str(), "untyped integer")
+                ret
+            | src.Constant.IsU64():
+                self.pushErr(errorToken, LogMsg.IncompatibleTypes, dest.Str(), "untyped unsigned integer")
+                ret
+            | src.Constant.IsF64():
+                self.pushErr(errorToken, LogMsg.IncompatibleTypes, dest.Str(), "untyped float")
+                ret
+            }
+        }
+        self.pushErr(errorToken, LogMsg.IncompatibleTypes, dest.Str(), src.Kind.Str())
+    }
+
+    fn checkTypeCompatibility1(mut &self, mut &dest: &TypeKind, mut &src: &Data,
+        mut &errorToken: &Token): bool {
+        if self._checkTypeCompatibility(dest, src.Kind, errorToken) {
+            ret true
+        }
+        self.pushCompatiblityError(dest, src, errorToken)
         ret false
     }
 
@@ -2206,6 +2230,7 @@ impl Sema {
             }
         } else {
             v.Value.Data.Constant = nil
+            v.Value.Data.untyped = false
         }
 
         // Remove kind for avoid more tuple-type errors.
