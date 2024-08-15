@@ -1070,11 +1070,11 @@ impl exprCoder {
             | &Var:
                 v := (&Var)(m.Err.Model)
                 if v.Ident == TokenKind.Error {
-                    self.oc.write("jule::VoidExceptional(except.error)")
+                    self.oc.write("jule::VoidExceptional{.error=std::move(except.error)}")
                     ret
                 }
             }
-            self.oc.write("jule::VoidExceptional(" + typeCoder.Any + "(")
+            self.oc.write("jule::VoidExceptional{.error=" + typeCoder.Any + "(")
         } else {
             self.oc.write("jule::Exceptional<")
             self.oc.tc.rc.codeMut1(self.oc.Buf, m.Func.Result)
@@ -1082,17 +1082,17 @@ impl exprCoder {
             | &Var:
                 v := (&Var)(m.Err.Model)
                 if v.Ident == TokenKind.Error {
-                    self.oc.write(">(except.error)")
+                    self.oc.write(">{.error=except.error}")
                     ret
                 }
             }
-            self.oc.write(">(" + typeCoder.Any + "(")
+            self.oc.write(">{.error=" + typeCoder.Any + "(")
         }
         self.possibleRefExpr(m.Err.Model)
         i := self.oc.pushAnyType(m.Err.Kind)
         self.oc.write(", &" + anyTypeIdent)
         self.oc.write(conv::Itoa(i))
-        self.oc.write("))")
+        self.oc.write(")}")
     }
 
     fn copyCall(mut &self, mut m: &BuiltinCopyCallExprModel) {
