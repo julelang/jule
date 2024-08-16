@@ -33,6 +33,7 @@ use sema for std::jule::sema::{
     SlicingExprModel,
     FallSt,
     TupleExprModel,
+    BuiltinErrorCallExprModel,
 }
 use strings for std::strings
 
@@ -417,6 +418,26 @@ impl scopeOptimizer {
 
     fn optimizeRet(mut self, mut r: &RetSt) {
         exprOptimizer.optimize(r.Expr)
+
+        // Break algorithm is exceptional-specific optimizations are not enabled.
+        // The following algorithms tries to apply specific optimizations for exceptionals.
+        if !Exceptional {
+            ret
+        }
+        match type r.Expr {
+        | &FnCallExprModel:
+            break
+        |:
+            ret
+        }
+        mut fc := (&FnCallExprModel)(r.Expr)
+        if !fc.Func.Decl.Exceptional ||
+            fc.Except == nil ||
+            len(fc.Except.Stmts) != 1 ||
+            !isForwarded(fc.Except) {
+            ret
+        }
+        self.setCurrentStmt(&ExceptionalForwardingExprModel{Expr: fc})
     }
 
     fn optimizeStmt(mut self, mut stmt: Stmt) {
@@ -508,4 +529,19 @@ fn isUnreachableMatchCase(&case: &Case): bool {
         }
     }
     ret true
+}
+
+fn isForwarded(&s: &Scope): bool {
+    last := s.Stmts[len(s.Stmts)-1]
+    match type last {
+    | &Data:
+        match type (&Data)(last).Model {
+        | &BuiltinErrorCallExprModel:
+            ret true
+        |:
+            ret false
+        }
+    |:
+        ret true
+    }
 }

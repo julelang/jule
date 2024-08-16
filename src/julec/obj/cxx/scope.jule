@@ -9,6 +9,7 @@ use opt::{
     AppendToSliceExprModel,
     MutSlicingExprModel,
     SwapExprModel,
+    ExceptionalForwardingExprModel,
 }
 use conv for std::conv
 use lex for std::jule::lex::{TokenKind}
@@ -56,6 +57,7 @@ enum compStmt: type {
     &AppendToSliceExprModel,
     &MutSlicingExprModel,
     &SwapExprModel,
+    &ExceptionalForwardingExprModel,
 }
 
 struct scopeCoder {
@@ -735,6 +737,11 @@ impl scopeCoder {
         self.oc.write(")")
     }
 
+    fn exceptionalForwarding(mut &self, mut m: &ExceptionalForwardingExprModel) {
+        self.oc.write("return ")
+        self.oc.ec.pureFuncCall(m.Expr)
+    }
+
     // Generates C++ code of statement.
     fn st(mut &self, mut st: compStmt) {
         if st == nil {
@@ -783,6 +790,8 @@ impl scopeCoder {
             self.mutSlicing((&MutSlicingExprModel)(st))
         | &SwapExprModel:
             self.swap((&SwapExprModel)(st))
+        | &ExceptionalForwardingExprModel:
+            self.exceptionalForwarding((&ExceptionalForwardingExprModel)(st))
         |:
             self.oc.write("<unimplemented_stmt>")
         }
