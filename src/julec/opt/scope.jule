@@ -39,8 +39,9 @@ use strings for std::strings
 
 // Scope optimizer that applies target-independent optimizations.
 struct scopeOptimizer {
-    i:     int
-    scope: &Scope
+    parent: &scopeOptimizer
+    i:      int
+    scope:  &Scope
 }
 
 impl scopeOptimizer {
@@ -50,16 +51,39 @@ impl scopeOptimizer {
         }
     }
 
-    fn setCurrentStmt(mut self, mut stmt: any) {
+    fn setCurrentStmt(mut &self, mut stmt: any) {
         self.scope.Stmts[self.i] = unsafe { *(*Stmt)(&stmt) }
     }
 
     // Removes current statement.
-    fn removeCurrent(mut self) {
+    fn removeCurrent(mut &self) {
         self.scope.Stmts = append(self.scope.Stmts[:self.i], self.scope.Stmts[self.i+1:]...)
     }
 
-    fn optimizeData(mut self, mut d: &Data) {
+    fn isLastStmt(mut &self): bool {
+        mut r := self
+        for r != nil; r = r.parent {
+            if len(r.scope.Stmts)-r.i != 1 {
+                ret false
+            }
+        }
+        ret true
+    }
+
+    fn isIter(mut &self): bool {
+        mut r := self.parent
+        for r != nil; r = r.parent {
+            match type r.scope.Stmts[r.i] {
+            | &RangeIter
+            | &WhileIter
+            | &InfIter:
+                ret true
+            }
+        }
+        ret false
+    }
+
+    fn optimizeData(mut &self, mut d: &Data) {
         match type d.Model {
         | &FnCallExprModel:
             mut m := (&FnCallExprModel)(d.Model)
@@ -70,17 +94,28 @@ impl scopeOptimizer {
                     ret
                 }
             }
+            exprOptimizer.optimize(d.Model)
+            if Exceptional &&
+                m.Func.Decl.Exceptional &&
+                m.Except != nil &&
+                len(m.Except.Stmts) == 1 &&
+                isForwarded(m.Except) &&
+                self.isLastStmt() &&
+                !self.isIter() {
+                self.setCurrentStmt(&ExceptionalForwardingExprModel{Expr: m})
+            }
+            ret
         }
         exprOptimizer.optimize(d.Model)
     }
 
-    fn optimizeVar(mut self, mut v: &Var) {
+    fn optimizeVar(mut &self, mut v: &Var) {
         if v.Value != nil {
             exprOptimizer.optimize(v.Value.Data.Model)
         }
     }
 
-    fn optimizeConditional(mut self, mut c: &Conditional) {
+    fn optimizeConditional(mut &self, mut c: &Conditional) {
         for (_, mut elif) in c.Elifs {
             exprOptimizer.optimize(elif.Expr)
             self.optimizeChild(elif.Scope)
@@ -149,7 +184,7 @@ impl scopeOptimizer {
         }
     }
 
-    fn buildDefaultConstantTrueCase(mut self, mut case: &Case, mut &i: int, mut &m: &Match) {
+    fn buildDefaultConstantTrueCase(mut &self, mut case: &Case, mut &i: int, mut &m: &Match) {
         case.Exprs = nil // Remove expressions to remove eval overhead.
         start := i
     loop:
@@ -175,7 +210,7 @@ impl scopeOptimizer {
         m.Cases = m.Cases[:start]
     }
 
-    fn optimizeMatch(mut self, mut m: &Match) {
+    fn optimizeMatch(mut &self, mut m: &Match) {
         for (_, mut case) in m.Cases {
             for (_, mut expr) in case.Exprs {
                 exprOptimizer.optimize(expr.Model)
@@ -239,18 +274,18 @@ impl scopeOptimizer {
         }
     }
 
-    fn optimizeRangeIter(mut self, mut it: &RangeIter) {
+    fn optimizeRangeIter(mut &self, mut it: &RangeIter) {
         exprOptimizer.optimize(it.Expr.Model)
         self.optimizeChild(it.Scope)
     }
 
-    fn optimizeWhileIter(mut self, mut it: &WhileIter) {
+    fn optimizeWhileIter(mut &self, mut it: &WhileIter) {
         exprOptimizer.optimize(it.Expr)
         self.optimizeStmt(it.Next)
         self.optimizeChild(it.Scope)
     }
 
-    fn substr(mut self, mut a: &sema::Assign): bool {
+    fn substr(mut &self, mut a: &sema::Assign): bool {
         if a.Op.Id != TokenId.Eq {
             ret false
         }
@@ -270,7 +305,7 @@ impl scopeOptimizer {
         ret false
     }
 
-    fn strAssign(mut self, mut a: &sema::Assign): bool {
+    fn strAssign(mut &self, mut a: &sema::Assign): bool {
         if !Str {
             ret false
         }
@@ -281,7 +316,7 @@ impl scopeOptimizer {
         ret self.substr(a)
     }
 
-    fn sliceAssign(mut self, mut a: &sema::Assign): bool {
+    fn sliceAssign(mut &self, mut a: &sema::Assign): bool {
         if !Slice || a.L.Kind.Slc() == nil {
             ret false
         }
@@ -289,7 +324,7 @@ impl scopeOptimizer {
         ret self.substr(a)
     }
 
-    fn optimizeAssign(mut self, mut assign: &sema::Assign) {
+    fn optimizeAssign(mut &self, mut assign: &sema::Assign) {
         if assign.Op.Id == TokenId.Eq &&
             equalModels(assign.L.Model, assign.R.Model) {
             self.removeCurrent()
@@ -367,7 +402,7 @@ impl scopeOptimizer {
         }
     }
 
-    fn tryOptimizeSwap(mut self, mut &assign: &MultiAssign): bool {
+    fn tryOptimizeSwap(mut &self, mut &assign: &MultiAssign): bool {
         if !Assign || len(assign.L) != 2 {
             ret false
         }
@@ -403,7 +438,7 @@ impl scopeOptimizer {
         ret true
     }
 
-    fn optimizeMultiAssign(mut self, mut assign: &MultiAssign) {
+    fn optimizeMultiAssign(mut &self, mut assign: &MultiAssign) {
         if self.tryOptimizeSwap(assign) {
             ret
         }
@@ -416,7 +451,7 @@ impl scopeOptimizer {
         exprOptimizer.optimize(assign.R)
     }
 
-    fn optimizeRet(mut self, mut r: &RetSt) {
+    fn optimizeRet(mut &self, mut r: &RetSt) {
         exprOptimizer.optimize(r.Expr)
 
         // Break algorithm is exceptional-specific optimizations are not enabled.
@@ -440,7 +475,7 @@ impl scopeOptimizer {
         self.setCurrentStmt(&ExceptionalForwardingExprModel{Expr: fc})
     }
 
-    fn optimizeStmt(mut self, mut stmt: Stmt) {
+    fn optimizeStmt(mut &self, mut stmt: Stmt) {
         match type stmt {
         | &Scope:
             self.optimizeChild((&Scope)(stmt))
@@ -467,13 +502,14 @@ impl scopeOptimizer {
         }
     }
 
-    fn optimizeChild(mut self, mut child: &Scope) {
+    fn optimizeChild(mut &self, mut child: &Scope) {
         mut so := scopeOptimizer.new(child)
+        so.parent = self
         so.optimize()
     }
 
     // Optimizes scope by enabled optimizations.
-    fn optimize(mut self) {
+    fn optimize(mut &self) {
         self.i = 0
         for self.i < len(self.scope.Stmts); self.i++ {
             self.optimizeStmt(self.scope.Stmts[self.i])
