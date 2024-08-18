@@ -183,15 +183,6 @@ impl jsonEncoder {
         self.buf.writeByte('"')
     }
 
-    fn encodePtr[T, Flag](mut self, &t: T)! {
-        if t == nil {
-            self.encodeNil()
-        } else {
-            comptime::TypeAlias(elem, comptime::TypeOf(T).Elem())
-            self.encode[elem, Flag](*t) else { error(error) }
-        }
-    }
-
     fn encodeStruct[T, Flag](mut self, &t: T)! {
         const tt = comptime::TypeOf(T)
         const useIndent = comptime::TypeOf(Flag) == comptime::TypeOf(encodeFlagType.Indent)
@@ -383,7 +374,15 @@ impl jsonEncoder {
         }
         const match tt.Kind() {
         | comptime::Kind.SmartPtr:
-            self.encodePtr[T, Flag](t) else { error(error) }
+            // Avoid to implement as a function.
+            // Fills call stack faster especially with recursive structures.
+            // Handle smart pointers here quicky and forward to relevant encoder.
+            if t == nil {
+                self.encodeNil()
+            } else {
+                comptime::TypeAlias(elem, tt.Elem())
+                self.encode[elem, Flag](*t) else { error(error) }
+            }
         | comptime::Kind.Struct:
             self.encodeStruct[T, Flag](t) else { error(error) }
         | comptime::Kind.Map:
