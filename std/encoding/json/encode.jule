@@ -33,7 +33,7 @@ enum encodeFlagType: type {
     // because it is not efficient enought as far as tested. Probably causes too
     // many reallocation. Therefore, just appends the newline when indentation needed,
     // this newlines also part of the encoded JSON result. After encoding,
-    // bytes should be handled and indentation will be appended after each newline.
+    // bytes should be handled and indentation should be appended after each newline.
     // Except indentations, it will append whitespace after colons and etc. to buffer.
     // So, just newlines should be handled, minor whitespaces will be handled by encoder.
     // The encoder also computes the total count of bytes for indentations. Thus,
@@ -103,18 +103,17 @@ impl jsonEncoder {
     }
 
     fn encodeStr(mut self, s: str) {
-        mut sb := unsafe::StrBytes(s)
         self.buf.writeByte('"')
         mut start := 0
         mut i := 0
-        for i < len(sb) {
-            b := sb[i]
+        for i < len(s) {
+            b := s[i]
             if b < utf8::RuneSelf {
                 if isHTMLSafe(b) || (!self.escapeHTML && isSafe(b)) {
                     i++
                     continue
                 }
-                self.buf.write(sb[start:i])
+                self.buf.writeStr(s[start:i])
                 match b {
                 | '\\':
                     self.buf.writeStr(`\\`)
@@ -144,13 +143,13 @@ impl jsonEncoder {
                 start = i
                 continue
             }
-            mut n := len(sb) - i
+            mut n := len(s) - i
             if n > utf8::UTFMax {
                 n = utf8::UTFMax
             }
-            c, size := utf8::DecodeRune(sb[i:i+n])
+            c, size := utf8::DecodeRuneStr(s[i:i+n])
             if c == utf8::RuneError && size == 1 {
-                self.buf.write(sb[start:i])
+                self.buf.writeStr(s[start:i])
                 self.buf.writeStr(`\ufffd`)
                 i += size
                 start = i
@@ -164,7 +163,7 @@ impl jsonEncoder {
             // escape them, so we do so unconditionally.
             // See https://en.wikipedia.org/wiki/JSON#Safety.
             if c == '\u2028' || c == '\u2029' {
-                self.buf.write(sb[start:i])
+                self.buf.writeStr(s[start:i])
                 self.buf.writeStr(`\u202`)
                 self.buf.writeByte(hex[c&0xF])
                 i += size
@@ -173,7 +172,7 @@ impl jsonEncoder {
             }
             i += size
         }
-        self.buf.write(sb[start:])
+        self.buf.writeStr(s[start:])
         self.buf.writeByte('"')
     }
 
