@@ -1,0 +1,505 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use std::unsafe
+use base64 for std::encoding::base64
+use conv for std::conv
+use comptime for std::comptime
+use math for std::math
+use utf8 for std::unicode::utf8
+
+const hex = "0123456789abcdef"
+
+// JSON encoder implementation flags.
+// This JSON encoding algorithm is based comptime and uses generics.
+// Since we do not want implement overhead of indentation handling for plain
+// encoding calls, we have to make separate implementations for plain and
+// indentation-based encoding algorithms. But this approach is hard to maintain.
+// Therefore we use opportunity of the generic types and Jule's comptime power.
+// All generic encoding algorithms use also Flag generic type to instantiate same
+// implementation separately for plain and indentation-based encoding algorithms,
+// and use Jule's comptime power to determine Flag whether enables indentation
+// algorithms. Thus, we can have separated algorithms for plain and
+// indentation-based encoding algorithms.
+enum encodeFlagType: type {
+    // Flag type for plain JSON encoding without indentation.
+    // When this type used for Flag type, indentation algorithms will be excluded.
+    Plain: int,
+
+    // Flag type for JSON encoding with indentation.
+    // When this type used for Flag type, indentation algorithms will be included.
+    // Indentation algorithms does not appends indentation during encoding,
+    // because it is not efficient enought as far as tested. Probably causes too
+    // many reallocation. Therefore, just appends the newline when indentation needed,
+    // this newlines also part of the encoded JSON result. After encoding,
+    // bytes should be handled and indentation will be appended after each newline.
+    // Except indentations, it will append whitespace after colons and etc. to buffer.
+    // So, just newlines should be handled, minor whitespaces will be handled by encoder.
+    // The encoder also computes the total count of bytes for indentations. Thus,
+    // we can know the exact size of the buffer including indentations with
+    // calculation like this: len(encoder.buf.bytes()) + encoder.total
+    // So if needed to making new allocation to handle indentations after encoding,
+    // we can allocate new buffer with exact size without wasted memory.
+    Indent: uint,
+}
+
+// JSON encoder with/without indentation.
+// For indentation, use Flag type logic.
+// See documentation of the [encodeFlagType].
+// See documentation of the Encode[T] for encoding details.
+struct jsonEncoder {
+    buf:        buffer // Common internal buffer to encode JSON.
+    indent:     int    // Length of bytes per indentation.
+    depth:      int    // Current depth.
+    total:      int    // Total count of bytes for indentations.
+    escapeHTML: bool
+}
+
+impl jsonEncoder {
+    fn encodeNil(mut self) {
+        self.buf.writeStr("null")
+    }
+
+    fn encodeBool(mut self, b: bool) {
+        if b {
+            self.buf.writeStr("true")
+        } else {
+            self.buf.writeStr("false")
+        }
+    }
+
+    fn encodeInt(mut self, x: i64) {
+        self.buf.writeStr(conv::FmtInt(x, 0xA))
+    }
+
+    fn encodeUint(mut self, x: u64) {
+        self.buf.writeStr(conv::FmtUint(x, 0xA))
+    }
+
+    fn encodeFloat(mut self, f: f64, bits: int)! {
+        if math::IsNaN(f) || math::IsInf(f, 0) {
+            error(JSONEncodeError.UnsupportedFloatValue)
+        }
+        mut fmt := 'f'
+        abs := math::Abs(f)
+        // Note: Must use f32 comparisons for underlying f32 value to get precise cutoffs right.
+        if abs != 0 {
+            if bits == 1<<6 && (abs < 1e-6 || abs >= 1e21) || bits == 1<<5 && (f32(abs) < 1e-6 || f32(abs) >= 1e21) {
+                fmt = 'e'
+            }
+        }
+        s := conv::FmtFloat(f, fmt, -1, 1 << 6)
+        mut sb := unsafe::StrBytes(s)
+        if fmt == 'e' {
+            // clean up e-09 to e-9
+            n := len(s)
+            if n >= 4 && sb[n-4] == 'e' && sb[n-3] == '-' && sb[n-2] == '0' {
+                sb[n-2] = sb[n-1]
+                sb = sb[:n-1]
+            }
+        }
+        self.buf.write(sb)
+    }
+
+    fn encodeStr(mut self, s: str) {
+        mut sb := unsafe::StrBytes(s)
+        self.buf.writeByte('"')
+        mut start := 0
+        mut i := 0
+        for i < len(sb) {
+            b := sb[i]
+            if b < utf8::RuneSelf {
+                if isHTMLSafe(b) || (!self.escapeHTML && isSafe(b)) {
+                    i++
+                    continue
+                }
+                self.buf.write(sb[start:i])
+                match b {
+                | '\\':
+                    self.buf.writeStr(`\\`)
+                | '"':
+                    self.buf.writeStr(`\"`)
+                | '\b':
+                    self.buf.writeStr(`\b`)
+                | '\f':
+                    self.buf.writeStr(`\f`)
+                | '\n':
+                    self.buf.writeStr(`\n`)
+                | '\r':
+                    self.buf.writeStr(`\r`)
+                | '\t':
+                    self.buf.writeStr(`\t`)
+                |:
+                    // This encodes bytes < 0x20 except for \b, \f, \n, \r and \t.
+                    // If escapeHTML is set, it also escapes <, >, and &
+                    // because they can lead to security holes when
+                    // user-controlled strings are rendered into JSON
+                    // and served to some browsers.
+                    self.buf.writeStr(`\u00`)
+                    self.buf.writeByte(hex[b>>4])
+                    self.buf.writeByte(hex[b&0xF])
+                }
+                i++
+                start = i
+                continue
+            }
+            mut n := len(sb) - i
+            if n > utf8::UTFMax {
+                n = utf8::UTFMax
+            }
+            c, size := utf8::DecodeRune(sb[i:i+n])
+            if c == utf8::RuneError && size == 1 {
+                self.buf.write(sb[start:i])
+                self.buf.writeStr(`\ufffd`)
+                i += size
+                start = i
+                continue
+            }
+            // U+2028 is LINE SEPARATOR.
+            // U+2029 is PARAGRAPH SEPARATOR.
+            // They are both technically valid characters in JSON strings,
+            // but don't work in JSONP, which has to be evaluated as JavaScript,
+            // and can lead to security holes there. It is valid JSON to
+            // escape them, so we do so unconditionally.
+            // See https://en.wikipedia.org/wiki/JSON#Safety.
+            if c == '\u2028' || c == '\u2029' {
+                self.buf.write(sb[start:i])
+                self.buf.writeStr(`\u202`)
+                self.buf.writeByte(hex[c&0xF])
+                i += size
+                start = i
+                continue
+            }
+            i += size
+        }
+        self.buf.write(sb[start:])
+        self.buf.writeByte('"')
+    }
+
+    fn encodeByteSlice(mut self, &s: []byte) {
+        const Padding = true // Padding for Base64 encoding.
+        self.buf.writeByte('"')
+        self.buf.write(base64::Encode(s, Padding))
+        self.buf.writeByte('"')
+    }
+
+    fn encodePtr[T, Flag](mut self, &t: T)! {
+        if t == nil {
+            self.encodeNil()
+        } else {
+            comptime::TypeAlias(elem, comptime::TypeOf(T).Elem())
+            self.encode[elem, Flag](*t) else { error(error) }
+        }
+    }
+
+    fn encodeStruct[T, Flag](mut self, &t: T)! {
+        const tt = comptime::TypeOf(T)
+        const useIndent = comptime::TypeOf(Flag) == comptime::TypeOf(encodeFlagType.Indent)
+        self.buf.writeByte('{')
+        const match {
+        | useIndent:
+            self.depth++
+            self.total += self.depth * self.indent
+            self.buf.writeByte('\n')
+        }
+        const vt = comptime::ValueOf(t)
+        const fields = tt.Fields()
+        const for i, field in fields {
+            const match {
+            | field.Public():
+                const match {
+                | i > 0 && useIndent:
+                    self.total += self.depth * self.indent
+                    self.buf.writeByte('\n')
+                }
+                self.buf.writeStr("\"" + field.Name() + "\":")
+                const fieldValue = vt.Field(field.Name())
+                comptime::TypeAlias(fieldType, fieldValue.Type())
+                const match type Flag {
+                | encodeFlagType.Indent:
+                    self.buf.writeByte(' ')
+                }
+                self.encode[fieldType, Flag](fieldValue.Unwrap()) else { error(error) }
+                const match {
+                | i < len(fields)-1:
+                    self.buf.writeByte(',')
+                }
+            }
+        }
+        const match {
+        | useIndent:
+            self.total += self.depth * self.indent
+            self.depth--
+            self.buf.writeByte('\n')
+        }
+        self.buf.writeByte('}')
+    }
+
+    fn encodeMap[T, Flag](mut self, &t: T)! {
+        const tt = comptime::TypeOf(T)
+        const keyT = tt.Key()
+        const valT = tt.Value()
+        match keyT.Kind() {
+        | comptime::Kind.Str
+        | comptime::Kind.Int
+        | comptime::Kind.I8
+        | comptime::Kind.I16
+        | comptime::Kind.I32
+        | comptime::Kind.I64
+        | comptime::Kind.Uint
+        | comptime::Kind.Uintptr
+        | comptime::Kind.U8
+        | comptime::Kind.U16
+        | comptime::Kind.U32
+        | comptime::Kind.U64:
+            break
+        |:
+            error(JSONEncodeError.UnsupportedType)
+        }
+        if t == nil {
+            self.encodeNil()
+            ret
+        }
+        const quoted = keyT.Kind() == comptime::Kind.Str
+        const useIndent = comptime::TypeOf(Flag) == comptime::TypeOf(encodeFlagType.Indent)
+        self.buf.writeByte('{')
+        const match {
+        | useIndent:
+            self.depth++
+            self.total += self.depth * self.indent
+            self.buf.writeByte('\n')
+        }
+        mut first := true
+        comptime::TypeAlias(keyType, tt.Key())
+        comptime::TypeAlias(valType, tt.Value())
+        for k, v in t {
+            if !first {
+                self.buf.writeByte(',')
+                const match {
+                | useIndent:
+                    self.total += self.depth * self.indent
+                    self.buf.writeByte('\n')
+                }
+            }
+            // No need to check Flag. The key type cannot be/include
+            // indentation-sensitive type. Look at this function's
+            // implementation to see match-type conditions for the key type.
+            const match {
+            | quoted:
+                self.encode[keyType, Flag](k) else { error(error) }
+            |:
+                self.buf.writeByte('"')
+                self.encode[keyType, Flag](k) else { error(error) }
+                self.buf.writeByte('"')
+            }
+            self.buf.writeByte(':')
+            const match {
+            | useIndent:
+                self.buf.writeByte(' ')
+            }
+            self.encode[valType, Flag](v) else { error(error) }
+            first = false
+        }
+        const match {
+        | useIndent:
+            self.total += self.depth * self.indent
+            self.depth--
+            self.buf.writeByte('\n')
+        }
+        self.buf.writeByte('}')
+    }
+
+    fn encodeArray[T, Flag](mut self, &t: T)! {
+        const useIndent = comptime::TypeOf(Flag) == comptime::TypeOf(encodeFlagType.Indent)
+        self.buf.writeByte('[')
+        const match {
+        | useIndent:
+            self.depth++
+            self.total += self.depth * self.indent
+            self.buf.writeByte('\n')
+        }
+        comptime::TypeAlias(elem, comptime::TypeOf(t).Elem())
+        for i, e in t {
+            if i > 0 {
+                self.buf.writeByte(',')
+                const match {
+                | useIndent:
+                    self.total += self.depth * self.indent
+                    self.buf.writeByte('\n')
+                }
+            }
+            self.encode[elem, Flag](e) else { error(error) }
+        }
+        const match {
+        | useIndent:
+            self.total += self.depth * self.indent
+            self.depth--
+            self.buf.writeByte('\n')
+        }
+        self.buf.writeByte(']')
+    }
+
+    // Checks nil case for slices, then forwards to the [encodeArray] method.
+    // Also uses base64-encoding algorithm for the []byte type.
+    // Non-nil slices and arrays should have same outputs.
+    fn encodeSlice[T, Flag](mut self, &t: T)! {
+        if t == nil {
+            self.encodeNil()
+            ret
+        }
+        const match type T {
+        | []byte:
+            self.encodeByteSlice(t)
+        |:
+            self.encodeArray[T, Flag](t) else { error(error) }
+        }
+    }
+
+    fn encode[T, Flag](mut self, &t: T)! {
+        const tt = comptime::TypeOf(T)
+        const match {
+        | tt.Binded():
+            error(JSONEncodeError.UnsupportedType)
+        }
+        const match type T {
+        | int | i8 | i16 | i32 | i64:
+            self.encodeInt(i64(t))
+            ret
+        | uint | uintptr | u8 | u16 | u32 | u64:
+            self.encodeUint(u64(t))
+            ret
+        | f32:
+            self.encodeFloat(f64(t), 1 << 5) else { error(error) }
+            ret
+        | f64:
+            self.encodeFloat(t, 1 << 6) else { error(error) }
+            ret
+        | bool:
+            self.encodeBool(t)
+            ret
+        | str:
+            self.encodeStr(t)
+            ret
+        }
+        const match tt.Kind() {
+        | comptime::Kind.SmartPtr:
+            self.encodePtr[T, Flag](t) else { error(error) }
+        | comptime::Kind.Struct:
+            self.encodeStruct[T, Flag](t) else { error(error) }
+        | comptime::Kind.Map:
+            self.encodeMap[T, Flag](t) else { error(error) }
+        | comptime::Kind.Array:
+            self.encodeArray[T, Flag](t) else { error(error) }
+        | comptime::Kind.Slice:
+            self.encodeSlice[T, Flag](t) else { error(error) }
+        |:
+            error(JSONEncodeError.UnsupportedType)
+        }
+    }
+}
+
+// Returns jsonEncoder with default configuration.
+fn encoder(): jsonEncoder {
+    ret jsonEncoder{
+        escapeHTML: true,
+    }
+}
+
+// Implements encoding of JSON as defined in RFC 7159.
+//
+// The algorithm is optimized for efficiency, performance and minimum runtime.
+// Uses generics and Jule's comptime. Type analysis guaranteed to be completed
+// at compile-time. Also this function is no-overhead guaranteed.
+// So just implements plain encoding algorithm without unnecessary
+// algorithms such as indentation handling.
+//
+// Implementation supports only Jule types, excluding binded types.
+//
+// Encoding details:
+//   Since this function designed for comptime type analysis, the type [T] should
+//   be valid type for comptime. The type [any], which is stores dynamic type, is not valid.
+//   Any unsupported type causes exceptional with [JSONEncodeError.UnsupportedType].
+//
+//   Signed/Unsigned Integers, Floating-Points:
+//     Encode as JSON numbers.
+//     For floating-points, NaN or ±Inf will cause exceptional with [JSONEncodeError.UnsupportedFloatValue].
+//
+//   Booleans:
+//     Encode as JSON booleans.
+//
+//   Strings:
+//     Encode as JSON strings coerced to valid UTF-8, replacing invalid bytes
+//     with the Unicode replacement rune. So that the JSON will be safe to embed
+//     inside HTML <script> tags, the string is encoded using [HTMLEscape],
+//     which replaces "<", ">", "&", U+2028, and U+2029 are escaped
+//     to "\u003c", "\u003e", "\u0026", "\u2028", and "\u2029".
+//
+//   Structs:
+//     Encode as JSON objects with only public fields of struct.
+//
+//   Arrays:
+//     Encode as JSON array.
+//
+//   Slices:
+//     Encode as JSON array.
+//     If slice is nil, encode as null JSON value.
+//     For the []byte type, encodes as a base64-encoded string.
+//
+//   Maps:
+//     Encode as JSON object.
+//     If map is nil, encode as null JSON value.
+//     The keys of the map always will be quoted.
+//     Also map's key type only can be: signed integer, unsigned integer and string.
+//     Other types will cause exceptional with [JSONEncodeError.UnsupportedType].
+//
+//   Smart Pointers:
+//     If smart pointer is nil, encode as null JSON value.
+//     Otherwise, will encode dereferenced value.
+//
+// Encode cannot represent cyclic data structures and does not handle them.
+// Passing cyclic structures for encoding will result in an cycle at runtime.
+// Too many nested types are not specifically checked and may cause too many
+// recursive function calls, resulting in a crash at runtime. As a result of the tests,
+// it is recommended that a data type can carry a maximum of 10000 nested data.
+// However, tousands of nested-data is always risky even below 10000.
+fn Encode[T](t: T)!: []byte {
+    mut encoder := encoder()
+    encoder.encode[T, encodeFlagType.Plain](t) else { error(error) }
+    ret encoder.buf.bytes()
+}
+
+// Same as Encode[T] function but enables identation.
+fn EncodeIndent[T](t: T, indent: str)!: []byte {
+    mut encoder := encoder()
+    encoder.indent = len(indent)
+    encoder.encode[T, encodeFlagType.Indent](t) else { error(error) }
+    mut bytes := encoder.buf.bytes()
+    if encoder.total == 0 {
+        ret bytes
+    }
+    // Handle indentation.
+    // See documentation of [encodeFlagType.Indent].
+    mut buf := make([]byte, len(bytes) + encoder.total)
+    mut depth := 0
+    mut p := &buf[0] // Use raw pointer to mutate buffer efficiently.
+    for _, b in bytes {
+        unsafe { *p = b }
+        p++
+        match b {
+        | '[' | '{':
+            depth++
+        | ']' | '}':
+            depth--
+        | '\n':
+            mut i := 0
+            for i < depth; i++ {
+                for _, ib in indent {
+                    unsafe { *p = ib }
+                    p++
+                }
+            }
+        }
+    }
+    ret buf
+}
