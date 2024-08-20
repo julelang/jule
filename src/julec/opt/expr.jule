@@ -399,9 +399,14 @@ impl exprOptimizer {
         for (i, mut arg) in args {
             if i < len(params) {
                 mut p := params[i]
-                if p.Decl.Mutable &&
-                    (p.Decl.Reference || isBoundaryRiskyType(p.Kind)) {
-                    possibleBoundaryRemove(self.boundary, arg)
+                if p.Decl.Mutable && p.Decl.Reference {
+                    if isBoundaryRiskyType(p.Kind) {
+                        // Clear boundary variable if exist and sizes.
+                        possibleBoundaryRemove(self.boundary, arg)
+                    } else if {
+                        // Clear sizes only, no boundary variable risk.
+                        possibleBoundaryRemove2(self.boundary, arg)
+                    }
                 }
             }
             exprOptimizer.optimize(arg)
