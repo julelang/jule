@@ -403,7 +403,7 @@ impl exprOptimizer {
                     if isBoundaryRiskyType(p.Kind) {
                         // Clear boundary variable if exist and sizes.
                         possibleBoundaryRemove(self.boundary, arg)
-                    } else if {
+                    } else {
                         // Clear sizes only, no boundary variable risk.
                         possibleBoundaryRemove2(self.boundary, arg)
                     }
@@ -448,6 +448,14 @@ impl exprOptimizer {
             ret
         }
 
+        array := m.Expr.Kind.Arr() != nil
+        // Constants checked by semantic analysis for arrays, safe.
+        if array && m.Index.IsConst() {
+            mut model := any(&UnsafeIndexingExprModel{Node: m})
+            *self.model = unsafe { *(*ExprModel)(&model) }
+            ret
+        }
+
         if self.boundary != nil && isBoundaryValidType(m.Expr.Kind) {
             var := getBoundaryVar(m.Expr.Model)
             if self.boundary.fitsMaxSize(var, m.Index.Model) {
@@ -456,30 +464,6 @@ impl exprOptimizer {
                 ret
             }
             self.boundary.pushVar(var, m.Index.Model)
-        }
-
-        array := m.Expr.Kind.Arr() != nil
-        // Constants checked by semantic analysis for arrays, safe.
-        if array && m.Index.IsConst() {
-            mut model := any(&UnsafeIndexingExprModel{Node: m})
-            *self.model = unsafe { *(*ExprModel)(&model) }
-            ret
-        }
-        match type m.Index.Model {
-        | &Var:
-            i := (&Var)(m.Index.Model)
-            if i.Mutable || i.IterRelation == nil {
-                break
-            }
-            match type m.Expr.Model {
-            | &Var:
-                r := (&Var)(m.Expr.Model)
-                // Iterated variable is indexed variable?
-                if i.IterRelation.Range == r {
-                    mut model := any(&UnsafeIndexingExprModel{Node: m})
-                    *self.model = unsafe { *(*ExprModel)(&model) }
-                }
-            }
         }
     }
 
