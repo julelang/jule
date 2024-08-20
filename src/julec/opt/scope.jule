@@ -39,16 +39,19 @@ use strings for std::strings
 
 // Scope optimizer that applies target-independent optimizations.
 struct scopeOptimizer {
-    parent: &scopeOptimizer
-    i:      int
-    scope:  &Scope
+    parent:   &scopeOptimizer
+    i:        int
+    scope:    &Scope
+    boundary: &boundary
 }
 
 impl scopeOptimizer {
     static fn new(mut scope: &Scope): &scopeOptimizer {
-        ret &scopeOptimizer{
+        mut sc := &scopeOptimizer{
             scope: scope,
         }
+        sc.boundary = &boundary{scope: sc}
+        ret sc
     }
 
     fn setCurrentStmt(mut &self, mut stmt: any) {
@@ -94,7 +97,7 @@ impl scopeOptimizer {
                     ret
                 }
             }
-            exprOptimizer.optimize(d.Model)
+            exprOptimizer.optimizeBoundary(d.Model, self.boundary)
             if Exceptional &&
                 m.Func.Decl.Exceptional &&
                 m.Except != nil &&
@@ -106,18 +109,18 @@ impl scopeOptimizer {
             }
             ret
         }
-        exprOptimizer.optimize(d.Model)
+        exprOptimizer.optimizeBoundary(d.Model, self.boundary)
     }
 
     fn optimizeVar(mut &self, mut v: &Var) {
         if v.Value != nil {
-            exprOptimizer.optimize(v.Value.Data.Model)
+            exprOptimizer.optimizeBoundary(v.Value.Data.Model, self.boundary)
         }
     }
 
     fn optimizeConditional(mut &self, mut c: &Conditional) {
         for (_, mut elif) in c.Elifs {
-            exprOptimizer.optimize(elif.Expr)
+            exprOptimizer.optimizeBoundary(elif.Expr, self.boundary)
             self.optimizeChild(elif.Scope)
         }
         if c.Default != nil {
@@ -213,7 +216,7 @@ impl scopeOptimizer {
     fn optimizeMatch(mut &self, mut m: &Match) {
         for (_, mut case) in m.Cases {
             for (_, mut expr) in case.Exprs {
-                exprOptimizer.optimize(expr.Model)
+                exprOptimizer.optimizeBoundary(expr.Model, self.boundary)
             }
             self.optimizeChild(case.Scope)
         }
@@ -302,7 +305,7 @@ impl scopeOptimizer {
                 | prim.IsI32():
                     // Expression is: []rune(str)
                     // Avoid making allocation, iterate runes of string.
-                    exprOptimizer.optimize(cem.Expr.Model) // Optimize string expression.
+                    exprOptimizer.optimizeBoundary(cem.Expr.Model, self.boundary) // Optimize string expression.
                     self.setCurrentStmt(&StrRuneIter{
                         Expr: cem.Expr,
                         Base: it,
@@ -311,11 +314,11 @@ impl scopeOptimizer {
                 }
             }
         }
-        exprOptimizer.optimize(it.Expr.Model)
+        exprOptimizer.optimizeBoundary(it.Expr.Model, self.boundary)
     }
 
     fn optimizeWhileIter(mut &self, mut it: &WhileIter) {
-        exprOptimizer.optimize(it.Expr)
+        exprOptimizer.optimizeBoundary(it.Expr, self.boundary)
         self.optimizeStmt(it.Next)
         self.optimizeChild(it.Scope)
     }
@@ -373,8 +376,9 @@ impl scopeOptimizer {
             ret
         }
 
-        exprOptimizer.optimize(assign.L.Model)
-        exprOptimizer.optimize(assign.R.Model)
+        possibleBoundaryRemove(self.boundary, assign.L.Model)
+        exprOptimizer.optimizeBoundary(assign.L.Model, self.boundary)
+        exprOptimizer.optimizeBoundary(assign.R.Model, self.boundary)
 
         match assign.Op.Id {
         | TokenId.SolidusEq | TokenId.PercentEq:
@@ -398,7 +402,7 @@ impl scopeOptimizer {
                 Left: assign.L,
                 Right: assign.R,
             })
-            exprOptimizer.optimize(model)
+            exprOptimizer.optimizeBoundary(model, self.boundary)
             match type model {
             | &BinaryExprModel:
                 assign.R = new(OperandExprModel, *assign.R)
@@ -467,8 +471,8 @@ impl scopeOptimizer {
             Left: assign.L[0],
             Right: assign.L[1],
         }
-        exprOptimizer.optimize(model.Left.Model)
-        exprOptimizer.optimize(model.Right.Model)
+        exprOptimizer.optimizeBoundary(model.Left.Model, self.boundary)
+        exprOptimizer.optimizeBoundary(model.Right.Model, self.boundary)
         self.setCurrentStmt(model)
         ret true
     }
@@ -480,14 +484,15 @@ impl scopeOptimizer {
 
         for (_, mut l) in assign.L {
             if l != nil {
-                exprOptimizer.optimize(l.Model)
+                possibleBoundaryRemove(self.boundary, l.Model)
+                exprOptimizer.optimizeBoundary(l.Model, self.boundary)
             }
         }
-        exprOptimizer.optimize(assign.R)
+        exprOptimizer.optimizeBoundary(assign.R, self.boundary)
     }
 
     fn optimizeRet(mut &self, mut r: &RetSt) {
-        exprOptimizer.optimize(r.Expr)
+        exprOptimizer.optimizeBoundary(r.Expr, self.boundary)
 
         // Break algorithm is exceptional-specific optimizations are not enabled.
         // The following algorithms tries to apply specific optimizations for exceptionals.
@@ -540,6 +545,7 @@ impl scopeOptimizer {
     fn optimizeChild(mut &self, mut child: &Scope) {
         mut so := scopeOptimizer.new(child)
         so.parent = self
+        so.boundary = self.boundary
         so.optimize()
     }
 

@@ -11,6 +11,7 @@ use std::jule::sema::{
     Data,
     Var,
     FnIns,
+    ParamIns,
     ExprModel,
     BinaryExprModel,
     OperandExprModel,
@@ -49,7 +50,8 @@ use types for std::jule::types
 
 // Expression optimizer that applies target-independent optimizations.
 struct exprOptimizer {
-    mut model: &ExprModel
+    mut model:    &ExprModel
+    mut boundary: &boundary
 }
 
 impl exprOptimizer {
@@ -58,6 +60,17 @@ impl exprOptimizer {
         if exprEnabled {
             mut exop := &exprOptimizer{
                 model: unsafe { (&ExprModel)(&model) },
+            }
+            exop.do()
+        }
+    }
+
+    static fn optimizeBoundary(mut &model: ExprModel, mut &b: &boundary) {
+        // Do optimizatitons if any enabled.
+        if exprEnabled {
+            mut exop := &exprOptimizer{
+                model: unsafe { (&ExprModel)(&model) },
+                boundary: b,
             }
             exop.do()
         }
@@ -369,6 +382,7 @@ impl exprOptimizer {
 
     fn structureLit(self, mut m: &StructLitExprModel) {
         for (_, mut arg) in m.Args {
+            possibleBoundaryRemove(self.boundary, arg.Expr.Model)
             exprOptimizer.optimize(arg.Expr.Model)
         }
     }
@@ -381,8 +395,15 @@ impl exprOptimizer {
         exprOptimizer.optimize(m.Expr.Model)
     }
 
-    fn args(self, mut &args: []ExprModel) {
+    fn args(self, mut params: []&ParamIns, mut &args: []ExprModel) {
         for (i, mut arg) in args {
+            if i < len(params) {
+                mut p := params[i]
+                if p.Decl.Mutable &&
+                    (p.Decl.Reference || isBoundaryRiskyType(p.Kind)) {
+                    possibleBoundaryRemove(self.boundary, arg)
+                }
+            }
             exprOptimizer.optimize(arg)
             args[i] = arg
         }
@@ -390,19 +411,20 @@ impl exprOptimizer {
 
     fn scope(self, mut &s: &Scope) {
         mut scopt := scopeOptimizer.new(s)
+        scopt.boundary = self.boundary
         scopt.optimize()
     }
 
     fn funcCall(self, mut m: &FnCallExprModel) {
         exprOptimizer.optimize(m.Expr)
-        self.args(m.Args)
+        self.args(m.Func.Params, m.Args)
         if m.Except != nil {
             self.scope(m.Except)
         }
     }
 
     fn slice(self, mut m: &SliceExprModel) {
-        self.args(m.Elems)
+        self.args(nil, m.Elems)
     }
 
     fn array(self, mut m: &ArrayExprModel) {
@@ -411,7 +433,7 @@ impl exprOptimizer {
             exprOptimizer.optimize(elem)
             m.Elems[0] = elem
         }
-        self.args(m.Elems)
+        self.args(nil, m.Elems)
     }
 
     fn indexing(self, mut m: &IndexingExprModel) {
@@ -420,6 +442,17 @@ impl exprOptimizer {
         if !Access {
             ret
         }
+
+        if self.boundary != nil && isBoundaryValidType(m.Expr.Kind) {
+            var := getBoundaryVar(m.Expr.Model)
+            if self.boundary.fitsMaxSize(var, m.Index.Model) {
+                mut model := any(&UnsafeIndexingExprModel{Node: m})
+                *self.model = unsafe { *(*ExprModel)(&model) }
+                ret
+            }
+            self.boundary.pushVar(var, m.Index.Model)
+        }
+
         array := m.Expr.Kind.Arr() != nil
         // Constants checked by semantic analysis for arrays, safe.
         if array && m.Index.IsConst() {
@@ -550,7 +583,7 @@ impl exprOptimizer {
     }
 
     fn backendEmit(self, mut m: &BackendEmitExprModel) {
-        self.args(m.Exprs)
+        self.args(nil, m.Exprs)
     }
 
     fn do(self) {

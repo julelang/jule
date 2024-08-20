@@ -1,0 +1,117 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use std::jule::constant::{Const}
+use std::jule::lex::{TokenId}
+use std::jule::sema::{Var, UnaryExprModel, ExprModel, TypeKind}
+
+const invalidBoundary = 0x0
+
+struct boundaryVar {
+    var:     uintptr
+    maxSize: ExprModel
+}
+
+// Information wrapper for boundary analysis.
+struct boundary {
+    scope: &scopeOptimizer
+    vars:  []&boundaryVar
+}
+
+impl boundary {
+    // Appends variable with initial maximum size expression.
+    // If variable is already exist, updates maximum size information.
+    fn pushVar(mut self, var: uintptr, mut maxSize: ExprModel) {
+        if !Access || var == invalidBoundary {
+            // Ignore it, because this optimizations within scope of the --opt--access flag.
+            ret
+        }
+        for (_, mut v) in self.vars {
+            if v.var == var {
+                if fitsMaxSize(maxSize, v.maxSize) {
+                    // Maximum size is fits, so new size is larger than current size.
+                    v.maxSize = maxSize
+                }
+                ret
+            }
+        }
+        // Not exist, append new one.
+        for (_, mut v) in self.vars {
+            if v.var == invalidBoundary {
+                // Empty place, use here instead of append.
+                v.var = var
+                v.maxSize = maxSize
+                ret
+            }
+        }
+        self.vars = append(self.vars, &boundaryVar{var: var, maxSize: maxSize})
+    }
+
+    fn removeVar(mut self, var: uintptr) {
+        if var != invalidBoundary {
+            for (_, mut v) in self.vars {
+                if v.var == var {
+                    v.var = invalidBoundary
+                    v.maxSize = nil
+                    break
+                }
+            }
+        }
+    }
+
+    // Reports whether maximum size of variable is fits with given expression.
+    fn fitsMaxSize(mut self, var: uintptr, expr: ExprModel): bool {
+        if var != invalidBoundary {
+            for _, v in self.vars {
+                if v.var == var {
+                    ret fitsMaxSize(v.maxSize, expr)
+                }
+            }
+        }
+        ret false
+    }
+}
+
+// Reports whether model is valid maximum size information for boundary analysis.
+fn isValidBoundaryInfo(m: ExprModel): bool { ret fitsMaxSize(m, m) }
+
+// Reports whether maximum size is fits with given expression.
+// In other words, reports whether: max >= expr
+fn fitsMaxSize(max: ExprModel, expr: ExprModel): bool {
+    if typeData(max) != typeData(expr) {
+        ret false
+    }
+    match type max {
+    | &Const:
+        exprConst := (&Const)(expr)
+        ret exprConst.AsF64() >= 0 && (&Const)(max).GtEq(*exprConst)
+    |:
+        ret false
+    }
+}
+
+fn possibleBoundaryRemove(mut &b: &boundary, model: ExprModel) {
+    if b != nil {
+        b.removeVar(getBoundaryVar(model))
+    }
+}
+
+fn isBoundaryRiskyType(mut t: &TypeKind): bool { ret t.Sptr() != nil }
+fn isBoundaryValidType(mut t: &TypeKind): bool { ret t.Ptr() == nil }
+
+fn getBoundaryVar(m: ExprModel): uintptr {
+    if !Access {
+        ret invalidBoundary
+    }
+    match type m {
+    | &Var:
+        ret uintptr((&Var)(m))
+    | &UnaryExprModel:
+        uem := (&UnaryExprModel)(m)
+        if uem.Op.Id == TokenId.Star { // Dereferencing.
+            ret getBoundaryVar(uem.Expr.Model)
+        }
+    }
+    ret invalidBoundary
+}
