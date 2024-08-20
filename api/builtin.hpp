@@ -83,11 +83,7 @@ namespace jule
     jule::Int copy(const jule::Slice<Item> &dest,
                    const jule::Slice<Item> &src) noexcept
     {
-        if (dest.empty() || src.empty())
-            return 0;
-        const jule::Int len = dest.len() > src.len()   ? src.len()
-                              : src.len() > dest.len() ? dest.len()
-                                                       : src.len();
+        const jule::Int len = src.len() > dest.len() ? dest.len(): src.len();
         std::copy(src._slice, src._slice + len, dest._slice);
         return len;
     }
@@ -96,20 +92,14 @@ namespace jule
     jule::Slice<Item> append(jule::Slice<Item> src,
                              const jule::Slice<Item> &components) noexcept
     {
-        if (src == nullptr && components == nullptr)
-            return nullptr;
-
         if (components._len == 0)
             return src;
-
         if (src._len + components._len > src._cap)
             src = jule::alloc_for_append(src, components._len);
-
         std::copy(
             components._slice,
             components._slice + components._len,
             src._slice + src._len);
-
         src._len += components._len;
         return src;
     }
