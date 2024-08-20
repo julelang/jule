@@ -10,7 +10,7 @@ const invalidBoundary = 0x0
 
 struct boundaryVar {
     var:     uintptr
-    maxSize: ExprModel
+    maxSize: []ExprModel
 }
 
 // Information wrapper for boundary analysis.
@@ -26,12 +26,19 @@ impl boundary {
             // Ignore it, because this optimizations within scope of the --opt--access flag.
             ret
         }
+        if !isValidBoundaryInfo(maxSize) {
+            ret
+        }
         for (_, mut v) in self.vars {
             if v.var == var {
-                if fitsMaxSize(maxSize, v.maxSize) {
-                    // Maximum size is fits, so new size is larger than current size.
-                    v.maxSize = maxSize
+                for i, max in v.maxSize {
+                    if fitsSize(maxSize, max) {
+                        // Maximum size is fits, so new size is larger than current size.
+                        v.maxSize[i] = maxSize
+                        ret
+                    }
                 }
+                v.maxSize = append(v.maxSize, maxSize)
                 ret
             }
         }
@@ -40,11 +47,11 @@ impl boundary {
             if v.var == invalidBoundary {
                 // Empty place, use here instead of append.
                 v.var = var
-                v.maxSize = maxSize
+                v.maxSize = append(v.maxSize, maxSize)
                 ret
             }
         }
-        self.vars = append(self.vars, &boundaryVar{var: var, maxSize: maxSize})
+        self.vars = append(self.vars, &boundaryVar{var: var, maxSize: [maxSize]})
     }
 
     fn removeVar(mut self, var: uintptr) {
@@ -52,7 +59,7 @@ impl boundary {
             for (_, mut v) in self.vars {
                 if v.var == var {
                     v.var = invalidBoundary
-                    v.maxSize = nil
+                    v.maxSize = v.maxSize[:0]
                     break
                 }
             }
@@ -64,7 +71,7 @@ impl boundary {
         if var != invalidBoundary {
             for _, v in self.vars {
                 if v.var == var {
-                    ret fitsMaxSize(v.maxSize, expr)
+                    ret fitsMaxSize(v.maxSize, expr) != -1
                 }
             }
         }
@@ -73,18 +80,37 @@ impl boundary {
 }
 
 // Reports whether model is valid maximum size information for boundary analysis.
-fn isValidBoundaryInfo(m: ExprModel): bool { ret fitsMaxSize(m, m) }
+fn isValidBoundaryInfo(m: ExprModel): bool { ret fitsSize(m, m) }
 
 // Reports whether maximum size is fits with given expression.
 // In other words, reports whether: max >= expr
-fn fitsMaxSize(max: ExprModel, expr: ExprModel): bool {
-    if typeData(max) != typeData(expr) {
+// Returns index number of max size which is fit, otherwise -1.
+fn fitsMaxSize(max: []ExprModel, expr: ExprModel): int {
+    for i, m in max {
+        if fitsSize(m, expr) {
+            ret i
+        }
+    }
+    ret -1
+}
+
+fn fitsSize(e1: ExprModel, e2: ExprModel): bool {
+    if typeData(e1) != typeData(e2) {
         ret false
     }
-    match type max {
+    match type e1 {
     | &Const:
-        exprConst := (&Const)(expr)
-        ret exprConst.AsF64() >= 0 && (&Const)(max).GtEq(*exprConst)
+        exprConst := (&Const)(e2)
+        ret exprConst.AsF64() >= 0 && (&Const)(e1).GtEq(*exprConst)
+    | &Var:
+        ret e1 == e2
+    | &UnaryExprModel:
+        uem1 := (&UnaryExprModel)(e1)
+        uem2 := (&UnaryExprModel)(e2)
+        if uem1.Op.Id != TokenId.Star || uem1.Op.Id != uem2.Op.Id {
+            ret false
+        }
+        ret fitsSize(uem1.Expr.Model, uem2.Expr.Model)
     |:
         ret false
     }
