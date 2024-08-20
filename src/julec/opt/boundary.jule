@@ -105,6 +105,10 @@ fn fitsSize(e1: ExprModel, e2: ExprModel): bool {
         ret exprConst.AsF64() >= 0 && (&Const)(e1).GtEq(*exprConst)
     | &Var:
         ret e1 == e2
+    | &StructSubIdentExprModel:
+        ssi1 := (&StructSubIdentExprModel)(e1)
+        ssi2 := (&StructSubIdentExprModel)(e2)
+        ret equalModels(ssi1.Expr.Model, ssi2.Expr.Model) && ssi1.Field == ssi2.Field
     | &UnaryExprModel:
         uem1 := (&UnaryExprModel)(e1)
         uem2 := (&UnaryExprModel)(e2)
@@ -168,6 +172,8 @@ fn getBoundaryVar(m: ExprModel): uintptr {
     match type m {
     | &Var:
         ret uintptr((&Var)(m))
+    | &StructSubIdentExprModel:
+        ret uintptr((&StructSubIdentExprModel)(m).Field)
     | &UnaryExprModel:
         uem := (&UnaryExprModel)(m)
         if uem.Op.Id == TokenId.Star { // Dereferencing.
