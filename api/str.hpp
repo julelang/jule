@@ -423,11 +423,13 @@ namespace jule
             jule::Slice<jule::I32> runes;
             char *s = this->operator char *();
             const char *end = s + this->_len;
-            for (; s < end; s++)
+            while (s < end)
             {
                 jule::I32 r;
-                std::tie(r, std::ignore) =
+                std::size_t len;
+                std::tie(r, len) =
                     jule::utf8_decode_rune_str(s, end - s);
+                s += len;
                 runes.push(r);
             }
             return runes;
