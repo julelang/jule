@@ -368,7 +368,7 @@ impl exprCoder {
     }
 
     fn castTraitFromTrait(mut &self, mut &m: &CastingExprModel, mut t1: &Trait, mut t2: &Trait) {
-        self.possibleRefExpr(m.Expr)
+        self.possibleRefExpr(m.Expr.Model)
         self.oc.write(".mask<")
         identCoder.traitDecl(self.oc.Buf, t1)
         self.oc.write(">(")
@@ -390,32 +390,32 @@ impl exprCoder {
                 ret
             }
             if m.ExprKind.TypeEnum() != nil {
-                self.possibleRefExpr(m.Expr)
+                self.possibleRefExpr(m.Expr.Model)
                 ret
             }
             i := self.oc.pushAnyType(m.ExprKind)
             self.oc.write(typeCoder.Any + "(")
-            match type m.Expr {
+            match type m.Expr.Model {
             | &Const:
                 prim := m.ExprKind.Prim()
                 if prim != nil && types::IsInt(prim.Kind) {
                     self.oc.write("static_cast<")
                     self.oc.tc.prim(self.oc.Buf, prim)
                     self.oc.write(">(")
-                    self.possibleRefExpr(m.Expr)
+                    self.possibleRefExpr(m.Expr.Model)
                     self.oc.write(")")
                     break
                 }
                 fall
             |:
-                self.possibleRefExpr(m.Expr)
+                self.possibleRefExpr(m.Expr.Model)
             }
             self.oc.write(", &" + anyTypeIdent)
             self.oc.write(conv::Itoa(i))
             self.oc.write(")")
             ret
         | isAny(m.ExprKind):
-            self.possibleRefExpr(m.Expr)
+            self.possibleRefExpr(m.Expr.Model)
             self.oc.write(".")
             if m.Kind.Sptr() != nil {
                 self.oc.write("cast_ptr<")
@@ -439,7 +439,7 @@ impl exprCoder {
             self.oc.write("((")
             self.oc.tc.kind(self.oc.Buf, m.Kind)
             self.oc.write(")(")
-            self.possibleRefExpr(m.Expr)
+            self.possibleRefExpr(m.Expr.Model)
             self.oc.write("))")
             ret
         | m.ExprKind.Trait() != nil:
@@ -447,7 +447,7 @@ impl exprCoder {
                 self.castTraitFromTrait(m, m.Kind.Trait(), m.ExprKind.Trait())
                 ret
             }
-            self.possibleRefExpr(m.Expr)
+            self.possibleRefExpr(m.Expr.Model)
             self.oc.write(".")
             if m.Kind.Sptr() != nil {
                 self.oc.write("cast_ptr<")
@@ -468,7 +468,7 @@ impl exprCoder {
         | m.Kind.Trait() != nil:
             self.oc.tc.kind(self.oc.Buf, m.Kind)
             self.oc.write("(")
-            self.possibleRefExpr(m.Expr)
+            self.possibleRefExpr(m.Expr.Model)
             self.oc.write(", ")
             self.oc.write(conv::Itoa(self.oc.findTypeOffset(m.Kind.Trait(), m.ExprKind)))
             self.oc.write(")")
@@ -482,14 +482,14 @@ impl exprCoder {
             } else {
                 self.oc.write(typeCoder.Str + "::from_rune(")
             }
-            self.possibleRefExpr(m.Expr)
+            self.possibleRefExpr(m.Expr.Model)
             self.oc.write(")")
             ret
         }
         self.oc.write("static_cast<")
         self.oc.tc.kind(self.oc.Buf, m.Kind)
         self.oc.write(">(")
-        self.possibleRefExpr(m.Expr)
+        self.possibleRefExpr(m.Expr.Model)
         self.oc.write(")")
     }
 

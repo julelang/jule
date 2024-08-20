@@ -10,6 +10,7 @@ use opt::{
     MutSlicingExprModel,
     SwapExprModel,
     ExceptionalForwardingExprModel,
+    StrRuneIter,
 }
 use conv for std::conv
 use lex for std::jule::lex::{TokenKind}
@@ -58,6 +59,7 @@ enum compStmt: type {
     &MutSlicingExprModel,
     &SwapExprModel,
     &ExceptionalForwardingExprModel,
+    &StrRuneIter,
 }
 
 struct scopeCoder {
@@ -228,6 +230,107 @@ impl scopeCoder {
         self.oc.indent()
         identCoder.iterEnd(self.oc.Buf, uintptr(it))
         self.oc.write(":;\n")
+
+        // Close scope.
+        self.oc.doneIndent()
+        self.oc.indent()
+        self.oc.write("}")
+    }
+
+    fn strRuneIter(mut &self, mut it: &StrRuneIter) {
+        mut sb := StrBuilder.New(1 << 6)
+        identCoder.iterBegin(sb, uintptr(it.Base))
+        begin := sb.Str()
+        sb.Clear()
+        identCoder.iterNext(sb, uintptr(it.Base))
+        next := sb.Str()
+
+        self.oc.write("{\n")
+        self.oc.addIndent()
+        self.oc.indent()
+
+        mut ref := false
+        self.oc.write("auto expr = ")
+        if opt::Copy && isCopyOptimizable(it.Expr) {
+            ref = true
+            match type it.Expr.Model {
+            | &Var:
+                v := (&Var)(it.Expr.Model)
+                if v.Reference {
+                    self.oc.ec.model(it.Expr.Model)
+                    break
+                }
+                fall
+            |:
+                self.oc.write("&(")
+                self.oc.ec.model(it.Expr.Model)
+                self.oc.write(")")
+            }
+        } else {
+            self.oc.ec.possibleRefExpr(it.Expr.Model)
+        }
+        self.oc.write(";\n")
+        self.oc.indent()
+        self.oc.write("char *it = expr")
+        if ref {
+            self.oc.write("->")
+        } else {
+            self.oc.write(".")
+        }
+        self.oc.write("operator char*();\n")
+        self.oc.indent()
+        self.oc.write("const char *end = it + expr")
+        if ref {
+            self.oc.write("->")
+        } else {
+            self.oc.write(".")
+        }
+        self.oc.write("len();\n")
+        self.oc.indent()
+        self.oc.write(begin)
+        self.oc.write(":;\n")
+        self.oc.indent()
+
+        // Variables.
+        if it.KeyA != nil {
+            self.oc.varInitExpr(it.KeyA, fn() { self.oc.write("end - it") })
+            self.oc.write("\n")
+            self.oc.indent()
+        }
+        self.oc.write("std::size_t len;")
+        if it.KeyB != nil {
+            self.oc.varInitExpr(it.KeyB, fn() { self.oc.write("it") })
+            self.oc.write("\n")
+            self.oc.indent()
+        } else {
+            self.oc.write("std::tie(std::ignore, len) = jule::utf8_decode_rune_str(it, ")
+            if it.KeyA != nil {
+                self.oc.write("end - it")
+            } else {
+                identCoder.var(it.KeyA)
+            }
+            self.oc.write(");")
+        }
+
+        self.oc.write("if (it < end) {\n")
+        self.oc.addIndent()
+        self.oc.indent()
+        self.scope(it.Base.Scope)
+        self.oc.write("\n")
+        self.oc.indent()
+        self.oc.write(next)
+        self.oc.write(":;\n")
+        self.oc.indent()
+        self.oc.write("it += len;\n")
+        self.oc.indent()
+        self.oc.write("goto ")
+        self.oc.write(begin)
+        self.oc.write(";\n")
+
+        // Close if.
+        self.oc.doneIndent()
+        self.oc.indent()
+        self.oc.write("}\n")
 
         // Close scope.
         self.oc.doneIndent()
@@ -798,6 +901,8 @@ impl scopeCoder {
             self.swap((&SwapExprModel)(st))
         | &ExceptionalForwardingExprModel:
             self.exceptionalForwarding((&ExceptionalForwardingExprModel)(st))
+        | &StrRuneIter:
+            self.strRuneIter((&StrRuneIter)(st))
         |:
             self.oc.write("<unimplemented_stmt>")
         }

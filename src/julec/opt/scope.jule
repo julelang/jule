@@ -275,27 +275,43 @@ impl scopeOptimizer {
     }
 
     fn optimizeRangeIter(mut &self, mut it: &RangeIter) {
+        // Optimize scope first, following alrgorithms related with expression.
+        // It might be skip this, so scope optimizater should be guaranteed to run.
+        self.optimizeChild(it.Scope)
         if Iter {
             match type it.Expr.Model {
             | &CastingExprModel:
                 mut cem := (&CastingExprModel)(it.Expr.Model)
+                eprim := cem.ExprKind.Prim()
+                if eprim == nil || !eprim.IsStr() {
+                    break
+                }
                 mut s := cem.Kind.Slc()
                 if s == nil {
                     break
                 }
                 prim := s.Elem.Prim()
-                if prim == nil || !prim.IsU8() {
+                if prim == nil {
                     break
                 }
-                eprim := cem.ExprKind.Prim()
-                if eprim == nil || !eprim.IsStr() {
-                    break
+                match {
+                | prim.IsU8():
+                    // Expression is: []byte(str)
+                    // Use string expression directly, byte casting is unnecessary.
+                    it.Expr = cem.Expr
+                | prim.IsI32():
+                    // Expression is: []rune(str)
+                    // Avoid making allocation, iterate runes of string.
+                    exprOptimizer.optimize(cem.Expr.Model) // Optimize string expression.
+                    self.setCurrentStmt(&StrRuneIter{
+                        Expr: cem.Expr,
+                        Base: it,
+                    })
+                    ret
                 }
-                it.Expr.Model = cem.Expr
             }
         }
         exprOptimizer.optimize(it.Expr.Model)
-        self.optimizeChild(it.Scope)
     }
 
     fn optimizeWhileIter(mut &self, mut it: &WhileIter) {
