@@ -421,15 +421,14 @@ namespace jule
         operator jule::Slice<jule::I32>(void) const
         {
             jule::Slice<jule::I32> runes;
-            const char *str = this->operator const char *();
-            for (jule::Int index = 0; index < this->len();)
+            char *s = this->operator char *();
+            const char *end = s + this->_len;
+            for (; s < end; s++)
             {
-                jule::I32 rune;
-                jule::Int n;
-                std::tie(rune, n) = jule::utf8_decode_rune_str(str + index,
-                                                               this->len() - index);
-                index += n;
-                runes.push(rune);
+                jule::I32 r;
+                std::tie(r, std::ignore) =
+                    jule::utf8_decode_rune_str(s, end - s);
+                runes.push(r);
             }
             return runes;
         }
