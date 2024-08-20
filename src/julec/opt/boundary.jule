@@ -54,16 +54,17 @@ impl boundary {
         self.vars = append(self.vars, &boundaryVar{var: var, maxSize: [maxSize]})
     }
 
-    fn removeVar(mut self, var: uintptr) {
+    fn removeVar(mut self, var: uintptr): bool {
         if var != invalidBoundary {
             for (_, mut v) in self.vars {
                 if v.var == var {
                     v.var = invalidBoundary
                     v.maxSize = v.maxSize[:0]
-                    break
+                    ret true
                 }
             }
         }
+        ret false
     }
 
     // Reports whether maximum size of variable is fits with given expression.
@@ -117,8 +118,22 @@ fn fitsSize(e1: ExprModel, e2: ExprModel): bool {
 }
 
 fn possibleBoundaryRemove(mut &b: &boundary, model: ExprModel) {
-    if b != nil {
-        b.removeVar(getBoundaryVar(model))
+    if b == nil {
+        ret
+    }
+    if b.removeVar(getBoundaryVar(model)) {
+        // Exist as a variable, so cannot be size data.
+        // Remove variable and return.
+        ret
+    }
+    // Clear if size data mutating.
+    for (_, mut v) in b.vars {
+        for i, max in v.maxSize {
+            if equalModels(max, model) {
+                v.maxSize = append(v.maxSize[:i], v.maxSize[i+1:]...)
+                break
+            }
+        }
     }
 }
 
