@@ -287,30 +287,32 @@ impl scopeCoder {
         }
         self.oc.write("len();\n")
         self.oc.indent()
+
+        // Variables.
+        if it.Base.KeyA != nil {
+            self.oc.varInitExpr(it.Base.KeyA, fn() { self.oc.write("0") })
+            self.oc.write("\n")
+            self.oc.indent()
+        }
+        self.oc.write("std::size_t len;\n")
+        self.oc.indent()
+        if it.Base.KeyB != nil {
+            self.oc.varInitExpr(it.Base.KeyB, nil)
+            self.oc.write("\n")
+            self.oc.indent()
+        }
         self.oc.write(begin)
         self.oc.write(":;\n")
         self.oc.indent()
-
-        // Variables.
-        if it.KeyA != nil {
-            self.oc.varInitExpr(it.KeyA, fn() { self.oc.write("end - it") })
-            self.oc.write("\n")
-            self.oc.indent()
-        }
-        self.oc.write("std::size_t len;")
-        if it.KeyB != nil {
-            self.oc.varInitExpr(it.KeyB, fn() { self.oc.write("it") })
-            self.oc.write("\n")
-            self.oc.indent()
+        self.oc.write("std::tie(")
+        if it.Base.KeyB != nil {
+            identCoder.var(self.oc.Buf, it.Base.KeyB)
         } else {
-            self.oc.write("std::tie(std::ignore, len) = jule::utf8_decode_rune_str(it, ")
-            if it.KeyA != nil {
-                self.oc.write("end - it")
-            } else {
-                identCoder.var(it.KeyA)
-            }
-            self.oc.write(");")
+            self.oc.write("std::ignore")
         }
+        self.oc.write(", len) = jule::utf8_decode_rune_str(it, end - it")
+        self.oc.write(");\n")
+        self.oc.indent()
 
         self.oc.write("if (it < end) {\n")
         self.oc.addIndent()
@@ -323,6 +325,11 @@ impl scopeCoder {
         self.oc.indent()
         self.oc.write("it += len;\n")
         self.oc.indent()
+        if it.Base.KeyA != nil {
+            identCoder.var(self.oc.Buf, it.Base.KeyA)
+            self.oc.write("++;\n")
+            self.oc.indent()
+        }
         self.oc.write("goto ")
         self.oc.write(begin)
         self.oc.write(";\n")
