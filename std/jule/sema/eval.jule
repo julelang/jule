@@ -827,7 +827,10 @@ impl Eval {
             if d == nil {
                 continue
             }
-            _ = self.s.checkAssignType(false, arr.Elem, d, s.Token)
+            const destIsRef = false
+            if self.s.checkValidityForInitExpr(!self.immutable, destIsRef, arr.Elem, d, elem.Token) {
+                _ = self.s.checkAssignType(destIsRef, arr.Elem, d, elem.Token)
+            }
             model.Elems = append(model.Elems, d.Model)
         }
         self.prefix = prefix
@@ -865,11 +868,13 @@ impl Eval {
         self.prefix = slc.Elem
         for (_, mut elem) in s.Exprs[i:] {
             mut d := self.evalExpr(elem)
-            if d == nil {
-                continue
+            if d != nil {
+                const destIsRef = false
+                if self.s.checkValidityForInitExpr(!self.immutable, destIsRef, slc.Elem, d, elem.Token) {
+                    _ = self.s.checkAssignType(destIsRef, slc.Elem, d, elem.Token)
+                }
+                model.Elems = append(model.Elems, d.Model)
             }
-            _ = self.s.checkAssignType(false, slc.Elem, d, s.Token)
-            model.Elems = append(model.Elems, d.Model)
         }
         self.prefix = prefix
 
@@ -905,6 +910,11 @@ impl Eval {
         if firstElem == nil {
             ret nil
         }
+
+        // Check mutability for first element.
+        const destIsRef = false
+        self.s.checkValidityForInitExpr(!self.immutable, destIsRef,
+            firstElem.Kind, firstElem, s.Exprs[0].Token)
 
         mut d := self.evalExpSlc(s, firstElem.Kind, firstElem.Model)
 
@@ -2863,8 +2873,13 @@ impl Eval {
                 ret nil
             }
 
-            _ = self.s.checkAssignType(false, m.Key, key, pair.Colon)
-            _ = self.s.checkAssignType(false, m.Val, val, pair.Colon)
+            const destIsRef = false
+            if self.s.checkValidityForInitExpr(!self.immutable, destIsRef, m.Key, key, pair.Key.Token) {
+                _ = self.s.checkAssignType(destIsRef, m.Key, key, pair.Key.Token)
+            }
+            if self.s.checkValidityForInitExpr(!self.immutable, destIsRef, m.Val, val, pair.Val.Token) {
+                _ = self.s.checkAssignType(destIsRef, m.Val, val, pair.Val.Token)
+            }
 
             model.Entries = append(model.Entries, &KeyValPairExprModel{
                 Key: key.Model,
