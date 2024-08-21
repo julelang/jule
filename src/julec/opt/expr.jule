@@ -269,7 +269,58 @@ impl exprOptimizer {
         ret false
     }
 
+    fn checkBinaryForBoundary(self, mut &m: &BinaryExprModel) {
+        match type m.Left.Model {
+        | &BuiltinLenCallExprModel:
+            mut blc := (&BuiltinLenCallExprModel)(m.Left.Model)
+            if !isBoundaryValidType(blc.Expr.Kind) {
+                ret
+            }
+            if m.Op.Id != TokenId.Gt && m.Op.Id != TokenId.Eqs {
+                ret
+            }
+            // len(x) > y, len(x) == y (constant)
+            // Max guaranteed size of x is y.
+            if m.Op.Id == TokenId.Eqs {
+                match type m.Right.Model {
+                | &Const:
+                    mut c := new(Const, *(&Const)(m.Right.Model)) // Do not mutate binary operand.
+                    c.Sub(*Const.NewI64(1))
+                    self.boundary.pushVar(getBoundaryVar(blc.Expr.Model), c)
+                }
+                ret
+            }
+            self.boundary.pushVar(getBoundaryVar(blc.Expr.Model), m.Right.Model)
+            ret
+        }
+        match type m.Right.Model {
+        | &BuiltinLenCallExprModel:
+            mut blc := (&BuiltinLenCallExprModel)(m.Right.Model)
+            if !isBoundaryValidType(blc.Expr.Kind) {
+                ret
+            }
+            if m.Op.Id != TokenId.Lt && m.Op.Id != TokenId.Eqs {
+                ret
+            }
+            // y < len(x), y (constant) == len(x)
+            // Max guaranteed size of x is y.
+            if m.Op.Id == TokenId.Eqs {
+                match type m.Left.Model {
+                | &Const:
+                    mut c := new(Const, *(&Const)(m.Left.Model)) // Do not mutate binary operand.
+                    c.Sub(*Const.NewI64(1))
+                    self.boundary.pushVar(getBoundaryVar(blc.Expr.Model), c)
+                }
+                ret
+            }
+            self.boundary.pushVar(getBoundaryVar(blc.Expr.Model), m.Left.Model)
+            ret
+        }
+    }
+
     fn binary(self, mut m: &BinaryExprModel) {
+        self.checkBinaryForBoundary(m)
+
         exprOptimizer.optimizeBoundary(m.Left.Model, self.boundary)
         exprOptimizer.optimizeBoundary(m.Right.Model, self.boundary)
 
