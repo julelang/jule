@@ -171,7 +171,14 @@ fn getBoundaryVar(m: ExprModel): uintptr {
     }
     match type m {
     | &Var:
-        ret uintptr((&Var)(m))
+        v := (&Var)(m)
+        if !v.Reference {
+            // Variable is not reference, return address of it.
+            ret uintptr((&Var)(m))
+        }
+        // Variable is reference, it should be initialized at source code.
+        // Investigate the initial expression for variable address.
+        ret getBoundaryVar(v.Value.Data.Model)
     | &StructSubIdentExprModel:
         ret uintptr((&StructSubIdentExprModel)(m).Field)
     | &UnaryExprModel:
