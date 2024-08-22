@@ -922,19 +922,19 @@ impl Eval {
         ret d
     }
 
-    fn checkIntegerIndexingByData(mut self, mut &d: &Data, token: &Token) {
-        err_key := checkDataForIntegerIndexing(d)
-        match err_key {
+    fn checkIntegerIndexingByData(mut self, mut &d: &Data, mut token: &Token) {
+        errKey := checkDataForIntegerIndexing(d, token)
+        match errKey {
         | LogMsg.Empty:
             ret
         | LogMsg.InvalidTypeForIndexing:
-            self.pushErr(token, err_key, d.Kind.Str())
+            self.pushErr(token, errKey, d.Kind.Str())
         |:
-            self.pushErr(token, err_key)
+            self.pushErr(token, errKey)
         }
     }
 
-    fn indexingPtr(mut self, mut &d: &Data, mut &index: &Data, &i: &IndexingExpr) {
+    fn indexingPtr(mut self, mut &d: &Data, mut &index: &Data, mut &i: &IndexingExpr) {
         self.checkIntegerIndexingByData(index, i.Token)
         d.Lvalue = true
 
@@ -950,7 +950,7 @@ impl Eval {
         d.Kind = ptr.Elem
     }
 
-    fn indexingArr(mut self, mut &d: &Data, mut &index: &Data, &i: &IndexingExpr) {
+    fn indexingArr(mut self, mut &d: &Data, mut &index: &Data, mut &i: &IndexingExpr) {
         mut arr := d.Kind.Arr()
         d.Kind = arr.Elem
         self.checkIntegerIndexingByData(index, i.Token)
@@ -960,7 +960,7 @@ impl Eval {
         }
     }
 
-    fn indexingSlc(mut self, mut &d: &Data, mut &index: &Data, &i: &IndexingExpr) {
+    fn indexingSlc(mut self, mut &d: &Data, mut &index: &Data, mut &i: &IndexingExpr) {
         mut slc := d.Kind.Slc()
         d.Kind = slc.Elem
         self.checkIntegerIndexingByData(index, i.Token)
@@ -999,7 +999,7 @@ impl Eval {
         d.Kind = m.Val
     }
 
-    fn indexingStr(mut self, mut &d: &Data, mut &index: &Data, &i: &IndexingExpr) {
+    fn indexingStr(mut self, mut &d: &Data, mut &index: &Data, mut &i: &IndexingExpr) {
         d.Kind = primU8 // Byte
         d.Mutable = false
         d.Lvalue = true
@@ -1783,7 +1783,7 @@ impl Eval {
         d.Mutable = d.Mutable || !d.Kind.Mutable()
 
         if !d.Decl && (d.Kind.Enum() == nil || !d.Kind.Enum().Kind.Kind.Equal(t)) {
-            applyCastKind(d, t)
+            applyCastKind(d, t, errorToken)
             (&CastingExprModel)(d.Model).Token = errorToken
         } else {
             d.Kind = t
@@ -2209,12 +2209,12 @@ impl Eval {
         ret d
     }
 
-    fn evalEnumStatic(mut self, mut enm: &Enum, ident: &Token): &Data {
+    fn evalEnumStatic(mut self, mut enm: &Enum, mut ident: &Token): &Data {
         mut item := enm.FindItem(ident.Kind)
         if item == nil {
             self.pushErr(ident, LogMsg.ObjHaveNotIdent, enm.Ident, ident.Kind)
         }
-        ret evalEnumStatic(enm, item)
+        ret evalEnumStatic(enm, item, ident)
     }
 
     fn evalTypeEnumStatic(mut self, mut enm: &TypeEnum, ident: &Token): &Data {
@@ -4156,7 +4156,7 @@ impl binaryEval {
             d.Constant = self.l.Constant
         }
         d.Model = d.Constant
-        applyCastModelByEnum(d, d.Kind.Enum())
+        applyCastModelByEnum(d, d.Kind.Enum(), self.op)
     }
 
     fn checkData(mut self, mut &d: &Data) {
@@ -4391,16 +4391,17 @@ fn isPtrArithmeticCompatible(mut &l: &Data, mut &r: &Data): bool {
     ret tcc.check()
 }
 
-fn applyCastKindModel(mut &d: &Data, mut &t: &TypeKind) {
+fn applyCastKindModel(mut &d: &Data, mut &t: &TypeKind, mut &token: &Token) {
     d.Model = &CastingExprModel{
+        Token: token,
         Expr: new(Data, *d),
         Kind: t,
         ExprKind: d.Kind,
     }
 }
 
-fn applyCastKind(mut &d: &Data, mut &t: &TypeKind) {
-    applyCastKindModel(d, t)
+fn applyCastKind(mut &d: &Data, mut &t: &TypeKind, mut &token: &Token) {
+    applyCastKindModel(d, t, token)
     d.Kind = t
 }
 
@@ -4410,7 +4411,7 @@ fn buildVoidData(): &Data {
     }
 }
 
-fn checkDataForIntegerIndexing(mut &d: &Data): (err_fmt: LogMsg) {
+fn checkDataForIntegerIndexing(mut &d: &Data, mut &token: &Token): (errFmt: LogMsg) {
     if d == nil {
         ret LogMsg.Empty
     }
@@ -4427,7 +4428,7 @@ fn checkDataForIntegerIndexing(mut &d: &Data): (err_fmt: LogMsg) {
     | d.Kind.Prim() == nil
     | d.IsConst()
     | types::RealKindOf(d.Kind.Prim().Str()) != types::RealKindOf(PrimKind.Int):
-        applyCastKind(d, primInt)
+        applyCastKind(d, primInt, token)
     }
     ret LogMsg.Empty
 }
@@ -4435,7 +4436,7 @@ fn checkDataForIntegerIndexing(mut &d: &Data): (err_fmt: LogMsg) {
 // Applies casting Model: to data by enum.
 // This is necessary to keep exact same type of enum's field type.
 // The parameter d should be constant data.
-fn applyCastModelByEnum(mut &d: &Data, mut e: &Enum) {
+fn applyCastModelByEnum(mut &d: &Data, mut e: &Enum, mut &token: &Token) {
     if e == nil {
         ret
     }
@@ -4443,7 +4444,7 @@ fn applyCastModelByEnum(mut &d: &Data, mut e: &Enum) {
     if p.IsStr() {
         ret
     }
-    applyCastKindModel(d, e.Kind.Kind)
+    applyCastKindModel(d, e.Kind.Kind, token)
 }
 
 fn castConstByType(&t: str, mut &d: &Data) {
@@ -4525,7 +4526,7 @@ fn constoa(&c: &Const): str {
     }
 }
 
-fn evalEnumStatic(mut &enm: &Enum, mut &item: &EnumItem): &Data {
+fn evalEnumStatic(mut &enm: &Enum, mut &item: &EnumItem, mut &token: &Token): &Data {
     mut d := &Data{
         Kind: &TypeKind{
             Kind: enm,
@@ -4534,7 +4535,7 @@ fn evalEnumStatic(mut &enm: &Enum, mut &item: &EnumItem): &Data {
     if item != nil {
         d.Constant = new(Const, *item.Value.Data.Constant)
         d.Model = d.Constant
-        applyCastModelByEnum(d, enm)
+        applyCastModelByEnum(d, enm, token)
     }
     ret d
 }

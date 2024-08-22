@@ -335,7 +335,7 @@ impl assignTypeChecker {
     fn check(mut self): bool {
         ok := self.checkCompatibility()
         if ok && !self.d.Kind.Variadic {
-            applyImplicitCast(self.dest, self.d)
+            applyImplicitCast(self.dest, self.d, self.errorToken)
         }
         ret ok
     }
@@ -789,10 +789,14 @@ impl fnCallArgChecker {
         // Save variadic status into separate variable.
         // Because parameter might be variadic, but type might be not variadic.
         // Some built-in functions passes non-variadic types.
-        variadic := p.Kind.Variadic
+        // Also allocate new type based on [p.Kind] because type should be remain non-variadic.
+        // The [p.Kind] used as prefix and base type.
+        mut oldKind := p.Kind
+        p.Kind = new(TypeKind, *p.Kind)
         p.Kind.Variadic = false
         defer {
-            p.Kind.Variadic = variadic
+            p.Kind.Variadic = false // Set actual type as non-variadic.
+            p.Kind = oldKind
         }
 
         for i < len(self.args); i++ {
@@ -819,6 +823,7 @@ impl fnCallArgChecker {
                 variadiced = true
                 p.Kind.Variadic = true
                 ok = ok && self.checkArg(p, d, arg.Token)
+                p.Kind.Variadic = false
                 match type d.Model {
                 | &SliceExprModel:
                     model = (&SliceExprModel)(d.Model)
