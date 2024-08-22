@@ -50,27 +50,21 @@ use types for std::jule::types
 
 // Expression optimizer that applies target-independent optimizations.
 struct exprOptimizer {
-    mut model:    &ExprModel
-    mut boundary: &boundary
+    mut model: &ExprModel
+    mut data:  &data // Should be non-nil guaranteed.
 }
 
 impl exprOptimizer {
     static fn optimize(mut &model: ExprModel) {
-        // Do optimizatitons if any enabled.
-        if exprEnabled {
-            mut exop := &exprOptimizer{
-                model: unsafe { (&ExprModel)(&model) },
-            }
-            exop.do()
-        }
+        exprOptimizer.optimizeData(model, emptyData)
     }
 
-    static fn optimizeBoundary(mut &model: ExprModel, mut &b: &boundary) {
+    static fn optimizeData(mut &model: ExprModel, mut &d: &data) {
         // Do optimizatitons if any enabled.
         if exprEnabled {
             mut exop := &exprOptimizer{
                 model: unsafe { (&ExprModel)(&model) },
-                boundary: b,
+                data: d,
             }
             exop.do()
         }
@@ -270,6 +264,9 @@ impl exprOptimizer {
     }
 
     fn checkBinaryForBoundary(self, mut &m: &BinaryExprModel) {
+        if self.data.boundary == nil {
+            ret
+        }
         match type m.Left.Model {
         | &BuiltinLenCallExprModel:
             mut blc := (&BuiltinLenCallExprModel)(m.Left.Model)
@@ -286,11 +283,11 @@ impl exprOptimizer {
                 | &Const:
                     mut c := new(Const, *(&Const)(m.Right.Model)) // Do not mutate binary operand.
                     c.Sub(*Const.NewI64(1))
-                    self.boundary.pushVar(getBoundaryVar(blc.Expr.Model), c)
+                    self.data.boundary.pushVar(getBoundaryVar(blc.Expr.Model), c)
                 }
                 ret
             }
-            self.boundary.pushVar(getBoundaryVar(blc.Expr.Model), m.Right.Model)
+            self.data.boundary.pushVar(getBoundaryVar(blc.Expr.Model), m.Right.Model)
             ret
         }
         match type m.Right.Model {
@@ -309,20 +306,53 @@ impl exprOptimizer {
                 | &Const:
                     mut c := new(Const, *(&Const)(m.Left.Model)) // Do not mutate binary operand.
                     c.Sub(*Const.NewI64(1))
-                    self.boundary.pushVar(getBoundaryVar(blc.Expr.Model), c)
+                    self.data.boundary.pushVar(getBoundaryVar(blc.Expr.Model), c)
                 }
                 ret
             }
-            self.boundary.pushVar(getBoundaryVar(blc.Expr.Model), m.Left.Model)
+            self.data.boundary.pushVar(getBoundaryVar(blc.Expr.Model), m.Left.Model)
+            ret
+        }
+    }
+
+    fn checkBinaryForNil(self, mut &m: &BinaryExprModel) {
+        if self.data.nils == nil {
+            ret
+        }
+        mut var := getNilVar(m.Left.Model)
+        if var != invalidNil {
+            if !isNilValidType(m.Left.Kind) {
+                ret
+            }
+            match type m.Right.Model {
+            | &Const:
+                // No need to check whether constant variable is nil.
+                // It only can be nil.
+                self.data.nils.pushVar(var, m.Op.Id == TokenId.NotEq)
+            }
+            ret
+        }
+        var = getNilVar(m.Right.Model)
+        if var != invalidNil {
+            if !isNilValidType(m.Right.Kind) {
+                ret
+            }
+            match type m.Left.Model {
+            | &Const:
+                // No need to check whether constant variable is nil.
+                // It only can be nil.
+                self.data.nils.pushVar(var, m.Op.Id == TokenId.NotEq)
+            }
             ret
         }
     }
 
     fn binary(self, mut m: &BinaryExprModel) {
         self.checkBinaryForBoundary(m)
+        self.checkBinaryForNil(m)
 
-        exprOptimizer.optimizeBoundary(m.Left.Model, self.boundary)
-        exprOptimizer.optimizeBoundary(m.Right.Model, self.boundary)
+        exprOptimizer.optimizeData(m.Left.Model, self.data)
+        exprOptimizer.optimizeData(m.Right.Model, self.data)
 
         if Cond {
             match {
@@ -406,7 +436,7 @@ impl exprOptimizer {
     }
 
     fn unary(self, mut m: &UnaryExprModel) {
-        exprOptimizer.optimizeBoundary(m.Expr.Model, self.boundary)
+        exprOptimizer.optimizeData(m.Expr.Model, self.data)
         if !Ptr {
             ret
         }
@@ -416,8 +446,26 @@ impl exprOptimizer {
             | &UnaryExprModel:
                 mut um := (&UnaryExprModel)(m.Expr.Model)
                 if um.Op.Id == TokenId.Amper {
+                    // Remove pointer overhead.
+                    // Expression is: *(&x)
+                    // Simplify to: x
                     *self.model = um.Expr.Model
+                    ret
                 }
+                ret
+            }
+            if !Access {
+                ret
+            }
+            if self.data.nils != nil && isNilValidType(m.Expr.Kind) {
+                var := getNilVar(m.Expr.Model)
+                if self.data.nils.isSafe(var) {
+                    mut model := any(&UnsafeDerefExprModel{Base: m})
+                    *self.model = unsafe { *(*ExprModel)(&model) }
+                    ret
+                }
+                // Now this varible is safe until it mutated.
+                self.data.nils.pushVar(var, true)
             }
         | TokenId.Amper:
             match type m.Expr.Model {
@@ -433,8 +481,13 @@ impl exprOptimizer {
 
     fn structureLit(self, mut m: &StructLitExprModel) {
         for (_, mut arg) in m.Args {
-            possibleBoundaryRemove(self.boundary, arg.Expr.Model)
-            exprOptimizer.optimizeBoundary(arg.Expr.Model, self.boundary)
+            if self.data.boundary != nil {
+                possibleBoundaryRemove(self.data.boundary, arg.Expr.Model)
+            }
+            if self.data.nils != nil {
+                possibleNilRemove(self.data.nils, arg.Expr.Model)
+            }
+            exprOptimizer.optimizeData(arg.Expr.Model, self.data)
         }
     }
 
@@ -443,7 +496,7 @@ impl exprOptimizer {
     }
 
     fn casting(self, mut m: &CastingExprModel) {
-        exprOptimizer.optimizeBoundary(m.Expr.Model, self.boundary)
+        exprOptimizer.optimizeData(m.Expr.Model, self.data)
     }
 
     fn args(self, mut params: []&ParamIns, mut &args: []ExprModel) {
@@ -451,28 +504,33 @@ impl exprOptimizer {
             if i < len(params) {
                 mut p := params[i]
                 if p.Decl.Mutable && p.Decl.Reference {
-                    if isBoundaryRiskyType(p.Kind) {
-                        // Clear boundary variable if exist and sizes.
-                        possibleBoundaryRemove(self.boundary, arg)
-                    } else {
-                        // Clear sizes only, no boundary variable risk.
-                        possibleBoundaryRemove2(self.boundary, arg)
+                    match {
+                    | self.data.boundary != nil:
+                        if isBoundaryRiskyType(p.Kind) {
+                            // Clear boundary variable if exist and sizes.
+                            possibleBoundaryRemove(self.data.boundary, arg)
+                        } else {
+                            // Clear sizes only, no boundary variable risk.
+                            possibleBoundaryRemove2(self.data.boundary, arg)
+                        }
+                    | self.data.nils != nil:
+                        possibleNilRemove(self.data.nils, arg)
                     }
                 }
             }
-            exprOptimizer.optimizeBoundary(arg, self.boundary)
+            exprOptimizer.optimizeData(arg, self.data)
             args[i] = arg
         }
     }
 
     fn scope(self, mut &s: &Scope) {
         mut scopt := scopeOptimizer.new(s)
-        scopt.boundary = self.boundary
+        scopt.data = self.data
         scopt.optimize()
     }
 
     fn funcCall(self, mut m: &FnCallExprModel) {
-        exprOptimizer.optimizeBoundary(m.Expr, self.boundary)
+        exprOptimizer.optimizeData(m.Expr, self.data)
         self.args(m.Func.Params, m.Args)
         if m.Except != nil {
             self.scope(m.Except)
@@ -486,15 +544,15 @@ impl exprOptimizer {
     fn array(self, mut m: &ArrayExprModel) {
         if len(m.Elems) == 2 && m.Elems[1] == nil {
             mut elem := m.Elems[0]
-            exprOptimizer.optimizeBoundary(elem, self.boundary)
+            exprOptimizer.optimizeData(elem, self.data)
             m.Elems[0] = elem
         }
         self.args(nil, m.Elems)
     }
 
     fn indexing(self, mut m: &IndexingExprModel) {
-        exprOptimizer.optimizeBoundary(m.Expr.Model, self.boundary)
-        exprOptimizer.optimizeBoundary(m.Index.Model, self.boundary)
+        exprOptimizer.optimizeData(m.Expr.Model, self.data)
+        exprOptimizer.optimizeData(m.Index.Model, self.data)
         if !Access {
             ret
         }
@@ -507,14 +565,14 @@ impl exprOptimizer {
             ret
         }
 
-        if self.boundary != nil && isBoundaryValidType(m.Expr.Kind) {
+        if self.data.boundary != nil && isBoundaryValidType(m.Expr.Kind) {
             var := getBoundaryVar(m.Expr.Model)
-            if self.boundary.fitsMaxSize(var, m.Index.Model) {
+            if self.data.boundary.fitsMaxSize(var, m.Index.Model) {
                 mut model := any(&UnsafeIndexingExprModel{Node: m})
                 *self.model = unsafe { *(*ExprModel)(&model) }
                 ret
             }
-            self.boundary.pushVar(var, m.Index.Model)
+            self.data.boundary.pushVar(var, m.Index.Model)
         }
     }
 
@@ -524,102 +582,102 @@ impl exprOptimizer {
 
     fn mapExpr(self, mut m: &MapExprModel) {
         for (_, mut pair) in m.Entries {
-            exprOptimizer.optimizeBoundary(pair.Key, self.boundary)
-            exprOptimizer.optimizeBoundary(pair.Val, self.boundary)
+            exprOptimizer.optimizeData(pair.Key, self.data)
+            exprOptimizer.optimizeData(pair.Val, self.data)
         }
     }
 
     fn slicing(self, mut m: &SlicingExprModel) {
-        exprOptimizer.optimizeBoundary(m.Expr, self.boundary)
-        exprOptimizer.optimizeBoundary(m.Left, self.boundary)
+        exprOptimizer.optimizeData(m.Expr, self.data)
+        exprOptimizer.optimizeData(m.Left, self.data)
         if m.Right != nil {
-            exprOptimizer.optimizeBoundary(m.Right, self.boundary)
+            exprOptimizer.optimizeData(m.Right, self.data)
         }
     }
 
     fn traitSub(self, mut m: &TraitSubIdentExprModel) {
-        exprOptimizer.optimizeBoundary(m.Expr, self.boundary)
+        exprOptimizer.optimizeData(m.Expr, self.data)
     }
 
     fn structureSub(self, mut m: &StructSubIdentExprModel) {
-        exprOptimizer.optimizeBoundary(m.Expr.Model, self.boundary)
+        exprOptimizer.optimizeData(m.Expr.Model, self.data)
     }
 
     fn tuple(self, mut m: &TupleExprModel) {
         for (_, mut d) in m.Datas {
-            exprOptimizer.optimizeBoundary(d.Model, self.boundary)
+            exprOptimizer.optimizeData(d.Model, self.data)
         }
     }
 
     fn newCall(self, mut m: &BuiltinNewCallExprModel) {
         if m.Init != nil {
-            exprOptimizer.optimizeBoundary(m.Init, self.boundary)
+            exprOptimizer.optimizeData(m.Init, self.data)
         }
     }
 
     fn outCall(self, mut m: &BuiltinOutCallExprModel) {
-        exprOptimizer.optimizeBoundary(m.Expr, self.boundary)
+        exprOptimizer.optimizeData(m.Expr, self.data)
     }
 
     fn outlnCall(self, mut m: &BuiltinOutlnCallExprModel) {
-        exprOptimizer.optimizeBoundary(m.Expr, self.boundary)
+        exprOptimizer.optimizeData(m.Expr, self.data)
     }
 
     fn panicCall(self, mut m: &BuiltinPanicCallExprModel) {
-        exprOptimizer.optimizeBoundary(m.Expr, self.boundary)
+        exprOptimizer.optimizeData(m.Expr, self.data)
     }
 
     fn assertCall(self, mut m: &BuiltinAssertCallExprModel) {
-        exprOptimizer.optimizeBoundary(m.Expr, self.boundary)
+        exprOptimizer.optimizeData(m.Expr, self.data)
     }
 
     fn errorCall(self, mut m: &BuiltinErrorCallExprModel) {
-        exprOptimizer.optimizeBoundary(m.Err.Model, self.boundary)
+        exprOptimizer.optimizeData(m.Err.Model, self.data)
     }
 
     fn makeCall(self, mut m: &BuiltinMakeCallExprModel) {
         if m.Len != nil {
-            exprOptimizer.optimizeBoundary(m.Len, self.boundary)
+            exprOptimizer.optimizeData(m.Len, self.data)
         }
         if m.Cap != nil {
-            exprOptimizer.optimizeBoundary(m.Cap, self.boundary)
+            exprOptimizer.optimizeData(m.Cap, self.data)
         }
     }
 
     fn appendCall(self, mut m: &BuiltinAppendCallExprModel) {
-        exprOptimizer.optimizeBoundary(m.Dest, self.boundary)
-        exprOptimizer.optimizeBoundary(m.Elements, self.boundary)
+        exprOptimizer.optimizeData(m.Dest, self.data)
+        exprOptimizer.optimizeData(m.Elements, self.data)
     }
 
     fn lenCall(self, mut m: &BuiltinLenCallExprModel) {
-        exprOptimizer.optimizeBoundary(m.Expr.Model, self.boundary)
+        exprOptimizer.optimizeData(m.Expr.Model, self.data)
     }
 
     fn capCall(self, mut m: &BuiltinCapCallExprModel) {
-        exprOptimizer.optimizeBoundary(m.Expr.Model, self.boundary)
+        exprOptimizer.optimizeData(m.Expr.Model, self.data)
     }
 
     fn deleteCall(self, mut m: &BuiltinDeleteCallExprModel) {
-        exprOptimizer.optimizeBoundary(m.Dest.Model, self.boundary)
+        exprOptimizer.optimizeData(m.Dest.Model, self.data)
         if m.Key != nil {
-            exprOptimizer.optimizeBoundary(m.Key.Model, self.boundary)
+            exprOptimizer.optimizeData(m.Key.Model, self.data)
         }
     }
 
     fn sizeof(self, mut m: &SizeofExprModel) {
-        exprOptimizer.optimizeBoundary(m.Expr, self.boundary)
+        exprOptimizer.optimizeData(m.Expr, self.data)
     }
 
     fn alignof(self, mut m: &AlignofExprModel) {
-        exprOptimizer.optimizeBoundary(m.Expr, self.boundary)
+        exprOptimizer.optimizeData(m.Expr, self.data)
     }
 
     fn integratedToStr(self, mut m: &IntegratedToStrExprModel) {
-        exprOptimizer.optimizeBoundary(m.Expr, self.boundary)
+        exprOptimizer.optimizeData(m.Expr, self.data)
     }
 
     fn free(self, mut m: &FreeExprModel) {
-        exprOptimizer.optimizeBoundary(m.Expr, self.boundary)
+        exprOptimizer.optimizeData(m.Expr, self.data)
     }
 
     fn backendEmit(self, mut m: &BackendEmitExprModel) {

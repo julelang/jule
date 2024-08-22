@@ -1,0 +1,98 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use std::jule::lex::{TokenId}
+use std::jule::sema::{Var, StructSubIdentExprModel, UnaryExprModel, ExprModel, TypeKind}
+
+const invalidNil = 0x0
+
+struct nilVar {
+    var:  uintptr
+    safe: bool
+}
+
+// Information wrapper for nil analysis.
+struct nils {
+    vars: []&nilVar
+}
+
+impl nils {
+    // Appends variable with initial safety state.
+    // If variable is already exist, updates safety information.
+    fn pushVar(mut self, var: uintptr, safe: bool) {
+        if !Access || var == invalidNil {
+            // Ignore it, because this optimizations within scope of the --opt-access flag.
+            ret
+        }
+        for (_, mut v) in self.vars {
+            if v.var == var {
+                v.safe = safe
+                ret
+            }
+        }
+        // Not exist, append new one.
+        for (_, mut v) in self.vars {
+            if v.var == invalidNil {
+                // Empty place, use here instead of append.
+                v.var = var
+                v.safe = safe
+                ret
+            }
+        }
+        self.vars = append(self.vars, &nilVar{var: var, safe: safe})
+    }
+
+    fn removeVar(mut self, var: uintptr): bool {
+        if var != invalidNil {
+            for (_, mut v) in self.vars {
+                if v.var == var {
+                    v.var = invalidNil
+                    v.safe = false
+                    ret true
+                }
+            }
+        }
+        ret false
+    }
+
+    // Reports whether variable is safe.
+    fn isSafe(mut self, var: uintptr): bool {
+        if var != invalidNil {
+            for _, v in self.vars {
+                if v.var == var {
+                    ret v.safe
+                }
+            }
+        }
+        ret false
+    }
+}
+
+fn possibleNilRemove(mut &n: &nils, m: ExprModel) {
+    if n != nil {
+        _ = n.removeVar(getNilVar(m))
+    }
+}
+
+fn isNilValidType(mut t: &TypeKind): bool { ret t.Sptr() != nil }
+
+fn getNilVar(m: ExprModel): uintptr {
+    if !Access {
+        ret invalidBoundary
+    }
+    match type m {
+    | &Var:
+        v := (&Var)(m)
+        if !v.Reference {
+            // Variable is not reference, return address of it.
+            ret uintptr((&Var)(m))
+        }
+        // Variable is reference, it should be initialized at source code.
+        // Investigate the initial expression for variable address.
+        ret getNilVar(v.Value.Data.Model)
+    | &StructSubIdentExprModel:
+        ret uintptr((&StructSubIdentExprModel)(m).Field)
+    }
+    ret invalidBoundary
+}

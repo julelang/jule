@@ -11,6 +11,7 @@ use opt::{
     AppendToSliceExprModel,
     StrCompExprModel,
     EmptyCompareExprModel,
+    UnsafeDerefExprModel,
 }
 use conv for std::conv
 use std::env::{Arch}
@@ -95,6 +96,7 @@ enum compExprModel: type {
     &StrCompExprModel,
     &RefExprModel,
     &EmptyCompareExprModel,
+    &UnsafeDerefExprModel,
 }
 
 struct exprCoder {
@@ -598,6 +600,19 @@ impl exprCoder {
         ret false
     }
 
+    fn writeReceiver(mut &self, mut m: compExprModel): (safeDeref: bool) {
+        match type m {
+        | &UnaryExprModel:
+            self.possibleRefExpr((&UnaryExprModel)(m).Expr.Model)
+            ret true
+        | &UnsafeDerefExprModel:
+            self.possibleRefExpr((&UnsafeDerefExprModel)(m).Base.Expr.Model)
+            ret false
+        |:
+            panic("implementation mistake, this panic call should be unreachable")
+        }
+    }
+
     fn pureFuncCall(mut &self, mut &m: &FnCallExprModel) {
         wrapped := self.isWrapped(m)
         self.modelForCall(m.Expr)
@@ -624,17 +639,19 @@ impl exprCoder {
                 match {
                 | m.Func.Decl.Params[0].IsRef():
                     // Ignore dereferencing, use data directly to call method.
-                    self.possibleRefExpr((&UnaryExprModel)(ssie.Expr.Model).Expr.Model)
+                    _ = self.writeReceiver(ssie.Expr.Model)
                 | ssie.Expr.Kind.Sptr() != nil:
                     // Ignore dereferencing, use data directly to call [ptr] method.
-                    self.possibleRefExpr((&UnaryExprModel)(ssie.Expr.Model).Expr.Model)
-                    self.oc.write(".ptr(")
-                    if !env::Production {
-                        self.oc.write("\"")
-                        self.oc.locInfo(m.Token)
-                        self.oc.write("\"")
+                    safe := self.writeReceiver(ssie.Expr.Model)
+                    if safe {
+                        self.oc.write(".ptr(")
+                        if !env::Production {
+                            self.oc.write("\"")
+                            self.oc.locInfo(m.Token)
+                            self.oc.write("\"")
+                        }
+                        self.oc.write(")")
                     }
-                    self.oc.write(")")
                 |:
                     if ssie.Expr.Kind.Struct() != nil {
                         match type ssie.Expr.Model {
@@ -1333,6 +1350,17 @@ impl exprCoder {
         self.oc.write(").empty()")
     }
 
+    fn unsafeDeref(mut &self, mut m: &UnsafeDerefExprModel) {
+        match {
+        | m.Base.Expr.Kind.Sptr() != nil:
+            self.oc.write("(*")
+            self.possibleRefExpr(m.Base.Expr.Model)
+            self.oc.write(".alloc)")
+        |:
+            panic("implementation mistake, this panic call should be unreachable")
+        }
+    }
+
     fn model(mut &self, mut m: compExprModel) {
         match type m {
         | str:
@@ -1425,6 +1453,8 @@ impl exprCoder {
             self.var((&RefExprModel)(m).Var)
         | &EmptyCompareExprModel:
             self.emptyCompare((&EmptyCompareExprModel)(m))
+        | &UnsafeDerefExprModel:
+            self.unsafeDeref((&UnsafeDerefExprModel)(m))
         |:
             self.oc.write("<unimplemented_expression_model>")
         }
