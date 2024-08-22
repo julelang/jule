@@ -159,6 +159,18 @@ namespace jule
             return this->data.template as<T>();
         }
 
+        template <typename T>
+        inline T unsafe_cast(void) const noexcept
+        {
+            return *reinterpret_cast<T *>(this->data.alloc);
+        }
+
+        template <typename T>
+        inline jule::Ptr<T> unsafe_cast_ptr(void) const noexcept
+        {
+            return this->data.template as<T>();
+        }
+
         inline jule::Any &operator=(const jule::Any &src) noexcept
         {
             this->dealloc();

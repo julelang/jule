@@ -12,6 +12,7 @@ use opt::{
     StrCompExprModel,
     EmptyCompareExprModel,
     UnsafeDerefExprModel,
+    UnsafeCastingExprModel,
 }
 use conv for std::conv
 use std::env::{Arch}
@@ -97,6 +98,7 @@ enum compExprModel: type {
     &RefExprModel,
     &EmptyCompareExprModel,
     &UnsafeDerefExprModel,
+    &UnsafeCastingExprModel,
 }
 
 struct exprCoder {
@@ -1361,6 +1363,23 @@ impl exprCoder {
         }
     }
 
+    fn unsafeCasting(mut &self, mut m: &UnsafeCastingExprModel) {
+        match {
+        | isAny(m.Base.ExprKind):
+            self.possibleRefExpr(m.Base.Expr.Model)
+            if m.Base.Kind.Sptr() != nil {
+                self.oc.write(".unsafe_cast_ptr<")
+                self.oc.tc.kind(self.oc.Buf, m.Base.Kind.Sptr().Elem)
+            } else {
+                self.oc.write(".unsafe_cast<")
+                self.oc.tc.kind(self.oc.Buf, m.Base.Kind)
+            }
+            self.oc.write(">()")
+        |:
+            panic("implementation mistake, this panic call should be unreachable")
+        }
+    }
+
     fn model(mut &self, mut m: compExprModel) {
         match type m {
         | str:
@@ -1455,6 +1474,8 @@ impl exprCoder {
             self.emptyCompare((&EmptyCompareExprModel)(m))
         | &UnsafeDerefExprModel:
             self.unsafeDeref((&UnsafeDerefExprModel)(m))
+        | &UnsafeCastingExprModel:
+            self.unsafeCasting((&UnsafeCastingExprModel)(m))
         |:
             self.oc.write("<unimplemented_expression_model>")
         }

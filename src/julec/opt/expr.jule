@@ -489,6 +489,9 @@ impl exprOptimizer {
             if self.data.nils != nil {
                 possibleNilRemove(self.data.nils, arg.Expr.Model)
             }
+            if self.data.dynamic != nil {
+                possibleDynamicRemove(self.data.dynamic, arg.Expr.Model)
+            }
             exprOptimizer.optimizeData(arg.Expr.Model, self.data)
         }
     }
@@ -498,7 +501,17 @@ impl exprOptimizer {
     }
 
     fn casting(self, mut m: &CastingExprModel) {
+        valid := isDynamicValidType(m.ExprKind)
+        var := getDynamicVar(m.Expr.Model)
+        if valid && self.data.dynamic != nil && self.data.dynamic.isFits(var, m.Kind) {
+            mut model := any(&UnsafeCastingExprModel{Base: m})
+            *self.model = unsafe { *(*ExprModel)(&model) }
+            ret
+        }
         exprOptimizer.optimizeData(m.Expr.Model, self.data)
+        if self.data.dynamic != nil && valid {
+            self.data.dynamic.pushVar(var, m.Kind)
+        }
     }
 
     fn args(self, mut params: []&ParamIns, mut &args: []ExprModel) {
@@ -506,13 +519,16 @@ impl exprOptimizer {
             if i < len(params) {
                 mut p := params[i]
                 if p.Decl.Mutable && p.Decl.Reference {
-                    match {
-                    | self.data.boundary != nil:
+                    if self.data.boundary != nil {
                         if isBoundaryRiskyType(p.Kind) {
                             possibleBoundaryRemove(self.data.boundary, arg)
                         }
-                    | self.data.nils != nil:
+                    }
+                    if self.data.nils != nil {
                         possibleNilRemove(self.data.nils, arg)
+                    }
+                    if self.data.dynamic != nil {
+                        possibleDynamicRemove(self.data.dynamic, arg)
                     }
                 }
             }

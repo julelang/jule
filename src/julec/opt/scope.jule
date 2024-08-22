@@ -53,6 +53,7 @@ impl scopeOptimizer {
             data: &data{
                 boundary: new(boundary),
                 nils: new(nils),
+                dynamic: new(dynamic),
             },
         }
         ret sc
@@ -123,6 +124,15 @@ impl scopeOptimizer {
                 isGuaranteedNonNilExpr(self.data.nils, v.Value.Data.Model) {
                 const safe = true
                 self.data.nils.pushVar(getNilVar(v), safe)
+            }
+            if self.data.dynamic != nil {
+                mut kind := isTypeGuaranteedDynamicData(
+                    self.data.dynamic, v.Kind.Kind, v.Value.Data.Model)
+                if kind != nil {
+                    if isDynamicValidType(v.Kind.Kind) {
+                        self.data.dynamic.pushVar(getDynamicVar(v), kind)
+                    }
+                }
             }
             exprOptimizer.optimizeData(v.Value.Data.Model, self.data)
         }
@@ -224,14 +234,32 @@ impl scopeOptimizer {
     }
 
     fn optimizeMatch(mut &self, mut m: &Match) {
+        mut var := invalidDynamic
+        if Dynamic && m.TypeMatch {
+            var = getDynamicVar(m.Expr.Model)
+        }
         for (_, mut case) in m.Cases {
             for (_, mut expr) in case.Exprs {
                 exprOptimizer.optimizeData(expr.Model, self.data)
+            }
+            if len(case.Exprs) == 1 && self.data.dynamic != nil {
+                // We can know the exact kind of dynamic type if expression is single.
+                mut kind := isTypeGuaranteedDynamicData(self.data.dynamic, case.Exprs[0].Kind, nil)
+                if kind != nil {
+                    self.data.dynamic.pushVar(var, kind)
+                } else {
+                    self.data.dynamic.removeVar(var)
+                }
             }
             self.optimizeChild(case.Scope)
         }
         if m.Default != nil {
             self.optimizeChild(m.Default.Scope)
+            if self.data.dynamic != nil {
+                // Type is not matched, clear information.
+                // We have not any type exact information.
+                self.data.dynamic.removeVar(var)
+            }
         }
 
         if !Cond {
@@ -403,8 +431,19 @@ impl scopeOptimizer {
                     const safe = true
                     self.data.nils.pushVar(getNilVar(assign.L.Model), safe)
                 }
-            } else  {
+            } else {
                 possibleNilRemove(self.data.nils, assign.L.Model)
+            }
+        }
+        if self.data.dynamic != nil {
+            mut kind := isTypeGuaranteedDynamicData(
+                self.data.dynamic, assign.R.Kind, assign.R.Model)
+            if kind != nil {
+                if isDynamicValidType(assign.L.Kind) {
+                    self.data.dynamic.pushVar(getDynamicVar(assign.L.Model), kind)
+                }
+            } else {
+                possibleDynamicRemove(self.data.dynamic, assign.L.Model)
             }
         }
 
@@ -540,6 +579,17 @@ impl scopeOptimizer {
                         }
                     } else {
                         possibleNilRemove(self.data.nils, l.Model)
+                    }
+                }
+                if self.data.dynamic != nil && tup != nil {
+                    mut kind := isTypeGuaranteedDynamicData(
+                        self.data.dynamic, tup.Datas[i].Kind, tup.Datas[i].Model)
+                    if kind != nil {
+                        if isDynamicValidType(l.Kind) {
+                            self.data.dynamic.pushVar(getDynamicVar(l.Model), kind)
+                        }
+                    } else {
+                        possibleDynamicRemove(self.data.dynamic, l.Model)
                     }
                 }
                 exprOptimizer.optimizeData(l.Model, self.data)

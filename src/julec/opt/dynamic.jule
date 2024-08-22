@@ -1,0 +1,145 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use std::jule::lex::{TokenId}
+use std::jule::sema::{
+    Data,
+    Var,
+    TypeKind,
+    ExprModel,
+    StructSubIdentExprModel,
+    UnaryExprModel,
+    CastingExprModel,
+}
+
+const invalidDynamic = uintptr(0x0)
+
+struct dynamicVar {
+    var:  uintptr
+    kind: &TypeKind
+}
+
+// Information wrapper for type analysis for dynamic types.
+struct dynamic {
+    vars: []&dynamicVar
+}
+
+impl dynamic {
+    // Appends variable with initial kind.
+    // If variable is already exist, updates kind information.
+    fn pushVar(mut &self, var: uintptr, mut kind: &TypeKind) {
+        if !Dynamic || var == invalidDynamic {
+            // Ignore it, because this optimizations within scope of the --opt-access flag.
+            ret
+        }
+        kind = isTypeGuaranteedDynamicData(self, kind, nil) // Just accept guaranteed types as kind.
+        for (_, mut v) in self.vars {
+            if v.var == var {
+                v.kind = kind
+                ret
+            }
+        }
+        // Not exist, append new one.
+        for (_, mut v) in self.vars {
+            if v.var == invalidDynamic {
+                // Empty place, use here instead of append.
+                v.var, v.kind = var, kind
+                ret
+            }
+        }
+        self.vars = append(self.vars, &dynamicVar{var: var, kind: kind})
+    }
+
+    fn removeVar(mut self, var: uintptr): bool {
+        if var != invalidDynamic {
+            for (_, mut v) in self.vars {
+                if v.var == var {
+                    v.var = invalidDynamic
+                    v.kind = nil
+                    ret true
+                }
+            }
+        }
+        ret false
+    }
+
+    // Reports whether variable is fits with kind.
+    fn isFits(mut self, var: uintptr, kind: &TypeKind): bool {
+        if var != invalidDynamic {
+            for _, v in self.vars {
+                if v.var == var {
+                    ret v.kind != nil && v.kind.Equal(kind)
+                }
+            }
+        }
+        ret false
+    }
+}
+
+fn possibleDynamicRemove(mut &d: &dynamic, m: ExprModel) {
+    if d != nil {
+        _ = d.removeVar(getDynamicVar(m))
+    }
+}
+
+fn isDynamicValidType(mut t: &TypeKind): bool { ret isAny(t) }
+
+fn isTypeGuaranteedDynamicData(mut &dy: &dynamic, mut t: &TypeKind, mut m: ExprModel): &TypeKind {
+    isAny := isAny(t)
+    if !isAny && t.Trait() == nil {
+        ret t
+    }
+    if !isAny {
+        ret nil
+    }
+    match type m {
+    | &CastingExprModel:
+        mut cem := (&CastingExprModel)(m)
+        ret isTypeGuaranteedDynamicData(dy, cem.ExprKind, cem.Expr.Model)
+    }
+    var := getDynamicVar(m)
+    if var == invalidDynamic {
+        ret nil
+    }
+    for (_, mut v) in dy.vars {
+        if v.var == var {
+            ret v.kind
+        }
+    }
+    ret nil
+}
+
+fn getDynamicVar(m: ExprModel): uintptr {
+    if !Dynamic {
+        ret invalidDynamic
+    }
+    match type m {
+    | &Var:
+        v := (&Var)(m)
+        if !v.Reference {
+            // Variable is not reference, return address of it.
+            ret uintptr((&Var)(m))
+        }
+        // Variable is reference, it should be initialized at source code.
+        // Investigate the initial expression for variable address.
+        ret getDynamicVar(v.Value.Data.Model)
+    | &StructSubIdentExprModel:
+        ret uintptr((&StructSubIdentExprModel)(m).Field)
+    | &UnaryExprModel:
+        uem := (&UnaryExprModel)(m)
+        if uem.Op.Id == TokenId.Star { // Dereferencing.
+            ret getDynamicVar(uem.Expr.Model)
+        }
+    }
+    ret invalidDynamic
+}
+
+// Reports whether type is handled as <any> type.
+fn isAny(mut &t: &TypeKind): bool {
+    if t.TypeEnum() != nil {
+        ret true
+    }
+    prim := t.Prim()
+    ret prim != nil && prim.IsAny()
+}
