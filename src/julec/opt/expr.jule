@@ -482,7 +482,9 @@ impl exprOptimizer {
     fn structureLit(self, mut m: &StructLitExprModel) {
         for (_, mut arg) in m.Args {
             if self.data.boundary != nil {
-                possibleBoundaryRemove(self.data.boundary, arg.Expr.Model)
+                if isBoundaryRiskyType(arg.Expr.Kind) {
+                    possibleBoundaryRemove(self.data.boundary, arg)
+                }
             }
             if self.data.nils != nil {
                 possibleNilRemove(self.data.nils, arg.Expr.Model)
@@ -507,11 +509,7 @@ impl exprOptimizer {
                     match {
                     | self.data.boundary != nil:
                         if isBoundaryRiskyType(p.Kind) {
-                            // Clear boundary variable if exist and sizes.
                             possibleBoundaryRemove(self.data.boundary, arg)
-                        } else {
-                            // Clear sizes only, no boundary variable risk.
-                            possibleBoundaryRemove2(self.data.boundary, arg)
                         }
                     | self.data.nils != nil:
                         possibleNilRemove(self.data.nils, arg)
