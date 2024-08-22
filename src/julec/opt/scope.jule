@@ -118,6 +118,12 @@ impl scopeOptimizer {
 
     fn optimizeVar(mut &self, mut v: &Var) {
         if v.Value != nil {
+            if self.data.nils != nil &&
+                isNilValidType(v.Kind.Kind) &&
+                isGuaranteedNonNilExpr(self.data.nils, v.Value.Data.Model) {
+                const safe = true
+                self.data.nils.pushVar(getNilVar(v), safe)
+            }
             exprOptimizer.optimizeData(v.Value.Data.Model, self.data)
         }
     }
@@ -390,7 +396,14 @@ impl scopeOptimizer {
             possibleBoundaryRemove(self.data.boundary, assign.L.Model)
         }
         if self.data.nils != nil {
-            possibleNilRemove(self.data.nils, assign.L.Model)
+            if isGuaranteedNonNilExpr(self.data.nils, assign.R.Model) {
+                if isNilValidType(assign.L.Kind) {
+                    const safe = true
+                    self.data.nils.pushVar(getNilVar(assign.L.Model), safe)
+                }
+            } else  {
+                possibleNilRemove(self.data.nils, assign.L.Model)
+            }
         }
 
         match {
@@ -505,10 +518,25 @@ impl scopeOptimizer {
             ret
         }
 
-        for (_, mut l) in assign.L {
+        mut tup := (&TupleExprModel)(nil)
+        match type assign.R {
+        | &TupleExprModel:
+            tup = (&TupleExprModel)(assign.R)
+        }
+        for (i, mut l) in assign.L {
             if l != nil {
                 if self.data.boundary != nil {
                     possibleBoundaryRemove(self.data.boundary, l.Model)
+                }
+                if self.data.nils != nil {
+                    if tup != nil && isGuaranteedNonNilExpr(self.data.nils, tup.Datas[i].Model) {
+                        if isNilValidType(l.Kind) {
+                            const safe = true
+                            self.data.nils.pushVar(getNilVar(l.Model), safe)
+                        }
+                    } else {
+                        possibleNilRemove(self.data.nils, l.Model)
+                    }
                 }
                 exprOptimizer.optimizeData(l.Model, self.data)
             }
