@@ -139,12 +139,17 @@ impl scopeOptimizer {
     }
 
     fn optimizeConditional(mut &self, mut c: &Conditional) {
+        mut checkpoint := self.data.getCheckpoint()
         for (_, mut elif) in c.Elifs {
             exprOptimizer.optimizeData(elif.Expr, self.data)
             self.optimizeChild(elif.Scope)
+            if len(c.Elifs) > 1 || c.Default != nil {
+                self.data.loadCheckpoint(checkpoint)
+            }
         }
         if c.Default != nil {
             self.optimizeChild(c.Default.Scope)
+            self.data.loadCheckpoint(checkpoint)
         }
 
         if !Cond {
@@ -238,6 +243,7 @@ impl scopeOptimizer {
         if Dynamic && m.TypeMatch {
             var = getDynamicVar(m.Expr.Model)
         }
+        mut checkpoint := self.data.getCheckpoint()
         for (_, mut case) in m.Cases {
             for (_, mut expr) in case.Exprs {
                 exprOptimizer.optimizeData(expr.Model, self.data)
@@ -252,14 +258,13 @@ impl scopeOptimizer {
                 }
             }
             self.optimizeChild(case.Scope)
+            if len(m.Cases) > 1 || m.Default != nil {
+                self.data.loadCheckpoint(checkpoint)
+            }
         }
         if m.Default != nil {
             self.optimizeChild(m.Default.Scope)
-            if self.data.dynamic != nil {
-                // Type is not matched, clear information.
-                // We have not any type exact information.
-                self.data.dynamic.removeVar(var)
-            }
+            self.data.loadCheckpoint(checkpoint)
         }
 
         if !Cond {
