@@ -134,34 +134,22 @@ fn rangeLast(mut &tokens: []&Token): (cutted: []&Token, cut: []&Token) {
 //
 // Special case is;
 //  parts(tokens) = nil if len(tokens) == 0
-fn parts(mut &tokens: []&Token, id: TokenId, exprMust: bool): ([][]&Token, []Log) {
+fn parts(mut &tokens: []&Token, id: TokenId, exprMust: bool): (parts: [][]&Token, errors: []Log) {
     if len(tokens) == 0 {
         ret nil, nil
     }
-
-    let mut parts: [][]&Token = nil
-    let mut errors: []Log = nil
-
     mut rangeN := 0
     mut last := 0
     for i, token in tokens {
         match token.Id {
-        | TokenId.LBrace
-        | TokenId.LBracket
-        | TokenId.LParent:
+        | TokenId.LBrace | TokenId.LBracket | TokenId.LParent:
             rangeN++
-            continue
-        | TokenId.RBrace
-        | TokenId.RBracket
-        | TokenId.RParent:
+        | TokenId.RBrace | TokenId.RBracket | TokenId.RParent:
             rangeN--
-        }
-
-        if rangeN > 0 {
-            continue
-        }
-
-        if token.Id == id {
+        | id:
+            if rangeN > 0 {
+                continue
+            }
             if exprMust && i-last <= 0 {
                 err := makeErr(token.Row, token.Column, token.File, LogMsg.MissingExpr)
                 errors = append(errors, err)
@@ -170,14 +158,10 @@ fn parts(mut &tokens: []&Token, id: TokenId, exprMust: bool): ([][]&Token, []Log
             last = i + 1
         }
     }
-
     if last < len(tokens) {
         parts = append(parts, tokens[last:])
-    } else if !exprMust {
-        parts = append(parts, [])
     }
-
-    ret parts, errors
+    ret
 }
 
 fn getCloseOfBrace(left: TokenId): TokenId {
