@@ -165,41 +165,9 @@ impl nat {
         // Use basic algorithm instead of karatsuba.
         if y.len() < karatsubaThreshold {
             self.bits = basicMul(self.bits, y.bits)
-            self.fit()
-            ret
+        } else {
+            self.bits = karatsuba(self.bits, y.bits)
         }
-
-        // Make size of operands are equal if not.
-        mut xb := self.bits
-        mut yb := y.bits
-        n := max(len(xb), len(yb))
-        if len(xb) < n {
-            mut xbn := make(bits, n)
-            _ = copy(xbn, xb)
-            xb = xbn
-        }
-        if len(yb) < n {
-            mut ybn := make(bits, n)
-            _ = copy(ybn, yb)
-            yb = ybn
-        }
-
-        // Reverse bits, karatsuba uses normal-order bits.
-        reverse(xb)
-        reverse(yb)
-
-        mut r := karatsuba(xb, yb)
-
-        // Reverse bits to save internal order.
-        if self.len() < n {
-            reverse(self.bits)
-        }
-        if y.len() < n {
-            reverse(y.bits)
-        }
-        reverse(r)
-
-        self.bits = r
         self.fit()
     }
 
@@ -302,11 +270,7 @@ impl nat {
 
     // Bitwise left shift for assignment.
     fn ShlAssign(mut self, y: uint) {
-        if y > 0 && self.len() > 0 {
-            mut xbits := make(bits, self.len() + int(y))
-            _ = copy(xbits[y:], self.bits)
-            self.bits = xbits
-        }
+        self.bits = lsh(self.bits, int(y))
     }
 
     // Bitwise right shift.
@@ -318,14 +282,7 @@ impl nat {
 
     // Bitwise right shift for assignment.
     fn ShrAssign(mut self, y: uint) {
-        if y == 0 {
-            ret
-        }
-        if y > uint(self.len()) {
-            self.bits = nil
-            ret
-        }
-        self.bits = self.bits[y:]
+        self.bits = rsh(self.bits, int(y))
     }
 
     // Bitwise or.
