@@ -4,6 +4,7 @@
 
 use env
 use obj::{IR}
+use comptime for std::comptime
 use build for std::jule::build::{Directive}
 use ast for std::jule::ast
 use std::jule::sema::{
@@ -125,12 +126,26 @@ impl ObjectDeadCode {
                         if self.isLive[&FnIns](ins) {
                             continue
                         }
+
+                        // Set trait implemented methods as alive.
                         // Push as live the method if implements a trait's method.
                         // Other methods will be marked as live by referenced defines,
                         // no need for special tracking algorithm to caught.
                         if isTraitMethod(s, ins) {
                             self.pushLive[&FnIns](ins)
                             self.setReferencesAsLive(ins.Refers)
+                        }
+
+                        // Set operator overloading methods as alive.
+                        // Just cannot track whether operator overloading is used yet.
+                        // So, removing these methods may cause compilation problems.
+                        const vs = comptime::ValueOf(*s)
+                        const om = vs.Field("Operators")
+                        const for _, field in om.Type().Fields() {
+                            if ins == om.Field(field.Name()).Unwrap() {
+                                self.pushLive[&FnIns](ins)
+                                self.setReferencesAsLive(ins.Refers)
+                            }
                         }
                     }
                 }
