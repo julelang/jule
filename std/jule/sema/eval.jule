@@ -748,19 +748,11 @@ impl Eval {
         if d == nil {
             ret nil
         }
-
         if !d.Kind.Variadicable() {
             self.pushErr(v.Token, LogMsg.VariadicWithNonVariadicable, d.Kind.Str())
             ret nil
         }
-
-        mut slc := d.Kind.Slc()
-        d.Kind = &TypeKind{
-            Variadic: true,
-            Generic: slc.Elem.Generic,
-            BindIdent: slc.Elem.BindIdent,
-            Kind: slc.Elem.Kind,
-        }
+        makeVariadic(d, d.Kind.Slc().Elem)
         ret d
     }
 
@@ -4576,5 +4568,14 @@ fn updateRefer[T](mut ref: &ReferenceStack, &old: T, mut &new: T) {
         if sym == old {
             ref.buffer[i] = new
         }
+    }
+}
+
+fn makeVariadic(mut &d: &Data, mut elem: &TypeKind) {
+    d.Kind = &TypeKind{
+        Variadic: true,
+        Generic: elem.Generic,
+        BindIdent: elem.BindIdent,
+        Kind: elem.Kind,
     }
 }

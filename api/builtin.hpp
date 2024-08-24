@@ -14,6 +14,7 @@
 
 #include "types.hpp"
 #include "ptr.hpp"
+#include "str.hpp"
 #include "slice.hpp"
 #include "utf16.hpp"
 
@@ -22,25 +23,6 @@ namespace jule
 
     typedef jule::U8 Byte;  // builtin: type byte: u8
     typedef jule::I32 Rune; // builtin: type rune: i32
-
-    template <typename T>
-    inline void out(const T &obj) noexcept;
-
-    template <typename T>
-    inline void outln(const T &obj) noexcept;
-
-    // Returns itself of slice if slice has enough capacity for +n elements.
-    // Returns new allocated slice if not.
-    template <typename Item>
-    jule::Slice<Item> alloc_for_append(const jule::Slice<Item> &dest,
-                                       const jule::Int &n) noexcept;
-
-    template <typename Item>
-    jule::Int copy(const jule::Slice<Item> &dest, const jule::Slice<Item> &src) noexcept;
-
-    template <typename Item>
-    jule::Slice<Item> append(jule::Slice<Item> src,
-                             const jule::Slice<Item> &components) noexcept;
 
     template <typename T>
     inline void out(const T &obj) noexcept
@@ -61,6 +43,8 @@ namespace jule
         std::cout << std::endl;
     }
 
+    // Returns itself of slice if slice has enough capacity for +n elements.
+    // Returns new allocated slice if not.
     template <typename Item>
     jule::Slice<Item> alloc_for_append(const jule::Slice<Item> &dest,
                                        const jule::Int &n) noexcept
@@ -83,25 +67,38 @@ namespace jule
     jule::Int copy(const jule::Slice<Item> &dest,
                    const jule::Slice<Item> &src) noexcept
     {
-        const jule::Int len = src.len() > dest.len() ? dest.len(): src.len();
+        const jule::Int len = src.len() > dest.len() ? dest.len() : src.len();
         std::copy(src._slice, src._slice + len, dest._slice);
         return len;
     }
 
-    template <typename Item>
-    jule::Slice<Item> append(jule::Slice<Item> src,
-                             const jule::Slice<Item> &components) noexcept
+    // Common template for append function variants.
+    template <typename Dest, typename Components>
+    Dest __append(Dest dest, const Components &components)
     {
         if (components._len == 0)
-            return src;
-        if (src._len + components._len > src._cap)
-            src = jule::alloc_for_append(src, components._len);
+            return dest;
+        if (dest._len + components._len > dest._cap)
+            dest = jule::alloc_for_append(dest, components._len);
         std::copy(
             components._slice,
             components._slice + components._len,
-            src._slice + src._len);
-        src._len += components._len;
-        return src;
+            dest._slice + dest._len);
+        dest._len += components._len;
+        return dest;
+    }
+
+    template <typename Item>
+    inline jule::Slice<Item> append(jule::Slice<Item> dest,
+                                    const jule::Slice<Item> &components) noexcept
+    {
+        return jule::__append(dest, components);
+    }
+
+    inline jule::Slice<jule::U8> append(jule::Slice<jule::U8> dest,
+                                        const jule::Str &components) noexcept
+    {
+        return jule::__append(dest, components);
     }
 
 } // namespace jule

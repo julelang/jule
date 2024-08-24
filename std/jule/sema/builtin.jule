@@ -9,6 +9,7 @@ use std::jule::ast::{
     IdentTypeDecl,
     GenericDecl,
     IdentExpr,
+    VariadicExpr,
 }
 use mod for std::jule::internal::mod
 use std::jule::build::{LogMsg}
@@ -518,18 +519,41 @@ fn builtinCallerAppend(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Dat
     e.prefix = t.Kind
     defer { e.prefix = prefix }
 
-    mut e1 := e.evalExpr(fc.Args[1])
-    if e1 == nil {
-        ret nil
-    }
+    const reference = false // Element parameter is not reference.
+    const mutable = true // Element parameter is mutable.
 
     d = &Data{
         Mutable: true,
         Kind: t.Kind,
     }
-    const reference = false // Element parameter is not reference.
-    const mutable = true // Element parameter is mutable.
-    if e1.Kind.Variadic {
+    match type fc.Args[1].Kind {
+    | &VariadicExpr:
+        if len(fc.Args) > 2 {
+            e.pushErr(fc.Args[2].Token, LogMsg.MoreArgsWithVariadiced)
+        }
+
+        mut e1 := e.evalExpr((&VariadicExpr)(fc.Args[1].Kind).Expr)
+        if e1 == nil {
+            ret nil
+        }
+        if s.Elem.Prim() != nil && s.Elem.Prim().IsU8() { // []byte
+            if e1.Kind.Prim() != nil && e1.Kind.Prim().IsStr() {
+                // append([]byte, str...)
+                makeVariadic(e1, primU8)
+                d.Model = &BuiltinAppendCallExprModel{
+                    Dest: t.Model,
+                    Elements: e1.Model,
+                }
+                ret d
+            }
+        }
+
+        if !e1.Kind.Variadicable() {
+            e.pushErr(fc.Args[1].Token, LogMsg.VariadicWithNonVariadicable, e1.Kind.Str())
+            ret nil
+        }
+        makeVariadic(e1, s.Elem)
+
         if e.s.checkValidityForInitExpr(mutable, reference, s.Elem, e1, fc.Args[1].Token) {
             // Check type if validity is good.
             // Helps to reduce error logs and duplicated logs.
@@ -539,33 +563,36 @@ fn builtinCallerAppend(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Dat
             Dest: t.Model,
             Elements: e1.Model,
         }
-        if len(fc.Args) > 2 {
-            e.pushErr(fc.Args[2].Token, LogMsg.MoreArgsWithVariadiced)
+        ret d
+    }
+
+    mut e1 := e.evalExpr(fc.Args[1])
+    if e1 == nil {
+        ret nil
+    }
+
+    mut slice := &SliceExprModel{
+        ElemKind: s.Elem,
+        Elems: make([]ExprModel, 0, len(fc.Args)-1)
+    }
+    for (_, mut arg) in fc.Args[1:] {
+        e1 = e.evalExpr(arg)
+        if e1 == nil {
+            ret nil
         }
-    } else {
-        mut slice := &SliceExprModel{
-            ElemKind: s.Elem,
-            Elems: make([]ExprModel, 0, len(fc.Args)-1)
+        if e1.Kind.Variadic {
+            e.pushErr(arg.Token, LogMsg.MoreArgsWithVariadiced)
         }
-        for (_, mut arg) in fc.Args[1:] {
-            e1 = e.evalExpr(arg)
-            if e1 == nil {
-                ret nil
-            }
-            if e1.Kind.Variadic {
-                e.pushErr(arg.Token, LogMsg.MoreArgsWithVariadiced)
-            }
-            if e.s.checkValidityForInitExpr(mutable, reference, s.Elem, e1, arg.Token) {
-                // Check type if validity is good.
-                // Helps to reduce error logs and duplicated logs.
-                _ = e.s.checkAssignType(reference, s.Elem, e1, arg.Token)
-            }
-            slice.Elems = append(slice.Elems, e1.Model)
+        if e.s.checkValidityForInitExpr(mutable, reference, s.Elem, e1, arg.Token) {
+            // Check type if validity is good.
+            // Helps to reduce error logs and duplicated logs.
+            _ = e.s.checkAssignType(reference, s.Elem, e1, arg.Token)
         }
-        d.Model = &BuiltinAppendCallExprModel{
-            Dest: t.Model,
-            Elements: slice,
-        }
+        slice.Elems = append(slice.Elems, e1.Model)
+    }
+    d.Model = &BuiltinAppendCallExprModel{
+        Dest: t.Model,
+        Elements: slice,
     }
     ret d
 }
