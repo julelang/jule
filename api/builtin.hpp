@@ -63,16 +63,29 @@ namespace jule
         return dest;
     }
 
-    template <typename Item>
-    jule::Int copy(const jule::Slice<Item> &dest,
-                   const jule::Slice<Item> &src) noexcept
+    // Common template for the copy function variants.
+    template <typename Dest, typename Src>
+    inline jule::Int __copy(const Dest &dest, const Src &src) noexcept
     {
         const jule::Int len = src.len() > dest.len() ? dest.len() : src.len();
         std::copy(src._slice, src._slice + len, dest._slice);
         return len;
     }
 
-    // Common template for append function variants.
+    template <typename Item>
+    inline jule::Int copy(const jule::Slice<Item> &dest,
+                          const jule::Slice<Item> &src) noexcept
+    {
+        return jule::__copy(dest, src);
+    }
+
+    template <typename Item>
+    inline jule::Int copy(const jule::Slice<Item> &dest, const jule::Str &src) noexcept
+    {
+        return jule::__copy(dest, src);
+    }
+
+    // Common template for the append function variants.
     template <typename Dest, typename Components>
     Dest __append(Dest dest, const Components &components)
     {
