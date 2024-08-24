@@ -296,39 +296,6 @@ fn findPackageBuiltinDef(&linkPath: str, &ident: str): any {
     }
 }
 
-fn builtinCallerCommonPlain(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data {
-    mut f := d.Kind.Fn()
-
-    mut fcac := fnCallArgChecker{
-        e: e,
-        f: f,
-        args: fc.Args,
-        dynamicAnnotation: false,
-        errorToken: fc.Token,
-    }
-    if !fcac.check() {
-        ret nil
-    }
-
-    mut model := &FnCallExprModel{
-        Func: f,
-        Expr: d.Model,
-        Args: fcac.argModels,
-        Token: fc.Token,
-    }
-
-    if f.Result == nil {
-        d = buildVoidData()
-    } else {
-        d = &Data{
-            Kind: f.Result,
-        }
-    }
-
-    d.Model = model
-    ret d
-}
-
 fn builtinCallerError(mut &e: &Eval, mut &fc: &FnCallExpr): &Data {
     if len(fc.Args) < 1 {
         e.pushErr(fc.Token, LogMsg.MissingExprFor, "err")
@@ -529,7 +496,7 @@ fn builtinCallerMake(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data 
 fn builtinCallerAppend(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data {
     if len(fc.Args) < 2 {
         if len(fc.Args) == 1 {
-            e.pushErr(fc.Token, LogMsg.MissingExprFor, "src")
+            e.pushErr(fc.Token, LogMsg.MissingExprFor, "values")
             ret nil
         }
         e.pushErr(fc.Token, LogMsg.MissingExprFor, "src, values")
@@ -541,39 +508,63 @@ fn builtinCallerAppend(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Dat
         ret nil
     }
 
-    if t.Kind.Slc() == nil {
+    mut s := t.Kind.Slc()
+    if s == nil {
         e.pushErr(fc.Args[0].Token, LogMsg.InvalidExpr)
         ret nil
     }
 
-    mut f := &FnIns{
-        Params: [
-            &ParamIns{
-                Decl: &Param{
-                    Mutable: true,
-                },
-                Kind: t.Kind,
-            },
-            &ParamIns{
-                Decl: &Param{
-                    Mutable: true,
-                    Variadic: true,
-                },
-                Kind: t.Kind.Slc().Elem,
-            },
-        ],
-        Result: t.Kind,
-        caller: builtinCallerCommonPlain,
+    mut prefix := e.prefix
+    e.prefix = t.Kind
+    defer { e.prefix = prefix }
+
+    mut e1 := e.evalExpr(fc.Args[1])
+    if e1 == nil {
+        ret nil
     }
-    d.Kind = &TypeKind{
-        Kind: f,
+
+    d = &Data{
+        Mutable: true,
+        Kind: t.Kind,
     }
-    d = builtinCallerCommonPlain(e, fc, d)
-    if d != nil {
-        mut model := (&FnCallExprModel)(d.Model)
+    const reference = false // Element parameter is not reference.
+    const mutable = true // Element parameter is mutable.
+    if e1.Kind.Variadic {
+        if e.s.checkValidityForInitExpr(mutable, reference, s.Elem, e1, fc.Args[1].Token) {
+            // Check type if validity is good.
+            // Helps to reduce error logs and duplicated logs.
+            _ = e.s.checkAssignType(reference, s.Elem, e1, fc.Args[1].Token)
+        }
         d.Model = &BuiltinAppendCallExprModel{
-            Dest: model.Args[0],
-            Elements: model.Args[1],
+            Dest: t.Model,
+            Elements: e1.Model,
+        }
+        if len(fc.Args) > 2 {
+            e.pushErr(fc.Args[2].Token, LogMsg.MoreArgsWithVariadiced)
+        }
+    } else {
+        mut slice := &SliceExprModel{
+            ElemKind: s.Elem,
+            Elems: make([]ExprModel, 0, len(fc.Args)-1)
+        }
+        for (_, mut arg) in fc.Args[1:] {
+            e1 = e.evalExpr(arg)
+            if e1 == nil {
+                ret nil
+            }
+            if e1.Kind.Variadic {
+                e.pushErr(arg.Token, LogMsg.MoreArgsWithVariadiced)
+            }
+            if e.s.checkValidityForInitExpr(mutable, reference, s.Elem, e1, arg.Token) {
+                // Check type if validity is good.
+                // Helps to reduce error logs and duplicated logs.
+                _ = e.s.checkAssignType(reference, s.Elem, e1, arg.Token)
+            }
+            slice.Elems = append(slice.Elems, e1.Model)
+        }
+        d.Model = &BuiltinAppendCallExprModel{
+            Dest: t.Model,
+            Elements: slice,
         }
     }
     ret d
