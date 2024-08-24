@@ -76,13 +76,13 @@ namespace jule
     inline jule::Int copy(const jule::Slice<Item> &dest,
                           const jule::Slice<Item> &src) noexcept
     {
-        return jule::__copy(dest, src);
+        return jule::__copy<jule::Slice<Item>, jule::Slice<Item>>(dest, src);
     }
 
     template <typename Item>
     inline jule::Int copy(const jule::Slice<Item> &dest, const jule::Str &src) noexcept
     {
-        return jule::__copy(dest, src);
+        return jule::__copy<jule::Slice<Item>, jule::Str>(dest, src);
     }
 
     // Common template for the append function variants.
@@ -105,13 +105,13 @@ namespace jule
     inline jule::Slice<Item> append(jule::Slice<Item> dest,
                                     const jule::Slice<Item> &components) noexcept
     {
-        return jule::__append(dest, components);
+        return jule::__append<jule::Slice<Item>, jule::Slice<Item>>(dest, components);
     }
 
     inline jule::Slice<jule::U8> append(jule::Slice<jule::U8> dest,
                                         const jule::Str &components) noexcept
     {
-        return jule::__append(dest, components);
+        return jule::__append<jule::Slice<jule::U8>, jule::Str>(dest, components);
     }
 
 } // namespace jule

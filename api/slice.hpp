@@ -379,7 +379,9 @@ namespace jule
             this->__push(item);
         }
 
-        void append(const jule::Slice<Item> &items)
+        // Common template for mutable appendation.
+        template <typename Items>
+        void append(const Items &items)
         {
             this->alloc_for_append(items._len);
             std::copy(items._slice, items._slice + items._len, this->_slice + this->_len);

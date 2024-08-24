@@ -40,8 +40,8 @@ namespace jule
         using buffer_t = jule::Ptr<jule::U8>;
 
         mutable jule::Str::buffer_t buffer;
-        mutable jule::U8 *_slice;
-        mutable jule::Int _len;
+        mutable jule::U8 *_slice = nullptr;
+        mutable jule::Int _len = 0;
 
         static jule::U8 *alloc(const jule::Int len) noexcept
         {
