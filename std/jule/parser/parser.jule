@@ -367,47 +367,42 @@ impl parser {
         }
     }
 
-    fn buildVarBegin(mut self, mut &v: &VarDecl, mut &i: int, &tokens: []&Token) {
-        tok := tokens[i]
+    fn buildVarBegin(mut self, mut &v: &VarDecl, mut &tokens: []&Token) {
+        tok := tokens[0]
         match tok.Id {
         | TokenId.Static:
             v.Statically = true
             fall
         | TokenId.Let:
             // Initialize 1 for skip the let keyword
-            i++
-            if i >= len(tokens) {
+            if len(tokens) == 1 {
+                tokens = nil
                 self.pushErr(tok, LogMsg.InvalidSyntax)
                 ret
             }
-            if tokens[i].Id == TokenId.Mut {
+            tokens = tokens[1:]
+            if tokens[0].Id == TokenId.Mut {
                 v.Mutable = true
                 // Skip the mut keyword
-                i++
+                tokens = tokens[1:]
             }
         | TokenId.Const:
-            i++
             v.Constant = true
+            tokens = tokens[1:]
         |:
-            self.pushErr(tok, LogMsg.InvalidSyntax)
-            ret
-        }
-        if i >= len(tokens) {
+            tokens = nil
             self.pushErr(tok, LogMsg.InvalidSyntax)
         }
     }
 
     fn buildVar(mut &self, mut tokens: []&Token): &VarDecl {
-        mut i := 0
         mut v := &VarDecl{
             Token: tokens[0],
         }
-        self.buildVarBegin(v, i, tokens)
-        if i >= len(tokens) {
+        self.buildVarBegin(v, tokens)
+        if len(tokens) == 0 {
             ret nil
         }
-
-        tokens = tokens[i:]
         if tokens[0].Id == TokenId.Amper {
             v.Reference = true
             if len(tokens) == 1 {
@@ -484,33 +479,31 @@ impl parser {
         mut param := new(ParamDecl)
 
         // Detects mut keyword.
-        mut i := 0
-        if tokens[i].Id == TokenId.Mut {
+        if tokens[0].Id == TokenId.Mut {
             param.Mutable = true
-            i++
-            if i >= len(tokens) {
-                self.pushErr(tokens[i-1], LogMsg.InvalidSyntax)
+            if len(tokens) == 1 {
+                self.pushErr(tokens[0], LogMsg.InvalidSyntax)
                 ret nil
             }
+            tokens = tokens[1:]
         }
 
         mut ident := StrBuilder.New(5)
 
-        if tokens[i].Id == TokenId.Amper {
+        if tokens[0].Id == TokenId.Amper {
             ident.WriteStr(TokenKind.Amper)
-            i++
-            if i >= len(tokens) {
-                self.pushErr(tokens[i-1], LogMsg.InvalidSyntax)
+            if len(tokens) == 1 {
+                self.pushErr(tokens[0], LogMsg.InvalidSyntax)
                 ret nil
             }
+            tokens = tokens[1:]
         }
 
-        if tokens[i].Id == TokenId.Self {
+        if tokens[0].Id == TokenId.Self {
             ident.WriteStr(str(TokenKind.Self))
-            param.Token = tokens[i]
-            i++
-            if i < len(tokens) {
-                self.pushErr(tokens[i], LogMsg.InvalidSyntax)
+            param.Token = tokens[0]
+            if len(tokens) != 1 {
+                self.pushErr(tokens[1], LogMsg.InvalidSyntax)
             }
         }
 
@@ -1822,10 +1815,9 @@ impl parser {
             ret
         }
         mut node := self.parseNode(st)
-        if node.Data == nil || self.stopped() {
-            ret
+        if node.Data != nil && !self.stopped() {
+            self.ast.Nodes = append(self.ast.Nodes, node)
         }
-        self.ast.Nodes = append(self.ast.Nodes, node)
     }
 
     fn removeRange(self, mut i: int, id: TokenId, &tokens: []&Token, mut &ranges: []int) {
@@ -1934,13 +1926,8 @@ impl parser {
         // Remove all errors.
         self.errors = nil
 
-        for i < len(stmts); i++ {
-            mut stmt := stmts[i]
-            self.appendNode(stmt.tokens)
-
-            if self.stopped() {
-                break
-            }
+        for i < len(stmts) && !self.stopped(); i++ {
+            self.appendNode(stmts[i].tokens)
         }
 
         if len(self.directives) != 0 {
