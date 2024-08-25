@@ -49,6 +49,7 @@ impl Scanner {
     // Scans line from handle via read method.
     // Scans bytes until end of the line, line delimiter is not included.
     // Reports whether readed byte into buffer.
+    // Forwards any exceptional.
     fn Scan(self)!: bool {
         const LINE_DELIMITER = '\n'
 
@@ -57,9 +58,7 @@ impl Scanner {
         let mut partBuff: bufferArray
         mut part := unsafe::Slice(&partBuff[0], len(partBuff))
         for {
-            n := self.r.Read(part) else {
-                ret false
-            }
+            n := self.r.Read(part) else { error(error) }
             if n == 0 {
                 break
             }
@@ -70,7 +69,7 @@ impl Scanner {
             self.b = append(self.b, part[:n]...)
         }
         self.b = clearCr(self.b)
-        ret len(self.b) != 0
+        ret len(self.b) > 0
     }
 }
 
