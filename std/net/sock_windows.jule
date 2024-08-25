@@ -6,6 +6,7 @@ use mem for std::mem
 use sys for std::sys
 use time for std::time
 use std::jule::integrated::{Char, Int, Long, UnsignedLong}
+use zsys for std::internal::zsys
 
 type netHandle: uint
 type addrLen: Int
@@ -77,6 +78,7 @@ unsafe fn connectSocket(handle: netHandle, sockAddr: *sys::Sockaddr, sockLen: ui
 }
 
 fn recvfrom(&conn: UdpConn, mut &buf: []byte)!: int {
+    zsys::HandleRW(buf)
     if conn.v6 {
         addrLen := addrLen(mem::SizeOf(conn.sockaddr6))
         n := unsafe { sys::Recvfrom(conn.handle, &buf[0], len(buf), 0, (*sys::Sockaddr)(&conn.sockaddr6), &addrLen) }
@@ -94,6 +96,7 @@ fn recvfrom(&conn: UdpConn, mut &buf: []byte)!: int {
 }
 
 fn sendto(&conn: UdpConn, &buf: []byte)!: int {
+    zsys::HandleRW(buf)
     if conn.v6 {
         addrLen := addrLen(mem::SizeOf(conn.sockaddr6))
         n := unsafe { sys::Sendto(conn.handle, &buf[0], len(buf), 0, (*sys::Sockaddr)(&conn.sockaddr6), addrLen) }

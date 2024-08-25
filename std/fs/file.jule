@@ -66,20 +66,23 @@ impl File {
     //  ReadOnly Retry Busy Device Seek InsufficientMemory Buffer
     static fn Read(path: str)!: []byte {
         s := Status.Of(path) else { error(error) }
-
         if !s.IsReg() {
             error(FsError.IsDir)
         }
-
-        if s.Size() == 0 {
+        sz := int(s.Size())
+        if sz == 0 {
             ret make([]byte, 0)
         }
-
         mut f := File.Open(path, OFlag.Rdonly, 0) else { error(error) }
-        defer { f.Close()! }
-
         mut buff := make([]byte, s.Size())
-        n := f.Read(buff) else { error(error) }
+        mut n := 0
+        for {
+            n += f.Read(buff[n:]) else { error(error) }
+            if n >= sz {
+                break
+            }
+        }
+        f.Close() else { error(error) }
         ret buff[:n]
     }
 
@@ -90,7 +93,13 @@ impl File {
     // can leave the file in a partially written state.
     static fn Write(path: str, data: []byte, perm: int)! {
         mut f := File.Open(path, OFlag.Wronly | OFlag.Create | OFlag.Trunc, perm) else { error(error) }
-        f.Write(data) else { error(error) }
+        mut n := 0
+        for {
+            n += f.Write(data[n:]) else { error(error) }
+            if n >= len(data) {
+                break
+            }
+        }
         f.Close() else { error(error) }
     }
 }
