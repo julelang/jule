@@ -17,6 +17,7 @@ use ast for std::jule::ast::{
     SliceExpr,
     VariadicExpr,
     TupleExpr,
+    FnCallExpr,
 }
 use std::jule::build::{LogMsg, Logf}
 use lit for std::jule::constant::lit
@@ -711,7 +712,7 @@ impl fnCallArgChecker {
         }
         mut err := StrBuilder.New(1 << 5)
         err.WriteStr(self.f.Decl.Ident)
-        err.WriteStr("\n       wanted (")
+        err.WriteStr("\n       want (")
         for i, p in params {
             err.WriteStr(p.Kind.Str())
             if len(params)-i > 1 {
@@ -1338,30 +1339,75 @@ impl retTypeChecker {
         }
     }
 
+    // Assumes len(self.exprs) == 0 and kind is [&FnCallExpr].
+    fn tryFuncMultiRetForward(mut self): bool {
+        mut eval := self.sc.s.eval(self.sc)
+        mut d := eval.evalExpr(self.exprs[0])
+        if d == nil {
+            // Return true to skip following "false" handling errors.
+            // Evaluation error is enough for developer for now.
+            ret true
+        }
+        mut tup := d.Kind.Tup()
+        if tup == nil {
+            ret false
+        }
+        if len(tup.Types) != len(self.types) {
+            goto err
+        }
+        self.model = d.Model
+        for i in self.types {
+            if !self.sc.s._checkTypeCompatibility(self.types[i], tup.Types[i], self.errorToken) {
+                goto err
+            }
+        }
+        ret true
+    err:
+        mut wanted := StrBuilder.New(1 << 5)
+        for i, t in self.types {
+            wanted.WriteStr(t.Str())
+            if len(self.types)-i > 1 {
+                wanted.WriteStr(", ")
+            }
+        }
+        mut given := StrBuilder.New(1 << 5)
+        for i, t in tup.Types {
+            given.WriteStr(t.Str())
+            if len(self.types)-i > 1 {
+                given.WriteStr(", ")
+            }
+        }
+        self.sc.s.pushErr(self.errorToken, LogMsg.WrongRetForward, wanted.Str(), given.Str())
+        ret false
+    }
+
     fn check(mut self, mut &e: &Expr): bool {
         self.prepareTypes()
         self.prepareExprs(e)
-
-        n := len(self.exprs)
-        if n == 0 && len(self.types) > 0 {
+        match {
+        | len(self.exprs) == 0 && len(self.types) > 0:
             if !self.f.Decl.AnyVar() {
                 self.sc.s.pushErr(self.errorToken, LogMsg.RequireRetExpr)
                 ret false
             }
             ret true
-        }
-
-        if n > 0 && self.f != nil && self.f.Decl.IsVoid() {
+        | len(self.exprs) > 0 && self.f != nil && self.f.Decl.IsVoid():
             self.sc.s.pushErr(self.errorToken, LogMsg.VoidFnRetExpr)
             ret false
-        }
-
-        if n > len(self.types) {
-            self.sc.s.pushErr(self.errorToken, LogMsg.OverflowRet)
-        } else if n < len(self.types) {
+        | len(self.exprs) == 1 && len(self.types) > 1:
+            match type self.exprs[0].Kind {
+            | &FnCallExpr:
+                if self.tryFuncMultiRetForward() {
+                    ret true
+                }
+            }
             self.sc.s.pushErr(self.errorToken, LogMsg.MissingMultiRet)
+            ret false
+        | len(self.exprs) < len(self.types):
+            self.sc.s.pushErr(self.errorToken, LogMsg.MissingMultiRet)
+        | len(self.exprs) > len(self.types):
+            self.sc.s.pushErr(self.errorToken, LogMsg.OverflowRet)
         }
-
         self.checkExprs()
         ret true
     }

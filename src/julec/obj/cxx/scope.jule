@@ -775,14 +775,23 @@ impl scopeCoder {
             self.oc.indent()
             ret
         }
-        mut datas := (&TupleExprModel)(r.Expr).Datas
-        for i, data in datas {
-            self.oc.write(resultName + "." + resultArgName)
-            self.oc.write(conv::Itoa(i))
-            self.oc.write(" = ")
-            self.oc.ec.possibleRefExpr(data.Model)
-            self.oc.write(";\n")
-            self.oc.indent()
+        match type r.Expr {
+        | &TupleExprModel:
+            mut datas := (&TupleExprModel)(r.Expr).Datas
+            for i, data in datas {
+                self.oc.write(resultName + "." + resultArgName)
+                self.oc.write(conv::Itoa(i))
+                self.oc.write(" = ")
+                self.oc.ec.possibleRefExpr(data.Model)
+                self.oc.write(";\n")
+                self.oc.indent()
+            }
+        | &FnCallExprModel:
+            self.oc.write(resultName + " = std::move(")
+            self.oc.ec.model(r.Expr)
+            self.oc.write(");\n")
+        |:
+            panic("implementation mistake, this panic call should be unreachable")
         }
     }
 
