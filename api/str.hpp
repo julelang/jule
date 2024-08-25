@@ -480,11 +480,8 @@ namespace jule
 
         jule::Bool operator==(const jule::Str &str) const noexcept
         {
-            if (this->_len != str._len)
-                return false;
-            if (this->_len == 0)
-                return true;
-            return std::strncmp(
+            return this->_len == str._len &&
+                   std::strncmp(
                        reinterpret_cast<const char *>(this->begin()),
                        reinterpret_cast<const char *>(str.begin()),
                        this->_len) == 0;
