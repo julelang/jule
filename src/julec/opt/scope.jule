@@ -375,10 +375,10 @@ impl scopeOptimizer {
         if a.Op.Id != TokenId.Eq {
             ret false
         }
-        match type a.R.Model {
+        match type a.Right.Model {
         | &SlicingExprModel:
-            mut sem := (&SlicingExprModel)(a.R.Model)
-            if equalModels(a.L.Model, sem.Expr) {
+            mut sem := (&SlicingExprModel)(a.Right.Model)
+            if equalModels(a.Left.Model, sem.Expr) {
                 self.setCurrentStmt(&MutSlicingExprModel{
                     Token: sem.Token,
                     Expr: sem.Expr,
@@ -395,7 +395,7 @@ impl scopeOptimizer {
         if !Str {
             ret false
         }
-        lp := a.L.Kind.Prim()
+        lp := a.Left.Kind.Prim()
         if lp == nil || !lp.IsStr() {
             ret false
         }
@@ -403,7 +403,7 @@ impl scopeOptimizer {
     }
 
     fn sliceAssign(mut &self, mut a: &sema::Assign): bool {
-        if !Slice || a.L.Kind.Slc() == nil {
+        if !Slice || a.Left.Kind.Slc() == nil {
             ret false
         }
         // [self.substr] applies this optimization without type dependence.
@@ -419,36 +419,36 @@ impl scopeOptimizer {
 
     fn optimizeAssign(mut &self, mut assign: &sema::Assign) {
         if assign.Op.Id == TokenId.Eq &&
-            equalModels(assign.L.Model, assign.R.Model) {
+            equalModels(assign.Left.Model, assign.Right.Model) {
             self.removeCurrent()
             self.i-- // In next iteration, point to correct statement.
             ret
         }
 
         if self.data.boundary != nil {
-            if isBoundaryRiskyType(assign.L.Kind) {
-                possibleBoundaryRemove(self.data.boundary, assign.L.Model)
+            if isBoundaryRiskyType(assign.Left.Kind) {
+                possibleBoundaryRemove(self.data.boundary, assign.Left.Model)
             }
         }
         if self.data.nils != nil {
-            if isGuaranteedNonNilExpr(self.data.nils, assign.R.Model) {
-                if isNilValidType(assign.L.Kind) {
+            if isGuaranteedNonNilExpr(self.data.nils, assign.Right.Model) {
+                if isNilValidType(assign.Left.Kind) {
                     const safe = true
-                    self.data.nils.pushVar(getNilVar(assign.L.Model), safe)
+                    self.data.nils.pushVar(getNilVar(assign.Left.Model), safe)
                 }
             } else {
-                possibleNilRemove(self.data.nils, assign.L.Model)
+                possibleNilRemove(self.data.nils, assign.Left.Model)
             }
         }
         if self.data.dynamic != nil {
             mut kind := isTypeGuaranteedDynamicData(
-                self.data.dynamic, assign.R.Kind, assign.R.Model)
+                self.data.dynamic, assign.Right.Kind, assign.Right.Model)
             if kind != nil {
-                if isDynamicValidType(assign.L.Kind) {
-                    self.data.dynamic.pushVar(getDynamicVar(assign.L.Model), kind)
+                if isDynamicValidType(assign.Left.Kind) {
+                    self.data.dynamic.pushVar(getDynamicVar(assign.Left.Model), kind)
                 }
             } else {
-                possibleDynamicRemove(self.data.dynamic, assign.L.Model)
+                possibleDynamicRemove(self.data.dynamic, assign.Left.Model)
             }
         }
 
@@ -458,13 +458,13 @@ impl scopeOptimizer {
             ret
         }
 
-        exprOptimizer.optimizeData(assign.L.Model, self.data)
-        exprOptimizer.optimizeData(assign.R.Model, self.data)
+        exprOptimizer.optimizeData(assign.Left.Model, self.data)
+        exprOptimizer.optimizeData(assign.Right.Model, self.data)
 
         match assign.Op.Id {
         | TokenId.SolidusEq | TokenId.PercentEq:
             // Do not check division of structures safety.
-            if !Math || assign.L.Kind.Struct() != nil {
+            if !Math || assign.Left.Kind.Struct() != nil {
                 break
             }
             oldId, oldKind := assign.Op.Id, assign.Op.Kind
@@ -480,16 +480,16 @@ impl scopeOptimizer {
             }
             mut model := ExprModel(&BinaryExprModel{
                 Op: assign.Op,
-                Left: assign.L,
-                Right: assign.R,
+                Left: assign.Left,
+                Right: assign.Right,
             })
             exprOptimizer.optimizeData(model, self.data)
             match type model {
             | &BinaryExprModel:
-                assign.R = new(OperandExprModel, *assign.R)
+                assign.Right = new(OperandExprModel, *assign.Right)
                 assign.Op.Id = TokenId.Eq
                 assign.Op.Kind = TokenKind.Eq
-                assign.R.Model = model
+                assign.Right.Model = model
                 ret
             }
             assign.Op.Id = oldId
@@ -498,10 +498,10 @@ impl scopeOptimizer {
         }
 
         if Append {
-            match type assign.R.Model {
+            match type assign.Right.Model {
             | &BuiltinAppendCallExprModel:
-                mut m := (&BuiltinAppendCallExprModel)(assign.R.Model)
-                if !areSameLvalueExprModel(assign.L.Model, m.Dest) {
+                mut m := (&BuiltinAppendCallExprModel)(assign.Right.Model)
+                if !areSameLvalueExprModel(assign.Left.Model, m.Dest) {
                     ret
                 }
                 match type m.Elements {
@@ -514,7 +514,7 @@ impl scopeOptimizer {
                 |:
                     // Append directly if appended to slice and assigned to the same memory.
                     self.setCurrentStmt(&AppendToSliceExprModel{
-                        Dest: assign.L.Model,
+                        Dest: assign.Left.Model,
                         Slice: m.Elements,
                     })
                 }
