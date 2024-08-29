@@ -472,21 +472,21 @@ impl scopeCoder {
     }
 
     fn mapLookupAssign(mut &self, mut &a: &MultiAssign) {
-        mut iem := (&IndexingExprModel)(a.R)
+        mut iem := (&IndexingExprModel)(a.Right)
         self.oc.ec.possibleRefExpr(iem.Expr.Model)
         self.oc.write(".lookup(")
         self.oc.ec.possibleRefExpr(iem.Index.Model)
         self.oc.write(", ")
-        if a.L[0] != nil {
+        if a.Left[0] != nil {
             self.oc.write("&(")
-            self.oc.ec.possibleRefExpr(a.L[0].Model)
+            self.oc.ec.possibleRefExpr(a.Left[0].Model)
             self.oc.write("), ")
         } else {
             self.oc.write("nullptr, ")
         }
-        if a.L[1] != nil {
+        if a.Left[1] != nil {
             self.oc.write("&(")
-            self.oc.ec.possibleRefExpr(a.L[1].Model)
+            self.oc.ec.possibleRefExpr(a.Left[1].Model)
             self.oc.write(")")
         } else {
             self.oc.write("nullptr")
@@ -498,11 +498,11 @@ impl scopeCoder {
         self.oc.write("({\n")
         self.oc.addIndent()
 
-        mut tup := (&TupleExprModel)(a.R)
+        mut tup := (&TupleExprModel)(a.Right)
 
         for (i, mut r) in tup.Datas {
             self.oc.indent()
-            mut l := a.L[i]
+            mut l := a.Left[i]
             if l != nil {
                 match type l.Model {
                 | &Var:
@@ -514,7 +514,7 @@ impl scopeCoder {
                         self.oc.write(" = &(")
                         self.oc.ec.possibleRefExpr(r.Model)
                         self.oc.write(");\n")
-                        a.L[i] = nil // Ignore handling for following statements.
+                        a.Left[i] = nil // Ignore handling for following statements.
                         continue
                     }
                 }
@@ -527,7 +527,7 @@ impl scopeCoder {
             self.oc.write(";\n")
         }
 
-        for (i, mut l) in a.L {
+        for (i, mut l) in a.Left {
             if l == nil {
                 continue
             }
@@ -548,14 +548,14 @@ impl scopeCoder {
         self.oc.addIndent()
         self.oc.indent()
 
-        mut f := (&FnCallExprModel)(a.R)
+        mut f := (&FnCallExprModel)(a.Right)
         self.oc.tc.rc.codeMut1(self.oc.Buf, f.Func.Result)
         self.oc.write(" " + assignResultName + " = ")
-        self.oc.ec.possibleRefExpr(a.R)
+        self.oc.ec.possibleRefExpr(a.Right)
         self.oc.write(";\n")
 
         mut tup := f.Func.Result.Tup()
-        for (i, mut l) in a.L {
+        for (i, mut l) in a.Left {
             if l != nil {
                 const r = assignResultName + "." + resultArgName
                 self.oc.indent()
@@ -604,13 +604,13 @@ impl scopeCoder {
 
     fn multiAssign(mut &self, mut a: &MultiAssign) {
         // Special cases.
-        match type a.R {
+        match type a.Right {
         | &IndexingExprModel: // Map lookup.
             self.mapLookupAssign(a)
             ret
         }
 
-        match type a.R {
+        match type a.Right {
         | &TupleExprModel:
             self.multiAssignTup(a)
         | &FnCallExprModel:

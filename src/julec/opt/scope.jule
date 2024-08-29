@@ -523,35 +523,35 @@ impl scopeOptimizer {
     }
 
     fn tryOptimizeSwap(mut &self, mut &assign: &MultiAssign): bool {
-        if !Assign || len(assign.L) != 2 ||
-            assign.L[0] == nil || assign.L[1] == nil {
+        if !Assign || len(assign.Left) != 2 ||
+            assign.Left[0] == nil || assign.Left[1] == nil {
             ret false
         }
         let mut tup: &TupleExprModel
-        match type assign.R {
+        match type assign.Right {
         | &TupleExprModel:
-            tup = (&TupleExprModel)(assign.R)
+            tup = (&TupleExprModel)(assign.Right)
         }
         if tup == nil || len(tup.Datas) != 2 {
             ret false
         }
 
         // Catch self assignments.
-        if equalModels(assign.L[0].Model, tup.Datas[0].Model) &&
-            equalModels(assign.L[1].Model, tup.Datas[1].Model) {
+        if equalModels(assign.Left[0].Model, tup.Datas[0].Model) &&
+            equalModels(assign.Left[1].Model, tup.Datas[1].Model) {
             self.removeCurrent()
             self.i-- // In next iteration, point to correct statement.
             ret true
         }
 
         // Catch swaps.
-        if !equalModels(assign.L[0].Model, tup.Datas[1].Model) ||
-            !equalModels(assign.L[1].Model, tup.Datas[0].Model) {
+        if !equalModels(assign.Left[0].Model, tup.Datas[1].Model) ||
+            !equalModels(assign.Left[1].Model, tup.Datas[0].Model) {
             ret false
         }
         mut model := &SwapExprModel{
-            Left: assign.L[0],
-            Right: assign.L[1],
+            Left: assign.Left[0],
+            Right: assign.Left[1],
         }
         exprOptimizer.optimizeData(model.Left.Model, self.data)
         exprOptimizer.optimizeData(model.Right.Model, self.data)
@@ -567,11 +567,11 @@ impl scopeOptimizer {
         }
 
         mut tup := (&TupleExprModel)(nil)
-        match type assign.R {
+        match type assign.Right {
         | &TupleExprModel:
-            tup = (&TupleExprModel)(assign.R)
+            tup = (&TupleExprModel)(assign.Right)
         }
-        for (i, mut l) in assign.L {
+        for (i, mut l) in assign.Left {
             if l != nil {
                 if self.data.boundary != nil {
                     if isBoundaryRiskyType(l.Kind) {
@@ -602,7 +602,7 @@ impl scopeOptimizer {
                 exprOptimizer.optimizeData(l.Model, self.data)
             }
         }
-        exprOptimizer.optimizeData(assign.R, self.data)
+        exprOptimizer.optimizeData(assign.Right, self.data)
     }
 
     fn optimizeRet(mut &self, mut r: &RetSt) {
