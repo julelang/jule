@@ -918,7 +918,7 @@ impl exprCoder {
     }
 
     fn anonFunc(mut &self, mut m: &AnonFnExprModel) {
-        ident := self.oc.pushAnonFn(m.Func)
+        ident := self.oc.pushAnonFn(m)
         self.oc.write("jule::__new_closure<")
         self.oc.tc.anonFunc(self.oc.Buf, m.Func)
         self.oc.write(">((void*)")
@@ -930,6 +930,15 @@ impl exprCoder {
         self.oc.write(ident)
         self.oc.write(anonFnCtxSuffix)
         self.oc.write("{")
+        for (i, mut v) in m.Captured {
+            self.oc.write(".")
+            identCoder.var(self.oc.Buf, v)
+            self.oc.write("=")
+            identCoder.var(self.oc.Buf, v)
+            if len(m.Captured)-i > 1 {
+                self.oc.write(",")
+            }
+        }
         self.oc.write("}).as<" + typeCoder.Uintptr + ">(), ")
         self.oc.write(ident)
         self.oc.write(anonFnCtxHandlerSuffix)
