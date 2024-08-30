@@ -141,6 +141,29 @@ namespace jule
 
 #endif // ifndef __JULE_FN_HPP
 
+#ifdef OS_WINDOWS
+#include <synchapi.h>
+#else
+#include <sys/mman.h>
+#include <unistd.h>
+#endif
+
+#ifdef OS_WINDOWS
+#define __JULE_CLOSURE_MTX_INIT() InitializeSRWLock(&jule::__closure_mtx)
+#define __JULE_CLOSURE_MTX_LOCK() AcquireSRWLockExclusive(&jule::__closure_mtx)
+#define __JULE_CLOSURE_MTX_UNLOCK() ReleaseSRWLockExclusive(&jule::__closure_mtx)
+#else
+#define __JULE_CLOSURE_MTX_INIT() pthread_mutex_init(&jule::__closure_mtx, 0)
+#define __JULE_CLOSURE_MTX_LOCK() pthread_mutex_lock(&jule::__closure_mtx)
+#define __JULE_CLOSURE_MTX_UNLOCK() pthread_mutex_unlock(&jule::__closure_mtx)
+#endif
+
+#define __JULE_ASSUMED_PAGE_SIZE 0x4000
+#define __JULE_CLOSURE_SIZE (((sizeof(void *) << 1 > sizeof(jule::__closure_thunk) ? sizeof(void *) << 1 : sizeof(jule::__closure_thunk)) + sizeof(void *) - 1) & ~(sizeof(void *) - 1))
+
+#define __JULE_CLOSURE_PAGE_PTR(closure) \
+    ((void **)(closure - __JULE_ASSUMED_PAGE_SIZE))
+
 namespace jule
 {
     // std::function wrapper of JuleC.
@@ -224,35 +247,8 @@ namespace jule
             return (stream << (void *)f.f);
         }
     };
-} // namespace jule
 
-#ifdef OS_WINDOWS
-#include <synchapi.h>
-#else
-#include <sys/mman.h>
-#include <unistd.h>
-#endif
-
-#ifdef OS_WINDOWS
-static SRWLOCK __closure_mtx;
-#define __JULE_CLOSURE_MTX_INIT() InitializeSRWLock(&jule::__closure_mtx)
-#define __JULE_CLOSURE_MTX_LOCK() AcquireSRWLockExclusive(&jule::__closure_mtx)
-#define __JULE_CLOSURE_MTX_UNLOCK() ReleaseSRWLockExclusive(&jule::__closure_mtx)
-#else
-#define __JULE_CLOSURE_MTX_INIT() pthread_mutex_init(&jule::__closure_mtx, 0)
-#define __JULE_CLOSURE_MTX_LOCK() pthread_mutex_lock(&jule::__closure_mtx)
-#define __JULE_CLOSURE_MTX_UNLOCK() pthread_mutex_unlock(&jule::__closure_mtx)
-#endif
-
-#define __JULE_ASSUMED_PAGE_SIZE 0x4000
-#define __JULE_CLOSURE_SIZE (((sizeof(void *) << 1 > sizeof(jule::__closure_thunk) ? sizeof(void *) << 1 : sizeof(jule::__closure_thunk)) + sizeof(void *) - 1) & ~(sizeof(void *) - 1))
-
-#define __JULE_CLOSURE_PAGE_PTR(closure) \
-    ((void **)(closure - __JULE_ASSUMED_PAGE_SIZE))
-
-namespace jule
-{
-    static int __page_size = __JULE_ASSUMED_PAGE_SIZE;
+    static jule::Uint __page_size = __JULE_ASSUMED_PAGE_SIZE;
 
 #if defined(ARCH_AMD64)
     static const char __closure_thunk[] = {
@@ -288,22 +284,43 @@ namespace jule
     };
 #endif
 
-#ifdef OS_WINDOWS
-    static SRWLOCK __closure_mtx;
-#else
-    static pthread_mutex_t __closure_mtx;
-#endif
-
     static jule::U8 *__closure_ptr = 0;
-    static int __closure_cap = 0;
+    static jule::Int __closure_cap = 0;
 
     static void *(*__closure_get_ctx)(void) = nullptr;
 
-    static void __closure_alloc(void)
+#ifdef OS_WINDOWS
+    static SRWLOCK __closure_mtx;
+    inline void __closure_mtx_init(void) noexcept { InitializeSRWLock(&jule::__closure_mtx) }
+    inline void __closure_mtx_lock(void) noexcept { AcquireSRWLockExclusive(&jule::__closure_mtx) }
+    inline void __closure_mtx_unlock(void) noexcept { ReleaseSRWLockExclusive(&jule::__closure_mtx) }
+#else
+    static pthread_mutex_t __closure_mtx;
+
+    inline void __closure_mtx_init(void) noexcept
+    {
+        if (pthread_mutex_init(&jule::__closure_mtx, 0) != 0)
+            jule::panic("closure mutex initialization failed");
+    }
+
+    inline void __closure_mtx_lock(void) noexcept
+    {
+        if (pthread_mutex_lock(&jule::__closure_mtx) != 0)
+            jule::panic("closure mutex locking failed");
+    }
+
+    inline void __closure_mtx_unlock(void) noexcept
+    {
+        if (pthread_mutex_unlock(&jule::__closure_mtx) != 0)
+            jule::panic("closure mutex unlocking failed");
+    }
+#endif
+
+    static void __closure_alloc(void) noexcept
     {
 #ifdef OS_WINDOWS
         jule::U8 *p = (jule::U8 *)VirtualAlloc(NULL, jule::__page_size << 1, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-        if (p == NULL)
+        if (!p)
             jule::panic(__JULE_ERROR__MEMORY_ALLOCATION_FAILED
                         "\nruntime: heap allocation failed for closure");
 #else
@@ -313,7 +330,7 @@ namespace jule
                         "\nruntime: heap allocation failed for closure");
 #endif
         jule::U8 *x = p + jule::__page_size;
-        int rem = jule::__page_size / __JULE_CLOSURE_SIZE;
+        jule::Uint rem = jule::__page_size / __JULE_CLOSURE_SIZE;
         jule::__closure_ptr = x;
         jule::__closure_cap = rem;
         while (rem > 0)
@@ -331,10 +348,10 @@ namespace jule
     }
 
     template <typename Ret, typename... Args>
-    jule::Fn2<Ret, Args...> __new_closure(void *fn, jule::Ptr<jule::Uintptr> ctx, void (*ctxHandler)(jule::Ptr<jule::Uintptr> &))
+    jule::Fn2<Ret, Args...> __new_closure(void *fn, jule::Ptr<jule::Uintptr> ctx, void (*ctxHandler)(jule::Ptr<jule::Uintptr> &)) noexcept
     {
         __JULE_CLOSURE_MTX_LOCK();
-        if (!jule::__closure_cap)
+        if (jule::__closure_cap < 1)
             jule::__closure_alloc();
         jule::__closure_cap--;
         jule::U8 *closure = jule::__closure_ptr;
@@ -352,7 +369,7 @@ namespace jule
     }
 
 #ifdef OS_WINDOWS
-    void __closure_init()
+    void __closure_init(void) noexcept
     {
         SYSTEM_INFO si;
         GetNativeSystemInfo(&si);
@@ -368,9 +385,10 @@ namespace jule
         jule::__closure_cap--;
     }
 #else
-    void __closure_init()
+    void __closure_init(void) noexcept
     {
         uint32_t page_size = sysconf(_SC_PAGESIZE);
+        // page_size must initialized with relevant expression before multiplication.
         page_size *= (((__JULE_ASSUMED_PAGE_SIZE - 1) / page_size) + 1);
         jule::__page_size = page_size;
         jule::__closure_alloc();
@@ -382,4 +400,4 @@ namespace jule
         jule::__closure_cap--;
     }
 #endif
-}
+} // namespace jule
