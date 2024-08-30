@@ -444,6 +444,7 @@ struct scopeChecker {
     result:     &FnIns // Result type for last statement.
     it:         uintptr
     cse:        uintptr
+    captured:   &[]&Var        // Anonymous function's captured variables will be stored here.
     labels:     &[]&scopeLabel // All labels of all scopes.
     gotos:      &[]&scopeGoto  // All gotos of all scopes.
     i:          int
@@ -468,22 +469,10 @@ impl Lookup for scopeChecker {
     //   - Parent scopes.
     //   - Sema.
     fn FindVar(mut self, ident: str, binded: bool): &Var {
-        // Search reverse for correct shadowing.
-        const Reverse = true
-        mut v := self.table.findVar(ident, binded, Reverse)
+        mut v := self.findVar(ident, binded)
         if v != nil {
             ret v
         }
-
-        mut parent := self.parent
-        for parent != nil {
-            v = parent.table.findVar(ident, binded, Reverse)
-            if v != nil {
-                ret v
-            }
-            parent = parent.parent
-        }
-
         ret self.s.FindVar(ident, binded)
     }
 
@@ -611,6 +600,30 @@ impl scopeChecker {
         ret false
     }
 
+    // Push captured variable.
+    // It will append to all [captured] fields,
+    // because if child-scopes captures this variable,
+    // parent-scopes must be capture this variable too.
+    // Starts pushing from self to all parents.
+    fn pushCaptured(mut &self, mut &v: &Var) {
+        mut sc := self
+        for {
+            if sc.captured != nil {
+                for _, cv in *sc.captured {
+                    if cv == v {
+                        goto exist
+                    }
+                }
+                *sc.captured = append(*sc.captured, v)
+            exist:
+            }
+            if sc.parent == nil {
+                break
+            }
+            sc = sc.parent
+        }
+    }
+
     // Returns root scope.
     // Accepts anonymous functions as root.
     fn getRoot(mut &self): &scopeChecker {
@@ -629,6 +642,24 @@ impl scopeChecker {
             root = root.parent
         }
         ret root
+    }
+
+    // Like [Lookup.FindVar] but designed for local variables only.
+    fn findVar(mut self, ident: str, binded: bool): &Var {
+        const Reverse = true // Search reverse for correct shadowing.
+        mut v := self.table.findVar(ident, binded, Reverse)
+        if v != nil {
+            ret v
+        }
+        mut parent := self.parent
+        for parent != nil {
+            v = parent.table.findVar(ident, binded, Reverse)
+            if v != nil {
+                ret v
+            }
+            parent = parent.parent
+        }
+        ret nil
     }
 
     // Returns label by identifier.

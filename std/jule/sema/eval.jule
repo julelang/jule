@@ -592,10 +592,14 @@ impl Eval {
                 ret nil
             }
         | &scopeChecker:
+            mut s := (&scopeChecker)(self.lookup)
+            mut root := s.getRoot()
+            if root.captured != nil && isVarCaptured(root, s, v) {
+                root.pushCaptured(v)
+            }
             if !v.Reference || self.isUnsafe() {
                 break
             }
-            mut s := (&scopeChecker)(self.lookup)
             for s.owner == nil && s.parent != nil {
                 s = s.parent
             }
@@ -2910,17 +2914,18 @@ impl Eval {
         if ins == nil {
             ret nil
         }
+        mut captured := make([]&Var, 0)
         match type self.lookup {
         | &scopeChecker:
             mut sc := (&scopeChecker)(self.lookup)
             mut scc := sc.newChildChecker()
             scc.labels = new([]&scopeLabel, nil)
             scc.gotos = new([]&scopeGoto, nil)
-            scc.owner = nil
+            scc.owner = ins
             scc.childIndex = 0
             scc.it = 0
             scc.cse = 0
-            scc.owner = ins
+            scc.captured = unsafe { (&[]&Var)(&captured) }
             self.s.checkFnInsSc(ins, scc)
         |:
             self.s.checkFnIns(ins)
@@ -2929,6 +2934,7 @@ impl Eval {
         ret &Data{
             Kind: &TypeKind{Kind: ins},
             Model: &AnonFnExprModel{
+                Captured: captured,
                 Func: ins,
                 Global: self.isGlobal(),
             },
@@ -4577,4 +4583,26 @@ fn makeVariadic(mut &d: &Data, mut elem: &TypeKind) {
         BindIdent: elem.BindIdent,
         Kind: elem.Kind,
     }
+}
+
+// Reports whether variable is captured from parent scope.
+// Parameters:
+//  - r: root scope of anonymous function
+//  - s: current scope which is v accessed from
+//  - v: variable to check
+fn isVarCaptured(r: &scopeChecker, mut s: &scopeChecker, v: &Var): bool {
+    if v.Scope == nil { // Global scope variable.
+        ret false
+    }
+    for {
+        if s.scope == v.Scope {
+            ret false
+        }
+        // Break iteration if parent is not exist or scope already reached to root.
+        if s.parent == nil || s == r {
+            break
+        }
+        s = s.parent
+    }
+    ret true
 }

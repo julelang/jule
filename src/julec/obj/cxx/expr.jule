@@ -103,6 +103,10 @@ enum compExprModel: type {
 
 struct exprCoder {
     oc: &ObjectCoder
+
+    // It will executed before common variable handling algorithm.
+    // If it returns true, common algorithm will not be executed.
+    varPrefixes: []fn(mut v: &Var): bool
 }
 
 impl exprCoder {
@@ -280,6 +284,11 @@ impl exprCoder {
     }
 
     fn var(mut &self, mut m: &Var) {
+        for _, prefix in self.varPrefixes {
+            if prefix(m) {
+                ret
+            }
+        }
         if m.Binded {
             d := findDirective(m.Directives, Directive.Namespace)
             if d != nil {
@@ -918,13 +927,30 @@ impl exprCoder {
     }
 
     fn anonFunc(mut &self, mut m: &AnonFnExprModel) {
-        self.oc.tc.func(self.oc.Buf, m.Func)
-        self.oc.write("([=]")
-        self.oc.paramsIns(m.Func.Params)
-        self.oc.write(" mutable -> ")
-        self.oc.tc.funcInsResult(self.oc.Buf, m.Func)
-        self.oc.write(" ")
-        self.oc.sc.funcScope(m.Func)
+        ident := self.oc.pushAnonFn(m)
+        self.oc.write("jule::__new_closure<")
+        self.oc.tc.anonFunc(self.oc.Buf, m.Func)
+        self.oc.write(">((void*)")
+        self.oc.write(ident)
+        self.oc.write(", jule::Ptr<")
+        self.oc.write(ident)
+        self.oc.write(anonFnCtxSuffix)
+        self.oc.write(">::make(")
+        self.oc.write(ident)
+        self.oc.write(anonFnCtxSuffix)
+        self.oc.write("{")
+        for (i, mut v) in m.Captured {
+            self.oc.write(".")
+            identCoder.var(self.oc.Buf, v)
+            self.oc.write("=")
+            self.var(v)
+            if len(m.Captured)-i > 1 {
+                self.oc.write(",")
+            }
+        }
+        self.oc.write("}).as<" + typeCoder.Uintptr + ">(), ")
+        self.oc.write(ident)
+        self.oc.write(anonFnCtxHandlerSuffix)
         self.oc.write(")")
     }
 
