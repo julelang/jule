@@ -1358,8 +1358,17 @@ impl ObjectCoder {
     }
 
     fn anonHashes(mut &self) {
-        for (_, mut h) in self.anons {
+        // Use recursive algorithm, because anonymous function may have
+        // anonymous functions, so [self.anons] may grow.
+        // Make sure all whether all anonymous functions are handled.
+    repeat:
+        mut anons := self.anons
+        self.anons = nil
+        for (_, mut h) in anons {
             self.anonFuncIns(h.expr, h.ident)
+        }
+        if len(self.anons) > 0 {
+            goto repeat
         }
     }
 
