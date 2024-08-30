@@ -600,6 +600,30 @@ impl scopeChecker {
         ret false
     }
 
+    // Push captured variable.
+    // It will append to all [captured] fields,
+    // because if child-scopes captures this variable,
+    // parent-scopes must be capture this variable too.
+    // Starts pushing from self to all parents.
+    fn pushCaptured(mut &self, mut &v: &Var) {
+        mut sc := self
+        for {
+            if sc.captured != nil {
+                for _, cv in *sc.captured {
+                    if cv == v {
+                        goto exist
+                    }
+                }
+                *sc.captured = append(*sc.captured, v)
+            exist:
+            }
+            if sc.parent == nil {
+                break
+            }
+            sc = sc.parent
+        }
+    }
+
     // Returns root scope.
     // Accepts anonymous functions as root.
     fn getRoot(mut &self): &scopeChecker {

@@ -106,7 +106,7 @@ struct exprCoder {
 
     // It will executed before common variable handling algorithm.
     // If it returns true, common algorithm will not be executed.
-    varPrefix: fn(mut v: &Var): bool
+    varPrefixes: []fn(mut v: &Var): bool
 }
 
 impl exprCoder {
@@ -284,8 +284,10 @@ impl exprCoder {
     }
 
     fn var(mut &self, mut m: &Var) {
-        if self.varPrefix != nil && self.varPrefix(m) {
-            ret
+        for _, prefix in self.varPrefixes {
+            if prefix(m) {
+                ret
+            }
         }
         if m.Binded {
             d := findDirective(m.Directives, Directive.Namespace)
@@ -941,7 +943,7 @@ impl exprCoder {
             self.oc.write(".")
             identCoder.var(self.oc.Buf, v)
             self.oc.write("=")
-            identCoder.var(self.oc.Buf, v)
+            self.var(v)
             if len(m.Captured)-i > 1 {
                 self.oc.write(",")
             }
