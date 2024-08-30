@@ -143,20 +143,14 @@ namespace jule
 
 namespace jule
 {
-
     // std::function wrapper of JuleC.
     template <typename Ret, typename... Args>
     struct Fn2
     {
     public:
-        struct CtxHandler
-        {
-            void (*dealloc)(jule::Ptr<jule::Uintptr> &alloc);
-        };
-
         Ret (*f)(Args...);
         jule::Ptr<jule::Uintptr> ctx; // Closure ctx.
-        CtxHandler *ctxHandler;
+        void (*ctxhandler)(jule::Ptr<jule::Uintptr> &alloc) = nullptr;
 
         Fn2(void) = default;
         Fn2(const Fn2<Ret, Args...> &) = default;
@@ -172,7 +166,7 @@ namespace jule
             this->f = nullptr;
             if (this->ctxHandler)
             {
-                this->ctxHandler->dealloc(this->ctx);
+                this->ctxHandler(this->ctx);
                 this->ctxHandler = nullptr;
             }
         }
@@ -335,7 +329,7 @@ namespace jule
     }
 
     template <typename Ret, typename... Args>
-    jule::Fn2<Ret, Args...> __new_closure(void *fn, jule::Ptr<jule::Uintptr> ctx, typename jule::Fn2<Ret, Args...>::CtxHandler *ctxHandler)
+    jule::Fn2<Ret, Args...> __new_closure(void *fn, jule::Ptr<jule::Uintptr> ctx, void (*ctxHandler)(jule::Ptr<jule::Uintptr> &))
     {
         __JULE_CLOSURE_MTX_LOCK();
         if (!jule::__closure_cap)

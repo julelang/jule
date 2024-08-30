@@ -57,7 +57,7 @@ impl typeCoder {
     const Slice = "jule::Slice"
     const Trait = "jule::Trait"
     const Array = "jule::Array"
-    const Fn = "jule::Fn"
+    const Fn = "jule::Fn2"
     const Bool = "jule::Bool"
     const Int = "jule::Int"
     const Uintptr = "jule::Uintptr"
@@ -276,21 +276,19 @@ impl typeCoder {
             self.oc.pushResultIns(f)
         }
         self.funcInsResult(buf, f)
-        buf.WriteByte('(')
-        if len(f.Params) > 0 {
-            for (i, mut param) in f.Params {
-                if param.Decl.IsSelf() {
-                    continue
-                }
-                self.paramIns(buf, param)
-                if len(f.Params)-i > 1 {
-                    buf.WriteByte(',')
-                }
-            }
-        } else {
-            buf.WriteStr("void")
+        if len(f.Params) == 0 {
+            ret
         }
-        buf.WriteByte(')')
+        buf.WriteByte(',')
+        for (i, mut param) in f.Params {
+            if param.Decl.IsSelf() {
+                continue
+            }
+            self.paramIns(buf, param)
+            if len(f.Params)-i > 1 {
+                buf.WriteByte(',')
+            }
+        }
     }
 
     // Generates C++ code of Fn TypeKind.

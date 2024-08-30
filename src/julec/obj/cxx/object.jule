@@ -44,6 +44,8 @@ use std::time::{Time}
 // Data offset of empty trait.
 const emptyTraitOffset = 0x0
 
+const anonFnCtxSuffix = "_ctx"                              // Anon fn identifier suffix for ctx struct identifier.
+const anonFnCtxHandlerSuffix = anonFnCtxSuffix + "_handler" // Anon fn identifier suffix for ctx allocation handler.
 const anyTypeIdent = "__jule_any_type"
 const indentKind = '\t'
 
@@ -68,8 +70,9 @@ struct ObjectCoder {
     // Internal buffer which is commonly used.
     Buf: StrBuilder
 
-    resultDecls: StrBuilder
-    anyObj:      StrBuilder
+    resultDecls: StrBuilder // Struct wrappers for multi-ret function types.
+    anyObj:      StrBuilder // Type handlers and others for the <any> type.
+    anonObj:     StrBuilder // Anonymous functions.
 
     ir:   &IR
     info: SerializationInfo
@@ -132,6 +135,34 @@ impl ObjectCoder {
             }
         }
         ret -1
+    }
+
+    fn pushAnonFn(mut &self, mut &f: &FnIns): (ident: str) {
+        // Handle identifier and generate ctx.
+        self.anonObj.WriteStr("struct ")
+        l := self.anonObj.Len()
+        self.anonObj.WriteStr("__jule_anon_")
+        self.anonObj.WriteStr(conv::FmtUint(u64(uintptr(f)), 0xF))
+        ident = str(unsafe { self.anonObj.Buf()[l:] })
+        self.anonObj.WriteStr(anonFnCtxSuffix + "{\n")
+        self.anonObj.WriteStr("};\n")
+
+        // Ctx handler function.
+        self.anonObj.WriteStr("static void ")
+        self.anonObj.WriteStr(ident)
+        self.anonObj.WriteStr(anonFnCtxHandlerSuffix + "(jule::Ptr<" + typeCoder.Uintptr + "> &ptr) { ptr.__as<")
+        self.anonObj.WriteStr(ident)
+        self.anonObj.WriteStr(anonFnCtxSuffix + ">().dealloc(); }\n")
+
+        // Anonymous function.
+        mut oldBuf := unsafe { self.Buf.Buf() }
+        unsafe { self.Buf.SetBuf(self.anonObj.Buf()) }
+        self.anonFuncIns(f, ident)
+        unsafe {
+            self.anonObj.SetBuf(self.Buf.Buf())
+            self.Buf.SetBuf(oldBuf)
+        }
+        ret
     }
 
     fn pushAnyType(mut &self, mut t: &TypeKind): int {
@@ -822,7 +853,7 @@ impl ObjectCoder {
         self.write(")")
     }
 
-    fn funcHead(mut &self, mut &f: &FnIns, ptr: bool) {
+    fn funcHead(mut &self, mut &f: &FnIns, ptr: bool, ident: str) {
         if !ptr && opt::Inline && !f.Decl.IsEntryPoint() {
             self.write("inline ")
         }
@@ -833,13 +864,17 @@ impl ObjectCoder {
             self.write(")")
         } else {
             self.write(" ")
-            identCoder.funcIns(self.Buf, f)
+            if ident == "" {
+                identCoder.funcIns(self.Buf, f)
+            } else {
+                self.write(ident)
+            }
         }
     }
 
     fn funcDeclIns(mut &self, mut &f: &FnIns, ptr: bool) {
         self.indent()
-        self.funcHead(f, ptr)
+        self.funcHead(f, ptr, "")
         self.paramsDecls(f.Params)
         self.write(";\n")
     }
@@ -1001,8 +1036,18 @@ impl ObjectCoder {
         self.varInitExpr(v, nil)
     }
 
+    fn anonFuncIns(mut &self, mut &f: &FnIns, ident: str) {
+        self.funcHead(f, false, ident)
+        self.paramsIns(f.Params)
+        self.write(" ")
+        self.sc.funcScope(f)
+        if f.Scope != nil {
+            self.write("\n\n")
+        }
+    }
+
     fn funcIns(mut &self, mut &f: &FnIns) {
-        self.funcHead(f, false)
+        self.funcHead(f, false, "")
         self.paramsIns(f.Params)
         self.write(" ")
         self.sc.funcScope(f)
@@ -1346,6 +1391,13 @@ impl ObjectCoder {
             mut head := make([]byte, 0, self.Buf.Len() + self.anyObj.Len())
             head = append(head, unsafe { self.Buf.Buf() }[:self.declPos]...)
             head = append(head, unsafe { self.anyObj.Buf() }...)
+            head = append(head, unsafe { self.Buf.Buf() }[self.declPos:]...)
+            unsafe { self.Buf.SetBuf(head) }
+        }
+        if self.anonObj.Len() > 0 {
+            mut head := make([]byte, 0, self.Buf.Len() + self.anonObj.Len())
+            head = append(head, unsafe { self.Buf.Buf() }[:self.declPos]...)
+            head = append(head, unsafe { self.anonObj.Buf() }...)
             head = append(head, unsafe { self.Buf.Buf() }[self.declPos:]...)
             unsafe { self.Buf.SetBuf(head) }
         }
