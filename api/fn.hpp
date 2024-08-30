@@ -7,8 +7,14 @@
 
 #include <string>
 #include <cstddef>
-#include <functional>
 #include <thread>
+
+#ifdef OS_WINDOWS
+#include <synchapi.h>
+#else
+#include <sys/mman.h>
+#include <unistd.h>
+#endif
 
 #include "types.hpp"
 #include "error.hpp"
@@ -19,134 +25,6 @@
     (std::thread{ROUTINE})
 #define __JULE_CO(EXPR) \
     (__JULE_CO_SPAWN([=](void) mutable -> void { EXPR; }).detach())
-
-namespace jule
-{
-
-    // std::function wrapper of JuleC.
-    template <typename>
-    struct Fn;
-
-    template <typename T, typename... U>
-    jule::Uintptr addr_of_fn(std::function<T(U...)> f) noexcept;
-
-    template <typename Function>
-    struct Fn
-    {
-    public:
-        std::function<Function> buffer;
-        jule::Uintptr _addr;
-
-        Fn(void) = default;
-        Fn(const Fn<Function> &fn) = default;
-        Fn(std::nullptr_t) : Fn() {}
-
-        Fn(const std::function<Function> &function) noexcept
-        {
-            this->_addr = jule::addr_of_fn(function);
-            if (this->_addr == 0)
-                this->_addr = (jule::Uintptr)(&function);
-            this->buffer = function;
-        }
-
-        Fn(const Function *function) noexcept
-        {
-            this->buffer = function;
-            this->_addr = jule::addr_of_fn(this->buffer);
-            if (this->_addr == 0)
-                this->_addr = (jule::Uintptr)(function);
-        }
-
-        template <typename... Arguments>
-        auto call(
-#ifndef __JULE_ENABLE__PRODUCTION
-            const char *file,
-#endif
-            Arguments... arguments)
-        {
-#ifndef __JULE_DISABLE__SAFETY
-            if (this->buffer == nullptr)
-#ifndef __JULE_ENABLE__PRODUCTION
-                jule::panic((std::string(__JULE_ERROR__INVALID_MEMORY) + "\nfile: ") + file);
-#else
-                jule::panic(__JULE_ERROR__INVALID_MEMORY);
-#endif // PRODUCTION
-#endif // SAFETY
-            return this->buffer(arguments...);
-        }
-
-        template <typename... Arguments>
-        inline auto operator()(Arguments... arguments)
-        {
-#ifndef __JULE_ENABLE__PRODUCTION
-            return this->call<Arguments...>("/api/fn.hpp", arguments...);
-#else
-            return this->call<Arguments...>(arguments...);
-#endif
-        }
-
-        constexpr jule::Uintptr addr(void) const noexcept
-        {
-            return this->_addr;
-        }
-
-        inline Fn<Function> &operator=(std::nullptr_t) noexcept
-        {
-            this->buffer = nullptr;
-            return *this;
-        }
-
-        inline Fn<Function> &operator=(const std::function<Function> &function)
-        {
-            this->buffer = function;
-            return *this;
-        }
-
-        inline Fn<Function> &operator=(const Function &function)
-        {
-            this->buffer = function;
-            return *this;
-        }
-
-        constexpr jule::Bool operator==(std::nullptr_t) const noexcept
-        {
-            return this->buffer == nullptr;
-        }
-
-        constexpr jule::Bool operator!=(std::nullptr_t) const noexcept
-        {
-            return !this->operator==(nullptr);
-        }
-
-        friend std::ostream &operator<<(std::ostream &stream,
-                                        const Fn<Function> &src) noexcept
-        {
-            if (src == nullptr)
-                return (stream << "<nil>");
-            return (stream << (void *)src._addr);
-        }
-    };
-
-    template <typename T, typename... U>
-    jule::Uintptr addr_of_fn(std::function<T(U...)> f) noexcept
-    {
-        typedef T(FnType)(U...);
-        FnType **fn_ptr = f.template target<FnType *>();
-        if (!fn_ptr)
-            return 0;
-        return (jule::Uintptr)(*fn_ptr);
-    }
-
-} // namespace jule
-
-#endif // ifndef __JULE_FN_HPP
-
-#ifdef OS_WINDOWS
-#include <synchapi.h>
-#else
-#include <sys/mman.h>
-#include <unistd.h>
-#endif
 
 #ifdef OS_WINDOWS
 #define __JULE_CLOSURE_MTX_INIT() InitializeSRWLock(&jule::__closure_mtx)
@@ -168,23 +46,23 @@ namespace jule
 {
     // std::function wrapper of JuleC.
     template <typename Ret, typename... Args>
-    struct Fn2
+    struct Fn
     {
     public:
         Ret (*f)(Args...);
         jule::Ptr<jule::Uintptr> ctx; // Closure ctx.
         void (*ctxHandler)(jule::Ptr<jule::Uintptr> &alloc) = nullptr;
 
-        Fn2(void) = default;
-        Fn2(const Fn2<Ret, Args...> &) = default;
-        Fn2(std::nullptr_t) : Fn2() {}
+        Fn(void) = default;
+        Fn(const Fn<Ret, Args...> &) = default;
+        Fn(std::nullptr_t) : Fn() {}
 
-        Fn2(Ret (*f)(Args...)) noexcept
+        Fn(Ret (*f)(Args...)) noexcept
         {
             this->f = f;
         }
 
-        ~Fn2(void) noexcept
+        ~Fn(void) noexcept
         {
             this->f = nullptr;
             if (this->ctxHandler)
@@ -223,7 +101,7 @@ namespace jule
 #endif
         }
 
-        inline Fn2<Ret, Args...> &operator=(std::nullptr_t) noexcept
+        inline Fn<Ret, Args...> &operator=(std::nullptr_t) noexcept
         {
             this->f = nullptr;
             return *this;
@@ -240,7 +118,7 @@ namespace jule
         }
 
         friend std::ostream &operator<<(std::ostream &stream,
-                                        const Fn2<Ret, Args...> &f) noexcept
+                                        const Fn<Ret, Args...> &f) noexcept
         {
             if (f == nullptr)
                 return (stream << "<nil>");
@@ -348,7 +226,7 @@ namespace jule
     }
 
     template <typename Ret, typename... Args>
-    jule::Fn2<Ret, Args...> __new_closure(void *fn, jule::Ptr<jule::Uintptr> ctx, void (*ctxHandler)(jule::Ptr<jule::Uintptr> &)) noexcept
+    jule::Fn<Ret, Args...> __new_closure(void *fn, jule::Ptr<jule::Uintptr> ctx, void (*ctxHandler)(jule::Ptr<jule::Uintptr> &)) noexcept
     {
         __JULE_CLOSURE_MTX_LOCK();
         if (jule::__closure_cap < 1)
@@ -361,7 +239,7 @@ namespace jule
         ptr[1] = fn;
         __JULE_CLOSURE_MTX_UNLOCK();
         Ret (*static_closure)(Args...) = (Ret(*)(Args...))closure;
-        jule::Fn2<Ret, Args...> fn2(static_closure);
+        jule::Fn<Ret, Args...> fn2(static_closure);
         fn2.ctx = std::move(ctx);
         fn2.ctxHandler = ctxHandler;
         ctx = nullptr;
@@ -401,3 +279,5 @@ namespace jule
     }
 #endif
 } // namespace jule
+
+#endif // ifndef __JULE_FN_HPP
