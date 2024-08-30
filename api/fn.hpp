@@ -286,7 +286,7 @@ namespace jule
     };
 #endif
 
-#ifdef _WIN32
+#ifdef OS_WINDOWS
     static SRWLOCK __closure_mtx;
 #else
     static pthread_mutex_t __closure_mtx;
@@ -299,7 +299,7 @@ namespace jule
 
     static void __closure_alloc(void)
     {
-#ifdef _WIN32
+#ifdef OS_WINDOWS
         jule::U8 *p = (jule::U8 *)VirtualAlloc(NULL, jule::__page_size << 1, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
         if (p == NULL)
             jule::panic(__JULE_ERROR__MEMORY_ALLOCATION_FAILED
@@ -320,7 +320,7 @@ namespace jule
             rem--;
             x += __JULE_CLOSURE_SIZE;
         }
-#ifdef _WIN32
+#ifdef OS_WINDOWS
         DWORD temp;
         VirtualProtect(jule::__closure_ptr, jule::__page_size, PAGE_EXECUTE_READ, &temp);
 #else
@@ -367,7 +367,8 @@ namespace jule
 #else
     void __closure_init()
     {
-        const uint32_t page_size = sysconf(_SC_PAGESIZE) * (((__JULE_ASSUMED_PAGE_SIZE - 1) / page_size) + 1);
+        uint32_t page_size = sysconf(_SC_PAGESIZE);
+        page_size *= (((__JULE_ASSUMED_PAGE_SIZE - 1) / page_size) + 1);
         jule::__page_size = page_size;
         jule::__closure_alloc();
         (void)mprotect(jule::__closure_ptr, page_size, PROT_READ | PROT_WRITE);
