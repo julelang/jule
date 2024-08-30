@@ -67,6 +67,11 @@ struct traitCast {
     t2: &Trait
 }
 
+struct anonHash {
+    expr:  &AnonFnExprModel
+    ident: str
+}
+
 struct ObjectCoder {
     // Internal buffer which is commonly used.
     Buf: StrBuilder
@@ -78,6 +83,7 @@ struct ObjectCoder {
     ir:   &IR
     info: SerializationInfo
     tmap: []&traitHash
+    anons: []&anonHash
 
     // Current indentation.
     indentBuffer: []byte
@@ -163,13 +169,8 @@ impl ObjectCoder {
         self.anonObj.WriteStr(anonFnCtxSuffix + ">().dealloc(); }\n")
 
         // Anonymous function.
-        mut oldBuf := unsafe { self.Buf.Buf() }
-        unsafe { self.Buf.SetBuf(self.anonObj.Buf()) }
-        self.anonFuncIns(m, ident)
-        unsafe {
-            self.anonObj.SetBuf(self.Buf.Buf())
-            self.Buf.SetBuf(oldBuf)
-        }
+        self.anons = append(self.anons, &anonHash{expr: m, ident: ident})
+        self.anonFuncInsDecl(m, ident)
         ret
     }
 
@@ -864,28 +865,28 @@ impl ObjectCoder {
     // The ident parameter means this function is anon, mostly.
     // But this parameter not only for anonymous functions.
     // It also useable as custom identifiers for functions.
-    fn funcHead(mut &self, mut &f: &FnIns, ptr: bool, ident: str) {
+    fn funcHead(mut &self, mut &buf: StrBuilder, mut &f: &FnIns, ptr: bool, ident: str) {
         if !ptr && opt::Inline && !f.Decl.IsEntryPoint() {
-            self.write("inline ")
+            buf.WriteStr("inline ")
         }
-        self.tc.funcInsResult(self.Buf, f)
+        self.tc.funcInsResult(buf, f)
         if ptr {
-            self.write("(*")
-            identCoder.funcIns(self.Buf, f)
-            self.write(")")
+            buf.WriteStr("(*")
+            identCoder.funcIns(buf, f)
+            buf.WriteByte(')')
         } else {
-            self.write(" ")
+            buf.WriteByte(' ')
             if ident == "" {
-                identCoder.funcIns(self.Buf, f)
+                identCoder.funcIns(buf, f)
             } else {
-                self.write(ident)
+                buf.WriteStr(ident)
             }
         }
     }
 
     fn funcDeclIns(mut &self, mut &f: &FnIns, ptr: bool) {
         self.indent()
-        self.funcHead(f, ptr, "")
+        self.funcHead(self.Buf, f, ptr, "")
         self.paramsDecls(f.Params)
         self.write(";\n")
     }
@@ -977,25 +978,25 @@ impl ObjectCoder {
         })
     }
 
-    fn paramIns(mut &self, mut &p: &ParamIns) {
-        self.tc.paramIns(self.Buf, p)
-        self.write(" ")
-        identCoder.param(self.Buf, p.Decl)
+    fn paramIns(mut &self, mut &buf: StrBuilder, mut &p: &ParamIns) {
+        self.tc.paramIns(buf, p)
+        buf.WriteByte(' ')
+        identCoder.param(buf, p.Decl)
     }
 
-    fn paramsIns(mut &self, mut &params: []&ParamIns) {
+    fn paramsIns(mut &self, mut &buf: StrBuilder, mut &params: []&ParamIns) {
         if len(params) == 0 {
-            self.write("(void)")
+            buf.WriteStr("(void)")
             ret
         }
-        self.write("(")
+        buf.WriteByte('(')
         for (i, mut p) in params {
-            self.paramIns(p)
+            self.paramIns(buf, p)
             if len(params)-i > 1 {
-                self.write(", ")
+                buf.WriteStr(", ")
             }
         }
-        self.write(")")
+        buf.WriteByte(')')
     }
 
     fn varInitExpr(mut &self, mut &v: &Var, init: fn()) {
@@ -1047,9 +1048,15 @@ impl ObjectCoder {
         self.varInitExpr(v, nil)
     }
 
+    fn anonFuncInsDecl(mut &self, mut &m: &AnonFnExprModel, ident: str) {
+        self.funcHead(self.anonObj, m.Func, false, ident)
+        self.paramsIns(self.anonObj, m.Func.Params)
+        self.anonObj.WriteByte(';')
+    }
+
     fn anonFuncIns(mut &self, mut &m: &AnonFnExprModel, ident: str) {
-        self.funcHead(m.Func, false, ident)
-        self.paramsIns(m.Func.Params)
+        self.funcHead(self.Buf, m.Func, false, ident)
+        self.paramsIns(self.Buf, m.Func.Params)
         self.write(" ")
         self.sc.anonFuncScope(m, ident)
         if m.Func.Scope != nil {
@@ -1058,8 +1065,8 @@ impl ObjectCoder {
     }
 
     fn funcIns(mut &self, mut &f: &FnIns) {
-        self.funcHead(f, false, "")
-        self.paramsIns(f.Params)
+        self.funcHead(self.Buf, f, false, "")
+        self.paramsIns(self.Buf, f.Params)
         self.write(" ")
         self.sc.funcScope(f)
         if f.Scope != nil {
@@ -1346,6 +1353,12 @@ impl ObjectCoder {
         })
     }
 
+    fn anonHashes(mut &self) {
+        for (_, mut h) in self.anons {
+            self.anonFuncIns(h.expr, h.ident)
+        }
+    }
+
     fn initCaller(mut &self) {
         self.write("void " + initCallerIdent + "(void) {\n")
         self.addIndent()
@@ -1399,12 +1412,15 @@ impl ObjectCoder {
         self.initCaller()
         self.write("\n\n")
 
+        self.anonHashes()
+
         if self.anyObj.Len() > 0 {
             mut head := make([]byte, 0, self.Buf.Len() + self.anyObj.Len())
             head = append(head, unsafe { self.Buf.Buf() }[:self.declPos]...)
             head = append(head, unsafe { self.anyObj.Buf() }...)
             head = append(head, unsafe { self.Buf.Buf() }[self.declPos:]...)
             unsafe { self.Buf.SetBuf(head) }
+            self.declPos += self.anyObj.Len()
         }
         if self.anonObj.Len() > 0 {
             mut head := make([]byte, 0, self.Buf.Len() + self.anonObj.Len())
