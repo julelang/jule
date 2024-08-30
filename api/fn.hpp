@@ -20,6 +20,7 @@
 #include "error.hpp"
 #include "panic.hpp"
 #include "platform.hpp"
+#include "ptr.hpp"
 
 #define __JULE_CO_SPAWN(ROUTINE) \
     (std::thread{ROUTINE})
