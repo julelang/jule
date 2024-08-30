@@ -150,7 +150,7 @@ namespace jule
     public:
         Ret (*f)(Args...);
         jule::Ptr<jule::Uintptr> ctx; // Closure ctx.
-        void (*ctxhandler)(jule::Ptr<jule::Uintptr> &alloc) = nullptr;
+        void (*ctxHandler)(jule::Ptr<jule::Uintptr> &alloc) = nullptr;
 
         Fn2(void) = default;
         Fn2(const Fn2<Ret, Args...> &) = default;
