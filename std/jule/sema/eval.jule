@@ -592,12 +592,18 @@ impl Eval {
                 ret nil
             }
         | &scopeChecker:
-            if !v.Reference || self.isUnsafe() {
-                break
-            }
             mut s := (&scopeChecker)(self.lookup)
             for s.owner == nil && s.parent != nil {
                 s = s.parent
+            }
+            if s.owner == nil || !s.owner.Anon {
+                ret
+            }
+            if s.captured != nil && s.findVar(v.Ident) == nil {
+                *s.captured = append(*s.captured, v)
+            }
+            if !v.Reference || self.isUnsafe() {
+                break
             }
             if s.owner != nil && s.owner.Anon && v.Scope != s.owner.Scope {
                 self.pushErr(errorToken, LogMsg.UsedRefInAnonFnFromParentScope, v.Ident)
@@ -2910,6 +2916,7 @@ impl Eval {
         if ins == nil {
             ret nil
         }
+        mut captured := make([]&Var, 0)
         match type self.lookup {
         | &scopeChecker:
             mut sc := (&scopeChecker)(self.lookup)
@@ -2921,6 +2928,7 @@ impl Eval {
             scc.it = 0
             scc.cse = 0
             scc.owner = ins
+            scc.captured = unsafe { (&[]&Var)(&captured) },
             self.s.checkFnInsSc(ins, scc)
         |:
             self.s.checkFnIns(ins)
@@ -2929,6 +2937,7 @@ impl Eval {
         ret &Data{
             Kind: &TypeKind{Kind: ins},
             Model: &AnonFnExprModel{
+                Captured: captured,
                 Func: ins,
                 Global: self.isGlobal(),
             },
