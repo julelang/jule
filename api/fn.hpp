@@ -168,6 +168,8 @@ namespace jule
             {
                 this->ctxHandler(this->ctx);
                 this->ctxHandler = nullptr;
+                this->ctx.ref = nullptr; // Disable GC for allocation.
+                this->ctx = nullptr;     // Assign as nullptr safely.
             }
         }
 
@@ -343,8 +345,9 @@ namespace jule
         __JULE_CLOSURE_MTX_UNLOCK();
         Ret (*static_closure)(Args...) = (Ret(*)(Args...))closure;
         jule::Fn2<Ret, Args...> fn2(static_closure);
-        fn2.ctx = ctx;
+        fn2.ctx = std::move(ctx);
         fn2.ctxHandler = ctxHandler;
+        ctx = nullptr;
         return fn2;
     }
 
