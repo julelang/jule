@@ -206,7 +206,7 @@ namespace jule
 
         constexpr jule::Bool operator==(std::nullptr_t) const noexcept
         {
-            return this->buffer == nullptr;
+            return this->f == nullptr;
         }
 
         constexpr jule::Bool operator!=(std::nullptr_t) const noexcept
