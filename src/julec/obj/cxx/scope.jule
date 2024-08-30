@@ -957,35 +957,7 @@ impl scopeCoder {
         }
     }
 
-    fn anonFuncScope(mut &self, mut &m: &AnonFnExprModel, ident: str) {
-        if f.Scope == nil {
-            ret
-        }
-        oldPrefix := self.oc.ec.varPrefix
-        self.oc.write("{\n")
-        self.oc.addIndent()
-
-        // Get ctx.
-        self.oc.write(idnet)
-        self.oc.write(anonFnCtxSuffix)
-        self.oc.write("__jule_closure_ctx = ")
-        self.oc.write(idnet)
-        self.oc.write(anonFnCtxSuffix)
-        self.oc.write("*)jule::__closure_get_ctx();")
-
-        self.oc.doneIndent()
-        self.oc.indent()
-        self.oc.write("}")
-        self.oc.ec.varPrefix = oldPrefix
-    }
-
-    // Generates C++ code of function's scope.
-    fn funcScope(mut &self, mut f: &FnIns) {
-        if f.Scope == nil {
-            ret
-        }
-        self.oc.write("{\n")
-        self.oc.addIndent()
+    fn commonFuncScope(mut &self, mut &f: &FnIns) {
         if !f.Decl.IsVoid() {
             mut tup := f.Result.Tup()
             if tup != nil {
@@ -1023,6 +995,40 @@ impl scopeCoder {
             self.oc.indent()
             self.oc.write("return jule::VoidExceptional{};\n")
         }
+    }
+
+    fn anonFuncScope(mut &self, mut m: &AnonFnExprModel, ident: str) {
+        if m.Func.Scope == nil {
+            ret
+        }
+        oldPrefix := self.oc.ec.varPrefix
+        self.oc.ec.varPrefix = fn(mut v: &Var): bool { ret captureVarHandling(self.oc, m, v) }
+        self.oc.write("{\n")
+        self.oc.addIndent()
+
+        // Get ctx.
+        self.oc.indent()
+        self.oc.write(ident)
+        self.oc.write(anonFnCtxSuffix + " *__jule_closure_ctx = (")
+        self.oc.write(ident)
+        self.oc.write(anonFnCtxSuffix + "*)jule::__closure_get_ctx();\n")
+
+        self.commonFuncScope(m.Func)
+
+        self.oc.doneIndent()
+        self.oc.indent()
+        self.oc.write("}")
+        self.oc.ec.varPrefix = oldPrefix
+    }
+
+    // Generates C++ code of function's scope.
+    fn funcScope(mut &self, mut f: &FnIns) {
+        if f.Scope == nil {
+            ret
+        }
+        self.oc.write("{\n")
+        self.oc.addIndent()
+        self.commonFuncScope(f)
         self.oc.doneIndent()
         self.oc.indent()
         self.oc.write("}")
@@ -1045,4 +1051,15 @@ fn isIterCopyOptimizable(&expr: &Data, &v: &Var): bool {
         ret true
     }
     ret !v.Mutable && !expr.Mutable
+}
+
+fn captureVarHandling(mut &oc: &ObjectCoder, mut &m: &AnonFnExprModel, mut &v: &Var): bool {
+    for _, cv in m.Captured {
+        if cv == v {
+            oc.write("__jule_closure_ctx->")
+            identCoder.var(oc.Buf, v)
+            ret true
+        }
+    }
+    ret false
 }
