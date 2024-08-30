@@ -103,6 +103,10 @@ enum compExprModel: type {
 
 struct exprCoder {
     oc: &ObjectCoder
+
+    // It will executed before common variable handling algorithm.
+    // If it returns true, common algorithm will not be executed.
+    varPrefix: fn(mut v: &Var): bool
 }
 
 impl exprCoder {
@@ -280,6 +284,9 @@ impl exprCoder {
     }
 
     fn var(mut &self, mut m: &Var) {
+        if self.varPrefix != nil && self.varPrefix(m) {
+            ret
+        }
         if m.Binded {
             d := findDirective(m.Directives, Directive.Namespace)
             if d != nil {

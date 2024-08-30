@@ -165,7 +165,7 @@ impl ObjectCoder {
         // Anonymous function.
         mut oldBuf := unsafe { self.Buf.Buf() }
         unsafe { self.Buf.SetBuf(self.anonObj.Buf()) }
-        self.anonFuncIns(m.Func, ident)
+        self.anonFuncIns(m, ident)
         unsafe {
             self.anonObj.SetBuf(self.Buf.Buf())
             self.Buf.SetBuf(oldBuf)
@@ -861,6 +861,9 @@ impl ObjectCoder {
         self.write(")")
     }
 
+    // The ident parameter means this function is anon, mostly.
+    // But this parameter not only for anonymous functions.
+    // It also useable as custom identifiers for functions.
     fn funcHead(mut &self, mut &f: &FnIns, ptr: bool, ident: str) {
         if !ptr && opt::Inline && !f.Decl.IsEntryPoint() {
             self.write("inline ")
@@ -1044,12 +1047,12 @@ impl ObjectCoder {
         self.varInitExpr(v, nil)
     }
 
-    fn anonFuncIns(mut &self, mut &f: &FnIns, ident: str) {
-        self.funcHead(f, false, ident)
-        self.paramsIns(f.Params)
+    fn anonFuncIns(mut &self, mut &m: &AnonFnExprModel, ident: str) {
+        self.funcHead(m.Func, false, ident)
+        self.paramsIns(m.Func.Params)
         self.write(" ")
-        self.sc.funcScope(f)
-        if f.Scope != nil {
+        self.sc.anonFuncScope(m)
+        if m.Func.Scope != nil {
             self.write("\n\n")
         }
     }
