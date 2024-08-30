@@ -31,9 +31,9 @@ public:
     }
 };
 
-__jule_thread_handle __jule_spawn_thread(const jule::Fn<void(void)> &routine) {
+__jule_thread_handle __jule_spawn_thread(const jule::Fn<void> &routine) {
     __jule_thread_handle jth;
-    jth._thread = jule::Ptr<std::thread>::make(new std::thread(routine.buffer));
+    jth._thread = jule::Ptr<std::thread>::make(new std::thread(routine));
     return jth;
 }
 
