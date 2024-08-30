@@ -27,16 +27,6 @@
 #define __JULE_CO(EXPR) \
     (__JULE_CO_SPAWN([=](void) mutable -> void { EXPR; }).detach())
 
-#ifdef OS_WINDOWS
-#define __JULE_CLOSURE_MTX_INIT() InitializeSRWLock(&jule::__closure_mtx)
-#define __JULE_CLOSURE_MTX_LOCK() AcquireSRWLockExclusive(&jule::__closure_mtx)
-#define __JULE_CLOSURE_MTX_UNLOCK() ReleaseSRWLockExclusive(&jule::__closure_mtx)
-#else
-#define __JULE_CLOSURE_MTX_INIT() pthread_mutex_init(&jule::__closure_mtx, 0)
-#define __JULE_CLOSURE_MTX_LOCK() pthread_mutex_lock(&jule::__closure_mtx)
-#define __JULE_CLOSURE_MTX_UNLOCK() pthread_mutex_unlock(&jule::__closure_mtx)
-#endif
-
 #define __JULE_ASSUMED_PAGE_SIZE 0x4000
 #define __JULE_CLOSURE_SIZE (((sizeof(void *) << 1 > sizeof(jule::__closure_thunk) ? sizeof(void *) << 1 : sizeof(jule::__closure_thunk)) + sizeof(void *) - 1) & ~(sizeof(void *) - 1))
 
@@ -170,9 +160,9 @@ namespace jule
 
 #ifdef OS_WINDOWS
     static SRWLOCK __closure_mtx;
-    inline void __closure_mtx_init(void) noexcept { InitializeSRWLock(&jule::__closure_mtx) }
-    inline void __closure_mtx_lock(void) noexcept { AcquireSRWLockExclusive(&jule::__closure_mtx) }
-    inline void __closure_mtx_unlock(void) noexcept { ReleaseSRWLockExclusive(&jule::__closure_mtx) }
+    inline void __closure_mtx_init(void) noexcept { InitializeSRWLock(&jule::__closure_mtx); }
+    inline void __closure_mtx_lock(void) noexcept { AcquireSRWLockExclusive(&jule::__closure_mtx); }
+    inline void __closure_mtx_unlock(void) noexcept { ReleaseSRWLockExclusive(&jule::__closure_mtx); }
 #else
     static pthread_mutex_t __closure_mtx;
 
@@ -229,7 +219,7 @@ namespace jule
     template <typename Ret, typename... Args>
     jule::Fn<Ret, Args...> __new_closure(void *fn, jule::Ptr<jule::Uintptr> ctx, void (*ctxHandler)(jule::Ptr<jule::Uintptr> &)) noexcept
     {
-        __JULE_CLOSURE_MTX_LOCK();
+        jule::__closure_mtx_lock();
         if (jule::__closure_cap < 1)
             jule::__closure_alloc();
         jule::__closure_cap--;
@@ -238,7 +228,7 @@ namespace jule
         void **ptr = __JULE_CLOSURE_PAGE_PTR(closure);
         ptr[0] = ctx;
         ptr[1] = fn;
-        __JULE_CLOSURE_MTX_UNLOCK();
+        jule::__closure_mtx_unlock();
         Ret (*static_closure)(Args...) = (Ret(*)(Args...))closure;
         jule::Fn<Ret, Args...> fn2(static_closure);
         fn2.ctx = std::move(ctx);
@@ -266,6 +256,7 @@ namespace jule
 #else
     void __closure_init(void) noexcept
     {
+        jule::__closure_mtx_init();
         uint32_t page_size = sysconf(_SC_PAGESIZE);
         // page_size must initialized with relevant expression before multiplication.
         page_size *= (((__JULE_ASSUMED_PAGE_SIZE - 1) / page_size) + 1);
