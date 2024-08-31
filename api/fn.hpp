@@ -19,12 +19,6 @@
 #define __JULE_CO(EXPR) \
     (__JULE_CO_SPAWN([=](void) mutable -> void { EXPR; }).detach())
 
-#define __JULE_ASSUMED_PAGE_SIZE 0x4000
-#define __JULE_CLOSURE_SIZE (((sizeof(void *) << 1 > sizeof(jule::__closure_thunk) ? sizeof(void *) << 1 : sizeof(jule::__closure_thunk)) + sizeof(void *) - 1) & ~(sizeof(void *) - 1))
-
-#define __JULE_CLOSURE_PAGE_PTR(closure) \
-    ((void **)(closure - __JULE_ASSUMED_PAGE_SIZE))
-
 namespace jule
 {
     // Anonymous function / closure wrapper of JuleC.
