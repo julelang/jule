@@ -69,21 +69,32 @@ impl File {
         if !s.IsReg() {
             error(FsError.IsDir)
         }
-        sz := int(s.Size())
-        if sz == 0 {
-            ret make([]byte, 0)
+
+        mut sz := int(s.Size())
+        if sz != int(s.Size()) {
+            sz = 0
         }
+        // Following information adopted from Go;
+        // If a file claims a small size, read at least 512 bytes.
+        // In particular, files in Linux's /proc claim size 0 but
+        // then do not work right if read in small pieces,
+        // so an initial read of 1 byte would not work correctly.
+        if sz < 1<<9 {
+            sz = 1<<9
+        }
+
         mut f := File.Open(path, OFlag.Rdonly, 0) else { error(error) }
-        mut buff := make([]byte, s.Size())
+        mut buf := make([]byte, sz)
         mut n := 0
-        for {
-            n += f.Read(buff[n:]) else { error(error) }
-            if n >= sz {
+        for n < sz {
+            rn := f.Read(buf[n:]) else { error(error) }
+            if rn == 0 {
                 break
             }
+            n += rn
         }
         f.Close() else { error(error) }
-        ret buff[:n]
+        ret buf[:n]
     }
 
     // Writes data to the named file, creating it if necessary.
@@ -94,11 +105,8 @@ impl File {
     static fn Write(path: str, data: []byte, perm: int)! {
         mut f := File.Open(path, OFlag.Wronly | OFlag.Create | OFlag.Trunc, perm) else { error(error) }
         mut n := 0
-        for {
+        for n < len(data) {
             n += f.Write(data[n:]) else { error(error) }
-            if n >= len(data) {
-                break
-            }
         }
         f.Close() else { error(error) }
     }
