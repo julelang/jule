@@ -35,7 +35,89 @@
 
 namespace jule
 {
-    // std::function wrapper of JuleC.
+    // Anonymous function / closure wrapper of JuleC.
+    template <typename Ret, typename... Args>
+    struct Fn2
+    {
+    public:
+        Ret (*f)(jule::Ptr<jule::Uintptr>, Args...);
+        jule::Ptr<jule::Uintptr> ctx; // Closure ctx.
+        void (*ctxHandler)(jule::Ptr<jule::Uintptr> &alloc) = nullptr;
+
+        Fn2(void) = default;
+        Fn2(const Fn2<Ret, Args...> &) = default;
+        Fn2(std::nullptr_t) noexcept : Fn2() {}
+
+        Fn2(Ret (*f)(jule::Ptr<jule::Uintptr>, Args...)) noexcept
+        {
+            this->f = f;
+        }
+
+        ~Fn2(void) noexcept
+        {
+            this->f = nullptr;
+            if (this->ctxHandler)
+            {
+                this->ctxHandler(this->ctx);
+                this->ctxHandler = nullptr;
+                this->ctx.ref = nullptr; // Disable GC for allocation.
+                this->ctx = nullptr;     // Assign to nullptr safely.
+            }
+        }
+
+        template <typename... Arguments>
+        Ret call(
+#ifndef __JULE_ENABLE__PRODUCTION
+            const char *file,
+#endif
+            Args... args)
+        {
+#ifndef __JULE_DISABLE__SAFETY
+            if (this->f == nullptr)
+#ifndef __JULE_ENABLE__PRODUCTION
+                jule::panic((std::string(__JULE_ERROR__INVALID_MEMORY) + "\nfile: ") + file);
+#else
+                jule::panic(__JULE_ERROR__INVALID_MEMORY);
+#endif // PRODUCTION
+#endif // SAFETY
+            return this->f(this->ctx, args...);
+        }
+
+        inline auto operator()(Args... args)
+        {
+#ifndef __JULE_ENABLE__PRODUCTION
+            return this->call<Args...>("/api/fn.hpp", args...);
+#else
+            return this->call<Args...>(args...);
+#endif
+        }
+
+        inline Fn2<Ret, Args...> &operator=(std::nullptr_t) noexcept
+        {
+            this->f = nullptr;
+            return *this;
+        }
+
+        constexpr jule::Bool operator==(std::nullptr_t) const noexcept
+        {
+            return this->f == nullptr;
+        }
+
+        constexpr jule::Bool operator!=(std::nullptr_t) const noexcept
+        {
+            return !this->operator==(nullptr);
+        }
+
+        friend std::ostream &operator<<(std::ostream &stream,
+                                        const Fn2<Ret, Args...> &f) noexcept
+        {
+            if (f == nullptr)
+                return (stream << "<nil>");
+            return (stream << (void *)f.f);
+        }
+    };
+
+    // Anonymous function / closure wrapper of JuleC.
     template <typename Ret, typename... Args>
     struct Fn
     {
@@ -116,6 +198,15 @@ namespace jule
             return (stream << (void *)f.f);
         }
     };
+
+    template <typename Ret, typename... Args>
+    jule::Fn2<Ret, Args...> __new_closure2(void *fn, jule::Ptr<jule::Uintptr> ctx, void (*ctxHandler)(jule::Ptr<jule::Uintptr> &)) noexcept
+    {
+        jule::Fn2<Ret, Args...> fn2((Ret(*)(jule::Ptr<jule::Uintptr>, Args...))fn);
+        fn2.ctx = std::move(ctx);
+        fn2.ctxHandler = ctxHandler;
+        return fn2;
+    }
 
     static jule::Uint __page_size = __JULE_ASSUMED_PAGE_SIZE;
 

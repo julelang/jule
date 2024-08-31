@@ -46,6 +46,7 @@ use std::jule::sema::{
 }
 use std::strings::{StrBuilder}
 
+const closureCtxIdent = "__jule_closure_ctx"
 const matchExpr = "_match_expr"
 const resultName = "__jule_func_result"
 const assignResultName = "__jule_assign_result"
@@ -1007,10 +1008,11 @@ impl scopeCoder {
 
         // Get ctx.
         self.oc.indent()
+        self.oc.write(typeCoder.Ptr + "<")
         self.oc.write(ident)
-        self.oc.write(anonFnCtxSuffix + " *__jule_closure_ctx = (")
+        self.oc.write(anonFnCtxSuffix + "> " + closureCtxIdent + " = " + ctxParamIdent + ".as<")
         self.oc.write(ident)
-        self.oc.write(anonFnCtxSuffix + "*)jule::__closure_get_ctx();\n")
+        self.oc.write(anonFnCtxSuffix + ">();\n")
 
         self.commonFuncScope(m.Func)
 
@@ -1055,7 +1057,7 @@ fn isIterCopyOptimizable(&expr: &Data, &v: &Var): bool {
 fn captureVarHandling(mut &oc: &ObjectCoder, mut &m: &AnonFnExprModel, mut &v: &Var): bool {
     for _, cv in m.Captured {
         if cv == v {
-            oc.write("__jule_closure_ctx->")
+            oc.write(closureCtxIdent + ".alloc->")
             identCoder.var(oc.Buf, v)
             ret true
         }

@@ -2914,6 +2914,7 @@ impl Eval {
         if ins == nil {
             ret nil
         }
+        ins.AsAnon = true
         mut captured := make([]&Var, 0)
         match type self.lookup {
         | &scopeChecker:
@@ -3019,9 +3020,10 @@ impl Eval {
             }
             if len(f.Generics) != len(f.Decl.Generics) {
                 self.s.pushErr(expr.Token, LogMsg.HasGenerics)
-            }
-            if !f.Decl.Statically && f.Decl.IsMethod() {
+            } else if !f.Decl.Statically && f.Decl.IsMethod() {
                 self.s.pushErr(expr.Token, LogMsg.MethodNotInvoked)
+            } else {
+                f.AsAnon = true
             }
         }
 
