@@ -45,6 +45,7 @@ use std::time::{Time}
 // Data offset of empty trait.
 const emptyTraitOffset = 0x0
 
+const ctxParamIdent = "__f_ctx"
 const anonFnCtxSuffix = "_ctx"                              // Anon fn identifier suffix for ctx struct identifier.
 const anonFnCtxHandlerSuffix = anonFnCtxSuffix + "_handler" // Anon fn identifier suffix for ctx allocation handler.
 const anyTypeIdent = "__jule_any_type"
@@ -849,23 +850,6 @@ impl ObjectCoder {
         }
     }
 
-    fn paramsDecls(mut &self, mut &params: []&ParamIns) {
-        if len(params) == 0 {
-            self.write("(void)")
-            ret
-        }
-
-        self.write("(")
-        for (i, mut p) in params {
-            self.tc.paramIns(self.Buf, p)
-            if len(params)-i > 1 {
-                self.write(", ")
-            }
-        }
-
-        self.write(")")
-    }
-
     // The ident parameter means this function is anon, mostly.
     // But this parameter not only for anonymous functions.
     // It also useable as custom identifiers for functions.
@@ -891,7 +875,7 @@ impl ObjectCoder {
     fn funcDeclIns(mut &self, mut &f: &FnIns, ptr: bool) {
         self.indent()
         self.funcHead(self.Buf, f, ptr, "")
-        self.paramsDecls(f.Params)
+        self.paramsIns(self.Buf, f)
         self.write(";\n")
     }
 
@@ -988,15 +972,21 @@ impl ObjectCoder {
         identCoder.param(buf, p.Decl)
     }
 
-    fn paramsIns(mut &self, mut &buf: StrBuilder, mut &params: []&ParamIns) {
-        if len(params) == 0 {
+    fn paramsIns(mut &self, mut &buf: StrBuilder, mut &f: &FnIns) {
+        if !f.AsAnon && len(f.Params) == 0 {
             buf.WriteStr("(void)")
             ret
         }
         buf.WriteByte('(')
-        for (i, mut p) in params {
+        if f.AsAnon {
+            buf.WriteStr(ctxParamType + " " + ctxParamIdent)
+            if len(f.Params) > 0 {
+                buf.WriteStr(", ")
+            }
+        }
+        for (i, mut p) in f.Params {
             self.paramIns(buf, p)
-            if len(params)-i > 1 {
+            if len(f.Params)-i > 1 {
                 buf.WriteStr(", ")
             }
         }
@@ -1054,13 +1044,13 @@ impl ObjectCoder {
 
     fn anonFuncInsDecl(mut &self, mut &m: &AnonFnExprModel, ident: str) {
         self.funcHead(self.anonObj, m.Func, false, ident)
-        self.paramsIns(self.anonObj, m.Func.Params)
+        self.paramsIns(self.anonObj, m.Func)
         self.anonObj.WriteByte(';')
     }
 
     fn anonFuncIns(mut &self, mut &m: &AnonFnExprModel, ident: str) {
         self.funcHead(self.Buf, m.Func, false, ident)
-        self.paramsIns(self.Buf, m.Func.Params)
+        self.paramsIns(self.Buf, m.Func)
         self.write(" ")
         self.sc.anonFuncScope(m, ident)
         if m.Func.Scope != nil {
@@ -1070,7 +1060,7 @@ impl ObjectCoder {
 
     fn funcIns(mut &self, mut &f: &FnIns) {
         self.funcHead(self.Buf, f, false, "")
-        self.paramsIns(self.Buf, f.Params)
+        self.paramsIns(self.Buf, f)
         self.write(" ")
         self.sc.funcScope(f)
         if f.Scope != nil {
@@ -1384,7 +1374,6 @@ impl ObjectCoder {
 
     fn end(mut &self) {
         self.write(`int main(int argc, char *argv[], char *envp[]) {
-    jule::__closure_init();
     jule::setup_argv(argc, argv);
     jule::setup_envp(envp);
 
