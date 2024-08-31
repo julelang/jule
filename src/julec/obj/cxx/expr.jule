@@ -937,31 +937,34 @@ impl exprCoder {
     }
 
     fn anonFunc(mut &self, mut m: &AnonFnExprModel) {
+        closure := isClosure(m)
         ident := self.oc.pushAnonFn(m)
         self.oc.write("jule::__new_closure<")
         self.oc.tc.anonFunc(self.oc.Buf, m.Func)
         self.oc.write(">((void*)")
         self.oc.write(ident)
-        self.oc.write(", jule::Ptr<")
-        self.oc.write(ident)
-        self.oc.write(anonFnCtxSuffix)
-        self.oc.write(">::make(")
-        self.oc.write(ident)
-        self.oc.write(anonFnCtxSuffix)
-        self.oc.write("{")
-        for (i, mut v) in m.Captured {
-            self.oc.write(".")
-            identCoder.var(self.oc.Buf, v)
-            self.oc.write("=")
-            self.var(v)
-            if len(m.Captured)-i > 1 {
-                self.oc.write(",")
+        if closure {
+            self.oc.write(", jule::Ptr<")
+            self.oc.write(ident)
+            self.oc.write(anonFnCtxSuffix)
+            self.oc.write(">::make(")
+            self.oc.write(ident)
+            self.oc.write(anonFnCtxSuffix + "{")
+            for (i, mut v) in m.Captured {
+                self.oc.write(".")
+                identCoder.var(self.oc.Buf, v)
+                self.oc.write("=")
+                self.var(v)
+                if len(m.Captured)-i > 1 {
+                    self.oc.write(",")
+                }
             }
+            self.oc.write("}).as<" + typeCoder.Uintptr + ">(), ")
+            self.oc.write(ident)
+            self.oc.write(anonFnCtxHandlerSuffix + ")")
+        } else {
+            self.oc.write(", nullptr, nullptr)")
         }
-        self.oc.write("}).as<" + typeCoder.Uintptr + ">(), ")
-        self.oc.write(ident)
-        self.oc.write(anonFnCtxHandlerSuffix)
-        self.oc.write(")")
     }
 
     fn mapExpr(mut &self, mut m: &MapExprModel) {
@@ -1716,3 +1719,5 @@ fn isAny(mut &t: &TypeKind): bool {
     prim := t.Prim()
     ret prim != nil && prim.IsAny()
 }
+
+fn isClosure(&m: &AnonFnExprModel): bool { ret len(m.Captured) > 0 }

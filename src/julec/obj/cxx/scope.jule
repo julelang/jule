@@ -1002,24 +1002,31 @@ impl scopeCoder {
         if m.Func.Scope == nil {
             ret
         }
-        self.oc.ec.varPrefixes = append(self.oc.ec.varPrefixes, fn(mut v: &Var): bool { ret captureVarHandling(self.oc, m, v) })
+        closure := isClosure(m)
+        if closure {
+            self.oc.ec.varPrefixes = append(self.oc.ec.varPrefixes, fn(mut v: &Var): bool { ret captureVarHandling(self.oc, m, v) })
+        }
         self.oc.write("{\n")
         self.oc.addIndent()
 
-        // Get ctx.
-        self.oc.indent()
-        self.oc.write(typeCoder.Ptr + "<")
-        self.oc.write(ident)
-        self.oc.write(anonFnCtxSuffix + "> " + closureCtxIdent + " = " + ctxParamIdent + ".as<")
-        self.oc.write(ident)
-        self.oc.write(anonFnCtxSuffix + ">();\n")
+        if closure {
+            // Get ctx.
+            self.oc.indent()
+            self.oc.write(typeCoder.Ptr + "<")
+            self.oc.write(ident)
+            self.oc.write(anonFnCtxSuffix + "> " + closureCtxIdent + " = " + ctxParamIdent + ".as<")
+            self.oc.write(ident)
+            self.oc.write(anonFnCtxSuffix + ">();\n")
+        }
 
         self.commonFuncScope(m.Func)
 
         self.oc.doneIndent()
         self.oc.indent()
         self.oc.write("}")
-        self.oc.ec.varPrefixes = self.oc.ec.varPrefixes[:len(self.oc.ec.varPrefixes)-1]
+        if closure {
+            self.oc.ec.varPrefixes = self.oc.ec.varPrefixes[:len(self.oc.ec.varPrefixes)-1]
+        }
     }
 
     // Generates C++ code of function's scope.

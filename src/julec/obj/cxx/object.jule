@@ -146,31 +146,37 @@ impl ObjectCoder {
     }
 
     fn pushAnonFn(mut &self, mut &m: &AnonFnExprModel): (ident: str) {
-        // Handle identifier and generate ctx.
-        self.anonObj.WriteStr("struct ")
-        l := self.anonObj.Len()
-        self.anonObj.WriteStr("__jule_anon_")
-        self.anonObj.WriteStr(conv::FmtUint(u64(uintptr(m.Func)), 0xF))
-        ident = str(unsafe { self.anonObj.Buf()[l:] })
-        self.anonObj.WriteStr(anonFnCtxSuffix + "{\n")
-        for (_, mut v) in m.Captured {
-            self.anonObj.WriteByte(indentKind) // 1x indent
-            self.tc.kind(self.anonObj, v.Kind.Kind)
-            self.anonObj.WriteByte(' ')
-            if v.Reference {
-                self.anonObj.WriteByte('*')
+        closure := isClosure(m)
+        if closure { // Closure?
+            // Handle identifier and generate ctx.
+            self.anonObj.WriteStr("struct ")
+            l := self.anonObj.Len()
+            self.anonObj.WriteStr("__jule_anon_")
+            self.anonObj.WriteStr(conv::FmtUint(u64(uintptr(m.Func)), 0xF))
+            ident = str(unsafe { self.anonObj.Buf()[l:] })
+            self.anonObj.WriteStr(anonFnCtxSuffix + "{\n")
+            for (_, mut v) in m.Captured {
+                self.anonObj.WriteByte(indentKind) // 1x indent
+                self.tc.kind(self.anonObj, v.Kind.Kind)
+                self.anonObj.WriteByte(' ')
+                if v.Reference {
+                    self.anonObj.WriteByte('*')
+                }
+                identCoder.var(self.anonObj, v)
+                self.anonObj.WriteStr(";\n")
             }
-            identCoder.var(self.anonObj, v)
-            self.anonObj.WriteStr(";\n")
-        }
-        self.anonObj.WriteStr("};\n")
+            self.anonObj.WriteStr("};\n")
 
-        // Ctx handler function.
-        self.anonObj.WriteStr("static void ")
-        self.anonObj.WriteStr(ident)
-        self.anonObj.WriteStr(anonFnCtxHandlerSuffix + "(jule::Ptr<" + typeCoder.Uintptr + "> &ptr) { ptr.__as<")
-        self.anonObj.WriteStr(ident)
-        self.anonObj.WriteStr(anonFnCtxSuffix + ">().dealloc(); }\n")
+            // Ctx handler function.
+            self.anonObj.WriteStr("static void ")
+            self.anonObj.WriteStr(ident)
+            self.anonObj.WriteStr(anonFnCtxHandlerSuffix + "(jule::Ptr<" + typeCoder.Uintptr + "> &ptr) { ptr.__as<")
+            self.anonObj.WriteStr(ident)
+            self.anonObj.WriteStr(anonFnCtxSuffix + ">().dealloc(); }\n")
+        } else {
+            ident = "__jule_anon"
+            ident += conv::FmtUint(u64(uintptr(m.Func)), 0xF)
+        }
 
         // Anonymous function.
         self.anons = append(self.anons, &anonHash{expr: m, ident: ident})
