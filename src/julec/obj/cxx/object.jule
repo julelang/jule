@@ -49,6 +49,7 @@ const ctxParamIdent = "__f_ctx"
 const anonFnCtxSuffix = "_ctx"                              // Anon fn identifier suffix for ctx struct identifier.
 const anonFnCtxHandlerSuffix = anonFnCtxSuffix + "_handler" // Anon fn identifier suffix for ctx allocation handler.
 const anyTypeIdent = "__jule_any_type"
+const deallocatedTypeIdent = "__jule_type_deallocator"
 const indentKind = '\t'
 
 struct SerializationInfo {
@@ -80,11 +81,13 @@ struct ObjectCoder {
     resultDecls: StrBuilder // Struct wrappers for multi-ret function types.
     anyObj:      StrBuilder // Type handlers and others for the <any> type.
     anonObj:     StrBuilder // Anonymous functions.
+    deallocObj:  StrBuilder // Deallocation function for [self.deallocated] types.
 
-    ir:   &IR
-    info: SerializationInfo
-    tmap: []&traitHash
-    anons: []&anonHash
+    ir:          &IR
+    info:        SerializationInfo
+    tmap:        []&traitHash
+    anons:       []&anonHash
+    deallocated: []&TypeKind // GC deallocated types for dynamic programming.
 
     // Current indentation.
     indentBuffer: []byte
@@ -145,6 +148,22 @@ impl ObjectCoder {
         ret -1
     }
 
+    fn pushDealloc(mut &self, mut t: &TypeKind): int {
+        for i, dt in self.deallocated {
+            if dt.Equal(t) {
+                ret i
+            }
+        }
+        i := len(self.deallocated)
+        self.deallocated = append(self.deallocated, t)
+        self.deallocObj.WriteStr("void " + deallocatedTypeIdent)
+        self.deallocObj.WriteStr(conv::Itoa(i))
+        self.deallocObj.WriteStr("(jule::Ptr<jule::Uintptr> &alloc) noexcept { alloc.__as<")
+        self.tc.kind(self.deallocObj, t)
+        self.deallocObj.WriteStr(">().dealloc(); }\n")
+        ret i
+    }
+
     fn pushAnonFn(mut &self, mut &m: &AnonFnExprModel): (ident: str) {
         closure := isClosure(m)
         if closure { // Closure?
@@ -200,20 +219,16 @@ impl ObjectCoder {
             mut elemKind := StrBuilder.New(40)
             self.tc.kind(elemKind, t.Sptr().Elem)
 
-            // dealloc function.
-            self.anyObj.WriteStr("void " + anyTypeIdent)
-            self.anyObj.WriteStr(si)
-            self.anyObj.WriteStr("_dealloc(jule::Ptr<jule::Uintptr> &alloc) noexcept { alloc.__as<")
-            self.anyObj.Write(unsafe { elemKind.Buf() })
-            self.anyObj.WriteStr(">().dealloc(); }\n")
+            // Deallocator function.
+            di := self.pushDealloc(t.Sptr().Elem)
 
             // Type structure.
             self.anyObj.WriteStr("struct " + typeCoder.Any + "::Type ")
             self.anyObj.WriteStr(anyTypeIdent)
             self.anyObj.WriteStr(si)
-            self.anyObj.WriteStr("{.dealloc=" + anyTypeIdent)
-            self.anyObj.WriteStr(si)
-            self.anyObj.WriteStr("_dealloc, .eq=jule::ptr_equal, .to_str=jule::ptr_to_str};\n")
+            self.anyObj.WriteStr("{.dealloc=" + deallocatedTypeIdent)
+            self.anyObj.WriteStr(conv::Itoa(di))
+            self.anyObj.WriteStr(", .eq=jule::ptr_equal, .to_str=jule::ptr_to_str};\n")
 
             // comparison function.
             self.anyObj.WriteStr(typeCoder.Bool + " " + anyTypeIdent)
@@ -232,12 +247,8 @@ impl ObjectCoder {
                 outln(t.Str())
             }
 
-            // dealloc function.
-            self.anyObj.WriteStr("void " + anyTypeIdent)
-            self.anyObj.WriteStr(si)
-            self.anyObj.WriteStr("_dealloc(jule::Ptr<jule::Uintptr> &alloc) noexcept { alloc.__as<")
-            self.anyObj.Write(kind)
-            self.anyObj.WriteStr(">().dealloc(); }\n")
+            // Deallocator function.
+            di := self.pushDealloc(t)
 
             if comparable {
                 // eq function.
@@ -267,9 +278,9 @@ impl ObjectCoder {
             self.anyObj.WriteStr("struct " + typeCoder.Any + "::Type ")
             self.anyObj.WriteStr(anyTypeIdent)
             self.anyObj.WriteStr(si)
-            self.anyObj.WriteStr("{.dealloc=" + anyTypeIdent)
-            self.anyObj.WriteStr(si)
-            self.anyObj.WriteStr("_dealloc, ")
+            self.anyObj.WriteStr("{.dealloc=" + deallocatedTypeIdent)
+            self.anyObj.WriteStr(conv::Itoa(di))
+            self.anyObj.WriteStr(", ")
             if comparable {
                 self.anyObj.WriteStr(".eq=" + anyTypeIdent)
                 self.anyObj.WriteStr(si)
@@ -1422,6 +1433,14 @@ impl ObjectCoder {
 
         self.anonHashes()
 
+        if self.deallocObj.Len() > 0 {
+            mut head := make([]byte, 0, self.Buf.Len() + self.deallocObj.Len())
+            head = append(head, unsafe { self.Buf.Buf() }[:self.declPos]...)
+            head = append(head, unsafe { self.deallocObj.Buf() }...)
+            head = append(head, unsafe { self.Buf.Buf() }[self.declPos:]...)
+            unsafe { self.Buf.SetBuf(head) }
+            self.declPos += self.deallocObj.Len()
+        }
         if self.anyObj.Len() > 0 {
             mut head := make([]byte, 0, self.Buf.Len() + self.anyObj.Len())
             head = append(head, unsafe { self.Buf.Buf() }[:self.declPos]...)
