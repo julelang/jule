@@ -195,6 +195,12 @@ impl exprBuilder {
             // Catch slice, array, and map types.
             ret self.buildType(tokens)
         }
+
+        // Caught anonymous functions.
+        if isAnonFnHead(tokens) {
+            ret self.buildType(tokens)
+        }
+
         self.pushErr(token, LogMsg.InvalidSyntax)
         ret nil
     }
@@ -385,13 +391,18 @@ impl exprBuilder {
                 ret expr
             }
         }
-        mut exprTokens, mut args_tokens := rangeLast(tokens)
+        mut exprTokens, mut argsTokens := rangeLast(tokens)
         // Expression is parentheses group if data.exprTokens is zero.
         // data.args_tokens holds tokens of parentheses range (include parentheses).
         if len(exprTokens) == 0 {
-            ret self.buildBetweenParentheses(args_tokens)
+            ret self.buildBetweenParentheses(argsTokens)
         }
-        ret self.buildFnCall(token, exprTokens, args_tokens)
+
+        // Caught anonymous function types.
+        if isAnonFnHead(exprTokens) {
+            ret self.buildType(tokens)
+        }
+        ret self.buildFnCall(token, exprTokens, argsTokens)
     }
 
     fn buildUnsafeExpr(mut self, mut tokens: []&Token): &UnsafeExpr {
@@ -810,9 +821,6 @@ impl exprBuilder {
             ret self.buildBraceRange(tokens)
         | TokenId.RBracket:
             ret self.buildBracketRange(tokens)
-        | TokenId.Fn:
-            // Function types.
-            ret self.buildType(tokens)
         }
         self.pushErr(token, LogMsg.InvalidSyntax)
         ret nil
@@ -955,24 +963,37 @@ fn getBlockExpr(mut &tokens: []&Token): []&Token {
 // Returns delimiter index, left range and right range tokens.
 // Returns nil slice and -1 if not found.
 fn splitDelim(mut &tokens: []&Token, delim: TokenId): ([]&Token, []&Token) {
+    mut func := -1
     mut rangeN := 0
-    for i, token in tokens {
+    mut i := 0
+    for i < len(tokens); i++ {
+        token := tokens[i]
         match token.Id {
+        | TokenId.Fn:
+            func = rangeN
         | TokenId.LBrace
         | TokenId.LBracket
         | TokenId.LParent:
             rangeN++
             continue
-        | TokenId.RBrace
-        | TokenId.RBracket
         | TokenId.RParent:
             rangeN--
-        | delim:
-            if rangeN == 0 {
-                mut l := tokens[:i]
-                mut r := tokens[i+1:]
-                ret l, r
+            if func == rangeN {
+                func = -1
+                // Skip colon token if function builded.
+                if len(tokens)-i > 1 && tokens[i+1].Id == TokenId.Colon {
+                    i++
+                    continue
+                }
             }
+        | TokenId.RBrace
+        | TokenId.RBracket:
+            rangeN--
+        }
+        if token.Id == delim && rangeN == 0 {
+            mut l := tokens[:i]
+            mut r := tokens[i+1:]
+            ret l, r
         }
     }
     ret nil, nil
@@ -1074,4 +1095,21 @@ fn getRangeExprTokens(mut &tokens: []&Token): ([]&Token, int) {
         }
     }
     ret nil, rangeN
+}
+
+fn isAnonFnHead(&tokens: []&Token): bool {
+    match tokens[0].Id {
+    | TokenId.Unsafe:
+        if len(tokens) == 1 || tokens[1].Id != TokenId.Fn {
+            break
+        }
+        fall
+    | TokenId.Fn:
+        if tokens[len(tokens)-1].Id == TokenId.RBrace {
+            // Not function type declaration, anonymous function expression.
+            break
+        }
+        ret true
+    }
+    ret false
 }
