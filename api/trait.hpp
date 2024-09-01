@@ -230,7 +230,7 @@ namespace jule
         }
 
         template <typename NewMask>
-        inline jule::Trait<NewMask> mask(jule::Int (*offsetMapper)(const jule::Int)) noexcept
+        inline jule::Trait<NewMask> map(jule::Int (*offsetMapper)(const jule::Int)) noexcept
         {
             jule::Trait<NewMask> newTrait;
             newTrait.type = this->type;
@@ -282,6 +282,256 @@ namespace jule
 
         friend inline std::ostream &operator<<(std::ostream &stream,
                                                const jule::Trait<Mask> &src) noexcept
+        {
+            if (src == nullptr)
+                return stream << "<nil>";
+            return stream << (void *)src.data.alloc;
+        }
+    };
+} // namespace jule
+
+namespace jule
+{
+    // Trait data container for Jule's traits.
+    // The `type` field points to `jule::Trait::Type` for deallocation,
+    // but it actually points to static data for trait's runtime data type.
+    // So, compiler may cast it to actual data type to use it. Therefore,
+    // the first field of the static data is should be always deallocation function pointer.
+    struct Trait2
+    {
+    public:
+        struct Type
+        {
+        public:
+            void (*dealloc)(jule::Ptr<jule::Uintptr> &);
+        };
+
+        mutable jule::Ptr<jule::Uintptr> data;
+        mutable jule::Trait2::Type *type = nullptr;
+        mutable jule::Bool ptr = false;
+
+        Trait2(void) = default;
+        Trait2(std::nullptr_t) : Trait2() {}
+
+        Trait2(const jule::Trait2 &trait)
+        {
+            this->__get_copy(trait);
+        }
+
+        Trait2(jule::Trait2 &&trait)
+        {
+            this->__get_copy(trait);
+        }
+
+        void __get_copy(const jule::Trait2 &trait)
+        {
+            this->data = trait.data;
+            this->type = trait.type;
+            this->ptr = trait.ptr;
+        }
+
+        void __get_copy(jule::Trait2 &&trait)
+        {
+            this->data = std::move(trait.data);
+            this->type = trait.type;
+            this->ptr = trait.ptr;
+        }
+
+        template <typename T>
+        Trait2(const T &data, jule::Trait2::Type *type) noexcept
+        {
+            this->type = type;
+            this->ptr = false;
+            T *alloc = new (std::nothrow) T;
+            if (!alloc)
+                jule::panic(__JULE_ERROR__MEMORY_ALLOCATION_FAILED "\nfile: /api/trait.hpp");
+
+            *alloc = data;
+#ifdef __JULE_DISABLE__REFERENCE_COUNTING
+            this->data = jule::Ptr<jule::Uintptr>::make(reinterpret_cast<jule::Uintptr *>(alloc), nullptr);
+#else
+            this->data = jule::Ptr<jule::Uintptr>::make(reinterpret_cast<jule::Uintptr *>(alloc));
+#endif
+        }
+
+        template <typename T>
+        Trait2(const jule::Ptr<T> &ref, jule::Trait2::Type *type) noexcept
+        {
+            this->type = type;
+            this->ptr = true;
+            this->data = ref.template as<jule::Uintptr>();
+        }
+
+        ~Trait2(void) noexcept
+        {
+            this->dealloc();
+        }
+
+        void __free(void) const noexcept
+        {
+            this->data.ref = nullptr;
+            this->data.alloc = nullptr;
+            this->ptr = false;
+        }
+
+        void dealloc(void) const noexcept
+        {
+            if (this->type)
+            {
+                this->type->dealloc(this->data);
+                this->type = nullptr;
+            }
+            this->__free();
+        }
+
+        inline void must_ok(
+#ifndef __JULE_ENABLE__PRODUCTION
+            const char *file
+#else
+            void
+#endif
+        ) const noexcept
+        {
+            if (this->operator==(nullptr))
+            {
+#ifndef __JULE_ENABLE__PRODUCTION
+                std::string error = __JULE_ERROR__INVALID_MEMORY "\nfile: ";
+                error += file;
+                jule::panic(error);
+#else
+                jule::panic(__JULE_ERROR__INVALID_MEMORY "\nfile: /api/trait.hpp");
+#endif
+            }
+        }
+
+        inline jule::Bool type_is(const jule::Bool ptr, const jule::Trait2::Type *type) const noexcept
+        {
+            return this->ptr == ptr && this->type == type;
+        }
+
+        inline jule::Trait2::Type *safe_type(
+#ifndef __JULE_ENABLE__PRODUCTION
+            const char *file
+#else
+            void
+#endif
+        )
+        {
+#ifndef __JULE_DISABLE__SAFETY
+            this->must_ok(
+#ifndef __JULE_ENABLE__PRODUCTION
+                file
+#endif
+            );
+#endif
+            return this->type;
+        }
+
+        template <typename T>
+        inline T cast(
+#ifndef __JULE_ENABLE__PRODUCTION
+            const char *file,
+#endif
+            const jule::Trait2::Type *type) noexcept
+        {
+#ifndef __JULE_DISABLE__SAFETY
+            this->must_ok(
+#ifndef __JULE_ENABLE__PRODUCTION
+                file
+#endif
+            );
+            if (!this->type_is(false, type))
+            {
+#ifndef __JULE_ENABLE__PRODUCTION
+                std::string error = __JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: trait casted to incompatible type\nfile: ";
+                error += file;
+                jule::panic(error);
+#else
+                jule::panic(__JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: trait casted to incompatible type");
+#endif
+            }
+#endif
+            return *static_cast<T *>(this->data.alloc);
+        }
+
+        template <typename T>
+        jule::Ptr<T> cast_ptr(
+#ifndef __JULE_ENABLE__PRODUCTION
+            const char *file,
+#endif
+            const jule::Trait2::Type *type) noexcept
+        {
+#ifndef __JULE_DISABLE__SAFETY
+            this->must_ok(
+#ifndef __JULE_ENABLE__PRODUCTION
+                file
+#endif
+            );
+            if (!this->type_is(true, type))
+            {
+#ifndef __JULE_ENABLE__PRODUCTION
+                std::string error = __JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: trait casted to incompatible type\nfile: ";
+                error += file;
+                jule::panic(error);
+#else
+                jule::panic(__JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: trait casted to incompatible type");
+#endif
+            }
+#endif
+            return this->data.template as<T>();
+        }
+
+        inline jule::Trait2 mask(void *(*typeMapper)(const void *)) noexcept
+        {
+            jule::Trait2 newTrait;
+            newTrait.type = (jule::Trait2::Type *)typeMapper((void *)this->type);
+            newTrait.ptr = this->ptr;
+            newTrait.data = this->data;
+            return newTrait;
+        }
+
+        inline jule::Trait2 &operator=(const std::nullptr_t) noexcept
+        {
+            this->dealloc();
+            return *this;
+        }
+
+        inline jule::Trait2 &operator=(const jule::Trait2 &src) noexcept
+        {
+            this->dealloc();
+            this->__get_copy(src);
+            return *this;
+        }
+
+        inline jule::Trait2 &operator=(jule::Trait2 &&src) noexcept
+        {
+            this->dealloc();
+            this->__get_copy(src);
+            return *this;
+        }
+
+        constexpr jule::Bool operator==(const jule::Trait2 &src) const noexcept
+        {
+            return this->data.alloc == src.data.alloc;
+        }
+
+        constexpr jule::Bool operator!=(const jule::Trait2 &src) const noexcept
+        {
+            return !this->operator==(src);
+        }
+
+        constexpr jule::Bool operator==(std::nullptr_t) const noexcept
+        {
+            return this->data.alloc == nullptr;
+        }
+
+        constexpr jule::Bool operator!=(std::nullptr_t) const noexcept
+        {
+            return !this->operator==(nullptr);
+        }
+
+        friend inline std::ostream &operator<<(std::ostream &stream,
+                                               const jule::Trait2 &src) noexcept
         {
             if (src == nullptr)
                 return stream << "<nil>";
