@@ -469,9 +469,11 @@ impl Lookup for scopeChecker {
     //   - Parent scopes.
     //   - Sema.
     fn FindVar(mut self, ident: str, binded: bool): &Var {
-        mut v := self.findVar(ident, binded)
-        if v != nil {
-            ret v
+        if !binded { // Local variables cannot be binded.
+            mut v := self.findVar(ident)
+            if v != nil {
+                ret v
+            }
         }
         ret self.s.FindVar(ident, binded)
     }
@@ -645,15 +647,16 @@ impl scopeChecker {
     }
 
     // Like [Lookup.FindVar] but designed for local variables only.
-    fn findVar(mut self, ident: str, binded: bool): &Var {
+    fn findVar(mut self, ident: str): &Var {
         const Reverse = true // Search reverse for correct shadowing.
-        mut v := self.table.findVar(ident, binded, Reverse)
+        const Binded = false // Local variables cannot be binded.
+        mut v := self.table.findVar(ident, Binded, Reverse)
         if v != nil {
             ret v
         }
         mut parent := self.parent
         for parent != nil {
-            v = parent.table.findVar(ident, binded, Reverse)
+            v = parent.table.findVar(ident, Binded, Reverse)
             if v != nil {
                 ret v
             }
