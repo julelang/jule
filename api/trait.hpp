@@ -205,7 +205,7 @@ namespace jule
             return this->data.template as<T>();
         }
 
-        inline jule::Trait mask(void *(*typeMapper)(const void *)) noexcept
+        inline jule::Trait map(void *(*typeMapper)(const void *)) noexcept
         {
             jule::Trait newTrait;
             newTrait.type = (jule::Trait::Type *)typeMapper((void *)this->type);
