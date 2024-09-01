@@ -53,7 +53,7 @@ namespace jule
     struct UTF8AcceptRange;
     std::string runes_to_utf8(const std::vector<jule::I32> &s) noexcept;
     std::tuple<jule::I32, std::size_t> utf8_decode_rune_str(const char *s, const std::size_t len);
-    template<typename Dest>
+    template <typename Dest>
     void utf8_push_rune_bytes(const jule::I32 &r, Dest &dest);
 
     // Definitions
@@ -391,9 +391,11 @@ namespace jule
                                4);
     }
 
-    template<typename Dest>
-    void utf8_push_rune_bytes(const jule::I32 &r, Dest &dest) {
-        if (static_cast<jule::U32>(r) <= jule::UTF8_RUNE1_MAX) {
+    template <typename Dest>
+    void utf8_push_rune_bytes(const jule::I32 &r, Dest &dest)
+    {
+        if (static_cast<jule::U32>(r) <= jule::UTF8_RUNE1_MAX)
+        {
             dest.push_back(static_cast<jule::U8>(r));
             return;
         }
@@ -411,7 +413,8 @@ namespace jule
             (jule::UTF8_SURROGATE_MIN <= i && i <= jule::UTF8_SURROGATE_MAX))
             _r = jule::UTF8_RUNE_ERROR;
 
-        if (i <= jule::UTF8_RUNE3_MAX) {
+        if (i <= jule::UTF8_RUNE3_MAX)
+        {
             dest.push_back(static_cast<jule::U8>(jule::UTF8_T3 | static_cast<jule::U8>(_r >> 12)));
             dest.push_back(static_cast<jule::U8>(jule::UTF8_TX | (static_cast<jule::U8>(_r >> 6) & jule::UTF8_MASKX)));
             dest.push_back(static_cast<jule::U8>(jule::UTF8_TX | (static_cast<jule::U8>(_r) & jule::UTF8_MASKX)));

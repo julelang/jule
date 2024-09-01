@@ -54,23 +54,27 @@ namespace jule
 
         Trait(void) = default;
         Trait(std::nullptr_t) : Trait() {}
-        
-        Trait(const jule::Trait<Mask> &trait) {
+
+        Trait(const jule::Trait<Mask> &trait)
+        {
             this->__get_copy(trait);
         }
 
-        Trait(jule::Trait<Mask> &&trait) {
+        Trait(jule::Trait<Mask> &&trait)
+        {
             this->__get_copy(trait);
         }
 
-        void __get_copy(const jule::Trait<Mask> &trait) {
+        void __get_copy(const jule::Trait<Mask> &trait)
+        {
             this->data = trait.data;
             this->type_offset = trait.type_offset;
             this->type = trait.type;
             this->ptr = trait.ptr;
         }
 
-        void __get_copy(jule::Trait<Mask> &&trait) {
+        void __get_copy(jule::Trait<Mask> &&trait)
+        {
             this->data = std::move(trait.data);
             this->type_offset = trait.type_offset;
             this->type = trait.type;
@@ -109,7 +113,8 @@ namespace jule
             this->dealloc();
         }
 
-        void __free(void) const noexcept {
+        void __free(void) const noexcept
+        {
             this->data.ref = nullptr;
             this->data.alloc = nullptr;
             this->type_offset = -1;
