@@ -1409,6 +1409,16 @@ impl ObjectCoder {
 }`)
     }
 
+    fn insertBuf(mut &self, mut &buf: StrBuilder, pos: int) {
+        if buf.Len() > 0 {
+            mut head := make([]byte, 0, self.Buf.Len() + buf.Len())
+            head = append(head, unsafe { self.Buf.Buf() }[:pos]...)
+            head = append(head, unsafe { buf.Buf() }...)
+            head = append(head, unsafe { self.Buf.Buf() }[pos:]...)
+            unsafe { self.Buf.SetBuf(head) }
+        }
+    }
+
     fn serializeHead(mut &self) {
         self.prepareStructures()
         self.buildTraitMap()
@@ -1416,14 +1426,8 @@ impl ObjectCoder {
         self.write("\n")
         self.decls()
 
-        if self.resultDecls.Len() > 0 {
-            mut head := make([]byte, 0, self.Buf.Len() + self.resultDecls.Len())
-            head = append(head, unsafe { self.Buf.Buf() }[:self.headPos]...)
-            head = append(head, unsafe { self.resultDecls.Buf() }...)
-            self.declPos += self.resultDecls.Len()
-            head = append(head, unsafe { self.Buf.Buf() }[self.headPos:]...)
-            unsafe { self.Buf.SetBuf(head) }
-        }
+        self.insertBuf(self.resultDecls, self.headPos)
+        self.declPos += self.resultDecls.Len()
 
         self.write("\n")
         self.structures()
@@ -1433,29 +1437,14 @@ impl ObjectCoder {
 
         self.anonHashes()
 
-        if self.deallocObj.Len() > 0 {
-            mut head := make([]byte, 0, self.Buf.Len() + self.deallocObj.Len())
-            head = append(head, unsafe { self.Buf.Buf() }[:self.declPos]...)
-            head = append(head, unsafe { self.deallocObj.Buf() }...)
-            head = append(head, unsafe { self.Buf.Buf() }[self.declPos:]...)
-            unsafe { self.Buf.SetBuf(head) }
-            self.declPos += self.deallocObj.Len()
-        }
-        if self.anyObj.Len() > 0 {
-            mut head := make([]byte, 0, self.Buf.Len() + self.anyObj.Len())
-            head = append(head, unsafe { self.Buf.Buf() }[:self.declPos]...)
-            head = append(head, unsafe { self.anyObj.Buf() }...)
-            head = append(head, unsafe { self.Buf.Buf() }[self.declPos:]...)
-            unsafe { self.Buf.SetBuf(head) }
-            self.declPos += self.anyObj.Len()
-        }
-        if self.anonObj.Len() > 0 {
-            mut head := make([]byte, 0, self.Buf.Len() + self.anonObj.Len())
-            head = append(head, unsafe { self.Buf.Buf() }[:self.declPos]...)
-            head = append(head, unsafe { self.anonObj.Buf() }...)
-            head = append(head, unsafe { self.Buf.Buf() }[self.declPos:]...)
-            unsafe { self.Buf.SetBuf(head) }
-        }
+        self.insertBuf(self.deallocObj, self.declPos)
+        self.declPos += self.deallocObj.Len()
+
+        self.insertBuf(self.anyObj, self.declPos)
+        self.declPos += self.anyObj.Len()
+
+        self.insertBuf(self.anonObj, self.declPos)
+        self.declPos += self.anonObj.Len()
     }
 
     fn Serialize(mut &self) {
