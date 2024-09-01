@@ -38,6 +38,7 @@ use std::jule::sema::{
     Operators,
     AnonFnExprModel,
 }
+use types for std::jule::types
 use path for std::fs::path
 use strings for std::strings::{StrBuilder}
 use std::time::{Time}
@@ -49,7 +50,19 @@ const ctxParamIdent = "__f_ctx"
 const anonFnCtxSuffix = "_ctx"                              // Anon fn identifier suffix for ctx struct identifier.
 const anonFnCtxHandlerSuffix = anonFnCtxSuffix + "_handler" // Anon fn identifier suffix for ctx allocation handler.
 const anyTypeIdent = "__jule_any_type"
+const deallocatedTypeIdent = "__jule_type_deallocator"
 const indentKind = '\t'
+
+// General pointer type for GC pointers.
+static mut generalGCPtr = &TypeKind{
+    Kind: &Sptr{
+        Elem: &TypeKind{
+            Kind: &Prim{
+                Kind: types::TypeKind.Uintptr,
+            },
+        },
+    },
+}
 
 struct SerializationInfo {
     Compiler:        str
@@ -80,11 +93,13 @@ struct ObjectCoder {
     resultDecls: StrBuilder // Struct wrappers for multi-ret function types.
     anyObj:      StrBuilder // Type handlers and others for the <any> type.
     anonObj:     StrBuilder // Anonymous functions.
+    deallocObj:  StrBuilder // Deallocation function for [self.deallocated] types.
 
-    ir:   &IR
-    info: SerializationInfo
-    tmap: []&traitHash
-    anons: []&anonHash
+    ir:          &IR
+    info:        SerializationInfo
+    tmap:        []&traitHash
+    anons:       []&anonHash
+    deallocated: []&TypeKind // GC deallocated types for dynamic programming.
 
     // Current indentation.
     indentBuffer: []byte
@@ -99,6 +114,7 @@ struct ObjectCoder {
 
     headPos: int
     declPos: int
+    wrapPos: int
 }
 
 impl ObjectCoder {
@@ -143,6 +159,22 @@ impl ObjectCoder {
             }
         }
         ret -1
+    }
+
+    fn pushDealloc(mut &self, mut t: &TypeKind): int {
+        for i, dt in self.deallocated {
+            if dt.Equal(t) {
+                ret i
+            }
+        }
+        i := len(self.deallocated)
+        self.deallocated = append(self.deallocated, t)
+        self.deallocObj.WriteStr("void " + deallocatedTypeIdent)
+        self.deallocObj.WriteStr(conv::Itoa(i))
+        self.deallocObj.WriteStr("(jule::Ptr<jule::Uintptr> &alloc) noexcept { alloc.__as<")
+        self.tc.kind(self.deallocObj, t)
+        self.deallocObj.WriteStr(">().dealloc(); }\n")
+        ret i
     }
 
     fn pushAnonFn(mut &self, mut &m: &AnonFnExprModel): (ident: str) {
@@ -200,20 +232,16 @@ impl ObjectCoder {
             mut elemKind := StrBuilder.New(40)
             self.tc.kind(elemKind, t.Sptr().Elem)
 
-            // dealloc function.
-            self.anyObj.WriteStr("void " + anyTypeIdent)
-            self.anyObj.WriteStr(si)
-            self.anyObj.WriteStr("_dealloc(jule::Ptr<jule::Uintptr> &alloc) noexcept { alloc.__as<")
-            self.anyObj.Write(unsafe { elemKind.Buf() })
-            self.anyObj.WriteStr(">().dealloc(); }\n")
+            // Deallocator function.
+            di := self.pushDealloc(t.Sptr().Elem)
 
             // Type structure.
             self.anyObj.WriteStr("struct " + typeCoder.Any + "::Type ")
             self.anyObj.WriteStr(anyTypeIdent)
             self.anyObj.WriteStr(si)
-            self.anyObj.WriteStr("{.dealloc=" + anyTypeIdent)
-            self.anyObj.WriteStr(si)
-            self.anyObj.WriteStr("_dealloc, .eq=jule::ptr_equal, .to_str=jule::ptr_to_str};\n")
+            self.anyObj.WriteStr("{.dealloc=" + deallocatedTypeIdent)
+            self.anyObj.WriteStr(conv::Itoa(di))
+            self.anyObj.WriteStr(", .eq=jule::ptr_equal, .to_str=jule::ptr_to_str};\n")
 
             // comparison function.
             self.anyObj.WriteStr(typeCoder.Bool + " " + anyTypeIdent)
@@ -228,16 +256,9 @@ impl ObjectCoder {
             mut kindB := StrBuilder.New(40)
             self.tc.kind(kindB, t)
             kind := unsafe { kindB.Buf() }
-            if unsafe::BytesStr(kind) == "[<unimplemented_type_kind>]" {
-                outln(t.Str())
-            }
 
-            // dealloc function.
-            self.anyObj.WriteStr("void " + anyTypeIdent)
-            self.anyObj.WriteStr(si)
-            self.anyObj.WriteStr("_dealloc(jule::Ptr<jule::Uintptr> &alloc) noexcept { alloc.__as<")
-            self.anyObj.Write(kind)
-            self.anyObj.WriteStr(">().dealloc(); }\n")
+            // Deallocator function.
+            di := self.pushDealloc(t)
 
             if comparable {
                 // eq function.
@@ -267,9 +288,9 @@ impl ObjectCoder {
             self.anyObj.WriteStr("struct " + typeCoder.Any + "::Type ")
             self.anyObj.WriteStr(anyTypeIdent)
             self.anyObj.WriteStr(si)
-            self.anyObj.WriteStr("{.dealloc=" + anyTypeIdent)
-            self.anyObj.WriteStr(si)
-            self.anyObj.WriteStr("_dealloc, ")
+            self.anyObj.WriteStr("{.dealloc=" + deallocatedTypeIdent)
+            self.anyObj.WriteStr(conv::Itoa(di))
+            self.anyObj.WriteStr(", ")
             if comparable {
                 self.anyObj.WriteStr(".eq=" + anyTypeIdent)
                 self.anyObj.WriteStr(si)
@@ -374,34 +395,36 @@ impl ObjectCoder {
         self.traitCastMap = append(self.traitCastMap, traitCast{t1: t1, t2: t2})
 
         // Not exist, push.
-        //
-        // TODO:
-        //  As partially confirmed by the experiments, the same mapping conditions
-        //  apply for two traits that casting into each other. It was decided that
-        //  additional investigation was needed to conclusively confirm this.
-        const offset = "offset"
-        self.anyObj.WriteStr(typeCoder.Int)
-        self.anyObj.WriteByte(' ')
+        const data = "data"
+        self.anyObj.WriteStr("void *")
         self.anyObj.Write(unsafe { ident.Buf() })
-        self.anyObj.WriteStr("(const " + typeCoder.Int + " " + offset + ") noexcept { ")
+        self.anyObj.WriteStr("(const void *" + data + ") noexcept { ")
+
+        mut t1Ident := StrBuilder.New(1 << 4)
+        mut t2Ident := StrBuilder.New(1 << 4)
+        identCoder.traitDecl(t1Ident, t1)
+        identCoder.traitDecl(t2Ident, t2)
+
         for (_, mut s1) in t1.Implemented {
             for _, s2 in t2.Implemented {
                 if s1 == s2 {
                     for (_, mut s1i) in s1.Instances {
                         i1 := self.findTypeOffsetS(t1, s1i)
                         i2 := self.findTypeOffsetS(t2, s1i)
-                        self.anyObj.WriteStr("if (offset == ")
+                        self.anyObj.WriteStr("if (data == &")
+                        self.anyObj.Write(unsafe { t2Ident.Buf() })
+                        self.anyObj.WriteStr("_mptr_data")
                         self.anyObj.WriteStr(conv::Itoa(i2))
-                        self.anyObj.WriteStr(") return ")
+                        self.anyObj.WriteStr(") return &")
+                        self.anyObj.Write(unsafe { t1Ident.Buf() })
+                        self.anyObj.WriteStr("_mptr_data")
                         self.anyObj.WriteStr(conv::Itoa(i1))
                         self.anyObj.WriteStr("; ")
                     }
                 }
             }
         }
-        self.anyObj.WriteStr(" return ")
-        self.anyObj.WriteStr(conv::Itoa(emptyTraitOffset))
-        self.anyObj.WriteStr("; }\n")
+        self.anyObj.WriteStr(" jule::panic(\"trait casting failed because of an implementation mistake, this is a JuleC bug\"); return nullptr; }\n")
     }
 
     // Writes location information of token as cstr bytes.
@@ -563,22 +586,6 @@ impl ObjectCoder {
                     // Push all methods to t from t's inheritances.
                     // Because they will be used for trait data generation.
                     pushMethodsFromInherits(t, t)
-                }
-            })
-        })
-    }
-
-    fn traitDecls(mut &self) {
-        self.iterPackages(fn(mut &pkg: &Package) {
-            iterFiles(pkg, fn(mut &file: &SymbolTable) {
-                for (_, mut t) in file.Traits {
-                    if t.Token == nil {
-                        ret
-                    }
-                    self.indent()
-                    self.write("struct ")
-                    identCoder.traitDecl(self.Buf, t)
-                    self.write("{};\n")
                 }
             })
         })
@@ -891,11 +898,11 @@ impl ObjectCoder {
         }
     }
 
-    fn funcDeclTrait(mut &self, mut &t: &Trait, mut &f: &Fn, ptr: bool) {
+    fn funcDeclTrait(mut &self, mut &f: &Fn) {
         for (_, mut c) in f.Instances {
             mut k := c.Params[0].Kind
-            c.Params[0].Kind = &TypeKind{Kind: t}
-            self.funcDeclIns(c, ptr)
+            c.Params[0].Kind = generalGCPtr
+            self.funcDeclIns(c, true)
             c.Params[0].Kind = k
         }
     }
@@ -913,38 +920,16 @@ impl ObjectCoder {
         })
     }
 
-    fn traitDataTypeMethods(mut &self, mut &owner: &Trait, mut &t: &Trait) {
+    fn traitDataTypeMethods(mut &self, mut &t: &Trait) {
         for (_, mut m) in t.Methods {
             mut ins := m.Instances[0]
-            mut p := ins.Params[0]
-            p.Kind = &TypeKind{
-                Kind: t,
-            }
             for (i, mut ip) in ins.Params[1:] {
                 if IsAnonIdent(ip.Decl.Ident) {
                     ip.Decl.Ident = "_" + conv::Itoa(i)
                 }
             }
-            if !env::Production {
-                mut lp := ins.Params[len(ins.Params)-1]
-                match type lp.Kind.Kind {
-                | &customType:
-                    break
-                |:
-                    ins.Params = append(ins.Params, &ParamIns{
-                        Decl: &Param{
-                            Ident: "__file",
-                        },
-                        Kind: &TypeKind{
-                            Kind: &customType{
-                                kind: "const char*",
-                            },
-                        },
-                    })
-                }
-            }
             self.pushResult(m)
-            self.funcDeclTrait(owner, m, true)
+            self.funcDeclTrait(m)
         }
     }
 
@@ -963,7 +948,9 @@ impl ObjectCoder {
                     self.write("MptrData")
                     self.write(" {\n")
                     self.addIndent()
-                    self.traitDataTypeMethods(t, t)
+                    self.indent()
+                    self.write("void (*dealloc)(" + typeCoder.Ptr + "<" + typeCoder.Uintptr + ">&);\n")
+                    self.traitDataTypeMethods(t)
                     self.doneIndent()
                     self.indent()
                     self.write("};\n\n")
@@ -1095,7 +1082,7 @@ impl ObjectCoder {
             f.Ident = s.Str()
 
             mut k := ins.Params[0].Kind
-            ins.Params[0].Kind = &TypeKind{Kind: hash.t}
+            ins.Params[0].Kind = generalGCPtr
             self.funcIns(ins)
             ins.Params[0].Kind = k
         }
@@ -1103,16 +1090,11 @@ impl ObjectCoder {
     }
 
     fn traitWrapper(mut &self, mut &m: &Fn, mut &hash: &traitHash) {
-        self.funcTrait(hash, m)
-
-        if hash.s == nil {
-            if env::Production {
-                self.write(" { jule::panic(__JULE_ERROR__INVALID_MEMORY); }\n")
-            } else {
-                self.write(" { jule::panic(" + typeCoder.Str + "(__JULE_ERROR__INVALID_MEMORY \"\\nlocation: \") + " + typeCoder.Str + "(_00___file)); }\n")
-            }
+        if len(hash.t.Implemented) == 0 {
             ret
         }
+
+        self.funcTrait(hash, m)
 
         ptr := !m.Params[0].IsRef()
 
@@ -1129,18 +1111,15 @@ impl ObjectCoder {
         }
         identCoder.func(self.Buf, sm)
         self.write("(")
+        self.write("_self_.as<")
         if ptr {
-            self.write("_self_.safe_ptr<")
             self.tc.structureIns(self.Buf, hash.s)
-            self.write(">(")
-            if !env::Production {
-                self.write("_00___file")
-            }
-            self.write(")")
         } else {
-            self.write("_self_.data.as<")
             self.tc.structure(self.Buf, sm.Owner)
-            self.write(">()")
+        }
+        self.write(">()")
+        if ptr {
+            self.write(".alloc")
         }
         for _, mp in m.Params[1:] {
             self.write(", ")
@@ -1175,44 +1154,33 @@ impl ObjectCoder {
         }
     }
 
-    fn traitData(mut &self, mut &hash: &traitHash, mut &old: &Trait) {
-        if len(hash.t.Methods) == 0 {
+    fn traitData(mut &self, mut &hash: &traitHash) {
+        if len(hash.t.Methods) == 0 || len(hash.t.Implemented) == 0 {
             ret
         }
         mut ident := StrBuilder.New(len(hash.t.Ident))
         identCoder.traitDecl(ident, hash.t)
-        if hash.t != old {
-            if old != nil {
-                self.doneIndent()
-                self.indent()
-                self.write("};\n")
-            }
-            self.write("static ")
-            self.writeBytes(unsafe { ident.Buf() })
-            self.write("MptrData ")
-            self.writeBytes(unsafe { ident.Buf() })
-            self.write("_mptr_data[] = {\n")
-            old = hash.t
-            self.addIndent()
-        }
-        self.indent()
-        self.write("{\n")
+        self.write("static ")
+        self.writeBytes(unsafe { ident.Buf() })
+        self.write("MptrData ")
+        self.writeBytes(unsafe { ident.Buf() })
+        self.write("_mptr_data")
+        self.write(conv::Itoa(hash.i))
+        self.write(" {\n")
         self.addIndent()
+        self.indent()
+        self.write(".dealloc=" + deallocatedTypeIdent)
+        i := self.pushDealloc(&TypeKind{Kind: hash.s})
+        self.write(conv::Itoa(i))
+        self.write(",\n")
         self.traitDataMethods(hash.t, hash)
         self.doneIndent()
-        self.indent()
-        self.write("},\n")
+        self.write("};")
     }
 
     fn traitDatas(mut &self) {
-        let mut old: &Trait = nil
         for (_, mut hash) in self.tmap {
-            self.traitData(hash, old)
-        }
-        if old != nil {
-            self.doneIndent()
-            self.indent()
-            self.write("};\n")
+            self.traitData(hash)
         }
     }
 
@@ -1228,7 +1196,6 @@ impl ObjectCoder {
     }
 
     fn decls(mut &self) {
-        self.traitDecls()
         self.structurePlainDecls()
         self.structureDecls()
         self.headPos = self.Buf.Len()
@@ -1237,6 +1204,7 @@ impl ObjectCoder {
         self.write("\n\n")
         self.traitDataTypes()
         self.write("\n\n")
+        self.wrapPos = self.Buf.Len()
         self.traitWrappers()
         self.write("\n\n")
         self.traitDatas()
@@ -1398,6 +1366,16 @@ impl ObjectCoder {
 }`)
     }
 
+    fn insertBuf(mut &self, mut &buf: StrBuilder, pos: int) {
+        if buf.Len() > 0 {
+            mut head := make([]byte, 0, self.Buf.Len() + buf.Len())
+            head = append(head, unsafe { self.Buf.Buf() }[:pos]...)
+            head = append(head, unsafe { buf.Buf() }...)
+            head = append(head, unsafe { self.Buf.Buf() }[pos:]...)
+            unsafe { self.Buf.SetBuf(head) }
+        }
+    }
+
     fn serializeHead(mut &self) {
         self.prepareStructures()
         self.buildTraitMap()
@@ -1405,14 +1383,9 @@ impl ObjectCoder {
         self.write("\n")
         self.decls()
 
-        if self.resultDecls.Len() > 0 {
-            mut head := make([]byte, 0, self.Buf.Len() + self.resultDecls.Len())
-            head = append(head, unsafe { self.Buf.Buf() }[:self.headPos]...)
-            head = append(head, unsafe { self.resultDecls.Buf() }...)
-            self.declPos += self.resultDecls.Len()
-            head = append(head, unsafe { self.Buf.Buf() }[self.headPos:]...)
-            unsafe { self.Buf.SetBuf(head) }
-        }
+        self.insertBuf(self.resultDecls, self.headPos)
+        self.wrapPos += self.resultDecls.Len()
+        self.declPos += self.resultDecls.Len()
 
         self.write("\n")
         self.structures()
@@ -1422,21 +1395,15 @@ impl ObjectCoder {
 
         self.anonHashes()
 
-        if self.anyObj.Len() > 0 {
-            mut head := make([]byte, 0, self.Buf.Len() + self.anyObj.Len())
-            head = append(head, unsafe { self.Buf.Buf() }[:self.declPos]...)
-            head = append(head, unsafe { self.anyObj.Buf() }...)
-            head = append(head, unsafe { self.Buf.Buf() }[self.declPos:]...)
-            unsafe { self.Buf.SetBuf(head) }
-            self.declPos += self.anyObj.Len()
-        }
-        if self.anonObj.Len() > 0 {
-            mut head := make([]byte, 0, self.Buf.Len() + self.anonObj.Len())
-            head = append(head, unsafe { self.Buf.Buf() }[:self.declPos]...)
-            head = append(head, unsafe { self.anonObj.Buf() }...)
-            head = append(head, unsafe { self.Buf.Buf() }[self.declPos:]...)
-            unsafe { self.Buf.SetBuf(head) }
-        }
+        self.insertBuf(self.deallocObj, self.wrapPos)
+        self.wrapPos += self.deallocObj.Len()
+        self.declPos += self.deallocObj.Len()
+
+        self.insertBuf(self.anyObj, self.declPos)
+        self.declPos += self.anyObj.Len()
+
+        self.insertBuf(self.anonObj, self.declPos)
+        self.declPos += self.anonObj.Len()
     }
 
     fn Serialize(mut &self) {

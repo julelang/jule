@@ -382,9 +382,7 @@ impl exprCoder {
 
     fn castTraitFromTrait(mut &self, mut &m: &CastingExprModel, mut t1: &Trait, mut t2: &Trait) {
         self.possibleRefExpr(m.Expr.Model)
-        self.oc.write(".mask<")
-        identCoder.traitDecl(self.oc.Buf, t1)
-        self.oc.write(">(")
+        self.oc.write(".map(")
         self.oc.pushAndWriteMaskMapper(t1, t2)
         self.oc.write(")")
     }
@@ -475,6 +473,9 @@ impl exprCoder {
                 self.oc.locInfo(m.Token)
                 self.oc.write("\", ")
             }
+            self.oc.write("(" + typeCoder.Trait + "::Type*)&")
+            identCoder.traitDecl(self.oc.Buf, m.ExprKind.Trait())
+            self.oc.write("_mptr_data")
             self.oc.write(conv::Itoa(self.oc.findTypeOffset(m.ExprKind.Trait(), m.Kind)))
             self.oc.write(")")
             ret
@@ -482,7 +483,9 @@ impl exprCoder {
             self.oc.tc.kind(self.oc.Buf, m.Kind)
             self.oc.write("(")
             self.possibleRefExpr(m.Expr.Model)
-            self.oc.write(", ")
+            self.oc.write(", (" + typeCoder.Trait + "::Type*)&")
+            identCoder.traitDecl(self.oc.Buf, m.Kind.Trait())
+            self.oc.write("_mptr_data")
             self.oc.write(conv::Itoa(self.oc.findTypeOffset(m.Kind.Trait(), m.ExprKind)))
             self.oc.write(")")
             ret
@@ -652,7 +655,6 @@ impl exprCoder {
                 self.oc.write(", ")
             }
         }
-        mut locinfo := false
         if !m.Func.IsBuiltin() && len(m.Func.Decl.Params) > 0 && m.Func.Decl.Params[0].IsSelf() {
             match type m.Expr {
             | &StructSubIdentExprModel:
@@ -701,20 +703,13 @@ impl exprCoder {
                 }
             | &TraitSubIdentExprModel:
                 self.possibleRefExpr((&TraitSubIdentExprModel)(m.Expr).Expr)
-                if !env::Production {
-                    locinfo = true
-                }
+                self.oc.write(".data")
                 if len(m.Args) > 0 {
                     self.oc.write(", ")
                 }
             }
         }
         self.args(m)
-        if locinfo {
-            self.oc.write(", \"")
-            self.oc.locInfo(m.Token)
-            self.oc.write("\"")
-        }
         self.oc.write(")")
 
         if wrapped {
@@ -1005,11 +1000,18 @@ impl exprCoder {
     }
 
     fn traitSub(mut &self, mut m: &TraitSubIdentExprModel) {
+        self.oc.write("((")
         identCoder.traitDecl(self.oc.Buf, m.Trt)
-        self.oc.write("_mptr_data")
-        self.oc.write("[(")
+        self.oc.write("MptrData")
+        self.oc.write("*)")
         self.possibleRefExpr(m.Expr)
-        self.oc.write(").type_offset].")
+        self.oc.write(".safe_type(")
+        if !env::Production {
+            self.oc.write("\"")
+            self.oc.locInfo(m.Token)
+            self.oc.write("\"")
+        }
+        self.oc.write("))->")
         identCoder.func(self.oc.Buf, m.Method)
     }
 

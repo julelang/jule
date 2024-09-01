@@ -6,7 +6,6 @@
 #define __JULE_TRAIT_HPP
 
 #include <string>
-#include <typeinfo>
 #include <ostream>
 #include <cstring>
 
@@ -17,75 +16,55 @@
 
 namespace jule
 {
-    template <typename T>
-    struct TraitDynamicType
-    {
-    public:
-        static void dealloc(jule::Ptr<jule::Uintptr> &alloc) noexcept
-        {
-            alloc.__as<T>().dealloc();
-        }
-    };
-
-    struct TraitType
-    {
-    public:
-        void (*dealloc)(jule::Ptr<jule::Uintptr> &alloc);
-    };
-
-    template <typename T>
-    static jule::TraitType *new_trait_type(void) noexcept
-    {
-        using type = typename std::decay<jule::TraitDynamicType<T>>::type;
-        static jule::TraitType table = {
-            .dealloc = type::dealloc,
-        };
-        return &table;
-    }
-
-    template <typename Mask>
+    // Trait data container for Jule's traits.
+    // The `type` field points to `jule::Trait::Type` for deallocation,
+    // but it actually points to static data for trait's runtime data type.
+    // So, compiler may cast it to actual data type to use it. Therefore,
+    // the first field of the static data is should be always deallocation function pointer.
     struct Trait
     {
     public:
+        struct Type
+        {
+        public:
+            void (*dealloc)(jule::Ptr<jule::Uintptr> &);
+        };
+
         mutable jule::Ptr<jule::Uintptr> data;
-        mutable jule::TraitType *type = nullptr;
-        mutable jule::Int type_offset = -1;
+        mutable jule::Trait::Type *type = nullptr;
         mutable jule::Bool ptr = false;
 
         Trait(void) = default;
         Trait(std::nullptr_t) : Trait() {}
 
-        Trait(const jule::Trait<Mask> &trait)
+        Trait(const jule::Trait &trait)
         {
             this->__get_copy(trait);
         }
 
-        Trait(jule::Trait<Mask> &&trait)
+        Trait(jule::Trait &&trait)
         {
             this->__get_copy(trait);
         }
 
-        void __get_copy(const jule::Trait<Mask> &trait)
+        void __get_copy(const jule::Trait &trait)
         {
             this->data = trait.data;
-            this->type_offset = trait.type_offset;
             this->type = trait.type;
             this->ptr = trait.ptr;
         }
 
-        void __get_copy(jule::Trait<Mask> &&trait)
+        void __get_copy(jule::Trait &&trait)
         {
             this->data = std::move(trait.data);
-            this->type_offset = trait.type_offset;
             this->type = trait.type;
             this->ptr = trait.ptr;
         }
 
         template <typename T>
-        Trait(const T &data, const jule::Int &type_offset) noexcept
+        Trait(const T &data, jule::Trait::Type *type) noexcept
         {
-            this->type_offset = type_offset;
-            this->type = jule::new_trait_type<T>();
+            this->type = type;
             this->ptr = false;
             T *alloc = new (std::nothrow) T;
             if (!alloc)
@@ -100,10 +79,9 @@ namespace jule
         }
 
         template <typename T>
-        Trait(const jule::Ptr<T> &ref, const jule::Int &type_offset) noexcept
+        Trait(const jule::Ptr<T> &ref, jule::Trait::Type *type) noexcept
         {
-            this->type_offset = type_offset;
-            this->type = jule::new_trait_type<T>();
+            this->type = type;
             this->ptr = true;
             this->data = ref.template as<jule::Uintptr>();
         }
@@ -117,7 +95,6 @@ namespace jule
         {
             this->data.ref = nullptr;
             this->data.alloc = nullptr;
-            this->type_offset = -1;
             this->ptr = false;
         }
 
@@ -151,13 +128,12 @@ namespace jule
             }
         }
 
-        inline jule::Bool type_is(const jule::Bool &ptr, const jule::Int &type_offset) const noexcept
+        inline jule::Bool type_is(const jule::Bool ptr, const jule::Trait::Type *type) const noexcept
         {
-            return this->ptr == ptr && this->type_offset == type_offset;
+            return this->ptr == ptr && this->type == type;
         }
 
-        template <typename T>
-        inline T *safe_ptr(
+        inline jule::Trait::Type *safe_type(
 #ifndef __JULE_ENABLE__PRODUCTION
             const char *file
 #else
@@ -172,7 +148,7 @@ namespace jule
 #endif
             );
 #endif
-            return reinterpret_cast<T *>(this->data.alloc);
+            return this->type;
         }
 
         template <typename T>
@@ -180,7 +156,7 @@ namespace jule
 #ifndef __JULE_ENABLE__PRODUCTION
             const char *file,
 #endif
-            const jule::Int &type_offset) noexcept
+            const jule::Trait::Type *type) noexcept
         {
 #ifndef __JULE_DISABLE__SAFETY
             this->must_ok(
@@ -188,7 +164,7 @@ namespace jule
                 file
 #endif
             );
-            if (!this->type_is(false, type_offset))
+            if (!this->type_is(false, type))
             {
 #ifndef __JULE_ENABLE__PRODUCTION
                 std::string error = __JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: trait casted to incompatible type\nfile: ";
@@ -207,7 +183,7 @@ namespace jule
 #ifndef __JULE_ENABLE__PRODUCTION
             const char *file,
 #endif
-            const jule::Int &type_offset) noexcept
+            const jule::Trait::Type *type) noexcept
         {
 #ifndef __JULE_DISABLE__SAFETY
             this->must_ok(
@@ -215,7 +191,7 @@ namespace jule
                 file
 #endif
             );
-            if (!this->type_is(true, type_offset))
+            if (!this->type_is(true, type))
             {
 #ifndef __JULE_ENABLE__PRODUCTION
                 std::string error = __JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: trait casted to incompatible type\nfile: ";
@@ -229,43 +205,41 @@ namespace jule
             return this->data.template as<T>();
         }
 
-        template <typename NewMask>
-        inline jule::Trait<NewMask> mask(jule::Int (*offsetMapper)(const jule::Int)) noexcept
+        inline jule::Trait mask(void *(*typeMapper)(const void *)) noexcept
         {
-            jule::Trait<NewMask> newTrait;
-            newTrait.type = this->type;
+            jule::Trait newTrait;
+            newTrait.type = (jule::Trait::Type *)typeMapper((void *)this->type);
             newTrait.ptr = this->ptr;
             newTrait.data = this->data;
-            newTrait.type_offset = offsetMapper(this->type_offset);
             return newTrait;
         }
 
-        inline jule::Trait<Mask> &operator=(const std::nullptr_t) noexcept
+        inline jule::Trait &operator=(const std::nullptr_t) noexcept
         {
             this->dealloc();
             return *this;
         }
 
-        inline jule::Trait<Mask> &operator=(const jule::Trait<Mask> &src) noexcept
-        {
-            this->dealloc();
-            this->__get_copy(src);
-            return *this;
-        }
-
-        inline jule::Trait<Mask> &operator=(jule::Trait<Mask> &&src) noexcept
+        inline jule::Trait &operator=(const jule::Trait &src) noexcept
         {
             this->dealloc();
             this->__get_copy(src);
             return *this;
         }
 
-        constexpr jule::Bool operator==(const jule::Trait<Mask> &src) const noexcept
+        inline jule::Trait &operator=(jule::Trait &&src) noexcept
+        {
+            this->dealloc();
+            this->__get_copy(src);
+            return *this;
+        }
+
+        constexpr jule::Bool operator==(const jule::Trait &src) const noexcept
         {
             return this->data.alloc == src.data.alloc;
         }
 
-        constexpr jule::Bool operator!=(const jule::Trait<Mask> &src) const noexcept
+        constexpr jule::Bool operator!=(const jule::Trait &src) const noexcept
         {
             return !this->operator==(src);
         }
@@ -281,7 +255,7 @@ namespace jule
         }
 
         friend inline std::ostream &operator<<(std::ostream &stream,
-                                               const jule::Trait<Mask> &src) noexcept
+                                               const jule::Trait &src) noexcept
         {
             if (src == nullptr)
                 return stream << "<nil>";
