@@ -574,25 +574,26 @@ impl scopeCoder {
                     self.oc.write(")")
                 |:
                     // It should be trait.
-                    self.oc.write(" = ")
                     if tup.Types[i].Trait() != nil { // Different traits, cast.
+                        self.oc.write(" = ")
                         mut t1 := l.Kind.Trait()
                         mut t2 := tup.Types[i].Trait()
                         self.oc.write(r)
                         self.oc.write(conv::Itoa(i))
-                        self.oc.write(".mask<")
+                        self.oc.write(".map<")
                         identCoder.traitDecl(self.oc.Buf, t1)
                         self.oc.write(">(")
                         self.oc.pushAndWriteMaskMapper(t1, t2)
                         self.oc.write(")")
                         break
                     }
-                    self.oc.tc.kind(self.oc.Buf, l.Kind)
-                    self.oc.write("(")
-                    self.oc.write(r)
+                    t := l.Kind.Trait()
+                    self.oc.write(" = " + typeCoder.Trait + "(" + r)
                     self.oc.write(conv::Itoa(i))
-                    self.oc.write(", ")
-                    self.oc.write(conv::Itoa(findTraitTypeOffset(l.Kind.Trait(), tup.Types[i])))
+                    self.oc.write(", (" + typeCoder.Trait + "::Type*)&")
+                    identCoder.traitDecl(self.oc.Buf, t)
+                    self.oc.write("_mptr_data")
+                    self.oc.write(conv::Itoa(findTraitTypeOffset(t, tup.Types[i])))
                     self.oc.write(")")
                 }
                 self.oc.write(";\n")
