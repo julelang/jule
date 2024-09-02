@@ -51,6 +51,7 @@ const anonFnCtxSuffix = "_ctx"                              // Anon fn identifie
 const anonFnCtxHandlerSuffix = anonFnCtxSuffix + "_handler" // Anon fn identifier suffix for ctx allocation handler.
 const anyTypeIdent = "__jule_any_type"
 const deallocatedTypeIdent = "__jule_type_deallocator"
+const traitMethodWrapperPrefix = "__jule_trait_method_wrapper_"
 const indentKind = '\t'
 
 // General pointer type for GC pointers.
@@ -67,13 +68,6 @@ static mut generalGCPtr = &TypeKind{
 struct SerializationInfo {
     Compiler:        str
     CompilerCommand: str
-}
-
-struct traitHash {
-    t:  &Trait
-    ti: str // ASCII-safe identifier of trait.
-    s:  &StructIns
-    i:  int
 }
 
 struct traitCast {
@@ -97,7 +91,6 @@ struct ObjectCoder {
 
     ir:          &IR
     info:        SerializationInfo
-    tmap:        []&traitHash
     anons:       []&anonHash
     deallocated: []&TypeKind // GC deallocated types for dynamic programming.
 
@@ -350,33 +343,6 @@ impl ObjectCoder {
         }
     }
 
-    fn findTypeOffsetS(self, t: &Trait, mut s: &StructIns): int {
-        if len(t.Implemented) == 0 {
-            ret emptyTraitOffset
-        }
-        for _, hash in self.tmap {
-            if hash.t == t && hash.s == s {
-                ret hash.i
-            }
-        }
-        ret -1
-    }
-
-    fn findTypeOffset(self, t: &Trait, mut k: &TypeKind): int {
-        if len(t.Implemented) == 0 {
-            ret emptyTraitOffset
-        }
-        let mut s: &StructIns = nil
-        if k.Sptr() != nil {
-            k = k.Sptr().Elem
-        }
-        s = k.Struct()
-        if s == nil {
-            ret -1
-        }
-        ret self.findTypeOffsetS(t, s)
-    }
-
     fn pushAndWriteMaskMapper(mut &self, mut t1: &Trait, mut t2: &Trait) {
         mut ident := StrBuilder.New(1 << 5)
         ident.WriteStr("__jule_trait_offset_mapper_")
@@ -409,8 +375,8 @@ impl ObjectCoder {
             for _, s2 in t2.Implemented {
                 if s1 == s2 {
                     for (_, mut s1i) in s1.Instances {
-                        i1 := self.findTypeOffsetS(t1, s1i)
-                        i2 := self.findTypeOffsetS(t2, s1i)
+                        i1 := findTraitTypeOffsetS(t1, s1i)
+                        i2 := findTraitTypeOffsetS(t2, s1i)
                         self.anyObj.WriteStr("if (data == &")
                         self.anyObj.Write(unsafe { t2Ident.Buf() })
                         self.anyObj.WriteStr("_mptr_data")
@@ -538,57 +504,6 @@ impl ObjectCoder {
                 self.prepareStructure(s)
             }
         }
-    }
-
-    fn iterPackages(mut &self, f: fn(mut &pkg: &Package)) {
-        for (_, mut used) in self.ir.Used {
-            if !used.Binded {
-                f(used.Package)
-            }
-        }
-        f(self.ir.Main)
-    }
-
-    fn buildTraitMap(mut &self) {
-        self.iterPackages(fn(mut &pkg: &Package) {
-            iterFiles(pkg, fn(mut &file: &SymbolTable) {
-                for (_, mut t) in file.Traits {
-                    if t.Token == nil {
-                        ret
-                    }
-                    if len(t.Implemented) == 0 {
-                        mut hash := &traitHash{
-                            t: t,
-                            s: nil,
-                            i: emptyTraitOffset,
-                        }
-                        mut b := StrBuilder.New(len(t.Ident))
-                        identCoder.writeIdentTo(b, t.Ident)
-                        hash.ti = b.Str()
-                        self.tmap = append(self.tmap, hash)
-                        continue
-                    }
-                    mut i := 0
-                    for (_, mut s) in t.Implemented {
-                        for (_, mut ins) in s.Instances {
-                            mut hash := &traitHash{
-                                t: t,
-                                s: ins,
-                                i: i,
-                            }
-                            mut b := StrBuilder.New(len(t.Ident))
-                            identCoder.writeIdentTo(b, t.Ident)
-                            hash.ti = b.Str()
-                            self.tmap = append(self.tmap, hash)
-                            i++
-                        }
-                    }
-                    // Push all methods to t from t's inheritances.
-                    // Because they will be used for trait data generation.
-                    pushMethodsFromInherits(t, t)
-                }
-            })
-        })
     }
 
     fn structurePlainDecl(mut &self, mut &s: &Struct) {
@@ -908,7 +823,7 @@ impl ObjectCoder {
     }
 
     fn funcDecls(mut &self) {
-        self.iterPackages(fn(mut &pkg: &Package) {
+        iterPackages(self.ir, fn(mut &pkg: &Package) {
             iterFiles(pkg, fn(mut &file: &SymbolTable) {
                 for (_, mut f) in file.Funcs {
                     if !f.Binded && f.Token != nil {
@@ -921,7 +836,7 @@ impl ObjectCoder {
     }
 
     fn traitDataTypeMethods(mut &self, mut &t: &Trait) {
-        for (_, mut m) in t.Methods {
+        iterTraitMethods(t, fn(mut &t: &Trait, mut &m: &Fn) {
             mut ins := m.Instances[0]
             for (i, mut ip) in ins.Params[1:] {
                 if IsAnonIdent(ip.Decl.Ident) {
@@ -930,17 +845,14 @@ impl ObjectCoder {
             }
             self.pushResult(m)
             self.funcDeclTrait(m)
-        }
+        })
     }
 
     fn traitDataTypes(mut &self) {
-        self.iterPackages(fn(mut &pkg: &Package) {
+        iterPackages(self.ir, fn(mut &pkg: &Package) {
             iterFiles(pkg, fn(mut &file: &SymbolTable) {
                 for (_, mut t) in file.Traits {
-                    if t.Token == nil {
-                        ret
-                    }
-                    if len(t.Methods) == 0 {
+                    if t.Token == nil || !isTraitHaveMethods(t) {
                         continue
                     }
                     self.write("struct ")
@@ -1067,19 +979,17 @@ impl ObjectCoder {
         }
     }
 
-    fn funcTrait(mut &self, mut &hash: &traitHash, mut &f: &Fn) {
+    fn funcTrait(mut &self, &s: &StructIns, mut &f: &Fn) {
         ident := f.Ident
         for (_, mut ins) in f.Instances {
             ins.Scope = nil
 
-            mut s := StrBuilder.New(len(f.Ident) + len(ident) + len(hash.ti) + len("__") + (1 << 2))
-            s.WriteStr(ident)
-            s.WriteByte('_')
-            s.WriteStr(hash.ti)
-            s.WriteByte('_')
-            s.WriteStr(conv::Itoa(hash.i))
+            mut nident := StrBuilder.New(30)
+            nident.WriteStr("__jule_trait_method_")
+            nident.WriteByte('_')
+            nident.WriteStr(conv::FmtUint(u64(uintptr(s)), 0xF))
 
-            f.Ident = s.Str()
+            f.Ident = nident.Str()
 
             mut k := ins.Params[0].Kind
             ins.Params[0].Kind = generalGCPtr
@@ -1089,99 +999,132 @@ impl ObjectCoder {
         f.Ident = ident
     }
 
-    fn traitWrapper(mut &self, mut &m: &Fn, mut &hash: &traitHash) {
-        if len(hash.t.Implemented) == 0 {
-            ret
-        }
+    fn traitWrapper(mut &self, mut &t: &Trait, mut &m: &Fn, mut &pairs: &map[uintptr][]uintptr) {
+    impls:
+        for (_, mut imp) in t.Implemented {
+            mut vals := (*pairs)[uintptr(m)]
+            // Is handled pair?
+            for _, val in vals {
+                if val == uintptr(imp) {
+                    // Exist, skip this step.
+                    continue impls
+                }
+            }
+            (*pairs)[uintptr(m)] = append(vals, uintptr(imp))
+            for (_, mut ins) in imp.Instances {
+                self.funcTrait(ins, m)
+                ptr := !m.Params[0].IsRef()
 
-        self.funcTrait(hash, m)
+                mut sm := ins.FindMethod(m.Ident, false)
+                if sm == nil || len(sm.Instances) == 0 {
+                    ret
+                }
 
-        ptr := !m.Params[0].IsRef()
-
-        mut sm := hash.s.FindMethod(m.Ident, false)
-        if sm == nil || len(sm.Instances) == 0 {
-            ret
-        }
-
-        self.addIndent()
-        self.write("{\n")
-        self.indent()
-        if sm.Exceptional || !sm.IsVoid() {
-            self.write("return ")
-        }
-        identCoder.func(self.Buf, sm)
-        self.write("(")
-        self.write("_self_.as<")
-        if ptr {
-            self.tc.structureIns(self.Buf, hash.s)
-        } else {
-            self.tc.structure(self.Buf, sm.Owner)
-        }
-        self.write(">()")
-        if ptr {
-            self.write(".alloc")
-        }
-        for _, mp in m.Params[1:] {
-            self.write(", ")
-            identCoder.param(self.Buf, mp)
-        }
-        self.write(");\n}\n")
-        self.doneIndent()
-    }
-
-    fn traitWrappers(mut &self) {
-        for (_, mut hash) in self.tmap {
-            for (_, mut m) in hash.t.Methods {
-                self.traitWrapper(m, hash)
+                self.addIndent()
+                self.write("{\n")
+                self.indent()
+                if sm.Exceptional || !sm.IsVoid() {
+                    self.write("return ")
+                }
+                identCoder.func(self.Buf, sm)
+                self.write("(")
+                self.write("_self_.as<")
+                if ptr {
+                    self.tc.structureIns(self.Buf, ins)
+                } else {
+                    self.tc.structure(self.Buf, sm.Owner)
+                }
+                self.write(">()")
+                if ptr {
+                    self.write(".alloc")
+                }
+                for _, mp in m.Params[1:] {
+                    self.write(", ")
+                    identCoder.param(self.Buf, mp)
+                }
+                self.write(");\n}\n")
+                self.doneIndent()
             }
         }
     }
 
-    fn traitDataMethods(mut &self, mut &t: &Trait, &hash: &traitHash) {
-        for (_, mut m) in t.Methods {
-            mut mIdent := StrBuilder.New(len(m.Ident))
-            identCoder.func(mIdent, m)
-            self.indent()
-            self.write(".")
-            self.writeBytes(unsafe { mIdent.Buf() })
-            self.write("=")
-            self.writeBytes(unsafe { mIdent.Buf() })
-            self.write("_")
-            self.write(hash.ti)
-            self.write("_")
-            self.write(conv::Itoa(hash.i))
-            self.write(",\n")
-        }
+    fn traitWrappers(mut &self) {
+        // Pairs for methods and structure instances.
+        // Used to avoid duplicated wrapper function generation.
+        mut pairs := new(map[uintptr][]uintptr)
+        iterPackages(self.ir, fn(mut &pkg: &Package) {
+            iterFiles(pkg, fn(mut &file: &SymbolTable) {
+                for (_, mut t) in file.Traits {
+                    if len(t.Implemented) == 0 {
+                        continue
+                    }
+                    iterTraitMethods(t, fn(mut &t: &Trait, mut &m: &Fn) {
+                        self.traitWrapper(t, m, pairs)
+                    })
+                }
+            })
+        })
     }
 
-    fn traitData(mut &self, mut &hash: &traitHash) {
-        if len(hash.t.Methods) == 0 || len(hash.t.Implemented) == 0 {
+    fn traitDataMethods(mut &self, mut &t: &Trait, s: &StructIns) {
+        iterTraitMethods(t, fn(mut &t: &Trait, mut &m: &Fn) {
+            ident := m.Ident
+
+            mut nident := StrBuilder.New(30)
+            nident.WriteStr("__jule_trait_method_")
+            nident.WriteByte('_')
+            nident.WriteStr(conv::FmtUint(u64(uintptr(s)), 0xF))
+
+            self.indent()
+            self.write(".")
+            identCoder.func(self.Buf, m)
+            self.write("=_")
+            self.write(conv::FmtUint(u64(uintptr(m)), 0xF))
+            self.write("_")
+            self.writeBytes(unsafe { nident.Buf() })
+            self.write(",\n")
+
+            m.Ident = ident
+        })
+    }
+
+    fn traitData(mut &self, mut &t: &Trait, i: int, mut &s: &StructIns) {
+        if !isTraitHaveMethods(t) || len(t.Implemented) == 0 {
             ret
         }
-        mut ident := StrBuilder.New(len(hash.t.Ident))
-        identCoder.traitDecl(ident, hash.t)
+        mut ident := StrBuilder.New(len(t.Ident))
+        identCoder.traitDecl(ident, t)
         self.write("static ")
         self.writeBytes(unsafe { ident.Buf() })
         self.write("MptrData ")
         self.writeBytes(unsafe { ident.Buf() })
         self.write("_mptr_data")
-        self.write(conv::Itoa(hash.i))
+        self.write(conv::Itoa(i))
         self.write(" {\n")
         self.addIndent()
         self.indent()
         self.write(".dealloc=" + deallocatedTypeIdent)
-        i := self.pushDealloc(&TypeKind{Kind: hash.s})
-        self.write(conv::Itoa(i))
+        self.write(conv::Itoa(self.pushDealloc(&TypeKind{Kind: s})))
         self.write(",\n")
-        self.traitDataMethods(hash.t, hash)
+        self.traitDataMethods(t, s)
         self.doneIndent()
-        self.write("};")
+        self.write("};\n")
     }
 
     fn traitDatas(mut &self) {
-        for (_, mut hash) in self.tmap {
-            self.traitData(hash)
-        }
+        iterPackages(self.ir, fn(mut &pkg: &Package) {
+            iterFiles(pkg, fn(mut &file: &SymbolTable) {
+                for (_, mut t) in file.Traits {
+                    mut i := 0
+                    for (_, mut s) in t.Implemented {
+                        for (_, mut ins) in s.Instances {
+                            self.traitData(t, i, ins)
+                            i++
+                        }
+                    }
+                }
+            })
+        })
     }
 
     fn globals(mut &self) {
@@ -1294,7 +1237,7 @@ impl ObjectCoder {
     }
 
     fn funcs(mut &self) {
-        self.iterPackages(fn(mut &pkg: &Package) {
+        iterPackages(self.ir, fn(mut &pkg: &Package) {
             iterFiles(pkg, fn(mut &file: &SymbolTable) {
                 for (_, mut f) in file.Funcs {
                     if !env::Test && hasDirective(f.Directives, Directive.Test) {
@@ -1339,7 +1282,7 @@ impl ObjectCoder {
     fn initCaller(mut &self) {
         self.write("void " + initCallerIdent + "(void) {\n")
         self.addIndent()
-        self.iterPackages(fn(mut &pkg: &Package) {
+        iterPackages(self.ir, fn(mut &pkg: &Package) {
             self.pushInit(pkg)
         })
         self.doneIndent()
@@ -1378,7 +1321,6 @@ impl ObjectCoder {
 
     fn serializeHead(mut &self) {
         self.prepareStructures()
-        self.buildTraitMap()
         self.head()
         self.write("\n")
         self.decls()
@@ -1412,12 +1354,6 @@ impl ObjectCoder {
     }
 }
 
-fn iterFiles(mut &pkg: &Package, f: fn(mut &f: &SymbolTable)) {
-    for (_, mut file) in pkg.Files {
-        f(file)
-    }
-}
-
 // Concatenate all strings into single string.
 fn concatAllParts(parts: ...&Token): []byte {
     mut n := 0
@@ -1432,37 +1368,6 @@ fn concatAllParts(parts: ...&Token): []byte {
         s.WriteStr(p.Kind)
     }
     ret unsafe { s.Buf() }
-}
-
-// Reports whether trait have method in this identifier.
-fn containsTraitMethod(mut &t: &Trait, &ident: str): bool {
-    for _, m in t.Methods {
-        if m.Ident == ident {
-            ret true
-        }
-    }
-    ret false
-}
-
-// Pushes src methods to dest if not exist any method with relevant identifier.
-// Also it uses deep walk algorithm for inheritances.
-// So it will pushes inheritances of src trait to dest.
-fn pushMethodsFromInherit(mut &dest: &Trait, mut &src: &Trait) {
-    pushMethodsFromInherits(dest, src)
-    for (_, mut m) in src.Methods {
-        if !containsTraitMethod(dest, m.Ident) {
-            dest.Methods = append(dest.Methods, m)
-        }
-    }
-}
-
-// Pushes inheritances of src to dest.
-// Call pushMethodsFromInherit method per inheritance of src.
-fn pushMethodsFromInherits(mut &dest: &Trait, mut &src: &Trait) {
-    for (_, mut inh) in src.Inherits {
-        mut t2 := inh.Kind.Trait()
-        pushMethodsFromInherit(dest, t2)
-    }
 }
 
 // Reports whether the m is operator overloading method.
