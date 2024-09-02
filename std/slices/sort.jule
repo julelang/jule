@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 // The Jule code is a modified version of the original Go code from
-// https://github.com/golang/go/blob/0df681248862a34ff1233cdc4cf0b036e4761652/src/slices/zsortordered.go and came with this notice.
+// https://github.com/golang/go/blob/0df681248862a34ff1233cdc4cf0b036e4761652/src/slices/sort.go and came with this notice.
 //
 // ====================================================
 // Copyright (c) 2009 The Go Authors. All rights reserved.
@@ -38,10 +38,39 @@
 use bits for std::math::bits
 use cmp for std::internal::cmp
 
-enum sortedHint {
-    Unknown,
-    Increasing,
-    Decreasing,
+// Sorts a slice of any ordered type in ascending order.
+// When sorting floating-point numbers, NaNs are ordered before other values.
+fn Sort[S: []E, E: ordered](mut s: S) {
+    n := len(s)
+    pdqsort(s, 0, n, bits::Len(uint(n)))
+}
+
+// Reports whether x is sorted in ascending order.
+fn IsSorted[S: []E, E: ordered](mut s: S): bool {
+    mut i := len(s) - 1
+    for i > 0; i-- {
+        if cmp::Less(s[i], s[i-1]) {
+            ret false
+        }
+    }
+    ret true
+}
+
+// Sorts the slice s in ascending order as determined by the cmp
+// function. This sort is not guaranteed to be stable.
+// cmp(a, b) should return a negative number when a < b, a positive number when
+// a > b and zero when a == b.
+//
+// SortFunc requires that cmp is a strict weak ordering.
+// See https://en.wikipedia.org/wiki/Weak_ordering#Strict_weak_orderings.
+fn SortFunc[S: []E, E](mut s: S, cmp: fn(a: E, b: E): int) {
+    n := len(s)
+    pdqsortFunc(s, 0, n, bits::Len(uint(n)), cmp)
+}
+
+fn nextPowerOfTwo(length: int): uint {
+    shift := uint(bits::Len(uint(length)))
+    ret uint(1 << shift)
 }
 
 // xorshift paper: https://www.jstatsoft.org/article/view/v008i14/xorshift.pdf
@@ -52,328 +81,4 @@ fn xorshiftNext(mut &r: xorshift): u64 {
     r ^= r >> 17
     r ^= r << 5
     ret u64(r)
-}
-
-fn nextPowerOfTwo(length: int): uint {
-    ret 1 << bits::Len(uint(length))
-}
-
-// Sorts data[a:b] using insertion sort.
-fn insertionSort[E: ordered](mut &data: []E, a: int, b: int) {
-    mut i := a + 1
-    for i < b; i++ {
-        mut j := i
-        for j > a && cmp::Less(data[j], data[j-1]); j-- {
-            data[j], data[j-1] = data[j-1], data[j]
-        }
-    }
-}
-
-// Implements the heap property on data[lo:hi].
-// first is an offset into the array where the root of the heap lies.
-fn siftDown[E: ordered](mut &data: []E, lo: int, hi: int, first: int) {
-    mut root := lo
-    for {
-        mut child := 2 * root + 1
-        if child >= hi {
-            break
-        }
-        if child+1 < hi && cmp::Less(data[first+child], data[first+child+1]) {
-            child++
-        }
-        if !cmp::Less(data[first+root], data[first+child]) {
-            ret
-        }
-        data[first+root], data[first+child] = data[first+child], data[first+root]
-        root = child
-    }
-}
-
-fn heapSort[E: ordered](mut &data: []E, a: int, b: int) {
-    first := a
-    lo := 0
-    hi := b - a
-
-    // Build heap with greatest element at top.
-    mut i := (hi - 1) >> 1
-    for i >= 0; i-- {
-        siftDown(data, i, hi, first)
-    }
-
-    // Pop elements, largest first, into end of data.
-    i = hi - 1
-    for i >= 0; i-- {
-        data[first], data[first+1] = data[first+1], data[first]
-        siftDown(data, lo, i, first)
-    }
-}
-
-// breakPatternsOrdered scatters some elements around in an attempt to break some patterns
-// that might cause imbalanced partitions in quicksort.
-fn breakPatterns[E: ordered](mut &data: []E, a: int, b: int) {
-    length := b - a
-    if length >= 8 {
-        mut random := xorshift(length)
-        modulus := nextPowerOfTwo(length)
-
-        mut idx := a + (length / 4) * 2 - 1
-        for idx <= a+(length / 4)*2+1; idx++ {
-            mut other := int(uint(xorshiftNext(random)) & (modulus - 1))
-            if other >= length {
-                other -= length
-            }
-            data[idx], data[a+other] = data[a+other], data[idx]
-        }
-    }
-}
-
-// Returns x,y where data[x] <= data[y], where x,y=a,b or x,y=b,a.
-fn order2O[E: ordered](data: []E, a: int, b: int, mut &swaps: int): (int, int) {
-    if cmp::Less(data[b], data[a]) {
-        swaps++
-        ret b, a
-    }
-    ret a, b
-}
-
-// Returns x where data[x] is the median of data[a],data[b],data[c], where x is a, b, or c.
-fn median[E: ordered](data: []E, mut a: int, mut b: int, mut c: int, mut &swaps: int): int {
-    a, b = order2O(data, a, b, swaps)
-    b, c = order2O(data, b, c, swaps)
-    a, b = order2O(data, a, b, swaps)
-    ret b
-}
-
-// Finds the median of data[a - 1], data[a], data[a + 1] and stores the index into a.
-fn medianAdjacent[E: ordered](data: []E, a: int, mut &swaps: int): int {
-    ret median(data, a - 1, a, a + 1, swaps)
-}
-
-// Chooses a pivot in data[a:b].
-//
-// [0,8): chooses a static pivot.
-// [8,shortestNinther): uses the simple median-of-three method.
-// [shortestNinther,∞): uses the Tukey ninther method.
-fn choosePivot[E: ordered](mut &data: []E, a: int, b: int): (pivot: int, hint: sortedHint) {
-    const shortestNinther = 50
-    const maxSwaps = 4 * 3
-
-    l := b - a
-
-    mut swaps := 0
-    mut i := a + l / 4 * 1
-    mut j := a + l / 4 * 2
-    mut k := a + l / 4 * 3
-
-    if l >= 8 {
-        if l >= shortestNinther {
-            // Tukey ninther method, the idea came from Rust's implementation.
-            i = medianAdjacent(data, i, swaps)
-            j = medianAdjacent(data, j, swaps)
-            k = medianAdjacent(data, k, swaps)
-        }
-        // Find the median among i, j, k and stores it into j.
-        j = median(data, i, j, k, swaps)
-    }
-
-    match swaps {
-    | 0:
-        ret j, sortedHint.Increasing
-    | maxSwaps:
-        ret j, sortedHint.Decreasing
-    |:
-        ret j, sortedHint.Unknown
-    }
-}
-
-fn reverseRange[E: ordered](mut &data: []E, a: int, b: int) {
-    mut i := a
-    mut j := b - 1
-    for i < j {
-        data[i], data[j] = data[j], data[i]
-        i++
-        j--
-    }
-}
-
-// Partially sorts a slice, returns true if the slice is sorted at the end.
-fn partialInsertionSort[E: ordered](mut &data: []E, a: int, b: int): bool {
-    const maxSteps = 5          // maximum number of adjacent out-of-order pairs that will get shifted
-    const shortestShifting = 50 // don't shift any elements on short arrays
-    mut i := a + 1
-    mut j := 0
-    for j < maxSteps; j++ {
-        for i < b && !cmp::Less(data[i], data[i-1]) {
-            i++
-        }
-
-        if i == b {
-            ret true
-        }
-
-        if b-a < shortestShifting {
-            ret false
-        }
-
-        data[i], data[i-1] = data[i-1], data[i]
-
-        // Shift the smaller one to the left.
-        if i-a >= 2 {
-            mut z := i - 1
-            for z >= 1; j-- {
-                if !cmp::Less(data[z], data[z-1]) {
-                    break
-                }
-                data[z], data[z-1] = data[z-1], data[z]
-            }
-        }
-        // Shift the greater one to the right.
-        if b-i >= 2 {
-            mut z := i + 1
-            for z < b; z++ {
-                if !cmp::Less(data[z], data[z-1]) {
-                    break
-                }
-                data[z], data[z-1] = data[z-1], data[z]
-            }
-        }
-    }
-    ret false
-}
-
-// Partitions data[a:b] into elements equal to data[pivot] followed by elements greater than data[pivot].
-// It assumed that data[a:b] does not contain elements smaller than the data[pivot].
-fn partitionEqual[E: ordered](mut &data: []E, a: int, b: int, pivot: int): (newpivot: int) {
-    data[a], data[pivot] = data[pivot], data[a]
-    mut i, mut j := a + 1, b - 1 // i and j are inclusive of the elements remaining to be partitioned
-
-    for {
-        for i <= j && !cmp::Less(data[a], data[i]) {
-            i++
-        }
-        for i <= j && cmp::Less(data[a], data[j]) {
-            j--
-        }
-        if i > j {
-            break
-        }
-        data[i], data[j] = data[j], data[i]
-        i++
-        j--
-    }
-    ret i
-}
-
-// Does one quicksort partition.
-// let p = data[pivot]
-// Moves elements in data[a:b] around, so that data[i]<p and data[j]>=p for i<newpivot and j>newpivot.
-// On return, data[newpivot] = p
-fn partition[E: ordered](mut &data: []E, a: int, b: int, pivot: int): (newpivot: int, alreadyPartitioned: bool) {
-    data[a], data[pivot] = data[pivot], data[a]
-    mut i, mut j := a + 1, b - 1 // i and j are inclusive of the elements remaining to be partitioned
-
-    for i <= j && cmp::Less(data[i], data[a]) {
-        i++
-    }
-    for i <= j && !cmp::Less(data[j], data[a]) {
-        j--
-    }
-    if i > j {
-        data[j], data[a] = data[a], data[j]
-        ret j, true
-    }
-    data[i], data[j] = data[j], data[i]
-    i++
-    j--
-
-    for {
-        for i <= j && cmp::Less(data[i], data[a]) {
-            i++
-        }
-        for i <= j && !cmp::Less(data[j], data[a]) {
-            j--
-        }
-        if i > j {
-            break
-        }
-        data[i], data[j] = data[j], data[i]
-        i++
-        j--
-    }
-    data[j], data[a] = data[a], data[j]
-    ret j, false
-}
-
-// Sorts data[a:b].
-// The algorithm based on pattern-defeating quicksort(pdqsort), but without the optimizations from BlockQuicksort.
-// pdqsort paper: https://arxiv.org/pdf/2106.05123.pdf
-// C++ implementation: https://github.com/orlp/pdqsort
-// Rust implementation: https://docs.rs/pdqsort/latest/pdqsort/
-// limit is the number of allowed bad (very unbalanced) pivots before falling back to heapsort.
-fn pdqsort[E: ordered](mut &data: []E, mut a: int, mut b: int, mut limit: int) {
-    const maxInsertion = 12
-
-    mut wasBalanced := true    // whether the last partitioning was reasonably balanced
-    mut wasPartitioned := true // whether the slice was already partitioned
-
-    for {
-        length := b - a
-
-        if length <= maxInsertion {
-            insertionSort(data, a, b)
-            ret
-        }
-
-        // Fall back to heapsort if too many bad choices were made.
-        if limit == 0 {
-            heapSort(data, a, b)
-            ret
-        }
-
-        // If the last partitioning was imbalanced, we need to breaking patterns.
-        if !wasBalanced {
-            breakPatterns(data, a, b)
-            limit--
-        }
-
-        mut pivot, mut hint := choosePivot(data, a, b)
-        if hint == sortedHint.Decreasing {
-            reverseRange(data, a, b)
-            // The chosen pivot was pivot-a elements after the start of the array.
-            // After reversing it is pivot-a elements before the end of the array.
-            // The idea came from Rust's implementation.
-            pivot = (b - 1) - (pivot - a)
-            hint = sortedHint.Increasing
-        }
-
-        // The slice is likely already sorted.
-        if wasBalanced && wasPartitioned && hint == sortedHint.Increasing {
-            if partialInsertionSort(data, a, b) {
-                ret
-            }
-        }
-
-        // Probably the slice contains many duplicate elements, partition the slice into
-        // elements equal to and elements greater than the pivot.
-        if a > 0 && !cmp::Less(data[a-1], data[pivot]) {
-            mid := partitionEqual(data, a, b, pivot)
-            a = mid
-            continue
-        }
-
-        mid, alreadyPartitioned := partition(data, a, b, pivot)
-        wasPartitioned = alreadyPartitioned
-
-        leftLen, rightLen := mid - a, b - mid
-        balanceThreshold := length / 8
-        if leftLen < rightLen {
-            wasBalanced = leftLen >= balanceThreshold
-            pdqsort(data, a, mid, limit)
-            a = mid + 1
-        } else {
-            wasBalanced = rightLen >= balanceThreshold
-            pdqsort(data, mid + 1, b, limit)
-            b = mid
-        }
-    }
 }
