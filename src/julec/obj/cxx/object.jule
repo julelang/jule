@@ -101,6 +101,10 @@ struct ObjectCoder {
     anyTypeMap:   []&TypeKind
     traitCastMap: []traitCast
 
+    // Pairs for methods and structure instances.
+    // Used to avoid duplicated wrapper function generation.
+    traitMetMap: map[&FnIns][]uintptr
+
     ec: &exprCoder
     sc: &scopeCoder
     tc: &typeCoder
@@ -963,8 +967,8 @@ impl ObjectCoder {
         }
     }
 
-    fn funcIns(mut &self, mut &f: &FnIns) {
-        self.funcHead(self.Buf, f, false, "")
+    fn funcIns(mut &self, mut &f: &FnIns, ident: str) {
+        self.funcHead(self.Buf, f, false, ident)
         self.paramsIns(self.Buf, f)
         self.write(" ")
         self.sc.funcScope(f)
@@ -975,45 +979,56 @@ impl ObjectCoder {
 
     fn func(mut &self, mut &f: &Fn) {
         for (_, mut ins) in f.Instances {
-            self.funcIns(ins)
+            self.funcIns(ins, "")
         }
     }
 
-    fn funcTrait(mut &self, &s: &StructIns, mut &f: &Fn) {
-        ident := f.Ident
-        for (_, mut ins) in f.Instances {
-            ins.Scope = nil
+    fn funcTrait(mut &self, &s: &StructIns, mut &f: &FnIns) {
+        f.Scope = nil
 
-            mut nident := StrBuilder.New(30)
-            nident.WriteStr("__jule_trait_method_")
-            nident.WriteByte('_')
-            nident.WriteStr(conv::FmtUint(u64(uintptr(s)), 0xF))
+        mut nident := StrBuilder.New(30)
+        nident.WriteStr("__jule_trait_method_")
+        nident.WriteStr(conv::FmtUint(u64(uintptr(f)), 0xF))
+        nident.WriteStr("_")
+        nident.WriteStr(conv::FmtUint(u64(uintptr(s)), 0xF))
 
-            f.Ident = nident.Str()
-
-            mut k := ins.Params[0].Kind
-            ins.Params[0].Kind = generalGCPtr
-            self.funcIns(ins)
-            ins.Params[0].Kind = k
-        }
-        f.Ident = ident
+        mut k := f.Params[0].Kind
+        f.Params[0].Kind = generalGCPtr
+        self.funcIns(f, nident.Str())
+        f.Params[0].Kind = k
     }
 
-    fn traitWrapper(mut &self, mut &t: &Trait, mut &m: &Fn, mut &pairs: &map[uintptr][]uintptr) {
+    fn findTraitMetMap(mut &self, mut &m: &Fn): (&FnIns, bool) {
+        mut mins := m.Instances[0]
+        for (mut f, _) in self.traitMetMap {
+            if f.Decl.Public == m.Public &&
+                f.Decl.Ident == m.Ident &&
+                f.EqualFn(mins) {
+                ret f, true
+            }
+        }
+        ret mins, false
+    }
+
+    fn traitWrapper(mut &self, mut &t: &Trait, mut &m: &Fn) {
     impls:
         for (_, mut imp) in t.Implemented {
-            mut vals := (*pairs)[uintptr(m)]
-            // Is handled pair?
-            for _, val in vals {
-                if val == uintptr(imp) {
-                    // Exist, skip this step.
-                    continue impls
+            mut mepf, exist := self.findTraitMetMap(m)
+            if exist {
+                // Is handled pair?
+                mut vals := self.traitMetMap[mepf]
+                for _, val in vals {
+                    if val == uintptr(imp) {
+                        // Exist, skip this step.
+                        continue impls
+                    }
                 }
+                self.traitMetMap[mepf] = append(vals, uintptr(imp))
+            } else {
+                self.traitMetMap[mepf] = append(make([]uintptr, 0), uintptr(imp))
             }
-            (*pairs)[uintptr(m)] = append(vals, uintptr(imp))
             for (_, mut ins) in imp.Instances {
-                self.funcTrait(ins, m)
-                ptr := !m.Params[0].IsRef()
+                self.funcTrait(ins, mepf)
 
                 mut sm := ins.FindMethod(m.Ident, false)
                 if sm == nil || len(sm.Instances) == 0 {
@@ -1023,18 +1038,16 @@ impl ObjectCoder {
                 self.addIndent()
                 self.write("{\n")
                 self.indent()
-                if sm.Exceptional || !sm.IsVoid() {
+                if m.Exceptional || !m.IsVoid() {
                     self.write("return ")
                 }
                 identCoder.func(self.Buf, sm)
                 self.write("(")
                 self.write("_self_.as<")
-                if ptr {
-                    self.tc.structureIns(self.Buf, ins)
-                } else {
-                    self.tc.structure(self.Buf, sm.Owner)
-                }
+                self.tc.structureIns(self.Buf, ins)
                 self.write(">()")
+
+                ptr := !m.Params[0].IsRef()
                 if ptr {
                     self.write(".alloc")
                 }
@@ -1049,9 +1062,6 @@ impl ObjectCoder {
     }
 
     fn traitWrappers(mut &self) {
-        // Pairs for methods and structure instances.
-        // Used to avoid duplicated wrapper function generation.
-        mut pairs := new(map[uintptr][]uintptr)
         iterPackages(self.ir, fn(mut &pkg: &Package) {
             iterFiles(pkg, fn(mut &file: &SymbolTable) {
                 for (_, mut t) in file.Traits {
@@ -1059,7 +1069,7 @@ impl ObjectCoder {
                         continue
                     }
                     iterTraitMethods(t, fn(mut &t: &Trait, mut &m: &Fn) {
-                        self.traitWrapper(t, m, pairs)
+                        self.traitWrapper(t, m)
                     })
                 }
             })
@@ -1068,23 +1078,18 @@ impl ObjectCoder {
 
     fn traitDataMethods(mut &self, mut &t: &Trait, s: &StructIns) {
         iterTraitMethods(t, fn(mut &t: &Trait, mut &m: &Fn) {
-            ident := m.Ident
-
-            mut nident := StrBuilder.New(30)
-            nident.WriteStr("__jule_trait_method_")
-            nident.WriteByte('_')
-            nident.WriteStr(conv::FmtUint(u64(uintptr(s)), 0xF))
-
             self.indent()
             self.write(".")
             identCoder.func(self.Buf, m)
-            self.write("=_")
-            self.write(conv::FmtUint(u64(uintptr(m)), 0xF))
+            self.write("=__jule_trait_method_")
+            mepf, exist := self.findTraitMetMap(m)
+            if !exist {
+                panic("implementation mistake, [traitDataMethods] could not found MepMap record")
+            }
+            self.write(conv::FmtUint(u64(uintptr(mepf)), 0xF))
             self.write("_")
-            self.writeBytes(unsafe { nident.Buf() })
+            self.write(conv::FmtUint(u64(uintptr(s)), 0xF))
             self.write(",\n")
-
-            m.Ident = ident
         })
     }
 
