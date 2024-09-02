@@ -61,6 +61,26 @@ namespace jule
             return str;
         }
 
+        static jule::I8 compare(const jule::U8 *s1, const jule::U8 *s2, const jule::Int n1, const jule::Int n2) noexcept
+        {
+            const jule::Int n = n1 > n2 ? n2 : n1;
+            jule::Int i = 0;
+            for (; i < n; ++i)
+            {
+                auto b1 = s1[i];
+                auto b2 = s2[i];
+                if (b1 < b2)
+                    return -1;
+                if (b1 > b2)
+                    return +1;
+            }
+            if (n1 < n2)
+                return -1;
+            if (n1 > n2)
+                return +1;
+            return 0;
+        }
+
         static jule::Str from_rune(const jule::I32 r) noexcept
         {
             jule::Str s;
@@ -494,34 +514,22 @@ namespace jule
 
         jule::Bool operator<(const jule::Str &str) const noexcept
         {
-            jule::Slice<jule::I32> thisr = this->operator jule::Slice<jule::I32>();
-            jule::Slice<jule::I32> strr = str.operator jule::Slice<jule::I32>();
-            jule::Int n = thisr.len() > strr.len() ? strr.len() : thisr.len();
-            for (jule::Int i = 0; i < n; ++i)
-                if (thisr.__at(i) != strr.__at(i))
-                    return thisr.__at(i) < strr.__at(i);
-            return thisr.len() < strr.len();
+            return jule::Str::compare(this->begin(), str.begin(), this->len(), str.len()) == -1;
         }
 
         inline jule::Bool operator<=(const jule::Str &str) const noexcept
         {
-            return this->operator==(str) || this->operator<(str);
+            return jule::Str::compare(this->begin(), str.begin(), this->len(), str.len()) <= 0;
         }
 
         jule::Bool operator>(const jule::Str &str) const noexcept
         {
-            jule::Slice<jule::I32> thisr = this->operator jule::Slice<jule::I32>();
-            jule::Slice<jule::I32> strr = str.operator jule::Slice<jule::I32>();
-            jule::Int n = thisr.len() > strr.len() ? strr.len() : thisr.len();
-            for (jule::Int i = 0; i < n; ++i)
-                if (thisr.__at(i) != strr.__at(i))
-                    return thisr.__at(i) > strr.__at(i);
-            return thisr.len() > strr.len();
+            return jule::Str::compare(this->begin(), str.begin(), this->len(), str.len()) == +1;
         }
 
         inline jule::Bool operator>=(const jule::Str &str) const noexcept
         {
-            return this->operator==(str) || this->operator>(str);
+            return jule::Str::compare(this->begin(), str.begin(), this->len(), str.len()) >= 0;
         }
 
         friend std::ostream &operator<<(std::ostream &stream,
