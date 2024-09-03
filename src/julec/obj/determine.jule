@@ -1,0 +1,96 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use comptime for std::comptime
+use path for std::fs::path
+use build for std::jule::build
+use std::jule::sema::{
+    Scope,
+    Fn,
+    Var,
+    FnIns,
+    StructIns,
+    StructSubIdentExprModel,
+    Data,
+    AnonFnExprModel,
+    TypeKind,
+    BuiltinErrorCallExprModel,
+}
+use strings for std::strings
+
+// Reports whether exceptional scope s forwards exceptional.
+fn IsForwarded(&s: &Scope): bool {
+    last := s.Stmts[len(s.Stmts)-1]
+    match type last {
+    | &Data:
+        match type (&Data)(last).Model {
+        | &BuiltinErrorCallExprModel:
+            ret true
+        |:
+            ret false
+        }
+    |:
+        ret true
+    }
+}
+
+// Reports whether expression comes from binded define.
+fn IsExprComesFromBind(&d: &Data): bool {
+    match type d.Model {
+    | &Var:
+        ret (&Var)(d.Model).Binded
+    | &StructSubIdentExprModel:
+        ret (&StructSubIdentExprModel)(d.Model).Owner.Decl.Binded
+    |:
+        ret false
+    }
+}
+
+// Reports whether type is handled as <any> type.
+fn IsAny(mut &t: &TypeKind): bool {
+    if t.TypeEnum() != nil {
+        ret true
+    }
+    prim := t.Prim()
+    ret prim != nil && prim.IsAny()
+}
+
+// Reports whether anonymous function is closure.
+fn IsClosure(&m: &AnonFnExprModel): bool { ret len(m.Captured) > 0 }
+
+// Reports whether the m is operator overloading method.
+fn IsOpMethod(&m: &Fn): bool {
+    if len(m.Generics) > 0 || len(m.Instances) == 0 {
+        ret false
+    }
+    mi := m.Instances[0]
+    const tableT = comptime::TypeOf(mi.Owner.Operators)
+    const tableV = comptime::ValueOf(mi.Owner.Operators)
+    const for _, field in tableT.Fields() {
+        if mi == tableV.Field(field.Name()).Unwrap() {
+            ret true
+        }
+    }
+    ret false
+}
+
+// Reports the f function of owner is implements a trait's method.
+fn IsTraitMethod(mut &owner: &StructIns, &f: &FnIns): bool {
+    for (_, mut t) in owner.Decl.Implements {
+        if t.FindMethod(f.Decl.Ident) != nil {
+            ret true
+        }
+    }
+    ret false
+}
+
+// Reports whether f is standard library package p.
+// Example use:
+//  - IsStdPackage(f, "math") for std::math
+//  - IsStdPackage(f, "math/big") for std::math::big
+fn IsStdPackage(&f: str, p: str): bool {
+    // Do not handle '/' separators of p, because it
+    // valid path separator for all supported platforms.
+    ret strings::HasPrefix(f, path::Join(build::PathStdlib, p))
+}

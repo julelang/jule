@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 use env
-use obj::{IR}
+use obj::{self, IR}
 use comptime for std::comptime
 use build for std::jule::build::{Directive}
 use ast for std::jule::ast
@@ -131,7 +131,7 @@ impl ObjectDeadCode {
                         // Push as live the method if implements a trait's method.
                         // Other methods will be marked as live by referenced defines,
                         // no need for special tracking algorithm to caught.
-                        if isTraitMethod(s, ins) {
+                        if obj::IsTraitMethod(s, ins) {
                             self.pushLive[&FnIns](ins)
                             self.setReferencesAsLive(ins.Refers)
                         }
@@ -173,7 +173,7 @@ impl ObjectDeadCode {
         if env::Test {
             for (_, mut file) in pkg.Files {
                 for (_, mut f) in file.Funcs {
-                    if hasDirective(f.Directives, Directive.Test) {
+                    if obj::HasDirective(f.Directives, Directive.Test) {
                         mut ins := f.Instances[0]
                         self.live.fns = append(self.live.fns, ins)
                         self.setReferencesAsLive(ins.Refers)
@@ -305,29 +305,4 @@ impl ObjectDeadCode {
 fn EliminateDefines(mut &ir: &IR) {
     mut ocd := ObjectDeadCode.new(ir)
     ocd.elimanate()
-}
-
-// Returns directive if exist.
-fn findDirective(mut &directives: []&ast::Directive, tag: str): &ast::Directive {
-    for (_, mut dr) in directives {
-        if dr.Tag.Kind == tag {
-            ret dr
-        }
-    }
-    ret nil
-}
-
-// Reports whether directive is exist.
-fn hasDirective(&directives: []&ast::Directive, tag: str): bool {
-    ret findDirective(unsafe { *(&directives) }, tag) != nil
-}
-
-// Reports the f function of owner is implements a trait's method.
-fn isTraitMethod(mut &owner: &StructIns, &f: &FnIns): bool {
-    for (_, mut t) in owner.Decl.Implements {
-        if t.FindMethod(f.Decl.Ident) != nil {
-            ret true
-        }
-    }
-    ret false
 }

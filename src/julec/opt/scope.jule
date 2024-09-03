@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use obj
 use env
 use path for std::fs::path
 use std::jule::build::{PathStdlib}
@@ -97,7 +98,7 @@ impl scopeOptimizer {
             mut m := (&FnCallExprModel)(d.Model)
             if env::Production {
                 if !m.Func.IsBuiltin() &&
-                    isStdPackage(m.Func.Decl.Token.File.Path, "debug") {
+                    obj::IsStdPackage(m.Func.Decl.Token.File.Path, "debug") {
                     self.setCurrentStmt(nil)
                     ret
                 }
@@ -107,7 +108,7 @@ impl scopeOptimizer {
                 m.Func.Decl.Exceptional &&
                 m.Except != nil &&
                 len(m.Except.Stmts) == 1 &&
-                isForwarded(m.Except) &&
+                obj::IsForwarded(m.Except) &&
                 self.isLastStmt() &&
                 !self.isIter() {
                 self.setCurrentStmt(&ExceptionalForwardingExprModel{Expr: m})
@@ -623,7 +624,7 @@ impl scopeOptimizer {
         if !fc.Func.Decl.Exceptional ||
             fc.Except == nil ||
             len(fc.Except.Stmts) != 1 ||
-            !isForwarded(fc.Except) {
+            !obj::IsForwarded(fc.Except) {
             ret
         }
         self.setCurrentStmt(&ExceptionalForwardingExprModel{Expr: fc})
@@ -674,10 +675,6 @@ impl scopeOptimizer {
     }
 }
 
-fn isStdPackage(&f: str, p: str): bool {
-    ret strings::HasPrefix(f, path::Join(PathStdlib, p))
-}
-
 fn isConstantValidConditionalCase(&i: &If): bool {
     match type i.Expr {
     | &Const:
@@ -722,19 +719,4 @@ fn isUnreachableMatchCase(&case: &Case): bool {
         }
     }
     ret true
-}
-
-fn isForwarded(&s: &Scope): bool {
-    last := s.Stmts[len(s.Stmts)-1]
-    match type last {
-    | &Data:
-        match type (&Data)(last).Model {
-        | &BuiltinErrorCallExprModel:
-            ret true
-        |:
-            ret false
-        }
-    |:
-        ret true
-    }
 }

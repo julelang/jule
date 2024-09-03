@@ -4,7 +4,7 @@
 
 use env
 use opt
-use obj::{IR}
+use obj::{self, IR}
 use std::unsafe
 use conv for std::conv
 use comptime for std::comptime
@@ -42,9 +42,6 @@ use types for std::jule::types
 use path for std::fs::path
 use strings for std::strings::{StrBuilder}
 use std::time::{Time}
-
-// Data offset of empty trait.
-const emptyTraitOffset = 0x0
 
 const ctxParamIdent = "__f_ctx"
 const anonFnCtxSuffix = "_ctx"                              // Anon fn identifier suffix for ctx struct identifier.
@@ -175,7 +172,7 @@ impl ObjectCoder {
     }
 
     fn pushAnonFn(mut &self, mut &m: &AnonFnExprModel): (ident: str) {
-        closure := isClosure(m)
+        closure := obj::IsClosure(m)
         if closure { // Closure?
             // Handle identifier and generate ctx.
             self.anonObj.WriteStr("struct ")
@@ -379,8 +376,8 @@ impl ObjectCoder {
             for _, s2 in t2.Implemented {
                 if s1 == s2 {
                     for (_, mut s1i) in s1.Instances {
-                        i1 := findTraitTypeOffsetS(t1, s1i)
-                        i2 := findTraitTypeOffsetS(t2, s1i)
+                        i1 := obj::FindTraitTypeOffsetS(t1, s1i)
+                        i2 := obj::FindTraitTypeOffsetS(t2, s1i)
                         self.anyObj.WriteStr("if (data == &")
                         self.anyObj.Write(unsafe { t2Ident.Buf() })
                         self.anyObj.WriteStr("_mptr_data")
@@ -827,8 +824,8 @@ impl ObjectCoder {
     }
 
     fn funcDecls(mut &self) {
-        iterPackages(self.ir, fn(mut &pkg: &Package) {
-            iterFiles(pkg, fn(mut &file: &SymbolTable) {
+        obj::IterPackages(self.ir, fn(mut &pkg: &Package) {
+            obj::IterFiles(pkg, fn(mut &file: &SymbolTable) {
                 for (_, mut f) in file.Funcs {
                     if !f.Binded && f.Token != nil {
                         self.pushResult(f)
@@ -840,7 +837,7 @@ impl ObjectCoder {
     }
 
     fn traitDataTypeMethods(mut &self, mut &t: &Trait) {
-        iterTraitMethods(t, fn(mut &m: &Fn) {
+        obj::IterTraitMethods(t, fn(mut &m: &Fn) {
             mut ins := m.Instances[0]
             for (i, mut ip) in ins.Params[1:] {
                 if IsAnonIdent(ip.Decl.Ident) {
@@ -853,8 +850,8 @@ impl ObjectCoder {
     }
 
     fn traitDataTypes(mut &self) {
-        iterPackages(self.ir, fn(mut &pkg: &Package) {
-            iterFiles(pkg, fn(mut &file: &SymbolTable) {
+        obj::IterPackages(self.ir, fn(mut &pkg: &Package) {
+            obj::IterFiles(pkg, fn(mut &file: &SymbolTable) {
                 for (_, mut t) in file.Traits {
                     if t.Token == nil || len(t.Implemented) == 0 {
                         continue
@@ -1062,13 +1059,13 @@ impl ObjectCoder {
     }
 
     fn traitWrappers(mut &self) {
-        iterPackages(self.ir, fn(mut &pkg: &Package) {
-            iterFiles(pkg, fn(mut &file: &SymbolTable) {
+        obj::IterPackages(self.ir, fn(mut &pkg: &Package) {
+            obj::IterFiles(pkg, fn(mut &file: &SymbolTable) {
                 for (_, mut t) in file.Traits {
                     if len(t.Implemented) == 0 {
                         continue
                     }
-                    iterTraitMethods(t, fn(mut &m: &Fn) {
+                    obj::IterTraitMethods(t, fn(mut &m: &Fn) {
                         self.traitWrapper(t, m)
                     })
                 }
@@ -1077,7 +1074,7 @@ impl ObjectCoder {
     }
 
     fn traitDataMethods(mut &self, mut &t: &Trait, s: &StructIns) {
-        iterTraitMethods(t, fn(mut &m: &Fn) {
+        obj::IterTraitMethods(t, fn(mut &m: &Fn) {
             self.indent()
             self.write(".")
             identCoder.func(self.Buf, m)
@@ -1114,8 +1111,8 @@ impl ObjectCoder {
     }
 
     fn traitDatas(mut &self) {
-        iterPackages(self.ir, fn(mut &pkg: &Package) {
-            iterFiles(pkg, fn(mut &file: &SymbolTable) {
+        obj::IterPackages(self.ir, fn(mut &pkg: &Package) {
+            obj::IterFiles(pkg, fn(mut &file: &SymbolTable) {
                 for (_, mut t) in file.Traits {
                     mut i := 0
                     for (_, mut s) in t.Implemented {
@@ -1239,10 +1236,10 @@ impl ObjectCoder {
     }
 
     fn funcs(mut &self) {
-        iterPackages(self.ir, fn(mut &pkg: &Package) {
-            iterFiles(pkg, fn(mut &file: &SymbolTable) {
+        obj::IterPackages(self.ir, fn(mut &pkg: &Package) {
+            obj::IterFiles(pkg, fn(mut &file: &SymbolTable) {
                 for (_, mut f) in file.Funcs {
-                    if !env::Test && hasDirective(f.Directives, Directive.Test) {
+                    if !env::Test && obj::HasDirective(f.Directives, Directive.Test) {
                         continue
                     }
                     if !f.Binded && f.Token != nil {
@@ -1255,7 +1252,7 @@ impl ObjectCoder {
     }
 
     fn pushInit(mut &self, mut &pkg: &Package) {
-        iterFiles(pkg, fn(mut &file: &SymbolTable) {
+        obj::IterFiles(pkg, fn(mut &file: &SymbolTable) {
             for _, f in file.Funcs {
                 if f.Ident == build::InitFn {
                     self.indent()
@@ -1284,7 +1281,7 @@ impl ObjectCoder {
     fn initCaller(mut &self) {
         self.write("void " + initCallerIdent + "(void) {\n")
         self.addIndent()
-        iterPackages(self.ir, fn(mut &pkg: &Package) {
+        obj::IterPackages(self.ir, fn(mut &pkg: &Package) {
             self.pushInit(pkg)
         })
         self.doneIndent()
@@ -1372,28 +1369,12 @@ fn concatAllParts(parts: ...&Token): []byte {
     ret unsafe { s.Buf() }
 }
 
-// Reports whether the m is operator overloading method.
-fn isOpMethod(&m: &Fn): bool {
-    if len(m.Generics) > 0 || len(m.Instances) == 0 {
-        ret false
-    }
-    mi := m.Instances[0]
-    const tableT = comptime::TypeOf(Operators)
-    const tableV = comptime::ValueOf(mi.Owner.Operators)
-    const for _, field in tableT.Fields() {
-        if mi == tableV.Field(field.Name()).Unwrap() {
-            ret true
-        }
-    }
-    ret false
-}
-
 // Reports whether the m is a method which is declarated top of the struct.
 fn isHeadDecl(mut &m: &Fn): bool {
     if len(m.Generics) > 0 || len(m.Instances) == 0 {
         ret false
     }
-    if isOpMethod(m) {
+    if obj::IsOpMethod(m) {
         ret true
     }
     mut mi := m.Instances[0]

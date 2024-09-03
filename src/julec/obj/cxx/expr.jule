@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use obj
 use env
 use opt::{
     RefExprModel,
@@ -244,8 +245,8 @@ impl exprCoder {
         if m.Op.Id == TokenId.Eqs || m.Op.Id == TokenId.NotEq {
             // If this binary operator comparing <any> type.
             // The m.Left is will be <any> one always.
-            if isAny(m.Left.Kind) {
-                if !m.Right.Kind.IsNil() && !isAny(m.Right.Kind) {
+            if obj::IsAny(m.Left.Kind) {
+                if !m.Right.Kind.IsNil() && !obj::IsAny(m.Right.Kind) {
                     self.oc.write("(")
                     if m.Op.Id == TokenId.NotEq {
                         self.oc.write("!")
@@ -290,7 +291,7 @@ impl exprCoder {
             }
         }
         if m.Binded {
-            d := findDirective(m.Directives, Directive.Namespace)
+            d := obj::FindDirective(m.Directives, Directive.Namespace)
             if d != nil {
                 self.oc.writeBytes(concatAllParts(d.Args...))
                 self.oc.write("::")
@@ -395,7 +396,7 @@ impl exprCoder {
     //    uses special casting algorithms.
     fn casting(mut &self, mut m: &CastingExprModel) {
         match {
-        | isAny(m.Kind):
+        | obj::IsAny(m.Kind):
             if m.ExprKind.IsNil() {
                 self.oc.write(typeCoder.Any + "()")
                 ret
@@ -425,7 +426,7 @@ impl exprCoder {
             self.oc.write(conv::Itoa(i))
             self.oc.write(")")
             ret
-        | isAny(m.ExprKind):
+        | obj::IsAny(m.ExprKind):
             self.possibleRefExpr(m.Expr.Model)
             self.oc.write(".")
             if m.Kind.Sptr() != nil {
@@ -476,7 +477,7 @@ impl exprCoder {
             self.oc.write("(" + typeCoder.Trait + "::Type*)&")
             identCoder.traitDecl(self.oc.Buf, m.ExprKind.Trait())
             self.oc.write("_mptr_data")
-            self.oc.write(conv::Itoa(findTraitTypeOffset(m.ExprKind.Trait(), m.Kind)))
+            self.oc.write(conv::Itoa(obj::FindTraitTypeOffset(m.ExprKind.Trait(), m.Kind)))
             self.oc.write(")")
             ret
         | m.Kind.Trait() != nil:
@@ -486,7 +487,7 @@ impl exprCoder {
             self.oc.write(", (" + typeCoder.Trait + "::Type*)&")
             identCoder.traitDecl(self.oc.Buf, m.Kind.Trait())
             self.oc.write("_mptr_data")
-            self.oc.write(conv::Itoa(findTraitTypeOffset(m.Kind.Trait(), m.ExprKind)))
+            self.oc.write(conv::Itoa(obj::FindTraitTypeOffset(m.Kind.Trait(), m.ExprKind)))
             self.oc.write(")")
             ret
         }
@@ -632,7 +633,7 @@ impl exprCoder {
         self.modelForCall(m.Expr)
         if !m.Func.IsBuiltin() {
             if m.Func.Decl.Binded && len(m.Func.Generics) > 0 {
-                if !hasDirective(m.Func.Decl.Directives, Directive.Cdef) {
+                if !obj::HasDirective(m.Func.Decl.Directives, Directive.Cdef) {
                     self.oc.write("<")
                     for (i, mut g) in m.Func.Generics {
                         self.oc.tc.kind(self.oc.Buf, g.Kind)
@@ -817,7 +818,7 @@ impl exprCoder {
                 self.oc.sc.scope(m.Except)
                 self.oc.write("\n")
             } else {
-                forwarded := isForwarded(m.Except)
+                forwarded := obj::IsForwarded(m.Except)
                 self.oc.write("(except.ok()) ? (except.result) : (")
                 if forwarded {
                     self.oc.write("{")
@@ -901,7 +902,7 @@ impl exprCoder {
         | env::Production
         | m.Expr.Kind.Ptr() != nil
         | m.Expr.Kind.Map() != nil
-        | isExprComesFromBind(m.Expr):
+        | obj::IsExprComesFromBind(m.Expr):
             self.oc.write("[")
             self.possibleRefExpr(m.Index.Model)
             self.oc.write("]")
@@ -932,7 +933,7 @@ impl exprCoder {
     }
 
     fn anonFunc(mut &self, mut m: &AnonFnExprModel) {
-        closure := isClosure(m)
+        closure := obj::IsClosure(m)
         ident := self.oc.pushAnonFn(m)
         self.oc.write("jule::__new_closure<")
         self.oc.tc.anonFunc(self.oc.Buf, m.Func)
@@ -1056,7 +1057,7 @@ impl exprCoder {
 
     fn funcIns(mut &self, mut m: &FnIns) {
         if m.Decl != nil && m.Decl.Binded {
-            d := findDirective(m.Decl.Directives, Directive.Namespace)
+            d := obj::FindDirective(m.Decl.Directives, Directive.Namespace)
             if d != nil {
                 self.oc.writeBytes(concatAllParts(d.Args...))
                 self.oc.write("::")
@@ -1398,7 +1399,7 @@ impl exprCoder {
 
     fn unsafeCasting(mut &self, mut m: &UnsafeCastingExprModel) {
         match {
-        | isAny(m.Base.ExprKind):
+        | obj::IsAny(m.Base.ExprKind):
             self.possibleRefExpr(m.Base.Expr.Model)
             if m.Base.Kind.Sptr() != nil {
                 self.oc.write(".unsafe_cast_ptr<")
@@ -1568,7 +1569,7 @@ impl exprCoder {
             ret
         }
         mut s := t.Struct()
-        if s != nil && s.Decl.Binded && findDirective(s.Decl.Directives, Directive.Typedef) == nil {
+        if s != nil && s.Decl.Binded && obj::FindDirective(s.Decl.Directives, Directive.Typedef) == nil {
             self.oc.write("(")
             self.oc.tc.kind(self.oc.Buf, t)
             self.oc.write("){}")
@@ -1686,40 +1687,3 @@ fn utoa(mut &s: StrBuilder, x: u64) {
     }
     s.WriteStr("LU")
 }
-
-fn isForwarded(&s: &Scope): bool {
-    last := s.Stmts[len(s.Stmts)-1]
-    match type last {
-    | &Data:
-        match type (&Data)(last).Model {
-        | &BuiltinErrorCallExprModel:
-            ret true
-        |:
-            ret false
-        }
-    |:
-        ret true
-    }
-}
-
-fn isExprComesFromBind(&d: &Data): bool {
-    match type d.Model {
-    | &Var:
-        ret (&Var)(d.Model).Binded
-    | &StructSubIdentExprModel:
-        ret (&StructSubIdentExprModel)(d.Model).Owner.Decl.Binded
-    |:
-        ret false
-    }
-}
-
-// Reports whether type is handled as <any> type.
-fn isAny(mut &t: &TypeKind): bool {
-    if t.TypeEnum() != nil {
-        ret true
-    }
-    prim := t.Prim()
-    ret prim != nil && prim.IsAny()
-}
-
-fn isClosure(&m: &AnonFnExprModel): bool { ret len(m.Captured) > 0 }
