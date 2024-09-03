@@ -515,12 +515,18 @@ fn builtinCallerAppend(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Dat
         ret nil
     }
 
+    const reference = false // Element parameter is not reference.
+    const mutable = true // Element parameter is mutable.
+
+    if e.s.checkValidityForInitExpr(mutable, reference, t.Kind, t, fc.Args[0].Token) {
+        // Check type if validity is good.
+        // Helps to reduce error logs and duplicated logs.
+        _ = e.s.checkAssignType(reference, t.Kind, t, fc.Args[0].Token)
+    }
+
     mut prefix := e.prefix
     e.prefix = t.Kind
     defer { e.prefix = prefix }
-
-    const reference = false // Element parameter is not reference.
-    const mutable = true // Element parameter is mutable.
 
     d = &Data{
         Mutable: true,
