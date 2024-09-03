@@ -10,51 +10,51 @@ struct OrderedDefines {
     Globals: []&Var
 }
 
-struct defineOrderer {}
-
-impl defineOrderer {
-    // Reports whether type in correct order by dependencies.
-    // Checked "t" should have minimum 1 dependency.
-    static fn isCommonOrdered[T](s: []T, t: T): bool {
-        for _, d in t.Depends {
-            for _, d2 in s {
-                if d == d2 {
-                    ret false
-                }
+// Reports whether type in correct order by dependencies.
+fn isOrdered[T](&t: &T, s: []&T): bool {
+lookup:
+    for _, d in t.Depends {
+        const match type T {
+        | Var:
+            if d.Constant {
+                // Skip constant variables for dependency analysis.
+                // It is not cost for runtime, so it is not an real-memory dependency.
+                continue
             }
         }
-        ret true
+        for _, o in s {
+            if d == o {
+                continue lookup
+            }
+        }
+        // Dependency is not ordered.
+        // All dependencies should be ordered first.
+        ret false
     }
+    ret true
+}
 
-    // Orders common types by their dependencies.
-    // Type's dependencies always comes first itself.
-    static fn orderCommon[T](mut &s: []T) {
-        mut n := len(s) - 1
-        for in s {
-            mut swapped := false
-            mut k := 0
-            for k < n; k++ {
-                if !defineOrderer.isCommonOrdered[T](s, s[k]) {
-                    s[k], s[k+1] = s[k+1], s[k]
-                    swapped = true
-                }
+fn order[T](mut &s: []&T) {
+    mut i := 0
+repeat:
+    mut j := i
+iter:
+    for j < len(s); j++ {
+        mut t := s[j]
+        for _, o in s[:i] {
+            if t == o {
+                // Do not iterate if already iterated and added to ordered list.
+                continue iter
             }
-            if !swapped {
-                break
+        }
+        if isOrdered(t, s[:i]) {
+            if i != j {
+                s[i], s[j] = s[j], s[i]
             }
-            n--
+            i++
         }
     }
-
-    // Orders structures by their dependencies.
-    // Struct's dependencies always comes first itself.
-    static fn orderStructures(mut &structs: []&Struct) {
-        defineOrderer.orderCommon[&Struct](structs)
-    }
-
-    // Orders variables by their dependencies.
-    // Var's dependencies always comes first itself.
-    static fn orderVars(mut &vars: []&Var) {
-        defineOrderer.orderCommon[&Var](vars)
+    if i < len(s) {
+        goto repeat
     }
 }
