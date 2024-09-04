@@ -5,499 +5,499 @@
 // Big arbitrary-precision signed integer.
 // Always in the normalized format, leading-zeros are eliminated.
 struct Int {
-    minus:   bool
-    mut nat: nat
+	minus:   bool
+	mut nat: nat
 }
 
 impl Int {
-    // Returns big integer that represents zero.
-    static fn Zero(): Int {
-        ret Int{
-            nat: nat.zero(),
-        }
-    }
+	// Returns big integer that represents zero.
+	static fn Zero(): Int {
+		ret Int{
+			nat: nat.zero(),
+		}
+	}
 
-    // Returns big integer that represents one.
-    static fn One(): Int {
-        ret Int{
-            nat: nat.one(),
-        }
-    }
+	// Returns big integer that represents one.
+	static fn One(): Int {
+		ret Int{
+			nat: nat.one(),
+		}
+	}
 
-    // Returns big integer that initialized by integer value.
-    // T can only be signed or unsigned integer types.
-    static fn New[T: Int | i8 | i16 | i32 | i64 | u8 | u16 | u32 | u64 | int | uint](i: T): Int {
-        const match type T {
-        | Int:
-            ret i
-        | i8 | i16 | i32 | i64 | u8 | u16 | u32 | u64 | int | uint:
-            ret Int{
-                minus: i < 0,
-                nat: nat.new[T](i),
-            }
-        |:
-            panic("std::math::big: Int.new[T]: unimplemented type, this panic call should be unreachable")
-        }
-    }
+	// Returns big integer that initialized by integer value.
+	// T can only be signed or unsigned integer types.
+	static fn New[T: Int | i8 | i16 | i32 | i64 | u8 | u16 | u32 | u64 | int | uint](i: T): Int {
+		const match type T {
+		| Int:
+			ret i
+		| i8 | i16 | i32 | i64 | u8 | u16 | u32 | u64 | int | uint:
+			ret Int{
+				minus: i < 0,
+				nat: nat.new[T](i),
+			}
+		|:
+			panic("std::math::big: Int.new[T]: unimplemented type, this panic call should be unreachable")
+		}
+	}
 
-    // Parse big integer from string. Fmt is the format of string.
-    // Results with exceptional if bits are not in the format or empty.
-    // Results with exceptional if fmt is not valid.
-    // Exceptional is always BigError.Format.
-    //
-    // Valid fmt values are;
-    //   - 2 for binary.
-    //   - 8 for octal.
-    //   - 10 for decimal.
-    //   - 16 for hexadecimal.
-    static fn Parse(mut s: str, fmt: int)!: Int {
-        mut r := Int{}
-        if len(s) > 0 {
-            match s[0] {
-            | '-':
-                r.minus = true
-                s = s[1:]
-            | '+':
-                s = s[1:]
-            }
-        }
-        r.nat = nat.parse(s, fmt) else { error(error) }
-        r.minus = r.minus && r.nat.len() != 0
-        ret r
-    }
+	// Parse big integer from string. Fmt is the format of string.
+	// Results with exceptional if bits are not in the format or empty.
+	// Results with exceptional if fmt is not valid.
+	// Exceptional is always BigError.Format.
+	//
+	// Valid fmt values are;
+	//   - 2 for binary.
+	//   - 8 for octal.
+	//   - 10 for decimal.
+	//   - 16 for hexadecimal.
+	static fn Parse(mut s: str, fmt: int)!: Int {
+		mut r := Int{}
+		if len(s) > 0 {
+			match s[0] {
+			| '-':
+				r.minus = true
+				s = s[1:]
+			| '+':
+				s = s[1:]
+			}
+		}
+		r.nat = nat.parse(s, fmt) else { error(error) }
+		r.minus = r.minus && r.nat.len() != 0
+		ret r
+	}
 
-    // Returns count of bits except sign-bit.
-    // Return value also means the minimum number of bits that can represent the integer.
-    fn Len(self): int {
-        ret self.nat.len()
-    }
+	// Returns count of bits except sign-bit.
+	// Return value also means the minimum number of bits that can represent the integer.
+	fn Len(self): int {
+		ret self.nat.len()
+	}
 
-    // Adds two Int and returns result.
-    fn Add(self, y: Int): Int {
-        mut r := self
-        r += y
-        ret r
-    }
+	// Adds two Int and returns result.
+	fn Add(self, y: Int): Int {
+		mut r := self
+		r += y
+		ret r
+	}
 
-    // Adds Int.
-    fn AddAssign(mut self, y: Int) {
-        match {
-        | y.Len() == 0:
-            ret
-        | self.minus == y.minus:
-            self.nat += y.nat
-        |:
-            mut cmp := self.nat.cmp(y.nat)
-            if cmp == 0 {
-                self.minus = false
-                self.nat = nat.zero()
-                ret
-            }
-            if y.minus {
-                cmp = -cmp
-            }
-            if self.minus && cmp == +1 ||
-                y.minus && cmp == -1 {
-                self.nat -= y.nat
-            } else {
-                self.nat = y.nat - self.nat
-            }
-            self.minus = cmp == +1
-        }
-    }
+	// Adds Int.
+	fn AddAssign(mut self, y: Int) {
+		match {
+		| y.Len() == 0:
+			ret
+		| self.minus == y.minus:
+			self.nat += y.nat
+		|:
+			mut cmp := self.nat.cmp(y.nat)
+			if cmp == 0 {
+				self.minus = false
+				self.nat = nat.zero()
+				ret
+			}
+			if y.minus {
+				cmp = -cmp
+			}
+			if self.minus && cmp == +1 ||
+				y.minus && cmp == -1 {
+				self.nat -= y.nat
+			} else {
+				self.nat = y.nat - self.nat
+			}
+			self.minus = cmp == +1
+		}
+	}
 
-    // Subtracts two Int and returns result.
-    fn Sub(self, y: Int): Int {
-        mut r := self
-        r -= y
-        ret r
-    }
+	// Subtracts two Int and returns result.
+	fn Sub(self, y: Int): Int {
+		mut r := self
+		r -= y
+		ret r
+	}
 
-    // Subtracts Int.
-    fn SubAssign(mut self, y: Int) {
-        if y.Len() == 0 {
-            ret
-        }
-        mut cmp := self.Cmp(y)
-        if cmp == 0 {
-            self.minus = false
-            self.nat = nat.zero()
-            ret
-        }
-        if self.minus == y.minus {
-            self.minus = cmp == -1
-            if cmp == +1 {
-                self.nat -= y.nat
-            } else {
-                self.nat = y.nat - self.nat
-            }
-            ret
-        }
-        self.minus = false
-        self.nat += y.nat
-        ret
-    }
+	// Subtracts Int.
+	fn SubAssign(mut self, y: Int) {
+		if y.Len() == 0 {
+			ret
+		}
+		mut cmp := self.Cmp(y)
+		if cmp == 0 {
+			self.minus = false
+			self.nat = nat.zero()
+			ret
+		}
+		if self.minus == y.minus {
+			self.minus = cmp == -1
+			if cmp == +1 {
+				self.nat -= y.nat
+			} else {
+				self.nat = y.nat - self.nat
+			}
+			ret
+		}
+		self.minus = false
+		self.nat += y.nat
+		ret
+	}
 
-    // Multiplies two Int and returns result.
-    fn Mul(self, y: Int): Int {
-        mut r := self
-        r *= y
-        ret r
-    }
+	// Multiplies two Int and returns result.
+	fn Mul(self, y: Int): Int {
+		mut r := self
+		r *= y
+		ret r
+	}
 
-    // Multiplies Int.
-    fn MulAssign(mut self, y: Int) {
-        self.nat *= y.nat
-        self.minus = self.Len() > 0 && self.minus != y.minus
-    }
+	// Multiplies Int.
+	fn MulAssign(mut self, y: Int) {
+		self.nat *= y.nat
+		self.minus = self.Len() > 0 && self.minus != y.minus
+	}
 
-    // Divides two Int and returns result.
-    fn Div(self, y: Int): Int {
-        mut r := self
-        r /= y
-        ret r
-    }
+	// Divides two Int and returns result.
+	fn Div(self, y: Int): Int {
+		mut r := self
+		r /= y
+		ret r
+	}
 
-    // Divides Int.
-    fn DivAssign(mut self, y: Int) {
-        self.nat /= y.nat
-        if self.Len() == 0 {
-            self.minus = false
-        } else {
-            self.minus = self.minus != y.minus
-        }
-    }
+	// Divides Int.
+	fn DivAssign(mut self, y: Int) {
+		self.nat /= y.nat
+		if self.Len() == 0 {
+			self.minus = false
+		} else {
+			self.minus = self.minus != y.minus
+		}
+	}
 
-    // Modulo two Int and returns result.
-    fn Mod(self, y: Int): Int {
-        mut r := self
-        r %= y
-        ret r
-    }
+	// Modulo two Int and returns result.
+	fn Mod(self, y: Int): Int {
+		mut r := self
+		r %= y
+		ret r
+	}
 
-    // Modulo Int.
-    fn ModAssign(mut self, y: Int) {
-        if self.minus == y.minus {
-            self.nat %= y.nat
-            self.minus = self.Len() > 0 && y.minus
-            ret
-        }
-        self.nat %= y.nat
-        if self.Len() == 0 {
-            self.minus = false
-            ret
-        }
-        self.nat -= y.nat
-        self.minus = self.Len() > 0 && y.minus
-    }
+	// Modulo Int.
+	fn ModAssign(mut self, y: Int) {
+		if self.minus == y.minus {
+			self.nat %= y.nat
+			self.minus = self.Len() > 0 && y.minus
+			ret
+		}
+		self.nat %= y.nat
+		if self.Len() == 0 {
+			self.minus = false
+			ret
+		}
+		self.nat -= y.nat
+		self.minus = self.Len() > 0 && y.minus
+	}
 
-    // Bitwise left shift.
-    fn Shl(self, y: int): Int {
-        mut r := self
-        r <<= y
-        ret r
-    }
+	// Bitwise left shift.
+	fn Shl(self, y: int): Int {
+		mut r := self
+		r <<= y
+		ret r
+	}
 
-    // Bitwise left shift for assignment.
-    fn ShlAssign(mut self, y: int) {
-        self.nat <<= y
-    }
+	// Bitwise left shift for assignment.
+	fn ShlAssign(mut self, y: int) {
+		self.nat <<= y
+	}
 
-    // Bitwise right shift.
-    fn Shr(self, y: int): Int {
-        mut r := self
-        r >>= y
-        ret r
-    }
+	// Bitwise right shift.
+	fn Shr(self, y: int): Int {
+		mut r := self
+		r >>= y
+		ret r
+	}
 
-    // Bitwise right shift for assignment.
-    fn ShrAssign(mut self, y: int) {
-        self.nat >>= y
-        self.minus = self.minus && self.Len() > 0
-    }
+	// Bitwise right shift for assignment.
+	fn ShrAssign(mut self, y: int) {
+		self.nat >>= y
+		self.minus = self.minus && self.Len() > 0
+	}
 
-    // Bitwise or.
-    fn BitOr(self, y: Int): Int {
-        mut r := self
-        r |= y
-        ret r
-    }
+	// Bitwise or.
+	fn BitOr(self, y: Int): Int {
+		mut r := self
+		r |= y
+		ret r
+	}
 
-    // Bitwise or for assignment.
-    fn BitOrAssign(mut self, y: Int) {
-        if self.Len() < y.Len() {
-            mut xb := make(bits, y.Len())
-            _ = copy(xb, self.nat.bits)
-            self.nat.bits = xb
-        }
-        if self.minus {
-            twosComplement(self.nat.bits)
-        }
-        if y.minus {
-            twosComplement(y.nat.bits)
-        }
-        or(self.nat.bits, y.nat.bits)
-        if self.minus && self.Len() >= y.Len() {
-            twosComplement(self.nat.bits)
-        }
-        if y.minus {
-            twosComplement(y.nat.bits)
-        }
-        self.nat.fit()
-    }
+	// Bitwise or for assignment.
+	fn BitOrAssign(mut self, y: Int) {
+		if self.Len() < y.Len() {
+			mut xb := make(bits, y.Len())
+			_ = copy(xb, self.nat.bits)
+			self.nat.bits = xb
+		}
+		if self.minus {
+			twosComplement(self.nat.bits)
+		}
+		if y.minus {
+			twosComplement(y.nat.bits)
+		}
+		or(self.nat.bits, y.nat.bits)
+		if self.minus && self.Len() >= y.Len() {
+			twosComplement(self.nat.bits)
+		}
+		if y.minus {
+			twosComplement(y.nat.bits)
+		}
+		self.nat.fit()
+	}
 
-    // Bitwise and.
-    fn BitAnd(self, y: Int): Int {
-        mut r := self
-        r &= y
-        ret r
-    }
+	// Bitwise and.
+	fn BitAnd(self, y: Int): Int {
+		mut r := self
+		r &= y
+		ret r
+	}
 
-    // Bitwise and for assignment.
-    fn BitAndAssign(mut self, y: Int) {
-        if self.Len() < y.Len() {
-            mut xb := make(bits, y.Len())
-            _ = copy(xb, self.nat.bits)
-            self.nat.bits = xb
-        }
-        if self.minus {
-            twosComplement(self.nat.bits)
-        }
-        if y.minus {
-            twosComplement(y.nat.bits)
-        }
-        if !self.minus && y.minus && self.Len() > y.Len() {
-            mut x := self.nat.bits[:y.Len()]
-            and(x, y.nat.bits)
-        } else {
-            and(self.nat.bits, y.nat.bits)
-        }
-        if y.minus {
-            twosComplement(y.nat.bits)
-            if self.minus {
-                twosComplement(self.nat.bits)
-            }
-        }
-        self.minus = self.minus && y.minus
-        self.nat.fit()
-    }
+	// Bitwise and for assignment.
+	fn BitAndAssign(mut self, y: Int) {
+		if self.Len() < y.Len() {
+			mut xb := make(bits, y.Len())
+			_ = copy(xb, self.nat.bits)
+			self.nat.bits = xb
+		}
+		if self.minus {
+			twosComplement(self.nat.bits)
+		}
+		if y.minus {
+			twosComplement(y.nat.bits)
+		}
+		if !self.minus && y.minus && self.Len() > y.Len() {
+			mut x := self.nat.bits[:y.Len()]
+			and(x, y.nat.bits)
+		} else {
+			and(self.nat.bits, y.nat.bits)
+		}
+		if y.minus {
+			twosComplement(y.nat.bits)
+			if self.minus {
+				twosComplement(self.nat.bits)
+			}
+		}
+		self.minus = self.minus && y.minus
+		self.nat.fit()
+	}
 
-    // Bitwise xor.
-    fn BitXor(self, y: Int): Int {
-        mut r := self
-        r ^= y
-        ret r
-    }
+	// Bitwise xor.
+	fn BitXor(self, y: Int): Int {
+		mut r := self
+		r ^= y
+		ret r
+	}
 
-    // Bitwise xor for assignment.
-    fn BitXorAssign(mut self, y: Int) {
-        if !self.minus && y.minus {
-            self = y ^ self
-            ret
-        }
-        if self.Len() < y.Len() {
-            mut xb := make(bits, y.Len())
-            _ = copy(xb, self.nat.bits)
-            self.nat.bits = xb
-        }
-        if self.minus {
-            twosComplement(self.nat.bits)
-        }
-        if y.minus {
-            twosComplement(y.nat.bits)
-        }
-        xor(self.nat.bits, y.nat.bits)
-        if self.minus && self.Len() >= y.Len() {
-            twosComplement(self.nat.bits)
-        }
-        if y.minus {
-            twosComplement(y.nat.bits)
-        }
-        self.minus = self.minus != y.minus
-        self.nat.fit()
-    }
+	// Bitwise xor for assignment.
+	fn BitXorAssign(mut self, y: Int) {
+		if !self.minus && y.minus {
+			self = y ^ self
+			ret
+		}
+		if self.Len() < y.Len() {
+			mut xb := make(bits, y.Len())
+			_ = copy(xb, self.nat.bits)
+			self.nat.bits = xb
+		}
+		if self.minus {
+			twosComplement(self.nat.bits)
+		}
+		if y.minus {
+			twosComplement(y.nat.bits)
+		}
+		xor(self.nat.bits, y.nat.bits)
+		if self.minus && self.Len() >= y.Len() {
+			twosComplement(self.nat.bits)
+		}
+		if y.minus {
+			twosComplement(y.nat.bits)
+		}
+		self.minus = self.minus != y.minus
+		self.nat.fit()
+	}
 
-    // Compares bits.
-    // Returns +1 if self > y.
-    // Returns 0 if self == y.
-    // Returns -1 if self < y.
-    fn Cmp(self, y: Int): int {
-        match {
-        | self.minus && !y.minus:
-            ret -1
-        | !self.minus && y.minus:
-            ret +1
-        }
-        cmp := self.nat.cmp(y.nat)
-        match {
-        | cmp == +1 && self.minus
-        | cmp == -1 && !self.minus:
-            ret -1
-        | cmp == +1 && !self.minus
-        | cmp == -1 && self.minus:
-            ret +1
-        |:
-            ret 0
-        }
-    }
+	// Compares bits.
+	// Returns +1 if self > y.
+	// Returns 0 if self == y.
+	// Returns -1 if self < y.
+	fn Cmp(self, y: Int): int {
+		match {
+		| self.minus && !y.minus:
+			ret -1
+		| !self.minus && y.minus:
+			ret +1
+		}
+		cmp := self.nat.cmp(y.nat)
+		match {
+		| cmp == +1 && self.minus
+		| cmp == -1 && !self.minus:
+			ret -1
+		| cmp == +1 && !self.minus
+		| cmp == -1 && self.minus:
+			ret +1
+		|:
+			ret 0
+		}
+	}
 
-    // Reports whether integer less than other.
-    fn Lt(self, y: Int): bool {
-        ret self.Cmp(y) == -1
-    }
+	// Reports whether integer less than other.
+	fn Lt(self, y: Int): bool {
+		ret self.Cmp(y) == -1
+	}
 
-    // Reports whether integer less than or equals to other.
-    fn LtEq(self, y: Int): bool {
-        ret self.Cmp(y) < +1
-    }
+	// Reports whether integer less than or equals to other.
+	fn LtEq(self, y: Int): bool {
+		ret self.Cmp(y) < +1
+	}
 
-    // Reports whether integer greater than other.
-    fn Gt(self, y: Int): bool {
-        ret self.Cmp(y) == +1
-    }
+	// Reports whether integer greater than other.
+	fn Gt(self, y: Int): bool {
+		ret self.Cmp(y) == +1
+	}
 
-    // Reports whether integer greater than or equals to other.
-    fn GtEq(self, y: Int): bool {
-        ret self.Cmp(y) > -1
-    }
+	// Reports whether integer greater than or equals to other.
+	fn GtEq(self, y: Int): bool {
+		ret self.Cmp(y) > -1
+	}
 
-    // Reports whether integers are equals.
-    fn Eq(self, y: Int): bool {
-        ret self.Cmp(y) == 0
-    }
+	// Reports whether integers are equals.
+	fn Eq(self, y: Int): bool {
+		ret self.Cmp(y) == 0
+	}
 
-    // Bitwise not.
-    fn BitNot(self): Int {
-        mut r := self.clone()
-        if r.minus {
-            subOne(r.nat.bits)
-            r.nat.fit()
-        } else {
-            carry := addOne(r.nat.bits)
-            if carry == 0b1 {
-                r.nat.bits = append(r.nat.bits, 0b1)
-            }
-        }
-        r.minus = !r.minus
-        ret r
-    }
+	// Bitwise not.
+	fn BitNot(self): Int {
+		mut r := self.clone()
+		if r.minus {
+			subOne(r.nat.bits)
+			r.nat.fit()
+		} else {
+			carry := addOne(r.nat.bits)
+			if carry == 0b1 {
+				r.nat.bits = append(r.nat.bits, 0b1)
+			}
+		}
+		r.minus = !r.minus
+		ret r
+	}
 
-    // Returns +1 if integer is positive or zero, -1 otherwise.
-    fn Sign(self): int {
-        if self.minus {
-            ret -1
-        }
-        ret +1
-    }
+	// Returns +1 if integer is positive or zero, -1 otherwise.
+	fn Sign(self): int {
+		if self.minus {
+			ret -1
+		}
+		ret +1
+	}
 
-    // Unary minus.
-    fn Neg(self): Int {
-        mut r := self.clone()
-        r.minus = !r.minus
-        ret r
-    }
+	// Unary minus.
+	fn Neg(self): Int {
+		mut r := self.clone()
+		r.minus = !r.minus
+		ret r
+	}
 
-    // Unary plus.
-    fn Pos(self): Int {
-        ret self.clone()
-    }
+	// Unary plus.
+	fn Pos(self): Int {
+		ret self.clone()
+	}
 
-    // Reports whether number is odd.
-    fn Odd(self): bool {
-        ret self.nat.odd()
-    }
+	// Reports whether number is odd.
+	fn Odd(self): bool {
+		ret self.nat.odd()
+	}
 
-    // Reports whether number is even.
-    fn Even(self): bool {
-        ret self.nat.even()
-    }
+	// Reports whether number is even.
+	fn Even(self): bool {
+		ret self.nat.even()
+	}
 
-    // Returns bit by index.
-    // The index zero means first bit at right.
-    fn Bit(self, i: int): int {
-        ret self.nat.bit(i)
-    }
+	// Returns bit by index.
+	// The index zero means first bit at right.
+	fn Bit(self, i: int): int {
+		ret self.nat.bit(i)
+	}
 
-    // Returns immutable copy of internal little-endian bits.
-    fn Bits(self): []byte {
-        ret cloneBits(self.nat.bits)
-    }
+	// Returns immutable copy of internal little-endian bits.
+	fn Bits(self): []byte {
+		ret cloneBits(self.nat.bits)
+	}
 
-    // Returns absolute value of integer.
-    fn Abs(self): Int {
-        mut r := self
-        r.minus = false
-        ret r
-    }
+	// Returns absolute value of integer.
+	fn Abs(self): Int {
+		mut r := self
+		r.minus = false
+		ret r
+	}
 
-    // Returns count of absolute's trailing zeros.
-    fn TrailingZeros(self): int {
-        ret self.nat.trailingZeros()
-    }
+	// Returns count of absolute's trailing zeros.
+	fn TrailingZeros(self): int {
+		ret self.nat.trailingZeros()
+	}
 
-    // Format number into string. Fmt is the format of number.
-    // Results with exceptional if fmt is not valid.
-    // Exceptional is always BigError.Format.
-    //
-    // Valid fmt values are;
-    //   - 2 for binary.
-    //   - 8 for octal.
-    //   - 10 for decimal.
-    //   - 16 for hexadecimal.
-    fn Format(self, fmt: int)!: str {
-        mut s := self.nat.format(fmt) else { error(error) }
-        if self.minus && s != "0" {
-            s = "-" + s
-        }
-        ret s
-    }
+	// Format number into string. Fmt is the format of number.
+	// Results with exceptional if fmt is not valid.
+	// Exceptional is always BigError.Format.
+	//
+	// Valid fmt values are;
+	//   - 2 for binary.
+	//   - 8 for octal.
+	//   - 10 for decimal.
+	//   - 16 for hexadecimal.
+	fn Format(self, fmt: int)!: str {
+		mut s := self.nat.format(fmt) else { error(error) }
+		if self.minus && s != "0" {
+			s = "-" + s
+		}
+		ret s
+	}
 
-    // Returns integer in i64.
-    // Causes exception if nuber large than capacity of i64.
-    // Exception is equals to i64.Min constant if integer is negative, else i64.Max.
-    fn ToI64(self)!: i64 {
-        if self.Len() > 63 {
-            if self.minus {
-                error(i64.Min)
-            }
-            error(i64.Max)
-        }
-        x := i64(u64FromBits(self.nat.bits))
-        if self.minus {
-            if x == 0 {
-                ret i64.Min
-            }
-            ret -x
-        }
-        ret x
-    }
+	// Returns integer in i64.
+	// Causes exception if nuber large than capacity of i64.
+	// Exception is equals to i64.Min constant if integer is negative, else i64.Max.
+	fn ToI64(self)!: i64 {
+		if self.Len() > 63 {
+			if self.minus {
+				error(i64.Min)
+			}
+			error(i64.Max)
+		}
+		x := i64(u64FromBits(self.nat.bits))
+		if self.minus {
+			if x == 0 {
+				ret i64.Min
+			}
+			ret -x
+		}
+		ret x
+	}
 
-    // Returns integer in u64.
-    // Causes exception if nuber large than capacity of u64.
-    // Exception is always equals to u64.Max constant.
-    fn ToU64(self)!: u64 {
-        x := self.nat.toU64() else { error(error) }
-        if self.minus {
-            ret -x
-        }
-        ret x
-    }
+	// Returns integer in u64.
+	// Causes exception if nuber large than capacity of u64.
+	// Exception is always equals to u64.Max constant.
+	fn ToU64(self)!: u64 {
+		x := self.nat.toU64() else { error(error) }
+		if self.minus {
+			ret -x
+		}
+		ret x
+	}
 
-    // Formats number with self.Format(10) by default.
-    fn Str(self): str {
-        ret self.Format(10)!
-    }
+	// Formats number with self.Format(10) by default.
+	fn Str(self): str {
+		ret self.Format(10)!
+	}
 
-    fn clone(self): Int {
-        mut r := self
-        r.nat = self.nat.clone()
-        ret r
-    }
+	fn clone(self): Int {
+		mut r := self
+		r.nat = self.nat.clone()
+		ret r
+	}
 }
 
 fn max(a: int, b: int): int {
-    if a > b {
-        ret a
-    }
-    ret b
+	if a > b {
+		ret a
+	}
+	ret b
 }

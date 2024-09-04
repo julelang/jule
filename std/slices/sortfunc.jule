@@ -37,93 +37,93 @@
 
 // Sorts data[a:b] using insertion sort.
 fn insertionSortFunc[S: []E, E](mut data: S, a: int, b: int, cmp: fn(a: E, b: E): int) {
-    mut i := a + 1
-    for i < b; i++ {
-        mut j := i
-        for j > a && (cmp(data[j], data[j-1]) < 0); j-- {
-            data[j], data[j-1] = data[j-1], data[j]
-        }
-    }
+	mut i := a + 1
+	for i < b; i++ {
+		mut j := i
+		for j > a && (cmp(data[j], data[j-1]) < 0); j-- {
+			data[j], data[j-1] = data[j-1], data[j]
+		}
+	}
 }
 
 // Implements the heap property on data[lo:hi].
 // first is an offset into the array where the root of the heap lies.
 fn siftDownFunc[S: []E, E](mut data: S, lo: int, hi: int, first: int, cmp: fn(a: E, b: E): int) {
-    mut root := lo
-    for {
-        mut child := 2 * root + 1
-        if child >= hi {
-            break
-        }
-        if child+1 < hi && (cmp(data[first+child], data[first+child+1]) < 0) {
-            child++
-        }
-        if !(cmp(data[first+root], data[first+child]) < 0) {
-            ret
-        }
-        data[first+root], data[first+child] = data[first+child], data[first+root]
-        root = child
-    }
+	mut root := lo
+	for {
+		mut child := 2 * root + 1
+		if child >= hi {
+			break
+		}
+		if child+1 < hi && (cmp(data[first+child], data[first+child+1]) < 0) {
+			child++
+		}
+		if !(cmp(data[first+root], data[first+child]) < 0) {
+			ret
+		}
+		data[first+root], data[first+child] = data[first+child], data[first+root]
+		root = child
+	}
 }
 
 fn heapSortFunc[S: []E, E](mut data: S, a: int, b: int, cmp: fn(a: E, b: E): int) {
-    first := a
-    lo := 0
-    hi := b - a
+	first := a
+	lo := 0
+	hi := b - a
 
-    // Build heap with greatest element at top.
-    mut i := (hi - 1) >> 1
-    for i >= 0; i-- {
-        siftDownFunc(data, i, hi, first, cmp)
-    }
+	// Build heap with greatest element at top.
+	mut i := (hi - 1) >> 1
+	for i >= 0; i-- {
+		siftDownFunc(data, i, hi, first, cmp)
+	}
 
-    // Pop elements, largest first, into end of data.
-    i = hi - 1
-    for i >= 0; i-- {
-        data[first], data[first+i] = data[first+i], data[first]
-        siftDownFunc(data, lo, i, first, cmp)
-    }
+	// Pop elements, largest first, into end of data.
+	i = hi - 1
+	for i >= 0; i-- {
+		data[first], data[first+i] = data[first+i], data[first]
+		siftDownFunc(data, lo, i, first, cmp)
+	}
 }
 
 // Scatters some elements around in an attempt to break some patterns
 // that might cause imbalanced partitions in quicksort.
 fn breakPatternsFunc[S: []E, E](mut data: S, a: int, b: int, cmp: fn(a: E, b: E): int) {
-    length := b - a
-    if length >= 8 {
-        mut random := xorshift(length)
-        modulus := nextPowerOfTwo(length)
+	length := b - a
+	if length >= 8 {
+		mut random := xorshift(length)
+		modulus := nextPowerOfTwo(length)
 
-        mut idx := a + (length >> 2) << 1 - 1
-        for idx <= a+(length >> 2)<<1+1; idx++ {
-            mut other := int(uint(xorshiftNext(random)) & (modulus - 1))
-            if other >= length {
-                other -= length
-            }
-            data[idx], data[a+other] = data[a+other], data[idx]
-        }
-    }
+		mut idx := a + (length >> 2) << 1 - 1
+		for idx <= a+(length >> 2)<<1+1; idx++ {
+			mut other := int(uint(xorshiftNext(random)) & (modulus - 1))
+			if other >= length {
+				other -= length
+			}
+			data[idx], data[a+other] = data[a+other], data[idx]
+		}
+	}
 }
 
 // Returns x,y where data[x] <= data[y], where x,y=a,b or x,y=b,a.
 fn order2Func[S: []E, E](data: S, a: int, b: int, mut &swaps: int, cmp: fn(a: E, b: E): int): (int, int) {
-    if cmp(data[b], data[a]) < 0 {
-        swaps++
-        ret b, a
-    }
-    ret a, b
+	if cmp(data[b], data[a]) < 0 {
+		swaps++
+		ret b, a
+	}
+	ret a, b
 }
 
 // Returns x where data[x] is the median of data[a],data[b],data[c], where x is a, b, or c.
 fn medianFunc[S: []E, E](data: S, mut a: int, mut b: int, mut c: int, mut &swaps: int, cmp: fn(a: E, b: E): int): int {
-    a, b = order2Func(data, a, b, swaps, cmp)
-    b, c = order2Func(data, b, c, swaps, cmp)
-    a, b = order2Func(data, a, b, swaps, cmp)
-    ret b
+	a, b = order2Func(data, a, b, swaps, cmp)
+	b, c = order2Func(data, b, c, swaps, cmp)
+	a, b = order2Func(data, a, b, swaps, cmp)
+	ret b
 }
 
 // Finds the median of data[a - 1], data[a], data[a + 1] and stores the index into a.
 fn medianAdjacentFunc[S: []E, E](mut data: S, a: int, mut &swaps: int, cmp: fn(a: E, b: E): int): int {
-    ret medianFunc(data, a - 1, a, a + 1, swaps, cmp)
+	ret medianFunc(data, a - 1, a, a + 1, swaps, cmp)
 }
 
 // Chooses a pivot in data[a:b].
@@ -132,114 +132,114 @@ fn medianAdjacentFunc[S: []E, E](mut data: S, a: int, mut &swaps: int, cmp: fn(a
 // [8,shortestNinther): uses the simple median-of-three method.
 // [shortestNinther,∞): uses the Tukey ninther method.
 fn choosePivotFunc[S: []E, E](mut data: S, a: int, b: int, cmp: fn(a: E, b: E): int): (pivot: int, hint: sortedHint) {
-    const shortestNinther = 50
-    const maxSwaps = 4 * 3
+	const shortestNinther = 50
+	const maxSwaps = 4 * 3
 
-    l := b - a
+	l := b - a
 
-    mut swaps := 0
-    mut i := a + l >> 2 * 1
-    mut j := a + l >> 2 * 2
-    mut k := a + l >> 2 * 3
+	mut swaps := 0
+	mut i := a + l >> 2 * 1
+	mut j := a + l >> 2 * 2
+	mut k := a + l >> 2 * 3
 
-    if l >= 8 {
-        if l >= shortestNinther {
-            // Tukey ninther method, the idea came from Rust's implementation.
-            i = medianAdjacentFunc(data, i, swaps, cmp)
-            j = medianAdjacentFunc(data, j, swaps, cmp)
-            k = medianAdjacentFunc(data, k, swaps, cmp)
-        }
-        // Find the median among i, j, k and stores it into j.
-        j = medianFunc(data, i, j, k, swaps, cmp)
-    }
+	if l >= 8 {
+		if l >= shortestNinther {
+			// Tukey ninther method, the idea came from Rust's implementation.
+			i = medianAdjacentFunc(data, i, swaps, cmp)
+			j = medianAdjacentFunc(data, j, swaps, cmp)
+			k = medianAdjacentFunc(data, k, swaps, cmp)
+		}
+		// Find the median among i, j, k and stores it into j.
+		j = medianFunc(data, i, j, k, swaps, cmp)
+	}
 
-    match swaps {
-    | 0:
-        ret j, sortedHint.Increasing
-    | maxSwaps:
-        ret j, sortedHint.Decreasing
-    |:
-        ret j, sortedHint.Unknown
-    }
+	match swaps {
+	| 0:
+		ret j, sortedHint.Increasing
+	| maxSwaps:
+		ret j, sortedHint.Decreasing
+	|:
+		ret j, sortedHint.Unknown
+	}
 }
 
 fn reverseRangeFunc[S: []E, E](mut data: S, a: int, b: int, cmp: fn(a: E, b: E): int) {
-    mut i := a
-    mut j := b - 1
-    for i < j {
-        data[i], data[j] = data[j], data[i]
-        i++
-        j--
-    }
+	mut i := a
+	mut j := b - 1
+	for i < j {
+		data[i], data[j] = data[j], data[i]
+		i++
+		j--
+	}
 }
 
 // Partially sorts a slice, returns true if the slice is sorted at the end.
 fn partialInsertionSortFunc[S: []E, E](mut data: S, a: int, b: int, cmp: fn(a: E, b: E): int): bool {
-    const maxSteps = 5          // maximum number of adjacent out-of-order pairs that will get shifted
-    const shortestShifting = 50 // don't shift any elements on short arrays
+	const maxSteps = 5          // maximum number of adjacent out-of-order pairs that will get shifted
+	const shortestShifting = 50 // don't shift any elements on short arrays
 
-    mut i := a + 1
-    mut j := 0
-    for j < maxSteps; j++ {
-        for i < b && !(cmp(data[i], data[i-1]) < 0) {
-            i++
-        }
+	mut i := a + 1
+	mut j := 0
+	for j < maxSteps; j++ {
+		for i < b && !(cmp(data[i], data[i-1]) < 0) {
+			i++
+		}
 
-        if i == b {
-            ret true
-        }
+		if i == b {
+			ret true
+		}
 
-        if b-a < shortestShifting {
-            ret false
-        }
+		if b-a < shortestShifting {
+			ret false
+		}
 
-        data[i], data[i-1] = data[i-1], data[i]
+		data[i], data[i-1] = data[i-1], data[i]
 
-        // Shift the smaller one to the left.
-        if i-a >= 2 {
-            j = i - 1
-            for j >= 1; j-- {
-                if !(cmp(data[j], data[j-1]) < 0) {
-                    break
-                }
-                data[j], data[j-1] = data[j-1], data[j]
-            }
-        }
-        // Shift the greater one to the right.
-        if b-i >= 2 {
-            j = i + 1
-            for j < b; j++ {
-                if !(cmp(data[j], data[j-1]) < 0) {
-                    break
-                }
-                data[j], data[j-1] = data[j-1], data[j]
-            }
-        }
-    }
-    ret false
+		// Shift the smaller one to the left.
+		if i-a >= 2 {
+			j = i - 1
+			for j >= 1; j-- {
+				if !(cmp(data[j], data[j-1]) < 0) {
+					break
+				}
+				data[j], data[j-1] = data[j-1], data[j]
+			}
+		}
+		// Shift the greater one to the right.
+		if b-i >= 2 {
+			j = i + 1
+			for j < b; j++ {
+				if !(cmp(data[j], data[j-1]) < 0) {
+					break
+				}
+				data[j], data[j-1] = data[j-1], data[j]
+			}
+		}
+	}
+	ret false
 }
 
 // Partitions data[a:b] into elements equal to data[pivot] followed by elements greater than data[pivot].
 // It assumed that data[a:b] does not contain elements smaller than the data[pivot].
 fn partitionEqualFunc[S: []E, E](mut data: S, a: int, b: int, pivot: int, cmp: fn(a: E, b: E): int): (newpivot: int) {
-    data[a], data[pivot] = data[pivot], data[a]
-    mut i, mut j := a + 1, b - 1 // i and j are inclusive of the elements remaining to be partitioned
+	data[a], data[pivot] = data[pivot], data[a]
+	mut i, mut j := a + 1, b - 1 // i and j are inclusive of the elements remaining to be partitioned
 
-    for {
-        for i <= j && !(cmp(data[a], data[i]) < 0) {
-            i++
-        }
-        for i <= j && (cmp(data[a], data[j]) < 0) {
-            j--
-        }
-        if i > j {
-            break
-        }
-        data[i], data[j] = data[j], data[i]
-        i++
-        j--
-    }
-    ret i
+	for {
+		for i <= j && !(cmp(data[a], data[i]) < 0) {
+			i++
+		}
+		for i <= j && (cmp(data[a], data[j]) < 0) {
+			j--
+		}
+		if i > j {
+			break
+		}
+		data[i], data[j] = data[j], data[i]
+		i++
+		j--
+	}
+	ret i
 }
 
 // Does one quicksort partition.
@@ -247,39 +247,39 @@ fn partitionEqualFunc[S: []E, E](mut data: S, a: int, b: int, pivot: int, cmp: f
 // Moves elements in data[a:b] around, so that data[i]<p and data[j]>=p for i<newpivot and j>newpivot.
 // On return, data[newpivot] = p
 fn partitionFunc[S: []E, E](mut data: S, a: int, b: int, pivot: int, cmp: fn(a: E, b: E): int): (newpivot: int, alreadyPartitioned: bool) {
-    data[a], data[pivot] = data[pivot], data[a]
-    mut i, mut j := a + 1, b - 1 // i and j are inclusive of the elements remaining to be partitioned
+	data[a], data[pivot] = data[pivot], data[a]
+	mut i, mut j := a + 1, b - 1 // i and j are inclusive of the elements remaining to be partitioned
 
-    for i <= j && (cmp(data[i], data[a]) < 0) {
-        i++
-    }
-    for i <= j && !(cmp(data[j], data[a]) < 0) {
-        j--
-    }
-    if i > j {
-        data[j], data[a] = data[a], data[j]
-        ret j, true
-    }
-    data[i], data[j] = data[j], data[i]
-    i++
-    j--
+	for i <= j && (cmp(data[i], data[a]) < 0) {
+		i++
+	}
+	for i <= j && !(cmp(data[j], data[a]) < 0) {
+		j--
+	}
+	if i > j {
+		data[j], data[a] = data[a], data[j]
+		ret j, true
+	}
+	data[i], data[j] = data[j], data[i]
+	i++
+	j--
 
-    for {
-        for i <= j && (cmp(data[i], data[a]) < 0) {
-            i++
-        }
-        for i <= j && !(cmp(data[j], data[a]) < 0) {
-            j--
-        }
-        if i > j {
-            break
-        }
-        data[i], data[j] = data[j], data[i]
-        i++
-        j--
-    }
-    data[j], data[a] = data[a], data[j]
-    ret j, false
+	for {
+		for i <= j && (cmp(data[i], data[a]) < 0) {
+			i++
+		}
+		for i <= j && !(cmp(data[j], data[a]) < 0) {
+			j--
+		}
+		if i > j {
+			break
+		}
+		data[i], data[j] = data[j], data[i]
+		i++
+		j--
+	}
+	data[j], data[a] = data[a], data[j]
+	ret j, false
 }
 
 // Sorts data[a:b].
@@ -289,69 +289,69 @@ fn partitionFunc[S: []E, E](mut data: S, a: int, b: int, pivot: int, cmp: fn(a: 
 // Rust implementation: https://docs.rs/pdqsort/latest/pdqsort/
 // limit is the number of allowed bad (very unbalanced) pivots before falling back to heapsort.
 fn pdqsortFunc[S: []E, E](mut data: S, mut a: int, mut b: int, mut limit: int, cmp: fn(a: E, b: E): int) {
-    const maxInsertion = 12
+	const maxInsertion = 12
 
-    mut wasBalanced := true    // whether the last partitioning was reasonably balanced
-    mut wasPartitioned := true // whether the slice was already partitioned
+	mut wasBalanced := true    // whether the last partitioning was reasonably balanced
+	mut wasPartitioned := true // whether the slice was already partitioned
 
-    for {
-        length := b - a
+	for {
+		length := b - a
 
-        if length <= maxInsertion {
-            insertionSortFunc(data, a, b, cmp)
-            ret
-        }
+		if length <= maxInsertion {
+			insertionSortFunc(data, a, b, cmp)
+			ret
+		}
 
-        // Fall back to heapsort if too many bad choices were made.
-        if limit == 0 {
-            heapSortFunc(data, a, b, cmp)
-            ret
-        }
+		// Fall back to heapsort if too many bad choices were made.
+		if limit == 0 {
+			heapSortFunc(data, a, b, cmp)
+			ret
+		}
 
-        // If the last partitioning was imbalanced, we need to breaking patterns.
-        if !wasBalanced {
-            breakPatternsFunc(data, a, b, cmp)
-            limit--
-        }
+		// If the last partitioning was imbalanced, we need to breaking patterns.
+		if !wasBalanced {
+			breakPatternsFunc(data, a, b, cmp)
+			limit--
+		}
 
-        mut pivot, mut hint := choosePivotFunc(data, a, b, cmp)
-        if hint == sortedHint.Decreasing {
-            reverseRangeFunc(data, a, b, cmp)
-            // The chosen pivot was pivot-a elements after the start of the array.
-            // After reversing it is pivot-a elements before the end of the array.
-            // The idea came from Rust's implementation.
-            pivot = (b - 1) - (pivot - a)
-            hint = sortedHint.Increasing
-        }
+		mut pivot, mut hint := choosePivotFunc(data, a, b, cmp)
+		if hint == sortedHint.Decreasing {
+			reverseRangeFunc(data, a, b, cmp)
+			// The chosen pivot was pivot-a elements after the start of the array.
+			// After reversing it is pivot-a elements before the end of the array.
+			// The idea came from Rust's implementation.
+			pivot = (b - 1) - (pivot - a)
+			hint = sortedHint.Increasing
+		}
 
-        // The slice is likely already sorted.
-        if wasBalanced && wasPartitioned && hint == sortedHint.Increasing {
-            if partialInsertionSortFunc(data, a, b, cmp) {
-                ret
-            }
-        }
+		// The slice is likely already sorted.
+		if wasBalanced && wasPartitioned && hint == sortedHint.Increasing {
+			if partialInsertionSortFunc(data, a, b, cmp) {
+				ret
+			}
+		}
 
-        // Probably the slice contains many duplicate elements, partition the slice into
-        // elements equal to and elements greater than the pivot.
-        if a > 0 && !(cmp(data[a-1], data[pivot]) < 0) {
-            mid := partitionEqualFunc(data, a, b, pivot, cmp)
-            a = mid
-            continue
-        }
+		// Probably the slice contains many duplicate elements, partition the slice into
+		// elements equal to and elements greater than the pivot.
+		if a > 0 && !(cmp(data[a-1], data[pivot]) < 0) {
+			mid := partitionEqualFunc(data, a, b, pivot, cmp)
+			a = mid
+			continue
+		}
 
-        mid, alreadyPartitioned := partitionFunc(data, a, b, pivot, cmp)
-        wasPartitioned = alreadyPartitioned
+		mid, alreadyPartitioned := partitionFunc(data, a, b, pivot, cmp)
+		wasPartitioned = alreadyPartitioned
 
-        leftLen, rightLen := mid - a, b - mid
-        balanceThreshold := length >> 3
-        if leftLen < rightLen {
-            wasBalanced = leftLen >= balanceThreshold
-            pdqsortFunc(data, a, mid, limit, cmp)
-            a = mid + 1
-        } else {
-            wasBalanced = rightLen >= balanceThreshold
-            pdqsortFunc(data, mid + 1, b, limit, cmp)
-            b = mid
-        }
-    }
+		leftLen, rightLen := mid - a, b - mid
+		balanceThreshold := length >> 3
+		if leftLen < rightLen {
+			wasBalanced = leftLen >= balanceThreshold
+			pdqsortFunc(data, a, mid, limit, cmp)
+			a = mid + 1
+		} else {
+			wasBalanced = rightLen >= balanceThreshold
+			pdqsortFunc(data, mid + 1, b, limit, cmp)
+			b = mid
+		}
+	}
 }

@@ -14,60 +14,60 @@ use std::sync::atomic::{MemoryOrder, AtomicU32}
 // in each parallel job:
 // `wg.done()` when finished
 struct WaitGroup {
-    taskN: AtomicU32 // current task count - reading/writing should be atomic
-    waitN: AtomicU32 // current wait count - reading/writing should be atomic
+	taskN: AtomicU32 // current task count - reading/writing should be atomic
+	waitN: AtomicU32 // current wait count - reading/writing should be atomic
 }
 
 impl WaitGroup {
-    // Returns new WaitGroup instance.
-    static fn New(): &WaitGroup {
-        ret new(WaitGroup)
-    }
+	// Returns new WaitGroup instance.
+	static fn New(): &WaitGroup {
+		ret new(WaitGroup)
+	}
 
-    // Increments (+delta) or decrements (-delta) task count by delta
-    // and unblocks any wait() calls if task count becomes zero.
-    // Panics if task count reaches below zero.
-    fn Add(mut self, delta: int) {
-        oldTask := int(self.taskN.Add(u32(delta), MemoryOrder.Relaxed))
-        nTask := oldTask + delta
-        if nTask < 0 {
-            panic("std:sync: WaitGroup.Add: negative number of tasks")
-        }
+	// Increments (+delta) or decrements (-delta) task count by delta
+	// and unblocks any wait() calls if task count becomes zero.
+	// Panics if task count reaches below zero.
+	fn Add(mut self, delta: int) {
+		oldTask := int(self.taskN.Add(u32(delta), MemoryOrder.Relaxed))
+		nTask := oldTask + delta
+		if nTask < 0 {
+			panic("std:sync: WaitGroup.Add: negative number of tasks")
+		}
 
-        // Number of tasks still greater than zero.
-        // No need to clear waiters.
-        if nTask != 0 {
-            ret
-        }
+		// Number of tasks still greater than zero.
+		// No need to clear waiters.
+		if nTask != 0 {
+			ret
+		}
 
-        // Number of tasks reaches to zero, therefore clear waiters.
-        for {
-            nWaiters := self.waitN.Load(MemoryOrder.Relaxed)
-            if nWaiters == 0 {
-                ret
-            }
+		// Number of tasks reaches to zero, therefore clear waiters.
+		for {
+			nWaiters := self.waitN.Load(MemoryOrder.Relaxed)
+			if nWaiters == 0 {
+				ret
+			}
 
-            if self.waitN.CompareSwap(nWaiters, 0, MemoryOrder.Relaxed) {
-                ret
-            }
-        }
-    }
+			if self.waitN.CompareSwap(nWaiters, 0, MemoryOrder.Relaxed) {
+				ret
+			}
+		}
+	}
 
-    // Decrements the WaitGroup counter by one.
-    fn Done(mut self) { self.Add(-1) }
+	// Decrements the WaitGroup counter by one.
+	fn Done(mut self) { self.Add(-1) }
 
-    // Blocks until all tasks are done (task count becomes zero)
-    fn Wait(mut self) {
-        nTask := self.taskN.Load(MemoryOrder.Relaxed)
-        if nTask == 0 {
-            // No task, no need to wait.
-            ret
-        }
+	// Blocks until all tasks are done (task count becomes zero)
+	fn Wait(mut self) {
+		nTask := self.taskN.Load(MemoryOrder.Relaxed)
+		if nTask == 0 {
+			// No task, no need to wait.
+			ret
+		}
 
-        // Register this wait call to waiters.
-        self.waitN.Add(1, MemoryOrder.Relaxed)
+		// Register this wait call to waiters.
+		self.waitN.Add(1, MemoryOrder.Relaxed)
 
-        // Wait for clearing waiters.
-        for self.waitN.Load(MemoryOrder.Relaxed) != 0 {}
-    }
+		// Wait for clearing waiters.
+		for self.waitN.Load(MemoryOrder.Relaxed) != 0 {}
+	}
 }

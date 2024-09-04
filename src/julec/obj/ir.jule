@@ -9,156 +9,156 @@ use sema for std::jule::sema
 
 // Intermediate representation of code for compiler.
 struct IR {
-    // Directory of root package.
-    Root:    str
-    Passes:  []str
-    Main:    &sema::Package
-    Used:    []&sema::ImportInfo
-    Ordered: OrderedDefines
+	// Directory of root package.
+	Root:    str
+	Passes:  []str
+	Main:    &sema::Package
+	Used:    []&sema::ImportInfo
+	Ordered: OrderedDefines
 }
 
 impl IR {
-    // Returns compiler IR of source code.
-    // Returned IR is lexed, parsed, and analyzed.
-    //
-    // - Returns nil reference and nil logs if path has not any Jule file.
-    // - Returns nil reference and logs if exist any log.
-    // - Returns IR and nil logs if everything is fine.
-    static fn Build(path: str, flags: sema::SemaFlag): (&IR, []Log) {
-        mut importer := JuleImporter.New(buildCompileInfo())
-        mut files, mut logs := importer.ImportPackage(path, true)
-        if len(logs) > 0 {
-            ret nil, logs
-        }
-        root := path
+	// Returns compiler IR of source code.
+	// Returned IR is lexed, parsed, and analyzed.
+	//
+	// - Returns nil reference and nil logs if path has not any Jule file.
+	// - Returns nil reference and logs if exist any log.
+	// - Returns IR and nil logs if everything is fine.
+	static fn Build(path: str, flags: sema::SemaFlag): (&IR, []Log) {
+		mut importer := JuleImporter.New(buildCompileInfo())
+		mut files, mut logs := importer.ImportPackage(path, true)
+		if len(logs) > 0 {
+			ret nil, logs
+		}
+		root := path
 
-        if len(files) == 0 {
-            ret nil, nil
-        }
+		if len(files) == 0 {
+			ret nil, nil
+		}
 
-        mut pkg, logs := sema::AnalyzePackage(files, importer, flags)
-        if len(logs) > 0 {
-            ret nil, logs
-        }
+		mut pkg, logs := sema::AnalyzePackage(files, importer, flags)
+		if len(logs) > 0 {
+			ret nil, logs
+		}
 
-        mut ir := &IR{
-            Root: root,
-            Main: pkg,
-            Used: importer.AllPackages(),
-        }
-        ir.Passes = getAllUniquePasses(ir.Main, ir.Used)
+		mut ir := &IR{
+			Root: root,
+			Main: pkg,
+			Used: importer.AllPackages(),
+		}
+		ir.Passes = getAllUniquePasses(ir.Main, ir.Used)
 
-        ret ir, nil
-    }
+		ret ir, nil
+	}
 }
 
 impl IR {
-    fn appendStructs(self, mut &p: &sema::Package, mut &buffer: []&sema::Struct) {
-        for (_, mut f) in p.Files {
-            for (_, mut s) in f.Structs {
-                if !s.Binded {
-                    buffer = append(buffer, s)
-                }
-            }
-        }
-    }
+	fn appendStructs(self, mut &p: &sema::Package, mut &buffer: []&sema::Struct) {
+		for (_, mut f) in p.Files {
+			for (_, mut s) in f.Structs {
+				if !s.Binded {
+					buffer = append(buffer, s)
+				}
+			}
+		}
+	}
 
-    // Returns all structures of main package and used pakcages.
-    // Ignores binded declarations.
-    fn GetAllStructures(mut self): []&sema::Struct {
-        let mut buffer: []&sema::Struct = nil
-        self.appendStructs(self.Main, buffer)
-        for (_, mut u) in self.Used {
-            if !u.Binded {
-                self.appendStructs(u.Package, buffer)
-            }
-        }
-        ret buffer
-    }
+	// Returns all structures of main package and used pakcages.
+	// Ignores binded declarations.
+	fn GetAllStructures(mut self): []&sema::Struct {
+		let mut buffer: []&sema::Struct = nil
+		self.appendStructs(self.Main, buffer)
+		for (_, mut u) in self.Used {
+			if !u.Binded {
+				self.appendStructs(u.Package, buffer)
+			}
+		}
+		ret buffer
+	}
 
-    fn appendGlobals(self, mut &p: &sema::Package, mut &buffer: []&sema::Var) {
-        for (_, mut f) in p.Files {
-            for (_, mut v) in f.Vars {
-                if v.Token != nil && !v.Binded && !v.Constant {
-                    buffer = append(buffer, v)
-                }
-            }
-        }
-    }
+	fn appendGlobals(self, mut &p: &sema::Package, mut &buffer: []&sema::Var) {
+		for (_, mut f) in p.Files {
+			for (_, mut v) in f.Vars {
+				if v.Token != nil && !v.Binded && !v.Constant {
+					buffer = append(buffer, v)
+				}
+			}
+		}
+	}
 
-    // Returns all globals of main package and used pakcages.
-    // Ignores binded declarations and constants.
-    fn GetAllGlobals(mut self): []&sema::Var {
-        let mut buffer: []&sema::Var = nil
-        self.appendGlobals(self.Main, buffer)
-        for (_, mut u) in self.Used {
-            if !u.Binded {
-                self.appendGlobals(u.Package, buffer)
-            }
-        }
-        ret buffer
-    }
+	// Returns all globals of main package and used pakcages.
+	// Ignores binded declarations and constants.
+	fn GetAllGlobals(mut self): []&sema::Var {
+		let mut buffer: []&sema::Var = nil
+		self.appendGlobals(self.Main, buffer)
+		for (_, mut u) in self.Used {
+			if !u.Binded {
+				self.appendGlobals(u.Package, buffer)
+			}
+		}
+		ret buffer
+	}
 
-    // Order defines at update ordered field of instance.
-    fn Order(mut self) {
-        self.Ordered.Structs = self.GetAllStructures()
-        self.Ordered.Globals = self.GetAllGlobals()
-        order(self.Ordered.Structs)
-        order(self.Ordered.Globals)
-    }
+	// Order defines at update ordered field of instance.
+	fn Order(mut self) {
+		self.Ordered.Structs = self.GetAllStructures()
+		self.Ordered.Globals = self.GetAllGlobals()
+		order(self.Ordered.Structs)
+		order(self.Ordered.Globals)
+	}
 }
 
 fn pushPasses(mut &p: &sema::Package, mut &passes: []str) {
-    for (_, mut f) in p.Files {
-    push:
-        for _, pass in f.Passes {
-            if pass.Text == "" {
-                continue
-            }
-            for _, cpass in passes {
-                if cpass == pass.Text {
-                    continue push
-                }
-            }
-            passes = append(passes, pass.Text)
-        }
-    }
+	for (_, mut f) in p.Files {
+	push:
+		for _, pass in f.Passes {
+			if pass.Text == "" {
+				continue
+			}
+			for _, cpass in passes {
+				if cpass == pass.Text {
+					continue push
+				}
+			}
+			passes = append(passes, pass.Text)
+		}
+	}
 }
 
 fn getAllUniquePasses(mut &pkg: &sema::Package, mut uses: []&sema::ImportInfo): []str {
-    let mut passes: []str = nil
+	let mut passes: []str = nil
 
-    pushPasses(pkg, passes)
-    for (_, mut u) in uses {
-        if !u.Binded {
-            pushPasses(u.Package, passes)
-        }
-    }
+	pushPasses(pkg, passes)
+	for (_, mut u) in uses {
+		if !u.Binded {
+			pushPasses(u.Package, passes)
+		}
+	}
 
-    ret passes
+	ret passes
 }
 
 fn buildCompileInfo(): CompileInfo {
-    mut info := CompileInfo{
-        Prod: env::Production,
-        Test: env::Test,
-    }
+	mut info := CompileInfo{
+		Prod: env::Production,
+		Test: env::Test,
+	}
 
-    match env::Compiler {
-    | Compiler.Clang:
-        info.Compiler = Compiler.Clang
-    | Compiler.GCC:
-        info.Compiler = Compiler.GCC
-    }
+	match env::Compiler {
+	| Compiler.Clang:
+		info.Compiler = Compiler.Clang
+	| Compiler.GCC:
+		info.Compiler = Compiler.GCC
+	}
 
-    match env::CppStd {
-    | CppStd.Cpp14:
-        info.CppStd = CppStd.Cpp14
-    | CppStd.Cpp17:
-        info.CppStd = CppStd.Cpp17
-    | CppStd.Cpp20:
-        info.CppStd = CppStd.Cpp20
-    }
+	match env::CppStd {
+	| CppStd.Cpp14:
+		info.CppStd = CppStd.Cpp14
+	| CppStd.Cpp17:
+		info.CppStd = CppStd.Cpp17
+	| CppStd.Cpp20:
+		info.CppStd = CppStd.Cpp20
+	}
 
-    ret info
+	ret info
 }

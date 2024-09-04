@@ -124,104 +124,104 @@
 //  Log1p(x < -1) = NaN
 //  Log1p(NaN) = NaN
 fn Log1p(x: f64): f64 {
-    const Sqrt2m1 = 4.142135623730950488017e-01      // sqrt(2)-1 = 0x3fda827999fcef34
-    const Sqrt2Halfm1 = -2.928932188134524755992e-01 // sqrt(2)/2-1 = 0xbfd2bec333018866
-    const Small = 1.0 / (1 << 29)                    // 2**-29 = 0x3e20000000000000
-    const Tiny = 1.0 / (1 << 54)                     // 2**-54
-    const Two53 = 1 << 53                            // 2**53
-    const Ln2Hi = 6.93147180369123816490e-01         // 3fe62e42fee00000
-    const Ln2Lo = 1.90821492927058770002e-10         // 3dea39ef35793c76
-    const LP1 = 6.666666666666735130e-01             // 3FE5555555555593
-    const LP2 = 3.999999999940941908e-01             // 3FD999999997FA04
-    const LP3 = 2.857142874366239149e-01             // 3FD2492494229359
-    const LP4 = 2.222219843214978396e-01             // 3FCC71C51D8E78AF
-    const LP5 = 1.818357216161805012e-01             // 3FC7466496CB03DE
-    const LP6 = 1.531383769920937332e-01             // 3FC39A09D078C69F
-    const LP7 = 1.479819860511658591e-01             // 3FC2F112DF3E5244
+	const Sqrt2m1 = 4.142135623730950488017e-01      // sqrt(2)-1 = 0x3fda827999fcef34
+	const Sqrt2Halfm1 = -2.928932188134524755992e-01 // sqrt(2)/2-1 = 0xbfd2bec333018866
+	const Small = 1.0 / (1 << 29)                    // 2**-29 = 0x3e20000000000000
+	const Tiny = 1.0 / (1 << 54)                     // 2**-54
+	const Two53 = 1 << 53                            // 2**53
+	const Ln2Hi = 6.93147180369123816490e-01         // 3fe62e42fee00000
+	const Ln2Lo = 1.90821492927058770002e-10         // 3dea39ef35793c76
+	const LP1 = 6.666666666666735130e-01             // 3FE5555555555593
+	const LP2 = 3.999999999940941908e-01             // 3FD999999997FA04
+	const LP3 = 2.857142874366239149e-01             // 3FD2492494229359
+	const LP4 = 2.222219843214978396e-01             // 3FCC71C51D8E78AF
+	const LP5 = 1.818357216161805012e-01             // 3FC7466496CB03DE
+	const LP6 = 1.531383769920937332e-01             // 3FC39A09D078C69F
+	const LP7 = 1.479819860511658591e-01             // 3FC2F112DF3E5244
 
-    // special cases
-    match {
-    | x < -1 | IsNaN(x): // includes -inf
-        ret NaN()
-    | x == -1:
-        ret Inf(-1)
-    | IsInf(x, 1):
-        ret Inf(1)
-    }
+	// special cases
+	match {
+	| x < -1 | IsNaN(x): // includes -inf
+		ret NaN()
+	| x == -1:
+		ret Inf(-1)
+	| IsInf(x, 1):
+		ret Inf(1)
+	}
 
-    absx := Abs(x)
+	absx := Abs(x)
 
-    mut f := 0.
-    mut iu := u64(0)
-    mut k := 1
-    if absx < Sqrt2m1 { //  |x| < sqrt(2)-1
-        if absx < Small { // |x| < 2**-29
-            if absx < Tiny { // |x| < 2**-54
-                ret x
-            }
-            ret x - x * x * 0.5
-        }
-        if x > Sqrt2Halfm1 { // sqrt(2)/2-1 < x
-            // (sqrt(2)/2-1) < x < (sqrt(2)-1)
-            k = 0
-            f = x
-            iu = 1
-        }
-    }
-    mut c := 0.
-    if k != 0 {
-        mut u := 0.
-        if absx < Two53 { // 1<<53
-            u = 1.0 + x
-            iu = F64Bits(u)
-            k = int((iu >> 52) - 1023)
-            // correction term
-            if k > 0 {
-                c = 1.0 - (u - x)
-            } else {
-                c = x - (u - 1.0)
-            }
-            c /= u
-        } else {
-            u = x
-            iu = F64Bits(u)
-            k = int((iu >> 52) - 1023)
-            c = 0
-        }
-        iu &= 0x000fffffffffffff
+	mut f := 0.
+	mut iu := u64(0)
+	mut k := 1
+	if absx < Sqrt2m1 { //  |x| < sqrt(2)-1
+		if absx < Small { // |x| < 2**-29
+			if absx < Tiny { // |x| < 2**-54
+				ret x
+			}
+			ret x - x * x * 0.5
+		}
+		if x > Sqrt2Halfm1 { // sqrt(2)/2-1 < x
+			// (sqrt(2)/2-1) < x < (sqrt(2)-1)
+			k = 0
+			f = x
+			iu = 1
+		}
+	}
+	mut c := 0.
+	if k != 0 {
+		mut u := 0.
+		if absx < Two53 { // 1<<53
+			u = 1.0 + x
+			iu = F64Bits(u)
+			k = int((iu >> 52) - 1023)
+			// correction term
+			if k > 0 {
+				c = 1.0 - (u - x)
+			} else {
+				c = x - (u - 1.0)
+			}
+			c /= u
+		} else {
+			u = x
+			iu = F64Bits(u)
+			k = int((iu >> 52) - 1023)
+			c = 0
+		}
+		iu &= 0x000fffffffffffff
 
-        if iu < 0x0006a09e667f3bcd { // mantissa of sqrt(2)
-            u = F64FromBits(iu | 0x3ff0000000000000) // normalize u
-        } else {
-            k++
-            u = F64FromBits(iu | 0x3fe0000000000000) // normalize u/2
-            iu = (0x0010000000000000 - iu) >> 2
-        }
-        f = u - 1.0 // sqrt(2)/2 < u < sqrt(2)
-    }
-    hfsq := 0.5 * f * f
-    mut s := 0.
-    mut R := 0.
-    mut z := 0.
-    if iu == 0 { // |f| < 2**-20
-        if f == 0 {
-            if k == 0 {
-                ret 0
-            }
-            c += f64(k) * Ln2Lo
-            ret f64(k) * Ln2Hi + c
-        }
-        R = hfsq * (1.0 - 0.66666666666666666 * f) // avoid division
-        if k == 0 {
-            ret f - R
-        }
-        ret f64(k) * Ln2Hi - ((R - (f64(k) * Ln2Lo + c)) - f)
-    }
-    s = f / (2.0 + f)
-    z = s * s
-    R = z * (LP1 + z * (LP2 + z * (LP3 + z * (LP4 + z * (LP5 + z * (LP6 + z * LP7))))))
-    if k == 0 {
-        ret f - (hfsq - s * (hfsq + R))
-    }
-    ret f64(k) * Ln2Hi - ((hfsq - (s * (hfsq + R) + (f64(k) * Ln2Lo + c))) - f)
+		if iu < 0x0006a09e667f3bcd { // mantissa of sqrt(2)
+			u = F64FromBits(iu | 0x3ff0000000000000) // normalize u
+		} else {
+			k++
+			u = F64FromBits(iu | 0x3fe0000000000000) // normalize u/2
+			iu = (0x0010000000000000 - iu) >> 2
+		}
+		f = u - 1.0 // sqrt(2)/2 < u < sqrt(2)
+	}
+	hfsq := 0.5 * f * f
+	mut s := 0.
+	mut R := 0.
+	mut z := 0.
+	if iu == 0 { // |f| < 2**-20
+		if f == 0 {
+			if k == 0 {
+				ret 0
+			}
+			c += f64(k) * Ln2Lo
+			ret f64(k) * Ln2Hi + c
+		}
+		R = hfsq * (1.0 - 0.66666666666666666 * f) // avoid division
+		if k == 0 {
+			ret f - R
+		}
+		ret f64(k) * Ln2Hi - ((R - (f64(k) * Ln2Lo + c)) - f)
+	}
+	s = f / (2.0 + f)
+	z = s * s
+	R = z * (LP1 + z * (LP2 + z * (LP3 + z * (LP4 + z * (LP5 + z * (LP6 + z * LP7))))))
+	if k == 0 {
+		ret f - (hfsq - s * (hfsq + R))
+	}
+	ret f64(k) * Ln2Hi - ((hfsq - (s * (hfsq + R) + (f64(k) * Ln2Lo + c))) - f)
 }

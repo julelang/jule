@@ -8,16 +8,16 @@ cpp use "dynar.hpp"
 #typedef
 #namespace "jule_std"
 cpp struct DynarBuffer[T] {
-    heap: *T
-    len:  int
-    cap:  int
+	heap: *T
+	len:  int
+	cap:  int
 }
 
 #namespace "std"
 cpp unsafe fn copy(mut start: *unsafe, mut end: *unsafe, mut dest: *unsafe)
 
 unsafe fn copy[T](mut dest: *T, mut buff: *T, len: int) {
-    cpp.copy(buff, buff + len, dest)
+	cpp.copy(buff, buff + len, dest)
 }
 
 // Dynamic allocation on heap, suitable for dynamic array scenarios.
@@ -31,93 +31,93 @@ unsafe fn copy[T](mut dest: *T, mut buff: *T, len: int) {
 // However, this functions have not any safet checks for performance purposes.
 // Use this structure carefully.
 struct Dynar[T] {
-    Buff: cpp.DynarBuffer[T]
+	Buff: cpp.DynarBuffer[T]
 }
 
 impl Dynar {
-    static fn New(): Dynar[T] {
-        ret Dynar[T]{}
-    }
+	static fn New(): Dynar[T] {
+		ret Dynar[T]{}
+	}
 
-    // Deallocate heap.
-    fn Dispose(mut self) {
-        self.Buff.len = 0
-        self.Buff.cap = 0
-        unsafe {
-            integ::DeleteArray[T](self.Buff.heap)
-        }
-        self.Buff.heap = nil
-    }
+	// Deallocate heap.
+	fn Dispose(mut self) {
+		self.Buff.len = 0
+		self.Buff.cap = 0
+		unsafe {
+			integ::DeleteArray[T](self.Buff.heap)
+		}
+		self.Buff.heap = nil
+	}
 
-    // Resizes heap. It will allocate new allocation by size and
-    // copies old elements into new heap after allocation, then
-    // deallocates old heap allocation.
-    // Reports whether process completed successfuly.
-    fn Resize(mut self, n: int): bool {
-        mut newHeap := integ::NewArray[T](n)
-        if newHeap == nil {
-            ret false
-        }
-        if self.Buff.heap == nil {
-            self.Buff.heap = newHeap
-            self.Buff.cap = n
-            ret true
-        }
-        unsafe {
-            mut size := n
-            if self.Buff.len <= n {
-                size = self.Buff.len
-            }
-            if self.Buff.len > 0 {
-                copy[T](newHeap, self.Buff.heap, size)
-            }
-            unsafe {
-                integ::DeleteArray[T](self.Buff.heap)
-            }
-            self.Buff.heap = newHeap
-        }
-        self.Buff.cap = n
-        ret true
-    }
+	// Resizes heap. It will allocate new allocation by size and
+	// copies old elements into new heap after allocation, then
+	// deallocates old heap allocation.
+	// Reports whether process completed successfuly.
+	fn Resize(mut self, n: int): bool {
+		mut newHeap := integ::NewArray[T](n)
+		if newHeap == nil {
+			ret false
+		}
+		if self.Buff.heap == nil {
+			self.Buff.heap = newHeap
+			self.Buff.cap = n
+			ret true
+		}
+		unsafe {
+			mut size := n
+			if self.Buff.len <= n {
+				size = self.Buff.len
+			}
+			if self.Buff.len > 0 {
+				copy[T](newHeap, self.Buff.heap, size)
+			}
+			unsafe {
+				integ::DeleteArray[T](self.Buff.heap)
+			}
+			self.Buff.heap = newHeap
+		}
+		self.Buff.cap = n
+		ret true
+	}
 
-    // Returns pointer that points to first element of buffer.
-    fn Begin(mut self): *T {
-        ret self.Buff.heap
-    }
+	// Returns pointer that points to first element of buffer.
+	fn Begin(mut self): *T {
+		ret self.Buff.heap
+	}
 
-    // Returns pointer that points to end of the last element of buffer.
-    fn End(mut self): *T {
-        ret self.Buff.heap + self.Buff.len
-    }
+	// Returns pointer that points to end of the last element of buffer.
+	fn End(mut self): *T {
+		ret self.Buff.heap + self.Buff.len
+	}
 
-    // Shift elements to right by n until reach i (including i).
-    // Starts at end of buffer, goes to left step by step.
-    fn ShiftRight(mut self, i: int, n: int) {
-        mut j := self.End() - 1
-        k := self.Begin() + i
-        for j >= k; j-- {
-            unsafe {
-                *(j + n) = *j
-            }
-        }
-    }
+	// Shift elements to right by n until reach i (including i).
+	// Starts at end of buffer, goes to left step by step.
+	fn ShiftRight(mut self, i: int, n: int) {
+		mut j := self.End() - 1
+		k := self.Begin() + i
+		for j >= k; j-- {
+			unsafe {
+				*(j + n) = *j
+			}
+		}
+	}
 
-    // Shift elements to left by n until reach j (excluding j), start at i.
-    fn ShiftLeft(mut self, i: int, j: int, n: int) {
-        mut k := self.Begin() + i
-        l := self.Begin() + j
-        for k < l; k++ {
-            unsafe {
-                *(k - n) = *k
-            }
-        }
-    }
+	// Shift elements to left by n until reach j (excluding j), start at i.
+	fn ShiftLeft(mut self, i: int, j: int, n: int) {
+		mut k := self.Begin() + i
+		l := self.Begin() + j
+		for k < l; k++ {
+			unsafe {
+				*(k - n) = *k
+			}
+		}
+	}
 
-    // Set buffer elements, starts at i.
-    // Uses p for read data, reads n elements and assigns to buffer.
-    fn Set(mut self, i: int, mut p: *T, n: int) {
-        unsafe {
-            copy[T](self.Begin() + i, p, n)
-        }
-    }
+	// Set buffer elements, starts at i.
+	// Uses p for read data, reads n elements and assigns to buffer.
+	fn Set(mut self, i: int, mut p: *T, n: int) {
+		unsafe {
+			copy[T](self.Begin() + i, p, n)
+		}
+	}
 }

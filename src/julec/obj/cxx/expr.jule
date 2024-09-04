@@ -5,15 +5,15 @@
 use obj
 use env
 use opt::{
-    RefExprModel,
-    UnsafeBinaryExprModel,
-    UnsafeIndexingExprModel,
-    PushToSliceExprModel,
-    AppendToSliceExprModel,
-    StrCompExprModel,
-    EmptyCompareExprModel,
-    UnsafeDerefExprModel,
-    UnsafeCastingExprModel,
+	RefExprModel,
+	UnsafeBinaryExprModel,
+	UnsafeIndexingExprModel,
+	PushToSliceExprModel,
+	AppendToSliceExprModel,
+	StrCompExprModel,
+	EmptyCompareExprModel,
+	UnsafeDerefExprModel,
+	UnsafeCastingExprModel,
 }
 use conv for std::conv
 use std::env::{Arch}
@@ -22,60 +22,60 @@ use std::jule::build::{Directive, Is64Bit}
 use std::jule::constant::{Const}
 use std::jule::lex::{Token, TokenId, TokenKind}
 use std::jule::sema::{
-    Trait,
-    Var,
-    FnIns,
-    StructIns,
-    TypeKind,
-    Data,
-    Value,
-    ExprModel,
-    BinaryExprModel,
-    UnaryExprModel,
-    StructLitExprModel,
-    AllocStructLitExprModel,
-    CastingExprModel,
-    Stmt,
-    FnCallExprModel,
-    SliceExprModel,
-    IndexingExprModel,
-    AnonFnExprModel,
-    MapExprModel,
-    SlicingExprModel,
-    TraitSubIdentExprModel,
-    StructSubIdentExprModel,
-    ArrayExprModel,
-    TupleExprModel,
-    BuiltinOutCallExprModel,
-    BuiltinOutlnCallExprModel,
-    BuiltinNewCallExprModel,
-    BuiltinPanicCallExprModel,
-    BuiltinAssertCallExprModel,
-    BuiltinMakeCallExprModel,
-    BuiltinAppendCallExprModel,
-    BuiltinErrorCallExprModel,
-    BuiltinCopyCallExprModel,
-    BuiltinLenCallExprModel,
-    BuiltinCapCallExprModel,
-    BuiltinDeleteCallExprModel,
-    SizeofExprModel,
-    AlignofExprModel,
-    RuneExprModel,
-    StructStaticIdentExprModel,
-    IntegratedToStrExprModel,
-    BackendEmitExprModel,
-    FreeExprModel,
-    OperandExprModel,
-    Scope,
+	Trait,
+	Var,
+	FnIns,
+	StructIns,
+	TypeKind,
+	Data,
+	Value,
+	ExprModel,
+	BinaryExprModel,
+	UnaryExprModel,
+	StructLitExprModel,
+	AllocStructLitExprModel,
+	CastingExprModel,
+	Stmt,
+	FnCallExprModel,
+	SliceExprModel,
+	IndexingExprModel,
+	AnonFnExprModel,
+	MapExprModel,
+	SlicingExprModel,
+	TraitSubIdentExprModel,
+	StructSubIdentExprModel,
+	ArrayExprModel,
+	TupleExprModel,
+	BuiltinOutCallExprModel,
+	BuiltinOutlnCallExprModel,
+	BuiltinNewCallExprModel,
+	BuiltinPanicCallExprModel,
+	BuiltinAssertCallExprModel,
+	BuiltinMakeCallExprModel,
+	BuiltinAppendCallExprModel,
+	BuiltinErrorCallExprModel,
+	BuiltinCopyCallExprModel,
+	BuiltinLenCallExprModel,
+	BuiltinCapCallExprModel,
+	BuiltinDeleteCallExprModel,
+	SizeofExprModel,
+	AlignofExprModel,
+	RuneExprModel,
+	StructStaticIdentExprModel,
+	IntegratedToStrExprModel,
+	BackendEmitExprModel,
+	FreeExprModel,
+	OperandExprModel,
+	Scope,
 }
 use types for std::jule::types::{
-    MaxF32,
-    MaxF64,
-    MinF32,
-    MinF64,
-    MaxI64,
-    MinI64,
-    MaxU64,
+	MaxF32,
+	MaxF64,
+	MinF32,
+	MinF64,
+	MaxI64,
+	MinI64,
+	MaxU64,
 }
 use math for std::math
 use strings for std::strings::{StrBuilder}
@@ -91,1599 +91,1599 @@ type PrimKind: types::TypeKind
 
 // Common group of semantic analysis expression model types and optimizer specific types.
 enum compExprModel: type {
-    ExprModel: ExprModel,
-    str, // For built-in expressions.
-    &UnsafeBinaryExprModel,
-    &UnsafeIndexingExprModel,
-    &StrCompExprModel,
-    &RefExprModel,
-    &EmptyCompareExprModel,
-    &UnsafeDerefExprModel,
-    &UnsafeCastingExprModel,
+	ExprModel: ExprModel,
+	str, // For built-in expressions.
+	&UnsafeBinaryExprModel,
+	&UnsafeIndexingExprModel,
+	&StrCompExprModel,
+	&RefExprModel,
+	&EmptyCompareExprModel,
+	&UnsafeDerefExprModel,
+	&UnsafeCastingExprModel,
 }
 
 struct exprCoder {
-    oc: &ObjectCoder
+	oc: &ObjectCoder
 
-    // It will executed before common variable handling algorithm.
-    // If it returns true, common algorithm will not be executed.
-    varPrefixes: []fn(mut v: &Var): bool
+	// It will executed before common variable handling algorithm.
+	// If it returns true, common algorithm will not be executed.
+	varPrefixes: []fn(mut v: &Var): bool
 }
 
 impl exprCoder {
-    static fn new(mut &oc: &ObjectCoder): &exprCoder {
-        ret &exprCoder{
-            oc: oc,
-        }
-    }
-
-    fn string(mut &self, &c: &Const) {
-        content := c.ReadStr()
-        if len(content) == 0 { // Empty.
-            self.oc.write(typeCoder.Str + "()")
-            ret
-        }
-        len := conv::FmtInt(i64(len(content)), 10)
-        self.oc.write(typeCoder.Str)
-        self.oc.write("::lit(")
-        cstrLit(self.oc.Buf, content)
-        self.oc.write(", ")
-        self.oc.write(len)
-        self.oc.write(")")
-    }
-
-    fn boolean(mut &self, b: bool) {
-        if b {
-            self.oc.write("true")
-        } else {
-            self.oc.write("false")
-        }
-    }
-
-    fn nilLit(mut &self) {
-        self.oc.write("nullptr")
-    }
-
-    fn ftoaSpecialCases(mut &self, &x: f64): bool {
-        match {
-        | math::IsNaN(x):
-            self.oc.write("NAN")
-        | math::IsInf(x, 1):
-            self.oc.write("INFINITY")
-        | math::IsInf(x, -1):
-            self.oc.write("-INFINITY")
-        |:
-            ret false
-        }
-        ret true
-    }
-
-    fn float32(mut &self, &c: &Const) {
-        x := c.AsF64()
-
-        // Special cases.
-        if self.ftoaSpecialCases(x) {
-            ret
-        }
-
-        match {
-        | x == MaxF32:
-            self.oc.write("jule::MAX_F32")
-        | x == MinF32:
-            self.oc.write("jule::MIN_F32")
-        |:
-            ftoa(self.oc.Buf, x, 1 << 5)
-            self.oc.write("f")
-        }
-    }
-
-    fn float64(mut &self, &c: &Const) {
-        x := c.AsF64()
-
-        // Special cases.
-        if self.ftoaSpecialCases(x) {
-            ret
-        }
-
-        match {
-        | x == MaxF64:
-            self.oc.write("jule::MAX_F64")
-        | x == MinF64:
-            self.oc.write("jule::MIN_F64")
-        |:
-            ftoa(self.oc.Buf, x, 1 << 6)
-        }
-    }
-
-    fn constant(mut &self, mut c: &Const) {
-        match {
-        | c.IsStr():
-            self.string(c)
-        | c.IsBool():
-            self.boolean(c.ReadBool())
-        | c.IsF64():
-            match {
-            | c.Kind == PrimKind.F32:
-                self.float32(c)
-            |:
-                self.float64(c)
-            }
-        | c.IsI64():
-            itoa(self.oc.Buf, c.ReadI64())
-        | c.IsU64():
-            utoa(self.oc.Buf, c.ReadU64())
-        | c.IsNil():
-            self.nilLit()
-        |:
-            self.oc.write("<unimplemented_constant_expression>")
-        }
-    }
-
-    fn divByZeroBinary(mut &self, &op: &Token, mut &l: &OperandExprModel, mut &r: &OperandExprModel) {
-        self.oc.write("jule::")
-        match op.Id {
-        | TokenId.Solidus
-        | TokenId.SolidusEq:
-            self.oc.write("div(")
-        | TokenId.Percent
-        | TokenId.PercentEq:
-            self.oc.write("mod(")
-        }
-
-        if !env::Production {
-            self.oc.write("\"")
-            self.oc.locInfo(op)
-            self.oc.write("\",")
-        }
-        self.possibleRefExpr(l.Model)
-        self.oc.write(",")
-        self.possibleRefExpr(r.Model)
-        self.oc.write(")")
-    }
-
-    fn unsafeBinary(mut &self, mut m: &BinaryExprModel) {
-        if m.Op.Id == TokenId.Eqs || m.Op.Id == TokenId.NotEq {
-            // If this binary operator comparing <any> type.
-            // The m.Left is will be <any> one always.
-            if obj::IsAny(m.Left.Kind) {
-                if !m.Right.Kind.IsNil() && !obj::IsAny(m.Right.Kind) {
-                    self.oc.write("(")
-                    if m.Op.Id == TokenId.NotEq {
-                        self.oc.write("!")
-                    }
-                    i := self.oc.pushAnyType(m.Right.Kind)
-                    self.oc.write(anyTypeIdent)
-                    self.oc.write(conv::Itoa(i))
-                    self.oc.write("_compare(")
-                    self.possibleRefExpr(m.Left.Model)
-                    self.oc.write(", ")
-                    self.possibleRefExpr(m.Right.Model)
-                    self.oc.write("))")
-                    ret
-                }
-            }
-        }
-        self.oc.write("(")
-        self.possibleRefExpr(m.Left.Model)
-        self.oc.write(" ")
-        self.oc.write(m.Op.Kind)
-        self.oc.write(" ")
-        self.possibleRefExpr(m.Right.Model)
-        self.oc.write(")")
-    }
-
-    fn binary(mut &self, mut m: &BinaryExprModel) {
-        match m.Op.Id {
-        | TokenId.Solidus | TokenId.Percent:
-            // Do not check division of structures safety.
-            if m.Left.Kind.Struct() == nil {
-                self.divByZeroBinary(m.Op, m.Left, m.Right)
-                ret
-            }
-        }
-        self.unsafeBinary(m)
-    }
-
-    fn var(mut &self, mut m: &Var) {
-        for _, prefix in self.varPrefixes {
-            if prefix(m) {
-                ret
-            }
-        }
-        if m.Binded {
-            d := obj::FindDirective(m.Directives, Directive.Namespace)
-            if d != nil {
-                self.oc.writeBytes(concatAllParts(d.Args...))
-                self.oc.write("::")
-            }
-        }
-        identCoder.var(self.oc.Buf, m)
-    }
-
-    fn structureIns(mut &self, mut m: &StructIns) {
-        self.oc.tc.structureIns(self.oc.Buf, m)
-    }
-
-    fn unary(mut &self, mut m: &UnaryExprModel) {
-        match m.Op.Id {
-        | TokenId.Caret:
-            self.oc.write("(~(")
-            self.possibleRefExpr(m.Expr.Model)
-            self.oc.write("))")
-            ret
-        | TokenId.Star:
-            if env::Production || m.Expr.Kind.Sptr() == nil {
-                break
-            }
-            self.possibleRefExpr(m.Expr.Model)
-            self.oc.write(".get(\"")
-            self.oc.locInfo(m.Op)
-            self.oc.write("\")")
-            ret
-        }
-        self.oc.write("(")
-        self.oc.write(m.Op.Kind)
-        self.oc.write("(")
-        self.possibleRefExpr(m.Expr.Model)
-        self.oc.write("))")
-    }
-
-    fn structureLit(mut &self, mut m: &StructLitExprModel) {
-        if m.Strct.Decl.Binded {
-            self.oc.write("(")
-        }
-        self.oc.tc.structureIns(self.oc.Buf, m.Strct)
-        if m.Strct.Decl.Binded {
-            self.oc.write(")")
-        }
-        self.oc.write("{")
-        if len(m.Args) > 0 {
-            // Fields are should be in order.
-            // In other words, GCC will produce error(s).
-        iter:
-            for i, f in m.Strct.Fields {
-                for (_, mut arg) in m.Args {
-                    if arg.Field == f {
-                        self.oc.write(".")
-                        identCoder.field(self.oc.Buf, arg.Field.Decl)
-                        self.oc.write("=")
-                        self.possibleRefExpr(arg.Expr.Model)
-                        if len(m.Strct.Fields)-i > 1 {
-                            self.oc.write(", ")
-                        }
-                        continue iter
-                    }
-                }
-            }
-        }
-        self.oc.write("}")
-    }
-
-    fn allocStructure(mut &self, mut m: &AllocStructLitExprModel) {
-        self.oc.write("jule::new_ptr<")
-        identCoder.structureIns(self.oc.Buf, m.Lit.Strct)
-        self.oc.write(">(")
-        self.structureLit(m.Lit)
-        self.oc.write(")")
-    }
-
-    fn possibleRefExpr(mut &self, expr: compExprModel) {
-        match type expr {
-        | &Var:
-            v := (&Var)(expr)
-            if v.Reference {
-                self.oc.write("(*(")
-                self.model(expr)
-                self.oc.write("))")
-                ret
-            }
-        }
-        self.model(expr)
-    }
-
-    fn castTraitFromTrait(mut &self, mut &m: &CastingExprModel, mut t1: &Trait, mut t2: &Trait) {
-        self.possibleRefExpr(m.Expr.Model)
-        self.oc.write(".map(")
-        self.oc.pushAndWriteMaskMapper(t1, t2)
-        self.oc.write(")")
-    }
-
-    // Casting expression.
-    //
-    // Special cases:
-    //  - The any type castings should be came first than others.
-    //    Otherwise, code generation might be wrong because <any> the
-    //    uses special casting algorithms.
-    fn casting(mut &self, mut m: &CastingExprModel) {
-        match {
-        | obj::IsAny(m.Kind):
-            if m.ExprKind.IsNil() {
-                self.oc.write(typeCoder.Any + "()")
-                ret
-            }
-            if m.ExprKind.TypeEnum() != nil {
-                self.possibleRefExpr(m.Expr.Model)
-                ret
-            }
-            i := self.oc.pushAnyType(m.ExprKind)
-            self.oc.write(typeCoder.Any + "(")
-            match type m.Expr.Model {
-            | &Const:
-                prim := m.ExprKind.Prim()
-                if prim != nil && types::IsInt(prim.Kind) {
-                    self.oc.write("static_cast<")
-                    self.oc.tc.prim(self.oc.Buf, prim)
-                    self.oc.write(">(")
-                    self.possibleRefExpr(m.Expr.Model)
-                    self.oc.write(")")
-                    break
-                }
-                fall
-            |:
-                self.possibleRefExpr(m.Expr.Model)
-            }
-            self.oc.write(", &" + anyTypeIdent)
-            self.oc.write(conv::Itoa(i))
-            self.oc.write(")")
-            ret
-        | obj::IsAny(m.ExprKind):
-            self.possibleRefExpr(m.Expr.Model)
-            self.oc.write(".")
-            if m.Kind.Sptr() != nil {
-                self.oc.write("cast_ptr<")
-                self.oc.tc.kind(self.oc.Buf, m.Kind.Sptr().Elem)
-            } else {
-                self.oc.write("cast<")
-                self.oc.tc.kind(self.oc.Buf, m.Kind)
-            }
-            self.oc.write(">(")
-            if !env::Production {
-                self.oc.write("\"")
-                self.oc.locInfo(m.Token)
-                self.oc.write("\", ")
-            }
-            self.oc.write("&" + anyTypeIdent)
-            self.oc.write(conv::Itoa(self.oc.pushAnyType(m.Kind)))
-            self.oc.write(")")
-            ret
-        | m.ExprKind.Ptr() != nil
-        | m.Kind.Ptr() != nil:
-            self.oc.write("((")
-            self.oc.tc.kind(self.oc.Buf, m.Kind)
-            self.oc.write(")(")
-            self.possibleRefExpr(m.Expr.Model)
-            self.oc.write("))")
-            ret
-        | m.ExprKind.Trait() != nil:
-            if m.Kind.Trait() != nil {
-                self.castTraitFromTrait(m, m.Kind.Trait(), m.ExprKind.Trait())
-                ret
-            }
-            self.possibleRefExpr(m.Expr.Model)
-            self.oc.write(".")
-            if m.Kind.Sptr() != nil {
-                self.oc.write("cast_ptr<")
-                self.oc.tc.kind(self.oc.Buf, m.Kind.Sptr().Elem)
-            } else {
-                self.oc.write("cast<")
-                self.oc.tc.kind(self.oc.Buf, m.Kind)
-            }
-            self.oc.write(">(")
-            if !env::Production {
-                self.oc.write("\"")
-                self.oc.locInfo(m.Token)
-                self.oc.write("\", ")
-            }
-            self.oc.write("(" + typeCoder.Trait + "::Type*)&")
-            identCoder.traitDecl(self.oc.Buf, m.ExprKind.Trait())
-            self.oc.write("_mptr_data")
-            self.oc.write(conv::Itoa(obj::FindTraitTypeOffset(m.ExprKind.Trait(), m.Kind)))
-            self.oc.write(")")
-            ret
-        | m.Kind.Trait() != nil:
-            self.oc.tc.kind(self.oc.Buf, m.Kind)
-            self.oc.write("(")
-            self.possibleRefExpr(m.Expr.Model)
-            self.oc.write(", (" + typeCoder.Trait + "::Type*)&")
-            identCoder.traitDecl(self.oc.Buf, m.Kind.Trait())
-            self.oc.write("_mptr_data")
-            self.oc.write(conv::Itoa(obj::FindTraitTypeOffset(m.Kind.Trait(), m.ExprKind)))
-            self.oc.write(")")
-            ret
-        }
-        prim := m.Kind.Prim()
-        eprim := m.ExprKind.Prim()
-        if eprim != nil && prim != nil && prim.IsStr() {
-            if eprim.IsU8() {
-                self.oc.write(typeCoder.Str + "::from_byte(")
-            } else {
-                self.oc.write(typeCoder.Str + "::from_rune(")
-            }
-            self.possibleRefExpr(m.Expr.Model)
-            self.oc.write(")")
-            ret
-        }
-        self.oc.write("static_cast<")
-        self.oc.tc.kind(self.oc.Buf, m.Kind)
-        self.oc.write(">(")
-        self.possibleRefExpr(m.Expr.Model)
-        self.oc.write(")")
-    }
-
-    fn models(mut &self, mut args: []ExprModel) {
-        if len(args) == 0 {
-            ret
-        }
-        for (i, mut a) in args {
-            self.possibleRefExpr(a)
-            if len(args)-i > 1 {
-                self.oc.write(",")
-            }
-        }
-    }
-
-    fn args(mut &self, mut &m: &FnCallExprModel) {
-        mut j := 0
-        if m.Func.Owner != nil && !m.Func.Decl.Statically ||
-            len(m.Func.Params) > 0 && m.Func.Params[0].Decl.IsSelf() {
-            j++ // Skip receiver parameter.
-        }
-        for i, arg in m.Args {
-            p := m.Func.Params[j]
-            if p.Decl != nil && p.Decl.Reference {
-                match type arg {
-                | &Var:
-                    v := (&Var)(arg)
-                    if v.Reference {
-                        self.model(arg)
-                        goto end
-                    }
-                }
-                self.oc.write("&(")
-                self.model(arg)
-                self.oc.write(")")
-                goto end
-            }
-            self.possibleRefExpr(arg)
-        end:
-            if len(m.Args)-i > 1 {
-                self.oc.write(", ")
-            }
-            j++
-        }
-    }
-
-    fn modelForCall(mut &self, mut expr: compExprModel) {
-        match type expr {
-        | &FnIns:
-            self.funcIns((&FnIns)(expr))
-            ret
-        | &StructSubIdentExprModel:
-            mut ssie := (&StructSubIdentExprModel)(expr)
-            if ssie.Method != nil {
-                self.funcIns(ssie.Method)
-                ret
-            }
-        }
-        self.possibleRefExpr(expr)
-    }
-
-    fn pushCallInf(mut &self, &m: &FnCallExprModel) {
-        if env::Production || !m.Func.Anon {
-            self.oc.write("(")
-            ret
-        }
-        if m.Func.Anon {
-            match type m.Expr {
-            | &StructSubIdentExprModel:
-                if (&StructSubIdentExprModel)(m.Expr).Field.Decl.Owner.Binded {
-                    self.oc.write("(")
-                    ret
-                }
-            }
-            self.oc.write(".call")
-        }
-        self.oc.write("(\"")
-        self.oc.locInfo(m.Token)
-        self.oc.write("\"")
-        if len(m.Args) != 0 {
-            self.oc.write(", ")
-        }
-    }
-
-    fn isWrapped(mut &self, mut &m: &FnCallExprModel): bool {
-        if !m.Func.IsBuiltin() && len(m.Func.Decl.Params) > 0 && m.Func.Decl.Params[0].IsSelf() {
-            match type m.Expr {
-            | &StructSubIdentExprModel:
-                mut ssie := (&StructSubIdentExprModel)(m.Expr)
-                match {
-                | m.Func.Decl.Params[0].IsRef()
-                | ssie.Expr.Kind.Sptr() != nil:
-                    break
-                |:
-                    if ssie.Expr.Kind.Struct() != nil {
-                        if !ssie.Expr.Lvalue {
-                            self.oc.write("({ auto _wrap_copy = ")
-                            self.model(ssie.Expr.Model)
-                            self.oc.write("; ")
-                            ret true
-                        }
-                    }
-                }
-            }
-        }
-        ret false
-    }
-
-    fn writeReceiver(mut &self, mut m: compExprModel): (safeDeref: bool) {
-        match type m {
-        | &UnaryExprModel:
-            self.possibleRefExpr((&UnaryExprModel)(m).Expr.Model)
-            ret true
-        | &UnsafeDerefExprModel:
-            self.possibleRefExpr((&UnsafeDerefExprModel)(m).Base.Expr.Model)
-            ret false
-        |:
-            panic("implementation mistake, this panic call should be unreachable")
-        }
-    }
-
-    fn pureFuncCall(mut &self, mut &m: &FnCallExprModel) {
-        wrapped := self.isWrapped(m)
-        self.modelForCall(m.Expr)
-        if !m.Func.IsBuiltin() {
-            if m.Func.Decl.Binded && len(m.Func.Generics) > 0 {
-                if !obj::HasDirective(m.Func.Decl.Directives, Directive.Cdef) {
-                    self.oc.write("<")
-                    for (i, mut g) in m.Func.Generics {
-                        self.oc.tc.kind(self.oc.Buf, g.Kind)
-                        if len(m.Func.Generics)-i > 1 {
-                            self.oc.write(", ")
-                        }
-                    }
-                    self.oc.write(">")
-                }
-            }
-        }
-        self.pushCallInf(m)
-        if m.Func.AsAnon && !m.Func.Anon {
-            // Function used as anonymous.
-            // So pass nullptr to ctx parameter.
-            // Do not pass nullptr if function is anonymous,
-            // beacause it stores ctx data internally and it will pass.
-            self.oc.write("nullptr")
-            if len(m.Args) > 0 {
-                self.oc.write(", ")
-            }
-        }
-        if !m.Func.IsBuiltin() && len(m.Func.Decl.Params) > 0 && m.Func.Decl.Params[0].IsSelf() {
-            match type m.Expr {
-            | &StructSubIdentExprModel:
-                mut ssie := (&StructSubIdentExprModel)(m.Expr)
-                match {
-                | m.Func.Decl.Params[0].IsRef():
-                    // Ignore dereferencing, use data directly to call method.
-                    _ = self.writeReceiver(ssie.Expr.Model)
-                | ssie.Expr.Kind.Sptr() != nil:
-                    // Ignore dereferencing, use data directly to call [ptr] method.
-                    safe := self.writeReceiver(ssie.Expr.Model)
-                    if safe {
-                        self.oc.write(".ptr(")
-                        if !env::Production {
-                            self.oc.write("\"")
-                            self.oc.locInfo(m.Token)
-                            self.oc.write("\"")
-                        }
-                        self.oc.write(")")
-                    }
-                |:
-                    if ssie.Expr.Kind.Struct() != nil {
-                        match type ssie.Expr.Model {
-                        | &Var:
-                            v := (&Var)(ssie.Expr.Model)
-                            if v.Reference {
-                                break
-                            }
-                            fall
-                        |:
-                            // Add address taking operation for non-pointers.
-                            self.oc.write("&")
-                        }
-                    }
-                    if wrapped {
-                        self.oc.write("_wrap_copy")
-                    } else if ssie.Expr.Kind.Ptr() == nil {
-                        self.model(ssie.Expr.Model)
-                    } else {
-                        // Ignore dereferencing, use data directly to call method.
-                        self.possibleRefExpr((&UnaryExprModel)(ssie.Expr.Model).Expr.Model)
-                    }
-                }
-                if len(m.Args) > 0 {
-                    self.oc.write(", ")
-                }
-            | &TraitSubIdentExprModel:
-                self.possibleRefExpr((&TraitSubIdentExprModel)(m.Expr).Expr)
-                self.oc.write(".data")
-                if len(m.Args) > 0 {
-                    self.oc.write(", ")
-                }
-            }
-        }
-        self.args(m)
-        self.oc.write(")")
-
-        if wrapped {
-            self.oc.write("; })")
-        }
-    }
-
-    fn coFuncCall(mut &self, mut &m: &FnCallExprModel) {
-        self.oc.write("{\n")
-        self.oc.addIndent()
-        mut head := StrBuilder.New(1 << 5)
-        head.WriteStr("std::thread([")
-        if m.Func.Owner != nil {
-            head.WriteStr(identCoder.Self)
-            if len(m.Args) > 0 {
-                head.WriteStr(", ")
-            }
-        }
-        for i, arg in m.Args {
-            if i > 0 {
-                head.WriteStr(", ")
-            }
-            match type arg {
-            | &Var:
-                mut v := (&Var)(arg)
-                identCoder.var(head, v)
-                continue
-            }
-            name := "_co_arg_" + conv::Itoa(i)
-            head.WriteStr(name)
-            self.oc.indent()
-            self.oc.tc.kind(self.oc.Buf, m.Func.Params[i].Kind)
-            self.oc.write(" ")
-            if m.Func.Params[i].Decl.Reference {
-                self.oc.write("&")
-            }
-            self.oc.write(name)
-            self.oc.write(" = ")
-            self.possibleRefExpr(arg)
-            self.oc.write(";\n")
-            argS := any(name)
-            m.Args[i] = unsafe { *(*ExprModel)(&argS) }
-        }
-        self.oc.indent()
-        self.oc.Buf.Write(unsafe { head.Buf() })
-        self.oc.write("](void) mutable -> void {\n")
-        self.oc.addIndent()
-        self.oc.indent()
-        self.pureFuncCall(m)
-        self.oc.write(";\n")
-        self.oc.doneIndent()
-        self.oc.indent()
-        self.oc.write("}).detach();\n")
-        self.oc.doneIndent()
-        self.oc.indent()
-        self.oc.write("}")
-    }
-
-    fn writeUseExpr(mut &self, mut &f: &FnIns, mut d: &Data) {
-        if d.Kind.Tup() == nil {
-            self.possibleRefExpr(d.Model)
-            self.oc.write(";")
-            ret
-        }
-        mut tup := (&TupleExprModel)(d.Model)
-        self.oc.tc.rc.tup(self.oc.Buf, f.Result.Tup())
-        self.oc.write("{")
-        for i, data in tup.Datas {
-            self.oc.write("." + resultArgName)
-            self.oc.write(conv::Itoa(i))
-            self.oc.write("=")
-            self.possibleRefExpr(data.Model)
-            if len(tup.Datas)-i > 1 {
-                self.oc.write(", ")
-            }
-        }
-        self.oc.write("};")
-    }
-
-    fn funcCall(mut &self, mut m: &FnCallExprModel) {
-        if m.IsCo {
-            // Do not check for exceptionals,
-            // exceptional functions cannot be called with co.
-            self.coFuncCall(m)
-            ret
-        }
-        if m.Func.IsBuiltin() ||
-            !m.Func.Decl.Exceptional ||
-            m.Except != nil && len(m.Except.Stmts) == 0 {
-            self.pureFuncCall(m)
-            ret
-        }
-
-        // Generate code for exceptional.
-        self.oc.write("({\n")
-        self.oc.addIndent()
-        self.oc.indent()
-        self.oc.write("auto except = ")
-        self.pureFuncCall(m)
-        self.oc.write(";\n")
-        self.oc.indent()
-        if m.Except != nil {
-            if m.Func.Result == nil || !m.Assigned {
-                self.oc.write("if (!except.ok()) ")
-                self.oc.sc.scope(m.Except)
-                self.oc.write("\n")
-            } else {
-                forwarded := obj::IsForwarded(m.Except)
-                self.oc.write("(except.ok()) ? (except.result) : (")
-                if forwarded {
-                    self.oc.write("{")
-                }
-                mut stmt := m.Except.Stmts[len(m.Except.Stmts)-1]
-                match type stmt {
-                | &Data:
-                    m.Except.Stmts = m.Except.Stmts[:len(m.Except.Stmts)-1]
-                    self.oc.write("{\n")
-                    self.oc.addIndent()
-                    self.oc.sc.scopeStmts(m.Except)
-                    self.oc.write("\n")
-                    self.oc.indent()
-                    self.writeUseExpr(m.Func, (&Data)(stmt))
-                    self.oc.write("\n")
-                    self.oc.doneIndent()
-                    self.oc.indent()
-                    self.oc.write("}")
-                |:
-                    self.oc.sc.scope(m.Except)
-                }
-                if forwarded {
-                    self.oc.write(" ")
-                    self.initExpr(m.Func.Result)
-                    self.oc.write(";}")
-                }
-                self.oc.write(");\n")
-            }
-            self.oc.doneIndent()
-        } else {
-            self.oc.write(`if (!except.ok()) jule::panic(jule::Str("unhandled exceptional: ") + except.error.type->to_str(except.error.data) + jule::Str("\nlocation: `)
-            self.oc.locInfo(m.Token)
-            self.oc.write("\"));\n")
-            if !m.Func.Decl.IsVoid() {
-                self.oc.indent()
-                self.oc.write("(except.result);\n")
-            }
-            self.oc.doneIndent()
-        }
-
-        self.oc.indent()
-        self.oc.write("})")
-    }
-
-    fn slice(mut &self, mut m: &SliceExprModel) {
-        if len(m.Elems) == 0 {
-            self.oc.tc.asSlice(self.oc.Buf, m.ElemKind)
-            self.oc.write("()")
-            ret
-        }
-        self.oc.tc.asSlice(self.oc.Buf, m.ElemKind)
-        self.oc.write("::make({")
-        self.models(m.Elems)
-        self.oc.write("})")
-    }
-
-    fn indexing(mut &self, mut m: &IndexingExprModel) {
-        match type m.Expr.Model {
-        | &Const:
-            // Cosntant string indexed. Use fast way, avoid making literal.
-            self.oc.write(typeCoder.Str + "::at(")
-            if !env::Production {
-                self.oc.write("\"")
-                self.oc.locInfo(m.Token)
-                self.oc.write("\", ")
-            }
-            self.oc.write("reinterpret_cast<const " + typeCoder.U8 + "*>(")
-            s := (&Const)(m.Expr.Model).ReadStr()
-            cstrLit(self.oc.Buf, s)
-            self.oc.write("), ")
-            self.oc.write(conv::Itoa(len(s)))
-            self.oc.write(", ")
-            self.possibleRefExpr(m.Index.Model)
-            self.oc.write(")")
-            ret
-        }
-
-        self.possibleRefExpr(m.Expr.Model)
-        // Index access with safety measures.
-        match {
-        | env::Production
-        | m.Expr.Kind.Ptr() != nil
-        | m.Expr.Kind.Map() != nil
-        | obj::IsExprComesFromBind(m.Expr):
-            self.oc.write("[")
-            self.possibleRefExpr(m.Index.Model)
-            self.oc.write("]")
-        |:
-            self.oc.write(".at(\"")
-            self.oc.locInfo(m.Token)
-            self.oc.write("\", ")
-            self.possibleRefExpr(m.Index.Model)
-            self.oc.write(")")
-        }
-    }
-
-    fn unsafeIndexing(mut &self, mut m: &UnsafeIndexingExprModel) {
-        self.possibleRefExpr(m.Node.Expr.Model)
-        // Index access with safety measures.
-        match {
-        | env::Production
-        | m.Node.Expr.Kind.Ptr() != nil
-        | m.Node.Expr.Kind.Map() != nil:
-            self.oc.write("[")
-            self.possibleRefExpr(m.Node.Index.Model)
-            self.oc.write("]")
-        |:
-            self.oc.write(".__at(")
-            self.possibleRefExpr(m.Node.Index.Model)
-            self.oc.write(")")
-        }
-    }
-
-    fn anonFunc(mut &self, mut m: &AnonFnExprModel) {
-        closure := obj::IsClosure(m)
-        ident := self.oc.pushAnonFn(m)
-        self.oc.write("jule::__new_closure<")
-        self.oc.tc.anonFunc(self.oc.Buf, m.Func)
-        self.oc.write(">((void*)")
-        self.oc.write(ident)
-        if closure {
-            self.oc.write(", jule::Ptr<")
-            self.oc.write(ident)
-            self.oc.write(anonFnCtxSuffix)
-            self.oc.write(">::make(")
-            self.oc.write(ident)
-            self.oc.write(anonFnCtxSuffix + "{")
-            for (i, mut v) in m.Captured {
-                self.oc.write(".")
-                identCoder.var(self.oc.Buf, v)
-                self.oc.write("=")
-                self.var(v)
-                if len(m.Captured)-i > 1 {
-                    self.oc.write(",")
-                }
-            }
-            self.oc.write("}).as<" + typeCoder.Uintptr + ">(), ")
-            self.oc.write(ident)
-            self.oc.write(anonFnCtxHandlerSuffix + ")")
-        } else {
-            self.oc.write(", nullptr, nullptr)")
-        }
-    }
-
-    fn mapExpr(mut &self, mut m: &MapExprModel) {
-        self.oc.write(typeCoder.Map + "<")
-        self.oc.tc.kind(self.oc.Buf, m.KeyKind)
-        self.oc.write(", ")
-        self.oc.tc.kind(self.oc.Buf, m.ValKind)
-        self.oc.write(">({")
-        if len(m.Entries) > 0 {
-            for (i, mut pair) in m.Entries {
-                self.oc.write("{")
-                self.possibleRefExpr(pair.Key)
-                self.oc.write(",")
-                self.possibleRefExpr(pair.Val)
-                self.oc.write("}")
-                if len(m.Entries)-i > 1 {
-                    self.oc.write(",")
-                }
-            }
-        }
-        self.oc.write("})")
-    }
-
-    fn slicing(mut &self, mut m: &SlicingExprModel) {
-        self.possibleRefExpr(m.Expr)
-        self.oc.write(".slice(")
-        if !env::Production {
-            self.oc.write("\"")
-            self.oc.locInfo(m.Token)
-            self.oc.write("\", ")
-        }
-        self.possibleRefExpr(m.Left)
-        if m.Right != nil {
-            self.oc.write(", ")
-            self.possibleRefExpr(m.Right)
-        }
-        self.oc.write(")")
-    }
-
-    fn traitSub(mut &self, mut m: &TraitSubIdentExprModel) {
-        self.oc.write("((")
-        identCoder.traitDecl(self.oc.Buf, m.Trt)
-        self.oc.write("MptrData")
-        self.oc.write("*)")
-        self.possibleRefExpr(m.Expr)
-        self.oc.write(".safe_type(")
-        if !env::Production {
-            self.oc.write("\"")
-            self.oc.locInfo(m.Token)
-            self.oc.write("\"")
-        }
-        self.oc.write("))->")
-        identCoder.func(self.oc.Buf, m.Method)
-    }
-
-    fn structureSub(mut &self, mut m: &StructSubIdentExprModel) {
-        self.possibleRefExpr(m.Expr.Model)
-        if m.Field == nil {
-            ret
-        }
-        self.oc.write(".")
-        identCoder.field(self.oc.Buf, m.Field.Decl)
-    }
-
-    fn array(mut &self, mut m: &ArrayExprModel) {
-        self.oc.tc.array(self.oc.Buf, m.Kind)
-        if len(m.Elems) == 0 {
-            self.oc.write("()")
-            ret
-        }
-
-        // Filled.
-        if len(m.Elems) == 2 && m.Elems[1] == nil {
-            self.oc.write("(")
-            self.possibleRefExpr(m.Elems[0])
-            self.oc.write(")")
-            ret
-        }
-
-        self.oc.write("({")
-        self.models(m.Elems)
-        self.oc.write("})")
-        ret
-    }
-
-    // Writes complete expression model of function instance.
-    // Usefull for strict type safety.
-    fn funcInsCommon(mut &self, mut m: &FnIns) {
-        self.oc.tc.func(self.oc.Buf, m)
-        self.oc.write("(")
-        self.funcIns(m)
-        self.oc.write(")")
-    }
-
-    fn funcIns(mut &self, mut m: &FnIns) {
-        if m.Decl != nil && m.Decl.Binded {
-            d := obj::FindDirective(m.Decl.Directives, Directive.Namespace)
-            if d != nil {
-                self.oc.writeBytes(concatAllParts(d.Args...))
-                self.oc.write("::")
-            }
-        }
-        identCoder.funcIns(self.oc.Buf, m)
-    }
-
-    fn tuple(mut &self, mut m: &TupleExprModel) {
-        for (i, mut d) in m.Datas {
-            self.possibleRefExpr(d.Model)
-            self.oc.write(";")
-            if len(m.Datas)-i > 1 {
-                self.oc.write("\n")
-                self.oc.indent()
-            }
-        }
-    }
-
-    fn newCall(mut &self, mut m: &BuiltinNewCallExprModel) {
-        self.oc.write("jule::new_ptr<")
-        self.oc.tc.kind(self.oc.Buf, m.Kind)
-        self.oc.write(">(")
-        if m.Init != nil {
-            self.possibleRefExpr(m.Init)
-        }
-        self.oc.write(")")
-    }
-
-    fn outCall(mut &self, mut m: &BuiltinOutCallExprModel) {
-        if m.Debug && env::Production {
-            ret
-        }
-        self.oc.write("jule::out(")
-        self.possibleRefExpr(m.Expr)
-        self.oc.write(")")
-    }
-
-    fn outlnCall(mut &self, mut m: &BuiltinOutlnCallExprModel) {
-        if m.Debug && env::Production {
-            ret
-        }
-        self.oc.write("jule::outln(")
-        self.possibleRefExpr(m.Expr)
-        self.oc.write(")")
-    }
-
-    fn panicCall(mut &self, mut m: &BuiltinPanicCallExprModel) {
-        self.oc.write("jule::panic(")
-        self.possibleRefExpr(m.Expr)
-        self.oc.write(` + jule::Str("\nlocation: `)
-        self.oc.locInfo(m.Token)
-        self.oc.write("\"));")
-    }
-
-    fn assertCall(mut &self, mut m: &BuiltinAssertCallExprModel) {
-        if env::Production {
-            ret
-        }
-        self.oc.write("if (!(")
-        self.possibleRefExpr(m.Expr)
-        self.oc.write(")) jule::panic(jule::Str(")
-        cstrLit(self.oc.Buf, m.Log)
-        self.oc.write(`) + jule::Str("\nlocation: `)
-        self.oc.locInfo(m.Token)
-        self.oc.write("\"));")
-    }
-
-    fn errorCall(mut &self, mut m: &BuiltinErrorCallExprModel) {
-        self.oc.write("return ")
-        if m.Func.Decl.IsVoid() {
-            match type m.Err.Model {
-            | &Var:
-                v := (&Var)(m.Err.Model)
-                if v.Ident == TokenKind.Error {
-                    self.oc.write("jule::VoidExceptional{.error=std::move(except.error)}")
-                    ret
-                }
-            }
-            self.oc.write("jule::VoidExceptional{.error=" + typeCoder.Any + "(")
-        } else {
-            self.oc.write("jule::Exceptional<")
-            self.oc.tc.rc.codeMut1(self.oc.Buf, m.Func.Result)
-            match type m.Err.Model {
-            | &Var:
-                v := (&Var)(m.Err.Model)
-                if v.Ident == TokenKind.Error {
-                    self.oc.write(">{.error=except.error}")
-                    ret
-                }
-            }
-            self.oc.write(">{.error=" + typeCoder.Any + "(")
-        }
-        self.possibleRefExpr(m.Err.Model)
-        i := self.oc.pushAnyType(m.Err.Kind)
-        self.oc.write(", &" + anyTypeIdent)
-        self.oc.write(conv::Itoa(i))
-        self.oc.write(")}")
-    }
-
-    fn copyCall(mut &self, mut m: &BuiltinCopyCallExprModel) {
-        self.oc.write("jule::copy(")
-        self.possibleRefExpr(m.Dest.Model)
-        self.oc.write(", ")
-        self.possibleRefExpr(m.Src.Model)
-        self.oc.write(")")
-    }
-
-    fn lenCall(mut &self, mut m: &BuiltinLenCallExprModel) {
-        self.possibleRefExpr(m.Expr.Model)
-        self.oc.write(".len()")
-    }
-
-    fn capCall(mut &self, mut m: &BuiltinCapCallExprModel) {
-        self.possibleRefExpr(m.Expr.Model)
-        self.oc.write(".cap()")
-    }
-
-    fn deleteCall(mut &self, mut m: &BuiltinDeleteCallExprModel) {
-        self.possibleRefExpr(m.Dest.Model)
-        if m.Key != nil {
-            self.oc.write(".del(")
-            self.possibleRefExpr(m.Key.Model)
-            self.oc.write(")")
-        } else {
-            self.oc.write(".clear()")
-        }
-    }
-
-    fn makeCallSlice(mut &self, mut &m: &BuiltinMakeCallExprModel) {
-        mut slice := m.Kind.Slc()
-        self.oc.tc.kind(self.oc.Buf, m.Kind)
-        self.oc.write("::alloc(")
-        self.possibleRefExpr(m.Len)
-        self.oc.write(", ")
-        if m.Cap != nil {
-            self.possibleRefExpr(m.Cap)
-        } else {
-            self.possibleRefExpr(m.Len)
-        }
-        if shouldInitialized(slice.Elem) {
-            self.oc.write(", ")
-            self.initExpr(slice.Elem)
-        }
-        self.oc.write(")")
-    }
-
-    fn makeCallStr(mut &self, mut &m: &BuiltinMakeCallExprModel) {
-        self.oc.write(typeCoder.Str)
-        self.oc.write("::alloc(")
-        self.possibleRefExpr(m.Len)
-        if m.Cap != nil {
-            self.oc.write(", ")
-            self.possibleRefExpr(m.Cap)
-        }
-        self.oc.write(")")
-    }
-
-    fn makeCall(mut &self, mut m: &BuiltinMakeCallExprModel) {
-        if m.Kind.Slc() != nil {
-            self.makeCallSlice(m)
-            ret
-        }
-        self.makeCallStr(m)
-    }
-
-    fn pushToSlice(mut &self, mut m: &PushToSliceExprModel) {
-        // Use l-value advantage and define reference variable to destination
-        // in the child scope to avoid potential repeated high-cost memory access overhead.
-        const destIdent = "__jule_push_dest"
-
-        self.oc.write("{ ")
-        self.oc.tc.asSlice(self.oc.Buf, m.Elems.ElemKind)
-
-        mut ptr := false
-        match type m.Dest {
-        | &UnaryExprModel:
-            // Use raw pointer directly if exist.
-            mut u := (&UnaryExprModel)(m.Dest)
-            if u.Expr.Kind.Ptr() != nil {
-                self.oc.write(" *" + destIdent + " = ")
-                self.possibleRefExpr(u.Expr.Model)
-                self.oc.write("; ")
-                ptr = true
-                break
-            }
-            fall
-        |:
-            self.oc.write(" &" + destIdent + " = ")
-            self.possibleRefExpr(m.Dest)
-            self.oc.write("; ")
-        }
-        // Pushed single item.
-        if len(m.Elems.Elems) == 1 {
-            if ptr {
-                self.oc.write(destIdent + "->push(")
-            } else {
-                self.oc.write(destIdent + ".push(")
-            }
-            self.possibleRefExpr(m.Elems.Elems[0])
-            self.oc.write("); }")
-            ret
-        }
-        // Pushed more than single item.
-        // Pre-allocate enough capacity if not exist for appendation.
-        if ptr {
-            self.oc.write(destIdent + "->alloc_for_append(")
-        } else {
-            self.oc.write(destIdent + ".alloc_for_append(")
-        }
-        self.oc.write(conv::Itoa(len(m.Elems.Elems)))
-        self.oc.write("); ")
-        for (_, mut e) in m.Elems.Elems {
-            self.oc.write(destIdent)
-            // Use the "__push" method to skip allocation boundary checking.
-            if ptr {
-                self.oc.write("->__push(")
-            } else {
-                self.oc.write(".__push(")
-            }
-            self.possibleRefExpr(e)
-            self.oc.write("); ")
-        }
-        self.oc.write("}")
-    }
-
-    fn appendToSlice(mut &self, mut m: &AppendToSliceExprModel) {
-        self.oc.write("(")
-        self.possibleRefExpr(m.Dest)
-        self.oc.write(").append(")
-        self.possibleRefExpr(m.Slice)
-        self.oc.write(");")
-    }
-
-    fn appendCall(mut &self, mut m: &BuiltinAppendCallExprModel) {
-        self.oc.write("jule::append(")
-        self.possibleRefExpr(m.Dest)
-        self.oc.write(",")
-        self.possibleRefExpr(m.Elements)
-        self.oc.write(")")
-    }
-
-    fn sizeof(mut &self, mut m: &SizeofExprModel) {
-        self.oc.write("sizeof(")
-        self.possibleRefExpr(m.Expr)
-        self.oc.write(")")
-    }
-
-    fn alignof(mut &self, mut m: &AlignofExprModel) {
-        self.oc.write("alignof(")
-        self.possibleRefExpr(m.Expr)
-        self.oc.write(")")
-    }
-
-    fn runeLit(mut &self, m: &RuneExprModel) {
-        if m.Code <= 127 { // ASCII.
-            self.oc.Buf.WriteByte('\'')
-            mut b := sbtoa(byte(m.Code))
-            if b == "'" {
-                self.oc.Buf.WriteByte('\\')
-            }
-            self.oc.Buf.WriteStr(b)
-            self.oc.Buf.WriteByte('\'')
-            ret
-        }
-        itoa(self.oc.Buf, i64(m.Code))
-    }
-
-    fn structureStatic(mut &self, mut m: &StructStaticIdentExprModel) {
-        identCoder.funcIns(self.oc.Buf, m.Method)
-    }
-
-    fn integratedToStr(mut &self, mut m: &IntegratedToStrExprModel) {
-        self.oc.write("jule::to_str(")
-        self.possibleRefExpr(m.Expr)
-        self.oc.write(")")
-    }
-
-    fn backendEmit(mut &self, mut m: &BackendEmitExprModel) {
-        if len(m.Exprs) == 0 {
-            self.oc.write(m.Code)
-            ret
-        }
-        n := self.oc.Buf.Len()
-        mut args := make([]any, len(m.Exprs))
-        for (i, mut expr) in m.Exprs {
-            self.possibleRefExpr(expr)
-            mut buf := unsafe { self.oc.Buf.Buf() }
-            args[i] = str(buf[n:])
-            unsafe { self.oc.Buf.SetBuf(buf[:n]) }
-        }
-        self.oc.write(fmt::Format(m.Code, args...))
-    }
-
-    fn free(mut &self, mut m: &FreeExprModel) {
-        self.possibleRefExpr(m.Expr)
-        if env::RC {
-            self.oc.write(".dealloc()")
-            ret
-        }
-        self.oc.write(".__free()")
-    }
-
-    fn strComp(mut &self, mut m: &StrCompExprModel) {
-        if m.NotEq {
-            self.oc.write("(!")
-        }
-        s := m.Right.ReadStr()
-        self.possibleRefExpr(m.Left)
-        self.oc.write(".equal(")
-        cstrLit(self.oc.Buf, s)
-        self.oc.write(", ")
-        self.oc.write(conv::Itoa(len(s)))
-        self.oc.write(")")
-        if m.NotEq {
-            self.oc.write(")")
-        }
-    }
-
-    fn emptyCompare(mut &self, mut m: &EmptyCompareExprModel) {
-        if m.Neg {
-            self.oc.write("!")
-        }
-        self.oc.write("(")
-        self.possibleRefExpr(m.Expr)
-        self.oc.write(").empty()")
-    }
-
-    fn unsafeDeref(mut &self, mut m: &UnsafeDerefExprModel) {
-        match {
-        | m.Base.Expr.Kind.Sptr() != nil:
-            self.oc.write("(*")
-            self.possibleRefExpr(m.Base.Expr.Model)
-            self.oc.write(".alloc)")
-        |:
-            panic("implementation mistake, this panic call should be unreachable")
-        }
-    }
-
-    fn unsafeCasting(mut &self, mut m: &UnsafeCastingExprModel) {
-        match {
-        | obj::IsAny(m.Base.ExprKind):
-            self.possibleRefExpr(m.Base.Expr.Model)
-            if m.Base.Kind.Sptr() != nil {
-                self.oc.write(".unsafe_cast_ptr<")
-                self.oc.tc.kind(self.oc.Buf, m.Base.Kind.Sptr().Elem)
-            } else {
-                self.oc.write(".unsafe_cast<")
-                self.oc.tc.kind(self.oc.Buf, m.Base.Kind)
-            }
-            self.oc.write(">()")
-        |:
-            panic("implementation mistake, this panic call should be unreachable")
-        }
-    }
-
-    fn model(mut &self, mut m: compExprModel) {
-        match type m {
-        | str:
-            self.oc.write(str(m))
-        | &TypeKind:
-            self.oc.tc.kind(self.oc.Buf, (&TypeKind)(m))
-        | &Const:
-            self.constant((&Const)(m))
-        | &Var:
-            self.var((&Var)(m))
-        | &StructIns:
-            self.structureIns((&StructIns)(m))
-        | &FnIns:
-            self.funcInsCommon((&FnIns)(m))
-        | &UnsafeBinaryExprModel:
-            self.unsafeBinary((&UnsafeBinaryExprModel)(m).Node)
-        | &BinaryExprModel:
-            self.binary((&BinaryExprModel)(m))
-        | &UnaryExprModel:
-            self.unary((&UnaryExprModel)(m))
-        | &StructLitExprModel:
-            self.structureLit((&StructLitExprModel)(m))
-        | &AllocStructLitExprModel:
-            self.allocStructure((&AllocStructLitExprModel)(m))
-        | &CastingExprModel:
-            self.casting((&CastingExprModel)(m))
-        | &FnCallExprModel:
-            self.funcCall((&FnCallExprModel)(m))
-        | &SliceExprModel:
-            self.slice((&SliceExprModel)(m))
-        | &ArrayExprModel:
-            self.array((&ArrayExprModel)(m))
-        | &UnsafeIndexingExprModel:
-            self.unsafeIndexing((&UnsafeIndexingExprModel)(m))
-        | &IndexingExprModel:
-            self.indexing((&IndexingExprModel)(m))
-        | &AnonFnExprModel:
-            self.anonFunc((&AnonFnExprModel)(m))
-        | &MapExprModel:
-            self.mapExpr((&MapExprModel)(m))
-        | &SlicingExprModel:
-            self.slicing((&SlicingExprModel)(m))
-        | &TraitSubIdentExprModel:
-            self.traitSub((&TraitSubIdentExprModel)(m))
-        | &StructSubIdentExprModel:
-            self.structureSub((&StructSubIdentExprModel)(m))
-        | &TupleExprModel:
-            self.tuple((&TupleExprModel)(m))
-        | &BuiltinOutCallExprModel:
-            self.outCall((&BuiltinOutCallExprModel)(m))
-        | &BuiltinOutlnCallExprModel:
-            self.outlnCall((&BuiltinOutlnCallExprModel)(m))
-        | &BuiltinNewCallExprModel:
-            self.newCall((&BuiltinNewCallExprModel)(m))
-        | &BuiltinPanicCallExprModel:
-            self.panicCall((&BuiltinPanicCallExprModel)(m))
-        | &BuiltinAssertCallExprModel:
-            self.assertCall((&BuiltinAssertCallExprModel)(m))
-        | &BuiltinErrorCallExprModel:
-            self.errorCall((&BuiltinErrorCallExprModel)(m))
-        | &BuiltinMakeCallExprModel:
-            self.makeCall((&BuiltinMakeCallExprModel)(m))
-        | &BuiltinAppendCallExprModel:
-            self.appendCall((&BuiltinAppendCallExprModel)(m))
-        | &BuiltinCopyCallExprModel:
-            self.copyCall((&BuiltinCopyCallExprModel)(m))
-        | &BuiltinLenCallExprModel:
-            self.lenCall((&BuiltinLenCallExprModel)(m))
-        | &BuiltinCapCallExprModel:
-            self.capCall((&BuiltinCapCallExprModel)(m))
-        | &BuiltinDeleteCallExprModel:
-            self.deleteCall((&BuiltinDeleteCallExprModel)(m))
-        | &SizeofExprModel:
-            self.sizeof((&SizeofExprModel)(m))
-        | &AlignofExprModel:
-            self.alignof((&AlignofExprModel)(m))
-        | &RuneExprModel:
-            self.runeLit((&RuneExprModel)(m))
-        | &StructStaticIdentExprModel:
-            self.structureStatic((&StructStaticIdentExprModel)(m))
-        | &IntegratedToStrExprModel:
-            self.integratedToStr((&IntegratedToStrExprModel)(m))
-        | &BackendEmitExprModel:
-            self.backendEmit((&BackendEmitExprModel)(m))
-        | &FreeExprModel:
-            self.free((&FreeExprModel)(m))
-        | &StrCompExprModel:
-            self.strComp((&StrCompExprModel)(m))
-        | &RefExprModel:
-            self.var((&RefExprModel)(m).Var)
-        | &EmptyCompareExprModel:
-            self.emptyCompare((&EmptyCompareExprModel)(m))
-        | &UnsafeDerefExprModel:
-            self.unsafeDeref((&UnsafeDerefExprModel)(m))
-        | &UnsafeCastingExprModel:
-            self.unsafeCasting((&UnsafeCastingExprModel)(m))
-        |:
-            self.oc.write("<unimplemented_expression_model>")
-        }
-    }
-
-    fn initExpr(mut &self, mut t: &TypeKind) {
-        if t.NilCompatible() {
-            if t.Ptr() != nil {
-                self.oc.write("nullptr")
-            } else {
-                self.oc.tc.kind(self.oc.Buf, t)
-                self.oc.write("(nullptr)")
-            }
-            ret
-        }
-        mut tup := t.Tup()
-        if tup != nil {
-            self.oc.tc.rc.tup(self.oc.Buf, tup)
-            self.oc.write("{")
-            for (i, mut tt) in tup.Types {
-                if !shouldInitialized(tt) {
-                    continue
-                }
-                self.oc.write("." + resultArgName)
-                self.oc.write(conv::Itoa(i))
-                self.oc.write("=")
-                self.initExpr(tt)
-                if len(tup.Types)-i > 1 {
-                    self.oc.write(", ")
-                }
-            }
-            self.oc.write("}")
-            ret
-        }
-        mut enm := t.Enum()
-        if enm != nil {
-            self.model(enm.Items[0].Value.Data.Model)
-            ret
-        }
-        prim := t.Prim()
-        if prim != nil {
-            if types::IsNum(prim.Kind) {
-                self.oc.write("0")
-            } else if prim.IsBool() {
-                self.oc.write("false")
-            } else if prim.IsStr() {
-                self.oc.write(typeCoder.Str + "()")
-            }
-            ret
-        }
-        if t.Arr() != nil {
-            mut arr := t.Arr()
-            self.oc.tc.kind(self.oc.Buf, t)
-            self.oc.write("(")
-            self.initExpr(arr.Elem)
-            self.oc.write(")")
-            ret
-        }
-        mut s := t.Struct()
-        if s != nil && s.Decl.Binded && obj::FindDirective(s.Decl.Directives, Directive.Typedef) == nil {
-            self.oc.write("(")
-            self.oc.tc.kind(self.oc.Buf, t)
-            self.oc.write("){}")
-            ret
-        }
-        self.oc.tc.kind(self.oc.Buf, t)
-        self.oc.write("()")
-    }
+	static fn new(mut &oc: &ObjectCoder): &exprCoder {
+		ret &exprCoder{
+			oc: oc,
+		}
+	}
+
+	fn string(mut &self, &c: &Const) {
+		content := c.ReadStr()
+		if len(content) == 0 { // Empty.
+			self.oc.write(typeCoder.Str + "()")
+			ret
+		}
+		len := conv::FmtInt(i64(len(content)), 10)
+		self.oc.write(typeCoder.Str)
+		self.oc.write("::lit(")
+		cstrLit(self.oc.Buf, content)
+		self.oc.write(", ")
+		self.oc.write(len)
+		self.oc.write(")")
+	}
+
+	fn boolean(mut &self, b: bool) {
+		if b {
+			self.oc.write("true")
+		} else {
+			self.oc.write("false")
+		}
+	}
+
+	fn nilLit(mut &self) {
+		self.oc.write("nullptr")
+	}
+
+	fn ftoaSpecialCases(mut &self, &x: f64): bool {
+		match {
+		| math::IsNaN(x):
+			self.oc.write("NAN")
+		| math::IsInf(x, 1):
+			self.oc.write("INFINITY")
+		| math::IsInf(x, -1):
+			self.oc.write("-INFINITY")
+		|:
+			ret false
+		}
+		ret true
+	}
+
+	fn float32(mut &self, &c: &Const) {
+		x := c.AsF64()
+
+		// Special cases.
+		if self.ftoaSpecialCases(x) {
+			ret
+		}
+
+		match {
+		| x == MaxF32:
+			self.oc.write("jule::MAX_F32")
+		| x == MinF32:
+			self.oc.write("jule::MIN_F32")
+		|:
+			ftoa(self.oc.Buf, x, 1 << 5)
+			self.oc.write("f")
+		}
+	}
+
+	fn float64(mut &self, &c: &Const) {
+		x := c.AsF64()
+
+		// Special cases.
+		if self.ftoaSpecialCases(x) {
+			ret
+		}
+
+		match {
+		| x == MaxF64:
+			self.oc.write("jule::MAX_F64")
+		| x == MinF64:
+			self.oc.write("jule::MIN_F64")
+		|:
+			ftoa(self.oc.Buf, x, 1 << 6)
+		}
+	}
+
+	fn constant(mut &self, mut c: &Const) {
+		match {
+		| c.IsStr():
+			self.string(c)
+		| c.IsBool():
+			self.boolean(c.ReadBool())
+		| c.IsF64():
+			match {
+			| c.Kind == PrimKind.F32:
+				self.float32(c)
+			|:
+				self.float64(c)
+			}
+		| c.IsI64():
+			itoa(self.oc.Buf, c.ReadI64())
+		| c.IsU64():
+			utoa(self.oc.Buf, c.ReadU64())
+		| c.IsNil():
+			self.nilLit()
+		|:
+			self.oc.write("<unimplemented_constant_expression>")
+		}
+	}
+
+	fn divByZeroBinary(mut &self, &op: &Token, mut &l: &OperandExprModel, mut &r: &OperandExprModel) {
+		self.oc.write("jule::")
+		match op.Id {
+		| TokenId.Solidus
+		| TokenId.SolidusEq:
+			self.oc.write("div(")
+		| TokenId.Percent
+		| TokenId.PercentEq:
+			self.oc.write("mod(")
+		}
+
+		if !env::Production {
+			self.oc.write("\"")
+			self.oc.locInfo(op)
+			self.oc.write("\",")
+		}
+		self.possibleRefExpr(l.Model)
+		self.oc.write(",")
+		self.possibleRefExpr(r.Model)
+		self.oc.write(")")
+	}
+
+	fn unsafeBinary(mut &self, mut m: &BinaryExprModel) {
+		if m.Op.Id == TokenId.Eqs || m.Op.Id == TokenId.NotEq {
+			// If this binary operator comparing <any> type.
+			// The m.Left is will be <any> one always.
+			if obj::IsAny(m.Left.Kind) {
+				if !m.Right.Kind.IsNil() && !obj::IsAny(m.Right.Kind) {
+					self.oc.write("(")
+					if m.Op.Id == TokenId.NotEq {
+						self.oc.write("!")
+					}
+					i := self.oc.pushAnyType(m.Right.Kind)
+					self.oc.write(anyTypeIdent)
+					self.oc.write(conv::Itoa(i))
+					self.oc.write("_compare(")
+					self.possibleRefExpr(m.Left.Model)
+					self.oc.write(", ")
+					self.possibleRefExpr(m.Right.Model)
+					self.oc.write("))")
+					ret
+				}
+			}
+		}
+		self.oc.write("(")
+		self.possibleRefExpr(m.Left.Model)
+		self.oc.write(" ")
+		self.oc.write(m.Op.Kind)
+		self.oc.write(" ")
+		self.possibleRefExpr(m.Right.Model)
+		self.oc.write(")")
+	}
+
+	fn binary(mut &self, mut m: &BinaryExprModel) {
+		match m.Op.Id {
+		| TokenId.Solidus | TokenId.Percent:
+			// Do not check division of structures safety.
+			if m.Left.Kind.Struct() == nil {
+				self.divByZeroBinary(m.Op, m.Left, m.Right)
+				ret
+			}
+		}
+		self.unsafeBinary(m)
+	}
+
+	fn var(mut &self, mut m: &Var) {
+		for _, prefix in self.varPrefixes {
+			if prefix(m) {
+				ret
+			}
+		}
+		if m.Binded {
+			d := obj::FindDirective(m.Directives, Directive.Namespace)
+			if d != nil {
+				self.oc.writeBytes(concatAllParts(d.Args...))
+				self.oc.write("::")
+			}
+		}
+		identCoder.var(self.oc.Buf, m)
+	}
+
+	fn structureIns(mut &self, mut m: &StructIns) {
+		self.oc.tc.structureIns(self.oc.Buf, m)
+	}
+
+	fn unary(mut &self, mut m: &UnaryExprModel) {
+		match m.Op.Id {
+		| TokenId.Caret:
+			self.oc.write("(~(")
+			self.possibleRefExpr(m.Expr.Model)
+			self.oc.write("))")
+			ret
+		| TokenId.Star:
+			if env::Production || m.Expr.Kind.Sptr() == nil {
+				break
+			}
+			self.possibleRefExpr(m.Expr.Model)
+			self.oc.write(".get(\"")
+			self.oc.locInfo(m.Op)
+			self.oc.write("\")")
+			ret
+		}
+		self.oc.write("(")
+		self.oc.write(m.Op.Kind)
+		self.oc.write("(")
+		self.possibleRefExpr(m.Expr.Model)
+		self.oc.write("))")
+	}
+
+	fn structureLit(mut &self, mut m: &StructLitExprModel) {
+		if m.Strct.Decl.Binded {
+			self.oc.write("(")
+		}
+		self.oc.tc.structureIns(self.oc.Buf, m.Strct)
+		if m.Strct.Decl.Binded {
+			self.oc.write(")")
+		}
+		self.oc.write("{")
+		if len(m.Args) > 0 {
+			// Fields are should be in order.
+			// In other words, GCC will produce error(s).
+		iter:
+			for i, f in m.Strct.Fields {
+				for (_, mut arg) in m.Args {
+					if arg.Field == f {
+						self.oc.write(".")
+						identCoder.field(self.oc.Buf, arg.Field.Decl)
+						self.oc.write("=")
+						self.possibleRefExpr(arg.Expr.Model)
+						if len(m.Strct.Fields)-i > 1 {
+							self.oc.write(", ")
+						}
+						continue iter
+					}
+				}
+			}
+		}
+		self.oc.write("}")
+	}
+
+	fn allocStructure(mut &self, mut m: &AllocStructLitExprModel) {
+		self.oc.write("jule::new_ptr<")
+		identCoder.structureIns(self.oc.Buf, m.Lit.Strct)
+		self.oc.write(">(")
+		self.structureLit(m.Lit)
+		self.oc.write(")")
+	}
+
+	fn possibleRefExpr(mut &self, expr: compExprModel) {
+		match type expr {
+		| &Var:
+			v := (&Var)(expr)
+			if v.Reference {
+				self.oc.write("(*(")
+				self.model(expr)
+				self.oc.write("))")
+				ret
+			}
+		}
+		self.model(expr)
+	}
+
+	fn castTraitFromTrait(mut &self, mut &m: &CastingExprModel, mut t1: &Trait, mut t2: &Trait) {
+		self.possibleRefExpr(m.Expr.Model)
+		self.oc.write(".map(")
+		self.oc.pushAndWriteMaskMapper(t1, t2)
+		self.oc.write(")")
+	}
+
+	// Casting expression.
+	//
+	// Special cases:
+	//  - The any type castings should be came first than others.
+	//    Otherwise, code generation might be wrong because <any> the
+	//    uses special casting algorithms.
+	fn casting(mut &self, mut m: &CastingExprModel) {
+		match {
+		| obj::IsAny(m.Kind):
+			if m.ExprKind.IsNil() {
+				self.oc.write(typeCoder.Any + "()")
+				ret
+			}
+			if m.ExprKind.TypeEnum() != nil {
+				self.possibleRefExpr(m.Expr.Model)
+				ret
+			}
+			i := self.oc.pushAnyType(m.ExprKind)
+			self.oc.write(typeCoder.Any + "(")
+			match type m.Expr.Model {
+			| &Const:
+				prim := m.ExprKind.Prim()
+				if prim != nil && types::IsInt(prim.Kind) {
+					self.oc.write("static_cast<")
+					self.oc.tc.prim(self.oc.Buf, prim)
+					self.oc.write(">(")
+					self.possibleRefExpr(m.Expr.Model)
+					self.oc.write(")")
+					break
+				}
+				fall
+			|:
+				self.possibleRefExpr(m.Expr.Model)
+			}
+			self.oc.write(", &" + anyTypeIdent)
+			self.oc.write(conv::Itoa(i))
+			self.oc.write(")")
+			ret
+		| obj::IsAny(m.ExprKind):
+			self.possibleRefExpr(m.Expr.Model)
+			self.oc.write(".")
+			if m.Kind.Sptr() != nil {
+				self.oc.write("cast_ptr<")
+				self.oc.tc.kind(self.oc.Buf, m.Kind.Sptr().Elem)
+			} else {
+				self.oc.write("cast<")
+				self.oc.tc.kind(self.oc.Buf, m.Kind)
+			}
+			self.oc.write(">(")
+			if !env::Production {
+				self.oc.write("\"")
+				self.oc.locInfo(m.Token)
+				self.oc.write("\", ")
+			}
+			self.oc.write("&" + anyTypeIdent)
+			self.oc.write(conv::Itoa(self.oc.pushAnyType(m.Kind)))
+			self.oc.write(")")
+			ret
+		| m.ExprKind.Ptr() != nil
+		| m.Kind.Ptr() != nil:
+			self.oc.write("((")
+			self.oc.tc.kind(self.oc.Buf, m.Kind)
+			self.oc.write(")(")
+			self.possibleRefExpr(m.Expr.Model)
+			self.oc.write("))")
+			ret
+		| m.ExprKind.Trait() != nil:
+			if m.Kind.Trait() != nil {
+				self.castTraitFromTrait(m, m.Kind.Trait(), m.ExprKind.Trait())
+				ret
+			}
+			self.possibleRefExpr(m.Expr.Model)
+			self.oc.write(".")
+			if m.Kind.Sptr() != nil {
+				self.oc.write("cast_ptr<")
+				self.oc.tc.kind(self.oc.Buf, m.Kind.Sptr().Elem)
+			} else {
+				self.oc.write("cast<")
+				self.oc.tc.kind(self.oc.Buf, m.Kind)
+			}
+			self.oc.write(">(")
+			if !env::Production {
+				self.oc.write("\"")
+				self.oc.locInfo(m.Token)
+				self.oc.write("\", ")
+			}
+			self.oc.write("(" + typeCoder.Trait + "::Type*)&")
+			identCoder.traitDecl(self.oc.Buf, m.ExprKind.Trait())
+			self.oc.write("_mptr_data")
+			self.oc.write(conv::Itoa(obj::FindTraitTypeOffset(m.ExprKind.Trait(), m.Kind)))
+			self.oc.write(")")
+			ret
+		| m.Kind.Trait() != nil:
+			self.oc.tc.kind(self.oc.Buf, m.Kind)
+			self.oc.write("(")
+			self.possibleRefExpr(m.Expr.Model)
+			self.oc.write(", (" + typeCoder.Trait + "::Type*)&")
+			identCoder.traitDecl(self.oc.Buf, m.Kind.Trait())
+			self.oc.write("_mptr_data")
+			self.oc.write(conv::Itoa(obj::FindTraitTypeOffset(m.Kind.Trait(), m.ExprKind)))
+			self.oc.write(")")
+			ret
+		}
+		prim := m.Kind.Prim()
+		eprim := m.ExprKind.Prim()
+		if eprim != nil && prim != nil && prim.IsStr() {
+			if eprim.IsU8() {
+				self.oc.write(typeCoder.Str + "::from_byte(")
+			} else {
+				self.oc.write(typeCoder.Str + "::from_rune(")
+			}
+			self.possibleRefExpr(m.Expr.Model)
+			self.oc.write(")")
+			ret
+		}
+		self.oc.write("static_cast<")
+		self.oc.tc.kind(self.oc.Buf, m.Kind)
+		self.oc.write(">(")
+		self.possibleRefExpr(m.Expr.Model)
+		self.oc.write(")")
+	}
+
+	fn models(mut &self, mut args: []ExprModel) {
+		if len(args) == 0 {
+			ret
+		}
+		for (i, mut a) in args {
+			self.possibleRefExpr(a)
+			if len(args)-i > 1 {
+				self.oc.write(",")
+			}
+		}
+	}
+
+	fn args(mut &self, mut &m: &FnCallExprModel) {
+		mut j := 0
+		if m.Func.Owner != nil && !m.Func.Decl.Statically ||
+			len(m.Func.Params) > 0 && m.Func.Params[0].Decl.IsSelf() {
+			j++ // Skip receiver parameter.
+		}
+		for i, arg in m.Args {
+			p := m.Func.Params[j]
+			if p.Decl != nil && p.Decl.Reference {
+				match type arg {
+				| &Var:
+					v := (&Var)(arg)
+					if v.Reference {
+						self.model(arg)
+						goto end
+					}
+				}
+				self.oc.write("&(")
+				self.model(arg)
+				self.oc.write(")")
+				goto end
+			}
+			self.possibleRefExpr(arg)
+		end:
+			if len(m.Args)-i > 1 {
+				self.oc.write(", ")
+			}
+			j++
+		}
+	}
+
+	fn modelForCall(mut &self, mut expr: compExprModel) {
+		match type expr {
+		| &FnIns:
+			self.funcIns((&FnIns)(expr))
+			ret
+		| &StructSubIdentExprModel:
+			mut ssie := (&StructSubIdentExprModel)(expr)
+			if ssie.Method != nil {
+				self.funcIns(ssie.Method)
+				ret
+			}
+		}
+		self.possibleRefExpr(expr)
+	}
+
+	fn pushCallInf(mut &self, &m: &FnCallExprModel) {
+		if env::Production || !m.Func.Anon {
+			self.oc.write("(")
+			ret
+		}
+		if m.Func.Anon {
+			match type m.Expr {
+			| &StructSubIdentExprModel:
+				if (&StructSubIdentExprModel)(m.Expr).Field.Decl.Owner.Binded {
+					self.oc.write("(")
+					ret
+				}
+			}
+			self.oc.write(".call")
+		}
+		self.oc.write("(\"")
+		self.oc.locInfo(m.Token)
+		self.oc.write("\"")
+		if len(m.Args) != 0 {
+			self.oc.write(", ")
+		}
+	}
+
+	fn isWrapped(mut &self, mut &m: &FnCallExprModel): bool {
+		if !m.Func.IsBuiltin() && len(m.Func.Decl.Params) > 0 && m.Func.Decl.Params[0].IsSelf() {
+			match type m.Expr {
+			| &StructSubIdentExprModel:
+				mut ssie := (&StructSubIdentExprModel)(m.Expr)
+				match {
+				| m.Func.Decl.Params[0].IsRef()
+				| ssie.Expr.Kind.Sptr() != nil:
+					break
+				|:
+					if ssie.Expr.Kind.Struct() != nil {
+						if !ssie.Expr.Lvalue {
+							self.oc.write("({ auto _wrap_copy = ")
+							self.model(ssie.Expr.Model)
+							self.oc.write("; ")
+							ret true
+						}
+					}
+				}
+			}
+		}
+		ret false
+	}
+
+	fn writeReceiver(mut &self, mut m: compExprModel): (safeDeref: bool) {
+		match type m {
+		| &UnaryExprModel:
+			self.possibleRefExpr((&UnaryExprModel)(m).Expr.Model)
+			ret true
+		| &UnsafeDerefExprModel:
+			self.possibleRefExpr((&UnsafeDerefExprModel)(m).Base.Expr.Model)
+			ret false
+		|:
+			panic("implementation mistake, this panic call should be unreachable")
+		}
+	}
+
+	fn pureFuncCall(mut &self, mut &m: &FnCallExprModel) {
+		wrapped := self.isWrapped(m)
+		self.modelForCall(m.Expr)
+		if !m.Func.IsBuiltin() {
+			if m.Func.Decl.Binded && len(m.Func.Generics) > 0 {
+				if !obj::HasDirective(m.Func.Decl.Directives, Directive.Cdef) {
+					self.oc.write("<")
+					for (i, mut g) in m.Func.Generics {
+						self.oc.tc.kind(self.oc.Buf, g.Kind)
+						if len(m.Func.Generics)-i > 1 {
+							self.oc.write(", ")
+						}
+					}
+					self.oc.write(">")
+				}
+			}
+		}
+		self.pushCallInf(m)
+		if m.Func.AsAnon && !m.Func.Anon {
+			// Function used as anonymous.
+			// So pass nullptr to ctx parameter.
+			// Do not pass nullptr if function is anonymous,
+			// beacause it stores ctx data internally and it will pass.
+			self.oc.write("nullptr")
+			if len(m.Args) > 0 {
+				self.oc.write(", ")
+			}
+		}
+		if !m.Func.IsBuiltin() && len(m.Func.Decl.Params) > 0 && m.Func.Decl.Params[0].IsSelf() {
+			match type m.Expr {
+			| &StructSubIdentExprModel:
+				mut ssie := (&StructSubIdentExprModel)(m.Expr)
+				match {
+				| m.Func.Decl.Params[0].IsRef():
+					// Ignore dereferencing, use data directly to call method.
+					_ = self.writeReceiver(ssie.Expr.Model)
+				| ssie.Expr.Kind.Sptr() != nil:
+					// Ignore dereferencing, use data directly to call [ptr] method.
+					safe := self.writeReceiver(ssie.Expr.Model)
+					if safe {
+						self.oc.write(".ptr(")
+						if !env::Production {
+							self.oc.write("\"")
+							self.oc.locInfo(m.Token)
+							self.oc.write("\"")
+						}
+						self.oc.write(")")
+					}
+				|:
+					if ssie.Expr.Kind.Struct() != nil {
+						match type ssie.Expr.Model {
+						| &Var:
+							v := (&Var)(ssie.Expr.Model)
+							if v.Reference {
+								break
+							}
+							fall
+						|:
+							// Add address taking operation for non-pointers.
+							self.oc.write("&")
+						}
+					}
+					if wrapped {
+						self.oc.write("_wrap_copy")
+					} else if ssie.Expr.Kind.Ptr() == nil {
+						self.model(ssie.Expr.Model)
+					} else {
+						// Ignore dereferencing, use data directly to call method.
+						self.possibleRefExpr((&UnaryExprModel)(ssie.Expr.Model).Expr.Model)
+					}
+				}
+				if len(m.Args) > 0 {
+					self.oc.write(", ")
+				}
+			| &TraitSubIdentExprModel:
+				self.possibleRefExpr((&TraitSubIdentExprModel)(m.Expr).Expr)
+				self.oc.write(".data")
+				if len(m.Args) > 0 {
+					self.oc.write(", ")
+				}
+			}
+		}
+		self.args(m)
+		self.oc.write(")")
+
+		if wrapped {
+			self.oc.write("; })")
+		}
+	}
+
+	fn coFuncCall(mut &self, mut &m: &FnCallExprModel) {
+		self.oc.write("{\n")
+		self.oc.addIndent()
+		mut head := StrBuilder.New(1 << 5)
+		head.WriteStr("std::thread([")
+		if m.Func.Owner != nil {
+			head.WriteStr(identCoder.Self)
+			if len(m.Args) > 0 {
+				head.WriteStr(", ")
+			}
+		}
+		for i, arg in m.Args {
+			if i > 0 {
+				head.WriteStr(", ")
+			}
+			match type arg {
+			| &Var:
+				mut v := (&Var)(arg)
+				identCoder.var(head, v)
+				continue
+			}
+			name := "_co_arg_" + conv::Itoa(i)
+			head.WriteStr(name)
+			self.oc.indent()
+			self.oc.tc.kind(self.oc.Buf, m.Func.Params[i].Kind)
+			self.oc.write(" ")
+			if m.Func.Params[i].Decl.Reference {
+				self.oc.write("&")
+			}
+			self.oc.write(name)
+			self.oc.write(" = ")
+			self.possibleRefExpr(arg)
+			self.oc.write(";\n")
+			argS := any(name)
+			m.Args[i] = unsafe { *(*ExprModel)(&argS) }
+		}
+		self.oc.indent()
+		self.oc.Buf.Write(unsafe { head.Buf() })
+		self.oc.write("](void) mutable -> void {\n")
+		self.oc.addIndent()
+		self.oc.indent()
+		self.pureFuncCall(m)
+		self.oc.write(";\n")
+		self.oc.doneIndent()
+		self.oc.indent()
+		self.oc.write("}).detach();\n")
+		self.oc.doneIndent()
+		self.oc.indent()
+		self.oc.write("}")
+	}
+
+	fn writeUseExpr(mut &self, mut &f: &FnIns, mut d: &Data) {
+		if d.Kind.Tup() == nil {
+			self.possibleRefExpr(d.Model)
+			self.oc.write(";")
+			ret
+		}
+		mut tup := (&TupleExprModel)(d.Model)
+		self.oc.tc.rc.tup(self.oc.Buf, f.Result.Tup())
+		self.oc.write("{")
+		for i, data in tup.Datas {
+			self.oc.write("." + resultArgName)
+			self.oc.write(conv::Itoa(i))
+			self.oc.write("=")
+			self.possibleRefExpr(data.Model)
+			if len(tup.Datas)-i > 1 {
+				self.oc.write(", ")
+			}
+		}
+		self.oc.write("};")
+	}
+
+	fn funcCall(mut &self, mut m: &FnCallExprModel) {
+		if m.IsCo {
+			// Do not check for exceptionals,
+			// exceptional functions cannot be called with co.
+			self.coFuncCall(m)
+			ret
+		}
+		if m.Func.IsBuiltin() ||
+			!m.Func.Decl.Exceptional ||
+			m.Except != nil && len(m.Except.Stmts) == 0 {
+			self.pureFuncCall(m)
+			ret
+		}
+
+		// Generate code for exceptional.
+		self.oc.write("({\n")
+		self.oc.addIndent()
+		self.oc.indent()
+		self.oc.write("auto except = ")
+		self.pureFuncCall(m)
+		self.oc.write(";\n")
+		self.oc.indent()
+		if m.Except != nil {
+			if m.Func.Result == nil || !m.Assigned {
+				self.oc.write("if (!except.ok()) ")
+				self.oc.sc.scope(m.Except)
+				self.oc.write("\n")
+			} else {
+				forwarded := obj::IsForwarded(m.Except)
+				self.oc.write("(except.ok()) ? (except.result) : (")
+				if forwarded {
+					self.oc.write("{")
+				}
+				mut stmt := m.Except.Stmts[len(m.Except.Stmts)-1]
+				match type stmt {
+				| &Data:
+					m.Except.Stmts = m.Except.Stmts[:len(m.Except.Stmts)-1]
+					self.oc.write("{\n")
+					self.oc.addIndent()
+					self.oc.sc.scopeStmts(m.Except)
+					self.oc.write("\n")
+					self.oc.indent()
+					self.writeUseExpr(m.Func, (&Data)(stmt))
+					self.oc.write("\n")
+					self.oc.doneIndent()
+					self.oc.indent()
+					self.oc.write("}")
+				|:
+					self.oc.sc.scope(m.Except)
+				}
+				if forwarded {
+					self.oc.write(" ")
+					self.initExpr(m.Func.Result)
+					self.oc.write(";}")
+				}
+				self.oc.write(");\n")
+			}
+			self.oc.doneIndent()
+		} else {
+			self.oc.write(`if (!except.ok()) jule::panic(jule::Str("unhandled exceptional: ") + except.error.type->to_str(except.error.data) + jule::Str("\nlocation: `)
+			self.oc.locInfo(m.Token)
+			self.oc.write("\"));\n")
+			if !m.Func.Decl.IsVoid() {
+				self.oc.indent()
+				self.oc.write("(except.result);\n")
+			}
+			self.oc.doneIndent()
+		}
+
+		self.oc.indent()
+		self.oc.write("})")
+	}
+
+	fn slice(mut &self, mut m: &SliceExprModel) {
+		if len(m.Elems) == 0 {
+			self.oc.tc.asSlice(self.oc.Buf, m.ElemKind)
+			self.oc.write("()")
+			ret
+		}
+		self.oc.tc.asSlice(self.oc.Buf, m.ElemKind)
+		self.oc.write("::make({")
+		self.models(m.Elems)
+		self.oc.write("})")
+	}
+
+	fn indexing(mut &self, mut m: &IndexingExprModel) {
+		match type m.Expr.Model {
+		| &Const:
+			// Cosntant string indexed. Use fast way, avoid making literal.
+			self.oc.write(typeCoder.Str + "::at(")
+			if !env::Production {
+				self.oc.write("\"")
+				self.oc.locInfo(m.Token)
+				self.oc.write("\", ")
+			}
+			self.oc.write("reinterpret_cast<const " + typeCoder.U8 + "*>(")
+			s := (&Const)(m.Expr.Model).ReadStr()
+			cstrLit(self.oc.Buf, s)
+			self.oc.write("), ")
+			self.oc.write(conv::Itoa(len(s)))
+			self.oc.write(", ")
+			self.possibleRefExpr(m.Index.Model)
+			self.oc.write(")")
+			ret
+		}
+
+		self.possibleRefExpr(m.Expr.Model)
+		// Index access with safety measures.
+		match {
+		| env::Production
+		| m.Expr.Kind.Ptr() != nil
+		| m.Expr.Kind.Map() != nil
+		| obj::IsExprComesFromBind(m.Expr):
+			self.oc.write("[")
+			self.possibleRefExpr(m.Index.Model)
+			self.oc.write("]")
+		|:
+			self.oc.write(".at(\"")
+			self.oc.locInfo(m.Token)
+			self.oc.write("\", ")
+			self.possibleRefExpr(m.Index.Model)
+			self.oc.write(")")
+		}
+	}
+
+	fn unsafeIndexing(mut &self, mut m: &UnsafeIndexingExprModel) {
+		self.possibleRefExpr(m.Node.Expr.Model)
+		// Index access with safety measures.
+		match {
+		| env::Production
+		| m.Node.Expr.Kind.Ptr() != nil
+		| m.Node.Expr.Kind.Map() != nil:
+			self.oc.write("[")
+			self.possibleRefExpr(m.Node.Index.Model)
+			self.oc.write("]")
+		|:
+			self.oc.write(".__at(")
+			self.possibleRefExpr(m.Node.Index.Model)
+			self.oc.write(")")
+		}
+	}
+
+	fn anonFunc(mut &self, mut m: &AnonFnExprModel) {
+		closure := obj::IsClosure(m)
+		ident := self.oc.pushAnonFn(m)
+		self.oc.write("jule::__new_closure<")
+		self.oc.tc.anonFunc(self.oc.Buf, m.Func)
+		self.oc.write(">((void*)")
+		self.oc.write(ident)
+		if closure {
+			self.oc.write(", jule::Ptr<")
+			self.oc.write(ident)
+			self.oc.write(anonFnCtxSuffix)
+			self.oc.write(">::make(")
+			self.oc.write(ident)
+			self.oc.write(anonFnCtxSuffix + "{")
+			for (i, mut v) in m.Captured {
+				self.oc.write(".")
+				identCoder.var(self.oc.Buf, v)
+				self.oc.write("=")
+				self.var(v)
+				if len(m.Captured)-i > 1 {
+					self.oc.write(",")
+				}
+			}
+			self.oc.write("}).as<" + typeCoder.Uintptr + ">(), ")
+			self.oc.write(ident)
+			self.oc.write(anonFnCtxHandlerSuffix + ")")
+		} else {
+			self.oc.write(", nullptr, nullptr)")
+		}
+	}
+
+	fn mapExpr(mut &self, mut m: &MapExprModel) {
+		self.oc.write(typeCoder.Map + "<")
+		self.oc.tc.kind(self.oc.Buf, m.KeyKind)
+		self.oc.write(", ")
+		self.oc.tc.kind(self.oc.Buf, m.ValKind)
+		self.oc.write(">({")
+		if len(m.Entries) > 0 {
+			for (i, mut pair) in m.Entries {
+				self.oc.write("{")
+				self.possibleRefExpr(pair.Key)
+				self.oc.write(",")
+				self.possibleRefExpr(pair.Val)
+				self.oc.write("}")
+				if len(m.Entries)-i > 1 {
+					self.oc.write(",")
+				}
+			}
+		}
+		self.oc.write("})")
+	}
+
+	fn slicing(mut &self, mut m: &SlicingExprModel) {
+		self.possibleRefExpr(m.Expr)
+		self.oc.write(".slice(")
+		if !env::Production {
+			self.oc.write("\"")
+			self.oc.locInfo(m.Token)
+			self.oc.write("\", ")
+		}
+		self.possibleRefExpr(m.Left)
+		if m.Right != nil {
+			self.oc.write(", ")
+			self.possibleRefExpr(m.Right)
+		}
+		self.oc.write(")")
+	}
+
+	fn traitSub(mut &self, mut m: &TraitSubIdentExprModel) {
+		self.oc.write("((")
+		identCoder.traitDecl(self.oc.Buf, m.Trt)
+		self.oc.write("MptrData")
+		self.oc.write("*)")
+		self.possibleRefExpr(m.Expr)
+		self.oc.write(".safe_type(")
+		if !env::Production {
+			self.oc.write("\"")
+			self.oc.locInfo(m.Token)
+			self.oc.write("\"")
+		}
+		self.oc.write("))->")
+		identCoder.func(self.oc.Buf, m.Method)
+	}
+
+	fn structureSub(mut &self, mut m: &StructSubIdentExprModel) {
+		self.possibleRefExpr(m.Expr.Model)
+		if m.Field == nil {
+			ret
+		}
+		self.oc.write(".")
+		identCoder.field(self.oc.Buf, m.Field.Decl)
+	}
+
+	fn array(mut &self, mut m: &ArrayExprModel) {
+		self.oc.tc.array(self.oc.Buf, m.Kind)
+		if len(m.Elems) == 0 {
+			self.oc.write("()")
+			ret
+		}
+
+		// Filled.
+		if len(m.Elems) == 2 && m.Elems[1] == nil {
+			self.oc.write("(")
+			self.possibleRefExpr(m.Elems[0])
+			self.oc.write(")")
+			ret
+		}
+
+		self.oc.write("({")
+		self.models(m.Elems)
+		self.oc.write("})")
+		ret
+	}
+
+	// Writes complete expression model of function instance.
+	// Usefull for strict type safety.
+	fn funcInsCommon(mut &self, mut m: &FnIns) {
+		self.oc.tc.func(self.oc.Buf, m)
+		self.oc.write("(")
+		self.funcIns(m)
+		self.oc.write(")")
+	}
+
+	fn funcIns(mut &self, mut m: &FnIns) {
+		if m.Decl != nil && m.Decl.Binded {
+			d := obj::FindDirective(m.Decl.Directives, Directive.Namespace)
+			if d != nil {
+				self.oc.writeBytes(concatAllParts(d.Args...))
+				self.oc.write("::")
+			}
+		}
+		identCoder.funcIns(self.oc.Buf, m)
+	}
+
+	fn tuple(mut &self, mut m: &TupleExprModel) {
+		for (i, mut d) in m.Datas {
+			self.possibleRefExpr(d.Model)
+			self.oc.write(";")
+			if len(m.Datas)-i > 1 {
+				self.oc.write("\n")
+				self.oc.indent()
+			}
+		}
+	}
+
+	fn newCall(mut &self, mut m: &BuiltinNewCallExprModel) {
+		self.oc.write("jule::new_ptr<")
+		self.oc.tc.kind(self.oc.Buf, m.Kind)
+		self.oc.write(">(")
+		if m.Init != nil {
+			self.possibleRefExpr(m.Init)
+		}
+		self.oc.write(")")
+	}
+
+	fn outCall(mut &self, mut m: &BuiltinOutCallExprModel) {
+		if m.Debug && env::Production {
+			ret
+		}
+		self.oc.write("jule::out(")
+		self.possibleRefExpr(m.Expr)
+		self.oc.write(")")
+	}
+
+	fn outlnCall(mut &self, mut m: &BuiltinOutlnCallExprModel) {
+		if m.Debug && env::Production {
+			ret
+		}
+		self.oc.write("jule::outln(")
+		self.possibleRefExpr(m.Expr)
+		self.oc.write(")")
+	}
+
+	fn panicCall(mut &self, mut m: &BuiltinPanicCallExprModel) {
+		self.oc.write("jule::panic(")
+		self.possibleRefExpr(m.Expr)
+		self.oc.write(` + jule::Str("\nlocation: `)
+		self.oc.locInfo(m.Token)
+		self.oc.write("\"));")
+	}
+
+	fn assertCall(mut &self, mut m: &BuiltinAssertCallExprModel) {
+		if env::Production {
+			ret
+		}
+		self.oc.write("if (!(")
+		self.possibleRefExpr(m.Expr)
+		self.oc.write(")) jule::panic(jule::Str(")
+		cstrLit(self.oc.Buf, m.Log)
+		self.oc.write(`) + jule::Str("\nlocation: `)
+		self.oc.locInfo(m.Token)
+		self.oc.write("\"));")
+	}
+
+	fn errorCall(mut &self, mut m: &BuiltinErrorCallExprModel) {
+		self.oc.write("return ")
+		if m.Func.Decl.IsVoid() {
+			match type m.Err.Model {
+			| &Var:
+				v := (&Var)(m.Err.Model)
+				if v.Ident == TokenKind.Error {
+					self.oc.write("jule::VoidExceptional{.error=std::move(except.error)}")
+					ret
+				}
+			}
+			self.oc.write("jule::VoidExceptional{.error=" + typeCoder.Any + "(")
+		} else {
+			self.oc.write("jule::Exceptional<")
+			self.oc.tc.rc.codeMut1(self.oc.Buf, m.Func.Result)
+			match type m.Err.Model {
+			| &Var:
+				v := (&Var)(m.Err.Model)
+				if v.Ident == TokenKind.Error {
+					self.oc.write(">{.error=except.error}")
+					ret
+				}
+			}
+			self.oc.write(">{.error=" + typeCoder.Any + "(")
+		}
+		self.possibleRefExpr(m.Err.Model)
+		i := self.oc.pushAnyType(m.Err.Kind)
+		self.oc.write(", &" + anyTypeIdent)
+		self.oc.write(conv::Itoa(i))
+		self.oc.write(")}")
+	}
+
+	fn copyCall(mut &self, mut m: &BuiltinCopyCallExprModel) {
+		self.oc.write("jule::copy(")
+		self.possibleRefExpr(m.Dest.Model)
+		self.oc.write(", ")
+		self.possibleRefExpr(m.Src.Model)
+		self.oc.write(")")
+	}
+
+	fn lenCall(mut &self, mut m: &BuiltinLenCallExprModel) {
+		self.possibleRefExpr(m.Expr.Model)
+		self.oc.write(".len()")
+	}
+
+	fn capCall(mut &self, mut m: &BuiltinCapCallExprModel) {
+		self.possibleRefExpr(m.Expr.Model)
+		self.oc.write(".cap()")
+	}
+
+	fn deleteCall(mut &self, mut m: &BuiltinDeleteCallExprModel) {
+		self.possibleRefExpr(m.Dest.Model)
+		if m.Key != nil {
+			self.oc.write(".del(")
+			self.possibleRefExpr(m.Key.Model)
+			self.oc.write(")")
+		} else {
+			self.oc.write(".clear()")
+		}
+	}
+
+	fn makeCallSlice(mut &self, mut &m: &BuiltinMakeCallExprModel) {
+		mut slice := m.Kind.Slc()
+		self.oc.tc.kind(self.oc.Buf, m.Kind)
+		self.oc.write("::alloc(")
+		self.possibleRefExpr(m.Len)
+		self.oc.write(", ")
+		if m.Cap != nil {
+			self.possibleRefExpr(m.Cap)
+		} else {
+			self.possibleRefExpr(m.Len)
+		}
+		if shouldInitialized(slice.Elem) {
+			self.oc.write(", ")
+			self.initExpr(slice.Elem)
+		}
+		self.oc.write(")")
+	}
+
+	fn makeCallStr(mut &self, mut &m: &BuiltinMakeCallExprModel) {
+		self.oc.write(typeCoder.Str)
+		self.oc.write("::alloc(")
+		self.possibleRefExpr(m.Len)
+		if m.Cap != nil {
+			self.oc.write(", ")
+			self.possibleRefExpr(m.Cap)
+		}
+		self.oc.write(")")
+	}
+
+	fn makeCall(mut &self, mut m: &BuiltinMakeCallExprModel) {
+		if m.Kind.Slc() != nil {
+			self.makeCallSlice(m)
+			ret
+		}
+		self.makeCallStr(m)
+	}
+
+	fn pushToSlice(mut &self, mut m: &PushToSliceExprModel) {
+		// Use l-value advantage and define reference variable to destination
+		// in the child scope to avoid potential repeated high-cost memory access overhead.
+		const destIdent = "__jule_push_dest"
+
+		self.oc.write("{ ")
+		self.oc.tc.asSlice(self.oc.Buf, m.Elems.ElemKind)
+
+		mut ptr := false
+		match type m.Dest {
+		| &UnaryExprModel:
+			// Use raw pointer directly if exist.
+			mut u := (&UnaryExprModel)(m.Dest)
+			if u.Expr.Kind.Ptr() != nil {
+				self.oc.write(" *" + destIdent + " = ")
+				self.possibleRefExpr(u.Expr.Model)
+				self.oc.write("; ")
+				ptr = true
+				break
+			}
+			fall
+		|:
+			self.oc.write(" &" + destIdent + " = ")
+			self.possibleRefExpr(m.Dest)
+			self.oc.write("; ")
+		}
+		// Pushed single item.
+		if len(m.Elems.Elems) == 1 {
+			if ptr {
+				self.oc.write(destIdent + "->push(")
+			} else {
+				self.oc.write(destIdent + ".push(")
+			}
+			self.possibleRefExpr(m.Elems.Elems[0])
+			self.oc.write("); }")
+			ret
+		}
+		// Pushed more than single item.
+		// Pre-allocate enough capacity if not exist for appendation.
+		if ptr {
+			self.oc.write(destIdent + "->alloc_for_append(")
+		} else {
+			self.oc.write(destIdent + ".alloc_for_append(")
+		}
+		self.oc.write(conv::Itoa(len(m.Elems.Elems)))
+		self.oc.write("); ")
+		for (_, mut e) in m.Elems.Elems {
+			self.oc.write(destIdent)
+			// Use the "__push" method to skip allocation boundary checking.
+			if ptr {
+				self.oc.write("->__push(")
+			} else {
+				self.oc.write(".__push(")
+			}
+			self.possibleRefExpr(e)
+			self.oc.write("); ")
+		}
+		self.oc.write("}")
+	}
+
+	fn appendToSlice(mut &self, mut m: &AppendToSliceExprModel) {
+		self.oc.write("(")
+		self.possibleRefExpr(m.Dest)
+		self.oc.write(").append(")
+		self.possibleRefExpr(m.Slice)
+		self.oc.write(");")
+	}
+
+	fn appendCall(mut &self, mut m: &BuiltinAppendCallExprModel) {
+		self.oc.write("jule::append(")
+		self.possibleRefExpr(m.Dest)
+		self.oc.write(",")
+		self.possibleRefExpr(m.Elements)
+		self.oc.write(")")
+	}
+
+	fn sizeof(mut &self, mut m: &SizeofExprModel) {
+		self.oc.write("sizeof(")
+		self.possibleRefExpr(m.Expr)
+		self.oc.write(")")
+	}
+
+	fn alignof(mut &self, mut m: &AlignofExprModel) {
+		self.oc.write("alignof(")
+		self.possibleRefExpr(m.Expr)
+		self.oc.write(")")
+	}
+
+	fn runeLit(mut &self, m: &RuneExprModel) {
+		if m.Code <= 127 { // ASCII.
+			self.oc.Buf.WriteByte('\'')
+			mut b := sbtoa(byte(m.Code))
+			if b == "'" {
+				self.oc.Buf.WriteByte('\\')
+			}
+			self.oc.Buf.WriteStr(b)
+			self.oc.Buf.WriteByte('\'')
+			ret
+		}
+		itoa(self.oc.Buf, i64(m.Code))
+	}
+
+	fn structureStatic(mut &self, mut m: &StructStaticIdentExprModel) {
+		identCoder.funcIns(self.oc.Buf, m.Method)
+	}
+
+	fn integratedToStr(mut &self, mut m: &IntegratedToStrExprModel) {
+		self.oc.write("jule::to_str(")
+		self.possibleRefExpr(m.Expr)
+		self.oc.write(")")
+	}
+
+	fn backendEmit(mut &self, mut m: &BackendEmitExprModel) {
+		if len(m.Exprs) == 0 {
+			self.oc.write(m.Code)
+			ret
+		}
+		n := self.oc.Buf.Len()
+		mut args := make([]any, len(m.Exprs))
+		for (i, mut expr) in m.Exprs {
+			self.possibleRefExpr(expr)
+			mut buf := unsafe { self.oc.Buf.Buf() }
+			args[i] = str(buf[n:])
+			unsafe { self.oc.Buf.SetBuf(buf[:n]) }
+		}
+		self.oc.write(fmt::Format(m.Code, args...))
+	}
+
+	fn free(mut &self, mut m: &FreeExprModel) {
+		self.possibleRefExpr(m.Expr)
+		if env::RC {
+			self.oc.write(".dealloc()")
+			ret
+		}
+		self.oc.write(".__free()")
+	}
+
+	fn strComp(mut &self, mut m: &StrCompExprModel) {
+		if m.NotEq {
+			self.oc.write("(!")
+		}
+		s := m.Right.ReadStr()
+		self.possibleRefExpr(m.Left)
+		self.oc.write(".equal(")
+		cstrLit(self.oc.Buf, s)
+		self.oc.write(", ")
+		self.oc.write(conv::Itoa(len(s)))
+		self.oc.write(")")
+		if m.NotEq {
+			self.oc.write(")")
+		}
+	}
+
+	fn emptyCompare(mut &self, mut m: &EmptyCompareExprModel) {
+		if m.Neg {
+			self.oc.write("!")
+		}
+		self.oc.write("(")
+		self.possibleRefExpr(m.Expr)
+		self.oc.write(").empty()")
+	}
+
+	fn unsafeDeref(mut &self, mut m: &UnsafeDerefExprModel) {
+		match {
+		| m.Base.Expr.Kind.Sptr() != nil:
+			self.oc.write("(*")
+			self.possibleRefExpr(m.Base.Expr.Model)
+			self.oc.write(".alloc)")
+		|:
+			panic("implementation mistake, this panic call should be unreachable")
+		}
+	}
+
+	fn unsafeCasting(mut &self, mut m: &UnsafeCastingExprModel) {
+		match {
+		| obj::IsAny(m.Base.ExprKind):
+			self.possibleRefExpr(m.Base.Expr.Model)
+			if m.Base.Kind.Sptr() != nil {
+				self.oc.write(".unsafe_cast_ptr<")
+				self.oc.tc.kind(self.oc.Buf, m.Base.Kind.Sptr().Elem)
+			} else {
+				self.oc.write(".unsafe_cast<")
+				self.oc.tc.kind(self.oc.Buf, m.Base.Kind)
+			}
+			self.oc.write(">()")
+		|:
+			panic("implementation mistake, this panic call should be unreachable")
+		}
+	}
+
+	fn model(mut &self, mut m: compExprModel) {
+		match type m {
+		| str:
+			self.oc.write(str(m))
+		| &TypeKind:
+			self.oc.tc.kind(self.oc.Buf, (&TypeKind)(m))
+		| &Const:
+			self.constant((&Const)(m))
+		| &Var:
+			self.var((&Var)(m))
+		| &StructIns:
+			self.structureIns((&StructIns)(m))
+		| &FnIns:
+			self.funcInsCommon((&FnIns)(m))
+		| &UnsafeBinaryExprModel:
+			self.unsafeBinary((&UnsafeBinaryExprModel)(m).Node)
+		| &BinaryExprModel:
+			self.binary((&BinaryExprModel)(m))
+		| &UnaryExprModel:
+			self.unary((&UnaryExprModel)(m))
+		| &StructLitExprModel:
+			self.structureLit((&StructLitExprModel)(m))
+		| &AllocStructLitExprModel:
+			self.allocStructure((&AllocStructLitExprModel)(m))
+		| &CastingExprModel:
+			self.casting((&CastingExprModel)(m))
+		| &FnCallExprModel:
+			self.funcCall((&FnCallExprModel)(m))
+		| &SliceExprModel:
+			self.slice((&SliceExprModel)(m))
+		| &ArrayExprModel:
+			self.array((&ArrayExprModel)(m))
+		| &UnsafeIndexingExprModel:
+			self.unsafeIndexing((&UnsafeIndexingExprModel)(m))
+		| &IndexingExprModel:
+			self.indexing((&IndexingExprModel)(m))
+		| &AnonFnExprModel:
+			self.anonFunc((&AnonFnExprModel)(m))
+		| &MapExprModel:
+			self.mapExpr((&MapExprModel)(m))
+		| &SlicingExprModel:
+			self.slicing((&SlicingExprModel)(m))
+		| &TraitSubIdentExprModel:
+			self.traitSub((&TraitSubIdentExprModel)(m))
+		| &StructSubIdentExprModel:
+			self.structureSub((&StructSubIdentExprModel)(m))
+		| &TupleExprModel:
+			self.tuple((&TupleExprModel)(m))
+		| &BuiltinOutCallExprModel:
+			self.outCall((&BuiltinOutCallExprModel)(m))
+		| &BuiltinOutlnCallExprModel:
+			self.outlnCall((&BuiltinOutlnCallExprModel)(m))
+		| &BuiltinNewCallExprModel:
+			self.newCall((&BuiltinNewCallExprModel)(m))
+		| &BuiltinPanicCallExprModel:
+			self.panicCall((&BuiltinPanicCallExprModel)(m))
+		| &BuiltinAssertCallExprModel:
+			self.assertCall((&BuiltinAssertCallExprModel)(m))
+		| &BuiltinErrorCallExprModel:
+			self.errorCall((&BuiltinErrorCallExprModel)(m))
+		| &BuiltinMakeCallExprModel:
+			self.makeCall((&BuiltinMakeCallExprModel)(m))
+		| &BuiltinAppendCallExprModel:
+			self.appendCall((&BuiltinAppendCallExprModel)(m))
+		| &BuiltinCopyCallExprModel:
+			self.copyCall((&BuiltinCopyCallExprModel)(m))
+		| &BuiltinLenCallExprModel:
+			self.lenCall((&BuiltinLenCallExprModel)(m))
+		| &BuiltinCapCallExprModel:
+			self.capCall((&BuiltinCapCallExprModel)(m))
+		| &BuiltinDeleteCallExprModel:
+			self.deleteCall((&BuiltinDeleteCallExprModel)(m))
+		| &SizeofExprModel:
+			self.sizeof((&SizeofExprModel)(m))
+		| &AlignofExprModel:
+			self.alignof((&AlignofExprModel)(m))
+		| &RuneExprModel:
+			self.runeLit((&RuneExprModel)(m))
+		| &StructStaticIdentExprModel:
+			self.structureStatic((&StructStaticIdentExprModel)(m))
+		| &IntegratedToStrExprModel:
+			self.integratedToStr((&IntegratedToStrExprModel)(m))
+		| &BackendEmitExprModel:
+			self.backendEmit((&BackendEmitExprModel)(m))
+		| &FreeExprModel:
+			self.free((&FreeExprModel)(m))
+		| &StrCompExprModel:
+			self.strComp((&StrCompExprModel)(m))
+		| &RefExprModel:
+			self.var((&RefExprModel)(m).Var)
+		| &EmptyCompareExprModel:
+			self.emptyCompare((&EmptyCompareExprModel)(m))
+		| &UnsafeDerefExprModel:
+			self.unsafeDeref((&UnsafeDerefExprModel)(m))
+		| &UnsafeCastingExprModel:
+			self.unsafeCasting((&UnsafeCastingExprModel)(m))
+		|:
+			self.oc.write("<unimplemented_expression_model>")
+		}
+	}
+
+	fn initExpr(mut &self, mut t: &TypeKind) {
+		if t.NilCompatible() {
+			if t.Ptr() != nil {
+				self.oc.write("nullptr")
+			} else {
+				self.oc.tc.kind(self.oc.Buf, t)
+				self.oc.write("(nullptr)")
+			}
+			ret
+		}
+		mut tup := t.Tup()
+		if tup != nil {
+			self.oc.tc.rc.tup(self.oc.Buf, tup)
+			self.oc.write("{")
+			for (i, mut tt) in tup.Types {
+				if !shouldInitialized(tt) {
+					continue
+				}
+				self.oc.write("." + resultArgName)
+				self.oc.write(conv::Itoa(i))
+				self.oc.write("=")
+				self.initExpr(tt)
+				if len(tup.Types)-i > 1 {
+					self.oc.write(", ")
+				}
+			}
+			self.oc.write("}")
+			ret
+		}
+		mut enm := t.Enum()
+		if enm != nil {
+			self.model(enm.Items[0].Value.Data.Model)
+			ret
+		}
+		prim := t.Prim()
+		if prim != nil {
+			if types::IsNum(prim.Kind) {
+				self.oc.write("0")
+			} else if prim.IsBool() {
+				self.oc.write("false")
+			} else if prim.IsStr() {
+				self.oc.write(typeCoder.Str + "()")
+			}
+			ret
+		}
+		if t.Arr() != nil {
+			mut arr := t.Arr()
+			self.oc.tc.kind(self.oc.Buf, t)
+			self.oc.write("(")
+			self.initExpr(arr.Elem)
+			self.oc.write(")")
+			ret
+		}
+		mut s := t.Struct()
+		if s != nil && s.Decl.Binded && obj::FindDirective(s.Decl.Directives, Directive.Typedef) == nil {
+			self.oc.write("(")
+			self.oc.tc.kind(self.oc.Buf, t)
+			self.oc.write("){}")
+			ret
+		}
+		self.oc.tc.kind(self.oc.Buf, t)
+		self.oc.write("()")
+	}
 }
 
 fn decomposeCommonEsq(b: byte): str {
-    match b {
-    | '\\':
-        ret "\\\\"
-    | '\'':
-        ret "'"
-    | '"':
-        ret `\"`
-    | '\a':
-        ret `\a`
-    | '\b':
-        ret `\b`
-    | '\f':
-        ret `\f`
-    | '\n':
-        ret `\n`
-    | '\r':
-        ret `\r`
-    | '\t':
-        ret `\t`
-    | '\v':
-        ret `\v`
-    |:
-        ret ""
-    }
+	match b {
+	| '\\':
+		ret "\\\\"
+	| '\'':
+		ret "'"
+	| '"':
+		ret `\"`
+	| '\a':
+		ret `\a`
+	| '\b':
+		ret `\b`
+	| '\f':
+		ret `\f`
+	| '\n':
+		ret `\n`
+	| '\r':
+		ret `\r`
+	| '\t':
+		ret `\t`
+	| '\v':
+		ret `\v`
+	|:
+		ret ""
+	}
 }
 
 fn sbtoa(b: byte): str {
-    if b == 0 {
-        ret "\\x00"
-    }
-    if b < utf8::RuneSelf { // ASCII, fast way.
-        seq := decomposeCommonEsq(b)
-        if seq != "" {
-            ret seq
-        }
-        if 32 <= b && b <= 126 {
-            ret str(b)
-        }
-    }
-    seq := conv::FmtUint(u64(b), 8)
-    if len(seq) == 2 {
-        ret "\\0" + seq
-    }
-    ret "\\" + seq
+	if b == 0 {
+		ret "\\x00"
+	}
+	if b < utf8::RuneSelf { // ASCII, fast way.
+		seq := decomposeCommonEsq(b)
+		if seq != "" {
+			ret seq
+		}
+		if 32 <= b && b <= 126 {
+			ret str(b)
+		}
+	}
+	seq := conv::FmtUint(u64(b), 8)
+	if len(seq) == 2 {
+		ret "\\0" + seq
+	}
+	ret "\\" + seq
 }
 
 fn cstrBytes(mut &s: StrBuilder, ctx: str) {
-    for _, b in ctx {
-        s.WriteStr(sbtoa(b))
-    }
+	for _, b in ctx {
+		s.WriteStr(sbtoa(b))
+	}
 }
 
 fn cstrLit(mut &s: StrBuilder, ctx: str) {
-    s.WriteByte('"')
-    cstrBytes(s, ctx)
-    s.WriteByte('"')
+	s.WriteByte('"')
+	cstrBytes(s, ctx)
+	s.WriteByte('"')
 }
 
 fn ftoa(mut &s: StrBuilder, f: f64, bitsize: int) {
-    if bitsize != 32 {
-        if f == f64(i64(f)) {
-            itoa(s, i64(f))
-            ret
-        }
-        if f == f64(u64(f)) {
-            utoa(s, u64(f))
-            ret
-        }
-    }
-    m := conv::FmtFloat(f, 'f', -1, bitsize)
-    s.WriteStr(m)
-    if !strings::Contains(m, ".") {
-        s.WriteStr(".0")
-    }
+	if bitsize != 32 {
+		if f == f64(i64(f)) {
+			itoa(s, i64(f))
+			ret
+		}
+		if f == f64(u64(f)) {
+			utoa(s, u64(f))
+			ret
+		}
+	}
+	m := conv::FmtFloat(f, 'f', -1, bitsize)
+	s.WriteStr(m)
+	if !strings::Contains(m, ".") {
+		s.WriteStr(".0")
+	}
 }
 
 fn itoa(mut &s: StrBuilder, x: i64) {
-    match {
-    | x == MaxI64:
-        s.WriteStr("jule::MAX_I64")
-        ret
-    | x == MinI64:
-        s.WriteStr("jule::MIN_I64")
-        ret
-    }
+	match {
+	| x == MaxI64:
+		s.WriteStr("jule::MAX_I64")
+		ret
+	| x == MinI64:
+		s.WriteStr("jule::MIN_I64")
+		ret
+	}
 
-    s.WriteStr(conv::FmtInt(x, 10))
-    if Is64Bit(Arch) {
-        s.WriteByte('L')
-    }
-    s.WriteByte('L')
+	s.WriteStr(conv::FmtInt(x, 10))
+	if Is64Bit(Arch) {
+		s.WriteByte('L')
+	}
+	s.WriteByte('L')
 }
 
 fn utoa(mut &s: StrBuilder, x: u64) {
-    match {
-    | x == MaxU64:
-        s.WriteStr("jule::MAX_U64")
-        ret
-    }
+	match {
+	| x == MaxU64:
+		s.WriteStr("jule::MAX_U64")
+		ret
+	}
 
-    s.WriteStr(conv::FmtUint(x, 10))
-    if Is64Bit(Arch) {
-        s.WriteByte('L')
-    }
-    s.WriteStr("LU")
+	s.WriteStr(conv::FmtUint(x, 10))
+	if Is64Bit(Arch) {
+		s.WriteByte('L')
+	}
+	s.WriteStr("LU")
 }

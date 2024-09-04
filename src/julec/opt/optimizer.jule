@@ -6,10 +6,10 @@ use env
 use obj::{IR}
 use deadcode for opt::deadcode
 use std::jule::sema::{
-    Package,
-    Var,
-    Fn,
-    Struct,
+	Package,
+	Var,
+	Fn,
+	Struct,
 }
 
 static mut exprEnabled = false
@@ -18,106 +18,106 @@ static mut scopeEnabled = false
 // Target-independent optimizer for IR.
 // Use this optimizer for all optimizations with single instance.
 struct Optimizer {
-    ir: &IR
+	ir: &IR
 }
 
 impl Optimizer {
-    // Returns new optimizer for IR.
-    static fn New(mut &ir: &IR): &Optimizer {
-        ret &Optimizer{
-            ir: ir,
-        }
-    }
+	// Returns new optimizer for IR.
+	static fn New(mut &ir: &IR): &Optimizer {
+		ret &Optimizer{
+			ir: ir,
+		}
+	}
 
-    fn optimizeGlobal(mut self, mut &v: &Var) {
-        if !v.Binded {
-            exprOptimizer.optimize(v.Value.Data.Model)
-        }
-    }
+	fn optimizeGlobal(mut self, mut &v: &Var) {
+		if !v.Binded {
+			exprOptimizer.optimize(v.Value.Data.Model)
+		}
+	}
 
-    fn optimizeFunction(mut self, mut &func: &Fn) {
-        if func.Binded {
-            ret
-        }
-        for (_, mut ins) in func.Instances {
-            mut so := scopeOptimizer.new(ins.Scope)
-            so.optimize()
-        }
-    }
+	fn optimizeFunction(mut self, mut &func: &Fn) {
+		if func.Binded {
+			ret
+		}
+		for (_, mut ins) in func.Instances {
+			mut so := scopeOptimizer.new(ins.Scope)
+			so.optimize()
+		}
+	}
 
-    fn optimizeStruct(mut self, mut &s: &Struct) {
-        if s.Binded {
-            ret
-        }
-        for (_, mut ins) in s.Instances {
-            for (_, mut f) in ins.Fields {
-                if f.Default != nil {
-                    exprOptimizer.optimize(f.Default.Model)
-                }
-            }
-            for (_, mut m) in ins.Methods {
-                self.optimizeFunction(m)
-            }
-        }
-    }
+	fn optimizeStruct(mut self, mut &s: &Struct) {
+		if s.Binded {
+			ret
+		}
+		for (_, mut ins) in s.Instances {
+			for (_, mut f) in ins.Fields {
+				if f.Default != nil {
+					exprOptimizer.optimize(f.Default.Model)
+				}
+			}
+			for (_, mut m) in ins.Methods {
+				self.optimizeFunction(m)
+			}
+		}
+	}
 
-    fn optimizeGlobals(mut self, mut &p: &Package) {
-        for (_, mut f) in p.Files {
-            for (_, mut v) in f.Vars {
-                self.optimizeGlobal(v)
-            }
-        }
-    }
+	fn optimizeGlobals(mut self, mut &p: &Package) {
+		for (_, mut f) in p.Files {
+			for (_, mut v) in f.Vars {
+				self.optimizeGlobal(v)
+			}
+		}
+	}
 
-    fn optimizeFunctions(mut self, mut &p: &Package) {
-        for (_, mut f) in p.Files {
-            for (_, mut func) in f.Funcs {
-                self.optimizeFunction(func)
-            }
-        }
-    }
+	fn optimizeFunctions(mut self, mut &p: &Package) {
+		for (_, mut f) in p.Files {
+			for (_, mut func) in f.Funcs {
+				self.optimizeFunction(func)
+			}
+		}
+	}
 
-    fn optimizeStructs(mut self, mut &p: &Package) {
-        for (_, mut f) in p.Files {
-            for (_, mut s) in f.Structs {
-                self.optimizeStruct(s)
-            }
-        }
-    }
+	fn optimizeStructs(mut self, mut &p: &Package) {
+		for (_, mut f) in p.Files {
+			for (_, mut s) in f.Structs {
+				self.optimizeStruct(s)
+			}
+		}
+	}
 
-    fn optimizePackage(mut self, mut &p: &Package) {
-        self.optimizeGlobals(p)
-        self.optimizeFunctions(p)
-        self.optimizeStructs(p)
-    }
+	fn optimizePackage(mut self, mut &p: &Package) {
+		self.optimizeGlobals(p)
+		self.optimizeFunctions(p)
+		self.optimizeStructs(p)
+	}
 
-    // Optimizes IR by enabled optimizations.
-    fn Optimize(mut self) {
-        detectEnabled()
+	// Optimizes IR by enabled optimizations.
+	fn Optimize(mut self) {
+		detectEnabled()
 
-        // See compiler reference (2)
-        if Deadcode {
-            deadcode::EliminateDefines(self.ir)
-        }
+		// See compiler reference (2)
+		if Deadcode {
+			deadcode::EliminateDefines(self.ir)
+		}
 
-        if scopeEnabled || exprEnabled {
-            for (_, mut u) in self.ir.Used {
-                if !u.Binded {
-                    self.optimizePackage(u.Package)
-                }
-            }
-            self.optimizePackage(self.ir.Main)
-        }
+		if scopeEnabled || exprEnabled {
+			for (_, mut u) in self.ir.Used {
+				if !u.Binded {
+					self.optimizePackage(u.Package)
+				}
+			}
+			self.optimizePackage(self.ir.Main)
+		}
 
-        // See compiler reference (3)
-        if Deadcode {
-            deadcode::EliminateScopes(self.ir)
-        }
-    }
+		// See compiler reference (3)
+		if Deadcode {
+			deadcode::EliminateScopes(self.ir)
+		}
+	}
 }
 
 fn detectEnabled() {
-    exprEnabled = Ptr || Math || Access || Cond
-    scopeEnabled = Cond || Append || Copy || Str || Slice || Assign || Exceptional ||
-        Iter || Dynamic
+	exprEnabled = Ptr || Math || Access || Cond
+	scopeEnabled = Cond || Append || Copy || Str || Slice || Assign || Exceptional ||
+		Iter || Dynamic
 }

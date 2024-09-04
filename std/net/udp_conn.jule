@@ -10,11 +10,11 @@ use sys for std::sys
 // UDP connection.
 // This structure represents server and client connections.
 struct UdpConn {
-    mut sockaddr4: sys::SockaddrIn
-    mut sockaddr6: sys::SockaddrIn6
-    mut handle:    netHandle = sys::INVALID_SOCKET
-    Addr:          &UdpAddr
-    v6:            bool
+	mut sockaddr4: sys::SockaddrIn
+	mut sockaddr6: sys::SockaddrIn6
+	mut handle:    netHandle = sys::INVALID_SOCKET
+	Addr:          &UdpAddr
+	v6:            bool
 }
 
 impl Conn for UdpConn {}
@@ -24,251 +24,251 @@ impl io::Stream for UdpConn {}
 impl io::WriterCloser for UdpConn {}
 
 impl UdpConn {
-    // Binds new UDP listener and starts listening given address.
-    // Returns relevant created &UdpConn if success.
-    // If addr is not a valid address, it will forward relevant parse exceptionals.
-    // In addition, any bind and listening error will be return as exceptional.
-    //
-    // See the [Connect] function for a description of the addr parameter.
-    static fn Bind(addr: str)!: &UdpConn {
-        ret udpBind(Network.Udp, addr) else { error(error) }
-    }
+	// Binds new UDP listener and starts listening given address.
+	// Returns relevant created &UdpConn if success.
+	// If addr is not a valid address, it will forward relevant parse exceptionals.
+	// In addition, any bind and listening error will be return as exceptional.
+	//
+	// See the [Connect] function for a description of the addr parameter.
+	static fn Bind(addr: str)!: &UdpConn {
+		ret udpBind(Network.Udp, addr) else { error(error) }
+	}
 
-    // Connects to UDP listener by given address.
-    // Returns relevant created &UdpConn if success.
-    // If addr is not a valid address, it will forward relevant parse exceptionals.
-    // In addition, any bind and listening error will be return as exceptional.
-    //
-    // See the [Connect] function for a description of the addr parameter.
-    static fn Connect(addr: str)!: &UdpConn {
-        ret udpConnect(Network.Udp, addr) else { error(error) }
-    }
+	// Connects to UDP listener by given address.
+	// Returns relevant created &UdpConn if success.
+	// If addr is not a valid address, it will forward relevant parse exceptionals.
+	// In addition, any bind and listening error will be return as exceptional.
+	//
+	// See the [Connect] function for a description of the addr parameter.
+	static fn Connect(addr: str)!: &UdpConn {
+		ret udpConnect(Network.Udp, addr) else { error(error) }
+	}
 
-    // Read bytes to buffer from connection and returns readed byte count.
-    // The number of bytes readed can never exceed the length of the buffer.
-    // If the buffer is larger than the number of bytes that can be read,
-    // the buffer will not cause an overflow.
-    // It will panic if connection is closed.
-    // All exceptionals are error code of implementation.
-    fn Read(mut self, mut buf: []byte)!: int {
-        if self.handle == sys::INVALID_SOCKET {
-            panic("std::net: UdpConn.Read: connection is closed")
-        }
-        if len(buf) == 0 {
-            ret 0
-        }
-        ret recvfrom(self, buf) else { error(error) }
-    }
+	// Read bytes to buffer from connection and returns readed byte count.
+	// The number of bytes readed can never exceed the length of the buffer.
+	// If the buffer is larger than the number of bytes that can be read,
+	// the buffer will not cause an overflow.
+	// It will panic if connection is closed.
+	// All exceptionals are error code of implementation.
+	fn Read(mut self, mut buf: []byte)!: int {
+		if self.handle == sys::INVALID_SOCKET {
+			panic("std::net: UdpConn.Read: connection is closed")
+		}
+		if len(buf) == 0 {
+			ret 0
+		}
+		ret recvfrom(self, buf) else { error(error) }
+	}
 
-    // Writes bytes to connection and returns writed byte count.
-    // The number of bytes written can never exceed the length of the buffer.
-    // All exceptionals are error code of implementation.
-    fn Write(mut self, buf: []byte)!: int {
-        if self.handle == sys::INVALID_SOCKET {
-            panic("std::net: UdpConn.Write: connection is closed")
-        }
-        if len(buf) == 0 {
-            ret 0
-        }
-        ret sendto(self, buf) else { error(error) }
-    }
+	// Writes bytes to connection and returns writed byte count.
+	// The number of bytes written can never exceed the length of the buffer.
+	// All exceptionals are error code of implementation.
+	fn Write(mut self, buf: []byte)!: int {
+		if self.handle == sys::INVALID_SOCKET {
+			panic("std::net: UdpConn.Write: connection is closed")
+		}
+		if len(buf) == 0 {
+			ret 0
+		}
+		ret sendto(self, buf) else { error(error) }
+	}
 
-    // Sets read timeout for connection.
-    // Timeout precision is microseconds.
-    // If the timeout is below one microsecond it will be accepted as zero.
-    // The zero timeout, clears current timeout if exist.
-    // All exceptionals are error code of implementation.
-    fn SetReadTimeout(mut self, timeout: time::DurInt)! {
-        if self.handle == sys::INVALID_SOCKET {
-            panic("std::net: TcpConn.SetReadTimeout: connection is closed")
-        }
-        setSocketTimeout(self.handle, sys::SO_RCVTIMEO, timeout) else { error(error) }
-    }
+	// Sets read timeout for connection.
+	// Timeout precision is microseconds.
+	// If the timeout is below one microsecond it will be accepted as zero.
+	// The zero timeout, clears current timeout if exist.
+	// All exceptionals are error code of implementation.
+	fn SetReadTimeout(mut self, timeout: time::DurInt)! {
+		if self.handle == sys::INVALID_SOCKET {
+			panic("std::net: TcpConn.SetReadTimeout: connection is closed")
+		}
+		setSocketTimeout(self.handle, sys::SO_RCVTIMEO, timeout) else { error(error) }
+	}
 
-    // Sets write timeout for connection.
-    // Timeout precision is microseconds.
-    // If the timeout is below one microsecond it will be accepted as zero.
-    // The zero timeout, clears current timeout if exist.
-    // All exceptionals are error code of implementation.
-    fn SetWriteTimeout(mut self, timeout: time::DurInt)! {
-        if self.handle == sys::INVALID_SOCKET {
-            panic("std::net: TcpConn.SetReadTimeout: connection is closed")
-        }
-        setSocketTimeout(self.handle, sys::SO_SNDTIMEO, timeout) else { error(error) }
-    }
+	// Sets write timeout for connection.
+	// Timeout precision is microseconds.
+	// If the timeout is below one microsecond it will be accepted as zero.
+	// The zero timeout, clears current timeout if exist.
+	// All exceptionals are error code of implementation.
+	fn SetWriteTimeout(mut self, timeout: time::DurInt)! {
+		if self.handle == sys::INVALID_SOCKET {
+			panic("std::net: TcpConn.SetReadTimeout: connection is closed")
+		}
+		setSocketTimeout(self.handle, sys::SO_SNDTIMEO, timeout) else { error(error) }
+	}
 
-    // Returns network name which is connected or listening.
-    // If connection closed, returns Network.Udp as a general network.
-    fn Network(self): Network {
-        match {
-        | self.handle == sys::INVALID_SOCKET:
-            ret Network.Udp
-        | self.v6:
-            ret Network.Udp6
-        |:
-            ret Network.Udp4
-        }
-    }
+	// Returns network name which is connected or listening.
+	// If connection closed, returns Network.Udp as a general network.
+	fn Network(self): Network {
+		match {
+		| self.handle == sys::INVALID_SOCKET:
+			ret Network.Udp
+		| self.v6:
+			ret Network.Udp6
+		|:
+			ret Network.Udp4
+		}
+	}
 
-    // Closes connection.
-    // All exceptionals are error code of implementation.
-    fn Close(mut self)! {
-        if self.handle == sys::INVALID_SOCKET {
-            ret
-        }
-        if !closeSocket(self.handle) {
-            error(lastErrorCode())
-        }
-        self.handle = sys::INVALID_SOCKET
-        self.v6 = false
-    }
+	// Closes connection.
+	// All exceptionals are error code of implementation.
+	fn Close(mut self)! {
+		if self.handle == sys::INVALID_SOCKET {
+			ret
+		}
+		if !closeSocket(self.handle) {
+			error(lastErrorCode())
+		}
+		self.handle = sys::INVALID_SOCKET
+		self.v6 = false
+	}
 }
 
 fn udpBind(network: Network, &addr: str)!: &UdpConn {
-    mut conn := UdpConn{
-        handle: netHandle(sys::INVALID_SOCKET),
-        Addr: UdpAddr.Resolve(network, addr) else { error(error) },
-    }
-    if conn.Addr.Ip.Empty() {
-        conn.handle = sys::Socket(sys::AF_INET, sys::SOCK_DGRAM, sys::IPPROTO_UDP)
-        if conn.handle < 0 {
-            error(lastErrorCode())
-        }
-        match network {
-        | Network.Udp | Network.Udp4:
-            conn.sockaddr4 = sys::SockaddrIn{}
-            conn.sockaddr4.sin_family = sys::AF_INET
-            conn.sockaddr4.sin_port = sys::Htons(conn.Addr.Port)
-            conn.sockaddr4.sin_addr.s_addr = sys::INADDR_ANY
-            unsafe {
-                if sys::Bind(conn.handle, (*sys::Sockaddr)(&conn.sockaddr4), mem::SizeOf(conn.sockaddr4)) != 0 {
-                    closeSocket(conn.handle)
-                    error(lastErrorCode())
-                }
-            }
-        | Network.Udp6:
-            conn.v6 = true
-            conn.handle = sys::Socket(sys::AF_INET6, sys::SOCK_DGRAM, sys::IPPROTO_UDP)
-            if conn.handle < 0 {
-                error(lastErrorCode())
-            }
-            mut sockAddr := sys::SockaddrIn6{}
-            sockAddr.sin6_family = sys::AF_INET6
-            sockAddr.sin6_port = sys::Htons(conn.Addr.Port)
-            unsafe {
-                if sys::Bind(conn.handle, (*sys::Sockaddr)(&sockAddr), mem::SizeOf(sockAddr)) != 0 {
-                    closeSocket(conn.handle)
-                    error(lastErrorCode())
-                }
-            }
-        |:
-            error(AddrError.UnknownNetwork)
-        }
-    } else {
-        mut ipv4 := conn.Addr.Ip.To4()
-        if ipv4.Empty() {
-            if network == Network.Udp4 {
-                error(AddrError.NoSuitable)
-            }
-            conn.v6 = true
-            conn.handle = sys::Socket(sys::AF_INET6, sys::SOCK_DGRAM, sys::IPPROTO_UDP)
-            if conn.handle < 0 {
-                error(lastErrorCode())
-            }
-            conn.sockaddr6 = sys::SockaddrIn6{}
-            conn.sockaddr6.sin6_family = sys::AF_INET6
-            for i, b in conn.Addr.Ip.Addr {
-                conn.sockaddr6.sin6_addr.s6_addr[i] = b
-            }
-            conn.sockaddr6.sin6_port = sys::Htons(conn.Addr.Port)
-            unsafe {
-                if sys::Bind(conn.handle, (*sys::Sockaddr)(&conn.sockaddr6), mem::SizeOf(conn.sockaddr6)) != 0 {
-                    closeSocket(conn.handle)
-                    error(lastErrorCode())
-                }
-            }
-        } else {
-            if network == Network.Udp6 {
-                error(AddrError.NoSuitable)
-            }
-            conn.Addr.Ip = ipv4
-            conn.handle = sys::Socket(sys::AF_INET, sys::SOCK_DGRAM, sys::IPPROTO_UDP)
-            if conn.handle < 0 {
-                error(lastErrorCode())
-            }
-            conn.sockaddr4 = sys::SockaddrIn{}
-            conn.sockaddr4.sin_family = sys::AF_INET
-            conn.sockaddr4.sin_port = sys::Htons(conn.Addr.Port)
-            conn.sockaddr4.sin_addr.s_addr = u32(beU64v4(conn.Addr.Ip.Addr))
-            unsafe {
-                if sys::Bind(conn.handle, (*sys::Sockaddr)(&conn.sockaddr4), mem::SizeOf(conn.sockaddr4)) != 0 {
-                    closeSocket(conn.handle)
-                    error(lastErrorCode())
-                }
-            }
-        }
-    }
-    ret new(UdpConn, conn)
+	mut conn := UdpConn{
+		handle: netHandle(sys::INVALID_SOCKET),
+		Addr: UdpAddr.Resolve(network, addr) else { error(error) },
+	}
+	if conn.Addr.Ip.Empty() {
+		conn.handle = sys::Socket(sys::AF_INET, sys::SOCK_DGRAM, sys::IPPROTO_UDP)
+		if conn.handle < 0 {
+			error(lastErrorCode())
+		}
+		match network {
+		| Network.Udp | Network.Udp4:
+			conn.sockaddr4 = sys::SockaddrIn{}
+			conn.sockaddr4.sin_family = sys::AF_INET
+			conn.sockaddr4.sin_port = sys::Htons(conn.Addr.Port)
+			conn.sockaddr4.sin_addr.s_addr = sys::INADDR_ANY
+			unsafe {
+				if sys::Bind(conn.handle, (*sys::Sockaddr)(&conn.sockaddr4), mem::SizeOf(conn.sockaddr4)) != 0 {
+					closeSocket(conn.handle)
+					error(lastErrorCode())
+				}
+			}
+		| Network.Udp6:
+			conn.v6 = true
+			conn.handle = sys::Socket(sys::AF_INET6, sys::SOCK_DGRAM, sys::IPPROTO_UDP)
+			if conn.handle < 0 {
+				error(lastErrorCode())
+			}
+			mut sockAddr := sys::SockaddrIn6{}
+			sockAddr.sin6_family = sys::AF_INET6
+			sockAddr.sin6_port = sys::Htons(conn.Addr.Port)
+			unsafe {
+				if sys::Bind(conn.handle, (*sys::Sockaddr)(&sockAddr), mem::SizeOf(sockAddr)) != 0 {
+					closeSocket(conn.handle)
+					error(lastErrorCode())
+				}
+			}
+		|:
+			error(AddrError.UnknownNetwork)
+		}
+	} else {
+		mut ipv4 := conn.Addr.Ip.To4()
+		if ipv4.Empty() {
+			if network == Network.Udp4 {
+				error(AddrError.NoSuitable)
+			}
+			conn.v6 = true
+			conn.handle = sys::Socket(sys::AF_INET6, sys::SOCK_DGRAM, sys::IPPROTO_UDP)
+			if conn.handle < 0 {
+				error(lastErrorCode())
+			}
+			conn.sockaddr6 = sys::SockaddrIn6{}
+			conn.sockaddr6.sin6_family = sys::AF_INET6
+			for i, b in conn.Addr.Ip.Addr {
+				conn.sockaddr6.sin6_addr.s6_addr[i] = b
+			}
+			conn.sockaddr6.sin6_port = sys::Htons(conn.Addr.Port)
+			unsafe {
+				if sys::Bind(conn.handle, (*sys::Sockaddr)(&conn.sockaddr6), mem::SizeOf(conn.sockaddr6)) != 0 {
+					closeSocket(conn.handle)
+					error(lastErrorCode())
+				}
+			}
+		} else {
+			if network == Network.Udp6 {
+				error(AddrError.NoSuitable)
+			}
+			conn.Addr.Ip = ipv4
+			conn.handle = sys::Socket(sys::AF_INET, sys::SOCK_DGRAM, sys::IPPROTO_UDP)
+			if conn.handle < 0 {
+				error(lastErrorCode())
+			}
+			conn.sockaddr4 = sys::SockaddrIn{}
+			conn.sockaddr4.sin_family = sys::AF_INET
+			conn.sockaddr4.sin_port = sys::Htons(conn.Addr.Port)
+			conn.sockaddr4.sin_addr.s_addr = u32(beU64v4(conn.Addr.Ip.Addr))
+			unsafe {
+				if sys::Bind(conn.handle, (*sys::Sockaddr)(&conn.sockaddr4), mem::SizeOf(conn.sockaddr4)) != 0 {
+					closeSocket(conn.handle)
+					error(lastErrorCode())
+				}
+			}
+		}
+	}
+	ret new(UdpConn, conn)
 }
 
 fn udpConnect(network: Network, &addr: str)!: &UdpConn {
-    mut conn := UdpConn{
-        handle: netHandle(sys::INVALID_SOCKET),
-        Addr: UdpAddr.Resolve(network, addr) else { error(error) },
-    }
-    if conn.Addr.Ip.Empty() {
-        conn.handle = sys::Socket(sys::AF_INET, sys::SOCK_DGRAM, sys::IPPROTO_UDP)
-        if conn.handle < 0 {
-            error(lastErrorCode())
-        }
-        match network {
-        | Network.Udp | Network.Udp4:
-            conn.sockaddr4 = sys::SockaddrIn{}
-            conn.sockaddr4.sin_family = sys::AF_INET
-            conn.sockaddr4.sin_port = sys::Htons(conn.Addr.Port)
-            conn.sockaddr4.sin_addr.s_addr = sys::INADDR_ANY
-        | Network.Udp6:
-            conn.handle = sys::Socket(sys::AF_INET6, sys::SOCK_DGRAM, sys::IPPROTO_UDP)
-            if conn.handle < 0 {
-                error(lastErrorCode())
-            }
-            conn.sockaddr6 = sys::SockaddrIn6{}
-            conn.sockaddr6.sin6_family = sys::AF_INET6
-            conn.sockaddr6.sin6_port = sys::Htons(conn.Addr.Port)
-        |:
-            error(AddrError.UnknownNetwork)
-        }
-    } else {
-        mut ipv4 := conn.Addr.Ip.To4()
-        if ipv4.Empty() {
-            if network == Network.Udp4 {
-                error(AddrError.NoSuitable)
-            }
-            conn.v6 = true
-            conn.handle = sys::Socket(sys::AF_INET6, sys::SOCK_DGRAM, sys::IPPROTO_UDP)
-            if conn.handle < 0 {
-                error(lastErrorCode())
-            }
-            conn.sockaddr6 = sys::SockaddrIn6{}
-            conn.sockaddr6.sin6_family = sys::AF_INET6
-            for i, b in conn.Addr.Ip.Addr {
-                conn.sockaddr6.sin6_addr.s6_addr[i] = b
-            }
-            conn.sockaddr6.sin6_port = sys::Htons(conn.Addr.Port)
-        } else {
-            if network == Network.Udp6 {
-                error(AddrError.NoSuitable)
-            }
-            conn.Addr.Ip = ipv4
-            conn.handle = sys::Socket(sys::AF_INET, sys::SOCK_DGRAM, sys::IPPROTO_UDP)
-            if conn.handle < 0 {
-                error(lastErrorCode())
-            }
-            conn.sockaddr4 = sys::SockaddrIn{}
-            conn.sockaddr4.sin_family = sys::AF_INET
-            conn.sockaddr4.sin_port = sys::Htons(conn.Addr.Port)
-            conn.sockaddr4.sin_addr.s_addr = u32(beU64v4(conn.Addr.Ip.Addr))
-        }
-    }
-    ret new(UdpConn, conn)
+	mut conn := UdpConn{
+		handle: netHandle(sys::INVALID_SOCKET),
+		Addr: UdpAddr.Resolve(network, addr) else { error(error) },
+	}
+	if conn.Addr.Ip.Empty() {
+		conn.handle = sys::Socket(sys::AF_INET, sys::SOCK_DGRAM, sys::IPPROTO_UDP)
+		if conn.handle < 0 {
+			error(lastErrorCode())
+		}
+		match network {
+		| Network.Udp | Network.Udp4:
+			conn.sockaddr4 = sys::SockaddrIn{}
+			conn.sockaddr4.sin_family = sys::AF_INET
+			conn.sockaddr4.sin_port = sys::Htons(conn.Addr.Port)
+			conn.sockaddr4.sin_addr.s_addr = sys::INADDR_ANY
+		| Network.Udp6:
+			conn.handle = sys::Socket(sys::AF_INET6, sys::SOCK_DGRAM, sys::IPPROTO_UDP)
+			if conn.handle < 0 {
+				error(lastErrorCode())
+			}
+			conn.sockaddr6 = sys::SockaddrIn6{}
+			conn.sockaddr6.sin6_family = sys::AF_INET6
+			conn.sockaddr6.sin6_port = sys::Htons(conn.Addr.Port)
+		|:
+			error(AddrError.UnknownNetwork)
+		}
+	} else {
+		mut ipv4 := conn.Addr.Ip.To4()
+		if ipv4.Empty() {
+			if network == Network.Udp4 {
+				error(AddrError.NoSuitable)
+			}
+			conn.v6 = true
+			conn.handle = sys::Socket(sys::AF_INET6, sys::SOCK_DGRAM, sys::IPPROTO_UDP)
+			if conn.handle < 0 {
+				error(lastErrorCode())
+			}
+			conn.sockaddr6 = sys::SockaddrIn6{}
+			conn.sockaddr6.sin6_family = sys::AF_INET6
+			for i, b in conn.Addr.Ip.Addr {
+				conn.sockaddr6.sin6_addr.s6_addr[i] = b
+			}
+			conn.sockaddr6.sin6_port = sys::Htons(conn.Addr.Port)
+		} else {
+			if network == Network.Udp6 {
+				error(AddrError.NoSuitable)
+			}
+			conn.Addr.Ip = ipv4
+			conn.handle = sys::Socket(sys::AF_INET, sys::SOCK_DGRAM, sys::IPPROTO_UDP)
+			if conn.handle < 0 {
+				error(lastErrorCode())
+			}
+			conn.sockaddr4 = sys::SockaddrIn{}
+			conn.sockaddr4.sin_family = sys::AF_INET
+			conn.sockaddr4.sin_port = sys::Htons(conn.Addr.Port)
+			conn.sockaddr4.sin_addr.s_addr = u32(beU64v4(conn.Addr.Ip.Addr))
+		}
+	}
+	ret new(UdpConn, conn)
 }

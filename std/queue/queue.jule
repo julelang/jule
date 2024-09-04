@@ -13,115 +13,115 @@ const growFactor = 2
 // Queues aren't use shared allocation between themselves.
 // Allocates new space and copies (not deep copy) items into space.
 struct Queue[T] {
-    mem: dynar::Dynar[T]
+	mem: dynar::Dynar[T]
 }
 
 impl Queue {
-    // Returns new queue instance with capacity.
-    static fn New(cap: int): Queue[T] {
-        mut queue := Queue[T]{
-            mem: dynar::Dynar[T].New(),
-        }
-        if cap > 0 {
-            queue.resize(cap)
-        }
-        ret queue
-    }
+	// Returns new queue instance with capacity.
+	static fn New(cap: int): Queue[T] {
+		mut queue := Queue[T]{
+			mem: dynar::Dynar[T].New(),
+		}
+		if cap > 0 {
+			queue.resize(cap)
+		}
+		ret queue
+	}
 
-    fn resize(mut self, n: int) {
-        ok := self.mem.Resize(n)
-        if !ok {
-            panic("Queue[T]: heap reallocation failed")
-        }
-    }
+	fn resize(mut self, n: int) {
+		ok := self.mem.Resize(n)
+		if !ok {
+			panic("Queue[T]: heap reallocation failed")
+		}
+	}
 
-    // Deallocate heap.
-    fn Dispose(mut self) {
-        self.mem.Dispose()
-    }
+	// Deallocate heap.
+	fn Dispose(mut self) {
+		self.mem.Dispose()
+	}
 
-    // Set capacity to length.
-    // Removes additional capacity that waiting to use.
-    // Allocates new memory to cut additional capacity.
-    fn Fit(mut self) {
-        if self.Len() != self.Cap() {
-            self.resize(self.Len())
-        }
-    }
+	// Set capacity to length.
+	// Removes additional capacity that waiting to use.
+	// Allocates new memory to cut additional capacity.
+	fn Fit(mut self) {
+		if self.Len() != self.Cap() {
+			self.resize(self.Len())
+		}
+	}
 
-    // Returns length of queue.
-    // Another meaning is count of elements.
-    fn Len(self): int {
-        ret self.mem.Buff.len
-    }
+	// Returns length of queue.
+	// Another meaning is count of elements.
+	fn Len(self): int {
+		ret self.mem.Buff.len
+	}
 
-    // Returns capacity of queue.
-    // Another meaning is additional redy-to-use allocation size.
-    fn Cap(self): int {
-        ret self.mem.Buff.cap
-    }
+	// Returns capacity of queue.
+	// Another meaning is additional redy-to-use allocation size.
+	fn Cap(self): int {
+		ret self.mem.Buff.cap
+	}
 
-    // Reports whether queue is empty.
-    fn Empty(self): bool {
-        ret self.Len() == 0
-    }
+	// Reports whether queue is empty.
+	fn Empty(self): bool {
+		ret self.Len() == 0
+	}
 
-    // Removes all elements.
-    // Does not deallocates buffer, keeps capacity.
-    fn Clear(mut self) {
-        self.mem.Buff.len = 0
-    }
+	// Removes all elements.
+	// Does not deallocates buffer, keeps capacity.
+	fn Clear(mut self) {
+		self.mem.Buff.len = 0
+	}
 
-    // Pushes element to rear of the queue.
-    fn Push(mut self, mut t: T) {
-        if self.Len() >= self.Cap() {
-            self.resize((self.Cap() * growFactor) + 1)
-        }
-        unsafe {
-            self.mem.Buff.heap[self.Len()] = t
-        }
-        self.mem.Buff.len++
-    }
+	// Pushes element to rear of the queue.
+	fn Push(mut self, mut t: T) {
+		if self.Len() >= self.Cap() {
+			self.resize((self.Cap() * growFactor) + 1)
+		}
+		unsafe {
+			self.mem.Buff.heap[self.Len()] = t
+		}
+		self.mem.Buff.len++
+	}
 
-    // Returns element front of the queue, then removes front element.
-    // Panics if queue is empty.
-    fn Pop(mut self): T {
-        if self.Empty() {
-            panic("Queue[T]: pop with zero-length queue")
-        }
-        mut t := unsafe { self.mem.Buff.heap[0] }
-        if self.Len() != 1 {
-            self.mem.ShiftLeft(1, self.Len(), 1)
-        }
-        self.mem.Buff.len--
-        ret t
-    }
+	// Returns element front of the queue, then removes front element.
+	// Panics if queue is empty.
+	fn Pop(mut self): T {
+		if self.Empty() {
+			panic("Queue[T]: pop with zero-length queue")
+		}
+		mut t := unsafe { self.mem.Buff.heap[0] }
+		if self.Len() != 1 {
+			self.mem.ShiftLeft(1, self.Len(), 1)
+		}
+		self.mem.Buff.len--
+		ret t
+	}
 
-    // Returns front element of the queue.
-    // Panics if queue is empty.
-    fn Front(mut self): T {
-        if self.Empty() {
-            panic("Queue[T]: front with zero-length queue")
-        }
-        unsafe {
-            ret self.mem.Buff.heap[0]
-        }
-    }
+	// Returns front element of the queue.
+	// Panics if queue is empty.
+	fn Front(mut self): T {
+		if self.Empty() {
+			panic("Queue[T]: front with zero-length queue")
+		}
+		unsafe {
+			ret self.mem.Buff.heap[0]
+		}
+	}
 
-    // Returns slice that contains elements of queue.
-    // Slice is not mutable reference to internal buffer, but can effect internal
-    // buffer if T is mutable type.
-    // Appends elements in front-to-rear order.
-    fn Slice(mut self): []T {
-        if self.Empty() {
-            ret nil
-        }
-        mut s := make([]T, 0, self.Len())
-        mut i := self.mem.Buff.heap
-        j := self.mem.Buff.heap + self.Len()
-        for i < j; i++ {
-            s = append(s, unsafe { *i })
-        }
-        ret s
-    }
+	// Returns slice that contains elements of queue.
+	// Slice is not mutable reference to internal buffer, but can effect internal
+	// buffer if T is mutable type.
+	// Appends elements in front-to-rear order.
+	fn Slice(mut self): []T {
+		if self.Empty() {
+			ret nil
+		}
+		mut s := make([]T, 0, self.Len())
+		mut i := self.mem.Buff.heap
+		j := self.mem.Buff.heap + self.Len()
+		for i < j; i++ {
+			s = append(s, unsafe { *i })
+		}
+		ret s
+	}
 }

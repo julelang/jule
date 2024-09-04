@@ -9,192 +9,192 @@ use types for std::jule::types
 use std::strings::{StrBuilder}
 
 enum builtinConstraint: str {
-    Signed: "signed",
-    Unsigned: "unsigned",
-    Float: "float",
-    Numeric: "numeric",
-    Immutable: "immutable",
-    Mutable: "mutable",
-    Ordered: "ordered",
-    Comparable: "comparable",
+	Signed: "signed",
+	Unsigned: "unsigned",
+	Float: "float",
+	Numeric: "numeric",
+	Immutable: "immutable",
+	Mutable: "mutable",
+	Ordered: "ordered",
+	Comparable: "comparable",
 }
 
 static builtinConstraints = [
-    builtinConstraint.Signed,
-    builtinConstraint.Unsigned,
-    builtinConstraint.Float,
-    builtinConstraint.Numeric,
-    builtinConstraint.Mutable,
-    builtinConstraint.Immutable,
-    builtinConstraint.Ordered,
-    builtinConstraint.Comparable,
+	builtinConstraint.Signed,
+	builtinConstraint.Unsigned,
+	builtinConstraint.Float,
+	builtinConstraint.Numeric,
+	builtinConstraint.Mutable,
+	builtinConstraint.Immutable,
+	builtinConstraint.Ordered,
+	builtinConstraint.Comparable,
 ]
 
 struct constraintChecker {
-    mut s: &Sema
+	mut s: &Sema
 
-    // Declarations of generics.
-    mut genericsD: []&GenericDecl
+	// Declarations of generics.
+	mut genericsD: []&GenericDecl
 
-    // Generics of instance.
-    mut generics: []&InsGeneric
+	// Generics of instance.
+	mut generics: []&InsGeneric
 
-    // Type aliases for generics.
-    // It can be nil if environment is not guaranteed.
-    // It will be used for guaranteed environments.
-    mut genericsA: []&TypeAlias
+	// Type aliases for generics.
+	// It can be nil if environment is not guaranteed.
+	// It will be used for guaranteed environments.
+	mut genericsA: []&TypeAlias
 
-    // Functions instance.
-    // If this field is not nil, process will be executed by functions.
-    mut fi: &FnIns
+	// Functions instance.
+	// If this field is not nil, process will be executed by functions.
+	mut fi: &FnIns
 
-    // Structure instance.
-    // If this field is not nil, process will be executed by structures.
-    mut si: &StructIns
+	// Structure instance.
+	// If this field is not nil, process will be executed by structures.
+	mut si: &StructIns
 
-    // Error that will use as error token.
-    mut et: &Token
+	// Error that will use as error token.
+	mut et: &Token
 
-    // Whether instance is unique.
-    mut uniq: bool
+	// Whether instance is unique.
+	mut uniq: bool
 }
 
 impl constraintChecker {
-    fn readyFn(mut &self): fn(mut &sema: &Sema, mut &generics: []&TypeAlias): bool {
-        ret fn(mut &sema: &Sema, mut &generics: []&TypeAlias): bool {
-            for (i, mut g) in self.genericsD {
-                mut generic := self.generics[i]
-                if g.Constraint == nil || len(g.Constraint.Mask) == 0 {
-                    continue
-                }
-                generic.Constraint = make([]&TypeKind, 0, len(g.Constraint.Mask))
-                for (_, mut mask) in g.Constraint.Mask {
-                    n := len(sema.errors)
-                    mut kind := sema.buildTypeWithRefers(mask, sema, generics, nil)
-                    if kind == nil {
-                        match type mask.Kind {
-                        | &IdentTypeDecl:
-                            mut itd := (&IdentTypeDecl)(mask.Kind)
-                            if len(itd.Generics) == 0 && isBuiltinConstraint(itd.Ident) {
-                                kind = &TypeKind{Kind: buildPrimType(itd.Ident)}
-                                sema.errors = sema.errors[:n]
-                                goto success
-                            }
-                        }
-                        ret false
-                    }
-                success:
-                    generic.Constraint = append(generic.Constraint, kind)
-                }
-            }
-            ret true
-        }
-    }
+	fn readyFn(mut &self): fn(mut &sema: &Sema, mut &generics: []&TypeAlias): bool {
+		ret fn(mut &sema: &Sema, mut &generics: []&TypeAlias): bool {
+			for (i, mut g) in self.genericsD {
+				mut generic := self.generics[i]
+				if g.Constraint == nil || len(g.Constraint.Mask) == 0 {
+					continue
+				}
+				generic.Constraint = make([]&TypeKind, 0, len(g.Constraint.Mask))
+				for (_, mut mask) in g.Constraint.Mask {
+					n := len(sema.errors)
+					mut kind := sema.buildTypeWithRefers(mask, sema, generics, nil)
+					if kind == nil {
+						match type mask.Kind {
+						| &IdentTypeDecl:
+							mut itd := (&IdentTypeDecl)(mask.Kind)
+							if len(itd.Generics) == 0 && isBuiltinConstraint(itd.Ident) {
+								kind = &TypeKind{Kind: buildPrimType(itd.Ident)}
+								sema.errors = sema.errors[:n]
+								goto success
+							}
+						}
+						ret false
+					}
+				success:
+					generic.Constraint = append(generic.Constraint, kind)
+				}
+			}
+			ret true
+		}
+	}
 
-    // Functions will be checked in their environment, because environment is not guaranteed.
-    fn readyFi(mut &self): bool {
-        self.genericsD = self.fi.Decl.Generics
-        self.generics = self.fi.Generics
-        ret !self.uniq || self.s.fnEnvironment(self.fi, self.readyFn())
-    }
+	// Functions will be checked in their environment, because environment is not guaranteed.
+	fn readyFi(mut &self): bool {
+		self.genericsD = self.fi.Decl.Generics
+		self.generics = self.fi.Generics
+		ret !self.uniq || self.s.fnEnvironment(self.fi, self.readyFn())
+	}
 
-    // Structure will be checked in current environment, because environment should be guaranteed.
-    fn readySi(mut &self): bool {
-        self.genericsD = self.si.Decl.Generics
-        self.generics = self.si.Generics
-        ret !self.uniq || self.readyFn()(self.s, self.genericsA)
-    }
+	// Structure will be checked in current environment, because environment should be guaranteed.
+	fn readySi(mut &self): bool {
+		self.genericsD = self.si.Decl.Generics
+		self.generics = self.si.Generics
+		ret !self.uniq || self.readyFn()(self.s, self.genericsA)
+	}
 
-    fn ready(mut &self): bool {
-        if self.fi != nil {
-            ret self.readyFi()
-        }
-        ret self.readySi()
-    }
+	fn ready(mut &self): bool {
+		if self.fi != nil {
+			ret self.readyFi()
+		}
+		ret self.readySi()
+	}
 
-    fn check(mut &self): bool {
-        if !self.ready() {
-            ret false
-        }
-    lookup:
-        for (i, mut g) in self.generics {
-            if g.Constraint == nil {
-                continue
-            }
-            for (_, mut c2) in g.Constraint {
-                mut prim := c2.Prim()
-                if prim != nil && prim.IsConstraint() {
-                    if matchConstraint(prim.Kind, g.Kind) {
-                        continue lookup
-                    }
-                    continue
-                }
-                if c2.Equal(g.Kind) {
-                    continue lookup
-                }
-            }
-            self.s.pushErr(self.et, LogMsg.ConstraintFailed, g.Kind.Str(), self.genericsD[i].Ident, toStrConstraints(g))
-            ret false
-        }
-        ret true
-    }
+	fn check(mut &self): bool {
+		if !self.ready() {
+			ret false
+		}
+	lookup:
+		for (i, mut g) in self.generics {
+			if g.Constraint == nil {
+				continue
+			}
+			for (_, mut c2) in g.Constraint {
+				mut prim := c2.Prim()
+				if prim != nil && prim.IsConstraint() {
+					if matchConstraint(prim.Kind, g.Kind) {
+						continue lookup
+					}
+					continue
+				}
+				if c2.Equal(g.Kind) {
+					continue lookup
+				}
+			}
+			self.s.pushErr(self.et, LogMsg.ConstraintFailed, g.Kind.Str(), self.genericsD[i].Ident, toStrConstraints(g))
+			ret false
+		}
+		ret true
+	}
 }
 
 fn toStrConstraints(g: &InsGeneric): str {
-    mut sb := StrBuilder.New(1 << 7)
-    for i, c in g.Constraint {
-        sb.WriteStr(c.Str())
-        if len(g.Constraint)-i > 1 {
-            sb.WriteStr(" | ")
-        }
-    }
-    ret sb.Str()
+	mut sb := StrBuilder.New(1 << 7)
+	for i, c in g.Constraint {
+		sb.WriteStr(c.Str())
+		if len(g.Constraint)-i > 1 {
+			sb.WriteStr(" | ")
+		}
+	}
+	ret sb.Str()
 }
 
 fn matchConstraint(&c: str, mut &g: &TypeKind): bool {
-    match c {
-    | builtinConstraint.Signed:
-        prim := g.Prim()
-        if prim == nil {
-            ret false
-        }
-        ret types::IsSigNum(prim.Kind)
-    | builtinConstraint.Unsigned:
-        prim := g.Prim()
-        if prim == nil {
-            ret false
-        }
-        ret types::IsUnsigInt(prim.Kind)
-    | builtinConstraint.Float:
-        prim := g.Prim()
-        if prim == nil {
-            ret false
-        }
-        ret types::IsFloat(prim.Kind)
-    | builtinConstraint.Numeric:
-        prim := g.Prim()
-        if prim == nil {
-            ret false
-        }
-        ret types::IsNum(prim.Kind)
-    | builtinConstraint.Mutable:
-        ret g.Mutable()
-    | builtinConstraint.Immutable:
-        ret !g.Mutable()
-    | builtinConstraint.Comparable:
-        ret g.Comparable()
-    | builtinConstraint.Ordered:
-        ret g.Ordered()
-    |:
-        ret false
-    }
+	match c {
+	| builtinConstraint.Signed:
+		prim := g.Prim()
+		if prim == nil {
+			ret false
+		}
+		ret types::IsSigNum(prim.Kind)
+	| builtinConstraint.Unsigned:
+		prim := g.Prim()
+		if prim == nil {
+			ret false
+		}
+		ret types::IsUnsigInt(prim.Kind)
+	| builtinConstraint.Float:
+		prim := g.Prim()
+		if prim == nil {
+			ret false
+		}
+		ret types::IsFloat(prim.Kind)
+	| builtinConstraint.Numeric:
+		prim := g.Prim()
+		if prim == nil {
+			ret false
+		}
+		ret types::IsNum(prim.Kind)
+	| builtinConstraint.Mutable:
+		ret g.Mutable()
+	| builtinConstraint.Immutable:
+		ret !g.Mutable()
+	| builtinConstraint.Comparable:
+		ret g.Comparable()
+	| builtinConstraint.Ordered:
+		ret g.Ordered()
+	|:
+		ret false
+	}
 }
 
 fn isBuiltinConstraint(&ident: str): bool {
-    for _, bc in builtinConstraints {
-        if ident == bc {
-            ret true
-        }
-    }
-    ret false
+	for _, bc in builtinConstraints {
+		if ident == bc {
+			ret true
+		}
+	}
+	ret false
 }

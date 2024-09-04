@@ -7,23 +7,23 @@ use sys for std::sys
 
 // Seek whence values.
 enum Seek: int {
-    Set: 0, // Seek relative to the origin of the file
-    Cur: 1, // Seek relative to the current offset
-    End: 2, // Seek relative to the end
+	Set: 0, // Seek relative to the origin of the file
+	Cur: 1, // Seek relative to the current offset
+	End: 2, // Seek relative to the end
 }
 
 // Flags to open wrapping those of the underlying system.
 // Not all flags may be implemented on a given system.
 // Exactly one of Rdonly, Wronly, or Rdwr must be specified.
 enum OFlag: int {
-    Rdonly: sys::O_RDONLY, // Open the file read-only
-    Wronly: sys::O_WRONLY, // Open the file write-only
-    Rdwr: sys::O_RDWR,     // Open the file read-write
-    Append: sys::O_APPEND, // Append data to the file when writing
-    Create: sys::O_CREAT,  // Create a new file if none exists
-    Excl: sys::O_EXCL,     // Used with OFlag.Create, file must not exist
-    Sync: sys::O_SYNC,     // Open for synchronous I/O
-    Trunc: sys::O_TRUNC,   // Truncate regular writable file when opened
+	Rdonly: sys::O_RDONLY, // Open the file read-only
+	Wronly: sys::O_WRONLY, // Open the file write-only
+	Rdwr: sys::O_RDWR,     // Open the file read-write
+	Append: sys::O_APPEND, // Append data to the file when writing
+	Create: sys::O_CREAT,  // Create a new file if none exists
+	Excl: sys::O_EXCL,     // Used with OFlag.Create, file must not exist
+	Sync: sys::O_SYNC,     // Open for synchronous I/O
+	Trunc: sys::O_TRUNC,   // Truncate regular writable file when opened
 }
 
 // The file stream handle.
@@ -37,103 +37,103 @@ enum OFlag: int {
 // for console handlers depending on the operating system.
 // For example, Windows has an overhead for UTF-16 processing.
 struct File {
-    handle: uintptr
+	handle: uintptr
 }
 
 impl File {
-    // Returns new &File by handle.
-    static fn New(handle: uintptr): &File {
-        ret &File{
-            handle: handle,
-        }
-    }
+	// Returns new &File by handle.
+	static fn New(handle: uintptr): &File {
+		ret &File{
+			handle: handle,
+		}
+	}
 
-    // Creates or truncates the named file. If the file already exists,
-    // it is truncated. If the file does not exist, it is created with mode 0666
-    // (before umask). If successful, methods on the returned File can
-    // be used for I/O; the associated file descriptor has mode OFlag.Rdwr.
-    static fn Create(path: str)!: &File {
-        ret File.Open(path, OFlag.Rdwr | OFlag.Create | OFlag.Trunc, 0666) else { error(error) }
-    }
+	// Creates or truncates the named file. If the file already exists,
+	// it is truncated. If the file does not exist, it is created with mode 0666
+	// (before umask). If successful, methods on the returned File can
+	// be used for I/O; the associated file descriptor has mode OFlag.Rdwr.
+	static fn Create(path: str)!: &File {
+		ret File.Open(path, OFlag.Rdwr | OFlag.Create | OFlag.Trunc, 0666) else { error(error) }
+	}
 
-    // Reads bytes of file.
-    // First, learns byte-size of file.
-    // Then reads bytes and returns buffer.
-    //
-    // Possible errors:
-    //  Denied Exist Signal SyncIO IO IsDir Loop PerProcessLimit LongPath
-    //  SystemWideLimit NotExist UnableStream NoSpace NotDir Device Overflow
-    //  ReadOnly Retry Busy Device Seek InsufficientMemory Buffer
-    static fn Read(path: str)!: []byte {
-        s := Status.Of(path) else { error(error) }
-        if !s.IsReg() {
-            error(FsError.IsDir)
-        }
+	// Reads bytes of file.
+	// First, learns byte-size of file.
+	// Then reads bytes and returns buffer.
+	//
+	// Possible errors:
+	//  Denied Exist Signal SyncIO IO IsDir Loop PerProcessLimit LongPath
+	//  SystemWideLimit NotExist UnableStream NoSpace NotDir Device Overflow
+	//  ReadOnly Retry Busy Device Seek InsufficientMemory Buffer
+	static fn Read(path: str)!: []byte {
+		s := Status.Of(path) else { error(error) }
+		if !s.IsReg() {
+			error(FsError.IsDir)
+		}
 
-        mut sz := int(s.Size())
-        if sz != int(s.Size()) {
-            sz = 0
-        }
-        // Following information adopted from Go;
-        // If a file claims a small size, read at least 512 bytes.
-        // In particular, files in Linux's /proc claim size 0 but
-        // then do not work right if read in small pieces,
-        // so an initial read of 1 byte would not work correctly.
-        if sz < 1<<9 {
-            sz = 1<<9
-        }
+		mut sz := int(s.Size())
+		if sz != int(s.Size()) {
+			sz = 0
+		}
+		// Following information adopted from Go;
+		// If a file claims a small size, read at least 512 bytes.
+		// In particular, files in Linux's /proc claim size 0 but
+		// then do not work right if read in small pieces,
+		// so an initial read of 1 byte would not work correctly.
+		if sz < 1<<9 {
+			sz = 1 << 9
+		}
 
-        mut f := File.Open(path, OFlag.Rdonly, 0) else { error(error) }
-        mut buf := make([]byte, sz)
-        mut n := 0
-        for n < sz {
-            rn := f.Read(buf[n:]) else { error(error) }
-            if rn == 0 {
-                break
-            }
-            n += rn
-        }
-        f.Close() else { error(error) }
-        ret buf[:n]
-    }
+		mut f := File.Open(path, OFlag.Rdonly, 0) else { error(error) }
+		mut buf := make([]byte, sz)
+		mut n := 0
+		for n < sz {
+			rn := f.Read(buf[n:]) else { error(error) }
+			if rn == 0 {
+				break
+			}
+			n += rn
+		}
+		f.Close() else { error(error) }
+		ret buf[:n]
+	}
 
-    // Writes data to the named file, creating it if necessary.
-    // If the file does not exist, creates it with permissions perm (before umask);
-    // otherwise truncates it before writing, without changing permissions.
-    // Since requires multiple system calls to complete, a failure mid-operation
-    // can leave the file in a partially written state.
-    static fn Write(path: str, data: []byte, perm: int)! {
-        mut f := File.Open(path, OFlag.Wronly | OFlag.Create | OFlag.Trunc, perm) else { error(error) }
-        mut n := 0
-        for n < len(data) {
-            n += f.Write(data[n:]) else { error(error) }
-        }
-        f.Close() else { error(error) }
-    }
+	// Writes data to the named file, creating it if necessary.
+	// If the file does not exist, creates it with permissions perm (before umask);
+	// otherwise truncates it before writing, without changing permissions.
+	// Since requires multiple system calls to complete, a failure mid-operation
+	// can leave the file in a partially written state.
+	static fn Write(path: str, data: []byte, perm: int)! {
+		mut f := File.Open(path, OFlag.Wronly | OFlag.Create | OFlag.Trunc, perm) else { error(error) }
+		mut n := 0
+		for n < len(data) {
+			n += f.Write(data[n:]) else { error(error) }
+		}
+		f.Close() else { error(error) }
+	}
 }
 
 impl File {
-    // Sets offset to next Read/Write operation and returns the new offset.
-    // whence: 0 (Seek.Set) means, relative to the origin of the file, 1 (Seek.Cur)
-    // means relative to the current offset, and 2 (Seek.End) means relative to end.
-    //
-    // Possible errors:
-    //  InvalidDescriptor SyncIO Overflow Seek
-    fn Seek(mut self, offset: int, origin: Seek)!: int {
-        pos := sys::Seek(int(self.handle), offset, int(origin))
-        if pos == -1 {
-            error(getLastFsError())
-        }
-        ret pos
-    }
+	// Sets offset to next Read/Write operation and returns the new offset.
+	// whence: 0 (Seek.Set) means, relative to the origin of the file, 1 (Seek.Cur)
+	// means relative to the current offset, and 2 (Seek.End) means relative to end.
+	//
+	// Possible errors:
+	//  InvalidDescriptor SyncIO Overflow Seek
+	fn Seek(mut self, offset: int, origin: Seek)!: int {
+		pos := sys::Seek(int(self.handle), offset, int(origin))
+		if pos == -1 {
+			error(getLastFsError())
+		}
+		ret pos
+	}
 
-    // Closes file handle.
-    //
-    // Possible errors:
-    //  InvalidDescriptor Signal IO
-    fn Close(mut self)! {
-        if sys::Close(int(self.handle)) == -1 {
-            error(getLastFsError())
-        }
-    }
+	// Closes file handle.
+	//
+	// Possible errors:
+	//  InvalidDescriptor Signal IO
+	fn Close(mut self)! {
+		if sys::Close(int(self.handle)) == -1 {
+			error(getLastFsError())
+		}
+	}
 }

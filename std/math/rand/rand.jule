@@ -26,121 +26,121 @@ type Seed: u64
 //
 //  With this formula, randomness can be made in the [min, max) range.
 struct Rand {
-    mut seed: Seed
+	mut seed: Seed
 }
 
 impl Rand {
-    const seedMask = 1 << 63 - 1
+	const seedMask = 1 << 63 - 1
 
-    // Returns new PRNG for seed.
-    static fn New(seed: Seed): &Rand {
-        mut rand := new(Rand)
-        rand.setSeed(seed)
-        ret rand
-    }
+	// Returns new PRNG for seed.
+	static fn New(seed: Seed): &Rand {
+		mut rand := new(Rand)
+		rand.setSeed(seed)
+		ret rand
+	}
 }
 
 impl Rand {
-    // Sets seed.
-    fn setSeed(self, seed: Seed) {
-        self.seed = seed & Rand.seedMask
-        self.seed += self.seed * (seed >> (1 << 3))
-    }
+	// Sets seed.
+	fn setSeed(self, seed: Seed) {
+		self.seed = seed & Rand.seedMask
+		self.seed += self.seed * (seed >> (1 << 3))
+	}
 
-    // Processes, sets, and returns new seed.
-    fn snext(self): Seed {
-        const NextMask = 0x41C64E6D
-        self.setSeed((self.seed * NextMask + 0x3039) & Rand.seedMask)
-        ret self.seed
-    }
+	// Processes, sets, and returns new seed.
+	fn snext(self): Seed {
+		const NextMask = 0x41C64E6D
+		self.setSeed((self.seed * NextMask + 0x3039) & Rand.seedMask)
+		ret self.seed
+	}
 
-    // Returns a non-genative pseudo-random
-    // 63-bit signed integer as an 64-bit signed integer.
-    fn Next63(self): i64 {
-        const RngMax = 1 << 63
-        const RngMask = RngMax - 1
-        ret i64(self.snext() & RngMask)
-    }
+	// Returns a non-genative pseudo-random
+	// 63-bit signed integer as an 64-bit signed integer.
+	fn Next63(self): i64 {
+		const RngMax = 1 << 63
+		const RngMask = RngMax - 1
+		ret i64(self.snext() & RngMask)
+	}
 
-    // Returns a non-genative pseudo-random
-    // 31-bit signed integer as an 31-bit signed integer.
-    fn Next31(self): i32 {
-        ret i32(self.Next63() >> 32)
-    }
+	// Returns a non-genative pseudo-random
+	// 31-bit signed integer as an 31-bit signed integer.
+	fn Next31(self): i32 {
+		ret i32(self.Next63() >> 32)
+	}
 
-    // Returns a non-genative pseudo-random int.
-    fn Next(self): int {
-        u := uint(self.Next63())
-        ret int(u << 1 >> 1) // clear sign bit if int == int32
-    }
+	// Returns a non-genative pseudo-random int.
+	fn Next(self): int {
+		u := uint(self.Next63())
+		ret int(u << 1 >> 1) // clear sign bit if int == int32
+	}
 
-    // Returns a non-genative pseudo-random in [0, n) range
-    // 63-bit signed integer as an 64-bit signed integer.
-    // If n <= 0, it panics.
-    fn Nextn63(self, n: i64): i64 {
-        if n <= 0 {
-            panic("Rand.Nextn63: invalid argument")
-        }
-        if n&(n - 1) == 0 {
-            ret self.Next63() & (n - 1)
-        }
-        max := i64(1 << 63 - 1 - (1 << 63) % u64(n))
-        mut v := self.Next63()
-        for v > max {
-            v = self.Next63()
-        }
-        ret v % n
-    }
+	// Returns a non-genative pseudo-random in [0, n) range
+	// 63-bit signed integer as an 64-bit signed integer.
+	// If n <= 0, it panics.
+	fn Nextn63(self, n: i64): i64 {
+		if n <= 0 {
+			panic("Rand.Nextn63: invalid argument")
+		}
+		if n&(n - 1) == 0 {
+			ret self.Next63() & (n - 1)
+		}
+		max := i64(1 << 63 - 1 - (1 << 63) % u64(n))
+		mut v := self.Next63()
+		for v > max {
+			v = self.Next63()
+		}
+		ret v % n
+	}
 
-    // Returns a non-genative pseudo-random in [0, n) range
-    // 31-bit signed integer as an 31-bit signed integer.
-    // If n <= 0, it panics.
-    fn Nextn31(self, n: i32): i32 {
-        if n <= 0 {
-            panic("Rand.nextn31: invalid argument")
-        }
-        if n&(n - 1) == 0 {
-            ret self.Next31() & (n - 1)
-        }
-        max := i32(1 << 31 - 1 - (1 << 31) % u32(n))
-        mut v := self.Next31()
-        for v > max {
-            v = self.Next31()
-        }
-        ret v % n
-    }
+	// Returns a non-genative pseudo-random in [0, n) range
+	// 31-bit signed integer as an 31-bit signed integer.
+	// If n <= 0, it panics.
+	fn Nextn31(self, n: i32): i32 {
+		if n <= 0 {
+			panic("Rand.nextn31: invalid argument")
+		}
+		if n&(n - 1) == 0 {
+			ret self.Next31() & (n - 1)
+		}
+		max := i32(1 << 31 - 1 - (1 << 31) % u32(n))
+		mut v := self.Next31()
+		for v > max {
+			v = self.Next31()
+		}
+		ret v % n
+	}
 
-    // Returns a non-genative pseudo-random in [0, n) range as int.
-    // If n <= 0, it panics.
-    fn Nextn(self, n: int): int {
-        if n <= 0 {
-            panic("Rand.nextn: invalid argument")
-        }
-        if n <= 1<<31-1 {
-            ret int(self.Nextn31(i32(n)))
-        }
-        ret int(self.Nextn63(i64(n)))
-    }
+	// Returns a non-genative pseudo-random in [0, n) range as int.
+	// If n <= 0, it panics.
+	fn Nextn(self, n: int): int {
+		if n <= 0 {
+			panic("Rand.nextn: invalid argument")
+		}
+		if n <= 1<<31-1 {
+			ret int(self.Nextn31(i32(n)))
+		}
+		ret int(self.Nextn63(i64(n)))
+	}
 
-    // Returns a non-genative pseudo-random in [0.0, 1.0) range
-    // as f64 floating-point.
-    fn Fnext64(self): f64 {
-    sample:
-        f := f64(self.Next63()) / (1 << 63)
-        if f == 1 {
-            goto sample
-        }
-        ret f
-    }
+	// Returns a non-genative pseudo-random in [0.0, 1.0) range
+	// as f64 floating-point.
+	fn Fnext64(self): f64 {
+	sample:
+		f := f64(self.Next63()) / (1 << 63)
+		if f == 1 {
+			goto sample
+		}
+		ret f
+	}
 
-    // Returns a non-genative pseudo-random in [0.0, 1.0) range
-    // as f32 floating-point.
-    fn Fnext32(self): f32 {
-    sample:
-        f := f32(self.Fnext64())
-        if f == 1 {
-            goto sample
-        }
-        ret f
-    }
+	// Returns a non-genative pseudo-random in [0.0, 1.0) range
+	// as f32 floating-point.
+	fn Fnext32(self): f32 {
+	sample:
+		f := f32(self.Fnext64())
+		if f == 1 {
+			goto sample
+		}
+		ret f
+	}
 }

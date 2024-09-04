@@ -12,126 +12,126 @@ use std::jule::lex::{Token, TokenId, TokenKind}
 // Read manual for more information about syntax or etc:
 // https://manual.jule.dev/compiler/directives.html#directive-expressions
 struct directiveEval {
-    logs: []Log
-    d:    &Directive
-    vars: []str
+	logs: []Log
+	d:    &Directive
+	vars: []str
 }
 
 impl directiveEval {
-    fn pushErr(mut self, t: &Token, fmt: LogMsg, args: ...any) {
-        self.logs = append(self.logs, Log{
-            Kind: LogKind.Error,
-            Row: t.Row,
-            Column: t.Column,
-            Path: t.File.Path,
-            Text: Logf(fmt, args...),
-        })
-    }
+	fn pushErr(mut self, t: &Token, fmt: LogMsg, args: ...any) {
+		self.logs = append(self.logs, Log{
+			Kind: LogKind.Error,
+			Row: t.Row,
+			Column: t.Column,
+			Path: t.File.Path,
+			Text: Logf(fmt, args...),
+		})
+	}
 
-    // Split operans by binary operators.
-    // Skips range of parentheses.
-    fn splitOperans(mut self, op: TokenId, mut &tokens: []&Token): [][]&Token {
-        mut parts := make([][]&Token, 0, 10)
-        mut i := 0
-        mut rangeN := 0
-        mut last := 0
-        for i < len(tokens)-1; i++ {
-            b := tokens[i]
-            match b.Id {
-            | TokenId.LParent:
-                rangeN++
-                continue
-            | TokenId.RParent:
-                rangeN--
-            }
-            if rangeN > 0 || b.Id != op {
-                continue
-            }
-            parts = append(parts, tokens[last:i])
-            last = i + 1
-        }
-        if last < len(tokens) {
-            parts = append(parts, tokens[last:])
-        } else {
-            // Missing operand.
-            self.pushErr(tokens[last-1], LogMsg.MissingExpr)
-            ret nil
-        }
-        ret parts
-    }
+	// Split operans by binary operators.
+	// Skips range of parentheses.
+	fn splitOperans(mut self, op: TokenId, mut &tokens: []&Token): [][]&Token {
+		mut parts := make([][]&Token, 0, 10)
+		mut i := 0
+		mut rangeN := 0
+		mut last := 0
+		for i < len(tokens)-1; i++ {
+			b := tokens[i]
+			match b.Id {
+			| TokenId.LParent:
+				rangeN++
+				continue
+			| TokenId.RParent:
+				rangeN--
+			}
+			if rangeN > 0 || b.Id != op {
+				continue
+			}
+			parts = append(parts, tokens[last:i])
+			last = i + 1
+		}
+		if last < len(tokens) {
+			parts = append(parts, tokens[last:])
+		} else {
+			// Missing operand.
+			self.pushErr(tokens[last-1], LogMsg.MissingExpr)
+			ret nil
+		}
+		ret parts
+	}
 
-    // Eval directive variable.
-    fn evalDirectiveIdent(self, ident: str): bool {
-        if ident == "" {
-            ret false
-        }
-        for _, var in self.vars {
-            if var == ident {
-                ret true
-            }
-        }
-        ret false
-    }
+	// Eval directive variable.
+	fn evalDirectiveIdent(self, ident: str): bool {
+		if ident == "" {
+			ret false
+		}
+		for _, var in self.vars {
+			if var == ident {
+				ret true
+			}
+		}
+		ret false
+	}
 
-    // Eval directive expression part.
-    // Accepts unary operators.
-    fn evalDirectivePart(mut self, mut part: []&Token): bool {
-        logicalNot := part[0].Id == TokenId.Excl
-        if logicalNot {
-            part = part[1:]
-        }
+	// Eval directive expression part.
+	// Accepts unary operators.
+	fn evalDirectivePart(mut self, mut part: []&Token): bool {
+		logicalNot := part[0].Id == TokenId.Excl
+		if logicalNot {
+			part = part[1:]
+		}
 
-        if len(part) > 1 {
-            self.pushErr(part[1], LogMsg.InvalidSyntax)
-            ret false
-        }
+		if len(part) > 1 {
+			self.pushErr(part[1], LogMsg.InvalidSyntax)
+			ret false
+		}
 
-        mut result := self.evalDirectiveIdent(part[0].Kind)
-        if logicalNot {
-            result = !result
-        }
-        ret result
-    }
+		mut result := self.evalDirectiveIdent(part[0].Kind)
+		if logicalNot {
+			result = !result
+		}
+		ret result
+	}
 
-    fn eval(mut self): bool {
-        if len(self.d.Args) == 0 {
-            self.pushErr(self.d.Tag, LogMsg.MissingExpr)
-            ret false
-        }
+	fn eval(mut self): bool {
+		if len(self.d.Args) == 0 {
+			self.pushErr(self.d.Tag, LogMsg.MissingExpr)
+			ret false
+		}
 
-        mut result := false
+		mut result := false
 
-        mut logicalOrParts := self.splitOperans(TokenId.DblVline, self.d.Args)
-        if logicalOrParts == nil {
-            ret false
-        }
+		mut logicalOrParts := self.splitOperans(TokenId.DblVline, self.d.Args)
+		if logicalOrParts == nil {
+			ret false
+		}
 
-        for (_, mut part) in logicalOrParts {
-            mut and := true
-            mut logicalAndParts := self.splitOperans(TokenId.DblAmper, part)
-            if logicalAndParts == nil {
-                ret false
-            }
+		for (_, mut part) in logicalOrParts {
+			mut and := true
+			mut logicalAndParts := self.splitOperans(TokenId.DblAmper, part)
+			if logicalAndParts == nil {
+				ret false
+			}
 
-            for (_, mut andPart) in logicalAndParts {
-                first := andPart[0]
-                if first.Id == TokenId.LParent {
-                    end := andPart[len(andPart)-1]
+			for (_, mut andPart) in logicalAndParts {
+				first := andPart[0]
+				if first.Id == TokenId.LParent {
+					end := andPart[len(andPart)-1]
 
-                    // Missing close.
-                    if end.Id != TokenId.RParent {
-                        self.pushErr(first, LogMsg.WaitCloseParent)
-                        ret false
-                    }
+					// Missing close.
+					if end.Id != TokenId.RParent {
+						self.pushErr(first, LogMsg.WaitCloseParent)
+						ret false
+					}
 
-                    andPart = andPart[1:len(andPart)-1] // Remove parentheses.
-                }
-                and = and && self.evalDirectivePart(andPart)
-            }
+					andPart = andPart[1:len(andPart)-1] // Remove parentheses.
+				}
+				and = and && self.evalDirectivePart(andPart)
+			}
 
-            result = result || and
-        }
+			result = result || and
+		}
 
-        ret result
-    }
+		ret result
+	}
 }

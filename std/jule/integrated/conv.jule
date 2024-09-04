@@ -12,93 +12,93 @@ use utf16 for std::unicode::utf16
 // s, with a terminating NULL added. If s includes NULL
 // character at any location, ignores followed characters.
 fn UTF16FromStr(s: str): []u16 {
-    // In the worst case all characters require two u16.
-    // Also account for the terminating NULL character.
-    // See: C Strings and Windows UTF16.
+	// In the worst case all characters require two u16.
+	// Also account for the terminating NULL character.
+	// See: C Strings and Windows UTF16.
 
-    const NullTermination = 0
-    runes := ([]rune)(s)
-    mut buff := make([]u16, 0, len(runes))
-    for _, r in runes {
-        if r == NullTermination {
-            break
-        }
-        buff = utf16::AppendRune(buff, r)
-    }
-    ret utf16::AppendRune(buff, NullTermination)
+	const NullTermination = 0
+	runes := ([]rune)(s)
+	mut buff := make([]u16, 0, len(runes))
+	for _, r in runes {
+		if r == NullTermination {
+			break
+		}
+		buff = utf16::AppendRune(buff, r)
+	}
+	ret utf16::AppendRune(buff, NullTermination)
 }
 
 // Returns the UTF-8 encoding of the UTF-16 sequence s,
 // with a terminating NULL removed. Returns empty string
 // if s is nil.
 fn UTF16ToStr(s: []u16): str {
-    if s == nil {
-        ret ""
-    }
-    mut codePage := unsafe { *(&s) }
-    for i, v in s {
-        if v == 0 {
-            codePage = codePage[:i]
-            break
-        }
-    }
-    ret str(utf16::Decode(codePage))
+	if s == nil {
+		ret ""
+	}
+	mut codePage := unsafe { *(&s) }
+	for i, v in s {
+		if v == 0 {
+			codePage = codePage[:i]
+			break
+		}
+	}
+	ret str(utf16::Decode(codePage))
 }
 
 // Returns the UTF-8 encoding of the UTF-16 sequence s in *u16 form,
 // with a terminating NULL removed. Returns empty string if s is nil.
 unsafe fn U16PtrToStr(s: *u16): str {
-    if s == nil {
-        ret ""
-    }
+	if s == nil {
+		ret ""
+	}
 
-    let mut codePage: []u16
-    mut i := 0
-    for ; i++ {
-        r := s[i]
-        if r == 0 {
-            ret str(utf16::Decode(codePage))
-        }
-        codePage = append(codePage, r)
-    }
-    ret ""
+	let mut codePage: []u16
+	mut i := 0
+	for ; i++ {
+		r := s[i]
+		if r == 0 {
+			ret str(utf16::Decode(codePage))
+		}
+		codePage = append(codePage, r)
+	}
+	ret ""
 }
 
 // Returns the string of s, with a terminating NULL removed.
 // Returns empty string if pointer is nil.
 unsafe fn BytePtrToStr(s: *byte): str {
-    if s == nil {
-        ret ""
-    }
-    mut n := 0
-    unsafe {
-        for s[n] != 0; n++ {}
-    }
-    if n == 0 {
-        ret ""
-    }
-    mut buf := make([]byte, n)
-    n = 0
-    unsafe {
-        for s[n] != 0; n++ {
-            buf[n] = s[n]
-        }
-    }
-    ret str(buf)
+	if s == nil {
+		ret ""
+	}
+	mut n := 0
+	unsafe {
+		for s[n] != 0; n++ {}
+	}
+	if n == 0 {
+		ret ""
+	}
+	mut buf := make([]byte, n)
+	n = 0
+	unsafe {
+		for s[n] != 0; n++ {
+			buf[n] = s[n]
+		}
+	}
+	ret str(buf)
 }
 
 // Returns s as NULL terminated byte slice which is able to be used safely as
 // NULL terminated string pointer. If s contatins NULL termination at any location,
 // accepts NULL termination is the end of s and skips following bytes.
 fn StrToBytes(s: str): []byte {
-    for i, b in s {
-        if b == 0 {
-            mut bytes := make([]byte, i+1)
-            copy(bytes, s[:len(bytes)])
-            ret bytes
-        }
-    }
-    mut bytes := make([]byte, len(s)+1)
-    copy(bytes, s)
-    ret bytes
+	for i, b in s {
+		if b == 0 {
+			mut bytes := make([]byte, i + 1)
+			copy(bytes, s[:len(bytes)])
+			ret bytes
+		}
+	}
+	mut bytes := make([]byte, len(s) + 1)
+	copy(bytes, s)
+	ret bytes
 }

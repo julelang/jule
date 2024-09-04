@@ -9,14 +9,14 @@ use utf8 for std::unicode::utf8
 use std::internal::strings::{StrBuilder}
 
 fn findFormatPrefix(&bytes: []byte, mut i: int): int {
-    for i < len(bytes) {
-        r, size := utf8::DecodeRune(bytes[i:])
-        if r == '{' {
-            ret i
-        }
-        i += size
-    }
-    ret -1
+	for i < len(bytes) {
+		r, size := utf8::DecodeRune(bytes[i:])
+		if r == '{' {
+			ret i
+		}
+		i += size
+	}
+	ret -1
 }
 
 // Returns range of {...}, included braces.
@@ -25,122 +25,122 @@ fn findFormatPrefix(&bytes: []byte, mut i: int): int {
 // i is points to position of last brace and +1 offset in the end.
 // Returns nil slice if there is no match.
 fn getFormatRange(mut &i: int, mut &bytes: []byte): []byte {
-    start := i
-    mut braces := 0
-    for i < len(bytes) {
-        r, size := utf8::DecodeRune(bytes[i:])
-        i += size
-        match r {
-        | '{':
-            braces++
-        | '}':
-            braces--
-            if braces == 0 {
-                ret bytes[start:i]
-            }
-        }
-    }
-    ret nil
+	start := i
+	mut braces := 0
+	for i < len(bytes) {
+		r, size := utf8::DecodeRune(bytes[i:])
+		i += size
+		match r {
+		| '{':
+			braces++
+		| '}':
+			braces--
+			if braces == 0 {
+				ret bytes[start:i]
+			}
+		}
+	}
+	ret nil
 }
 
 // Formats arg by default format and appends to buf.
 fn FmtByDefault(mut &buf: StrBuilder, &arg: any) {
-    if arg == nil {
-        buf.WriteStr("<nil>")
-        ret
-    }
-    match type arg {
-    | f32:
-        buf.WriteStr(conv::FmtFloat(f64(f32(arg)), 'g', -1, 32))
-    | f64:
-        buf.WriteStr(conv::FmtFloat(f64(arg), 'g', -1, 64))
-    | i8:
-        buf.WriteStr(conv::FmtInt(i64(i8(arg)), 10))
-    | i16:
-        buf.WriteStr(conv::FmtInt(i64(i16(arg)), 10))
-    | i32:
-        buf.WriteStr(conv::FmtInt(i64(i32(arg)), 10))
-    | i64:
-        buf.WriteStr(conv::FmtInt(i64(arg), 10))
-    | u8:
-        buf.WriteStr(conv::FmtUint(u64(u8(arg)), 10))
-    | u16:
-        buf.WriteStr(conv::FmtUint(u64(u16(arg)), 10))
-    | u32:
-        buf.WriteStr(conv::FmtUint(u64(u32(arg)), 10))
-    | u64:
-        buf.WriteStr(conv::FmtUint(u64(arg), 10))
-    | str:
-        buf.WriteStr(str(arg))
-    | bool:
-        if bool(arg) {
-            buf.WriteStr("true")
-        } else {
-            buf.WriteStr("false")
-        }
-    |:
-        buf.WriteStr(integ::ToStr(arg))
-    }
+	if arg == nil {
+		buf.WriteStr("<nil>")
+		ret
+	}
+	match type arg {
+	| f32:
+		buf.WriteStr(conv::FmtFloat(f64(f32(arg)), 'g', -1, 32))
+	| f64:
+		buf.WriteStr(conv::FmtFloat(f64(arg), 'g', -1, 64))
+	| i8:
+		buf.WriteStr(conv::FmtInt(i64(i8(arg)), 10))
+	| i16:
+		buf.WriteStr(conv::FmtInt(i64(i16(arg)), 10))
+	| i32:
+		buf.WriteStr(conv::FmtInt(i64(i32(arg)), 10))
+	| i64:
+		buf.WriteStr(conv::FmtInt(i64(arg), 10))
+	| u8:
+		buf.WriteStr(conv::FmtUint(u64(u8(arg)), 10))
+	| u16:
+		buf.WriteStr(conv::FmtUint(u64(u16(arg)), 10))
+	| u32:
+		buf.WriteStr(conv::FmtUint(u64(u32(arg)), 10))
+	| u64:
+		buf.WriteStr(conv::FmtUint(u64(arg), 10))
+	| str:
+		buf.WriteStr(str(arg))
+	| bool:
+		if bool(arg) {
+			buf.WriteStr("true")
+		} else {
+			buf.WriteStr("false")
+		}
+	|:
+		buf.WriteStr(integ::ToStr(arg))
+	}
 }
 
 fn applyFmtByDefault(mut &buf: StrBuilder, mut &j: int, args: ...any) {
-    arg := args[j]
-    j++
-    FmtByDefault(buf, arg)
+	arg := args[j]
+	j++
+	FmtByDefault(buf, arg)
 }
 
 // Returns result of formatting.
 // Parameter j is the position of argument list.
 fn applyFmt(mut &fmt: []byte, mut &buf: StrBuilder, mut &j: int, args: ...any) {
-    // {}
-    if len(fmt) == 2 {
-        applyFmtByDefault(buf, j, args...)
-        ret
-    }
-    // {{}} = {}
-    if len(fmt) == 4 &&
-        fmt[0] == '{' &&
-        fmt[1] == '{' &&
-        fmt[2] == '}' &&
-        fmt[3] == '}' {
-        buf.WriteStr("{}")
-        ret
-    }
-    buf.Write(fmt)
+	// {}
+	if len(fmt) == 2 {
+		applyFmtByDefault(buf, j, args...)
+		ret
+	}
+	// {{}} = {}
+	if len(fmt) == 4 &&
+		fmt[0] == '{' &&
+		fmt[1] == '{' &&
+		fmt[2] == '}' &&
+		fmt[3] == '}' {
+		buf.WriteStr("{}")
+		ret
+	}
+	buf.Write(fmt)
 }
 
 // See the [std::fmt::Format] function.
 // For this function, returned []byte is might be string literal actually.
 // Be careful about mutating it.
 fn Format(fmt: str, args: ...any): []byte {
-    mut fmtBytes := unsafe::StrBytes(fmt)
-    if len(args) == 0 {
-        ret fmtBytes
-    }
-    mut i := findFormatPrefix(fmtBytes, 0)
-    if i == -1 {
-        ret fmtBytes
-    }
-    mut j := 0
-    mut last := 0
-    mut buf := StrBuilder.New(len(fmt))
-    for i != -1; i = findFormatPrefix(fmtBytes, i) {
-        buf.Write(fmtBytes[last:i])
-        mut format := getFormatRange(i, fmtBytes)
-        if format == nil {
-            continue
-        }
-        applyFmt(format, buf, j, args...)
-        if j >= len(args) {
-            buf.Write(fmtBytes[i:])
-            last = len(fmtBytes)
-            break
-        }
-        // Set last positioning to latest value of i.
-        last = i
-    }
-    if last < len(fmtBytes) {
-        buf.Write(fmtBytes[last:])
-    }
-    ret unsafe { buf.Buf() }
+	mut fmtBytes := unsafe::StrBytes(fmt)
+	if len(args) == 0 {
+		ret fmtBytes
+	}
+	mut i := findFormatPrefix(fmtBytes, 0)
+	if i == -1 {
+		ret fmtBytes
+	}
+	mut j := 0
+	mut last := 0
+	mut buf := StrBuilder.New(len(fmt))
+	for i != -1; i = findFormatPrefix(fmtBytes, i) {
+		buf.Write(fmtBytes[last:i])
+		mut format := getFormatRange(i, fmtBytes)
+		if format == nil {
+			continue
+		}
+		applyFmt(format, buf, j, args...)
+		if j >= len(args) {
+			buf.Write(fmtBytes[i:])
+			last = len(fmtBytes)
+			break
+		}
+		// Set last positioning to latest value of i.
+		last = i
+	}
+	if last < len(fmtBytes) {
+		buf.Write(fmtBytes[last:])
+	}
+	ret unsafe { buf.Buf() }
 }

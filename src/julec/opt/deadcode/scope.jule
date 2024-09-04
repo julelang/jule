@@ -4,279 +4,279 @@
 
 use obj::{IR}
 use std::jule::sema::{
-    Package,
-    Fn,
-    Scope,
-    Stmt,
-    Data,
-    RetSt,
-    Label,
-    GotoSt,
-    BuiltinErrorCallExprModel,
-    BuiltinPanicCallExprModel,
-    RangeIter,
-    WhileIter,
-    InfIter,
-    Conditional,
-    Match,
-    ExprModel,
-    Assign,
-    MultiAssign,
+	Package,
+	Fn,
+	Scope,
+	Stmt,
+	Data,
+	RetSt,
+	Label,
+	GotoSt,
+	BuiltinErrorCallExprModel,
+	BuiltinPanicCallExprModel,
+	RangeIter,
+	WhileIter,
+	InfIter,
+	Conditional,
+	Match,
+	ExprModel,
+	Assign,
+	MultiAssign,
 }
 
 // Dead code eliminate optimizer for scopes.
 struct scopeDeadCode {
-    parent: &scopeDeadCode
-    s:      &Scope
-    stmts:  *[]Stmt
-    i:      int // Position.
-    labels: &[]&Label
-    gotos:  &[]&GotoSt
-    except: bool
+	parent: &scopeDeadCode
+	s:      &Scope
+	stmts:  *[]Stmt
+	i:      int // Position.
+	labels: &[]&Label
+	gotos:  &[]&GotoSt
+	except: bool
 }
 
 impl scopeDeadCode {
-    fn optimizeChild(mut &self, mut &s: &Scope) {
-        mut sdc := &scopeDeadCode{
-            parent: self,
-            s: s,
-            stmts: &s.Stmts,
-            labels: self.labels,
-            gotos: self.gotos,
-        }
-        unsafe { sdc.optimizeStmts() }
-    }
+	fn optimizeChild(mut &self, mut &s: &Scope) {
+		mut sdc := &scopeDeadCode{
+			parent: self,
+			s: s,
+			stmts: &s.Stmts,
+			labels: self.labels,
+			gotos: self.gotos,
+		}
+		unsafe { sdc.optimizeStmts() }
+	}
 
-    fn optimizeBodyChildExceptional(mut &self, mut &s: &Scope) {
-        mut sdc := &scopeDeadCode{
-            s: s,
-            stmts: &s.Stmts,
-            labels: self.labels,
-            gotos: self.gotos,
-            except: true,
-        }
-        unsafe { sdc.optimizeStmts() }
-    }
+	fn optimizeBodyChildExceptional(mut &self, mut &s: &Scope) {
+		mut sdc := &scopeDeadCode{
+			s: s,
+			stmts: &s.Stmts,
+			labels: self.labels,
+			gotos: self.gotos,
+			except: true,
+		}
+		unsafe { sdc.optimizeStmts() }
+	}
 
-    fn optimizeBodyChild(mut &self, mut &s: &Scope) {
-        mut sdc := &scopeDeadCode{
-            s: s,
-            stmts: &s.Stmts,
-            labels: self.labels,
-            gotos: self.gotos,
-        }
-        unsafe { sdc.optimizeStmts() }
-    }
+	fn optimizeBodyChild(mut &self, mut &s: &Scope) {
+		mut sdc := &scopeDeadCode{
+			s: s,
+			stmts: &s.Stmts,
+			labels: self.labels,
+			gotos: self.gotos,
+		}
+		unsafe { sdc.optimizeStmts() }
+	}
 
-    fn optimizeExprModel(mut &self, mut &model: ExprModel) {
-        edc := exprDeadCode.new(self)
-        edc.optimize(model)
-    }
+	fn optimizeExprModel(mut &self, mut &model: ExprModel) {
+		edc := exprDeadCode.new(self)
+		edc.optimize(model)
+	}
 
-    fn eliminateFollowed(mut self) {
-        if len(*self.gotos) != 0 {
-            ret
-        }
-        unsafe {
-            *self.stmts = (*self.stmts)[:self.i+1]
-        }
-        mut parent := self.parent
-        for parent != nil {
-            unsafe {
-                *parent.stmts = (*parent.stmts)[:parent.i+1]
-            }
-            parent = parent.parent
-        }
-    }
+	fn eliminateFollowed(mut self) {
+		if len(*self.gotos) != 0 {
+			ret
+		}
+		unsafe {
+			*self.stmts = (*self.stmts)[:self.i+1]
+		}
+		mut parent := self.parent
+		for parent != nil {
+			unsafe {
+				*parent.stmts = (*parent.stmts)[:parent.i+1]
+			}
+			parent = parent.parent
+		}
+	}
 
-    fn pushGoto(mut &self, mut gt: &GotoSt) {
-        mut i := 0
-        for i < len(*self.labels); i++ {
-            if gt.Ident == (*self.labels)[i].Ident {
-                ret
-            }
-        }
-        *self.gotos = append(*self.gotos, gt)
-    }
+	fn pushGoto(mut &self, mut gt: &GotoSt) {
+		mut i := 0
+		for i < len(*self.labels); i++ {
+			if gt.Ident == (*self.labels)[i].Ident {
+				ret
+			}
+		}
+		*self.gotos = append(*self.gotos, gt)
+	}
 
-    fn pushLabel(mut &self, mut l: &Label) {
-        mut i := 0
-        for i < len(*self.gotos) {
-            if l.Ident == (*self.gotos)[i].Ident {
-                copy((*self.gotos)[i:], (*self.gotos)[i+1:])
-                *self.gotos = (*self.gotos)[:len(*self.gotos)-1]
-                continue
-            }
-            i++
-        }
-        *self.labels = append(*self.labels, l)
-    }
+	fn pushLabel(mut &self, mut l: &Label) {
+		mut i := 0
+		for i < len(*self.gotos) {
+			if l.Ident == (*self.gotos)[i].Ident {
+				copy((*self.gotos)[i:], (*self.gotos)[i+1:])
+				*self.gotos = (*self.gotos)[:len(*self.gotos)-1]
+				continue
+			}
+			i++
+		}
+		*self.labels = append(*self.labels, l)
+	}
 
-    fn optimizeRangeIter(mut &self, mut it: &RangeIter) {
-        self.optimizeExprModel(it.Expr.Model)
-        self.optimizeBodyChild(it.Scope)
-    }
+	fn optimizeRangeIter(mut &self, mut it: &RangeIter) {
+		self.optimizeExprModel(it.Expr.Model)
+		self.optimizeBodyChild(it.Scope)
+	}
 
-    fn optimizeWhileIter(mut &self, mut it: &WhileIter) {
-        self.optimizeExprModel(it.Expr)
-        if it.Next != nil {
-            self.optimizeStmt(it.Next)
-        }
-        self.optimizeBodyChild(it.Scope)
-    }
+	fn optimizeWhileIter(mut &self, mut it: &WhileIter) {
+		self.optimizeExprModel(it.Expr)
+		if it.Next != nil {
+			self.optimizeStmt(it.Next)
+		}
+		self.optimizeBodyChild(it.Scope)
+	}
 
-    fn optimizeInfIter(mut &self, mut it: &InfIter) {
-        self.optimizeBodyChild(it.Scope)
-    }
+	fn optimizeInfIter(mut &self, mut it: &InfIter) {
+		self.optimizeBodyChild(it.Scope)
+	}
 
-    fn optimizeConditional(mut &self, mut c: &Conditional) {
-        for (_, mut case) in c.Elifs {
-            if case != nil {
-                self.optimizeExprModel(case.Expr)
-                self.optimizeBodyChild(case.Scope)
-            }
-        }
-        if c.Default != nil {
-            if len(c.Elifs) == 0 {
-                // Use just child.
-                // There one case, this default scope can accepted as plain anonymous scope.
-                self.optimizeChild(c.Default.Scope)
-            } else {
-                self.optimizeBodyChild(c.Default.Scope)
-            }
-        }
-    }
+	fn optimizeConditional(mut &self, mut c: &Conditional) {
+		for (_, mut case) in c.Elifs {
+			if case != nil {
+				self.optimizeExprModel(case.Expr)
+				self.optimizeBodyChild(case.Scope)
+			}
+		}
+		if c.Default != nil {
+			if len(c.Elifs) == 0 {
+				// Use just child.
+				// There one case, this default scope can accepted as plain anonymous scope.
+				self.optimizeChild(c.Default.Scope)
+			} else {
+				self.optimizeBodyChild(c.Default.Scope)
+			}
+		}
+	}
 
-    fn optimizeMatch(mut &self, mut m: &Match) {
-        for (_, mut case) in m.Cases {
-            for (_, mut expr) in case.Exprs {
-                self.optimizeExprModel(expr.Model)
-            }
-            self.optimizeBodyChild(case.Scope)
-        }
-        if m.Default != nil {
-            if len(m.Cases) == 0 {
-                // Use just child.
-                // There one case, this default scope can accepted as plain anonymous scope.
-                self.optimizeChild(m.Default.Scope)
-            } else {
-                self.optimizeBodyChild(m.Default.Scope)
-            }
-        }
-    }
+	fn optimizeMatch(mut &self, mut m: &Match) {
+		for (_, mut case) in m.Cases {
+			for (_, mut expr) in case.Exprs {
+				self.optimizeExprModel(expr.Model)
+			}
+			self.optimizeBodyChild(case.Scope)
+		}
+		if m.Default != nil {
+			if len(m.Cases) == 0 {
+				// Use just child.
+				// There one case, this default scope can accepted as plain anonymous scope.
+				self.optimizeChild(m.Default.Scope)
+			} else {
+				self.optimizeBodyChild(m.Default.Scope)
+			}
+		}
+	}
 
-    fn optimizeAssign(mut &self, mut assign: &Assign) {
-        self.optimizeExprModel(assign.Left.Model)
-        self.optimizeExprModel(assign.Right.Model)
-    }
+	fn optimizeAssign(mut &self, mut assign: &Assign) {
+		self.optimizeExprModel(assign.Left.Model)
+		self.optimizeExprModel(assign.Right.Model)
+	}
 
-    fn optimizeMultiAssign(mut &self, mut assign: &MultiAssign) {
-        for (_, mut l) in assign.Left {
-            if l != nil {
-                self.optimizeExprModel(l.Model)
-            }
-        }
-        self.optimizeExprModel(assign.Right)
-    }
+	fn optimizeMultiAssign(mut &self, mut assign: &MultiAssign) {
+		for (_, mut l) in assign.Left {
+			if l != nil {
+				self.optimizeExprModel(l.Model)
+			}
+		}
+		self.optimizeExprModel(assign.Right)
+	}
 
-    fn optimizeStmt(mut &self, mut st: Stmt) {
-        match type st {
-        | &Scope:
-            mut scope := (&Scope)(st)
-            if scope.Deferred {
-                eliminateDeadCodeOfScope(scope)
-            } else {
-                self.optimizeChild(scope)
-            }
-        | &RangeIter:
-            self.optimizeRangeIter((&RangeIter)(st))
-        | &WhileIter:
-            self.optimizeWhileIter((&WhileIter)(st))
-        | &InfIter:
-            self.optimizeInfIter((&InfIter)(st))
-        | &Conditional:
-            self.optimizeConditional((&Conditional)(st))
-        | &Match:
-            self.optimizeMatch((&Match)(st))
-        | &Assign:
-            self.optimizeAssign((&Assign)(st))
-        | &MultiAssign:
-            self.optimizeMultiAssign((&MultiAssign)(st))
-        | &Data:
-            mut d := (&Data)(st)
-            if self.except {
-                break
-            }
-            match type d.Model {
-            | &BuiltinErrorCallExprModel
-            | &BuiltinPanicCallExprModel:
-                // Remove followed statements of the function call.
-                // Unreachable code.
-                self.eliminateFollowed()
-            |:
-                self.optimizeExprModel(d.Model)
-            }
-        | &RetSt:
-            // Remove followed statements of the return statement.
-            // Unreachable code.
-            self.eliminateFollowed()
-        | &GotoSt:
-            self.pushGoto((&GotoSt)(st))
-            // Remove followed statements of the return statement.
-            // Unreachable code.
-            self.eliminateFollowed()
-        | &Label:
-            self.pushLabel((&Label)(st))
-        }
-    }
+	fn optimizeStmt(mut &self, mut st: Stmt) {
+		match type st {
+		| &Scope:
+			mut scope := (&Scope)(st)
+			if scope.Deferred {
+				eliminateDeadCodeOfScope(scope)
+			} else {
+				self.optimizeChild(scope)
+			}
+		| &RangeIter:
+			self.optimizeRangeIter((&RangeIter)(st))
+		| &WhileIter:
+			self.optimizeWhileIter((&WhileIter)(st))
+		| &InfIter:
+			self.optimizeInfIter((&InfIter)(st))
+		| &Conditional:
+			self.optimizeConditional((&Conditional)(st))
+		| &Match:
+			self.optimizeMatch((&Match)(st))
+		| &Assign:
+			self.optimizeAssign((&Assign)(st))
+		| &MultiAssign:
+			self.optimizeMultiAssign((&MultiAssign)(st))
+		| &Data:
+			mut d := (&Data)(st)
+			if self.except {
+				break
+			}
+			match type d.Model {
+			| &BuiltinErrorCallExprModel
+			| &BuiltinPanicCallExprModel:
+				// Remove followed statements of the function call.
+				// Unreachable code.
+				self.eliminateFollowed()
+			|:
+				self.optimizeExprModel(d.Model)
+			}
+		| &RetSt:
+			// Remove followed statements of the return statement.
+			// Unreachable code.
+			self.eliminateFollowed()
+		| &GotoSt:
+			self.pushGoto((&GotoSt)(st))
+			// Remove followed statements of the return statement.
+			// Unreachable code.
+			self.eliminateFollowed()
+		| &Label:
+			self.pushLabel((&Label)(st))
+		}
+	}
 
-    unsafe fn optimizeStmts(mut &self) {
-        self.i = 0
-        for self.i < len(*self.stmts); self.i++ {
-            self.optimizeStmt((*self.stmts)[self.i])
-        }
-    }
+	unsafe fn optimizeStmts(mut &self) {
+		self.i = 0
+		for self.i < len(*self.stmts); self.i++ {
+			self.optimizeStmt((*self.stmts)[self.i])
+		}
+	}
 }
 
 fn eliminateDeadCodeOfScope(mut s: &Scope) {
-    labels := make([]&Label, 0, 1 << 4)
-    gotos := make([]&GotoSt, 0, 1 << 4)
-    mut sdc := &scopeDeadCode{
-        s: s,
-        stmts: &s.Stmts,
-        labels: unsafe { (&[]&Label)(&labels) },
-        gotos: unsafe { (&[]&GotoSt)(&gotos) },
-    }
-    unsafe { sdc.optimizeStmts() }
+	labels := make([]&Label, 0, 1 << 4)
+	gotos := make([]&GotoSt, 0, 1 << 4)
+	mut sdc := &scopeDeadCode{
+		s: s,
+		stmts: &s.Stmts,
+		labels: unsafe { (&[]&Label)(&labels) },
+		gotos: unsafe { (&[]&GotoSt)(&gotos) },
+	}
+	unsafe { sdc.optimizeStmts() }
 }
 
 // Eliminates dead functions.
 fn eliminateScopeFunctions(mut &funcs: []&Fn) {
-    for (_, mut func) in funcs {
-        for (_, mut ins) in func.Instances {
-            eliminateDeadCodeOfScope(ins.Scope)
-        }
-    }
+	for (_, mut func) in funcs {
+		for (_, mut ins) in func.Instances {
+			eliminateDeadCodeOfScope(ins.Scope)
+		}
+	}
 }
 
 fn eliminateFunctionsScopePackage(mut &pkg: &Package) {
-    for (_, mut f) in pkg.Files {
-        eliminateScopeFunctions(f.Funcs)
-    }
+	for (_, mut f) in pkg.Files {
+		eliminateScopeFunctions(f.Funcs)
+	}
 }
 
 fn eliminateScopePackage(mut &pkg: &Package) {
-    eliminateFunctionsScopePackage(pkg)
+	eliminateFunctionsScopePackage(pkg)
 }
 
 // Eliminate dead scope codes.
 fn EliminateScopes(mut &ir: &IR) {
-    mut i := len(ir.Used) - 1
-    for i >= 0; i-- {
-        mut u := ir.Used[i]
-        if !u.Binded {
-            eliminateScopePackage(u.Package)
-        }
-    }
-    eliminateScopePackage(ir.Main)
+	mut i := len(ir.Used) - 1
+	for i >= 0; i-- {
+		mut u := ir.Used[i]
+		if !u.Binded {
+			eliminateScopePackage(u.Package)
+		}
+	}
+	eliminateScopePackage(ir.Main)
 }

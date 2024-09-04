@@ -11,1441 +11,1441 @@ use types for std::jule::types
 // All comptime-structure methods starts with underscore (_).
 
 struct comptimeMatch {
-    data:      &Data
-    exprToken: &Token
+	data:      &Data
+	exprToken: &Token
 }
 
 impl Kind for comptimeMatch {
-    fn Str(self): str { ret "comptimeMatch" }
-    fn Equal(&self, other: &TypeKind): bool { ret false }
+	fn Str(self): str { ret "comptimeMatch" }
+	fn Equal(&self, other: &TypeKind): bool { ret false }
 }
 
 trait comptimeRangeKind {
-    fn ready(mut self, mut &keyA: &Var, mut &keyB: &Var)
-    fn step(mut self, i: int, mut &keyA: &Var, mut &keyB: &Var)
-    fn len(self): int
+	fn ready(mut self, mut &keyA: &Var, mut &keyB: &Var)
+	fn step(mut self, i: int, mut &keyA: &Var, mut &keyB: &Var)
+	fn len(self): int
 }
 
 // Compile-time ranges.
 struct comptimeRange {
-    kind: comptimeRangeKind
+	kind: comptimeRangeKind
 }
 
 impl Kind for comptimeRange {
-    fn Str(self): str { ret "comptimeRange" }
-    fn Equal(&self, other: &TypeKind): bool { ret false }
+	fn Str(self): str { ret "comptimeRange" }
+	fn Equal(&self, other: &TypeKind): bool { ret false }
 }
 
 // Compile-time field for structure.
 struct comptimeStructField {
-    field: &FieldIns
+	field: &FieldIns
 }
 
 impl Kind for comptimeStructField {
-    fn Str(self): str { ret "comptimeStructField" }
-    fn Equal(&self, other: &TypeKind): bool { ret false }
+	fn Str(self): str { ret "comptimeStructField" }
+	fn Equal(&self, other: &TypeKind): bool { ret false }
 }
 
 impl comptimeStructField {
-    fn _Name(&self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
-        if len(fc.Args) > 0 {
-            e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Name")
-            ret nil
-        }
-        mut constant := Const.NewStr(self.field.Decl.Ident)
-        ret &Data{
-            Kind: primStr,
-            Constant: constant,
-            Model: constant,
-        }
-    }
+	fn _Name(&self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+		if len(fc.Args) > 0 {
+			e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Name")
+			ret nil
+		}
+		mut constant := Const.NewStr(self.field.Decl.Ident)
+		ret &Data{
+			Kind: primStr,
+			Constant: constant,
+			Model: constant,
+		}
+	}
 
-    fn _Type(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
-        if len(fc.Args) > 0 {
-            e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Type")
-            ret nil
-        }
-        ret buildComptimeTypeInfoData(e.s, self.field.Kind)
-    }
+	fn _Type(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+		if len(fc.Args) > 0 {
+			e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Type")
+			ret nil
+		}
+		ret buildComptimeTypeInfoData(e.s, self.field.Kind)
+	}
 
-    fn _Public(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
-        if len(fc.Args) > 0 {
-            e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Public")
-            ret nil
-        }
-        mut constant := Const.NewBool(self.field.Decl.Public)
-        ret &Data{
-            Kind: primBool,
-            Constant: constant,
-            Model: constant,
-        }
-    }
+	fn _Public(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+		if len(fc.Args) > 0 {
+			e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Public")
+			ret nil
+		}
+		mut constant := Const.NewBool(self.field.Decl.Public)
+		ret &Data{
+			Kind: primBool,
+			Constant: constant,
+			Model: constant,
+		}
+	}
 
-    fn subIdent(mut &self, &ident: str): &Data {
-        match ident {
-        | "Name":
-            mut method := &FnIns{
-                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
-                    ret self._Name(e, fc)
-                },
-            }
-            ret buildAsComptimeMethodData(method)
-        | "Public":
-            mut method := &FnIns{
-                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
-                    ret self._Public(e, fc)
-                },
-            }
-            ret buildAsComptimeMethodData(method)
-        | "Type":
-            mut method := &FnIns{
-                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
-                    ret self._Type(e, fc)
-                },
-            }
-            ret buildAsComptimeMethodData(method)
-        |:
-            ret nil
-        }
-    }
+	fn subIdent(mut &self, &ident: str): &Data {
+		match ident {
+		| "Name":
+			mut method := &FnIns{
+				caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+					ret self._Name(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		| "Public":
+			mut method := &FnIns{
+				caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+					ret self._Public(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		| "Type":
+			mut method := &FnIns{
+				caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+					ret self._Type(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		|:
+			ret nil
+		}
+	}
 }
 
 // Compile-time fields range for structure.
 struct comptimeStructFields {
-    fields: []&FieldIns
+	fields: []&FieldIns
 }
 
 impl Kind for comptimeStructFields {
-    fn Str(self): str { ret "comptimeStructFields" }
-    fn Equal(&self, other: &TypeKind): bool { ret false }
+	fn Str(self): str { ret "comptimeStructFields" }
+	fn Equal(&self, other: &TypeKind): bool { ret false }
 }
 
 impl comptimeRangeKind for comptimeStructFields {
-    fn ready(mut self, mut &keyA: &Var, mut &keyB: &Var) {
-        if keyA != nil {
-            keyA.Constant = true
-            keyA.Value = &Value{
-                Data: new(Data),
-            }
-            keyA.Kind = findBuiltinTypeAlias(PrimKind.Int).Kind
-        }
-        if keyB != nil {
-            keyB.Constant = true
-            keyB.Value = &Value{
-                Data: new(Data),
-            }
-            keyB.Kind = &TypeSymbol{
-                Kind: &TypeKind{
-                    Kind: new(comptimeStructField),
-                },
-            }
-        }
-    }
+	fn ready(mut self, mut &keyA: &Var, mut &keyB: &Var) {
+		if keyA != nil {
+			keyA.Constant = true
+			keyA.Value = &Value{
+				Data: new(Data),
+			}
+			keyA.Kind = findBuiltinTypeAlias(PrimKind.Int).Kind
+		}
+		if keyB != nil {
+			keyB.Constant = true
+			keyB.Value = &Value{
+				Data: new(Data),
+			}
+			keyB.Kind = &TypeSymbol{
+				Kind: &TypeKind{
+					Kind: new(comptimeStructField),
+				},
+			}
+		}
+	}
 
-    fn step(mut self, i: int, mut &keyA: &Var, mut &keyB: &Var) {
-        if keyA != nil {
-            // Kind should be assigned by caller.
-            keyA.Value.Data.Constant = Const.NewI64(i64(i))
-            keyA.Value.Data.Model = keyA.Value.Data.Constant
-        }
-        if keyB != nil {
-            // Kind should be assigned by caller.
-            keyB.Kind.Kind.comptimeStructField().field = self.fields[i]
-        }
-    }
+	fn step(mut self, i: int, mut &keyA: &Var, mut &keyB: &Var) {
+		if keyA != nil {
+			// Kind should be assigned by caller.
+			keyA.Value.Data.Constant = Const.NewI64(i64(i))
+			keyA.Value.Data.Model = keyA.Value.Data.Constant
+		}
+		if keyB != nil {
+			// Kind should be assigned by caller.
+			keyB.Kind.Kind.comptimeStructField().field = self.fields[i]
+		}
+	}
 
-    fn len(self): int {
-        ret len(self.fields)
-    }
+	fn len(self): int {
+		ret len(self.fields)
+	}
 }
 
 // Compile-time static field for structure.
 struct comptimeStatic {
-    field: &Var
+	field: &Var
 }
 
 impl Kind for comptimeStatic {
-    fn Str(self): str { ret "comptimeStatic" }
-    fn Equal(&self, other: &TypeKind): bool { ret false }
+	fn Str(self): str { ret "comptimeStatic" }
+	fn Equal(&self, other: &TypeKind): bool { ret false }
 }
 
 impl comptimeStatic {
-    fn _Name(&self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
-        if len(fc.Args) > 0 {
-            e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Name")
-            ret nil
-        }
-        mut constant := Const.NewStr(self.field.Ident)
-        ret &Data{
-            Kind: primStr,
-            Constant: constant,
-            Model: constant,
-        }
-    }
+	fn _Name(&self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+		if len(fc.Args) > 0 {
+			e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Name")
+			ret nil
+		}
+		mut constant := Const.NewStr(self.field.Ident)
+		ret &Data{
+			Kind: primStr,
+			Constant: constant,
+			Model: constant,
+		}
+	}
 
-    fn _Type(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
-        if len(fc.Args) > 0 {
-            e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Type")
-            ret nil
-        }
-        ret buildComptimeTypeInfoData(e.s, self.field.Kind.Kind)
-    }
+	fn _Type(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+		if len(fc.Args) > 0 {
+			e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Type")
+			ret nil
+		}
+		ret buildComptimeTypeInfoData(e.s, self.field.Kind.Kind)
+	}
 
-    fn _Public(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
-        if len(fc.Args) > 0 {
-            e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Public")
-            ret nil
-        }
-        mut constant := Const.NewBool(self.field.Public)
-        ret &Data{
-            Kind: primBool,
-            Constant: constant,
-            Model: constant,
-        }
-    }
+	fn _Public(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+		if len(fc.Args) > 0 {
+			e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Public")
+			ret nil
+		}
+		mut constant := Const.NewBool(self.field.Public)
+		ret &Data{
+			Kind: primBool,
+			Constant: constant,
+			Model: constant,
+		}
+	}
 
-    fn subIdent(mut &self, &ident: str): &Data {
-        match ident {
-        | "Name":
-            mut method := &FnIns{
-                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
-                    ret self._Name(e, fc)
-                },
-            }
-            ret buildAsComptimeMethodData(method)
-        | "Public":
-            mut method := &FnIns{
-                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
-                    ret self._Public(e, fc)
-                },
-            }
-            ret buildAsComptimeMethodData(method)
-        | "Type":
-            mut method := &FnIns{
-                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
-                    ret self._Type(e, fc)
-                },
-            }
-            ret buildAsComptimeMethodData(method)
-        |:
-            ret nil
-        }
-    }
+	fn subIdent(mut &self, &ident: str): &Data {
+		match ident {
+		| "Name":
+			mut method := &FnIns{
+				caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+					ret self._Name(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		| "Public":
+			mut method := &FnIns{
+				caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+					ret self._Public(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		| "Type":
+			mut method := &FnIns{
+				caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+					ret self._Type(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		|:
+			ret nil
+		}
+	}
 }
 
 // Compile-time static fields range for structure.
 struct comptimeStatics {
-    fields: []&Var
+	fields: []&Var
 }
 
 impl Kind for comptimeStatics {
-    fn Str(self): str { ret "comptimeStatics" }
-    fn Equal(&self, other: &TypeKind): bool { ret false }
+	fn Str(self): str { ret "comptimeStatics" }
+	fn Equal(&self, other: &TypeKind): bool { ret false }
 }
 
 impl comptimeRangeKind for comptimeStatics {
-    fn ready(mut self, mut &keyA: &Var, mut &keyB: &Var) {
-        if keyA != nil {
-            keyA.Constant = true
-            keyA.Value = &Value{
-                Data: new(Data),
-            }
-            keyA.Kind = findBuiltinTypeAlias(PrimKind.Int).Kind
-        }
-        if keyB != nil {
-            keyB.Constant = true
-            keyB.Value = &Value{
-                Data: new(Data),
-            }
-            keyB.Kind = &TypeSymbol{
-                Kind: &TypeKind{
-                    Kind: new(comptimeStatic),
-                },
-            }
-        }
-    }
+	fn ready(mut self, mut &keyA: &Var, mut &keyB: &Var) {
+		if keyA != nil {
+			keyA.Constant = true
+			keyA.Value = &Value{
+				Data: new(Data),
+			}
+			keyA.Kind = findBuiltinTypeAlias(PrimKind.Int).Kind
+		}
+		if keyB != nil {
+			keyB.Constant = true
+			keyB.Value = &Value{
+				Data: new(Data),
+			}
+			keyB.Kind = &TypeSymbol{
+				Kind: &TypeKind{
+					Kind: new(comptimeStatic),
+				},
+			}
+		}
+	}
 
-    fn step(mut self, i: int, mut &keyA: &Var, mut &keyB: &Var) {
-        if keyA != nil {
-            // Kind should be assigned by caller.
-            keyA.Value.Data.Constant = Const.NewI64(i64(i))
-            keyA.Value.Data.Model = keyA.Value.Data.Constant
-        }
-        if keyB != nil {
-            // Kind should be assigned by caller.
-            keyB.Kind.Kind.comptimeStatic().field = self.fields[i]
-        }
-    }
+	fn step(mut self, i: int, mut &keyA: &Var, mut &keyB: &Var) {
+		if keyA != nil {
+			// Kind should be assigned by caller.
+			keyA.Value.Data.Constant = Const.NewI64(i64(i))
+			keyA.Value.Data.Model = keyA.Value.Data.Constant
+		}
+		if keyB != nil {
+			// Kind should be assigned by caller.
+			keyB.Kind.Kind.comptimeStatic().field = self.fields[i]
+		}
+	}
 
-    fn len(self): int {
-        ret len(self.fields)
-    }
+	fn len(self): int {
+		ret len(self.fields)
+	}
 }
 
 // Compile-time field for enum.
 struct comptimeEnumField {
-    field: &EnumItem
+	field: &EnumItem
 }
 
 impl Kind for comptimeEnumField {
-    fn Str(self): str { ret "comptimeEnumField" }
-    fn Equal(&self, other: &TypeKind): bool { ret false }
+	fn Str(self): str { ret "comptimeEnumField" }
+	fn Equal(&self, other: &TypeKind): bool { ret false }
 }
 
 impl comptimeEnumField {
-    fn _Name(&self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
-        if len(fc.Args) > 0 {
-            e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Name")
-            ret nil
-        }
-        mut constant := Const.NewStr(self.field.Ident)
-        ret &Data{
-            Kind: primStr,
-            Constant: constant,
-            Model: constant,
-        }
-    }
+	fn _Name(&self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+		if len(fc.Args) > 0 {
+			e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Name")
+			ret nil
+		}
+		mut constant := Const.NewStr(self.field.Ident)
+		ret &Data{
+			Kind: primStr,
+			Constant: constant,
+			Model: constant,
+		}
+	}
 
-    fn subIdent(mut &self, &ident: str): &Data {
-        match ident {
-        | "Name":
-            mut method := &FnIns{
-                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
-                    ret self._Name(e, fc)
-                },
-            }
-            ret buildAsComptimeMethodData(method)
-        |:
-            ret nil
-        }
-    }
+	fn subIdent(mut &self, &ident: str): &Data {
+		match ident {
+		| "Name":
+			mut method := &FnIns{
+				caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+					ret self._Name(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		|:
+			ret nil
+		}
+	}
 }
 
 // Compile-time fields range for enum.
 struct comptimeEnumFields {
-    fields: []&EnumItem
+	fields: []&EnumItem
 }
 
 impl Kind for comptimeEnumFields {
-    fn Str(self): str { ret "comptimeEnumFields" }
-    fn Equal(&self, other: &TypeKind): bool { ret false }
+	fn Str(self): str { ret "comptimeEnumFields" }
+	fn Equal(&self, other: &TypeKind): bool { ret false }
 }
 
 impl comptimeRangeKind for comptimeEnumFields {
-    fn ready(mut self, mut &keyA: &Var, mut &keyB: &Var) {
-        if keyA != nil {
-            keyA.Constant = true
-            keyA.Value = &Value{
-                Data: new(Data),
-            }
-            keyA.Kind = findBuiltinTypeAlias(PrimKind.Int).Kind
-        }
-        if keyB != nil {
-            keyB.Constant = true
-            keyB.Value = &Value{
-                Data: new(Data),
-            }
-            keyB.Kind = &TypeSymbol{
-                Kind: &TypeKind{
-                    Kind: new(comptimeEnumField),
-                },
-            }
-        }
-    }
+	fn ready(mut self, mut &keyA: &Var, mut &keyB: &Var) {
+		if keyA != nil {
+			keyA.Constant = true
+			keyA.Value = &Value{
+				Data: new(Data),
+			}
+			keyA.Kind = findBuiltinTypeAlias(PrimKind.Int).Kind
+		}
+		if keyB != nil {
+			keyB.Constant = true
+			keyB.Value = &Value{
+				Data: new(Data),
+			}
+			keyB.Kind = &TypeSymbol{
+				Kind: &TypeKind{
+					Kind: new(comptimeEnumField),
+				},
+			}
+		}
+	}
 
-    fn step(mut self, i: int, mut &keyA: &Var, mut &keyB: &Var) {
-        if keyA != nil {
-            // Kind should be assigned by caller.
-            keyA.Value.Data.Constant = Const.NewI64(i64(i))
-            keyA.Value.Data.Model = keyA.Value.Data.Constant
-        }
-        if keyB != nil {
-            // Kind should be assigned by caller.
-            keyB.Kind.Kind.comptimeEnumField().field = self.fields[i]
-        }
-    }
+	fn step(mut self, i: int, mut &keyA: &Var, mut &keyB: &Var) {
+		if keyA != nil {
+			// Kind should be assigned by caller.
+			keyA.Value.Data.Constant = Const.NewI64(i64(i))
+			keyA.Value.Data.Model = keyA.Value.Data.Constant
+		}
+		if keyB != nil {
+			// Kind should be assigned by caller.
+			keyB.Kind.Kind.comptimeEnumField().field = self.fields[i]
+		}
+	}
 
-    fn len(self): int {
-        ret len(self.fields)
-    }
+	fn len(self): int {
+		ret len(self.fields)
+	}
 }
 
 // Compile-time parameter for functions.
 struct comptimeParam {
-    param: &ParamIns
+	param: &ParamIns
 }
 
 impl Kind for comptimeParam {
-    fn Str(self): str { ret "comptimeParam" }
-    fn Equal(&self, other: &TypeKind): bool { ret false }
+	fn Str(self): str { ret "comptimeParam" }
+	fn Equal(&self, other: &TypeKind): bool { ret false }
 }
 
 impl comptimeParam {
-    fn _Name(&self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
-        if len(fc.Args) > 0 {
-            e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Name")
-            ret nil
-        }
-        mut constant := Const.NewStr(self.param.Decl.Ident)
-        ret &Data{
-            Kind: primStr,
-            Constant: constant,
-            Model: constant,
-        }
-    }
+	fn _Name(&self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+		if len(fc.Args) > 0 {
+			e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Name")
+			ret nil
+		}
+		mut constant := Const.NewStr(self.param.Decl.Ident)
+		ret &Data{
+			Kind: primStr,
+			Constant: constant,
+			Model: constant,
+		}
+	}
 
-    fn _Type(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
-        if len(fc.Args) > 0 {
-            e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Type")
-            ret nil
-        }
-        ret buildComptimeTypeInfoData(e.s, self.param.Kind)
-    }
+	fn _Type(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+		if len(fc.Args) > 0 {
+			e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Type")
+			ret nil
+		}
+		ret buildComptimeTypeInfoData(e.s, self.param.Kind)
+	}
 
-    fn _Variadic(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
-        if len(fc.Args) > 0 {
-            e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Variadic")
-            ret nil
-        }
-        mut constant := Const.NewBool(self.param.Decl.Variadic)
-        ret &Data{
-            Kind: primBool,
-            Constant: constant,
-            Model: constant,
-        }
-    }
+	fn _Variadic(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+		if len(fc.Args) > 0 {
+			e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Variadic")
+			ret nil
+		}
+		mut constant := Const.NewBool(self.param.Decl.Variadic)
+		ret &Data{
+			Kind: primBool,
+			Constant: constant,
+			Model: constant,
+		}
+	}
 
-    fn _Reference(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
-        if len(fc.Args) > 0 {
-            e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Reference")
-            ret nil
-        }
-        mut constant := Const.NewBool(self.param.Decl.Reference)
-        ret &Data{
-            Kind: primBool,
-            Constant: constant,
-            Model: constant,
-        }
-    }
+	fn _Reference(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+		if len(fc.Args) > 0 {
+			e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Reference")
+			ret nil
+		}
+		mut constant := Const.NewBool(self.param.Decl.Reference)
+		ret &Data{
+			Kind: primBool,
+			Constant: constant,
+			Model: constant,
+		}
+	}
 
-    fn subIdent(mut &self, &ident: str): &Data {
-        match ident {
-        | "Name":
-            mut method := &FnIns{
-                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
-                    ret self._Name(e, fc)
-                },
-            }
-            ret buildAsComptimeMethodData(method)
-        | "Variadic":
-            mut method := &FnIns{
-                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
-                    ret self._Variadic(e, fc)
-                },
-            }
-            ret buildAsComptimeMethodData(method)
-        | "Reference":
-            mut method := &FnIns{
-                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
-                    ret self._Reference(e, fc)
-                },
-            }
-            ret buildAsComptimeMethodData(method)
-        | "Type":
-            mut method := &FnIns{
-                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
-                    ret self._Type(e, fc)
-                },
-            }
-            ret buildAsComptimeMethodData(method)
-        |:
-            ret nil
-        }
-    }
+	fn subIdent(mut &self, &ident: str): &Data {
+		match ident {
+		| "Name":
+			mut method := &FnIns{
+				caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+					ret self._Name(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		| "Variadic":
+			mut method := &FnIns{
+				caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+					ret self._Variadic(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		| "Reference":
+			mut method := &FnIns{
+				caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+					ret self._Reference(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		| "Type":
+			mut method := &FnIns{
+				caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+					ret self._Type(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		|:
+			ret nil
+		}
+	}
 }
 
 // Compile-time parameters range for function.
 struct comptimeParams {
-    params: []&ParamIns
+	params: []&ParamIns
 }
 
 impl Kind for comptimeParams {
-    fn Str(self): str { ret "comptimeParams" }
-    fn Equal(&self, other: &TypeKind): bool { ret false }
+	fn Str(self): str { ret "comptimeParams" }
+	fn Equal(&self, other: &TypeKind): bool { ret false }
 }
 
 impl comptimeRangeKind for comptimeParams {
-    fn ready(mut self, mut &keyA: &Var, mut &keyB: &Var) {
-        if keyA != nil {
-            keyA.Constant = true
-            keyA.Value = &Value{
-                Data: new(Data),
-            }
-            keyA.Kind = findBuiltinTypeAlias(PrimKind.Int).Kind
-        }
-        if keyB != nil {
-            keyB.Constant = true
-            keyB.Value = &Value{
-                Data: new(Data),
-            }
-            keyB.Kind = &TypeSymbol{
-                Kind: &TypeKind{
-                    Kind: new(comptimeParam),
-                },
-            }
-        }
-    }
+	fn ready(mut self, mut &keyA: &Var, mut &keyB: &Var) {
+		if keyA != nil {
+			keyA.Constant = true
+			keyA.Value = &Value{
+				Data: new(Data),
+			}
+			keyA.Kind = findBuiltinTypeAlias(PrimKind.Int).Kind
+		}
+		if keyB != nil {
+			keyB.Constant = true
+			keyB.Value = &Value{
+				Data: new(Data),
+			}
+			keyB.Kind = &TypeSymbol{
+				Kind: &TypeKind{
+					Kind: new(comptimeParam),
+				},
+			}
+		}
+	}
 
-    fn step(mut self, i: int, mut &keyA: &Var, mut &keyB: &Var) {
-        if keyA != nil {
-            // Kind should be assigned by caller.
-            keyA.Value.Data.Constant = Const.NewI64(i64(i))
-            keyA.Value.Data.Model = keyA.Value.Data.Constant
-        }
-        if keyB != nil {
-            // Kind should be assigned by caller.
-            keyB.Kind.Kind.comptimeParam().param = self.params[i]
-        }
-    }
+	fn step(mut self, i: int, mut &keyA: &Var, mut &keyB: &Var) {
+		if keyA != nil {
+			// Kind should be assigned by caller.
+			keyA.Value.Data.Constant = Const.NewI64(i64(i))
+			keyA.Value.Data.Model = keyA.Value.Data.Constant
+		}
+		if keyB != nil {
+			// Kind should be assigned by caller.
+			keyB.Kind.Kind.comptimeParam().param = self.params[i]
+		}
+	}
 
-    fn len(self): int {
-        ret len(self.params)
-    }
+	fn len(self): int {
+		ret len(self.params)
+	}
 }
 
 // Compile-time type info range.
 struct comptimeTypeInfos {
-    types: []&comptimeTypeInfo
+	types: []&comptimeTypeInfo
 }
 
 impl Kind for comptimeTypeInfos {
-    fn Str(self): str { ret "comptimeTypeInfos" }
-    fn Equal(&self, other: &TypeKind): bool { ret false }
+	fn Str(self): str { ret "comptimeTypeInfos" }
+	fn Equal(&self, other: &TypeKind): bool { ret false }
 }
 
 impl comptimeRangeKind for comptimeTypeInfos {
-    fn ready(mut self, mut &keyA: &Var, mut &keyB: &Var) {
-        if keyA != nil {
-            keyA.Constant = true
-            keyA.Value = &Value{
-                Data: new(Data),
-            }
-            keyA.Kind = findBuiltinTypeAlias(PrimKind.Int).Kind
-        }
-        if keyB != nil {
-            keyB.Constant = true
-            keyB.Value = &Value{
-                Data: new(Data),
-            }
-            keyB.Kind = &TypeSymbol{
-                Kind: &TypeKind{
-                    Kind: new(comptimeTypeInfo),
-                },
-            }
-        }
-    }
+	fn ready(mut self, mut &keyA: &Var, mut &keyB: &Var) {
+		if keyA != nil {
+			keyA.Constant = true
+			keyA.Value = &Value{
+				Data: new(Data),
+			}
+			keyA.Kind = findBuiltinTypeAlias(PrimKind.Int).Kind
+		}
+		if keyB != nil {
+			keyB.Constant = true
+			keyB.Value = &Value{
+				Data: new(Data),
+			}
+			keyB.Kind = &TypeSymbol{
+				Kind: &TypeKind{
+					Kind: new(comptimeTypeInfo),
+				},
+			}
+		}
+	}
 
-    fn step(mut self, i: int, mut &keyA: &Var, mut &keyB: &Var) {
-        if keyA != nil {
-            // Kind should be assigned by caller.
-            keyA.Value.Data.Constant = Const.NewI64(i64(i))
-            keyA.Value.Data.Model = keyA.Value.Data.Constant
-        }
-        if keyB != nil {
-            // Kind should be assigned by caller.
-            keyB.Kind.Kind.Kind = self.types[i]
-        }
-    }
+	fn step(mut self, i: int, mut &keyA: &Var, mut &keyB: &Var) {
+		if keyA != nil {
+			// Kind should be assigned by caller.
+			keyA.Value.Data.Constant = Const.NewI64(i64(i))
+			keyA.Value.Data.Model = keyA.Value.Data.Constant
+		}
+		if keyB != nil {
+			// Kind should be assigned by caller.
+			keyB.Kind.Kind.Kind = self.types[i]
+		}
+	}
 
-    fn len(self): int {
-        ret len(self.types)
-    }
+	fn len(self): int {
+		ret len(self.types)
+	}
 }
 
 // Compile-time type information data.
 struct comptimeTypeInfo {
-    base: &TypeKind
+	base: &TypeKind
 }
 
 impl Kind for comptimeTypeInfo {
-    fn Str(self): str { ret "comptimeTypeInfo[" + self.base.Str() + "]" }
-    fn Equal(&self, other: &TypeKind): bool { ret false }
+	fn Str(self): str { ret "comptimeTypeInfo[" + self.base.Str() + "]" }
+	fn Equal(&self, other: &TypeKind): bool { ret false }
 }
 
 impl comptimeTypeInfo {
-    fn _Str(&self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
-        if len(fc.Args) > 0 {
-            e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Str")
-            ret nil
-        }
-        mut constant := Const.NewStr(self.base.Str())
-        ret &Data{
-            Kind: primStr,
-            Constant: constant,
-            Model: constant,
-        }
-    }
+	fn _Str(&self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+		if len(fc.Args) > 0 {
+			e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Str")
+			ret nil
+		}
+		mut constant := Const.NewStr(self.base.Str())
+		ret &Data{
+			Kind: primStr,
+			Constant: constant,
+			Model: constant,
+		}
+	}
 
-    fn _Kind(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
-        if len(fc.Args) > 0 {
-            e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Kind")
-            ret nil
-        }
-        mut enm := findComptimePackage(e.s).FindEnum("Kind")
-        let mut item: &EnumItem = nil
-        match {
-        | self.base.Void():
-            item = enm.FindItem("Void")
-        | self.base.Struct() != nil:
-            item = enm.FindItem("Struct")
-        | self.base.Trait() != nil:
-            item = enm.FindItem("Trait")
-        | self.base.Ptr() != nil:
-            if self.base.Ptr().IsUnsafe() {
-                item = enm.FindItem("UnsafePtr")
-            } else {
-                item = enm.FindItem("Ptr")
-            }
-        | self.base.Sptr() != nil:
-            item = enm.FindItem("SmartPtr")
-        | self.base.Enum() != nil:
-            item = enm.FindItem("Enum")
-        | self.base.Map() != nil:
-            item = enm.FindItem("Map")
-        | self.base.Slc() != nil:
-            item = enm.FindItem("Slice")
-        | self.base.Arr() != nil:
-            item = enm.FindItem("Array")
-        | self.base.Fn() != nil:
-            item = enm.FindItem("Func")
-        | self.base.Tup() != nil:
-            item = enm.FindItem("Tuple")
-        | self.base.Prim() != nil:
-            prim := self.base.Prim()
-            match {
-            | prim.IsAny():
-                item = enm.FindItem("Any")
-            | prim.IsBool():
-                item = enm.FindItem("Bool")
-            | prim.IsStr():
-                item = enm.FindItem("Str")
-            | prim.IsF32():
-                item = enm.FindItem("F32")
-            | prim.IsF64():
-                item = enm.FindItem("F64")
-            | prim.IsI8():
-                item = enm.FindItem("I8")
-            | prim.IsI16():
-                item = enm.FindItem("I16")
-            | prim.IsI32():
-                item = enm.FindItem("I32")
-            | prim.IsI64():
-                item = enm.FindItem("I64")
-            | prim.IsU8():
-                item = enm.FindItem("U8")
-            | prim.IsU16():
-                item = enm.FindItem("U16")
-            | prim.IsU32():
-                item = enm.FindItem("U32")
-            | prim.IsU64():
-                item = enm.FindItem("U64")
-            | prim.IsInt():
-                item = enm.FindItem("Int")
-            | prim.IsUint():
-                item = enm.FindItem("Uint")
-            | prim.IsUintptr():
-                item = enm.FindItem("Uintptr")
-            |:
-                panic("Kind(): unimplemented type for std::comptime: " + self.base.Str())
-            }
-        |:
-            panic("Kind(): unimplemented type for std::comptime: " + self.base.Str())
-        }
-        ret evalEnumStatic(enm, item, fc.Token)
-    }
+	fn _Kind(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+		if len(fc.Args) > 0 {
+			e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Kind")
+			ret nil
+		}
+		mut enm := findComptimePackage(e.s).FindEnum("Kind")
+		let mut item: &EnumItem = nil
+		match {
+		| self.base.Void():
+			item = enm.FindItem("Void")
+		| self.base.Struct() != nil:
+			item = enm.FindItem("Struct")
+		| self.base.Trait() != nil:
+			item = enm.FindItem("Trait")
+		| self.base.Ptr() != nil:
+			if self.base.Ptr().IsUnsafe() {
+				item = enm.FindItem("UnsafePtr")
+			} else {
+				item = enm.FindItem("Ptr")
+			}
+		| self.base.Sptr() != nil:
+			item = enm.FindItem("SmartPtr")
+		| self.base.Enum() != nil:
+			item = enm.FindItem("Enum")
+		| self.base.Map() != nil:
+			item = enm.FindItem("Map")
+		| self.base.Slc() != nil:
+			item = enm.FindItem("Slice")
+		| self.base.Arr() != nil:
+			item = enm.FindItem("Array")
+		| self.base.Fn() != nil:
+			item = enm.FindItem("Func")
+		| self.base.Tup() != nil:
+			item = enm.FindItem("Tuple")
+		| self.base.Prim() != nil:
+			prim := self.base.Prim()
+			match {
+			| prim.IsAny():
+				item = enm.FindItem("Any")
+			| prim.IsBool():
+				item = enm.FindItem("Bool")
+			| prim.IsStr():
+				item = enm.FindItem("Str")
+			| prim.IsF32():
+				item = enm.FindItem("F32")
+			| prim.IsF64():
+				item = enm.FindItem("F64")
+			| prim.IsI8():
+				item = enm.FindItem("I8")
+			| prim.IsI16():
+				item = enm.FindItem("I16")
+			| prim.IsI32():
+				item = enm.FindItem("I32")
+			| prim.IsI64():
+				item = enm.FindItem("I64")
+			| prim.IsU8():
+				item = enm.FindItem("U8")
+			| prim.IsU16():
+				item = enm.FindItem("U16")
+			| prim.IsU32():
+				item = enm.FindItem("U32")
+			| prim.IsU64():
+				item = enm.FindItem("U64")
+			| prim.IsInt():
+				item = enm.FindItem("Int")
+			| prim.IsUint():
+				item = enm.FindItem("Uint")
+			| prim.IsUintptr():
+				item = enm.FindItem("Uintptr")
+			|:
+				panic("Kind(): unimplemented type for std::comptime: " + self.base.Str())
+			}
+		|:
+			panic("Kind(): unimplemented type for std::comptime: " + self.base.Str())
+		}
+		ret evalEnumStatic(enm, item, fc.Token)
+	}
 
-    fn _Bits(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
-        if len(fc.Args) > 0 {
-            e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Bits")
-            ret nil
-        }
-        prim := self.base.Prim()
-        if prim == nil {
-            e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.base.Str(), "Bits")
-            ret nil
-        }
-        n := types::BitsizeOf(prim.Kind)
-        if n == -1 {
-            e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.base.Str(), "Bits")
-            ret nil
-        }
-        mut constant := Const.NewI64(i64(n))
-        ret &Data{
-            Kind: primStr,
-            Constant: constant,
-            Model: constant,
-        }
-    }
+	fn _Bits(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+		if len(fc.Args) > 0 {
+			e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Bits")
+			ret nil
+		}
+		prim := self.base.Prim()
+		if prim == nil {
+			e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.base.Str(), "Bits")
+			ret nil
+		}
+		n := types::BitsizeOf(prim.Kind)
+		if n == -1 {
+			e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.base.Str(), "Bits")
+			ret nil
+		}
+		mut constant := Const.NewI64(i64(n))
+		ret &Data{
+			Kind: primStr,
+			Constant: constant,
+			Model: constant,
+		}
+	}
 
-    fn _Elem(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
-        if len(fc.Args) > 0 {
-            e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Elem")
-            ret nil
-        }
-        mut ptr := self.base.Ptr()
-        if ptr != nil {
-            if ptr.IsUnsafe() {
-                e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.base.Str(), "Elem")
-                ret nil
-            }
-            ret buildComptimeTypeInfoData(e.s, ptr.Elem)
-        }
-        mut sptr := self.base.Sptr()
-        if sptr != nil {
-            ret buildComptimeTypeInfoData(e.s, sptr.Elem)
-        }
-        mut slice := self.base.Slc()
-        if slice != nil {
-            ret buildComptimeTypeInfoData(e.s, slice.Elem)
-        }
-        mut array := self.base.Arr()
-        if array != nil {
-            ret buildComptimeTypeInfoData(e.s, array.Elem)
-        }
-        mut enm := self.base.Enum()
-        if enm != nil {
-            ret buildComptimeTypeInfoData(e.s, enm.Kind.Kind)
-        }
-        e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.base.Str(), "Elem")
-        ret nil
-    }
+	fn _Elem(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+		if len(fc.Args) > 0 {
+			e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Elem")
+			ret nil
+		}
+		mut ptr := self.base.Ptr()
+		if ptr != nil {
+			if ptr.IsUnsafe() {
+				e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.base.Str(), "Elem")
+				ret nil
+			}
+			ret buildComptimeTypeInfoData(e.s, ptr.Elem)
+		}
+		mut sptr := self.base.Sptr()
+		if sptr != nil {
+			ret buildComptimeTypeInfoData(e.s, sptr.Elem)
+		}
+		mut slice := self.base.Slc()
+		if slice != nil {
+			ret buildComptimeTypeInfoData(e.s, slice.Elem)
+		}
+		mut array := self.base.Arr()
+		if array != nil {
+			ret buildComptimeTypeInfoData(e.s, array.Elem)
+		}
+		mut enm := self.base.Enum()
+		if enm != nil {
+			ret buildComptimeTypeInfoData(e.s, enm.Kind.Kind)
+		}
+		e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.base.Str(), "Elem")
+		ret nil
+	}
 
-    fn _Size(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
-        if len(fc.Args) > 0 {
-            e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Size")
-            ret nil
-        }
-        mut arr := self.base.Arr()
-        if arr == nil {
-            e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.base.Str(), "Size")
-            ret nil
-        }
-        mut constant := Const.NewI64(i64(arr.N))
-        ret &Data{
-            Kind: primInt,
-            Constant: constant,
-            Model: constant,
-        }
-    }
+	fn _Size(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+		if len(fc.Args) > 0 {
+			e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Size")
+			ret nil
+		}
+		mut arr := self.base.Arr()
+		if arr == nil {
+			e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.base.Str(), "Size")
+			ret nil
+		}
+		mut constant := Const.NewI64(i64(arr.N))
+		ret &Data{
+			Kind: primInt,
+			Constant: constant,
+			Model: constant,
+		}
+	}
 
-    fn _Key(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
-        if len(fc.Args) > 0 {
-            e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Key")
-            ret nil
-        }
-        mut m := self.base.Map()
-        if m == nil {
-            e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.base.Str(), "Key")
-            ret nil
-        }
-        ret buildComptimeTypeInfoData(e.s, m.Key)
-    }
+	fn _Key(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+		if len(fc.Args) > 0 {
+			e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Key")
+			ret nil
+		}
+		mut m := self.base.Map()
+		if m == nil {
+			e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.base.Str(), "Key")
+			ret nil
+		}
+		ret buildComptimeTypeInfoData(e.s, m.Key)
+	}
 
-    fn _Value(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
-        if len(fc.Args) > 0 {
-            e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Value")
-            ret nil
-        }
-        mut m := self.base.Map()
-        if m == nil {
-            e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.base.Str(), "Value")
-            ret nil
-        }
-        ret buildComptimeTypeInfoData(e.s, m.Val)
-    }
+	fn _Value(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+		if len(fc.Args) > 0 {
+			e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Value")
+			ret nil
+		}
+		mut m := self.base.Map()
+		if m == nil {
+			e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.base.Str(), "Value")
+			ret nil
+		}
+		ret buildComptimeTypeInfoData(e.s, m.Val)
+	}
 
-    fn _Fields(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
-        if len(fc.Args) > 0 {
-            e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Fields")
-            ret nil
-        }
-        mut s := self.base.Struct()
-        if s != nil {
-            ret &Data{
-                Kind: &TypeKind{
-                    Kind: &comptimeStructFields{
-                        fields: s.Fields,
-                    },
-                },
-            }
-        }
-        mut enm := self.base.Enum()
-        if enm != nil {
-            ret &Data{
-                Kind: &TypeKind{
-                    Kind: &comptimeEnumFields{
-                        fields: enm.Items,
-                    },
-                },
-            }
-        }
-        e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.base.Str(), "Fields")
-        ret nil
-    }
+	fn _Fields(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+		if len(fc.Args) > 0 {
+			e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Fields")
+			ret nil
+		}
+		mut s := self.base.Struct()
+		if s != nil {
+			ret &Data{
+				Kind: &TypeKind{
+					Kind: &comptimeStructFields{
+						fields: s.Fields,
+					},
+				},
+			}
+		}
+		mut enm := self.base.Enum()
+		if enm != nil {
+			ret &Data{
+				Kind: &TypeKind{
+					Kind: &comptimeEnumFields{
+						fields: enm.Items,
+					},
+				},
+			}
+		}
+		e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.base.Str(), "Fields")
+		ret nil
+	}
 
-    fn _Statics(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
-        if len(fc.Args) > 0 {
-            e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Statics")
-            ret nil
-        }
-        mut s := self.base.Struct()
-        if s == nil {
-            e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.base.Str(), "Fields")
-            ret nil
-        }
-        ret &Data{
-            Kind: &TypeKind{
-                Kind: &comptimeStatics{
-                    fields: s.Statics,
-                },
-            },
-        }
-    }
+	fn _Statics(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+		if len(fc.Args) > 0 {
+			e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Statics")
+			ret nil
+		}
+		mut s := self.base.Struct()
+		if s == nil {
+			e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.base.Str(), "Fields")
+			ret nil
+		}
+		ret &Data{
+			Kind: &TypeKind{
+				Kind: &comptimeStatics{
+					fields: s.Statics,
+				},
+			},
+		}
+	}
 
-    fn _Public(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
-        if len(fc.Args) > 0 {
-            e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Public")
-            ret nil
-        }
-        mut public := false
-        match {
-        | self.base.Struct() != nil:
-            public = self.base.Struct().Decl.Public
-        | self.base.Trait() != nil:
-            public = self.base.Trait().Public
-        | self.base.Enum() != nil:
-            public = self.base.Enum().Public
-        | self.base.TypeEnum() != nil:
-            public = self.base.TypeEnum().Public
-        |:
-            e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.base.Str(), "Public")
-            ret nil
-        }
-        mut constant := Const.NewBool(public)
-        ret &Data{
-            Kind: primBool,
-            Constant: constant,
-            Model: constant,
-        }
-    }
+	fn _Public(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+		if len(fc.Args) > 0 {
+			e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Public")
+			ret nil
+		}
+		mut public := false
+		match {
+		| self.base.Struct() != nil:
+			public = self.base.Struct().Decl.Public
+		| self.base.Trait() != nil:
+			public = self.base.Trait().Public
+		| self.base.Enum() != nil:
+			public = self.base.Enum().Public
+		| self.base.TypeEnum() != nil:
+			public = self.base.TypeEnum().Public
+		|:
+			e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.base.Str(), "Public")
+			ret nil
+		}
+		mut constant := Const.NewBool(public)
+		ret &Data{
+			Kind: primBool,
+			Constant: constant,
+			Model: constant,
+		}
+	}
 
-    fn _Binded(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
-        if len(fc.Args) > 0 {
-            e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Binded")
-            ret nil
-        }
-        mut constant := Const.NewBool(self.base.Binded())
-        ret &Data{
-            Kind: primBool,
-            Constant: constant,
-            Model: constant,
-        }
-    }
+	fn _Binded(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+		if len(fc.Args) > 0 {
+			e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Binded")
+			ret nil
+		}
+		mut constant := Const.NewBool(self.base.Binded())
+		ret &Data{
+			Kind: primBool,
+			Constant: constant,
+			Model: constant,
+		}
+	}
 
-    fn _Ordered(&self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
-        if len(fc.Args) > 0 {
-            e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Ordered")
-            ret nil
-        }
-        mut constant := Const.NewBool(self.base.Ordered())
-        ret &Data{
-            Kind: primStr,
-            Constant: constant,
-            Model: constant,
-        }
-    }
+	fn _Ordered(&self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+		if len(fc.Args) > 0 {
+			e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Ordered")
+			ret nil
+		}
+		mut constant := Const.NewBool(self.base.Ordered())
+		ret &Data{
+			Kind: primStr,
+			Constant: constant,
+			Model: constant,
+		}
+	}
 
-    fn _Comparable(&self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
-        if len(fc.Args) > 0 {
-            e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Comparable")
-            ret nil
-        }
-        mut constant := Const.NewBool(self.base.Comparable())
-        ret &Data{
-            Kind: primStr,
-            Constant: constant,
-            Model: constant,
-        }
-    }
+	fn _Comparable(&self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+		if len(fc.Args) > 0 {
+			e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Comparable")
+			ret nil
+		}
+		mut constant := Const.NewBool(self.base.Comparable())
+		ret &Data{
+			Kind: primStr,
+			Constant: constant,
+			Model: constant,
+		}
+	}
 
-    fn _Mutable(&self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
-        if len(fc.Args) > 0 {
-            e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Mutable")
-            ret nil
-        }
-        mut constant := Const.NewBool(self.base.Mutable())
-        ret &Data{
-            Kind: primBool,
-            Constant: constant,
-            Model: constant,
-        }
-    }
+	fn _Mutable(&self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+		if len(fc.Args) > 0 {
+			e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Mutable")
+			ret nil
+		}
+		mut constant := Const.NewBool(self.base.Mutable())
+		ret &Data{
+			Kind: primBool,
+			Constant: constant,
+			Model: constant,
+		}
+	}
 
-    fn _Types(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
-        if len(fc.Args) > 0 {
-            e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Types")
-            ret nil
-        }
-        mut tup := self.base.Tup()
-        if tup == nil {
-            e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.base.Str(), "Types")
-            ret nil
-        }
-        mut infos := &comptimeTypeInfos{
-            types: make([]&comptimeTypeInfo, 0, len(tup.Types)),
-        }
-        for (_, mut t) in tup.Types {
-            infos.types = append(infos.types, e.s.meta.pushComptimeTypeInfo(t))
-        }
-        ret &Data{
-            Kind: &TypeKind{
-                Kind: infos,
-            },
-        }
-    }
+	fn _Types(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+		if len(fc.Args) > 0 {
+			e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Types")
+			ret nil
+		}
+		mut tup := self.base.Tup()
+		if tup == nil {
+			e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.base.Str(), "Types")
+			ret nil
+		}
+		mut infos := &comptimeTypeInfos{
+			types: make([]&comptimeTypeInfo, 0, len(tup.Types)),
+		}
+		for (_, mut t) in tup.Types {
+			infos.types = append(infos.types, e.s.meta.pushComptimeTypeInfo(t))
+		}
+		ret &Data{
+			Kind: &TypeKind{
+				Kind: infos,
+			},
+		}
+	}
 
-    fn _Exceptional(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
-        if len(fc.Args) > 0 {
-            e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Exceptional")
-            ret nil
-        }
-        mut f := self.base.Fn()
-        if f == nil {
-            e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.base.Str(), "Exceptional")
-            ret nil
-        }
-        mut constant := Const.NewBool(f.Decl != nil && f.Decl.Exceptional)
-        ret &Data{
-            Kind: primBool,
-            Constant: constant,
-            Model: constant,
-        }
-    }
+	fn _Exceptional(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+		if len(fc.Args) > 0 {
+			e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Exceptional")
+			ret nil
+		}
+		mut f := self.base.Fn()
+		if f == nil {
+			e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.base.Str(), "Exceptional")
+			ret nil
+		}
+		mut constant := Const.NewBool(f.Decl != nil && f.Decl.Exceptional)
+		ret &Data{
+			Kind: primBool,
+			Constant: constant,
+			Model: constant,
+		}
+	}
 
-    fn _CanNil(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
-        if len(fc.Args) > 0 {
-            e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "CanNil")
-            ret nil
-        }
-        mut constant := Const.NewBool(self.base.NilCompatible())
-        ret &Data{
-            Kind: primBool,
-            Constant: constant,
-            Model: constant,
-        }
-    }
+	fn _CanNil(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+		if len(fc.Args) > 0 {
+			e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "CanNil")
+			ret nil
+		}
+		mut constant := Const.NewBool(self.base.NilCompatible())
+		ret &Data{
+			Kind: primBool,
+			Constant: constant,
+			Model: constant,
+		}
+	}
 
-    fn _RC(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
-        if len(fc.Args) > 0 {
-            e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "RC")
-            ret nil
-        }
-        mut constant := Const.NewBool(self.base.PerformsRC())
-        ret &Data{
-            Kind: primBool,
-            Constant: constant,
-            Model: constant,
-        }
-    }
+	fn _RC(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+		if len(fc.Args) > 0 {
+			e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "RC")
+			ret nil
+		}
+		mut constant := Const.NewBool(self.base.PerformsRC())
+		ret &Data{
+			Kind: primBool,
+			Constant: constant,
+			Model: constant,
+		}
+	}
 
-    fn _Result(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
-        if len(fc.Args) > 0 {
-            e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Result")
-            ret nil
-        }
-        mut f := self.base.Fn()
-        if f == nil {
-            e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.base.Str(), "Result")
-            ret nil
-        }
-        if f.Result == nil {
-            ret buildComptimeTypeInfoData(e.s, primVoid)
-        }
-        ret buildComptimeTypeInfoData(e.s, f.Result)
-    }
+	fn _Result(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+		if len(fc.Args) > 0 {
+			e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Result")
+			ret nil
+		}
+		mut f := self.base.Fn()
+		if f == nil {
+			e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.base.Str(), "Result")
+			ret nil
+		}
+		if f.Result == nil {
+			ret buildComptimeTypeInfoData(e.s, primVoid)
+		}
+		ret buildComptimeTypeInfoData(e.s, f.Result)
+	}
 
-    fn _Params(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
-        if len(fc.Args) > 0 {
-            e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Params")
-            ret nil
-        }
-        mut f := self.base.Fn()
-        if f == nil {
-            e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.base.Str(), "Params")
-            ret nil
-        }
-        ret &Data{
-            Kind: &TypeKind{
-                Kind: &comptimeParams{params: f.Params},
-            },
-        }
-    }
+	fn _Params(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+		if len(fc.Args) > 0 {
+			e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Params")
+			ret nil
+		}
+		mut f := self.base.Fn()
+		if f == nil {
+			e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.base.Str(), "Params")
+			ret nil
+		}
+		ret &Data{
+			Kind: &TypeKind{
+				Kind: &comptimeParams{params: f.Params},
+			},
+		}
+	}
 
-    fn subIdent(mut &self, &ident: str): &Data {
-        match ident {
-        | "Str":
-            mut method := &FnIns{
-                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
-                    ret self._Str(e, fc)
-                },
-            }
-            ret buildAsComptimeMethodData(method)
-        | "Bits":
-            mut method := &FnIns{
-                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
-                    ret self._Bits(e, fc)
-                },
-            }
-            ret buildAsComptimeMethodData(method)
-        | "Elem":
-            mut method := &FnIns{
-                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
-                    ret self._Elem(e, fc)
-                },
-            }
-            ret buildAsComptimeMethodData(method)
-        | "Size":
-            mut method := &FnIns{
-                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
-                    ret self._Size(e, fc)
-                },
-            }
-            ret buildAsComptimeMethodData(method)
-        | "Key":
-            mut method := &FnIns{
-                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
-                    ret self._Key(e, fc)
-                },
-            }
-            ret buildAsComptimeMethodData(method)
-        | "Value":
-            mut method := &FnIns{
-                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
-                    ret self._Value(e, fc)
-                },
-            }
-            ret buildAsComptimeMethodData(method)
-        | "Fields":
-            mut method := &FnIns{
-                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
-                    ret self._Fields(e, fc)
-                },
-            }
-            ret buildAsComptimeMethodData(method)
-        | "Statics":
-            mut method := &FnIns{
-                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
-                    ret self._Statics(e, fc)
-                },
-            }
-            ret buildAsComptimeMethodData(method)
-        | "Params":
-            mut method := &FnIns{
-                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
-                    ret self._Params(e, fc)
-                },
-            }
-            ret buildAsComptimeMethodData(method)
-        | "Types":
-            mut method := &FnIns{
-                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
-                    ret self._Types(e, fc)
-                },
-            }
-            ret buildAsComptimeMethodData(method)
-        | "Public":
-            mut method := &FnIns{
-                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
-                    ret self._Public(e, fc)
-                },
-            }
-            ret buildAsComptimeMethodData(method)
-        | "Binded":
-            mut method := &FnIns{
-                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
-                    ret self._Binded(e, fc)
-                },
-            }
-            ret buildAsComptimeMethodData(method)
-        | "Ordered":
-            mut method := &FnIns{
-                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
-                    ret self._Ordered(e, fc)
-                },
-            }
-            ret buildAsComptimeMethodData(method)
-        | "Comparable":
-            mut method := &FnIns{
-                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
-                    ret self._Comparable(e, fc)
-                },
-            }
-            ret buildAsComptimeMethodData(method)
-        | "Mutable":
-            mut method := &FnIns{
-                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
-                    ret self._Mutable(e, fc)
-                },
-            }
-            ret buildAsComptimeMethodData(method)
-        | "Exceptional":
-            mut method := &FnIns{
-                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
-                    ret self._Exceptional(e, fc)
-                },
-            }
-            ret buildAsComptimeMethodData(method)
-        | "CanNil":
-            mut method := &FnIns{
-                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
-                    ret self._CanNil(e, fc)
-                },
-            }
-            ret buildAsComptimeMethodData(method)
-        | "RC":
-            mut method := &FnIns{
-                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
-                    ret self._RC(e, fc)
-                },
-            }
-            ret buildAsComptimeMethodData(method)
-        | "Result":
-            mut method := &FnIns{
-                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
-                    ret self._Result(e, fc)
-                },
-            }
-            ret buildAsComptimeMethodData(method)
-        | "Kind":
-            mut method := &FnIns{
-                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
-                    ret self._Kind(e, fc)
-                },
-            }
-            ret buildAsComptimeMethodData(method)
-        |:
-            ret nil
-        }
-    }
+	fn subIdent(mut &self, &ident: str): &Data {
+		match ident {
+		| "Str":
+			mut method := &FnIns{
+				caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+					ret self._Str(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		| "Bits":
+			mut method := &FnIns{
+				caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+					ret self._Bits(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		| "Elem":
+			mut method := &FnIns{
+				caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+					ret self._Elem(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		| "Size":
+			mut method := &FnIns{
+				caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+					ret self._Size(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		| "Key":
+			mut method := &FnIns{
+				caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+					ret self._Key(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		| "Value":
+			mut method := &FnIns{
+				caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+					ret self._Value(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		| "Fields":
+			mut method := &FnIns{
+				caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+					ret self._Fields(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		| "Statics":
+			mut method := &FnIns{
+				caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+					ret self._Statics(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		| "Params":
+			mut method := &FnIns{
+				caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+					ret self._Params(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		| "Types":
+			mut method := &FnIns{
+				caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+					ret self._Types(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		| "Public":
+			mut method := &FnIns{
+				caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+					ret self._Public(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		| "Binded":
+			mut method := &FnIns{
+				caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+					ret self._Binded(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		| "Ordered":
+			mut method := &FnIns{
+				caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+					ret self._Ordered(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		| "Comparable":
+			mut method := &FnIns{
+				caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+					ret self._Comparable(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		| "Mutable":
+			mut method := &FnIns{
+				caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+					ret self._Mutable(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		| "Exceptional":
+			mut method := &FnIns{
+				caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+					ret self._Exceptional(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		| "CanNil":
+			mut method := &FnIns{
+				caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+					ret self._CanNil(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		| "RC":
+			mut method := &FnIns{
+				caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+					ret self._RC(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		| "Result":
+			mut method := &FnIns{
+				caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+					ret self._Result(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		| "Kind":
+			mut method := &FnIns{
+				caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+					ret self._Kind(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		|:
+			ret nil
+		}
+	}
 }
 
 // Compile-time value information data.
 struct comptimeValue {
-    data: &Data
+	data: &Data
 }
 
 impl Kind for comptimeValue {
-    fn Str(self): str { ret "comptimeValue" }
-    fn Equal(&self, other: &TypeKind): bool { ret false }
+	fn Str(self): str { ret "comptimeValue" }
+	fn Equal(&self, other: &TypeKind): bool { ret false }
 }
 
 impl comptimeValue {
-    fn _Unwrap(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
-        if len(fc.Args) > 0 {
-            e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Unwrap")
-            ret nil
-        }
-        ret self.data
-    }
+	fn _Unwrap(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+		if len(fc.Args) > 0 {
+			e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Unwrap")
+			ret nil
+		}
+		ret self.data
+	}
 
-    fn _Type(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
-        if len(fc.Args) > 0 {
-            e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Type")
-            ret nil
-        }
-        ret buildComptimeTypeInfoData(e.s, self.data.Kind)
-    }
+	fn _Type(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+		if len(fc.Args) > 0 {
+			e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Type")
+			ret nil
+		}
+		ret buildComptimeTypeInfoData(e.s, self.data.Kind)
+	}
 
-    fn _Lvalue(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
-        if len(fc.Args) > 0 {
-            e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Lvalue")
-            ret nil
-        }
-        mut constant := Const.NewBool(self.data.Lvalue)
-        ret &Data{
-            Kind: primBool,
-            Constant: constant,
-            Model: constant,
-        }
-    }
+	fn _Lvalue(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+		if len(fc.Args) > 0 {
+			e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Lvalue")
+			ret nil
+		}
+		mut constant := Const.NewBool(self.data.Lvalue)
+		ret &Data{
+			Kind: primBool,
+			Constant: constant,
+			Model: constant,
+		}
+	}
 
-    fn _Mutable(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
-        if len(fc.Args) > 0 {
-            e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Mutable")
-            ret nil
-        }
-        mut constant := Const.NewBool(self.data.Mutable)
-        ret &Data{
-            Kind: primBool,
-            Constant: constant,
-            Model: constant,
-        }
-    }
+	fn _Mutable(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+		if len(fc.Args) > 0 {
+			e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Mutable")
+			ret nil
+		}
+		mut constant := Const.NewBool(self.data.Mutable)
+		ret &Data{
+			Kind: primBool,
+			Constant: constant,
+			Model: constant,
+		}
+	}
 
-    fn _Const(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
-        if len(fc.Args) > 0 {
-            e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Const")
-            ret nil
-        }
-        mut constant := Const.NewBool(self.data.IsConst())
-        ret &Data{
-            Kind: primBool,
-            Constant: constant,
-            Model: constant,
-        }
-    }
+	fn _Const(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+		if len(fc.Args) > 0 {
+			e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Const")
+			ret nil
+		}
+		mut constant := Const.NewBool(self.data.IsConst())
+		ret &Data{
+			Kind: primBool,
+			Constant: constant,
+			Model: constant,
+		}
+	}
 
-    fn _Field(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
-        if len(fc.Args) > 1 {
-            e.pushErr(fc.Args[1].Token, LogMsg.ArgumentOverflow, "Field")
-            ret nil
-        }
-        mut s := self.data.Kind.Struct()
-        if s == nil {
-            e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.data.Kind.Str(), "Field")
-            ret nil
-        }
-        mut arg := fc.Args[0]
-        mut d := e.evalExpr(arg)
-        if d == nil {
-            ret nil
-        }
-        if !d.IsConst() {
-            e.pushErr(arg.Token, LogMsg.ExprNotConst)
-            ret nil
-        }
-        prim := d.Kind.Prim()
-        if prim == nil || !prim.IsStr() {
-            e.pushErr(arg.Token, LogMsg.IncompatibleTypes, PrimKind.Str, d.Kind.Str())
-            ret nil
-        }
-        ident := d.Constant.ReadStr()
-        mut f := s.FindField(ident)
-        if f == nil {
-            e.pushErr(arg.Token, LogMsg.ObjHaveNotIdent, s.Decl.Ident, ident)
-            ret nil
-        }
-        d = new(Data, *self.data)
-        d = e.evalStructSubIdentField(d, s, arg.Token, f)
-        ret buildComptimeValue(d)
-    }
+	fn _Field(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+		if len(fc.Args) > 1 {
+			e.pushErr(fc.Args[1].Token, LogMsg.ArgumentOverflow, "Field")
+			ret nil
+		}
+		mut s := self.data.Kind.Struct()
+		if s == nil {
+			e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.data.Kind.Str(), "Field")
+			ret nil
+		}
+		mut arg := fc.Args[0]
+		mut d := e.evalExpr(arg)
+		if d == nil {
+			ret nil
+		}
+		if !d.IsConst() {
+			e.pushErr(arg.Token, LogMsg.ExprNotConst)
+			ret nil
+		}
+		prim := d.Kind.Prim()
+		if prim == nil || !prim.IsStr() {
+			e.pushErr(arg.Token, LogMsg.IncompatibleTypes, PrimKind.Str, d.Kind.Str())
+			ret nil
+		}
+		ident := d.Constant.ReadStr()
+		mut f := s.FindField(ident)
+		if f == nil {
+			e.pushErr(arg.Token, LogMsg.ObjHaveNotIdent, s.Decl.Ident, ident)
+			ret nil
+		}
+		d = new(Data, *self.data)
+		d = e.evalStructSubIdentField(d, s, arg.Token, f)
+		ret buildComptimeValue(d)
+	}
 
-    fn subIdent(mut &self, &ident: str): &Data {
-        match ident {
-        | "Unwrap":
-            mut method := &FnIns{
-                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
-                    ret self._Unwrap(e, fc)
-                },
-            }
-            ret buildAsComptimeMethodData(method)
-        | "Type":
-            mut method := &FnIns{
-                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
-                    ret self._Type(e, fc)
-                },
-            }
-            ret buildAsComptimeMethodData(method)
-        | "Lvalue":
-            mut method := &FnIns{
-                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
-                    ret self._Lvalue(e, fc)
-                },
-            }
-            ret buildAsComptimeMethodData(method)
-        | "Mutable":
-            mut method := &FnIns{
-                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
-                    ret self._Mutable(e, fc)
-                },
-            }
-            ret buildAsComptimeMethodData(method)
-        | "Const":
-            mut method := &FnIns{
-                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
-                    ret self._Const(e, fc)
-                },
-            }
-            ret buildAsComptimeMethodData(method)
-        | "Field":
-            mut method := &FnIns{
-                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
-                    ret self._Field(e, fc)
-                },
-            }
-            ret buildAsComptimeMethodData(method)
-        |:
-            ret nil
-        }
-    }
+	fn subIdent(mut &self, &ident: str): &Data {
+		match ident {
+		| "Unwrap":
+			mut method := &FnIns{
+				caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+					ret self._Unwrap(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		| "Type":
+			mut method := &FnIns{
+				caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+					ret self._Type(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		| "Lvalue":
+			mut method := &FnIns{
+				caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+					ret self._Lvalue(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		| "Mutable":
+			mut method := &FnIns{
+				caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+					ret self._Mutable(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		| "Const":
+			mut method := &FnIns{
+				caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+					ret self._Const(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		| "Field":
+			mut method := &FnIns{
+				caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+					ret self._Field(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		|:
+			ret nil
+		}
+	}
 }
 
 // Compile-time file info range.
 struct comptimeFiles {
-    files: []&SymbolTable
+	files: []&SymbolTable
 }
 
 impl Kind for comptimeFiles {
-    fn Str(self): str { ret "comptimeFiles" }
-    fn Equal(&self, other: &TypeKind): bool { ret false }
+	fn Str(self): str { ret "comptimeFiles" }
+	fn Equal(&self, other: &TypeKind): bool { ret false }
 }
 
 impl comptimeRangeKind for comptimeFiles {
-    fn ready(mut self, mut &keyA: &Var, mut &keyB: &Var) {
-        if keyA != nil {
-            keyA.Constant = true
-            keyA.Value = &Value{
-                Data: new(Data),
-            }
-            keyA.Kind = findBuiltinTypeAlias(PrimKind.Int).Kind
-        }
-        if keyB != nil {
-            keyB.Constant = true
-            keyB.Value = &Value{
-                Data: new(Data),
-            }
-            keyB.Kind = &TypeSymbol{
-                Kind: &TypeKind{
-                    Kind: new(comptimeFile),
-                },
-            }
-        }
-    }
+	fn ready(mut self, mut &keyA: &Var, mut &keyB: &Var) {
+		if keyA != nil {
+			keyA.Constant = true
+			keyA.Value = &Value{
+				Data: new(Data),
+			}
+			keyA.Kind = findBuiltinTypeAlias(PrimKind.Int).Kind
+		}
+		if keyB != nil {
+			keyB.Constant = true
+			keyB.Value = &Value{
+				Data: new(Data),
+			}
+			keyB.Kind = &TypeSymbol{
+				Kind: &TypeKind{
+					Kind: new(comptimeFile),
+				},
+			}
+		}
+	}
 
-    fn step(mut self, i: int, mut &keyA: &Var, mut &keyB: &Var) {
-        if keyA != nil {
-            // Kind should be assigned by caller.
-            keyA.Value.Data.Constant = Const.NewI64(i64(i))
-            keyA.Value.Data.Model = keyA.Value.Data.Constant
-        }
-        if keyB != nil {
-            // Kind should be assigned by caller.
-            (&comptimeFile)(keyB.Kind.Kind.Kind).file = self.files[i]
-        }
-    }
+	fn step(mut self, i: int, mut &keyA: &Var, mut &keyB: &Var) {
+		if keyA != nil {
+			// Kind should be assigned by caller.
+			keyA.Value.Data.Constant = Const.NewI64(i64(i))
+			keyA.Value.Data.Model = keyA.Value.Data.Constant
+		}
+		if keyB != nil {
+			// Kind should be assigned by caller.
+			(&comptimeFile)(keyB.Kind.Kind.Kind).file = self.files[i]
+		}
+	}
 
-    fn len(self): int {
-        ret len(self.files)
-    }
+	fn len(self): int {
+		ret len(self.files)
+	}
 }
 
 // Compile-time file information data.
 struct comptimeFile {
-    file: &SymbolTable
+	file: &SymbolTable
 }
 
 impl Kind for comptimeFile {
-    fn Str(self): str { ret "comptimeFile" }
-    fn Equal(&self, other: &TypeKind): bool { ret false }
+	fn Str(self): str { ret "comptimeFile" }
+	fn Equal(&self, other: &TypeKind): bool { ret false }
 }
 
 impl comptimeFile {
-    fn _Path(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
-        if len(fc.Args) > 0 {
-            e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Path")
-            ret nil
-        }
-        mut constant := Const.NewStr(self.file.File.Path)
-        ret &Data{
-            Kind: primStr,
-            Constant: constant,
-            Model: constant,
-        }
-    }
+	fn _Path(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+		if len(fc.Args) > 0 {
+			e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Path")
+			ret nil
+		}
+		mut constant := Const.NewStr(self.file.File.Path)
+		ret &Data{
+			Kind: primStr,
+			Constant: constant,
+			Model: constant,
+		}
+	}
 
-    fn _Name(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
-        if len(fc.Args) > 0 {
-            e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Name")
-            ret nil
-        }
-        mut constant := Const.NewStr(self.file.File.Name())
-        ret &Data{
-            Kind: primStr,
-            Constant: constant,
-            Model: constant,
-        }
-    }
+	fn _Name(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+		if len(fc.Args) > 0 {
+			e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Name")
+			ret nil
+		}
+		mut constant := Const.NewStr(self.file.File.Name())
+		ret &Data{
+			Kind: primStr,
+			Constant: constant,
+			Model: constant,
+		}
+	}
 
-    fn _Dir(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
-        if len(fc.Args) > 0 {
-            e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Dir")
-            ret nil
-        }
-        mut constant := Const.NewStr(self.file.File.Dir())
-        ret &Data{
-            Kind: primStr,
-            Constant: constant,
-            Model: constant,
-        }
-    }
+	fn _Dir(mut &self, mut &e: &Eval, mut &fc: &ast::FnCallExpr): &Data {
+		if len(fc.Args) > 0 {
+			e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Dir")
+			ret nil
+		}
+		mut constant := Const.NewStr(self.file.File.Dir())
+		ret &Data{
+			Kind: primStr,
+			Constant: constant,
+			Model: constant,
+		}
+	}
 
-    fn subIdent(mut &self, &ident: str): &Data {
-        match ident {
-        | "Path":
-            mut method := &FnIns{
-                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
-                    ret self._Path(e, fc)
-                },
-            }
-            ret buildAsComptimeMethodData(method)
-        | "Name":
-            mut method := &FnIns{
-                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
-                    ret self._Name(e, fc)
-                },
-            }
-            ret buildAsComptimeMethodData(method)
-        | "Dir":
-            mut method := &FnIns{
-                caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
-                    ret self._Dir(e, fc)
-                },
-            }
-            ret buildAsComptimeMethodData(method)
-        |:
-            ret nil
-        }
-    }
+	fn subIdent(mut &self, &ident: str): &Data {
+		match ident {
+		| "Path":
+			mut method := &FnIns{
+				caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+					ret self._Path(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		| "Name":
+			mut method := &FnIns{
+				caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+					ret self._Name(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		| "Dir":
+			mut method := &FnIns{
+				caller: fn(mut &e: &Eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+					ret self._Dir(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		|:
+			ret nil
+		}
+	}
 }
 
 fn buildAsComptimeMethodData(mut &f: &FnIns): &Data {
-    ret &Data{
-        Kind: &TypeKind{
-            Kind: f,
-        },
-    }
+	ret &Data{
+		Kind: &TypeKind{
+			Kind: f,
+		},
+	}
 }
 
 fn findComptimePackage(mut &s: &Sema): &ImportInfo {
-    ret s.SelectPackage(fn(pkg: &ImportInfo): bool {
-        ret pkg.LinkPath == "std::comptime"
-    })
+	ret s.SelectPackage(fn(pkg: &ImportInfo): bool {
+		ret pkg.LinkPath == "std::comptime"
+	})
 }
 
 fn buildComptimeTypeInfoData(mut &s: &Sema, mut &t: &TypeKind): &Data {
-    ret &Data{
-        Kind: &TypeKind{
-            Kind: s.meta.pushComptimeTypeInfo(t),
-        },
-    }
+	ret &Data{
+		Kind: &TypeKind{
+			Kind: s.meta.pushComptimeTypeInfo(t),
+		},
+	}
 }
 
 fn buildComptimeValue(mut &d: &Data): &Data {
-    ret &Data{
-        Kind: &TypeKind{
-            Kind: &comptimeValue{
-                data: d,
-            },
-        },
-    }
+	ret &Data{
+		Kind: &TypeKind{
+			Kind: &comptimeValue{
+				data: d,
+			},
+		},
+	}
 }

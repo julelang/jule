@@ -10,9 +10,9 @@ use zsys for std::internal::zsys
 // TCP connection.
 // In most cases, represents TCP client.
 struct TcpConn {
-    mut handle: netHandle = sys::INVALID_SOCKET
-    v6:         bool
-    Addr:       &TcpAddr
+	mut handle: netHandle = sys::INVALID_SOCKET
+	v6:         bool
+	Addr:       &TcpAddr
 }
 
 impl Conn for TcpConn {}
@@ -22,98 +22,98 @@ impl io::Stream for TcpConn {}
 impl io::WriterCloser for TcpConn {}
 
 impl TcpConn {
-    // Read bytes to buffer from connection and returns readed byte count.
-    // The number of bytes readed can never exceed the length of the buffer.
-    // If the buffer is larger than the number of bytes that can be read,
-    // the buffer will not cause an overflow.
-    // It will panic if connection is closed.
-    // If connection is closed by server, it returns zero and sets connection
-    // state as closed. So if you try read again, function will panic because of
-    // connection state is closed.
-    // All exceptionals are error code of implementation.
-    fn Read(mut self, mut buf: []byte)!: int {
-        if self.handle == sys::INVALID_SOCKET {
-            panic("std::net: TcpConn.Read: connection is closed")
-        }
-        if len(buf) == 0 {
-            ret 0
-        }
-        zsys::HandleRW(buf)
-        n := unsafe { sys::Recv(self.handle, &buf[0], uint(len(buf)), 0) }
-        if n > 0 {
-            ret n
-        } else if n == 0 {
-            self.Close()!
-            ret 0
-        }
-        error(lastErrorCode())
-    }
+	// Read bytes to buffer from connection and returns readed byte count.
+	// The number of bytes readed can never exceed the length of the buffer.
+	// If the buffer is larger than the number of bytes that can be read,
+	// the buffer will not cause an overflow.
+	// It will panic if connection is closed.
+	// If connection is closed by server, it returns zero and sets connection
+	// state as closed. So if you try read again, function will panic because of
+	// connection state is closed.
+	// All exceptionals are error code of implementation.
+	fn Read(mut self, mut buf: []byte)!: int {
+		if self.handle == sys::INVALID_SOCKET {
+			panic("std::net: TcpConn.Read: connection is closed")
+		}
+		if len(buf) == 0 {
+			ret 0
+		}
+		zsys::HandleRW(buf)
+		n := unsafe { sys::Recv(self.handle, &buf[0], uint(len(buf)), 0) }
+		if n > 0 {
+			ret n
+		} else if n == 0 {
+			self.Close()!
+			ret 0
+		}
+		error(lastErrorCode())
+	}
 
-    // Writes bytes to connection and returns writed byte count.
-    // The number of bytes written can never exceed the length of the buffer.
-    // All exceptionals are error code of implementation.
-    fn Write(mut self, buf: []byte)!: int {
-        if self.handle == sys::INVALID_SOCKET {
-            panic("std::net: TcpConn.Write: connection is closed")
-        }
-        if len(buf) == 0 {
-            ret 0
-        }
-        zsys::HandleRW(buf)
-        n := unsafe { sys::Send(self.handle, &buf[0], uint(len(buf)), 0) }
-        if n < 0 {
-            error(lastErrorCode())
-        }
-        ret n
-    }
+	// Writes bytes to connection and returns writed byte count.
+	// The number of bytes written can never exceed the length of the buffer.
+	// All exceptionals are error code of implementation.
+	fn Write(mut self, buf: []byte)!: int {
+		if self.handle == sys::INVALID_SOCKET {
+			panic("std::net: TcpConn.Write: connection is closed")
+		}
+		if len(buf) == 0 {
+			ret 0
+		}
+		zsys::HandleRW(buf)
+		n := unsafe { sys::Send(self.handle, &buf[0], uint(len(buf)), 0) }
+		if n < 0 {
+			error(lastErrorCode())
+		}
+		ret n
+	}
 
-    // Sets read timeout for connection.
-    // Timeout precision is microseconds.
-    // If the timeout is below one microsecond it will be accepted as zero.
-    // The zero timeout, clears current timeout if exist.
-    // All exceptionals are error code of implementation.
-    fn SetReadTimeout(mut self, timeout: time::DurInt)! {
-        if self.handle == sys::INVALID_SOCKET {
-            panic("std::net: TcpConn.SetReadTimeout: connection is closed")
-        }
-        setSocketTimeout(self.handle, sys::SO_RCVTIMEO, timeout) else { error(error) }
-    }
+	// Sets read timeout for connection.
+	// Timeout precision is microseconds.
+	// If the timeout is below one microsecond it will be accepted as zero.
+	// The zero timeout, clears current timeout if exist.
+	// All exceptionals are error code of implementation.
+	fn SetReadTimeout(mut self, timeout: time::DurInt)! {
+		if self.handle == sys::INVALID_SOCKET {
+			panic("std::net: TcpConn.SetReadTimeout: connection is closed")
+		}
+		setSocketTimeout(self.handle, sys::SO_RCVTIMEO, timeout) else { error(error) }
+	}
 
-    // Sets write timeout for connection.
-    // Timeout precision is microseconds.
-    // If the timeout is below one microsecond it will be accepted as zero.
-    // The zero timeout, clears current timeout if exist.
-    // All exceptionals are error code of implementation.
-    fn SetWriteTimeout(mut self, timeout: time::DurInt)! {
-        if self.handle == sys::INVALID_SOCKET {
-            panic("std::net: TcpConn.SetReadTimeout: connection is closed")
-        }
-        setSocketTimeout(self.handle, sys::SO_SNDTIMEO, timeout) else { error(error) }
-    }
+	// Sets write timeout for connection.
+	// Timeout precision is microseconds.
+	// If the timeout is below one microsecond it will be accepted as zero.
+	// The zero timeout, clears current timeout if exist.
+	// All exceptionals are error code of implementation.
+	fn SetWriteTimeout(mut self, timeout: time::DurInt)! {
+		if self.handle == sys::INVALID_SOCKET {
+			panic("std::net: TcpConn.SetReadTimeout: connection is closed")
+		}
+		setSocketTimeout(self.handle, sys::SO_SNDTIMEO, timeout) else { error(error) }
+	}
 
-    // Returns network name which is connected.
-    // If connection closed, returns Network.Tcp as a general network.
-    fn Network(self): Network {
-        match {
-        | self.handle == sys::INVALID_SOCKET:
-            ret Network.Tcp
-        | self.v6:
-            ret Network.Tcp6
-        |:
-            ret Network.Tcp4
-        }
-    }
+	// Returns network name which is connected.
+	// If connection closed, returns Network.Tcp as a general network.
+	fn Network(self): Network {
+		match {
+		| self.handle == sys::INVALID_SOCKET:
+			ret Network.Tcp
+		| self.v6:
+			ret Network.Tcp6
+		|:
+			ret Network.Tcp4
+		}
+	}
 
-    // Closes connection.
-    // All exceptionals are error code of implementation.
-    fn Close(mut self)! {
-        if self.handle == sys::INVALID_SOCKET {
-            ret
-        }
-        if !closeSocket(self.handle) {
-            error(lastErrorCode())
-        }
-        self.handle = sys::INVALID_SOCKET
-        self.v6 = false
-    }
+	// Closes connection.
+	// All exceptionals are error code of implementation.
+	fn Close(mut self)! {
+		if self.handle == sys::INVALID_SOCKET {
+			ret
+		}
+		if !closeSocket(self.handle) {
+			error(lastErrorCode())
+		}
+		self.handle = sys::INVALID_SOCKET
+		self.v6 = false
+	}
 }

@@ -219,73 +219,73 @@ const sb7 = -2.24409524465858183362e+01 // 0xC03670E242712D62
 //  Erf(-Inf) = -1
 //  Erf(NaN) = NaN
 fn Erf(mut x: f64): f64 {
-    const VeryTiny = 2.848094538889218e-306 // 0x0080000000000000
-    const Small = 1.0 / (1 << 28)           // 2**-28
-    // special cases
-    match {
-    | IsNaN(x):
-        ret NaN()
-    | IsInf(x, 1):
-        ret 1
-    | IsInf(x, -1):
-        ret -1
-    }
-    mut sign := false
-    if x < 0 {
-        x = -x
-        sign = true
-    }
-    if x < 0.84375 { // |x| < 0.84375
-        mut temp := 0.
-        if x < Small { // |x| < 2**-28
-            if x < VeryTiny {
-                temp = 0.125 * (8.0 * x + efx8 * x) // avoid underflow
-            } else {
-                temp = x + efx * x
-            }
-        } else {
-            z := x * x
-            r := pp0 + z * (pp1 + z * (pp2 + z * (pp3 + z * pp4)))
-            s := 1 + z * (qq1 + z * (qq2 + z * (qq3 + z * (qq4 + z * qq5))))
-            y := r / s
-            temp = x + x * y
-        }
-        if sign {
-            ret -temp
-        }
-        ret temp
-    }
-    if x < 1.25 { // 0.84375 <= |x| < 1.25
-        s := x - 1
-        P := pa0 + s * (pa1 + s * (pa2 + s * (pa3 + s * (pa4 + s * (pa5 + s * pa6)))))
-        Q := 1 + s * (qa1 + s * (qa2 + s * (qa3 + s * (qa4 + s * (qa5 + s * qa6)))))
-        if sign {
-            ret -erx - P / Q
-        }
-        ret erx + P / Q
-    }
-    if x >= 6 { // inf > |x| >= 6
-        if sign {
-            ret -1
-        }
-        ret 1
-    }
-    s := 1 / (x * x)
-    mut R := 0.
-    mut S := 0.
-    if x < 1/0.35 { // |x| < 1 / 0.35  ~ 2.857143
-        R = ra0 + s * (ra1 + s * (ra2 + s * (ra3 + s * (ra4 + s * (ra5 + s * (ra6 + s * ra7))))))
-        S = 1 + s * (sa1 + s * (sa2 + s * (sa3 + s * (sa4 + s * (sa5 + s * (sa6 + s * (sa7 + s * sa8)))))))
-    } else { // |x| >= 1 / 0.35  ~ 2.857143
-        R = ra0 + s * (rb1 + s * (rb2 + s * (rb3 + s * (rb4 + s * (rb5 + s * rb6)))))
-        S = 1 + s * (sb1 + s * (sb2 + s * (sb3 + s * (sb4 + s * (sb5 + s * (sb6 + s * sb7))))))
-    }
-    z := F64FromBits(F64Bits(x) & 0xffffffff00000000) // pseudo-single (20-bit) precision x
-    r := Exp(-z * z - 0.5625) * Exp((z - x) * (z + x) + R / S)
-    if sign {
-        ret r / x - 1
-    }
-    ret 1 - r / x
+	const VeryTiny = 2.848094538889218e-306 // 0x0080000000000000
+	const Small = 1.0 / (1 << 28)           // 2**-28
+	// special cases
+	match {
+	| IsNaN(x):
+		ret NaN()
+	| IsInf(x, 1):
+		ret 1
+	| IsInf(x, -1):
+		ret -1
+	}
+	mut sign := false
+	if x < 0 {
+		x = -x
+		sign = true
+	}
+	if x < 0.84375 { // |x| < 0.84375
+		mut temp := 0.
+		if x < Small { // |x| < 2**-28
+			if x < VeryTiny {
+				temp = 0.125 * (8.0 * x + efx8 * x) // avoid underflow
+			} else {
+				temp = x + efx * x
+			}
+		} else {
+			z := x * x
+			r := pp0 + z * (pp1 + z * (pp2 + z * (pp3 + z * pp4)))
+			s := 1 + z * (qq1 + z * (qq2 + z * (qq3 + z * (qq4 + z * qq5))))
+			y := r / s
+			temp = x + x * y
+		}
+		if sign {
+			ret -temp
+		}
+		ret temp
+	}
+	if x < 1.25 { // 0.84375 <= |x| < 1.25
+		s := x - 1
+		P := pa0 + s * (pa1 + s * (pa2 + s * (pa3 + s * (pa4 + s * (pa5 + s * pa6)))))
+		Q := 1 + s * (qa1 + s * (qa2 + s * (qa3 + s * (qa4 + s * (qa5 + s * qa6)))))
+		if sign {
+			ret -erx - P / Q
+		}
+		ret erx + P / Q
+	}
+	if x >= 6 { // inf > |x| >= 6
+		if sign {
+			ret -1
+		}
+		ret 1
+	}
+	s := 1 / (x * x)
+	mut R := 0.
+	mut S := 0.
+	if x < 1/0.35 { // |x| < 1 / 0.35  ~ 2.857143
+		R = ra0 + s * (ra1 + s * (ra2 + s * (ra3 + s * (ra4 + s * (ra5 + s * (ra6 + s * ra7))))))
+		S = 1 + s * (sa1 + s * (sa2 + s * (sa3 + s * (sa4 + s * (sa5 + s * (sa6 + s * (sa7 + s * sa8)))))))
+	} else { // |x| >= 1 / 0.35  ~ 2.857143
+		R = ra0 + s * (rb1 + s * (rb2 + s * (rb3 + s * (rb4 + s * (rb5 + s * rb6)))))
+		S = 1 + s * (sb1 + s * (sb2 + s * (sb3 + s * (sb4 + s * (sb5 + s * (sb6 + s * sb7))))))
+	}
+	z := F64FromBits(F64Bits(x) & 0xffffffff00000000) // pseudo-single (20-bit) precision x
+	r := Exp(-z * z - 0.5625) * Exp((z - x) * (z + x) + R / S)
+	if sign {
+		ret r / x - 1
+	}
+	ret 1 - r / x
 }
 
 // Returns the complementary error function of x.
@@ -295,73 +295,73 @@ fn Erf(mut x: f64): f64 {
 //  Erfc(-Inf) = 2
 //  Erfc(NaN) = NaN
 fn Erfc(mut x: f64): f64 {
-    const Tiny = 1.0 / (1 << 56) // 2**-56
-    // special cases
-    match {
-    | IsNaN(x):
-        ret NaN()
-    | IsInf(x, 1):
-        ret 0
-    | IsInf(x, -1):
-        ret 2
-    }
-    mut sign := false
-    if x < 0 {
-        x = -x
-        sign = true
-    }
-    if x < 0.84375 { // |x| < 0.84375
-        mut temp := 0.
-        if x < Tiny { // |x| < 2**-56
-            temp = x
-        } else {
-            z := x * x
-            r := pp0 + z * (pp1 + z * (pp2 + z * (pp3 + z * pp4)))
-            s := 1 + z * (qq1 + z * (qq2 + z * (qq3 + z * (qq4 + z * qq5))))
-            y := r / s
-            if x < 0.25 { // |x| < 1/4
-                temp = x + x * y
-            } else {
-                temp = 0.5 + (x * y + (x - 0.5))
-            }
-        }
-        if sign {
-            ret 1 + temp
-        }
-        ret 1 - temp
-    }
-    if x < 1.25 { // 0.84375 <= |x| < 1.25
-        s := x - 1
-        P := pa0 + s * (pa1 + s * (pa2 + s * (pa3 + s * (pa4 + s * (pa5 + s * pa6)))))
-        Q := 1 + s * (qa1 + s * (qa2 + s * (qa3 + s * (qa4 + s * (qa5 + s * qa6)))))
-        if sign {
-            ret 1 + erx + Q / P
-        }
-        ret 1 - erx - Q / P
-    }
-    if x < 28 { // |x| < 28
-        s := 1 / (x * x)
-        mut R := 0.
-        mut S := 0.
-        if x < 1/0.35 { // |x| < 1 / 0.35 ~ 2.857143
-            R = ra0 + s * (ra1 + s * (ra2 + s * (ra3 + s * (ra4 + s * (ra5 + s * (ra6 + s * ra7))))))
-            S = 1 + s * (sa1 + s * (sa2 + s * (sa3 + s * (sa4 + s * (sa5 + s * (sa6 + s * (sa7 + s * sa8)))))))
-        } else { // |x| >= 1 / 0.35 ~ 2.857143
-            if sign && x > 6 {
-                ret 2 // x < -6
-            }
-            R = rb0 + s * (rb1 + s * (rb2 + s * (rb3 + s * (rb4 + s * (rb5 + s * rb6)))))
-            S = 1 + s * (sb1 + s * (sb2 + s * (sb3 + s * (sb4 + s * (sb5 + s * (sb6 + s * sb7))))))
-        }
-        z := F64FromBits(F64Bits(x) & 0xffffffff00000000) // pseudo-single (20-bit) precision x
-        r := Exp(-z * z - 0.5625) * Exp((z - x) * (z + x) + R / S)
-        if sign {
-            ret 2 - r / x
-        }
-        ret r / x
-    }
-    if sign {
-        ret 2
-    }
-    ret 0
+	const Tiny = 1.0 / (1 << 56) // 2**-56
+	// special cases
+	match {
+	| IsNaN(x):
+		ret NaN()
+	| IsInf(x, 1):
+		ret 0
+	| IsInf(x, -1):
+		ret 2
+	}
+	mut sign := false
+	if x < 0 {
+		x = -x
+		sign = true
+	}
+	if x < 0.84375 { // |x| < 0.84375
+		mut temp := 0.
+		if x < Tiny { // |x| < 2**-56
+			temp = x
+		} else {
+			z := x * x
+			r := pp0 + z * (pp1 + z * (pp2 + z * (pp3 + z * pp4)))
+			s := 1 + z * (qq1 + z * (qq2 + z * (qq3 + z * (qq4 + z * qq5))))
+			y := r / s
+			if x < 0.25 { // |x| < 1/4
+				temp = x + x * y
+			} else {
+				temp = 0.5 + (x * y + (x - 0.5))
+			}
+		}
+		if sign {
+			ret 1 + temp
+		}
+		ret 1 - temp
+	}
+	if x < 1.25 { // 0.84375 <= |x| < 1.25
+		s := x - 1
+		P := pa0 + s * (pa1 + s * (pa2 + s * (pa3 + s * (pa4 + s * (pa5 + s * pa6)))))
+		Q := 1 + s * (qa1 + s * (qa2 + s * (qa3 + s * (qa4 + s * (qa5 + s * qa6)))))
+		if sign {
+			ret 1 + erx + Q / P
+		}
+		ret 1 - erx - Q / P
+	}
+	if x < 28 { // |x| < 28
+		s := 1 / (x * x)
+		mut R := 0.
+		mut S := 0.
+		if x < 1/0.35 { // |x| < 1 / 0.35 ~ 2.857143
+			R = ra0 + s * (ra1 + s * (ra2 + s * (ra3 + s * (ra4 + s * (ra5 + s * (ra6 + s * ra7))))))
+			S = 1 + s * (sa1 + s * (sa2 + s * (sa3 + s * (sa4 + s * (sa5 + s * (sa6 + s * (sa7 + s * sa8)))))))
+		} else { // |x| >= 1 / 0.35 ~ 2.857143
+			if sign && x > 6 {
+				ret 2 // x < -6
+			}
+			R = rb0 + s * (rb1 + s * (rb2 + s * (rb3 + s * (rb4 + s * (rb5 + s * rb6)))))
+			S = 1 + s * (sb1 + s * (sb2 + s * (sb3 + s * (sb4 + s * (sb5 + s * (sb6 + s * sb7))))))
+		}
+		z := F64FromBits(F64Bits(x) & 0xffffffff00000000) // pseudo-single (20-bit) precision x
+		r := Exp(-z * z - 0.5625) * Exp((z - x) * (z + x) + R / S)
+		if sign {
+			ret 2 - r / x
+		}
+		ret r / x
+	}
+	if sign {
+		ret 2
+	}
+	ret 0
 }

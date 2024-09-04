@@ -7,763 +7,763 @@ use math for std::math
 use std::jule::constant::{Const}
 use std::jule::lex::{TokenId, TokenKind}
 use std::jule::sema::{
-    Scope,
-    Data,
-    Var,
-    FnIns,
-    ParamIns,
-    ExprModel,
-    BinaryExprModel,
-    OperandExprModel,
-    UnaryExprModel,
-    StructLitExprModel,
-    AllocStructLitExprModel,
-    CastingExprModel,
-    FnCallExprModel,
-    SliceExprModel,
-    ArrayExprModel,
-    IndexingExprModel,
-    AnonFnExprModel,
-    MapExprModel,
-    SlicingExprModel,
-    TraitSubIdentExprModel,
-    StructSubIdentExprModel,
-    TupleExprModel,
-    BuiltinNewCallExprModel,
-    BuiltinOutCallExprModel,
-    BuiltinOutlnCallExprModel,
-    BuiltinPanicCallExprModel,
-    BuiltinAssertCallExprModel,
-    BuiltinErrorCallExprModel,
-    BuiltinMakeCallExprModel,
-    BuiltinAppendCallExprModel,
-    BuiltinLenCallExprModel,
-    BuiltinCapCallExprModel,
-    BuiltinDeleteCallExprModel,
-    SizeofExprModel,
-    AlignofExprModel,
-    IntegratedToStrExprModel,
-    FreeExprModel,
-    BackendEmitExprModel,
+	Scope,
+	Data,
+	Var,
+	FnIns,
+	ParamIns,
+	ExprModel,
+	BinaryExprModel,
+	OperandExprModel,
+	UnaryExprModel,
+	StructLitExprModel,
+	AllocStructLitExprModel,
+	CastingExprModel,
+	FnCallExprModel,
+	SliceExprModel,
+	ArrayExprModel,
+	IndexingExprModel,
+	AnonFnExprModel,
+	MapExprModel,
+	SlicingExprModel,
+	TraitSubIdentExprModel,
+	StructSubIdentExprModel,
+	TupleExprModel,
+	BuiltinNewCallExprModel,
+	BuiltinOutCallExprModel,
+	BuiltinOutlnCallExprModel,
+	BuiltinPanicCallExprModel,
+	BuiltinAssertCallExprModel,
+	BuiltinErrorCallExprModel,
+	BuiltinMakeCallExprModel,
+	BuiltinAppendCallExprModel,
+	BuiltinLenCallExprModel,
+	BuiltinCapCallExprModel,
+	BuiltinDeleteCallExprModel,
+	SizeofExprModel,
+	AlignofExprModel,
+	IntegratedToStrExprModel,
+	FreeExprModel,
+	BackendEmitExprModel,
 }
 use types for std::jule::types
 
 // Expression optimizer that applies target-independent optimizations.
 struct exprOptimizer {
-    mut model: &ExprModel
-    mut data:  &data // Should be non-nil guaranteed.
+	mut model: &ExprModel
+	mut data:  &data // Should be non-nil guaranteed.
 }
 
 impl exprOptimizer {
-    static fn optimize(mut &model: ExprModel) {
-        exprOptimizer.optimizeData(model, emptyData)
-    }
+	static fn optimize(mut &model: ExprModel) {
+		exprOptimizer.optimizeData(model, emptyData)
+	}
 
-    static fn optimizeData(mut &model: ExprModel, mut &d: &data) {
-        // Do optimizatitons if any enabled.
-        if exprEnabled {
-            mut exop := &exprOptimizer{
-                model: unsafe { (&ExprModel)(&model) },
-                data: d,
-            }
-            exop.do()
-        }
-    }
+	static fn optimizeData(mut &model: ExprModel, mut &d: &data) {
+		// Do optimizatitons if any enabled.
+		if exprEnabled {
+			mut exop := &exprOptimizer{
+				model: unsafe { (&ExprModel)(&model) },
+				data: d,
+			}
+			exop.do()
+		}
+	}
 
-    fn selfCmpCond(self, mut &m: &BinaryExprModel): bool {
-        if !equalModels(m.Left.Model, m.Right.Model) {
-            ret false
-        }
-        match m.Op.Id {
-        | TokenId.Eqs
-        | TokenId.LtEq
-        | TokenId.GtEq:
-            // Operators used with itself: ==, <=, >=.
-            // Evaluation will be always true.
-            *self.model = Const.NewBool(true)
-            ret true
-        | TokenId.NotEq
-        | TokenId.Lt
-        | TokenId.Gt:
-            // Operators used with itself: !=, <, >.
-            // Evaluation will be always false.
-            *self.model = Const.NewBool(false)
-            ret true
-        |:
-            ret false
-        }
-    }
+	fn selfCmpCond(self, mut &m: &BinaryExprModel): bool {
+		if !equalModels(m.Left.Model, m.Right.Model) {
+			ret false
+		}
+		match m.Op.Id {
+		| TokenId.Eqs
+		| TokenId.LtEq
+		| TokenId.GtEq:
+			// Operators used with itself: ==, <=, >=.
+			// Evaluation will be always true.
+			*self.model = Const.NewBool(true)
+			ret true
+		| TokenId.NotEq
+		| TokenId.Lt
+		| TokenId.Gt:
+			// Operators used with itself: !=, <, >.
+			// Evaluation will be always false.
+			*self.model = Const.NewBool(false)
+			ret true
+		|:
+			ret false
+		}
+	}
 
-    fn boolCond(self, mut &m: &BinaryExprModel): bool {
-        lp := m.Left.Kind.Prim()
-        if lp == nil || !lp.IsBool() {
-            ret false
-        }
-        match type m.Left.Model {
-        | &Const:
-            // Equality comparison, swap operation is safe and will not change
-            // the behavior of the program.
-            m.Left, m.Right = m.Right, m.Left
-        |:
-            match type m.Right.Model {
-            | &Const:
-                break
-            |:
-                ret false
-            }
-        }
-        mut c := (&Const)(m.Right.Model)
-        match m.Op.Id {
-        | TokenId.DblAmper:
-            if c.ReadBool() {
-                // Use left operand as model directly.
-                // Logical and with constant true exprssion is always will be true.
-                // The non-constant left operand should be true,
-                // this is the only important thing. So eliminate constant true.
-                *self.model = m.Left.Model
-            } else {
-                // Logical and with constant false expression.
-                // Binary expression is always will be false.
-                c.SetBool(false)
-                *self.model = c
-            }
-            ret true
-        | TokenId.DblVline:
-            if c.ReadBool() {
-                // Logical or with constant true expression.
-                // Binary expression is always will be true.
-                c.SetBool(true)
-                *self.model = c
-            } else {
-                // Use left operand as model directly.
-                // Logical or with constant false exprssion is always will be false.
-                // The non-constant left operand should be true,
-                // this is the only important thing. So eliminate constant false.
-                *self.model = m.Left.Model
-            }
-            ret true
-        |:
-        }
-        ret false
-    }
+	fn boolCond(self, mut &m: &BinaryExprModel): bool {
+		lp := m.Left.Kind.Prim()
+		if lp == nil || !lp.IsBool() {
+			ret false
+		}
+		match type m.Left.Model {
+		| &Const:
+			// Equality comparison, swap operation is safe and will not change
+			// the behavior of the program.
+			m.Left, m.Right = m.Right, m.Left
+		|:
+			match type m.Right.Model {
+			| &Const:
+				break
+			|:
+				ret false
+			}
+		}
+		mut c := (&Const)(m.Right.Model)
+		match m.Op.Id {
+		| TokenId.DblAmper:
+			if c.ReadBool() {
+				// Use left operand as model directly.
+				// Logical and with constant true exprssion is always will be true.
+				// The non-constant left operand should be true,
+				// this is the only important thing. So eliminate constant true.
+				*self.model = m.Left.Model
+			} else {
+				// Logical and with constant false expression.
+				// Binary expression is always will be false.
+				c.SetBool(false)
+				*self.model = c
+			}
+			ret true
+		| TokenId.DblVline:
+			if c.ReadBool() {
+				// Logical or with constant true expression.
+				// Binary expression is always will be true.
+				c.SetBool(true)
+				*self.model = c
+			} else {
+				// Use left operand as model directly.
+				// Logical or with constant false exprssion is always will be false.
+				// The non-constant left operand should be true,
+				// this is the only important thing. So eliminate constant false.
+				*self.model = m.Left.Model
+			}
+			ret true
+		|:
+		}
+		ret false
+	}
 
-    fn strCond(self, mut m: &BinaryExprModel): bool {
-        lp := m.Left.Kind.Prim()
-        if lp == nil || !lp.IsStr() {
-            ret false
-        }
-        if m.Op.Id != TokenId.Eqs && m.Op.Id != TokenId.NotEq {
-            ret false
-        }
-        match type m.Left.Model {
-        | &Const:
-            // Equality comparison, swap operation is safe and will not change
-            // the behavior of the program.
-            m.Left, m.Right = m.Right, m.Left
-        |:
-            match type m.Right.Model {
-            | &Const:
-                break
-            |:
-                ret false
-            }
-        }
-        mut c := (&Const)(m.Right.Model)
-        match m.Op.Id {
-        | TokenId.Eqs:
-            if c.ReadStr() == "" {
-                mut model := any(&EmptyCompareExprModel{
-                    Expr: m.Left.Model,
-                    Neg: false,
-                })
-                *self.model = unsafe { *(*ExprModel)(&model) }
-                break
-            }
-            mut model := any(&StrCompExprModel{
-                Left: m.Left.Model,
-                Right: c,
-                NotEq: false,
-            })
-            *self.model = unsafe { *(*ExprModel)(&model) }
-        | TokenId.NotEq:
-            if c.ReadStr() == "" {
-                mut model := any(&EmptyCompareExprModel{
-                    Expr: m.Left.Model,
-                    Neg: true,
-                })
-                *self.model = unsafe { *(*ExprModel)(&model) }
-                break
-            }
-            mut model := any(&StrCompExprModel{
-                Left: m.Left.Model,
-                Right: c,
-                NotEq: true,
-            })
-            *self.model = unsafe { *(*ExprModel)(&model) }
-        }
-        ret true
-    }
+	fn strCond(self, mut m: &BinaryExprModel): bool {
+		lp := m.Left.Kind.Prim()
+		if lp == nil || !lp.IsStr() {
+			ret false
+		}
+		if m.Op.Id != TokenId.Eqs && m.Op.Id != TokenId.NotEq {
+			ret false
+		}
+		match type m.Left.Model {
+		| &Const:
+			// Equality comparison, swap operation is safe and will not change
+			// the behavior of the program.
+			m.Left, m.Right = m.Right, m.Left
+		|:
+			match type m.Right.Model {
+			| &Const:
+				break
+			|:
+				ret false
+			}
+		}
+		mut c := (&Const)(m.Right.Model)
+		match m.Op.Id {
+		| TokenId.Eqs:
+			if c.ReadStr() == "" {
+				mut model := any(&EmptyCompareExprModel{
+					Expr: m.Left.Model,
+					Neg: false,
+				})
+				*self.model = unsafe { *(*ExprModel)(&model) }
+				break
+			}
+			mut model := any(&StrCompExprModel{
+				Left: m.Left.Model,
+				Right: c,
+				NotEq: false,
+			})
+			*self.model = unsafe { *(*ExprModel)(&model) }
+		| TokenId.NotEq:
+			if c.ReadStr() == "" {
+				mut model := any(&EmptyCompareExprModel{
+					Expr: m.Left.Model,
+					Neg: true,
+				})
+				*self.model = unsafe { *(*ExprModel)(&model) }
+				break
+			}
+			mut model := any(&StrCompExprModel{
+				Left: m.Left.Model,
+				Right: c,
+				NotEq: true,
+			})
+			*self.model = unsafe { *(*ExprModel)(&model) }
+		}
+		ret true
+	}
 
-    fn tryNeutralElement1(self, mut &m: &BinaryExprModel, mut c: &Const, &nc: &OperandExprModel): bool {
-        if c.IsStr() { // Constant is string, check for string optimizations.
-            if !Str {
-                ret false
-            }
-            if c.ReadStr() == "" && m.Op.Id == TokenId.Plus {
-                // Concatenation with empty string, use the non-constnat operand's model.
-                *self.model = nc.Model
-                ret true
-            }
-            ret false
-        }
+	fn tryNeutralElement1(self, mut &m: &BinaryExprModel, mut c: &Const, &nc: &OperandExprModel): bool {
+		if c.IsStr() { // Constant is string, check for string optimizations.
+			if !Str {
+				ret false
+			}
+			if c.ReadStr() == "" && m.Op.Id == TokenId.Plus {
+				// Concatenation with empty string, use the non-constnat operand's model.
+				*self.model = nc.Model
+				ret true
+			}
+			ret false
+		}
 
-        // Following algoritms are designed for zero-constant math operations.
-        // So make required conditions are guaranteed.
-        if !Math || c.AsF64() != 0 {
-            ret false
-        }
-        match m.Op.Id {
-        | TokenId.Shl
-        | TokenId.Shr:
-            // If the constant expression is shifter, use the right operand's model.
-            if nc == m.Left {
-                *self.model = nc.Model
-                ret true
-            }
-            // If the shifter expression is non-constant, shifted value is constant-zero.
-            // Use zero-constant directly.
-            *self.model = c
-            ret true
-        | TokenId.Star:
-            c.SetI64(0)
-            *self.model = c
-            ret true
-        | TokenId.Plus
-        | TokenId.Minus:
-            *self.model = nc.Model
-            ret true
-        }
-        ret false
-    }
+		// Following algoritms are designed for zero-constant math operations.
+		// So make required conditions are guaranteed.
+		if !Math || c.AsF64() != 0 {
+			ret false
+		}
+		match m.Op.Id {
+		| TokenId.Shl
+		| TokenId.Shr:
+			// If the constant expression is shifter, use the right operand's model.
+			if nc == m.Left {
+				*self.model = nc.Model
+				ret true
+			}
+			// If the shifter expression is non-constant, shifted value is constant-zero.
+			// Use zero-constant directly.
+			*self.model = c
+			ret true
+		| TokenId.Star:
+			c.SetI64(0)
+			*self.model = c
+			ret true
+		| TokenId.Plus
+		| TokenId.Minus:
+			*self.model = nc.Model
+			ret true
+		}
+		ret false
+	}
 
-    // Tries optimize binary expression for neutral elements.
-    // Specialized in math optimizations.
-    fn tryNeutralElement(self, mut &m: &BinaryExprModel): bool {
-        // For netural element optimization, one of the operands should be constant.
-        match type m.Left.Model {
-        | &Const:
-            mut c := (&Const)(m.Left.Model)
-            ret self.tryNeutralElement1(m, c, m.Right)
-        }
-        match type m.Right.Model {
-        | &Const:
-            mut c := (&Const)(m.Right.Model)
-            ret self.tryNeutralElement1(m, c, m.Left)
-        }
-        ret false
-    }
+	// Tries optimize binary expression for neutral elements.
+	// Specialized in math optimizations.
+	fn tryNeutralElement(self, mut &m: &BinaryExprModel): bool {
+		// For netural element optimization, one of the operands should be constant.
+		match type m.Left.Model {
+		| &Const:
+			mut c := (&Const)(m.Left.Model)
+			ret self.tryNeutralElement1(m, c, m.Right)
+		}
+		match type m.Right.Model {
+		| &Const:
+			mut c := (&Const)(m.Right.Model)
+			ret self.tryNeutralElement1(m, c, m.Left)
+		}
+		ret false
+	}
 
-    fn checkBinaryForBoundary(self, mut &m: &BinaryExprModel) {
-        if self.data.boundary == nil {
-            ret
-        }
-        match type m.Left.Model {
-        | &BuiltinLenCallExprModel:
-            mut blc := (&BuiltinLenCallExprModel)(m.Left.Model)
-            if !isBoundaryValidType(blc.Expr.Kind) {
-                ret
-            }
-            if m.Op.Id != TokenId.Gt && m.Op.Id != TokenId.Eqs {
-                ret
-            }
-            // len(x) > y, len(x) == y (constant)
-            // Max guaranteed size of x is y.
-            if m.Op.Id == TokenId.Eqs {
-                match type m.Right.Model {
-                | &Const:
-                    mut c := new(Const, *(&Const)(m.Right.Model)) // Do not mutate binary operand.
-                    c.Sub(*Const.NewI64(1))
-                    self.data.boundary.pushVar(getBoundaryVar(blc.Expr.Model), c)
-                }
-                ret
-            }
-            self.data.boundary.pushVar(getBoundaryVar(blc.Expr.Model), m.Right.Model)
-            ret
-        }
-        match type m.Right.Model {
-        | &BuiltinLenCallExprModel:
-            mut blc := (&BuiltinLenCallExprModel)(m.Right.Model)
-            if !isBoundaryValidType(blc.Expr.Kind) {
-                ret
-            }
-            if m.Op.Id != TokenId.Lt && m.Op.Id != TokenId.Eqs {
-                ret
-            }
-            // y < len(x), y (constant) == len(x)
-            // Max guaranteed size of x is y.
-            if m.Op.Id == TokenId.Eqs {
-                match type m.Left.Model {
-                | &Const:
-                    mut c := new(Const, *(&Const)(m.Left.Model)) // Do not mutate binary operand.
-                    c.Sub(*Const.NewI64(1))
-                    self.data.boundary.pushVar(getBoundaryVar(blc.Expr.Model), c)
-                }
-                ret
-            }
-            self.data.boundary.pushVar(getBoundaryVar(blc.Expr.Model), m.Left.Model)
-            ret
-        }
-    }
+	fn checkBinaryForBoundary(self, mut &m: &BinaryExprModel) {
+		if self.data.boundary == nil {
+			ret
+		}
+		match type m.Left.Model {
+		| &BuiltinLenCallExprModel:
+			mut blc := (&BuiltinLenCallExprModel)(m.Left.Model)
+			if !isBoundaryValidType(blc.Expr.Kind) {
+				ret
+			}
+			if m.Op.Id != TokenId.Gt && m.Op.Id != TokenId.Eqs {
+				ret
+			}
+			// len(x) > y, len(x) == y (constant)
+			// Max guaranteed size of x is y.
+			if m.Op.Id == TokenId.Eqs {
+				match type m.Right.Model {
+				| &Const:
+					mut c := new(Const, *(&Const)(m.Right.Model)) // Do not mutate binary operand.
+					c.Sub(*Const.NewI64(1))
+					self.data.boundary.pushVar(getBoundaryVar(blc.Expr.Model), c)
+				}
+				ret
+			}
+			self.data.boundary.pushVar(getBoundaryVar(blc.Expr.Model), m.Right.Model)
+			ret
+		}
+		match type m.Right.Model {
+		| &BuiltinLenCallExprModel:
+			mut blc := (&BuiltinLenCallExprModel)(m.Right.Model)
+			if !isBoundaryValidType(blc.Expr.Kind) {
+				ret
+			}
+			if m.Op.Id != TokenId.Lt && m.Op.Id != TokenId.Eqs {
+				ret
+			}
+			// y < len(x), y (constant) == len(x)
+			// Max guaranteed size of x is y.
+			if m.Op.Id == TokenId.Eqs {
+				match type m.Left.Model {
+				| &Const:
+					mut c := new(Const, *(&Const)(m.Left.Model)) // Do not mutate binary operand.
+					c.Sub(*Const.NewI64(1))
+					self.data.boundary.pushVar(getBoundaryVar(blc.Expr.Model), c)
+				}
+				ret
+			}
+			self.data.boundary.pushVar(getBoundaryVar(blc.Expr.Model), m.Left.Model)
+			ret
+		}
+	}
 
-    fn checkBinaryForNil(self, mut &m: &BinaryExprModel) {
-        if self.data.nils == nil {
-            ret
-        }
-        mut var := getNilVar(m.Left.Model)
-        if var != invalidNil {
-            if !isNilValidType(m.Left.Kind) {
-                ret
-            }
-            match type m.Right.Model {
-            | &Const:
-                // No need to check whether constant variable is nil.
-                // It only can be nil.
-                self.data.nils.pushVar(var, m.Op.Id == TokenId.NotEq)
-            }
-            ret
-        }
-        var = getNilVar(m.Right.Model)
-        if var != invalidNil {
-            if !isNilValidType(m.Right.Kind) {
-                ret
-            }
-            match type m.Left.Model {
-            | &Const:
-                // No need to check whether constant variable is nil.
-                // It only can be nil.
-                self.data.nils.pushVar(var, m.Op.Id == TokenId.NotEq)
-            }
-            ret
-        }
-    }
+	fn checkBinaryForNil(self, mut &m: &BinaryExprModel) {
+		if self.data.nils == nil {
+			ret
+		}
+		mut var := getNilVar(m.Left.Model)
+		if var != invalidNil {
+			if !isNilValidType(m.Left.Kind) {
+				ret
+			}
+			match type m.Right.Model {
+			| &Const:
+				// No need to check whether constant variable is nil.
+				// It only can be nil.
+				self.data.nils.pushVar(var, m.Op.Id == TokenId.NotEq)
+			}
+			ret
+		}
+		var = getNilVar(m.Right.Model)
+		if var != invalidNil {
+			if !isNilValidType(m.Right.Kind) {
+				ret
+			}
+			match type m.Left.Model {
+			| &Const:
+				// No need to check whether constant variable is nil.
+				// It only can be nil.
+				self.data.nils.pushVar(var, m.Op.Id == TokenId.NotEq)
+			}
+			ret
+		}
+	}
 
-    fn binary(self, mut m: &BinaryExprModel) {
-        self.checkBinaryForBoundary(m)
-        self.checkBinaryForNil(m)
+	fn binary(self, mut m: &BinaryExprModel) {
+		self.checkBinaryForBoundary(m)
+		self.checkBinaryForNil(m)
 
-        exprOptimizer.optimizeData(m.Left.Model, self.data)
-        exprOptimizer.optimizeData(m.Right.Model, self.data)
+		exprOptimizer.optimizeData(m.Left.Model, self.data)
+		exprOptimizer.optimizeData(m.Right.Model, self.data)
 
-        if Cond {
-            match {
-            | self.strCond(m)
-            | self.boolCond(m)
-            | self.selfCmpCond(m):
-                ret
-            }
-        }
+		if Cond {
+			match {
+			| self.strCond(m)
+			| self.boolCond(m)
+			| self.selfCmpCond(m):
+				ret
+			}
+		}
 
-        if self.tryNeutralElement(m) {
-            ret
-        }
+		if self.tryNeutralElement(m) {
+			ret
+		}
 
-        if !Math {
-            ret
-        }
+		if !Math {
+			ret
+		}
 
-        // Check whether the right operand is constant for safety.
-        // The following algorithms assumes the right operand is constant.
-        match type m.Right.Model {
-        | &Const:
-            break
-        |:
-            ret
-        }
+		// Check whether the right operand is constant for safety.
+		// The following algorithms assumes the right operand is constant.
+		match type m.Right.Model {
+		| &Const:
+			break
+		|:
+			ret
+		}
 
-        // Break optimizations if types are not primitive.
-        // No need for checking whether types are arithmetic,
-        // because relevant operators are conly avaliable for arithmetic primitives.
-        lp := m.Left.Kind.Prim()
-        if lp == nil {
-            ret
-        }
-        rp := m.Right.Kind.Prim()
-        if rp == nil {
-            ret
-        }
+		// Break optimizations if types are not primitive.
+		// No need for checking whether types are arithmetic,
+		// because relevant operators are conly avaliable for arithmetic primitives.
+		lp := m.Left.Kind.Prim()
+		if lp == nil {
+			ret
+		}
+		rp := m.Right.Kind.Prim()
+		if rp == nil {
+			ret
+		}
 
-        match m.Op.Id {
-        | TokenId.Star:
-            ok, x := checkForBitShiftOpt(m.Left, m.Right)
-            if ok {
-                m.Op.Id = TokenId.Shl
-                m.Op.Kind = TokenKind.Shl
-                mut c := (&Const)(m.Right.Model)
-                c.SetU64(x)
-                // No need to set model as UnsafeBinaryExprModel,
-                // shl is not checked at runtime, so it is optimize enough.
-                ret
-            }
-        | TokenId.Solidus:
-            ok, x := checkForBitShiftOpt(m.Left, m.Right)
-            if ok {
-                m.Op.Id = TokenId.Shr
-                m.Op.Kind = TokenKind.Shr
-                mut c := (&Const)(m.Right.Model)
-                c.SetU64(x)
-                // No need to set model as UnsafeBinaryExprModel,
-                // shr is not checked at runtime, so it is optimize enough.
-                ret
-            }
-        | TokenId.Percent:
-            mut c := (&Const)(m.Right.Model)
-            if c.AsF64() == 0b10 {
-                m.Op.Id = TokenId.Amper
-                m.Op.Kind = TokenKind.Amper
-                c.SetI64(1)
-                // No need to set model as UnsafeBinaryExprModel,
-                // bitwise and is not checked at runtime, so it is optimize enough.
-                ret
-            }
-        |:
-            // Eliminate unsupported operators.
-            ret
-        }
-        // Update model as UnsafeBinaryExprModel because it is safe, comptime checked.
-        // There is no risk like zero-division.
-        mut model := any(&UnsafeBinaryExprModel{Node: m})
-        *self.model = unsafe { *(*ExprModel)(&model) }
-    }
+		match m.Op.Id {
+		| TokenId.Star:
+			ok, x := checkForBitShiftOpt(m.Left, m.Right)
+			if ok {
+				m.Op.Id = TokenId.Shl
+				m.Op.Kind = TokenKind.Shl
+				mut c := (&Const)(m.Right.Model)
+				c.SetU64(x)
+				// No need to set model as UnsafeBinaryExprModel,
+				// shl is not checked at runtime, so it is optimize enough.
+				ret
+			}
+		| TokenId.Solidus:
+			ok, x := checkForBitShiftOpt(m.Left, m.Right)
+			if ok {
+				m.Op.Id = TokenId.Shr
+				m.Op.Kind = TokenKind.Shr
+				mut c := (&Const)(m.Right.Model)
+				c.SetU64(x)
+				// No need to set model as UnsafeBinaryExprModel,
+				// shr is not checked at runtime, so it is optimize enough.
+				ret
+			}
+		| TokenId.Percent:
+			mut c := (&Const)(m.Right.Model)
+			if c.AsF64() == 0b10 {
+				m.Op.Id = TokenId.Amper
+				m.Op.Kind = TokenKind.Amper
+				c.SetI64(1)
+				// No need to set model as UnsafeBinaryExprModel,
+				// bitwise and is not checked at runtime, so it is optimize enough.
+				ret
+			}
+		|:
+			// Eliminate unsupported operators.
+			ret
+		}
+		// Update model as UnsafeBinaryExprModel because it is safe, comptime checked.
+		// There is no risk like zero-division.
+		mut model := any(&UnsafeBinaryExprModel{Node: m})
+		*self.model = unsafe { *(*ExprModel)(&model) }
+	}
 
-    fn unary(self, mut m: &UnaryExprModel) {
-        exprOptimizer.optimizeData(m.Expr.Model, self.data)
-        if !Ptr {
-            ret
-        }
-        match m.Op.Id {
-        | TokenId.Star:
-            match type m.Expr.Model {
-            | &UnaryExprModel:
-                mut um := (&UnaryExprModel)(m.Expr.Model)
-                if um.Op.Id == TokenId.Amper {
-                    // Remove pointer overhead.
-                    // Expression is: *(&x)
-                    // Simplify to: x
-                    *self.model = um.Expr.Model
-                    ret
-                }
-                ret
-            }
-            if !Access {
-                ret
-            }
-            if self.data.nils != nil && isNilValidType(m.Expr.Kind) {
-                var := getNilVar(m.Expr.Model)
-                if self.data.nils.isSafe(var) {
-                    mut model := any(&UnsafeDerefExprModel{Base: m})
-                    *self.model = unsafe { *(*ExprModel)(&model) }
-                    ret
-                }
-                // Now this varible is safe until it mutated.
-                self.data.nils.pushVar(var, true)
-            }
-        | TokenId.Amper:
-            match type m.Expr.Model {
-            | &Var:
-                mut v := (&Var)(m.Expr.Model)
-                if v.Reference {
-                    mut model := any(&RefExprModel{Var: v})
-                    *self.model = unsafe { *(*ExprModel)(&model) }
-                }
-            }
-        }
-    }
+	fn unary(self, mut m: &UnaryExprModel) {
+		exprOptimizer.optimizeData(m.Expr.Model, self.data)
+		if !Ptr {
+			ret
+		}
+		match m.Op.Id {
+		| TokenId.Star:
+			match type m.Expr.Model {
+			| &UnaryExprModel:
+				mut um := (&UnaryExprModel)(m.Expr.Model)
+				if um.Op.Id == TokenId.Amper {
+					// Remove pointer overhead.
+					// Expression is: *(&x)
+					// Simplify to: x
+					*self.model = um.Expr.Model
+					ret
+				}
+				ret
+			}
+			if !Access {
+				ret
+			}
+			if self.data.nils != nil && isNilValidType(m.Expr.Kind) {
+				var := getNilVar(m.Expr.Model)
+				if self.data.nils.isSafe(var) {
+					mut model := any(&UnsafeDerefExprModel{Base: m})
+					*self.model = unsafe { *(*ExprModel)(&model) }
+					ret
+				}
+				// Now this varible is safe until it mutated.
+				self.data.nils.pushVar(var, true)
+			}
+		| TokenId.Amper:
+			match type m.Expr.Model {
+			| &Var:
+				mut v := (&Var)(m.Expr.Model)
+				if v.Reference {
+					mut model := any(&RefExprModel{Var: v})
+					*self.model = unsafe { *(*ExprModel)(&model) }
+				}
+			}
+		}
+	}
 
-    fn structureLit(self, mut m: &StructLitExprModel) {
-        for (_, mut arg) in m.Args {
-            if self.data.boundary != nil {
-                if isBoundaryRiskyType(arg.Expr.Kind) {
-                    possibleBoundaryRemove(self.data.boundary, arg)
-                }
-            }
-            if self.data.nils != nil {
-                possibleNilRemove(self.data.nils, arg.Expr.Model)
-            }
-            if self.data.dynamic != nil {
-                possibleDynamicRemove(self.data.dynamic, arg.Expr.Model)
-            }
-            exprOptimizer.optimizeData(arg.Expr.Model, self.data)
-        }
-    }
+	fn structureLit(self, mut m: &StructLitExprModel) {
+		for (_, mut arg) in m.Args {
+			if self.data.boundary != nil {
+				if isBoundaryRiskyType(arg.Expr.Kind) {
+					possibleBoundaryRemove(self.data.boundary, arg)
+				}
+			}
+			if self.data.nils != nil {
+				possibleNilRemove(self.data.nils, arg.Expr.Model)
+			}
+			if self.data.dynamic != nil {
+				possibleDynamicRemove(self.data.dynamic, arg.Expr.Model)
+			}
+			exprOptimizer.optimizeData(arg.Expr.Model, self.data)
+		}
+	}
 
-    fn allocStructure(self, mut m: &AllocStructLitExprModel) {
-        self.structureLit(m.Lit)
-    }
+	fn allocStructure(self, mut m: &AllocStructLitExprModel) {
+		self.structureLit(m.Lit)
+	}
 
-    fn casting(self, mut m: &CastingExprModel) {
-        valid := isDynamicValidType(m.ExprKind)
-        var := getDynamicVar(m.Expr.Model)
-        if valid && self.data.dynamic != nil && self.data.dynamic.isFits(var, m.Kind) {
-            mut model := any(&UnsafeCastingExprModel{Base: m})
-            *self.model = unsafe { *(*ExprModel)(&model) }
-            ret
-        }
-        exprOptimizer.optimizeData(m.Expr.Model, self.data)
-        if self.data.dynamic != nil && valid {
-            self.data.dynamic.pushVar(var, m.Kind)
-        }
-    }
+	fn casting(self, mut m: &CastingExprModel) {
+		valid := isDynamicValidType(m.ExprKind)
+		var := getDynamicVar(m.Expr.Model)
+		if valid && self.data.dynamic != nil && self.data.dynamic.isFits(var, m.Kind) {
+			mut model := any(&UnsafeCastingExprModel{Base: m})
+			*self.model = unsafe { *(*ExprModel)(&model) }
+			ret
+		}
+		exprOptimizer.optimizeData(m.Expr.Model, self.data)
+		if self.data.dynamic != nil && valid {
+			self.data.dynamic.pushVar(var, m.Kind)
+		}
+	}
 
-    fn args(self, mut params: []&ParamIns, mut &args: []ExprModel) {
-        for (i, mut arg) in args {
-            if i < len(params) {
-                mut p := params[i]
-                if p.Decl.Mutable && p.Decl.Reference {
-                    if self.data.boundary != nil {
-                        if isBoundaryRiskyType(p.Kind) {
-                            possibleBoundaryRemove(self.data.boundary, arg)
-                        }
-                    }
-                    if self.data.nils != nil {
-                        possibleNilRemove(self.data.nils, arg)
-                    }
-                    if self.data.dynamic != nil {
-                        possibleDynamicRemove(self.data.dynamic, arg)
-                    }
-                }
-            }
-            exprOptimizer.optimizeData(arg, self.data)
-            args[i] = arg
-        }
-    }
+	fn args(self, mut params: []&ParamIns, mut &args: []ExprModel) {
+		for (i, mut arg) in args {
+			if i < len(params) {
+				mut p := params[i]
+				if p.Decl.Mutable && p.Decl.Reference {
+					if self.data.boundary != nil {
+						if isBoundaryRiskyType(p.Kind) {
+							possibleBoundaryRemove(self.data.boundary, arg)
+						}
+					}
+					if self.data.nils != nil {
+						possibleNilRemove(self.data.nils, arg)
+					}
+					if self.data.dynamic != nil {
+						possibleDynamicRemove(self.data.dynamic, arg)
+					}
+				}
+			}
+			exprOptimizer.optimizeData(arg, self.data)
+			args[i] = arg
+		}
+	}
 
-    fn scope(self, mut &s: &Scope) {
-        mut scopt := scopeOptimizer.new(s)
-        scopt.data = self.data
-        scopt.optimize()
-    }
+	fn scope(self, mut &s: &Scope) {
+		mut scopt := scopeOptimizer.new(s)
+		scopt.data = self.data
+		scopt.optimize()
+	}
 
-    fn funcCall(self, mut m: &FnCallExprModel) {
-        exprOptimizer.optimizeData(m.Expr, self.data)
-        self.args(m.Func.Params, m.Args)
-        if m.Except != nil {
-            self.scope(m.Except)
-        }
-    }
+	fn funcCall(self, mut m: &FnCallExprModel) {
+		exprOptimizer.optimizeData(m.Expr, self.data)
+		self.args(m.Func.Params, m.Args)
+		if m.Except != nil {
+			self.scope(m.Except)
+		}
+	}
 
-    fn slice(self, mut m: &SliceExprModel) {
-        self.args(nil, m.Elems)
-    }
+	fn slice(self, mut m: &SliceExprModel) {
+		self.args(nil, m.Elems)
+	}
 
-    fn array(self, mut m: &ArrayExprModel) {
-        if len(m.Elems) == 2 && m.Elems[1] == nil {
-            mut elem := m.Elems[0]
-            exprOptimizer.optimizeData(elem, self.data)
-            m.Elems[0] = elem
-        }
-        self.args(nil, m.Elems)
-    }
+	fn array(self, mut m: &ArrayExprModel) {
+		if len(m.Elems) == 2 && m.Elems[1] == nil {
+			mut elem := m.Elems[0]
+			exprOptimizer.optimizeData(elem, self.data)
+			m.Elems[0] = elem
+		}
+		self.args(nil, m.Elems)
+	}
 
-    fn indexing(self, mut m: &IndexingExprModel) {
-        exprOptimizer.optimizeData(m.Expr.Model, self.data)
-        exprOptimizer.optimizeData(m.Index.Model, self.data)
-        if !Access {
-            ret
-        }
+	fn indexing(self, mut m: &IndexingExprModel) {
+		exprOptimizer.optimizeData(m.Expr.Model, self.data)
+		exprOptimizer.optimizeData(m.Index.Model, self.data)
+		if !Access {
+			ret
+		}
 
-        array := m.Expr.Kind.Arr() != nil
-        // Constants checked by semantic analysis for arrays, safe.
-        if array && m.Index.IsConst() {
-            mut model := any(&UnsafeIndexingExprModel{Node: m})
-            *self.model = unsafe { *(*ExprModel)(&model) }
-            ret
-        }
+		array := m.Expr.Kind.Arr() != nil
+		// Constants checked by semantic analysis for arrays, safe.
+		if array && m.Index.IsConst() {
+			mut model := any(&UnsafeIndexingExprModel{Node: m})
+			*self.model = unsafe { *(*ExprModel)(&model) }
+			ret
+		}
 
-        if self.data.boundary != nil && isBoundaryValidType(m.Expr.Kind) {
-            var := getBoundaryVar(m.Expr.Model)
-            if self.data.boundary.fitsMaxSize(var, m.Index.Model) {
-                mut model := any(&UnsafeIndexingExprModel{Node: m})
-                *self.model = unsafe { *(*ExprModel)(&model) }
-                ret
-            }
-            self.data.boundary.pushVar(var, m.Index.Model)
-        }
-    }
+		if self.data.boundary != nil && isBoundaryValidType(m.Expr.Kind) {
+			var := getBoundaryVar(m.Expr.Model)
+			if self.data.boundary.fitsMaxSize(var, m.Index.Model) {
+				mut model := any(&UnsafeIndexingExprModel{Node: m})
+				*self.model = unsafe { *(*ExprModel)(&model) }
+				ret
+			}
+			self.data.boundary.pushVar(var, m.Index.Model)
+		}
+	}
 
-    fn anonFunc(self, mut m: &AnonFnExprModel) {
-        self.scope(m.Func.Scope)
-    }
+	fn anonFunc(self, mut m: &AnonFnExprModel) {
+		self.scope(m.Func.Scope)
+	}
 
-    fn mapExpr(self, mut m: &MapExprModel) {
-        for (_, mut pair) in m.Entries {
-            exprOptimizer.optimizeData(pair.Key, self.data)
-            exprOptimizer.optimizeData(pair.Val, self.data)
-        }
-    }
+	fn mapExpr(self, mut m: &MapExprModel) {
+		for (_, mut pair) in m.Entries {
+			exprOptimizer.optimizeData(pair.Key, self.data)
+			exprOptimizer.optimizeData(pair.Val, self.data)
+		}
+	}
 
-    fn slicing(self, mut m: &SlicingExprModel) {
-        exprOptimizer.optimizeData(m.Expr, self.data)
-        exprOptimizer.optimizeData(m.Left, self.data)
-        if m.Right != nil {
-            exprOptimizer.optimizeData(m.Right, self.data)
-        }
-    }
+	fn slicing(self, mut m: &SlicingExprModel) {
+		exprOptimizer.optimizeData(m.Expr, self.data)
+		exprOptimizer.optimizeData(m.Left, self.data)
+		if m.Right != nil {
+			exprOptimizer.optimizeData(m.Right, self.data)
+		}
+	}
 
-    fn traitSub(self, mut m: &TraitSubIdentExprModel) {
-        exprOptimizer.optimizeData(m.Expr, self.data)
-    }
+	fn traitSub(self, mut m: &TraitSubIdentExprModel) {
+		exprOptimizer.optimizeData(m.Expr, self.data)
+	}
 
-    fn structureSub(self, mut m: &StructSubIdentExprModel) {
-        exprOptimizer.optimizeData(m.Expr.Model, self.data)
-    }
+	fn structureSub(self, mut m: &StructSubIdentExprModel) {
+		exprOptimizer.optimizeData(m.Expr.Model, self.data)
+	}
 
-    fn tuple(self, mut m: &TupleExprModel) {
-        for (_, mut d) in m.Datas {
-            exprOptimizer.optimizeData(d.Model, self.data)
-        }
-    }
+	fn tuple(self, mut m: &TupleExprModel) {
+		for (_, mut d) in m.Datas {
+			exprOptimizer.optimizeData(d.Model, self.data)
+		}
+	}
 
-    fn newCall(self, mut m: &BuiltinNewCallExprModel) {
-        if m.Init != nil {
-            exprOptimizer.optimizeData(m.Init, self.data)
-        }
-    }
+	fn newCall(self, mut m: &BuiltinNewCallExprModel) {
+		if m.Init != nil {
+			exprOptimizer.optimizeData(m.Init, self.data)
+		}
+	}
 
-    fn outCall(self, mut m: &BuiltinOutCallExprModel) {
-        exprOptimizer.optimizeData(m.Expr, self.data)
-    }
+	fn outCall(self, mut m: &BuiltinOutCallExprModel) {
+		exprOptimizer.optimizeData(m.Expr, self.data)
+	}
 
-    fn outlnCall(self, mut m: &BuiltinOutlnCallExprModel) {
-        exprOptimizer.optimizeData(m.Expr, self.data)
-    }
+	fn outlnCall(self, mut m: &BuiltinOutlnCallExprModel) {
+		exprOptimizer.optimizeData(m.Expr, self.data)
+	}
 
-    fn panicCall(self, mut m: &BuiltinPanicCallExprModel) {
-        exprOptimizer.optimizeData(m.Expr, self.data)
-    }
+	fn panicCall(self, mut m: &BuiltinPanicCallExprModel) {
+		exprOptimizer.optimizeData(m.Expr, self.data)
+	}
 
-    fn assertCall(self, mut m: &BuiltinAssertCallExprModel) {
-        exprOptimizer.optimizeData(m.Expr, self.data)
-    }
+	fn assertCall(self, mut m: &BuiltinAssertCallExprModel) {
+		exprOptimizer.optimizeData(m.Expr, self.data)
+	}
 
-    fn errorCall(self, mut m: &BuiltinErrorCallExprModel) {
-        exprOptimizer.optimizeData(m.Err.Model, self.data)
-    }
+	fn errorCall(self, mut m: &BuiltinErrorCallExprModel) {
+		exprOptimizer.optimizeData(m.Err.Model, self.data)
+	}
 
-    fn makeCall(self, mut m: &BuiltinMakeCallExprModel) {
-        if m.Len != nil {
-            exprOptimizer.optimizeData(m.Len, self.data)
-        }
-        if m.Cap != nil {
-            exprOptimizer.optimizeData(m.Cap, self.data)
-        }
-    }
+	fn makeCall(self, mut m: &BuiltinMakeCallExprModel) {
+		if m.Len != nil {
+			exprOptimizer.optimizeData(m.Len, self.data)
+		}
+		if m.Cap != nil {
+			exprOptimizer.optimizeData(m.Cap, self.data)
+		}
+	}
 
-    fn appendCall(self, mut m: &BuiltinAppendCallExprModel) {
-        exprOptimizer.optimizeData(m.Dest, self.data)
-        exprOptimizer.optimizeData(m.Elements, self.data)
-    }
+	fn appendCall(self, mut m: &BuiltinAppendCallExprModel) {
+		exprOptimizer.optimizeData(m.Dest, self.data)
+		exprOptimizer.optimizeData(m.Elements, self.data)
+	}
 
-    fn lenCall(self, mut m: &BuiltinLenCallExprModel) {
-        exprOptimizer.optimizeData(m.Expr.Model, self.data)
-    }
+	fn lenCall(self, mut m: &BuiltinLenCallExprModel) {
+		exprOptimizer.optimizeData(m.Expr.Model, self.data)
+	}
 
-    fn capCall(self, mut m: &BuiltinCapCallExprModel) {
-        exprOptimizer.optimizeData(m.Expr.Model, self.data)
-    }
+	fn capCall(self, mut m: &BuiltinCapCallExprModel) {
+		exprOptimizer.optimizeData(m.Expr.Model, self.data)
+	}
 
-    fn deleteCall(self, mut m: &BuiltinDeleteCallExprModel) {
-        exprOptimizer.optimizeData(m.Dest.Model, self.data)
-        if m.Key != nil {
-            exprOptimizer.optimizeData(m.Key.Model, self.data)
-        }
-    }
+	fn deleteCall(self, mut m: &BuiltinDeleteCallExprModel) {
+		exprOptimizer.optimizeData(m.Dest.Model, self.data)
+		if m.Key != nil {
+			exprOptimizer.optimizeData(m.Key.Model, self.data)
+		}
+	}
 
-    fn sizeof(self, mut m: &SizeofExprModel) {
-        exprOptimizer.optimizeData(m.Expr, self.data)
-    }
+	fn sizeof(self, mut m: &SizeofExprModel) {
+		exprOptimizer.optimizeData(m.Expr, self.data)
+	}
 
-    fn alignof(self, mut m: &AlignofExprModel) {
-        exprOptimizer.optimizeData(m.Expr, self.data)
-    }
+	fn alignof(self, mut m: &AlignofExprModel) {
+		exprOptimizer.optimizeData(m.Expr, self.data)
+	}
 
-    fn integratedToStr(self, mut m: &IntegratedToStrExprModel) {
-        exprOptimizer.optimizeData(m.Expr, self.data)
-    }
+	fn integratedToStr(self, mut m: &IntegratedToStrExprModel) {
+		exprOptimizer.optimizeData(m.Expr, self.data)
+	}
 
-    fn free(self, mut m: &FreeExprModel) {
-        exprOptimizer.optimizeData(m.Expr, self.data)
-    }
+	fn free(self, mut m: &FreeExprModel) {
+		exprOptimizer.optimizeData(m.Expr, self.data)
+	}
 
-    fn backendEmit(self, mut m: &BackendEmitExprModel) {
-        self.args(nil, m.Exprs)
-    }
+	fn backendEmit(self, mut m: &BackendEmitExprModel) {
+		self.args(nil, m.Exprs)
+	}
 
-    fn do(self) {
-        match type *self.model {
-        | &BinaryExprModel:
-            self.binary((&BinaryExprModel)(*self.model))
-        | &UnaryExprModel:
-            self.unary((&UnaryExprModel)(*self.model))
-        | &StructLitExprModel:
-            self.structureLit((&StructLitExprModel)(*self.model))
-        | &AllocStructLitExprModel:
-            self.allocStructure((&AllocStructLitExprModel)(*self.model))
-        | &CastingExprModel:
-            self.casting((&CastingExprModel)(*self.model))
-        | &FnCallExprModel:
-            self.funcCall((&FnCallExprModel)(*self.model))
-        | &SliceExprModel:
-            self.slice((&SliceExprModel)(*self.model))
-        | &ArrayExprModel:
-            self.array((&ArrayExprModel)(*self.model))
-        | &IndexingExprModel:
-            self.indexing((&IndexingExprModel)(*self.model))
-        | &AnonFnExprModel:
-            self.anonFunc((&AnonFnExprModel)(*self.model))
-        | &MapExprModel:
-            self.mapExpr((&MapExprModel)(*self.model))
-        | &SlicingExprModel:
-            self.slicing((&SlicingExprModel)(*self.model))
-        | &TraitSubIdentExprModel:
-            self.traitSub((&TraitSubIdentExprModel)(*self.model))
-        | &StructSubIdentExprModel:
-            self.structureSub((&StructSubIdentExprModel)(*self.model))
-        | &TupleExprModel:
-            self.tuple((&TupleExprModel)(*self.model))
-        | &BuiltinOutCallExprModel:
-            self.outCall((&BuiltinOutCallExprModel)(*self.model))
-        | &BuiltinOutlnCallExprModel:
-            self.outlnCall((&BuiltinOutlnCallExprModel)(*self.model))
-        | &BuiltinNewCallExprModel:
-            self.newCall((&BuiltinNewCallExprModel)(*self.model))
-        | &BuiltinPanicCallExprModel:
-            self.panicCall((&BuiltinPanicCallExprModel)(*self.model))
-        | &BuiltinAssertCallExprModel:
-            self.assertCall((&BuiltinAssertCallExprModel)(*self.model))
-        | &BuiltinErrorCallExprModel:
-            self.errorCall((&BuiltinErrorCallExprModel)(*self.model))
-        | &BuiltinMakeCallExprModel:
-            self.makeCall((&BuiltinMakeCallExprModel)(*self.model))
-        | &BuiltinAppendCallExprModel:
-            self.appendCall((&BuiltinAppendCallExprModel)(*self.model))
-        | &BuiltinLenCallExprModel:
-            self.lenCall((&BuiltinLenCallExprModel)(*self.model))
-        | &BuiltinCapCallExprModel:
-            self.capCall((&BuiltinCapCallExprModel)(*self.model))
-        | &BuiltinDeleteCallExprModel:
-            self.deleteCall((&BuiltinDeleteCallExprModel)(*self.model))
-        | &SizeofExprModel:
-            self.sizeof((&SizeofExprModel)(*self.model))
-        | &AlignofExprModel:
-            self.alignof((&AlignofExprModel)(*self.model))
-        | &IntegratedToStrExprModel:
-            self.integratedToStr((&IntegratedToStrExprModel)(*self.model))
-        | &FreeExprModel:
-            self.free((&FreeExprModel)(*self.model))
-        | &BackendEmitExprModel:
-            self.backendEmit((&BackendEmitExprModel)(*self.model))
-        }
-    }
+	fn do(self) {
+		match type *self.model {
+		| &BinaryExprModel:
+			self.binary((&BinaryExprModel)(*self.model))
+		| &UnaryExprModel:
+			self.unary((&UnaryExprModel)(*self.model))
+		| &StructLitExprModel:
+			self.structureLit((&StructLitExprModel)(*self.model))
+		| &AllocStructLitExprModel:
+			self.allocStructure((&AllocStructLitExprModel)(*self.model))
+		| &CastingExprModel:
+			self.casting((&CastingExprModel)(*self.model))
+		| &FnCallExprModel:
+			self.funcCall((&FnCallExprModel)(*self.model))
+		| &SliceExprModel:
+			self.slice((&SliceExprModel)(*self.model))
+		| &ArrayExprModel:
+			self.array((&ArrayExprModel)(*self.model))
+		| &IndexingExprModel:
+			self.indexing((&IndexingExprModel)(*self.model))
+		| &AnonFnExprModel:
+			self.anonFunc((&AnonFnExprModel)(*self.model))
+		| &MapExprModel:
+			self.mapExpr((&MapExprModel)(*self.model))
+		| &SlicingExprModel:
+			self.slicing((&SlicingExprModel)(*self.model))
+		| &TraitSubIdentExprModel:
+			self.traitSub((&TraitSubIdentExprModel)(*self.model))
+		| &StructSubIdentExprModel:
+			self.structureSub((&StructSubIdentExprModel)(*self.model))
+		| &TupleExprModel:
+			self.tuple((&TupleExprModel)(*self.model))
+		| &BuiltinOutCallExprModel:
+			self.outCall((&BuiltinOutCallExprModel)(*self.model))
+		| &BuiltinOutlnCallExprModel:
+			self.outlnCall((&BuiltinOutlnCallExprModel)(*self.model))
+		| &BuiltinNewCallExprModel:
+			self.newCall((&BuiltinNewCallExprModel)(*self.model))
+		| &BuiltinPanicCallExprModel:
+			self.panicCall((&BuiltinPanicCallExprModel)(*self.model))
+		| &BuiltinAssertCallExprModel:
+			self.assertCall((&BuiltinAssertCallExprModel)(*self.model))
+		| &BuiltinErrorCallExprModel:
+			self.errorCall((&BuiltinErrorCallExprModel)(*self.model))
+		| &BuiltinMakeCallExprModel:
+			self.makeCall((&BuiltinMakeCallExprModel)(*self.model))
+		| &BuiltinAppendCallExprModel:
+			self.appendCall((&BuiltinAppendCallExprModel)(*self.model))
+		| &BuiltinLenCallExprModel:
+			self.lenCall((&BuiltinLenCallExprModel)(*self.model))
+		| &BuiltinCapCallExprModel:
+			self.capCall((&BuiltinCapCallExprModel)(*self.model))
+		| &BuiltinDeleteCallExprModel:
+			self.deleteCall((&BuiltinDeleteCallExprModel)(*self.model))
+		| &SizeofExprModel:
+			self.sizeof((&SizeofExprModel)(*self.model))
+		| &AlignofExprModel:
+			self.alignof((&AlignofExprModel)(*self.model))
+		| &IntegratedToStrExprModel:
+			self.integratedToStr((&IntegratedToStrExprModel)(*self.model))
+		| &FreeExprModel:
+			self.free((&FreeExprModel)(*self.model))
+		| &BackendEmitExprModel:
+			self.backendEmit((&BackendEmitExprModel)(*self.model))
+		}
+	}
 }
 
 // Checks for bit-shifting optimizations.
@@ -777,58 +777,58 @@ impl exprOptimizer {
 // As a result: returns whether bit-shifting is possible and what nth power of 2^r.
 // Assumes the model r is constant.
 fn checkForBitShiftOpt(&l: &OperandExprModel, &r: &OperandExprModel): (ok: bool, x: u64) {
-    if !types::IsInt(l.Kind.Str()) || !types::IsInt(r.Kind.Str()) {
-        ret false, 0
-    }
-    x = (&Const)(r.Model).AsU64()
-    if x == 0 || x%2 != 0 {
-        ret false, 0
-    }
-    j := math::Log2(f64(x))
-    z := u64(j)
-    if f64(z) != j {
-        ret false, 0
-    }
-    ret true, z
+	if !types::IsInt(l.Kind.Str()) || !types::IsInt(r.Kind.Str()) {
+		ret false, 0
+	}
+	x = (&Const)(r.Model).AsU64()
+	if x == 0 || x%2 != 0 {
+		ret false, 0
+	}
+	j := math::Log2(f64(x))
+	z := u64(j)
+	if f64(z) != j {
+		ret false, 0
+	}
+	ret true, z
 }
 
 // Reports l and r the same lvalue expression.
 fn areSameLvalueExprModel(&l: ExprModel, &r: ExprModel): bool {
-    match type l {
-    | &Var:
-        // Compare values directly.
-        // If the l and r have same pointers, means same variable.
-        ret l == r
-    | &StructSubIdentExprModel:
-        match type r {
-        | &StructSubIdentExprModel:
-            break
-        |:
-            ret false
-        }
-        lsi := (&StructSubIdentExprModel)(l)
-        rsi := (&StructSubIdentExprModel)(r)
-        // Compare fields directly.
-        // If the l and r have same pointers,
-        // means same variable of same struct instance.
-        if lsi.Field != rsi.Field {
-            ret false
-        }
-        // Check head expressions used for field access.
-        ret areSameLvalueExprModel(lsi.Expr.Model, rsi.Expr.Model)
-    | &UnaryExprModel:
-        match type r {
-        | &UnaryExprModel:
-            ul := (&UnaryExprModel)(l)
-            ur := (&UnaryExprModel)(r)
-            // Unary operators should have the same operator.
-            // The operator does not matter.
-            if ul.Op.Id != ur.Op.Id || ul.Op.Kind != ur.Op.Kind {
-                ret false
-            }
-            // Check expressions used for unary.
-            ret areSameLvalueExprModel(ul.Expr.Model, ur.Expr.Model)
-        }
-    }
-    ret false
+	match type l {
+	| &Var:
+		// Compare values directly.
+		// If the l and r have same pointers, means same variable.
+		ret l == r
+	| &StructSubIdentExprModel:
+		match type r {
+		| &StructSubIdentExprModel:
+			break
+		|:
+			ret false
+		}
+		lsi := (&StructSubIdentExprModel)(l)
+		rsi := (&StructSubIdentExprModel)(r)
+		// Compare fields directly.
+		// If the l and r have same pointers,
+		// means same variable of same struct instance.
+		if lsi.Field != rsi.Field {
+			ret false
+		}
+		// Check head expressions used for field access.
+		ret areSameLvalueExprModel(lsi.Expr.Model, rsi.Expr.Model)
+	| &UnaryExprModel:
+		match type r {
+		| &UnaryExprModel:
+			ul := (&UnaryExprModel)(l)
+			ur := (&UnaryExprModel)(r)
+			// Unary operators should have the same operator.
+			// The operator does not matter.
+			if ul.Op.Id != ur.Op.Id || ul.Op.Kind != ur.Op.Kind {
+				ret false
+			}
+			// Check expressions used for unary.
+			ret areSameLvalueExprModel(ul.Expr.Model, ur.Expr.Model)
+		}
+	}
+	ret false
 }

@@ -5,40 +5,40 @@
 use std::jule::sema::{Package, SymbolTable, Trait, Fn}
 
 fn IterPackages(mut &ir: &IR, f: fn(mut &pkg: &Package)) {
-    for (_, mut used) in ir.Used {
-        if !used.Binded {
-            f(used.Package)
-        }
-    }
-    f(ir.Main)
+	for (_, mut used) in ir.Used {
+		if !used.Binded {
+			f(used.Package)
+		}
+	}
+	f(ir.Main)
 }
 
 fn IterFiles(mut &pkg: &Package, f: fn(mut &f: &SymbolTable)) {
-    for (_, mut file) in pkg.Files {
-        f(file)
-    }
+	for (_, mut file) in pkg.Files {
+		f(file)
+	}
 }
 
 fn iterTraitInheritMethods(mut &base: &Trait, mut &t: &Trait, f: fn(mut &m: &Fn)) {
-    iterTraitInheritMethods1(base, t, f)
-    for (_, mut m) in t.Methods {
-        if !ContainsTraitMethod(base, m.Ident) { // Do not iterate iterated method.
-            f(m)
-        }
-    }
+	iterTraitInheritMethods1(base, t, f)
+	for (_, mut m) in t.Methods {
+		if !ContainsTraitMethod(base, m.Ident) { // Do not iterate iterated method.
+			f(m)
+		}
+	}
 }
 
 fn iterTraitInheritMethods1(mut &base: &Trait, mut &t: &Trait, f: fn(mut &m: &Fn)) {
-    for (_, mut inh) in t.Inherits {
-        mut t2 := inh.Kind.Trait()
-        iterTraitInheritMethods(base, t2, f)
-    }
+	for (_, mut inh) in t.Inherits {
+		mut t2 := inh.Kind.Trait()
+		iterTraitInheritMethods(base, t2, f)
+	}
 }
 
 // Iterates methods of trait, including inherited methods.
 fn IterTraitMethods(mut &t: &Trait, f: fn(mut &m: &Fn)) {
-    for (_, mut m) in t.Methods {
-        f(m)
-    }
-    iterTraitInheritMethods1(t, t, f)
+	for (_, mut m) in t.Methods {
+		f(m)
+	}
+	iterTraitInheritMethods1(t, t, f)
 }

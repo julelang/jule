@@ -40,68 +40,68 @@ use std::sync::atomic::{MemoryOrder, AtomicU8}
 // Once is an object that will perform exactly one action.
 // A Once must not be copied after first use.
 struct Once {
-    // done indicates whether the action has been performed.
-    // It is first in the struct because it is used in the hot path.
-    // The hot path is inlined at every call site.
-    // Placing done first allows more compact instructions on some architectures (amd64/i386),
-    // and fewer instructions (to calculate offset) on other architectures.
-    mut done: AtomicU8
-    mut m:    Mutex
+	// done indicates whether the action has been performed.
+	// It is first in the struct because it is used in the hot path.
+	// The hot path is inlined at every call site.
+	// Placing done first allows more compact instructions on some architectures (amd64/i386),
+	// and fewer instructions (to calculate offset) on other architectures.
+	mut done: AtomicU8
+	mut m:    Mutex
 }
 
 impl Once {
-    // Returns new instance for Once.
-    static fn New(): Once {
-        ret Once{}
-    }
+	// Returns new instance for Once.
+	static fn New(): Once {
+		ret Once{}
+	}
 
-    // Calls the function f if and only if do is being called for the
-    // first time for this instance of Once. In other words, given
-    //
-    //  let once = Once{}
-    //
-    // if once.do(f) is called multiple times, only the first call will invoke f,
-    // even if f has a different value in each invocation. A new instance of
-    // Once is required for each function to execute.
-    //
-    // do is intended for initialization that must be run exactly once. Since f
-    // is niladic, it may be necessary to use a function literal to capture the
-    // arguments to a function to be invoked by do:
-    //
-    //  config.once.do(func() { config.init(filename) })
-    //
-    // Because no call to do returns until the one call to f returns, if f causes
-    // do to be called, it will deadlock.
-    //
-    // If f panics, do considers it to have returned; future calls of do return
-    // without calling f.
-    fn Do(self, f: fn()) {
-        // Note: Here is an incorrect implementation of do:
-        //
-        //  if self.done.compare_swap(0, 1) {
-        //      f()
-        //  }
-        //
-        // do guarantees that when it returns, f has finished.
-        // This implementation would not implement that guarantee:
-        // given two simultaneous calls, the winner of the cas would
-        // call f, and the second would return immediately, without
-        // waiting for the first's call to f to complete.
-        // This is why the slow path falls back to a mutex, and why
-        // the self.done.store must be delayed until after f returns.
+	// Calls the function f if and only if do is being called for the
+	// first time for this instance of Once. In other words, given
+	//
+	//  let once = Once{}
+	//
+	// if once.do(f) is called multiple times, only the first call will invoke f,
+	// even if f has a different value in each invocation. A new instance of
+	// Once is required for each function to execute.
+	//
+	// do is intended for initialization that must be run exactly once. Since f
+	// is niladic, it may be necessary to use a function literal to capture the
+	// arguments to a function to be invoked by do:
+	//
+	//  config.once.do(func() { config.init(filename) })
+	//
+	// Because no call to do returns until the one call to f returns, if f causes
+	// do to be called, it will deadlock.
+	//
+	// If f panics, do considers it to have returned; future calls of do return
+	// without calling f.
+	fn Do(self, f: fn()) {
+		// Note: Here is an incorrect implementation of do:
+		//
+		//  if self.done.compare_swap(0, 1) {
+		//      f()
+		//  }
+		//
+		// do guarantees that when it returns, f has finished.
+		// This implementation would not implement that guarantee:
+		// given two simultaneous calls, the winner of the cas would
+		// call f, and the second would return immediately, without
+		// waiting for the first's call to f to complete.
+		// This is why the slow path falls back to a mutex, and why
+		// the self.done.store must be delayed until after f returns.
 
-        if self.done.Load(MemoryOrder.Relaxed) == 0 {
-            // Outlined slow-path to allow inlining of the fast-path.
-            self.doSlow(f)
-        }
-    }
+		if self.done.Load(MemoryOrder.Relaxed) == 0 {
+			// Outlined slow-path to allow inlining of the fast-path.
+			self.doSlow(f)
+		}
+	}
 
-    fn doSlow(self, f: fn()) {
-        self.m.Lock()
-        if self.done.Load(MemoryOrder.Relaxed) == 0 {
-            f()
-            self.done.Store(1, MemoryOrder.Relaxed)
-        }
-        self.m.Unlock()
-    }
+	fn doSlow(self, f: fn()) {
+		self.m.Lock()
+		if self.done.Load(MemoryOrder.Relaxed) == 0 {
+			f()
+			self.done.Store(1, MemoryOrder.Relaxed)
+		}
+		self.m.Unlock()
+	}
 }

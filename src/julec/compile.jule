@@ -12,19 +12,19 @@ use std::fs::{FsError, OFlag, File, Directory, Status}
 use path for std::fs::path
 use integrated for std::jule::integrated
 use std::jule::sema::{
-    ImportInfo,
-    Package,
-    SemaFlag,
+	ImportInfo,
+	Package,
+	SemaFlag,
 }
 use build for std::jule::build::{
-    self,
-    LogMsg,
-    Log,
-    PathStdlib,
-    EntryPoint,
-    InitFn,
-    Logf,
-    IsValidCppExt,
+	self,
+	LogMsg,
+	Log,
+	PathStdlib,
+	EntryPoint,
+	InitFn,
+	Logf,
+	IsValidCppExt,
 }
 use types for std::jule::types
 use std::process::{ProcessError, Cmd}
@@ -35,394 +35,394 @@ static mut OutName = "ir.cpp"
 static mut Out = ""
 
 fn init() {
-    // Configure compiler to default by platform
-    // Compiler path will be set by compiler before compilation if still unassigned.
-    env::Compiler = "clang"
+	// Configure compiler to default by platform
+	// Compiler path will be set by compiler before compilation if still unassigned.
+	env::Compiler = "clang"
 }
 
 fn openOutput(&path: str): &File {
-    dir := path::Dir(path)
+	dir := path::Dir(path)
 
-    Status.Of(dir) else {
-        Directory.Create(dir) else {
-            Throw("a problem occurs when code generation")
-        }
-    }
+	Status.Of(dir) else {
+		Directory.Create(dir) else {
+			Throw("a problem occurs when code generation")
+		}
+	}
 
-    ret File.Create(path) else {
-        Throw("a problem occurs when code generation")
-        use nil
-    }
+	ret File.Create(path) else {
+		Throw("a problem occurs when code generation")
+		use nil
+	}
 }
 
 // Remove generated objects for compilation.
 fn clearObjects() {
-    File.Remove(getCompilePath()) else {
-        outln("a problem occurs when object cleaning")
-        ret
-    }
+	File.Remove(getCompilePath()) else {
+		outln("a problem occurs when object cleaning")
+		ret
+	}
 
-    // All created objects are cleaned.
-    // So, deletes directory if empty after cleaned all objects,
-    // if not, leaves the directory.
-    Directory.Remove(OutDir) else {}
+	// All created objects are cleaned.
+	// So, deletes directory if empty after cleaned all objects,
+	// if not, leaves the directory.
+	Directory.Remove(OutDir) else {}
 }
 
 // Compie generated IR.
 fn compileIr(compiler: str, compilerCmd: str) {
-    mut cmd := Cmd.New(compiler)
-    cmd.Args = strings::Split(compilerCmd, " ", -1)
-    cmd.Spawn() else {
-        match error {
-        | ProcessError.NotExist:
-            AnsiEscape.Print(AnsiEscape.RedSeq, "back-end compiler could not used because of compiler path is not exist")
-        | ProcessError.Denied:
-            AnsiEscape.Print(AnsiEscape.RedSeq, "back-end compiler could not used because of permission denied")
-        |:
-            AnsiEscape.Print(AnsiEscape.RedSeq, "back-end compiler could not used because of unknown problem")
-        }
-        Throw("")
-    }
-    status := cmd.Wait()!
-    if status != 0 {
-        errorMessage := "\n>>> your backend compiler (" + env::Compiler + `) reports problems
+	mut cmd := Cmd.New(compiler)
+	cmd.Args = strings::Split(compilerCmd, " ", -1)
+	cmd.Spawn() else {
+		match error {
+		| ProcessError.NotExist:
+			AnsiEscape.Print(AnsiEscape.RedSeq, "back-end compiler could not used because of compiler path is not exist")
+		| ProcessError.Denied:
+			AnsiEscape.Print(AnsiEscape.RedSeq, "back-end compiler could not used because of permission denied")
+		|:
+			AnsiEscape.Print(AnsiEscape.RedSeq, "back-end compiler could not used because of unknown problem")
+		}
+		Throw("")
+	}
+	status := cmd.Wait()!
+	if status != 0 {
+		errorMessage := "\n>>> your backend compiler (" + env::Compiler + `) reports problems
 >>> please check errors above
 >>> is this a compiler problem, please report us: https://github.com/julelang/jule/issues/new/choose`
 
-        AnsiEscape.Print(AnsiEscape.RedSeq, errorMessage)
-        Throw("")
-    }
+		AnsiEscape.Print(AnsiEscape.RedSeq, errorMessage)
+		Throw("")
+	}
 
-    clearObjects()
+	clearObjects()
 }
 
 fn isCppSourceFile(path: str): bool {
-    offset := strings::FindLastByte(path, '.')
-    if offset == -1 {
-        ret false
-    }
-    ret IsValidCppExt(path[offset:])
+	offset := strings::FindLastByte(path, '.')
+	if offset == -1 {
+		ret false
+	}
+	ret IsValidCppExt(path[offset:])
 }
 
 fn pushCompCmdClang(mut &cmd: StrBuilder) {
-    // Disable all warnings.
-    cmd.WriteStr("-Wno-everything ")
+	// Disable all warnings.
+	cmd.WriteStr("-Wno-everything ")
 
-    // Set C++ standard.
-    cmd.WriteStr("--std=")
-    match env::CppStd {
-    | "cpp14":
-        cmd.WriteStr("c++14")
-    | "cpp17":
-        cmd.WriteStr("c++17")
-    | "cpp20":
-        cmd.WriteStr("c++20")
-    }
-    cmd.WriteByte(' ')
+	// Set C++ standard.
+	cmd.WriteStr("--std=")
+	match env::CppStd {
+	| "cpp14":
+		cmd.WriteStr("c++14")
+	| "cpp17":
+		cmd.WriteStr("c++17")
+	| "cpp20":
+		cmd.WriteStr("c++20")
+	}
+	cmd.WriteByte(' ')
 
-    if env::Production {
-        cmd.WriteStr("-O3 ") // Enable all optimizations.
-        cmd.WriteStr("-flto ") // Enable LTO.
-        cmd.WriteStr("-DNDEBUG ") // Define NDEBUG, turn off assertions.
-        cmd.WriteStr("-fomit-frame-pointer ") // Do not use frame pointer.
-    } else {
-        cmd.WriteStr("-O0 ") // No optimization.
-    }
+	if env::Production {
+		cmd.WriteStr("-O3 ") // Enable all optimizations.
+		cmd.WriteStr("-flto ") // Enable LTO.
+		cmd.WriteStr("-DNDEBUG ") // Define NDEBUG, turn off assertions.
+		cmd.WriteStr("-fomit-frame-pointer ") // Do not use frame pointer.
+	} else {
+		cmd.WriteStr("-O0 ") // No optimization.
+	}
 }
 
 fn pushCompCmdGcc(mut &cmd: StrBuilder) {
-    // Disable all warnings.
-    cmd.WriteStr("-w ")
+	// Disable all warnings.
+	cmd.WriteStr("-w ")
 
-    // Set C++ standard.
-    cmd.WriteStr("--std=")
-    match env::CppStd {
-    | "cpp14":
-        cmd.WriteStr("c++14")
-    | "cpp17":
-        cmd.WriteStr("c++17")
-    | "cpp20":
-        cmd.WriteStr("c++20")
-    }
-    cmd.WriteByte(' ')
+	// Set C++ standard.
+	cmd.WriteStr("--std=")
+	match env::CppStd {
+	| "cpp14":
+		cmd.WriteStr("c++14")
+	| "cpp17":
+		cmd.WriteStr("c++17")
+	| "cpp20":
+		cmd.WriteStr("c++20")
+	}
+	cmd.WriteByte(' ')
 
-    if env::Production {
-        cmd.WriteStr("-O3 ") // Enable all optimizations.
-        cmd.WriteStr("-DNDEBUG ") // Define NDEBUG, turn off assertions.
-        cmd.WriteStr("-fomit-frame-pointer ") // Do not use frame pointer.
-    } else {
-        cmd.WriteStr("-O0 ") // No optimization.
-    }
+	if env::Production {
+		cmd.WriteStr("-O3 ") // Enable all optimizations.
+		cmd.WriteStr("-DNDEBUG ") // Define NDEBUG, turn off assertions.
+		cmd.WriteStr("-fomit-frame-pointer ") // Do not use frame pointer.
+	} else {
+		cmd.WriteStr("-O0 ") // No optimization.
+	}
 }
 
 // Generate compile command for backend-compiler.
 fn genCompileCmd(sourcePath: str, &ir: &IR): (str, str) {
-    &compiler := env::CompilerPath
-    mut cmd := StrBuilder.New(1 << 6)
+	&compiler := env::CompilerPath
+	mut cmd := StrBuilder.New(1 << 6)
 
-    match env::Compiler {
-    | "gcc":
-        pushCompCmdGcc(cmd)
-    | "clang":
-        pushCompCmdClang(cmd)
-    }
+	match env::Compiler {
+	| "gcc":
+		pushCompCmdGcc(cmd)
+	| "clang":
+		pushCompCmdClang(cmd)
+	}
 
-    // Push binded source files.
-    for _, u in ir.Used {
-        if u.Binded && isCppSourceFile(u.Path) {
-            cmd.WriteStr(u.Path)
-            cmd.WriteByte(' ')
-        }
-    }
+	// Push binded source files.
+	for _, u in ir.Used {
+		if u.Binded && isCppSourceFile(u.Path) {
+			cmd.WriteStr(u.Path)
+			cmd.WriteByte(' ')
+		}
+	}
 
-    if Out != "" {
-        cmd.WriteStr("-o ")
-        cmd.WriteStr(Out)
-        cmd.WriteByte(' ')
-    }
-    cmd.WriteStr(sourcePath)
+	if Out != "" {
+		cmd.WriteStr("-o ")
+		cmd.WriteStr(Out)
+		cmd.WriteByte(' ')
+	}
+	cmd.WriteStr(sourcePath)
 
-    // Push passes.
-    for _, pass in ir.Passes {
-        cmd.WriteByte(' ')
-        cmd.WriteStr(pass)
-    }
+	// Push passes.
+	for _, pass in ir.Passes {
+		cmd.WriteByte(' ')
+		cmd.WriteStr(pass)
+	}
 
-    // Link necessary libraries for Windows.
-    if build::Os == build::DistOs.Windows {
-        cmd.WriteStr(" -lshell32")
-    }
+	// Link necessary libraries for Windows.
+	if build::Os == build::DistOs.Windows {
+		cmd.WriteStr(" -lshell32")
+	}
 
-    ret compiler, cmd.Str()
+	ret compiler, cmd.Str()
 }
 
 fn getCompilePath(): str {
-    // Return command-line argument form
-    // instead of absolute path.
-    ret path::Join(OutDir, OutName)
+	// Return command-line argument form
+	// instead of absolute path.
+	ret path::Join(OutDir, OutName)
 }
 
 fn applyTargetIndependentOptimizations(mut &ir: &IR) {
-    mut opt := Optimizer.New(ir)
-    opt.Optimize()
+	mut opt := Optimizer.New(ir)
+	opt.Optimize()
 }
 
 fn checkCompilerFlag() {
-    match env::Compiler {
-    | "":
-        Throw("missing option value: --compiler")
-    | "clang":
-        if env::CompilerPath == "" {
-            env::CompilerPath = "clang++"
-        }
-    | "gcc":
-        if env::CompilerPath == "" {
-            env::CompilerPath = "g++"
-        }
-    |:
-        Throw("invalid option value for --compiler: " + env::Compiler)
-    }
+	match env::Compiler {
+	| "":
+		Throw("missing option value: --compiler")
+	| "clang":
+		if env::CompilerPath == "" {
+			env::CompilerPath = "clang++"
+		}
+	| "gcc":
+		if env::CompilerPath == "" {
+			env::CompilerPath = "g++"
+		}
+	|:
+		Throw("invalid option value for --compiler: " + env::Compiler)
+	}
 }
 
 fn checkTargetArch(arch: str) {
-    if arch != build::DistArch.Amd64 &&
-        arch != build::DistArch.Arm64 &&
-        arch != build::DistArch.I386 {
-        Throw("--target: unsupported/undefined architecture: " + arch)
-    }
+	if arch != build::DistArch.Amd64 &&
+		arch != build::DistArch.Arm64 &&
+		arch != build::DistArch.I386 {
+		Throw("--target: unsupported/undefined architecture: " + arch)
+	}
 }
 
 fn checkTargetOs(os: str) {
-    if os != build::DistOs.Windows &&
-        os != build::DistOs.Linux &&
-        os != build::DistOs.Darwin {
-        Throw("--target: unsupported/undefined operating system: " + os)
-    }
+	if os != build::DistOs.Windows &&
+		os != build::DistOs.Linux &&
+		os != build::DistOs.Darwin {
+		Throw("--target: unsupported/undefined operating system: " + os)
+	}
 }
 
 fn checkTargetFlag(&target: str) {
-    if target == "" {
-        Throw("missing option value: --target")
-    }
+	if target == "" {
+		Throw("missing option value: --target")
+	}
 
-    parts := strings::Split(target, "-", -1)
-    if len(parts) != 2 {
-        Throw("--target: undefined platform target format: " + target)
-    }
+	parts := strings::Split(target, "-", -1)
+	if len(parts) != 2 {
+		Throw("--target: undefined platform target format: " + target)
+	}
 
-    os, arch := parts[0], parts[1]
+	os, arch := parts[0], parts[1]
 
-    if os != "native" {
-        checkTargetOs(os)
-        build::Os = os
-    }
-    if arch != "native" {
-        checkTargetArch(arch)
-        build::Arch = arch
-    }
-    types::UpdateTarget()
+	if os != "native" {
+		checkTargetOs(os)
+		build::Os = os
+	}
+	if arch != "native" {
+		checkTargetArch(arch)
+		build::Arch = arch
+	}
+	types::UpdateTarget()
 }
 
 fn checkOptFlag(&opt: str) {
-    if opt == "" {
-        Throw("missing option value: --opt")
-    }
+	if opt == "" {
+		Throw("missing option value: --opt")
+	}
 
-    match opt {
-    | "L0":
-        break
-    | "L1":
-        opt::PushOptLevel(OptLevel.L1)
-    |:
-        Throw("--opt: invalid optimization level: " + opt)
-    }
+	match opt {
+	| "L0":
+		break
+	| "L1":
+		opt::PushOptLevel(OptLevel.L1)
+	|:
+		Throw("--opt: invalid optimization level: " + opt)
+	}
 }
 
 fn checkCppStdFlag() {
-    match env::CppStd {
-    | "cpp14"
-    | "cpp17"
-    | "cpp20":
-        break
-    |:
-        Throw("--cppstd: invalid cpp standard: " + env::CppStd)
-    }
+	match env::CppStd {
+	| "cpp14"
+	| "cpp17"
+	| "cpp20":
+		break
+	|:
+		Throw("--cppstd: invalid cpp standard: " + env::CppStd)
+	}
 }
 
 fn checkFlags(&args: []str): []str {
-    mut opt := "L0"
-    mut target := "native-native"
+	mut opt := "L0"
+	mut target := "native-native"
 
-    mut fs := FlagSet.New()
+	mut fs := FlagSet.New()
 
-    fs.AddVar[str](unsafe { (&str)(&opt) }, "opt", 0, "Optimization level")
-    fs.AddVar[str](unsafe { (&str)(&target) }, "target", 0, "Target system")
-    fs.AddVar[str](unsafe { (&str)(&Out) }, "out", 'o', "Output identifier")
-    fs.AddVar[bool](unsafe { (&bool)(&env::Shadowing) }, "shadowing", 0, "Allow shadowing")
-    fs.AddVar[bool](unsafe { (&bool)(&env::Transpilation) }, "transpile", 't', "Transpile code")
-    fs.AddVar[str](unsafe { (&str)(&env::Compiler) }, "compiler", 0, "Backend compiler")
-    fs.AddVar[str](unsafe { (&str)(&env::CompilerPath) }, "compiler-path", 0, "Path of backend compiler")
-    fs.AddVar[bool](unsafe { (&bool)(&env::Production) }, "production", 'p', "Compile for production")
-    fs.AddVar[bool](unsafe { (&bool)(&env::RC) }, "disable-rc", 0, "Disable reference counting")
-    fs.AddVar[bool](unsafe { (&bool)(&env::Safety) }, "disable-safety", 0, "Disable safety")
-    fs.AddVar[str](unsafe { (&str)(&env::CppStd) }, "cppstd", 0, "C++ standard")
-    fs.AddVar[bool](unsafe { (&bool)(&opt::Copy) }, "opt-copy", 0, "Copy optimization")
-    fs.AddVar[bool](unsafe { (&bool)(&opt::Deadcode) }, "opt-deadcode", 0, "Deadcode optimization")
-    fs.AddVar[bool](unsafe { (&bool)(&opt::Append) }, "opt-append", 0, "Append optimization")
-    fs.AddVar[bool](unsafe { (&bool)(&opt::Math) }, "opt-math", 0, "Math optimization")
-    fs.AddVar[bool](unsafe { (&bool)(&opt::Access) }, "opt-access", 0, "Access optimization")
-    fs.AddVar[bool](unsafe { (&bool)(&opt::Inline) }, "opt-inline", 0, "Inline optimization")
-    fs.AddVar[bool](unsafe { (&bool)(&opt::Ptr) }, "opt-ptr", 0, "Pointer optimizations")
-    fs.AddVar[bool](unsafe { (&bool)(&opt::Cond) }, "opt-cond", 0, "Conditional optimizations")
-    fs.AddVar[bool](unsafe { (&bool)(&opt::Str) }, "opt-str", 0, "String optimizations")
-    fs.AddVar[bool](unsafe { (&bool)(&opt::Slice) }, "opt-slice", 0, "Slice optimizations")
-    fs.AddVar[bool](unsafe { (&bool)(&opt::Assign) }, "opt-assign", 0, "Assignment optimizations")
-    fs.AddVar[bool](unsafe { (&bool)(&opt::Exceptional) }, "opt-exceptional", 0, "Exceptional optimizations")
-    fs.AddVar[bool](unsafe { (&bool)(&opt::Iter) }, "opt-iter", 0, "Iterations optimizations")
-    fs.AddVar[bool](unsafe { (&bool)(&opt::Dynamic) }, "opt-dynamic", 0, "Dynamic programming optimizations")
+	fs.AddVar[str](unsafe { (&str)(&opt) }, "opt", 0, "Optimization level")
+	fs.AddVar[str](unsafe { (&str)(&target) }, "target", 0, "Target system")
+	fs.AddVar[str](unsafe { (&str)(&Out) }, "out", 'o', "Output identifier")
+	fs.AddVar[bool](unsafe { (&bool)(&env::Shadowing) }, "shadowing", 0, "Allow shadowing")
+	fs.AddVar[bool](unsafe { (&bool)(&env::Transpilation) }, "transpile", 't', "Transpile code")
+	fs.AddVar[str](unsafe { (&str)(&env::Compiler) }, "compiler", 0, "Backend compiler")
+	fs.AddVar[str](unsafe { (&str)(&env::CompilerPath) }, "compiler-path", 0, "Path of backend compiler")
+	fs.AddVar[bool](unsafe { (&bool)(&env::Production) }, "production", 'p', "Compile for production")
+	fs.AddVar[bool](unsafe { (&bool)(&env::RC) }, "disable-rc", 0, "Disable reference counting")
+	fs.AddVar[bool](unsafe { (&bool)(&env::Safety) }, "disable-safety", 0, "Disable safety")
+	fs.AddVar[str](unsafe { (&str)(&env::CppStd) }, "cppstd", 0, "C++ standard")
+	fs.AddVar[bool](unsafe { (&bool)(&opt::Copy) }, "opt-copy", 0, "Copy optimization")
+	fs.AddVar[bool](unsafe { (&bool)(&opt::Deadcode) }, "opt-deadcode", 0, "Deadcode optimization")
+	fs.AddVar[bool](unsafe { (&bool)(&opt::Append) }, "opt-append", 0, "Append optimization")
+	fs.AddVar[bool](unsafe { (&bool)(&opt::Math) }, "opt-math", 0, "Math optimization")
+	fs.AddVar[bool](unsafe { (&bool)(&opt::Access) }, "opt-access", 0, "Access optimization")
+	fs.AddVar[bool](unsafe { (&bool)(&opt::Inline) }, "opt-inline", 0, "Inline optimization")
+	fs.AddVar[bool](unsafe { (&bool)(&opt::Ptr) }, "opt-ptr", 0, "Pointer optimizations")
+	fs.AddVar[bool](unsafe { (&bool)(&opt::Cond) }, "opt-cond", 0, "Conditional optimizations")
+	fs.AddVar[bool](unsafe { (&bool)(&opt::Str) }, "opt-str", 0, "String optimizations")
+	fs.AddVar[bool](unsafe { (&bool)(&opt::Slice) }, "opt-slice", 0, "Slice optimizations")
+	fs.AddVar[bool](unsafe { (&bool)(&opt::Assign) }, "opt-assign", 0, "Assignment optimizations")
+	fs.AddVar[bool](unsafe { (&bool)(&opt::Exceptional) }, "opt-exceptional", 0, "Exceptional optimizations")
+	fs.AddVar[bool](unsafe { (&bool)(&opt::Iter) }, "opt-iter", 0, "Iterations optimizations")
+	fs.AddVar[bool](unsafe { (&bool)(&opt::Dynamic) }, "opt-dynamic", 0, "Dynamic programming optimizations")
 
-    mut content := fs.Parse(args) else {
-        Throw(str(error))
-        use nil // Avoid error.
-    }
+	mut content := fs.Parse(args) else {
+		Throw(str(error))
+		use nil // Avoid error.
+	}
 
-    checkCompilerFlag()
-    checkCppStdFlag()
-    checkTargetFlag(target)
-    checkOptFlag(opt)
+	checkCompilerFlag()
+	checkCppStdFlag()
+	checkTargetFlag(target)
+	checkOptFlag(opt)
 
-    ret content
+	ret content
 }
 
 fn setupSemaFlags(mut &flags: SemaFlag) {
-    if env::Shadowing {
-        flags |= SemaFlag.Shadowing
-    }
+	if env::Shadowing {
+		flags |= SemaFlag.Shadowing
+	}
 }
 
 fn buildIr(&args: []str): &IR {
-    content := checkFlags(args)
+	content := checkFlags(args)
 
-    mut semaFlags := SemaFlag.Default
-    setupSemaFlags(semaFlags)
+	mut semaFlags := SemaFlag.Default
+	setupSemaFlags(semaFlags)
 
-    if len(content) == 0 {
-        Throw(Logf(LogMsg.MissingCompilePath))
-    } else if len(content) > 1 {
-        Throw("undefined content: " + content[1])
-    }
-    mut path, ok := path::Abs(content[0])
-    if !ok {
-        Throw("compile path could not processed because of a problem")
-    }
+	if len(content) == 0 {
+		Throw(Logf(LogMsg.MissingCompilePath))
+	} else if len(content) > 1 {
+		Throw("undefined content: " + content[1])
+	}
+	mut path, ok := path::Abs(content[0])
+	if !ok {
+		Throw("compile path could not processed because of a problem")
+	}
 
-    // Check standard library.
-    inf := Status.Of(PathStdlib) else {
-        Throw(Logf(LogMsg.StdlibNotExist))
-        ret nil // Avoid error.
-    }
-    if !inf.IsDir() {
-        Throw(Logf(LogMsg.StdlibNotExist))
-    }
+	// Check standard library.
+	inf := Status.Of(PathStdlib) else {
+		Throw(Logf(LogMsg.StdlibNotExist))
+		ret nil // Avoid error.
+	}
+	if !inf.IsDir() {
+		Throw(Logf(LogMsg.StdlibNotExist))
+	}
 
-    mut ir, logs := IR.Build(path, semaFlags)
+	mut ir, logs := IR.Build(path, semaFlags)
 
-    if ir == nil && logs == nil {
-        Throw(Logf(LogMsg.NoFileInEntryPackage, path))
-    }
+	if ir == nil && logs == nil {
+		Throw(Logf(LogMsg.NoFileInEntryPackage, path))
+	}
 
-    if logs != nil {
-        Logger.PrintLogs(logs)
-        Throw("")
-    }
+	if logs != nil {
+		Logger.PrintLogs(logs)
+		Throw("")
+	}
 
-    ret ir
+	ret ir
 }
 
 // Process compile command by "ARGS" global.
 fn compileCommand(mut &args: []str) {
-    args = args[1:] // Remove program path.
-    if args[0] == "test" {
-        env::Test = true
-        args = args[1:]
-    }
-    mut ir := buildIr(args)
+	args = args[1:] // Remove program path.
+	if args[0] == "test" {
+		env::Test = true
+		args = args[1:]
+	}
+	mut ir := buildIr(args)
 
-    const Binded = false
+	const Binded = false
 
-    if !env::Test {
-        mut main := ir.Main.FindFn(EntryPoint, Binded)
-        if main == nil {
-            Throw(Logf(LogMsg.NoEntryPoint))
-        }
-    }
+	if !env::Test {
+		mut main := ir.Main.FindFn(EntryPoint, Binded)
+		if main == nil {
+			Throw(Logf(LogMsg.NoEntryPoint))
+		}
+	}
 
-    applyTargetIndependentOptimizations(ir)
+	applyTargetIndependentOptimizations(ir)
 
-    // See compiler reference (1)
-    ir.Order()
+	// See compiler reference (1)
+	ir.Order()
 
-    compPath := getCompilePath()
-    compiler, compilerCmd := genCompileCmd(compPath, ir)
+	compPath := getCompilePath()
+	compiler, compilerCmd := genCompileCmd(compPath, ir)
 
-    mut oc := cxx::ObjectCoder.New(ir, cxx::SerializationInfo{
-        Compiler: compiler,
-        CompilerCommand: compilerCmd,
-    })
-    if env::Test {
-        mut tc := cxx::TestCoder.New(oc)
-        tc.Serialize()
-    } else {
-        oc.Serialize()
-    }
+	mut oc := cxx::ObjectCoder.New(ir, cxx::SerializationInfo{
+		Compiler: compiler,
+		CompilerCommand: compilerCmd,
+	})
+	if env::Test {
+		mut tc := cxx::TestCoder.New(oc)
+		tc.Serialize()
+	} else {
+		oc.Serialize()
+	}
 
-    mut file := openOutput(compPath)
-    file.Write(unsafe { oc.Buf.Buf() }) else {
-        Throw("object code could not write")
-    }
-    file.Close()!
+	mut file := openOutput(compPath)
+	file.Write(unsafe { oc.Buf.Buf() }) else {
+		Throw("object code could not write")
+	}
+	file.Close()!
 
-    if !env::Transpilation {
-        compileIr(compiler, compilerCmd)
-    }
+	if !env::Transpilation {
+		compileIr(compiler, compilerCmd)
+	}
 }

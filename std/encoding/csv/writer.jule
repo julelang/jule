@@ -56,127 +56,127 @@ use utf8 for std::unicode::utf8
 // Flush method to guarantee all data has been forwarded to
 // the underlying io::Writer.
 struct Writer {
-    Comma:   rune // Field delimiter (set to ',' by new)
-    UseCrlf: bool // True to use \r\n as the line terminator
+	Comma:   rune // Field delimiter (set to ',' by new)
+	UseCrlf: bool // True to use \r\n as the line terminator
 
-    w: io::Writer
+	w: io::Writer
 }
 
 impl Writer {
-    // Returns new Writer instance that writes w.
-    static fn New(mut w: io::Writer): &Writer {
-        ret &Writer{
-            Comma: ',',
-            w: w,
-        }
-    }
+	// Returns new Writer instance that writes w.
+	static fn New(mut w: io::Writer): &Writer {
+		ret &Writer{
+			Comma: ',',
+			w: w,
+		}
+	}
 
-    // Reports whether our field must be enclosed in quotes.
-    // Fields with a comma, fields with a quote or newline, and
-    // fields which start with a space must be enclosed in quotes.
-    // We used to quote empty strings, but we do not anymore (as of Go 1.4).
-    // The two representations should be equivalent, but Postgres distinguishes
-    // quoted vs non-quoted empty string during database imports, and it has
-    // an option to force the quoted behavior for non-quoted CSV but it has
-    // no option to force the non-quoted behavior for quoted CSV, making
-    // CSV with quoted empty strings strictly less useful.
-    // Not quoting the empty string also makes this package match the behavior
-    // of Microsoft Excel and Google Drive.
-    // For Postgres, quote the data terminating string `\.`.
-    fn fieldNeedsQuotes(self, field: []byte): bool {
-        if len(field) == 0 {
-            ret false
-        }
-        if len(field) == 2 && field[0] == '\\' && field[1] == '.' {
-            ret true
-        }
-        if self.Comma < utf8::RuneSelf {
-            mut i := 0
-            for i < len(field); i++ {
-                c := field[i]
-                if c == '\n' || c == '\r' || c == '"' || c == byte(self.Comma) {
-                    ret true
-                }
-            }
-        } else if bytes::ContainsRune(field, self.Comma) ||
-            bytes::ContainsAny(field, unsafe::StrBytes("\"\r\n")) {
-            ret true
-        }
-        r1, _ := utf8::DecodeRune(field)
-        ret unicode::IsSpace(r1)
-    }
+	// Reports whether our field must be enclosed in quotes.
+	// Fields with a comma, fields with a quote or newline, and
+	// fields which start with a space must be enclosed in quotes.
+	// We used to quote empty strings, but we do not anymore (as of Go 1.4).
+	// The two representations should be equivalent, but Postgres distinguishes
+	// quoted vs non-quoted empty string during database imports, and it has
+	// an option to force the quoted behavior for non-quoted CSV but it has
+	// no option to force the non-quoted behavior for quoted CSV, making
+	// CSV with quoted empty strings strictly less useful.
+	// Not quoting the empty string also makes this package match the behavior
+	// of Microsoft Excel and Google Drive.
+	// For Postgres, quote the data terminating string `\.`.
+	fn fieldNeedsQuotes(self, field: []byte): bool {
+		if len(field) == 0 {
+			ret false
+		}
+		if len(field) == 2 && field[0] == '\\' && field[1] == '.' {
+			ret true
+		}
+		if self.Comma < utf8::RuneSelf {
+			mut i := 0
+			for i < len(field); i++ {
+				c := field[i]
+				if c == '\n' || c == '\r' || c == '"' || c == byte(self.Comma) {
+					ret true
+				}
+			}
+		} else if bytes::ContainsRune(field, self.Comma) ||
+			bytes::ContainsAny(field, unsafe::StrBytes("\"\r\n")) {
+			ret true
+		}
+		r1, _ := utf8::DecodeRune(field)
+		ret unicode::IsSpace(r1)
+	}
 
-    // Writes a single CSV record along with any necessary quoting.
-    // A record is a slice of strings with each string being one field.
-    // Forwards any exceptional from internal objects such as writer.
-    fn Write(mut self, record: []str)! {
-        if !validDelim(self.Comma) {
-            error(CsvError.InvalidDelim)
-        }
-        for (n, mut field) in record {
-            if n > 0 {
-                mut bytes := make([]byte, utf8::UTFMax)
-                j := utf8::EncodeRune(bytes, self.Comma)
-                self.w.Write(bytes[:j]) else { error(error) }
-            }
+	// Writes a single CSV record along with any necessary quoting.
+	// A record is a slice of strings with each string being one field.
+	// Forwards any exceptional from internal objects such as writer.
+	fn Write(mut self, record: []str)! {
+		if !validDelim(self.Comma) {
+			error(CsvError.InvalidDelim)
+		}
+		for (n, mut field) in record {
+			if n > 0 {
+				mut bytes := make([]byte, utf8::UTFMax)
+				j := utf8::EncodeRune(bytes, self.Comma)
+				self.w.Write(bytes[:j]) else { error(error) }
+			}
 
-            // Use fb instead of field to avoid copying.
-            mut fb := unsafe::StrBytes(field)
+			// Use fb instead of field to avoid copying.
+			mut fb := unsafe::StrBytes(field)
 
-            // If we don't have to have a quoted field then just
-            // write out the field and continue to the next field.
-            if !self.fieldNeedsQuotes(fb) {
-                self.w.Write(fb) else { error(error) }
-                continue
-            }
+			// If we don't have to have a quoted field then just
+			// write out the field and continue to the next field.
+			if !self.fieldNeedsQuotes(fb) {
+				self.w.Write(fb) else { error(error) }
+				continue
+			}
 
-            self.w.Write(['"']) else { error(error) }
+			self.w.Write(['"']) else { error(error) }
 
-            for len(fb) > 0 {
-                // Search for special characters.
-                mut i := bytes::FindAny(fb, unsafe::StrBytes("\"\r\n"))
-                if i < 0 {
-                    i = len(fb)
-                }
+			for len(fb) > 0 {
+				// Search for special characters.
+				mut i := bytes::FindAny(fb, unsafe::StrBytes("\"\r\n"))
+				if i < 0 {
+					i = len(fb)
+				}
 
-                // Copy verbatim everything before the special character.
-                self.w.Write(fb[:i]) else { error(error) }
-                fb = fb[i:]
+				// Copy verbatim everything before the special character.
+				self.w.Write(fb[:i]) else { error(error) }
+				fb = fb[i:]
 
-                // Encode the special character.
-                if len(fb) > 0 {
-                    match fb[0] {
-                    | '"':
-                        self.w.Write(unsafe::StrBytes(`""`)) else { error(error) }
-                    | '\r':
-                        if !self.UseCrlf {
-                            self.w.Write(['\r']) else { error(error) }
-                        }
-                    | '\n':
-                        if self.UseCrlf {
-                            self.w.Write(unsafe::StrBytes("\r\n")) else { error(error) }
-                        } else {
-                            self.w.Write(unsafe::StrBytes("\n")) else { error(error) }
-                        }
-                    }
-                    fb = fb[1:]
-                }
-            }
+				// Encode the special character.
+				if len(fb) > 0 {
+					match fb[0] {
+					| '"':
+						self.w.Write(unsafe::StrBytes(`""`)) else { error(error) }
+					| '\r':
+						if !self.UseCrlf {
+							self.w.Write(['\r']) else { error(error) }
+						}
+					| '\n':
+						if self.UseCrlf {
+							self.w.Write(unsafe::StrBytes("\r\n")) else { error(error) }
+						} else {
+							self.w.Write(unsafe::StrBytes("\n")) else { error(error) }
+						}
+					}
+					fb = fb[1:]
+				}
+			}
 
-            self.w.Write(unsafe::StrBytes("\"")) else { error(error) }
-        }
-        if self.UseCrlf {
-            self.w.Write(unsafe::StrBytes("\r\n")) else { error(error) }
-        } else {
-            self.w.Write(unsafe::StrBytes("\n")) else { error(error) }
-        }
-    }
+			self.w.Write(unsafe::StrBytes("\"")) else { error(error) }
+		}
+		if self.UseCrlf {
+			self.w.Write(unsafe::StrBytes("\r\n")) else { error(error) }
+		} else {
+			self.w.Write(unsafe::StrBytes("\n")) else { error(error) }
+		}
+	}
 
-    // Writes multiple CSV records using [Writer.Write] and
-    // forwording any exception.
-    fn WriteAll(mut self, records: [][]str)! {
-        for _, record in records {
-            self.Write(record) else { error(error) }
-        }
-    }
+	// Writes multiple CSV records using [Writer.Write] and
+	// forwording any exception.
+	fn WriteAll(mut self, records: [][]str)! {
+		for _, record in records {
+			self.Write(record) else { error(error) }
+		}
+	}
 }

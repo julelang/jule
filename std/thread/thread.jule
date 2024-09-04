@@ -7,16 +7,16 @@ cpp use "thread.hpp"
 #namespace "std"
 #typedef
 cpp struct thread {
-    detach:   fn()
-    join:     fn()
-    joinable: fn(): bool
+	detach:   fn()
+	join:     fn()
+	joinable: fn(): bool
 }
 
 #typedef
 cpp struct __jule_thread_handle {
-    thread:    fn(): *cpp.thread
-    ref_count: fn(): uint
-    drop:      fn()
+	thread:    fn(): *cpp.thread
+	ref_count: fn(): uint
+	drop:      fn()
 }
 
 cpp fn __jule_spawn_thread(routine: fn()): cpp.__jule_thread_handle
@@ -31,61 +31,61 @@ cpp fn __jule_spawn_thread(routine: fn()): cpp.__jule_thread_handle
 //
 // It is experimental.
 struct Thread {
-    handle: cpp.__jule_thread_handle
+	handle: cpp.__jule_thread_handle
 }
 
 impl Thread {
-    // Spawns new thread by routine.
-    // Panics if routine is nil.
-    // Thread starts execution of routine when spawned.
-    static fn Spawn(routine: fn()): &Thread {
-        if routine == nil {
-            panic("std::thread Thread.Spawn: routine is nil")
-        }
-        ret &Thread{
-            handle: cpp.__jule_spawn_thread(routine),
-        }
-    }
+	// Spawns new thread by routine.
+	// Panics if routine is nil.
+	// Thread starts execution of routine when spawned.
+	static fn Spawn(routine: fn()): &Thread {
+		if routine == nil {
+			panic("std::thread Thread.Spawn: routine is nil")
+		}
+		ret &Thread{
+			handle: cpp.__jule_spawn_thread(routine),
+		}
+	}
 }
 
 impl Thread {
-    // Wait for complete execution of thread if active.
-    // Returns when the thread execution has completed.
-    // So program stops execution until thread's execution has completed.
-    //
-    // Panics if thread is not active.
-    fn Wait(self) {
-        if !self.Active() {
-            panic("std::thread Thread.Wait: thread is not active")
-        }
-        unsafe { self.handle.thread().join() }
-        self.handle.drop()
-    }
+	// Wait for complete execution of thread if active.
+	// Returns when the thread execution has completed.
+	// So program stops execution until thread's execution has completed.
+	//
+	// Panics if thread is not active.
+	fn Wait(self) {
+		if !self.Active() {
+			panic("std::thread Thread.Wait: thread is not active")
+		}
+		unsafe { self.handle.thread().join() }
+		self.handle.drop()
+	}
 
-    // Detach thread and make it independent.
-    // After this, this thread object can no longer identify thread.
-    fn Detach(self) {
-        if !self.Active() {
-            panic("std::thread Thread.Detach: thread is not active")
-        }
-        unsafe { self.handle.thread().detach() }
-        self.handle.drop()
-    }
+	// Detach thread and make it independent.
+	// After this, this thread object can no longer identify thread.
+	fn Detach(self) {
+		if !self.Active() {
+			panic("std::thread Thread.Detach: thread is not active")
+		}
+		unsafe { self.handle.thread().detach() }
+		self.handle.drop()
+	}
 
-    // Reports whether thread object identifies an active
-    // thread of execution.
-    fn Active(self): bool {
-        if self.handle.thread() == nil {
-            ret false
-        }
-        ret unsafe { self.handle.thread().joinable() }
-    }
+	// Reports whether thread object identifies an active
+	// thread of execution.
+	fn Active(self): bool {
+		if self.handle.thread() == nil {
+			ret false
+		}
+		ret unsafe { self.handle.thread().joinable() }
+	}
 
-    // Detaches thread if thread is still executing.
-    fn Dispose(mut self) {
-        if self.Active() && self.handle.ref_count() == 1 {
-            unsafe { self.handle.thread().detach() }
-        }
-        self.handle.drop()
-    }
+	// Detaches thread if thread is still executing.
+	fn Dispose(mut self) {
+		if self.Active() && self.handle.ref_count() == 1 {
+			unsafe { self.handle.thread().detach() }
+		}
+		self.handle.drop()
+	}
 }

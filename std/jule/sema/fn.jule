@@ -9,382 +9,382 @@ use std::internal::strings::{StrBuilder}
 
 // Return type.
 struct RetType {
-    Kind:   &TypeSymbol
-    Idents: []&Token
+	Kind:   &TypeSymbol
+	Idents: []&Token
 }
 
 // Parameter.
 struct Param {
-    Token:     &Token
-    Mutable:   bool
-    Variadic:  bool
-    Reference: bool
-    Kind:      &TypeSymbol
-    Ident:     str
+	Token:     &Token
+	Mutable:   bool
+	Variadic:  bool
+	Reference: bool
+	Kind:      &TypeSymbol
+	Ident:     str
 }
 
 impl Param {
-    fn instance(mut &self): &ParamIns {
-        ret &ParamIns{
-            Decl: self,
-        }
-    }
+	fn instance(mut &self): &ParamIns {
+		ret &ParamIns{
+			Decl: self,
+		}
+	}
 
-    // Reports whether parameter is self (receiver) parameter.
-    fn IsSelf(self): bool {
-        ret self.Ident == "&self" || self.Ident == "self"
-    }
+	// Reports whether parameter is self (receiver) parameter.
+	fn IsSelf(self): bool {
+		ret self.Ident == "&self" || self.Ident == "self"
+	}
 
-    // Reports whether self (receiver) parameter is reference.
-    fn IsRef(self): bool {
-        ret self.Ident != "" && self.Ident[0] == '&'
-    }
+	// Reports whether self (receiver) parameter is reference.
+	fn IsRef(self): bool {
+		ret self.Ident != "" && self.Ident[0] == '&'
+	}
 }
 
 // Function.
 struct Fn {
-    sema: &Sema
+	sema: &Sema
 
-    Token:       &Token
-    Global:      bool
-    Unsafety:    bool
-    Public:      bool
-    Binded:      bool
-    Statically:  bool
-    Exceptional: bool
-    Ident:       str
-    Directives:  []&Directive
-    Scope:       &ScopeTree
-    Generics:    []&GenericDecl
-    Result:      &RetType
-    Params:      []&Param
-    Owner:       &Struct
+	Token:       &Token
+	Global:      bool
+	Unsafety:    bool
+	Public:      bool
+	Binded:      bool
+	Statically:  bool
+	Exceptional: bool
+	Ident:       str
+	Directives:  []&Directive
+	Scope:       &ScopeTree
+	Generics:    []&GenericDecl
+	Result:      &RetType
+	Params:      []&Param
+	Owner:       &Struct
 
-    // Function instances for each unique type combination of function call.
-    // Nil if function is never used.
-    Instances: []&FnIns
+	// Function instances for each unique type combination of function call.
+	// Nil if function is never used.
+	Instances: []&FnIns
 }
 
 impl Fn {
-    // Reports whether return type is void.
-    fn IsVoid(self): bool {
-        ret self.Result == nil
-    }
+	// Reports whether return type is void.
+	fn IsVoid(self): bool {
+		ret self.Result == nil
+	}
 
-    // Reports whether function is method.
-    fn IsMethod(self): bool {
-        ret self.Owner != nil
-    }
+	// Reports whether function is method.
+	fn IsMethod(self): bool {
+		ret self.Owner != nil
+	}
 
-    // Reports whether function is entry point.
-    fn IsEntryPoint(self): bool {
-        ret self.Ident == EntryPoint
-    }
+	// Reports whether function is entry point.
+	fn IsEntryPoint(self): bool {
+		ret self.Ident == EntryPoint
+	}
 
-    // Reports whether function is initializer function.
-    fn IsInit(self): bool {
-        ret self.Ident == InitFn
-    }
+	// Reports whether function is initializer function.
+	fn IsInit(self): bool {
+		ret self.Ident == InitFn
+	}
 
-    // Reports whether function is anonymous function.
-    fn IsAnon(self): bool {
-        ret IsAnonIdent(self.Ident)
-    }
+	// Reports whether function is anonymous function.
+	fn IsAnon(self): bool {
+		ret IsAnonIdent(self.Ident)
+	}
 
-    // Reports whether function has return variable(s).
-    fn AnyVar(self): bool {
-        ret self.Result != nil && len(self.Result.Idents) > 0
-    }
+	// Reports whether function has return variable(s).
+	fn AnyVar(self): bool {
+		ret self.Result != nil && len(self.Result.Idents) > 0
+	}
 
-    // Force to new instance.
-    fn instanceForce(mut &self): &FnIns {
-        mut ins := &FnIns{
-            Decl: self,
-            Scope: new(Scope),
-            Refers: ReferenceStack.new(),
-        }
+	// Force to new instance.
+	fn instanceForce(mut &self): &FnIns {
+		mut ins := &FnIns{
+			Decl: self,
+			Scope: new(Scope),
+			Refers: ReferenceStack.new(),
+		}
 
-        ins.Params = make([]&ParamIns, 0, len(self.Params))
-        for (_, mut p) in self.Params {
-            ins.Params = append(ins.Params, p.instance())
-        }
+		ins.Params = make([]&ParamIns, 0, len(self.Params))
+		for (_, mut p) in self.Params {
+			ins.Params = append(ins.Params, p.instance())
+		}
 
-        if ins.Decl.Result != nil {
-            ins.Result = ins.Decl.Result.Kind.Kind
-        }
+		if ins.Decl.Result != nil {
+			ins.Result = ins.Decl.Result.Kind.Kind
+		}
 
-        ret ins
-    }
+		ret ins
+	}
 
-    fn instance(mut &self): &FnIns {
-        // Returns already created instance for just one unique combination.
-        if len(self.Generics) == 0 && len(self.Instances) == 1 {
-            ret self.Instances[0]
-        }
-        ret self.instanceForce()
-    }
+	fn instance(mut &self): &FnIns {
+		// Returns already created instance for just one unique combination.
+		if len(self.Generics) == 0 && len(self.Instances) == 1 {
+			ret self.Instances[0]
+		}
+		ret self.instanceForce()
+	}
 
-    // Appends function instance.
-    // Returns instance if already instance is already exist, nil if not.
-    fn appendInstance(mut self, mut &ins: &FnIns): &FnIns {
-        if len(self.Generics) == 0 {
-            // Skip already created instance for just one unique combination.
-            if len(self.Instances) == 1 {
-                ret self.Instances[0]
-            }
+	// Appends function instance.
+	// Returns instance if already instance is already exist, nil if not.
+	fn appendInstance(mut self, mut &ins: &FnIns): &FnIns {
+		if len(self.Generics) == 0 {
+			// Skip already created instance for just one unique combination.
+			if len(self.Instances) == 1 {
+				ret self.Instances[0]
+			}
 
-            self.Instances = append(self.Instances, ins)
-            ret nil
-        }
+			self.Instances = append(self.Instances, ins)
+			ret nil
+		}
 
-        if len(self.Instances) == 0 {
-            self.Instances = append(self.Instances, ins)
-            ret nil
-        }
+		if len(self.Instances) == 0 {
+			self.Instances = append(self.Instances, ins)
+			ret nil
+		}
 
-        for (_, mut ains) in self.Instances {
-            if ains.Same(ins) {
-                // Instances are same.
-                ret ains
-            }
-        }
+		for (_, mut ains) in self.Instances {
+			if ains.Same(ins) {
+				// Instances are same.
+				ret ains
+			}
+		}
 
-        self.Instances = append(self.Instances, ins)
-        ret nil
-    }
+		self.Instances = append(self.Instances, ins)
+		ret nil
+	}
 }
 
 // Parameter instance.
 struct ParamIns {
-    Decl: &Param
-    Kind: &TypeKind
+	Decl: &Param
+	Kind: &TypeKind
 }
 
 impl ParamIns {
-    // Implement: Kind
-    // Returns ParamIns's type kind as string.
-    fn Str(self): str {
-        mut s := StrBuilder.New(1 << 5)
-        if self.Decl.Mutable {
-            s.WriteStr("mut ")
-        }
+	// Implement: Kind
+	// Returns ParamIns's type kind as string.
+	fn Str(self): str {
+		mut s := StrBuilder.New(1 << 5)
+		if self.Decl.Mutable {
+			s.WriteStr("mut ")
+		}
 
-        if self.Decl.Reference {
-            s.WriteStr("&_:")
-        }
+		if self.Decl.Reference {
+			s.WriteStr("&_:")
+		}
 
-        if self.Decl.IsSelf() {
-            if self.Decl.IsRef() {
-                s.WriteByte('&')
-            }
-            s.WriteStr("self")
-            ret s.Str()
-        }
+		if self.Decl.IsSelf() {
+			if self.Decl.IsRef() {
+				s.WriteByte('&')
+			}
+			s.WriteStr("self")
+			ret s.Str()
+		}
 
-        if self.Decl.Variadic {
-            s.WriteStr("...")
-        }
-        if self.Kind != nil {
-            s.WriteStr(self.Kind.Str())
-        }
-        ret s.Str()
-    }
+		if self.Decl.Variadic {
+			s.WriteStr("...")
+		}
+		if self.Kind != nil {
+			s.WriteStr(self.Kind.Str())
+		}
+		ret s.Str()
+	}
 }
 
 // Function instance.
 struct FnIns {
-    Owner:    &StructIns
-    Decl:     &Fn
-    Generics: []&InsGeneric
-    Params:   []&ParamIns
-    Result:   &TypeKind
-    Scope:    &Scope
-    Refers:   &ReferenceStack
-    Anon:     bool
-    AsAnon:   bool // Whether this function instance used as anonymous function.
+	Owner:    &StructIns
+	Decl:     &Fn
+	Generics: []&InsGeneric
+	Params:   []&ParamIns
+	Result:   &TypeKind
+	Scope:    &Scope
+	Refers:   &ReferenceStack
+	Anon:     bool
+	AsAnon:   bool // Whether this function instance used as anonymous function.
 
-    caller:   builtinCaller
-    reloaded: bool
+	caller:   builtinCaller
+	reloaded: bool
 }
 
 impl Kind for FnIns {
-    // Implement: Kind
-    // Returns Fn's type kind as string.
-    fn Str(self): str {
-        const Ident = false
-        ret self.GetKindStr(Ident)
-    }
+	// Implement: Kind
+	// Returns Fn's type kind as string.
+	fn Str(self): str {
+		const Ident = false
+		ret self.GetKindStr(Ident)
+	}
 
-    // Reports whether types are same.
-    fn Equal(&self, other: &TypeKind): bool {
-        f := unsafe { (*(&other)).Fn() }
-        if f == nil {
-            ret false
-        }
-        ret self.EqualFn(f)
-    }
+	// Reports whether types are same.
+	fn Equal(&self, other: &TypeKind): bool {
+		f := unsafe { (*(&other)).Fn() }
+		if f == nil {
+			ret false
+		}
+		ret self.EqualFn(f)
+	}
 }
 
 impl FnIns {
-    // Reports whether functions are equals.
-    fn EqualFn(&self, &f: &FnIns): bool {
-        if self.Decl.Exceptional != f.Decl.Exceptional {
-            ret false
-        }
-        if self.Decl.Unsafety != f.Decl.Unsafety {
-            ret false
-        }
-        if self.Decl.IsVoid() != f.Decl.IsVoid() {
-            ret false
-        }
-        checkParams := fn(p1: &ParamIns, p2: &ParamIns): bool {
-            if p1.Decl.Mutable != p2.Decl.Mutable {
-                ret false
-            }
+	// Reports whether functions are equals.
+	fn EqualFn(&self, &f: &FnIns): bool {
+		if self.Decl.Exceptional != f.Decl.Exceptional {
+			ret false
+		}
+		if self.Decl.Unsafety != f.Decl.Unsafety {
+			ret false
+		}
+		if self.Decl.IsVoid() != f.Decl.IsVoid() {
+			ret false
+		}
+		checkParams := fn(p1: &ParamIns, p2: &ParamIns): bool {
+			if p1.Decl.Mutable != p2.Decl.Mutable {
+				ret false
+			}
 
-            if p1.Decl.IsSelf() {
-                if !p2.Decl.IsSelf() {
-                    ret false
-                }
+			if p1.Decl.IsSelf() {
+				if !p2.Decl.IsSelf() {
+					ret false
+				}
 
-                if p1.Decl.IsRef() != p2.Decl.IsRef() {
-                    ret false
-                }
+				if p1.Decl.IsRef() != p2.Decl.IsRef() {
+					ret false
+				}
 
-                ret true
-            }
+				ret true
+			}
 
-            if p1.Decl.Reference != p2.Decl.Reference {
-                ret false
-            }
+			if p1.Decl.Reference != p2.Decl.Reference {
+				ret false
+			}
 
-            if p1.Decl.Variadic != p2.Decl.Variadic {
-                ret false
-            }
+			if p1.Decl.Variadic != p2.Decl.Variadic {
+				ret false
+			}
 
-            ret p1.Kind.Equal(p2.Kind)
-        }
+			ret p1.Kind.Equal(p2.Kind)
+		}
 
-        if len(f.Params) != len(self.Params) {
-            ret false
-        }
+		if len(f.Params) != len(self.Params) {
+			ret false
+		}
 
-        mut i := 0
-        for i < len(self.Params); i++ {
-            if !checkParams(self.Params[i], f.Params[i]) {
-                ret false
-            }
-        }
+		mut i := 0
+		for i < len(self.Params); i++ {
+			if !checkParams(self.Params[i], f.Params[i]) {
+				ret false
+			}
+		}
 
-        if !self.Decl.IsVoid() {
-            if !self.Result.Equal(f.Result) {
-                ret false
-            }
-        }
+		if !self.Decl.IsVoid() {
+			if !self.Result.Equal(f.Result) {
+				ret false
+			}
+		}
 
-        ret true
-    }
+		ret true
+	}
 
-    // Reports whether functions are equals by trait implementation rules.
-    fn equalTrait(&self, &other: &FnIns): bool {
-        if self.Decl.Public != other.Decl.Public {
-            ret false
-        }
-        if self.Decl.Ident != other.Decl.Ident {
-            ret false
-        }
-        if !self.EqualFn(other) {
-            ret false
-        }
-        if len(self.Decl.Generics) != len(other.Decl.Generics) {
-            ret false
-        }
-        ret true
-    }
+	// Reports whether functions are equals by trait implementation rules.
+	fn equalTrait(&self, &other: &FnIns): bool {
+		if self.Decl.Public != other.Decl.Public {
+			ret false
+		}
+		if self.Decl.Ident != other.Decl.Ident {
+			ret false
+		}
+		if !self.EqualFn(other) {
+			ret false
+		}
+		if len(self.Decl.Generics) != len(other.Decl.Generics) {
+			ret false
+		}
+		ret true
+	}
 
-    // Returns all types of result.
-    // Returns nil if result is nil.
-    // Returns mutable slice if returns internal slice.
-    fn Types(mut self): []&TypeKind {
-        match {
-        | self.Result == nil:
-            ret nil
-        | self.Result.Tup() == nil:
-            ret [self.Result]
-        |:
-            ret self.Result.Tup().Types
-        }
-    }
+	// Returns all types of result.
+	// Returns nil if result is nil.
+	// Returns mutable slice if returns internal slice.
+	fn Types(mut self): []&TypeKind {
+		match {
+		| self.Result == nil:
+			ret nil
+		| self.Result.Tup() == nil:
+			ret [self.Result]
+		|:
+			ret self.Result.Tup().Types
+		}
+	}
 
-    // Reports whether instance is built-in.
-    fn IsBuiltin(self): bool {
-        ret self.caller != nil
-    }
+	// Reports whether instance is built-in.
+	fn IsBuiltin(self): bool {
+		ret self.caller != nil
+	}
 
-    // Reports whether instance is anonymous function.
-    fn IsAnon(self): bool {
-        ret self.Anon ||
-            self.Decl != nil && self.Decl.IsAnon()
-    }
+	// Reports whether instance is anonymous function.
+	fn IsAnon(self): bool {
+		ret self.Anon ||
+			self.Decl != nil && self.Decl.IsAnon()
+	}
 
-    // Reports whether instances are same.
-    // Returns true if declarations and generics are same.
-    fn Same(self, f: &FnIns): bool {
-        if self.Decl != f.Decl || len(f.Generics) != len(self.Generics) {
-            ret false
-        }
+	// Reports whether instances are same.
+	// Returns true if declarations and generics are same.
+	fn Same(self, f: &FnIns): bool {
+		if self.Decl != f.Decl || len(f.Generics) != len(self.Generics) {
+			ret false
+		}
 
-        for i, g in self.Generics {
-            g2 := f.Generics[i]
-            if g.Kind.BindIdent != g2.Kind.BindIdent || !g.Kind.Equal(g2.Kind) {
-                ret false
-            }
-        }
-        ret true
-    }
+		for i, g in self.Generics {
+			g2 := f.Generics[i]
+			if g.Kind.BindIdent != g2.Kind.BindIdent || !g.Kind.Equal(g2.Kind) {
+				ret false
+			}
+		}
+		ret true
+	}
 
-    // Returns kind string of function instance.
-    // Appends identifier to kind of this instance.
-    // Does not appends identifier of this instance to kind if self.Decl is nil reference.
-    fn GetKindStr(self, ident: bool): str {
-        mut s := StrBuilder.New(1 << 5)
+	// Returns kind string of function instance.
+	// Appends identifier to kind of this instance.
+	// Does not appends identifier of this instance to kind if self.Decl is nil reference.
+	fn GetKindStr(self, ident: bool): str {
+		mut s := StrBuilder.New(1 << 5)
 
-        if self.Decl.Unsafety {
-            s.WriteStr("unsafe ")
-        }
+		if self.Decl.Unsafety {
+			s.WriteStr("unsafe ")
+		}
 
-        s.WriteStr("fn")
+		s.WriteStr("fn")
 
-        if ident && self.Decl != nil {
-            s.WriteByte(' ')
-            s.WriteStr(self.Decl.Ident)
-        }
+		if ident && self.Decl != nil {
+			s.WriteByte(' ')
+			s.WriteStr(self.Decl.Ident)
+		}
 
-        s.WriteByte('(')
-        n := len(self.Params)
-        if n > 0 {
-            for i, p in self.Params {
-                s.WriteStr(p.Str())
-                if i < len(self.Params)-1 {
-                    s.WriteByte(',')
-                }
-            }
-        }
-        s.WriteByte(')')
-        if self.Decl.Exceptional {
-            s.WriteByte('!')
-        }
-        if !self.Decl.IsVoid() {
-            s.WriteByte(':')
-            s.WriteStr(self.Result.Str())
-        }
-        ret s.Str()
-    }
+		s.WriteByte('(')
+		n := len(self.Params)
+		if n > 0 {
+			for i, p in self.Params {
+				s.WriteStr(p.Str())
+				if i < len(self.Params)-1 {
+					s.WriteByte(',')
+				}
+			}
+		}
+		s.WriteByte(')')
+		if self.Decl.Exceptional {
+			s.WriteByte('!')
+		}
+		if !self.Decl.IsVoid() {
+			s.WriteByte(':')
+			s.WriteStr(self.Result.Str())
+		}
+		ret s.Str()
+	}
 }
 
 fn parameterUsesGenerics(mut &p: &ParamIns, &generics: []&GenericDecl): bool {
-    if p.Decl.IsSelf() {
-        ret false
-    }
-    ret kindUsesGenerics(p.Kind, generics)
+	if p.Decl.IsSelf() {
+		ret false
+	}
+	ret kindUsesGenerics(p.Kind, generics)
 }

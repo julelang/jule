@@ -6,264 +6,264 @@
 struct FuncPattern {}
 
 impl FuncPattern {
-    // Reports whether function is the reserved Dispose function.
-    static fn Dispose(f: &Fn): bool {
-        ret f != nil &&
-            f.Owner != nil &&
-            f.Ident == "Dispose" &&
-            !f.Statically &&
-            !f.Unsafety &&
-            f.IsVoid() &&
-            len(f.Generics) == 0 &&
-            len(f.Params) == 1 &&
-            f.Params[0].Mutable &&
-            !f.Params[0].IsRef()
-    }
+	// Reports whether function is the reserved Dispose function.
+	static fn Dispose(f: &Fn): bool {
+		ret f != nil &&
+			f.Owner != nil &&
+			f.Ident == "Dispose" &&
+			!f.Statically &&
+			!f.Unsafety &&
+			f.IsVoid() &&
+			len(f.Generics) == 0 &&
+			len(f.Params) == 1 &&
+			f.Params[0].Mutable &&
+			!f.Params[0].IsRef()
+	}
 
-    // Reports whether function is the reserved Str function.
-    static fn Str(f: &Fn): bool {
-        if f == nil ||
-            f.Owner == nil ||
-            f.Ident != "Str" ||
-            f.Statically ||
-            f.Unsafety ||
-            f.IsVoid() ||
-            len(f.Generics) != 0 ||
-            len(f.Params) != 1 ||
-            f.Params[0].Mutable ||
-            f.Params[0].IsRef() {
-            ret false
-        }
+	// Reports whether function is the reserved Str function.
+	static fn Str(f: &Fn): bool {
+		if f == nil ||
+			f.Owner == nil ||
+			f.Ident != "Str" ||
+			f.Statically ||
+			f.Unsafety ||
+			f.IsVoid() ||
+			len(f.Generics) != 0 ||
+			len(f.Params) != 1 ||
+			f.Params[0].Mutable ||
+			f.Params[0].IsRef() {
+			ret false
+		}
 
-        mut ins := unsafe { *(&f.Instances[0]) }
-        prim := ins.Result.Prim()
-        if prim == nil {
-            ret false
-        }
-        ret prim.IsStr()
-    }
+		mut ins := unsafe { *(&f.Instances[0]) }
+		prim := ins.Result.Prim()
+		if prim == nil {
+			ret false
+		}
+		ret prim.IsStr()
+	}
 
-    static fn logical(&f: &Fn, ident: str): bool {
-        if f == nil ||
-            f.Ident != ident ||
-            f.Owner == nil ||
-            len(f.Instances) == 0 ||
-            f.Statically ||
-            f.Unsafety ||
-            f.IsVoid() ||
-            len(f.Generics) != 0 ||
-            len(f.Params) != 2 ||
-            f.Params[0].Mutable ||
-            f.Params[0].IsRef() ||
-            f.Params[1].Mutable ||
-            f.Params[1].Reference {
-            ret false
-        }
+	static fn logical(&f: &Fn, ident: str): bool {
+		if f == nil ||
+			f.Ident != ident ||
+			f.Owner == nil ||
+			len(f.Instances) == 0 ||
+			f.Statically ||
+			f.Unsafety ||
+			f.IsVoid() ||
+			len(f.Generics) != 0 ||
+			len(f.Params) != 2 ||
+			f.Params[0].Mutable ||
+			f.Params[0].IsRef() ||
+			f.Params[1].Mutable ||
+			f.Params[1].Reference {
+			ret false
+		}
 
-        mut ins := unsafe { *(&f.Instances[0]) }
-        prim := ins.Result.Prim()
-        if prim == nil || !prim.IsBool() {
-            ret false
-        }
-        ret ins.Owner == ins.Params[1].Kind.Struct()
-    }
+		mut ins := unsafe { *(&f.Instances[0]) }
+		prim := ins.Result.Prim()
+		if prim == nil || !prim.IsBool() {
+			ret false
+		}
+		ret ins.Owner == ins.Params[1].Kind.Struct()
+	}
 
-    // Reports whether function is the reserved Eq function.
-    static fn Eq(f: &Fn): bool {
-        ret FuncPattern.logical(f, "Eq")
-    }
+	// Reports whether function is the reserved Eq function.
+	static fn Eq(f: &Fn): bool {
+		ret FuncPattern.logical(f, "Eq")
+	}
 
-    // Reports whether function is the reserved Gt function.
-    static fn Gt(f: &Fn): bool {
-        ret FuncPattern.logical(f, "Gt")
-    }
+	// Reports whether function is the reserved Gt function.
+	static fn Gt(f: &Fn): bool {
+		ret FuncPattern.logical(f, "Gt")
+	}
 
-    // Reports whether function is the reserved GtEq function.
-    static fn GtEq(f: &Fn): bool {
-        ret FuncPattern.logical(f, "GtEq")
-    }
+	// Reports whether function is the reserved GtEq function.
+	static fn GtEq(f: &Fn): bool {
+		ret FuncPattern.logical(f, "GtEq")
+	}
 
-    // Reports whether function is the reserved Lt function.
-    static fn Lt(f: &Fn): bool {
-        ret FuncPattern.logical(f, "Lt")
-    }
+	// Reports whether function is the reserved Lt function.
+	static fn Lt(f: &Fn): bool {
+		ret FuncPattern.logical(f, "Lt")
+	}
 
-    // Reports whether function is the reserved LtEq function.
-    static fn LtEq(f: &Fn): bool {
-        ret FuncPattern.logical(f, "LtEq")
-    }
+	// Reports whether function is the reserved LtEq function.
+	static fn LtEq(f: &Fn): bool {
+		ret FuncPattern.logical(f, "LtEq")
+	}
 
-    static fn result(&f: &Fn, ident: str): bool {
-        if f == nil ||
-            f.Ident != ident ||
-            f.Owner == nil ||
-            len(f.Instances) == 0 ||
-            f.Statically ||
-            f.Unsafety ||
-            f.IsVoid() ||
-            len(f.Generics) != 0 ||
-            len(f.Params) != 2 ||
-            f.Params[0].Mutable ||
-            f.Params[0].IsRef() ||
-            f.Params[1].Mutable ||
-            f.Params[1].Reference {
-            ret false
-        }
+	static fn result(&f: &Fn, ident: str): bool {
+		if f == nil ||
+			f.Ident != ident ||
+			f.Owner == nil ||
+			len(f.Instances) == 0 ||
+			f.Statically ||
+			f.Unsafety ||
+			f.IsVoid() ||
+			len(f.Generics) != 0 ||
+			len(f.Params) != 2 ||
+			f.Params[0].Mutable ||
+			f.Params[0].IsRef() ||
+			f.Params[1].Mutable ||
+			f.Params[1].Reference {
+			ret false
+		}
 
-        mut ins := unsafe { *(&f.Instances[0]) }
-        ret ins.Result.Struct() == ins.Owner
-    }
+		mut ins := unsafe { *(&f.Instances[0]) }
+		ret ins.Result.Struct() == ins.Owner
+	}
 
-    // Reports whether function is the reserved Shl function.
-    static fn Shl(f: &Fn): bool {
-        ret FuncPattern.result(f, "Shl")
-    }
+	// Reports whether function is the reserved Shl function.
+	static fn Shl(f: &Fn): bool {
+		ret FuncPattern.result(f, "Shl")
+	}
 
-    // Reports whether function is the reserved Shr function.
-    static fn Shr(f: &Fn): bool {
-        ret FuncPattern.result(f, "Shr")
-    }
+	// Reports whether function is the reserved Shr function.
+	static fn Shr(f: &Fn): bool {
+		ret FuncPattern.result(f, "Shr")
+	}
 
-    // Reports whether function is the reserved Add function.
-    static fn Add(f: &Fn): bool {
-        ret FuncPattern.result(f, "Add")
-    }
+	// Reports whether function is the reserved Add function.
+	static fn Add(f: &Fn): bool {
+		ret FuncPattern.result(f, "Add")
+	}
 
-    // Reports whether function is the reserved Sub function.
-    static fn Sub(f: &Fn): bool {
-        ret FuncPattern.result(f, "Sub")
-    }
+	// Reports whether function is the reserved Sub function.
+	static fn Sub(f: &Fn): bool {
+		ret FuncPattern.result(f, "Sub")
+	}
 
-    // Reports whether function is the reserved Div function.
-    static fn Div(f: &Fn): bool {
-        ret FuncPattern.result(f, "Div")
-    }
+	// Reports whether function is the reserved Div function.
+	static fn Div(f: &Fn): bool {
+		ret FuncPattern.result(f, "Div")
+	}
 
-    // Reports whether function is the reserved Mul function.
-    static fn Mul(f: &Fn): bool {
-        ret FuncPattern.result(f, "Mul")
-    }
+	// Reports whether function is the reserved Mul function.
+	static fn Mul(f: &Fn): bool {
+		ret FuncPattern.result(f, "Mul")
+	}
 
-    // Reports whether function is the reserved Mod function.
-    static fn Mod(f: &Fn): bool {
-        ret FuncPattern.result(f, "Mod")
-    }
+	// Reports whether function is the reserved Mod function.
+	static fn Mod(f: &Fn): bool {
+		ret FuncPattern.result(f, "Mod")
+	}
 
-    // Reports whether function is the reserved BitAnd function.
-    static fn BitAnd(f: &Fn): bool {
-        ret FuncPattern.result(f, "BitAnd")
-    }
+	// Reports whether function is the reserved BitAnd function.
+	static fn BitAnd(f: &Fn): bool {
+		ret FuncPattern.result(f, "BitAnd")
+	}
 
-    // Reports whether function is the reserved BitOr function.
-    static fn BitOr(f: &Fn): bool {
-        ret FuncPattern.result(f, "BitOr")
-    }
+	// Reports whether function is the reserved BitOr function.
+	static fn BitOr(f: &Fn): bool {
+		ret FuncPattern.result(f, "BitOr")
+	}
 
-    // Reports whether function is the reserved BitXor function.
-    static fn BitXor(f: &Fn): bool {
-        ret FuncPattern.result(f, "BitXor")
-    }
+	// Reports whether function is the reserved BitXor function.
+	static fn BitXor(f: &Fn): bool {
+		ret FuncPattern.result(f, "BitXor")
+	}
 
-    static fn unary(&f: &Fn, ident: str): bool {
-        if f == nil ||
-            f.Ident != ident ||
-            f.Owner == nil ||
-            len(f.Instances) == 0 ||
-            f.Statically ||
-            f.Unsafety ||
-            f.IsVoid() ||
-            len(f.Generics) != 0 ||
-            len(f.Params) != 1 ||
-            f.Params[0].Mutable ||
-            f.Params[0].IsRef() {
-            ret false
-        }
+	static fn unary(&f: &Fn, ident: str): bool {
+		if f == nil ||
+			f.Ident != ident ||
+			f.Owner == nil ||
+			len(f.Instances) == 0 ||
+			f.Statically ||
+			f.Unsafety ||
+			f.IsVoid() ||
+			len(f.Generics) != 0 ||
+			len(f.Params) != 1 ||
+			f.Params[0].Mutable ||
+			f.Params[0].IsRef() {
+			ret false
+		}
 
-        mut ins := unsafe { *(&f.Instances[0]) }
-        ret ins.Result.Struct() == ins.Owner
-    }
+		mut ins := unsafe { *(&f.Instances[0]) }
+		ret ins.Result.Struct() == ins.Owner
+	}
 
-    // Reports whether function is the reserved Neg function.
-    static fn Neg(f: &Fn): bool {
-        ret FuncPattern.unary(f, "Neg")
-    }
+	// Reports whether function is the reserved Neg function.
+	static fn Neg(f: &Fn): bool {
+		ret FuncPattern.unary(f, "Neg")
+	}
 
-    // Reports whether function is the reserved Pos function.
-    static fn Pos(f: &Fn): bool {
-        ret FuncPattern.unary(f, "Pos")
-    }
+	// Reports whether function is the reserved Pos function.
+	static fn Pos(f: &Fn): bool {
+		ret FuncPattern.unary(f, "Pos")
+	}
 
-    // Reports whether function is the reserved BitNot function.
-    static fn BitNot(f: &Fn): bool {
-        ret FuncPattern.unary(f, "BitNot")
-    }
+	// Reports whether function is the reserved BitNot function.
+	static fn BitNot(f: &Fn): bool {
+		ret FuncPattern.unary(f, "BitNot")
+	}
 
-    static fn assign(&f: &Fn, ident: str): bool {
-        if f == nil ||
-            f.Ident != ident ||
-            f.Owner == nil ||
-            len(f.Instances) == 0 ||
-            f.Statically ||
-            f.Unsafety ||
-            !f.IsVoid() ||
-            len(f.Generics) != 0 ||
-            len(f.Params) != 2 ||
-            !f.Params[0].Mutable ||
-            f.Params[0].IsRef() ||
-            f.Params[1].Mutable ||
-            f.Params[1].Reference {
-            ret false
-        }
-        ret true
-    }
+	static fn assign(&f: &Fn, ident: str): bool {
+		if f == nil ||
+			f.Ident != ident ||
+			f.Owner == nil ||
+			len(f.Instances) == 0 ||
+			f.Statically ||
+			f.Unsafety ||
+			!f.IsVoid() ||
+			len(f.Generics) != 0 ||
+			len(f.Params) != 2 ||
+			!f.Params[0].Mutable ||
+			f.Params[0].IsRef() ||
+			f.Params[1].Mutable ||
+			f.Params[1].Reference {
+			ret false
+		}
+		ret true
+	}
 
-    // Reports whether function is the reserved AddAssign function.
-    static fn AddAssign(f: &Fn): bool {
-        ret FuncPattern.assign(f, "AddAssign")
-    }
+	// Reports whether function is the reserved AddAssign function.
+	static fn AddAssign(f: &Fn): bool {
+		ret FuncPattern.assign(f, "AddAssign")
+	}
 
-    // Reports whether function is the reserved SubAssign function.
-    static fn SubAssign(f: &Fn): bool {
-        ret FuncPattern.assign(f, "SubAssign")
-    }
+	// Reports whether function is the reserved SubAssign function.
+	static fn SubAssign(f: &Fn): bool {
+		ret FuncPattern.assign(f, "SubAssign")
+	}
 
-    // Reports whether function is the reserved DivAssign function.
-    static fn DivAssign(f: &Fn): bool {
-        ret FuncPattern.assign(f, "DivAssign")
-    }
+	// Reports whether function is the reserved DivAssign function.
+	static fn DivAssign(f: &Fn): bool {
+		ret FuncPattern.assign(f, "DivAssign")
+	}
 
-    // Reports whether function is the reserved MulAssign function.
-    static fn MulAssign(f: &Fn): bool {
-        ret FuncPattern.assign(f, "MulAssign")
-    }
+	// Reports whether function is the reserved MulAssign function.
+	static fn MulAssign(f: &Fn): bool {
+		ret FuncPattern.assign(f, "MulAssign")
+	}
 
-    // Reports whether function is the reserved ModAssign function.
-    static fn ModAssign(f: &Fn): bool {
-        ret FuncPattern.assign(f, "ModAssign")
-    }
+	// Reports whether function is the reserved ModAssign function.
+	static fn ModAssign(f: &Fn): bool {
+		ret FuncPattern.assign(f, "ModAssign")
+	}
 
-    // Reports whether function is the reserved ShlAssign function.
-    static fn ShlAssign(f: &Fn): bool {
-        ret FuncPattern.assign(f, "ShlAssign")
-    }
+	// Reports whether function is the reserved ShlAssign function.
+	static fn ShlAssign(f: &Fn): bool {
+		ret FuncPattern.assign(f, "ShlAssign")
+	}
 
-    // Reports whether function is the reserved ShrAssign function.
-    static fn ShrAssign(f: &Fn): bool {
-        ret FuncPattern.assign(f, "ShrAssign")
-    }
+	// Reports whether function is the reserved ShrAssign function.
+	static fn ShrAssign(f: &Fn): bool {
+		ret FuncPattern.assign(f, "ShrAssign")
+	}
 
-    // Reports whether function is the reserved BitOrAssign function.
-    static fn BitOrAssign(f: &Fn): bool {
-        ret FuncPattern.assign(f, "BitOrAssign")
-    }
+	// Reports whether function is the reserved BitOrAssign function.
+	static fn BitOrAssign(f: &Fn): bool {
+		ret FuncPattern.assign(f, "BitOrAssign")
+	}
 
-    // Reports whether function is the reserved BitAndAssign function.
-    static fn BitAndAssign(f: &Fn): bool {
-        ret FuncPattern.assign(f, "BitAndAssign")
-    }
+	// Reports whether function is the reserved BitAndAssign function.
+	static fn BitAndAssign(f: &Fn): bool {
+		ret FuncPattern.assign(f, "BitAndAssign")
+	}
 
-    // Reports whether function is the reserved BitXorAssign function.
-    static fn BitXorAssign(f: &Fn): bool {
-        ret FuncPattern.assign(f, "BitXorAssign")
-    }
+	// Reports whether function is the reserved BitXorAssign function.
+	static fn BitXorAssign(f: &Fn): bool {
+		ret FuncPattern.assign(f, "BitXorAssign")
+	}
 }

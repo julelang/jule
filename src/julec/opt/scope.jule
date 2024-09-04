@@ -9,714 +9,714 @@ use std::jule::build::{PathStdlib}
 use std::jule::constant::{Const}
 use std::jule::lex::{TokenId, TokenKind}
 use sema for std::jule::sema::{
-    Var,
-    Data,
-    Scope,
-    Stmt,
-    ExprModel,
-    FnCallExprModel,
-    Conditional,
-    CastingExprModel,
-    If,
-    Else,
-    Case,
-    Match,
-    RangeIter,
-    WhileIter,
-    InfIter,
-    MultiAssign,
-    RetSt,
-    BinaryExprModel,
-    OperandExprModel,
-    BuiltinAppendCallExprModel,
-    SliceExprModel,
-    StructSubIdentExprModel,
-    SlicingExprModel,
-    FallSt,
-    TupleExprModel,
-    BuiltinErrorCallExprModel,
-    Postfix,
+	Var,
+	Data,
+	Scope,
+	Stmt,
+	ExprModel,
+	FnCallExprModel,
+	Conditional,
+	CastingExprModel,
+	If,
+	Else,
+	Case,
+	Match,
+	RangeIter,
+	WhileIter,
+	InfIter,
+	MultiAssign,
+	RetSt,
+	BinaryExprModel,
+	OperandExprModel,
+	BuiltinAppendCallExprModel,
+	SliceExprModel,
+	StructSubIdentExprModel,
+	SlicingExprModel,
+	FallSt,
+	TupleExprModel,
+	BuiltinErrorCallExprModel,
+	Postfix,
 }
 use strings for std::strings
 
 // Scope optimizer that applies target-independent optimizations.
 struct scopeOptimizer {
-    parent: &scopeOptimizer
-    i:      int
-    scope:  &Scope
-    data:   &data // Should be non-nil guaranteed.
+	parent: &scopeOptimizer
+	i:      int
+	scope:  &Scope
+	data:   &data // Should be non-nil guaranteed.
 }
 
 impl scopeOptimizer {
-    static fn new(mut scope: &Scope): &scopeOptimizer {
-        mut sc := &scopeOptimizer{
-            scope: scope,
-            data: &data{
-                boundary: new(boundary),
-                nils: new(nils),
-                dynamic: new(dynamic),
-            },
-        }
-        ret sc
-    }
+	static fn new(mut scope: &Scope): &scopeOptimizer {
+		mut sc := &scopeOptimizer{
+			scope: scope,
+			data: &data{
+				boundary: new(boundary),
+				nils: new(nils),
+				dynamic: new(dynamic),
+			},
+		}
+		ret sc
+	}
 
-    fn setCurrentStmt(mut &self, mut stmt: any) {
-        self.scope.Stmts[self.i] = unsafe { *(*Stmt)(&stmt) }
-    }
+	fn setCurrentStmt(mut &self, mut stmt: any) {
+		self.scope.Stmts[self.i] = unsafe { *(*Stmt)(&stmt) }
+	}
 
-    // Removes current statement.
-    fn removeCurrent(mut &self) {
-        self.scope.Stmts = append(self.scope.Stmts[:self.i], self.scope.Stmts[self.i+1:]...)
-    }
+	// Removes current statement.
+	fn removeCurrent(mut &self) {
+		self.scope.Stmts = append(self.scope.Stmts[:self.i], self.scope.Stmts[self.i+1:]...)
+	}
 
-    fn isLastStmt(mut &self): bool {
-        mut r := self
-        for r != nil; r = r.parent {
-            if len(r.scope.Stmts)-r.i != 1 {
-                ret false
-            }
-        }
-        ret true
-    }
+	fn isLastStmt(mut &self): bool {
+		mut r := self
+		for r != nil; r = r.parent {
+			if len(r.scope.Stmts)-r.i != 1 {
+				ret false
+			}
+		}
+		ret true
+	}
 
-    fn isIter(mut &self): bool {
-        mut r := self.parent
-        for r != nil; r = r.parent {
-            match type r.scope.Stmts[r.i] {
-            | &RangeIter
-            | &WhileIter
-            | &InfIter:
-                ret true
-            }
-        }
-        ret false
-    }
+	fn isIter(mut &self): bool {
+		mut r := self.parent
+		for r != nil; r = r.parent {
+			match type r.scope.Stmts[r.i] {
+			| &RangeIter
+			| &WhileIter
+			| &InfIter:
+				ret true
+			}
+		}
+		ret false
+	}
 
-    fn optimizeData(mut &self, mut d: &Data) {
-        match type d.Model {
-        | &FnCallExprModel:
-            mut m := (&FnCallExprModel)(d.Model)
-            if env::Production {
-                if !m.Func.IsBuiltin() &&
-                    obj::IsStdPackage(m.Func.Decl.Token.File.Path, "debug") {
-                    self.setCurrentStmt(nil)
-                    ret
-                }
-            }
-            exprOptimizer.optimizeData(d.Model, self.data)
-            if Exceptional &&
-                m.Func.Decl.Exceptional &&
-                m.Except != nil &&
-                len(m.Except.Stmts) == 1 &&
-                obj::IsForwarded(m.Except) &&
-                self.isLastStmt() &&
-                !self.isIter() {
-                self.setCurrentStmt(&ExceptionalForwardingExprModel{Expr: m})
-            }
-            ret
-        }
-        exprOptimizer.optimizeData(d.Model, self.data)
-    }
+	fn optimizeData(mut &self, mut d: &Data) {
+		match type d.Model {
+		| &FnCallExprModel:
+			mut m := (&FnCallExprModel)(d.Model)
+			if env::Production {
+				if !m.Func.IsBuiltin() &&
+					obj::IsStdPackage(m.Func.Decl.Token.File.Path, "debug") {
+					self.setCurrentStmt(nil)
+					ret
+				}
+			}
+			exprOptimizer.optimizeData(d.Model, self.data)
+			if Exceptional &&
+				m.Func.Decl.Exceptional &&
+				m.Except != nil &&
+				len(m.Except.Stmts) == 1 &&
+				obj::IsForwarded(m.Except) &&
+				self.isLastStmt() &&
+				!self.isIter() {
+				self.setCurrentStmt(&ExceptionalForwardingExprModel{Expr: m})
+			}
+			ret
+		}
+		exprOptimizer.optimizeData(d.Model, self.data)
+	}
 
-    fn optimizeVar(mut &self, mut v: &Var) {
-        if v.Value != nil {
-            if self.data.nils != nil &&
-                isNilValidType(v.Kind.Kind) &&
-                isGuaranteedNonNilExpr(self.data.nils, v.Value.Data.Model) {
-                const safe = true
-                self.data.nils.pushVar(getNilVar(v), safe)
-            }
-            if self.data.dynamic != nil {
-                mut kind := isTypeGuaranteedDynamicData(
-                    self.data.dynamic, v.Kind.Kind, v.Value.Data.Model)
-                if kind != nil {
-                    if isDynamicValidType(v.Kind.Kind) {
-                        self.data.dynamic.pushVar(getDynamicVar(v), kind)
-                    }
-                }
-            }
-            exprOptimizer.optimizeData(v.Value.Data.Model, self.data)
-        }
-    }
+	fn optimizeVar(mut &self, mut v: &Var) {
+		if v.Value != nil {
+			if self.data.nils != nil &&
+				isNilValidType(v.Kind.Kind) &&
+				isGuaranteedNonNilExpr(self.data.nils, v.Value.Data.Model) {
+				const safe = true
+				self.data.nils.pushVar(getNilVar(v), safe)
+			}
+			if self.data.dynamic != nil {
+				mut kind := isTypeGuaranteedDynamicData(
+					self.data.dynamic, v.Kind.Kind, v.Value.Data.Model)
+				if kind != nil {
+					if isDynamicValidType(v.Kind.Kind) {
+						self.data.dynamic.pushVar(getDynamicVar(v), kind)
+					}
+				}
+			}
+			exprOptimizer.optimizeData(v.Value.Data.Model, self.data)
+		}
+	}
 
-    fn optimizeConditional(mut &self, mut c: &Conditional) {
-        mut checkpoint := self.data.getCheckpoint()
-        for (_, mut elif) in c.Elifs {
-            exprOptimizer.optimizeData(elif.Expr, self.data)
-            self.optimizeChild(elif.Scope)
-            if len(c.Elifs) > 1 || c.Default != nil {
-                self.data.loadCheckpoint(checkpoint)
-            }
-        }
-        if c.Default != nil {
-            self.optimizeChild(c.Default.Scope)
-            self.data.loadCheckpoint(checkpoint)
-        }
+	fn optimizeConditional(mut &self, mut c: &Conditional) {
+		mut checkpoint := self.data.getCheckpoint()
+		for (_, mut elif) in c.Elifs {
+			exprOptimizer.optimizeData(elif.Expr, self.data)
+			self.optimizeChild(elif.Scope)
+			if len(c.Elifs) > 1 || c.Default != nil {
+				self.data.loadCheckpoint(checkpoint)
+			}
+		}
+		if c.Default != nil {
+			self.optimizeChild(c.Default.Scope)
+			self.data.loadCheckpoint(checkpoint)
+		}
 
-        if !Cond {
-            ret
-        }
+		if !Cond {
+			ret
+		}
 
-        mut constCase := false // Has cosntant true case.
+		mut constCase := false // Has cosntant true case.
 
-        // Remove unnecessary trailing cases that comes after constant true case.
-        for (i, mut elif) in c.Elifs {
-            if !isConstantValidConditionalCase(elif) {
-                continue
-            }
-            constCase = true
-            c.Elifs = c.Elifs[:i]
-            c.Default = &Else{
-                Scope: elif.Scope,
-            }
-            break
-        }
+		// Remove unnecessary trailing cases that comes after constant true case.
+		for (i, mut elif) in c.Elifs {
+			if !isConstantValidConditionalCase(elif) {
+				continue
+			}
+			constCase = true
+			c.Elifs = c.Elifs[:i]
+			c.Default = &Else{
+				Scope: elif.Scope,
+			}
+			break
+		}
 
-        if len(c.Elifs) == 0 {
-            ret
-        }
+		if len(c.Elifs) == 0 {
+			ret
+		}
 
-        // Remove unreachable cases.
-        mut i := &c.Elifs[0]
-        end := &c.Elifs[len(c.Elifs)-1]
-        for i <= end; i++ {
-            unsafe {
-                if isUnreachableConditionalCase(*i) {
-                    *i = nil
-                }
-            }
-        }
+		// Remove unreachable cases.
+		mut i := &c.Elifs[0]
+		end := &c.Elifs[len(c.Elifs)-1]
+		for i <= end; i++ {
+			unsafe {
+				if isUnreachableConditionalCase(*i) {
+					*i = nil
+				}
+			}
+		}
 
-        if len(c.Elifs) == 0 {
-            ret
-        }
+		if len(c.Elifs) == 0 {
+			ret
+		}
 
-        // Skip one-case checking if const-case is not exist.
-        if !constCase {
-            ret
-        }
+		// Skip one-case checking if const-case is not exist.
+		if !constCase {
+			ret
+		}
 
-        mut only := -1
-        for j, elif in c.Elifs {
-            if elif != nil {
-                if only != -1 {
-                    // Break checking, there is more than one case.
-                    ret
-                }
-                only = j
-            }
-        }
+		mut only := -1
+		for j, elif in c.Elifs {
+			if elif != nil {
+				if only != -1 {
+					// Break checking, there is more than one case.
+					ret
+				}
+				only = j
+			}
+		}
 
-        // Here is one case.
-        if only != -1 {
-            self.setCurrentStmt(c.Elifs[only].Scope)
-        }
-    }
+		// Here is one case.
+		if only != -1 {
+			self.setCurrentStmt(c.Elifs[only].Scope)
+		}
+	}
 
-    fn buildDefaultConstantTrueCase(mut &self, mut case: &Case, mut &i: int, mut &m: &Match) {
-        case.Exprs = nil // Remove expressions to remove eval overhead.
-        start := i
-    loop:
-        for {
-            if len(case.Scope.Stmts) == 0 {
-                break
-            }
-            mut &stmt := unsafe { *(&case.Scope.Stmts[len(case.Scope.Stmts)-1]) }
-            match type stmt {
-            | &FallSt:
-                i++
-                if i >= len(m.Cases) {
-                    stmt = m.Default.Scope
-                    break loop
-                }
-                case = m.Cases[i]
-                stmt = case.Scope
-            |:
-                break loop
-            }
-        }
-        m.Default = m.Cases[start]
-        m.Cases = m.Cases[:start]
-    }
+	fn buildDefaultConstantTrueCase(mut &self, mut case: &Case, mut &i: int, mut &m: &Match) {
+		case.Exprs = nil // Remove expressions to remove eval overhead.
+		start := i
+	loop:
+		for {
+			if len(case.Scope.Stmts) == 0 {
+				break
+			}
+			mut &stmt := unsafe { *(&case.Scope.Stmts[len(case.Scope.Stmts)-1]) }
+			match type stmt {
+			| &FallSt:
+				i++
+				if i >= len(m.Cases) {
+					stmt = m.Default.Scope
+					break loop
+				}
+				case = m.Cases[i]
+				stmt = case.Scope
+			|:
+				break loop
+			}
+		}
+		m.Default = m.Cases[start]
+		m.Cases = m.Cases[:start]
+	}
 
-    fn optimizeMatch(mut &self, mut m: &Match) {
-        mut var := invalidDynamic
-        if Dynamic && m.TypeMatch {
-            var = getDynamicVar(m.Expr.Model)
-        }
-        mut checkpoint := self.data.getCheckpoint()
-        for (_, mut case) in m.Cases {
-            for (_, mut expr) in case.Exprs {
-                exprOptimizer.optimizeData(expr.Model, self.data)
-            }
-            if len(case.Exprs) == 1 && self.data.dynamic != nil {
-                // We can know the exact kind of dynamic type if expression is single.
-                mut kind := isTypeGuaranteedDynamicData(self.data.dynamic, case.Exprs[0].Kind, nil)
-                if kind != nil {
-                    self.data.dynamic.pushVar(var, kind)
-                } else {
-                    self.data.dynamic.removeVar(var)
-                }
-            }
-            self.optimizeChild(case.Scope)
-            if len(m.Cases) > 1 || m.Default != nil {
-                self.data.loadCheckpoint(checkpoint)
-            }
-        }
-        if m.Default != nil {
-            self.optimizeChild(m.Default.Scope)
-            self.data.loadCheckpoint(checkpoint)
-        }
+	fn optimizeMatch(mut &self, mut m: &Match) {
+		mut var := invalidDynamic
+		if Dynamic && m.TypeMatch {
+			var = getDynamicVar(m.Expr.Model)
+		}
+		mut checkpoint := self.data.getCheckpoint()
+		for (_, mut case) in m.Cases {
+			for (_, mut expr) in case.Exprs {
+				exprOptimizer.optimizeData(expr.Model, self.data)
+			}
+			if len(case.Exprs) == 1 && self.data.dynamic != nil {
+				// We can know the exact kind of dynamic type if expression is single.
+				mut kind := isTypeGuaranteedDynamicData(self.data.dynamic, case.Exprs[0].Kind, nil)
+				if kind != nil {
+					self.data.dynamic.pushVar(var, kind)
+				} else {
+					self.data.dynamic.removeVar(var)
+				}
+			}
+			self.optimizeChild(case.Scope)
+			if len(m.Cases) > 1 || m.Default != nil {
+				self.data.loadCheckpoint(checkpoint)
+			}
+		}
+		if m.Default != nil {
+			self.optimizeChild(m.Default.Scope)
+			self.data.loadCheckpoint(checkpoint)
+		}
 
-        if !Cond {
-            ret
-        }
+		if !Cond {
+			ret
+		}
 
-        mut constCase := false // Has cosntant true case.
+		mut constCase := false // Has cosntant true case.
 
-        // Remove unnecessary trailing cases that comes after constant true case.
-        for (mut i, mut case) in m.Cases {
-            if !isConstantValidMatchCase(case) {
-                continue
-            }
-            constCase = true
-            self.buildDefaultConstantTrueCase(case, i, m)
-            break
-        }
+		// Remove unnecessary trailing cases that comes after constant true case.
+		for (mut i, mut case) in m.Cases {
+			if !isConstantValidMatchCase(case) {
+				continue
+			}
+			constCase = true
+			self.buildDefaultConstantTrueCase(case, i, m)
+			break
+		}
 
-        if len(m.Cases) == 0 {
-            ret
-        }
+		if len(m.Cases) == 0 {
+			ret
+		}
 
-        // Remove unreachable cases.
-        mut i := &m.Cases[0]
-        end := &m.Cases[len(m.Cases)-1]
-        for i <= end; i++ {
-            unsafe {
-                if isUnreachableMatchCase(*i) {
-                    *i = nil
-                }
-            }
-        }
+		// Remove unreachable cases.
+		mut i := &m.Cases[0]
+		end := &m.Cases[len(m.Cases)-1]
+		for i <= end; i++ {
+			unsafe {
+				if isUnreachableMatchCase(*i) {
+					*i = nil
+				}
+			}
+		}
 
-        // Skip one-case checking if const-case is not exist.
-        if !constCase {
-            ret
-        }
+		// Skip one-case checking if const-case is not exist.
+		if !constCase {
+			ret
+		}
 
-        mut only := -1
-        for j, case in m.Cases {
-            if case != nil {
-                if only != -1 {
-                    // Break checking, there is more than one case.
-                    ret
-                }
-                only = j
-            }
-        }
+		mut only := -1
+		for j, case in m.Cases {
+			if case != nil {
+				if only != -1 {
+					// Break checking, there is more than one case.
+					ret
+				}
+				only = j
+			}
+		}
 
-        // Here is one case.
-        if only != -1 {
-            self.setCurrentStmt(m.Cases[only].Scope)
-        }
-    }
+		// Here is one case.
+		if only != -1 {
+			self.setCurrentStmt(m.Cases[only].Scope)
+		}
+	}
 
-    fn optimizeRangeIter(mut &self, mut it: &RangeIter) {
-        // Optimize scope first, following alrgorithms related with expression.
-        // It might be skip this, so scope optimizater should be guaranteed to run.
-        if self.data.boundary != nil && it.KeyA != nil {
-            // Add index variable to boundary analysis.
-            self.data.boundary.pushVar(getBoundaryVar(it.Expr.Model), it.KeyA)
-        }
-        self.optimizeChild(it.Scope)
+	fn optimizeRangeIter(mut &self, mut it: &RangeIter) {
+		// Optimize scope first, following alrgorithms related with expression.
+		// It might be skip this, so scope optimizater should be guaranteed to run.
+		if self.data.boundary != nil && it.KeyA != nil {
+			// Add index variable to boundary analysis.
+			self.data.boundary.pushVar(getBoundaryVar(it.Expr.Model), it.KeyA)
+		}
+		self.optimizeChild(it.Scope)
 
-        if Iter {
-            match type it.Expr.Model {
-            | &CastingExprModel:
-                mut cem := (&CastingExprModel)(it.Expr.Model)
-                eprim := cem.ExprKind.Prim()
-                if eprim == nil || !eprim.IsStr() {
-                    break
-                }
-                mut s := cem.Kind.Slc()
-                if s == nil {
-                    break
-                }
-                prim := s.Elem.Prim()
-                if prim == nil {
-                    break
-                }
-                match {
-                | prim.IsU8():
-                    // Expression is: []byte(str)
-                    // Use string expression directly, byte casting is unnecessary.
-                    it.Expr = cem.Expr
-                | prim.IsI32():
-                    // Expression is: []rune(str)
-                    // Avoid making allocation, iterate runes of string.
-                    exprOptimizer.optimizeData(cem.Expr.Model, self.data) // Optimize string expression.
-                    self.setCurrentStmt(&StrRuneIter{
-                        Expr: cem.Expr,
-                        Base: it,
-                    })
-                    ret
-                }
-            }
-        }
-        exprOptimizer.optimizeData(it.Expr.Model, self.data)
-    }
+		if Iter {
+			match type it.Expr.Model {
+			| &CastingExprModel:
+				mut cem := (&CastingExprModel)(it.Expr.Model)
+				eprim := cem.ExprKind.Prim()
+				if eprim == nil || !eprim.IsStr() {
+					break
+				}
+				mut s := cem.Kind.Slc()
+				if s == nil {
+					break
+				}
+				prim := s.Elem.Prim()
+				if prim == nil {
+					break
+				}
+				match {
+				| prim.IsU8():
+					// Expression is: []byte(str)
+					// Use string expression directly, byte casting is unnecessary.
+					it.Expr = cem.Expr
+				| prim.IsI32():
+					// Expression is: []rune(str)
+					// Avoid making allocation, iterate runes of string.
+					exprOptimizer.optimizeData(cem.Expr.Model, self.data) // Optimize string expression.
+					self.setCurrentStmt(&StrRuneIter{
+						Expr: cem.Expr,
+						Base: it,
+					})
+					ret
+				}
+			}
+		}
+		exprOptimizer.optimizeData(it.Expr.Model, self.data)
+	}
 
-    fn optimizeWhileIter(mut &self, mut it: &WhileIter) {
-        exprOptimizer.optimizeData(it.Expr, self.data)
-        self.optimizeStmt(it.Next)
-        self.optimizeChild(it.Scope)
-    }
+	fn optimizeWhileIter(mut &self, mut it: &WhileIter) {
+		exprOptimizer.optimizeData(it.Expr, self.data)
+		self.optimizeStmt(it.Next)
+		self.optimizeChild(it.Scope)
+	}
 
-    fn substr(mut &self, mut a: &sema::Assign): bool {
-        if a.Op.Id != TokenId.Eq {
-            ret false
-        }
-        match type a.Right.Model {
-        | &SlicingExprModel:
-            mut sem := (&SlicingExprModel)(a.Right.Model)
-            if equalModels(a.Left.Model, sem.Expr) {
-                self.setCurrentStmt(&MutSlicingExprModel{
-                    Token: sem.Token,
-                    Expr: sem.Expr,
-                    Left: sem.Left,
-                    Right: sem.Right,
-                })
-                ret true
-            }
-        }
-        ret false
-    }
+	fn substr(mut &self, mut a: &sema::Assign): bool {
+		if a.Op.Id != TokenId.Eq {
+			ret false
+		}
+		match type a.Right.Model {
+		| &SlicingExprModel:
+			mut sem := (&SlicingExprModel)(a.Right.Model)
+			if equalModels(a.Left.Model, sem.Expr) {
+				self.setCurrentStmt(&MutSlicingExprModel{
+					Token: sem.Token,
+					Expr: sem.Expr,
+					Left: sem.Left,
+					Right: sem.Right,
+				})
+				ret true
+			}
+		}
+		ret false
+	}
 
-    fn strAssign(mut &self, mut a: &sema::Assign): bool {
-        if !Str {
-            ret false
-        }
-        lp := a.Left.Kind.Prim()
-        if lp == nil || !lp.IsStr() {
-            ret false
-        }
-        ret self.substr(a)
-    }
+	fn strAssign(mut &self, mut a: &sema::Assign): bool {
+		if !Str {
+			ret false
+		}
+		lp := a.Left.Kind.Prim()
+		if lp == nil || !lp.IsStr() {
+			ret false
+		}
+		ret self.substr(a)
+	}
 
-    fn sliceAssign(mut &self, mut a: &sema::Assign): bool {
-        if !Slice || a.Left.Kind.Slc() == nil {
-            ret false
-        }
-        // [self.substr] applies this optimization without type dependence.
-        ret self.substr(a)
-    }
+	fn sliceAssign(mut &self, mut a: &sema::Assign): bool {
+		if !Slice || a.Left.Kind.Slc() == nil {
+			ret false
+		}
+		// [self.substr] applies this optimization without type dependence.
+		ret self.substr(a)
+	}
 
-    fn optimizePostfix(mut &self, mut postfix: &Postfix) {
-        if self.data.boundary != nil {
-            possibleBoundaryRemove(self.data.boundary, postfix.Expr)
-        }
-        exprOptimizer.optimizeData(postfix.Expr, self.data)
-    }
+	fn optimizePostfix(mut &self, mut postfix: &Postfix) {
+		if self.data.boundary != nil {
+			possibleBoundaryRemove(self.data.boundary, postfix.Expr)
+		}
+		exprOptimizer.optimizeData(postfix.Expr, self.data)
+	}
 
-    fn optimizeAssign(mut &self, mut assign: &sema::Assign) {
-        if assign.Op.Id == TokenId.Eq &&
-            equalModels(assign.Left.Model, assign.Right.Model) {
-            self.removeCurrent()
-            self.i-- // In next iteration, point to correct statement.
-            ret
-        }
+	fn optimizeAssign(mut &self, mut assign: &sema::Assign) {
+		if assign.Op.Id == TokenId.Eq &&
+			equalModels(assign.Left.Model, assign.Right.Model) {
+			self.removeCurrent()
+			self.i-- // In next iteration, point to correct statement.
+			ret
+		}
 
-        if self.data.boundary != nil {
-            if isBoundaryRiskyType(assign.Left.Kind) {
-                possibleBoundaryRemove(self.data.boundary, assign.Left.Model)
-            }
-        }
-        if self.data.nils != nil {
-            if isGuaranteedNonNilExpr(self.data.nils, assign.Right.Model) {
-                if isNilValidType(assign.Left.Kind) {
-                    const safe = true
-                    self.data.nils.pushVar(getNilVar(assign.Left.Model), safe)
-                }
-            } else {
-                possibleNilRemove(self.data.nils, assign.Left.Model)
-            }
-        }
-        if self.data.dynamic != nil {
-            mut kind := isTypeGuaranteedDynamicData(
-                self.data.dynamic, assign.Right.Kind, assign.Right.Model)
-            if kind != nil {
-                if isDynamicValidType(assign.Left.Kind) {
-                    self.data.dynamic.pushVar(getDynamicVar(assign.Left.Model), kind)
-                }
-            } else {
-                possibleDynamicRemove(self.data.dynamic, assign.Left.Model)
-            }
-        }
+		if self.data.boundary != nil {
+			if isBoundaryRiskyType(assign.Left.Kind) {
+				possibleBoundaryRemove(self.data.boundary, assign.Left.Model)
+			}
+		}
+		if self.data.nils != nil {
+			if isGuaranteedNonNilExpr(self.data.nils, assign.Right.Model) {
+				if isNilValidType(assign.Left.Kind) {
+					const safe = true
+					self.data.nils.pushVar(getNilVar(assign.Left.Model), safe)
+				}
+			} else {
+				possibleNilRemove(self.data.nils, assign.Left.Model)
+			}
+		}
+		if self.data.dynamic != nil {
+			mut kind := isTypeGuaranteedDynamicData(
+				self.data.dynamic, assign.Right.Kind, assign.Right.Model)
+			if kind != nil {
+				if isDynamicValidType(assign.Left.Kind) {
+					self.data.dynamic.pushVar(getDynamicVar(assign.Left.Model), kind)
+				}
+			} else {
+				possibleDynamicRemove(self.data.dynamic, assign.Left.Model)
+			}
+		}
 
-        match {
-        | self.strAssign(assign)
-        | self.sliceAssign(assign):
-            ret
-        }
+		match {
+		| self.strAssign(assign)
+		| self.sliceAssign(assign):
+			ret
+		}
 
-        exprOptimizer.optimizeData(assign.Left.Model, self.data)
-        exprOptimizer.optimizeData(assign.Right.Model, self.data)
+		exprOptimizer.optimizeData(assign.Left.Model, self.data)
+		exprOptimizer.optimizeData(assign.Right.Model, self.data)
 
-        match assign.Op.Id {
-        | TokenId.SolidusEq | TokenId.PercentEq:
-            // Do not check division of structures safety.
-            if !Math || assign.Left.Kind.Struct() != nil {
-                break
-            }
-            oldId, oldKind := assign.Op.Id, assign.Op.Kind
-            match assign.Op.Id {
-            | TokenId.SolidusEq:
-                assign.Op.Id = TokenId.Solidus
-                assign.Op.Kind = TokenKind.Solidus
-            | TokenId.PercentEq:
-                assign.Op.Id = TokenId.Percent
-                assign.Op.Kind = TokenKind.Percent
-            |:
-                panic("implementation mistake, this panic call should be unreachable")
-            }
-            mut model := ExprModel(&BinaryExprModel{
-                Op: assign.Op,
-                Left: assign.Left,
-                Right: assign.Right,
-            })
-            exprOptimizer.optimizeData(model, self.data)
-            match type model {
-            | &BinaryExprModel:
-                assign.Right = new(OperandExprModel, *assign.Right)
-                assign.Op.Id = TokenId.Eq
-                assign.Op.Kind = TokenKind.Eq
-                assign.Right.Model = model
-                ret
-            }
-            assign.Op.Id = oldId
-            assign.Op.Kind = oldKind
-            ret
-        }
+		match assign.Op.Id {
+		| TokenId.SolidusEq | TokenId.PercentEq:
+			// Do not check division of structures safety.
+			if !Math || assign.Left.Kind.Struct() != nil {
+				break
+			}
+			oldId, oldKind := assign.Op.Id, assign.Op.Kind
+			match assign.Op.Id {
+			| TokenId.SolidusEq:
+				assign.Op.Id = TokenId.Solidus
+				assign.Op.Kind = TokenKind.Solidus
+			| TokenId.PercentEq:
+				assign.Op.Id = TokenId.Percent
+				assign.Op.Kind = TokenKind.Percent
+			|:
+				panic("implementation mistake, this panic call should be unreachable")
+			}
+			mut model := ExprModel(&BinaryExprModel{
+				Op: assign.Op,
+				Left: assign.Left,
+				Right: assign.Right,
+			})
+			exprOptimizer.optimizeData(model, self.data)
+			match type model {
+			| &BinaryExprModel:
+				assign.Right = new(OperandExprModel, *assign.Right)
+				assign.Op.Id = TokenId.Eq
+				assign.Op.Kind = TokenKind.Eq
+				assign.Right.Model = model
+				ret
+			}
+			assign.Op.Id = oldId
+			assign.Op.Kind = oldKind
+			ret
+		}
 
-        if Append {
-            match type assign.Right.Model {
-            | &BuiltinAppendCallExprModel:
-                mut m := (&BuiltinAppendCallExprModel)(assign.Right.Model)
-                if !areSameLvalueExprModel(assign.Left.Model, m.Dest) {
-                    ret
-                }
-                match type m.Elements {
-                | &SliceExprModel:
-                    // Push items one-by-one for self-appended memory.
-                    self.setCurrentStmt(&PushToSliceExprModel{
-                        Dest: m.Dest,
-                        Elems: (&SliceExprModel)(m.Elements),
-                    })
-                |:
-                    // Append directly if appended to slice and assigned to the same memory.
-                    self.setCurrentStmt(&AppendToSliceExprModel{
-                        Dest: assign.Left.Model,
-                        Slice: m.Elements,
-                    })
-                }
-            }
-        }
-    }
+		if Append {
+			match type assign.Right.Model {
+			| &BuiltinAppendCallExprModel:
+				mut m := (&BuiltinAppendCallExprModel)(assign.Right.Model)
+				if !areSameLvalueExprModel(assign.Left.Model, m.Dest) {
+					ret
+				}
+				match type m.Elements {
+				| &SliceExprModel:
+					// Push items one-by-one for self-appended memory.
+					self.setCurrentStmt(&PushToSliceExprModel{
+						Dest: m.Dest,
+						Elems: (&SliceExprModel)(m.Elements),
+					})
+				|:
+					// Append directly if appended to slice and assigned to the same memory.
+					self.setCurrentStmt(&AppendToSliceExprModel{
+						Dest: assign.Left.Model,
+						Slice: m.Elements,
+					})
+				}
+			}
+		}
+	}
 
-    fn tryOptimizeSwap(mut &self, mut &assign: &MultiAssign): bool {
-        if !Assign || len(assign.Left) != 2 ||
-            assign.Left[0] == nil || assign.Left[1] == nil {
-            ret false
-        }
-        let mut tup: &TupleExprModel
-        match type assign.Right {
-        | &TupleExprModel:
-            tup = (&TupleExprModel)(assign.Right)
-        }
-        if tup == nil || len(tup.Datas) != 2 {
-            ret false
-        }
+	fn tryOptimizeSwap(mut &self, mut &assign: &MultiAssign): bool {
+		if !Assign || len(assign.Left) != 2 ||
+			assign.Left[0] == nil || assign.Left[1] == nil {
+			ret false
+		}
+		let mut tup: &TupleExprModel
+		match type assign.Right {
+		| &TupleExprModel:
+			tup = (&TupleExprModel)(assign.Right)
+		}
+		if tup == nil || len(tup.Datas) != 2 {
+			ret false
+		}
 
-        // Catch self assignments.
-        if equalModels(assign.Left[0].Model, tup.Datas[0].Model) &&
-            equalModels(assign.Left[1].Model, tup.Datas[1].Model) {
-            self.removeCurrent()
-            self.i-- // In next iteration, point to correct statement.
-            ret true
-        }
+		// Catch self assignments.
+		if equalModels(assign.Left[0].Model, tup.Datas[0].Model) &&
+			equalModels(assign.Left[1].Model, tup.Datas[1].Model) {
+			self.removeCurrent()
+			self.i-- // In next iteration, point to correct statement.
+			ret true
+		}
 
-        // Catch swaps.
-        if !equalModels(assign.Left[0].Model, tup.Datas[1].Model) ||
-            !equalModels(assign.Left[1].Model, tup.Datas[0].Model) {
-            ret false
-        }
-        mut model := &SwapExprModel{
-            Left: assign.Left[0],
-            Right: assign.Left[1],
-        }
-        exprOptimizer.optimizeData(model.Left.Model, self.data)
-        exprOptimizer.optimizeData(model.Right.Model, self.data)
-        self.setCurrentStmt(model)
-        ret true
-    }
+		// Catch swaps.
+		if !equalModels(assign.Left[0].Model, tup.Datas[1].Model) ||
+			!equalModels(assign.Left[1].Model, tup.Datas[0].Model) {
+			ret false
+		}
+		mut model := &SwapExprModel{
+			Left: assign.Left[0],
+			Right: assign.Left[1],
+		}
+		exprOptimizer.optimizeData(model.Left.Model, self.data)
+		exprOptimizer.optimizeData(model.Right.Model, self.data)
+		self.setCurrentStmt(model)
+		ret true
+	}
 
-    fn optimizeMultiAssign(mut &self, mut assign: &MultiAssign) {
-        if self.tryOptimizeSwap(assign) {
-            // Swap operation can skip the following algorithm.
-            // As far as tested, following analysis are not necessary.
-            ret
-        }
+	fn optimizeMultiAssign(mut &self, mut assign: &MultiAssign) {
+		if self.tryOptimizeSwap(assign) {
+			// Swap operation can skip the following algorithm.
+			// As far as tested, following analysis are not necessary.
+			ret
+		}
 
-        mut tup := (&TupleExprModel)(nil)
-        match type assign.Right {
-        | &TupleExprModel:
-            tup = (&TupleExprModel)(assign.Right)
-        }
-        for (i, mut l) in assign.Left {
-            if l != nil {
-                if self.data.boundary != nil {
-                    if isBoundaryRiskyType(l.Kind) {
-                        possibleBoundaryRemove(self.data.boundary, l.Model)
-                    }
-                }
-                if self.data.nils != nil {
-                    if tup != nil && isGuaranteedNonNilExpr(self.data.nils, tup.Datas[i].Model) {
-                        if isNilValidType(l.Kind) {
-                            const safe = true
-                            self.data.nils.pushVar(getNilVar(l.Model), safe)
-                        }
-                    } else {
-                        possibleNilRemove(self.data.nils, l.Model)
-                    }
-                }
-                if self.data.dynamic != nil && tup != nil {
-                    mut kind := isTypeGuaranteedDynamicData(
-                        self.data.dynamic, tup.Datas[i].Kind, tup.Datas[i].Model)
-                    if kind != nil {
-                        if isDynamicValidType(l.Kind) {
-                            self.data.dynamic.pushVar(getDynamicVar(l.Model), kind)
-                        }
-                    } else {
-                        possibleDynamicRemove(self.data.dynamic, l.Model)
-                    }
-                }
-                exprOptimizer.optimizeData(l.Model, self.data)
-            }
-        }
-        exprOptimizer.optimizeData(assign.Right, self.data)
-    }
+		mut tup := (&TupleExprModel)(nil)
+		match type assign.Right {
+		| &TupleExprModel:
+			tup = (&TupleExprModel)(assign.Right)
+		}
+		for (i, mut l) in assign.Left {
+			if l != nil {
+				if self.data.boundary != nil {
+					if isBoundaryRiskyType(l.Kind) {
+						possibleBoundaryRemove(self.data.boundary, l.Model)
+					}
+				}
+				if self.data.nils != nil {
+					if tup != nil && isGuaranteedNonNilExpr(self.data.nils, tup.Datas[i].Model) {
+						if isNilValidType(l.Kind) {
+							const safe = true
+							self.data.nils.pushVar(getNilVar(l.Model), safe)
+						}
+					} else {
+						possibleNilRemove(self.data.nils, l.Model)
+					}
+				}
+				if self.data.dynamic != nil && tup != nil {
+					mut kind := isTypeGuaranteedDynamicData(
+						self.data.dynamic, tup.Datas[i].Kind, tup.Datas[i].Model)
+					if kind != nil {
+						if isDynamicValidType(l.Kind) {
+							self.data.dynamic.pushVar(getDynamicVar(l.Model), kind)
+						}
+					} else {
+						possibleDynamicRemove(self.data.dynamic, l.Model)
+					}
+				}
+				exprOptimizer.optimizeData(l.Model, self.data)
+			}
+		}
+		exprOptimizer.optimizeData(assign.Right, self.data)
+	}
 
-    fn optimizeRet(mut &self, mut r: &RetSt) {
-        exprOptimizer.optimizeData(r.Expr, self.data)
+	fn optimizeRet(mut &self, mut r: &RetSt) {
+		exprOptimizer.optimizeData(r.Expr, self.data)
 
-        // Break algorithm is exceptional-specific optimizations are not enabled.
-        // The following algorithms tries to apply specific optimizations for exceptionals.
-        if !Exceptional {
-            ret
-        }
-        match type r.Expr {
-        | &FnCallExprModel:
-            break
-        |:
-            ret
-        }
-        mut fc := (&FnCallExprModel)(r.Expr)
-        if !fc.Func.Decl.Exceptional ||
-            fc.Except == nil ||
-            len(fc.Except.Stmts) != 1 ||
-            !obj::IsForwarded(fc.Except) {
-            ret
-        }
-        self.setCurrentStmt(&ExceptionalForwardingExprModel{Expr: fc})
-    }
+		// Break algorithm is exceptional-specific optimizations are not enabled.
+		// The following algorithms tries to apply specific optimizations for exceptionals.
+		if !Exceptional {
+			ret
+		}
+		match type r.Expr {
+		| &FnCallExprModel:
+			break
+		|:
+			ret
+		}
+		mut fc := (&FnCallExprModel)(r.Expr)
+		if !fc.Func.Decl.Exceptional ||
+			fc.Except == nil ||
+			len(fc.Except.Stmts) != 1 ||
+			!obj::IsForwarded(fc.Except) {
+			ret
+		}
+		self.setCurrentStmt(&ExceptionalForwardingExprModel{Expr: fc})
+	}
 
-    fn optimizeStmt(mut &self, mut stmt: Stmt) {
-        match type stmt {
-        | &Scope:
-            self.optimizeChild((&Scope)(stmt))
-        | &Data:
-            self.optimizeData((&Data)(stmt))
-        | &Var:
-            self.optimizeVar((&Var)(stmt))
-        | &Conditional:
-            self.optimizeConditional((&Conditional)(stmt))
-        | &RangeIter:
-            self.optimizeRangeIter((&RangeIter)(stmt))
-        | &WhileIter:
-            self.optimizeWhileIter((&WhileIter)(stmt))
-        | &InfIter:
-            self.optimizeChild((&InfIter)(stmt).Scope)
-        | &sema::Assign:
-            self.optimizeAssign((&sema::Assign)(stmt))
-        | &MultiAssign:
-            self.optimizeMultiAssign((&MultiAssign)(stmt))
-        | &Match:
-            self.optimizeMatch((&Match)(stmt))
-        | &RetSt:
-            self.optimizeRet((&RetSt)(stmt))
-        | &Postfix:
-            self.optimizePostfix((&Postfix)(stmt))
-        }
-    }
+	fn optimizeStmt(mut &self, mut stmt: Stmt) {
+		match type stmt {
+		| &Scope:
+			self.optimizeChild((&Scope)(stmt))
+		| &Data:
+			self.optimizeData((&Data)(stmt))
+		| &Var:
+			self.optimizeVar((&Var)(stmt))
+		| &Conditional:
+			self.optimizeConditional((&Conditional)(stmt))
+		| &RangeIter:
+			self.optimizeRangeIter((&RangeIter)(stmt))
+		| &WhileIter:
+			self.optimizeWhileIter((&WhileIter)(stmt))
+		| &InfIter:
+			self.optimizeChild((&InfIter)(stmt).Scope)
+		| &sema::Assign:
+			self.optimizeAssign((&sema::Assign)(stmt))
+		| &MultiAssign:
+			self.optimizeMultiAssign((&MultiAssign)(stmt))
+		| &Match:
+			self.optimizeMatch((&Match)(stmt))
+		| &RetSt:
+			self.optimizeRet((&RetSt)(stmt))
+		| &Postfix:
+			self.optimizePostfix((&Postfix)(stmt))
+		}
+	}
 
-    fn optimizeChild(mut &self, mut child: &Scope) {
-        mut so := scopeOptimizer.new(child)
-        so.parent = self
-        so.data = self.data
-        so.optimize()
-    }
+	fn optimizeChild(mut &self, mut child: &Scope) {
+		mut so := scopeOptimizer.new(child)
+		so.parent = self
+		so.data = self.data
+		so.optimize()
+	}
 
-    // Optimizes scope by enabled optimizations.
-    fn optimize(mut &self) {
-        self.i = 0
-        for self.i < len(self.scope.Stmts); self.i++ {
-            self.optimizeStmt(self.scope.Stmts[self.i])
-        }
-    }
+	// Optimizes scope by enabled optimizations.
+	fn optimize(mut &self) {
+		self.i = 0
+		for self.i < len(self.scope.Stmts); self.i++ {
+			self.optimizeStmt(self.scope.Stmts[self.i])
+		}
+	}
 }
 
 fn isConstantValidConditionalCase(&i: &If): bool {
-    match type i.Expr {
-    | &Const:
-        c := (&Const)(i.Expr)
-        ret c.IsBool() && c.ReadBool()
-    }
-    ret false
+	match type i.Expr {
+	| &Const:
+		c := (&Const)(i.Expr)
+		ret c.IsBool() && c.ReadBool()
+	}
+	ret false
 }
 
 fn isUnreachableExpr(&expr: ExprModel): bool {
-    match type expr {
-    | &Const:
-        c := (&Const)(expr)
-        ret c.IsBool() && !c.ReadBool()
-    | &BinaryExprModel:
-        m := (&BinaryExprModel)(expr)
-        if m.Op.Id == TokenId.DblAmper {
-            ret isUnreachableExpr(m.Left.Model) ||
-                isUnreachableExpr(m.Right.Model)
-        }
-    }
-    ret false
+	match type expr {
+	| &Const:
+		c := (&Const)(expr)
+		ret c.IsBool() && !c.ReadBool()
+	| &BinaryExprModel:
+		m := (&BinaryExprModel)(expr)
+		if m.Op.Id == TokenId.DblAmper {
+			ret isUnreachableExpr(m.Left.Model) ||
+				isUnreachableExpr(m.Right.Model)
+		}
+	}
+	ret false
 }
 
 fn isConstantValidMatchCase(&case: &Case): bool {
-    for _, expr in case.Exprs {
-        if expr.IsConst() && expr.Constant.IsBool() && expr.Constant.ReadBool() {
-            ret true
-        }
-    }
-    ret false
+	for _, expr in case.Exprs {
+		if expr.IsConst() && expr.Constant.IsBool() && expr.Constant.ReadBool() {
+			ret true
+		}
+	}
+	ret false
 }
 
 fn isUnreachableConditionalCase(&i: &If): bool {
-    ret isUnreachableExpr(i.Expr)
+	ret isUnreachableExpr(i.Expr)
 }
 
 fn isUnreachableMatchCase(&case: &Case): bool {
-    for _, expr in case.Exprs {
-        if !isUnreachableExpr(expr.Model) {
-            ret false
-        }
-    }
-    ret true
+	for _, expr in case.Exprs {
+		if !isUnreachableExpr(expr.Model) {
+			ret false
+		}
+	}
+	ret true
 }

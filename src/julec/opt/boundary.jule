@@ -9,75 +9,75 @@ use std::jule::sema::{Var, StructSubIdentExprModel, UnaryExprModel, ExprModel, T
 const invalidBoundary = uintptr(0x0)
 
 struct boundaryVar {
-    var:     uintptr
-    maxSize: []ExprModel
+	var:     uintptr
+	maxSize: []ExprModel
 }
 
 // Information wrapper for boundary analysis.
 struct boundary {
-    vars: []boundaryVar
+	vars: []boundaryVar
 }
 
 impl boundary {
-    // Appends variable with initial maximum size expression.
-    // If variable is already exist, updates maximum size information.
-    fn pushVar(mut self, var: uintptr, mut maxSize: ExprModel) {
-        if !Access || var == invalidBoundary {
-            // Ignore it, because this optimizations within scope of the --opt-access flag.
-            ret
-        }
-        if !isValidBoundaryInfo(maxSize) {
-            ret
-        }
-        for (_, mut v) in self.vars {
-            if v.var == var {
-                for i, max in v.maxSize {
-                    if fitsSize(maxSize, max) {
-                        // Maximum size is fits, so new size is larger than current size.
-                        v.maxSize[i] = maxSize
-                        ret
-                    }
-                }
-                v.maxSize = append(v.maxSize, maxSize)
-                ret
-            }
-        }
-        // Not exist, append new one.
-        for (_, mut v) in self.vars {
-            if v.var == invalidBoundary {
-                // Empty place, use here instead of append.
-                v.var = var
-                v.maxSize = append(v.maxSize, maxSize)
-                ret
-            }
-        }
-        self.vars = append(self.vars, boundaryVar{var: var, maxSize: [maxSize]})
-    }
+	// Appends variable with initial maximum size expression.
+	// If variable is already exist, updates maximum size information.
+	fn pushVar(mut self, var: uintptr, mut maxSize: ExprModel) {
+		if !Access || var == invalidBoundary {
+			// Ignore it, because this optimizations within scope of the --opt-access flag.
+			ret
+		}
+		if !isValidBoundaryInfo(maxSize) {
+			ret
+		}
+		for (_, mut v) in self.vars {
+			if v.var == var {
+				for i, max in v.maxSize {
+					if fitsSize(maxSize, max) {
+						// Maximum size is fits, so new size is larger than current size.
+						v.maxSize[i] = maxSize
+						ret
+					}
+				}
+				v.maxSize = append(v.maxSize, maxSize)
+				ret
+			}
+		}
+		// Not exist, append new one.
+		for (_, mut v) in self.vars {
+			if v.var == invalidBoundary {
+				// Empty place, use here instead of append.
+				v.var = var
+				v.maxSize = append(v.maxSize, maxSize)
+				ret
+			}
+		}
+		self.vars = append(self.vars, boundaryVar{var: var, maxSize: [maxSize]})
+	}
 
-    fn removeVar(mut self, var: uintptr): bool {
-        if var != invalidBoundary {
-            for (_, mut v) in self.vars {
-                if v.var == var {
-                    v.var = invalidBoundary
-                    v.maxSize = v.maxSize[:0]
-                    ret true
-                }
-            }
-        }
-        ret false
-    }
+	fn removeVar(mut self, var: uintptr): bool {
+		if var != invalidBoundary {
+			for (_, mut v) in self.vars {
+				if v.var == var {
+					v.var = invalidBoundary
+					v.maxSize = v.maxSize[:0]
+					ret true
+				}
+			}
+		}
+		ret false
+	}
 
-    // Reports whether maximum size of variable is fits with given expression.
-    fn fitsMaxSize(mut self, var: uintptr, expr: ExprModel): bool {
-        if var != invalidBoundary {
-            for _, v in self.vars {
-                if v.var == var {
-                    ret fitsMaxSize(v.maxSize, expr) != -1
-                }
-            }
-        }
-        ret false
-    }
+	// Reports whether maximum size of variable is fits with given expression.
+	fn fitsMaxSize(mut self, var: uintptr, expr: ExprModel): bool {
+		if var != invalidBoundary {
+			for _, v in self.vars {
+				if v.var == var {
+					ret fitsMaxSize(v.maxSize, expr) != -1
+				}
+			}
+		}
+		ret false
+	}
 }
 
 // Reports whether model is valid maximum size information for boundary analysis.
@@ -87,80 +87,80 @@ fn isValidBoundaryInfo(m: ExprModel): bool { ret fitsSize(m, m) }
 // In other words, reports whether: max >= expr
 // Returns index number of max size which is fit, otherwise -1.
 fn fitsMaxSize(max: []ExprModel, expr: ExprModel): int {
-    for i, m in max {
-        if fitsSize(m, expr) {
-            ret i
-        }
-    }
-    ret -1
+	for i, m in max {
+		if fitsSize(m, expr) {
+			ret i
+		}
+	}
+	ret -1
 }
 
 fn fitsSize(e1: ExprModel, e2: ExprModel): bool {
-    if typeData(e1) != typeData(e2) {
-        ret false
-    }
-    match type e1 {
-    | &Const:
-        exprConst := (&Const)(e2)
-        ret exprConst.AsF64() >= 0 && (&Const)(e1).GtEq(*exprConst)
-    | &Var:
-        ret e1 == e2
-    | &StructSubIdentExprModel:
-        ssi1 := (&StructSubIdentExprModel)(e1)
-        ssi2 := (&StructSubIdentExprModel)(e2)
-        ret equalModels(ssi1.Expr.Model, ssi2.Expr.Model) && ssi1.Field == ssi2.Field
-    | &UnaryExprModel:
-        uem1 := (&UnaryExprModel)(e1)
-        uem2 := (&UnaryExprModel)(e2)
-        if uem1.Op.Id != TokenId.Star || uem1.Op.Id != uem2.Op.Id {
-            ret false
-        }
-        ret fitsSize(uem1.Expr.Model, uem2.Expr.Model)
-    |:
-        ret false
-    }
+	if typeData(e1) != typeData(e2) {
+		ret false
+	}
+	match type e1 {
+	| &Const:
+		exprConst := (&Const)(e2)
+		ret exprConst.AsF64() >= 0 && (&Const)(e1).GtEq(*exprConst)
+	| &Var:
+		ret e1 == e2
+	| &StructSubIdentExprModel:
+		ssi1 := (&StructSubIdentExprModel)(e1)
+		ssi2 := (&StructSubIdentExprModel)(e2)
+		ret equalModels(ssi1.Expr.Model, ssi2.Expr.Model) && ssi1.Field == ssi2.Field
+	| &UnaryExprModel:
+		uem1 := (&UnaryExprModel)(e1)
+		uem2 := (&UnaryExprModel)(e2)
+		if uem1.Op.Id != TokenId.Star || uem1.Op.Id != uem2.Op.Id {
+			ret false
+		}
+		ret fitsSize(uem1.Expr.Model, uem2.Expr.Model)
+	|:
+		ret false
+	}
 }
 
 fn possibleBoundaryRemove(mut &b: &boundary, model: ExprModel) {
-    // Clear if size data mutating.
-    for (_, mut v) in b.vars {
-        for i, max in v.maxSize {
-            if equalModels(max, model) {
-                v.maxSize = append(v.maxSize[:i], v.maxSize[i+1:]...)
-                break
-            }
-        }
-    }
+	// Clear if size data mutating.
+	for (_, mut v) in b.vars {
+		for i, max in v.maxSize {
+			if equalModels(max, model) {
+				v.maxSize = append(v.maxSize[:i], v.maxSize[i+1:]...)
+				break
+			}
+		}
+	}
 }
 
 fn isBoundaryRiskyType(mut t: &TypeKind): bool {
-    // Reports true for not-arrays because array's size cannot be changed.
-    ret t.Arr() == nil
+	// Reports true for not-arrays because array's size cannot be changed.
+	ret t.Arr() == nil
 }
 
 fn isBoundaryValidType(mut t: &TypeKind): bool { ret t.Slc() != nil || t.Arr() != nil }
 
 fn getBoundaryVar(m: ExprModel): uintptr {
-    if !Access {
-        ret invalidBoundary
-    }
-    match type m {
-    | &Var:
-        v := (&Var)(m)
-        if !v.Reference {
-            // Variable is not reference, return address of it.
-            ret uintptr((&Var)(m))
-        }
-        // Variable is reference, it should be initialized at source code.
-        // Investigate the initial expression for variable address.
-        ret getBoundaryVar(v.Value.Data.Model)
-    | &StructSubIdentExprModel:
-        ret uintptr((&StructSubIdentExprModel)(m).Field)
-    | &UnaryExprModel:
-        uem := (&UnaryExprModel)(m)
-        if uem.Op.Id == TokenId.Star { // Dereferencing.
-            ret getBoundaryVar(uem.Expr.Model)
-        }
-    }
-    ret invalidBoundary
+	if !Access {
+		ret invalidBoundary
+	}
+	match type m {
+	| &Var:
+		v := (&Var)(m)
+		if !v.Reference {
+			// Variable is not reference, return address of it.
+			ret uintptr((&Var)(m))
+		}
+		// Variable is reference, it should be initialized at source code.
+		// Investigate the initial expression for variable address.
+		ret getBoundaryVar(v.Value.Data.Model)
+	| &StructSubIdentExprModel:
+		ret uintptr((&StructSubIdentExprModel)(m).Field)
+	| &UnaryExprModel:
+		uem := (&UnaryExprModel)(m)
+		if uem.Op.Id == TokenId.Star { // Dereferencing.
+			ret getBoundaryVar(uem.Expr.Model)
+		}
+	}
+	ret invalidBoundary
 }

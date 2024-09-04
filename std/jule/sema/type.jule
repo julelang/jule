@@ -7,21 +7,21 @@
 
 use conv for std::conv
 use ast for std::jule::ast::{
-    Ast,
-    TypeDecl,
-    GenericDecl,
-    FnDecl,
-    MapTypeDecl,
-    PtrTypeDecl,
-    SlcTypeDecl,
-    ArrTypeDecl,
-    ScopeTree,
-    NamespaceTypeDecl,
-    TypeDeclKind,
-    TupleTypeDecl,
-    SptrTypeDecl,
-    IdentTypeDecl,
-    SubIdentTypeDecl,
+	Ast,
+	TypeDecl,
+	GenericDecl,
+	FnDecl,
+	MapTypeDecl,
+	PtrTypeDecl,
+	SlcTypeDecl,
+	ArrTypeDecl,
+	ScopeTree,
+	NamespaceTypeDecl,
+	TypeDeclKind,
+	TupleTypeDecl,
+	SptrTypeDecl,
+	IdentTypeDecl,
+	SubIdentTypeDecl,
 }
 use std::jule::build::{LogMsg, Logf}
 use std::jule::lex::{Token, TokenKind, TokenId}
@@ -32,1724 +32,1724 @@ type PrimKind: types::TypeKind
 
 // Generic type for instance types.
 struct InsGeneric {
-    Kind:       &TypeKind
-    Constraint: []&TypeKind
+	Kind:       &TypeKind
+	Constraint: []&TypeKind
 }
 
 // Type alias.
 struct TypeAlias {
-    Scope:    &ScopeTree
-    Public:   bool
-    Binded:   bool
-    Used:     bool
-    Generic:  bool
-    Token:    &Token
-    Ident:    str
-    Kind:     &TypeSymbol
-    Refers:   []any        // Referred identifiers, except binded ones.
-    Generics: []&TypeAlias // See developer reference (1).
+	Scope:    &ScopeTree
+	Public:   bool
+	Binded:   bool
+	Used:     bool
+	Generic:  bool
+	Token:    &Token
+	Ident:    str
+	Kind:     &TypeSymbol
+	Refers:   []any        // Referred identifiers, except binded ones.
+	Generics: []&TypeAlias // See developer reference (1).
 }
 
 // Kind of type declaration.
 trait Kind {
-    fn Str(self): str
-    fn Equal(&self, other: &TypeKind): bool
+	fn Str(self): str
+	fn Equal(&self, other: &TypeKind): bool
 }
 
 // Evaluated type declaration.
 struct TypeKind {
-    BindIdent: str
-    Generic:   bool
-    Variadic:  bool
-    Kind:      Kind
+	BindIdent: str
+	Generic:   bool
+	Variadic:  bool
+	Kind:      Kind
 }
 
 impl Kind for TypeKind {
-    // Returns kind as string.
-    fn Str(self): str {
-        if self.IsNil() {
-            ret "nil"
-        }
+	// Returns kind as string.
+	fn Str(self): str {
+		if self.IsNil() {
+			ret "nil"
+		}
 
-        mut kind := StrBuilder.New(1 << 4)
+		mut kind := StrBuilder.New(1 << 4)
 
-        if self.Variadic {
-            kind.WriteStr("...")
-        }
+		if self.Variadic {
+			kind.WriteStr("...")
+		}
 
-        if self.Binded() {
-            kind.WriteStr("cpp.")
-            kind.WriteStr(self.BindIdent)
-        } else {
-            kind.WriteStr(self.Kind.Str())
-        }
-        ret kind.Str()
-    }
+		if self.Binded() {
+			kind.WriteStr("cpp.")
+			kind.WriteStr(self.BindIdent)
+		} else {
+			kind.WriteStr(self.Kind.Str())
+		}
+		ret kind.Str()
+	}
 
-    // Reports whether types are same.
-    fn Equal(&self, other: &TypeKind): bool {
-        if self.IsNil() {
-            ret other.IsNil()
-        }
-        if self.Binded() {
-            ret other.Binded() && self.BindIdent == other.BindIdent
-        }
-        ret self.Kind.Equal(other)
-    }
+	// Reports whether types are same.
+	fn Equal(&self, other: &TypeKind): bool {
+		if self.IsNil() {
+			ret other.IsNil()
+		}
+		if self.Binded() {
+			ret other.Binded() && self.BindIdent == other.BindIdent
+		}
+		ret self.Kind.Equal(other)
+	}
 }
 
 impl TypeKind {
-    // Reports whether type is binded kind.
-    fn Binded(self): bool { ret len(self.BindIdent) != 0 }
+	// Reports whether type is binded kind.
+	fn Binded(self): bool { ret len(self.BindIdent) != 0 }
 
-    // Reports whether kind is "nil".
-    fn IsNil(self): bool { ret self.Kind == nil }
+	// Reports whether kind is "nil".
+	fn IsNil(self): bool { ret self.Kind == nil }
 
-    // Reports whether kind is "void".
-    fn Void(self): bool {
-        prim := unsafe { (*(&self)).Prim() }
-        ret prim != nil && prim.Kind == "void"
-    }
+	// Reports whether kind is "void".
+	fn Void(self): bool {
+		prim := unsafe { (*(&self)).Prim() }
+		ret prim != nil && prim.Kind == "void"
+	}
 
-    // Reports whether kind is comparable.
-    fn Comparable(self): bool {
-        unsafe {
-            mut _self := &self
-            if _self.Struct() != nil {
-                ret _self.Struct().Comparable
-            }
-            ret _self.Map() == nil && _self.Slc() == nil && _self.Fn() == nil
-        }
-    }
+	// Reports whether kind is comparable.
+	fn Comparable(self): bool {
+		unsafe {
+			mut _self := &self
+			if _self.Struct() != nil {
+				ret _self.Struct().Comparable
+			}
+			ret _self.Map() == nil && _self.Slc() == nil && _self.Fn() == nil
+		}
+	}
 
-    // Reports whether kind is mutable.
-    fn Mutable(self): bool {
-        unsafe {
-            mut _self := &self
-            if _self.Struct() != nil {
-                ret _self.Struct().Mutable
-            }
-            if _self.Trait() != nil {
-                ret true
-            }
-            if _self.Prim() != nil {
-                p := _self.Prim()
-                ret p.IsAny()
-            }
-            if _self.Arr() != nil {
-                ret _self.Arr().Elem.Mutable()
-            }
-            ret _self.Slc() != nil ||
-                _self.Ptr() != nil ||
-                _self.Sptr() != nil
-        }
-    }
+	// Reports whether kind is mutable.
+	fn Mutable(self): bool {
+		unsafe {
+			mut _self := &self
+			if _self.Struct() != nil {
+				ret _self.Struct().Mutable
+			}
+			if _self.Trait() != nil {
+				ret true
+			}
+			if _self.Prim() != nil {
+				p := _self.Prim()
+				ret p.IsAny()
+			}
+			if _self.Arr() != nil {
+				ret _self.Arr().Elem.Mutable()
+			}
+			ret _self.Slc() != nil ||
+				_self.Ptr() != nil ||
+				_self.Sptr() != nil
+		}
+	}
 
-    // Reports whether kind supports ordered constrait.
-    fn Ordered(self): bool {
-        unsafe {
-            mut _self := &self
-            prim := _self.Prim()
-            if prim != nil {
-                ret types::IsNum(prim.Kind) || prim.IsStr()
-            }
-            if _self.Ptr() != nil {
-                ret true
-            }
-            s := _self.Struct()
-            if s != nil {
-                ret s.Operators.Gt != nil &&
-                    s.Operators.GtEq != nil &&
-                    s.Operators.Lt != nil &&
-                    s.Operators.LtEq != nil
-            }
-            enm := _self.Enum()
-            if enm != nil {
-                ret types::IsNum(enm.Kind.Kind.Str())
-            }
-            ret false
-        }
-    }
+	// Reports whether kind supports ordered constrait.
+	fn Ordered(self): bool {
+		unsafe {
+			mut _self := &self
+			prim := _self.Prim()
+			if prim != nil {
+				ret types::IsNum(prim.Kind) || prim.IsStr()
+			}
+			if _self.Ptr() != nil {
+				ret true
+			}
+			s := _self.Struct()
+			if s != nil {
+				ret s.Operators.Gt != nil &&
+					s.Operators.GtEq != nil &&
+					s.Operators.Lt != nil &&
+					s.Operators.LtEq != nil
+			}
+			enm := _self.Enum()
+			if enm != nil {
+				ret types::IsNum(enm.Kind.Kind.Str())
+			}
+			ret false
+		}
+	}
 
-    // Reports whether kind is nil compatible.
-    fn NilCompatible(self): bool {
-        unsafe {
-            mut _self := &self
+	// Reports whether kind is nil compatible.
+	fn NilCompatible(self): bool {
+		unsafe {
+			mut _self := &self
 
-            prim := _self.Prim()
-            if prim != nil && prim.IsAny() {
-                ret true
-            }
+			prim := _self.Prim()
+			if prim != nil && prim.IsAny() {
+				ret true
+			}
 
-            ret _self.IsNil() ||
-                _self.Fn() != nil ||
-                _self.Sptr() != nil ||
-                _self.Ptr() != nil ||
-                _self.Trait() != nil ||
-                _self.Slc() != nil ||
-                _self.Map() != nil ||
-                _self.TypeEnum() != nil
-        }
-    }
+			ret _self.IsNil() ||
+				_self.Fn() != nil ||
+				_self.Sptr() != nil ||
+				_self.Ptr() != nil ||
+				_self.Trait() != nil ||
+				_self.Slc() != nil ||
+				_self.Map() != nil ||
+				_self.TypeEnum() != nil
+		}
+	}
 
-    // Reports whether kind performs reference-counting.
-    fn PerformsRC(self): bool {
-        unsafe {
-            mut _self := &self
-            prim := _self.Prim()
-            if prim != nil {
-                ret prim.IsAny() || prim.IsStr()
-            }
-            ret _self.Sptr() != nil || _self.Slc() != nil || _self.Trait() != nil
-        }
-    }
+	// Reports whether kind performs reference-counting.
+	fn PerformsRC(self): bool {
+		unsafe {
+			mut _self := &self
+			prim := _self.Prim()
+			if prim != nil {
+				ret prim.IsAny() || prim.IsStr()
+			}
+			ret _self.Sptr() != nil || _self.Slc() != nil || _self.Trait() != nil
+		}
+	}
 
-    // Reports whether kind is variadicable.
-    fn Variadicable(self): bool {
-        unsafe {
-            mut _self := &self
-            ret _self.Slc() != nil
-        }
-    }
+	// Reports whether kind is variadicable.
+	fn Variadicable(self): bool {
+		unsafe {
+			mut _self := &self
+			ret _self.Slc() != nil
+		}
+	}
 
-    // Returns primitive type if kind is primitive type, nil reference if not.
-    fn Prim(mut self): &Prim {
-        match type self.Kind {
-        | &Prim:
-            ret (&Prim)(self.Kind)
-        |:
-            ret nil
-        }
-    }
+	// Returns primitive type if kind is primitive type, nil reference if not.
+	fn Prim(mut self): &Prim {
+		match type self.Kind {
+		| &Prim:
+			ret (&Prim)(self.Kind)
+		|:
+			ret nil
+		}
+	}
 
-    // Returns reference type if kind is smart pointer, nil reference if not.
-    fn Sptr(mut self): &Sptr {
-        match type self.Kind {
-        | &Sptr:
-            ret (&Sptr)(self.Kind)
-        |:
-            ret nil
-        }
-    }
+	// Returns reference type if kind is smart pointer, nil reference if not.
+	fn Sptr(mut self): &Sptr {
+		match type self.Kind {
+		| &Sptr:
+			ret (&Sptr)(self.Kind)
+		|:
+			ret nil
+		}
+	}
 
-    // Returns pointer type if kind is pointer, nil reference if not.
-    fn Ptr(mut self): &Ptr {
-        match type self.Kind {
-        | &Ptr:
-            ret (&Ptr)(self.Kind)
-        |:
-            ret nil
-        }
-    }
+	// Returns pointer type if kind is pointer, nil reference if not.
+	fn Ptr(mut self): &Ptr {
+		match type self.Kind {
+		| &Ptr:
+			ret (&Ptr)(self.Kind)
+		|:
+			ret nil
+		}
+	}
 
-    // Returns enum type if kind is enum, nil reference if not.
-    fn Enum(mut self): &Enum {
-        match type self.Kind {
-        | &Enum:
-            ret (&Enum)(self.Kind)
-        |:
-            ret nil
-        }
-    }
+	// Returns enum type if kind is enum, nil reference if not.
+	fn Enum(mut self): &Enum {
+		match type self.Kind {
+		| &Enum:
+			ret (&Enum)(self.Kind)
+		|:
+			ret nil
+		}
+	}
 
-    // Returns type enum if kind is type enum, nil reference if not.
-    fn TypeEnum(mut self): &TypeEnum {
-        match type self.Kind {
-        | &TypeEnum:
-            ret (&TypeEnum)(self.Kind)
-        |:
-            ret nil
-        }
-    }
+	// Returns type enum if kind is type enum, nil reference if not.
+	fn TypeEnum(mut self): &TypeEnum {
+		match type self.Kind {
+		| &TypeEnum:
+			ret (&TypeEnum)(self.Kind)
+		|:
+			ret nil
+		}
+	}
 
-    // Returns array type if kind is array, nil reference if not.
-    fn Arr(mut self): &Arr {
-        match type self.Kind {
-        | &Arr:
-            ret (&Arr)(self.Kind)
-        |:
-            ret nil
-        }
-    }
+	// Returns array type if kind is array, nil reference if not.
+	fn Arr(mut self): &Arr {
+		match type self.Kind {
+		| &Arr:
+			ret (&Arr)(self.Kind)
+		|:
+			ret nil
+		}
+	}
 
-    // Returns slice type if kind is slice, nil reference if not.
-    fn Slc(mut self): &Slc {
-        match type self.Kind {
-        | &Slc:
-            ret (&Slc)(self.Kind)
-        |:
-            ret nil
-        }
-    }
+	// Returns slice type if kind is slice, nil reference if not.
+	fn Slc(mut self): &Slc {
+		match type self.Kind {
+		| &Slc:
+			ret (&Slc)(self.Kind)
+		|:
+			ret nil
+		}
+	}
 
-    // Returns fn type if kind is function, nil reference if not.
-    fn Fn(mut self): &FnIns {
-        match type self.Kind {
-        | &FnIns:
-            ret (&FnIns)(self.Kind)
-        |:
-            ret nil
-        }
-    }
+	// Returns fn type if kind is function, nil reference if not.
+	fn Fn(mut self): &FnIns {
+		match type self.Kind {
+		| &FnIns:
+			ret (&FnIns)(self.Kind)
+		|:
+			ret nil
+		}
+	}
 
-    // Returns struct type if kind is structure, nil reference if not.
-    fn Struct(mut self): &StructIns {
-        match type self.Kind {
-        | &StructIns:
-            ret (&StructIns)(self.Kind)
-        |:
-            ret nil
-        }
-    }
+	// Returns struct type if kind is structure, nil reference if not.
+	fn Struct(mut self): &StructIns {
+		match type self.Kind {
+		| &StructIns:
+			ret (&StructIns)(self.Kind)
+		|:
+			ret nil
+		}
+	}
 
-    // Returns trait type if kind is trait, nil reference if not.
-    fn Trait(mut self): &Trait {
-        match type self.Kind {
-        | &Trait:
-            ret (&Trait)(self.Kind)
-        |:
-            ret nil
-        }
-    }
+	// Returns trait type if kind is trait, nil reference if not.
+	fn Trait(mut self): &Trait {
+		match type self.Kind {
+		| &Trait:
+			ret (&Trait)(self.Kind)
+		|:
+			ret nil
+		}
+	}
 
-    // Returns map type if kind is map, nil reference if not.
-    fn Map(mut self): &Map {
-        match type self.Kind {
-        | &Map:
-            ret (&Map)(self.Kind)
-        |:
-            ret nil
-        }
-    }
+	// Returns map type if kind is map, nil reference if not.
+	fn Map(mut self): &Map {
+		match type self.Kind {
+		| &Map:
+			ret (&Map)(self.Kind)
+		|:
+			ret nil
+		}
+	}
 
-    // Returns tuple type if kind is tuple, nil reference if not.
-    fn Tup(mut self): &Tuple {
-        match type self.Kind {
-        | &Tuple:
-            ret (&Tuple)(self.Kind)
-        |:
-            ret nil
-        }
-    }
+	// Returns tuple type if kind is tuple, nil reference if not.
+	fn Tup(mut self): &Tuple {
+		match type self.Kind {
+		| &Tuple:
+			ret (&Tuple)(self.Kind)
+		|:
+			ret nil
+		}
+	}
 
-    // Reports whether kind is comptime type.
-    // It will not check for the [comptimeRange].
-    // Checks regular constant comptime expression types only.
-    fn comptime(mut self): bool {
-        ret self.comptimeTypeInfos() != nil ||
-            self.comptimeTypeInfo() != nil ||
-            self.comptimeStructFields() != nil ||
-            self.comptimeStructField() != nil ||
-            self.comptimeEnumFields() != nil ||
-            self.comptimeEnumField() != nil ||
-            self.comptimeStatics() != nil ||
-            self.comptimeStatic() != nil ||
-            self.comptimeParams() != nil ||
-            self.comptimeParam() != nil ||
-            self.comptimeValue() != nil ||
-            self.comptimeFiles() != nil ||
-            self.comptimeFile() != nil
-    }
+	// Reports whether kind is comptime type.
+	// It will not check for the [comptimeRange].
+	// Checks regular constant comptime expression types only.
+	fn comptime(mut self): bool {
+		ret self.comptimeTypeInfos() != nil ||
+			self.comptimeTypeInfo() != nil ||
+			self.comptimeStructFields() != nil ||
+			self.comptimeStructField() != nil ||
+			self.comptimeEnumFields() != nil ||
+			self.comptimeEnumField() != nil ||
+			self.comptimeStatics() != nil ||
+			self.comptimeStatic() != nil ||
+			self.comptimeParams() != nil ||
+			self.comptimeParam() != nil ||
+			self.comptimeValue() != nil ||
+			self.comptimeFiles() != nil ||
+			self.comptimeFile() != nil
+	}
 
-    fn comptimeStructFields(mut self): &comptimeStructFields {
-        match type self.Kind {
-        | &comptimeStructFields:
-            ret (&comptimeStructFields)(self.Kind)
-        |:
-            ret nil
-        }
-    }
+	fn comptimeStructFields(mut self): &comptimeStructFields {
+		match type self.Kind {
+		| &comptimeStructFields:
+			ret (&comptimeStructFields)(self.Kind)
+		|:
+			ret nil
+		}
+	}
 
-    fn comptimeStructField(mut self): &comptimeStructField {
-        match type self.Kind {
-        | &comptimeStructField:
-            ret (&comptimeStructField)(self.Kind)
-        |:
-            ret nil
-        }
-    }
+	fn comptimeStructField(mut self): &comptimeStructField {
+		match type self.Kind {
+		| &comptimeStructField:
+			ret (&comptimeStructField)(self.Kind)
+		|:
+			ret nil
+		}
+	}
 
-    fn comptimeEnumFields(mut self): &comptimeEnumFields {
-        match type self.Kind {
-        | &comptimeEnumFields:
-            ret (&comptimeEnumFields)(self.Kind)
-        |:
-            ret nil
-        }
-    }
+	fn comptimeEnumFields(mut self): &comptimeEnumFields {
+		match type self.Kind {
+		| &comptimeEnumFields:
+			ret (&comptimeEnumFields)(self.Kind)
+		|:
+			ret nil
+		}
+	}
 
-    fn comptimeEnumField(mut self): &comptimeEnumField {
-        match type self.Kind {
-        | &comptimeEnumField:
-            ret (&comptimeEnumField)(self.Kind)
-        |:
-            ret nil
-        }
-    }
+	fn comptimeEnumField(mut self): &comptimeEnumField {
+		match type self.Kind {
+		| &comptimeEnumField:
+			ret (&comptimeEnumField)(self.Kind)
+		|:
+			ret nil
+		}
+	}
 
-    fn comptimeParams(mut self): &comptimeParams {
-        match type self.Kind {
-        | &comptimeParams:
-            ret (&comptimeParams)(self.Kind)
-        |:
-            ret nil
-        }
-    }
+	fn comptimeParams(mut self): &comptimeParams {
+		match type self.Kind {
+		| &comptimeParams:
+			ret (&comptimeParams)(self.Kind)
+		|:
+			ret nil
+		}
+	}
 
-    fn comptimeParam(mut self): &comptimeParam {
-        match type self.Kind {
-        | &comptimeParam:
-            ret (&comptimeParam)(self.Kind)
-        |:
-            ret nil
-        }
-    }
+	fn comptimeParam(mut self): &comptimeParam {
+		match type self.Kind {
+		| &comptimeParam:
+			ret (&comptimeParam)(self.Kind)
+		|:
+			ret nil
+		}
+	}
 
-    fn comptimeRange(mut self): &comptimeRange {
-        match type self.Kind {
-        | &comptimeRange:
-            ret (&comptimeRange)(self.Kind)
-        |:
-            ret nil
-        }
-    }
+	fn comptimeRange(mut self): &comptimeRange {
+		match type self.Kind {
+		| &comptimeRange:
+			ret (&comptimeRange)(self.Kind)
+		|:
+			ret nil
+		}
+	}
 
-    fn comptimeTypeInfos(mut self): &comptimeTypeInfos {
-        match type self.Kind {
-        | &comptimeTypeInfos:
-            ret (&comptimeTypeInfos)(self.Kind)
-        |:
-            ret nil
-        }
-    }
+	fn comptimeTypeInfos(mut self): &comptimeTypeInfos {
+		match type self.Kind {
+		| &comptimeTypeInfos:
+			ret (&comptimeTypeInfos)(self.Kind)
+		|:
+			ret nil
+		}
+	}
 
-    fn comptimeTypeInfo(mut self): &comptimeTypeInfo {
-        match type self.Kind {
-        | &comptimeTypeInfo:
-            ret (&comptimeTypeInfo)(self.Kind)
-        |:
-            ret nil
-        }
-    }
+	fn comptimeTypeInfo(mut self): &comptimeTypeInfo {
+		match type self.Kind {
+		| &comptimeTypeInfo:
+			ret (&comptimeTypeInfo)(self.Kind)
+		|:
+			ret nil
+		}
+	}
 
-    fn comptimeStatics(mut self): &comptimeStatics {
-        match type self.Kind {
-        | &comptimeStatics:
-            ret (&comptimeStatics)(self.Kind)
-        |:
-            ret nil
-        }
-    }
+	fn comptimeStatics(mut self): &comptimeStatics {
+		match type self.Kind {
+		| &comptimeStatics:
+			ret (&comptimeStatics)(self.Kind)
+		|:
+			ret nil
+		}
+	}
 
-    fn comptimeStatic(mut self): &comptimeStatic {
-        match type self.Kind {
-        | &comptimeStatic:
-            ret (&comptimeStatic)(self.Kind)
-        |:
-            ret nil
-        }
-    }
+	fn comptimeStatic(mut self): &comptimeStatic {
+		match type self.Kind {
+		| &comptimeStatic:
+			ret (&comptimeStatic)(self.Kind)
+		|:
+			ret nil
+		}
+	}
 
-    fn comptimeValue(mut self): &comptimeValue {
-        match type self.Kind {
-        | &comptimeValue:
-            ret (&comptimeValue)(self.Kind)
-        |:
-            ret nil
-        }
-    }
+	fn comptimeValue(mut self): &comptimeValue {
+		match type self.Kind {
+		| &comptimeValue:
+			ret (&comptimeValue)(self.Kind)
+		|:
+			ret nil
+		}
+	}
 
-    fn comptimeFile(mut self): &comptimeFile {
-        match type self.Kind {
-        | &comptimeFile:
-            ret (&comptimeFile)(self.Kind)
-        |:
-            ret nil
-        }
-    }
+	fn comptimeFile(mut self): &comptimeFile {
+		match type self.Kind {
+		| &comptimeFile:
+			ret (&comptimeFile)(self.Kind)
+		|:
+			ret nil
+		}
+	}
 
-    fn comptimeFiles(mut self): &comptimeFiles {
-        match type self.Kind {
-        | &comptimeFiles:
-            ret (&comptimeFiles)(self.Kind)
-        |:
-            ret nil
-        }
-    }
+	fn comptimeFiles(mut self): &comptimeFiles {
+		match type self.Kind {
+		| &comptimeFiles:
+			ret (&comptimeFiles)(self.Kind)
+		|:
+			ret nil
+		}
+	}
 }
 
 // Type.
 struct TypeSymbol {
-    Decl: &TypeDecl // Never changed by semantic analyzer.
-    Kind: &TypeKind
+	Decl: &TypeDecl // Never changed by semantic analyzer.
+	Kind: &TypeKind
 }
 
 impl TypeSymbol {
-    // Reports whether type is checked already.
-    fn checked(self): bool { ret self.Kind != nil }
+	// Reports whether type is checked already.
+	fn checked(self): bool { ret self.Kind != nil }
 
-    // Removes kind and ready to check.
-    // checked() reports false after this function.
-    fn removeKind(mut self) { self.Kind = nil }
+	// Removes kind and ready to check.
+	// checked() reports false after this function.
+	fn removeKind(mut self) { self.Kind = nil }
 }
 
 // Primitive type.
 struct Prim {
-    Kind: str
+	Kind: str
 }
 
 impl Kind for Prim {
-    // Returns kind.
-    fn Str(self): str {
-        ret self.Kind
-    }
+	// Returns kind.
+	fn Str(self): str {
+		ret self.Kind
+	}
 
-    // Reports whether types are same.
-    fn Equal(&self, other: &TypeKind): bool {
-        prim := unsafe { (*(&other)).Prim() }
-        if prim == nil {
-            ret false
-        }
-        ret self.Kind == prim.Kind
-    }
+	// Reports whether types are same.
+	fn Equal(&self, other: &TypeKind): bool {
+		prim := unsafe { (*(&other)).Prim() }
+		if prim == nil {
+			ret false
+		}
+		ret self.Kind == prim.Kind
+	}
 }
 
 impl Prim {
-    // Reports whether type is built-in constraint.
-    fn IsConstraint(self): bool {
-        ret !self.IsStr() &&
-            !self.IsAny() &&
-            !self.IsBool() &&
-            !types::IsNum(self.Kind)
-    }
+	// Reports whether type is built-in constraint.
+	fn IsConstraint(self): bool {
+		ret !self.IsStr() &&
+			!self.IsAny() &&
+			!self.IsBool() &&
+			!types::IsNum(self.Kind)
+	}
 
-    // Reports whether type is primitive i8.
-    fn IsI8(self): bool { ret self.Kind == PrimKind.I8 }
+	// Reports whether type is primitive i8.
+	fn IsI8(self): bool { ret self.Kind == PrimKind.I8 }
 
-    // Reports whether type is primitive i16.
-    fn IsI16(self): bool { ret self.Kind == PrimKind.I16 }
+	// Reports whether type is primitive i16.
+	fn IsI16(self): bool { ret self.Kind == PrimKind.I16 }
 
-    // Reports whether type is primitive i32.
-    fn IsI32(self): bool { ret self.Kind == PrimKind.I32 }
+	// Reports whether type is primitive i32.
+	fn IsI32(self): bool { ret self.Kind == PrimKind.I32 }
 
-    // Reports whether type is primitive i64.
-    fn IsI64(self): bool { ret self.Kind == PrimKind.I64 }
+	// Reports whether type is primitive i64.
+	fn IsI64(self): bool { ret self.Kind == PrimKind.I64 }
 
-    // Reports whether type is primitive u8.
-    fn IsU8(self): bool { ret self.Kind == PrimKind.U8 }
+	// Reports whether type is primitive u8.
+	fn IsU8(self): bool { ret self.Kind == PrimKind.U8 }
 
-    // Reports whether type is primitive u16.
-    fn IsU16(self): bool { ret self.Kind == PrimKind.U16 }
+	// Reports whether type is primitive u16.
+	fn IsU16(self): bool { ret self.Kind == PrimKind.U16 }
 
-    // Reports whether type is primitive u32.
-    fn IsU32(self): bool { ret self.Kind == PrimKind.U32 }
+	// Reports whether type is primitive u32.
+	fn IsU32(self): bool { ret self.Kind == PrimKind.U32 }
 
-    // Reports whether type is primitive u64.
-    fn IsU64(self): bool { ret self.Kind == PrimKind.U64 }
+	// Reports whether type is primitive u64.
+	fn IsU64(self): bool { ret self.Kind == PrimKind.U64 }
 
-    // Reports whether type is primitive f32.
-    fn IsF32(self): bool { ret self.Kind == PrimKind.F32 }
+	// Reports whether type is primitive f32.
+	fn IsF32(self): bool { ret self.Kind == PrimKind.F32 }
 
-    // Reports whether type is primitive f64.
-    fn IsF64(self): bool { ret self.Kind == PrimKind.F64 }
+	// Reports whether type is primitive f64.
+	fn IsF64(self): bool { ret self.Kind == PrimKind.F64 }
 
-    // Reports whether type is primitive int.
-    fn IsInt(self): bool { ret self.Kind == PrimKind.Int }
+	// Reports whether type is primitive int.
+	fn IsInt(self): bool { ret self.Kind == PrimKind.Int }
 
-    // Reports whether type is primitive uint.
-    fn IsUint(self): bool { ret self.Kind == PrimKind.Uint }
+	// Reports whether type is primitive uint.
+	fn IsUint(self): bool { ret self.Kind == PrimKind.Uint }
 
-    // Reports whether type is primitive uintptr.
-    fn IsUintptr(self): bool { ret self.Kind == PrimKind.Uintptr }
+	// Reports whether type is primitive uintptr.
+	fn IsUintptr(self): bool { ret self.Kind == PrimKind.Uintptr }
 
-    // Reports whether type is primitive bool.
-    fn IsBool(self): bool { ret self.Kind == PrimKind.Bool }
+	// Reports whether type is primitive bool.
+	fn IsBool(self): bool { ret self.Kind == PrimKind.Bool }
 
-    // Reports whether type is primitive str.
-    fn IsStr(self): bool { ret self.Kind == PrimKind.Str }
+	// Reports whether type is primitive str.
+	fn IsStr(self): bool { ret self.Kind == PrimKind.Str }
 
-    // Reports whether type is primitive any.
-    fn IsAny(self): bool { ret self.Kind == PrimKind.Any }
+	// Reports whether type is primitive any.
+	fn IsAny(self): bool { ret self.Kind == PrimKind.Any }
 }
 
 // Smart pointer.
 struct Sptr {
-    Elem: &TypeKind
+	Elem: &TypeKind
 }
 
 impl Kind for Sptr {
-    // Returns smart pointer kind as string.
-    fn Str(self): str { ret "&" + self.Elem.Str() }
+	// Returns smart pointer kind as string.
+	fn Str(self): str { ret "&" + self.Elem.Str() }
 
-    // Reports whether types are same.
-    fn Equal(&self, other: &TypeKind): bool {
-        sptr := unsafe { (*(&other)).Sptr() }
-        if sptr == nil {
-            ret false
-        }
-        ret self.Elem.Equal(sptr.Elem)
-    }
+	// Reports whether types are same.
+	fn Equal(&self, other: &TypeKind): bool {
+		sptr := unsafe { (*(&other)).Sptr() }
+		if sptr == nil {
+			ret false
+		}
+		ret self.Elem.Equal(sptr.Elem)
+	}
 }
 
 // Slice type.
 struct Slc {
-    Elem: &TypeKind
+	Elem: &TypeKind
 }
 
 impl Kind for Slc {
-    // Returns slice kind as string.
-    fn Str(self): str { ret "[]" + self.Elem.Str() }
+	// Returns slice kind as string.
+	fn Str(self): str { ret "[]" + self.Elem.Str() }
 
-    // Reports whether types are same.
-    fn Equal(&self, other: &TypeKind): bool {
-        slc := unsafe { (*(&other)).Slc() }
-        if slc == nil {
-            ret false
-        }
-        ret self.Elem.Equal(slc.Elem)
-    }
+	// Reports whether types are same.
+	fn Equal(&self, other: &TypeKind): bool {
+		slc := unsafe { (*(&other)).Slc() }
+		if slc == nil {
+			ret false
+		}
+		ret self.Elem.Equal(slc.Elem)
+	}
 }
 
 // Tuple type.
 struct Tuple {
-    Types: []&TypeKind
+	Types: []&TypeKind
 }
 
 impl Kind for Tuple {
-    // Returns tuple kind as string.
-    fn Str(self): str {
-        mut s := StrBuilder.New(1 << 4)
-        s.WriteByte('(')
-        s.WriteStr(self.Types[0].Str())
-        for _, t in self.Types[1:] {
-            s.WriteByte(',')
-            s.WriteStr(t.Str())
-        }
-        s.WriteByte(')')
-        ret s.Str()
-    }
+	// Returns tuple kind as string.
+	fn Str(self): str {
+		mut s := StrBuilder.New(1 << 4)
+		s.WriteByte('(')
+		s.WriteStr(self.Types[0].Str())
+		for _, t in self.Types[1:] {
+			s.WriteByte(',')
+			s.WriteStr(t.Str())
+		}
+		s.WriteByte(')')
+		ret s.Str()
+	}
 
-    // Reports whether types are same.
-    fn Equal(&self, other: &TypeKind): bool {
-        tup := unsafe { (*(&other)).Tup() }
-        if tup == nil {
-            ret false
-        }
-        if len(self.Types) != len(tup.Types) {
-            ret false
-        }
-        mut i := 0
-        for i < len(self.Types); i++ {
-            if !self.Types[i].Equal(tup.Types[i]) {
-                ret false
-            }
-        }
+	// Reports whether types are same.
+	fn Equal(&self, other: &TypeKind): bool {
+		tup := unsafe { (*(&other)).Tup() }
+		if tup == nil {
+			ret false
+		}
+		if len(self.Types) != len(tup.Types) {
+			ret false
+		}
+		mut i := 0
+		for i < len(self.Types); i++ {
+			if !self.Types[i].Equal(tup.Types[i]) {
+				ret false
+			}
+		}
 
-        ret true
-    }
+		ret true
+	}
 }
 
 // Map type.
 struct Map {
-    Key: &TypeKind
-    Val: &TypeKind
+	Key: &TypeKind
+	Val: &TypeKind
 }
 
 impl Kind for Map {
-    // Returns map kind as string.
-    fn Str(self): str {
-        mut s := StrBuilder.New(1 << 4)
-        s.WriteStr("map[")
-        s.WriteStr(self.Key.Str())
-        s.WriteByte(']')
-        s.WriteStr(self.Val.Str())
-        ret s.Str()
-    }
+	// Returns map kind as string.
+	fn Str(self): str {
+		mut s := StrBuilder.New(1 << 4)
+		s.WriteStr("map[")
+		s.WriteStr(self.Key.Str())
+		s.WriteByte(']')
+		s.WriteStr(self.Val.Str())
+		ret s.Str()
+	}
 
-    // Reports whether types are same.
-    fn Equal(&self, other: &TypeKind): bool {
-        m := unsafe { (*(&other)).Map() }
-        if m == nil {
-            ret false
-        }
-        ret self.Key.Equal(m.Key) && self.Val.Equal(m.Val)
-    }
+	// Reports whether types are same.
+	fn Equal(&self, other: &TypeKind): bool {
+		m := unsafe { (*(&other)).Map() }
+		if m == nil {
+			ret false
+		}
+		ret self.Key.Equal(m.Key) && self.Val.Equal(m.Val)
+	}
 }
 
 // Array type.
 struct Arr {
-    Auto: bool // Auto-sized array.
-    N:    int
-    Elem: &TypeKind
+	Auto: bool // Auto-sized array.
+	N:    int
+	Elem: &TypeKind
 }
 
 impl Kind for Arr {
-    // Returns array kind as string.
-    fn Str(self): str {
-        mut s := StrBuilder.New(1 << 4)
-        s.WriteByte('[')
-        s.WriteStr(conv::Itoa(self.N))
-        s.WriteByte(']')
-        s.WriteStr(self.Elem.Str())
-        ret s.Str()
-    }
+	// Returns array kind as string.
+	fn Str(self): str {
+		mut s := StrBuilder.New(1 << 4)
+		s.WriteByte('[')
+		s.WriteStr(conv::Itoa(self.N))
+		s.WriteByte(']')
+		s.WriteStr(self.Elem.Str())
+		ret s.Str()
+	}
 
-    // Reports whether types are same.
-    fn Equal(&self, other: &TypeKind): bool {
-        arr := unsafe { (*(&other)).Arr() }
-        if arr == nil {
-            ret false
-        }
-        ret self.N == arr.N && self.Elem.Equal(arr.Elem)
-    }
+	// Reports whether types are same.
+	fn Equal(&self, other: &TypeKind): bool {
+		arr := unsafe { (*(&other)).Arr() }
+		if arr == nil {
+			ret false
+		}
+		ret self.N == arr.N && self.Elem.Equal(arr.Elem)
+	}
 }
 
 // Pointer type.
 struct Ptr {
-    Elem: &TypeKind
+	Elem: &TypeKind
 }
 
 impl Kind for Ptr {
-    // Returns pointer kind as string.
-    fn Str(self): str {
-        if self.IsUnsafe() {
-            ret "*unsafe"
-        }
-        ret "*" + self.Elem.Str()
-    }
+	// Returns pointer kind as string.
+	fn Str(self): str {
+		if self.IsUnsafe() {
+			ret "*unsafe"
+		}
+		ret "*" + self.Elem.Str()
+	}
 
-    // Reports whether types are same.
-    fn Equal(&self, other: &TypeKind): bool {
-        ptr := unsafe { (*(&other)).Ptr() }
-        match {
-        | ptr == nil:
-            ret false
-        | ptr.IsUnsafe():
-            ret self.IsUnsafe()
-        |:
-            ret self.Elem.Equal(ptr.Elem)
-        }
-    }
+	// Reports whether types are same.
+	fn Equal(&self, other: &TypeKind): bool {
+		ptr := unsafe { (*(&other)).Ptr() }
+		match {
+		| ptr == nil:
+			ret false
+		| ptr.IsUnsafe():
+			ret self.IsUnsafe()
+		|:
+			ret self.Elem.Equal(ptr.Elem)
+		}
+	}
 }
 
 impl Ptr {
-    // Reports whether pointer is unsafe pointer (*unsafe).
-    fn IsUnsafe(self): bool { ret self.Elem == nil }
+	// Reports whether pointer is unsafe pointer (*unsafe).
+	fn IsUnsafe(self): bool { ret self.Elem == nil }
 }
 
 struct referencer {
-    ident: str
-    owner: any
-    refs:  *[]any
+	ident: str
+	owner: any
+	refs:  *[]any
 }
 
 // Checks type and builds result as kind.
 // Removes kind if error occurs,
 // so type is not reports true for checked state.
 struct typeChecker {
-    // Uses Sema for:
-    //  - Push errors.
-    s: &Sema
+	// Uses Sema for:
+	//  - Push errors.
+	s: &Sema
 
-    // Uses Lookup for:
-    //  - Lookup symbol tables for root specific.
-    rootLookup: Lookup
+	// Uses Lookup for:
+	//  - Lookup symbol tables for root specific.
+	rootLookup: Lookup
 
-    // Uses Lookup for:
-    //  - Lookup symbol tables for current.
-    //  - It might be change when evaluation of namespace selection or etc.
-    lookup: Lookup
+	// Uses Lookup for:
+	//  - Lookup symbol tables for current.
+	//  - It might be change when evaluation of namespace selection or etc.
+	lookup: Lookup
 
-    // If this is not nil, appends referred ident types.
-    // Also used as checker owner.
-    referencer: &referencer
+	// If this is not nil, appends referred ident types.
+	// Also used as checker owner.
+	referencer: &referencer
 
-    // If this not nil, type dependencies will push into stack.
-    refers: &ReferenceStack
+	// If this not nil, type dependencies will push into stack.
+	refers: &ReferenceStack
 
-    errorToken: &Token
+	errorToken: &Token
 
-    // This identifiers ignored and
-    // appends as primitive type.
-    //
-    // Each dimension 2 array accepted as identifier group.
-    ignoreGenerics: []&GenericDecl
+	// This identifiers ignored and
+	// appends as primitive type.
+	//
+	// Each dimension 2 array accepted as identifier group.
+	ignoreGenerics: []&GenericDecl
 
-    // Relevant type kinds that contains an ignored generic type.
-    ignoredGenerics: *[]&TypeKind
+	// Relevant type kinds that contains an ignored generic type.
+	ignoredGenerics: *[]&TypeKind
 
-    // This generics used as type alias for real kind.
-    useGenerics: []&TypeAlias
+	// This generics used as type alias for real kind.
+	useGenerics: []&TypeAlias
 
-    // Current checked type is risky for cycles.
-    // If this field is true, cycle analysis will be executed for type.
-    cycleRisk: bool = true
+	// Current checked type is risky for cycles.
+	// If this field is true, cycle analysis will be executed for type.
+	cycleRisk: bool = true
 
-    // Disallow/suppress Jule's built-in defines.
-    disBuiltin: bool
+	// Disallow/suppress Jule's built-in defines.
+	disBuiltin: bool
 
-    // Name selection is enabled.
-    // No binded definitions, no generic type representation.
-    // Only typename selection.
-    //
-    // If selection is a struct, returns invalid instance that only has decl field.
-    selection: bool
+	// Name selection is enabled.
+	// No binded definitions, no generic type representation.
+	// Only typename selection.
+	//
+	// If selection is a struct, returns invalid instance that only has decl field.
+	selection: bool
 
-    // See developer reference (4).
-    ownerAlias: &TypeAlias
+	// See developer reference (4).
+	ownerAlias: &TypeAlias
 
-    // This generics are banned because of causes instantiation cycles.
-    // Usually stores structure generics and method generics.
-    // See developer reference (5).
-    bannedGenerics: []&TypeAlias
+	// This generics are banned because of causes instantiation cycles.
+	// Usually stores structure generics and method generics.
+	// See developer reference (5).
+	bannedGenerics: []&TypeAlias
 
-    // Enable/Disable status of instantiation catching.
-    // See developer reference (6).
-    inscatch: bool
+	// Enable/Disable status of instantiation catching.
+	// See developer reference (6).
+	inscatch: bool
 }
 
 impl typeChecker {
-    fn pushErr(mut self, token: &Token, fmt: LogMsg, args: ...any) {
-        self.s.pushErr(token, fmt, args...)
-    }
-
-    fn allowBuiltin(mut self) {
-        self.disBuiltin = false
-    }
-
-    fn disallowBuiltin(mut self) {
-        self.disBuiltin = true
-    }
-
-    fn pushReference[T](mut self, mut &t: T) {
-        if self.refers == nil {
-            ret
-        }
-        if self.refers.Exist[T](t) {
-            ret
-        }
-        self.refers.Push(t)
-    }
-
-    fn pushReferenceByKind(mut self, mut &k: &TypeKind) {
-        match {
-        | k.Struct() != nil:
-            mut t := k.Struct()
-            self.pushReference[&StructIns](t)
-        | k.Trait() != nil:
-            mut t := k.Trait()
-            self.pushReference[&Trait](t)
-        }
-    }
-
-    fn pushCycleError(self, def1: any, def2: any, mut &message: StrBuilder) {
-        const Padding = 7
-        getIdent := fn(&def: any): str {
-            match type def {
-            | &TypeAlias:
-                ret (&TypeAlias)(def).Ident
-            | &Struct:
-                ret (&Struct)(def).Ident
-            |:
-                ret ""
-            }
-        }
-        m := message.Str()
-        def1Ident := getIdent(def1)
-        def2Ident := getIdent(def2)
-        refersTo := Logf(LogMsg.RefersTo, def1Ident, def2Ident)
-        message.WriteStr(strings::Repeat(" ", Padding))
-        message.WriteStr(refersTo)
-        message.WriteByte('\n')
-        message.WriteStr(m)
-    }
-
-    fn checkCrossCycle(self, decl: any, mut &message: StrBuilder): bool {
-        match type decl {
-        | &TypeAlias:
-            ta := (&TypeAlias)(decl)
-            for _, d in ta.Refers {
-                match {
-                | self.referencer.owner == d:
-                    self.pushCycleError(ta, d, message)
-                    ret false
-                | !self.checkCrossCycle(d, message):
-                    self.pushCycleError(ta, d, message)
-                    ret false
-                }
-            }
-        | &Struct:
-            s := (&Struct)(decl)
-            for _, d in s.Depends {
-                match {
-                | self.referencer.owner == d:
-                    self.pushCycleError(s, d, message)
-                    ret false
-                | !self.checkCrossCycle(d, message):
-                    self.pushCycleError(s, d, message)
-                    ret false
-                }
-            }
-        }
-        ret true
-    }
-
-    // Checks type alias illegal cycles.
-    // Appends reference to reference if there is no illegal cycle.
-    // Returns true if self.referencer is nil reference.
-    // Returns true if refers is nil.
-    fn checkIllegalCycles(mut self, &ident: &IdentTypeDecl, mut decl: any): (ok: bool) {
-        if self.referencer == nil || !self.cycleRisk {
-            ret true
-        }
-
-        match type decl {
-        | &Struct:
-            if (&Struct)(decl).Binded {
-                ret true
-            }
-        | &TypeAlias:
-            if (&TypeAlias)(decl).Binded {
-                ret true
-            }
-        }
-
-        // Check illegal cycle for itself.
-        // Because refers's owner is decl.
-        if self.referencer.owner == decl {
-            self.pushErr(ident.Token, LogMsg.IllegalCycleRefersItself, self.referencer.ident)
-            ret false
-        }
-
-        mut message := StrBuilder.New(1 << 5)
-
-        if !self.checkCrossCycle(decl, message) {
-            mut errMsg := message.Str()
-            message.Clear()
-            self.pushCycleError(self.referencer.owner, decl, message)
-            errMsg += message.Str()
-            self.pushErr(ident.Token, LogMsg.IllegalCrossCycle, errMsg)
-            ret false
-        }
-
-        match type self.referencer.owner {
-        | &TypeAlias:
-            unsafe {
-                *self.referencer.refs = append(*self.referencer.refs, decl)
-            }
-        | &Struct:
-            match type decl {
-            | &Struct:
-                mut s := (&Struct)(self.referencer.owner)
-                s.Depends = append(s.Depends, (&Struct)(decl))
-            }
-        }
-
-        ret true
-    }
-
-    fn fromTypeAlias(mut self, &decl: &IdentTypeDecl, mut &ta: &TypeAlias): Kind {
-        if !self.s.isAccessibleDefine(ta.Public, ta.Token) {
-            self.pushErr(decl.Token, LogMsg.IdentNotExist, decl.Ident)
-            ret nil
-        }
-
-        ta.Used = true
-
-        if len(decl.Generics) > 0 {
-            self.pushErr(decl.Token, LogMsg.TypeNotSupportsGenerics, decl.Ident)
-            ret nil
-        }
-
-        // Enable instantiation cycle catching if type alias is
-        // one of the banned generics.
-        if !self.inscatch && self.bannedGenerics != nil {
-            self.inscatch = true
-            for _, bg in self.bannedGenerics {
-                if bg == ta || ta.Kind.Kind != nil && ta.Kind.Kind.Equal(bg.Kind.Kind) {
-                    self.inscatch = false
-                    break
-                }
-            }
-        }
-
-        // Catch instantiation cycles.
-        // See developer reference (5).
-        if self.inscatch {
-            for _, bg in self.bannedGenerics {
-                if bg == ta {
-                    self.pushErr(decl.Token, LogMsg.InitiationCycle, decl.Ident)
-                    ret nil
-                }
-                for _, dg in ta.Generics {
-                    if bg == dg {
-                        self.pushErr(decl.Token, LogMsg.InitiationCycle, decl.Ident)
-                        ret nil
-                    }
-                }
-            }
-        }
-
-        mut ok := self.checkIllegalCycles(decl, ta)
-        if !ok {
-            ret nil
-        }
-
-        // Build kind if not builded already.
-        if ta.Kind.Kind == nil {
-            ok = self.s.checkTypeAliasDeclKind(ta, self.lookup)
-            if !ok {
-                ret nil
-            }
-        }
-
-        // Push generic reference to owner type alias.
-        // See developer reference (3) and (4) for more information.
-        if ta.Generic && self.ownerAlias != nil {
-            self.ownerAlias.Generics = append(self.ownerAlias.Generics, ta)
-        }
-
-        mut tk := &TypeKind{
-            Generic: ta.Generic,
-            Kind: ta.Kind.Kind.Kind,
-        }
-        self.pushReferenceByKind(tk)
-        if ta.Binded {
-            tk.BindIdent = ta.Ident
-        } else {
-            tk.BindIdent = ta.Kind.Kind.BindIdent
-        }
-        ret tk
-    }
-
-    fn fromEnum(mut self, &decl: &IdentTypeDecl, mut &e: &Enum): &Enum {
-        if !self.s.isAccessibleDefine(e.Public, e.Token) {
-            self.pushErr(decl.Token, LogMsg.IdentNotExist, decl.Ident)
-            ret nil
-        }
-        if len(decl.Generics) > 0 {
-            self.pushErr(decl.Token, LogMsg.TypeNotSupportsGenerics, decl.Ident)
-            ret nil
-        }
-        ret e
-    }
-
-    fn fromTypeEnum(mut self, &decl: &IdentTypeDecl, mut &e: &TypeEnum): &TypeEnum {
-        if !self.s.isAccessibleDefine(e.Public, e.Token) {
-            self.pushErr(decl.Token, LogMsg.IdentNotExist, decl.Ident)
-            ret nil
-        }
-        if len(decl.Generics) > 0 {
-            self.pushErr(decl.Token, LogMsg.TypeNotSupportsGenerics, decl.Ident)
-            ret nil
-        }
-        ret e
-    }
-
-    fn fromTrait(mut self, &decl: &IdentTypeDecl, mut &t: &Trait): &Trait {
-        if !self.s.isAccessibleDefine(t.Public, t.Token) {
-            self.pushErr(decl.Token, LogMsg.IdentNotExist, decl.Ident)
-            ret nil
-        }
-        if len(decl.Generics) > 0 {
-            self.pushErr(decl.Token, LogMsg.TypeNotSupportsGenerics, decl.Ident)
-            ret nil
-        }
-        self.pushReference[&Trait](t)
-        ret t
-    }
-
-    fn checkStructIns(mut self, mut &ins: &StructIns, mut &errorToken: &Token): (ok: bool) {
-        if ins.Checked {
-            ret true
-        }
-        ins.Checked = true
-
-        // Break algorithm cycle.
-        if self.referencer != nil && self.referencer.owner == ins.Decl {
-            ret true
-        }
-
-        if !self.s.precheckStructIns(ins, errorToken) {
-            ret false
-        }
-        if len(ins.Generics) > 0 {
-            self.s.checkStructInsOperators(ins)
-            self.s.checkStructIns(ins)
-        }
-        ret true
-    }
-
-    fn appendUsedStructReference(mut self, mut &s: &Struct) {
-        if self.referencer == nil {
-            ret
-        }
-        match type self.referencer.owner {
-        | &Struct:
-            mut refS := (&Struct)(self.referencer.owner)
-            if !refS.IsUses(s) {
-                refS.Uses = append(refS.Uses, s)
-            }
-        }
-    }
-
-    fn buildStructInstance(mut self, mut &decl: &IdentTypeDecl, mut &s: &Struct): &StructIns {
-        // Save configuration.
-        mut referencer := self.referencer
-        self.referencer = nil
-        mut bannedGenerics := self.bannedGenerics
-
-        // Set banned generics to catch initiation cycles.
-        // This just necessary for root, therefore avoid set each time.
-        if self.bannedGenerics == nil {
-            match type self.lookup {
-            | &scopeChecker:
-                mut sc := (&scopeChecker)(self.lookup)
-                mut hard := sc.getHardRoot()
-                if hard.owner.Owner == nil || hard.owner.Owner.Decl != s {
-                    break
-                }
-                n := len(hard.owner.Generics) + len(hard.owner.Owner.Generics)
-                // Add scope generics to to catch instantiation cycles.
-                // See developer reference (5).
-                self.bannedGenerics = hard.table.TypeAliases[:n]
-            }
-        } else {
-            self.inscatch = true
-        }
-
-        // Use rootLookup to parse generics with current current.
-        mut lookup := self.lookup
-        self.lookup = self.rootLookup
-
-        // Build generics.
-        mut ins := s.instance()
-        ins.Generics = make([]&InsGeneric, 0, len(decl.Generics))
-        for (_, mut g) in decl.Generics {
-            mut kind := self.build(g.Kind)
-            if kind == nil {
-                ret nil
-            }
-            ins.Generics = append(ins.Generics, &InsGeneric{Kind: kind})
-        }
-
-        // Restore configuration.
-        self.lookup = lookup
-        self.bannedGenerics = bannedGenerics
-        self.referencer = referencer
-
-        ret ins
-    }
-
-    fn fromStruct(mut self, mut &decl: &IdentTypeDecl, mut &s: &Struct): &StructIns {
-        if !self.s.isAccessibleDefine(s.Public, s.Token) {
-            self.pushErr(decl.Token, LogMsg.IdentNotExist, decl.Ident)
-            ret nil
-        }
-
-        // Name selection.
-        // Return instance instantly.
-        if self.selection {
-            if len(decl.Generics) > 0 {
-                self.pushErr(decl.Token, LogMsg.GenericsNotAllowed)
-                ret nil
-            }
-            ret &StructIns{
-                Decl: s,
-            }
-        }
-
-        mut ok := self.checkIllegalCycles(decl, s)
-        if !ok {
-            ret nil
-        }
-        self.appendUsedStructReference(s)
-
-        mut ins := self.buildStructInstance(decl, s)
-        if ins == nil {
-            ret nil
-        }
-
-        ok = self.s.checkGenericQuantity(len(ins.Decl.Generics), len(ins.Generics), decl.Token)
-        if !ok {
-            ret nil
-        }
-
-        mut existInstance := s.appendInstance(ins)
-        if existInstance != nil {
-            if !self.s.checkConstraintsStruct(ins, decl.Token, existInstance) {
-                ret nil
-            }
-            // Already checked instance, did not appended.
-            // So, this instance is not unique.
-            self.pushReference[&StructIns](existInstance)
-            ret existInstance
-        }
-        if !self.checkStructIns(ins, decl.Token) {
-            ret nil
-        }
-        self.pushReference[&StructIns](ins)
-        ret ins
-    }
-
-    // Returns identifier if found. Also checks founded identifier.
-    // Uses internal lookup for all process except finding step of identifier.
-    // Will find identifier in [l], not internal lookup.
-    // Also finds in built-in lookup if allowed.
-    // If another lookup nedeed, uses internal lookup, so any generic type build
-    // process will use internal lookup. This might be useful for building
-    // genericed type from another package.
-    fn getDef(mut self, mut &decl: &IdentTypeDecl): Kind {
-        for _, g in self.ignoreGenerics {
-            if g.Ident == decl.Ident {
-                ret buildPrimType(g.Ident)
-            }
-        }
-
-        for (_, mut g) in self.useGenerics {
-            if g.Ident == decl.Ident {
-                if len(decl.Generics) > 0 {
-                    self.pushErr(decl.Token, LogMsg.TypeNotSupportsGenerics, decl.Ident)
-                    ret nil
-                }
-                mut st := g.Kind.Kind.Struct()
-                if st != nil {
-                    ok := self.checkIllegalCycles(decl, st.Decl)
-                    if !ok {
-                        ret nil
-                    }
-                }
-                ret g.Kind.Kind.Kind
-            }
-        }
-
-        if !decl.Binded {
-            mut e := self.lookup.FindEnum(decl.Ident)
-            if e != nil {
-                ret self.fromEnum(decl, e)
-            }
-
-            mut te := self.lookup.FindTypeEnum(decl.Ident)
-            if te != nil {
-                ret self.fromTypeEnum(decl, te)
-            }
-
-            mut t := self.lookup.FindTrait(decl.Ident)
-            if t != nil {
-                ret self.fromTrait(decl, t)
-            }
-        } else if self.selection {
-            self.pushErr(decl.Token, LogMsg.BindedTypeNotAllowed)
-            ret nil
-        }
-
-        mut s := self.lookup.FindStruct(decl.Ident, decl.Binded)
-        if s != nil {
-            ret self.fromStruct(decl, s)
-        }
-
-        mut ta := self.lookup.FindTypeAlias(decl.Ident, decl.Binded)
-        if ta == nil && !self.disBuiltin {
-            ta = findBuiltinTypeAlias(decl.Ident)
-        }
-        if ta != nil {
-            ret self.fromTypeAlias(decl, ta)
-        }
-
-        self.pushErr(decl.Token, LogMsg.IdentNotExist, decl.Ident)
-        ret nil
-    }
-
-    fn buildIdent(mut self, mut decl: &IdentTypeDecl): Kind {
-        ret self.getDef(decl)
-    }
-
-    fn buildSubIdent(mut self, mut decl: &SubIdentTypeDecl): Kind {
-        mut ident := self.buildIdent(decl.Idents[0])
-        if ident == nil {
-            ret nil
-        }
-        match type ident {
-        | &TypeEnum:
-            break
-        |:
-            self.pushErr(self.errorToken, LogMsg.InvalidSyntax)
-            ret nil
-        }
-        mut t := (&TypeEnum)(ident)
-        mut idents := decl.Idents[1:]
-        for i, id in idents {
-            mut item := t.FindItem(id.Ident)
-            if item == nil {
-                self.pushErr(id.Token, LogMsg.ObjHaveNotIdent, t.Ident, id.Ident)
-                ret nil
-            }
-            if len(idents)-i == 1 {
-                self.pushReferenceByKind(item.Kind.Kind)
-                ret item.Kind.Kind
-            }
-            t = item.Kind.Kind.TypeEnum()
-            if t == nil {
-                self.pushErr(self.errorToken, LogMsg.InvalidSyntax)
-                ret nil
-            }
-        }
-        // Should be unreachable.
-        ret nil
-    }
-
-    fn buildSptrFromType(mut self, mut &elem: &TypeKind): &Sptr {
-        // Check special cases.
-        match {
-        | elem == nil:
-            ret nil
-        | elem.Struct() != nil:
-            s := elem.Struct()
-            if s.Decl != nil && s.Decl.Binded {
-                self.pushErr(self.errorToken, LogMsg.BindedStructForRef)
-                ret nil
-            }
-        | elem.Arr() != nil && elem.Arr().Auto:
-            self.pushErr(self.errorToken, LogMsg.ArrayAutoSized)
-            ret nil
-        }
-        ret &Sptr{
-            Elem: elem,
-        }
-    }
-
-    fn buildSptr(mut self, mut decl: &SptrTypeDecl): &Sptr {
-        cycleRisk := self.cycleRisk
-        self.cycleRisk = false
-        defer { self.cycleRisk = cycleRisk }
-
-        mut elem := self.checkDecl(decl.Elem)
-        ret self.buildSptrFromType(elem)
-    }
-
-    fn buildPtrFromType(mut self, mut &elem: &TypeKind): &Ptr {
-        // Check special cases.
-        match {
-        | elem == nil:
-            ret nil
-        | elem.Arr() != nil && elem.Arr().Auto:
-            self.pushErr(self.errorToken, LogMsg.ArrayAutoSized)
-            ret new(Ptr)
-        }
-
-        ret &Ptr{
-            Elem: elem,
-        }
-    }
-
-    fn buildPtr(mut self, mut decl: &PtrTypeDecl): &Ptr {
-        cycleRisk := self.cycleRisk
-        self.cycleRisk = false
-        defer { self.cycleRisk = cycleRisk }
-
-        let mut elem: &TypeKind = nil
-
-        if !decl.IsUnsafe() {
-            elem = self.checkDecl(decl.Elem)
-            ret self.buildPtrFromType(elem)
-        }
-
-        ret &Ptr{
-            Elem: elem,
-        }
-    }
-
-    fn buildSlc(mut self, mut decl: &SlcTypeDecl): &Slc {
-        cycleRisk := self.cycleRisk
-        self.cycleRisk = false
-        defer { self.cycleRisk = cycleRisk }
-
-        mut elem := self.checkDecl(decl.Elem)
-
-        // Check special cases.
-        match {
-        | elem == nil:
-            ret nil
-        | elem.Arr() != nil && elem.Arr().Auto:
-            self.pushErr(decl.Elem.Token, LogMsg.ArrayAutoSized)
-            ret nil
-        }
-
-        ret &Slc{
-            Elem: elem,
-        }
-    }
-
-    fn buildArr(mut self, mut decl: &ArrTypeDecl): &Arr {
-        mut n := 0
-
-        if !decl.AutoSized() {
-            mut size := self.s.eval(self.lookup).evalExpr(decl.Size)
-            if size == nil {
-                ret nil
-            }
-
-            if !size.IsConst() {
-                self.pushErr(decl.Size.Token, LogMsg.ExprNotConst)
-                ret nil
-            } else if size.Kind.Prim() == nil || !types::IsInt(size.Kind.Prim().Kind) {
-                self.pushErr(decl.Size.Token, LogMsg.ArraySizeIsNotInt)
-                ret nil
-            }
-
-            n = int(size.Constant.AsI64())
-            if n < 0 {
-                self.pushErr(decl.Elem.Token, LogMsg.ArraySizeIsNeg)
-                ret nil
-            } else {
-                max := types::MaxI(PrimKind.Int)
-                if types::BitSize != 64 && i64(n) > max {
-                    self.pushErr(decl.Size.Token, LogMsg.ArraySizeOverflow,
-                        constoa(size.Constant), conv::FmtInt(max, 10))
-                    ret nil
-                }
-            }
-        }
-
-        mut elem := self.checkDecl(decl.Elem)
-
-        // Check special cases.
-        match {
-        | elem == nil:
-            ret nil
-        | elem.Arr() != nil && elem.Arr().Auto:
-            self.pushErr(decl.Elem.Token, LogMsg.ArrayAutoSized)
-            ret nil
-        }
-
-        ret &Arr{
-            Auto: decl.AutoSized(),
-            N: n,
-            Elem: elem,
-        }
-    }
-
-    fn buildMap(mut self, mut decl: &MapTypeDecl): &Map {
-        cycleRisk := self.cycleRisk
-        self.cycleRisk = false
-        defer { self.cycleRisk = cycleRisk }
-
-        mut key := self.checkDecl(decl.Key)
-        if key == nil {
-            ret nil
-        }
-
-        mut val := self.checkDecl(decl.Val)
-        if val == nil {
-            ret nil
-        }
-        if val.Enum() != nil {
-            self.pushErr(decl.Val.Token, LogMsg.EnumAsMapVal)
-        }
-
-        ret &Map{
-            Key: key,
-            Val: val,
-        }
-    }
-
-    fn buildTuple(mut self, mut decl: &TupleTypeDecl): &Tuple {
-        mut types := make([]&TypeKind, 0, len(decl.Types))
-        for (_, mut t) in decl.Types {
-            mut kind := self.checkDecl(t)
-            if kind == nil {
-                ret nil
-            }
-            types = append(types, kind)
-        }
-
-        ret &Tuple{Types: types}
-    }
-
-    fn checkFuncTypes(mut self, mut &f: &FnIns): (ok: bool) {
-        for (_, mut p) in f.Params {
-            p.Kind = self.build(p.Decl.Kind.Decl.Kind)
-            ok = p.Kind != nil
-            if !ok {
-                ret false
-            }
-            self.s.checkFnParamKind(p)
-        }
-
-        if !f.Decl.IsVoid() {
-            f.Result = self.build(f.Decl.Result.Kind.Decl.Kind)
-            ret f.Result != nil
-        }
-
-        ret true
-    }
-
-    fn buildFunc(mut self, mut decl: &FnDecl): &FnIns {
-        cycleRisk := self.cycleRisk
-        self.cycleRisk = false
-        defer { self.cycleRisk = cycleRisk }
-
-        if len(decl.Generics) > 0 {
-            self.pushErr(decl.Token, LogMsg.GenericedFnAsAnonFn)
-            ret nil
-        }
-
-        mut f := buildFunc(decl)
-
-        n := len(self.s.errors)
-        self.s.checkAnonFuncDecl(f)
-        if n != len(self.s.errors) {
-            ret nil
-        }
-
-        mut ins := f.instanceForce()
-        ins.Anon = true
-        ins.AsAnon = true
-
-        ok := self.checkFuncTypes(ins)
-        if !ok {
-            ret nil
-        }
-
-        ret ins
-    }
-
-    fn buildByNamespace(mut self, mut decl: &NamespaceTypeDecl): Kind {
-        path := buildLinkPathByTokens(decl.Idents)
-        mut imp := self.lookup.SelectPackage(fn(imp: &ImportInfo): bool {
-            if len(decl.Idents) == 1 && imp.Alias == path {
-                ret true
-            }
-            ret imp.LinkPath == path && imp.isAccessibleViaSelection()
-        })
-
-        selfIdent := str(TokenKind.Self)
-        if imp == nil || !imp.isLookupable(selfIdent) {
-            self.pushErr(decl.Idents[0], LogMsg.NamespaceNotExist, path)
-            ret nil
-        }
-
-        self.disallowBuiltin()
-        mut lookup := self.lookup
-        self.lookup = imp
-        mut kind := self.checkDecl(decl.Kind)
-        self.lookup = lookup
-        self.allowBuiltin()
-        ret kind
-    }
-
-    fn build(mut self, mut &declKind: TypeDeclKind): &TypeKind {
-        let mut kind: Kind = nil
-        match type declKind {
-        | &IdentTypeDecl:
-            mut t := self.buildIdent((&IdentTypeDecl)(declKind))
-            if t != nil {
-                kind = t
-            }
-        | &SubIdentTypeDecl:
-            mut t := self.buildSubIdent((&SubIdentTypeDecl)(declKind))
-            if t != nil {
-                kind = t
-            }
-        | &SptrTypeDecl:
-            self.inscatch = true
-            mut t := self.buildSptr((&SptrTypeDecl)(declKind))
-            if t != nil {
-                kind = t
-            }
-        | &PtrTypeDecl:
-            self.inscatch = true
-            mut t := self.buildPtr((&PtrTypeDecl)(declKind))
-            if t != nil {
-                kind = t
-            }
-        | &SlcTypeDecl:
-            self.inscatch = true
-            mut t := self.buildSlc((&SlcTypeDecl)(declKind))
-            if t != nil {
-                kind = t
-            }
-        | &ArrTypeDecl:
-            self.inscatch = true
-            mut t := self.buildArr((&ArrTypeDecl)(declKind))
-            if t != nil {
-                kind = t
-            }
-        | &MapTypeDecl:
-            self.inscatch = true
-            mut t := self.buildMap((&MapTypeDecl)(declKind))
-            if t != nil {
-                kind = t
-            }
-        | &TupleTypeDecl:
-            self.inscatch = true
-            mut t := self.buildTuple((&TupleTypeDecl)(declKind))
-            if t != nil {
-                kind = t
-            }
-        | &FnDecl:
-            self.inscatch = true
-            mut t := self.buildFunc((&FnDecl)(declKind))
-            if t != nil {
-                kind = t
-            }
-        | &NamespaceTypeDecl:
-            self.inscatch = true
-            mut t := self.buildByNamespace((&NamespaceTypeDecl)(declKind))
-            if t != nil {
-                kind = t
-            }
-        |:
-            self.pushErr(self.errorToken, LogMsg.InvalidType)
-            ret nil
-        }
-        if kind == nil {
-            ret nil
-        }
-        match type kind {
-        | &TypeKind:
-            ret (&TypeKind)(kind)
-        |:
-            mut tk := &TypeKind{Kind: kind}
-            match type kind {
-            | &Prim:
-                if self.ignoredGenerics != nil {
-                    unsafe { *self.ignoredGenerics = append(*self.ignoredGenerics, tk) }
-                }
-            | &StructIns:
-                s := (&StructIns)(kind)
-                if s.Decl != nil && s.Decl.Binded {
-                    tk.BindIdent = s.Decl.Ident
-                }
-            }
-            ret tk
-        }
-    }
-
-    fn checkDecl(mut self, mut &decl: &TypeDecl): &TypeKind {
-        // Save current token.
-        mut errorToken := self.errorToken
-
-        self.errorToken = decl.Token
-        mut kind := self.build(decl.Kind)
-        self.errorToken = errorToken
-
-        ret kind
-    }
-
-    fn check(mut self, mut &t: &TypeSymbol) {
-        if t.Decl == nil {
-            ret
-        }
-        mut kind := self.checkDecl(t.Decl)
-        if kind == nil {
-            t.removeKind()
-            ret
-        }
-        t.Kind = kind
-    }
+	fn pushErr(mut self, token: &Token, fmt: LogMsg, args: ...any) {
+		self.s.pushErr(token, fmt, args...)
+	}
+
+	fn allowBuiltin(mut self) {
+		self.disBuiltin = false
+	}
+
+	fn disallowBuiltin(mut self) {
+		self.disBuiltin = true
+	}
+
+	fn pushReference[T](mut self, mut &t: T) {
+		if self.refers == nil {
+			ret
+		}
+		if self.refers.Exist[T](t) {
+			ret
+		}
+		self.refers.Push(t)
+	}
+
+	fn pushReferenceByKind(mut self, mut &k: &TypeKind) {
+		match {
+		| k.Struct() != nil:
+			mut t := k.Struct()
+			self.pushReference[&StructIns](t)
+		| k.Trait() != nil:
+			mut t := k.Trait()
+			self.pushReference[&Trait](t)
+		}
+	}
+
+	fn pushCycleError(self, def1: any, def2: any, mut &message: StrBuilder) {
+		const Padding = 7
+		getIdent := fn(&def: any): str {
+			match type def {
+			| &TypeAlias:
+				ret (&TypeAlias)(def).Ident
+			| &Struct:
+				ret (&Struct)(def).Ident
+			|:
+				ret ""
+			}
+		}
+		m := message.Str()
+		def1Ident := getIdent(def1)
+		def2Ident := getIdent(def2)
+		refersTo := Logf(LogMsg.RefersTo, def1Ident, def2Ident)
+		message.WriteStr(strings::Repeat(" ", Padding))
+		message.WriteStr(refersTo)
+		message.WriteByte('\n')
+		message.WriteStr(m)
+	}
+
+	fn checkCrossCycle(self, decl: any, mut &message: StrBuilder): bool {
+		match type decl {
+		| &TypeAlias:
+			ta := (&TypeAlias)(decl)
+			for _, d in ta.Refers {
+				match {
+				| self.referencer.owner == d:
+					self.pushCycleError(ta, d, message)
+					ret false
+				| !self.checkCrossCycle(d, message):
+					self.pushCycleError(ta, d, message)
+					ret false
+				}
+			}
+		| &Struct:
+			s := (&Struct)(decl)
+			for _, d in s.Depends {
+				match {
+				| self.referencer.owner == d:
+					self.pushCycleError(s, d, message)
+					ret false
+				| !self.checkCrossCycle(d, message):
+					self.pushCycleError(s, d, message)
+					ret false
+				}
+			}
+		}
+		ret true
+	}
+
+	// Checks type alias illegal cycles.
+	// Appends reference to reference if there is no illegal cycle.
+	// Returns true if self.referencer is nil reference.
+	// Returns true if refers is nil.
+	fn checkIllegalCycles(mut self, &ident: &IdentTypeDecl, mut decl: any): (ok: bool) {
+		if self.referencer == nil || !self.cycleRisk {
+			ret true
+		}
+
+		match type decl {
+		| &Struct:
+			if (&Struct)(decl).Binded {
+				ret true
+			}
+		| &TypeAlias:
+			if (&TypeAlias)(decl).Binded {
+				ret true
+			}
+		}
+
+		// Check illegal cycle for itself.
+		// Because refers's owner is decl.
+		if self.referencer.owner == decl {
+			self.pushErr(ident.Token, LogMsg.IllegalCycleRefersItself, self.referencer.ident)
+			ret false
+		}
+
+		mut message := StrBuilder.New(1 << 5)
+
+		if !self.checkCrossCycle(decl, message) {
+			mut errMsg := message.Str()
+			message.Clear()
+			self.pushCycleError(self.referencer.owner, decl, message)
+			errMsg += message.Str()
+			self.pushErr(ident.Token, LogMsg.IllegalCrossCycle, errMsg)
+			ret false
+		}
+
+		match type self.referencer.owner {
+		| &TypeAlias:
+			unsafe {
+				*self.referencer.refs = append(*self.referencer.refs, decl)
+			}
+		| &Struct:
+			match type decl {
+			| &Struct:
+				mut s := (&Struct)(self.referencer.owner)
+				s.Depends = append(s.Depends, (&Struct)(decl))
+			}
+		}
+
+		ret true
+	}
+
+	fn fromTypeAlias(mut self, &decl: &IdentTypeDecl, mut &ta: &TypeAlias): Kind {
+		if !self.s.isAccessibleDefine(ta.Public, ta.Token) {
+			self.pushErr(decl.Token, LogMsg.IdentNotExist, decl.Ident)
+			ret nil
+		}
+
+		ta.Used = true
+
+		if len(decl.Generics) > 0 {
+			self.pushErr(decl.Token, LogMsg.TypeNotSupportsGenerics, decl.Ident)
+			ret nil
+		}
+
+		// Enable instantiation cycle catching if type alias is
+		// one of the banned generics.
+		if !self.inscatch && self.bannedGenerics != nil {
+			self.inscatch = true
+			for _, bg in self.bannedGenerics {
+				if bg == ta || ta.Kind.Kind != nil && ta.Kind.Kind.Equal(bg.Kind.Kind) {
+					self.inscatch = false
+					break
+				}
+			}
+		}
+
+		// Catch instantiation cycles.
+		// See developer reference (5).
+		if self.inscatch {
+			for _, bg in self.bannedGenerics {
+				if bg == ta {
+					self.pushErr(decl.Token, LogMsg.InitiationCycle, decl.Ident)
+					ret nil
+				}
+				for _, dg in ta.Generics {
+					if bg == dg {
+						self.pushErr(decl.Token, LogMsg.InitiationCycle, decl.Ident)
+						ret nil
+					}
+				}
+			}
+		}
+
+		mut ok := self.checkIllegalCycles(decl, ta)
+		if !ok {
+			ret nil
+		}
+
+		// Build kind if not builded already.
+		if ta.Kind.Kind == nil {
+			ok = self.s.checkTypeAliasDeclKind(ta, self.lookup)
+			if !ok {
+				ret nil
+			}
+		}
+
+		// Push generic reference to owner type alias.
+		// See developer reference (3) and (4) for more information.
+		if ta.Generic && self.ownerAlias != nil {
+			self.ownerAlias.Generics = append(self.ownerAlias.Generics, ta)
+		}
+
+		mut tk := &TypeKind{
+			Generic: ta.Generic,
+			Kind: ta.Kind.Kind.Kind,
+		}
+		self.pushReferenceByKind(tk)
+		if ta.Binded {
+			tk.BindIdent = ta.Ident
+		} else {
+			tk.BindIdent = ta.Kind.Kind.BindIdent
+		}
+		ret tk
+	}
+
+	fn fromEnum(mut self, &decl: &IdentTypeDecl, mut &e: &Enum): &Enum {
+		if !self.s.isAccessibleDefine(e.Public, e.Token) {
+			self.pushErr(decl.Token, LogMsg.IdentNotExist, decl.Ident)
+			ret nil
+		}
+		if len(decl.Generics) > 0 {
+			self.pushErr(decl.Token, LogMsg.TypeNotSupportsGenerics, decl.Ident)
+			ret nil
+		}
+		ret e
+	}
+
+	fn fromTypeEnum(mut self, &decl: &IdentTypeDecl, mut &e: &TypeEnum): &TypeEnum {
+		if !self.s.isAccessibleDefine(e.Public, e.Token) {
+			self.pushErr(decl.Token, LogMsg.IdentNotExist, decl.Ident)
+			ret nil
+		}
+		if len(decl.Generics) > 0 {
+			self.pushErr(decl.Token, LogMsg.TypeNotSupportsGenerics, decl.Ident)
+			ret nil
+		}
+		ret e
+	}
+
+	fn fromTrait(mut self, &decl: &IdentTypeDecl, mut &t: &Trait): &Trait {
+		if !self.s.isAccessibleDefine(t.Public, t.Token) {
+			self.pushErr(decl.Token, LogMsg.IdentNotExist, decl.Ident)
+			ret nil
+		}
+		if len(decl.Generics) > 0 {
+			self.pushErr(decl.Token, LogMsg.TypeNotSupportsGenerics, decl.Ident)
+			ret nil
+		}
+		self.pushReference[&Trait](t)
+		ret t
+	}
+
+	fn checkStructIns(mut self, mut &ins: &StructIns, mut &errorToken: &Token): (ok: bool) {
+		if ins.Checked {
+			ret true
+		}
+		ins.Checked = true
+
+		// Break algorithm cycle.
+		if self.referencer != nil && self.referencer.owner == ins.Decl {
+			ret true
+		}
+
+		if !self.s.precheckStructIns(ins, errorToken) {
+			ret false
+		}
+		if len(ins.Generics) > 0 {
+			self.s.checkStructInsOperators(ins)
+			self.s.checkStructIns(ins)
+		}
+		ret true
+	}
+
+	fn appendUsedStructReference(mut self, mut &s: &Struct) {
+		if self.referencer == nil {
+			ret
+		}
+		match type self.referencer.owner {
+		| &Struct:
+			mut refS := (&Struct)(self.referencer.owner)
+			if !refS.IsUses(s) {
+				refS.Uses = append(refS.Uses, s)
+			}
+		}
+	}
+
+	fn buildStructInstance(mut self, mut &decl: &IdentTypeDecl, mut &s: &Struct): &StructIns {
+		// Save configuration.
+		mut referencer := self.referencer
+		self.referencer = nil
+		mut bannedGenerics := self.bannedGenerics
+
+		// Set banned generics to catch initiation cycles.
+		// This just necessary for root, therefore avoid set each time.
+		if self.bannedGenerics == nil {
+			match type self.lookup {
+			| &scopeChecker:
+				mut sc := (&scopeChecker)(self.lookup)
+				mut hard := sc.getHardRoot()
+				if hard.owner.Owner == nil || hard.owner.Owner.Decl != s {
+					break
+				}
+				n := len(hard.owner.Generics) + len(hard.owner.Owner.Generics)
+				// Add scope generics to to catch instantiation cycles.
+				// See developer reference (5).
+				self.bannedGenerics = hard.table.TypeAliases[:n]
+			}
+		} else {
+			self.inscatch = true
+		}
+
+		// Use rootLookup to parse generics with current current.
+		mut lookup := self.lookup
+		self.lookup = self.rootLookup
+
+		// Build generics.
+		mut ins := s.instance()
+		ins.Generics = make([]&InsGeneric, 0, len(decl.Generics))
+		for (_, mut g) in decl.Generics {
+			mut kind := self.build(g.Kind)
+			if kind == nil {
+				ret nil
+			}
+			ins.Generics = append(ins.Generics, &InsGeneric{Kind: kind})
+		}
+
+		// Restore configuration.
+		self.lookup = lookup
+		self.bannedGenerics = bannedGenerics
+		self.referencer = referencer
+
+		ret ins
+	}
+
+	fn fromStruct(mut self, mut &decl: &IdentTypeDecl, mut &s: &Struct): &StructIns {
+		if !self.s.isAccessibleDefine(s.Public, s.Token) {
+			self.pushErr(decl.Token, LogMsg.IdentNotExist, decl.Ident)
+			ret nil
+		}
+
+		// Name selection.
+		// Return instance instantly.
+		if self.selection {
+			if len(decl.Generics) > 0 {
+				self.pushErr(decl.Token, LogMsg.GenericsNotAllowed)
+				ret nil
+			}
+			ret &StructIns{
+				Decl: s,
+			}
+		}
+
+		mut ok := self.checkIllegalCycles(decl, s)
+		if !ok {
+			ret nil
+		}
+		self.appendUsedStructReference(s)
+
+		mut ins := self.buildStructInstance(decl, s)
+		if ins == nil {
+			ret nil
+		}
+
+		ok = self.s.checkGenericQuantity(len(ins.Decl.Generics), len(ins.Generics), decl.Token)
+		if !ok {
+			ret nil
+		}
+
+		mut existInstance := s.appendInstance(ins)
+		if existInstance != nil {
+			if !self.s.checkConstraintsStruct(ins, decl.Token, existInstance) {
+				ret nil
+			}
+			// Already checked instance, did not appended.
+			// So, this instance is not unique.
+			self.pushReference[&StructIns](existInstance)
+			ret existInstance
+		}
+		if !self.checkStructIns(ins, decl.Token) {
+			ret nil
+		}
+		self.pushReference[&StructIns](ins)
+		ret ins
+	}
+
+	// Returns identifier if found. Also checks founded identifier.
+	// Uses internal lookup for all process except finding step of identifier.
+	// Will find identifier in [l], not internal lookup.
+	// Also finds in built-in lookup if allowed.
+	// If another lookup nedeed, uses internal lookup, so any generic type build
+	// process will use internal lookup. This might be useful for building
+	// genericed type from another package.
+	fn getDef(mut self, mut &decl: &IdentTypeDecl): Kind {
+		for _, g in self.ignoreGenerics {
+			if g.Ident == decl.Ident {
+				ret buildPrimType(g.Ident)
+			}
+		}
+
+		for (_, mut g) in self.useGenerics {
+			if g.Ident == decl.Ident {
+				if len(decl.Generics) > 0 {
+					self.pushErr(decl.Token, LogMsg.TypeNotSupportsGenerics, decl.Ident)
+					ret nil
+				}
+				mut st := g.Kind.Kind.Struct()
+				if st != nil {
+					ok := self.checkIllegalCycles(decl, st.Decl)
+					if !ok {
+						ret nil
+					}
+				}
+				ret g.Kind.Kind.Kind
+			}
+		}
+
+		if !decl.Binded {
+			mut e := self.lookup.FindEnum(decl.Ident)
+			if e != nil {
+				ret self.fromEnum(decl, e)
+			}
+
+			mut te := self.lookup.FindTypeEnum(decl.Ident)
+			if te != nil {
+				ret self.fromTypeEnum(decl, te)
+			}
+
+			mut t := self.lookup.FindTrait(decl.Ident)
+			if t != nil {
+				ret self.fromTrait(decl, t)
+			}
+		} else if self.selection {
+			self.pushErr(decl.Token, LogMsg.BindedTypeNotAllowed)
+			ret nil
+		}
+
+		mut s := self.lookup.FindStruct(decl.Ident, decl.Binded)
+		if s != nil {
+			ret self.fromStruct(decl, s)
+		}
+
+		mut ta := self.lookup.FindTypeAlias(decl.Ident, decl.Binded)
+		if ta == nil && !self.disBuiltin {
+			ta = findBuiltinTypeAlias(decl.Ident)
+		}
+		if ta != nil {
+			ret self.fromTypeAlias(decl, ta)
+		}
+
+		self.pushErr(decl.Token, LogMsg.IdentNotExist, decl.Ident)
+		ret nil
+	}
+
+	fn buildIdent(mut self, mut decl: &IdentTypeDecl): Kind {
+		ret self.getDef(decl)
+	}
+
+	fn buildSubIdent(mut self, mut decl: &SubIdentTypeDecl): Kind {
+		mut ident := self.buildIdent(decl.Idents[0])
+		if ident == nil {
+			ret nil
+		}
+		match type ident {
+		| &TypeEnum:
+			break
+		|:
+			self.pushErr(self.errorToken, LogMsg.InvalidSyntax)
+			ret nil
+		}
+		mut t := (&TypeEnum)(ident)
+		mut idents := decl.Idents[1:]
+		for i, id in idents {
+			mut item := t.FindItem(id.Ident)
+			if item == nil {
+				self.pushErr(id.Token, LogMsg.ObjHaveNotIdent, t.Ident, id.Ident)
+				ret nil
+			}
+			if len(idents)-i == 1 {
+				self.pushReferenceByKind(item.Kind.Kind)
+				ret item.Kind.Kind
+			}
+			t = item.Kind.Kind.TypeEnum()
+			if t == nil {
+				self.pushErr(self.errorToken, LogMsg.InvalidSyntax)
+				ret nil
+			}
+		}
+		// Should be unreachable.
+		ret nil
+	}
+
+	fn buildSptrFromType(mut self, mut &elem: &TypeKind): &Sptr {
+		// Check special cases.
+		match {
+		| elem == nil:
+			ret nil
+		| elem.Struct() != nil:
+			s := elem.Struct()
+			if s.Decl != nil && s.Decl.Binded {
+				self.pushErr(self.errorToken, LogMsg.BindedStructForRef)
+				ret nil
+			}
+		| elem.Arr() != nil && elem.Arr().Auto:
+			self.pushErr(self.errorToken, LogMsg.ArrayAutoSized)
+			ret nil
+		}
+		ret &Sptr{
+			Elem: elem,
+		}
+	}
+
+	fn buildSptr(mut self, mut decl: &SptrTypeDecl): &Sptr {
+		cycleRisk := self.cycleRisk
+		self.cycleRisk = false
+		defer { self.cycleRisk = cycleRisk }
+
+		mut elem := self.checkDecl(decl.Elem)
+		ret self.buildSptrFromType(elem)
+	}
+
+	fn buildPtrFromType(mut self, mut &elem: &TypeKind): &Ptr {
+		// Check special cases.
+		match {
+		| elem == nil:
+			ret nil
+		| elem.Arr() != nil && elem.Arr().Auto:
+			self.pushErr(self.errorToken, LogMsg.ArrayAutoSized)
+			ret new(Ptr)
+		}
+
+		ret &Ptr{
+			Elem: elem,
+		}
+	}
+
+	fn buildPtr(mut self, mut decl: &PtrTypeDecl): &Ptr {
+		cycleRisk := self.cycleRisk
+		self.cycleRisk = false
+		defer { self.cycleRisk = cycleRisk }
+
+		let mut elem: &TypeKind = nil
+
+		if !decl.IsUnsafe() {
+			elem = self.checkDecl(decl.Elem)
+			ret self.buildPtrFromType(elem)
+		}
+
+		ret &Ptr{
+			Elem: elem,
+		}
+	}
+
+	fn buildSlc(mut self, mut decl: &SlcTypeDecl): &Slc {
+		cycleRisk := self.cycleRisk
+		self.cycleRisk = false
+		defer { self.cycleRisk = cycleRisk }
+
+		mut elem := self.checkDecl(decl.Elem)
+
+		// Check special cases.
+		match {
+		| elem == nil:
+			ret nil
+		| elem.Arr() != nil && elem.Arr().Auto:
+			self.pushErr(decl.Elem.Token, LogMsg.ArrayAutoSized)
+			ret nil
+		}
+
+		ret &Slc{
+			Elem: elem,
+		}
+	}
+
+	fn buildArr(mut self, mut decl: &ArrTypeDecl): &Arr {
+		mut n := 0
+
+		if !decl.AutoSized() {
+			mut size := self.s.eval(self.lookup).evalExpr(decl.Size)
+			if size == nil {
+				ret nil
+			}
+
+			if !size.IsConst() {
+				self.pushErr(decl.Size.Token, LogMsg.ExprNotConst)
+				ret nil
+			} else if size.Kind.Prim() == nil || !types::IsInt(size.Kind.Prim().Kind) {
+				self.pushErr(decl.Size.Token, LogMsg.ArraySizeIsNotInt)
+				ret nil
+			}
+
+			n = int(size.Constant.AsI64())
+			if n < 0 {
+				self.pushErr(decl.Elem.Token, LogMsg.ArraySizeIsNeg)
+				ret nil
+			} else {
+				max := types::MaxI(PrimKind.Int)
+				if types::BitSize != 64 && i64(n) > max {
+					self.pushErr(decl.Size.Token, LogMsg.ArraySizeOverflow,
+						constoa(size.Constant), conv::FmtInt(max, 10))
+					ret nil
+				}
+			}
+		}
+
+		mut elem := self.checkDecl(decl.Elem)
+
+		// Check special cases.
+		match {
+		| elem == nil:
+			ret nil
+		| elem.Arr() != nil && elem.Arr().Auto:
+			self.pushErr(decl.Elem.Token, LogMsg.ArrayAutoSized)
+			ret nil
+		}
+
+		ret &Arr{
+			Auto: decl.AutoSized(),
+			N: n,
+			Elem: elem,
+		}
+	}
+
+	fn buildMap(mut self, mut decl: &MapTypeDecl): &Map {
+		cycleRisk := self.cycleRisk
+		self.cycleRisk = false
+		defer { self.cycleRisk = cycleRisk }
+
+		mut key := self.checkDecl(decl.Key)
+		if key == nil {
+			ret nil
+		}
+
+		mut val := self.checkDecl(decl.Val)
+		if val == nil {
+			ret nil
+		}
+		if val.Enum() != nil {
+			self.pushErr(decl.Val.Token, LogMsg.EnumAsMapVal)
+		}
+
+		ret &Map{
+			Key: key,
+			Val: val,
+		}
+	}
+
+	fn buildTuple(mut self, mut decl: &TupleTypeDecl): &Tuple {
+		mut types := make([]&TypeKind, 0, len(decl.Types))
+		for (_, mut t) in decl.Types {
+			mut kind := self.checkDecl(t)
+			if kind == nil {
+				ret nil
+			}
+			types = append(types, kind)
+		}
+
+		ret &Tuple{Types: types}
+	}
+
+	fn checkFuncTypes(mut self, mut &f: &FnIns): (ok: bool) {
+		for (_, mut p) in f.Params {
+			p.Kind = self.build(p.Decl.Kind.Decl.Kind)
+			ok = p.Kind != nil
+			if !ok {
+				ret false
+			}
+			self.s.checkFnParamKind(p)
+		}
+
+		if !f.Decl.IsVoid() {
+			f.Result = self.build(f.Decl.Result.Kind.Decl.Kind)
+			ret f.Result != nil
+		}
+
+		ret true
+	}
+
+	fn buildFunc(mut self, mut decl: &FnDecl): &FnIns {
+		cycleRisk := self.cycleRisk
+		self.cycleRisk = false
+		defer { self.cycleRisk = cycleRisk }
+
+		if len(decl.Generics) > 0 {
+			self.pushErr(decl.Token, LogMsg.GenericedFnAsAnonFn)
+			ret nil
+		}
+
+		mut f := buildFunc(decl)
+
+		n := len(self.s.errors)
+		self.s.checkAnonFuncDecl(f)
+		if n != len(self.s.errors) {
+			ret nil
+		}
+
+		mut ins := f.instanceForce()
+		ins.Anon = true
+		ins.AsAnon = true
+
+		ok := self.checkFuncTypes(ins)
+		if !ok {
+			ret nil
+		}
+
+		ret ins
+	}
+
+	fn buildByNamespace(mut self, mut decl: &NamespaceTypeDecl): Kind {
+		path := buildLinkPathByTokens(decl.Idents)
+		mut imp := self.lookup.SelectPackage(fn(imp: &ImportInfo): bool {
+			if len(decl.Idents) == 1 && imp.Alias == path {
+				ret true
+			}
+			ret imp.LinkPath == path && imp.isAccessibleViaSelection()
+		})
+
+		selfIdent := str(TokenKind.Self)
+		if imp == nil || !imp.isLookupable(selfIdent) {
+			self.pushErr(decl.Idents[0], LogMsg.NamespaceNotExist, path)
+			ret nil
+		}
+
+		self.disallowBuiltin()
+		mut lookup := self.lookup
+		self.lookup = imp
+		mut kind := self.checkDecl(decl.Kind)
+		self.lookup = lookup
+		self.allowBuiltin()
+		ret kind
+	}
+
+	fn build(mut self, mut &declKind: TypeDeclKind): &TypeKind {
+		let mut kind: Kind = nil
+		match type declKind {
+		| &IdentTypeDecl:
+			mut t := self.buildIdent((&IdentTypeDecl)(declKind))
+			if t != nil {
+				kind = t
+			}
+		| &SubIdentTypeDecl:
+			mut t := self.buildSubIdent((&SubIdentTypeDecl)(declKind))
+			if t != nil {
+				kind = t
+			}
+		| &SptrTypeDecl:
+			self.inscatch = true
+			mut t := self.buildSptr((&SptrTypeDecl)(declKind))
+			if t != nil {
+				kind = t
+			}
+		| &PtrTypeDecl:
+			self.inscatch = true
+			mut t := self.buildPtr((&PtrTypeDecl)(declKind))
+			if t != nil {
+				kind = t
+			}
+		| &SlcTypeDecl:
+			self.inscatch = true
+			mut t := self.buildSlc((&SlcTypeDecl)(declKind))
+			if t != nil {
+				kind = t
+			}
+		| &ArrTypeDecl:
+			self.inscatch = true
+			mut t := self.buildArr((&ArrTypeDecl)(declKind))
+			if t != nil {
+				kind = t
+			}
+		| &MapTypeDecl:
+			self.inscatch = true
+			mut t := self.buildMap((&MapTypeDecl)(declKind))
+			if t != nil {
+				kind = t
+			}
+		| &TupleTypeDecl:
+			self.inscatch = true
+			mut t := self.buildTuple((&TupleTypeDecl)(declKind))
+			if t != nil {
+				kind = t
+			}
+		| &FnDecl:
+			self.inscatch = true
+			mut t := self.buildFunc((&FnDecl)(declKind))
+			if t != nil {
+				kind = t
+			}
+		| &NamespaceTypeDecl:
+			self.inscatch = true
+			mut t := self.buildByNamespace((&NamespaceTypeDecl)(declKind))
+			if t != nil {
+				kind = t
+			}
+		|:
+			self.pushErr(self.errorToken, LogMsg.InvalidType)
+			ret nil
+		}
+		if kind == nil {
+			ret nil
+		}
+		match type kind {
+		| &TypeKind:
+			ret (&TypeKind)(kind)
+		|:
+			mut tk := &TypeKind{Kind: kind}
+			match type kind {
+			| &Prim:
+				if self.ignoredGenerics != nil {
+					unsafe { *self.ignoredGenerics = append(*self.ignoredGenerics, tk) }
+				}
+			| &StructIns:
+				s := (&StructIns)(kind)
+				if s.Decl != nil && s.Decl.Binded {
+					tk.BindIdent = s.Decl.Ident
+				}
+			}
+			ret tk
+		}
+	}
+
+	fn checkDecl(mut self, mut &decl: &TypeDecl): &TypeKind {
+		// Save current token.
+		mut errorToken := self.errorToken
+
+		self.errorToken = decl.Token
+		mut kind := self.build(decl.Kind)
+		self.errorToken = errorToken
+
+		ret kind
+	}
+
+	fn check(mut self, mut &t: &TypeSymbol) {
+		if t.Decl == nil {
+			ret
+		}
+		mut kind := self.checkDecl(t.Decl)
+		if kind == nil {
+			t.removeKind()
+			ret
+		}
+		t.Kind = kind
+	}
 }
 
 struct identTypeLookup {}
 
 impl identTypeLookup {
-    static fn prim(&ident: str, t: &Prim): bool {
-        ret t.Kind == ident
-    }
+	static fn prim(&ident: str, t: &Prim): bool {
+		ret t.Kind == ident
+	}
 
-    static fn exist(&ident: str, mut &k: &TypeKind): bool {
-        match {
-        | k.Prim() != nil:
-            ret identTypeLookup.prim(ident, k.Prim())
-        | k.Sptr() != nil:
-            mut sptr := k.Sptr()
-            ret identTypeLookup.exist(ident, sptr.Elem)
-        | k.Ptr() != nil:
-            mut ptr := k.Ptr()
-            ret identTypeLookup.exist(ident, ptr.Elem)
-        | k.Slc() != nil:
-            mut slc := k.Slc()
-            ret identTypeLookup.exist(ident, slc.Elem)
-        | k.Arr() != nil:
-            mut arr := k.Arr()
-            ret identTypeLookup.exist(ident, arr.Elem)
-        | k.Map() != nil:
-            mut m := k.Map()
-            ret identTypeLookup.exist(ident, m.Key) ||
-                identTypeLookup.exist(ident, m.Val)
-        | k.Struct() != nil:
-            mut s := k.Struct()
-            for (_, mut g) in s.Generics {
-                if identTypeLookup.exist(ident, g.Kind) {
-                    ret true
-                }
-            }
-            ret false
-        | k.Fn() != nil:
-            mut f := k.Fn()
-            for (_, mut p) in f.Params {
-                if p.Decl.IsSelf() {
-                    continue
-                }
-                if identTypeLookup.exist(ident, p.Kind) {
-                    ret true
-                }
-            }
-            if f.Result != nil {
-                ret identTypeLookup.exist(ident, f.Result)
-            }
-            ret false
-        | k.Tup() != nil:
-            mut tup := k.Tup()
-            for (_, mut t) in tup.Types {
-                if identTypeLookup.exist(ident, t) {
-                    ret true
-                }
-            }
-            ret false
-        |:
-            ret false
-        }
-    }
+	static fn exist(&ident: str, mut &k: &TypeKind): bool {
+		match {
+		| k.Prim() != nil:
+			ret identTypeLookup.prim(ident, k.Prim())
+		| k.Sptr() != nil:
+			mut sptr := k.Sptr()
+			ret identTypeLookup.exist(ident, sptr.Elem)
+		| k.Ptr() != nil:
+			mut ptr := k.Ptr()
+			ret identTypeLookup.exist(ident, ptr.Elem)
+		| k.Slc() != nil:
+			mut slc := k.Slc()
+			ret identTypeLookup.exist(ident, slc.Elem)
+		| k.Arr() != nil:
+			mut arr := k.Arr()
+			ret identTypeLookup.exist(ident, arr.Elem)
+		| k.Map() != nil:
+			mut m := k.Map()
+			ret identTypeLookup.exist(ident, m.Key) ||
+				identTypeLookup.exist(ident, m.Val)
+		| k.Struct() != nil:
+			mut s := k.Struct()
+			for (_, mut g) in s.Generics {
+				if identTypeLookup.exist(ident, g.Kind) {
+					ret true
+				}
+			}
+			ret false
+		| k.Fn() != nil:
+			mut f := k.Fn()
+			for (_, mut p) in f.Params {
+				if p.Decl.IsSelf() {
+					continue
+				}
+				if identTypeLookup.exist(ident, p.Kind) {
+					ret true
+				}
+			}
+			if f.Result != nil {
+				ret identTypeLookup.exist(ident, f.Result)
+			}
+			ret false
+		| k.Tup() != nil:
+			mut tup := k.Tup()
+			for (_, mut t) in tup.Types {
+				if identTypeLookup.exist(ident, t) {
+					ret true
+				}
+			}
+			ret false
+		|:
+			ret false
+		}
+	}
 }
 
 fn kindUsesGenerics(mut &k: &TypeKind, &generics: []&GenericDecl): bool {
-    for _, g in generics {
-        if identTypeLookup.exist(g.Ident, k) {
-            ret true
-        }
-    }
-    ret false
+	for _, g in generics {
+		if identTypeLookup.exist(g.Ident, k) {
+			ret true
+		}
+	}
+	ret false
 }
 
 // Reports whether directive is exist.
 fn hasDirective(mut &directives: []&ast::Directive, tag: str): bool {
-    for (_, mut dr) in directives {
-        if dr.Tag.Kind == tag {
-            ret true
-        }
-    }
-    ret false
+	for (_, mut dr) in directives {
+		if dr.Tag.Kind == tag {
+			ret true
+		}
+	}
+	ret false
 }
 
 fn canGetPtr(mut &d: &Data): bool {
-    match {
-    | !d.Lvalue | d.IsConst():
-        ret false
-    | d.Kind.Fn() != nil | d.Kind.Enum() != nil:
-        ret false
-    |:
-        ret true
-    }
+	match {
+	| !d.Lvalue | d.IsConst():
+		ret false
+	| d.Kind.Fn() != nil | d.Kind.Enum() != nil:
+		ret false
+	|:
+		ret true
+	}
 }
 
 // Reports kind is valid for smart pointer type such as &T.
 fn isValidForSptrType(mut &t: &TypeKind): bool {
-    mut s := t.Struct()
-    if s != nil && s.Decl != nil && s.Decl.Binded {
-        ret false
-    }
-    ret true
+	mut s := t.Struct()
+	if s != nil && s.Decl != nil && s.Decl.Binded {
+		ret false
+	}
+	ret true
 }
 
 // Reports kind is valid for reference such as reference variables.
@@ -1757,84 +1757,84 @@ fn isValidForRef(mut &t: &TypeKind): bool { ret t.Fn() == nil }
 
 // Reports whether type has built-in string conversion support.
 fn isBuiltinStrConvertable(mut &t: &TypeKind): bool {
-    ret !t.Void() && t.Fn() == nil && t.Tup() == nil && !t.comptime()
+	ret !t.Void() && t.Fn() == nil && t.Tup() == nil && !t.comptime()
 }
 
 fn buildLinkPathByTokens(&tokens: []&Token): str {
-    if len(tokens) == 1 && tokens[0].Id == TokenId.Unsafe {
-        ret "std::unsafe"
-    }
-    mut n := 0
-    for _, token in tokens {
-        n += len(token.Kind)
-        n += 2
-    }
-    mut s := StrBuilder.New(n)
-    for i, token in tokens {
-        s.WriteStr(token.Kind)
-        if len(tokens)-i > 1 {
-            s.WriteStr("::")
-        }
-    }
-    ret s.Str()
+	if len(tokens) == 1 && tokens[0].Id == TokenId.Unsafe {
+		ret "std::unsafe"
+	}
+	mut n := 0
+	for _, token in tokens {
+		n += len(token.Kind)
+		n += 2
+	}
+	mut s := StrBuilder.New(n)
+	for i, token in tokens {
+		s.WriteStr(token.Kind)
+		if len(tokens)-i > 1 {
+			s.WriteStr("::")
+		}
+	}
+	ret s.Str()
 }
 
 fn buildPrimType(kind: str): &Prim {
-    ret &Prim{
-        Kind: kind,
-    }
+	ret &Prim{
+		Kind: kind,
+	}
 }
 
 fn getStructFromKind(mut k: &TypeKind): &Struct {
-    match {
-    | k == nil:
-        ret nil
-    | k.Struct() != nil:
-        ret k.Struct().Decl
-    | k.Sptr() != nil:
-        ret getStructFromKind(k.Sptr().Elem)
-    | k.Slc() != nil:
-        ret getStructFromKind(k.Slc().Elem)
-    | k.Arr() != nil:
-        ret getStructFromKind(k.Arr().Elem)
-    | k.Ptr() != nil:
-        // Pass pointers.
-        // Cloning just copies pointer address.
-        // There is no any illegal cycle risk.
-        ret nil
-    |:
-        ret nil
-    }
+	match {
+	| k == nil:
+		ret nil
+	| k.Struct() != nil:
+		ret k.Struct().Decl
+	| k.Sptr() != nil:
+		ret getStructFromKind(k.Sptr().Elem)
+	| k.Slc() != nil:
+		ret getStructFromKind(k.Slc().Elem)
+	| k.Arr() != nil:
+		ret getStructFromKind(k.Arr().Elem)
+	| k.Ptr() != nil:
+		// Pass pointers.
+		// Cloning just copies pointer address.
+		// There is no any illegal cycle risk.
+		ret nil
+	|:
+		ret nil
+	}
 }
 
 fn applyImplicitCast(mut &dest: &TypeKind, mut &d: &Data, mut &token: &Token) {
-    if d.Kind.IsNil() {
-        ret
-    }
-    destPrim := dest.Prim()
-    if destPrim != nil && destPrim.IsAny() {
-        prim := d.Kind.Prim()
-        if prim == nil || !prim.IsAny() {
-            applyCastKind(d, dest, token)
-        }
-        ret
-    }
+	if d.Kind.IsNil() {
+		ret
+	}
+	destPrim := dest.Prim()
+	if destPrim != nil && destPrim.IsAny() {
+		prim := d.Kind.Prim()
+		if prim == nil || !prim.IsAny() {
+			applyCastKind(d, dest, token)
+		}
+		ret
+	}
 
-    dt := dest.Trait()
-    if dt != nil {
-        bt := d.Kind.Trait()
-        if bt == nil || bt != dt {
-            applyCastKindModel(d, dest, token)
-            ret
-        }
-    }
+	dt := dest.Trait()
+	if dt != nil {
+		bt := d.Kind.Trait()
+		if bt == nil || bt != dt {
+			applyCastKindModel(d, dest, token)
+			ret
+		}
+	}
 
-    if dest.TypeEnum() != nil && d.Kind.TypeEnum() == nil {
-        applyCastKindModel(d, dest, token)
-        ret
-    }
+	if dest.TypeEnum() != nil && d.Kind.TypeEnum() == nil {
+		applyCastKindModel(d, dest, token)
+		ret
+	}
 }
 
 fn validTypeForXof(mut &t: &TypeKind): bool {
-    ret !t.Void() && t.Fn() == nil
+	ret !t.Void() && t.Fn() == nil
 }

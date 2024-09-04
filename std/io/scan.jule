@@ -8,75 +8,75 @@ use std::fs::{File}
 // Scanner for files or etc.
 // Scans bytes line-by-line.
 struct Scanner {
-    mut r: Reader
-    mut b: []byte
+	mut r: Reader
+	mut b: []byte
 }
 
 impl Scanner {
-    const bufferSize = 1 << 10
+	const bufferSize = 1 << 10
 
-    // New &Scanner from Reader.
-    static fn New(mut r: Reader): &Scanner {
-        ret &Scanner{
-            r: r,
-            b: make([]byte, 0, Scanner.bufferSize),
-        }
-    }
+	// New &Scanner from Reader.
+	static fn New(mut r: Reader): &Scanner {
+		ret &Scanner{
+			r: r,
+			b: make([]byte, 0, Scanner.bufferSize),
+		}
+	}
 
-    // New &Scanner from &File.
-    // Uses &FileStream for Reader trait compatibility.
-    static fn Newf(mut f: &File): &Scanner {
-        ret &Scanner{
-            r: FileStream.New(f),
-            b: make([]byte, 0, Scanner.bufferSize),
-        }
-    }
+	// New &Scanner from &File.
+	// Uses &FileStream for Reader trait compatibility.
+	static fn Newf(mut f: &File): &Scanner {
+		ret &Scanner{
+			r: FileStream.New(f),
+			b: make([]byte, 0, Scanner.bufferSize),
+		}
+	}
 }
 
 impl Scanner {
-    fn reset(self) {
-        self.b = self.b[:0]
-    }
+	fn reset(self) {
+		self.b = self.b[:0]
+	}
 
-    // Returns bytes of recent scan.
-    // Returned slice is mutable copy of buffer.
-    // The next [Scan] call will write into same internal allocation.
-    fn Bytes(self): []byte { ret self.b }
+	// Returns bytes of recent scan.
+	// Returned slice is mutable copy of buffer.
+	// The next [Scan] call will write into same internal allocation.
+	fn Bytes(self): []byte { ret self.b }
 
-    // Returns text from bytes of recent scan.
-    fn Text(self): str { ret str(self.b) }
+	// Returns text from bytes of recent scan.
+	fn Text(self): str { ret str(self.b) }
 
-    // Scans line from handle via read method.
-    // Scans bytes until end of the line, line delimiter is not included.
-    // Reports whether readed byte into buffer.
-    // Forwards any exceptional.
-    fn Scan(self)!: bool {
-        const LINE_DELIMITER = '\n'
+	// Scans line from handle via read method.
+	// Scans bytes until end of the line, line delimiter is not included.
+	// Reports whether readed byte into buffer.
+	// Forwards any exceptional.
+	fn Scan(self)!: bool {
+		const LINE_DELIMITER = '\n'
 
-        self.reset()
+		self.reset()
 
-        let mut partBuff: bufferArray
-        mut part := unsafe::Slice(&partBuff[0], len(partBuff))
-        for {
-            n := self.r.Read(part) else { error(error) }
-            if n == 0 {
-                break
-            }
-            if part[n-1] == LINE_DELIMITER {
-                self.b = append(self.b, part[:n-1]...)
-                break
-            }
-            self.b = append(self.b, part[:n]...)
-        }
-        self.b = clearCr(self.b)
-        ret len(self.b) > 0
-    }
+		let mut partBuff: bufferArray
+		mut part := unsafe::Slice(&partBuff[0], len(partBuff))
+		for {
+			n := self.r.Read(part) else { error(error) }
+			if n == 0 {
+				break
+			}
+			if part[n-1] == LINE_DELIMITER {
+				self.b = append(self.b, part[:n-1]...)
+				break
+			}
+			self.b = append(self.b, part[:n]...)
+		}
+		self.b = clearCr(self.b)
+		ret len(self.b) > 0
+	}
 }
 
 // Clear last carriage return from buff if exist.
 fn clearCr(mut buf: []byte): []byte {
-    if len(buf) > 0 && buf[len(buf)-1] == '\r' {
-        ret buf[:len(buf)-1]
-    }
-    ret buf
+	if len(buf) > 0 && buf[len(buf)-1] == '\r' {
+		ret buf[:len(buf)-1]
+	}
+	ret buf
 }

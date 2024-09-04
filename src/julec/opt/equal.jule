@@ -5,90 +5,90 @@
 use integ for std::jule::integrated
 use std::jule::constant::{Const}
 use std::jule::sema::{
-    ExprModel,
-    Var,
-    CastingExprModel,
-    UnaryExprModel,
-    IndexingExprModel,
-    BinaryExprModel,
-    StructSubIdentExprModel,
+	ExprModel,
+	Var,
+	CastingExprModel,
+	UnaryExprModel,
+	IndexingExprModel,
+	BinaryExprModel,
+	StructSubIdentExprModel,
 }
 
 fn typeData(&m: ExprModel): uintptr {
-    ret unsafe { uintptr(integ::Emit[*unsafe]("({}).type", m)) }
+	ret unsafe { uintptr(integ::Emit[*unsafe]("({}).type", m)) }
 }
 
 fn equalConst(l: &Const, r: &Const): bool {
-    match {
-    | l.IsI64():
-        ret r.IsI64() && l.ReadI64() == r.ReadI64()
-    | l.IsU64():
-        ret r.IsU64() && l.ReadU64() == r.ReadU64()
-    | l.IsF64():
-        ret r.IsF64() && l.ReadF64() == r.ReadF64()
-    | l.IsStr():
-        ret r.IsStr() && l.ReadStr() == r.ReadStr()
-    | l.IsBool():
-        ret r.IsBool() && l.ReadBool() == r.ReadBool()
-    | l.IsNil():
-        ret r.IsNil()
-    |:
-        ret false
-    }
+	match {
+	| l.IsI64():
+		ret r.IsI64() && l.ReadI64() == r.ReadI64()
+	| l.IsU64():
+		ret r.IsU64() && l.ReadU64() == r.ReadU64()
+	| l.IsF64():
+		ret r.IsF64() && l.ReadF64() == r.ReadF64()
+	| l.IsStr():
+		ret r.IsStr() && l.ReadStr() == r.ReadStr()
+	| l.IsBool():
+		ret r.IsBool() && l.ReadBool() == r.ReadBool()
+	| l.IsNil():
+		ret r.IsNil()
+	|:
+		ret false
+	}
 }
 
 fn equalCasting(l: &CastingExprModel, r: &CastingExprModel): bool {
-    if !l.Kind.Equal(r.Kind) {
-        ret false
-    }
-    ret equalModels(l.Expr.Model, r.Expr.Model)
+	if !l.Kind.Equal(r.Kind) {
+		ret false
+	}
+	ret equalModels(l.Expr.Model, r.Expr.Model)
 }
 
 fn equalUnary(l: &UnaryExprModel, r: &UnaryExprModel): bool {
-    if l.Op.Id != r.Op.Id || l.Op.Kind != r.Op.Kind {
-        ret false
-    }
-    ret equalModels(l.Expr.Model, r.Expr.Model)
+	if l.Op.Id != r.Op.Id || l.Op.Kind != r.Op.Kind {
+		ret false
+	}
+	ret equalModels(l.Expr.Model, r.Expr.Model)
 }
 
 fn equalIndexing(l: &IndexingExprModel, r: &IndexingExprModel): bool {
-    ret equalModels(l.Expr.Model, r.Expr.Model) &&
-        equalModels(l.Index.Model, r.Index.Model)
+	ret equalModels(l.Expr.Model, r.Expr.Model) &&
+		equalModels(l.Index.Model, r.Index.Model)
 }
 
 fn equalBinary(l: &BinaryExprModel, r: &BinaryExprModel): bool {
-    if l.Op.Id != r.Op.Id || l.Op.Kind != r.Op.Kind {
-        ret false
-    }
-    ret equalModels(l.Left.Model, r.Left.Model) &&
-        equalModels(l.Right.Model, r.Right.Model)
+	if l.Op.Id != r.Op.Id || l.Op.Kind != r.Op.Kind {
+		ret false
+	}
+	ret equalModels(l.Left.Model, r.Left.Model) &&
+		equalModels(l.Right.Model, r.Right.Model)
 }
 
 // Reports whether expressions are equal.
 // Designed lvalue equality comparison oriented,
 // such as swap statement value comparisons.
 fn equalModels(l: ExprModel, r: ExprModel): bool {
-    if typeData(l) != typeData(r) {
-        ret false
-    }
-    match type l {
-    | &Var:
-        ret (&Var)(l) == (&Var)(r)
-    | &StructSubIdentExprModel:
-        li := (&StructSubIdentExprModel)(l)
-        ri := (&StructSubIdentExprModel)(r)
-        ret li.Field == ri.Field && equalModels(li.Expr.Model, ri.Expr.Model)
-    | &Const:
-        ret equalConst((&Const)(l), (&Const)(r))
-    | &CastingExprModel:
-        ret equalCasting((&CastingExprModel)(l), (&CastingExprModel)(r))
-    | &UnaryExprModel:
-        ret equalUnary((&UnaryExprModel)(l), (&UnaryExprModel)(r))
-    | &IndexingExprModel:
-        ret equalIndexing((&IndexingExprModel)(l), (&IndexingExprModel)(r))
-    | &BinaryExprModel:
-        ret equalBinary((&BinaryExprModel)(l), (&BinaryExprModel)(r))
-    |:
-        ret false
-    }
+	if typeData(l) != typeData(r) {
+		ret false
+	}
+	match type l {
+	| &Var:
+		ret (&Var)(l) == (&Var)(r)
+	| &StructSubIdentExprModel:
+		li := (&StructSubIdentExprModel)(l)
+		ri := (&StructSubIdentExprModel)(r)
+		ret li.Field == ri.Field && equalModels(li.Expr.Model, ri.Expr.Model)
+	| &Const:
+		ret equalConst((&Const)(l), (&Const)(r))
+	| &CastingExprModel:
+		ret equalCasting((&CastingExprModel)(l), (&CastingExprModel)(r))
+	| &UnaryExprModel:
+		ret equalUnary((&UnaryExprModel)(l), (&UnaryExprModel)(r))
+	| &IndexingExprModel:
+		ret equalIndexing((&IndexingExprModel)(l), (&IndexingExprModel)(r))
+	| &BinaryExprModel:
+		ret equalBinary((&BinaryExprModel)(l), (&BinaryExprModel)(r))
+	|:
+		ret false
+	}
 }

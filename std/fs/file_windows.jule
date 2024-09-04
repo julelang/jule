@@ -9,112 +9,112 @@ use utf16 for std::unicode::utf16
 use zsys for std::internal::zsys
 
 impl File {
-    // Opens file stream with named file, specified flag
-    // (OFlag.Rdwr, OFlag.Trunc etc.) and perm. If named file does
-    // not exist and OFlag.Creat flag is passed, will created with
-    // mode (before umask). If successful, returns File reference with handle
-    // to file stream and the reference can used for I/O operations.
-    //
-    // Possible errors:
-    //  Denied Exist Signal SyncIO IO IsDir Loop PerProcessLimit LongPath
-    //  SystemWideLimit NotExist UnableStream NoSpace NotDir Device Overflow
-    //  ReadOnly Retry Busy
-    static fn Open(path: str, flag: OFlag, mode: int)!: &File {
-        utf16Path := integ::UTF16FromStr(path)
-        handle := unsafe { sys::Wopen(&utf16Path[0], int(flag), mode) }
-        if handle == -1 {
-            error(getLastFsError())
-        }
-        ret File.New(uintptr(handle))
-    }
+	// Opens file stream with named file, specified flag
+	// (OFlag.Rdwr, OFlag.Trunc etc.) and perm. If named file does
+	// not exist and OFlag.Creat flag is passed, will created with
+	// mode (before umask). If successful, returns File reference with handle
+	// to file stream and the reference can used for I/O operations.
+	//
+	// Possible errors:
+	//  Denied Exist Signal SyncIO IO IsDir Loop PerProcessLimit LongPath
+	//  SystemWideLimit NotExist UnableStream NoSpace NotDir Device Overflow
+	//  ReadOnly Retry Busy
+	static fn Open(path: str, flag: OFlag, mode: int)!: &File {
+		utf16Path := integ::UTF16FromStr(path)
+		handle := unsafe { sys::Wopen(&utf16Path[0], int(flag), mode) }
+		if handle == -1 {
+			error(getLastFsError())
+		}
+		ret File.New(uintptr(handle))
+	}
 
-    // Removes named file.
-    //
-    // Possible errors:
-    //  Denined Busy LongPath NotExist InsufficientMemory NotDir
-    static fn Remove(path: str)! {
-        utf16Path := integ::UTF16FromStr(path)
-        if unsafe { !sys::DeleteFile(&utf16Path[0]) } {
-            error(getLastFsError())
-        }
-    }
+	// Removes named file.
+	//
+	// Possible errors:
+	//  Denined Busy LongPath NotExist InsufficientMemory NotDir
+	static fn Remove(path: str)! {
+		utf16Path := integ::UTF16FromStr(path)
+		if unsafe { !sys::DeleteFile(&utf16Path[0]) } {
+			error(getLastFsError())
+		}
+	}
 }
 
 impl File {
-    // Writes bytes to handle and returns writed byte count.
-    // The number of bytes written can never exceed the length of the buf.
-    //
-    // Possible errors:
-    //  Retry InvalidDescriptor Big Signal IO NoSpace Pipe Range SyncIO
-    //  Seek Device Buffer
-    fn Write(mut self, buf: []byte)!: (n: int) {
-        if len(buf) == 0 {
-            ret 0
-        }
+	// Writes bytes to handle and returns writed byte count.
+	// The number of bytes written can never exceed the length of the buf.
+	//
+	// Possible errors:
+	//  Retry InvalidDescriptor Big Signal IO NoSpace Pipe Range SyncIO
+	//  Seek Device Buffer
+	fn Write(mut self, buf: []byte)!: (n: int) {
+		if len(buf) == 0 {
+			ret 0
+		}
 
-        if isConsoleHandle(self.handle) {
-            utf16Buf := integ::UTF16FromStr(str(buf))
-            ok := unsafe { sys::WriteConsole(self.handle, &utf16Buf[0], len(utf16Buf), n, nil) }
-            if !ok {
-                error(getLastFsError())
-            }
-            ret n
-        }
+		if isConsoleHandle(self.handle) {
+			utf16Buf := integ::UTF16FromStr(str(buf))
+			ok := unsafe { sys::WriteConsole(self.handle, &utf16Buf[0], len(utf16Buf), n, nil) }
+			if !ok {
+				error(getLastFsError())
+			}
+			ret n
+		}
 
-        zsys::HandleRW(buf)
-        n = unsafe { sys::Write(int(self.handle), &buf[0], uint(len(buf))) }
-        if n == -1 {
-            error(getLastFsError())
-        }
-        ret n
-    }
+		zsys::HandleRW(buf)
+		n = unsafe { sys::Write(int(self.handle), &buf[0], uint(len(buf))) }
+		if n == -1 {
+			error(getLastFsError())
+		}
+		ret n
+	}
 
-    // Read bytes to buffer from handle and returns readed byte count.
-    // The number of bytes readed can never exceed the length of the buf.
-    // If the buf is larger than the number of bytes that can be read,
-    // the buffer will not cause an overflow. Offset will be shifted
-    // by the number of bytes read.
-    //
-    // Possible errors:
-    //  Retry InvalidDescriptor Signal SyncIO IO IsDir Overflow Buffer
-    //  InsufficientMemory Device Seek
-    fn Read(mut self, mut buf: []byte)!: (n: int) {
-        if len(buf) == 0 {
-            ret 0
-        }
+	// Read bytes to buffer from handle and returns readed byte count.
+	// The number of bytes readed can never exceed the length of the buf.
+	// If the buf is larger than the number of bytes that can be read,
+	// the buffer will not cause an overflow. Offset will be shifted
+	// by the number of bytes read.
+	//
+	// Possible errors:
+	//  Retry InvalidDescriptor Signal SyncIO IO IsDir Overflow Buffer
+	//  InsufficientMemory Device Seek
+	fn Read(mut self, mut buf: []byte)!: (n: int) {
+		if len(buf) == 0 {
+			ret 0
+		}
 
-        if isConsoleHandle(self.handle) {
-            mut codepage := make([]u16, len(buf))
-            ok := unsafe { sys::ReadConsole(self.handle, &codepage[0], len(buf), n) }
-            if !ok {
-                error(getLastFsError())
-            }
+		if isConsoleHandle(self.handle) {
+			mut codepage := make([]u16, len(buf))
+			ok := unsafe { sys::ReadConsole(self.handle, &codepage[0], len(buf), n) }
+			if !ok {
+				error(getLastFsError())
+			}
 
-            runes := utf16::Decode(codepage[:n])
-            n = 0
-            for _, r in runes {
-                size := utf8::RuneLen(r)
-                if n+size > len(buf) {
-                    break
-                }
-                _ = utf8::EncodeRune(buf[n:], r)
-                n += size
-            }
+			runes := utf16::Decode(codepage[:n])
+			n = 0
+			for _, r in runes {
+				size := utf8::RuneLen(r)
+				if n+size > len(buf) {
+					break
+				}
+				_ = utf8::EncodeRune(buf[n:], r)
+				n += size
+			}
 
-            ret n
-        }
+			ret n
+		}
 
-        zsys::HandleRW(buf)
-        n = unsafe { sys::Read(int(self.handle), &buf[0], uint(len(buf))) }
-        if n == -1 {
-            error(getLastFsError())
-        }
-        ret n
-    }
+		zsys::HandleRW(buf)
+		n = unsafe { sys::Read(int(self.handle), &buf[0], uint(len(buf))) }
+		if n == -1 {
+			error(getLastFsError())
+		}
+		ret n
+	}
 }
 
 fn isConsoleHandle(handle: uintptr): bool {
-    ret handle == sys::STDIN ||
-        handle == sys::STDOUT ||
-        handle == sys::STDERR
+	ret handle == sys::STDIN ||
+		handle == sys::STDOUT ||
+		handle == sys::STDERR
 }

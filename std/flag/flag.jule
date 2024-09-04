@@ -9,32 +9,32 @@ const bitSize = 0b1000000
 
 // Common behaviors of flags.
 trait CommonFlag {
-    // Returns name of flag.
-    fn Name(self): str
+	// Returns name of flag.
+	fn Name(self): str
 
-    // Returns short name of flag.
-    fn Short(self): rune
+	// Returns short name of flag.
+	fn Short(self): rune
 
-    // Returns description of flag.
-    fn What(self): str
+	// Returns description of flag.
+	fn What(self): str
 
-    // Resets data to default.
-    fn Reset(mut self)
+	// Resets data to default.
+	fn Reset(mut self)
 }
 
 struct Flag[T] {
-    name:    str
-    short:   rune
-    default: T
-    what:    str
-    data:    &T
+	name:    str
+	short:   rune
+	default: T
+	what:    str
+	data:    &T
 }
 
 impl CommonFlag for Flag {
-    fn Name(self): str { ret self.name }
-    fn What(self): str { ret self.what }
-    fn Reset(mut self) { *self.data = self.default }
-    fn Short(self): rune { ret self.short }
+	fn Name(self): str { ret self.name }
+	fn What(self): str { ret self.what }
+	fn Reset(mut self) { *self.data = self.default }
+	fn Short(self): rune { ret self.short }
 }
 
 // Flag for i64 type.
@@ -54,245 +54,245 @@ type StrFlag: &Flag[str]
 
 // Flag parser for command-line arguments.
 struct FlagSet {
-    flags: []CommonFlag
+	flags: []CommonFlag
 }
 
 impl FlagSet {
-    // Returns new flagset.
-    static fn New(): &FlagSet {
-        ret &FlagSet{
-            flags: make([]CommonFlag, 0, 20),
-        }
-    }
+	// Returns new flagset.
+	static fn New(): &FlagSet {
+		ret &FlagSet{
+			flags: make([]CommonFlag, 0, 20),
+		}
+	}
 }
 
 impl FlagSet {
-    // Returns flag by name, returns nil if not exist.
-    fn FindFlag(mut self, name: str): CommonFlag {
-        for (_, mut flag) in self.flags {
-            if flag.Name() == name {
-                ret flag
-            }
-        }
-        ret nil
-    }
+	// Returns flag by name, returns nil if not exist.
+	fn FindFlag(mut self, name: str): CommonFlag {
+		for (_, mut flag) in self.flags {
+			if flag.Name() == name {
+				ret flag
+			}
+		}
+		ret nil
+	}
 
-    // Returns flag by short name, returns nil if not exist.
-    fn FindFlagShort(mut self, name: rune): CommonFlag {
-        for (_, mut flag) in self.flags {
-            if flag.Short() == name {
-                ret flag
-            }
-        }
-        ret nil
-    }
+	// Returns flag by short name, returns nil if not exist.
+	fn FindFlagShort(mut self, name: rune): CommonFlag {
+		for (_, mut flag) in self.flags {
+			if flag.Short() == name {
+				ret flag
+			}
+		}
+		ret nil
+	}
 
-    // Returns all flags.
-    fn Flags(mut self): []CommonFlag {
-        ret self.flags
-    }
+	// Returns all flags.
+	fn Flags(mut self): []CommonFlag {
+		ret self.flags
+	}
 
-    // Parse arguments and process flags.
-    // Returns non-flag content.
-    // Exceptional always is string and holds error message.
-    //
-    // Syntax:
-    //   Long names can be used with double dash (--). Short names can be
-    //   used with a single dash (-). When Boolean flags are used, they use
-    //   the opposite of their default values. Floating-point values are the
-    //   same as the `parse_float` function provided by std::conv package.
-    //   Decimal, octal, binary and hexadecimal formats are supported for
-    //   signed and unsigned integer types. String types accept values ​​directly.
-    //
-    //   Octal values are represented by starts with 0o or 0 prefix.
-    //   Hexadecimal values are represented by starts with 0x prefix.
-    //   Binary values are represented by starts with 0b prefix.
-    //
-    //   A space is required to give a value. When a single dash (-) is used,
-    //   all following characters are considered short names and thus collective
-    //   use is allowed. If the short name flags used need values, the values ​
-    //   should follow respectively.
-    fn Parse(mut self, args: []str)!: []str {
-        mut ap := argParser{
-            set: self,
-            args: unsafe { *(&args) },
-        }
-        ap.parse() else { error(error) }
-        ret ap.content
-    }
+	// Parse arguments and process flags.
+	// Returns non-flag content.
+	// Exceptional always is string and holds error message.
+	//
+	// Syntax:
+	//   Long names can be used with double dash (--). Short names can be
+	//   used with a single dash (-). When Boolean flags are used, they use
+	//   the opposite of their default values. Floating-point values are the
+	//   same as the `parse_float` function provided by std::conv package.
+	//   Decimal, octal, binary and hexadecimal formats are supported for
+	//   signed and unsigned integer types. String types accept values ​​directly.
+	//
+	//   Octal values are represented by starts with 0o or 0 prefix.
+	//   Hexadecimal values are represented by starts with 0x prefix.
+	//   Binary values are represented by starts with 0b prefix.
+	//
+	//   A space is required to give a value. When a single dash (-) is used,
+	//   all following characters are considered short names and thus collective
+	//   use is allowed. If the short name flags used need values, the values ​
+	//   should follow respectively.
+	fn Parse(mut self, args: []str)!: []str {
+		mut ap := argParser{
+			set: self,
+			args: unsafe { *(&args) },
+		}
+		ap.parse() else { error(error) }
+		ret ap.content
+	}
 
-    // Resets all flags to default value.
-    fn Reset(mut self) {
-        for _, f in self.flags {
-            f.Reset()
-        }
-    }
+	// Resets all flags to default value.
+	fn Reset(mut self) {
+		for _, f in self.flags {
+			f.Reset()
+		}
+	}
 
-    fn addFlagCommon[T](mut self, name: str, short: rune, what: str): &Flag[T] {
-        if self.FindFlag(name) != nil {
-            panic("std::flag: FlagSet.Add[T]: flag is already exist in this name: " + name)
-        }
+	fn addFlagCommon[T](mut self, name: str, short: rune, what: str): &Flag[T] {
+		if self.FindFlag(name) != nil {
+			panic("std::flag: FlagSet.Add[T]: flag is already exist in this name: " + name)
+		}
 
-        if short != 0 && self.FindFlagShort(short) != nil {
-            panic("std::flag: FlagSet.Add[T]: flag is already exist in this short name: " + str(short))
-        }
+		if short != 0 && self.FindFlagShort(short) != nil {
+			panic("std::flag: FlagSet.Add[T]: flag is already exist in this short name: " + str(short))
+		}
 
-        mut flag := &Flag[T]{
-            name: name,
-            short: short,
-            what: what,
-        }
-        self.flags = append(self.flags, flag)
-        ret flag
-    }
+		mut flag := &Flag[T]{
+			name: name,
+			short: short,
+			what: what,
+		}
+		self.flags = append(self.flags, flag)
+		ret flag
+	}
 
-    // Adds new flag and returns allocated reference variable.
-    // Panics if name or short name is alreadys exist.
-    // Zero (0) short names will be ignored.
-    // Panics if used unsupported type.
-    //
-    // Supported types are:
-    //  - i64
-    //  - u64
-    //  - f64
-    //  - str
-    //  - bool
-    fn Add[T: i64 | u64 | f64 | bool | str](mut self, name: str, short: rune, default: T, what: str): &T {
-        mut flag := self.addFlagCommon[T](name, short, what)
-        flag.data = new(T, default)
-        ret flag.data
-    }
+	// Adds new flag and returns allocated reference variable.
+	// Panics if name or short name is alreadys exist.
+	// Zero (0) short names will be ignored.
+	// Panics if used unsupported type.
+	//
+	// Supported types are:
+	//  - i64
+	//  - u64
+	//  - f64
+	//  - str
+	//  - bool
+	fn Add[T: i64 | u64 | f64 | bool | str](mut self, name: str, short: rune, default: T, what: str): &T {
+		mut flag := self.addFlagCommon[T](name, short, what)
+		flag.data = new(T, default)
+		ret flag.data
+	}
 
-    // Same with add method but do not allocates new reference, uses existing.
-    fn AddVar[T: i64 | u64 | f64 | bool | str](mut self, mut var: &T, name: str, short: rune, what: str) {
-        if var == nil {
-            panic("std::flag: FlatSet.AddVar[T]: variable is nil")
-        }
-        mut flag := self.addFlagCommon[T](name, short, what)
-        flag.default = *var
-        flag.data = var
-    }
+	// Same with add method but do not allocates new reference, uses existing.
+	fn AddVar[T: i64 | u64 | f64 | bool | str](mut self, mut var: &T, name: str, short: rune, what: str) {
+		if var == nil {
+			panic("std::flag: FlatSet.AddVar[T]: variable is nil")
+		}
+		mut flag := self.addFlagCommon[T](name, short, what)
+		flag.default = *var
+		flag.data = var
+	}
 }
 
 struct argParser {
-    set:     FlagSet
-    args:    []str
-    content: []str
-    i:       int
+	set:     FlagSet
+	args:    []str
+	content: []str
+	i:       int
 }
 
 impl argParser {
-    fn parseInteger[T](self, &s: str, parser: fn(s: str, base: int): (T, bool)): (x: T, ok: bool) {
-        match {
-        | s == "":
-            ret 0, false
-        | strings::HasPrefix(s, "0x"): // Hexadecimal
-            x, ok = parser(s[2:], 0b00010000)
-        | strings::HasPrefix(s, "0b"): // Binary
-            x, ok = parser(s[2:], 0b10)
-        | strings::HasPrefix(s, "0o"): // Octal
-            x, ok = parser(s[2:], 0b1000)
-        | s[0] == '0': // Octal
-            x, ok = parser(s[1:], 0b1000)
-        |:
-            // Decimal
-            x, ok = parser(s, 0b1010)
-        }
-        ret
-    }
+	fn parseInteger[T](self, &s: str, parser: fn(s: str, base: int): (T, bool)): (x: T, ok: bool) {
+		match {
+		| s == "":
+			ret 0, false
+		| strings::HasPrefix(s, "0x"): // Hexadecimal
+			x, ok = parser(s[2:], 0b00010000)
+		| strings::HasPrefix(s, "0b"): // Binary
+			x, ok = parser(s[2:], 0b10)
+		| strings::HasPrefix(s, "0o"): // Octal
+			x, ok = parser(s[2:], 0b1000)
+		| s[0] == '0': // Octal
+			x, ok = parser(s[1:], 0b1000)
+		|:
+			// Decimal
+			x, ok = parser(s, 0b1010)
+		}
+		ret
+	}
 
-    fn getData(mut self): str {
-        if self.i+1 >= len(self.args) {
-            ret ""
-        }
-        self.i++
-        ret self.args[self.i]
-    }
+	fn getData(mut self): str {
+		if self.i+1 >= len(self.args) {
+			ret ""
+		}
+		self.i++
+		ret self.args[self.i]
+	}
 
-    fn processFlag(mut self, mut &flag: CommonFlag)! {
-        match type flag {
-        | BoolFlag:
-            mut bf := BoolFlag(flag)
-            *bf.data = !bf.default
-            ret
-        }
+	fn processFlag(mut self, mut &flag: CommonFlag)! {
+		match type flag {
+		| BoolFlag:
+			mut bf := BoolFlag(flag)
+			*bf.data = !bf.default
+			ret
+		}
 
-        data := self.getData()
-        if data == "" {
-            error("--" + flag.Name() + ": expression missing")
-        }
+		data := self.getData()
+		if data == "" {
+			error("--" + flag.Name() + ": expression missing")
+		}
 
-        match type flag {
-        | IntFlag:
-            mut intf := IntFlag(flag)
-            (*intf.data), ok := self.parseInteger[i64](data, fn(s: str, base: int): (i64, bool) {
-                ret conv::ParseInt(s, base, bitSize) else { ret 0, false }, true
-            })
-            if !ok {
-                error("--" + flag.Name() + ": expression must be valid signed integer")
-            }
-        | UintFlag:
-            mut uintf := UintFlag(flag)
-            (*uintf.data), ok := self.parseInteger[u64](data, fn(s: str, base: int): (u64, bool) {
-                ret conv::ParseUint(s, base, bitSize) else { ret 0, false }, true
-            })
-            if !ok {
-                error("--" + flag.Name() + ": expression must be valid unsigned integer")
-            }
-        | FloatFlag:
-            mut ff := FloatFlag(flag)
-            *ff.data = conv::ParseFloat(data, bitSize) else {
-                error("--" + flag.Name() + ": expression must be valid floating-point")
-            }
-        | StrFlag:
-            *StrFlag(flag).data = data
-        }
-    }
+		match type flag {
+		| IntFlag:
+			mut intf := IntFlag(flag)
+			(*intf.data), ok := self.parseInteger[i64](data, fn(s: str, base: int): (i64, bool) {
+				ret conv::ParseInt(s, base, bitSize) else { ret 0, false }, true
+			})
+			if !ok {
+				error("--" + flag.Name() + ": expression must be valid signed integer")
+			}
+		| UintFlag:
+			mut uintf := UintFlag(flag)
+			(*uintf.data), ok := self.parseInteger[u64](data, fn(s: str, base: int): (u64, bool) {
+				ret conv::ParseUint(s, base, bitSize) else { ret 0, false }, true
+			})
+			if !ok {
+				error("--" + flag.Name() + ": expression must be valid unsigned integer")
+			}
+		| FloatFlag:
+			mut ff := FloatFlag(flag)
+			*ff.data = conv::ParseFloat(data, bitSize) else {
+				error("--" + flag.Name() + ": expression must be valid floating-point")
+			}
+		| StrFlag:
+			*StrFlag(flag).data = data
+		}
+	}
 
-    fn singleDash(mut self, &arg: str)! {
-        if len(arg) == 1 { // Just dash.
-            error(arg + ": missing argument")
-        }
-        // Start at 1 to skip dash.
-        for _, r in []rune(arg[1:]) {
-            mut flag := self.set.FindFlagShort(r)
-            if flag == nil {
-                error(arg + ": flag is not exist: " + str(r))
-            }
-            self.processFlag(flag) else { error(error) }
-        }
-    }
+	fn singleDash(mut self, &arg: str)! {
+		if len(arg) == 1 { // Just dash.
+			error(arg + ": missing argument")
+		}
+		// Start at 1 to skip dash.
+		for _, r in []rune(arg[1:]) {
+			mut flag := self.set.FindFlagShort(r)
+			if flag == nil {
+				error(arg + ": flag is not exist: " + str(r))
+			}
+			self.processFlag(flag) else { error(error) }
+		}
+	}
 
-    fn doubleDash(mut self, &arg: str)! {
-        if len(arg) == 2 { // Just dash.
-            error(arg + ": missing argument")
-        }
-        mut flag := self.set.FindFlag(arg[2:]) // Start at 2 to skip dashes.
-        if flag == nil {
-            error(arg + ": flag is not exist")
-        }
-        self.processFlag(flag) else { error(error) }
-    }
+	fn doubleDash(mut self, &arg: str)! {
+		if len(arg) == 2 { // Just dash.
+			error(arg + ": missing argument")
+		}
+		mut flag := self.set.FindFlag(arg[2:]) // Start at 2 to skip dashes.
+		if flag == nil {
+			error(arg + ": flag is not exist")
+		}
+		self.processFlag(flag) else { error(error) }
+	}
 
-    fn tryArg(mut self)! {
-        arg := self.args[self.i]
-        if len(self.args) == 0 {
-            ret
-        }
-        if arg[0] == '-' {
-            if len(arg) > 1 && arg[1] == '-' {
-                self.doubleDash(arg) else { error(error) }
-                ret
-            }
-            self.singleDash(arg) else { error(error) }
-            ret
-        }
-        self.content = append(self.content, arg)
-    }
+	fn tryArg(mut self)! {
+		arg := self.args[self.i]
+		if len(self.args) == 0 {
+			ret
+		}
+		if arg[0] == '-' {
+			if len(arg) > 1 && arg[1] == '-' {
+				self.doubleDash(arg) else { error(error) }
+				ret
+			}
+			self.singleDash(arg) else { error(error) }
+			ret
+		}
+		self.content = append(self.content, arg)
+	}
 
-    fn parse(mut self)! {
-        for self.i < len(self.args); self.i++ {
-            self.tryArg() else { error(error) }
-        }
-    }
+	fn parse(mut self)! {
+		for self.i < len(self.args); self.i++ {
+			self.tryArg() else { error(error) }
+		}
+	}
 }

@@ -7,53 +7,53 @@ use integ for std::jule::integrated
 use sys for std::sys
 
 impl Directory {
-    // Reads the named directory and returs all its directory entries can read.
-    //
-    // Possible errors:
-    //  Denied InvalidDescriptor PerProcessLimit SystemWideLimit
-    //  NotExist InsufficientMemory NotDir
-    static fn Read(path: str)!: (dirents: []&DirEntry) {
-        s := integ::StrToBytes(path)
-        mut dir := unsafe { sys::Opendir(&s[0]) }
-        if dir == nil {
-            error(getLastFsError())
-        }
-        for {
-            dirent := unsafe { sys::Readdir(dir) }
-            if dirent == nil {
-                break
-            }
-            name := unsafe { integ::BytePtrToStr((*u8)(dirent.d_name)) }
-            mut stat := Status.Of(path::Join(path, name)) else { error(error) }
-            dirents = append(dirents, &DirEntry{
-                Name: name,
-                Stat: stat,
-            })
-        }
-        _ = unsafe { sys::Closedir(dir) }
-        ret
-    }
+	// Reads the named directory and returs all its directory entries can read.
+	//
+	// Possible errors:
+	//  Denied InvalidDescriptor PerProcessLimit SystemWideLimit
+	//  NotExist InsufficientMemory NotDir
+	static fn Read(path: str)!: (dirents: []&DirEntry) {
+		s := integ::StrToBytes(path)
+		mut dir := unsafe { sys::Opendir(&s[0]) }
+		if dir == nil {
+			error(getLastFsError())
+		}
+		for {
+			dirent := unsafe { sys::Readdir(dir) }
+			if dirent == nil {
+				break
+			}
+			name := unsafe { integ::BytePtrToStr((*u8)(dirent.d_name)) }
+			mut stat := Status.Of(path::Join(path, name)) else { error(error) }
+			dirents = append(dirents, &DirEntry{
+				Name: name,
+				Stat: stat,
+			})
+		}
+		_ = unsafe { sys::Closedir(dir) }
+		ret
+	}
 
-    // Creates directory.
-    //
-    // Possible errors: Denied Exist ReadOnly NoSpace
-    static fn Create(path: str)! {
-        // NOTICE
-        // Also can has EMLINK error-code.
-        // Make sure this situation should documented or not.
-        s := integ::StrToBytes(path)
-        if unsafe { sys::Mkdir(&s[0], 0700) } != 0 {
-            error(getLastFsError())
-        }
-    }
+	// Creates directory.
+	//
+	// Possible errors: Denied Exist ReadOnly NoSpace
+	static fn Create(path: str)! {
+		// NOTICE
+		// Also can has EMLINK error-code.
+		// Make sure this situation should documented or not.
+		s := integ::StrToBytes(path)
+		if unsafe { sys::Mkdir(&s[0], 0700) } != 0 {
+			error(getLastFsError())
+		}
+	}
 
-    // Removes empty directory.
-    //
-    // Possible errors: Denined NotExist NotEmpty SyncIO IO Loop NotDir
-    static fn Remove(path: str)! {
-        s := integ::StrToBytes(path)
-        if unsafe { sys::Rmdir(&s[0]) } != 0 {
-            error(getLastFsError())
-        }
-    }
+	// Removes empty directory.
+	//
+	// Possible errors: Denined NotExist NotEmpty SyncIO IO Loop NotDir
+	static fn Remove(path: str)! {
+		s := integ::StrToBytes(path)
+		if unsafe { sys::Rmdir(&s[0]) } != 0 {
+			error(getLastFsError())
+		}
+	}
 }

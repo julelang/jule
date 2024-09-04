@@ -3,2255 +3,2255 @@
 // license that can be found in the LICENSE file.
 
 use ast for std::jule::ast::{
-    Expr,
-    ScopeTree,
-    TypeAliasDecl,
-    VarDecl,
-    NodeData,
-    AssignSt,
-    FnCallExpr,
-    WhileKind,
-    RangeKind,
-    Iter,
-    LabelSt,
-    TupleExpr,
-    UnsafeExpr,
-    AssignLeft,
-    MatchCase,
-    UseExpr,
-    ExprData,
-    StmtData,
+	Expr,
+	ScopeTree,
+	TypeAliasDecl,
+	VarDecl,
+	NodeData,
+	AssignSt,
+	FnCallExpr,
+	WhileKind,
+	RangeKind,
+	Iter,
+	LabelSt,
+	TupleExpr,
+	UnsafeExpr,
+	AssignLeft,
+	MatchCase,
+	UseExpr,
+	ExprData,
+	StmtData,
 }
 use std::jule::build::{LogMsg}
 use std::jule::constant::{Const}
 use std::jule::lex::{
-    Token,
-    TokenId,
-    TokenKind,
-    IsIgnoreIdent,
-    IsAnonIdent,
-    IsPostfixOp,
+	Token,
+	TokenId,
+	TokenKind,
+	IsIgnoreIdent,
+	IsAnonIdent,
+	IsPostfixOp,
 }
 use types for std::jule::types
 
 // Statement type.
 enum Stmt: type {
-    &Scope,
-    &Var,
-    &Data,
-    &Conditional,
-    &InfIter,
-    &WhileIter,
-    &RangeIter,
-    &ContSt,
-    &Label,
-    &GotoSt,
-    &Postfix,
-    &Assign,
-    &MultiAssign,
-    &Match,
-    &FallSt,
-    &BreakSt,
-    &RetSt,
+	&Scope,
+	&Var,
+	&Data,
+	&Conditional,
+	&InfIter,
+	&WhileIter,
+	&RangeIter,
+	&ContSt,
+	&Label,
+	&GotoSt,
+	&Postfix,
+	&Assign,
+	&MultiAssign,
+	&Match,
+	&FallSt,
+	&BreakSt,
+	&RetSt,
 }
 
 fn newScopeCheckerBase(mut &s: &Sema, mut owner: &FnIns): &scopeChecker {
-    ret &scopeChecker{
-        s: s,
-        owner: owner,
-        table: new(SymbolTable),
-    }
+	ret &scopeChecker{
+		s: s,
+		owner: owner,
+		table: new(SymbolTable),
+	}
 }
 
 fn newScopeChecker(mut &s: &Sema, mut owner: &FnIns): &scopeChecker {
-    mut base := newScopeCheckerBase(s, owner)
-    base.labels = new([]&scopeLabel, nil)
-    base.gotos = new([]&scopeGoto, nil)
-    ret base
+	mut base := newScopeCheckerBase(s, owner)
+	base.labels = new([]&scopeLabel, nil)
+	base.gotos = new([]&scopeGoto, nil)
+	ret base
 }
 
 // Returns label by identifier.
 // Returns nil if not exist any label in this identifier.
 // Lookups given scope and parent scopes.
 fn findLabelParent(&ident: str, mut scope: &scopeChecker): &scopeLabel {
-    mut label := scope.findLabelScope(ident)
-    for label == nil {
-        if scope.parent == nil || scope.owner != nil {
-            ret nil
-        }
+	mut label := scope.findLabelScope(ident)
+	for label == nil {
+		if scope.parent == nil || scope.owner != nil {
+			ret nil
+		}
 
-        scope = scope.parent
-        label = scope.findLabelScope(ident)
-    }
+		scope = scope.parent
+		label = scope.findLabelScope(ident)
+	}
 
-    ret label
+	ret label
 }
 
 fn modelIsGotoScope(Model: any, &sc: &Scope): bool {
-    match type Model {
-    | &FnCallExprModel:
-        fcem := (&FnCallExprModel)(Model)
-        if fcem.Except == sc {
-            ret true
-        }
-    | &Data:
-        d := (&Data)(Model)
-        ret modelIsGotoScope(d.Model, sc)
-    }
-    ret false
+	match type Model {
+	| &FnCallExprModel:
+		fcem := (&FnCallExprModel)(Model)
+		if fcem.Except == sc {
+			ret true
+		}
+	| &Data:
+		d := (&Data)(Model)
+		ret modelIsGotoScope(d.Model, sc)
+	}
+	ret false
 }
 
 fn stmtIsGotoScope(&stmt: Stmt, &sc: &Scope): bool {
-    match type stmt {
-    | &Scope:
-        ret (&Scope)(stmt) == sc
-    | &InfIter:
-        ret (&InfIter)(stmt).Scope == sc
-    | &RangeIter:
-        it := (&RangeIter)(stmt)
-        ret it.Scope == sc || modelIsGotoScope(it.Expr.Model, sc)
-    | &WhileIter:
-        it := (&WhileIter)(stmt)
-        ret it.Scope == sc ||
-            modelIsGotoScope(it.Expr, sc) ||
-            modelIsGotoScope(it.Next, sc)
-    | &Match:
-        m := (&Match)(stmt)
-        for _, c in m.Cases {
-            if c.Scope == sc {
-                ret true
-            }
-            for _, expr in c.Exprs {
-                if modelIsGotoScope(expr.Model, sc) {
-                    ret true
-                }
-            }
-        }
-        ret m.Default != nil && m.Default.Scope == sc
-    | &Conditional:
-        c := (&Conditional)(stmt)
-        for _, elif in c.Elifs {
-            if elif.Scope == sc || modelIsGotoScope(elif.Expr, sc) {
-                ret true
-            }
-        }
-        ret c.Default != nil && c.Default.Scope == sc
-    | &Data:
-        d := (&Data)(stmt)
-        ret modelIsGotoScope(d.Model, sc)
-    |:
-        ret false
-    }
+	match type stmt {
+	| &Scope:
+		ret (&Scope)(stmt) == sc
+	| &InfIter:
+		ret (&InfIter)(stmt).Scope == sc
+	| &RangeIter:
+		it := (&RangeIter)(stmt)
+		ret it.Scope == sc || modelIsGotoScope(it.Expr.Model, sc)
+	| &WhileIter:
+		it := (&WhileIter)(stmt)
+		ret it.Scope == sc ||
+			modelIsGotoScope(it.Expr, sc) ||
+			modelIsGotoScope(it.Next, sc)
+	| &Match:
+		m := (&Match)(stmt)
+		for _, c in m.Cases {
+			if c.Scope == sc {
+				ret true
+			}
+			for _, expr in c.Exprs {
+				if modelIsGotoScope(expr.Model, sc) {
+					ret true
+				}
+			}
+		}
+		ret m.Default != nil && m.Default.Scope == sc
+	| &Conditional:
+		c := (&Conditional)(stmt)
+		for _, elif in c.Elifs {
+			if elif.Scope == sc || modelIsGotoScope(elif.Expr, sc) {
+				ret true
+			}
+		}
+		ret c.Default != nil && c.Default.Scope == sc
+	| &Data:
+		d := (&Data)(stmt)
+		ret modelIsGotoScope(d.Model, sc)
+	|:
+		ret false
+	}
 }
 
 fn countMatchType(&m: &Match, &t: &TypeKind): int {
-    mut n := 0
-    kind := t.Str()
+	mut n := 0
+	kind := t.Str()
 loop:
-    for _, c in m.Cases {
-        if c == nil {
-            continue
-        }
+	for _, c in m.Cases {
+		if c == nil {
+			continue
+		}
 
-        for _, expr in c.Exprs {
-            // Break loop because this expression is not parsed yet.
-            // So, parsed cases finished.
-            if expr == nil {
-                break loop
-            }
+		for _, expr in c.Exprs {
+			// Break loop because this expression is not parsed yet.
+			// So, parsed cases finished.
+			if expr == nil {
+				break loop
+			}
 
-            if kind == (&TypeKind)(expr.Model).Str() {
-                n++
-            }
-        }
-    }
-    ret n
+			if kind == (&TypeKind)(expr.Model).Str() {
+				n++
+			}
+		}
+	}
+	ret n
 }
 
 fn getDatasFromTupleData(mut &d: &Data): []&Data {
-    if d.Kind.Tup() != nil {
-        match type d.Model {
-        | &TupleExprModel:
-            ret (&TupleExprModel)(d.Model).Datas
-        |:
-            mut t := d.Kind.Tup()
-            mut r := make([]&Data, 0, len(t.Types))
-            for (_, mut kind) in t.Types {
-                r = append(r, &Data{
-                    Mutable: true, // Function return.
-                    Kind: kind,
-                })
-            }
-            ret r
-        }
-    } else {
-        ret [d]
-    }
+	if d.Kind.Tup() != nil {
+		match type d.Model {
+		| &TupleExprModel:
+			ret (&TupleExprModel)(d.Model).Datas
+		|:
+			mut t := d.Kind.Tup()
+			mut r := make([]&Data, 0, len(t.Types))
+			for (_, mut kind) in t.Types {
+				r = append(r, &Data{
+					Mutable: true, // Function return.
+					Kind: kind,
+				})
+			}
+			ret r
+		}
+	} else {
+		ret [d]
+	}
 }
 
 fn getExprModels(mut &m: ExprData): []ExprData {
-    match type m {
-    | &TupleExpr:
-        mut tup := (&TupleExpr)(m)
-        mut models := make([]ExprData, 0, len(tup.Expr))
-        for (_, mut expr) in tup.Expr {
-            models = append(models, expr.Kind)
-        }
-        ret models
-    |:
-        ret [m]
-    }
+	match type m {
+	| &TupleExpr:
+		mut tup := (&TupleExpr)(m)
+		mut models := make([]ExprData, 0, len(tup.Expr))
+		for (_, mut expr) in tup.Expr {
+			models = append(models, expr.Kind)
+		}
+		ret models
+	|:
+		ret [m]
+	}
 }
 
 fn checkMut(mut &s: &Sema, &left: &Data, mut right: &Data, op: &Token): (ok: bool) {
-    match {
-    | !left.Mutable:
-        s.pushErr(op, LogMsg.AssignToNonMut)
-        ret false
-    | right != nil && !right.Mutable && right.Kind.Mutable():
-        if op.Id != TokenId.Eq && right.Kind.Struct() != nil {
-            // If operator is not assignment, and kind is structure, allow.
-            // Operator overloading uses immutable copy of right operand.
-            // It's safe.
-            ret true
-        }
-        s.pushErr(op, LogMsg.AssignNonMutToMut, right.Kind.Str())
-        ret false
-    |:
-        ret true
-    }
+	match {
+	| !left.Mutable:
+		s.pushErr(op, LogMsg.AssignToNonMut)
+		ret false
+	| right != nil && !right.Mutable && right.Kind.Mutable():
+		if op.Id != TokenId.Eq && right.Kind.Struct() != nil {
+			// If operator is not assignment, and kind is structure, allow.
+			// Operator overloading uses immutable copy of right operand.
+			// It's safe.
+			ret true
+		}
+		s.pushErr(op, LogMsg.AssignNonMutToMut, right.Kind.Str())
+		ret false
+	|:
+		ret true
+	}
 }
 
 fn checkAssign(mut &s: &Sema, mut &left: &Data, mut right: &Data, op: &Token): (ok: bool) {
-    f := left.Kind.Fn()
-    if f != nil && f.Decl != nil && f.Decl.Global {
-        s.pushErr(op, LogMsg.AssignTypeNotSupportValue)
-        ret false
-    }
+	f := left.Kind.Fn()
+	if f != nil && f.Decl != nil && f.Decl.Global {
+		s.pushErr(op, LogMsg.AssignTypeNotSupportValue)
+		ret false
+	}
 
-    match {
-    | left.IsConst():
-        s.pushErr(op, LogMsg.AssignConst)
-        s.pushSuggestion(LogMsg.RemoveConstToAssign)
-        ret false
-    | !left.Lvalue:
-        s.pushErr(op, LogMsg.AssignRequireLvalue)
-        ret false
-    | !checkMut(s, left, right, op):
-        ret false
-    |:
-        ret true
-    }
+	match {
+	| left.IsConst():
+		s.pushErr(op, LogMsg.AssignConst)
+		s.pushSuggestion(LogMsg.RemoveConstToAssign)
+		ret false
+	| !left.Lvalue:
+		s.pushErr(op, LogMsg.AssignRequireLvalue)
+		ret false
+	| !checkMut(s, left, right, op):
+		ret false
+	|:
+		ret true
+	}
 }
 
 fn isValidAstStForNextSt(mut &n: StmtData): bool {
-    match type n {
-    | &AssignSt:
-        ret !(&AssignSt)(n).Declarative
-    | &Expr:
-        ret true
-    |:
-        ret false
-    }
+	match type n {
+	| &AssignSt:
+		ret !(&AssignSt)(n).Declarative
+	| &Expr:
+		ret true
+	|:
+		ret false
+	}
 }
 
 fn isValidStForNextSt(&st: Stmt): bool {
-    match type st {
-    | &Postfix
-    | &Assign
-    | &MultiAssign:
-        ret true
-    | &Data:
-        match type (&Data)(st).Model {
-        | &FnCallExprModel:
-            ret true
-        |:
-            ret false
-        }
-    |:
-        ret false
-    }
+	match type st {
+	| &Postfix
+	| &Assign
+	| &MultiAssign:
+		ret true
+	| &Data:
+		match type (&Data)(st).Model {
+		| &FnCallExprModel:
+			ret true
+		|:
+			ret false
+		}
+	|:
+		ret false
+	}
 }
 
 fn stmtIsDef(&st: Stmt): bool {
-    match type st {
-    | &Var:
-        ret true
-    |:
-        ret false
-    }
+	match type st {
+	| &Var:
+		ret true
+	|:
+		ret false
+	}
 }
 
 // Scope.
 struct Scope {
-    Parent:   &Scope
-    Unsafety: bool
-    Deferred: bool
-    Stmts:    []Stmt
+	Parent:   &Scope
+	Unsafety: bool
+	Deferred: bool
+	Stmts:    []Stmt
 }
 
 // Chain conditional node.
 struct If {
-    Expr:  ExprModel
-    Scope: &Scope
+	Expr:  ExprModel
+	Scope: &Scope
 }
 
 // Default scope of conditional chain.
 struct Else {
-    Scope: &Scope
+	Scope: &Scope
 }
 
 // Conditional chain.
 struct Conditional {
-    Elifs:   []&If // First not is root condition.
-    Default: &Else
+	Elifs:   []&If // First not is root condition.
+	Default: &Else
 }
 
 // Infinity iteration.
 struct InfIter {
-    Scope: &Scope
+	Scope: &Scope
 }
 
 // While iteration.
 struct WhileIter {
-    Expr:  ExprModel // Can be nil if iteration is while-next kind.
-    Next:  Stmt      // Nil if iteration is not while-next kind.
-    Scope: &Scope
+	Expr:  ExprModel // Can be nil if iteration is while-next kind.
+	Next:  Stmt      // Nil if iteration is not while-next kind.
+	Scope: &Scope
 }
 
 impl WhileIter {
-    // Reports whether iteration is while-next kind.
-    fn IsWhileNext(self): bool {
-        ret self.Next != nil
-    }
+	// Reports whether iteration is while-next kind.
+	fn IsWhileNext(self): bool {
+		ret self.Next != nil
+	}
 }
 
 // Range iteration.
 struct RangeIter {
-    Expr:  &Data
-    Scope: &Scope
-    KeyA:  &Var
-    KeyB:  &Var
+	Expr:  &Data
+	Scope: &Scope
+	KeyA:  &Var
+	KeyB:  &Var
 }
 
 // Continue statement.
 struct ContSt {
-    It: uintptr
+	It: uintptr
 }
 
 // Break statement.
 struct BreakSt {
-    It:   uintptr
-    Mtch: uintptr
+	It:   uintptr
+	Mtch: uintptr
 }
 
 // Label.
 struct Label {
-    Ident: str
+	Ident: str
 }
 
 // Goto statement.
 struct GotoSt {
-    Ident: str
-    Label: &Label
+	Ident: str
+	Label: &Label
 }
 
 // Postfix assignment.
 struct Postfix {
-    Expr: ExprModel
-    Op:   str
+	Expr: ExprModel
+	Op:   str
 }
 
 // Assigment.
 struct Assign {
-    Left:  &OperandExprModel
-    Right: &OperandExprModel
-    Op:    &Token
+	Left:  &OperandExprModel
+	Right: &OperandExprModel
+	Op:    &Token
 }
 
 // Multi-declarative assignment.
 struct MultiAssign {
-    Decls: []&Var
-    Left:  []&Data // Nil Model:s represents ingored expressions.
-    Right: ExprModel
+	Decls: []&Var
+	Left:  []&Data // Nil Model:s represents ingored expressions.
+	Right: ExprModel
 }
 
 // Match-Case.
 struct Match {
-    Expr:      &Data
-    TypeMatch: bool
-    Comptime:  bool
-    Cases:     []&Case
-    Default:   &Case
+	Expr:      &Data
+	TypeMatch: bool
+	Comptime:  bool
+	Cases:     []&Case
+	Default:   &Case
 }
 
 impl Match {
-    // Reports whether match is type-match for generic type.
-    fn IsGenericTypeMatch(self): bool {
-        ret self.TypeMatch && self.Expr != nil && self.Expr.Kind.Generic
-    }
+	// Reports whether match is type-match for generic type.
+	fn IsGenericTypeMatch(self): bool {
+		ret self.TypeMatch && self.Expr != nil && self.Expr.Kind.Generic
+	}
 }
 
 // Match-Case case.
 struct Case {
-    Owner: &Match
-    Scope: &Scope
-    Exprs: []&Data
-    Next:  &Case
+	Owner: &Match
+	Scope: &Scope
+	Exprs: []&Data
+	Next:  &Case
 }
 
 impl Case {
-    // Reports whether case is default.
-    fn isDefault(self): bool { ret self.Exprs == nil }
+	// Reports whether case is default.
+	fn isDefault(self): bool { ret self.Exprs == nil }
 }
 
 // Fall statement.
 struct FallSt {
-    DestCase: uintptr
+	DestCase: uintptr
 }
 
 // Return statement.
 struct RetSt {
-    Func: &FnIns
-    Expr: ExprModel
+	Func: &FnIns
+	Expr: ExprModel
 }
 
 struct scopeLabel {
-    token: &Token
-    label: &Label
-    pos:   int
-    scope: &scopeChecker
-    used:  bool
+	token: &Token
+	label: &Label
+	pos:   int
+	scope: &scopeChecker
+	used:  bool
 }
 
 struct scopeGoto {
-    st:    &GotoSt
-    gt:    &ast::GotoSt
-    scope: &scopeChecker
-    pos:   int
+	st:    &GotoSt
+	gt:    &ast::GotoSt
+	scope: &scopeChecker
+	pos:   int
 }
 
 // Scope checker.
 struct scopeChecker {
-    calledFrom: &Token
-    s:          &Sema
-    owner:      &FnIns // See developer reference (1).
-    parent:     &scopeChecker
-    childIndex: int // Index of child scope.
-    table:      &SymbolTable
-    scope:      &Scope
-    tree:       &ScopeTree
-    result:     &FnIns // Result type for last statement.
-    it:         uintptr
-    cse:        uintptr
-    captured:   &[]&Var        // Anonymous function's captured variables will be stored here.
-    labels:     &[]&scopeLabel // All labels of all scopes.
-    gotos:      &[]&scopeGoto  // All gotos of all scopes.
-    i:          int
+	calledFrom: &Token
+	s:          &Sema
+	owner:      &FnIns // See developer reference (1).
+	parent:     &scopeChecker
+	childIndex: int // Index of child scope.
+	table:      &SymbolTable
+	scope:      &Scope
+	tree:       &ScopeTree
+	result:     &FnIns // Result type for last statement.
+	it:         uintptr
+	cse:        uintptr
+	captured:   &[]&Var        // Anonymous function's captured variables will be stored here.
+	labels:     &[]&scopeLabel // All labels of all scopes.
+	gotos:      &[]&scopeGoto  // All gotos of all scopes.
+	i:          int
 }
 
 impl Lookup for scopeChecker {
-    // Returns imported package by selector.
-    // Returns nil reference if selector returns false for all packages.
-    // Returns nil reference if selector is nil.
-    //
-    // Lookups:
-    //   - Sema.
-    fn SelectPackage(mut self, selector: fn(&ImportInfo): bool): &ImportInfo {
-        ret self.s.SelectPackage(selector)
-    }
+	// Returns imported package by selector.
+	// Returns nil reference if selector returns false for all packages.
+	// Returns nil reference if selector is nil.
+	//
+	// Lookups:
+	//   - Sema.
+	fn SelectPackage(mut self, selector: fn(&ImportInfo): bool): &ImportInfo {
+		ret self.s.SelectPackage(selector)
+	}
 
-    // Returns variable by identifier and binded state.
-    // Returns nil reference if not exist any variable in this identifier.
-    //
-    // Lookups:
-    //   - Current scope.
-    //   - Parent scopes.
-    //   - Sema.
-    fn FindVar(mut self, ident: str, binded: bool): &Var {
-        if !binded { // Local variables cannot be binded.
-            mut v := self.findVar(ident)
-            if v != nil {
-                ret v
-            }
-        }
-        ret self.s.FindVar(ident, binded)
-    }
+	// Returns variable by identifier and binded state.
+	// Returns nil reference if not exist any variable in this identifier.
+	//
+	// Lookups:
+	//   - Current scope.
+	//   - Parent scopes.
+	//   - Sema.
+	fn FindVar(mut self, ident: str, binded: bool): &Var {
+		if !binded { // Local variables cannot be binded.
+			mut v := self.findVar(ident)
+			if v != nil {
+				ret v
+			}
+		}
+		ret self.s.FindVar(ident, binded)
+	}
 
-    // Returns type alias by identifier and binded state.
-    // Returns nil reference if not exist any type alias in this identifier.
-    //
-    // Lookups:
-    //   - Current scope.
-    //   - Parent scopes.
-    //   - Sema.
-    fn FindTypeAlias(mut self, ident: str, binded: bool): &TypeAlias {
-        // Search reverse for correct shadowing.
-        const Reverse = true
-        mut ta := self.table.findTypeAlias(ident, binded, Reverse)
-        if ta != nil {
-            ret ta
-        }
+	// Returns type alias by identifier and binded state.
+	// Returns nil reference if not exist any type alias in this identifier.
+	//
+	// Lookups:
+	//   - Current scope.
+	//   - Parent scopes.
+	//   - Sema.
+	fn FindTypeAlias(mut self, ident: str, binded: bool): &TypeAlias {
+		// Search reverse for correct shadowing.
+		const Reverse = true
+		mut ta := self.table.findTypeAlias(ident, binded, Reverse)
+		if ta != nil {
+			ret ta
+		}
 
-        mut parent := self.parent
-        for parent != nil {
-            ta = parent.table.findTypeAlias(ident, binded, Reverse)
-            if ta != nil {
-                ret ta
-            }
-            parent = parent.parent
-        }
+		mut parent := self.parent
+		for parent != nil {
+			ta = parent.table.findTypeAlias(ident, binded, Reverse)
+			if ta != nil {
+				ret ta
+			}
+			parent = parent.parent
+		}
 
-        ret self.s.FindTypeAlias(ident, binded)
-    }
+		ret self.s.FindTypeAlias(ident, binded)
+	}
 
-    // Returns struct by identifier and binded state.
-    // Returns nil reference if not exist any struct in this identifier.
-    //
-    // Lookups:
-    //   - Sema.
-    fn FindStruct(mut self, ident: str, binded: bool): &Struct {
-        ret self.s.FindStruct(ident, binded)
-    }
+	// Returns struct by identifier and binded state.
+	// Returns nil reference if not exist any struct in this identifier.
+	//
+	// Lookups:
+	//   - Sema.
+	fn FindStruct(mut self, ident: str, binded: bool): &Struct {
+		ret self.s.FindStruct(ident, binded)
+	}
 
-    // Returns function by identifier and binded state.
-    // Returns nil reference if not exist any function in this identifier.
-    //
-    // Lookups:
-    //   - Sema.
-    fn FindFn(mut self, ident: str, binded: bool): &Fn {
-        ret self.s.FindFn(ident, binded)
-    }
+	// Returns function by identifier and binded state.
+	// Returns nil reference if not exist any function in this identifier.
+	//
+	// Lookups:
+	//   - Sema.
+	fn FindFn(mut self, ident: str, binded: bool): &Fn {
+		ret self.s.FindFn(ident, binded)
+	}
 
-    // Returns trait by identifier.
-    // Returns nil reference if not exist any trait in this identifier.
-    //
-    // Lookups:
-    //   - Sema.
-    fn FindTrait(mut self, ident: str): &Trait {
-        ret self.s.FindTrait(ident)
-    }
+	// Returns trait by identifier.
+	// Returns nil reference if not exist any trait in this identifier.
+	//
+	// Lookups:
+	//   - Sema.
+	fn FindTrait(mut self, ident: str): &Trait {
+		ret self.s.FindTrait(ident)
+	}
 
-    // Returns enum by identifier.
-    // Returns nil reference if not exist any enum in this identifier.
-    //
-    // Lookups:
-    //   - Sema.
-    fn FindEnum(mut self, ident: str): &Enum {
-        ret self.s.FindEnum(ident)
-    }
+	// Returns enum by identifier.
+	// Returns nil reference if not exist any enum in this identifier.
+	//
+	// Lookups:
+	//   - Sema.
+	fn FindEnum(mut self, ident: str): &Enum {
+		ret self.s.FindEnum(ident)
+	}
 
-    // Returns type enum by identifier.
-    // Returns nil reference if not exist any type enum in this identifier.
-    //
-    // Lookups:
-    //   - Sema.
-    fn FindTypeEnum(mut self, ident: str): &TypeEnum {
-        ret self.s.FindTypeEnum(ident)
-    }
+	// Returns type enum by identifier.
+	// Returns nil reference if not exist any type enum in this identifier.
+	//
+	// Lookups:
+	//   - Sema.
+	fn FindTypeEnum(mut self, ident: str): &TypeEnum {
+		ret self.s.FindTypeEnum(ident)
+	}
 }
 
 impl scopeChecker {
-    // Reports whether scope is unsafe.
-    fn isUnsafe(mut &self): bool {
-        mut scope := self
-
-    iter:
-        if scope.scope.Unsafety {
-            ret true
-        }
-
-        if scope.parent != nil {
-            scope = scope.parent
-            goto iter
-        }
-
-        ret false
-    }
-
-    // Reports scope is root.
-    // Accepts anonymous functions as root.
-    fn isRoot(self): bool {
-        ret self.parent == nil || self.owner != nil
-    }
-
-    // Stop checking.
-    fn stop(mut self) {
-        self.i = -1
-    }
-
-    // Reports whether checking is stopped.
-    fn stopped(self): bool {
-        ret self.i == -1
-    }
-
-    // Reports scope is deferred.
-    fn isDeferred(mut &self): bool {
-        mut scope := self
-
-    iter:
-        if scope.scope.Deferred {
-            ret true
-        }
-
-        if scope.parent != nil {
-            scope = scope.parent
-            goto iter
-        }
-
-        ret false
-    }
-
-    // Push captured variable.
-    // It will append to all [captured] fields,
-    // because if child-scopes captures this variable,
-    // parent-scopes must be capture this variable too.
-    // Starts pushing from self to all parents.
-    // If any parent scope is not captures variable v, iteration will be break.
-    fn pushCaptured(mut &self, mut &v: &Var) {
-        mut sc := self
-        for {
-            if sc.captured != nil {
-                for _, cv in *sc.captured {
-                    if cv == v {
-                        goto exist
-                    }
-                }
-                *sc.captured = append(*sc.captured, v)
-            exist:
-            }
-            if sc.parent == nil {
-                break
-            }
-            sc = sc.parent
-            if !isVarCaptured(sc, sc, v) {
-                break
-            }
-        }
-    }
-
-    // Returns root scope.
-    // Accepts anonymous functions as root.
-    fn getRoot(mut &self): &scopeChecker {
-        mut root := self
-        for root.parent != nil && root.owner == nil {
-            root = root.parent
-        }
-        ret root
-    }
-
-    // Returns hard root scope, owner always represents root function of this scope.
-    // Not accepts anonymous functions as root.
-    fn getHardRoot(mut &self): &scopeChecker {
-        mut root := self
-        for root.parent != nil {
-            root = root.parent
-        }
-        ret root
-    }
-
-    // Like [Lookup.FindVar] but designed for local variables only.
-    fn findVar(mut self, ident: str): &Var {
-        const Reverse = true // Search reverse for correct shadowing.
-        const Binded = false // Local variables cannot be binded.
-        mut v := self.table.findVar(ident, Binded, Reverse)
-        if v != nil {
-            ret v
-        }
-        mut parent := self.parent
-        for parent != nil {
-            v = parent.table.findVar(ident, Binded, Reverse)
-            if v != nil {
-                ret v
-            }
-            parent = parent.parent
-        }
-        ret nil
-    }
-
-    // Returns label by identifier.
-    // Returns nil if not exist any label in this identifier.
-    // Just lookups current scope.
-    fn findLabel(mut self, &ident: str): &Label {
-        for (_, mut st) in self.scope.Stmts {
-            match type st {
-            | &Label:
-                mut label := (&Label)(st)
-                if label.Ident == ident {
-                    ret label
-                }
-            }
-        }
-        ret nil
-    }
-
-    // Returns label by identifier.
-    // Returns nil if not exist any label in this identifier.
-    // Just lookups current scope.
-    fn findLabelScope(mut &self, &ident: str): &scopeLabel {
-        mut label := self.findLabelAll(ident)
-        if label != nil && label.scope == self {
-            ret label
-        }
-
-        ret nil
-    }
-
-    // Returns label by identifier.
-    // Returns nil if not exist any label in this identifier.
-    // Lookups all labels.
-    fn findLabelAll(mut self, &ident: str): &scopeLabel {
-        for (_, mut lbl) in *self.labels {
-            if lbl.label.Ident == ident {
-                ret lbl
-            }
-        }
-        ret nil
-    }
-
-    // Reports this identifier duplicated in scope.
-    // The "self" parameter represents address of exception identifier.
-    // If founded identifier address equals to self, will be skipped.
-    fn isDuplicatedIdent(mut self, itself: uintptr, &ident: str): bool {
-        v := self.FindVar(ident, false)
-        if v != nil && uintptr(v) != itself {
-            if v.Scope == nil { // Ignore globals.
-                ret false
-            }
-            ret v.Scope == self.scope || !self.s.isFlag(SemaFlag.Shadowing)
-        }
-
-        ta := self.FindTypeAlias(ident, false)
-        if ta != nil && uintptr(ta) != itself {
-            if ta.Scope == nil { // Ignore globals.
-                ret false
-            }
-            ret ta.Scope == self.tree || !self.s.isFlag(SemaFlag.Shadowing)
-        }
-
-        ret false
-    }
-
-    fn checkVarDecl(mut &self, mut decl: &VarDecl) {
-        mut v := buildVar(decl)
-        v.Scope = self.scope
-
-        defer {
-            self.table.Vars = append(self.table.Vars, v)
-            self.scope.Stmts = append(self.scope.Stmts, v)
-        }
-
-        if self.isDuplicatedIdent(uintptr(v), v.Ident) {
-            self.s.pushErr(v.Token, LogMsg.DuplicatedIdent, v.Ident)
-            self.s.pushSuggestion(LogMsg.RenameForAvoidDuplication)
-            self.stop()
-            ret
-        }
-
-        self.s.checkVarDecl(v, self)
-        if !v.IsTypeInferred() && (v.Kind == nil || v.Kind.Kind == nil) {
-            ret
-        }
-
-        self.s.evalVarValue(v, self)
-        if !v.IsInitialized() || v.Value.Data == nil {
-            // Skip checks if error ocurrs when evaluated expression,
-            // or unitiliazed variable.
-            ret
-        }
-        self.removeInteriorMutRisk(v.Value.Data)
-        self.s.checkVarValue(v)
-    }
-
-    fn checkTypeAlias(mut &self, mut &ta: &TypeAlias) {
-        if self.isDuplicatedIdent(uintptr(ta), ta.Ident) {
-            self.s.pushErr(ta.Token, LogMsg.DuplicatedIdent, ta.Ident)
-            self.s.pushSuggestion(LogMsg.RenameForAvoidDuplication)
-            self.stop()
-            ret
-        }
-        self.s.checkTypeAliasDecl(ta, self)
-        self.table.TypeAliases = append(self.table.TypeAliases, ta)
-
-        // Stop immediately if destination type is could not evaluated.
-        if ta.Kind.Kind == nil {
-            self.stop()
-        }
-    }
-
-    fn checkTypeAliasDecl(mut &self, mut decl: &TypeAliasDecl) {
-        mut ta := buildTypeAlias(decl)
-        self.checkTypeAlias(ta)
-    }
-
-    fn getChild(mut self): &Scope {
-        ret &Scope{
-            Parent: self.scope,
-        }
-    }
-
-    fn checkChildSsc(mut &self, mut &tree: &ScopeTree, mut &s: &Scope, mut &ssc: &scopeChecker) {
-        ssc.parent = self
-        ssc.check(tree, s)
-    }
-
-    fn checkChildSc(mut &self, mut &tree: &ScopeTree, mut &ssc: &scopeChecker): &Scope {
-        mut s := self.getChild()
-        self.checkChildSsc(tree, s, ssc)
-        ret s
-    }
-
-    fn checkChild(mut &self, mut &tree: &ScopeTree): &Scope {
-        mut ssc := self.newChildChecker()
-        ret self.checkChildSc(tree, ssc)
-    }
-
-    fn checkAnonScope(mut &self, mut tree: &ScopeTree) {
-        mut s := self.checkChild(tree)
-        self.scope.Stmts = append(self.scope.Stmts, s)
-    }
-
-    fn processErrorCall(mut &self, mut &m: &BuiltinErrorCallExprModel, err: &Token) {
-        if self.isDeferred() {
-            self.s.pushErr(err, LogMsg.ErrorInDeferred)
-        }
-
-        mut root := self.getRoot()
-        if !root.owner.Decl.Exceptional {
-            self.s.pushErr(err, LogMsg.ErrorWithNonExceptional)
-            self.s.pushSuggestion(LogMsg.DeclareExceptional)
-        }
-        m.Func = root.owner
-    }
-
-    fn checkExpr(mut &self, mut expr: &Expr) {
-        mut eval := self.s.eval(self)
-        eval.ignored = true
-        mut d := eval.evalExpr(expr)
-        if d == nil || d.Model == nil {
-            // Skip nil data, because evaluation failed and error documented (it should be) already.
-            // Skip nil modeled data, this return only caused by built-in functions and it should be safe.
-            ret
-        }
-
-        match type d.Model {
-        | &BuiltinErrorCallExprModel:
-            mut m := (&BuiltinErrorCallExprModel)(d.Model)
-            self.processErrorCall(m, expr.Token)
-            self.scope.Stmts = append(self.scope.Stmts, d)
-        | &BackendEmitExprModel
-        | &BuiltinAppendCallExprModel
-        | &BuiltinOutCallExprModel
-        | &BuiltinOutlnCallExprModel
-        | &BuiltinPanicCallExprModel
-        | &BuiltinAssertCallExprModel
-        | &BuiltinCopyCallExprModel
-        | &BuiltinDeleteCallExprModel
-        | &FreeExprModel
-        | &FnCallExprModel:
-            self.scope.Stmts = append(self.scope.Stmts, d)
-        |:
-            self.s.pushErr(expr.Token, LogMsg.InvalidSyntax)
-        }
-    }
-
-    fn checkIf(mut &self, mut i: &ast::If): &If {
-        mut s := self.checkChild(i.Scope)
-
-        mut d := self.s.eval(self).evalExpr(i.Expr)
-        if d == nil {
-            ret nil
-        }
-
-        mut prim := d.Kind.Prim()
-        if prim == nil || !prim.IsBool() {
-            self.s.pushErr(i.Expr.Token, LogMsg.IfRequireBoolExpr)
-            ret nil
-        }
-
-        ret &If{
-            Expr: d.Model,
-            Scope: s,
-        }
-    }
-
-    fn checkElse(mut &self, mut e: &ast::Else): &Else {
-        ret &Else{
-            Scope: self.checkChild(e.Scope),
-        }
-    }
-
-    fn checkConditional(mut &self, mut conditional: &ast::Conditional) {
-        mut c := new(Conditional)
-        self.scope.Stmts = append(self.scope.Stmts, c)
-
-        c.Elifs = make([]&If, 0, len(conditional.Tail) + 1)
-
-        c.Elifs = append(c.Elifs, self.checkIf(conditional.Head))
-        for (_, mut elif) in conditional.Tail {
-            c.Elifs = append(c.Elifs, self.checkIf(elif))
-        }
-
-        if conditional.Default != nil {
-            c.Default = self.checkElse(conditional.Default)
-        }
-    }
-
-    fn checkIterScopeSsc(mut &self, it: uintptr, mut tree: &ScopeTree, mut &s: &Scope, mut ssc: &scopeChecker) {
-        ssc.it = it
-        self.checkChildSsc(tree, s, ssc)
-    }
-
-    fn checkIterScopeSc(mut &self, it: uintptr, mut tree: &ScopeTree, mut ssc: &scopeChecker): &Scope {
-        mut scope := self.getChild()
-        self.checkIterScopeSsc(it, tree, scope, ssc)
-        ret scope
-    }
-
-    fn checkIterScope(mut &self, it: uintptr, mut &tree: &ScopeTree): &Scope {
-        mut ssc := self.newChildChecker()
-        ret self.checkIterScopeSc(it, tree, ssc)
-    }
-
-    fn checkInfIter(mut &self, mut &it: &Iter) {
-        mut kind := new(InfIter)
-        self.scope.Stmts = append(self.scope.Stmts, kind)
-        kind.Scope = self.checkIterScope(uintptr(kind), it.Scope)
-    }
-
-    fn checkWhileIter(mut &self, mut &it: &Iter) {
-        mut wh := (&WhileKind)(it.Kind)
-        if wh.Expr == nil && wh.Next == nil {
-            self.checkInfIter(it)
-            ret
-        }
-
-        mut kind := new(WhileIter)
-        self.scope.Stmts = append(self.scope.Stmts, kind)
-        kind.Scope = self.checkIterScope(uintptr(kind), it.Scope)
-
-        if wh.Expr != nil {
-            mut d := self.s.eval(self).evalExpr(wh.Expr)
-            if d == nil {
-                ret
-            }
-
-            prim := d.Kind.Prim()
-            if prim == nil {
-                self.s.pushErr(it.Token, LogMsg.IterWhileRequireBoolExpr)
-                ret
-            }
-
-            if !prim.IsBool() {
-                self.s.pushErr(it.Token, LogMsg.IterWhileRequireBoolExpr)
-                ret
-            }
-
-            kind.Expr = d.Model
-        }
-
-        if wh.IsWhileNext() {
-            if !isValidAstStForNextSt(wh.Next) {
-                self.s.pushErr(wh.NextToken, LogMsg.InvalidStmtForNext)
-                ret
-            }
-
-            n := len(self.scope.Stmts)
-            self.checkNode(wh.Next)
-            if n < len(self.scope.Stmts) {
-                mut st := self.scope.Stmts[n]
-                self.scope.Stmts = self.scope.Stmts[:n] // Remove trailing statements.
-                if !isValidStForNextSt(st) {
-                    self.s.pushErr(wh.NextToken, LogMsg.InvalidStmtForNext)
-                }
-                kind.Next = st
-            }
-        }
-    }
-
-    fn checkComptimeRangeIter(mut &self, mut &it: &Iter, mut &kind: &RangeIter, mut &d: &Data) {
-        if kind.KeyA != nil {
-            if !self.s.isFlag(SemaFlag.Shadowing) && self.isDuplicatedIdent(0, kind.KeyA.Ident) {
-                self.s.pushErr(kind.KeyA.Token, LogMsg.DuplicatedIdent, kind.KeyA.Ident)
-                self.s.pushSuggestion(LogMsg.RenameForAvoidDuplication)
-            }
-        }
-        if kind.KeyB != nil {
-            if !self.s.isFlag(SemaFlag.Shadowing) && self.isDuplicatedIdent(0, kind.KeyB.Ident) {
-                self.s.pushErr(kind.KeyB.Token, LogMsg.DuplicatedIdent, kind.KeyB.Ident)
-                self.s.pushSuggestion(LogMsg.RenameForAvoidDuplication)
-            }
-        }
-
-        mut rang := (&RangeKind)(it.Kind)
-        makeComptimeRange(d)
-        if d.Decl {
-            self.s.pushErr(rang.Expr.Token, LogMsg.InvalidTypeForComptimeIter, d.Kind.Str())
-            ret
-        }
-
-        mut rc := rangeChecker{
-            sc: self,
-            Kind: kind,
-            rang: rang,
-            d: d,
-        }
-        ok := rc.check()
-        if !ok {
-            ret
-        }
-
-        mut comptime := d.Kind.comptimeRange()
-        comptime.kind.ready(kind.KeyA, kind.KeyB)
-        mut i := 0
-        errors := len(self.s.errors)
-        for i < comptime.kind.len(); i++ {
-            mut ssc := self.newChildChecker()
-            mut scope := self.getChild()
-            if kind.KeyA != nil {
-                kind.KeyA.Scope = scope
-                ssc.table.Vars = append(ssc.table.Vars, kind.KeyA)
-            }
-            if kind.KeyB != nil {
-                kind.KeyB.Scope = scope
-                ssc.table.Vars = append(ssc.table.Vars, kind.KeyB)
-            }
-            comptime.kind.step(i, kind.KeyA, kind.KeyB)
-            self.checkChildSsc(it.Scope, scope, ssc)
-            if errors != len(self.s.errors) {
-                // Stop execution if new error occurred.
-                break
-            }
-            self.scope.Stmts = append(self.scope.Stmts, scope)
-        }
-    }
-
-    fn checkRangeIter(mut &self, mut &it: &Iter) {
-        mut rang := (&RangeKind)(it.Kind)
-
-        mut d := self.s.eval(self).evalExpr1(rang.Expr)
-        if d == nil {
-            ret
-        }
-
-        mut kind := &RangeIter{
-            Expr: d,
-        }
-
-        if it.Comptime {
-            self.checkComptimeRangeIter(it, kind, d)
-            ret
-        }
-        if d.Kind.comptime() {
-            self.s.pushErr(rang.Expr.Token, LogMsg.ComptimeExprForRuntimeIteration)
-            self.s.pushSuggestion(LogMsg.DeclareComptimeForeach)
-            ret
-        }
-
-        mut rc := rangeChecker{
-            sc: self,
-            Kind: kind,
-            rang: rang,
-            d: d,
-        }
-        ok := rc.check()
-        if !ok {
-            ret
-        }
-
-        self.scope.Stmts = append(self.scope.Stmts, kind)
-
-        mut ssc := self.newChildChecker()
-        mut scope := self.getChild()
-
-        if kind.KeyA != nil {
-            if !self.s.isFlag(SemaFlag.Shadowing) && self.isDuplicatedIdent(0, kind.KeyA.Ident) {
-                self.s.pushErr(kind.KeyA.Token, LogMsg.DuplicatedIdent, kind.KeyA.Ident)
-                self.s.pushSuggestion(LogMsg.RenameForAvoidDuplication)
-            }
-            kind.KeyA.Scope = scope
-            ssc.table.Vars = append(ssc.table.Vars, kind.KeyA)
-        }
-
-        if kind.KeyB != nil {
-            if !self.s.isFlag(SemaFlag.Shadowing) && self.isDuplicatedIdent(0, kind.KeyB.Ident) {
-                self.s.pushErr(kind.KeyB.Token, LogMsg.DuplicatedIdent, kind.KeyB.Ident)
-                self.s.pushSuggestion(LogMsg.RenameForAvoidDuplication)
-            }
-            kind.KeyB.Scope = scope
-            ssc.table.Vars = append(ssc.table.Vars, kind.KeyB)
-        }
-
-        self.checkIterScopeSsc(uintptr(kind), it.Scope, scope, ssc)
-        kind.Scope = scope
-    }
-
-    fn checkIter(mut &self, mut it: &Iter) {
-        if it.IsInf() {
-            if it.Comptime {
-                self.s.pushErr(it.Token, LogMsg.InvalidComptimeIter)
-                ret
-            }
-            self.checkInfIter(it)
-            ret
-        }
-
-        match type it.Kind {
-        | &WhileKind:
-            if it.Comptime {
-                self.s.pushErr(it.Token, LogMsg.InvalidComptimeIter)
-                ret
-            }
-            self.checkWhileIter(it)
-        | &RangeKind:
-            self.checkRangeIter(it)
-        |:
-            outln("error <unimplemented iteration kind>")
-        }
-    }
-
-    fn checkValidContLabel(mut &self, it: uintptr): bool {
-        mut scope := self
-
-    iter:
-        if scope.it == it {
-            ret true
-        }
-
-        if scope.parent != nil {
-            scope = scope.parent
-            goto iter
-        }
-
-        ret false
-    }
-
-    fn checkValidBreakLabel(mut &self, ptr: uintptr): bool {
-        mut scope := self
-
-    iter:
-        if scope.it == ptr {
-            ret true
-        }
-
-        if scope.cse != 0 {
-            mtch := unsafe { uintptr((*Case)(scope.cse).Owner) }
-            if mtch == ptr {
-                ret true
-            }
-        }
-
-        if scope.parent != nil {
-            scope = scope.parent
-            goto iter
-        }
-
-        ret false
-    }
-
-    fn checkContValidScope(mut &self, c: &ast::ContSt): &ContSt {
-        if self.isDeferred() {
-            self.s.pushErr(c.Token, LogMsg.ContinueAtOutOfValidScope)
-            ret nil
-        }
-
-        if c.Label != nil {
-            ret new(ContSt)
-        }
-
-        mut scope := self
-    iter:
-        match {
-        | scope.it == 0 && scope.parent != nil && scope.owner == nil:
-            scope = scope.parent
-            goto iter
-        | scope.it != 0:
-            ret &ContSt{It: scope.it}
-        }
-
-        self.s.pushErr(c.Token, LogMsg.ContinueAtOutOfValidScope)
-        ret nil
-    }
-
-    fn checkCont(mut &self, c: &ast::ContSt) {
-        mut cont := self.checkContValidScope(c)
-        if cont == nil {
-            ret
-        }
-
-        if c.Label != nil { // Label given.
-            mut label := findLabelParent(c.Label.Kind, self.parent)
-            if label == nil {
-                self.s.pushErr(c.Label, LogMsg.LabelNotExist, c.Label.Kind)
-                ret
-            }
-
-            label.used = true
-
-            if label.pos+1 >= len(label.scope.scope.Stmts) {
-                self.s.pushErr(c.Label, LogMsg.InvalidLabel, c.Label.Kind)
-                ret
-            }
-
-            i := label.pos + 1
-            if i >= len(label.scope.scope.Stmts) {
-                self.s.pushErr(c.Label, LogMsg.InvalidLabel)
-            } else {
-                mut st := label.scope.scope.Stmts[i]
-                match type st {
-                | &InfIter:
-                    cont.It = uintptr((&InfIter)(st))
-                | &RangeIter:
-                    cont.It = uintptr((&RangeIter)(st))
-                | &WhileIter:
-                    cont.It = uintptr((&WhileIter)(st))
-                |:
-                    self.s.pushErr(c.Label, LogMsg.InvalidLabel, c.Label.Kind)
-                }
-            }
-        }
-
-        if cont.It != 0 {
-            if !self.checkValidContLabel(cont.It) {
-                self.s.pushErr(c.Label, LogMsg.InvalidLabel, c.Label.Kind)
-            }
-        }
-
-        self.scope.Stmts = append(self.scope.Stmts, cont)
-    }
-
-    fn checkLabel(mut &self, mut l: &LabelSt) {
-        if self.findLabel(l.Ident) != nil {
-            self.s.pushErr(l.Token, LogMsg.LabelExist, l.Ident)
-            ret
-        }
-
-        mut label := &Label{
-            Ident: l.Ident,
-        }
-
-        self.scope.Stmts = append(self.scope.Stmts, label)
-        *self.labels = append(*self.labels, &scopeLabel{
-            token: l.Token,
-            label: label,
-            pos: len(self.scope.Stmts) - 1,
-            scope: self,
-        })
-    }
-
-    fn pushGoto(mut &self, mut gt: &ast::GotoSt) {
-        mut st := &GotoSt{
-            Ident: gt.Label.Kind,
-        }
-        self.scope.Stmts = append(self.scope.Stmts, st)
-
-        *self.gotos = append(*self.gotos, &scopeGoto{
-            st: st,
-            gt: gt,
-            pos: len(self.scope.Stmts) - 1,
-            scope: self,
-        })
-    }
-
-    fn checkPostfix(mut &self, mut a: &AssignSt) {
-        if len(a.Left) > 1 {
-            self.s.pushErr(a.Setter, LogMsg.InvalidSyntax)
-            ret
-        }
-
-        mut expr := a.Left[0].Expr
-        mut d := self.s.eval(self).evalExpr(expr)
-        if d == nil {
-            ret
-        }
-
-        _ = checkAssign(self.s, d, nil, a.Setter)
-
-        if d.Kind.Ptr() != nil {
-            mut ptr := d.Kind.Ptr()
-            if ptr.IsUnsafe() {
-                self.s.pushErr(a.Setter, LogMsg.OperatorNotForJuleType, a.Setter.Kind, d.Kind.Str())
-                ret
-            }
-        } else {
-            if d.Kind.Prim() == nil || !types::IsNum(d.Kind.Prim().Kind) {
-                self.s.pushErr(a.Setter, LogMsg.OperatorNotForJuleType, a.Setter.Kind, d.Kind.Str())
-                ret
-            }
-        }
-
-        self.scope.Stmts = append(self.scope.Stmts, &Postfix{
-            Expr: d.Model,
-            Op: a.Setter.Kind,
-        })
-    }
-
-    fn isNewAssignIdent(mut self, ident: str): bool {
-        if IsIgnoreIdent(ident) || ident == "" {
-            ret false
-        }
-        ret self.table.defByIdent(ident, false) == nil
-    }
-
-    // Remove the interior mutability risk if the d represents a structure and
-    // this scope is owned by method which is owned by the relevant structure.
-    // In this case we should remove the interior mutability risk of data to allow copying.
-    // Otherwise assign analysis will complain and copy operation will not be allowed.
-    //
-    // See also documentation of the [sema.isMutRiskyStruct] method.
-    fn removeInteriorMutRisk(mut &self, mut &d: &Data) {
-        s := d.Kind.Struct()
-        if s == nil {
-            ret
-        }
-        root := self.getHardRoot()
-        if root.owner.Owner != s {
-            ret
-        }
-        // Mark data as mutable.
-        // Mutable data is not occurs mutability risk for analysis.
-        d.Mutable = true
-    }
-
-    fn checkStructureAssignOp(mut &self, mut &s: &StructIns, mut &a: &AssignSt, mut &r: &Data): bool {
-        // This method adopted from [binaryEval.checkStructCommonOperatorCompatibility].
-        // Should follow this method.
-        let mut overload: &FnIns = nil
-        match a.Setter.Id {
-        | TokenId.PlusEq:
-            overload = s.Operators.AddAssign
-        | TokenId.MinusEq:
-            overload = s.Operators.SubAssign
-        | TokenId.SolidusEq:
-            overload = s.Operators.DivAssign
-        | TokenId.StarEq:
-            overload = s.Operators.MulAssign
-        | TokenId.PercentEq:
-            overload = s.Operators.ModAssign
-        | TokenId.ShlEq:
-            overload = s.Operators.ShlAssign
-        | TokenId.ShrEq:
-            overload = s.Operators.ShrAssign
-        | TokenId.VlineEq:
-            overload = s.Operators.BitOrAssign
-        | TokenId.AmperEq:
-            overload = s.Operators.BitAndAssign
-        | TokenId.CaretEq:
-            overload = s.Operators.BitXorAssign
-        |:
-            self.s.pushErr(a.Setter, LogMsg.OperatorNotForJuleType, a.Setter.Kind, s.Str())
-            ret false
-        }
-
-        if overload == nil {
-            self.s.pushErr(a.Setter, LogMsg.OperatorNotForJuleType, a.Setter.Kind, s.Str())
-            ret false
-        }
-
-        mut p := overload.Params[1]
-        ret self.s.checkAssignType(p.Decl.Reference, p.Kind, r, a.Setter)
-    }
-
-    fn checkSingleAssign(mut &self, mut &a: &AssignSt) {
-        let mut l: &Data = nil
-
-        if !IsIgnoreIdent(a.Left[0].Ident) {
-            mut expr := a.Left[0].Expr
-            l = self.s.eval(self).evalExpr(expr)
-            if l == nil {
-                ret
-            }
-        }
-
-        let mut eval: &Eval = nil
-        if l != nil {
-            eval = self.s.evalp(self, l.Kind)
-        } else {
-            eval = self.s.eval(self)
-        }
-        eval.unsafety = self.isUnsafe()
-        mut r := eval.evalExpr(a.Right)
-        if r == nil {
-            ret
-        }
-
-        self.removeInteriorMutRisk(r)
-
-        if l == nil {
-            if r.Kind.Void() {
-                self.s.pushErr(a.Right.Token, LogMsg.InvalidExpr)
-            }
-            self.scope.Stmts = append(self.scope.Stmts, r)
-            ret
-        }
-
-        if !checkAssign(self.s, l, r, a.Setter) {
-            ret
-        }
-
-        if r.Kind.Tup() != nil {
-            self.s.pushErr(a.Setter, LogMsg.MissingMultiAssignIdents)
-            ret
-        }
-
-        mut lm := &OperandExprModel{
-            Kind: l.Kind,
-            Model: l.Model,
-        }
-        mut rm := &OperandExprModel{
-            Kind: r.Kind,
-            Model: r.Model,
-        }
-        self.scope.Stmts = append(self.scope.Stmts, &Assign{Left: lm, Right: rm, Op: a.Setter})
-
-        if a.Setter.Id == TokenId.Eq {
-            mut checker := assignTypeChecker{
-                s: self.s,
-                dest: l.Kind,
-                d: r,
-                errorToken: a.Setter,
-            }
-            if checker.check() {
-                rm.Model = r.Model
-                lm.Model = l.Model
-            }
-            ret
-        }
-        mut strct := l.Kind.Struct()
-        if strct != nil {
-            self.checkStructureAssignOp(strct, a, r)
-            ret
-        }
-        id := a.Setter.Id
-        a.Setter.Id = removeEqFromOp(a.Setter.Id)
-        mut solver := binaryEval.new(eval, a.Setter)
-        solver.l, solver.r = l, r
-        _ = solver.evalOp()
-        a.Setter.Id = id
-    }
-
-    fn processEndPartOfMultiAssign(mut self, mut &st: &MultiAssign,
-        mut &a: &AssignSt, mut &lexpr: &AssignLeft, mut &l: &Data, mut &r: &Data) {
-        if !lexpr.Reference && IsIgnoreIdent(lexpr.Ident) {
-            if r.Kind.Void() {
-                self.s.pushErr(a.Right.Token, LogMsg.InvalidExpr)
-            }
-            st.Left = append(st.Left, nil)
-            ret
-        }
-
-        if a.Declarative && (lexpr.Reference || self.isNewAssignIdent(lexpr.Ident)) {
-            if self.isDuplicatedIdent(0, lexpr.Ident) {
-                self.s.pushErr(lexpr.Token, LogMsg.DuplicatedIdent, lexpr.Ident)
-                self.s.pushSuggestion(LogMsg.RenameForAvoidDuplication)
-                self.stop()
-                ret
-            }
-            if IsIgnoreIdent(lexpr.Ident) {
-                self.s.pushErr(lexpr.Token, LogMsg.IgnoreIdent)
-            }
-
-            // Add new variable declaration statement.
-            mut v := &Var{
-                Ident: lexpr.Ident,
-                Token: lexpr.Token,
-                Mutable: lexpr.Mutable,
-                Reference: lexpr.Reference,
-                Scope: self.scope,
-                Value: &Value{
-                    Expr: a.Right,
-                    Data: r,
-                },
-            }
-            self.s.checkVarValue(v)
-            st.Left = append(st.Left, &Data{
-                Lvalue: !v.Constant,
-                Mutable: v.Mutable,
-                Reference: v.Reference,
-                Kind: v.Kind.Kind,
-                Model: v,
-            })
-            st.Decls = append(st.Decls, v)
-            self.table.Vars = append(self.table.Vars, v)
-            ret
-        }
-
-        if lexpr.Mutable || lexpr.Reference {
-            self.s.pushErr(lexpr.Token, LogMsg.DuplicatedIdent, lexpr.Ident)
-            self.s.pushSuggestion(LogMsg.RenameForAvoidDuplication)
-        }
-
-        if !checkAssign(self.s, l, r, lexpr.Token) {
-            ret
-        }
-
-        // Set reference false because this is normal assigment.
-        // So, we don't need to check reference assignment should using lvalue.
-        const Reference = false
-        self.s.checkValidityForInitExpr(l.Mutable, Reference, l.Kind, r, a.Setter)
-
-        mut checker := assignTypeChecker{
-            s: self.s,
-            dest: l.Kind,
-            d: r,
-            errorToken: a.Setter,
-        }
-        checker.check()
-        st.Left = append(st.Left, l)
-    }
-
-    fn checkMultiAssign(mut &self, mut &a: &AssignSt) {
-        mut rd := self.s.eval(self).evalExpr(a.Right)
-        if rd == nil {
-            ret
-        }
-        mut right := getDatasFromTupleData(rd)
-        if len(right) == 1 {
-            match type right[0].Model {
-            | &IndexingExprModel:
-                mut iem := (&IndexingExprModel)(right[0].Model)
-                if iem.Expr.Kind.Map() != nil { // Is map lookup.
-                    right = [
-                        &Data{Kind: iem.Expr.Kind.Map().Val},
-                        &Data{Kind: primBool},
-                    ]
-                }
-            }
-        }
-
-        match {
-        | len(a.Left) > len(right):
-            self.s.pushErr(a.Setter, LogMsg.OverflowMultiAssignIdents)
-            ret
-        | len(a.Left) < len(right):
-            self.s.pushErr(a.Setter, LogMsg.MissingMultiAssignIdents)
-            ret
-        }
-
-        mut st := &MultiAssign{
-            Right: rd.Model,
-        }
-        for i in a.Left {
-            mut lexpr := a.Left[i]
-            let mut l: &Data = nil
-            if !IsIgnoreIdent(lexpr.Ident) &&
-                (!a.Declarative || !self.isNewAssignIdent(lexpr.Ident)) {
-                l = self.s.eval(self).evalExpr(lexpr.Expr)
-                if l == nil {
-                    continue
-                }
-            }
-            mut r := right[i]
-            self.removeInteriorMutRisk(r)
-            self.processEndPartOfMultiAssign(st, a, lexpr, l, r)
-        }
-        self.scope.Stmts = append(self.scope.Stmts, st)
-    }
-
-    fn checkAssignSt(mut &self, mut a: &AssignSt) {
-        match {
-        | IsPostfixOp(a.Setter.Id):
-            self.checkPostfix(a)
-        | len(a.Left) == 1:
-            self.checkSingleAssign(a)
-        |:
-            self.checkMultiAssign(a)
-        }
-    }
-
-    fn checkCaseScope(mut &self, &c: &Case, mut &tree: &ScopeTree): &Scope {
-        mut ssc := self.newChildChecker()
-        ssc.cse = uintptr(c)
-        ret self.checkChildSc(tree, ssc)
-    }
-
-    fn checkCase(mut &self, mut m: &Match, i: int, mut c: &ast::Case, mut expr: &Data): &Case {
-        mut case := m.Cases[i]
-        case.Exprs = make([]&Data, 0, len(c.Exprs))
-        mut constMatched := false
-        mut eval := self.s.eval(self)
-        for (_, mut e) in c.Exprs {
-            mut d := eval.evalExprKind(e.Kind)
-            if d == nil {
-                continue
-            }
-
-            if m.TypeMatch {
-                // Match types. There is not need to check whether d.Decl is true.
-                // Parser always tries to build type declarations for type-match cases.
-                // So, d is should be type declaration already.
-                case.Exprs = append(case.Exprs, d)
-                if countMatchType(m, d.Kind) > 1 {
-                    self.s.pushErr(e.Token, LogMsg.DuplicateMatchType, d.Kind.Str())
-                }
-                if m.Comptime {
-                    constMatched = constMatched || expr.Kind.Equal(d.Kind)
-                } else {
-                    if expr.Kind.TypeEnum() != nil {
-                        _ = self.s.checkTypeCompatibility(expr.Kind, d.Kind, e.Token)
-                    } else {
-                        trt := expr.Kind.Trait()
-                        if trt != nil {
-                            _ = self.s.checkTypeCompatibility(expr.Kind, d.Kind, e.Token)
-                        }
-                    }
-                }
-                continue
-            }
-
-            if d.Decl {
-                self.s.pushErr(e.Token, LogMsg.DeclFoundInsteadExpr)
-                self.s.pushSuggestion(LogMsg.UseTypeMatch)
-                continue
-            }
-
-            if m.Comptime {
-                if !d.IsConst() && d.Kind.comptimeTypeInfo() == nil {
-                    self.s.pushErr(e.Token, LogMsg.ExprNotConst)
-                    self.s.pushSuggestion(LogMsg.InvalidExprForConstMatch)
-                    continue
-                }
-                if !constMatched {
-                    if d.IsConst() {
-                        constMatched = expr.IsConst() && d.Constant.Eq(*expr.Constant)
-                    } else {
-                        exprCti := expr.Kind.comptimeTypeInfo()
-                        constMatched = exprCti != nil && d.Kind.comptimeTypeInfo().base.Equal(exprCti.base)
-                    }
-                }
-            }
-
-            case.Exprs = append(case.Exprs, d)
-            if !m.Comptime ||
-                expr.Kind.comptimeTypeInfo() == nil ||
-                d.Kind.comptimeTypeInfo() == nil {
-                mut checker := assignTypeChecker{
-                    s: self.s,
-                    dest: expr.Kind,
-                    d: d,
-                    errorToken: e.Token,
-                }
-                checker.check()
-            }
-        }
-        if !m.Comptime || constMatched {
-            case.Scope = self.checkCaseScope(case, c.Scope)
-        }
-        ret case
-    }
-
-    fn checkCases(mut &self, mut &m: &MatchCase, mut rm: &Match, mut expr: &Data) {
-        rm.Cases = make([]&Case, 0, len(m.Cases))
-        for i in m.Cases {
-            mut case := &Case{
-                Owner: rm,
-            }
-            if i > 0 {
-                rm.Cases[i-1].Next = case
-            }
-            rm.Cases = append(rm.Cases, case)
-        }
-
-        if rm.Default != nil && len(m.Cases) > 0 {
-            rm.Cases[len(rm.Cases)-1].Next = rm.Default
-        }
-
-        for (i, mut c) in m.Cases {
-            self.checkCase(rm, i, c, expr)
-        }
-    }
-
-    fn checkDefault(mut &self, mut m: &Match, mut d: &ast::Else): &Case {
-        mut def := &Case{
-            Owner: m,
-        }
-        def.Scope = self.checkCaseScope(def, d.Scope)
-        ret def
-    }
-
-    fn checkComptimePanic(mut &self, mut callToken: &Token, &s: &Scope) {
-        if len(s.Stmts) != 1 {
-            ret
-        }
-        stmt := s.Stmts[0]
-        match type stmt {
-        | &Data:
-            d := (&Data)(stmt)
-            match type d.Model {
-            | &BuiltinPanicCallExprModel:
-                mut m := (&BuiltinPanicCallExprModel)(d.Model)
-                match type m.Expr {
-                | &Const:
-                    c := (&Const)(m.Expr)
-                    if !c.IsStr() {
-                        break
-                    }
-                    if callToken == nil {
-                        mut root := self.getHardRoot()
-                        if root.calledFrom == nil {
-                            callToken = m.Token
-                        } else {
-                            callToken = root.calledFrom
-                        }
-                    }
-                    self.s.pushErr(callToken, LogMsg.ComptimePanic, c.ReadStr())
-                    self.stop()
-                }
-            }
-        }
-    }
-
-    fn processConstMatch(mut &self, mut &tm: &Match, mut &m: &MatchCase) {
-        for (i, mut c) in tm.Cases {
-            if c.Scope != nil {
-                let mut token: &Token = nil
-                if !tm.TypeMatch && len(c.Scope.Stmts) > 0 {
-                    token = m.Cases[i].Scope.Stmts[0].Token
-                }
-                self.checkComptimePanic(token, c.Scope)
-                tm.Default = c
-                tm.Cases = nil
-                ret
-            }
-        }
-        if m.Default != nil {
-            tm.Cases = nil
-            tm.Default = self.checkDefault(tm, m.Default)
-            if tm.Default != nil {
-                let mut token: &Token = nil
-                if !tm.TypeMatch {
-                    token = m.Default.Scope.Stmts[0].Token
-                }
-                self.checkComptimePanic(token, tm.Default.Scope)
-            }
-        } else {
-            // Remove all cases, no success matching.
-            tm.Cases = nil
-        }
-    }
-
-    fn checkTypeMatch(mut &self, mut &m: &MatchCase) {
-        mut d := self.s.eval(self).eval1(m.Expr)
-        if d == nil {
-            ret
-        }
-
-        if m.Comptime {
-            mut cti := d.Kind.comptimeTypeInfo()
-            if cti == nil {
-                if !d.Decl {
-                    self.s.pushErr(m.Expr.Token, LogMsg.InvalidComptimeTypeMatchExpr)
-                    ret
-                }
-            } else {
-                d.Kind = cti.base
-            }
-        } else if d.Decl || !((d.Kind.Prim() != nil && d.Kind.Prim().IsAny()) || d.Kind.Trait() != nil || d.Kind.TypeEnum() != nil) {
-            self.s.pushErr(m.Expr.Token, LogMsg.TypeCaseHasNotValidExpr)
-            ret
-        }
-
-        mut tm := &Match{
-            TypeMatch: true,
-            Expr: d,
-            Comptime: m.Comptime,
-        }
-
-        // Do not check default if comptime matching enabled.
-        // We do not know any case will be matched yet.
-        // The [self.processConstMatch] will check cases and if not exist
-        // any matching, will check default case if exist and handle it.
-        if !tm.Comptime && m.Default != nil {
-            tm.Default = self.checkDefault(tm, m.Default)
-        }
-
-        self.checkCases(m, tm, d)
-        if tm.Comptime {
-            self.processConstMatch(tm, m)
-        }
-        self.scope.Stmts = append(self.scope.Stmts, tm)
-    }
-
-    fn checkCommonMatch(mut &self, mut &m: &MatchCase) {
-        let mut d: &Data = nil
-        if m.Expr == nil {
-            d = &Data{
-                Constant: Const.NewBool(true),
-                Kind: primBool,
-            }
-            d.Model = d.Constant
-        } else {
-            d = self.s.eval(self).evalExpr1(m.Expr)
-            if d == nil {
-                ret
-            }
-        }
-
-        if m.Comptime {
-            if !canComptimeMatch(d) {
-                self.s.pushErr(m.Expr.Token, LogMsg.ExprNotConst)
-                self.s.pushSuggestion(LogMsg.InvalidExprForConstMatch)
-                ret
-            }
-        } else if d.Kind.comptime() {
-            self.s.pushErr(m.Expr.Token, LogMsg.ExprNotConst)
-            self.s.pushSuggestion(LogMsg.InvalidExprForConstMatch)
-            ret
-        }
-
-        mut mc := &Match{
-            Expr: d,
-            Comptime: m.Comptime,
-        }
-
-        // Push into stmts here. Otherwise, labeled break statements and others
-        // will may log error(s) event semantic is good.
-        self.scope.Stmts = append(self.scope.Stmts, mc)
-
-        // Do not check default if comptime matching enabled.
-        // We do not know any case will be matched yet.
-        // The [self.processConstMatch] will check cases and if not exist
-        // any matching, will check default case if exist and handle it.
-        if !mc.Comptime && m.Default != nil {
-            mc.Default = self.checkDefault(mc, m.Default)
-        }
-
-        self.checkCases(m, mc, d)
-        if mc.Comptime {
-            self.processConstMatch(mc, m)
-        }
-    }
-
-    fn checkMatch(mut &self, mut m: &MatchCase) {
-        if m.TypeMatch {
-            self.checkTypeMatch(m)
-            ret
-        }
-        self.checkCommonMatch(m)
-    }
-
-    fn checkFall(mut &self, f: &ast::FallSt) {
-        if self.cse == 0 ||
-            len(self.scope.Stmts)+1 < len(self.scope.Stmts) ||
-            self.isDeferred() {
-            self.s.pushErr(f.Token, LogMsg.FallthroughWrongUse)
-            ret
-        }
-
-        mut case := unsafe { (*Case)(self.cse) }
-        if unsafe { case.Owner.Comptime } {
-            self.s.pushErr(f.Token, LogMsg.ComptimeFallthrough)
-            ret
-        } else if unsafe { case.Next } == nil {
-            self.s.pushErr(f.Token, LogMsg.FallthroughIntoFinalCase)
-            self.s.pushSuggestion(LogMsg.RemoveFallthroughFromFinalCase)
-            ret
-        }
-
-        self.scope.Stmts = append(self.scope.Stmts, &FallSt{
-            DestCase: unsafe { uintptr(case.Next) },
-        })
-    }
-
-    fn checkBreakWithLabel(mut &self, b: &ast::BreakSt): &BreakSt {
-        mut brk := self.checkPlainBreak(b)
-        if brk == nil {
-            ret nil
-        }
-
-        // Set pointer to zero.
-        // Pointer will set by label.
-        brk.It = 0
-        brk.Mtch = 0
-
-        mut label := findLabelParent(b.Label.Kind, self.parent)
-        if label == nil {
-            self.s.pushErr(b.Label, LogMsg.LabelNotExist, b.Label.Kind)
-            ret nil
-        }
-
-        label.used = true
-
-        if label.pos+1 >= len(label.scope.scope.Stmts) {
-            self.s.pushErr(b.Label, LogMsg.InvalidLabel, b.Label.Kind)
-            ret nil
-        }
-
-        i := label.pos + 1
-        if i >= len(label.scope.scope.Stmts) {
-            self.s.pushErr(b.Label, LogMsg.InvalidLabel, b.Label.Kind)
-        } else {
-            mut st := label.scope.scope.Stmts[i]
-            match type st {
-            | &InfIter:
-                brk.It = uintptr((&InfIter)(st))
-            | &RangeIter:
-                brk.It = uintptr((&RangeIter)(st))
-            | &WhileIter:
-                brk.It = uintptr((&WhileIter)(st))
-            | &Match:
-                brk.Mtch = uintptr((&Match)(st))
-            |:
-                self.s.pushErr(b.Label, LogMsg.InvalidLabel, b.Label.Kind)
-            }
-        }
-
-        if brk.It != 0 {
-            if !self.checkValidBreakLabel(brk.It) {
-                self.s.pushErr(b.Label, LogMsg.InvalidLabel, b.Label.Kind)
-            }
-        }
-
-        if brk.Mtch != 0 {
-            if !self.checkValidBreakLabel(brk.Mtch) {
-                self.s.pushErr(b.Label, LogMsg.InvalidLabel, b.Label.Kind)
-            }
-        }
-
-        ret brk
-    }
-
-    fn checkPlainBreak(mut &self, b: &ast::BreakSt): &BreakSt {
-        if self.isDeferred() {
-            self.s.pushErr(b.Token, LogMsg.BreakAtOutOfValidScope)
-            ret nil
-        }
-
-        mut scope := self
-    iter:
-        match {
-        | scope.it == 0 && scope.cse == 0 && scope.parent != nil && scope.owner == nil:
-            scope = scope.parent
-            goto iter
-        | scope.it != 0:
-            ret &BreakSt{It: scope.it}
-        | scope.cse != 0:
-            ret &BreakSt{Mtch: unsafe { uintptr((*Case)(scope.cse).Owner) }}
-        }
-
-        self.s.pushErr(b.Token, LogMsg.BreakAtOutOfValidScope)
-        ret nil
-    }
-
-    fn checkBreak(mut &self, b: &ast::BreakSt) {
-        if b.Label != nil { // Label given.
-            mut brk := self.checkBreakWithLabel(b)
-            self.scope.Stmts = append(self.scope.Stmts, brk)
-            ret
-        }
-
-        mut brk := self.checkPlainBreak(b)
-        self.scope.Stmts = append(self.scope.Stmts, brk)
-    }
-
-    fn checkRet(mut &self, mut r: &ast::RetSt) {
-        if self.isDeferred() {
-            self.s.pushErr(r.Token, LogMsg.RetInDeferred)
-        }
-
-        mut rt := &RetSt{
-            Func: self.getRoot().owner,
-        }
-        self.scope.Stmts = append(self.scope.Stmts, rt)
-
-        mut rtc := &retTypeChecker{
-            sc: self,
-            f: rt.Func,
-            errorToken: r.Token,
-        }
-        ok := rtc.check(r.Expr)
-        if !ok {
-            ret
-        }
-
-        if r.Expr != nil {
-            rt.Expr = rtc.model
-        }
-    }
-
-    fn checkUseExpr(mut &self, ue: &UseExpr) {
-        if self.result == nil {
-            self.s.pushErr(ue.Token, LogMsg.UseExprOutOfScope)
-            ret
-        }
-
-        if self.isDeferred() {
-            self.s.pushErr(ue.Token, LogMsg.UseExprInDeferred)
-        }
-
-        if self.i+1 < len(self.tree.Stmts) {
-            self.s.pushErr(ue.Token, LogMsg.UseExprNotLast)
-        }
-        // Validated at end of scope's analysis.
-    }
-
-    fn checkNode(mut &self, mut &node: StmtData) {
-        match type node {
-        | &ScopeTree:
-            self.checkAnonScope((&ScopeTree)(node))
-        | &VarDecl:
-            self.checkVarDecl((&VarDecl)(node))
-        | &TypeAliasDecl:
-            self.checkTypeAliasDecl((&TypeAliasDecl)(node))
-        | &Expr:
-            self.checkExpr((&Expr)(node))
-        | &ast::Conditional:
-            self.checkConditional((&ast::Conditional)(node))
-        | &Iter:
-            self.checkIter((&Iter)(node))
-        | &ast::ContSt:
-            self.checkCont((&ast::ContSt)(node))
-        | &LabelSt:
-            self.checkLabel((&LabelSt)(node))
-        | &ast::GotoSt:
-            self.pushGoto((&ast::GotoSt)(node))
-        | &AssignSt:
-            self.checkAssignSt((&AssignSt)(node))
-        | &MatchCase:
-            self.checkMatch((&MatchCase)(node))
-        | &ast::FallSt:
-            self.checkFall((&ast::FallSt)(node))
-        | &ast::BreakSt:
-            self.checkBreak((&ast::BreakSt)(node))
-        | &ast::RetSt:
-            self.checkRet((&ast::RetSt)(node))
-        | &UseExpr:
-            self.checkUseExpr((&UseExpr)(node))
-        |:
-            outln("error <unimplemented scope node>")
-        }
-    }
-
-    fn checkResult(mut &self) {
-        mut stmt := self.tree.Stmts[len(self.tree.Stmts)-1]
-        match type stmt.Data {
-        | &UseExpr:
-            mut ue := (&UseExpr)(stmt.Data)
-            mut d := self.s.eval(self).evalExpr(ue.Expr)
-            if d == nil {
-                ret
-            }
-            self.scope.Stmts = append(self.scope.Stmts, d)
-            mut rtc := &retTypeChecker{
-                sc: self,
-                errorToken: ue.Expr.Token,
-                types: self.result.Types(),
-            }
-            _ = rtc.check(ue.Expr)
-        | &Expr:
-            mut expr := (&Expr)(stmt.Data)
-            mut d := self.s.eval(self).evalExpr(expr)
-            if d == nil {
-                ret
-            }
-            match type d.Model {
-            | &BuiltinErrorCallExprModel:
-                mut m := (&BuiltinErrorCallExprModel)(d.Model)
-                self.processErrorCall(m, expr.Token)
-                self.scope.Stmts = append(self.scope.Stmts, d)
-            |:
-                ret
-            }
-        | &ast::GotoSt
-        | &ast::BreakSt
-        | &ast::ContSt
-        | &ast::RetSt:
-            self.checkNode(stmt.Data)
-        |:
-            self.checkNode(stmt.Data)
-            ret
-        }
-
-        // Set result to nil, it is a mark for whether result is processed.
-        self.result = nil
-    }
-
-    fn checkTree(mut &self) {
-        self.i = 0
-        mut n := len(self.tree.Stmts)
-        if self.result != nil {
-            // Skip last statement if result is exist.
-            // Algorithm will check last statement for result.
-            // So, if you check last statement also here, it will duplicate.
-            n--
-        }
-        for self.i < n; self.i++ {
-            mut stmt := self.tree.Stmts[self.i]
-            self.checkNode(stmt.Data)
-            if self.stopped() {
-                ret
-            }
-        }
-        if self.result != nil && len(self.tree.Stmts) != 0 {
-            self.checkResult()
-        }
-    }
-
-    fn checkGoto(mut self, mut &gt: &scopeGoto, mut &label: &scopeLabel) {
-        mut gtsc := gt.scope
-        for gtsc.childIndex-1 > label.scope.childIndex {
-            gtsc = gtsc.parent
-        }
-
-        mut n := 0
-
-        if gtsc.scope == label.scope.scope {
-            // Scopes are same and label at above, so safe.
-            if gt.pos > label.pos {
-                ret
-            }
-
-            // Limit controlling to goto's position.
-            // Label and goto is in same scope.
-            n = gt.pos
-        }
-
-        mut i := label.pos - 1
-
-        if n == 0 {
-            for j, stmt in label.scope.scope.Stmts {
-                // Break if position reached to goto's scope.
-                if stmtIsGotoScope(stmt, gtsc.scope) {
-                    n = j
-                    break
-                }
-            }
-        }
-
-        for i >= n; i-- {
-            mut stmt := label.scope.scope.Stmts[i]
-            if stmtIsDef(stmt) {
-                self.s.pushErr(gt.gt.Token, LogMsg.GotoJumpsDeclarations, gt.gt.Label.Kind)
-                ret
-            }
-        }
-    }
-
-    fn checkGotos(mut self) {
-        for (_, mut gt) in *self.gotos {
-            mut label := self.findLabelAll(gt.gt.Label.Kind)
-            if label == nil {
-                self.s.pushErr(gt.gt.Token, LogMsg.LabelNotExist, gt.gt.Label.Kind)
-                continue
-            }
-            gt.st.Label = label.label
-            label.used = true
-            self.checkGoto(gt, label)
-        }
-    }
-
-    fn checkLabels(mut self) {
-        for _, l in *self.labels {
-            if !l.used {
-                self.s.pushErr(l.token, LogMsg.DeclaredButNotUsed, l.label.Ident)
-            }
-        }
-    }
-
-    fn checkVars(mut self) {
-        for _, v in self.table.Vars {
-            if !v.Used && !v.Constant && !IsIgnoreIdent(v.Ident) && !IsAnonIdent(v.Ident) {
-                self.s.pushErr(v.Token, LogMsg.DeclaredButNotUsed, v.Ident)
-            }
-        }
-    }
-
-    fn checkAliases(mut self) {
-        for _, a in self.table.TypeAliases {
-            if !a.Used && !IsIgnoreIdent(a.Ident) && !IsAnonIdent(a.Ident) {
-                self.s.pushErr(a.Token, LogMsg.DeclaredButNotUsed, a.Ident)
-            }
-        }
-    }
-
-    // Checks scope tree.
-    fn check(mut &self, mut &tree: &ScopeTree, mut &s: &Scope) {
-        s.Deferred = tree.Deferred
-        s.Unsafety = tree.Unsafety
-
-        errors := len(self.s.errors)
-
-        self.tree = tree
-        self.scope = s
-
-        self.checkTree()
-
-        // If we have new errors, don't check unused declarations.
-        if errors == len(self.s.errors) {
-            self.checkVars()
-            self.checkAliases()
-
-            if self.isRoot() {
-                self.checkGotos()
-                self.checkLabels()
-            }
-        }
-    }
-
-    fn newChildChecker(mut &self): &scopeChecker {
-        mut base := newScopeCheckerBase(self.s, nil)
-        base.parent = self
-        base.labels = self.labels
-        base.gotos = self.gotos
-        base.childIndex = self.childIndex + 1
-        ret base
-    }
+	// Reports whether scope is unsafe.
+	fn isUnsafe(mut &self): bool {
+		mut scope := self
+
+	iter:
+		if scope.scope.Unsafety {
+			ret true
+		}
+
+		if scope.parent != nil {
+			scope = scope.parent
+			goto iter
+		}
+
+		ret false
+	}
+
+	// Reports scope is root.
+	// Accepts anonymous functions as root.
+	fn isRoot(self): bool {
+		ret self.parent == nil || self.owner != nil
+	}
+
+	// Stop checking.
+	fn stop(mut self) {
+		self.i = -1
+	}
+
+	// Reports whether checking is stopped.
+	fn stopped(self): bool {
+		ret self.i == -1
+	}
+
+	// Reports scope is deferred.
+	fn isDeferred(mut &self): bool {
+		mut scope := self
+
+	iter:
+		if scope.scope.Deferred {
+			ret true
+		}
+
+		if scope.parent != nil {
+			scope = scope.parent
+			goto iter
+		}
+
+		ret false
+	}
+
+	// Push captured variable.
+	// It will append to all [captured] fields,
+	// because if child-scopes captures this variable,
+	// parent-scopes must be capture this variable too.
+	// Starts pushing from self to all parents.
+	// If any parent scope is not captures variable v, iteration will be break.
+	fn pushCaptured(mut &self, mut &v: &Var) {
+		mut sc := self
+		for {
+			if sc.captured != nil {
+				for _, cv in *sc.captured {
+					if cv == v {
+						goto exist
+					}
+				}
+				*sc.captured = append(*sc.captured, v)
+			exist:
+			}
+			if sc.parent == nil {
+				break
+			}
+			sc = sc.parent
+			if !isVarCaptured(sc, sc, v) {
+				break
+			}
+		}
+	}
+
+	// Returns root scope.
+	// Accepts anonymous functions as root.
+	fn getRoot(mut &self): &scopeChecker {
+		mut root := self
+		for root.parent != nil && root.owner == nil {
+			root = root.parent
+		}
+		ret root
+	}
+
+	// Returns hard root scope, owner always represents root function of this scope.
+	// Not accepts anonymous functions as root.
+	fn getHardRoot(mut &self): &scopeChecker {
+		mut root := self
+		for root.parent != nil {
+			root = root.parent
+		}
+		ret root
+	}
+
+	// Like [Lookup.FindVar] but designed for local variables only.
+	fn findVar(mut self, ident: str): &Var {
+		const Reverse = true // Search reverse for correct shadowing.
+		const Binded = false // Local variables cannot be binded.
+		mut v := self.table.findVar(ident, Binded, Reverse)
+		if v != nil {
+			ret v
+		}
+		mut parent := self.parent
+		for parent != nil {
+			v = parent.table.findVar(ident, Binded, Reverse)
+			if v != nil {
+				ret v
+			}
+			parent = parent.parent
+		}
+		ret nil
+	}
+
+	// Returns label by identifier.
+	// Returns nil if not exist any label in this identifier.
+	// Just lookups current scope.
+	fn findLabel(mut self, &ident: str): &Label {
+		for (_, mut st) in self.scope.Stmts {
+			match type st {
+			| &Label:
+				mut label := (&Label)(st)
+				if label.Ident == ident {
+					ret label
+				}
+			}
+		}
+		ret nil
+	}
+
+	// Returns label by identifier.
+	// Returns nil if not exist any label in this identifier.
+	// Just lookups current scope.
+	fn findLabelScope(mut &self, &ident: str): &scopeLabel {
+		mut label := self.findLabelAll(ident)
+		if label != nil && label.scope == self {
+			ret label
+		}
+
+		ret nil
+	}
+
+	// Returns label by identifier.
+	// Returns nil if not exist any label in this identifier.
+	// Lookups all labels.
+	fn findLabelAll(mut self, &ident: str): &scopeLabel {
+		for (_, mut lbl) in *self.labels {
+			if lbl.label.Ident == ident {
+				ret lbl
+			}
+		}
+		ret nil
+	}
+
+	// Reports this identifier duplicated in scope.
+	// The "self" parameter represents address of exception identifier.
+	// If founded identifier address equals to self, will be skipped.
+	fn isDuplicatedIdent(mut self, itself: uintptr, &ident: str): bool {
+		v := self.FindVar(ident, false)
+		if v != nil && uintptr(v) != itself {
+			if v.Scope == nil { // Ignore globals.
+				ret false
+			}
+			ret v.Scope == self.scope || !self.s.isFlag(SemaFlag.Shadowing)
+		}
+
+		ta := self.FindTypeAlias(ident, false)
+		if ta != nil && uintptr(ta) != itself {
+			if ta.Scope == nil { // Ignore globals.
+				ret false
+			}
+			ret ta.Scope == self.tree || !self.s.isFlag(SemaFlag.Shadowing)
+		}
+
+		ret false
+	}
+
+	fn checkVarDecl(mut &self, mut decl: &VarDecl) {
+		mut v := buildVar(decl)
+		v.Scope = self.scope
+
+		defer {
+			self.table.Vars = append(self.table.Vars, v)
+			self.scope.Stmts = append(self.scope.Stmts, v)
+		}
+
+		if self.isDuplicatedIdent(uintptr(v), v.Ident) {
+			self.s.pushErr(v.Token, LogMsg.DuplicatedIdent, v.Ident)
+			self.s.pushSuggestion(LogMsg.RenameForAvoidDuplication)
+			self.stop()
+			ret
+		}
+
+		self.s.checkVarDecl(v, self)
+		if !v.IsTypeInferred() && (v.Kind == nil || v.Kind.Kind == nil) {
+			ret
+		}
+
+		self.s.evalVarValue(v, self)
+		if !v.IsInitialized() || v.Value.Data == nil {
+			// Skip checks if error ocurrs when evaluated expression,
+			// or unitiliazed variable.
+			ret
+		}
+		self.removeInteriorMutRisk(v.Value.Data)
+		self.s.checkVarValue(v)
+	}
+
+	fn checkTypeAlias(mut &self, mut &ta: &TypeAlias) {
+		if self.isDuplicatedIdent(uintptr(ta), ta.Ident) {
+			self.s.pushErr(ta.Token, LogMsg.DuplicatedIdent, ta.Ident)
+			self.s.pushSuggestion(LogMsg.RenameForAvoidDuplication)
+			self.stop()
+			ret
+		}
+		self.s.checkTypeAliasDecl(ta, self)
+		self.table.TypeAliases = append(self.table.TypeAliases, ta)
+
+		// Stop immediately if destination type is could not evaluated.
+		if ta.Kind.Kind == nil {
+			self.stop()
+		}
+	}
+
+	fn checkTypeAliasDecl(mut &self, mut decl: &TypeAliasDecl) {
+		mut ta := buildTypeAlias(decl)
+		self.checkTypeAlias(ta)
+	}
+
+	fn getChild(mut self): &Scope {
+		ret &Scope{
+			Parent: self.scope,
+		}
+	}
+
+	fn checkChildSsc(mut &self, mut &tree: &ScopeTree, mut &s: &Scope, mut &ssc: &scopeChecker) {
+		ssc.parent = self
+		ssc.check(tree, s)
+	}
+
+	fn checkChildSc(mut &self, mut &tree: &ScopeTree, mut &ssc: &scopeChecker): &Scope {
+		mut s := self.getChild()
+		self.checkChildSsc(tree, s, ssc)
+		ret s
+	}
+
+	fn checkChild(mut &self, mut &tree: &ScopeTree): &Scope {
+		mut ssc := self.newChildChecker()
+		ret self.checkChildSc(tree, ssc)
+	}
+
+	fn checkAnonScope(mut &self, mut tree: &ScopeTree) {
+		mut s := self.checkChild(tree)
+		self.scope.Stmts = append(self.scope.Stmts, s)
+	}
+
+	fn processErrorCall(mut &self, mut &m: &BuiltinErrorCallExprModel, err: &Token) {
+		if self.isDeferred() {
+			self.s.pushErr(err, LogMsg.ErrorInDeferred)
+		}
+
+		mut root := self.getRoot()
+		if !root.owner.Decl.Exceptional {
+			self.s.pushErr(err, LogMsg.ErrorWithNonExceptional)
+			self.s.pushSuggestion(LogMsg.DeclareExceptional)
+		}
+		m.Func = root.owner
+	}
+
+	fn checkExpr(mut &self, mut expr: &Expr) {
+		mut eval := self.s.eval(self)
+		eval.ignored = true
+		mut d := eval.evalExpr(expr)
+		if d == nil || d.Model == nil {
+			// Skip nil data, because evaluation failed and error documented (it should be) already.
+			// Skip nil modeled data, this return only caused by built-in functions and it should be safe.
+			ret
+		}
+
+		match type d.Model {
+		| &BuiltinErrorCallExprModel:
+			mut m := (&BuiltinErrorCallExprModel)(d.Model)
+			self.processErrorCall(m, expr.Token)
+			self.scope.Stmts = append(self.scope.Stmts, d)
+		| &BackendEmitExprModel
+		| &BuiltinAppendCallExprModel
+		| &BuiltinOutCallExprModel
+		| &BuiltinOutlnCallExprModel
+		| &BuiltinPanicCallExprModel
+		| &BuiltinAssertCallExprModel
+		| &BuiltinCopyCallExprModel
+		| &BuiltinDeleteCallExprModel
+		| &FreeExprModel
+		| &FnCallExprModel:
+			self.scope.Stmts = append(self.scope.Stmts, d)
+		|:
+			self.s.pushErr(expr.Token, LogMsg.InvalidSyntax)
+		}
+	}
+
+	fn checkIf(mut &self, mut i: &ast::If): &If {
+		mut s := self.checkChild(i.Scope)
+
+		mut d := self.s.eval(self).evalExpr(i.Expr)
+		if d == nil {
+			ret nil
+		}
+
+		mut prim := d.Kind.Prim()
+		if prim == nil || !prim.IsBool() {
+			self.s.pushErr(i.Expr.Token, LogMsg.IfRequireBoolExpr)
+			ret nil
+		}
+
+		ret &If{
+			Expr: d.Model,
+			Scope: s,
+		}
+	}
+
+	fn checkElse(mut &self, mut e: &ast::Else): &Else {
+		ret &Else{
+			Scope: self.checkChild(e.Scope),
+		}
+	}
+
+	fn checkConditional(mut &self, mut conditional: &ast::Conditional) {
+		mut c := new(Conditional)
+		self.scope.Stmts = append(self.scope.Stmts, c)
+
+		c.Elifs = make([]&If, 0, len(conditional.Tail) + 1)
+
+		c.Elifs = append(c.Elifs, self.checkIf(conditional.Head))
+		for (_, mut elif) in conditional.Tail {
+			c.Elifs = append(c.Elifs, self.checkIf(elif))
+		}
+
+		if conditional.Default != nil {
+			c.Default = self.checkElse(conditional.Default)
+		}
+	}
+
+	fn checkIterScopeSsc(mut &self, it: uintptr, mut tree: &ScopeTree, mut &s: &Scope, mut ssc: &scopeChecker) {
+		ssc.it = it
+		self.checkChildSsc(tree, s, ssc)
+	}
+
+	fn checkIterScopeSc(mut &self, it: uintptr, mut tree: &ScopeTree, mut ssc: &scopeChecker): &Scope {
+		mut scope := self.getChild()
+		self.checkIterScopeSsc(it, tree, scope, ssc)
+		ret scope
+	}
+
+	fn checkIterScope(mut &self, it: uintptr, mut &tree: &ScopeTree): &Scope {
+		mut ssc := self.newChildChecker()
+		ret self.checkIterScopeSc(it, tree, ssc)
+	}
+
+	fn checkInfIter(mut &self, mut &it: &Iter) {
+		mut kind := new(InfIter)
+		self.scope.Stmts = append(self.scope.Stmts, kind)
+		kind.Scope = self.checkIterScope(uintptr(kind), it.Scope)
+	}
+
+	fn checkWhileIter(mut &self, mut &it: &Iter) {
+		mut wh := (&WhileKind)(it.Kind)
+		if wh.Expr == nil && wh.Next == nil {
+			self.checkInfIter(it)
+			ret
+		}
+
+		mut kind := new(WhileIter)
+		self.scope.Stmts = append(self.scope.Stmts, kind)
+		kind.Scope = self.checkIterScope(uintptr(kind), it.Scope)
+
+		if wh.Expr != nil {
+			mut d := self.s.eval(self).evalExpr(wh.Expr)
+			if d == nil {
+				ret
+			}
+
+			prim := d.Kind.Prim()
+			if prim == nil {
+				self.s.pushErr(it.Token, LogMsg.IterWhileRequireBoolExpr)
+				ret
+			}
+
+			if !prim.IsBool() {
+				self.s.pushErr(it.Token, LogMsg.IterWhileRequireBoolExpr)
+				ret
+			}
+
+			kind.Expr = d.Model
+		}
+
+		if wh.IsWhileNext() {
+			if !isValidAstStForNextSt(wh.Next) {
+				self.s.pushErr(wh.NextToken, LogMsg.InvalidStmtForNext)
+				ret
+			}
+
+			n := len(self.scope.Stmts)
+			self.checkNode(wh.Next)
+			if n < len(self.scope.Stmts) {
+				mut st := self.scope.Stmts[n]
+				self.scope.Stmts = self.scope.Stmts[:n] // Remove trailing statements.
+				if !isValidStForNextSt(st) {
+					self.s.pushErr(wh.NextToken, LogMsg.InvalidStmtForNext)
+				}
+				kind.Next = st
+			}
+		}
+	}
+
+	fn checkComptimeRangeIter(mut &self, mut &it: &Iter, mut &kind: &RangeIter, mut &d: &Data) {
+		if kind.KeyA != nil {
+			if !self.s.isFlag(SemaFlag.Shadowing) && self.isDuplicatedIdent(0, kind.KeyA.Ident) {
+				self.s.pushErr(kind.KeyA.Token, LogMsg.DuplicatedIdent, kind.KeyA.Ident)
+				self.s.pushSuggestion(LogMsg.RenameForAvoidDuplication)
+			}
+		}
+		if kind.KeyB != nil {
+			if !self.s.isFlag(SemaFlag.Shadowing) && self.isDuplicatedIdent(0, kind.KeyB.Ident) {
+				self.s.pushErr(kind.KeyB.Token, LogMsg.DuplicatedIdent, kind.KeyB.Ident)
+				self.s.pushSuggestion(LogMsg.RenameForAvoidDuplication)
+			}
+		}
+
+		mut rang := (&RangeKind)(it.Kind)
+		makeComptimeRange(d)
+		if d.Decl {
+			self.s.pushErr(rang.Expr.Token, LogMsg.InvalidTypeForComptimeIter, d.Kind.Str())
+			ret
+		}
+
+		mut rc := rangeChecker{
+			sc: self,
+			Kind: kind,
+			rang: rang,
+			d: d,
+		}
+		ok := rc.check()
+		if !ok {
+			ret
+		}
+
+		mut comptime := d.Kind.comptimeRange()
+		comptime.kind.ready(kind.KeyA, kind.KeyB)
+		mut i := 0
+		errors := len(self.s.errors)
+		for i < comptime.kind.len(); i++ {
+			mut ssc := self.newChildChecker()
+			mut scope := self.getChild()
+			if kind.KeyA != nil {
+				kind.KeyA.Scope = scope
+				ssc.table.Vars = append(ssc.table.Vars, kind.KeyA)
+			}
+			if kind.KeyB != nil {
+				kind.KeyB.Scope = scope
+				ssc.table.Vars = append(ssc.table.Vars, kind.KeyB)
+			}
+			comptime.kind.step(i, kind.KeyA, kind.KeyB)
+			self.checkChildSsc(it.Scope, scope, ssc)
+			if errors != len(self.s.errors) {
+				// Stop execution if new error occurred.
+				break
+			}
+			self.scope.Stmts = append(self.scope.Stmts, scope)
+		}
+	}
+
+	fn checkRangeIter(mut &self, mut &it: &Iter) {
+		mut rang := (&RangeKind)(it.Kind)
+
+		mut d := self.s.eval(self).evalExpr1(rang.Expr)
+		if d == nil {
+			ret
+		}
+
+		mut kind := &RangeIter{
+			Expr: d,
+		}
+
+		if it.Comptime {
+			self.checkComptimeRangeIter(it, kind, d)
+			ret
+		}
+		if d.Kind.comptime() {
+			self.s.pushErr(rang.Expr.Token, LogMsg.ComptimeExprForRuntimeIteration)
+			self.s.pushSuggestion(LogMsg.DeclareComptimeForeach)
+			ret
+		}
+
+		mut rc := rangeChecker{
+			sc: self,
+			Kind: kind,
+			rang: rang,
+			d: d,
+		}
+		ok := rc.check()
+		if !ok {
+			ret
+		}
+
+		self.scope.Stmts = append(self.scope.Stmts, kind)
+
+		mut ssc := self.newChildChecker()
+		mut scope := self.getChild()
+
+		if kind.KeyA != nil {
+			if !self.s.isFlag(SemaFlag.Shadowing) && self.isDuplicatedIdent(0, kind.KeyA.Ident) {
+				self.s.pushErr(kind.KeyA.Token, LogMsg.DuplicatedIdent, kind.KeyA.Ident)
+				self.s.pushSuggestion(LogMsg.RenameForAvoidDuplication)
+			}
+			kind.KeyA.Scope = scope
+			ssc.table.Vars = append(ssc.table.Vars, kind.KeyA)
+		}
+
+		if kind.KeyB != nil {
+			if !self.s.isFlag(SemaFlag.Shadowing) && self.isDuplicatedIdent(0, kind.KeyB.Ident) {
+				self.s.pushErr(kind.KeyB.Token, LogMsg.DuplicatedIdent, kind.KeyB.Ident)
+				self.s.pushSuggestion(LogMsg.RenameForAvoidDuplication)
+			}
+			kind.KeyB.Scope = scope
+			ssc.table.Vars = append(ssc.table.Vars, kind.KeyB)
+		}
+
+		self.checkIterScopeSsc(uintptr(kind), it.Scope, scope, ssc)
+		kind.Scope = scope
+	}
+
+	fn checkIter(mut &self, mut it: &Iter) {
+		if it.IsInf() {
+			if it.Comptime {
+				self.s.pushErr(it.Token, LogMsg.InvalidComptimeIter)
+				ret
+			}
+			self.checkInfIter(it)
+			ret
+		}
+
+		match type it.Kind {
+		| &WhileKind:
+			if it.Comptime {
+				self.s.pushErr(it.Token, LogMsg.InvalidComptimeIter)
+				ret
+			}
+			self.checkWhileIter(it)
+		| &RangeKind:
+			self.checkRangeIter(it)
+		|:
+			outln("error <unimplemented iteration kind>")
+		}
+	}
+
+	fn checkValidContLabel(mut &self, it: uintptr): bool {
+		mut scope := self
+
+	iter:
+		if scope.it == it {
+			ret true
+		}
+
+		if scope.parent != nil {
+			scope = scope.parent
+			goto iter
+		}
+
+		ret false
+	}
+
+	fn checkValidBreakLabel(mut &self, ptr: uintptr): bool {
+		mut scope := self
+
+	iter:
+		if scope.it == ptr {
+			ret true
+		}
+
+		if scope.cse != 0 {
+			mtch := unsafe { uintptr((*Case)(scope.cse).Owner) }
+			if mtch == ptr {
+				ret true
+			}
+		}
+
+		if scope.parent != nil {
+			scope = scope.parent
+			goto iter
+		}
+
+		ret false
+	}
+
+	fn checkContValidScope(mut &self, c: &ast::ContSt): &ContSt {
+		if self.isDeferred() {
+			self.s.pushErr(c.Token, LogMsg.ContinueAtOutOfValidScope)
+			ret nil
+		}
+
+		if c.Label != nil {
+			ret new(ContSt)
+		}
+
+		mut scope := self
+	iter:
+		match {
+		| scope.it == 0 && scope.parent != nil && scope.owner == nil:
+			scope = scope.parent
+			goto iter
+		| scope.it != 0:
+			ret &ContSt{It: scope.it}
+		}
+
+		self.s.pushErr(c.Token, LogMsg.ContinueAtOutOfValidScope)
+		ret nil
+	}
+
+	fn checkCont(mut &self, c: &ast::ContSt) {
+		mut cont := self.checkContValidScope(c)
+		if cont == nil {
+			ret
+		}
+
+		if c.Label != nil { // Label given.
+			mut label := findLabelParent(c.Label.Kind, self.parent)
+			if label == nil {
+				self.s.pushErr(c.Label, LogMsg.LabelNotExist, c.Label.Kind)
+				ret
+			}
+
+			label.used = true
+
+			if label.pos+1 >= len(label.scope.scope.Stmts) {
+				self.s.pushErr(c.Label, LogMsg.InvalidLabel, c.Label.Kind)
+				ret
+			}
+
+			i := label.pos + 1
+			if i >= len(label.scope.scope.Stmts) {
+				self.s.pushErr(c.Label, LogMsg.InvalidLabel)
+			} else {
+				mut st := label.scope.scope.Stmts[i]
+				match type st {
+				| &InfIter:
+					cont.It = uintptr((&InfIter)(st))
+				| &RangeIter:
+					cont.It = uintptr((&RangeIter)(st))
+				| &WhileIter:
+					cont.It = uintptr((&WhileIter)(st))
+				|:
+					self.s.pushErr(c.Label, LogMsg.InvalidLabel, c.Label.Kind)
+				}
+			}
+		}
+
+		if cont.It != 0 {
+			if !self.checkValidContLabel(cont.It) {
+				self.s.pushErr(c.Label, LogMsg.InvalidLabel, c.Label.Kind)
+			}
+		}
+
+		self.scope.Stmts = append(self.scope.Stmts, cont)
+	}
+
+	fn checkLabel(mut &self, mut l: &LabelSt) {
+		if self.findLabel(l.Ident) != nil {
+			self.s.pushErr(l.Token, LogMsg.LabelExist, l.Ident)
+			ret
+		}
+
+		mut label := &Label{
+			Ident: l.Ident,
+		}
+
+		self.scope.Stmts = append(self.scope.Stmts, label)
+		*self.labels = append(*self.labels, &scopeLabel{
+			token: l.Token,
+			label: label,
+			pos: len(self.scope.Stmts) - 1,
+			scope: self,
+		})
+	}
+
+	fn pushGoto(mut &self, mut gt: &ast::GotoSt) {
+		mut st := &GotoSt{
+			Ident: gt.Label.Kind,
+		}
+		self.scope.Stmts = append(self.scope.Stmts, st)
+
+		*self.gotos = append(*self.gotos, &scopeGoto{
+			st: st,
+			gt: gt,
+			pos: len(self.scope.Stmts) - 1,
+			scope: self,
+		})
+	}
+
+	fn checkPostfix(mut &self, mut a: &AssignSt) {
+		if len(a.Left) > 1 {
+			self.s.pushErr(a.Setter, LogMsg.InvalidSyntax)
+			ret
+		}
+
+		mut expr := a.Left[0].Expr
+		mut d := self.s.eval(self).evalExpr(expr)
+		if d == nil {
+			ret
+		}
+
+		_ = checkAssign(self.s, d, nil, a.Setter)
+
+		if d.Kind.Ptr() != nil {
+			mut ptr := d.Kind.Ptr()
+			if ptr.IsUnsafe() {
+				self.s.pushErr(a.Setter, LogMsg.OperatorNotForJuleType, a.Setter.Kind, d.Kind.Str())
+				ret
+			}
+		} else {
+			if d.Kind.Prim() == nil || !types::IsNum(d.Kind.Prim().Kind) {
+				self.s.pushErr(a.Setter, LogMsg.OperatorNotForJuleType, a.Setter.Kind, d.Kind.Str())
+				ret
+			}
+		}
+
+		self.scope.Stmts = append(self.scope.Stmts, &Postfix{
+			Expr: d.Model,
+			Op: a.Setter.Kind,
+		})
+	}
+
+	fn isNewAssignIdent(mut self, ident: str): bool {
+		if IsIgnoreIdent(ident) || ident == "" {
+			ret false
+		}
+		ret self.table.defByIdent(ident, false) == nil
+	}
+
+	// Remove the interior mutability risk if the d represents a structure and
+	// this scope is owned by method which is owned by the relevant structure.
+	// In this case we should remove the interior mutability risk of data to allow copying.
+	// Otherwise assign analysis will complain and copy operation will not be allowed.
+	//
+	// See also documentation of the [sema.isMutRiskyStruct] method.
+	fn removeInteriorMutRisk(mut &self, mut &d: &Data) {
+		s := d.Kind.Struct()
+		if s == nil {
+			ret
+		}
+		root := self.getHardRoot()
+		if root.owner.Owner != s {
+			ret
+		}
+		// Mark data as mutable.
+		// Mutable data is not occurs mutability risk for analysis.
+		d.Mutable = true
+	}
+
+	fn checkStructureAssignOp(mut &self, mut &s: &StructIns, mut &a: &AssignSt, mut &r: &Data): bool {
+		// This method adopted from [binaryEval.checkStructCommonOperatorCompatibility].
+		// Should follow this method.
+		let mut overload: &FnIns = nil
+		match a.Setter.Id {
+		| TokenId.PlusEq:
+			overload = s.Operators.AddAssign
+		| TokenId.MinusEq:
+			overload = s.Operators.SubAssign
+		| TokenId.SolidusEq:
+			overload = s.Operators.DivAssign
+		| TokenId.StarEq:
+			overload = s.Operators.MulAssign
+		| TokenId.PercentEq:
+			overload = s.Operators.ModAssign
+		| TokenId.ShlEq:
+			overload = s.Operators.ShlAssign
+		| TokenId.ShrEq:
+			overload = s.Operators.ShrAssign
+		| TokenId.VlineEq:
+			overload = s.Operators.BitOrAssign
+		| TokenId.AmperEq:
+			overload = s.Operators.BitAndAssign
+		| TokenId.CaretEq:
+			overload = s.Operators.BitXorAssign
+		|:
+			self.s.pushErr(a.Setter, LogMsg.OperatorNotForJuleType, a.Setter.Kind, s.Str())
+			ret false
+		}
+
+		if overload == nil {
+			self.s.pushErr(a.Setter, LogMsg.OperatorNotForJuleType, a.Setter.Kind, s.Str())
+			ret false
+		}
+
+		mut p := overload.Params[1]
+		ret self.s.checkAssignType(p.Decl.Reference, p.Kind, r, a.Setter)
+	}
+
+	fn checkSingleAssign(mut &self, mut &a: &AssignSt) {
+		let mut l: &Data = nil
+
+		if !IsIgnoreIdent(a.Left[0].Ident) {
+			mut expr := a.Left[0].Expr
+			l = self.s.eval(self).evalExpr(expr)
+			if l == nil {
+				ret
+			}
+		}
+
+		let mut eval: &Eval = nil
+		if l != nil {
+			eval = self.s.evalp(self, l.Kind)
+		} else {
+			eval = self.s.eval(self)
+		}
+		eval.unsafety = self.isUnsafe()
+		mut r := eval.evalExpr(a.Right)
+		if r == nil {
+			ret
+		}
+
+		self.removeInteriorMutRisk(r)
+
+		if l == nil {
+			if r.Kind.Void() {
+				self.s.pushErr(a.Right.Token, LogMsg.InvalidExpr)
+			}
+			self.scope.Stmts = append(self.scope.Stmts, r)
+			ret
+		}
+
+		if !checkAssign(self.s, l, r, a.Setter) {
+			ret
+		}
+
+		if r.Kind.Tup() != nil {
+			self.s.pushErr(a.Setter, LogMsg.MissingMultiAssignIdents)
+			ret
+		}
+
+		mut lm := &OperandExprModel{
+			Kind: l.Kind,
+			Model: l.Model,
+		}
+		mut rm := &OperandExprModel{
+			Kind: r.Kind,
+			Model: r.Model,
+		}
+		self.scope.Stmts = append(self.scope.Stmts, &Assign{Left: lm, Right: rm, Op: a.Setter})
+
+		if a.Setter.Id == TokenId.Eq {
+			mut checker := assignTypeChecker{
+				s: self.s,
+				dest: l.Kind,
+				d: r,
+				errorToken: a.Setter,
+			}
+			if checker.check() {
+				rm.Model = r.Model
+				lm.Model = l.Model
+			}
+			ret
+		}
+		mut strct := l.Kind.Struct()
+		if strct != nil {
+			self.checkStructureAssignOp(strct, a, r)
+			ret
+		}
+		id := a.Setter.Id
+		a.Setter.Id = removeEqFromOp(a.Setter.Id)
+		mut solver := binaryEval.new(eval, a.Setter)
+		solver.l, solver.r = l, r
+		_ = solver.evalOp()
+		a.Setter.Id = id
+	}
+
+	fn processEndPartOfMultiAssign(mut self, mut &st: &MultiAssign,
+		mut &a: &AssignSt, mut &lexpr: &AssignLeft, mut &l: &Data, mut &r: &Data) {
+		if !lexpr.Reference && IsIgnoreIdent(lexpr.Ident) {
+			if r.Kind.Void() {
+				self.s.pushErr(a.Right.Token, LogMsg.InvalidExpr)
+			}
+			st.Left = append(st.Left, nil)
+			ret
+		}
+
+		if a.Declarative && (lexpr.Reference || self.isNewAssignIdent(lexpr.Ident)) {
+			if self.isDuplicatedIdent(0, lexpr.Ident) {
+				self.s.pushErr(lexpr.Token, LogMsg.DuplicatedIdent, lexpr.Ident)
+				self.s.pushSuggestion(LogMsg.RenameForAvoidDuplication)
+				self.stop()
+				ret
+			}
+			if IsIgnoreIdent(lexpr.Ident) {
+				self.s.pushErr(lexpr.Token, LogMsg.IgnoreIdent)
+			}
+
+			// Add new variable declaration statement.
+			mut v := &Var{
+				Ident: lexpr.Ident,
+				Token: lexpr.Token,
+				Mutable: lexpr.Mutable,
+				Reference: lexpr.Reference,
+				Scope: self.scope,
+				Value: &Value{
+					Expr: a.Right,
+					Data: r,
+				},
+			}
+			self.s.checkVarValue(v)
+			st.Left = append(st.Left, &Data{
+				Lvalue: !v.Constant,
+				Mutable: v.Mutable,
+				Reference: v.Reference,
+				Kind: v.Kind.Kind,
+				Model: v,
+			})
+			st.Decls = append(st.Decls, v)
+			self.table.Vars = append(self.table.Vars, v)
+			ret
+		}
+
+		if lexpr.Mutable || lexpr.Reference {
+			self.s.pushErr(lexpr.Token, LogMsg.DuplicatedIdent, lexpr.Ident)
+			self.s.pushSuggestion(LogMsg.RenameForAvoidDuplication)
+		}
+
+		if !checkAssign(self.s, l, r, lexpr.Token) {
+			ret
+		}
+
+		// Set reference false because this is normal assigment.
+		// So, we don't need to check reference assignment should using lvalue.
+		const Reference = false
+		self.s.checkValidityForInitExpr(l.Mutable, Reference, l.Kind, r, a.Setter)
+
+		mut checker := assignTypeChecker{
+			s: self.s,
+			dest: l.Kind,
+			d: r,
+			errorToken: a.Setter,
+		}
+		checker.check()
+		st.Left = append(st.Left, l)
+	}
+
+	fn checkMultiAssign(mut &self, mut &a: &AssignSt) {
+		mut rd := self.s.eval(self).evalExpr(a.Right)
+		if rd == nil {
+			ret
+		}
+		mut right := getDatasFromTupleData(rd)
+		if len(right) == 1 {
+			match type right[0].Model {
+			| &IndexingExprModel:
+				mut iem := (&IndexingExprModel)(right[0].Model)
+				if iem.Expr.Kind.Map() != nil { // Is map lookup.
+					right = [
+						&Data{Kind: iem.Expr.Kind.Map().Val},
+						&Data{Kind: primBool},
+					]
+				}
+			}
+		}
+
+		match {
+		| len(a.Left) > len(right):
+			self.s.pushErr(a.Setter, LogMsg.OverflowMultiAssignIdents)
+			ret
+		| len(a.Left) < len(right):
+			self.s.pushErr(a.Setter, LogMsg.MissingMultiAssignIdents)
+			ret
+		}
+
+		mut st := &MultiAssign{
+			Right: rd.Model,
+		}
+		for i in a.Left {
+			mut lexpr := a.Left[i]
+			let mut l: &Data = nil
+			if !IsIgnoreIdent(lexpr.Ident) &&
+				(!a.Declarative || !self.isNewAssignIdent(lexpr.Ident)) {
+				l = self.s.eval(self).evalExpr(lexpr.Expr)
+				if l == nil {
+					continue
+				}
+			}
+			mut r := right[i]
+			self.removeInteriorMutRisk(r)
+			self.processEndPartOfMultiAssign(st, a, lexpr, l, r)
+		}
+		self.scope.Stmts = append(self.scope.Stmts, st)
+	}
+
+	fn checkAssignSt(mut &self, mut a: &AssignSt) {
+		match {
+		| IsPostfixOp(a.Setter.Id):
+			self.checkPostfix(a)
+		| len(a.Left) == 1:
+			self.checkSingleAssign(a)
+		|:
+			self.checkMultiAssign(a)
+		}
+	}
+
+	fn checkCaseScope(mut &self, &c: &Case, mut &tree: &ScopeTree): &Scope {
+		mut ssc := self.newChildChecker()
+		ssc.cse = uintptr(c)
+		ret self.checkChildSc(tree, ssc)
+	}
+
+	fn checkCase(mut &self, mut m: &Match, i: int, mut c: &ast::Case, mut expr: &Data): &Case {
+		mut case := m.Cases[i]
+		case.Exprs = make([]&Data, 0, len(c.Exprs))
+		mut constMatched := false
+		mut eval := self.s.eval(self)
+		for (_, mut e) in c.Exprs {
+			mut d := eval.evalExprKind(e.Kind)
+			if d == nil {
+				continue
+			}
+
+			if m.TypeMatch {
+				// Match types. There is not need to check whether d.Decl is true.
+				// Parser always tries to build type declarations for type-match cases.
+				// So, d is should be type declaration already.
+				case.Exprs = append(case.Exprs, d)
+				if countMatchType(m, d.Kind) > 1 {
+					self.s.pushErr(e.Token, LogMsg.DuplicateMatchType, d.Kind.Str())
+				}
+				if m.Comptime {
+					constMatched = constMatched || expr.Kind.Equal(d.Kind)
+				} else {
+					if expr.Kind.TypeEnum() != nil {
+						_ = self.s.checkTypeCompatibility(expr.Kind, d.Kind, e.Token)
+					} else {
+						trt := expr.Kind.Trait()
+						if trt != nil {
+							_ = self.s.checkTypeCompatibility(expr.Kind, d.Kind, e.Token)
+						}
+					}
+				}
+				continue
+			}
+
+			if d.Decl {
+				self.s.pushErr(e.Token, LogMsg.DeclFoundInsteadExpr)
+				self.s.pushSuggestion(LogMsg.UseTypeMatch)
+				continue
+			}
+
+			if m.Comptime {
+				if !d.IsConst() && d.Kind.comptimeTypeInfo() == nil {
+					self.s.pushErr(e.Token, LogMsg.ExprNotConst)
+					self.s.pushSuggestion(LogMsg.InvalidExprForConstMatch)
+					continue
+				}
+				if !constMatched {
+					if d.IsConst() {
+						constMatched = expr.IsConst() && d.Constant.Eq(*expr.Constant)
+					} else {
+						exprCti := expr.Kind.comptimeTypeInfo()
+						constMatched = exprCti != nil && d.Kind.comptimeTypeInfo().base.Equal(exprCti.base)
+					}
+				}
+			}
+
+			case.Exprs = append(case.Exprs, d)
+			if !m.Comptime ||
+				expr.Kind.comptimeTypeInfo() == nil ||
+				d.Kind.comptimeTypeInfo() == nil {
+				mut checker := assignTypeChecker{
+					s: self.s,
+					dest: expr.Kind,
+					d: d,
+					errorToken: e.Token,
+				}
+				checker.check()
+			}
+		}
+		if !m.Comptime || constMatched {
+			case.Scope = self.checkCaseScope(case, c.Scope)
+		}
+		ret case
+	}
+
+	fn checkCases(mut &self, mut &m: &MatchCase, mut rm: &Match, mut expr: &Data) {
+		rm.Cases = make([]&Case, 0, len(m.Cases))
+		for i in m.Cases {
+			mut case := &Case{
+				Owner: rm,
+			}
+			if i > 0 {
+				rm.Cases[i-1].Next = case
+			}
+			rm.Cases = append(rm.Cases, case)
+		}
+
+		if rm.Default != nil && len(m.Cases) > 0 {
+			rm.Cases[len(rm.Cases)-1].Next = rm.Default
+		}
+
+		for (i, mut c) in m.Cases {
+			self.checkCase(rm, i, c, expr)
+		}
+	}
+
+	fn checkDefault(mut &self, mut m: &Match, mut d: &ast::Else): &Case {
+		mut def := &Case{
+			Owner: m,
+		}
+		def.Scope = self.checkCaseScope(def, d.Scope)
+		ret def
+	}
+
+	fn checkComptimePanic(mut &self, mut callToken: &Token, &s: &Scope) {
+		if len(s.Stmts) != 1 {
+			ret
+		}
+		stmt := s.Stmts[0]
+		match type stmt {
+		| &Data:
+			d := (&Data)(stmt)
+			match type d.Model {
+			| &BuiltinPanicCallExprModel:
+				mut m := (&BuiltinPanicCallExprModel)(d.Model)
+				match type m.Expr {
+				| &Const:
+					c := (&Const)(m.Expr)
+					if !c.IsStr() {
+						break
+					}
+					if callToken == nil {
+						mut root := self.getHardRoot()
+						if root.calledFrom == nil {
+							callToken = m.Token
+						} else {
+							callToken = root.calledFrom
+						}
+					}
+					self.s.pushErr(callToken, LogMsg.ComptimePanic, c.ReadStr())
+					self.stop()
+				}
+			}
+		}
+	}
+
+	fn processConstMatch(mut &self, mut &tm: &Match, mut &m: &MatchCase) {
+		for (i, mut c) in tm.Cases {
+			if c.Scope != nil {
+				let mut token: &Token = nil
+				if !tm.TypeMatch && len(c.Scope.Stmts) > 0 {
+					token = m.Cases[i].Scope.Stmts[0].Token
+				}
+				self.checkComptimePanic(token, c.Scope)
+				tm.Default = c
+				tm.Cases = nil
+				ret
+			}
+		}
+		if m.Default != nil {
+			tm.Cases = nil
+			tm.Default = self.checkDefault(tm, m.Default)
+			if tm.Default != nil {
+				let mut token: &Token = nil
+				if !tm.TypeMatch {
+					token = m.Default.Scope.Stmts[0].Token
+				}
+				self.checkComptimePanic(token, tm.Default.Scope)
+			}
+		} else {
+			// Remove all cases, no success matching.
+			tm.Cases = nil
+		}
+	}
+
+	fn checkTypeMatch(mut &self, mut &m: &MatchCase) {
+		mut d := self.s.eval(self).eval1(m.Expr)
+		if d == nil {
+			ret
+		}
+
+		if m.Comptime {
+			mut cti := d.Kind.comptimeTypeInfo()
+			if cti == nil {
+				if !d.Decl {
+					self.s.pushErr(m.Expr.Token, LogMsg.InvalidComptimeTypeMatchExpr)
+					ret
+				}
+			} else {
+				d.Kind = cti.base
+			}
+		} else if d.Decl || !((d.Kind.Prim() != nil && d.Kind.Prim().IsAny()) || d.Kind.Trait() != nil || d.Kind.TypeEnum() != nil) {
+			self.s.pushErr(m.Expr.Token, LogMsg.TypeCaseHasNotValidExpr)
+			ret
+		}
+
+		mut tm := &Match{
+			TypeMatch: true,
+			Expr: d,
+			Comptime: m.Comptime,
+		}
+
+		// Do not check default if comptime matching enabled.
+		// We do not know any case will be matched yet.
+		// The [self.processConstMatch] will check cases and if not exist
+		// any matching, will check default case if exist and handle it.
+		if !tm.Comptime && m.Default != nil {
+			tm.Default = self.checkDefault(tm, m.Default)
+		}
+
+		self.checkCases(m, tm, d)
+		if tm.Comptime {
+			self.processConstMatch(tm, m)
+		}
+		self.scope.Stmts = append(self.scope.Stmts, tm)
+	}
+
+	fn checkCommonMatch(mut &self, mut &m: &MatchCase) {
+		let mut d: &Data = nil
+		if m.Expr == nil {
+			d = &Data{
+				Constant: Const.NewBool(true),
+				Kind: primBool,
+			}
+			d.Model = d.Constant
+		} else {
+			d = self.s.eval(self).evalExpr1(m.Expr)
+			if d == nil {
+				ret
+			}
+		}
+
+		if m.Comptime {
+			if !canComptimeMatch(d) {
+				self.s.pushErr(m.Expr.Token, LogMsg.ExprNotConst)
+				self.s.pushSuggestion(LogMsg.InvalidExprForConstMatch)
+				ret
+			}
+		} else if d.Kind.comptime() {
+			self.s.pushErr(m.Expr.Token, LogMsg.ExprNotConst)
+			self.s.pushSuggestion(LogMsg.InvalidExprForConstMatch)
+			ret
+		}
+
+		mut mc := &Match{
+			Expr: d,
+			Comptime: m.Comptime,
+		}
+
+		// Push into stmts here. Otherwise, labeled break statements and others
+		// will may log error(s) event semantic is good.
+		self.scope.Stmts = append(self.scope.Stmts, mc)
+
+		// Do not check default if comptime matching enabled.
+		// We do not know any case will be matched yet.
+		// The [self.processConstMatch] will check cases and if not exist
+		// any matching, will check default case if exist and handle it.
+		if !mc.Comptime && m.Default != nil {
+			mc.Default = self.checkDefault(mc, m.Default)
+		}
+
+		self.checkCases(m, mc, d)
+		if mc.Comptime {
+			self.processConstMatch(mc, m)
+		}
+	}
+
+	fn checkMatch(mut &self, mut m: &MatchCase) {
+		if m.TypeMatch {
+			self.checkTypeMatch(m)
+			ret
+		}
+		self.checkCommonMatch(m)
+	}
+
+	fn checkFall(mut &self, f: &ast::FallSt) {
+		if self.cse == 0 ||
+			len(self.scope.Stmts)+1 < len(self.scope.Stmts) ||
+			self.isDeferred() {
+			self.s.pushErr(f.Token, LogMsg.FallthroughWrongUse)
+			ret
+		}
+
+		mut case := unsafe { (*Case)(self.cse) }
+		if unsafe { case.Owner.Comptime } {
+			self.s.pushErr(f.Token, LogMsg.ComptimeFallthrough)
+			ret
+		} else if unsafe { case.Next } == nil {
+			self.s.pushErr(f.Token, LogMsg.FallthroughIntoFinalCase)
+			self.s.pushSuggestion(LogMsg.RemoveFallthroughFromFinalCase)
+			ret
+		}
+
+		self.scope.Stmts = append(self.scope.Stmts, &FallSt{
+			DestCase: unsafe { uintptr(case.Next) },
+		})
+	}
+
+	fn checkBreakWithLabel(mut &self, b: &ast::BreakSt): &BreakSt {
+		mut brk := self.checkPlainBreak(b)
+		if brk == nil {
+			ret nil
+		}
+
+		// Set pointer to zero.
+		// Pointer will set by label.
+		brk.It = 0
+		brk.Mtch = 0
+
+		mut label := findLabelParent(b.Label.Kind, self.parent)
+		if label == nil {
+			self.s.pushErr(b.Label, LogMsg.LabelNotExist, b.Label.Kind)
+			ret nil
+		}
+
+		label.used = true
+
+		if label.pos+1 >= len(label.scope.scope.Stmts) {
+			self.s.pushErr(b.Label, LogMsg.InvalidLabel, b.Label.Kind)
+			ret nil
+		}
+
+		i := label.pos + 1
+		if i >= len(label.scope.scope.Stmts) {
+			self.s.pushErr(b.Label, LogMsg.InvalidLabel, b.Label.Kind)
+		} else {
+			mut st := label.scope.scope.Stmts[i]
+			match type st {
+			| &InfIter:
+				brk.It = uintptr((&InfIter)(st))
+			| &RangeIter:
+				brk.It = uintptr((&RangeIter)(st))
+			| &WhileIter:
+				brk.It = uintptr((&WhileIter)(st))
+			| &Match:
+				brk.Mtch = uintptr((&Match)(st))
+			|:
+				self.s.pushErr(b.Label, LogMsg.InvalidLabel, b.Label.Kind)
+			}
+		}
+
+		if brk.It != 0 {
+			if !self.checkValidBreakLabel(brk.It) {
+				self.s.pushErr(b.Label, LogMsg.InvalidLabel, b.Label.Kind)
+			}
+		}
+
+		if brk.Mtch != 0 {
+			if !self.checkValidBreakLabel(brk.Mtch) {
+				self.s.pushErr(b.Label, LogMsg.InvalidLabel, b.Label.Kind)
+			}
+		}
+
+		ret brk
+	}
+
+	fn checkPlainBreak(mut &self, b: &ast::BreakSt): &BreakSt {
+		if self.isDeferred() {
+			self.s.pushErr(b.Token, LogMsg.BreakAtOutOfValidScope)
+			ret nil
+		}
+
+		mut scope := self
+	iter:
+		match {
+		| scope.it == 0 && scope.cse == 0 && scope.parent != nil && scope.owner == nil:
+			scope = scope.parent
+			goto iter
+		| scope.it != 0:
+			ret &BreakSt{It: scope.it}
+		| scope.cse != 0:
+			ret &BreakSt{Mtch: unsafe { uintptr((*Case)(scope.cse).Owner) }}
+		}
+
+		self.s.pushErr(b.Token, LogMsg.BreakAtOutOfValidScope)
+		ret nil
+	}
+
+	fn checkBreak(mut &self, b: &ast::BreakSt) {
+		if b.Label != nil { // Label given.
+			mut brk := self.checkBreakWithLabel(b)
+			self.scope.Stmts = append(self.scope.Stmts, brk)
+			ret
+		}
+
+		mut brk := self.checkPlainBreak(b)
+		self.scope.Stmts = append(self.scope.Stmts, brk)
+	}
+
+	fn checkRet(mut &self, mut r: &ast::RetSt) {
+		if self.isDeferred() {
+			self.s.pushErr(r.Token, LogMsg.RetInDeferred)
+		}
+
+		mut rt := &RetSt{
+			Func: self.getRoot().owner,
+		}
+		self.scope.Stmts = append(self.scope.Stmts, rt)
+
+		mut rtc := &retTypeChecker{
+			sc: self,
+			f: rt.Func,
+			errorToken: r.Token,
+		}
+		ok := rtc.check(r.Expr)
+		if !ok {
+			ret
+		}
+
+		if r.Expr != nil {
+			rt.Expr = rtc.model
+		}
+	}
+
+	fn checkUseExpr(mut &self, ue: &UseExpr) {
+		if self.result == nil {
+			self.s.pushErr(ue.Token, LogMsg.UseExprOutOfScope)
+			ret
+		}
+
+		if self.isDeferred() {
+			self.s.pushErr(ue.Token, LogMsg.UseExprInDeferred)
+		}
+
+		if self.i+1 < len(self.tree.Stmts) {
+			self.s.pushErr(ue.Token, LogMsg.UseExprNotLast)
+		}
+		// Validated at end of scope's analysis.
+	}
+
+	fn checkNode(mut &self, mut &node: StmtData) {
+		match type node {
+		| &ScopeTree:
+			self.checkAnonScope((&ScopeTree)(node))
+		| &VarDecl:
+			self.checkVarDecl((&VarDecl)(node))
+		| &TypeAliasDecl:
+			self.checkTypeAliasDecl((&TypeAliasDecl)(node))
+		| &Expr:
+			self.checkExpr((&Expr)(node))
+		| &ast::Conditional:
+			self.checkConditional((&ast::Conditional)(node))
+		| &Iter:
+			self.checkIter((&Iter)(node))
+		| &ast::ContSt:
+			self.checkCont((&ast::ContSt)(node))
+		| &LabelSt:
+			self.checkLabel((&LabelSt)(node))
+		| &ast::GotoSt:
+			self.pushGoto((&ast::GotoSt)(node))
+		| &AssignSt:
+			self.checkAssignSt((&AssignSt)(node))
+		| &MatchCase:
+			self.checkMatch((&MatchCase)(node))
+		| &ast::FallSt:
+			self.checkFall((&ast::FallSt)(node))
+		| &ast::BreakSt:
+			self.checkBreak((&ast::BreakSt)(node))
+		| &ast::RetSt:
+			self.checkRet((&ast::RetSt)(node))
+		| &UseExpr:
+			self.checkUseExpr((&UseExpr)(node))
+		|:
+			outln("error <unimplemented scope node>")
+		}
+	}
+
+	fn checkResult(mut &self) {
+		mut stmt := self.tree.Stmts[len(self.tree.Stmts)-1]
+		match type stmt.Data {
+		| &UseExpr:
+			mut ue := (&UseExpr)(stmt.Data)
+			mut d := self.s.eval(self).evalExpr(ue.Expr)
+			if d == nil {
+				ret
+			}
+			self.scope.Stmts = append(self.scope.Stmts, d)
+			mut rtc := &retTypeChecker{
+				sc: self,
+				errorToken: ue.Expr.Token,
+				types: self.result.Types(),
+			}
+			_ = rtc.check(ue.Expr)
+		| &Expr:
+			mut expr := (&Expr)(stmt.Data)
+			mut d := self.s.eval(self).evalExpr(expr)
+			if d == nil {
+				ret
+			}
+			match type d.Model {
+			| &BuiltinErrorCallExprModel:
+				mut m := (&BuiltinErrorCallExprModel)(d.Model)
+				self.processErrorCall(m, expr.Token)
+				self.scope.Stmts = append(self.scope.Stmts, d)
+			|:
+				ret
+			}
+		| &ast::GotoSt
+		| &ast::BreakSt
+		| &ast::ContSt
+		| &ast::RetSt:
+			self.checkNode(stmt.Data)
+		|:
+			self.checkNode(stmt.Data)
+			ret
+		}
+
+		// Set result to nil, it is a mark for whether result is processed.
+		self.result = nil
+	}
+
+	fn checkTree(mut &self) {
+		self.i = 0
+		mut n := len(self.tree.Stmts)
+		if self.result != nil {
+			// Skip last statement if result is exist.
+			// Algorithm will check last statement for result.
+			// So, if you check last statement also here, it will duplicate.
+			n--
+		}
+		for self.i < n; self.i++ {
+			mut stmt := self.tree.Stmts[self.i]
+			self.checkNode(stmt.Data)
+			if self.stopped() {
+				ret
+			}
+		}
+		if self.result != nil && len(self.tree.Stmts) != 0 {
+			self.checkResult()
+		}
+	}
+
+	fn checkGoto(mut self, mut &gt: &scopeGoto, mut &label: &scopeLabel) {
+		mut gtsc := gt.scope
+		for gtsc.childIndex-1 > label.scope.childIndex {
+			gtsc = gtsc.parent
+		}
+
+		mut n := 0
+
+		if gtsc.scope == label.scope.scope {
+			// Scopes are same and label at above, so safe.
+			if gt.pos > label.pos {
+				ret
+			}
+
+			// Limit controlling to goto's position.
+			// Label and goto is in same scope.
+			n = gt.pos
+		}
+
+		mut i := label.pos - 1
+
+		if n == 0 {
+			for j, stmt in label.scope.scope.Stmts {
+				// Break if position reached to goto's scope.
+				if stmtIsGotoScope(stmt, gtsc.scope) {
+					n = j
+					break
+				}
+			}
+		}
+
+		for i >= n; i-- {
+			mut stmt := label.scope.scope.Stmts[i]
+			if stmtIsDef(stmt) {
+				self.s.pushErr(gt.gt.Token, LogMsg.GotoJumpsDeclarations, gt.gt.Label.Kind)
+				ret
+			}
+		}
+	}
+
+	fn checkGotos(mut self) {
+		for (_, mut gt) in *self.gotos {
+			mut label := self.findLabelAll(gt.gt.Label.Kind)
+			if label == nil {
+				self.s.pushErr(gt.gt.Token, LogMsg.LabelNotExist, gt.gt.Label.Kind)
+				continue
+			}
+			gt.st.Label = label.label
+			label.used = true
+			self.checkGoto(gt, label)
+		}
+	}
+
+	fn checkLabels(mut self) {
+		for _, l in *self.labels {
+			if !l.used {
+				self.s.pushErr(l.token, LogMsg.DeclaredButNotUsed, l.label.Ident)
+			}
+		}
+	}
+
+	fn checkVars(mut self) {
+		for _, v in self.table.Vars {
+			if !v.Used && !v.Constant && !IsIgnoreIdent(v.Ident) && !IsAnonIdent(v.Ident) {
+				self.s.pushErr(v.Token, LogMsg.DeclaredButNotUsed, v.Ident)
+			}
+		}
+	}
+
+	fn checkAliases(mut self) {
+		for _, a in self.table.TypeAliases {
+			if !a.Used && !IsIgnoreIdent(a.Ident) && !IsAnonIdent(a.Ident) {
+				self.s.pushErr(a.Token, LogMsg.DeclaredButNotUsed, a.Ident)
+			}
+		}
+	}
+
+	// Checks scope tree.
+	fn check(mut &self, mut &tree: &ScopeTree, mut &s: &Scope) {
+		s.Deferred = tree.Deferred
+		s.Unsafety = tree.Unsafety
+
+		errors := len(self.s.errors)
+
+		self.tree = tree
+		self.scope = s
+
+		self.checkTree()
+
+		// If we have new errors, don't check unused declarations.
+		if errors == len(self.s.errors) {
+			self.checkVars()
+			self.checkAliases()
+
+			if self.isRoot() {
+				self.checkGotos()
+				self.checkLabels()
+			}
+		}
+	}
+
+	fn newChildChecker(mut &self): &scopeChecker {
+		mut base := newScopeCheckerBase(self.s, nil)
+		base.parent = self
+		base.labels = self.labels
+		base.gotos = self.gotos
+		base.childIndex = self.childIndex + 1
+		ret base
+	}
 }
 
 fn removeEqFromOp(op: TokenId): TokenId {
-    match op {
-    | TokenId.PlusEq:
-        ret TokenId.Plus
-    | TokenId.MinusEq:
-        ret TokenId.Minus
-    | TokenId.StarEq:
-        ret TokenId.Star
-    | TokenId.SolidusEq:
-        ret TokenId.Solidus
-    | TokenId.PercentEq:
-        ret TokenId.Percent
-    | TokenId.ShlEq:
-        ret TokenId.Shl
-    | TokenId.ShrEq:
-        ret TokenId.Shr
-    | TokenId.CaretEq:
-        ret TokenId.Caret
-    | TokenId.AmperEq:
-        ret TokenId.Amper
-    | TokenId.VlineEq:
-        ret TokenId.Vline
-    |:
-        ret op
-    }
+	match op {
+	| TokenId.PlusEq:
+		ret TokenId.Plus
+	| TokenId.MinusEq:
+		ret TokenId.Minus
+	| TokenId.StarEq:
+		ret TokenId.Star
+	| TokenId.SolidusEq:
+		ret TokenId.Solidus
+	| TokenId.PercentEq:
+		ret TokenId.Percent
+	| TokenId.ShlEq:
+		ret TokenId.Shl
+	| TokenId.ShrEq:
+		ret TokenId.Shr
+	| TokenId.CaretEq:
+		ret TokenId.Caret
+	| TokenId.AmperEq:
+		ret TokenId.Amper
+	| TokenId.VlineEq:
+		ret TokenId.Vline
+	|:
+		ret op
+	}
 }
 
 // Makes data d as comptimeRange.
 // If type is not supported, d.Decl will be true.
 fn makeComptimeRange(mut &d: &Data) {
-    match {
-    | d.Kind.comptimeStructFields() != nil:
-        d.Kind = &TypeKind{Kind: &comptimeRange{d.Kind.comptimeStructFields()}}
-    | d.Kind.comptimeEnumFields() != nil:
-        d.Kind = &TypeKind{Kind: &comptimeRange{d.Kind.comptimeEnumFields()}}
-    | d.Kind.comptimeTypeInfos() != nil:
-        d.Kind = &TypeKind{Kind: &comptimeRange{d.Kind.comptimeTypeInfos()}}
-    | d.Kind.comptimeParams() != nil:
-        d.Kind = &TypeKind{Kind: &comptimeRange{d.Kind.comptimeParams()}}
-    | d.Kind.comptimeStatics() != nil:
-        d.Kind = &TypeKind{Kind: &comptimeRange{d.Kind.comptimeStatics()}}
-    | d.Kind.comptimeFiles() != nil:
-        d.Kind = &TypeKind{Kind: &comptimeRange{d.Kind.comptimeFiles()}}
-    |:
-        // Flag for failure.
-        d.Decl = true
-    }
+	match {
+	| d.Kind.comptimeStructFields() != nil:
+		d.Kind = &TypeKind{Kind: &comptimeRange{d.Kind.comptimeStructFields()}}
+	| d.Kind.comptimeEnumFields() != nil:
+		d.Kind = &TypeKind{Kind: &comptimeRange{d.Kind.comptimeEnumFields()}}
+	| d.Kind.comptimeTypeInfos() != nil:
+		d.Kind = &TypeKind{Kind: &comptimeRange{d.Kind.comptimeTypeInfos()}}
+	| d.Kind.comptimeParams() != nil:
+		d.Kind = &TypeKind{Kind: &comptimeRange{d.Kind.comptimeParams()}}
+	| d.Kind.comptimeStatics() != nil:
+		d.Kind = &TypeKind{Kind: &comptimeRange{d.Kind.comptimeStatics()}}
+	| d.Kind.comptimeFiles() != nil:
+		d.Kind = &TypeKind{Kind: &comptimeRange{d.Kind.comptimeFiles()}}
+	|:
+		// Flag for failure.
+		d.Decl = true
+	}
 }
 
 // Reports whether d can match at comptime.
 fn canComptimeMatch(mut &d: &Data): bool {
-    // Do not allow value if has unsupported type for type infer.
-    if !isGoodValueToInfer(d) {
-        ret false
-    }
-    ret d.IsConst() || d.Kind.comptimeTypeInfo() != nil
+	// Do not allow value if has unsupported type for type infer.
+	if !isGoodValueToInfer(d) {
+		ret false
+	}
+	ret d.IsConst() || d.Kind.comptimeTypeInfo() != nil
 }

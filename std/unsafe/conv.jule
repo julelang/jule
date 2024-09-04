@@ -8,50 +8,50 @@ use integ for std::jule::integrated
 // The returned string uses n as length.
 // Will not perform garbage collection.
 fn Str(b: *byte, n: int): str {
-    mut s := ""
-    unsafe {
-        integ::Emit("{}.buffer = {}::make({}, {})", s, &byte, b, nil)
-        integ::Emit("{}._len = {}", s, n)
-        integ::Emit("{}._slice = {}", s, b)
-    }
-    ret s
+	mut s := ""
+	unsafe {
+		integ::Emit("{}.buffer = {}::make({}, {})", s, &byte, b, nil)
+		integ::Emit("{}._len = {}", s, n)
+		integ::Emit("{}._slice = {}", s, b)
+	}
+	ret s
 }
 
 // Returns slice based on e, the parameter e means first element of slice.
 // The returned slice uses n as length and capacity.
 // Will not perform garbage collection.
 fn Slice[Elem](e: *Elem, n: int): []Elem {
-    mut buf := []Elem(nil)
-    unsafe {
-        integ::Emit("{}.data = {}::make({}, {})", buf, &Elem, e, nil)
-        integ::Emit("{}._len = {}", buf, n)
-        integ::Emit("{}._cap = {}", buf, n)
-        integ::Emit("{}._slice = {}", buf, e)
-    }
-    ret buf
+	mut buf := []Elem(nil)
+	unsafe {
+		integ::Emit("{}.data = {}::make({}, {})", buf, &Elem, e, nil)
+		integ::Emit("{}._len = {}", buf, n)
+		integ::Emit("{}._cap = {}", buf, n)
+		integ::Emit("{}._slice = {}", buf, e)
+	}
+	ret buf
 }
 
 // Alias for Slice(b, n).
 fn Bytes(b: *byte, n: int): []byte {
-    ret Slice(b, n)
+	ret Slice(b, n)
 }
 
 // Alias for Slice(&s[0], len(s)).
 // Returns nil if len(s) == 0.
 fn StrBytes(s: str): []byte {
-    if len(s) == 0 {
-        ret nil
-    }
-    ret Slice(&s[0], len(s))
+	if len(s) == 0 {
+		ret nil
+	}
+	ret Slice(&s[0], len(s))
 }
 
 // Alias for Str(&b[0], len(b)).
 // Returns empty string if len(b) == 0.
 fn BytesStr(b: []byte): str {
-    if len(b) == 0 {
-        ret ""
-    }
-    ret Str(&b[0], len(b))
+	if len(b) == 0 {
+		ret ""
+	}
+	ret Str(&b[0], len(b))
 }
 
 // Same as [BytesStr] but keeps garbage collection.
@@ -59,12 +59,12 @@ fn StrFromBytes(b: []byte): str { ret unsafe { *(*str)(&b) } }
 
 // Same as [StrBytes] but keeps garbage collection.
 fn BytesFromStr(s: str): []byte {
-    mut b := StrBytes(s)
-    unsafe {
-        if integ::Emit[bool]("{}.buffer.ref != {}", s, nil) {
-            integ::Emit("{}.data.ref = {}.buffer.ref", b, s)
-            integ::Emit("{}.data.add_ref()", b)
-        }
-    }
-    ret b
+	mut b := StrBytes(s)
+	unsafe {
+		if integ::Emit[bool]("{}.buffer.ref != {}", s, nil) {
+			integ::Emit("{}.data.ref = {}.buffer.ref", b, s)
+			integ::Emit("{}.data.add_ref()", b)
+		}
+	}
+	ret b
 }

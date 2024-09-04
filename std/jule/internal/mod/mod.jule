@@ -11,52 +11,52 @@ use strings for std::strings
 // Searches module file in path.
 // Reports whether module file is exist in given directory.
 fn FindModuleFile(&dirents: []&DirEntry): bool {
-    for _, d in dirents {
-        if !d.Stat.IsDir() && d.Name == build::ModuleFile {
-            ret true
-        }
-    }
-    ret false
+	for _, d in dirents {
+		if !d.Stat.IsDir() && d.Name == build::ModuleFile {
+			ret true
+		}
+	}
+	ret false
 }
 
 // Searches module file in path, and their parent paths.
 // Returns empty string if any module file is not exist.
 // Returns directory path of module file if exist.
 fn FindModuleFileDeep(mut path: str): str {
-    for {
-        mut dirents := Directory.Read(path) else {
-            break
-        }
+	for {
+		mut dirents := Directory.Read(path) else {
+			break
+		}
 
-        exist := FindModuleFile(dirents)
-        if exist {
-            ret path
-        }
+		exist := FindModuleFile(dirents)
+		if exist {
+			ret path
+		}
 
-        n := len(path)
-        path = path::Dir(path)
-        if len(path) == n { // Same path, no difference.
-            break
-        }
-    }
+		n := len(path)
+		path = path::Dir(path)
+		if len(path) == n { // Same path, no difference.
+			break
+		}
+	}
 
-    ret ""
+	ret ""
 }
 
 // Checks module file of given directory.
 fn CheckModuleFile(&path: str): []Log {
-    bytes := File.Read(path::Join(path, build::ModuleFile)) else {
-        ret [{
-                Kind: LogKind.Flat,
-                Text: "module file could not checked because of a problem",
-            }]
-    }
-    s := strings::Trim(unsafe::BytesStr(bytes), " \n\r\t\v")
-    if len(s) != 0 {
-        ret [{
-                Kind: LogKind.Flat,
-                Text: "module file has syntax error(s)",
-            }]
-    }
-    ret nil
+	bytes := File.Read(path::Join(path, build::ModuleFile)) else {
+		ret [{
+				Kind: LogKind.Flat,
+				Text: "module file could not checked because of a problem",
+			}]
+	}
+	s := strings::Trim(unsafe::BytesStr(bytes), " \n\r\t\v")
+	if len(s) != 0 {
+		ret [{
+				Kind: LogKind.Flat,
+				Text: "module file has syntax error(s)",
+			}]
+	}
+	ret nil
 }

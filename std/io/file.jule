@@ -9,14 +9,14 @@ use std::internal::strings::{StrBuilder}
 // Stream implementation for file handles.
 // Uses internally mutable buffer.
 struct FileStream {
-    buff: &File
+	buff: &File
 }
 
 impl FileStream {
-    // Returns new FileStream instance for file.
-    static fn New(mut f: &File): &FileStream {
-        ret &FileStream{buff: f}
-    }
+	// Returns new FileStream instance for file.
+	static fn New(mut f: &File): &FileStream {
+		ret &FileStream{buff: f}
+	}
 }
 
 impl Reader for FileStream {}
@@ -24,68 +24,68 @@ impl Writer for FileStream {}
 impl Stream for FileStream {}
 
 impl FileStream {
-    // Returns internal file buffer.
-    fn File(mut self): &File {
-        ret self.buff
-    }
+	// Returns internal file buffer.
+	fn File(mut self): &File {
+		ret self.buff
+	}
 
-    // Read bytes to buffer from stream and returns readed byte count.
-    // The number of bytes readed can never exceed the length of the buff.
-    // If the buff is larger than the number of bytes that can be read,
-    // the buffer will not cause an overflow.
-    fn Read(mut self, mut buff: []byte)!: (n: int) {
-        ret self.buff.Read(buff) else { error(error) }
-    }
+	// Read bytes to buffer from stream and returns readed byte count.
+	// The number of bytes readed can never exceed the length of the buff.
+	// If the buff is larger than the number of bytes that can be read,
+	// the buffer will not cause an overflow.
+	fn Read(mut self, mut buff: []byte)!: (n: int) {
+		ret self.buff.Read(buff) else { error(error) }
+	}
 
-    // Writes bytes to stream and returns writed byte count.
-    // The number of bytes written can never exceed the length of the buff.
-    fn Write(mut self, buff: []byte)!: (n: int) {
-        ret self.buff.Write(buff) else { error(error) }
-    }
+	// Writes bytes to stream and returns writed byte count.
+	// The number of bytes written can never exceed the length of the buff.
+	fn Write(mut self, buff: []byte)!: (n: int) {
+		ret self.buff.Write(buff) else { error(error) }
+	}
 
-    // Same as read_line method, but returns in bytes.
-    fn ReadLineBytes(mut self)!: []byte {
-        const LINE_DELIMITER = '\n'
+	// Same as read_line method, but returns in bytes.
+	fn ReadLineBytes(mut self)!: []byte {
+		const LINE_DELIMITER = '\n'
 
-        mut buff := make([]byte, 1, 1024)
-        let mut partBuff: bufferArray
-        mut part := unsafe::Slice(&partBuff[0], len(partBuff))
-        for {
-            n := self.buff.Read(part) else { error(error) }
-            if n == 0 {
-                break
-            }
-            if part[n-1] == LINE_DELIMITER {
-                buff = append(buff, part[:n-1]...)
-                break
-            }
-            buff = append(buff, part[:n]...)
-        }
-        clearCr(buff)
-        ret buff
-    }
+		mut buff := make([]byte, 1, 1024)
+		let mut partBuff: bufferArray
+		mut part := unsafe::Slice(&partBuff[0], len(partBuff))
+		for {
+			n := self.buff.Read(part) else { error(error) }
+			if n == 0 {
+				break
+			}
+			if part[n-1] == LINE_DELIMITER {
+				buff = append(buff, part[:n-1]...)
+				break
+			}
+			buff = append(buff, part[:n]...)
+		}
+		clearCr(buff)
+		ret buff
+	}
 
-    // Reads line from file handle via &File.read method.
-    // Returns bytes until end of the line, line delimiter is not included.
-    // Returns zero-length string when reached EOF.
-    fn ReadLine(mut self)!: str {
-        const LINE_DELIMITER = '\n'
+	// Reads line from file handle via &File.read method.
+	// Returns bytes until end of the line, line delimiter is not included.
+	// Returns zero-length string when reached EOF.
+	fn ReadLine(mut self)!: str {
+		const LINE_DELIMITER = '\n'
 
-        mut buf := StrBuilder.New(1 << 10)
-        let mut partBuff: bufferArray
-        mut part := unsafe::Slice(&partBuff[0], len(partBuff))
-        for {
-            n := self.buff.Read(part) else { error(error) }
-            if n == 0 {
-                break
-            }
-            if part[n-1] == LINE_DELIMITER {
-                buf.Write(part[:n-1])
-                break
-            }
-            buf.Write(part[:n])
-        }
-        unsafe { buf.SetBuf(clearCr(buf.Buf())) }
-        ret buf.Str()
-    }
+		mut buf := StrBuilder.New(1 << 10)
+		let mut partBuff: bufferArray
+		mut part := unsafe::Slice(&partBuff[0], len(partBuff))
+		for {
+			n := self.buff.Read(part) else { error(error) }
+			if n == 0 {
+				break
+			}
+			if part[n-1] == LINE_DELIMITER {
+				buf.Write(part[:n-1])
+				break
+			}
+			buf.Write(part[:n])
+		}
+		unsafe { buf.SetBuf(clearCr(buf.Buf())) }
+		ret buf.Str()
+	}
 }

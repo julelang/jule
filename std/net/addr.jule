@@ -7,36 +7,36 @@ use conv for std::internal::conv
 
 // Address errors.
 enum AddrError {
-    NoSuitable,                    // No suitable address.
-    Unable,                        // Unable to parse address.
-    MissingIPv6,                   // IPv6 address is missing.
-    UnexpectedToken,               // Address have unexpected token(s).
-    TooShort,                      // Address is too short.
-    TooLong,                       // Address is too long.
-    IPv4FieldValueOverflow,        // IPv4 address field has value > 255.
-    EmptyField,                    // IPv4 address field must have at least one digit.
-    IPv4FieldOctetWithLeadingZero, // IPv4 field has octet with leading zero.
-    EmptyZone,                     // Zone must be a non-empty string.
-    IPv6FieldValueOverflow,        // Each group must have 4 or less digits or field has value >=2^16.
-    IPv6ShortColon,                // Colon must be followed by more characters.
-    MissingPort,                   // Port is missing.
-    InvalidPort,                   // Port is invalid.
-    TooManyColons,                 // There is too many colons.
-    MissingRBracket,               // There is missing right bracket "]".
-    UnexpectedLBracket,            // Address have unexpected left bracket "[".
-    UnexpectedRBracket,            // Address have unexpected right bracket "]".
-    UnknownNetwork,                // Unknown network name.
+	NoSuitable,                    // No suitable address.
+	Unable,                        // Unable to parse address.
+	MissingIPv6,                   // IPv6 address is missing.
+	UnexpectedToken,               // Address have unexpected token(s).
+	TooShort,                      // Address is too short.
+	TooLong,                       // Address is too long.
+	IPv4FieldValueOverflow,        // IPv4 address field has value > 255.
+	EmptyField,                    // IPv4 address field must have at least one digit.
+	IPv4FieldOctetWithLeadingZero, // IPv4 field has octet with leading zero.
+	EmptyZone,                     // Zone must be a non-empty string.
+	IPv6FieldValueOverflow,        // Each group must have 4 or less digits or field has value >=2^16.
+	IPv6ShortColon,                // Colon must be followed by more characters.
+	MissingPort,                   // Port is missing.
+	InvalidPort,                   // Port is invalid.
+	TooManyColons,                 // There is too many colons.
+	MissingRBracket,               // There is missing right bracket "]".
+	UnexpectedLBracket,            // Address have unexpected left bracket "[".
+	UnexpectedRBracket,            // Address have unexpected right bracket "]".
+	UnknownNetwork,                // Unknown network name.
 }
 
 const localhost = "localhost"
 
 // Represents a network end point address.
 trait Addr {
-    // Returns name of the network.
-    fn Network(self): str
+	// Returns name of the network.
+	fn Network(self): str
 
-    // String form of address.
-    fn Str(self): str
+	// String form of address.
+	fn Str(self): str
 }
 
 // Combines host and port into a network address of the
@@ -45,11 +45,11 @@ trait Addr {
 //
 // See the [Connect] function for a description of the host and port parameters.
 fn JoinHostPort(host: str, port: str): str {
-    // We assume that host is a literal IPv6 address if host has colons.
-    if fastbytes::FindByteStr(host, ':') >= 0 {
-        ret "[" + host + "]:" + port
-    }
-    ret host + ":" + port
+	// We assume that host is a literal IPv6 address if host has colons.
+	if fastbytes::FindByteStr(host, ':') >= 0 {
+		ret "[" + host + "]:" + port
+	}
+	ret host + ":" + port
 }
 
 // Splits a network address of the form "host:port",
@@ -64,62 +64,62 @@ fn JoinHostPort(host: str, port: str): str {
 //
 // Exceptionals are always will be AddrError.
 fn SplitHostPort(hostport: str)!: (host: str, port: str) {
-    mut j, mut k := 0, 0
-    i := fastbytes::FindLastByteStr(hostport, ':')
-    if i == -1 {
-        error(AddrError.MissingPort)
-    }
-    if hostport[0] == '[' {
-        // Expect the first ']' just before the last ':'.
-        end := fastbytes::FindByteStr(hostport, ']')
-        if end == -1 {
-            error(AddrError.MissingRBracket)
-        }
-        match end + 1 {
-        | len(hostport):
-            error(AddrError.MissingPort)
-        | i:
-            // Expected result, it's fine.
-        |:
-            // Either ']' isn't followed by a colon, or it is
-            // followed by a colon that is not the last one.
-            if hostport[end+1] == ':' {
-                error(AddrError.TooManyColons)
-            }
-            error(AddrError.MissingPort)
-        }
-        host = hostport[1:end]
-        j, k = 1, end + 1 // There can't be a '[' resp. ']' before these positions.
-    } else {
-        host = hostport[:i]
-        if fastbytes::FindByteStr(host, ':') != -1 {
-            error(AddrError.TooManyColons)
-        }
-    }
-    if fastbytes::FindByteStr(hostport[j:], '[') != -1 {
-        error(AddrError.UnexpectedLBracket)
-    }
-    if fastbytes::FindByteStr(hostport[k:], ']') != -1 {
-        error(AddrError.UnexpectedRBracket)
-    }
-    port = hostport[i+1:]
-    ret
+	mut j, mut k := 0, 0
+	i := fastbytes::FindLastByteStr(hostport, ':')
+	if i == -1 {
+		error(AddrError.MissingPort)
+	}
+	if hostport[0] == '[' {
+		// Expect the first ']' just before the last ':'.
+		end := fastbytes::FindByteStr(hostport, ']')
+		if end == -1 {
+			error(AddrError.MissingRBracket)
+		}
+		match end + 1 {
+		| len(hostport):
+			error(AddrError.MissingPort)
+		| i:
+			// Expected result, it's fine.
+		|:
+			// Either ']' isn't followed by a colon, or it is
+			// followed by a colon that is not the last one.
+			if hostport[end+1] == ':' {
+				error(AddrError.TooManyColons)
+			}
+			error(AddrError.MissingPort)
+		}
+		host = hostport[1:end]
+		j, k = 1, end + 1 // There can't be a '[' resp. ']' before these positions.
+	} else {
+		host = hostport[:i]
+		if fastbytes::FindByteStr(host, ':') != -1 {
+			error(AddrError.TooManyColons)
+		}
+	}
+	if fastbytes::FindByteStr(hostport[j:], '[') != -1 {
+		error(AddrError.UnexpectedLBracket)
+	}
+	if fastbytes::FindByteStr(hostport[k:], ']') != -1 {
+		error(AddrError.UnexpectedRBracket)
+	}
+	port = hostport[i+1:]
+	ret
 }
 
 fn internetAddr(&net: Network, mut ip: Ip, port: int, zone: str): Addr {
-    match net {
-    | Network.Tcp | Network.Tcp4 | Network.Tcp6:
-        ret &TcpAddr{Ip: ip, Port: port, Zone: zone}
-    | Network.Udp | Network.Udp4 | Network.Udp6:
-        ret &UdpAddr{Ip: ip, Port: port, Zone: zone}
-    |:
-        panic("unexpected network: " + str(net))
-    }
+	match net {
+	| Network.Tcp | Network.Tcp4 | Network.Tcp6:
+		ret &TcpAddr{Ip: ip, Port: port, Zone: zone}
+	| Network.Udp | Network.Udp4 | Network.Udp6:
+		ret &UdpAddr{Ip: ip, Port: port, Zone: zone}
+	|:
+		panic("unexpected network: " + str(net))
+	}
 }
 
 enum ipAddr: type {
-    Ip,
-    TcpAddr,
+	Ip,
+	TcpAddr,
 }
 
 // Parses addr as an IP address, returning the result. The string
@@ -128,19 +128,19 @@ enum ipAddr: type {
 //
 // Exceptionals are always will be AddrError.
 fn parseAddr(addr: str)!: ipAddr {
-    for _, b in addr {
-        match b {
-        | '.':
-            ret parseIPv4(addr) else { error(error) }
-        | ':':
-            ret parseIPv6(addr) else { error(error) }
-        | '%':
-            // Assume that this was trying to be an IPv6 address with
-            // a zone specifier, but the address is missing.
-            error(AddrError.MissingIPv6)
-        }
-    }
-    error(AddrError.Unable)
+	for _, b in addr {
+		match b {
+		| '.':
+			ret parseIPv4(addr) else { error(error) }
+		| ':':
+			ret parseIPv6(addr) else { error(error) }
+		| '%':
+			// Assume that this was trying to be an IPv6 address with
+			// a zone specifier, but the address is missing.
+			error(AddrError.MissingIPv6)
+		}
+	}
+	error(AddrError.Unable)
 }
 
 // Resolvers addr which may be aliteral IP address and
@@ -148,119 +148,119 @@ fn parseAddr(addr: str)!: ipAddr {
 //
 // Forwards any exceptional from used methods.
 fn resolveInternetAddr(&net: Network, &addr: str)!: Addr {
-    if addr == "" {
-        error(AddrError.MissingPort)
-    }
-    mut host, mut port := "", ""
-    mut portnum := 0
-    match net {
-    | Network.Tcp | Network.Tcp4 | Network.Tcp6
-    | Network.Udp | Network.Udp4 | Network.Udp6:
-        host, port = SplitHostPort(addr) else { error(error) }
-        (portnum), ok := conv::Atoi(port)
-        if !ok {
-            error(AddrError.InvalidPort)
-        }
-    |:
-        error(AddrError.UnknownNetwork)
-    }
-    if host == "" {
-        ret internetAddr(net, Ip.Empty(), portnum, "")
-    }
-    if host == localhost {
-        ret buildLocalhostAddr(net, portnum)
-    }
-    mut ip := parseAddr(host) else { error(error) }
-    match type ip {
-    | Ip:
-        match net {
-        | Network.Tcp6 | Network.Udp6:
-            ret nil
-        | Network.Tcp | Network.Tcp4:
-            ret &TcpAddr{
-                Ip: (Ip)(ip),
-                Port: portnum,
-            }
-        | Network.Udp | Network.Udp4:
-            ret &UdpAddr{
-                Ip: (Ip)(ip),
-                Port: portnum,
-            }
-        |:
-            panic("implementation bug, this panic should be unreachable")
-        }
-    | TcpAddr:
-        mut ipAddr := (TcpAddr)(ip)
-        match net {
-        | Network.Tcp:
-            ipAddr.Port = portnum
-            ret new(TcpAddr, ipAddr)
-        | Network.Udp:
-            ret &UdpAddr{
-                Ip: ipAddr.Ip,
-                Zone: ipAddr.Zone,
-                Port: portnum,
-            }
-        | Network.Tcp4:
-            if !ipAddr.Ip.To4().Empty() {
-                ipAddr.Port = portnum
-                ret new(TcpAddr, ipAddr)
-            }
-        | Network.Udp4:
-            if !ipAddr.Ip.To4().Empty() {
-                ret &UdpAddr{
-                    Ip: ipAddr.Ip,
-                    Zone: ipAddr.Zone,
-                    Port: portnum,
-                }
-            }
-        | Network.Tcp6:
-            if len(ipAddr.Ip.Addr) == Ipv6.Len && ipAddr.Ip.To4().Empty() {
-                ipAddr.Port = portnum
-                ret new(TcpAddr, ipAddr)
-            }
-        | Network.Udp6:
-            if len(ipAddr.Ip.Addr) == Ipv6.Len && ipAddr.Ip.To4().Empty() {
-                ret &UdpAddr{
-                    Ip: ipAddr.Ip,
-                    Zone: ipAddr.Zone,
-                    Port: portnum,
-                }
-            }
-        }
-    }
-    ret nil
+	if addr == "" {
+		error(AddrError.MissingPort)
+	}
+	mut host, mut port := "", ""
+	mut portnum := 0
+	match net {
+	| Network.Tcp | Network.Tcp4 | Network.Tcp6
+	| Network.Udp | Network.Udp4 | Network.Udp6:
+		host, port = SplitHostPort(addr) else { error(error) }
+		(portnum), ok := conv::Atoi(port)
+		if !ok {
+			error(AddrError.InvalidPort)
+		}
+	|:
+		error(AddrError.UnknownNetwork)
+	}
+	if host == "" {
+		ret internetAddr(net, Ip.Empty(), portnum, "")
+	}
+	if host == localhost {
+		ret buildLocalhostAddr(net, portnum)
+	}
+	mut ip := parseAddr(host) else { error(error) }
+	match type ip {
+	| Ip:
+		match net {
+		| Network.Tcp6 | Network.Udp6:
+			ret nil
+		| Network.Tcp | Network.Tcp4:
+			ret &TcpAddr{
+				Ip: (Ip)(ip),
+				Port: portnum,
+			}
+		| Network.Udp | Network.Udp4:
+			ret &UdpAddr{
+				Ip: (Ip)(ip),
+				Port: portnum,
+			}
+		|:
+			panic("implementation bug, this panic should be unreachable")
+		}
+	| TcpAddr:
+		mut ipAddr := (TcpAddr)(ip)
+		match net {
+		| Network.Tcp:
+			ipAddr.Port = portnum
+			ret new(TcpAddr, ipAddr)
+		| Network.Udp:
+			ret &UdpAddr{
+				Ip: ipAddr.Ip,
+				Zone: ipAddr.Zone,
+				Port: portnum,
+			}
+		| Network.Tcp4:
+			if !ipAddr.Ip.To4().Empty() {
+				ipAddr.Port = portnum
+				ret new(TcpAddr, ipAddr)
+			}
+		| Network.Udp4:
+			if !ipAddr.Ip.To4().Empty() {
+				ret &UdpAddr{
+					Ip: ipAddr.Ip,
+					Zone: ipAddr.Zone,
+					Port: portnum,
+				}
+			}
+		| Network.Tcp6:
+			if len(ipAddr.Ip.Addr) == Ipv6.Len && ipAddr.Ip.To4().Empty() {
+				ipAddr.Port = portnum
+				ret new(TcpAddr, ipAddr)
+			}
+		| Network.Udp6:
+			if len(ipAddr.Ip.Addr) == Ipv6.Len && ipAddr.Ip.To4().Empty() {
+				ret &UdpAddr{
+					Ip: ipAddr.Ip,
+					Zone: ipAddr.Zone,
+					Port: portnum,
+				}
+			}
+		}
+	}
+	ret nil
 }
 
 fn buildLocalhostAddr(&net: Network, port: int): Addr {
-    match net {
-    | Network.Tcp | Network.Tcp4:
-        ret &TcpAddr{
-            Ip: Ipv4.Addr(127, 0, 0, 1),
-            Port: port,
-        }
-    | Network.Udp | Network.Udp4:
-        ret &UdpAddr{
-            Ip: Ipv4.Addr(127, 0, 0, 1),
-            Port: port,
-        }
-    }
-    match net {
-    | Network.Tcp6:
-        mut addr := make([]byte, Ipv6.Len)
-        addr[len(addr)-1] = 1
-        ret &TcpAddr{
-            Ip: Ip{Addr: addr},
-            Port: port,
-        }
-    | Network.Udp6:
-        mut addr := make([]byte, Ipv6.Len)
-        addr[len(addr)-1] = 1
-        ret &UdpAddr{
-            Ip: Ip{Addr: addr},
-            Port: port,
-        }
-    |:
-        panic("implementation bug, this panic should be unreachable")
-    }
+	match net {
+	| Network.Tcp | Network.Tcp4:
+		ret &TcpAddr{
+			Ip: Ipv4.Addr(127, 0, 0, 1),
+			Port: port,
+		}
+	| Network.Udp | Network.Udp4:
+		ret &UdpAddr{
+			Ip: Ipv4.Addr(127, 0, 0, 1),
+			Port: port,
+		}
+	}
+	match net {
+	| Network.Tcp6:
+		mut addr := make([]byte, Ipv6.Len)
+		addr[len(addr)-1] = 1
+		ret &TcpAddr{
+			Ip: Ip{Addr: addr},
+			Port: port,
+		}
+	| Network.Udp6:
+		mut addr := make([]byte, Ipv6.Len)
+		addr[len(addr)-1] = 1
+		ret &UdpAddr{
+			Ip: Ip{Addr: addr},
+			Port: port,
+		}
+	|:
+		panic("implementation bug, this panic should be unreachable")
+	}
 }

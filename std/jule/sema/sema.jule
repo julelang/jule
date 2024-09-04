@@ -11,2906 +11,2906 @@ use types for std::jule::types
 use strings for std::strings::{StrBuilder}
 
 fn isValidModelForRef(mut &m: ExprModel): bool {
-    match type m {
-    | &Var:
-        ret true
-    | &StructSubIdentExprModel:
-        mut model := (&StructSubIdentExprModel)(m)
-        ret model.Field != nil && isValidModelForRef(model.Expr.Model)
-    | &UnaryExprModel:
-        mut unary := (&UnaryExprModel)(m)
-        if unary.Op.Id != TokenId.Star {
-            ret false
-        }
-        // Return true because of raw pointer dereferencing is an Unsafe Jule feature.
-        if unary.Expr.Kind.Ptr() != nil {
-            ret true
-        }
-        // Dereferencing should be smart pointer, otherwise return false.
-        if unary.Expr.Kind.Sptr() == nil {
-            ret false
-        }
-        ret isValidModelForRef(unary.Expr.Model)
-    | &IndexingExprModel:
-        mut indexing := (&IndexingExprModel)(m)
-        ret isValidModelForRef(indexing.Expr.Model)
-    |:
-        ret false
-    }
+	match type m {
+	| &Var:
+		ret true
+	| &StructSubIdentExprModel:
+		mut model := (&StructSubIdentExprModel)(m)
+		ret model.Field != nil && isValidModelForRef(model.Expr.Model)
+	| &UnaryExprModel:
+		mut unary := (&UnaryExprModel)(m)
+		if unary.Op.Id != TokenId.Star {
+			ret false
+		}
+		// Return true because of raw pointer dereferencing is an Unsafe Jule feature.
+		if unary.Expr.Kind.Ptr() != nil {
+			ret true
+		}
+		// Dereferencing should be smart pointer, otherwise return false.
+		if unary.Expr.Kind.Sptr() == nil {
+			ret false
+		}
+		ret isValidModelForRef(unary.Expr.Model)
+	| &IndexingExprModel:
+		mut indexing := (&IndexingExprModel)(m)
+		ret isValidModelForRef(indexing.Expr.Model)
+	|:
+		ret false
+	}
 }
 
 fn compilerErr(&token: &Token, line: bool, fmt: LogMsg, args: ...any): Log {
-    mut log := Log{
-        Kind: LogKind.Error,
-        Row: token.Row,
-        Column: token.Column,
-        Path: token.File.Path,
-        Text: Logf(fmt, args...),
-    }
-    if line {
-        log.Line = token.File.GetRow(token.Row)
-    }
-    ret log
+	mut log := Log{
+		Kind: LogKind.Error,
+		Row: token.Row,
+		Column: token.Column,
+		Path: token.File.Path,
+		Text: Logf(fmt, args...),
+	}
+	if line {
+		log.Line = token.File.GetRow(token.Row)
+	}
+	ret log
 }
 
 fn impIsLookupable(&i: &ImportInfo, &ident: str): bool {
-    if i.Binded {
-        ret false
-    }
-    if !i.ImportAll {
-        if len(i.Selected) > 0 {
-            ret i.existIdent(ident)
-        }
-    }
-    ret i.ImportAll
+	if i.Binded {
+		ret false
+	}
+	if !i.ImportAll {
+		if len(i.Selected) > 0 {
+			ret i.existIdent(ident)
+		}
+	}
+	ret i.ImportAll
 }
 
 fn appendRetVars(mut &dest: []&Var, mut &f: &FnIns) {
-    if f.Decl.IsVoid() || f.Result == nil {
-        ret
-    }
+	if f.Decl.IsVoid() || f.Result == nil {
+		ret
+	}
 
-    mut types := f.Types()
-    for (i, mut ident) in f.Decl.Result.Idents {
-        if IsIgnoreIdent(ident.Kind) || IsAnonIdent(ident.Kind) {
-            continue
-        }
-        dest = append(dest, &Var{
-            Used: true,
-            Mutable: true,
-            Ident: ident.Kind,
-            Token: ident,
-            Scope: f.Scope,
-            Kind: &TypeSymbol{
-                Kind: types[i],
-            },
-            Value: &Value{
-                Data: new(Data),
-            },
-            RetOrder: i,
-        })
-    }
-    if len(f.Decl.Result.Idents) == 1 && len(dest) == 1 {
-        dest[len(dest)-1].RetOrder = -1
-    }
+	mut types := f.Types()
+	for (i, mut ident) in f.Decl.Result.Idents {
+		if IsIgnoreIdent(ident.Kind) || IsAnonIdent(ident.Kind) {
+			continue
+		}
+		dest = append(dest, &Var{
+			Used: true,
+			Mutable: true,
+			Ident: ident.Kind,
+			Token: ident,
+			Scope: f.Scope,
+			Kind: &TypeSymbol{
+				Kind: types[i],
+			},
+			Value: &Value{
+				Data: new(Data),
+			},
+			RetOrder: i,
+		})
+	}
+	if len(f.Decl.Result.Idents) == 1 && len(dest) == 1 {
+		dest[len(dest)-1].RetOrder = -1
+	}
 }
 
 fn appendParamVars(mut &dest: []&Var, mut &f: &FnIns) {
-    if len(f.Params) == 0 {
-        ret
-    }
+	if len(f.Params) == 0 {
+		ret
+	}
 
-    for (_, mut p) in f.Params {
-        if IsIgnoreIdent(p.Decl.Ident) || IsAnonIdent(p.Decl.Ident) {
-            continue
-        }
+	for (_, mut p) in f.Params {
+		if IsIgnoreIdent(p.Decl.Ident) || IsAnonIdent(p.Decl.Ident) {
+			continue
+		}
 
-        mut v := &Var{
-            Used: true,
-            Reference: p.Decl.Reference,
-            Mutable: p.Decl.Mutable,
-            Ident: p.Decl.Ident,
-            Token: p.Decl.Token,
-            Kind: new(TypeSymbol),
-            Scope: f.Scope,
-            Value: &Value{
-                Data: new(Data),
-            },
-        }
+		mut v := &Var{
+			Used: true,
+			Reference: p.Decl.Reference,
+			Mutable: p.Decl.Mutable,
+			Ident: p.Decl.Ident,
+			Token: p.Decl.Token,
+			Kind: new(TypeSymbol),
+			Scope: f.Scope,
+			Value: &Value{
+				Data: new(Data),
+			},
+		}
 
-        match {
-        | p.Decl.IsSelf():
-            v.Kind.Kind = &TypeKind{
-                Variadic: false,
-                Kind: f.Owner,
-            }
-            v.Reference = !p.Decl.IsRef()
+		match {
+		| p.Decl.IsSelf():
+			v.Kind.Kind = &TypeKind{
+				Variadic: false,
+				Kind: f.Owner,
+			}
+			v.Reference = !p.Decl.IsRef()
 
-            if p.Decl.IsRef() {
-                v.Ident = v.Ident[1:] // Remove reference sign.
-                v.Kind.Kind.Kind = &Sptr{
-                    Elem: &TypeKind{
-                        BindIdent: v.Kind.Kind.BindIdent,
-                        Kind: v.Kind.Kind.Kind,
-                    },
-                }
-            }
-        | p.Decl.Variadic:
-            v.Kind.Kind = &TypeKind{
-                Variadic: false,
-                Kind: &Slc{
-                    Elem: &TypeKind{
-                        BindIdent: p.Kind.BindIdent,
-                        Kind: p.Kind.Kind,
-                    },
-                },
-            }
-        |:
-            v.Kind.Kind = p.Kind
-        }
+			if p.Decl.IsRef() {
+				v.Ident = v.Ident[1:] // Remove reference sign.
+				v.Kind.Kind.Kind = &Sptr{
+					Elem: &TypeKind{
+						BindIdent: v.Kind.Kind.BindIdent,
+						Kind: v.Kind.Kind.Kind,
+					},
+				}
+			}
+		| p.Decl.Variadic:
+			v.Kind.Kind = &TypeKind{
+				Variadic: false,
+				Kind: &Slc{
+					Elem: &TypeKind{
+						BindIdent: p.Kind.BindIdent,
+						Kind: p.Kind.Kind,
+					},
+				},
+			}
+		|:
+			v.Kind.Kind = p.Kind
+		}
 
-        dest = append(dest, v)
-    }
+		dest = append(dest, v)
+	}
 }
 
 // Builds type aliases for generic types of scope.
 // See developer reference (1), and (2).
 fn appendGenericTypeAliases(mut &dest: []&TypeAlias, mut &f: &FnIns) {
-    mut size := len(f.Generics)
-    if f.Decl.Owner != nil {
-        size += len(f.Decl.Owner.Generics)
-    }
+	mut size := len(f.Generics)
+	if f.Decl.Owner != nil {
+		size += len(f.Decl.Owner.Generics)
+	}
 
-    if size == 0 {
-        ret
-    }
+	if size == 0 {
+		ret
+	}
 
-    for (i, mut g) in f.Generics {
-        mut decl := f.Decl.Generics[i]
-        dest = append(dest, &TypeAlias{
-            Used: true,
-            Generic: true,
-            Scope: f.Decl.Scope,
-            Ident: decl.Ident,
-            Token: decl.Token,
-            Kind: &TypeSymbol{Kind: g.Kind},
-        })
-    }
+	for (i, mut g) in f.Generics {
+		mut decl := f.Decl.Generics[i]
+		dest = append(dest, &TypeAlias{
+			Used: true,
+			Generic: true,
+			Scope: f.Decl.Scope,
+			Ident: decl.Ident,
+			Token: decl.Token,
+			Kind: &TypeSymbol{Kind: g.Kind},
+		})
+	}
 
-    if f.Decl.Owner != nil {
-        mut owner := f.Owner
-        for (i, mut g) in owner.Generics {
-            mut decl := owner.Decl.Generics[i]
-            dest = append(dest, &TypeAlias{
-                Used: true,
-                Generic: true,
-                Scope: f.Decl.Scope,
-                Ident: decl.Ident,
-                Token: decl.Token,
-                Kind: &TypeSymbol{Kind: g.Kind},
-            })
-        }
-    }
+	if f.Decl.Owner != nil {
+		mut owner := f.Owner
+		for (i, mut g) in owner.Generics {
+			mut decl := owner.Decl.Generics[i]
+			dest = append(dest, &TypeAlias{
+				Used: true,
+				Generic: true,
+				Scope: f.Decl.Scope,
+				Ident: decl.Ident,
+				Token: decl.Token,
+				Kind: &TypeSymbol{Kind: g.Kind},
+			})
+		}
+	}
 }
 
 fn findFile(mut &files: []&SymbolTable, &handler: &File): &SymbolTable {
-    for (_, mut fl) in files {
-        if fl.File == handler {
-            ret fl
-        }
-    }
-    ret nil
+	for (_, mut fl) in files {
+		if fl.File == handler {
+			ret fl
+		}
+	}
+	ret nil
 }
 
 unsafe fn pushSuggestion(mut log: *Log, fmt: LogMsg, args: ...any) {
-    log.Suggestion = Logf(fmt, args...)
+	log.Suggestion = Logf(fmt, args...)
 }
 
 struct commonSemaMeta {
-    comptimeTypeInfos: []&comptimeTypeInfo
+	comptimeTypeInfos: []&comptimeTypeInfo
 }
 
 impl commonSemaMeta {
-    fn pushComptimeTypeInfo(mut self, mut &t: &TypeKind): &comptimeTypeInfo {
-        for (_, mut t2) in self.comptimeTypeInfos {
-            if t2.base.BindIdent == t.BindIdent && t2.base.Equal(t) {
-                ret t2
-            }
-        }
-        mut t1 := &comptimeTypeInfo{base: t}
-        self.comptimeTypeInfos = append(self.comptimeTypeInfos, t1)
-        ret t1
-    }
+	fn pushComptimeTypeInfo(mut self, mut &t: &TypeKind): &comptimeTypeInfo {
+		for (_, mut t2) in self.comptimeTypeInfos {
+			if t2.base.BindIdent == t.BindIdent && t2.base.Equal(t) {
+				ret t2
+			}
+		}
+		mut t1 := &comptimeTypeInfo{base: t}
+		self.comptimeTypeInfos = append(self.comptimeTypeInfos, t1)
+		ret t1
+	}
 }
 
 // Semantic analyzer for tables.
 // Accepts tables as files of package.
 struct Sema {
-    errors: []Log
-    files:  []&SymbolTable // Package files.
-    file:   &SymbolTable   // Current package file.
-    flags:  SemaFlag
-    meta:   &commonSemaMeta
+	errors: []Log
+	files:  []&SymbolTable // Package files.
+	file:   &SymbolTable   // Current package file.
+	flags:  SemaFlag
+	meta:   &commonSemaMeta
 }
 
 impl Lookup for Sema {
-    // Returns imported package by selector.
-    // Returns nil reference if selector returns false for all packages.
-    // Returns nil reference if selector is nil.
-    //
-    // Lookups:
-    //   - Current file's imported packages.
-    fn SelectPackage(mut self, selector: fn(&ImportInfo): bool): &ImportInfo {
-        ret self.file.SelectPackage(selector)
-    }
+	// Returns imported package by selector.
+	// Returns nil reference if selector returns false for all packages.
+	// Returns nil reference if selector is nil.
+	//
+	// Lookups:
+	//   - Current file's imported packages.
+	fn SelectPackage(mut self, selector: fn(&ImportInfo): bool): &ImportInfo {
+		ret self.file.SelectPackage(selector)
+	}
 
-    // Returns variable by identifier and binded state.
-    // Returns nil reference if not exist any variable in this identifier.
-    //
-    // Lookups:
-    //   - Package file's symbol table.
-    //   - Current file's public denifes of imported packages.
-    fn FindVar(mut self, ident: str, binded: bool): &Var {
-        // Lookup package files.
-        mut v := findVarInPackage(self.files, ident, binded)
-        if v != nil {
-            ret v
-        }
+	// Returns variable by identifier and binded state.
+	// Returns nil reference if not exist any variable in this identifier.
+	//
+	// Lookups:
+	//   - Package file's symbol table.
+	//   - Current file's public denifes of imported packages.
+	fn FindVar(mut self, ident: str, binded: bool): &Var {
+		// Lookup package files.
+		mut v := findVarInPackage(self.files, ident, binded)
+		if v != nil {
+			ret v
+		}
 
-        // If identifier is not public, it should be built-in or package define.
-        if !mod::IsPub(ident) {
-            ret nil
-        }
+		// If identifier is not public, it should be built-in or package define.
+		if !mod::IsPub(ident) {
+			ret nil
+		}
 
-        // Lookup current file's public denifes of imported packages.
-        for (_, mut imp) in self.file.Imports {
-            if !impIsLookupable(imp, ident) {
-                continue
-            }
-            v = imp.FindVar(ident, binded)
-            if v != nil && self.isAccessibleDefine(v.Public, v.Token) {
-                ret v
-            }
-        }
+		// Lookup current file's public denifes of imported packages.
+		for (_, mut imp) in self.file.Imports {
+			if !impIsLookupable(imp, ident) {
+				continue
+			}
+			v = imp.FindVar(ident, binded)
+			if v != nil && self.isAccessibleDefine(v.Public, v.Token) {
+				ret v
+			}
+		}
 
-        ret nil
-    }
+		ret nil
+	}
 
-    // Returns type alias by identifier and binded state.
-    // Returns nil reference if not exist any type alias in this identifier.
-    //
-    // Lookups:
-    //   - Package file's symbol table.
-    //   - Current file's public denifes of imported packages.
-    fn FindTypeAlias(mut self, ident: str, binded: bool): &TypeAlias {
-        // Lookup package files.
-        mut ta := findTypeAliasInPackage(self.files, ident, binded)
-        if ta != nil {
-            ret ta
-        }
+	// Returns type alias by identifier and binded state.
+	// Returns nil reference if not exist any type alias in this identifier.
+	//
+	// Lookups:
+	//   - Package file's symbol table.
+	//   - Current file's public denifes of imported packages.
+	fn FindTypeAlias(mut self, ident: str, binded: bool): &TypeAlias {
+		// Lookup package files.
+		mut ta := findTypeAliasInPackage(self.files, ident, binded)
+		if ta != nil {
+			ret ta
+		}
 
-        // If identifier is not public, it should be built-in or package define.
-        if !mod::IsPub(ident) {
-            ret nil
-        }
+		// If identifier is not public, it should be built-in or package define.
+		if !mod::IsPub(ident) {
+			ret nil
+		}
 
-        // Lookup current file's public denifes of imported packages.
-        for (_, mut imp) in self.file.Imports {
-            if !impIsLookupable(imp, ident) {
-                continue
-            }
-            ta = imp.FindTypeAlias(ident, binded)
-            if ta != nil && self.isAccessibleDefine(ta.Public, ta.Token) {
-                ret ta
-            }
-        }
+		// Lookup current file's public denifes of imported packages.
+		for (_, mut imp) in self.file.Imports {
+			if !impIsLookupable(imp, ident) {
+				continue
+			}
+			ta = imp.FindTypeAlias(ident, binded)
+			if ta != nil && self.isAccessibleDefine(ta.Public, ta.Token) {
+				ret ta
+			}
+		}
 
-        ret nil
-    }
+		ret nil
+	}
 
-    // Returns struct by identifier and binded state.
-    // Returns nil reference if not exist any struct in this identifier.
-    //
-    // Lookups:
-    //   - Package file's symbol table.
-    //   - Current file's public denifes of imported packages.
-    fn FindStruct(mut self, ident: str, binded: bool): &Struct {
-        // Lookup package files.
-        mut s := findStructInPackage(self.files, ident, binded)
-        if s != nil {
-            ret s
-        }
+	// Returns struct by identifier and binded state.
+	// Returns nil reference if not exist any struct in this identifier.
+	//
+	// Lookups:
+	//   - Package file's symbol table.
+	//   - Current file's public denifes of imported packages.
+	fn FindStruct(mut self, ident: str, binded: bool): &Struct {
+		// Lookup package files.
+		mut s := findStructInPackage(self.files, ident, binded)
+		if s != nil {
+			ret s
+		}
 
-        // If identifier is not public, it should be built-in or package define.
-        if !mod::IsPub(ident) {
-            ret nil
-        }
+		// If identifier is not public, it should be built-in or package define.
+		if !mod::IsPub(ident) {
+			ret nil
+		}
 
-        // Lookup current file's public denifes of imported packages.
-        for (_, mut imp) in self.file.Imports {
-            if !impIsLookupable(imp, ident) {
-                continue
-            }
-            s = imp.FindStruct(ident, binded)
-            if s != nil && self.isAccessibleDefine(s.Public, s.Token) {
-                ret s
-            }
-        }
-        ret nil
-    }
+		// Lookup current file's public denifes of imported packages.
+		for (_, mut imp) in self.file.Imports {
+			if !impIsLookupable(imp, ident) {
+				continue
+			}
+			s = imp.FindStruct(ident, binded)
+			if s != nil && self.isAccessibleDefine(s.Public, s.Token) {
+				ret s
+			}
+		}
+		ret nil
+	}
 
-    // Returns function by identifier and binded state.
-    // Returns nil reference if not exist any function in this identifier.
-    //
-    // Lookups:
-    //   - Package file's symbol table.
-    //   - Current file's public denifes of imported packages.
-    fn FindFn(mut self, ident: str, binded: bool): &Fn {
-        // Lookup package files.
-        mut f := findFnInPackage(self.files, ident, binded)
-        if f != nil {
-            ret f
-        }
+	// Returns function by identifier and binded state.
+	// Returns nil reference if not exist any function in this identifier.
+	//
+	// Lookups:
+	//   - Package file's symbol table.
+	//   - Current file's public denifes of imported packages.
+	fn FindFn(mut self, ident: str, binded: bool): &Fn {
+		// Lookup package files.
+		mut f := findFnInPackage(self.files, ident, binded)
+		if f != nil {
+			ret f
+		}
 
-        // If identifier is not public, it should be built-in or package define.
-        if !mod::IsPub(ident) {
-            ret nil
-        }
+		// If identifier is not public, it should be built-in or package define.
+		if !mod::IsPub(ident) {
+			ret nil
+		}
 
-        // Lookup current file's public denifes of imported packages.
-        for (_, mut imp) in self.file.Imports {
-            if !impIsLookupable(imp, ident) {
-                continue
-            }
-            f = imp.FindFn(ident, binded)
-            if f != nil && self.isAccessibleDefine(f.Public, f.Token) {
-                ret f
-            }
-        }
+		// Lookup current file's public denifes of imported packages.
+		for (_, mut imp) in self.file.Imports {
+			if !impIsLookupable(imp, ident) {
+				continue
+			}
+			f = imp.FindFn(ident, binded)
+			if f != nil && self.isAccessibleDefine(f.Public, f.Token) {
+				ret f
+			}
+		}
 
-        ret nil
-    }
+		ret nil
+	}
 
-    // Returns trait by identifier.
-    // Returns nil reference if not exist any trait in this identifier.
-    //
-    // Lookups:
-    //   - Package file's symbol table.
-    //   - Current file's public denifes of imported packages.
-    fn FindTrait(mut self, ident: str): &Trait {
-        // Lookup package files.
-        mut t := findTraitInPackage(self.files, ident)
-        if t != nil {
-            ret t
-        }
+	// Returns trait by identifier.
+	// Returns nil reference if not exist any trait in this identifier.
+	//
+	// Lookups:
+	//   - Package file's symbol table.
+	//   - Current file's public denifes of imported packages.
+	fn FindTrait(mut self, ident: str): &Trait {
+		// Lookup package files.
+		mut t := findTraitInPackage(self.files, ident)
+		if t != nil {
+			ret t
+		}
 
-        // If identifier is not public, it should be built-in or package define.
-        if !mod::IsPub(ident) {
-            ret nil
-        }
+		// If identifier is not public, it should be built-in or package define.
+		if !mod::IsPub(ident) {
+			ret nil
+		}
 
-        // Lookup current file's public denifes of imported packages.
-        for (_, mut imp) in self.file.Imports {
-            if !impIsLookupable(imp, ident) {
-                continue
-            }
-            t = imp.FindTrait(ident)
-            if t != nil && self.isAccessibleDefine(t.Public, t.Token) {
-                ret t
-            }
-        }
+		// Lookup current file's public denifes of imported packages.
+		for (_, mut imp) in self.file.Imports {
+			if !impIsLookupable(imp, ident) {
+				continue
+			}
+			t = imp.FindTrait(ident)
+			if t != nil && self.isAccessibleDefine(t.Public, t.Token) {
+				ret t
+			}
+		}
 
-        ret nil
-    }
+		ret nil
+	}
 
-    // Returns enum by identifier.
-    // Returns nil reference if not exist any enum in this identifier.
-    //
-    // Lookups:
-    //   - Package file's symbol table.
-    //   - Current file's public denifes of imported packages.
-    fn FindEnum(mut self, ident: str): &Enum {
-        // Lookup package files.
-        mut e := findEnumInPackage(self.files, ident)
-        if e != nil {
-            ret e
-        }
+	// Returns enum by identifier.
+	// Returns nil reference if not exist any enum in this identifier.
+	//
+	// Lookups:
+	//   - Package file's symbol table.
+	//   - Current file's public denifes of imported packages.
+	fn FindEnum(mut self, ident: str): &Enum {
+		// Lookup package files.
+		mut e := findEnumInPackage(self.files, ident)
+		if e != nil {
+			ret e
+		}
 
-        // If identifier is not public, it should be built-in or package define.
-        if !mod::IsPub(ident) {
-            ret nil
-        }
+		// If identifier is not public, it should be built-in or package define.
+		if !mod::IsPub(ident) {
+			ret nil
+		}
 
-        // Lookup current file's public denifes of imported packages.
-        for (_, mut imp) in self.file.Imports {
-            if !impIsLookupable(imp, ident) {
-                continue
-            }
-            e = imp.FindEnum(ident)
-            if e != nil && self.isAccessibleDefine(e.Public, e.Token) {
-                ret e
-            }
-        }
+		// Lookup current file's public denifes of imported packages.
+		for (_, mut imp) in self.file.Imports {
+			if !impIsLookupable(imp, ident) {
+				continue
+			}
+			e = imp.FindEnum(ident)
+			if e != nil && self.isAccessibleDefine(e.Public, e.Token) {
+				ret e
+			}
+		}
 
-        ret nil
-    }
+		ret nil
+	}
 
-    // Returns type enum by identifier.
-    // Returns nil reference if not exist any type enum in this identifier.
-    //
-    // Lookups:
-    //   - Package file's symbol table.
-    //   - Current file's public denifes of imported packages.
-    fn FindTypeEnum(mut self, ident: str): &TypeEnum {
-        // Lookup package files.
-        mut e := findTypeEnumInPackage(self.files, ident)
-        if e != nil {
-            ret e
-        }
+	// Returns type enum by identifier.
+	// Returns nil reference if not exist any type enum in this identifier.
+	//
+	// Lookups:
+	//   - Package file's symbol table.
+	//   - Current file's public denifes of imported packages.
+	fn FindTypeEnum(mut self, ident: str): &TypeEnum {
+		// Lookup package files.
+		mut e := findTypeEnumInPackage(self.files, ident)
+		if e != nil {
+			ret e
+		}
 
-        // If identifier is not public, it should be built-in or package define.
-        if !mod::IsPub(ident) {
-            ret nil
-        }
+		// If identifier is not public, it should be built-in or package define.
+		if !mod::IsPub(ident) {
+			ret nil
+		}
 
-        // Lookup current file's public denifes of imported packages.
-        for (_, mut imp) in self.file.Imports {
-            if !impIsLookupable(imp, ident) {
-                continue
-            }
-            e = imp.FindTypeEnum(ident)
-            if e != nil && self.isAccessibleDefine(e.Public, e.Token) {
-                ret e
-            }
-        }
+		// Lookup current file's public denifes of imported packages.
+		for (_, mut imp) in self.file.Imports {
+			if !impIsLookupable(imp, ident) {
+				continue
+			}
+			e = imp.FindTypeEnum(ident)
+			if e != nil && self.isAccessibleDefine(e.Public, e.Token) {
+				ret e
+			}
+		}
 
-        ret nil
-    }
+		ret nil
+	}
 }
 
 impl Sema {
-    // Reports whether flags has given flag.
-    fn isFlag(self, flags: SemaFlag): bool { ret self.flags&flags == flags }
-
-    fn setCurrentFile(mut self, mut f: &SymbolTable) { self.file = f }
-
-    fn pushErr(mut self, token: &Token, fmt: LogMsg, args: ...any) {
-        self.errors = append(self.errors, compilerErr(token, true, fmt, args...))
-    }
-
-    // Push suggestion to last log.
-    fn pushSuggestion(mut self, fmt: LogMsg, args: ...any) {
-        unsafe { pushSuggestion(&self.errors[len(self.errors)-1], fmt, args...) }
-    }
-
-    // Reports whether define is accessible in the current package.
-    fn isAccessibleDefine(self, public: bool, token: &Token): bool {
-        ret public || token.File == nil || self.file.File.Dir() == token.File.Dir()
-    }
-
-    // Reports this identifier duplicated in package's global scope.
-    // The "self" parameter represents address of exception identifier.
-    // If founded identifier address equals to self, will be skipped.
-    fn isDuplicatedIdent(self, itself: uintptr, &ident: str, binded: bool): bool {
-        for _, f in self.files {
-            if f.isDuplicatedIdent(itself, ident, binded) {
-                ret true
-            }
-
-            for _, imp in f.Imports {
-                for _, selected in imp.Selected {
-                    if selected.Kind == ident {
-                        ret true
-                    }
-                }
-            }
-        }
-        ret false
-    }
-
-    fn checkDirectives(mut &self, mut &d: []&ast::Directive, mut o: any) {
-        mut dc := directiveChecker{
-            s: self,
-            d: unsafe { (&[]&ast::Directive)(&d) },
-            o: o,
-        }
-        dc.check()
-    }
-
-    fn checkGenericQuantity(mut self, required: int, given: int, token: &Token): (ok: bool) {
-        match {
-        | required == 0 && given > 0:
-            self.pushErr(token, LogMsg.NotHasGenerics)
-            ret false
-        | required > 0 && given == 0:
-            self.pushErr(token, LogMsg.HasGenerics)
-            ret false
-        | required < given:
-            self.pushErr(token, LogMsg.GenericsOverflow)
-            ret false
-        | required > given:
-            self.pushErr(token, LogMsg.MissingGenerics)
-            ret false
-        |:
-            ret true
-        }
-    }
-
-    fn isDuplicatedImportSelection(self, itself: uintptr, &ident: str): bool {
-        for _, imp in self.file.Imports {
-            if uintptr(imp) == itself {
-                // Don't scan trailing imports.
-                break
-            }
-            if imp.existIdent(ident) {
-                ret true
-            }
-        }
-        ret false
-    }
-
-    fn getImportDef(self, &ident: str, mut &imp: &ImportInfo): any {
-        if findPackageBuiltinDef(imp.LinkPath, ident) != nil {
-            ret true
-        }
-        for (_, mut f) in imp.Package.Files {
-            // Binded defines can't export.
-            const Binded = false
-            mut def := f.defByIdent(ident, Binded)
-            if def != nil {
-                ret def
-            }
-        }
-        ret nil
-    }
-
-    fn checkImportSelection[T](mut self, &ident: &Token, &s: T): bool {
-        if !self.isAccessibleDefine(s.Public, s.Token) {
-            self.pushErr(ident, LogMsg.IdentIsNotAccessible, ident.Kind)
-            self.pushSuggestion(LogMsg.MakePubToAccess)
-            ret false
-        }
-        const Binded = false // Exported defines cannot be binded.
-        if defByIdentPackage(self.files, s.Ident, Binded) != nil {
-            self.pushErr(ident, LogMsg.SelectedImportExistInPackage, s.Ident)
-            ret false
-        }
-        ret true
-    }
-
-    fn checkImportSelectedSelections(mut self, mut &imp: &ImportInfo): (ok: bool) {
-        ok = true
-        for _, ident in imp.Selected {
-            if ident.Kind == TokenKind.Self {
-                continue
-            }
-
-            if self.isDuplicatedImportSelection(uintptr(imp), ident.Kind) {
-                self.pushErr(ident, LogMsg.DuplicatedIdent, ident.Kind)
-                self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
-                ok = false
-                continue
-            }
-
-            mut def := self.getImportDef(ident.Kind, imp)
-            match type def {
-            | bool:
-                // Pass, built-in.
-                continue
-            | &Var:
-                mut v := (&Var)(def)
-                ok = self.checkImportSelection(ident, v) && ok
-            | &TypeAlias:
-                mut ta := (&TypeAlias)(def)
-                ok = self.checkImportSelection(ident, ta) && ok
-            | &Struct:
-                mut s := (&Struct)(def)
-                ok = self.checkImportSelection(ident, s) && ok
-            | &Trait:
-                mut t := (&Trait)(def)
-                ok = self.checkImportSelection(ident, t) && ok
-            | &Enum:
-                mut e := (&Enum)(def)
-                ok = self.checkImportSelection(ident, e) && ok
-            | &TypeEnum:
-                mut e := (&TypeEnum)(def)
-                ok = self.checkImportSelection(ident, e) && ok
-            | &Fn:
-                mut f := (&Fn)(def)
-                ok = self.checkImportSelection(ident, f) && ok
-            |:
-                self.pushErr(ident, LogMsg.IdentNotExist, ident.Kind)
-                ok = false
-                continue
-            }
-        }
-        ret
-    }
-
-    fn checkImportsAllSelectionsFromCollection[T](mut self, &s: []T, &et: &Token): bool {
-        mut ok := true
-        for _, d in s {
-            if d.Public {
-                ok = self.checkImportSelection(et, d) && ok
-            }
-        }
-        ret ok
-    }
-
-    fn checkImportAllSelections(mut self, &imp: &ImportInfo): (ok: bool) {
-        ok = true
-        for _, file in imp.Package.Files {
-            ok = self.checkImportsAllSelectionsFromCollection(file.Vars, imp.Token) && ok
-            ok = self.checkImportsAllSelectionsFromCollection(file.TypeAliases, imp.Token) && ok
-            ok = self.checkImportsAllSelectionsFromCollection(file.Structs, imp.Token) && ok
-            ok = self.checkImportsAllSelectionsFromCollection(file.Funcs, imp.Token) && ok
-            ok = self.checkImportsAllSelectionsFromCollection(file.Traits, imp.Token) && ok
-            ok = self.checkImportsAllSelectionsFromCollection(file.Enums, imp.Token) && ok
-            ok = self.checkImportsAllSelectionsFromCollection(file.TypeEnums, imp.Token) && ok
-        }
-        ret
-    }
-
-    fn checkImportSelections(mut self, mut &imp: &ImportInfo): (ok: bool) {
-        if len(imp.Selected) > 0 {
-            ret self.checkImportSelectedSelections(imp)
-        } else if imp.ImportAll {
-            ret self.checkImportAllSelections(imp)
-        }
-        ret true
-    }
-
-    fn isUseAliasDuplication(mut self, &imp: &ImportInfo): bool {
-        for (_, mut imp2) in self.file.Imports {
-            if imp2 == imp {
-                break
-            }
-            if imp2.Alias == imp.Alias {
-                ret true
-            }
-            // Catch identifiers of other use declarations.
-            if imp2.Ident == imp2.LinkPath && imp2.Ident == imp.Alias {
-                ret true
-            }
-        }
-        ret false
-    }
-
-    fn checkImport(mut self, mut &imp: &ImportInfo): bool {
-        if imp.Binded || len(imp.Package.Files) == 0 {
-            ret true
-        }
-
-        // Check special cases for std::unsafe.
-        if imp.LinkPath == "std::unsafe" {
-            if imp.ImportAll || imp.Alias != "" || len(imp.Selected) > 0 {
-                self.pushErr(imp.Token, LogMsg.ExpectedPlainUseDecl, "use std::unsafe")
-                ret false
-            }
-        }
-
-        if len(imp.Alias) != 0 {
-            if IsIgnoreIdent(imp.Alias) {
-                self.pushErr(imp.Token, LogMsg.IgnoreIdent)
-            } else if self.isUseAliasDuplication(imp) {
-                self.pushErr(imp.Token, LogMsg.DuplicatedUseAlias, imp.Alias)
-                self.pushSuggestion(LogMsg.RenameUseAliasAvoidDuplication)
-            }
-        }
-
-        if !imp.Duplicate {
-            mut sema := &Sema{
-                flags: self.flags,
-                meta: self.meta,
-            }
-            sema.check(imp.Package.Files)
-            if len(sema.errors) != 0 {
-                self.errors = append(self.errors, sema.errors...)
-                sema.errors = nil
-                ret false
-            }
-        }
-        ret self.checkImportSelections(imp)
-    }
-
-    fn checkImports(mut self) {
-        for (_, mut file) in self.files {
-            self.setCurrentFile(file)
-            for (_, mut imp) in file.Imports {
-                ok := self.checkImport(imp)
-                // Break checking if package has error.
-                if !ok {
-                    ret
-                }
-            }
-        }
-    }
-
-    fn implFileImpls(mut &self) {
-        for (_, mut imp) in self.file.Impls {
-            self.implImpl(imp)
-        }
-    }
-
-    fn implImpls(mut &self) {
-        for (_, mut file) in self.files {
-            self.setCurrentFile(file)
-            self.implFileImpls()
-        }
-    }
-
-    fn checkEnums(mut &self) {
-        for (_, mut file) in self.files {
-            self.setCurrentFile(file)
-            match {
-            | !self.checkEnumDecls():
-            | !self.checkTypeEnumDecls():
-            }
-        }
-    }
-
-    fn checkFileInherits(mut &self) {
-        for (_, mut t) in self.file.Traits {
-            ok := self._checkTraitDeclInherits(t)
-            if !ok {
-                ret
-            }
-        }
-    }
-
-    fn checkInherits(mut &self) {
-        for (_, mut file) in self.files {
-            self.setCurrentFile(file)
-            self.checkFileInherits()
-        }
-    }
-
-    fn typeChecker(mut &self, mut l: Lookup, mut generics: []&TypeAlias,
-        mut referencer: &referencer): typeChecker {
-        mut tc := typeChecker{
-            s: self,
-            rootLookup: l,
-            lookup: l,
-            referencer: referencer,
-            useGenerics: generics,
-        }
-        match type l {
-        | &scopeChecker:
-            mut hard := (&scopeChecker)(l).getHardRoot()
-            tc.refers = hard.owner.Refers
-        }
-        // referencer's refs field is not nil if owner is type alias.
-        if referencer != nil && referencer.refs != nil {
-            // Set owner alias field of TypeChecker to collect generic dependencies.
-            // See developer reference (4).
-            match type referencer.owner {
-            | &TypeAlias:
-                tc.ownerAlias = (&TypeAlias)(referencer.owner)
-            }
-        }
-        ret tc
-    }
-
-    // Builds type, builds result as kind and collects referred type aliases.
-    fn buildTypeWithRefers(mut &self, mut &t: &ast::TypeDecl, mut l: Lookup,
-        mut generics: []&TypeAlias, mut referencer: &referencer): &TypeKind {
-        ret self.typeChecker(l, generics, referencer).checkDecl(t)
-    }
-
-    // Checks type, builds result as kind and collects referred type aliases.
-    // Skips already checked types.
-    fn checkTypeWithRefers(mut &self, mut &t: &TypeSymbol, mut l: Lookup,
-        mut generics: []&TypeAlias, mut referencer: &referencer): (ok: bool) {
-        if t.checked() {
-            ret true
-        }
-        t.Kind = self.buildTypeWithRefers(t.Decl, l, generics, referencer)
-        ret t.checked()
-    }
-
-    fn constraintChecker(mut &self): &constraintChecker {
-        ret &constraintChecker{s: self}
-    }
-
-    // Checks type and builds result as kind.
-    // Skips already checked types.
-    fn checkType(mut &self, mut &t: &TypeSymbol, mut l: Lookup): bool {
-        ret self.checkTypeWithRefers(t, l, nil, nil)
-    }
-
-    // Builds type with type aliases for generics.
-    // Returns nil if error occur or failed.
-    fn buildTypeWithGenerics(mut &self, mut &t: &ast::TypeDecl,
-        mut generics: []&TypeAlias, mut refers: &ReferenceStack): &TypeKind {
-        mut tc := &typeChecker{
-            s: self,
-            rootLookup: self,
-            lookup: self,
-            useGenerics: generics,
-            refers: refers,
-        }
-        ret tc.checkDecl(t)
-    }
-
-    // Same as self.buildTypeWithGenerics but not uses any generics.
-    fn buildType(mut &self, mut &t: &ast::TypeDecl): &TypeKind {
-        ret self.buildTypeWithGenerics(t, nil, nil)
-    }
-
-    // Select type with name selection.
-    fn selectType(mut &self, mut &t: &ast::TypeDecl): &TypeKind {
-        mut tc := &typeChecker{
-            s: self,
-            rootLookup: self,
-            lookup: self,
-            selection: true,
-        }
-        ret tc.checkDecl(t)
-    }
-
-    // Returns Eval instance for configuration with
-    // type prefix and checks var dependencies.
-    fn evalpd(mut &self, mut l: Lookup, mut p: &TypeKind, mut owner: &Var): &Eval {
-        mut e := &Eval{
-            s: self,
-            lookup: l,
-            owner: owner,
-        }
-        match type l {
-        | &scopeChecker:
-            e.unsafety = (&scopeChecker)(l).isUnsafe()
-        }
-        e.prefix = p
-        ret e
-    }
-
-    // Returns Eval instance for configuration with type prefix.
-    fn evalp(mut &self, mut l: Lookup, mut p: &TypeKind): &Eval {
-        ret self.evalpd(l, p, nil)
-    }
-
-    // Returns Eval instance for configuration.
-    fn eval(mut &self, mut l: Lookup): &Eval {
-        ret self.evalp(l, nil)
-    }
-
-    fn checkAssignType(mut &self, destIsRef: bool, mut &dest: &TypeKind,
-        mut &d: &Data, mut errorToken: &Token): bool {
-        if d.Decl {
-            self.pushErr(errorToken, LogMsg.InvalidExpr)
-            ret false
-        }
-        if destIsRef {
-            if !dest.Equal(d.Kind) {
-                self.pushErr(errorToken, LogMsg.IncompatibleTypes, dest.Str(), d.Kind.Str())
-                ret false
-            }
-        } else {
-            mut atc := &assignTypeChecker{
-                s: self,
-                errorToken: errorToken,
-                dest: dest,
-                d: d,
-            }
-            ok := atc.check()
-            if !ok {
-                ret false
-            }
-        }
-
-        if !d.IsConst() || dest.Prim() == nil {
-            ret true
-        }
-
-        mut kind := dest.Prim().Kind
-
-        match {
-        | types::IsSigInt(kind):
-            d.Constant.SetI64(d.Constant.AsI64())
-        | types::IsUnsigInt(kind):
-            d.Constant.SetU64(d.Constant.AsU64())
-        | types::IsFloat(kind):
-            d.Constant.SetF64(d.Constant.AsF64())
-        }
-
-        ret true
-    }
-
-    fn _checkTypeCompatibility(mut &self, mut &dest: &TypeKind, mut &src: &TypeKind,
-        mut errorToken: &Token): bool {
-        if src == nil {
-            ret false
-        }
-        // Tuple to single type, always fails.
-        if src.Tup() != nil {
-            ret false
-        }
-        mut tcc := typeCompatibilityChecker{
-            s: self,
-            errorToken: errorToken,
-            dest: dest,
-            src: src,
-        }
-        ret tcc.check()
-    }
-
-    fn checkTypeCompatibility(mut &self, mut &dest: &TypeKind,
-        mut &src: &TypeKind, mut &errorToken: &Token): bool {
-        if self._checkTypeCompatibility(dest, src, errorToken) {
-            ret true
-        }
-        self.pushErr(errorToken, LogMsg.IncompatibleTypes, dest.Str(), src.Str())
-        ret false
-    }
-
-    fn pushCompatiblityError(mut self, mut &dest: &TypeKind, mut &src: &Data,
-        mut &errorToken: &Token) {
-        if src.untyped {
-            match {
-            | src.Constant.IsI64():
-                self.pushErr(errorToken, LogMsg.IncompatibleTypes, dest.Str(), "untyped integer")
-                ret
-            | src.Constant.IsU64():
-                self.pushErr(errorToken, LogMsg.IncompatibleTypes, dest.Str(), "untyped unsigned integer")
-                ret
-            | src.Constant.IsF64():
-                self.pushErr(errorToken, LogMsg.IncompatibleTypes, dest.Str(), "untyped float")
-                ret
-            }
-        }
-        self.pushErr(errorToken, LogMsg.IncompatibleTypes, dest.Str(), src.Kind.Str())
-    }
-
-    fn checkTypeCompatibility1(mut &self, mut &dest: &TypeKind, mut &src: &Data,
-        mut &errorToken: &Token): bool {
-        if self._checkTypeCompatibility(dest, src.Kind, errorToken) {
-            ret true
-        }
-        self.pushCompatiblityError(dest, src, errorToken)
-        ret false
-    }
-
-    // Builds non-generic types but skips generic types.
-    // Builds generic identifiers as primitive type.
-    //
-    // Useful:
-    //   - For non-generic type parsed string type kinds.
-    //   - For checking non-generic types.
-    fn buildNonGenericTypeKind(mut &self, mut &ast: &ast::TypeDecl,
-        mut &generics: []&ast::GenericDecl, mut &ignored: []&TypeKind): &TypeKind {
-        mut tc := &typeChecker{
-            s: self,
-            rootLookup: self,
-            lookup: self,
-            ignoreGenerics: generics,
-            ignoredGenerics: &ignored,
-        }
-        ret tc.checkDecl(ast)
-    }
-
-    fn buildFnNonGenericTypeKinds(mut &self, mut &f: &FnIns, mut &ignored: []&TypeKind): (ok: bool) {
-        ok = true
-        let mut generics: []&ast::GenericDecl = nil
-        if f.Decl.IsMethod() {
-            generics = append(f.Decl.Generics, f.Decl.Owner.Generics...)
-        } else {
-            generics = f.Decl.Generics
-        }
-
-        for (_, mut p) in f.Params {
-            if !p.Decl.IsSelf() {
-                p.Kind = self.buildNonGenericTypeKind(p.Decl.Kind.Decl, generics, ignored)
-                ok = ok && p.Kind != nil
-            }
-        }
-        if !f.Decl.IsVoid() {
-            f.Result = self.buildNonGenericTypeKind(f.Decl.Result.Kind.Decl, generics, ignored)
-            ok = ok && f.Result != nil
-        }
-        ret
-    }
-
-    fn getTraitCheckFnKind(mut &self, mut &f: &Fn): &FnIns {
-        if len(f.Instances) == 1 {
-            ret f.Instances[0]
-        }
-        mut ins := f.instanceForce()
-
-        mut tc := &typeChecker{
-            s: self,
-            rootLookup: self,
-            lookup: self,
-        }
-        for (_, mut p) in ins.Params {
-            if !p.Decl.IsSelf() {
-                p.Kind = tc.checkDecl(p.Decl.Kind.Decl)
-            }
-        }
-        if !f.IsVoid() {
-            ins.Result = tc.checkDecl(f.Result.Kind.Decl)
-        }
-
-        ret ins
-    }
-
-    fn checkConstraintsFn(mut &self, mut &f: &FnIns, mut &et: &Token, mut exist: &FnIns): bool {
-        mut cc := self.constraintChecker()
-        cc.et = et
-        cc.fi = f
-        if exist != nil {
-            for (i, mut g) in exist.Generics {
-                f.Generics[i].Constraint = g.Constraint
-            }
-        } else {
-            cc.uniq = true
-        }
-        ret cc.check()
-    }
-
-    fn checkConstraintsStruct(mut &self, mut &s: &StructIns, mut &et: &Token, mut exist: &StructIns): bool {
-        mut cc := self.constraintChecker()
-        cc.et = et
-        cc.si = s
-        if exist != nil {
-            for (i, mut g) in exist.Generics {
-                s.Generics[i].Constraint = g.Constraint
-            }
-        } else {
-            cc.uniq = true
-        }
-        ret cc.check()
-    }
-
-    // Call algo in the function's native environment.
-    // Errors will be handled.
-    // Returns result of algo.
-    fn fnEnvironment(mut &self, mut &f: &FnIns, algo: fn(mut &sema: &Sema, mut &generics: []&TypeAlias): bool): bool {
-        mut sema := f.Decl.sema
-        mut old := f.Decl.sema.file
-        defer { f.Decl.sema.setCurrentFile(old) }
-        mut file := findFile(f.Decl.sema.files, f.Decl.Token.File)
-        if file != nil {
-            f.Decl.sema.setCurrentFile(file)
-        }
-
-        mut size := len(f.Generics)
-        if f.Decl != nil && f.Decl.Owner != nil {
-            size += len(f.Decl.Owner.Generics)
-        }
-
-        mut generics := make([]&TypeAlias, 0, size)
-        appendGenericTypeAliases(generics, f)
-
-        ok := algo(sema, generics)
-
-        if sema != self {
-            self.errors = append(self.errors, sema.errors...)
-            sema.errors = nil
-        }
-
-        ret ok
-    }
-
-    fn checkFnParamKind(mut &self, mut &p: &ParamIns) {
-        p.Kind.Variadic = p.Decl.Variadic
-        if p.Decl.Reference && !isValidForRef(p.Kind) {
-            self.pushErr(p.Decl.Token, LogMsg.RefPointsToInvalidType, p.Kind.Str())
-        }
-    }
-
-    fn reloadFnInsTypes(mut &self, mut f: &FnIns): bool {
-        if f.IsBuiltin() || f.IsAnon() {
-            ret true
-        }
-        ret self.fnEnvironment(f, fn(mut &sema: &Sema, mut &generics: []&TypeAlias): bool {
-            mut ok := true
-            for (_, mut p) in f.Params {
-                if p.Decl.IsSelf() {
-                    if p.Decl.IsRef() {
-                        p.Kind = &TypeKind{
-                            Kind: &Sptr{
-                                Elem: &TypeKind{
-                                    Kind: f.Owner,
-                                },
-                            },
-                        }
-                    } else {
-                        p.Kind = &TypeKind{Kind: f.Owner}
-                    }
-                } else {
-                    p.Kind = sema.buildTypeWithGenerics(p.Decl.Kind.Decl, generics, f.Refers)
-                    if p.Kind != nil {
-                        self.checkFnParamKind(p)
-                    } else {
-                        ok = false
-                    }
-                }
-            }
-            if !f.Decl.IsVoid() {
-                f.Result = sema.buildTypeWithGenerics(f.Decl.Result.Kind.Decl, generics, f.Refers)
-                ok = f.Result != nil && ok
-            }
-            ret ok
-        })
-    }
-
-    fn checkRefValidityForInitExpr(mut &self, leftMut: bool, mut &d: &Data, mut &errorToken: &Token): bool {
-        if !isValidModelForRef(d.Model) {
-            self.pushErr(errorToken, LogMsg.RefAssignNonVar)
-            ret false
-        }
-        if leftMut && !d.Mutable {
-            self.pushErr(errorToken, LogMsg.MutRefPointsImmut)
-            ret false
-        }
-        ret true
-    }
-
-    // Reports whether struct is risky for mutability.
-    // Designed for copy assignments.
-    // It will not check mutability risk of the internal mutable data or etc.
-    // It will check interior mutability risk of the new copy.
-    // Assumes the assigned memory is mutable.
-    fn isMutRiskyStruct(self, &s: &StructIns): bool {
-        for _, f in s.Fields {
-            // Inerior mutability enables to copy internal mutable data with safety.
-            // If field is interior mutable and their kind is mutable,
-            // check whether the field accessible. If field is not accessible,
-            // there is no problem, because no risk for mutability.
-            //
-            // For example:
-            //  We have a Foo struct. The Foo struct have the x field which is
-            //  interior mutable with mutable kind. So the following code is risky:
-            //
-            //    a := Foo{}
-            //    mut b := a
-            //
-            //  The example code above will create new copy of variable a, which is
-            //  instance of struct Foo. If the field x is accessible, the variable
-            //  b can mutate it, since it is mutable and can access to field x.
-            //  Therefore, copying interior mutable fields with mutable kind
-            //  must be disallowed if field is accessible for safety reasons.
-            if f.Decl.Mutable && f.Kind.Mutable() &&
-                self.isAccessibleDefine(f.Decl.Public, f.Decl.Token) {
-                ret true
-            }
-        }
-        ret false
-    }
-
-    fn checkValidityForInitExpr(mut &self, leftMut: bool, leftRef: bool,
-        &leftKind: &TypeKind, mut &d: &Data, mut &errorToken: &Token): bool {
-        if leftMut && !d.Mutable {
-            // Check classical assignment mutability.
-            if d.Kind.Mutable() {
-                self.pushErr(errorToken, LogMsg.AssignNonMutToMut, d.Kind.Str())
-                ret false
-            }
-            // Check interior mutability risk for the struct copy.
-            s := d.Kind.Struct()
-            if s != nil && self.isMutRiskyStruct(s) {
-                self.pushErr(errorToken, LogMsg.CopyWithMutableData, d.Kind.Str())
-                ret false
-            }
-        }
-        if leftRef {
-            if !self.checkRefValidityForInitExpr(leftMut, d, errorToken) {
-                ret false
-            }
-        }
-        mut atc := &assignTypeChecker{
-            s: self,
-            d: d,
-            errorToken: errorToken,
-        }
-        ret atc.checkValidity()
-    }
-
-    fn checkTypeAliasDeclKind(mut &self, mut &ta: &TypeAlias, mut l: Lookup): (ok: bool) {
-        mut old := self.file
-        defer {
-            self.setCurrentFile(old)
-        }
-        if ta.Token != nil {
-            mut file := findFile(self.files, ta.Token.File)
-            if file != nil {
-                self.setCurrentFile(file)
-            }
-        }
-        ok = self.checkTypeWithRefers(ta.Kind, l, nil, &referencer{
-            ident: ta.Ident,
-            owner: ta,
-            refs: &ta.Refers,
-        })
-        if ok && ta.Kind.Kind.Arr() != nil && ta.Kind.Kind.Arr().Auto {
-            self.pushErr(ta.Kind.Decl.Token, LogMsg.ArrayAutoSized)
-            ok = false
-        }
-        ret
-    }
-
-    fn checkTypeAliasDecl(mut &self, mut &ta: &TypeAlias, mut l: Lookup) {
-        if IsIgnoreIdent(ta.Ident) {
-            self.pushErr(ta.Token, LogMsg.IgnoreIdent)
-        }
-        self.checkTypeAliasDeclKind(ta, l)
-    }
-
-    // Checks type alias declaration with duplicated identifiers.
-    fn checkTypeAliasDeclDup(mut &self, mut &ta: &TypeAlias) {
-        if IsIgnoreIdent(ta.Ident) {
-            self.pushErr(ta.Token, LogMsg.IgnoreIdent)
-        }
-        if self.isDuplicatedIdent(uintptr(ta), ta.Ident, ta.Binded) {
-            self.pushErr(ta.Token, LogMsg.DuplicatedIdent, ta.Ident)
-            self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
-        }
-        self.checkTypeAliasDeclKind(ta, self)
-    }
-
-    // Checks current package file's type alias declarations.
-    fn checkTypeAliasDecls(mut &self): (ok: bool) {
-        for (_, mut ta) in self.file.TypeAliases {
-            self.checkTypeAliasDeclDup(ta)
-
-            // Break checking if type alias has error.
-            if len(self.errors) > 0 {
-                ret false
-            }
-        }
-        ret true
-    }
-
-    fn checkEnumItemsDup[T](mut self, items: []T) {
-        for _, item in items {
-            if item.Ident == "" {
-                continue
-            } else if IsIgnoreIdent(item.Ident) {
-                self.pushErr(item.Token, LogMsg.IgnoreIdent)
-            } else {
-                for _, citem in items {
-                    if item == citem {
-                        break
-                    } else if item.Ident == citem.Ident {
-                        self.pushErr(item.Token, LogMsg.DuplicatedIdent, item.Ident)
-                        self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
-                        break
-                    }
-                }
-            }
-        }
-    }
-
-    fn checkEnumItemsStr(mut &self, mut &e: &Enum) {
-        mut eval := self.eval(self)
-        for (_, mut item) in e.Items {
-            if item.AutoExpr() {
-                item.Value = &Value{
-                    Data: &Data{
-                        Constant: Const.NewStr(item.Ident),
-                    },
-                }
-                item.Value.Data.Model = item.Value.Data.Constant
-            } else {
-                mut d := eval.evalExpr(item.Value.Expr)
-                if d == nil {
-                    continue
-                }
-
-                if !d.IsConst() {
-                    self.pushErr(item.Value.Expr.Token, LogMsg.ExprNotConst)
-                }
-
-                _ = self.checkAssignType(false, e.Kind.Kind, d, item.Token)
-                item.Value.Data = d
-            }
-        }
-    }
-
-    fn checkEnumItemInt[Int](mut &self, mut &eval: &Eval, mut &e: &Enum, &prim: &Prim, mut &item: &EnumItem, mut &n: Int) {
-        if item.AutoExpr() {
-            item.Value = &Value{
-                Data: new(Data),
-            }
-            const match type Int {
-            | i64:
-                item.Value.Data.Constant = Const.NewI64(n)
-            | u64:
-                item.Value.Data.Constant = Const.NewU64(n)
-            |:
-                panic("unimplemented enum int type, this panic call should be unreachable")
-            }
-            item.Value.Data.Model = item.Value.Data.Constant
-        } else {
-            mut d := eval.evalExpr(item.Value.Expr)
-            if d == nil {
-                ret
-            }
-            if !d.IsConst() {
-                self.pushErr(item.Value.Expr.Token, LogMsg.ExprNotConst)
-            }
-            _ = self.checkAssignType(false, e.Kind.Kind, d, item.Token)
-            item.Value.Data = d
-            const match type Int {
-            | i64:
-                n = item.Value.Data.Constant.ReadI64()
-            | u64:
-                n = item.Value.Data.Constant.ReadU64()
-            |:
-                panic("unimplemented enum int type, this panic call should be unreachable")
-            }
-        }
-    }
-
-    fn checkEnumItemsInt1[Int](mut &self, &prim: &Prim, mut &e: &Enum) {
-        mut max := Int(0)
-        const match type Int {
-        | i64:
-            max = types::MaxI(prim.Str())
-        | u64:
-            max = types::MaxU(prim.Str())
-        |:
-            panic("unimplemented enum int type, this panic call should be unrechable")
-        }
-
-        mut eval := self.eval(self)
-        mut n := Int(0)
-        mut first := e.Items[0]
-        self.checkEnumItemInt(eval, e, prim, first, n)
-        if first.Value.Data != nil {
-            const match type Int {
-            | i64:
-                n = first.Value.Data.Constant.AsI64()
-            | u64:
-                n = first.Value.Data.Constant.AsU64()
-            |:
-                panic("unimplemented enum int type, this panic call should be unreachable")
-            }
-        }
-        for (_, mut item) in e.Items[1:] {
-            if item.AutoExpr() && n > 0 && max-n <= 0 {
-                self.pushErr(item.Token, LogMsg.OverflowLimits)
-                break
-            }
-            n++
-            self.checkEnumItemInt(eval, e, prim, item, n)
-        }
-    }
-
-    fn checkEnumItemsInt(mut &self, mut &e: &Enum) {
-        prim := e.Kind.Kind.Prim()
-        match {
-        | types::IsSigInt(prim.Kind):
-            self.checkEnumItemsInt1[i64](prim, e)
-        |:
-            self.checkEnumItemsInt1[u64](prim, e)
-        }
-    }
-
-    fn checkEnumDecl(mut &self, mut &e: &Enum) {
-        if IsIgnoreIdent(e.Ident) {
-            self.pushErr(e.Token, LogMsg.IgnoreIdent)
-        } else if self.isDuplicatedIdent(uintptr(e), e.Ident, false) {
-            self.pushErr(e.Token, LogMsg.DuplicatedIdent, e.Ident)
-            self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
-        }
-
-        if len(e.Items) == 0 {
-            self.pushErr(e.Token, LogMsg.NoMemberInEnum, e.Ident)
-            ret
-        }
-
-        self.checkEnumItemsDup[&EnumItem](e.Items)
-
-        if e.Kind != nil {
-            if !self.checkType(e.Kind, self) {
-                ret
-            }
-        } else {
-            // Set to default type.
-            e.Kind = findBuiltinTypeAlias(PrimKind.Int).Kind
-        }
-
-        mut t := e.Kind.Kind.Prim()
-        if t == nil {
-            self.pushErr(e.Token, LogMsg.InvalidTypeSource)
-            ret
-        }
-
-        // Check items.
-        match {
-        | t.IsStr():
-            self.checkEnumItemsStr(e)
-        | types::IsInt(t.Str()):
-            self.checkEnumItemsInt(e)
-        |:
-            self.pushErr(e.Token, LogMsg.InvalidTypeSource)
-        }
-    }
-
-    fn checkTypeEnumDecl(mut &self, mut &e: &TypeEnum) {
-        if IsIgnoreIdent(e.Ident) {
-            self.pushErr(e.Token, LogMsg.IgnoreIdent)
-        } else if self.isDuplicatedIdent(uintptr(e), e.Ident, false) {
-            self.pushErr(e.Token, LogMsg.DuplicatedIdent, e.Ident)
-            self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
-        }
-
-        if len(e.Items) == 0 {
-            self.pushErr(e.Token, LogMsg.NoMemberInEnum, e.Ident)
-            ret
-        }
-
-        self.checkEnumItemsDup[&TypeEnumItem](e.Items)
-        for (_, mut item) in e.Items {
-            if item.Kind == nil {
-                self.pushErr(item.Token, LogMsg.MissingType)
-                continue
-            }
-            ok := self.checkType(item.Kind, self)
-            if !ok {
-                continue
-            }
-            p := item.Kind.Kind.Prim()
-            if p != nil && p.IsAny() {
-                self.pushErr(item.Token, LogMsg.AnyWithTypeEnum)
-            }
-        }
-        if len(e.Items) == 1 {
-            mut item := e.Items[0]
-            tk := TypeKind{
-                Kind: e,
-            }
-            if item.Kind.Kind != nil && item.Kind.Kind.Equal(unsafe { (&TypeKind)(&tk) }) {
-                self.pushErr(item.Token, LogMsg.IllegalCycleRefersItself, e.Str())
-            }
-        }
-    }
-
-    // Checks current package file's enum declarations.
-    fn checkEnumDecls(mut &self): (ok: bool) {
-        for (_, mut e) in self.file.Enums {
-            self.checkEnumDecl(e)
-            // Break checking if type alias has error.
-            if len(self.errors) > 0 {
-                ret false
-            }
-        }
-        ret true
-    }
-
-    // Checks current package file's type enum declarations.
-    fn checkTypeEnumDecls(mut &self): (ok: bool) {
-        for (_, mut e) in self.file.TypeEnums {
-            self.checkTypeEnumDecl(e)
-            // Break checking if type alias has error.
-            if len(self.errors) > 0 {
-                ret false
-            }
-        }
-        ret true
-    }
-
-    fn checkDeclGenerics(mut self, &generics: []&ast::GenericDecl): (ok: bool) {
-        ok = true
-        for i, g in generics {
-            if IsIgnoreIdent(g.Ident) {
-                self.pushErr(g.Token, LogMsg.IgnoreIdent)
-                ok = false
-                continue
-            }
-
-            // Check duplications.
-        duplicationLookup:
-            for j, ct in generics {
-                match {
-                | j >= i:
-                    // Skip current and following generics.
-                    break duplicationLookup
-                | g.Ident == ct.Ident:
-                    self.pushErr(g.Token, LogMsg.DuplicatedIdent, g.Ident)
-                    self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
-                    ok = false
-                    break duplicationLookup
-                }
-            }
-        }
-        ret
-    }
-
-    fn checkFnDeclParamsDup(mut self, &f: &Fn): (ok: bool) {
-        ok = true
-    check:
-        for i, p in f.Params {
-            // Lookup in generics.
-            for _, g in f.Generics {
-                if p.Ident == g.Ident {
-                    ok = false
-                    self.pushErr(p.Token, LogMsg.DuplicatedIdent, p.Ident)
-                    self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
-                    continue check
-                }
-            }
-
-        paramsLookup:
-            for j, jp in f.Params {
-                match {
-                | j >= i:
-                    // Skip current and following parameters.
-                    break paramsLookup
-                | IsIgnoreIdent(p.Ident)
-                | IsIgnoreIdent(jp.Ident)
-                | IsAnonIdent(p.Ident)
-                | IsAnonIdent(jp.Ident):
-                    // Skip anonymous parameters.
-                    break paramsLookup
-                | p.Ident == jp.Ident:
-                    ok = false
-                    self.pushErr(p.Token, LogMsg.DuplicatedIdent, p.Ident)
-                    self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
-                    continue check
-                }
-            }
-        }
-        ret
-    }
-
-    fn checkFnDeclResultDup(mut self, &f: &Fn): (ok: bool) {
-        ok = true
-        if f.IsVoid() {
-            ret
-        }
-
-        // Check duplications.
-        for i, v in f.Result.Idents {
-            if IsIgnoreIdent(v.Kind) || IsAnonIdent(v.Kind) {
-                continue // Skip anonymous return variables.
-            }
-            // Lookup in generics.
-            for _, g in f.Generics {
-                if v.Kind == g.Ident {
-                    goto exist
-                }
-            }
-            // Lookup in parameters.
-            for _, p in f.Params {
-                if v.Kind == p.Ident {
-                    goto exist
-                }
-            }
-
-            // Lookup in return identifiers.
-        itself_lookup:
-            for j, jv in f.Result.Idents {
-                match {
-                | j >= i:
-                    // Skip current and following identifiers.
-                    break itself_lookup
-                | jv.Kind == v.Kind:
-                    goto exist
-                }
-            }
-            continue
-        exist:
-            self.pushErr(v, LogMsg.DuplicatedIdent, v.Kind)
-            self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
-            ok = false
-        }
-
-        ret
-    }
-
-    fn checkFnVariadicParam(mut &self, mut &f: &Fn): bool {
-        if len(f.Params) == 0 {
-            ret false
-        }
-        mut param := f.Params[len(f.Params)-1]
-        if param.Variadic && param.Reference {
-            self.pushErr(param.Token, LogMsg.VariadicReference)
-        }
-        ret true
-    }
-
-    // Checks generics, parameters and return type.
-    // Not checks scope, and other things.
-    fn checkFnDeclPrototype(mut &self, mut &f: &Fn) {
-        if f.Exceptional && f.Binded {
-            self.pushErr(f.Token, LogMsg.BindedExceptional)
-            ret
-        }
-
-        if f.Exceptional {
-            if f.IsEntryPoint() {
-                self.pushErr(f.Token, LogMsg.ExceptionalEntryPoint)
-            } else if f.IsInit() {
-                self.pushErr(f.Token, LogMsg.ExceptionalInit)
-            }
-        }
-
-        match {
-        | !self.checkDeclGenerics(f.Generics):
-        | !self.checkFnDeclParamsDup(f):
-        | !self.checkFnDeclResultDup(f):
-        | !self.checkFnVariadicParam(f):
-        }
-    }
-
-    fn catchTraitInheritCycle(mut &self, t1: &Trait, mut t2: &Trait, mut &message: StrBuilder): (ok: bool) {
-        ok = true
-        for (_, mut i) in t2.Inherits {
-            if i.Kind == nil {
-                continue
-            }
-            mut t3 := i.Kind.Trait()
-            if t1 == t3 {
-                self.pushCycleError(t2.Ident, t3.Ident, message)
-                ret false
-            }
-            if !self.catchTraitInheritCycle(t1, t3, message) {
-                self.pushCycleError(t2.Ident, t3.Ident, message)
-                ret false
-            }
-        }
-        ret
-    }
-
-    fn _checkTraitDeclInherits(mut &self, mut &t: &Trait): (ok: bool) {
-        ok = true
-        for (i, mut it) in t.Inherits {
-            if !self.checkType(it, self) {
-                ok = false
-                continue
-            }
-            mut t2 := it.Kind.Trait()
-            if t2 == nil {
-                self.pushErr(it.Decl.Token, LogMsg.InheritedNonTrait, t.Ident, it.Kind.Str())
-                ok = false
-                continue
-            }
-            for j, it2 in t.Inherits {
-                if j >= i {
-                    break
-                }
-                if it2.Kind != nil && it.Kind.Equal(it2.Kind) {
-                    self.pushErr(it.Decl.Token, LogMsg.DuplicatedIdent, t2.Ident)
-                    ok = false
-                    break
-                }
-            }
-            if t == t2 {
-                self.pushErr(it.Decl.Token, LogMsg.IllegalCycleRefersItself, t.Ident)
-                ok = false
-            } else {
-                mut message := StrBuilder.New(1 << 6)
-                ok = ok && self.catchTraitInheritCycle(t, t2, message)
-                if message.Len() > 0 {
-                    mut errMsg := message.Str()
-                    message.Clear()
-                    self.pushCycleError(t.Ident, t2.Ident, message)
-                    errMsg += message.Str()
-                    self.pushErr(it.Decl.Token, LogMsg.IllegalCrossCycle, errMsg)
-                }
-            }
-        }
-        ret ok
-    }
-
-    fn checkTraitDeclInherits(mut &self, mut &t: &Trait) {
-        for (i, mut it) in t.Inherits {
-            mut t1 := it.Kind.Trait()
-            for (j, mut it2) in t.Inherits {
-                if j == i {
-                    continue
-                }
-                mut t2 := it2.Kind.Trait()
-                for (_, mut t1m) in t1.Methods {
-                    mut t2m := t2.FindMethod(t1m.Ident)
-                    if t2m == nil {
-                        continue
-                    }
-                    t1f := self.getTraitCheckFnKind(t1m)
-                    t2f := self.getTraitCheckFnKind(t2m)
-                    if !t1f.equalTrait(t2f) {
-                        self.pushErr(it.Decl.Token, LogMsg.IncompatibleInherit,
-                            t.Ident, t2.Ident, t1f.GetKindStr(true), t2f.GetKindStr(true))
-                        ret
-                    }
-                }
-            }
-        }
-    }
-
-    fn checkTraitDeclMethod(mut &self, mut &f: &Fn) {
-        if IsIgnoreIdent(f.Ident) {
-            self.pushErr(f.Token, LogMsg.IgnoreIdent)
-        } else if IsAnonIdent(f.Ident) {
-            self.pushErr(f.Token, LogMsg.AnonFn)
-        }
-        f.sema = self
-        self.checkFnDeclPrototype(f)
-        mut ins := f.instance()
-        _ = self.reloadFnInsTypes(ins)
-        ins.reloaded = true
-        f.appendInstance(ins)
-    }
-
-    fn checkTraitDeclMethods(mut &self, mut &t: &Trait) {
-        for (i, mut f) in t.Methods {
-            self.checkTraitDeclMethod(f)
-
-            // Break checking if type alias has error.
-            if len(self.errors) > 0 {
-                ret
-            }
-
-            if t.findMethodInherit(f.Ident) != nil {
-                self.pushErr(f.Token, LogMsg.DuplicatedIdent, f.Ident)
-                self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
-                continue
-            }
-
-            // Check duplications.
-        duplicateLookup:
-            for j, jf in t.Methods {
-                // NOTE:
-                //  Ignore identifier checking is unnecessary here.
-                //  Because ignore identifiers logs error.
-                //  Errors breaks checking, so here is unreachable code for
-                //  ignore identified methods.
-                match {
-                | j >= i:
-                    // Skip current and following methods.
-                    break duplicateLookup
-                | f.Ident == jf.Ident:
-                    self.pushErr(f.Token, LogMsg.DuplicatedIdent, f.Ident)
-                    self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
-                    break duplicateLookup
-                }
-            }
-        }
-    }
-
-    fn checkTraitDecl(mut &self, mut &t: &Trait) {
-        if IsIgnoreIdent(t.Ident) {
-            self.pushErr(t.Token, LogMsg.IgnoreIdent)
-        } else if self.isDuplicatedIdent(uintptr(t), t.Ident, false) {
-            self.pushErr(t.Token, LogMsg.DuplicatedIdent, t.Ident)
-            self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
-        }
-
-        self.checkTraitDeclInherits(t)
-        self.checkTraitDeclMethods(t)
-    }
-
-    // Checks current package file's trait declarations.
-    fn checkTraitDecls(mut &self): (ok: bool) {
-        for (_, mut t) in self.file.Traits {
-            self.checkTraitDecl(t)
-            // Break checking if type alias has error.
-            if len(self.errors) > 0 {
-                ret false
-            }
-        }
-        ret true
-    }
-
-    fn checkTraitImplMethods(mut self, mut &base: &Trait, &ipl: &Impl): (ok: bool) {
-        ok = true
-        for _, f in ipl.Methods {
-            if base.FindMethod(f.Ident) == nil {
-                self.pushErr(f.Token, LogMsg.TraitHaveNotIdent, base.Ident, f.Ident)
-                ok = false
-            }
-        }
-        ret
-    }
-
-    fn implToStruct(mut &self, mut &dest: &Struct, mut &ipl: &Impl): (ok: bool) {
-        ok = true
-
-        // Methods.
-        for (_, mut f) in ipl.Methods {
-            if dest.FindMethod(f.Ident, f.Statically) != nil || dest.FindField(f.Ident) != nil {
-                self.pushErr(f.Token, LogMsg.StructAlreadyHaveIdent, dest.Ident, f.Ident)
-                ok = false
-                continue
-            }
-
-            if len(dest.Generics) > 0 && len(f.Generics) > 0 {
-                for _, fg in f.Generics {
-                    for _, dg in dest.Generics {
-                        if fg.Ident == dg.Ident {
-                            self.pushErr(fg.Token, LogMsg.MethodHasGenericWithSameIdent)
-                            ok = false
-                        }
-                    }
-                }
-            }
-
-            self.checkDirectives(f.Directives, f)
-
-            f.sema = self
-            f.Owner = dest
-            dest.Methods = append(dest.Methods, f)
-        }
-
-        for (_, mut v) in ipl.Statics {
-            const Static = true
-            if dest.FindMethod(v.Ident, Static) != nil || dest.FindStatic(v.Ident) != nil {
-                self.pushErr(v.Token, LogMsg.StructAlreadyHaveIdent, dest.Ident, v.Ident)
-                ok = false
-                continue
-            }
-            dest.Statics = append(dest.Statics, v)
-        }
-        ret
-    }
-
-    // Implement trait to destination.
-    fn implTrait(mut &self, mut &decl: &Impl) {
-        mut base_t := self.selectType(decl.Base)
-        if base_t == nil {
-            ret
-        }
-        mut base := base_t.Trait()
-        if base == nil {
-            self.pushErr(decl.Base.Token, LogMsg.ImplInvalidBase, base_t.Str())
-            self.pushSuggestion(LogMsg.ExpectedTrait)
-            ret
-        }
-
-        mut destT := self.selectType(decl.Dest)
-        if destT == nil {
-            ret
-        }
-        mut destS := destT.Struct()
-        if destS == nil {
-            self.pushErr(decl.Dest.Token, LogMsg.ImplInvalidDest, destT.Str())
-            self.pushSuggestion(LogMsg.ExpectedStruct)
-            ret
-        }
-
-        mut dest := destS.Decl
-
-        if dest.Token.File.Dir() != self.file.File.Dir() {
-            self.pushErr(decl.Dest.Token, LogMsg.IllegalImplOutOfPackage)
-            ret
-        }
-
-        pushImplemented(base, dest)
-        pushImplements(dest, base)
-
-        if len(decl.Statics) > 0 {
-            self.pushErr(decl.Statics[0].Token, LogMsg.TraitImplHasStatic)
-        }
-
-        match {
-        | !self.checkTraitImplMethods(base, decl):
-        | !self.implToStruct(dest, decl):
-        }
-    }
-
-    fn implStruct(mut &self, mut &decl: &Impl) {
-        mut destT := self.selectType(decl.Dest)
-        if destT == nil {
-            ret
-        }
-        mut destS := destT.Struct()
-        if destS == nil {
-            self.pushErr(decl.Dest.Token, LogMsg.ImplInvalidDest, destT.Str())
-            self.pushSuggestion(LogMsg.ExpectedStruct)
-            ret
-        }
-
-        mut dest := destS.Decl
-        if dest.Token.File.Dir() != self.file.File.Dir() {
-            self.pushErr(decl.Dest.Token, LogMsg.IllegalImplOutOfPackage)
-            ret
-        }
-
-        match {
-        | !self.implToStruct(dest, decl):
-        }
-    }
-
-    // Implement implementation.
-    fn implImpl(mut &self, mut &decl: &Impl) {
-        match {
-        | decl.IsTraitImpl():
-            self.implTrait(decl)
-        | decl.IsStructImpl():
-            self.implStruct(decl)
-        }
-    }
-
-    // Checks variable declaration.
-    // Will not check duplicated identifiers.
-    fn checkVarDecl(mut &self, mut &decl: &Var, mut l: Lookup) {
-        if IsIgnoreIdent(decl.Ident) {
-            self.pushErr(decl.Token, LogMsg.IgnoreIdent)
-        }
-
-        if decl.IsTypeInferred() {
-            if !decl.IsInitialized() {
-                self.pushErr(decl.Token, LogMsg.MissingValueForTypeInference)
-            }
-        } else {
-            _ = self.checkType(decl.Kind, l)
-        }
-
-        if decl.Reference {
-            if decl.Constant {
-                self.pushErr(decl.Token, LogMsg.ConstRef)
-            }
-            if decl.Statically {
-                self.pushErr(decl.Token, LogMsg.StaticReference)
-            }
-        }
-
-        if !decl.IsInitialized() {
-            if decl.Constant {
-                self.pushErr(decl.Token, LogMsg.ConstVarNotHaveExpr)
-            }
-            if decl.Statically {
-                self.pushErr(decl.Token, LogMsg.StaticNotHaveExpr)
-            }
-            if decl.Reference {
-                self.pushErr(decl.Token, LogMsg.RefNotInited)
-            }
-        }
-    }
-
-    // Checks variable declaration for global scope.
-    // Checks duplicated identifiers by Sema.
-    fn checkGlobalVarDecl(mut &self, mut &decl: &Var) {
-        if self.isDuplicatedIdent(uintptr(decl), decl.Ident, decl.Binded) {
-            self.pushErr(decl.Token, LogMsg.DuplicatedIdent, decl.Ident)
-            self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
-        }
-        if decl.Binded && decl.Constant {
-            self.pushErr(decl.Token, LogMsg.BindedVarIsConst)
-        }
-        if !decl.Binded && !decl.Constant && !decl.Statically {
-            self.pushErr(decl.Token, LogMsg.GlobalNotStatic)
-            self.pushSuggestion(LogMsg.UseStaticKeywordToDef)
-        }
-        self.checkDirectives(decl.Directives, decl)
-        self.checkVarDecl(decl, self)
-    }
-
-    // Checks current package file's global variable declarations.
-    fn checkGlobalDecls(mut &self): (ok: bool) {
-        for (_, mut decl) in self.file.Vars {
-            self.checkGlobalVarDecl(decl)
-            // Break checking if type alias has error.
-            if len(self.errors) > 0 {
-                ret false
-            }
-        }
-        ret true
-    }
-
-    fn checkStructTraitImpl(mut &self, mut &strct: &Struct, mut &trt: &Trait): (ok: bool) {
-        for (_, mut tf) in trt.Methods {
-            mut exist := false
-            mut sf := strct.FindMethod(tf.Ident, tf.Statically)
-            tfK := self.getTraitCheckFnKind(tf)
-            if sf != nil {
-                mut sfK := self.getTraitCheckFnKind(sf)
-                exist = tfK.equalTrait(sfK)
-            }
-            if exist {
-                d := findDirective(sf.Directives, Directive.Deprecated)
-                if d != nil {
-                    self.pushErr(d.Tag, LogMsg.TraitImplDeprecated)
-                }
-                ok = false
-            } else {
-                const Ident = true
-                self.pushErr(strct.Token, LogMsg.NotImplTraitDef, trt.Ident, tfK.GetKindStr(Ident))
-                ok = false
-            }
-        }
-        ret
-    }
-
-    fn checkStructImpls(mut &self, mut &s: &Struct): (ok: bool) {
-        ok = true
-        for (_, mut trt) in s.Implements {
-            ok = self.checkStructTraitImpl(s, trt) && ok
-        }
-        ret ok
-    }
-
-    fn checkStructFields(mut &self, mut &st: &Struct): (ok: bool) {
-        ok = true
-        for (_, mut f) in st.Fields {
-            f.Owner = st
-            for _, cf in st.Fields {
-                if f == cf {
-                    break
-                } else if f.Ident == cf.Ident {
-                    self.pushErr(f.Token, LogMsg.DuplicatedIdent, f.Ident)
-                    self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
-                    ok = false
-                }
-            }
-        }
-        ret ok
-    }
-
-    fn checkStructDecl(mut &self, mut &s: &Struct) {
-        if IsIgnoreIdent(s.Ident) {
-            self.pushErr(s.Token, LogMsg.IgnoreIdent)
-        } else if self.isDuplicatedIdent(uintptr(s), s.Ident, s.Binded) {
-            self.pushErr(s.Token, LogMsg.DuplicatedIdent, s.Ident)
-            self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
-        }
-
-        self.checkDirectives(s.Directives, s)
-
-        match {
-        | !self.checkDeclGenerics(s.Generics):
-        | !self.checkStructFields(s):
-        | !self.checkStructImpls(s):
-        | !self.checkFuncDeclsBy(s.Methods):
-        }
-    }
-
-    // Checks current package file's structure declarations.
-    fn checkStructDecls(mut &self): (ok: bool) {
-        for (_, mut s) in self.file.Structs {
-            self.checkStructDecl(s)
-            // Break checking if type alias has error.
-            if len(self.errors) > 0 {
-                ret false
-            }
-        }
-        ret true
-    }
-
-    fn checkAnonFuncDecl(mut &self, mut &f: &Fn) {
-        f.sema = self
-        self.checkFnDeclPrototype(f)
-    }
-
-    fn checkFuncDecl(mut &self, mut &f: &Fn) {
-        if IsIgnoreIdent(f.Ident) {
-            self.pushErr(f.Token, LogMsg.IgnoreIdent)
-        } else if f.IsAnon() {
-            self.pushErr(f.Token, LogMsg.AnonFn)
-        }
-
-        self.checkDirectives(f.Directives, f)
-        self.checkAnonFuncDecl(f)
-
-        if f.Owner == nil && self.isDuplicatedIdent(uintptr(f), f.Ident, f.Binded) {
-            if f.Ident == build::InitFn {
-                init := self.FindFn(build::InitFn, false)
-                if init != nil {
-                    ret
-                }
-            }
-            self.pushErr(f.Token, LogMsg.DuplicatedIdent, f.Ident)
-            self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
-        }
-    }
-
-    fn checkFuncDeclsBy(mut &self, mut &funcs: []&Fn): bool {
-        for (_, mut f) in funcs {
-            self.checkFuncDecl(f)
-            // Break checking if error occurs.
-            if len(self.errors) > 0 {
-                ret false
-            }
-        }
-        ret true
-    }
-
-    // Checks current package file's function declarations.
-    fn checkFuncDecls(mut &self): (ok: bool) {
-        ret self.checkFuncDeclsBy(self.file.Funcs)
-    }
-
-    fn pushCycleError(self, &st1: str, &st2: str, mut &message: StrBuilder) {
-        const Padding = 7
-        refersTo := Logf(LogMsg.RefersTo, st1, st2)
-        m := message.Str()
-        message.WriteStr(strings::Repeat(" ", Padding))
-        message.WriteStr(refersTo)
-        message.WriteByte('\n')
-        message.WriteStr(m)
-    }
-
-    fn checkCrossCycle(self, &st1: &Struct, &st2: &Struct, mut &message: StrBuilder): bool {
-        for _, u in st2.Uses {
-            if u == st1 {
-                self.pushCycleError(st2.Ident, u.Ident, message)
-                ret false
-            }
-            if !self.checkCrossCycle(st1, u, message) {
-                self.pushCycleError(st2.Ident, u.Ident, message)
-                ret false
-            }
-        }
-        ret true
-    }
-
-    // Checks declarations of all package files.
-    // Breaks checking if checked file failed.
-    fn checkPackageDecls(mut &self) {
-        for (_, mut f) in self.files {
-            self.setCurrentFile(f)
-            if !self.checkTypeAliasDecls() {
-                ret
-            }
-        }
-
-        for (_, mut f) in self.files {
-            self.setCurrentFile(f)
-            if !self.checkTraitDecls() {
-                ret
-            }
-        }
-
-        for (_, mut f) in self.files {
-            self.setCurrentFile(f)
-            if !self.checkGlobalDecls() {
-                ret
-            }
-        }
-
-        for (_, mut f) in self.files {
-            self.setCurrentFile(f)
-            match {
-            | !self.checkFuncDecls():
-            | !self.checkStructDecls():
-            |:
-                continue
-            }
-            ret
-        }
-    }
-
-    fn checkDataForTypeInference(mut self, &d: &Data, &err_token: &Token) {
-        match {
-        | d.IsNil():
-            self.pushErr(err_token, LogMsg.NilForTypeInference)
-        | d.IsVoid():
-            self.pushErr(err_token, LogMsg.VoidForTypeInference)
-        | d.Kind.Variadic:
-            self.pushErr(err_token, LogMsg.InvalidExprForTypeInference)
-        }
-    }
-
-    // Checks value of variable.
-    fn checkVarValue(mut &self, mut &v: &Var) {
-        if v.IsTypeInferred() {
-            // Build new TypeSymbol because auto-type symbols are nil.
-            v.Kind = &TypeSymbol{Kind: v.Value.Data.Kind}
-
-            self.checkDataForTypeInference(v.Value.Data, v.Value.Expr.Token)
-            self.checkValidityForInitExpr(
-                v.Mutable,
-                v.Reference,
-                v.Kind.Kind,
-                v.Value.Data,
-                v.Value.Expr.Token)
-        } else {
-            mut arr := v.Kind.Kind.Arr()
-            if arr != nil {
-                if arr.Auto {
-                    dataArr := v.Value.Data.Kind.Arr()
-                    if dataArr != nil {
-                        arr.N = dataArr.N
-                    }
-                }
-            }
-
-            if self.checkAssignType(v.Reference, v.Kind.Kind, v.Value.Data, v.Value.Expr.Token) {
-                self.checkValidityForInitExpr(
-                    v.Mutable,
-                    v.Reference,
-                    v.Kind.Kind,
-                    v.Value.Data,
-                    v.Value.Expr.Token)
-            }
-        }
-
-        if v.Reference && !isValidForRef(v.Kind.Kind) {
-            self.pushErr(v.Token, LogMsg.RefPointsToInvalidType, v.Kind.Kind.Str())
-        }
-
-        if v.Constant {
-            if !v.Value.Data.IsConst() && !v.Value.Data.Kind.comptime() {
-                self.pushErr(v.Value.Expr.Token, LogMsg.ExprNotConst)
-            }
-        } else {
-            v.Value.Data.Constant = nil
-            v.Value.Data.untyped = false
-        }
-
-        // Remove kind for avoid more tuple-type errors.
-        if v.Kind.Kind.Tup() != nil {
-            v.Kind.Kind = nil
-        }
-    }
-
-    // Evaluates value of variable if initialized.
-    fn evalVarValue(mut &self, mut &decl: &Var, mut l: Lookup) {
-        if !decl.IsInitialized() {
-            ret
-        }
-
-        let mut eval: &Eval = nil
-        if decl.Kind != nil {
-            eval = self.evalpd(l, decl.Kind.Kind, decl)
-        } else {
-            eval = self.evalpd(l, nil, decl)
-        }
-        eval.immutable = !decl.Mutable
-        decl.Value.Data = eval.evalExpr(decl.Value.Expr)
-    }
-
-    // Evaluateds value of variable and checks.
-    // Assumes the variable is global.
-    fn checkVar(mut &self, mut &decl: &Var, mut l: Lookup) {
-        self.evalVarValue(decl, l)
-        if decl.Value.Data == nil {
-            ret // Skip checks if error ocurrs.
-        }
-        self.checkVarValue(decl)
-    }
-
-    // Checks current package file's global variables.
-    fn checkGlobals(mut &self) {
-        for (_, mut decl) in self.file.Vars {
-            if decl.Binded {
-                continue
-            }
-            if decl.IsInitialized() && decl.Value.Data == nil ||
-                decl.IsTypeInferred() && decl.Kind.Kind == nil {
-                self.checkVar(decl, self)
-            }
-        }
-    }
-
-    // Returns new FnIns as ready-to-analysis.
-    // If function already has a instance, returns existing instance.
-    // Returns nil if have a problem.
-    fn readyToCheckFn(mut &self, mut &s: &StructIns, mut &f: &Fn): &FnIns {
-        mut ins := f.instance()
-        if len(f.Instances) != 0 {
-            ret ins
-        }
-        ins.Owner = s
-        f.appendInstance(ins)
-        ins.reloaded = true
-        if self.reloadFnInsTypes(ins) {
-            ret ins
-        }
-        ret nil
-    }
-
-    fn checkTypeMethod(mut &self, mut &s: &StructIns, mut &f: &Fn) {
-        // Generic instances are checked instantly.
-        if len(f.Generics) > 0 {
-            ret
-        }
-        mut ins := f.Instances[0]
-        if len(ins.Scope.Stmts) > 0 {
-            // Checked
-            ret
-        }
-        self.checkFnIns(ins)
-    }
-
-    fn checkStructInsOp(mut &self, mut &s: &StructIns, mut &f: &Fn, p: fn(f: &Fn): bool): &FnIns {
-        if f == nil || len(f.Generics) > 0 || !p(f) {
-            ret nil
-        }
-        ret f.Instances[0]
-    }
-
-    // Checks environment-dependent parts of structure instance.
-    // Which is contains fields and generic-type constraints.
-    // If generic instance will be check, errorToken should be passed.
-    fn checkStructEnv(mut &self, mut &s: &StructIns, mut errorToken: &Token): (ok: bool) {
-        mut tc := typeChecker{
-            s: s.Decl.sema,
-            rootLookup: s.Decl.sema,
-            lookup: s.Decl.sema,
-            referencer: &referencer{
-                ident: s.Decl.Ident,
-                owner: s.Decl,
-            },
-            refers: s.Refers,
-        }
-
-        if len(s.Generics) > 0 {
-            tc.useGenerics = make([]&TypeAlias, 0, len(s.Generics))
-            for (i, mut g) in s.Generics {
-                mut decl := s.Decl.Generics[i]
-                tc.useGenerics = append(tc.useGenerics, &TypeAlias{
-                    Ident: decl.Ident,
-                    Token: decl.Token,
-                    Kind: &TypeSymbol{Kind: g.Kind},
-                })
-            }
-        }
-
-        mut oldFile := self.file
-        defer { self.setCurrentFile(oldFile) }
-
-        if self.file.File != s.Decl.Token.File {
-            mut file := findFile(self.files, s.Decl.Token.File)
-            if file != nil {
-                self.setCurrentFile(file)
-            }
-        }
-
-        if len(s.Generics) > 0 {
-            mut cc := self.constraintChecker()
-            cc.et = errorToken
-            cc.si = s
-            cc.genericsA = tc.useGenerics
-            cc.uniq = true
-            if !cc.check() {
-                ret
-            }
-        }
-
-        ok = true
-
-        if len(s.Statics) > 0 {
-            mut n := len(self.errors)
-            self.files[0].TypeAliases = append(tc.useGenerics, self.files[0].TypeAliases...)
-            for (_, mut v) in s.Statics {
-                self.checkVarDecl(v, self)
-                self.checkVar(v, self)
-                ok = len(self.errors)-n == 0 && ok
-            }
-            self.files[0].TypeAliases = self.files[0].TypeAliases[len(tc.useGenerics):]
-            if !ok {
-                ret false
-            }
-        }
-
-        mut eval := self.eval(self)
-        s.Comparable = !s.Decl.Binded
-        for (_, mut f) in s.Fields {
-            mut kind := tc.checkDecl(f.Decl.Kind.Decl)
-            ok = kind != nil && ok
-            if kind == nil {
-                if self != s.Decl.sema && len(s.Decl.sema.errors) > 0 {
-                    self.errors = append(self.errors, s.Decl.sema.errors...)
-                    s.Decl.sema.errors = nil
-                }
-                continue
-            }
-            f.Kind = kind
-            s.Mutable = s.Mutable || (!f.Decl.Mutable && f.Kind.Mutable())
-            s.Comparable = s.Comparable && f.Kind.Comparable()
-
-            // Skip this field if not has default value.
-            if f.Decl.Default == nil {
-                continue
-            }
-            eval.prefix = f.Kind
-            eval.field = f
-            f.Default = eval.evalExpr(f.Decl.Default)
-
-            // Skip if eval returned nil.
-            // Relevant error(s) logged by eval.
-            if f.Default == nil {
-                continue
-            }
-
-            const Reference = false // Fields cannot be reference.
-            _ = self.checkAssignType(Reference, f.Kind, f.Default, f.Decl.Default.Token)
-        }
-        ret
-    }
-
-    fn precheckStructIns(mut &self, mut &s: &StructIns, mut errorToken: &Token): (ok: bool) {
-        ok = self.checkStructEnv(s, errorToken)
-        if !ok {
-            ret false
-        }
-        for (_, mut f) in s.Methods {
-            if len(f.Generics) == 0 {
-                if self.readyToCheckFn(s, f) == nil {
-                    ret false
-                }
-            }
-        }
-        ret true
-    }
-
-    fn checkStructIns(mut &self, mut &s: &StructIns) {
-        for (_, mut f) in s.Methods {
-            self.checkTypeMethod(s, f)
-        }
-    }
-
-    fn checkTypeStruct(mut &self, mut &s: &Struct) {
-        if s.Binded {
-            ret
-        }
-
-        // Generic instances are checked instantly.
-        if len(s.Generics) > 0 {
-            ret
-        }
-
-        // NOTICE:
-        // Do not check zero instance case, operator overloading
-        // checker will create an instance if not exist.
-        for (_, mut ins) in s.Instances {
-            self.checkStructIns(ins)
-        }
-    }
-
-    fn checkStructTypes(mut &self) {
-        for (_, mut s) in self.file.Structs {
-            self.checkTypeStruct(s)
-        }
-    }
-
-    fn checkStructInsOperators(mut &self, mut s: &StructIns) {
-        for (_, mut m) in s.Methods {
-            match m.Ident {
-            | "Eq":
-                s.Operators.Eq = self.checkStructInsOp(s, m, FuncPattern.Eq)
-                s.Comparable = s.Operators.Eq != nil
-            | "Gt":
-                s.Operators.Gt = self.checkStructInsOp(s, m, FuncPattern.Gt)
-            | "GtEq":
-                s.Operators.GtEq = self.checkStructInsOp(s, m, FuncPattern.GtEq)
-            | "Lt":
-                s.Operators.Lt = self.checkStructInsOp(s, m, FuncPattern.Lt)
-            | "LtEq":
-                s.Operators.LtEq = self.checkStructInsOp(s, m, FuncPattern.LtEq)
-            | "Shl":
-                s.Operators.Shl = self.checkStructInsOp(s, m, FuncPattern.Shl)
-            | "Shr":
-                s.Operators.Shr = self.checkStructInsOp(s, m, FuncPattern.Shr)
-            | "Add":
-                s.Operators.Add = self.checkStructInsOp(s, m, FuncPattern.Add)
-            | "Sub":
-                s.Operators.Sub = self.checkStructInsOp(s, m, FuncPattern.Sub)
-            | "Div":
-                s.Operators.Div = self.checkStructInsOp(s, m, FuncPattern.Div)
-            | "Mul":
-                s.Operators.Mul = self.checkStructInsOp(s, m, FuncPattern.Mul)
-            | "Mod":
-                s.Operators.Mod = self.checkStructInsOp(s, m, FuncPattern.Mod)
-            | "BitAnd":
-                s.Operators.BitAnd = self.checkStructInsOp(s, m, FuncPattern.BitAnd)
-            | "BitOr":
-                s.Operators.BitOr = self.checkStructInsOp(s, m, FuncPattern.BitOr)
-            | "BitXor":
-                s.Operators.BitXor = self.checkStructInsOp(s, m, FuncPattern.BitXor)
-            | "Neg":
-                s.Operators.Neg = self.checkStructInsOp(s, m, FuncPattern.Neg)
-            | "Pos":
-                s.Operators.Pos = self.checkStructInsOp(s, m, FuncPattern.Pos)
-            | "BitNot":
-                s.Operators.BitNot = self.checkStructInsOp(s, m, FuncPattern.BitNot)
-            | "AddAssign":
-                s.Operators.AddAssign = self.checkStructInsOp(s, m, FuncPattern.AddAssign)
-            | "SubAssign":
-                s.Operators.SubAssign = self.checkStructInsOp(s, m, FuncPattern.SubAssign)
-            | "DivAssign":
-                s.Operators.DivAssign = self.checkStructInsOp(s, m, FuncPattern.DivAssign)
-            | "MulAssign":
-                s.Operators.MulAssign = self.checkStructInsOp(s, m, FuncPattern.MulAssign)
-            | "ModAssign":
-                s.Operators.ModAssign = self.checkStructInsOp(s, m, FuncPattern.ModAssign)
-            | "ShlAssign":
-                s.Operators.ShlAssign = self.checkStructInsOp(s, m, FuncPattern.ShlAssign)
-            | "ShrAssign":
-                s.Operators.ShrAssign = self.checkStructInsOp(s, m, FuncPattern.ShrAssign)
-            | "BitOrAssign":
-                s.Operators.BitOrAssign = self.checkStructInsOp(s, m, FuncPattern.BitOrAssign)
-            | "BitAndAssign":
-                s.Operators.BitAndAssign = self.checkStructInsOp(s, m, FuncPattern.BitAndAssign)
-            | "BitXorAssign":
-                s.Operators.BitXorAssign = self.checkStructInsOp(s, m, FuncPattern.BitXorAssign)
-            }
-        }
-    }
-
-    fn precheckStructType(mut &self, mut &s: &Struct) {
-        if s.Binded {
-            ret
-        }
-
-        // Generic instances are checked instantly.
-        if len(s.Generics) > 0 {
-            ret
-        }
-
-        if len(s.Instances) == 0 {
-            mut ins := s.instance()
-            ins.Checked = true
-            s.appendInstance(ins) // Append instance before precheck.
-            self.precheckStructIns(ins, nil)
-        }
-
-        self.checkStructInsOperators(s.Instances[0])
-    }
-
-    fn precheckStructTypes(mut &self) {
-        for (_, mut s) in self.file.Structs {
-            self.precheckStructType(s)
-        }
-    }
-
-    fn checkRets(mut self, mut &f: &FnIns) {
-        if f.Decl.IsVoid() {
-            ret
-        }
-        mrc := missingRetChecker.new()
-        ok := mrc.check(f.Scope)
-        if !ok {
-            self.pushErr(f.Decl.Token, LogMsg.MissingRet)
-        }
-    }
-
-    fn checkFnInsSc(mut self, mut &f: &FnIns, mut &sc: &scopeChecker) {
-        appendRetVars(sc.table.Vars, f)
-        appendParamVars(sc.table.Vars, f)
-        appendGenericTypeAliases(sc.table.TypeAliases, f)
-
-        sc.check(f.Decl.Scope, f.Scope)
-
-        // Check return statements if scopeChecker not forced to stop.
-        if !sc.stopped() {
-            self.checkRets(f)
-        }
-    }
-
-    fn checkFnInsCaller(mut &self, mut &f: &FnIns, mut caller: &Token) {
-        if f.Decl.Binded {
-            ret
-        }
-
-        mut old := f.Decl.sema.file
-        defer { f.Decl.sema.setCurrentFile(old) }
-        mut file := findFile(f.Decl.sema.files, f.Decl.Token.File)
-        if file != nil {
-            f.Decl.sema.setCurrentFile(file)
-        }
-
-        mut sc := newScopeChecker(f.Decl.sema, f)
-        sc.calledFrom = caller
-        self.checkFnInsSc(f, sc)
-
-        if f.Decl.sema != self {
-            self.errors = append(self.errors, f.Decl.sema.errors...)
-            f.Decl.sema.errors = nil
-        }
-    }
-
-    fn checkFnIns(mut &self, mut &f: &FnIns) {
-        self.checkFnInsCaller(f, nil)
-    }
-
-    fn checkFunc(mut &self, mut &f: &Fn) {
-        if f.Binded {
-            ret
-        }
-
-        // Generic instances are checked instantly.
-        if len(f.Generics) > 0 {
-            ret
-        }
-
-        for (_, mut ins) in f.Instances {
-            self.checkFnIns(ins)
-        }
-    }
-
-    fn checkTestFn(mut self, mut &f: &FnIns) {
-        if f.Decl.Public {
-            self.pushErr(f.Decl.Token, LogMsg.PubTestFn)
-            self.pushSuggestion(LogMsg.RemovePubModifier)
-            ret
-        }
-
-        if f.Decl.Unsafety ||
-            !f.Decl.IsVoid() ||
-            len(f.Decl.Generics) != 0 ||
-            len(f.Params) != 1 ||
-            f.Decl.Params[0].Mutable ||
-            f.Decl.Params[0].Reference {
-            self.pushErr(f.Decl.Token, LogMsg.WrongTestFnDecl)
-            self.pushSuggestion(LogMsg.UseExpectedTestFnDecl)
-            ret
-        }
-
-        mut sptr := f.Params[0].Kind.Sptr()
-        if sptr == nil {
-            self.pushErr(f.Decl.Token, LogMsg.WrongTestFnDecl)
-            self.pushSuggestion(LogMsg.UseExpectedTestFnDecl)
-            ret
-        }
-
-        s := sptr.Elem.Struct()
-        if s == nil || !isStdPackage(s.Decl.Token.File.Path, "testing") {
-            self.pushErr(f.Decl.Token, LogMsg.WrongTestFnDecl)
-            self.pushSuggestion(LogMsg.UseExpectedTestFnDecl)
-            ret
-        }
-    }
-
-    fn precheckFunc(mut &self, mut &f: &Fn) {
-        if f.Binded {
-            ret
-        }
-
-        // Generic instances are checked instantly.
-        if len(f.Generics) > 0 {
-            ret
-        }
-
-        if len(f.Instances) == 0 {
-            mut ins := f.instanceForce()
-            f.Instances = append(f.Instances, ins)
-            ok := self.reloadFnInsTypes(ins)
-            ins.reloaded = true
-
-            if ok && hasDirective(f.Directives, Directive.Test) {
-                self.checkTestFn(ins)
-            }
-        }
-    }
-
-    // Prechecks types of current package file's functions.
-    fn precheckFuncs(mut &self) {
-        for (_, mut decl) in self.file.Traits {
-            for (_, mut m) in decl.Methods {
-                self.precheckFunc(m)
-            }
-        }
-        for (_, mut decl) in self.file.Funcs {
-            self.precheckFunc(decl)
-        }
-    }
-
-    // Checks types of current package file's functions.
-    fn checkFuncs(mut &self) {
-        for (_, mut decl) in self.file.Funcs {
-            self.checkFunc(decl)
-        }
-    }
-
-    // Checks all types of all package files.
-    // Breaks checking if checked file failed.
-    fn checkPackageTypes(mut &self) {
-        for (_, mut f) in self.files {
-            self.setCurrentFile(f)
-            self.checkGlobals()
-            self.precheckFuncs()
-            // Check structures first, see developer reference (7).
-            // Check operators first, see developer reference (7.1), and (7.2).
-            self.precheckStructTypes()
-        }
-        if len(self.errors) > 0 {
-            ret
-        }
-        for (_, mut f) in self.files {
-            self.setCurrentFile(f)
-            self.checkFuncs()
-            self.checkStructTypes()
-        }
-    }
-
-    fn setFileSemaFields(mut &self) {
-        for (_, mut f) in self.file.Funcs {
-            f.sema = self
-        }
-        for (_, mut st) in self.file.Structs {
-            st.sema = self
-        }
-    }
-
-    fn setSemaFields(mut &self) {
-        for (_, mut file) in self.files {
-            self.setCurrentFile(file)
-            self.setFileSemaFields()
-        }
-    }
-
-    fn check(mut &self, mut &files: []&SymbolTable) {
-        self.files = files
-
-        self.checkImports()
-        if len(self.errors) != 0 {
-            ret
-        }
-
-        self.setSemaFields()
-
-        self.checkInherits()
-        if len(self.errors) != 0 {
-            ret
-        }
-
-        self.implImpls()
-        if len(self.errors) != 0 {
-            ret
-        }
-
-        // Check enums here.
-        // See developer reference (8).
-        self.checkEnums()
-        if len(self.errors) != 0 {
-            ret
-        }
-
-        self.checkPackageDecls()
-        if len(self.errors) != 0 {
-            ret
-        }
-
-        self.checkPackageTypes()
-    }
+	// Reports whether flags has given flag.
+	fn isFlag(self, flags: SemaFlag): bool { ret self.flags&flags == flags }
+
+	fn setCurrentFile(mut self, mut f: &SymbolTable) { self.file = f }
+
+	fn pushErr(mut self, token: &Token, fmt: LogMsg, args: ...any) {
+		self.errors = append(self.errors, compilerErr(token, true, fmt, args...))
+	}
+
+	// Push suggestion to last log.
+	fn pushSuggestion(mut self, fmt: LogMsg, args: ...any) {
+		unsafe { pushSuggestion(&self.errors[len(self.errors)-1], fmt, args...) }
+	}
+
+	// Reports whether define is accessible in the current package.
+	fn isAccessibleDefine(self, public: bool, token: &Token): bool {
+		ret public || token.File == nil || self.file.File.Dir() == token.File.Dir()
+	}
+
+	// Reports this identifier duplicated in package's global scope.
+	// The "self" parameter represents address of exception identifier.
+	// If founded identifier address equals to self, will be skipped.
+	fn isDuplicatedIdent(self, itself: uintptr, &ident: str, binded: bool): bool {
+		for _, f in self.files {
+			if f.isDuplicatedIdent(itself, ident, binded) {
+				ret true
+			}
+
+			for _, imp in f.Imports {
+				for _, selected in imp.Selected {
+					if selected.Kind == ident {
+						ret true
+					}
+				}
+			}
+		}
+		ret false
+	}
+
+	fn checkDirectives(mut &self, mut &d: []&ast::Directive, mut o: any) {
+		mut dc := directiveChecker{
+			s: self,
+			d: unsafe { (&[]&ast::Directive)(&d) },
+			o: o,
+		}
+		dc.check()
+	}
+
+	fn checkGenericQuantity(mut self, required: int, given: int, token: &Token): (ok: bool) {
+		match {
+		| required == 0 && given > 0:
+			self.pushErr(token, LogMsg.NotHasGenerics)
+			ret false
+		| required > 0 && given == 0:
+			self.pushErr(token, LogMsg.HasGenerics)
+			ret false
+		| required < given:
+			self.pushErr(token, LogMsg.GenericsOverflow)
+			ret false
+		| required > given:
+			self.pushErr(token, LogMsg.MissingGenerics)
+			ret false
+		|:
+			ret true
+		}
+	}
+
+	fn isDuplicatedImportSelection(self, itself: uintptr, &ident: str): bool {
+		for _, imp in self.file.Imports {
+			if uintptr(imp) == itself {
+				// Don't scan trailing imports.
+				break
+			}
+			if imp.existIdent(ident) {
+				ret true
+			}
+		}
+		ret false
+	}
+
+	fn getImportDef(self, &ident: str, mut &imp: &ImportInfo): any {
+		if findPackageBuiltinDef(imp.LinkPath, ident) != nil {
+			ret true
+		}
+		for (_, mut f) in imp.Package.Files {
+			// Binded defines can't export.
+			const Binded = false
+			mut def := f.defByIdent(ident, Binded)
+			if def != nil {
+				ret def
+			}
+		}
+		ret nil
+	}
+
+	fn checkImportSelection[T](mut self, &ident: &Token, &s: T): bool {
+		if !self.isAccessibleDefine(s.Public, s.Token) {
+			self.pushErr(ident, LogMsg.IdentIsNotAccessible, ident.Kind)
+			self.pushSuggestion(LogMsg.MakePubToAccess)
+			ret false
+		}
+		const Binded = false // Exported defines cannot be binded.
+		if defByIdentPackage(self.files, s.Ident, Binded) != nil {
+			self.pushErr(ident, LogMsg.SelectedImportExistInPackage, s.Ident)
+			ret false
+		}
+		ret true
+	}
+
+	fn checkImportSelectedSelections(mut self, mut &imp: &ImportInfo): (ok: bool) {
+		ok = true
+		for _, ident in imp.Selected {
+			if ident.Kind == TokenKind.Self {
+				continue
+			}
+
+			if self.isDuplicatedImportSelection(uintptr(imp), ident.Kind) {
+				self.pushErr(ident, LogMsg.DuplicatedIdent, ident.Kind)
+				self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
+				ok = false
+				continue
+			}
+
+			mut def := self.getImportDef(ident.Kind, imp)
+			match type def {
+			| bool:
+				// Pass, built-in.
+				continue
+			| &Var:
+				mut v := (&Var)(def)
+				ok = self.checkImportSelection(ident, v) && ok
+			| &TypeAlias:
+				mut ta := (&TypeAlias)(def)
+				ok = self.checkImportSelection(ident, ta) && ok
+			| &Struct:
+				mut s := (&Struct)(def)
+				ok = self.checkImportSelection(ident, s) && ok
+			| &Trait:
+				mut t := (&Trait)(def)
+				ok = self.checkImportSelection(ident, t) && ok
+			| &Enum:
+				mut e := (&Enum)(def)
+				ok = self.checkImportSelection(ident, e) && ok
+			| &TypeEnum:
+				mut e := (&TypeEnum)(def)
+				ok = self.checkImportSelection(ident, e) && ok
+			| &Fn:
+				mut f := (&Fn)(def)
+				ok = self.checkImportSelection(ident, f) && ok
+			|:
+				self.pushErr(ident, LogMsg.IdentNotExist, ident.Kind)
+				ok = false
+				continue
+			}
+		}
+		ret
+	}
+
+	fn checkImportsAllSelectionsFromCollection[T](mut self, &s: []T, &et: &Token): bool {
+		mut ok := true
+		for _, d in s {
+			if d.Public {
+				ok = self.checkImportSelection(et, d) && ok
+			}
+		}
+		ret ok
+	}
+
+	fn checkImportAllSelections(mut self, &imp: &ImportInfo): (ok: bool) {
+		ok = true
+		for _, file in imp.Package.Files {
+			ok = self.checkImportsAllSelectionsFromCollection(file.Vars, imp.Token) && ok
+			ok = self.checkImportsAllSelectionsFromCollection(file.TypeAliases, imp.Token) && ok
+			ok = self.checkImportsAllSelectionsFromCollection(file.Structs, imp.Token) && ok
+			ok = self.checkImportsAllSelectionsFromCollection(file.Funcs, imp.Token) && ok
+			ok = self.checkImportsAllSelectionsFromCollection(file.Traits, imp.Token) && ok
+			ok = self.checkImportsAllSelectionsFromCollection(file.Enums, imp.Token) && ok
+			ok = self.checkImportsAllSelectionsFromCollection(file.TypeEnums, imp.Token) && ok
+		}
+		ret
+	}
+
+	fn checkImportSelections(mut self, mut &imp: &ImportInfo): (ok: bool) {
+		if len(imp.Selected) > 0 {
+			ret self.checkImportSelectedSelections(imp)
+		} else if imp.ImportAll {
+			ret self.checkImportAllSelections(imp)
+		}
+		ret true
+	}
+
+	fn isUseAliasDuplication(mut self, &imp: &ImportInfo): bool {
+		for (_, mut imp2) in self.file.Imports {
+			if imp2 == imp {
+				break
+			}
+			if imp2.Alias == imp.Alias {
+				ret true
+			}
+			// Catch identifiers of other use declarations.
+			if imp2.Ident == imp2.LinkPath && imp2.Ident == imp.Alias {
+				ret true
+			}
+		}
+		ret false
+	}
+
+	fn checkImport(mut self, mut &imp: &ImportInfo): bool {
+		if imp.Binded || len(imp.Package.Files) == 0 {
+			ret true
+		}
+
+		// Check special cases for std::unsafe.
+		if imp.LinkPath == "std::unsafe" {
+			if imp.ImportAll || imp.Alias != "" || len(imp.Selected) > 0 {
+				self.pushErr(imp.Token, LogMsg.ExpectedPlainUseDecl, "use std::unsafe")
+				ret false
+			}
+		}
+
+		if len(imp.Alias) != 0 {
+			if IsIgnoreIdent(imp.Alias) {
+				self.pushErr(imp.Token, LogMsg.IgnoreIdent)
+			} else if self.isUseAliasDuplication(imp) {
+				self.pushErr(imp.Token, LogMsg.DuplicatedUseAlias, imp.Alias)
+				self.pushSuggestion(LogMsg.RenameUseAliasAvoidDuplication)
+			}
+		}
+
+		if !imp.Duplicate {
+			mut sema := &Sema{
+				flags: self.flags,
+				meta: self.meta,
+			}
+			sema.check(imp.Package.Files)
+			if len(sema.errors) != 0 {
+				self.errors = append(self.errors, sema.errors...)
+				sema.errors = nil
+				ret false
+			}
+		}
+		ret self.checkImportSelections(imp)
+	}
+
+	fn checkImports(mut self) {
+		for (_, mut file) in self.files {
+			self.setCurrentFile(file)
+			for (_, mut imp) in file.Imports {
+				ok := self.checkImport(imp)
+				// Break checking if package has error.
+				if !ok {
+					ret
+				}
+			}
+		}
+	}
+
+	fn implFileImpls(mut &self) {
+		for (_, mut imp) in self.file.Impls {
+			self.implImpl(imp)
+		}
+	}
+
+	fn implImpls(mut &self) {
+		for (_, mut file) in self.files {
+			self.setCurrentFile(file)
+			self.implFileImpls()
+		}
+	}
+
+	fn checkEnums(mut &self) {
+		for (_, mut file) in self.files {
+			self.setCurrentFile(file)
+			match {
+			| !self.checkEnumDecls():
+			| !self.checkTypeEnumDecls():
+			}
+		}
+	}
+
+	fn checkFileInherits(mut &self) {
+		for (_, mut t) in self.file.Traits {
+			ok := self._checkTraitDeclInherits(t)
+			if !ok {
+				ret
+			}
+		}
+	}
+
+	fn checkInherits(mut &self) {
+		for (_, mut file) in self.files {
+			self.setCurrentFile(file)
+			self.checkFileInherits()
+		}
+	}
+
+	fn typeChecker(mut &self, mut l: Lookup, mut generics: []&TypeAlias,
+		mut referencer: &referencer): typeChecker {
+		mut tc := typeChecker{
+			s: self,
+			rootLookup: l,
+			lookup: l,
+			referencer: referencer,
+			useGenerics: generics,
+		}
+		match type l {
+		| &scopeChecker:
+			mut hard := (&scopeChecker)(l).getHardRoot()
+			tc.refers = hard.owner.Refers
+		}
+		// referencer's refs field is not nil if owner is type alias.
+		if referencer != nil && referencer.refs != nil {
+			// Set owner alias field of TypeChecker to collect generic dependencies.
+			// See developer reference (4).
+			match type referencer.owner {
+			| &TypeAlias:
+				tc.ownerAlias = (&TypeAlias)(referencer.owner)
+			}
+		}
+		ret tc
+	}
+
+	// Builds type, builds result as kind and collects referred type aliases.
+	fn buildTypeWithRefers(mut &self, mut &t: &ast::TypeDecl, mut l: Lookup,
+		mut generics: []&TypeAlias, mut referencer: &referencer): &TypeKind {
+		ret self.typeChecker(l, generics, referencer).checkDecl(t)
+	}
+
+	// Checks type, builds result as kind and collects referred type aliases.
+	// Skips already checked types.
+	fn checkTypeWithRefers(mut &self, mut &t: &TypeSymbol, mut l: Lookup,
+		mut generics: []&TypeAlias, mut referencer: &referencer): (ok: bool) {
+		if t.checked() {
+			ret true
+		}
+		t.Kind = self.buildTypeWithRefers(t.Decl, l, generics, referencer)
+		ret t.checked()
+	}
+
+	fn constraintChecker(mut &self): &constraintChecker {
+		ret &constraintChecker{s: self}
+	}
+
+	// Checks type and builds result as kind.
+	// Skips already checked types.
+	fn checkType(mut &self, mut &t: &TypeSymbol, mut l: Lookup): bool {
+		ret self.checkTypeWithRefers(t, l, nil, nil)
+	}
+
+	// Builds type with type aliases for generics.
+	// Returns nil if error occur or failed.
+	fn buildTypeWithGenerics(mut &self, mut &t: &ast::TypeDecl,
+		mut generics: []&TypeAlias, mut refers: &ReferenceStack): &TypeKind {
+		mut tc := &typeChecker{
+			s: self,
+			rootLookup: self,
+			lookup: self,
+			useGenerics: generics,
+			refers: refers,
+		}
+		ret tc.checkDecl(t)
+	}
+
+	// Same as self.buildTypeWithGenerics but not uses any generics.
+	fn buildType(mut &self, mut &t: &ast::TypeDecl): &TypeKind {
+		ret self.buildTypeWithGenerics(t, nil, nil)
+	}
+
+	// Select type with name selection.
+	fn selectType(mut &self, mut &t: &ast::TypeDecl): &TypeKind {
+		mut tc := &typeChecker{
+			s: self,
+			rootLookup: self,
+			lookup: self,
+			selection: true,
+		}
+		ret tc.checkDecl(t)
+	}
+
+	// Returns Eval instance for configuration with
+	// type prefix and checks var dependencies.
+	fn evalpd(mut &self, mut l: Lookup, mut p: &TypeKind, mut owner: &Var): &Eval {
+		mut e := &Eval{
+			s: self,
+			lookup: l,
+			owner: owner,
+		}
+		match type l {
+		| &scopeChecker:
+			e.unsafety = (&scopeChecker)(l).isUnsafe()
+		}
+		e.prefix = p
+		ret e
+	}
+
+	// Returns Eval instance for configuration with type prefix.
+	fn evalp(mut &self, mut l: Lookup, mut p: &TypeKind): &Eval {
+		ret self.evalpd(l, p, nil)
+	}
+
+	// Returns Eval instance for configuration.
+	fn eval(mut &self, mut l: Lookup): &Eval {
+		ret self.evalp(l, nil)
+	}
+
+	fn checkAssignType(mut &self, destIsRef: bool, mut &dest: &TypeKind,
+		mut &d: &Data, mut errorToken: &Token): bool {
+		if d.Decl {
+			self.pushErr(errorToken, LogMsg.InvalidExpr)
+			ret false
+		}
+		if destIsRef {
+			if !dest.Equal(d.Kind) {
+				self.pushErr(errorToken, LogMsg.IncompatibleTypes, dest.Str(), d.Kind.Str())
+				ret false
+			}
+		} else {
+			mut atc := &assignTypeChecker{
+				s: self,
+				errorToken: errorToken,
+				dest: dest,
+				d: d,
+			}
+			ok := atc.check()
+			if !ok {
+				ret false
+			}
+		}
+
+		if !d.IsConst() || dest.Prim() == nil {
+			ret true
+		}
+
+		mut kind := dest.Prim().Kind
+
+		match {
+		| types::IsSigInt(kind):
+			d.Constant.SetI64(d.Constant.AsI64())
+		| types::IsUnsigInt(kind):
+			d.Constant.SetU64(d.Constant.AsU64())
+		| types::IsFloat(kind):
+			d.Constant.SetF64(d.Constant.AsF64())
+		}
+
+		ret true
+	}
+
+	fn _checkTypeCompatibility(mut &self, mut &dest: &TypeKind, mut &src: &TypeKind,
+		mut errorToken: &Token): bool {
+		if src == nil {
+			ret false
+		}
+		// Tuple to single type, always fails.
+		if src.Tup() != nil {
+			ret false
+		}
+		mut tcc := typeCompatibilityChecker{
+			s: self,
+			errorToken: errorToken,
+			dest: dest,
+			src: src,
+		}
+		ret tcc.check()
+	}
+
+	fn checkTypeCompatibility(mut &self, mut &dest: &TypeKind,
+		mut &src: &TypeKind, mut &errorToken: &Token): bool {
+		if self._checkTypeCompatibility(dest, src, errorToken) {
+			ret true
+		}
+		self.pushErr(errorToken, LogMsg.IncompatibleTypes, dest.Str(), src.Str())
+		ret false
+	}
+
+	fn pushCompatiblityError(mut self, mut &dest: &TypeKind, mut &src: &Data,
+		mut &errorToken: &Token) {
+		if src.untyped {
+			match {
+			| src.Constant.IsI64():
+				self.pushErr(errorToken, LogMsg.IncompatibleTypes, dest.Str(), "untyped integer")
+				ret
+			| src.Constant.IsU64():
+				self.pushErr(errorToken, LogMsg.IncompatibleTypes, dest.Str(), "untyped unsigned integer")
+				ret
+			| src.Constant.IsF64():
+				self.pushErr(errorToken, LogMsg.IncompatibleTypes, dest.Str(), "untyped float")
+				ret
+			}
+		}
+		self.pushErr(errorToken, LogMsg.IncompatibleTypes, dest.Str(), src.Kind.Str())
+	}
+
+	fn checkTypeCompatibility1(mut &self, mut &dest: &TypeKind, mut &src: &Data,
+		mut &errorToken: &Token): bool {
+		if self._checkTypeCompatibility(dest, src.Kind, errorToken) {
+			ret true
+		}
+		self.pushCompatiblityError(dest, src, errorToken)
+		ret false
+	}
+
+	// Builds non-generic types but skips generic types.
+	// Builds generic identifiers as primitive type.
+	//
+	// Useful:
+	//   - For non-generic type parsed string type kinds.
+	//   - For checking non-generic types.
+	fn buildNonGenericTypeKind(mut &self, mut &ast: &ast::TypeDecl,
+		mut &generics: []&ast::GenericDecl, mut &ignored: []&TypeKind): &TypeKind {
+		mut tc := &typeChecker{
+			s: self,
+			rootLookup: self,
+			lookup: self,
+			ignoreGenerics: generics,
+			ignoredGenerics: &ignored,
+		}
+		ret tc.checkDecl(ast)
+	}
+
+	fn buildFnNonGenericTypeKinds(mut &self, mut &f: &FnIns, mut &ignored: []&TypeKind): (ok: bool) {
+		ok = true
+		let mut generics: []&ast::GenericDecl = nil
+		if f.Decl.IsMethod() {
+			generics = append(f.Decl.Generics, f.Decl.Owner.Generics...)
+		} else {
+			generics = f.Decl.Generics
+		}
+
+		for (_, mut p) in f.Params {
+			if !p.Decl.IsSelf() {
+				p.Kind = self.buildNonGenericTypeKind(p.Decl.Kind.Decl, generics, ignored)
+				ok = ok && p.Kind != nil
+			}
+		}
+		if !f.Decl.IsVoid() {
+			f.Result = self.buildNonGenericTypeKind(f.Decl.Result.Kind.Decl, generics, ignored)
+			ok = ok && f.Result != nil
+		}
+		ret
+	}
+
+	fn getTraitCheckFnKind(mut &self, mut &f: &Fn): &FnIns {
+		if len(f.Instances) == 1 {
+			ret f.Instances[0]
+		}
+		mut ins := f.instanceForce()
+
+		mut tc := &typeChecker{
+			s: self,
+			rootLookup: self,
+			lookup: self,
+		}
+		for (_, mut p) in ins.Params {
+			if !p.Decl.IsSelf() {
+				p.Kind = tc.checkDecl(p.Decl.Kind.Decl)
+			}
+		}
+		if !f.IsVoid() {
+			ins.Result = tc.checkDecl(f.Result.Kind.Decl)
+		}
+
+		ret ins
+	}
+
+	fn checkConstraintsFn(mut &self, mut &f: &FnIns, mut &et: &Token, mut exist: &FnIns): bool {
+		mut cc := self.constraintChecker()
+		cc.et = et
+		cc.fi = f
+		if exist != nil {
+			for (i, mut g) in exist.Generics {
+				f.Generics[i].Constraint = g.Constraint
+			}
+		} else {
+			cc.uniq = true
+		}
+		ret cc.check()
+	}
+
+	fn checkConstraintsStruct(mut &self, mut &s: &StructIns, mut &et: &Token, mut exist: &StructIns): bool {
+		mut cc := self.constraintChecker()
+		cc.et = et
+		cc.si = s
+		if exist != nil {
+			for (i, mut g) in exist.Generics {
+				s.Generics[i].Constraint = g.Constraint
+			}
+		} else {
+			cc.uniq = true
+		}
+		ret cc.check()
+	}
+
+	// Call algo in the function's native environment.
+	// Errors will be handled.
+	// Returns result of algo.
+	fn fnEnvironment(mut &self, mut &f: &FnIns, algo: fn(mut &sema: &Sema, mut &generics: []&TypeAlias): bool): bool {
+		mut sema := f.Decl.sema
+		mut old := f.Decl.sema.file
+		defer { f.Decl.sema.setCurrentFile(old) }
+		mut file := findFile(f.Decl.sema.files, f.Decl.Token.File)
+		if file != nil {
+			f.Decl.sema.setCurrentFile(file)
+		}
+
+		mut size := len(f.Generics)
+		if f.Decl != nil && f.Decl.Owner != nil {
+			size += len(f.Decl.Owner.Generics)
+		}
+
+		mut generics := make([]&TypeAlias, 0, size)
+		appendGenericTypeAliases(generics, f)
+
+		ok := algo(sema, generics)
+
+		if sema != self {
+			self.errors = append(self.errors, sema.errors...)
+			sema.errors = nil
+		}
+
+		ret ok
+	}
+
+	fn checkFnParamKind(mut &self, mut &p: &ParamIns) {
+		p.Kind.Variadic = p.Decl.Variadic
+		if p.Decl.Reference && !isValidForRef(p.Kind) {
+			self.pushErr(p.Decl.Token, LogMsg.RefPointsToInvalidType, p.Kind.Str())
+		}
+	}
+
+	fn reloadFnInsTypes(mut &self, mut f: &FnIns): bool {
+		if f.IsBuiltin() || f.IsAnon() {
+			ret true
+		}
+		ret self.fnEnvironment(f, fn(mut &sema: &Sema, mut &generics: []&TypeAlias): bool {
+			mut ok := true
+			for (_, mut p) in f.Params {
+				if p.Decl.IsSelf() {
+					if p.Decl.IsRef() {
+						p.Kind = &TypeKind{
+							Kind: &Sptr{
+								Elem: &TypeKind{
+									Kind: f.Owner,
+								},
+							},
+						}
+					} else {
+						p.Kind = &TypeKind{Kind: f.Owner}
+					}
+				} else {
+					p.Kind = sema.buildTypeWithGenerics(p.Decl.Kind.Decl, generics, f.Refers)
+					if p.Kind != nil {
+						self.checkFnParamKind(p)
+					} else {
+						ok = false
+					}
+				}
+			}
+			if !f.Decl.IsVoid() {
+				f.Result = sema.buildTypeWithGenerics(f.Decl.Result.Kind.Decl, generics, f.Refers)
+				ok = f.Result != nil && ok
+			}
+			ret ok
+		})
+	}
+
+	fn checkRefValidityForInitExpr(mut &self, leftMut: bool, mut &d: &Data, mut &errorToken: &Token): bool {
+		if !isValidModelForRef(d.Model) {
+			self.pushErr(errorToken, LogMsg.RefAssignNonVar)
+			ret false
+		}
+		if leftMut && !d.Mutable {
+			self.pushErr(errorToken, LogMsg.MutRefPointsImmut)
+			ret false
+		}
+		ret true
+	}
+
+	// Reports whether struct is risky for mutability.
+	// Designed for copy assignments.
+	// It will not check mutability risk of the internal mutable data or etc.
+	// It will check interior mutability risk of the new copy.
+	// Assumes the assigned memory is mutable.
+	fn isMutRiskyStruct(self, &s: &StructIns): bool {
+		for _, f in s.Fields {
+			// Inerior mutability enables to copy internal mutable data with safety.
+			// If field is interior mutable and their kind is mutable,
+			// check whether the field accessible. If field is not accessible,
+			// there is no problem, because no risk for mutability.
+			//
+			// For example:
+			//  We have a Foo struct. The Foo struct have the x field which is
+			//  interior mutable with mutable kind. So the following code is risky:
+			//
+			//    a := Foo{}
+			//    mut b := a
+			//
+			//  The example code above will create new copy of variable a, which is
+			//  instance of struct Foo. If the field x is accessible, the variable
+			//  b can mutate it, since it is mutable and can access to field x.
+			//  Therefore, copying interior mutable fields with mutable kind
+			//  must be disallowed if field is accessible for safety reasons.
+			if f.Decl.Mutable && f.Kind.Mutable() &&
+				self.isAccessibleDefine(f.Decl.Public, f.Decl.Token) {
+				ret true
+			}
+		}
+		ret false
+	}
+
+	fn checkValidityForInitExpr(mut &self, leftMut: bool, leftRef: bool,
+		&leftKind: &TypeKind, mut &d: &Data, mut &errorToken: &Token): bool {
+		if leftMut && !d.Mutable {
+			// Check classical assignment mutability.
+			if d.Kind.Mutable() {
+				self.pushErr(errorToken, LogMsg.AssignNonMutToMut, d.Kind.Str())
+				ret false
+			}
+			// Check interior mutability risk for the struct copy.
+			s := d.Kind.Struct()
+			if s != nil && self.isMutRiskyStruct(s) {
+				self.pushErr(errorToken, LogMsg.CopyWithMutableData, d.Kind.Str())
+				ret false
+			}
+		}
+		if leftRef {
+			if !self.checkRefValidityForInitExpr(leftMut, d, errorToken) {
+				ret false
+			}
+		}
+		mut atc := &assignTypeChecker{
+			s: self,
+			d: d,
+			errorToken: errorToken,
+		}
+		ret atc.checkValidity()
+	}
+
+	fn checkTypeAliasDeclKind(mut &self, mut &ta: &TypeAlias, mut l: Lookup): (ok: bool) {
+		mut old := self.file
+		defer {
+			self.setCurrentFile(old)
+		}
+		if ta.Token != nil {
+			mut file := findFile(self.files, ta.Token.File)
+			if file != nil {
+				self.setCurrentFile(file)
+			}
+		}
+		ok = self.checkTypeWithRefers(ta.Kind, l, nil, &referencer{
+			ident: ta.Ident,
+			owner: ta,
+			refs: &ta.Refers,
+		})
+		if ok && ta.Kind.Kind.Arr() != nil && ta.Kind.Kind.Arr().Auto {
+			self.pushErr(ta.Kind.Decl.Token, LogMsg.ArrayAutoSized)
+			ok = false
+		}
+		ret
+	}
+
+	fn checkTypeAliasDecl(mut &self, mut &ta: &TypeAlias, mut l: Lookup) {
+		if IsIgnoreIdent(ta.Ident) {
+			self.pushErr(ta.Token, LogMsg.IgnoreIdent)
+		}
+		self.checkTypeAliasDeclKind(ta, l)
+	}
+
+	// Checks type alias declaration with duplicated identifiers.
+	fn checkTypeAliasDeclDup(mut &self, mut &ta: &TypeAlias) {
+		if IsIgnoreIdent(ta.Ident) {
+			self.pushErr(ta.Token, LogMsg.IgnoreIdent)
+		}
+		if self.isDuplicatedIdent(uintptr(ta), ta.Ident, ta.Binded) {
+			self.pushErr(ta.Token, LogMsg.DuplicatedIdent, ta.Ident)
+			self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
+		}
+		self.checkTypeAliasDeclKind(ta, self)
+	}
+
+	// Checks current package file's type alias declarations.
+	fn checkTypeAliasDecls(mut &self): (ok: bool) {
+		for (_, mut ta) in self.file.TypeAliases {
+			self.checkTypeAliasDeclDup(ta)
+
+			// Break checking if type alias has error.
+			if len(self.errors) > 0 {
+				ret false
+			}
+		}
+		ret true
+	}
+
+	fn checkEnumItemsDup[T](mut self, items: []T) {
+		for _, item in items {
+			if item.Ident == "" {
+				continue
+			} else if IsIgnoreIdent(item.Ident) {
+				self.pushErr(item.Token, LogMsg.IgnoreIdent)
+			} else {
+				for _, citem in items {
+					if item == citem {
+						break
+					} else if item.Ident == citem.Ident {
+						self.pushErr(item.Token, LogMsg.DuplicatedIdent, item.Ident)
+						self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
+						break
+					}
+				}
+			}
+		}
+	}
+
+	fn checkEnumItemsStr(mut &self, mut &e: &Enum) {
+		mut eval := self.eval(self)
+		for (_, mut item) in e.Items {
+			if item.AutoExpr() {
+				item.Value = &Value{
+					Data: &Data{
+						Constant: Const.NewStr(item.Ident),
+					},
+				}
+				item.Value.Data.Model = item.Value.Data.Constant
+			} else {
+				mut d := eval.evalExpr(item.Value.Expr)
+				if d == nil {
+					continue
+				}
+
+				if !d.IsConst() {
+					self.pushErr(item.Value.Expr.Token, LogMsg.ExprNotConst)
+				}
+
+				_ = self.checkAssignType(false, e.Kind.Kind, d, item.Token)
+				item.Value.Data = d
+			}
+		}
+	}
+
+	fn checkEnumItemInt[Int](mut &self, mut &eval: &Eval, mut &e: &Enum, &prim: &Prim, mut &item: &EnumItem, mut &n: Int) {
+		if item.AutoExpr() {
+			item.Value = &Value{
+				Data: new(Data),
+			}
+			const match type Int {
+			| i64:
+				item.Value.Data.Constant = Const.NewI64(n)
+			| u64:
+				item.Value.Data.Constant = Const.NewU64(n)
+			|:
+				panic("unimplemented enum int type, this panic call should be unreachable")
+			}
+			item.Value.Data.Model = item.Value.Data.Constant
+		} else {
+			mut d := eval.evalExpr(item.Value.Expr)
+			if d == nil {
+				ret
+			}
+			if !d.IsConst() {
+				self.pushErr(item.Value.Expr.Token, LogMsg.ExprNotConst)
+			}
+			_ = self.checkAssignType(false, e.Kind.Kind, d, item.Token)
+			item.Value.Data = d
+			const match type Int {
+			| i64:
+				n = item.Value.Data.Constant.ReadI64()
+			| u64:
+				n = item.Value.Data.Constant.ReadU64()
+			|:
+				panic("unimplemented enum int type, this panic call should be unreachable")
+			}
+		}
+	}
+
+	fn checkEnumItemsInt1[Int](mut &self, &prim: &Prim, mut &e: &Enum) {
+		mut max := Int(0)
+		const match type Int {
+		| i64:
+			max = types::MaxI(prim.Str())
+		| u64:
+			max = types::MaxU(prim.Str())
+		|:
+			panic("unimplemented enum int type, this panic call should be unrechable")
+		}
+
+		mut eval := self.eval(self)
+		mut n := Int(0)
+		mut first := e.Items[0]
+		self.checkEnumItemInt(eval, e, prim, first, n)
+		if first.Value.Data != nil {
+			const match type Int {
+			| i64:
+				n = first.Value.Data.Constant.AsI64()
+			| u64:
+				n = first.Value.Data.Constant.AsU64()
+			|:
+				panic("unimplemented enum int type, this panic call should be unreachable")
+			}
+		}
+		for (_, mut item) in e.Items[1:] {
+			if item.AutoExpr() && n > 0 && max-n <= 0 {
+				self.pushErr(item.Token, LogMsg.OverflowLimits)
+				break
+			}
+			n++
+			self.checkEnumItemInt(eval, e, prim, item, n)
+		}
+	}
+
+	fn checkEnumItemsInt(mut &self, mut &e: &Enum) {
+		prim := e.Kind.Kind.Prim()
+		match {
+		| types::IsSigInt(prim.Kind):
+			self.checkEnumItemsInt1[i64](prim, e)
+		|:
+			self.checkEnumItemsInt1[u64](prim, e)
+		}
+	}
+
+	fn checkEnumDecl(mut &self, mut &e: &Enum) {
+		if IsIgnoreIdent(e.Ident) {
+			self.pushErr(e.Token, LogMsg.IgnoreIdent)
+		} else if self.isDuplicatedIdent(uintptr(e), e.Ident, false) {
+			self.pushErr(e.Token, LogMsg.DuplicatedIdent, e.Ident)
+			self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
+		}
+
+		if len(e.Items) == 0 {
+			self.pushErr(e.Token, LogMsg.NoMemberInEnum, e.Ident)
+			ret
+		}
+
+		self.checkEnumItemsDup[&EnumItem](e.Items)
+
+		if e.Kind != nil {
+			if !self.checkType(e.Kind, self) {
+				ret
+			}
+		} else {
+			// Set to default type.
+			e.Kind = findBuiltinTypeAlias(PrimKind.Int).Kind
+		}
+
+		mut t := e.Kind.Kind.Prim()
+		if t == nil {
+			self.pushErr(e.Token, LogMsg.InvalidTypeSource)
+			ret
+		}
+
+		// Check items.
+		match {
+		| t.IsStr():
+			self.checkEnumItemsStr(e)
+		| types::IsInt(t.Str()):
+			self.checkEnumItemsInt(e)
+		|:
+			self.pushErr(e.Token, LogMsg.InvalidTypeSource)
+		}
+	}
+
+	fn checkTypeEnumDecl(mut &self, mut &e: &TypeEnum) {
+		if IsIgnoreIdent(e.Ident) {
+			self.pushErr(e.Token, LogMsg.IgnoreIdent)
+		} else if self.isDuplicatedIdent(uintptr(e), e.Ident, false) {
+			self.pushErr(e.Token, LogMsg.DuplicatedIdent, e.Ident)
+			self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
+		}
+
+		if len(e.Items) == 0 {
+			self.pushErr(e.Token, LogMsg.NoMemberInEnum, e.Ident)
+			ret
+		}
+
+		self.checkEnumItemsDup[&TypeEnumItem](e.Items)
+		for (_, mut item) in e.Items {
+			if item.Kind == nil {
+				self.pushErr(item.Token, LogMsg.MissingType)
+				continue
+			}
+			ok := self.checkType(item.Kind, self)
+			if !ok {
+				continue
+			}
+			p := item.Kind.Kind.Prim()
+			if p != nil && p.IsAny() {
+				self.pushErr(item.Token, LogMsg.AnyWithTypeEnum)
+			}
+		}
+		if len(e.Items) == 1 {
+			mut item := e.Items[0]
+			tk := TypeKind{
+				Kind: e,
+			}
+			if item.Kind.Kind != nil && item.Kind.Kind.Equal(unsafe { (&TypeKind)(&tk) }) {
+				self.pushErr(item.Token, LogMsg.IllegalCycleRefersItself, e.Str())
+			}
+		}
+	}
+
+	// Checks current package file's enum declarations.
+	fn checkEnumDecls(mut &self): (ok: bool) {
+		for (_, mut e) in self.file.Enums {
+			self.checkEnumDecl(e)
+			// Break checking if type alias has error.
+			if len(self.errors) > 0 {
+				ret false
+			}
+		}
+		ret true
+	}
+
+	// Checks current package file's type enum declarations.
+	fn checkTypeEnumDecls(mut &self): (ok: bool) {
+		for (_, mut e) in self.file.TypeEnums {
+			self.checkTypeEnumDecl(e)
+			// Break checking if type alias has error.
+			if len(self.errors) > 0 {
+				ret false
+			}
+		}
+		ret true
+	}
+
+	fn checkDeclGenerics(mut self, &generics: []&ast::GenericDecl): (ok: bool) {
+		ok = true
+		for i, g in generics {
+			if IsIgnoreIdent(g.Ident) {
+				self.pushErr(g.Token, LogMsg.IgnoreIdent)
+				ok = false
+				continue
+			}
+
+			// Check duplications.
+		duplicationLookup:
+			for j, ct in generics {
+				match {
+				| j >= i:
+					// Skip current and following generics.
+					break duplicationLookup
+				| g.Ident == ct.Ident:
+					self.pushErr(g.Token, LogMsg.DuplicatedIdent, g.Ident)
+					self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
+					ok = false
+					break duplicationLookup
+				}
+			}
+		}
+		ret
+	}
+
+	fn checkFnDeclParamsDup(mut self, &f: &Fn): (ok: bool) {
+		ok = true
+	check:
+		for i, p in f.Params {
+			// Lookup in generics.
+			for _, g in f.Generics {
+				if p.Ident == g.Ident {
+					ok = false
+					self.pushErr(p.Token, LogMsg.DuplicatedIdent, p.Ident)
+					self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
+					continue check
+				}
+			}
+
+		paramsLookup:
+			for j, jp in f.Params {
+				match {
+				| j >= i:
+					// Skip current and following parameters.
+					break paramsLookup
+				| IsIgnoreIdent(p.Ident)
+				| IsIgnoreIdent(jp.Ident)
+				| IsAnonIdent(p.Ident)
+				| IsAnonIdent(jp.Ident):
+					// Skip anonymous parameters.
+					break paramsLookup
+				| p.Ident == jp.Ident:
+					ok = false
+					self.pushErr(p.Token, LogMsg.DuplicatedIdent, p.Ident)
+					self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
+					continue check
+				}
+			}
+		}
+		ret
+	}
+
+	fn checkFnDeclResultDup(mut self, &f: &Fn): (ok: bool) {
+		ok = true
+		if f.IsVoid() {
+			ret
+		}
+
+		// Check duplications.
+		for i, v in f.Result.Idents {
+			if IsIgnoreIdent(v.Kind) || IsAnonIdent(v.Kind) {
+				continue // Skip anonymous return variables.
+			}
+			// Lookup in generics.
+			for _, g in f.Generics {
+				if v.Kind == g.Ident {
+					goto exist
+				}
+			}
+			// Lookup in parameters.
+			for _, p in f.Params {
+				if v.Kind == p.Ident {
+					goto exist
+				}
+			}
+
+			// Lookup in return identifiers.
+		itself_lookup:
+			for j, jv in f.Result.Idents {
+				match {
+				| j >= i:
+					// Skip current and following identifiers.
+					break itself_lookup
+				| jv.Kind == v.Kind:
+					goto exist
+				}
+			}
+			continue
+		exist:
+			self.pushErr(v, LogMsg.DuplicatedIdent, v.Kind)
+			self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
+			ok = false
+		}
+
+		ret
+	}
+
+	fn checkFnVariadicParam(mut &self, mut &f: &Fn): bool {
+		if len(f.Params) == 0 {
+			ret false
+		}
+		mut param := f.Params[len(f.Params)-1]
+		if param.Variadic && param.Reference {
+			self.pushErr(param.Token, LogMsg.VariadicReference)
+		}
+		ret true
+	}
+
+	// Checks generics, parameters and return type.
+	// Not checks scope, and other things.
+	fn checkFnDeclPrototype(mut &self, mut &f: &Fn) {
+		if f.Exceptional && f.Binded {
+			self.pushErr(f.Token, LogMsg.BindedExceptional)
+			ret
+		}
+
+		if f.Exceptional {
+			if f.IsEntryPoint() {
+				self.pushErr(f.Token, LogMsg.ExceptionalEntryPoint)
+			} else if f.IsInit() {
+				self.pushErr(f.Token, LogMsg.ExceptionalInit)
+			}
+		}
+
+		match {
+		| !self.checkDeclGenerics(f.Generics):
+		| !self.checkFnDeclParamsDup(f):
+		| !self.checkFnDeclResultDup(f):
+		| !self.checkFnVariadicParam(f):
+		}
+	}
+
+	fn catchTraitInheritCycle(mut &self, t1: &Trait, mut t2: &Trait, mut &message: StrBuilder): (ok: bool) {
+		ok = true
+		for (_, mut i) in t2.Inherits {
+			if i.Kind == nil {
+				continue
+			}
+			mut t3 := i.Kind.Trait()
+			if t1 == t3 {
+				self.pushCycleError(t2.Ident, t3.Ident, message)
+				ret false
+			}
+			if !self.catchTraitInheritCycle(t1, t3, message) {
+				self.pushCycleError(t2.Ident, t3.Ident, message)
+				ret false
+			}
+		}
+		ret
+	}
+
+	fn _checkTraitDeclInherits(mut &self, mut &t: &Trait): (ok: bool) {
+		ok = true
+		for (i, mut it) in t.Inherits {
+			if !self.checkType(it, self) {
+				ok = false
+				continue
+			}
+			mut t2 := it.Kind.Trait()
+			if t2 == nil {
+				self.pushErr(it.Decl.Token, LogMsg.InheritedNonTrait, t.Ident, it.Kind.Str())
+				ok = false
+				continue
+			}
+			for j, it2 in t.Inherits {
+				if j >= i {
+					break
+				}
+				if it2.Kind != nil && it.Kind.Equal(it2.Kind) {
+					self.pushErr(it.Decl.Token, LogMsg.DuplicatedIdent, t2.Ident)
+					ok = false
+					break
+				}
+			}
+			if t == t2 {
+				self.pushErr(it.Decl.Token, LogMsg.IllegalCycleRefersItself, t.Ident)
+				ok = false
+			} else {
+				mut message := StrBuilder.New(1 << 6)
+				ok = ok && self.catchTraitInheritCycle(t, t2, message)
+				if message.Len() > 0 {
+					mut errMsg := message.Str()
+					message.Clear()
+					self.pushCycleError(t.Ident, t2.Ident, message)
+					errMsg += message.Str()
+					self.pushErr(it.Decl.Token, LogMsg.IllegalCrossCycle, errMsg)
+				}
+			}
+		}
+		ret ok
+	}
+
+	fn checkTraitDeclInherits(mut &self, mut &t: &Trait) {
+		for (i, mut it) in t.Inherits {
+			mut t1 := it.Kind.Trait()
+			for (j, mut it2) in t.Inherits {
+				if j == i {
+					continue
+				}
+				mut t2 := it2.Kind.Trait()
+				for (_, mut t1m) in t1.Methods {
+					mut t2m := t2.FindMethod(t1m.Ident)
+					if t2m == nil {
+						continue
+					}
+					t1f := self.getTraitCheckFnKind(t1m)
+					t2f := self.getTraitCheckFnKind(t2m)
+					if !t1f.equalTrait(t2f) {
+						self.pushErr(it.Decl.Token, LogMsg.IncompatibleInherit,
+							t.Ident, t2.Ident, t1f.GetKindStr(true), t2f.GetKindStr(true))
+						ret
+					}
+				}
+			}
+		}
+	}
+
+	fn checkTraitDeclMethod(mut &self, mut &f: &Fn) {
+		if IsIgnoreIdent(f.Ident) {
+			self.pushErr(f.Token, LogMsg.IgnoreIdent)
+		} else if IsAnonIdent(f.Ident) {
+			self.pushErr(f.Token, LogMsg.AnonFn)
+		}
+		f.sema = self
+		self.checkFnDeclPrototype(f)
+		mut ins := f.instance()
+		_ = self.reloadFnInsTypes(ins)
+		ins.reloaded = true
+		f.appendInstance(ins)
+	}
+
+	fn checkTraitDeclMethods(mut &self, mut &t: &Trait) {
+		for (i, mut f) in t.Methods {
+			self.checkTraitDeclMethod(f)
+
+			// Break checking if type alias has error.
+			if len(self.errors) > 0 {
+				ret
+			}
+
+			if t.findMethodInherit(f.Ident) != nil {
+				self.pushErr(f.Token, LogMsg.DuplicatedIdent, f.Ident)
+				self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
+				continue
+			}
+
+			// Check duplications.
+		duplicateLookup:
+			for j, jf in t.Methods {
+				// NOTE:
+				//  Ignore identifier checking is unnecessary here.
+				//  Because ignore identifiers logs error.
+				//  Errors breaks checking, so here is unreachable code for
+				//  ignore identified methods.
+				match {
+				| j >= i:
+					// Skip current and following methods.
+					break duplicateLookup
+				| f.Ident == jf.Ident:
+					self.pushErr(f.Token, LogMsg.DuplicatedIdent, f.Ident)
+					self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
+					break duplicateLookup
+				}
+			}
+		}
+	}
+
+	fn checkTraitDecl(mut &self, mut &t: &Trait) {
+		if IsIgnoreIdent(t.Ident) {
+			self.pushErr(t.Token, LogMsg.IgnoreIdent)
+		} else if self.isDuplicatedIdent(uintptr(t), t.Ident, false) {
+			self.pushErr(t.Token, LogMsg.DuplicatedIdent, t.Ident)
+			self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
+		}
+
+		self.checkTraitDeclInherits(t)
+		self.checkTraitDeclMethods(t)
+	}
+
+	// Checks current package file's trait declarations.
+	fn checkTraitDecls(mut &self): (ok: bool) {
+		for (_, mut t) in self.file.Traits {
+			self.checkTraitDecl(t)
+			// Break checking if type alias has error.
+			if len(self.errors) > 0 {
+				ret false
+			}
+		}
+		ret true
+	}
+
+	fn checkTraitImplMethods(mut self, mut &base: &Trait, &ipl: &Impl): (ok: bool) {
+		ok = true
+		for _, f in ipl.Methods {
+			if base.FindMethod(f.Ident) == nil {
+				self.pushErr(f.Token, LogMsg.TraitHaveNotIdent, base.Ident, f.Ident)
+				ok = false
+			}
+		}
+		ret
+	}
+
+	fn implToStruct(mut &self, mut &dest: &Struct, mut &ipl: &Impl): (ok: bool) {
+		ok = true
+
+		// Methods.
+		for (_, mut f) in ipl.Methods {
+			if dest.FindMethod(f.Ident, f.Statically) != nil || dest.FindField(f.Ident) != nil {
+				self.pushErr(f.Token, LogMsg.StructAlreadyHaveIdent, dest.Ident, f.Ident)
+				ok = false
+				continue
+			}
+
+			if len(dest.Generics) > 0 && len(f.Generics) > 0 {
+				for _, fg in f.Generics {
+					for _, dg in dest.Generics {
+						if fg.Ident == dg.Ident {
+							self.pushErr(fg.Token, LogMsg.MethodHasGenericWithSameIdent)
+							ok = false
+						}
+					}
+				}
+			}
+
+			self.checkDirectives(f.Directives, f)
+
+			f.sema = self
+			f.Owner = dest
+			dest.Methods = append(dest.Methods, f)
+		}
+
+		for (_, mut v) in ipl.Statics {
+			const Static = true
+			if dest.FindMethod(v.Ident, Static) != nil || dest.FindStatic(v.Ident) != nil {
+				self.pushErr(v.Token, LogMsg.StructAlreadyHaveIdent, dest.Ident, v.Ident)
+				ok = false
+				continue
+			}
+			dest.Statics = append(dest.Statics, v)
+		}
+		ret
+	}
+
+	// Implement trait to destination.
+	fn implTrait(mut &self, mut &decl: &Impl) {
+		mut base_t := self.selectType(decl.Base)
+		if base_t == nil {
+			ret
+		}
+		mut base := base_t.Trait()
+		if base == nil {
+			self.pushErr(decl.Base.Token, LogMsg.ImplInvalidBase, base_t.Str())
+			self.pushSuggestion(LogMsg.ExpectedTrait)
+			ret
+		}
+
+		mut destT := self.selectType(decl.Dest)
+		if destT == nil {
+			ret
+		}
+		mut destS := destT.Struct()
+		if destS == nil {
+			self.pushErr(decl.Dest.Token, LogMsg.ImplInvalidDest, destT.Str())
+			self.pushSuggestion(LogMsg.ExpectedStruct)
+			ret
+		}
+
+		mut dest := destS.Decl
+
+		if dest.Token.File.Dir() != self.file.File.Dir() {
+			self.pushErr(decl.Dest.Token, LogMsg.IllegalImplOutOfPackage)
+			ret
+		}
+
+		pushImplemented(base, dest)
+		pushImplements(dest, base)
+
+		if len(decl.Statics) > 0 {
+			self.pushErr(decl.Statics[0].Token, LogMsg.TraitImplHasStatic)
+		}
+
+		match {
+		| !self.checkTraitImplMethods(base, decl):
+		| !self.implToStruct(dest, decl):
+		}
+	}
+
+	fn implStruct(mut &self, mut &decl: &Impl) {
+		mut destT := self.selectType(decl.Dest)
+		if destT == nil {
+			ret
+		}
+		mut destS := destT.Struct()
+		if destS == nil {
+			self.pushErr(decl.Dest.Token, LogMsg.ImplInvalidDest, destT.Str())
+			self.pushSuggestion(LogMsg.ExpectedStruct)
+			ret
+		}
+
+		mut dest := destS.Decl
+		if dest.Token.File.Dir() != self.file.File.Dir() {
+			self.pushErr(decl.Dest.Token, LogMsg.IllegalImplOutOfPackage)
+			ret
+		}
+
+		match {
+		| !self.implToStruct(dest, decl):
+		}
+	}
+
+	// Implement implementation.
+	fn implImpl(mut &self, mut &decl: &Impl) {
+		match {
+		| decl.IsTraitImpl():
+			self.implTrait(decl)
+		| decl.IsStructImpl():
+			self.implStruct(decl)
+		}
+	}
+
+	// Checks variable declaration.
+	// Will not check duplicated identifiers.
+	fn checkVarDecl(mut &self, mut &decl: &Var, mut l: Lookup) {
+		if IsIgnoreIdent(decl.Ident) {
+			self.pushErr(decl.Token, LogMsg.IgnoreIdent)
+		}
+
+		if decl.IsTypeInferred() {
+			if !decl.IsInitialized() {
+				self.pushErr(decl.Token, LogMsg.MissingValueForTypeInference)
+			}
+		} else {
+			_ = self.checkType(decl.Kind, l)
+		}
+
+		if decl.Reference {
+			if decl.Constant {
+				self.pushErr(decl.Token, LogMsg.ConstRef)
+			}
+			if decl.Statically {
+				self.pushErr(decl.Token, LogMsg.StaticReference)
+			}
+		}
+
+		if !decl.IsInitialized() {
+			if decl.Constant {
+				self.pushErr(decl.Token, LogMsg.ConstVarNotHaveExpr)
+			}
+			if decl.Statically {
+				self.pushErr(decl.Token, LogMsg.StaticNotHaveExpr)
+			}
+			if decl.Reference {
+				self.pushErr(decl.Token, LogMsg.RefNotInited)
+			}
+		}
+	}
+
+	// Checks variable declaration for global scope.
+	// Checks duplicated identifiers by Sema.
+	fn checkGlobalVarDecl(mut &self, mut &decl: &Var) {
+		if self.isDuplicatedIdent(uintptr(decl), decl.Ident, decl.Binded) {
+			self.pushErr(decl.Token, LogMsg.DuplicatedIdent, decl.Ident)
+			self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
+		}
+		if decl.Binded && decl.Constant {
+			self.pushErr(decl.Token, LogMsg.BindedVarIsConst)
+		}
+		if !decl.Binded && !decl.Constant && !decl.Statically {
+			self.pushErr(decl.Token, LogMsg.GlobalNotStatic)
+			self.pushSuggestion(LogMsg.UseStaticKeywordToDef)
+		}
+		self.checkDirectives(decl.Directives, decl)
+		self.checkVarDecl(decl, self)
+	}
+
+	// Checks current package file's global variable declarations.
+	fn checkGlobalDecls(mut &self): (ok: bool) {
+		for (_, mut decl) in self.file.Vars {
+			self.checkGlobalVarDecl(decl)
+			// Break checking if type alias has error.
+			if len(self.errors) > 0 {
+				ret false
+			}
+		}
+		ret true
+	}
+
+	fn checkStructTraitImpl(mut &self, mut &strct: &Struct, mut &trt: &Trait): (ok: bool) {
+		for (_, mut tf) in trt.Methods {
+			mut exist := false
+			mut sf := strct.FindMethod(tf.Ident, tf.Statically)
+			tfK := self.getTraitCheckFnKind(tf)
+			if sf != nil {
+				mut sfK := self.getTraitCheckFnKind(sf)
+				exist = tfK.equalTrait(sfK)
+			}
+			if exist {
+				d := findDirective(sf.Directives, Directive.Deprecated)
+				if d != nil {
+					self.pushErr(d.Tag, LogMsg.TraitImplDeprecated)
+				}
+				ok = false
+			} else {
+				const Ident = true
+				self.pushErr(strct.Token, LogMsg.NotImplTraitDef, trt.Ident, tfK.GetKindStr(Ident))
+				ok = false
+			}
+		}
+		ret
+	}
+
+	fn checkStructImpls(mut &self, mut &s: &Struct): (ok: bool) {
+		ok = true
+		for (_, mut trt) in s.Implements {
+			ok = self.checkStructTraitImpl(s, trt) && ok
+		}
+		ret ok
+	}
+
+	fn checkStructFields(mut &self, mut &st: &Struct): (ok: bool) {
+		ok = true
+		for (_, mut f) in st.Fields {
+			f.Owner = st
+			for _, cf in st.Fields {
+				if f == cf {
+					break
+				} else if f.Ident == cf.Ident {
+					self.pushErr(f.Token, LogMsg.DuplicatedIdent, f.Ident)
+					self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
+					ok = false
+				}
+			}
+		}
+		ret ok
+	}
+
+	fn checkStructDecl(mut &self, mut &s: &Struct) {
+		if IsIgnoreIdent(s.Ident) {
+			self.pushErr(s.Token, LogMsg.IgnoreIdent)
+		} else if self.isDuplicatedIdent(uintptr(s), s.Ident, s.Binded) {
+			self.pushErr(s.Token, LogMsg.DuplicatedIdent, s.Ident)
+			self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
+		}
+
+		self.checkDirectives(s.Directives, s)
+
+		match {
+		| !self.checkDeclGenerics(s.Generics):
+		| !self.checkStructFields(s):
+		| !self.checkStructImpls(s):
+		| !self.checkFuncDeclsBy(s.Methods):
+		}
+	}
+
+	// Checks current package file's structure declarations.
+	fn checkStructDecls(mut &self): (ok: bool) {
+		for (_, mut s) in self.file.Structs {
+			self.checkStructDecl(s)
+			// Break checking if type alias has error.
+			if len(self.errors) > 0 {
+				ret false
+			}
+		}
+		ret true
+	}
+
+	fn checkAnonFuncDecl(mut &self, mut &f: &Fn) {
+		f.sema = self
+		self.checkFnDeclPrototype(f)
+	}
+
+	fn checkFuncDecl(mut &self, mut &f: &Fn) {
+		if IsIgnoreIdent(f.Ident) {
+			self.pushErr(f.Token, LogMsg.IgnoreIdent)
+		} else if f.IsAnon() {
+			self.pushErr(f.Token, LogMsg.AnonFn)
+		}
+
+		self.checkDirectives(f.Directives, f)
+		self.checkAnonFuncDecl(f)
+
+		if f.Owner == nil && self.isDuplicatedIdent(uintptr(f), f.Ident, f.Binded) {
+			if f.Ident == build::InitFn {
+				init := self.FindFn(build::InitFn, false)
+				if init != nil {
+					ret
+				}
+			}
+			self.pushErr(f.Token, LogMsg.DuplicatedIdent, f.Ident)
+			self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
+		}
+	}
+
+	fn checkFuncDeclsBy(mut &self, mut &funcs: []&Fn): bool {
+		for (_, mut f) in funcs {
+			self.checkFuncDecl(f)
+			// Break checking if error occurs.
+			if len(self.errors) > 0 {
+				ret false
+			}
+		}
+		ret true
+	}
+
+	// Checks current package file's function declarations.
+	fn checkFuncDecls(mut &self): (ok: bool) {
+		ret self.checkFuncDeclsBy(self.file.Funcs)
+	}
+
+	fn pushCycleError(self, &st1: str, &st2: str, mut &message: StrBuilder) {
+		const Padding = 7
+		refersTo := Logf(LogMsg.RefersTo, st1, st2)
+		m := message.Str()
+		message.WriteStr(strings::Repeat(" ", Padding))
+		message.WriteStr(refersTo)
+		message.WriteByte('\n')
+		message.WriteStr(m)
+	}
+
+	fn checkCrossCycle(self, &st1: &Struct, &st2: &Struct, mut &message: StrBuilder): bool {
+		for _, u in st2.Uses {
+			if u == st1 {
+				self.pushCycleError(st2.Ident, u.Ident, message)
+				ret false
+			}
+			if !self.checkCrossCycle(st1, u, message) {
+				self.pushCycleError(st2.Ident, u.Ident, message)
+				ret false
+			}
+		}
+		ret true
+	}
+
+	// Checks declarations of all package files.
+	// Breaks checking if checked file failed.
+	fn checkPackageDecls(mut &self) {
+		for (_, mut f) in self.files {
+			self.setCurrentFile(f)
+			if !self.checkTypeAliasDecls() {
+				ret
+			}
+		}
+
+		for (_, mut f) in self.files {
+			self.setCurrentFile(f)
+			if !self.checkTraitDecls() {
+				ret
+			}
+		}
+
+		for (_, mut f) in self.files {
+			self.setCurrentFile(f)
+			if !self.checkGlobalDecls() {
+				ret
+			}
+		}
+
+		for (_, mut f) in self.files {
+			self.setCurrentFile(f)
+			match {
+			| !self.checkFuncDecls():
+			| !self.checkStructDecls():
+			|:
+				continue
+			}
+			ret
+		}
+	}
+
+	fn checkDataForTypeInference(mut self, &d: &Data, &err_token: &Token) {
+		match {
+		| d.IsNil():
+			self.pushErr(err_token, LogMsg.NilForTypeInference)
+		| d.IsVoid():
+			self.pushErr(err_token, LogMsg.VoidForTypeInference)
+		| d.Kind.Variadic:
+			self.pushErr(err_token, LogMsg.InvalidExprForTypeInference)
+		}
+	}
+
+	// Checks value of variable.
+	fn checkVarValue(mut &self, mut &v: &Var) {
+		if v.IsTypeInferred() {
+			// Build new TypeSymbol because auto-type symbols are nil.
+			v.Kind = &TypeSymbol{Kind: v.Value.Data.Kind}
+
+			self.checkDataForTypeInference(v.Value.Data, v.Value.Expr.Token)
+			self.checkValidityForInitExpr(
+				v.Mutable,
+				v.Reference,
+				v.Kind.Kind,
+				v.Value.Data,
+				v.Value.Expr.Token)
+		} else {
+			mut arr := v.Kind.Kind.Arr()
+			if arr != nil {
+				if arr.Auto {
+					dataArr := v.Value.Data.Kind.Arr()
+					if dataArr != nil {
+						arr.N = dataArr.N
+					}
+				}
+			}
+
+			if self.checkAssignType(v.Reference, v.Kind.Kind, v.Value.Data, v.Value.Expr.Token) {
+				self.checkValidityForInitExpr(
+					v.Mutable,
+					v.Reference,
+					v.Kind.Kind,
+					v.Value.Data,
+					v.Value.Expr.Token)
+			}
+		}
+
+		if v.Reference && !isValidForRef(v.Kind.Kind) {
+			self.pushErr(v.Token, LogMsg.RefPointsToInvalidType, v.Kind.Kind.Str())
+		}
+
+		if v.Constant {
+			if !v.Value.Data.IsConst() && !v.Value.Data.Kind.comptime() {
+				self.pushErr(v.Value.Expr.Token, LogMsg.ExprNotConst)
+			}
+		} else {
+			v.Value.Data.Constant = nil
+			v.Value.Data.untyped = false
+		}
+
+		// Remove kind for avoid more tuple-type errors.
+		if v.Kind.Kind.Tup() != nil {
+			v.Kind.Kind = nil
+		}
+	}
+
+	// Evaluates value of variable if initialized.
+	fn evalVarValue(mut &self, mut &decl: &Var, mut l: Lookup) {
+		if !decl.IsInitialized() {
+			ret
+		}
+
+		let mut eval: &Eval = nil
+		if decl.Kind != nil {
+			eval = self.evalpd(l, decl.Kind.Kind, decl)
+		} else {
+			eval = self.evalpd(l, nil, decl)
+		}
+		eval.immutable = !decl.Mutable
+		decl.Value.Data = eval.evalExpr(decl.Value.Expr)
+	}
+
+	// Evaluateds value of variable and checks.
+	// Assumes the variable is global.
+	fn checkVar(mut &self, mut &decl: &Var, mut l: Lookup) {
+		self.evalVarValue(decl, l)
+		if decl.Value.Data == nil {
+			ret // Skip checks if error ocurrs.
+		}
+		self.checkVarValue(decl)
+	}
+
+	// Checks current package file's global variables.
+	fn checkGlobals(mut &self) {
+		for (_, mut decl) in self.file.Vars {
+			if decl.Binded {
+				continue
+			}
+			if decl.IsInitialized() && decl.Value.Data == nil ||
+				decl.IsTypeInferred() && decl.Kind.Kind == nil {
+				self.checkVar(decl, self)
+			}
+		}
+	}
+
+	// Returns new FnIns as ready-to-analysis.
+	// If function already has a instance, returns existing instance.
+	// Returns nil if have a problem.
+	fn readyToCheckFn(mut &self, mut &s: &StructIns, mut &f: &Fn): &FnIns {
+		mut ins := f.instance()
+		if len(f.Instances) != 0 {
+			ret ins
+		}
+		ins.Owner = s
+		f.appendInstance(ins)
+		ins.reloaded = true
+		if self.reloadFnInsTypes(ins) {
+			ret ins
+		}
+		ret nil
+	}
+
+	fn checkTypeMethod(mut &self, mut &s: &StructIns, mut &f: &Fn) {
+		// Generic instances are checked instantly.
+		if len(f.Generics) > 0 {
+			ret
+		}
+		mut ins := f.Instances[0]
+		if len(ins.Scope.Stmts) > 0 {
+			// Checked
+			ret
+		}
+		self.checkFnIns(ins)
+	}
+
+	fn checkStructInsOp(mut &self, mut &s: &StructIns, mut &f: &Fn, p: fn(f: &Fn): bool): &FnIns {
+		if f == nil || len(f.Generics) > 0 || !p(f) {
+			ret nil
+		}
+		ret f.Instances[0]
+	}
+
+	// Checks environment-dependent parts of structure instance.
+	// Which is contains fields and generic-type constraints.
+	// If generic instance will be check, errorToken should be passed.
+	fn checkStructEnv(mut &self, mut &s: &StructIns, mut errorToken: &Token): (ok: bool) {
+		mut tc := typeChecker{
+			s: s.Decl.sema,
+			rootLookup: s.Decl.sema,
+			lookup: s.Decl.sema,
+			referencer: &referencer{
+				ident: s.Decl.Ident,
+				owner: s.Decl,
+			},
+			refers: s.Refers,
+		}
+
+		if len(s.Generics) > 0 {
+			tc.useGenerics = make([]&TypeAlias, 0, len(s.Generics))
+			for (i, mut g) in s.Generics {
+				mut decl := s.Decl.Generics[i]
+				tc.useGenerics = append(tc.useGenerics, &TypeAlias{
+					Ident: decl.Ident,
+					Token: decl.Token,
+					Kind: &TypeSymbol{Kind: g.Kind},
+				})
+			}
+		}
+
+		mut oldFile := self.file
+		defer { self.setCurrentFile(oldFile) }
+
+		if self.file.File != s.Decl.Token.File {
+			mut file := findFile(self.files, s.Decl.Token.File)
+			if file != nil {
+				self.setCurrentFile(file)
+			}
+		}
+
+		if len(s.Generics) > 0 {
+			mut cc := self.constraintChecker()
+			cc.et = errorToken
+			cc.si = s
+			cc.genericsA = tc.useGenerics
+			cc.uniq = true
+			if !cc.check() {
+				ret
+			}
+		}
+
+		ok = true
+
+		if len(s.Statics) > 0 {
+			mut n := len(self.errors)
+			self.files[0].TypeAliases = append(tc.useGenerics, self.files[0].TypeAliases...)
+			for (_, mut v) in s.Statics {
+				self.checkVarDecl(v, self)
+				self.checkVar(v, self)
+				ok = len(self.errors)-n == 0 && ok
+			}
+			self.files[0].TypeAliases = self.files[0].TypeAliases[len(tc.useGenerics):]
+			if !ok {
+				ret false
+			}
+		}
+
+		mut eval := self.eval(self)
+		s.Comparable = !s.Decl.Binded
+		for (_, mut f) in s.Fields {
+			mut kind := tc.checkDecl(f.Decl.Kind.Decl)
+			ok = kind != nil && ok
+			if kind == nil {
+				if self != s.Decl.sema && len(s.Decl.sema.errors) > 0 {
+					self.errors = append(self.errors, s.Decl.sema.errors...)
+					s.Decl.sema.errors = nil
+				}
+				continue
+			}
+			f.Kind = kind
+			s.Mutable = s.Mutable || (!f.Decl.Mutable && f.Kind.Mutable())
+			s.Comparable = s.Comparable && f.Kind.Comparable()
+
+			// Skip this field if not has default value.
+			if f.Decl.Default == nil {
+				continue
+			}
+			eval.prefix = f.Kind
+			eval.field = f
+			f.Default = eval.evalExpr(f.Decl.Default)
+
+			// Skip if eval returned nil.
+			// Relevant error(s) logged by eval.
+			if f.Default == nil {
+				continue
+			}
+
+			const Reference = false // Fields cannot be reference.
+			_ = self.checkAssignType(Reference, f.Kind, f.Default, f.Decl.Default.Token)
+		}
+		ret
+	}
+
+	fn precheckStructIns(mut &self, mut &s: &StructIns, mut errorToken: &Token): (ok: bool) {
+		ok = self.checkStructEnv(s, errorToken)
+		if !ok {
+			ret false
+		}
+		for (_, mut f) in s.Methods {
+			if len(f.Generics) == 0 {
+				if self.readyToCheckFn(s, f) == nil {
+					ret false
+				}
+			}
+		}
+		ret true
+	}
+
+	fn checkStructIns(mut &self, mut &s: &StructIns) {
+		for (_, mut f) in s.Methods {
+			self.checkTypeMethod(s, f)
+		}
+	}
+
+	fn checkTypeStruct(mut &self, mut &s: &Struct) {
+		if s.Binded {
+			ret
+		}
+
+		// Generic instances are checked instantly.
+		if len(s.Generics) > 0 {
+			ret
+		}
+
+		// NOTICE:
+		// Do not check zero instance case, operator overloading
+		// checker will create an instance if not exist.
+		for (_, mut ins) in s.Instances {
+			self.checkStructIns(ins)
+		}
+	}
+
+	fn checkStructTypes(mut &self) {
+		for (_, mut s) in self.file.Structs {
+			self.checkTypeStruct(s)
+		}
+	}
+
+	fn checkStructInsOperators(mut &self, mut s: &StructIns) {
+		for (_, mut m) in s.Methods {
+			match m.Ident {
+			| "Eq":
+				s.Operators.Eq = self.checkStructInsOp(s, m, FuncPattern.Eq)
+				s.Comparable = s.Operators.Eq != nil
+			| "Gt":
+				s.Operators.Gt = self.checkStructInsOp(s, m, FuncPattern.Gt)
+			| "GtEq":
+				s.Operators.GtEq = self.checkStructInsOp(s, m, FuncPattern.GtEq)
+			| "Lt":
+				s.Operators.Lt = self.checkStructInsOp(s, m, FuncPattern.Lt)
+			| "LtEq":
+				s.Operators.LtEq = self.checkStructInsOp(s, m, FuncPattern.LtEq)
+			| "Shl":
+				s.Operators.Shl = self.checkStructInsOp(s, m, FuncPattern.Shl)
+			| "Shr":
+				s.Operators.Shr = self.checkStructInsOp(s, m, FuncPattern.Shr)
+			| "Add":
+				s.Operators.Add = self.checkStructInsOp(s, m, FuncPattern.Add)
+			| "Sub":
+				s.Operators.Sub = self.checkStructInsOp(s, m, FuncPattern.Sub)
+			| "Div":
+				s.Operators.Div = self.checkStructInsOp(s, m, FuncPattern.Div)
+			| "Mul":
+				s.Operators.Mul = self.checkStructInsOp(s, m, FuncPattern.Mul)
+			| "Mod":
+				s.Operators.Mod = self.checkStructInsOp(s, m, FuncPattern.Mod)
+			| "BitAnd":
+				s.Operators.BitAnd = self.checkStructInsOp(s, m, FuncPattern.BitAnd)
+			| "BitOr":
+				s.Operators.BitOr = self.checkStructInsOp(s, m, FuncPattern.BitOr)
+			| "BitXor":
+				s.Operators.BitXor = self.checkStructInsOp(s, m, FuncPattern.BitXor)
+			| "Neg":
+				s.Operators.Neg = self.checkStructInsOp(s, m, FuncPattern.Neg)
+			| "Pos":
+				s.Operators.Pos = self.checkStructInsOp(s, m, FuncPattern.Pos)
+			| "BitNot":
+				s.Operators.BitNot = self.checkStructInsOp(s, m, FuncPattern.BitNot)
+			| "AddAssign":
+				s.Operators.AddAssign = self.checkStructInsOp(s, m, FuncPattern.AddAssign)
+			| "SubAssign":
+				s.Operators.SubAssign = self.checkStructInsOp(s, m, FuncPattern.SubAssign)
+			| "DivAssign":
+				s.Operators.DivAssign = self.checkStructInsOp(s, m, FuncPattern.DivAssign)
+			| "MulAssign":
+				s.Operators.MulAssign = self.checkStructInsOp(s, m, FuncPattern.MulAssign)
+			| "ModAssign":
+				s.Operators.ModAssign = self.checkStructInsOp(s, m, FuncPattern.ModAssign)
+			| "ShlAssign":
+				s.Operators.ShlAssign = self.checkStructInsOp(s, m, FuncPattern.ShlAssign)
+			| "ShrAssign":
+				s.Operators.ShrAssign = self.checkStructInsOp(s, m, FuncPattern.ShrAssign)
+			| "BitOrAssign":
+				s.Operators.BitOrAssign = self.checkStructInsOp(s, m, FuncPattern.BitOrAssign)
+			| "BitAndAssign":
+				s.Operators.BitAndAssign = self.checkStructInsOp(s, m, FuncPattern.BitAndAssign)
+			| "BitXorAssign":
+				s.Operators.BitXorAssign = self.checkStructInsOp(s, m, FuncPattern.BitXorAssign)
+			}
+		}
+	}
+
+	fn precheckStructType(mut &self, mut &s: &Struct) {
+		if s.Binded {
+			ret
+		}
+
+		// Generic instances are checked instantly.
+		if len(s.Generics) > 0 {
+			ret
+		}
+
+		if len(s.Instances) == 0 {
+			mut ins := s.instance()
+			ins.Checked = true
+			s.appendInstance(ins) // Append instance before precheck.
+			self.precheckStructIns(ins, nil)
+		}
+
+		self.checkStructInsOperators(s.Instances[0])
+	}
+
+	fn precheckStructTypes(mut &self) {
+		for (_, mut s) in self.file.Structs {
+			self.precheckStructType(s)
+		}
+	}
+
+	fn checkRets(mut self, mut &f: &FnIns) {
+		if f.Decl.IsVoid() {
+			ret
+		}
+		mrc := missingRetChecker.new()
+		ok := mrc.check(f.Scope)
+		if !ok {
+			self.pushErr(f.Decl.Token, LogMsg.MissingRet)
+		}
+	}
+
+	fn checkFnInsSc(mut self, mut &f: &FnIns, mut &sc: &scopeChecker) {
+		appendRetVars(sc.table.Vars, f)
+		appendParamVars(sc.table.Vars, f)
+		appendGenericTypeAliases(sc.table.TypeAliases, f)
+
+		sc.check(f.Decl.Scope, f.Scope)
+
+		// Check return statements if scopeChecker not forced to stop.
+		if !sc.stopped() {
+			self.checkRets(f)
+		}
+	}
+
+	fn checkFnInsCaller(mut &self, mut &f: &FnIns, mut caller: &Token) {
+		if f.Decl.Binded {
+			ret
+		}
+
+		mut old := f.Decl.sema.file
+		defer { f.Decl.sema.setCurrentFile(old) }
+		mut file := findFile(f.Decl.sema.files, f.Decl.Token.File)
+		if file != nil {
+			f.Decl.sema.setCurrentFile(file)
+		}
+
+		mut sc := newScopeChecker(f.Decl.sema, f)
+		sc.calledFrom = caller
+		self.checkFnInsSc(f, sc)
+
+		if f.Decl.sema != self {
+			self.errors = append(self.errors, f.Decl.sema.errors...)
+			f.Decl.sema.errors = nil
+		}
+	}
+
+	fn checkFnIns(mut &self, mut &f: &FnIns) {
+		self.checkFnInsCaller(f, nil)
+	}
+
+	fn checkFunc(mut &self, mut &f: &Fn) {
+		if f.Binded {
+			ret
+		}
+
+		// Generic instances are checked instantly.
+		if len(f.Generics) > 0 {
+			ret
+		}
+
+		for (_, mut ins) in f.Instances {
+			self.checkFnIns(ins)
+		}
+	}
+
+	fn checkTestFn(mut self, mut &f: &FnIns) {
+		if f.Decl.Public {
+			self.pushErr(f.Decl.Token, LogMsg.PubTestFn)
+			self.pushSuggestion(LogMsg.RemovePubModifier)
+			ret
+		}
+
+		if f.Decl.Unsafety ||
+			!f.Decl.IsVoid() ||
+			len(f.Decl.Generics) != 0 ||
+			len(f.Params) != 1 ||
+			f.Decl.Params[0].Mutable ||
+			f.Decl.Params[0].Reference {
+			self.pushErr(f.Decl.Token, LogMsg.WrongTestFnDecl)
+			self.pushSuggestion(LogMsg.UseExpectedTestFnDecl)
+			ret
+		}
+
+		mut sptr := f.Params[0].Kind.Sptr()
+		if sptr == nil {
+			self.pushErr(f.Decl.Token, LogMsg.WrongTestFnDecl)
+			self.pushSuggestion(LogMsg.UseExpectedTestFnDecl)
+			ret
+		}
+
+		s := sptr.Elem.Struct()
+		if s == nil || !isStdPackage(s.Decl.Token.File.Path, "testing") {
+			self.pushErr(f.Decl.Token, LogMsg.WrongTestFnDecl)
+			self.pushSuggestion(LogMsg.UseExpectedTestFnDecl)
+			ret
+		}
+	}
+
+	fn precheckFunc(mut &self, mut &f: &Fn) {
+		if f.Binded {
+			ret
+		}
+
+		// Generic instances are checked instantly.
+		if len(f.Generics) > 0 {
+			ret
+		}
+
+		if len(f.Instances) == 0 {
+			mut ins := f.instanceForce()
+			f.Instances = append(f.Instances, ins)
+			ok := self.reloadFnInsTypes(ins)
+			ins.reloaded = true
+
+			if ok && hasDirective(f.Directives, Directive.Test) {
+				self.checkTestFn(ins)
+			}
+		}
+	}
+
+	// Prechecks types of current package file's functions.
+	fn precheckFuncs(mut &self) {
+		for (_, mut decl) in self.file.Traits {
+			for (_, mut m) in decl.Methods {
+				self.precheckFunc(m)
+			}
+		}
+		for (_, mut decl) in self.file.Funcs {
+			self.precheckFunc(decl)
+		}
+	}
+
+	// Checks types of current package file's functions.
+	fn checkFuncs(mut &self) {
+		for (_, mut decl) in self.file.Funcs {
+			self.checkFunc(decl)
+		}
+	}
+
+	// Checks all types of all package files.
+	// Breaks checking if checked file failed.
+	fn checkPackageTypes(mut &self) {
+		for (_, mut f) in self.files {
+			self.setCurrentFile(f)
+			self.checkGlobals()
+			self.precheckFuncs()
+			// Check structures first, see developer reference (7).
+			// Check operators first, see developer reference (7.1), and (7.2).
+			self.precheckStructTypes()
+		}
+		if len(self.errors) > 0 {
+			ret
+		}
+		for (_, mut f) in self.files {
+			self.setCurrentFile(f)
+			self.checkFuncs()
+			self.checkStructTypes()
+		}
+	}
+
+	fn setFileSemaFields(mut &self) {
+		for (_, mut f) in self.file.Funcs {
+			f.sema = self
+		}
+		for (_, mut st) in self.file.Structs {
+			st.sema = self
+		}
+	}
+
+	fn setSemaFields(mut &self) {
+		for (_, mut file) in self.files {
+			self.setCurrentFile(file)
+			self.setFileSemaFields()
+		}
+	}
+
+	fn check(mut &self, mut &files: []&SymbolTable) {
+		self.files = files
+
+		self.checkImports()
+		if len(self.errors) != 0 {
+			ret
+		}
+
+		self.setSemaFields()
+
+		self.checkInherits()
+		if len(self.errors) != 0 {
+			ret
+		}
+
+		self.implImpls()
+		if len(self.errors) != 0 {
+			ret
+		}
+
+		// Check enums here.
+		// See developer reference (8).
+		self.checkEnums()
+		if len(self.errors) != 0 {
+			ret
+		}
+
+		self.checkPackageDecls()
+		if len(self.errors) != 0 {
+			ret
+		}
+
+		self.checkPackageTypes()
+	}
 }
 
 struct missingRetChecker {
-    mut breaked: []uintptr
-    mut falled:  bool
+	mut breaked: []uintptr
+	mut falled:  bool
 }
 
 impl missingRetChecker {
-    static fn new(): missingRetChecker {
-        ret missingRetChecker{
-            breaked: make([]uintptr, 1 << 4),
-        }
-    }
+	static fn new(): missingRetChecker {
+		ret missingRetChecker{
+			breaked: make([]uintptr, 1 << 4),
+		}
+	}
 
-    fn checkConditional(self, mut c: &Conditional): bool {
-        for (_, mut elif) in c.Elifs {
-            if elif == nil {
-                ret false
-            }
-            if !self.checkScope(elif.Scope) {
-                ret false
-            }
-        }
-        ret c.Default != nil && self.checkScope(c.Default.Scope)
-    }
+	fn checkConditional(self, mut c: &Conditional): bool {
+		for (_, mut elif) in c.Elifs {
+			if elif == nil {
+				ret false
+			}
+			if !self.checkScope(elif.Scope) {
+				ret false
+			}
+		}
+		ret c.Default != nil && self.checkScope(c.Default.Scope)
+	}
 
-    fn checkMatch(self, mut m: &Match): bool {
-        for (_, mut c) in m.Cases {
-            if c == nil {
-                ret false
-            }
-            n := len(self.breaked)
-            ok := self.checkScope(c.Scope)
-            match {
-            | n != len(self.breaked):
-                ret false
-            | !ok:
-                if !self.falled {
-                    ret false
-                }
-                fall
-            | self.falled:
-                self.falled = false
-                if c.Next == nil {
-                    ret false
-                }
-                continue
-            }
-        }
-        ret m.Default != nil && self.checkScope(m.Default.Scope)
-    }
+	fn checkMatch(self, mut m: &Match): bool {
+		for (_, mut c) in m.Cases {
+			if c == nil {
+				ret false
+			}
+			n := len(self.breaked)
+			ok := self.checkScope(c.Scope)
+			match {
+			| n != len(self.breaked):
+				ret false
+			| !ok:
+				if !self.falled {
+					ret false
+				}
+				fall
+			| self.falled:
+				self.falled = false
+				if c.Next == nil {
+					ret false
+				}
+				continue
+			}
+		}
+		ret m.Default != nil && self.checkScope(m.Default.Scope)
+	}
 
-    fn checkInfIter(self, mut it: &InfIter): bool {
-        n := len(self.breaked)
-        if self.checkScope(it.Scope) {
-            self.breaked = self.breaked[:n]
-            ret true
-        }
-        if n != len(self.breaked) {
-            itaddr := uintptr(it)
-            for _, addr in self.breaked[n:] {
-                if itaddr == addr {
-                    self.breaked = self.breaked[:n]
-                    ret false
-                }
-            }
-            self.breaked = self.breaked[:n]
-        }
-        ret true
-    }
+	fn checkInfIter(self, mut it: &InfIter): bool {
+		n := len(self.breaked)
+		if self.checkScope(it.Scope) {
+			self.breaked = self.breaked[:n]
+			ret true
+		}
+		if n != len(self.breaked) {
+			itaddr := uintptr(it)
+			for _, addr in self.breaked[n:] {
+				if itaddr == addr {
+					self.breaked = self.breaked[:n]
+					ret false
+				}
+			}
+			self.breaked = self.breaked[:n]
+		}
+		ret true
+	}
 
-    fn checkScope(self, mut s: &Scope): bool {
-        if s == nil {
-            ret false
-        }
-        for (_, mut st) in s.Stmts {
-            match type st {
-            | &FallSt:
-                self.falled = true
-                ret false
-            | &BreakSt:
-                addr := (&BreakSt)(st).It
-                if addr != 0 {
-                    self.breaked = append(self.breaked, addr)
-                }
-                ret false
-            | &ContSt:
-                ret false
-            | &InfIter:
-                if self.checkInfIter((&InfIter)(st)) {
-                    ret true
-                }
-            | &RetSt:
-                ret true
-            | &Scope:
-                if self.checkScope((&Scope)(st)) {
-                    ret true
-                }
-            | &Data:
-                match type (&Data)(st).Model {
-                | &BuiltinPanicCallExprModel
-                | &BuiltinErrorCallExprModel:
-                    ret true
-                }
-            | &Conditional:
-                if self.checkConditional((&Conditional)(st)) {
-                    ret true
-                }
-            | &Match:
-                if self.checkMatch((&Match)(st)) {
-                    ret true
-                }
-            }
-        }
-        ret false
-    }
+	fn checkScope(self, mut s: &Scope): bool {
+		if s == nil {
+			ret false
+		}
+		for (_, mut st) in s.Stmts {
+			match type st {
+			| &FallSt:
+				self.falled = true
+				ret false
+			| &BreakSt:
+				addr := (&BreakSt)(st).It
+				if addr != 0 {
+					self.breaked = append(self.breaked, addr)
+				}
+				ret false
+			| &ContSt:
+				ret false
+			| &InfIter:
+				if self.checkInfIter((&InfIter)(st)) {
+					ret true
+				}
+			| &RetSt:
+				ret true
+			| &Scope:
+				if self.checkScope((&Scope)(st)) {
+					ret true
+				}
+			| &Data:
+				match type (&Data)(st).Model {
+				| &BuiltinPanicCallExprModel
+				| &BuiltinErrorCallExprModel:
+					ret true
+				}
+			| &Conditional:
+				if self.checkConditional((&Conditional)(st)) {
+					ret true
+				}
+			| &Match:
+				if self.checkMatch((&Match)(st)) {
+					ret true
+				}
+			}
+		}
+		ret false
+	}
 
-    fn check(self, mut s: &Scope): bool {
-        ret self.checkScope(s)
-    }
+	fn check(self, mut s: &Scope): bool {
+		ret self.checkScope(s)
+	}
 }
 
 fn pushImplemented(mut t: &Trait, mut &d: &Struct) {
 push:
-    match {
-    | len(t.Implemented) > 0:
-        for _, s in t.Implemented {
-            if s == d {
-                break push
-            }
-        }
-        fall
-    |:
-        t.Implemented = append(t.Implemented, d)
-    }
-    for (_, mut i) in t.Inherits {
-        pushImplemented(i.Kind.Trait(), d)
-    }
+	match {
+	| len(t.Implemented) > 0:
+		for _, s in t.Implemented {
+			if s == d {
+				break push
+			}
+		}
+		fall
+	|:
+		t.Implemented = append(t.Implemented, d)
+	}
+	for (_, mut i) in t.Inherits {
+		pushImplemented(i.Kind.Trait(), d)
+	}
 }
 
 fn pushImplements(mut &s: &Struct, mut t: &Trait) {
 push:
-    match {
-    | len(s.Implements) > 0:
-        for _, b in s.Implements {
-            if b == t {
-                break push
-            }
-        }
-        fall
-    |:
-        s.Implements = append(s.Implements, t)
-    }
-    for (_, mut i) in t.Inherits {
-        pushImplements(s, i.Kind.Trait())
-    }
+	match {
+	| len(s.Implements) > 0:
+		for _, b in s.Implements {
+			if b == t {
+				break push
+			}
+		}
+		fall
+	|:
+		s.Implements = append(s.Implements, t)
+	}
+	for (_, mut i) in t.Inherits {
+		pushImplements(s, i.Kind.Trait())
+	}
 }

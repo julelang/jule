@@ -43,33 +43,33 @@
 //  Ldexp(±Inf, exp) = ±Inf
 //  Ldexp(NaN, exp) = NaN
 fn Ldexp(mut frac: f64, mut exp: int): f64 {
-    // special cases
-    match {
-    | frac == 0:
-        ret frac // correctly return -0
-    | IsInf(frac, 0) | IsNaN(frac):
-        ret frac
-    }
-    mut e := 0
-    frac, e = normalize(frac)
-    exp += e
-    mut x := F64Bits(frac)
-    exp += int(x >> shift) & mask - bias
-    if exp < -1075 {
-        ret Copysign(0, frac) // underflow
-    }
-    if exp > 1023 { // overflow
-        if frac < 0 {
-            ret Inf(-1)
-        }
-        ret Inf(1)
-    }
-    mut m := 1.
-    if exp < -1022 { // denormal
-        exp += 53
-        m = 1.0 / (1 << 53) // 2**-53
-    }
-    x = x & ^(mask << shift)
-    x |= u64(exp + bias) << shift
-    ret m * F64FromBits(x)
+	// special cases
+	match {
+	| frac == 0:
+		ret frac // correctly return -0
+	| IsInf(frac, 0) | IsNaN(frac):
+		ret frac
+	}
+	mut e := 0
+	frac, e = normalize(frac)
+	exp += e
+	mut x := F64Bits(frac)
+	exp += int(x >> shift) & mask - bias
+	if exp < -1075 {
+		ret Copysign(0, frac) // underflow
+	}
+	if exp > 1023 { // overflow
+		if frac < 0 {
+			ret Inf(-1)
+		}
+		ret Inf(1)
+	}
+	mut m := 1.
+	if exp < -1022 { // denormal
+		exp += 53
+		m = 1.0 / (1 << 53) // 2**-53
+	}
+	x = x & ^(mask << shift)
+	x |= u64(exp + bias) << shift
+	ret m * F64FromBits(x)
 }

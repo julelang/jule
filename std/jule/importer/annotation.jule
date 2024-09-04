@@ -7,103 +7,103 @@ use build for std::jule::build
 use strings for std::strings
 
 fn checkOs(arg: str): (ok: bool, exist: bool) {
-    ok = false
-    exist = true
-    match arg {
-    | build::DistOs.Windows:
-        ok = build::IsWindows(build::Os)
-    | build::DistOs.Darwin:
-        ok = build::IsDarwin(build::Os)
-    | build::DistOs.Linux:
-        ok = build::IsLinux(build::Os)
-    | build::DistOs.Unix:
-        ok = build::IsUnix(build::Os)
-    |:
-        ok = true
-        exist = false
-    }
-    ret
+	ok = false
+	exist = true
+	match arg {
+	| build::DistOs.Windows:
+		ok = build::IsWindows(build::Os)
+	| build::DistOs.Darwin:
+		ok = build::IsDarwin(build::Os)
+	| build::DistOs.Linux:
+		ok = build::IsLinux(build::Os)
+	| build::DistOs.Unix:
+		ok = build::IsUnix(build::Os)
+	|:
+		ok = true
+		exist = false
+	}
+	ret
 }
 
 fn checkArch(arg: str): (ok: bool, exist: bool) {
-    ok = false
-    exist = true
-    match arg {
-    | build::DistArch.I386:
-        ok = build::IsI386(build::Arch)
-    | build::DistArch.Amd64:
-        ok = build::IsAmd64(build::Arch)
-    | build::DistArch.Arm64:
-        ok = build::IsArm64(build::Arch)
-    | build::DistArch.X64:
-        ok = build::Is64Bit(build::Arch)
-    | build::DistArch.X32:
-        ok = build::Is32Bit(build::Arch)
-    |:
-        ok = true
-        exist = false
-    }
-    ret
+	ok = false
+	exist = true
+	match arg {
+	| build::DistArch.I386:
+		ok = build::IsI386(build::Arch)
+	| build::DistArch.Amd64:
+		ok = build::IsAmd64(build::Arch)
+	| build::DistArch.Arm64:
+		ok = build::IsArm64(build::Arch)
+	| build::DistArch.X64:
+		ok = build::Is64Bit(build::Arch)
+	| build::DistArch.X32:
+		ok = build::Is32Bit(build::Arch)
+	|:
+		ok = true
+		exist = false
+	}
+	ret
 }
 
 // Reports whether file path passes file annotation by current system.
 fn isPassFileAnnotation(mut p: str): bool {
-    p = path::Base(p)
-    n := len(p)
-    p = p[:n-len(path::Ext(p))]
+	p = path::Base(p)
+	n := len(p)
+	p = p[:n-len(path::Ext(p))]
 
-    // a1 is the second annotation.
-    // Should be architecture annotation if exist annotation 2 (aka a2),
-    // can operating system or architecture annotation if not.
-    mut a1 := ""
-    // a2 is first filter.
-    // Should be operating system filter if exist and valid annotation.
-    mut a2 := ""
+	// a1 is the second annotation.
+	// Should be architecture annotation if exist annotation 2 (aka a2),
+	// can operating system or architecture annotation if not.
+	mut a1 := ""
+	// a2 is first filter.
+	// Should be operating system filter if exist and valid annotation.
+	mut a2 := ""
 
-    // Annotation 1
-    mut i := strings::FindLastByte(p, '_')
-    if i == -1 {
-        // Check file name directly if not exist any _ character.
-        mut ok, mut exist := checkOs(p)
-        if exist {
-            ret ok
-        }
-        ok, exist = checkArch(p)
-        ret !exist || ok
-    }
-    if i+1 >= n {
-        ret true
-    }
-    a1 = p[i+1:]
+	// Annotation 1
+	mut i := strings::FindLastByte(p, '_')
+	if i == -1 {
+		// Check file name directly if not exist any _ character.
+		mut ok, mut exist := checkOs(p)
+		if exist {
+			ret ok
+		}
+		ok, exist = checkArch(p)
+		ret !exist || ok
+	}
+	if i+1 >= n {
+		ret true
+	}
+	a1 = p[i+1:]
 
-    p = p[:i]
+	p = p[:i]
 
-    // Annotation 2
-    i = strings::FindLastByte(p, '_')
-    if i != -1 {
-        a2 = p[i+1:]
-    }
+	// Annotation 2
+	i = strings::FindLastByte(p, '_')
+	if i != -1 {
+		a2 = p[i+1:]
+	}
 
-    if a2 == "" {
-        mut ok, mut exist := checkOs(a1)
-        if exist {
-            ret ok
-        }
-        ok, exist = checkArch(a1)
-        ret !exist || ok
-    }
+	if a2 == "" {
+		mut ok, mut exist := checkOs(a1)
+		if exist {
+			ret ok
+		}
+		ok, exist = checkArch(a1)
+		ret !exist || ok
+	}
 
-    mut ok, mut exist := checkArch(a1)
-    if exist {
-        if !ok {
-            ret false
-        }
-        ok, exist = checkOs(a2)
-        ret !exist || ok
-    }
+	mut ok, mut exist := checkArch(a1)
+	if exist {
+		if !ok {
+			ret false
+		}
+		ok, exist = checkOs(a2)
+		ret !exist || ok
+	}
 
-    // a1 is not architecture, for this reason bad couple pattern.
-    // Accept as one pattern, so a1 can be platform.
-    ok, exist = checkOs(a1)
-    ret !exist || ok
+	// a1 is not architecture, for this reason bad couple pattern.
+	// Accept as one pattern, so a1 can be platform.
+	ok, exist = checkOs(a1)
+	ret !exist || ok
 }

@@ -5,45 +5,45 @@
 use obj
 use env
 use opt::{
-    self,
-    PushToSliceExprModel,
-    AppendToSliceExprModel,
-    MutSlicingExprModel,
-    SwapExprModel,
-    ExceptionalForwardingExprModel,
-    StrRuneIter,
+	self,
+	PushToSliceExprModel,
+	AppendToSliceExprModel,
+	MutSlicingExprModel,
+	SwapExprModel,
+	ExceptionalForwardingExprModel,
+	StrRuneIter,
 }
 use conv for std::conv
 use lex for std::jule::lex::{TokenKind}
 use std::jule::constant::{Const}
 use std::jule::sema::{
-    Data,
-    Stmt,
-    FnIns,
-    Var,
-    Scope,
-    If,
-    Conditional,
-    InfIter,
-    WhileIter,
-    RangeIter,
-    ContSt,
-    BreakSt,
-    Label,
-    GotoSt,
-    Postfix,
-    Assign,
-    MultiAssign,
-    Match,
-    Case,
-    FallSt,
-    RetSt,
-    TupleExprModel,
-    TypeKind,
-    SlicingExprModel,
-    IndexingExprModel,
-    FnCallExprModel,
-    AnonFnExprModel,
+	Data,
+	Stmt,
+	FnIns,
+	Var,
+	Scope,
+	If,
+	Conditional,
+	InfIter,
+	WhileIter,
+	RangeIter,
+	ContSt,
+	BreakSt,
+	Label,
+	GotoSt,
+	Postfix,
+	Assign,
+	MultiAssign,
+	Match,
+	Case,
+	FallSt,
+	RetSt,
+	TupleExprModel,
+	TypeKind,
+	SlicingExprModel,
+	IndexingExprModel,
+	FnCallExprModel,
+	AnonFnExprModel,
 }
 use std::strings::{StrBuilder}
 
@@ -56,1022 +56,1022 @@ static assignArgName = "__jule_assign_arg"
 
 // Common group of semantic analysis stmt types and optimizer specific types.
 enum compStmt: type {
-    Stmt: Stmt,
-    &PushToSliceExprModel,
-    &AppendToSliceExprModel,
-    &MutSlicingExprModel,
-    &SwapExprModel,
-    &ExceptionalForwardingExprModel,
-    &StrRuneIter,
+	Stmt: Stmt,
+	&PushToSliceExprModel,
+	&AppendToSliceExprModel,
+	&MutSlicingExprModel,
+	&SwapExprModel,
+	&ExceptionalForwardingExprModel,
+	&StrRuneIter,
 }
 
 struct scopeCoder {
-    oc: &ObjectCoder
+	oc: &ObjectCoder
 }
 
 impl scopeCoder {
-    static fn new(mut &oc: &ObjectCoder): &scopeCoder {
-        ret &scopeCoder{
-            oc: oc,
-        }
-    }
-
-    // Common head object-code for iterations of all kind.
-    fn iterHead[T](mut &self, &it: T, mut &ref: bool, begin: str) {
-        self.oc.write("{\n")
-        self.oc.addIndent()
-        self.oc.indent()
-        self.oc.write("auto expr = ")
-        if opt::Copy && isCopyOptimizable(it.Expr) {
-            ref = true
-            match type it.Expr.Model {
-            | &Var:
-                v := (&Var)(it.Expr.Model)
-                if v.Reference {
-                    self.oc.ec.model(it.Expr.Model)
-                    break
-                }
-                fall
-            |:
-                self.oc.write("&(")
-                self.oc.ec.model(it.Expr.Model)
-                self.oc.write(")")
-            }
-        } else {
-            self.oc.ec.possibleRefExpr(it.Expr.Model)
-        }
-        self.oc.write(";\n")
-        self.oc.indent()
-        self.oc.write("auto it = expr")
-        if ref {
-            self.oc.write("->")
-        } else {
-            self.oc.write(".")
-        }
-        self.oc.write("begin();\n")
-        self.oc.indent()
-        self.oc.write("auto expr_end = expr")
-        if ref {
-            self.oc.write("->")
-        } else {
-            self.oc.write(".")
-        }
-        self.oc.write("end();\n")
-        self.oc.indent()
-        self.oc.write(begin)
-        self.oc.write(":;\n")
-        self.oc.indent()
-        self.oc.write("if (it != expr_end) {\n")
-        self.oc.addIndent()
-        self.oc.indent()
-    }
-
-    fn rangeIndexIter(mut &self, mut &it: &RangeIter) {
-        mut sb := StrBuilder.New(1 << 6)
-        identCoder.iterBegin(sb, uintptr(it))
-        begin := sb.Str()
-        sb.Clear()
-        identCoder.iterNext(sb, uintptr(it))
-        next := sb.Str()
-
-        mut ref := false
-        self.iterHead(it, ref, begin)
-        if it.KeyA != nil {
-            self.oc.varInitExpr(it.KeyA, fn() {
-                if ref {
-                    self.oc.write("it - expr->begin()")
-                } else {
-                    self.oc.write("it - expr.begin()")
-                }
-            })
-            self.oc.write("\n")
-            self.oc.indent()
-        }
-        if it.KeyB != nil {
-            it.KeyB.Reference = opt::Copy && isIterCopyOptimizable(it.Expr, it.KeyB)
-            self.oc.varInitExpr(it.KeyB, fn() {
-                unsafe {
-                    if it.KeyB.Reference {
-                        self.oc.write("it")
-                    } else {
-                        self.oc.write("*it")
-                    }
-                }
-            })
-            self.oc.write("\n")
-            self.oc.indent()
-        }
-        self.scope(it.Scope)
-        self.oc.write("\n")
-        self.oc.indent()
-        self.oc.write(next)
-        self.oc.write(":;\n")
-        self.oc.indent()
-        self.oc.write("++it;\n")
-        self.oc.indent()
-        if it.KeyA != nil {
-            identCoder.var(self.oc.Buf, it.KeyA)
-            self.oc.write("++;\n")
-            self.oc.indent()
-        }
-        self.oc.write("goto ")
-        self.oc.write(begin)
-        self.oc.write(";\n")
-
-        // Close if.
-        self.oc.doneIndent()
-        self.oc.indent()
-        self.oc.write("}\n")
-
-        self.oc.indent()
-        identCoder.iterEnd(self.oc.Buf, uintptr(it))
-        self.oc.write(":;\n")
-
-        // Close scope.
-        self.oc.doneIndent()
-        self.oc.indent()
-        self.oc.write("}")
-    }
-
-    fn rangeHashmapIter(mut &self, mut &it: &RangeIter) {
-        mut sb := StrBuilder.New(1 << 6)
-        identCoder.iterBegin(sb, uintptr(it))
-        begin := sb.Str()
-        sb.Clear()
-        identCoder.iterNext(sb, uintptr(it))
-        next := sb.Str()
-
-        mut ref := false
-        self.iterHead(it, ref, begin)
-        if it.KeyA != nil {
-            self.oc.varInitExpr(it.KeyA, fn() { self.oc.write("it->first") })
-            self.oc.write("\n")
-            self.oc.indent()
-        }
-        if it.KeyB != nil {
-            self.oc.varInitExpr(it.KeyB, fn() { self.oc.write("it->second") })
-            self.oc.write("\n")
-            self.oc.indent()
-        }
-        self.scope(it.Scope)
-        self.oc.write("\n")
-        self.oc.indent()
-        self.oc.write(next)
-        self.oc.write(":;\n")
-        self.oc.indent()
-        self.oc.write("++it;\n")
-        self.oc.indent()
-        self.oc.write("goto ")
-        self.oc.write(begin)
-        self.oc.write(";\n")
-
-        // Close if.
-        self.oc.doneIndent()
-        self.oc.indent()
-        self.oc.write("}\n")
-
-        self.oc.indent()
-        identCoder.iterEnd(self.oc.Buf, uintptr(it))
-        self.oc.write(":;\n")
-
-        // Close scope.
-        self.oc.doneIndent()
-        self.oc.indent()
-        self.oc.write("}")
-    }
-
-    fn strRuneIter(mut &self, mut it: &StrRuneIter) {
-        mut sb := StrBuilder.New(1 << 6)
-        identCoder.iterBegin(sb, uintptr(it.Base))
-        begin := sb.Str()
-        sb.Clear()
-        identCoder.iterNext(sb, uintptr(it.Base))
-        next := sb.Str()
-
-        self.oc.write("{\n")
-        self.oc.addIndent()
-        self.oc.indent()
-
-        mut ref := false
-        self.oc.write("auto expr = ")
-        if opt::Copy && isCopyOptimizable(it.Expr) {
-            ref = true
-            match type it.Expr.Model {
-            | &Var:
-                v := (&Var)(it.Expr.Model)
-                if v.Reference {
-                    self.oc.ec.model(it.Expr.Model)
-                    break
-                }
-                fall
-            |:
-                self.oc.write("&(")
-                self.oc.ec.model(it.Expr.Model)
-                self.oc.write(")")
-            }
-        } else {
-            self.oc.ec.possibleRefExpr(it.Expr.Model)
-        }
-        self.oc.write(";\n")
-        self.oc.indent()
-        self.oc.write("char *it = expr")
-        if ref {
-            self.oc.write("->")
-        } else {
-            self.oc.write(".")
-        }
-        self.oc.write("operator char*();\n")
-        self.oc.indent()
-        self.oc.write("const char *end = it + expr")
-        if ref {
-            self.oc.write("->")
-        } else {
-            self.oc.write(".")
-        }
-        self.oc.write("len();\n")
-        self.oc.indent()
-
-        // Variables.
-        if it.Base.KeyA != nil {
-            self.oc.varInitExpr(it.Base.KeyA, fn() { self.oc.write("0") })
-            self.oc.write("\n")
-            self.oc.indent()
-        }
-        self.oc.write("std::size_t len;\n")
-        self.oc.indent()
-        if it.Base.KeyB != nil {
-            self.oc.varInitExpr(it.Base.KeyB, nil)
-            self.oc.write("\n")
-            self.oc.indent()
-        }
-        self.oc.write(begin)
-        self.oc.write(":;\n")
-        self.oc.indent()
-        self.oc.write("std::tie(")
-        if it.Base.KeyB != nil {
-            identCoder.var(self.oc.Buf, it.Base.KeyB)
-        } else {
-            self.oc.write("std::ignore")
-        }
-        self.oc.write(", len) = jule::utf8_decode_rune_str(it, end - it")
-        self.oc.write(");\n")
-        self.oc.indent()
-
-        self.oc.write("if (it < end) {\n")
-        self.oc.addIndent()
-        self.oc.indent()
-        self.scope(it.Base.Scope)
-        self.oc.write("\n")
-        self.oc.indent()
-        self.oc.write(next)
-        self.oc.write(":;\n")
-        self.oc.indent()
-        self.oc.write("it += len;\n")
-        self.oc.indent()
-        if it.Base.KeyA != nil {
-            identCoder.var(self.oc.Buf, it.Base.KeyA)
-            self.oc.write("++;\n")
-            self.oc.indent()
-        }
-        self.oc.write("goto ")
-        self.oc.write(begin)
-        self.oc.write(";\n")
-
-        // Close if.
-        self.oc.doneIndent()
-        self.oc.indent()
-        self.oc.write("}\n")
-
-        // Close scope.
-        self.oc.doneIndent()
-        self.oc.indent()
-        self.oc.write("}")
-    }
-
-    fn ifCase(mut &self, mut i: &If) {
-        if i.Expr != nil {
-            self.oc.write("if (")
-            self.oc.ec.possibleRefExpr(i.Expr)
-            self.oc.write(") ")
-        }
-        self.scope(i.Scope)
-    }
-
-    fn conditional(mut &self, mut c: &Conditional) {
-        mut writed := false
-        for (_, mut elif) in c.Elifs {
-            if elif == nil {
-                continue
-            }
-            if writed {
-                self.oc.write(" else ")
-            }
-            writed = true
-            self.ifCase(elif)
-        }
-        if c.Default != nil {
-            if writed {
-                self.oc.write(" else ")
-            }
-            self.scope(c.Default.Scope)
-        }
-    }
-
-    fn infIter(mut &self, mut it: &InfIter) {
-        self.oc.write("for (;;) {\n")
-        self.oc.addIndent() // Indent scope.
-        self.oc.indent()
-        self.scope(it.Scope)
-        self.oc.doneIndent()
-        self.oc.write("\n")
-        self.oc.indent()
-        identCoder.iterNext(self.oc.Buf, uintptr(it))
-        self.oc.write(":;\n")
-        self.oc.indent()
-        self.oc.write("}\n")
-        self.oc.indent()
-        identCoder.iterEnd(self.oc.Buf, uintptr(it))
-        self.oc.write(":;")
-    }
-
-    fn whileIter(mut &self, mut it: &WhileIter) {
-        if it.Expr != nil && it.Next == nil {
-            self.oc.write("while (")
-            self.oc.ec.possibleRefExpr(it.Expr)
-            self.oc.write(") {")
-        } else {
-            self.oc.write("for (; ")
-            if it.Expr != nil {
-                self.oc.ec.possibleRefExpr(it.Expr)
-            }
-            self.oc.write("; ")
-            if it.Next != nil {
-                self.st(it.Next)
-            }
-            self.oc.write(") {")
-        }
-
-        if len(it.Scope.Stmts) == 0 {
-            self.oc.write("}")
-            ret
-        }
-
-        self.oc.write("\n")
-        self.oc.addIndent()
-        self.oc.indent()
-        self.scope(it.Scope)
-        self.oc.write("\n")
-        self.oc.doneIndent()
-        self.oc.indent()
-
-        identCoder.iterNext(self.oc.Buf, uintptr(it))
-        self.oc.write(":;\n")
-        self.oc.indent()
-        self.oc.write("}\n")
-        self.oc.indent()
-        identCoder.iterEnd(self.oc.Buf, uintptr(it))
-        self.oc.write(":;")
-    }
-
-    fn rangeIter(mut &self, mut it: &RangeIter) {
-        match {
-        | it.Expr.Kind.Slc() != nil:
-            self.rangeIndexIter(it)
-        | it.Expr.Kind.Arr() != nil:
-            self.rangeIndexIter(it)
-        | it.Expr.Kind.Map() != nil:
-            self.rangeHashmapIter(it)
-        |:
-            self.rangeIndexIter(it) // Str
-        }
-    }
-
-    fn cont(mut &self, c: &ContSt) {
-        self.oc.write("goto ")
-        identCoder.iterNext(self.oc.Buf, c.It)
-    }
-
-    fn label(mut &self, l: &Label) {
-        identCoder.label(self.oc.Buf, uintptr(l))
-        self.oc.write(":")
-    }
-
-    fn gotoSt(mut &self, gt: &GotoSt) {
-        self.oc.write("goto ")
-        identCoder.label(self.oc.Buf, uintptr(gt.Label))
-    }
-
-    fn postfix(mut &self, mut p: &Postfix) {
-        self.oc.write("(")
-        self.oc.ec.possibleRefExpr(p.Expr)
-        self.oc.write(")")
-        self.oc.write(p.Op)
-    }
-
-    fn assign(mut &self, mut a: &Assign) {
-        self.oc.ec.possibleRefExpr(a.Left.Model)
-        self.oc.write(a.Op.Kind)
-        self.oc.ec.possibleRefExpr(a.Right.Model)
-    }
-
-    fn mapLookupAssign(mut &self, mut &a: &MultiAssign) {
-        mut iem := (&IndexingExprModel)(a.Right)
-        self.oc.ec.possibleRefExpr(iem.Expr.Model)
-        self.oc.write(".lookup(")
-        self.oc.ec.possibleRefExpr(iem.Index.Model)
-        self.oc.write(", ")
-        if a.Left[0] != nil {
-            self.oc.write("&(")
-            self.oc.ec.possibleRefExpr(a.Left[0].Model)
-            self.oc.write("), ")
-        } else {
-            self.oc.write("nullptr, ")
-        }
-        if a.Left[1] != nil {
-            self.oc.write("&(")
-            self.oc.ec.possibleRefExpr(a.Left[1].Model)
-            self.oc.write(")")
-        } else {
-            self.oc.write("nullptr")
-        }
-        self.oc.write(")")
-    }
-
-    fn multiAssignTup(mut &self, mut &a: &MultiAssign) {
-        self.oc.write("({\n")
-        self.oc.addIndent()
-
-        mut tup := (&TupleExprModel)(a.Right)
-
-        for (i, mut r) in tup.Datas {
-            self.oc.indent()
-            mut l := a.Left[i]
-            if l != nil {
-                match type l.Model {
-                | &Var:
-                    mut v := (&Var)(l.Model)
-                    // If variable is reference and uninitialized,
-                    // it should be declared in this multiple-assignment.
-                    if v.Reference && !v.IsInitialized() {
-                        identCoder.var(self.oc.Buf, v)
-                        self.oc.write(" = &(")
-                        self.oc.ec.possibleRefExpr(r.Model)
-                        self.oc.write(");\n")
-                        a.Left[i] = nil // Ignore handling for following statements.
-                        continue
-                    }
-                }
-                self.oc.tc.kind(self.oc.Buf, l.Kind)
-                self.oc.write(" ")
-                identCoder.toOut(self.oc.Buf, assignArgName, uintptr(i))
-                self.oc.write(" = ")
-            }
-            self.oc.ec.possibleRefExpr(r.Model)
-            self.oc.write(";\n")
-        }
-
-        for (i, mut l) in a.Left {
-            if l == nil {
-                continue
-            }
-            self.oc.indent()
-            self.oc.ec.possibleRefExpr(l.Model)
-            self.oc.write(" = ")
-            identCoder.toOut(self.oc.Buf, assignArgName, uintptr(i))
-            self.oc.write(";\n")
-        }
-
-        self.oc.doneIndent()
-        self.oc.indent()
-        self.oc.write("})")
-    }
-
-    fn multiAssignFn(mut &self, mut &a: &MultiAssign) {
-        self.oc.write("({\n")
-        self.oc.addIndent()
-        self.oc.indent()
-
-        mut f := (&FnCallExprModel)(a.Right)
-        self.oc.tc.rc.codeMut1(self.oc.Buf, f.Func.Result)
-        self.oc.write(" " + assignResultName + " = ")
-        self.oc.ec.possibleRefExpr(a.Right)
-        self.oc.write(";\n")
-
-        mut tup := f.Func.Result.Tup()
-        for (i, mut l) in a.Left {
-            if l != nil {
-                const r = assignResultName + "." + resultArgName
-                self.oc.indent()
-                self.oc.ec.possibleRefExpr(l.Model)
-                match {
-                | tup.Types[i].Equal(l.Kind):
-                    self.oc.write(" = " + r)
-                    self.oc.write(conv::Itoa(i))
-                | obj::IsAny(l.Kind):
-                    self.oc.write(" = " + typeCoder.Any + "(" + r)
-                    self.oc.write(conv::Itoa(i))
-                    self.oc.write(", &" + anyTypeIdent)
-                    self.oc.write(conv::Itoa(self.oc.pushAnyType(tup.Types[i])))
-                    self.oc.write(")")
-                |:
-                    // It should be trait.
-                    if tup.Types[i].Trait() != nil { // Different traits, cast.
-                        self.oc.write(" = ")
-                        mut t1 := l.Kind.Trait()
-                        mut t2 := tup.Types[i].Trait()
-                        self.oc.write(r)
-                        self.oc.write(conv::Itoa(i))
-                        self.oc.write(".map<")
-                        identCoder.traitDecl(self.oc.Buf, t1)
-                        self.oc.write(">(")
-                        self.oc.pushAndWriteMaskMapper(t1, t2)
-                        self.oc.write(")")
-                        break
-                    }
-                    t := l.Kind.Trait()
-                    self.oc.write(" = " + typeCoder.Trait + "(" + r)
-                    self.oc.write(conv::Itoa(i))
-                    self.oc.write(", (" + typeCoder.Trait + "::Type*)&")
-                    identCoder.traitDecl(self.oc.Buf, t)
-                    self.oc.write("_mptr_data")
-                    self.oc.write(conv::Itoa(obj::FindTraitTypeOffset(t, tup.Types[i])))
-                    self.oc.write(")")
-                }
-                self.oc.write(";\n")
-            }
-        }
-
-        self.oc.doneIndent()
-        self.oc.indent()
-        self.oc.write("})")
-    }
-
-    fn multiAssign(mut &self, mut a: &MultiAssign) {
-        // Write declarations without no initialization.
-        // It will initialize with assignments.
-        for (_, mut d) in a.Decls {
-            self.oc.varInitExpr(d, nil)
-            self.oc.write("\n")
-            self.oc.indent()
-        }
-
-        // Special cases.
-        match type a.Right {
-        | &IndexingExprModel: // Map lookup.
-            self.mapLookupAssign(a)
-            ret
-        }
-
-        match type a.Right {
-        | &TupleExprModel:
-            self.multiAssignTup(a)
-        | &FnCallExprModel:
-            self.multiAssignFn(a)
-        |:
-            panic("this panic call should be unreachable")
-        }
-    }
-
-    fn matchExpr(mut &self, mut m: &Match): fn() {
-        if !m.Expr.IsConst() {
-            ret fn() { self.oc.write(matchExpr) }
-        }
-        if !m.Expr.Constant.IsBool() || !m.Expr.Constant.ReadBool() {
-            ret fn() { self.oc.ec.possibleRefExpr(m.Expr.Model) }
-        }
-        ret nil
-    }
-
-    fn case(mut &self, mut m: &Match, mut c: &Case) {
-        if len(c.Exprs) != 0 && !m.Comptime {
-            if len(m.Cases) > 0 && m.Cases[0] == c {
-                self.oc.write("if (")
-            } else {
-                self.oc.write("else if (")
-            }
-            for (i, mut expr) in c.Exprs {
-                match {
-                | !m.TypeMatch:
-                    caseExpr := self.matchExpr(m)
-                    if m.Expr.GoodOperand(expr) {
-                        if caseExpr != nil {
-                            caseExpr()
-                            self.oc.write(" == ")
-                        }
-                        self.oc.ec.possibleRefExpr(expr.Model)
-                    } else {
-                        self.oc.ec.possibleRefExpr(expr.Model)
-                        if caseExpr != nil {
-                            self.oc.write(" == ")
-                            caseExpr()
-                        }
-                    }
-                |:
-                    self.oc.write(matchExpr)
-                    mut tk := (&TypeKind)(expr.Model)
-                    if m.Expr.Kind.Trait() != nil {
-                        self.oc.write(".type_is(")
-                        self.oc.ec.boolean(expr.Kind.Sptr() != nil)
-                        self.oc.write(", (const " + typeCoder.Trait + "::Type*)&")
-                        identCoder.traitDecl(self.oc.Buf, m.Expr.Kind.Trait())
-                        self.oc.write("_mptr_data")
-                        self.oc.write(conv::Itoa(obj::FindTraitTypeOffset(m.Expr.Kind.Trait(), expr.Kind)))
-                        self.oc.write(")")
-                    } else { // Any type.
-                        j := self.oc.pushAnyType(tk)
-                        self.oc.write(".type == &" + anyTypeIdent)
-                        self.oc.write(conv::Itoa(j))
-                    }
-                }
-
-                if len(c.Exprs)-i > 1 {
-                    self.oc.write(" || ")
-                }
-            }
-            self.oc.write(") ")
-        } else if m.Default == c && len(m.Cases) != 0 {
-            self.oc.indent()
-            self.oc.write("else ")
-        }
-
-        self.oc.addIndent()
-
-        self.oc.write("{\n")
-        self.oc.indent()
-        identCoder.caseBegin(self.oc.Buf, uintptr(c))
-        self.oc.write(":;\n")
-        if len(c.Scope.Stmts) > 0 {
-            self.oc.indent()
-            self.scope(c.Scope)
-            self.oc.write("\n")
-        }
-
-        self.oc.doneIndent()
-
-        self.oc.indent()
-        self.oc.write("}")
-    }
-
-    fn matchSt(mut &self, mut m: &Match) {
-        if len(m.Cases) == 0 && m.Default == nil {
-            ret
-        }
-
-        if m.Comptime && (m.Default == nil || len(m.Default.Scope.Stmts) == 0) {
-            ret
-        }
-
-        self.oc.write("{\n")
-
-        self.oc.addIndent()
-
-        self.oc.indent()
-
-        // Constant expressions generated as literals in conditions.
-        if !m.Comptime && !m.Expr.IsConst() {
-            if opt::Copy && isCopyOptimizable(m.Expr) {
-                self.oc.write("auto &_match_expr{ ")
-            } else {
-                self.oc.write("auto _match_expr{ ")
-            }
-            self.oc.ec.possibleRefExpr(m.Expr.Model)
-            self.oc.write(" };\n")
-            self.oc.indent()
-        }
-
-        if len(m.Cases) > 0 {
-            for (_, mut c) in m.Cases {
-                if c == nil {
-                    continue
-                }
-                self.oc.write("\n")
-                self.oc.indent()
-                self.case(m, c)
-            }
-        }
-
-        if m.Default != nil {
-            self.oc.write("\n")
-            self.case(m, m.Default)
-        }
-
-        self.oc.write("\n")
-        self.oc.indent()
-        identCoder.matchEnd(self.oc.Buf, uintptr(m))
-        self.oc.write(":;")
-        self.oc.write("\n")
-
-        self.oc.doneIndent()
-
-        self.oc.indent()
-        self.oc.write("}")
-    }
-
-    fn fallSt(mut &self, f: &FallSt) {
-        self.oc.write("goto ")
-        identCoder.caseBegin(self.oc.Buf, f.DestCase)
-    }
-
-    fn breakSt(mut &self, b: &BreakSt) {
-        self.oc.write("goto ")
-        if b.It != 0 {
-            identCoder.iterEnd(self.oc.Buf, b.It)
-        } else {
-            identCoder.matchEnd(self.oc.Buf, b.Mtch)
-        }
-    }
-
-    fn setResult(mut &self, mut r: &RetSt) {
-        if len(r.Func.Decl.Result.Idents) == 1 {
-            self.oc.write(resultName + " = ")
-            self.oc.ec.possibleRefExpr(r.Expr)
-            self.oc.write(";\n")
-            self.oc.indent()
-            ret
-        }
-        match type r.Expr {
-        | &TupleExprModel:
-            mut datas := (&TupleExprModel)(r.Expr).Datas
-            for i, data in datas {
-                self.oc.write(resultName + "." + resultArgName)
-                self.oc.write(conv::Itoa(i))
-                self.oc.write(" = ")
-                self.oc.ec.possibleRefExpr(data.Model)
-                self.oc.write(";\n")
-                self.oc.indent()
-            }
-        | &FnCallExprModel:
-            self.oc.write(resultName + " = std::move(")
-            self.oc.ec.model(r.Expr)
-            self.oc.write(");\n")
-        |:
-            panic("implementation mistake, this panic call should be unreachable")
-        }
-    }
-
-    fn retSt(mut &self, mut r: &RetSt) {
-        // Void.
-        if r.Func.Decl.IsVoid() {
-            if r.Func.Decl.Exceptional {
-                self.oc.write("return jule::VoidExceptional{};")
-                ret
-            }
-            self.oc.write("return;")
-            ret
-        } else if len(r.Func.Decl.Result.Idents) == 0 {
-            if r.Func.Decl.Exceptional {
-                self.oc.write("return jule::Exceptional<")
-                self.oc.tc.kind(self.oc.Buf, r.Func.Result)
-                self.oc.write(">{.result=")
-                self.oc.ec.possibleRefExpr(r.Expr)
-                self.oc.write("};")
-            } else {
-                self.oc.write("return ")
-                self.oc.ec.possibleRefExpr(r.Expr)
-                self.oc.write(";")
-            }
-            ret
-        }
-
-        if r.Expr != nil {
-            self.setResult(r)
-        }
-        if r.Func.Decl.Exceptional {
-            self.oc.write("return jule::Exceptional<")
-            self.oc.tc.rc.codeMut1(self.oc.Buf, r.Func.Result)
-            self.oc.write(">{.result=" + resultName + "};")
-        } else {
-            self.oc.write("return " + resultName + ";")
-        }
-    }
-
-    fn var(mut &self, mut v: &Var) {
-        if !v.Constant {
-            self.oc.var(v)
-        }
-    }
-
-    fn mutSlicing(mut &self, mut m: &MutSlicingExprModel) {
-        self.oc.write("(")
-        self.oc.ec.possibleRefExpr(m.Expr)
-        self.oc.write(").mut_slice(")
-        if !env::Production {
-            self.oc.write("\"")
-            self.oc.locInfo(m.Token)
-            self.oc.write("\", ")
-        }
-        self.oc.ec.possibleRefExpr(m.Left)
-        if m.Right != nil {
-            self.oc.write(", ")
-            self.oc.ec.possibleRefExpr(m.Right)
-        }
-        self.oc.write(");")
-    }
-
-    fn swap(mut &self, mut m: &SwapExprModel) {
-        self.oc.write("std::swap(")
-        self.oc.ec.possibleRefExpr(m.Left.Model)
-        self.oc.write(", ")
-        self.oc.ec.possibleRefExpr(m.Right.Model)
-        self.oc.write(")")
-    }
-
-    fn exceptionalForwarding(mut &self, mut m: &ExceptionalForwardingExprModel) {
-        self.oc.write("return ")
-        self.oc.ec.pureFuncCall(m.Expr)
-    }
-
-    // Generates C++ code of statement.
-    fn st(mut &self, mut st: compStmt) {
-        if st == nil {
-            ret
-        }
-        match type st {
-        | &Scope:
-            self.scope((&Scope)(st))
-        | &Var:
-            self.var((&Var)(st))
-        | &Data:
-            self.oc.ec.model((&Data)(st).Model)
-        | &Conditional:
-            self.conditional((&Conditional)(st))
-        | &InfIter:
-            self.infIter((&InfIter)(st))
-        | &WhileIter:
-            self.whileIter((&WhileIter)(st))
-        | &RangeIter:
-            self.rangeIter((&RangeIter)(st))
-        | &ContSt:
-            self.cont((&ContSt)(st))
-        | &Label:
-            self.label((&Label)(st))
-        | &GotoSt:
-            self.gotoSt((&GotoSt)(st))
-        | &Postfix:
-            self.postfix((&Postfix)(st))
-        | &Assign:
-            self.assign((&Assign)(st))
-        | &MultiAssign:
-            self.multiAssign((&MultiAssign)(st))
-        | &Match:
-            self.matchSt((&Match)(st))
-        | &FallSt:
-            self.fallSt((&FallSt)(st))
-        | &BreakSt:
-            self.breakSt((&BreakSt)(st))
-        | &RetSt:
-            self.retSt((&RetSt)(st))
-        | &PushToSliceExprModel:
-            self.oc.ec.pushToSlice((&PushToSliceExprModel)(st))
-        | &AppendToSliceExprModel:
-            self.oc.ec.appendToSlice((&AppendToSliceExprModel)(st))
-        | &MutSlicingExprModel:
-            self.mutSlicing((&MutSlicingExprModel)(st))
-        | &SwapExprModel:
-            self.swap((&SwapExprModel)(st))
-        | &ExceptionalForwardingExprModel:
-            self.exceptionalForwarding((&ExceptionalForwardingExprModel)(st))
-        | &StrRuneIter:
-            self.strRuneIter((&StrRuneIter)(st))
-        |:
-            self.oc.write("<unimplemented_stmt>")
-        }
-    }
-
-    fn scopeStmts(mut &self, mut &s: &Scope) {
-        for (_, mut st) in s.Stmts {
-            self.oc.indent()
-            self.st(st)
-            self.oc.write(";\n")
-        }
-    }
-
-    // Generates C++ code of scope.
-    fn scope(mut &self, mut s: &Scope) {
-        self.oc.addIndent()
-        if s.Deferred {
-            self.oc.write("__JULE_DEFER(")
-        }
-        self.oc.write("{\n")
-        self.scopeStmts(s)
-        self.oc.doneIndent()
-        self.oc.indent()
-        self.oc.write("}")
-        if s.Deferred {
-            self.oc.write(");")
-        }
-    }
-
-    fn commonFuncScope(mut &self, mut &f: &FnIns) {
-        if !f.Decl.IsVoid() {
-            mut tup := f.Result.Tup()
-            if tup != nil {
-                self.oc.indent()
-                self.oc.tc.rc.tup(self.oc.Buf, tup)
-                self.oc.write(" " + resultName + ";\n")
-                for (i, mut t) in tup.Types {
-                    if shouldInitialized(t) {
-                        self.oc.indent()
-                        self.oc.write(resultName + "." + resultArgName)
-                        self.oc.write(conv::Itoa(i))
-                        self.oc.write(" = ")
-                        self.oc.ec.initExpr(t)
-                        self.oc.write(";\n")
-                    }
-                }
-            } else if len(f.Decl.Result.Idents) == 1 {
-                // Non-tuple signle return type with identifier.
-                // Use [resultName] as identifier.
-                self.oc.indent()
-                self.oc.tc.kind(self.oc.Buf, f.Result)
-                self.oc.write(" " + resultName)
-                if shouldInitialized(f.Result) {
-                    self.oc.write(" = ")
-                    self.oc.ec.initExpr(f.Result)
-                }
-                self.oc.write(";\n")
-            }
-        }
-        self.scopeStmts(f.Scope)
-        if f.Decl.Exceptional && f.Decl.IsVoid() {
-            // Just for void exceptionals.
-            // Other cases checked by semantic analsis and disallowed
-            // if they are not returns.
-            self.oc.indent()
-            self.oc.write("return jule::VoidExceptional{};\n")
-        }
-    }
-
-    fn anonFuncScope(mut &self, mut m: &AnonFnExprModel, ident: str) {
-        if m.Func.Scope == nil {
-            ret
-        }
-        closure := obj::IsClosure(m)
-        if closure {
-            self.oc.ec.varPrefixes = append(self.oc.ec.varPrefixes, fn(mut v: &Var): bool { ret captureVarHandling(self.oc, m, v) })
-        }
-        self.oc.write("{\n")
-        self.oc.addIndent()
-
-        if closure {
-            // Get ctx.
-            self.oc.indent()
-            self.oc.write(typeCoder.Ptr + "<")
-            self.oc.write(ident)
-            self.oc.write(anonFnCtxSuffix + "> " + closureCtxIdent + " = " + ctxParamIdent + ".as<")
-            self.oc.write(ident)
-            self.oc.write(anonFnCtxSuffix + ">();\n")
-        }
-
-        self.commonFuncScope(m.Func)
-
-        self.oc.doneIndent()
-        self.oc.indent()
-        self.oc.write("}")
-        if closure {
-            self.oc.ec.varPrefixes = self.oc.ec.varPrefixes[:len(self.oc.ec.varPrefixes)-1]
-        }
-    }
-
-    // Generates C++ code of function's scope.
-    fn funcScope(mut &self, mut f: &FnIns) {
-        if f.Scope == nil {
-            ret
-        }
-        self.oc.write("{\n")
-        self.oc.addIndent()
-        self.commonFuncScope(f)
-        self.oc.doneIndent()
-        self.oc.indent()
-        self.oc.write("}")
-    }
+	static fn new(mut &oc: &ObjectCoder): &scopeCoder {
+		ret &scopeCoder{
+			oc: oc,
+		}
+	}
+
+	// Common head object-code for iterations of all kind.
+	fn iterHead[T](mut &self, &it: T, mut &ref: bool, begin: str) {
+		self.oc.write("{\n")
+		self.oc.addIndent()
+		self.oc.indent()
+		self.oc.write("auto expr = ")
+		if opt::Copy && isCopyOptimizable(it.Expr) {
+			ref = true
+			match type it.Expr.Model {
+			| &Var:
+				v := (&Var)(it.Expr.Model)
+				if v.Reference {
+					self.oc.ec.model(it.Expr.Model)
+					break
+				}
+				fall
+			|:
+				self.oc.write("&(")
+				self.oc.ec.model(it.Expr.Model)
+				self.oc.write(")")
+			}
+		} else {
+			self.oc.ec.possibleRefExpr(it.Expr.Model)
+		}
+		self.oc.write(";\n")
+		self.oc.indent()
+		self.oc.write("auto it = expr")
+		if ref {
+			self.oc.write("->")
+		} else {
+			self.oc.write(".")
+		}
+		self.oc.write("begin();\n")
+		self.oc.indent()
+		self.oc.write("auto expr_end = expr")
+		if ref {
+			self.oc.write("->")
+		} else {
+			self.oc.write(".")
+		}
+		self.oc.write("end();\n")
+		self.oc.indent()
+		self.oc.write(begin)
+		self.oc.write(":;\n")
+		self.oc.indent()
+		self.oc.write("if (it != expr_end) {\n")
+		self.oc.addIndent()
+		self.oc.indent()
+	}
+
+	fn rangeIndexIter(mut &self, mut &it: &RangeIter) {
+		mut sb := StrBuilder.New(1 << 6)
+		identCoder.iterBegin(sb, uintptr(it))
+		begin := sb.Str()
+		sb.Clear()
+		identCoder.iterNext(sb, uintptr(it))
+		next := sb.Str()
+
+		mut ref := false
+		self.iterHead(it, ref, begin)
+		if it.KeyA != nil {
+			self.oc.varInitExpr(it.KeyA, fn() {
+				if ref {
+					self.oc.write("it - expr->begin()")
+				} else {
+					self.oc.write("it - expr.begin()")
+				}
+			})
+			self.oc.write("\n")
+			self.oc.indent()
+		}
+		if it.KeyB != nil {
+			it.KeyB.Reference = opt::Copy && isIterCopyOptimizable(it.Expr, it.KeyB)
+			self.oc.varInitExpr(it.KeyB, fn() {
+				unsafe {
+					if it.KeyB.Reference {
+						self.oc.write("it")
+					} else {
+						self.oc.write("*it")
+					}
+				}
+			})
+			self.oc.write("\n")
+			self.oc.indent()
+		}
+		self.scope(it.Scope)
+		self.oc.write("\n")
+		self.oc.indent()
+		self.oc.write(next)
+		self.oc.write(":;\n")
+		self.oc.indent()
+		self.oc.write("++it;\n")
+		self.oc.indent()
+		if it.KeyA != nil {
+			identCoder.var(self.oc.Buf, it.KeyA)
+			self.oc.write("++;\n")
+			self.oc.indent()
+		}
+		self.oc.write("goto ")
+		self.oc.write(begin)
+		self.oc.write(";\n")
+
+		// Close if.
+		self.oc.doneIndent()
+		self.oc.indent()
+		self.oc.write("}\n")
+
+		self.oc.indent()
+		identCoder.iterEnd(self.oc.Buf, uintptr(it))
+		self.oc.write(":;\n")
+
+		// Close scope.
+		self.oc.doneIndent()
+		self.oc.indent()
+		self.oc.write("}")
+	}
+
+	fn rangeHashmapIter(mut &self, mut &it: &RangeIter) {
+		mut sb := StrBuilder.New(1 << 6)
+		identCoder.iterBegin(sb, uintptr(it))
+		begin := sb.Str()
+		sb.Clear()
+		identCoder.iterNext(sb, uintptr(it))
+		next := sb.Str()
+
+		mut ref := false
+		self.iterHead(it, ref, begin)
+		if it.KeyA != nil {
+			self.oc.varInitExpr(it.KeyA, fn() { self.oc.write("it->first") })
+			self.oc.write("\n")
+			self.oc.indent()
+		}
+		if it.KeyB != nil {
+			self.oc.varInitExpr(it.KeyB, fn() { self.oc.write("it->second") })
+			self.oc.write("\n")
+			self.oc.indent()
+		}
+		self.scope(it.Scope)
+		self.oc.write("\n")
+		self.oc.indent()
+		self.oc.write(next)
+		self.oc.write(":;\n")
+		self.oc.indent()
+		self.oc.write("++it;\n")
+		self.oc.indent()
+		self.oc.write("goto ")
+		self.oc.write(begin)
+		self.oc.write(";\n")
+
+		// Close if.
+		self.oc.doneIndent()
+		self.oc.indent()
+		self.oc.write("}\n")
+
+		self.oc.indent()
+		identCoder.iterEnd(self.oc.Buf, uintptr(it))
+		self.oc.write(":;\n")
+
+		// Close scope.
+		self.oc.doneIndent()
+		self.oc.indent()
+		self.oc.write("}")
+	}
+
+	fn strRuneIter(mut &self, mut it: &StrRuneIter) {
+		mut sb := StrBuilder.New(1 << 6)
+		identCoder.iterBegin(sb, uintptr(it.Base))
+		begin := sb.Str()
+		sb.Clear()
+		identCoder.iterNext(sb, uintptr(it.Base))
+		next := sb.Str()
+
+		self.oc.write("{\n")
+		self.oc.addIndent()
+		self.oc.indent()
+
+		mut ref := false
+		self.oc.write("auto expr = ")
+		if opt::Copy && isCopyOptimizable(it.Expr) {
+			ref = true
+			match type it.Expr.Model {
+			| &Var:
+				v := (&Var)(it.Expr.Model)
+				if v.Reference {
+					self.oc.ec.model(it.Expr.Model)
+					break
+				}
+				fall
+			|:
+				self.oc.write("&(")
+				self.oc.ec.model(it.Expr.Model)
+				self.oc.write(")")
+			}
+		} else {
+			self.oc.ec.possibleRefExpr(it.Expr.Model)
+		}
+		self.oc.write(";\n")
+		self.oc.indent()
+		self.oc.write("char *it = expr")
+		if ref {
+			self.oc.write("->")
+		} else {
+			self.oc.write(".")
+		}
+		self.oc.write("operator char*();\n")
+		self.oc.indent()
+		self.oc.write("const char *end = it + expr")
+		if ref {
+			self.oc.write("->")
+		} else {
+			self.oc.write(".")
+		}
+		self.oc.write("len();\n")
+		self.oc.indent()
+
+		// Variables.
+		if it.Base.KeyA != nil {
+			self.oc.varInitExpr(it.Base.KeyA, fn() { self.oc.write("0") })
+			self.oc.write("\n")
+			self.oc.indent()
+		}
+		self.oc.write("std::size_t len;\n")
+		self.oc.indent()
+		if it.Base.KeyB != nil {
+			self.oc.varInitExpr(it.Base.KeyB, nil)
+			self.oc.write("\n")
+			self.oc.indent()
+		}
+		self.oc.write(begin)
+		self.oc.write(":;\n")
+		self.oc.indent()
+		self.oc.write("std::tie(")
+		if it.Base.KeyB != nil {
+			identCoder.var(self.oc.Buf, it.Base.KeyB)
+		} else {
+			self.oc.write("std::ignore")
+		}
+		self.oc.write(", len) = jule::utf8_decode_rune_str(it, end - it")
+		self.oc.write(");\n")
+		self.oc.indent()
+
+		self.oc.write("if (it < end) {\n")
+		self.oc.addIndent()
+		self.oc.indent()
+		self.scope(it.Base.Scope)
+		self.oc.write("\n")
+		self.oc.indent()
+		self.oc.write(next)
+		self.oc.write(":;\n")
+		self.oc.indent()
+		self.oc.write("it += len;\n")
+		self.oc.indent()
+		if it.Base.KeyA != nil {
+			identCoder.var(self.oc.Buf, it.Base.KeyA)
+			self.oc.write("++;\n")
+			self.oc.indent()
+		}
+		self.oc.write("goto ")
+		self.oc.write(begin)
+		self.oc.write(";\n")
+
+		// Close if.
+		self.oc.doneIndent()
+		self.oc.indent()
+		self.oc.write("}\n")
+
+		// Close scope.
+		self.oc.doneIndent()
+		self.oc.indent()
+		self.oc.write("}")
+	}
+
+	fn ifCase(mut &self, mut i: &If) {
+		if i.Expr != nil {
+			self.oc.write("if (")
+			self.oc.ec.possibleRefExpr(i.Expr)
+			self.oc.write(") ")
+		}
+		self.scope(i.Scope)
+	}
+
+	fn conditional(mut &self, mut c: &Conditional) {
+		mut writed := false
+		for (_, mut elif) in c.Elifs {
+			if elif == nil {
+				continue
+			}
+			if writed {
+				self.oc.write(" else ")
+			}
+			writed = true
+			self.ifCase(elif)
+		}
+		if c.Default != nil {
+			if writed {
+				self.oc.write(" else ")
+			}
+			self.scope(c.Default.Scope)
+		}
+	}
+
+	fn infIter(mut &self, mut it: &InfIter) {
+		self.oc.write("for (;;) {\n")
+		self.oc.addIndent() // Indent scope.
+		self.oc.indent()
+		self.scope(it.Scope)
+		self.oc.doneIndent()
+		self.oc.write("\n")
+		self.oc.indent()
+		identCoder.iterNext(self.oc.Buf, uintptr(it))
+		self.oc.write(":;\n")
+		self.oc.indent()
+		self.oc.write("}\n")
+		self.oc.indent()
+		identCoder.iterEnd(self.oc.Buf, uintptr(it))
+		self.oc.write(":;")
+	}
+
+	fn whileIter(mut &self, mut it: &WhileIter) {
+		if it.Expr != nil && it.Next == nil {
+			self.oc.write("while (")
+			self.oc.ec.possibleRefExpr(it.Expr)
+			self.oc.write(") {")
+		} else {
+			self.oc.write("for (; ")
+			if it.Expr != nil {
+				self.oc.ec.possibleRefExpr(it.Expr)
+			}
+			self.oc.write("; ")
+			if it.Next != nil {
+				self.st(it.Next)
+			}
+			self.oc.write(") {")
+		}
+
+		if len(it.Scope.Stmts) == 0 {
+			self.oc.write("}")
+			ret
+		}
+
+		self.oc.write("\n")
+		self.oc.addIndent()
+		self.oc.indent()
+		self.scope(it.Scope)
+		self.oc.write("\n")
+		self.oc.doneIndent()
+		self.oc.indent()
+
+		identCoder.iterNext(self.oc.Buf, uintptr(it))
+		self.oc.write(":;\n")
+		self.oc.indent()
+		self.oc.write("}\n")
+		self.oc.indent()
+		identCoder.iterEnd(self.oc.Buf, uintptr(it))
+		self.oc.write(":;")
+	}
+
+	fn rangeIter(mut &self, mut it: &RangeIter) {
+		match {
+		| it.Expr.Kind.Slc() != nil:
+			self.rangeIndexIter(it)
+		| it.Expr.Kind.Arr() != nil:
+			self.rangeIndexIter(it)
+		| it.Expr.Kind.Map() != nil:
+			self.rangeHashmapIter(it)
+		|:
+			self.rangeIndexIter(it) // Str
+		}
+	}
+
+	fn cont(mut &self, c: &ContSt) {
+		self.oc.write("goto ")
+		identCoder.iterNext(self.oc.Buf, c.It)
+	}
+
+	fn label(mut &self, l: &Label) {
+		identCoder.label(self.oc.Buf, uintptr(l))
+		self.oc.write(":")
+	}
+
+	fn gotoSt(mut &self, gt: &GotoSt) {
+		self.oc.write("goto ")
+		identCoder.label(self.oc.Buf, uintptr(gt.Label))
+	}
+
+	fn postfix(mut &self, mut p: &Postfix) {
+		self.oc.write("(")
+		self.oc.ec.possibleRefExpr(p.Expr)
+		self.oc.write(")")
+		self.oc.write(p.Op)
+	}
+
+	fn assign(mut &self, mut a: &Assign) {
+		self.oc.ec.possibleRefExpr(a.Left.Model)
+		self.oc.write(a.Op.Kind)
+		self.oc.ec.possibleRefExpr(a.Right.Model)
+	}
+
+	fn mapLookupAssign(mut &self, mut &a: &MultiAssign) {
+		mut iem := (&IndexingExprModel)(a.Right)
+		self.oc.ec.possibleRefExpr(iem.Expr.Model)
+		self.oc.write(".lookup(")
+		self.oc.ec.possibleRefExpr(iem.Index.Model)
+		self.oc.write(", ")
+		if a.Left[0] != nil {
+			self.oc.write("&(")
+			self.oc.ec.possibleRefExpr(a.Left[0].Model)
+			self.oc.write("), ")
+		} else {
+			self.oc.write("nullptr, ")
+		}
+		if a.Left[1] != nil {
+			self.oc.write("&(")
+			self.oc.ec.possibleRefExpr(a.Left[1].Model)
+			self.oc.write(")")
+		} else {
+			self.oc.write("nullptr")
+		}
+		self.oc.write(")")
+	}
+
+	fn multiAssignTup(mut &self, mut &a: &MultiAssign) {
+		self.oc.write("({\n")
+		self.oc.addIndent()
+
+		mut tup := (&TupleExprModel)(a.Right)
+
+		for (i, mut r) in tup.Datas {
+			self.oc.indent()
+			mut l := a.Left[i]
+			if l != nil {
+				match type l.Model {
+				| &Var:
+					mut v := (&Var)(l.Model)
+					// If variable is reference and uninitialized,
+					// it should be declared in this multiple-assignment.
+					if v.Reference && !v.IsInitialized() {
+						identCoder.var(self.oc.Buf, v)
+						self.oc.write(" = &(")
+						self.oc.ec.possibleRefExpr(r.Model)
+						self.oc.write(");\n")
+						a.Left[i] = nil // Ignore handling for following statements.
+						continue
+					}
+				}
+				self.oc.tc.kind(self.oc.Buf, l.Kind)
+				self.oc.write(" ")
+				identCoder.toOut(self.oc.Buf, assignArgName, uintptr(i))
+				self.oc.write(" = ")
+			}
+			self.oc.ec.possibleRefExpr(r.Model)
+			self.oc.write(";\n")
+		}
+
+		for (i, mut l) in a.Left {
+			if l == nil {
+				continue
+			}
+			self.oc.indent()
+			self.oc.ec.possibleRefExpr(l.Model)
+			self.oc.write(" = ")
+			identCoder.toOut(self.oc.Buf, assignArgName, uintptr(i))
+			self.oc.write(";\n")
+		}
+
+		self.oc.doneIndent()
+		self.oc.indent()
+		self.oc.write("})")
+	}
+
+	fn multiAssignFn(mut &self, mut &a: &MultiAssign) {
+		self.oc.write("({\n")
+		self.oc.addIndent()
+		self.oc.indent()
+
+		mut f := (&FnCallExprModel)(a.Right)
+		self.oc.tc.rc.codeMut1(self.oc.Buf, f.Func.Result)
+		self.oc.write(" " + assignResultName + " = ")
+		self.oc.ec.possibleRefExpr(a.Right)
+		self.oc.write(";\n")
+
+		mut tup := f.Func.Result.Tup()
+		for (i, mut l) in a.Left {
+			if l != nil {
+				const r = assignResultName + "." + resultArgName
+				self.oc.indent()
+				self.oc.ec.possibleRefExpr(l.Model)
+				match {
+				| tup.Types[i].Equal(l.Kind):
+					self.oc.write(" = " + r)
+					self.oc.write(conv::Itoa(i))
+				| obj::IsAny(l.Kind):
+					self.oc.write(" = " + typeCoder.Any + "(" + r)
+					self.oc.write(conv::Itoa(i))
+					self.oc.write(", &" + anyTypeIdent)
+					self.oc.write(conv::Itoa(self.oc.pushAnyType(tup.Types[i])))
+					self.oc.write(")")
+				|:
+					// It should be trait.
+					if tup.Types[i].Trait() != nil { // Different traits, cast.
+						self.oc.write(" = ")
+						mut t1 := l.Kind.Trait()
+						mut t2 := tup.Types[i].Trait()
+						self.oc.write(r)
+						self.oc.write(conv::Itoa(i))
+						self.oc.write(".map<")
+						identCoder.traitDecl(self.oc.Buf, t1)
+						self.oc.write(">(")
+						self.oc.pushAndWriteMaskMapper(t1, t2)
+						self.oc.write(")")
+						break
+					}
+					t := l.Kind.Trait()
+					self.oc.write(" = " + typeCoder.Trait + "(" + r)
+					self.oc.write(conv::Itoa(i))
+					self.oc.write(", (" + typeCoder.Trait + "::Type*)&")
+					identCoder.traitDecl(self.oc.Buf, t)
+					self.oc.write("_mptr_data")
+					self.oc.write(conv::Itoa(obj::FindTraitTypeOffset(t, tup.Types[i])))
+					self.oc.write(")")
+				}
+				self.oc.write(";\n")
+			}
+		}
+
+		self.oc.doneIndent()
+		self.oc.indent()
+		self.oc.write("})")
+	}
+
+	fn multiAssign(mut &self, mut a: &MultiAssign) {
+		// Write declarations without no initialization.
+		// It will initialize with assignments.
+		for (_, mut d) in a.Decls {
+			self.oc.varInitExpr(d, nil)
+			self.oc.write("\n")
+			self.oc.indent()
+		}
+
+		// Special cases.
+		match type a.Right {
+		| &IndexingExprModel: // Map lookup.
+			self.mapLookupAssign(a)
+			ret
+		}
+
+		match type a.Right {
+		| &TupleExprModel:
+			self.multiAssignTup(a)
+		| &FnCallExprModel:
+			self.multiAssignFn(a)
+		|:
+			panic("this panic call should be unreachable")
+		}
+	}
+
+	fn matchExpr(mut &self, mut m: &Match): fn() {
+		if !m.Expr.IsConst() {
+			ret fn() { self.oc.write(matchExpr) }
+		}
+		if !m.Expr.Constant.IsBool() || !m.Expr.Constant.ReadBool() {
+			ret fn() { self.oc.ec.possibleRefExpr(m.Expr.Model) }
+		}
+		ret nil
+	}
+
+	fn case(mut &self, mut m: &Match, mut c: &Case) {
+		if len(c.Exprs) != 0 && !m.Comptime {
+			if len(m.Cases) > 0 && m.Cases[0] == c {
+				self.oc.write("if (")
+			} else {
+				self.oc.write("else if (")
+			}
+			for (i, mut expr) in c.Exprs {
+				match {
+				| !m.TypeMatch:
+					caseExpr := self.matchExpr(m)
+					if m.Expr.GoodOperand(expr) {
+						if caseExpr != nil {
+							caseExpr()
+							self.oc.write(" == ")
+						}
+						self.oc.ec.possibleRefExpr(expr.Model)
+					} else {
+						self.oc.ec.possibleRefExpr(expr.Model)
+						if caseExpr != nil {
+							self.oc.write(" == ")
+							caseExpr()
+						}
+					}
+				|:
+					self.oc.write(matchExpr)
+					mut tk := (&TypeKind)(expr.Model)
+					if m.Expr.Kind.Trait() != nil {
+						self.oc.write(".type_is(")
+						self.oc.ec.boolean(expr.Kind.Sptr() != nil)
+						self.oc.write(", (const " + typeCoder.Trait + "::Type*)&")
+						identCoder.traitDecl(self.oc.Buf, m.Expr.Kind.Trait())
+						self.oc.write("_mptr_data")
+						self.oc.write(conv::Itoa(obj::FindTraitTypeOffset(m.Expr.Kind.Trait(), expr.Kind)))
+						self.oc.write(")")
+					} else { // Any type.
+						j := self.oc.pushAnyType(tk)
+						self.oc.write(".type == &" + anyTypeIdent)
+						self.oc.write(conv::Itoa(j))
+					}
+				}
+
+				if len(c.Exprs)-i > 1 {
+					self.oc.write(" || ")
+				}
+			}
+			self.oc.write(") ")
+		} else if m.Default == c && len(m.Cases) != 0 {
+			self.oc.indent()
+			self.oc.write("else ")
+		}
+
+		self.oc.addIndent()
+
+		self.oc.write("{\n")
+		self.oc.indent()
+		identCoder.caseBegin(self.oc.Buf, uintptr(c))
+		self.oc.write(":;\n")
+		if len(c.Scope.Stmts) > 0 {
+			self.oc.indent()
+			self.scope(c.Scope)
+			self.oc.write("\n")
+		}
+
+		self.oc.doneIndent()
+
+		self.oc.indent()
+		self.oc.write("}")
+	}
+
+	fn matchSt(mut &self, mut m: &Match) {
+		if len(m.Cases) == 0 && m.Default == nil {
+			ret
+		}
+
+		if m.Comptime && (m.Default == nil || len(m.Default.Scope.Stmts) == 0) {
+			ret
+		}
+
+		self.oc.write("{\n")
+
+		self.oc.addIndent()
+
+		self.oc.indent()
+
+		// Constant expressions generated as literals in conditions.
+		if !m.Comptime && !m.Expr.IsConst() {
+			if opt::Copy && isCopyOptimizable(m.Expr) {
+				self.oc.write("auto &_match_expr{ ")
+			} else {
+				self.oc.write("auto _match_expr{ ")
+			}
+			self.oc.ec.possibleRefExpr(m.Expr.Model)
+			self.oc.write(" };\n")
+			self.oc.indent()
+		}
+
+		if len(m.Cases) > 0 {
+			for (_, mut c) in m.Cases {
+				if c == nil {
+					continue
+				}
+				self.oc.write("\n")
+				self.oc.indent()
+				self.case(m, c)
+			}
+		}
+
+		if m.Default != nil {
+			self.oc.write("\n")
+			self.case(m, m.Default)
+		}
+
+		self.oc.write("\n")
+		self.oc.indent()
+		identCoder.matchEnd(self.oc.Buf, uintptr(m))
+		self.oc.write(":;")
+		self.oc.write("\n")
+
+		self.oc.doneIndent()
+
+		self.oc.indent()
+		self.oc.write("}")
+	}
+
+	fn fallSt(mut &self, f: &FallSt) {
+		self.oc.write("goto ")
+		identCoder.caseBegin(self.oc.Buf, f.DestCase)
+	}
+
+	fn breakSt(mut &self, b: &BreakSt) {
+		self.oc.write("goto ")
+		if b.It != 0 {
+			identCoder.iterEnd(self.oc.Buf, b.It)
+		} else {
+			identCoder.matchEnd(self.oc.Buf, b.Mtch)
+		}
+	}
+
+	fn setResult(mut &self, mut r: &RetSt) {
+		if len(r.Func.Decl.Result.Idents) == 1 {
+			self.oc.write(resultName + " = ")
+			self.oc.ec.possibleRefExpr(r.Expr)
+			self.oc.write(";\n")
+			self.oc.indent()
+			ret
+		}
+		match type r.Expr {
+		| &TupleExprModel:
+			mut datas := (&TupleExprModel)(r.Expr).Datas
+			for i, data in datas {
+				self.oc.write(resultName + "." + resultArgName)
+				self.oc.write(conv::Itoa(i))
+				self.oc.write(" = ")
+				self.oc.ec.possibleRefExpr(data.Model)
+				self.oc.write(";\n")
+				self.oc.indent()
+			}
+		| &FnCallExprModel:
+			self.oc.write(resultName + " = std::move(")
+			self.oc.ec.model(r.Expr)
+			self.oc.write(");\n")
+		|:
+			panic("implementation mistake, this panic call should be unreachable")
+		}
+	}
+
+	fn retSt(mut &self, mut r: &RetSt) {
+		// Void.
+		if r.Func.Decl.IsVoid() {
+			if r.Func.Decl.Exceptional {
+				self.oc.write("return jule::VoidExceptional{};")
+				ret
+			}
+			self.oc.write("return;")
+			ret
+		} else if len(r.Func.Decl.Result.Idents) == 0 {
+			if r.Func.Decl.Exceptional {
+				self.oc.write("return jule::Exceptional<")
+				self.oc.tc.kind(self.oc.Buf, r.Func.Result)
+				self.oc.write(">{.result=")
+				self.oc.ec.possibleRefExpr(r.Expr)
+				self.oc.write("};")
+			} else {
+				self.oc.write("return ")
+				self.oc.ec.possibleRefExpr(r.Expr)
+				self.oc.write(";")
+			}
+			ret
+		}
+
+		if r.Expr != nil {
+			self.setResult(r)
+		}
+		if r.Func.Decl.Exceptional {
+			self.oc.write("return jule::Exceptional<")
+			self.oc.tc.rc.codeMut1(self.oc.Buf, r.Func.Result)
+			self.oc.write(">{.result=" + resultName + "};")
+		} else {
+			self.oc.write("return " + resultName + ";")
+		}
+	}
+
+	fn var(mut &self, mut v: &Var) {
+		if !v.Constant {
+			self.oc.var(v)
+		}
+	}
+
+	fn mutSlicing(mut &self, mut m: &MutSlicingExprModel) {
+		self.oc.write("(")
+		self.oc.ec.possibleRefExpr(m.Expr)
+		self.oc.write(").mut_slice(")
+		if !env::Production {
+			self.oc.write("\"")
+			self.oc.locInfo(m.Token)
+			self.oc.write("\", ")
+		}
+		self.oc.ec.possibleRefExpr(m.Left)
+		if m.Right != nil {
+			self.oc.write(", ")
+			self.oc.ec.possibleRefExpr(m.Right)
+		}
+		self.oc.write(");")
+	}
+
+	fn swap(mut &self, mut m: &SwapExprModel) {
+		self.oc.write("std::swap(")
+		self.oc.ec.possibleRefExpr(m.Left.Model)
+		self.oc.write(", ")
+		self.oc.ec.possibleRefExpr(m.Right.Model)
+		self.oc.write(")")
+	}
+
+	fn exceptionalForwarding(mut &self, mut m: &ExceptionalForwardingExprModel) {
+		self.oc.write("return ")
+		self.oc.ec.pureFuncCall(m.Expr)
+	}
+
+	// Generates C++ code of statement.
+	fn st(mut &self, mut st: compStmt) {
+		if st == nil {
+			ret
+		}
+		match type st {
+		| &Scope:
+			self.scope((&Scope)(st))
+		| &Var:
+			self.var((&Var)(st))
+		| &Data:
+			self.oc.ec.model((&Data)(st).Model)
+		| &Conditional:
+			self.conditional((&Conditional)(st))
+		| &InfIter:
+			self.infIter((&InfIter)(st))
+		| &WhileIter:
+			self.whileIter((&WhileIter)(st))
+		| &RangeIter:
+			self.rangeIter((&RangeIter)(st))
+		| &ContSt:
+			self.cont((&ContSt)(st))
+		| &Label:
+			self.label((&Label)(st))
+		| &GotoSt:
+			self.gotoSt((&GotoSt)(st))
+		| &Postfix:
+			self.postfix((&Postfix)(st))
+		| &Assign:
+			self.assign((&Assign)(st))
+		| &MultiAssign:
+			self.multiAssign((&MultiAssign)(st))
+		| &Match:
+			self.matchSt((&Match)(st))
+		| &FallSt:
+			self.fallSt((&FallSt)(st))
+		| &BreakSt:
+			self.breakSt((&BreakSt)(st))
+		| &RetSt:
+			self.retSt((&RetSt)(st))
+		| &PushToSliceExprModel:
+			self.oc.ec.pushToSlice((&PushToSliceExprModel)(st))
+		| &AppendToSliceExprModel:
+			self.oc.ec.appendToSlice((&AppendToSliceExprModel)(st))
+		| &MutSlicingExprModel:
+			self.mutSlicing((&MutSlicingExprModel)(st))
+		| &SwapExprModel:
+			self.swap((&SwapExprModel)(st))
+		| &ExceptionalForwardingExprModel:
+			self.exceptionalForwarding((&ExceptionalForwardingExprModel)(st))
+		| &StrRuneIter:
+			self.strRuneIter((&StrRuneIter)(st))
+		|:
+			self.oc.write("<unimplemented_stmt>")
+		}
+	}
+
+	fn scopeStmts(mut &self, mut &s: &Scope) {
+		for (_, mut st) in s.Stmts {
+			self.oc.indent()
+			self.st(st)
+			self.oc.write(";\n")
+		}
+	}
+
+	// Generates C++ code of scope.
+	fn scope(mut &self, mut s: &Scope) {
+		self.oc.addIndent()
+		if s.Deferred {
+			self.oc.write("__JULE_DEFER(")
+		}
+		self.oc.write("{\n")
+		self.scopeStmts(s)
+		self.oc.doneIndent()
+		self.oc.indent()
+		self.oc.write("}")
+		if s.Deferred {
+			self.oc.write(");")
+		}
+	}
+
+	fn commonFuncScope(mut &self, mut &f: &FnIns) {
+		if !f.Decl.IsVoid() {
+			mut tup := f.Result.Tup()
+			if tup != nil {
+				self.oc.indent()
+				self.oc.tc.rc.tup(self.oc.Buf, tup)
+				self.oc.write(" " + resultName + ";\n")
+				for (i, mut t) in tup.Types {
+					if shouldInitialized(t) {
+						self.oc.indent()
+						self.oc.write(resultName + "." + resultArgName)
+						self.oc.write(conv::Itoa(i))
+						self.oc.write(" = ")
+						self.oc.ec.initExpr(t)
+						self.oc.write(";\n")
+					}
+				}
+			} else if len(f.Decl.Result.Idents) == 1 {
+				// Non-tuple signle return type with identifier.
+				// Use [resultName] as identifier.
+				self.oc.indent()
+				self.oc.tc.kind(self.oc.Buf, f.Result)
+				self.oc.write(" " + resultName)
+				if shouldInitialized(f.Result) {
+					self.oc.write(" = ")
+					self.oc.ec.initExpr(f.Result)
+				}
+				self.oc.write(";\n")
+			}
+		}
+		self.scopeStmts(f.Scope)
+		if f.Decl.Exceptional && f.Decl.IsVoid() {
+			// Just for void exceptionals.
+			// Other cases checked by semantic analsis and disallowed
+			// if they are not returns.
+			self.oc.indent()
+			self.oc.write("return jule::VoidExceptional{};\n")
+		}
+	}
+
+	fn anonFuncScope(mut &self, mut m: &AnonFnExprModel, ident: str) {
+		if m.Func.Scope == nil {
+			ret
+		}
+		closure := obj::IsClosure(m)
+		if closure {
+			self.oc.ec.varPrefixes = append(self.oc.ec.varPrefixes, fn(mut v: &Var): bool { ret captureVarHandling(self.oc, m, v) })
+		}
+		self.oc.write("{\n")
+		self.oc.addIndent()
+
+		if closure {
+			// Get ctx.
+			self.oc.indent()
+			self.oc.write(typeCoder.Ptr + "<")
+			self.oc.write(ident)
+			self.oc.write(anonFnCtxSuffix + "> " + closureCtxIdent + " = " + ctxParamIdent + ".as<")
+			self.oc.write(ident)
+			self.oc.write(anonFnCtxSuffix + ">();\n")
+		}
+
+		self.commonFuncScope(m.Func)
+
+		self.oc.doneIndent()
+		self.oc.indent()
+		self.oc.write("}")
+		if closure {
+			self.oc.ec.varPrefixes = self.oc.ec.varPrefixes[:len(self.oc.ec.varPrefixes)-1]
+		}
+	}
+
+	// Generates C++ code of function's scope.
+	fn funcScope(mut &self, mut f: &FnIns) {
+		if f.Scope == nil {
+			ret
+		}
+		self.oc.write("{\n")
+		self.oc.addIndent()
+		self.commonFuncScope(f)
+		self.oc.doneIndent()
+		self.oc.indent()
+		self.oc.write("}")
+	}
 }
 
 fn isCopyOptimizable(&expr: &Data): bool {
-    if !expr.Lvalue {
-        ret false
-    }
-    match type expr.Model {
-    | &SlicingExprModel:
-        ret false
-    }
-    ret true
+	if !expr.Lvalue {
+		ret false
+	}
+	match type expr.Model {
+	| &SlicingExprModel:
+		ret false
+	}
+	ret true
 }
 
 fn isIterCopyOptimizable(&expr: &Data, &v: &Var): bool {
-    if !expr.Lvalue && !expr.Kind.Mutable() {
-        ret true
-    }
-    ret !v.Mutable && !expr.Mutable
+	if !expr.Lvalue && !expr.Kind.Mutable() {
+		ret true
+	}
+	ret !v.Mutable && !expr.Mutable
 }
 
 fn captureVarHandling(mut &oc: &ObjectCoder, mut &m: &AnonFnExprModel, mut &v: &Var): bool {
-    for _, cv in m.Captured {
-        if cv == v {
-            oc.write(closureCtxIdent + ".alloc->")
-            identCoder.var(oc.Buf, v)
-            ret true
-        }
-    }
-    ret false
+	for _, cv in m.Captured {
+		if cv == v {
+			oc.write(closureCtxIdent + ".alloc->")
+			identCoder.var(oc.Buf, v)
+			ret true
+		}
+	}
+	ret false
 }

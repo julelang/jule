@@ -9,8 +9,8 @@ use utf8 for std::unicode::utf8
 // Reports whether rune is byte actually.
 // In other words, whether rune is ACII.
 fn IsAscii(r: rune): bool {
-    const MaxAscii = 1 << 7 - 1
-    ret r <= MaxAscii
+	const MaxAscii = 1 << 7 - 1
+	ret r <= MaxAscii
 }
 
 // Returns rune value string from literal, includes quotes.
@@ -18,15 +18,15 @@ fn IsAscii(r: rune): bool {
 // Returns zero rune if len(lit) == 0.
 // Assumes lit is syntaticaly and semantically correct.
 fn ToRune(mut lit: str): rune {
-    mut r := rune(0)
-    lit = lit[1:len(lit)-1]
-    if lit[0] == '\\' && len(lit) > 1 {
-        mut i := 0
-        r = runeFromEsqSeq(lit, i)
-    } else {
-        r, _ = utf8::DecodeRuneStr(lit)
-    }
-    ret r
+	mut r := rune(0)
+	lit = lit[1:len(lit)-1]
+	if lit[0] == '\\' && len(lit) > 1 {
+		mut i := 0
+		r = runeFromEsqSeq(lit, i)
+	} else {
+		r, _ = utf8::DecodeRuneStr(lit)
+	}
+	ret r
 }
 
 // Returns raw-string value string from literal, includes quotes.
@@ -34,10 +34,10 @@ fn ToRune(mut lit: str): rune {
 // Returns empty string if len(lit) == 0.
 // Assumes lit is syntaticaly and semantically correct.
 fn ToRawStr(lit: str): str {
-    if len(lit) == 2 {
-        ret ""
-    }
-    ret lit[1:len(lit)-1]
+	if len(lit) == 2 {
+		ret ""
+	}
+	ret lit[1:len(lit)-1]
 }
 
 // Returns string value string from literal, includes quotes.
@@ -45,108 +45,108 @@ fn ToRawStr(lit: str): str {
 // Returns empty string if len(lit) == 0.
 // Assumes lit is syntaticaly and semantically correct.
 fn ToStr(mut lit: str): str {
-    if len(lit) == 2 {
-        ret ""
-    }
+	if len(lit) == 2 {
+		ret ""
+	}
 
-    // Means string is just ASCII text without escape sequences.
-    mut isPure := true
-    for _, b in lit {
-        if b >= utf8::RuneSelf || b == '\\' {
-            isPure = false
-            break
-        }
-    }
+	// Means string is just ASCII text without escape sequences.
+	mut isPure := true
+	for _, b in lit {
+		if b >= utf8::RuneSelf || b == '\\' {
+			isPure = false
+			break
+		}
+	}
 
-    if isPure {
-        ret lit[1:len(lit)-1]
-    }
+	if isPure {
+		ret lit[1:len(lit)-1]
+	}
 
-    // String is not pure.
-    // Handle unicode characters and escape sequences.
-    lit = lit[1:len(lit)-1]
-    mut s := make([]byte, 0, len(lit))
-    mut i := 0
-    for i < len(lit) {
-        b := lit[i]
-        if b == '\\' {
-            strEsqSeq(s, lit, i)
-        } else {
-            r, size := utf8::DecodeRuneStr(lit[i:])
-            i += size
-            s = utf8::AppendRune(s, r)
-        }
-    }
-    ret unsafe::StrFromBytes(s)
+	// String is not pure.
+	// Handle unicode characters and escape sequences.
+	lit = lit[1:len(lit)-1]
+	mut s := make([]byte, 0, len(lit))
+	mut i := 0
+	for i < len(lit) {
+		b := lit[i]
+		if b == '\\' {
+			strEsqSeq(s, lit, i)
+		} else {
+			r, size := utf8::DecodeRuneStr(lit[i:])
+			i += size
+			s = utf8::AppendRune(s, r)
+		}
+	}
+	ret unsafe::StrFromBytes(s)
 }
 
 fn tryBtoaCommonEsq(s: str): (seq: byte, ok: bool) {
-    if len(s) < 2 || s[0] != '\\' {
-        ret
-    }
-    match s[1] {
-    | '\\':
-        seq = '\\'
-    | '\'':
-        seq = '\''
-    | '"':
-        seq = '"'
-    | 'a':
-        seq = '\a'
-    | 'b':
-        seq = '\b'
-    | 'f':
-        seq = '\f'
-    | 'n':
-        seq = '\n'
-    | 'r':
-        seq = '\r'
-    | 't':
-        seq = '\t'
-    | 'v':
-        seq = '\v'
-    }
-    ok = seq != 0
-    ret
+	if len(s) < 2 || s[0] != '\\' {
+		ret
+	}
+	match s[1] {
+	| '\\':
+		seq = '\\'
+	| '\'':
+		seq = '\''
+	| '"':
+		seq = '"'
+	| 'a':
+		seq = '\a'
+	| 'b':
+		seq = '\b'
+	| 'f':
+		seq = '\f'
+	| 'n':
+		seq = '\n'
+	| 'r':
+		seq = '\r'
+	| 't':
+		seq = '\t'
+	| 'v':
+		seq = '\v'
+	}
+	ok = seq != 0
+	ret
 }
 
 fn runeFromEsqSeq(s: str, mut &i: int): rune {
-    b, ok := tryBtoaCommonEsq(s[i:])
-    i++ // Skip escape sequence solidus.
-    if ok {
-        i++ // Skip sequence specifier.
-        ret rune(b)
-    }
+	b, ok := tryBtoaCommonEsq(s[i:])
+	i++ // Skip escape sequence solidus.
+	if ok {
+		i++ // Skip sequence specifier.
+		ret rune(b)
+	}
 
-    match s[i] {
-    | 'u':
-        const SeqLen = 5
-        r := rune(conv::ParseUint(s[i+1 : i+SeqLen], 16, 64)!)
-        i += SeqLen
-        ret r
-    | 'U':
-        const SeqLen = 9
-        r := rune(conv::ParseUint(s[i+1 : i+SeqLen], 16, 64)!)
-        i += SeqLen
-        ret r
-    | 'x':
-        const SeqLen = 3
-        seq := s[i+1 : i+SeqLen]
-        i += SeqLen
-        ret rune(conv::ParseUint(seq, 16, 64)!)
-    |:
-        const SeqLen = 3
-        seq := s[i:i+SeqLen]
-        i += SeqLen
-        ret rune(conv::ParseUint(seq[1:], 8, 64)!)
-    }
+	match s[i] {
+	| 'u':
+		const SeqLen = 5
+		r := rune(conv::ParseUint(s[i+1 : i+SeqLen], 16, 64)!)
+		i += SeqLen
+		ret r
+	| 'U':
+		const SeqLen = 9
+		r := rune(conv::ParseUint(s[i+1 : i+SeqLen], 16, 64)!)
+		i += SeqLen
+		ret r
+	| 'x':
+		const SeqLen = 3
+		seq := s[i+1 : i+SeqLen]
+		i += SeqLen
+		ret rune(conv::ParseUint(seq, 16, 64)!)
+	|:
+		const SeqLen = 3
+		seq := s[i:i+SeqLen]
+		i += SeqLen
+		ret rune(conv::ParseUint(seq[1:], 8, 64)!)
+	}
 }
 
 fn strEsqSeq(mut &buf: []byte, s: str, mut &i: int) {
-    r := runeFromEsqSeq(s, i)
-    if r <= 255 {
-        buf = append(buf, byte(r))
-        ret
-    }
-    buf = utf8::AppendRune(buf, r)
+	r := runeFromEsqSeq(s, i)
+	if r <= 255 {
+		buf = append(buf, byte(r))
+		ret
+	}
+	buf = utf8::AppendRune(buf, r)
 }

@@ -32,122 +32,122 @@ use bits for std::math::bits
 //   moshier@na-net.ornl.gov
 
 impl Cmplx {
-    // Complex circular tangent
-    //
-    // DESCRIPTION:
-    //
-    // If
-    //     z = x + iy,
-    //
-    // then
-    //
-    //           sin 2x  +  i sinh 2y
-    //     w  =  --------------------.
-    //            cos 2x  +  cosh 2y
-    //
-    // On the real axis the denominator is zero at odd multiples
-    // of PI/2. The denominator is evaluated by its Taylor
-    // series near these points.
-    //
-    // ctan(z) = -i ctanh(iz).
-    //
-    // ACCURACY:
-    //
-    //                      Relative error:
-    // arithmetic   domain     # trials      peak         rms
-    //    DEC       -10,+10      5200       7.1e-17     1.6e-17
-    //    IEEE      -10,+10     30000       7.2e-16     1.2e-16
-    // Also tested by ctan * ccot = 1 and catan(ctan(z))  =  z.
+	// Complex circular tangent
+	//
+	// DESCRIPTION:
+	//
+	// If
+	//     z = x + iy,
+	//
+	// then
+	//
+	//           sin 2x  +  i sinh 2y
+	//     w  =  --------------------.
+	//            cos 2x  +  cosh 2y
+	//
+	// On the real axis the denominator is zero at odd multiples
+	// of PI/2. The denominator is evaluated by its Taylor
+	// series near these points.
+	//
+	// ctan(z) = -i ctanh(iz).
+	//
+	// ACCURACY:
+	//
+	//                      Relative error:
+	// arithmetic   domain     # trials      peak         rms
+	//    DEC       -10,+10      5200       7.1e-17     1.6e-17
+	//    IEEE      -10,+10     30000       7.2e-16     1.2e-16
+	// Also tested by ctan * ccot = 1 and catan(ctan(z))  =  z.
 
-    // Returns the tangent of complex number.
-    fn Tan(self): Cmplx {
-        match {
-        | math::IsInf(self.Imag(), 0):
-            match {
-            | math::IsInf(self.Real(), 0) | math::IsNaN(self.Real()):
-                ret Cmplx.New(math::Copysign(0, self.Real()), math::Copysign(1, self.Imag()))
-            }
-            ret Cmplx.New(math::Copysign(0, math::Sin(2 * self.Real())), math::Copysign(1, self.Imag()))
-        | self.Real() == 0 && math::IsNaN(self.Imag()):
-            ret self
-        }
-        mut d := math::Cos(2 * self.Real()) + math::Cosh(2 * self.Imag())
-        if math::Abs(d) < 0.25 {
-            d = tanSeries(self)
-        }
-        if d == 0 {
-            ret Cmplx.Inf(1)
-        }
-        ret Cmplx.New(math::Sin(2 * self.Real()) / d, math::Sinh(2 * self.Imag()) / d)
-    }
+	// Returns the tangent of complex number.
+	fn Tan(self): Cmplx {
+		match {
+		| math::IsInf(self.Imag(), 0):
+			match {
+			| math::IsInf(self.Real(), 0) | math::IsNaN(self.Real()):
+				ret Cmplx.New(math::Copysign(0, self.Real()), math::Copysign(1, self.Imag()))
+			}
+			ret Cmplx.New(math::Copysign(0, math::Sin(2 * self.Real())), math::Copysign(1, self.Imag()))
+		| self.Real() == 0 && math::IsNaN(self.Imag()):
+			ret self
+		}
+		mut d := math::Cos(2 * self.Real()) + math::Cosh(2 * self.Imag())
+		if math::Abs(d) < 0.25 {
+			d = tanSeries(self)
+		}
+		if d == 0 {
+			ret Cmplx.Inf(1)
+		}
+		ret Cmplx.New(math::Sin(2 * self.Real()) / d, math::Sinh(2 * self.Imag()) / d)
+	}
 
-    // Complex hyperbolic tangent
-    //
-    // DESCRIPTION:
-    //
-    // tanh z = (sinh 2x  +  i sin 2y) / (cosh 2x + cos 2y) .
-    //
-    // ACCURACY:
-    //
-    //                      Relative error:
-    // arithmetic   domain     # trials      peak         rms
-    //    IEEE      -10,+10     30000       1.7e-14     2.4e-16
+	// Complex hyperbolic tangent
+	//
+	// DESCRIPTION:
+	//
+	// tanh z = (sinh 2x  +  i sin 2y) / (cosh 2x + cos 2y) .
+	//
+	// ACCURACY:
+	//
+	//                      Relative error:
+	// arithmetic   domain     # trials      peak         rms
+	//    IEEE      -10,+10     30000       1.7e-14     2.4e-16
 
-    // Returns the hyperbolic tangent of complex number.
-    fn Tanh(self): Cmplx {
-        match {
-        | math::IsInf(self.Real(), 0):
-            match {
-            | math::IsInf(self.Imag(), 0) | math::IsNaN(self.Imag()):
-                ret Cmplx.New(math::Copysign(1, self.Real()), math::Copysign(0, self.Imag()))
-            }
-            ret Cmplx.New(math::Copysign(1, self.Real()), math::Copysign(0, math::Sin(2 * self.Imag())))
-        | self.Imag() == 0 && math::IsNaN(self.Real()):
-            ret self
-        }
-        d := math::Cosh(2 * self.Real()) + math::Cos(2 * self.Imag())
-        if d == 0 {
-            ret Cmplx.Inf(1)
-        }
-        ret Cmplx.New(math::Sinh(2 * self.Real()) / d, math::Sin(2 * self.Imag()) / d)
-    }
+	// Returns the hyperbolic tangent of complex number.
+	fn Tanh(self): Cmplx {
+		match {
+		| math::IsInf(self.Real(), 0):
+			match {
+			| math::IsInf(self.Imag(), 0) | math::IsNaN(self.Imag()):
+				ret Cmplx.New(math::Copysign(1, self.Real()), math::Copysign(0, self.Imag()))
+			}
+			ret Cmplx.New(math::Copysign(1, self.Real()), math::Copysign(0, math::Sin(2 * self.Imag())))
+		| self.Imag() == 0 && math::IsNaN(self.Real()):
+			ret self
+		}
+		d := math::Cosh(2 * self.Real()) + math::Cos(2 * self.Imag())
+		if d == 0 {
+			ret Cmplx.Inf(1)
+		}
+		ret Cmplx.New(math::Sinh(2 * self.Real()) / d, math::Sin(2 * self.Imag()) / d)
+	}
 
-    // Complex circular cotangent
-    //
-    // DESCRIPTION:
-    //
-    // If
-    //     z = x + iy,
-    //
-    // then
-    //
-    //           sin 2x  -  i sinh 2y
-    //     w  =  --------------------.
-    //            cosh 2y  -  cos 2x
-    //
-    // On the real axis, the denominator has zeros at even
-    // multiples of PI/2.  Near these points it is evaluated
-    // by a Taylor series.
-    //
-    // ACCURACY:
-    //
-    //                      Relative error:
-    // arithmetic   domain     # trials      peak         rms
-    //    DEC       -10,+10      3000       6.5e-17     1.6e-17
-    //    IEEE      -10,+10     30000       9.2e-16     1.2e-16
-    // Also tested by ctan * ccot = 1 + i0.
+	// Complex circular cotangent
+	//
+	// DESCRIPTION:
+	//
+	// If
+	//     z = x + iy,
+	//
+	// then
+	//
+	//           sin 2x  -  i sinh 2y
+	//     w  =  --------------------.
+	//            cosh 2y  -  cos 2x
+	//
+	// On the real axis, the denominator has zeros at even
+	// multiples of PI/2.  Near these points it is evaluated
+	// by a Taylor series.
+	//
+	// ACCURACY:
+	//
+	//                      Relative error:
+	// arithmetic   domain     # trials      peak         rms
+	//    DEC       -10,+10      3000       6.5e-17     1.6e-17
+	//    IEEE      -10,+10     30000       9.2e-16     1.2e-16
+	// Also tested by ctan * ccot = 1 + i0.
 
-    // Returns the cotangent of complex number.
-    fn Cot(self): Cmplx {
-        mut d := math::Cosh(2 * self.Imag()) - math::Cos(2 * self.Real())
-        if math::Abs(d) < 0.25 {
-            d = tanSeries(self)
-        }
-        if d == 0 {
-            ret Cmplx.Inf(1)
-        }
-        ret Cmplx.New(math::Sin(2 * self.Real()) / d, -math::Sinh(2 * self.Imag()) / d)
-    }
+	// Returns the cotangent of complex number.
+	fn Cot(self): Cmplx {
+		mut d := math::Cosh(2 * self.Imag()) - math::Cos(2 * self.Real())
+		if math::Abs(d) < 0.25 {
+			d = tanSeries(self)
+		}
+		if d == 0 {
+			ret Cmplx.Inf(1)
+		}
+		ret Cmplx.New(math::Sin(2 * self.Real()) / d, -math::Sinh(2 * self.Imag()) / d)
+	}
 }
 
 // Reduces the input argument x to the range (-PI/2, PI/2].
@@ -159,141 +159,141 @@ impl Cmplx {
 // "ARGUMENT REDUCTION FOR HUGE ARGUMENTS: Good to the Last Bit"
 // K. C. Ng et al, March 24, 1992.
 fn reducePi(mut x: f64): f64 {
-    // reduce_threshold is the maximum value of x where the reduction using
-    // Cody-Waite reduction still gives accurate results. This threshold
-    // is set by t*PIn being representable as a float64 without error
-    // where t is given by t = floor(x * (1 / PI)) and PIn are the leading partial
-    // terms of PI. Since the leading terms, PI1 and PI2 below, have 30 and 32
-    // trailing zero bits respectively, t should have less than 30 significant bits.
-    //	t < 1<<30  -> floor(x*(1/PI)+0.5) < 1<<30 -> x < (1<<30-1) * PI - 0.5
-    // So, conservatively we can take x < 1<<30.
-    const REDUCE_THRESHOLD: f64 = 1 << 30
+	// reduce_threshold is the maximum value of x where the reduction using
+	// Cody-Waite reduction still gives accurate results. This threshold
+	// is set by t*PIn being representable as a float64 without error
+	// where t is given by t = floor(x * (1 / PI)) and PIn are the leading partial
+	// terms of PI. Since the leading terms, PI1 and PI2 below, have 30 and 32
+	// trailing zero bits respectively, t should have less than 30 significant bits.
+	//	t < 1<<30  -> floor(x*(1/PI)+0.5) < 1<<30 -> x < (1<<30-1) * PI - 0.5
+	// So, conservatively we can take x < 1<<30.
+	const REDUCE_THRESHOLD: f64 = 1 << 30
 
-    if math::Abs(x) < REDUCE_THRESHOLD {
-        // Use Cody-Waite reduction in three parts.
+	if math::Abs(x) < REDUCE_THRESHOLD {
+		// Use Cody-Waite reduction in three parts.
 
-        // PI1, PI2 and PI3 comprise an extended precision value of PI
-        // such that PI ~= PI1 + PI2 + PI3. The parts are chosen so
-        // that PI1 and PI2 have an approximately equal number of trailing
-        // zero bits. This ensures that t*PI1 and t*PI2 are exact for
-        // large integer values of t. The full precision PI3 ensures the
-        // approximation of PI is accurate to 102 bits to handle cancellation
-        // during subtraction.
-        const PI1 = 3.141592502593994      // 0x400921fb40000000
-        const PI2 = 1.5099578831723193e-07 // 0x3e84442d00000000
-        const PI3 = 1.0780605716316238e-14 // 0x3d08469898cc5170
+		// PI1, PI2 and PI3 comprise an extended precision value of PI
+		// such that PI ~= PI1 + PI2 + PI3. The parts are chosen so
+		// that PI1 and PI2 have an approximately equal number of trailing
+		// zero bits. This ensures that t*PI1 and t*PI2 are exact for
+		// large integer values of t. The full precision PI3 ensures the
+		// approximation of PI is accurate to 102 bits to handle cancellation
+		// during subtraction.
+		const PI1 = 3.141592502593994      // 0x400921fb40000000
+		const PI2 = 1.5099578831723193e-07 // 0x3e84442d00000000
+		const PI3 = 1.0780605716316238e-14 // 0x3d08469898cc5170
 
-        mut t := x / math::Pi
-        t += 0.5
-        t = f64(i64(t)) // i64(t) = the multiple
-        ret ((x - t * PI1) - t * PI2) - t * PI3
-    }
-    // Must apply Payne-Hanek range reduction
-    const MASK = 0x7FF
-    const SHIFT = 64 - 11 - 1
-    const BIAS = 1023
-    const FRAC_MASK = 1 << SHIFT - 1
+		mut t := x / math::Pi
+		t += 0.5
+		t = f64(i64(t)) // i64(t) = the multiple
+		ret ((x - t * PI1) - t * PI2) - t * PI3
+	}
+	// Must apply Payne-Hanek range reduction
+	const MASK = 0x7FF
+	const SHIFT = 64 - 11 - 1
+	const BIAS = 1023
+	const FRAC_MASK = 1 << SHIFT - 1
 
-    // Extract out the integer and exponent such that,
-    // x = ix * 2 ** exp.
-    mut ix := math::F64Bits(x)
-    exp := int(ix >> SHIFT & MASK) - BIAS - SHIFT
-    ix &= FRAC_MASK
-    ix |= 1 << SHIFT
+	// Extract out the integer and exponent such that,
+	// x = ix * 2 ** exp.
+	mut ix := math::F64Bits(x)
+	exp := int(ix >> SHIFT & MASK) - BIAS - SHIFT
+	ix &= FRAC_MASK
+	ix |= 1 << SHIFT
 
-    // m_pi is the binary digits of 1/PI as a u64 array,
-    // that is, 1/PI = Sum mPI[i]*2^(-64*i).
-    // 19 64-bit digits give 1216 bits of precision
-    // to handle the largest possible f64 exponent.
-    let mPi: [...]u64 = [
-        0x0000000000000000,
-        0x517cc1b727220a94,
-        0xfe13abe8fa9a6ee0,
-        0x6db14acc9e21c820,
-        0xff28b1d5ef5de2b0,
-        0xdb92371d2126e970,
-        0x0324977504e8c90e,
-        0x7f0ef58e5894d39f,
-        0x74411afa975da242,
-        0x74ce38135a2fbf20,
-        0x9cc8eb1cc1a99cfa,
-        0x4e422fc5defc941d,
-        0x8ffc4bffef02cc07,
-        0xf79788c5ad05368f,
-        0xb69b3f6793e584db,
-        0xa7a31fb34f2ff516,
-        0xba93dd63f5f2f8bd,
-        0x9e839cfbc5294975,
-        0x35fdafd88fc6ae84,
-        0x2b0198237e3db5d5,
-    ]
-    // Use the exponent to extract the 3 appropriate u64 digits from mPi,
-    // B ~ (z0, z1, z2), such that the product leading digit has the exponent -64.
-    // Note, exp >= 50 since x >= REDUCE_THRESHOLD and exp < 971 for maximum f64.
-    digit, bitshift := uint(exp + 64) / 64, uint(exp + 64) % 64
-    z0 := (mPi[digit] << bitshift) | (mPi[digit+1] >> (64 - bitshift))
-    z1 := (mPi[digit+1] << bitshift) | (mPi[digit+2] >> (64 - bitshift))
-    z2 := (mPi[digit+2] << bitshift) | (mPi[digit+3] >> (64 - bitshift))
-    // Multiply mantissa by the digits and extract the upper two digits (hi, lo).
-    z2hi, _ := bits::Mul64(z2, ix)
-    z1hi, z1lo := bits::Mul64(z1, ix)
-    z0lo := z0 * ix
-    lo, c := bits::Add64(z1lo, z2hi, 0)
-    mut hi, _ := bits::Add64(z0lo, z1hi, c)
-    // Find the magnitude of the fraction.
-    lz := uint(bits::LeadingZeros64(hi))
-    e := u64(BIAS - (lz + 1))
-    // Clear implicit mantissa bit and shift into place.
-    hi = (hi << (lz + 1)) | (lo >> (64 - (lz + 1)))
-    hi >>= 64 - SHIFT
-    // Include the exponent and convert to a float.
-    hi |= e << SHIFT
-    x = math::F64FromBits(hi)
-    // map to (-PI/2, PI/2]
-    if x > 0.5 {
-        x--
-    }
-    ret math::Pi * x
+	// m_pi is the binary digits of 1/PI as a u64 array,
+	// that is, 1/PI = Sum mPI[i]*2^(-64*i).
+	// 19 64-bit digits give 1216 bits of precision
+	// to handle the largest possible f64 exponent.
+	let mPi: [...]u64 = [
+		0x0000000000000000,
+		0x517cc1b727220a94,
+		0xfe13abe8fa9a6ee0,
+		0x6db14acc9e21c820,
+		0xff28b1d5ef5de2b0,
+		0xdb92371d2126e970,
+		0x0324977504e8c90e,
+		0x7f0ef58e5894d39f,
+		0x74411afa975da242,
+		0x74ce38135a2fbf20,
+		0x9cc8eb1cc1a99cfa,
+		0x4e422fc5defc941d,
+		0x8ffc4bffef02cc07,
+		0xf79788c5ad05368f,
+		0xb69b3f6793e584db,
+		0xa7a31fb34f2ff516,
+		0xba93dd63f5f2f8bd,
+		0x9e839cfbc5294975,
+		0x35fdafd88fc6ae84,
+		0x2b0198237e3db5d5,
+	]
+	// Use the exponent to extract the 3 appropriate u64 digits from mPi,
+	// B ~ (z0, z1, z2), such that the product leading digit has the exponent -64.
+	// Note, exp >= 50 since x >= REDUCE_THRESHOLD and exp < 971 for maximum f64.
+	digit, bitshift := uint(exp + 64) / 64, uint(exp + 64) % 64
+	z0 := (mPi[digit] << bitshift) | (mPi[digit+1] >> (64 - bitshift))
+	z1 := (mPi[digit+1] << bitshift) | (mPi[digit+2] >> (64 - bitshift))
+	z2 := (mPi[digit+2] << bitshift) | (mPi[digit+3] >> (64 - bitshift))
+	// Multiply mantissa by the digits and extract the upper two digits (hi, lo).
+	z2hi, _ := bits::Mul64(z2, ix)
+	z1hi, z1lo := bits::Mul64(z1, ix)
+	z0lo := z0 * ix
+	lo, c := bits::Add64(z1lo, z2hi, 0)
+	mut hi, _ := bits::Add64(z0lo, z1hi, c)
+	// Find the magnitude of the fraction.
+	lz := uint(bits::LeadingZeros64(hi))
+	e := u64(BIAS - (lz + 1))
+	// Clear implicit mantissa bit and shift into place.
+	hi = (hi << (lz + 1)) | (lo >> (64 - (lz + 1)))
+	hi >>= 64 - SHIFT
+	// Include the exponent and convert to a float.
+	hi |= e << SHIFT
+	x = math::F64FromBits(hi)
+	// map to (-PI/2, PI/2]
+	if x > 0.5 {
+		x--
+	}
+	ret math::Pi * x
 }
 
 // Taylor series expansion for cosh(2y) - cos(2x)
 fn tanSeries(z: Cmplx): f64 {
-    const MACHEP = 1.0 / (1 << 53)
+	const MACHEP = 1.0 / (1 << 53)
 
-    mut x := reducePi(math::Abs(2 * z.Real()))
-    x = x * x
-    mut y := math::Abs(2 * z.Imag())
-    y = y * y
-    mut x2 := 1.0
-    mut y2 := 1.0
-    mut f := 1.0
-    mut rn := 0.0
-    mut d := 0.0
-    for {
-        rn++
-        f *= rn
-        rn++
-        f *= rn
-        x2 *= x
-        y2 *= y
-        mut t := y2 + x2
-        t /= f
-        d += t
+	mut x := reducePi(math::Abs(2 * z.Real()))
+	x = x * x
+	mut y := math::Abs(2 * z.Imag())
+	y = y * y
+	mut x2 := 1.0
+	mut y2 := 1.0
+	mut f := 1.0
+	mut rn := 0.0
+	mut d := 0.0
+	for {
+		rn++
+		f *= rn
+		rn++
+		f *= rn
+		x2 *= x
+		y2 *= y
+		mut t := y2 + x2
+		t /= f
+		d += t
 
-        rn++
-        f *= rn
-        rn++
-        f *= rn
-        x2 *= x
-        y2 *= y
-        t = y2 - x2
-        t /= f
-        d += t
-        if !(math::Abs(t/d) > MACHEP) {
-            // Caution: Use ! and > instead of <= for correct behavior if t/d is NaN.
-            // See issue 17577 of Go project.
-            break
-        }
-    }
-    ret d
+		rn++
+		f *= rn
+		rn++
+		f *= rn
+		x2 *= x
+		y2 *= y
+		t = y2 - x2
+		t /= f
+		d += t
+		if !(math::Abs(t/d) > MACHEP) {
+			// Caution: Use ! and > instead of <= for correct behavior if t/d is NaN.
+			// See issue 17577 of Go project.
+			break
+		}
+	}
+	ret d
 }

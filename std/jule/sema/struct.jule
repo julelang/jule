@@ -9,320 +9,320 @@ use std::internal::strings::{StrBuilder}
 
 // Field.
 struct Field {
-    Owner:   &Struct
-    Token:   &Token
-    Public:  bool
-    Mutable: bool // Interior mutability.
-    Ident:   str
-    Kind:    &TypeSymbol
-    Default: &Expr // Nil if not given.
+	Owner:   &Struct
+	Token:   &Token
+	Public:  bool
+	Mutable: bool // Interior mutability.
+	Ident:   str
+	Kind:    &TypeSymbol
+	Default: &Expr // Nil if not given.
 }
 
 impl Field {
-    fn instance(mut &self): &FieldIns {
-        ret &FieldIns{
-            Decl: self,
-        }
-    }
+	fn instance(mut &self): &FieldIns {
+		ret &FieldIns{
+			Decl: self,
+		}
+	}
 }
 
 // Overloaded operators for instance.
 // Patterns are checked.
 struct Operators {
-    Eq:           &FnIns
-    Gt:           &FnIns
-    GtEq:         &FnIns
-    Lt:           &FnIns
-    LtEq:         &FnIns
-    Shl:          &FnIns
-    Shr:          &FnIns
-    Add:          &FnIns
-    Sub:          &FnIns
-    Div:          &FnIns
-    Mul:          &FnIns
-    Mod:          &FnIns
-    BitAnd:       &FnIns
-    BitOr:        &FnIns
-    BitXor:       &FnIns
-    Neg:          &FnIns
-    Pos:          &FnIns
-    BitNot:       &FnIns
-    AddAssign:    &FnIns
-    SubAssign:    &FnIns
-    DivAssign:    &FnIns
-    MulAssign:    &FnIns
-    ModAssign:    &FnIns
-    ShlAssign:    &FnIns
-    ShrAssign:    &FnIns
-    BitOrAssign:  &FnIns
-    BitAndAssign: &FnIns
-    BitXorAssign: &FnIns
+	Eq:           &FnIns
+	Gt:           &FnIns
+	GtEq:         &FnIns
+	Lt:           &FnIns
+	LtEq:         &FnIns
+	Shl:          &FnIns
+	Shr:          &FnIns
+	Add:          &FnIns
+	Sub:          &FnIns
+	Div:          &FnIns
+	Mul:          &FnIns
+	Mod:          &FnIns
+	BitAnd:       &FnIns
+	BitOr:        &FnIns
+	BitXor:       &FnIns
+	Neg:          &FnIns
+	Pos:          &FnIns
+	BitNot:       &FnIns
+	AddAssign:    &FnIns
+	SubAssign:    &FnIns
+	DivAssign:    &FnIns
+	MulAssign:    &FnIns
+	ModAssign:    &FnIns
+	ShlAssign:    &FnIns
+	ShrAssign:    &FnIns
+	BitOrAssign:  &FnIns
+	BitAndAssign: &FnIns
+	BitXorAssign: &FnIns
 }
 
 // Structure.
 struct Struct {
-    // Used for type parsing.
-    // Used declaration'sema sema for instance type checking.
-    sema: &Sema
+	// Used for type parsing.
+	// Used declaration'sema sema for instance type checking.
+	sema: &Sema
 
-    // This structure depended to these structures, except binded ones.
-    // Only stores plain identifier references such as A, B, and MyStruct.
-    // Not includes non-pain identifier references such as *A, &B, and []MyStruct.
-    Depends: []&Struct
+	// This structure depended to these structures, except binded ones.
+	// Only stores plain identifier references such as A, B, and MyStruct.
+	// Not includes non-pain identifier references such as *A, &B, and []MyStruct.
+	Depends: []&Struct
 
-    // This structures uses these structures.
-    // Stores all referred structures.
-    Uses: []&Struct
+	// This structures uses these structures.
+	// Stores all referred structures.
+	Uses: []&Struct
 
-    Token:      &Token
-    Ident:      str
-    Fields:     []&Field
-    Methods:    []&Fn
-    Statics:    []&Var
-    Public:     bool
-    Binded:     bool
-    Directives: []&Directive
-    Generics:   []&GenericDecl
-    Implements: []&Trait
+	Token:      &Token
+	Ident:      str
+	Fields:     []&Field
+	Methods:    []&Fn
+	Statics:    []&Var
+	Public:     bool
+	Binded:     bool
+	Directives: []&Directive
+	Generics:   []&GenericDecl
+	Implements: []&Trait
 
-    // Structure instances for each unique type combination of structure.
-    // Nil if structure is never used.
-    Instances: []&StructIns
+	// Structure instances for each unique type combination of structure.
+	// Nil if structure is never used.
+	Instances: []&StructIns
 }
 
 impl Struct {
-    fn instance(mut &self): &StructIns {
-        // Returns already created instance for just one unique combination.
-        if len(self.Generics) == 0 && len(self.Instances) == 1 {
-            ret self.Instances[0]
-        }
+	fn instance(mut &self): &StructIns {
+		// Returns already created instance for just one unique combination.
+		if len(self.Generics) == 0 && len(self.Instances) == 1 {
+			ret self.Instances[0]
+		}
 
-        mut ins := &StructIns{
-            Decl: self,
-            Fields: make([]&FieldIns, 0, len(self.Fields)),
-            Statics: make([]&Var, 0, len(self.Statics)),
-            Refers: ReferenceStack.new(),
-        }
+		mut ins := &StructIns{
+			Decl: self,
+			Fields: make([]&FieldIns, 0, len(self.Fields)),
+			Statics: make([]&Var, 0, len(self.Statics)),
+			Refers: ReferenceStack.new(),
+		}
 
-        for (_, mut s) in self.Statics {
-            ins.Statics = append(ins.Statics, new(Var, *s))
-        }
+		for (_, mut s) in self.Statics {
+			ins.Statics = append(ins.Statics, new(Var, *s))
+		}
 
-        for (_, mut f) in self.Fields {
-            ins.Fields = append(ins.Fields, f.instance())
-            if !f.Mutable && f.Kind.Kind != nil && f.Kind.Kind.Mutable() {
-                ins.Mutable = true
-            }
-        }
+		for (_, mut f) in self.Fields {
+			ins.Fields = append(ins.Fields, f.instance())
+			if !f.Mutable && f.Kind.Kind != nil && f.Kind.Kind.Mutable() {
+				ins.Mutable = true
+			}
+		}
 
-        if len(self.Generics) == 0 {
-            ins.Methods = self.Methods
-        } else {
-            ins.Methods = make([]&Fn, 0, len(self.Methods))
-            for (_, mut f) in self.Methods {
-                mut fins := new(Fn, *f)
-                fins.Instances = nil
-                ins.Methods = append(ins.Methods, fins)
-            }
-        }
+		if len(self.Generics) == 0 {
+			ins.Methods = self.Methods
+		} else {
+			ins.Methods = make([]&Fn, 0, len(self.Methods))
+			for (_, mut f) in self.Methods {
+				mut fins := new(Fn, *f)
+				fins.Instances = nil
+				ins.Methods = append(ins.Methods, fins)
+			}
+		}
 
-        ret ins
-    }
+		ret ins
+	}
 
-    // Appends instance if unique.
-    // Returns already exist instance if given insance is not unique.
-    fn appendInstance(mut self, mut &ins: &StructIns): &StructIns {
-        // Skip already created instance for just one unique combination.
-        if len(self.Generics) == 0 && len(self.Instances) == 1 {
-            ret self.Instances[0]
-        }
+	// Appends instance if unique.
+	// Returns already exist instance if given insance is not unique.
+	fn appendInstance(mut self, mut &ins: &StructIns): &StructIns {
+		// Skip already created instance for just one unique combination.
+		if len(self.Generics) == 0 && len(self.Instances) == 1 {
+			ret self.Instances[0]
+		}
 
-        for (_, mut ains) in self.Instances {
-            if ains.Same(ins) {
-                ret ains
-            }
-        }
+		for (_, mut ains) in self.Instances {
+			if ains.Same(ins) {
+				ret ains
+			}
+		}
 
-        self.Instances = append(self.Instances, ins)
-        ret nil
-    }
+		self.Instances = append(self.Instances, ins)
+		ret nil
+	}
 
-    // Returns method by identifier.
-    // Returns nil reference if not exist any method in this identifier.
-    fn FindMethod(mut self, ident: str, statically: bool): &Fn {
-        for (_, mut f) in self.Methods {
-            if f.Statically == statically && f.Ident == ident {
-                ret f
-            }
-        }
-        ret nil
-    }
+	// Returns method by identifier.
+	// Returns nil reference if not exist any method in this identifier.
+	fn FindMethod(mut self, ident: str, statically: bool): &Fn {
+		for (_, mut f) in self.Methods {
+			if f.Statically == statically && f.Ident == ident {
+				ret f
+			}
+		}
+		ret nil
+	}
 
-    // Returns static field by identifier.
-    // Returns nil reference if not exist any static field in this identifier.
-    fn FindStatic(mut self, ident: str): &Var {
-        for (_, mut v) in self.Statics {
-            if v.Ident == ident {
-                ret v
-            }
-        }
-        ret nil
-    }
+	// Returns static field by identifier.
+	// Returns nil reference if not exist any static field in this identifier.
+	fn FindStatic(mut self, ident: str): &Var {
+		for (_, mut v) in self.Statics {
+			if v.Ident == ident {
+				ret v
+			}
+		}
+		ret nil
+	}
 
-    // Returns field by identifier.
-    // Returns nil reference if not exist any field in this identifier.
-    fn FindField(mut self, ident: str): &Field {
-        for (_, mut f) in self.Fields {
-            if f.Ident == ident {
-                ret f
-            }
-        }
-        ret nil
-    }
+	// Returns field by identifier.
+	// Returns nil reference if not exist any field in this identifier.
+	fn FindField(mut self, ident: str): &Field {
+		for (_, mut f) in self.Fields {
+			if f.Ident == ident {
+				ret f
+			}
+		}
+		ret nil
+	}
 
-    // Reports whether structure implements given trait.
-    fn IsImplements(self, t: &Trait): bool {
-        for _, it in self.Implements {
-            if t == it {
-                ret true
-            }
-        }
-        ret false
-    }
+	// Reports whether structure implements given trait.
+	fn IsImplements(self, t: &Trait): bool {
+		for _, it in self.Implements {
+			if t == it {
+				ret true
+			}
+		}
+		ret false
+	}
 
-    // Reports whether structure is uses given structure.
-    fn IsUses(self, s: &Struct): bool {
-        for _, u in self.Uses {
-            for s == u {
-                ret true
-            }
-        }
-        ret false
-    }
+	// Reports whether structure is uses given structure.
+	fn IsUses(self, s: &Struct): bool {
+		for _, u in self.Uses {
+			for s == u {
+				ret true
+			}
+		}
+		ret false
+	}
 
-    // Reports whether structure has only reference-type-accessible defines.
-    fn HasRefAccessible(self): bool {
-        for _, m in self.Methods {
-            if len(m.Params) > 0 && m.Params[0].IsRef() {
-                ret true
-            }
-        }
-        ret false
-    }
+	// Reports whether structure has only reference-type-accessible defines.
+	fn HasRefAccessible(self): bool {
+		for _, m in self.Methods {
+			if len(m.Params) > 0 && m.Params[0].IsRef() {
+				ret true
+			}
+		}
+		ret false
+	}
 }
 
 // Field instance.
 struct FieldIns {
-    Decl:    &Field
-    Kind:    &TypeKind
-    Default: &Data // Nil if not given.
+	Decl:    &Field
+	Kind:    &TypeKind
+	Default: &Data // Nil if not given.
 }
 
 // Structure instance.
 struct StructIns {
-    Checked:    bool
-    Decl:       &Struct
-    Generics:   []&InsGeneric
-    Fields:     []&FieldIns
-    Statics:    []&Var
-    Methods:    []&Fn
-    Mutable:    bool // This structure has mutable defines.
-    Comparable: bool
-    Refers:     &ReferenceStack
-    Operators:  Operators
+	Checked:    bool
+	Decl:       &Struct
+	Generics:   []&InsGeneric
+	Fields:     []&FieldIns
+	Statics:    []&Var
+	Methods:    []&Fn
+	Mutable:    bool // This structure has mutable defines.
+	Comparable: bool
+	Refers:     &ReferenceStack
+	Operators:  Operators
 }
 
 impl Kind for StructIns {
-    // Implement: Kind
-    // Returns Struct's type kind as string.
-    fn Str(self): str {
-        mut kind := StrBuilder.New(1 << 5)
-        kind.WriteStr(self.Decl.Ident)
-        if len(self.Generics) > 0 {
-            kind.WriteByte('[')
-            for i, g in self.Generics {
-                kind.WriteStr(g.Kind.Str())
-                if i < len(self.Generics)-1 {
-                    kind.WriteByte(',')
-                }
-            }
-            kind.WriteByte(']')
-        }
-        ret kind.Str()
-    }
+	// Implement: Kind
+	// Returns Struct's type kind as string.
+	fn Str(self): str {
+		mut kind := StrBuilder.New(1 << 5)
+		kind.WriteStr(self.Decl.Ident)
+		if len(self.Generics) > 0 {
+			kind.WriteByte('[')
+			for i, g in self.Generics {
+				kind.WriteStr(g.Kind.Str())
+				if i < len(self.Generics)-1 {
+					kind.WriteByte(',')
+				}
+			}
+			kind.WriteByte(']')
+		}
+		ret kind.Str()
+	}
 
-    // Reports whether types are same.
-    fn Equal(&self, other: &TypeKind): bool {
-        s := unsafe { (*(&other)).Struct() }
-        if s == nil {
-            ret false
-        }
+	// Reports whether types are same.
+	fn Equal(&self, other: &TypeKind): bool {
+		s := unsafe { (*(&other)).Struct() }
+		if s == nil {
+			ret false
+		}
 
-        if self.Decl != s.Decl {
-            ret false
-        }
+		if self.Decl != s.Decl {
+			ret false
+		}
 
-        if len(self.Generics) != len(s.Generics) {
-            ret false
-        }
+		if len(self.Generics) != len(s.Generics) {
+			ret false
+		}
 
-        mut i := 0
-        for i < len(self.Generics); i++ {
-            if !self.Generics[i].Kind.Equal(s.Generics[i].Kind) {
-                ret false
-            }
-        }
+		mut i := 0
+		for i < len(self.Generics); i++ {
+			if !self.Generics[i].Kind.Equal(s.Generics[i].Kind) {
+				ret false
+			}
+		}
 
-        ret true
-    }
+		ret true
+	}
 }
 
 impl StructIns {
-    // Reports whether instances are same.
-    // Returns true if declarations and generics are same.
-    fn Same(self, s: &StructIns): bool {
-        if self.Decl != s.Decl || len(s.Generics) != len(self.Generics) {
-            ret false
-        }
-        for i, g in self.Generics {
-            g2 := s.Generics[i]
-            if g.Kind.BindIdent != g2.Kind.BindIdent || !g.Kind.Equal(g2.Kind) {
-                ret false
-            }
-        }
-        ret true
-    }
+	// Reports whether instances are same.
+	// Returns true if declarations and generics are same.
+	fn Same(self, s: &StructIns): bool {
+		if self.Decl != s.Decl || len(s.Generics) != len(self.Generics) {
+			ret false
+		}
+		for i, g in self.Generics {
+			g2 := s.Generics[i]
+			if g.Kind.BindIdent != g2.Kind.BindIdent || !g.Kind.Equal(g2.Kind) {
+				ret false
+			}
+		}
+		ret true
+	}
 
-    // Returns method by identifier.
-    // Returns nil reference if not exist any method in this identifier.
-    fn FindMethod(mut self, ident: str, statically: bool): &Fn {
-        for (_, mut f) in self.Methods {
-            if f.Statically == statically && f.Ident == ident {
-                ret f
-            }
-        }
-        ret nil
-    }
+	// Returns method by identifier.
+	// Returns nil reference if not exist any method in this identifier.
+	fn FindMethod(mut self, ident: str, statically: bool): &Fn {
+		for (_, mut f) in self.Methods {
+			if f.Statically == statically && f.Ident == ident {
+				ret f
+			}
+		}
+		ret nil
+	}
 
-    // Returns field by identifier.
-    // Returns nil reference if not exist any field in this identifier.
-    fn FindField(mut self, ident: str): &FieldIns {
-        for (_, mut f) in self.Fields {
-            if f.Decl.Ident == ident {
-                ret f
-            }
-        }
-        ret nil
-    }
+	// Returns field by identifier.
+	// Returns nil reference if not exist any field in this identifier.
+	fn FindField(mut self, ident: str): &FieldIns {
+		for (_, mut f) in self.Fields {
+			if f.Decl.Ident == ident {
+				ret f
+			}
+		}
+		ret nil
+	}
 
-    // Returns static field by identifier.
-    // Returns nil reference if not exist any static field in this identifier.
-    fn FindStatic(mut self, ident: str): &Var {
-        for (_, mut v) in self.Statics {
-            if v.Ident == ident {
-                ret v
-            }
-        }
-        ret nil
-    }
+	// Returns static field by identifier.
+	// Returns nil reference if not exist any static field in this identifier.
+	fn FindStatic(mut self, ident: str): &Var {
+		for (_, mut v) in self.Statics {
+			if v.Ident == ident {
+				ret v
+			}
+		}
+		ret nil
+	}
 }

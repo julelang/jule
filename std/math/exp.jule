@@ -120,93 +120,93 @@
 // Very large values overflow to 0 or Inf.
 // Very small values underflow to 1.
 fn Exp(x: f64): f64 {
-    const Ln2Hi = 6.93147180369123816490e-01
-    const Ln2Lo = 1.90821492927058770002e-10
-    const Log2E = 1.44269504088896338700e+00
+	const Ln2Hi = 6.93147180369123816490e-01
+	const Ln2Lo = 1.90821492927058770002e-10
+	const Log2E = 1.44269504088896338700e+00
 
-    const Overflow = 7.09782712893383973096e+02
-    const Underflow = -7.45133219101941108420e+02
-    const NearZero = 1.0 / (1 << 28) // 2**-28
+	const Overflow = 7.09782712893383973096e+02
+	const Underflow = -7.45133219101941108420e+02
+	const NearZero = 1.0 / (1 << 28) // 2**-28
 
-    // special cases
-    match {
-    | IsNaN(x) | IsInf(x, 1):
-        ret x
-    | IsInf(x, -1):
-        ret 0
-    | x > Overflow:
-        ret Inf(1)
-    | x < Underflow:
-        ret 0
-    | -NearZero < x && x < NearZero:
-        ret 1 + x
-    }
+	// special cases
+	match {
+	| IsNaN(x) | IsInf(x, 1):
+		ret x
+	| IsInf(x, -1):
+		ret 0
+	| x > Overflow:
+		ret Inf(1)
+	| x < Underflow:
+		ret 0
+	| -NearZero < x && x < NearZero:
+		ret 1 + x
+	}
 
-    // reduce; computed as r = hi - lo for extra precision.
-    mut k := 0
-    match {
-    | x < 0:
-        k = int(Log2E * x - 0.5)
-    | x > 0:
-        k = int(Log2E * x + 0.5)
-    }
-    hi := x - f64(k) * Ln2Hi
-    lo := f64(k) * Ln2Lo
+	// reduce; computed as r = hi - lo for extra precision.
+	mut k := 0
+	match {
+	| x < 0:
+		k = int(Log2E * x - 0.5)
+	| x > 0:
+		k = int(Log2E * x + 0.5)
+	}
+	hi := x - f64(k) * Ln2Hi
+	lo := f64(k) * Ln2Lo
 
-    // compute
-    ret expmulti(hi, lo, k)
+	// compute
+	ret expmulti(hi, lo, k)
 }
 
 // Returns 2**x, the base-2 exponential of x.
 // Special cases are the same as Exp.
 fn Exp2(x: f64): f64 {
-    const Ln2Hi = 6.93147180369123816490e-01
-    const Ln2Lo = 1.90821492927058770002e-10
+	const Ln2Hi = 6.93147180369123816490e-01
+	const Ln2Lo = 1.90821492927058770002e-10
 
-    const Overflow = 1.0239999999999999e+03
-    const Underflow = -1.0740e+03
+	const Overflow = 1.0239999999999999e+03
+	const Underflow = -1.0740e+03
 
-    // special cases
-    match {
-    | IsNaN(x) | IsInf(x, 1):
-        ret x
-    | IsInf(x, -1):
-        ret 0
-    | x > Overflow:
-        ret Inf(1)
-    | x < Underflow:
-        ret 0
-    }
+	// special cases
+	match {
+	| IsNaN(x) | IsInf(x, 1):
+		ret x
+	| IsInf(x, -1):
+		ret 0
+	| x > Overflow:
+		ret Inf(1)
+	| x < Underflow:
+		ret 0
+	}
 
-    // argument reduction; x = r×lg(e) + k with |r| ≤ ln(2)/2.
-    // computed as r = hi - lo for extra precision.
-    mut k := 0
-    match {
-    | x > 0:
-        k = int(x + 0.5)
-    | x < 0:
-        k = int(x - 0.5)
-    }
-    t := x - f64(k)
-    hi := t * Ln2Hi
-    lo := -t * Ln2Lo
+	// argument reduction; x = r×lg(e) + k with |r| ≤ ln(2)/2.
+	// computed as r = hi - lo for extra precision.
+	mut k := 0
+	match {
+	| x > 0:
+		k = int(x + 0.5)
+	| x < 0:
+		k = int(x - 0.5)
+	}
+	t := x - f64(k)
+	hi := t * Ln2Hi
+	lo := -t * Ln2Lo
 
-    // compute
-    ret expmulti(hi, lo, k)
+	// compute
+	ret expmulti(hi, lo, k)
 }
 
 // Returns e**r × 2**k where r = hi - lo and |r| ≤ ln(2)/2.
 fn expmulti(hi: f64, lo: f64, k: int): f64 {
-    const p1 = 1.66666666666666657415e-01  /* 0x3FC55555; 0x55555555 */
-    const p2 = -2.77777777770155933842e-03 /* 0xBF66C16C; 0x16BEBD93 */
-    const p3 = 6.61375632143793436117e-05  /* 0x3F11566A; 0xAF25DE2C */
-    const p4 = -1.65339022054652515390e-06 /* 0xBEBBBD41; 0xC5D26BF1 */
-    const p5 = 4.13813679705723846039e-08  /* 0x3E663769; 0x72BEA4D0 */
+	const p1 = 1.66666666666666657415e-01  /* 0x3FC55555; 0x55555555 */
+	const p2 = -2.77777777770155933842e-03 /* 0xBF66C16C; 0x16BEBD93 */
+	const p3 = 6.61375632143793436117e-05  /* 0x3F11566A; 0xAF25DE2C */
+	const p4 = -1.65339022054652515390e-06 /* 0xBEBBBD41; 0xC5D26BF1 */
+	const p5 = 4.13813679705723846039e-08  /* 0x3E663769; 0x72BEA4D0 */
 
-    r := hi - lo
-    t := r * r
-    c := r - t * (p1 + t * (p2 + t * (p3 + t * (p4 + t * p5))))
-    y := 1 - ((lo - (r * c) / (2 - c)) - hi)
-    // TODO(rsc): make sure ldexp can handle boundary k
-    ret Ldexp(y, k)
+	r := hi - lo
+	t := r * r
+	c := r - t * (p1 + t * (p2 + t * (p3 + t * (p4 + t * p5))))
+	y := 1 - ((lo - (r * c) / (2 - c)) - hi)
+	// TODO(rsc): make sure ldexp can handle boundary k
+	ret Ldexp(y, k)
 }

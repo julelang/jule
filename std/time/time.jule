@@ -40,39 +40,39 @@ type TimeData: u64
 
 // Abstract time.
 struct AbsTime {
-    Day:     TimeData
-    WeekDay: TimeData
-    YearDay: TimeData
-    Month:   TimeData
-    Year:    TimeData
-    Second:  TimeData
-    Minute:  TimeData
-    Hour:    TimeData
+	Day:     TimeData
+	WeekDay: TimeData
+	YearDay: TimeData
+	Month:   TimeData
+	Year:    TimeData
+	Second:  TimeData
+	Minute:  TimeData
+	Hour:    TimeData
 }
 
 impl AbsTime {
-    // Returns abstract time as unix-time seconds.
-    fn Unix(self): UnixTime {
-        mut leap := false
-        mut y := self.Year - unixYearOffset
-        mut m := self.Month - unixMonthOffset
-        if m >= 12 || m < 0 {
-            mut adj := m / 12
-            m %= 12
-            if m < 0 {
-                adj--
-                m += 12
-            }
-            y += adj
-        }
-        mut t := unixYearToSeconds(y, leap)
-        t += unixMonthToSeconds(m, leap)
-        t += day * (self.Day - 1)
-        t += hour * self.Hour
-        t += 60 * self.Minute
-        t += self.Second
-        ret t
-    }
+	// Returns abstract time as unix-time seconds.
+	fn Unix(self): UnixTime {
+		mut leap := false
+		mut y := self.Year - unixYearOffset
+		mut m := self.Month - unixMonthOffset
+		if m >= 12 || m < 0 {
+			mut adj := m / 12
+			m %= 12
+			if m < 0 {
+				adj--
+				m += 12
+			}
+			y += adj
+		}
+		mut t := unixYearToSeconds(y, leap)
+		t += unixMonthToSeconds(m, leap)
+		t += day * (self.Day - 1)
+		t += hour * self.Hour
+		t += 60 * self.Minute
+		t += self.Second
+		ret t
+	}
 }
 
 // Timestamp.
@@ -83,207 +83,207 @@ impl AbsTime {
 // call in the background. Back-to-back calls may cause you
 // to make the same calculation over and over again.
 struct Time {
-    sec: UnixTime
+	sec: UnixTime
 }
 
 impl Time {
-    // Returns new time instance from unix-time.
-    static fn Unix(sec: UnixTime): Time {
-        ret Time{
-            sec: sec,
-        }
-    }
+	// Returns new time instance from unix-time.
+	static fn Unix(sec: UnixTime): Time {
+		ret Time{
+			sec: sec,
+		}
+	}
 
-    // Returns time instance of the moment.
-    static fn Now(): Time {
-        ret Time.Unix(unix())
-    }
+	// Returns time instance of the moment.
+	static fn Now(): Time {
+		ret Time.Unix(unix())
+	}
 }
 
 impl Time {
-    // Returns time as unix-time.
-    fn Unix(self): UnixTime { ret self.sec }
+	// Returns time as unix-time.
+	fn Unix(self): UnixTime { ret self.sec }
 
-    // Returns day of month.
-    fn Day(self): TimeData { ret self.Abs().Day }
+	// Returns day of month.
+	fn Day(self): TimeData { ret self.Abs().Day }
 
-    // Returns month.
-    fn Month(self): TimeData { ret self.Abs().Month }
+	// Returns month.
+	fn Month(self): TimeData { ret self.Abs().Month }
 
-    // Returns year.
-    fn Year(self): TimeData { ret self.Abs().Year }
+	// Returns year.
+	fn Year(self): TimeData { ret self.Abs().Year }
 
-    // Returns second.
-    fn Second(self): TimeData { ret self.Abs().Second }
+	// Returns second.
+	fn Second(self): TimeData { ret self.Abs().Second }
 
-    // Returns minute.
-    fn Minute(self): TimeData { ret self.Abs().Minute }
+	// Returns minute.
+	fn Minute(self): TimeData { ret self.Abs().Minute }
 
-    // Returns hour.
-    fn Hour(self): TimeData { ret self.Abs().Hour }
+	// Returns hour.
+	fn Hour(self): TimeData { ret self.Abs().Hour }
 
-    // Returns time as abstract time.
-    fn Abs(self): AbsTime {
-        secs := self.sec - modApoch
-        mut days := secs / day
-        mut remSecs := secs % day
-        if remSecs < 0 {
-            remSecs += day
-            days--
-        }
+	// Returns time as abstract time.
+	fn Abs(self): AbsTime {
+		secs := self.sec - modApoch
+		mut days := secs / day
+		mut remSecs := secs % day
+		if remSecs < 0 {
+			remSecs += day
+			days--
+		}
 
-        mut qcCycles := days / daysPer400Y
-        mut remDays := days % daysPer400Y
-        if remDays < 0 {
-            remDays += daysPer400Y
-            qcCycles--
-        }
+		mut qcCycles := days / daysPer400Y
+		mut remDays := days % daysPer400Y
+		if remDays < 0 {
+			remDays += daysPer400Y
+			qcCycles--
+		}
 
-        mut cCycles := remDays / daysPer100Y
-        if cCycles == 4 {
-            cCycles--
-        }
-        remDays -= cCycles * daysPer100Y
+		mut cCycles := remDays / daysPer100Y
+		if cCycles == 4 {
+			cCycles--
+		}
+		remDays -= cCycles * daysPer100Y
 
-        mut qCycles := remDays / daysPer4Y
-        if qCycles == 25 {
-            qCycles--
-        }
-        remDays -= qCycles * daysPer4Y
+		mut qCycles := remDays / daysPer4Y
+		if qCycles == 25 {
+			qCycles--
+		}
+		remDays -= qCycles * daysPer4Y
 
-        mut remYears := remDays / daysPerY
-        if remYears == 4 {
-            remYears--
-        }
-        remDays -= remYears * daysPerY
+		mut remYears := remDays / daysPerY
+		if remYears == 4 {
+			remYears--
+		}
+		remDays -= remYears * daysPerY
 
-        mut leap := u64(0)
-        if remYears == 0 && (qCycles > 0 || cCycles == 0) {
-            leap = 1
-        }
-        mut yDay := remDays + 31 + 28 + leap
-        if yDay >= daysPerY+leap {
-            yDay -= daysPerY + leap
-        }
+		mut leap := u64(0)
+		if remYears == 0 && (qCycles > 0 || cCycles == 0) {
+			leap = 1
+		}
+		mut yDay := remDays + 31 + 28 + leap
+		if yDay >= daysPerY+leap {
+			yDay -= daysPerY + leap
+		}
 
-        mut months := u64(0)
-        for mdays[months] <= remDays; months++ {
-            remDays -= mdays[months]
-        }
+		mut months := u64(0)
+		for mdays[months] <= remDays; months++ {
+			remDays -= mdays[months]
+		}
 
-        mut t := AbsTime{}
-        t.Year = remYears + 4 * qCycles + 100 * cCycles + 400 * qcCycles + 100
-        t.Month = months + 2
-        if t.Month >= 12 {
-            t.Month -= 12
-            t.Year++
-        }
-        t.Month += unixMonthOffset
-        t.Year += unixYearOffset
-        t.Day = remDays + 1
-        t.WeekDay = (3 + days) % 7
-        if t.WeekDay < 0 {
-            t.WeekDay += 7
-        }
-        t.YearDay = yDay
-        t.Hour = remSecs / hour
-        t.Minute = remSecs / 60 % 60
-        t.Second = remSecs % 60
-        ret t
-    }
+		mut t := AbsTime{}
+		t.Year = remYears + 4 * qCycles + 100 * cCycles + 400 * qcCycles + 100
+		t.Month = months + 2
+		if t.Month >= 12 {
+			t.Month -= 12
+			t.Year++
+		}
+		t.Month += unixMonthOffset
+		t.Year += unixYearOffset
+		t.Day = remDays + 1
+		t.WeekDay = (3 + days) % 7
+		if t.WeekDay < 0 {
+			t.WeekDay += 7
+		}
+		t.YearDay = yDay
+		t.Hour = remSecs / hour
+		t.Minute = remSecs / 60 % 60
+		t.Second = remSecs % 60
+		ret t
+	}
 }
 
 // Returns current unix time UTC.
 fn unix(): UnixTime {
-    ret UnixTime(unsafe { cpp.time(nil) })
+	ret UnixTime(unsafe { cpp.time(nil) })
 }
 
 fn unixYearToSeconds(y: TimeData, mut &leap: bool): UnixTime {
-    if y-2 <= 136 {
-        mut leaps := (y - 68) >> 2
-        leap = (y - 68)&3 == 0
-        if leap {
-            leaps--
-        }
-        ret 31536000 * (y - 70) + day * leaps
-    }
+	if y-2 <= 136 {
+		mut leaps := (y - 68) >> 2
+		leap = (y - 68)&3 == 0
+		if leap {
+			leaps--
+		}
+		ret 31536000 * (y - 70) + day * leaps
+	}
 
-    mut leaps := TimeData(0)
-    mut centuries := TimeData(0)
-    mut cycles := (y - 100) / 400
-    mut rem := (y - 100) % 400
-    if rem < 0 {
-        cycles--
-        rem += 400
-    }
-    if rem == 0 {
-        leap = true
-        centuries = 0
-        leaps = 0
-    } else {
-        if rem >= 200 {
-            if rem >= 300 {
-                centuries = 3
-                rem -= 300
-            } else {
-                centuries = 2
-                rem -= 200
-            }
-        } else {
-            if rem >= 100 {
-                centuries = 1
-                rem -= 100
-            } else {
-                centuries = 0
-            }
-        }
-        if rem == 0 {
-            leap = false
-            leaps = 0
-        } else {
-            leaps = rem / 4
-            rem %= 4
-            leap = rem == 0
-        }
-    }
+	mut leaps := TimeData(0)
+	mut centuries := TimeData(0)
+	mut cycles := (y - 100) / 400
+	mut rem := (y - 100) % 400
+	if rem < 0 {
+		cycles--
+		rem += 400
+	}
+	if rem == 0 {
+		leap = true
+		centuries = 0
+		leaps = 0
+	} else {
+		if rem >= 200 {
+			if rem >= 300 {
+				centuries = 3
+				rem -= 300
+			} else {
+				centuries = 2
+				rem -= 200
+			}
+		} else {
+			if rem >= 100 {
+				centuries = 1
+				rem -= 100
+			} else {
+				centuries = 0
+			}
+		}
+		if rem == 0 {
+			leap = false
+			leaps = 0
+		} else {
+			leaps = rem / 4
+			rem %= 4
+			leap = rem == 0
+		}
+	}
 
-    leaps += 97 * cycles + 24 * centuries
-    if leap {
-        leaps++
-    }
+	leaps += 97 * cycles + 24 * centuries
+	if leap {
+		leaps++
+	}
 
-    ret (y - 100) * 31536000 + leaps * day + 946684800 + day
+	ret (y - 100) * 31536000 + leaps * day + 946684800 + day
 }
 
 fn unixMonthToSeconds(m: TimeData, leap: bool): UnixTime {
-    // Set seconds through month.
-    mut t := UnixTime(0)
-    match m {
-    | 1:
-        t = 31 * day
-    | 2:
-        t = 59 * day
-    | 3:
-        t = 90 * day
-    | 4:
-        t = 120 * day
-    | 5:
-        t = 151 * day
-    | 6:
-        t = 181 * day
-    | 7:
-        t = 212 * day
-    | 8:
-        t = 243 * day
-    | 9:
-        t = 273 * day
-    | 10:
-        t = 304 * day
-    | 11:
-        t = 334 * day
-    }
-    if leap && m >= 2 {
-        t += day
-    }
-    ret t
+	// Set seconds through month.
+	mut t := UnixTime(0)
+	match m {
+	| 1:
+		t = 31 * day
+	| 2:
+		t = 59 * day
+	| 3:
+		t = 90 * day
+	| 4:
+		t = 120 * day
+	| 5:
+		t = 151 * day
+	| 6:
+		t = 181 * day
+	| 7:
+		t = 212 * day
+	| 8:
+		t = 243 * day
+	| 9:
+		t = 273 * day
+	| 10:
+		t = 304 * day
+	| 11:
+		t = 334 * day
+	}
+	if leap && m >= 2 {
+		t += day
+	}
+	ret t
 }

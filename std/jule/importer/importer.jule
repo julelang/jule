@@ -6,193 +6,193 @@ use std::fs::{OFlag, FsError, DirEntry, File, Directory}
 use path for std::fs::path
 use std::jule::ast::{Ast}
 use build for std::jule::build::{
-    Directive,
-    LogKind,
-    Log,
-    Ext,
+	Directive,
+	LogKind,
+	Log,
+	Ext,
 }
 use mod for std::jule::internal::mod
 use std::jule::lex::{
-    LexMode,
-    Token,
-    NewFileSet,
-    Lex,
+	LexMode,
+	Token,
+	NewFileSet,
+	Lex,
 }
 use std::jule::parser::{ParseFile}
 use std::jule::sema::{
-    Importer,
-    ImportInfo,
+	Importer,
+	ImportInfo,
 }
 use process for std::process
 use strings for std::strings
 
 // Read buffer by file path.
 fn readBuff(path: str): []byte {
-    ret File.Read(path) else {
-        outln("error: file cannot read")
-        const ErrorExitCode = 1
-        process::Exit(ErrorExitCode)
-        ret nil // Avoid error
-    }
+	ret File.Read(path) else {
+		outln("error: file cannot read")
+		const ErrorExitCode = 1
+		process::Exit(ErrorExitCode)
+		ret nil // Avoid error
+	}
 }
 
 // Make compiler error, just text.
 // Not includes row, column, and etc. informations.
 fn flatCompilerErr(text: str): Log {
-    ret Log{
-        Kind: LogKind.Error,
-        Text: text,
-    }
+	ret Log{
+		Kind: LogKind.Error,
+		Text: text,
+	}
 }
 
 // Default importer for the reference Jule compiler.
 struct JuleImporter {
-    mods: []str
-    mod:  str
-    pkgs: []&ImportInfo
-    vars: []str
+	mods: []str
+	mod:  str
+	pkgs: []&ImportInfo
+	vars: []str
 }
 
 impl JuleImporter {
-    // Returns new importer instance by compile information.
-    static fn New(info: CompileInfo): &JuleImporter {
-        mut imp := &JuleImporter{
-            mods: [build::PathStdlib],
-        }
-        initVars(imp.vars, info)
-        ret imp
-    }
+	// Returns new importer instance by compile information.
+	static fn New(info: CompileInfo): &JuleImporter {
+		mut imp := &JuleImporter{
+			mods: [build::PathStdlib],
+		}
+		initVars(imp.vars, info)
+		ret imp
+	}
 
-    // Returns all imported packages.
-    // The return value is mutable reference to internal buffer.
-    // You should be care about using that copy.
-    fn AllPackages(mut self): []&ImportInfo {
-        ret self.pkgs
-    }
+	// Returns all imported packages.
+	// The return value is mutable reference to internal buffer.
+	// You should be care about using that copy.
+	fn AllPackages(mut self): []&ImportInfo {
+		ret self.pkgs
+	}
 }
 
 impl Importer for JuleImporter {
-    fn SetModPath(mut self, path: str) {
-        self.mod = path
-    }
+	fn SetModPath(mut self, path: str) {
+		self.mod = path
+	}
 
-    fn GetModPath(self): str {
-        ret self.mod
-    }
+	fn GetModPath(self): str {
+		ret self.mod
+	}
 
-    fn ModById(self, id: int): str {
-        ret self.mods[id]
-    }
+	fn ModById(self, id: int): str {
+		ret self.mods[id]
+	}
 
-    fn GetImport(mut self, path: str): &ImportInfo {
-        for (_, mut p) in self.pkgs {
-            if p.Path == path {
-                ret p
-            }
-        }
-        ret nil
-    }
+	fn GetImport(mut self, path: str): &ImportInfo {
+		for (_, mut p) in self.pkgs {
+			if p.Path == path {
+				ret p
+			}
+		}
+		ret nil
+	}
 
-    fn ImportPackage(mut self, path: str, update_mod: bool): ([]&Ast, []Log) {
-        mut dirents := Directory.Read(path) else {
-            ret nil, [flatCompilerErr("connot read package directory: " + path)]
-        }
+	fn ImportPackage(mut self, path: str, update_mod: bool): ([]&Ast, []Log) {
+		mut dirents := Directory.Read(path) else {
+			ret nil, [flatCompilerErr("connot read package directory: " + path)]
+		}
 
-        if update_mod {
-            newMod := mod::FindModuleFileDeep(path)
-            if newMod != self.mod {
-                self.mod = newMod
-                mut errs := mod::CheckModuleFile(self.mod)
-                if len(errs) != 0 {
-                    ret nil, errs
-                }
-            }
-        }
+		if update_mod {
+			newMod := mod::FindModuleFileDeep(path)
+			if newMod != self.mod {
+				self.mod = newMod
+				mut errs := mod::CheckModuleFile(self.mod)
+				if len(errs) != 0 {
+					ret nil, errs
+				}
+			}
+		}
 
-        mut asts := make([]&Ast, 0, len(dirents))
-        for _, dirent in dirents {
-            // Skip directories, and non-jule files.
-            if dirent.Stat.IsDir() || !strings::HasSuffix(dirent.Name, build::Ext) {
-                continue
-            }
+		mut asts := make([]&Ast, 0, len(dirents))
+		for _, dirent in dirents {
+			// Skip directories, and non-jule files.
+			if dirent.Stat.IsDir() || !strings::HasSuffix(dirent.Name, build::Ext) {
+				continue
+			}
 
-            _path := path::Join(path, dirent.Name)
-            mut file := NewFileSet(_path)
-            file.Fill(readBuff(file.Path))
-            mut errors := Lex(file, LexMode.Standard)
-            if len(errors) > 0 {
-                ret nil, errors
-            }
+			_path := path::Join(path, dirent.Name)
+			mut file := NewFileSet(_path)
+			file.Fill(readBuff(file.Path))
+			mut errors := Lex(file, LexMode.Standard)
+			if len(errors) > 0 {
+				ret nil, errors
+			}
 
-            mut finfo := ParseFile(file)
-            if len(finfo.Errors) > 0 {
-                ret nil, finfo.Errors
-            }
+			mut finfo := ParseFile(file)
+			if len(finfo.Errors) > 0 {
+				ret nil, finfo.Errors
+			}
 
-            // Skip this source file if file annotation is failed.
-            if !isPassFileAnnotation(dirent.Name) {
-                continue
-            }
+			// Skip this source file if file annotation is failed.
+			if !isPassFileAnnotation(dirent.Name) {
+				continue
+			}
 
-            r, mut logs := self.isPassBuildDirectives(finfo.Ast)
-            if len(logs) > 0 {
-                ret nil, logs
-            }
+			r, mut logs := self.isPassBuildDirectives(finfo.Ast)
+			if len(logs) > 0 {
+				ret nil, logs
+			}
 
-            // Skip file if can't pass build directives.
-            if !r {
-                continue
-            }
+			// Skip file if can't pass build directives.
+			if !r {
+				continue
+			}
 
-            asts = append(asts, finfo.Ast)
-        }
+			asts = append(asts, finfo.Ast)
+		}
 
-        ret asts, nil
-    }
+		ret asts, nil
+	}
 
-    fn Imported(mut self, mut imp: &ImportInfo) {
-        // Already imported?
-        for _, p in self.pkgs {
-            if p.Binded == imp.Binded && p.LinkPath == imp.LinkPath {
-                ret
-            }
-        }
+	fn Imported(mut self, mut imp: &ImportInfo) {
+		// Already imported?
+		for _, p in self.pkgs {
+			if p.Binded == imp.Binded && p.LinkPath == imp.LinkPath {
+				ret
+			}
+		}
 
-        if len(self.mod) != 0 {
-            for i, mod in self.mods {
-                if self.mod == mod {
-                    imp.ModId = i
-                    goto setted
-                }
-            }
-            imp.ModId = len(self.mods)
-            self.mods = append(self.mods, self.mod)
-        setted:
-        }
+		if len(self.mod) != 0 {
+			for i, mod in self.mods {
+				if self.mod == mod {
+					imp.ModId = i
+					goto setted
+				}
+			}
+			imp.ModId = len(self.mods)
+			self.mods = append(self.mods, self.mod)
+		setted:
+		}
 
-        self.pkgs = append(self.pkgs, imp)
-    }
+		self.pkgs = append(self.pkgs, imp)
+	}
 }
 
 impl JuleImporter {
-    // Reports whether file passes build directives.
-    fn isPassBuildDirectives(mut self, mut &file: &Ast): (bool, []Log) {
-        for (_, mut td) in file.TopDirectives {
-            if td.Tag.Kind != Directive.Build {
-                continue
-            }
-            mut de := directiveEval{
-                d: td,
-                vars: self.vars,
-            }
-            result := de.eval()
-            if len(de.logs) > 0 {
-                ret false, de.logs
-            }
-            if !result {
-                ret false, nil
-            }
-        }
-        ret true, nil
-    }
+	// Reports whether file passes build directives.
+	fn isPassBuildDirectives(mut self, mut &file: &Ast): (bool, []Log) {
+		for (_, mut td) in file.TopDirectives {
+			if td.Tag.Kind != Directive.Build {
+				continue
+			}
+			mut de := directiveEval{
+				d: td,
+				vars: self.vars,
+			}
+			result := de.eval()
+			if len(de.logs) > 0 {
+				ret false, de.logs
+			}
+			if !result {
+				ret false, nil
+			}
+		}
+		ret true, nil
+	}
 }

@@ -13,113 +13,113 @@ const growFactor = 2
 // Stacks aren't use shared allocation between themselves.
 // Allocates new space and copies (not deep copy) items into space.
 struct Stack[T] {
-    mem: dynar::Dynar[T]
+	mem: dynar::Dynar[T]
 }
 
 impl Stack {
-    // Returns new stack instance with capacity.
-    static fn New(cap: int): Stack[T] {
-        mut stack := Stack[T]{
-            mem: dynar::Dynar[T].New(),
-        }
-        if cap > 0 {
-            stack.resize(cap)
-        }
-        ret stack
-    }
+	// Returns new stack instance with capacity.
+	static fn New(cap: int): Stack[T] {
+		mut stack := Stack[T]{
+			mem: dynar::Dynar[T].New(),
+		}
+		if cap > 0 {
+			stack.resize(cap)
+		}
+		ret stack
+	}
 
-    fn resize(mut self, n: int) {
-        ok := self.mem.Resize(n)
-        if !ok {
-            panic("Stack[T]: heap reallocation failed")
-        }
-    }
+	fn resize(mut self, n: int) {
+		ok := self.mem.Resize(n)
+		if !ok {
+			panic("Stack[T]: heap reallocation failed")
+		}
+	}
 
-    // Deallocate heap.
-    fn Dispose(mut self) {
-        self.mem.Dispose()
-    }
+	// Deallocate heap.
+	fn Dispose(mut self) {
+		self.mem.Dispose()
+	}
 
-    // Set capacity to length.
-    // Removes additional capacity that waiting to use.
-    // Allocates new memory to cut additional capacity.
-    fn Fit(mut self) {
-        if self.Len() != self.Cap() {
-            self.resize(self.Len())
-        }
-    }
+	// Set capacity to length.
+	// Removes additional capacity that waiting to use.
+	// Allocates new memory to cut additional capacity.
+	fn Fit(mut self) {
+		if self.Len() != self.Cap() {
+			self.resize(self.Len())
+		}
+	}
 
-    // Returns length of stack.
-    // Another meaning is count of elements.
-    fn Len(self): int {
-        ret self.mem.Buff.len
-    }
+	// Returns length of stack.
+	// Another meaning is count of elements.
+	fn Len(self): int {
+		ret self.mem.Buff.len
+	}
 
-    // Returns capacity of stack.
-    // Another meaning is additional redy-to-use allocation size.
-    fn Cap(self): int {
-        ret self.mem.Buff.cap
-    }
+	// Returns capacity of stack.
+	// Another meaning is additional redy-to-use allocation size.
+	fn Cap(self): int {
+		ret self.mem.Buff.cap
+	}
 
-    // Reports whether stack is empty.
-    fn Empty(self): bool {
-        ret self.Len() == 0
-    }
+	// Reports whether stack is empty.
+	fn Empty(self): bool {
+		ret self.Len() == 0
+	}
 
-    // Removes all elements.
-    // Does not deallocates buffer, keeps capacity.
-    fn Clear(mut self) {
-        self.mem.Buff.len = 0
-    }
+	// Removes all elements.
+	// Does not deallocates buffer, keeps capacity.
+	fn Clear(mut self) {
+		self.mem.Buff.len = 0
+	}
 
-    // Pushes element to top of the stack.
-    fn Push(mut self, mut t: T) {
-        if self.Len() >= self.Cap() {
-            self.resize((self.Cap() * growFactor) + 1)
-        }
-        unsafe {
-            self.mem.Buff.heap[self.Len()] = t
-        }
-        self.mem.Buff.len++
-    }
+	// Pushes element to top of the stack.
+	fn Push(mut self, mut t: T) {
+		if self.Len() >= self.Cap() {
+			self.resize((self.Cap() * growFactor) + 1)
+		}
+		unsafe {
+			self.mem.Buff.heap[self.Len()] = t
+		}
+		self.mem.Buff.len++
+	}
 
-    // Returns top element of stack, then removes top element.
-    // Panics if stack is empty.
-    fn Pop(mut self): T {
-        if self.Empty() {
-            panic("Stack[T]: pop with zero-length stack")
-        }
-        self.mem.Buff.len--
-        unsafe {
-            ret self.mem.Buff.heap[self.Len()]
-        }
-    }
+	// Returns top element of stack, then removes top element.
+	// Panics if stack is empty.
+	fn Pop(mut self): T {
+		if self.Empty() {
+			panic("Stack[T]: pop with zero-length stack")
+		}
+		self.mem.Buff.len--
+		unsafe {
+			ret self.mem.Buff.heap[self.Len()]
+		}
+	}
 
-    // Returns top element of stack.
-    // Panics if stack is empty.
-    fn Top(mut self): T {
-        if self.Empty() {
-            panic("Stack[T]: top with zero-length stack")
-        }
-        unsafe {
-            ret self.mem.Buff.heap[self.Len()-1]
-        }
-    }
+	// Returns top element of stack.
+	// Panics if stack is empty.
+	fn Top(mut self): T {
+		if self.Empty() {
+			panic("Stack[T]: top with zero-length stack")
+		}
+		unsafe {
+			ret self.mem.Buff.heap[self.Len()-1]
+		}
+	}
 
-    // Returns slice that contains elements of stack.
-    // Slice is not mutable reference to internal buffer, but can effect internal
-    // buffer if T is mutable type.
-    // Appends elements in top-to-bottom order.
-    fn Slice(mut self): []T {
-        if self.Empty() {
-            ret nil
-        }
-        mut s := make([]T, 0, self.Len())
-        mut i := self.mem.Buff.heap + self.Len() - 1
-        j := self.mem.Buff.heap
-        for i >= j; i-- {
-            s = append(s, unsafe { *i })
-        }
-        ret s
-    }
+	// Returns slice that contains elements of stack.
+	// Slice is not mutable reference to internal buffer, but can effect internal
+	// buffer if T is mutable type.
+	// Appends elements in top-to-bottom order.
+	fn Slice(mut self): []T {
+		if self.Empty() {
+			ret nil
+		}
+		mut s := make([]T, 0, self.Len())
+		mut i := self.mem.Buff.heap + self.Len() - 1
+		j := self.mem.Buff.heap
+		for i >= j; i-- {
+			s = append(s, unsafe { *i })
+		}
+		ret s
+	}
 }

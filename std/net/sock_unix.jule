@@ -12,124 +12,124 @@ type netHandle: int
 type addrLen: u32
 
 fn lastErrorCode(): int {
-    ret sys::GetLastErrno()
+	ret sys::GetLastErrno()
 }
 
 fn closeSocket(handle: netHandle): bool {
-    ret sys::Close(handle) >= 0
+	ret sys::Close(handle) >= 0
 }
 
 fn closeSocketBlockingMode(handle: netHandle)! {
-    mut arg := sys::Fcntl(handle, sys::F_GETFL, 0)
-    if arg < 0 {
-        error(lastErrorCode())
-    }
-    arg |= sys::O_NONBLOCK
-    if sys::Fcntl(handle, sys::F_SETFL, arg) < 0 {
-        error(lastErrorCode())
-    }
+	mut arg := sys::Fcntl(handle, sys::F_GETFL, 0)
+	if arg < 0 {
+		error(lastErrorCode())
+	}
+	arg |= sys::O_NONBLOCK
+	if sys::Fcntl(handle, sys::F_SETFL, arg) < 0 {
+		error(lastErrorCode())
+	}
 }
 
 fn openSocketBlockingMode(handle: netHandle)! {
-    mut arg := sys::Fcntl(handle, sys::F_GETFL, 0)
-    if arg < 0 {
-        error(lastErrorCode())
-    }
-    arg &= ^sys::O_NONBLOCK
-    if sys::Fcntl(handle, sys::F_SETFL, arg) < 0 {
-        error(lastErrorCode())
-    }
+	mut arg := sys::Fcntl(handle, sys::F_GETFL, 0)
+	if arg < 0 {
+		error(lastErrorCode())
+	}
+	arg &= ^sys::O_NONBLOCK
+	if sys::Fcntl(handle, sys::F_SETFL, arg) < 0 {
+		error(lastErrorCode())
+	}
 }
 
 unsafe fn connectSocket(handle: netHandle, sockAddr: *sys::Sockaddr, sockLen: uint, timeout: time::DurInt)! {
-    if timeout == 0 {
-        connectSocketNoTimeout(handle, sockAddr, sockLen) else { error(error) }
-        ret
-    }
-    tv := timevalFromDuration(timeout)
-    if tv.tv_sec == 0 && tv.tv_usec == 0 {
-        connectSocketNoTimeout(handle, sockAddr, sockLen) else { error(error) }
-        ret
-    }
-    closeSocketBlockingMode(handle) else { error(error) }
-    mut res := sys::Connect(handle, sockAddr, sockLen)
-    if res < 0 {
-        err := lastErrorCode()
-        if err != sys::EINPROGRESS {
-            error(err)
-        }
-    } else {
-        ret
-    }
-    mut fd := sys::Fd{}
-    sys::FdZero(&fd)
-    sys::FdSet(handle, &fd)
+	if timeout == 0 {
+		connectSocketNoTimeout(handle, sockAddr, sockLen) else { error(error) }
+		ret
+	}
+	tv := timevalFromDuration(timeout)
+	if tv.tv_sec == 0 && tv.tv_usec == 0 {
+		connectSocketNoTimeout(handle, sockAddr, sockLen) else { error(error) }
+		ret
+	}
+	closeSocketBlockingMode(handle) else { error(error) }
+	mut res := sys::Connect(handle, sockAddr, sockLen)
+	if res < 0 {
+		err := lastErrorCode()
+		if err != sys::EINPROGRESS {
+			error(err)
+		}
+	} else {
+		ret
+	}
+	mut fd := sys::Fd{}
+	sys::FdZero(&fd)
+	sys::FdSet(handle, &fd)
 lookup:
-    for {
-        res = sys::Select(handle + 1, nil, &fd, nil, &tv)
-        err := lastErrorCode()
-        match {
-        | res < 0 && err != sys::EINTR:
-            error(err)
-        | res > 0:
-            len2 := UnsignedInt(mem::SizeOf(int))
-            opt := 0
-            if sys::Getsockopt(handle, sys::SOL_SOCKET, sys::SO_ERROR, &opt, &len2) < 0 {
-                error(lastErrorCode())
-            }
-            if opt != 0 {
-                error(opt)
-            }
-            break lookup
-        |:
-            // Timeout.
-            error(-1)
-        }
-    }
-    openSocketBlockingMode(handle) else { error(error) }
+	for {
+		res = sys::Select(handle + 1, nil, &fd, nil, &tv)
+		err := lastErrorCode()
+		match {
+		| res < 0 && err != sys::EINTR:
+			error(err)
+		| res > 0:
+			len2 := UnsignedInt(mem::SizeOf(int))
+			opt := 0
+			if sys::Getsockopt(handle, sys::SOL_SOCKET, sys::SO_ERROR, &opt, &len2) < 0 {
+				error(lastErrorCode())
+			}
+			if opt != 0 {
+				error(opt)
+			}
+			break lookup
+		|:
+			// Timeout.
+			error(-1)
+		}
+	}
+	openSocketBlockingMode(handle) else { error(error) }
 }
 
 fn recvfrom(&conn: UdpConn, mut &buf: []byte)!: int {
-    zsys::HandleRW(buf)
-    if conn.v6 {
-        addrLen := addrLen(mem::SizeOf(conn.sockaddr6))
-        n := unsafe { sys::Recvfrom(conn.handle, &buf[0], uint(len(buf)), 0, (*sys::Sockaddr)(&conn.sockaddr6), &addrLen) }
-        if n >= 0 {
-            ret int(n)
-        }
-    } else {
-        addrLen := addrLen(mem::SizeOf(conn.sockaddr4))
-        n := unsafe { sys::Recvfrom(conn.handle, &buf[0], uint(len(buf)), 0, (*sys::Sockaddr)(&conn.sockaddr4), &addrLen) }
-        if n >= 0 {
-            ret int(n)
-        }
-    }
-    error(lastErrorCode())
+	zsys::HandleRW(buf)
+	if conn.v6 {
+		addrLen := addrLen(mem::SizeOf(conn.sockaddr6))
+		n := unsafe { sys::Recvfrom(conn.handle, &buf[0], uint(len(buf)), 0, (*sys::Sockaddr)(&conn.sockaddr6), &addrLen) }
+		if n >= 0 {
+			ret int(n)
+		}
+	} else {
+		addrLen := addrLen(mem::SizeOf(conn.sockaddr4))
+		n := unsafe { sys::Recvfrom(conn.handle, &buf[0], uint(len(buf)), 0, (*sys::Sockaddr)(&conn.sockaddr4), &addrLen) }
+		if n >= 0 {
+			ret int(n)
+		}
+	}
+	error(lastErrorCode())
 }
 
 fn sendto(&conn: UdpConn, &buf: []byte)!: int {
-    zsys::HandleRW(buf)
-    if conn.v6 {
-        addrLen := addrLen(mem::SizeOf(conn.sockaddr6))
-        n := unsafe { sys::Sendto(conn.handle, &buf[0], uint(len(buf)), 0, (*sys::Sockaddr)(&conn.sockaddr6), addrLen) }
-        if n >= 0 {
-            ret int(n)
-        }
-    } else {
-        addrLen := addrLen(mem::SizeOf(conn.sockaddr4))
-        n := unsafe { sys::Sendto(conn.handle, &buf[0], uint(len(buf)), 0, (*sys::Sockaddr)(&conn.sockaddr4), addrLen) }
-        if n >= 0 {
-            ret int(n)
-        }
-    }
-    error(lastErrorCode())
+	zsys::HandleRW(buf)
+	if conn.v6 {
+		addrLen := addrLen(mem::SizeOf(conn.sockaddr6))
+		n := unsafe { sys::Sendto(conn.handle, &buf[0], uint(len(buf)), 0, (*sys::Sockaddr)(&conn.sockaddr6), addrLen) }
+		if n >= 0 {
+			ret int(n)
+		}
+	} else {
+		addrLen := addrLen(mem::SizeOf(conn.sockaddr4))
+		n := unsafe { sys::Sendto(conn.handle, &buf[0], uint(len(buf)), 0, (*sys::Sockaddr)(&conn.sockaddr4), addrLen) }
+		if n >= 0 {
+			ret int(n)
+		}
+	}
+	error(lastErrorCode())
 }
 
 fn setSocketTimeout(handle: netHandle, scope: int, timeout: time::DurInt)! {
-    tv := timevalFromDuration(timeout)
-    unsafe {
-        if sys::Setsockopt(handle, sys::SOL_SOCKET, scope, &tv, mem::SizeOf(tv)) < 0 {
-            error(lastErrorCode())
-        }
-    }
+	tv := timevalFromDuration(timeout)
+	unsafe {
+		if sys::Setsockopt(handle, sys::SOL_SOCKET, scope, &tv, mem::SizeOf(tv)) < 0 {
+			error(lastErrorCode())
+		}
+	}
 }

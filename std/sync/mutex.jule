@@ -8,29 +8,29 @@ cpp use "<mutex>"
 #namespace "std"
 #typedef
 cpp struct mutex {
-    lock:     fn()
-    unlock:   fn()
-    try_lock: fn(): bool
+	lock:     fn()
+	unlock:   fn()
+	try_lock: fn(): bool
 }
 
 struct mutex {
-    p: *cpp.mutex
+	p: *cpp.mutex
 }
 
 impl mutex {
-    static fn new(): &mutex {
-        mut mtx := &mutex{
-            p: integ::New[cpp.mutex](),
-        }
-        if mtx.p == nil {
-            panic("std::sync: mutex: allocation failed")
-        }
-        ret mtx
-    }
+	static fn new(): &mutex {
+		mut mtx := &mutex{
+			p: integ::New[cpp.mutex](),
+		}
+		if mtx.p == nil {
+			panic("std::sync: mutex: allocation failed")
+		}
+		ret mtx
+	}
 
-    fn Dispose(mut self) {
-        unsafe { integ::Delete[cpp.mutex](self.p) }
-    }
+	fn Dispose(mut self) {
+		unsafe { integ::Delete[cpp.mutex](self.p) }
+	}
 }
 
 // Muxtex is a primitive used to protect memory in
@@ -45,35 +45,35 @@ impl mutex {
 // Mutex suitable for using without smart pointers thanks to internal allocations.
 // The internal allocation automatically deallocated by smart pointer.
 struct Mutex {
-    mtx: &mutex = mutex.new()
+	mtx: &mutex = mutex.new()
 }
 
 impl Mutex {
-    // Returns new initialized ready-for-use Mutex.
-    static fn New(): Mutex {
-        ret Mutex{}
-    }
+	// Returns new initialized ready-for-use Mutex.
+	static fn New(): Mutex {
+		ret Mutex{}
+	}
 }
 
 impl Mutex {
-    // Locks the mutex. If the mutex is locked by
-    // another thread, it stops the execution of the
-    // algorithm to seize it and waits to lock the mutex.
-    fn Lock(self) {
-        unsafe { self.mtx.p.lock() }
-    }
+	// Locks the mutex. If the mutex is locked by
+	// another thread, it stops the execution of the
+	// algorithm to seize it and waits to lock the mutex.
+	fn Lock(self) {
+		unsafe { self.mtx.p.lock() }
+	}
 
-    // Unlock the mutex you locked and make it open
-    // to locking by the thread.
-    fn Unlock(self) {
-        unsafe { self.mtx.p.unlock() }
-    }
+	// Unlock the mutex you locked and make it open
+	// to locking by the thread.
+	fn Unlock(self) {
+		unsafe { self.mtx.p.unlock() }
+	}
 
-    // Try locking the mutex. But unlike the lock
-    // method, it just tries to lock instead of waiting
-    // to lock. Returns true if the locking was
-    // successful, false otherwise.
-    fn TryLock(self): bool {
-        ret unsafe { self.mtx.p.try_lock() }
-    }
+	// Try locking the mutex. But unlike the lock
+	// method, it just tries to lock instead of waiting
+	// to lock. Returns true if the locking was
+	// successful, false otherwise.
+	fn TryLock(self): bool {
+		ret unsafe { self.mtx.p.try_lock() }
+	}
 }

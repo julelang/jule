@@ -6,446 +6,446 @@ use std::unsafe
 
 // An arbitrary-precision natural number.
 struct nat {
-    mut bits: bits
+	mut bits: bits
 }
 
 impl nat {
-    // Returns nat that represents zero.
-    static fn zero(): nat {
-        ret nat{}
-    }
+	// Returns nat that represents zero.
+	static fn zero(): nat {
+		ret nat{}
+	}
 
-    // Returns nat that represents one.
-    static fn one(): nat {
-        ret nat{
-            bits: [1],
-        }
-    }
+	// Returns nat that represents one.
+	static fn one(): nat {
+		ret nat{
+			bits: [1],
+		}
+	}
 
-    // Returns nat that initialized by integer value.
-    // T can only be signed or unsigned integer types.
-    static fn new[T](mut i: T): nat {
-        const match type T {
-        | nat:
-            ret i
-        }
-        mut nat := nat.zero()
-        const match type T {
-        | i8:
-            nat.bits = make(bits, 1 << 3 - 1)
-        | u8:
-            nat.bits = make(bits, 1 << 3)
-        | i16:
-            nat.bits = make(bits, 1 << 4 - 1)
-        | u16:
-            nat.bits = make(bits, 1 << 4)
-        | i32:
-            nat.bits = make(bits, 1 << 5 - 1)
-        | u32:
-            nat.bits = make(bits, 1 << 5)
-        | i64:
-            nat.bits = make(bits, 1 << 6 - 1)
-        | u64:
-            nat.bits = make(bits, 1 << 6)
-        | int:
-            nat.bits = make(bits, _INT_SIZE - 1)
-        | uint:
-            nat.bits = make(bits, _INT_SIZE)
-        |:
-            panic("std::math::big: nat.new[T]: T is should be signed or unsigned integer type except uintptr")
-        }
-        if i < 0 {
-            i = -i
-        }
-        for j in nat.bits {
-            nat.bits[j] = bit((i >> j) & 0b1)
-        }
-        nat.fit()
-        ret nat
-    }
+	// Returns nat that initialized by integer value.
+	// T can only be signed or unsigned integer types.
+	static fn new[T](mut i: T): nat {
+		const match type T {
+		| nat:
+			ret i
+		}
+		mut nat := nat.zero()
+		const match type T {
+		| i8:
+			nat.bits = make(bits, 1 << 3 - 1)
+		| u8:
+			nat.bits = make(bits, 1 << 3)
+		| i16:
+			nat.bits = make(bits, 1 << 4 - 1)
+		| u16:
+			nat.bits = make(bits, 1 << 4)
+		| i32:
+			nat.bits = make(bits, 1 << 5 - 1)
+		| u32:
+			nat.bits = make(bits, 1 << 5)
+		| i64:
+			nat.bits = make(bits, 1 << 6 - 1)
+		| u64:
+			nat.bits = make(bits, 1 << 6)
+		| int:
+			nat.bits = make(bits, _INT_SIZE - 1)
+		| uint:
+			nat.bits = make(bits, _INT_SIZE)
+		|:
+			panic("std::math::big: nat.new[T]: T is should be signed or unsigned integer type except uintptr")
+		}
+		if i < 0 {
+			i = -i
+		}
+		for j in nat.bits {
+			nat.bits[j] = bit((i >> j) & 0b1)
+		}
+		nat.fit()
+		ret nat
+	}
 
-    // Parse nat from string. Fmt is the format of string.
-    // Results with exceptional if bits are not in the format or empty.
-    // Results with exceptional if fmt is not valid.
-    // Exceptional is always BigError.Format.
-    //
-    // Valid fmt values are;
-    //   - 2 for binary.
-    //   - 8 for octal.
-    //   - 10 for decimal.
-    //   - 16 for hexadecimal.
-    static fn parse(s: str, fmt: int)!: nat {
-        if s == "" {
-            error(BigError.Format)
-        }
-        mut r := nat{}
-        match fmt {
-        | 2:
-            r.bits = parseBinary(s) else { error(error) }
-        | 8:
-            r.bits = parseOctal(s) else { error(error) }
-        | 10:
-            r.bits = parseDecimal(s) else { error(error) }
-        | 16:
-            r.bits = parseHex(s) else { error(error) }
-        |:
-            error(BigError.Format)
-        }
-        ret r
-    }
+	// Parse nat from string. Fmt is the format of string.
+	// Results with exceptional if bits are not in the format or empty.
+	// Results with exceptional if fmt is not valid.
+	// Exceptional is always BigError.Format.
+	//
+	// Valid fmt values are;
+	//   - 2 for binary.
+	//   - 8 for octal.
+	//   - 10 for decimal.
+	//   - 16 for hexadecimal.
+	static fn parse(s: str, fmt: int)!: nat {
+		if s == "" {
+			error(BigError.Format)
+		}
+		mut r := nat{}
+		match fmt {
+		| 2:
+			r.bits = parseBinary(s) else { error(error) }
+		| 8:
+			r.bits = parseOctal(s) else { error(error) }
+		| 10:
+			r.bits = parseDecimal(s) else { error(error) }
+		| 16:
+			r.bits = parseHex(s) else { error(error) }
+		|:
+			error(BigError.Format)
+		}
+		ret r
+	}
 
-    // Returns count of bits.
-    // Return value also means the minimum number of bits that can represent the integer.
-    fn len(self): int {
-        ret len(self.bits)
-    }
+	// Returns count of bits.
+	// Return value also means the minimum number of bits that can represent the integer.
+	fn len(self): int {
+		ret len(self.bits)
+	}
 
-    // Eliminates initial-zeros, normalizes bits.
-    fn fit(mut self) {
-        fit(self.bits)
-    }
+	// Eliminates initial-zeros, normalizes bits.
+	fn fit(mut self) {
+		fit(self.bits)
+	}
 
-    // Adds two nat and returns result.
-    fn Add(self, y: nat): nat {
-        mut r := self
-        r += y
-        ret r
-    }
+	// Adds two nat and returns result.
+	fn Add(self, y: nat): nat {
+		mut r := self
+		r += y
+		ret r
+	}
 
-    // Adds nat.
-    fn AddAssign(mut self, y: nat) {
-        if y.len() == 0 {
-            ret
-        }
-        self.bits = cloneBits(self.bits)
-        addRes(self.bits, y.bits)
-    }
+	// Adds nat.
+	fn AddAssign(mut self, y: nat) {
+		if y.len() == 0 {
+			ret
+		}
+		self.bits = cloneBits(self.bits)
+		addRes(self.bits, y.bits)
+	}
 
-    // Subtracts two nat and returns result.
-    fn Sub(self, y: nat): nat {
-        mut r := self
-        r -= y
-        ret r
-    }
+	// Subtracts two nat and returns result.
+	fn Sub(self, y: nat): nat {
+		mut r := self
+		r -= y
+		ret r
+	}
 
-    // Subtracts nat.
-    fn SubAssign(mut self, y: nat) {
-        if y.len() == 0 {
-            ret
-        }
-        self.bits = cloneBits(self.bits)
-        subRes(self.bits, y.bits)
-        self.fit()
-    }
+	// Subtracts nat.
+	fn SubAssign(mut self, y: nat) {
+		if y.len() == 0 {
+			ret
+		}
+		self.bits = cloneBits(self.bits)
+		subRes(self.bits, y.bits)
+		self.fit()
+	}
 
-    // Multiplies two nat and returns result.
-    fn Mul(self, y: nat): nat {
-        mut r := self
-        r *= y
-        ret r
-    }
+	// Multiplies two nat and returns result.
+	fn Mul(self, y: nat): nat {
+		mut r := self
+		r *= y
+		ret r
+	}
 
-    // Multiplies nat.
-    fn MulAssign(mut self, y: nat) {
-        match y.len() {
-        | 1:
-            ret
-        | 0:
-            // Right operand is zero, result is always zero.
-            self.bits = nil
-            ret
-        }
-        if self.len() == 0 {
-            // Right operand is zero, result is always zero.
-            self.bits = nil
-            ret
-        }
+	// Multiplies nat.
+	fn MulAssign(mut self, y: nat) {
+		match y.len() {
+		| 1:
+			ret
+		| 0:
+			// Right operand is zero, result is always zero.
+			self.bits = nil
+			ret
+		}
+		if self.len() == 0 {
+			// Right operand is zero, result is always zero.
+			self.bits = nil
+			ret
+		}
 
-        // The opeand y is small number.
-        // Use basic algorithm instead of karatsuba.
-        if y.len() < karatsubaThreshold {
-            self.bits = basicMul(self.bits, y.bits)
-        } else {
-            self.bits = karatsuba(self.bits, y.bits)
-        }
-        self.fit()
-    }
+		// The opeand y is small number.
+		// Use basic algorithm instead of karatsuba.
+		if y.len() < karatsubaThreshold {
+			self.bits = basicMul(self.bits, y.bits)
+		} else {
+			self.bits = karatsuba(self.bits, y.bits)
+		}
+		self.fit()
+	}
 
-    // Divides two nat and returns result.
-    fn Div(self, y: nat): nat {
-        mut r := self
-        r /= y
-        ret r
-    }
+	// Divides two nat and returns result.
+	fn Div(self, y: nat): nat {
+		mut r := self
+		r /= y
+		ret r
+	}
 
-    // Divides nat.
-    fn DivAssign(mut self, y: nat) {
-        if self.len() == 0 {
-            // Left operans is zero, remainder is always zero.
-            ret
-        }
-        match y.len() {
-        | 1:
-            // Right operand is 1, quotient is always equals to left operand.
-            ret
-        | 0:
-            panic("std::math::big: division by zero")
-        }
-        match self.cmp(y) {
-        | -1:
-            // Left operand is less than right oprand.
-            // Quotient is always equals to zero.
-            self.bits = nil
-            ret
-        | 0:
-            // Left oprand and right operand are equal.
-            // Quotient is always zero.
-            self.bits = [1]
-            ret
-        }
-        mut xb := cloneBits(self.bits)
-        mut q := make(bits, len(xb))
-        _ = copy(q[len(q)-len(y.bits):], y.bits)
-        mut s := make(bits, len(xb))
-        recursiveDiv(xb, y.bits, s, q)
-        self.bits = s
-        self.fit()
-    }
+	// Divides nat.
+	fn DivAssign(mut self, y: nat) {
+		if self.len() == 0 {
+			// Left operans is zero, remainder is always zero.
+			ret
+		}
+		match y.len() {
+		| 1:
+			// Right operand is 1, quotient is always equals to left operand.
+			ret
+		| 0:
+			panic("std::math::big: division by zero")
+		}
+		match self.cmp(y) {
+		| -1:
+			// Left operand is less than right oprand.
+			// Quotient is always equals to zero.
+			self.bits = nil
+			ret
+		| 0:
+			// Left oprand and right operand are equal.
+			// Quotient is always zero.
+			self.bits = [1]
+			ret
+		}
+		mut xb := cloneBits(self.bits)
+		mut q := make(bits, len(xb))
+		_ = copy(q[len(q)-len(y.bits):], y.bits)
+		mut s := make(bits, len(xb))
+		recursiveDiv(xb, y.bits, s, q)
+		self.bits = s
+		self.fit()
+	}
 
-    // Modulo two nat and returns result.
-    fn Mod(self, y: nat): nat {
-        mut r := self
-        r %= y
-        ret r
-    }
+	// Modulo two nat and returns result.
+	fn Mod(self, y: nat): nat {
+		mut r := self
+		r %= y
+		ret r
+	}
 
-    // Modulo nat.
-    fn ModAssign(mut self, y: nat) {
-        if self.len() == 0 {
-            // Left operans is zero, remainder is always zero.
-            ret
-        }
-        match {
-        | y.len() == 1:
-            // Right operand is 1, remainder is always zero.
-            self.bits = nil
-            ret
-        | y.len() == 2 && y.bits[0] == 0b0:
-            // Right operand is 2.
-            // If left opeand is even, remainder is always zero.
-            // If left operand is odd, remainder is always one.
-            if self.even() {
-                self.bits = nil
-            } else {
-                self.bits = [1]
-            }
-            ret
-        | y.len() == 0:
-            panic("std::math::big: division by zero")
-        }
-        match self.cmp(y) {
-        | -1:
-            // Left operand less than right operand.
-            // Remainder always equals to left operand.
-            ret
-        | 0:
-            // Left oprand and right operand are equal.
-            // Remainder is always zero.
-            self.bits = nil
-            ret
-        }
-        mut xb := cloneBits(self.bits)
-        mut q := make(bits, len(xb))
-        _ = copy(q[len(q)-len(y.bits):], y.bits)
-        self.bits = recursiveMod(xb, y.bits, q)
-        self.fit()
-    }
+	// Modulo nat.
+	fn ModAssign(mut self, y: nat) {
+		if self.len() == 0 {
+			// Left operans is zero, remainder is always zero.
+			ret
+		}
+		match {
+		| y.len() == 1:
+			// Right operand is 1, remainder is always zero.
+			self.bits = nil
+			ret
+		| y.len() == 2 && y.bits[0] == 0b0:
+			// Right operand is 2.
+			// If left opeand is even, remainder is always zero.
+			// If left operand is odd, remainder is always one.
+			if self.even() {
+				self.bits = nil
+			} else {
+				self.bits = [1]
+			}
+			ret
+		| y.len() == 0:
+			panic("std::math::big: division by zero")
+		}
+		match self.cmp(y) {
+		| -1:
+			// Left operand less than right operand.
+			// Remainder always equals to left operand.
+			ret
+		| 0:
+			// Left oprand and right operand are equal.
+			// Remainder is always zero.
+			self.bits = nil
+			ret
+		}
+		mut xb := cloneBits(self.bits)
+		mut q := make(bits, len(xb))
+		_ = copy(q[len(q)-len(y.bits):], y.bits)
+		self.bits = recursiveMod(xb, y.bits, q)
+		self.fit()
+	}
 
-    // Bitwise left shift.
-    fn Shl(self, y: int): nat {
-        mut r := self
-        r <<= y
-        ret r
-    }
+	// Bitwise left shift.
+	fn Shl(self, y: int): nat {
+		mut r := self
+		r <<= y
+		ret r
+	}
 
-    // Bitwise left shift for assignment.
-    fn ShlAssign(mut self, y: int) {
-        self.bits = lsh(self.bits, y)
-    }
+	// Bitwise left shift for assignment.
+	fn ShlAssign(mut self, y: int) {
+		self.bits = lsh(self.bits, y)
+	}
 
-    // Bitwise right shift.
-    fn Shr(self, y: int): nat {
-        mut r := self
-        r >>= y
-        ret r
-    }
+	// Bitwise right shift.
+	fn Shr(self, y: int): nat {
+		mut r := self
+		r >>= y
+		ret r
+	}
 
-    // Bitwise right shift for assignment.
-    fn ShrAssign(mut self, y: int) {
-        self.bits = rsh(self.bits, y)
-    }
+	// Bitwise right shift for assignment.
+	fn ShrAssign(mut self, y: int) {
+		self.bits = rsh(self.bits, y)
+	}
 
-    // Bitwise or.
-    fn BitOr(self, y: nat): nat {
-        mut r := self
-        r |= y
-        ret r
-    }
+	// Bitwise or.
+	fn BitOr(self, y: nat): nat {
+		mut r := self
+		r |= y
+		ret r
+	}
 
-    // Bitwise or for assignment.
-    fn BitOrAssign(mut self, y: nat) {
-        if self.len() < y.len() {
-            self = y | self
-            ret
-        }
-        self.bits = cloneBits(self.bits)
-        or(self.bits, y.bits)
-        self.fit()
-    }
+	// Bitwise or for assignment.
+	fn BitOrAssign(mut self, y: nat) {
+		if self.len() < y.len() {
+			self = y | self
+			ret
+		}
+		self.bits = cloneBits(self.bits)
+		or(self.bits, y.bits)
+		self.fit()
+	}
 
-    // Bitwise and.
-    fn BitAnd(self, y: nat): nat {
-        mut r := self
-        r &= y
-        ret r
-    }
+	// Bitwise and.
+	fn BitAnd(self, y: nat): nat {
+		mut r := self
+		r &= y
+		ret r
+	}
 
-    // Bitwise and for assignment.
-    fn BitAndAssign(mut self, y: nat) {
-        if self.len() < y.len() {
-            self = y & self
-            ret
-        }
-        self.bits = cloneBits(self.bits)
-        and(self.bits, y.bits)
-        self.fit()
-    }
+	// Bitwise and for assignment.
+	fn BitAndAssign(mut self, y: nat) {
+		if self.len() < y.len() {
+			self = y & self
+			ret
+		}
+		self.bits = cloneBits(self.bits)
+		and(self.bits, y.bits)
+		self.fit()
+	}
 
-    // Bitwise and.
-    fn BitXor(self, y: nat): nat {
-        mut r := self
-        r ^= y
-        ret r
-    }
+	// Bitwise and.
+	fn BitXor(self, y: nat): nat {
+		mut r := self
+		r ^= y
+		ret r
+	}
 
-    // Bitwise xor for assignment.
-    fn BitXorAssign(mut self, y: nat) {
-        if self.len() < y.len() {
-            self = y ^ self
-            ret
-        }
-        self.bits = cloneBits(self.bits)
-        xor(self.bits, y.bits)
-        self.fit()
-    }
+	// Bitwise xor for assignment.
+	fn BitXorAssign(mut self, y: nat) {
+		if self.len() < y.len() {
+			self = y ^ self
+			ret
+		}
+		self.bits = cloneBits(self.bits)
+		xor(self.bits, y.bits)
+		self.fit()
+	}
 
-    // Compares bits.
-    // Returns +1 if self > y.
-    // Returns 0 if self == y.
-    // Returns -1 if self < y.
-    fn cmp(self, y: nat): int {
-        ret cmp(self.bits, y.bits)
-    }
+	// Compares bits.
+	// Returns +1 if self > y.
+	// Returns 0 if self == y.
+	// Returns -1 if self < y.
+	fn cmp(self, y: nat): int {
+		ret cmp(self.bits, y.bits)
+	}
 
-    // Reports whether integer less than other.
-    fn Lt(self, y: nat): bool {
-        ret self.cmp(y) == -1
-    }
+	// Reports whether integer less than other.
+	fn Lt(self, y: nat): bool {
+		ret self.cmp(y) == -1
+	}
 
-    // Reports whether integer less than or equals to other.
-    fn LtEq(self, y: nat): bool {
-        ret self.cmp(y) < +1
-    }
+	// Reports whether integer less than or equals to other.
+	fn LtEq(self, y: nat): bool {
+		ret self.cmp(y) < +1
+	}
 
-    // Reports whether integer greater than other.
-    fn Gt(self, y: nat): bool {
-        ret self.cmp(y) == +1
-    }
+	// Reports whether integer greater than other.
+	fn Gt(self, y: nat): bool {
+		ret self.cmp(y) == +1
+	}
 
-    // Reports whether integer greater than or equals to other.
-    fn GtEq(self, y: nat): bool {
-        ret self.cmp(y) > -1
-    }
+	// Reports whether integer greater than or equals to other.
+	fn GtEq(self, y: nat): bool {
+		ret self.cmp(y) > -1
+	}
 
-    // Reports whether bits are equals.
-    fn Eq(self, y: nat): bool {
-        ret self.cmp(y) == 0
-    }
+	// Reports whether bits are equals.
+	fn Eq(self, y: nat): bool {
+		ret self.cmp(y) == 0
+	}
 
-    // Reports whether number is odd.
-    fn odd(self): bool {
-        ret isOdd(self.bits)
-    }
+	// Reports whether number is odd.
+	fn odd(self): bool {
+		ret isOdd(self.bits)
+	}
 
-    // Reports whether number is even.
-    fn even(self): bool {
-        ret isEven(self.bits)
-    }
+	// Reports whether number is even.
+	fn even(self): bool {
+		ret isEven(self.bits)
+	}
 
-    // Returns bit by index.
-    // The index zero means first bit at right.
-    fn bit(self, i: int): int {
-        if i < 0 {
-            panic("std::math::big: negative bit index")
-        }
-        if i >= self.len() {
-            ret 0
-        }
-        ret int(self.bits[i])
-    }
+	// Returns bit by index.
+	// The index zero means first bit at right.
+	fn bit(self, i: int): int {
+		if i < 0 {
+			panic("std::math::big: negative bit index")
+		}
+		if i >= self.len() {
+			ret 0
+		}
+		ret int(self.bits[i])
+	}
 
-    // Returns count of trailing zeros.
-    fn trailingZeros(self): int {
-        for i, b in self.bits {
-            if b != 0b0 {
-                ret i
-            }
-        }
-        ret 0
-    }
+	// Returns count of trailing zeros.
+	fn trailingZeros(self): int {
+		for i, b in self.bits {
+			if b != 0b0 {
+				ret i
+			}
+		}
+		ret 0
+	}
 
-    // Format number into string. Fmt is the format of number.
-    // Results with exceptional if fmt is not valid.
-    // Exceptional is always BigError.Format.
-    //
-    // Valid fmt values are;
-    //   - 2 for binary.
-    //   - 8 for octal.
-    ///  - 10 for decimal.
-    ///  - 16 for hexadecimal.
-    fn format(self, fmt: int)!: str {
-        match fmt {
-        | 2:
-            ret formatBinary(self.bits)
-        | 8:
-            ret formatOctal(self.bits)
-        | 10:
-            ret formatDecimal(self.bits)
-        | 16:
-            ret formatHex(self.bits)
-        |:
-            error(BigError.Format)
-        }
-    }
+	// Format number into string. Fmt is the format of number.
+	// Results with exceptional if fmt is not valid.
+	// Exceptional is always BigError.Format.
+	//
+	// Valid fmt values are;
+	//   - 2 for binary.
+	//   - 8 for octal.
+	///  - 10 for decimal.
+	///  - 16 for hexadecimal.
+	fn format(self, fmt: int)!: str {
+		match fmt {
+		| 2:
+			ret formatBinary(self.bits)
+		| 8:
+			ret formatOctal(self.bits)
+		| 10:
+			ret formatDecimal(self.bits)
+		| 16:
+			ret formatHex(self.bits)
+		|:
+			error(BigError.Format)
+		}
+	}
 
-    // Returns integer in u64.
-    // Causes exception if nuber large than capacity of u64.
-    // Exception is always equals to u64.Max constant.
-    fn toU64(self)!: u64 {
-        if self.len() > 64 {
-            error(u64.Max)
-        }
-        ret u64FromBits(self.bits)
-    }
+	// Returns integer in u64.
+	// Causes exception if nuber large than capacity of u64.
+	// Exception is always equals to u64.Max constant.
+	fn toU64(self)!: u64 {
+		if self.len() > 64 {
+			error(u64.Max)
+		}
+		ret u64FromBits(self.bits)
+	}
 
-    // Formats number with self.format(10) by default.
-    fn toStr(self): str {
-        ret self.format(10)!
-    }
+	// Formats number with self.format(10) by default.
+	fn toStr(self): str {
+		ret self.format(10)!
+	}
 
-    fn clone(self): nat {
-        ret nat{
-            bits: cloneBits(self.bits),
-        }
-    }
+	fn clone(self): nat {
+		ret nat{
+			bits: cloneBits(self.bits),
+		}
+	}
 }

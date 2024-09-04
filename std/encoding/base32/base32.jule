@@ -13,30 +13,30 @@ static t32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
 const paddingByte = '='
 
 fn lenNoPad(b: []byte): int {
-    mut i := len(b) - 1
-    for i >= 0 && b[i] == paddingByte; i-- {}
-    ret i + 1
+	mut i := len(b) - 1
+	for i >= 0 && b[i] == paddingByte; i-- {}
+	ret i + 1
 }
 
 fn encodeLen(n: int, pad: bool): int {
-    if pad {
-        ret (n + 4) / 5 << 3
-    }
-    ret n / 5 << 3 + (n % 5 << 3 + 4) / 5
+	if pad {
+		ret (n + 4) / 5 << 3
+	}
+	ret n / 5 << 3 + (n % 5 << 3 + 4) / 5
 }
 
 // Returns length of encoded bytes of b.
 fn EncodeLen(b: []byte, pad: bool): int {
-    ret encodeLen(len(b), pad)
+	ret encodeLen(len(b), pad)
 }
 
 // Returns length of decoded bytes of b.
 fn DecodeLen(b: []byte): int {
-    if len(b) == 0 {
-        ret 0
-    }
-    n := lenNoPad(b)
-    ret n >> 3 * 5 + n % 8 * 5 >> 3
+	if len(b) == 0 {
+		ret 0
+	}
+	n := lenNoPad(b)
+	ret n >> 3 * 5 + n % 8 * 5 >> 3
 }
 
 // Encodes source bytes into dest with standard base32 table.
@@ -44,77 +44,77 @@ fn DecodeLen(b: []byte): int {
 // Adds padding if pad is true.
 // Algorithm will call the append function to append dest.
 fn Encode(src: []byte, pad: bool): []byte {
-    n := encodeLen(len(src), pad)
-    if n == 0 {
-        ret nil
-    }
-    t := &t32[0]
-    mut bits := u64(0)
-    mut buffer := u32(0)
-    mut dest := make([]byte, n)
-    mut p := &dest[0]
-    for _, b in src {
-        buffer <<= 8
-        buffer += u32(b)
-        bits += 8
-        for bits >= 5; p++ {
-            unsafe { *p = t[(buffer>>(bits-5))&0x3F] }
-            buffer &= ^(0x1F << (bits - 5))
-            bits -= 5
-        }
-    }
+	n := encodeLen(len(src), pad)
+	if n == 0 {
+		ret nil
+	}
+	t := &t32[0]
+	mut bits := u64(0)
+	mut buffer := u32(0)
+	mut dest := make([]byte, n)
+	mut p := &dest[0]
+	for _, b in src {
+		buffer <<= 8
+		buffer += u32(b)
+		bits += 8
+		for bits >= 5; p++ {
+			unsafe { *p = t[(buffer>>(bits-5))&0x3F] }
+			buffer &= ^(0x1F << (bits - 5))
+			bits -= 5
+		}
+	}
 
-    match len(src) % 5 {
-    | 1:
-        buffer <<= 2
-        unsafe { *p = t[buffer&0x1F] }
-        if pad {
-            p++
-            unsafe { *p = paddingByte }
-            p++
-            unsafe { *p = paddingByte }
-            p++
-            unsafe { *p = paddingByte }
-            p++
-            unsafe { *p = paddingByte }
-            p++
-            unsafe { *p = paddingByte }
-            p++
-            unsafe { *p = paddingByte }
-        }
-    | 2:
-        buffer <<= 4
-        unsafe { *p = t[buffer&0x1F] }
-        if pad {
-            p++
-            unsafe { *p = paddingByte }
-            p++
-            unsafe { *p = paddingByte }
-            p++
-            unsafe { *p = paddingByte }
-            p++
-            unsafe { *p = paddingByte }
-        }
-    | 3:
-        buffer <<= 1
-        unsafe { *p = t[buffer&0x1F] }
-        if pad {
-            p++
-            unsafe { *p = paddingByte }
-            p++
-            unsafe { *p = paddingByte }
-            p++
-            unsafe { *p = paddingByte }
-        }
-    | 4:
-        buffer <<= 3
-        unsafe { *p = t[buffer&0x1F] }
-        if pad {
-            p++
-            unsafe { *p = paddingByte }
-        }
-    }
-    ret dest
+	match len(src) % 5 {
+	| 1:
+		buffer <<= 2
+		unsafe { *p = t[buffer&0x1F] }
+		if pad {
+			p++
+			unsafe { *p = paddingByte }
+			p++
+			unsafe { *p = paddingByte }
+			p++
+			unsafe { *p = paddingByte }
+			p++
+			unsafe { *p = paddingByte }
+			p++
+			unsafe { *p = paddingByte }
+			p++
+			unsafe { *p = paddingByte }
+		}
+	| 2:
+		buffer <<= 4
+		unsafe { *p = t[buffer&0x1F] }
+		if pad {
+			p++
+			unsafe { *p = paddingByte }
+			p++
+			unsafe { *p = paddingByte }
+			p++
+			unsafe { *p = paddingByte }
+			p++
+			unsafe { *p = paddingByte }
+		}
+	| 3:
+		buffer <<= 1
+		unsafe { *p = t[buffer&0x1F] }
+		if pad {
+			p++
+			unsafe { *p = paddingByte }
+			p++
+			unsafe { *p = paddingByte }
+			p++
+			unsafe { *p = paddingByte }
+		}
+	| 4:
+		buffer <<= 3
+		unsafe { *p = t[buffer&0x1F] }
+		if pad {
+			p++
+			unsafe { *p = paddingByte }
+		}
+	}
+	ret dest
 }
 
 // Decodes source bytes into dest with standard base32 table.
@@ -122,29 +122,29 @@ fn Encode(src: []byte, pad: bool): []byte {
 // Detects padding by default, no required padding specification.
 // Algorithm will call the append function to append dest.
 fn Decode(src: []byte): []byte {
-    n := DecodeLen(src)
-    if n == 0 {
-        ret nil
-    }
-    mut buffer := u32(0)
-    mut bits := u64(0)
-    mut dest := make([]byte, n)
-    mut p := &dest[0]
-    for _, b in src {
-        i := fastbytes::FindByteStr(t32, b)
-        buffer <<= 5
-        bits += 5
-        if i != -1 {
-            buffer += u32(31 - (31 - i))
-        }
-        if bits >= 8 {
-            if b != paddingByte {
-                unsafe { *p = byte(buffer >> (bits - 8)) }
-                p++
-            }
-            buffer &= ^(0xFF << (bits - 8))
-            bits -= 8
-        }
-    }
-    ret dest
+	n := DecodeLen(src)
+	if n == 0 {
+		ret nil
+	}
+	mut buffer := u32(0)
+	mut bits := u64(0)
+	mut dest := make([]byte, n)
+	mut p := &dest[0]
+	for _, b in src {
+		i := fastbytes::FindByteStr(t32, b)
+		buffer <<= 5
+		bits += 5
+		if i != -1 {
+			buffer += u32(31 - (31 - i))
+		}
+		if bits >= 8 {
+			if b != paddingByte {
+				unsafe { *p = byte(buffer >> (bits - 8)) }
+				p++
+			}
+			buffer &= ^(0xFF << (bits - 8))
+			bits -= 8
+		}
+	}
+	ret dest
 }

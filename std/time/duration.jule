@@ -9,166 +9,166 @@ type DurInt: i64
 struct Duration {}
 
 impl Duration {
-    const min = DurInt.Min
-    const max = DurInt.Max
+	const min = DurInt.Min
+	const max = DurInt.Max
 
-    // A nanosecond.
-    const Nanosecond: DurInt = 1
+	// A nanosecond.
+	const Nanosecond: DurInt = 1
 
-    // Nanoseconds in microsecond.
-    // How many nanoseconds are in microsecond.
-    const Microsecond: DurInt = 1000 * Duration.Nanosecond
+	// Nanoseconds in microsecond.
+	// How many nanoseconds are in microsecond.
+	const Microsecond: DurInt = 1000 * Duration.Nanosecond
 
-    // Nanoseconds in millisecond.
-    // How many nanoseconds are in millisecond.
-    const Millisecond: DurInt = 1000 * Duration.Microsecond
+	// Nanoseconds in millisecond.
+	// How many nanoseconds are in millisecond.
+	const Millisecond: DurInt = 1000 * Duration.Microsecond
 
-    // Nanoseconds in second.
-    // How many nanoseconds are in second.
-    const Second: DurInt = 1000 * Duration.Millisecond
+	// Nanoseconds in second.
+	// How many nanoseconds are in second.
+	const Second: DurInt = 1000 * Duration.Millisecond
 
-    // Nanoseconds in minute.
-    // How many nanoseconds are in minute.
-    const Minute: DurInt = 60 * Duration.Second
+	// Nanoseconds in minute.
+	// How many nanoseconds are in minute.
+	const Minute: DurInt = 60 * Duration.Second
 
-    // Nanoseconds in hour.
-    // How many nanoseconds are in hour.
-    const Hour: DurInt = 60 * Duration.Minute
+	// Nanoseconds in hour.
+	// How many nanoseconds are in hour.
+	const Hour: DurInt = 60 * Duration.Minute
 
-    // Returns duration as nanoseconds.
-    static fn Nanoseconds(d: DurInt): DurInt {
-        ret d
-    }
+	// Returns duration as nanoseconds.
+	static fn Nanoseconds(d: DurInt): DurInt {
+		ret d
+	}
 
-    // Returns duration as microseconds.
-    static fn Microseconds(d: DurInt): DurInt {
-        ret d / Duration.Microsecond
-    }
+	// Returns duration as microseconds.
+	static fn Microseconds(d: DurInt): DurInt {
+		ret d / Duration.Microsecond
+	}
 
-    // Returns duration as milliseconds.
-    static fn Milliseconds(d: DurInt): DurInt {
-        ret d / Duration.Millisecond
-    }
+	// Returns duration as milliseconds.
+	static fn Milliseconds(d: DurInt): DurInt {
+		ret d / Duration.Millisecond
+	}
 
-    // Returns duration as floating-point seconds.
-    static fn Seconds(d: DurInt): f64 {
-        sec := d / Duration.Second
-        nsec := d % Duration.Second
-        ret f64(sec) + f64(nsec) / 1e9
-    }
+	// Returns duration as floating-point seconds.
+	static fn Seconds(d: DurInt): f64 {
+		sec := d / Duration.Second
+		nsec := d % Duration.Second
+		ret f64(sec) + f64(nsec) / 1e9
+	}
 
-    // Returns duration as floating-point minutes.
-    static fn Minutes(d: DurInt): f64 {
-        min := d / Duration.Minute
-        nsec := d % Duration.Minute
-        ret f64(min) + f64(nsec) / (60 * 1e9)
-    }
+	// Returns duration as floating-point minutes.
+	static fn Minutes(d: DurInt): f64 {
+		min := d / Duration.Minute
+		nsec := d % Duration.Minute
+		ret f64(min) + f64(nsec) / (60 * 1e9)
+	}
 
-    // Returns duration as floating-point hours.
-    static fn Hours(d: DurInt): f64 {
-        hour := d / Duration.Hour
-        nsec := d % Duration.Hour
-        ret f64(hour) + f64(nsec) / (60 * 60 * 1e9)
-    }
+	// Returns duration as floating-point hours.
+	static fn Hours(d: DurInt): f64 {
+		hour := d / Duration.Hour
+		nsec := d % Duration.Hour
+		ret f64(hour) + f64(nsec) / (60 * 60 * 1e9)
+	}
 
-    // Returns absolute value of duration.
-    static fn Abs(d: DurInt): DurInt {
-        match {
-        | d >= 0:
-            ret d
-        | d == Duration.min:
-            ret Duration.max
-        |:
-            ret -d
-        }
-    }
+	// Returns absolute value of duration.
+	static fn Abs(d: DurInt): DurInt {
+		match {
+		| d >= 0:
+			ret d
+		| d == Duration.min:
+			ret Duration.max
+		|:
+			ret -d
+		}
+	}
 
-    // Returns a string representing the duration in the form "72h3m0.5s".
-    // Leading zero units are omitted. As a special case, durations less than one
-    // second format use a smaller unit (milli-, micro-, or nanoseconds) to ensure
-    // that the leading digit is non-zero. The zero duration formats as 0s.
-    static fn Str(d: DurInt): str {
-        mut buf := make([]byte, 1 << 5)
-        n := formatDuration(d, buf)
-        buf = buf[n:]
-        ret str(buf)
-    }
+	// Returns a string representing the duration in the form "72h3m0.5s".
+	// Leading zero units are omitted. As a special case, durations less than one
+	// second format use a smaller unit (milli-, micro-, or nanoseconds) to ensure
+	// that the leading digit is non-zero. The zero duration formats as 0s.
+	static fn Str(d: DurInt): str {
+		mut buf := make([]byte, 1 << 5)
+		n := formatDuration(d, buf)
+		buf = buf[n:]
+		ret str(buf)
+	}
 }
 
 // Formats the representation of d into the end of buf and
 // returns the offset of the first character.
 fn formatDuration(d: DurInt, mut buf: []byte): int {
-    // Largest time is 2540400h10m10.000000000s
-    mut w := len(buf)
+	// Largest time is 2540400h10m10.000000000s
+	mut w := len(buf)
 
-    mut u := u64(d)
-    neg := d < 0
-    if neg {
-        u = -u
-    }
+	mut u := u64(d)
+	neg := d < 0
+	if neg {
+		u = -u
+	}
 
-    if u < u64(Duration.Second) {
-        // Special case: if duration is smaller than a second,
-        // use smaller units, like 1.2ms
-        mut prec := 0
-        w--
-        buf[w] = 's'
-        w--
-        match {
-        | u == 0:
-            buf[w] = '0'
-            ret w
-        | u < u64(Duration.Microsecond):
-            // print nanoseconds
-            prec = 0
-            buf[w] = 'n'
-        | u < u64(Duration.Millisecond):
-            // print microseconds
-            prec = 3
-            // U+00B5 'µ' micro sign == 0xC2 0xB5
-            w-- // Need room for two bytes.
-            buf[w] = 194
-            buf[w+1] = 181
-        |:
-            // print milliseconds
-            prec = 6
-            buf[w] = 'm'
-        }
-        w, u = fmtFrac(buf[:w], u, prec)
-        w = fmtInt(buf[:w], u)
-    } else {
-        w--
-        buf[w] = 's'
+	if u < u64(Duration.Second) {
+		// Special case: if duration is smaller than a second,
+		// use smaller units, like 1.2ms
+		mut prec := 0
+		w--
+		buf[w] = 's'
+		w--
+		match {
+		| u == 0:
+			buf[w] = '0'
+			ret w
+		| u < u64(Duration.Microsecond):
+			// print nanoseconds
+			prec = 0
+			buf[w] = 'n'
+		| u < u64(Duration.Millisecond):
+			// print microseconds
+			prec = 3
+			// U+00B5 'µ' micro sign == 0xC2 0xB5
+			w-- // Need room for two bytes.
+			buf[w] = 194
+			buf[w+1] = 181
+		|:
+			// print milliseconds
+			prec = 6
+			buf[w] = 'm'
+		}
+		w, u = fmtFrac(buf[:w], u, prec)
+		w = fmtInt(buf[:w], u)
+	} else {
+		w--
+		buf[w] = 's'
 
-        w, u = fmtFrac(buf[:w], u, 9)
+		w, u = fmtFrac(buf[:w], u, 9)
 
-        // u is now integer seconds
-        w = fmtInt(buf[:w], u % 60)
-        u /= 60
+		// u is now integer seconds
+		w = fmtInt(buf[:w], u % 60)
+		u /= 60
 
-        // u is now integer minutes
-        if u > 0 {
-            w--
-            buf[w] = 'm'
-            w = fmtInt(buf[:w], u % 60)
-            u /= 60
+		// u is now integer minutes
+		if u > 0 {
+			w--
+			buf[w] = 'm'
+			w = fmtInt(buf[:w], u % 60)
+			u /= 60
 
-            // u is now integer hours
-            // Stop at hours because days can be different lengths.
-            if u > 0 {
-                w--
-                buf[w] = 'h'
-                w = fmtInt(buf[:w], u)
-            }
-        }
-    }
+			// u is now integer hours
+			// Stop at hours because days can be different lengths.
+			if u > 0 {
+				w--
+				buf[w] = 'h'
+				w = fmtInt(buf[:w], u)
+			}
+		}
+	}
 
-    if neg {
-        w--
-        buf[w] = '-'
-    }
+	if neg {
+		w--
+		buf[w] = '-'
+	}
 
-    ret w
+	ret w
 }
 
 // Formats the fraction of v/10**prec (e.g., ".12345") into the
@@ -176,39 +176,39 @@ fn formatDuration(d: DurInt, mut buf: []byte): int {
 // point too when the fraction is 0. It returns the index where the
 // output bytes begin and the value v/10**prec.
 fn fmtFrac(mut buf: []byte, mut v: u64, prec: int): (nw: int, nv: u64) {
-    // Omit trailing zeros up to and including decimal point.
-    mut w := len(buf)
-    mut print := false
-    mut i := 0
-    for i < prec; i++ {
-        digit := v % 10
-        print = print || digit != 0
-        if print {
-            w--
-            buf[w] = byte(digit) + '0'
-        }
-        v /= 10
-    }
-    if print {
-        w--
-        buf[w] = '.'
-    }
-    ret w, v
+	// Omit trailing zeros up to and including decimal point.
+	mut w := len(buf)
+	mut print := false
+	mut i := 0
+	for i < prec; i++ {
+		digit := v % 10
+		print = print || digit != 0
+		if print {
+			w--
+			buf[w] = byte(digit) + '0'
+		}
+		v /= 10
+	}
+	if print {
+		w--
+		buf[w] = '.'
+	}
+	ret w, v
 }
 
 // Formats v into the tail of buf.
 // It returns the index where the output begins.
 fn fmtInt(mut buf: []byte, mut v: u64): int {
-    mut w := len(buf)
-    if v == 0 {
-        w--
-        buf[w] = '0'
-    } else {
-        for v > 0 {
-            w--
-            buf[w] = byte(v % 10) + '0'
-            v /= 10
-        }
-    }
-    ret w
+	mut w := len(buf)
+	if v == 0 {
+		w--
+		buf[w] = '0'
+	} else {
+		for v > 0 {
+			w--
+			buf[w] = byte(v % 10) + '0'
+			v /= 10
+		}
+	}
+	ret w
 }

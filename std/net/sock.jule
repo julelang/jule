@@ -13,12 +13,12 @@ use sys for std::sys
 //
 // See the [Connect] function for a description of the network and addr parameters.
 fn Listen(network: Network, addr: str)!: Listener {
-    match network {
-    | Network.Tcp | Network.Tcp4 | Network.Tcp6:
-        ret tcpBind(network, addr) else { error(error) }
-    |:
-        error(AddrError.UnknownNetwork)
-    }
+	match network {
+	| Network.Tcp | Network.Tcp4 | Network.Tcp6:
+		ret tcpBind(network, addr) else { error(error) }
+	|:
+		error(AddrError.UnknownNetwork)
+	}
 }
 
 // Listens the address on the named network.
@@ -27,7 +27,7 @@ fn Listen(network: Network, addr: str)!: Listener {
 //
 // See the [Connect] function for a description of the network and addr parameters.
 fn ListenUDP(network: Network, addr: str)!: &UdpConn {
-    ret udpBind(network, addr) else { error(error) }
+	ret udpBind(network, addr) else { error(error) }
 }
 
 // Connects to the address on the named network.
@@ -70,7 +70,7 @@ fn ListenUDP(network: Network, addr: str)!: &UdpConn {
 //
 // It will forward any exceptional from network connectors.
 fn Connect(network: Network, addr: str)!: Conn {
-    ret ConnectTimeout(network, addr, 0) else { error(error) }
+	ret ConnectTimeout(network, addr, 0) else { error(error) }
 }
 
 // Same as Connect, but uses timeout.
@@ -78,32 +78,32 @@ fn Connect(network: Network, addr: str)!: Conn {
 // Timeout precision is microseconds.
 // If the timeout is below one microsecond it will be ignored.
 fn ConnectTimeout(network: Network, addr: str, timeout: time::DurInt)!: Conn {
-    match network {
-    | Network.Tcp | Network.Tcp4 | Network.Tcp6:
-        ret tcpConnect(network, addr, timeout) else { error(error) }
-    | Network.Udp | Network.Udp4 | Network.Udp6:
-        ret udpConnect(network, addr) else { error(error) }
-    |:
-        error(AddrError.UnknownNetwork)
-    }
+	match network {
+	| Network.Tcp | Network.Tcp4 | Network.Tcp6:
+		ret tcpConnect(network, addr, timeout) else { error(error) }
+	| Network.Udp | Network.Udp4 | Network.Udp6:
+		ret udpConnect(network, addr) else { error(error) }
+	|:
+		error(AddrError.UnknownNetwork)
+	}
 }
 
 unsafe fn getSocketAddr(handle: netHandle, addr: *sys::Sockaddr, len: addrLen)! {
-    if sys::Getsockname(handle, addr, &len) < 0 {
-        error(lastErrorCode())
-    }
+	if sys::Getsockname(handle, addr, &len) < 0 {
+		error(lastErrorCode())
+	}
 }
 
 unsafe fn connectSocketNoTimeout(handle: netHandle, sockAddr: *sys::Sockaddr, sockLen: uint)! {
-    if sys::Connect(handle, sockAddr, sockLen) < 0 {
-        error(lastErrorCode())
-    }
+	if sys::Connect(handle, sockAddr, sockLen) < 0 {
+		error(lastErrorCode())
+	}
 }
 
 fn timevalFromDuration(timeout: time::DurInt): sys::Timeval {
-    sec := i64(time::Duration.Seconds(timeout))
-    mut tv := sys::Timeval{}
-    tv.tv_sec = sec
-    tv.tv_usec = time::Duration.Microseconds(timeout - (time::Duration.Second * sec))
-    ret tv
+	sec := i64(time::Duration.Seconds(timeout))
+	mut tv := sys::Timeval{}
+	tv.tv_sec = sec
+	tv.tv_usec = time::Duration.Microseconds(timeout - (time::Duration.Second * sec))
+	ret tv
 }

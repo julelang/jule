@@ -12,121 +12,121 @@ type netHandle: uint
 type addrLen: Int
 
 fn lastErrorCode(): int {
-    ret sys::WSAGetLastError()
+	ret sys::WSAGetLastError()
 }
 
 fn closeSocket(handle: netHandle): bool {
-    ret sys::CloseSocket(handle) >= 0
+	ret sys::CloseSocket(handle) >= 0
 }
 
 fn setSocketBlockingMode(handle: netHandle, mode: UnsignedLong)! {
-    FIONBIO := 0x80000000 | (Long(mem::SizeOf(UnsignedLong) & 0x7F) << 16) | ('f' << 8) | 126
-    unsafe {
-        if sys::Ioctlsocket(handle, FIONBIO, &mode) == sys::SOCKET_ERROR {
-            error(lastErrorCode())
-        }
-    }
+	FIONBIO := 0x80000000 | (Long(mem::SizeOf(UnsignedLong) & 0x7F) << 16) | ('f' << 8) | 126
+	unsafe {
+		if sys::Ioctlsocket(handle, FIONBIO, &mode) == sys::SOCKET_ERROR {
+			error(lastErrorCode())
+		}
+	}
 }
 
 fn closeSocketBlockingMode(handle: netHandle)! {
-    setSocketBlockingMode(handle, 1) else { error(error) }
+	setSocketBlockingMode(handle, 1) else { error(error) }
 }
 
 fn openSocketBlockingMode(handle: netHandle)! {
-    setSocketBlockingMode(handle, 0) else { error(error) }
+	setSocketBlockingMode(handle, 0) else { error(error) }
 }
 
 unsafe fn connectSocket(handle: netHandle, sockAddr: *sys::Sockaddr, sockLen: uint, timeout: time::DurInt)! {
-    if timeout == 0 {
-        connectSocketNoTimeout(handle, sockAddr, sockLen) else { error(error) }
-        ret
-    }
-    tv := timevalFromDuration(timeout)
-    if tv.tv_sec == 0 && tv.tv_usec == 0 {
-        connectSocketNoTimeout(handle, sockAddr, sockLen) else { error(error) }
-        ret
-    }
-    closeSocketBlockingMode(handle) else { error(error) }
-    if sys::Connect(handle, sockAddr, sockLen) != sys::SOCKET_ERROR {
-        ret
-    }
-    err := lastErrorCode()
-    if err != sys::WSAEWOULDBLOCK {
-        error(err)
-    }
-    fdW := sys::Fd{}
-    mut fdE := sys::Fd{}
-    sys::FdZero(&fdW)
-    sys::FdSet(handle, &fdW)
-    sys::FdZero(&fdE)
-    sys::FdSet(handle, &fdE)
-    res := sys::Select(0, nil, &fdW, &fdE, &tv)
-    if res <= 0 {
-        if res == 0 {
-            // Timeout.
-            error(-1)
-        }
-        error(lastErrorCode())
-    }
-    if sys::FdIsset(handle, &fdE) != 0 {
-        mut opt := Int(0)
-        mut optLen := Int(mem::SizeOf(opt))
-        sys::Getsockopt(handle, sys::SOL_SOCKET, sys::SO_ERROR, (*Char)(&opt), &optLen)
-        error(int(opt))
-    }
-    openSocketBlockingMode(handle) else { error(error) }
+	if timeout == 0 {
+		connectSocketNoTimeout(handle, sockAddr, sockLen) else { error(error) }
+		ret
+	}
+	tv := timevalFromDuration(timeout)
+	if tv.tv_sec == 0 && tv.tv_usec == 0 {
+		connectSocketNoTimeout(handle, sockAddr, sockLen) else { error(error) }
+		ret
+	}
+	closeSocketBlockingMode(handle) else { error(error) }
+	if sys::Connect(handle, sockAddr, sockLen) != sys::SOCKET_ERROR {
+		ret
+	}
+	err := lastErrorCode()
+	if err != sys::WSAEWOULDBLOCK {
+		error(err)
+	}
+	fdW := sys::Fd{}
+	mut fdE := sys::Fd{}
+	sys::FdZero(&fdW)
+	sys::FdSet(handle, &fdW)
+	sys::FdZero(&fdE)
+	sys::FdSet(handle, &fdE)
+	res := sys::Select(0, nil, &fdW, &fdE, &tv)
+	if res <= 0 {
+		if res == 0 {
+			// Timeout.
+			error(-1)
+		}
+		error(lastErrorCode())
+	}
+	if sys::FdIsset(handle, &fdE) != 0 {
+		mut opt := Int(0)
+		mut optLen := Int(mem::SizeOf(opt))
+		sys::Getsockopt(handle, sys::SOL_SOCKET, sys::SO_ERROR, (*Char)(&opt), &optLen)
+		error(int(opt))
+	}
+	openSocketBlockingMode(handle) else { error(error) }
 }
 
 fn recvfrom(&conn: UdpConn, mut &buf: []byte)!: int {
-    zsys::HandleRW(buf)
-    if conn.v6 {
-        addrLen := addrLen(mem::SizeOf(conn.sockaddr6))
-        n := unsafe { sys::Recvfrom(conn.handle, &buf[0], len(buf), 0, (*sys::Sockaddr)(&conn.sockaddr6), &addrLen) }
-        if n >= 0 {
-            ret int(n)
-        }
-    } else {
-        addrLen := addrLen(mem::SizeOf(conn.sockaddr4))
-        n := unsafe { sys::Recvfrom(conn.handle, &buf[0], len(buf), 0, (*sys::Sockaddr)(&conn.sockaddr4), &addrLen) }
-        if n >= 0 {
-            ret int(n)
-        }
-    }
-    error(lastErrorCode())
+	zsys::HandleRW(buf)
+	if conn.v6 {
+		addrLen := addrLen(mem::SizeOf(conn.sockaddr6))
+		n := unsafe { sys::Recvfrom(conn.handle, &buf[0], len(buf), 0, (*sys::Sockaddr)(&conn.sockaddr6), &addrLen) }
+		if n >= 0 {
+			ret int(n)
+		}
+	} else {
+		addrLen := addrLen(mem::SizeOf(conn.sockaddr4))
+		n := unsafe { sys::Recvfrom(conn.handle, &buf[0], len(buf), 0, (*sys::Sockaddr)(&conn.sockaddr4), &addrLen) }
+		if n >= 0 {
+			ret int(n)
+		}
+	}
+	error(lastErrorCode())
 }
 
 fn sendto(&conn: UdpConn, &buf: []byte)!: int {
-    zsys::HandleRW(buf)
-    if conn.v6 {
-        addrLen := addrLen(mem::SizeOf(conn.sockaddr6))
-        n := unsafe { sys::Sendto(conn.handle, &buf[0], len(buf), 0, (*sys::Sockaddr)(&conn.sockaddr6), addrLen) }
-        if n >= 0 {
-            ret int(n)
-        }
-    } else {
-        addrLen := addrLen(mem::SizeOf(conn.sockaddr4))
-        n := unsafe { sys::Sendto(conn.handle, &buf[0], len(buf), 0, (*sys::Sockaddr)(&conn.sockaddr4), addrLen) }
-        if n >= 0 {
-            ret int(n)
-        }
-    }
-    error(lastErrorCode())
+	zsys::HandleRW(buf)
+	if conn.v6 {
+		addrLen := addrLen(mem::SizeOf(conn.sockaddr6))
+		n := unsafe { sys::Sendto(conn.handle, &buf[0], len(buf), 0, (*sys::Sockaddr)(&conn.sockaddr6), addrLen) }
+		if n >= 0 {
+			ret int(n)
+		}
+	} else {
+		addrLen := addrLen(mem::SizeOf(conn.sockaddr4))
+		n := unsafe { sys::Sendto(conn.handle, &buf[0], len(buf), 0, (*sys::Sockaddr)(&conn.sockaddr4), addrLen) }
+		if n >= 0 {
+			ret int(n)
+		}
+	}
+	error(lastErrorCode())
 }
 
 fn setSocketTimeout(handle: netHandle, scope: int, timeout: time::DurInt)! {
-    tv := timevalFromDuration(timeout)
-    unsafe {
-        if sys::Setsockopt(handle, sys::SOL_SOCKET, scope, (*Char)(&tv), int(mem::SizeOf(tv))) < 0 {
-            error(lastErrorCode())
-        }
-    }
+	tv := timevalFromDuration(timeout)
+	unsafe {
+		if sys::Setsockopt(handle, sys::SOL_SOCKET, scope, (*Char)(&tv), int(mem::SizeOf(tv))) < 0 {
+			error(lastErrorCode())
+		}
+	}
 }
 
 fn init() {
-    mut wsaData := sys::WsaData{}
-    verReq := sys::MakeWord(2, 2)
-    r := unsafe { sys::WSAStartup(verReq, &wsaData) }
-    if r != 0 {
-        panic("syd::net [windows specific]: WSAStartup failed")
-    }
+	mut wsaData := sys::WsaData{}
+	verReq := sys::MakeWord(2, 2)
+	r := unsafe { sys::WSAStartup(verReq, &wsaData) }
+	if r != 0 {
+		panic("syd::net [windows specific]: WSAStartup failed")
+	}
 }

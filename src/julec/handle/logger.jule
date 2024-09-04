@@ -10,73 +10,73 @@ use strings for std::strings
 struct Logger {}
 
 impl Logger {
-    // Prints flag log.
-    static fn LogFlat(&l: Log) {
-        outln(l.Text)
-    }
+	// Prints flag log.
+	static fn LogFlat(&l: Log) {
+		outln(l.Text)
+	}
 
-    // Prints error log.
-    static fn LogError(&l: Log) {
-        out(AnsiEscape.RedSeq)
-        out("error: ")
-        out(l.Text)
-        AnsiEscape.Reset()
+	// Prints error log.
+	static fn LogError(&l: Log) {
+		out(AnsiEscape.RedSeq)
+		out("error: ")
+		out(l.Text)
+		AnsiEscape.Reset()
 
-        if len(l.Path) != 0 {
-            out("\n  --> ")
-            out(l.Path)
-        }
-        if l.Row != 0 && l.Column != 0 {
-            out(":")
-            out(conv::Itoa(l.Row))
-            out(":")
-            out(conv::Itoa(l.Column))
-        }
-        if len(l.Line) != 0 {
-            // For correct handling, trim leading and trailing space bytes.
-            // Also replace tabs with spaces for deterministic size.
-            mut line := strings::Trim(l.Line, "\r\n\v\b\t ")
-            line = strings::Replace(line, "\t", " ", -1)
+		if len(l.Path) != 0 {
+			out("\n  --> ")
+			out(l.Path)
+		}
+		if l.Row != 0 && l.Column != 0 {
+			out(":")
+			out(conv::Itoa(l.Row))
+			out(":")
+			out(conv::Itoa(l.Column))
+		}
+		if len(l.Line) != 0 {
+			// For correct handling, trim leading and trailing space bytes.
+			// Also replace tabs with spaces for deterministic size.
+			mut line := strings::Trim(l.Line, "\r\n\v\b\t ")
+			line = strings::Replace(line, "\t", " ", -1)
 
-            mut offset := len(l.Line) - len(line) + 1
-            out("\n  ")
-            row := conv::Itoa(l.Row)
-            out(row)
-            out(" | ")
-            out(line)
-            out("\n  ")
-            out(strings::Repeat(" ", len(row)))
-            out(" | ")
-            out(strings::Repeat(" ", l.Column - offset))
-            out("^")
-            if len(l.Suggestion) != 0 {
-                out("\n  ")
-                out(strings::Repeat(" ", len(row)))
-                out(" | ")
-                AnsiEscape.Print(AnsiEscape.BrightMagentaSeq, "suggestion: ")
-                out(l.Suggestion)
-            }
-        }
-        outln("\n")
-    }
+			mut offset := len(l.Line) - len(line) + 1
+			out("\n  ")
+			row := conv::Itoa(l.Row)
+			out(row)
+			out(" | ")
+			out(line)
+			out("\n  ")
+			out(strings::Repeat(" ", len(row)))
+			out(" | ")
+			out(strings::Repeat(" ", l.Column - offset))
+			out("^")
+			if len(l.Suggestion) != 0 {
+				out("\n  ")
+				out(strings::Repeat(" ", len(row)))
+				out(" | ")
+				AnsiEscape.Print(AnsiEscape.BrightMagentaSeq, "suggestion: ")
+				out(l.Suggestion)
+			}
+		}
+		outln("\n")
+	}
 
-    // Log.
-    static fn Log(&l: Log) {
-        match l.Kind {
-        | LogKind.Flat:
-            Logger.LogFlat(l)
-        | LogKind.Error:
-            Logger.LogError(l)
-        }
-    }
+	// Log.
+	static fn Log(&l: Log) {
+		match l.Kind {
+		| LogKind.Flat:
+			Logger.LogFlat(l)
+		| LogKind.Error:
+			Logger.LogError(l)
+		}
+	}
 
-    // Prints all logs.
-    static fn PrintLogs(&logs: []Log) {
-        for _, l in logs {
-            Logger.Log(l)
-        }
-        out("=== ")
-        out(conv::Itoa(len(logs)))
-        outln(" error generated ===")
-    }
+	// Prints all logs.
+	static fn PrintLogs(&logs: []Log) {
+		for _, l in logs {
+			Logger.Log(l)
+		}
+		out("=== ")
+		out(conv::Itoa(len(logs)))
+		outln(" error generated ===")
+	}
 }

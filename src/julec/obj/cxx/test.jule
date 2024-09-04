@@ -5,155 +5,155 @@
 use env
 use obj::{self, IR}
 use std::jule::build::{
-    Directive,
+	Directive,
 }
 use std::jule::sema::{
-    ImportInfo,
-    Package,
-    Fn,
-    FnIns,
-    StructIns,
+	ImportInfo,
+	Package,
+	Fn,
+	FnIns,
+	StructIns,
 }
 use std::strings::{StrBuilder}
 
 struct TestCoder {
-    t:         &StructIns
-    tmReset:   &Fn
-    tmFailed:  &Fn
-    tmSkipped: &Fn
+	t:         &StructIns
+	tmReset:   &Fn
+	tmFailed:  &Fn
+	tmSkipped: &Fn
 
-    oc: &ObjectCoder
+	oc: &ObjectCoder
 }
 
 impl TestCoder {
-    static fn New(mut &oc: &ObjectCoder): &TestCoder {
-        ret &TestCoder{
-            oc: oc,
-        }
-    }
+	static fn New(mut &oc: &ObjectCoder): &TestCoder {
+		ret &TestCoder{
+			oc: oc,
+		}
+	}
 
-    fn findTestingPackage(mut &self): &ImportInfo {
-        for (_, mut imp) in self.oc.ir.Used {
-            if imp.LinkPath == "std::testing" {
-                ret imp
-            }
-        }
-        ret nil
-    }
+	fn findTestingPackage(mut &self): &ImportInfo {
+		for (_, mut imp) in self.oc.ir.Used {
+			if imp.LinkPath == "std::testing" {
+				ret imp
+			}
+		}
+		ret nil
+	}
 
-    fn appendTest(mut &self, mut f: &FnIns) {
-        self.oc.indent()
-        self.callTmReset()
-        self.oc.write(";\n")
-        self.oc.indent()
-        self.oc.write("std::cout << \">>> TEST RUNNING: \" ")
-        cstrLit(self.oc.Buf, f.Decl.Ident)
-        self.oc.write(" << std::endl;\n")
-        self.oc.indent()
-        identCoder.funcIns(self.oc.Buf, f)
-        self.oc.write("(_t);\n")
-        self.oc.indent()
-        self.oc.write("post_test();\n")
-    }
+	fn appendTest(mut &self, mut f: &FnIns) {
+		self.oc.indent()
+		self.callTmReset()
+		self.oc.write(";\n")
+		self.oc.indent()
+		self.oc.write("std::cout << \">>> TEST RUNNING: \" ")
+		cstrLit(self.oc.Buf, f.Decl.Ident)
+		self.oc.write(" << std::endl;\n")
+		self.oc.indent()
+		identCoder.funcIns(self.oc.Buf, f)
+		self.oc.write("(_t);\n")
+		self.oc.indent()
+		self.oc.write("post_test();\n")
+	}
 
-    fn appendPackageTests(mut &self, mut &p: &Package) {
-        for (_, mut file) in p.Files {
-            for (_, mut f) in file.Funcs {
-                if obj::HasDirective(f.Directives, Directive.Test) {
-                    self.appendTest(f.Instances[0])
-                }
-            }
-        }
-    }
+	fn appendPackageTests(mut &self, mut &p: &Package) {
+		for (_, mut file) in p.Files {
+			for (_, mut f) in file.Funcs {
+				if obj::HasDirective(f.Directives, Directive.Test) {
+					self.appendTest(f.Instances[0])
+				}
+			}
+		}
+	}
 
-    fn readyTestingPackage(mut &self): bool {
-        mut p := self.findTestingPackage()
-        if p == nil {
-            // std::testing is not used.
-            // So, developers cannot write valid test functions.
-            ret false
-        }
+	fn readyTestingPackage(mut &self): bool {
+		mut p := self.findTestingPackage()
+		if p == nil {
+			// std::testing is not used.
+			// So, developers cannot write valid test functions.
+			ret false
+		}
 
-        self.t = p.FindStruct("T", false).Instances[0]
+		self.t = p.FindStruct("T", false).Instances[0]
 
-        self.tmReset = self.t.FindMethod("reset", false)
-        self.tmFailed = self.t.FindMethod("Failed", false)
-        self.tmSkipped = self.t.FindMethod("Skipped", false)
-        ret true
-    }
+		self.tmReset = self.t.FindMethod("reset", false)
+		self.tmFailed = self.t.FindMethod("Failed", false)
+		self.tmSkipped = self.t.FindMethod("Skipped", false)
+		ret true
+	}
 
-    fn callTmReset(mut &self) {
-        identCoder.func(self.oc.Buf, self.tmReset)
-        self.oc.write("(_t)")
-    }
+	fn callTmReset(mut &self) {
+		identCoder.func(self.oc.Buf, self.tmReset)
+		self.oc.write("(_t)")
+	}
 
-    fn callTmFailed(mut &self) {
-        identCoder.func(self.oc.Buf, self.tmFailed)
-        self.oc.write("(_t)")
-    }
+	fn callTmFailed(mut &self) {
+		identCoder.func(self.oc.Buf, self.tmFailed)
+		self.oc.write("(_t)")
+	}
 
-    fn callTmSkipped(mut &self) {
-        identCoder.func(self.oc.Buf, self.tmSkipped)
-        self.oc.write("(_t)")
-    }
+	fn callTmSkipped(mut &self) {
+		identCoder.func(self.oc.Buf, self.tmSkipped)
+		self.oc.write("(_t)")
+	}
 
-    // Serialize tests and test point.
-    // Appends to object code.
-    fn Serialize(mut &self) {
-        self.oc.serializeHead()
-        defer {
-            self.oc.end()
-        }
+	// Serialize tests and test point.
+	// Appends to object code.
+	fn Serialize(mut &self) {
+		self.oc.serializeHead()
+		defer {
+			self.oc.end()
+		}
 
-        self.oc.write("\nvoid test_point(void) {\n")
-        self.oc.addIndent()
-        self.oc.indent()
+		self.oc.write("\nvoid test_point(void) {\n")
+		self.oc.addIndent()
+		self.oc.indent()
 
-        if !self.readyTestingPackage() {
-            self.oc.write("}")
-            self.oc.doneIndent()
-            ret
-        }
+		if !self.readyTestingPackage() {
+			self.oc.write("}")
+			self.oc.doneIndent()
+			ret
+		}
 
-        mut tb := StrBuilder.New(40)
-        self.oc.tc.structureIns(tb, self.t)
-        self.oc.tc.asSptr(self.oc.Buf, unsafe { tb.Buf() })
-        self.oc.write(" _t = jule::new_ptr<")
-        self.oc.writeBytes(unsafe { tb.Buf() })
-        self.oc.write(">(); _t.ref = nullptr;\n")
+		mut tb := StrBuilder.New(40)
+		self.oc.tc.structureIns(tb, self.t)
+		self.oc.tc.asSptr(self.oc.Buf, unsafe { tb.Buf() })
+		self.oc.write(" _t = jule::new_ptr<")
+		self.oc.writeBytes(unsafe { tb.Buf() })
+		self.oc.write(">(); _t.ref = nullptr;\n")
 
-        self.oc.indent()
-        self.oc.write("jule::Uint total = 0, failed = 0, skipped = 0;\n")
-        self.oc.indent()
+		self.oc.indent()
+		self.oc.write("jule::Uint total = 0, failed = 0, skipped = 0;\n")
+		self.oc.indent()
 
-        self.oc.write("auto post_test = [&](void) {\n")
-        self.oc.addIndent()
-        self.oc.indent()
-        self.oc.write("++total;\n")
-        self.oc.indent()
-        self.oc.write("if (")
-        self.callTmFailed()
-        self.oc.write(") { ++failed; std::cout << \"    [*] FAILED\" << std::endl; }\n")
-        self.oc.indent()
-        self.oc.write("else if (")
-        self.callTmSkipped()
-        self.oc.write(") { ++skipped; std::cout << \"    [*] SKIPPED\" << std::endl; }\n")
-        self.oc.indent()
-        self.oc.write("else { std::cout << \"    [*] PASSED\" << std::endl; }\n")
-        self.oc.doneIndent()
-        self.oc.indent()
-        self.oc.write("};\n")
+		self.oc.write("auto post_test = [&](void) {\n")
+		self.oc.addIndent()
+		self.oc.indent()
+		self.oc.write("++total;\n")
+		self.oc.indent()
+		self.oc.write("if (")
+		self.callTmFailed()
+		self.oc.write(") { ++failed; std::cout << \"    [*] FAILED\" << std::endl; }\n")
+		self.oc.indent()
+		self.oc.write("else if (")
+		self.callTmSkipped()
+		self.oc.write(") { ++skipped; std::cout << \"    [*] SKIPPED\" << std::endl; }\n")
+		self.oc.indent()
+		self.oc.write("else { std::cout << \"    [*] PASSED\" << std::endl; }\n")
+		self.oc.doneIndent()
+		self.oc.indent()
+		self.oc.write("};\n")
 
-        self.appendPackageTests(self.oc.ir.Main)
+		self.appendPackageTests(self.oc.ir.Main)
 
-        self.oc.write("\n\n")
-        self.oc.indent()
-        self.oc.write("std::cout << std::endl << \"total tests: \" << total << \" skipped: \" << skipped << \" failed: \" << failed << \" pass: \" << total-failed-skipped << std::endl;\n")
-        self.oc.indent()
-        self.oc.write("if (failed != 0) std::exit(1);\n")
+		self.oc.write("\n\n")
+		self.oc.indent()
+		self.oc.write("std::cout << std::endl << \"total tests: \" << total << \" skipped: \" << skipped << \" failed: \" << failed << \" pass: \" << total-failed-skipped << std::endl;\n")
+		self.oc.indent()
+		self.oc.write("if (failed != 0) std::exit(1);\n")
 
-        self.oc.doneIndent()
-        self.oc.indent()
-        self.oc.write("}\n")
-    }
+		self.oc.doneIndent()
+		self.oc.indent()
+		self.oc.write("}\n")
+	}
 }

@@ -6,73 +6,73 @@ use std::unsafe
 use fmt for std::internal::fmt
 
 enum status: byte {
-    Na: 0x0,
-    Skip: 0x1 << 0,
-    Fail: 0x1 << 1,
+	Na: 0x0,
+	Skip: 0x1 << 0,
+	Fail: 0x1 << 1,
 }
 
 // A test utility also used by the Jule runtime.
 // It provides functionalities that facilitate the
 // management and development of tests.
 struct T {
-    mut s: status
+	mut s: status
 }
 
 impl T {
-    // Used by runtime.
-    // Reset all data.
-    fn reset(self) {
-        self.s = status.Na
-    }
+	// Used by runtime.
+	// Reset all data.
+	fn reset(self) {
+		self.s = status.Na
+	}
 
-    // Wrapper for internal logs.
-    fn println(self, msg: str) {
-        out("    ")
-        outln(msg)
-    }
+	// Wrapper for internal logs.
+	fn println(self, msg: str) {
+		out("    ")
+		outln(msg)
+	}
 
-    // Fails test.
-    // Does not breaks scope execution.
-    fn Fail(self) {
-        if self.s == status.Skip {
-            panic("std::testing: T.fail: failed test that already skipped")
-        }
-        self.s = status.Fail
-    }
+	// Fails test.
+	// Does not breaks scope execution.
+	fn Fail(self) {
+		if self.s == status.Skip {
+			panic("std::testing: T.fail: failed test that already skipped")
+		}
+		self.s = status.Fail
+	}
 
-    // Reports whether test is failed.
-    fn Failed(self): bool {
-        ret self.s == status.Fail
-    }
+	// Reports whether test is failed.
+	fn Failed(self): bool {
+		ret self.s == status.Fail
+	}
 
-    // Skip test.
-    // Does not breaks scope execution.
-    fn Skip(self) {
-        if self.s == status.Skip {
-            panic("std::testing: T.skip: skipped test that already failed")
-        }
-        self.s = status.Skip
-    }
+	// Skip test.
+	// Does not breaks scope execution.
+	fn Skip(self) {
+		if self.s == status.Skip {
+			panic("std::testing: T.skip: skipped test that already failed")
+		}
+		self.s = status.Skip
+	}
 
-    // Reports whether test is skipped.
-    fn Skipped(self): bool {
-        ret self.s == status.Skip
-    }
+	// Reports whether test is skipped.
+	fn Skipped(self): bool {
+		ret self.s == status.Skip
+	}
 
-    // Set status of test as failure if expression is evaluated false at runtime.
-    fn Assert(self, expr: bool, message: str): bool {
-        if !expr {
-            self.println(message)
-            self.Fail()
-        }
-        ret expr
-    }
+	// Set status of test as failure if expression is evaluated false at runtime.
+	fn Assert(self, expr: bool, message: str): bool {
+		if !expr {
+			self.println(message)
+			self.Fail()
+		}
+		ret expr
+	}
 
-    // Set status of test as failure and print message by formatting.
-    // Prints new-line after formatted text.
-    // Uses std::fmt internally.
-    fn Errorf(self, fmt: str, args: ...any) {
-        self.println(unsafe::BytesStr(fmt::Format(fmt, args...)))
-        self.Fail()
-    }
+	// Set status of test as failure and print message by formatting.
+	// Prints new-line after formatted text.
+	// Uses std::fmt internally.
+	fn Errorf(self, fmt: str, args: ...any) {
+		self.println(unsafe::BytesStr(fmt::Format(fmt, args...)))
+		self.Fail()
+	}
 }

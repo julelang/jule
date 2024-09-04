@@ -15,13 +15,13 @@ cpp let INFINITE: int
 
 #typedef
 cpp struct STARTUPINFOW {
-    cb: uint
+	cb: uint
 }
 
 #typedef
 cpp struct PROCESS_INFORMATION {
-    hProcess: cpp.HANDLE
-    hThread:  cpp.HANDLE
+	hProcess: cpp.HANDLE
+	hThread:  cpp.HANDLE
 }
 
 cpp unsafe fn CreateProcessW(*u16, *u16, *unsafe, *unsafe, int, integ: integ::LongLong, *unsafe, *u16, *cpp.STARTUPINFOW, *cpp.PROCESS_INFORMATION): int
@@ -33,142 +33,142 @@ cpp unsafe fn WaitForSingleObject(cpp.HANDLE, int)
 const _CREATE_UNICODE_ENVIRONMENT = 0x00000400
 
 struct cmdAttrs {
-    hProcess: cpp.HANDLE
-    hThread:  cpp.HANDLE
+	hProcess: cpp.HANDLE
+	hThread:  cpp.HANDLE
 }
 
 impl Cmd {
-    fn spawn(self)! {
-        if self.attrs.hProcess != nil {
-            panic("command is already spawned")
-        }
-        mut startupInfo := cpp.STARTUPINFOW{}
-        mut processInfo := cpp.PROCESS_INFORMATION{}
-        unsafe {
-            cpp.ZeroMemory(&startupInfo, mem::SizeOf(startupInfo))
-            cpp.ZeroMemory(&processInfo, mem::SizeOf(processInfo))
-        }
-        startupInfo.cb = mem::SizeOf(startupInfo)
-        mut args := make([]str, 1, 1 + len(self.Args))
-        args[0] = self.path
-        args = append(args, self.Args...)
-        argv := integ::UTF16FromStr(makeCmdLine(args))
-        env := createEnvBlock(self.Env) else { error(error) }
-        mut envp := &env[0]
-        if len(self.Env) == 0 {
-            envp = nil
-        }
-        const flags = _CREATE_UNICODE_ENVIRONMENT
-        unsafe {
-            if cpp.CreateProcessW(nil, (*integ::Wchar)(&argv[0]), nil, nil, 0,
-                flags, envp, nil, &startupInfo, &processInfo) == 0 {
-                error(getLastProcessError())
-            }
-        }
-        self.attrs.hProcess = processInfo.hProcess
-        self.attrs.hThread = processInfo.hThread
-    }
+	fn spawn(self)! {
+		if self.attrs.hProcess != nil {
+			panic("command is already spawned")
+		}
+		mut startupInfo := cpp.STARTUPINFOW{}
+		mut processInfo := cpp.PROCESS_INFORMATION{}
+		unsafe {
+			cpp.ZeroMemory(&startupInfo, mem::SizeOf(startupInfo))
+			cpp.ZeroMemory(&processInfo, mem::SizeOf(processInfo))
+		}
+		startupInfo.cb = mem::SizeOf(startupInfo)
+		mut args := make([]str, 1, 1 + len(self.Args))
+		args[0] = self.path
+		args = append(args, self.Args...)
+		argv := integ::UTF16FromStr(makeCmdLine(args))
+		env := createEnvBlock(self.Env) else { error(error) }
+		mut envp := &env[0]
+		if len(self.Env) == 0 {
+			envp = nil
+		}
+		const flags = _CREATE_UNICODE_ENVIRONMENT
+		unsafe {
+			if cpp.CreateProcessW(nil, (*integ::Wchar)(&argv[0]), nil, nil, 0,
+				flags, envp, nil, &startupInfo, &processInfo) == 0 {
+				error(getLastProcessError())
+			}
+		}
+		self.attrs.hProcess = processInfo.hProcess
+		self.attrs.hThread = processInfo.hThread
+	}
 
-    fn kill(self)! {
-        if self.attrs.hProcess == nil {
-            panic("command is not spawned")
-        }
-        if unsafe { cpp.TerminateProcess(self.attrs.hProcess, 0) } {
-            self.attrs.hProcess = nil
-            self.attrs.hThread = nil
-            ret
-        }
-        error(-1)
-    }
+	fn kill(self)! {
+		if self.attrs.hProcess == nil {
+			panic("command is not spawned")
+		}
+		if unsafe { cpp.TerminateProcess(self.attrs.hProcess, 0) } {
+			self.attrs.hProcess = nil
+			self.attrs.hThread = nil
+			ret
+		}
+		error(-1)
+	}
 
-    fn wait(self)!: int {
-        if self.attrs.hProcess == nil {
-            panic("command is not spawned")
-        }
-        unsafe { cpp.WaitForSingleObject(self.attrs.hProcess, cpp.INFINITE) }
-        mut exitCode := integ::LongLong(-1)
-        unsafe {
-            cpp.GetExitCodeProcess(self.attrs.hProcess, &exitCode)
-            sys::CloseHandle(uintptr(self.attrs.hProcess))
-            sys::CloseHandle(uintptr(self.attrs.hThread))
-        }
-        self.attrs.hProcess = nil
-        self.attrs.hThread = nil
-        ret int(exitCode)
-    }
+	fn wait(self)!: int {
+		if self.attrs.hProcess == nil {
+			panic("command is not spawned")
+		}
+		unsafe { cpp.WaitForSingleObject(self.attrs.hProcess, cpp.INFINITE) }
+		mut exitCode := integ::LongLong(-1)
+		unsafe {
+			cpp.GetExitCodeProcess(self.attrs.hProcess, &exitCode)
+			sys::CloseHandle(uintptr(self.attrs.hProcess))
+			sys::CloseHandle(uintptr(self.attrs.hThread))
+		}
+		self.attrs.hProcess = nil
+		self.attrs.hThread = nil
+		ret int(exitCode)
+	}
 }
 
 // Escapes the string s, as per escapeArg, appends the result to s.
 fn appendEscapeArg(mut &s: StrBuilder, arg: str) {
-    if len(arg) == 0 {
-        s.WriteStr(`""`)
-        ret
-    }
+	if len(arg) == 0 {
+		s.WriteStr(`""`)
+		ret
+	}
 
-    mut needsBackslash := false
-    mut hasSpace := false
-    mut i := 0
-    for i < len(arg); i++ {
-        match arg[i] {
-        | '"' | '\\':
-            needsBackslash = true
-        | ' ' | '\t':
-            hasSpace = true
-        }
-    }
+	mut needsBackslash := false
+	mut hasSpace := false
+	mut i := 0
+	for i < len(arg); i++ {
+		match arg[i] {
+		| '"' | '\\':
+			needsBackslash = true
+		| ' ' | '\t':
+			hasSpace = true
+		}
+	}
 
-    if !needsBackslash && !hasSpace {
-        // No special handling required; normal case.
-        s.WriteStr(arg)
-        ret
-    }
-    if !needsBackslash {
-        // hasSpace is true, so we need to quote the string.
-        s.WriteByte('"')
-        s.WriteStr(arg)
-        s.WriteByte('"')
-        ret
-    }
+	if !needsBackslash && !hasSpace {
+		// No special handling required; normal case.
+		s.WriteStr(arg)
+		ret
+	}
+	if !needsBackslash {
+		// hasSpace is true, so we need to quote the string.
+		s.WriteByte('"')
+		s.WriteStr(arg)
+		s.WriteByte('"')
+		ret
+	}
 
-    if hasSpace {
-        s.WriteByte('"')
-    }
-    mut slashes := 0
-    i = 0
-    for i < len(arg); i++ {
-        c := arg[i]
-        match c {
-        | '\\':
-            slashes++
-        | '"':
-            for slashes > 0; slashes-- {
-                s.WriteByte('\\')
-            }
-            s.WriteByte('\\')
-        |:
-            slashes = 0
-        }
-        s.WriteByte(c)
-    }
-    if hasSpace {
-        for slashes > 0; slashes-- {
-            s.WriteByte('\\')
-        }
-        s.WriteByte('"')
-    }
+	if hasSpace {
+		s.WriteByte('"')
+	}
+	mut slashes := 0
+	i = 0
+	for i < len(arg); i++ {
+		c := arg[i]
+		match c {
+		| '\\':
+			slashes++
+		| '"':
+			for slashes > 0; slashes-- {
+				s.WriteByte('\\')
+			}
+			s.WriteByte('\\')
+		|:
+			slashes = 0
+		}
+		s.WriteByte(c)
+	}
+	if hasSpace {
+		for slashes > 0; slashes-- {
+			s.WriteByte('\\')
+		}
+		s.WriteByte('"')
+	}
 }
 
 // Builds a command line out of args by escaping "special"
 // characters and joining the arguments with spaces.
 fn makeCmdLine(args: []str): str {
-    mut s := StrBuilder.New(1 << 4)
-    for _, arg in args {
-        if s.Len() > 0 {
-            s.WriteByte(' ')
-        }
-        appendEscapeArg(s, arg)
-    }
-    ret s.Str()
+	mut s := StrBuilder.New(1 << 4)
+	for _, arg in args {
+		if s.Len() > 0 {
+			s.WriteByte(' ')
+		}
+		appendEscapeArg(s, arg)
+	}
+	ret s.Str()
 }
 
 // Converts an array of environment strings into
@@ -177,24 +177,24 @@ fn makeCmdLine(args: []str): str {
 // Last bytes are two UCS-2 NULLs, or four NULL bytes.
 // If any string contains a NULL, it returns (nil, EINVAL).
 fn createEnvBlock(env: []str)!: []u16 {
-    if len(env) == 0 {
-        ret utf16::Encode([]rune("\x00\x00"))
-    }
-    mut n := 0
-    for _, s in env {
-        if fastbytes::FindByteStr(s, 0) != -1 {
-            error(ProcessError.Env)
-        }
-        n += len(s) + 1
-    }
-    n++
-    mut b := make([]u16, 0, n)
-    for _, s in env {
-        for _, c in []rune(s) {
-            b = utf16::AppendRune(b, c)
-        }
-        b = utf16::AppendRune(b, 0)
-    }
-    b = utf16::AppendRune(b, 0)
-    ret b
+	if len(env) == 0 {
+		ret utf16::Encode([]rune("\x00\x00"))
+	}
+	mut n := 0
+	for _, s in env {
+		if fastbytes::FindByteStr(s, 0) != -1 {
+			error(ProcessError.Env)
+		}
+		n += len(s) + 1
+	}
+	n++
+	mut b := make([]u16, 0, n)
+	for _, s in env {
+		for _, c in []rune(s) {
+			b = utf16::AppendRune(b, c)
+		}
+		b = utf16::AppendRune(b, 0)
+	}
+	b = utf16::AppendRune(b, 0)
+	ret b
 }

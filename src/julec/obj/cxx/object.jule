@@ -10,33 +10,33 @@ use conv for std::conv
 use comptime for std::comptime
 use jule for std::jule
 use build for std::jule::build::{
-    Directive,
+	Directive,
 }
 use std::jule::lex::{
-    Token,
-    TokenId,
-    IsIgnoreIdent,
-    IsAnonIdent,
+	Token,
+	TokenId,
+	IsIgnoreIdent,
+	IsAnonIdent,
 }
 use std::jule::sema::{
-    FuncPattern,
-    Package,
-    SymbolTable,
-    Param,
-    ParamIns,
-    Trait,
-    Struct,
-    FieldIns,
-    Var,
-    StructIns,
-    Fn,
-    FnIns,
-    TypeKind,
-    Prim,
-    Sptr,
-    TypeSymbol,
-    Operators,
-    AnonFnExprModel,
+	FuncPattern,
+	Package,
+	SymbolTable,
+	Param,
+	ParamIns,
+	Trait,
+	Struct,
+	FieldIns,
+	Var,
+	StructIns,
+	Fn,
+	FnIns,
+	TypeKind,
+	Prim,
+	Sptr,
+	TypeSymbol,
+	Operators,
+	AnonFnExprModel,
 }
 use types for std::jule::types
 use path for std::fs::path
@@ -53,1331 +53,1331 @@ const indentKind = '\t'
 
 // General pointer type for GC pointers.
 static mut generalGCPtr = &TypeKind{
-    Kind: &Sptr{
-        Elem: &TypeKind{
-            Kind: &Prim{
-                Kind: types::TypeKind.Uintptr,
-            },
-        },
-    },
+	Kind: &Sptr{
+		Elem: &TypeKind{
+			Kind: &Prim{
+				Kind: types::TypeKind.Uintptr,
+			},
+		},
+	},
 }
 
 struct SerializationInfo {
-    Compiler:        str
-    CompilerCommand: str
+	Compiler:        str
+	CompilerCommand: str
 }
 
 struct traitCast {
-    t1: &Trait
-    t2: &Trait
+	t1: &Trait
+	t2: &Trait
 }
 
 struct anonHash {
-    expr:  &AnonFnExprModel
-    ident: str
+	expr:  &AnonFnExprModel
+	ident: str
 }
 
 struct ObjectCoder {
-    // Internal buffer which is commonly used.
-    Buf: StrBuilder
+	// Internal buffer which is commonly used.
+	Buf: StrBuilder
 
-    resultDecls: StrBuilder // Struct wrappers for multi-ret function types.
-    anyObj:      StrBuilder // Type handlers and others for the <any> type.
-    anonObj:     StrBuilder // Anonymous functions.
-    deallocObj:  StrBuilder // Deallocation function for [self.deallocated] types.
+	resultDecls: StrBuilder // Struct wrappers for multi-ret function types.
+	anyObj:      StrBuilder // Type handlers and others for the <any> type.
+	anonObj:     StrBuilder // Anonymous functions.
+	deallocObj:  StrBuilder // Deallocation function for [self.deallocated] types.
 
-    ir:          &IR
-    info:        SerializationInfo
-    anons:       []&anonHash
-    deallocated: []&TypeKind // GC deallocated types for dynamic programming.
+	ir:          &IR
+	info:        SerializationInfo
+	anons:       []&anonHash
+	deallocated: []&TypeKind // GC deallocated types for dynamic programming.
 
-    // Current indentation.
-    indentBuffer: []byte
+	// Current indentation.
+	indentBuffer: []byte
 
-    resultMap:    map[str]bool
-    anyTypeMap:   []&TypeKind
-    traitCastMap: []traitCast
+	resultMap:    map[str]bool
+	anyTypeMap:   []&TypeKind
+	traitCastMap: []traitCast
 
-    // Pairs for methods and structure instances.
-    // Used to avoid duplicated wrapper function generation.
-    traitMetMap: map[&FnIns][]uintptr
+	// Pairs for methods and structure instances.
+	// Used to avoid duplicated wrapper function generation.
+	traitMetMap: map[&FnIns][]uintptr
 
-    ec: &exprCoder
-    sc: &scopeCoder
-    tc: &typeCoder
+	ec: &exprCoder
+	sc: &scopeCoder
+	tc: &typeCoder
 
-    headPos: int
-    declPos: int
-    wrapPos: int
+	headPos: int
+	declPos: int
+	wrapPos: int
 }
 
 impl ObjectCoder {
-    static fn New(mut &ir: &IR, info: SerializationInfo): &ObjectCoder {
-        mut oc := &ObjectCoder{
-            ir: ir,
-            info: info,
-        }
-        oc.ec = exprCoder.new(oc)
-        oc.sc = scopeCoder.new(oc)
-        oc.tc = typeCoder.new(oc)
-        ret oc
-    }
-
-    fn write(mut &self, s: str) {
-        self.Buf.WriteStr(s)
-    }
-
-    fn writeBytes(mut &self, b: []byte) {
-        self.Buf.Write(b)
-    }
-
-    // Increase indentation.
-    fn addIndent(mut &self) {
-        self.indentBuffer = append(self.indentBuffer, indentKind)
-    }
-
-    // Decrase indentation.
-    fn doneIndent(mut &self) {
-        self.indentBuffer = self.indentBuffer[:len(self.indentBuffer)-1]
-    }
-
-    // Writes indention string by indentBuffer.
-    fn indent(mut &self) {
-        self.Buf.Write(self.indentBuffer)
-    }
-
-    fn findAnyType(mut &self, mut &t: &TypeKind): int {
-        for (i, mut at) in self.anyTypeMap {
-            if at.Equal(t) {
-                ret i
-            }
-        }
-        ret -1
-    }
-
-    fn pushDealloc(mut &self, mut t: &TypeKind): int {
-        for i, dt in self.deallocated {
-            if dt.Equal(t) {
-                ret i
-            }
-        }
-        i := len(self.deallocated)
-        self.deallocated = append(self.deallocated, t)
-        self.deallocObj.WriteStr("void " + deallocatedTypeIdent)
-        self.deallocObj.WriteStr(conv::Itoa(i))
-        self.deallocObj.WriteStr("(jule::Ptr<jule::Uintptr> &alloc) noexcept { alloc.__as<")
-        self.tc.kind(self.deallocObj, t)
-        self.deallocObj.WriteStr(">().dealloc(); }\n")
-        ret i
-    }
-
-    fn pushAnonFn(mut &self, mut &m: &AnonFnExprModel): (ident: str) {
-        closure := obj::IsClosure(m)
-        if closure { // Closure?
-            // Handle identifier and generate ctx.
-            self.anonObj.WriteStr("struct ")
-            l := self.anonObj.Len()
-            self.anonObj.WriteStr("__jule_anon_")
-            self.anonObj.WriteStr(conv::FmtUint(u64(uintptr(m.Func)), 0xF))
-            ident = str(unsafe { self.anonObj.Buf()[l:] })
-            self.anonObj.WriteStr(anonFnCtxSuffix + "{\n")
-            for (_, mut v) in m.Captured {
-                self.anonObj.WriteByte(indentKind) // 1x indent
-                self.tc.kind(self.anonObj, v.Kind.Kind)
-                self.anonObj.WriteByte(' ')
-                if v.Reference {
-                    self.anonObj.WriteByte('*')
-                }
-                identCoder.var(self.anonObj, v)
-                self.anonObj.WriteStr(";\n")
-            }
-            self.anonObj.WriteStr("};\n")
-
-            // Ctx handler function.
-            self.anonObj.WriteStr("static void ")
-            self.anonObj.WriteStr(ident)
-            self.anonObj.WriteStr(anonFnCtxHandlerSuffix + "(jule::Ptr<" + typeCoder.Uintptr + "> &ptr) { ptr.__as<")
-            self.anonObj.WriteStr(ident)
-            self.anonObj.WriteStr(anonFnCtxSuffix + ">().dealloc(); }\n")
-        } else {
-            ident = "__jule_anon"
-            ident += conv::FmtUint(u64(uintptr(m.Func)), 0xF)
-        }
-
-        // Anonymous function.
-        self.anons = append(self.anons, &anonHash{expr: m, ident: ident})
-        self.anonFuncInsDecl(m, ident)
-        self.anonObj.WriteByte('\n')
-        ret
-    }
-
-    fn pushAnyType(mut &self, mut t: &TypeKind): int {
-        if t.Enum() != nil {
-            t = t.Enum().Kind.Kind
-        }
-        mut i := self.findAnyType(t)
-        if i != -1 {
-            ret i
-        }
-        i = len(self.anyTypeMap)
-        self.anyTypeMap = append(self.anyTypeMap, t)
-        si := conv::Itoa(i)
-        if t.Sptr() != nil {
-            mut elemKind := StrBuilder.New(40)
-            self.tc.kind(elemKind, t.Sptr().Elem)
-
-            // Deallocator function.
-            di := self.pushDealloc(t.Sptr().Elem)
-
-            // Type structure.
-            self.anyObj.WriteStr("struct " + typeCoder.Any + "::Type ")
-            self.anyObj.WriteStr(anyTypeIdent)
-            self.anyObj.WriteStr(si)
-            self.anyObj.WriteStr("{.dealloc=" + deallocatedTypeIdent)
-            self.anyObj.WriteStr(conv::Itoa(di))
-            self.anyObj.WriteStr(", .eq=jule::ptr_equal, .to_str=jule::ptr_to_str};\n")
-
-            // comparison function.
-            self.anyObj.WriteStr(typeCoder.Bool + " " + anyTypeIdent)
-            self.anyObj.WriteStr(si)
-            self.anyObj.WriteStr("_compare(const " + typeCoder.Any + " &any, const ")
-            self.tc.asSptr(self.anyObj, unsafe { elemKind.Buf() })
-            self.anyObj.WriteStr(" &other) { return any.type == &" + anyTypeIdent)
-            self.anyObj.WriteStr(si)
-            self.anyObj.WriteStr(" && jule::ptr_equal(any.data.alloc, other.alloc); }\n")
-        } else {
-            comparable := t.Comparable()
-            mut kindB := StrBuilder.New(40)
-            self.tc.kind(kindB, t)
-            kind := unsafe { kindB.Buf() }
-
-            // Deallocator function.
-            di := self.pushDealloc(t)
-
-            if comparable {
-                // eq function.
-                self.anyObj.WriteStr(typeCoder.Bool + " " + anyTypeIdent)
-                self.anyObj.WriteStr(si)
-                self.anyObj.WriteStr("_eq(void *alloc, void *other) noexcept { return *reinterpret_cast<")
-                self.anyObj.Write(kind)
-                self.anyObj.WriteStr("*>(alloc) == *reinterpret_cast<")
-                self.anyObj.Write(kind)
-                self.anyObj.WriteStr("*>(other); }\n")
-            }
-
-            // to_str function.
-            self.anyObj.WriteStr(typeCoder.Str + " " + anyTypeIdent)
-            self.anyObj.WriteStr(si)
-            self.anyObj.WriteStr("_to_str(const void *alloc) noexcept { return jule::to_str(*reinterpret_cast<")
-            if t.Ptr() == nil {
-                self.anyObj.WriteStr("const ")
-                self.anyObj.Write(kind)
-            } else {
-                self.anyObj.Write(kind)
-                self.anyObj.WriteStr("* const")
-            }
-            self.anyObj.WriteStr("*>(alloc)); }\n")
-
-            // Type structure.
-            self.anyObj.WriteStr("struct " + typeCoder.Any + "::Type ")
-            self.anyObj.WriteStr(anyTypeIdent)
-            self.anyObj.WriteStr(si)
-            self.anyObj.WriteStr("{.dealloc=" + deallocatedTypeIdent)
-            self.anyObj.WriteStr(conv::Itoa(di))
-            self.anyObj.WriteStr(", ")
-            if comparable {
-                self.anyObj.WriteStr(".eq=" + anyTypeIdent)
-                self.anyObj.WriteStr(si)
-                self.anyObj.WriteStr("_eq, ")
-            }
-            self.anyObj.WriteStr(".to_str=" + anyTypeIdent)
-            self.anyObj.WriteStr(si)
-            self.anyObj.WriteStr("_to_str};\n")
-
-            if comparable {
-                // compare function.
-                self.anyObj.WriteStr(typeCoder.Bool + " " + anyTypeIdent)
-                self.anyObj.WriteStr(si)
-                self.anyObj.WriteStr("_compare(const " + typeCoder.Any + " &any, const ")
-                self.anyObj.Write(kind)
-                self.anyObj.WriteStr(" &other) { return any.type == &" + anyTypeIdent)
-                self.anyObj.WriteStr(si)
-                self.anyObj.WriteStr(" && " + anyTypeIdent)
-                self.anyObj.WriteStr(si)
-                self.anyObj.WriteStr("_eq(any.data.alloc, (void*)&other); }\n")
-            }
-        }
-        ret i
-    }
-
-    fn pushResultIns(mut &self, mut &f: &FnIns) {
-        s := str(self.tc.rc.code(f.Result))
-        _, ok := self.resultMap[s]
-        if ok {
-            ret
-        }
-        self.resultMap[s] = false
-        self.resultDecls.WriteStr("struct ")
-        self.resultDecls.WriteStr(s)
-        self.resultDecls.WriteStr(" {\n")
-        for (i, mut t) in f.Result.Tup().Types {
-            self.resultDecls.WriteByte(indentKind)
-            self.tc.kind(self.resultDecls, t)
-            self.resultDecls.WriteByte(' ')
-            self.resultDecls.WriteStr(resultArgName)
-            self.resultDecls.WriteStr(conv::Itoa(i))
-            self.resultDecls.WriteStr(";\n")
-        }
-        self.resultDecls.WriteStr("};\n")
-    }
-
-    fn pushResult(mut &self, mut &f: &Fn) {
-        if f.IsVoid() || len(f.Result.Idents) <= 1 {
-            ret
-        }
-        mut n := len(f.Instances)
-        if len(f.Generics) == 0 {
-            n = 1
-        }
-        for (_, mut ins) in f.Instances[:n] {
-            self.pushResultIns(ins)
-        }
-    }
-
-    fn pushAndWriteMaskMapper(mut &self, mut t1: &Trait, mut t2: &Trait) {
-        mut ident := StrBuilder.New(1 << 5)
-        ident.WriteStr("__jule_trait_offset_mapper_")
-        ident.WriteStr(conv::FmtUint(u64(uintptr(t2)), 0xF))
-        ident.WriteStr("_to_")
-        ident.WriteStr(conv::FmtUint(u64(uintptr(t1)), 0xF))
-        self.Buf.Write(unsafe { ident.Buf() })
-
-        // Lookup and push if this match is not exist.
-        for _, m in self.traitCastMap {
-            if m.t1 == t1 && m.t2 == t2 {
-                ret
-            }
-        }
-
-        self.traitCastMap = append(self.traitCastMap, traitCast{t1: t1, t2: t2})
-
-        // Not exist, push.
-        const data = "data"
-        self.anyObj.WriteStr("void *")
-        self.anyObj.Write(unsafe { ident.Buf() })
-        self.anyObj.WriteStr("(const void *" + data + ") noexcept { ")
-
-        mut t1Ident := StrBuilder.New(1 << 4)
-        mut t2Ident := StrBuilder.New(1 << 4)
-        identCoder.traitDecl(t1Ident, t1)
-        identCoder.traitDecl(t2Ident, t2)
-
-        for (_, mut s1) in t1.Implemented {
-            for _, s2 in t2.Implemented {
-                if s1 == s2 {
-                    for (_, mut s1i) in s1.Instances {
-                        i1 := obj::FindTraitTypeOffsetS(t1, s1i)
-                        i2 := obj::FindTraitTypeOffsetS(t2, s1i)
-                        self.anyObj.WriteStr("if (data == &")
-                        self.anyObj.Write(unsafe { t2Ident.Buf() })
-                        self.anyObj.WriteStr("_mptr_data")
-                        self.anyObj.WriteStr(conv::Itoa(i2))
-                        self.anyObj.WriteStr(") return &")
-                        self.anyObj.Write(unsafe { t1Ident.Buf() })
-                        self.anyObj.WriteStr("_mptr_data")
-                        self.anyObj.WriteStr(conv::Itoa(i1))
-                        self.anyObj.WriteStr("; ")
-                    }
-                }
-            }
-        }
-        self.anyObj.WriteStr(" jule::panic(\"trait casting failed because of an implementation mistake, this is a JuleC bug\"); return nullptr; }\n")
-    }
-
-    // Writes location information of token as cstr bytes.
-    fn locInfo(mut &self, &t: &Token) {
-        &loc := t.File.Path
-
-        // Normalize path if production compilation enabled.
-        if env::Production {
-            match {
-            | strings::HasPrefix(loc, build::PathStdlib):
-                // Remove absolute path prefix of standard library.
-                // Just keeps "std/" prefix.
-                cstrBytes(self.Buf, loc[len(path::Dir(build::PathStdlib))+1:])
-            | strings::HasPrefix(loc, self.ir.Root):
-                // Remove absolute path prefix of root package.
-                // Just keeps "[package_dir]/" prefix.
-                cstrBytes(self.Buf, loc[len(path::Dir(self.ir.Root))+1:])
-            |:
-                cstrBytes(self.Buf, loc)
-            }
-        } else {
-            cstrBytes(self.Buf, loc)
-        }
-        self.write(":")
-        self.write(conv::Itoa(t.Row))
-        self.write(":")
-        self.write(conv::Itoa(t.Column))
-    }
-
-    fn head(mut &self) {
-        time := Time.Now()
-        abs := time.Abs()
-        self.write("// Auto generated by JuleC.\n")
-        self.write("// JuleC version: ")
-        self.write(jule::Version)
-        self.write("\n")
-        self.write("// Date: ")
-        self.write(conv::FmtUint(abs.Day, 10))
-        self.write("/")
-        self.write(conv::FmtUint(abs.Month, 10))
-        self.write("/")
-        self.write(conv::FmtUint(abs.Year, 10))
-        self.write(" (DD/MM/YYYY) UTC\n//\n// Recomended Compile Command;\n// ")
-        self.write(self.info.Compiler)
-        self.write(" ")
-        self.write(self.info.CompilerCommand)
-        self.write("\n\n")
-
-        if env::Production {
-            self.write("#define __JULE_ENABLE__PRODUCTION\n")
-        }
-        if !env::RC {
-            self.write("#define __JULE_DISABLE__REFERENCE_COUNTING\n")
-        }
-        if !env::Safety {
-            self.write("#define __JULE_DISABLE__SAFETY\n")
-        }
-
-        // Include binded libraries here, before the API header.
-        // See developer reference (4).
-        self.links()
-
-        self.write("\n\n#include \"")
-        self.write(build::PathApi)
-        self.write("\"\n\n")
-    }
-
-    fn links(mut &self) {
-        for _, used in self.ir.Used {
-            match {
-            | !used.Binded:
-                continue
-            | build::IsStdHeaderPath(used.Path):
-                self.write("#include ")
-                self.write(used.Path)
-                self.write("\n")
-            | build::IsValidHeaderExt(path::Ext(used.Path)):
-                self.write("#include \"")
-                self.write(used.Path)
-                self.write("\"\n")
-            }
-        }
-    }
-
-    fn prepareStructure(mut self, mut &s: &Struct) {
-        for (_, mut ins) in s.Instances {
-            for (_, mut m) in ins.Methods {
-                if m.Statically {
-                    continue
-                }
-                for (_, mut mins) in m.Instances {
-                    mut p := mins.Params[0]
-                    mut kind := StrBuilder.New(40)
-                    self.tc.kind(kind, p.Kind)
-                    if !p.Decl.IsRef() {
-                        kind.WriteStr("*")
-                    }
-                    p.Kind = &TypeKind{
-                        Kind: &customType{
-                            kind: kind.Str(),
-                        },
-                    }
-                }
-            }
-        }
-    }
-
-    fn prepareStructures(mut &self) {
-        for (_, mut s) in self.ir.Ordered.Structs {
-            if s.Token != nil {
-                self.prepareStructure(s)
-            }
-        }
-    }
-
-    fn structurePlainDecl(mut &self, mut &s: &Struct) {
-        for (_, mut ins) in s.Instances {
-            self.write("struct ")
-            identCoder.structureIns(self.Buf, ins)
-            self.write(";\n")
-        }
-    }
-
-    fn structurePlainDecls(mut &self) {
-        for (_, mut s) in self.ir.Ordered.Structs {
-            if s.Token != nil {
-                self.structurePlainDecl(s)
-            }
-        }
-    }
-
-    fn fieldDecl(mut &self, mut &f: &FieldIns) {
-        self.tc.kind(self.Buf, f.Kind)
-        self.write(" ")
-        identCoder.field(self.Buf, f.Decl)
-        if f.Default == nil {
-            if shouldInitialized(f.Kind) {
-                self.write(" = ")
-                // No default expression.
-                // Use default expression of data-type.
-                self.ec.initExpr(f.Kind)
-            }
-        } else {
-            self.write(" = ")
-            self.ec.possibleRefExpr(f.Default.Model)
-        }
-        self.write(";")
-    }
-
-    fn structureDestructor(mut &self, mut &s: &StructIns) {
-        // Dispose method must be non-static
-        const Static = false
-        disposeMethod := s.FindMethod("Dispose", Static)
-        mut disposed := FuncPattern.Dispose(disposeMethod)
-        // Call destructor if implemented.
-        if !disposed {
-            ret
-        }
-        self.write("~")
-        identCoder.structureIns(self.Buf, s)
-        self.write("(void) { ")
-        identCoder.func(self.Buf, disposeMethod)
-        self.write("(this); }")
-    }
-
-    fn structureOperatorEq(mut &self, ident: []byte, mut &s: &StructIns) {
-        if !s.Comparable {
-            ret
-        }
-        // Operator overloading.
-        if s.Operators.Eq != nil {
-            self.structureOperator(ident, s.Operators.Eq, "==")
-            ret
-        }
-
-        self.indent()
-        if opt::Inline {
-            self.write("inline ")
-        }
-        self.write("bool operator==(")
-        self.writeBytes(ident)
-        self.write(" _other) {")
-        if len(s.Fields) > 0 {
-            self.addIndent()
-            self.write("\n")
-            self.indent()
-            self.write("return ")
-            self.addIndent()
-            mut writed := false
-            for (_, mut f) in s.Fields {
-                // Skip binded struct kinds.
-                strct := f.Kind.Struct()
-                if strct != nil && strct.Decl != nil && strct.Decl.Binded {
-                    continue
-                }
-                if writed {
-                    self.write(" &&")
-                }
-                writed = true
-                self.write("\n")
-                self.indent()
-                self.write("this->")
-                mut fIdent := StrBuilder.New(len(f.Decl.Ident))
-                identCoder.field(fIdent, f.Decl)
-                self.writeBytes(unsafe { fIdent.Buf() })
-                self.write(" == _other.")
-                self.writeBytes(unsafe { fIdent.Buf() })
-            }
-            self.doneIndent()
-            if !writed {
-                self.write("true")
-            }
-            self.write(";\n")
-            self.doneIndent()
-            self.indent()
-            self.write("}")
-        } else {
-            self.write(" return true; }")
-        }
-        self.write("\n\n")
-    }
-
-    fn structureOperatorNotEq(mut &self, ident: []byte, mut &s: &StructIns) {
-        if !s.Comparable {
-            ret
-        }
-        self.indent()
-        if opt::Inline {
-            self.write("inline ")
-        }
-        self.write("bool operator!=(")
-        self.writeBytes(ident)
-        self.write(" _other) { return !this->operator==(_other); }\n\n")
-    }
-
-    // Write operator overloading forwarding for reserved function.
-    fn structureOperator(mut &self, ident: []byte, mut &f: &FnIns, op: str) {
-        if f == nil {
-            ret
-        }
-
-        unary := len(f.Params) == 1 // Just self parameter.
-        assignment := f.Decl.IsVoid()
-
-        self.indent()
-        if opt::Inline {
-            self.write("inline ")
-        }
-        if assignment {
-            self.writeBytes(ident)
-            self.write("&")
-        } else {
-            if f.Result.Prim() == nil {
-                // If result type is not primitive, always structure's itself.
-                self.writeBytes(ident)
-            } else {
-                // Logical.
-                self.write(typeCoder.Bool)
-            }
-        }
-        self.write(" operator")
-        self.write(op)
-        self.write("(")
-        if !unary {
-            mut p := f.Params[1]
-            self.tc.paramIns(self.Buf, p)
-            self.write(" _other")
-        }
-        self.write(") { ")
-        if !assignment {
-            self.write("return ")
-        }
-        identCoder.funcIns(self.Buf, f)
-        if !unary {
-            self.write("(this, _other); ")
-            if assignment {
-                self.write("return *this; ")
-            }
-            self.write("}")
-        } else {
-            self.write("(this); }")
-        }
-        self.write("\n\n")
-    }
-
-    fn structureOperators(mut &self, mut &s: &StructIns) {
-        mut sb := StrBuilder.New(40)
-        identCoder.structureIns(sb, s)
-        ident := unsafe { sb.Buf() }
-
-        // Binary.
-        self.structureOperatorEq(ident, s)
-        self.structureOperatorNotEq(ident, s)
-        self.structureOperator(ident, s.Operators.Gt, ">")
-        self.structureOperator(ident, s.Operators.GtEq, ">=")
-        self.structureOperator(ident, s.Operators.Lt, "<")
-        self.structureOperator(ident, s.Operators.LtEq, "<=")
-        self.structureOperator(ident, s.Operators.Shl, "<<")
-        self.structureOperator(ident, s.Operators.Shr, ">>")
-        self.structureOperator(ident, s.Operators.Add, "+")
-        self.structureOperator(ident, s.Operators.Sub, "-")
-        self.structureOperator(ident, s.Operators.Div, "/")
-        self.structureOperator(ident, s.Operators.Mul, "*")
-        self.structureOperator(ident, s.Operators.Mod, "%")
-        self.structureOperator(ident, s.Operators.BitAnd, "&")
-        self.structureOperator(ident, s.Operators.BitOr, "|")
-        self.structureOperator(ident, s.Operators.BitXor, "^")
-
-        // Unary.
-        self.structureOperator(ident, s.Operators.Neg, "-")
-        self.structureOperator(ident, s.Operators.Pos, "+")
-        self.structureOperator(ident, s.Operators.BitNot, "~")
-
-        // Assignment.
-        self.structureOperator(ident, s.Operators.AddAssign, "+=")
-        self.structureOperator(ident, s.Operators.SubAssign, "-=")
-        self.structureOperator(ident, s.Operators.DivAssign, "/=")
-        self.structureOperator(ident, s.Operators.MulAssign, "*=")
-        self.structureOperator(ident, s.Operators.ModAssign, "%=")
-        self.structureOperator(ident, s.Operators.ShlAssign, "<<=")
-        self.structureOperator(ident, s.Operators.ShrAssign, ">>=")
-        self.structureOperator(ident, s.Operators.BitOrAssign, "|=")
-        self.structureOperator(ident, s.Operators.BitAndAssign, "&=")
-        self.structureOperator(ident, s.Operators.BitXorAssign, "^=")
-    }
-
-    fn structureInsDecl(mut &self, mut &s: &StructIns) {
-        for (_, mut m) in s.Methods {
-            // Operator methods are declared by [structureDecl].
-            if isHeadDecl(m) {
-                self.funcDecl(m, false)
-            }
-        }
-        self.write("struct ")
-        identCoder.structureIns(self.Buf, s)
-        self.write(" {\n")
-
-        self.addIndent()
-        for (_, mut f) in s.Fields {
-            self.indent()
-            self.fieldDecl(f)
-            self.write("\n")
-        }
-
-        self.indent()
-        self.structureDestructor(s)
-        self.write("\n\n")
-
-        self.structureOperators(s)
-        self.write("\n")
-
-        self.doneIndent()
-        self.indent()
-        self.write("};")
-    }
-
-    fn structureDecl(mut &self, mut &s: &Struct) {
-        for (_, mut ins) in s.Instances {
-            self.structureInsDecl(ins)
-        }
-    }
-
-    fn structureDecls(mut &self) {
-        for (_, mut s) in self.ir.Ordered.Structs {
-            if s.Token != nil {
-                self.structureDecl(s)
-                self.write("\n")
-            }
-        }
-    }
-
-    fn structureMethodDecls(mut &self) {
-        for (_, mut s) in self.ir.Ordered.Structs {
-            if s.Token != nil {
-                for (_, mut ins) in s.Instances {
-                    for (_, mut m) in ins.Methods {
-                        // Operator methods are declared by [structureDecl].
-                        if !isHeadDecl(m) {
-                            self.pushResult(m)
-                            self.funcDecl(m, false)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // The ident parameter means this function is anon, mostly.
-    // But this parameter not only for anonymous functions.
-    // It also useable as custom identifiers for functions.
-    fn funcHead(mut &self, mut &buf: StrBuilder, mut &f: &FnIns, ptr: bool, ident: str) {
-        if !ptr && opt::Inline && !f.Decl.IsEntryPoint() {
-            buf.WriteStr("inline ")
-        }
-        self.tc.funcInsResult(buf, f)
-        if ptr {
-            buf.WriteStr("(*")
-            identCoder.funcIns(buf, f)
-            buf.WriteByte(')')
-        } else {
-            buf.WriteByte(' ')
-            if ident == "" {
-                identCoder.funcIns(buf, f)
-            } else {
-                buf.WriteStr(ident)
-            }
-        }
-    }
-
-    fn funcDeclIns(mut &self, mut &f: &FnIns, ptr: bool) {
-        self.indent()
-        self.funcHead(self.Buf, f, ptr, "")
-        self.paramsIns(self.Buf, f)
-        self.write(";\n")
-    }
-
-    fn funcDecl(mut &self, mut &f: &Fn, ptr: bool) {
-        for (_, mut c) in f.Instances {
-            self.funcDeclIns(c, ptr)
-        }
-    }
-
-    fn funcDeclTrait(mut &self, mut &f: &Fn) {
-        for (_, mut c) in f.Instances {
-            mut k := c.Params[0].Kind
-            c.Params[0].Kind = generalGCPtr
-            self.funcDeclIns(c, true)
-            c.Params[0].Kind = k
-        }
-    }
-
-    fn funcDecls(mut &self) {
-        obj::IterPackages(self.ir, fn(mut &pkg: &Package) {
-            obj::IterFiles(pkg, fn(mut &file: &SymbolTable) {
-                for (_, mut f) in file.Funcs {
-                    if !f.Binded && f.Token != nil {
-                        self.pushResult(f)
-                        self.funcDecl(f, false)
-                    }
-                }
-            })
-        })
-    }
-
-    fn traitDataTypeMethods(mut &self, mut &t: &Trait) {
-        obj::IterTraitMethods(t, fn(mut &m: &Fn) {
-            mut ins := m.Instances[0]
-            for (i, mut ip) in ins.Params[1:] {
-                if IsAnonIdent(ip.Decl.Ident) {
-                    ip.Decl.Ident = "_" + conv::Itoa(i)
-                }
-            }
-            self.pushResult(m)
-            self.funcDeclTrait(m)
-        })
-    }
-
-    fn traitDataTypes(mut &self) {
-        obj::IterPackages(self.ir, fn(mut &pkg: &Package) {
-            obj::IterFiles(pkg, fn(mut &file: &SymbolTable) {
-                for (_, mut t) in file.Traits {
-                    if t.Token == nil || len(t.Implemented) == 0 {
-                        continue
-                    }
-                    self.write("struct ")
-                    identCoder.traitDecl(self.Buf, t)
-                    self.write("MptrData")
-                    self.write(" {\n")
-                    self.addIndent()
-                    self.indent()
-                    self.write("void (*dealloc)(" + typeCoder.Ptr + "<" + typeCoder.Uintptr + ">&);\n")
-                    self.traitDataTypeMethods(t)
-                    self.doneIndent()
-                    self.indent()
-                    self.write("};\n\n")
-                }
-            })
-        })
-    }
-
-    fn paramIns(mut &self, mut &buf: StrBuilder, mut &p: &ParamIns) {
-        self.tc.paramIns(buf, p)
-        buf.WriteByte(' ')
-        identCoder.param(buf, p.Decl)
-    }
-
-    fn paramsIns(mut &self, mut &buf: StrBuilder, mut &f: &FnIns) {
-        if !f.AsAnon && len(f.Params) == 0 {
-            buf.WriteStr("(void)")
-            ret
-        }
-        buf.WriteByte('(')
-        if f.AsAnon {
-            buf.WriteStr(ctxParamType + " " + ctxParamIdent)
-            if len(f.Params) > 0 {
-                buf.WriteStr(", ")
-            }
-        }
-        for (i, mut p) in f.Params {
-            self.paramIns(buf, p)
-            if len(f.Params)-i > 1 {
-                buf.WriteStr(", ")
-            }
-        }
-        buf.WriteByte(')')
-    }
-
-    fn varInitExpr(mut &self, mut &v: &Var, init: fn()) {
-        if v.Statically {
-            self.write("static ")
-        }
-
-        self.tc.kind(self.Buf, v.Kind.Kind)
-        self.write(" ")
-        if v.Reference {
-            self.write("*")
-        }
-        identCoder.var(self.Buf, v)
-        if init != nil {
-            self.write(" = ")
-            init()
-        }
-        self.write(";")
-    }
-
-    fn var(mut &self, mut v: &Var) {
-        if IsIgnoreIdent(v.Ident) {
-            ret
-        }
-        if v.Value != nil && v.Value.Expr != nil {
-            if v.Value.Data.Model != nil {
-                if v.Reference {
-                    self.varInitExpr(v, fn() {
-                        self.write("&(")
-                        self.ec.model(v.Value.Data.Model)
-                        self.write(")")
-                    })
-                } else {
-                    self.varInitExpr(v, fn() { self.ec.possibleRefExpr(v.Value.Data.Model) })
-                }
-                ret
-            }
-            self.varInitExpr(v, nil)
-            ret
-        }
-        if v.Reference {
-            self.varInitExpr(v, fn() { self.write("nullptr") })
-            ret
-        }
-        if shouldInitialized(v.Kind.Kind) {
-            self.varInitExpr(v, fn() { self.ec.initExpr(v.Kind.Kind) })
-            ret
-        }
-        self.varInitExpr(v, nil)
-    }
-
-    fn anonFuncInsDecl(mut &self, mut &m: &AnonFnExprModel, ident: str) {
-        self.funcHead(self.anonObj, m.Func, false, ident)
-        self.paramsIns(self.anonObj, m.Func)
-        self.anonObj.WriteByte(';')
-    }
-
-    fn anonFuncIns(mut &self, mut &m: &AnonFnExprModel, ident: str) {
-        self.funcHead(self.Buf, m.Func, false, ident)
-        self.paramsIns(self.Buf, m.Func)
-        self.write(" ")
-        self.sc.anonFuncScope(m, ident)
-        if m.Func.Scope != nil {
-            self.write("\n\n")
-        }
-    }
-
-    fn funcIns(mut &self, mut &f: &FnIns, ident: str) {
-        self.funcHead(self.Buf, f, false, ident)
-        self.paramsIns(self.Buf, f)
-        self.write(" ")
-        self.sc.funcScope(f)
-        if f.Scope != nil {
-            self.write("\n\n")
-        }
-    }
-
-    fn func(mut &self, mut &f: &Fn) {
-        for (_, mut ins) in f.Instances {
-            self.funcIns(ins, "")
-        }
-    }
-
-    fn funcTrait(mut &self, &s: &StructIns, mut &f: &FnIns) {
-        f.Scope = nil
-
-        mut nident := StrBuilder.New(30)
-        nident.WriteStr("__jule_trait_method_")
-        nident.WriteStr(conv::FmtUint(u64(uintptr(f)), 0xF))
-        nident.WriteStr("_")
-        nident.WriteStr(conv::FmtUint(u64(uintptr(s)), 0xF))
-
-        mut k := f.Params[0].Kind
-        f.Params[0].Kind = generalGCPtr
-        self.funcIns(f, nident.Str())
-        f.Params[0].Kind = k
-    }
-
-    fn findTraitMetMap(mut &self, mut &m: &Fn): (&FnIns, bool) {
-        mut mins := m.Instances[0]
-        for (mut f, _) in self.traitMetMap {
-            if f.Decl.Public == m.Public &&
-                f.Decl.Ident == m.Ident &&
-                f.EqualFn(mins) {
-                ret f, true
-            }
-        }
-        ret mins, false
-    }
-
-    fn traitWrapper(mut &self, mut &t: &Trait, mut &m: &Fn) {
-    impls:
-        for (_, mut imp) in t.Implemented {
-            mut mepf, exist := self.findTraitMetMap(m)
-            if exist {
-                // Is handled pair?
-                mut vals := self.traitMetMap[mepf]
-                for _, val in vals {
-                    if val == uintptr(imp) {
-                        // Exist, skip this step.
-                        continue impls
-                    }
-                }
-                self.traitMetMap[mepf] = append(vals, uintptr(imp))
-            } else {
-                self.traitMetMap[mepf] = append(make([]uintptr, 0), uintptr(imp))
-            }
-            for (_, mut ins) in imp.Instances {
-                self.funcTrait(ins, mepf)
-
-                mut sm := ins.FindMethod(m.Ident, false)
-                if sm == nil || len(sm.Instances) == 0 {
-                    ret
-                }
-
-                self.addIndent()
-                self.write("{\n")
-                self.indent()
-                if m.Exceptional || !m.IsVoid() {
-                    self.write("return ")
-                }
-                identCoder.func(self.Buf, sm)
-                self.write("(")
-                self.write("_self_.as<")
-                self.tc.structureIns(self.Buf, ins)
-                self.write(">()")
-
-                ptr := !m.Params[0].IsRef()
-                if ptr {
-                    self.write(".alloc")
-                }
-                for _, mp in m.Params[1:] {
-                    self.write(", ")
-                    identCoder.param(self.Buf, mp)
-                }
-                self.write(");\n}\n")
-                self.doneIndent()
-            }
-        }
-    }
-
-    fn traitWrappers(mut &self) {
-        obj::IterPackages(self.ir, fn(mut &pkg: &Package) {
-            obj::IterFiles(pkg, fn(mut &file: &SymbolTable) {
-                for (_, mut t) in file.Traits {
-                    if len(t.Implemented) == 0 {
-                        continue
-                    }
-                    obj::IterTraitMethods(t, fn(mut &m: &Fn) {
-                        self.traitWrapper(t, m)
-                    })
-                }
-            })
-        })
-    }
-
-    fn traitDataMethods(mut &self, mut &t: &Trait, s: &StructIns) {
-        obj::IterTraitMethods(t, fn(mut &m: &Fn) {
-            self.indent()
-            self.write(".")
-            identCoder.func(self.Buf, m)
-            self.write("=__jule_trait_method_")
-            mepf, exist := self.findTraitMetMap(m)
-            if !exist {
-                panic("implementation mistake, [traitDataMethods] could not found MepMap record")
-            }
-            self.write(conv::FmtUint(u64(uintptr(mepf)), 0xF))
-            self.write("_")
-            self.write(conv::FmtUint(u64(uintptr(s)), 0xF))
-            self.write(",\n")
-        })
-    }
-
-    fn traitData(mut &self, mut &t: &Trait, i: int, mut &s: &StructIns) {
-        mut ident := StrBuilder.New(len(t.Ident))
-        identCoder.traitDecl(ident, t)
-        self.write("static ")
-        self.writeBytes(unsafe { ident.Buf() })
-        self.write("MptrData ")
-        self.writeBytes(unsafe { ident.Buf() })
-        self.write("_mptr_data")
-        self.write(conv::Itoa(i))
-        self.write(" {\n")
-        self.addIndent()
-        self.indent()
-        self.write(".dealloc=" + deallocatedTypeIdent)
-        self.write(conv::Itoa(self.pushDealloc(&TypeKind{Kind: s})))
-        self.write(",\n")
-        self.traitDataMethods(t, s)
-        self.doneIndent()
-        self.write("};\n")
-    }
-
-    fn traitDatas(mut &self) {
-        obj::IterPackages(self.ir, fn(mut &pkg: &Package) {
-            obj::IterFiles(pkg, fn(mut &file: &SymbolTable) {
-                for (_, mut t) in file.Traits {
-                    mut i := 0
-                    for (_, mut s) in t.Implemented {
-                        for (_, mut ins) in s.Instances {
-                            self.traitData(t, i, ins)
-                            i++
-                        }
-                    }
-                }
-            })
-        })
-    }
-
-    fn globals(mut &self) {
-        for (_, mut v) in self.ir.Ordered.Globals {
-            self.tc.kind(self.Buf, v.Kind.Kind)
-            self.write(" ")
-            identCoder.var(self.Buf, v)
-            self.write(" = ")
-            self.ec.model(v.Value.Data.Model)
-            self.write(";\n")
-        }
-    }
-
-    fn decls(mut &self) {
-        self.structurePlainDecls()
-        self.structureDecls()
-        self.headPos = self.Buf.Len()
-        self.structureMethodDecls()
-        self.funcDecls()
-        self.write("\n\n")
-        self.traitDataTypes()
-        self.write("\n\n")
-        self.wrapPos = self.Buf.Len()
-        self.traitWrappers()
-        self.write("\n\n")
-        self.traitDatas()
-        self.write("\n\n")
-        self.declPos = self.Buf.Len()
-        self.globals()
-    }
-
-    fn structureMethods(mut &self, mut &s: &StructIns) {
-        for (_, mut f) in s.Methods {
-            self.func(f)
-            self.write("\n\n")
-        }
-    }
-
-    fn structureOstream(mut &self, mut &s: &StructIns) {
-        self.indent()
-        self.write("std::ostream &operator<<(std::ostream &_Stream, ")
-        identCoder.structureIns(self.Buf, s)
-        self.write(" _Src) {\n")
-        self.addIndent()
-        self.indent()
-
-        mut fts := s.FindMethod("Str", false)
-        if FuncPattern.Str(fts) {
-            self.write("_Stream << ")
-            identCoder.func(self.Buf, fts)
-            self.write("(&_Src);\n")
-        } else {
-            self.write(`_Stream << "`)
-            cstrBytes(self.Buf, s.Decl.Ident)
-            self.write("{\";\n")
-
-            for (i, mut f) in s.Fields {
-                self.indent()
-                self.write(`_Stream << "`)
-                cstrBytes(self.Buf, f.Decl.Ident)
-                self.write(`:`)
-
-                // Skip binded struct kinds.
-                strct := f.Kind.Struct()
-                if strct != nil && strct.Decl != nil && strct.Decl.Binded {
-                    self.write(` cpp.`)
-                    identCoder.field(self.Buf, f.Decl)
-                    self.write(`"`)
-                } else {
-                    self.write(`" << _Src.`)
-                    identCoder.field(self.Buf, f.Decl)
-                }
-                if i+1 < len(s.Fields) {
-                    self.write(" << \", \"")
-                }
-                self.write(";\n")
-            }
-
-            self.indent()
-            self.write("_Stream << \"}\";\n")
-        }
-
-        self.indent()
-        self.write("return _Stream;\n")
-
-        self.doneIndent()
-        self.write("}")
-    }
-
-    fn structureIns(mut &self, mut &s: &StructIns) {
-        self.structureMethods(s)
-        self.write("\n\n")
-        self.structureOstream(s)
-    }
-
-    fn structure(mut &self, mut &s: &Struct) {
-        for (_, mut ins) in s.Instances {
-            self.structureIns(ins)
-            self.write("\n\n")
-        }
-    }
-
-    fn structures(mut &self) {
-        for (_, mut s) in self.ir.Ordered.Structs {
-            if s.Token != nil {
-                self.structure(s)
-                self.write("\n\n")
-            }
-        }
-    }
-
-    fn funcs(mut &self) {
-        obj::IterPackages(self.ir, fn(mut &pkg: &Package) {
-            obj::IterFiles(pkg, fn(mut &file: &SymbolTable) {
-                for (_, mut f) in file.Funcs {
-                    if !env::Test && obj::HasDirective(f.Directives, Directive.Test) {
-                        continue
-                    }
-                    if !f.Binded && f.Token != nil {
-                        self.func(f)
-                        self.write("\n\n")
-                    }
-                }
-            })
-        })
-    }
-
-    fn pushInit(mut &self, mut &pkg: &Package) {
-        obj::IterFiles(pkg, fn(mut &file: &SymbolTable) {
-            for _, f in file.Funcs {
-                if f.Ident == build::InitFn {
-                    self.indent()
-                    identCoder.func(self.Buf, f)
-                    self.write("();\n")
-                }
-            }
-        })
-    }
-
-    fn anonHashes(mut &self) {
-        // Use recursive algorithm, because anonymous function may have
-        // anonymous functions, so [self.anons] may grow.
-        // Make sure all whether all anonymous functions are handled.
-    repeat:
-        mut anons := self.anons
-        self.anons = nil
-        for (_, mut h) in anons {
-            self.anonFuncIns(h.expr, h.ident)
-        }
-        if len(self.anons) > 0 {
-            goto repeat
-        }
-    }
-
-    fn initCaller(mut &self) {
-        self.write("void " + initCallerIdent + "(void) {\n")
-        self.addIndent()
-        obj::IterPackages(self.ir, fn(mut &pkg: &Package) {
-            self.pushInit(pkg)
-        })
-        self.doneIndent()
-        self.write("\n}")
-    }
-
-    fn end(mut &self) {
-        self.write(`int main(int argc, char *argv[], char *envp[]) {
+	static fn New(mut &ir: &IR, info: SerializationInfo): &ObjectCoder {
+		mut oc := &ObjectCoder{
+			ir: ir,
+			info: info,
+		}
+		oc.ec = exprCoder.new(oc)
+		oc.sc = scopeCoder.new(oc)
+		oc.tc = typeCoder.new(oc)
+		ret oc
+	}
+
+	fn write(mut &self, s: str) {
+		self.Buf.WriteStr(s)
+	}
+
+	fn writeBytes(mut &self, b: []byte) {
+		self.Buf.Write(b)
+	}
+
+	// Increase indentation.
+	fn addIndent(mut &self) {
+		self.indentBuffer = append(self.indentBuffer, indentKind)
+	}
+
+	// Decrase indentation.
+	fn doneIndent(mut &self) {
+		self.indentBuffer = self.indentBuffer[:len(self.indentBuffer)-1]
+	}
+
+	// Writes indention string by indentBuffer.
+	fn indent(mut &self) {
+		self.Buf.Write(self.indentBuffer)
+	}
+
+	fn findAnyType(mut &self, mut &t: &TypeKind): int {
+		for (i, mut at) in self.anyTypeMap {
+			if at.Equal(t) {
+				ret i
+			}
+		}
+		ret -1
+	}
+
+	fn pushDealloc(mut &self, mut t: &TypeKind): int {
+		for i, dt in self.deallocated {
+			if dt.Equal(t) {
+				ret i
+			}
+		}
+		i := len(self.deallocated)
+		self.deallocated = append(self.deallocated, t)
+		self.deallocObj.WriteStr("void " + deallocatedTypeIdent)
+		self.deallocObj.WriteStr(conv::Itoa(i))
+		self.deallocObj.WriteStr("(jule::Ptr<jule::Uintptr> &alloc) noexcept { alloc.__as<")
+		self.tc.kind(self.deallocObj, t)
+		self.deallocObj.WriteStr(">().dealloc(); }\n")
+		ret i
+	}
+
+	fn pushAnonFn(mut &self, mut &m: &AnonFnExprModel): (ident: str) {
+		closure := obj::IsClosure(m)
+		if closure { // Closure?
+			// Handle identifier and generate ctx.
+			self.anonObj.WriteStr("struct ")
+			l := self.anonObj.Len()
+			self.anonObj.WriteStr("__jule_anon_")
+			self.anonObj.WriteStr(conv::FmtUint(u64(uintptr(m.Func)), 0xF))
+			ident = str(unsafe { self.anonObj.Buf()[l:] })
+			self.anonObj.WriteStr(anonFnCtxSuffix + "{\n")
+			for (_, mut v) in m.Captured {
+				self.anonObj.WriteByte(indentKind) // 1x indent
+				self.tc.kind(self.anonObj, v.Kind.Kind)
+				self.anonObj.WriteByte(' ')
+				if v.Reference {
+					self.anonObj.WriteByte('*')
+				}
+				identCoder.var(self.anonObj, v)
+				self.anonObj.WriteStr(";\n")
+			}
+			self.anonObj.WriteStr("};\n")
+
+			// Ctx handler function.
+			self.anonObj.WriteStr("static void ")
+			self.anonObj.WriteStr(ident)
+			self.anonObj.WriteStr(anonFnCtxHandlerSuffix + "(jule::Ptr<" + typeCoder.Uintptr + "> &ptr) { ptr.__as<")
+			self.anonObj.WriteStr(ident)
+			self.anonObj.WriteStr(anonFnCtxSuffix + ">().dealloc(); }\n")
+		} else {
+			ident = "__jule_anon"
+			ident += conv::FmtUint(u64(uintptr(m.Func)), 0xF)
+		}
+
+		// Anonymous function.
+		self.anons = append(self.anons, &anonHash{expr: m, ident: ident})
+		self.anonFuncInsDecl(m, ident)
+		self.anonObj.WriteByte('\n')
+		ret
+	}
+
+	fn pushAnyType(mut &self, mut t: &TypeKind): int {
+		if t.Enum() != nil {
+			t = t.Enum().Kind.Kind
+		}
+		mut i := self.findAnyType(t)
+		if i != -1 {
+			ret i
+		}
+		i = len(self.anyTypeMap)
+		self.anyTypeMap = append(self.anyTypeMap, t)
+		si := conv::Itoa(i)
+		if t.Sptr() != nil {
+			mut elemKind := StrBuilder.New(40)
+			self.tc.kind(elemKind, t.Sptr().Elem)
+
+			// Deallocator function.
+			di := self.pushDealloc(t.Sptr().Elem)
+
+			// Type structure.
+			self.anyObj.WriteStr("struct " + typeCoder.Any + "::Type ")
+			self.anyObj.WriteStr(anyTypeIdent)
+			self.anyObj.WriteStr(si)
+			self.anyObj.WriteStr("{.dealloc=" + deallocatedTypeIdent)
+			self.anyObj.WriteStr(conv::Itoa(di))
+			self.anyObj.WriteStr(", .eq=jule::ptr_equal, .to_str=jule::ptr_to_str};\n")
+
+			// comparison function.
+			self.anyObj.WriteStr(typeCoder.Bool + " " + anyTypeIdent)
+			self.anyObj.WriteStr(si)
+			self.anyObj.WriteStr("_compare(const " + typeCoder.Any + " &any, const ")
+			self.tc.asSptr(self.anyObj, unsafe { elemKind.Buf() })
+			self.anyObj.WriteStr(" &other) { return any.type == &" + anyTypeIdent)
+			self.anyObj.WriteStr(si)
+			self.anyObj.WriteStr(" && jule::ptr_equal(any.data.alloc, other.alloc); }\n")
+		} else {
+			comparable := t.Comparable()
+			mut kindB := StrBuilder.New(40)
+			self.tc.kind(kindB, t)
+			kind := unsafe { kindB.Buf() }
+
+			// Deallocator function.
+			di := self.pushDealloc(t)
+
+			if comparable {
+				// eq function.
+				self.anyObj.WriteStr(typeCoder.Bool + " " + anyTypeIdent)
+				self.anyObj.WriteStr(si)
+				self.anyObj.WriteStr("_eq(void *alloc, void *other) noexcept { return *reinterpret_cast<")
+				self.anyObj.Write(kind)
+				self.anyObj.WriteStr("*>(alloc) == *reinterpret_cast<")
+				self.anyObj.Write(kind)
+				self.anyObj.WriteStr("*>(other); }\n")
+			}
+
+			// to_str function.
+			self.anyObj.WriteStr(typeCoder.Str + " " + anyTypeIdent)
+			self.anyObj.WriteStr(si)
+			self.anyObj.WriteStr("_to_str(const void *alloc) noexcept { return jule::to_str(*reinterpret_cast<")
+			if t.Ptr() == nil {
+				self.anyObj.WriteStr("const ")
+				self.anyObj.Write(kind)
+			} else {
+				self.anyObj.Write(kind)
+				self.anyObj.WriteStr("* const")
+			}
+			self.anyObj.WriteStr("*>(alloc)); }\n")
+
+			// Type structure.
+			self.anyObj.WriteStr("struct " + typeCoder.Any + "::Type ")
+			self.anyObj.WriteStr(anyTypeIdent)
+			self.anyObj.WriteStr(si)
+			self.anyObj.WriteStr("{.dealloc=" + deallocatedTypeIdent)
+			self.anyObj.WriteStr(conv::Itoa(di))
+			self.anyObj.WriteStr(", ")
+			if comparable {
+				self.anyObj.WriteStr(".eq=" + anyTypeIdent)
+				self.anyObj.WriteStr(si)
+				self.anyObj.WriteStr("_eq, ")
+			}
+			self.anyObj.WriteStr(".to_str=" + anyTypeIdent)
+			self.anyObj.WriteStr(si)
+			self.anyObj.WriteStr("_to_str};\n")
+
+			if comparable {
+				// compare function.
+				self.anyObj.WriteStr(typeCoder.Bool + " " + anyTypeIdent)
+				self.anyObj.WriteStr(si)
+				self.anyObj.WriteStr("_compare(const " + typeCoder.Any + " &any, const ")
+				self.anyObj.Write(kind)
+				self.anyObj.WriteStr(" &other) { return any.type == &" + anyTypeIdent)
+				self.anyObj.WriteStr(si)
+				self.anyObj.WriteStr(" && " + anyTypeIdent)
+				self.anyObj.WriteStr(si)
+				self.anyObj.WriteStr("_eq(any.data.alloc, (void*)&other); }\n")
+			}
+		}
+		ret i
+	}
+
+	fn pushResultIns(mut &self, mut &f: &FnIns) {
+		s := str(self.tc.rc.code(f.Result))
+		_, ok := self.resultMap[s]
+		if ok {
+			ret
+		}
+		self.resultMap[s] = false
+		self.resultDecls.WriteStr("struct ")
+		self.resultDecls.WriteStr(s)
+		self.resultDecls.WriteStr(" {\n")
+		for (i, mut t) in f.Result.Tup().Types {
+			self.resultDecls.WriteByte(indentKind)
+			self.tc.kind(self.resultDecls, t)
+			self.resultDecls.WriteByte(' ')
+			self.resultDecls.WriteStr(resultArgName)
+			self.resultDecls.WriteStr(conv::Itoa(i))
+			self.resultDecls.WriteStr(";\n")
+		}
+		self.resultDecls.WriteStr("};\n")
+	}
+
+	fn pushResult(mut &self, mut &f: &Fn) {
+		if f.IsVoid() || len(f.Result.Idents) <= 1 {
+			ret
+		}
+		mut n := len(f.Instances)
+		if len(f.Generics) == 0 {
+			n = 1
+		}
+		for (_, mut ins) in f.Instances[:n] {
+			self.pushResultIns(ins)
+		}
+	}
+
+	fn pushAndWriteMaskMapper(mut &self, mut t1: &Trait, mut t2: &Trait) {
+		mut ident := StrBuilder.New(1 << 5)
+		ident.WriteStr("__jule_trait_offset_mapper_")
+		ident.WriteStr(conv::FmtUint(u64(uintptr(t2)), 0xF))
+		ident.WriteStr("_to_")
+		ident.WriteStr(conv::FmtUint(u64(uintptr(t1)), 0xF))
+		self.Buf.Write(unsafe { ident.Buf() })
+
+		// Lookup and push if this match is not exist.
+		for _, m in self.traitCastMap {
+			if m.t1 == t1 && m.t2 == t2 {
+				ret
+			}
+		}
+
+		self.traitCastMap = append(self.traitCastMap, traitCast{t1: t1, t2: t2})
+
+		// Not exist, push.
+		const data = "data"
+		self.anyObj.WriteStr("void *")
+		self.anyObj.Write(unsafe { ident.Buf() })
+		self.anyObj.WriteStr("(const void *" + data + ") noexcept { ")
+
+		mut t1Ident := StrBuilder.New(1 << 4)
+		mut t2Ident := StrBuilder.New(1 << 4)
+		identCoder.traitDecl(t1Ident, t1)
+		identCoder.traitDecl(t2Ident, t2)
+
+		for (_, mut s1) in t1.Implemented {
+			for _, s2 in t2.Implemented {
+				if s1 == s2 {
+					for (_, mut s1i) in s1.Instances {
+						i1 := obj::FindTraitTypeOffsetS(t1, s1i)
+						i2 := obj::FindTraitTypeOffsetS(t2, s1i)
+						self.anyObj.WriteStr("if (data == &")
+						self.anyObj.Write(unsafe { t2Ident.Buf() })
+						self.anyObj.WriteStr("_mptr_data")
+						self.anyObj.WriteStr(conv::Itoa(i2))
+						self.anyObj.WriteStr(") return &")
+						self.anyObj.Write(unsafe { t1Ident.Buf() })
+						self.anyObj.WriteStr("_mptr_data")
+						self.anyObj.WriteStr(conv::Itoa(i1))
+						self.anyObj.WriteStr("; ")
+					}
+				}
+			}
+		}
+		self.anyObj.WriteStr(" jule::panic(\"trait casting failed because of an implementation mistake, this is a JuleC bug\"); return nullptr; }\n")
+	}
+
+	// Writes location information of token as cstr bytes.
+	fn locInfo(mut &self, &t: &Token) {
+		&loc := t.File.Path
+
+		// Normalize path if production compilation enabled.
+		if env::Production {
+			match {
+			| strings::HasPrefix(loc, build::PathStdlib):
+				// Remove absolute path prefix of standard library.
+				// Just keeps "std/" prefix.
+				cstrBytes(self.Buf, loc[len(path::Dir(build::PathStdlib))+1:])
+			| strings::HasPrefix(loc, self.ir.Root):
+				// Remove absolute path prefix of root package.
+				// Just keeps "[package_dir]/" prefix.
+				cstrBytes(self.Buf, loc[len(path::Dir(self.ir.Root))+1:])
+			|:
+				cstrBytes(self.Buf, loc)
+			}
+		} else {
+			cstrBytes(self.Buf, loc)
+		}
+		self.write(":")
+		self.write(conv::Itoa(t.Row))
+		self.write(":")
+		self.write(conv::Itoa(t.Column))
+	}
+
+	fn head(mut &self) {
+		time := Time.Now()
+		abs := time.Abs()
+		self.write("// Auto generated by JuleC.\n")
+		self.write("// JuleC version: ")
+		self.write(jule::Version)
+		self.write("\n")
+		self.write("// Date: ")
+		self.write(conv::FmtUint(abs.Day, 10))
+		self.write("/")
+		self.write(conv::FmtUint(abs.Month, 10))
+		self.write("/")
+		self.write(conv::FmtUint(abs.Year, 10))
+		self.write(" (DD/MM/YYYY) UTC\n//\n// Recomended Compile Command;\n// ")
+		self.write(self.info.Compiler)
+		self.write(" ")
+		self.write(self.info.CompilerCommand)
+		self.write("\n\n")
+
+		if env::Production {
+			self.write("#define __JULE_ENABLE__PRODUCTION\n")
+		}
+		if !env::RC {
+			self.write("#define __JULE_DISABLE__REFERENCE_COUNTING\n")
+		}
+		if !env::Safety {
+			self.write("#define __JULE_DISABLE__SAFETY\n")
+		}
+
+		// Include binded libraries here, before the API header.
+		// See developer reference (4).
+		self.links()
+
+		self.write("\n\n#include \"")
+		self.write(build::PathApi)
+		self.write("\"\n\n")
+	}
+
+	fn links(mut &self) {
+		for _, used in self.ir.Used {
+			match {
+			| !used.Binded:
+				continue
+			| build::IsStdHeaderPath(used.Path):
+				self.write("#include ")
+				self.write(used.Path)
+				self.write("\n")
+			| build::IsValidHeaderExt(path::Ext(used.Path)):
+				self.write("#include \"")
+				self.write(used.Path)
+				self.write("\"\n")
+			}
+		}
+	}
+
+	fn prepareStructure(mut self, mut &s: &Struct) {
+		for (_, mut ins) in s.Instances {
+			for (_, mut m) in ins.Methods {
+				if m.Statically {
+					continue
+				}
+				for (_, mut mins) in m.Instances {
+					mut p := mins.Params[0]
+					mut kind := StrBuilder.New(40)
+					self.tc.kind(kind, p.Kind)
+					if !p.Decl.IsRef() {
+						kind.WriteStr("*")
+					}
+					p.Kind = &TypeKind{
+						Kind: &customType{
+							kind: kind.Str(),
+						},
+					}
+				}
+			}
+		}
+	}
+
+	fn prepareStructures(mut &self) {
+		for (_, mut s) in self.ir.Ordered.Structs {
+			if s.Token != nil {
+				self.prepareStructure(s)
+			}
+		}
+	}
+
+	fn structurePlainDecl(mut &self, mut &s: &Struct) {
+		for (_, mut ins) in s.Instances {
+			self.write("struct ")
+			identCoder.structureIns(self.Buf, ins)
+			self.write(";\n")
+		}
+	}
+
+	fn structurePlainDecls(mut &self) {
+		for (_, mut s) in self.ir.Ordered.Structs {
+			if s.Token != nil {
+				self.structurePlainDecl(s)
+			}
+		}
+	}
+
+	fn fieldDecl(mut &self, mut &f: &FieldIns) {
+		self.tc.kind(self.Buf, f.Kind)
+		self.write(" ")
+		identCoder.field(self.Buf, f.Decl)
+		if f.Default == nil {
+			if shouldInitialized(f.Kind) {
+				self.write(" = ")
+				// No default expression.
+				// Use default expression of data-type.
+				self.ec.initExpr(f.Kind)
+			}
+		} else {
+			self.write(" = ")
+			self.ec.possibleRefExpr(f.Default.Model)
+		}
+		self.write(";")
+	}
+
+	fn structureDestructor(mut &self, mut &s: &StructIns) {
+		// Dispose method must be non-static
+		const Static = false
+		disposeMethod := s.FindMethod("Dispose", Static)
+		mut disposed := FuncPattern.Dispose(disposeMethod)
+		// Call destructor if implemented.
+		if !disposed {
+			ret
+		}
+		self.write("~")
+		identCoder.structureIns(self.Buf, s)
+		self.write("(void) { ")
+		identCoder.func(self.Buf, disposeMethod)
+		self.write("(this); }")
+	}
+
+	fn structureOperatorEq(mut &self, ident: []byte, mut &s: &StructIns) {
+		if !s.Comparable {
+			ret
+		}
+		// Operator overloading.
+		if s.Operators.Eq != nil {
+			self.structureOperator(ident, s.Operators.Eq, "==")
+			ret
+		}
+
+		self.indent()
+		if opt::Inline {
+			self.write("inline ")
+		}
+		self.write("bool operator==(")
+		self.writeBytes(ident)
+		self.write(" _other) {")
+		if len(s.Fields) > 0 {
+			self.addIndent()
+			self.write("\n")
+			self.indent()
+			self.write("return ")
+			self.addIndent()
+			mut writed := false
+			for (_, mut f) in s.Fields {
+				// Skip binded struct kinds.
+				strct := f.Kind.Struct()
+				if strct != nil && strct.Decl != nil && strct.Decl.Binded {
+					continue
+				}
+				if writed {
+					self.write(" &&")
+				}
+				writed = true
+				self.write("\n")
+				self.indent()
+				self.write("this->")
+				mut fIdent := StrBuilder.New(len(f.Decl.Ident))
+				identCoder.field(fIdent, f.Decl)
+				self.writeBytes(unsafe { fIdent.Buf() })
+				self.write(" == _other.")
+				self.writeBytes(unsafe { fIdent.Buf() })
+			}
+			self.doneIndent()
+			if !writed {
+				self.write("true")
+			}
+			self.write(";\n")
+			self.doneIndent()
+			self.indent()
+			self.write("}")
+		} else {
+			self.write(" return true; }")
+		}
+		self.write("\n\n")
+	}
+
+	fn structureOperatorNotEq(mut &self, ident: []byte, mut &s: &StructIns) {
+		if !s.Comparable {
+			ret
+		}
+		self.indent()
+		if opt::Inline {
+			self.write("inline ")
+		}
+		self.write("bool operator!=(")
+		self.writeBytes(ident)
+		self.write(" _other) { return !this->operator==(_other); }\n\n")
+	}
+
+	// Write operator overloading forwarding for reserved function.
+	fn structureOperator(mut &self, ident: []byte, mut &f: &FnIns, op: str) {
+		if f == nil {
+			ret
+		}
+
+		unary := len(f.Params) == 1 // Just self parameter.
+		assignment := f.Decl.IsVoid()
+
+		self.indent()
+		if opt::Inline {
+			self.write("inline ")
+		}
+		if assignment {
+			self.writeBytes(ident)
+			self.write("&")
+		} else {
+			if f.Result.Prim() == nil {
+				// If result type is not primitive, always structure's itself.
+				self.writeBytes(ident)
+			} else {
+				// Logical.
+				self.write(typeCoder.Bool)
+			}
+		}
+		self.write(" operator")
+		self.write(op)
+		self.write("(")
+		if !unary {
+			mut p := f.Params[1]
+			self.tc.paramIns(self.Buf, p)
+			self.write(" _other")
+		}
+		self.write(") { ")
+		if !assignment {
+			self.write("return ")
+		}
+		identCoder.funcIns(self.Buf, f)
+		if !unary {
+			self.write("(this, _other); ")
+			if assignment {
+				self.write("return *this; ")
+			}
+			self.write("}")
+		} else {
+			self.write("(this); }")
+		}
+		self.write("\n\n")
+	}
+
+	fn structureOperators(mut &self, mut &s: &StructIns) {
+		mut sb := StrBuilder.New(40)
+		identCoder.structureIns(sb, s)
+		ident := unsafe { sb.Buf() }
+
+		// Binary.
+		self.structureOperatorEq(ident, s)
+		self.structureOperatorNotEq(ident, s)
+		self.structureOperator(ident, s.Operators.Gt, ">")
+		self.structureOperator(ident, s.Operators.GtEq, ">=")
+		self.structureOperator(ident, s.Operators.Lt, "<")
+		self.structureOperator(ident, s.Operators.LtEq, "<=")
+		self.structureOperator(ident, s.Operators.Shl, "<<")
+		self.structureOperator(ident, s.Operators.Shr, ">>")
+		self.structureOperator(ident, s.Operators.Add, "+")
+		self.structureOperator(ident, s.Operators.Sub, "-")
+		self.structureOperator(ident, s.Operators.Div, "/")
+		self.structureOperator(ident, s.Operators.Mul, "*")
+		self.structureOperator(ident, s.Operators.Mod, "%")
+		self.structureOperator(ident, s.Operators.BitAnd, "&")
+		self.structureOperator(ident, s.Operators.BitOr, "|")
+		self.structureOperator(ident, s.Operators.BitXor, "^")
+
+		// Unary.
+		self.structureOperator(ident, s.Operators.Neg, "-")
+		self.structureOperator(ident, s.Operators.Pos, "+")
+		self.structureOperator(ident, s.Operators.BitNot, "~")
+
+		// Assignment.
+		self.structureOperator(ident, s.Operators.AddAssign, "+=")
+		self.structureOperator(ident, s.Operators.SubAssign, "-=")
+		self.structureOperator(ident, s.Operators.DivAssign, "/=")
+		self.structureOperator(ident, s.Operators.MulAssign, "*=")
+		self.structureOperator(ident, s.Operators.ModAssign, "%=")
+		self.structureOperator(ident, s.Operators.ShlAssign, "<<=")
+		self.structureOperator(ident, s.Operators.ShrAssign, ">>=")
+		self.structureOperator(ident, s.Operators.BitOrAssign, "|=")
+		self.structureOperator(ident, s.Operators.BitAndAssign, "&=")
+		self.structureOperator(ident, s.Operators.BitXorAssign, "^=")
+	}
+
+	fn structureInsDecl(mut &self, mut &s: &StructIns) {
+		for (_, mut m) in s.Methods {
+			// Operator methods are declared by [structureDecl].
+			if isHeadDecl(m) {
+				self.funcDecl(m, false)
+			}
+		}
+		self.write("struct ")
+		identCoder.structureIns(self.Buf, s)
+		self.write(" {\n")
+
+		self.addIndent()
+		for (_, mut f) in s.Fields {
+			self.indent()
+			self.fieldDecl(f)
+			self.write("\n")
+		}
+
+		self.indent()
+		self.structureDestructor(s)
+		self.write("\n\n")
+
+		self.structureOperators(s)
+		self.write("\n")
+
+		self.doneIndent()
+		self.indent()
+		self.write("};")
+	}
+
+	fn structureDecl(mut &self, mut &s: &Struct) {
+		for (_, mut ins) in s.Instances {
+			self.structureInsDecl(ins)
+		}
+	}
+
+	fn structureDecls(mut &self) {
+		for (_, mut s) in self.ir.Ordered.Structs {
+			if s.Token != nil {
+				self.structureDecl(s)
+				self.write("\n")
+			}
+		}
+	}
+
+	fn structureMethodDecls(mut &self) {
+		for (_, mut s) in self.ir.Ordered.Structs {
+			if s.Token != nil {
+				for (_, mut ins) in s.Instances {
+					for (_, mut m) in ins.Methods {
+						// Operator methods are declared by [structureDecl].
+						if !isHeadDecl(m) {
+							self.pushResult(m)
+							self.funcDecl(m, false)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// The ident parameter means this function is anon, mostly.
+	// But this parameter not only for anonymous functions.
+	// It also useable as custom identifiers for functions.
+	fn funcHead(mut &self, mut &buf: StrBuilder, mut &f: &FnIns, ptr: bool, ident: str) {
+		if !ptr && opt::Inline && !f.Decl.IsEntryPoint() {
+			buf.WriteStr("inline ")
+		}
+		self.tc.funcInsResult(buf, f)
+		if ptr {
+			buf.WriteStr("(*")
+			identCoder.funcIns(buf, f)
+			buf.WriteByte(')')
+		} else {
+			buf.WriteByte(' ')
+			if ident == "" {
+				identCoder.funcIns(buf, f)
+			} else {
+				buf.WriteStr(ident)
+			}
+		}
+	}
+
+	fn funcDeclIns(mut &self, mut &f: &FnIns, ptr: bool) {
+		self.indent()
+		self.funcHead(self.Buf, f, ptr, "")
+		self.paramsIns(self.Buf, f)
+		self.write(";\n")
+	}
+
+	fn funcDecl(mut &self, mut &f: &Fn, ptr: bool) {
+		for (_, mut c) in f.Instances {
+			self.funcDeclIns(c, ptr)
+		}
+	}
+
+	fn funcDeclTrait(mut &self, mut &f: &Fn) {
+		for (_, mut c) in f.Instances {
+			mut k := c.Params[0].Kind
+			c.Params[0].Kind = generalGCPtr
+			self.funcDeclIns(c, true)
+			c.Params[0].Kind = k
+		}
+	}
+
+	fn funcDecls(mut &self) {
+		obj::IterPackages(self.ir, fn(mut &pkg: &Package) {
+			obj::IterFiles(pkg, fn(mut &file: &SymbolTable) {
+				for (_, mut f) in file.Funcs {
+					if !f.Binded && f.Token != nil {
+						self.pushResult(f)
+						self.funcDecl(f, false)
+					}
+				}
+			})
+		})
+	}
+
+	fn traitDataTypeMethods(mut &self, mut &t: &Trait) {
+		obj::IterTraitMethods(t, fn(mut &m: &Fn) {
+			mut ins := m.Instances[0]
+			for (i, mut ip) in ins.Params[1:] {
+				if IsAnonIdent(ip.Decl.Ident) {
+					ip.Decl.Ident = "_" + conv::Itoa(i)
+				}
+			}
+			self.pushResult(m)
+			self.funcDeclTrait(m)
+		})
+	}
+
+	fn traitDataTypes(mut &self) {
+		obj::IterPackages(self.ir, fn(mut &pkg: &Package) {
+			obj::IterFiles(pkg, fn(mut &file: &SymbolTable) {
+				for (_, mut t) in file.Traits {
+					if t.Token == nil || len(t.Implemented) == 0 {
+						continue
+					}
+					self.write("struct ")
+					identCoder.traitDecl(self.Buf, t)
+					self.write("MptrData")
+					self.write(" {\n")
+					self.addIndent()
+					self.indent()
+					self.write("void (*dealloc)(" + typeCoder.Ptr + "<" + typeCoder.Uintptr + ">&);\n")
+					self.traitDataTypeMethods(t)
+					self.doneIndent()
+					self.indent()
+					self.write("};\n\n")
+				}
+			})
+		})
+	}
+
+	fn paramIns(mut &self, mut &buf: StrBuilder, mut &p: &ParamIns) {
+		self.tc.paramIns(buf, p)
+		buf.WriteByte(' ')
+		identCoder.param(buf, p.Decl)
+	}
+
+	fn paramsIns(mut &self, mut &buf: StrBuilder, mut &f: &FnIns) {
+		if !f.AsAnon && len(f.Params) == 0 {
+			buf.WriteStr("(void)")
+			ret
+		}
+		buf.WriteByte('(')
+		if f.AsAnon {
+			buf.WriteStr(ctxParamType + " " + ctxParamIdent)
+			if len(f.Params) > 0 {
+				buf.WriteStr(", ")
+			}
+		}
+		for (i, mut p) in f.Params {
+			self.paramIns(buf, p)
+			if len(f.Params)-i > 1 {
+				buf.WriteStr(", ")
+			}
+		}
+		buf.WriteByte(')')
+	}
+
+	fn varInitExpr(mut &self, mut &v: &Var, init: fn()) {
+		if v.Statically {
+			self.write("static ")
+		}
+
+		self.tc.kind(self.Buf, v.Kind.Kind)
+		self.write(" ")
+		if v.Reference {
+			self.write("*")
+		}
+		identCoder.var(self.Buf, v)
+		if init != nil {
+			self.write(" = ")
+			init()
+		}
+		self.write(";")
+	}
+
+	fn var(mut &self, mut v: &Var) {
+		if IsIgnoreIdent(v.Ident) {
+			ret
+		}
+		if v.Value != nil && v.Value.Expr != nil {
+			if v.Value.Data.Model != nil {
+				if v.Reference {
+					self.varInitExpr(v, fn() {
+						self.write("&(")
+						self.ec.model(v.Value.Data.Model)
+						self.write(")")
+					})
+				} else {
+					self.varInitExpr(v, fn() { self.ec.possibleRefExpr(v.Value.Data.Model) })
+				}
+				ret
+			}
+			self.varInitExpr(v, nil)
+			ret
+		}
+		if v.Reference {
+			self.varInitExpr(v, fn() { self.write("nullptr") })
+			ret
+		}
+		if shouldInitialized(v.Kind.Kind) {
+			self.varInitExpr(v, fn() { self.ec.initExpr(v.Kind.Kind) })
+			ret
+		}
+		self.varInitExpr(v, nil)
+	}
+
+	fn anonFuncInsDecl(mut &self, mut &m: &AnonFnExprModel, ident: str) {
+		self.funcHead(self.anonObj, m.Func, false, ident)
+		self.paramsIns(self.anonObj, m.Func)
+		self.anonObj.WriteByte(';')
+	}
+
+	fn anonFuncIns(mut &self, mut &m: &AnonFnExprModel, ident: str) {
+		self.funcHead(self.Buf, m.Func, false, ident)
+		self.paramsIns(self.Buf, m.Func)
+		self.write(" ")
+		self.sc.anonFuncScope(m, ident)
+		if m.Func.Scope != nil {
+			self.write("\n\n")
+		}
+	}
+
+	fn funcIns(mut &self, mut &f: &FnIns, ident: str) {
+		self.funcHead(self.Buf, f, false, ident)
+		self.paramsIns(self.Buf, f)
+		self.write(" ")
+		self.sc.funcScope(f)
+		if f.Scope != nil {
+			self.write("\n\n")
+		}
+	}
+
+	fn func(mut &self, mut &f: &Fn) {
+		for (_, mut ins) in f.Instances {
+			self.funcIns(ins, "")
+		}
+	}
+
+	fn funcTrait(mut &self, &s: &StructIns, mut &f: &FnIns) {
+		f.Scope = nil
+
+		mut nident := StrBuilder.New(30)
+		nident.WriteStr("__jule_trait_method_")
+		nident.WriteStr(conv::FmtUint(u64(uintptr(f)), 0xF))
+		nident.WriteStr("_")
+		nident.WriteStr(conv::FmtUint(u64(uintptr(s)), 0xF))
+
+		mut k := f.Params[0].Kind
+		f.Params[0].Kind = generalGCPtr
+		self.funcIns(f, nident.Str())
+		f.Params[0].Kind = k
+	}
+
+	fn findTraitMetMap(mut &self, mut &m: &Fn): (&FnIns, bool) {
+		mut mins := m.Instances[0]
+		for (mut f, _) in self.traitMetMap {
+			if f.Decl.Public == m.Public &&
+				f.Decl.Ident == m.Ident &&
+				f.EqualFn(mins) {
+				ret f, true
+			}
+		}
+		ret mins, false
+	}
+
+	fn traitWrapper(mut &self, mut &t: &Trait, mut &m: &Fn) {
+	impls:
+		for (_, mut imp) in t.Implemented {
+			mut mepf, exist := self.findTraitMetMap(m)
+			if exist {
+				// Is handled pair?
+				mut vals := self.traitMetMap[mepf]
+				for _, val in vals {
+					if val == uintptr(imp) {
+						// Exist, skip this step.
+						continue impls
+					}
+				}
+				self.traitMetMap[mepf] = append(vals, uintptr(imp))
+			} else {
+				self.traitMetMap[mepf] = append(make([]uintptr, 0), uintptr(imp))
+			}
+			for (_, mut ins) in imp.Instances {
+				self.funcTrait(ins, mepf)
+
+				mut sm := ins.FindMethod(m.Ident, false)
+				if sm == nil || len(sm.Instances) == 0 {
+					ret
+				}
+
+				self.addIndent()
+				self.write("{\n")
+				self.indent()
+				if m.Exceptional || !m.IsVoid() {
+					self.write("return ")
+				}
+				identCoder.func(self.Buf, sm)
+				self.write("(")
+				self.write("_self_.as<")
+				self.tc.structureIns(self.Buf, ins)
+				self.write(">()")
+
+				ptr := !m.Params[0].IsRef()
+				if ptr {
+					self.write(".alloc")
+				}
+				for _, mp in m.Params[1:] {
+					self.write(", ")
+					identCoder.param(self.Buf, mp)
+				}
+				self.write(");\n}\n")
+				self.doneIndent()
+			}
+		}
+	}
+
+	fn traitWrappers(mut &self) {
+		obj::IterPackages(self.ir, fn(mut &pkg: &Package) {
+			obj::IterFiles(pkg, fn(mut &file: &SymbolTable) {
+				for (_, mut t) in file.Traits {
+					if len(t.Implemented) == 0 {
+						continue
+					}
+					obj::IterTraitMethods(t, fn(mut &m: &Fn) {
+						self.traitWrapper(t, m)
+					})
+				}
+			})
+		})
+	}
+
+	fn traitDataMethods(mut &self, mut &t: &Trait, s: &StructIns) {
+		obj::IterTraitMethods(t, fn(mut &m: &Fn) {
+			self.indent()
+			self.write(".")
+			identCoder.func(self.Buf, m)
+			self.write("=__jule_trait_method_")
+			mepf, exist := self.findTraitMetMap(m)
+			if !exist {
+				panic("implementation mistake, [traitDataMethods] could not found MepMap record")
+			}
+			self.write(conv::FmtUint(u64(uintptr(mepf)), 0xF))
+			self.write("_")
+			self.write(conv::FmtUint(u64(uintptr(s)), 0xF))
+			self.write(",\n")
+		})
+	}
+
+	fn traitData(mut &self, mut &t: &Trait, i: int, mut &s: &StructIns) {
+		mut ident := StrBuilder.New(len(t.Ident))
+		identCoder.traitDecl(ident, t)
+		self.write("static ")
+		self.writeBytes(unsafe { ident.Buf() })
+		self.write("MptrData ")
+		self.writeBytes(unsafe { ident.Buf() })
+		self.write("_mptr_data")
+		self.write(conv::Itoa(i))
+		self.write(" {\n")
+		self.addIndent()
+		self.indent()
+		self.write(".dealloc=" + deallocatedTypeIdent)
+		self.write(conv::Itoa(self.pushDealloc(&TypeKind{Kind: s})))
+		self.write(",\n")
+		self.traitDataMethods(t, s)
+		self.doneIndent()
+		self.write("};\n")
+	}
+
+	fn traitDatas(mut &self) {
+		obj::IterPackages(self.ir, fn(mut &pkg: &Package) {
+			obj::IterFiles(pkg, fn(mut &file: &SymbolTable) {
+				for (_, mut t) in file.Traits {
+					mut i := 0
+					for (_, mut s) in t.Implemented {
+						for (_, mut ins) in s.Instances {
+							self.traitData(t, i, ins)
+							i++
+						}
+					}
+				}
+			})
+		})
+	}
+
+	fn globals(mut &self) {
+		for (_, mut v) in self.ir.Ordered.Globals {
+			self.tc.kind(self.Buf, v.Kind.Kind)
+			self.write(" ")
+			identCoder.var(self.Buf, v)
+			self.write(" = ")
+			self.ec.model(v.Value.Data.Model)
+			self.write(";\n")
+		}
+	}
+
+	fn decls(mut &self) {
+		self.structurePlainDecls()
+		self.structureDecls()
+		self.headPos = self.Buf.Len()
+		self.structureMethodDecls()
+		self.funcDecls()
+		self.write("\n\n")
+		self.traitDataTypes()
+		self.write("\n\n")
+		self.wrapPos = self.Buf.Len()
+		self.traitWrappers()
+		self.write("\n\n")
+		self.traitDatas()
+		self.write("\n\n")
+		self.declPos = self.Buf.Len()
+		self.globals()
+	}
+
+	fn structureMethods(mut &self, mut &s: &StructIns) {
+		for (_, mut f) in s.Methods {
+			self.func(f)
+			self.write("\n\n")
+		}
+	}
+
+	fn structureOstream(mut &self, mut &s: &StructIns) {
+		self.indent()
+		self.write("std::ostream &operator<<(std::ostream &_Stream, ")
+		identCoder.structureIns(self.Buf, s)
+		self.write(" _Src) {\n")
+		self.addIndent()
+		self.indent()
+
+		mut fts := s.FindMethod("Str", false)
+		if FuncPattern.Str(fts) {
+			self.write("_Stream << ")
+			identCoder.func(self.Buf, fts)
+			self.write("(&_Src);\n")
+		} else {
+			self.write(`_Stream << "`)
+			cstrBytes(self.Buf, s.Decl.Ident)
+			self.write("{\";\n")
+
+			for (i, mut f) in s.Fields {
+				self.indent()
+				self.write(`_Stream << "`)
+				cstrBytes(self.Buf, f.Decl.Ident)
+				self.write(`:`)
+
+				// Skip binded struct kinds.
+				strct := f.Kind.Struct()
+				if strct != nil && strct.Decl != nil && strct.Decl.Binded {
+					self.write(` cpp.`)
+					identCoder.field(self.Buf, f.Decl)
+					self.write(`"`)
+				} else {
+					self.write(`" << _Src.`)
+					identCoder.field(self.Buf, f.Decl)
+				}
+				if i+1 < len(s.Fields) {
+					self.write(" << \", \"")
+				}
+				self.write(";\n")
+			}
+
+			self.indent()
+			self.write("_Stream << \"}\";\n")
+		}
+
+		self.indent()
+		self.write("return _Stream;\n")
+
+		self.doneIndent()
+		self.write("}")
+	}
+
+	fn structureIns(mut &self, mut &s: &StructIns) {
+		self.structureMethods(s)
+		self.write("\n\n")
+		self.structureOstream(s)
+	}
+
+	fn structure(mut &self, mut &s: &Struct) {
+		for (_, mut ins) in s.Instances {
+			self.structureIns(ins)
+			self.write("\n\n")
+		}
+	}
+
+	fn structures(mut &self) {
+		for (_, mut s) in self.ir.Ordered.Structs {
+			if s.Token != nil {
+				self.structure(s)
+				self.write("\n\n")
+			}
+		}
+	}
+
+	fn funcs(mut &self) {
+		obj::IterPackages(self.ir, fn(mut &pkg: &Package) {
+			obj::IterFiles(pkg, fn(mut &file: &SymbolTable) {
+				for (_, mut f) in file.Funcs {
+					if !env::Test && obj::HasDirective(f.Directives, Directive.Test) {
+						continue
+					}
+					if !f.Binded && f.Token != nil {
+						self.func(f)
+						self.write("\n\n")
+					}
+				}
+			})
+		})
+	}
+
+	fn pushInit(mut &self, mut &pkg: &Package) {
+		obj::IterFiles(pkg, fn(mut &file: &SymbolTable) {
+			for _, f in file.Funcs {
+				if f.Ident == build::InitFn {
+					self.indent()
+					identCoder.func(self.Buf, f)
+					self.write("();\n")
+				}
+			}
+		})
+	}
+
+	fn anonHashes(mut &self) {
+		// Use recursive algorithm, because anonymous function may have
+		// anonymous functions, so [self.anons] may grow.
+		// Make sure all whether all anonymous functions are handled.
+	repeat:
+		mut anons := self.anons
+		self.anons = nil
+		for (_, mut h) in anons {
+			self.anonFuncIns(h.expr, h.ident)
+		}
+		if len(self.anons) > 0 {
+			goto repeat
+		}
+	}
+
+	fn initCaller(mut &self) {
+		self.write("void " + initCallerIdent + "(void) {\n")
+		self.addIndent()
+		obj::IterPackages(self.ir, fn(mut &pkg: &Package) {
+			self.pushInit(pkg)
+		})
+		self.doneIndent()
+		self.write("\n}")
+	}
+
+	fn end(mut &self) {
+		self.write(`int main(int argc, char *argv[], char *envp[]) {
     jule::setup_argv(argc, argv);
     jule::setup_envp(envp);
 
     __jule_call_initializers();
     `)
 
-        if env::Test {
-            self.write("test_point();")
-        } else {
-            self.write("entry_point();")
-        }
+		if env::Test {
+			self.write("test_point();")
+		} else {
+			self.write("entry_point();")
+		}
 
-        self.write(`
+		self.write(`
 
     return EXIT_SUCCESS;
 }`)
-    }
+	}
 
-    fn insertBuf(mut &self, mut &buf: StrBuilder, pos: int) {
-        if buf.Len() > 0 {
-            mut head := make([]byte, 0, self.Buf.Len() + buf.Len())
-            head = append(head, unsafe { self.Buf.Buf() }[:pos]...)
-            head = append(head, unsafe { buf.Buf() }...)
-            head = append(head, unsafe { self.Buf.Buf() }[pos:]...)
-            unsafe { self.Buf.SetBuf(head) }
-        }
-    }
+	fn insertBuf(mut &self, mut &buf: StrBuilder, pos: int) {
+		if buf.Len() > 0 {
+			mut head := make([]byte, 0, self.Buf.Len() + buf.Len())
+			head = append(head, unsafe { self.Buf.Buf() }[:pos]...)
+			head = append(head, unsafe { buf.Buf() }...)
+			head = append(head, unsafe { self.Buf.Buf() }[pos:]...)
+			unsafe { self.Buf.SetBuf(head) }
+		}
+	}
 
-    fn serializeHead(mut &self) {
-        self.prepareStructures()
-        self.head()
-        self.write("\n")
-        self.decls()
+	fn serializeHead(mut &self) {
+		self.prepareStructures()
+		self.head()
+		self.write("\n")
+		self.decls()
 
-        self.insertBuf(self.resultDecls, self.headPos)
-        self.wrapPos += self.resultDecls.Len()
-        self.declPos += self.resultDecls.Len()
+		self.insertBuf(self.resultDecls, self.headPos)
+		self.wrapPos += self.resultDecls.Len()
+		self.declPos += self.resultDecls.Len()
 
-        self.write("\n")
-        self.structures()
-        self.funcs()
-        self.initCaller()
-        self.write("\n\n")
+		self.write("\n")
+		self.structures()
+		self.funcs()
+		self.initCaller()
+		self.write("\n\n")
 
-        self.anonHashes()
+		self.anonHashes()
 
-        self.insertBuf(self.deallocObj, self.wrapPos)
-        self.wrapPos += self.deallocObj.Len()
-        self.declPos += self.deallocObj.Len()
+		self.insertBuf(self.deallocObj, self.wrapPos)
+		self.wrapPos += self.deallocObj.Len()
+		self.declPos += self.deallocObj.Len()
 
-        self.insertBuf(self.anyObj, self.declPos)
-        self.declPos += self.anyObj.Len()
+		self.insertBuf(self.anyObj, self.declPos)
+		self.declPos += self.anyObj.Len()
 
-        self.insertBuf(self.anonObj, self.declPos)
-        self.declPos += self.anonObj.Len()
-    }
+		self.insertBuf(self.anonObj, self.declPos)
+		self.declPos += self.anonObj.Len()
+	}
 
-    fn Serialize(mut &self) {
-        self.serializeHead()
-        self.end()
-    }
+	fn Serialize(mut &self) {
+		self.serializeHead()
+		self.end()
+	}
 }
 
 // Concatenate all strings into single string.
 fn concatAllParts(parts: ...&Token): []byte {
-    mut n := 0
-    for _, part in parts {
-        n += len(part.Kind)
-    }
-    if n == 0 {
-        ret nil
-    }
-    mut s := StrBuilder.New(n)
-    for _, p in parts {
-        s.WriteStr(p.Kind)
-    }
-    ret unsafe { s.Buf() }
+	mut n := 0
+	for _, part in parts {
+		n += len(part.Kind)
+	}
+	if n == 0 {
+		ret nil
+	}
+	mut s := StrBuilder.New(n)
+	for _, p in parts {
+		s.WriteStr(p.Kind)
+	}
+	ret unsafe { s.Buf() }
 }
 
 // Reports whether the m is a method which is declarated top of the struct.
 fn isHeadDecl(mut &m: &Fn): bool {
-    if len(m.Generics) > 0 || len(m.Instances) == 0 {
-        ret false
-    }
-    if obj::IsOpMethod(m) {
-        ret true
-    }
-    mut mi := m.Instances[0]
-    const Static = false
-    ret FuncPattern.Dispose(mi.Owner.FindMethod("Dispose", Static))
+	if len(m.Generics) > 0 || len(m.Instances) == 0 {
+		ret false
+	}
+	if obj::IsOpMethod(m) {
+		ret true
+	}
+	mut mi := m.Instances[0]
+	const Static = false
+	ret FuncPattern.Dispose(mi.Owner.FindMethod("Dispose", Static))
 }

@@ -42,18 +42,18 @@
 //  Floor(±Inf) = ±Inf
 //  Floor(NaN) = NaN
 fn Floor(x: f64): f64 {
-    if x == 0 || IsNaN(x) || IsInf(x, 0) {
-        ret x
-    }
-    if x < 0 {
-        mut d, fract := Modf(-x)
-        if fract != 0.0 {
-            d = d + 1
-        }
-        ret -d
-    }
-    d, _ := Modf(x)
-    ret d
+	if x == 0 || IsNaN(x) || IsInf(x, 0) {
+		ret x
+	}
+	if x < 0 {
+		mut d, fract := Modf(-x)
+		if fract != 0.0 {
+			d = d + 1
+		}
+		ret -d
+	}
+	d, _ := Modf(x)
+	ret d
 }
 
 // Returns the least integer value greater than or equal to x.
@@ -71,11 +71,11 @@ fn Ceil(x: f64): f64 { ret -Floor(-x) }
 //  Trunc(±Inf) = ±Inf
 //  Trunc(NaN) = NaN
 fn Trunc(x: f64): f64 {
-    if x == 0 || IsNaN(x) || IsInf(x, 0) {
-        ret x
-    }
-    d, _ := Modf(x)
-    ret d
+	if x == 0 || IsNaN(x) || IsInf(x, 0) {
+		ret x
+	}
+	d, _ := Modf(x)
+	ret d
 }
 
 // Returns the nearest integer, rounding half away from zero.
@@ -85,34 +85,34 @@ fn Trunc(x: f64): f64 {
 //  Round(±Inf) = ±Inf
 //  Round(NaN) = NaN
 fn Round(x: f64): f64 {
-    // round is a faster implementation of:
-    //
-    // round(x f64) f64 {
-    //   t: = trunc(x)
-    //   if abs(x-t) >= 0.5 {
-    //       ret t + copysign(1, x)
-    //   }
-    //   ret t
-    // }
-    mut bits := F64Bits(x)
-    mut e := uint(bits >> shift) & mask
-    if e < bias {
-        // Round abs(x) < 1 including denormals.
-        bits &= signMask // +-0
-        if e == bias-1 {
-            bits |= uvone // +-1
-        }
-    } else if e < bias+shift {
-        // Round any abs(x) >= 1 containing a fractional component [0,1).
-        //
-        // Numbers with larger exponents are returned unchanged since they
-        // must be either an integer, infinity, or NaN.
-        const HALF = 1 << (shift - 1)
-        e -= bias
-        bits += HALF >> e
-        bits &= ^(fracMask >> e)
-    }
-    ret F64FromBits(bits)
+	// round is a faster implementation of:
+	//
+	// round(x f64) f64 {
+	//   t: = trunc(x)
+	//   if abs(x-t) >= 0.5 {
+	//       ret t + copysign(1, x)
+	//   }
+	//   ret t
+	// }
+	mut bits := F64Bits(x)
+	mut e := uint(bits >> shift) & mask
+	if e < bias {
+		// Round abs(x) < 1 including denormals.
+		bits &= signMask // +-0
+		if e == bias-1 {
+			bits |= uvone // +-1
+		}
+	} else if e < bias+shift {
+		// Round any abs(x) >= 1 containing a fractional component [0,1).
+		//
+		// Numbers with larger exponents are returned unchanged since they
+		// must be either an integer, infinity, or NaN.
+		const HALF = 1 << (shift - 1)
+		e -= bias
+		bits += HALF >> e
+		bits &= ^(fracMask >> e)
+	}
+	ret F64FromBits(bits)
 }
 
 // Returns the nearest integer, rounding ties to even.
@@ -122,34 +122,34 @@ fn Round(x: f64): f64 {
 //  RoundEven(±Inf) = ±Inf
 //  RoundEven(NaN) = NaN
 fn RoundEven(x: f64): f64 {
-    // round_even is a faster implementation of:
-    //
-    // round_even(x f64) f64 {
-    //   t: = trunc(x)
-    //   odd: = remainder(t, 2) != 0
-    //   d: = abs(x - t)
-    //   if d > 0.5 || (d == 0.5 && odd) {
-    //       ret t + copysign(1, x)
-    //   }
-    //   ret t
-    // }
-    mut bits := F64Bits(x)
-    mut e := uint(bits >> shift) & mask
-    if e >= bias {
-        // Round abs(x) >= 1.
-        // - Large numbers without fractional components, infinity, and NaN are unchanged.
-        // - Add 0.499.. or 0.5 before truncating depending on whether the truncated
-        //   number is even or odd (respectively).
-        const halfMinusUlp = (1 << (shift - 1)) - 1
-        e -= bias
-        bits += (halfMinusUlp + (bits >> (shift - e)) & 1) >> e
-        bits &= ^(fracMask >> e)
-    } else if e == bias-1 && bits&fracMask != 0 {
-        // Round 0.5 < abs(x) < 1.
-        bits = bits & signMask | uvone // +-1
-    } else {
-        // Round abs(x) <= 0.5 including denormals.
-        bits &= signMask // +-0
-    }
-    ret F64FromBits(bits)
+	// round_even is a faster implementation of:
+	//
+	// round_even(x f64) f64 {
+	//   t: = trunc(x)
+	//   odd: = remainder(t, 2) != 0
+	//   d: = abs(x - t)
+	//   if d > 0.5 || (d == 0.5 && odd) {
+	//       ret t + copysign(1, x)
+	//   }
+	//   ret t
+	// }
+	mut bits := F64Bits(x)
+	mut e := uint(bits >> shift) & mask
+	if e >= bias {
+		// Round abs(x) >= 1.
+		// - Large numbers without fractional components, infinity, and NaN are unchanged.
+		// - Add 0.499.. or 0.5 before truncating depending on whether the truncated
+		//   number is even or odd (respectively).
+		const halfMinusUlp = (1 << (shift - 1)) - 1
+		e -= bias
+		bits += (halfMinusUlp + (bits >> (shift - e)) & 1) >> e
+		bits &= ^(fracMask >> e)
+	} else if e == bias-1 && bits&fracMask != 0 {
+		// Round 0.5 < abs(x) < 1.
+		bits = bits & signMask | uvone // +-1
+	} else {
+		// Round abs(x) <= 0.5 including denormals.
+		bits &= signMask // +-0
+	}
+	ret F64FromBits(bits)
 }
