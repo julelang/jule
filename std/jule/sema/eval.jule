@@ -2300,16 +2300,16 @@ impl Eval {
 		d.Model = model
 		d.Kind = f.Kind
 		d.Lvalue = true
-
 		if f.Decl.Mutable && !d.Mutable {
 			// Interior mutability.
 			match type self.lookup {
 			| &scopeChecker:
-				scope := (&scopeChecker)(self.lookup).getRoot()
+				// Use hard root scope to handle interior mutability.
+				// To handle anonymous functions and closures too.
+				scope := (&scopeChecker)(self.lookup).getHardRoot()
 				d.Mutable = scope.owner != nil && scope.owner.Owner == s
 			}
 		}
-
 		ret d
 	}
 
