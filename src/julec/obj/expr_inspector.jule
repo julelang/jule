@@ -1,0 +1,172 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use std::jule::sema::{
+	Data,
+	ExprModel,
+	BinaryExprModel,
+	OperandExprModel,
+	UnaryExprModel,
+	StructLitExprModel,
+	AllocStructLitExprModel,
+	CastingExprModel,
+	FnCallExprModel,
+	SliceExprModel,
+	ArrayExprModel,
+	IndexingExprModel,
+	AnonFnExprModel,
+	MapExprModel,
+	SlicingExprModel,
+	TraitSubIdentExprModel,
+	StructSubIdentExprModel,
+	TupleExprModel,
+	BuiltinNewCallExprModel,
+	BuiltinOutCallExprModel,
+	BuiltinOutlnCallExprModel,
+	BuiltinPanicCallExprModel,
+	BuiltinAssertCallExprModel,
+	BuiltinErrorCallExprModel,
+	BuiltinMakeCallExprModel,
+	BuiltinAppendCallExprModel,
+	BuiltinLenCallExprModel,
+	BuiltinCapCallExprModel,
+	BuiltinDeleteCallExprModel,
+	SizeofExprModel,
+	AlignofExprModel,
+	IntegratedToStrExprModel,
+	FreeExprModel,
+	BackendEmitExprModel,
+}
+
+// Expression model inspector.
+struct ExprInspector {
+	// If it is true, skips child expression models of current handled model if exist.
+	// For exmaple, after handling binary expression, walker skips left and right operands.
+	SkipChild: bool
+
+	handler: fn(mut &m: ExprModel)
+}
+
+impl ExprInspector {
+	// Returns new inspector.
+	static fn New(): &ExprInspector {
+		ret new(ExprInspector)
+	}
+
+	fn args(mut self, mut args: []ExprModel) {
+		for (_, mut arg) in args {
+			self.inspect(arg)
+		}
+	}
+
+	fn inspect(mut self, mut m: ExprModel) {
+		self.SkipChild = false
+		self.handler(m)
+		if self.SkipChild {
+			ret
+		}
+		match type m {
+		| &BinaryExprModel:
+			mut b := (&BinaryExprModel)(m)
+			self.inspect(b.Left.Model)
+			self.inspect(b.Right.Model)
+		| &UnaryExprModel:
+			self.inspect((&UnaryExprModel)(m).Expr.Model)
+		| &StructLitExprModel:
+			for (_, mut arg) in (&StructLitExprModel)(m).Args {
+				self.inspect(arg.Expr.Model)
+			}
+		| &AllocStructLitExprModel:
+			self.inspect((&AllocStructLitExprModel)(m).Lit)
+		| &CastingExprModel:
+			self.inspect((&CastingExprModel)(m).Expr.Model)
+		| &FnCallExprModel:
+			mut fc := (&FnCallExprModel)(m)
+			self.inspect(fc.Expr)
+			self.args(fc.Args)
+		| &SliceExprModel:
+			self.args((&SliceExprModel)(m).Elems)
+		| &ArrayExprModel:
+			self.args((&ArrayExprModel)(m).Elems)
+		| &IndexingExprModel:
+			mut i := (&IndexingExprModel)(m)
+			self.inspect(i.Expr.Model)
+			self.inspect(i.Index.Model)
+		| &MapExprModel:
+			for (_, mut pair) in (&MapExprModel)(m).Entries {
+				self.inspect(pair.Key)
+				self.inspect(pair.Val)
+			}
+		| &SlicingExprModel:
+			mut s := (&SlicingExprModel)(m)
+			self.inspect(s.Expr)
+			self.inspect(s.Left)
+			if s.Right != nil {
+				self.inspect(s.Right)
+			}
+		| &TraitSubIdentExprModel:
+			self.inspect((&TraitSubIdentExprModel)(m).Expr)
+		| &StructSubIdentExprModel:
+			self.inspect((&StructSubIdentExprModel)(m).Expr.Model)
+		| &TupleExprModel:
+			for (_, mut d) in (&TupleExprModel)(m).Datas {
+				self.inspect(d.Model)
+			}
+		| &BuiltinNewCallExprModel:
+			mut b := (&BuiltinNewCallExprModel)(m)
+			if b.Init != nil {
+				self.inspect(b.Init)
+			}
+		| &BuiltinOutCallExprModel:
+			self.inspect((&BuiltinOutCallExprModel)(m).Expr)
+		| &BuiltinOutlnCallExprModel:
+			self.inspect((&BuiltinOutlnCallExprModel)(m).Expr)
+		| &BuiltinPanicCallExprModel:
+			self.inspect((&BuiltinPanicCallExprModel)(m).Expr)
+		| &BuiltinAssertCallExprModel:
+			self.inspect((&BuiltinAssertCallExprModel)(m).Expr)
+		| &BuiltinErrorCallExprModel:
+			self.inspect((&BuiltinErrorCallExprModel)(m).Err.Model)
+		| &BuiltinMakeCallExprModel:
+			mut b := (&BuiltinMakeCallExprModel)(m)
+			if b.Len != nil {
+				self.inspect(b.Len)
+			}
+			if b.Cap != nil {
+				self.inspect(b.Cap)
+			}
+		| &BuiltinAppendCallExprModel:
+			mut b := (&BuiltinAppendCallExprModel)(m)
+			self.inspect(b.Dest)
+			self.inspect(b.Elements)
+		| &BuiltinLenCallExprModel:
+			self.inspect((&BuiltinLenCallExprModel)(m).Expr.Model)
+		| &BuiltinCapCallExprModel:
+			self.inspect((&BuiltinCapCallExprModel)(m).Expr.Model)
+		| &BuiltinDeleteCallExprModel:
+			mut b := (&BuiltinDeleteCallExprModel)(m)
+			self.inspect(b.Dest.Model)
+			if b.Key != nil {
+				self.inspect(b.Key.Model)
+			}
+		| &SizeofExprModel:
+			self.inspect((&SizeofExprModel)(m).Expr)
+		| &AlignofExprModel:
+			self.inspect((&AlignofExprModel)(m).Expr)
+		| &IntegratedToStrExprModel:
+			self.inspect((&IntegratedToStrExprModel)(m).Expr)
+		| &FreeExprModel:
+			self.inspect((&FreeExprModel)(m).Expr)
+		| &BackendEmitExprModel:
+			self.args((&BackendEmitExprModel)(m).Exprs)
+		}
+	}
+
+	// Inspect expression model.
+	// Resets [SkipChild] to default.
+	fn Inspect(mut self, mut m: ExprModel, f: fn(mut &m: ExprModel)) {
+		self.handler = f
+		self.inspect(m)
+	}
+}

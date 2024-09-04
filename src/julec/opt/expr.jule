@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use obj
 use env
 use math for std::math
 use std::jule::constant::{Const}
@@ -47,6 +48,9 @@ use std::jule::sema::{
 	BackendEmitExprModel,
 }
 use types for std::jule::types
+
+// Common expression model inspector.
+static mut exprInspector = obj::ExprInspector.New()
 
 // Expression optimizer that applies target-independent optimizations.
 struct exprOptimizer {
@@ -351,9 +355,6 @@ impl exprOptimizer {
 		self.checkBinaryForBoundary(m)
 		self.checkBinaryForNil(m)
 
-		exprOptimizer.optimizeData(m.Left.Model, self.data)
-		exprOptimizer.optimizeData(m.Right.Model, self.data)
-
 		if Cond {
 			match {
 			| self.strCond(m)
@@ -436,7 +437,6 @@ impl exprOptimizer {
 	}
 
 	fn unary(self, mut m: &UnaryExprModel) {
-		exprOptimizer.optimizeData(m.Expr.Model, self.data)
 		if !Ptr {
 			ret
 		}
@@ -492,12 +492,7 @@ impl exprOptimizer {
 			if self.data.dynamic != nil {
 				possibleDynamicRemove(self.data.dynamic, arg.Expr.Model)
 			}
-			exprOptimizer.optimizeData(arg.Expr.Model, self.data)
 		}
-	}
-
-	fn allocStructure(self, mut m: &AllocStructLitExprModel) {
-		self.structureLit(m.Lit)
 	}
 
 	fn casting(self, mut m: &CastingExprModel) {
@@ -506,9 +501,9 @@ impl exprOptimizer {
 		if valid && self.data.dynamic != nil && self.data.dynamic.isFits(var, m.Kind) {
 			mut model := any(&UnsafeCastingExprModel{Base: m})
 			*self.model = unsafe { *(*ExprModel)(&model) }
+			exprInspector.SkipChild = true
 			ret
 		}
-		exprOptimizer.optimizeData(m.Expr.Model, self.data)
 		if self.data.dynamic != nil && valid {
 			self.data.dynamic.pushVar(var, m.Kind)
 		}
@@ -532,8 +527,6 @@ impl exprOptimizer {
 					}
 				}
 			}
-			exprOptimizer.optimizeData(arg, self.data)
-			args[i] = arg
 		}
 	}
 
@@ -544,29 +537,13 @@ impl exprOptimizer {
 	}
 
 	fn funcCall(self, mut m: &FnCallExprModel) {
-		exprOptimizer.optimizeData(m.Expr, self.data)
 		self.args(m.Func.Params, m.Args)
 		if m.Except != nil {
 			self.scope(m.Except)
 		}
 	}
 
-	fn slice(self, mut m: &SliceExprModel) {
-		self.args(nil, m.Elems)
-	}
-
-	fn array(self, mut m: &ArrayExprModel) {
-		if len(m.Elems) == 2 && m.Elems[1] == nil {
-			mut elem := m.Elems[0]
-			exprOptimizer.optimizeData(elem, self.data)
-			m.Elems[0] = elem
-		}
-		self.args(nil, m.Elems)
-	}
-
 	fn indexing(self, mut m: &IndexingExprModel) {
-		exprOptimizer.optimizeData(m.Expr.Model, self.data)
-		exprOptimizer.optimizeData(m.Index.Model, self.data)
 		if !Access {
 			ret
 		}
@@ -594,175 +571,25 @@ impl exprOptimizer {
 		self.scope(m.Func.Scope)
 	}
 
-	fn mapExpr(self, mut m: &MapExprModel) {
-		for (_, mut pair) in m.Entries {
-			exprOptimizer.optimizeData(pair.Key, self.data)
-			exprOptimizer.optimizeData(pair.Val, self.data)
-		}
-	}
-
-	fn slicing(self, mut m: &SlicingExprModel) {
-		exprOptimizer.optimizeData(m.Expr, self.data)
-		exprOptimizer.optimizeData(m.Left, self.data)
-		if m.Right != nil {
-			exprOptimizer.optimizeData(m.Right, self.data)
-		}
-	}
-
-	fn traitSub(self, mut m: &TraitSubIdentExprModel) {
-		exprOptimizer.optimizeData(m.Expr, self.data)
-	}
-
-	fn structureSub(self, mut m: &StructSubIdentExprModel) {
-		exprOptimizer.optimizeData(m.Expr.Model, self.data)
-	}
-
-	fn tuple(self, mut m: &TupleExprModel) {
-		for (_, mut d) in m.Datas {
-			exprOptimizer.optimizeData(d.Model, self.data)
-		}
-	}
-
-	fn newCall(self, mut m: &BuiltinNewCallExprModel) {
-		if m.Init != nil {
-			exprOptimizer.optimizeData(m.Init, self.data)
-		}
-	}
-
-	fn outCall(self, mut m: &BuiltinOutCallExprModel) {
-		exprOptimizer.optimizeData(m.Expr, self.data)
-	}
-
-	fn outlnCall(self, mut m: &BuiltinOutlnCallExprModel) {
-		exprOptimizer.optimizeData(m.Expr, self.data)
-	}
-
-	fn panicCall(self, mut m: &BuiltinPanicCallExprModel) {
-		exprOptimizer.optimizeData(m.Expr, self.data)
-	}
-
-	fn assertCall(self, mut m: &BuiltinAssertCallExprModel) {
-		exprOptimizer.optimizeData(m.Expr, self.data)
-	}
-
-	fn errorCall(self, mut m: &BuiltinErrorCallExprModel) {
-		exprOptimizer.optimizeData(m.Err.Model, self.data)
-	}
-
-	fn makeCall(self, mut m: &BuiltinMakeCallExprModel) {
-		if m.Len != nil {
-			exprOptimizer.optimizeData(m.Len, self.data)
-		}
-		if m.Cap != nil {
-			exprOptimizer.optimizeData(m.Cap, self.data)
-		}
-	}
-
-	fn appendCall(self, mut m: &BuiltinAppendCallExprModel) {
-		exprOptimizer.optimizeData(m.Dest, self.data)
-		exprOptimizer.optimizeData(m.Elements, self.data)
-	}
-
-	fn lenCall(self, mut m: &BuiltinLenCallExprModel) {
-		exprOptimizer.optimizeData(m.Expr.Model, self.data)
-	}
-
-	fn capCall(self, mut m: &BuiltinCapCallExprModel) {
-		exprOptimizer.optimizeData(m.Expr.Model, self.data)
-	}
-
-	fn deleteCall(self, mut m: &BuiltinDeleteCallExprModel) {
-		exprOptimizer.optimizeData(m.Dest.Model, self.data)
-		if m.Key != nil {
-			exprOptimizer.optimizeData(m.Key.Model, self.data)
-		}
-	}
-
-	fn sizeof(self, mut m: &SizeofExprModel) {
-		exprOptimizer.optimizeData(m.Expr, self.data)
-	}
-
-	fn alignof(self, mut m: &AlignofExprModel) {
-		exprOptimizer.optimizeData(m.Expr, self.data)
-	}
-
-	fn integratedToStr(self, mut m: &IntegratedToStrExprModel) {
-		exprOptimizer.optimizeData(m.Expr, self.data)
-	}
-
-	fn free(self, mut m: &FreeExprModel) {
-		exprOptimizer.optimizeData(m.Expr, self.data)
-	}
-
-	fn backendEmit(self, mut m: &BackendEmitExprModel) {
-		self.args(nil, m.Exprs)
-	}
-
 	fn do(self) {
-		match type *self.model {
-		| &BinaryExprModel:
-			self.binary((&BinaryExprModel)(*self.model))
-		| &UnaryExprModel:
-			self.unary((&UnaryExprModel)(*self.model))
-		| &StructLitExprModel:
-			self.structureLit((&StructLitExprModel)(*self.model))
-		| &AllocStructLitExprModel:
-			self.allocStructure((&AllocStructLitExprModel)(*self.model))
-		| &CastingExprModel:
-			self.casting((&CastingExprModel)(*self.model))
-		| &FnCallExprModel:
-			self.funcCall((&FnCallExprModel)(*self.model))
-		| &SliceExprModel:
-			self.slice((&SliceExprModel)(*self.model))
-		| &ArrayExprModel:
-			self.array((&ArrayExprModel)(*self.model))
-		| &IndexingExprModel:
-			self.indexing((&IndexingExprModel)(*self.model))
-		| &AnonFnExprModel:
-			self.anonFunc((&AnonFnExprModel)(*self.model))
-		| &MapExprModel:
-			self.mapExpr((&MapExprModel)(*self.model))
-		| &SlicingExprModel:
-			self.slicing((&SlicingExprModel)(*self.model))
-		| &TraitSubIdentExprModel:
-			self.traitSub((&TraitSubIdentExprModel)(*self.model))
-		| &StructSubIdentExprModel:
-			self.structureSub((&StructSubIdentExprModel)(*self.model))
-		| &TupleExprModel:
-			self.tuple((&TupleExprModel)(*self.model))
-		| &BuiltinOutCallExprModel:
-			self.outCall((&BuiltinOutCallExprModel)(*self.model))
-		| &BuiltinOutlnCallExprModel:
-			self.outlnCall((&BuiltinOutlnCallExprModel)(*self.model))
-		| &BuiltinNewCallExprModel:
-			self.newCall((&BuiltinNewCallExprModel)(*self.model))
-		| &BuiltinPanicCallExprModel:
-			self.panicCall((&BuiltinPanicCallExprModel)(*self.model))
-		| &BuiltinAssertCallExprModel:
-			self.assertCall((&BuiltinAssertCallExprModel)(*self.model))
-		| &BuiltinErrorCallExprModel:
-			self.errorCall((&BuiltinErrorCallExprModel)(*self.model))
-		| &BuiltinMakeCallExprModel:
-			self.makeCall((&BuiltinMakeCallExprModel)(*self.model))
-		| &BuiltinAppendCallExprModel:
-			self.appendCall((&BuiltinAppendCallExprModel)(*self.model))
-		| &BuiltinLenCallExprModel:
-			self.lenCall((&BuiltinLenCallExprModel)(*self.model))
-		| &BuiltinCapCallExprModel:
-			self.capCall((&BuiltinCapCallExprModel)(*self.model))
-		| &BuiltinDeleteCallExprModel:
-			self.deleteCall((&BuiltinDeleteCallExprModel)(*self.model))
-		| &SizeofExprModel:
-			self.sizeof((&SizeofExprModel)(*self.model))
-		| &AlignofExprModel:
-			self.alignof((&AlignofExprModel)(*self.model))
-		| &IntegratedToStrExprModel:
-			self.integratedToStr((&IntegratedToStrExprModel)(*self.model))
-		| &FreeExprModel:
-			self.free((&FreeExprModel)(*self.model))
-		| &BackendEmitExprModel:
-			self.backendEmit((&BackendEmitExprModel)(*self.model))
-		}
+		exprInspector.Inspect(*self.model, fn(mut &m: ExprModel) {
+			match type m {
+			| &BinaryExprModel:
+				unsafe { self.binary((&BinaryExprModel)(*self.model)) }
+			| &UnaryExprModel:
+				unsafe { self.unary((&UnaryExprModel)(*self.model)) }
+			| &StructLitExprModel:
+				unsafe { self.structureLit((&StructLitExprModel)(*self.model)) }
+			| &CastingExprModel:
+				unsafe { self.casting((&CastingExprModel)(*self.model)) }
+			| &FnCallExprModel:
+				unsafe { self.funcCall((&FnCallExprModel)(*self.model)) }
+			| &IndexingExprModel:
+				unsafe { self.indexing((&IndexingExprModel)(*self.model)) }
+			| &AnonFnExprModel:
+				unsafe { self.anonFunc((&AnonFnExprModel)(*self.model)) }
+			}
+		})
 	}
 }
 
