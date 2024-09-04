@@ -4380,13 +4380,19 @@ fn isPtrArithmeticCompatible(mut &l: &Data, mut &r: &Data): bool {
     if ptr != nil {
         ret l.Kind.Ptr().Elem.Equal(ptr.Elem)
     }
-    if r.IsConst() {
-        ret intAssignable(types::TypeKind.Int, r)
+    if r.IsConst() && r.untyped {
+        ret intAssignable(types::TypeKind.Int, r) ||
+            intAssignable(types::TypeKind.Uint, r)
     }
+
     mut tcc := typeCompatibilityChecker{
         dest: primInt,
         src: r.Kind,
     }
+    if tcc.check() {
+        ret true
+    }
+    tcc.dest = primUint
     ret tcc.check()
 }
 
