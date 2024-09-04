@@ -28,7 +28,6 @@ use std::jule::sema::{
 struct scopeDeadCode {
 	parent: &scopeDeadCode
 	s:      &Scope
-	stmts:  *[]Stmt
 	i:      int // Position.
 	labels: &[]&Label
 	gotos:  &[]&GotoSt
@@ -40,7 +39,6 @@ impl scopeDeadCode {
 		mut sdc := &scopeDeadCode{
 			parent: self,
 			s: s,
-			stmts: &s.Stmts,
 			labels: self.labels,
 			gotos: self.gotos,
 		}
@@ -50,7 +48,6 @@ impl scopeDeadCode {
 	fn optimizeBodyChildExceptional(mut &self, mut &s: &Scope) {
 		mut sdc := &scopeDeadCode{
 			s: s,
-			stmts: &s.Stmts,
 			labels: self.labels,
 			gotos: self.gotos,
 			except: true,
@@ -61,7 +58,6 @@ impl scopeDeadCode {
 	fn optimizeBodyChild(mut &self, mut &s: &Scope) {
 		mut sdc := &scopeDeadCode{
 			s: s,
-			stmts: &s.Stmts,
 			labels: self.labels,
 			gotos: self.gotos,
 		}
@@ -78,12 +74,12 @@ impl scopeDeadCode {
 			ret
 		}
 		unsafe {
-			*self.stmts = (*self.stmts)[:self.i+1]
+			self.s.Stmts = self.s.Stmts[:self.i+1]
 		}
 		mut parent := self.parent
 		for parent != nil {
 			unsafe {
-				*parent.stmts = (*parent.stmts)[:parent.i+1]
+				parent.s.Stmts = parent.s.Stmts[:parent.i+1]
 			}
 			parent = parent.parent
 		}
@@ -232,8 +228,8 @@ impl scopeDeadCode {
 
 	unsafe fn optimizeStmts(mut &self) {
 		self.i = 0
-		for self.i < len(*self.stmts); self.i++ {
-			self.optimizeStmt((*self.stmts)[self.i])
+		for self.i < len(self.s.Stmts); self.i++ {
+			self.optimizeStmt(self.s.Stmts[self.i])
 		}
 	}
 }
@@ -243,7 +239,6 @@ fn eliminateDeadCodeOfScope(mut s: &Scope) {
 	gotos := make([]&GotoSt, 0, 1 << 4)
 	mut sdc := &scopeDeadCode{
 		s: s,
-		stmts: &s.Stmts,
 		labels: unsafe { (&[]&Label)(&labels) },
 		gotos: unsafe { (&[]&GotoSt)(&gotos) },
 	}
