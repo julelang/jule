@@ -33,13 +33,12 @@ impl Logger {
             out(conv::Itoa(l.Column))
         }
         if len(l.Line) != 0 {
-            mut line := strings::TrimLeft(l.Line, "\r\n\v\b ")
+            // For correct handling, trim leading and trailing space bytes.
+            // Also replace tabs with spaces for deterministic size.
+            mut line := strings::Trim(l.Line, "\r\n\v\b\t ")
+            line = strings::Replace(line, "\t", " ", -1)
+
             mut offset := len(l.Line) - len(line) + 1
-            mut oldLen := len(line)
-            line = strings::TrimLeft(line, "\t")
-            if oldLen != len(line) {
-                offset += (oldLen - len(line)) * 8
-            }
             out("\n  ")
             row := conv::Itoa(l.Row)
             out(row)
