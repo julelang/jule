@@ -9,9 +9,6 @@ use std::jule::sema::{
 	AnonFnExprModel,
 }
 
-// Common expression model inspector.
-static mut exprInspector = obj::ExprInspector.New()
-
 // Dead code eliminate optimizer for expressions.
 struct exprDeadCode {
 	mut s: &scopeDeadCode
@@ -25,7 +22,8 @@ impl exprDeadCode {
 	}
 
 	fn optimize(self, mut &model: ExprModel) {
-		exprInspector.Inspect(model, fn(mut &expr: ExprModel) {
+		mut inspector := obj::ExprInspector.New()
+		inspector.Inspect(model, fn(mut &expr: ExprModel) {
 			match type expr {
 			| &FnCallExprModel:
 				mut m := (&FnCallExprModel)(expr)
@@ -33,7 +31,7 @@ impl exprDeadCode {
 					unsafe { self.s.optimizeBodyChildExceptional(m.Except) }
 				}
 			| &AnonFnExprModel:
-				mut m := (&FnCallExprModel)(expr)
+				mut m := (&AnonFnExprModel)(expr)
 				eliminateDeadCodeOfScope(m.Func.Scope)
 			}
 		})
