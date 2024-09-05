@@ -2,7 +2,7 @@
     Thank you for contributing to Jule project!
     Be sure to follow our Code of Conduct and contributing guidelines, and fill in the details below.
 
-    Contributing guidelines: https://jule.dev/contribute
+    Contributing Guidelines: https://jule.dev/contribute
 -->
 
 ### Description
@@ -18,7 +18,7 @@
 - [ ] All the new and existing tests pass.
 - [ ] The code follows the code style and conventions of the project.
 - [ ] No plagiarized, duplicated, or repetitive code that has been directly copied from another source.
-- [ ] I have read the whole [Contributing guidelines](https://jule.dev/contribute) of the project and its resources/related pages.
+- [ ] I have read the whole [Contributing Guidelines](https://jule.dev/contribute) of the project and its resources/related pages.
 
 ### Screenshots (if any)
 
