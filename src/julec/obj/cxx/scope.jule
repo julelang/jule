@@ -468,7 +468,21 @@ impl scopeCoder {
 		self.oc.write(p.Op)
 	}
 
+	fn divByZeroAssign(mut &self, mut a: &Assign) {
+		self.oc.ec.possibleRefExpr(a.Left.Model)
+		self.oc.write(" = ")
+		self.oc.ec.divByZeroBinary(a.Op, a.Left, a.Right)
+	}
+
 	fn assign(mut &self, mut a: &Assign) {
+		match a.Op.Kind {
+		| TokenKind.SolidusEq | TokenKind.PercentEq:
+			// Do not check division of structures safety.
+			if a.Left.Kind.Struct() == nil {
+				self.divByZeroAssign(a)
+				ret
+			}
+		}
 		self.oc.ec.possibleRefExpr(a.Left.Model)
 		self.oc.write(a.Op.Kind)
 		self.oc.ec.possibleRefExpr(a.Right.Model)
