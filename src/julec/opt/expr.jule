@@ -22,17 +22,14 @@ use std::jule::sema::{
 	AnonFnExprModel,
 	StructSubIdentExprModel,
 	BuiltinLenCallExprModel,
-
 }
 use types for std::jule::types
 
-// Common expression model inspector.
-static mut exprInspector = obj::ExprInspector.New()
-
 // Expression optimizer that applies target-independent optimizations.
 struct exprOptimizer {
-	mut model: &ExprModel
-	mut data:  &data // Should be non-nil guaranteed.
+	mut model:     &ExprModel
+	mut data:      &data // Should be non-nil guaranteed.
+	mut inspector: &obj::ExprInspector
 }
 
 impl exprOptimizer {
@@ -46,6 +43,7 @@ impl exprOptimizer {
 			mut exop := &exprOptimizer{
 				model: unsafe { (&ExprModel)(&model) },
 				data: d,
+				inspector: obj::ExprInspector.New(),
 			}
 			exop.do()
 		}
@@ -478,7 +476,7 @@ impl exprOptimizer {
 		if valid && self.data.dynamic != nil && self.data.dynamic.isFits(var, m.Kind) {
 			mut model := any(&UnsafeCastingExprModel{Base: m})
 			*self.model = unsafe { *(*ExprModel)(&model) }
-			exprInspector.SkipChild = true
+			self.inspector.SkipChild = true
 			ret
 		}
 		if self.data.dynamic != nil && valid {
@@ -488,20 +486,21 @@ impl exprOptimizer {
 
 	fn args(self, mut params: []&ParamIns, mut &args: []ExprModel) {
 		for (i, mut arg) in args {
-			if i < len(params) {
-				mut p := params[i]
-				if p.Decl.Mutable && p.Decl.Reference {
-					if self.data.boundary != nil {
-						if isBoundaryRiskyType(p.Kind) {
-							possibleBoundaryRemove(self.data.boundary, arg)
-						}
+			if i >= len(params) {
+				continue
+			}
+			mut p := params[i]
+			if p.Decl.Mutable && p.Decl.Reference {
+				if self.data.boundary != nil {
+					if isBoundaryRiskyType(p.Kind) {
+						possibleBoundaryRemove(self.data.boundary, arg)
 					}
-					if self.data.nils != nil {
-						possibleNilRemove(self.data.nils, arg)
-					}
-					if self.data.dynamic != nil {
-						possibleDynamicRemove(self.data.dynamic, arg)
-					}
+				}
+				if self.data.nils != nil {
+					possibleNilRemove(self.data.nils, arg)
+				}
+				if self.data.dynamic != nil {
+					possibleDynamicRemove(self.data.dynamic, arg)
 				}
 			}
 		}
@@ -549,22 +548,23 @@ impl exprOptimizer {
 	}
 
 	fn do(self) {
-		exprInspector.Inspect(*self.model, fn(mut &m: ExprModel) {
+		self.inspector.Inspect(*self.model, fn(mut &m: ExprModel) {
+			unsafe { self.model = (&ExprModel)(&m) }
 			match type m {
 			| &BinaryExprModel:
-				unsafe { self.binary((&BinaryExprModel)(*self.model)) }
+				unsafe { self.binary((&BinaryExprModel)(m)) }
 			| &UnaryExprModel:
-				unsafe { self.unary((&UnaryExprModel)(*self.model)) }
+				unsafe { self.unary((&UnaryExprModel)(m)) }
 			| &StructLitExprModel:
-				unsafe { self.structureLit((&StructLitExprModel)(*self.model)) }
+				unsafe { self.structureLit((&StructLitExprModel)(m)) }
 			| &CastingExprModel:
-				unsafe { self.casting((&CastingExprModel)(*self.model)) }
+				unsafe { self.casting((&CastingExprModel)(m)) }
 			| &FnCallExprModel:
-				unsafe { self.funcCall((&FnCallExprModel)(*self.model)) }
+				unsafe { self.funcCall((&FnCallExprModel)(m)) }
 			| &IndexingExprModel:
-				unsafe { self.indexing((&IndexingExprModel)(*self.model)) }
+				unsafe { self.indexing((&IndexingExprModel)(m)) }
 			| &AnonFnExprModel:
-				unsafe { self.anonFunc((&AnonFnExprModel)(*self.model)) }
+				unsafe { self.anonFunc((&AnonFnExprModel)(m)) }
 			}
 		})
 	}

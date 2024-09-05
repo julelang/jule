@@ -60,7 +60,7 @@ impl ExprInspector {
 		}
 	}
 
-	fn inspect(mut self, mut m: ExprModel) {
+	fn inspect(mut self, mut &m: ExprModel) {
 		self.SkipChild = false
 		self.handler(m)
 		if self.SkipChild {
@@ -72,31 +72,40 @@ impl ExprInspector {
 			self.inspect(b.Left.Model)
 			self.inspect(b.Right.Model)
 		| &UnaryExprModel:
-			self.inspect((&UnaryExprModel)(m).Expr.Model)
+			mut u := (&UnaryExprModel)(m)
+			self.inspect(u.Expr.Model)
 		| &StructLitExprModel:
-			for (_, mut arg) in (&StructLitExprModel)(m).Args {
-				self.inspect(arg.Expr.Model)
+			mut lit := (&StructLitExprModel)(m)
+			for i in lit.Args {
+				self.inspect(lit.Args[i].Expr.Model)
 			}
 		| &AllocStructLitExprModel:
-			self.inspect((&AllocStructLitExprModel)(m).Lit)
+			mut lit := (&AllocStructLitExprModel)(m).Lit
+			for i in lit.Args {
+				self.inspect(lit.Args[i].Expr.Model)
+			}
 		| &CastingExprModel:
-			self.inspect((&CastingExprModel)(m).Expr.Model)
+			mut c := (&CastingExprModel)(m)
+			self.inspect(c.Expr.Model)
 		| &FnCallExprModel:
 			mut fc := (&FnCallExprModel)(m)
 			self.inspect(fc.Expr)
 			self.args(fc.Args)
 		| &SliceExprModel:
-			self.args((&SliceExprModel)(m).Elems)
+			mut s := (&SliceExprModel)(m)
+			self.args(s.Elems)
 		| &ArrayExprModel:
-			self.args((&ArrayExprModel)(m).Elems)
+			mut a := (&ArrayExprModel)(m)
+			self.args(a.Elems)
 		| &IndexingExprModel:
 			mut i := (&IndexingExprModel)(m)
 			self.inspect(i.Expr.Model)
 			self.inspect(i.Index.Model)
 		| &MapExprModel:
-			for (_, mut pair) in (&MapExprModel)(m).Entries {
-				self.inspect(pair.Key)
-				self.inspect(pair.Val)
+			mut mp := (&MapExprModel)(m)
+			for i in mp.Entries {
+				self.inspect(mp.Entries[i].Key)
+				self.inspect(mp.Entries[i].Val)
 			}
 		| &SlicingExprModel:
 			mut s := (&SlicingExprModel)(m)
@@ -106,12 +115,15 @@ impl ExprInspector {
 				self.inspect(s.Right)
 			}
 		| &TraitSubIdentExprModel:
-			self.inspect((&TraitSubIdentExprModel)(m).Expr)
+			mut t := (&TraitSubIdentExprModel)(m)
+			self.inspect(t.Expr)
 		| &StructSubIdentExprModel:
-			self.inspect((&StructSubIdentExprModel)(m).Expr.Model)
+			mut s := (&StructSubIdentExprModel)(m)
+			self.inspect(s.Expr.Model)
 		| &TupleExprModel:
-			for (_, mut d) in (&TupleExprModel)(m).Datas {
-				self.inspect(d.Model)
+			mut t := (&TupleExprModel)(m)
+			for i in t.Datas {
+				self.inspect(t.Datas[i].Model)
 			}
 		| &BuiltinNewCallExprModel:
 			mut b := (&BuiltinNewCallExprModel)(m)
@@ -119,15 +131,20 @@ impl ExprInspector {
 				self.inspect(b.Init)
 			}
 		| &BuiltinOutCallExprModel:
-			self.inspect((&BuiltinOutCallExprModel)(m).Expr)
+			mut c := (&BuiltinOutCallExprModel)(m)
+			self.inspect(c.Expr)
 		| &BuiltinOutlnCallExprModel:
-			self.inspect((&BuiltinOutlnCallExprModel)(m).Expr)
+			mut c := (&BuiltinOutlnCallExprModel)(m)
+			self.inspect(c.Expr)
 		| &BuiltinPanicCallExprModel:
-			self.inspect((&BuiltinPanicCallExprModel)(m).Expr)
+			mut c := (&BuiltinPanicCallExprModel)(m)
+			self.inspect(c.Expr)
 		| &BuiltinAssertCallExprModel:
-			self.inspect((&BuiltinAssertCallExprModel)(m).Expr)
+			mut c := (&BuiltinAssertCallExprModel)(m)
+			self.inspect(c.Expr)
 		| &BuiltinErrorCallExprModel:
-			self.inspect((&BuiltinErrorCallExprModel)(m).Err.Model)
+			mut c := (&BuiltinErrorCallExprModel)(m)
+			self.inspect(c.Err.Model)
 		| &BuiltinMakeCallExprModel:
 			mut b := (&BuiltinMakeCallExprModel)(m)
 			if b.Len != nil {
@@ -141,9 +158,11 @@ impl ExprInspector {
 			self.inspect(b.Dest)
 			self.inspect(b.Elements)
 		| &BuiltinLenCallExprModel:
-			self.inspect((&BuiltinLenCallExprModel)(m).Expr.Model)
+			mut l := (&BuiltinLenCallExprModel)(m)
+			self.inspect(l.Expr.Model)
 		| &BuiltinCapCallExprModel:
-			self.inspect((&BuiltinCapCallExprModel)(m).Expr.Model)
+			mut c := (&BuiltinCapCallExprModel)(m)
+			self.inspect(c.Expr.Model)
 		| &BuiltinDeleteCallExprModel:
 			mut b := (&BuiltinDeleteCallExprModel)(m)
 			self.inspect(b.Dest.Model)
@@ -151,21 +170,27 @@ impl ExprInspector {
 				self.inspect(b.Key.Model)
 			}
 		| &SizeofExprModel:
-			self.inspect((&SizeofExprModel)(m).Expr)
+			mut s := (&SizeofExprModel)(m)
+			self.inspect(s.Expr)
 		| &AlignofExprModel:
-			self.inspect((&AlignofExprModel)(m).Expr)
+			mut a := (&AlignofExprModel)(m)
+			self.inspect(a.Expr)
 		| &IntegratedToStrExprModel:
-			self.inspect((&IntegratedToStrExprModel)(m).Expr)
+			mut i := (&IntegratedToStrExprModel)(m)
+			self.inspect(i.Expr)
 		| &FreeExprModel:
-			self.inspect((&FreeExprModel)(m).Expr)
+			mut f := (&FreeExprModel)(m)
+			self.inspect(f.Expr)
 		| &BackendEmitExprModel:
-			self.args((&BackendEmitExprModel)(m).Exprs)
+			mut e := (&BackendEmitExprModel)(m)
+			self.args(e.Exprs)
 		}
 	}
 
 	// Inspect expression model.
 	// Resets [SkipChild] to default.
-	fn Inspect(mut self, mut m: ExprModel, f: fn(mut &m: ExprModel)) {
+	// Inspector guarantees the parameter m will always point to original model.
+	fn Inspect(mut self, mut &m: ExprModel, f: fn(mut &m: ExprModel)) {
 		self.handler = f
 		self.inspect(m)
 	}

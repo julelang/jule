@@ -7,7 +7,7 @@ use env
 use path for std::fs::path
 use std::jule::build::{PathStdlib}
 use std::jule::constant::{Const}
-use std::jule::lex::{TokenId, TokenKind}
+use lex for std::jule::lex::{TokenId, TokenKind}
 use sema for std::jule::sema::{
 	Var,
 	Data,
@@ -479,15 +479,19 @@ impl scopeOptimizer {
 			|:
 				panic("implementation mistake, this panic call should be unreachable")
 			}
-			mut model := ExprModel(&BinaryExprModel{
+			mut b := &BinaryExprModel{
 				Op: assign.Op,
 				Left: assign.Left,
 				Right: assign.Right,
-			})
+			}
+			mut model := ExprModel(b)
 			exprOptimizer.optimizeData(model, self.data)
-			match type model {
-			| &BinaryExprModel:
+			match type unsafe { *(*any)(&model) } {
+			| &UnsafeBinaryExprModel:
+				// Model optimized.
+				// Use optimized model directly.
 				assign.Right = new(OperandExprModel, *assign.Right)
+				b.Op = new(lex::Token, *b.Op) // Unsafe model wrap original model. Save token.
 				assign.Op.Id = TokenId.Eq
 				assign.Op.Kind = TokenKind.Eq
 				assign.Right.Model = model
