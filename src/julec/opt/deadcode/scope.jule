@@ -7,6 +7,7 @@ use std::jule::sema::{
 	Package,
 	Fn,
 	Scope,
+	Struct,
 	Stmt,
 	Data,
 	RetSt,
@@ -245,7 +246,7 @@ fn eliminateDeadCodeOfScope(mut s: &Scope) {
 	unsafe { sdc.optimizeStmts() }
 }
 
-// Eliminates dead functions.
+// Eliminates dead scope elements of functions.
 fn eliminateScopeFunctions(mut &funcs: []&Fn) {
 	for (_, mut func) in funcs {
 		for (_, mut ins) in func.Instances {
@@ -254,9 +255,19 @@ fn eliminateScopeFunctions(mut &funcs: []&Fn) {
 	}
 }
 
+// Eliminates dead scope elements of struct methods.
+fn eliminateScopeStructMethods(mut &structs: []&Struct) {
+	for (_, mut s) in structs {
+		for (_, mut ins) in s.Instances {
+			eliminateScopeFunctions(ins.Methods)
+		}
+	}
+}
+
 fn eliminateFunctionsScopePackage(mut &pkg: &Package) {
 	for (_, mut f) in pkg.Files {
 		eliminateScopeFunctions(f.Funcs)
+		eliminateScopeStructMethods(f.Structs)
 	}
 }
 
