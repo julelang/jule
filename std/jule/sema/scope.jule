@@ -1439,8 +1439,19 @@ impl scopeChecker {
 			st.Left = append(st.Left, nil)
 			ret
 		}
-
-		if a.Declarative && (lexpr.Reference || self.isNewAssignIdent(lexpr.Ident)) {
+		if a.Declarative {
+			match type lexpr.Expr.Kind {
+			| &ast::IdentExpr:
+				if !self.isNewAssignIdent(lexpr.Ident) {
+					goto norm
+				}
+			|:
+				if lexpr.Mutable || lexpr.Reference {
+					self.s.pushErr(lexpr.Token, LogMsg.InvalidSyntax)
+					ret
+				}
+				goto norm
+			}
 			if self.isDuplicatedIdent(0, lexpr.Ident) {
 				self.s.pushErr(lexpr.Token, LogMsg.DuplicatedIdent, lexpr.Ident)
 				self.s.pushSuggestion(LogMsg.RenameForAvoidDuplication)
@@ -1475,7 +1486,7 @@ impl scopeChecker {
 			self.table.Vars = append(self.table.Vars, v)
 			ret
 		}
-
+	norm:
 		if lexpr.Mutable || lexpr.Reference {
 			self.s.pushErr(lexpr.Token, LogMsg.DuplicatedIdent, lexpr.Ident)
 			self.s.pushSuggestion(LogMsg.RenameForAvoidDuplication)
@@ -1534,12 +1545,25 @@ impl scopeChecker {
 		for i in a.Left {
 			mut lexpr := a.Left[i]
 			let mut l: &Data = nil
-			if !IsIgnoreIdent(lexpr.Ident) &&
-				(!a.Declarative || !self.isNewAssignIdent(lexpr.Ident)) {
+			if !IsIgnoreIdent(lexpr.Ident) {
+				if !a.Declarative {
+					goto eval
+				}
+				if lexpr.Mutable && lexpr.Reference {
+					goto end
+				}
+				match type lexpr.Expr.Kind {
+				| &ast::IdentExpr:
+					if self.isNewAssignIdent(lexpr.Ident) {
+						goto end
+					}
+				}
+			eval:
 				l = self.s.eval(self).evalExpr(lexpr.Expr)
 				if l == nil {
 					continue
 				}
+			end:
 			}
 			mut r := right[i]
 			self.removeInteriorMutRisk(r)
