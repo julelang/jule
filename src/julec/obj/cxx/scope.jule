@@ -16,7 +16,7 @@ use opt::{
 use conv for std::conv
 use lex for std::jule::lex::{TokenKind}
 use std::jule::constant::{Const}
-use std::jule::sema::{
+use sema for std::jule::sema::{
 	Data,
 	Stmt,
 	FnIns,
@@ -474,6 +474,21 @@ impl scopeCoder {
 		self.oc.ec.divByZeroBinary(a.Op, a.Left, a.Right)
 	}
 
+	fn operatorOverloadingAssign(mut &self, mut &s: &sema::StructIns, mut &l: &sema::OperandExprModel,
+		mut &r: &sema::OperandExprModel, op: lex::TokenId) {
+		const Unary = false
+		f := obj::FindOperator(s, op, Unary)
+		if f == nil {
+			panic("binary operator overloading is not exist, this is an implementation mistake")
+		}
+		identCoder.funcIns(self.oc.Buf, f)
+		self.oc.write("(&")
+		self.oc.ec.possibleRefExpr(l.Model)
+		self.oc.write(", ")
+		self.oc.ec.possibleRefExpr(r.Model)
+		self.oc.write(")")
+	}
+
 	fn assign(mut &self, mut a: &Assign) {
 		match a.Op.Kind {
 		| TokenKind.SolidusEq | TokenKind.PercentEq:
@@ -483,6 +498,13 @@ impl scopeCoder {
 				ret
 			}
 		}
+
+		if a.Op.Id != lex::TokenId.Eq && a.Left.Kind.Struct() != nil {
+			mut s := a.Left.Kind.Struct()
+			self.operatorOverloadingAssign(s, a.Left, a.Right, a.Op.Id)
+			ret
+		}
+
 		self.oc.ec.possibleRefExpr(a.Left.Model)
 		self.oc.write(a.Op.Kind)
 		self.oc.ec.possibleRefExpr(a.Right.Model)
