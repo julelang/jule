@@ -566,7 +566,7 @@ impl ObjectCoder {
 		self.write("(this); }")
 	}
 
-	fn structureOperatorEq(mut &self, ident: str, mut &s: &StructIns) {
+	fn structureOperatorEq(mut &self, ident: str, mut &s: &StructIns, decl: bool) {
 		if !defaultEq(s) {
 			ret
 		}
@@ -581,7 +581,13 @@ impl ObjectCoder {
 		self.write(ident)
 		self.write(" *_self_, ")
 		self.write(ident)
-		self.write(" _other_) {")
+		self.write(" _other_)")
+		if decl {
+			// Declaration only.
+			self.write(";\n\n")
+			ret
+		}
+		self.write(" {")
 		if len(s.Fields) == 0 {
 			self.write(" return true; }\n\n")
 			ret
@@ -628,13 +634,13 @@ impl ObjectCoder {
 		self.write("}\n\n")
 	}
 
-	fn structureOperators(mut &self, mut &s: &StructIns) {
+	fn structureOperators(mut &self, mut &s: &StructIns, decl: bool) {
 		mut sb := StrBuilder.New(40)
 		identCoder.structureIns(sb, s)
 		ident := sb.Str()
 
 		// Binary.
-		self.structureOperatorEq(ident, s)
+		self.structureOperatorEq(ident, s, decl)
 	}
 
 	fn structureInsDecl(mut &self, mut &s: &StructIns) {
@@ -663,7 +669,8 @@ impl ObjectCoder {
 		self.indent()
 		self.write("};")
 
-		self.structureOperators(s)
+		const DeclOnly = true
+		self.structureOperators(s, DeclOnly)
 	}
 
 	fn structureDecl(mut &self, mut &s: &Struct) {
@@ -1132,6 +1139,8 @@ impl ObjectCoder {
 	}
 
 	fn structureIns(mut &self, mut &s: &StructIns) {
+		const DeclOnly = false
+		self.structureOperators(s, DeclOnly)
 		self.structureMethods(s)
 		self.write("\n\n")
 		self.structureOstream(s)

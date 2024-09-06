@@ -263,10 +263,12 @@ impl exprCoder {
 			ret
 		}
 
+		// Special cases for comparable types.
 		if op == TokenId.Eqs || op == TokenId.NotEq {
-			// If this binary operator comparing <any> type.
-			// The m.Left is will be <any> one always.
-			if obj::IsAny(lk) {
+			match {
+			| obj::IsAny(lk):
+				// If this binary operator comparing <any> type.
+				// The left operand is will be <any> one always.
 				if !rk.IsNil() && !obj::IsAny(rk) {
 					buf.WriteByte('(')
 					if op == TokenId.NotEq {
@@ -282,6 +284,24 @@ impl exprCoder {
 					buf.WriteStr("))")
 					ret
 				}
+			| lk.Arr() != nil:
+				// If this binary operator comparing array type.
+				// The left operand is will be array one always.
+				arr := lk.Arr()
+				mut f := obj::RuntimeFindFn(self.oc.ir.Runtime, obj::RuntimeFunc.arrayCmp)
+				mut ins := obj::FindGenericInstance(f, arr.Elem)
+				identCoder.funcIns(buf, ins)
+				if op == TokenId.NotEq {
+					buf.WriteByte('!')
+				}
+				buf.WriteByte('(')
+				buf.WriteStr(l)
+				buf.WriteStr(".begin(), ")
+				buf.WriteStr(r)
+				buf.WriteStr(".begin(), ")
+				buf.WriteStr(conv::Itoa(arr.N))
+				buf.WriteByte(')')
+				ret
 			}
 		}
 		buf.WriteByte('(')

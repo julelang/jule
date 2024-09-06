@@ -3,6 +3,7 @@
 // license that can be found in the LICENSE file.
 
 use env
+use ast for std::jule::ast
 use std::jule::build::{Log, LogKind}
 use std::jule::importer::{JuleImporter, CompileInfo, Compiler, CppStd}
 use sema for std::jule::sema
@@ -13,6 +14,7 @@ struct IR {
 	Root:    str
 	Passes:  []str
 	Main:    &sema::Package
+	Runtime: &sema::ImportInfo // std::runtime
 	Used:    []&sema::ImportInfo
 	Ordered: OrderedDefines
 }
@@ -21,12 +23,13 @@ impl IR {
 	// Returns compiler IR of source code.
 	// Returned IR is lexed, parsed, and analyzed.
 	//
-	// - Returns nil reference and nil logs if path has not any Jule file.
-	// - Returns nil reference and logs if exist any log.
+	// - Returns (nil, nil) logs if path has not any Jule file.
+	// - Returns (nil, logs) if exist any log.
 	// - Returns IR and nil logs if everything is fine.
 	static fn Build(path: str, flags: sema::SemaFlag): (&IR, []Log) {
 		mut importer := JuleImporter.New(buildCompileInfo())
-		mut files, mut logs := importer.ImportPackage(path, true)
+		const UpdateMod = true // Use root module for project if exist.
+		mut files, mut logs := importer.ImportPackage(path, UpdateMod)
 		if len(logs) > 0 {
 			ret nil, logs
 		}
@@ -35,6 +38,10 @@ impl IR {
 		if len(files) == 0 {
 			ret nil, nil
 		}
+
+		// Push std::runtime package to first file.
+		// Each Jule program should import this standard package.
+		pushRuntimeToAST(files[0])
 
 		mut pkg, logs := sema::AnalyzePackage(files, importer, flags)
 		if len(logs) > 0 {
@@ -47,6 +54,9 @@ impl IR {
 			Used: importer.AllPackages(),
 		}
 		ir.Passes = getAllUniquePasses(ir.Main, ir.Used)
+
+		// Set up special packages.
+		ir.Runtime = pkg.Files[0].Imports[0] // std::runtime
 
 		ret ir, nil
 	}
@@ -101,10 +111,10 @@ impl IR {
 
 	// Order defines at update ordered field of instance.
 	fn Order(mut self) {
-		self.Ordered.Structs = self.GetAllStructures()
 		self.Ordered.Globals = self.GetAllGlobals()
-		order(self.Ordered.Structs)
+		self.Ordered.Structs = self.GetAllStructures()
 		order(self.Ordered.Globals)
+		order(self.Ordered.Structs)
 	}
 }
 
@@ -161,4 +171,23 @@ fn buildCompileInfo(): CompileInfo {
 	}
 
 	ret info
+}
+
+// See [std::jule] developer reference (9).
+fn pushRuntimeToAST(mut &f: &ast::Ast) {
+	mut decl := &ast::UseDecl{
+		Token: nil, // Nil token is a flag for implicit declaration.
+		LinkPath: "std::runtime",
+		Alias: "",
+		Full: false,
+		Selected: nil,
+		Binded: false,
+		Std: true,
+	}
+	if len(f.UseDecls) > 0 {
+		f.UseDecls = append(f.UseDecls[:1], f.UseDecls...)
+		f.UseDecls[0] = decl
+	} else {
+		f.UseDecls = append(f.UseDecls, decl)
+	}
 }

@@ -417,7 +417,7 @@ impl symbolBuilder {
 
 		ret &ImportInfo{
 			ImportAll: decl.Full,
-			Token: decl.Token,
+			Token: decl.Token, // Use decl token for correct implementation. See developer refernece (9).
 			Path: path,
 			LinkPath: decl.LinkPath,
 			Ident: ident,
@@ -495,18 +495,30 @@ impl symbolBuilder {
 		}
 	}
 
-	fn checkDuplicateUseDecl(mut self, &pkg: &ImportInfo): (ok: bool) {
-		// Find package by path to detect cpp header imports.
-		lpkg := self.table.SelectPackage(fn(spkg: &ImportInfo): bool {
+	fn findUseDecl(mut self, &pkg: &ImportInfo): &ImportInfo {
+		ret self.table.SelectPackage(fn(spkg: &ImportInfo): bool {
+			// Find package by path to detect cpp header imports.
 			ret unsafe { pkg.Path == spkg.Path }
 		})
+	}
+
+	fn checkDuplicateUseDecl(mut self, mut &pkg: &ImportInfo): (ok: bool, implicit: bool) {
+		mut lpkg := self.findUseDecl(pkg)
 		if lpkg == nil {
-			ret true
+			ret true, false
+		}
+
+		// See developer reference (9).
+		if isImplicitImport(lpkg) {
+			// Imported same package by source code. Update token.
+			// See developer reference (9.5).
+			lpkg.Token = pkg.Token
+			ret true, true
 		}
 
 		self.pushErr(pkg.Token, LogMsg.DuplicateUseDecl, pkg.LinkPath)
 		self.pushSuggestion(LogMsg.RemoveUseDeclAvoidDuplication)
-		ret false
+		ret false, false
 	}
 
 	fn implImportSelections(mut self, mut &imp: &ImportInfo, mut &decl: &UseDecl) {
@@ -665,13 +677,19 @@ impl symbolBuilder {
 			ret nil
 		}
 
-		mut ok := self.checkDuplicateUseDecl(imp)
+		mut ok, implicit := self.checkDuplicateUseDecl(imp)
 		if !ok {
 			ret nil
 		}
 
 		ok = self.importPackage(imp, decl)
-		self.table.Imports = append(self.table.Imports, imp)
+		if !implicit {
+			// Duplication analysis returns true, but actually it is duplication.
+			// Implicit import detected.
+			// Do not check and push again to imports.
+			// See developer reference (9.2).
+			self.table.Imports = append(self.table.Imports, imp)
+		}
 		if ok {
 			self.importer.Imported(imp)
 			ret imp
@@ -779,4 +797,10 @@ impl symbolBuilder {
 			ret
 		}
 	}
+}
+
+// Reports whether imp is implicitly imported.
+// See developer reference (9).
+fn isImplicitImport(imp: &ImportInfo): bool {
+	ret imp.Token == nil
 }

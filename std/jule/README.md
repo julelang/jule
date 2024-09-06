@@ -9,7 +9,7 @@ It is also used by the official reference compiler JuleC and is developed in par
 - [`lex`](./lex): Lexical analyzer.
 - [`importer`](./importer): Default Jule importer.
 - [`parser`](./parser): Parser.
-- [`sema`](./sema): Semantic analyzer.
+- [`sema`](./sema): Semantic analyzer and CAST (Compilation Abstract Syntax Tree) components.
 - [`types`](./types): Elementary package for type safety.
 
 ## Developer Reference
@@ -50,3 +50,25 @@ For example:
 - **(8)** Check `enum` declarations first before using them or any using possibility appears. Enum fields should be evaluated before evaluate algorithms executed. Otherwise, probably program will panic because of unevaluated enum field(s) when tried to use.
 
     - **(8.1)** This is not apply for type enums. Type enum's fields are type alias actually. They are should anaylsis like type aliases.
+
+- **(9)** Semantic analysis supports built-in use declarations for developers, but this functionality is not for common purposes. These declarations do not cause problems in duplication analysis. For example, you added the `x` package as embedded in the AST, but the source also contains a use declaration for this package, in which case a conflict does not occur.\
+\
+These packages are specially processed and treated differently than standard use declarations. These treatments only apply to supported packages. To see relevant treatments, see implicit imports section of the reference.\
+\
+Typical uses are things like capturing or tracing private behavior. For example, the reference Jule compiler may embed the `std::runtime` package for some special calls. The semantic analyzer makes the necessary private calls for this embedded package when necessary. For example, appends instance to array compare generic method for array comparions.
+    - **(9.1)** The `Token` field is used to distinguish specific packages. If the `Token` field of the AST element is set to `nil`, the package built-in use declaration is considered. Accordingly, AST must always set the `Token` field for each use declaration.
+    - **(9.2)** Semantic ananlyzer must to guarantee any duplication will not appended to imports. So, built-in implicit imported packages cannot be duplicated even placed source file contains separate use declaration for the same package.
+    - **(9.3)** These packages should be placed as first use declarations of the main package's first file.
+    - **(9.4)** Semantic analyzer will not collect references for these packages. So any definition will not have a collection of references.
+    - **(9.5)** If semantic anlayzer encourter same package with any implicitly imported package in the same source file, assigns token of source file declaration to implicitly imported package. It also helps to caught dupliations for same packages after first one in the source file.
+
+### Implicit Imports
+
+Implicit imports are as described in developer reference (9). This section addresses which package is supported and what special behaviors it has.
+
+#### `std::runtime`
+
+This package is a basic package developed for Jule programs and focuses on runtime functionalities.
+
+Here is the list of custom behaviors for this package;
+- (1) `arrayCmp`: Developed to eliminate the need for the Jule compiler to generate code specifically for array comparisons for each backend and to reduce analysis cost. The semantic analyzer creates the necessary instance for this generic function when an array comparison is made. Thus, the necessary comparison function for each array is programmed at the Jule frontent level.

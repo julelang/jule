@@ -27,6 +27,21 @@ fn buildSymbols(mut &ast: &Ast, mut &importer: Importer, mut owner: &symbolBuild
 	ret nil, sb.errors
 }
 
+// See developer reference (9).
+fn collectImplicitImports(mut &s: &Sema, mut &file: &SymbolTable) {
+	for (_, mut imp) in file.Imports {
+		if !isImplicitImport(imp) {
+			break
+		}
+		match imp.LinkPath {
+		| "std::runtime":
+			s.meta.runtime = imp
+		|:
+			panic("implementation mistake in implicit import collection, this panic call should be unreachable")
+		}
+	}
+}
+
 fn analyzePackage(mut &files: []&Ast, mut &importer: Importer, &flags: SemaFlag): (&Package, []Log) {
 	// Build symbol tables of files.
 	mut tables := make([]&SymbolTable, 0, len(files))
@@ -42,6 +57,11 @@ fn analyzePackage(mut &files: []&Ast, mut &importer: Importer, &flags: SemaFlag)
 		flags: flags,
 		meta: new(commonSemaMeta),
 	}
+
+	// Use first table (so first file) for this.
+	// See developer reference (9).
+	collectImplicitImports(sema, tables[0])
+
 	sema.check(tables)
 	if len(sema.errors) > 0 {
 		ret nil, sema.errors

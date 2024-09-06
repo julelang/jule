@@ -1172,33 +1172,20 @@ impl Eval {
 
 	// Checks new generics function instance.
 	// If instance is already exist, f will point to exist instantantiation.
-	fn checkGenericFn(mut &self, mut &f: &FnIns, mut &et: &Token, mut &model: ExprModel): bool {
-		ok := self.s.reloadFnInsTypes(f)
-		f.reloaded = true
-		if !ok {
-			ret false
-		}
-		mut existInstance := f.Decl.appendInstance(f)
-		// TODO: [check] is possible to optimize here using same environment with realoadFnInsTypes?
-		if !self.s.checkConstraintsFn(f, et, existInstance) {
-			ret false
-		}
-		if existInstance != nil {
-			// Update model and references by exist function instance.
+	fn checkGenericFn(mut &self, mut &f: &FnIns, mut &et: &Token, mut &model: ExprModel): (ok: bool, exist: bool) {
+		mut old := f
+		ok, exist = self.s.checkGenericFn(f, et)
+		if ok && exist {
+			// Update model by exist function instance.
 			// Generic functions returns always new instance, because might be
 			// generics are inferred. Therefore, always returns new instance for requests.
 			// So, if this absolute instance is already exist, update model.
 			// Otherwise, model's instance will be a dangling, because it never
 			// be appended into instances of function declaration since already exist.
-			updateModelToGenericIns(model, existInstance)
-			updateRefer(self.getOwnerRefers(), f, existInstance)
-			// Set f to exist one.
-			f = existInstance
-		} else {
-			// Check generic function instance instantly.
-			self.s.checkFnInsCaller(f, et)
+			updateModelToGenericIns(model, f)
+			updateRefer(self.getOwnerRefers(), old, f)
 		}
-		ret true
+		ret
 	}
 
 	fn evalFnGenericFromIndexing(mut &self, mut &d: &Data, mut &i: &IndexingExpr) {
@@ -1233,7 +1220,8 @@ impl Eval {
 			ret
 		}
 
-		if self.checkGenericFn(f, i.Expr.Token, d.Model) {
+		ok, _ := self.checkGenericFn(f, i.Expr.Token, d.Model)
+		if ok {
 			d.Kind.Kind = f
 		} else {
 			d = nil
@@ -2121,7 +2109,8 @@ impl Eval {
 				d = nil
 				ret
 			}
-			if !self.checkGenericFn(f, fc.Token, d.Model) {
+			ok, _ = self.checkGenericFn(f, fc.Token, d.Model)
+			if !ok {
 				d = nil
 				ret
 			}
@@ -3638,6 +3627,15 @@ impl binaryEval {
 		match self.op.Id {
 		| TokenId.Eqs
 		| TokenId.NotEq:
+			if self.e.s.meta.runtime != nil {
+				// Add instance to relevant runtime function for array element type if not exist.
+				mut f := runtimeFindFn(self.e.s.meta.runtime, runtimeFunc.arrayCmp).instanceForce()
+				f.Generics = append(f.Generics, &InsGeneric{Kind: self.l.Kind.Arr().Elem})
+				ok, _ := self.e.s.checkGenericFn(f, self.op)
+				if !ok {
+					panic("arrayCmp evaluation failed, this is an implementation mistake")
+				}
+			}
 			ret &Data{
 				Kind: primBool,
 			}

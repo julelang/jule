@@ -208,6 +208,7 @@ unsafe fn pushSuggestion(mut log: *Log, fmt: LogMsg, args: ...any) {
 
 struct commonSemaMeta {
 	comptimeTypeInfos: []&comptimeTypeInfo
+	runtime:           &ImportInfo // Implicitly imported [std::runtime] package.
 }
 
 impl commonSemaMeta {
@@ -2292,6 +2293,31 @@ impl Sema {
 		ret nil
 	}
 
+	// Checks new generics function instance.
+	// If instance is already exist, f will point to exist instantantiation.
+	fn checkGenericFn(mut &self, mut &f: &FnIns, mut &et: &Token): (ok: bool, exist: bool) {
+		ok = self.reloadFnInsTypes(f)
+		f.reloaded = true
+		if !ok {
+			ret false, false
+		}
+		mut existInstance := f.Decl.appendInstance(f)
+		// TODO: [check] is possible to optimize here using same environment with realoadFnInsTypes?
+		if !self.checkConstraintsFn(f, et, existInstance) {
+			ret false, false
+		}
+		if existInstance != nil {
+			// Set f to exist one.
+			f = existInstance
+			exist = true
+		} else {
+			// Check generic function instance instantly.
+			self.checkFnInsCaller(f, et)
+		}
+		ok = true
+		ret
+	}
+
 	fn checkTypeMethod(mut &self, mut &s: &StructIns, mut &f: &Fn) {
 		// Generic instances are checked instantly.
 		if len(f.Generics) > 0 {
@@ -2417,6 +2443,27 @@ impl Sema {
 		if !ok {
 			ret false
 		}
+
+		// See implicit imports reference (1).
+		// If structure instance is comparable and have not custom compare method,
+		// compiler will use default compare method. If There is array field,
+		// push instance for runtime function.
+		if s.Comparable && s.Operators.Eq == nil {
+			mut decl := runtimeFindFn(self.meta.runtime, runtimeFunc.arrayCmp)
+			for (_, mut field) in s.Fields {
+				mut arr := field.Kind.Arr()
+				if arr == nil {
+					continue
+				}
+				mut f := decl.instanceForce()
+				f.Generics = append(f.Generics, &InsGeneric{Kind: arr.Elem})
+				ok, _ = self.checkGenericFn(f, field.Decl.Token)
+				if !ok {
+					panic("arrayCmp evaluation failed, this is an implementation mistake")
+				}
+			}
+		}
+
 		for (_, mut f) in s.Methods {
 			if len(f.Generics) == 0 {
 				if self.readyToCheckFn(s, f) == nil {
