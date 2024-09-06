@@ -2,8 +2,10 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use comptime for std::comptime
 use ast for std::jule::ast
-use std::jule::sema::{Trait, StructIns, TypeKind}
+use std::jule::lex::{TokenId}
+use std::jule::sema::{Trait, StructIns, TypeKind, FnIns}
 
 // Returns directive if exist.
 fn FindDirective(mut &directives: []&ast::Directive, tag: str): &ast::Directive {
@@ -70,4 +72,71 @@ fn FindTraitTypeOffset(t: &Trait, mut k: &TypeKind): int {
 		ret -1
 	}
 	ret FindTraitTypeOffsetS(t, s)
+}
+
+// Returns overloaded operator method by operator id.
+fn FindOperator(mut &s: &StructIns, op: TokenId, unary: bool): &FnIns {
+	match op {
+	| TokenId.Eqs:
+		ret s.Operators.Eq
+	| TokenId.Gt:
+		ret s.Operators.Gt
+	| TokenId.GtEq:
+		ret s.Operators.GtEq
+	| TokenId.Lt:
+		ret s.Operators.Lt
+	| TokenId.LtEq:
+		ret s.Operators.LtEq
+	| TokenId.Shl:
+		ret s.Operators.Shl
+	| TokenId.Shr:
+		ret s.Operators.Shr
+	| TokenId.Plus:
+		if unary {
+			ret s.Operators.Pos
+		}
+		ret s.Operators.Add
+	| TokenId.Minus:
+		if unary {
+			ret s.Operators.Neg
+		}
+		ret s.Operators.Sub
+	| TokenId.Solidus:
+		ret s.Operators.Div
+	| TokenId.Star:
+		ret s.Operators.Mul
+	| TokenId.Percent:
+		ret s.Operators.Mod
+	| TokenId.Amper:
+		ret s.Operators.BitAnd
+	| TokenId.Vline:
+		ret s.Operators.BitOr
+	| TokenId.Caret:
+		if unary {
+			ret s.Operators.BitNot
+		}
+		ret s.Operators.BitXor
+	| TokenId.PlusEq:
+		ret s.Operators.AddAssign
+	| TokenId.MinusEq:
+		ret s.Operators.SubAssign
+	| TokenId.SolidusEq:
+		ret s.Operators.DivAssign
+	| TokenId.StarEq:
+		ret s.Operators.MulAssign
+	| TokenId.PercentEq:
+		ret s.Operators.ModAssign
+	| TokenId.ShlEq:
+		ret s.Operators.ShlAssign
+	| TokenId.ShrEq:
+		ret s.Operators.ShrAssign
+	| TokenId.VlineEq:
+		ret s.Operators.BitOrAssign
+	| TokenId.AmperEq:
+		ret s.Operators.BitAndAssign
+	| TokenId.CaretEq:
+		ret s.Operators.BitXorAssign
+	|:
+		ret nil
+	}
 }

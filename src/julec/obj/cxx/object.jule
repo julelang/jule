@@ -15,10 +15,11 @@ use build for std::jule::build::{
 use std::jule::lex::{
 	Token,
 	TokenId,
+	TokenKind,
 	IsIgnoreIdent,
 	IsAnonIdent,
 }
-use std::jule::sema::{
+use sema for std::jule::sema::{
 	FuncPattern,
 	Package,
 	SymbolTable,
@@ -49,6 +50,7 @@ const anonFnCtxHandlerSuffix = anonFnCtxSuffix + "_handler" // Anon fn identifie
 const anyTypeIdent = "__jule_any_type"
 const deallocatedTypeIdent = "__jule_type_deallocator"
 const traitMethodWrapperPrefix = "__jule_trait_method_wrapper_"
+const structDefaultEqMethodSuffix = "_eq"
 const indentKind = '\t'
 
 // General pointer type for GC pointers.
@@ -249,20 +251,27 @@ impl ObjectCoder {
 			comparable := t.Comparable()
 			mut kindB := StrBuilder.New(40)
 			self.tc.kind(kindB, t)
-			kind := unsafe { kindB.Buf() }
+			kind := kindB.Str()
 
 			// Deallocator function.
 			di := self.pushDealloc(t)
 
 			if comparable {
 				// eq function.
+
+				// Common model for custom expressions.
+				mut lmodel := "*reinterpret_cast<"
+				lmodel += kind
+				lmodel += "*>("
+				mut rmodel := lmodel
+				rmodel += "other)"
+				lmodel += "alloc)"
+
 				self.anyObj.WriteStr(typeCoder.Bool + " " + anyTypeIdent)
 				self.anyObj.WriteStr(si)
-				self.anyObj.WriteStr("_eq(void *alloc, void *other) noexcept { return *reinterpret_cast<")
-				self.anyObj.Write(kind)
-				self.anyObj.WriteStr("*>(alloc) == *reinterpret_cast<")
-				self.anyObj.Write(kind)
-				self.anyObj.WriteStr("*>(other); }\n")
+				self.anyObj.WriteStr("_eq(void *alloc, void *other) noexcept { return ")
+				self.ec._unsafeBinary(self.anyObj, lmodel, rmodel, t, t, TokenId.Eqs, TokenKind.Eqs)
+				self.anyObj.WriteStr("; }\n")
 			}
 
 			// to_str function.
@@ -271,9 +280,9 @@ impl ObjectCoder {
 			self.anyObj.WriteStr("_to_str(const void *alloc) noexcept { return jule::to_str(*reinterpret_cast<")
 			if t.Ptr() == nil {
 				self.anyObj.WriteStr("const ")
-				self.anyObj.Write(kind)
+				self.anyObj.WriteStr(kind)
 			} else {
-				self.anyObj.Write(kind)
+				self.anyObj.WriteStr(kind)
 				self.anyObj.WriteStr("* const")
 			}
 			self.anyObj.WriteStr("*>(alloc)); }\n")
@@ -299,7 +308,7 @@ impl ObjectCoder {
 				self.anyObj.WriteStr(typeCoder.Bool + " " + anyTypeIdent)
 				self.anyObj.WriteStr(si)
 				self.anyObj.WriteStr("_compare(const " + typeCoder.Any + " &any, const ")
-				self.anyObj.Write(kind)
+				self.anyObj.WriteStr(kind)
 				self.anyObj.WriteStr(" &other) { return any.type == &" + anyTypeIdent)
 				self.anyObj.WriteStr(si)
 				self.anyObj.WriteStr(" && " + anyTypeIdent)
@@ -557,165 +566,75 @@ impl ObjectCoder {
 		self.write("(this); }")
 	}
 
-	fn structureOperatorEq(mut &self, ident: []byte, mut &s: &StructIns) {
-		if !s.Comparable {
+	fn structureOperatorEq(mut &self, ident: str, mut &s: &StructIns) {
+		if !defaultEq(s) {
 			ret
 		}
-		// Operator overloading.
-		if s.Operators.Eq != nil {
-			self.structureOperator(ident, s.Operators.Eq, "==")
-			ret
-		}
-
-		self.indent()
+		self.write("\n")
 		if opt::Inline {
 			self.write("inline ")
 		}
-		self.write("bool operator==(")
-		self.writeBytes(ident)
-		self.write(" _other) {")
-		if len(s.Fields) > 0 {
-			self.addIndent()
+		self.write(typeCoder.Bool + " ")
+		self.write(ident)
+		self.write(structDefaultEqMethodSuffix)
+		self.write("(")
+		self.write(ident)
+		self.write(" *_self_, ")
+		self.write(ident)
+		self.write(" _other_) {")
+		if len(s.Fields) == 0 {
+			self.write(" return true; }\n\n")
+			ret
+		}
+		self.addIndent()
+		self.write("\n")
+		self.indent()
+		self.write("return ")
+		self.addIndent()
+		mut writed := false
+
+		// Common model for custom expressions.
+		mut lmodel := "_self_->"
+		mut rmodel := "_other_."
+
+		for (_, mut f) in s.Fields {
+			// Skip binded struct kinds.
+			strct := f.Kind.Struct()
+			if strct != nil && strct.Decl != nil && strct.Decl.Binded {
+				continue
+			}
+			if writed {
+				self.write(" &&")
+			}
+			writed = true
 			self.write("\n")
 			self.indent()
-			self.write("return ")
-			self.addIndent()
-			mut writed := false
-			for (_, mut f) in s.Fields {
-				// Skip binded struct kinds.
-				strct := f.Kind.Struct()
-				if strct != nil && strct.Decl != nil && strct.Decl.Binded {
-					continue
-				}
-				if writed {
-					self.write(" &&")
-				}
-				writed = true
-				self.write("\n")
-				self.indent()
-				self.write("this->")
-				mut fIdent := StrBuilder.New(len(f.Decl.Ident))
-				identCoder.field(fIdent, f.Decl)
-				self.writeBytes(unsafe { fIdent.Buf() })
-				self.write(" == _other.")
-				self.writeBytes(unsafe { fIdent.Buf() })
-			}
-			self.doneIndent()
-			if !writed {
-				self.write("true")
-			}
-			self.write(";\n")
-			self.doneIndent()
-			self.indent()
-			self.write("}")
-		} else {
-			self.write(" return true; }")
-		}
-		self.write("\n\n")
-	}
 
-	fn structureOperatorNotEq(mut &self, ident: []byte, mut &s: &StructIns) {
-		if !s.Comparable {
-			ret
+			mut fIdent := StrBuilder.New(len(f.Decl.Ident))
+			identCoder.field(fIdent, f.Decl)
+			lmodel += unsafe { unsafe::BytesStr(fIdent.Buf()) }
+			rmodel += unsafe { unsafe::BytesStr(fIdent.Buf()) }
+			self.ec._unsafeBinary(self.Buf, lmodel, rmodel, f.Kind, f.Kind, TokenId.Eqs, TokenKind.Eqs)
+			lmodel = lmodel[:len(lmodel)-fIdent.Len()]
+			rmodel = lmodel[:len(rmodel)-fIdent.Len()]
 		}
+		self.doneIndent()
+		if !writed {
+			self.write("true")
+		}
+		self.write(";\n")
+		self.doneIndent()
 		self.indent()
-		if opt::Inline {
-			self.write("inline ")
-		}
-		self.write("bool operator!=(")
-		self.writeBytes(ident)
-		self.write(" _other) { return !this->operator==(_other); }\n\n")
-	}
-
-	// Write operator overloading forwarding for reserved function.
-	fn structureOperator(mut &self, ident: []byte, mut &f: &FnIns, op: str) {
-		if f == nil {
-			ret
-		}
-
-		unary := len(f.Params) == 1 // Just self parameter.
-		assignment := f.Decl.IsVoid()
-
-		self.indent()
-		if opt::Inline {
-			self.write("inline ")
-		}
-		if assignment {
-			self.writeBytes(ident)
-			self.write("&")
-		} else {
-			if f.Result.Prim() == nil {
-				// If result type is not primitive, always structure's itself.
-				self.writeBytes(ident)
-			} else {
-				// Logical.
-				self.write(typeCoder.Bool)
-			}
-		}
-		self.write(" operator")
-		self.write(op)
-		self.write("(")
-		if !unary {
-			mut p := f.Params[1]
-			self.tc.paramIns(self.Buf, p)
-			self.write(" _other")
-		}
-		self.write(") { ")
-		if !assignment {
-			self.write("return ")
-		}
-		identCoder.funcIns(self.Buf, f)
-		if !unary {
-			self.write("(this, _other); ")
-			if assignment {
-				self.write("return *this; ")
-			}
-			self.write("}")
-		} else {
-			self.write("(this); }")
-		}
-		self.write("\n\n")
+		self.write("}\n\n")
 	}
 
 	fn structureOperators(mut &self, mut &s: &StructIns) {
 		mut sb := StrBuilder.New(40)
 		identCoder.structureIns(sb, s)
-		ident := unsafe { sb.Buf() }
+		ident := sb.Str()
 
 		// Binary.
 		self.structureOperatorEq(ident, s)
-		self.structureOperatorNotEq(ident, s)
-		self.structureOperator(ident, s.Operators.Gt, ">")
-		self.structureOperator(ident, s.Operators.GtEq, ">=")
-		self.structureOperator(ident, s.Operators.Lt, "<")
-		self.structureOperator(ident, s.Operators.LtEq, "<=")
-		self.structureOperator(ident, s.Operators.Shl, "<<")
-		self.structureOperator(ident, s.Operators.Shr, ">>")
-		self.structureOperator(ident, s.Operators.Add, "+")
-		self.structureOperator(ident, s.Operators.Sub, "-")
-		self.structureOperator(ident, s.Operators.Div, "/")
-		self.structureOperator(ident, s.Operators.Mul, "*")
-		self.structureOperator(ident, s.Operators.Mod, "%")
-		self.structureOperator(ident, s.Operators.BitAnd, "&")
-		self.structureOperator(ident, s.Operators.BitOr, "|")
-		self.structureOperator(ident, s.Operators.BitXor, "^")
-
-		// Unary.
-		self.structureOperator(ident, s.Operators.Neg, "-")
-		self.structureOperator(ident, s.Operators.Pos, "+")
-		self.structureOperator(ident, s.Operators.BitNot, "~")
-
-		// Assignment.
-		self.structureOperator(ident, s.Operators.AddAssign, "+=")
-		self.structureOperator(ident, s.Operators.SubAssign, "-=")
-		self.structureOperator(ident, s.Operators.DivAssign, "/=")
-		self.structureOperator(ident, s.Operators.MulAssign, "*=")
-		self.structureOperator(ident, s.Operators.ModAssign, "%=")
-		self.structureOperator(ident, s.Operators.ShlAssign, "<<=")
-		self.structureOperator(ident, s.Operators.ShrAssign, ">>=")
-		self.structureOperator(ident, s.Operators.BitOrAssign, "|=")
-		self.structureOperator(ident, s.Operators.BitAndAssign, "&=")
-		self.structureOperator(ident, s.Operators.BitXorAssign, "^=")
 	}
 
 	fn structureInsDecl(mut &self, mut &s: &StructIns) {
@@ -740,12 +659,11 @@ impl ObjectCoder {
 		self.structureDestructor(s)
 		self.write("\n\n")
 
-		self.structureOperators(s)
-		self.write("\n")
-
 		self.doneIndent()
 		self.indent()
 		self.write("};")
+
+		self.structureOperators(s)
 	}
 
 	fn structureDecl(mut &self, mut &s: &Struct) {
@@ -1380,4 +1298,9 @@ fn isHeadDecl(mut &m: &Fn): bool {
 	mut mi := m.Instances[0]
 	const Static = false
 	ret FuncPattern.Dispose(mi.Owner.FindMethod("Dispose", Static))
+}
+
+// Reports whether structure needs default compare method.
+fn defaultEq(&s: &StructIns): bool {
+	ret s.Comparable && s.Operators.Eq == nil
 }

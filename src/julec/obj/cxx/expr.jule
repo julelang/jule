@@ -92,7 +92,8 @@ type PrimKind: types::TypeKind
 // Common group of semantic analysis expression model types and optimizer specific types.
 enum compExprModel: type {
 	ExprModel: ExprModel,
-	str, // For built-in expressions.
+	str,  // For built-in expressions.
+	&str, // For built-in expressions.
 	&UnsafeBinaryExprModel,
 	&UnsafeIndexingExprModel,
 	&StrCompExprModel,
@@ -219,6 +220,18 @@ impl exprCoder {
 		}
 	}
 
+	fn operatorOverloadingUnary(mut &self, mut &s: &StructIns, op: TokenId, mut e: compExprModel) {
+		const Unary = true
+		f := obj::FindOperator(s, op, Unary)
+		if f == nil {
+			panic("unary operator overloading is not exist, this is an implementation mistake")
+		}
+		identCoder.funcIns(self.oc.Buf, f)
+		self.oc.write("(&")
+		self.possibleRefExpr(e)
+		self.oc.write(")")
+	}
+
 	fn divByZeroBinary(mut &self, &op: &Token, mut &l: &OperandExprModel, mut &r: &OperandExprModel) {
 		self.oc.write("jule::")
 		match op.Id {
@@ -241,35 +254,55 @@ impl exprCoder {
 		self.oc.write(")")
 	}
 
-	fn unsafeBinary(mut &self, mut m: &BinaryExprModel) {
-		if m.Op.Id == TokenId.Eqs || m.Op.Id == TokenId.NotEq {
+	fn _unsafeBinary(mut &self, mut &buf: StrBuilder, &l: str, &r: str,
+		mut &lk: &TypeKind, mut &rk: &TypeKind, op: TokenId, kind: str) {
+		// Operator overloading.
+		if lk.Struct() != nil {
+			mut s := lk.Struct()
+			operatorOverloadingBinary(buf, s, l, r, op, kind)
+			ret
+		}
+
+		if op == TokenId.Eqs || op == TokenId.NotEq {
 			// If this binary operator comparing <any> type.
 			// The m.Left is will be <any> one always.
-			if obj::IsAny(m.Left.Kind) {
-				if !m.Right.Kind.IsNil() && !obj::IsAny(m.Right.Kind) {
-					self.oc.write("(")
-					if m.Op.Id == TokenId.NotEq {
-						self.oc.write("!")
+			if obj::IsAny(lk) {
+				if !rk.IsNil() && !obj::IsAny(rk) {
+					buf.WriteByte('(')
+					if op == TokenId.NotEq {
+						buf.WriteByte('!')
 					}
-					i := self.oc.pushAnyType(m.Right.Kind)
-					self.oc.write(anyTypeIdent)
-					self.oc.write(conv::Itoa(i))
-					self.oc.write("_compare(")
-					self.possibleRefExpr(m.Left.Model)
-					self.oc.write(", ")
-					self.possibleRefExpr(m.Right.Model)
-					self.oc.write("))")
+					i := self.oc.pushAnyType(rk)
+					buf.WriteStr(anyTypeIdent)
+					buf.WriteStr(conv::Itoa(i))
+					buf.WriteStr("_compare(")
+					buf.WriteStr(l)
+					buf.WriteStr(", ")
+					buf.WriteStr(r)
+					buf.WriteStr("))")
 					ret
 				}
 			}
 		}
-		self.oc.write("(")
+		buf.WriteByte('(')
+		buf.WriteStr(l)
+		buf.WriteByte(' ')
+		buf.WriteStr(kind)
+		buf.WriteByte(' ')
+		buf.WriteStr(r)
+		buf.WriteByte(')')
+	}
+
+	fn unsafeBinary(mut &self, mut m: &BinaryExprModel) {
+		i := self.oc.Buf.Len()
+		mut oldbuf := unsafe { self.oc.Buf.Buf() }
 		self.possibleRefExpr(m.Left.Model)
-		self.oc.write(" ")
-		self.oc.write(m.Op.Kind)
-		self.oc.write(" ")
+		l := str(unsafe { self.oc.Buf.Buf()[i:] })
+		unsafe { self.oc.Buf.SetBuf(oldbuf) }
 		self.possibleRefExpr(m.Right.Model)
-		self.oc.write(")")
+		r := str(unsafe { self.oc.Buf.Buf()[i:] })
+		unsafe { self.oc.Buf.SetBuf(oldbuf) }
+		self._unsafeBinary(self.oc.Buf, l, r, m.Left.Kind, m.Right.Kind, m.Op.Id, m.Op.Kind)
 	}
 
 	fn binary(mut &self, mut m: &BinaryExprModel) {
@@ -305,6 +338,13 @@ impl exprCoder {
 	}
 
 	fn unary(mut &self, mut m: &UnaryExprModel) {
+		// Operator overloading.
+		if m.Expr.Kind.Struct() != nil {
+			mut s := m.Expr.Kind.Struct()
+			self.operatorOverloadingUnary(s, m.Op.Id, m.Expr.Model)
+			ret
+		}
+
 		match m.Op.Id {
 		| TokenId.Caret:
 			self.oc.write("(~(")
@@ -1418,6 +1458,8 @@ impl exprCoder {
 		match type m {
 		| str:
 			self.oc.write(str(m))
+		| &str:
+			self.oc.write(*(&str)(m))
 		| &TypeKind:
 			self.oc.tc.kind(self.oc.Buf, (&TypeKind)(m))
 		| &Const:
@@ -1686,4 +1728,32 @@ fn utoa(mut &s: StrBuilder, x: u64) {
 		s.WriteByte('L')
 	}
 	s.WriteStr("LU")
+}
+
+fn operatorOverloadingBinary(mut &buf: StrBuilder, mut &s: &StructIns, &l: str,
+	&r: str, op: TokenId, kind: str) {
+	const Unary = false
+	mut f := (&FnIns)(nil)
+	if op == TokenId.NotEq {
+		f = obj::FindOperator(s, TokenId.Eqs, Unary)
+		buf.WriteByte('!')
+	} else {
+		f = obj::FindOperator(s, op, Unary)
+	}
+	if f == nil {
+		if op == TokenId.Eqs || op == TokenId.NotEq {
+			// Equal method not exist. Compiler will create, use default method.
+			identCoder.structureIns(buf, s)
+			buf.WriteStr(structDefaultEqMethodSuffix)
+		goto common
+		}
+		panic("binary operator overloading is not exist, this is an implementation mistake")
+	}
+	identCoder.funcIns(buf, f)
+common:
+	buf.WriteStr("(&")
+	buf.WriteStr(l)
+	buf.WriteStr(", ")
+	buf.WriteStr(r)
+	buf.WriteByte(')')
 }
