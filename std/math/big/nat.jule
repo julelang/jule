@@ -189,6 +189,44 @@ impl nat {
 		ret r
 	}
 
+	// Sets self to quotient self/y, returns remainder self%y.
+	fn divMod(mut self, y: nat): nat {
+		if self.len() == 0 {
+			// Left operans is zero, remainder is always zero.
+			ret nat.zero()
+		}
+		match y.len() {
+		| 1:
+			// Right operand is 1, remainder is always zero.
+			ret nat.zero()
+		| 0:
+			panic("std::math::big: division by zero")
+		}
+		match self.cmp(y) {
+		| -1:
+			// Left operand is less than right operand.
+			// Quotient is always equals to zero, remainder equals to left operand.
+			mut rem := nat{self.bits}
+			self.bits = nil
+			ret rem
+		| 0:
+			// Left operand and right operand are equal.
+			// Quotient is always equals one, remainder zero.
+			self.bits = [1]
+			ret nat.zero()
+		}
+		mut xb := cloneBits(self.bits)
+		mut q := make(bits, len(xb))
+		copy(q[len(q)-len(y.bits):], y.bits)
+		mut s := make(bits, len(xb))
+		recursiveDiv(xb, y.bits, s, q)
+		self.bits = s
+		self.fit()
+		mut rem := nat{xb}
+		rem.fit()
+		ret rem
+	}
+
 	// Divides nat.
 	fn DivAssign(mut self, y: nat) {
 		if self.len() == 0 {
@@ -197,26 +235,26 @@ impl nat {
 		}
 		match y.len() {
 		| 1:
-			// Right operand is 1, quotient is always equals to left operand.
+			// Right operand is 1, remainder is always zero.
 			ret
 		| 0:
 			panic("std::math::big: division by zero")
 		}
 		match self.cmp(y) {
 		| -1:
-			// Left operand is less than right oprand.
-			// Quotient is always equals to zero.
+			// Left operand is less than right operand.
+			// Quotient is always equals to zero, remainder equals to left operand.
 			self.bits = nil
 			ret
 		| 0:
-			// Left oprand and right operand are equal.
-			// Quotient is always zero.
+			// Left operand and right operand are equal.
+			// Quotient is always equals one, remainder zero.
 			self.bits = [1]
 			ret
 		}
 		mut xb := cloneBits(self.bits)
 		mut q := make(bits, len(xb))
-		_ = copy(q[len(q)-len(y.bits):], y.bits)
+		copy(q[len(q)-len(y.bits):], y.bits)
 		mut s := make(bits, len(xb))
 		recursiveDiv(xb, y.bits, s, q)
 		self.bits = s
@@ -233,7 +271,7 @@ impl nat {
 	// Modulo nat.
 	fn ModAssign(mut self, y: nat) {
 		if self.len() == 0 {
-			// Left operans is zero, remainder is always zero.
+			// Left operands is zero, remainder is always zero.
 			ret
 		}
 		match {
@@ -243,7 +281,7 @@ impl nat {
 			ret
 		| y.len() == 2 && y.bits[0] == 0b0:
 			// Right operand is 2.
-			// If left opeand is even, remainder is always zero.
+			// If left operand is even, remainder is always zero.
 			// If left operand is odd, remainder is always one.
 			if self.even() {
 				self.bits = nil
@@ -260,14 +298,14 @@ impl nat {
 			// Remainder always equals to left operand.
 			ret
 		| 0:
-			// Left oprand and right operand are equal.
+			// Left operand and right operand are equal.
 			// Remainder is always zero.
 			self.bits = nil
 			ret
 		}
 		mut xb := cloneBits(self.bits)
 		mut q := make(bits, len(xb))
-		_ = copy(q[len(q)-len(y.bits):], y.bits)
+		copy(q[len(q)-len(y.bits):], y.bits)
 		self.bits = recursiveMod(xb, y.bits, q)
 		self.fit()
 	}

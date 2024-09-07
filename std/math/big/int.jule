@@ -146,6 +146,17 @@ impl Int {
 		self.minus = self.Len() > 0 && self.minus != y.minus
 	}
 
+	// Sets self to quotient self/y, returns remainder self%y.
+	fn DivMod(mut self, y: Int): Int {
+		mut r := Int{
+			minus: self.minus,
+			nat: self.nat.divMod(y.nat),
+		}
+		self.minus = self.minus != y.minus && self.Len() > 0 // 0 has no sign
+		handleRem(r, y)
+		ret r
+	}
+
 	// Divides two Int and returns result.
 	fn Div(self, y: Int): Int {
 		mut r := self
@@ -156,11 +167,7 @@ impl Int {
 	// Divides Int.
 	fn DivAssign(mut self, y: Int) {
 		self.nat /= y.nat
-		if self.Len() == 0 {
-			self.minus = false
-		} else {
-			self.minus = self.minus != y.minus
-		}
+		self.minus = self.minus != y.minus && self.Len() > 0 // 0 has no sign
 	}
 
 	// Modulo two Int and returns result.
@@ -172,18 +179,8 @@ impl Int {
 
 	// Modulo Int.
 	fn ModAssign(mut self, y: Int) {
-		if self.minus == y.minus {
-			self.nat %= y.nat
-			self.minus = self.Len() > 0 && y.minus
-			ret
-		}
 		self.nat %= y.nat
-		if self.Len() == 0 {
-			self.minus = false
-			ret
-		}
-		self.nat -= y.nat
-		self.minus = self.Len() > 0 && y.minus
+		handleRem(self, y)
 	}
 
 	// Bitwise left shift.
@@ -222,7 +219,7 @@ impl Int {
 	fn BitOrAssign(mut self, y: Int) {
 		if self.Len() < y.Len() {
 			mut xb := make(bits, y.Len())
-			_ = copy(xb, self.nat.bits)
+			copy(xb, self.nat.bits)
 			self.nat.bits = xb
 		}
 		if self.minus {
@@ -252,7 +249,7 @@ impl Int {
 	fn BitAndAssign(mut self, y: Int) {
 		if self.Len() < y.Len() {
 			mut xb := make(bits, y.Len())
-			_ = copy(xb, self.nat.bits)
+			copy(xb, self.nat.bits)
 			self.nat.bits = xb
 		}
 		if self.minus {
@@ -292,7 +289,7 @@ impl Int {
 		}
 		if self.Len() < y.Len() {
 			mut xb := make(bits, y.Len())
-			_ = copy(xb, self.nat.bits)
+			copy(xb, self.nat.bits)
 			self.nat.bits = xb
 		}
 		if self.minus {
@@ -502,4 +499,13 @@ fn min(a: int, b: int): int {
 		ret a
 	}
 	ret b
+}
+
+// Handles remainder after x%y computation.
+// Assumes r equals to remainder x%y.
+fn handleRem(mut &r: Int, &y: Int) {
+	if r.minus != y.minus && r.nat.len() > 0 {
+		r.nat -= y.nat
+	}
+	r.minus = y.minus && r.Len() > 0 // 0 has no sign
 }
