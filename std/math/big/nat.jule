@@ -421,6 +421,44 @@ impl nat {
 		ret self.cmp(y) == 0
 	}
 
+	// Returns square root |√self| of number.
+	fn sqrt(self): nat {
+		if self.cmp(nat.one()) <= 0 {
+			ret self
+		}
+		// The following algorithm and description adopted from the Go programming language.
+		// Source file: https://github.com/golang/go/blob/509bbeb407f58d06a8680b48a7f02f530d67f088/src/math/big/nat.go
+		//
+		// Start with value known to be too large and repeat "z = ⌊(z + ⌊x/z⌋)/2⌋" until it stops getting smaller.
+		// See Brent and Zimmermann, Modern Computer Arithmetic, Algorithm 1.13 (SqrtInt).
+		// https://members.loria.fr/PZimmermann/mca/pub226.html
+		// If x is one less than a perfect square, the sequence oscillates between the correct z and z+1;
+		// otherwise it converges to the correct z and stays there.
+		mut z1 := nat.one().bits
+		mut z2 := nat.zero().bits
+		z1 = lsh(z1, (self.len() + 1) >> 1) // must be ≥ √x
+		mut n := 0
+		for {
+			// z2 = x / z1
+			mut xb := cloneBits(self.bits)
+			mut q := make(bits, len(xb))
+			copy(q[len(q)-len(z1):], z1)
+			z2 = make(bits, len(xb))
+			recursiveDiv(xb, z1, z2, q)
+			fit(z2)
+
+			addRes(z2, z1)
+			z2 = rsh(z2, 1)
+			if cmp(z2, z1) >= 0 {
+				// z1 is answer.
+				ret nat{z1}
+			}
+			z1, z2 = z2, z1
+			n++
+		}
+		panic("std::math::big: nat.sqrt implementation mistake")
+	}
+
 	// Reports whether number is odd.
 	fn odd(self): bool {
 		ret isOdd(self.bits)
