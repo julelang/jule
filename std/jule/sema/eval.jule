@@ -3993,16 +3993,23 @@ impl binaryEval {
 		}
 	}
 
-	fn checkSpecialCases(mut self) {
+	fn checkSpecialCases(mut self): (ok: bool) {
+		ok = true
 		if !self.l.Kind.Comparable() && !self.r.Kind.IsNil() {
 			self.e.pushErr(self.op, LogMsg.TypeIsNotComparable, self.l.Kind.Str())
+			ok = false
 		} else if !self.r.Kind.Comparable() && !self.l.Kind.IsNil() {
 			self.e.pushErr(self.op, LogMsg.TypeIsNotComparable, self.r.Kind.Str())
+			ok = false
 		}
+		ret ok
 	}
 
 	fn evalOp(mut self): &Data {
-		self.checkSpecialCases()
+		ok := self.checkSpecialCases()
+		if !ok {
+			ret nil
+		}
 		match {
 		| self.l.Kind.Void():
 			self.e.pushErr(self.op, LogMsg.OperatorNotForJuleType, self.op.Kind, "void")
