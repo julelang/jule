@@ -271,16 +271,26 @@ fn basicMul(mut &x: bits, mut y: bits): bits {
 	| len(y):
 		ret x
 	}
-	let mut r: bits = nil
-	mut m := make(bits, len(x), len(x) << 1)
-	_ = copy(m, x)
-	for len(y) > 0 {
-		if isOdd(y) {
+
+	// Allocate enough space for karatsuba of x0*y0 and full result of x*y.
+	k := karatsubaLen(min(len(x), len(y)))
+	t := len(x) + len(y)
+	n := max(k, t)
+	mut r := make(bits, n)
+
+	// Allocate enough space for shifting.
+	mut m := append(make(bits, 0, t), x...)
+
+	// Compute.
+	mut yp := &y[0]
+	end := yp + len(y)
+	for yp < end; yp++ {
+		if unsafe { *yp == 0b1 } { // Is odd.
 			addRes(r, m)
 		}
+		// m<<1
 		m = append(m[:1], m...)
 		m[0] = 0b0
-		y = y[1:]
 	}
 	ret r
 }
@@ -309,6 +319,45 @@ fn rsh(mut x: bits, y: int): bits {
 // If the y operand's bitlength <= threshold, use basic multiplication algorithm.
 const karatsubaThreshold = (1 << 5) + (1 << 4)
 
+// Computes an approximation to the maximum k <= n such that
+// k = p<<i for a number p <= threshold and an i >= 0. Thus, the
+// result is the largest number that can be divided repeatedly by 2 before
+// becoming about the value of threshold.
+fn karatsubaLen(mut n: int): int {
+	mut i := uint(0)
+	for n > karatsubaThreshold {
+		n >>= 1
+		i++
+	}
+	ret n << i
+}
+
+// Same as [lsh] but optimized for karatsuba.
+// Use it only no mutation risk for other bits.
+fn karatsubaLsh(mut x: bits, mut y: int): bits {
+	if y > 0 && len(x) > 0 {
+		mut n := len(x) + y
+		if cap(x)-n >= 0 {
+			mut z := len(x)
+			x = x[:n]
+			for z > 0 {
+				n--
+				z--
+				x[n] = x[z]
+			}
+			for y > 0 {
+				y--
+				x[y] = 0b0
+			}
+			ret x
+		}
+		mut x2 := make(bits, len(x) + y)
+		_ = copy(x2[y:], x)
+		ret x2
+	}
+	ret x
+}
+
 fn karatsuba(mut x: bits, mut y: bits): bits {
 	fit(x)
 	fit(y)
@@ -329,9 +378,9 @@ fn karatsuba(mut x: bits, mut y: bits): bits {
 	mut z1 := karatsuba(x0, y0)
 	subRes(z1, z2)
 	subRes(z1, z0)
-	z1 = lsh(z1, m)
+	z1 = karatsubaLsh(z1, m)
 	addRes(z1, z0)
-	addRes(z1, lsh(z2, m << 1))
+	addRes(z1, karatsubaLsh(z2, m << 1))
 	ret z1
 }
 
