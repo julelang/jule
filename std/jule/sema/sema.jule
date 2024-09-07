@@ -1025,10 +1025,16 @@ impl sema {
 		for (_, mut p) in ins.Params {
 			if !p.Decl.IsSelf() {
 				p.Kind = tc.checkDecl(p.Decl.Kind.Decl)
+				if p.Kind == nil {
+					ret nil
+				}
 			}
 		}
 		if !f.IsVoid() {
 			ins.Result = tc.checkDecl(f.Result.Kind.Decl)
+			if ins.Result == nil {
+				ret nil
+			}
 		}
 
 		ret ins
@@ -1998,7 +2004,9 @@ impl sema {
 			tfK := self.getTraitCheckFnKind(tf)
 			if sf != nil {
 				mut sfK := self.getTraitCheckFnKind(sf)
-				exist = tfK.equalTrait(sfK)
+				if sfK != nil {
+					exist = tfK.equalTrait(sfK)
+				}
 			}
 			if exist {
 				d := findDirective(sf.Directives, Directive.Deprecated)
