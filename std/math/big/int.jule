@@ -90,11 +90,11 @@ impl Int {
 			// (-x) + y == y - x == -(x - y)
 			if self.nat.cmp(y.nat) >= 0 {
 				self.nat -= y.nat
-				self.minus = self.minus && self.nat.len() > 0 // 0 has no sign
 			} else {
+				self.minus = !self.minus
 				self.nat = y.nat - self.nat
-				self.minus = !self.minus && self.nat.len() > 0 // 0 has no sign
 			}
+			self.minus = self.minus && self.nat.len() > 0 // 0 has no sign
 		}
 	}
 
@@ -107,27 +107,21 @@ impl Int {
 
 	// Subtracts Int.
 	fn SubAssign(mut self, y: Int) {
-		if y.Len() == 0 {
-			ret
-		}
-		mut cmp := self.Cmp(y)
-		if cmp == 0 {
-			self.minus = false
-			self.nat = nat.zero()
-			ret
-		}
-		if self.minus == y.minus {
-			self.minus = cmp == -1
-			if cmp == +1 {
+		if self.minus != y.minus {
+			// x - (-y) == x + y
+			// (-x) - y == -(x + y)
+			self.nat += y.nat
+		} else {
+			// x - y == x - y == -(y - x)
+			// (-x) - (-y) == y - x == -(x - y)
+			if self.nat.cmp(y.nat) >= 0 {
 				self.nat -= y.nat
 			} else {
+				self.minus = !self.minus
 				self.nat = y.nat - self.nat
 			}
-			ret
+			self.minus = self.minus && self.nat.len() > 0 // 0 has no sign
 		}
-		self.minus = false
-		self.nat += y.nat
-		ret
 	}
 
 	// Multiplies two Int and returns result.
