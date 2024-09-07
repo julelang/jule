@@ -260,6 +260,26 @@ fn isEven(&b: bits): bool {
 	ret len(b) > 0 && b[0] == 0b0
 }
 
+fn cloneBits(x: bits): bits {
+	ret append(make(bits, 0, len(x)), x...)
+}
+
+fn lsh(mut x: bits, y: int): bits {
+	if y > 0 && len(x) > 0 {
+		mut x2 := make(bits, len(x) + y)
+		_ = copy(x2[y:], x)
+		ret x2
+	}
+	ret x
+}
+
+fn rsh(mut x: bits, y: int): bits {
+	if y > len(x) {
+		ret nil
+	}
+	ret x[y:]
+}
+
 // Basic multiplication algorithm for bits.
 fn basicMul(mut &x: bits, mut y: bits): bits {
 	if len(x) == 0 || len(y) == 0 {
@@ -295,24 +315,32 @@ fn basicMul(mut &x: bits, mut y: bits): bits {
 	ret r
 }
 
-fn cloneBits(x: bits): bits {
-	ret append(make(bits, 0, len(x)), x...)
-}
-
-fn lsh(mut x: bits, y: int): bits {
-	if y > 0 && len(x) > 0 {
-		mut x2 := make(bits, len(x) + y)
-		_ = copy(x2[y:], x)
-		ret x2
+// Basic square algorithm for bits.
+fn basicSqr(mut &x: bits): bits {
+	if len(x) <= 1 {
+		ret x
 	}
-	ret x
-}
 
-fn rsh(mut x: bits, y: int): bits {
-	if y > len(x) {
-		ret nil
+	// Allocate enough space for full result of x*x.
+	k := karatsubaLen(len(x))
+	n := max(k, len(x))
+	mut r := make(bits, n)
+
+	// Allocate enough space for shifting.
+	mut m := append(make(bits, 0, len(x) << 1), x...)
+
+	// Compute.
+	mut xp := &x[0]
+	end := xp + len(x)
+	for xp < end; xp++ {
+		if unsafe { *xp == 0b1 } { // Is odd.
+			addRes(r, m)
+		}
+		// m<<1
+		m = append(m[:1], m...)
+		m[0] = 0b0
 	}
-	ret x[y:]
+	ret r
 }
 
 // This threshold is represents number of bits small numbers for karatsuba algorithm.
@@ -358,7 +386,7 @@ fn karatsubaLsh(mut x: bits, mut y: int): bits {
 	ret x
 }
 
-fn karatsuba(mut x: bits, mut y: bits): bits {
+fn karatsubaMul(mut x: bits, mut y: bits): bits {
 	fit(x)
 	fit(y)
 	if len(x) < karatsubaThreshold || len(y) < karatsubaThreshold {
@@ -371,11 +399,32 @@ fn karatsuba(mut x: bits, mut y: bits): bits {
 	mut y1 := rsh(y, m)
 	mut y0 := cloneBits(y)
 	subRes(y0, lsh(y1, m))
-	mut z2 := karatsuba(x1, y1)
-	mut z0 := karatsuba(x0, y0)
+	mut z2 := karatsubaMul(x1, y1)
+	mut z0 := karatsubaMul(x0, y0)
 	addRes(x0, x1)
 	addRes(y0, y1)
-	mut z1 := karatsuba(x0, y0)
+	mut z1 := karatsubaMul(x0, y0)
+	subRes(z1, z2)
+	subRes(z1, z0)
+	z1 = karatsubaLsh(z1, m)
+	addRes(z1, z0)
+	addRes(z1, karatsubaLsh(z2, m << 1))
+	ret z1
+}
+
+fn karatsubaSqr(mut x: bits): bits {
+	fit(x)
+	if len(x) < karatsubaThreshold {
+		ret basicSqr(x)
+	}
+	m := len(x) >> 1
+	mut x1 := rsh(x, m)
+	mut x0 := cloneBits(x)
+	subRes(x0, lsh(x1, m))
+	mut z2 := karatsubaSqr(x1)
+	mut z0 := karatsubaSqr(x0)
+	addRes(x0, x1)
+	mut z1 := karatsubaSqr(x0)
 	subRes(z1, z2)
 	subRes(z1, z0)
 	z1 = karatsubaLsh(z1, m)
