@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use std::unsafe
+
 // Single bit.
 type bit: byte
 
@@ -10,12 +12,10 @@ type bits: []bit
 
 const _INT_SIZE = 32 << (^uint(0) >> 63)
 
-fn u64FromBits(b: bits): u64 {
-	mut u := u64(0)
-	for i, bit in b {
-		u |= u64(bit) << i
+fn setU64(mut &b: bits, z: u64) {
+	for i in b {
+		b[i] = bit((z >> i) & 0b1)
 	}
-	ret u
 }
 
 // Add one to bits.
@@ -292,7 +292,13 @@ fn basicMul(mut &x: bits, mut y: bits): bits {
 	mut r := make(bits, n)
 
 	// Allocate enough space for shifting.
-	mut m := append(make(bits, 0, t), x...)
+	mut m := bits(nil)
+	if t <= karatsubaShiftCacheSize {
+		m = karatsubaLshC(x, 1) // Shift by 1 to get cache memory.
+		m = m[1:] // Remove shifting.
+	} else {
+		m = append(make(bits, 0, t), x...)
+	}
 
 	// Compute.
 	mut yp := &y[0]
@@ -310,35 +316,32 @@ fn basicMul(mut &x: bits, mut y: bits): bits {
 
 // Basic square algorithm for bits.
 fn basicSqr(mut &x: bits): bits {
-	if len(x) <= 1 {
-		ret x
+	// Number of bits for square.
+	// The result guaranteed to fit into u64.
+	// Maximum result equals to (1<<30) * (1<<30).
+	const squareThreshold = 30
+	if len(x) <= squareThreshold {
+		// Allocate enough space for full result of x*x.
+		k := karatsubaLen(len(x))
+		n := max(k, len(x) << 1)
+		mut r := make(bits, n)
+
+		mut z := u64FromBits(x)
+		z *= z
+		setU64(r, z)
+		outln(r)
+		ret r
 	}
-
-	// Allocate enough space for full result of x*x.
-	k := karatsubaLen(len(x))
-	n := max(k, len(x))
-	mut r := make(bits, n)
-
-	// Allocate enough space for shifting.
-	mut m := append(make(bits, 0, len(x) << 1), x...)
-
-	// Compute.
-	mut xp := &x[0]
-	end := xp + len(x)
-	for xp < end; xp++ {
-		if unsafe { *xp == 0b1 } { // Is odd.
-			addRes(r, m)
-		}
-		// m<<1
-		m = append(m[:1], m...)
-		m[0] = 0b0
-	}
-	ret r
+	ret basicMul(x, x)
 }
 
 // This threshold is represents number of bits small numbers for karatsuba algorithm.
 // If the y operand's bitlength <= threshold, use basic multiplication algorithm.
-const karatsubaThreshold = (1 << 5) + (1 << 4)
+const karatsubaThreshold = 1 << 6
+
+// Size of preallocated left shift memory.
+// The shifted memory is stack allocated and designed for temporary use.
+const karatsubaShiftCacheSize = 1 << 10
 
 // Computes an approximation to the maximum k <= n such that
 // k = p<<i for a number p <= threshold and an i >= 0. Thus, the
@@ -356,42 +359,65 @@ fn karatsubaLen(mut n: int): int {
 // Same as [lsh] but optimized for karatsuba.
 // Use it only no mutation risk for other bits.
 fn karatsubaLsh(mut x: bits, mut y: int): bits {
-	if y > 0 && len(x) > 0 {
-		mut n := len(x) + y
-		if cap(x)-n >= 0 {
-			mut z := len(x)
-			x = x[:n]
-			for z > 0 {
-				n--
-				z--
-				x[n] = x[z]
-			}
-			for y > 0 {
-				y--
-				x[y] = 0b0
-			}
-			ret x
-		}
-		mut x2 := make(bits, len(x) + y)
-		copy(x2[y:], x)
-		ret x2
+	if y == 0 || len(x) == 0 {
+		ret x
 	}
-	ret x
+	mut n := len(x) + y
+	if cap(x)-n >= 0 {
+		mut z := len(x)
+		x = x[:n]
+		for z > 0 {
+			n--
+			z--
+			x[n] = x[z]
+		}
+		for y > 0 {
+			y--
+			x[y] = 0b0
+		}
+		ret x
+	}
+	mut x2 := make(bits, n)
+	copy(x2[y:], x)
+	ret x2
+}
+
+// Same as [karatsubaLsh], but implements preallocated fast cache memory.
+fn karatsubaLshC(mut x: bits, mut y: int): bits {
+	static mut cache: [karatsubaShiftCacheSize]bit = [0, ...]
+
+	if y == 0 || len(x) == 0 {
+		ret x
+	}
+
+	mut n := len(x) + y
+
+	// Fits in preallocated cache.
+	if len(cache) >= n {
+		mut s := unsafe::Slice(&cache[0], n)
+		copy(s[y:], x)
+		y--
+		for y >= 0; y-- {
+			s[y] = 0b0
+		}
+		ret s
+	}
+
+	ret karatsubaLsh(x, y)
 }
 
 fn karatsubaMul(mut x: bits, mut y: bits): bits {
 	fit(x)
 	fit(y)
-	if len(x) < karatsubaThreshold || len(y) < karatsubaThreshold {
+	n := min(len(x), len(y))
+	if n < karatsubaThreshold {
 		ret basicMul(x, y)
 	}
-	m := max(len(x), len(y)) >> 1
-	mut x1 := rsh(x, m)
-	mut x0 := cloneBits(x)
-	subRes(x0, lsh(x1, m))
-	mut y1 := rsh(y, m)
-	mut y0 := cloneBits(y)
-	subRes(y0, lsh(y1, m))
+	m := n >> 1
+	mut x1 := x[m:]
+	mut x0 := cloneBits(x[:m])
+	mut y1 := y[m:]
+	mut y0 := cloneBits(y[:m])
 	mut z2 := karatsubaMul(x1, y1)
 	mut z0 := karatsubaMul(x0, y0)
 	addRes(x0, x1)
@@ -401,7 +427,7 @@ fn karatsubaMul(mut x: bits, mut y: bits): bits {
 	subRes(z1, z0)
 	z1 = karatsubaLsh(z1, m)
 	addRes(z1, z0)
-	addRes(z1, karatsubaLsh(z2, m << 1))
+	addRes(z1, karatsubaLshC(z2, m << 1))
 	ret z1
 }
 
@@ -411,9 +437,8 @@ fn karatsubaSqr(mut x: bits): bits {
 		ret basicSqr(x)
 	}
 	m := len(x) >> 1
-	mut x1 := rsh(x, m)
-	mut x0 := cloneBits(x)
-	subRes(x0, lsh(x1, m))
+	mut x1 := x[m:]
+	mut x0 := cloneBits(x[:m])
 	mut z2 := karatsubaSqr(x1)
 	mut z0 := karatsubaSqr(x0)
 	addRes(x0, x1)
@@ -422,7 +447,7 @@ fn karatsubaSqr(mut x: bits): bits {
 	subRes(z1, z0)
 	z1 = karatsubaLsh(z1, m)
 	addRes(z1, z0)
-	addRes(z1, karatsubaLsh(z2, m << 1))
+	addRes(z1, karatsubaLshC(z2, m << 1))
 	ret z1
 }
 
