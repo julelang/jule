@@ -18,34 +18,33 @@ fn Str(b: *byte, n: int): str {
 }
 
 // Returns slice based on e, the parameter e means first element of slice.
-// The returned slice uses n as length and capacity.
 // Will not perform garbage collection.
-fn Slice[Elem](e: *Elem, n: int): []Elem {
+fn Slice[Elem](e: *Elem, len: int, cap: int): []Elem {
 	mut buf := []Elem(nil)
 	unsafe {
 		integ::Emit("{}.data = {}::make({}, {})", buf, &Elem, e, nil)
-		integ::Emit("{}._len = {}", buf, n)
-		integ::Emit("{}._cap = {}", buf, n)
+		integ::Emit("{}._len = {}", buf, len)
+		integ::Emit("{}._cap = {}", buf, cap)
 		integ::Emit("{}._slice = {}", buf, e)
 	}
 	ret buf
 }
 
-// Alias for Slice(b, n).
+// Alias for Slice(b, n, n).
 fn Bytes(b: *byte, n: int): []byte {
-	ret Slice(b, n)
+	ret Slice(b, n, n)
 }
 
-// Alias for Slice(&s[0], len(s)).
+// Alias for Slice(&s[0], len(s), len(s)).
 // Returns nil if len(s) == 0.
 fn StrBytes(s: str): []byte {
 	if len(s) == 0 {
 		ret nil
 	}
-	ret Slice(&s[0], len(s))
+	ret Slice(&s[0], len(s), len(s))
 }
 
-// Alias for Str(&b[0], len(b)).
+// Alias for Str(&b[0], len(b), len(b)).
 // Returns empty string if len(b) == 0.
 fn BytesStr(b: []byte): str {
 	if len(b) == 0 {

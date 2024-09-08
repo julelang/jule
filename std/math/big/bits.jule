@@ -292,13 +292,8 @@ fn basicMul(mut &x: bits, mut y: bits): bits {
 	mut r := make(bits, n)
 
 	// Allocate enough space for shifting.
-	mut m := bits(nil)
-	if t <= karatsubaShiftCacheSize {
-		m = karatsubaLshC(x, 1) // Shift by 1 to get cache memory.
-		m = m[1:] // Remove shifting.
-	} else {
-		m = append(make(bits, 0, t), x...)
-	}
+	mut m := karatsubaLshC(x, t)
+	m = m[t:]
 
 	// Compute.
 	mut yp := &y[0]
@@ -308,7 +303,8 @@ fn basicMul(mut &x: bits, mut y: bits): bits {
 			addRes(r, m)
 		}
 		// m<<1
-		m = append(m[:1], m...)
+		m = m[:len(m)+1]
+		copy(m[1:], m)
 		m[0] = 0b0
 	}
 	ret r
@@ -316,23 +312,49 @@ fn basicMul(mut &x: bits, mut y: bits): bits {
 
 // Basic square algorithm for bits.
 fn basicSqr(mut &x: bits): bits {
+	k := karatsubaLen(len(x))
+	t := len(x) << 1
+	n := max(k, t)
+
 	// Number of bits for square.
 	// The result guaranteed to fit into u64.
 	// Maximum result equals to (1<<30) * (1<<30).
 	const squareThreshold = 30
 	if len(x) <= squareThreshold {
 		// Allocate enough space for full result of x*x.
-		k := karatsubaLen(len(x))
-		n := max(k, len(x) << 1)
 		mut r := make(bits, n)
 
 		mut z := u64FromBits(x)
 		z *= z
 		setU64(r, z)
-		outln(r)
 		ret r
 	}
-	ret basicMul(x, x)
+	
+	// Allocate enough space for full result of x*x.
+	mut r := make(bits, n)
+
+	// Allocate enough space for shifting.
+	mut m := bits(nil)
+	if t <= karatsubaShiftCacheSize {
+		m = karatsubaLshC(x, 1) // Shift by 1 to get cache memory.
+		m = m[1:] // Remove shifting.
+	} else {
+		m = append(make(bits, 0, t), x...)
+	}
+
+	// Compute.
+	mut xp := &x[0]
+	end := xp + len(x)
+	for xp < end; xp++ {
+		if unsafe { *xp == 0b1 } { // Is odd.
+			addRes(r, m)
+		}
+		// m<<1
+		m = m[:len(m)+1]
+		copy(m[1:], m)
+		m[0] = 0b0
+	}
+	ret r
 }
 
 // This threshold is represents number of bits small numbers for karatsuba algorithm.
@@ -394,7 +416,7 @@ fn karatsubaLshC(mut x: bits, mut y: int): bits {
 
 	// Fits in preallocated cache.
 	if len(cache) >= n {
-		mut s := unsafe::Slice(&cache[0], n)
+		mut s := unsafe::Slice(&cache[0], n, karatsubaShiftCacheSize)
 		copy(s[y:], x)
 		y--
 		for y >= 0; y-- {
