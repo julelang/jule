@@ -536,17 +536,6 @@ impl ObjectCoder {
 		self.tc.kind(self.Buf, f.Kind)
 		self.write(" ")
 		identCoder.field(self.Buf, f.Decl)
-		if f.Default == nil {
-			if shouldInitialized(f.Kind) {
-				self.write(" = ")
-				// No default expression.
-				// Use default expression of data-type.
-				self.ec.initExpr(f.Kind)
-			}
-		} else {
-			self.write(" = ")
-			self.ec.possibleRefExpr(f.Default.Model)
-		}
 		self.write(";")
 	}
 
@@ -1051,14 +1040,12 @@ impl ObjectCoder {
 		})
 	}
 
-	fn globals(mut &self) {
+	fn globalDecls(mut &self) {
 		for (_, mut v) in self.ir.Ordered.Globals {
 			self.tc.kind(self.Buf, v.Kind.Kind)
 			self.write(" ")
 			identCoder.var(self.Buf, v)
-			self.write(" = ")
-			self.ec.model(v.Value.Data.Model)
-			self.write(";\n")
+			self.write(";")
 		}
 	}
 
@@ -1077,7 +1064,7 @@ impl ObjectCoder {
 		self.traitDatas()
 		self.write("\n\n")
 		self.declPos = self.Buf.Len()
-		self.globals()
+		self.globalDecls()
 	}
 
 	fn structureMethods(mut &self, mut &s: &StructIns) {
@@ -1205,6 +1192,16 @@ impl ObjectCoder {
 		}
 	}
 
+	fn initGlobals(mut &self) {
+		for (_, mut v) in self.ir.Ordered.Globals {
+			identCoder.var(self.Buf, v)
+			self.write(" = ")
+			self.ec.model(v.Value.Data.Model)
+			self.write(";\n")
+			self.Buf.WriteByte(indentKind)
+		}
+	}
+
 	fn initCaller(mut &self) {
 		self.write("void " + initCallerIdent + "(void) {\n")
 		self.addIndent()
@@ -1217,11 +1214,13 @@ impl ObjectCoder {
 
 	fn end(mut &self) {
 		self.write(`int main(int argc, char *argv[], char *envp[]) {
-    jule::setup_argv(argc, argv);
-    jule::setup_envp(envp);
+	jule::setup_argv(argc, argv);
+	jule::setup_envp(envp);
 
-    __jule_call_initializers();
-    `)
+	`)
+	self.initGlobals()
+	self.write(`__jule_call_initializers();
+	`)
 
 		if env::Test {
 			self.write("test_point();")
@@ -1231,7 +1230,7 @@ impl ObjectCoder {
 
 		self.write(`
 
-    return EXIT_SUCCESS;
+	return EXIT_SUCCESS;
 }`)
 	}
 

@@ -24,8 +24,10 @@ use std::jule::lex::{Token, TokenId, TokenKind}
 use std::jule::sema::{
 	Trait,
 	Var,
+	Arr,
 	FnIns,
 	StructIns,
+	FieldIns,
 	TypeKind,
 	Data,
 	Value,
@@ -86,6 +88,9 @@ const cppIgnore = "std::ignore"
 
 // Represents default expression for type.
 const cPpDefaultExpr = "{}"
+
+const collectionIdent = "__jule_collection"
+const collectionItIdent = "it"
 
 type PrimKind: types::TypeKind
 
@@ -397,24 +402,29 @@ impl exprCoder {
 			self.oc.write(")")
 		}
 		self.oc.write("{")
-		if len(m.Args) > 0 {
-			// Fields are should be in order.
-			// In other words, GCC will produce error(s).
-		iter:
-			for i, f in m.Strct.Fields {
-				for (_, mut arg) in m.Args {
-					if arg.Field == f {
-						self.oc.write(".")
-						identCoder.field(self.oc.Buf, arg.Field.Decl)
-						self.oc.write("=")
-						self.possibleRefExpr(arg.Expr.Model)
-						if len(m.Strct.Fields)-i > 1 {
-							self.oc.write(", ")
-						}
-						continue iter
+		// Fields are should be in order.
+		// In other words, GCC will produce error(s).
+	fields:
+		for (i, mut f) in m.Strct.Fields {
+			for (_, mut arg) in m.Args {
+				// Field exist, initialize it with literal expression.
+				if arg.Field == f {
+					if i > 0 {
+						self.oc.write(", ")
 					}
+					self.oc.write(".")
+					identCoder.field(self.oc.Buf, f.Decl)
+					self.oc.write("=")
+					self.possibleRefExpr(arg.Expr.Model)
+					continue fields
 				}
 			}
+			if i > 0 {
+				self.oc.write(", ")
+			}
+			// Field is not exist in literal arguments.
+			// Initialize it by default.
+			self.handleFieldByDefault(f)
 		}
 		self.oc.write("}")
 	}
@@ -929,10 +939,27 @@ impl exprCoder {
 			self.oc.write("()")
 			ret
 		}
+		self.oc.write("({ auto " + collectionIdent + " = ")
 		self.oc.tc.asSlice(self.oc.Buf, m.ElemKind)
-		self.oc.write("::make({")
-		self.models(m.Elems)
-		self.oc.write("})")
+		size := conv::Itoa(len(m.Elems))
+		self.oc.write("::alloc(")
+		self.oc.write(size)
+		self.oc.write(", ")
+		self.oc.write(size)
+		self.oc.write("); auto ")
+		self.oc.write(collectionItIdent)
+		self.oc.write(" = ")
+		self.oc.write(collectionIdent)
+		self.oc.write(".begin(); ")
+		for i in m.Elems {
+			self.oc.write("(*")
+			self.oc.write(collectionItIdent)
+			self.oc.write("++) = ")
+			self.possibleRefExpr(m.Elems[i])
+			self.oc.write("; ")
+		}
+		self.oc.write(collectionIdent)
+		self.oc.write("; })")
 	}
 
 	fn indexing(mut &self, mut m: &IndexingExprModel) {
@@ -1086,23 +1113,52 @@ impl exprCoder {
 	}
 
 	fn array(mut &self, mut m: &ArrayExprModel) {
-		self.oc.tc.array(self.oc.Buf, m.Kind)
-		if len(m.Elems) == 0 {
+		if m.Kind.N == 0 {
+			self.oc.tc.array(self.oc.Buf, m.Kind)
 			self.oc.write("()")
 			ret
 		}
 
 		// Filled.
 		if len(m.Elems) == 2 && m.Elems[1] == nil {
+			self.oc.tc.array(self.oc.Buf, m.Kind)
 			self.oc.write("(")
 			self.possibleRefExpr(m.Elems[0])
 			self.oc.write(")")
 			ret
 		}
 
-		self.oc.write("({")
-		self.models(m.Elems)
-		self.oc.write("})")
+		self.oc.write("({ auto " + collectionIdent + " = ")
+		self.oc.tc.array(self.oc.Buf, m.Kind)
+		self.oc.write("(); auto ")
+		self.oc.write(collectionItIdent)
+		self.oc.write(" = ")
+		self.oc.write(collectionIdent)
+		self.oc.write(".begin(); ")
+		if len(m.Elems) != m.Kind.N {
+			// Define end pointer for remainders.
+			self.oc.write("const auto ")
+			self.oc.write(collectionIdent)
+			self.oc.write("_end = ")
+			self.oc.write(collectionIdent)
+			self.oc.write(".end(); ")
+		}
+		for i in m.Elems {
+			self.oc.write("(*")
+			self.oc.write(collectionItIdent)
+			self.oc.write("++) = ")
+			self.possibleRefExpr(m.Elems[i])
+			self.oc.write("; ")
+		}
+		if len(m.Elems) == m.Kind.N {
+			// Array filled already.
+			self.oc.write(collectionIdent)
+			self.oc.write("; })")
+			ret
+		}
+		self.fillCollectionByDefault(m.Kind.Elem)
+		self.oc.write(collectionIdent)
+		self.oc.write("; })")
 		ret
 	}
 
@@ -1248,6 +1304,7 @@ impl exprCoder {
 	}
 
 	fn makeCallSlice(mut &self, mut &m: &BuiltinMakeCallExprModel) {
+		self.oc.write("({ auto " + collectionIdent + " = ")
 		mut slice := m.Kind.Slc()
 		self.oc.tc.kind(self.oc.Buf, m.Kind)
 		self.oc.write("::alloc(")
@@ -1258,11 +1315,9 @@ impl exprCoder {
 		} else {
 			self.possibleRefExpr(m.Len)
 		}
-		if shouldInitialized(slice.Elem) {
-			self.oc.write(", ")
-			self.initExpr(slice.Elem)
-		}
-		self.oc.write(")")
+		self.oc.write("); ")
+		self.initCollection(slice.Elem)
+		self.oc.write(" " + collectionIdent + "; })")
 	}
 
 	fn makeCallStr(mut &self, mut &m: &BuiltinMakeCallExprModel) {
@@ -1577,6 +1632,80 @@ impl exprCoder {
 		}
 	}
 
+	// Writes default initialization of struct field.
+	fn handleFieldByDefault(mut &self, mut &f: &FieldIns) {
+		// If field have default expression, initialize with it.
+		// Otherwise, initialize it by default expression.
+		if f.Default != nil {
+			self.oc.write(".")
+			identCoder.field(self.oc.Buf, f.Decl)
+			self.oc.write("=")
+			self.possibleRefExpr(f.Default.Model)
+			ret
+		}
+		self.oc.write(".")
+		identCoder.field(self.oc.Buf, f.Decl)
+		self.oc.write("=")
+		self.initExpr(f.Kind)
+	}
+
+	// Writes default struct literal expression to initialize it by default.
+	fn initStructLit(mut &self, mut &s: &StructIns) {
+		if s.Decl.Binded && obj::FindDirective(s.Decl.Directives, Directive.Typedef) == nil {
+			self.oc.write("(")
+			self.oc.tc.structureIns(self.oc.Buf, s)
+			self.oc.write("){}")
+			ret
+		}
+		self.oc.tc.structureIns(self.oc.Buf, s)
+		self.oc.write("{")
+		for (i, mut f) in s.Fields {
+			if i > 0 {
+				self.oc.write(", ")
+			}
+			self.handleFieldByDefault(f)
+		}
+		self.oc.write("}")
+	}
+
+	// Writes iteration to initialize collection elements by default.
+	// Assumes collectionItIdent and collectionIdent + "_end" is already defined.
+	fn fillCollectionByDefault(mut &self, mut &elem: &TypeKind) {
+		self.oc.write("for (; ")
+		self.oc.write(collectionItIdent)
+		self.oc.write(" < ")
+		self.oc.write(collectionIdent)
+		self.oc.write("_end; ++")
+		self.oc.write(collectionItIdent)
+		self.oc.write(") *")
+		self.oc.write(collectionItIdent)
+		self.oc.write(" = ")
+		self.initExpr(elem)
+		self.oc.write(";")
+	}
+
+	fn initCollection(mut &self, mut &elem: &TypeKind) {
+		self.oc.write("auto ")
+		self.oc.write(collectionItIdent)
+		self.oc.write(" = ")
+		self.oc.write(collectionIdent)
+		self.oc.write(".begin(); const auto ")
+		self.oc.write(collectionIdent)
+		self.oc.write("_end = ")
+		self.oc.write(collectionIdent)
+		self.oc.write(".end(); ")
+		self.fillCollectionByDefault(elem)
+	}
+
+	// Writes default array literal expression to initialize it by default.
+	fn initArray(mut &self, mut &arr: &Arr) {
+		self.oc.write("({ auto " + collectionIdent + " = ")
+		self.oc.tc.array(self.oc.Buf, arr)
+		self.oc.write("(); ")
+		self.initCollection(arr.Elem)
+		self.oc.write(" " + collectionIdent + "; })")
+	}
+
 	fn initExpr(mut &self, mut t: &TypeKind) {
 		if t.NilCompatible() {
 			if t.Ptr() != nil {
@@ -1624,17 +1753,12 @@ impl exprCoder {
 		}
 		if t.Arr() != nil {
 			mut arr := t.Arr()
-			self.oc.tc.kind(self.oc.Buf, t)
-			self.oc.write("(")
-			self.initExpr(arr.Elem)
-			self.oc.write(")")
+			self.initArray(arr)
 			ret
 		}
 		mut s := t.Struct()
-		if s != nil && s.Decl.Binded && obj::FindDirective(s.Decl.Directives, Directive.Typedef) == nil {
-			self.oc.write("(")
-			self.oc.tc.kind(self.oc.Buf, t)
-			self.oc.write("){}")
+		if s != nil {
+			self.initStructLit(s)
 			ret
 		}
 		self.oc.tc.kind(self.oc.Buf, t)
