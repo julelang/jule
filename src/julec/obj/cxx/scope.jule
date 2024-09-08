@@ -468,8 +468,27 @@ impl scopeCoder {
 		self.oc.write(p.Op)
 	}
 
+	fn assignLeft(mut &self, mut &model: sema::ExprModel) {
+		match type model {
+		| &IndexingExprModel:
+			mut iem := (&IndexingExprModel)(model)
+			_map := iem.Expr.Kind.Map()
+			if _map == nil {
+				break
+			}
+			// Map indexing used for assignment.
+			// Generate direct lookup unlike expression coder.
+			self.oc.ec.possibleRefExpr(iem.Expr.Model)
+			self.oc.write("[")
+			self.oc.ec.possibleRefExpr(iem.Index.Model)
+			self.oc.write("]")
+			ret
+		}
+		self.oc.ec.possibleRefExpr(model)
+	}
+
 	fn divByZeroAssign(mut &self, mut a: &Assign) {
-		self.oc.ec.possibleRefExpr(a.Left.Model)
+		self.assignLeft(a.Left.Model)
 		self.oc.write(" = ")
 		self.oc.ec.divByZeroBinary(a.Op, a.Left, a.Right)
 	}
@@ -483,7 +502,7 @@ impl scopeCoder {
 		}
 		identCoder.funcIns(self.oc.Buf, f)
 		self.oc.write("(&")
-		self.oc.ec.possibleRefExpr(l.Model)
+		self.assignLeft(l.Model)
 		self.oc.write(", ")
 		self.oc.ec.possibleRefExpr(r.Model)
 		self.oc.write(")")
@@ -505,14 +524,14 @@ impl scopeCoder {
 			ret
 		}
 
-		self.oc.ec.possibleRefExpr(a.Left.Model)
+		self.assignLeft(a.Left.Model)
 		self.oc.write(a.Op.Kind)
 		self.oc.ec.possibleRefExpr(a.Right.Model)
 	}
 
 	fn mapLookupAssign(mut &self, mut &a: &MultiAssign) {
 		mut iem := (&IndexingExprModel)(a.Right)
-		self.oc.ec.possibleRefExpr(iem.Expr.Model)
+		self.assignLeft(iem.Expr.Model)
 		self.oc.write(".lookup(")
 		self.oc.ec.possibleRefExpr(iem.Index.Model)
 		self.oc.write(", ")
@@ -571,7 +590,7 @@ impl scopeCoder {
 				continue
 			}
 			self.oc.indent()
-			self.oc.ec.possibleRefExpr(l.Model)
+			self.assignLeft(l.Model)
 			self.oc.write(" = ")
 			identCoder.toOut(self.oc.Buf, assignArgName, uintptr(i))
 			self.oc.write(";\n")
@@ -595,44 +614,45 @@ impl scopeCoder {
 
 		mut tup := f.Func.Result.Tup()
 		for (i, mut l) in a.Left {
-			if l != nil {
-				const r = assignResultName + "." + resultArgName
-				self.oc.indent()
-				self.oc.ec.possibleRefExpr(l.Model)
-				match {
-				| tup.Types[i].Equal(l.Kind):
-					self.oc.write(" = " + r)
-					self.oc.write(conv::Itoa(i))
-				| obj::IsAny(l.Kind):
-					self.oc.write(" = " + typeCoder.Any + "(" + r)
-					self.oc.write(conv::Itoa(i))
-					self.oc.write(", &" + anyTypeIdent)
-					self.oc.write(conv::Itoa(self.oc.pushAnyType(tup.Types[i])))
-					self.oc.write(")")
-				|:
-					// It should be trait.
-					if tup.Types[i].Trait() != nil { // Different traits, cast.
-						self.oc.write(" = ")
-						mut t1 := l.Kind.Trait()
-						mut t2 := tup.Types[i].Trait()
-						self.oc.write(r)
-						self.oc.write(conv::Itoa(i))
-						self.oc.write(".map(")
-						self.oc.pushAndWriteMaskMapper(t1, t2)
-						self.oc.write(")")
-						break
-					}
-					t := l.Kind.Trait()
-					self.oc.write(" = " + typeCoder.Trait + "(" + r)
-					self.oc.write(conv::Itoa(i))
-					self.oc.write(", (" + typeCoder.Trait + "::Type*)&")
-					identCoder.traitDecl(self.oc.Buf, t)
-					self.oc.write("_mptr_data")
-					self.oc.write(conv::Itoa(obj::FindTraitTypeOffset(t, tup.Types[i])))
-					self.oc.write(")")
-				}
-				self.oc.write(";\n")
+			if l == nil {
+				continue
 			}
+			const r = assignResultName + "." + resultArgName
+			self.oc.indent()
+			self.assignLeft(l.Model)
+			match {
+			| tup.Types[i].Equal(l.Kind):
+				self.oc.write(" = " + r)
+				self.oc.write(conv::Itoa(i))
+			| obj::IsAny(l.Kind):
+				self.oc.write(" = " + typeCoder.Any + "(" + r)
+				self.oc.write(conv::Itoa(i))
+				self.oc.write(", &" + anyTypeIdent)
+				self.oc.write(conv::Itoa(self.oc.pushAnyType(tup.Types[i])))
+				self.oc.write(")")
+			|:
+				// It should be trait.
+				if tup.Types[i].Trait() != nil { // Different traits, cast.
+					self.oc.write(" = ")
+					mut t1 := l.Kind.Trait()
+					mut t2 := tup.Types[i].Trait()
+					self.oc.write(r)
+					self.oc.write(conv::Itoa(i))
+					self.oc.write(".map(")
+					self.oc.pushAndWriteMaskMapper(t1, t2)
+					self.oc.write(")")
+					break
+				}
+				t := l.Kind.Trait()
+				self.oc.write(" = " + typeCoder.Trait + "(" + r)
+				self.oc.write(conv::Itoa(i))
+				self.oc.write(", (" + typeCoder.Trait + "::Type*)&")
+				identCoder.traitDecl(self.oc.Buf, t)
+				self.oc.write("_mptr_data")
+				self.oc.write(conv::Itoa(obj::FindTraitTypeOffset(t, tup.Types[i])))
+				self.oc.write(")")
+			}
+			self.oc.write(";\n")
 		}
 
 		self.oc.doneIndent()

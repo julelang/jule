@@ -983,17 +983,46 @@ impl exprCoder {
 			ret
 		}
 
-		self.possibleRefExpr(m.Expr.Model)
 		// Index access with safety measures.
 		match {
+		| m.Expr.Kind.Map() != nil:
+			const valueIdent = "__lookup_val"
+			const okIdent = "__lookup_ok"
+			mut _map := m.Expr.Kind.Map()
+			self.oc.write("({ ")
+			self.oc.tc.kind(self.oc.Buf, _map.Val)
+			self.oc.write(" ")
+			self.oc.write(valueIdent)
+			self.oc.write("; ")
+			self.oc.write(typeCoder.Bool)
+			self.oc.write(" ")
+			self.oc.write(okIdent)
+			self.oc.write("; ")
+			self.possibleRefExpr(m.Expr.Model)
+			self.oc.write(".lookup(")
+			self.possibleRefExpr(m.Index.Model)
+			self.oc.write(", &")
+			self.oc.write(valueIdent)
+			self.oc.write(", &")
+			self.oc.write(okIdent)
+			self.oc.write("); if (!")
+			self.oc.write(okIdent)
+			self.oc.write(") ")
+			self.oc.write(valueIdent)
+			self.oc.write(" = ")
+			self.initExpr(_map.Val)
+			self.oc.write("; ")
+			self.oc.write(valueIdent)
+			self.oc.write("; })")
 		| env::Production
 		| m.Expr.Kind.Ptr() != nil
-		| m.Expr.Kind.Map() != nil
 		| obj::IsExprComesFromBind(m.Expr):
+			self.possibleRefExpr(m.Expr.Model)
 			self.oc.write("[")
 			self.possibleRefExpr(m.Index.Model)
 			self.oc.write("]")
 		|:
+			self.possibleRefExpr(m.Expr.Model)
 			self.oc.write(".at(\"")
 			self.oc.locInfo(m.Token)
 			self.oc.write("\", ")
