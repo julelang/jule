@@ -2864,16 +2864,15 @@ impl missingRetChecker {
 		ret m.Default != nil && self.checkScope(m.Default.Scope)
 	}
 
-	fn checkInfIter(self, mut it: &InfIter): bool {
+	fn checkInfIter(self, it: uintptr, mut &s: &Scope): bool {
 		n := len(self.breaked)
-		if self.checkScope(it.Scope) {
+		if self.checkScope(s) {
 			self.breaked = self.breaked[:n]
 			ret true
 		}
 		if n != len(self.breaked) {
-			itaddr := uintptr(it)
 			for _, addr in self.breaked[n:] {
-				if itaddr == addr {
+				if it == addr {
 					self.breaked = self.breaked[:n]
 					ret false
 				}
@@ -2901,8 +2900,17 @@ impl missingRetChecker {
 			| &ContSt:
 				ret false
 			| &InfIter:
-				if self.checkInfIter((&InfIter)(st)) {
+				mut ii := (&InfIter)(st)
+				if self.checkInfIter(uintptr(ii), ii.Scope) {
 					ret true
+				}
+			| &WhileIter:
+				mut wn := (&WhileIter)(st)
+				if wn.IsWhileNext() && wn.Expr == nil {
+					// Condition is nil, possible infinite iteration.
+					if self.checkInfIter(uintptr(wn), wn.Scope) {
+						ret true
+					}
 				}
 			| &RetSt:
 				ret true
