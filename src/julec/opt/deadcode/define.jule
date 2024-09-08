@@ -17,6 +17,7 @@ use std::jule::sema::{
 	Struct,
 	StructIns,
 	Trait,
+	FuncPattern,
 }
 
 struct liveTable {
@@ -137,7 +138,7 @@ impl ObjectDeadCode {
 						}
 
 						// Set operator overloading methods as alive.
-						// Just cannot track whether operator overloading is used yet.
+						// Just cannot trace whether operator overloading is used yet.
 						// So, removing these methods may cause compilation problems.
 						const vs = comptime::ValueOf(*s)
 						const om = vs.Field("Operators")
@@ -146,6 +147,25 @@ impl ObjectDeadCode {
 								self.pushLive[&FnIns](ins)
 								self.setReferencesAsLive(ins.Refers)
 							}
+						}
+
+						// Set reserved methods as alive.
+						// So, removing these methods may cause compilation problems,
+						// or unexpected program bavior.
+						const Binded = false
+
+						mut dispose := s.FindMethod("Dispose", Binded)
+						if dispose != nil && FuncPattern.Dispose(dispose) {
+							mut fins := dispose.Instances[0]
+							self.pushLive[&FnIns](fins)
+							self.setReferencesAsLive(fins.Refers)
+						}
+
+						mut _str := s.FindMethod("Str", Binded)
+						if _str != nil && FuncPattern.Str(_str) {
+							mut fins := _str.Instances[0]
+							self.pushLive[&FnIns](fins)
+							self.setReferencesAsLive(fins.Refers)
 						}
 					}
 				}
