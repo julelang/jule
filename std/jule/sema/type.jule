@@ -993,14 +993,17 @@ impl typeChecker {
 			}
 		}
 
-		mut ok := self.checkIllegalCycles(decl, ta)
-		if !ok {
-			ret nil
-		}
-
 		// Build kind if not builded already.
 		if ta.Kind.Kind == nil {
-			ok = self.s.checkTypeAliasDeclKind(ta, self.lookup)
+			ok := self.s.checkTypeAliasDeclKind(ta, self.lookup)
+			if !ok {
+				ret nil
+			}
+		}
+
+		match type ta.Kind.Kind.Kind {
+		| &StructIns:
+			ok := self.checkIllegalCycles(decl, (&StructIns)(ta.Kind.Kind.Kind).Decl)
 			if !ok {
 				ret nil
 			}
