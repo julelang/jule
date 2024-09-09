@@ -61,6 +61,9 @@ Typical uses are things like capturing or tracing private behavior. For example,
     - **(9.3)** These packages should be placed as first use declarations of the main package's first file.
     - **(9.4)** Semantic analyzer will not collect references for these packages. So any definition will not have a collection of references.
     - **(9.5)** If semantic anlayzer encourter same package with any implicitly imported package in the same source file, assigns token of source file declaration to implicitly imported package. It also helps to caught dupliations for same packages after first one in the source file.
+- **(10)** Jule can handle supported types bidirectionally for binary expressions (`s == nil || nil == s` or etc.). However, when creating CAST, some types in binary expressions must always be left operand. These types are; `any`, type enums, enums, smart pointers, raw pointers and traits.
+    - **(10.1)** For these special types, the type that is the left operand can normally be left or right operand. It is only guaranteed if the expression of the relevant type is in the left operand. There may be a shift in the original order.
+    - **(10.2)** In the case of a `nil` comparison, the right operand should always be `nil`.
 
 ### Implicit Imports
 
