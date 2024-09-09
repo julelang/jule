@@ -129,7 +129,7 @@ struct eval {
 	ignored:    bool // Evaluated expression is not for assignment or something else.
 	disBuiltin: bool // Disallow/suppress Jule's built-in defines.
 	owner:      &Var
-	field:      &FieldIns // Field of this default expression. Used for checking cycles.
+	field:      &FieldIns // Field of this default expression. Used for checking cycles and dependency collection.
 	arg:        bool      // This expression evaluating for argument.
 }
 
@@ -403,6 +403,10 @@ impl eval {
 			if self.owner != nil &&
 				self.owner.Scope == nil {
 				ret self.owner.Refers
+			}
+			// If field exist, push reference to struct.
+			if self.field != nil {
+				ret self.field.Owner.Refers
 			}
 		}
 		ret nil
