@@ -348,7 +348,7 @@ namespace jule
         const jule::U8 x = jule::utf8_first[s0];
         if (x >= jule::UTF8_AS)
         {
-            const jule::I32 mask = x << 31 >> 31;
+            const jule::I32 mask = static_cast<jule::I32>(x) << 31 >> 31;
             return std::make_tuple((static_cast<jule::I32>(s[0]) & ~mask) |
                                        (jule::UTF8_RUNE_ERROR & mask),
                                    1);
