@@ -3926,32 +3926,65 @@ impl binaryEval {
 		ret lk == rk
 	}
 
+	// Operator guaranteed to be << or >>.
+	fn shift(mut self): &Data {
+		lk := self.l.Kind.Prim()
+		if lk == nil {
+			self.e.pushErr(self.op, LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Kind.Str())
+			ret nil
+		}
+		rk := self.r.Kind.Prim()
+		if rk == nil {
+			self.e.pushErr(self.op, LogMsg.OperatorNotForJuleType, self.op.Kind, self.r.Kind.Str())
+			ret nil
+		}
+		// primitive guaranteed
+
+		if !types::IsNum(lk.Kind) || !types::IsNum(rk.Kind) {
+			self.e.s.pushCompatiblityError(self.l.Kind, self.r, self.op)
+			ret nil
+		}
+		// number guaranteed
+
+		if !types::IsInt(lk.Kind) {
+			// should be floating-point
+			if !self.l.IsConst() {
+				self.e.pushErr(self.op, LogMsg.IncompatibleTypes, lk.Kind, rk.Kind)
+				ret nil
+			} else if intAssignable(PrimKind.I64, self.l) {
+				self.l.Constant.SetI64(self.l.Constant.AsI64())
+			} else if intAssignable(PrimKind.U64, self.l) {
+				self.l.Constant.SetU64(self.l.Constant.AsU64())
+			}
+		}
+		if !types::IsInt(rk.Kind) {
+			// should be floating-point
+			if !self.r.IsConst() {
+				self.e.pushErr(self.op, LogMsg.IncompatibleTypes, lk.Kind, rk.Kind)
+				ret nil
+			} else if intAssignable(PrimKind.I64, self.r) {
+				self.r.Constant.SetI64(self.r.Constant.AsI64())
+			} else if intAssignable(PrimKind.U64, self.r) {
+				self.r.Constant.SetU64(self.r.Constant.AsU64())
+			}
+		}
+		// integer guaranteed
+
+		if !isOkForShifting(self.r) {
+			self.e.pushErr(self.op, LogMsg.BitShiftMustUnsigned)
+			ret nil
+		}
+		// unsigned guaranteed
+
+		ret self.l
+	}
+
 	fn evalFloat(mut self): &Data {
 		lk := self.l.Kind.Prim().Kind // Float guaranteed.
 		rk := self.r.Kind.Prim().Kind // Primitive guaranteed.
 		if !self.numbersAreCompatibile(lk, rk) {
 			self.e.s.pushCompatiblityError(self.l.Kind, self.r, self.op)
 			ret nil
-		}
-
-		match self.op.Id {
-		| TokenId.Shl
-		| TokenId.Shr:
-			if !self.l.IsConst() || !intAssignable(PrimKind.I64, self.l) {
-				self.e.pushErr(self.op, LogMsg.IncompatibleTypes, lk, rk)
-				ret nil
-			}
-			if !self.r.IsConst() || !intAssignable(PrimKind.U64, self.r) {
-				self.e.pushErr(self.op, LogMsg.IncompatibleTypes, lk, rk)
-				ret nil
-			}
-			self.l.Constant.SetI64(self.l.Constant.AsI64())
-			self.r.Constant.SetU64(self.r.Constant.AsU64())
-			if !isOkForShifting(self.r) {
-				self.e.pushErr(self.op, LogMsg.BitShiftMustUnsigned)
-				ret nil
-			}
-			ret self.l
 		}
 
 		// Logicals.
@@ -3970,6 +4003,9 @@ impl binaryEval {
 
 		// Arithmetics.
 		match self.op.Id {
+		| TokenId.Shl
+		| TokenId.Shr:
+			panic("sema: binary shifting operator handling failed")
 		| TokenId.Plus
 		| TokenId.Minus
 		| TokenId.Star
@@ -3994,20 +4030,6 @@ impl binaryEval {
 		lk := self.l.Kind.Prim().Kind // Integer guaranteed.
 		rk := self.r.Kind.Prim().Kind // Primitive guaranteed.
 
-		match self.op.Id {
-		| TokenId.Shl
-		| TokenId.Shr:
-			if !types::IsInt(lk) || !types::IsInt(rk) {
-				self.e.pushErr(self.op, LogMsg.IncompatibleTypes, lk, rk)
-				ret nil
-			}
-			if !isOkForShifting(self.r) {
-				self.e.pushErr(self.op, LogMsg.BitShiftMustUnsigned)
-				ret nil
-			}
-			ret self.l
-		}
-
 		if !self.numbersAreCompatibile(lk, rk) {
 			self.e.s.pushCompatiblityError(self.l.Kind, self.r, self.op)
 			ret nil
@@ -4028,6 +4050,9 @@ impl binaryEval {
 
 		// Arithmetics.
 		match self.op.Id {
+		| TokenId.Shl
+		| TokenId.Shr:
+			panic("sema: binary shifting operator handling failed")
 		| TokenId.Plus
 		| TokenId.Minus
 		| TokenId.Star
@@ -4087,6 +4112,9 @@ impl binaryEval {
 		ok := self.checkSpecialCases()
 		if !ok {
 			ret nil
+		}
+		if self.op.Id == TokenId.Shl || self.op.Id == TokenId.Shr {
+			ret self.shift()
 		}
 		match {
 		| self.l.Kind.Void():
