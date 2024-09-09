@@ -464,14 +464,33 @@ impl eval {
 		ret d
 	}
 
-	fn evalStruct(mut self, mut s: &StructIns, errorToken: &Token): &Data {
-		if !self.s.isAccessibleDefine(s.Decl.Public, s.Decl.Token) {
-			self.pushErr(errorToken, LogMsg.IdentIsNotAccessible, s.Decl.Ident)
+	fn evalStruct(mut self, mut s: &Struct, mut errorToken: &Token): &Data {
+		if !self.s.isAccessibleDefine(s.Public, s.Token) {
+			self.pushErr(errorToken, LogMsg.IdentIsNotAccessible, s.Ident)
 			self.pushSuggestion(LogMsg.MakePubToAccess)
 			ret nil
 		}
-		self.checkDeprecated(s.Decl.Directives, errorToken)
-		ret self._evalStruct(s)
+
+		self.checkDeprecated(s.Directives, errorToken)
+
+		mut ins := s.instance()
+		if len(s.Generics) == 0 {
+			// For generics; it is safe. Because compiler should disallow using
+			// genericed structures without instantiation. So, structures should be
+			// instantiated. But, there is no generics, structure may have different
+			// instances. So, append instance to structure if not exist, use
+			// the existing instance if exist already.
+			mut exist := s.appendInstance(ins)
+			if exist != nil {
+				ins = exist
+			} else {
+				// If this is a new instance; precheck structure instance to make ready.
+				if !self.s.precheckStructIns(ins, errorToken) {
+					ret nil
+				}
+			}
+		}
+		ret self._evalStruct(ins)
 	}
 
 	fn evalFnIns(self, mut f: &FnIns): &Data {
@@ -691,6 +710,9 @@ impl eval {
 		let mut d: &Data = nil
 		match type kind {
 		| &StructIns:
+			// Eval structure instance directly.
+			// No risk for instantiation because type aliases always points to
+			// valid instance even with generics.
 			d = self._evalStruct((&StructIns)(kind))
 		| &Enum:
 			d = self._evalEnum((&Enum)(kind))
@@ -714,7 +736,7 @@ impl eval {
 		ret d
 	}
 
-	fn evalDef(mut self, mut &def: any, ident: &Token): &Data {
+	fn evalDef(mut self, mut &def: any, mut ident: &Token): &Data {
 		match type def {
 		| &Var:
 			ret self.evalVar((&Var)(def), ident)
@@ -723,7 +745,7 @@ impl eval {
 		| &TypeEnum:
 			ret self.evalTypeEnum((&TypeEnum)(def), ident)
 		| &Struct:
-			ret self.evalStruct((&Struct)(def).instance(), ident)
+			ret self.evalStruct((&Struct)(def), ident)
 		| &Fn:
 			mut f := (&Fn)(def)
 			if f.Ident != build::InitFn {
@@ -738,7 +760,7 @@ impl eval {
 		ret nil
 	}
 
-	fn evalIdent(mut self, ident: &IdentExpr): &Data {
+	fn evalIdent(mut self, mut ident: &IdentExpr): &Data {
 		mut def := self.getDef(ident.Ident, ident.Binded)
 		ret self.evalDef(def, ident.Token)
 	}
@@ -1825,7 +1847,7 @@ impl eval {
 		ret self.evalCastT(t.Kind, c.Expr, c.Kind.Token)
 	}
 
-	fn evalNsSelection(mut self, s: &NsSelectionExpr): &Data {
+	fn evalNsSelection(mut self, mut s: &NsSelectionExpr): &Data {
 		path := buildLinkPathByTokens(s.Ns)
 		mut imp := self.lookup.SelectPackage(fn(imp: &ImportInfo): bool {
 			if len(s.Ns) == 1 && imp.Alias == path {
