@@ -3035,6 +3035,7 @@ impl eval {
 
 		match {
 		| d.Kind.Fn() != nil:
+			// Check special cases for functions.
 			mut f := d.Kind.Fn()
 			if f.IsBuiltin() {
 				self.s.pushErr(expr.Token, LogMsg.BuiltinNotInvoked)
@@ -3046,6 +3047,17 @@ impl eval {
 				self.s.pushErr(expr.Token, LogMsg.MethodNotInvoked)
 			} else {
 				f.AsAnon = true
+			}
+		| d.Decl:
+			// Check evaluated type declarations.
+			mut s := d.Kind.Struct()
+			if s == nil {
+				break
+			}
+			required := len(s.Decl.Generics)
+			given := len(s.Generics)
+			if !self.s.checkGenericQuantity(required, given, expr.Token) {
+				ret nil
 			}
 		}
 
