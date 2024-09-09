@@ -81,6 +81,11 @@ namespace jule
         template <typename T>
         Trait(const jule::Ptr<T> &ref, jule::Trait::Type *type) noexcept
         {
+            if (ref == nullptr) {
+                // Pointer is nil, so can't able to use as base allocation.
+                // Make a nil trait.
+                return;
+            }
             this->type = type;
             this->ptr = true;
             this->data = ref.template as<jule::Uintptr>();
