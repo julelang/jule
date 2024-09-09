@@ -3041,9 +3041,12 @@ impl eval {
 				self.s.pushErr(expr.Token, LogMsg.BuiltinNotInvoked)
 				break
 			}
-			if len(f.Generics) != len(f.Decl.Generics) {
-				self.s.pushErr(expr.Token, LogMsg.HasGenerics)
-			} else if !f.Decl.Statically && f.Decl.IsMethod() {
+			required := len(f.Decl.Generics)
+			given := len(f.Generics)
+			if !self.s.checkGenericQuantity(required, given, expr.Token) {
+				ret nil
+			}
+			if !f.Decl.Statically && f.Decl.IsMethod() {
 				self.s.pushErr(expr.Token, LogMsg.MethodNotInvoked)
 			} else {
 				f.AsAnon = true
