@@ -4132,9 +4132,18 @@ impl binaryEval {
 		if !ok {
 			ret nil
 		}
+
+		// Structure may have operator overloading.
+		// Handle them if left operand is struct.
+		if self.l.Kind.Struct() != nil {
+			ret self.evalStruct()
+		}
+		
+		// Shift operators.
 		if self.op.Id == TokenId.Shl || self.op.Id == TokenId.Shr {
 			ret self.shift()
 		}
+
 		match {
 		| self.l.Kind.Void():
 			self.e.pushErr(self.op, LogMsg.OperatorNotForJuleType, self.op.Kind, "void")
@@ -4181,8 +4190,6 @@ impl binaryEval {
 			fall
 		| self.l.Kind.Trait() != nil:
 			ret self.evalTrait()
-		| self.l.Kind.Struct() != nil:
-			ret self.evalStruct()
 		| self.l.Kind.Prim() != nil:
 			ret self.evalPrim()
 		|:
