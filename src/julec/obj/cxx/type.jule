@@ -458,10 +458,18 @@ impl resultCoder {
 	}
 }
 
+// Reports wheter type supports initialization.
+fn ableToInit(mut &t: &TypeKind): bool {
+	ret !t.Binded()
+}
+
 // Reports whether type should initialized.
 // If the type API implemented structure of something like that, initialization is redundant.
 // Let the constructor do it's job.
 fn shouldInitialized(mut &t: &TypeKind): bool {
+	if !ableToInit(t) {
+		ret false
+	}
 	prim := t.Prim()
 	if prim != nil {
 		ret !prim.IsAny() && !prim.IsStr()
@@ -478,7 +486,8 @@ fn shouldInitialized(mut &t: &TypeKind): bool {
 	| t.Fn() != nil:
 		ret false
 	| t.Arr() != nil:
-		ret true
+		mut arr := t.Arr()
+		ret ableToInit(arr.Elem)
 	| t.Struct() != nil:
 		ret true
 	|:

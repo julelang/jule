@@ -1009,13 +1009,17 @@ impl exprCoder {
 			self.oc.write(valueIdent)
 			self.oc.write(", &")
 			self.oc.write(okIdent)
-			self.oc.write("); if (!")
-			self.oc.write(okIdent)
-			self.oc.write(") ")
-			self.oc.write(valueIdent)
-			self.oc.write(" = ")
-			self.initExpr(_map.Val)
-			self.oc.write("; ")
+			self.oc.write("); ")
+			if ableToInit(_map.Val) {
+				// Assign to default value if key is not exist and able to init.
+				self.oc.write("if (!")
+				self.oc.write(okIdent)
+				self.oc.write(") ")
+				self.oc.write(valueIdent)
+				self.oc.write(" = ")
+				self.initExpr(_map.Val)
+				self.oc.write("; ")
+			}
 			self.oc.write(valueIdent)
 			self.oc.write("; })")
 		| env::Production
@@ -1146,7 +1150,9 @@ impl exprCoder {
 	}
 
 	fn array(mut &self, mut m: &ArrayExprModel) {
-		if m.Kind.N == 0 {
+		// Plain initialization if array is zero-length or
+		// no specific expression and not able to init elements.
+		if m.Kind.N == 0 || len(m.Elems) == 0 && !ableToInit(m.Kind.Elem) {
 			self.oc.tc.array(self.oc.Buf, m.Kind)
 			self.oc.write("()")
 			ret
@@ -1183,13 +1189,9 @@ impl exprCoder {
 			self.possibleRefExpr(m.Elems[i])
 			self.oc.write("; ")
 		}
-		if len(m.Elems) == m.Kind.N {
-			// Array filled already.
-			self.oc.write(collectionIdent)
-			self.oc.write("; })")
-			ret
+		if len(m.Elems) != m.Kind.N && ableToInit(m.Kind.Elem) {
+			self.fillCollectionByDefault(m.Kind.Elem)
 		}
-		self.fillCollectionByDefault(m.Kind.Elem)
 		self.oc.write(collectionIdent)
 		self.oc.write("; })")
 		ret
@@ -1232,7 +1234,7 @@ impl exprCoder {
 		self.oc.write(">(")
 		if m.Init != nil {
 			self.possibleRefExpr(m.Init)
-		} else {
+		} else if ableToInit(m.Kind) {
 			self.initExpr(m.Kind)
 		}
 		self.oc.write(")")
@@ -1339,8 +1341,11 @@ impl exprCoder {
 	}
 
 	fn makeCallSlice(mut &self, mut &m: &BuiltinMakeCallExprModel) {
-		self.oc.write("({ auto " + collectionIdent + " = ")
 		mut slice := m.Kind.Slc()
+		init := ableToInit(slice.Elem)
+		if init {
+			self.oc.write("({ auto " + collectionIdent + " = ")
+		}
 		self.oc.tc.kind(self.oc.Buf, m.Kind)
 		self.oc.write("::alloc(")
 		self.possibleRefExpr(m.Len)
@@ -1350,7 +1355,11 @@ impl exprCoder {
 		} else {
 			self.possibleRefExpr(m.Len)
 		}
-		self.oc.write("); ")
+		self.oc.write(")")
+		if !init {
+			ret
+		}
+		self.oc.write("; ")
 		self.initCollection(slice.Elem)
 		self.oc.write(" " + collectionIdent + "; })")
 	}
@@ -1668,7 +1677,7 @@ impl exprCoder {
 	}
 
 	// Writes default initialization of struct field.
-	fn handleFieldByDefault(mut &self, mut &f: &FieldIns) {
+	fn handleFieldByDefault(mut &self, mut &f: &FieldIns): (inited: bool) {
 		// If field have default expression, initialize with it.
 		// Otherwise, initialize it by default expression.
 		if f.Default != nil {
@@ -1676,12 +1685,16 @@ impl exprCoder {
 			identCoder.field(self.oc.Buf, f.Decl)
 			self.oc.write("=")
 			self.possibleRefExpr(f.Default.Model)
-			ret
+			ret true
+		}
+		if !ableToInit(f.Kind) {
+			ret false
 		}
 		self.oc.write(".")
 		identCoder.field(self.oc.Buf, f.Decl)
 		self.oc.write("=")
 		self.initExpr(f.Kind)
+		ret true
 	}
 
 	// Writes default struct literal expression to initialize it by default.
@@ -1694,17 +1707,19 @@ impl exprCoder {
 		}
 		self.oc.tc.structureIns(self.oc.Buf, s)
 		self.oc.write("{")
-		for (i, mut f) in s.Fields {
-			if i > 0 {
+		mut inited := false
+		for (_, mut f) in s.Fields {
+			if inited {
 				self.oc.write(", ")
 			}
-			self.handleFieldByDefault(f)
+			inited = self.handleFieldByDefault(f)
 		}
 		self.oc.write("}")
 	}
 
 	// Writes iteration to initialize collection elements by default.
 	// Assumes collectionItIdent and collectionIdent + "_end" is already defined.
+	// Assumes collection element kind able to init.
 	fn fillCollectionByDefault(mut &self, mut &elem: &TypeKind) {
 		self.oc.write("for (; ")
 		self.oc.write(collectionItIdent)
@@ -1719,6 +1734,7 @@ impl exprCoder {
 		self.oc.write(";")
 	}
 
+	// Assumes collection element kind able to init.
 	fn initCollection(mut &self, mut &elem: &TypeKind) {
 		self.oc.write("auto ")
 		self.oc.write(collectionItIdent)
@@ -1734,6 +1750,12 @@ impl exprCoder {
 
 	// Writes default array literal expression to initialize it by default.
 	fn initArray(mut &self, mut &arr: &Arr) {
+		// Plain initialization if array is zero-length.
+		if arr.N == 0 {
+			self.oc.tc.array(self.oc.Buf, arr)
+			self.oc.write("()")
+			ret
+		}
 		self.oc.write("({ auto " + collectionIdent + " = ")
 		self.oc.tc.array(self.oc.Buf, arr)
 		self.oc.write("(); ")
