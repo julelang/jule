@@ -65,7 +65,7 @@ namespace jule
             buffer.ref = new (std::nothrow) jule::Uint;
             if (!buffer.ref)
                 jule::panic(__JULE_ERROR__MEMORY_ALLOCATION_FAILED
-                            "\nruntime: memory allocation failed for reference counter of reference type");
+                            "\nruntime: memory allocation failed for reference counter of smart pointer");
 
             *buffer.ref = jule::REFERENCE_DELTA;
 #endif
@@ -81,7 +81,7 @@ namespace jule
             buffer.alloc = new (std::nothrow) T;
             if (!buffer.alloc)
                 jule::panic(__JULE_ERROR__MEMORY_ALLOCATION_FAILED
-                            "\nruntime: memory allocation failed for heap of reference type");
+                            "\nruntime: memory allocation failed for heap of smart pointer");
 
             *buffer.alloc = instance;
             buffer.ref = ref;
@@ -96,7 +96,7 @@ namespace jule
             auto *ref = new (std::nothrow) jule::Uint;
             if (!ref)
                 jule::panic(__JULE_ERROR__MEMORY_ALLOCATION_FAILED
-                            "\nruntime: memory allocation failed for reference counter of reference type");
+                            "\nruntime: memory allocation failed for reference counter of smart pointer");
             *ref = jule::REFERENCE_DELTA;
 
             return jule::Ptr<T>::make(instance, ref);
@@ -293,11 +293,11 @@ namespace jule
             if (this->operator==(nullptr))
             {
 #ifndef __JULE_ENABLE__PRODUCTION
-                std::string error = __JULE_ERROR__INVALID_MEMORY "\nruntime: reference type is nil\nfile: ";
+                std::string error = __JULE_ERROR__INVALID_MEMORY "\nruntime: smart pointer is nil\nfile: ";
                 error += file;
                 jule::panic(error);
 #else
-                jule::panic(__JULE_ERROR__INVALID_MEMORY "\nruntime: reference type is nil");
+                jule::panic(__JULE_ERROR__INVALID_MEMORY "\nruntime: smart pointer is nil");
 #endif
             }
         }
