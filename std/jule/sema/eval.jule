@@ -3983,11 +3983,15 @@ impl binaryEval {
 
 		if self.e.s.meta.runtime != nil {
 			// Add instance to relevant runtime function for shifting types if not exist.
-			mut f := runtimeFindFn(self.e.s.meta.runtime, runtimeFunc.shiftLeft).instanceForce()
+			mut func := runtimeFunc.shiftLeft
+			if self.op.Id == TokenId.Shr {
+				func = runtimeFunc.shiftRight
+			}
+			mut f := runtimeFindFn(self.e.s.meta.runtime, func).instanceForce()
 			f.Generics = append(f.Generics, &InsGeneric{Kind: self.l.Kind}, &InsGeneric{Kind: self.r.Kind})
 			ok, _ := self.e.s.checkGenericFn(f, self.op)
 			if !ok {
-				panic("shiftLeft evaluation failed, this is an implementation mistake")
+				panic("sema: shift evaluation failed, this is an implementation mistake")
 			}
 		}
 

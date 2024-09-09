@@ -304,9 +304,9 @@ impl exprCoder {
 			}
 		}
 
-		// guarantee unsigned integer wrap around
-		if op == TokenId.Plus || op == TokenId.Minus ||
-			op == TokenId.Star || op == TokenId.Shl {
+		match op {
+		| TokenId.Plus | TokenId.Minus | TokenId.Star | TokenId.Shl:
+			// guarantee unsigned integer wrap around
 			lp := lk.Prim()
 			if lp != nil && types::IsUnsigInt(lp.Kind) {
 				buf.WriteByte('(')
@@ -347,6 +347,17 @@ impl exprCoder {
 		self.oc.write(")")
 	}
 
+	fn shr(mut &self, mut &l: &OperandExprModel, mut &r: &OperandExprModel) {
+		mut f := obj::RuntimeFindFn(self.oc.ir.Runtime, obj::RuntimeFunc.shiftRight)
+		mut ins := obj::FindGenericInstance(f, l.Kind, r.Kind)
+		identCoder.funcIns(self.oc.Buf, ins)
+		self.oc.write("(")
+		self.possibleRefExpr(l.Model)
+		self.oc.write(", ")
+		self.possibleRefExpr(r.Model)
+		self.oc.write(")")
+	}
+
 	fn binary(mut &self, mut m: &BinaryExprModel) {
 		match m.Op.Id {
 		| TokenId.Solidus | TokenId.Percent:
@@ -359,6 +370,12 @@ impl exprCoder {
 			// Do not check shifting of structures.
 			if m.Left.Kind.Struct() == nil {
 				self.shl(m.Left, m.Right)
+				ret
+			}
+		| TokenId.Shr:
+			// Do not check shifting of structures.
+			if m.Left.Kind.Struct() == nil {
+				self.shr(m.Left, m.Right)
 				ret
 			}
 		}
