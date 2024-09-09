@@ -72,6 +72,61 @@ impl ObjectDeadCode {
 		}
 	}
 
+	fn pushStructAsLive(mut &self, mut &s: &StructIns) {
+		if self.isLive[&StructIns](s) {
+			ret
+		}
+		self.pushLive[&StructIns](s)
+		self.setReferencesAsLive(s.Refers)
+		for (_, mut m) in s.Methods {
+			for (_, mut ins) in m.Instances {
+				if self.isLive[&FnIns](ins) {
+					continue
+				}
+
+				// Set trait implemented methods as alive.
+				// Push as live the method if implements a trait's method.
+				// Other methods will be marked as live by referenced defines,
+				// no need for special tracking algorithm to caught.
+				if obj::IsTraitMethod(s, ins) {
+					self.pushLive[&FnIns](ins)
+					self.setReferencesAsLive(ins.Refers)
+				}
+
+				// Set operator overloading methods as alive.
+				// Just cannot trace whether operator overloading is used yet.
+				// So, removing these methods may cause compilation problems.
+				const vs = comptime::ValueOf(*s)
+				const om = vs.Field("Operators")
+				const for _, field in om.Type().Fields() {
+					if ins == om.Field(field.Name()).Unwrap() {
+						self.pushLive[&FnIns](ins)
+						self.setReferencesAsLive(ins.Refers)
+					}
+				}
+
+				// Set reserved methods as alive.
+				// So, removing these methods may cause compilation problems,
+				// or unexpected program bavior.
+				const Binded = false
+
+				mut dispose := s.FindMethod("Dispose", Binded)
+				if dispose != nil && FuncPattern.Dispose(dispose) {
+					mut fins := dispose.Instances[0]
+					self.pushLive[&FnIns](fins)
+					self.setReferencesAsLive(fins.Refers)
+				}
+
+				mut _str := s.FindMethod("Str", Binded)
+				if _str != nil && FuncPattern.Str(_str) {
+					mut fins := _str.Instances[0]
+					self.pushLive[&FnIns](fins)
+					self.setReferencesAsLive(fins.Refers)
+				}
+			}
+		}
+	}
+
 	fn setReferencesAsLive(mut &self, mut &rs: &ReferenceStack) {
 		if rs == nil {
 			ret
@@ -117,58 +172,7 @@ impl ObjectDeadCode {
 				self.setReferencesAsLive(v.Refers)
 			| &StructIns:
 				mut s := (&StructIns)(ref)
-				if self.isLive[&StructIns](s) {
-					break
-				}
-				self.pushLive[&StructIns](s)
-				self.setReferencesAsLive(s.Refers)
-				for (_, mut m) in s.Methods {
-					for (_, mut ins) in m.Instances {
-						if self.isLive[&FnIns](ins) {
-							continue
-						}
-
-						// Set trait implemented methods as alive.
-						// Push as live the method if implements a trait's method.
-						// Other methods will be marked as live by referenced defines,
-						// no need for special tracking algorithm to caught.
-						if obj::IsTraitMethod(s, ins) {
-							self.pushLive[&FnIns](ins)
-							self.setReferencesAsLive(ins.Refers)
-						}
-
-						// Set operator overloading methods as alive.
-						// Just cannot trace whether operator overloading is used yet.
-						// So, removing these methods may cause compilation problems.
-						const vs = comptime::ValueOf(*s)
-						const om = vs.Field("Operators")
-						const for _, field in om.Type().Fields() {
-							if ins == om.Field(field.Name()).Unwrap() {
-								self.pushLive[&FnIns](ins)
-								self.setReferencesAsLive(ins.Refers)
-							}
-						}
-
-						// Set reserved methods as alive.
-						// So, removing these methods may cause compilation problems,
-						// or unexpected program bavior.
-						const Binded = false
-
-						mut dispose := s.FindMethod("Dispose", Binded)
-						if dispose != nil && FuncPattern.Dispose(dispose) {
-							mut fins := dispose.Instances[0]
-							self.pushLive[&FnIns](fins)
-							self.setReferencesAsLive(fins.Refers)
-						}
-
-						mut _str := s.FindMethod("Str", Binded)
-						if _str != nil && FuncPattern.Str(_str) {
-							mut fins := _str.Instances[0]
-							self.pushLive[&FnIns](fins)
-							self.setReferencesAsLive(fins.Refers)
-						}
-					}
-				}
+				self.pushStructAsLive(s)
 			}
 		}
 	}
@@ -178,7 +182,9 @@ impl ObjectDeadCode {
 			for (_, mut f) in file.Funcs {
 				if f.Ident == build::InitFn {
 					mut ins := f.Instances[0]
-					self.live.fns = append(self.live.fns, ins)
+					if !self.isLive[&FnIns](ins) {
+						self.pushLive[&FnIns](ins)
+					}
 					self.setReferencesAsLive(ins.Refers)
 				}
 			}
@@ -189,13 +195,30 @@ impl ObjectDeadCode {
 		// Collect live references based on initializer functions.
 		self.inits(pkg)
 
-		// Collect test functions if test compilation is enabled.
+		// Collect test functions and the std::testing::{T} struct if test compilation is enabled.
 		if env::Test {
+			if len(pkg.Files) > 0 && obj::IsStdPackage(pkg.Files[0].File.Path, "testing") {
+				const Binded = false
+				mut s := pkg.FindStruct("T", Binded)
+				mut ins := s.Instances[0]
+				self.pushStructAsLive(ins)
+				for (_, mut m) in ins.Methods {
+					for (_, mut mins) in m.Instances {
+						if self.isLive[&FnIns](mins) {
+							continue
+						}
+						self.pushLive[&FnIns](mins)
+						self.setReferencesAsLive(mins.Refers)
+					}
+				}
+			}
 			for (_, mut file) in pkg.Files {
 				for (_, mut f) in file.Funcs {
 					if obj::HasDirective(f.Directives, Directive.Test) {
 						mut ins := f.Instances[0]
-						self.live.fns = append(self.live.fns, ins)
+						if !self.isLive[&FnIns](ins) {
+							self.pushLive[&FnIns](ins)
+						}
 						self.setReferencesAsLive(ins.Refers)
 					}
 				}
@@ -213,9 +236,13 @@ impl ObjectDeadCode {
 
 		// Push live references based on entry point.
 		mut main := self.ir.Main.FindFn(build::EntryPoint, false)
-		mut ins := main.Instances[0]
-		self.live.fns = append(self.live.fns, ins)
-		self.setReferencesAsLive(ins.Refers)
+		if main != nil {
+			mut ins := main.Instances[0]
+			if !self.isLive[&FnIns](ins) {
+				self.pushLive[&FnIns](ins)
+			}
+			self.setReferencesAsLive(ins.Refers)
+		}
 	}
 
 	fn removeDeadGlobals(mut &self, mut &vars: []&Var) {
