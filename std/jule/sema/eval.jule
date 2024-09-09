@@ -509,6 +509,17 @@ impl eval {
 		self.checkDeprecated(f.Directives, errorToken)
 
 		mut ins := f.instance()
+		if len(f.Generics) == 0 {
+			// For generics; it is safe. Because compiler should disallow using
+			// genericed functions without instantiation. So, functions should be
+			// instantiated. But, there is no generics, function may have different
+			// instances. So, append instance to function if not exist, use
+			// the existing instance if exist already.
+			mut exist := f.appendInstance(ins)
+			if exist != nil {
+				ins = exist
+			}
+		}
 		self.pushReference[&FnIns](ins)
 		ret self.evalFnIns(ins)
 	}
