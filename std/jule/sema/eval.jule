@@ -3927,6 +3927,7 @@ impl binaryEval {
 	}
 
 	// Operator guaranteed to be << or >>.
+	// Operands should be guaranteed in original order.
 	fn shift(mut self): &Data {
 		lk := self.l.Kind.Prim()
 		if lk == nil {
@@ -3948,24 +3949,28 @@ impl binaryEval {
 
 		if !types::IsInt(lk.Kind) {
 			// should be floating-point
-			if !self.l.IsConst() {
+			if !self.l.IsConst() || !self.l.untyped {
 				self.e.pushErr(self.op, LogMsg.IncompatibleTypes, lk.Kind, rk.Kind)
 				ret nil
 			} else if intAssignable(PrimKind.I64, self.l) {
 				self.l.Constant.SetI64(self.l.Constant.AsI64())
+				self.l.Kind = primI64
 			} else if intAssignable(PrimKind.U64, self.l) {
 				self.l.Constant.SetU64(self.l.Constant.AsU64())
+				self.l.Kind = primU64
 			}
 		}
 		if !types::IsInt(rk.Kind) {
 			// should be floating-point
-			if !self.r.IsConst() {
+			if !self.r.IsConst() || !self.l.untyped {
 				self.e.pushErr(self.op, LogMsg.IncompatibleTypes, lk.Kind, rk.Kind)
 				ret nil
 			} else if intAssignable(PrimKind.I64, self.r) {
 				self.r.Constant.SetI64(self.r.Constant.AsI64())
+				self.r.Kind = primI64
 			} else if intAssignable(PrimKind.U64, self.r) {
 				self.r.Constant.SetU64(self.r.Constant.AsU64())
+				self.r.Kind = primU64
 			}
 		}
 		// integer guaranteed
@@ -3975,6 +3980,16 @@ impl binaryEval {
 			ret nil
 		}
 		// unsigned guaranteed
+
+		if self.e.s.meta.runtime != nil {
+			// Add instance to relevant runtime function for shifting types if not exist.
+			mut f := runtimeFindFn(self.e.s.meta.runtime, runtimeFunc.shiftLeft).instanceForce()
+			f.Generics = append(f.Generics, &InsGeneric{Kind: self.l.Kind}, &InsGeneric{Kind: self.r.Kind})
+			ok, _ := self.e.s.checkGenericFn(f, self.op)
+			if !ok {
+				panic("shiftLeft evaluation failed, this is an implementation mistake")
+			}
+		}
 
 		ret self.l
 	}

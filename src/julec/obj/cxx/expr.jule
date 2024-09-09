@@ -303,6 +303,18 @@ impl exprCoder {
 				ret
 			}
 		}
+
+		// guarantee unsigned integer wrap around
+		if op == TokenId.Plus || op == TokenId.Minus ||
+			op == TokenId.Star || op == TokenId.Shl {
+			lp := lk.Prim()
+			if lp != nil && types::IsUnsigInt(lp.Kind) {
+				buf.WriteByte('(')
+				self.oc.tc.prim(buf, lp)
+				buf.WriteByte(')')
+			}
+		}
+
 		buf.WriteByte('(')
 		buf.WriteStr(l)
 		buf.WriteByte(' ')
@@ -324,12 +336,29 @@ impl exprCoder {
 		self._unsafeBinary(self.oc.Buf, l, r, m.Left.Kind, m.Right.Kind, m.Op.Id, m.Op.Kind)
 	}
 
+	fn shl(mut &self, mut &l: &OperandExprModel, mut &r: &OperandExprModel) {
+		mut f := obj::RuntimeFindFn(self.oc.ir.Runtime, obj::RuntimeFunc.shiftLeft)
+		mut ins := obj::FindGenericInstance(f, l.Kind, r.Kind)
+		identCoder.funcIns(self.oc.Buf, ins)
+		self.oc.write("(")
+		self.possibleRefExpr(l.Model)
+		self.oc.write(", ")
+		self.possibleRefExpr(r.Model)
+		self.oc.write(")")
+	}
+
 	fn binary(mut &self, mut m: &BinaryExprModel) {
 		match m.Op.Id {
 		| TokenId.Solidus | TokenId.Percent:
-			// Do not check division of structures safety.
+			// Do not check division safety of structures.
 			if m.Left.Kind.Struct() == nil {
 				self.divByZeroBinary(m.Op, m.Left, m.Right)
+				ret
+			}
+		| TokenId.Shl:
+			// Do not check shifting of structures.
+			if m.Left.Kind.Struct() == nil {
+				self.shl(m.Left, m.Right)
 				ret
 			}
 		}

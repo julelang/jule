@@ -14,7 +14,7 @@ use opt::{
 	StrRuneIter,
 }
 use conv for std::conv
-use lex for std::jule::lex::{TokenKind}
+use lex for std::jule::lex::{TokenId, TokenKind}
 use std::jule::constant::{Const}
 use sema for std::jule::sema::{
 	Data,
@@ -487,6 +487,12 @@ impl scopeCoder {
 		self.oc.ec.possibleRefExpr(model)
 	}
 
+	fn shl(mut &self, mut a: &Assign) {
+		self.assignLeft(a.Left.Model)
+		self.oc.write(" = ")
+		self.oc.ec.shl(a.Left, a.Right)
+	}
+
 	fn divByZeroAssign(mut &self, mut a: &Assign) {
 		self.assignLeft(a.Left.Model)
 		self.oc.write(" = ")
@@ -509,11 +515,17 @@ impl scopeCoder {
 	}
 
 	fn assign(mut &self, mut a: &Assign) {
-		match a.Op.Kind {
-		| TokenKind.SolidusEq | TokenKind.PercentEq:
-			// Do not check division of structures safety.
+		match a.Op.Id {
+		| TokenId.SolidusEq | TokenId.PercentEq:
+			// Do not check division safety of structures.
 			if a.Left.Kind.Struct() == nil {
 				self.divByZeroAssign(a)
+				ret
+			}
+		| TokenId.ShlEq:
+			// Do not check shifting of structures.
+			if a.Left.Kind.Struct() == nil {
+				self.shl(a)
 				ret
 			}
 		}
