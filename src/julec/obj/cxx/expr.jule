@@ -404,31 +404,34 @@ impl exprCoder {
 		self.oc.write("{")
 		// Fields are should be in order.
 		// In other words, GCC will produce error(s).
+		mut inited := false
 	fields:
-		for (i, mut f) in m.Strct.Fields {
+		for (_, mut f) in m.Strct.Fields {
 			for (_, mut arg) in m.Args {
 				// Field exist, initialize it with literal expression.
 				if arg.Field == f {
-					if i > 0 {
+					if inited {
 						self.oc.write(", ")
 					}
 					self.oc.write(".")
 					identCoder.field(self.oc.Buf, f.Decl)
 					self.oc.write("=")
 					self.possibleRefExpr(arg.Expr.Model)
+					inited = true
 					continue fields
 				}
 			}
 			if m.Strct.Decl.Binded {
 				// Do not initialize field of binded struct.
+				inited = false
 				continue
 			}
-			if i > 0 {
+			if inited {
 				self.oc.write(", ")
 			}
 			// Field is not exist in literal arguments.
 			// Initialize it by default.
-			self.handleFieldByDefault(f)
+			inited = self.handleFieldByDefault(f)
 		}
 		self.oc.write("}")
 	}
