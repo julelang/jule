@@ -171,6 +171,9 @@ fn appendGenericTypeAliases(mut &dest: []&TypeAlias, mut &f: &FnIns) {
 	}
 
 	for (i, mut g) in f.Generics {
+		if g == nil {
+			continue
+		}
 		mut decl := f.Decl.Generics[i]
 		dest = append(dest, &TypeAlias{
 			Used: true,
@@ -995,26 +998,28 @@ impl sema {
 		ret tc.checkDecl(ast)
 	}
 
-	fn buildFnNonGenericTypeKinds(mut &self, mut &f: &FnIns, mut &ignored: []&TypeKind): (ok: bool) {
+	fn buildFnNonGenericTypeKinds(mut &self, mut f: &FnIns, mut ignored: []&TypeKind): (ok: bool) {
 		ok = true
-		let mut generics: []&ast::GenericDecl = nil
+		mut genericDecls := ([]&ast::GenericDecl)(nil)
 		if f.Decl.IsMethod() {
-			generics = append(f.Decl.Generics, f.Decl.Owner.Generics...)
+			genericDecls = append(f.Decl.Generics, f.Decl.Owner.Generics...)
 		} else {
-			generics = f.Decl.Generics
+			genericDecls = f.Decl.Generics
 		}
-
-		for (_, mut p) in f.Params {
-			if !p.Decl.IsSelf() {
-				p.Kind = self.buildNonGenericTypeKind(p.Decl.Kind.Decl, generics, ignored)
-				ok = ok && p.Kind != nil
+		ret self.fnEnvironment(f, fn(mut &sema: &sema, mut &generics: []&TypeAlias): (ok: bool) {
+			ok = true
+			for (_, mut p) in f.Params {
+				if !p.Decl.IsSelf() {
+					p.Kind = sema.buildNonGenericTypeKind(p.Decl.Kind.Decl, genericDecls, ignored)
+					ok = ok && p.Kind != nil
+				}
 			}
-		}
-		if !f.Decl.IsVoid() {
-			f.Result = self.buildNonGenericTypeKind(f.Decl.Result.Kind.Decl, generics, ignored)
-			ok = ok && f.Result != nil
-		}
-		ret
+			if !f.Decl.IsVoid() {
+				f.Result = sema.buildNonGenericTypeKind(f.Decl.Result.Kind.Decl, genericDecls, ignored)
+				ok = ok && f.Result != nil
+			}
+			ret
+		})
 	}
 
 	fn getTraitCheckFnKind(mut &self, mut &f: &Fn): &FnIns {
