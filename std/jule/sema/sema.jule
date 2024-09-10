@@ -1015,24 +1015,23 @@ impl sema {
 		ret tc.checkDecl(ast)
 	}
 
-	fn buildFnNonGenericTypeKinds(mut &self, mut f: &FnIns, mut ignored: []&TypeKind): (ok: bool) {
-		ok = true
-		mut genericDecls := ([]&ast::GenericDecl)(nil)
+	fn buildFnNonGenericTypeKinds(mut &self, mut f: &FnIns, mut &ignored: []&TypeKind): (ok: bool) {
+		let mut generics: []&ast::GenericDecl = nil
 		if f.Decl.IsMethod() {
-			genericDecls = append(f.Decl.Generics, f.Decl.Owner.Generics...)
+			generics = append(f.Decl.Generics, f.Decl.Owner.Generics...)
 		} else {
-			genericDecls = f.Decl.Generics
+			generics = f.Decl.Generics
 		}
-		ret self.fnEnvironment(f, fn(mut &sema: &sema, mut &generics: []&TypeAlias): (ok: bool) {
+		ret self.basicFnEnvironment(f, fn(mut &sema: &sema): (ok: bool) {
 			ok = true
 			for (_, mut p) in f.Params {
 				if !p.Decl.IsSelf() {
-					p.Kind = sema.buildNonGenericTypeKind(p.Decl.Kind.Decl, genericDecls, ignored)
+					p.Kind = sema.buildNonGenericTypeKind(p.Decl.Kind.Decl, generics, unsafe { ignored })
 					ok = ok && p.Kind != nil
 				}
 			}
 			if !f.Decl.IsVoid() {
-				f.Result = sema.buildNonGenericTypeKind(f.Decl.Result.Kind.Decl, genericDecls, ignored)
+				f.Result = sema.buildNonGenericTypeKind(f.Decl.Result.Kind.Decl, generics, unsafe { ignored })
 				ok = ok && f.Result != nil
 			}
 			ret
@@ -1099,31 +1098,36 @@ impl sema {
 	// Calls algo in the function's native environment.
 	// Errors will be handled.
 	// Returns result of algo.
-	fn fnEnvironment(mut &self, mut &f: &FnIns, algo: fn(mut &sema: &sema, mut &generics: []&TypeAlias): bool): bool {
+	fn basicFnEnvironment(mut &self, mut &f: &FnIns, algo: fn(mut &sema: &sema): bool): bool {
 		mut sema := f.Decl.sema
-		mut old := f.Decl.sema.file
-		defer { f.Decl.sema.setCurrentFile(old) }
-		mut file := findFile(f.Decl.sema.files, f.Decl.Token.File)
+		mut old := sema.getCurrentFile()
+		mut file := findFile(sema.files, f.Decl.Token.File)
 		if file != nil {
-			f.Decl.sema.setCurrentFile(file)
+			sema.setCurrentFile(file)
 		}
 
-		mut size := len(f.Generics)
-		if f.Decl != nil && f.Decl.Owner != nil {
-			size += len(f.Decl.Owner.Generics)
-		}
-
-		mut generics := make([]&TypeAlias, 0, size)
-		appendGenericTypeAliases(generics, f)
-
-		ok := algo(sema, generics)
+		ok := algo(sema)
 
 		if sema != self {
 			self.errors = append(self.errors, sema.errors...)
 			sema.errors = nil
 		}
+		sema.setCurrentFile(old)
 
 		ret ok
+	}
+
+	// Calls basicFnEnvironment internally but handles generics.
+	fn fnEnvironment(mut &self, mut &f: &FnIns, algo: fn(mut &sema: &sema, mut &generics: []&TypeAlias): bool): bool {
+		mut size := len(f.Generics)
+		if f.Decl != nil && f.Decl.Owner != nil {
+			size += len(f.Decl.Owner.Generics)
+		}
+		mut generics := make([]&TypeAlias, 0, size)
+		appendGenericTypeAliases(generics, f)
+		ret self.basicFnEnvironment(f, fn(mut &sema: &sema): bool {
+			ret algo(sema, generics)
+		})
 	}
 
 	fn checkFnParamKind(mut &self, mut &p: &ParamIns) {
