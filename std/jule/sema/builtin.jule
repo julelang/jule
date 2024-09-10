@@ -504,24 +504,25 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &FnCallExpr, mut &d: &Data): &Dat
 		ret nil
 	}
 
-	mut t := e.evalExpr(fc.Args[0])
+	mut firstArg := fc.Args[0]
+	mut t := e.evalExpr(firstArg)
 	if t == nil {
 		ret nil
 	}
 
 	mut s := t.Kind.Slc()
 	if s == nil {
-		e.pushErr(fc.Args[0].Token, LogMsg.InvalidExpr)
+		e.pushErr(firstArg.Token, LogMsg.InvalidExpr)
 		ret nil
 	}
 
 	const reference = false // Element parameter is not reference.
 	const mutable = true    // Element parameter is mutable.
 
-	if e.s.checkValidityForInitExpr(mutable, reference, t.Kind, t, fc.Args[0].Token) {
+	if e.s.checkValidityForInitExpr(mutable, reference, t.Kind, t, firstArg.Token) {
 		// Check type if validity is good.
 		// Helps to reduce error logs and duplicated logs.
-		_ = e.s.checkAssignType(reference, t.Kind, t, fc.Args[0].Token)
+		_ = e.s.checkAssignType(reference, t.Kind, t, firstArg.Token)
 	}
 
 	mut prefix := e.prefix
@@ -532,13 +533,14 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &FnCallExpr, mut &d: &Data): &Dat
 		Mutable: true,
 		Kind: t.Kind,
 	}
-	match type fc.Args[1].Kind {
+	mut secondArg := fc.Args[1]
+	match type secondArg.Kind {
 	| &VariadicExpr:
 		if len(fc.Args) > 2 {
 			e.pushErr(fc.Args[2].Token, LogMsg.MoreArgsWithVariadiced)
 		}
 
-		mut e1 := e.evalExpr((&VariadicExpr)(fc.Args[1].Kind).Expr)
+		mut e1 := e.evalExpr((&VariadicExpr)(secondArg.Kind).Expr)
 		if e1 == nil {
 			ret nil
 		}
@@ -555,15 +557,15 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &FnCallExpr, mut &d: &Data): &Dat
 		}
 
 		if !e1.Kind.Variadicable() {
-			e.pushErr(fc.Args[1].Token, LogMsg.VariadicWithNonVariadicable, e1.Kind.Str())
+			e.pushErr(secondArg.Token, LogMsg.VariadicWithNonVariadicable, e1.Kind.Str())
 			ret nil
 		}
 		makeVariadic(e1, s.Elem)
 
-		if e.s.checkValidityForInitExpr(mutable, reference, s.Elem, e1, fc.Args[1].Token) {
+		if e.s.checkValidityForInitExpr(mutable, reference, s.Elem, e1, secondArg.Token) {
 			// Check type if validity is good.
 			// Helps to reduce error logs and duplicated logs.
-			_ = e.s.checkAssignType(reference, s.Elem, e1, fc.Args[1].Token)
+			_ = e.s.checkAssignType(reference, s.Elem, e1, secondArg.Token)
 		}
 		d.Model = &BuiltinAppendCallExprModel{
 			Dest: t.Model,
@@ -572,7 +574,7 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &FnCallExpr, mut &d: &Data): &Dat
 		ret d
 	}
 
-	mut e1 := e.evalExpr(fc.Args[1])
+	mut e1 := e.evalExpr(secondArg)
 	if e1 == nil {
 		ret nil
 	}
