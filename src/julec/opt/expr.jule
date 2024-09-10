@@ -401,6 +401,16 @@ impl exprOptimizer {
 				// bitwise and is not checked at runtime, so it is optimize enough.
 				ret
 			}
+		| TokenId.Shl | TokenId.Shr:
+			// semantic anlayzer guarantees right operator is unsigned if constant
+			z := types::BitsizeOf(lp.Kind)
+			s := (&Const)(m.Right.Model).AsU64()
+			if s >= u64(z) {
+				// shifting greater than bitsize of the left operand
+				// discard all bits, result always equals to zero
+				*self.model = Const.NewU64(0)
+				ret
+			}
 		|:
 			// Eliminate unsupported operators.
 			ret

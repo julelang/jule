@@ -463,7 +463,7 @@ impl scopeOptimizer {
 		exprOptimizer.optimizeData(assign.Right.Model, self.data)
 
 		match assign.Op.Id {
-		| TokenId.SolidusEq | TokenId.PercentEq:
+		| TokenId.SolidusEq | TokenId.PercentEq | TokenId.ShlEq | TokenId.ShrEq:
 			// Do not check division of structures safety.
 			if !Math || assign.Left.Kind.Struct() != nil {
 				break
@@ -476,6 +476,12 @@ impl scopeOptimizer {
 			| TokenId.PercentEq:
 				assign.Op.Id = TokenId.Percent
 				assign.Op.Kind = TokenKind.Percent
+			| TokenId.ShlEq:
+				assign.Op.Id = TokenId.Shl
+				assign.Op.Kind = TokenKind.Shl
+			| TokenId.ShrEq:
+				assign.Op.Id = TokenId.Shr
+				assign.Op.Kind = TokenKind.Shr
 			|:
 				panic("implementation mistake, this panic call should be unreachable")
 			}
@@ -486,9 +492,8 @@ impl scopeOptimizer {
 			}
 			mut model := ExprModel(b)
 			exprOptimizer.optimizeData(model, self.data)
-			match type unsafe { *(*any)(&model) } {
-			| &UnsafeBinaryExprModel:
-				// Model optimized.
+			if model != b {
+				// Binary model optimized.
 				// Use optimized model directly.
 				assign.Right = new(OperandExprModel, *assign.Right)
 				b.Op = new(lex::Token, *b.Op) // Unsafe model wrap original model. Save token.
