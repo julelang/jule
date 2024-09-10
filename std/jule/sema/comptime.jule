@@ -428,6 +428,19 @@ impl comptimeParam {
 		}
 	}
 
+	fn _Recv(mut &self, mut &e: &eval, mut &fc: &ast::FnCallExpr): &Data {
+		if len(fc.Args) > 0 {
+			e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Recv")
+			ret nil
+		}
+		mut constant := Const.NewBool(self.param.Decl.IsSelf())
+		ret &Data{
+			Kind: primBool,
+			Constant: constant,
+			Model: constant,
+		}
+	}
+
 	fn subIdent(mut &self, &ident: str): &Data {
 		match ident {
 		| "Name":
@@ -448,6 +461,13 @@ impl comptimeParam {
 			mut method := &FnIns{
 				caller: fn(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
 					ret self._Reference(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		| "Recv":
+			mut method := &FnIns{
+				caller: fn(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+					ret self._Recv(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
