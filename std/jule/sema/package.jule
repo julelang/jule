@@ -4,7 +4,7 @@
 
 use path for std::fs::path
 use std::jule::ast::{AST}
-use std::jule::build::{PathStdlib, Log}
+use build for std::jule::build
 use std::jule::lex::{Token, TokenKind}
 use strings for std::strings
 
@@ -34,7 +34,7 @@ trait Importer {
 	// Should return abstract syntax tree of package files.
 	// Logs accepts as error.
 	// Updated module to package's module if exist when update_mod is true.
-	fn ImportPackage(mut self, path: str, update_mod: bool): ([]&AST, []Log)
+	fn ImportPackage(mut self, path: str, update_mod: bool): ([]&AST, []build::Log)
 
 	// Invoked after the package is imported.
 	// Sets module identitity of imported package to current module.
@@ -361,6 +361,13 @@ impl Lookup for Package {
 	}
 }
 
+// Reports whether f is standard library package p.
+// Example use:
+//  - IsStdPackage(f, "") for determine the whether f is standard library package
+//  - IsStdPackage(f, "math") for std::math
+//  - IsStdPackage(f, "math/big") for std::math::big
 fn isStdPackage(&f: str, p: str): bool {
-	ret strings::HasPrefix(f, path::Join(PathStdlib, p))
+	// Do not handle '/' separators of p, because it
+	// valid path separator for all supported platforms.
+	ret strings::HasPrefix(f, path::Join(build::PathStdlib, p))
 }

@@ -494,8 +494,25 @@ impl sema {
 	}
 
 	// Reports whether define is accessible in the current package.
+	// The public and token parameters belongs to define which is accessed.
 	fn isAccessibleDefine(self, public: bool, token: &Token): bool {
-		ret public || token.File == nil || self.file.File.Dir() == token.File.Dir()
+		if public || token.File == nil {
+			// defins is public or built-in
+			ret true
+		}
+		selfDir := self.file.File.Dir()
+		tokenDir := token.File.Dir()
+		if selfDir == tokenDir {
+			// define is in the same package
+			ret true
+		}
+		// define is not public or in-package define
+		// but it may come from the std::runtime package
+		// so allow access if standard library package tries
+		if isStdPackage(tokenDir, "runtime") && isStdPackage(selfDir, "") {
+			ret true
+		}
+		ret false
 	}
 
 	// Reports this identifier duplicated in package's global scope.
