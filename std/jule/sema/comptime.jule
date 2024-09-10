@@ -402,6 +402,19 @@ impl comptimeParam {
 		ret buildComptimeTypeInfoData(e.s, self.param.Kind)
 	}
 
+	fn _Mutable(mut &self, mut &e: &eval, mut &fc: &ast::FnCallExpr): &Data {
+		if len(fc.Args) > 0 {
+			e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Mutable")
+			ret nil
+		}
+		mut constant := Const.NewBool(self.param.Decl.Mutable)
+		ret &Data{
+			Kind: primBool,
+			Constant: constant,
+			Model: constant,
+		}
+	}
+
 	fn _Variadic(mut &self, mut &e: &eval, mut &fc: &ast::FnCallExpr): &Data {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, LogMsg.ArgumentOverflow, "Variadic")
@@ -447,6 +460,13 @@ impl comptimeParam {
 			mut method := &FnIns{
 				caller: fn(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
 					ret self._Name(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		| "Mutable":
+			mut method := &FnIns{
+				caller: fn(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+					ret self._Mutable(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
