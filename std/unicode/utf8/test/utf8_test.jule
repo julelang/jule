@@ -1,0 +1,404 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+// The Jule code is a modified version of the original Go code and came with this notice.
+//
+// ====================================================
+// Copyright (c) 2009 The Go Authors. All rights reserved.
+// 
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+// 
+//    * Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+//    * Redistributions in binary form must reproduce the above
+// copyright notice, this list of conditions and the following disclaimer
+// in the documentation and/or other materials provided with the
+// distribution.
+//    * Neither the name of Google Inc. nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+// 
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// ====================================================
+
+#build test
+
+use std::unsafe
+use std::testing::{T}
+use utf8 for std::unicode::utf8
+use fastbytes for std::internal::fastbytes
+
+struct Utf8Map {
+	r: rune
+	s: str
+}
+
+static utf8map: []Utf8Map = [
+	{0x0000, "\x00"},
+	{0x0001, "\x01"},
+	{0x007e, "\x7e"},
+	{0x007f, "\x7f"},
+	{0x0080, "\xc2\x80"},
+	{0x0081, "\xc2\x81"},
+	{0x00bf, "\xc2\xbf"},
+	{0x00c0, "\xc3\x80"},
+	{0x00c1, "\xc3\x81"},
+	{0x00c8, "\xc3\x88"},
+	{0x00d0, "\xc3\x90"},
+	{0x00e0, "\xc3\xa0"},
+	{0x00f0, "\xc3\xb0"},
+	{0x00f8, "\xc3\xb8"},
+	{0x00ff, "\xc3\xbf"},
+	{0x0100, "\xc4\x80"},
+	{0x07ff, "\xdf\xbf"},
+	{0x0400, "\xd0\x80"},
+	{0x0800, "\xe0\xa0\x80"},
+	{0x0801, "\xe0\xa0\x81"},
+	{0x1000, "\xe1\x80\x80"},
+	{0xd000, "\xed\x80\x80"},
+	{0xd7ff, "\xed\x9f\xbf"}, // last code point before surrogate half.
+	{0xe000, "\xee\x80\x80"}, // first code point after surrogate half.
+	{0xfffe, "\xef\xbf\xbe"},
+	{0xffff, "\xef\xbf\xbf"},
+	{0x10000, "\xf0\x90\x80\x80"},
+	{0x10001, "\xf0\x90\x80\x81"},
+	{0x40000, "\xf1\x80\x80\x80"},
+	{0x10fffe, "\xf4\x8f\xbf\xbe"},
+	{0x10ffff, "\xf4\x8f\xbf\xbf"},
+	{0xFFFD, "\xef\xbf\xbd"},
+]
+
+static surrogateMap: []Utf8Map = [
+	{0xd800, "\xed\xa0\x80"}, // surrogate min decodes to (RuneError, 1)
+	{0xdfff, "\xed\xbf\xbf"}, // surrogate max decodes to (RuneError, 1)
+]
+
+static testStrings = [
+	"",
+	"abcd",
+	"☺☻☹",
+	"日a本b語ç日ð本Ê語þ日¥本¼語i日©",
+	"日a本b語ç日ð本Ê語þ日¥本¼語i日©日a本b語ç日ð本Ê語þ日¥本¼語i日©日a本b語ç日ð本Ê語þ日¥本¼語i日©",
+	"\x80\x80\x80\x80",
+]
+
+#test
+fn testFullRune(t: &T) {
+	for _, m in utf8map {
+		b := []byte(m.s)
+		if !utf8::FullRune(b) {
+			t.Errorf("FullRune({}) ({}) = false, want true", b, m.r)
+		}
+		s := m.s
+		if !utf8::FullRuneStr(s) {
+			t.Errorf("FullRuneStr({}) ({}) = false, want true", s, m.r)
+		}
+		b1 := b[0 : len(b)-1]
+		if utf8::FullRune(b1) {
+			t.Errorf("FullRune({}) = true, want false", b1)
+		}
+		s1 := str(b1)
+		if utf8::FullRuneStr(s1) {
+			t.Errorf("FullRuneStr({}) = true, want false", s1)
+		}
+	}
+	for _, s in ["\xc0", "\xc1"] {
+		b := []byte(s)
+		if !utf8::FullRune(b) {
+			t.Errorf("FullRune({}) = false, want true", s)
+		}
+		if !utf8::FullRuneStr(s) {
+			t.Errorf("FullRuneStr({}) = false, want true", s)
+		}
+	}
+}
+
+#test
+fn testEncodeRune(t: &T) {
+	let mut buf: [10]byte
+	mut s := unsafe::Slice(&buf[0], len(buf), len(buf))
+	for _, m in utf8map {
+		b := []byte(m.s)
+		n := utf8::EncodeRune(s, m.r)
+		b1 := s[0:n]
+		if !fastbytes::Equal(b, b1) {
+			t.Errorf("EncodeRune({}) = {} want {}", m.r, b1, b)
+		}
+	}
+}
+
+#test
+fn testAppendRune(t: &T) {
+	for _, m in utf8map {
+		mut buf := utf8::AppendRune(nil, m.r)
+		if str(buf) != m.s {
+			t.Errorf("AppendRune(nil, {}) = {}, want {}", m.r, buf, m.s)
+		}
+		buf = utf8::AppendRune([]byte("init"), m.r)
+		if str(buf) != "init"+m.s {
+			t.Errorf("AppendRune(init, {}) = {}, want {}", m.r, buf, "init"+m.s)
+		}
+	}
+}
+
+#test
+fn testDecodeRune(t: &T) {
+	for _, m in utf8map {
+		mut b := []byte(m.s)
+		mut r, mut size := utf8::DecodeRune(b)
+		if r != m.r || size != len(b) {
+			t.Errorf("DecodeRune({}) = {}, {} want {}, {}", b, r, size, m.r, len(b))
+		}
+		mut s := m.s
+		r, size = utf8::DecodeRuneStr(s)
+		if r != m.r || size != len(b) {
+			t.Errorf("DecodeRuneStr({}) = {}, {} want {}, {}", s, r, size, m.r, len(b))
+		}
+
+		// there's an extra byte that bytes left behind - make sure trailing byte works
+		r, size = utf8::DecodeRune(b[0:cap(b)])
+		if r != m.r || size != len(b) {
+			t.Errorf("DecodeRune({}) = {}, {} want {}, {}", b, r, size, m.r, len(b))
+		}
+		s = m.s + "\x00"
+		r, size = utf8::DecodeRuneStr(s)
+		if r != m.r || size != len(b) {
+			t.Errorf("DecodeRuneStr({}) = {}, {} want {}, {}", s, r, size, m.r, len(b))
+		}
+
+		// make sure missing bytes fail
+		mut wantsize := 1
+		if wantsize >= len(b) {
+			wantsize = 0
+		}
+		r, size = utf8::DecodeRune(b[0 : len(b)-1])
+		if r != utf8::RuneError || size != wantsize {
+			t.Errorf("DecodeRune({}) = {}, {} want {}, {}", b[0:len(b)-1], r, size, utf8::RuneError, wantsize)
+		}
+		s = m.s[0 : len(m.s)-1]
+		r, size = utf8::DecodeRuneStr(s)
+		if r != utf8::RuneError || size != wantsize {
+			t.Errorf("DecodeRuneStr({}) = {}, {} want {}, {}", s, r, size, utf8::RuneError, wantsize)
+		}
+
+		// make sure bad sequences fail
+		if len(b) == 1 {
+			b[0] = 0x80
+		} else {
+			b[len(b)-1] = 0x7F
+		}
+		r, size = utf8::DecodeRune(b)
+		if r != utf8::RuneError || size != 1 {
+			t.Errorf("DecodeRune({}) = {}, {} want {}, {}", b, r, size, utf8::RuneError, 1)
+		}
+		s = str(b)
+		r, size = utf8::DecodeRuneStr(s)
+		if r != utf8::RuneError || size != 1 {
+			t.Errorf("DecodeRuneStr({}) = {}, {} want {}, {}", s, r, size, utf8::RuneError, 1)
+		}
+
+	}
+}
+
+#test
+fn testDecodeSurrogateRune(t: &T) {
+	for _, m in surrogateMap {
+		b := []byte(m.s)
+		mut r, mut size := utf8::DecodeRune(b)
+		if r != utf8::RuneError || size != 1 {
+			t.Errorf("DecodeRune({}) = {}, {} want {}, {}", b, r, size, utf8::RuneError, 1)
+		}
+		s := m.s
+		r, size = utf8::DecodeRuneStr(s)
+		if r != utf8::RuneError || size != 1 {
+			t.Errorf("DecodeRuneStr({}) = {}, {} want {}, {}", b, r, size, utf8::RuneError, 1)
+		}
+	}
+}
+
+struct info {
+	index: int
+	r:     rune
+}
+
+fn runtimeRuneCount(s: str): int {
+	ret len([]rune(s))
+}
+
+// Check that a range loop, len([]rune(string)) optimization and
+// []rune conversions visit the same runes.
+// Not really a test of this package, but the assumption is used here and
+// it's good to verify.
+#test
+fn testRuntimeConversion(t: &T) {
+	for _, ts in testStrings {
+		count := utf8::RuneCountStr(ts)
+		mut n := runtimeRuneCount(ts)
+		if n != count {
+			t.Errorf("{}: len([]rune()) counted {} runes; got {} from RuneCountStr", ts, n, count)
+			break
+		}
+
+		runes := []rune(ts)
+		n = len(runes)
+		if n != count {
+			t.Errorf("{}: []rune() has length {}; got {} from RuneCountStr", ts, n, count)
+			break
+		}
+		mut i := 0
+		for _, r in []rune(ts) {
+			if r != runes[i] {
+				t.Errorf("{[{}]: expected {} ({}); got {} ({})", ts, i, runes[i], runes[i], r, r)
+			}
+			i++
+		}
+	}
+}
+
+// Check that negative runes encode as U+FFFD.
+#test
+fn testNegativeRune(t: &T) {
+	mut errorbuf := make([]byte, utf8::UTFMax)
+	errorbuf = errorbuf[0:utf8::EncodeRune(errorbuf, utf8::RuneError)]
+	mut buf := make([]byte, utf8::UTFMax)
+	buf = buf[0:utf8::EncodeRune(buf, -1)]
+	if !fastbytes::Equal(buf, errorbuf) {
+		t.Errorf("incorrect encoding [{}] for -1; expected [{}]", buf, errorbuf)
+	}
+}
+
+struct runeCountTest {
+	inp: str
+	out: int
+}
+
+static runecountCases: []runeCountTest = [
+	{"abcd", 4},
+	{"☺☻☹", 3},
+	{"1,2,3,4", 7},
+	{"\xe2\x00", 2},
+	{"\xe2\x80", 2},
+	{"a\xe2\x80", 3},
+]
+
+#test
+fn testRuneCount(t: &T) {
+	for _, tt in runecountCases {
+		mut out := utf8::RuneCountStr(tt.inp)
+		if out != tt.out {
+			t.Errorf("RuneCountStr({}) = {}, want {}", tt.inp, out, tt.out)
+		}
+		out = utf8::RuneCount([]byte(tt.inp))
+		if out != tt.out {
+			t.Errorf("RuneCount({}) = {}, want {}", tt.inp, out, tt.out)
+		}
+	}
+}
+
+struct runeLenTest {
+	r:    rune
+	size: int
+}
+
+static runelenCases: []runeLenTest = [
+	{0, 1},
+	{'e', 1},
+	{'é', 2},
+	{'☺', 3},
+	{utf8::RuneError, 3},
+	{utf8::MaxRune, 4},
+	{0xD800, -1},
+	{0xDFFF, -1},
+	{utf8::MaxRune + 1, -1},
+	{-1, -1},
+]
+
+#test
+fn testRuneLen(t: &T) {
+	for _, tt in runelenCases {
+		size := utf8::RuneLen(tt.r)
+		if size != tt.size {
+			t.Errorf("RuneLen({}) = {}, want {}", tt.r, size, tt.size)
+		}
+	}
+}
+
+struct validTest {
+	inp:  str
+	out: bool
+}
+
+static validCases: []validTest = [
+	{"", true},
+	{"a", true},
+	{"abc", true},
+	{"Ж", true},
+	{"ЖЖ", true},
+	{"брэд-ЛГТМ", true},
+	{"☺☻☹", true},
+	{"aa\xe2", false},
+	{str([]byte([66, 250])), false},
+	{str([]byte([66, 250, 67])), false},
+	{"a\uFFFDb", true},
+	{"\xF4\x8F\xBF\xBF", true},      // U+10FFFF
+	{"\xF4\x90\x80\x80", false},     // U+10FFFF+1; out of range
+	{"\xF7\xBF\xBF\xBF", false},     // 0x1FFFFF; out of range
+	{"\xFB\xBF\xBF\xBF\xBF", false}, // 0x3FFFFFF; out of range
+	{"\xc0\x80", false},             // U+0000 encoded in two bytes: incorrect
+	{"\xed\xa0\x80", false},         // U+D800 high surrogate (sic)
+	{"\xed\xbf\xbf", false},         // U+DFFF low surrogate (sic)
+]
+
+#test
+fn testValid(t: &T) {
+	for _, tt in validCases {
+		if utf8::Valid([]byte(tt.inp)) != tt.out {
+			t.Errorf("Valid({}) = {}; want {}", tt.inp, !tt.out, tt.out)
+		}
+		if utf8::ValidStr(tt.inp) != tt.out {
+			t.Errorf("ValidStr({}) = {}; want {}", tt.inp, !tt.out, tt.out)
+		}
+	}
+}
+
+struct validRuneTest {
+	r:  rune
+	ok: bool
+}
+
+static validruneCases: []validRuneTest = [
+	{0, true},
+	{'e', true},
+	{'é', true},
+	{'☺', true},
+	{utf8::RuneError, true},
+	{utf8::MaxRune, true},
+	{0xD7FF, true},
+	{0xD800, false},
+	{0xDFFF, false},
+	{0xE000, true},
+	{utf8::MaxRune + 1, false},
+	{-1, false},
+]
+
+fn TestValidRune(t: &T) {
+	for _, tt in validruneCases {
+		ok := utf8::ValidRune(tt.r)
+		if ok != tt.ok {
+			t.Errorf("ValidRune({}) = {}, want {}", tt.r, ok, tt.ok)
+		}
+	}
+}
