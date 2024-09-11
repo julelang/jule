@@ -105,12 +105,15 @@ namespace jule
 
         void dealloc(void) const noexcept
         {
-            if (this->type)
+            this->data.ref = nullptr;
+            this->data.alloc = nullptr;
+            this->ptr = false;
+            /*if (this->type)
             {
                 this->type->dealloc(this->data);
                 this->type = nullptr;
             }
-            this->__free();
+            this->__free();*/
         }
 
         inline void must_ok(

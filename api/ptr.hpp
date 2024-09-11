@@ -180,7 +180,9 @@ namespace jule
         // Frees memory if reference counting reaches to zero.
         void dealloc(void) const noexcept
         {
-            if (!this->ref)
+            this->ref = nullptr;
+            this->alloc = nullptr;
+            /*if (!this->ref)
             {
                 this->alloc = nullptr;
                 return;
@@ -193,7 +195,7 @@ namespace jule
                 return;
             }
 
-            this->__free();
+            this->__free();*/
         }
 
         inline T *ptr(
