@@ -649,27 +649,24 @@ impl eval {
 		}
 
 		// TODO: merge following separated checking analysis for variables.
-		if !v.Binded && (v.Value == nil || v.Value.Data == nil) {
-			if v.Constant {
-				// Save source file of constant variable.
-				// Use it for evaluation and checking for correct analysis.
-				// Otherwise, evaluation problems may occur.
-				// Especially if variable uses use declaration namespaces in expression.
-				mut varfile := findVarFileInPackage(self.s.files, v)
-				mut file := self.s.getCurrentFile()
-				self.s.setCurrentFile(varfile)
+		if !v.Binded && v.Constant && v.Scope == nil && (v.Value == nil || v.Value.Data == nil) {
+			// Save source file of global constant variable.
+			// Use it for evaluation and checking for correct analysis.
+			// Otherwise, evaluation problems may occur.
+			// Especially if variable uses use declaration namespaces in expression.
+			mut varfile := findVarFileInPackage(self.s.files, v)
+			mut file := self.s.getCurrentFile()
+			self.s.setCurrentFile(varfile)
 
-				// Eval constant dependent variable.
-				self.s.checkVar(v, self.s)
+			// Eval constant dependent variable.
+			self.s.checkVar(v, self.s)
 
-				// Save the original file.
-				self.s.setCurrentFile(file)
+			// Save the original file.
+			self.s.setCurrentFile(file)
 
-				if v.Value == nil || v.Value.Data == nil {
-					// Skip error.
-					ret nil
-				}
-
+			if v.Value == nil || v.Value.Data == nil {
+				// Skip error.
+				ret nil
 			}
 		}
 
