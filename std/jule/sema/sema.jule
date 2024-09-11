@@ -1130,6 +1130,21 @@ impl sema {
 		})
 	}
 
+	fn handleParamKind(mut &self, mut &f: &FnIns, mut &p: &ParamIns) {
+		if self.meta.runtime != nil {
+			// See implicit imports reference (4).
+			// Create new scope-drop function for the parameter kind.
+			mut drop := runtimeFindFn(self.meta.runtime, runtimeFunc.drop)
+			if f.Decl == drop {
+				// Parameters will handled, so this function will called again.
+				// So, infinite recursion occur, break cycle.
+				ret
+			}
+			self.handleRuntimeDrop(drop, p.Kind, p.Decl.Token)
+		}
+	}
+
+	// Assumes p.Kind != nil
 	fn checkFnParamKind(mut &self, mut &p: &ParamIns) {
 		p.Kind.Variadic = p.Decl.Variadic
 		if p.Decl.Reference && !isValidForRef(p.Kind) {
@@ -1156,9 +1171,12 @@ impl sema {
 					} else {
 						p.Kind = &TypeKind{Kind: f.Owner}
 					}
+					// For implicit imports reference (4), receiver type will be hanled.
+					// There is nothing to do.
 				} else {
 					p.Kind = sema.buildTypeWithGenerics(p.Decl.Kind.Decl, generics, f.Refers)
 					if p.Kind != nil {
+						self.handleParamKind(f, p)
 						self.checkFnParamKind(p)
 					} else {
 						ok = false
@@ -1497,9 +1515,7 @@ impl sema {
 		}
 		if len(e.Items) == 1 {
 			mut item := e.Items[0]
-			tk := TypeKind{
-				Kind: e,
-			}
+			tk := TypeKind{Kind: e}
 			if item.Kind.Kind != nil && item.Kind.Kind.Equal(unsafe { (&TypeKind)(&tk) }) {
 				self.pushErr(item.Token, LogMsg.IllegalCycleRefersItself, e.Str())
 			}
@@ -2229,14 +2245,9 @@ impl sema {
 		if v.IsTypeInferred() {
 			// Build new TypeSymbol because auto-type symbols are nil.
 			v.Kind = &TypeSymbol{Kind: v.Value.Data.Kind}
-
 			self.checkDataForTypeInference(v.Value.Data, v.Value.Expr.Token)
-			self.checkValidityForInitExpr(
-				v.Mutable,
-				v.Reference,
-				v.Kind.Kind,
-				v.Value.Data,
-				v.Value.Expr.Token)
+			self.checkValidityForInitExpr(v.Mutable, v.Reference, v.Kind.Kind,
+				v.Value.Data, v.Value.Expr.Token)
 		} else {
 			mut arr := v.Kind.Kind.Arr()
 			if arr != nil {
@@ -2247,15 +2258,16 @@ impl sema {
 					}
 				}
 			}
-
 			if self.checkAssignType(v.Reference, v.Kind.Kind, v.Value.Data, v.Value.Expr.Token) {
-				self.checkValidityForInitExpr(
-					v.Mutable,
-					v.Reference,
-					v.Kind.Kind,
-					v.Value.Data,
-					v.Value.Expr.Token)
+				self.checkValidityForInitExpr(v.Mutable, v.Reference, v.Kind.Kind,
+					v.Value.Data, v.Value.Expr.Token)
 			}
+		}
+
+		// See implicit imports reference (4).
+		if self.meta.runtime != nil && !v.Constant {
+			mut drop := runtimeFindFn(self.meta.runtime, runtimeFunc.drop)
+			self.handleRuntimeDrop(drop, v.Kind.Kind, v.Token)
 		}
 
 		if v.Reference && !isValidForRef(v.Kind.Kind) {
@@ -2478,30 +2490,62 @@ impl sema {
 		ret
 	}
 
+	fn handleRuntimeDrop(mut &self, mut &drop: &Fn, mut &kind: &TypeKind, mut &token: &Token) {
+		if !typeHaveSpecialDrop(kind) {
+			ret
+		}
+		mut f := drop.instanceForce()
+		f.Generics = append(f.Generics, &InsGeneric{Kind: kind})
+		ok, _ := self.checkGenericFn(f, token)
+		if !ok {
+			panic("sema: runtime::drop evaluation failed, this is an implementation mistake")
+		}
+	}
+
+	// Assumes self.meta.runtime != nil and s checked successfully.
+	fn handleRuntimeForStructIns(mut &self, mut &s: &StructIns) {
+		// See implicit imports reference (1).
+		// If structure instance is comparable and have not custom compare method,
+		// compiler will use default compare method. If There is array field,
+		// push instance for runtime function.
+		mut arrayCmp := (&Fn)(nil)
+		if s.Comparable && s.Operators.Eq == nil {
+			arrayCmp = runtimeFindFn(self.meta.runtime, runtimeFunc.arrayCmp)
+		}
+
+		// See implicit imports reference (4).
+		// Create new scope-drop function for the new struct instance and fields.
+		mut drop := runtimeFindFn(self.meta.runtime, runtimeFunc.drop)
+		{
+			mut st := &TypeKind{Kind: s}
+			self.handleRuntimeDrop(drop, st, s.Decl.Token)
+		}
+
+		for (_, mut field) in s.Fields {
+			if arrayCmp != nil {
+				mut arr := field.Kind.Arr()
+				if arr != nil {
+					mut f := arrayCmp.instanceForce()
+					f.Generics = append(f.Generics, &InsGeneric{Kind: arr.Elem})
+					ok, _ := self.checkGenericFn(f, field.Decl.Token)
+					if !ok {
+						panic("sema:: runtime::arrayCmp evaluation failed, this is an implementation mistake")
+					}
+				}
+			}
+			self.handleRuntimeDrop(drop, field.Kind, field.Decl.Token)
+		}
+	}
+
 	fn precheckStructIns(mut &self, mut &s: &StructIns, mut errorToken: &Token): (ok: bool) {
 		ok = self.checkStructEnv(s, errorToken)
 		if !ok {
 			ret false
 		}
 
-		// See implicit imports reference (1).
-		// If structure instance is comparable and have not custom compare method,
-		// compiler will use default compare method. If There is array field,
-		// push instance for runtime function.
-		if s.Comparable && s.Operators.Eq == nil && self.meta.runtime != nil {
-			mut decl := runtimeFindFn(self.meta.runtime, runtimeFunc.arrayCmp)
-			for (_, mut field) in s.Fields {
-				mut arr := field.Kind.Arr()
-				if arr == nil {
-					continue
-				}
-				mut f := decl.instanceForce()
-				f.Generics = append(f.Generics, &InsGeneric{Kind: arr.Elem})
-				ok, _ = self.checkGenericFn(f, field.Decl.Token)
-				if !ok {
-					panic("arrayCmp evaluation failed, this is an implementation mistake")
-				}
-			}
+		// Handle relevant runtime functions.
+		if !s.Decl.Binded && self.meta.runtime != nil {
+			self.handleRuntimeForStructIns(s)
 		}
 
 		for (_, mut f) in s.Methods {
@@ -2646,9 +2690,9 @@ impl sema {
 	}
 
 	fn checkFnInsSc(mut self, mut &f: &FnIns, mut &sc: &scopeChecker) {
-		appendRetVars(sc.table.Vars, f)
-		appendParamVars(sc.table.Vars, f)
-		appendGenericTypeAliases(sc.table.TypeAliases, f)
+		appendRetVars(f.Scope.Table.Vars, f)
+		appendParamVars(f.Scope.Table.Vars, f)
+		appendGenericTypeAliases(f.Scope.Table.TypeAliases, f)
 
 		sc.check(f.Decl.Scope, f.Scope)
 

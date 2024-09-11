@@ -539,22 +539,6 @@ impl ObjectCoder {
 		self.write(";")
 	}
 
-	fn structureDestructor(mut &self, mut &s: &StructIns) {
-		// Dispose method must be non-static
-		const Static = false
-		disposeMethod := s.FindMethod("Dispose", Static)
-		mut disposed := FuncPattern.Dispose(disposeMethod)
-		// Call destructor if implemented.
-		if !disposed {
-			ret
-		}
-		self.write("~")
-		identCoder.structureIns(self.Buf, s)
-		self.write("(void) { ")
-		identCoder.func(self.Buf, disposeMethod)
-		self.write("(this); }")
-	}
-
 	fn structureOperatorEq(mut &self, ident: str, mut &s: &StructIns, decl: bool) {
 		if !defaultEq(s) {
 			ret
@@ -633,12 +617,6 @@ impl ObjectCoder {
 	}
 
 	fn structureInsDecl(mut &self, mut &s: &StructIns) {
-		for (_, mut m) in s.Methods {
-			// Operator methods are declared by [structureDecl].
-			if isHeadDecl(m) {
-				self.funcDecl(m, false)
-			}
-		}
 		self.write("struct ")
 		identCoder.structureIns(self.Buf, s)
 		self.write(" {\n")
@@ -649,10 +627,6 @@ impl ObjectCoder {
 			self.fieldDecl(f)
 			self.write("\n")
 		}
-
-		self.indent()
-		self.structureDestructor(s)
-		self.write("\n\n")
 
 		self.doneIndent()
 		self.indent()
@@ -683,10 +657,8 @@ impl ObjectCoder {
 				for (_, mut ins) in s.Instances {
 					for (_, mut m) in ins.Methods {
 						// Operator methods are declared by [structureDecl].
-						if !isHeadDecl(m) {
-							self.pushResult(m)
-							self.funcDecl(m, false)
-						}
+						self.pushResult(m)
+						self.funcDecl(m, false)
 					}
 				}
 			}
@@ -1293,19 +1265,6 @@ fn concatAllParts(parts: ...&Token): []byte {
 		s.WriteStr(p.Kind)
 	}
 	ret unsafe { s.Buf() }
-}
-
-// Reports whether the m is a method which is declarated top of the struct.
-fn isHeadDecl(mut &m: &Fn): bool {
-	if len(m.Generics) > 0 || len(m.Instances) == 0 {
-		ret false
-	}
-	if obj::IsOpMethod(m) {
-		ret true
-	}
-	mut mi := m.Instances[0]
-	const Static = false
-	ret FuncPattern.Dispose(mi.Owner.FindMethod("Dispose", Static))
 }
 
 // Reports whether structure needs default compare method.

@@ -1,0 +1,101 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use comptime for std::comptime
+use atomic for std::sync::atomic
+use integ for std::jule::integrated
+
+#cdef
+cpp unsafe fn __jule_atomic_add_explicit[T](
+	mut addr: *T, delta: int, order: atomic::MemoryOrder): (old: T)
+
+// Reference counting pointer.
+type rcPtr: *uint
+
+// The reference counting data delta value that must occur
+// per each reference counting operation.
+const ReferenceDelta = 1
+
+// Returns allocation pointer of type.
+fn getAllocPtr[T](mut &z: T): *unsafe {
+	const t = comptime::TypeOf(T)
+	const match t.Kind() {
+	| comptime::Kind.SmartPtr:
+		ret unsafe { integ::Emit[*unsafe]("{}.alloc", z) }
+	|:
+		panic("runtime: getAllocPtr: unimplemented type: " + t.Str())
+	}
+}
+
+// Returns reference counting pointer of type.
+fn getRefPtr[T](mut &z: T): rcPtr {
+	const t = comptime::TypeOf(T)
+	const match t.Kind() {
+	| comptime::Kind.SmartPtr:
+		ret unsafe { integ::Emit[rcPtr]("{}.ref", z) }
+	|:
+		panic("runtime: getRefPtr: unimplemented type: " + t.Str())
+	}
+}
+
+// Drop reference count of reference pointer.
+unsafe fn dropRef(mut rp: rcPtr): (zeroed: bool) {
+	ret cpp.__jule_atomic_add_explicit(rp, -ReferenceDelta, atomic::MemoryOrder.Relaxed) == ReferenceDelta
+}
+
+// Deallocate heap memory.
+unsafe fn delete(mut p: *unsafe) {
+	integ::Emit("free({})", p)
+}
+
+// Compiler will not append the [drop] function calls
+// if block terminated by a call to this function.
+// Compiler will not checks strictly-deep whether this function called.
+// So it should be clear. Mostly, use before return statements, error calls or etc.
+unsafe fn noDrop() {}
+
+// Define out-of-scope, auto destructor for the type.
+// A function call to [drop] inserted by the compiler when necessary.
+// Only instantiated for supported types, not for all types.
+fn drop[T](mut &z: T) {
+	const t = comptime::TypeOf(T)
+	const match t.Kind() {
+	| comptime::Kind.Slice
+	| comptime::Kind.Array:
+		for (_, mut elem) in z {
+			drop(elem)
+			unsafe { noDrop() }
+		}
+	| comptime::Kind.SmartPtr:
+		/*mut rp := getRefPtr(z)
+		zeroed := unsafe { dropRef(rp) }
+		if zeroed {
+			drop(*z)
+			mut ap := getAllocPtr(z)
+			unsafe { delete(ap) }
+			unsafe { noDrop() }
+		}
+		unsafe { noDrop() }*/
+	| comptime::Kind.Struct:
+		const decl = t.Decl()
+		const DropFunc = "Dispose"
+		const for _, method in decl.Methods() {
+			const match method.Name() {
+			| DropFunc:
+				const params = method.Params()
+				const match {
+				| len(params) != 1:
+					unsafe { noDrop() }
+					ret
+				}
+				const v = comptime::ValueOf(z)
+				v.Method(DropFunc).Unwrap()() // call destructor
+				unsafe { noDrop() }
+				ret // method found, no need to continue iteration
+			}
+		}
+	}
+	// no special treatment
+	unsafe { noDrop() }
+}

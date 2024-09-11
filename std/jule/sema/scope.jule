@@ -20,7 +20,6 @@ use ast for std::jule::ast::{
 	MatchCase,
 	UseExpr,
 	ExprData,
-	StmtData,
 }
 use std::jule::build::{LogMsg}
 use std::jule::constant::{Const}
@@ -56,11 +55,14 @@ enum Stmt: type {
 }
 
 fn newScopeCheckerBase(mut &s: &sema, mut owner: &FnIns): &scopeChecker {
-	ret &scopeChecker{
+	mut c := &scopeChecker{
 		s: s,
 		owner: owner,
-		table: new(SymbolTable),
 	}
+	if owner != nil {
+		c.scope = owner.Scope
+	}
+	ret c
 }
 
 fn newScopeChecker(mut &s: &sema, mut owner: &FnIns): &scopeChecker {
@@ -244,7 +246,7 @@ fn checkAssign(mut &s: &sema, mut &left: &Data, mut right: &Data, op: &Token): (
 	}
 }
 
-fn isValidAstStForNextSt(mut &n: StmtData): bool {
+fn isValidAstStForNextSt(mut &n: ast::StmtData): bool {
 	match type n {
 	| &AssignSt:
 		ret !(&AssignSt)(n).Declarative
@@ -284,10 +286,26 @@ fn stmtIsDef(&st: Stmt): bool {
 
 // Scope.
 struct Scope {
-	Parent:   &Scope
-	Unsafety: bool
-	Deferred: bool
-	Stmts:    []Stmt
+	Parent:     &Scope
+	Unsafety:   bool
+	Deferred:   bool
+	Stmts:      []Stmt
+
+	ChildIndex: int
+	StmtIndex:  int
+
+	// Stores only supported types for scopes.
+	// Not initialize like other symbol tables.
+	// Designed for symbol handling and lookup for scopes.
+	Table: &SymbolTable
+}
+
+impl Scope {
+	static fn new(): &Scope {
+		ret &Scope{
+			Table: new(SymbolTable),
+		}
+	}
 }
 
 // Chain conditional node.
@@ -309,14 +327,14 @@ struct Conditional {
 
 // Infinity iteration.
 struct InfIter {
-	Scope: &Scope
+	Scope: &Scope // See developer reference (11).
 }
 
 // While iteration.
 struct WhileIter {
+	Scope: &Scope    // See developer reference (11).
 	Expr:  ExprModel // Can be nil if iteration is while-next kind.
 	Next:  Stmt      // Nil if iteration is not while-next kind.
-	Scope: &Scope
 }
 
 impl WhileIter {
@@ -328,32 +346,42 @@ impl WhileIter {
 
 // Range iteration.
 struct RangeIter {
+	Scope: &Scope // See developer reference (11).
 	Expr:  &Data
-	Scope: &Scope
 	KeyA:  &Var
 	KeyB:  &Var
 }
 
 // Continue statement.
 struct ContSt {
-	It: uintptr
+	Index: int
+	Scope: &Scope // Scope of statement.
+	Dest:  &Scope // Scope of label.
+	It:    uintptr
 }
 
 // Break statement.
 struct BreakSt {
-	It:   uintptr
-	Mtch: uintptr
+	Index: int
+	Scope: &Scope // Scope of statement.
+	Dest:  &Scope // Scope of label.
+	It:    uintptr
+	Mtch:  uintptr
 }
 
 // Label.
 struct Label {
 	Ident: str
+	Scope: &Scope // Owner scope.
+	Index: int    // Index of statement.
 }
 
 // Goto statement.
 struct GotoSt {
 	Ident: str
 	Label: &Label
+	Scope: &Scope // Owner scope.
+	Index: int    // Index of statement.
 }
 
 // Postfix assignment.
@@ -378,6 +406,7 @@ struct MultiAssign {
 
 // Match-Case.
 struct Match {
+	Scope:     &Scope // Owner scope. See developer reference (11).
 	Expr:      &Data
 	TypeMatch: bool
 	Comptime:  bool
@@ -407,13 +436,17 @@ impl Case {
 
 // Fall statement.
 struct FallSt {
+	Index:    int    // Index of statement.
+	Scope:    &Scope // Owner scope.
 	DestCase: uintptr
 }
 
 // Return statement.
 struct RetSt {
-	Func: &FnIns
-	Expr: ExprModel
+	Index: int
+	Func:  &FnIns
+	Scope: &Scope
+	Expr:  ExprModel
 }
 
 struct scopeLabel {
@@ -438,7 +471,6 @@ struct scopeChecker {
 	owner:      &FnIns // See developer reference (1).
 	parent:     &scopeChecker
 	childIndex: int // Index of child scope.
-	table:      &SymbolTable
 	scope:      &Scope
 	tree:       &ScopeTree
 	result:     &FnIns // Result type for last statement.
@@ -447,7 +479,7 @@ struct scopeChecker {
 	captured:   &[]&Var        // Anonymous function's captured variables will be stored here.
 	labels:     &[]&scopeLabel // All labels of all scopes.
 	gotos:      &[]&scopeGoto  // All gotos of all scopes.
-	i:          int
+	i:          int            // current position of stmts iteration
 }
 
 impl Lookup for scopeChecker {
@@ -488,14 +520,14 @@ impl Lookup for scopeChecker {
 	fn FindTypeAlias(mut self, ident: str, binded: bool): &TypeAlias {
 		// Search reverse for correct shadowing.
 		const Reverse = true
-		mut ta := self.table.findTypeAlias(ident, binded, Reverse)
+		mut ta := self.scope.Table.findTypeAlias(ident, binded, Reverse)
 		if ta != nil {
 			ret ta
 		}
 
 		mut parent := self.parent
 		for parent != nil {
-			ta = parent.table.findTypeAlias(ident, binded, Reverse)
+			ta = parent.scope.Table.findTypeAlias(ident, binded, Reverse)
 			if ta != nil {
 				ret ta
 			}
@@ -654,13 +686,13 @@ impl scopeChecker {
 	fn findVar(mut self, ident: str): &Var {
 		const Reverse = true // Search reverse for correct shadowing.
 		const Binded = false // Local variables cannot be binded.
-		mut v := self.table.findVar(ident, Binded, Reverse)
+		mut v := self.scope.Table.findVar(ident, Binded, Reverse)
 		if v != nil {
 			ret v
 		}
 		mut parent := self.parent
 		for parent != nil {
-			v = parent.table.findVar(ident, Binded, Reverse)
+			v = parent.scope.Table.findVar(ident, Binded, Reverse)
 			if v != nil {
 				ret v
 			}
@@ -737,7 +769,7 @@ impl scopeChecker {
 		v.Scope = self.scope
 
 		defer {
-			self.table.Vars = append(self.table.Vars, v)
+			self.scope.Table.Vars = append(self.scope.Table.Vars, v)
 			self.scope.Stmts = append(self.scope.Stmts, v)
 		}
 
@@ -771,7 +803,7 @@ impl scopeChecker {
 			ret
 		}
 		self.s.checkTypeAliasDecl(ta, self)
-		self.table.TypeAliases = append(self.table.TypeAliases, ta)
+		self.scope.Table.TypeAliases = append(self.scope.Table.TypeAliases, ta)
 
 		// Stop immediately if destination type is could not evaluated.
 		if ta.Kind.Kind == nil {
@@ -785,13 +817,16 @@ impl scopeChecker {
 	}
 
 	fn getChild(mut self): &Scope {
-		ret &Scope{
-			Parent: self.scope,
-		}
+		mut s := Scope.new()
+		s.Parent = self.scope
+		ret s
 	}
 
 	fn checkChildSsc(mut &self, mut &tree: &ScopeTree, mut &s: &Scope, mut &ssc: &scopeChecker) {
 		ssc.parent = self
+		ssc.scope = s
+		ssc.scope.ChildIndex = ssc.childIndex
+		ssc.scope.StmtIndex = self.i
 		ssc.check(tree, s)
 	}
 
@@ -822,6 +857,8 @@ impl scopeChecker {
 			self.s.pushSuggestion(LogMsg.DeclareExceptional)
 		}
 		m.Func = root.owner
+		m.Scope = self.scope
+		m.Index = self.i
 	}
 
 	fn checkExpr(mut &self, mut expr: &Expr) {
@@ -839,11 +876,14 @@ impl scopeChecker {
 			mut m := (&BuiltinErrorCallExprModel)(d.Model)
 			self.processErrorCall(m, expr.Token)
 			self.scope.Stmts = append(self.scope.Stmts, d)
+		| &BuiltinPanicCallExprModel:
+			mut m := (&BuiltinPanicCallExprModel)(d.Model)
+			m.Scope = self.scope
+			self.scope.Stmts = append(self.scope.Stmts, d)
 		| &BackendEmitExprModel
 		| &BuiltinAppendCallExprModel
 		| &BuiltinOutCallExprModel
 		| &BuiltinOutlnCallExprModel
-		| &BuiltinPanicCallExprModel
 		| &BuiltinAssertCallExprModel
 		| &BuiltinCopyCallExprModel
 		| &BuiltinDeleteCallExprModel
@@ -1008,13 +1048,14 @@ impl scopeChecker {
 		for i < comptime.kind.len(); i++ {
 			mut ssc := self.newChildChecker()
 			mut scope := self.getChild()
+			ssc.scope = scope
 			if kind.KeyA != nil {
 				kind.KeyA.Scope = scope
-				ssc.table.Vars = append(ssc.table.Vars, kind.KeyA)
+				ssc.scope.Table.Vars = append(ssc.scope.Table.Vars, kind.KeyA)
 			}
 			if kind.KeyB != nil {
 				kind.KeyB.Scope = scope
-				ssc.table.Vars = append(ssc.table.Vars, kind.KeyB)
+				ssc.scope.Table.Vars = append(ssc.scope.Table.Vars, kind.KeyB)
 			}
 			comptime.kind.step(i, kind.KeyA, kind.KeyB)
 			self.checkChildSsc(it.Scope, scope, ssc)
@@ -1063,6 +1104,7 @@ impl scopeChecker {
 
 		mut ssc := self.newChildChecker()
 		mut scope := self.getChild()
+		ssc.scope = scope
 
 		if kind.KeyA != nil {
 			if !self.s.isFlag(SemaFlag.Shadowing) && self.isDuplicatedIdent(0, kind.KeyA.Ident) {
@@ -1070,7 +1112,7 @@ impl scopeChecker {
 				self.s.pushSuggestion(LogMsg.RenameForAvoidDuplication)
 			}
 			kind.KeyA.Scope = scope
-			ssc.table.Vars = append(ssc.table.Vars, kind.KeyA)
+			ssc.scope.Table.Vars = append(ssc.scope.Table.Vars, kind.KeyA)
 		}
 
 		if kind.KeyB != nil {
@@ -1079,7 +1121,7 @@ impl scopeChecker {
 				self.s.pushSuggestion(LogMsg.RenameForAvoidDuplication)
 			}
 			kind.KeyB.Scope = scope
-			ssc.table.Vars = append(ssc.table.Vars, kind.KeyB)
+			ssc.scope.Table.Vars = append(ssc.scope.Table.Vars, kind.KeyB)
 		}
 
 		self.checkIterScopeSsc(uintptr(kind), it.Scope, scope, ssc)
@@ -1217,6 +1259,8 @@ impl scopeChecker {
 			}
 		}
 
+		cont.Index = self.i
+		cont.Scope = self.scope
 		self.scope.Stmts = append(self.scope.Stmts, cont)
 	}
 
@@ -1228,6 +1272,8 @@ impl scopeChecker {
 
 		mut label := &Label{
 			Ident: l.Ident,
+			Scope: self.scope,
+			Index: self.i,
 		}
 
 		self.scope.Stmts = append(self.scope.Stmts, label)
@@ -1242,6 +1288,8 @@ impl scopeChecker {
 	fn pushGoto(mut &self, mut gt: &ast::GotoSt) {
 		mut st := &GotoSt{
 			Ident: gt.Label.Kind,
+			Scope: self.scope,
+			Index: self.i,
 		}
 		self.scope.Stmts = append(self.scope.Stmts, st)
 
@@ -1290,7 +1338,7 @@ impl scopeChecker {
 		if IsIgnoreIdent(ident) || ident == "" {
 			ret false
 		}
-		ret self.table.defByIdent(ident, false) == nil
+		ret self.scope.Table.defByIdent(ident, false) == nil
 	}
 
 	// Remove the interior mutability risk if the d represents a structure and
@@ -1483,7 +1531,7 @@ impl scopeChecker {
 				Model: v,
 			})
 			st.Decls = append(st.Decls, v)
-			self.table.Vars = append(self.table.Vars, v)
+			self.scope.Table.Vars = append(self.scope.Table.Vars, v)
 			ret
 		}
 	norm:
@@ -1776,6 +1824,7 @@ impl scopeChecker {
 		}
 
 		mut tm := &Match{
+			Scope: self.scope,
 			TypeMatch: true,
 			Expr: d,
 			Comptime: m.Comptime,
@@ -1824,6 +1873,7 @@ impl scopeChecker {
 		}
 
 		mut mc := &Match{
+			Scope: self.scope,
 			Expr: d,
 			Comptime: m.Comptime,
 		}
@@ -1873,6 +1923,8 @@ impl scopeChecker {
 		}
 
 		self.scope.Stmts = append(self.scope.Stmts, &FallSt{
+			Index: self.i,
+			Scope: self.scope,
 			DestCase: unsafe { uintptr(case.Next) },
 		})
 	}
@@ -1887,6 +1939,8 @@ impl scopeChecker {
 		// Pointer will set by label.
 		brk.It = 0
 		brk.Mtch = 0
+
+		brk.Scope = self.scope
 
 		mut label := findLabelParent(b.Label.Kind, self.parent)
 		if label == nil {
@@ -1960,11 +2014,14 @@ impl scopeChecker {
 	fn checkBreak(mut &self, b: &ast::BreakSt) {
 		if b.Label != nil { // Label given.
 			mut brk := self.checkBreakWithLabel(b)
+			brk.Index = self.i
 			self.scope.Stmts = append(self.scope.Stmts, brk)
 			ret
 		}
 
 		mut brk := self.checkPlainBreak(b)
+		brk.Index = self.i
+		brk.Scope = self.scope
 		self.scope.Stmts = append(self.scope.Stmts, brk)
 	}
 
@@ -1974,7 +2031,9 @@ impl scopeChecker {
 		}
 
 		mut rt := &RetSt{
+			Index: self.i,
 			Func: self.getRoot().owner,
+			Scope: self.scope,
 		}
 		self.scope.Stmts = append(self.scope.Stmts, rt)
 
@@ -2009,7 +2068,7 @@ impl scopeChecker {
 		// Validated at end of scope's analysis.
 	}
 
-	fn checkNode(mut &self, mut &node: StmtData) {
+	fn checkNode(mut &self, mut &node: ast::StmtData) {
 		match type node {
 		| &ScopeTree:
 			self.checkAnonScope((&ScopeTree)(node))
@@ -2173,7 +2232,7 @@ impl scopeChecker {
 	}
 
 	fn checkVars(mut self) {
-		for _, v in self.table.Vars {
+		for _, v in self.scope.Table.Vars {
 			if !v.Used && !v.Constant && !IsIgnoreIdent(v.Ident) && !IsAnonIdent(v.Ident) {
 				self.s.pushErr(v.Token, LogMsg.DeclaredButNotUsed, v.Ident)
 			}
@@ -2181,7 +2240,7 @@ impl scopeChecker {
 	}
 
 	fn checkAliases(mut self) {
-		for _, a in self.table.TypeAliases {
+		for _, a in self.scope.Table.TypeAliases {
 			if !a.Used && !IsIgnoreIdent(a.Ident) && !IsAnonIdent(a.Ident) {
 				self.s.pushErr(a.Token, LogMsg.DeclaredButNotUsed, a.Ident)
 			}

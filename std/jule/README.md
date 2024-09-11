@@ -63,6 +63,7 @@ Typical uses are things like capturing or tracing private behavior. For example,
 - **(10)** Jule can handle supported types bidirectionally for binary expressions (`s == nil || nil == s` or etc.). However, when creating CAST, some types in binary expressions must always be left operand. These types are; `any`, type enums, enums, smart pointers, raw pointers and traits.
     - **(10.1)** For these special types, the type that is the left operand can normally be left or right operand. It is only guaranteed if the expression of the relevant type is in the left operand. There may be a shift in the original order.
     - **(10.2)** In the case of a `nil` comparison, the right operand should always be `nil`.
+- **(11)** The `Scope` field of iteration or match expressions must be the first one. Accordingly, coverage data of the relevant type can be obtained by reinterpreting types such as `uintptr` with Unsafe Jule.
 
 ### Implicit Imports
 
@@ -76,3 +77,4 @@ Here is the list of custom behaviors for this package;
 - (1) `arrayCmp`: Developed to eliminate the need for the Jule compiler to generate code specifically for array comparisons for each backend and to reduce analysis cost. The semantic analyzer creates the necessary instance for this generic function when an array comparison is made. Thus, the necessary comparison function for each array is programmed at the Jule frontent level.
 - (2) `shiftLeft`: Developed to eliminate the need for the Jule compiler to generate code specifically for integer left shiftings for each backend and to reduce analysis cost. The semantic analyzer creates the necessary instance for this generic function when an integer left shifting is made. Thus, the necessary shifting function for each operation is programmed at the Jule frontent level.
 - (3) `shiftRight`: Same as `shiftLeft` but designed for right shiftings.
+- Other functions: see package documentations
