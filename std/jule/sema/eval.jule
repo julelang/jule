@@ -2340,6 +2340,7 @@ impl eval {
 	}
 
 	// This method evaluates expressions, will not check public availability.
+	// The tok parameter should be identifier to accessed.
 	fn evalStructSubIdentField(mut self, mut &d: &Data, mut &s: &StructIns, mut &tok: &Token, mut &f: &FieldIns): &Data {
 		mut model := &StructSubIdentExprModel{
 			Token: tok,
@@ -2360,6 +2361,29 @@ impl eval {
 				d.Mutable = scope.owner != nil && scope.owner.Owner == s
 			}
 		}
+		ret d
+	}
+
+	// This method evaluates expressions, will not check public availability.
+	// The tok parameter should be identifier to accessed.
+	fn evalStructSubIdentMethod(mut self, mut &d: &Data, mut &s: &StructIns, mut &tok: &Token, mut &m: &Fn, ref: bool): &Data {
+		if m.Params[0].IsRef() && !ref {
+			self.pushErr(tok, LogMsg.RefMethodUsedWithNotRefInstance)
+		}
+
+		self.checkDeprecated(m.Directives, tok)
+
+		mut ins := m.instance()
+		ins.Owner = s
+		self.pushReference[&FnIns](ins)
+		mut model := new(Data, *d)
+		d.Model = &StructSubIdentExprModel{
+			Token: tok,
+			Expr: model,
+			Method: ins,
+			Owner: s,
+		}
+		d.Kind = &TypeKind{Kind: ins}
 		ret d
 	}
 
@@ -2384,24 +2408,7 @@ impl eval {
 			self.pushSuggestion(LogMsg.MakePubToAccess)
 		}
 
-		if m.Params[0].IsRef() && !ref {
-			self.pushErr(si.Ident, LogMsg.RefMethodUsedWithNotRefInstance)
-		}
-
-		self.checkDeprecated(m.Directives, si.Ident)
-
-		mut ins := m.instance()
-		ins.Owner = s
-		self.pushReference[&FnIns](ins)
-		mut model := new(Data, *d)
-		d.Model = &StructSubIdentExprModel{
-			Token: si.Ident,
-			Expr: model,
-			Method: ins,
-			Owner: s,
-		}
-		d.Kind = &TypeKind{Kind: ins}
-		ret d
+		ret self.evalStructSubIdentMethod(d, s, si.Ident, m, ref)
 	}
 
 	fn evalIntTypeStatic(mut self, ident: &Token): &Data {
