@@ -1163,6 +1163,52 @@ impl comptimeValue {
 		ret buildComptimeValue(d)
 	}
 
+	fn _Method(mut &self, mut &e: &eval, mut &fc: &ast::FnCallExpr): &Data {
+		if len(fc.Args) > 1 {
+			e.pushErr(fc.Args[1].Token, LogMsg.ArgumentOverflow, "Method")
+			ret nil
+		}
+		mut ref := false
+		mut s := (&StructIns)(nil)
+		if self.data.Kind.Sptr() != nil {
+			s = self.data.Kind.Sptr().Elem.Struct()
+			ref = true
+		} else {
+			s = self.data.Kind.Struct()
+		}
+		if s == nil {
+			e.pushErr(fc.Token, LogMsg.InvalidTypeForFn, self.data.Kind.Str(), "Method")
+			ret nil
+		}
+		mut arg := fc.Args[0]
+		mut d := e.evalExpr(arg)
+		if d == nil {
+			ret nil
+		}
+		if !d.IsConst() {
+			e.pushErr(arg.Token, LogMsg.ExprNotConst)
+			ret nil
+		}
+		prim := d.Kind.Prim()
+		if prim == nil || !prim.IsStr() {
+			e.pushErr(arg.Token, LogMsg.IncompatibleTypes, PrimKind.Str, d.Kind.Str())
+			ret nil
+		}
+		ident := d.Constant.ReadStr()
+		const Static = false
+		mut m := s.FindMethod(ident, Static)
+		if m == nil {
+			e.pushErr(arg.Token, LogMsg.ObjHaveNotIdent, s.Decl.Ident, ident)
+			ret nil
+		}
+		d = new(Data, *self.data)
+		if ref {
+			makeImplicitDeref(d, fc.Token)
+		}
+		d = e.evalStructSubIdentMethod(d, s, arg.Token, m, ref)
+		ret buildComptimeValue(d)
+	}
+
 	fn subIdent(mut &self, &ident: str): &Data {
 		match ident {
 		| "Unwrap":
@@ -1204,6 +1250,13 @@ impl comptimeValue {
 			mut method := &FnIns{
 				caller: fn(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
 					ret self._Field(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		| "Method":
+			mut method := &FnIns{
+				caller: fn(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+					ret self._Method(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
