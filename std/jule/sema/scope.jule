@@ -66,7 +66,7 @@ fn newScopeCheckerBase(mut &s: &sema, mut owner: &FnIns): &scopeChecker {
 fn newScopeChecker(mut &s: &sema, mut owner: &FnIns): &scopeChecker {
 	mut base := newScopeCheckerBase(s, owner)
 	base.labels = new([]&scopeLabel, nil)
-	base.gotos = new([]&scopeGoto, nil)
+	base.gotos = new([]&GotoSt, nil)
 	ret base
 }
 
@@ -79,69 +79,10 @@ fn findLabelParent(&ident: str, mut scope: &scopeChecker): &scopeLabel {
 		if scope.parent == nil || scope.owner != nil {
 			ret nil
 		}
-
 		scope = scope.parent
 		label = scope.findLabelScope(ident)
 	}
-
 	ret label
-}
-
-fn modelIsGotoScope(Model: any, &sc: &Scope): bool {
-	match type Model {
-	| &FnCallExprModel:
-		fcem := (&FnCallExprModel)(Model)
-		if fcem.Except == sc {
-			ret true
-		}
-	| &Data:
-		d := (&Data)(Model)
-		ret modelIsGotoScope(d.Model, sc)
-	}
-	ret false
-}
-
-fn stmtIsGotoScope(&stmt: Stmt, &sc: &Scope): bool {
-	match type stmt {
-	| &Scope:
-		ret (&Scope)(stmt) == sc
-	| &InfIter:
-		ret (&InfIter)(stmt).Scope == sc
-	| &RangeIter:
-		it := (&RangeIter)(stmt)
-		ret it.Scope == sc || modelIsGotoScope(it.Expr.Model, sc)
-	| &WhileIter:
-		it := (&WhileIter)(stmt)
-		ret it.Scope == sc ||
-			modelIsGotoScope(it.Expr, sc) ||
-			modelIsGotoScope(it.Next, sc)
-	| &Match:
-		m := (&Match)(stmt)
-		for _, c in m.Cases {
-			if c.Scope == sc {
-				ret true
-			}
-			for _, expr in c.Exprs {
-				if modelIsGotoScope(expr.Model, sc) {
-					ret true
-				}
-			}
-		}
-		ret m.Default != nil && m.Default.Scope == sc
-	| &Conditional:
-		c := (&Conditional)(stmt)
-		for _, elif in c.Elifs {
-			if elif.Scope == sc || modelIsGotoScope(elif.Expr, sc) {
-				ret true
-			}
-		}
-		ret c.Default != nil && c.Default.Scope == sc
-	| &Data:
-		d := (&Data)(stmt)
-		ret modelIsGotoScope(d.Model, sc)
-	|:
-		ret false
-	}
 }
 
 fn countMatchType(&m: &Match, &t: &TypeKind): int {
@@ -273,15 +214,6 @@ fn isValidStForNextSt(&st: Stmt): bool {
 	}
 }
 
-fn stmtIsDef(&st: Stmt): bool {
-	match type st {
-	| &Var:
-		ret true
-	|:
-		ret false
-	}
-}
-
 // Scope.
 struct Scope {
 	Parent:   &Scope
@@ -364,6 +296,7 @@ struct Label {
 // Goto statement.
 struct GotoSt {
 	Ident: str
+	Token: &Token
 	Label: &Label
 	Scope: &Scope // Owner scope.
 	Index: int    // Index of statement.
@@ -432,17 +365,8 @@ struct RetSt {
 
 struct scopeLabel {
 	token: &Token
-	label: &Label
-	pos:   int
-	scope: &scopeChecker
+	node:  &Label
 	used:  bool
-}
-
-struct scopeGoto {
-	st:    &GotoSt
-	gt:    &ast::GotoSt
-	scope: &scopeChecker
-	pos:   int
 }
 
 // Scope checker.
@@ -460,7 +384,7 @@ struct scopeChecker {
 	cse:        uintptr
 	captured:   &[]&Var        // Anonymous function's captured variables will be stored here.
 	labels:     &[]&scopeLabel // All labels of all scopes.
-	gotos:      &[]&scopeGoto  // All gotos of all scopes.
+	gotos:      &[]&GotoSt     // All gotos of all scopes.
 	i:          int            // Index of current statement.
 }
 
@@ -704,10 +628,9 @@ impl scopeChecker {
 	// Just lookups current scope.
 	fn findLabelScope(mut &self, &ident: str): &scopeLabel {
 		mut label := self.findLabelAll(ident)
-		if label != nil && label.scope == self {
+		if label != nil && label.node.Scope == self.scope {
 			ret label
 		}
-
 		ret nil
 	}
 
@@ -716,7 +639,7 @@ impl scopeChecker {
 	// Lookups all labels.
 	fn findLabelAll(mut self, &ident: str): &scopeLabel {
 		for (_, mut lbl) in *self.labels {
-			if lbl.label.Ident == ident {
+			if lbl.node.Ident == ident {
 				ret lbl
 			}
 		}
@@ -1204,16 +1127,16 @@ impl scopeChecker {
 
 			label.used = true
 
-			if label.pos+1 >= len(label.scope.scope.Stmts) {
+			if label.node.Index+1 >= len(label.node.Scope.Stmts) {
 				self.s.pushErr(c.Label, LogMsg.InvalidLabel, c.Label.Kind)
 				ret
 			}
 
-			i := label.pos + 1
-			if i >= len(label.scope.scope.Stmts) {
+			i := label.node.Index + 1
+			if i >= len(label.node.Scope.Stmts) {
 				self.s.pushErr(c.Label, LogMsg.InvalidLabel)
 			} else {
-				mut st := label.scope.scope.Stmts[i]
+				mut st := label.node.Scope.Stmts[i]
 				match type st {
 				| &InfIter:
 					cont.It = uintptr((&InfIter)(st))
@@ -1251,26 +1174,19 @@ impl scopeChecker {
 		self.scope.Stmts = append(self.scope.Stmts, label)
 		*self.labels = append(*self.labels, &scopeLabel{
 			token: l.Token,
-			label: label,
-			pos: len(self.scope.Stmts) - 1,
-			scope: self,
+			node: label,
 		})
 	}
 
 	fn pushGoto(mut &self, mut gt: &ast::GotoSt) {
 		mut st := &GotoSt{
+			Token: gt.Label,
 			Ident: gt.Label.Kind,
 			Scope: self.scope,
 			Index: self.i,
 		}
 		self.scope.Stmts = append(self.scope.Stmts, st)
-
-		*self.gotos = append(*self.gotos, &scopeGoto{
-			st: st,
-			gt: gt,
-			pos: len(self.scope.Stmts) - 1,
-			scope: self,
-		})
+		*self.gotos = append(*self.gotos, st)
 	}
 
 	fn checkPostfix(mut &self, mut a: &AssignSt) {
@@ -1918,16 +1834,16 @@ impl scopeChecker {
 
 		label.used = true
 
-		if label.pos+1 >= len(label.scope.scope.Stmts) {
+		if label.node.Index+1 >= len(label.node.Scope.Stmts) {
 			self.s.pushErr(b.Label, LogMsg.InvalidLabel, b.Label.Kind)
 			ret nil
 		}
 
-		i := label.pos + 1
-		if i >= len(label.scope.scope.Stmts) {
+		i := label.node.Index + 1
+		if i >= len(label.node.Scope.Stmts) {
 			self.s.pushErr(b.Label, LogMsg.InvalidLabel, b.Label.Kind)
 		} else {
-			mut st := label.scope.scope.Stmts[i]
+			mut st := label.node.Scope.Stmts[i]
 			match type st {
 			| &InfIter:
 				brk.It = uintptr((&InfIter)(st))
@@ -2133,54 +2049,71 @@ impl scopeChecker {
 		}
 	}
 
-	fn checkGoto(mut self, mut &gt: &scopeGoto, mut &label: &scopeLabel) {
-		mut gtsc := gt.scope
-		for gtsc.childIndex-1 > label.scope.childIndex {
-			gtsc = gtsc.parent
-		}
-
+	fn checkGoto(mut self, mut &gt: &GotoSt, mut &label: &scopeLabel) {
 		mut n := 0
-
-		if gtsc.scope == label.scope.scope {
-			// Scopes are same and label at above, so safe.
-			if gt.pos > label.pos {
+		if gt.Scope == label.node.Scope {
+			// Scopes are same and label at above, so it is safe.
+			if gt.Index > label.node.Index {
 				ret
 			}
-
 			// Limit controlling to goto's position.
 			// Label and goto is in same scope.
-			n = gt.pos
-		}
-
-		mut i := label.pos - 1
-
-		if n == 0 {
-			for j, stmt in label.scope.scope.Stmts {
-				// Break if position reached to goto's scope.
-				if stmtIsGotoScope(stmt, gtsc.scope) {
-					n = j
-					break
-				}
+			n = gt.Index
+		} else if gt.Scope.ChildIndex > label.node.Scope.ChildIndex {
+			// Label owned by a parent scope.
+			// Find parent scope of goto scope based on label.
+			// So we can evaluate by same scope conditions.
+			mut gtsc := gt.Scope
+			for gtsc.ChildIndex-1 > label.node.Scope.ChildIndex {
+				gtsc = gtsc.Parent
 			}
-		}
-
-		for i >= n; i-- {
-			mut stmt := label.scope.scope.Stmts[i]
-			if stmtIsDef(stmt) {
-				self.s.pushErr(gt.gt.Token, LogMsg.GotoJumpsDeclarations, gt.gt.Label.Kind)
+			if gtsc.StmtIndex > label.node.Index {
+				// Scopes are same and label at above, so it is safe.
 				ret
 			}
+			// Limit controlling to goto's position.
+			// Label and goto is in same scope.
+			// If same scope condition is not met,
+			// we have zero offset because of root scope.
+			// So algorithm will check all statements without limitation,
+			// so any declaration will cause an error.
+			n = gtsc.StmtIndex
+		} else {
+			// Label owned by a child scope. Set limit offset to zero.
+			// Thus algorithm will check all statements without limitation,
+			// so any declaration will cause an error.
+			n = 0
+		}
+
+		mut s := label.node.Scope     // Start checking at scope of label.
+		mut i := label.node.Index - 1 // Start end limit by label statement.
+		for {
+			for i >= n; i-- {
+				mut stmt := s.Stmts[i]
+				if stmtIsDef(stmt) {
+					self.s.pushErr(gt.Token, LogMsg.GotoJumpsDeclarations, gt.Ident)
+					ret
+				}
+			}
+			if s.ChildIndex > gt.Scope.ChildIndex {
+				// Current scope is more depth than goto scope.
+				// So jump to parent scope to check any missing declaration.
+				s = s.Parent
+				i = s.StmtIndex - 1 // Set end limit to above of current scope statement.
+				continue
+			}
+			break
 		}
 	}
 
 	fn checkGotos(mut self) {
 		for (_, mut gt) in *self.gotos {
-			mut label := self.findLabelAll(gt.gt.Label.Kind)
+			mut label := self.findLabelAll(gt.Ident)
 			if label == nil {
-				self.s.pushErr(gt.gt.Token, LogMsg.LabelNotExist, gt.gt.Label.Kind)
+				self.s.pushErr(gt.Token, LogMsg.LabelNotExist, gt.Ident)
 				continue
 			}
-			gt.st.Label = label.label
+			gt.Label = label.node
 			label.used = true
 			self.checkGoto(gt, label)
 		}
@@ -2189,7 +2122,7 @@ impl scopeChecker {
 	fn checkLabels(mut self) {
 		for _, l in *self.labels {
 			if !l.used {
-				self.s.pushErr(l.token, LogMsg.DeclaredButNotUsed, l.label.Ident)
+				self.s.pushErr(l.token, LogMsg.DeclaredButNotUsed, l.node.Ident)
 			}
 		}
 	}
@@ -2302,4 +2235,16 @@ fn canComptimeMatch(mut &d: &Data): bool {
 		ret false
 	}
 	ret d.IsConst() || d.Kind.comptimeTypeInfo() != nil
+}
+
+fn stmtIsDef(&stmt: Stmt): bool {
+	match type stmt {
+	| &Var:
+		ret true
+	| &MultiAssign:
+		ma := (&MultiAssign)(stmt)
+		ret len(ma.Decls) > 0
+	|:
+		ret false
+	}
 }
