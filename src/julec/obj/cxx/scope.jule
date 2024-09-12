@@ -406,23 +406,15 @@ impl scopeCoder {
 	}
 
 	fn whileIter(mut &self, mut it: &WhileIter) {
-		if it.Expr != nil && it.Next == nil {
-			self.oc.write("while (")
+		self.oc.write("while (")
+		if it.Expr != nil {
 			self.oc.ec.possibleRefExpr(it.Expr)
-			self.oc.write(") {")
 		} else {
-			self.oc.write("for (; ")
-			if it.Expr != nil {
-				self.oc.ec.possibleRefExpr(it.Expr)
-			}
-			self.oc.write("; ")
-			if it.Next != nil {
-				self.st(it.Next)
-			}
-			self.oc.write(") {")
+			self.oc.write("true")
 		}
 
-		if len(it.Scope.Stmts) == 0 {
+		self.oc.write(") {")
+		if len(it.Scope.Stmts) == 0 && it.Next == nil {
 			self.oc.write("}")
 			ret
 		}
@@ -438,6 +430,11 @@ impl scopeCoder {
 		identCoder.iterNext(self.oc.Buf, uintptr(it))
 		self.oc.write(":;\n")
 		self.oc.indent()
+		if it.Next != nil {
+			self.st(it.Next)
+			self.oc.write(";\n")
+			self.oc.indent()
+		}
 		self.oc.write("}\n")
 		self.oc.indent()
 		identCoder.iterEnd(self.oc.Buf, uintptr(it))
