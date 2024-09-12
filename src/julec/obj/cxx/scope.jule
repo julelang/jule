@@ -978,7 +978,7 @@ impl scopeCoder {
 			const resultIdent = "__jule_result"
 			self.oc.write("{ auto " + resultIdent + " = ")
 			self.oc.ec.possibleRefExpr(r.Expr)
-			self.oc.write(";\n")
+			self.oc.write("; ")
 			self.handleDrops(r.Scope, r.Func.Scope, dropFlags, r.Index)
 			self.oc.write("return ")
 			if r.Func.Decl.Exceptional {
@@ -1055,6 +1055,7 @@ impl scopeCoder {
 				for (_, mut md) in m.Datas {
 					if !obj::TypeHaveSpecialDrop(md.Kind) {
 						self.oc.ec.model(md.Model)
+						self.oc.write("; ")
 						continue
 					}
 					self.oc.write("({ auto ")
@@ -1063,7 +1064,7 @@ impl scopeCoder {
 					self.oc.ec.possibleRefExpr(md.Model)
 					self.oc.write("; ")
 					self.dh.dropModel(tempVar, md.Kind)
-					self.oc.write(" });\n")
+					self.oc.write(" }); ")
 				}
 			| &FnCallExprModel:
 				mut m := (&FnCallExprModel)(d.Model)
@@ -1363,12 +1364,11 @@ impl dropHandler {
 
 	fn dropModel(mut &self, mut m: compExprModel, mut &k: &TypeKind) {
 		i := self.sc.oc.pushDrop(k)
-		self.sc.oc.indent()
 		self.sc.oc.write(dropFuncIdentPrefix)
 		self.sc.oc.write(conv::Itoa(i))
 		self.sc.oc.write("(&")
 		self.sc.oc.ec.possibleRefExpr(m)
-		self.sc.oc.write(");\n")
+		self.sc.oc.write(");")
 	}
 
 	fn commonStep(mut &self, i: int, mut &stmt: Stmt): bool {
