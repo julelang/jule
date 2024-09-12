@@ -1160,6 +1160,10 @@ impl sema {
 			mut ok := true
 			for (_, mut p) in f.Params {
 				if p.Decl.IsSelf() {
+					if f.Owner == nil {
+						// Trait methods have not owner yet. Skip them.
+						continue
+					}
 					if p.Decl.IsRef() {
 						p.Kind = &TypeKind{
 							Kind: &Sptr{
@@ -1173,6 +1177,7 @@ impl sema {
 					}
 					// For implicit imports reference (4), receiver type will be hanled.
 					// There is nothing to do.
+					self.handleParamKind(f, p)
 				} else {
 					p.Kind = sema.buildTypeWithGenerics(p.Decl.Kind.Decl, generics, f.Refers)
 					if p.Kind != nil {

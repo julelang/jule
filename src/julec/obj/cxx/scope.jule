@@ -1431,6 +1431,16 @@ impl dropHandler {
 			if self.f&dropFlag.SkipRoot == dropFlag.SkipRoot {
 				ret
 			}
+			// handle GC-collected receiver
+			for (_, mut v) in self.rs.Table.Vars {
+				if v.Ident == TokenKind.Self {
+					if v.Kind.Kind.Sptr() != nil {
+						mut stmt := Stmt(v)
+						f(-1, stmt)
+					}
+					break
+				}
+			}
 		}
 		mut noDrop := obj::RuntimeFindFn(self.sc.oc.ir.Runtime, obj::RuntimeFunc.noDrop).Instances[0]
 		if isLastStmtCalls(self.cs, noDrop) {
@@ -1476,11 +1486,6 @@ impl dropHandler {
 
 	fn handle(mut &self) {
 		self.dr = obj::RuntimeFindFn(self.sc.oc.ir.Runtime, obj::RuntimeFunc.drop)
-		if len(self.rs.Table.Vars) > 0 && self.rs.Table.Vars[0].Ident == TokenKind.Self &&
-			self.rs.Table.Vars[0].Kind.Kind.Sptr() != nil {
-			// handle receiver parameter
-			self.dropVar(self.rs.Table.Vars[0])
-		}
 		self.step()
 	}
 }

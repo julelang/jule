@@ -7,11 +7,26 @@ use atomic for std::sync::atomic
 use integ for std::jule::integrated
 
 #cdef
-cpp unsafe fn __jule_atomic_add_explicit[T](
-	mut addr: *T, delta: int, order: atomic::MemoryOrder): (old: T)
+cpp unsafe fn __jule_atomic_swap_explicit[T](
+	mut addr: *T, new: T, order: atomic::MemoryOrder): (old: T)
 
-// Reference counting pointer.
-type rcPtr: *uint
+#cdef
+cpp unsafe fn __jule_atomic_compare_swap_explicit[T](mut addr: *T, old: *T,
+	new: T, suc: atomic::MemoryOrder, fail: atomic::MemoryOrder): (swapped: bool)
+
+#cdef
+cpp unsafe fn __jule_atomic_add_explicit[T1, T2](
+	mut addr: *T1, delta: T2, order: atomic::MemoryOrder): (old: T1)
+
+#cdef
+cpp unsafe fn __jule_atomic_load_explicit[T](addr: *T, order: atomic::MemoryOrder): T
+
+#cdef
+cpp unsafe fn __jule_atomic_store_explicit[T](
+	mut addr: *T, val: T, order: atomic::MemoryOrder)
+
+// Reference counting data.
+type rc: uint
 
 // The reference counting data delta value that must occur
 // per each reference counting operation.
@@ -21,27 +36,64 @@ const ReferenceDelta = 1
 fn getAllocPtr[T](mut &z: T): *unsafe {
 	const t = comptime::TypeOf(T)
 	const match t.Kind() {
+	| comptime::Kind.TypeEnum
+	| comptime::Kind.Any:
+		// <any>
+		ret unsafe { integ::Emit[*rc]("{}.data.alloc", z) }
+	| comptime::Kind.Trait:
+		// <trait>
+		ret unsafe { integ::Emit[*rc]("{}.data.alloc", z) }
 	| comptime::Kind.SmartPtr:
-		ret unsafe { integ::Emit[*unsafe]("{}.alloc", z) }
+		// <gc-ptr>
+		ret unsafe { integ::Emit[*rc]("{}.alloc", z) }
+	| comptime::Kind.Str:
+		// str
+		ret unsafe { integ::Emit[*rc]("{}.buffer.alloc", z) }
+	| comptime::Kind.Slice:
+		// []T
+		ret unsafe { integ::Emit[*rc]("{}.data.alloc", z) }
 	|:
 		panic("runtime: getAllocPtr: unimplemented type: " + t.Str())
 	}
 }
 
 // Returns reference counting pointer of type.
-fn getRefPtr[T](mut &z: T): rcPtr {
+fn getRefPtr[T](mut &z: T): *rc {
 	const t = comptime::TypeOf(T)
 	const match t.Kind() {
+	| comptime::Kind.TypeEnum
+	| comptime::Kind.Any:
+		// <any>
+		ret unsafe { integ::Emit[*rc]("{}.data.ref", z) }
+	| comptime::Kind.Trait:
+		// <trait>
+		ret unsafe { integ::Emit[*rc]("{}.data.ref", z) }
 	| comptime::Kind.SmartPtr:
-		ret unsafe { integ::Emit[rcPtr]("{}.ref", z) }
+		// <gc-ptr>
+		ret unsafe { integ::Emit[*rc]("{}.ref", z) }
+	| comptime::Kind.Str:
+		// str
+		ret unsafe { integ::Emit[*rc]("{}.buffer.ref", z) }
+	| comptime::Kind.Slice:
+		// []T
+		ret unsafe { integ::Emit[*rc]("{}.data.ref", z) }
 	|:
 		panic("runtime: getRefPtr: unimplemented type: " + t.Str())
 	}
 }
 
 // Drop reference count of reference pointer.
-unsafe fn dropRef(mut rp: rcPtr): (zeroed: bool) {
+unsafe fn dropRef(mut rp: *rc): (zeroed: bool) {
 	ret cpp.__jule_atomic_add_explicit(rp, -ReferenceDelta, atomic::MemoryOrder.Relaxed) == ReferenceDelta
+}
+
+// Add reference count of reference pointer.
+unsafe fn addRef(mut rp: *rc) {
+	cpp.__jule_atomic_add_explicit(rp, ReferenceDelta, atomic::MemoryOrder.Relaxed)
+}
+
+unsafe fn loadRef(mut rp: *rc): rc {
+	ret cpp.__jule_atomic_load_explicit(rp, atomic::MemoryOrder.Relaxed)
 }
 
 // Deallocate heap memory.
@@ -53,33 +105,88 @@ unsafe fn delete(mut p: *unsafe) {
 // if block terminated by a call to this function.
 // Compiler will not checks strictly-deep whether this function called.
 // So it should be clear. Mostly, use before return statements, error calls or etc.
-unsafe fn noDrop() {}
+unsafe fn noDrop() {
+	// jule:compiler_implemented
+}
+
+// Adds strong reference to data for GC.
+// Designed for GC-collected types.
+fn strongRefer[T](mut &z: T) {
+	mut rp := getRefPtr(z)
+	unsafe { addRef(rp) }
+}
+
+// Handle copy operation of GC-collected types.
+fn gcCopy[T](mut &z: T) {
+	/*const t = comptime::TypeOf(T)
+	const match {
+	| t.Binded():
+		unsafe { noDrop() }
+		ret
+	| t.GC():
+		strongRefer(z)
+		unsafe { noDrop() }
+		ret
+	}*/
+	/*const match t.Kind() {
+	| comptime::Kind.Array:
+		for (_, mut elem) in z {
+			drop(elem)
+			unsafe { noDrop() }
+		}
+	| comptime::Kind.Struct:
+		const decl = t.Decl()
+		const v = comptime::ValueOf(z)
+		const for _, field in decl.Fields() {
+			gcCopy(v.Field(field.Name()).Unwrap())
+			unsafe { noDrop() }
+		}
+	}*/
+	// no special treatment
+	unsafe { noDrop() }
+}
 
 // Define out-of-scope, auto destructor for the type.
 // A function call to [drop] inserted by the compiler when necessary.
 // Only instantiated for supported types, not for all types.
 fn drop[T](mut &z: T) {
 	const t = comptime::TypeOf(T)
+	const match {
+	| t.Binded():
+		unsafe { noDrop() }
+		ret
+	}
 	const match t.Kind() {
 	| comptime::Kind.Slice
 	| comptime::Kind.Array:
-		for (_, mut elem) in z {
-			drop(elem)
-			unsafe { noDrop() }
+		const match t.Elem().Kind() {
+		| comptime::Kind.Func:
+			// TODO: implement
+		|:
+			for (_, mut elem) in z {
+				drop(elem)
+				unsafe { noDrop() }
+			}
 		}
 	| comptime::Kind.SmartPtr:
-		/*mut rp := getRefPtr(z)
+		mut rp := getRefPtr(z)
 		zeroed := unsafe { dropRef(rp) }
 		if zeroed {
-			drop(*z)
+			const match t.Elem().Kind() {
+			| comptime::Kind.Func:
+				break
+			|:
+				drop(*z)
+			}
 			mut ap := getAllocPtr(z)
 			unsafe { delete(ap) }
 			unsafe { noDrop() }
 		}
-		unsafe { noDrop() }*/
+		unsafe { noDrop() }
 	| comptime::Kind.Struct:
 		const decl = t.Decl()
 		const DropFunc = "Dispose"
+		const v = comptime::ValueOf(z)
 		const for _, method in decl.Methods() {
 			const match method.Name() {
 			| DropFunc:
@@ -89,12 +196,19 @@ fn drop[T](mut &z: T) {
 					unsafe { noDrop() }
 					ret
 				}
-				const v = comptime::ValueOf(z)
 				v.Method(DropFunc).Unwrap()() // call destructor
 				unsafe { noDrop() }
 				ret // method found, no need to continue iteration
 			}
 		}
+		//const for _, field in t.Fields() {
+		//	const match field.Type().Kind() {
+		//	| comptime::Kind.Func:
+		//		break
+		//	|:
+		//		drop(v.Field(field.Decl().Name()).Unwrap())
+		//	}
+		//}
 	}
 	// no special treatment
 	unsafe { noDrop() }
