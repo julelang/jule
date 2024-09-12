@@ -288,6 +288,15 @@ struct Scope {
 	Unsafety: bool
 	Deferred: bool
 	Stmts:    []Stmt
+
+	// Data of the child scope starting from the root scope.
+	// For the root scope, counting starts from 0. So the root scope will be 0.
+	// It increases by one for each child scope.
+	ChildIndex: int
+
+	// If the scope is a child scope,
+	// it contains the data of the statement in which it was appear.
+	StmtIndex: int
 }
 
 // Chain conditional node.
@@ -348,12 +357,16 @@ struct BreakSt {
 // Label.
 struct Label {
 	Ident: str
+	Scope: &Scope // Owner scope.
+	Index: int    // Index of statement.
 }
 
 // Goto statement.
 struct GotoSt {
 	Ident: str
 	Label: &Label
+	Scope: &Scope // Owner scope.
+	Index: int    // Index of statement.
 }
 
 // Postfix assignment.
@@ -448,7 +461,7 @@ struct scopeChecker {
 	captured:   &[]&Var        // Anonymous function's captured variables will be stored here.
 	labels:     &[]&scopeLabel // All labels of all scopes.
 	gotos:      &[]&scopeGoto  // All gotos of all scopes.
-	i:          int
+	i:          int            // Index of current statement.
 }
 
 impl Lookup for scopeChecker {
@@ -792,6 +805,8 @@ impl scopeChecker {
 	}
 
 	fn checkChildSsc(mut &self, mut &tree: &ScopeTree, mut &s: &Scope, mut &ssc: &scopeChecker) {
+		s.StmtIndex = self.i
+		s.ChildIndex = ssc.childIndex
 		ssc.parent = self
 		ssc.check(tree, s)
 	}
@@ -1229,6 +1244,8 @@ impl scopeChecker {
 
 		mut label := &Label{
 			Ident: l.Ident,
+			Scope: self.scope,
+			Index: self.i,
 		}
 
 		self.scope.Stmts = append(self.scope.Stmts, label)
@@ -1243,6 +1260,8 @@ impl scopeChecker {
 	fn pushGoto(mut &self, mut gt: &ast::GotoSt) {
 		mut st := &GotoSt{
 			Ident: gt.Label.Kind,
+			Scope: self.scope,
+			Index: self.i,
 		}
 		self.scope.Stmts = append(self.scope.Stmts, st)
 
