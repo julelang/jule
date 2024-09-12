@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use std::jule::sema::{ImportInfo, Fn}
+use sema for std::jule::sema::{ImportInfo, Fn}
 
 enum RuntimeFunc: str {
 	arrayCmp: "arrayCmp",
@@ -18,4 +18,32 @@ fn RuntimeFindFn(mut &runtime: &ImportInfo, ident: RuntimeFunc): &Fn {
 		panic("runtime function is not exist, this is an implementation mistake, this panic call should be unreachable")
 	}
 	ret f
+}
+
+// Reports whether type have special drop call for [std::runtime::{drop}].
+// For example, GC collected types or structures with destructor.
+fn TypeHaveSpecialDrop(mut k: &sema::TypeKind): bool {
+	if k.Binded() {
+		ret false
+	}
+	if k.GC() {
+		ret true
+	}
+	match {
+	| k.Arr() != nil:
+		ret TypeHaveSpecialDrop(k.Arr().Elem)
+	| k.Map() != nil:
+		mut m := k.Map()
+		ret TypeHaveSpecialDrop(m.Key) || TypeHaveSpecialDrop(m.Val)
+	| k.Struct() != nil:
+		mut s := k.Struct()
+		for (_, mut f) in s.Fields {
+			if TypeHaveSpecialDrop(f.Kind) {
+				ret true
+			}
+		}
+		const Binded = false
+		ret sema::FuncPattern.Dispose(s.FindMethod("Dispose", Binded))
+	}
+	ret false
 }

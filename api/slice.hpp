@@ -140,7 +140,10 @@ namespace jule
         {
             this->_len = 0;
             this->_cap = 0;
-#ifdef __JULE_DISABLE__REFERENCE_COUNTING
+            this->data.alloc = nullptr;
+            this->_slice = nullptr;
+            this->data.ref = nullptr;
+/*#ifdef __JULE_DISABLE__REFERENCE_COUNTING
             this->data.dealloc();
 #else
             if (!this->data.ref)
@@ -162,7 +165,7 @@ namespace jule
             }
 
             this->__free();
-#endif // __JULE_DISABLE__REFERENCE_COUNTING
+#endif // __JULE_DISABLE__REFERENCE_COUNTING*/
         }
 
         void alloc_new(const jule::Int &len, const jule::Int &cap)

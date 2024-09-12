@@ -65,15 +65,26 @@ enum compStmt: type {
 	&StrRuneIter,
 }
 
+// Used for common scope containers.
+// See [std::jule] developer reference (11).
+struct anyIter {
+	scope: &Scope
+}
+
 struct scopeCoder {
 	oc: &ObjectCoder
+	dh: &dropHandler
 }
 
 impl scopeCoder {
 	static fn new(mut &oc: &ObjectCoder): &scopeCoder {
-		ret &scopeCoder{
+		mut sc := &scopeCoder{
 			oc: oc,
 		}
+		sc.dh = &dropHandler{
+			sc: sc,
+		}
+		ret sc
 	}
 
 	// Common head object-code for iterations of all kind.
@@ -446,7 +457,12 @@ impl scopeCoder {
 		}
 	}
 
-	fn cont(mut &self, c: &ContSt) {
+	fn cont(mut &self, mut c: &ContSt) {
+		// Get scope of iteration.
+		// See [std::jule] developer reference (11).
+		mut root := unsafe { (*anyIter)(c.It).scope }
+		self.handleDrops(c.Scope, root, dropFlag.Recursive, c.Index)
+
 		self.oc.write("goto ")
 		identCoder.iterNext(self.oc.Buf, c.It)
 	}
@@ -456,7 +472,10 @@ impl scopeCoder {
 		self.oc.write(":")
 	}
 
-	fn gotoSt(mut &self, gt: &GotoSt) {
+	fn gotoSt(mut &self, mut gt: &GotoSt) {
+		mut flags := dropFlag.Recursive|dropFlag.SkipRoot
+		self.handleDrops(gt.Scope, gt.Label.Scope, flags, gt.Index)
+
 		self.oc.write("goto ")
 		identCoder.label(self.oc.Buf, uintptr(gt.Label))
 	}
@@ -548,12 +567,28 @@ impl scopeCoder {
 			ret
 		}
 
+		if obj::TypeHaveSpecialDrop(a.Left.Kind) {
+			self.dh.dropModel(a.Left.Model, a.Left.Kind)
+		}
 		self.assignLeft(a.Left.Model)
 		self.oc.write(a.Op.Kind)
 		self.oc.ec.possibleRefExpr(a.Right.Model)
 	}
 
 	fn mapLookupAssign(mut &self, mut &a: &MultiAssign) {
+		if a.Left[0] != nil {
+			mut l := a.Left[0]
+			if obj::TypeHaveSpecialDrop(l.Kind) {
+				self.dh.dropModel(l.Model, l.Kind)
+			}
+		}
+		if a.Left[1] != nil {
+			mut l := a.Left[1]
+			if obj::TypeHaveSpecialDrop(l.Kind) {
+				self.dh.dropModel(l.Model, l.Kind)
+			}
+		}
+
 		mut iem := (&IndexingExprModel)(a.Right)
 		self.assignLeft(iem.Expr.Model)
 		self.oc.write(".lookup(")
@@ -585,6 +620,7 @@ impl scopeCoder {
 		for (i, mut r) in tup.Datas {
 			self.oc.indent()
 			mut l := a.Left[i]
+			owned := l != nil || !obj::TypeHaveSpecialDrop(r.Kind)
 			if l != nil {
 				match type l.Model {
 				| &Var:
@@ -600,18 +636,36 @@ impl scopeCoder {
 						continue
 					}
 				}
+				if obj::TypeHaveSpecialDrop(l.Kind) {
+					self.dh.dropModel(l.Model, l.Kind)
+				}
 				self.oc.tc.kind(self.oc.Buf, l.Kind)
 				self.oc.write(" ")
 				identCoder.toOut(self.oc.Buf, assignArgName, uintptr(i))
 				self.oc.write(" = ")
 			}
+			// create and drop it if not owned
+			const tempVar = "__jule_temp"
+			if !owned {
+				self.oc.write("({ auto ")
+				self.oc.write(tempVar)
+				self.oc.write(" = ")
+			}
 			self.oc.ec.possibleRefExpr(r.Model)
+			if !owned {
+				self.oc.write("; ")
+				self.dh.dropModel(tempVar, r.Kind)
+				self.oc.write(" })")
+			}
 			self.oc.write(";\n")
 		}
 
 		for (i, mut l) in a.Left {
 			if l == nil {
 				continue
+			}
+			if obj::TypeHaveSpecialDrop(l.Kind) {
+				self.dh.dropModel(l.Model, l.Kind)
 			}
 			self.oc.indent()
 			self.assignLeft(l.Model)
@@ -638,10 +692,18 @@ impl scopeCoder {
 
 		mut tup := f.Func.Result.Tup()
 		for (i, mut l) in a.Left {
+			const r = assignResultName + "." + resultArgName
+
 			if l == nil {
+				mut rk := tup.Types[i]
+				if obj::TypeHaveSpecialDrop(rk) {
+					// drop it, it is not owned
+					ident := r + conv::Itoa(i)
+					self.dh.dropModel(ident, rk)
+				}
 				continue
 			}
-			const r = assignResultName + "." + resultArgName
+
 			self.oc.indent()
 			self.assignLeft(l.Model)
 			match {
@@ -845,16 +907,29 @@ impl scopeCoder {
 		self.oc.write("}")
 	}
 
-	fn fallSt(mut &self, f: &FallSt) {
+	fn fallSt(mut &self, mut f: &FallSt) {
+		self.handleDrops(f.Scope, f.Scope, dropFlag.Default, f.Index)
+
 		self.oc.write("goto ")
 		identCoder.caseBegin(self.oc.Buf, f.DestCase)
 	}
 
-	fn breakSt(mut &self, b: &BreakSt) {
-		self.oc.write("goto ")
+	fn breakSt(mut &self, mut b: &BreakSt) {
 		if b.It != 0 {
+			// Get scope of iteration.
+			// See [std::jule] developer reference (11).
+			mut root := unsafe { (*anyIter)(b.It).scope }
+			self.handleDrops(b.Scope, root, dropFlag.Recursive, b.Index)
+
+			self.oc.write("goto ")
 			identCoder.iterEnd(self.oc.Buf, b.It)
 		} else {
+			// Get scope of iteration.
+			// See [std::jule] developer reference (11).
+			mut root := unsafe { (*anyIter)(b.Mtch).scope }
+			self.handleDrops(b.Scope, root, dropFlag.Recursive, b.Index)
+
+			self.oc.write("goto ")
 			identCoder.matchEnd(self.oc.Buf, b.Mtch)
 		}
 	}
@@ -888,8 +963,11 @@ impl scopeCoder {
 	}
 
 	fn retSt(mut &self, mut r: &RetSt) {
+		const dropFlags = dropFlag.Recursive
+
 		// Void.
 		if r.Func.Decl.IsVoid() {
+			self.handleDrops(r.Scope, r.Func.Scope, dropFlags, r.Index)
 			if r.Func.Decl.Exceptional {
 				self.oc.write("return jule::VoidExceptional{};")
 				ret
@@ -897,23 +975,32 @@ impl scopeCoder {
 			self.oc.write("return;")
 			ret
 		} else if len(r.Func.Decl.Result.Idents) == 0 {
+			const resultIdent = "__jule_result"
+			self.oc.write("{ auto " + resultIdent + " = ")
+			self.oc.ec.possibleRefExpr(r.Expr)
+			self.oc.write(";\n")
+			self.handleDrops(r.Scope, r.Func.Scope, dropFlags, r.Index)
+			self.oc.write("return ")
 			if r.Func.Decl.Exceptional {
-				self.oc.write("return jule::Exceptional<")
+				self.oc.write("jule::Exceptional<")
 				self.oc.tc.kind(self.oc.Buf, r.Func.Result)
 				self.oc.write(">{.result=")
-				self.oc.ec.possibleRefExpr(r.Expr)
+				self.oc.write(resultIdent)
 				self.oc.write("};")
 			} else {
-				self.oc.write("return ")
-				self.oc.ec.possibleRefExpr(r.Expr)
-				self.oc.write(";")
+				self.oc.write(resultIdent)
+				self.oc.write("; ")
 			}
+			self.oc.write("}")
 			ret
 		}
 
 		if r.Expr != nil {
 			self.setResult(r)
 		}
+
+		self.handleDrops(r.Scope, r.Func.Scope, dropFlags, r.Index)
+
 		if r.Func.Decl.Exceptional {
 			self.oc.write("return jule::Exceptional<")
 			self.oc.tc.rc.codeMut1(self.oc.Buf, r.Func.Result)
@@ -959,6 +1046,69 @@ impl scopeCoder {
 		self.oc.ec.pureFuncCall(m.Expr)
 	}
 
+	fn handleUnusedData(mut &self, mut d: &Data) {
+		const tempVar = "__jule_temp"
+		if d.Kind.Tup() != nil {
+			match type d.Model {
+			| &TupleExprModel:
+				mut m := (&TupleExprModel)(d.Model)
+				for (_, mut md) in m.Datas {
+					if !obj::TypeHaveSpecialDrop(md.Kind) {
+						self.oc.ec.model(md.Model)
+						continue
+					}
+					self.oc.write("({ auto ")
+					self.oc.write(tempVar)
+					self.oc.write(" = ")
+					self.oc.ec.possibleRefExpr(md.Model)
+					self.oc.write("; ")
+					self.dh.dropModel(tempVar, md.Kind)
+					self.oc.write(" });\n")
+				}
+			| &FnCallExprModel:
+				mut m := (&FnCallExprModel)(d.Model)
+
+				self.oc.write("({ auto ")
+				self.oc.write(tempVar)
+				self.oc.write(" = ")
+				self.oc.ec.possibleRefExpr(m)
+				self.oc.write("; ")
+
+				const r = tempVar + "." + resultArgName
+				mut tup := m.Func.Result.Tup()
+				for (i, mut t) in tup.Types {
+					if !obj::TypeHaveSpecialDrop(t) {
+						continue
+					}
+					self.dh.dropModel(r + conv::Itoa(i), t)
+				}
+				self.oc.write("});")
+			|:
+				panic("backend_cxx: unsued data have unimplemented type")
+			}
+			ret
+		}
+		if !obj::TypeHaveSpecialDrop(d.Kind) {
+			self.oc.ec.model(d.Model)
+			ret
+		}
+		self.oc.write("({ auto ")
+		self.oc.write(tempVar)
+		self.oc.write(" = ")
+		self.oc.ec.possibleRefExpr(d.Model)
+		self.oc.write("; ")
+		self.dh.dropModel(tempVar, d.Kind)
+		self.oc.write(" });\n")
+	}
+
+	fn possibleUnsuedData(mut &self, mut d: &Data) {
+		if !d.Kind.Void() {
+			self.handleUnusedData(d)
+			ret
+		}
+		self.oc.ec.model(d.Model)
+	}
+
 	// Generates C++ code of statement.
 	fn st(mut &self, mut st: compStmt) {
 		if st == nil {
@@ -970,7 +1120,7 @@ impl scopeCoder {
 		| &Var:
 			self.var((&Var)(st))
 		| &Data:
-			self.oc.ec.model((&Data)(st).Model)
+			self.possibleUnsuedData((&Data)(st))
 		| &Conditional:
 			self.conditional((&Conditional)(st))
 		| &InfIter:
@@ -1024,6 +1174,14 @@ impl scopeCoder {
 		}
 	}
 
+	fn handleDrops(mut &self, mut &s: &Scope, mut &root: &Scope, flags: dropFlag, i: int) {
+		self.dh.rs = root
+		self.dh.cs = s
+		self.dh.f = flags
+		self.dh.i = i
+		self.dh.handle()
+	}
+
 	// Generates C++ code of scope.
 	fn scope(mut &self, mut s: &Scope) {
 		self.oc.addIndent()
@@ -1032,6 +1190,7 @@ impl scopeCoder {
 		}
 		self.oc.write("{\n")
 		self.scopeStmts(s)
+		self.handleDrops(s, s, dropFlag.Default, len(s.Stmts))
 		self.oc.doneIndent()
 		self.oc.indent()
 		self.oc.write("}")
@@ -1071,6 +1230,7 @@ impl scopeCoder {
 			}
 		}
 		self.scopeStmts(f.Scope)
+		self.handleDrops(f.Scope, f.Scope, dropFlag.Default, len(f.Scope.Stmts))
 		if f.Decl.Exceptional && f.Decl.IsVoid() {
 			// Just for void exceptionals.
 			// Other cases checked by semantic analsis and disallowed
@@ -1152,4 +1312,143 @@ fn captureVarHandling(mut &oc: &ObjectCoder, mut &m: &AnonFnExprModel, mut &v: &
 		}
 	}
 	ret false
+}
+
+// Reports whether scope is terminated by last statement.
+// Such as panic calls or return statements.
+fn isScopeTerminated(&s: &Scope): bool {
+	if len(s.Stmts) == 0 {
+		ret false
+	}
+	stmt := s.Stmts[len(s.Stmts) - 1]
+	match type stmt {
+	| &ContSt
+	| &RetSt
+	| &BreakSt
+	| &FallSt:
+		ret true
+	| &Data:
+		d := (&Data)(stmt)
+		match type d.Model {
+		| &sema::BuiltinErrorCallExprModel
+		| &sema::BuiltinPanicCallExprModel:
+			ret true
+		}
+	}
+	ret false
+}
+
+enum dropFlag {
+	Default,
+	Recursive,
+	RetVars,
+	SkipRoot,
+}
+
+struct dropHandler {
+	sc: &scopeCoder
+	rs: &Scope // root scope
+	cs: &Scope // current scope
+	f:  dropFlag
+	i:  int // maximum statement index for start scope
+	pi: int // statement index of previous scope
+}
+
+impl dropHandler {
+	fn dropVar(mut &self, mut v: &Var) {
+		if obj::TypeHaveSpecialDrop(v.Kind.Kind) {
+			self.dropModel(v, v.Kind.Kind)
+		}
+	}
+
+	fn dropModel(mut &self, mut m: compExprModel, mut &k: &TypeKind) {
+		i := self.sc.oc.pushDrop(k)
+		self.sc.oc.indent()
+		self.sc.oc.write(dropFuncIdentPrefix)
+		self.sc.oc.write(conv::Itoa(i))
+		self.sc.oc.write("(&")
+		self.sc.oc.ec.possibleRefExpr(m)
+		self.sc.oc.write(");\n")
+	}
+
+	fn commonStep(mut &self, i: int, mut &stmt: Stmt): bool {
+		match type stmt {
+		| &Var:
+			mut v := (&Var)(stmt)
+			if v.Constant {
+				// skip constants
+				ret true
+			}
+			if v.RetOrder != -2 {
+				if self.f&dropFlag.RetVars != dropFlag.RetVars {
+					// skip return variable if flag not passed
+					ret true
+				}
+			}
+			self.dropVar(v)
+		}
+		ret true
+	}
+
+	fn step1(mut &self, f: fn(i: int, mut &stmt: Stmt): (cont: bool)) {
+		if len(self.cs.Table.Vars) == 0 {
+			ret
+		}
+		if self.rs == self.cs {
+			// root scope
+			if self.f&dropFlag.SkipRoot == dropFlag.SkipRoot {
+				ret
+			}
+			// handle GC-collected receiver
+			for (_, mut v) in self.rs.Table.Vars {
+				if v.Ident == TokenKind.Self {
+					if v.Kind.Kind.Sptr() != nil {
+						mut stmt := Stmt(v)
+						f(-1, stmt)
+					}
+					break
+				}
+			}
+		}
+		for (i, mut stmt) in self.cs.Stmts {
+			if !f(i, stmt) {
+				break
+			}
+		}
+	}
+
+	fn step(mut &self) {
+		// handle first scope
+		self.step1(fn(i: int, mut &stmt: Stmt): bool {
+			if i >= self.i {
+				ret false
+			}
+			ret self.commonStep(i, stmt)
+		})
+	goto next
+		for {
+			self.step1(fn(i: int, mut &stmt: Stmt): bool {
+				// limit by child index
+				if i >= self.pi {
+					ret false
+				}
+				ret self.commonStep(i, stmt)
+			})
+		next:
+			if self.cs == self.rs {
+				// reached to root scope
+				break
+			}
+			if self.cs.Parent != nil && self.f&dropFlag.Recursive == dropFlag.Recursive {
+				self.pi = self.cs.StmtIndex
+				self.cs = self.cs.Parent
+			} else {
+				break
+			}
+		}
+	}
+
+	fn handle(mut &self) {
+		self.step()
+	}
 }

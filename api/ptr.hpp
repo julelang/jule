@@ -37,6 +37,14 @@ namespace jule
     // Reports whether pointer allocations are points to same address.
     inline jule::Bool ptr_equal(void *alloc, void *other);
 
+    inline jule::Bool drop_ref(jule::Uint *ref) noexcept
+    {
+        return __jule_atomic_add_explicit(ref, -jule::REFERENCE_DELTA,
+                                          __JULE_ATOMIC_MEMORY_ORDER__RELAXED) == jule::REFERENCE_DELTA;
+    }
+
+    inline void free(void *ptr) noexcept { delete ptr; }
+
     template <typename T>
     struct Ptr
     {
@@ -129,8 +137,8 @@ namespace jule
         // Copy content from source.
         void __get_copy(const jule::Ptr<T> &src) noexcept
         {
-            if (src.ref)
-                src.add_ref();
+            /*if (src.ref)
+                src.add_ref();*/
             this->ref = src.ref;
             this->alloc = src.alloc;
         }
@@ -180,7 +188,9 @@ namespace jule
         // Frees memory if reference counting reaches to zero.
         void dealloc(void) const noexcept
         {
-            if (!this->ref)
+            this->ref = nullptr;
+            this->alloc = nullptr;
+            /*if (!this->ref)
             {
                 this->alloc = nullptr;
                 return;
@@ -193,7 +203,7 @@ namespace jule
                 return;
             }
 
-            this->__free();
+            this->__free();*/
         }
 
         inline T *ptr(

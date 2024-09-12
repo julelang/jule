@@ -1,0 +1,196 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use obj
+use conv for std::conv
+use sema for std::jule::sema
+use strings for std::strings::{StrBuilder}
+
+struct dropBodyImplementer {
+	oc: &ObjectCoder
+}
+
+impl dropBodyImplementer {
+	static fn new(mut &oc: &ObjectCoder): dropBodyImplementer {
+		ret dropBodyImplementer{oc: oc}
+	}
+
+	fn sptr(mut self, mut &buf: StrBuilder, mut &sptr: &sema::Sptr) {
+		buf.WriteStr("if (!z->ref) return;\n")
+		buf.WriteByte(indentKind)
+		buf.WriteStr("if (!jule::drop_ref(z->ref)) return;\n")
+		buf.WriteByte(indentKind)
+		if obj::TypeHaveSpecialDrop(sptr.Elem) {
+			buf.WriteStr(dropFuncIdentPrefix)
+			buf.WriteStr(conv::Itoa(self.oc.pushDrop(sptr.Elem)))
+			buf.WriteStr("(z->alloc);\n")
+			buf.WriteByte(indentKind)
+		}
+		buf.WriteStr("jule::free(z->ref);\n")
+		buf.WriteByte(indentKind)
+		buf.WriteStr("jule::free(z->alloc);\n")
+		buf.WriteByte(indentKind)
+		buf.WriteStr("z->alloc = nullptr; z->ref = nullptr;\n")
+	}
+
+	fn anyz(mut self, mut &buf: StrBuilder) {
+		buf.WriteStr("if (!z->data.ref) return;\n")
+		buf.WriteByte(indentKind)
+		buf.WriteStr("if (!jule::drop_ref(z->data.ref)) return;\n")
+		buf.WriteByte(indentKind)
+		buf.WriteStr("if (z->type) z->type->dealloc(z->data);\n")
+		buf.WriteByte(indentKind)
+		buf.WriteStr("jule::free(z->data.ref);\n")
+		buf.WriteByte(indentKind)
+		buf.WriteStr("jule::free(z->data.alloc);\n")
+		buf.WriteByte(indentKind)
+		buf.WriteStr("z->type = nullptr; z->data.alloc = nullptr; z->data.ref = nullptr;\n")
+	}
+
+	fn traitz(mut self, mut &buf: StrBuilder) {
+		self.anyz(buf)
+		buf.WriteByte(indentKind)
+		buf.WriteStr("z->ptr = false;\n")
+	}
+
+	fn strz(mut self, mut &buf: StrBuilder) {
+		buf.WriteStr("if (!z->buffer.ref) return;\n")
+		buf.WriteByte(indentKind)
+		buf.WriteStr("if (!jule::drop_ref(z->buffer.ref)) return;\n")
+		buf.WriteByte(indentKind)
+		buf.WriteStr("jule::free(z->buffer.ref);\n")
+		buf.WriteByte(indentKind)
+		buf.WriteStr("jule::free(z->buffer.alloc);\n")
+		buf.WriteByte(indentKind)
+		buf.WriteStr("z->_slice = nullptr; z->buffer.alloc = nullptr; z->buffer.ref = nullptr;\n")
+	}
+
+	fn slice(mut self, mut &buf: StrBuilder, mut &slice: &sema::Slc) {
+		buf.WriteStr("if (!z->data.ref) return;\n")
+		buf.WriteByte(indentKind)
+		buf.WriteStr("if (!jule::drop_ref(z->data.ref)) return;\n")
+		buf.WriteByte(indentKind)
+		if obj::TypeHaveSpecialDrop(slice.Elem) {
+			buf.WriteStr("for (")
+			self.oc.tc.kind(buf, slice.Elem)
+			buf.WriteStr(" *i = z->data.alloc; i < z->data.alloc + z->_len; ++i) ")
+			buf.WriteStr(dropFuncIdentPrefix)
+			buf.WriteStr(conv::Itoa(self.oc.pushDrop(slice.Elem)))
+			buf.WriteStr("(i);\n")
+			buf.WriteByte(indentKind)
+		}
+		buf.WriteStr("jule::free(z->data.ref);\n")
+		buf.WriteByte(indentKind)
+		buf.WriteStr("jule::free(z->data.alloc);\n")
+		buf.WriteByte(indentKind)
+		buf.WriteStr("z->_len = 0; z->_cap = 0;\n")
+		buf.WriteByte(indentKind)
+		buf.WriteStr("z->_slice = nullptr; z->data.alloc = nullptr; z->data.ref = nullptr;\n")
+	}
+
+	fn array(mut self, mut &buf: StrBuilder, mut &array: &sema::Arr) {
+		buf.WriteStr("for (")
+		self.oc.tc.kind(buf, array.Elem)
+		buf.WriteStr(" *i = z->buffer; i < z->buffer + ")
+		buf.WriteStr(conv::Itoa(array.N))
+		buf.WriteStr("; ++i) ")
+		buf.WriteStr(dropFuncIdentPrefix)
+		buf.WriteStr(conv::Itoa(self.oc.pushDrop(array.Elem)))
+		buf.WriteStr("(i);\n")
+	}
+
+	fn strct(mut self, mut &buf: StrBuilder, mut &strct: &sema::StructIns) {
+		const DestructorIdent = "Dispose"
+		const Binded = false
+		mut destructor := strct.FindMethod(DestructorIdent, Binded)
+		if destructor != nil && sema::FuncPattern.Dispose(destructor) {
+			mut ins := destructor.Instances[0]
+			identCoder.funcIns(buf, ins)
+			buf.WriteStr("(z);\n")
+			buf.WriteByte(indentKind)
+		}
+
+		for (_, mut field) in strct.Fields {
+			if obj::TypeHaveSpecialDrop(field.Kind) {
+				buf.WriteStr(dropFuncIdentPrefix)
+				buf.WriteStr(conv::Itoa(self.oc.pushDrop(field.Kind)))
+				buf.WriteStr("(&z->")
+				identCoder.field(buf, field.Decl)
+				buf.WriteStr(");\n")
+				buf.WriteByte(indentKind)
+			}
+		}
+	}
+
+	fn mapz(mut self, mut &buf: StrBuilder, mut &mapz: &sema::Map) {
+		buf.WriteStr("for (auto i: *z) {\n")
+		buf.WriteByte(indentKind)
+		if obj::TypeHaveSpecialDrop(mapz.Key) {
+			buf.WriteStr(dropFuncIdentPrefix)
+			buf.WriteStr(conv::Itoa(self.oc.pushDrop(mapz.Key)))
+			buf.WriteStr("((")
+			self.oc.tc.kind(buf, mapz.Key)
+			buf.WriteStr("*)&i.first);\n")
+		}
+		if obj::TypeHaveSpecialDrop(mapz.Val) {
+			buf.WriteStr(dropFuncIdentPrefix)
+			buf.WriteStr(conv::Itoa(self.oc.pushDrop(mapz.Val)))
+			buf.WriteStr("((")
+			self.oc.tc.kind(buf, mapz.Val)
+			buf.WriteStr("*)&i.second);\n")
+		}
+		buf.WriteStr("}\n")
+	}
+
+	fn implBody(mut self, mut &buf: StrBuilder, mut &t: &sema::TypeKind) {
+		mut sptr := t.Sptr()
+		if sptr != nil {
+			self.sptr(buf, sptr)
+			ret
+		}
+		mut prim := t.Prim()
+		if prim != nil {
+			match {
+			| prim.IsAny():
+				self.anyz(buf)
+				ret
+			| prim.IsStr():
+				self.strz(buf)
+				ret
+			}
+			panic("memory: unimplemented type for drop semantic")
+		}
+		mut te := t.TypeEnum()
+		if te != nil {
+			self.anyz(buf)
+			ret
+		}
+		mut slice := t.Slc()
+		if slice != nil {
+			self.slice(buf, slice)
+			ret
+		}
+		mut array := t.Arr()
+		if array != nil {
+			self.array(buf, array)
+			ret
+		}
+		mut traitz := t.Trait()
+		if traitz != nil {
+			self.traitz(buf)
+			ret
+		}
+		mut mapz := t.Map()
+		if mapz != nil {
+			self.mapz(buf, mapz)
+			ret
+		}
+		mut strct := t.Struct()
+		if strct != nil {
+			self.strct(buf, strct)
+			ret
+		}
+		panic("memory: unimplemented type for drop semantic")
+	}
+}

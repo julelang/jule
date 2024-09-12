@@ -44,6 +44,7 @@ use path for std::fs::path
 use strings for std::strings::{StrBuilder}
 use std::time::{Time}
 
+const dropFuncIdentPrefix = "__jule_drop"
 const ctxParamIdent = "__f_ctx"
 const anonFnCtxSuffix = "_ctx"                              // Anon fn identifier suffix for ctx struct identifier.
 const anonFnCtxHandlerSuffix = anonFnCtxSuffix + "_handler" // Anon fn identifier suffix for ctx allocation handler.
@@ -79,6 +80,11 @@ struct anonHash {
 	ident: str
 }
 
+struct bufHash {
+	t: &TypeKind
+	b: str
+}
+
 struct ObjectCoder {
 	// Internal buffer which is commonly used.
 	Buf: StrBuilder
@@ -92,6 +98,7 @@ struct ObjectCoder {
 	info:        SerializationInfo
 	anons:       []&anonHash
 	deallocated: []&TypeKind // GC deallocated types for dynamic programming.
+	drops:       []&bufHash  // List of drop function calls based on types.
 
 	// Current indentation.
 	indentBuffer: []byte
@@ -155,6 +162,34 @@ impl ObjectCoder {
 			}
 		}
 		ret -1
+	}
+
+	fn pushDrop(mut &self, mut t: &TypeKind): int {
+		for i, h in self.drops {
+			if h.t.Equal(t) {
+				ret i
+			}
+		}
+		i := len(self.drops)
+		mut drop := StrBuilder.New(1 << 7)
+
+		mut hash := &bufHash{t: t}
+		self.drops = append(self.drops, hash)
+
+		drop.WriteStr("void ")
+		drop.WriteStr(dropFuncIdentPrefix)
+		drop.WriteStr(conv::Itoa(i))
+		drop.WriteStr("(")
+		self.tc.kind(drop, t)
+		drop.WriteStr(" *z) noexcept {\n")
+		drop.WriteByte(indentKind)
+
+		mut dbi := dropBodyImplementer.new(self)
+		dbi.implBody(drop, t)
+
+		drop.WriteStr("}\n")
+		hash.b = drop.Str()
+		ret i
 	}
 
 	fn pushDealloc(mut &self, mut t: &TypeKind): int {
@@ -539,22 +574,6 @@ impl ObjectCoder {
 		self.write(";")
 	}
 
-	fn structureDestructor(mut &self, mut &s: &StructIns) {
-		// Dispose method must be non-static
-		const Static = false
-		disposeMethod := s.FindMethod("Dispose", Static)
-		mut disposed := FuncPattern.Dispose(disposeMethod)
-		// Call destructor if implemented.
-		if !disposed {
-			ret
-		}
-		self.write("~")
-		identCoder.structureIns(self.Buf, s)
-		self.write("(void) { ")
-		identCoder.func(self.Buf, disposeMethod)
-		self.write("(this); }")
-	}
-
 	fn structureOperatorEq(mut &self, ident: str, mut &s: &StructIns, decl: bool) {
 		if !defaultEq(s) {
 			ret
@@ -649,10 +668,6 @@ impl ObjectCoder {
 			self.fieldDecl(f)
 			self.write("\n")
 		}
-
-		self.indent()
-		self.structureDestructor(s)
-		self.write("\n\n")
 
 		self.doneIndent()
 		self.indent()
@@ -1234,6 +1249,16 @@ impl ObjectCoder {
 }`)
 	}
 
+	fn insertBuf1(mut &self, buf: str, pos: int) {
+		if len(buf) > 0 {
+			mut head := make([]byte, 0, self.Buf.Len() + len(buf))
+			head = append(head, unsafe { self.Buf.Buf() }[:pos]...)
+			head = append(head, buf...)
+			head = append(head, unsafe { self.Buf.Buf() }[pos:]...)
+			unsafe { self.Buf.SetBuf(head) }
+		}
+	}
+
 	fn insertBuf(mut &self, mut &buf: StrBuilder, pos: int) {
 		if buf.Len() > 0 {
 			mut head := make([]byte, 0, self.Buf.Len() + buf.Len())
@@ -1261,6 +1286,24 @@ impl ObjectCoder {
 		self.write("\n\n")
 
 		self.anonHashes()
+
+		// Declare droppers first.
+		for _, h in self.drops {
+			i := strings::FindByte(h.b, '{') // Cut by body.
+			b := h.b[:i]
+			self.insertBuf1(b, self.wrapPos)
+			self.wrapPos += len(b)
+			self.declPos += len(b)
+			self.insertBuf1(";\n", self.wrapPos)
+			self.wrapPos += 2
+			self.declPos += 2
+		}
+		// Define them.
+		for _, h in self.drops {
+			self.insertBuf1(h.b, self.wrapPos)
+			self.wrapPos += len(h.b)
+			self.declPos += len(h.b)
+		}
 
 		self.insertBuf(self.deallocObj, self.wrapPos)
 		self.wrapPos += self.deallocObj.Len()

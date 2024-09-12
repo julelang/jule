@@ -207,7 +207,10 @@ namespace jule
         void dealloc(void) noexcept
         {
             this->_len = 0;
-#ifdef __JULE_DISABLE__REFERENCE_COUNTING
+            this->buffer.alloc = nullptr;
+            this->_slice = nullptr;
+            this->buffer.ref = nullptr;
+/*#ifdef __JULE_DISABLE__REFERENCE_COUNTING
             this->buffer.dealloc();
 #else
             if (!this->buffer.ref)
@@ -229,7 +232,7 @@ namespace jule
             }
 
             this->__free();
-#endif // __JULE_DISABLE__REFERENCE_COUNTING
+#endif // __JULE_DISABLE__REFERENCE_COUNTING*/
         }
 
         ~Str(void) noexcept
