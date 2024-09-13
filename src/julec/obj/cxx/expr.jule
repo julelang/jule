@@ -902,9 +902,7 @@ impl exprCoder {
 			self.coFuncCall(m)
 			ret
 		}
-		if m.Func.IsBuiltin() ||
-			!m.Func.Decl.Exceptional ||
-			m.Except != nil && len(m.Except.Stmts) == 0 {
+		if m.Func.IsBuiltin() || !m.Func.Decl.Exceptional {
 			self.pureFuncCall(m)
 			ret
 		}
@@ -922,6 +920,9 @@ impl exprCoder {
 				self.oc.write("if (!except.ok()) ")
 				self.oc.sc.scope(m.Except)
 				self.oc.write("\n")
+				if m.Func.Result != nil {
+					self.oc.sc.dropResult("except.result", m.Func.Result)
+				}
 			} else {
 				forwarded := obj::IsForwarded(m.Except)
 				self.oc.write("(except.ok()) ? (except.result) : (")
@@ -958,6 +959,9 @@ impl exprCoder {
 			self.oc.locInfo(m.Token)
 			self.oc.write("\"));\n")
 			if !m.Func.Decl.IsVoid() {
+				if !m.Assigned {
+					self.oc.sc.dropResult("except.result", m.Func.Result)
+				}
 				self.oc.indent()
 				self.oc.write("(except.result);\n")
 			}

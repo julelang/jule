@@ -1043,7 +1043,31 @@ impl scopeCoder {
 		self.oc.ec.pureFuncCall(m.Expr)
 	}
 
+	fn dropResult(mut &self, var: str, mut &t: &TypeKind) {
+		mut tup := t.Tup();
+		if tup != nil {
+			for (i, mut tupt) in tup.Types {
+				if obj::TypeHaveSpecialDrop(tupt) {
+					self.dh.dropModel(var + "." + resultArgName + conv::Itoa(i), tupt)
+				}
+			}
+			ret
+		}
+		if obj::TypeHaveSpecialDrop(t) {
+			self.dh.dropModel(var, t)
+		}
+	}
+
 	fn handleUnusedData(mut &self, mut d: &Data) {
+		match type d.Model {
+		| &FnCallExprModel:
+			mut fc := (&FnCallExprModel)(d.Model)
+			if fc.Func.Decl.Exceptional && !fc.Assigned {
+				self.oc.ec.possibleRefExpr(d.Model)
+				ret
+			}
+		}
+
 		const tempVar = "__jule_temp"
 		if d.Kind.Tup() != nil {
 			match type d.Model {
@@ -1090,6 +1114,19 @@ impl scopeCoder {
 			self.oc.ec.model(d.Model)
 			ret
 		}
+
+		match type d.Model {
+		| &FnCallExprModel:
+			mut fc := (&FnCallExprModel)(d.Model)
+			self.oc.write("{ auto ")
+			self.oc.write(tempVar)
+			self.oc.write(" = ")
+			self.oc.ec.possibleRefExpr(d.Model)
+			self.oc.write("; ")
+			self.dropResult(tempVar, fc.Func.Result)
+			self.oc.write(" } ")
+		}
+
 		self.oc.write("({ auto ")
 		self.oc.write(tempVar)
 		self.oc.write(" = ")
@@ -1103,6 +1140,14 @@ impl scopeCoder {
 		if !d.Kind.Void() {
 			self.handleUnusedData(d)
 			ret
+		}
+		match type d.Model {
+		| &FnCallExprModel:
+			fcem := (&FnCallExprModel)(d.Model)
+			if fcem.Func.Decl.Exceptional {
+				self.handleUnusedData(d)
+				ret
+			}
 		}
 		self.oc.ec.model(d.Model)
 	}
@@ -1448,4 +1493,18 @@ impl dropHandler {
 	fn handle(mut &self) {
 		self.step()
 	}
+}
+
+fn isForwarded(&s: &Scope): bool {
+	if s == nil {
+		ret false
+	}
+	if len(s.Stmts) == 1 {
+		stmt := s.Stmts[len(s.Stmts)-1]
+		match type unsafe { *(*compStmt)(&stmt) } {
+		| &ExceptionalForwardingExprModel:
+			ret true
+		}
+	}
+	ret obj::IsForwarded(s)
 }
