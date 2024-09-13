@@ -21,7 +21,7 @@ use fmt for std::fmt
 use std::jule::build::{Directive, Is64Bit}
 use std::jule::constant::{Const}
 use std::jule::lex::{Token, TokenId, TokenKind}
-use std::jule::sema::{
+use sema for std::jule::sema::{
 	Trait,
 	Var,
 	Arr,
@@ -669,6 +669,20 @@ impl exprCoder {
 				self.funcIns(ssie.Method)
 				ret
 			}
+		| &TraitSubIdentExprModel:
+			tsiem := (&TraitSubIdentExprModel)(expr)
+			self.oc.write("((")
+			identCoder.traitDecl(self.oc.Buf, tsiem.Trt)
+			self.oc.write("MptrData")
+			self.oc.write("*)(__jule_recv).safe_type(")
+			if !env::Production {
+				self.oc.write("\"")
+				self.oc.locInfo(tsiem.Token)
+				self.oc.write("\"")
+			}
+			self.oc.write("))->")
+			identCoder.func(self.oc.Buf, tsiem.Method)
+			ret
 		}
 		self.possibleRefExpr(expr)
 	}
@@ -708,9 +722,6 @@ impl exprCoder {
 				|:
 					if ssie.Expr.Kind.Struct() != nil {
 						if !ssie.Expr.Lvalue {
-							self.oc.write("({ auto _wrap_copy = ")
-							self.model(ssie.Expr.Model)
-							self.oc.write("; ")
 							ret true
 						}
 					}
@@ -720,21 +731,155 @@ impl exprCoder {
 		ret false
 	}
 
-	fn writeReceiver(mut &self, mut m: compExprModel): (safeDeref: bool) {
-		match type m {
-		| &UnaryExprModel:
-			self.possibleRefExpr((&UnaryExprModel)(m).Expr.Model)
-			ret true
+	fn writeWrapped(mut &self, mut &m: &FnCallExprModel) {
+		mut ssie := (&StructSubIdentExprModel)(m.Expr)
+		self.oc.write("({ auto _wrap_copy = ")
+		self.model(ssie.Expr.Model)
+		self.oc.write("; ")
+	}
+
+	fn writeReceiverTrait(mut &self, mut &m: &TraitSubIdentExprModel): (drop: bool, deref: bool, safeDeref: bool) {
+		safeDeref = true
+		let mut model: compExprModel = m.Expr.Model
+		match type model {
 		| &UnsafeDerefExprModel:
-			self.possibleRefExpr((&UnsafeDerefExprModel)(m).Base.Expr.Model)
-			ret false
+			mut udem := (&UnsafeDerefExprModel)(model)
+			model = udem.Base
+			safeDeref = false
+			fall
+		| &UnaryExprModel:
+			// Smart pointer dereferencing or something like that?
+			mut uem := (&UnaryExprModel)(model)
+			match type uem.Expr.Model {
+			| &FnCallExprModel:
+				// Base expression comes from a function call.
+				// Need to be drop.
+				break
+			|:
+				// Expression come from safe place.
+				// Handle it in ordinary way.
+				self.possibleRefExpr(uem.Expr.Model)
+				self.oc.write("; ")
+				drop = false
+				deref = true
+				ret
+			}
+			// guaranteed: type abviously needs to be dropped
+			self.possibleRefExpr(uem.Expr.Model)
+			self.oc.write("; ")
+			drop = obj::TypeHaveSpecialDrop(uem.Expr.Kind) // make sure type able to drop
+			deref = true
+			ret
+		| &FnCallExprModel:
+			// guaranteed: type abviously needs to be dropped
+			self.possibleRefExpr(model)
+			self.oc.write("; ")
+			drop = true
+			deref = false
+			ret
 		|:
-			panic("implementation mistake, this panic call should be unreachable")
+			// handle like ordinary expression
+			self.possibleRefExpr(model)
+			self.oc.write("; ")
+			drop = false
+			deref = false
+			ret
 		}
 	}
 
+	fn writeReceiverStruct(mut &self, mut &m: &StructSubIdentExprModel): (drop: bool, deref: bool, safeDeref: bool) {
+		safeDeref = true
+		let mut model: compExprModel = m.Expr.Model
+		match type model {
+		| &UnsafeDerefExprModel:
+			mut udem := (&UnsafeDerefExprModel)(model)
+			model = udem.Base
+			safeDeref = false
+			fall
+		| &UnaryExprModel:
+			// Smart pointer dereferencing or something like that?
+			mut uem := (&UnaryExprModel)(model)
+			match type uem.Expr.Model {
+			| &FnCallExprModel:
+				// Base expression comes from a function call.
+				// Need to be drop.
+				break
+			|:
+				// Expression come from safe place.
+				// Handle it in ordinary way.
+				self.possibleRefExpr(uem.Expr.Model)
+				self.oc.write("; ")
+				drop = false
+				deref = true
+				ret
+			}
+			// guaranteed: type abviously needs to be dropped
+			self.possibleRefExpr(uem.Expr.Model)
+			self.oc.write("; ")
+			drop = obj::TypeHaveSpecialDrop(uem.Expr.Kind) // make sure type able to drop
+			deref = true
+			ret
+		| &FnCallExprModel:
+			// guaranteed: type abviously needs to be dropped
+			self.possibleRefExpr(model)
+			self.oc.write("; ")
+			drop = true
+			deref = false
+			ret
+		|:
+			drop = false
+			deref = false
+			if m.Expr.Kind.Struct() != nil {
+				match type m.Expr.Model {
+				| &Var:
+					v := (&Var)(m.Expr.Model)
+					if v.Reference {
+						deref = true
+						break
+					}
+				}
+			}
+			if m.Expr.Kind.Ptr() == nil {
+				self.model(m.Expr.Model)
+			} else {
+				// Ignore dereferencing, use data directly to call method.
+				self.possibleRefExpr((&UnaryExprModel)(m.Expr.Model).Expr.Model)
+			}
+			self.oc.write("; ")
+			ret
+		}
+	}
+
+	fn writeReceiver(mut &self, mut m: &FnCallExprModel, mut &recvKind: &TypeKind): (drop: bool, deref: bool, safeDeref: bool) {
+		mut p := m.Func.Params[0]
+		if isTraitRecv(p) {
+			mut tsiem := (&TraitSubIdentExprModel)(m.Expr)
+			recvKind = tsiem.Expr.Kind
+			ret self.writeReceiverTrait(tsiem)
+		}
+		mut ssiem := (&StructSubIdentExprModel)(m.Expr)
+		recvKind = ssiem.Expr.Kind
+		ret self.writeReceiverStruct(ssiem)
+	}
+
 	fn pureFuncCall(mut &self, mut &m: &FnCallExprModel) {
-		wrapped := self.isWrapped(m)
+		const recvVar = "__jule_recv"
+		const resultVar = "__jule_result"
+		recv := !m.Func.IsBuiltin() && len(m.Func.Decl.Params) > 0 && m.Func.Decl.Params[0].IsSelf()
+		mut drop, mut deref, mut safeDeref := false, false, false
+		mut recvKind := (&TypeKind)(nil)
+		if recv {
+			self.oc.write("({ auto ")
+			self.oc.write(recvVar)
+			self.oc.write(" = ")
+			drop, deref, safeDeref = self.writeReceiver(m, recvKind)
+		}
+		result := !m.Func.Decl.IsVoid()
+		if result && recv {
+			self.oc.write("auto ")
+			self.oc.write(resultVar)
+			self.oc.write(" = ")
+		}
 		self.modelForCall(m.Expr)
 		if !m.Func.IsBuiltin() {
 			if m.Func.Decl.Binded && len(m.Func.Generics) > 0 {
@@ -761,7 +906,85 @@ impl exprCoder {
 				self.oc.write(", ")
 			}
 		}
-		if !m.Func.IsBuiltin() && len(m.Func.Decl.Params) > 0 && m.Func.Decl.Params[0].IsSelf() {
+		if recv {
+			// pass receiver parameter
+			mut rp := m.Func.Params[0]
+			if isTraitRecv(rp) {
+				self.oc.write(recvVar)
+				self.oc.write(".data")
+			} else if rp.Decl.IsRef() {
+				self.oc.write(recvVar)
+			} else {
+				// pointer receiver
+				if deref {
+					self.oc.write(recvVar)
+					if rp.Kind.Sptr() != nil {
+						// smart pointer passed to pointer receiver
+						// convert it pointer safely
+						if safeDeref {
+							self.oc.write(".ptr(")
+							if !env::Production {
+								self.oc.write("\"")
+								self.oc.locInfo(m.Token)
+								self.oc.write("\"")
+							}
+							self.oc.write(")")
+						} else {
+							self.oc.write(".alloc")
+						}
+					}
+				} else {
+					self.oc.write("&")
+					self.oc.write(recvVar)
+				}
+			}
+			if len(m.Args) > 0 {
+				self.oc.write(", ")
+			}
+		}
+		self.args(m)
+		self.oc.write(")")
+
+		if recv {
+			self.oc.write(";")
+			if drop {
+				self.oc.sc.dh.dropModel(recvVar, recvKind)
+			}
+			if result {
+				self.oc.write("(")
+				self.oc.write(resultVar)
+				self.oc.write(")")
+			}
+			self.oc.write("; })")
+		}
+		/*wrapped := self.isWrapped(m)
+		self.modelForCall(m.Expr)
+		if !m.Func.IsBuiltin() {
+			if m.Func.Decl.Binded && len(m.Func.Generics) > 0 {
+				if !obj::HasDirective(m.Func.Decl.Directives, Directive.Cdef) {
+					self.oc.write("<")
+					for (i, mut g) in m.Func.Generics {
+						self.oc.tc.kind(self.oc.Buf, g.Kind)
+						if len(m.Func.Generics)-i > 1 {
+							self.oc.write(", ")
+						}
+					}
+					self.oc.write(">")
+				}
+			}
+		}
+		self.pushCallInf(m)
+		if m.Func.AsAnon && !m.Func.Anon {
+			// Function used as anonymous.
+			// So pass nullptr to ctx parameter.
+			// Do not pass nullptr if function is anonymous,
+			// beacause it stores ctx data internally and it will pass.
+			self.oc.write("nullptr")
+			if len(m.Args) > 0 {
+				self.oc.write(", ")
+			}
+		}
+		if recv {
 			match type m.Expr {
 			| &StructSubIdentExprModel:
 				mut ssie := (&StructSubIdentExprModel)(m.Expr)
@@ -808,7 +1031,7 @@ impl exprCoder {
 					self.oc.write(", ")
 				}
 			| &TraitSubIdentExprModel:
-				self.possibleRefExpr((&TraitSubIdentExprModel)(m.Expr).Expr)
+				self.possibleRefExpr((&TraitSubIdentExprModel)(m.Expr).Expr.Model)
 				self.oc.write(".data")
 				if len(m.Args) > 0 {
 					self.oc.write(", ")
@@ -820,7 +1043,7 @@ impl exprCoder {
 
 		if wrapped {
 			self.oc.write("; })")
-		}
+		}*/
 	}
 
 	fn coFuncCall(mut &self, mut &m: &FnCallExprModel) {
@@ -1159,12 +1382,89 @@ impl exprCoder {
 		self.oc.write(")")
 	}
 
-	fn traitSub(mut &self, mut m: &TraitSubIdentExprModel) {
+	fn handleTraitSubMoveSemantics(mut &self, mut m: &TraitSubIdentExprModel): (ordinary: bool) {
+		const tempVar = "__jule_temp"
+		mut deref := false
+		mut dropKind := m.Expr.Kind
+		match type m.Expr.Model {
+		| &UnaryExprModel:
+			// Smart pointer dereferencing or something like that?
+			mut uem := (&UnaryExprModel)(m.Expr.Model)
+			// guaranteed: type may need to drop handling
+			if !obj::TypeHaveSpecialDrop(uem.Expr.Kind) {
+				// no need to handle drop semantics
+				ret true
+			}
+			match type uem.Expr.Model {
+			| &FnCallExprModel:
+				// Base expression comes from a function call.
+				// Need to be drop.
+				break
+			|:
+				// Expression come from safe place.
+				// Handle it in ordinary way.
+				ret true
+			}
+			// guaranteed: type abviously needs to be dropped
+			self.oc.write("({ auto ")
+			self.oc.write(tempVar)
+			self.oc.write(" = ")
+			self.possibleRefExpr(uem.Expr.Model)
+			self.oc.write("; ")
+			deref = true
+			dropKind = uem.Expr.Kind
+		| &FnCallExprModel:
+			if !obj::TypeHaveSpecialDrop(m.Expr.Kind) {
+				// no need to handle drop semantics
+				ret true
+			}
+			// guaranteed: type abviously needs to be dropped
+			self.oc.write("({ auto ")
+			self.oc.write(tempVar)
+			self.oc.write(" = ")
+			self.possibleRefExpr(m.Expr.Model)
+			self.oc.write("; ")
+		|:
+			// handle like ordinary expression
+			ret true
+		}
+		// guaranteed: type abviously needs to be dropped
 		self.oc.write("((")
 		identCoder.traitDecl(self.oc.Buf, m.Trt)
 		self.oc.write("MptrData")
 		self.oc.write("*)")
-		self.possibleRefExpr(m.Expr)
+		self.oc.write("(")
+		self.oc.write(tempVar)
+		if deref {
+			self.oc.write("->")
+		} else {
+			self.oc.write(".")
+		}
+		self.oc.write("safe_type(")
+		if !env::Production {
+			self.oc.write("\"")
+			self.oc.locInfo(m.Token)
+			self.oc.write("\"")
+		}
+		self.oc.write("))->")
+		identCoder.func(self.oc.Buf, m.Method)
+		self.oc.write("; ")
+		self.oc.sc.dh.dropModel(tempVar, dropKind)
+
+		self.oc.write("})")
+		ret false
+	}
+
+	fn traitSub(mut &self, mut m: &TraitSubIdentExprModel) {
+		ordinary := self.handleTraitSubMoveSemantics(m)
+		if !ordinary {
+			ret
+		}
+		self.oc.write("((")
+		identCoder.traitDecl(self.oc.Buf, m.Trt)
+		self.oc.write("MptrData")
+		self.oc.write("*)")
+		self.possibleRefExpr(m.Expr.Model)
 		self.oc.write(".safe_type(")
 		if !env::Production {
 			self.oc.write("\"")
@@ -1175,11 +1475,85 @@ impl exprCoder {
 		identCoder.func(self.oc.Buf, m.Method)
 	}
 
+	fn handleStructSubMoveSemantics(mut &self, mut m: &StructSubIdentExprModel): (ordinary: bool) {
+		const tempVar = "__jule_temp"
+		const retVar = "__jule_result"
+		mut deref := false
+		mut dropKind := m.Expr.Kind
+		match type m.Expr.Model {
+		| &UnaryExprModel:
+			// Smart pointer dereferencing or something like that?
+			mut uem := (&UnaryExprModel)(m.Expr.Model)
+			// guaranteed: type may need to drop handling
+			if !obj::TypeHaveSpecialDrop(uem.Expr.Kind) {
+				// no need to handle drop semantics
+				ret true
+			}
+			match type uem.Expr.Model {
+			| &FnCallExprModel:
+				// Base expression comes from a function call.
+				// Need to be drop.
+				break
+			|:
+				// Expression come from safe place.
+				// Handle it in ordinary way.
+				ret true
+			}
+			// guaranteed: type abviously needs to be dropped
+			self.oc.write("({ auto ")
+			self.oc.write(tempVar)
+			self.oc.write(" = ")
+			self.possibleRefExpr(uem.Expr.Model)
+			self.oc.write("; ")
+			deref = true
+			dropKind = uem.Expr.Kind
+		| &FnCallExprModel:
+			if !obj::TypeHaveSpecialDrop(m.Expr.Kind) {
+				// no need to handle drop semantics
+				ret true
+			}
+			// guaranteed: type abviously needs to be dropped
+			self.oc.write("({ auto ")
+			self.oc.write(tempVar)
+			self.oc.write(" = ")
+			self.possibleRefExpr(m.Expr.Model)
+			self.oc.write("; ")
+		|:
+			// handle like ordinary expression
+			ret true
+		}
+		// guaranteed: type abviously needs to be dropped
+		self.oc.tc.kind(self.oc.Buf, m.Field.Kind)
+		self.oc.write(" ")
+		self.oc.write(retVar)
+		self.oc.write(" = ")
+		self.oc.write(tempVar)
+		if deref {
+			self.oc.write("->")
+		} else {
+			self.oc.write(".")
+		}
+		identCoder.field(self.oc.Buf, m.Field.Decl)
+		self.oc.write("; ")
+		self.oc.sc.dh.dropModel(tempVar, dropKind)
+		self.oc.write("(")
+		self.oc.write(retVar)
+		self.oc.write("); })")
+		ret false
+	}
+
 	fn structureSub(mut &self, mut m: &StructSubIdentExprModel) {
-		self.possibleRefExpr(m.Expr.Model)
 		if m.Field == nil {
+			// Methods are handled already.
+			// No risk for drop semantics.
+			self.possibleRefExpr(m.Expr.Model)
 			ret
 		}
+		ordinary := self.handleStructSubMoveSemantics(m)
+		if !ordinary {
+			ret
+		}
+		self.possibleRefExpr(m.Expr.Model)
 		self.oc.write(".")
 		identCoder.field(self.oc.Buf, m.Field.Decl)
 	}
@@ -1993,3 +2367,6 @@ common:
 	buf.WriteStr(r)
 	buf.WriteByte(')')
 }
+
+// Reports whether receiver parameter is trait receiver.
+fn isTraitRecv(&p: &sema::ParamIns): bool { ret p.Kind == nil }
