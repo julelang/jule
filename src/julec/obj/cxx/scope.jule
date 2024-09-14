@@ -621,17 +621,30 @@ impl scopeCoder {
 			ret
 		}
 
-		if a.Op.Id == TokenId.Eq && obj::TypeHaveSpecialDrop(a.Left.Kind) {
+		const tempVar = "__jule_temp"
+		drop := a.Op.Id == TokenId.Eq && obj::TypeHaveSpecialDrop(a.Left.Kind)
+		if drop {
 			mut node, _ := isMapIndexing(a.Left.Model)
 			if node != nil {
 				self.mapAssign(node, a.Right.Model)
 				ret
 			}
-			self.dh.dropModel(a.Left.Model, a.Left.Kind)
+			self.oc.write("{ ")
+			self.oc.tc.kind(self.oc.Buf, a.Left.Kind)
+			self.oc.write(" ")
+			self.oc.write(tempVar)
+			self.oc.write(" = ")
+			self.assignLeft(a.Left.Model)
+			self.oc.write("; ")
 		}
 		self.assignLeft(a.Left.Model)
 		self.oc.write(a.Op.Kind)
 		self.handleCopy(a.Right.Model)
+		if drop {
+			self.oc.write("; ")
+			self.dh.dropModel(tempVar, a.Left.Kind)
+			self.oc.write("}")
+		}
 	}
 
 	fn mapLookupAssign(mut &self, mut &a: &MultiAssign) {
@@ -704,6 +717,7 @@ impl scopeCoder {
 	}
 
 	fn multiAssignTup(mut &self, mut &a: &MultiAssign) {
+		const tempVar = "__jule_temp"
 		self.oc.write("({\n")
 		self.oc.addIndent()
 
@@ -734,7 +748,6 @@ impl scopeCoder {
 				self.oc.write(" = ")
 			}
 			// create and drop it if not owned
-			const tempVar = "__jule_temp"
 			if !owned {
 				self.oc.write("({ auto ")
 				self.oc.write(tempVar)
@@ -754,7 +767,8 @@ impl scopeCoder {
 				continue
 			}
 			self.oc.indent()
-			if obj::TypeHaveSpecialDrop(l.Kind) {
+			drop := obj::TypeHaveSpecialDrop(l.Kind)
+			if drop {
 				mut node, _ := isMapIndexing(l.Model)
 				if node != nil {
 					mut r := StrBuilder.New(len(assignArgName) + 20)
@@ -762,12 +776,23 @@ impl scopeCoder {
 					self.mapAssign(node, r.Str())
 					continue
 				}
-				self.dh.dropModel(l.Model, l.Kind)
+				self.oc.write("{ ")
+				self.oc.tc.kind(self.oc.Buf, l.Kind)
+				self.oc.write(" ")
+				self.oc.write(tempVar)
+				self.oc.write(" = ")
+				self.assignLeft(l.Model)
+				self.oc.write("; ")
 			}
 			self.assignLeft(l.Model)
 			self.oc.write(" = ")
 			identCoder.toOut(self.oc.Buf, assignArgName, uintptr(i))
 			self.oc.write(";\n")
+			if drop {
+				self.oc.write("; ")
+				self.dh.dropModel(tempVar, l.Kind)
+				self.oc.write("}")
+			}
 		}
 
 		self.oc.doneIndent()
