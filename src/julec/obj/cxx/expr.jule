@@ -760,55 +760,18 @@ impl exprCoder {
 	}
 
 	fn writeReceiverTrait(mut &self, mut &m: &TraitSubIdentExprModel): (drop: bool, deref: bool, safeDeref: bool) {
-		safeDeref = true
-		let mut model: compExprModel = m.Expr.Model
-		match type model {
-		| &UnsafeDerefExprModel:
-			mut udem := (&UnsafeDerefExprModel)(model)
-			model = udem.Base
-			safeDeref = false
-			fall
-		| &UnaryExprModel:
-			// Smart pointer dereferencing or something like that?
-			mut uem := (&UnaryExprModel)(model)
-			match type uem.Expr.Model {
-			| &FnCallExprModel:
-				// Base expression comes from a function call.
-				// Need to be drop.
-				break
-			|:
-				// Expression come from safe place.
-				// Handle it in ordinary way.
-				self.oc.sc.handleCopy(uem.Expr.Model)
-				self.oc.write("; ")
-				drop = false
-				deref = true
-				ret
-			}
-			// guaranteed: type abviously needs to be dropped
-			self.oc.sc.handleCopy(uem.Expr.Model)
-			self.oc.write("; ")
-			drop = obj::TypeHaveSpecialDrop(uem.Expr.Kind) // make sure type able to drop
-			deref = true
-			ret
-		| &FnCallExprModel:
-			// guaranteed: type abviously needs to be dropped
-			self.oc.sc.handleCopy(model)
-			self.oc.write("; ")
-			drop = true
-			deref = false
-			ret
-		|:
-			// handle like ordinary expression
-			self.oc.sc.handleCopy(model)
-			self.oc.write("; ")
-			drop = false
-			deref = false
-			ret
-		}
+		const recvVar = "__jule_recv"
+		self.oc.tc.kind(self.oc.Buf, m.Expr.Kind)
+		self.oc.write(" ")
+		self.oc.write(recvVar)
+		self.oc.write(" = ")
+		self.oc.sc.handleCopy(m.Expr.Model)
+		self.oc.write("; ")
+		ret
 	}
 
 	fn writeReceiverStruct(mut &self, mut &m: &StructSubIdentExprModel): (drop: bool, deref: bool, safeDeref: bool) {
+		const recvVar = "__jule_recv"
 		safeDeref = true
 		let mut model: compExprModel = m.Expr.Model
 		match type model {
@@ -816,99 +779,38 @@ impl exprCoder {
 			safeDeref = false
 			model = (&UnsafeDerefExprModel)(model).Base
 		| &UnaryExprModel:
-			deref = true
 			mut uem := (&UnaryExprModel)(model)
-			if uem.Expr.Kind.Sptr() != nil {
-				// Avoid dereferencing of smart pointer.
+			if uem.Op.Id == TokenId.Star {
+				self.oc.tc.kind(self.oc.Buf, uem.Expr.Kind)
+				self.oc.write(" ")
+				self.oc.write(recvVar)
+				self.oc.write(" = ")
 				self.oc.sc.handleCopy(uem.Expr.Model)
 				self.oc.write("; ")
+				deref = uem.Expr.Kind.Ptr() == nil // get pointer of non-pointer expression
 				ret
 			}
 		}
-		self.oc.sc.handleCopy(m.Expr.Model)
+		mut kind := obj::IsLvalueModel(m.Expr.Model)
+		self.oc.tc.kind(self.oc.Buf, m.Expr.Kind)
+		self.oc.write(" ")
+		ptr := kind != nil && kind.Ptr() == nil
+		deref = !ptr // get pointer of non-pointer expression
+		if ptr {
+			deref = false
+			self.oc.write(" *")
+		}
+		self.oc.write(recvVar)
+		self.oc.write(" = ")
+		if ptr {
+			self.oc.write("&(")
+		}
+		self.possibleRefExpr(m.Expr.Model)
+		if ptr {
+			self.oc.write(")")
+		}
 		self.oc.write("; ")
 		ret
-		/*safeDeref = true
-		let mut model: compExprModel = m.Expr.Model
-		match type model {
-		| &UnsafeDerefExprModel:
-			mut udem := (&UnsafeDerefExprModel)(model)
-			if udem.Base.Op.Id == TokenId.Amper {
-				// Expression come from safe place.
-				// Handle it in ordinary way.
-				self.oc.sc.handleCopy(m.Expr.Model)
-				self.oc.write("; ")
-				drop = false
-				deref = true
-				ret
-			}
-			// should be guaranteed: uem.Op.Id == TokenId.Star
-			model = udem.Base
-			safeDeref = false
-			fall
-		| &UnaryExprModel:
-			// Smart pointer dereferencing or something like that?
-			mut uem := (&UnaryExprModel)(model)
-			if uem.Op.Id == TokenId.Amper {
-				// Expression come from safe place.
-				// Handle it in ordinary way.
-				self.oc.sc.handleCopy(m.Expr.Model)
-				self.oc.write("; ")
-				drop = false
-				deref = true
-				ret
-			}
-			// should be guaranteed: uem.Op.Id == TokenId.Star
-
-			match type uem.Expr.Model {
-			| &FnCallExprModel:
-				// Base expression comes from a function call.
-				// Need to be drop.
-				break
-			|:
-				// Expression come from safe place.
-				// Handle it in ordinary way.
-				self.oc.sc.handleCopy(uem.Expr.Model)
-				self.oc.write("; ")
-				drop = false
-				deref = true
-				ret
-			}
-			// guaranteed: type abviously needs to be dropped
-			self.oc.sc.handleCopy(uem.Expr.Model)
-			self.oc.write("; ")
-			drop = obj::TypeHaveSpecialDrop(uem.Expr.Kind) // make sure type able to drop
-			deref = true
-			ret
-		| &FnCallExprModel:
-			// guaranteed: type abviously needs to be dropped
-			self.oc.sc.handleCopy(model)
-			self.oc.write("; ")
-			drop = true
-			deref = false
-			ret
-		|:
-			drop = false
-			deref = false
-			if m.Expr.Kind.Struct() != nil {
-				match type m.Expr.Model {
-				| &Var:
-					v := (&Var)(m.Expr.Model)
-					if v.Reference {
-						deref = true
-						break
-					}
-				}
-			}
-			if m.Expr.Kind.Ptr() == nil {
-				self.oc.sc.handleCopy(m.Expr.Model)
-			} else {
-				// Ignore dereferencing, use data directly to call method.
-				self.oc.sc.handleCopy((&UnaryExprModel)(m.Expr.Model).Expr.Model)
-			}
-			self.oc.write("; ")
-			ret
-		}*/
 	}
 
 	fn writeReceiver(mut &self, mut m: &FnCallExprModel, mut &recvKind: &TypeKind): (drop: bool, deref: bool, safeDeref: bool) {
@@ -930,9 +832,7 @@ impl exprCoder {
 		mut drop, mut deref, mut safeDeref := false, false, false
 		mut recvKind := (&TypeKind)(nil)
 		if recv {
-			self.oc.write("({ auto ")
-			self.oc.write(recvVar)
-			self.oc.write(" = ")
+			self.oc.write("({ ")
 			drop, deref, safeDeref = self.writeReceiver(m, recvKind)
 		}
 		result := !m.Func.Decl.IsVoid()
@@ -979,7 +879,7 @@ impl exprCoder {
 				// pointer receiver
 				if deref {
 					sptr := recvKind.Sptr() != nil
-					if !sptr {
+					if !sptr && recvKind.Ptr() == nil {
 						// take pointer or receiver if receiver is not already pointer
 						self.oc.write("&")
 					}
@@ -1000,7 +900,6 @@ impl exprCoder {
 						}
 					}
 				} else {
-					self.oc.write("&")
 					self.oc.write(recvVar)
 				}
 			}
