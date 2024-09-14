@@ -1591,22 +1591,34 @@ impl dropHandler {
 		self.sc.oc.ec.possibleRefExpr(m)
 		self.sc.oc.write(");")
 	}
+	
+	fn varStep(mut &self, mut &v: &Var): bool {
+		if v.Constant {
+			// skip constants
+			ret true
+		}
+		if v.RetOrder != -2 {
+			if self.f&dropFlag.RetVars != dropFlag.RetVars {
+				// skip return variable if flag not passed
+				ret true
+			}
+		}
+		self.dropVar(v)
+		ret true
+	}
 
 	fn commonStep(mut &self, i: int, mut &stmt: Stmt): bool {
 		match type stmt {
 		| &Var:
 			mut v := (&Var)(stmt)
-			if v.Constant {
-				// skip constants
-				ret true
-			}
-			if v.RetOrder != -2 {
-				if self.f&dropFlag.RetVars != dropFlag.RetVars {
-					// skip return variable if flag not passed
-					ret true
+			ret self.varStep(v)
+		| &MultiAssign:
+			mut ma := (&MultiAssign)(stmt)
+			for (_, mut v) in ma.Decls {
+				if !self.varStep(v) {
+					ret false
 				}
 			}
-			self.dropVar(v)
 		}
 		ret true
 	}
