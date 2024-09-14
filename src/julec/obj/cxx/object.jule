@@ -44,6 +44,7 @@ use path for std::fs::path
 use strings for std::strings::{StrBuilder}
 use std::time::{Time}
 
+const copyFuncIdentPrefix = "__jule_copy"
 const dropFuncIdentPrefix = "__jule_drop"
 const ctxParamIdent = "__f_ctx"
 const anonFnCtxSuffix = "_ctx"                              // Anon fn identifier suffix for ctx struct identifier.
@@ -99,6 +100,7 @@ struct ObjectCoder {
 	anons:       []&anonHash
 	deallocated: []&TypeKind // GC deallocated types for dynamic programming.
 	drops:       []&bufHash  // List of drop function calls based on types.
+	copys:       []&bufHash  // List of copy function calls based on types.
 
 	// Current indentation.
 	indentBuffer: []byte
@@ -189,6 +191,35 @@ impl ObjectCoder {
 
 		drop.WriteStr("}\n")
 		hash.b = drop.Str()
+		ret i
+	}
+
+	fn pushCopy(mut &self, mut t: &TypeKind): int {
+		for i, h in self.copys {
+			if h.t.Equal(t) {
+				ret i
+			}
+		}
+		i := len(self.copys)
+		mut buf := StrBuilder.New(1 << 7)
+
+		mut hash := &bufHash{t: t}
+		self.copys = append(self.copys, hash)
+
+		self.tc.kind(buf, t)
+		buf.WriteStr(" ")
+		buf.WriteStr(copyFuncIdentPrefix)
+		buf.WriteStr(conv::Itoa(i))
+		buf.WriteStr("(")
+		self.tc.kind(buf, t)
+		buf.WriteStr(" *z) noexcept {\n")
+		buf.WriteByte(indentKind)
+
+		mut dbi := copyBodyImplementer.new(self)
+		dbi.implBody(buf, t)
+
+		buf.WriteStr("}\n")
+		hash.b = buf.Str()
 		ret i
 	}
 
@@ -859,7 +890,7 @@ impl ObjectCoder {
 						self.write(")")
 					})
 				} else {
-					self.varInitExpr(v, fn() { self.ec.possibleRefExpr(v.Value.Data.Model) })
+					self.varInitExpr(v, fn() { self.sc.handleCopy(v.Value.Data.Model) })
 				}
 				ret
 			}
@@ -1211,7 +1242,7 @@ impl ObjectCoder {
 		for (_, mut v) in self.ir.Ordered.Globals {
 			identCoder.var(self.Buf, v)
 			self.write(" = ")
-			self.ec.model(v.Value.Data.Model)
+			self.sc.handleCopy(v.Value.Data.Model)
 			self.write(";\n")
 			self.Buf.WriteByte(indentKind)
 		}
@@ -1286,7 +1317,6 @@ impl ObjectCoder {
 		self.write("\n\n")
 
 		self.anonHashes()
-
 		// Declare droppers first.
 		for _, h in self.drops {
 			i := strings::FindByte(h.b, '{') // Cut by body.
@@ -1300,6 +1330,24 @@ impl ObjectCoder {
 		}
 		// Define them.
 		for _, h in self.drops {
+			self.insertBuf1(h.b, self.wrapPos)
+			self.wrapPos += len(h.b)
+			self.declPos += len(h.b)
+		}
+
+		// Declare copiers first.
+		for _, h in self.copys {
+			i := strings::FindByte(h.b, '{') // Cut by body.
+			b := h.b[:i]
+			self.insertBuf1(b, self.wrapPos)
+			self.wrapPos += len(b)
+			self.declPos += len(b)
+			self.insertBuf1(";\n", self.wrapPos)
+			self.wrapPos += 2
+			self.declPos += 2
+		}
+		// Define them.
+		for _, h in self.copys {
 			self.insertBuf1(h.b, self.wrapPos)
 			self.wrapPos += len(h.b)
 			self.declPos += len(h.b)

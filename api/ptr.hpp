@@ -37,6 +37,11 @@ namespace jule
     // Reports whether pointer allocations are points to same address.
     inline jule::Bool ptr_equal(void *alloc, void *other);
 
+    inline void add_ref(jule::Uint *ref) noexcept
+    {
+        __jule_atomic_add_explicit(ref, jule::REFERENCE_DELTA, __JULE_ATOMIC_MEMORY_ORDER__RELAXED);
+    }
+
     inline jule::Bool drop_ref(jule::Uint *ref) noexcept
     {
         return __jule_atomic_add_explicit(ref, -jule::REFERENCE_DELTA,

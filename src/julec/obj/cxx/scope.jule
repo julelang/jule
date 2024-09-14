@@ -165,7 +165,11 @@ impl scopeCoder {
 					if it.KeyB.Reference {
 						self.oc.write("it")
 					} else {
-						self.oc.write("*it")
+						if obj::TypeHaveSpecialCopy(it.KeyB.Kind.Kind) {
+							self.handleCopyS("it", it.KeyB.Kind.Kind)
+						} else {
+							self.oc.write("*it")
+						}
 					}
 				}
 			})
@@ -215,12 +219,12 @@ impl scopeCoder {
 		mut ref := false
 		self.iterHead(it, ref, begin)
 		if it.KeyA != nil {
-			self.oc.varInitExpr(it.KeyA, fn() { self.oc.write("it->first") })
+			self.oc.varInitExpr(it.KeyA, fn() { self.handleCopyS("&it->first", unsafe { it.KeyA.Kind.Kind }) })
 			self.oc.write("\n")
 			self.oc.indent()
 		}
 		if it.KeyB != nil {
-			self.oc.varInitExpr(it.KeyB, fn() { self.oc.write("it->second") })
+			self.oc.varInitExpr(it.KeyB, fn() { self.handleCopyS("&it->second", unsafe { it.KeyB.Kind.Kind }) })
 			self.oc.write("\n")
 			self.oc.indent()
 		}
@@ -536,6 +540,51 @@ impl scopeCoder {
 		self.oc.write(")")
 	}
 
+	fn mapAssign(mut &self, mut l: &IndexingExprModel, r: compExprModel) {
+		const baseVar = "__jule_base"
+		const valVar = "__jule_val"
+		const indexVar = "__jule_index"
+		mut mapz := l.Expr.Kind.Map()
+		if mapz == nil {
+			panic("scope: mapAssign: map type is not guaranteed")
+		}
+		self.oc.write("{ ")
+		self.oc.tc.kind(self.oc.Buf, mapz.Key)
+		self.oc.write(" ")
+		self.oc.write(indexVar)
+		self.oc.write(" = ")
+		self.oc.ec.possibleRefExpr(l.Index.Model)
+		self.oc.write("; ")
+		self.oc.tc.mapType(self.oc.Buf, mapz)
+		self.oc.write(" *")
+		self.oc.write(baseVar)
+		self.oc.write(" = &(")
+		self.oc.ec.possibleRefExpr(l.Expr.Model)
+		self.oc.write("); auto ")
+		self.oc.write(valVar)
+		self.oc.write(" = ")
+		self.oc.write(baseVar)
+		self.oc.write("->buffer.find(")
+		self.oc.write(indexVar)
+		self.oc.write("); if (")
+		self.oc.write(valVar)
+		self.oc.write(" != ")
+		self.oc.write(baseVar)
+		self.oc.write("->end()) { ")
+		self.dh.dropModel(valVar + "->second", mapz.Val)
+		self.oc.write(" ")
+		self.oc.write(valVar)
+		self.oc.write("->second = ")
+		self.handleCopy(r)
+		self.oc.write("; } else { ")
+		self.oc.write(baseVar)
+		self.oc.write("->operator[](")
+		self.oc.write(indexVar)
+		self.oc.write(") = ")
+		self.handleCopy(r)
+		self.oc.write("; }} ")
+	}
+
 	fn assign(mut &self, mut a: &Assign) {
 		match a.Op.Id {
 		| TokenId.SolidusEq | TokenId.PercentEq:
@@ -564,48 +613,86 @@ impl scopeCoder {
 			ret
 		}
 
-		if obj::TypeHaveSpecialDrop(a.Left.Kind) {
+		if a.Op.Id == TokenId.Eq && obj::TypeHaveSpecialDrop(a.Left.Kind) {
+			mut node, _ := isMapIndexing(a.Left.Model)
+			if node != nil {
+				self.mapAssign(node, a.Right.Model)
+				ret
+			}
 			self.dh.dropModel(a.Left.Model, a.Left.Kind)
 		}
 		self.assignLeft(a.Left.Model)
 		self.oc.write(a.Op.Kind)
-		self.oc.ec.possibleRefExpr(a.Right.Model)
+		self.handleCopy(a.Right.Model)
 	}
 
 	fn mapLookupAssign(mut &self, mut &a: &MultiAssign) {
-		if a.Left[0] != nil {
-			mut l := a.Left[0]
-			if obj::TypeHaveSpecialDrop(l.Kind) {
-				self.dh.dropModel(l.Model, l.Kind)
+		mut iem := (&IndexingExprModel)(a.Right)
+		mut mapz := iem.Expr.Kind.Map()
+		if mapz == nil {
+			panic("scope: mapLookupAssign: expression type is not map")
+		}
+		const valVar = "__jule_val"
+		const okVar = "__jule_ok"
+		mut val := a.Left[0]
+		wrapped := val != nil
+		if wrapped {
+			self.oc.write("{ ")
+			self.oc.tc.kind(self.oc.Buf, mapz.Val)
+			self.oc.write(" *")
+			self.oc.write(valVar)
+			self.oc.write(" = &(")
+			self.assignLeft(val.Model)
+			self.oc.write("); ")
+			if obj::TypeHaveSpecialDrop(mapz.Val) {
+				self.dh.dropModel("(*" + valVar + ")", mapz.Val)
 			}
 		}
+		// no need to drop status variable because of it is boolean type
+		// which is no need for drop semantics
+
 		if a.Left[1] != nil {
-			mut l := a.Left[1]
-			if obj::TypeHaveSpecialDrop(l.Kind) {
-				self.dh.dropModel(l.Model, l.Kind)
-			}
+			self.oc.write(typeCoder.Bool)
+			self.oc.write(" *")
+			self.oc.write(okVar)
+			self.oc.write(" = &(")
+			self.oc.ec.possibleRefExpr(a.Left[1].Model)
+			self.oc.write("); ")
+		} else if wrapped {
+			self.oc.write(typeCoder.Bool)
+			self.oc.write(" ")
+			self.oc.write(okVar)
+			self.oc.write(" = false; ")
 		}
 
-		mut iem := (&IndexingExprModel)(a.Right)
 		self.assignLeft(iem.Expr.Model)
 		self.oc.write(".lookup(")
 		self.oc.ec.possibleRefExpr(iem.Index.Model)
 		self.oc.write(", ")
-		if a.Left[0] != nil {
-			self.oc.write("&(")
-			self.oc.ec.possibleRefExpr(a.Left[0].Model)
-			self.oc.write("), ")
+		if wrapped {
+			self.oc.write(valVar)
+			self.oc.write(", ")
 		} else {
 			self.oc.write("nullptr, ")
 		}
 		if a.Left[1] != nil {
-			self.oc.write("&(")
-			self.oc.ec.possibleRefExpr(a.Left[1].Model)
-			self.oc.write(")")
+			self.oc.write(okVar)
+		} else if wrapped {
+			self.oc.write("&")
+			self.oc.write(okVar)
 		} else {
 			self.oc.write("nullptr")
 		}
-		self.oc.write(")")
+		self.oc.write("); ")
+		if wrapped {
+			if obj::TypeHaveSpecialCopy(mapz.Val) {
+				self.oc.write("if (")
+				self.oc.write(okVar)
+				self.oc.write(") ")
+				self.handleCopyS(valVar, mapz.Val)
+			}
+			self.oc.write("; }")
+		}
 	}
 
 	fn multiAssignTup(mut &self, mut &a: &MultiAssign) {
@@ -633,9 +720,6 @@ impl scopeCoder {
 						continue
 					}
 				}
-				if obj::TypeHaveSpecialDrop(l.Kind) {
-					self.dh.dropModel(l.Model, l.Kind)
-				}
 				self.oc.tc.kind(self.oc.Buf, l.Kind)
 				self.oc.write(" ")
 				identCoder.toOut(self.oc.Buf, assignArgName, uintptr(i))
@@ -648,7 +732,7 @@ impl scopeCoder {
 				self.oc.write(tempVar)
 				self.oc.write(" = ")
 			}
-			self.oc.ec.possibleRefExpr(r.Model)
+			self.handleCopy(r.Model)
 			if !owned {
 				self.oc.write("; ")
 				self.dh.dropModel(tempVar, r.Kind)
@@ -661,10 +745,17 @@ impl scopeCoder {
 			if l == nil {
 				continue
 			}
+			self.oc.indent()
 			if obj::TypeHaveSpecialDrop(l.Kind) {
+				mut node, _ := isMapIndexing(l.Model)
+				if node != nil {
+					mut r := StrBuilder.New(len(assignArgName) + 20)
+					identCoder.toOut(r, assignArgName, uintptr(i))
+					self.mapAssign(node, r.Str())
+					continue
+				}
 				self.dh.dropModel(l.Model, l.Kind)
 			}
-			self.oc.indent()
 			self.assignLeft(l.Model)
 			self.oc.write(" = ")
 			identCoder.toOut(self.oc.Buf, assignArgName, uintptr(i))
@@ -702,6 +793,14 @@ impl scopeCoder {
 			}
 
 			self.oc.indent()
+			if obj::TypeHaveSpecialDrop(l.Kind) {
+				mut node, _ := isMapIndexing(l.Model)
+				if node != nil {
+					self.mapAssign(node, r + conv::Itoa(i))
+					continue
+				}
+				self.dh.dropModel(l.Model, l.Kind)
+			}
 			self.assignLeft(l.Model)
 			match {
 			| tup.Types[i].Equal(l.Kind):
@@ -934,7 +1033,7 @@ impl scopeCoder {
 	fn setResult(mut &self, mut r: &RetSt) {
 		if len(r.Func.Decl.Result.Idents) == 1 {
 			self.oc.write(resultName + " = ")
-			self.oc.ec.possibleRefExpr(r.Expr)
+			self.handleCopy(r.Expr)
 			self.oc.write(";\n")
 			self.oc.indent()
 			ret
@@ -946,14 +1045,13 @@ impl scopeCoder {
 				self.oc.write(resultName + "." + resultArgName)
 				self.oc.write(conv::Itoa(i))
 				self.oc.write(" = ")
-				self.oc.ec.possibleRefExpr(data.Model)
+				self.handleCopy(data.Model)
 				self.oc.write(";\n")
 				self.oc.indent()
 			}
 		| &FnCallExprModel:
-			self.oc.write(resultName + " = std::move(")
-			self.oc.ec.model(r.Expr)
-			self.oc.write(");\n")
+			self.oc.write(resultName + " = ")
+			self.handleCopy(r.Expr)
 		|:
 			panic("implementation mistake, this panic call should be unreachable")
 		}
@@ -974,7 +1072,7 @@ impl scopeCoder {
 		} else if len(r.Func.Decl.Result.Idents) == 0 {
 			const resultIdent = "__jule_result"
 			self.oc.write("{ auto " + resultIdent + " = ")
-			self.oc.ec.possibleRefExpr(r.Expr)
+			self.handleCopy(r.Expr)
 			self.oc.write("; ")
 			self.handleDrops(r.Scope, r.Func.Scope, dropFlags, r.Index)
 			self.oc.write("return ")
@@ -1082,7 +1180,7 @@ impl scopeCoder {
 					self.oc.write("({ auto ")
 					self.oc.write(tempVar)
 					self.oc.write(" = ")
-					self.oc.ec.possibleRefExpr(md.Model)
+					self.handleCopy(md.Model)
 					self.oc.write("; ")
 					self.dh.dropModel(tempVar, md.Kind)
 					self.oc.write(" }); ")
@@ -1093,7 +1191,7 @@ impl scopeCoder {
 				self.oc.write("({ auto ")
 				self.oc.write(tempVar)
 				self.oc.write(" = ")
-				self.oc.ec.possibleRefExpr(m)
+				self.handleCopy(m)
 				self.oc.write("; ")
 
 				const r = tempVar + "." + resultArgName
@@ -1121,7 +1219,7 @@ impl scopeCoder {
 			self.oc.write("{ auto ")
 			self.oc.write(tempVar)
 			self.oc.write(" = ")
-			self.oc.ec.possibleRefExpr(d.Model)
+			self.handleCopy(d.Model)
 			self.oc.write("; ")
 			self.dropResult(tempVar, fc.Func.Result)
 			self.oc.write(" } ")
@@ -1130,7 +1228,7 @@ impl scopeCoder {
 		self.oc.write("({ auto ")
 		self.oc.write(tempVar)
 		self.oc.write(" = ")
-		self.oc.ec.possibleRefExpr(d.Model)
+		self.handleCopy(d.Model)
 		self.oc.write("; ")
 		self.dh.dropModel(tempVar, d.Kind)
 		self.oc.write(" });\n")
@@ -1223,6 +1321,44 @@ impl scopeCoder {
 		self.dh.f = flags
 		self.dh.i = i
 		self.dh.handle()
+	}
+
+	// Same as [handleCopyS] but writes to custom buffer.
+	fn handleCopySB(mut &self, mut &buf: StrBuilder, s: str, mut &t: &sema::TypeKind) {
+		if !obj::TypeHaveSpecialCopy(t) {
+			buf.WriteStr(s)
+			ret
+		}
+		i := self.oc.pushCopy(t)
+		buf.WriteStr(copyFuncIdentPrefix)
+		buf.WriteStr(conv::Itoa(i))
+		buf.WriteStr("(")
+		buf.WriteStr(s)
+		buf.WriteStr(")")
+	}
+
+	// Handles copy semantics by s and t.
+	// Assumes s parameter is expression string and t is it's kind.
+	// Always handles, no checking to determine whether s is lvalue.
+	fn handleCopyS(mut &self, s: str, mut &t: &sema::TypeKind) {
+		self.handleCopySB(self.oc.Buf, s, t)
+	}
+
+	// Handles copy semantics by m.
+	// Writes expression model but if it required copy semantics, will be applied.
+	// Only applies copy semantics if model is lvalue.
+	fn handleCopy(mut &self, mut m: compExprModel) {
+		mut kind := obj::IsLvalueModel(m)
+		if kind == nil || !obj::TypeHaveSpecialCopy(kind) {
+			self.oc.ec.possibleRefExpr(m)
+			ret
+		}
+		i := self.oc.pushCopy(kind)
+		self.oc.write(copyFuncIdentPrefix)
+		self.oc.write(conv::Itoa(i))
+		self.oc.write("(&")
+		self.oc.ec.possibleRefExpr(m)
+		self.oc.write(")")
 	}
 
 	// Generates C++ code of scope.
@@ -1507,4 +1643,23 @@ fn isForwarded(&s: &Scope): bool {
 		}
 	}
 	ret obj::IsForwarded(s)
+}
+
+// Returns indexing expression if model is map indexing, returns nil otherwise.
+fn isMapIndexing(mut m: compExprModel): (&IndexingExprModel, safe: bool) {
+	match type m {
+	| &opt::UnsafeIndexingExprModel:
+		mut node := (&opt::UnsafeIndexingExprModel)(m).Node
+		if node.Expr.Kind.Map() == nil {
+			break
+		}
+		ret node, false
+	| &IndexingExprModel:
+		mut node := (&IndexingExprModel)(m)
+		if node.Expr.Kind.Map() == nil {
+			break
+		}
+		ret node, true
+	}
+	ret nil, false
 }

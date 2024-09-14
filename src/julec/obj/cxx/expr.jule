@@ -499,7 +499,7 @@ impl exprCoder {
 	}
 
 	fn castTraitFromTrait(mut &self, mut &m: &CastingExprModel, mut t1: &Trait, mut t2: &Trait) {
-		self.possibleRefExpr(m.Expr.Model)
+		self.oc.sc.handleCopy(m.Expr.Model)
 		self.oc.write(".map(")
 		self.oc.pushAndWriteMaskMapper(t1, t2)
 		self.oc.write(")")
@@ -537,13 +537,22 @@ impl exprCoder {
 				}
 				fall
 			|:
-				self.possibleRefExpr(m.Expr.Model)
+				self.oc.sc.handleCopy(m.Expr.Model)
 			}
 			self.oc.write(", &" + anyTypeIdent)
 			self.oc.write(conv::Itoa(i))
 			self.oc.write(")")
 			ret
 		| obj::IsAny(m.ExprKind):
+			const resultVar = "__jule_result"
+			needCopy := obj::TypeHaveSpecialCopy(m.Kind)
+			if needCopy {
+				self.oc.write("({ ")
+				self.oc.tc.kind(self.oc.Buf, m.Kind)
+				self.oc.write(" ")
+				self.oc.write(resultVar)
+				self.oc.write(" = ")
+			}
 			self.possibleRefExpr(m.Expr.Model)
 			self.oc.write(".")
 			if m.Kind.Sptr() != nil {
@@ -562,6 +571,11 @@ impl exprCoder {
 			self.oc.write("&" + anyTypeIdent)
 			self.oc.write(conv::Itoa(self.oc.pushAnyType(m.Kind)))
 			self.oc.write(")")
+			if needCopy {
+				self.oc.write("; (")
+				self.oc.sc.handleCopyS("&" + resultVar, m.Kind)
+				self.oc.write("); })")
+			}
 			ret
 		| m.ExprKind.Ptr() != nil
 		| m.Kind.Ptr() != nil:
@@ -575,6 +589,15 @@ impl exprCoder {
 			if m.Kind.Trait() != nil {
 				self.castTraitFromTrait(m, m.Kind.Trait(), m.ExprKind.Trait())
 				ret
+			}
+			const resultVar = "__jule_result"
+			needCopy := obj::TypeHaveSpecialCopy(m.Kind)
+			if needCopy {
+				self.oc.write("({ ")
+				self.oc.tc.kind(self.oc.Buf, m.Kind)
+				self.oc.write(" ")
+				self.oc.write(resultVar)
+				self.oc.write(" = ")
 			}
 			self.possibleRefExpr(m.Expr.Model)
 			self.oc.write(".")
@@ -596,11 +619,16 @@ impl exprCoder {
 			self.oc.write("_mptr_data")
 			self.oc.write(conv::Itoa(obj::FindTraitTypeOffset(m.ExprKind.Trait(), m.Kind)))
 			self.oc.write(")")
+			if needCopy {
+				self.oc.write("; (")
+				self.oc.sc.handleCopyS("&" + resultVar, m.Kind)
+				self.oc.write("); })")
+			}
 			ret
 		| m.Kind.Trait() != nil:
 			self.oc.tc.kind(self.oc.Buf, m.Kind)
 			self.oc.write("(")
-			self.possibleRefExpr(m.Expr.Model)
+			self.oc.sc.handleCopy(m.Expr.Model)
 			self.oc.write(", (" + typeCoder.Trait + "::Type*)&")
 			identCoder.traitDecl(self.oc.Buf, m.Kind.Trait())
 			self.oc.write("_mptr_data")
@@ -649,7 +677,7 @@ impl exprCoder {
 				self.oc.write(")")
 				goto end
 			}
-			self.possibleRefExpr(arg)
+			self.oc.sc.handleCopy(arg)
 		end:
 			if len(m.Args)-i > 1 {
 				self.oc.write(", ")
@@ -731,13 +759,6 @@ impl exprCoder {
 		ret false
 	}
 
-	fn writeWrapped(mut &self, mut &m: &FnCallExprModel) {
-		mut ssie := (&StructSubIdentExprModel)(m.Expr)
-		self.oc.write("({ auto _wrap_copy = ")
-		self.model(ssie.Expr.Model)
-		self.oc.write("; ")
-	}
-
 	fn writeReceiverTrait(mut &self, mut &m: &TraitSubIdentExprModel): (drop: bool, deref: bool, safeDeref: bool) {
 		safeDeref = true
 		let mut model: compExprModel = m.Expr.Model
@@ -758,28 +779,28 @@ impl exprCoder {
 			|:
 				// Expression come from safe place.
 				// Handle it in ordinary way.
-				self.possibleRefExpr(uem.Expr.Model)
+				self.oc.sc.handleCopy(uem.Expr.Model)
 				self.oc.write("; ")
 				drop = false
 				deref = true
 				ret
 			}
 			// guaranteed: type abviously needs to be dropped
-			self.possibleRefExpr(uem.Expr.Model)
+			self.oc.sc.handleCopy(uem.Expr.Model)
 			self.oc.write("; ")
 			drop = obj::TypeHaveSpecialDrop(uem.Expr.Kind) // make sure type able to drop
 			deref = true
 			ret
 		| &FnCallExprModel:
 			// guaranteed: type abviously needs to be dropped
-			self.possibleRefExpr(model)
+			self.oc.sc.handleCopy(model)
 			self.oc.write("; ")
 			drop = true
 			deref = false
 			ret
 		|:
 			// handle like ordinary expression
-			self.possibleRefExpr(model)
+			self.oc.sc.handleCopy(model)
 			self.oc.write("; ")
 			drop = false
 			deref = false
@@ -807,21 +828,21 @@ impl exprCoder {
 			|:
 				// Expression come from safe place.
 				// Handle it in ordinary way.
-				self.possibleRefExpr(uem.Expr.Model)
+				self.oc.sc.handleCopy(uem.Expr.Model)
 				self.oc.write("; ")
 				drop = false
 				deref = true
 				ret
 			}
 			// guaranteed: type abviously needs to be dropped
-			self.possibleRefExpr(uem.Expr.Model)
+			self.oc.sc.handleCopy(uem.Expr.Model)
 			self.oc.write("; ")
 			drop = obj::TypeHaveSpecialDrop(uem.Expr.Kind) // make sure type able to drop
 			deref = true
 			ret
 		| &FnCallExprModel:
 			// guaranteed: type abviously needs to be dropped
-			self.possibleRefExpr(model)
+			self.oc.sc.handleCopy(model)
 			self.oc.write("; ")
 			drop = true
 			deref = false
@@ -840,10 +861,10 @@ impl exprCoder {
 				}
 			}
 			if m.Expr.Kind.Ptr() == nil {
-				self.model(m.Expr.Model)
+				self.oc.sc.handleCopy(m.Expr.Model)
 			} else {
 				// Ignore dereferencing, use data directly to call method.
-				self.possibleRefExpr((&UnaryExprModel)(m.Expr.Model).Expr.Model)
+				self.oc.sc.handleCopy((&UnaryExprModel)(m.Expr.Model).Expr.Model)
 			}
 			self.oc.write("; ")
 			ret
@@ -917,8 +938,12 @@ impl exprCoder {
 			} else {
 				// pointer receiver
 				if deref {
+					sptr := recvKind.Sptr() != nil
+					if !sptr {
+						self.oc.write("&")
+					}
 					self.oc.write(recvVar)
-					if rp.Kind.Sptr() != nil {
+					if sptr {
 						// smart pointer passed to pointer receiver
 						// convert it pointer safely
 						if safeDeref {
@@ -957,93 +982,6 @@ impl exprCoder {
 			}
 			self.oc.write("; })")
 		}
-		/*wrapped := self.isWrapped(m)
-		self.modelForCall(m.Expr)
-		if !m.Func.IsBuiltin() {
-			if m.Func.Decl.Binded && len(m.Func.Generics) > 0 {
-				if !obj::HasDirective(m.Func.Decl.Directives, Directive.Cdef) {
-					self.oc.write("<")
-					for (i, mut g) in m.Func.Generics {
-						self.oc.tc.kind(self.oc.Buf, g.Kind)
-						if len(m.Func.Generics)-i > 1 {
-							self.oc.write(", ")
-						}
-					}
-					self.oc.write(">")
-				}
-			}
-		}
-		self.pushCallInf(m)
-		if m.Func.AsAnon && !m.Func.Anon {
-			// Function used as anonymous.
-			// So pass nullptr to ctx parameter.
-			// Do not pass nullptr if function is anonymous,
-			// beacause it stores ctx data internally and it will pass.
-			self.oc.write("nullptr")
-			if len(m.Args) > 0 {
-				self.oc.write(", ")
-			}
-		}
-		if recv {
-			match type m.Expr {
-			| &StructSubIdentExprModel:
-				mut ssie := (&StructSubIdentExprModel)(m.Expr)
-				match {
-				| m.Func.Decl.Params[0].IsRef():
-					// Ignore dereferencing, use data directly to call method.
-					_ = self.writeReceiver(ssie.Expr.Model)
-				| ssie.Expr.Kind.Sptr() != nil:
-					// Ignore dereferencing, use data directly to call [ptr] method.
-					safe := self.writeReceiver(ssie.Expr.Model)
-					if safe {
-						self.oc.write(".ptr(")
-						if !env::Production {
-							self.oc.write("\"")
-							self.oc.locInfo(m.Token)
-							self.oc.write("\"")
-						}
-						self.oc.write(")")
-					}
-				|:
-					if ssie.Expr.Kind.Struct() != nil {
-						match type ssie.Expr.Model {
-						| &Var:
-							v := (&Var)(ssie.Expr.Model)
-							if v.Reference {
-								break
-							}
-							fall
-						|:
-							// Add address taking operation for non-pointers.
-							self.oc.write("&")
-						}
-					}
-					if wrapped {
-						self.oc.write("_wrap_copy")
-					} else if ssie.Expr.Kind.Ptr() == nil {
-						self.model(ssie.Expr.Model)
-					} else {
-						// Ignore dereferencing, use data directly to call method.
-						self.possibleRefExpr((&UnaryExprModel)(ssie.Expr.Model).Expr.Model)
-					}
-				}
-				if len(m.Args) > 0 {
-					self.oc.write(", ")
-				}
-			| &TraitSubIdentExprModel:
-				self.possibleRefExpr((&TraitSubIdentExprModel)(m.Expr).Expr.Model)
-				self.oc.write(".data")
-				if len(m.Args) > 0 {
-					self.oc.write(", ")
-				}
-			}
-		}
-		self.args(m)
-		self.oc.write(")")
-
-		if wrapped {
-			self.oc.write("; })")
-		}*/
 	}
 
 	fn coFuncCall(mut &self, mut &m: &FnCallExprModel) {
@@ -1052,7 +990,20 @@ impl exprCoder {
 		mut head := StrBuilder.New(1 << 5)
 		head.WriteStr("std::thread([")
 		if m.Func.Owner != nil {
-			head.WriteStr(identCoder.Self)
+			rp := m.Func.Params[0]
+			if isTraitRecv(rp) {
+				mut recvType := &sema::TypeKind{
+					Kind: &sema::Sptr{
+						Elem: &sema::TypeKind{
+							Kind: &sema::Prim{Kind: types::TypeKind.Uintptr},
+						},
+					},
+				}
+				self.oc.sc.handleCopySB(head, identCoder.Self, recvType)
+			} else {
+				mut recvType := &sema::TypeKind{Kind: m.Func.Owner}
+				self.oc.sc.handleCopySB(head, identCoder.Self, recvType)
+			}
 			if len(m.Args) > 0 {
 				head.WriteStr(", ")
 			}
@@ -1060,12 +1011,6 @@ impl exprCoder {
 		for i, arg in m.Args {
 			if i > 0 {
 				head.WriteStr(", ")
-			}
-			match type arg {
-			| &Var:
-				mut v := (&Var)(arg)
-				identCoder.var(head, v)
-				continue
 			}
 			name := "_co_arg_" + conv::Itoa(i)
 			head.WriteStr(name)
@@ -1077,7 +1022,7 @@ impl exprCoder {
 			}
 			self.oc.write(name)
 			self.oc.write(" = ")
-			self.possibleRefExpr(arg)
+			self.oc.sc.handleCopy(arg)
 			self.oc.write(";\n")
 			argS := any(name)
 			m.Args[i] = unsafe { *(*ExprModel)(&argS) }
@@ -1099,7 +1044,7 @@ impl exprCoder {
 
 	fn writeUseExpr(mut &self, mut &f: &FnIns, mut d: &Data) {
 		if d.Kind.Tup() == nil {
-			self.possibleRefExpr(d.Model)
+			self.oc.sc.handleCopy(d.Model)
 			self.oc.write(";")
 			ret
 		}
@@ -1110,12 +1055,34 @@ impl exprCoder {
 			self.oc.write("." + resultArgName)
 			self.oc.write(conv::Itoa(i))
 			self.oc.write("=")
-			self.possibleRefExpr(data.Model)
+			self.oc.sc.handleCopy(data.Model)
 			if len(tup.Datas)-i > 1 {
 				self.oc.write(", ")
 			}
 		}
 		self.oc.write("};")
+	}
+
+	fn handleResultCopy(mut &self, mut &t: &TypeKind) {
+		mut tup := t.Tup()
+		if tup == nil {
+			if obj::TypeHaveSpecialCopy(t) {
+				self.oc.sc.handleCopyS("(&except.result)", t)
+				ret
+			}
+			self.oc.write("(except.result)")
+			ret
+		}
+		self.oc.write("({")
+		for (i, mut tupt) in tup.Types {
+			if obj::TypeHaveSpecialCopy(tupt) {
+				mut r := "&except.result." + resultArgName
+				r += conv::Itoa(i)
+				self.oc.sc.handleCopyS(r, tupt)
+				self.oc.write("; ")
+			}
+		}
+		self.oc.write("(except.result); })")
 	}
 
 	fn funcCall(mut &self, mut m: &FnCallExprModel) {
@@ -1148,7 +1115,9 @@ impl exprCoder {
 				}
 			} else {
 				forwarded := obj::IsForwarded(m.Except)
-				self.oc.write("(except.ok()) ? (except.result) : (")
+				self.oc.write("(except.ok()) ? ")
+				self.handleResultCopy(m.Func.Result)
+				self.oc.write(" : (")
 				if forwarded {
 					self.oc.write("{")
 				}
@@ -1186,7 +1155,8 @@ impl exprCoder {
 					self.oc.sc.dropResult("except.result", m.Func.Result)
 				}
 				self.oc.indent()
-				self.oc.write("(except.result);\n")
+				self.handleResultCopy(m.Func.Result)
+				self.oc.write("\n")
 			}
 			self.oc.doneIndent()
 		}
@@ -1217,10 +1187,49 @@ impl exprCoder {
 			self.oc.write("(*")
 			self.oc.write(collectionItIdent)
 			self.oc.write("++) = ")
-			self.possibleRefExpr(m.Elems[i])
+			self.oc.sc.handleCopy(m.Elems[i])
 			self.oc.write("; ")
 		}
 		self.oc.write(collectionIdent)
+		self.oc.write("; })")
+	}
+
+	fn mapIndexing(mut &self, mut &m: &IndexingExprModel) {
+		const valueIdent = "__lookup_val"
+		const okIdent = "__lookup_ok"
+		mut _map := m.Expr.Kind.Map()
+		self.oc.write("({ ")
+		self.oc.tc.kind(self.oc.Buf, _map.Val)
+		self.oc.write(" ")
+		self.oc.write(valueIdent)
+		self.oc.write("; ")
+		self.oc.write(typeCoder.Bool)
+		self.oc.write(" ")
+		self.oc.write(okIdent)
+		self.oc.write("; ")
+		self.possibleRefExpr(m.Expr.Model)
+		self.oc.write(".lookup(")
+		self.possibleRefExpr(m.Index.Model)
+		self.oc.write(", &")
+		self.oc.write(valueIdent)
+		self.oc.write(", &")
+		self.oc.write(okIdent)
+		self.oc.write("); ")
+		if ableToInit(_map.Val) {
+			// Assign to default value if key is not exist and able to init.
+			self.oc.write("if (!")
+			self.oc.write(okIdent)
+			self.oc.write(") ")
+			self.oc.write(valueIdent)
+			self.oc.write(" = ")
+			self.initExpr(_map.Val)
+			self.oc.write("; ")
+		}
+		if obj::TypeHaveSpecialCopy(_map.Val) {
+			self.oc.sc.handleCopyS("&" + valueIdent, _map.Val)
+		} else {
+			self.oc.write(valueIdent)
+		}
 		self.oc.write("; })")
 	}
 
@@ -1248,52 +1257,55 @@ impl exprCoder {
 		// Index access with safety measures.
 		match {
 		| m.Expr.Kind.Map() != nil:
-			const valueIdent = "__lookup_val"
-			const okIdent = "__lookup_ok"
-			mut _map := m.Expr.Kind.Map()
-			self.oc.write("({ ")
-			self.oc.tc.kind(self.oc.Buf, _map.Val)
-			self.oc.write(" ")
-			self.oc.write(valueIdent)
-			self.oc.write("; ")
-			self.oc.write(typeCoder.Bool)
-			self.oc.write(" ")
-			self.oc.write(okIdent)
-			self.oc.write("; ")
-			self.possibleRefExpr(m.Expr.Model)
-			self.oc.write(".lookup(")
-			self.possibleRefExpr(m.Index.Model)
-			self.oc.write(", &")
-			self.oc.write(valueIdent)
-			self.oc.write(", &")
-			self.oc.write(okIdent)
-			self.oc.write("); ")
-			if ableToInit(_map.Val) {
-				// Assign to default value if key is not exist and able to init.
-				self.oc.write("if (!")
-				self.oc.write(okIdent)
-				self.oc.write(") ")
-				self.oc.write(valueIdent)
-				self.oc.write(" = ")
-				self.initExpr(_map.Val)
-				self.oc.write("; ")
-			}
-			self.oc.write(valueIdent)
-			self.oc.write("; })")
-		| env::Production
-		| m.Expr.Kind.Ptr() != nil
+			self.mapIndexing(m)
 		| obj::IsExprComesFromBind(m.Expr):
 			self.possibleRefExpr(m.Expr.Model)
 			self.oc.write("[")
 			self.possibleRefExpr(m.Index.Model)
 			self.oc.write("]")
+		| env::Production
+		| m.Expr.Kind.Ptr() != nil:
+			const tempVar = "__jule_temp"
+			mut t := getElemKind(m.Expr.Kind)
+			needCopy := obj::TypeHaveSpecialCopy(t)
+			if needCopy {
+				self.oc.write("({ ")
+				self.oc.tc.kind(self.oc.Buf, t)
+				self.oc.write(" ")
+				self.oc.write(tempVar)
+				self.oc.write(" = ")
+			}
+			self.possibleRefExpr(m.Expr.Model)
+			self.oc.write("[")
+			self.possibleRefExpr(m.Index.Model)
+			self.oc.write("]")
+			if needCopy {
+				self.oc.write("; ")
+				self.oc.sc.handleCopyS("&" + tempVar, t)
+				self.oc.write("; })")
+			}
 		|:
+			const tempVar = "__jule_temp"
+			mut t := getElemKind(m.Expr.Kind)
+			needCopy := obj::TypeHaveSpecialCopy(t)
+			if needCopy {
+				self.oc.write("({ ")
+				self.oc.tc.kind(self.oc.Buf, t)
+				self.oc.write(" ")
+				self.oc.write(tempVar)
+				self.oc.write(" = ")
+			}
 			self.possibleRefExpr(m.Expr.Model)
 			self.oc.write(".at(\"")
 			self.oc.locInfo(m.Token)
 			self.oc.write("\", ")
 			self.possibleRefExpr(m.Index.Model)
 			self.oc.write(")")
+			if needCopy {
+				self.oc.write("; ")
+				self.oc.sc.handleCopyS("&" + tempVar, t)
+				self.oc.write("; })")
+			}
 		}
 	}
 
@@ -1301,16 +1313,45 @@ impl exprCoder {
 		self.possibleRefExpr(m.Node.Expr.Model)
 		// Index access with safety measures.
 		match {
-		| env::Production
-		| m.Node.Expr.Kind.Ptr() != nil
 		| m.Node.Expr.Kind.Map() != nil:
+			self.mapIndexing(m.Node)
+		| env::Production
+		| m.Node.Expr.Kind.Ptr() != nil:
+			const tempVar = "__jule_temp"
+			mut t := getElemKind(m.Node.Expr.Kind)
+			needCopy := obj::TypeHaveSpecialCopy(t)
+			if needCopy {
+				self.oc.write("({ ")
+				self.oc.tc.kind(self.oc.Buf, t)
+				self.oc.write(tempVar)
+				self.oc.write(" = ")
+			}
 			self.oc.write("[")
 			self.possibleRefExpr(m.Node.Index.Model)
 			self.oc.write("]")
+			if needCopy {
+				self.oc.write("; ")
+				self.oc.sc.handleCopyS(tempVar, t)
+				self.oc.write(" });")
+			}
 		|:
+			const tempVar = "__jule_temp"
+			mut t := getElemKind(m.Node.Expr.Kind)
+			needCopy := obj::TypeHaveSpecialCopy(t)
+			if needCopy {
+				self.oc.write("({ ")
+				self.oc.tc.kind(self.oc.Buf, t)
+				self.oc.write(tempVar)
+				self.oc.write(" = ")
+			}
 			self.oc.write(".__at(")
 			self.possibleRefExpr(m.Node.Index.Model)
 			self.oc.write(")")
+			if needCopy {
+				self.oc.write("; ")
+				self.oc.sc.handleCopyS(tempVar, t)
+				self.oc.write(" });")
+			}
 		}
 	}
 
@@ -1332,7 +1373,11 @@ impl exprCoder {
 				self.oc.write(".")
 				identCoder.var(self.oc.Buf, v)
 				self.oc.write("=")
-				self.var(v)
+				if v.Reference {
+					self.var(v)
+				} else {
+					self.oc.sc.handleCopy(v)
+				}
 				if len(m.Captured)-i > 1 {
 					self.oc.write(",")
 				}
@@ -1354,9 +1399,9 @@ impl exprCoder {
 		if len(m.Entries) > 0 {
 			for (i, mut pair) in m.Entries {
 				self.oc.write("{")
-				self.possibleRefExpr(pair.Key)
+				self.oc.sc.handleCopy(pair.Key)
 				self.oc.write(",")
-				self.possibleRefExpr(pair.Val)
+				self.oc.sc.handleCopy(pair.Val)
 				self.oc.write("}")
 				if len(m.Entries)-i > 1 {
 					self.oc.write(",")
@@ -1367,7 +1412,9 @@ impl exprCoder {
 	}
 
 	fn slicing(mut &self, mut m: &SlicingExprModel) {
-		self.possibleRefExpr(m.Expr)
+		// slicable types are always have special copy semantics but not affects elements
+		// so apply copy semantics to base expression directly
+		self.oc.sc.handleCopy(m.Expr)
 		self.oc.write(".slice(")
 		if !env::Production {
 			self.oc.write("\"")
@@ -1567,15 +1614,6 @@ impl exprCoder {
 			ret
 		}
 
-		// Filled.
-		if len(m.Elems) == 2 && m.Elems[1] == nil {
-			self.oc.tc.array(self.oc.Buf, m.Kind)
-			self.oc.write("(")
-			self.possibleRefExpr(m.Elems[0])
-			self.oc.write(")")
-			ret
-		}
-
 		self.oc.write("({ auto " + collectionIdent + " = ")
 		self.oc.tc.array(self.oc.Buf, m.Kind)
 		self.oc.write("(); auto ")
@@ -1583,6 +1621,29 @@ impl exprCoder {
 		self.oc.write(" = ")
 		self.oc.write(collectionIdent)
 		self.oc.write(".begin(); ")
+
+		// Filled.
+		if len(m.Elems) == 2 && m.Elems[1] == nil {
+			const elemVar = "elemVar"
+			self.oc.tc.kind(self.oc.Buf, m.Kind.Elem)
+			self.oc.write(" ")
+			self.oc.write(elemVar)
+			self.oc.write(" = ")
+			self.possibleRefExpr(m.Elems[0])
+			self.oc.write("; ")
+			mut i := 0
+			for i < m.Kind.N; i++ {
+				self.oc.write(" (*")
+				self.oc.write(collectionItIdent)
+				self.oc.write("++) = ")
+				self.oc.sc.handleCopyS("&" + elemVar, m.Kind.Elem)
+				self.oc.write("; ")
+			}
+			self.oc.write(collectionIdent)
+			self.oc.write("; });")
+			ret
+		}
+
 		if len(m.Elems) != m.Kind.N {
 			// Define end pointer for remainders.
 			self.oc.write("const auto ")
@@ -1595,7 +1656,7 @@ impl exprCoder {
 			self.oc.write("(*")
 			self.oc.write(collectionItIdent)
 			self.oc.write("++) = ")
-			self.possibleRefExpr(m.Elems[i])
+			self.oc.sc.handleCopy(m.Elems[i])
 			self.oc.write("; ")
 		}
 		if len(m.Elems) != m.Kind.N && ableToInit(m.Kind.Elem) {
@@ -1627,6 +1688,7 @@ impl exprCoder {
 	}
 
 	fn tuple(mut &self, mut m: &TupleExprModel) {
+		// this function should fine with no-copy or drop semantics
 		for (i, mut d) in m.Datas {
 			self.possibleRefExpr(d.Model)
 			self.oc.write(";")
@@ -1642,7 +1704,7 @@ impl exprCoder {
 		self.oc.tc.kind(self.oc.Buf, m.Kind)
 		self.oc.write(">(")
 		if m.Init != nil {
-			self.possibleRefExpr(m.Init)
+			self.oc.sc.handleCopy(m.Init)
 		} else if ableToInit(m.Kind) {
 			self.initExpr(m.Kind)
 		}
@@ -1669,7 +1731,7 @@ impl exprCoder {
 
 	fn panicCall(mut &self, mut m: &BuiltinPanicCallExprModel) {
 		self.oc.write("jule::panic(")
-		self.possibleRefExpr(m.Expr)
+		self.oc.sc.handleCopy(m.Expr)
 		self.oc.write(` + jule::Str("\nlocation: `)
 		self.oc.locInfo(m.Token)
 		self.oc.write("\"));")
@@ -1713,7 +1775,7 @@ impl exprCoder {
 			}
 			self.oc.write(">{.error=" + typeCoder.Any + "(")
 		}
-		self.possibleRefExpr(m.Err.Model)
+		self.oc.sc.handleCopy(m.Err.Model)
 		i := self.oc.pushAnyType(m.Err.Kind)
 		self.oc.write(", &" + anyTypeIdent)
 		self.oc.write(conv::Itoa(i))
@@ -1721,11 +1783,49 @@ impl exprCoder {
 	}
 
 	fn copyCall(mut &self, mut m: &BuiltinCopyCallExprModel) {
-		self.oc.write("jule::copy(")
+		// Use destination parameter as slice.
+		// Because source parameter may take non-slice type with compatible elements.
+		// Such as; copy([]byte, str)
+		mut slice := m.Dest.Kind.Slc()
+		mut elem := slice.Elem
+		needCopy := obj::TypeHaveSpecialCopy(elem)
+		if !needCopy {
+			self.oc.write("jule::copy(")
+			self.possibleRefExpr(m.Dest.Model)
+			self.oc.write(", ")
+			self.possibleRefExpr(m.Src.Model)
+			self.oc.write(")")
+			ret
+		}
+		// make inline copy call with copy semantics
+		self.oc.write("({\n")
+		self.oc.addIndent()
+		self.oc.indent()
+		self.oc.tc.kind(self.oc.Buf, m.Dest.Kind)
+		self.oc.write(" dest = ")
 		self.possibleRefExpr(m.Dest.Model)
-		self.oc.write(", ")
+		self.oc.write(";\n")
+		self.oc.indent()
+		self.oc.tc.kind(self.oc.Buf, m.Dest.Kind)
+		self.oc.write(" src = ")
 		self.possibleRefExpr(m.Src.Model)
-		self.oc.write(")")
+		self.oc.write(";\n")
+		self.oc.indent()
+		self.oc.write("const ")
+		self.oc.write(typeCoder.Int)
+		self.oc.write(" len = src.len() > dest.len() ? dest.len() : src.len();\n")
+		self.oc.indent()
+		self.oc.tc.kind(self.oc.Buf, elem)
+		self.oc.write(" *dp = dest._slice, *sp = src._slice, *ep = dest._slice + len;\n")
+		self.oc.indent()
+		self.oc.write("while (dp < ep) { *dp = ")
+		self.oc.sc.handleCopyS("sp", elem)
+		self.oc.write("; dp++; sp++; }\n")
+		self.oc.indent()
+		self.oc.write("(len);\n")
+		self.oc.doneIndent()
+		self.oc.indent()
+		self.oc.write("})")
 	}
 
 	fn lenCall(mut &self, mut m: &BuiltinLenCallExprModel) {
@@ -1825,7 +1925,7 @@ impl exprCoder {
 			} else {
 				self.oc.write(destIdent + ".push(")
 			}
-			self.possibleRefExpr(m.Elems.Elems[0])
+			self.oc.sc.handleCopy(m.Elems.Elems[0])
 			self.oc.write("); }")
 			ret
 		}
@@ -1846,7 +1946,7 @@ impl exprCoder {
 			} else {
 				self.oc.write(".__push(")
 			}
-			self.possibleRefExpr(e)
+			self.oc.sc.handleCopy(e)
 			self.oc.write("); ")
 		}
 		self.oc.write("}")
@@ -1856,7 +1956,7 @@ impl exprCoder {
 		self.oc.write("(")
 		self.possibleRefExpr(m.Dest)
 		self.oc.write(").append(")
-		self.possibleRefExpr(m.Slice)
+		self.oc.sc.handleCopy(m.Slice)
 		self.oc.write(");")
 	}
 
@@ -1864,7 +1964,7 @@ impl exprCoder {
 		self.oc.write("jule::append(")
 		self.possibleRefExpr(m.Dest)
 		self.oc.write(",")
-		self.possibleRefExpr(m.Elements)
+		self.oc.sc.handleCopy(m.Elements)
 		self.oc.write(")")
 	}
 
@@ -1957,9 +2057,24 @@ impl exprCoder {
 	fn unsafeDeref(mut &self, mut m: &UnsafeDerefExprModel) {
 		match {
 		| m.Base.Expr.Kind.Sptr() != nil:
+			const resultVar = "__jule_result"
+			mut t := m.Base.Expr.Kind.Sptr().Elem
+			needCopy := obj::TypeHaveSpecialCopy(t)
+			if needCopy {
+				self.oc.write("({ ")
+				self.oc.tc.kind(self.oc.Buf, t)
+				self.oc.write(" ")
+				self.oc.write(resultVar)
+				self.oc.write(" = ")
+			}
 			self.oc.write("(*")
 			self.possibleRefExpr(m.Base.Expr.Model)
 			self.oc.write(".alloc)")
+			if needCopy {
+				self.oc.write("; (")
+				self.oc.sc.handleCopyS("&" + resultVar, t)
+				self.oc.write("); })")
+			}
 		|:
 			panic("implementation mistake, this panic call should be unreachable")
 		}
@@ -1968,6 +2083,15 @@ impl exprCoder {
 	fn unsafeCasting(mut &self, mut m: &UnsafeCastingExprModel) {
 		match {
 		| obj::IsAny(m.Base.ExprKind):
+			const resultVar = "__jule_result"
+			needCopy := obj::TypeHaveSpecialCopy(m.Base.Kind)
+			if needCopy {
+				self.oc.write("({ ")
+				self.oc.tc.kind(self.oc.Buf, m.Base.Kind)
+				self.oc.write(" ")
+				self.oc.write(resultVar)
+				self.oc.write(" = ")
+			}
 			self.possibleRefExpr(m.Base.Expr.Model)
 			if m.Base.Kind.Sptr() != nil {
 				self.oc.write(".unsafe_cast_ptr<")
@@ -1977,6 +2101,11 @@ impl exprCoder {
 				self.oc.tc.kind(self.oc.Buf, m.Base.Kind)
 			}
 			self.oc.write(">()")
+			if needCopy {
+				self.oc.write("; (")
+				self.oc.sc.handleCopyS("&" + resultVar, m.Base.Kind)
+				self.oc.write("); })")
+			}
 		|:
 			panic("implementation mistake, this panic call should be unreachable")
 		}
@@ -2093,7 +2222,7 @@ impl exprCoder {
 			self.oc.write(".")
 			identCoder.field(self.oc.Buf, f.Decl)
 			self.oc.write("=")
-			self.possibleRefExpr(f.Default.Model)
+			self.oc.sc.handleCopy(f.Default.Model)
 			ret true
 		}
 		if !ableToInit(f.Kind) {

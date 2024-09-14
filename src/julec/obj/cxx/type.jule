@@ -38,6 +38,12 @@ static mut anyKind = &TypeKind{
 	},
 }
 
+static mut primByte = &TypeKind{
+	Kind: &Prim{
+		Kind: types::TypeKind.U8,
+	},
+}
+
 struct customType {
 	kind: str
 }
@@ -505,4 +511,35 @@ fn shouldInitialized(mut &t: &TypeKind): bool {
 	|:
 		ret true
 	}
+}
+
+// Returns element kind of t.
+// Returns nil if type have not element type.
+fn getElemKind(mut &t: &TypeKind): &TypeKind {
+	mut ptr := t.Ptr()
+	if ptr != nil {
+		if ptr.IsUnsafe() {
+			ret nil
+		}
+		ret ptr.Elem
+	}
+	mut sptr := t.Sptr()
+	if sptr != nil {
+		ret sptr.Elem
+	}
+	mut arr := t.Arr()
+	if arr != nil {
+		ret arr.Elem
+	}
+	mut slice := t.Slc()
+	if slice != nil {
+		ret slice.Elem
+	}
+	mut prim := t.Prim()
+	if prim != nil {
+		if prim.IsStr() {
+			ret primByte
+		}
+	}
+	ret nil
 }
