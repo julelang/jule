@@ -813,13 +813,53 @@ impl exprCoder {
 		let mut model: compExprModel = m.Expr.Model
 		match type model {
 		| &UnsafeDerefExprModel:
+			safeDeref = false
+			model = (&UnsafeDerefExprModel)(model).Base
+		| &UnaryExprModel:
+			deref = true
+			mut uem := (&UnaryExprModel)(model)
+			if uem.Expr.Kind.Sptr() != nil {
+				// Avoid dereferencing of smart pointer.
+				self.oc.sc.handleCopy(uem.Expr.Model)
+				self.oc.write("; ")
+				ret
+			}
+		}
+		self.oc.sc.handleCopy(m.Expr.Model)
+		self.oc.write("; ")
+		ret
+		/*safeDeref = true
+		let mut model: compExprModel = m.Expr.Model
+		match type model {
+		| &UnsafeDerefExprModel:
 			mut udem := (&UnsafeDerefExprModel)(model)
+			if udem.Base.Op.Id == TokenId.Amper {
+				// Expression come from safe place.
+				// Handle it in ordinary way.
+				self.oc.sc.handleCopy(m.Expr.Model)
+				self.oc.write("; ")
+				drop = false
+				deref = true
+				ret
+			}
+			// should be guaranteed: uem.Op.Id == TokenId.Star
 			model = udem.Base
 			safeDeref = false
 			fall
 		| &UnaryExprModel:
 			// Smart pointer dereferencing or something like that?
 			mut uem := (&UnaryExprModel)(model)
+			if uem.Op.Id == TokenId.Amper {
+				// Expression come from safe place.
+				// Handle it in ordinary way.
+				self.oc.sc.handleCopy(m.Expr.Model)
+				self.oc.write("; ")
+				drop = false
+				deref = true
+				ret
+			}
+			// should be guaranteed: uem.Op.Id == TokenId.Star
+
 			match type uem.Expr.Model {
 			| &FnCallExprModel:
 				// Base expression comes from a function call.
@@ -868,7 +908,7 @@ impl exprCoder {
 			}
 			self.oc.write("; ")
 			ret
-		}
+		}*/
 	}
 
 	fn writeReceiver(mut &self, mut m: &FnCallExprModel, mut &recvKind: &TypeKind): (drop: bool, deref: bool, safeDeref: bool) {
@@ -940,6 +980,7 @@ impl exprCoder {
 				if deref {
 					sptr := recvKind.Sptr() != nil
 					if !sptr {
+						// take pointer or receiver if receiver is not already pointer
 						self.oc.write("&")
 					}
 					self.oc.write(recvVar)
@@ -1156,7 +1197,7 @@ impl exprCoder {
 				}
 				self.oc.indent()
 				self.handleResultCopy(m.Func.Result)
-				self.oc.write("\n")
+				self.oc.write(";\n")
 			}
 			self.oc.doneIndent()
 		}
@@ -1265,47 +1306,17 @@ impl exprCoder {
 			self.oc.write("]")
 		| env::Production
 		| m.Expr.Kind.Ptr() != nil:
-			const tempVar = "__jule_temp"
-			mut t := getElemKind(m.Expr.Kind)
-			needCopy := obj::TypeHaveSpecialCopy(t)
-			if needCopy {
-				self.oc.write("({ ")
-				self.oc.tc.kind(self.oc.Buf, t)
-				self.oc.write(" ")
-				self.oc.write(tempVar)
-				self.oc.write(" = ")
-			}
 			self.possibleRefExpr(m.Expr.Model)
 			self.oc.write("[")
 			self.possibleRefExpr(m.Index.Model)
 			self.oc.write("]")
-			if needCopy {
-				self.oc.write("; ")
-				self.oc.sc.handleCopyS("&" + tempVar, t)
-				self.oc.write("; })")
-			}
 		|:
-			const tempVar = "__jule_temp"
-			mut t := getElemKind(m.Expr.Kind)
-			needCopy := obj::TypeHaveSpecialCopy(t)
-			if needCopy {
-				self.oc.write("({ ")
-				self.oc.tc.kind(self.oc.Buf, t)
-				self.oc.write(" ")
-				self.oc.write(tempVar)
-				self.oc.write(" = ")
-			}
 			self.possibleRefExpr(m.Expr.Model)
 			self.oc.write(".at(\"")
 			self.oc.locInfo(m.Token)
 			self.oc.write("\", ")
 			self.possibleRefExpr(m.Index.Model)
 			self.oc.write(")")
-			if needCopy {
-				self.oc.write("; ")
-				self.oc.sc.handleCopyS("&" + tempVar, t)
-				self.oc.write("; })")
-			}
 		}
 	}
 
@@ -1317,41 +1328,13 @@ impl exprCoder {
 			self.mapIndexing(m.Node)
 		| env::Production
 		| m.Node.Expr.Kind.Ptr() != nil:
-			const tempVar = "__jule_temp"
-			mut t := getElemKind(m.Node.Expr.Kind)
-			needCopy := obj::TypeHaveSpecialCopy(t)
-			if needCopy {
-				self.oc.write("({ ")
-				self.oc.tc.kind(self.oc.Buf, t)
-				self.oc.write(tempVar)
-				self.oc.write(" = ")
-			}
 			self.oc.write("[")
 			self.possibleRefExpr(m.Node.Index.Model)
 			self.oc.write("]")
-			if needCopy {
-				self.oc.write("; ")
-				self.oc.sc.handleCopyS(tempVar, t)
-				self.oc.write(" });")
-			}
 		|:
-			const tempVar = "__jule_temp"
-			mut t := getElemKind(m.Node.Expr.Kind)
-			needCopy := obj::TypeHaveSpecialCopy(t)
-			if needCopy {
-				self.oc.write("({ ")
-				self.oc.tc.kind(self.oc.Buf, t)
-				self.oc.write(tempVar)
-				self.oc.write(" = ")
-			}
 			self.oc.write(".__at(")
 			self.possibleRefExpr(m.Node.Index.Model)
 			self.oc.write(")")
-			if needCopy {
-				self.oc.write("; ")
-				self.oc.sc.handleCopyS(tempVar, t)
-				self.oc.write(" });")
-			}
 		}
 	}
 

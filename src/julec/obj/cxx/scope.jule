@@ -219,12 +219,20 @@ impl scopeCoder {
 		mut ref := false
 		self.iterHead(it, ref, begin)
 		if it.KeyA != nil {
-			self.oc.varInitExpr(it.KeyA, fn() { self.handleCopyS("&it->first", unsafe { it.KeyA.Kind.Kind }) })
+			mut key := StrBuilder.New(20)
+			key.WriteStr("(")
+			self.oc.tc.kind(key, it.KeyA.Kind.Kind)
+			key.WriteStr("*)(&it->first)")
+			self.oc.varInitExpr(it.KeyA, fn() { self.handleCopyS(key.Str(), unsafe { it.KeyA.Kind.Kind }) })
 			self.oc.write("\n")
 			self.oc.indent()
 		}
 		if it.KeyB != nil {
-			self.oc.varInitExpr(it.KeyB, fn() { self.handleCopyS("&it->second", unsafe { it.KeyB.Kind.Kind }) })
+			mut val := StrBuilder.New(20)
+			val.WriteStr("(")
+			self.oc.tc.kind(val, it.KeyB.Kind.Kind)
+			val.WriteStr("*)(&it->first)")
+			self.oc.varInitExpr(it.KeyB, fn() { self.handleCopyS(val.Str(), unsafe { it.KeyB.Kind.Kind }) })
 			self.oc.write("\n")
 			self.oc.indent()
 		}
@@ -1052,6 +1060,7 @@ impl scopeCoder {
 		| &FnCallExprModel:
 			self.oc.write(resultName + " = ")
 			self.handleCopy(r.Expr)
+			self.oc.write("; ")
 		|:
 			panic("implementation mistake, this panic call should be unreachable")
 		}
@@ -1353,12 +1362,20 @@ impl scopeCoder {
 			self.oc.ec.possibleRefExpr(m)
 			ret
 		}
+		const tempVar = "__jule_temp"
 		i := self.oc.pushCopy(kind)
+		self.oc.write("({ ")
+		self.oc.tc.kind(self.oc.Buf, kind)
+		self.oc.write(" ")
+		self.oc.write(tempVar)
+		self.oc.write(" = ")
+		self.oc.ec.possibleRefExpr(m)
+		self.oc.write("; ")
 		self.oc.write(copyFuncIdentPrefix)
 		self.oc.write(conv::Itoa(i))
 		self.oc.write("(&")
-		self.oc.ec.possibleRefExpr(m)
-		self.oc.write(")")
+		self.oc.write(tempVar)
+		self.oc.write("); })")
 	}
 
 	// Generates C++ code of scope.
