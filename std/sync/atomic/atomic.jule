@@ -2,24 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-#cdef
-cpp unsafe fn __jule_atomic_swap_explicit[T](
-	mut addr: *T, new: T, order: MemoryOrder): (old: T)
-
-#cdef
-cpp unsafe fn __jule_atomic_compare_swap_explicit[T](mut addr: *T, old: *T,
-	new: T, suc: MemoryOrder, fail: MemoryOrder): (swapped: bool)
-
-#cdef
-cpp unsafe fn __jule_atomic_add_explicit[T](
-	mut addr: *T, delta: T, order: MemoryOrder): (old: T)
-
-#cdef
-cpp unsafe fn __jule_atomic_load_explicit[T](addr: *T, order: MemoryOrder): T
-
-#cdef
-cpp unsafe fn __jule_atomic_store_explicit[T](
-	mut addr: *T, val: T, order: MemoryOrder)
+use runtime for std::runtime
 
 // Memory order for atomic operations.
 // Specifies how memory accesses.
@@ -28,31 +11,31 @@ enum MemoryOrder {
 	// There no synchronization or ordering on read/write access.
 	// Only the operation is guaranteed to be atomic.
 	// Usually performs fastest atomicity performance.
-	Relaxed: 0,
+	Relaxed: runtime::atomicRelaxed,
 
 	// Combined with a load, if the loaded value was written
 	// by a store operation with a Release or stronger order,
 	// all subsequent operations are ordered after that store.
 	// Especially all subsequent uploads will see the data
 	// written before the repository.
-	Acquire: 2,
+	Acquire: runtime::atomicAcquire,
 
 	// When combined with a store, all previous operations are
 	// ordered with the Acquire or stronger order before any load
 	// of that value. In particular, all previous writes become
 	// visible to all threads that perform an Acquire or stronger
 	// load of this value.
-	Release: 3,
+	Release: runtime::atomicRelease,
 
 	// Acquire and Release combined.
 	// Aka acquire/release.
 	// For loads it uses Acquire, for stores it uses Release ordering.
-	AcqRel: 4,
+	AcqRel: runtime::atomicAcqRel,
 
 	// Default memory order for most things.
 	// Aka sequentially consistent.
 	// Operations are sequenced consistently.
-	SeqCst: 5,
+	SeqCst: runtime::atomicSeqCst,
 }
 
 struct atomicNumber[T] {
@@ -62,27 +45,27 @@ struct atomicNumber[T] {
 impl atomicNumber {
 	// Atomically stores new value and returns the previous value.
 	fn Swap(mut self, new: T, order: MemoryOrder): (old: T) {
-		ret unsafe { cpp.__jule_atomic_swap_explicit[T](&self.n, new, order) }
+		ret unsafe { runtime::atomicSwap[T](&self.n, &new, order) }
 	}
 
 	// Executes the compare-and-swap operation.
 	fn CompareSwap(mut self, old: T, new: T, order: MemoryOrder): (swapped: bool) {
-		ret unsafe { cpp.__jule_atomic_compare_swap_explicit[T](&self.n, &old, new, order, order) }
+		ret unsafe { runtime::atomicCompareSwap[T](&self.n, &old, &new, order, order) }
 	}
 
 	// Atomically adds delta to value and returns the previous value.
 	fn Add(mut self, delta: T, order: MemoryOrder): (old: T) {
-		ret unsafe { cpp.__jule_atomic_add_explicit[T](&self.n, delta, order) }
+		ret unsafe { runtime::atomicAdd[T](&self.n, delta, order) }
 	}
 
 	// Atomically reads and returns value.
 	fn Load(self, order: MemoryOrder): T {
-		ret unsafe { cpp.__jule_atomic_load_explicit[T](&self.n, order) }
+		ret unsafe { runtime::atomicLoad[T](&self.n, order) }
 	}
 
 	// Atomically assigns to value.
 	fn Store(mut self, val: T, order: MemoryOrder) {
-		unsafe { cpp.__jule_atomic_store_explicit[T](&self.n, val, order) }
+		unsafe { runtime::atomicStore[T](&self.n, &val, order) }
 	}
 }
 
@@ -129,29 +112,29 @@ type AtomicUintptr: atomicNumber[uintptr]
 // Atomically stores new into addr and returns the previous addr value.
 // Only integer types are supported.
 fn Swap[T: int | uint | i8 | i16 | i32 | i64 | u8 | u16 | u32 | u64 | uintptr](mut &addr: T, new: T, order: MemoryOrder): (old: T) {
-	ret unsafe { cpp.__jule_atomic_swap_explicit[T](&addr, new, order) }
+	ret unsafe { runtime::atomicSwap[T](&addr, &new, order) }
 }
 
 // Executes the compare-and-swap operation for value.
 // Only integer types are supported.
 fn CompareSwap[T: int | uint | i8 | i16 | i32 | i64 | u8 | u16 | u32 | u64 | uintptr](mut &addr: T, old: T, new: T, order: MemoryOrder): (swapped: bool) {
-	ret unsafe { cpp.__jule_atomic_compare_swap_explicit[T](&addr, &old, new, order, order) }
+	ret unsafe { runtime::atomicCompareSwap[T](&addr, &old, &new, order, order) }
 }
 
 // Atomically adds delta to addr and returns the previous addr value.
 // Only integer types are supported.
 fn Add[T: int | uint | i8 | i16 | i32 | i64 | u8 | u16 | u32 | u64 | uintptr](mut &addr: T, delta: T, order: MemoryOrder): (old: T) {
-	ret unsafe { cpp.__jule_atomic_add_explicit[T](&addr, delta, order) }
+	ret unsafe { runtime::atomicAdd[T](&addr, delta, order) }
 }
 
 // Atomically loads addr.
 // Only integer types are supported.
 fn Load[T: int | uint | i8 | i16 | i32 | i64 | u8 | u16 | u32 | u64 | uintptr](&addr: T, order: MemoryOrder): T {
-	ret unsafe { cpp.__jule_atomic_load_explicit[T](&addr, order) }
+	ret unsafe { runtime::atomicLoad[T](&addr, order) }
 }
 
 // Atomically stores val into addr.
 // Only integer types are supported.
 fn Store[T: int | uint | i8 | i16 | i32 | i64 | u8 | u16 | u32 | u64 | uintptr](mut &addr: T, val: T, order: MemoryOrder) {
-	unsafe { cpp.__jule_atomic_store_explicit[T](&addr, val, order) }
+	unsafe { runtime::atomicStore[T](&addr, &val, order) }
 }

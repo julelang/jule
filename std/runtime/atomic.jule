@@ -1,0 +1,52 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+type atomicMemoryOrder: int
+
+const atomicRelaxed = atomicMemoryOrder(0)
+const atomicConsume = atomicMemoryOrder(1)
+const atomicAcquire = atomicMemoryOrder(2)
+const atomicRelease = atomicMemoryOrder(3)
+const atomicAcqRel = atomicMemoryOrder(4)
+const atomicSeqCst = atomicMemoryOrder(5)
+
+#cdef
+cpp unsafe fn __atomic_store(*unsafe, *unsafe, atomicMemoryOrder)
+
+#cdef
+cpp unsafe fn __atomic_load(*unsafe, *unsafe, atomicMemoryOrder)
+
+#cdef
+cpp unsafe fn __atomic_exchange[T](*unsafe, *unsafe, *unsafe, atomicMemoryOrder): T
+
+#cdef
+cpp unsafe fn __atomic_compare_exchange(*unsafe, *unsafe, *unsafe, int, atomicMemoryOrder, atomicMemoryOrder): bool
+
+#cdef
+cpp unsafe fn __atomic_fetch_add[T](*unsafe, T, atomicMemoryOrder): T
+
+unsafe fn atomicSwap[T](mut p: *T, new: *T, mo: atomicMemoryOrder): (old: T) {
+	let mut tmp: T
+	cpp.__atomic_exchange[T](p, new, &tmp, mo)
+	ret tmp
+}
+
+unsafe fn atomicLoad[T](p: *T, mo: atomicMemoryOrder): T {
+	let mut tmp: T
+	cpp.__atomic_load(p, &tmp, mo)
+	ret tmp
+}
+
+unsafe fn atomicCompareSwap[T](mut p: *T, old: *T, new: *T, suc: atomicMemoryOrder, fail: atomicMemoryOrder): (swapped: bool) {
+	const Magic = 0x0
+	ret cpp.__atomic_compare_exchange(p, old, new, Magic, suc, fail)
+}
+
+unsafe fn atomicAdd[T](mut p: *T, delta: T, mo: atomicMemoryOrder): (old: T) {
+	ret cpp.__atomic_fetch_add[T](p, delta, mo)
+}
+
+unsafe fn atomicStore[T](mut p: *T, val: *T, mo: atomicMemoryOrder) {
+	cpp.__atomic_store(p, val, mo)
+}
