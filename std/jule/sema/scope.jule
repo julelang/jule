@@ -1317,6 +1317,9 @@ impl scopeChecker {
 			if r.Kind.Void() {
 				self.s.pushErr(a.Right.Token, LogMsg.InvalidExpr)
 			}
+			if a.Setter.Id != TokenId.Eq {
+				self.s.pushErr(a.Setter, LogMsg.InvalidSyntax)
+			}
 			self.scope.Stmts = append(self.scope.Stmts, r)
 			ret
 		}
@@ -1443,6 +1446,10 @@ impl scopeChecker {
 	}
 
 	fn checkMultiAssign(mut &self, mut &a: &AssignSt) {
+		if a.Setter.Id != TokenId.Eq && a.Setter.Id != TokenId.ColonEq {
+			self.s.pushErr(a.Setter, LogMsg.InvalidSyntax)
+			ret
+		}
 		mut rd := self.s.eval(self).evalExpr(a.Right)
 		if rd == nil {
 			ret
