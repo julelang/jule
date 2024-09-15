@@ -85,30 +85,6 @@ fn findLabelParent(&ident: str, mut scope: &scopeChecker): &scopeLabel {
 	ret label
 }
 
-fn countMatchType(&m: &Match, &t: &TypeKind): int {
-	mut n := 0
-	kind := t.Str()
-loop:
-	for _, c in m.Cases {
-		if c == nil {
-			continue
-		}
-
-		for _, expr in c.Exprs {
-			// Break loop because this expression is not parsed yet.
-			// So, parsed cases finished.
-			if expr == nil {
-				break loop
-			}
-
-			if kind == (&TypeKind)(expr.Model).Str() {
-				n++
-			}
-		}
-	}
-	ret n
-}
-
 fn getDatasFromTupleData(mut &d: &Data): []&Data {
 	if d.Kind.Tup() != nil {
 		match type d.Model {
@@ -2251,4 +2227,25 @@ fn stmtIsDef(&stmt: Stmt): bool {
 	|:
 		ret false
 	}
+}
+
+fn countMatchType(&m: &Match, &t: &TypeKind): int {
+	mut n := 0
+loop:
+	for _, c in m.Cases {
+		if c == nil {
+			continue
+		}
+		for _, expr in c.Exprs {
+			// Break loop because this expression is not parsed yet.
+			// So, parsed cases finished.
+			if expr == nil {
+				break loop
+			}
+			if t.Equal((&TypeKind)(expr.Model)) {
+				n++
+			}
+		}
+	}
+	ret n
 }
