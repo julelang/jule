@@ -102,8 +102,17 @@ enum compExprModel: type {
 	&UnsafeCastingExprModel,
 }
 
+enum exprFlag {
+	NA,
+	lvalue,
+}
+
 struct exprCoder {
 	oc: &ObjectCoder
+
+	// expression handling flags
+	// it will be reset to default after each handled expression model
+	flags: exprFlag
 
 	// It will executed before common variable handling algorithm.
 	// If it returns true, common algorithm will not be executed.
@@ -1405,6 +1414,7 @@ impl exprCoder {
 	fn handleStructSubMoveSemantics(mut &self, mut m: &StructSubIdentExprModel): (ordinary: bool) {
 		const tempVar = "__jule_temp"
 		const retVar = "__jule_result"
+		lvalue := self.flags&exprFlag.lvalue == exprFlag.lvalue
 		mut deref := false
 		mut dropKind := m.Expr.Kind
 		match type m.Expr.Model {
@@ -1422,7 +1432,10 @@ impl exprCoder {
 				ret true
 			}
 			// guaranteed: type abviously needs to be dropped
-			self.oc.write("(*({ auto ")
+			if lvalue {
+				self.oc.write("(*")
+			}
+			self.oc.write("({ auto ")
 			self.oc.write(tempVar)
 			self.oc.write(" = ")
 			self.possibleRefExpr(uem.Expr.Model)
@@ -1440,7 +1453,10 @@ impl exprCoder {
 				ret true
 			}
 			// guaranteed: type abviously needs to be dropped
-			self.oc.write("(*({ auto ")
+			if lvalue {
+				self.oc.write("(*")
+			}
+			self.oc.write("({ auto ")
 			self.oc.write(tempVar)
 			self.oc.write(" = ")
 			self.possibleRefExpr(m.Expr.Model)
@@ -1448,9 +1464,15 @@ impl exprCoder {
 		}
 		// guaranteed: type abviously needs to be dropped
 		self.oc.tc.kind(self.oc.Buf, m.Field.Kind)
-		self.oc.write(" *")
+		self.oc.write(" ")
+		if lvalue {
+			self.oc.write("*")
+		}
 		self.oc.write(retVar)
-		self.oc.write(" = &(")
+		self.oc.write(" = ")
+		if lvalue {
+			self.oc.write("&(")
+		}
 		self.oc.write(tempVar)
 		if deref {
 			self.oc.write("->")
@@ -1458,11 +1480,21 @@ impl exprCoder {
 			self.oc.write(".")
 		}
 		identCoder.field(self.oc.Buf, m.Field.Decl)
-		self.oc.write("); ")
+		if lvalue {
+			self.oc.write(")")
+		}
+		self.oc.write("; ")
+		if !lvalue {
+			self.oc.sc.handleCopyS("&" + retVar, m.Field.Kind)
+			self.oc.write("; ")
+		}
 		self.oc.sc.dh.dropModel(tempVar, dropKind)
 		self.oc.write("(")
 		self.oc.write(retVar)
-		self.oc.write("); }))")
+		self.oc.write("); })")
+		if lvalue {
+			self.oc.write(")")
+		}
 		ret false
 	}
 
@@ -2145,6 +2177,7 @@ impl exprCoder {
 		|:
 			self.oc.write("<unimplemented_expression_model>")
 		}
+		self.flags = exprFlag.NA
 	}
 
 	// Writes default initialization of struct field.
