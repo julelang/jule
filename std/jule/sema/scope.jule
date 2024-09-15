@@ -1366,8 +1366,8 @@ impl scopeChecker {
 		a.Setter.Id = id
 	}
 
-	fn processEndPartOfMultiAssign(mut self, mut &st: &MultiAssign,
-		mut &a: &AssignSt, mut &lexpr: &AssignLeft, mut &l: &Data, mut &r: &Data) {
+	fn processEndPartOfMultiAssign(mut self, mut &st: &MultiAssign, mut &a: &AssignSt,
+		mut &lexpr: &AssignLeft, mut &l: &Data, mut &r: &Data, strict: bool) {
 		if !lexpr.Reference && IsIgnoreIdent(lexpr.Ident) {
 			if r.Kind.Void() {
 				self.s.pushErr(a.Right.Token, LogMsg.InvalidExpr)
@@ -1434,16 +1434,11 @@ impl scopeChecker {
 
 		// Set reference false because this is normal assigment.
 		// So, we don't need to check reference assignment should using lvalue.
-		const Reference = false
-		self.s.checkValidityForInitExpr(l.Mutable, Reference, l.Kind, r, a.Setter)
-
-		mut checker := assignTypeChecker{
-			s: self.s,
-			dest: l.Kind,
-			d: r,
-			errorToken: a.Setter,
+		mut reference := false
+		if self.s.checkValidityForInitExpr(l.Mutable, reference, l.Kind, r, lexpr.Token) {
+			reference = strict // enable reference checking if strict mode enabled
+			self.s.checkAssignType(reference, l.Kind, r, lexpr.Token)
 		}
-		checker.check()
 		st.Left = append(st.Left, l)
 	}
 
@@ -1452,12 +1447,14 @@ impl scopeChecker {
 		if rd == nil {
 			ret
 		}
+		mut strict := false // Any type compatibility analysis requires exact same type.
 		mut right := getDatasFromTupleData(rd)
 		if len(right) == 1 {
 			match type right[0].Model {
 			| &IndexingExprModel:
 				mut iem := (&IndexingExprModel)(right[0].Model)
 				if iem.Expr.Kind.Map() != nil { // Is map lookup.
+					strict = true
 					right = [
 						&Data{Mutable: right[0].Mutable, Kind: iem.Expr.Kind.Map().Val},
 						&Data{Kind: primBool},
@@ -1503,7 +1500,7 @@ impl scopeChecker {
 			}
 			mut r := right[i]
 			self.removeInteriorMutRisk(r)
-			self.processEndPartOfMultiAssign(st, a, lexpr, l, r)
+			self.processEndPartOfMultiAssign(st, a, lexpr, l, r, strict)
 		}
 		self.scope.Stmts = append(self.scope.Stmts, st)
 	}
