@@ -108,6 +108,55 @@ fn IsImplicitImport(imp: &ImportInfo): bool {
 	ret imp.Token == nil
 }
 
+// Returns element kind of t.
+// Returns nil if type have not element type.
+fn GetElemKind(mut &t: &sema::TypeKind): &sema::TypeKind {
+	mut ptr := t.Ptr()
+	if ptr != nil {
+		if ptr.IsUnsafe() {
+			ret nil
+		}
+		ret ptr.Elem
+	}
+	mut sptr := t.Sptr()
+	if sptr != nil {
+		ret sptr.Elem
+	}
+	mut arr := t.Arr()
+	if arr != nil {
+		ret arr.Elem
+	}
+	mut slice := t.Slc()
+	if slice != nil {
+		ret slice.Elem
+	}
+	mut prim := t.Prim()
+	if prim != nil {
+		if prim.IsStr() {
+			ret &sema::TypeKind{
+				Kind: &sema::Prim{
+					Kind: types::TypeKind.U8,
+				},
+			}
+		}
+	}
+	ret nil
+}
+
+// Similary to IsLvalueModel, but designed to determine whether expression is
+// based on lvalue expression.
+fn IsLvalueBasedModel(mut m: any): bool {
+	match type m {
+	| &sema::UnaryExprModel:
+		mut uem := (&sema::UnaryExprModel)(m)
+		if uem.Op.Id == lex::TokenId.Star {
+			ret IsLvalueBasedModel(uem.Expr.Model)
+		}
+		ret false
+	}
+	ret IsLvalueModel(m) != nil
+}
+
 // Reports whether expression model is lvalue expression model.
 // Designed to determine copy semantics required expression models.
 // Returns expression type of expression model if valid, nil otherwise.
@@ -128,17 +177,7 @@ fn IsLvalueModel(mut m: any): &TypeKind {
 	| &sema::UnaryExprModel:
 		mut unary := (&sema::UnaryExprModel)(m)
 		if unary.Op.Id == lex::TokenId.Star {
-			match {
-			| unary.Expr.Kind.Ptr() != nil:
-				mut p := unary.Expr.Kind.Ptr()
-				if p.IsUnsafe() {
-					ret nil
-				}
-				ret p.Elem
-			| unary.Expr.Kind.Sptr() != nil:
-				mut p := unary.Expr.Kind.Sptr()
-				ret p.Elem
-			}
+			ret GetElemKind(unary.Expr.Kind)
 		}
 		ret nil
 	| &sema::IndexingExprModel:

@@ -456,7 +456,7 @@ impl exprCoder {
 					self.oc.write(".")
 					identCoder.field(self.oc.Buf, f.Decl)
 					self.oc.write("=")
-					self.possibleRefExpr(arg.Expr.Model)
+					self.oc.sc.handleCopy(arg.Expr.Model)
 					inited = true
 					continue fields
 				}
@@ -1313,6 +1313,7 @@ impl exprCoder {
 
 	fn handleTraitSubMoveSemantics(mut &self, mut m: &TraitSubIdentExprModel): (ordinary: bool) {
 		const tempVar = "__jule_temp"
+		const retVar = "__jule_result"
 		mut deref := false
 		mut dropKind := m.Expr.Kind
 		match type m.Expr.Model {
@@ -1324,38 +1325,35 @@ impl exprCoder {
 				// no need to handle drop semantics
 				ret true
 			}
-			match type uem.Expr.Model {
-			| &FnCallExprModel:
-				// Base expression comes from a function call.
-				// Need to be drop.
-				break
-			|:
+			if obj::IsLvalueBasedModel(uem.Expr.Model) {
 				// Expression come from safe place.
 				// Handle it in ordinary way.
 				ret true
 			}
 			// guaranteed: type abviously needs to be dropped
-			self.oc.write("({ auto ")
+			self.oc.write("(*({ auto ")
 			self.oc.write(tempVar)
 			self.oc.write(" = ")
 			self.possibleRefExpr(uem.Expr.Model)
 			self.oc.write("; ")
 			deref = true
 			dropKind = uem.Expr.Kind
-		| &FnCallExprModel:
+		|:
 			if !obj::TypeHaveSpecialDrop(m.Expr.Kind) {
 				// no need to handle drop semantics
 				ret true
 			}
+			if obj::IsLvalueBasedModel(m.Expr.Model) {
+				// Expression come from safe place.
+				// Handle it in ordinary way.
+				ret true
+			}
 			// guaranteed: type abviously needs to be dropped
-			self.oc.write("({ auto ")
+			self.oc.write("(*({ auto ")
 			self.oc.write(tempVar)
 			self.oc.write(" = ")
 			self.possibleRefExpr(m.Expr.Model)
 			self.oc.write("; ")
-		|:
-			// handle like ordinary expression
-			ret true
 		}
 		// guaranteed: type abviously needs to be dropped
 		self.oc.write("((")
@@ -1418,44 +1416,41 @@ impl exprCoder {
 				// no need to handle drop semantics
 				ret true
 			}
-			match type uem.Expr.Model {
-			| &FnCallExprModel:
-				// Base expression comes from a function call.
-				// Need to be drop.
-				break
-			|:
+			if obj::IsLvalueBasedModel(uem.Expr.Model) {
 				// Expression come from safe place.
 				// Handle it in ordinary way.
 				ret true
 			}
 			// guaranteed: type abviously needs to be dropped
-			self.oc.write("({ auto ")
+			self.oc.write("(*({ auto ")
 			self.oc.write(tempVar)
 			self.oc.write(" = ")
 			self.possibleRefExpr(uem.Expr.Model)
 			self.oc.write("; ")
 			deref = true
 			dropKind = uem.Expr.Kind
-		| &FnCallExprModel:
+		|:
 			if !obj::TypeHaveSpecialDrop(m.Expr.Kind) {
 				// no need to handle drop semantics
 				ret true
 			}
+			if obj::IsLvalueBasedModel(m.Expr.Model) {
+				// Expression come from safe place.
+				// Handle it in ordinary way.
+				ret true
+			}
 			// guaranteed: type abviously needs to be dropped
-			self.oc.write("({ auto ")
+			self.oc.write("(*({ auto ")
 			self.oc.write(tempVar)
 			self.oc.write(" = ")
 			self.possibleRefExpr(m.Expr.Model)
 			self.oc.write("; ")
-		|:
-			// handle like ordinary expression
-			ret true
 		}
 		// guaranteed: type abviously needs to be dropped
 		self.oc.tc.kind(self.oc.Buf, m.Field.Kind)
-		self.oc.write(" ")
+		self.oc.write(" *")
 		self.oc.write(retVar)
-		self.oc.write(" = ")
+		self.oc.write(" = &(")
 		self.oc.write(tempVar)
 		if deref {
 			self.oc.write("->")
@@ -1463,11 +1458,11 @@ impl exprCoder {
 			self.oc.write(".")
 		}
 		identCoder.field(self.oc.Buf, m.Field.Decl)
-		self.oc.write("; ")
+		self.oc.write("); ")
 		self.oc.sc.dh.dropModel(tempVar, dropKind)
 		self.oc.write("(")
 		self.oc.write(retVar)
-		self.oc.write("); })")
+		self.oc.write("); }))")
 		ret false
 	}
 
