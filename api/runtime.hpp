@@ -24,5 +24,6 @@ jule::Uint __jule_RCLoad(jule::Uint *p);
 void __jule_RCAdd(jule::Uint *p);
 jule::Bool __jule_RCDrop(jule::Uint *p);
 void __jule_RCFree(jule::Uint *p);
+jule::Int __jule_compareStr(jule::Str *a, jule::Str *b);
 
 #endif // #ifndef __JULE_RUNTIME_HPP

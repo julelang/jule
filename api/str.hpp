@@ -62,26 +62,6 @@ namespace jule
             return str;
         }
 
-        static jule::I8 compare(const jule::U8 *s1, const jule::U8 *s2, const jule::Int n1, const jule::Int n2) noexcept
-        {
-            const jule::Int n = n1 > n2 ? n2 : n1;
-            jule::Int i = 0;
-            for (; i < n; ++i)
-            {
-                auto b1 = s1[i];
-                auto b2 = s2[i];
-                if (b1 < b2)
-                    return -1;
-                if (b1 > b2)
-                    return +1;
-            }
-            if (n1 < n2)
-                return -1;
-            if (n1 > n2)
-                return +1;
-            return 0;
-        }
-
         static jule::Str from_rune(const jule::I32 r) noexcept
         {
             jule::Str s;
@@ -509,22 +489,22 @@ namespace jule
 
         jule::Bool operator<(const jule::Str &str) const noexcept
         {
-            return jule::Str::compare(this->begin(), str.begin(), this->len(), str.len()) == -1;
+            return __jule_compareStr((jule::Str*)this, (jule::Str*)&str) == -1;
         }
 
         inline jule::Bool operator<=(const jule::Str &str) const noexcept
         {
-            return jule::Str::compare(this->begin(), str.begin(), this->len(), str.len()) <= 0;
+            return __jule_compareStr((jule::Str*)this, (jule::Str*)&str) <= 0;
         }
 
         jule::Bool operator>(const jule::Str &str) const noexcept
         {
-            return jule::Str::compare(this->begin(), str.begin(), this->len(), str.len()) == +1;
+            return __jule_compareStr((jule::Str*)this, (jule::Str*)&str) == +1;
         }
 
         inline jule::Bool operator>=(const jule::Str &str) const noexcept
         {
-            return jule::Str::compare(this->begin(), str.begin(), this->len(), str.len()) >= 0;
+            return __jule_compareStr((jule::Str*)this, (jule::Str*)&str) >= 0;
         }
     };
 
