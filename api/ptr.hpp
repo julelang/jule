@@ -300,11 +300,7 @@ namespace jule
         friend inline std::ostream &operator<<(std::ostream &stream,
                                                const jule::Ptr<T> &ref) noexcept
         {
-            if (ref == nullptr)
-                stream << "<nil>";
-            else
-                stream << ref.alloc;
-            return stream;
+            return stream << __jule_ptrToStr(ref.alloc);
         }
     };
 

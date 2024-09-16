@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <thread>
 
+#include "runtime.hpp"
 #include "types.hpp"
 #include "error.hpp"
 #include "panic.hpp"
@@ -97,9 +98,7 @@ namespace jule
         friend std::ostream &operator<<(std::ostream &stream,
                                         const Fn<Ret, Args...> &f) noexcept
         {
-            if (f == nullptr)
-                return (stream << "<nil>");
-            return (stream << (void *)f.f);
+            return stream << __jule_ptrToStr((void *)f.f);
         }
     };
 

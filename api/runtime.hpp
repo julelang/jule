@@ -8,10 +8,13 @@
 #ifndef __JULE_RUNTIME_HPP
 #define __JULE_RUNTIME_HPP
 
+#include <ostream>
+
 #include "types.hpp"
 
 namespace jule {
 	class Str;
+	std::ostream &operator<<(std::ostream &stream, const jule::Str &src) noexcept;
 };
 
 jule::Bool __jule_ptrEqual(void *a, void *b);

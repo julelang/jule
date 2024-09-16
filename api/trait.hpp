@@ -9,6 +9,7 @@
 #include <ostream>
 #include <cstring>
 
+#include "runtime.hpp"
 #include "types.hpp"
 #include "panic.hpp"
 #include "error.hpp"
@@ -262,9 +263,7 @@ namespace jule
         friend inline std::ostream &operator<<(std::ostream &stream,
                                                const jule::Trait &src) noexcept
         {
-            if (src == nullptr)
-                return stream << "<nil>";
-            return stream << (void *)src.data.alloc;
+            return stream << __jule_ptrToStr(src.data.alloc);
         }
     };
 } // namespace jule

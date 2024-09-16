@@ -526,15 +526,14 @@ namespace jule
         {
             return jule::Str::compare(this->begin(), str.begin(), this->len(), str.len()) >= 0;
         }
-
-        friend std::ostream &operator<<(std::ostream &stream,
-                                        const jule::Str &src) noexcept
-        {
-            for (const jule::U8 &b : src)
-                stream << static_cast<char>(b);
-            return stream;
-        }
     };
+
+    std::ostream &operator<<(std::ostream &stream, const jule::Str &src) noexcept
+    {
+        for (const jule::U8 &b : src)
+            stream << static_cast<char>(b);
+        return stream;
+    }
 
     template <typename T>
     jule::Str to_str(const T &obj)
