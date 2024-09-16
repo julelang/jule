@@ -83,7 +83,7 @@ impl identCoder {
 		identCoder.writeIdentTo(buf, ident)
 	}
 
-	static fn func(mut &buf: StrBuilder, &f: &Fn) {
+	static fn func(mut &buf: StrBuilder, mut &f: &Fn) {
 		match {
 		| f.Binded:
 			buf.WriteStr(f.Ident)
@@ -96,10 +96,15 @@ impl identCoder {
 				buf.WriteStr("static_")
 			}
 		}
+		export := obj::FindDirective(f.Directives, Directive.Export)
+		if export != nil {
+			buf.WriteStr(export.Args[0].Kind)
+			ret
+		}
 		identCoder.toOut(buf, f.Ident, uintptr(f))
 	}
 
-	static fn funcIns(mut &buf: StrBuilder, &f: &FnIns) {
+	static fn funcIns(mut &buf: StrBuilder, mut &f: &FnIns) {
 		if f.IsBuiltin() {
 			// Do not use [identCoder.writeIdentTo] for this.
 			// Built-in functions are always ASCII.
@@ -180,6 +185,11 @@ impl identCoder {
 		| v.Scope != nil:
 			identCoder.toLocal(buf, v.Token.Row, v.Token.Column, v.Ident)
 		|:
+			export := obj::FindDirective(v.Directives, Directive.Export)
+			if export != nil {
+				buf.WriteStr(export.Args[0].Kind)
+				ret
+			}
 			identCoder.toOut(buf, v.Ident, uintptr(v))
 		}
 	}

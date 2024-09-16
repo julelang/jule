@@ -75,4 +75,6 @@ Actually, JuleC just generates C++ code for now.
 
 - **(3)** Scope part of deadcoe elimination optimizations, should be executed after other optimizations. Because other optimzations may will change code structure, so some scope deadcode elimination cases may occur. This possible optimizations cannot catched by scope optimizer if scope deadcode elimination optimizations applied before other independent middle-end optimizations.
 
-- **(4)** For C/C++ IRs, include linked headers before the API. Otherwise it may cause compilation errors. For example, on Windows, `winsock2.h` must be included before `windows.h`. In a case where the API includes `windows.h` it is against this to later include `winsock2.h`.
+- **(4)** For C/C++ IRs, include linked standard headers before the API. Otherwise it may cause compilation errors. For example, on Windows, `winsock2.h` must be included before `windows.h`. In a case where the API includes `windows.h` it is against this to later include `winsock2.h`.
+
+- **(5)** Since user defined headers may use exported definitions of Jule, they must be imported after Jule declarations. Otherwise, compilation errors may occur.

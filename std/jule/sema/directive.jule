@@ -81,6 +81,7 @@ impl directiveChecker {
 			ret
 		}
 
+		// remove quotes
 		d.Args[0].Kind = arg.Kind[1:len(arg.Kind)-1]
 
 		// Push relevant directives.
@@ -133,6 +134,7 @@ impl directiveChecker {
 			ret
 		}
 
+		// remove quotes
 		d.Args[0].Kind = arg.Kind[1:len(arg.Kind)-1]
 	}
 
@@ -157,6 +159,44 @@ impl directiveChecker {
 		}
 	}
 
+	fn checkExport(mut self, mut &d: &ast::Directive) {
+		match type self.o {
+		| &Fn:
+			f := (&Fn)(self.o)
+			if f.Binded || f.IsInit() || f.IsEntryPoint() || f.IsMethod() || len(f.Generics) > 0 {
+				self.s.pushErr(d.Tag, LogMsg.UnsupportedDirective, d.Tag.Kind)
+				ret
+			}
+		| &Var:
+			v := (&Var)(self.o)
+			if v.Binded || v.Constant {
+				self.s.pushErr(d.Tag, LogMsg.UnsupportedDirective, d.Tag.Kind)
+			}
+		|:
+			self.s.pushErr(d.Tag, LogMsg.UnsupportedDirective, d.Tag.Kind)
+			ret
+		}
+		if len(d.Args) > 1 {
+			self.s.pushErr(d.Args[1], LogMsg.ArgumentOverflow, d.Tag.Kind)
+			ret
+		}
+		if len(d.Args) < 1 {
+			self.s.pushErr(d.Tag, LogMsg.MissingExpr)
+			ret
+		}
+		arg := d.Args[0]
+		if arg.Id != TokenId.Lit {
+			self.s.pushErr(arg, LogMsg.InvalidSyntax)
+			ret
+		}
+		if arg.Kind[0] != '"' {
+			self.s.pushErr(arg, LogMsg.InvalidSyntax)
+			ret
+		}
+		// remove quotes
+		d.Args[0].Kind = arg.Kind[1:len(arg.Kind)-1]
+	}
+
 	fn checkDirective(mut self, mut &d: &ast::Directive) {
 		match d.Tag.Kind {
 		| Directive.Cdef:
@@ -169,6 +209,8 @@ impl directiveChecker {
 			self.checkDeprecated(d)
 		| Directive.Test:
 			self.checkTest(d)
+		| Directive.Export:
+			self.checkExport(d)
 		| Directive.Build
 		| Directive.Pass:
 			self.s.pushErr(d.Tag, LogMsg.UnsupportedDirective, d.Tag.Kind)

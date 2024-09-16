@@ -459,25 +459,31 @@ impl ObjectCoder {
 			self.write("#define __JULE_DISABLE__SAFETY\n")
 		}
 
-		// Include binded libraries here, before the API header.
+		// Include binded standard library headers here, before the API header.
 		// See developer reference (4).
-		self.links()
+		self.links(true)
 
 		self.write("\n\n#include \"")
 		self.write(build::PathApi)
 		self.write("\"\n\n")
 	}
 
-	fn links(mut &self) {
+	fn links(mut &self, std: bool) {
 		for _, used in self.ir.Used {
 			match {
 			| !used.Binded:
 				continue
 			| build::IsStdHeaderPath(used.Path):
+				if !std {
+					continue
+				}
 				self.write("#include ")
 				self.write(used.Path)
 				self.write("\n")
 			| build::IsValidHeaderExt(path::Ext(used.Path)):
+				if std {
+					continue
+				}
 				self.write("#include \"")
 				self.write(used.Path)
 				self.write("\"\n")
@@ -542,7 +548,7 @@ impl ObjectCoder {
 	fn structureDestructor(mut &self, mut &s: &StructIns) {
 		// Dispose method must be non-static
 		const Static = false
-		disposeMethod := s.FindMethod("Dispose", Static)
+		mut disposeMethod := s.FindMethod("Dispose", Static)
 		mut disposed := FuncPattern.Dispose(disposeMethod)
 		// Call destructor if implemented.
 		if !disposed {
@@ -1065,6 +1071,12 @@ impl ObjectCoder {
 		self.write("\n\n")
 		self.declPos = self.Buf.Len()
 		self.globalDecls()
+
+		// Include user-defined libraries here.
+		// See developer reference (5).
+		self.write("\n\n")
+		self.links(false)
+		self.write("\n\n")
 	}
 
 	fn structureMethods(mut &self, mut &s: &StructIns) {
@@ -1167,7 +1179,7 @@ impl ObjectCoder {
 
 	fn pushInit(mut &self, mut &pkg: &Package) {
 		obj::IterFiles(pkg, fn(mut &file: &SymbolTable) {
-			for _, f in file.Funcs {
+			for (_, mut f) in file.Funcs {
 				if f.Ident == build::InitFn {
 					self.indent()
 					identCoder.func(self.Buf, f)
