@@ -9,9 +9,17 @@
 #define __JULE_RUNTIME_HPP
 
 #include "types.hpp"
-#include "str.hpp"
+
+namespace jule {
+	class Str;
+};
 
 jule::Bool __jule_ptrEqual(void *a, void *b);
 jule::Str __jule_ptrToStr(void *p);
+jule::Uint *__jule_RCNew(void);
+jule::Uint __jule_RCLoad(jule::Uint *p);
+void __jule_RCAdd(jule::Uint *p);
+jule::Bool __jule_RCDrop(jule::Uint *p);
+void __jule_RCFree(jule::Uint *p);
 
 #endif // #ifndef __JULE_RUNTIME_HPP

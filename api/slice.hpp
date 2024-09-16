@@ -10,6 +10,7 @@
 #include <ostream>
 #include <initializer_list>
 
+#include "runtime.hpp"
 #include "panic.hpp"
 #include "error.hpp"
 #include "ptr.hpp"
@@ -128,7 +129,7 @@ namespace jule
         // heap allocations are valid or something like that.
         void __free(void) noexcept
         {
-            delete this->data.ref;
+            __jule_RCFree(this->data.ref);
             this->data.ref = nullptr;
 
             delete[] this->data.alloc;
@@ -145,22 +146,16 @@ namespace jule
 #else
             if (!this->data.ref)
             {
+                this->data.ref = nullptr;
                 this->data.alloc = nullptr;
                 return;
             }
-
-            // Use jule::REFERENCE_DELTA, DON'T USE drop_ref METHOD BECAUSE
-            // jule_ref does automatically this.
-            // If not in this case:
-            //   if this is method called from destructor, reference count setted to
-            //   negative integer but reference count is unsigned, for this reason
-            //   allocation is not deallocated.
-            if (this->data.get_ref_n() != jule::REFERENCE_DELTA)
+            if (__jule_RCDrop(this->data.ref))
             {
+                this->data.ref = nullptr;
                 this->data.alloc = nullptr;
                 return;
             }
-
             this->__free();
 #endif // __JULE_DISABLE__REFERENCE_COUNTING
         }
