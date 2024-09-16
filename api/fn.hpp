@@ -47,9 +47,9 @@ namespace jule
             {
                 this->ctxHandler(this->ctx);
                 this->ctxHandler = nullptr;
-                this->ctx.ref = nullptr; // Disable GC for allocation.
-                this->ctx = nullptr;     // Assign to nullptr safely.
             }
+            this->ctx.ref = nullptr; // Disable GC for allocation.
+            this->ctx = nullptr;     // Assign to nullptr safely.
         }
 
         template <typename... Arguments>
