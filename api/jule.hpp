@@ -27,7 +27,6 @@ CONFIGURATION DEFINES
 #include "exceptional.hpp"
 #include "fn.hpp"
 #include "map.hpp"
-#include "misc.hpp"
 #include "panic.hpp"
 #include "platform.hpp"
 #include "ptr.hpp"
