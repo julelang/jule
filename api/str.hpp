@@ -62,6 +62,11 @@ namespace jule
             return str;
         }
 
+        static jule::Str lit(const char *s) noexcept
+        {
+            return jule::Str::lit(s, std::strlen(s));
+        }
+
         static jule::Str from_rune(const jule::I32 r) noexcept
         {
             jule::Str s;

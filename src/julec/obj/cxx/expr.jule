@@ -232,20 +232,24 @@ impl exprCoder {
 	}
 
 	fn divByZeroBinary(mut &self, &op: &Token, mut &l: &OperandExprModel, mut &r: &OperandExprModel) {
-		self.oc.write("jule::")
+		mut f := (&FnIns)(nil)
 		match op.Id {
 		| TokenId.Solidus
 		| TokenId.SolidusEq:
-			self.oc.write("div(")
+			mut div := obj::RuntimeFindFn(self.oc.ir.Runtime, obj::RuntimeFunc.div)
+			f = obj::FindGenericInstance(div, l.Kind, r.Kind)
 		| TokenId.Percent
 		| TokenId.PercentEq:
-			self.oc.write("mod(")
+			mut mod := obj::RuntimeFindFn(self.oc.ir.Runtime, obj::RuntimeFunc.mod)
+			f = obj::FindGenericInstance(mod, l.Kind, r.Kind)
 		}
-
+		identCoder.funcIns(self.oc.Buf, f)
+		self.oc.write("(")
 		if !env::Production {
-			self.oc.write("\"")
+			self.oc.write(typeCoder.Str)
+			self.oc.write("::lit(\"")
 			self.oc.locInfo(op)
-			self.oc.write("\",")
+			self.oc.write("\"),")
 		}
 		self.possibleRefExpr(l.Model)
 		self.oc.write(",")
@@ -361,8 +365,8 @@ impl exprCoder {
 	fn binary(mut &self, mut m: &BinaryExprModel) {
 		match m.Op.Id {
 		| TokenId.Solidus | TokenId.Percent:
-			// Do not check division safety of structures.
-			if m.Left.Kind.Struct() == nil {
+			// Do not check division safety of structures and skip if safety disabled.
+			if env::Safety && m.Left.Kind.Struct() == nil {
 				self.divByZeroBinary(m.Op, m.Left, m.Right)
 				ret
 			}

@@ -3859,34 +3859,18 @@ impl binaryEval {
 	fn setTypeToGreater(mut self) {
 		lp := self.l.Kind.Prim()
 		rp := self.r.Kind.Prim()
-		if self.l.IsConst() {
-			if !self.r.IsConst() {
-				self.l.Kind = self.r.Kind
-				self.l.Constant.Kind = rp.Kind
-				ret
-			}
-			goto set
-		}
-		if self.r.IsConst() {
-			self.r.Constant.Kind = lp.Kind
-			ret
-		}
-	set:
 		if self.l.untyped && !self.r.untyped {
 			self.l.Kind = self.r.Kind
-			if self.l.IsConst() {
-				self.l.Constant.Kind = rp.Kind
-			}
+			self.l.Constant.Kind = rp.Kind
 			self.l.untyped = false
-			ret
 		} else if !self.l.untyped && self.r.untyped {
-			ret
-		}
-		if types::IsGreater(rp.Kind, lp.Kind) {
-			self.l.Kind = self.r.Kind
-			if self.l.IsConst() {
-				self.l.Constant.Kind = rp.Kind
-			}
+			self.r.Kind = self.l.Kind
+			self.r.Constant.Kind = lp.Kind
+			self.r.untyped = false
+		} else if self.l.untyped && self.r.untyped {
+			self.r.Kind = self.l.Kind
+			self.r.Constant.Kind = lp.Kind
+			self.r.untyped = false
 		}
 	}
 
@@ -3935,6 +3919,18 @@ impl binaryEval {
 			ret intAssignable(lk, self.r)
 		}
 		ret lk == rk
+	}
+
+	// General function to handle binary runtime functions.
+	// Assumes runtime package is exist.
+	// Function declarations looks like: fn[T1, T2](...)
+	fn pushRuntimeBinary(mut self, func: runtimeFunc) {
+		mut f := runtimeFindFn(self.e.s.meta.runtime, func).instanceForce()
+		f.Generics = append(f.Generics, &InsGeneric{Kind: self.l.Kind}, &InsGeneric{Kind: self.r.Kind})
+		ok, _ := self.e.s.checkGenericFn(f, self.op)
+		if !ok {
+			panic("sema: shift evaluation failed, this is an implementation mistake")
+		}
 	}
 
 	// Operator guaranteed to be << or >>.
@@ -3998,12 +3994,7 @@ impl binaryEval {
 			if self.op.Id == TokenId.Shr {
 				func = runtimeFunc.shiftRight
 			}
-			mut f := runtimeFindFn(self.e.s.meta.runtime, func).instanceForce()
-			f.Generics = append(f.Generics, &InsGeneric{Kind: self.l.Kind}, &InsGeneric{Kind: self.r.Kind})
-			ok, _ := self.e.s.checkGenericFn(f, self.op)
-			if !ok {
-				panic("sema: shift evaluation failed, this is an implementation mistake")
-			}
+			self.pushRuntimeBinary(func)
 		}
 
 		ret self.l
@@ -4038,9 +4029,14 @@ impl binaryEval {
 			panic("sema: binary shifting operator handling failed")
 		| TokenId.Plus
 		| TokenId.Minus
-		| TokenId.Star
+		| TokenId.Star:
+			self.setTypeToGreater()
+			ret self.l
 		| TokenId.Solidus:
 			self.setTypeToGreater()
+			if self.e.s.meta.runtime != nil {
+				self.pushRuntimeBinary(runtimeFunc.div)
+			}
 			ret self.l
 		| TokenId.Percent:
 			if !types::IsInt(rk) {
@@ -4049,6 +4045,9 @@ impl binaryEval {
 			}
 			self.mod()
 			self.setTypeToGreater()
+			if self.e.s.meta.runtime != nil {
+				self.pushRuntimeBinary(runtimeFunc.mod)
+			}
 			ret self.r
 		|:
 			self.e.pushErr(self.op, LogMsg.OperatorNotForFloat, self.op.Kind)
@@ -4086,15 +4085,23 @@ impl binaryEval {
 		| TokenId.Plus
 		| TokenId.Minus
 		| TokenId.Star
-		| TokenId.Solidus
 		| TokenId.Amper
 		| TokenId.Vline
 		| TokenId.Caret:
 			self.setTypeToGreater()
 			ret self.l
+		| TokenId.Solidus:
+			self.setTypeToGreater()
+			if self.e.s.meta.runtime != nil {
+				self.pushRuntimeBinary(runtimeFunc.div)
+			}
+			ret self.l
 		| TokenId.Percent:
 			self.mod()
 			self.setTypeToGreater()
+			if self.e.s.meta.runtime != nil {
+				self.pushRuntimeBinary(runtimeFunc.mod)
+			}
 			ret self.l
 		|:
 			self.e.pushErr(self.op, LogMsg.OperatorNotForInt, self.op.Kind)
