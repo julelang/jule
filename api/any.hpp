@@ -23,7 +23,7 @@ namespace jule
         public:
             void (*dealloc)(jule::Ptr<jule::Uintptr> &alloc);
             jule::Bool (*eq)(void *alloc, void *other);
-            jule::Str (*to_str)(const void *alloc);
+            jule::Str (*to_str)(void *alloc);
         };
 
         mutable jule::Ptr<jule::Uintptr> data;
