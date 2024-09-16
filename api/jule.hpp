@@ -20,7 +20,6 @@ CONFIGURATION DEFINES
 #include "impl_flag.hpp"
 #include "any.hpp"
 #include "array.hpp"
-#include "atomic.hpp"
 #include "builtin.hpp"
 #include "defer.hpp"
 #include "env.hpp"
