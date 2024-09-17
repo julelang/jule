@@ -978,16 +978,17 @@ impl eval {
 		ret d
 	}
 
-	fn checkIntegerIndexingByData(mut self, mut &d: &Data, mut token: &Token) {
+	fn checkIntegerIndexingByData(mut self, mut &d: &Data, mut token: &Token): bool {
 		errKey := checkDataForIntegerIndexing(d, token)
 		match errKey {
 		| LogMsg.Empty:
-			ret
+			ret true
 		| LogMsg.InvalidTypeForIndexing:
 			self.pushErr(token, errKey, d.Kind.Str())
 		|:
 			self.pushErr(token, errKey)
 		}
+		ret false
 	}
 
 	fn indexingPtr(mut self, mut &d: &Data, mut &index: &Data, mut &i: &IndexingExpr) {
@@ -1084,6 +1085,31 @@ impl eval {
 		}
 	}
 
+	fn comptimeRange(mut self, mut &d: &Data, mut &index: &Data, mut &i: &IndexingExpr) {
+		if index == nil {
+			d = nil
+			ret
+		}
+		if !self.checkIntegerIndexingByData(index, i.Index.Token) {
+			d = nil
+			ret
+		}
+		if !index.IsConst() {
+			d = nil
+			self.pushErr(i.Index.Token, LogMsg.ExprNotConst)
+			ret
+		}
+		// guaranteed: index >= 0
+		j := int(index.Constant.AsI64())
+		mut ci.kind := d.Kind.comptimeRange()
+		if j >= ci.kind.len() {
+			d = nil
+			self.pushErr(i.Index.Token, LogMsg.OverflowLimits)
+			ret
+		}
+		ci.kind.index(d, j)
+	}
+
 	fn toIndexing(mut self, mut &d: &Data, mut &index: &Data, mut &i: &IndexingExpr) {
 		match {
 		| d.Kind.Ptr() != nil:
@@ -1105,6 +1131,9 @@ impl eval {
 				self.indexingStr(d, index, i)
 				ret
 			}
+		| d.Kind.comptimeRange() != nil:
+			self.comptimeRange(d, index, i)
+			ret
 		}
 		self.pushErr(i.Token, LogMsg.NotSupportsIndexing, d.Kind.Str())
 	}
@@ -1317,12 +1346,18 @@ impl eval {
 			ret nil
 		}
 
+		// caught comptime indexing expressions
+		makeComptimeRange(d)
+
 		// Set decl to true. It's a kind of flag.
 		// If decl is true after indexing eval, do not touch Model:.
 		// Setted by indexing eval.
 		d.Decl = false
 
 		self.toIndexing(d, index, i)
+		if d == nil {
+			ret nil
+		}
 		if d.IsConst() {
 			d.Decl = false
 			d.Model = d.Constant
