@@ -321,6 +321,8 @@ fn builtinCallerError(mut &e: &eval, mut &fc: &FnCallExpr): &Data {
 		ret nil
 	}
 
+	applyRuntimeToStr(e.s, expr.Kind, primAny, token)
+
 	mut d := buildVoidData()
 	d.Model = &BuiltinErrorCallExprModel{Err: expr}
 	ret d
@@ -335,18 +337,21 @@ fn builtinCallerOut(mut &e: &eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data {
 		e.pushErr(fc.Args[1].Token, LogMsg.ArgumentOverflow, "out")
 	}
 
-	mut expr := e.evalExpr(fc.Args[0])
+	mut arg := fc.Args[0]
+	mut expr := e.evalExpr(arg)
 	if expr == nil {
 		ret nil
 	}
 
 	if !isBuiltinStrConvertable(expr.Kind) {
-		e.pushErr(fc.Args[0].Token, LogMsg.InvalidExpr)
+		e.pushErr(arg.Token, LogMsg.InvalidExpr)
 		ret nil
 	}
 
+	pushRuntimeToStr(e.s, expr.Kind, arg.Token)
+
 	mut d := buildVoidData()
-	d.Model = &BuiltinOutCallExprModel{Expr: expr.Model}
+	d.Model = &BuiltinOutCallExprModel{Expr: expr}
 	ret d
 }
 

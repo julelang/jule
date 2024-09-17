@@ -214,6 +214,7 @@ impl ObjectCoder {
 	}
 
 	fn pushAnyType(mut &self, mut t: &TypeKind): int {
+		mut orig := t
 		if t.Enum() != nil {
 			t = t.Enum().Kind.Kind
 		}
@@ -277,7 +278,11 @@ impl ObjectCoder {
 			// to_str function.
 			self.anyObj.WriteStr(typeCoder.Str + " " + anyTypeIdent)
 			self.anyObj.WriteStr(si)
-			self.anyObj.WriteStr("_to_str(void *alloc) noexcept { return jule::to_str(*reinterpret_cast<")
+			self.anyObj.WriteStr("_to_str(void *alloc) noexcept { return ")
+			mut decl := obj::RuntimeFindFn(self.ir.Runtime, obj::RuntimeFunc.toStr)
+			mut f := obj::FindGenericInstance(decl, orig)
+			identCoder.funcIns(self.anyObj, f)
+			self.anyObj.WriteStr("(*reinterpret_cast<")
 			if t.Ptr() == nil {
 				self.anyObj.WriteStr("const ")
 				self.anyObj.WriteStr(kind)
@@ -1086,63 +1091,10 @@ impl ObjectCoder {
 		}
 	}
 
-	fn structureOstream(mut &self, mut &s: &StructIns) {
-		self.indent()
-		self.write("std::ostream &operator<<(std::ostream &_Stream, ")
-		identCoder.structureIns(self.Buf, s)
-		self.write(" _Src) {\n")
-		self.addIndent()
-		self.indent()
-
-		mut fts := s.FindMethod("Str", false)
-		if FuncPattern.Str(fts) {
-			self.write("_Stream << ")
-			identCoder.func(self.Buf, fts)
-			self.write("(&_Src);\n")
-		} else {
-			self.write(`_Stream << "`)
-			cstrBytes(self.Buf, s.Decl.Ident)
-			self.write("{\";\n")
-
-			for (i, mut f) in s.Fields {
-				self.indent()
-				self.write(`_Stream << "`)
-				cstrBytes(self.Buf, f.Decl.Ident)
-				self.write(`:`)
-
-				// Skip binded struct kinds.
-				strct := f.Kind.Struct()
-				if strct != nil && strct.Decl != nil && strct.Decl.Binded {
-					self.write(` cpp.`)
-					identCoder.field(self.Buf, f.Decl)
-					self.write(`"`)
-				} else {
-					self.write(`" << _Src.`)
-					identCoder.field(self.Buf, f.Decl)
-				}
-				if i+1 < len(s.Fields) {
-					self.write(" << \", \"")
-				}
-				self.write(";\n")
-			}
-
-			self.indent()
-			self.write("_Stream << \"}\";\n")
-		}
-
-		self.indent()
-		self.write("return _Stream;\n")
-
-		self.doneIndent()
-		self.write("}")
-	}
-
 	fn structureIns(mut &self, mut &s: &StructIns) {
 		const DeclOnly = false
 		self.structureOperators(s, DeclOnly)
 		self.structureMethods(s)
-		self.write("\n\n")
-		self.structureOstream(s)
 	}
 
 	fn structure(mut &self, mut &s: &Struct) {

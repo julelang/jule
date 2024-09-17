@@ -79,3 +79,4 @@ Here is the list of custom behaviors for this package;
 - (3) `shiftRight`: Same as `shiftLeft` but designed for right shiftings.
 - (4) `div`: Developed to eliminate the need for the Jule compiler to generate code specifically for divisions for each backend and to reduce analysis cost. The semantic analyzer creates the necessary instance for this generic function when an division is made. Thus, the necessary division function for each operation is programmed at the Jule frontent level.
 - (5):`mod`: Same as `div` but designed for modulo.
+- (6): `toStr`: 

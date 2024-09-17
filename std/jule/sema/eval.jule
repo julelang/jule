@@ -979,7 +979,7 @@ impl eval {
 	}
 
 	fn checkIntegerIndexingByData(mut self, mut &d: &Data, mut token: &Token): bool {
-		errKey := checkDataForIntegerIndexing(d, token)
+		errKey := checkDataForIntegerIndexing(self.s, d, token)
 		match errKey {
 		| LogMsg.Empty:
 			ret true
@@ -1862,7 +1862,7 @@ impl eval {
 		d.Mutable = d.Mutable || !d.Kind.Mutable()
 
 		if !d.Decl && (d.Kind.Enum() == nil || !d.Kind.Enum().Kind.Kind.Equal(t)) {
-			applyCastKind(d, t, errorToken)
+			applyCastKind(self.s, d, t, errorToken)
 			(&CastingExprModel)(d.Model).Token = errorToken
 		} else {
 			d.Kind = t
@@ -2294,7 +2294,7 @@ impl eval {
 		if item == nil {
 			self.pushErr(ident, LogMsg.ObjHaveNotIdent, enm.Ident, ident.Kind)
 		}
-		ret evalEnumStatic(enm, item, ident)
+		ret evalEnumStatic(self.s, enm, item, ident)
 	}
 
 	fn evalTypeEnumStatic(mut self, mut enm: &TypeEnum, ident: &Token): &Data {
@@ -3840,6 +3840,7 @@ impl binaryEval {
 		match self.op.Id {
 		| TokenId.Eqs
 		| TokenId.NotEq:
+			applyImplicitCast(self.e.s, self.l.Kind, self.r, self.op)
 			ret &Data{
 				Kind: primBool,
 			}
@@ -4330,7 +4331,7 @@ impl binaryEval {
 			d.Constant = self.l.Constant
 		}
 		d.Model = d.Constant
-		applyCastModelByEnum(d, d.Kind.Enum(), self.op)
+		applyCastModelByEnum(self.e.s, d, d.Kind.Enum(), self.op)
 	}
 
 	fn checkData(mut self, mut &d: &Data) {
@@ -4573,7 +4574,22 @@ fn isPtrArithmeticCompatible(mut &l: &Data, mut &r: &Data): bool {
 	ret tcc.check()
 }
 
-fn applyCastKindModel(mut &d: &Data, mut &t: &TypeKind, mut &token: &Token) {
+fn applyRuntimeToStr(mut &s: &sema, mut &from: &TypeKind, mut &to: &TypeKind, mut &token: &Token) {
+	prim := to.Prim()
+	if prim != nil {
+		if prim.IsAny() {
+			pushRuntimeToStr(s, from, token)
+		}
+		ret
+	}
+	if to.TypeEnum() != nil {
+		pushRuntimeToStr(s, from, token)
+		ret
+	}
+}
+
+fn applyCastKindModel(mut &s: &sema, mut &d: &Data, mut &t: &TypeKind, mut &token: &Token) {
+	applyRuntimeToStr(s, d.Kind, t, token)
 	d.Model = &CastingExprModel{
 		Token: token,
 		Expr: new(Data, *d),
@@ -4582,8 +4598,8 @@ fn applyCastKindModel(mut &d: &Data, mut &t: &TypeKind, mut &token: &Token) {
 	}
 }
 
-fn applyCastKind(mut &d: &Data, mut &t: &TypeKind, mut &token: &Token) {
-	applyCastKindModel(d, t, token)
+fn applyCastKind(mut &s: &sema, mut &d: &Data, mut &t: &TypeKind, mut &token: &Token) {
+	applyCastKindModel(s, d, t, token)
 	d.Kind = t
 }
 
@@ -4593,7 +4609,7 @@ fn buildVoidData(): &Data {
 	}
 }
 
-fn checkDataForIntegerIndexing(mut &d: &Data, mut &token: &Token): (errFmt: LogMsg) {
+fn checkDataForIntegerIndexing(mut &s: &sema, mut &d: &Data, mut &token: &Token): (errFmt: LogMsg) {
 	if d == nil {
 		ret LogMsg.Empty
 	}
@@ -4610,7 +4626,7 @@ fn checkDataForIntegerIndexing(mut &d: &Data, mut &token: &Token): (errFmt: LogM
 	| d.Kind.Prim() == nil
 	| d.IsConst()
 	| types::RealKindOf(d.Kind.Prim().Str()) != types::RealKindOf(PrimKind.Int):
-		applyCastKind(d, primInt, token)
+		applyCastKind(s, d, primInt, token)
 	}
 	ret LogMsg.Empty
 }
@@ -4618,15 +4634,11 @@ fn checkDataForIntegerIndexing(mut &d: &Data, mut &token: &Token): (errFmt: LogM
 // Applies casting Model: to data by enum.
 // This is necessary to keep exact same type of enum's field type.
 // The parameter d should be constant data.
-fn applyCastModelByEnum(mut &d: &Data, mut e: &Enum, mut &token: &Token) {
+fn applyCastModelByEnum(mut &s: &sema, mut &d: &Data, mut e: &Enum, mut &token: &Token) {
 	if e == nil {
 		ret
 	}
-	p := e.Kind.Kind.Prim()
-	if p.IsStr() {
-		ret
-	}
-	applyCastKindModel(d, e.Kind.Kind, token)
+	applyCastKindModel(s, d, e.Kind.Kind, token)
 }
 
 fn castConstByType(&t: str, mut &d: &Data) {
@@ -4708,7 +4720,7 @@ fn constoa(&c: &Const): str {
 	}
 }
 
-fn evalEnumStatic(mut &enm: &Enum, mut &item: &EnumItem, mut &token: &Token): &Data {
+fn evalEnumStatic(mut &s: &sema, mut &enm: &Enum, mut &item: &EnumItem, mut &token: &Token): &Data {
 	mut d := &Data{
 		Kind: &TypeKind{
 			Kind: enm,
@@ -4717,7 +4729,7 @@ fn evalEnumStatic(mut &enm: &Enum, mut &item: &EnumItem, mut &token: &Token): &D
 	if item != nil {
 		d.Constant = new(Const, *item.Value.Data.Constant)
 		d.Model = d.Constant
-		applyCastModelByEnum(d, enm, token)
+		applyCastModelByEnum(s, d, enm, token)
 	}
 	ret d
 }

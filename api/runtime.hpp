@@ -19,6 +19,10 @@ namespace jule {
 
 jule::Bool __jule_ptrEqual(void *a, void *b);
 jule::Str __jule_ptrToStr(void *p);
+jule::Str __jule_boolToStr(jule::Bool b);
+jule::Str __jule_i64ToStr(jule::I64 x);
+jule::Str __jule_u64ToStr(jule::U64 x);
+jule::Str __jule_f64ToStr(jule::F64 x);
 jule::Uint *__jule_RCNew(void);
 jule::Uint __jule_RCLoad(jule::Uint *p);
 void __jule_RCAdd(jule::Uint *p);
