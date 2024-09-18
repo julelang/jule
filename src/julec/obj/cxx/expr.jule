@@ -237,11 +237,11 @@ impl exprCoder {
 		| TokenId.Solidus
 		| TokenId.SolidusEq:
 			mut div := obj::RuntimeFindFn(self.oc.ir.Runtime, obj::RuntimeFunc.div)
-			f = obj::FindGenericInstance(div, l.Kind, r.Kind)
+			f = obj::FindFnGenericInstance(div, l.Kind, r.Kind)
 		| TokenId.Percent
 		| TokenId.PercentEq:
 			mut mod := obj::RuntimeFindFn(self.oc.ir.Runtime, obj::RuntimeFunc.mod)
-			f = obj::FindGenericInstance(mod, l.Kind, r.Kind)
+			f = obj::FindFnGenericInstance(mod, l.Kind, r.Kind)
 		}
 		identCoder.funcIns(self.oc.Buf, f)
 		self.oc.write("(")
@@ -292,7 +292,7 @@ impl exprCoder {
 				// The left operand is will be array one always.
 				arr := lk.Arr()
 				mut f := obj::RuntimeFindFn(self.oc.ir.Runtime, obj::RuntimeFunc.arrayCmp)
-				mut ins := obj::FindGenericInstance(f, arr.Elem)
+				mut ins := obj::FindFnGenericInstance(f, arr.Elem)
 				if op == TokenId.NotEq {
 					buf.WriteByte('!')
 				}
@@ -304,6 +304,19 @@ impl exprCoder {
 				buf.WriteStr(".begin(), ")
 				buf.WriteStr(conv::Itoa(arr.N))
 				buf.WriteByte(')')
+				ret
+			| lk.Map() != nil:
+				// map types only comparable with <nil>.
+				// so this check is enough, see [std::jule] developer reference (11.2).
+				mut _map := lk.Map()
+				mut s := obj::RuntimeFindStruct(self.oc.ir.Runtime, obj::RuntimeStruct._Map)
+				mut ins := obj::FindStructGenericInstance(s, _map.Key, _map.Val)
+				const Binded = false
+				mut f := ins.FindMethod("isNil", Binded).Instances[0]
+				identCoder.funcIns(self.oc.Buf, f)
+				self.oc.write("(&")
+				self.oc.write(l)
+				self.oc.write(")")
 				ret
 			}
 		}
@@ -342,7 +355,7 @@ impl exprCoder {
 
 	fn shl(mut &self, mut &l: &OperandExprModel, mut &r: &OperandExprModel) {
 		mut f := obj::RuntimeFindFn(self.oc.ir.Runtime, obj::RuntimeFunc.shiftLeft)
-		mut ins := obj::FindGenericInstance(f, l.Kind, r.Kind)
+		mut ins := obj::FindFnGenericInstance(f, l.Kind, r.Kind)
 		identCoder.funcIns(self.oc.Buf, ins)
 		self.oc.write("(")
 		self.possibleRefExpr(l.Model)
@@ -353,7 +366,7 @@ impl exprCoder {
 
 	fn shr(mut &self, mut &l: &OperandExprModel, mut &r: &OperandExprModel) {
 		mut f := obj::RuntimeFindFn(self.oc.ir.Runtime, obj::RuntimeFunc.shiftRight)
-		mut ins := obj::FindGenericInstance(f, l.Kind, r.Kind)
+		mut ins := obj::FindFnGenericInstance(f, l.Kind, r.Kind)
 		identCoder.funcIns(self.oc.Buf, ins)
 		self.oc.write("(")
 		self.possibleRefExpr(l.Model)
@@ -610,6 +623,11 @@ impl exprCoder {
 			self.oc.write("_mptr_data")
 			self.oc.write(conv::Itoa(obj::FindTraitTypeOffset(m.Kind.Trait(), m.ExprKind)))
 			self.oc.write(")")
+			ret
+		| m.Kind.Map() != nil:
+			// maps only supports casting from nil (except <any> but they are handled)
+			self.oc.tc.kind(self.oc.Buf, m.Kind)
+			self.oc.write("{}")
 			ret
 		}
 		prim := m.Kind.Prim()
@@ -1025,38 +1043,17 @@ impl exprCoder {
 		// Index access with safety measures.
 		match {
 		| m.Expr.Kind.Map() != nil:
-			const valueIdent = "__lookup_val"
-			const okIdent = "__lookup_ok"
 			mut _map := m.Expr.Kind.Map()
-			self.oc.write("({ ")
-			self.oc.tc.kind(self.oc.Buf, _map.Val)
-			self.oc.write(" ")
-			self.oc.write(valueIdent)
-			self.oc.write("; ")
-			self.oc.write(typeCoder.Bool)
-			self.oc.write(" ")
-			self.oc.write(okIdent)
-			self.oc.write("; ")
+			mut s := obj::RuntimeFindStruct(self.oc.ir.Runtime, obj::RuntimeStruct._Map)
+			mut ins := obj::FindStructGenericInstance(s, _map.Key, _map.Val)
+			const Binded = false
+			mut f := ins.FindMethod("get", Binded).Instances[0]
+			identCoder.funcIns(self.oc.Buf, f)
+			self.oc.write("(&")
 			self.possibleRefExpr(m.Expr.Model)
-			self.oc.write(".lookup(")
+			self.oc.write(", ")
 			self.possibleRefExpr(m.Index.Model)
-			self.oc.write(", &")
-			self.oc.write(valueIdent)
-			self.oc.write(", &")
-			self.oc.write(okIdent)
-			self.oc.write("); ")
-			if ableToInit(_map.Val) {
-				// Assign to default value if key is not exist and able to init.
-				self.oc.write("if (!")
-				self.oc.write(okIdent)
-				self.oc.write(") ")
-				self.oc.write(valueIdent)
-				self.oc.write(" = ")
-				self.initExpr(_map.Val)
-				self.oc.write("; ")
-			}
-			self.oc.write(valueIdent)
-			self.oc.write("; })")
+			self.oc.write(")")
 		| env::Production
 		| m.Expr.Kind.Ptr() != nil
 		| obj::IsExprComesFromBind(m.Expr):
@@ -1123,24 +1120,36 @@ impl exprCoder {
 	}
 
 	fn mapExpr(mut &self, mut m: &MapExprModel) {
-		self.oc.write(typeCoder.Map + "<")
-		self.oc.tc.kind(self.oc.Buf, m.KeyKind)
-		self.oc.write(", ")
-		self.oc.tc.kind(self.oc.Buf, m.ValKind)
-		self.oc.write(">({")
-		if len(m.Entries) > 0 {
-			for (i, mut pair) in m.Entries {
-				self.oc.write("{")
-				self.possibleRefExpr(pair.Key)
-				self.oc.write(",")
-				self.possibleRefExpr(pair.Val)
-				self.oc.write("}")
-				if len(m.Entries)-i > 1 {
-					self.oc.write(",")
-				}
-			}
+		if len(m.Entries) == 0 {
+			self.oc.tc.mapType(self.oc.Buf, m.Kind)
+			self.oc.write("{}")
+			ret
 		}
-		self.oc.write("})")
+
+		mut s := obj::RuntimeFindStruct(self.oc.ir.Runtime, obj::RuntimeStruct._Map)
+		mut ins := obj::FindStructGenericInstance(s, m.Kind.Key, m.Kind.Val)
+		const Binded = false
+		mut f := ins.FindMethod("set", Binded).Instances[0]
+
+		const mapVar = "__jule_map"
+		self.oc.write("({ ")
+		self.oc.tc.mapType(self.oc.Buf, m.Kind)
+		self.oc.write(" ")
+		self.oc.write(mapVar)
+		self.oc.write("; ")
+		for (_, mut pair) in m.Entries {
+			self.oc.write("(*")
+			identCoder.funcIns(self.oc.Buf, f)
+			self.oc.write("(&")
+			self.oc.write(mapVar)
+			self.oc.write(", ")
+			self.possibleRefExpr(pair.Key)
+			self.oc.write(")) = ")
+			self.possibleRefExpr(pair.Val)
+			self.oc.write("; ")
+		}
+		self.oc.write(mapVar)
+		self.oc.write("; })")
 	}
 
 	fn slicing(mut &self, mut m: &SlicingExprModel) {
@@ -1281,7 +1290,7 @@ impl exprCoder {
 		}
 		self.oc.write("jule::out(")
 		mut decl := obj::RuntimeFindFn(self.oc.ir.Runtime, obj::RuntimeFunc.toStr)
-		mut f := obj::FindGenericInstance(decl, m.Expr.Kind)
+		mut f := obj::FindFnGenericInstance(decl, m.Expr.Kind)
 		identCoder.funcIns(self.oc.Buf, f)
 		self.oc.write("(")
 		self.possibleRefExpr(m.Expr.Model)
@@ -1294,7 +1303,7 @@ impl exprCoder {
 		}
 		self.oc.write("jule::outln(")
 		mut decl := obj::RuntimeFindFn(self.oc.ir.Runtime, obj::RuntimeFunc.toStr)
-		mut f := obj::FindGenericInstance(decl, m.Expr.Kind)
+		mut f := obj::FindFnGenericInstance(decl, m.Expr.Kind)
 		identCoder.funcIns(self.oc.Buf, f)
 		self.oc.write("(")
 		self.possibleRefExpr(m.Expr.Model)
@@ -1373,13 +1382,27 @@ impl exprCoder {
 	}
 
 	fn deleteCall(mut &self, mut m: &BuiltinDeleteCallExprModel) {
-		self.possibleRefExpr(m.Dest.Model)
+		mut _map := m.Dest.Kind.Map()
+		if _map == nil {
+			panic("cxx: deleteCall: destination is not map")
+		}
+		mut s := obj::RuntimeFindStruct(self.oc.ir.Runtime, obj::RuntimeStruct._Map)
+		mut ins := obj::FindStructGenericInstance(s, _map.Key, _map.Val)
+		const Binded = false
 		if m.Key != nil {
-			self.oc.write(".del(")
+			mut f := ins.FindMethod("del", Binded).Instances[0]
+			identCoder.funcIns(self.oc.Buf, f)
+			self.oc.write("(&")
+			self.possibleRefExpr(m.Dest.Model)
+			self.oc.write(", ")
 			self.possibleRefExpr(m.Key.Model)
 			self.oc.write(")")
 		} else {
-			self.oc.write(".clear()")
+			mut f := ins.FindMethod("clear", Binded).Instances[0]
+			identCoder.funcIns(self.oc.Buf, f)
+			self.oc.write("(&")
+			self.possibleRefExpr(m.Dest.Model)
+			self.oc.write(")")
 		}
 	}
 
@@ -1808,6 +1831,11 @@ impl exprCoder {
 
 	fn initExpr(mut &self, mut t: &TypeKind) {
 		if t.NilCompatible() {
+			if t.Map() != nil {
+				self.oc.tc.kind(self.oc.Buf, t)
+				self.oc.write("{}")
+				ret
+			}
 			if t.Ptr() != nil {
 				self.oc.write("nullptr")
 			} else {

@@ -5,7 +5,7 @@
 use comptime for std::comptime
 use ast for std::jule::ast
 use std::jule::lex::{TokenId}
-use std::jule::sema::{Trait, StructIns, TypeKind, Fn, FnIns}
+use std::jule::sema::{Trait, Struct, StructIns, TypeKind, Fn, FnIns}
 
 // Returns directive if exist.
 fn FindDirective(mut &directives: []&ast::Directive, tag: str): &ast::Directive {
@@ -144,9 +144,25 @@ fn FindOperator(mut &s: &StructIns, op: TokenId, unary: bool): &FnIns {
 // Returns function instance by generics.
 // Assumes generics parameter have enough and same size with generic count of f.
 // Panics if not exist any instance.
-fn FindGenericInstance(mut &f: &Fn, generics: ...&TypeKind): &FnIns {
+fn FindFnGenericInstance(mut &f: &Fn, generics: ...&TypeKind): &FnIns {
 lookup:
 	for (_, mut ins) in f.Instances {
+		for i in ins.Generics {
+			if !ins.Generics[i].Kind.Equal(generics[i]) {
+				continue lookup
+			}
+		}
+		ret ins
+	}
+	panic("generic instance lookup failed, this is an implementation mistake")
+}
+
+// Returns struct instance by generics.
+// Assumes generics parameter have enough and same size with generic count of s.
+// Panics if not exist any instance.
+fn FindStructGenericInstance(mut &s: &Struct, generics: ...&TypeKind): &StructIns {
+lookup:
+	for (_, mut ins) in s.Instances {
 		for i in ins.Generics {
 			if !ins.Generics[i].Kind.Equal(generics[i]) {
 				continue lookup

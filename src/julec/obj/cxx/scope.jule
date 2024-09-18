@@ -201,15 +201,53 @@ impl scopeCoder {
 		identCoder.iterNext(sb, uintptr(it))
 		next := sb.Str()
 
-		mut ref := false
-		self.iterHead(it, ref, begin)
+		mut _map := it.Expr.Kind.Map()
+		mut s := obj::RuntimeFindStruct(self.oc.ir.Runtime, obj::RuntimeStruct._Map)
+		mut ins := obj::FindStructGenericInstance(s, _map.Key, _map.Val)
+		const Binded = false
+		mut f := ins.FindMethod("iterator", Binded).Instances[0]
+
+		mut itDecl := obj::RuntimeFindStruct(self.oc.ir.Runtime, obj::RuntimeStruct.mapIterator)
+		mut iterator := obj::FindStructGenericInstance(itDecl, _map.Key, _map.Val)
+		mut nextCall := iterator.FindMethod("next", Binded).Instances[0]
+
+		const resultName = "__iterator_result"
+		const resultArgName = resultName + "." + resultArgName
+		let resultKey = resultArgName + "0"
+		let resultVal = resultArgName + "1"
+
+		self.oc.write("{\n")
+		self.oc.addIndent()
+		self.oc.indent()
+		self.oc.tc.structureIns(self.oc.Buf, iterator)
+		self.oc.write(" it = ")
+		identCoder.funcIns(self.oc.Buf, f)
+		self.oc.write("(&")
+		self.oc.ec.possibleRefExpr(it.Expr.Model)
+		self.oc.write(");\n")
+		self.oc.indent()
+		self.oc.write(begin)
+		self.oc.write(":;\n")
+		self.oc.indent()
+		self.oc.tc.funcInsResult(self.oc.Buf, nextCall)
+		self.oc.write(" ")
+		self.oc.write(resultName)
+		self.oc.write(" = ")
+		identCoder.funcIns(self.oc.Buf, nextCall)
+		self.oc.write("(&it);\n")
+		self.oc.indent()
+		self.oc.write("if (")
+		self.oc.write(resultKey)
+		self.oc.write(" != nullptr) {\n")
+		self.oc.addIndent()
+		self.oc.indent()
 		if it.KeyA != nil {
-			self.oc.varInitExpr(it.KeyA, fn() { self.oc.write("it->first") })
+			self.oc.varInitExpr(it.KeyA, fn() { self.oc.write("*" + resultKey) })
 			self.oc.write("\n")
 			self.oc.indent()
 		}
 		if it.KeyB != nil {
-			self.oc.varInitExpr(it.KeyB, fn() { self.oc.write("it->second") })
+			self.oc.varInitExpr(it.KeyB, fn() { self.oc.write("*" + resultVal) })
 			self.oc.write("\n")
 			self.oc.indent()
 		}
@@ -218,8 +256,6 @@ impl scopeCoder {
 		self.oc.indent()
 		self.oc.write(next)
 		self.oc.write(":;\n")
-		self.oc.indent()
-		self.oc.write("++it;\n")
 		self.oc.indent()
 		self.oc.write("goto ")
 		self.oc.write(begin)
@@ -478,10 +514,17 @@ impl scopeCoder {
 			}
 			// Map indexing used for assignment.
 			// Generate direct lookup unlike expression coder.
+			mut s := obj::RuntimeFindStruct(self.oc.ir.Runtime, obj::RuntimeStruct._Map)
+			mut ins := obj::FindStructGenericInstance(s, _map.Key, _map.Val)
+			const Binded = false
+			mut f := ins.FindMethod("set", Binded).Instances[0]
+			self.oc.write("(*")
+			identCoder.funcIns(self.oc.Buf, f)
+			self.oc.write("(&")
 			self.oc.ec.possibleRefExpr(iem.Expr.Model)
-			self.oc.write("[")
+			self.oc.write(", ")
 			self.oc.ec.possibleRefExpr(iem.Index.Model)
-			self.oc.write("]")
+			self.oc.write("))")
 			ret
 		}
 		self.oc.ec.possibleRefExpr(model)
@@ -555,8 +598,17 @@ impl scopeCoder {
 
 	fn mapLookupAssign(mut &self, mut &a: &MultiAssign) {
 		mut iem := (&IndexingExprModel)(a.Right)
+		mut _map := iem.Expr.Kind.Map()
+
+		mut s := obj::RuntimeFindStruct(self.oc.ir.Runtime, obj::RuntimeStruct._Map)
+		mut ins := obj::FindStructGenericInstance(s, _map.Key, _map.Val)
+		const Binded = false
+		mut f := ins.FindMethod("lookup", Binded).Instances[0]
+
+		identCoder.funcIns(self.oc.Buf, f)
+		self.oc.write("(&")
 		self.assignLeft(iem.Expr.Model)
-		self.oc.write(".lookup(")
+		self.oc.write(", ")
 		self.oc.ec.possibleRefExpr(iem.Index.Model)
 		self.oc.write(", ")
 		if a.Left[0] != nil {
