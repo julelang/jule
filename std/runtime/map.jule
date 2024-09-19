@@ -72,18 +72,18 @@ fn hashLen16_3(u: u64, v: u64, mul: u64): u64 {
 
 fn hashLen0to16(bytes: []byte, n: int): u64 {
 	if n >= 8 {
-		mul := k2 + u64(n)*2
+		mul := k2 + u64(n) << 1
 		a := fetch64(bytes) + k2
 		b := fetch64(bytes[n-8:])
-		c := rotate64(b, 37)*mul + a
+		c := rotate64(b, 37) * mul + a
 		d := (rotate64(a, 25) + b) * mul
 		ret hashLen16_3(c, d, mul)
 	}
 
 	if n >= 4 {
-		mul := k2 + u64(n)*2
+		mul := k2 + u64(n) << 1
 		a := u64(fetch32(bytes))
-		ret hashLen16_3(u64(n)+(a<<3), u64(fetch32(bytes[n-4:])), mul)
+		ret hashLen16_3(u64(n) + (a << 3), u64(fetch32(bytes[n-4:])), mul)
 	}
 
 	if n > 0 {
@@ -92,7 +92,7 @@ fn hashLen0to16(bytes: []byte, n: int): u64 {
 		c := u8(bytes[n-1])
 		y := u32(a) + (u32(b) << 8)
 		z := n + (int(c) << 2)
-		ret shiftMix(u64(y)*k2^u64(z)*k0) * k2
+		ret shiftMix(u64(y) * k2 ^ u64(z) * k0) * k2
 	}
 
 	ret k2
@@ -106,8 +106,8 @@ fn hashMurmur(mut bytes: []byte, n: int, seed: u128): u128 {
 	mut l := n - 16
 
 	if l <= 0 { // len <= 16
-		a = shiftMix(a*k1) * k1
-		c = b*k1 + hashLen0to16(bytes, n)
+		a = shiftMix(a * k1) * k1
+		c = b * k1 + hashLen0to16(bytes, n)
 
 		if n >= 8 {
 			d = shiftMix(a + fetch64(bytes))
@@ -115,15 +115,15 @@ fn hashMurmur(mut bytes: []byte, n: int, seed: u128): u128 {
 			d = shiftMix(a + c)
 		}
 	} else { // len > 16
-		c = hashLen16(fetch64(bytes[n-8:])+k1, a)
-		d = hashLen16(b+u64(n), c+fetch64(bytes[n-16:]))
+		c = hashLen16(fetch64(bytes[n-8:]) + k1, a)
+		d = hashLen16(b + u64(n), c + fetch64(bytes[n-16:]))
 		a += d
 
 		for {
-			a ^= shiftMix(fetch64(bytes)*k1) * k1
+			a ^= shiftMix(fetch64(bytes) * k1) * k1
 			a *= k1
 			b ^= a
-			c ^= shiftMix(fetch64(bytes[8:])*k1) * k1
+			c ^= shiftMix(fetch64(bytes[8:]) * k1) * k1
 			c *= k1
 			d ^= c
 			bytes = bytes[16:]
@@ -142,7 +142,7 @@ fn hashMurmur(mut bytes: []byte, n: int, seed: u128): u128 {
 
 fn weakHashLen32WithSeeds(w: u64, x: u64, y: u64, z: u64, mut a: u64, mut b: u64): u128 {
 	a += w
-	b = rotate64(b+a+z, 21)
+	b = rotate64(b + a + z, 21)
 	c := a
 	a += x
 	a += y
@@ -170,29 +170,29 @@ fn hashWithSeed(mut bytes: []byte, mut n: int, seed: u128): u128 {
 	mut y := seed.hi
 	mut z := u64(n) * k1
 
-	v.lo = rotate64(y^k1, 49)*k1 + fetch64(bytes)
-	v.hi = rotate64(v.lo, 42)*k1 + fetch64(bytes[8:])
-	w.lo = rotate64(y+z, 35)*k1 + x
-	w.hi = rotate64(x+fetch64(bytes[88:]), 53) * k1
+	v.lo = rotate64(y ^ k1, 49) * k1 + fetch64(bytes)
+	v.hi = rotate64(v.lo, 42) * k1 + fetch64(bytes[8:])
+	w.lo = rotate64(y + z, 35) * k1 + x
+	w.hi = rotate64(x + fetch64(bytes[88:]), 53) * k1
 
 	// This is the same inner loop as CityHash64(), manually unrolled.
 	for {
-		x = rotate64(x+y+v.lo+fetch64(bytes[8:]), 37) * k1
-		y = rotate64(y+v.hi+fetch64(bytes[48:]), 42) * k1
+		x = rotate64(x + y + v.lo + fetch64(bytes[8:]), 37) * k1
+		y = rotate64(y + v.hi + fetch64(bytes[48:]), 42) * k1
 		x ^= w.hi
 		y += v.lo + fetch64(bytes[40:])
-		z = rotate64(z+w.lo, 33) * k1
-		v = weakHashLen32WithSeeds_3(bytes, v.hi*k1, x+w.lo)
-		w = weakHashLen32WithSeeds_3(bytes[32:], z+w.hi, y+fetch64(bytes[16:]))
+		z = rotate64(z + w.lo, 33) * k1
+		v = weakHashLen32WithSeeds_3(bytes, v.hi * k1, x + w.lo)
+		w = weakHashLen32WithSeeds_3(bytes[32:], z + w.hi, y + fetch64(bytes[16:]))
 		z, x = x, z
 		bytes = bytes[64:]
-		x = rotate64(x+y+v.lo+fetch64(bytes[8:]), 37) * k1
-		y = rotate64(y+v.hi+fetch64(bytes[48:]), 42) * k1
+		x = rotate64(x + y + v.lo + fetch64(bytes[8:]), 37) * k1
+		y = rotate64(y + v.hi + fetch64(bytes[48:]), 42) * k1
 		x ^= w.hi
 		y += v.lo + fetch64(bytes[40:])
-		z = rotate64(z+w.lo, 33) * k1
-		v = weakHashLen32WithSeeds_3(bytes, v.hi*k1, x+w.lo)
-		w = weakHashLen32WithSeeds_3(bytes[32:], z+w.hi, y+fetch64(bytes[16:]))
+		z = rotate64(z + w.lo, 33) * k1
+		v = weakHashLen32WithSeeds_3(bytes, v.hi * k1, x + w.lo)
+		w = weakHashLen32WithSeeds_3(bytes[32:], z + w.hi, y + fetch64(bytes[16:]))
 		z, x = x, z
 		bytes = bytes[64:]
 		n -= 128
@@ -201,9 +201,9 @@ fn hashWithSeed(mut bytes: []byte, mut n: int, seed: u128): u128 {
 		}
 	}
 
-	x += rotate64(v.lo+z, 49) * k0
-	y = y*k0 + rotate64(w.hi, 37)
-	z = z*k0 + rotate64(w.lo, 27)
+	x += rotate64(v.lo + z, 49) * k0
+	y = y * k0 + rotate64(w.hi, 37)
+	z = z * k0 + rotate64(w.lo, 27)
 	w.lo *= 9
 	v.lo *= k0
 
@@ -211,12 +211,12 @@ fn hashWithSeed(mut bytes: []byte, mut n: int, seed: u128): u128 {
 	let mut tailDone = 0
 	for tailDone < n {
 		tailDone += 32
-		y = rotate64(x+y, 42)*k0 + v.hi
+		y = rotate64(x + y, 42) * k0 + v.hi
 		w.lo += fetch64(t[rn-tailDone+16:])
-		x = x*k0 + w.lo
+		x = x * k0 + w.lo
 		z += w.hi + fetch64(t[rn-tailDone:])
 		w.hi += v.lo
-		v = weakHashLen32WithSeeds_3(t[rn-tailDone:], v.lo+z, v.hi)
+		v = weakHashLen32WithSeeds_3(t[rn-tailDone:], v.lo + z, v.hi)
 		v.lo *= k0
 	}
 
@@ -224,9 +224,9 @@ fn hashWithSeed(mut bytes: []byte, mut n: int, seed: u128): u128 {
 	// enough information for a strong 128-bit hash.  We use two
 	// different 56-byte-to-8-byte hashes to get a 16-byte final result.
 	x = hashLen16(x, v.lo)
-	y = hashLen16(y+z, w.lo)
+	y = hashLen16(y + z, w.lo)
 
-	ret u128{hashLen16(x+v.hi, w.hi) + y, hashLen16(x+w.hi, y+v.hi)}
+	ret u128{hashLen16(x + v.hi, w.hi) + y, hashLen16(x + w.hi, y + v.hi)}
 }
 
 // The hash function, designed for the built-in map type.
@@ -256,7 +256,7 @@ fn hashWithSeed(mut bytes: []byte, mut n: int, seed: u128): u128 {
 fn hash(mut bytes: []byte): u64 {
 	mut sum := u128{}
 	if len(bytes) > 16 {
-		sum = hashWithSeed(bytes[16:], len(bytes)-16,
+		sum = hashWithSeed(bytes[16:], len(bytes) - 16,
 			u128{fetch64(bytes), fetch64(bytes[8:]) + k0})
 	} else {
 		sum = hashWithSeed(bytes, len(bytes), u128{k0, k1})
@@ -264,7 +264,7 @@ fn hash(mut bytes: []byte): u64 {
 	ret hash128to64(sum)
 }
 
-const groupSize       = 8
+const groupSize = 8
 const maxAvgGroupLoad = 4
 
 const loBits = 0x0101010101010101
@@ -295,7 +295,7 @@ unsafe fn metaMatchEmpty(m: *metadata): bitset {
 fn nextMatch(mut &b: bitset): u32 {
 	s := u32(bits::TrailingZeros64(u64(b)))
 	b &= ^(1 << s) // clear bit |s|
-	ret s >> 3   // div by 8
+	ret s >> 3 // div by 8
 }
 
 fn hasZeroByte(x: u64): bitset {
@@ -335,10 +335,10 @@ fn fastModN(x: u32, n: u32): u32 {
 	ret u32((u64(x) * u64(n)) >> 32)
 }
 
-const h1Mask    = 0xffff_ffff_ffff_ff80
-const h2Mask    = 0x0000_0000_0000_007f
-const empty     = -128 // 0b1000_0000
-const tombstone = -2   // 0b1111_1110
+const h1Mask = 0xffff_ffff_ffff_ff80
+const h2Mask = 0x0000_0000_0000_007f
+const empty = -128   // 0b1000_0000
+const tombstone = -2 // 0b1111_1110
 
 // Default initial size of a map.
 const mapInitialSize = 8
@@ -397,7 +397,7 @@ impl _Map {
 			ret
 		}
 
-		groups, ctrl := self.data.groups, self.data.ctrl
+		mut groups, ctrl := self.data.groups, self.data.ctrl
 		self.data.groups = make([]group[Key, Val], n)
 		self.data.ctrl = make([]metadata, n)
 		for i in self.data.ctrl {

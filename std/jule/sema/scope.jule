@@ -564,6 +564,10 @@ impl scopeChecker {
 		ret root
 	}
 
+	fn getOwnerRefers(mut &self): &ReferenceStack {
+		ret self.getHardRoot().owner.Refers
+	}
+
 	// Like [Lookup.FindVar] but designed for local variables only.
 	fn findVar(mut self, ident: str): &Var {
 		const Reverse = true // Search reverse for correct shadowing.
@@ -1261,7 +1265,7 @@ impl scopeChecker {
 		}
 
 		mut p := overload.Params[1]
-		ret self.s.checkAssignType(p.Decl.Reference, p.Kind, r, a.Setter)
+		ret self.s.checkAssignType(p.Decl.Reference, p.Kind, r, a.Setter, self.getOwnerRefers())
 	}
 
 	fn checkSingleAssign(mut &self, mut &a: &AssignSt) {
@@ -1325,6 +1329,7 @@ impl scopeChecker {
 				dest: l.Kind,
 				d: r,
 				errorToken: a.Setter,
+				refers: self.getOwnerRefers(),
 			}
 			if checker.check() {
 				rm.Model = r.Model
@@ -1345,7 +1350,7 @@ impl scopeChecker {
 		a.Setter.Id = id
 	}
 
-	fn processEndPartOfMultiAssign(mut self, mut &st: &MultiAssign, mut &a: &AssignSt,
+	fn processEndPartOfMultiAssign(mut &self, mut &st: &MultiAssign, mut &a: &AssignSt,
 		mut &lexpr: &AssignLeft, mut &l: &Data, mut &r: &Data, strict: bool) {
 		if !lexpr.Reference && IsIgnoreIdent(lexpr.Ident) {
 			if r.Kind.Void() {
@@ -1416,7 +1421,7 @@ impl scopeChecker {
 		mut reference := false
 		if self.s.checkValidityForInitExpr(l.Mutable, reference, l.Kind, r, lexpr.Token) {
 			reference = strict // enable reference checking if strict mode enabled
-			self.s.checkAssignType(reference, l.Kind, r, lexpr.Token)
+			self.s.checkAssignType(reference, l.Kind, r, lexpr.Token, self.getOwnerRefers())
 		}
 		st.Left = append(st.Left, l)
 	}
@@ -1536,7 +1541,7 @@ impl scopeChecker {
 						}
 					}
 				}
-				applyRuntimeToStr(self.s, d.Kind, m.Expr.Kind, e.Token)
+				applyRuntimeToStr(self.s, d.Kind, m.Expr.Kind, e.Token, self.getOwnerRefers())
 				continue
 			}
 
@@ -1571,6 +1576,7 @@ impl scopeChecker {
 					dest: expr.Kind,
 					d: d,
 					errorToken: e.Token,
+					refers: self.getOwnerRefers(),
 				}
 				checker.check()
 			}

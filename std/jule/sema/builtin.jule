@@ -321,7 +321,7 @@ fn builtinCallerError(mut &e: &eval, mut &fc: &FnCallExpr): &Data {
 		ret nil
 	}
 
-	applyRuntimeToStr(e.s, expr.Kind, primAny, token)
+	applyRuntimeToStr(e.s, expr.Kind, primAny, token, e.getOwnerRefers())
 
 	mut d := buildVoidData()
 	d.Model = &BuiltinErrorCallExprModel{Err: expr}
@@ -348,7 +348,7 @@ fn builtinCallerOut(mut &e: &eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data {
 		ret nil
 	}
 
-	pushRuntimeToStr(e.s, expr.Kind, arg.Token)
+	pushRuntimeToStr(e.s, expr.Kind, arg.Token, e.getOwnerRefers())
 
 	mut d := buildVoidData()
 	d.Model = &BuiltinOutCallExprModel{Expr: expr}
@@ -413,7 +413,7 @@ fn builtinCallerNew(mut &e: &eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data {
 			const Reference = false
 			e.s.checkValidityForInitExpr(
 				!e.immutable, Reference, t.Kind, init, token)
-			_ = e.s.checkAssignType(false, t.Kind, init, token)
+			_ = e.s.checkAssignType(false, t.Kind, init, token, e.getOwnerRefers())
 
 			d.Model = &BuiltinNewCallExprModel{
 				Kind: t.Kind,
@@ -534,7 +534,7 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &FnCallExpr, mut &d: &Data): &Dat
 	if e.s.checkValidityForInitExpr(mutable, reference, t.Kind, t, firstArg.Token) {
 		// Check type if validity is good.
 		// Helps to reduce error logs and duplicated logs.
-		_ = e.s.checkAssignType(reference, t.Kind, t, firstArg.Token)
+		_ = e.s.checkAssignType(reference, t.Kind, t, firstArg.Token, e.getOwnerRefers())
 	}
 
 	mut prefix := e.prefix
@@ -577,7 +577,7 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &FnCallExpr, mut &d: &Data): &Dat
 		if e.s.checkValidityForInitExpr(mutable, reference, s.Elem, e1, secondArg.Token) {
 			// Check type if validity is good.
 			// Helps to reduce error logs and duplicated logs.
-			_ = e.s.checkAssignType(reference, s.Elem, e1, secondArg.Token)
+			_ = e.s.checkAssignType(reference, s.Elem, e1, secondArg.Token, e.getOwnerRefers())
 		}
 		d.Model = &BuiltinAppendCallExprModel{
 			Dest: t.Model,
@@ -606,7 +606,7 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &FnCallExpr, mut &d: &Data): &Dat
 		if e.s.checkValidityForInitExpr(mutable, reference, s.Elem, e1, arg.Token) {
 			// Check type if validity is good.
 			// Helps to reduce error logs and duplicated logs.
-			_ = e.s.checkAssignType(reference, s.Elem, e1, arg.Token)
+			_ = e.s.checkAssignType(reference, s.Elem, e1, arg.Token, e.getOwnerRefers())
 		}
 		slice.Elems = append(slice.Elems, e1.Model)
 	}
@@ -809,7 +809,7 @@ fn callerDeleteMap(mut &e: &eval, mut &fc: &FnCallExpr, mut &expr: &Data, mut &d
 		|:
 			const Reference = false
 			mut keyType := expr.Kind.Map().Key
-			if !e.s.checkAssignType(Reference, keyType, key, fc.Args[1].Token) {
+			if !e.s.checkAssignType(Reference, keyType, key, fc.Args[1].Token, e.getOwnerRefers()) {
 				ret nil
 			}
 		}

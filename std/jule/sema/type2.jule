@@ -249,6 +249,7 @@ struct assignTypeChecker {
 	dest:       &TypeKind
 	d:          &Data
 	errorToken: &Token
+	refers:     &ReferenceStack
 }
 
 impl assignTypeChecker {
@@ -336,7 +337,7 @@ impl assignTypeChecker {
 	fn check(mut self): bool {
 		ok := self.checkCompatibility()
 		if ok && !self.d.Kind.Variadic {
-			applyImplicitCast(self.s, self.dest, self.d, self.errorToken)
+			applyImplicitCast(self.s, self.dest, self.d, self.errorToken, self.refers)
 		}
 		ret ok
 	}
@@ -748,7 +749,7 @@ impl fnCallArgChecker {
 		if self.e.s.checkValidityForInitExpr(p.Decl.Mutable, p.Decl.Reference, p.Kind, arg, errorToken) {
 			// Check type if validity is good.
 			// Helps to reduce error logs and duplicated logs.
-			ret self.e.s.checkAssignType(p.Decl.Reference, p.Kind, arg, errorToken)
+			ret self.e.s.checkAssignType(p.Decl.Reference, p.Kind, arg, errorToken, self.e.getOwnerRefers())
 		}
 		ret false
 	}
@@ -957,7 +958,7 @@ impl structLitChecker {
 		if self.e.s.checkValidityForInitExpr(mutable, Reference, f.Kind, d, errorToken) {
 			// Check type if validity is good.
 			// Helps to reduce error logs and duplicated logs.
-			_ = self.e.s.checkAssignType(false, f.Kind, d, errorToken)
+			_ = self.e.s.checkAssignType(false, f.Kind, d, errorToken, self.e.getOwnerRefers())
 		}
 		self.args = append(self.args, &StructArgExprModel{
 			Token: errorToken,
@@ -1326,6 +1327,7 @@ impl retTypeChecker {
 				dest: t,
 				d: d,
 				errorToken: self.errorToken,
+				refers: self.sc.getHardRoot().owner.Refers,
 			}
 			ac.check()
 		}

@@ -396,8 +396,7 @@ impl eval {
 	fn getOwnerRefers(mut self): &ReferenceStack {
 		match type self.lookup {
 		| &scopeChecker:
-			mut sc := (&scopeChecker)(self.lookup).getHardRoot()
-			ret sc.owner.Refers
+			ret (&scopeChecker)(self.lookup).getOwnerRefers()
 		|:
 			// Push reference to owner if global.
 			if self.owner != nil &&
@@ -884,7 +883,7 @@ impl eval {
 			}
 			const destIsRef = false
 			if self.s.checkValidityForInitExpr(!self.immutable, destIsRef, arr.Elem, d, elem.Token) {
-				_ = self.s.checkAssignType(destIsRef, arr.Elem, d, elem.Token)
+				_ = self.s.checkAssignType(destIsRef, arr.Elem, d, elem.Token, self.getOwnerRefers())
 			}
 			model.Elems = append(model.Elems, d.Model)
 		}
@@ -926,7 +925,7 @@ impl eval {
 			if d != nil {
 				const destIsRef = false
 				if self.s.checkValidityForInitExpr(!self.immutable, destIsRef, slc.Elem, d, elem.Token) {
-					_ = self.s.checkAssignType(destIsRef, slc.Elem, d, elem.Token)
+					_ = self.s.checkAssignType(destIsRef, slc.Elem, d, elem.Token, self.getOwnerRefers())
 				}
 				model.Elems = append(model.Elems, d.Model)
 			}
@@ -979,7 +978,7 @@ impl eval {
 	}
 
 	fn checkIntegerIndexingByData(mut self, mut &d: &Data, mut token: &Token): bool {
-		errKey := checkDataForIntegerIndexing(self.s, d, token)
+		errKey := checkDataForIntegerIndexing(self.s, d, token, self.getOwnerRefers())
 		match errKey {
 		| LogMsg.Empty:
 			ret true
@@ -1051,6 +1050,7 @@ impl eval {
 			dest: m.Key,
 			d: index,
 			errorToken: i.Token,
+			refers: self.getOwnerRefers(),
 		}
 		_ = atc.check()
 		d.Kind = m.Val
@@ -1862,7 +1862,7 @@ impl eval {
 		d.Mutable = d.Mutable || !d.Kind.Mutable()
 
 		if !d.Decl && (d.Kind.Enum() == nil || !d.Kind.Enum().Kind.Kind.Equal(t)) {
-			applyCastKind(self.s, d, t, errorToken)
+			applyCastKind(self.s, d, t, errorToken, self.getOwnerRefers())
 			(&CastingExprModel)(d.Model).Token = errorToken
 		} else {
 			d.Kind = t
@@ -2294,7 +2294,7 @@ impl eval {
 		if item == nil {
 			self.pushErr(ident, LogMsg.ObjHaveNotIdent, enm.Ident, ident.Kind)
 		}
-		ret evalEnumStatic(self.s, enm, item, ident)
+		ret evalEnumStatic(self.s, enm, item, ident, self.getOwnerRefers())
 	}
 
 	fn evalTypeEnumStatic(mut self, mut enm: &TypeEnum, ident: &Token): &Data {
@@ -2965,10 +2965,10 @@ impl eval {
 
 			const destIsRef = false
 			if self.s.checkValidityForInitExpr(!self.immutable, destIsRef, m.Key, key, pair.Key.Token) {
-				_ = self.s.checkAssignType(destIsRef, m.Key, key, pair.Key.Token)
+				_ = self.s.checkAssignType(destIsRef, m.Key, key, pair.Key.Token, self.getOwnerRefers())
 			}
 			if self.s.checkValidityForInitExpr(!self.immutable, destIsRef, m.Val, val, pair.Val.Token) {
-				_ = self.s.checkAssignType(destIsRef, m.Val, val, pair.Val.Token)
+				_ = self.s.checkAssignType(destIsRef, m.Val, val, pair.Val.Token, self.getOwnerRefers())
 			}
 
 			model.Entries = append(model.Entries, &KeyValPairExprModel{
@@ -3558,7 +3558,7 @@ impl binaryEval {
 		}
 
 		mut p := overload.Params[1]
-		ret self.e.s.checkAssignType(p.Decl.Reference, p.Kind, self.r, self.op)
+		ret self.e.s.checkAssignType(p.Decl.Reference, p.Kind, self.r, self.op, self.e.getOwnerRefers())
 	}
 
 	fn evalComptimeTypeInfo(mut self): &Data {
@@ -3758,6 +3758,7 @@ impl binaryEval {
 				if !ok {
 					panic("arrayCmp evaluation failed, this is an implementation mistake")
 				}
+				self.e.pushReference[&FnIns](f)
 			}
 			ret &Data{
 				Kind: primBool,
@@ -3839,7 +3840,7 @@ impl binaryEval {
 		match self.op.Id {
 		| TokenId.Eqs
 		| TokenId.NotEq:
-			applyImplicitCast(self.e.s, self.l.Kind, self.r, self.op)
+			applyImplicitCast(self.e.s, self.l.Kind, self.r, self.op, self.e.getOwnerRefers())
 			ret &Data{
 				Kind: primBool,
 			}
@@ -3966,6 +3967,7 @@ impl binaryEval {
 		if !ok {
 			panic("sema: shift evaluation failed, this is an implementation mistake")
 		}
+		self.e.pushReference[&FnIns](f)
 	}
 
 	// Operator guaranteed to be << or >>.
@@ -4330,7 +4332,7 @@ impl binaryEval {
 			d.Constant = self.l.Constant
 		}
 		d.Model = d.Constant
-		applyCastModelByEnum(self.e.s, d, d.Kind.Enum(), self.op)
+		applyCastModelByEnum(self.e.s, d, d.Kind.Enum(), self.op, self.e.getOwnerRefers())
 	}
 
 	fn checkData(mut self, mut &d: &Data) {
@@ -4573,22 +4575,24 @@ fn isPtrArithmeticCompatible(mut &l: &Data, mut &r: &Data): bool {
 	ret tcc.check()
 }
 
-fn applyRuntimeToStr(mut &s: &sema, mut &from: &TypeKind, mut &to: &TypeKind, mut &token: &Token) {
+fn applyRuntimeToStr(mut &s: &sema, mut &from: &TypeKind, mut &to: &TypeKind,
+	mut &token: &Token, mut refers: &ReferenceStack) {
 	prim := to.Prim()
 	if prim != nil {
 		if prim.IsAny() {
-			pushRuntimeToStr(s, from, token)
+			pushRuntimeToStr(s, from, token, refers)
 		}
 		ret
 	}
 	if to.TypeEnum() != nil {
-		pushRuntimeToStr(s, from, token)
+		pushRuntimeToStr(s, from, token, refers)
 		ret
 	}
 }
 
-fn applyCastKindModel(mut &s: &sema, mut &d: &Data, mut &t: &TypeKind, mut &token: &Token) {
-	applyRuntimeToStr(s, d.Kind, t, token)
+fn applyCastKindModel(mut &s: &sema, mut &d: &Data, mut &t: &TypeKind,
+	mut &token: &Token, mut refers: &ReferenceStack) {
+	applyRuntimeToStr(s, d.Kind, t, token, refers)
 	d.Model = &CastingExprModel{
 		Token: token,
 		Expr: new(Data, *d),
@@ -4597,8 +4601,9 @@ fn applyCastKindModel(mut &s: &sema, mut &d: &Data, mut &t: &TypeKind, mut &toke
 	}
 }
 
-fn applyCastKind(mut &s: &sema, mut &d: &Data, mut &t: &TypeKind, mut &token: &Token) {
-	applyCastKindModel(s, d, t, token)
+fn applyCastKind(mut &s: &sema, mut &d: &Data, mut &t: &TypeKind,
+	mut &token: &Token, mut refers: &ReferenceStack) {
+	applyCastKindModel(s, d, t, token, refers)
 	d.Kind = t
 }
 
@@ -4608,7 +4613,8 @@ fn buildVoidData(): &Data {
 	}
 }
 
-fn checkDataForIntegerIndexing(mut &s: &sema, mut &d: &Data, mut &token: &Token): (errFmt: LogMsg) {
+fn checkDataForIntegerIndexing(mut &s: &sema, mut &d: &Data,
+	mut &token: &Token, mut refers: &ReferenceStack): (errFmt: LogMsg) {
 	if d == nil {
 		ret LogMsg.Empty
 	}
@@ -4625,7 +4631,7 @@ fn checkDataForIntegerIndexing(mut &s: &sema, mut &d: &Data, mut &token: &Token)
 	| d.Kind.Prim() == nil
 	| d.IsConst()
 	| types::RealKindOf(d.Kind.Prim().Str()) != types::RealKindOf(PrimKind.Int):
-		applyCastKind(s, d, primInt, token)
+		applyCastKind(s, d, primInt, token, refers)
 	}
 	ret LogMsg.Empty
 }
@@ -4633,11 +4639,12 @@ fn checkDataForIntegerIndexing(mut &s: &sema, mut &d: &Data, mut &token: &Token)
 // Applies casting Model: to data by enum.
 // This is necessary to keep exact same type of enum's field type.
 // The parameter d should be constant data.
-fn applyCastModelByEnum(mut &s: &sema, mut &d: &Data, mut e: &Enum, mut &token: &Token) {
+fn applyCastModelByEnum(mut &s: &sema, mut &d: &Data, mut e: &Enum,
+	mut &token: &Token, mut refers: &ReferenceStack) {
 	if e == nil {
 		ret
 	}
-	applyCastKindModel(s, d, e.Kind.Kind, token)
+	applyCastKindModel(s, d, e.Kind.Kind, token, refers)
 }
 
 fn castConstByType(&t: str, mut &d: &Data) {
@@ -4719,7 +4726,8 @@ fn constoa(&c: &Const): str {
 	}
 }
 
-fn evalEnumStatic(mut &s: &sema, mut &enm: &Enum, mut &item: &EnumItem, mut &token: &Token): &Data {
+fn evalEnumStatic(mut &s: &sema, mut &enm: &Enum, mut &item: &EnumItem,
+	mut &token: &Token, mut refers: &ReferenceStack): &Data {
 	mut d := &Data{
 		Kind: &TypeKind{
 			Kind: enm,
@@ -4728,7 +4736,7 @@ fn evalEnumStatic(mut &s: &sema, mut &enm: &Enum, mut &item: &EnumItem, mut &tok
 	if item != nil {
 		d.Constant = new(Const, *item.Value.Data.Constant)
 		d.Model = d.Constant
-		applyCastModelByEnum(s, d, enm, token)
+		applyCastModelByEnum(s, d, enm, token, refers)
 	}
 	ret d
 }
