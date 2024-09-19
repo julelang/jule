@@ -5,16 +5,8 @@
 #ifndef __JULE_BUILTIN_HPP
 #define __JULE_BUILTIN_HPP
 
-#include <iostream>
-
-#ifdef OS_WINDOWS
-#include <vector>
-#include <windows.h>
-#endif
-
 #include "runtime.hpp"
 #include "types.hpp"
-#include "ptr.hpp"
 #include "str.hpp"
 #include "slice.hpp"
 

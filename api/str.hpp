@@ -12,7 +12,6 @@
 #include "runtime.hpp"
 #include "impl_flag.hpp"
 #include "panic.hpp"
-#include "utf8.hpp"
 #include "slice.hpp"
 #include "types.hpp"
 #include "error.hpp"
@@ -64,26 +63,6 @@ namespace jule
             return jule::Str::lit(s, std::strlen(s));
         }
 
-        static jule::Str from_rune(const jule::I32 r) noexcept
-        {
-            jule::Str s;
-            s._len = 0;
-            s.buffer = jule::Str::buffer_t::make(jule::Str::alloc(4));
-            s._slice = s.buffer.alloc;
-            jule::utf8_push_rune_bytes(r, s);
-            return s;
-        }
-
-        static jule::Str from_byte(const jule::U8 b) noexcept
-        {
-            jule::Str s;
-            s._len = 1;
-            s.buffer = jule::Str::buffer_t::make(jule::Str::alloc(s._len));
-            s._slice = s.buffer.alloc;
-            s._slice[0] = b;
-            return s;
-        }
-
         // Returns element by index.
         // Includes safety checking.
         // Designed for constant strings.
@@ -118,7 +97,6 @@ namespace jule
         Str(const jule::U8 *src) : Str(src, src + std::strlen(reinterpret_cast<const char *>(src))) {}
         Str(const std::string &src) : Str(reinterpret_cast<const jule::U8 *>(src.c_str()),
                                           reinterpret_cast<const jule::U8 *>(src.c_str() + src.size())) {}
-        Str(const jule::Slice<U8> &src) : Str(src.begin(), src.end()) {}
         Str(const std::vector<U8> &src) : Str(src.data(), src.data() + src.size()) {}
 
         Str(const char *src) : Str(reinterpret_cast<const jule::U8 *>(src),
@@ -131,15 +109,6 @@ namespace jule
             this->buffer = jule::Str::buffer_t::make(buf);
             this->_slice = buf;
             std::copy(begin, end, this->_slice);
-        }
-
-        Str(const jule::Slice<jule::I32> &src)
-        {
-            this->_len = 0;
-            this->buffer = jule::Str::buffer_t::make(jule::Str::alloc(src.len() << 2));
-            this->_slice = this->buffer.alloc;
-            for (const jule::I32 &r : src)
-                jule::utf8_push_rune_bytes(r, *this);
         }
 
         using Iterator = jule::U8 *;
@@ -405,31 +374,6 @@ namespace jule
         inline operator const std::basic_string<char>(void) const
         {
             return std::basic_string<char>(this->begin(), this->end());
-        }
-
-        operator jule::Slice<jule::U8>(void) const
-        {
-            jule::Slice<jule::U8> slice;
-            slice.alloc_new(this->len(), this->len());
-            std::memcpy(slice.begin(), this->begin(), this->len());
-            return slice;
-        }
-
-        operator jule::Slice<jule::I32>(void) const
-        {
-            jule::Slice<jule::I32> runes;
-            char *s = this->operator char *();
-            const char *end = s + this->_len;
-            while (s < end)
-            {
-                jule::I32 r;
-                std::size_t len;
-                std::tie(r, len) =
-                    jule::utf8_decode_rune_str(s, end - s);
-                s += len;
-                runes.push(r);
-            }
-            return runes;
         }
 
         jule::Str &operator+=(const jule::Str &str)

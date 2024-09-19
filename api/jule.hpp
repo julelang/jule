@@ -32,6 +32,5 @@ CONFIGURATION DEFINES
 #include "str.hpp"
 #include "trait.hpp"
 #include "types.hpp"
-#include "utf8.hpp"
 
 #endif // ifndef __JULE_HPP
