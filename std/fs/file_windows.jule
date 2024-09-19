@@ -6,7 +6,7 @@ use integ for std::jule::integrated
 use sys for std::sys
 use utf8 for std::unicode::utf8
 use utf16 for std::unicode::utf16
-use zsys for std::internal::zsys
+use runtime for std::runtime
 
 impl File {
 	// Opens file stream with named file, specified flag
@@ -52,16 +52,15 @@ impl File {
 			ret 0
 		}
 
+		runtime::handleRW(buf)
 		if isConsoleHandle(self.handle) {
-			utf16Buf := integ::UTF16FromStr(str(buf))
-			ok := unsafe { sys::WriteConsole(self.handle, &utf16Buf[0], len(utf16Buf), n, nil) }
-			if !ok {
+			n = unsafe { runtime::writeConsole(self.handle, buf) }
+			if n == -1 {
 				error(getLastFsError())
 			}
 			ret n
 		}
 
-		zsys::HandleRW(buf)
 		n = unsafe { sys::Write(int(self.handle), &buf[0], uint(len(buf))) }
 		if n == -1 {
 			error(getLastFsError())
@@ -83,28 +82,15 @@ impl File {
 			ret 0
 		}
 
+		runtime::handleRW(buf)
 		if isConsoleHandle(self.handle) {
-			mut codepage := make([]u16, len(buf))
-			ok := unsafe { sys::ReadConsole(self.handle, &codepage[0], len(buf), n) }
-			if !ok {
+			n = unsafe { runtime::readConsole(self.handle, buf) }
+			if n == -1 {
 				error(getLastFsError())
 			}
-
-			runes := utf16::Decode(codepage[:n])
-			n = 0
-			for _, r in runes {
-				size := utf8::RuneLen(r)
-				if n+size > len(buf) {
-					break
-				}
-				_ = utf8::EncodeRune(buf[n:], r)
-				n += size
-			}
-
 			ret n
 		}
 
-		zsys::HandleRW(buf)
 		n = unsafe { sys::Read(int(self.handle), &buf[0], uint(len(buf))) }
 		if n == -1 {
 			error(getLastFsError())

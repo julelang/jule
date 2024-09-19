@@ -1,0 +1,69 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use std::unsafe
+use sys for std::sys
+use integ for std::jule::integrated
+use utf8 for std::unicode::utf8
+use utf16 for std::unicode::utf16
+
+fn _handleRW(&b: []byte) {}
+
+// Writes to console handle.
+// Returns written byte count if success, -1 otherwise.
+unsafe fn writeConsole(handle: sys::Handle, buf: []byte): (n: int) {
+	utf16Buf := integ::UTF16FromStr(unsafe::BytesStr(buf))
+	ok := sys::WriteConsole(handle, &utf16Buf[0], len(utf16Buf), n, nil)
+	if !ok {
+		ret -1
+	}
+	ret n
+}
+
+// Reads from console handle.
+// Returns readed byte count if success, -1 otherwise.
+unsafe fn readConsole(handle: sys::Handle, mut buf: []byte): (n: int) {
+	mut codepage := make([]u16, len(buf))
+	ok := sys::ReadConsole(handle, &codepage[0], len(codepage), n)
+	if !ok {
+		ret -1
+	}
+
+	runes := utf16::Decode(codepage[:n])
+	n = 0
+	for _, r in runes {
+		size := utf8::RuneLen(r)
+		if n+size > len(buf) {
+			break
+		}
+		_ = utf8::EncodeRune(buf[n:], r)
+		n += size
+	}
+
+	ret n
+}
+
+// Writes to stdout.
+// Returns written byte count if success, -1 otherwise.
+#export "__jule_writeStdout"
+fn writeStdout(mut buf: []byte): int {
+	handleRW(buf)
+	ret unsafe { writeConsole(sys::STDOUT, buf) }
+}
+
+// Writes to stderr.
+// Returns written byte count if success, -1 otherwise.
+#export "__jule_writeStderr"
+fn writeStderr(mut buf: []byte): int {
+	handleRW(buf)
+	ret unsafe { writeConsole(sys::STDERR, buf) }
+}
+
+// Reads from stdin.
+// Returns readed byte count if success, -1 otherwise.
+#export "__jule_readStdin"
+fn readStdin(mut buf: []byte): int {
+	handleRW(buf)
+	ret unsafe { readConsole(sys::STDIN, buf) }
+}

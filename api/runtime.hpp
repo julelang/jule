@@ -12,9 +12,12 @@
 
 #include "types.hpp"
 
-namespace jule {
+namespace jule
+{
 	class Str;
 	std::ostream &operator<<(std::ostream &stream, const jule::Str &src) noexcept;
+	template <typename Item>
+	class Slice;
 };
 
 jule::Bool __jule_ptrEqual(void *a, void *b);
@@ -29,5 +32,8 @@ void __jule_RCAdd(jule::Uint *p);
 jule::Bool __jule_RCDrop(jule::Uint *p);
 void __jule_RCFree(jule::Uint *p);
 jule::Int __jule_compareStr(jule::Str *a, jule::Str *b);
+jule::Int __jule_writeStdout(jule::Slice<jule::U8> buf);
+jule::Int __jule_writeStderr(jule::Slice<jule::U8> buf);
+jule::Int __jule_readStdin(jule::Slice<jule::U8> buf);
 
 #endif // #ifndef __JULE_RUNTIME_HPP
