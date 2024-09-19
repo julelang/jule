@@ -266,9 +266,6 @@ fn findBuiltinDefStdComptime(&ident: str): any {
 
 fn findBuiltinDefStdJuleIntegrated(&ident: str): any {
 	match ident {
-	| "ToStr":
-		static mut f = &FnIns{caller: builtinCallerStdJuleIntegratedToStr}
-		ret f
 	| "Emit":
 		static mut f = &FnIns{
 			Decl: &Fn{
@@ -1111,33 +1108,6 @@ fn builtinCallerStdMemFree(mut &e: &eval, mut &fc: &FnCallExpr, mut &_: &Data): 
 	mut result := buildVoidData()
 	result.Model = &FreeExprModel{Expr: d.Model}
 	ret result
-}
-
-fn builtinCallerStdJuleIntegratedToStr(mut &e: &eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data {
-	if len(fc.Args) < 1 {
-		e.pushErr(fc.Token, LogMsg.MissingExprFor, "expr")
-		ret nil
-	}
-	if len(fc.Args) > 1 {
-		e.pushErr(fc.Args[1].Token, LogMsg.ArgumentOverflow, "ToStr")
-	}
-
-	mut d := e.evalExpr(fc.Args[0])
-	if d == nil {
-		ret nil
-	}
-
-	if !isBuiltinStrConvertable(d.Kind) {
-		e.pushErr(fc.Args[0].Token, LogMsg.InvalidExpr)
-		ret nil
-	}
-
-	ret &Data{
-		Kind: primStr,
-		Model: &IntegratedToStrExprModel{
-			Expr: d.Model,
-		},
-	}
 }
 
 fn builtinCallerStdJuleIntegratedEmit(mut &e: &eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data {
