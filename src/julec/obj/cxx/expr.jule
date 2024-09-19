@@ -1371,6 +1371,18 @@ impl exprCoder {
 	}
 
 	fn lenCall(mut &self, mut m: &BuiltinLenCallExprModel) {
+		mut _map := m.Expr.Kind.Map()
+		if _map != nil {
+			mut s := obj::RuntimeFindStruct(self.oc.ir.Runtime, obj::RuntimeStruct._Map)
+			mut ins := obj::FindStructGenericInstance(s, _map.Key, _map.Val)
+			const Binded = false
+			mut f := ins.FindMethod("len", Binded).Instances[0]
+			identCoder.funcIns(self.oc.Buf, f)
+			self.oc.write("(&")
+			self.possibleRefExpr(m.Expr.Model)
+			self.oc.write(")")
+			ret
+		}
 		self.possibleRefExpr(m.Expr.Model)
 		self.oc.write(".len()")
 	}
