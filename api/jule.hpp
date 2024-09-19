@@ -22,7 +22,6 @@ CONFIGURATION DEFINES
 #include "array.hpp"
 #include "builtin.hpp"
 #include "defer.hpp"
-#include "env.hpp"
 #include "error.hpp"
 #include "exceptional.hpp"
 #include "fn.hpp"
