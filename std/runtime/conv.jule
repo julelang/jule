@@ -195,6 +195,15 @@ fn structToStr[T](x: T): str {
 // Returns x in string form with default format.
 // It designed for general-purpose string conversion for built-in behavior.
 fn toStr[T](x: T): str {
+	const t = comptime::TypeOf(T)
+	const match {
+	| t.Binded():
+		ret t.Str()
+	| t.CanNil():
+		if x == nil {
+			ret "<nil>"
+		}
+	}
 	const match type T {
 	| str:
 		ret x
@@ -211,13 +220,6 @@ fn toStr[T](x: T): str {
 			ret "<nil>"
 		}
 		ret unsafe { integ::Emit[str]("{}.type->to_str({}.data.alloc)", x, x) }
-	}
-	const t = comptime::TypeOf(T)
-	const match {
-	| t.CanNil():
-		if x == nil {
-			ret "<nil>"
-		}
 	}
 	const match t.Kind() {
 	| comptime::Kind.Trait:
