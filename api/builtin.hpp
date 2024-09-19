@@ -17,7 +17,6 @@
 #include "ptr.hpp"
 #include "str.hpp"
 #include "slice.hpp"
-#include "utf16.hpp"
 
 namespace jule
 {

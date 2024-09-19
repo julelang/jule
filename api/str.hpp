@@ -13,7 +13,6 @@
 #include "impl_flag.hpp"
 #include "panic.hpp"
 #include "utf8.hpp"
-#include "utf16.hpp"
 #include "slice.hpp"
 #include "types.hpp"
 #include "error.hpp"
