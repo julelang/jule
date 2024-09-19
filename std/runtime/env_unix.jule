@@ -2,13 +2,14 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use integ for std::jule::integrated
+use std::unsafe
 
 fn args(): []str {
 	mut args := make([]str, argc)
 	for i in args {
 		unsafe {
-			args[i] = integ::BytePtrToStr(argv[i])
+			mut arg := argv[i]
+			args[i] = unsafe::Str(arg, strlen(arg))
 		}
 	}
 	ret args
@@ -20,8 +21,14 @@ fn env(): []str {
 	mut it := envp
 	unsafe {
 		for *it != nil; it++ {
-			env = append(env, integ::BytePtrToStr(*it))
+			mut p := *it
+			env = append(env, unsafe::Str(p, strlen(p)))
 		}
 	}
 	ret env
+}
+
+unsafe fn strlen(mut p: *byte): (n: int) {
+	for *p != 0; p++ { n++ }
+	ret
 }
