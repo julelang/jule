@@ -3957,19 +3957,6 @@ impl binaryEval {
 		ret lk == rk
 	}
 
-	// General function to handle binary runtime functions.
-	// Assumes runtime package is exist.
-	// Function declarations looks like: fn[T1, T2](...)
-	fn pushRuntimeBinary(mut self, func: runtimeFunc) {
-		mut f := runtimeFindFn(self.e.s.meta.runtime, func).instanceForce()
-		f.Generics = append(f.Generics, &InsGeneric{Kind: self.l.Kind}, &InsGeneric{Kind: self.r.Kind})
-		ok, _ := self.e.s.checkGenericFn(f, self.op)
-		if !ok {
-			panic("sema: shift evaluation failed, this is an implementation mistake")
-		}
-		self.e.pushReference[&FnIns](f)
-	}
-
 	// Operator guaranteed to be << or >>.
 	// Operands should be guaranteed in original order.
 	fn shift(mut self): &Data {
@@ -4024,16 +4011,6 @@ impl binaryEval {
 			ret nil
 		}
 		// unsigned guaranteed
-
-		if self.e.s.meta.runtime != nil {
-			// Add instance to relevant runtime function for shifting types if not exist.
-			mut func := runtimeFunc.shiftLeft
-			if self.op.Id == TokenId.Shr {
-				func = runtimeFunc.shiftRight
-			}
-			self.pushRuntimeBinary(func)
-		}
-
 		ret self.l
 	}
 
@@ -4071,9 +4048,6 @@ impl binaryEval {
 			ret self.l
 		| TokenId.Solidus:
 			self.setTypeToGreater()
-			if self.e.s.meta.runtime != nil {
-				self.pushRuntimeBinary(runtimeFunc.div)
-			}
 			ret self.l
 		| TokenId.Percent:
 			if !types::IsInt(rk) {
@@ -4082,9 +4056,6 @@ impl binaryEval {
 			}
 			self.mod()
 			self.setTypeToGreater()
-			if self.e.s.meta.runtime != nil {
-				self.pushRuntimeBinary(runtimeFunc.mod)
-			}
 			ret self.r
 		|:
 			self.e.pushErr(self.op, LogMsg.OperatorNotForFloat, self.op.Kind)
@@ -4129,16 +4100,10 @@ impl binaryEval {
 			ret self.l
 		| TokenId.Solidus:
 			self.setTypeToGreater()
-			if self.e.s.meta.runtime != nil {
-				self.pushRuntimeBinary(runtimeFunc.div)
-			}
 			ret self.l
 		| TokenId.Percent:
 			self.mod()
 			self.setTypeToGreater()
-			if self.e.s.meta.runtime != nil {
-				self.pushRuntimeBinary(runtimeFunc.mod)
-			}
 			ret self.l
 		|:
 			self.e.pushErr(self.op, LogMsg.OperatorNotForInt, self.op.Kind)

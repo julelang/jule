@@ -75,9 +75,5 @@ This package is a basic package developed for Jule programs and focuses on runti
 
 Here is the list of custom behaviors for this package;
 - (1) `arrayCmp`: Developed to eliminate the need for the Jule compiler to generate code specifically for array comparisons for each backend and to reduce analysis cost. The semantic analyzer creates the necessary instance for this generic function when an array comparison is made. Thus, the necessary comparison function for each array is programmed at the Jule frontent level.
-- (2) `shiftLeft`: Developed to eliminate the need for the Jule compiler to generate code specifically for integer left shiftings for each backend and to reduce analysis cost. The semantic analyzer creates the necessary instance for this generic function when an integer left shifting is made. Thus, the necessary shifting function for each operation is programmed at the Jule frontent level.
-- (3) `shiftRight`: Same as `shiftLeft` but designed for right shiftings.
-- (4) `div`: Developed to eliminate the need for the Jule compiler to generate code specifically for divisions for each backend and to reduce analysis cost. The semantic analyzer creates the necessary instance for this generic function when an division is made. Thus, the necessary division function for each operation is programmed at the Jule frontent level.
-- (5):`mod`: Same as `div` but designed for modulo.
-- (6): `toStr`: Built-in string conversion function for types. An instance is created in any situation that may be required.
-- (7): `_Map`: Built-in map type implementation. An instance created for each unique map type declaration.
+- (2): `toStr`: Built-in string conversion function for types. An instance is created in any situation that may be required.
+- (3): `_Map`: Built-in map type implementation. An instance created for each unique map type declaration.

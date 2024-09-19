@@ -231,29 +231,42 @@ impl exprCoder {
 	}
 
 	fn divByZeroBinary(mut &self, &op: &Token, mut &l: &OperandExprModel, mut &r: &OperandExprModel) {
-		mut f := (&FnIns)(nil)
+		const xVar = "__jule_x"
+		const yVar = "__jule_y"
+		self.oc.write("({ ")
+		self.oc.tc.kind(self.oc.Buf, l.Kind)
+		self.oc.write(" ")
+		self.oc.write(xVar)
+		self.oc.write(" = ")
+		self.possibleRefExpr(l.Model)
+		self.oc.write("; ")
+		self.oc.tc.kind(self.oc.Buf, r.Kind)
+		self.oc.write(" ")
+		self.oc.write(yVar)
+		self.oc.write(" = ")
+		self.possibleRefExpr(r.Model)
+		self.oc.write("; if (")
+		self.oc.write(yVar)
+		self.oc.write(` == 0) __jule_panic_s("runtime: divide by zero"`)
+		if !env::Production {
+			self.oc.write(" \"")
+			self.oc.locInfo(op)
+			self.oc.write("\"")
+		}
+		self.oc.write("); ((")
+		self.oc.tc.kind(self.oc.Buf, l.Kind)
+		self.oc.write(")(")
+		self.oc.write(xVar)
 		match op.Id {
 		| TokenId.Solidus
 		| TokenId.SolidusEq:
-			mut div := obj::RuntimeFindFn(self.oc.ir.Runtime, obj::RuntimeFunc.div)
-			f = obj::FindFnGenericInstance(div, l.Kind, r.Kind)
+			self.oc.write(" / ")
 		| TokenId.Percent
 		| TokenId.PercentEq:
-			mut mod := obj::RuntimeFindFn(self.oc.ir.Runtime, obj::RuntimeFunc.mod)
-			f = obj::FindFnGenericInstance(mod, l.Kind, r.Kind)
+			self.oc.write(" % ")
 		}
-		identCoder.funcIns(self.oc.Buf, f)
-		self.oc.write("(")
-		if !env::Production {
-			self.oc.write(typeCoder.Str)
-			self.oc.write("::lit(\"")
-			self.oc.locInfo(op)
-			self.oc.write("\"),")
-		}
-		self.possibleRefExpr(l.Model)
-		self.oc.write(",")
-		self.possibleRefExpr(r.Model)
-		self.oc.write(")")
+		self.oc.write(yVar)
+		self.oc.write(")); })")
 	}
 
 	fn _unsafeBinary(mut &self, mut &buf: StrBuilder, &l: str, &r: str,
@@ -353,25 +366,59 @@ impl exprCoder {
 	}
 
 	fn shl(mut &self, mut &l: &OperandExprModel, mut &r: &OperandExprModel) {
-		mut f := obj::RuntimeFindFn(self.oc.ir.Runtime, obj::RuntimeFunc.shiftLeft)
-		mut ins := obj::FindFnGenericInstance(f, l.Kind, r.Kind)
-		identCoder.funcIns(self.oc.Buf, ins)
-		self.oc.write("(")
+		const xVar = "__jule_x"
+		const yVar = "__jule_y"
+		self.oc.write("({ ")
+		self.oc.tc.kind(self.oc.Buf, l.Kind)
+		self.oc.write(" ")
+		self.oc.write(xVar)
+		self.oc.write(" = ")
 		self.possibleRefExpr(l.Model)
-		self.oc.write(", ")
+		self.oc.write("; ")
+		self.oc.tc.kind(self.oc.Buf, r.Kind)
+		self.oc.write(" ")
+		self.oc.write(yVar)
+		self.oc.write(" = ")
 		self.possibleRefExpr(r.Model)
-		self.oc.write(")")
+		self.oc.write("; ((")
+		self.oc.tc.kind(self.oc.Buf, l.Kind)
+		self.oc.write(")(")
+		self.oc.write(yVar)
+		self.oc.write(" >= ")
+		self.oc.write(conv::Itoa(types::BitsizeOf(l.Kind.Prim().Kind)))
+		self.oc.write(" ? 0 : ")
+		self.oc.write(xVar)
+		self.oc.write(" << ")
+		self.oc.write(yVar)
+		self.oc.write(")); })")
 	}
 
 	fn shr(mut &self, mut &l: &OperandExprModel, mut &r: &OperandExprModel) {
-		mut f := obj::RuntimeFindFn(self.oc.ir.Runtime, obj::RuntimeFunc.shiftRight)
-		mut ins := obj::FindFnGenericInstance(f, l.Kind, r.Kind)
-		identCoder.funcIns(self.oc.Buf, ins)
-		self.oc.write("(")
+		const xVar = "__jule_x"
+		const yVar = "__jule_y"
+		self.oc.write("({ ")
+		self.oc.tc.kind(self.oc.Buf, l.Kind)
+		self.oc.write(" ")
+		self.oc.write(xVar)
+		self.oc.write(" = ")
 		self.possibleRefExpr(l.Model)
-		self.oc.write(", ")
+		self.oc.write("; ")
+		self.oc.tc.kind(self.oc.Buf, r.Kind)
+		self.oc.write(" ")
+		self.oc.write(yVar)
+		self.oc.write(" = ")
 		self.possibleRefExpr(r.Model)
-		self.oc.write(")")
+		self.oc.write("; ((")
+		self.oc.tc.kind(self.oc.Buf, l.Kind)
+		self.oc.write(")(")
+		self.oc.write(yVar)
+		self.oc.write(" >= ")
+		self.oc.write(conv::Itoa(types::BitsizeOf(l.Kind.Prim().Kind)))
+		self.oc.write(" ? 0 : ")
+		self.oc.write(xVar)
+		self.oc.write(" >> ")
+		self.oc.write(yVar)
+		self.oc.write(")); })")
 	}
 
 	fn binary(mut &self, mut m: &BinaryExprModel) {
