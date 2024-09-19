@@ -6,7 +6,6 @@
 #define __JULE_PTR_HPP
 
 #include <string>
-#include <ostream>
 
 #include "runtime.hpp"
 #include "types.hpp"
@@ -295,12 +294,6 @@ namespace jule
         inline jule::Bool operator!=(const jule::Ptr<T> &ref) const noexcept
         {
             return !this->operator==(ref);
-        }
-
-        friend inline std::ostream &operator<<(std::ostream &stream,
-                                               const jule::Ptr<T> &ref) noexcept
-        {
-            return stream << __jule_ptrToStr(ref.alloc);
         }
     };
 

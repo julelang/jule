@@ -6,7 +6,6 @@
 #define __JULE_TRAIT_HPP
 
 #include <string>
-#include <ostream>
 #include <cstring>
 
 #include "runtime.hpp"
@@ -258,12 +257,6 @@ namespace jule
         constexpr jule::Bool operator!=(std::nullptr_t) const noexcept
         {
             return !this->operator==(nullptr);
-        }
-
-        friend inline std::ostream &operator<<(std::ostream &stream,
-                                               const jule::Trait &src) noexcept
-        {
-            return stream << __jule_ptrToStr(src.data.alloc);
         }
     };
 } // namespace jule

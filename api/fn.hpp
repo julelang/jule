@@ -94,12 +94,6 @@ namespace jule
         {
             return !this->operator==(nullptr);
         }
-
-        friend std::ostream &operator<<(std::ostream &stream,
-                                        const Fn<Ret, Args...> &f) noexcept
-        {
-            return stream << __jule_ptrToStr((void *)f.f);
-        }
     };
 
     template <typename Ret, typename... Args>

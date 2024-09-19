@@ -5,8 +5,6 @@
 #ifndef __JULE_STR_HPP
 #define __JULE_STR_HPP
 
-#include <sstream>
-#include <ostream>
 #include <string>
 #include <cstring>
 #include <vector>
@@ -512,41 +510,6 @@ namespace jule
             return __jule_compareStr((jule::Str*)this, (jule::Str*)&str) >= 0;
         }
     };
-
-    std::ostream &operator<<(std::ostream &stream, const jule::Str &src) noexcept
-    {
-        for (const jule::U8 &b : src)
-            stream << static_cast<char>(b);
-        return stream;
-    }
-
-    template <typename T>
-    jule::Str to_str(const T &obj)
-    {
-        std::stringstream stream;
-        stream << obj;
-        return jule::Str(stream.str());
-    }
-
-    inline jule::Str to_str(const jule::Str &s) noexcept
-    {
-        return s;
-    }
-
-    inline jule::Str to_str(const char *s) noexcept
-    {
-        jule::Str s2;
-        s2._len = std::strlen(s);
-        auto buf = jule::Str::alloc(s2._len);
-        s2.buffer = jule::Str::buffer_t::make(buf);
-        s2._slice = s2.buffer.alloc;
-        return s2;
-    }
-
-    inline jule::Str to_str(char *s) noexcept
-    {
-        return jule::to_str(const_cast<const char *>(s));
-    }
 } // namespace jule
 
 #endif // #ifndef __JULE_STR_HPP

@@ -6,8 +6,6 @@
 #define __JULE_SLICE_HPP
 
 #include <cstddef>
-#include <sstream>
-#include <ostream>
 #include <initializer_list>
 
 #include "runtime.hpp"
@@ -456,24 +454,6 @@ namespace jule
         {
             this->dealloc();
             return *this;
-        }
-
-        friend std::ostream &operator<<(std::ostream &stream,
-                                        const jule::Slice<Item> &src) noexcept
-        {
-            if (src.empty())
-                return stream << "[]";
-
-            stream << '[';
-            for (jule::Int index = 0; index < src._len;)
-            {
-                stream << src._slice[index++];
-                if (index < src._len)
-                    stream << ' ';
-            }
-            stream << ']';
-
-            return stream;
         }
     };
 

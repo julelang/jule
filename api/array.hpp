@@ -6,8 +6,6 @@
 #define __JULE_ARRAY_HPP
 
 #include <initializer_list>
-#include <sstream>
-#include <ostream>
 
 #include "panic.hpp"
 #include "error.hpp"
@@ -196,20 +194,6 @@ namespace jule
 #else
             return this->at(index);
 #endif
-        }
-
-        friend std::ostream &operator<<(std::ostream &stream,
-                                        const jule::Array<Item, N> &src) noexcept
-        {
-            stream << '[';
-            for (jule::Int index = 0; index < N;)
-            {
-                stream << src[index++];
-                if (index < N)
-                    stream << " ";
-            }
-            stream << ']';
-            return stream;
         }
     };
 

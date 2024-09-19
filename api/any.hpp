@@ -9,7 +9,6 @@
 #include <typeinfo>
 #include <cstddef>
 #include <cstdlib>
-#include <ostream>
 
 #include "str.hpp"
 
@@ -223,16 +222,6 @@ namespace jule
         constexpr jule::Bool operator!=(std::nullptr_t) const noexcept
         {
             return !this->operator==(nullptr);
-        }
-
-        friend std::ostream &operator<<(std::ostream &stream,
-                                        const jule::Any &src) noexcept
-        {
-            if (src.operator!=(nullptr))
-                stream << src.type->to_str(src.data.alloc);
-            else
-                stream << "<nil>";
-            return stream;
         }
     };
 
