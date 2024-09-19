@@ -39,5 +39,6 @@ jule::Slice<jule::I32> __jule_strToRunes(jule::Str s);
 jule::Slice<jule::U8> __jule_strToBytes(jule::Str s);
 jule::Str __jule_strFromByte(jule::U8 b);
 jule::Str __jule_strFromRune(jule::I32 r);
+void __jule_runeStep(jule::U8 *s, jule::Int len, jule::I32 *r, jule::Int *outLen);
 
 #endif // #ifndef __JULE_RUNTIME_HPP

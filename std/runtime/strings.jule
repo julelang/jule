@@ -85,3 +85,17 @@ fn strFromRune(r: rune): str {
 	buf = utf8::AppendRune(buf, r)
 	ret unsafe::StrFromBytes(buf)
 }
+
+// Designed for []rune(s) iterations.
+// Takes pointer to string withl length
+// and sets output pointers by first rune of string.
+// Passing nil pointer for any parameter is not safe except |r|.
+#export "__jule_runeStep"
+unsafe fn runeStep(s: *byte, n: int, mut r: *rune, mut outLen: *int) {
+	buf := unsafe::Slice(s, n, n)
+	if r != nil {
+		*r, *outLen = utf8::DecodeRune(buf)
+	} else {
+		_, *outLen = utf8::DecodeRune(buf)
+	}
+}
