@@ -33,11 +33,11 @@ namespace jule
         static jule::Slice<Item> alloc(const jule::Int &len, const jule::Int &cap) noexcept
         {
             if (len < 0)
-                jule::panic("runtime: []T: slice allocation length lower than zero");
+                __jule_panic_s("runtime: []T: slice allocation length lower than zero");
             if (cap < 0)
-                jule::panic("runtime: []T: slice allocation capacity lower than zero");
+                __jule_panic_s("runtime: []T: slice allocation capacity lower than zero");
             if (len > cap)
-                jule::panic("runtime: []T: slice allocation length greater than capacity");
+                __jule_panic_s("runtime: []T: slice allocation length greater than capacity");
             jule::Slice<Item> buffer;
             buffer.alloc_new(len, cap);
             return buffer;
@@ -46,11 +46,11 @@ namespace jule
         static jule::Slice<Item> alloc(const jule::Int &len, const jule::Int &cap, const Item &def) noexcept
         {
             if (len < 0)
-                jule::panic("runtime: []T: slice allocation length lower than zero");
+                __jule_panic_s("runtime: []T: slice allocation length lower than zero");
             if (cap < 0)
-                jule::panic("runtime: []T: slice allocation capacity lower than zero");
+                __jule_panic_s("runtime: []T: slice allocation capacity lower than zero");
             if (len > cap)
-                jule::panic("runtime: []T: slice allocation length greater than capacity");
+                __jule_panic_s("runtime: []T: slice allocation length greater than capacity");
             jule::Slice<Item> buffer;
             buffer.alloc_new(len, cap, def);
             return buffer;
@@ -116,9 +116,9 @@ namespace jule
 #ifndef __JULE_ENABLE__PRODUCTION
                 std::string error = __JULE_ERROR__INVALID_MEMORY "\nruntime: slice is nil\nfile: ";
                 error += file;
-                jule::panic(error);
+                __jule_panic_s(error);
 #else
-                jule::panic(__JULE_ERROR__INVALID_MEMORY "\nruntime: slice is nil");
+                __jule_panic_s(__JULE_ERROR__INVALID_MEMORY "\nruntime: slice is nil");
 #endif
             }
         }
@@ -164,7 +164,7 @@ namespace jule
 
             Item *alloc = new (std::nothrow) Item[cap];
             if (!alloc)
-                jule::panic(__JULE_ERROR__MEMORY_ALLOCATION_FAILED
+                __jule_panic_s(__JULE_ERROR__MEMORY_ALLOCATION_FAILED
                             "\nruntime: heap allocation failed of slice");
 
 #ifdef __JULE_DISABLE__REFERENCE_COUNTING
@@ -232,7 +232,7 @@ namespace jule
                 error += "\nfile: ";
                 error += file;
 #endif
-                jule::panic(error);
+                __jule_panic_s(error);
             }
 #endif
             this->_slice += start;
@@ -292,7 +292,7 @@ namespace jule
                 error += "\nfile: ";
                 error += file;
 #endif
-                jule::panic(error);
+                __jule_panic_s(error);
             }
 #endif
             jule::Slice<Item> slice;
@@ -421,7 +421,7 @@ namespace jule
                 error += "\nfile: ";
                 error += file;
 #endif
-                jule::panic(error);
+                __jule_panic_s(error);
             }
 #endif
             return this->__at(index);

@@ -44,7 +44,7 @@ namespace jule
         {
             auto buf = new (std::nothrow) jule::U8[len];
             if (!buf)
-                jule::panic(__JULE_ERROR__MEMORY_ALLOCATION_FAILED
+                __jule_panic_s(__JULE_ERROR__MEMORY_ALLOCATION_FAILED
                             "\nruntime: memory allocation failed for string");
             std::memset(buf, 0, len);
             return buf;
@@ -82,7 +82,7 @@ namespace jule
                 error += "\nfile: ";
                 error += file;
 #endif
-                jule::panic(error);
+                __jule_panic_s(error);
             }
 #endif
             return s[i];
@@ -200,7 +200,7 @@ namespace jule
                 error += "\nfile:";
                 error += file;
 #endif
-                jule::panic(error);
+                __jule_panic_s(error);
             }
 #endif
             this->_slice += start;
@@ -252,7 +252,7 @@ namespace jule
                 error += "\nfile:";
                 error += file;
 #endif
-                jule::panic(error);
+                __jule_panic_s(error);
             }
 #endif
             jule::Str s;
@@ -334,7 +334,7 @@ namespace jule
                 error += "\nfile: ";
                 error += file;
 #endif
-                jule::panic(error);
+                __jule_panic_s(error);
             }
 #endif
             return this->__at(index);

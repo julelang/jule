@@ -65,7 +65,7 @@ namespace jule
 
             buffer.alloc = new (std::nothrow) T;
             if (!buffer.alloc)
-                jule::panic(__JULE_ERROR__MEMORY_ALLOCATION_FAILED
+                __jule_panic_s(__JULE_ERROR__MEMORY_ALLOCATION_FAILED
                             "\nruntime: memory allocation failed for heap of smart pointer");
 
             *buffer.alloc = instance;
@@ -252,9 +252,9 @@ namespace jule
 #ifndef __JULE_ENABLE__PRODUCTION
                 std::string error = __JULE_ERROR__INVALID_MEMORY "\nruntime: smart pointer is nil\nfile: ";
                 error += file;
-                jule::panic(error);
+                __jule_panic_s(error);
 #else
-                jule::panic(__JULE_ERROR__INVALID_MEMORY "\nruntime: smart pointer is nil");
+                __jule_panic_s(__JULE_ERROR__INVALID_MEMORY "\nruntime: smart pointer is nil");
 #endif
             }
         }

@@ -405,7 +405,7 @@ impl ObjectCoder {
 				}
 			}
 		}
-		self.anyObj.WriteStr(" jule::panic(\"trait casting failed because of an implementation mistake, this is a JuleC bug\"); return nullptr; }\n")
+		self.anyObj.WriteStr(" __jule_panic_s(\"trait casting failed because of an implementation mistake, this is a JuleC bug\"); return nullptr; }\n")
 	}
 
 	// Writes location information of token as cstr bytes.
@@ -471,6 +471,9 @@ impl ObjectCoder {
 		self.write("\n\n#include \"")
 		self.write(build::PathApi)
 		self.write("\"\n\n")
+
+		// Include user-defined headers after including API header.
+		self.links(false)
 	}
 
 	fn links(mut &self, std: bool) {
@@ -1076,12 +1079,6 @@ impl ObjectCoder {
 		self.write("\n\n")
 		self.declPos = self.Buf.Len()
 		self.globalDecls()
-
-		// Include user-defined libraries here.
-		// See developer reference (5).
-		self.write("\n\n")
-		self.links(false)
-		self.write("\n\n")
 	}
 
 	fn structureMethods(mut &self, mut &s: &StructIns) {

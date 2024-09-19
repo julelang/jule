@@ -29,15 +29,16 @@
 
 // Push int to string buffer in decimal format.
 // This function designed to avoid using of std::to_string.
-void __jule_push_int_to_str(std::string &s, jule::Int i) noexcept
-{
-    if (i < 0)
-    {
-        i = -i;
-        s.push_back('-');
+#define __jule_push_int_to_str(s, i)                   \
+    {                                                  \
+        auto j = i;                                    \
+        if (i < 0)                                     \
+        {                                              \
+            j = -j;                                    \
+            s.push_back('-');                          \
+        }                                              \
+        for (auto len = s.length(); j > 0; j /= 10)    \
+            s.insert(s.begin() + len, (j % 10) + '0'); \
     }
-    for (auto len = s.length(); i > 0; i /= 10)
-        s.insert(s.begin() + len, (i % 10) + '0');
-}
 
 #endif // ifndef __JULE_ERROR_HPP

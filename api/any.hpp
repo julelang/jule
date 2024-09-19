@@ -40,7 +40,7 @@ namespace jule
             this->type = type;
             T *alloc = new (std::nothrow) T;
             if (!alloc)
-                jule::panic(__JULE_ERROR__MEMORY_ALLOCATION_FAILED "\nfile: /api/any.hpp");
+                __jule_panic_s(__JULE_ERROR__MEMORY_ALLOCATION_FAILED "\nfile: /api/any.hpp");
 
             *alloc = data;
 #ifdef __JULE_DISABLE__REFERENCE_COUNTING
@@ -96,9 +96,9 @@ namespace jule
 #ifndef __JULE_ENABLE__PRODUCTION
                 std::string error = __JULE_ERROR__INVALID_MEMORY "\nfile: ";
                 error += file;
-                jule::panic(error);
+                __jule_panic_s(error);
 #else
-                jule::panic(__JULE_ERROR__INVALID_MEMORY "\nfile: /api/any.hpp");
+                __jule_panic_s(__JULE_ERROR__INVALID_MEMORY "\nfile: /api/any.hpp");
 #endif
             }
         }
@@ -127,9 +127,9 @@ namespace jule
 #ifndef __JULE_ENABLE__PRODUCTION
                 std::string error = __JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: <any> casted to incompatible type\nfile: ";
                 error += file;
-                jule::panic(error);
+                __jule_panic_s(error);
 #else
-                jule::panic(__JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: <any> casted to incompatible type");
+                __jule_panic_s(__JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: <any> casted to incompatible type");
 #endif
             }
 #endif
@@ -154,9 +154,9 @@ namespace jule
 #ifndef __JULE_ENABLE__PRODUCTION
                 std::string error = __JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: <any> casted to incompatible type\nfile: ";
                 error += file;
-                jule::panic(error);
+                __jule_panic_s(error);
 #else
-                jule::panic(__JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: <any> casted to incompatible type");
+                __jule_panic_s(__JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: <any> casted to incompatible type");
 #endif
             }
 #endif

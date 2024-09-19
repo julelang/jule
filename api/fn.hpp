@@ -62,9 +62,9 @@ namespace jule
 #ifndef __JULE_DISABLE__SAFETY
             if (this->f == nullptr)
 #ifndef __JULE_ENABLE__PRODUCTION
-                jule::panic((std::string(__JULE_ERROR__INVALID_MEMORY) + "\nfile: ") + file);
+                __jule_panic_s((std::string(__JULE_ERROR__INVALID_MEMORY) + "\nfile: ") + file);
 #else
-                jule::panic(__JULE_ERROR__INVALID_MEMORY);
+                __jule_panic_s(__JULE_ERROR__INVALID_MEMORY);
 #endif // PRODUCTION
 #endif // SAFETY
             return this->f(this->ctx, args...);

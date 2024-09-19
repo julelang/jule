@@ -5,17 +5,15 @@
 #ifndef __JULE_PANIC_HPP
 #define __JULE_PANIC_HPP
 
+#include <string>
 #include "types.hpp"
 #include "runtime.hpp"
 
-namespace jule
-{
-    __attribute__((noreturn)) void panic(const std::string &expr)
-    {
-        __jule_panic((jule::U8*)(expr.c_str()), expr.length());
-        __builtin_unreachable();
+#define __jule_panic_s(s)                                    \
+    {                                                        \
+        std::string ws = s;                                  \
+        __jule_panic((jule::U8 *)(ws.c_str()), ws.length()); \
+        __builtin_unreachable();                             \
     }
-
-} // namespace jule
 
 #endif // ifndef __JULE_PANIC_HPP
