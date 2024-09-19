@@ -1,0 +1,54 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use sys for std::sys
+use integ for std::jule::integrated
+
+cpp fn GetCommandLineW(): *integ::Wchar
+cpp unsafe fn CommandLineToArgvW(*integ::Wchar, *integ::Int): **integ::Wchar
+cpp unsafe fn LocalFree(*unsafe)
+cpp fn GetEnvironmentStringsW(): *integ::Wchar
+cpp unsafe fn FreeEnvironmentStringsW(*integ::Wchar)
+cpp unsafe fn GetModuleFileNameW(*unsafe, *integ::Wchar, int): int
+
+fn args(): []str {
+	mut cmdl := cpp.GetCommandLineW()
+	mut argvw := unsafe { cpp.CommandLineToArgvW(cmdl, (*integ::Int)(&argc)) }
+	mut args := make([]str, argc)
+	for i in args {
+		args[i] = unsafe { integ::U16PtrToStr((*u16)(argvw[i])) }
+	}
+	unsafe { cpp.LocalFree(argvw) }
+	ret args
+}
+
+fn env(): []str {
+	const avgEnvVars = 20
+	const NULL = 0
+	mut env := make([]str, 0, avgEnvVars)
+	mut envS := cpp.GetEnvironmentStringsW()
+	mut np := envS
+	mut latest := envS
+	unsafe {
+		for *latest != NULL {
+			for *np != NULL; np++ {}
+			env = append(env, integ::U16PtrToStr((*u16)(latest)))
+			np++
+			latest = np
+		}
+	}
+	unsafe { cpp.FreeEnvironmentStringsW(envS) }
+	ret env
+}
+
+fn executable(): str {
+	const NULL = 0
+	mut buf := make([]u16, sys::MAX_PATH)
+	n := unsafe { cpp.GetModuleFileNameW(nil, (*integ::Wchar)(&buf[0]), sys::MAX_PATH) }
+	if n > 0 {
+		buf[n] = NULL
+		ret unsafe { integ::U16PtrToStr(&buf[0]) }
+	}
+	panic("runtime: executable path read error")
+}
