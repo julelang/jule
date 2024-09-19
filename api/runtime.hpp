@@ -35,5 +35,6 @@ jule::Int __jule_compareStr(jule::Str *a, jule::Str *b);
 jule::Int __jule_writeStdout(jule::Slice<jule::U8> buf);
 jule::Int __jule_writeStderr(jule::Slice<jule::U8> buf);
 jule::Int __jule_readStdin(jule::Slice<jule::U8> buf);
+void __jule_panic(jule::U8 *m, jule::Int n);
 
 #endif // #ifndef __JULE_RUNTIME_HPP
