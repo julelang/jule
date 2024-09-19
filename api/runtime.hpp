@@ -33,5 +33,11 @@ jule::Int __jule_writeStdout(jule::Slice<jule::U8> buf);
 jule::Int __jule_writeStderr(jule::Slice<jule::U8> buf);
 jule::Int __jule_readStdin(jule::Slice<jule::U8> buf);
 void __jule_panic(jule::U8 *m, jule::Int n);
+jule::Str __jule_bytesToStr(jule::Slice<jule::U8> bytes);
+jule::Str __jule_runesToStr(jule::Slice<jule::I32> runes);
+jule::Slice<jule::I32> __jule_strToRunes(jule::Str s);
+jule::Slice<jule::U8> __jule_strToBytes(jule::Str s);
+jule::Str __jule_strFromByte(jule::U8 b);
+jule::Str __jule_strFromRune(jule::I32 r);
 
 #endif // #ifndef __JULE_RUNTIME_HPP

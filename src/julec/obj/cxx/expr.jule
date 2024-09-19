@@ -629,17 +629,48 @@ impl exprCoder {
 			self.oc.write("{}")
 			ret
 		}
-		prim := m.Kind.Prim()
-		eprim := m.ExprKind.Prim()
-		if eprim != nil && prim != nil && prim.IsStr() {
-			if eprim.IsU8() {
-				self.oc.write(typeCoder.Str + "::from_byte(")
-			} else {
-				self.oc.write(typeCoder.Str + "::from_rune(")
+		mut prim := m.Kind.Prim()
+		if prim != nil && prim.IsStr() {
+			mut eprim := m.ExprKind.Prim()
+			if eprim != nil && prim != nil {
+				if eprim.IsU8() {
+					self.oc.write("__jule_strFromByte(")
+				} else {
+					self.oc.write("__jule_strFromRune(")
+				}
+				self.possibleRefExpr(m.Expr.Model)
+				self.oc.write(")")
+				ret
 			}
-			self.possibleRefExpr(m.Expr.Model)
-			self.oc.write(")")
-			ret
+			mut slc := m.ExprKind.Slc()
+			if slc != nil {
+				eprim = slc.Elem.Prim()
+				// []rune or []byte
+				if eprim.IsI32() {
+					self.oc.write("__jule_runesToStr(")
+				} else {
+					self.oc.write("__jule_bytesToStr(")
+				}
+				self.possibleRefExpr(m.Expr.Model)
+				self.oc.write(")")
+				ret
+			}
+		}
+		prim = m.ExprKind.Prim()
+		if prim != nil && prim.IsStr() {
+			mut slc := m.Kind.Slc()
+			if slc != nil {
+				prim = slc.Elem.Prim()
+				// []rune or []byte
+				if prim.IsI32() {
+					self.oc.write("__jule_strToRunes(")
+				} else {
+					self.oc.write("__jule_strToBytes(")
+				}
+				self.possibleRefExpr(m.Expr.Model)
+				self.oc.write(")")
+				ret
+			}
 		}
 		self.oc.write("static_cast<")
 		self.oc.tc.kind(self.oc.Buf, m.Kind)

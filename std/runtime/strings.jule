@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use std::unsafe
+use utf8 for std::unicode::utf8
+
 // See [std::strings::{Compare}] function for documentation.
 #export "__jule_compareStr"
 fn compareStr(&a: str, &b: str): int {
@@ -26,4 +29,59 @@ fn compareStr(&a: str, &b: str): int {
 		ret +1
 	}
 	ret 0
+}
+
+// Converts []byte to str.
+#export "__jule_bytesToStr"
+fn bytesToStr(bytes: []byte): str {
+	mut buf := make([]byte, len(bytes))
+	copy(buf, bytes)
+	ret unsafe::StrFromBytes(buf)
+}
+
+// Converts []rune to str.
+#export "__jule_runesToStr"
+fn runesToStr(runes: []rune): str {
+	mut buf := make([]byte, 0, len(runes) * utf8::UTFMax)
+	for _, r in runes {
+		buf = utf8::AppendRune(buf, r)
+	}
+	ret unsafe::StrFromBytes(buf)
+}
+
+// Converts str to []rune.
+#export "__jule_strToRunes"
+fn strToRunes(s: str): []rune {
+	mut buf := make([]rune, 0, utf8::RuneCountStr(s))
+	mut n := 0
+	for n < len(s) {
+		r, len := utf8::DecodeRuneStr(s[n:])
+		n += len
+		buf = append(buf, r)
+	}
+	ret buf[:n]
+}
+
+// Converts str to []byte.
+#export "__jule_strToBytes"
+fn strToBytes(s: str): []byte {
+	mut buf := make([]byte, len(s))
+	copy(buf, s)
+	ret buf
+}
+
+// Converts byte to str.
+#export "__jule_strFromByte"
+fn strFromByte(b: byte): str {
+	mut buf := make([]byte, 1)
+	buf[0] = b
+	ret unsafe::StrFromBytes(buf)
+}
+
+// Converts rune to str.
+#export "__jule_strFromRune"
+fn strFromRune(r: rune): str {
+	mut buf := make([]byte, 0, utf8::UTFMax)
+	buf = utf8::AppendRune(buf, r)
+	ret unsafe::StrFromBytes(buf)
 }
