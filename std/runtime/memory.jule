@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use comptime for std::comptime
-
 // C's free function.
 cpp fn free(*unsafe)
 
@@ -14,61 +12,4 @@ cpp fn malloc(uint): *unsafe
 #export "__jule_ptrEqual"
 fn ptrEqual(a: *unsafe, b: *unsafe): bool {
 	ret a == b
-}
-
-// Type of reference counting data.
-type _RCType: uint
-
-// Pointer type for rereference counting data.
-type _RCPtr: *_RCType
-
-// The reference counting data delta value that must occur
-// per each reference counting operation.
-const _RCDelta = 1
-
-// Atomic memory ordering for reference counting data.
-const _RCMo = atomicRelaxed
-
-// Returns new initialized ready-to-use reference counting data allocation pointer.
-#export "__jule_RCNew"
-fn _RCNew(): _RCPtr {
-	const Bits = comptime::TypeOf(_RCType).Bits()
-	const BitsPerByte = 8
-	mut p := unsafe { (_RCPtr)(cpp.malloc(Bits / BitsPerByte)) }
-	if p == nil {
-		panic("runtime: memory allocation failed for reference counting data")
-	}
-	unsafe { *p = _RCDelta } // Initialize with one reference.
-	ret p
-}
-
-// Reads reference counting data.
-// Passing nil pointer is not safe.
-#export "__jule_RCLoad"
-unsafe fn _RCLoad(p: _RCPtr): _RCType {
-	ret atomicLoad[_RCType](p, _RCMo)
-}
-
-// Adds strong reference to reference pointer.
-// Passing nil pointer is not safe.
-#export "__jule_RCAdd"
-unsafe fn _RCAdd(mut p: _RCPtr) {
-	atomicAdd[_RCType](p, _RCDelta, _RCMo)
-}
-
-// Drops strong reference from reference pointer.
-// Passing nil pointer is not safe.
-// Reports wheter allocation still alive.
-#export "__jule_RCDrop"
-unsafe fn _RCDrop(mut p: _RCPtr): bool {
-	// Use integer type to avoid negative integer error.
-	// the atomicAdd function returns old data of pointer.
-	// So if old data equals to delta, means references zeroed.
-	ret atomicAdd[_RCType](p, -_RCDelta, _RCMo) > _RCDelta
-}
-
-// Deallocates reference counting data allocation.
-#export "__jule_RCFree"
-unsafe fn _RCFree(p: _RCPtr) {
-	cpp.free(p)
 }
