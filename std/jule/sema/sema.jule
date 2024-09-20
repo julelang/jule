@@ -845,6 +845,17 @@ impl sema {
 		ret self.checkTypeWithRefers(t, l, nil, nil)
 	}
 
+	// Same as the checkType but takes referencer.
+	fn checkTypeRefers(mut &self, mut &t: &ast::TypeDecl, mut l: Lookup, mut refers: &ReferenceStack): &TypeKind {
+		mut tc := &typeChecker{
+			s: self,
+			rootLookup: l,
+			lookup: l,
+			refers: refers,
+		}
+		ret tc.checkDecl(t)
+	}
+
 	// Builds type with type aliases for generics.
 	// Returns nil if error occur or failed.
 	fn buildTypeWithGenerics(mut &self, mut &t: &ast::TypeDecl,
@@ -1990,7 +2001,7 @@ impl sema {
 			|:
 				panic("sema: checkVarDecl: unimplemented referencer")
 			}
-			decl.Kind.Kind = self.buildTypeWithGenerics(decl.Kind.Decl, nil, refers)
+			decl.Kind.Kind = self.checkTypeRefers(decl.Kind.Decl, l, refers)
 		}
 
 		if decl.Reference {
