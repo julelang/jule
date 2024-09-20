@@ -1981,7 +1981,16 @@ impl sema {
 				self.pushErr(decl.Token, LogMsg.MissingValueForTypeInference)
 			}
 		} else {
-			_ = self.checkType(decl.Kind, l)
+			mut refers := (&ReferenceStack)(nil)
+			match type l {
+			| &sema:
+				refers = decl.Refers
+			| &scopeChecker:
+				refers = (&scopeChecker)(l).getOwnerRefers()
+			|:
+				panic("sema: checkVarDecl: unimplemented referencer")
+			}
+			decl.Kind.Kind = self.buildTypeWithGenerics(decl.Kind.Decl, nil, refers)
 		}
 
 		if decl.Reference {
