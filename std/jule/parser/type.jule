@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use std::jule::ast::{
+use ast for std::jule::ast::{
 	TypeDecl,
 	SubIdentTypeDecl,
 	IdentTypeDecl,
@@ -359,6 +359,16 @@ impl typeBuilder {
 			ret self.buildIdent()
 		| TokenId.Cpp:
 			ret self.buildCppLink()
+		| TokenId.Unsafe:
+			if len(self.tokens)-*self.i > 1 && self.tokens[*self.i+1].Id == TokenId.Fn {
+				// unsafe function
+				*self.i++ // point to function keyword
+				mut f := self.buildFn()
+				if f != nil {
+					(&ast::FnDecl)(f.Kind).Unsafety = true
+				}
+				ret f
+			}
 		| TokenId.Fn:
 			ret self.buildFn()
 		| TokenId.Star:
@@ -375,11 +385,10 @@ impl typeBuilder {
 			ret self.buildEnumerable()
 		| TokenId.Map:
 			ret self.buildMap()
-		|:
-			*self.i++
-			self.pushErr(token, LogMsg.InvalidSyntax)
-			ret nil
 		}
+		*self.i++
+		self.pushErr(token, LogMsg.InvalidSyntax)
+		ret nil
 	}
 
 	// Builds type.
