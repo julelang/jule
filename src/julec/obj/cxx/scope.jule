@@ -204,12 +204,12 @@ impl scopeCoder {
 		mut _map := it.Expr.Kind.Map()
 		mut s := obj::RuntimeFindStruct(self.oc.ir.Runtime, obj::RuntimeStruct._Map)
 		mut ins := obj::FindStructGenericInstance(s, _map.Key, _map.Val)
-		const Binded = false
-		mut f := ins.FindMethod("iterator", Binded).Instances[0]
+		const Static = false
+		mut f := ins.FindMethod("iterator", Static).Instances[0]
 
 		mut itDecl := obj::RuntimeFindStruct(self.oc.ir.Runtime, obj::RuntimeStruct.mapIterator)
 		mut iterator := obj::FindStructGenericInstance(itDecl, _map.Key, _map.Val)
-		mut nextCall := iterator.FindMethod("next", Binded).Instances[0]
+		mut nextCall := iterator.FindMethod("next", Static).Instances[0]
 
 		const resultName = "__iterator_result"
 		const resultArgName = resultName + "." + resultArgName
@@ -222,7 +222,7 @@ impl scopeCoder {
 		self.oc.tc.structureIns(self.oc.Buf, iterator)
 		self.oc.write(" it = ")
 		identCoder.funcIns(self.oc.Buf, f)
-		self.oc.write("(&")
+		self.oc.write("(")
 		self.oc.ec.possibleRefExpr(it.Expr.Model)
 		self.oc.write(");\n")
 		self.oc.indent()
@@ -520,13 +520,19 @@ impl scopeCoder {
 			// Generate direct lookup unlike expression coder.
 			mut s := obj::RuntimeFindStruct(self.oc.ir.Runtime, obj::RuntimeStruct._Map)
 			mut ins := obj::FindStructGenericInstance(s, _map.Key, _map.Val)
-			const Binded = false
-			mut f := ins.FindMethod("set", Binded).Instances[0]
+			const Static = false
+			mut f := ins.FindMethod("set", Static).Instances[0]
 			self.oc.write("(*")
 			identCoder.funcIns(self.oc.Buf, f)
-			self.oc.write("(&")
+			self.oc.write("((")
 			self.oc.ec.possibleRefExpr(iem.Expr.Model)
-			self.oc.write(", ")
+			self.oc.write(").ptr(")
+			if !env::Production {
+				self.oc.write("\"")
+				self.oc.locInfo(iem.Token)
+				self.oc.write("\"")
+			}
+			self.oc.write("), ")
 			self.oc.ec.possibleRefExpr(iem.Index.Model)
 			self.oc.write("))")
 			ret
@@ -601,18 +607,25 @@ impl scopeCoder {
 	}
 
 	fn mapLookupAssign(mut &self, mut &a: &MultiAssign) {
+		// map lookup right expression always should be indexing
 		mut iem := (&IndexingExprModel)(a.Right)
 		mut _map := iem.Expr.Kind.Map()
 
 		mut s := obj::RuntimeFindStruct(self.oc.ir.Runtime, obj::RuntimeStruct._Map)
 		mut ins := obj::FindStructGenericInstance(s, _map.Key, _map.Val)
-		const Binded = false
-		mut f := ins.FindMethod("lookup", Binded).Instances[0]
+		const Static = false
+		mut f := ins.FindMethod("lookup", Static).Instances[0]
 
 		identCoder.funcIns(self.oc.Buf, f)
-		self.oc.write("(&")
+		self.oc.write("((")
 		self.assignLeft(iem.Expr.Model)
-		self.oc.write(", ")
+		self.oc.write(").ptr(")
+		if !env::Production {
+			self.oc.write("\"")
+			self.oc.locInfo(iem.Token)
+			self.oc.write("\"")
+		}
+		self.oc.write("), ")
 		self.oc.ec.possibleRefExpr(iem.Index.Model)
 		self.oc.write(", ")
 		if a.Left[0] != nil {

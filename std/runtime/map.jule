@@ -8,7 +8,8 @@
 // it does not offer a thread-safe implementation.
 // Uses the [hash] function to hash keys.
 // An empty initialization literal is valid and equals to nil map.
-// It uses a internal pointer to achieve a pass-by-reference experience.
+// To make it pass-by-reference, compiler implements map instances using with smart pointers.
+// So, typically a nil map actually is a nil smart pointer.
 //
 // Implementation adopted from Go port of the Abseil's SwissTable.
 // Source repository: https://github.com/dolthub/swiss, commit [f4b2bab].
@@ -117,7 +118,7 @@ struct group[Key: comparable, Val] {
 	values: [groupSize]Val
 }
 
-struct mapData[Key: comparable, Val] {
+struct _Map[Key: comparable, Val] {
 	ctrl:     []metadata
 	groups:   []group[Key, Val]
 	resident: int
@@ -125,24 +126,19 @@ struct mapData[Key: comparable, Val] {
 	limit:    int
 }
 
-struct _Map[Key: comparable, Val] {
-	data: &mapData[Key, Val]
-}
-
 impl _Map {
-	// Reports whether map is nil.
-	fn isNil(self): bool {
-		ret self.data == nil
+	// Return non-nil map instance for [Key, Val] pair.
+	static fn make(): &_Map[Key, Val] {
+		ret new(_Map[Key, Val])
 	}
 
 	fn initData(mut self, cap: int) {
-		self.data = new(mapData[Key, Val])
 		groups := numGroups(cap)
-		self.data.ctrl = make([]metadata, groups)
-		self.data.groups = make([]group[Key, Val], groups)
-		self.data.limit = groups * maxAvgGroupLoad
-		for i in self.data.ctrl {
-			self.data.ctrl[i] = newEmptyMetadata()
+		self.ctrl = make([]metadata, groups)
+		self.groups = make([]group[Key, Val], groups)
+		self.limit = groups * maxAvgGroupLoad
+		for i in self.ctrl {
+			self.ctrl[i] = newEmptyMetadata()
 		}
 	}
 
@@ -153,20 +149,20 @@ impl _Map {
 	}
 
 	fn rehash(mut self, n: int) {
-		if self.isNil() {
+		if self.groups == nil {
 			// no need for rehashing just handle nil data
 			self.initData(mapInitialSize)
 			ret
 		}
 
-		mut groups, ctrl := self.data.groups, self.data.ctrl
-		self.data.groups = make([]group[Key, Val], n)
-		self.data.ctrl = make([]metadata, n)
-		for i in self.data.ctrl {
-			self.data.ctrl[i] = newEmptyMetadata()
+		mut groups, ctrl := self.groups, self.ctrl
+		self.groups = make([]group[Key, Val], n)
+		self.ctrl = make([]metadata, n)
+		for i in self.ctrl {
+			self.ctrl[i] = newEmptyMetadata()
 		}
-		self.data.limit = n * maxAvgGroupLoad
-		self.data.resident, self.data.dead = 0, 0
+		self.limit = n * maxAvgGroupLoad
+		self.resident, self.dead = 0, 0
 		for g in ctrl {
 			for s in ctrl[g] {
 				c := ctrl[g][s]
@@ -179,12 +175,12 @@ impl _Map {
 	}
 
 	fn nextSize(self): (n: int) {
-		if self.isNil() {
+		if self.groups == nil {
 			ret mapInitialSize
 		}
-		n = len(self.data.groups) << 2
-		if self.data.dead >= (self.data.resident >> 1) {
-			n = len(self.data.groups)
+		n = len(self.groups) << 2
+		if self.dead >= (self.resident >> 1) {
+			n = len(self.groups)
 		}
 		ret
 	}
@@ -193,21 +189,21 @@ impl _Map {
 	// Sets |v| if found and pointer not nil.
 	// Same as the |ok| variable which reports whether |v| exist.
 	unsafe fn lookup(mut self, mut k: Key, mut v: *Val, mut ok: *bool) {
-		if self.isNil() {
+		if self.groups == nil {
 			if ok != nil {
 				*ok = false
 			}
 			ret
 		}
 		hi, lo := splitHash(self.hash(k))
-		mut g := probeStart(hi, len(self.data.groups))
+		mut g := probeStart(hi, len(self.groups))
 		for { // inlined find loop
-			mut matches := unsafe { metaMatchH2(&self.data.ctrl[g], lo) }
+			mut matches := unsafe { metaMatchH2(&self.ctrl[g], lo) }
 			for matches != 0 {
 				s := nextMatch(matches)
-				if k == self.data.groups[g].keys[s] {
+				if k == self.groups[g].keys[s] {
 					if v != nil {
-						*v = self.data.groups[g].values[s]
+						*v = self.groups[g].values[s]
 					}
 					if ok != nil {
 						*ok = true
@@ -216,7 +212,7 @@ impl _Map {
 				}
 			}
 			// |k| is not in group |g|, stop probing if we see an empty slot
-			matches = unsafe { metaMatchEmpty(&self.data.ctrl[g]) }
+			matches = unsafe { metaMatchEmpty(&self.ctrl[g]) }
 			if matches != 0 {
 				if ok != nil {
 					*ok = false
@@ -224,7 +220,7 @@ impl _Map {
 				ret
 			}
 			g += 1 // linear probing
-			if g >= u32(len(self.data.groups)) {
+			if g >= u32(len(self.groups)) {
 				g = 0
 			}
 		}
@@ -241,34 +237,34 @@ impl _Map {
 	// Attempts to insert |k|.
 	// Returns pointer to value of inserted or already exist |k|.
 	fn set(mut self, mut k: Key): (v: *Val) {
-		if self.isNil() || self.data.resident >= self.data.limit {
+		if self.resident >= self.limit {
 			self.rehash(self.nextSize())
 		}
 		hi, lo := splitHash(self.hash(k))
-		mut g := probeStart(hi, len(self.data.groups))
+		mut g := probeStart(hi, len(self.groups))
 		for { // inlined find loop
-			mut matches := unsafe { metaMatchH2(&self.data.ctrl[g], lo) }
+			mut matches := unsafe { metaMatchH2(&self.ctrl[g], lo) }
 			for matches != 0 {
 				s := nextMatch(matches)
-				if k == self.data.groups[g].keys[s] { // update
-					self.data.groups[g].keys[s] = k
-					v = &self.data.groups[g].values[s]
+				if k == self.groups[g].keys[s] { // update
+					self.groups[g].keys[s] = k
+					v = &self.groups[g].values[s]
 					ret
 				}
 			}
 			// |k| is not in group |g|,
 			// stop probing if we see an empty slot
-			matches = unsafe { metaMatchEmpty(&self.data.ctrl[g]) }
+			matches = unsafe { metaMatchEmpty(&self.ctrl[g]) }
 			if matches != 0 { // insert
 				s := nextMatch(matches)
-				self.data.groups[g].keys[s] = k
-				v = &self.data.groups[g].values[s]
-				self.data.ctrl[g][s] = i8(lo)
-				self.data.resident++
+				self.groups[g].keys[s] = k
+				v = &self.groups[g].values[s]
+				self.ctrl[g][s] = i8(lo)
+				self.resident++
 				ret
 			}
 			g += 1 // linear probing
-			if g >= u32(len(self.data.groups)) {
+			if g >= u32(len(self.groups)) {
 				g = 0
 			}
 		}
@@ -276,16 +272,16 @@ impl _Map {
 
 	// Attempts to remove |k|, returns true successful.
 	fn del(mut self, mut k: Key): (ok: bool) {
-		if self.isNil() {
+		if self.groups == nil {
 			ret false
 		}
 		hi, lo := splitHash(self.hash(k))
-		mut g := probeStart(hi, len(self.data.groups))
+		mut g := probeStart(hi, len(self.groups))
 		for {
-			mut matches := unsafe { metaMatchH2(&self.data.ctrl[g], lo) }
+			mut matches := unsafe { metaMatchH2(&self.ctrl[g], lo) }
 			for matches != 0 {
 				s := nextMatch(matches)
-				if k == self.data.groups[g].keys[s] {
+				if k == self.groups[g].keys[s] {
 					ok = true
 					// optimization: if |self.ctrl[g]| contains any empty
 					// metadata bytes, we can physically delete |k|
@@ -294,29 +290,29 @@ impl _Map {
 					// would already be terminated by the existing empty
 					// slot, and therefore reclaiming slot |s| will not
 					// cause premature termination of probes into |g|.
-					if unsafe { metaMatchEmpty(&self.data.ctrl[g]) != 0 } {
-						self.data.ctrl[g][s] = empty
-						self.data.resident--
+					if unsafe { metaMatchEmpty(&self.ctrl[g]) != 0 } {
+						self.ctrl[g][s] = empty
+						self.resident--
 					} else {
-						self.data.ctrl[g][s] = tombstone
-						self.data.dead++
+						self.ctrl[g][s] = tombstone
+						self.dead++
 					}
 					let mut key: Key
 					let mut val: Val
-					self.data.groups[g].keys[s] = key
-					self.data.groups[g].values[s] = val
+					self.groups[g].keys[s] = key
+					self.groups[g].values[s] = val
 					ret
 				}
 			}
 			// |key| is not in group |g|,
 			// stop probing if we see an empty slot
-			matches = unsafe { metaMatchEmpty(&self.data.ctrl[g]) }
+			matches = unsafe { metaMatchEmpty(&self.ctrl[g]) }
 			if matches != 0 { // |key| absent
 				ok = false
 				ret
 			}
 			g += 1 // linear probing
-			if g >= u32(len(self.data.groups)) {
+			if g >= u32(len(self.groups)) {
 				g = 0
 			}
 		}
@@ -324,18 +320,15 @@ impl _Map {
 
 	// Removes all elements from the Map.
 	fn clear(mut self) {
-		if self.isNil() {
-			ret
-		}
-		for i, c in self.data.ctrl {
+		for i, c in self.ctrl {
 			for j in c {
-				self.data.ctrl[i][j] = empty
+				self.ctrl[i][j] = empty
 			}
 		}
 		let mut k: Key
 		let mut v: Val
-		for i in self.data.groups {
-			mut g := &self.data.groups[i]
+		for i in self.groups {
+			mut g := &self.groups[i]
 			unsafe {
 				for j in g.keys {
 					g.keys[j] = k
@@ -343,17 +336,17 @@ impl _Map {
 				}
 			}
 		}
-		self.data.resident, self.data.dead = 0, 0
+		self.resident, self.dead = 0, 0
 	}
 
 	// Returns the number of elements in the map.
-	fn len(self): int { ret self.data.resident - self.data.dead }
+	fn len(self): int { ret self.resident - self.dead }
 
 	// Returns the number of additional elements
 	// the can be added before resizing.
-	fn cap(self): int { ret self.data.limit - self.data.resident }
+	fn cap(self): int { ret self.limit - self.resident }
 
-	fn iterator(mut self): mapIterator[Key, Val] {
+	fn iterator(mut &self): mapIterator[Key, Val] {
 		mut iterator := mapIterator[Key, Val]{m: self}
 		iterator.init()
 		ret iterator
@@ -366,7 +359,7 @@ impl _Map {
 // mutated during iteration, mutations will be reflected on return from
 // iter, but the set of keys visited by iter is non-deterministic.
 struct mapIterator[Key: comparable, Val] {
-	m:      _Map[Key, Val]
+	m:      &_Map[Key, Val]
 	ctrl:   []metadata
 	groups: []group[Key, Val]
 	n:      int
@@ -376,13 +369,14 @@ struct mapIterator[Key: comparable, Val] {
 
 impl mapIterator {
 	fn init(mut self) {
-		if !self.m.isNil() {
-			// take a consistent view of the table in case
-			// we rehash during iteration
-			self.ctrl, self.groups = unsafe { self.m.data.ctrl, self.m.data.groups }
-			// pick a random starting group
-			self.g = randInt(u64(uintptr(&self)), len(self.groups))
+		if self.m == nil {
+			ret
 		}
+		// take a consistent view of the table in case
+		// we rehash during iteration
+		self.ctrl, self.groups = unsafe { self.m.ctrl, self.m.groups }
+		// pick a random starting group
+		self.g = randInt(u64(uintptr(&self)), len(self.groups))
 		self.n = 0
 		self.s = 0
 	}

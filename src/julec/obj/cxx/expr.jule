@@ -317,19 +317,6 @@ impl exprCoder {
 				buf.WriteStr(conv::Itoa(arr.N))
 				buf.WriteByte(')')
 				ret
-			| lk.Map() != nil:
-				// map types only comparable with <nil>.
-				// so this check is enough, see [std::jule] developer reference (11.2).
-				mut _map := lk.Map()
-				mut s := obj::RuntimeFindStruct(self.oc.ir.Runtime, obj::RuntimeStruct._Map)
-				mut ins := obj::FindStructGenericInstance(s, _map.Key, _map.Val)
-				const Binded = false
-				mut f := ins.FindMethod("isNil", Binded).Instances[0]
-				identCoder.funcIns(self.oc.Buf, f)
-				self.oc.write("(&")
-				self.oc.write(l)
-				self.oc.write(")")
-				ret
 			}
 		}
 
@@ -669,11 +656,6 @@ impl exprCoder {
 			self.oc.write("_mptr_data")
 			self.oc.write(conv::Itoa(obj::FindTraitTypeOffset(m.Kind.Trait(), m.ExprKind)))
 			self.oc.write(")")
-			ret
-		| m.Kind.Map() != nil:
-			// maps only supports casting from nil (except <any> but they are handled)
-			self.oc.tc.kind(self.oc.Buf, m.Kind)
-			self.oc.write("{}")
 			ret
 		}
 		mut prim := m.Kind.Prim()
@@ -1123,12 +1105,18 @@ impl exprCoder {
 			mut _map := m.Expr.Kind.Map()
 			mut s := obj::RuntimeFindStruct(self.oc.ir.Runtime, obj::RuntimeStruct._Map)
 			mut ins := obj::FindStructGenericInstance(s, _map.Key, _map.Val)
-			const Binded = false
-			mut f := ins.FindMethod("get", Binded).Instances[0]
+			const Static = false
+			mut f := ins.FindMethod("get", Static).Instances[0]
 			identCoder.funcIns(self.oc.Buf, f)
-			self.oc.write("(&")
+			self.oc.write("((")
 			self.possibleRefExpr(m.Expr.Model)
-			self.oc.write(", ")
+			self.oc.write(").ptr(")
+			if !env::Production {
+				self.oc.write("\"")
+				self.oc.locInfo(m.Token)
+				self.oc.write("\"")
+			}
+			self.oc.write("), ")
 			self.possibleRefExpr(m.Index.Model)
 			self.oc.write(")")
 		| env::Production
@@ -1197,27 +1185,30 @@ impl exprCoder {
 	}
 
 	fn mapExpr(mut &self, mut m: &MapExprModel) {
+		mut s := obj::RuntimeFindStruct(self.oc.ir.Runtime, obj::RuntimeStruct._Map)
+		mut ins := obj::FindStructGenericInstance(s, m.Kind.Key, m.Kind.Val)
+		const Static = true
+		mut maker := ins.FindMethod("make", Static).Instances[0]
 		if len(m.Entries) == 0 {
-			self.oc.tc.mapType(self.oc.Buf, m.Kind)
-			self.oc.write("{}")
+			identCoder.funcIns(self.oc.Buf, maker)
+			self.oc.write("()")
 			ret
 		}
 
-		mut s := obj::RuntimeFindStruct(self.oc.ir.Runtime, obj::RuntimeStruct._Map)
-		mut ins := obj::FindStructGenericInstance(s, m.Kind.Key, m.Kind.Val)
-		const Binded = false
-		mut f := ins.FindMethod("set", Binded).Instances[0]
+		mut f := ins.FindMethod("set", !Static).Instances[0]
 
 		const mapVar = "__jule_map"
 		self.oc.write("({ ")
 		self.oc.tc.mapType(self.oc.Buf, m.Kind)
 		self.oc.write(" ")
 		self.oc.write(mapVar)
-		self.oc.write("; ")
+		self.oc.write(" = ")
+		identCoder.funcIns(self.oc.Buf, maker)
+			self.oc.write("(); ")
 		for (_, mut pair) in m.Entries {
 			self.oc.write("(*")
 			identCoder.funcIns(self.oc.Buf, f)
-			self.oc.write("(&")
+			self.oc.write("(")
 			self.oc.write(mapVar)
 			self.oc.write(", ")
 			self.possibleRefExpr(pair.Key)
@@ -1453,8 +1444,8 @@ impl exprCoder {
 		if _map != nil {
 			mut s := obj::RuntimeFindStruct(self.oc.ir.Runtime, obj::RuntimeStruct._Map)
 			mut ins := obj::FindStructGenericInstance(s, _map.Key, _map.Val)
-			const Binded = false
-			mut f := ins.FindMethod("len", Binded).Instances[0]
+			const Static = false
+			mut f := ins.FindMethod("len", Static).Instances[0]
 			identCoder.funcIns(self.oc.Buf, f)
 			self.oc.write("(&")
 			self.possibleRefExpr(m.Expr.Model)
@@ -1477,9 +1468,9 @@ impl exprCoder {
 		}
 		mut s := obj::RuntimeFindStruct(self.oc.ir.Runtime, obj::RuntimeStruct._Map)
 		mut ins := obj::FindStructGenericInstance(s, _map.Key, _map.Val)
-		const Binded = false
+		const Static = false
 		if m.Key != nil {
-			mut f := ins.FindMethod("del", Binded).Instances[0]
+			mut f := ins.FindMethod("del", Static).Instances[0]
 			identCoder.funcIns(self.oc.Buf, f)
 			self.oc.write("(&")
 			self.possibleRefExpr(m.Dest.Model)
@@ -1487,7 +1478,7 @@ impl exprCoder {
 			self.possibleRefExpr(m.Key.Model)
 			self.oc.write(")")
 		} else {
-			mut f := ins.FindMethod("clear", Binded).Instances[0]
+			mut f := ins.FindMethod("clear", Static).Instances[0]
 			identCoder.funcIns(self.oc.Buf, f)
 			self.oc.write("(&")
 			self.possibleRefExpr(m.Dest.Model)
