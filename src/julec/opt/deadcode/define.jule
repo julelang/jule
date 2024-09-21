@@ -20,6 +20,19 @@ use std::jule::sema::{
 	FuncPattern,
 }
 
+struct specialCaseDefines {
+	runtime_Map:         &Struct
+	runtime_mapIterator: &Struct
+}
+
+impl specialCaseDefines {
+	// Reports whether all methods live of structure.
+	fn isAllMethodsLive(self, s: &Struct): bool {
+		ret s == self.runtime_Map ||
+			s == self.runtime_mapIterator
+	}
+}
+
 struct liveTable {
 	vars:    []&Var
 	fns:     []&FnIns
@@ -30,6 +43,7 @@ struct liveTable {
 struct ObjectDeadCode {
 	live: liveTable
 	ir:   &IR
+	scd:  specialCaseDefines
 }
 
 impl ObjectDeadCode {
@@ -78,9 +92,17 @@ impl ObjectDeadCode {
 		}
 		self.pushLive[&StructIns](s)
 		self.setReferencesAsLive(s.Refers)
+		allLive := self.scd.isAllMethodsLive(s.Decl)
 		for (_, mut m) in s.Methods {
 			for (_, mut ins) in m.Instances {
 				if self.isLive[&FnIns](ins) {
+					continue
+				}
+
+				// Push all methods as live if s is built-in map type.
+				if allLive {
+					self.pushLive[&FnIns](ins)
+					self.setReferencesAsLive(ins.Refers)
 					continue
 				}
 
@@ -194,6 +216,28 @@ impl ObjectDeadCode {
 	fn collectLivePackage(mut &self, mut &pkg: &Package) {
 		// Collect live references based on initializer functions.
 		self.inits(pkg)
+
+		// collect api defines as live
+		obj::IterFiles(pkg, fn(mut &file: &SymbolTable) {
+			for (_, mut v) in file.Vars {
+				if obj::HasDirective(v.Directives, Directive.Export) {
+					if !self.isLive[&Var](v) {
+						self.pushLive[&Var](v)
+						self.setReferencesAsLive(v.Refers)
+					}
+				}
+			}
+			for (_, mut f) in file.Funcs {
+				if obj::HasDirective(f.Directives, Directive.Export) {
+					for (_, mut ins) in f.Instances {
+						if !self.isLive[&FnIns](ins) {
+							self.pushLive[&FnIns](ins)
+							self.setReferencesAsLive(ins.Refers)
+						}
+					}
+				}
+			}
+		})
 
 		// Collect test functions and the std::testing::{T} struct if test compilation is enabled.
 		if env::Test {
@@ -336,15 +380,20 @@ impl ObjectDeadCode {
 
 	fn removeDeads(mut &self) {
 		for (_, mut used) in self.ir.Used {
-			// Skip binded and implicit imports.
-			if !used.Binded && !obj::IsImplicitImport(used) {
+			if !used.Binded {
 				self.removeDeadsPackage(used.Package)
 			}
 		}
 		self.removeDeadsPackage(self.ir.Main)
 	}
 
+	fn collectSpecialCaseDefines(mut &self) {
+		self.scd.runtime_Map = obj::RuntimeFindStruct(self.ir.Runtime, obj::RuntimeStruct._Map)
+		self.scd.runtime_mapIterator = obj::RuntimeFindStruct(self.ir.Runtime, obj::RuntimeStruct.mapIterator)
+	}
+
 	fn elimanate(mut &self) {
+		self.collectSpecialCaseDefines()
 		self.collectLive()
 		self.removeDeads()
 	}

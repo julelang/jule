@@ -23,7 +23,7 @@ public:
     { this->_thread.dealloc(); }
 
     inline jule::Uint ref_count(void)
-    { return this->_thread.ref != nullptr ? this->_thread.get_ref_n() : 0; }
+    { return this->_thread.ref != nullptr ? __jule_RCLoad(this->_thread.ref) : 0; }
 
     __jule_thread_handle& operator=(const __jule_thread_handle &jth) {
         this->_thread = jth._thread;

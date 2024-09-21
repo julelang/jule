@@ -1170,6 +1170,24 @@ impl typeChecker {
 		ret ins
 	}
 
+	fn fromStructIns(mut self, mut &ins: &StructIns, mut token: &Token): &StructIns {
+		mut existInstance := ins.Decl.appendInstance(ins)
+		if existInstance != nil {
+			if !self.s.checkConstraintsStruct(ins, token, existInstance) {
+				ret nil
+			}
+			// Already checked instance, did not appended.
+			// So, this instance is not unique.
+			self.pushReference[&StructIns](existInstance)
+			ret existInstance
+		}
+		if !self.checkStructIns(ins, token) {
+			ret nil
+		}
+		self.pushReference[&StructIns](ins)
+		ret ins
+	}
+
 	fn fromStruct(mut self, mut &decl: &IdentTypeDecl, mut &s: &Struct): &StructIns {
 		if !self.s.isAccessibleDefine(s.Public, s.Token) {
 			self.pushErr(decl.Token, LogMsg.IdentNotExist, decl.Ident)
@@ -1204,21 +1222,7 @@ impl typeChecker {
 			ret nil
 		}
 
-		mut existInstance := s.appendInstance(ins)
-		if existInstance != nil {
-			if !self.s.checkConstraintsStruct(ins, decl.Token, existInstance) {
-				ret nil
-			}
-			// Already checked instance, did not appended.
-			// So, this instance is not unique.
-			self.pushReference[&StructIns](existInstance)
-			ret existInstance
-		}
-		if !self.checkStructIns(ins, decl.Token) {
-			ret nil
-		}
-		self.pushReference[&StructIns](ins)
-		ret ins
+		ret self.fromStructIns(ins, decl.Token)
 	}
 
 	// Returns identifier if found. Also checks founded identifier.
@@ -1474,6 +1478,14 @@ impl typeChecker {
 		}
 		if val.Enum() != nil {
 			self.pushErr(decl.Val.Token, LogMsg.EnumAsMapVal)
+		}
+
+		if self.s.meta.runtime != nil {
+			mut s := runtimeFindStruct(self.s.meta.runtime, runtimeStruct._Map)
+			self.appendUsedStructReference(s)
+			mut ins := s.instance()
+			ins.Generics = [&InsGeneric{Kind: key}, &InsGeneric{Kind: val}]
+			_ = self.fromStructIns(ins, decl.Key.Token)
 		}
 
 		ret &Map{
@@ -1836,7 +1848,8 @@ fn getStructFromKind(mut k: &TypeKind): &Struct {
 	}
 }
 
-fn applyImplicitCast(mut &dest: &TypeKind, mut &d: &Data, mut &token: &Token) {
+fn applyImplicitCast(mut &s: &sema, mut &dest: &TypeKind, mut &d: &Data,
+	mut &token: &Token, mut refers: &ReferenceStack) {
 	if d.Kind.IsNil() {
 		ret
 	}
@@ -1844,7 +1857,7 @@ fn applyImplicitCast(mut &dest: &TypeKind, mut &d: &Data, mut &token: &Token) {
 	if destPrim != nil && destPrim.IsAny() {
 		prim := d.Kind.Prim()
 		if prim == nil || !prim.IsAny() {
-			applyCastKind(d, dest, token)
+			applyCastKind(s, d, dest, token, refers)
 		}
 		ret
 	}
@@ -1853,13 +1866,13 @@ fn applyImplicitCast(mut &dest: &TypeKind, mut &d: &Data, mut &token: &Token) {
 	if dt != nil {
 		bt := d.Kind.Trait()
 		if bt == nil || bt != dt {
-			applyCastKindModel(d, dest, token)
+			applyCastKindModel(s, d, dest, token, refers)
 			ret
 		}
 	}
 
 	if dest.TypeEnum() != nil && d.Kind.TypeEnum() == nil {
-		applyCastKindModel(d, dest, token)
+		applyCastKindModel(s, d, dest, token, refers)
 		ret
 	}
 }

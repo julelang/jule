@@ -6,8 +6,6 @@
 #define __JULE_ARRAY_HPP
 
 #include <initializer_list>
-#include <sstream>
-#include <ostream>
 
 #include "panic.hpp"
 #include "error.hpp"
@@ -17,11 +15,7 @@
 
 namespace jule
 {
-
     // Built-in array type.
-    template <typename Item, jule::Int N>
-    struct Array;
-
     template <typename Item, jule::Int N>
     struct Array
     {
@@ -81,7 +75,7 @@ namespace jule
                 error += "\nfile: ";
                 error += file;
 #endif
-                jule::panic(error);
+                __jule_panic_s(error);
             }
 #endif
             if (start == end)
@@ -138,26 +132,6 @@ namespace jule
             return N == 0;
         }
 
-        constexpr jule::Bool operator==(const jule::Array<Item, N> &src) const
-        {
-            if (this == &src)
-                return true;
-
-            jule::Array<Item, N>::ConstIterator it = src.begin();
-            for (const Item &a : *this)
-                if (a != *it)
-                    return false;
-                else
-                    ++it;
-
-            return true;
-        }
-
-        constexpr jule::Bool operator!=(const jule::Array<Item, N> &src) const
-        {
-            return !this->operator==(src);
-        }
-
         // Returns element by index.
         // Not includes safety checking.
         constexpr Item &__at(const jule::Int &index) const noexcept
@@ -183,7 +157,7 @@ namespace jule
                 error += "\nfile: ";
                 error += file;
 #endif
-                jule::panic(error);
+                __jule_panic_s(error);
             }
 #endif
             return this->__at(index);
@@ -196,20 +170,6 @@ namespace jule
 #else
             return this->at(index);
 #endif
-        }
-
-        friend std::ostream &operator<<(std::ostream &stream,
-                                        const jule::Array<Item, N> &src) noexcept
-        {
-            stream << '[';
-            for (jule::Int index = 0; index < N;)
-            {
-                stream << src[index++];
-                if (index < N)
-                    stream << " ";
-            }
-            stream << ']';
-            return stream;
         }
     };
 

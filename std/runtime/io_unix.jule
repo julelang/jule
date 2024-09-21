@@ -1,0 +1,53 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use sys for std::sys
+
+// This information adopted from the Go programming language:
+//
+// Darwin and FreeBSD can't read or write 2GB+ files at a time,
+// even on 64-bit systems.
+// The same is true of socket implementations on many systems.
+// See golang.org/issue/7812 and golang.org/issue/16266.
+// Use 1GB instead of, say, 2GB-1, to keep subsequent reads aligned.
+const maxRW = 1 << 30
+
+fn _handleRW(&b: []byte) {
+	if len(b) > maxRW {
+		unsafe { *(&b) = (*(&b))[:maxRW] }
+	}
+}
+
+// Writes to stdout.
+// Returns written byte count if success, -1 otherwise.
+#export "__jule_writeStdout"
+fn writeStdout(mut buf: []byte): int {
+	if len(buf) == 0 {
+		ret 0
+	}
+	handleRW(buf)
+	ret unsafe { sys::Write(int(sys::STDOUT), &buf[0], uint(len(buf))) }
+}
+
+// Writes to stderr.
+// Returns written byte count if success, -1 otherwise.
+#export "__jule_writeStderr"
+fn writeStderr(mut buf: []byte): int {
+	if len(buf) == 0 {
+		ret 0
+	}
+	handleRW(buf)
+	ret unsafe { sys::Write(int(sys::STDERR), &buf[0], uint(len(buf))) }
+}
+
+// Reads from stdin.
+// Returns readed byte count if success, -1 otherwise.
+#export "__jule_readStdin"
+fn readStdin(mut buf: []byte): int {
+	if len(buf) == 0 {
+		ret 0
+	}
+	handleRW(buf)
+	ret unsafe { sys::Write(int(sys::STDIN), &buf[0], uint(len(buf))) }
+}

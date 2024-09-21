@@ -845,6 +845,17 @@ impl sema {
 		ret self.checkTypeWithRefers(t, l, nil, nil)
 	}
 
+	// Same as the checkType but takes referencer.
+	fn checkTypeRefers(mut &self, mut &t: &ast::TypeDecl, mut l: Lookup, mut refers: &ReferenceStack): &TypeKind {
+		mut tc := &typeChecker{
+			s: self,
+			rootLookup: l,
+			lookup: l,
+			refers: refers,
+		}
+		ret tc.checkDecl(t)
+	}
+
 	// Builds type with type aliases for generics.
 	// Returns nil if error occur or failed.
 	fn buildTypeWithGenerics(mut &self, mut &t: &ast::TypeDecl,
@@ -902,7 +913,7 @@ impl sema {
 	}
 
 	fn checkAssignType(mut &self, destIsRef: bool, mut &dest: &TypeKind,
-		mut &d: &Data, mut errorToken: &Token): bool {
+		mut &d: &Data, mut errorToken: &Token, mut refers: &ReferenceStack): bool {
 		if d.Decl {
 			self.pushErr(errorToken, LogMsg.InvalidExpr)
 			ret false
@@ -918,6 +929,7 @@ impl sema {
 				errorToken: errorToken,
 				dest: dest,
 				d: d,
+				refers: refers,
 			}
 			ok := atc.check()
 			if !ok {
@@ -1344,7 +1356,8 @@ impl sema {
 					self.pushErr(item.Value.Expr.Token, LogMsg.ExprNotConst)
 				}
 
-				_ = self.checkAssignType(false, e.Kind.Kind, d, item.Token)
+				mut refers := (&ReferenceStack)(nil) // constant expressions not uses
+				_ = self.checkAssignType(false, e.Kind.Kind, d, item.Token, refers)
 				item.Value.Data = d
 			}
 		}
@@ -1372,7 +1385,8 @@ impl sema {
 			if !d.IsConst() {
 				self.pushErr(item.Value.Expr.Token, LogMsg.ExprNotConst)
 			}
-			_ = self.checkAssignType(false, e.Kind.Kind, d, item.Token)
+			mut refers := (&ReferenceStack)(nil) // constant expressions not uses
+			_ = self.checkAssignType(false, e.Kind.Kind, d, item.Token, refers)
 			item.Value.Data = d
 			const match type Int {
 			| i64:
@@ -1978,7 +1992,16 @@ impl sema {
 				self.pushErr(decl.Token, LogMsg.MissingValueForTypeInference)
 			}
 		} else {
-			_ = self.checkType(decl.Kind, l)
+			mut refers := (&ReferenceStack)(nil)
+			match type l {
+			| &sema:
+				refers = decl.Refers
+			| &scopeChecker:
+				refers = (&scopeChecker)(l).getOwnerRefers()
+			|:
+				panic("sema: checkVarDecl: unimplemented referencer")
+			}
+			decl.Kind.Kind = self.checkTypeRefers(decl.Kind.Decl, l, refers)
 		}
 
 		if decl.Reference {
@@ -2252,7 +2275,7 @@ impl sema {
 				}
 			}
 
-			if self.checkAssignType(v.Reference, v.Kind.Kind, v.Value.Data, v.Value.Expr.Token) {
+			if self.checkAssignType(v.Reference, v.Kind.Kind, v.Value.Data, v.Value.Expr.Token, v.Refers) {
 				self.checkValidityForInitExpr(
 					v.Mutable,
 					v.Reference,
@@ -2477,7 +2500,7 @@ impl sema {
 			}
 
 			const Reference = false // Fields cannot be reference.
-			_ = self.checkAssignType(Reference, f.Kind, f.Default, f.Decl.Default.Token)
+			_ = self.checkAssignType(Reference, f.Kind, f.Default, f.Decl.Default.Token, s.Refers)
 		}
 		ret
 	}
@@ -2505,6 +2528,7 @@ impl sema {
 				if !ok {
 					panic("arrayCmp evaluation failed, this is an implementation mistake")
 				}
+				s.Refers.Push(f)
 			}
 		}
 
@@ -3011,5 +3035,21 @@ push:
 	}
 	for (_, mut i) in t.Inherits {
 		pushImplements(s, i.Kind.Trait())
+	}
+}
+
+fn pushRuntimeToStr(mut &s: &sema, mut &t: &TypeKind, mut &token: &Token,
+	mut refers: &ReferenceStack) {
+	if s.meta.runtime == nil || t.IsNil() {
+		ret
+	}
+	mut f := runtimeFindFn(s.meta.runtime, runtimeFunc.toStr).instanceForce()
+	f.Generics = append(f.Generics, &InsGeneric{Kind: t})
+	ok, _ := s.checkGenericFn(f, token)
+	if !ok {
+		panic("sema: toStr evaluation failed, this is an implementation mistake")
+	}
+	if refers != nil {
+		refers.Push(f)
 	}
 }

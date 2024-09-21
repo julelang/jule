@@ -6,10 +6,9 @@
 #define __JULE_SLICE_HPP
 
 #include <cstddef>
-#include <sstream>
-#include <ostream>
 #include <initializer_list>
 
+#include "runtime.hpp"
 #include "panic.hpp"
 #include "error.hpp"
 #include "ptr.hpp"
@@ -34,11 +33,11 @@ namespace jule
         static jule::Slice<Item> alloc(const jule::Int &len, const jule::Int &cap) noexcept
         {
             if (len < 0)
-                jule::panic("runtime: []T: slice allocation length lower than zero");
+                __jule_panic_s("runtime: []T: slice allocation length lower than zero");
             if (cap < 0)
-                jule::panic("runtime: []T: slice allocation capacity lower than zero");
+                __jule_panic_s("runtime: []T: slice allocation capacity lower than zero");
             if (len > cap)
-                jule::panic("runtime: []T: slice allocation length greater than capacity");
+                __jule_panic_s("runtime: []T: slice allocation length greater than capacity");
             jule::Slice<Item> buffer;
             buffer.alloc_new(len, cap);
             return buffer;
@@ -47,11 +46,11 @@ namespace jule
         static jule::Slice<Item> alloc(const jule::Int &len, const jule::Int &cap, const Item &def) noexcept
         {
             if (len < 0)
-                jule::panic("runtime: []T: slice allocation length lower than zero");
+                __jule_panic_s("runtime: []T: slice allocation length lower than zero");
             if (cap < 0)
-                jule::panic("runtime: []T: slice allocation capacity lower than zero");
+                __jule_panic_s("runtime: []T: slice allocation capacity lower than zero");
             if (len > cap)
-                jule::panic("runtime: []T: slice allocation length greater than capacity");
+                __jule_panic_s("runtime: []T: slice allocation length greater than capacity");
             jule::Slice<Item> buffer;
             buffer.alloc_new(len, cap, def);
             return buffer;
@@ -117,9 +116,9 @@ namespace jule
 #ifndef __JULE_ENABLE__PRODUCTION
                 std::string error = __JULE_ERROR__INVALID_MEMORY "\nruntime: slice is nil\nfile: ";
                 error += file;
-                jule::panic(error);
+                __jule_panic_s(error);
 #else
-                jule::panic(__JULE_ERROR__INVALID_MEMORY "\nruntime: slice is nil");
+                __jule_panic_s(__JULE_ERROR__INVALID_MEMORY "\nruntime: slice is nil");
 #endif
             }
         }
@@ -128,7 +127,7 @@ namespace jule
         // heap allocations are valid or something like that.
         void __free(void) noexcept
         {
-            delete this->data.ref;
+            __jule_RCFree(this->data.ref);
             this->data.ref = nullptr;
 
             delete[] this->data.alloc;
@@ -145,22 +144,16 @@ namespace jule
 #else
             if (!this->data.ref)
             {
+                this->data.ref = nullptr;
                 this->data.alloc = nullptr;
                 return;
             }
-
-            // Use jule::REFERENCE_DELTA, DON'T USE drop_ref METHOD BECAUSE
-            // jule_ref does automatically this.
-            // If not in this case:
-            //   if this is method called from destructor, reference count setted to
-            //   negative integer but reference count is unsigned, for this reason
-            //   allocation is not deallocated.
-            if (this->data.get_ref_n() != jule::REFERENCE_DELTA)
+            if (__jule_RCDrop(this->data.ref))
             {
+                this->data.ref = nullptr;
                 this->data.alloc = nullptr;
                 return;
             }
-
             this->__free();
 #endif // __JULE_DISABLE__REFERENCE_COUNTING
         }
@@ -171,7 +164,7 @@ namespace jule
 
             Item *alloc = new (std::nothrow) Item[cap];
             if (!alloc)
-                jule::panic(__JULE_ERROR__MEMORY_ALLOCATION_FAILED
+                __jule_panic_s(__JULE_ERROR__MEMORY_ALLOCATION_FAILED
                             "\nruntime: heap allocation failed of slice");
 
 #ifdef __JULE_DISABLE__REFERENCE_COUNTING
@@ -239,7 +232,7 @@ namespace jule
                 error += "\nfile: ";
                 error += file;
 #endif
-                jule::panic(error);
+                __jule_panic_s(error);
             }
 #endif
             this->_slice += start;
@@ -299,7 +292,7 @@ namespace jule
                 error += "\nfile: ";
                 error += file;
 #endif
-                jule::panic(error);
+                __jule_panic_s(error);
             }
 #endif
             jule::Slice<Item> slice;
@@ -428,7 +421,7 @@ namespace jule
                 error += "\nfile: ";
                 error += file;
 #endif
-                jule::panic(error);
+                __jule_panic_s(error);
             }
 #endif
             return this->__at(index);
@@ -461,24 +454,6 @@ namespace jule
         {
             this->dealloc();
             return *this;
-        }
-
-        friend std::ostream &operator<<(std::ostream &stream,
-                                        const jule::Slice<Item> &src) noexcept
-        {
-            if (src.empty())
-                return stream << "[]";
-
-            stream << '[';
-            for (jule::Int index = 0; index < src._len;)
-            {
-                stream << src._slice[index++];
-                if (index < src._len)
-                    stream << ' ';
-            }
-            stream << ']';
-
-            return stream;
         }
     };
 

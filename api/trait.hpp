@@ -6,9 +6,9 @@
 #define __JULE_TRAIT_HPP
 
 #include <string>
-#include <ostream>
 #include <cstring>
 
+#include "runtime.hpp"
 #include "types.hpp"
 #include "panic.hpp"
 #include "error.hpp"
@@ -68,7 +68,7 @@ namespace jule
             this->ptr = false;
             T *alloc = new (std::nothrow) T;
             if (!alloc)
-                jule::panic(__JULE_ERROR__MEMORY_ALLOCATION_FAILED "\nfile: /api/trait.hpp");
+                __jule_panic_s(__JULE_ERROR__MEMORY_ALLOCATION_FAILED "\nfile: /api/trait.hpp");
 
             *alloc = data;
 #ifdef __JULE_DISABLE__REFERENCE_COUNTING
@@ -126,9 +126,9 @@ namespace jule
 #ifndef __JULE_ENABLE__PRODUCTION
                 std::string error = __JULE_ERROR__INVALID_MEMORY "\nfile: ";
                 error += file;
-                jule::panic(error);
+                __jule_panic_s(error);
 #else
-                jule::panic(__JULE_ERROR__INVALID_MEMORY "\nfile: /api/trait.hpp");
+                __jule_panic_s(__JULE_ERROR__INVALID_MEMORY "\nfile: /api/trait.hpp");
 #endif
             }
         }
@@ -174,9 +174,9 @@ namespace jule
 #ifndef __JULE_ENABLE__PRODUCTION
                 std::string error = __JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: trait casted to incompatible type\nfile: ";
                 error += file;
-                jule::panic(error);
+                __jule_panic_s(error);
 #else
-                jule::panic(__JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: trait casted to incompatible type");
+                __jule_panic_s(__JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: trait casted to incompatible type");
 #endif
             }
 #endif
@@ -201,9 +201,9 @@ namespace jule
 #ifndef __JULE_ENABLE__PRODUCTION
                 std::string error = __JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: trait casted to incompatible type\nfile: ";
                 error += file;
-                jule::panic(error);
+                __jule_panic_s(error);
 #else
-                jule::panic(__JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: trait casted to incompatible type");
+                __jule_panic_s(__JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: trait casted to incompatible type");
 #endif
             }
 #endif
@@ -257,14 +257,6 @@ namespace jule
         constexpr jule::Bool operator!=(std::nullptr_t) const noexcept
         {
             return !this->operator==(nullptr);
-        }
-
-        friend inline std::ostream &operator<<(std::ostream &stream,
-                                               const jule::Trait &src) noexcept
-        {
-            if (src == nullptr)
-                return stream << "<nil>";
-            return stream << (void *)src.data.alloc;
         }
     };
 } // namespace jule

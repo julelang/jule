@@ -16,18 +16,15 @@ CONFIGURATION DEFINES
 #ifndef __JULE_HPP
 #define __JULE_HPP
 
+#include "runtime.hpp"
 #include "impl_flag.hpp"
 #include "any.hpp"
 #include "array.hpp"
-#include "atomic.hpp"
 #include "builtin.hpp"
 #include "defer.hpp"
-#include "env.hpp"
 #include "error.hpp"
 #include "exceptional.hpp"
 #include "fn.hpp"
-#include "map.hpp"
-#include "misc.hpp"
 #include "panic.hpp"
 #include "platform.hpp"
 #include "ptr.hpp"
@@ -35,7 +32,5 @@ CONFIGURATION DEFINES
 #include "str.hpp"
 #include "trait.hpp"
 #include "types.hpp"
-#include "utf8.hpp"
-#include "utf16.hpp"
 
 #endif // ifndef __JULE_HPP

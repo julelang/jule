@@ -266,9 +266,6 @@ fn findBuiltinDefStdComptime(&ident: str): any {
 
 fn findBuiltinDefStdJuleIntegrated(&ident: str): any {
 	match ident {
-	| "ToStr":
-		static mut f = &FnIns{caller: builtinCallerStdJuleIntegratedToStr}
-		ret f
 	| "Emit":
 		static mut f = &FnIns{
 			Decl: &Fn{
@@ -321,6 +318,8 @@ fn builtinCallerError(mut &e: &eval, mut &fc: &FnCallExpr): &Data {
 		ret nil
 	}
 
+	applyRuntimeToStr(e.s, expr.Kind, primAny, token, e.getOwnerRefers())
+
 	mut d := buildVoidData()
 	d.Model = &BuiltinErrorCallExprModel{Err: expr}
 	ret d
@@ -335,18 +334,21 @@ fn builtinCallerOut(mut &e: &eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data {
 		e.pushErr(fc.Args[1].Token, LogMsg.ArgumentOverflow, "out")
 	}
 
-	mut expr := e.evalExpr(fc.Args[0])
+	mut arg := fc.Args[0]
+	mut expr := e.evalExpr(arg)
 	if expr == nil {
 		ret nil
 	}
 
 	if !isBuiltinStrConvertable(expr.Kind) {
-		e.pushErr(fc.Args[0].Token, LogMsg.InvalidExpr)
+		e.pushErr(arg.Token, LogMsg.InvalidExpr)
 		ret nil
 	}
 
+	pushRuntimeToStr(e.s, expr.Kind, arg.Token, e.getOwnerRefers())
+
 	mut d := buildVoidData()
-	d.Model = &BuiltinOutCallExprModel{Expr: expr.Model}
+	d.Model = &BuiltinOutCallExprModel{Expr: expr}
 	ret d
 }
 
@@ -408,7 +410,7 @@ fn builtinCallerNew(mut &e: &eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data {
 			const Reference = false
 			e.s.checkValidityForInitExpr(
 				!e.immutable, Reference, t.Kind, init, token)
-			_ = e.s.checkAssignType(false, t.Kind, init, token)
+			_ = e.s.checkAssignType(false, t.Kind, init, token, e.getOwnerRefers())
 
 			d.Model = &BuiltinNewCallExprModel{
 				Kind: t.Kind,
@@ -529,7 +531,7 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &FnCallExpr, mut &d: &Data): &Dat
 	if e.s.checkValidityForInitExpr(mutable, reference, t.Kind, t, firstArg.Token) {
 		// Check type if validity is good.
 		// Helps to reduce error logs and duplicated logs.
-		_ = e.s.checkAssignType(reference, t.Kind, t, firstArg.Token)
+		_ = e.s.checkAssignType(reference, t.Kind, t, firstArg.Token, e.getOwnerRefers())
 	}
 
 	mut prefix := e.prefix
@@ -572,7 +574,7 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &FnCallExpr, mut &d: &Data): &Dat
 		if e.s.checkValidityForInitExpr(mutable, reference, s.Elem, e1, secondArg.Token) {
 			// Check type if validity is good.
 			// Helps to reduce error logs and duplicated logs.
-			_ = e.s.checkAssignType(reference, s.Elem, e1, secondArg.Token)
+			_ = e.s.checkAssignType(reference, s.Elem, e1, secondArg.Token, e.getOwnerRefers())
 		}
 		d.Model = &BuiltinAppendCallExprModel{
 			Dest: t.Model,
@@ -601,7 +603,7 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &FnCallExpr, mut &d: &Data): &Dat
 		if e.s.checkValidityForInitExpr(mutable, reference, s.Elem, e1, arg.Token) {
 			// Check type if validity is good.
 			// Helps to reduce error logs and duplicated logs.
-			_ = e.s.checkAssignType(reference, s.Elem, e1, arg.Token)
+			_ = e.s.checkAssignType(reference, s.Elem, e1, arg.Token, e.getOwnerRefers())
 		}
 		slice.Elems = append(slice.Elems, e1.Model)
 	}
@@ -804,7 +806,7 @@ fn callerDeleteMap(mut &e: &eval, mut &fc: &FnCallExpr, mut &expr: &Data, mut &d
 		|:
 			const Reference = false
 			mut keyType := expr.Kind.Map().Key
-			if !e.s.checkAssignType(Reference, keyType, key, fc.Args[1].Token) {
+			if !e.s.checkAssignType(Reference, keyType, key, fc.Args[1].Token, e.getOwnerRefers()) {
 				ret nil
 			}
 		}
@@ -1106,33 +1108,6 @@ fn builtinCallerStdMemFree(mut &e: &eval, mut &fc: &FnCallExpr, mut &_: &Data): 
 	mut result := buildVoidData()
 	result.Model = &FreeExprModel{Expr: d.Model}
 	ret result
-}
-
-fn builtinCallerStdJuleIntegratedToStr(mut &e: &eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data {
-	if len(fc.Args) < 1 {
-		e.pushErr(fc.Token, LogMsg.MissingExprFor, "expr")
-		ret nil
-	}
-	if len(fc.Args) > 1 {
-		e.pushErr(fc.Args[1].Token, LogMsg.ArgumentOverflow, "ToStr")
-	}
-
-	mut d := e.evalExpr(fc.Args[0])
-	if d == nil {
-		ret nil
-	}
-
-	if !isBuiltinStrConvertable(d.Kind) {
-		e.pushErr(fc.Args[0].Token, LogMsg.InvalidExpr)
-		ret nil
-	}
-
-	ret &Data{
-		Kind: primStr,
-		Model: &IntegratedToStrExprModel{
-			Expr: d.Model,
-		},
-	}
 }
 
 fn builtinCallerStdJuleIntegratedEmit(mut &e: &eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data {

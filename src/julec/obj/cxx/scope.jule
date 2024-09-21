@@ -201,15 +201,53 @@ impl scopeCoder {
 		identCoder.iterNext(sb, uintptr(it))
 		next := sb.Str()
 
-		mut ref := false
-		self.iterHead(it, ref, begin)
+		mut _map := it.Expr.Kind.Map()
+		mut s := obj::RuntimeFindStruct(self.oc.ir.Runtime, obj::RuntimeStruct._Map)
+		mut ins := obj::FindStructGenericInstance(s, _map.Key, _map.Val)
+		const Static = false
+		mut f := ins.FindMethod("iterator", Static).Instances[0]
+
+		mut itDecl := obj::RuntimeFindStruct(self.oc.ir.Runtime, obj::RuntimeStruct.mapIterator)
+		mut iterator := obj::FindStructGenericInstance(itDecl, _map.Key, _map.Val)
+		mut nextCall := iterator.FindMethod("next", Static).Instances[0]
+
+		const resultName = "__iterator_result"
+		const resultArgName = resultName + "." + resultArgName
+		let resultKey = resultArgName + "0"
+		let resultVal = resultArgName + "1"
+
+		self.oc.write("{\n")
+		self.oc.addIndent()
+		self.oc.indent()
+		self.oc.tc.structureIns(self.oc.Buf, iterator)
+		self.oc.write(" it = ")
+		identCoder.funcIns(self.oc.Buf, f)
+		self.oc.write("(")
+		self.oc.ec.possibleRefExpr(it.Expr.Model)
+		self.oc.write(");\n")
+		self.oc.indent()
+		self.oc.write(begin)
+		self.oc.write(":;\n")
+		self.oc.indent()
+		self.oc.tc.funcInsResult(self.oc.Buf, nextCall)
+		self.oc.write(" ")
+		self.oc.write(resultName)
+		self.oc.write(" = ")
+		identCoder.funcIns(self.oc.Buf, nextCall)
+		self.oc.write("(&it);\n")
+		self.oc.indent()
+		self.oc.write("if (")
+		self.oc.write(resultKey)
+		self.oc.write(" != nullptr) {\n")
+		self.oc.addIndent()
+		self.oc.indent()
 		if it.KeyA != nil {
-			self.oc.varInitExpr(it.KeyA, fn() { self.oc.write("it->first") })
+			self.oc.varInitExpr(it.KeyA, fn() { self.oc.write("*" + resultKey) })
 			self.oc.write("\n")
 			self.oc.indent()
 		}
 		if it.KeyB != nil {
-			self.oc.varInitExpr(it.KeyB, fn() { self.oc.write("it->second") })
+			self.oc.varInitExpr(it.KeyB, fn() { self.oc.write("*" + resultVal) })
 			self.oc.write("\n")
 			self.oc.indent()
 		}
@@ -218,8 +256,6 @@ impl scopeCoder {
 		self.oc.indent()
 		self.oc.write(next)
 		self.oc.write(":;\n")
-		self.oc.indent()
-		self.oc.write("++it;\n")
 		self.oc.indent()
 		self.oc.write("goto ")
 		self.oc.write(begin)
@@ -274,15 +310,18 @@ impl scopeCoder {
 		}
 		self.oc.write(";\n")
 		self.oc.indent()
-		self.oc.write("char *it = expr")
+		self.oc.write(typeCoder.U8)
+		self.oc.write(" *it = expr")
 		if ref {
 			self.oc.write("->")
 		} else {
 			self.oc.write(".")
 		}
-		self.oc.write("operator char*();\n")
+		self.oc.write("begin();\n")
 		self.oc.indent()
-		self.oc.write("const char *end = it + expr")
+		self.oc.write("const ")
+		self.oc.write(typeCoder.U8)
+		self.oc.write(" *end = it + expr")
 		if ref {
 			self.oc.write("->")
 		} else {
@@ -297,7 +336,8 @@ impl scopeCoder {
 			self.oc.write("\n")
 			self.oc.indent()
 		}
-		self.oc.write("std::size_t len;\n")
+		self.oc.write(typeCoder.Int)
+		self.oc.write(" len;\n")
 		self.oc.indent()
 		if it.Base.KeyB != nil {
 			self.oc.varInitExpr(it.Base.KeyB, nil)
@@ -307,14 +347,14 @@ impl scopeCoder {
 		self.oc.write(begin)
 		self.oc.write(":;\n")
 		self.oc.indent()
-		self.oc.write("std::tie(")
+		self.oc.write("__jule_runeStep(it, end - it, ")
 		if it.Base.KeyB != nil {
+			self.oc.write("&")
 			identCoder.var(self.oc.Buf, it.Base.KeyB)
 		} else {
-			self.oc.write("std::ignore")
+			self.oc.write("nullptr")
 		}
-		self.oc.write(", len) = jule::utf8_decode_rune_str(it, end - it")
-		self.oc.write(");\n")
+		self.oc.write(", &len);\n")
 		self.oc.indent()
 
 		self.oc.write("if (it < end) {\n")
@@ -478,10 +518,23 @@ impl scopeCoder {
 			}
 			// Map indexing used for assignment.
 			// Generate direct lookup unlike expression coder.
+			mut s := obj::RuntimeFindStruct(self.oc.ir.Runtime, obj::RuntimeStruct._Map)
+			mut ins := obj::FindStructGenericInstance(s, _map.Key, _map.Val)
+			const Static = false
+			mut f := ins.FindMethod("set", Static).Instances[0]
+			self.oc.write("(*")
+			identCoder.funcIns(self.oc.Buf, f)
+			self.oc.write("((")
 			self.oc.ec.possibleRefExpr(iem.Expr.Model)
-			self.oc.write("[")
+			self.oc.write(").ptr(")
+			if !env::Production {
+				self.oc.write("\"")
+				self.oc.locInfo(iem.Token)
+				self.oc.write("\"")
+			}
+			self.oc.write("), ")
 			self.oc.ec.possibleRefExpr(iem.Index.Model)
-			self.oc.write("]")
+			self.oc.write("))")
 			ret
 		}
 		self.oc.ec.possibleRefExpr(model)
@@ -523,8 +576,8 @@ impl scopeCoder {
 	fn assign(mut &self, mut a: &Assign) {
 		match a.Op.Id {
 		| TokenId.SolidusEq | TokenId.PercentEq:
-			// Do not check division safety of structures.
-			if a.Left.Kind.Struct() == nil {
+			// Do not check division safety of structures and skip if safety disabled.
+			if env::Safety && a.Left.Kind.Struct() == nil {
 				self.divByZeroAssign(a)
 				ret
 			}
@@ -554,9 +607,19 @@ impl scopeCoder {
 	}
 
 	fn mapLookupAssign(mut &self, mut &a: &MultiAssign) {
+		// map lookup right expression always should be indexing
 		mut iem := (&IndexingExprModel)(a.Right)
+		mut _map := iem.Expr.Kind.Map()
+
+		mut s := obj::RuntimeFindStruct(self.oc.ir.Runtime, obj::RuntimeStruct._Map)
+		mut ins := obj::FindStructGenericInstance(s, _map.Key, _map.Val)
+		const Static = false
+		mut f := ins.FindMethod("lookup", Static).Instances[0]
+
+		identCoder.funcIns(self.oc.Buf, f)
+		self.oc.write("(")
 		self.assignLeft(iem.Expr.Model)
-		self.oc.write(".lookup(")
+		self.oc.write(", ")
 		self.oc.ec.possibleRefExpr(iem.Index.Model)
 		self.oc.write(", ")
 		if a.Left[0] != nil {

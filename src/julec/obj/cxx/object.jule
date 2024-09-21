@@ -118,6 +118,8 @@ impl ObjectCoder {
 		mut oc := &ObjectCoder{
 			ir: ir,
 			info: info,
+			resultMap: {},
+			traitMetMap: {},
 		}
 		oc.ec = exprCoder.new(oc)
 		oc.sc = scopeCoder.new(oc)
@@ -214,6 +216,7 @@ impl ObjectCoder {
 	}
 
 	fn pushAnyType(mut &self, mut t: &TypeKind): int {
+		mut orig := t
 		if t.Enum() != nil {
 			t = t.Enum().Kind.Kind
 		}
@@ -237,7 +240,7 @@ impl ObjectCoder {
 			self.anyObj.WriteStr(si)
 			self.anyObj.WriteStr("{.dealloc=" + deallocatedTypeIdent)
 			self.anyObj.WriteStr(conv::Itoa(di))
-			self.anyObj.WriteStr(", .eq=jule::ptr_equal, .to_str=jule::ptr_to_str};\n")
+			self.anyObj.WriteStr(", .eq=__jule_ptrEqual, .to_str=__jule_ptrToStr};\n")
 
 			// comparison function.
 			self.anyObj.WriteStr(typeCoder.Bool + " " + anyTypeIdent)
@@ -246,7 +249,7 @@ impl ObjectCoder {
 			self.tc.asSptr(self.anyObj, unsafe { elemKind.Buf() })
 			self.anyObj.WriteStr(" &other) { return any.type == &" + anyTypeIdent)
 			self.anyObj.WriteStr(si)
-			self.anyObj.WriteStr(" && jule::ptr_equal(any.data.alloc, other.alloc); }\n")
+			self.anyObj.WriteStr(" && __jule_ptrEqual(any.data.alloc, other.alloc); }\n")
 		} else {
 			comparable := t.Comparable()
 			mut kindB := StrBuilder.New(40)
@@ -277,7 +280,11 @@ impl ObjectCoder {
 			// to_str function.
 			self.anyObj.WriteStr(typeCoder.Str + " " + anyTypeIdent)
 			self.anyObj.WriteStr(si)
-			self.anyObj.WriteStr("_to_str(const void *alloc) noexcept { return jule::to_str(*reinterpret_cast<")
+			self.anyObj.WriteStr("_to_str(void *alloc) noexcept { return ")
+			mut decl := obj::RuntimeFindFn(self.ir.Runtime, obj::RuntimeFunc.toStr)
+			mut f := obj::FindFnGenericInstance(decl, orig)
+			identCoder.funcIns(self.anyObj, f)
+			self.anyObj.WriteStr("(*reinterpret_cast<")
 			if t.Ptr() == nil {
 				self.anyObj.WriteStr("const ")
 				self.anyObj.WriteStr(kind)
@@ -400,7 +407,7 @@ impl ObjectCoder {
 				}
 			}
 		}
-		self.anyObj.WriteStr(" jule::panic(\"trait casting failed because of an implementation mistake, this is a JuleC bug\"); return nullptr; }\n")
+		self.anyObj.WriteStr(" __jule_panic_s(\"trait casting failed because of an implementation mistake, this is a JuleC bug\"); return nullptr; }\n")
 	}
 
 	// Writes location information of token as cstr bytes.
@@ -466,6 +473,9 @@ impl ObjectCoder {
 		self.write("\n\n#include \"")
 		self.write(build::PathApi)
 		self.write("\"\n\n")
+
+		// Include user-defined headers after including API header.
+		self.links(false)
 	}
 
 	fn links(mut &self, std: bool) {
@@ -947,7 +957,8 @@ impl ObjectCoder {
 			for (_, mut ins) in imp.Instances {
 				self.funcTrait(ins, mepf)
 
-				mut sm := ins.FindMethod(m.Ident, false)
+				const Static = false
+				mut sm := ins.FindMethod(m.Ident, Static)
 				if sm == nil || len(sm.Instances) == 0 {
 					ret
 				}
@@ -1051,7 +1062,7 @@ impl ObjectCoder {
 			self.tc.kind(self.Buf, v.Kind.Kind)
 			self.write(" ")
 			identCoder.var(self.Buf, v)
-			self.write(";")
+			self.write(";\n")
 		}
 	}
 
@@ -1071,12 +1082,6 @@ impl ObjectCoder {
 		self.write("\n\n")
 		self.declPos = self.Buf.Len()
 		self.globalDecls()
-
-		// Include user-defined libraries here.
-		// See developer reference (5).
-		self.write("\n\n")
-		self.links(false)
-		self.write("\n\n")
 	}
 
 	fn structureMethods(mut &self, mut &s: &StructIns) {
@@ -1086,63 +1091,10 @@ impl ObjectCoder {
 		}
 	}
 
-	fn structureOstream(mut &self, mut &s: &StructIns) {
-		self.indent()
-		self.write("std::ostream &operator<<(std::ostream &_Stream, ")
-		identCoder.structureIns(self.Buf, s)
-		self.write(" _Src) {\n")
-		self.addIndent()
-		self.indent()
-
-		mut fts := s.FindMethod("Str", false)
-		if FuncPattern.Str(fts) {
-			self.write("_Stream << ")
-			identCoder.func(self.Buf, fts)
-			self.write("(&_Src);\n")
-		} else {
-			self.write(`_Stream << "`)
-			cstrBytes(self.Buf, s.Decl.Ident)
-			self.write("{\";\n")
-
-			for (i, mut f) in s.Fields {
-				self.indent()
-				self.write(`_Stream << "`)
-				cstrBytes(self.Buf, f.Decl.Ident)
-				self.write(`:`)
-
-				// Skip binded struct kinds.
-				strct := f.Kind.Struct()
-				if strct != nil && strct.Decl != nil && strct.Decl.Binded {
-					self.write(` cpp.`)
-					identCoder.field(self.Buf, f.Decl)
-					self.write(`"`)
-				} else {
-					self.write(`" << _Src.`)
-					identCoder.field(self.Buf, f.Decl)
-				}
-				if i+1 < len(s.Fields) {
-					self.write(" << \", \"")
-				}
-				self.write(";\n")
-			}
-
-			self.indent()
-			self.write("_Stream << \"}\";\n")
-		}
-
-		self.indent()
-		self.write("return _Stream;\n")
-
-		self.doneIndent()
-		self.write("}")
-	}
-
 	fn structureIns(mut &self, mut &s: &StructIns) {
 		const DeclOnly = false
 		self.structureOperators(s, DeclOnly)
 		self.structureMethods(s)
-		self.write("\n\n")
-		self.structureOstream(s)
 	}
 
 	fn structure(mut &self, mut &s: &Struct) {
@@ -1225,13 +1177,16 @@ impl ObjectCoder {
 	}
 
 	fn end(mut &self) {
-		self.write(`int main(int argc, char *argv[], char *envp[]) {
-	jule::setup_argv(argc, argv);
-	jule::setup_envp(envp);
-
-	`)
+		self.write(`int main(int argc, char *argv[], char *envp[]) {`)
+		self.write("\n\n")
+		self.indent()
 	self.initGlobals()
-	self.write(`__jule_call_initializers();
+	self.write(`
+	__jule_argc = static_cast<jule::Int>(argc);
+	__jule_argv = reinterpret_cast<jule::U8**>(argv);
+	__jule_envp = reinterpret_cast<jule::U8**>(envp);
+
+	__jule_call_initializers();
 	`)
 
 		if env::Test {

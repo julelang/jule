@@ -1,0 +1,255 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use std::unsafe
+use comptime for std::comptime
+use integ for std::jule::integrated
+
+// Returns pointer in string form.
+#export "__jule_ptrToStr"
+fn ptrToStr(p: *unsafe): str {
+	if p == nil {
+		ret "<nil>"
+	}
+	const numbers = "0123456789abcdef"
+	mut buf := make([]byte, 0, 12)
+	buf = append(buf, "0x"...)
+	mut z := uintptr(p)
+	for z > 0 {
+		buf = append(buf, numbers[z%16])
+		z >>= 4
+	}
+	mut i := 0
+	for i < len(buf)>>1; i++ {
+		buf[i+2], buf[len(buf)-i-1] = buf[len(buf)-i-1], buf[i+2]
+	}
+	ret unsafe::StrFromBytes(buf)
+}
+
+// Returns boolean in string form.
+#export "__jule_boolToStr"
+fn boolToStr(b: bool): str {
+	if b {
+		ret "true"
+	}
+	ret "false"
+}
+
+// Returns x in decimal string format.
+#export "__jule_i64ToStr"
+fn i64ToStr(x: i64): str {
+	if x < 0 {
+		ret "-" + u64ToStr(u64(-x))
+	}
+	ret u64ToStr(u64(x))
+}
+
+// Returns x in decimal string format.
+#export "__jule_u64ToStr"
+fn u64ToStr(mut x: u64): str {
+	mut buf := make([]byte, 20) // big enough for 64bit value base 10
+	n := u64ToBuf(buf, x)
+	buf = buf[:n]
+	ret unsafe::StrFromBytes(buf)
+}
+
+// Writes x in decimal string format into buf.
+// Returns number of written bytes.
+fn u64ToBuf(mut buf: []byte, mut x: u64): int {
+	if x == 0 {
+		buf[0] = '0'
+		ret 1
+	}
+	mut i := 0
+	for x >= 10 {
+		q := x / 10
+		buf[i] = byte('0' + x - q * 10)
+		i++
+		x = q
+	}
+	// x < 10
+	n := i + 1
+	buf[i] = byte('0' + x)
+	rev(buf[:n])
+	ret n
+}
+
+// Returns x in decimal string format.
+#export "__jule_f64ToStr"
+fn f64ToStr(mut f: f64): str {
+	const Prec = 4 // Fraction precision.
+
+	//   ±   u64  .   frac
+	n := 1 + 20 + 1 + Prec // enough size for base 10
+	mut buf := make([]byte, n)
+	mut j := 0
+	if f < 0 {
+		buf[0] = '-'
+		j++
+		f = -f
+	}
+
+	intPart := u64(f)
+	j += u64ToBuf(buf[j:], intPart)
+
+	buf[j] = '.'
+	mut fracPart := f - f64(intPart)
+	mut i := 0
+	for i < Prec; i++ {
+		fracPart *= 10
+		digit := int(fracPart)
+		j++
+		buf[j] = byte('0' + digit)
+		fracPart -= f64(digit)
+	}
+
+	// trim trailing zeros
+	for j >= 0; j-- {
+		if buf[j] != '0' {
+			break
+		}
+	}
+	if buf[j] != '.' {
+		j++
+	}
+	buf = buf[:j]
+
+	ret unsafe::StrFromBytes(buf)
+}
+
+// Returns x in string form with default format.
+// Compatible with slices.
+fn arrToStr[T](x: T): str {
+	mut buf := make([]byte, 0, 20)
+	buf = append(buf, '[')
+	for i, z in x {
+		if i > 0 {
+			buf = append(buf, ", "...)
+		}
+		buf = append(buf, toStr(z)...)
+	}
+	buf = append(buf, ']')
+	ret unsafe::StrFromBytes(buf)
+}
+
+// Returns x in string form with default format.
+fn mapToStr[T](x: T): str {
+	mut buf := make([]byte, 0, 20)
+	buf = append(buf, '{')
+	mut writed := false
+	for key, val in x {
+		if writed {
+			buf = append(buf, ", "...)
+		} else {
+			writed = true
+		}
+		buf = append(buf, toStr(key)...)
+		buf = append(buf, ':')
+		buf = append(buf, toStr(val)...)
+	}
+	buf = append(buf, '}')
+	ret unsafe::StrFromBytes(buf)
+}
+
+// Returns x in string form with default format.
+fn structToStr[T](x: T): str {
+	const t = comptime::TypeOf(T)
+	const v = comptime::ValueOf(x)
+
+	// lookup for reserved str function
+	const for _, method in t.Decl().Methods() {
+		const match method.Name() {
+		| "Str":
+			const methodv = v.Method(method.Name())
+			const match {
+			| methodv.Type().Result().Kind() == comptime::Kind.Str:
+				const params = method.Params()
+				const match {
+				| len(params) == 1 && !params[0].Mutable():
+					ret methodv.Unwrap()()
+				}
+			}
+		}
+	}
+
+	// use algorithm for default formatting
+	mut buf := make([]byte, 0, 20)
+	buf = append(buf, '{')
+	const for i, field in t.Fields() {
+		const match {
+		| i > 0:
+			buf = append(buf, ", "...)
+		}
+		const match {
+		| field.Type().Binded():
+			buf = append(buf, field.Type().Str()...)
+		|:
+			buf = append(buf, toStr(v.Field(field.Decl().Name()).Unwrap())...)
+		}
+	}
+	buf = append(buf, '}')
+	ret unsafe::StrFromBytes(buf)
+}
+
+// Returns x in string form with default format.
+// It designed for general-purpose string conversion for built-in behavior.
+fn toStr[T](x: T): str {
+	const t = comptime::TypeOf(T)
+	const match {
+	| t.Binded():
+		ret t.Str()
+	| t.CanNil():
+		if x == nil {
+			ret "<nil>"
+		}
+	}
+	const match type T {
+	| str:
+		ret x
+	| int | i8 | i16 | i32 | i64:
+		ret i64ToStr(i64(x))
+	| uint | uintptr | u8 | u16 | u32 | u64:
+		ret u64ToStr(u64(x))
+	| f32 | f64:
+		ret f64ToStr(f64(x))
+	| bool:
+		ret boolToStr(x)
+	| any:
+		if x == nil {
+			ret "<nil>"
+		}
+		ret unsafe { integ::Emit[str]("{}.type->to_str({}.data.alloc)", x, x) }
+	}
+	const match t.Kind() {
+	| comptime::Kind.Trait:
+		ret unsafe { ptrToStr(integ::Emit[*uint]("{}.data.alloc", x, x)) }
+	| comptime::Kind.TypeEnum:
+		ret unsafe { integ::Emit[str]("{}.type->to_str({}.data.alloc)", x, x) }
+	| comptime::Kind.Func:
+		ret unsafe { ptrToStr(integ::Emit[*unsafe]("({}){}.f", *unsafe, x)) }
+	| comptime::Kind.Slice
+	| comptime::Kind.Array:
+		ret arrToStr(x)
+	| comptime::Kind.Map:
+		ret mapToStr(x)
+	| comptime::Kind.Struct:
+		ret structToStr(x)
+	| comptime::Kind.SmartPtr:
+		ret unsafe { ptrToStr((*unsafe)(uintptr(x))) }
+	| comptime::Kind.Ptr
+	| comptime::Kind.UnsafePtr:
+		ret ptrToStr(x)
+	| comptime::Kind.Enum:
+		comptime::TypeAlias(elemType, t.Elem())
+		ret toStr[elemType](x)
+	}
+	panic("runtime: unsupported type for toStr")
+}
+
+fn rev(mut b: []byte) {
+	mut i := 0
+	for i < len(b)>>1; i++ {
+		b[i], b[len(b)-1-i] = b[len(b)-1-i], b[i]
+	}
+}

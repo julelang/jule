@@ -1,0 +1,37 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use comptime for std::comptime
+
+// Type of reference counting data.
+type _RCType: uint
+
+// Pointer type for rereference counting data.
+type _RCPtr: *_RCType
+
+// The reference counting data delta value that must occur
+// per each reference counting operation.
+const RCDelta = 1
+
+// Atomic memory ordering for reference counting data.
+const _RCMo = atomicSeqCst
+
+// Returns new initialized ready-to-use reference counting data allocation pointer.
+#export "__jule_RCNew"
+fn _RCNew(): _RCPtr {
+	const Bits = comptime::TypeOf(_RCType).Bits()
+	const BitsPerByte = 8
+	mut p := unsafe { (_RCPtr)(cpp.malloc(Bits / BitsPerByte)) }
+	if p == nil {
+		panic("runtime: memory allocation failed for reference counting data")
+	}
+	unsafe { *p = RCDelta } // Initialize with one reference.
+	ret p
+}
+
+// Deallocates reference counting data allocation.
+#export "__jule_RCFree"
+unsafe fn _RCFree(p: _RCPtr) {
+	cpp.free(p)
+}

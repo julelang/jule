@@ -59,7 +59,7 @@ Typical uses are things like capturing or tracing private behavior. For example,
     - **(9.1)** The `Token` field is used to distinguish specific packages. If the `Token` field of the AST element is set to `nil`, the package built-in use declaration is considered. Accordingly, AST must always set the `Token` field for each use declaration which is not implicitly imported.
     - **(9.2)** Semantic analyzer will ignore implicit use declaration for duplication analysis. So, built-in implicit imported packages may be duplicated if placed source file contains separate use declaration for the same package.
     - **(9.3)** These packages should be placed as first use declarations of the main package's first file.
-    - **(9.4)** Semantic analyzer will not collect references for these packages. So any definition will not have a collection of references. But references may collected if used in ordinary way unlike implicit instantiation by semantic anlayzer.
+    - **(9.4)** Semantic analyzer will not collect references for some defines of these packages. So any definition will not have a collection of references if not supported. But references may collected if used in ordinary way unlike implicit instantiation by semantic anlayzer.
 - **(10)** Jule can handle supported types bidirectionally for binary expressions (`s == nil || nil == s` or etc.). However, when creating CAST, some types in binary expressions must always be left operand. These types are; `any`, type enums, enums, smart pointers, raw pointers and traits.
     - **(10.1)** For these special types, the type that is the left operand can normally be left or right operand. It is only guaranteed if the expression of the relevant type is in the left operand. There may be a shift in the original order.
     - **(10.2)** In the case of a `nil` comparison, the right operand should always be `nil`.
@@ -75,5 +75,5 @@ This package is a basic package developed for Jule programs and focuses on runti
 
 Here is the list of custom behaviors for this package;
 - (1) `arrayCmp`: Developed to eliminate the need for the Jule compiler to generate code specifically for array comparisons for each backend and to reduce analysis cost. The semantic analyzer creates the necessary instance for this generic function when an array comparison is made. Thus, the necessary comparison function for each array is programmed at the Jule frontent level.
-- (2) `shiftLeft`: Developed to eliminate the need for the Jule compiler to generate code specifically for integer left shiftings for each backend and to reduce analysis cost. The semantic analyzer creates the necessary instance for this generic function when an integer left shifting is made. Thus, the necessary shifting function for each operation is programmed at the Jule frontent level.
-- (3) `shiftRight`: Same as `shiftLeft` but designed for right shiftings.
+- (2): `toStr`: Built-in string conversion function for types. An instance is created in any situation that may be required.
+- (3): `_Map`: Built-in map type implementation. An instance created for each unique map type declaration.

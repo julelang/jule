@@ -5,18 +5,10 @@
 #ifndef __JULE_BUILTIN_HPP
 #define __JULE_BUILTIN_HPP
 
-#include <iostream>
-
-#ifdef OS_WINDOWS
-#include <vector>
-#include <windows.h>
-#endif
-
+#include "runtime.hpp"
 #include "types.hpp"
-#include "ptr.hpp"
 #include "str.hpp"
 #include "slice.hpp"
-#include "utf16.hpp"
 
 namespace jule
 {
@@ -24,23 +16,15 @@ namespace jule
     typedef jule::U8 Byte;  // builtin: type byte: u8
     typedef jule::I32 Rune; // builtin: type rune: i32
 
-    template <typename T>
-    inline void out(const T &obj) noexcept
+    inline void out(const jule::Str &obj) noexcept
     {
-#ifdef OS_WINDOWS
-        const std::vector<jule::U16> utf16_str = jule::utf16_from_str(jule::to_str<T>(obj));
-        HANDLE handle = GetStdHandle(STD_OUTPUT_HANDLE);
-        WriteConsoleW(handle, utf16_str.data(), utf16_str.size(), nullptr, nullptr);
-#else
-        std::cout << obj;
-#endif
+        __jule_writeStdout(obj.fake_slice());
     }
 
-    template <typename T>
-    inline void outln(const T &obj) noexcept
+    inline void outln(const jule::Str &obj) noexcept
     {
         jule::out(obj);
-        std::cout << std::endl;
+        __jule_writeStdout(jule::Str::lit("\n", 1).fake_slice());
     }
 
     // Returns itself of slice if slice has enough capacity for +n elements.

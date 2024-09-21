@@ -9,7 +9,6 @@
 #include <typeinfo>
 #include <cstddef>
 #include <cstdlib>
-#include <ostream>
 
 #include "str.hpp"
 
@@ -23,7 +22,7 @@ namespace jule
         public:
             void (*dealloc)(jule::Ptr<jule::Uintptr> &alloc);
             jule::Bool (*eq)(void *alloc, void *other);
-            jule::Str (*to_str)(const void *alloc);
+            jule::Str (*to_str)(void *alloc);
         };
 
         mutable jule::Ptr<jule::Uintptr> data;
@@ -41,7 +40,7 @@ namespace jule
             this->type = type;
             T *alloc = new (std::nothrow) T;
             if (!alloc)
-                jule::panic(__JULE_ERROR__MEMORY_ALLOCATION_FAILED "\nfile: /api/any.hpp");
+                __jule_panic_s(__JULE_ERROR__MEMORY_ALLOCATION_FAILED "\nfile: /api/any.hpp");
 
             *alloc = data;
 #ifdef __JULE_DISABLE__REFERENCE_COUNTING
@@ -97,9 +96,9 @@ namespace jule
 #ifndef __JULE_ENABLE__PRODUCTION
                 std::string error = __JULE_ERROR__INVALID_MEMORY "\nfile: ";
                 error += file;
-                jule::panic(error);
+                __jule_panic_s(error);
 #else
-                jule::panic(__JULE_ERROR__INVALID_MEMORY "\nfile: /api/any.hpp");
+                __jule_panic_s(__JULE_ERROR__INVALID_MEMORY "\nfile: /api/any.hpp");
 #endif
             }
         }
@@ -128,9 +127,9 @@ namespace jule
 #ifndef __JULE_ENABLE__PRODUCTION
                 std::string error = __JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: <any> casted to incompatible type\nfile: ";
                 error += file;
-                jule::panic(error);
+                __jule_panic_s(error);
 #else
-                jule::panic(__JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: <any> casted to incompatible type");
+                __jule_panic_s(__JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: <any> casted to incompatible type");
 #endif
             }
 #endif
@@ -155,9 +154,9 @@ namespace jule
 #ifndef __JULE_ENABLE__PRODUCTION
                 std::string error = __JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: <any> casted to incompatible type\nfile: ";
                 error += file;
-                jule::panic(error);
+                __jule_panic_s(error);
 #else
-                jule::panic(__JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: <any> casted to incompatible type");
+                __jule_panic_s(__JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: <any> casted to incompatible type");
 #endif
             }
 #endif
@@ -223,16 +222,6 @@ namespace jule
         constexpr jule::Bool operator!=(std::nullptr_t) const noexcept
         {
             return !this->operator==(nullptr);
-        }
-
-        friend std::ostream &operator<<(std::ostream &stream,
-                                        const jule::Any &src) noexcept
-        {
-            if (src.operator!=(nullptr))
-                stream << src.type->to_str(src.data.alloc);
-            else
-                stream << "<nil>";
-            return stream;
         }
     };
 

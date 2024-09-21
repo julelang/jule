@@ -46,9 +46,9 @@ impl TestCoder {
 		self.callTmReset()
 		self.oc.write(";\n")
 		self.oc.indent()
-		self.oc.write("std::cout << \">>> TEST RUNNING: \" ")
+		self.oc.write("__jule_writeStdout(jule::Str(\">>> TEST RUNNING: \" ")
 		cstrLit(self.oc.Buf, f.Decl.Ident)
-		self.oc.write(" << std::endl;\n")
+		self.oc.write(" \"\\n\").fake_slice());\n")
 		self.oc.indent()
 		identCoder.funcIns(self.oc.Buf, f)
 		self.oc.write("(_t);\n")
@@ -74,11 +74,13 @@ impl TestCoder {
 			ret false
 		}
 
-		self.t = p.FindStruct("T", false).Instances[0]
+		const Binded = false
+		self.t = p.FindStruct("T", Binded).Instances[0]
 
-		self.tmReset = self.t.FindMethod("reset", false)
-		self.tmFailed = self.t.FindMethod("Failed", false)
-		self.tmSkipped = self.t.FindMethod("Skipped", false)
+		const Static = false
+		self.tmReset = self.t.FindMethod("reset", Static)
+		self.tmFailed = self.t.FindMethod("Failed", Static)
+		self.tmSkipped = self.t.FindMethod("Skipped", Static)
 		ret true
 	}
 
@@ -123,7 +125,7 @@ impl TestCoder {
 		self.oc.write(">(); _t.ref = nullptr;\n")
 
 		self.oc.indent()
-		self.oc.write("jule::Uint total = 0, failed = 0, skipped = 0;\n")
+		self.oc.write("jule::U64 total = 0, failed = 0, skipped = 0;\n")
 		self.oc.indent()
 
 		self.oc.write("auto post_test = [&](void) {\n")
@@ -133,13 +135,13 @@ impl TestCoder {
 		self.oc.indent()
 		self.oc.write("if (")
 		self.callTmFailed()
-		self.oc.write(") { ++failed; std::cout << \"    [*] FAILED\" << std::endl; }\n")
+		self.oc.write(") { ++failed; __jule_writeStdout(jule::Str::lit(\"    [*] FAILED\\n\", 16).fake_slice()); }\n")
 		self.oc.indent()
 		self.oc.write("else if (")
 		self.callTmSkipped()
-		self.oc.write(") { ++skipped; std::cout << \"    [*] SKIPPED\" << std::endl; }\n")
+		self.oc.write(") { ++skipped; __jule_writeStdout(jule::Str::lit(\"    [*] SKIPPED\\n\", 17).fake_slice()); }\n")
 		self.oc.indent()
-		self.oc.write("else { std::cout << \"    [*] PASSED\" << std::endl; }\n")
+		self.oc.write("else { __jule_writeStdout(jule::Str::lit(\"    [*] PASSED\\n\", 16).fake_slice()); }\n")
 		self.oc.doneIndent()
 		self.oc.indent()
 		self.oc.write("};\n")
@@ -148,7 +150,23 @@ impl TestCoder {
 
 		self.oc.write("\n\n")
 		self.oc.indent()
-		self.oc.write("std::cout << std::endl << \"total tests: \" << total << \" skipped: \" << skipped << \" failed: \" << failed << \" pass: \" << total-failed-skipped << std::endl;\n")
+		self.oc.write("__jule_writeStdout(jule::Str::lit(\"\\ntotal tests: \", 14).fake_slice());\n")
+		self.oc.indent()
+		self.oc.write("__jule_writeStdout(__jule_u64ToStr(total).fake_slice());\n")
+		self.oc.indent()
+		self.oc.write("__jule_writeStdout(jule::Str::lit(\" skipped: \", 10).fake_slice());\n")
+		self.oc.indent()
+		self.oc.write("__jule_writeStdout(__jule_u64ToStr(skipped).fake_slice());\n")
+		self.oc.indent()
+		self.oc.write("__jule_writeStdout(jule::Str::lit(\" failed: \", 9).fake_slice());\n")
+		self.oc.indent()
+		self.oc.write("__jule_writeStdout(__jule_u64ToStr(failed).fake_slice());\n")
+		self.oc.indent()
+		self.oc.write("__jule_writeStdout(jule::Str::lit(\" pass: \", 7).fake_slice());\n")
+		self.oc.indent()
+		self.oc.write("__jule_writeStdout(__jule_u64ToStr(total-failed-skipped).fake_slice());\n")
+		self.oc.indent()
+		self.oc.write("__jule_writeStdout(jule::Str::lit(\"\\n\", 1).fake_slice());\n")
 		self.oc.indent()
 		self.oc.write("if (failed != 0) std::exit(1);\n")
 

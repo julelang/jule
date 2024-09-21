@@ -1,0 +1,22 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use sys for std::sys
+use integ for std::jule::integrated
+
+cpp use "<mach-o/dyld.h>"
+
+cpp unsafe fn _NSGetExecutablePath(b: *integ::Char, *u32): bool
+
+fn executable(): str {
+	let mut buf: [sys::PATH_MAX]byte = [0, ...]
+	size := u32(len(buf))
+	mut p := &buf[0]
+	unsafe {
+		if !cpp._NSGetExecutablePath((*integ::Char)(p), &size) {
+			ret integ::BytePtrToStr(p)
+		}
+	}
+	panic("runtime: executable path read error")
+}

@@ -1,0 +1,427 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+// This file constains the source code of the built-in map type.
+// The built-in map type implementation is typically a hashmap.
+// It is not lock-free in terms of concurrency, that is,
+// it does not offer a thread-safe implementation.
+// Uses the [hash] function to hash keys.
+// An empty initialization literal is valid and equals to nil map.
+// To make it pass-by-reference, compiler implements map instances using with smart pointers.
+// So, typically a nil map actually is a nil smart pointer.
+//
+// Implementation adopted from Go port of the Abseil's SwissTable.
+// Source repository: https://github.com/dolthub/swiss, commit [f4b2bab].
+// But the implementation is not same as repository.
+// Optimized for the Jule runtime and compiler.
+//
+//   Copyright 2024 The Jule Programming Language
+//
+//   Licensed under the Apache License, Version 2.0 (the "License");
+//   you may not use this file except in compliance with the License.
+//   You may obtain a copy of the License at
+//
+//       http://www.apache.org/licenses/LICENSE-2.0
+//
+//   Unless required by applicable law or agreed to in writing, software
+//   distributed under the License is distributed on an "AS IS" BASIS,
+//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//   See the License for the specific language governing permissions and
+//   limitations under the License.
+
+use std::unsafe
+use bits for std::math::bits
+
+const groupSize = 8
+const maxAvgGroupLoad = 4
+
+const loBits = 0x0101010101010101
+const hiBits = 0x8080808080808080
+
+type bitset: u64
+
+// h1 is a 57 bit hash prefix
+type h1: u64
+
+// h2 is a 7 bit hash suffix
+type h2: i8
+
+// metadata is the h2 metadata array for a group.
+// find operations first probe the controls bytes
+// to filter candidates before matching keys
+type metadata: [groupSize]i8
+
+unsafe fn metaMatchH2(m: *metadata, h: h2): bitset {
+	// https://graphics.stanford.edu/~seander/bithacks.html##ValueInWord
+	ret hasZeroByte(castU64(m) ^ (loBits * u64(h)))
+}
+
+unsafe fn metaMatchEmpty(m: *metadata): bitset {
+	ret hasZeroByte(castU64(m) ^ hiBits)
+}
+
+fn nextMatch(mut &b: bitset): u32 {
+	s := u32(bits::TrailingZeros64(u64(b)))
+	b &= ^(1 << s) // clear bit |s|
+	ret s >> 3 // div by 8
+}
+
+fn hasZeroByte(x: u64): bitset {
+	ret bitset(((x - loBits) & ^(x)) & hiBits)
+}
+
+unsafe fn castU64(m: *metadata): u64 {
+	ret unsafe { *(*u64)(m) }
+}
+
+// Returns the minimum number of groups needed to store |n| elems.
+fn numGroups(n: int): (groups: int) {
+	groups = (n + maxAvgGroupLoad - 1) / maxAvgGroupLoad
+	if groups == 0 {
+		groups = 1
+	}
+	ret
+}
+
+fn newEmptyMetadata(): (meta: metadata) {
+	for i in meta {
+		meta[i] = empty
+	}
+	ret
+}
+
+fn splitHash(h: u64): (h1, h2) {
+	ret h1((h & h1Mask) >> 7), h2(h & h2Mask)
+}
+
+fn probeStart(hi: h1, groups: int): u32 {
+	ret fastModN(u32(hi), u32(groups))
+}
+
+// lemire.me/blog/2016/06/27/a-fast-alternative-to-the-modulo-reduction/
+fn fastModN(x: u32, n: u32): u32 {
+	ret u32((u64(x) * u64(n)) >> 32)
+}
+
+const h1Mask = 0xffff_ffff_ffff_ff80
+const h2Mask = 0x0000_0000_0000_007f
+const empty = -128   // 0b1000_0000
+const tombstone = -2 // 0b1111_1110
+
+// Default initial size of a map.
+const mapInitialSize = 8
+
+// group is a group of 16 key-value pairs
+struct group[Key: comparable, Val] {
+	keys:   [groupSize]Key
+	values: [groupSize]Val
+}
+
+struct _Map[Key: comparable, Val] {
+	ctrl:     []metadata
+	groups:   []group[Key, Val]
+	resident: int
+	dead:     int
+	limit:    int
+}
+
+impl _Map {
+	// Return non-nil map instance for [Key, Val] pair.
+	static fn make(): &_Map[Key, Val] {
+		ret new(_Map[Key, Val])
+	}
+
+	fn initData(mut self, cap: int) {
+		groups := numGroups(cap)
+		self.ctrl = make([]metadata, groups)
+		self.groups = make([]group[Key, Val], groups)
+		self.limit = groups * maxAvgGroupLoad
+		for i in self.ctrl {
+			self.ctrl[i] = newEmptyMetadata()
+		}
+	}
+
+	// Returns hash for key.
+	fn hash(self, k: Key): u64 {
+		bytes := toStr(k)
+		ret hash(unsafe::StrBytes(bytes))
+	}
+
+	fn rehash(mut self, n: int) {
+		if self.groups == nil {
+			// no need for rehashing just handle nil data
+			self.initData(mapInitialSize)
+			ret
+		}
+
+		mut groups, ctrl := self.groups, self.ctrl
+		self.groups = make([]group[Key, Val], n)
+		self.ctrl = make([]metadata, n)
+		for i in self.ctrl {
+			self.ctrl[i] = newEmptyMetadata()
+		}
+		self.limit = n * maxAvgGroupLoad
+		self.resident, self.dead = 0, 0
+		for g in ctrl {
+			for s in ctrl[g] {
+				c := ctrl[g][s]
+				if c == empty || c == tombstone {
+					continue
+				}
+				unsafe { *self.set(groups[g].keys[s]) = groups[g].values[s] }
+			}
+		}
+	}
+
+	fn nextSize(self): (n: int) {
+		if self.groups == nil {
+			ret mapInitialSize
+		}
+		n = len(self.groups) << 2
+		if self.dead >= (self.resident >> 1) {
+			n = len(self.groups)
+		}
+		ret
+	}
+
+	// Returns the |v| mapped by |k| if one exists.
+	// Sets |v| if found and pointer not nil.
+	// Same as the |ok| variable which reports whether |v| exist.
+	unsafe fn lookup(mut &self, mut k: Key, mut v: *Val, mut ok: *bool) {
+		if self == nil || self.groups == nil {
+			if ok != nil {
+				*ok = false
+			}
+			ret
+		}
+		hi, lo := splitHash(self.hash(k))
+		mut g := probeStart(hi, len(self.groups))
+		for { // inlined find loop
+			mut matches := unsafe { metaMatchH2(&self.ctrl[g], lo) }
+			for matches != 0 {
+				s := nextMatch(matches)
+				if k == self.groups[g].keys[s] {
+					if v != nil {
+						*v = self.groups[g].values[s]
+					}
+					if ok != nil {
+						*ok = true
+					}
+					ret
+				}
+			}
+			// |k| is not in group |g|, stop probing if we see an empty slot
+			matches = unsafe { metaMatchEmpty(&self.ctrl[g]) }
+			if matches != 0 {
+				if ok != nil {
+					*ok = false
+				}
+				ret
+			}
+			g += 1 // linear probing
+			if g >= u32(len(self.groups)) {
+				g = 0
+			}
+		}
+	}
+
+	// Returns value of key if exist, otherwise returns default value of value type.
+	fn get(mut &self, mut k: Key): Val {
+		let mut v: Val
+		if self != nil {
+			mut ok := false
+			unsafe { self.lookup(k, &v, &ok) }
+		}
+		ret v
+	}
+
+	// Attempts to insert |k|.
+	// Returns pointer to value of inserted or already exist |k|.
+	fn set(mut self, mut k: Key): (v: *Val) {
+		if self.resident >= self.limit {
+			self.rehash(self.nextSize())
+		}
+		hi, lo := splitHash(self.hash(k))
+		mut g := probeStart(hi, len(self.groups))
+		for { // inlined find loop
+			mut matches := unsafe { metaMatchH2(&self.ctrl[g], lo) }
+			for matches != 0 {
+				s := nextMatch(matches)
+				if k == self.groups[g].keys[s] { // update
+					self.groups[g].keys[s] = k
+					v = &self.groups[g].values[s]
+					ret
+				}
+			}
+			// |k| is not in group |g|,
+			// stop probing if we see an empty slot
+			matches = unsafe { metaMatchEmpty(&self.ctrl[g]) }
+			if matches != 0 { // insert
+				s := nextMatch(matches)
+				self.groups[g].keys[s] = k
+				v = &self.groups[g].values[s]
+				self.ctrl[g][s] = i8(lo)
+				self.resident++
+				ret
+			}
+			g += 1 // linear probing
+			if g >= u32(len(self.groups)) {
+				g = 0
+			}
+		}
+	}
+
+	// Attempts to remove |k|, returns true successful.
+	fn del(mut &self, mut k: Key): (ok: bool) {
+		if self == nil || self.groups == nil {
+			ret false
+		}
+		hi, lo := splitHash(self.hash(k))
+		mut g := probeStart(hi, len(self.groups))
+		for {
+			mut matches := unsafe { metaMatchH2(&self.ctrl[g], lo) }
+			for matches != 0 {
+				s := nextMatch(matches)
+				if k == self.groups[g].keys[s] {
+					ok = true
+					// optimization: if |self.ctrl[g]| contains any empty
+					// metadata bytes, we can physically delete |k|
+					// rather than placing a tombstone.
+					// The observation is that any probes into group |g|
+					// would already be terminated by the existing empty
+					// slot, and therefore reclaiming slot |s| will not
+					// cause premature termination of probes into |g|.
+					if unsafe { metaMatchEmpty(&self.ctrl[g]) != 0 } {
+						self.ctrl[g][s] = empty
+						self.resident--
+					} else {
+						self.ctrl[g][s] = tombstone
+						self.dead++
+					}
+					let mut key: Key
+					let mut val: Val
+					self.groups[g].keys[s] = key
+					self.groups[g].values[s] = val
+					ret
+				}
+			}
+			// |key| is not in group |g|,
+			// stop probing if we see an empty slot
+			matches = unsafe { metaMatchEmpty(&self.ctrl[g]) }
+			if matches != 0 { // |key| absent
+				ok = false
+				ret
+			}
+			g += 1 // linear probing
+			if g >= u32(len(self.groups)) {
+				g = 0
+			}
+		}
+	}
+
+	// Removes all elements from the Map.
+	fn clear(mut &self) {
+		if self == nil {
+			ret
+		}
+		for i, c in self.ctrl {
+			for j in c {
+				self.ctrl[i][j] = empty
+			}
+		}
+		let mut k: Key
+		let mut v: Val
+		for i in self.groups {
+			mut g := &self.groups[i]
+			unsafe {
+				for j in g.keys {
+					g.keys[j] = k
+					g.values[j] = v
+				}
+			}
+		}
+		self.resident, self.dead = 0, 0
+	}
+
+	// Returns the number of elements in the map.
+	fn len(&self): int {
+		if self == nil {
+			ret 0
+		}
+		ret self.resident - self.dead
+	}
+
+	// Returns the number of additional elements
+	// the can be added before resizing.
+	fn cap(self): int { ret self.limit - self.resident }
+
+	fn iterator(mut &self): mapIterator[Key, Val] {
+		mut iterator := mapIterator[Key, Val]{m: self}
+		iterator.init()
+		ret iterator
+	}
+}
+
+// Iterates the elements of the map, returns pointer to the key and value.
+// It guarantees that any key in the map will be visited only once, and
+// for un-mutated maps, every key will be visited once. If the map is
+// mutated during iteration, mutations will be reflected on return from
+// iter, but the set of keys visited by iter is non-deterministic.
+struct mapIterator[Key: comparable, Val] {
+	m:      &_Map[Key, Val]
+	ctrl:   []metadata
+	groups: []group[Key, Val]
+	n:      int
+	g:      int
+	s:      int
+}
+
+impl mapIterator {
+	fn init(mut self) {
+		if self.m == nil {
+			ret
+		}
+		// take a consistent view of the table in case
+		// we rehash during iteration
+		self.ctrl, self.groups = unsafe { self.m.ctrl, self.m.groups }
+		if self.m.len() > 0 {
+			// pick a random starting group
+			self.g = randInt(u64(uintptr(&self)), len(self.groups))
+		}
+		self.n = 0
+		self.s = 0
+	}
+
+	// Returns pointer to the key and value.
+	// Returns nil pointer for both if iteration ended.
+	fn next(mut self): (*Key, *Val) {
+		for self.n < len(self.groups); self.n++ {
+			ctrl := &self.ctrl[self.g]
+			for self.s < len(unsafe { *ctrl }); self.s++ {
+				c := unsafe { (*ctrl)[self.s] }
+				if c == empty || c == tombstone {
+					continue
+				}
+				mut k := &self.groups[self.g].keys[self.s]
+				mut v := &self.groups[self.g].values[self.s]
+				self.s++
+				if self.s >= len(unsafe { *ctrl }) {
+					self.n++
+					self.s = 0
+					self.g++
+					if self.g >= len(self.groups) {
+						self.g = 0
+					}
+				}
+				ret k, v
+			}
+			self.g++
+			self.s = 0
+			if self.g >= len(self.groups) {
+				self.g = 0
+			}
+		}
+		ret nil, nil
+	}
+}

@@ -1,0 +1,101 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use std::unsafe
+use utf8 for std::unicode::utf8
+
+// See [std::strings::{Compare}] function for documentation.
+#export "__jule_compareStr"
+fn compareStr(&a: str, &b: str): int {
+	mut l := len(a)
+	if len(b) < l {
+		l = len(b)
+	}
+	mut i := 0
+	for i < l; i++ {
+		c1, c2 := a[i], b[i]
+		if c1 < c2 {
+			ret -1
+		}
+		if c1 > c2 {
+			ret +1
+		}
+	}
+	if len(a) < len(b) {
+		ret -1
+	}
+	if len(a) > len(b) {
+		ret +1
+	}
+	ret 0
+}
+
+// Converts []byte to str.
+#export "__jule_bytesToStr"
+fn bytesToStr(bytes: []byte): str {
+	mut buf := make([]byte, len(bytes))
+	copy(buf, bytes)
+	ret unsafe::StrFromBytes(buf)
+}
+
+// Converts []rune to str.
+#export "__jule_runesToStr"
+fn runesToStr(runes: []rune): str {
+	mut buf := make([]byte, 0, len(runes) * utf8::UTFMax)
+	for _, r in runes {
+		buf = utf8::AppendRune(buf, r)
+	}
+	ret unsafe::StrFromBytes(buf)
+}
+
+// Converts str to []rune.
+#export "__jule_strToRunes"
+fn strToRunes(s: str): []rune {
+	mut buf := make([]rune, 0, utf8::RuneCountStr(s))
+	mut n := 0
+	for n < len(s) {
+		r, len := utf8::DecodeRuneStr(s[n:])
+		n += len
+		buf = append(buf, r)
+	}
+	ret buf
+}
+
+// Converts str to []byte.
+#export "__jule_strToBytes"
+fn strToBytes(s: str): []byte {
+	mut buf := make([]byte, len(s))
+	copy(buf, s)
+	ret buf
+}
+
+// Converts byte to str.
+#export "__jule_strFromByte"
+fn strFromByte(b: byte): str {
+	mut buf := make([]byte, 1)
+	buf[0] = b
+	ret unsafe::StrFromBytes(buf)
+}
+
+// Converts rune to str.
+#export "__jule_strFromRune"
+fn strFromRune(r: rune): str {
+	mut buf := make([]byte, 0, utf8::UTFMax)
+	buf = utf8::AppendRune(buf, r)
+	ret unsafe::StrFromBytes(buf)
+}
+
+// Designed for []rune(s) iterations.
+// Takes pointer to string withl length
+// and sets output pointers by first rune of string.
+// Passing nil pointer for any parameter is not safe except |r|.
+#export "__jule_runeStep"
+unsafe fn runeStep(s: *byte, n: int, mut r: *rune, mut outLen: *int) {
+	buf := unsafe::Slice(s, n, n)
+	if r != nil {
+		*r, *outLen = utf8::DecodeRune(buf)
+	} else {
+		_, *outLen = utf8::DecodeRune(buf)
+	}
+}

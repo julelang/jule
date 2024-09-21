@@ -1,0 +1,22 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use std::unsafe
+use sys for std::sys
+use integ for std::jule::integrated
+
+cpp use "<unistd.h>"
+
+cpp unsafe fn readlink(*integ::Char, *integ::Char, int): int
+
+fn executable(): str {
+	mut buf := make([]byte, sys::PATH_MAX)
+	p := "/proc/self/exe"
+	n := unsafe { cpp.readlink((*integ::Char)(&p[0]), (*integ::Char)(&buf[0]), len(buf)) }
+	if n != -1 {
+		buf = buf[:n]
+		ret unsafe::StrFromBytes(buf)
+	}
+	panic("runtime: executable path read error")
+}

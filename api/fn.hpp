@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <thread>
 
+#include "runtime.hpp"
 #include "types.hpp"
 #include "error.hpp"
 #include "panic.hpp"
@@ -46,9 +47,9 @@ namespace jule
             {
                 this->ctxHandler(this->ctx);
                 this->ctxHandler = nullptr;
-                this->ctx.ref = nullptr; // Disable GC for allocation.
-                this->ctx = nullptr;     // Assign to nullptr safely.
             }
+            this->ctx.ref = nullptr; // Disable GC for allocation.
+            this->ctx = nullptr;     // Assign to nullptr safely.
         }
 
         template <typename... Arguments>
@@ -61,9 +62,9 @@ namespace jule
 #ifndef __JULE_DISABLE__SAFETY
             if (this->f == nullptr)
 #ifndef __JULE_ENABLE__PRODUCTION
-                jule::panic((std::string(__JULE_ERROR__INVALID_MEMORY) + "\nfile: ") + file);
+                __jule_panic_s((std::string(__JULE_ERROR__INVALID_MEMORY) + "\nfile: ") + file);
 #else
-                jule::panic(__JULE_ERROR__INVALID_MEMORY);
+                __jule_panic_s(__JULE_ERROR__INVALID_MEMORY);
 #endif // PRODUCTION
 #endif // SAFETY
             return this->f(this->ctx, args...);
@@ -92,14 +93,6 @@ namespace jule
         constexpr jule::Bool operator!=(std::nullptr_t) const noexcept
         {
             return !this->operator==(nullptr);
-        }
-
-        friend std::ostream &operator<<(std::ostream &stream,
-                                        const Fn<Ret, Args...> &f) noexcept
-        {
-            if (f == nullptr)
-                return (stream << "<nil>");
-            return (stream << (void *)f.f);
         }
     };
 

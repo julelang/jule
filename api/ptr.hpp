@@ -6,20 +6,14 @@
 #define __JULE_PTR_HPP
 
 #include <string>
-#include <ostream>
 
-#include "atomic.hpp"
+#include "runtime.hpp"
 #include "types.hpp"
 #include "error.hpp"
 #include "panic.hpp"
 
 namespace jule
 {
-
-    // The reference counting data delta value that must occur
-    // per each reference counting operation.
-    constexpr signed int REFERENCE_DELTA = 1;
-
     // Wrapper structure for raw pointer of JuleC.
     // This structure is the used by Jule references for reference-counting
     // and memory management.
@@ -33,9 +27,6 @@ namespace jule
     // Equavelent of Jule's ptr(T, EXPR) call.
     template <typename T>
     inline jule::Ptr<T> new_ptr(const T &init) noexcept;
-
-    // Reports whether pointer allocations are points to same address.
-    inline jule::Bool ptr_equal(void *alloc, void *other);
 
     template <typename T>
     struct Ptr
@@ -62,14 +53,8 @@ namespace jule
             jule::Ptr<T> buffer;
 
 #ifndef __JULE_DISABLE__REFERENCE_COUNTING
-            buffer.ref = new (std::nothrow) jule::Uint;
-            if (!buffer.ref)
-                jule::panic(__JULE_ERROR__MEMORY_ALLOCATION_FAILED
-                            "\nruntime: memory allocation failed for reference counter of smart pointer");
-
-            *buffer.ref = jule::REFERENCE_DELTA;
+            buffer.ref = __jule_RCNew();
 #endif
-
             buffer.alloc = ptr;
             return buffer;
         }
@@ -80,7 +65,7 @@ namespace jule
 
             buffer.alloc = new (std::nothrow) T;
             if (!buffer.alloc)
-                jule::panic(__JULE_ERROR__MEMORY_ALLOCATION_FAILED
+                __jule_panic_s(__JULE_ERROR__MEMORY_ALLOCATION_FAILED
                             "\nruntime: memory allocation failed for heap of smart pointer");
 
             *buffer.alloc = instance;
@@ -93,13 +78,7 @@ namespace jule
 #ifdef __JULE_DISABLE__REFERENCE_COUNTING
             return jule::Ptr<T>::make(instance, nullptr);
 #else
-            auto *ref = new (std::nothrow) jule::Uint;
-            if (!ref)
-                jule::panic(__JULE_ERROR__MEMORY_ALLOCATION_FAILED
-                            "\nruntime: memory allocation failed for reference counter of smart pointer");
-            *ref = jule::REFERENCE_DELTA;
-
-            return jule::Ptr<T>::make(instance, ref);
+            return jule::Ptr<T>::make(instance, __jule_RCNew());
 #endif
         }
 
@@ -130,7 +109,7 @@ namespace jule
         void __get_copy(const jule::Ptr<T> &src) noexcept
         {
             if (src.ref)
-                src.add_ref();
+                __jule_RCAdd(src.ref);
             this->ref = src.ref;
             this->alloc = src.alloc;
         }
@@ -142,33 +121,11 @@ namespace jule
             this->alloc = src.alloc;
         }
 
-        inline jule::Int drop_ref(void) const noexcept
-        {
-            return __jule_atomic_add_explicit(
-                this->ref,
-                -jule::REFERENCE_DELTA,
-                __JULE_ATOMIC_MEMORY_ORDER__RELAXED);
-        }
-
-        inline jule::Int add_ref(void) const noexcept
-        {
-            return __jule_atomic_add_explicit(
-                this->ref,
-                jule::REFERENCE_DELTA,
-                __JULE_ATOMIC_MEMORY_ORDER__RELAXED);
-        }
-
-        inline jule::Uint get_ref_n(void) const noexcept
-        {
-            return __jule_atomic_load_explicit(
-                this->ref, __JULE_ATOMIC_MEMORY_ORDER__RELAXED);
-        }
-
         // Frees memory. Unsafe function, not includes any safety checking for
         // heap allocations are valid or something like that.
         void __free(void) const noexcept
         {
-            delete this->ref;
+            __jule_RCFree(this->ref);
             this->ref = nullptr;
 
             delete this->alloc;
@@ -186,7 +143,7 @@ namespace jule
                 return;
             }
 
-            if (this->drop_ref() != jule::REFERENCE_DELTA)
+            if (__jule_RCDrop(this->ref))
             {
                 this->ref = nullptr;
                 this->alloc = nullptr;
@@ -239,7 +196,7 @@ namespace jule
             ptr.ref = this->ref;
 #ifndef __JULE_DISABLE__REFERENCE_COUNTING
             if (this->ref)
-                this->add_ref();
+                __jule_RCAdd(this->ref);
 #endif
             ptr.alloc = reinterpret_cast<T2 *>(this->alloc);
             return ptr;
@@ -295,9 +252,9 @@ namespace jule
 #ifndef __JULE_ENABLE__PRODUCTION
                 std::string error = __JULE_ERROR__INVALID_MEMORY "\nruntime: smart pointer is nil\nfile: ";
                 error += file;
-                jule::panic(error);
+                __jule_panic_s(error);
 #else
-                jule::panic(__JULE_ERROR__INVALID_MEMORY "\nruntime: smart pointer is nil");
+                __jule_panic_s(__JULE_ERROR__INVALID_MEMORY "\nruntime: smart pointer is nil");
 #endif
             }
         }
@@ -331,22 +288,12 @@ namespace jule
 
         inline jule::Bool operator==(const jule::Ptr<T> &ref) const noexcept
         {
-            return jule::ptr_equal(this->alloc, ref.alloc);
+            return __jule_ptrEqual(this->alloc, ref.alloc);
         }
 
         inline jule::Bool operator!=(const jule::Ptr<T> &ref) const noexcept
         {
             return !this->operator==(ref);
-        }
-
-        friend inline std::ostream &operator<<(std::ostream &stream,
-                                               const jule::Ptr<T> &ref) noexcept
-        {
-            if (ref == nullptr)
-                stream << "<nil>";
-            else
-                stream << ref.alloc;
-            return stream;
         }
     };
 
@@ -364,11 +311,6 @@ namespace jule
 #else
         return jule::Ptr<T>::make(init);
 #endif
-    }
-
-    inline jule::Bool ptr_equal(void *alloc, void *other)
-    {
-        return alloc == other;
     }
 } // namespace jule
 
