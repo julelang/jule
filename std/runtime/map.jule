@@ -188,8 +188,8 @@ impl _Map {
 	// Returns the |v| mapped by |k| if one exists.
 	// Sets |v| if found and pointer not nil.
 	// Same as the |ok| variable which reports whether |v| exist.
-	unsafe fn lookup(mut self, mut k: Key, mut v: *Val, mut ok: *bool) {
-		if self.groups == nil {
+	unsafe fn lookup(mut &self, mut k: Key, mut v: *Val, mut ok: *bool) {
+		if self == nil || self.groups == nil {
 			if ok != nil {
 				*ok = false
 			}
@@ -227,10 +227,12 @@ impl _Map {
 	}
 
 	// Returns value of key if exist, otherwise returns default value of value type.
-	fn get(mut self, mut k: Key): Val {
+	fn get(mut &self, mut k: Key): Val {
 		let mut v: Val
-		mut ok := false
-		unsafe { self.lookup(k, &v, &ok) }
+		if self != nil {
+			mut ok := false
+			unsafe { self.lookup(k, &v, &ok) }
+		}
 		ret v
 	}
 
@@ -271,8 +273,8 @@ impl _Map {
 	}
 
 	// Attempts to remove |k|, returns true successful.
-	fn del(mut self, mut k: Key): (ok: bool) {
-		if self.groups == nil {
+	fn del(mut &self, mut k: Key): (ok: bool) {
+		if self == nil || self.groups == nil {
 			ret false
 		}
 		hi, lo := splitHash(self.hash(k))
@@ -319,7 +321,10 @@ impl _Map {
 	}
 
 	// Removes all elements from the Map.
-	fn clear(mut self) {
+	fn clear(mut &self) {
+		if self == nil {
+			ret
+		}
 		for i, c in self.ctrl {
 			for j in c {
 				self.ctrl[i][j] = empty
@@ -340,7 +345,12 @@ impl _Map {
 	}
 
 	// Returns the number of elements in the map.
-	fn len(self): int { ret self.resident - self.dead }
+	fn len(&self): int {
+		if self == nil {
+			ret 0
+		}
+		ret self.resident - self.dead
+	}
 
 	// Returns the number of additional elements
 	// the can be added before resizing.
