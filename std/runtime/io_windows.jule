@@ -17,11 +17,12 @@ unsafe fn writeConsole(handle: sys::Handle, buf: []byte): (n: int) {
 		ret 0
 	}
 	utf16Buf := integ::UTF16FromStr(unsafe::BytesStr(buf))
-	ok := sys::WriteConsole(handle, &utf16Buf[0], len(utf16Buf), n, nil)
+	mut written := u32(0)
+	ok := sys::WriteConsole(handle, &utf16Buf[0], u32(len(utf16Buf)), written, nil)
 	if !ok {
 		ret -1
 	}
-	ret n
+	ret len(buf)
 }
 
 // Reads from console handle.
@@ -31,12 +32,13 @@ unsafe fn readConsole(handle: sys::Handle, mut buf: []byte): (n: int) {
 		ret 0
 	}
 	mut codepage := make([]u16, len(buf))
-	ok := sys::ReadConsole(handle, &codepage[0], len(codepage), n)
+	mut readed := u32(0)
+	ok := sys::ReadConsole(handle, &codepage[0], u32(len(codepage)), readed)
 	if !ok {
 		ret -1
 	}
 
-	runes := utf16::Decode(codepage[:n])
+	runes := utf16::Decode(codepage[:readed])
 	n = 0
 	for _, r in runes {
 		size := utf8::RuneLen(r)
