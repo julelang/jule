@@ -2,57 +2,26 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use integ for std::jule::integrated
-cpp use "<mutex>"
+use atomic for std::sync::atomic
 
-#namespace "std"
-#typedef
-cpp struct mutex {
-	lock:     fn()
-	unlock:   fn()
-	try_lock: fn(): bool
-}
-
-struct mutex {
-	p: *cpp.mutex
-}
-
-impl mutex {
-	static fn new(): &mutex {
-		mut mtx := &mutex{
-			p: integ::New[cpp.mutex](),
-		}
-		if mtx.p == nil {
-			panic("std::sync: mutex: allocation failed")
-		}
-		ret mtx
-	}
-
-	fn Dispose(mut self) {
-		unsafe { integ::Delete[cpp.mutex](self.p) }
-	}
-}
+const mutexUnlocked = 0
+const mutexLocked = 1
 
 // Muxtex is a primitive used to protect memory in
 // multi-threading situations such as concurrent access.
 //
-// If you try to lock an already locked mutex again
-// in the same thread or exhibit similar behavior, a system
-// signal is likely to occur.
-//
-// Mutextes are uses internal mutability and internal allocations.
+// Mutextes are uses internal mutability and internal states.
 // Locking, unlocking and etc is not mutable operations.
-// Mutex suitable for using without smart pointers thanks to internal allocations.
-// The internal allocation automatically deallocated by smart pointer.
+// But there is no internal mutable memory, so mutexes are not use shared memory.
+// Therefore, for correct use, a mutex instance should not be copied.
+// Otherwise internal state will be copied and not mutated by other instances.
+//
+// Mutexes are not implemented using API of operating system. Implemented in pure Jule.
+// This mutex implementation is not fair and will not optimize starvations.
+// Also it will not check ownership of the mutex,
+// so another thread can unlock the mutex locked by another thread.
 struct Mutex {
-	mtx: &mutex = mutex.new()
-}
-
-impl Mutex {
-	// Returns new initialized ready-for-use Mutex.
-	static fn New(): Mutex {
-		ret Mutex{}
-	}
+	mut state: i32
 }
 
 impl Mutex {
@@ -60,13 +29,16 @@ impl Mutex {
 	// another thread, it stops the execution of the
 	// algorithm to seize it and waits to lock the mutex.
 	fn Lock(self) {
-		unsafe { self.mtx.p.lock() }
+		for !self.TryLock() {}
 	}
 
 	// Unlock the mutex you locked and make it open
 	// to locking by the thread.
 	fn Unlock(self) {
-		unsafe { self.mtx.p.unlock() }
+		old := atomic::Add(self.state, -mutexLocked, atomic::MemoryOrder.SeqCst)
+		if old == 0 {
+			panic("sync: Mutex: unlock of unlocked mutex")
+		}
 	}
 
 	// Try locking the mutex. But unlike the lock
@@ -74,6 +46,6 @@ impl Mutex {
 	// to lock. Returns true if the locking was
 	// successful, false otherwise.
 	fn TryLock(self): bool {
-		ret unsafe { self.mtx.p.try_lock() }
+		ret atomic::CompareSwap(self.state, mutexUnlocked, mutexLocked, atomic::MemoryOrder.SeqCst)
 	}
 }
