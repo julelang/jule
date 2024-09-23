@@ -52,7 +52,6 @@ use std::jule::sema::{
 	BuiltinOutlnCallExprModel,
 	BuiltinNewCallExprModel,
 	BuiltinPanicCallExprModel,
-	BuiltinAssertCallExprModel,
 	BuiltinMakeCallExprModel,
 	BuiltinAppendCallExprModel,
 	BuiltinErrorCallExprModel,
@@ -1380,19 +1379,6 @@ impl exprCoder {
 		self.oc.write("\"));")
 	}
 
-	fn assertCall(mut &self, mut m: &BuiltinAssertCallExprModel) {
-		if env::Production {
-			ret
-		}
-		self.oc.write("if (!(")
-		self.possibleRefExpr(m.Expr)
-		self.oc.write(")) __jule_panic_s(jule::Str(")
-		cstrLit(self.oc.Buf, m.Log)
-		self.oc.write(`) + jule::Str("\nlocation: `)
-		self.oc.locInfo(m.Token)
-		self.oc.write("\"));")
-	}
-
 	fn errorCall(mut &self, mut m: &BuiltinErrorCallExprModel) {
 		self.oc.write("return ")
 		if m.Func.Decl.IsVoid() {
@@ -1765,8 +1751,6 @@ impl exprCoder {
 			self.newCall((&BuiltinNewCallExprModel)(m))
 		| &BuiltinPanicCallExprModel:
 			self.panicCall((&BuiltinPanicCallExprModel)(m))
-		| &BuiltinAssertCallExprModel:
-			self.assertCall((&BuiltinAssertCallExprModel)(m))
 		| &BuiltinErrorCallExprModel:
 			self.errorCall((&BuiltinErrorCallExprModel)(m))
 		| &BuiltinMakeCallExprModel:

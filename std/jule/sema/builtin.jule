@@ -55,9 +55,6 @@ fn findBuiltinFunc(&ident: str): &FnIns {
 	| "delete":
 		static mut f = &FnIns{caller: builtinCallerDelete}
 		ret f
-	| "assert":
-		static mut f = &FnIns{caller: builtinCallerAssert}
-		ret f
 	|:
 		ret nil
 	}
@@ -837,50 +834,6 @@ fn builtinCallerDelete(mut &e: &eval, mut &fc: &FnCallExpr, mut &d: &Data): &Dat
 		e.pushErr(fc.Args[0].Token, LogMsg.InvalidExpr)
 		ret nil
 	}
-}
-
-fn builtinCallerAssert(mut &e: &eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data {
-	if len(fc.Args) < 1 {
-		e.pushErr(fc.Token, LogMsg.MissingExprFor, "expr")
-		ret nil
-	}
-	if len(fc.Args) > 2 {
-		e.pushErr(fc.Args[2].Token, LogMsg.ArgumentOverflow, "assert")
-	}
-
-	mut expr := e.evalExpr(fc.Args[0])
-	if expr == nil {
-		ret nil
-	}
-
-	if expr.Kind.Prim() == nil || !expr.Kind.Prim().IsBool() {
-		e.pushErr(fc.Token, LogMsg.AssertNonBool)
-	}
-
-	mut model := &BuiltinAssertCallExprModel{
-		Token: fc.Token,
-		Expr: expr.Model,
-		Log: "assertion failed", // Default log message.
-	}
-
-	// Custom log message is exist.
-	if len(fc.Args) == 2 {
-		mut log := e.evalExpr(fc.Args[1])
-		if log == nil {
-			ret nil
-		}
-
-		if !log.IsConst() || log.Kind.Prim() == nil || !log.Kind.Prim().IsStr() {
-			e.pushErr(fc.Args[1].Token, LogMsg.IncompatibleTypes, "const str", log.Kind.Str())
-			ret nil
-		}
-
-		model.Log = log.Constant.ReadStr()
-	}
-
-	mut d := buildVoidData()
-	d.Model = model
-	ret d
 }
 
 fn builtinCallerStdComptimeTypeOf(mut &e: &eval, mut &fc: &FnCallExpr, mut &_: &Data): &Data {
