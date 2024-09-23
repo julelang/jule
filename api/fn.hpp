@@ -27,7 +27,7 @@ namespace jule
     struct Fn
     {
     public:
-        Ret (*f)(jule::Ptr<jule::Uintptr>, Args...);
+        Ret (*f)(jule::Ptr<jule::Uintptr>, Args...) = nullptr;
         jule::Ptr<jule::Uintptr> ctx; // Closure ctx.
         void (*ctxHandler)(jule::Ptr<jule::Uintptr> &alloc) = nullptr;
 
