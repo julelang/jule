@@ -15,11 +15,6 @@
 #include "panic.hpp"
 #include "ptr.hpp"
 
-#define __JULE_CO_SPAWN(ROUTINE) \
-    (std::thread{ROUTINE})
-#define __JULE_CO(EXPR) \
-    (__JULE_CO_SPAWN([=](void) mutable -> void { EXPR; }).detach())
-
 namespace jule
 {
     // Anonymous function / closure wrapper of JuleC.

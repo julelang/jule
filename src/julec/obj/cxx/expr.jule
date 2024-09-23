@@ -906,49 +906,76 @@ impl exprCoder {
 	fn coFuncCall(mut &self, mut &m: &FnCallExprModel) {
 		self.oc.write("{\n")
 		self.oc.addIndent()
-		mut head := StrBuilder.New(1 << 5)
-		head.WriteStr("std::thread([")
-		if m.Func.Owner != nil {
-			head.WriteStr(identCoder.Self)
-			if len(m.Args) > 0 {
-				head.WriteStr(", ")
-			}
-		}
-		for i, arg in m.Args {
-			if i > 0 {
-				head.WriteStr(", ")
-			}
-			match type arg {
-			| &Var:
-				mut v := (&Var)(arg)
-				identCoder.var(head, v)
-				continue
-			}
-			name := "_co_arg_" + conv::Itoa(i)
-			head.WriteStr(name)
+		self.oc.indent()
+
+		const noWrap = ""
+		const argData = "__jule_argdata"
+		mut i := noWrap
+		if len(m.Func.Params) > 0 || m.Func.AsAnon {
+			i = conv::Itoa(self.oc.pushCoSpawn(m.Func))
+			t := coSpawnPrefix + coSpawnArgDataSuffix + i
+			self.oc.write(t)
+			self.oc.write(" *")
+			self.oc.write(argData)
+			self.oc.write(" = new (std::nothrow) ")
+			self.oc.write(t)
+			self.oc.write("; if (!")
+			self.oc.write(argData)
+			self.oc.write(`) __jule_panic((`)
+			self.oc.write(typeCoder.U8)
+			self.oc.write(`*)"memory allocation failed for concurrent call", 44);` + "\n")
 			self.oc.indent()
-			self.oc.tc.kind(self.oc.Buf, m.Func.Params[i].Kind)
-			self.oc.write(" ")
-			if m.Func.Params[i].Decl.Reference {
-				self.oc.write("&")
-			}
-			self.oc.write(name)
+
+			// setup function data
+			self.oc.write(argData)
+			self.oc.write("->")
+			self.oc.write(coSpawnArgDataFunc)
 			self.oc.write(" = ")
-			self.possibleRefExpr(arg)
+			self.modelForCall(m.Expr)
 			self.oc.write(";\n")
-			argS := any(name)
-			m.Args[i] = unsafe { *(*ExprModel)(&argS) }
+
+			// setup argument data
+			for j in m.Func.Params {
+				self.oc.indent()
+				self.oc.write(argData)
+				self.oc.write("->")
+				self.oc.write(coSpawnArgDataParam)
+				self.oc.write(conv::Itoa(j))
+				self.oc.write(" = ")
+				self.possibleRefExpr(m.Args[j])
+				self.oc.write(";\n")
+			}
+			self.oc.indent()
 		}
-		self.oc.indent()
-		self.oc.Buf.Write(unsafe { head.Buf() })
-		self.oc.write("](void) mutable -> void {\n")
-		self.oc.addIndent()
-		self.oc.indent()
-		self.pureFuncCall(m)
-		self.oc.write(";\n")
-		self.oc.doneIndent()
-		self.oc.indent()
-		self.oc.write("}).detach();\n")
+
+		// spawn thread
+		if i != noWrap {
+			self.oc.write("if (!")
+		}
+		self.oc.write("__jule_coSpawn((void*)")
+		if i == noWrap {
+			identCoder.funcIns(self.oc.Buf, m.Func)
+		} else {
+			self.oc.write(coSpawnPrefix + coSpawnMethodSuffix + i)
+		}
+		self.oc.write(", ")
+		if i == noWrap {
+			self.oc.write("NULL")
+		} else {
+			self.oc.write("(void*)")
+			self.oc.write(argData)
+		}
+		self.oc.write(")")
+		if i == noWrap {
+			self.oc.write(";")
+		} else {
+			self.oc.write(") { delete ")
+			self.oc.write(argData)
+			self.oc.write("; __jule_panic((")
+			self.oc.write(typeCoder.U8)
+			self.oc.write(`*)"thread creation failed for concurrent call", 42); }`)
+		}
+		self.oc.write("\n")
 		self.oc.doneIndent()
 		self.oc.indent()
 		self.oc.write("}")

@@ -1,0 +1,22 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use integ for std::jule::integrated
+
+cpp use "<pthread.h>"
+
+cpp unsafe fn pthread_create(*cpp.pthread_t, *unsafe, *unsafe, *unsafe): int
+cpp fn pthread_detach(cpp.pthread_t): int
+
+#typedef
+cpp struct pthread_t{}
+
+unsafe fn _coSpawn(func: *unsafe, args: *unsafe): bool {
+	let t: cpp.pthread_t
+	if cpp.pthread_create(&t, nil, integ::Emit[*unsafe]("(void*(*)(void*))({})", func), args) != 0 {
+		ret false
+	}
+	cpp.pthread_detach(t)
+	ret true
+}
