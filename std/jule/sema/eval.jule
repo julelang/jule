@@ -1769,9 +1769,7 @@ impl eval {
 		prim := t.Prim()
 		match {
 		| prim.IsAny():
-			// The any type supports casting to any data type.
-			d.Constant = nil
-			d.untyped = false
+			panic("eval: castPrim: any case should be unreachable in this routine")
 		| prim.IsStr():
 			self.castStr(d, errorToken)
 		| types::IsInt(prim.Str()):
@@ -1832,6 +1830,10 @@ impl eval {
 			} else if t.TypeEnum() != nil {
 				self.pushErr(errorToken, LogMsg.EnumCastedFromAny)
 			}
+			d.Constant = nil
+			d.untyped = false
+		| t.Prim() != nil && t.Prim().IsAny():
+			// The any type supports casting to any data type.
 			d.Constant = nil
 			d.untyped = false
 		| d.Kind.TypeEnum() != nil:
