@@ -2,6 +2,41 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+// The Jule code is a modified version of the original Go code from
+// https://github.com/golang/go/blob/65a6e05070e56bafc00bbe24f2fa18ed07ed716b/src/strings/strings.go and came with this notice.
+//
+// ====================================================
+// Copyright (c) 2009 The Go Authors. All rights reserved.
+// 
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+// 
+//    * Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+//    * Redistributions in binary form must reproduce the above
+// copyright notice, this list of conditions and the following disclaimer
+// in the documentation and/or other materials provided with the
+// distribution.
+//    * Neither the name of Google Inc. nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+// 
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// ====================================================
+
+use utf8 for std::unicode::utf8
+use unicode for std::unicode
 use runtime for std::runtime
 
 // Returns an integer comparing two strings lexicographically.
@@ -12,4 +47,89 @@ use runtime for std::runtime
 // to use the built-in string comparison operators ==, <, >, and so on.
 fn Compare(a: str, b: str): int {
 	ret runtime::compareStr(a, b)
+}
+
+// Reports whether s and t, interpreted as UTF-8 strings,
+// are equal under simple Unicode case-folding, which is a more general
+// form of case-insensitivity.
+fn EqualFold(mut s: str, mut t: str): bool {
+	// ASCII fast path
+	mut i := 0
+	for i < len(s) && i < len(t); i++ {
+		mut sr := s[i]
+		mut tr := t[i]
+		if sr|tr >= utf8::RuneSelf {
+			goto hasUnicode
+		}
+
+		// Easy case.
+		if tr == sr {
+			continue
+		}
+
+		// Make sr < tr to simplify what follows.
+		if tr < sr {
+			tr, sr = sr, tr
+		}
+		// ASCII only, sr/tr must be upper/lower case
+		if 'A' <= sr && sr <= 'Z' && tr == sr+'a'-'A' {
+			continue
+		}
+		ret false
+	}
+	// Check if we've exhausted both strings.
+	ret len(s) == len(t)
+
+hasUnicode:
+	s = s[i:]
+	t = t[i:]
+	for (_, mut sr) in []rune(s) {
+		// If t is exhausted the strings are not equal.
+		if len(t) == 0 {
+			ret false
+		}
+
+		// Extract first rune from second string.
+		let mut tr: rune
+		if t[0] < utf8::RuneSelf {
+			tr, t = rune(t[0]), t[1:]
+		} else {
+			r, size := utf8::DecodeRuneStr(t)
+			tr, t = r, t[size:]
+		}
+
+		// If they match, keep going; if not, return false.
+
+		// Easy case.
+		if tr == sr {
+			continue
+		}
+
+		// Make sr < tr to simplify what follows.
+		if tr < sr {
+			tr, sr = sr, tr
+		}
+		// Fast check for ASCII.
+		if tr < utf8::RuneSelf {
+			// ASCII only, sr/tr must be upper/lower case
+			if 'A' <= sr && sr <= 'Z' && tr == sr+'a'-'A' {
+				continue
+			}
+			ret false
+		}
+
+		// General case. SimpleFold(x) returns the next equivalent rune > x
+		// or wraps around to smaller values.
+		mut r := unicode::SimpleFold(sr)
+		for r != sr && r < tr {
+			r = unicode::SimpleFold(r)
+		}
+		if r == tr {
+			continue
+		}
+		ret false
+	}
+
+	// First string is empty, so check if the second one is also empty.
+	ret len(t) == 0
 }
