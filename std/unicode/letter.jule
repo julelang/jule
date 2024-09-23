@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 // The Jule code is a modified version of the original Go code from
-// https://github.com/golang/go/blob/go1.19/src/unicode/letter.go and came with this notice.
+// https://github.com/golang/go/blob/b8e533a7cdc60d84a0c52bfaf3dcb5bf148ac3a8/src/unicode/letter.go and came with this notice.
 //
 // ====================================================
 // Copyright (c) 2009 The Go Authors. All rights reserved.
@@ -86,10 +86,10 @@ struct foldPair {
 //  {UPPER_LOWER, UPPER_LOWER, UPPER_LOWER}
 //
 // The constant UPPER_LOWER has an otherwise impossible delta value.
-struct caseRange {
-	lo:    u32
-	hi:    u32
-	delta: d
+struct CaseRange {
+	Lo:    u32
+	Hi:    u32
+	Delta: d
 }
 
 // Represents of a range of 16-bit Unicode code points. The range runs from lo to hi
@@ -122,7 +122,7 @@ struct RangeTable {
 
 // to maps the rune using the specified case mapping.
 // It additionally reports whether caseRange contained a mapping for r.
-fn to(case: int, r: rune, caseRange: []caseRange): (mappedRune: rune, foundMapping: bool) {
+fn to(case: int, r: rune, caseRange: []CaseRange): (mappedRune: rune, foundMapping: bool) {
 	if case < 0 || MaxCase <= case {
 		ret ReplacementChar, false // as reasonable an error as any
 	}
@@ -133,8 +133,8 @@ fn to(case: int, r: rune, caseRange: []caseRange): (mappedRune: rune, foundMappi
 	for lo < hi {
 		m := lo + (hi - lo) / 2
 		cr := caseRange[m]
-		if rune(cr.lo) <= r && r <= rune(cr.hi) {
-			delta := cr.delta[case]
+		if rune(cr.Lo) <= r && r <= rune(cr.Hi) {
+			delta := cr.Delta[case]
 			if delta > MaxRune {
 				// In an Upper-Lower sequence, which always starts with
 				// an UpperCase letter, the real deltas always look like:
@@ -146,11 +146,11 @@ fn to(case: int, r: rune, caseRange: []caseRange): (mappedRune: rune, foundMappi
 				// bit in the sequence offset.
 				// The constants UpperCase and TitleCase are even while LowerCase
 				// is odd so we take the low bit from case.
-				ret rune(cr.lo) + ((r - rune(cr.lo)) & ^1 | rune(case & 1)), true
+				ret rune(cr.Lo) + ((r - rune(cr.Lo)) & ^1 | rune(case & 1)), true
 			}
 			ret r + delta, true
 		}
-		if r < rune(cr.lo) {
+		if r < rune(cr.Lo) {
 			hi = m
 		} else {
 			lo = m + 1
@@ -161,7 +161,7 @@ fn to(case: int, r: rune, caseRange: []caseRange): (mappedRune: rune, foundMappi
 
 // Maps the rune to the specified case: UpperCase, LowerCase, or TitleCase.
 fn To(case: int, mut r: rune): rune {
-	r, _ = to(case, r, CASE_RANGES)
+	r, _ = to(case, r, CaseRanges)
 	ret r
 }
 
@@ -307,4 +307,100 @@ fn IsLower(r: rune): bool {
 		ret _PROPERTIES[u8(r)]&__P_L_MASK == __P_LL
 	}
 	ret isExcludingLatin(Lower, r)
+}
+
+// Converts r to case using CaseRange cr.
+fn convertCase(case: int, r: rune, cr: &CaseRange): rune {
+	delta := cr.Delta[case]
+	if delta > MaxRune {
+		// In an Upper-Lower sequence, which always starts with
+		// an UpperCase letter, the real deltas always look like:
+		//	{0, 1, 0}    UpperCase (Lower is next)
+		//	{-1, 0, -1}  LowerCase (Upper, Title are previous)
+		// The characters at even offsets from the beginning of the
+		// sequence are upper case; the ones at odd offsets are lower.
+		// The correct mapping can be done by clearing or setting the low
+		// bit in the sequence offset.
+		// The constants UpperCase and TitleCase are even while LowerCase
+		// is odd so we take the low bit from case.
+		ret rune(cr.Lo) + ((r-rune(cr.Lo))&^1 | rune(case&1))
+	}
+	ret r + delta
+}
+
+// Returns the CaseRange mapping for rune r or nil if no
+// mapping exists for r.
+fn lookupCaseRange(r: rune, caseRange: []CaseRange): &CaseRange {
+	// binary search over ranges
+	mut lo := 0
+	mut hi := len(caseRange)
+	for lo < hi {
+		m := int(uint(lo+hi) >> 1)
+		mut cr := unsafe { (&CaseRange)(&caseRange[m]) }
+		if rune(cr.Lo) <= r && r <= rune(cr.Hi) {
+			ret cr
+		}
+		if r < rune(cr.Lo) {
+			hi = m
+		} else {
+			lo = m + 1
+		}
+	}
+	ret nil
+}
+
+// Iterates over Unicode code points equivalent under
+// the Unicode-defined simple case folding. Among the code points
+// equivalent to rune (including rune itself), SimpleFold returns the
+// smallest rune > r if one exists, or else the smallest rune >= 0.
+// If r is not a valid Unicode code point, SimpleFold(r) returns r.
+//
+// For example:
+//
+//  SimpleFold('A') = 'a'
+//  SimpleFold('a') = 'A'
+//
+//  SimpleFold('K') = 'k'
+//  SimpleFold('k') = '\u212A' (Kelvin symbol, K)
+//  SimpleFold('\u212A') = 'K'
+//
+//  SimpleFold('1') = '1'
+//
+//  SimpleFold(-2) = -2
+fn SimpleFold(r: rune): rune {
+	if r < 0 || r > MaxRune {
+		ret r
+	}
+
+	if int(r) < len(asciiFold) {
+		ret rune(asciiFold[r])
+	}
+
+	// Consult caseOrbit table for special cases.
+	mut lo := 0
+	mut hi := len(caseOrbit)
+	for lo < hi {
+		m := int(uint(lo+hi) >> 1)
+		if rune(caseOrbit[m].from) < r {
+			lo = m + 1
+		} else {
+			hi = m
+		}
+	}
+	if lo < len(caseOrbit) && rune(caseOrbit[lo].from) == r {
+		ret rune(caseOrbit[lo].to)
+	}
+
+	// No folding specified. This is a one- or two-element
+	// equivalence class containing rune and ToLower(rune)
+	// and ToUpper(rune) if they are different from rune.
+	cr := lookupCaseRange(r, CaseRanges)
+	if cr != nil {
+		l := convertCase(LowerCase, r, cr)
+		if l != r {
+			ret l
+		}
+		ret convertCase(UpperCase, r, cr)
+	}
+	ret r
 }
