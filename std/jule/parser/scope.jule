@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use std::jule::ast::{
+use ast for std::jule::ast::{
 	ScopeTree,
 	Node,
 	NodeData,
@@ -942,18 +942,22 @@ impl scopeParser {
 			if len(assign.Left) > 1 {
 				ret assign, true
 			}
-			// Single left, use &VarDecl intead.
+			// Single left, use &VarDecl intead if possible.
 			mut left := assign.Left[0]
-			mut decl := &VarDecl{
-				Token: left.Token,
-				Setter: assign.Setter,
-				Ident: left.Ident,
-				Mutable: left.Mutable,
-				Reference: left.Reference,
-				Scope: self.s,
-				Expr: assign.Right,
+			match type left.Expr.Kind {
+			| &ast::IdentExpr:
+				mut decl := &VarDecl{
+					Token: left.Token,
+					Setter: assign.Setter,
+					Ident: left.Ident,
+					Mutable: left.Mutable,
+					Reference: left.Reference,
+					Scope: self.s,
+					Expr: assign.Right,
+				}
+				ret decl, true
 			}
-			ret decl, true
+			ret assign, true
 		}
 
 		mut parts, errs := parts(info.l, TokenId.Comma, true)
