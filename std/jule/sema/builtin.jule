@@ -568,10 +568,19 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &FnCallExpr, mut &d: &Data): &Dat
 		}
 		makeVariadic(e1, s.Elem)
 
+		// Before the analysis, set variadic kind as not variadic.
+		// This is should be made to avoid mutability error for base type of slice.
+		// Element types should still be checked.
+		// Since the variadiced slice will not mutated, just check mutability risk of elements.
+		e1.Kind.Variadic = false
+
 		if e.s.checkValidityForInitExpr(mutable, reference, s.Elem, e1, secondArg.Token) {
+			e1.Kind.Variadic = true
 			// Check type if validity is good.
 			// Helps to reduce error logs and duplicated logs.
 			_ = e.s.checkAssignType(reference, s.Elem, e1, secondArg.Token, e.getOwnerRefers())
+		} else {
+			e1.Kind.Variadic = true
 		}
 		d.Model = &BuiltinAppendCallExprModel{
 			Dest: t.Model,
