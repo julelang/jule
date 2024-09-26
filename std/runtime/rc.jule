@@ -30,6 +30,63 @@ fn _RCNew(): _RCPtr {
 	ret p
 }
 
+// Reads reference counting data.
+// Passing nil pointer is not safe.
+//
+// Implemented with no thread-safety by default.
+// If thread-safety necessary, compiler will update implementation implicitly.
+// See memory model of concurrency.
+#export "__jule_RCLoad"
+unsafe fn _RCLoad(p: _RCPtr): _RCType {
+	ret *p
+}
+
+// Same as _RCLoad but have thread-safe implementation.
+#export "__jule_RCLoadAtomic"
+unsafe fn _RCLoadAtomic(p: _RCPtr): _RCType {
+	ret atomicLoad[_RCType](p, _RCMo)
+}
+
+// Adds strong reference to reference pointer.
+// Passing nil pointer is not safe.
+//
+// Implemented with no thread-safety by default.
+// If thread-safety necessary, compiler will update implementation implicitly.
+// See memory model of concurrency.
+#export "__jule_RCAdd"
+unsafe fn _RCAdd(mut p: _RCPtr) {
+	*p += RCDelta
+}
+
+// Same as _RCAdd but have thread-safe implementation.
+#export "__jule_RCAddAtomic"
+unsafe fn _RCAddAtomic(mut p: _RCPtr) {
+	atomicAdd[_RCType](p, RCDelta, _RCMo)
+}
+
+// Drops strong reference from reference pointer.
+// Passing nil pointer is not safe.
+// Reports wheter allocation still alive.
+//
+// Implemented with no thread-safety by default.
+// If thread-safety necessary, compiler will update implementation implicitly.
+// See memory model of concurrency.
+#export "__jule_RCDrop"
+unsafe fn _RCDrop(mut p: _RCPtr): bool {
+	// If old data equals to delta, means references zeroed.
+	alive := *p > RCDelta
+	*p -= RCDelta
+	ret alive
+}
+
+// Same as _RCDrop but have thread-safe implementation.
+#export "__jule_RCDropAtomic"
+unsafe fn _RCDropAtomic(mut p: _RCPtr): bool {
+	// The atomicAdd function returns old data of pointer.
+	// So if old data equals to delta, means references zeroed.
+	ret atomicAdd[_RCType](p, -RCDelta, _RCMo) > RCDelta
+}
+
 // Deallocates reference counting data allocation.
 #export "__jule_RCFree"
 unsafe fn _RCFree(p: _RCPtr) {

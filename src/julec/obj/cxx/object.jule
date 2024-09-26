@@ -94,6 +94,10 @@ struct anonHash {
 	ident: str
 }
 
+struct metadata {
+	concurrent: bool // Whether built-in concurrency used.
+}
+
 struct ObjectCoder {
 	// Internal buffer which is commonly used.
 	Buf: StrBuilder
@@ -128,6 +132,8 @@ struct ObjectCoder {
 	headPos: int
 	declPos: int
 	wrapPos: int
+
+	meta: metadata
 }
 
 impl ObjectCoder {
@@ -296,6 +302,8 @@ impl ObjectCoder {
 	}
 
 	fn pushAnonFn(mut &self, mut &m: &AnonFnExprModel): (ident: str) {
+		self.meta.concurrent = self.meta.concurrent || m.Func.CalledCo
+
 		closure := obj::IsClosure(m)
 		if closure { // Closure?
 			// Handle identifier and generate ctx.
@@ -852,6 +860,7 @@ impl ObjectCoder {
 	}
 
 	fn funcDeclIns(mut &self, mut &f: &FnIns, ptr: bool) {
+		self.meta.concurrent = self.meta.concurrent || f.CalledCo
 		self.indent()
 		self.funcHead(self.Buf, f, ptr, "")
 		self.paramsIns(self.Buf, f)
@@ -1014,7 +1023,7 @@ impl ObjectCoder {
 		}
 	}
 
-	fn funcIns(mut &self, mut &f: &FnIns, ident: str) {
+	fn funcIns(mut &self, mut f: &FnIns, ident: str) {
 		self.funcHead(self.Buf, f, false, ident)
 		self.paramsIns(self.Buf, f)
 		self.write(" ")
@@ -1240,6 +1249,13 @@ impl ObjectCoder {
 					if !env::Test && obj::HasDirective(f.Directives, Directive.Test) {
 						continue
 					}
+					// skip special runtime functions
+					if unsafe { pkg == self.ir.Runtime.Package } {
+						match f.Ident {
+						| "_RCAdd" | "_RCLoad" | "_RCDrop":
+							continue
+						}
+					}
 					if !f.Binded && f.Token != nil {
 						self.func(f)
 						self.write("\n\n")
@@ -1330,6 +1346,23 @@ impl ObjectCoder {
 		}
 	}
 
+	// Implement RC functions of runtime.
+	// Checks concurrency state of program and updates function implementations
+	// to thread-safe variants if necessary.
+	fn implementRC(mut &self) {
+		if self.meta.concurrent {
+			// enable thread-safety for safe concurrency
+			self.funcIns(obj::RuntimeFindFn(self.ir.Runtime, obj::RuntimeFunc._RCAddAtomic).Instances[0], "__jule_RCAdd")
+			self.funcIns(obj::RuntimeFindFn(self.ir.Runtime, obj::RuntimeFunc._RCLoadAtomic).Instances[0], "__jule_RCLoad")
+			self.funcIns(obj::RuntimeFindFn(self.ir.Runtime, obj::RuntimeFunc._RCDropAtomic).Instances[0], "__jule_RCDrop")
+		} else {
+			// no thread-safety
+			self.funcIns(obj::RuntimeFindFn(self.ir.Runtime, obj::RuntimeFunc._RCAdd).Instances[0], "")
+			self.funcIns(obj::RuntimeFindFn(self.ir.Runtime, obj::RuntimeFunc._RCLoad).Instances[0], "")
+			self.funcIns(obj::RuntimeFindFn(self.ir.Runtime, obj::RuntimeFunc._RCDrop).Instances[0], "")
+		}
+	}
+
 	fn serializeHead(mut &self) {
 		self.prepareStructures()
 		self.head()
@@ -1347,6 +1380,10 @@ impl ObjectCoder {
 		self.write("\n\n")
 
 		self.anonHashes()
+
+		// Concurrency analysis done.
+		// Implement RC functions.
+		self.implementRC()
 
 		self.insertBuf(self.deallocObj, self.wrapPos)
 		self.wrapPos += self.deallocObj.Len()
