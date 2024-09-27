@@ -73,9 +73,9 @@ const mask2 = 0b00011111
 const mask3 = 0b00001111
 const mask4 = 0b00000111
 
-const rune1max = 1 << 7 - 1
-const rune2max = 1 << 11 - 1
-const rune3max = 1 << 16 - 1
+const rune1max = 1<<7 - 1
+const rune2max = 1<<11 - 1
+const rune3max = 1<<16 - 1
 
 // The default lowest and highest continuation byte.
 const locb = 0b10000000
@@ -190,7 +190,7 @@ fn DecodeRune(p: []byte): (r: rune, size: int) {
 		// handling the ASCII and invalid cases accordingly. This mask-and-or
 		// approach prevents an additional branch.
 		mask := rune(x) << 31 >> 31 // Create 0x0000 or 0xFFFF.
-		ret rune(p[0]) & ^mask | RuneError & mask, 1
+		ret rune(p[0])&^mask | RuneError&mask, 1
 	}
 	sz := int(x & 7)
 	accept := acceptRanges[x>>4]
@@ -202,20 +202,20 @@ fn DecodeRune(p: []byte): (r: rune, size: int) {
 		ret RuneError, 1
 	}
 	if sz <= 2 { // <= instead of == to help the compiler eliminate some bounds checks
-		ret rune(p0 & mask2) << 6 | rune(b1 & maskX), 2
+		ret rune(p0&mask2)<<6 | rune(b1&maskX), 2
 	}
 	b2 := p[2]
 	if b2 < locb || hicb < b2 {
 		ret RuneError, 1
 	}
 	if sz <= 3 {
-		ret rune(p0 & mask3) << 12 | rune(b1 & maskX) << 6 | rune(b2 & maskX), 3
+		ret rune(p0&mask3)<<12 | rune(b1&maskX)<<6 | rune(b2&maskX), 3
 	}
 	b3 := p[3]
 	if b3 < locb || hicb < b3 {
 		ret RuneError, 1
 	}
-	ret rune(p0 & mask4) << 18 | rune(b1 & maskX) << 12 | rune(b2 & maskX) << 6 | rune(b3 & maskX), 4
+	ret rune(p0&mask4)<<18 | rune(b1&maskX)<<12 | rune(b2&maskX)<<6 | rune(b3&maskX), 4
 }
 
 // Is like DecodeRune but its input is a string. If s is empty
@@ -237,7 +237,7 @@ fn DecodeRuneStr(s: str): (r: rune, size: int) {
 		// handling the ASCII and invalid cases accordingly. This mask-and-or
 		// approach prevents an additional branch.
 		mask := rune(x) << 31 >> 31 // Create 0x0000 or 0xFFFF.
-		ret rune(s[0]) & ^mask | RuneError & mask, 1
+		ret rune(s[0])&^mask | RuneError&mask, 1
 	}
 	sz := int(x & 7)
 	accept := acceptRanges[x>>4]
@@ -249,20 +249,20 @@ fn DecodeRuneStr(s: str): (r: rune, size: int) {
 		ret RuneError, 1
 	}
 	if sz <= 2 { // <= instead of == to help the compiler eliminate some bounds checks
-		ret rune(s0 & mask2) << 6 | rune(s1 & maskX), 2
+		ret rune(s0&mask2)<<6 | rune(s1&maskX), 2
 	}
 	s2 := s[2]
 	if s2 < locb || hicb < s2 {
 		ret RuneError, 1
 	}
 	if sz <= 3 {
-		ret rune(s0 & mask3) << 12 | rune(s1 & maskX) << 6 | rune(s2 & maskX), 3
+		ret rune(s0&mask3)<<12 | rune(s1&maskX)<<6 | rune(s2&maskX), 3
 	}
 	s3 := s[3]
 	if s3 < locb || hicb < s3 {
 		ret RuneError, 1
 	}
-	ret rune(s0 & mask4) << 18 | rune(s1 & maskX) << 12 | rune(s2 & maskX) << 6 | rune(s3 & maskX), 4
+	ret rune(s0&mask4)<<18 | rune(s1&maskX)<<12 | rune(s2&maskX)<<6 | rune(s3&maskX), 4
 }
 
 // Unpacks the last UTF-8 encoding in p and returns the rune and
@@ -379,22 +379,22 @@ fn EncodeRune(mut p: []byte, mut r: rune): int {
 		p[0] = byte(r)
 		ret 1
 	| i <= rune2max:
-		p[0] = t2 | byte(r >> 6)
-		p[1] = tx | byte(r) & maskX
+		p[0] = t2 | byte(r>>6)
+		p[1] = tx | byte(r)&maskX
 		ret 2
 	| i > MaxRune | surrogateMin <= i && i <= surrogateMax:
 		r = RuneError
 		fall
 	| i <= rune3max:
-		p[0] = t3 | byte(r >> 12)
-		p[1] = tx | byte(r >> 6) & maskX
-		p[2] = tx | byte(r) & maskX
+		p[0] = t3 | byte(r>>12)
+		p[1] = tx | byte(r>>6)&maskX
+		p[2] = tx | byte(r)&maskX
 		ret 3
 	|:
-		p[0] = t4 | byte(r >> 18)
-		p[1] = tx | byte(r >> 12) & maskX
-		p[2] = tx | byte(r >> 6) & maskX
-		p[3] = tx | byte(r) & maskX
+		p[0] = t4 | byte(r>>18)
+		p[1] = tx | byte(r>>12)&maskX
+		p[2] = tx | byte(r>>6)&maskX
+		p[3] = tx | byte(r)&maskX
 		ret 4
 	}
 }
@@ -414,14 +414,14 @@ fn appendRuneNonASCII(mut p: []byte, mut r: rune): []byte {
 	i := u32(r)
 	match {
 	| i <= rune2max:
-		ret append(p, t2 | byte(r >> 6), tx | byte(r) & maskX)
+		ret append(p, t2|byte(r>>6), tx|byte(r)&maskX)
 	| i > MaxRune | surrogateMin <= i && i <= surrogateMax:
 		r = RuneSelf
 		fall
 	| i <= rune3max:
-		ret append(p, t3 | byte(r >> 12), tx | byte(r >> 6) & maskX, tx | byte(r) & maskX)
+		ret append(p, t3|byte(r>>12), tx|byte(r>>6)&maskX, tx|byte(r)&maskX)
 	|:
-		ret append(p, t4 | byte(r >> 18), tx | byte(r >> 12) & maskX, tx | byte(r >> 6) & maskX, tx | byte(r) & maskX)
+		ret append(p, t4|byte(r>>18), tx|byte(r>>12)&maskX, tx|byte(r>>6)&maskX, tx|byte(r)&maskX)
 	}
 }
 
@@ -526,9 +526,9 @@ fn Valid(p: []byte): bool {
 	for len(cp) >= 8 {
 		// Combining two 32 bit loads allows the same code to be used
 		// for 32 and 64 bit platforms.
-		first32 := u32(cp[0]) | u32(cp[1]) << 8 | u32(cp[2]) << 16 | u32(cp[3]) << 24
-		second32 := u32(cp[4]) | u32(cp[5]) << 8 | u32(cp[6]) << 16 | u32(cp[7]) << 24
-		if (first32 | second32)&0x80808080 != 0 {
+		first32 := u32(cp[0]) | u32(cp[1])<<8 | u32(cp[2])<<16 | u32(cp[3])<<24
+		second32 := u32(cp[4]) | u32(cp[5])<<8 | u32(cp[6])<<16 | u32(cp[7])<<24
+		if (first32|second32)&0x80808080 != 0 {
 			// Found a non ASCII byte (>= RneSelf).
 			break
 		}
@@ -577,9 +577,9 @@ fn ValidStr(mut s: str): bool {
 	for len(s) >= 8 {
 		// Combining two 32 bit loads allows the same code to be used
 		// for 32 and 64 bit platforms.
-		first32 := u32(s[0]) | u32(s[1]) << 8 | u32(s[2]) << 16 | u32(s[3]) << 24
-		second32 := u32(s[4]) | u32(s[5]) << 8 | u32(s[6]) << 16 | u32(s[7]) << 24
-		if (first32 | second32)&0x80808080 != 0 {
+		first32 := u32(s[0]) | u32(s[1])<<8 | u32(s[2])<<16 | u32(s[3])<<24
+		second32 := u32(s[4]) | u32(s[5])<<8 | u32(s[6])<<16 | u32(s[7])<<24
+		if (first32|second32)&0x80808080 != 0 {
 			// Found a non ASCII byte (>= RuneSelf).
 			break
 		}

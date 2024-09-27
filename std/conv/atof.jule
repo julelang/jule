@@ -214,7 +214,7 @@ loop_end:
 				continue
 			}
 			if e < 10000 {
-				e = e * 10 + int(s[i]) - '0'
+				e = e*10 + int(s[i]) - '0'
 			}
 		}
 		dp += e * esign
@@ -315,7 +315,7 @@ impl decimal {
 					continue
 				}
 				if e < 10000 {
-					e = e * 10 + int(s[i]) - '0'
+					e = e*10 + int(s[i]) - '0'
 				}
 			}
 			self.dp += e * esign
@@ -406,7 +406,7 @@ impl decimal {
 		}
 
 		// Denormalized?
-		if mant&(1 << flt.mantbits) == 0 {
+		if mant&(1<<flt.mantbits) == 0 {
 			exp = flt.bias
 		}
 		goto out
@@ -414,13 +414,13 @@ impl decimal {
 	overflow:
 		// ±inf
 		mant = 0
-		exp = int(uint(1) << flt.expbits - 1 + uint(flt.bias))
+		exp = int(uint(1)<<flt.expbits - 1 + uint(flt.bias))
 		overflow = true
 
 	out:
 		// Assemble bits.
-		mut bits := mant & (1 << flt.mantbits - 1)
-		bits |= u64((exp - flt.bias) & int(1 << flt.expbits - 1)) << flt.mantbits
+		mut bits := mant & (1<<flt.mantbits - 1)
+		bits |= u64((exp-flt.bias)&int(1<<flt.expbits-1)) << flt.mantbits
 		if self.neg {
 			bits |= 1 << flt.mantbits << flt.expbits
 		}
@@ -554,7 +554,7 @@ fn atof32exact(mantissa: u64, mut exp: int, mut neg: bool): (f: f32, ok: bool) {
 // The string s has already been parsed into a mantissa, exponent, and sign (neg==true for negative).
 // If trunc is true, trailing non-zero bits have been omitted from the mantissa.
 fn atofHex(&flt: floatInfo, mut mantissa: u64, mut exp: int, neg: bool, trunc: bool): (f64, ConvError) {
-	maxExp := int(1 << flt.expbits) + flt.bias - 2
+	maxExp := int(1<<flt.expbits) + flt.bias - 2
 	minExp := flt.bias + 1
 	exp += int(flt.mantbits) // mantissa now implicitly divided by 2^mantbits.
 
@@ -571,8 +571,8 @@ fn atofHex(&flt: floatInfo, mut mantissa: u64, mut exp: int, neg: bool, trunc: b
 	if trunc {
 		mantissa |= 1
 	}
-	for mantissa>>(1 + flt.mantbits + 2) != 0 {
-		mantissa = mantissa >> 1 | mantissa & 1
+	for mantissa>>(1+flt.mantbits+2) != 0 {
+		mantissa = mantissa>>1 | mantissa&1
 		exp++
 	}
 
@@ -580,7 +580,7 @@ fn atofHex(&flt: floatInfo, mut mantissa: u64, mut exp: int, neg: bool, trunc: b
 	// denormalize in hopes of making it representable.
 	// (The -2 is for the rounding bits.)
 	for mantissa > 1 && exp < minExp-2 {
-		mantissa = mantissa >> 1 | mantissa & 1
+		mantissa = mantissa>>1 | mantissa&1
 		exp++
 	}
 
@@ -591,7 +591,7 @@ fn atofHex(&flt: floatInfo, mut mantissa: u64, mut exp: int, neg: bool, trunc: b
 	exp += 2
 	if round == 3 {
 		mantissa++
-		if mantissa == 1<<(1 + flt.mantbits) {
+		if mantissa == 1<<(1+flt.mantbits) {
 			mantissa >>= 1
 			exp++
 		}
@@ -607,8 +607,8 @@ fn atofHex(&flt: floatInfo, mut mantissa: u64, mut exp: int, neg: bool, trunc: b
 		err = ConvError.OutOfRange
 	}
 
-	mut bits := mantissa & (1 << flt.mantbits - 1)
-	bits |= u64((exp - flt.bias) & int(1 << flt.expbits - 1)) << flt.mantbits
+	mut bits := mantissa & (1<<flt.mantbits - 1)
+	bits |= u64((exp-flt.bias)&int(1<<flt.expbits-1)) << flt.mantbits
 	if neg {
 		bits |= 1 << flt.mantbits << flt.expbits
 	}
@@ -656,7 +656,7 @@ fn atof32(s: str): (f: f32, n: int, err: ConvError) {
 			// have found the correct result. Confirm by
 			// converting the upper mantissa bound.
 			mut fUp := f32(0)
-			fUp, ok = eiselLemire32(mantissa + 1, exp, neg)
+			fUp, ok = eiselLemire32(mantissa+1, exp, neg)
 			if ok && f == fUp {
 				ret f, n, ConvError.Ok
 			}
@@ -713,7 +713,7 @@ fn atof64(s: str): (f: f64, n: int, err: ConvError) {
 			// have found the correct result. Confirm by
 			// converting the upper mantissa bound.
 			mut fUp := 0.
-			fUp, ok = eiselLemire64(mantissa + 1, exp, neg)
+			fUp, ok = eiselLemire64(mantissa+1, exp, neg)
 			if ok && f == fUp {
 				ret f, n, ConvError.Ok
 			}

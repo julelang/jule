@@ -212,12 +212,12 @@ fn Expm1(mut x: f64): f64 {
 			}
 		} else {
 			if !sign {
-				k = int(INV_LN2 * x + 0.5)
+				k = int(INV_LN2*x + 0.5)
 			} else {
-				k = int(INV_LN2 * x - 0.5)
+				k = int(INV_LN2*x - 0.5)
 			}
 			t := f64(k)
-			hi = x - t * LN2_HI // t * LN2_HI is exact here
+			hi = x - t*LN2_HI // t * LN2_HI is exact here
 			lo = t * LN2_LO
 		}
 		x = hi - lo
@@ -231,36 +231,36 @@ fn Expm1(mut x: f64): f64 {
 	// x is now in primary range
 	hfx := 0.5 * x
 	hxs := x * hfx
-	r1 := 1 + hxs * (Q1 + hxs * (Q2 + hxs * (Q3 + hxs * (Q4 + hxs * Q5))))
-	mut t := 3 - r1 * hfx
-	mut e := hxs * ((r1 - t) / (6.0 - x * t))
+	r1 := 1 + hxs*(Q1+hxs*(Q2+hxs*(Q3+hxs*(Q4+hxs*Q5))))
+	mut t := 3 - r1*hfx
+	mut e := hxs * ((r1 - t) / (6.0 - x*t))
 	if k == 0 {
-		ret x - (x * e - hxs) // c is 0
+		ret x - (x*e - hxs) // c is 0
 	}
-	e = (x * (e - c) - c)
+	e = (x*(e-c) - c)
 	e -= hxs
 	match {
 	| k == -1:
-		ret 0.5 * (x - e) - 0.5
+		ret 0.5*(x-e) - 0.5
 	| k == 1:
 		if x < -0.25 {
 			ret -2 * (e - (x + 0.5))
 		}
-		ret 1 + 2 * (x - e)
+		ret 1 + 2*(x-e)
 	| k <= -2 | k > 56: // suffice to return exp(x)-1
 		mut y := 1 - (e - x)
-		y = F64FromBits(F64Bits(y) + u64(k) << 52) // add k to y's exponent
+		y = F64FromBits(F64Bits(y) + u64(k)<<52) // add k to y's exponent
 		ret y - 1
 	}
 	if k < 20 {
 		t = F64FromBits(u64(0x3ff0000000000000 - (0x20000000000000 >> uint(k)))) // t=1-2**-k
 		mut y := t - (e - x)
-		y = F64FromBits(F64Bits(y) + u64(k) << 52) // add k to y's exponent
+		y = F64FromBits(F64Bits(y) + u64(k)<<52) // add k to y's exponent
 		ret y
 	}
-	t = F64FromBits(u64(0x3ff - k) << 52) // 2**-k
+	t = F64FromBits(u64(0x3ff-k) << 52) // 2**-k
 	mut y := x - (e + t)
 	y++
-	y = F64FromBits(F64Bits(y) + u64(k) << 52) // add k to y's exponent
+	y = F64FromBits(F64Bits(y) + u64(k)<<52) // add k to y's exponent
 	ret y
 }

@@ -92,7 +92,7 @@ fn ryuFtoaFixed32(mut &d: decimalSlice, mut mant: u32, exp: int, prec: int) {
 	}
 	// Remove extra lower bits and keep rounding info.
 	extra := uint(-dexp2)
-	extraMask := u32(1 << extra - 1)
+	extraMask := u32(1<<extra - 1)
 
 	mut dfrac := u32(0)
 	di, dfrac = di >> extra, di & extraMask
@@ -106,7 +106,7 @@ fn ryuFtoaFixed32(mut &d: decimalSlice, mut mant: u32, exp: int, prec: int) {
 	} else {
 		// otherwise, d+1/2 always rounds up because
 		// we truncated below.
-		roundUp = dfrac>>(extra - 1) == 1
+		roundUp = dfrac>>(extra-1) == 1
 	}
 	if dfrac != 0 {
 		d0 = false
@@ -131,7 +131,7 @@ fn ryuFtoaFixed64(mut &d: decimalSlice, mut mant: u64, exp: int, prec: int) {
 	mut e2 := exp
 	b := bits::Len64(mant)
 	if b < 55 {
-		mant = mant << uint(55 - b)
+		mant = mant << uint(55-b)
 		e2 += int(b) - 55
 	}
 	// Choose an exponent such that rounded mant*(2^e2)*(10^q) has
@@ -164,7 +164,7 @@ fn ryuFtoaFixed64(mut &d: decimalSlice, mut mant: u64, exp: int, prec: int) {
 	}
 	// Remove extra lower bits and keep rounding info.
 	extra := uint(-dexp2)
-	extraMask := u64(1 << extra - 1)
+	extraMask := u64(1<<extra - 1)
 
 	mut dfrac := u64(0)
 	di, dfrac = di >> extra, di & extraMask
@@ -178,7 +178,7 @@ fn ryuFtoaFixed64(mut &d: decimalSlice, mut mant: u64, exp: int, prec: int) {
 	} else {
 		// otherwise, d+1/2 always rounds up because
 		// we truncated below.
-		roundUp = dfrac>>(extra - 1) == 1
+		roundUp = dfrac>>(extra-1) == 1
 	}
 	if dfrac != 0 {
 		d0 = false
@@ -323,7 +323,7 @@ fn ryuFtoaShortest(mut &d: decimalSlice, mut mant: u64, exp: int, &flt: floatInf
 	// Express the results (dl, dc, du)*2^e2 as integers.
 	// Extra bits must be removed and rounding hints computed.
 	extra := uint(-e2)
-	extraMask := u64(1 << extra - 1)
+	extraMask := u64(1<<extra - 1)
 	// Now compute the floored, integral base 10 mantissas.
 	mut fracl := u64(0)
 	dl, fracl = dl >> extra, dl & extraMask
@@ -353,7 +353,7 @@ fn ryuFtoaShortest(mut &d: decimalSlice, mut mant: u64, exp: int, &flt: floatInf
 	} else {
 		// otherwise, the result is a lower truncation of the ideal
 		// result.
-		cup = fracc>>(extra - 1) == 1
+		cup = fracc>>(extra-1) == 1
 	}
 	// Is 'dl' an allowed representation?
 	// Only if it is an exact value, and if the original binary mantissa
@@ -396,11 +396,11 @@ fn computeBounds(mant: u64, exp: int,
 	&flt: floatInfo): (lower: u64, central: u64, upper: u64, e2: int) {
 	if mant != 1<<flt.mantbits || exp == flt.bias+1-int(flt.mantbits) {
 		// regular case (or denormals)
-		lower, central, upper = 2 * mant - 1, 2 * mant, 2 * mant + 1
+		lower, central, upper = 2*mant - 1, 2*mant, 2*mant + 1
 		e2 = exp - 1
 	} else {
 		// border of an exponent
-		lower, central, upper = 4 * mant - 1, 4 * mant, 4 * mant + 2
+		lower, central, upper = 4*mant - 1, 4*mant, 4*mant + 2
 		e2 = exp - 2
 	}
 	ret
@@ -436,7 +436,7 @@ fn ryuDigits(mut &d: decimalSlice, lower: u64, central: u64, upper: u64, mut c0:
 		d.d = d.d[n:]
 		d.nd = int(9 - n)
 		// emit low part
-		ryuDigits32(d, llo, clo, ulo, c0, cup, d.nd + 8)
+		ryuDigits32(d, llo, clo, ulo, c0, cup, d.nd+8)
 	}
 	// trim trailing zeros
 	for d.nd > 0 && d.d[d.nd-1] == '0' {
@@ -547,7 +547,7 @@ fn mult64bitPow10(m: u32, mut e2: int, q: int): (resM: u32, resE: int, exact: bo
 	}
 	hi, lo := bits::Mul64(u64(m), pow)
 	e2 += mulByLog10Log2(q) - 63 + 57
-	ret u32(hi << 7 | lo >> 57), e2, lo<<7 == 0
+	ret u32(hi<<7 | lo>>57), e2, lo<<7 == 0
 }
 
 // Takes a floating-point input with a 55-bit
@@ -580,7 +580,7 @@ fn mult128bitPow10(m: u64, mut e2: int, q: int): (resM: u64, resE: int, exact: b
 	mut h1, h0 := bits::Mul64(m, pow[1])
 	mid, carry := bits::Add64(l1, h0, 0)
 	h1 += carry
-	ret h1 << 9 | mid >> 55, e2, mid<<9 == 0 && l0 == 0
+	ret h1<<9 | mid>>55, e2, mid<<9 == 0 && l0 == 0
 }
 
 fn divisibleByPow5(mut m: u64, k: int): bool {
@@ -604,7 +604,7 @@ fn divmod1e9(x: u64): (u32, u32) {
 		ret u32(x / 1e9), u32(x % 1e9)
 	}
 	// Use the same sequence of operations as the amd64 compiler.
-	hi, _ := bits::Mul64(x >> 1, 0x89705f4136b4a598) // binary digits of 1e-9
+	hi, _ := bits::Mul64(x>>1, 0x89705f4136b4a598) // binary digits of 1e-9
 	q := hi >> 28
-	ret u32(q), u32(x - q * 1e9)
+	ret u32(q), u32(x - q*1e9)
 }

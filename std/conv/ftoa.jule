@@ -81,7 +81,7 @@ fn FmtFloat(f: f64, fmt: byte, prec: int, bitSize: int): str {
 	// It returns always head pointer of slice, so deallocation is safe.
 	// There is no need to make new allocation for string.
 	ret unsafe::StrFromBytes(
-		genericFtoa(make([]byte, 0, max(prec + 4 + 1, 24 + 1)), f, fmt, prec, bitSize))
+		genericFtoa(make([]byte, 0, max(prec+4+1, 24+1)), f, fmt, prec, bitSize))
 }
 
 fn genericFtoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bitSize: int): []byte {
@@ -98,12 +98,12 @@ fn genericFtoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bitSize: int
 		panic("std::conv: illegal bitSize")
 	}
 
-	neg := bits>>(flt.expbits + flt.mantbits) != 0
-	mut exp := int(bits >> flt.mantbits) & int(1 << flt.expbits - 1)
-	mut mant := bits & (u64(1) << flt.mantbits - 1)
+	neg := bits>>(flt.expbits+flt.mantbits) != 0
+	mut exp := int(bits>>flt.mantbits) & int(1<<flt.expbits-1)
+	mut mant := bits & (u64(1)<<flt.mantbits - 1)
 
 	match exp {
-	| int(1 << flt.expbits - 1):
+	| int(1<<flt.expbits - 1):
 		// +inf, NaN
 		match {
 		| mant != 0:
@@ -141,14 +141,14 @@ fn genericFtoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bitSize: int
 	if shortest {
 		// Use Ryu algorithm.
 		digs.d = make([]byte, 32)
-		ryuFtoaShortest(digs, mant, exp - int(flt.mantbits), *flt)
+		ryuFtoaShortest(digs, mant, exp-int(flt.mantbits), *flt)
 		ok = true
 		// Precision for shortest representation mode.
 		match fmt {
 		| 'e' | 'E':
-			prec = max(digs.nd - 1, 0)
+			prec = max(digs.nd-1, 0)
 		| 'f':
-			prec = max(digs.nd - digs.dp, 0)
+			prec = max(digs.nd-digs.dp, 0)
 		| 'g' | 'G':
 			prec = digs.nd
 		}
@@ -169,11 +169,11 @@ fn genericFtoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bitSize: int
 		}
 		if bitSize == 32 && digits <= 9 {
 			digs.d = make([]byte, 24)
-			ryuFtoaFixed32(digs, u32(mant), exp - int(flt.mantbits), digits)
+			ryuFtoaFixed32(digs, u32(mant), exp-int(flt.mantbits), digits)
 			ok = true
 		} else if digits <= 18 {
 			digs.d = make([]byte, 24)
-			ryuFtoaFixed64(digs, mant, exp - int(flt.mantbits), digits)
+			ryuFtoaFixed64(digs, mant, exp-int(flt.mantbits), digits)
 			ok = true
 		}
 	}
@@ -199,7 +199,7 @@ fn bigFtoa(mut dst: []byte, mut prec: int, fmt: byte, neg: bool,
 		| 'e' | 'E':
 			prec = digs.nd - 1
 		| 'f':
-			prec = max(digs.nd - digs.dp, 0)
+			prec = max(digs.nd-digs.dp, 0)
 		| 'g' | 'G':
 			prec = digs.nd
 		}
@@ -245,12 +245,12 @@ fn fmtDigits(mut dst: []byte, shortest: bool, neg: bool,
 			if prec > digs.nd {
 				prec = digs.nd
 			}
-			ret fmtE(dst, neg, digs, prec - 1, fmt + 'e' - 'g')
+			ret fmtE(dst, neg, digs, prec-1, fmt+'e'-'g')
 		}
 		if prec > digs.dp {
 			prec = digs.nd
 		}
-		ret fmtF(dst, neg, digs, max(prec - digs.dp, 0))
+		ret fmtF(dst, neg, digs, max(prec-digs.dp, 0))
 	}
 
 	// unknown format
@@ -290,7 +290,7 @@ fn roundShortest(mut &d: decimal, mant: u64, exp: int, &flt: floatInfo) {
 	// Next highest floating point number is mant+1 << exp-mantbits.
 	// Our upper bound is halfway between, mant*2+1 << exp-mantbits-1.
 	mut upper := decimal{}
-	upper.assign(mant * 2 + 1)
+	upper.assign(mant*2 + 1)
 	upper.shift(exp - int(flt.mantbits) - 1)
 
 	// d = mant << (exp - mantbits)
@@ -305,11 +305,11 @@ fn roundShortest(mut &d: decimal, mant: u64, exp: int, &flt: floatInfo) {
 		mantlo = mant - 1
 		explo = exp
 	} else {
-		mantlo = mant * 2 - 1
+		mantlo = mant*2 - 1
 		explo = exp - 1
 	}
 	mut lower := decimal{}
-	lower.assign(mantlo * 2 + 1)
+	lower.assign(mantlo*2 + 1)
 	lower.shift(explo - int(flt.mantbits) - 1)
 
 	// The upper and lower bounds are possible outputs only if
@@ -415,7 +415,7 @@ fn fmtE(mut dst: []byte, neg: bool, d: decimalSlice, prec: int, fmt: byte): []by
 	if prec > 0 {
 		dst = append(dst, '.')
 		mut i := 1
-		m := min(d.nd, prec + 1)
+		m := min(d.nd, prec+1)
 		if i < m {
 			dst = append(dst, d.d[i:m]...)
 			i = m
@@ -442,11 +442,11 @@ fn fmtE(mut dst: []byte, neg: bool, d: decimalSlice, prec: int, fmt: byte): []by
 	// dd or ddd
 	match {
 	| exp < 10:
-		dst = append(dst, '0', byte(exp) + '0')
+		dst = append(dst, '0', byte(exp)+'0')
 	| exp < 100:
-		dst = append(dst, byte(exp / 10) + '0', byte(exp % 10) + '0')
+		dst = append(dst, byte(exp/10)+'0', byte(exp%10)+'0')
 	|:
-		dst = append(dst, byte(exp / 100) + '0', byte(exp / 10) % 10 + '0', byte(exp % 10) + '0')
+		dst = append(dst, byte(exp/100)+'0', byte(exp/10)%10+'0', byte(exp%10)+'0')
 	}
 
 	ret dst
@@ -524,13 +524,13 @@ fn fmtX(mut dst: []byte, prec: int, fmt: byte, neg: bool,
 	// Round if requested.
 	if prec >= 0 && prec < 15 {
 		shift := uint(prec * 4)
-		extra := (mant << shift) & (1 << 60 - 1)
+		extra := (mant << shift) & (1<<60 - 1)
 		mant >>= 60 - shift
-		if extra|(mant & 1) > 1<<59 {
+		if extra|(mant&1) > 1<<59 {
 			mant++
 		}
 		mant <<= 60 - shift
-		if mant&(1 << 61) != 0 {
+		if mant&(1<<61) != 0 {
 			// Wrapped around.
 			mant >>= 1
 			exp++
@@ -548,7 +548,7 @@ fn fmtX(mut dst: []byte, prec: int, fmt: byte, neg: bool,
 	if neg {
 		dst = append(dst, '-')
 	}
-	dst = append(dst, '0', fmt, '0' + byte((mant >> 60) & 1))
+	dst = append(dst, '0', fmt, '0'+byte((mant>>60)&1))
 
 	// .fraction
 	mant <<= 4 // remove leading 0 or 1
@@ -584,11 +584,11 @@ fn fmtX(mut dst: []byte, prec: int, fmt: byte, neg: bool,
 	// dd or ddd or dddd
 	match {
 	| exp < 100:
-		dst = append(dst, byte(exp / 10) + '0', byte(exp % 10) + '0')
+		dst = append(dst, byte(exp/10)+'0', byte(exp%10)+'0')
 	| exp < 1000:
-		dst = append(dst, byte(exp / 100) + '0', byte((exp / 10) % 10) + '0', byte(exp % 10) + '0')
+		dst = append(dst, byte(exp/100)+'0', byte((exp/10)%10)+'0', byte(exp%10)+'0')
 	|:
-		dst = append(dst, byte(exp / 1000) + '0', byte(exp / 100) % 10 + '0', byte((exp / 10) % 10) + '0', byte(exp % 10) + '0')
+		dst = append(dst, byte(exp/1000)+'0', byte(exp/100)%10+'0', byte((exp/10)%10)+'0', byte(exp%10)+'0')
 	}
 	ret dst
 }
