@@ -4,8 +4,8 @@
 
 use comptime for std::comptime
 use ast for std::jule::ast
-use std::jule::lex::{TokenId}
-use std::jule::sema::{Trait, Struct, StructIns, TypeKind, Fn, FnIns}
+use lex for std::jule::lex
+use sema for std::jule::sema
 
 // Returns directive if exist.
 fn FindDirective(mut &directives: []&ast::Directive, tag: str): &ast::Directive {
@@ -23,7 +23,7 @@ fn HasDirective(&directives: []&ast::Directive, tag: str): bool {
 }
 
 // Reports whether trait have method in this identifier.
-fn ContainsTraitMethod(mut &t: &Trait, &ident: str): bool {
+fn ContainsTraitMethod(mut &t: &sema::Trait, &ident: str): bool {
 	for _, m in t.Methods {
 		if m.Ident == ident {
 			ret true
@@ -36,7 +36,7 @@ fn ContainsTraitMethod(mut &t: &Trait, &ident: str): bool {
 const emptyTraitOffset = 0
 
 // Returns index of structu ins by trait implements.
-fn FindTraitTypeOffsetS(t: &Trait, mut s: &StructIns): int {
+fn FindTraitTypeOffsetS(t: &sema::Trait, mut s: &sema::StructIns): int {
 	if len(t.Implemented) == 0 {
 		ret emptyTraitOffset
 	}
@@ -59,11 +59,11 @@ fn FindTraitTypeOffsetS(t: &Trait, mut s: &StructIns): int {
 
 // Same as [FindTraitTypeOffsetS] but designed for TypeKind based lookup.
 // It checks structure instances even used with smart pointer.
-fn FindTraitTypeOffset(t: &Trait, mut k: &TypeKind): int {
+fn FindTraitTypeOffset(t: &sema::Trait, mut k: &sema::TypeKind): int {
 	if len(t.Implemented) == 0 {
 		ret emptyTraitOffset
 	}
-	let mut s: &StructIns = nil
+	let mut s: &sema::StructIns = nil
 	if k.Sptr() != nil {
 		k = k.Sptr().Elem
 	}
@@ -75,66 +75,66 @@ fn FindTraitTypeOffset(t: &Trait, mut k: &TypeKind): int {
 }
 
 // Returns overloaded operator method by operator id.
-fn FindOperator(mut &s: &StructIns, op: TokenId, unary: bool): &FnIns {
+fn FindOperator(mut &s: &sema::StructIns, op: lex::TokenId, unary: bool): &sema::FnIns {
 	match op {
-	| TokenId.Eqs:
+	| lex::TokenId.Eqs:
 		ret s.Operators.Eq
-	| TokenId.Gt:
+	| lex::TokenId.Gt:
 		ret s.Operators.Gt
-	| TokenId.GtEq:
+	| lex::TokenId.GtEq:
 		ret s.Operators.GtEq
-	| TokenId.Lt:
+	| lex::TokenId.Lt:
 		ret s.Operators.Lt
-	| TokenId.LtEq:
+	| lex::TokenId.LtEq:
 		ret s.Operators.LtEq
-	| TokenId.Shl:
+	| lex::TokenId.Shl:
 		ret s.Operators.Shl
-	| TokenId.Shr:
+	| lex::TokenId.Shr:
 		ret s.Operators.Shr
-	| TokenId.Plus:
+	| lex::TokenId.Plus:
 		if unary {
 			ret s.Operators.Pos
 		}
 		ret s.Operators.Add
-	| TokenId.Minus:
+	| lex::TokenId.Minus:
 		if unary {
 			ret s.Operators.Neg
 		}
 		ret s.Operators.Sub
-	| TokenId.Solidus:
+	| lex::TokenId.Solidus:
 		ret s.Operators.Div
-	| TokenId.Star:
+	| lex::TokenId.Star:
 		ret s.Operators.Mul
-	| TokenId.Percent:
+	| lex::TokenId.Percent:
 		ret s.Operators.Mod
-	| TokenId.Amper:
+	| lex::TokenId.Amper:
 		ret s.Operators.BitAnd
-	| TokenId.Vline:
+	| lex::TokenId.Vline:
 		ret s.Operators.BitOr
-	| TokenId.Caret:
+	| lex::TokenId.Caret:
 		if unary {
 			ret s.Operators.BitNot
 		}
 		ret s.Operators.BitXor
-	| TokenId.PlusEq:
+	| lex::TokenId.PlusEq:
 		ret s.Operators.AddAssign
-	| TokenId.MinusEq:
+	| lex::TokenId.MinusEq:
 		ret s.Operators.SubAssign
-	| TokenId.SolidusEq:
+	| lex::TokenId.SolidusEq:
 		ret s.Operators.DivAssign
-	| TokenId.StarEq:
+	| lex::TokenId.StarEq:
 		ret s.Operators.MulAssign
-	| TokenId.PercentEq:
+	| lex::TokenId.PercentEq:
 		ret s.Operators.ModAssign
-	| TokenId.ShlEq:
+	| lex::TokenId.ShlEq:
 		ret s.Operators.ShlAssign
-	| TokenId.ShrEq:
+	| lex::TokenId.ShrEq:
 		ret s.Operators.ShrAssign
-	| TokenId.VlineEq:
+	| lex::TokenId.VlineEq:
 		ret s.Operators.BitOrAssign
-	| TokenId.AmperEq:
+	| lex::TokenId.AmperEq:
 		ret s.Operators.BitAndAssign
-	| TokenId.CaretEq:
+	| lex::TokenId.CaretEq:
 		ret s.Operators.BitXorAssign
 	|:
 		ret nil
@@ -144,7 +144,7 @@ fn FindOperator(mut &s: &StructIns, op: TokenId, unary: bool): &FnIns {
 // Returns function instance by generics.
 // Assumes generics parameter have enough and same size with generic count of f.
 // Panics if not exist any instance.
-fn FindFnGenericInstance(mut &f: &Fn, generics: ...&TypeKind): &FnIns {
+fn FindFnGenericInstance(mut &f: &sema::Fn, generics: ...&sema::TypeKind): &sema::FnIns {
 lookup:
 	for (_, mut ins) in f.Instances {
 		for i in ins.Generics {
@@ -160,7 +160,7 @@ lookup:
 // Returns struct instance by generics.
 // Assumes generics parameter have enough and same size with generic count of s.
 // Panics if not exist any instance.
-fn FindStructGenericInstance(mut &s: &Struct, generics: ...&TypeKind): &StructIns {
+fn FindStructGenericInstance(mut &s: &sema::Struct, generics: ...&sema::TypeKind): &sema::StructIns {
 lookup:
 	for (_, mut ins) in s.Instances {
 		for i in ins.Generics {

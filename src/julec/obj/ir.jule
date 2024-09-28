@@ -4,8 +4,8 @@
 
 use env
 use ast for std::jule::ast
-use std::jule::build::{Log, LogKind}
-use std::jule::importer::{JuleImporter, CompileInfo, Compiler, CppStd}
+use build for std::jule::build
+use importer for std::jule::importer
 use sema for std::jule::sema
 
 // Intermediate representation of code for compiler.
@@ -26,8 +26,8 @@ impl IR {
 	// - Returns (nil, nil) logs if path has not any Jule file.
 	// - Returns (nil, logs) if exist any log.
 	// - Returns IR and nil logs if everything is fine.
-	static fn Build(path: str, flags: sema::SemaFlag): (&IR, []Log) {
-		mut importer := JuleImporter.New(buildCompileInfo())
+	static fn Build(path: str, flags: sema::SemaFlag): (&IR, []build::Log) {
+		mut importer := importer::JuleImporter.New(buildCompileInfo())
 		const UpdateMod = true // Use root module for project if exist.
 		mut files, mut logs := importer.ImportPackage(path, UpdateMod)
 		if len(logs) > 0 {
@@ -149,26 +149,26 @@ fn getAllUniquePasses(mut &pkg: &sema::Package, mut uses: []&sema::ImportInfo): 
 	ret passes
 }
 
-fn buildCompileInfo(): CompileInfo {
-	mut info := CompileInfo{
+fn buildCompileInfo(): importer::CompileInfo {
+	mut info := importer::CompileInfo{
 		Prod: env::Production,
 		Test: env::Test,
 	}
 
 	match env::Compiler {
-	| Compiler.Clang:
-		info.Compiler = Compiler.Clang
-	| Compiler.GCC:
-		info.Compiler = Compiler.GCC
+	| importer::Compiler.Clang:
+		info.Compiler = importer::Compiler.Clang
+	| importer::Compiler.GCC:
+		info.Compiler = importer::Compiler.GCC
 	}
 
 	match env::CppStd {
-	| CppStd.Cpp14:
-		info.CppStd = CppStd.Cpp14
-	| CppStd.Cpp17:
-		info.CppStd = CppStd.Cpp17
-	| CppStd.Cpp20:
-		info.CppStd = CppStd.Cpp20
+	| importer::CppStd.Cpp14:
+		info.CppStd = importer::CppStd.Cpp14
+	| importer::CppStd.Cpp17:
+		info.CppStd = importer::CppStd.Cpp17
+	| importer::CppStd.Cpp20:
+		info.CppStd = importer::CppStd.Cpp20
 	}
 
 	ret info

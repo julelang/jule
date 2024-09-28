@@ -2,40 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use std::jule::sema::{
-	Data,
-	ExprModel,
-	BinaryExprModel,
-	OperandExprModel,
-	UnaryExprModel,
-	StructLitExprModel,
-	AllocStructLitExprModel,
-	CastingExprModel,
-	FnCallExprModel,
-	SliceExprModel,
-	ArrayExprModel,
-	IndexingExprModel,
-	AnonFnExprModel,
-	MapExprModel,
-	SlicingExprModel,
-	TraitSubIdentExprModel,
-	StructSubIdentExprModel,
-	TupleExprModel,
-	BuiltinNewCallExprModel,
-	BuiltinOutCallExprModel,
-	BuiltinOutlnCallExprModel,
-	BuiltinPanicCallExprModel,
-	BuiltinErrorCallExprModel,
-	BuiltinMakeCallExprModel,
-	BuiltinAppendCallExprModel,
-	BuiltinLenCallExprModel,
-	BuiltinCapCallExprModel,
-	BuiltinDeleteCallExprModel,
-	SizeofExprModel,
-	AlignofExprModel,
-	FreeExprModel,
-	BackendEmitExprModel,
-}
+use sema for std::jule::sema
 
 // Expression model inspector.
 struct ExprInspector {
@@ -43,7 +10,7 @@ struct ExprInspector {
 	// For exmaple, after handling binary expression, walker skips left and right operands.
 	SkipChild: bool
 
-	handler: fn(mut &m: ExprModel)
+	handler: fn(mut &m: sema::ExprModel)
 }
 
 impl ExprInspector {
@@ -52,129 +19,129 @@ impl ExprInspector {
 		ret new(ExprInspector)
 	}
 
-	fn args(mut self, mut args: []ExprModel) {
+	fn args(mut self, mut args: []sema::ExprModel) {
 		for (_, mut arg) in args {
 			self.inspect(arg)
 		}
 	}
 
-	fn inspect(mut self, mut &m: ExprModel) {
+	fn inspect(mut self, mut &m: sema::ExprModel) {
 		self.SkipChild = false
 		self.handler(m)
 		if self.SkipChild {
 			ret
 		}
 		match type m {
-		| &BinaryExprModel:
-			mut b := (&BinaryExprModel)(m)
+		| &sema::BinaryExprModel:
+			mut b := (&sema::BinaryExprModel)(m)
 			self.inspect(b.Left.Model)
 			self.inspect(b.Right.Model)
-		| &UnaryExprModel:
-			mut u := (&UnaryExprModel)(m)
+		| &sema::UnaryExprModel:
+			mut u := (&sema::UnaryExprModel)(m)
 			self.inspect(u.Expr.Model)
-		| &StructLitExprModel:
-			mut lit := (&StructLitExprModel)(m)
+		| &sema::StructLitExprModel:
+			mut lit := (&sema::StructLitExprModel)(m)
 			for (_, mut arg) in lit.Args {
 				self.inspect(arg.Expr.Model)
 			}
-		| &AllocStructLitExprModel:
-			mut lit := (&AllocStructLitExprModel)(m).Lit
+		| &sema::AllocStructLitExprModel:
+			mut lit := (&sema::AllocStructLitExprModel)(m).Lit
 			for (_, mut arg) in lit.Args {
 				self.inspect(arg.Expr.Model)
 			}
-		| &CastingExprModel:
-			mut c := (&CastingExprModel)(m)
+		| &sema::CastingExprModel:
+			mut c := (&sema::CastingExprModel)(m)
 			self.inspect(c.Expr.Model)
-		| &FnCallExprModel:
-			mut fc := (&FnCallExprModel)(m)
+		| &sema::FnCallExprModel:
+			mut fc := (&sema::FnCallExprModel)(m)
 			self.inspect(fc.Expr)
 			self.args(fc.Args)
-		| &SliceExprModel:
-			mut s := (&SliceExprModel)(m)
+		| &sema::SliceExprModel:
+			mut s := (&sema::SliceExprModel)(m)
 			self.args(s.Elems)
-		| &ArrayExprModel:
-			mut a := (&ArrayExprModel)(m)
+		| &sema::ArrayExprModel:
+			mut a := (&sema::ArrayExprModel)(m)
 			self.args(a.Elems)
-		| &IndexingExprModel:
-			mut i := (&IndexingExprModel)(m)
+		| &sema::IndexingExprModel:
+			mut i := (&sema::IndexingExprModel)(m)
 			self.inspect(i.Expr.Model)
 			self.inspect(i.Index.Model)
-		| &MapExprModel:
-			mut mp := (&MapExprModel)(m)
+		| &sema::MapExprModel:
+			mut mp := (&sema::MapExprModel)(m)
 			for (_, mut entry) in mp.Entries {
 				self.inspect(entry.Key)
 				self.inspect(entry.Val)
 			}
-		| &SlicingExprModel:
-			mut s := (&SlicingExprModel)(m)
+		| &sema::SlicingExprModel:
+			mut s := (&sema::SlicingExprModel)(m)
 			self.inspect(s.Expr)
 			self.inspect(s.Left)
 			if s.Right != nil {
 				self.inspect(s.Right)
 			}
-		| &TraitSubIdentExprModel:
-			mut t := (&TraitSubIdentExprModel)(m)
+		| &sema::TraitSubIdentExprModel:
+			mut t := (&sema::TraitSubIdentExprModel)(m)
 			self.inspect(t.Expr)
-		| &StructSubIdentExprModel:
-			mut s := (&StructSubIdentExprModel)(m)
+		| &sema::StructSubIdentExprModel:
+			mut s := (&sema::StructSubIdentExprModel)(m)
 			self.inspect(s.Expr.Model)
-		| &TupleExprModel:
-			mut t := (&TupleExprModel)(m)
+		| &sema::TupleExprModel:
+			mut t := (&sema::TupleExprModel)(m)
 			for (_, mut d) in t.Datas {
 				self.inspect(d.Model)
 			}
-		| &BuiltinNewCallExprModel:
-			mut b := (&BuiltinNewCallExprModel)(m)
+		| &sema::BuiltinNewCallExprModel:
+			mut b := (&sema::BuiltinNewCallExprModel)(m)
 			if b.Init != nil {
 				self.inspect(b.Init)
 			}
-		| &BuiltinOutCallExprModel:
-			mut c := (&BuiltinOutCallExprModel)(m)
+		| &sema::BuiltinOutCallExprModel:
+			mut c := (&sema::BuiltinOutCallExprModel)(m)
 			self.inspect(c.Expr.Model)
-		| &BuiltinOutlnCallExprModel:
-			mut c := (&BuiltinOutlnCallExprModel)(m)
+		| &sema::BuiltinOutlnCallExprModel:
+			mut c := (&sema::BuiltinOutlnCallExprModel)(m)
 			self.inspect(c.Expr.Model)
-		| &BuiltinPanicCallExprModel:
-			mut c := (&BuiltinPanicCallExprModel)(m)
+		| &sema::BuiltinPanicCallExprModel:
+			mut c := (&sema::BuiltinPanicCallExprModel)(m)
 			self.inspect(c.Expr)
-		| &BuiltinErrorCallExprModel:
-			mut c := (&BuiltinErrorCallExprModel)(m)
+		| &sema::BuiltinErrorCallExprModel:
+			mut c := (&sema::BuiltinErrorCallExprModel)(m)
 			self.inspect(c.Err.Model)
-		| &BuiltinMakeCallExprModel:
-			mut b := (&BuiltinMakeCallExprModel)(m)
+		| &sema::BuiltinMakeCallExprModel:
+			mut b := (&sema::BuiltinMakeCallExprModel)(m)
 			if b.Len != nil {
 				self.inspect(b.Len)
 			}
 			if b.Cap != nil {
 				self.inspect(b.Cap)
 			}
-		| &BuiltinAppendCallExprModel:
-			mut b := (&BuiltinAppendCallExprModel)(m)
+		| &sema::BuiltinAppendCallExprModel:
+			mut b := (&sema::BuiltinAppendCallExprModel)(m)
 			self.inspect(b.Dest)
 			self.inspect(b.Elements)
-		| &BuiltinLenCallExprModel:
-			mut l := (&BuiltinLenCallExprModel)(m)
+		| &sema::BuiltinLenCallExprModel:
+			mut l := (&sema::BuiltinLenCallExprModel)(m)
 			self.inspect(l.Expr.Model)
-		| &BuiltinCapCallExprModel:
-			mut c := (&BuiltinCapCallExprModel)(m)
+		| &sema::BuiltinCapCallExprModel:
+			mut c := (&sema::BuiltinCapCallExprModel)(m)
 			self.inspect(c.Expr.Model)
-		| &BuiltinDeleteCallExprModel:
-			mut b := (&BuiltinDeleteCallExprModel)(m)
+		| &sema::BuiltinDeleteCallExprModel:
+			mut b := (&sema::BuiltinDeleteCallExprModel)(m)
 			self.inspect(b.Dest.Model)
 			if b.Key != nil {
 				self.inspect(b.Key.Model)
 			}
-		| &SizeofExprModel:
-			mut s := (&SizeofExprModel)(m)
+		| &sema::SizeofExprModel:
+			mut s := (&sema::SizeofExprModel)(m)
 			self.inspect(s.Expr)
-		| &AlignofExprModel:
-			mut a := (&AlignofExprModel)(m)
+		| &sema::AlignofExprModel:
+			mut a := (&sema::AlignofExprModel)(m)
 			self.inspect(a.Expr)
-		| &FreeExprModel:
-			mut f := (&FreeExprModel)(m)
+		| &sema::FreeExprModel:
+			mut f := (&sema::FreeExprModel)(m)
 			self.inspect(f.Expr)
-		| &BackendEmitExprModel:
-			mut e := (&BackendEmitExprModel)(m)
+		| &sema::BackendEmitExprModel:
+			mut e := (&sema::BackendEmitExprModel)(m)
 			self.args(e.Exprs)
 		}
 	}
@@ -182,7 +149,7 @@ impl ExprInspector {
 	// Inspect expression model.
 	// Resets [SkipChild] to default.
 	// Inspector guarantees the parameter m will always point to original model.
-	fn Inspect(mut self, mut &m: ExprModel, f: fn(mut &m: ExprModel)) {
+	fn Inspect(mut self, mut &m: sema::ExprModel, f: fn(mut &m: sema::ExprModel)) {
 		self.handler = f
 		self.inspect(m)
 	}

@@ -5,28 +5,16 @@
 use comptime for std::comptime
 use path for std::fs::path
 use build for std::jule::build
-use std::jule::sema::{
-	ImportInfo,
-	Scope,
-	Fn,
-	Var,
-	FnIns,
-	StructIns,
-	StructSubIdentExprModel,
-	Data,
-	AnonFnExprModel,
-	TypeKind,
-	BuiltinErrorCallExprModel,
-}
+use sema for std::jule::sema
 use strings for std::strings
 
 // Reports whether exceptional scope s forwards exceptional.
-fn IsForwarded(&s: &Scope): bool {
+fn IsForwarded(&s: &sema::Scope): bool {
 	last := s.Stmts[len(s.Stmts)-1]
 	match type last {
-	| &Data:
-		match type (&Data)(last).Model {
-		| &BuiltinErrorCallExprModel:
+	| &sema::Data:
+		match type (&sema::Data)(last).Model {
+		| &sema::BuiltinErrorCallExprModel:
 			ret true
 		|:
 			ret false
@@ -37,19 +25,19 @@ fn IsForwarded(&s: &Scope): bool {
 }
 
 // Reports whether expression comes from binded define.
-fn IsExprComesFromBind(&d: &Data): bool {
+fn IsExprComesFromBind(&d: &sema::Data): bool {
 	match type d.Model {
-	| &Var:
-		ret (&Var)(d.Model).Binded
-	| &StructSubIdentExprModel:
-		ret (&StructSubIdentExprModel)(d.Model).Owner.Decl.Binded
+	| &sema::Var:
+		ret (&sema::Var)(d.Model).Binded
+	| &sema::StructSubIdentExprModel:
+		ret (&sema::StructSubIdentExprModel)(d.Model).Owner.Decl.Binded
 	|:
 		ret false
 	}
 }
 
 // Reports whether type is handled as <any> type.
-fn IsAny(mut &t: &TypeKind): bool {
+fn IsAny(mut &t: &sema::TypeKind): bool {
 	if t.TypeEnum() != nil {
 		ret true
 	}
@@ -58,10 +46,10 @@ fn IsAny(mut &t: &TypeKind): bool {
 }
 
 // Reports whether anonymous function is closure.
-fn IsClosure(&m: &AnonFnExprModel): bool { ret len(m.Captured) > 0 }
+fn IsClosure(&m: &sema::AnonFnExprModel): bool { ret len(m.Captured) > 0 }
 
 // Reports whether the m is operator overloading method.
-fn IsOpMethod(&m: &Fn): bool {
+fn IsOpMethod(&m: &sema::Fn): bool {
 	if len(m.Generics) > 0 || len(m.Instances) == 0 {
 		ret false
 	}
@@ -77,7 +65,7 @@ fn IsOpMethod(&m: &Fn): bool {
 }
 
 // Reports the f function of owner is implements a trait's method.
-fn IsTraitMethod(mut &owner: &StructIns, &f: &FnIns): bool {
+fn IsTraitMethod(mut &owner: &sema::StructIns, &f: &sema::FnIns): bool {
 	for (_, mut t) in owner.Decl.Implements {
 		if t.FindMethod(f.Decl.Ident) != nil {
 			ret true
@@ -99,6 +87,6 @@ fn IsStdPackage(f: str, p: str): bool {
 
 // Reports whether imp is implicitly imported.
 // See developer reference (9).
-fn IsImplicitImport(imp: &ImportInfo): bool {
+fn IsImplicitImport(imp: &sema::ImportInfo): bool {
 	ret imp.Token == nil
 }
