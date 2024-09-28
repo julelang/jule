@@ -193,10 +193,6 @@ namespace jule
 
         inline jule::Bool operator==(const jule::Any &other) const noexcept
         {
-            // Break comparison cycle.
-            if (this->data != nullptr && this->data.alloc == other.data.alloc)
-                return true;
-
             if (this->operator==(nullptr))
                 return other.operator==(nullptr);
 

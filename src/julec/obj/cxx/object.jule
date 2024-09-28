@@ -379,7 +379,6 @@ impl ObjectCoder {
 			self.anyObj.WriteStr(si)
 			self.anyObj.WriteStr(" && __jule_ptrEqual(any.data.alloc, other.alloc); }\n")
 		} else {
-			comparable := t.Comparable()
 			mut kindB := StrBuilder.New(40)
 			self.tc.kind(kindB, t)
 			kind := kindB.Str()
@@ -387,22 +386,34 @@ impl ObjectCoder {
 			// Deallocator function.
 			di := self.pushDealloc(t)
 
-			if comparable {
-				// eq function.
+			// eq function.
 
-				// Common model for custom expressions.
-				mut lmodel := "*reinterpret_cast<"
-				lmodel += kind
-				lmodel += "*>("
-				mut rmodel := lmodel
-				rmodel += "other)"
-				lmodel += "alloc)"
+			// Common model for custom expressions.
+			mut lmodel := "*reinterpret_cast<"
+			lmodel += kind
+			lmodel += "*>("
+			mut rmodel := lmodel
+			rmodel += "other)"
+			lmodel += "alloc)"
 
-				self.anyObj.WriteStr(typeCoder.Bool + " " + anyTypeIdent)
-				self.anyObj.WriteStr(si)
-				self.anyObj.WriteStr("_eq(void *alloc, void *other) noexcept { return ")
+			self.anyObj.WriteStr(typeCoder.Bool + " " + anyTypeIdent)
+			self.anyObj.WriteStr(si)
+			self.anyObj.WriteStr("_eq(void *alloc, void *other) noexcept { ")
+			if t.Comparable() {
+				self.anyObj.WriteStr("return ")
 				self.ec._unsafeBinary(self.anyObj, lmodel, rmodel, t, t, TokenId.Eqs, TokenKind.Eqs)
 				self.anyObj.WriteStr("; }\n")
+			} else {
+				self.anyObj.WriteStr(`__jule_panic((`)
+				self.anyObj.WriteStr(typeCoder.U8)
+				self.anyObj.WriteStr(`*)"runtime: comparing uncomparable type " "`)
+				mut n := self.anyObj.Len()
+				cstrBytes(self.anyObj, t.Str())
+				n = self.anyObj.Len() - n
+				n += 37 // offset of message prefix
+				self.anyObj.WriteStr("\", ")
+				self.anyObj.WriteStr(conv::Itoa(n))
+				self.anyObj.WriteStr("); return false; }\n")
 			}
 
 			// to_str function.
@@ -428,28 +439,11 @@ impl ObjectCoder {
 			self.anyObj.WriteStr(si)
 			self.anyObj.WriteStr("{.dealloc=" + deallocatedTypeIdent)
 			self.anyObj.WriteStr(conv::Itoa(di))
-			self.anyObj.WriteStr(", ")
-			if comparable {
-				self.anyObj.WriteStr(".eq=" + anyTypeIdent)
-				self.anyObj.WriteStr(si)
-				self.anyObj.WriteStr("_eq, ")
-			}
-			self.anyObj.WriteStr(".to_str=" + anyTypeIdent)
+			self.anyObj.WriteStr(", .eq=" + anyTypeIdent)
+			self.anyObj.WriteStr(si)
+			self.anyObj.WriteStr("_eq, .to_str=" + anyTypeIdent)
 			self.anyObj.WriteStr(si)
 			self.anyObj.WriteStr("_to_str};\n")
-
-			if comparable {
-				// compare function.
-				self.anyObj.WriteStr(typeCoder.Bool + " " + anyTypeIdent)
-				self.anyObj.WriteStr(si)
-				self.anyObj.WriteStr("_compare(const " + typeCoder.Any + " &any, const ")
-				self.anyObj.WriteStr(kind)
-				self.anyObj.WriteStr(" &other) { return any.type == &" + anyTypeIdent)
-				self.anyObj.WriteStr(si)
-				self.anyObj.WriteStr(" && " + anyTypeIdent)
-				self.anyObj.WriteStr(si)
-				self.anyObj.WriteStr("_eq(any.data.alloc, (void*)&other); }\n")
-			}
 		}
 		ret i
 	}
