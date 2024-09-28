@@ -3,51 +3,40 @@
 // license that can be found in the LICENSE file.
 
 use env
-use obj::{self, IR}
+use obj
 use comptime for std::comptime
-use build for std::jule::build::{Directive}
+use build for std::jule::build
 use ast for std::jule::ast
-use std::jule::sema::{
-	Package,
-	SymTab,
-	ReferenceStack,
-	Var,
-	Fn,
-	FnIns,
-	Struct,
-	StructIns,
-	Trait,
-	FuncPattern,
-}
+use sema for std::jule::sema
 
 struct specialCaseDefines {
-	runtime_Map:         &Struct
-	runtime_mapIterator: &Struct
+	runtime_Map:         &sema::Struct
+	runtime_mapIterator: &sema::Struct
 }
 
 impl specialCaseDefines {
 	// Reports whether all methods live of structure.
-	fn isAllMethodsLive(self, s: &Struct): bool {
+	fn isAllMethodsLive(self, s: &sema::Struct): bool {
 		ret s == self.runtime_Map ||
 			s == self.runtime_mapIterator
 	}
 }
 
 struct liveTable {
-	vars:    []&Var
-	fns:     []&FnIns
-	structs: []&StructIns
-	traits:  []&Trait
+	vars:    []&sema::Var
+	fns:     []&sema::FnIns
+	structs: []&sema::StructIns
+	traits:  []&sema::Trait
 }
 
 struct ObjectDeadCode {
 	live: liveTable
-	ir:   &IR
+	ir:   &obj::IR
 	scd:  specialCaseDefines
 }
 
 impl ObjectDeadCode {
-	static fn new(mut &ir: &IR): &ObjectDeadCode {
+	static fn new(mut &ir: &obj::IR): &ObjectDeadCode {
 		ret &ObjectDeadCode{
 			ir: ir,
 		}
@@ -56,13 +45,13 @@ impl ObjectDeadCode {
 	fn isLive[T](mut &self, &t: T): bool {
 		let mut live: []T = nil
 		const match type T {
-		| &FnIns:
+		| &sema::FnIns:
 			live = self.live.fns
-		| &Var:
+		| &sema::Var:
 			live = self.live.vars
-		| &StructIns:
+		| &sema::StructIns:
 			live = self.live.structs
-		| &Trait:
+		| &sema::Trait:
 			live = self.live.traits
 		}
 		for i in live {
@@ -75,33 +64,33 @@ impl ObjectDeadCode {
 
 	fn pushLive[T](mut &self, mut t: T) {
 		const match type T {
-		| &Var:
+		| &sema::Var:
 			self.live.vars = append(self.live.vars, t)
-		| &FnIns:
+		| &sema::FnIns:
 			self.live.fns = append(self.live.fns, t)
-		| &StructIns:
+		| &sema::StructIns:
 			self.live.structs = append(self.live.structs, t)
-		| &Trait:
+		| &sema::Trait:
 			self.live.traits = append(self.live.traits, t)
 		}
 	}
 
-	fn pushStructAsLive(mut &self, mut &s: &StructIns) {
-		if self.isLive[&StructIns](s) {
+	fn pushStructAsLive(mut &self, mut &s: &sema::StructIns) {
+		if self.isLive[&sema::StructIns](s) {
 			ret
 		}
-		self.pushLive[&StructIns](s)
+		self.pushLive[&sema::StructIns](s)
 		self.setReferencesAsLive(s.Refers)
 		allLive := self.scd.isAllMethodsLive(s.Decl)
 		for (_, mut m) in s.Methods {
 			for (_, mut ins) in m.Instances {
-				if self.isLive[&FnIns](ins) {
+				if self.isLive[&sema::FnIns](ins) {
 					continue
 				}
 
 				// Push all methods as live if s is built-in map type.
 				if allLive {
-					self.pushLive[&FnIns](ins)
+					self.pushLive[&sema::FnIns](ins)
 					self.setReferencesAsLive(ins.Refers)
 					continue
 				}
@@ -111,7 +100,7 @@ impl ObjectDeadCode {
 				// Other methods will be marked as live by referenced defines,
 				// no need for special tracking algorithm to caught.
 				if obj::IsTraitMethod(s, ins) {
-					self.pushLive[&FnIns](ins)
+					self.pushLive[&sema::FnIns](ins)
 					self.setReferencesAsLive(ins.Refers)
 				}
 
@@ -122,7 +111,7 @@ impl ObjectDeadCode {
 				const om = vs.Field("Operators")
 				const for _, field in om.Type().Decl().Fields() {
 					if ins == om.Field(field.Name()).Unwrap() {
-						self.pushLive[&FnIns](ins)
+						self.pushLive[&sema::FnIns](ins)
 						self.setReferencesAsLive(ins.Refers)
 					}
 				}
@@ -133,23 +122,23 @@ impl ObjectDeadCode {
 				const Binded = false
 
 				mut dispose := s.FindMethod("Dispose", Binded)
-				if dispose != nil && FuncPattern.Dispose(dispose) {
+				if dispose != nil && sema::FuncPattern.Dispose(dispose) {
 					mut fins := dispose.Instances[0]
-					self.pushLive[&FnIns](fins)
+					self.pushLive[&sema::FnIns](fins)
 					self.setReferencesAsLive(fins.Refers)
 				}
 
 				mut _str := s.FindMethod("Str", Binded)
-				if _str != nil && FuncPattern.Str(_str) {
+				if _str != nil && sema::FuncPattern.Str(_str) {
 					mut fins := _str.Instances[0]
-					self.pushLive[&FnIns](fins)
+					self.pushLive[&sema::FnIns](fins)
 					self.setReferencesAsLive(fins.Refers)
 				}
 			}
 		}
 	}
 
-	fn setReferencesAsLive(mut &self, mut &rs: &ReferenceStack) {
+	fn setReferencesAsLive(mut &self, mut &rs: &sema::ReferenceStack) {
 		if rs == nil {
 			ret
 		}
@@ -157,55 +146,55 @@ impl ObjectDeadCode {
 		for i < rs.Len(); i++ {
 			mut ref := rs.At(i)
 			match type ref {
-			| &Trait:
-				mut t := (&Trait)(ref)
-				if self.isLive[&Trait](t) {
+			| &sema::Trait:
+				mut t := (&sema::Trait)(ref)
+				if self.isLive[&sema::Trait](t) {
 					continue
 				}
-				self.pushLive[&Trait](t)
+				self.pushLive[&sema::Trait](t)
 				for (_, mut ins) in t.Methods {
 					for (_, mut mins) in ins.Instances {
-						if self.isLive[&FnIns](mins) {
+						if self.isLive[&sema::FnIns](mins) {
 							continue
 						}
-						self.pushLive[&FnIns](mins)
+						self.pushLive[&sema::FnIns](mins)
 						self.setReferencesAsLive(mins.Refers)
 					}
 				}
-			| &FnIns:
-				mut f := (&FnIns)(ref)
-				if self.isLive[&FnIns](f) {
+			| &sema::FnIns:
+				mut f := (&sema::FnIns)(ref)
+				if self.isLive[&sema::FnIns](f) {
 					break
 				}
 				if f.Owner != nil && !f.Decl.Statically {
-					if !self.isLive[&StructIns](f.Owner) {
-						self.pushLive[&StructIns](f.Owner)
+					if !self.isLive[&sema::StructIns](f.Owner) {
+						self.pushLive[&sema::StructIns](f.Owner)
 						self.setReferencesAsLive(f.Owner.Refers)
 					}
 				}
-				self.pushLive[&FnIns](f)
+				self.pushLive[&sema::FnIns](f)
 				self.setReferencesAsLive(f.Refers)
-			| &Var:
-				mut v := (&Var)(ref)
-				if self.isLive[&Var](v) {
+			| &sema::Var:
+				mut v := (&sema::Var)(ref)
+				if self.isLive[&sema::Var](v) {
 					break
 				}
-				self.pushLive[&Var](v)
+				self.pushLive[&sema::Var](v)
 				self.setReferencesAsLive(v.Refers)
-			| &StructIns:
-				mut s := (&StructIns)(ref)
+			| &sema::StructIns:
+				mut s := (&sema::StructIns)(ref)
 				self.pushStructAsLive(s)
 			}
 		}
 	}
 
-	fn inits(mut &self, mut &pkg: &Package) {
+	fn inits(mut &self, mut &pkg: &sema::Package) {
 		for (_, mut file) in pkg.Files {
 			for (_, mut f) in file.Funcs {
 				if f.Ident == build::InitFn {
 					mut ins := f.Instances[0]
-					if !self.isLive[&FnIns](ins) {
-						self.pushLive[&FnIns](ins)
+					if !self.isLive[&sema::FnIns](ins) {
+						self.pushLive[&sema::FnIns](ins)
 					}
 					self.setReferencesAsLive(ins.Refers)
 				}
@@ -213,25 +202,25 @@ impl ObjectDeadCode {
 		}
 	}
 
-	fn collectLivePackage(mut &self, mut &pkg: &Package) {
+	fn collectLivePackage(mut &self, mut &pkg: &sema::Package) {
 		// Collect live references based on initializer functions.
 		self.inits(pkg)
 
 		// collect api defines as live
-		obj::IterFiles(pkg, fn(mut &file: &SymTab) {
+		obj::IterFiles(pkg, fn(mut &file: &sema::SymTab) {
 			for (_, mut v) in file.Vars {
-				if obj::HasDirective(v.Directives, Directive.Export) {
-					if !self.isLive[&Var](v) {
-						self.pushLive[&Var](v)
+				if obj::HasDirective(v.Directives, build::Directive.Export) {
+					if !self.isLive[&sema::Var](v) {
+						self.pushLive[&sema::Var](v)
 						self.setReferencesAsLive(v.Refers)
 					}
 				}
 			}
 			for (_, mut f) in file.Funcs {
-				if obj::HasDirective(f.Directives, Directive.Export) {
+				if obj::HasDirective(f.Directives, build::Directive.Export) {
 					for (_, mut ins) in f.Instances {
-						if !self.isLive[&FnIns](ins) {
-							self.pushLive[&FnIns](ins)
+						if !self.isLive[&sema::FnIns](ins) {
+							self.pushLive[&sema::FnIns](ins)
 							self.setReferencesAsLive(ins.Refers)
 						}
 					}
@@ -248,20 +237,20 @@ impl ObjectDeadCode {
 				self.pushStructAsLive(ins)
 				for (_, mut m) in ins.Methods {
 					for (_, mut mins) in m.Instances {
-						if self.isLive[&FnIns](mins) {
+						if self.isLive[&sema::FnIns](mins) {
 							continue
 						}
-						self.pushLive[&FnIns](mins)
+						self.pushLive[&sema::FnIns](mins)
 						self.setReferencesAsLive(mins.Refers)
 					}
 				}
 			}
 			for (_, mut file) in pkg.Files {
 				for (_, mut f) in file.Funcs {
-					if obj::HasDirective(f.Directives, Directive.Test) {
+					if obj::HasDirective(f.Directives, build::Directive.Test) {
 						mut ins := f.Instances[0]
-						if !self.isLive[&FnIns](ins) {
-							self.pushLive[&FnIns](ins)
+						if !self.isLive[&sema::FnIns](ins) {
+							self.pushLive[&sema::FnIns](ins)
 						}
 						self.setReferencesAsLive(ins.Refers)
 					}
@@ -282,18 +271,18 @@ impl ObjectDeadCode {
 		mut main := self.ir.Main.FindFn(build::EntryPoint, false)
 		if main != nil {
 			mut ins := main.Instances[0]
-			if !self.isLive[&FnIns](ins) {
-				self.pushLive[&FnIns](ins)
+			if !self.isLive[&sema::FnIns](ins) {
+				self.pushLive[&sema::FnIns](ins)
 			}
 			self.setReferencesAsLive(ins.Refers)
 		}
 	}
 
-	fn removeDeadGlobals(mut &self, mut &vars: []&Var) {
+	fn removeDeadGlobals(mut &self, mut &vars: []&sema::Var) {
 		mut i := 0
 		for i < len(vars) {
 			v := vars[i]
-			if self.isLive[&Var](v) {
+			if self.isLive[&sema::Var](v) {
 				i++
 				continue
 			}
@@ -301,14 +290,14 @@ impl ObjectDeadCode {
 		}
 	}
 
-	fn removeDeadFns(mut &self, mut &funcs: []&Fn) {
+	fn removeDeadFns(mut &self, mut &funcs: []&sema::Fn) {
 		mut i := 0
 		for i < len(funcs) {
 			mut f := funcs[i]
 			mut j := 0
 			for j < len(f.Instances) {
 				ins := f.Instances[j]
-				if self.isLive[&FnIns](ins) {
+				if self.isLive[&sema::FnIns](ins) {
 					j++
 					continue
 				}
@@ -322,7 +311,7 @@ impl ObjectDeadCode {
 		}
 	}
 
-	fn removeDeadStructs(mut &self, mut &structs: []&Struct) {
+	fn removeDeadStructs(mut &self, mut &structs: []&sema::Struct) {
 		mut i := 0
 		for i < len(structs) {
 			mut s := structs[i]
@@ -330,7 +319,7 @@ impl ObjectDeadCode {
 			for j < len(s.Instances) {
 				mut ins := s.Instances[j]
 				self.removeDeadFns(ins.Methods)
-				if len(ins.Methods) != 0 || self.isLive[&StructIns](ins) {
+				if len(ins.Methods) != 0 || self.isLive[&sema::StructIns](ins) {
 					j++
 					continue
 				}
@@ -344,11 +333,11 @@ impl ObjectDeadCode {
 		}
 	}
 
-	fn removeDeadTraits(mut &self, mut &traits: []&Trait) {
+	fn removeDeadTraits(mut &self, mut &traits: []&sema::Trait) {
 		mut i := 0
 		for i < len(traits) {
 			mut t := traits[i]
-			if !self.isLive[&Trait](t) {
+			if !self.isLive[&sema::Trait](t) {
 				traits = append(traits[:i], traits[i+1:]...)
 				continue
 			}
@@ -365,14 +354,14 @@ impl ObjectDeadCode {
 		}
 	}
 
-	fn removeDeadsFile(mut &self, mut &file: &SymTab) {
+	fn removeDeadsFile(mut &self, mut &file: &sema::SymTab) {
 		self.removeDeadFns(file.Funcs)
 		self.removeDeadStructs(file.Structs)
 		self.removeDeadTraits(file.Traits)
 		self.removeDeadGlobals(file.Vars)
 	}
 
-	fn removeDeadsPackage(mut &self, mut &pkg: &Package) {
+	fn removeDeadsPackage(mut &self, mut &pkg: &sema::Package) {
 		for (_, mut file) in pkg.Files {
 			self.removeDeadsFile(file)
 		}
@@ -399,7 +388,7 @@ impl ObjectDeadCode {
 	}
 }
 
-fn EliminateDefines(mut &ir: &IR) {
+fn EliminateDefines(mut &ir: &obj::IR) {
 	mut ocd := ObjectDeadCode.new(ir)
 	ocd.elimanate()
 }

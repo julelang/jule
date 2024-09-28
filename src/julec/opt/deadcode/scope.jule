@@ -2,41 +2,21 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use obj::{IR}
-use std::jule::sema::{
-	Package,
-	Fn,
-	Scope,
-	Struct,
-	Stmt,
-	Data,
-	RetSt,
-	Label,
-	GotoSt,
-	BuiltinErrorCallExprModel,
-	BuiltinPanicCallExprModel,
-	RangeIter,
-	WhileIter,
-	InfIter,
-	Conditional,
-	Match,
-	ExprModel,
-	Assign,
-	MultiAssign,
-}
+use obj
+use sema for std::jule::sema
 
 // Dead code eliminate optimizer for scopes.
 struct scopeDeadCode {
 	parent: &scopeDeadCode
-	s:      &Scope
+	s:      &sema::Scope
 	i:      int // Position.
-	labels: &[]&Label
-	gotos:  &[]&GotoSt
+	labels: &[]&sema::Label
+	gotos:  &[]&sema::GotoSt
 	except: bool
 }
 
 impl scopeDeadCode {
-	fn optimizeChild(mut &self, mut &s: &Scope) {
+	fn optimizeChild(mut &self, mut &s: &sema::Scope) {
 		mut sdc := &scopeDeadCode{
 			parent: self,
 			s: s,
@@ -46,7 +26,7 @@ impl scopeDeadCode {
 		unsafe { sdc.optimizeStmts() }
 	}
 
-	fn optimizeBodyChildExceptional(mut &self, mut &s: &Scope) {
+	fn optimizeBodyChildExceptional(mut &self, mut &s: &sema::Scope) {
 		mut sdc := &scopeDeadCode{
 			s: s,
 			labels: self.labels,
@@ -56,7 +36,7 @@ impl scopeDeadCode {
 		unsafe { sdc.optimizeStmts() }
 	}
 
-	fn optimizeBodyChild(mut &self, mut &s: &Scope) {
+	fn optimizeBodyChild(mut &self, mut &s: &sema::Scope) {
 		mut sdc := &scopeDeadCode{
 			s: s,
 			labels: self.labels,
@@ -65,7 +45,7 @@ impl scopeDeadCode {
 		unsafe { sdc.optimizeStmts() }
 	}
 
-	fn optimizeExprModel(mut &self, mut &model: ExprModel) {
+	fn optimizeExprModel(mut &self, mut &model: sema::ExprModel) {
 		edc := exprDeadCode.new(self)
 		edc.optimize(model)
 	}
@@ -86,7 +66,7 @@ impl scopeDeadCode {
 		}
 	}
 
-	fn pushGoto(mut &self, mut gt: &GotoSt) {
+	fn pushGoto(mut &self, mut gt: &sema::GotoSt) {
 		mut i := 0
 		for i < len(*self.labels); i++ {
 			if gt.Ident == (*self.labels)[i].Ident {
@@ -96,7 +76,7 @@ impl scopeDeadCode {
 		*self.gotos = append(*self.gotos, gt)
 	}
 
-	fn pushLabel(mut &self, mut l: &Label) {
+	fn pushLabel(mut &self, mut l: &sema::Label) {
 		mut i := 0
 		for i < len(*self.gotos) {
 			if l.Ident == (*self.gotos)[i].Ident {
@@ -109,12 +89,12 @@ impl scopeDeadCode {
 		*self.labels = append(*self.labels, l)
 	}
 
-	fn optimizeRangeIter(mut &self, mut it: &RangeIter) {
+	fn optimizeRangeIter(mut &self, mut it: &sema::RangeIter) {
 		self.optimizeExprModel(it.Expr.Model)
 		self.optimizeBodyChild(it.Scope)
 	}
 
-	fn optimizeWhileIter(mut &self, mut it: &WhileIter) {
+	fn optimizeWhileIter(mut &self, mut it: &sema::WhileIter) {
 		self.optimizeExprModel(it.Expr)
 		if it.Next != nil {
 			self.optimizeStmt(it.Next)
@@ -122,11 +102,11 @@ impl scopeDeadCode {
 		self.optimizeBodyChild(it.Scope)
 	}
 
-	fn optimizeInfIter(mut &self, mut it: &InfIter) {
+	fn optimizeInfIter(mut &self, mut it: &sema::InfIter) {
 		self.optimizeBodyChild(it.Scope)
 	}
 
-	fn optimizeConditional(mut &self, mut c: &Conditional) {
+	fn optimizeConditional(mut &self, mut c: &sema::Conditional) {
 		for (_, mut case) in c.Elifs {
 			if case != nil {
 				self.optimizeExprModel(case.Expr)
@@ -144,7 +124,7 @@ impl scopeDeadCode {
 		}
 	}
 
-	fn optimizeMatch(mut &self, mut m: &Match) {
+	fn optimizeMatch(mut &self, mut m: &sema::Match) {
 		for (_, mut case) in m.Cases {
 			for (_, mut expr) in case.Exprs {
 				self.optimizeExprModel(expr.Model)
@@ -162,12 +142,12 @@ impl scopeDeadCode {
 		}
 	}
 
-	fn optimizeAssign(mut &self, mut assign: &Assign) {
+	fn optimizeAssign(mut &self, mut assign: &sema::Assign) {
 		self.optimizeExprModel(assign.Left.Model)
 		self.optimizeExprModel(assign.Right.Model)
 	}
 
-	fn optimizeMultiAssign(mut &self, mut assign: &MultiAssign) {
+	fn optimizeMultiAssign(mut &self, mut assign: &sema::MultiAssign) {
 		for (_, mut l) in assign.Left {
 			if l != nil {
 				self.optimizeExprModel(l.Model)
@@ -176,54 +156,54 @@ impl scopeDeadCode {
 		self.optimizeExprModel(assign.Right)
 	}
 
-	fn optimizeStmt(mut &self, mut st: Stmt) {
+	fn optimizeStmt(mut &self, mut st: sema::Stmt) {
 		match type st {
-		| &Scope:
-			mut scope := (&Scope)(st)
+		| &sema::Scope:
+			mut scope := (&sema::Scope)(st)
 			if scope.Deferred {
 				eliminateDeadCodeOfScope(scope)
 			} else {
 				self.optimizeChild(scope)
 			}
-		| &RangeIter:
-			self.optimizeRangeIter((&RangeIter)(st))
-		| &WhileIter:
-			self.optimizeWhileIter((&WhileIter)(st))
-		| &InfIter:
-			self.optimizeInfIter((&InfIter)(st))
-		| &Conditional:
-			self.optimizeConditional((&Conditional)(st))
-		| &Match:
-			self.optimizeMatch((&Match)(st))
-		| &Assign:
-			self.optimizeAssign((&Assign)(st))
-		| &MultiAssign:
-			self.optimizeMultiAssign((&MultiAssign)(st))
-		| &Data:
-			mut d := (&Data)(st)
+		| &sema::RangeIter:
+			self.optimizeRangeIter((&sema::RangeIter)(st))
+		| &sema::WhileIter:
+			self.optimizeWhileIter((&sema::WhileIter)(st))
+		| &sema::InfIter:
+			self.optimizeInfIter((&sema::InfIter)(st))
+		| &sema::Conditional:
+			self.optimizeConditional((&sema::Conditional)(st))
+		| &sema::Match:
+			self.optimizeMatch((&sema::Match)(st))
+		| &sema::Assign:
+			self.optimizeAssign((&sema::Assign)(st))
+		| &sema::MultiAssign:
+			self.optimizeMultiAssign((&sema::MultiAssign)(st))
+		| &sema::Data:
+			mut d := (&sema::Data)(st)
 			if self.except {
 				break
 			}
 			match type d.Model {
-			| &BuiltinErrorCallExprModel
-			| &BuiltinPanicCallExprModel:
+			| &sema::BuiltinErrorCallExprModel
+			| &sema::BuiltinPanicCallExprModel:
 				// Remove followed statements of the function call.
 				// Unreachable code.
 				self.eliminateFollowed()
 			|:
 				self.optimizeExprModel(d.Model)
 			}
-		| &RetSt:
+		| &sema::RetSt:
 			// Remove followed statements of the return statement.
 			// Unreachable code.
 			self.eliminateFollowed()
-		| &GotoSt:
-			self.pushGoto((&GotoSt)(st))
+		| &sema::GotoSt:
+			self.pushGoto((&sema::GotoSt)(st))
 			// Remove followed statements of the return statement.
 			// Unreachable code.
 			self.eliminateFollowed()
-		| &Label:
-			self.pushLabel((&Label)(st))
+		| &sema::Label:
+			self.pushLabel((&sema::Label)(st))
 		}
 	}
 
@@ -235,19 +215,19 @@ impl scopeDeadCode {
 	}
 }
 
-fn eliminateDeadCodeOfScope(mut s: &Scope) {
-	labels := make([]&Label, 0, 1<<4)
-	gotos := make([]&GotoSt, 0, 1<<4)
+fn eliminateDeadCodeOfScope(mut s: &sema::Scope) {
+	labels := make([]&sema::Label, 0, 1<<4)
+	gotos := make([]&sema::GotoSt, 0, 1<<4)
 	mut sdc := &scopeDeadCode{
 		s: s,
-		labels: unsafe { (&[]&Label)(&labels) },
-		gotos: unsafe { (&[]&GotoSt)(&gotos) },
+		labels: unsafe { (&[]&sema::Label)(&labels) },
+		gotos: unsafe { (&[]&sema::GotoSt)(&gotos) },
 	}
 	unsafe { sdc.optimizeStmts() }
 }
 
 // Eliminates dead scope elements of functions.
-fn eliminateScopeFunctions(mut &funcs: []&Fn) {
+fn eliminateScopeFunctions(mut &funcs: []&sema::Fn) {
 	for (_, mut func) in funcs {
 		for (_, mut ins) in func.Instances {
 			eliminateDeadCodeOfScope(ins.Scope)
@@ -256,7 +236,7 @@ fn eliminateScopeFunctions(mut &funcs: []&Fn) {
 }
 
 // Eliminates dead scope elements of struct methods.
-fn eliminateScopeStructMethods(mut &structs: []&Struct) {
+fn eliminateScopeStructMethods(mut &structs: []&sema::Struct) {
 	for (_, mut s) in structs {
 		for (_, mut ins) in s.Instances {
 			eliminateScopeFunctions(ins.Methods)
@@ -264,19 +244,19 @@ fn eliminateScopeStructMethods(mut &structs: []&Struct) {
 	}
 }
 
-fn eliminateFunctionsScopePackage(mut &pkg: &Package) {
+fn eliminateFunctionsScopePackage(mut &pkg: &sema::Package) {
 	for (_, mut f) in pkg.Files {
 		eliminateScopeFunctions(f.Funcs)
 		eliminateScopeStructMethods(f.Structs)
 	}
 }
 
-fn eliminateScopePackage(mut &pkg: &Package) {
+fn eliminateScopePackage(mut &pkg: &sema::Package) {
 	eliminateFunctionsScopePackage(pkg)
 }
 
 // Eliminate dead scope codes.
-fn EliminateScopes(mut &ir: &IR) {
+fn EliminateScopes(mut &ir: &obj::IR) {
 	mut i := len(ir.Used) - 1
 	for i >= 0; i-- {
 		mut u := ir.Used[i]
