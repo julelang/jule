@@ -4,45 +4,18 @@
 
 use env
 use opt
-use obj::{self, IR}
+use obj
 use std::unsafe
 use conv for std::conv
 use comptime for std::comptime
 use jule for std::jule
-use build for std::jule::build::{
-	Directive,
-}
-use std::jule::lex::{
-	Token,
-	TokenId,
-	TokenKind,
-	IsIgnoreIdent,
-	IsAnonIdent,
-}
-use sema for std::jule::sema::{
-	FuncPattern,
-	Package,
-	SymTab,
-	Param,
-	ParamIns,
-	Trait,
-	Struct,
-	FieldIns,
-	Var,
-	StructIns,
-	Fn,
-	FnIns,
-	TypeKind,
-	Prim,
-	Sptr,
-	TypeSymbol,
-	Operators,
-	AnonFnExprModel,
-}
+use build for std::jule::build
+use lex for std::jule::lex
+use sema for std::jule::sema
 use types for std::jule::types
 use path for std::fs::path
-use strings for std::strings::{StrBuilder}
-use std::time::{Time}
+use strings for std::strings
+use time for std::time
 
 const ctxParamIdent = "__f_ctx"
 const anonFnCtxSuffix = "_ctx"                              // Anon fn identifier suffix for ctx struct identifier.
@@ -69,10 +42,10 @@ const structDefaultEqMethodSuffix = "_eq"
 const indentKind = '\t'
 
 // General pointer type for GC pointers.
-static mut generalGCPtr = &TypeKind{
-	Kind: &Sptr{
-		Elem: &TypeKind{
-			Kind: &Prim{
+static mut generalGCPtr = &sema::TypeKind{
+	Kind: &sema::Sptr{
+		Elem: &sema::TypeKind{
+			Kind: &sema::Prim{
 				Kind: types::TypeKind.Uintptr,
 			},
 		},
@@ -85,12 +58,12 @@ struct SerializationInfo {
 }
 
 struct traitCast {
-	t1: &Trait
-	t2: &Trait
+	t1: &sema::Trait
+	t2: &sema::Trait
 }
 
 struct anonHash {
-	expr:  &AnonFnExprModel
+	expr:  &sema::AnonFnExprModel
 	ident: str
 }
 
@@ -100,30 +73,30 @@ struct metadata {
 
 struct ObjectCoder {
 	// Internal buffer which is commonly used.
-	Buf: StrBuilder
+	Buf: strings::StrBuilder
 
-	resultDecls: StrBuilder // Struct wrappers for multi-ret function types.
-	anyObj:      StrBuilder // Type handlers and others for the <any> type.
-	anonObj:     StrBuilder // Anonymous functions.
-	deallocObj:  StrBuilder // Deallocation function for [self.deallocated] types.
-	coSpawnObj:  StrBuilder // Wrapper defines for co-spawns.
+	resultDecls: strings::StrBuilder // Struct wrappers for multi-ret function types.
+	anyObj:      strings::StrBuilder // Type handlers and others for the <any> type.
+	anonObj:     strings::StrBuilder // Anonymous functions.
+	deallocObj:  strings::StrBuilder // Deallocation function for [self.deallocated] types.
+	coSpawnObj:  strings::StrBuilder // Wrapper defines for co-spawns.
 
-	ir:          &IR
+	ir:          &obj::IR
 	info:        SerializationInfo
 	anons:       []&anonHash
-	deallocated: []&TypeKind // GC deallocated types for dynamic programming.
+	deallocated: []&sema::TypeKind // GC deallocated types for dynamic programming.
 
 	// Current indentation.
 	indentBuffer: []byte
 
 	resultMap:    map[str]bool
-	anyTypeMap:   []&TypeKind
+	anyTypeMap:   []&sema::TypeKind
 	traitCastMap: []traitCast
-	coSpawnMap:   []&FnIns
+	coSpawnMap:   []&sema::FnIns
 
 	// Pairs for methods and structure instances.
 	// Used to avoid duplicated wrapper function generation.
-	traitMetMap: map[&FnIns][]uintptr
+	traitMetMap: map[&sema::FnIns][]uintptr
 
 	ec: &exprCoder
 	sc: &scopeCoder
@@ -137,7 +110,7 @@ struct ObjectCoder {
 }
 
 impl ObjectCoder {
-	static fn New(mut &ir: &IR, info: SerializationInfo): &ObjectCoder {
+	static fn New(mut &ir: &obj::IR, info: SerializationInfo): &ObjectCoder {
 		mut oc := &ObjectCoder{
 			ir: ir,
 			info: info,
@@ -173,7 +146,7 @@ impl ObjectCoder {
 		self.Buf.Write(self.indentBuffer)
 	}
 
-	fn findAnyType(mut &self, mut &t: &TypeKind): int {
+	fn findAnyType(mut &self, mut &t: &sema::TypeKind): int {
 		for (i, mut at) in self.anyTypeMap {
 			if at.Equal(t) {
 				ret i
@@ -182,7 +155,7 @@ impl ObjectCoder {
 		ret -1
 	}
 
-	fn pushCoSpawn(mut &self, mut f: &FnIns): int {
+	fn pushCoSpawn(mut &self, mut f: &sema::FnIns): int {
 		for i, sf in self.coSpawnMap {
 			if len(sf.Params) == len(f.Params) {
 				for j, sp in sf.Params {
@@ -285,7 +258,7 @@ impl ObjectCoder {
 		ret i
 	}
 
-	fn pushDealloc(mut &self, mut t: &TypeKind): int {
+	fn pushDealloc(mut &self, mut t: &sema::TypeKind): int {
 		for i, dt in self.deallocated {
 			if dt.Equal(t) {
 				ret i
@@ -301,7 +274,7 @@ impl ObjectCoder {
 		ret i
 	}
 
-	fn pushAnonFn(mut &self, mut &m: &AnonFnExprModel): (ident: str) {
+	fn pushAnonFn(mut &self, mut &m: &sema::AnonFnExprModel): (ident: str) {
 		self.meta.concurrent = self.meta.concurrent || m.Func.CalledCo
 
 		closure := obj::IsClosure(m)
@@ -343,7 +316,7 @@ impl ObjectCoder {
 		ret
 	}
 
-	fn pushAnyType(mut &self, mut t: &TypeKind): int {
+	fn pushAnyType(mut &self, mut t: &sema::TypeKind): int {
 		mut orig := t
 		if t.Enum() != nil {
 			t = t.Enum().Kind.Kind
@@ -356,7 +329,7 @@ impl ObjectCoder {
 		self.anyTypeMap = append(self.anyTypeMap, t)
 		si := conv::Itoa(i)
 		if t.Sptr() != nil {
-			mut elemKind := StrBuilder.New(40)
+			mut elemKind := strings::StrBuilder.New(40)
 			self.tc.kind(elemKind, t.Sptr().Elem)
 
 			// Deallocator function.
@@ -379,7 +352,7 @@ impl ObjectCoder {
 			self.anyObj.WriteStr(si)
 			self.anyObj.WriteStr(" && __jule_ptrEqual(any.data.alloc, other.alloc); }\n")
 		} else {
-			mut kindB := StrBuilder.New(40)
+			mut kindB := strings::StrBuilder.New(40)
 			self.tc.kind(kindB, t)
 			kind := kindB.Str()
 
@@ -401,7 +374,7 @@ impl ObjectCoder {
 			self.anyObj.WriteStr("_eq(void *alloc, void *other) noexcept { ")
 			if t.Comparable() {
 				self.anyObj.WriteStr("return ")
-				self.ec._unsafeBinary(self.anyObj, lmodel, rmodel, t, t, TokenId.Eqs, TokenKind.Eqs)
+				self.ec._unsafeBinary(self.anyObj, lmodel, rmodel, t, t, lex::TokenId.Eqs, lex::TokenKind.Eqs)
 				self.anyObj.WriteStr("; }\n")
 			} else {
 				self.anyObj.WriteStr(`__jule_panic((`)
@@ -448,7 +421,7 @@ impl ObjectCoder {
 		ret i
 	}
 
-	fn pushResultIns(mut &self, mut &f: &FnIns) {
+	fn pushResultIns(mut &self, mut &f: &sema::FnIns) {
 		s := str(self.tc.rc.code(f.Result))
 		_, ok := self.resultMap[s]
 		if ok {
@@ -469,7 +442,7 @@ impl ObjectCoder {
 		self.resultDecls.WriteStr("};\n")
 	}
 
-	fn pushResult(mut &self, mut &f: &Fn) {
+	fn pushResult(mut &self, mut &f: &sema::Fn) {
 		if f.IsVoid() || len(f.Result.Idents) <= 1 {
 			ret
 		}
@@ -482,8 +455,8 @@ impl ObjectCoder {
 		}
 	}
 
-	fn pushAndWriteMaskMapper(mut &self, mut t1: &Trait, mut t2: &Trait) {
-		mut ident := StrBuilder.New(1 << 5)
+	fn pushAndWriteMaskMapper(mut &self, mut t1: &sema::Trait, mut t2: &sema::Trait) {
+		mut ident := strings::StrBuilder.New(1 << 5)
 		ident.WriteStr("__jule_trait_offset_mapper_")
 		ident.WriteStr(conv::FmtUint(u64(uintptr(t2)), 0xF))
 		ident.WriteStr("_to_")
@@ -505,8 +478,8 @@ impl ObjectCoder {
 		self.anyObj.Write(unsafe { ident.Buf() })
 		self.anyObj.WriteStr("(const void *" + data + ") noexcept { ")
 
-		mut t1Ident := StrBuilder.New(1 << 4)
-		mut t2Ident := StrBuilder.New(1 << 4)
+		mut t1Ident := strings::StrBuilder.New(1 << 4)
+		mut t2Ident := strings::StrBuilder.New(1 << 4)
 		identCoder.traitDecl(t1Ident, t1)
 		identCoder.traitDecl(t2Ident, t2)
 
@@ -533,7 +506,7 @@ impl ObjectCoder {
 	}
 
 	// Writes location information of token as cstr bytes.
-	fn locInfo(mut &self, &t: &Token) {
+	fn locInfo(mut &self, &t: &lex::Token) {
 		&loc := t.File.Path
 
 		// Normalize path if production compilation enabled.
@@ -560,7 +533,7 @@ impl ObjectCoder {
 	}
 
 	fn head(mut &self) {
-		time := Time.Now()
+		time := time::Time.Now()
 		abs := time.Abs()
 		self.write("// Auto generated by JuleC.\n")
 		self.write("// JuleC version: ")
@@ -623,7 +596,7 @@ impl ObjectCoder {
 		}
 	}
 
-	fn prepareStructure(mut self, mut &s: &Struct) {
+	fn prepareStructure(mut self, mut &s: &sema::Struct) {
 		for (_, mut ins) in s.Instances {
 			for (_, mut m) in ins.Methods {
 				if m.Statically {
@@ -631,12 +604,12 @@ impl ObjectCoder {
 				}
 				for (_, mut mins) in m.Instances {
 					mut p := mins.Params[0]
-					mut kind := StrBuilder.New(40)
+					mut kind := strings::StrBuilder.New(40)
 					self.tc.kind(kind, p.Kind)
 					if !p.Decl.IsRef() {
 						kind.WriteStr("*")
 					}
-					p.Kind = &TypeKind{
+					p.Kind = &sema::TypeKind{
 						Kind: &customType{
 							kind: kind.Str(),
 						},
@@ -654,7 +627,7 @@ impl ObjectCoder {
 		}
 	}
 
-	fn structurePlainDecl(mut &self, mut &s: &Struct) {
+	fn structurePlainDecl(mut &self, mut &s: &sema::Struct) {
 		for (_, mut ins) in s.Instances {
 			self.write("struct ")
 			identCoder.structureIns(self.Buf, ins)
@@ -670,18 +643,18 @@ impl ObjectCoder {
 		}
 	}
 
-	fn fieldDecl(mut &self, mut &f: &FieldIns) {
+	fn fieldDecl(mut &self, mut &f: &sema::FieldIns) {
 		self.tc.kind(self.Buf, f.Kind)
 		self.write(" ")
 		identCoder.field(self.Buf, f.Decl)
 		self.write(";")
 	}
 
-	fn structureDestructor(mut &self, mut &s: &StructIns) {
+	fn structureDestructor(mut &self, mut &s: &sema::StructIns) {
 		// Dispose method must be non-static
 		const Static = false
 		mut disposeMethod := s.FindMethod("Dispose", Static)
-		mut disposed := FuncPattern.Dispose(disposeMethod)
+		mut disposed := sema::FuncPattern.Dispose(disposeMethod)
 		// Call destructor if implemented.
 		if !disposed {
 			ret
@@ -693,7 +666,7 @@ impl ObjectCoder {
 		self.write("(this); }")
 	}
 
-	fn structureOperatorEq(mut &self, ident: str, mut &s: &StructIns, decl: bool) {
+	fn structureOperatorEq(mut &self, ident: str, mut &s: &sema::StructIns, decl: bool) {
 		if !defaultEq(s) {
 			ret
 		}
@@ -743,11 +716,11 @@ impl ObjectCoder {
 			self.write("\n")
 			self.indent()
 
-			mut fIdent := StrBuilder.New(len(f.Decl.Ident))
+			mut fIdent := strings::StrBuilder.New(len(f.Decl.Ident))
 			identCoder.field(fIdent, f.Decl)
 			lmodel += unsafe { unsafe::BytesStr(fIdent.Buf()) }
 			rmodel += unsafe { unsafe::BytesStr(fIdent.Buf()) }
-			self.ec._unsafeBinary(self.Buf, lmodel, rmodel, f.Kind, f.Kind, TokenId.Eqs, TokenKind.Eqs)
+			self.ec._unsafeBinary(self.Buf, lmodel, rmodel, f.Kind, f.Kind, lex::TokenId.Eqs, lex::TokenKind.Eqs)
 			lmodel = lmodel[:len(lmodel)-fIdent.Len()]
 			rmodel = lmodel[:len(rmodel)-fIdent.Len()]
 		}
@@ -761,8 +734,8 @@ impl ObjectCoder {
 		self.write("}\n\n")
 	}
 
-	fn structureOperators(mut &self, mut &s: &StructIns, decl: bool) {
-		mut sb := StrBuilder.New(40)
+	fn structureOperators(mut &self, mut &s: &sema::StructIns, decl: bool) {
+		mut sb := strings::StrBuilder.New(40)
 		identCoder.structureIns(sb, s)
 		ident := sb.Str()
 
@@ -770,7 +743,7 @@ impl ObjectCoder {
 		self.structureOperatorEq(ident, s, decl)
 	}
 
-	fn structureInsDecl(mut &self, mut &s: &StructIns) {
+	fn structureInsDecl(mut &self, mut &s: &sema::StructIns) {
 		for (_, mut m) in s.Methods {
 			// Operator methods are declared by [structureDecl].
 			if isHeadDecl(m) {
@@ -800,7 +773,7 @@ impl ObjectCoder {
 		self.structureOperators(s, DeclOnly)
 	}
 
-	fn structureDecl(mut &self, mut &s: &Struct) {
+	fn structureDecl(mut &self, mut &s: &sema::Struct) {
 		for (_, mut ins) in s.Instances {
 			self.structureInsDecl(ins)
 		}
@@ -834,7 +807,7 @@ impl ObjectCoder {
 	// The ident parameter means this function is anon, mostly.
 	// But this parameter not only for anonymous functions.
 	// It also useable as custom identifiers for functions.
-	fn funcHead(mut &self, mut &buf: StrBuilder, mut &f: &FnIns, ptr: bool, ident: str) {
+	fn funcHead(mut &self, mut &buf: strings::StrBuilder, mut &f: &sema::FnIns, ptr: bool, ident: str) {
 		if !ptr && opt::Inline && !f.Decl.IsEntryPoint() {
 			buf.WriteStr("inline ")
 		}
@@ -853,7 +826,7 @@ impl ObjectCoder {
 		}
 	}
 
-	fn funcDeclIns(mut &self, mut &f: &FnIns, ptr: bool) {
+	fn funcDeclIns(mut &self, mut &f: &sema::FnIns, ptr: bool) {
 		self.meta.concurrent = self.meta.concurrent || f.CalledCo
 		self.indent()
 		self.funcHead(self.Buf, f, ptr, "")
@@ -861,13 +834,13 @@ impl ObjectCoder {
 		self.write(";\n")
 	}
 
-	fn funcDecl(mut &self, mut &f: &Fn, ptr: bool) {
+	fn funcDecl(mut &self, mut &f: &sema::Fn, ptr: bool) {
 		for (_, mut c) in f.Instances {
 			self.funcDeclIns(c, ptr)
 		}
 	}
 
-	fn funcDeclTrait(mut &self, mut &f: &Fn) {
+	fn funcDeclTrait(mut &self, mut &f: &sema::Fn) {
 		for (_, mut c) in f.Instances {
 			mut k := c.Params[0].Kind
 			c.Params[0].Kind = generalGCPtr
@@ -877,8 +850,8 @@ impl ObjectCoder {
 	}
 
 	fn funcDecls(mut &self) {
-		obj::IterPackages(self.ir, fn(mut &pkg: &Package) {
-			obj::IterFiles(pkg, fn(mut &file: &SymTab) {
+		obj::IterPackages(self.ir, fn(mut &pkg: &sema::Package) {
+			obj::IterFiles(pkg, fn(mut &file: &sema::SymTab) {
 				for (_, mut f) in file.Funcs {
 					if !f.Binded && f.Token != nil {
 						self.pushResult(f)
@@ -889,11 +862,11 @@ impl ObjectCoder {
 		})
 	}
 
-	fn traitDataTypeMethods(mut &self, mut &t: &Trait) {
-		obj::IterTraitMethods(t, fn(mut &m: &Fn) {
+	fn traitDataTypeMethods(mut &self, mut &t: &sema::Trait) {
+		obj::IterTraitMethods(t, fn(mut &m: &sema::Fn) {
 			mut ins := m.Instances[0]
 			for (i, mut ip) in ins.Params[1:] {
-				if IsAnonIdent(ip.Decl.Ident) {
+				if lex::IsAnonIdent(ip.Decl.Ident) {
 					ip.Decl.Ident = "_" + conv::Itoa(i)
 				}
 			}
@@ -903,8 +876,8 @@ impl ObjectCoder {
 	}
 
 	fn traitDataTypes(mut &self) {
-		obj::IterPackages(self.ir, fn(mut &pkg: &Package) {
-			obj::IterFiles(pkg, fn(mut &file: &SymTab) {
+		obj::IterPackages(self.ir, fn(mut &pkg: &sema::Package) {
+			obj::IterFiles(pkg, fn(mut &file: &sema::SymTab) {
 				for (_, mut t) in file.Traits {
 					if t.Token == nil {
 						continue
@@ -925,13 +898,13 @@ impl ObjectCoder {
 		})
 	}
 
-	fn paramIns(mut &self, mut &buf: StrBuilder, mut &p: &ParamIns) {
+	fn paramIns(mut &self, mut &buf: strings::StrBuilder, mut &p: &sema::ParamIns) {
 		self.tc.paramIns(buf, p)
 		buf.WriteByte(' ')
 		identCoder.param(buf, p.Decl)
 	}
 
-	fn paramsIns(mut &self, mut &buf: StrBuilder, mut &f: &FnIns) {
+	fn paramsIns(mut &self, mut &buf: strings::StrBuilder, mut &f: &sema::FnIns) {
 		if !f.AsAnon && len(f.Params) == 0 {
 			buf.WriteStr("(void)")
 			ret
@@ -952,7 +925,7 @@ impl ObjectCoder {
 		buf.WriteByte(')')
 	}
 
-	fn varInitExpr(mut &self, mut &v: &Var, init: fn()) {
+	fn varInitExpr(mut &self, mut &v: &sema::Var, init: fn()) {
 		if v.Statically {
 			self.write("static ")
 		}
@@ -970,8 +943,8 @@ impl ObjectCoder {
 		self.write(";")
 	}
 
-	fn var(mut &self, mut v: &Var) {
-		if IsIgnoreIdent(v.Ident) {
+	fn var(mut &self, mut v: &sema::Var) {
+		if lex::IsIgnoreIdent(v.Ident) {
 			ret
 		}
 		if v.Value != nil && v.Value.Expr != nil {
@@ -1001,13 +974,13 @@ impl ObjectCoder {
 		self.varInitExpr(v, nil)
 	}
 
-	fn anonFuncInsDecl(mut &self, mut &m: &AnonFnExprModel, ident: str) {
+	fn anonFuncInsDecl(mut &self, mut &m: &sema::AnonFnExprModel, ident: str) {
 		self.funcHead(self.anonObj, m.Func, false, ident)
 		self.paramsIns(self.anonObj, m.Func)
 		self.anonObj.WriteByte(';')
 	}
 
-	fn anonFuncIns(mut &self, mut &m: &AnonFnExprModel, ident: str) {
+	fn anonFuncIns(mut &self, mut &m: &sema::AnonFnExprModel, ident: str) {
 		self.funcHead(self.Buf, m.Func, false, ident)
 		self.paramsIns(self.Buf, m.Func)
 		self.write(" ")
@@ -1017,7 +990,7 @@ impl ObjectCoder {
 		}
 	}
 
-	fn funcIns(mut &self, mut f: &FnIns, ident: str) {
+	fn funcIns(mut &self, mut f: &sema::FnIns, ident: str) {
 		self.funcHead(self.Buf, f, false, ident)
 		self.paramsIns(self.Buf, f)
 		self.write(" ")
@@ -1027,16 +1000,16 @@ impl ObjectCoder {
 		}
 	}
 
-	fn func(mut &self, mut &f: &Fn) {
+	fn func(mut &self, mut &f: &sema::Fn) {
 		for (_, mut ins) in f.Instances {
 			self.funcIns(ins, "")
 		}
 	}
 
-	fn funcTrait(mut &self, &s: &StructIns, mut &f: &FnIns) {
+	fn funcTrait(mut &self, &s: &sema::StructIns, mut &f: &sema::FnIns) {
 		f.Scope = nil
 
-		mut nident := StrBuilder.New(30)
+		mut nident := strings::StrBuilder.New(30)
 		nident.WriteStr("__jule_trait_method_")
 		nident.WriteStr(conv::FmtUint(u64(uintptr(f)), 0xF))
 		nident.WriteStr("_")
@@ -1048,7 +1021,7 @@ impl ObjectCoder {
 		f.Params[0].Kind = k
 	}
 
-	fn findTraitMetMap(mut &self, mut &m: &Fn): (&FnIns, bool) {
+	fn findTraitMetMap(mut &self, mut &m: &sema::Fn): (&sema::FnIns, bool) {
 		mut mins := m.Instances[0]
 		for (mut f, _) in self.traitMetMap {
 			if f.Decl.Public == m.Public &&
@@ -1060,7 +1033,7 @@ impl ObjectCoder {
 		ret mins, false
 	}
 
-	fn traitWrapper(mut &self, mut &t: &Trait, mut &m: &Fn) {
+	fn traitWrapper(mut &self, mut &t: &sema::Trait, mut &m: &sema::Fn) {
 	impls:
 		for (_, mut imp) in t.Implemented {
 			mut mepf, exist := self.findTraitMetMap(m)
@@ -1113,13 +1086,13 @@ impl ObjectCoder {
 	}
 
 	fn traitWrappers(mut &self) {
-		obj::IterPackages(self.ir, fn(mut &pkg: &Package) {
-			obj::IterFiles(pkg, fn(mut &file: &SymTab) {
+		obj::IterPackages(self.ir, fn(mut &pkg: &sema::Package) {
+			obj::IterFiles(pkg, fn(mut &file: &sema::SymTab) {
 				for (_, mut t) in file.Traits {
 					if len(t.Implemented) == 0 {
 						continue
 					}
-					obj::IterTraitMethods(t, fn(mut &m: &Fn) {
+					obj::IterTraitMethods(t, fn(mut &m: &sema::Fn) {
 						self.traitWrapper(t, m)
 					})
 				}
@@ -1127,8 +1100,8 @@ impl ObjectCoder {
 		})
 	}
 
-	fn traitDataMethods(mut &self, mut &t: &Trait, s: &StructIns) {
-		obj::IterTraitMethods(t, fn(mut &m: &Fn) {
+	fn traitDataMethods(mut &self, mut &t: &sema::Trait, s: &sema::StructIns) {
+		obj::IterTraitMethods(t, fn(mut &m: &sema::Fn) {
 			self.indent()
 			self.write(".")
 			identCoder.func(self.Buf, m)
@@ -1144,8 +1117,8 @@ impl ObjectCoder {
 		})
 	}
 
-	fn traitData(mut &self, mut &t: &Trait, i: int, mut &s: &StructIns) {
-		mut ident := StrBuilder.New(len(t.Ident))
+	fn traitData(mut &self, mut &t: &sema::Trait, i: int, mut &s: &sema::StructIns) {
+		mut ident := strings::StrBuilder.New(len(t.Ident))
 		identCoder.traitDecl(ident, t)
 		self.write("static ")
 		self.writeBytes(unsafe { ident.Buf() })
@@ -1157,7 +1130,7 @@ impl ObjectCoder {
 		self.addIndent()
 		self.indent()
 		self.write(".dealloc=" + deallocatedTypeIdent)
-		self.write(conv::Itoa(self.pushDealloc(&TypeKind{Kind: s})))
+		self.write(conv::Itoa(self.pushDealloc(&sema::TypeKind{Kind: s})))
 		self.write(",\n")
 		self.traitDataMethods(t, s)
 		self.doneIndent()
@@ -1165,8 +1138,8 @@ impl ObjectCoder {
 	}
 
 	fn traitDatas(mut &self) {
-		obj::IterPackages(self.ir, fn(mut &pkg: &Package) {
-			obj::IterFiles(pkg, fn(mut &file: &SymTab) {
+		obj::IterPackages(self.ir, fn(mut &pkg: &sema::Package) {
+			obj::IterFiles(pkg, fn(mut &file: &sema::SymTab) {
 				for (_, mut t) in file.Traits {
 					mut i := 0
 					for (_, mut s) in t.Implemented {
@@ -1207,20 +1180,20 @@ impl ObjectCoder {
 		self.globalDecls()
 	}
 
-	fn structureMethods(mut &self, mut &s: &StructIns) {
+	fn structureMethods(mut &self, mut &s: &sema::StructIns) {
 		for (_, mut f) in s.Methods {
 			self.func(f)
 			self.write("\n\n")
 		}
 	}
 
-	fn structureIns(mut &self, mut &s: &StructIns) {
+	fn structureIns(mut &self, mut &s: &sema::StructIns) {
 		const DeclOnly = false
 		self.structureOperators(s, DeclOnly)
 		self.structureMethods(s)
 	}
 
-	fn structure(mut &self, mut &s: &Struct) {
+	fn structure(mut &self, mut &s: &sema::Struct) {
 		for (_, mut ins) in s.Instances {
 			self.structureIns(ins)
 			self.write("\n\n")
@@ -1237,10 +1210,10 @@ impl ObjectCoder {
 	}
 
 	fn funcs(mut &self) {
-		obj::IterPackages(self.ir, fn(mut &pkg: &Package) {
-			obj::IterFiles(pkg, fn(mut &file: &SymTab) {
+		obj::IterPackages(self.ir, fn(mut &pkg: &sema::Package) {
+			obj::IterFiles(pkg, fn(mut &file: &sema::SymTab) {
 				for (_, mut f) in file.Funcs {
-					if !env::Test && obj::HasDirective(f.Directives, Directive.Test) {
+					if !env::Test && obj::HasDirective(f.Directives, build::Directive.Test) {
 						continue
 					}
 					// skip special runtime functions
@@ -1259,8 +1232,8 @@ impl ObjectCoder {
 		})
 	}
 
-	fn pushInit(mut &self, mut &pkg: &Package) {
-		obj::IterFiles(pkg, fn(mut &file: &SymTab) {
+	fn pushInit(mut &self, mut &pkg: &sema::Package) {
+		obj::IterFiles(pkg, fn(mut &file: &sema::SymTab) {
 			for (_, mut f) in file.Funcs {
 				if f.Ident == build::InitFn {
 					self.indent()
@@ -1299,7 +1272,7 @@ impl ObjectCoder {
 	fn initCaller(mut &self) {
 		self.write("void " + initCallerIdent + "(void) {\n")
 		self.addIndent()
-		obj::IterPackages(self.ir, fn(mut &pkg: &Package) {
+		obj::IterPackages(self.ir, fn(mut &pkg: &sema::Package) {
 			self.pushInit(pkg)
 		})
 		self.doneIndent()
@@ -1330,7 +1303,7 @@ impl ObjectCoder {
 }`)
 	}
 
-	fn insertBuf(mut &self, mut &buf: StrBuilder, pos: int) {
+	fn insertBuf(mut &self, mut &buf: strings::StrBuilder, pos: int) {
 		if buf.Len() > 0 {
 			mut head := make([]byte, 0, self.Buf.Len()+buf.Len())
 			head = append(head, unsafe { self.Buf.Buf() }[:pos]...)
@@ -1400,7 +1373,7 @@ impl ObjectCoder {
 }
 
 // Concatenate all strings into single string.
-fn concatAllParts(parts: ...&Token): []byte {
+fn concatAllParts(parts: ...&lex::Token): []byte {
 	mut n := 0
 	for _, part in parts {
 		n += len(part.Kind)
@@ -1408,7 +1381,7 @@ fn concatAllParts(parts: ...&Token): []byte {
 	if n == 0 {
 		ret nil
 	}
-	mut s := StrBuilder.New(n)
+	mut s := strings::StrBuilder.New(n)
 	for _, p in parts {
 		s.WriteStr(p.Kind)
 	}
@@ -1416,7 +1389,7 @@ fn concatAllParts(parts: ...&Token): []byte {
 }
 
 // Reports whether the m is a method which is declarated top of the struct.
-fn isHeadDecl(mut &m: &Fn): bool {
+fn isHeadDecl(mut &m: &sema::Fn): bool {
 	if len(m.Generics) > 0 || len(m.Instances) == 0 {
 		ret false
 	}
@@ -1425,10 +1398,10 @@ fn isHeadDecl(mut &m: &Fn): bool {
 	}
 	mut mi := m.Instances[0]
 	const Static = false
-	ret FuncPattern.Dispose(mi.Owner.FindMethod("Dispose", Static))
+	ret sema::FuncPattern.Dispose(mi.Owner.FindMethod("Dispose", Static))
 }
 
 // Reports whether structure needs default compare method.
-fn defaultEq(&s: &StructIns): bool {
+fn defaultEq(&s: &sema::StructIns): bool {
 	ret s.Comparable && s.Operators.Eq == nil
 }

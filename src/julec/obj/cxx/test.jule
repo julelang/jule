@@ -2,25 +2,16 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use env
-use obj::{self, IR}
-use std::jule::build::{
-	Directive,
-}
-use std::jule::sema::{
-	ImportInfo,
-	Package,
-	Fn,
-	FnIns,
-	StructIns,
-}
-use std::strings::{StrBuilder}
+use obj
+use build for std::jule::build
+use sema for std::jule::sema
+use strings for std::strings
 
 struct TestCoder {
-	t:         &StructIns
-	tmReset:   &Fn
-	tmFailed:  &Fn
-	tmSkipped: &Fn
+	t:         &sema::StructIns
+	tmReset:   &sema::Fn
+	tmFailed:  &sema::Fn
+	tmSkipped: &sema::Fn
 
 	oc: &ObjectCoder
 }
@@ -32,7 +23,7 @@ impl TestCoder {
 		}
 	}
 
-	fn findTestingPackage(mut &self): &ImportInfo {
+	fn findTestingPackage(mut &self): &sema::ImportInfo {
 		for (_, mut imp) in self.oc.ir.Used {
 			if imp.LinkPath == "std::testing" {
 				ret imp
@@ -41,7 +32,7 @@ impl TestCoder {
 		ret nil
 	}
 
-	fn appendTest(mut &self, mut f: &FnIns) {
+	fn appendTest(mut &self, mut f: &sema::FnIns) {
 		self.oc.indent()
 		self.callTmReset()
 		self.oc.write(";\n")
@@ -56,10 +47,10 @@ impl TestCoder {
 		self.oc.write("post_test();\n")
 	}
 
-	fn appendPackageTests(mut &self, mut &p: &Package) {
+	fn appendPackageTests(mut &self, mut &p: &sema::Package) {
 		for (_, mut file) in p.Files {
 			for (_, mut f) in file.Funcs {
-				if obj::HasDirective(f.Directives, Directive.Test) {
+				if obj::HasDirective(f.Directives, build::Directive.Test) {
 					self.appendTest(f.Instances[0])
 				}
 			}
@@ -117,7 +108,7 @@ impl TestCoder {
 			ret
 		}
 
-		mut tb := StrBuilder.New(40)
+		mut tb := strings::StrBuilder.New(40)
 		self.oc.tc.structureIns(tb, self.t)
 		self.oc.tc.asSptr(self.oc.Buf, unsafe { tb.Buf() })
 		self.oc.write(" _t = jule::new_ptr<")

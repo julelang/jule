@@ -4,48 +4,12 @@
 
 use obj
 use env
-use opt::{
-	self,
-	PushToSliceExprModel,
-	AppendToSliceExprModel,
-	MutSlicingExprModel,
-	SwapExprModel,
-	ExceptionalForwardingExprModel,
-	StrRuneIter,
-}
+use opt
 use conv for std::conv
-use lex for std::jule::lex::{TokenId, TokenKind}
-use std::jule::constant::{Const}
-use sema for std::jule::sema::{
-	Data,
-	Stmt,
-	FnIns,
-	Var,
-	Scope,
-	If,
-	Conditional,
-	InfIter,
-	WhileIter,
-	RangeIter,
-	ContSt,
-	BreakSt,
-	Label,
-	GotoSt,
-	Postfix,
-	Assign,
-	MultiAssign,
-	Match,
-	Case,
-	FallSt,
-	RetSt,
-	TupleExprModel,
-	TypeKind,
-	SlicingExprModel,
-	IndexingExprModel,
-	FnCallExprModel,
-	AnonFnExprModel,
-}
-use std::strings::{StrBuilder}
+use lex for std::jule::lex
+use constant for std::jule::constant
+use sema for std::jule::sema
+use strings for std::strings
 
 const closureCtxIdent = "__jule_closure_ctx"
 const matchExpr = "_match_expr"
@@ -56,13 +20,13 @@ static assignArgName = "__jule_assign_arg"
 
 // Common group of semantic analysis stmt types and optimizer specific types.
 enum compStmt: type {
-	Stmt: Stmt,
-	&PushToSliceExprModel,
-	&AppendToSliceExprModel,
-	&MutSlicingExprModel,
-	&SwapExprModel,
-	&ExceptionalForwardingExprModel,
-	&StrRuneIter,
+	Stmt: sema::Stmt,
+	&opt::PushToSliceExprModel,
+	&opt::AppendToSliceExprModel,
+	&opt::MutSlicingExprModel,
+	&opt::SwapExprModel,
+	&opt::ExceptionalForwardingExprModel,
+	&opt::StrRuneIter,
 }
 
 struct scopeCoder {
@@ -85,8 +49,8 @@ impl scopeCoder {
 		if opt::Copy && isCopyOptimizable(it.Expr) {
 			ref = true
 			match type it.Expr.Model {
-			| &Var:
-				v := (&Var)(it.Expr.Model)
+			| &sema::Var:
+				v := (&sema::Var)(it.Expr.Model)
 				if v.Reference {
 					self.oc.ec.model(it.Expr.Model)
 					break
@@ -126,8 +90,8 @@ impl scopeCoder {
 		self.oc.indent()
 	}
 
-	fn rangeIndexIter(mut &self, mut &it: &RangeIter) {
-		mut sb := StrBuilder.New(1 << 6)
+	fn rangeIndexIter(mut &self, mut &it: &sema::RangeIter) {
+		mut sb := strings::StrBuilder.New(1 << 6)
 		identCoder.iterBegin(sb, uintptr(it))
 		begin := sb.Str()
 		sb.Clear()
@@ -193,8 +157,8 @@ impl scopeCoder {
 		self.oc.write("}")
 	}
 
-	fn rangeHashmapIter(mut &self, mut &it: &RangeIter) {
-		mut sb := StrBuilder.New(1 << 6)
+	fn rangeHashmapIter(mut &self, mut &it: &sema::RangeIter) {
+		mut sb := strings::StrBuilder.New(1 << 6)
 		identCoder.iterBegin(sb, uintptr(it))
 		begin := sb.Str()
 		sb.Clear()
@@ -276,8 +240,8 @@ impl scopeCoder {
 		self.oc.write("}")
 	}
 
-	fn strRuneIter(mut &self, mut it: &StrRuneIter) {
-		mut sb := StrBuilder.New(1 << 6)
+	fn strRuneIter(mut &self, mut it: &opt::StrRuneIter) {
+		mut sb := strings::StrBuilder.New(1 << 6)
 		identCoder.iterBegin(sb, uintptr(it.Base))
 		begin := sb.Str()
 		sb.Clear()
@@ -293,8 +257,8 @@ impl scopeCoder {
 		if opt::Copy && isCopyOptimizable(it.Expr) {
 			ref = true
 			match type it.Expr.Model {
-			| &Var:
-				v := (&Var)(it.Expr.Model)
+			| &sema::Var:
+				v := (&sema::Var)(it.Expr.Model)
 				if v.Reference {
 					self.oc.ec.model(it.Expr.Model)
 					break
@@ -388,7 +352,7 @@ impl scopeCoder {
 		self.oc.write("}")
 	}
 
-	fn ifCase(mut &self, mut i: &If) {
+	fn ifCase(mut &self, mut i: &sema::If) {
 		if i.Expr != nil {
 			self.oc.write("if (")
 			self.oc.ec.possibleRefExpr(i.Expr)
@@ -397,7 +361,7 @@ impl scopeCoder {
 		self.scope(i.Scope)
 	}
 
-	fn conditional(mut &self, mut c: &Conditional) {
+	fn conditional(mut &self, mut c: &sema::Conditional) {
 		mut writed := false
 		for (_, mut elif) in c.Elifs {
 			if elif == nil {
@@ -417,7 +381,7 @@ impl scopeCoder {
 		}
 	}
 
-	fn infIter(mut &self, mut it: &InfIter) {
+	fn infIter(mut &self, mut it: &sema::InfIter) {
 		self.oc.write("for (;;) {\n")
 		self.oc.addIndent() // Indent scope.
 		self.oc.indent()
@@ -434,7 +398,7 @@ impl scopeCoder {
 		self.oc.write(":;")
 	}
 
-	fn whileIter(mut &self, mut it: &WhileIter) {
+	fn whileIter(mut &self, mut it: &sema::WhileIter) {
 		if it.Expr != nil && it.Next == nil {
 			self.oc.write("while (")
 			self.oc.ec.possibleRefExpr(it.Expr)
@@ -473,7 +437,7 @@ impl scopeCoder {
 		self.oc.write(":;")
 	}
 
-	fn rangeIter(mut &self, mut it: &RangeIter) {
+	fn rangeIter(mut &self, mut it: &sema::RangeIter) {
 		match {
 		| it.Expr.Kind.Slc() != nil:
 			self.rangeIndexIter(it)
@@ -486,22 +450,22 @@ impl scopeCoder {
 		}
 	}
 
-	fn cont(mut &self, c: &ContSt) {
+	fn cont(mut &self, c: &sema::ContSt) {
 		self.oc.write("goto ")
 		identCoder.iterNext(self.oc.Buf, c.It)
 	}
 
-	fn label(mut &self, l: &Label) {
+	fn label(mut &self, l: &sema::Label) {
 		identCoder.label(self.oc.Buf, uintptr(l))
 		self.oc.write(":")
 	}
 
-	fn gotoSt(mut &self, gt: &GotoSt) {
+	fn gotoSt(mut &self, gt: &sema::GotoSt) {
 		self.oc.write("goto ")
 		identCoder.label(self.oc.Buf, uintptr(gt.Label))
 	}
 
-	fn postfix(mut &self, mut p: &Postfix) {
+	fn postfix(mut &self, mut p: &sema::Postfix) {
 		self.oc.write("(")
 		self.oc.ec.possibleRefExpr(p.Expr)
 		self.oc.write(")")
@@ -510,8 +474,8 @@ impl scopeCoder {
 
 	fn assignLeft(mut &self, mut &model: sema::ExprModel) {
 		match type model {
-		| &IndexingExprModel:
-			mut iem := (&IndexingExprModel)(model)
+		| &sema::IndexingExprModel:
+			mut iem := (&sema::IndexingExprModel)(model)
 			_map := iem.Expr.Kind.Map()
 			if _map == nil {
 				break
@@ -540,19 +504,19 @@ impl scopeCoder {
 		self.oc.ec.possibleRefExpr(model)
 	}
 
-	fn shl(mut &self, mut a: &Assign) {
+	fn shl(mut &self, mut a: &sema::Assign) {
 		self.assignLeft(a.Left.Model)
 		self.oc.write(" = ")
 		self.oc.ec.shl(a.Left, a.Right)
 	}
 
-	fn shr(mut &self, mut a: &Assign) {
+	fn shr(mut &self, mut a: &sema::Assign) {
 		self.assignLeft(a.Left.Model)
 		self.oc.write(" = ")
 		self.oc.ec.shr(a.Left, a.Right)
 	}
 
-	fn divByZeroAssign(mut &self, mut a: &Assign) {
+	fn divByZeroAssign(mut &self, mut a: &sema::Assign) {
 		self.assignLeft(a.Left.Model)
 		self.oc.write(" = ")
 		self.oc.ec.divByZeroBinary(a.Op, a.Left, a.Right)
@@ -573,21 +537,21 @@ impl scopeCoder {
 		self.oc.write(")")
 	}
 
-	fn assign(mut &self, mut a: &Assign) {
+	fn assign(mut &self, mut a: &sema::Assign) {
 		match a.Op.Id {
-		| TokenId.SolidusEq | TokenId.PercentEq:
+		| lex::TokenId.SolidusEq | lex::TokenId.PercentEq:
 			// Do not check division safety of structures and skip if safety disabled.
 			if env::Safety && a.Left.Kind.Struct() == nil {
 				self.divByZeroAssign(a)
 				ret
 			}
-		| TokenId.ShlEq:
+		| lex::TokenId.ShlEq:
 			// Do not check shifting of structures.
 			if a.Left.Kind.Struct() == nil {
 				self.shl(a)
 				ret
 			}
-		| TokenId.ShrEq:
+		| lex::TokenId.ShrEq:
 			// Do not check shifting of structures.
 			if a.Left.Kind.Struct() == nil {
 				self.shr(a)
@@ -606,9 +570,9 @@ impl scopeCoder {
 		self.oc.ec.possibleRefExpr(a.Right.Model)
 	}
 
-	fn mapLookupAssign(mut &self, mut &a: &MultiAssign) {
+	fn mapLookupAssign(mut &self, mut &a: &sema::MultiAssign) {
 		// map lookup right expression always should be indexing
-		mut iem := (&IndexingExprModel)(a.Right)
+		mut iem := (&sema::IndexingExprModel)(a.Right)
 		mut _map := iem.Expr.Kind.Map()
 
 		mut s := obj::RuntimeFindStruct(self.oc.ir.Runtime, obj::RuntimeStruct._Map)
@@ -639,19 +603,19 @@ impl scopeCoder {
 		self.oc.write(")")
 	}
 
-	fn multiAssignTup(mut &self, mut &a: &MultiAssign) {
+	fn multiAssignTup(mut &self, mut &a: &sema::MultiAssign) {
 		self.oc.write("({\n")
 		self.oc.addIndent()
 
-		mut tup := (&TupleExprModel)(a.Right)
+		mut tup := (&sema::TupleExprModel)(a.Right)
 
 		for (i, mut r) in tup.Datas {
 			self.oc.indent()
 			mut l := a.Left[i]
 			if l != nil {
 				match type l.Model {
-				| &Var:
-					mut v := (&Var)(l.Model)
+				| &sema::Var:
+					mut v := (&sema::Var)(l.Model)
 					// If variable is reference and uninitialized,
 					// it should be declared in this multiple-assignment.
 					if v.Reference && !v.IsInitialized() {
@@ -688,12 +652,12 @@ impl scopeCoder {
 		self.oc.write("})")
 	}
 
-	fn multiAssignFn(mut &self, mut &a: &MultiAssign) {
+	fn multiAssignFn(mut &self, mut &a: &sema::MultiAssign) {
 		self.oc.write("({\n")
 		self.oc.addIndent()
 		self.oc.indent()
 
-		mut f := (&FnCallExprModel)(a.Right)
+		mut f := (&sema::FnCallExprModel)(a.Right)
 		self.oc.tc.rc.codeMut1(self.oc.Buf, f.Func.Result)
 		self.oc.write(" " + assignResultName + " = ")
 		self.oc.ec.possibleRefExpr(a.Right)
@@ -747,7 +711,7 @@ impl scopeCoder {
 		self.oc.write("})")
 	}
 
-	fn multiAssign(mut &self, mut a: &MultiAssign) {
+	fn multiAssign(mut &self, mut a: &sema::MultiAssign) {
 		// Write declarations without no initialization.
 		// It will initialize with assignments.
 		for (_, mut d) in a.Decls {
@@ -758,22 +722,22 @@ impl scopeCoder {
 
 		// Special cases.
 		match type a.Right {
-		| &IndexingExprModel: // Map lookup.
+		| &sema::IndexingExprModel: // Map lookup.
 			self.mapLookupAssign(a)
 			ret
 		}
 
 		match type a.Right {
-		| &TupleExprModel:
+		| &sema::TupleExprModel:
 			self.multiAssignTup(a)
-		| &FnCallExprModel:
+		| &sema::FnCallExprModel:
 			self.multiAssignFn(a)
 		|:
 			panic("this panic call should be unreachable")
 		}
 	}
 
-	fn matchExpr(mut &self, mut m: &Match): fn() {
+	fn matchExpr(mut &self, mut m: &sema::Match): fn() {
 		if !m.Expr.IsConst() {
 			ret fn() { self.oc.write(matchExpr) }
 		}
@@ -783,7 +747,7 @@ impl scopeCoder {
 		ret nil
 	}
 
-	fn case(mut &self, mut m: &Match, mut c: &Case) {
+	fn case(mut &self, mut m: &sema::Match, mut c: &sema::Case) {
 		if len(c.Exprs) != 0 && !m.Comptime {
 			if len(m.Cases) > 0 && m.Cases[0] == c {
 				self.oc.write("if (")
@@ -809,7 +773,7 @@ impl scopeCoder {
 					}
 				|:
 					self.oc.write(matchExpr)
-					mut tk := (&TypeKind)(expr.Model)
+					mut tk := (&sema::TypeKind)(expr.Model)
 					if m.Expr.Kind.Trait() != nil {
 						self.oc.write(".type_is(")
 						self.oc.ec.boolean(expr.Kind.Sptr() != nil)
@@ -853,7 +817,7 @@ impl scopeCoder {
 		self.oc.write("}")
 	}
 
-	fn matchSt(mut &self, mut m: &Match) {
+	fn matchSt(mut &self, mut m: &sema::Match) {
 		if len(m.Cases) == 0 && m.Default == nil {
 			ret
 		}
@@ -908,12 +872,12 @@ impl scopeCoder {
 		self.oc.write("}")
 	}
 
-	fn fallSt(mut &self, f: &FallSt) {
+	fn fallSt(mut &self, f: &sema::FallSt) {
 		self.oc.write("goto ")
 		identCoder.caseBegin(self.oc.Buf, f.DestCase)
 	}
 
-	fn breakSt(mut &self, b: &BreakSt) {
+	fn breakSt(mut &self, b: &sema::BreakSt) {
 		self.oc.write("goto ")
 		if b.It != 0 {
 			identCoder.iterEnd(self.oc.Buf, b.It)
@@ -922,7 +886,7 @@ impl scopeCoder {
 		}
 	}
 
-	fn setResult(mut &self, mut r: &RetSt) {
+	fn setResult(mut &self, mut r: &sema::RetSt) {
 		if len(r.Func.Decl.Result.Idents) == 1 {
 			self.oc.write(resultName + " = ")
 			self.oc.ec.possibleRefExpr(r.Expr)
@@ -931,8 +895,8 @@ impl scopeCoder {
 			ret
 		}
 		match type r.Expr {
-		| &TupleExprModel:
-			mut datas := (&TupleExprModel)(r.Expr).Datas
+		| &sema::TupleExprModel:
+			mut datas := (&sema::TupleExprModel)(r.Expr).Datas
 			for i, data in datas {
 				self.oc.write(resultName + "." + resultArgName)
 				self.oc.write(conv::Itoa(i))
@@ -941,7 +905,7 @@ impl scopeCoder {
 				self.oc.write(";\n")
 				self.oc.indent()
 			}
-		| &FnCallExprModel:
+		| &sema::FnCallExprModel:
 			self.oc.write(resultName + " = std::move(")
 			self.oc.ec.model(r.Expr)
 			self.oc.write(");\n")
@@ -950,7 +914,7 @@ impl scopeCoder {
 		}
 	}
 
-	fn retSt(mut &self, mut r: &RetSt) {
+	fn retSt(mut &self, mut r: &sema::RetSt) {
 		// Void.
 		if r.Func.Decl.IsVoid() {
 			if r.Func.Decl.Exceptional {
@@ -986,13 +950,13 @@ impl scopeCoder {
 		}
 	}
 
-	fn var(mut &self, mut v: &Var) {
+	fn var(mut &self, mut v: &sema::Var) {
 		if !v.Constant {
 			self.oc.var(v)
 		}
 	}
 
-	fn mutSlicing(mut &self, mut m: &MutSlicingExprModel) {
+	fn mutSlicing(mut &self, mut m: &opt::MutSlicingExprModel) {
 		self.oc.write("(")
 		self.oc.ec.possibleRefExpr(m.Expr)
 		self.oc.write(").mut_slice(")
@@ -1009,7 +973,7 @@ impl scopeCoder {
 		self.oc.write(");")
 	}
 
-	fn swap(mut &self, mut m: &SwapExprModel) {
+	fn swap(mut &self, mut m: &opt::SwapExprModel) {
 		self.oc.write("std::swap(")
 		self.oc.ec.possibleRefExpr(m.Left.Model)
 		self.oc.write(", ")
@@ -1017,7 +981,7 @@ impl scopeCoder {
 		self.oc.write(")")
 	}
 
-	fn exceptionalForwarding(mut &self, mut m: &ExceptionalForwardingExprModel) {
+	fn exceptionalForwarding(mut &self, mut m: &opt::ExceptionalForwardingExprModel) {
 		self.oc.write("return ")
 		self.oc.ec.pureFuncCall(m.Expr)
 	}
@@ -1028,58 +992,58 @@ impl scopeCoder {
 			ret
 		}
 		match type st {
-		| &Scope:
-			self.scope((&Scope)(st))
-		| &Var:
-			self.var((&Var)(st))
-		| &Data:
-			self.oc.ec.model((&Data)(st).Model)
-		| &Conditional:
-			self.conditional((&Conditional)(st))
-		| &InfIter:
-			self.infIter((&InfIter)(st))
-		| &WhileIter:
-			self.whileIter((&WhileIter)(st))
-		| &RangeIter:
-			self.rangeIter((&RangeIter)(st))
-		| &ContSt:
-			self.cont((&ContSt)(st))
-		| &Label:
-			self.label((&Label)(st))
-		| &GotoSt:
-			self.gotoSt((&GotoSt)(st))
-		| &Postfix:
-			self.postfix((&Postfix)(st))
-		| &Assign:
-			self.assign((&Assign)(st))
-		| &MultiAssign:
-			self.multiAssign((&MultiAssign)(st))
-		| &Match:
-			self.matchSt((&Match)(st))
-		| &FallSt:
-			self.fallSt((&FallSt)(st))
-		| &BreakSt:
-			self.breakSt((&BreakSt)(st))
-		| &RetSt:
-			self.retSt((&RetSt)(st))
-		| &PushToSliceExprModel:
-			self.oc.ec.pushToSlice((&PushToSliceExprModel)(st))
-		| &AppendToSliceExprModel:
-			self.oc.ec.appendToSlice((&AppendToSliceExprModel)(st))
-		| &MutSlicingExprModel:
-			self.mutSlicing((&MutSlicingExprModel)(st))
-		| &SwapExprModel:
-			self.swap((&SwapExprModel)(st))
-		| &ExceptionalForwardingExprModel:
-			self.exceptionalForwarding((&ExceptionalForwardingExprModel)(st))
-		| &StrRuneIter:
-			self.strRuneIter((&StrRuneIter)(st))
+		| &sema::Scope:
+			self.scope((&sema::Scope)(st))
+		| &sema::Var:
+			self.var((&sema::Var)(st))
+		| &sema::Data:
+			self.oc.ec.model((&sema::Data)(st).Model)
+		| &sema::Conditional:
+			self.conditional((&sema::Conditional)(st))
+		| &sema::InfIter:
+			self.infIter((&sema::InfIter)(st))
+		| &sema::WhileIter:
+			self.whileIter((&sema::WhileIter)(st))
+		| &sema::RangeIter:
+			self.rangeIter((&sema::RangeIter)(st))
+		| &sema::ContSt:
+			self.cont((&sema::ContSt)(st))
+		| &sema::Label:
+			self.label((&sema::Label)(st))
+		| &sema::GotoSt:
+			self.gotoSt((&sema::GotoSt)(st))
+		| &sema::Postfix:
+			self.postfix((&sema::Postfix)(st))
+		| &sema::Assign:
+			self.assign((&sema::Assign)(st))
+		| &sema::MultiAssign:
+			self.multiAssign((&sema::MultiAssign)(st))
+		| &sema::Match:
+			self.matchSt((&sema::Match)(st))
+		| &sema::FallSt:
+			self.fallSt((&sema::FallSt)(st))
+		| &sema::BreakSt:
+			self.breakSt((&sema::BreakSt)(st))
+		| &sema::RetSt:
+			self.retSt((&sema::RetSt)(st))
+		| &opt::PushToSliceExprModel:
+			self.oc.ec.pushToSlice((&opt::PushToSliceExprModel)(st))
+		| &opt::AppendToSliceExprModel:
+			self.oc.ec.appendToSlice((&opt::AppendToSliceExprModel)(st))
+		| &opt::MutSlicingExprModel:
+			self.mutSlicing((&opt::MutSlicingExprModel)(st))
+		| &opt::SwapExprModel:
+			self.swap((&opt::SwapExprModel)(st))
+		| &opt::ExceptionalForwardingExprModel:
+			self.exceptionalForwarding((&opt::ExceptionalForwardingExprModel)(st))
+		| &opt::StrRuneIter:
+			self.strRuneIter((&opt::StrRuneIter)(st))
 		|:
 			self.oc.write("<unimplemented_stmt>")
 		}
 	}
 
-	fn scopeStmts(mut &self, mut &s: &Scope) {
+	fn scopeStmts(mut &self, mut &s: &sema::Scope) {
 		for (_, mut st) in s.Stmts {
 			self.oc.indent()
 			self.st(st)
@@ -1088,7 +1052,7 @@ impl scopeCoder {
 	}
 
 	// Generates C++ code of scope.
-	fn scope(mut &self, mut s: &Scope) {
+	fn scope(mut &self, mut s: &sema::Scope) {
 		self.oc.addIndent()
 		if s.Deferred {
 			self.oc.write("__JULE_DEFER(")
@@ -1103,7 +1067,7 @@ impl scopeCoder {
 		}
 	}
 
-	fn commonFuncScope(mut &self, mut &f: &FnIns) {
+	fn commonFuncScope(mut &self, mut &f: &sema::FnIns) {
 		if !f.Decl.IsVoid() {
 			mut tup := f.Result.Tup()
 			if tup != nil {
@@ -1143,13 +1107,13 @@ impl scopeCoder {
 		}
 	}
 
-	fn anonFuncScope(mut &self, mut m: &AnonFnExprModel, ident: str) {
+	fn anonFuncScope(mut &self, mut m: &sema::AnonFnExprModel, ident: str) {
 		if m.Func.Scope == nil {
 			ret
 		}
 		closure := obj::IsClosure(m)
 		if closure {
-			self.oc.ec.varPrefixes = append(self.oc.ec.varPrefixes, fn(mut v: &Var): bool { ret captureVarHandling(self.oc, m, v) })
+			self.oc.ec.varPrefixes = append(self.oc.ec.varPrefixes, fn(mut v: &sema::Var): bool { ret captureVarHandling(self.oc, m, v) })
 		}
 		self.oc.write("{\n")
 		self.oc.addIndent()
@@ -1175,7 +1139,7 @@ impl scopeCoder {
 	}
 
 	// Generates C++ code of function's scope.
-	fn funcScope(mut &self, mut f: &FnIns) {
+	fn funcScope(mut &self, mut f: &sema::FnIns) {
 		if f.Scope == nil {
 			ret
 		}
@@ -1188,25 +1152,25 @@ impl scopeCoder {
 	}
 }
 
-fn isCopyOptimizable(&expr: &Data): bool {
+fn isCopyOptimizable(&expr: &sema::Data): bool {
 	if !expr.Lvalue {
 		ret false
 	}
 	match type expr.Model {
-	| &SlicingExprModel:
+	| &sema::SlicingExprModel:
 		ret false
 	}
 	ret true
 }
 
-fn isIterCopyOptimizable(&expr: &Data, &v: &Var): bool {
+fn isIterCopyOptimizable(&expr: &sema::Data, &v: &sema::Var): bool {
 	if !expr.Lvalue && !expr.Kind.Mutable() {
 		ret true
 	}
 	ret !v.Mutable && !expr.Mutable
 }
 
-fn captureVarHandling(mut &oc: &ObjectCoder, mut &m: &AnonFnExprModel, mut &v: &Var): bool {
+fn captureVarHandling(mut &oc: &ObjectCoder, mut &m: &sema::AnonFnExprModel, mut &v: &sema::Var): bool {
 	for _, cv in m.Captured {
 		if cv == v {
 			oc.write(closureCtxIdent + ".alloc->")
