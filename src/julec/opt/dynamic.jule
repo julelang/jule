@@ -3,22 +3,14 @@
 // license that can be found in the LICENSE file.
 
 use obj
-use std::jule::lex::{TokenId}
-use std::jule::sema::{
-	Data,
-	Var,
-	TypeKind,
-	ExprModel,
-	StructSubIdentExprModel,
-	UnaryExprModel,
-	CastingExprModel,
-}
+use lex for std::jule::lex
+use sema for std::jule::sema
 
 const invalidDynamic = uintptr(0x0)
 
 struct dynamicVar {
 	var:  uintptr
-	kind: &TypeKind
+	kind: &sema::TypeKind
 }
 
 // Information wrapper for type analysis for dynamic types.
@@ -29,7 +21,7 @@ struct dynamic {
 impl dynamic {
 	// Appends variable with initial kind.
 	// If variable is already exist, updates kind information.
-	fn pushVar(mut &self, var: uintptr, mut kind: &TypeKind) {
+	fn pushVar(mut &self, var: uintptr, mut kind: &sema::TypeKind) {
 		if !Dynamic || var == invalidDynamic {
 			// Ignore it, because this optimizations within scope of the --opt-access flag.
 			ret
@@ -66,7 +58,7 @@ impl dynamic {
 	}
 
 	// Reports whether variable is fits with kind.
-	fn isFits(mut self, var: uintptr, kind: &TypeKind): bool {
+	fn isFits(mut self, var: uintptr, kind: &sema::TypeKind): bool {
 		if var != invalidDynamic {
 			for _, v in self.vars {
 				if v.var == var {
@@ -78,15 +70,15 @@ impl dynamic {
 	}
 }
 
-fn possibleDynamicRemove(mut &d: &dynamic, m: ExprModel) {
+fn possibleDynamicRemove(mut &d: &dynamic, m: sema::ExprModel) {
 	if d != nil {
 		_ = d.removeVar(getDynamicVar(m))
 	}
 }
 
-fn isDynamicValidType(mut t: &TypeKind): bool { ret obj::IsAny(t) }
+fn isDynamicValidType(mut t: &sema::TypeKind): bool { ret obj::IsAny(t) }
 
-fn isTypeGuaranteedDynamicData(mut &dy: &dynamic, mut t: &TypeKind, mut m: ExprModel): &TypeKind {
+fn isTypeGuaranteedDynamicData(mut &dy: &dynamic, mut t: &sema::TypeKind, mut m: sema::ExprModel): &sema::TypeKind {
 	isAny := obj::IsAny(t)
 	if !isAny && t.Trait() == nil {
 		ret t
@@ -95,8 +87,8 @@ fn isTypeGuaranteedDynamicData(mut &dy: &dynamic, mut t: &TypeKind, mut m: ExprM
 		ret nil
 	}
 	match type m {
-	| &CastingExprModel:
-		mut cem := (&CastingExprModel)(m)
+	| &sema::CastingExprModel:
+		mut cem := (&sema::CastingExprModel)(m)
 		ret isTypeGuaranteedDynamicData(dy, cem.ExprKind, cem.Expr.Model)
 	}
 	var := getDynamicVar(m)
@@ -111,25 +103,25 @@ fn isTypeGuaranteedDynamicData(mut &dy: &dynamic, mut t: &TypeKind, mut m: ExprM
 	ret nil
 }
 
-fn getDynamicVar(m: ExprModel): uintptr {
+fn getDynamicVar(m: sema::ExprModel): uintptr {
 	if !Dynamic {
 		ret invalidDynamic
 	}
 	match type m {
-	| &Var:
-		v := (&Var)(m)
+	| &sema::Var:
+		v := (&sema::Var)(m)
 		if !v.Reference {
 			// Variable is not reference, return address of it.
-			ret uintptr((&Var)(m))
+			ret uintptr((&sema::Var)(m))
 		}
 		// Variable is reference, it should be initialized at source code.
 		// Investigate the initial expression for variable address.
 		ret getDynamicVar(v.Value.Data.Model)
-	| &StructSubIdentExprModel:
-		ret uintptr((&StructSubIdentExprModel)(m).Field)
-	| &UnaryExprModel:
-		uem := (&UnaryExprModel)(m)
-		if uem.Op.Id == TokenId.Star { // Dereferencing.
+	| &sema::StructSubIdentExprModel:
+		ret uintptr((&sema::StructSubIdentExprModel)(m).Field)
+	| &sema::UnaryExprModel:
+		uem := (&sema::UnaryExprModel)(m)
+		if uem.Op.Id == lex::TokenId.Star { // Dereferencing.
 			ret getDynamicVar(uem.Expr.Model)
 		}
 	}

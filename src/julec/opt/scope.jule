@@ -5,50 +5,22 @@
 use obj
 use env
 use path for std::fs::path
-use std::jule::build::{PathStdlib}
-use std::jule::constant::{Const}
-use lex for std::jule::lex::{TokenId, TokenKind}
-use sema for std::jule::sema::{
-	Var,
-	Data,
-	Scope,
-	Stmt,
-	ExprModel,
-	FnCallExprModel,
-	Conditional,
-	CastingExprModel,
-	If,
-	Else,
-	Case,
-	Match,
-	RangeIter,
-	WhileIter,
-	InfIter,
-	MultiAssign,
-	RetSt,
-	BinaryExprModel,
-	OperandExprModel,
-	BuiltinAppendCallExprModel,
-	SliceExprModel,
-	StructSubIdentExprModel,
-	SlicingExprModel,
-	FallSt,
-	TupleExprModel,
-	BuiltinErrorCallExprModel,
-	Postfix,
-}
+use build for std::jule::build
+use constant for std::jule::constant
+use lex for std::jule::lex
+use sema for std::jule::sema
 use strings for std::strings
 
 // Scope optimizer that applies target-independent optimizations.
 struct scopeOptimizer {
 	parent: &scopeOptimizer
 	i:      int
-	scope:  &Scope
+	scope:  &sema::Scope
 	data:   &data // Should be non-nil guaranteed.
 }
 
 impl scopeOptimizer {
-	static fn new(mut scope: &Scope): &scopeOptimizer {
+	static fn new(mut scope: &sema::Scope): &scopeOptimizer {
 		mut sc := &scopeOptimizer{
 			scope: scope,
 			data: &data{
@@ -61,7 +33,7 @@ impl scopeOptimizer {
 	}
 
 	fn setCurrentStmt(mut &self, mut stmt: any) {
-		self.scope.Stmts[self.i] = unsafe { *(*Stmt)(&stmt) }
+		self.scope.Stmts[self.i] = unsafe { *(*sema::Stmt)(&stmt) }
 	}
 
 	// Removes current statement.
@@ -83,19 +55,19 @@ impl scopeOptimizer {
 		mut r := self.parent
 		for r != nil; r = r.parent {
 			match type r.scope.Stmts[r.i] {
-			| &RangeIter
-			| &WhileIter
-			| &InfIter:
+			| &sema::RangeIter
+			| &sema::WhileIter
+			| &sema::InfIter:
 				ret true
 			}
 		}
 		ret false
 	}
 
-	fn optimizeData(mut &self, mut d: &Data) {
+	fn optimizeData(mut &self, mut d: &sema::Data) {
 		match type d.Model {
-		| &FnCallExprModel:
-			mut m := (&FnCallExprModel)(d.Model)
+		| &sema::FnCallExprModel:
+			mut m := (&sema::FnCallExprModel)(d.Model)
 			if env::Production {
 				if !m.Func.IsBuiltin() &&
 					obj::IsStdPackage(m.Func.Decl.Token.File.Path, "debug") {
@@ -118,7 +90,7 @@ impl scopeOptimizer {
 		exprOptimizer.optimizeData(d.Model, self.data)
 	}
 
-	fn optimizeVar(mut &self, mut v: &Var) {
+	fn optimizeVar(mut &self, mut v: &sema::Var) {
 		if v.Value != nil {
 			if self.data.nils != nil &&
 				isNilValidType(v.Kind.Kind) &&
@@ -139,7 +111,7 @@ impl scopeOptimizer {
 		}
 	}
 
-	fn optimizeConditional(mut &self, mut c: &Conditional) {
+	fn optimizeConditional(mut &self, mut c: &sema::Conditional) {
 		mut checkpoint := self.data.getCheckpoint()
 		for (_, mut elif) in c.Elifs {
 			exprOptimizer.optimizeData(elif.Expr, self.data)
@@ -166,7 +138,7 @@ impl scopeOptimizer {
 			}
 			constCase = true
 			c.Elifs = c.Elifs[:i]
-			c.Default = &Else{
+			c.Default = &sema::Else{
 				Scope: elif.Scope,
 			}
 			break
@@ -213,7 +185,7 @@ impl scopeOptimizer {
 		}
 	}
 
-	fn buildDefaultConstantTrueCase(mut &self, mut case: &Case, mut &i: int, mut &m: &Match) {
+	fn buildDefaultConstantTrueCase(mut &self, mut case: &sema::Case, mut &i: int, mut &m: &sema::Match) {
 		case.Exprs = nil // Remove expressions to remove eval overhead.
 		start := i
 	loop:
@@ -223,7 +195,7 @@ impl scopeOptimizer {
 			}
 			mut &stmt := unsafe { *(&case.Scope.Stmts[len(case.Scope.Stmts)-1]) }
 			match type stmt {
-			| &FallSt:
+			| &sema::FallSt:
 				i++
 				if i >= len(m.Cases) {
 					stmt = m.Default.Scope
@@ -239,7 +211,7 @@ impl scopeOptimizer {
 		m.Cases = m.Cases[:start]
 	}
 
-	fn optimizeMatch(mut &self, mut m: &Match) {
+	fn optimizeMatch(mut &self, mut m: &sema::Match) {
 		mut var := invalidDynamic
 		if Dynamic && m.TypeMatch {
 			var = getDynamicVar(m.Expr.Model)
@@ -321,7 +293,7 @@ impl scopeOptimizer {
 		}
 	}
 
-	fn optimizeRangeIter(mut &self, mut it: &RangeIter) {
+	fn optimizeRangeIter(mut &self, mut it: &sema::RangeIter) {
 		// Optimize scope first, following alrgorithms related with expression.
 		// It might be skip this, so scope optimizater should be guaranteed to run.
 		if self.data.boundary != nil && it.KeyA != nil {
@@ -332,8 +304,8 @@ impl scopeOptimizer {
 
 		if Iter {
 			match type it.Expr.Model {
-			| &CastingExprModel:
-				mut cem := (&CastingExprModel)(it.Expr.Model)
+			| &sema::CastingExprModel:
+				mut cem := (&sema::CastingExprModel)(it.Expr.Model)
 				eprim := cem.ExprKind.Prim()
 				if eprim == nil || !eprim.IsStr() {
 					break
@@ -366,19 +338,19 @@ impl scopeOptimizer {
 		exprOptimizer.optimizeData(it.Expr.Model, self.data)
 	}
 
-	fn optimizeWhileIter(mut &self, mut it: &WhileIter) {
+	fn optimizeWhileIter(mut &self, mut it: &sema::WhileIter) {
 		exprOptimizer.optimizeData(it.Expr, self.data)
 		self.optimizeStmt(it.Next)
 		self.optimizeChild(it.Scope)
 	}
 
 	fn substr(mut &self, mut a: &sema::Assign): bool {
-		if a.Op.Id != TokenId.Eq {
+		if a.Op.Id != lex::TokenId.Eq {
 			ret false
 		}
 		match type a.Right.Model {
-		| &SlicingExprModel:
-			mut sem := (&SlicingExprModel)(a.Right.Model)
+		| &sema::SlicingExprModel:
+			mut sem := (&sema::SlicingExprModel)(a.Right.Model)
 			if equalModels(a.Left.Model, sem.Expr) {
 				self.setCurrentStmt(&MutSlicingExprModel{
 					Token: sem.Token,
@@ -411,7 +383,7 @@ impl scopeOptimizer {
 		ret self.substr(a)
 	}
 
-	fn optimizePostfix(mut &self, mut postfix: &Postfix) {
+	fn optimizePostfix(mut &self, mut postfix: &sema::Postfix) {
 		if self.data.boundary != nil {
 			possibleBoundaryRemove(self.data.boundary, postfix.Expr)
 		}
@@ -419,7 +391,7 @@ impl scopeOptimizer {
 	}
 
 	fn optimizeAssign(mut &self, mut assign: &sema::Assign) {
-		if assign.Op.Id == TokenId.Eq &&
+		if assign.Op.Id == lex::TokenId.Eq &&
 			equalModels(assign.Left.Model, assign.Right.Model) {
 			self.removeCurrent()
 			self.i-- // In next iteration, point to correct statement.
@@ -463,42 +435,42 @@ impl scopeOptimizer {
 		exprOptimizer.optimizeData(assign.Right.Model, self.data)
 
 		match assign.Op.Id {
-		| TokenId.SolidusEq | TokenId.PercentEq | TokenId.ShlEq | TokenId.ShrEq:
+		| lex::TokenId.SolidusEq | lex::TokenId.PercentEq | lex::TokenId.ShlEq | lex::TokenId.ShrEq:
 			// Do not check structures.
 			if !Math || assign.Left.Kind.Struct() != nil {
 				break
 			}
 			oldId, oldKind := assign.Op.Id, assign.Op.Kind
 			match assign.Op.Id {
-			| TokenId.SolidusEq:
-				assign.Op.Id = TokenId.Solidus
-				assign.Op.Kind = TokenKind.Solidus
-			| TokenId.PercentEq:
-				assign.Op.Id = TokenId.Percent
-				assign.Op.Kind = TokenKind.Percent
-			| TokenId.ShlEq:
-				assign.Op.Id = TokenId.Shl
-				assign.Op.Kind = TokenKind.Shl
-			| TokenId.ShrEq:
-				assign.Op.Id = TokenId.Shr
-				assign.Op.Kind = TokenKind.Shr
+			| lex::TokenId.SolidusEq:
+				assign.Op.Id = lex::TokenId.Solidus
+				assign.Op.Kind = lex::TokenKind.Solidus
+			| lex::TokenId.PercentEq:
+				assign.Op.Id = lex::TokenId.Percent
+				assign.Op.Kind = lex::TokenKind.Percent
+			| lex::TokenId.ShlEq:
+				assign.Op.Id = lex::TokenId.Shl
+				assign.Op.Kind = lex::TokenKind.Shl
+			| lex::TokenId.ShrEq:
+				assign.Op.Id = lex::TokenId.Shr
+				assign.Op.Kind = lex::TokenKind.Shr
 			|:
 				panic("implementation mistake, this panic call should be unreachable")
 			}
-			mut b := &BinaryExprModel{
+			mut b := &sema::BinaryExprModel{
 				Op: assign.Op,
 				Left: assign.Left,
 				Right: assign.Right,
 			}
-			mut model := ExprModel(b)
+			mut model := sema::ExprModel(b)
 			exprOptimizer.optimizeData(model, self.data)
 			if model != b {
 				// Binary model optimized.
 				// Use optimized model directly.
-				assign.Right = new(OperandExprModel, *assign.Right)
+				assign.Right = new(sema::OperandExprModel, *assign.Right)
 				b.Op = new(lex::Token, *b.Op) // Unsafe model wraps original model. Save token.
-				assign.Op.Id = TokenId.Eq
-				assign.Op.Kind = TokenKind.Eq
+				assign.Op.Id = lex::TokenId.Eq
+				assign.Op.Kind = lex::TokenKind.Eq
 				assign.Right.Model = model
 				ret
 			}
@@ -509,17 +481,17 @@ impl scopeOptimizer {
 
 		if Append {
 			match type assign.Right.Model {
-			| &BuiltinAppendCallExprModel:
-				mut m := (&BuiltinAppendCallExprModel)(assign.Right.Model)
+			| &sema::BuiltinAppendCallExprModel:
+				mut m := (&sema::BuiltinAppendCallExprModel)(assign.Right.Model)
 				if !areSameLvalueExprModel(assign.Left.Model, m.Dest) {
 					ret
 				}
 				match type m.Elements {
-				| &SliceExprModel:
+				| &sema::SliceExprModel:
 					// Push items one-by-one for self-appended memory.
 					self.setCurrentStmt(&PushToSliceExprModel{
 						Dest: m.Dest,
-						Elems: (&SliceExprModel)(m.Elements),
+						Elems: (&sema::SliceExprModel)(m.Elements),
 					})
 				|:
 					// Append directly if appended to slice and assigned to the same memory.
@@ -532,15 +504,15 @@ impl scopeOptimizer {
 		}
 	}
 
-	fn tryOptimizeSwap(mut &self, mut &assign: &MultiAssign): bool {
+	fn tryOptimizeSwap(mut &self, mut &assign: &sema::MultiAssign): bool {
 		if !Assign || len(assign.Left) != 2 ||
 			assign.Left[0] == nil || assign.Left[1] == nil {
 			ret false
 		}
-		let mut tup: &TupleExprModel
+		let mut tup: &sema::TupleExprModel
 		match type assign.Right {
-		| &TupleExprModel:
-			tup = (&TupleExprModel)(assign.Right)
+		| &sema::TupleExprModel:
+			tup = (&sema::TupleExprModel)(assign.Right)
 		}
 		if tup == nil || len(tup.Datas) != 2 {
 			ret false
@@ -569,17 +541,17 @@ impl scopeOptimizer {
 		ret true
 	}
 
-	fn optimizeMultiAssign(mut &self, mut assign: &MultiAssign) {
+	fn optimizeMultiAssign(mut &self, mut assign: &sema::MultiAssign) {
 		if self.tryOptimizeSwap(assign) {
 			// Swap operation can skip the following algorithm.
 			// As far as tested, following analysis are not necessary.
 			ret
 		}
 
-		mut tup := (&TupleExprModel)(nil)
+		mut tup := (&sema::TupleExprModel)(nil)
 		match type assign.Right {
-		| &TupleExprModel:
-			tup = (&TupleExprModel)(assign.Right)
+		| &sema::TupleExprModel:
+			tup = (&sema::TupleExprModel)(assign.Right)
 		}
 		for (i, mut l) in assign.Left {
 			if l != nil {
@@ -615,7 +587,7 @@ impl scopeOptimizer {
 		exprOptimizer.optimizeData(assign.Right, self.data)
 	}
 
-	fn optimizeRet(mut &self, mut r: &RetSt) {
+	fn optimizeRet(mut &self, mut r: &sema::RetSt) {
 		exprOptimizer.optimizeData(r.Expr, self.data)
 
 		// Break algorithm is exceptional-specific optimizations are not enabled.
@@ -624,12 +596,12 @@ impl scopeOptimizer {
 			ret
 		}
 		match type r.Expr {
-		| &FnCallExprModel:
+		| &sema::FnCallExprModel:
 			break
 		|:
 			ret
 		}
-		mut fc := (&FnCallExprModel)(r.Expr)
+		mut fc := (&sema::FnCallExprModel)(r.Expr)
 		if !fc.Func.Decl.Exceptional ||
 			fc.Except == nil ||
 			len(fc.Except.Stmts) != 1 ||
@@ -639,36 +611,36 @@ impl scopeOptimizer {
 		self.setCurrentStmt(&ExceptionalForwardingExprModel{Expr: fc})
 	}
 
-	fn optimizeStmt(mut &self, mut stmt: Stmt) {
+	fn optimizeStmt(mut &self, mut stmt: sema::Stmt) {
 		match type stmt {
-		| &Scope:
-			self.optimizeChild((&Scope)(stmt))
-		| &Data:
-			self.optimizeData((&Data)(stmt))
-		| &Var:
-			self.optimizeVar((&Var)(stmt))
-		| &Conditional:
-			self.optimizeConditional((&Conditional)(stmt))
-		| &RangeIter:
-			self.optimizeRangeIter((&RangeIter)(stmt))
-		| &WhileIter:
-			self.optimizeWhileIter((&WhileIter)(stmt))
-		| &InfIter:
-			self.optimizeChild((&InfIter)(stmt).Scope)
+		| &sema::Scope:
+			self.optimizeChild((&sema::Scope)(stmt))
+		| &sema::Data:
+			self.optimizeData((&sema::Data)(stmt))
+		| &sema::Var:
+			self.optimizeVar((&sema::Var)(stmt))
+		| &sema::Conditional:
+			self.optimizeConditional((&sema::Conditional)(stmt))
+		| &sema::RangeIter:
+			self.optimizeRangeIter((&sema::RangeIter)(stmt))
+		| &sema::WhileIter:
+			self.optimizeWhileIter((&sema::WhileIter)(stmt))
+		| &sema::InfIter:
+			self.optimizeChild((&sema::InfIter)(stmt).Scope)
 		| &sema::Assign:
 			self.optimizeAssign((&sema::Assign)(stmt))
-		| &MultiAssign:
-			self.optimizeMultiAssign((&MultiAssign)(stmt))
-		| &Match:
-			self.optimizeMatch((&Match)(stmt))
-		| &RetSt:
-			self.optimizeRet((&RetSt)(stmt))
-		| &Postfix:
-			self.optimizePostfix((&Postfix)(stmt))
+		| &sema::MultiAssign:
+			self.optimizeMultiAssign((&sema::MultiAssign)(stmt))
+		| &sema::Match:
+			self.optimizeMatch((&sema::Match)(stmt))
+		| &sema::RetSt:
+			self.optimizeRet((&sema::RetSt)(stmt))
+		| &sema::Postfix:
+			self.optimizePostfix((&sema::Postfix)(stmt))
 		}
 	}
 
-	fn optimizeChild(mut &self, mut child: &Scope) {
+	fn optimizeChild(mut &self, mut child: &sema::Scope) {
 		mut so := scopeOptimizer.new(child)
 		so.parent = self
 		so.data = self.data
@@ -684,23 +656,23 @@ impl scopeOptimizer {
 	}
 }
 
-fn isConstantValidConditionalCase(&i: &If): bool {
+fn isConstantValidConditionalCase(&i: &sema::If): bool {
 	match type i.Expr {
-	| &Const:
-		c := (&Const)(i.Expr)
+	| &constant::Const:
+		c := (&constant::Const)(i.Expr)
 		ret c.IsBool() && c.ReadBool()
 	}
 	ret false
 }
 
-fn isUnreachableExpr(&expr: ExprModel): bool {
+fn isUnreachableExpr(&expr: sema::ExprModel): bool {
 	match type expr {
-	| &Const:
-		c := (&Const)(expr)
+	| &constant::Const:
+		c := (&constant::Const)(expr)
 		ret c.IsBool() && !c.ReadBool()
-	| &BinaryExprModel:
-		m := (&BinaryExprModel)(expr)
-		if m.Op.Id == TokenId.DblAmper {
+	| &sema::BinaryExprModel:
+		m := (&sema::BinaryExprModel)(expr)
+		if m.Op.Id == lex::TokenId.DblAmper {
 			ret isUnreachableExpr(m.Left.Model) ||
 				isUnreachableExpr(m.Right.Model)
 		}
@@ -708,7 +680,7 @@ fn isUnreachableExpr(&expr: ExprModel): bool {
 	ret false
 }
 
-fn isConstantValidMatchCase(&case: &Case): bool {
+fn isConstantValidMatchCase(&case: &sema::Case): bool {
 	for _, expr in case.Exprs {
 		if expr.IsConst() && expr.Constant.IsBool() && expr.Constant.ReadBool() {
 			ret true
@@ -717,11 +689,11 @@ fn isConstantValidMatchCase(&case: &Case): bool {
 	ret false
 }
 
-fn isUnreachableConditionalCase(&i: &If): bool {
+fn isUnreachableConditionalCase(&i: &sema::If): bool {
 	ret isUnreachableExpr(i.Expr)
 }
 
-fn isUnreachableMatchCase(&case: &Case): bool {
+fn isUnreachableMatchCase(&case: &sema::Case): bool {
 	for _, expr in case.Exprs {
 		if !isUnreachableExpr(expr.Model) {
 			ret false

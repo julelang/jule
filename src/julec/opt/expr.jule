@@ -5,43 +5,28 @@
 use obj
 use env
 use math for std::math
-use std::jule::constant::{Const}
-use lex for std::jule::lex::{TokenId, TokenKind}
-use std::jule::sema::{
-	Scope,
-	Var,
-	ParamIns,
-	ExprModel,
-	BinaryExprModel,
-	OperandExprModel,
-	UnaryExprModel,
-	StructLitExprModel,
-	CastingExprModel,
-	FnCallExprModel,
-	IndexingExprModel,
-	AnonFnExprModel,
-	StructSubIdentExprModel,
-	BuiltinLenCallExprModel,
-}
+use constant for std::jule::constant
+use lex for std::jule::lex
+use sema for std::jule::sema
 use types for std::jule::types
 
 // Expression optimizer that applies target-independent optimizations.
 struct exprOptimizer {
-	mut model:     &ExprModel
+	mut model:     &sema::ExprModel
 	mut data:      &data // Should be non-nil guaranteed.
 	mut inspector: &obj::ExprInspector
 }
 
 impl exprOptimizer {
-	static fn optimize(mut &model: ExprModel) {
+	static fn optimize(mut &model: sema::ExprModel) {
 		exprOptimizer.optimizeData(model, emptyData)
 	}
 
-	static fn optimizeData(mut &model: ExprModel, mut &d: &data) {
+	static fn optimizeData(mut &model: sema::ExprModel, mut &d: &data) {
 		// Do optimizatitons if any enabled.
 		if exprEnabled {
 			mut exop := &exprOptimizer{
-				model: unsafe { (&ExprModel)(&model) },
+				model: unsafe { (&sema::ExprModel)(&model) },
 				data: d,
 				inspector: obj::ExprInspector.New(),
 			}
@@ -49,51 +34,51 @@ impl exprOptimizer {
 		}
 	}
 
-	fn selfCmpCond(self, mut &m: &BinaryExprModel): bool {
+	fn selfCmpCond(self, mut &m: &sema::BinaryExprModel): bool {
 		if !equalModels(m.Left.Model, m.Right.Model) {
 			ret false
 		}
 		match m.Op.Id {
-		| TokenId.Eqs
-		| TokenId.LtEq
-		| TokenId.GtEq:
+		| lex::TokenId.Eqs
+		| lex::TokenId.LtEq
+		| lex::TokenId.GtEq:
 			// Operators used with itself: ==, <=, >=.
 			// Evaluation will be always true.
-			*self.model = Const.NewBool(true)
+			*self.model = constant::Const.NewBool(true)
 			ret true
-		| TokenId.NotEq
-		| TokenId.Lt
-		| TokenId.Gt:
+		| lex::TokenId.NotEq
+		| lex::TokenId.Lt
+		| lex::TokenId.Gt:
 			// Operators used with itself: !=, <, >.
 			// Evaluation will be always false.
-			*self.model = Const.NewBool(false)
+			*self.model = constant::Const.NewBool(false)
 			ret true
 		|:
 			ret false
 		}
 	}
 
-	fn boolCond(self, mut &m: &BinaryExprModel): bool {
+	fn boolCond(self, mut &m: &sema::BinaryExprModel): bool {
 		lp := m.Left.Kind.Prim()
 		if lp == nil || !lp.IsBool() {
 			ret false
 		}
 		match type m.Left.Model {
-		| &Const:
+		| &constant::Const:
 			// Equality comparison, swap operation is safe and will not change
 			// the behavior of the program.
 			m.Left, m.Right = m.Right, m.Left
 		|:
 			match type m.Right.Model {
-			| &Const:
+			| &constant::Const:
 				break
 			|:
 				ret false
 			}
 		}
-		mut c := (&Const)(m.Right.Model)
+		mut c := (&constant::Const)(m.Right.Model)
 		match m.Op.Id {
-		| TokenId.DblAmper:
+		| lex::TokenId.DblAmper:
 			if c.ReadBool() {
 				// Use left operand as model directly.
 				// Logical and with constant true exprssion is always will be true.
@@ -107,7 +92,7 @@ impl exprOptimizer {
 				*self.model = c
 			}
 			ret true
-		| TokenId.DblVline:
+		| lex::TokenId.DblVline:
 			if c.ReadBool() {
 				// Logical or with constant true expression.
 				// Binary expression is always will be true.
@@ -126,36 +111,36 @@ impl exprOptimizer {
 		ret false
 	}
 
-	fn strCond(self, mut m: &BinaryExprModel): bool {
+	fn strCond(self, mut m: &sema::BinaryExprModel): bool {
 		lp := m.Left.Kind.Prim()
 		if lp == nil || !lp.IsStr() {
 			ret false
 		}
-		if m.Op.Id != TokenId.Eqs && m.Op.Id != TokenId.NotEq {
+		if m.Op.Id != lex::TokenId.Eqs && m.Op.Id != lex::TokenId.NotEq {
 			ret false
 		}
 		match type m.Left.Model {
-		| &Const:
+		| &constant::Const:
 			// Equality comparison, swap operation is safe and will not change
 			// the behavior of the program.
 			m.Left, m.Right = m.Right, m.Left
 		|:
 			match type m.Right.Model {
-			| &Const:
+			| &constant::Const:
 				break
 			|:
 				ret false
 			}
 		}
-		mut c := (&Const)(m.Right.Model)
+		mut c := (&constant::Const)(m.Right.Model)
 		match m.Op.Id {
-		| TokenId.Eqs:
+		| lex::TokenId.Eqs:
 			if c.ReadStr() == "" {
 				mut model := any(&EmptyCompareExprModel{
 					Expr: m.Left.Model,
 					Neg: false,
 				})
-				*self.model = unsafe { *(*ExprModel)(&model) }
+				*self.model = unsafe { *(*sema::ExprModel)(&model) }
 				break
 			}
 			mut model := any(&StrCompExprModel{
@@ -163,14 +148,14 @@ impl exprOptimizer {
 				Right: c,
 				NotEq: false,
 			})
-			*self.model = unsafe { *(*ExprModel)(&model) }
-		| TokenId.NotEq:
+			*self.model = unsafe { *(*sema::ExprModel)(&model) }
+		| lex::TokenId.NotEq:
 			if c.ReadStr() == "" {
 				mut model := any(&EmptyCompareExprModel{
 					Expr: m.Left.Model,
 					Neg: true,
 				})
-				*self.model = unsafe { *(*ExprModel)(&model) }
+				*self.model = unsafe { *(*sema::ExprModel)(&model) }
 				break
 			}
 			mut model := any(&StrCompExprModel{
@@ -178,17 +163,17 @@ impl exprOptimizer {
 				Right: c,
 				NotEq: true,
 			})
-			*self.model = unsafe { *(*ExprModel)(&model) }
+			*self.model = unsafe { *(*sema::ExprModel)(&model) }
 		}
 		ret true
 	}
 
-	fn tryNeutralElement1(self, mut &m: &BinaryExprModel, mut c: &Const, &nc: &OperandExprModel): bool {
+	fn tryNeutralElement1(self, mut &m: &sema::BinaryExprModel, mut c: &constant::Const, &nc: &sema::OperandExprModel): bool {
 		if c.IsStr() { // Constant is string, check for string optimizations.
 			if !Str {
 				ret false
 			}
-			if c.ReadStr() == "" && m.Op.Id == TokenId.Plus {
+			if c.ReadStr() == "" && m.Op.Id == lex::TokenId.Plus {
 				// Concatenation with empty string, use the non-constnat operand's model.
 				*self.model = nc.Model
 				ret true
@@ -202,8 +187,8 @@ impl exprOptimizer {
 			ret false
 		}
 		match m.Op.Id {
-		| TokenId.Shl
-		| TokenId.Shr:
+		| lex::TokenId.Shl
+		| lex::TokenId.Shr:
 			// If the constant expression is shifter, use the right operand's model.
 			if nc == m.Left {
 				*self.model = nc.Model
@@ -213,12 +198,12 @@ impl exprOptimizer {
 			// Use zero-constant directly.
 			*self.model = c
 			ret true
-		| TokenId.Star:
+		| lex::TokenId.Star:
 			c.SetI64(0)
 			*self.model = c
 			ret true
-		| TokenId.Plus
-		| TokenId.Minus:
+		| lex::TokenId.Plus
+		| lex::TokenId.Minus:
 			*self.model = nc.Model
 			ret true
 		}
@@ -227,41 +212,41 @@ impl exprOptimizer {
 
 	// Tries optimize binary expression for neutral elements.
 	// Specialized in math optimizations.
-	fn tryNeutralElement(self, mut &m: &BinaryExprModel): bool {
+	fn tryNeutralElement(self, mut &m: &sema::BinaryExprModel): bool {
 		// For netural element optimization, one of the operands should be constant.
 		match type m.Left.Model {
-		| &Const:
-			mut c := (&Const)(m.Left.Model)
+		| &constant::Const:
+			mut c := (&constant::Const)(m.Left.Model)
 			ret self.tryNeutralElement1(m, c, m.Right)
 		}
 		match type m.Right.Model {
-		| &Const:
-			mut c := (&Const)(m.Right.Model)
+		| &constant::Const:
+			mut c := (&constant::Const)(m.Right.Model)
 			ret self.tryNeutralElement1(m, c, m.Left)
 		}
 		ret false
 	}
 
-	fn checkBinaryForBoundary(self, mut &m: &BinaryExprModel) {
+	fn checkBinaryForBoundary(self, mut &m: &sema::BinaryExprModel) {
 		if self.data.boundary == nil {
 			ret
 		}
 		match type m.Left.Model {
-		| &BuiltinLenCallExprModel:
-			mut blc := (&BuiltinLenCallExprModel)(m.Left.Model)
+		| &sema::BuiltinLenCallExprModel:
+			mut blc := (&sema::BuiltinLenCallExprModel)(m.Left.Model)
 			if !isBoundaryValidType(blc.Expr.Kind) {
 				ret
 			}
-			if m.Op.Id != TokenId.Gt && m.Op.Id != TokenId.Eqs {
+			if m.Op.Id != lex::TokenId.Gt && m.Op.Id != lex::TokenId.Eqs {
 				ret
 			}
 			// len(x) > y, len(x) == y (constant)
 			// Max guaranteed size of x is y.
-			if m.Op.Id == TokenId.Eqs {
+			if m.Op.Id == lex::TokenId.Eqs {
 				match type m.Right.Model {
-				| &Const:
-					mut c := new(Const, *(&Const)(m.Right.Model)) // Do not mutate binary operand.
-					c.Sub(*Const.NewI64(1))
+				| &constant::Const:
+					mut c := new(constant::Const, *(&constant::Const)(m.Right.Model)) // Do not mutate binary operand.
+					c.Sub(*constant::Const.NewI64(1))
 					self.data.boundary.pushVar(getBoundaryVar(blc.Expr.Model), c)
 				}
 				ret
@@ -270,21 +255,21 @@ impl exprOptimizer {
 			ret
 		}
 		match type m.Right.Model {
-		| &BuiltinLenCallExprModel:
-			mut blc := (&BuiltinLenCallExprModel)(m.Right.Model)
+		| &sema::BuiltinLenCallExprModel:
+			mut blc := (&sema::BuiltinLenCallExprModel)(m.Right.Model)
 			if !isBoundaryValidType(blc.Expr.Kind) {
 				ret
 			}
-			if m.Op.Id != TokenId.Lt && m.Op.Id != TokenId.Eqs {
+			if m.Op.Id != lex::TokenId.Lt && m.Op.Id != lex::TokenId.Eqs {
 				ret
 			}
 			// y < len(x), y (constant) == len(x)
 			// Max guaranteed size of x is y.
-			if m.Op.Id == TokenId.Eqs {
+			if m.Op.Id == lex::TokenId.Eqs {
 				match type m.Left.Model {
-				| &Const:
-					mut c := new(Const, *(&Const)(m.Left.Model)) // Do not mutate binary operand.
-					c.Sub(*Const.NewI64(1))
+				| &constant::Const:
+					mut c := new(constant::Const, *(&constant::Const)(m.Left.Model)) // Do not mutate binary operand.
+					c.Sub(*constant::Const.NewI64(1))
 					self.data.boundary.pushVar(getBoundaryVar(blc.Expr.Model), c)
 				}
 				ret
@@ -294,7 +279,7 @@ impl exprOptimizer {
 		}
 	}
 
-	fn checkBinaryForNil(self, mut &m: &BinaryExprModel) {
+	fn checkBinaryForNil(self, mut &m: &sema::BinaryExprModel) {
 		if self.data.nils == nil {
 			ret
 		}
@@ -304,10 +289,10 @@ impl exprOptimizer {
 				ret
 			}
 			match type m.Right.Model {
-			| &Const:
+			| &constant::Const:
 				// No need to check whether constant variable is nil.
 				// It only can be nil.
-				self.data.nils.pushVar(var, m.Op.Id == TokenId.NotEq)
+				self.data.nils.pushVar(var, m.Op.Id == lex::TokenId.NotEq)
 			}
 			ret
 		}
@@ -317,16 +302,16 @@ impl exprOptimizer {
 				ret
 			}
 			match type m.Left.Model {
-			| &Const:
+			| &constant::Const:
 				// No need to check whether constant variable is nil.
 				// It only can be nil.
-				self.data.nils.pushVar(var, m.Op.Id == TokenId.NotEq)
+				self.data.nils.pushVar(var, m.Op.Id == lex::TokenId.NotEq)
 			}
 			ret
 		}
 	}
 
-	fn binary(self, mut m: &BinaryExprModel) {
+	fn binary(self, mut m: &sema::BinaryExprModel) {
 		self.checkBinaryForBoundary(m)
 		self.checkBinaryForNil(m)
 
@@ -350,7 +335,7 @@ impl exprOptimizer {
 		// Check whether the right operand is constant for safety.
 		// The following algorithms assumes the right operand is constant.
 		match type m.Right.Model {
-		| &Const:
+		| &constant::Const:
 			break
 		|:
 			ret
@@ -369,49 +354,49 @@ impl exprOptimizer {
 		}
 
 		match m.Op.Id {
-		| TokenId.Star:
+		| lex::TokenId.Star:
 			ok, x := checkForBitShiftOpt(m.Left, m.Right)
 			if ok {
 				m.Op = new(lex::Token, *m.Op)
-				m.Op.Id = TokenId.Shl
-				m.Op.Kind = TokenKind.Shl
-				mut c := (&Const)(m.Right.Model)
+				m.Op.Id = lex::TokenId.Shl
+				m.Op.Kind = lex::TokenKind.Shl
+				mut c := (&constant::Const)(m.Right.Model)
 				c.SetU64(x)
 				// No need to set model as UnsafeBinaryExprModel,
 				// shl is not checked at runtime, so it is optimize enough.
 				ret
 			}
-		| TokenId.Solidus:
+		| lex::TokenId.Solidus:
 			ok, x := checkForBitShiftOpt(m.Left, m.Right)
 			if ok {
 				m.Op = new(lex::Token, *m.Op)
-				m.Op.Id = TokenId.Shr
-				m.Op.Kind = TokenKind.Shr
-				mut c := (&Const)(m.Right.Model)
+				m.Op.Id = lex::TokenId.Shr
+				m.Op.Kind = lex::TokenKind.Shr
+				mut c := (&constant::Const)(m.Right.Model)
 				c.SetU64(x)
 				// No need to set model as UnsafeBinaryExprModel,
 				// shr is not checked at runtime, so it is optimize enough.
 				ret
 			}
-		| TokenId.Percent:
-			mut c := (&Const)(m.Right.Model)
+		| lex::TokenId.Percent:
+			mut c := (&constant::Const)(m.Right.Model)
 			if c.AsF64() == 0b10 {
 				m.Op = new(lex::Token, *m.Op)
-				m.Op.Id = TokenId.Amper
-				m.Op.Kind = TokenKind.Amper
+				m.Op.Id = lex::TokenId.Amper
+				m.Op.Kind = lex::TokenKind.Amper
 				c.SetI64(1)
 				// No need to set model as UnsafeBinaryExprModel,
 				// bitwise and is not checked at runtime, so it is optimize enough.
 				ret
 			}
-		| TokenId.Shl | TokenId.Shr:
+		| lex::TokenId.Shl | lex::TokenId.Shr:
 			// semantic anlayzer guarantees right operator is unsigned if constant
 			z := types::BitsizeOf(lp.Kind)
-			s := (&Const)(m.Right.Model).AsU64()
+			s := (&constant::Const)(m.Right.Model).AsU64()
 			if s >= u64(z) {
 				// shifting greater than bitsize of the left operand
 				// discard all bits, result always equals to zero
-				*self.model = Const.NewU64(0)
+				*self.model = constant::Const.NewU64(0)
 				ret
 			}
 		|:
@@ -421,19 +406,19 @@ impl exprOptimizer {
 		// Update model as UnsafeBinaryExprModel because it is safe, comptime checked.
 		// There is no risk like zero-division.
 		mut model := any(&UnsafeBinaryExprModel{Node: m})
-		*self.model = unsafe { *(*ExprModel)(&model) }
+		*self.model = unsafe { *(*sema::ExprModel)(&model) }
 	}
 
-	fn unary(self, mut m: &UnaryExprModel) {
+	fn unary(self, mut m: &sema::UnaryExprModel) {
 		if !Ptr {
 			ret
 		}
 		match m.Op.Id {
-		| TokenId.Star:
+		| lex::TokenId.Star:
 			match type m.Expr.Model {
-			| &UnaryExprModel:
-				mut um := (&UnaryExprModel)(m.Expr.Model)
-				if um.Op.Id == TokenId.Amper {
+			| &sema::UnaryExprModel:
+				mut um := (&sema::UnaryExprModel)(m.Expr.Model)
+				if um.Op.Id == lex::TokenId.Amper {
 					// Remove pointer overhead.
 					// Expression is: *(&x)
 					// Simplify to: x
@@ -449,25 +434,25 @@ impl exprOptimizer {
 				var := getNilVar(m.Expr.Model)
 				if self.data.nils.isSafe(var) {
 					mut model := any(&UnsafeDerefExprModel{Base: m})
-					*self.model = unsafe { *(*ExprModel)(&model) }
+					*self.model = unsafe { *(*sema::ExprModel)(&model) }
 					ret
 				}
 				// Now this varible is safe until it mutated.
 				self.data.nils.pushVar(var, true)
 			}
-		| TokenId.Amper:
+		| lex::TokenId.Amper:
 			match type m.Expr.Model {
-			| &Var:
-				mut v := (&Var)(m.Expr.Model)
+			| &sema::Var:
+				mut v := (&sema::Var)(m.Expr.Model)
 				if v.Reference {
 					mut model := any(&RefExprModel{Var: v})
-					*self.model = unsafe { *(*ExprModel)(&model) }
+					*self.model = unsafe { *(*sema::ExprModel)(&model) }
 				}
 			}
 		}
 	}
 
-	fn structureLit(self, mut m: &StructLitExprModel) {
+	fn structureLit(self, mut m: &sema::StructLitExprModel) {
 		for (_, mut arg) in m.Args {
 			if self.data.boundary != nil {
 				if isBoundaryRiskyType(arg.Expr.Kind) {
@@ -483,12 +468,12 @@ impl exprOptimizer {
 		}
 	}
 
-	fn casting(self, mut m: &CastingExprModel) {
+	fn casting(self, mut m: &sema::CastingExprModel) {
 		valid := isDynamicValidType(m.ExprKind)
 		var := getDynamicVar(m.Expr.Model)
 		if valid && self.data.dynamic != nil && self.data.dynamic.isFits(var, m.Kind) {
 			mut model := any(&UnsafeCastingExprModel{Base: m})
-			*self.model = unsafe { *(*ExprModel)(&model) }
+			*self.model = unsafe { *(*sema::ExprModel)(&model) }
 			self.inspector.SkipChild = true
 			ret
 		}
@@ -497,7 +482,7 @@ impl exprOptimizer {
 		}
 	}
 
-	fn args(self, mut params: []&ParamIns, mut &args: []ExprModel) {
+	fn args(self, mut params: []&sema::ParamIns, mut &args: []sema::ExprModel) {
 		for (i, mut arg) in args {
 			if i >= len(params) {
 				continue
@@ -519,20 +504,20 @@ impl exprOptimizer {
 		}
 	}
 
-	fn scope(self, mut &s: &Scope) {
+	fn scope(self, mut &s: &sema::Scope) {
 		mut scopt := scopeOptimizer.new(s)
 		scopt.data = self.data
 		scopt.optimize()
 	}
 
-	fn funcCall(self, mut m: &FnCallExprModel) {
+	fn funcCall(self, mut m: &sema::FnCallExprModel) {
 		self.args(m.Func.Params, m.Args)
 		if m.Except != nil {
 			self.scope(m.Except)
 		}
 	}
 
-	fn indexing(self, mut m: &IndexingExprModel) {
+	fn indexing(self, mut m: &sema::IndexingExprModel) {
 		if !Access {
 			ret
 		}
@@ -541,7 +526,7 @@ impl exprOptimizer {
 		// Constants checked by semantic analysis for arrays, safe.
 		if array && m.Index.IsConst() {
 			mut model := any(&UnsafeIndexingExprModel{Node: m})
-			*self.model = unsafe { *(*ExprModel)(&model) }
+			*self.model = unsafe { *(*sema::ExprModel)(&model) }
 			ret
 		}
 
@@ -549,35 +534,35 @@ impl exprOptimizer {
 			var := getBoundaryVar(m.Expr.Model)
 			if self.data.boundary.fitsMaxSize(var, m.Index.Model) {
 				mut model := any(&UnsafeIndexingExprModel{Node: m})
-				*self.model = unsafe { *(*ExprModel)(&model) }
+				*self.model = unsafe { *(*sema::ExprModel)(&model) }
 				ret
 			}
 			self.data.boundary.pushVar(var, m.Index.Model)
 		}
 	}
 
-	fn anonFunc(self, mut m: &AnonFnExprModel) {
+	fn anonFunc(self, mut m: &sema::AnonFnExprModel) {
 		self.scope(m.Func.Scope)
 	}
 
 	fn do(self) {
-		self.inspector.Inspect(*self.model, fn(mut &m: ExprModel) {
-			unsafe { self.model = (&ExprModel)(&m) }
+		self.inspector.Inspect(*self.model, fn(mut &m: sema::ExprModel) {
+			unsafe { self.model = (&sema::ExprModel)(&m) }
 			match type m {
-			| &BinaryExprModel:
-				unsafe { self.binary((&BinaryExprModel)(m)) }
-			| &UnaryExprModel:
-				unsafe { self.unary((&UnaryExprModel)(m)) }
-			| &StructLitExprModel:
-				unsafe { self.structureLit((&StructLitExprModel)(m)) }
-			| &CastingExprModel:
-				unsafe { self.casting((&CastingExprModel)(m)) }
-			| &FnCallExprModel:
-				unsafe { self.funcCall((&FnCallExprModel)(m)) }
-			| &IndexingExprModel:
-				unsafe { self.indexing((&IndexingExprModel)(m)) }
-			| &AnonFnExprModel:
-				unsafe { self.anonFunc((&AnonFnExprModel)(m)) }
+			| &sema::BinaryExprModel:
+				unsafe { self.binary((&sema::BinaryExprModel)(m)) }
+			| &sema::UnaryExprModel:
+				unsafe { self.unary((&sema::UnaryExprModel)(m)) }
+			| &sema::StructLitExprModel:
+				unsafe { self.structureLit((&sema::StructLitExprModel)(m)) }
+			| &sema::CastingExprModel:
+				unsafe { self.casting((&sema::CastingExprModel)(m)) }
+			| &sema::FnCallExprModel:
+				unsafe { self.funcCall((&sema::FnCallExprModel)(m)) }
+			| &sema::IndexingExprModel:
+				unsafe { self.indexing((&sema::IndexingExprModel)(m)) }
+			| &sema::AnonFnExprModel:
+				unsafe { self.anonFunc((&sema::AnonFnExprModel)(m)) }
 			}
 		})
 	}
@@ -593,11 +578,11 @@ impl exprOptimizer {
 //
 // As a result: returns whether bit-shifting is possible and what nth power of 2^r.
 // Assumes the model r is constant.
-fn checkForBitShiftOpt(&l: &OperandExprModel, &r: &OperandExprModel): (ok: bool, x: u64) {
+fn checkForBitShiftOpt(&l: &sema::OperandExprModel, &r: &sema::OperandExprModel): (ok: bool, x: u64) {
 	if !types::IsInt(l.Kind.Str()) || !types::IsInt(r.Kind.Str()) {
 		ret false, 0
 	}
-	x = (&Const)(r.Model).AsU64()
+	x = (&constant::Const)(r.Model).AsU64()
 	if x == 0 || x%2 != 0 {
 		ret false, 0
 	}
@@ -610,21 +595,21 @@ fn checkForBitShiftOpt(&l: &OperandExprModel, &r: &OperandExprModel): (ok: bool,
 }
 
 // Reports l and r the same lvalue expression.
-fn areSameLvalueExprModel(&l: ExprModel, &r: ExprModel): bool {
+fn areSameLvalueExprModel(&l: sema::ExprModel, &r: sema::ExprModel): bool {
 	match type l {
-	| &Var:
+	| &sema::Var:
 		// Compare values directly.
 		// If the l and r have same pointers, means same variable.
 		ret l == r
-	| &StructSubIdentExprModel:
+	| &sema::StructSubIdentExprModel:
 		match type r {
-		| &StructSubIdentExprModel:
+		| &sema::StructSubIdentExprModel:
 			break
 		|:
 			ret false
 		}
-		lsi := (&StructSubIdentExprModel)(l)
-		rsi := (&StructSubIdentExprModel)(r)
+		lsi := (&sema::StructSubIdentExprModel)(l)
+		rsi := (&sema::StructSubIdentExprModel)(r)
 		// Compare fields directly.
 		// If the l and r have same pointers,
 		// means same variable of same struct instance.
@@ -633,11 +618,11 @@ fn areSameLvalueExprModel(&l: ExprModel, &r: ExprModel): bool {
 		}
 		// Check head expressions used for field access.
 		ret areSameLvalueExprModel(lsi.Expr.Model, rsi.Expr.Model)
-	| &UnaryExprModel:
+	| &sema::UnaryExprModel:
 		match type r {
-		| &UnaryExprModel:
-			ul := (&UnaryExprModel)(l)
-			ur := (&UnaryExprModel)(r)
+		| &sema::UnaryExprModel:
+			ul := (&sema::UnaryExprModel)(l)
+			ur := (&sema::UnaryExprModel)(r)
 			// Unary operators should have the same operator.
 			// The operator does not matter.
 			if ul.Op.Id != ur.Op.Id || ul.Op.Kind != ur.Op.Kind {

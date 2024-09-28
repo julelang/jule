@@ -2,14 +2,8 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use std::jule::lex::{TokenId}
-use std::jule::sema::{
-	Var,
-	TypeKind,
-	ExprModel,
-	StructSubIdentExprModel,
-	BuiltinNewCallExprModel,
-}
+use lex for std::jule::lex
+use sema for std::jule::sema
 
 const invalidNil = uintptr(0x0)
 
@@ -75,38 +69,38 @@ impl nils {
 	}
 }
 
-fn possibleNilRemove(mut &n: &nils, m: ExprModel) {
+fn possibleNilRemove(mut &n: &nils, m: sema::ExprModel) {
 	if n != nil {
 		_ = n.removeVar(getNilVar(m))
 	}
 }
 
-fn isGuaranteedNonNilExpr(mut &n: &nils, m: ExprModel): bool {
+fn isGuaranteedNonNilExpr(mut &n: &nils, m: sema::ExprModel): bool {
 	match type m {
-	| &BuiltinNewCallExprModel:
+	| &sema::BuiltinNewCallExprModel:
 		ret true
 	}
 	ret n != nil && n.isSafe(getNilVar(m))
 }
 
-fn isNilValidType(mut t: &TypeKind): bool { ret t.Sptr() != nil }
+fn isNilValidType(mut t: &sema::TypeKind): bool { ret t.Sptr() != nil }
 
-fn getNilVar(m: ExprModel): uintptr {
+fn getNilVar(m: sema::ExprModel): uintptr {
 	if !Access {
 		ret invalidBoundary
 	}
 	match type m {
-	| &Var:
-		v := (&Var)(m)
+	| &sema::Var:
+		v := (&sema::Var)(m)
 		if !v.Reference {
 			// Variable is not reference, return address of it.
-			ret uintptr((&Var)(m))
+			ret uintptr((&sema::Var)(m))
 		}
 		// Variable is reference, it should be initialized at source code.
 		// Investigate the initial expression for variable address.
 		ret getNilVar(v.Value.Data.Model)
-	| &StructSubIdentExprModel:
-		ret uintptr((&StructSubIdentExprModel)(m).Field)
+	| &sema::StructSubIdentExprModel:
+		ret uintptr((&sema::StructSubIdentExprModel)(m).Field)
 	}
 	ret invalidBoundary
 }

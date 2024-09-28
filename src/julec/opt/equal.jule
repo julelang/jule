@@ -3,22 +3,14 @@
 // license that can be found in the LICENSE file.
 
 use integ for std::jule::integrated
-use std::jule::constant::{Const}
-use std::jule::sema::{
-	ExprModel,
-	Var,
-	CastingExprModel,
-	UnaryExprModel,
-	IndexingExprModel,
-	BinaryExprModel,
-	StructSubIdentExprModel,
-}
+use constant for std::jule::constant
+use sema for std::jule::sema
 
-fn typeData(&m: ExprModel): uintptr {
+fn typeData(&m: sema::ExprModel): uintptr {
 	ret unsafe { uintptr(integ::Emit[*unsafe]("({}).type", m)) }
 }
 
-fn equalConst(l: &Const, r: &Const): bool {
+fn equalConst(l: &constant::Const, r: &constant::Const): bool {
 	match {
 	| l.IsI64():
 		ret r.IsI64() && l.ReadI64() == r.ReadI64()
@@ -37,26 +29,26 @@ fn equalConst(l: &Const, r: &Const): bool {
 	}
 }
 
-fn equalCasting(l: &CastingExprModel, r: &CastingExprModel): bool {
+fn equalCasting(l: &sema::CastingExprModel, r: &sema::CastingExprModel): bool {
 	if !l.Kind.Equal(r.Kind) {
 		ret false
 	}
 	ret equalModels(l.Expr.Model, r.Expr.Model)
 }
 
-fn equalUnary(l: &UnaryExprModel, r: &UnaryExprModel): bool {
+fn equalUnary(l: &sema::UnaryExprModel, r: &sema::UnaryExprModel): bool {
 	if l.Op.Id != r.Op.Id || l.Op.Kind != r.Op.Kind {
 		ret false
 	}
 	ret equalModels(l.Expr.Model, r.Expr.Model)
 }
 
-fn equalIndexing(l: &IndexingExprModel, r: &IndexingExprModel): bool {
+fn equalIndexing(l: &sema::IndexingExprModel, r: &sema::IndexingExprModel): bool {
 	ret equalModels(l.Expr.Model, r.Expr.Model) &&
 		equalModels(l.Index.Model, r.Index.Model)
 }
 
-fn equalBinary(l: &BinaryExprModel, r: &BinaryExprModel): bool {
+fn equalBinary(l: &sema::BinaryExprModel, r: &sema::BinaryExprModel): bool {
 	if l.Op.Id != r.Op.Id || l.Op.Kind != r.Op.Kind {
 		ret false
 	}
@@ -67,27 +59,27 @@ fn equalBinary(l: &BinaryExprModel, r: &BinaryExprModel): bool {
 // Reports whether expressions are equal.
 // Designed lvalue equality comparison oriented,
 // such as swap statement value comparisons.
-fn equalModels(l: ExprModel, r: ExprModel): bool {
+fn equalModels(l: sema::ExprModel, r: sema::ExprModel): bool {
 	if typeData(l) != typeData(r) {
 		ret false
 	}
 	match type l {
-	| &Var:
-		ret (&Var)(l) == (&Var)(r)
-	| &StructSubIdentExprModel:
-		li := (&StructSubIdentExprModel)(l)
-		ri := (&StructSubIdentExprModel)(r)
+	| &sema::Var:
+		ret (&sema::Var)(l) == (&sema::Var)(r)
+	| &sema::StructSubIdentExprModel:
+		li := (&sema::StructSubIdentExprModel)(l)
+		ri := (&sema::StructSubIdentExprModel)(r)
 		ret li.Field == ri.Field && equalModels(li.Expr.Model, ri.Expr.Model)
-	| &Const:
-		ret equalConst((&Const)(l), (&Const)(r))
-	| &CastingExprModel:
-		ret equalCasting((&CastingExprModel)(l), (&CastingExprModel)(r))
-	| &UnaryExprModel:
-		ret equalUnary((&UnaryExprModel)(l), (&UnaryExprModel)(r))
-	| &IndexingExprModel:
-		ret equalIndexing((&IndexingExprModel)(l), (&IndexingExprModel)(r))
-	| &BinaryExprModel:
-		ret equalBinary((&BinaryExprModel)(l), (&BinaryExprModel)(r))
+	| &constant::Const:
+		ret equalConst((&constant::Const)(l), (&constant::Const)(r))
+	| &sema::CastingExprModel:
+		ret equalCasting((&sema::CastingExprModel)(l), (&sema::CastingExprModel)(r))
+	| &sema::UnaryExprModel:
+		ret equalUnary((&sema::UnaryExprModel)(l), (&sema::UnaryExprModel)(r))
+	| &sema::IndexingExprModel:
+		ret equalIndexing((&sema::IndexingExprModel)(l), (&sema::IndexingExprModel)(r))
+	| &sema::BinaryExprModel:
+		ret equalBinary((&sema::BinaryExprModel)(l), (&sema::BinaryExprModel)(r))
 	|:
 		ret false
 	}

@@ -3,14 +3,9 @@
 // license that can be found in the LICENSE file.
 
 use env
-use obj::{IR}
+use obj
 use deadcode for opt::deadcode
-use std::jule::sema::{
-	Package,
-	Var,
-	Fn,
-	Struct,
-}
+use sema for std::jule::sema
 
 static mut exprEnabled = false
 static mut scopeEnabled = false
@@ -18,24 +13,24 @@ static mut scopeEnabled = false
 // Target-independent optimizer for IR.
 // Use this optimizer for all optimizations with single instance.
 struct Optimizer {
-	ir: &IR
+	ir: &obj::IR
 }
 
 impl Optimizer {
 	// Returns new optimizer for IR.
-	static fn New(mut &ir: &IR): &Optimizer {
+	static fn New(mut &ir: &obj::IR): &Optimizer {
 		ret &Optimizer{
 			ir: ir,
 		}
 	}
 
-	fn optimizeGlobal(mut self, mut &v: &Var) {
+	fn optimizeGlobal(mut self, mut &v: &sema::Var) {
 		if !v.Binded {
 			exprOptimizer.optimize(v.Value.Data.Model)
 		}
 	}
 
-	fn optimizeFunction(mut self, mut &func: &Fn) {
+	fn optimizeFunction(mut self, mut &func: &sema::Fn) {
 		if func.Binded {
 			ret
 		}
@@ -45,7 +40,7 @@ impl Optimizer {
 		}
 	}
 
-	fn optimizeStruct(mut self, mut &s: &Struct) {
+	fn optimizeStruct(mut self, mut &s: &sema::Struct) {
 		if s.Binded {
 			ret
 		}
@@ -61,7 +56,7 @@ impl Optimizer {
 		}
 	}
 
-	fn optimizeGlobals(mut self, mut &p: &Package) {
+	fn optimizeGlobals(mut self, mut &p: &sema::Package) {
 		for (_, mut f) in p.Files {
 			for (_, mut v) in f.Vars {
 				self.optimizeGlobal(v)
@@ -69,7 +64,7 @@ impl Optimizer {
 		}
 	}
 
-	fn optimizeFunctions(mut self, mut &p: &Package) {
+	fn optimizeFunctions(mut self, mut &p: &sema::Package) {
 		for (_, mut f) in p.Files {
 			for (_, mut func) in f.Funcs {
 				self.optimizeFunction(func)
@@ -77,7 +72,7 @@ impl Optimizer {
 		}
 	}
 
-	fn optimizeStructs(mut self, mut &p: &Package) {
+	fn optimizeStructs(mut self, mut &p: &sema::Package) {
 		for (_, mut f) in p.Files {
 			for (_, mut s) in f.Structs {
 				self.optimizeStruct(s)
@@ -85,7 +80,7 @@ impl Optimizer {
 		}
 	}
 
-	fn optimizePackage(mut self, mut &p: &Package) {
+	fn optimizePackage(mut self, mut &p: &sema::Package) {
 		self.optimizeGlobals(p)
 		self.optimizeFunctions(p)
 		self.optimizeStructs(p)

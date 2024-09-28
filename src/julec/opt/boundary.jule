@@ -2,15 +2,15 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use std::jule::constant::{Const}
-use std::jule::lex::{TokenId}
-use std::jule::sema::{Var, StructSubIdentExprModel, UnaryExprModel, ExprModel, TypeKind}
+use constant for std::jule::constant
+use lex for std::jule::lex
+use sema for std::jule::sema
 
 const invalidBoundary = uintptr(0x0)
 
 struct boundaryVar {
 	var:     uintptr
-	maxSize: []ExprModel
+	maxSize: []sema::ExprModel
 }
 
 // Information wrapper for boundary analysis.
@@ -21,7 +21,7 @@ struct boundary {
 impl boundary {
 	// Appends variable with initial maximum size expression.
 	// If variable is already exist, updates maximum size information.
-	fn pushVar(mut self, var: uintptr, mut maxSize: ExprModel) {
+	fn pushVar(mut self, var: uintptr, mut maxSize: sema::ExprModel) {
 		if !Access || var == invalidBoundary {
 			// Ignore it, because this optimizations within scope of the --opt-access flag.
 			ret
@@ -68,7 +68,7 @@ impl boundary {
 	}
 
 	// Reports whether maximum size of variable is fits with given expression.
-	fn fitsMaxSize(mut self, var: uintptr, expr: ExprModel): bool {
+	fn fitsMaxSize(mut self, var: uintptr, expr: sema::ExprModel): bool {
 		if var != invalidBoundary {
 			for _, v in self.vars {
 				if v.var == var {
@@ -81,12 +81,12 @@ impl boundary {
 }
 
 // Reports whether model is valid maximum size information for boundary analysis.
-fn isValidBoundaryInfo(m: ExprModel): bool { ret fitsSize(m, m) }
+fn isValidBoundaryInfo(m: sema::ExprModel): bool { ret fitsSize(m, m) }
 
 // Reports whether maximum size is fits with given expression.
 // In other words, reports whether: max >= expr
 // Returns index number of max size which is fit, otherwise -1.
-fn fitsMaxSize(max: []ExprModel, expr: ExprModel): int {
+fn fitsMaxSize(max: []sema::ExprModel, expr: sema::ExprModel): int {
 	for i, m in max {
 		if fitsSize(m, expr) {
 			ret i
@@ -95,24 +95,24 @@ fn fitsMaxSize(max: []ExprModel, expr: ExprModel): int {
 	ret -1
 }
 
-fn fitsSize(e1: ExprModel, e2: ExprModel): bool {
+fn fitsSize(e1: sema::ExprModel, e2: sema::ExprModel): bool {
 	if typeData(e1) != typeData(e2) {
 		ret false
 	}
 	match type e1 {
-	| &Const:
-		exprConst := (&Const)(e2)
-		ret exprConst.AsF64() >= 0 && (&Const)(e1).GtEq(*exprConst)
-	| &Var:
+	| &constant::Const:
+		exprConst := (&constant::Const)(e2)
+		ret exprConst.AsF64() >= 0 && (&constant::Const)(e1).GtEq(*exprConst)
+	| &sema::Var:
 		ret e1 == e2
-	| &StructSubIdentExprModel:
-		ssi1 := (&StructSubIdentExprModel)(e1)
-		ssi2 := (&StructSubIdentExprModel)(e2)
+	| &sema::StructSubIdentExprModel:
+		ssi1 := (&sema::StructSubIdentExprModel)(e1)
+		ssi2 := (&sema::StructSubIdentExprModel)(e2)
 		ret equalModels(ssi1.Expr.Model, ssi2.Expr.Model) && ssi1.Field == ssi2.Field
-	| &UnaryExprModel:
-		uem1 := (&UnaryExprModel)(e1)
-		uem2 := (&UnaryExprModel)(e2)
-		if uem1.Op.Id != TokenId.Star || uem1.Op.Id != uem2.Op.Id {
+	| &sema::UnaryExprModel:
+		uem1 := (&sema::UnaryExprModel)(e1)
+		uem2 := (&sema::UnaryExprModel)(e2)
+		if uem1.Op.Id != lex::TokenId.Star || uem1.Op.Id != uem2.Op.Id {
 			ret false
 		}
 		ret fitsSize(uem1.Expr.Model, uem2.Expr.Model)
@@ -121,7 +121,7 @@ fn fitsSize(e1: ExprModel, e2: ExprModel): bool {
 	}
 }
 
-fn possibleBoundaryRemove(mut &b: &boundary, model: ExprModel) {
+fn possibleBoundaryRemove(mut &b: &boundary, model: sema::ExprModel) {
 	// Clear if size data mutating.
 	for (_, mut v) in b.vars {
 		for i, max in v.maxSize {
@@ -133,32 +133,32 @@ fn possibleBoundaryRemove(mut &b: &boundary, model: ExprModel) {
 	}
 }
 
-fn isBoundaryRiskyType(mut t: &TypeKind): bool {
+fn isBoundaryRiskyType(mut t: &sema::TypeKind): bool {
 	// Reports true for not-arrays because array's size cannot be changed.
 	ret t.Arr() == nil
 }
 
-fn isBoundaryValidType(mut t: &TypeKind): bool { ret t.Slc() != nil || t.Arr() != nil }
+fn isBoundaryValidType(mut t: &sema::TypeKind): bool { ret t.Slc() != nil || t.Arr() != nil }
 
-fn getBoundaryVar(m: ExprModel): uintptr {
+fn getBoundaryVar(m: sema::ExprModel): uintptr {
 	if !Access {
 		ret invalidBoundary
 	}
 	match type m {
-	| &Var:
-		v := (&Var)(m)
+	| &sema::Var:
+		v := (&sema::Var)(m)
 		if !v.Reference {
 			// Variable is not reference, return address of it.
-			ret uintptr((&Var)(m))
+			ret uintptr((&sema::Var)(m))
 		}
 		// Variable is reference, it should be initialized at source code.
 		// Investigate the initial expression for variable address.
 		ret getBoundaryVar(v.Value.Data.Model)
-	| &StructSubIdentExprModel:
-		ret uintptr((&StructSubIdentExprModel)(m).Field)
-	| &UnaryExprModel:
-		uem := (&UnaryExprModel)(m)
-		if uem.Op.Id == TokenId.Star { // Dereferencing.
+	| &sema::StructSubIdentExprModel:
+		ret uintptr((&sema::StructSubIdentExprModel)(m).Field)
+	| &sema::UnaryExprModel:
+		uem := (&sema::UnaryExprModel)(m)
+		if uem.Op.Id == lex::TokenId.Star { // Dereferencing.
 			ret getBoundaryVar(uem.Expr.Model)
 		}
 	}
