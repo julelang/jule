@@ -3,14 +3,14 @@
 // license that can be found in the LICENSE file.
 
 use std::unsafe
-use std::fs::{File, Directory, DirEntry}
+use fs for std::fs
 use path for std::fs::path
-use build for std::jule::build::{Log, LogKind}
+use build for std::jule::build
 use strings for std::strings
 
 // Searches module file in path.
 // Reports whether module file is exist in given directory.
-fn FindModuleFile(&dirents: []&DirEntry): bool {
+fn FindModuleFile(&dirents: []&fs::DirEntry): bool {
 	for _, d in dirents {
 		if !d.Stat.IsDir() && d.Name == build::ModuleFile {
 			ret true
@@ -24,7 +24,7 @@ fn FindModuleFile(&dirents: []&DirEntry): bool {
 // Returns directory path of module file if exist.
 fn FindModuleFileDeep(mut path: str): str {
 	for {
-		mut dirents := Directory.Read(path) else {
+		mut dirents := fs::Directory.Read(path) else {
 			break
 		}
 
@@ -44,17 +44,17 @@ fn FindModuleFileDeep(mut path: str): str {
 }
 
 // Checks module file of given directory.
-fn CheckModuleFile(&path: str): []Log {
-	bytes := File.Read(path::Join(path, build::ModuleFile)) else {
+fn CheckModuleFile(&path: str): []build::Log {
+	bytes := fs::File.Read(path::Join(path, build::ModuleFile)) else {
 		ret [{
-				Kind: LogKind.Flat,
+				Kind: build::LogKind.Flat,
 				Text: "module file could not checked because of a problem",
 			}]
 	}
 	s := strings::Trim(unsafe::BytesStr(bytes), " \n\r\t\v")
 	if len(s) != 0 {
 		ret [{
-				Kind: LogKind.Flat,
+				Kind: build::LogKind.Flat,
 				Text: "module file has syntax error(s)",
 			}]
 	}
