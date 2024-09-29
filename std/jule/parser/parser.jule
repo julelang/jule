@@ -834,163 +834,17 @@ impl parser {
 		ret f
 	}
 
-	fn getUseDeclSelectors(mut self, mut tokens: []&lex::Token): []&lex::Token {
-		mut i := 0
-		tokens = range(i, lex::TokenId.LBrace, lex::TokenId.RBrace, tokens)
-		mut parts, errs := parts(tokens, lex::TokenId.Comma, true)
-		if len(errs) > 0 {
-			self.errors = append(self.errors, errs...)
-			ret nil
-		}
-
-		mut selectors := make([]&lex::Token, 0, len(parts))
-		for (_, mut part) in parts {
-			if len(part) > 1 {
-				self.pushErr(part[1], build::LogMsg.InvalidSyntax)
-			}
-			mut tok := part[0]
-			if tok.Id != lex::TokenId.Ident && tok.Id != lex::TokenId.Self {
-				self.pushErr(tok, build::LogMsg.InvalidSyntax)
-				self.pushSuggestion(build::LogMsg.ExpectedIdentifier)
-				continue
-			}
-			selectors = append(selectors, tok)
-		}
-		ret selectors
-	}
-
-	fn buildBindUseDecl(mut self, mut &decl: &ast::UseDecl, &tokens: []&lex::Token) {
+	fn buildBindUseDecl(mut self, mut &decl: &ast::UseDecl, mut &tokens: []&lex::Token) {
 		if len(tokens) > 1 {
 			self.pushErr(tokens[1], build::LogMsg.InvalidSyntax)
 		}
-		token := tokens[0]
-		if token.Id != lex::TokenId.Lit || (token.Kind[0] != '`' && token.Kind[0] != '"') {
+		mut token := tokens[0]
+		if token.Id != lex::TokenId.Lit || !lex::IsStr(token.Kind) {
 			self.pushErr(token, build::LogMsg.InvalidExpr)
 			ret
 		}
 		decl.Binded = true
-		decl.LinkPath = token.Kind[1:len(token.Kind)-1]
-	}
-
-	fn useDeclTokstoa(mut self, &tokens: []&lex::Token): str {
-		mut n := 0
-		for _, token in tokens {
-			if token.Id != lex::TokenId.Ident && token.Id != lex::TokenId.DblColon {
-				self.pushErr(token, build::LogMsg.InvalidSyntax)
-			}
-			n += len(token.Kind)
-		}
-		mut s := strings::StrBuilder.New(n)
-		for _, token in tokens {
-			s.WriteStr(token.Kind)
-		}
-		ret s.Str()
-	}
-
-	fn buildStdUseDecl(mut self, mut &decl: &ast::UseDecl, mut tokens: []&lex::Token) {
-		decl.Std = true
-
-		mut token := tokens[0]
-		if len(tokens) < 3 {
-			self.pushErr(token, build::LogMsg.InvalidSyntax)
-			ret
-		}
-
-		tokens = tokens[2:]
-		token = tokens[len(tokens)-1]
-		match token.Id {
-		| lex::TokenId.DblColon:
-			self.pushErr(token, build::LogMsg.InvalidSyntax)
-			ret
-		| lex::TokenId.RBrace:
-			let mut selectors: []&lex::Token = nil
-			tokens, selectors = rangeLast(tokens)
-			decl.Selected = self.getUseDeclSelectors(selectors)
-			if len(tokens) == 0 {
-				self.pushErr(token, build::LogMsg.InvalidSyntax)
-				ret
-			}
-			token = tokens[len(tokens)-1]
-			if token.Id != lex::TokenId.DblColon {
-				self.pushErr(token, build::LogMsg.InvalidSyntax)
-				ret
-			}
-			tokens = tokens[:len(tokens)-1]
-			if len(tokens) == 0 {
-				self.pushErr(token, build::LogMsg.InvalidSyntax)
-				ret
-			}
-		| lex::TokenId.Star:
-			tokens = tokens[:len(tokens)-1]
-			if len(tokens) == 0 {
-				self.pushErr(token, build::LogMsg.InvalidSyntax)
-				ret
-			}
-			token = tokens[len(tokens)-1]
-			if token.Id != lex::TokenId.DblColon {
-				self.pushErr(token, build::LogMsg.InvalidSyntax)
-				ret
-			}
-			tokens = tokens[:len(tokens)-1]
-			if len(tokens) == 0 {
-				self.pushErr(token, build::LogMsg.InvalidSyntax)
-				ret
-			}
-			decl.Full = true
-		}
-		if len(tokens) == 1 && tokens[0].Id == lex::TokenId.Unsafe { // Is std::unsafe?
-			decl.LinkPath = "std::unsafe"
-		} else {
-			decl.LinkPath = "std::" + self.useDeclTokstoa(tokens)
-		}
-	}
-
-	fn buildIdentUseDecl(mut self, mut &decl: &ast::UseDecl, mut tokens: []&lex::Token) {
-		decl.Std = false
-
-		mut token := tokens[len(tokens)-1]
-		match token.Id {
-		| lex::TokenId.DblColon:
-			self.pushErr(token, build::LogMsg.InvalidSyntax)
-			ret
-		| lex::TokenId.RBrace:
-			let mut selectors: []&lex::Token = nil
-			tokens, selectors = rangeLast(tokens)
-			decl.Selected = self.getUseDeclSelectors(selectors)
-			if len(tokens) == 0 {
-				self.pushErr(token, build::LogMsg.InvalidSyntax)
-				ret
-			}
-			token = tokens[len(tokens)-1]
-			if token.Id != lex::TokenId.DblColon {
-				self.pushErr(token, build::LogMsg.InvalidSyntax)
-				ret
-			}
-			tokens = tokens[:len(tokens)-1]
-			if len(tokens) == 0 {
-				self.pushErr(token, build::LogMsg.InvalidSyntax)
-				ret
-			}
-		| lex::TokenId.Star:
-			tokens = tokens[:len(tokens)-1]
-			if len(tokens) == 0 {
-				self.pushErr(token, build::LogMsg.InvalidSyntax)
-				ret
-			}
-			token = tokens[len(tokens)-1]
-			if token.Id != lex::TokenId.DblColon {
-				self.pushErr(token, build::LogMsg.InvalidSyntax)
-				ret
-			}
-			tokens = tokens[:len(tokens)-1]
-			if len(tokens) == 0 {
-				self.pushErr(token, build::LogMsg.InvalidSyntax)
-				ret
-			}
-			decl.Full = true
-		}
-
-		decl.LinkPath = self.useDeclTokstoa(tokens)
+		decl.Path = token
 	}
 
 	fn parseUseDecl(mut self, mut &decl: &ast::UseDecl, mut tokens: []&lex::Token) {
@@ -1000,31 +854,26 @@ impl parser {
 		}
 
 		mut token := tokens[0]
-		if token.Id != lex::TokenId.Ident {
+		if token.Id != lex::TokenId.Ident && token.Id != lex::TokenId.Lit && !lex::IsStr(token.Kind) {
 			self.pushErr(token, build::LogMsg.InvalidSyntax)
-			self.pushSuggestion(build::LogMsg.ExpectedIdentifier)
 			ret
 		}
 
-		if len(tokens) > 2 && tokens[1].Id == lex::TokenId.For {
-			decl.Alias = token.Kind
-			if tokens[2].Id != lex::TokenId.Ident {
+		if token.Id == lex::TokenId.Ident { // custom alias exist
+			decl.Alias = token
+			tokens = tokens[1:]
+			if len(tokens) == 0 {
 				self.pushErr(token, build::LogMsg.InvalidSyntax)
-				self.pushSuggestion(build::LogMsg.ExpectedIdentifier)
 				ret
 			}
-			tokens = tokens[2:]
 			token = tokens[0]
+			if token.Id != lex::TokenId.Lit || !lex::IsStr(token.Kind) {
+				self.pushErr(token, build::LogMsg.InvalidSyntax)
+				ret
+			}
 		}
 
-		const StdlibPrefix = "std"
-
-		match {
-		| token.Kind == StdlibPrefix:
-			self.buildStdUseDecl(decl, tokens)
-		|:
-			self.buildIdentUseDecl(decl, tokens)
-		}
+		decl.Path = token
 	}
 
 	fn buildUseDecl(mut self, mut tokens: []&lex::Token, binded: bool): &ast::UseDecl {

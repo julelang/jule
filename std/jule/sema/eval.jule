@@ -1152,8 +1152,8 @@ impl eval {
 					ret false
 				}
 			}
-		| &ast::NsSelectionExpr:
-			mut ns := (&ast::NsSelectionExpr)(expr.Kind)
+		| &ast::NamespaceExpr:
+			mut ns := (&ast::NamespaceExpr)(expr.Kind)
 			mut decl := &ast::IdentTypeDecl{
 				Token: ns.Ident,
 				Ident: ns.Ident.Kind,
@@ -1161,7 +1161,7 @@ impl eval {
 			generics = append(generics, &ast::TypeDecl{
 				Token: decl.Token,
 				Kind: &ast::NamespaceTypeDecl{
-					Idents: ns.Ns,
+					Namespace: ns.Namespace,
 					Kind: &ast::TypeDecl{
 						Token: decl.Token,
 						Kind: decl,
@@ -1192,8 +1192,8 @@ impl eval {
 				Token: expr.Token,
 				Ident: expr.Ident,
 			}
-		| &ast::NsSelectionExpr:
-			mut expr := (&ast::NsSelectionExpr)(i.Expr.Kind)
+		| &ast::NamespaceExpr:
+			mut expr := (&ast::NamespaceExpr)(i.Expr.Kind)
 			decl = &ast::IdentTypeDecl{
 				Token: expr.Ident,
 				Ident: expr.Ident.Kind,
@@ -1868,17 +1868,13 @@ impl eval {
 		ret self.evalCastT(t.Kind, c.Expr, c.Kind.Token)
 	}
 
-	fn evalNsSelection(mut self, mut s: &ast::NsSelectionExpr): &Data {
-		path := buildLinkPathByTokens(s.Ns)
+	fn evalNamespace(mut self, mut s: &ast::NamespaceExpr): &Data {
 		mut imp := self.lookup.SelectPackage(fn(imp: &ImportInfo): bool {
-			if len(s.Ns) == 1 && imp.Alias == path {
-				ret true
-			}
-			ret imp.LinkPath == path && imp.isAccessibleViaSelection()
+			ret imp.Alias == s.Namespace.Kind
 		})
 
 		if imp == nil {
-			self.pushErr(s.Ns[0], build::LogMsg.NamespaceNotExist, path)
+			self.pushErr(s.Namespace, build::LogMsg.NamespaceNotExist, s.Namespace.Kind)
 			ret nil
 		}
 
@@ -3029,8 +3025,8 @@ impl eval {
 			ret self.evalSlicing((&ast::SlicingExpr)(kind))
 		| &ast::CastExpr:
 			ret self.evalCast((&ast::CastExpr)(kind))
-		| &ast::NsSelectionExpr:
-			ret self.evalNsSelection((&ast::NsSelectionExpr)(kind))
+		| &ast::NamespaceExpr:
+			ret self.evalNamespace((&ast::NamespaceExpr)(kind))
 		| &ast::StructLit:
 			ret self.evalStructLit((&ast::StructLit)(kind))
 		| &ast::TypeDecl:
@@ -4428,15 +4424,6 @@ fn buildErrorVar(mut &s: &Scope, mut &fc: &ast::FnCallExpr): &Var {
 }
 
 fn findBuiltinsSema(&ident: str, mut s: &sema): any {
-	for (_, mut imp) in s.file.Imports {
-		if imp.ImportAll || imp.existIdent(ident) {
-			mut def := findBuiltinsImport(ident, imp)
-			if def != nil {
-				ret def
-			}
-		}
-	}
-
 	// If package is std, check for internal builtin defines.
 	mut ppath := s.file.File.Dir()
 	if strings::HasPrefix(ppath, build::PathStdlib) {

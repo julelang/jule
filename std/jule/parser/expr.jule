@@ -113,27 +113,36 @@ impl exprBuilder {
 		}
 	}
 
-	fn buildNsSubIdent(mut self, mut &tokens: []&lex::Token): &ast::NsSelectionExpr {
-		mut ns := new(ast::NsSelectionExpr)
-		if len(tokens) == 3 && tokens[0].Id == lex::TokenId.Unsafe {
-			// Check unsafe scope selection.
-			ns.Ns = tokens[:1]
-			ns.Ident = tokens[2]
-		} else {
-			for (i, mut token) in tokens {
-				if i%2 == 0 {
-					if token.Id != lex::TokenId.Ident {
-						self.pushErr(token, build::LogMsg.InvalidSyntax)
-						self.pushSuggestion(build::LogMsg.ExpectedIdentifier)
-					}
-					ns.Ns = append(ns.Ns, token)
-				} else if token.Id != lex::TokenId.DblColon {
-					self.pushErr(token, build::LogMsg.InvalidSyntax)
-					self.pushSuggestion(build::LogMsg.ExpectedDblColon)
-				}
-			}
-			ns.Ident = ns.Ns[len(ns.Ns)-1]
-			ns.Ns = ns.Ns[:len(ns.Ns)-1]
+	fn buildNamespace(mut self, mut &tokens: []&lex::Token): &ast::NamespaceExpr {
+		mut ns := new(ast::NamespaceExpr)
+		if len(tokens) > 3 {
+			self.pushErr(tokens[3], build::LogMsg.InvalidSyntax)
+		}
+		ns.Namespace = tokens[0]
+		if ns.Namespace.Id != lex::TokenId.Ident && ns.Namespace.Id != lex::TokenId.Unsafe {
+			self.pushErr(ns.Namespace, build::LogMsg.InvalidSyntax)
+			self.pushSuggestion(build::LogMsg.ExpectedIdentifier)
+		}
+		if len(tokens) < 2 {
+			self.pushErr(ns.Namespace, build::LogMsg.InvalidSyntax)
+			self.pushSuggestion(build::LogMsg.ExpectedDblColon)
+			ret nil
+		}
+		if tokens[1].Id != lex::TokenId.DblColon {
+			self.pushErr(tokens[1], build::LogMsg.InvalidSyntax)
+			self.pushSuggestion(build::LogMsg.ExpectedDblColon)
+			ret nil
+		}
+		if len(tokens) < 3 {
+			self.pushErr(tokens[1], build::LogMsg.InvalidSyntax)
+			self.pushSuggestion(build::LogMsg.ExpectedIdentifier)
+			ret nil
+		}
+		ns.Ident = tokens[2]
+		if ns.Ident.Id != lex::TokenId.Ident {
+			self.pushErr(ns.Ident, build::LogMsg.InvalidSyntax)
+			self.pushSuggestion(build::LogMsg.ExpectedIdentifier)
+			ret nil
 		}
 		ret ns
 	}
@@ -159,7 +168,7 @@ impl exprBuilder {
 		| lex::TokenId.Dot:
 			ret self.buildObjSubIdent(tokens)
 		| lex::TokenId.DblColon:
-			ret self.buildNsSubIdent(tokens)
+			ret self.buildNamespace(tokens)
 		| lex::TokenId.RBracket:
 			// Catch slice, array, and map types.
 			ret self.buildType(tokens)

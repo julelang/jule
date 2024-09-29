@@ -58,18 +58,6 @@ fn compilerErr(&token: &lex::Token, line: bool, fmt: build::LogMsg, args: ...any
 	ret log
 }
 
-fn impIsLookupable(&i: &ImportInfo, &ident: str): bool {
-	if i.Binded {
-		ret false
-	}
-	if !i.ImportAll {
-		if len(i.Selected) > 0 {
-			ret i.existIdent(ident)
-		}
-	}
-	ret i.ImportAll
-}
-
 fn appendRetVars(mut &dest: []&Var, mut &f: &FnIns) {
 	if f.Decl.IsVoid() || f.Result == nil {
 		ret
@@ -273,7 +261,7 @@ impl Lookup for sema {
 
 		// Lookup current file's public denifes of imported packages.
 		for (_, mut imp) in self.file.Imports {
-			if !impIsLookupable(imp, ident) {
+			if !imp.isLookupable() {
 				continue
 			}
 			v = imp.FindVar(ident, binded)
@@ -305,7 +293,7 @@ impl Lookup for sema {
 
 		// Lookup current file's public denifes of imported packages.
 		for (_, mut imp) in self.file.Imports {
-			if !impIsLookupable(imp, ident) {
+			if !imp.isLookupable() {
 				continue
 			}
 			ta = imp.FindTypeAlias(ident, binded)
@@ -337,7 +325,7 @@ impl Lookup for sema {
 
 		// Lookup current file's public denifes of imported packages.
 		for (_, mut imp) in self.file.Imports {
-			if !impIsLookupable(imp, ident) {
+			if !imp.isLookupable() {
 				continue
 			}
 			s = imp.FindStruct(ident, binded)
@@ -368,7 +356,7 @@ impl Lookup for sema {
 
 		// Lookup current file's public denifes of imported packages.
 		for (_, mut imp) in self.file.Imports {
-			if !impIsLookupable(imp, ident) {
+			if !imp.isLookupable() {
 				continue
 			}
 			f = imp.FindFn(ident, binded)
@@ -400,7 +388,7 @@ impl Lookup for sema {
 
 		// Lookup current file's public denifes of imported packages.
 		for (_, mut imp) in self.file.Imports {
-			if !impIsLookupable(imp, ident) {
+			if !imp.isLookupable() {
 				continue
 			}
 			t = imp.FindTrait(ident)
@@ -432,7 +420,7 @@ impl Lookup for sema {
 
 		// Lookup current file's public denifes of imported packages.
 		for (_, mut imp) in self.file.Imports {
-			if !impIsLookupable(imp, ident) {
+			if !imp.isLookupable() {
 				continue
 			}
 			e = imp.FindEnum(ident)
@@ -464,7 +452,7 @@ impl Lookup for sema {
 
 		// Lookup current file's public denifes of imported packages.
 		for (_, mut imp) in self.file.Imports {
-			if !impIsLookupable(imp, ident) {
+			if !imp.isLookupable() {
 				continue
 			}
 			e = imp.FindTypeEnum(ident)
@@ -523,14 +511,6 @@ impl sema {
 			if f.isDuplicatedIdent(itself, ident, binded) {
 				ret true
 			}
-
-			for _, imp in f.Imports {
-				for _, selected in imp.Selected {
-					if selected.Kind == ident {
-						ret true
-					}
-				}
-			}
 		}
 		ret false
 	}
@@ -563,19 +543,6 @@ impl sema {
 		}
 	}
 
-	fn isDuplicatedImportSelection(self, itself: uintptr, &ident: str): bool {
-		for _, imp in self.file.Imports {
-			if uintptr(imp) == itself {
-				// Don't scan trailing imports.
-				break
-			}
-			if imp.existIdent(ident) {
-				ret true
-			}
-		}
-		ret false
-	}
-
 	fn getImportDef(self, &ident: str, mut &imp: &ImportInfo): any {
 		if findPackageBuiltinDef(imp.LinkPath, ident) != nil {
 			ret true
@@ -605,55 +572,6 @@ impl sema {
 		ret true
 	}
 
-	fn checkImportSelectedSelections(mut self, mut &imp: &ImportInfo): (ok: bool) {
-		ok = true
-		for _, ident in imp.Selected {
-			if ident.Kind == lex::TokenKind.Self {
-				continue
-			}
-
-			if self.isDuplicatedImportSelection(uintptr(imp), ident.Kind) {
-				self.pushErr(ident, build::LogMsg.DuplicatedIdent, ident.Kind)
-				self.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
-				ok = false
-				continue
-			}
-
-			mut def := self.getImportDef(ident.Kind, imp)
-			match type def {
-			| bool:
-				// Pass, built-in.
-				continue
-			| &Var:
-				mut v := (&Var)(def)
-				ok = self.checkImportSelection(ident, v) && ok
-			| &TypeAlias:
-				mut ta := (&TypeAlias)(def)
-				ok = self.checkImportSelection(ident, ta) && ok
-			| &Struct:
-				mut s := (&Struct)(def)
-				ok = self.checkImportSelection(ident, s) && ok
-			| &Trait:
-				mut t := (&Trait)(def)
-				ok = self.checkImportSelection(ident, t) && ok
-			| &Enum:
-				mut e := (&Enum)(def)
-				ok = self.checkImportSelection(ident, e) && ok
-			| &TypeEnum:
-				mut e := (&TypeEnum)(def)
-				ok = self.checkImportSelection(ident, e) && ok
-			| &Fn:
-				mut f := (&Fn)(def)
-				ok = self.checkImportSelection(ident, f) && ok
-			|:
-				self.pushErr(ident, build::LogMsg.IdentNotExist, ident.Kind)
-				ok = false
-				continue
-			}
-		}
-		ret
-	}
-
 	fn checkImportsAllSelectionsFromCollection[T](mut self, &s: []T, &et: &lex::Token): bool {
 		mut ok := true
 		for _, d in s {
@@ -664,39 +582,12 @@ impl sema {
 		ret ok
 	}
 
-	fn checkImportAllSelections(mut self, &imp: &ImportInfo): (ok: bool) {
-		ok = true
-		for _, file in imp.Package.Files {
-			ok = self.checkImportsAllSelectionsFromCollection(file.Vars, imp.Token) && ok
-			ok = self.checkImportsAllSelectionsFromCollection(file.TypeAliases, imp.Token) && ok
-			ok = self.checkImportsAllSelectionsFromCollection(file.Structs, imp.Token) && ok
-			ok = self.checkImportsAllSelectionsFromCollection(file.Funcs, imp.Token) && ok
-			ok = self.checkImportsAllSelectionsFromCollection(file.Traits, imp.Token) && ok
-			ok = self.checkImportsAllSelectionsFromCollection(file.Enums, imp.Token) && ok
-			ok = self.checkImportsAllSelectionsFromCollection(file.TypeEnums, imp.Token) && ok
-		}
-		ret
-	}
-
-	fn checkImportSelections(mut self, mut &imp: &ImportInfo): (ok: bool) {
-		if len(imp.Selected) > 0 {
-			ret self.checkImportSelectedSelections(imp)
-		} else if imp.ImportAll {
-			ret self.checkImportAllSelections(imp)
-		}
-		ret true
-	}
-
 	fn isUseAliasDuplication(mut self, &imp: &ImportInfo): bool {
 		for (_, mut imp2) in self.file.Imports {
 			if imp2 == imp {
 				break
 			}
 			if imp2.Alias == imp.Alias {
-				ret true
-			}
-			// Catch identifiers of other use declarations.
-			if imp2.Ident == imp2.LinkPath && imp2.Ident == imp.Alias {
 				ret true
 			}
 		}
@@ -708,19 +599,17 @@ impl sema {
 			ret true
 		}
 
-		// Check special cases for std::unsafe.
-		if imp.LinkPath == "std::unsafe" {
-			if imp.ImportAll || imp.Alias != "" || len(imp.Selected) > 0 {
-				self.pushErr(imp.Token, build::LogMsg.ExpectedPlainUseDecl, "use std::unsafe")
-				ret false
-			}
+		// Check special cases for "std/unsafe".
+		if imp.LinkPath == "std/unsafe" && imp.Alias != "" {
+			self.pushErr(imp.Decl.Token, build::LogMsg.ExpectedPlainUseDecl, `use "std/unsafe"`)
+			ret false
 		}
 
 		if len(imp.Alias) != 0 {
 			if lex::IsIgnoreIdent(imp.Alias) {
-				self.pushErr(imp.Token, build::LogMsg.IgnoreIdent)
+				self.pushErr(imp.Decl.Token, build::LogMsg.IgnoreIdent)
 			} else if self.isUseAliasDuplication(imp) {
-				self.pushErr(imp.Token, build::LogMsg.DuplicatedUseAlias, imp.Alias)
+				self.pushErr(imp.Decl.Token, build::LogMsg.DuplicatedUseAlias, imp.Alias)
 				self.pushSuggestion(build::LogMsg.RenameUseAliasAvoidDuplication)
 			}
 		}
@@ -737,7 +626,7 @@ impl sema {
 				ret false
 			}
 		}
-		ret self.checkImportSelections(imp)
+		ret true
 	}
 
 	fn checkImports(mut self) {

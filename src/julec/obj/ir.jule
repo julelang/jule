@@ -5,6 +5,7 @@
 use env
 use ast for std::jule::ast
 use build for std::jule::build
+use lex for std::jule::lex
 use importer for std::jule::importer
 use sema for std::jule::sema
 
@@ -41,8 +42,8 @@ impl IR {
 
 		// Push std::runtime package to first file.
 		// Each Jule program should import this standard package.
-		mut firstFile := files[0]
-		pushRuntimeToAST(firstFile)
+		//mut firstFile := files[0]
+		//pushRuntimeToAST(firstFile)
 
 		mut pkg, logs := sema::AnalyzePackage(files, importer, flags)
 		if len(logs) > 0 {
@@ -174,16 +175,13 @@ fn buildCompileInfo(): importer::CompileInfo {
 	ret info
 }
 
-// See [std::jule] developer reference (9).
+// See "std/jule" developer reference (9).
 fn pushRuntimeToAST(mut &f: &ast::AST) {
 	mut decl := &ast::UseDecl{
 		Token: nil, // Nil token is a flag for implicit declaration.
-		LinkPath: "std::runtime",
-		Alias: "",
-		Full: false,
-		Selected: nil,
+		Path: &lex::Token{Id: lex::TokenId.Lit, Kind: `"std/runtime"`},
+		Alias: nil,
 		Binded: false,
-		Std: true,
 	}
 	f.UseDecls = append(f.UseDecls, decl)
 	if len(f.UseDecls) > 1 {

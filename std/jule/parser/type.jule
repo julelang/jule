@@ -45,29 +45,31 @@ impl typeBuilder {
 		mut t := &ast::TypeDecl{
 			Token: self.tokens[*self.i],
 		}
-
-		mut nst := new(ast::NamespaceTypeDecl)
-		mut n := 0
-		for *self.i < len(self.tokens); *self.i++ {
-			mut token := self.tokens[*self.i]
-			if n%2 == 0 {
-				if token.Id != lex::TokenId.Ident {
-					self.pushErr(token, build::LogMsg.InvalidSyntax)
-					self.pushSuggestion(build::LogMsg.ExpectedIdentifier)
-				}
-				nst.Idents = append(nst.Idents, token)
-			} else if token.Id != lex::TokenId.DblColon {
-				break
-			}
-			n++
+		mut ns := new(ast::NamespaceTypeDecl)
+		ns.Namespace = self.tokens[*self.i]
+		if ns.Namespace.Id != lex::TokenId.Ident && ns.Namespace.Id != lex::TokenId.Unsafe {
+			self.pushErr(ns.Namespace, build::LogMsg.InvalidSyntax)
+			self.pushSuggestion(build::LogMsg.ExpectedIdentifier)
 		}
-
-		// Remove selected identifier token.
-		nst.Idents = nst.Idents[:len(nst.Idents)-1]
-
-		*self.i-- // Set offset to last identifier.
-		nst.Kind = self.buildIdent()
-		t.Kind = nst
+		*self.i++
+		if len(self.tokens) <= *self.i {
+			self.pushErr(ns.Namespace, build::LogMsg.InvalidSyntax)
+			self.pushSuggestion(build::LogMsg.ExpectedDblColon)
+			ret nil
+		}
+		if self.tokens[*self.i].Id != lex::TokenId.DblColon {
+			self.pushErr(self.tokens[*self.i], build::LogMsg.InvalidSyntax)
+			self.pushSuggestion(build::LogMsg.ExpectedDblColon)
+			ret nil
+		}
+		*self.i++
+		if len(self.tokens) <= *self.i {
+			self.pushErr(self.tokens[*self.i-1], build::LogMsg.InvalidSyntax)
+			self.pushSuggestion(build::LogMsg.ExpectedIdentifier)
+			ret nil
+		}
+		ns.Kind = self.buildIdent()
+		t.Kind = ns
 		ret t
 	}
 

@@ -1539,25 +1539,20 @@ impl typeChecker {
 		ret ins
 	}
 
-	fn buildByNamespace(mut self, mut decl: &ast::NamespaceTypeDecl): Kind {
-		path := buildLinkPathByTokens(decl.Idents)
+	fn buildNamespace(mut self, mut ns: &ast::NamespaceTypeDecl): Kind {
 		mut imp := self.lookup.SelectPackage(fn(imp: &ImportInfo): bool {
-			if len(decl.Idents) == 1 && imp.Alias == path {
-				ret true
-			}
-			ret imp.LinkPath == path && imp.isAccessibleViaSelection()
+			ret imp.Alias == ns.Namespace.Kind
 		})
 
-		selfIdent := str(lex::TokenKind.Self)
-		if imp == nil || !imp.isLookupable(selfIdent) {
-			self.pushErr(decl.Idents[0], build::LogMsg.NamespaceNotExist, path)
+		if imp == nil || !imp.isLookupable() {
+			self.pushErr(ns.Namespace, build::LogMsg.NamespaceNotExist, ns.Namespace.Kind)
 			ret nil
 		}
 
 		self.disallowBuiltin()
 		mut lookup := self.lookup
 		self.lookup = imp
-		mut kind := self.checkDecl(decl.Kind)
+		mut kind := self.checkDecl(ns.Kind)
 		self.lookup = lookup
 		self.allowBuiltin()
 		ret kind
@@ -1620,7 +1615,7 @@ impl typeChecker {
 			}
 		| &ast::NamespaceTypeDecl:
 			self.inscatch = true
-			mut t := self.buildByNamespace((&ast::NamespaceTypeDecl)(declKind))
+			mut t := self.buildNamespace((&ast::NamespaceTypeDecl)(declKind))
 			if t != nil {
 				kind = t
 			}
@@ -1774,25 +1769,6 @@ fn isValidForRef(mut &t: &TypeKind): bool { ret t.Fn() == nil }
 // Reports whether type has built-in string conversion support.
 fn isBuiltinStrConvertable(mut &t: &TypeKind): bool {
 	ret !t.Void() && t.Fn() == nil && t.Tup() == nil && !t.comptime()
-}
-
-fn buildLinkPathByTokens(&tokens: []&lex::Token): str {
-	if len(tokens) == 1 && tokens[0].Id == lex::TokenId.Unsafe {
-		ret "std::unsafe"
-	}
-	mut n := 0
-	for _, token in tokens {
-		n += len(token.Kind)
-		n += 2
-	}
-	mut s := strings::StrBuilder.New(n)
-	for i, token in tokens {
-		s.WriteStr(token.Kind)
-		if len(tokens)-i > 1 {
-			s.WriteStr("::")
-		}
-	}
-	ret s.Str()
 }
 
 fn buildPrimType(kind: str): &Prim {
