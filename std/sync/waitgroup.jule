@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use std::sync::atomic::{MemoryOrder, AtomicU32}
+use atomic for std::sync::atomic
 
 // Do not copy an instance of WaitGroup, use a ref or pointer instead.
 //
@@ -14,8 +14,8 @@ use std::sync::atomic::{MemoryOrder, AtomicU32}
 // in each parallel job:
 // `wg.done()` when finished
 struct WaitGroup {
-	taskN: AtomicU32 // current task count - reading/writing should be atomic
-	waitN: AtomicU32 // current wait count - reading/writing should be atomic
+	taskN: atomic::AtomicU32 // current task count - reading/writing should be atomic
+	waitN: atomic::AtomicU32 // current wait count - reading/writing should be atomic
 }
 
 impl WaitGroup {
@@ -28,7 +28,7 @@ impl WaitGroup {
 	// and unblocks any wait() calls if task count becomes zero.
 	// Panics if task count reaches below zero.
 	fn Add(mut self, delta: int) {
-		oldTask := int(self.taskN.Add(u32(delta), MemoryOrder.Relaxed))
+		oldTask := int(self.taskN.Add(u32(delta), atomic::MemoryOrder.Relaxed))
 		nTask := oldTask + delta
 		if nTask < 0 {
 			panic("std:sync: WaitGroup.Add: negative number of tasks")
@@ -42,12 +42,12 @@ impl WaitGroup {
 
 		// Number of tasks reaches to zero, therefore clear waiters.
 		for {
-			nWaiters := self.waitN.Load(MemoryOrder.Relaxed)
+			nWaiters := self.waitN.Load(atomic::MemoryOrder.Relaxed)
 			if nWaiters == 0 {
 				ret
 			}
 
-			if self.waitN.CompareSwap(nWaiters, 0, MemoryOrder.Relaxed) {
+			if self.waitN.CompareSwap(nWaiters, 0, atomic::MemoryOrder.Relaxed) {
 				ret
 			}
 		}
@@ -58,16 +58,16 @@ impl WaitGroup {
 
 	// Blocks until all tasks are done (task count becomes zero)
 	fn Wait(mut self) {
-		nTask := self.taskN.Load(MemoryOrder.Relaxed)
+		nTask := self.taskN.Load(atomic::MemoryOrder.Relaxed)
 		if nTask == 0 {
 			// No task, no need to wait.
 			ret
 		}
 
 		// Register this wait call to waiters.
-		self.waitN.Add(1, MemoryOrder.Relaxed)
+		self.waitN.Add(1, atomic::MemoryOrder.Relaxed)
 
 		// Wait for clearing waiters.
-		for self.waitN.Load(MemoryOrder.Relaxed) != 0 {}
+		for self.waitN.Load(atomic::MemoryOrder.Relaxed) != 0 {}
 	}
 }
