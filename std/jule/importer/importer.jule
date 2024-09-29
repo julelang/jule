@@ -2,33 +2,20 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use std::fs::{OFlag, FsError, DirEntry, File, Directory}
+use fs for std::fs
 use path for std::fs::path
-use std::jule::ast::{AST}
-use build for std::jule::build::{
-	Directive,
-	LogKind,
-	Log,
-	Ext,
-}
+use ast for std::jule::ast
+use build for std::jule::build
 use mod for std::jule::internal::mod
-use std::jule::lex::{
-	LexMode,
-	Token,
-	NewFileSet,
-	Lex,
-}
-use std::jule::parser::{ParseFile}
-use std::jule::sema::{
-	Importer,
-	ImportInfo,
-}
+use lex for std::jule::lex
+use parser for std::jule::parser
+use sema for std::jule::sema
 use process for std::process
 use strings for std::strings
 
 // Read buffer by file path.
 fn readBuff(path: str): []byte {
-	ret File.Read(path) else {
+	ret fs::File.Read(path) else {
 		outln("error: file cannot read")
 		const ErrorExitCode = 1
 		process::Exit(ErrorExitCode)
@@ -38,9 +25,9 @@ fn readBuff(path: str): []byte {
 
 // Make compiler error, just text.
 // Not includes row, column, and etc. informations.
-fn flatCompilerErr(text: str): Log {
-	ret Log{
-		Kind: LogKind.Error,
+fn flatCompilerErr(text: str): build::Log {
+	ret build::Log{
+		Kind: build::LogKind.Error,
 		Text: text,
 	}
 }
@@ -49,7 +36,7 @@ fn flatCompilerErr(text: str): Log {
 struct JuleImporter {
 	mods: []str
 	mod:  str
-	pkgs: []&ImportInfo
+	pkgs: []&sema::ImportInfo
 	vars: []str
 }
 
@@ -66,12 +53,12 @@ impl JuleImporter {
 	// Returns all imported packages.
 	// The return value is mutable reference to internal buffer.
 	// You should be care about using that copy.
-	fn AllPackages(mut self): []&ImportInfo {
+	fn AllPackages(mut self): []&sema::ImportInfo {
 		ret self.pkgs
 	}
 }
 
-impl Importer for JuleImporter {
+impl sema::Importer for JuleImporter {
 	fn SetModPath(mut self, path: str) {
 		self.mod = path
 	}
@@ -84,7 +71,7 @@ impl Importer for JuleImporter {
 		ret self.mods[id]
 	}
 
-	fn GetImport(mut self, path: str): &ImportInfo {
+	fn GetImport(mut self, path: str): &sema::ImportInfo {
 		for (_, mut p) in self.pkgs {
 			// avoid case sensivity for fair comparison
 			if strings::EqualFold(p.Path, path) {
@@ -94,8 +81,8 @@ impl Importer for JuleImporter {
 		ret nil
 	}
 
-	fn ImportPackage(mut self, path: str, updateMod: bool): ([]&AST, []Log) {
-		mut dirents := Directory.Read(path) else {
+	fn ImportPackage(mut self, path: str, updateMod: bool): ([]&ast::AST, []build::Log) {
+		mut dirents := fs::Directory.Read(path) else {
 			ret nil, [flatCompilerErr("cannot read package directory: " + path)]
 		}
 
@@ -110,7 +97,7 @@ impl Importer for JuleImporter {
 			}
 		}
 
-		mut asts := make([]&AST, 0, len(dirents))
+		mut asts := make([]&ast::AST, 0, len(dirents))
 		for _, dirent in dirents {
 			// Skip directories, and non-jule files.
 			if dirent.Stat.IsDir() || !strings::HasSuffix(dirent.Name, build::Ext) {
@@ -118,14 +105,14 @@ impl Importer for JuleImporter {
 			}
 
 			_path := path::Join(path, dirent.Name)
-			mut file := NewFileSet(_path)
+			mut file := lex::NewFileSet(_path)
 			file.Fill(readBuff(file.Path))
-			mut errors := Lex(file, LexMode.Standard)
+			mut errors := lex::Lex(file, lex::LexMode.Standard)
 			if len(errors) > 0 {
 				ret nil, errors
 			}
 
-			mut finfo := ParseFile(file)
+			mut finfo := parser::ParseFile(file)
 			if len(finfo.Errors) > 0 {
 				ret nil, finfo.Errors
 			}
@@ -151,7 +138,7 @@ impl Importer for JuleImporter {
 		ret asts, nil
 	}
 
-	fn Imported(mut self, mut imp: &ImportInfo) {
+	fn Imported(mut self, mut imp: &sema::ImportInfo) {
 		// Already imported?
 		for _, p in self.pkgs {
 			// avoid case sensivity for fair comparison
@@ -178,9 +165,9 @@ impl Importer for JuleImporter {
 
 impl JuleImporter {
 	// Reports whether file passes build directives.
-	fn isPassBuildDirectives(mut self, mut &file: &AST): (bool, []Log) {
+	fn isPassBuildDirectives(mut self, mut &file: &ast::AST): (bool, []build::Log) {
 		for (_, mut td) in file.TopDirectives {
-			if td.Tag.Kind != Directive.Build {
+			if td.Tag.Kind != build::Directive.Build {
 				continue
 			}
 			mut de := directiveEval{

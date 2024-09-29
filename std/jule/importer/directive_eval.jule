@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use std::jule::ast::{Directive}
-use std::jule::build::{Log, LogKind, LogMsg, Logf}
-use std::jule::lex::{Token, TokenId, TokenKind}
+use ast for std::jule::ast
+use build for std::jule::build
+use lex for std::jule::lex
 
 // Eval directive expression.
 // Directive expressions are logial expressions and uses varaibles.
@@ -12,36 +12,36 @@ use std::jule::lex::{Token, TokenId, TokenKind}
 // Read manual for more information about syntax or etc:
 // https://manual.jule.dev/compiler/directives.html#directive-expressions
 struct directiveEval {
-	logs: []Log
-	d:    &Directive
+	logs: []build::Log
+	d:    &ast::Directive
 	vars: []str
 }
 
 impl directiveEval {
-	fn pushErr(mut self, t: &Token, fmt: LogMsg, args: ...any) {
-		self.logs = append(self.logs, Log{
-			Kind: LogKind.Error,
+	fn pushErr(mut self, t: &lex::Token, fmt: build::LogMsg, args: ...any) {
+		self.logs = append(self.logs, build::Log{
+			Kind: build::LogKind.Error,
 			Row: t.Row,
 			Column: t.Column,
 			Path: t.File.Path,
-			Text: Logf(fmt, args...),
+			Text: build::Logf(fmt, args...),
 		})
 	}
 
 	// Split operans by binary operators.
 	// Skips range of parentheses.
-	fn splitOperans(mut self, op: TokenId, mut &tokens: []&Token): [][]&Token {
-		mut parts := make([][]&Token, 0, 10)
+	fn splitOperans(mut self, op: lex::TokenId, mut &tokens: []&lex::Token): [][]&lex::Token {
+		mut parts := make([][]&lex::Token, 0, 10)
 		mut i := 0
 		mut rangeN := 0
 		mut last := 0
 		for i < len(tokens)-1; i++ {
 			b := tokens[i]
 			match b.Id {
-			| TokenId.LParent:
+			| lex::TokenId.LParent:
 				rangeN++
 				continue
-			| TokenId.RParent:
+			| lex::TokenId.RParent:
 				rangeN--
 			}
 			if rangeN > 0 || b.Id != op {
@@ -54,7 +54,7 @@ impl directiveEval {
 			parts = append(parts, tokens[last:])
 		} else {
 			// Missing operand.
-			self.pushErr(tokens[last-1], LogMsg.MissingExpr)
+			self.pushErr(tokens[last-1], build::LogMsg.MissingExpr)
 			ret nil
 		}
 		ret parts
@@ -75,14 +75,14 @@ impl directiveEval {
 
 	// Eval directive expression part.
 	// Accepts unary operators.
-	fn evalDirectivePart(mut self, mut part: []&Token): bool {
-		logicalNot := part[0].Id == TokenId.Excl
+	fn evalDirectivePart(mut self, mut part: []&lex::Token): bool {
+		logicalNot := part[0].Id == lex::TokenId.Excl
 		if logicalNot {
 			part = part[1:]
 		}
 
 		if len(part) > 1 {
-			self.pushErr(part[1], LogMsg.InvalidSyntax)
+			self.pushErr(part[1], build::LogMsg.InvalidSyntax)
 			ret false
 		}
 
@@ -95,32 +95,32 @@ impl directiveEval {
 
 	fn eval(mut self): bool {
 		if len(self.d.Args) == 0 {
-			self.pushErr(self.d.Tag, LogMsg.MissingExpr)
+			self.pushErr(self.d.Tag, build::LogMsg.MissingExpr)
 			ret false
 		}
 
 		mut result := false
 
-		mut logicalOrParts := self.splitOperans(TokenId.DblVline, self.d.Args)
+		mut logicalOrParts := self.splitOperans(lex::TokenId.DblVline, self.d.Args)
 		if logicalOrParts == nil {
 			ret false
 		}
 
 		for (_, mut part) in logicalOrParts {
 			mut and := true
-			mut logicalAndParts := self.splitOperans(TokenId.DblAmper, part)
+			mut logicalAndParts := self.splitOperans(lex::TokenId.DblAmper, part)
 			if logicalAndParts == nil {
 				ret false
 			}
 
 			for (_, mut andPart) in logicalAndParts {
 				first := andPart[0]
-				if first.Id == TokenId.LParent {
+				if first.Id == lex::TokenId.LParent {
 					end := andPart[len(andPart)-1]
 
 					// Missing close.
-					if end.Id != TokenId.RParent {
-						self.pushErr(first, LogMsg.WaitCloseParent)
+					if end.Id != lex::TokenId.RParent {
+						self.pushErr(first, build::LogMsg.WaitCloseParent)
 						ret false
 					}
 
