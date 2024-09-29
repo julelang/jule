@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use std::jule::ast::{GenericDecl, IdentTypeDecl}
-use std::jule::build::{LogMsg}
-use std::jule::lex::{Token}
+use ast for std::jule::ast
+use build for std::jule::build
+use lex for std::jule::lex
 use types for std::jule::types
-use std::strings::{StrBuilder}
+use strings for std::strings
 
 enum builtinConstraint: str {
 	Signed: "signed",
@@ -34,7 +34,7 @@ struct constraintChecker {
 	mut s: &sema
 
 	// Declarations of generics.
-	mut genericsD: []&GenericDecl
+	mut genericsD: []&ast::GenericDecl
 
 	// Generics of instance.
 	mut generics: []&InsGeneric
@@ -53,7 +53,7 @@ struct constraintChecker {
 	mut si: &StructIns
 
 	// Error that will use as error token.
-	mut et: &Token
+	mut et: &lex::Token
 
 	// Whether instance is unique.
 	mut uniq: bool
@@ -73,8 +73,8 @@ impl constraintChecker {
 					mut kind := sema.buildTypeWithRefers(mask, sema, generics, nil)
 					if kind == nil {
 						match type mask.Kind {
-						| &IdentTypeDecl:
-							mut itd := (&IdentTypeDecl)(mask.Kind)
+						| &ast::IdentTypeDecl:
+							mut itd := (&ast::IdentTypeDecl)(mask.Kind)
 							if len(itd.Generics) == 0 && isBuiltinConstraint(itd.Ident) {
 								kind = &TypeKind{Kind: buildPrimType(itd.Ident)}
 								sema.errors = sema.errors[:n]
@@ -133,7 +133,7 @@ impl constraintChecker {
 					continue lookup
 				}
 			}
-			self.s.pushErr(self.et, LogMsg.ConstraintFailed, g.Kind.Str(), self.genericsD[i].Ident, toStrConstraints(g))
+			self.s.pushErr(self.et, build::LogMsg.ConstraintFailed, g.Kind.Str(), self.genericsD[i].Ident, toStrConstraints(g))
 			ret false
 		}
 		ret true
@@ -141,7 +141,7 @@ impl constraintChecker {
 }
 
 fn toStrConstraints(g: &InsGeneric): str {
-	mut sb := StrBuilder.New(1 << 7)
+	mut sb := strings::StrBuilder.New(1 << 7)
 	for i, c in g.Constraint {
 		sb.WriteStr(c.Str())
 		if len(g.Constraint)-i > 1 {

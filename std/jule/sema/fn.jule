@@ -2,20 +2,20 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use std::jule::ast::{Directive, GenericDecl, ScopeTree}
-use std::jule::build::{EntryPoint, InitFn}
-use std::jule::lex::{Token, IsAnonIdent}
-use std::internal::strings::{StrBuilder}
+use ast for std::jule::ast
+use build for std::jule::build
+use lex for std::jule::lex
+use strings for std::internal::strings
 
 // Return type.
 struct RetType {
 	Kind:   &TypeSymbol
-	Idents: []&Token
+	Idents: []&lex::Token
 }
 
 // Parameter.
 struct Param {
-	Token:     &Token
+	Token:     &lex::Token
 	Mutable:   bool
 	Variadic:  bool
 	Reference: bool
@@ -45,7 +45,7 @@ impl Param {
 struct Fn {
 	sema: &sema
 
-	Token:       &Token
+	Token:       &lex::Token
 	Global:      bool
 	Unsafety:    bool
 	Public:      bool
@@ -53,9 +53,9 @@ struct Fn {
 	Statically:  bool
 	Exceptional: bool
 	Ident:       str
-	Directives:  []&Directive
-	Scope:       &ScopeTree
-	Generics:    []&GenericDecl
+	Directives:  []&ast::Directive
+	Scope:       &ast::ScopeTree
+	Generics:    []&ast::GenericDecl
 	Result:      &RetType
 	Params:      []&Param
 	Owner:       &Struct
@@ -87,17 +87,17 @@ impl Fn {
 
 	// Reports whether function is entry point.
 	fn IsEntryPoint(self): bool {
-		ret self.Ident == EntryPoint
+		ret self.Ident == build::EntryPoint
 	}
 
 	// Reports whether function is initializer function.
 	fn IsInit(self): bool {
-		ret self.Ident == InitFn
+		ret self.Ident == build::InitFn
 	}
 
 	// Reports whether function is anonymous function.
 	fn IsAnon(self): bool {
-		ret IsAnonIdent(self.Ident)
+		ret lex::IsAnonIdent(self.Ident)
 	}
 
 	// Reports whether function has return variable(s).
@@ -173,7 +173,7 @@ impl ParamIns {
 	// Implement: Kind
 	// Returns ParamIns's type kind as string.
 	fn Str(self): str {
-		mut s := StrBuilder.New(1 << 5)
+		mut s := strings::StrBuilder.New(1 << 5)
 		if self.Decl.Mutable {
 			s.WriteStr("mut ")
 		}
@@ -357,7 +357,7 @@ impl FnIns {
 	// Appends identifier to kind of this instance.
 	// Does not appends identifier of this instance to kind if self.Decl is nil reference.
 	fn GetKindStr(self, ident: bool): str {
-		mut s := StrBuilder.New(1 << 5)
+		mut s := strings::StrBuilder.New(1 << 5)
 
 		if self.Decl != nil && self.Decl.Unsafety {
 			s.WriteStr("unsafe ")
@@ -392,7 +392,7 @@ impl FnIns {
 	}
 }
 
-fn parameterUsesGenerics(mut &p: &ParamIns, &generics: []&GenericDecl): bool {
+fn parameterUsesGenerics(mut &p: &ParamIns, &generics: []&ast::GenericDecl): bool {
 	if p.Decl.IsSelf() {
 		ret false
 	}

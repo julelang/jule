@@ -6,23 +6,11 @@
 
 use conv for std::conv
 use math for std::math
-use ast for std::jule::ast::{
-	Expr,
-	KeyValPair,
-	FieldExprPair,
-	RangeKind,
-	VarDecl,
-	ExprData,
-	IdentExpr,
-	SliceExpr,
-	VariadicExpr,
-	TupleExpr,
-	FnCallExpr,
-}
-use std::jule::build::{Directive, LogMsg, Logf}
+use ast for std::jule::ast
+use build for std::jule::build
 use lit for std::jule::constant::lit
-use std::jule::lex::{Token, Ident, IsIgnoreIdent, IsAnonIdent}
-use std::internal::strings::{StrBuilder}
+use lex for std::jule::lex
+use strings for std::internal::strings
 use types for std::jule::types
 
 fn traitHasReferenceReceiver(&t: &Trait): bool {
@@ -112,11 +100,11 @@ struct typeCompatibilityChecker {
 	s:          &sema // Used for error logging.
 	dest:       &TypeKind
 	src:        &TypeKind
-	errorToken: &Token
+	errorToken: &lex::Token
 }
 
 impl typeCompatibilityChecker {
-	fn pushErr(mut self, fmt: LogMsg, args: ...any) {
+	fn pushErr(mut self, fmt: build::LogMsg, args: ...any) {
 		self.s.pushErr(self.errorToken, fmt, args...)
 	}
 
@@ -140,7 +128,7 @@ impl typeCompatibilityChecker {
 				ret false
 			}
 			if !ref && traitHasReferenceReceiver(trt) {
-				self.pushErr(LogMsg.TraitHasRefParamFn)
+				self.pushErr(build::LogMsg.TraitHasRefParamFn)
 				ret false
 			}
 			ret true
@@ -248,12 +236,12 @@ struct assignTypeChecker {
 	s:          &sema // Used for error logging and type checking.
 	dest:       &TypeKind
 	d:          &Data
-	errorToken: &Token
+	errorToken: &lex::Token
 	refers:     &ReferenceStack
 }
 
 impl assignTypeChecker {
-	fn pushErr(mut self, fmt: LogMsg, args: ...any) {
+	fn pushErr(mut self, fmt: build::LogMsg, args: ...any) {
 		self.s.pushErr(self.errorToken, fmt, args...)
 	}
 
@@ -264,21 +252,21 @@ impl assignTypeChecker {
 			f := self.d.Kind.Fn()
 			match {
 			| f.IsBuiltin():
-				self.pushErr(LogMsg.BuiltinAsNonFn)
+				self.pushErr(build::LogMsg.BuiltinAsNonFn)
 				valid = false
 			| f.Decl.Binded:
-				self.pushErr(LogMsg.BindedFnAsAnonFn)
+				self.pushErr(build::LogMsg.BindedFnAsAnonFn)
 				valid = false
 			| !f.Decl.Statically && f.Decl.IsMethod():
-				self.pushErr(LogMsg.MethodAsAnonFn)
+				self.pushErr(build::LogMsg.MethodAsAnonFn)
 				valid = false
 			| len(f.Decl.Generics) > 0 && len(f.Generics) == 0:
-				self.pushErr(LogMsg.GenericedFnAsAnonFn)
-				self.s.pushSuggestion(LogMsg.InstantiateGenericFnToUseAsAnon)
+				self.pushErr(build::LogMsg.GenericedFnAsAnonFn)
+				self.s.pushSuggestion(build::LogMsg.InstantiateGenericFnToUseAsAnon)
 				valid = false
 			}
 		| self.d.Kind.Tup() != nil:
-			self.pushErr(LogMsg.TupleAssignToSingle)
+			self.pushErr(build::LogMsg.TupleAssignToSingle)
 			valid = false
 		}
 		ret valid
@@ -348,7 +336,7 @@ struct dynamicTypeAnnotation {
 	f:          &FnIns
 	p:          &ParamIns
 	a:          &Data
-	errorToken: &Token
+	errorToken: &lex::Token
 	k:          *&TypeKind
 	c:          &ast::TypeDecl
 	ignored:    []&TypeKind // Ignored generics.
@@ -667,8 +655,8 @@ impl dynamicTypeAnnotation {
 
 struct fnCallArgChecker {
 	e:                 &eval
-	args:              []&Expr
-	errorToken:        &Token
+	args:              []&ast::Expr
+	errorToken:        &lex::Token
 	f:                 &FnIns
 	dynamicAnnotation: bool
 	argModels:         []ExprModel
@@ -676,11 +664,11 @@ struct fnCallArgChecker {
 }
 
 impl fnCallArgChecker {
-	fn pushErrToken(mut self, token: &Token, fmt: LogMsg, args: ...any) {
+	fn pushErrToken(mut self, token: &lex::Token, fmt: build::LogMsg, args: ...any) {
 		self.e.s.pushErr(token, fmt, args...)
 	}
 
-	fn pushErr(mut self, fmt: LogMsg, args: ...any) {
+	fn pushErr(mut self, fmt: build::LogMsg, args: ...any) {
 		self.pushErrToken(self.errorToken, fmt, args...)
 	}
 
@@ -700,18 +688,18 @@ impl fnCallArgChecker {
 		}
 
 		mut diff := n - len(self.args)
-		mut log := LogMsg.Empty
+		mut log := build::LogMsg.Empty
 		match {
 		| diff == 0:
 			ret true
 		| n > 0 && params[n-1].Decl.Variadic:
 			ret true
 		| diff < 0 || diff > len(params):
-			log = LogMsg.ArgumentOverflow
+			log = build::LogMsg.ArgumentOverflow
 		|:
-			log = LogMsg.MissingArgs
+			log = build::LogMsg.MissingArgs
 		}
-		mut err := StrBuilder.New(1 << 5)
+		mut err := strings::StrBuilder.New(1 << 5)
 		err.WriteStr(self.f.Decl.Ident)
 		err.WriteStr("\n       want (")
 		for i, p in params {
@@ -725,7 +713,7 @@ impl fnCallArgChecker {
 		ret false
 	}
 
-	fn checkArg(mut self, mut &p: &ParamIns, mut &arg: &Data, mut &errorToken: &Token): (ok: bool) {
+	fn checkArg(mut self, mut &p: &ParamIns, mut &arg: &Data, mut &errorToken: &lex::Token): (ok: bool) {
 		if self.dynamicAnnotation && parameterUsesGenerics(p, self.f.Decl.Generics) {
 			// Accept as fail if parameter is variadic or expression is invalid.
 			ok = !p.Decl.Variadic && isGoodValueToInfer(arg)
@@ -741,7 +729,7 @@ impl fnCallArgChecker {
 				ok = unsafe { dta.annotate() }
 			}
 			if !ok {
-				self.pushErrToken(errorToken, LogMsg.DynamicTypeAnnotationFailed)
+				self.pushErrToken(errorToken, build::LogMsg.DynamicTypeAnnotationFailed)
 				ret false
 			}
 		}
@@ -754,7 +742,7 @@ impl fnCallArgChecker {
 		ret false
 	}
 
-	fn push(mut self, mut &p: &ParamIns, mut arg: &Expr): (ok: bool) {
+	fn push(mut self, mut &p: &ParamIns, mut arg: &ast::Expr): (ok: bool) {
 		mut old := self.e.prefix
 		oldImmut := self.e.immutable
 
@@ -805,7 +793,7 @@ impl fnCallArgChecker {
 			mut arg := self.args[i]
 
 			match type arg.Kind {
-			| &VariadicExpr:
+			| &ast::VariadicExpr:
 				self.e.prefix = &TypeKind{
 					Kind: &Slc{
 						Elem: p.Kind,
@@ -850,7 +838,7 @@ impl fnCallArgChecker {
 			// Use variable i because when variadic argument appears iteral will break.
 			// And it will increase variable i for point to following argument.
 			// Therefore, variable i always points to problematic argument.
-			self.pushErrToken(self.args[i].Token, LogMsg.MoreArgsWithVariadiced)
+			self.pushErrToken(self.args[i].Token, build::LogMsg.MoreArgsWithVariadiced)
 		}
 
 		if model != nil {
@@ -893,7 +881,7 @@ impl fnCallArgChecker {
 	fn checkDynamicTypeAnnotation(mut self): (ok: bool) {
 		for _, g in self.f.Generics {
 			if g == nil {
-				self.pushErr(LogMsg.DynamicTypeAnnotationFailed)
+				self.pushErr(build::LogMsg.DynamicTypeAnnotationFailed)
 				ret false
 			}
 		}
@@ -926,29 +914,29 @@ fn checkMutRiskOfStructLit(mut &s: &sema, &m: &StructLitExprModel) {
 			continue
 		}
 		if !arg.Expr.Mutable && arg.Expr.Kind.Mutable() {
-			s.pushErr(arg.Token, LogMsg.AssignNonMutToMut, arg.Expr.Kind.Str())
+			s.pushErr(arg.Token, build::LogMsg.AssignNonMutToMut, arg.Expr.Kind.Str())
 		}
 	}
 }
 
 struct structLitChecker {
 	e:          &eval
-	errorToken: &Token
+	errorToken: &lex::Token
 	s:          &StructIns
 	args:       []&StructArgExprModel
 }
 
 impl structLitChecker {
-	fn pushErr(mut self, token: &Token, fmt: LogMsg, args: ...any) {
+	fn pushErr(mut self, token: &lex::Token, fmt: build::LogMsg, args: ...any) {
 		self.e.pushErr(token, fmt, args...)
 	}
 
 	// Push suggestion to last log.
-	fn pushSuggestion(mut self, fmt: LogMsg, args: ...any) {
+	fn pushSuggestion(mut self, fmt: build::LogMsg, args: ...any) {
 		self.e.pushSuggestion(fmt, args...)
 	}
 
-	fn pushMatch(mut self, mut &f: &FieldIns, mut &d: &Data, mut &errorToken: &Token) {
+	fn pushMatch(mut self, mut &f: &FieldIns, mut &d: &Data, mut &errorToken: &lex::Token) {
 		const Reference = false
 		// If evaluated for the immutable memory, check as immutable.
 		// But if field in scope of the interior mutability, check as mutable.
@@ -967,29 +955,29 @@ impl structLitChecker {
 		})
 	}
 
-	fn checkPair(mut self, mut &pair: &FieldExprPair, mut &exprs: []&Expr) {
+	fn checkPair(mut self, mut &pair: &ast::FieldExprPair, mut &exprs: []&ast::Expr) {
 		// Check existing.
 		mut f := self.s.FindField(pair.Field.Kind)
 		if f == nil {
-			self.pushErr(pair.Field, LogMsg.IdentNotExist, pair.Field.Kind)
+			self.pushErr(pair.Field, build::LogMsg.IdentNotExist, pair.Field.Kind)
 			ret
 		}
 		if !self.e.s.isAccessibleDefine(f.Decl.Public, f.Decl.Token) {
-			self.pushErr(pair.Field, LogMsg.IdentIsNotAccessible, pair.Field.Kind)
-			self.pushSuggestion(LogMsg.MakePubToAccess)
+			self.pushErr(pair.Field, build::LogMsg.IdentIsNotAccessible, pair.Field.Kind)
+			self.pushSuggestion(build::LogMsg.MakePubToAccess)
 		}
 
 		// Check duplications.
 	dup_lookup:
 		for (_, mut expr) in exprs {
 			match type expr.Kind {
-			| &FieldExprPair:
-				mut dpair := (&FieldExprPair)(expr.Kind)
+			| &ast::FieldExprPair:
+				mut dpair := (&ast::FieldExprPair)(expr.Kind)
 				match {
 				| pair == dpair:
 					break dup_lookup
 				| pair.Field.Kind == dpair.Field.Kind:
-					self.pushErr(pair.Field, LogMsg.AlreadyHasExpr, pair.Field.Kind)
+					self.pushErr(pair.Field, build::LogMsg.AlreadyHasExpr, pair.Field.Kind)
 					break dup_lookup
 				}
 			}
@@ -1006,22 +994,22 @@ impl structLitChecker {
 		self.pushMatch(f, d, pair.Field)
 	}
 
-	fn readyExprs(mut self, mut &exprs: []&Expr): bool {
+	fn readyExprs(mut self, mut &exprs: []&ast::Expr): bool {
 		mut ok := true
 		for (i, mut expr) in exprs {
 			match type expr.Kind {
-			| &KeyValPair:
-				mut pair := (&KeyValPair)(expr.Kind)
+			| &ast::KeyValPair:
+				mut pair := (&ast::KeyValPair)(expr.Kind)
 				match type pair.Key.Kind {
-				| &IdentExpr:
+				| &ast::IdentExpr:
 					// Ok
 					break
 				|:
-					self.pushErr(pair.Colon, LogMsg.InvalidSyntax)
+					self.pushErr(pair.Colon, build::LogMsg.InvalidSyntax)
 					ok = false
 					continue
 				}
-				exprs[i].Kind = &FieldExprPair{
+				exprs[i].Kind = &ast::FieldExprPair{
 					Field: pair.Key.Token,
 					Expr: pair.Val,
 				}
@@ -1030,7 +1018,7 @@ impl structLitChecker {
 		ret ok
 	}
 
-	fn check(mut self, mut &exprs: []&Expr) {
+	fn check(mut self, mut &exprs: []&ast::Expr) {
 		if len(exprs) == 0 {
 			ret
 		}
@@ -1040,27 +1028,27 @@ impl structLitChecker {
 		mut paired := false
 		for (i, mut expr) in exprs {
 			match type expr.Kind {
-			| &FieldExprPair:
-				mut pair := (&FieldExprPair)(expr.Kind)
+			| &ast::FieldExprPair:
+				mut pair := (&ast::FieldExprPair)(expr.Kind)
 				if i > 0 && !paired {
-					self.pushErr(pair.Field, LogMsg.InvalidSyntax)
+					self.pushErr(pair.Field, build::LogMsg.InvalidSyntax)
 				}
 				paired = true
 				self.checkPair(pair, exprs)
 			|:
 				if paired {
-					self.pushErr(expr.Token, LogMsg.ArgMustTargetToField)
+					self.pushErr(expr.Token, build::LogMsg.ArgMustTargetToField)
 				}
 				if i >= len(self.s.Fields) {
-					self.pushErr(expr.Token, LogMsg.ArgumentOverflow)
+					self.pushErr(expr.Token, build::LogMsg.ArgumentOverflow)
 					continue
 				}
 
 				mut field := self.s.Fields[i]
 
 				if !self.e.s.isAccessibleDefine(field.Decl.Public, field.Decl.Token) {
-					self.pushErr(self.errorToken, LogMsg.StructureLitWithPrivFields)
-					self.pushSuggestion(LogMsg.UseFieldPairToInstantiate)
+					self.pushErr(self.errorToken, build::LogMsg.StructureLitWithPrivFields)
+					self.pushSuggestion(build::LogMsg.UseFieldPairToInstantiate)
 					ret
 				}
 
@@ -1086,12 +1074,12 @@ impl structLitChecker {
 				ret
 			}
 
-			mut idents := StrBuilder.New(1 << 5)
+			mut idents := strings::StrBuilder.New(1 << 5)
 			for diff > 0; diff-- {
 				idents.WriteStr(", ")
 				idents.WriteStr(self.s.Fields[n-diff].Decl.Ident)
 			}
-			self.pushErr(self.errorToken, LogMsg.MissingExprFor,
+			self.pushErr(self.errorToken, build::LogMsg.MissingExprFor,
 				str(unsafe { idents.Buf() }[2:])) /* Remove first separator. */
 		}
 	}
@@ -1100,19 +1088,19 @@ impl structLitChecker {
 // Range checker and setter.
 struct rangeChecker {
 	sc:   &scopeChecker
-	rang: &RangeKind
+	rang: &ast::RangeKind
 	Kind: &RangeIter
 	d:    &Data
 }
 
 impl rangeChecker {
-	fn buildVar(self, mut &decl: &VarDecl): &Var {
+	fn buildVar(self, mut &decl: &ast::VarDecl): &Var {
 		mut v := buildVar(decl)
 		ret v
 	}
 
 	fn setSizeKey(mut self) {
-		if self.rang.KeyA == nil || IsIgnoreIdent(self.rang.KeyA.Ident) {
+		if self.rang.KeyA == nil || lex::IsIgnoreIdent(self.rang.KeyA.Ident) {
 			ret
 		}
 		self.Kind.KeyA = self.buildVar(self.rang.KeyA)
@@ -1140,7 +1128,7 @@ impl rangeChecker {
 
 	fn checkSlice(mut self) {
 		self.setSizeKey()
-		if self.rang.KeyB == nil || IsIgnoreIdent(self.rang.KeyB.Ident) {
+		if self.rang.KeyB == nil || lex::IsIgnoreIdent(self.rang.KeyB.Ident) {
 			ret
 		}
 
@@ -1153,7 +1141,7 @@ impl rangeChecker {
 
 	fn checkArray(mut self) {
 		self.setSizeKey()
-		if self.rang.KeyB == nil || IsIgnoreIdent(self.rang.KeyB.Ident) {
+		if self.rang.KeyB == nil || lex::IsIgnoreIdent(self.rang.KeyB.Ident) {
 			ret
 		}
 
@@ -1165,7 +1153,7 @@ impl rangeChecker {
 	}
 
 	fn checkMapKeyA(mut self) {
-		if self.rang.KeyA == nil || IsIgnoreIdent(self.rang.KeyA.Ident) {
+		if self.rang.KeyA == nil || lex::IsIgnoreIdent(self.rang.KeyA.Ident) {
 			ret
 		}
 
@@ -1180,7 +1168,7 @@ impl rangeChecker {
 	}
 
 	fn checkMapKeyB(mut self) {
-		if self.rang.KeyB == nil || IsIgnoreIdent(self.rang.KeyB.Ident) {
+		if self.rang.KeyB == nil || lex::IsIgnoreIdent(self.rang.KeyB.Ident) {
 			ret
 		}
 
@@ -1201,7 +1189,7 @@ impl rangeChecker {
 
 	fn checkStr(mut self) {
 		self.setSizeKey()
-		if self.rang.KeyB == nil || IsIgnoreIdent(self.rang.KeyB.Ident) {
+		if self.rang.KeyB == nil || lex::IsIgnoreIdent(self.rang.KeyB.Ident) {
 			ret
 		}
 		self.Kind.KeyB = self.buildVar(self.rang.KeyB)
@@ -1211,12 +1199,12 @@ impl rangeChecker {
 	fn checkComptime(mut self) {
 		self.setSizeKey()
 		if self.rang.KeyA != nil && self.rang.KeyA.Mutable {
-			self.sc.s.pushErr(self.rang.KeyA.Token, LogMsg.CannotBeMut, self.rang.KeyA.Ident)
+			self.sc.s.pushErr(self.rang.KeyA.Token, build::LogMsg.CannotBeMut, self.rang.KeyA.Ident)
 		}
 		if self.rang.KeyB != nil && self.rang.KeyB.Mutable {
-			self.sc.s.pushErr(self.rang.KeyB.Token, LogMsg.CannotBeMut, self.rang.KeyB.Ident)
+			self.sc.s.pushErr(self.rang.KeyB.Token, build::LogMsg.CannotBeMut, self.rang.KeyB.Ident)
 		}
-		if self.rang.KeyB == nil || IsIgnoreIdent(self.rang.KeyB.Ident) {
+		if self.rang.KeyB == nil || lex::IsIgnoreIdent(self.rang.KeyB.Ident) {
 			ret
 		}
 		self.Kind.KeyB = self.buildVar(self.rang.KeyB)
@@ -1235,7 +1223,7 @@ impl rangeChecker {
 			self.checkComptime()
 			ret true
 		|:
-			self.sc.s.pushErr(self.rang.InToken, LogMsg.IterRangeRequireEnumerableExpr)
+			self.sc.s.pushErr(self.rang.InToken, build::LogMsg.IterRangeRequireEnumerableExpr)
 			ret false
 		}
 	}
@@ -1262,7 +1250,7 @@ impl rangeChecker {
 				ret true
 			}
 		}
-		self.sc.s.pushErr(self.rang.InToken, LogMsg.IterRangeRequireEnumerableExpr)
+		self.sc.s.pushErr(self.rang.InToken, build::LogMsg.IterRangeRequireEnumerableExpr)
 		ret false
 	}
 }
@@ -1272,8 +1260,8 @@ struct retTypeChecker {
 	sc:         &scopeChecker
 	f:          &FnIns
 	types:      []&TypeKind // Return types.
-	exprs:      []&Expr     // Return expressions.
-	errorToken: &Token
+	exprs:      []&ast::Expr     // Return expressions.
+	errorToken: &lex::Token
 	model:      ExprModel
 }
 
@@ -1284,13 +1272,13 @@ impl retTypeChecker {
 		}
 	}
 
-	fn prepareExprs(mut self, mut &e: &Expr) {
+	fn prepareExprs(mut self, mut &e: &ast::Expr) {
 		if e == nil {
 			ret
 		}
 		match type e.Kind {
-		| &TupleExpr:
-			self.exprs = (&TupleExpr)(e.Kind).Expr
+		| &ast::TupleExpr:
+			self.exprs = (&ast::TupleExpr)(e.Kind).Expr
 		|:
 			self.exprs = append(self.exprs, e)
 		}
@@ -1318,7 +1306,7 @@ impl retTypeChecker {
 			datas = append(datas, d)
 
 			if !d.Mutable && d.Kind.Mutable() {
-				self.sc.s.pushErr(self.errorToken, LogMsg.RetWithMutTypedNonMut)
+				self.sc.s.pushErr(self.errorToken, build::LogMsg.RetWithMutTypedNonMut)
 				ret
 			}
 
@@ -1342,7 +1330,7 @@ impl retTypeChecker {
 		}
 	}
 
-	// Assumes len(self.exprs) == 0 and kind is [&FnCallExpr].
+	// Assumes len(self.exprs) == 0 and kind is [&ast::FnCallExpr].
 	fn tryFuncMultiRetForward(mut self): bool {
 		mut eval := self.sc.s.eval(self.sc)
 		mut d := eval.evalExpr(self.exprs[0])
@@ -1368,50 +1356,50 @@ impl retTypeChecker {
 		}
 		ret true
 	err:
-		mut wanted := StrBuilder.New(1 << 5)
+		mut wanted := strings::StrBuilder.New(1 << 5)
 		for i, t in self.types {
 			wanted.WriteStr(t.Str())
 			if len(self.types)-i > 1 {
 				wanted.WriteStr(", ")
 			}
 		}
-		mut given := StrBuilder.New(1 << 5)
+		mut given := strings::StrBuilder.New(1 << 5)
 		for i, t in tup.Types {
 			given.WriteStr(t.Str())
 			if len(self.types)-i > 1 {
 				given.WriteStr(", ")
 			}
 		}
-		self.sc.s.pushErr(self.errorToken, LogMsg.WrongRetForward, wanted.Str(), given.Str())
+		self.sc.s.pushErr(self.errorToken, build::LogMsg.WrongRetForward, wanted.Str(), given.Str())
 		ret false
 	}
 
-	fn check(mut self, mut &e: &Expr): bool {
+	fn check(mut self, mut &e: &ast::Expr): bool {
 		self.prepareTypes()
 		self.prepareExprs(e)
 		match {
 		| len(self.exprs) == 0 && len(self.types) > 0:
 			if !self.f.Decl.AnyVar() {
-				self.sc.s.pushErr(self.errorToken, LogMsg.RequireRetExpr)
+				self.sc.s.pushErr(self.errorToken, build::LogMsg.RequireRetExpr)
 				ret false
 			}
 			ret true
 		| len(self.exprs) > 0 && self.f != nil && self.f.Decl.IsVoid():
-			self.sc.s.pushErr(self.errorToken, LogMsg.VoidFnRetExpr)
+			self.sc.s.pushErr(self.errorToken, build::LogMsg.VoidFnRetExpr)
 			ret false
 		| len(self.exprs) == 1 && len(self.types) > 1:
 			match type self.exprs[0].Kind {
-			| &FnCallExpr:
+			| &ast::FnCallExpr:
 				if self.tryFuncMultiRetForward() {
 					ret true
 				}
 			}
-			self.sc.s.pushErr(self.errorToken, LogMsg.MissingMultiRet)
+			self.sc.s.pushErr(self.errorToken, build::LogMsg.MissingMultiRet)
 			ret false
 		| len(self.exprs) < len(self.types):
-			self.sc.s.pushErr(self.errorToken, LogMsg.MissingMultiRet)
+			self.sc.s.pushErr(self.errorToken, build::LogMsg.MissingMultiRet)
 		| len(self.exprs) > len(self.types):
-			self.sc.s.pushErr(self.errorToken, LogMsg.OverflowRet)
+			self.sc.s.pushErr(self.errorToken, build::LogMsg.OverflowRet)
 		}
 		self.checkExprs()
 		ret true

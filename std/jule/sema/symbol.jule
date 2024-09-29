@@ -2,40 +2,12 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use std::fs::{FsError, Status}
+use fs for std::fs
 use path for std::fs::path
-use ast for std::jule::ast::{
-	AST,
-	TypeDecl,
-	TypeAliasDecl,
-	FieldDecl,
-	TypeEnumDecl,
-	TypeEnumItemDecl,
-	EnumDecl,
-	EnumItemDecl,
-	VarDecl,
-	TraitDecl,
-	StructDecl,
-	ParamDecl,
-	FnDecl,
-	RetTypeDecl,
-	Node,
-	Expr,
-	UseDecl,
-}
-use std::jule::build::{
-	PathStdlib,
-	LogMsg,
-	Log,
-	LogKind,
-	Directive,
-	Logf,
-	IsStdHeaderPath,
-	IsValidHeaderExt,
-	IsValidCppExt,
-}
-use std::jule::lex::{Token, TokenId, TokenKind}
-use strings for std::strings::{StrBuilder}
+use ast for std::jule::ast
+use build for std::jule::build
+use lex for std::jule::lex
+use strings for std::strings
 
 // Stack for symbol references.
 // It used by Sema to store necessary references.
@@ -87,11 +59,11 @@ impl ReferenceStack {
 
 // Directive pass.
 struct Pass {
-	Token: &Token
+	Token: &lex::Token
 	Text:  str
 }
 
-fn buildType(mut t: &TypeDecl): &TypeSymbol {
+fn buildType(mut t: &ast::TypeDecl): &TypeSymbol {
 	if t == nil {
 		ret nil
 	}
@@ -100,7 +72,7 @@ fn buildType(mut t: &TypeDecl): &TypeSymbol {
 	}
 }
 
-fn buildExpr(mut expr: &Expr): &Value {
+fn buildExpr(mut expr: &ast::Expr): &Value {
 	if expr == nil {
 		ret nil
 	}
@@ -109,7 +81,7 @@ fn buildExpr(mut expr: &Expr): &Value {
 	}
 }
 
-fn buildTypeAlias(mut decl: &TypeAliasDecl): &TypeAlias {
+fn buildTypeAlias(mut decl: &ast::TypeAliasDecl): &TypeAlias {
 	ret &TypeAlias{
 		Scope: decl.Scope,
 		Public: decl.Public,
@@ -120,7 +92,7 @@ fn buildTypeAlias(mut decl: &TypeAliasDecl): &TypeAlias {
 	}
 }
 
-fn buildField(mut decl: &FieldDecl): &Field {
+fn buildField(mut decl: &ast::FieldDecl): &Field {
 	ret &Field{
 		Token: decl.Token,
 		Public: decl.Public,
@@ -131,7 +103,7 @@ fn buildField(mut decl: &FieldDecl): &Field {
 	}
 }
 
-fn buildFields(mut &decls: []&FieldDecl): []&Field {
+fn buildFields(mut &decls: []&ast::FieldDecl): []&Field {
 	mut fields := make([]&Field, 0, len(decls))
 	for (_, mut decl) in decls {
 		fields = append(fields, buildField(decl))
@@ -139,7 +111,7 @@ fn buildFields(mut &decls: []&FieldDecl): []&Field {
 	ret fields
 }
 
-fn buildStruct(mut decl: &StructDecl): &Struct {
+fn buildStruct(mut decl: &ast::StructDecl): &Struct {
 	ret &Struct{
 		Token: decl.Token,
 		Ident: decl.Ident,
@@ -151,7 +123,7 @@ fn buildStruct(mut decl: &StructDecl): &Struct {
 	}
 }
 
-fn buildParam(mut decl: &ParamDecl): &Param {
+fn buildParam(mut decl: &ast::ParamDecl): &Param {
 	ret &Param{
 		Token: decl.Token,
 		Mutable: decl.Mutable,
@@ -162,7 +134,7 @@ fn buildParam(mut decl: &ParamDecl): &Param {
 	}
 }
 
-fn buildParams(mut &decls: []&ParamDecl): []&Param {
+fn buildParams(mut &decls: []&ast::ParamDecl): []&Param {
 	mut params := make([]&Param, 0, len(decls))
 	for (_, mut decl) in decls {
 		params = append(params, buildParam(decl))
@@ -170,7 +142,7 @@ fn buildParams(mut &decls: []&ParamDecl): []&Param {
 	ret params
 }
 
-fn buildRetType(mut decl: &RetTypeDecl): &RetType {
+fn buildRetType(mut decl: &ast::RetTypeDecl): &RetType {
 	if decl.Idents == nil && decl.Kind == nil {
 		ret nil // Void type.
 	}
@@ -180,7 +152,7 @@ fn buildRetType(mut decl: &RetTypeDecl): &RetType {
 	}
 }
 
-fn buildFunc(mut decl: &FnDecl): &Fn {
+fn buildFunc(mut decl: &ast::FnDecl): &Fn {
 	ret &Fn{
 		Token: decl.Token,
 		Global: decl.Global,
@@ -198,7 +170,7 @@ fn buildFunc(mut decl: &FnDecl): &Fn {
 	}
 }
 
-fn buildMethods(mut &decls: []&FnDecl): []&Fn {
+fn buildMethods(mut &decls: []&ast::FnDecl): []&Fn {
 	mut methods := make([]&Fn, 0, len(decls))
 	for (_, mut decl) in decls {
 		methods = append(methods, buildFunc(decl))
@@ -206,7 +178,7 @@ fn buildMethods(mut &decls: []&FnDecl): []&Fn {
 	ret methods
 }
 
-fn buildTraitInherits(mut &inherits: []&TypeDecl): []&TypeSymbol {
+fn buildTraitInherits(mut &inherits: []&ast::TypeDecl): []&TypeSymbol {
 	mut symbols := make([]&TypeSymbol, 0, len(inherits))
 	for (_, mut it) in inherits {
 		symbols = append(symbols, buildType(it))
@@ -214,7 +186,7 @@ fn buildTraitInherits(mut &inherits: []&TypeDecl): []&TypeSymbol {
 	ret symbols
 }
 
-fn buildTrait(mut decl: &TraitDecl): &Trait {
+fn buildTrait(mut decl: &ast::TraitDecl): &Trait {
 	ret &Trait{
 		Token: decl.Token,
 		Ident: decl.Ident,
@@ -224,7 +196,7 @@ fn buildTrait(mut decl: &TraitDecl): &Trait {
 	}
 }
 
-fn buildEnumItem(mut decl: &EnumItemDecl): &EnumItem {
+fn buildEnumItem(mut decl: &ast::EnumItemDecl): &EnumItem {
 	ret &EnumItem{
 		Token: decl.Token,
 		Ident: decl.Ident,
@@ -232,7 +204,7 @@ fn buildEnumItem(mut decl: &EnumItemDecl): &EnumItem {
 	}
 }
 
-fn buildEnumItems(mut &decls: []&EnumItemDecl): []&EnumItem {
+fn buildEnumItems(mut &decls: []&ast::EnumItemDecl): []&EnumItem {
 	mut items := make([]&EnumItem, 0, len(decls))
 	for (_, mut decl) in decls {
 		items = append(items, buildEnumItem(decl))
@@ -240,7 +212,7 @@ fn buildEnumItems(mut &decls: []&EnumItemDecl): []&EnumItem {
 	ret items
 }
 
-fn buildEnum(mut decl: &EnumDecl): &Enum {
+fn buildEnum(mut decl: &ast::EnumDecl): &Enum {
 	ret &Enum{
 		Token: decl.Token,
 		Public: decl.Public,
@@ -250,7 +222,7 @@ fn buildEnum(mut decl: &EnumDecl): &Enum {
 	}
 }
 
-fn buildTypeEnumItem(mut decl: &TypeEnumItemDecl): &TypeEnumItem {
+fn buildTypeEnumItem(mut decl: &ast::TypeEnumItemDecl): &TypeEnumItem {
 	ret &TypeEnumItem{
 		Token: decl.Token,
 		Ident: decl.Ident,
@@ -258,7 +230,7 @@ fn buildTypeEnumItem(mut decl: &TypeEnumItemDecl): &TypeEnumItem {
 	}
 }
 
-fn buildTypeEnumItems(mut &decls: []&TypeEnumItemDecl): []&TypeEnumItem {
+fn buildTypeEnumItems(mut &decls: []&ast::TypeEnumItemDecl): []&TypeEnumItem {
 	mut items := make([]&TypeEnumItem, 0, len(decls))
 	for (_, mut decl) in decls {
 		items = append(items, buildTypeEnumItem(decl))
@@ -266,7 +238,7 @@ fn buildTypeEnumItems(mut &decls: []&TypeEnumItemDecl): []&TypeEnumItem {
 	ret items
 }
 
-fn buildTypeEnum(mut decl: &TypeEnumDecl): &TypeEnum {
+fn buildTypeEnum(mut decl: &ast::TypeEnumDecl): &TypeEnum {
 	ret &TypeEnum{
 		Token: decl.Token,
 		Public: decl.Public,
@@ -275,7 +247,7 @@ fn buildTypeEnum(mut decl: &TypeEnumDecl): &TypeEnum {
 	}
 }
 
-fn buildVar(mut decl: &VarDecl): &Var {
+fn buildVar(mut decl: &ast::VarDecl): &Var {
 	ret &Var{
 		Token: decl.Token,
 		Ident: decl.Ident,
@@ -292,7 +264,7 @@ fn buildVar(mut decl: &VarDecl): &Var {
 	}
 }
 
-fn buildVars(mut decls: []&VarDecl): []&Var {
+fn buildVars(mut decls: []&ast::VarDecl): []&Var {
 	mut vars := make([]&Var, 0, len(decls))
 	for (_, mut decl) in decls {
 		vars = append(vars, buildVar(decl))
@@ -315,8 +287,8 @@ fn buildImpl(mut decl: &ast::Impl): &Impl {
 struct symBuilder {
 	owner:    &symBuilder
 	importer: Importer
-	errors:   []Log
-	ast:      &AST
+	errors:   []build::Log
+	ast:      &ast::AST
 	table:    &SymTab
 }
 
@@ -329,43 +301,43 @@ impl symBuilder {
 		ret root
 	}
 
-	fn pushErr(mut self, &token: &Token, fmt: LogMsg, args: ...any) {
+	fn pushErr(mut self, &token: &lex::Token, fmt: build::LogMsg, args: ...any) {
 		self.errors = append(self.errors, compilerErr(token, true, fmt, args...))
 	}
 
-	fn pushErrText(mut self, &token: &Token, fmt: LogMsg, args: ...any) {
+	fn pushErrText(mut self, &token: &lex::Token, fmt: build::LogMsg, args: ...any) {
 		self.errors = append(self.errors, compilerErr(token, false, fmt, args...))
 	}
 
 	// Push suggestion to last log.
-	fn pushSuggestion(mut self, fmt: LogMsg, args: ...any) {
+	fn pushSuggestion(mut self, fmt: build::LogMsg, args: ...any) {
 		unsafe { pushSuggestion(&self.errors[len(self.errors)-1], fmt, args...) }
 	}
 
-	fn checkCppUseDeclPath(mut self, &decl: &UseDecl, &path: str): (ok: bool) {
+	fn checkCppUseDeclPath(mut self, &decl: &ast::UseDecl, &path: str): (ok: bool) {
 		ext := path::Ext(path)
-		if !IsValidHeaderExt(ext) && !IsValidCppExt(ext) {
-			self.pushErr(decl.Token, LogMsg.InvalidCppExt, ext)
+		if !build::IsValidHeaderExt(ext) && !build::IsValidCppExt(ext) {
+			self.pushErr(decl.Token, build::LogMsg.InvalidCppExt, ext)
 			ret false
 		}
 
 		// Exist?
-		info := Status.Of(path) else {
-			self.pushErr(decl.Token, LogMsg.UseNotFound, decl.LinkPath)
+		info := fs::Status.Of(path) else {
+			self.pushErr(decl.Token, build::LogMsg.UseNotFound, decl.LinkPath)
 			ret false
 		}
 		if info.IsDir() {
-			self.pushErr(decl.Token, LogMsg.UseNotFound, decl.LinkPath)
+			self.pushErr(decl.Token, build::LogMsg.UseNotFound, decl.LinkPath)
 			ret false
 		}
 
 		ret true
 	}
 
-	fn buildCppHeaderImport(mut self, mut &decl: &UseDecl): &ImportInfo {
+	fn buildCppHeaderImport(mut self, mut &decl: &ast::UseDecl): &ImportInfo {
 		mut path := decl.LinkPath
 
-		if !IsStdHeaderPath(decl.LinkPath) {
+		if !build::IsStdHeaderPath(decl.LinkPath) {
 			path = path::Join(decl.Token.File.Dir(), decl.LinkPath)
 			mut ok := self.checkCppUseDeclPath(decl, path)
 			if !ok {
@@ -375,7 +347,7 @@ impl symBuilder {
 			// Set to absolute path for correct include path.
 			path, ok = path::Abs(path)
 			if !ok {
-				self.pushErr(decl.Token, LogMsg.UseNotFound, decl.LinkPath)
+				self.pushErr(decl.Token, build::LogMsg.UseNotFound, decl.LinkPath)
 			}
 		}
 
@@ -390,29 +362,29 @@ impl symBuilder {
 		}
 	}
 
-	fn buildStdImport(mut self, mut &decl: &UseDecl): &ImportInfo {
+	fn buildStdImport(mut self, mut &decl: &ast::UseDecl): &ImportInfo {
 		// No need to check blank identifiers for standart packages.
 		mut path := decl.LinkPath[len("std::"):] // Skip "std::" prefix.
-		path = strings::Replace(path, TokenKind.DblColon, str(path::Separator), -1)
-		path = path::Join(PathStdlib, path)
+		path = strings::Replace(path, lex::TokenKind.DblColon, str(path::Separator), -1)
+		path = path::Join(build::PathStdlib, path)
 		path, ok := path::Abs(path)
 		if !ok {
-			self.pushErr(decl.Token, LogMsg.UseNotFound, decl.LinkPath)
+			self.pushErr(decl.Token, build::LogMsg.UseNotFound, decl.LinkPath)
 			ret nil
 		}
 
 		// Exist?
-		info := Status.Of(path) else {
-			self.pushErr(decl.Token, LogMsg.UseNotFound, decl.LinkPath)
+		info := fs::Status.Of(path) else {
+			self.pushErr(decl.Token, build::LogMsg.UseNotFound, decl.LinkPath)
 			ret nil
 		}
 		if !info.IsDir() {
-			self.pushErr(decl.Token, LogMsg.UseNotFound, decl.LinkPath)
+			self.pushErr(decl.Token, build::LogMsg.UseNotFound, decl.LinkPath)
 			ret nil
 		}
 
 		// Select last identifier of namespace chain.
-		i := strings::FindLast(decl.LinkPath, TokenKind.DblColon) + 1
+		i := strings::FindLast(decl.LinkPath, lex::TokenKind.DblColon) + 1
 		ident := decl.LinkPath[i:]
 
 		ret &ImportInfo{
@@ -430,43 +402,43 @@ impl symBuilder {
 		}
 	}
 
-	fn buildIdentImport(mut &self, mut &decl: &UseDecl): &ImportInfo {
+	fn buildIdentImport(mut &self, mut &decl: &ast::UseDecl): &ImportInfo {
 		if decl.LinkPath == "_" ||
 			strings::Find(decl.LinkPath, "::_::") != -1 ||
 			strings::HasSuffix(decl.LinkPath, "::_") {
-			self.pushErr(decl.Token, LogMsg.BlankIdentInUseDecl)
+			self.pushErr(decl.Token, build::LogMsg.BlankIdentInUseDecl)
 			ret nil
 		}
 
 		modPath := self.importer.GetModPath()
 		if len(modPath) == 0 {
-			self.pushErr(decl.Token, LogMsg.ModuleNotFound)
-			self.pushSuggestion(LogMsg.UseModInit)
+			self.pushErr(decl.Token, build::LogMsg.ModuleNotFound)
+			self.pushSuggestion(build::LogMsg.UseModInit)
 			ret nil
 		}
 
 		mut path := decl.LinkPath
-		path = strings::Replace(path, TokenKind.DblColon, str(path::Separator), -1)
+		path = strings::Replace(path, lex::TokenKind.DblColon, str(path::Separator), -1)
 		path = path::Join(modPath, path)
 
 		path, ok := path::Abs(path)
 		if !ok {
-			self.pushErr(decl.Token, LogMsg.UseNotFound, decl.LinkPath)
+			self.pushErr(decl.Token, build::LogMsg.UseNotFound, decl.LinkPath)
 			ret nil
 		}
 
 		// Exist?
-		info := Status.Of(path) else {
-			self.pushErr(decl.Token, LogMsg.UseNotFound, decl.LinkPath)
+		info := fs::Status.Of(path) else {
+			self.pushErr(decl.Token, build::LogMsg.UseNotFound, decl.LinkPath)
 			ret nil
 		}
 		if !info.IsDir() {
-			self.pushErr(decl.Token, LogMsg.UseNotFound, decl.LinkPath)
+			self.pushErr(decl.Token, build::LogMsg.UseNotFound, decl.LinkPath)
 			ret nil
 		}
 
 		// Select last identifier of namespace chain.
-		i := strings::FindLast(decl.LinkPath, TokenKind.DblColon) + 1
+		i := strings::FindLast(decl.LinkPath, lex::TokenKind.DblColon) + 1
 		ident := decl.LinkPath[i:]
 
 		ret &ImportInfo{
@@ -484,7 +456,7 @@ impl symBuilder {
 		}
 	}
 
-	fn buildImport(mut &self, mut &decl: &UseDecl): &ImportInfo {
+	fn buildImport(mut &self, mut &decl: &ast::UseDecl): &ImportInfo {
 		match {
 		| decl.Binded:
 			ret self.buildCppHeaderImport(decl)
@@ -508,20 +480,20 @@ impl symBuilder {
 		if lpkg == nil {
 			ret true
 		}
-		self.pushErr(pkg.Token, LogMsg.DuplicateUseDecl, pkg.LinkPath)
-		self.pushSuggestion(LogMsg.RemoveUseDeclAvoidDuplication)
+		self.pushErr(pkg.Token, build::LogMsg.DuplicateUseDecl, pkg.LinkPath)
+		self.pushSuggestion(build::LogMsg.RemoveUseDeclAvoidDuplication)
 		ret false
 	}
 
-	fn implImportSelections(mut self, mut &imp: &ImportInfo, mut &decl: &UseDecl) {
+	fn implImportSelections(mut self, mut &imp: &ImportInfo, mut &decl: &ast::UseDecl) {
 		imp.Selected = decl.Selected
 		for _, item in imp.Selected {
 			for _, citem in imp.Selected {
 				if item == citem {
 					break
 				} else if item.Kind == citem.Kind {
-					self.pushErr(item, LogMsg.DuplicatedUseSelection, item.Kind)
-					self.pushSuggestion(LogMsg.RemoveUseSelectionAvoidDupliation)
+					self.pushErr(item, build::LogMsg.DuplicatedUseSelection, item.Kind)
+					self.pushSuggestion(build::LogMsg.RemoveUseSelectionAvoidDupliation)
 					break
 				}
 			}
@@ -529,9 +501,9 @@ impl symBuilder {
 	}
 
 	fn getAsLinkPath(mut &self, mut path: str): str {
-		if strings::HasPrefix(path, PathStdlib) {
-			path = path[len(PathStdlib):]
-			ret "std" + strings::Replace(path, str(path::Separator), TokenKind.DblColon, -1)
+		if strings::HasPrefix(path, build::PathStdlib) {
+			path = path[len(build::PathStdlib):]
+			ret "std" + strings::Replace(path, str(path::Separator), lex::TokenKind.DblColon, -1)
 		}
 
 		root, _ := path::Abs(self.importer.GetModPath())
@@ -539,13 +511,13 @@ impl symBuilder {
 		if path[0] == path::Separator {
 			path = path[1:]
 		}
-		ret strings::Replace(path, str(path::Separator), TokenKind.DblColon, -1)
+		ret strings::Replace(path, str(path::Separator), lex::TokenKind.DblColon, -1)
 	}
 
-	fn pushCycleError(mut &self, &sb: &symBuilder, path: str, mut &message: StrBuilder) {
+	fn pushCycleError(mut &self, &sb: &symBuilder, path: str, mut &message: strings::StrBuilder) {
 		const Padding = 7
-		refersTo := Logf(
-			LogMsg.RefersTo,
+		refersTo := build::Logf(
+			build::LogMsg.RefersTo,
 			self.getAsLinkPath(sb.table.File.Dir()),
 			self.getAsLinkPath(path))
 		m := message.Str()
@@ -555,8 +527,8 @@ impl symBuilder {
 		message.WriteStr(m)
 	}
 
-	fn pushCrossCycleError(mut &self, &target: &symBuilder, &imp: &ImportInfo, &errorToken: &Token) {
-		mut message := StrBuilder.New(1 << 5)
+	fn pushCrossCycleError(mut &self, &target: &symBuilder, &imp: &ImportInfo, &errorToken: &lex::Token) {
+		mut message := strings::StrBuilder.New(1 << 5)
 
 		self.pushCycleError(self, imp.Path, message)
 
@@ -575,12 +547,12 @@ impl symBuilder {
 			owner = owner.owner
 		}
 
-		self.pushErr(errorToken, LogMsg.PkgIllegalCrossCycle, message.Str())
+		self.pushErr(errorToken, build::LogMsg.PkgIllegalCrossCycle, message.Str())
 	}
 
-	fn checkImportCycles(mut &self, imp: &ImportInfo, &decl: &UseDecl): bool {
+	fn checkImportCycles(mut &self, imp: &ImportInfo, &decl: &ast::UseDecl): bool {
 		if imp.Path == self.table.File.Dir() {
-			self.pushErr(decl.Token, LogMsg.PkgIllegalCycleRefersItself, self.getAsLinkPath(imp.Path))
+			self.pushErr(decl.Token, build::LogMsg.PkgIllegalCycleRefersItself, self.getAsLinkPath(imp.Path))
 			ret false
 		}
 
@@ -609,13 +581,13 @@ impl symBuilder {
 	//  - decl: relevant use declaration.
 	//  - mod: module that imports relevant package.
 	//  - path: path of package that importing.
-	fn checkPackageAccessibility(mut self, &decl: &UseDecl, &mod: str, &path: str) {
+	fn checkPackageAccessibility(mut self, &decl: &ast::UseDecl, &mod: str, &path: str) {
 		if self.importer.GetModPath() != mod && strings::Contains(path, "internal") {
-			self.pushErr(decl.Token, LogMsg.UseDeclForInternal)
+			self.pushErr(decl.Token, build::LogMsg.UseDeclForInternal)
 		}
 	}
 
-	fn importPackage(mut &self, mut &imp: &ImportInfo, mut &decl: &UseDecl): (ok: bool) {
+	fn importPackage(mut &self, mut &imp: &ImportInfo, mut &decl: &ast::UseDecl): (ok: bool) {
 		if imp.Binded {
 			ret true
 		}
@@ -637,7 +609,7 @@ impl symBuilder {
 			oldMod := self.importer.GetModPath()
 			defer { self.importer.SetModPath(oldMod) }
 			if imp.Std {
-				self.importer.SetModPath(PathStdlib)
+				self.importer.SetModPath(build::PathStdlib)
 			}
 			mut asts, mut errors := self.importer.ImportPackage(imp.Path, !imp.Std)
 			if len(errors) > 0 {
@@ -662,7 +634,7 @@ impl symBuilder {
 		ret true
 	}
 
-	fn importUseDecl(mut &self, mut &decl: &UseDecl): &ImportInfo {
+	fn importUseDecl(mut &self, mut &decl: &ast::UseDecl): &ImportInfo {
 		mut imp := self.buildImport(decl)
 		// Break analysis if error occurs.
 		if imp == nil {
@@ -691,33 +663,33 @@ impl symBuilder {
 		}
 	}
 
-	fn appendNode(mut self, mut &node: Node) {
+	fn appendNode(mut self, mut &node: ast::Node) {
 		match type node.Data {
 		| &ast::Impl:
 			self.table.Impls = append(self.table.Impls, buildImpl((&ast::Impl)(node.Data)))
-		| &TypeAliasDecl:
-			mut ta := buildTypeAlias((&TypeAliasDecl)(node.Data))
+		| &ast::TypeAliasDecl:
+			mut ta := buildTypeAlias((&ast::TypeAliasDecl)(node.Data))
 			self.table.TypeAliases = append(self.table.TypeAliases, ta)
-		| &StructDecl:
-			mut srct := buildStruct((&StructDecl)(node.Data))
+		| &ast::StructDecl:
+			mut srct := buildStruct((&ast::StructDecl)(node.Data))
 			self.table.Structs = append(self.table.Structs, srct)
-		| &FnDecl:
-			mut f := buildFunc((&FnDecl)(node.Data))
+		| &ast::FnDecl:
+			mut f := buildFunc((&ast::FnDecl)(node.Data))
 			self.table.Funcs = append(self.table.Funcs, f)
-		| &TraitDecl:
-			mut t := buildTrait((&TraitDecl)(node.Data))
+		| &ast::TraitDecl:
+			mut t := buildTrait((&ast::TraitDecl)(node.Data))
 			self.table.Traits = append(self.table.Traits, t)
-		| &VarDecl:
-			mut v := buildVar((&VarDecl)(node.Data))
+		| &ast::VarDecl:
+			mut v := buildVar((&ast::VarDecl)(node.Data))
 			self.table.Vars = append(self.table.Vars, v)
-		| &EnumDecl:
-			mut e := buildEnum((&EnumDecl)(node.Data))
+		| &ast::EnumDecl:
+			mut e := buildEnum((&ast::EnumDecl)(node.Data))
 			self.table.Enums = append(self.table.Enums, e)
-		| &TypeEnumDecl:
-			mut e := buildTypeEnum((&TypeEnumDecl)(node.Data))
+		| &ast::TypeEnumDecl:
+			mut e := buildTypeEnum((&ast::TypeEnumDecl)(node.Data))
 			self.table.TypeEnums = append(self.table.TypeEnums, e)
 		|:
-			self.pushErr(node.Token, LogMsg.InvalidSyntax)
+			self.pushErr(node.Token, build::LogMsg.InvalidSyntax)
 		}
 	}
 
@@ -729,21 +701,21 @@ impl symBuilder {
 
 	fn pushDirectivePass(mut self, mut &d: &ast::Directive) {
 		if len(d.Args) == 0 {
-			self.pushErr(d.Tag, LogMsg.MissingExpr)
+			self.pushErr(d.Tag, build::LogMsg.MissingExpr)
 			ret
 		} else if len(d.Args) > 1 {
 			arg := d.Args[1]
-			self.pushErr(arg, LogMsg.ArgumentOverflow, d.Tag.Kind)
+			self.pushErr(arg, build::LogMsg.ArgumentOverflow, d.Tag.Kind)
 		}
 
 		arg := d.Args[0]
-		if arg.Id != TokenId.Lit {
-			self.pushErr(arg, LogMsg.InvalidSyntax)
+		if arg.Id != lex::TokenId.Lit {
+			self.pushErr(arg, build::LogMsg.InvalidSyntax)
 			ret
 		}
 
 		if arg.Kind[0] != '"' {
-			self.pushErr(arg, LogMsg.InvalidSyntax)
+			self.pushErr(arg, build::LogMsg.InvalidSyntax)
 			ret
 		}
 
@@ -756,7 +728,7 @@ impl symBuilder {
 	fn appendTopDirectives(mut self) {
 		for (_, mut d) in self.ast.TopDirectives {
 			match d.Tag.Kind {
-			| Directive.Pass:
+			| build::Directive.Pass:
 				self.pushDirectivePass(d)
 			}
 		}

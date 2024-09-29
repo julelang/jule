@@ -3,12 +3,12 @@
 // license that can be found in the LICENSE file.
 
 use ast for std::jule::ast
-use build for std::jule::build::{Directive, LogMsg, Log, LogKind, Logf}
-use std::jule::constant::{Const}
-use std::jule::lex::{File, Token, TokenId, TokenKind, IsIgnoreIdent, IsAnonIdent}
+use build for std::jule::build
+use constant for std::jule::constant
+use lex for std::jule::lex
 use mod for std::jule::internal::mod
 use types for std::jule::types
-use strings for std::strings::{StrBuilder}
+use strings for std::strings
 
 fn isValidModelForRef(mut &m: ExprModel): bool {
 	match type m {
@@ -19,7 +19,7 @@ fn isValidModelForRef(mut &m: ExprModel): bool {
 		ret model.Field != nil && isValidModelForRef(model.Expr.Model)
 	| &UnaryExprModel:
 		mut unary := (&UnaryExprModel)(m)
-		if unary.Op.Id != TokenId.Star {
+		if unary.Op.Id != lex::TokenId.Star {
 			ret false
 		}
 		// Return true because of raw pointer dereferencing is an Unsafe Jule feature.
@@ -44,13 +44,13 @@ fn isValidModelForRef(mut &m: ExprModel): bool {
 	}
 }
 
-fn compilerErr(&token: &Token, line: bool, fmt: LogMsg, args: ...any): Log {
-	mut log := Log{
-		Kind: LogKind.Error,
+fn compilerErr(&token: &lex::Token, line: bool, fmt: build::LogMsg, args: ...any): build::Log {
+	mut log := build::Log{
+		Kind: build::LogKind.Error,
 		Row: token.Row,
 		Column: token.Column,
 		Path: token.File.Path,
-		Text: Logf(fmt, args...),
+		Text: build::Logf(fmt, args...),
 	}
 	if line {
 		log.Line = token.File.GetRow(token.Row)
@@ -77,7 +77,7 @@ fn appendRetVars(mut &dest: []&Var, mut &f: &FnIns) {
 
 	mut types := f.Types()
 	for (i, mut ident) in f.Decl.Result.Idents {
-		if IsIgnoreIdent(ident.Kind) || IsAnonIdent(ident.Kind) {
+		if lex::IsIgnoreIdent(ident.Kind) || lex::IsAnonIdent(ident.Kind) {
 			continue
 		}
 		dest = append(dest, &Var{
@@ -106,7 +106,7 @@ fn appendParamVars(mut &dest: []&Var, mut &f: &FnIns) {
 	}
 
 	for (_, mut p) in f.Params {
-		if IsIgnoreIdent(p.Decl.Ident) || IsAnonIdent(p.Decl.Ident) {
+		if lex::IsIgnoreIdent(p.Decl.Ident) || lex::IsAnonIdent(p.Decl.Ident) {
 			continue
 		}
 
@@ -201,7 +201,7 @@ fn appendGenericTypeAliases(mut &dest: []&TypeAlias, mut &f: &FnIns) {
 	}
 }
 
-fn findFile(mut &files: []&SymTab, &handler: &File): &SymTab {
+fn findFile(mut &files: []&SymTab, &handler: &lex::File): &SymTab {
 	for (_, mut fl) in files {
 		if fl.File == handler {
 			ret fl
@@ -210,8 +210,8 @@ fn findFile(mut &files: []&SymTab, &handler: &File): &SymTab {
 	ret nil
 }
 
-unsafe fn pushSuggestion(mut log: *Log, fmt: LogMsg, args: ...any) {
-	log.Suggestion = Logf(fmt, args...)
+unsafe fn pushSuggestion(mut log: *build::Log, fmt: build::LogMsg, args: ...any) {
+	log.Suggestion = build::Logf(fmt, args...)
 }
 
 struct commonSemaMeta {
@@ -235,7 +235,7 @@ impl commonSemaMeta {
 // Semantic analyzer for tables.
 // Accepts tables as files of package.
 struct sema {
-	errors: []Log
+	errors: []build::Log
 	files:  []&SymTab // Package files.
 	file:   &SymTab   // Current package file.
 	flags:  SemaFlag
@@ -484,18 +484,18 @@ impl sema {
 	fn getCurrentFile(mut self): &SymTab { ret self.file }
 	fn setCurrentFile(mut self, mut f: &SymTab) { self.file = f }
 
-	fn pushErr(mut self, token: &Token, fmt: LogMsg, args: ...any) {
+	fn pushErr(mut self, token: &lex::Token, fmt: build::LogMsg, args: ...any) {
 		self.errors = append(self.errors, compilerErr(token, true, fmt, args...))
 	}
 
 	// Push suggestion to last log.
-	fn pushSuggestion(mut self, fmt: LogMsg, args: ...any) {
+	fn pushSuggestion(mut self, fmt: build::LogMsg, args: ...any) {
 		unsafe { pushSuggestion(&self.errors[len(self.errors)-1], fmt, args...) }
 	}
 
 	// Reports whether define is accessible in the current package.
 	// The public and token parameters belongs to define which is accessed.
-	fn isAccessibleDefine(self, public: bool, token: &Token): bool {
+	fn isAccessibleDefine(self, public: bool, token: &lex::Token): bool {
 		if public || token.File == nil {
 			// defins is public or built-in
 			ret true
@@ -544,19 +544,19 @@ impl sema {
 		dc.check()
 	}
 
-	fn checkGenericQuantity(mut self, required: int, given: int, token: &Token): (ok: bool) {
+	fn checkGenericQuantity(mut self, required: int, given: int, token: &lex::Token): (ok: bool) {
 		match {
 		| required == 0 && given > 0:
-			self.pushErr(token, LogMsg.NotHasGenerics)
+			self.pushErr(token, build::LogMsg.NotHasGenerics)
 			ret false
 		| required > 0 && given == 0:
-			self.pushErr(token, LogMsg.HasGenerics)
+			self.pushErr(token, build::LogMsg.HasGenerics)
 			ret false
 		| required < given:
-			self.pushErr(token, LogMsg.GenericsOverflow)
+			self.pushErr(token, build::LogMsg.GenericsOverflow)
 			ret false
 		| required > given:
-			self.pushErr(token, LogMsg.MissingGenerics)
+			self.pushErr(token, build::LogMsg.MissingGenerics)
 			ret false
 		|:
 			ret true
@@ -591,15 +591,15 @@ impl sema {
 		ret nil
 	}
 
-	fn checkImportSelection[T](mut self, &ident: &Token, &s: T): bool {
+	fn checkImportSelection[T](mut self, &ident: &lex::Token, &s: T): bool {
 		if !self.isAccessibleDefine(s.Public, s.Token) {
-			self.pushErr(ident, LogMsg.IdentIsNotAccessible, ident.Kind)
-			self.pushSuggestion(LogMsg.MakePubToAccess)
+			self.pushErr(ident, build::LogMsg.IdentIsNotAccessible, ident.Kind)
+			self.pushSuggestion(build::LogMsg.MakePubToAccess)
 			ret false
 		}
 		const Binded = false // Exported defines cannot be binded.
 		if defByIdentPackage(self.files, s.Ident, Binded) != nil {
-			self.pushErr(ident, LogMsg.SelectedImportExistInPackage, s.Ident)
+			self.pushErr(ident, build::LogMsg.SelectedImportExistInPackage, s.Ident)
 			ret false
 		}
 		ret true
@@ -608,13 +608,13 @@ impl sema {
 	fn checkImportSelectedSelections(mut self, mut &imp: &ImportInfo): (ok: bool) {
 		ok = true
 		for _, ident in imp.Selected {
-			if ident.Kind == TokenKind.Self {
+			if ident.Kind == lex::TokenKind.Self {
 				continue
 			}
 
 			if self.isDuplicatedImportSelection(uintptr(imp), ident.Kind) {
-				self.pushErr(ident, LogMsg.DuplicatedIdent, ident.Kind)
-				self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
+				self.pushErr(ident, build::LogMsg.DuplicatedIdent, ident.Kind)
+				self.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
 				ok = false
 				continue
 			}
@@ -646,7 +646,7 @@ impl sema {
 				mut f := (&Fn)(def)
 				ok = self.checkImportSelection(ident, f) && ok
 			|:
-				self.pushErr(ident, LogMsg.IdentNotExist, ident.Kind)
+				self.pushErr(ident, build::LogMsg.IdentNotExist, ident.Kind)
 				ok = false
 				continue
 			}
@@ -654,7 +654,7 @@ impl sema {
 		ret
 	}
 
-	fn checkImportsAllSelectionsFromCollection[T](mut self, &s: []T, &et: &Token): bool {
+	fn checkImportsAllSelectionsFromCollection[T](mut self, &s: []T, &et: &lex::Token): bool {
 		mut ok := true
 		for _, d in s {
 			if d.Public {
@@ -711,17 +711,17 @@ impl sema {
 		// Check special cases for std::unsafe.
 		if imp.LinkPath == "std::unsafe" {
 			if imp.ImportAll || imp.Alias != "" || len(imp.Selected) > 0 {
-				self.pushErr(imp.Token, LogMsg.ExpectedPlainUseDecl, "use std::unsafe")
+				self.pushErr(imp.Token, build::LogMsg.ExpectedPlainUseDecl, "use std::unsafe")
 				ret false
 			}
 		}
 
 		if len(imp.Alias) != 0 {
-			if IsIgnoreIdent(imp.Alias) {
-				self.pushErr(imp.Token, LogMsg.IgnoreIdent)
+			if lex::IsIgnoreIdent(imp.Alias) {
+				self.pushErr(imp.Token, build::LogMsg.IgnoreIdent)
 			} else if self.isUseAliasDuplication(imp) {
-				self.pushErr(imp.Token, LogMsg.DuplicatedUseAlias, imp.Alias)
-				self.pushSuggestion(LogMsg.RenameUseAliasAvoidDuplication)
+				self.pushErr(imp.Token, build::LogMsg.DuplicatedUseAlias, imp.Alias)
+				self.pushSuggestion(build::LogMsg.RenameUseAliasAvoidDuplication)
 			}
 		}
 
@@ -913,14 +913,14 @@ impl sema {
 	}
 
 	fn checkAssignType(mut &self, destIsRef: bool, mut &dest: &TypeKind,
-		mut &d: &Data, mut errorToken: &Token, mut refers: &ReferenceStack): bool {
+		mut &d: &Data, mut errorToken: &lex::Token, mut refers: &ReferenceStack): bool {
 		if d.Decl {
-			self.pushErr(errorToken, LogMsg.InvalidExpr)
+			self.pushErr(errorToken, build::LogMsg.InvalidExpr)
 			ret false
 		}
 		if destIsRef {
 			if !dest.Equal(d.Kind) {
-				self.pushErr(errorToken, LogMsg.IncompatibleTypes, dest.Str(), d.Kind.Str())
+				self.pushErr(errorToken, build::LogMsg.IncompatibleTypes, dest.Str(), d.Kind.Str())
 				ret false
 			}
 		} else {
@@ -956,7 +956,7 @@ impl sema {
 	}
 
 	fn _checkTypeCompatibility(mut &self, mut &dest: &TypeKind, mut &src: &TypeKind,
-		mut errorToken: &Token): bool {
+		mut errorToken: &lex::Token): bool {
 		if src == nil {
 			ret false
 		}
@@ -974,34 +974,34 @@ impl sema {
 	}
 
 	fn checkTypeCompatibility(mut &self, mut &dest: &TypeKind,
-		mut &src: &TypeKind, mut &errorToken: &Token): bool {
+		mut &src: &TypeKind, mut &errorToken: &lex::Token): bool {
 		if self._checkTypeCompatibility(dest, src, errorToken) {
 			ret true
 		}
-		self.pushErr(errorToken, LogMsg.IncompatibleTypes, dest.Str(), src.Str())
+		self.pushErr(errorToken, build::LogMsg.IncompatibleTypes, dest.Str(), src.Str())
 		ret false
 	}
 
 	fn pushCompatiblityError(mut self, mut &dest: &TypeKind, mut &src: &Data,
-		mut &errorToken: &Token) {
+		mut &errorToken: &lex::Token) {
 		if src.untyped {
 			match {
 			| src.Constant.IsI64():
-				self.pushErr(errorToken, LogMsg.IncompatibleTypes, dest.Str(), "untyped integer")
+				self.pushErr(errorToken, build::LogMsg.IncompatibleTypes, dest.Str(), "untyped integer")
 				ret
 			| src.Constant.IsU64():
-				self.pushErr(errorToken, LogMsg.IncompatibleTypes, dest.Str(), "untyped unsigned integer")
+				self.pushErr(errorToken, build::LogMsg.IncompatibleTypes, dest.Str(), "untyped unsigned integer")
 				ret
 			| src.Constant.IsF64():
-				self.pushErr(errorToken, LogMsg.IncompatibleTypes, dest.Str(), "untyped float")
+				self.pushErr(errorToken, build::LogMsg.IncompatibleTypes, dest.Str(), "untyped float")
 				ret
 			}
 		}
-		self.pushErr(errorToken, LogMsg.IncompatibleTypes, dest.Str(), src.Kind.Str())
+		self.pushErr(errorToken, build::LogMsg.IncompatibleTypes, dest.Str(), src.Kind.Str())
 	}
 
 	fn checkTypeCompatibility1(mut &self, mut &dest: &TypeKind, mut &src: &Data,
-		mut &errorToken: &Token): bool {
+		mut &errorToken: &lex::Token): bool {
 		if self._checkTypeCompatibility(dest, src.Kind, errorToken) {
 			ret true
 		}
@@ -1079,7 +1079,7 @@ impl sema {
 		ret ins
 	}
 
-	fn checkConstraintsFn(mut &self, mut &f: &FnIns, mut &et: &Token, mut exist: &FnIns): bool {
+	fn checkConstraintsFn(mut &self, mut &f: &FnIns, mut &et: &lex::Token, mut exist: &FnIns): bool {
 		mut cc := self.constraintChecker()
 		cc.et = et
 		cc.fi = f
@@ -1093,7 +1093,7 @@ impl sema {
 		ret cc.check()
 	}
 
-	fn checkConstraintsStruct(mut &self, mut &s: &StructIns, mut &et: &Token, mut exist: &StructIns): bool {
+	fn checkConstraintsStruct(mut &self, mut &s: &StructIns, mut &et: &lex::Token, mut exist: &StructIns): bool {
 		mut cc := self.constraintChecker()
 		cc.et = et
 		cc.si = s
@@ -1145,7 +1145,7 @@ impl sema {
 	fn checkFnParamKind(mut &self, mut &p: &ParamIns) {
 		p.Kind.Variadic = p.Decl.Variadic
 		if p.Decl.Reference && !isValidForRef(p.Kind) {
-			self.pushErr(p.Decl.Token, LogMsg.RefPointsToInvalidType, p.Kind.Str())
+			self.pushErr(p.Decl.Token, build::LogMsg.RefPointsToInvalidType, p.Kind.Str())
 		}
 	}
 
@@ -1189,13 +1189,13 @@ impl sema {
 		})
 	}
 
-	fn checkRefValidityForInitExpr(mut &self, leftMut: bool, mut &d: &Data, mut &errorToken: &Token): bool {
+	fn checkRefValidityForInitExpr(mut &self, leftMut: bool, mut &d: &Data, mut &errorToken: &lex::Token): bool {
 		if !isValidModelForRef(d.Model) {
-			self.pushErr(errorToken, LogMsg.RefAssignNonVar)
+			self.pushErr(errorToken, build::LogMsg.RefAssignNonVar)
 			ret false
 		}
 		if leftMut && !d.Mutable {
-			self.pushErr(errorToken, LogMsg.MutRefPointsImmut)
+			self.pushErr(errorToken, build::LogMsg.MutRefPointsImmut)
 			ret false
 		}
 		ret true
@@ -1234,17 +1234,17 @@ impl sema {
 	}
 
 	fn checkValidityForInitExpr(mut &self, leftMut: bool, leftRef: bool,
-		&leftKind: &TypeKind, mut &d: &Data, mut &errorToken: &Token): bool {
+		&leftKind: &TypeKind, mut &d: &Data, mut &errorToken: &lex::Token): bool {
 		if leftMut && !d.Mutable {
 			// Check classical assignment mutability.
 			if d.Kind.Mutable() || d.Kind.Variadic {
-				self.pushErr(errorToken, LogMsg.AssignNonMutToMut, d.Kind.Str())
+				self.pushErr(errorToken, build::LogMsg.AssignNonMutToMut, d.Kind.Str())
 				ret false
 			}
 			// Check interior mutability risk for the struct copy.
 			s := d.Kind.Struct()
 			if s != nil && self.isMutRiskyStruct(s) {
-				self.pushErr(errorToken, LogMsg.CopyWithMutableData, d.Kind.Str())
+				self.pushErr(errorToken, build::LogMsg.CopyWithMutableData, d.Kind.Str())
 				ret false
 			}
 		}
@@ -1278,27 +1278,27 @@ impl sema {
 			refs: &ta.Refers,
 		})
 		if ok && ta.Kind.Kind.Arr() != nil && ta.Kind.Kind.Arr().Auto {
-			self.pushErr(ta.Kind.Decl.Token, LogMsg.ArrayAutoSized)
+			self.pushErr(ta.Kind.Decl.Token, build::LogMsg.ArrayAutoSized)
 			ok = false
 		}
 		ret
 	}
 
 	fn checkTypeAliasDecl(mut &self, mut &ta: &TypeAlias, mut l: Lookup) {
-		if IsIgnoreIdent(ta.Ident) {
-			self.pushErr(ta.Token, LogMsg.IgnoreIdent)
+		if lex::IsIgnoreIdent(ta.Ident) {
+			self.pushErr(ta.Token, build::LogMsg.IgnoreIdent)
 		}
 		self.checkTypeAliasDeclKind(ta, l)
 	}
 
 	// Checks type alias declaration with duplicated identifiers.
 	fn checkTypeAliasDeclDup(mut &self, mut &ta: &TypeAlias) {
-		if IsIgnoreIdent(ta.Ident) {
-			self.pushErr(ta.Token, LogMsg.IgnoreIdent)
+		if lex::IsIgnoreIdent(ta.Ident) {
+			self.pushErr(ta.Token, build::LogMsg.IgnoreIdent)
 		}
 		if self.isDuplicatedIdent(uintptr(ta), ta.Ident, ta.Binded) {
-			self.pushErr(ta.Token, LogMsg.DuplicatedIdent, ta.Ident)
-			self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
+			self.pushErr(ta.Token, build::LogMsg.DuplicatedIdent, ta.Ident)
+			self.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
 		}
 		self.checkTypeAliasDeclKind(ta, self)
 	}
@@ -1320,15 +1320,15 @@ impl sema {
 		for _, item in items {
 			if item.Ident == "" {
 				continue
-			} else if IsIgnoreIdent(item.Ident) {
-				self.pushErr(item.Token, LogMsg.IgnoreIdent)
+			} else if lex::IsIgnoreIdent(item.Ident) {
+				self.pushErr(item.Token, build::LogMsg.IgnoreIdent)
 			} else {
 				for _, citem in items {
 					if item == citem {
 						break
 					} else if item.Ident == citem.Ident {
-						self.pushErr(item.Token, LogMsg.DuplicatedIdent, item.Ident)
-						self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
+						self.pushErr(item.Token, build::LogMsg.DuplicatedIdent, item.Ident)
+						self.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
 						break
 					}
 				}
@@ -1342,7 +1342,7 @@ impl sema {
 			if item.AutoExpr() {
 				item.Value = &Value{
 					Data: &Data{
-						Constant: Const.NewStr(item.Ident),
+						Constant: constant::Const.NewStr(item.Ident),
 					},
 				}
 				item.Value.Data.Model = item.Value.Data.Constant
@@ -1353,7 +1353,7 @@ impl sema {
 				}
 
 				if !d.IsConst() {
-					self.pushErr(item.Value.Expr.Token, LogMsg.ExprNotConst)
+					self.pushErr(item.Value.Expr.Token, build::LogMsg.ExprNotConst)
 				}
 
 				mut refers := (&ReferenceStack)(nil) // constant expressions not uses
@@ -1370,9 +1370,9 @@ impl sema {
 			}
 			const match type Int {
 			| i64:
-				item.Value.Data.Constant = Const.NewI64(n)
+				item.Value.Data.Constant = constant::Const.NewI64(n)
 			| u64:
-				item.Value.Data.Constant = Const.NewU64(n)
+				item.Value.Data.Constant = constant::Const.NewU64(n)
 			|:
 				panic("unimplemented enum int type, this panic call should be unreachable")
 			}
@@ -1383,7 +1383,7 @@ impl sema {
 				ret
 			}
 			if !d.IsConst() {
-				self.pushErr(item.Value.Expr.Token, LogMsg.ExprNotConst)
+				self.pushErr(item.Value.Expr.Token, build::LogMsg.ExprNotConst)
 			}
 			mut refers := (&ReferenceStack)(nil) // constant expressions not uses
 			_ = self.checkAssignType(false, e.Kind.Kind, d, item.Token, refers)
@@ -1426,7 +1426,7 @@ impl sema {
 		}
 		for (_, mut item) in e.Items[1:] {
 			if item.AutoExpr() && n > 0 && max-n <= 0 {
-				self.pushErr(item.Token, LogMsg.OverflowLimits)
+				self.pushErr(item.Token, build::LogMsg.OverflowLimits)
 				break
 			}
 			n++
@@ -1445,15 +1445,15 @@ impl sema {
 	}
 
 	fn checkEnumDecl(mut &self, mut &e: &Enum) {
-		if IsIgnoreIdent(e.Ident) {
-			self.pushErr(e.Token, LogMsg.IgnoreIdent)
+		if lex::IsIgnoreIdent(e.Ident) {
+			self.pushErr(e.Token, build::LogMsg.IgnoreIdent)
 		} else if self.isDuplicatedIdent(uintptr(e), e.Ident, false) {
-			self.pushErr(e.Token, LogMsg.DuplicatedIdent, e.Ident)
-			self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
+			self.pushErr(e.Token, build::LogMsg.DuplicatedIdent, e.Ident)
+			self.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
 		}
 
 		if len(e.Items) == 0 {
-			self.pushErr(e.Token, LogMsg.NoMemberInEnum, e.Ident)
+			self.pushErr(e.Token, build::LogMsg.NoMemberInEnum, e.Ident)
 			ret
 		}
 
@@ -1470,7 +1470,7 @@ impl sema {
 
 		mut t := e.Kind.Kind.Prim()
 		if t == nil {
-			self.pushErr(e.Token, LogMsg.InvalidTypeSource)
+			self.pushErr(e.Token, build::LogMsg.InvalidTypeSource)
 			ret
 		}
 
@@ -1481,27 +1481,27 @@ impl sema {
 		| types::IsInt(t.Str()):
 			self.checkEnumItemsInt(e)
 		|:
-			self.pushErr(e.Token, LogMsg.InvalidTypeSource)
+			self.pushErr(e.Token, build::LogMsg.InvalidTypeSource)
 		}
 	}
 
 	fn checkTypeEnumDecl(mut &self, mut &e: &TypeEnum) {
-		if IsIgnoreIdent(e.Ident) {
-			self.pushErr(e.Token, LogMsg.IgnoreIdent)
+		if lex::IsIgnoreIdent(e.Ident) {
+			self.pushErr(e.Token, build::LogMsg.IgnoreIdent)
 		} else if self.isDuplicatedIdent(uintptr(e), e.Ident, false) {
-			self.pushErr(e.Token, LogMsg.DuplicatedIdent, e.Ident)
-			self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
+			self.pushErr(e.Token, build::LogMsg.DuplicatedIdent, e.Ident)
+			self.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
 		}
 
 		if len(e.Items) == 0 {
-			self.pushErr(e.Token, LogMsg.NoMemberInEnum, e.Ident)
+			self.pushErr(e.Token, build::LogMsg.NoMemberInEnum, e.Ident)
 			ret
 		}
 
 		self.checkEnumItemsDup[&TypeEnumItem](e.Items)
 		for (_, mut item) in e.Items {
 			if item.Kind == nil {
-				self.pushErr(item.Token, LogMsg.MissingType)
+				self.pushErr(item.Token, build::LogMsg.MissingType)
 				continue
 			}
 			ok := self.checkType(item.Kind, self)
@@ -1510,7 +1510,7 @@ impl sema {
 			}
 			p := item.Kind.Kind.Prim()
 			if p != nil && p.IsAny() {
-				self.pushErr(item.Token, LogMsg.AnyWithTypeEnum)
+				self.pushErr(item.Token, build::LogMsg.AnyWithTypeEnum)
 			}
 		}
 		if len(e.Items) == 1 {
@@ -1519,7 +1519,7 @@ impl sema {
 				Kind: e,
 			}
 			if item.Kind.Kind != nil && item.Kind.Kind.Equal(unsafe { (&TypeKind)(&tk) }) {
-				self.pushErr(item.Token, LogMsg.IllegalCycleRefersItself, e.Str())
+				self.pushErr(item.Token, build::LogMsg.IllegalCycleRefersItself, e.Str())
 			}
 		}
 	}
@@ -1551,8 +1551,8 @@ impl sema {
 	fn checkDeclGenerics(mut self, &generics: []&ast::GenericDecl): (ok: bool) {
 		ok = true
 		for i, g in generics {
-			if IsIgnoreIdent(g.Ident) {
-				self.pushErr(g.Token, LogMsg.IgnoreIdent)
+			if lex::IsIgnoreIdent(g.Ident) {
+				self.pushErr(g.Token, build::LogMsg.IgnoreIdent)
 				ok = false
 				continue
 			}
@@ -1565,8 +1565,8 @@ impl sema {
 					// Skip current and following generics.
 					break duplicationLookup
 				| g.Ident == ct.Ident:
-					self.pushErr(g.Token, LogMsg.DuplicatedIdent, g.Ident)
-					self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
+					self.pushErr(g.Token, build::LogMsg.DuplicatedIdent, g.Ident)
+					self.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
 					ok = false
 					break duplicationLookup
 				}
@@ -1583,8 +1583,8 @@ impl sema {
 			for _, g in f.Generics {
 				if p.Ident == g.Ident {
 					ok = false
-					self.pushErr(p.Token, LogMsg.DuplicatedIdent, p.Ident)
-					self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
+					self.pushErr(p.Token, build::LogMsg.DuplicatedIdent, p.Ident)
+					self.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
 					continue check
 				}
 			}
@@ -1595,16 +1595,16 @@ impl sema {
 				| j >= i:
 					// Skip current and following parameters.
 					break paramsLookup
-				| IsIgnoreIdent(p.Ident)
-				| IsIgnoreIdent(jp.Ident)
-				| IsAnonIdent(p.Ident)
-				| IsAnonIdent(jp.Ident):
+				| lex::IsIgnoreIdent(p.Ident)
+				| lex::IsIgnoreIdent(jp.Ident)
+				| lex::IsAnonIdent(p.Ident)
+				| lex::IsAnonIdent(jp.Ident):
 					// Skip anonymous parameters.
 					break paramsLookup
 				| p.Ident == jp.Ident:
 					ok = false
-					self.pushErr(p.Token, LogMsg.DuplicatedIdent, p.Ident)
-					self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
+					self.pushErr(p.Token, build::LogMsg.DuplicatedIdent, p.Ident)
+					self.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
 					continue check
 				}
 			}
@@ -1620,7 +1620,7 @@ impl sema {
 
 		// Check duplications.
 		for i, v in f.Result.Idents {
-			if IsIgnoreIdent(v.Kind) || IsAnonIdent(v.Kind) {
+			if lex::IsIgnoreIdent(v.Kind) || lex::IsAnonIdent(v.Kind) {
 				continue // Skip anonymous return variables.
 			}
 			// Lookup in generics.
@@ -1649,8 +1649,8 @@ impl sema {
 			}
 			continue
 		exist:
-			self.pushErr(v, LogMsg.DuplicatedIdent, v.Kind)
-			self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
+			self.pushErr(v, build::LogMsg.DuplicatedIdent, v.Kind)
+			self.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
 			ok = false
 		}
 
@@ -1663,7 +1663,7 @@ impl sema {
 		}
 		mut param := f.Params[len(f.Params)-1]
 		if param.Variadic && param.Reference {
-			self.pushErr(param.Token, LogMsg.VariadicReference)
+			self.pushErr(param.Token, build::LogMsg.VariadicReference)
 		}
 		ret true
 	}
@@ -1672,15 +1672,15 @@ impl sema {
 	// Not checks scope, and other things.
 	fn checkFnDeclPrototype(mut &self, mut &f: &Fn) {
 		if f.Exceptional && f.Binded {
-			self.pushErr(f.Token, LogMsg.BindedExceptional)
+			self.pushErr(f.Token, build::LogMsg.BindedExceptional)
 			ret
 		}
 
 		if f.Exceptional {
 			if f.IsEntryPoint() {
-				self.pushErr(f.Token, LogMsg.ExceptionalEntryPoint)
+				self.pushErr(f.Token, build::LogMsg.ExceptionalEntryPoint)
 			} else if f.IsInit() {
-				self.pushErr(f.Token, LogMsg.ExceptionalInit)
+				self.pushErr(f.Token, build::LogMsg.ExceptionalInit)
 			}
 		}
 
@@ -1692,7 +1692,7 @@ impl sema {
 		}
 	}
 
-	fn catchTraitInheritCycle(mut &self, t1: &Trait, mut t2: &Trait, mut &message: StrBuilder): (ok: bool) {
+	fn catchTraitInheritCycle(mut &self, t1: &Trait, mut t2: &Trait, mut &message: strings::StrBuilder): (ok: bool) {
 		ok = true
 		for (_, mut i) in t2.Inherits {
 			if i.Kind == nil {
@@ -1720,7 +1720,7 @@ impl sema {
 			}
 			mut t2 := it.Kind.Trait()
 			if t2 == nil {
-				self.pushErr(it.Decl.Token, LogMsg.InheritedNonTrait, t.Ident, it.Kind.Str())
+				self.pushErr(it.Decl.Token, build::LogMsg.InheritedNonTrait, t.Ident, it.Kind.Str())
 				ok = false
 				continue
 			}
@@ -1729,23 +1729,23 @@ impl sema {
 					break
 				}
 				if it2.Kind != nil && it.Kind.Equal(it2.Kind) {
-					self.pushErr(it.Decl.Token, LogMsg.DuplicatedIdent, t2.Ident)
+					self.pushErr(it.Decl.Token, build::LogMsg.DuplicatedIdent, t2.Ident)
 					ok = false
 					break
 				}
 			}
 			if t == t2 {
-				self.pushErr(it.Decl.Token, LogMsg.IllegalCycleRefersItself, t.Ident)
+				self.pushErr(it.Decl.Token, build::LogMsg.IllegalCycleRefersItself, t.Ident)
 				ok = false
 			} else {
-				mut message := StrBuilder.New(1 << 6)
+				mut message := strings::StrBuilder.New(1 << 6)
 				ok = ok && self.catchTraitInheritCycle(t, t2, message)
 				if message.Len() > 0 {
 					mut errMsg := message.Str()
 					message.Clear()
 					self.pushCycleError(t.Ident, t2.Ident, message)
 					errMsg += message.Str()
-					self.pushErr(it.Decl.Token, LogMsg.IllegalCrossCycle, errMsg)
+					self.pushErr(it.Decl.Token, build::LogMsg.IllegalCrossCycle, errMsg)
 				}
 			}
 		}
@@ -1768,7 +1768,7 @@ impl sema {
 					t1f := self.getTraitCheckFnKind(t1m)
 					t2f := self.getTraitCheckFnKind(t2m)
 					if !t1f.equalTrait(t2f) {
-						self.pushErr(it.Decl.Token, LogMsg.IncompatibleInherit,
+						self.pushErr(it.Decl.Token, build::LogMsg.IncompatibleInherit,
 							t.Ident, t2.Ident, t1f.GetKindStr(true), t2f.GetKindStr(true))
 						ret
 					}
@@ -1778,10 +1778,10 @@ impl sema {
 	}
 
 	fn checkTraitDeclMethod(mut &self, mut &f: &Fn) {
-		if IsIgnoreIdent(f.Ident) {
-			self.pushErr(f.Token, LogMsg.IgnoreIdent)
-		} else if IsAnonIdent(f.Ident) {
-			self.pushErr(f.Token, LogMsg.AnonFn)
+		if lex::IsIgnoreIdent(f.Ident) {
+			self.pushErr(f.Token, build::LogMsg.IgnoreIdent)
+		} else if lex::IsAnonIdent(f.Ident) {
+			self.pushErr(f.Token, build::LogMsg.AnonFn)
 		}
 		f.sema = self
 		self.checkFnDeclPrototype(f)
@@ -1801,8 +1801,8 @@ impl sema {
 			}
 
 			if t.findMethodInherit(f.Ident) != nil {
-				self.pushErr(f.Token, LogMsg.DuplicatedIdent, f.Ident)
-				self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
+				self.pushErr(f.Token, build::LogMsg.DuplicatedIdent, f.Ident)
+				self.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
 				continue
 			}
 
@@ -1819,8 +1819,8 @@ impl sema {
 					// Skip current and following methods.
 					break duplicateLookup
 				| f.Ident == jf.Ident:
-					self.pushErr(f.Token, LogMsg.DuplicatedIdent, f.Ident)
-					self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
+					self.pushErr(f.Token, build::LogMsg.DuplicatedIdent, f.Ident)
+					self.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
 					break duplicateLookup
 				}
 			}
@@ -1828,11 +1828,11 @@ impl sema {
 	}
 
 	fn checkTraitDecl(mut &self, mut &t: &Trait) {
-		if IsIgnoreIdent(t.Ident) {
-			self.pushErr(t.Token, LogMsg.IgnoreIdent)
+		if lex::IsIgnoreIdent(t.Ident) {
+			self.pushErr(t.Token, build::LogMsg.IgnoreIdent)
 		} else if self.isDuplicatedIdent(uintptr(t), t.Ident, false) {
-			self.pushErr(t.Token, LogMsg.DuplicatedIdent, t.Ident)
-			self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
+			self.pushErr(t.Token, build::LogMsg.DuplicatedIdent, t.Ident)
+			self.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
 		}
 
 		self.checkTraitDeclInherits(t)
@@ -1855,7 +1855,7 @@ impl sema {
 		ok = true
 		for _, f in ipl.Methods {
 			if base.FindMethod(f.Ident) == nil {
-				self.pushErr(f.Token, LogMsg.TraitHaveNotIdent, base.Ident, f.Ident)
+				self.pushErr(f.Token, build::LogMsg.TraitHaveNotIdent, base.Ident, f.Ident)
 				ok = false
 			}
 		}
@@ -1868,7 +1868,7 @@ impl sema {
 		// Methods.
 		for (_, mut f) in ipl.Methods {
 			if dest.FindMethod(f.Ident, f.Statically) != nil || dest.FindField(f.Ident) != nil {
-				self.pushErr(f.Token, LogMsg.StructAlreadyHaveIdent, dest.Ident, f.Ident)
+				self.pushErr(f.Token, build::LogMsg.StructAlreadyHaveIdent, dest.Ident, f.Ident)
 				ok = false
 				continue
 			}
@@ -1877,7 +1877,7 @@ impl sema {
 				for _, fg in f.Generics {
 					for _, dg in dest.Generics {
 						if fg.Ident == dg.Ident {
-							self.pushErr(fg.Token, LogMsg.MethodHasGenericWithSameIdent)
+							self.pushErr(fg.Token, build::LogMsg.MethodHasGenericWithSameIdent)
 							ok = false
 						}
 					}
@@ -1894,7 +1894,7 @@ impl sema {
 		for (_, mut v) in ipl.Statics {
 			const Static = true
 			if dest.FindMethod(v.Ident, Static) != nil || dest.FindStatic(v.Ident) != nil {
-				self.pushErr(v.Token, LogMsg.StructAlreadyHaveIdent, dest.Ident, v.Ident)
+				self.pushErr(v.Token, build::LogMsg.StructAlreadyHaveIdent, dest.Ident, v.Ident)
 				ok = false
 				continue
 			}
@@ -1911,8 +1911,8 @@ impl sema {
 		}
 		mut base := base_t.Trait()
 		if base == nil {
-			self.pushErr(decl.Base.Token, LogMsg.ImplInvalidBase, base_t.Str())
-			self.pushSuggestion(LogMsg.ExpectedTrait)
+			self.pushErr(decl.Base.Token, build::LogMsg.ImplInvalidBase, base_t.Str())
+			self.pushSuggestion(build::LogMsg.ExpectedTrait)
 			ret
 		}
 
@@ -1922,15 +1922,15 @@ impl sema {
 		}
 		mut destS := destT.Struct()
 		if destS == nil {
-			self.pushErr(decl.Dest.Token, LogMsg.ImplInvalidDest, destT.Str())
-			self.pushSuggestion(LogMsg.ExpectedStruct)
+			self.pushErr(decl.Dest.Token, build::LogMsg.ImplInvalidDest, destT.Str())
+			self.pushSuggestion(build::LogMsg.ExpectedStruct)
 			ret
 		}
 
 		mut dest := destS.Decl
 
 		if dest.Token.File.Dir() != self.file.File.Dir() {
-			self.pushErr(decl.Dest.Token, LogMsg.IllegalImplOutOfPackage)
+			self.pushErr(decl.Dest.Token, build::LogMsg.IllegalImplOutOfPackage)
 			ret
 		}
 
@@ -1938,7 +1938,7 @@ impl sema {
 		pushImplements(dest, base)
 
 		if len(decl.Statics) > 0 {
-			self.pushErr(decl.Statics[0].Token, LogMsg.TraitImplHasStatic)
+			self.pushErr(decl.Statics[0].Token, build::LogMsg.TraitImplHasStatic)
 		}
 
 		match {
@@ -1954,14 +1954,14 @@ impl sema {
 		}
 		mut destS := destT.Struct()
 		if destS == nil {
-			self.pushErr(decl.Dest.Token, LogMsg.ImplInvalidDest, destT.Str())
-			self.pushSuggestion(LogMsg.ExpectedStruct)
+			self.pushErr(decl.Dest.Token, build::LogMsg.ImplInvalidDest, destT.Str())
+			self.pushSuggestion(build::LogMsg.ExpectedStruct)
 			ret
 		}
 
 		mut dest := destS.Decl
 		if dest.Token.File.Dir() != self.file.File.Dir() {
-			self.pushErr(decl.Dest.Token, LogMsg.IllegalImplOutOfPackage)
+			self.pushErr(decl.Dest.Token, build::LogMsg.IllegalImplOutOfPackage)
 			ret
 		}
 
@@ -1983,13 +1983,13 @@ impl sema {
 	// Checks variable declaration.
 	// Will not check duplicated identifiers.
 	fn checkVarDecl(mut &self, mut &decl: &Var, mut l: Lookup) {
-		if IsIgnoreIdent(decl.Ident) {
-			self.pushErr(decl.Token, LogMsg.IgnoreIdent)
+		if lex::IsIgnoreIdent(decl.Ident) {
+			self.pushErr(decl.Token, build::LogMsg.IgnoreIdent)
 		}
 
 		if decl.IsTypeInferred() {
 			if !decl.IsInitialized() {
-				self.pushErr(decl.Token, LogMsg.MissingValueForTypeInference)
+				self.pushErr(decl.Token, build::LogMsg.MissingValueForTypeInference)
 			}
 		} else {
 			mut refers := (&ReferenceStack)(nil)
@@ -2006,22 +2006,22 @@ impl sema {
 
 		if decl.Reference {
 			if decl.Constant {
-				self.pushErr(decl.Token, LogMsg.ConstRef)
+				self.pushErr(decl.Token, build::LogMsg.ConstRef)
 			}
 			if decl.Statically {
-				self.pushErr(decl.Token, LogMsg.StaticReference)
+				self.pushErr(decl.Token, build::LogMsg.StaticReference)
 			}
 		}
 
 		if !decl.IsInitialized() {
 			if decl.Constant {
-				self.pushErr(decl.Token, LogMsg.ConstVarNotHaveExpr)
+				self.pushErr(decl.Token, build::LogMsg.ConstVarNotHaveExpr)
 			}
 			if decl.Statically {
-				self.pushErr(decl.Token, LogMsg.StaticNotHaveExpr)
+				self.pushErr(decl.Token, build::LogMsg.StaticNotHaveExpr)
 			}
 			if decl.Reference {
-				self.pushErr(decl.Token, LogMsg.RefNotInited)
+				self.pushErr(decl.Token, build::LogMsg.RefNotInited)
 			}
 		}
 	}
@@ -2030,15 +2030,15 @@ impl sema {
 	// Checks duplicated identifiers by Sema.
 	fn checkGlobalVarDecl(mut &self, mut &decl: &Var) {
 		if self.isDuplicatedIdent(uintptr(decl), decl.Ident, decl.Binded) {
-			self.pushErr(decl.Token, LogMsg.DuplicatedIdent, decl.Ident)
-			self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
+			self.pushErr(decl.Token, build::LogMsg.DuplicatedIdent, decl.Ident)
+			self.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
 		}
 		if decl.Binded && decl.Constant {
-			self.pushErr(decl.Token, LogMsg.BindedVarIsConst)
+			self.pushErr(decl.Token, build::LogMsg.BindedVarIsConst)
 		}
 		if !decl.Binded && !decl.Constant && !decl.Statically {
-			self.pushErr(decl.Token, LogMsg.GlobalNotStatic)
-			self.pushSuggestion(LogMsg.UseStaticKeywordToDef)
+			self.pushErr(decl.Token, build::LogMsg.GlobalNotStatic)
+			self.pushSuggestion(build::LogMsg.UseStaticKeywordToDef)
 		}
 		self.checkDirectives(decl.Directives, decl)
 		self.checkVarDecl(decl, self)
@@ -2068,14 +2068,14 @@ impl sema {
 				}
 			}
 			if exist {
-				d := findDirective(sf.Directives, Directive.Deprecated)
+				d := findDirective(sf.Directives, build::Directive.Deprecated)
 				if d != nil {
-					self.pushErr(d.Tag, LogMsg.TraitImplDeprecated)
+					self.pushErr(d.Tag, build::LogMsg.TraitImplDeprecated)
 				}
 				ok = false
 			} else {
 				const Ident = true
-				self.pushErr(strct.Token, LogMsg.NotImplTraitDef, trt.Ident, tfK.GetKindStr(Ident))
+				self.pushErr(strct.Token, build::LogMsg.NotImplTraitDef, trt.Ident, tfK.GetKindStr(Ident))
 				ok = false
 			}
 		}
@@ -2098,8 +2098,8 @@ impl sema {
 				if f == cf {
 					break
 				} else if f.Ident == cf.Ident {
-					self.pushErr(f.Token, LogMsg.DuplicatedIdent, f.Ident)
-					self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
+					self.pushErr(f.Token, build::LogMsg.DuplicatedIdent, f.Ident)
+					self.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
 					ok = false
 				}
 			}
@@ -2108,11 +2108,11 @@ impl sema {
 	}
 
 	fn checkStructDecl(mut &self, mut &s: &Struct) {
-		if IsIgnoreIdent(s.Ident) {
-			self.pushErr(s.Token, LogMsg.IgnoreIdent)
+		if lex::IsIgnoreIdent(s.Ident) {
+			self.pushErr(s.Token, build::LogMsg.IgnoreIdent)
 		} else if self.isDuplicatedIdent(uintptr(s), s.Ident, s.Binded) {
-			self.pushErr(s.Token, LogMsg.DuplicatedIdent, s.Ident)
-			self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
+			self.pushErr(s.Token, build::LogMsg.DuplicatedIdent, s.Ident)
+			self.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
 		}
 
 		self.checkDirectives(s.Directives, s)
@@ -2143,10 +2143,10 @@ impl sema {
 	}
 
 	fn checkFuncDecl(mut &self, mut &f: &Fn) {
-		if IsIgnoreIdent(f.Ident) {
-			self.pushErr(f.Token, LogMsg.IgnoreIdent)
+		if lex::IsIgnoreIdent(f.Ident) {
+			self.pushErr(f.Token, build::LogMsg.IgnoreIdent)
 		} else if f.IsAnon() {
-			self.pushErr(f.Token, LogMsg.AnonFn)
+			self.pushErr(f.Token, build::LogMsg.AnonFn)
 		}
 
 		self.checkDirectives(f.Directives, f)
@@ -2159,8 +2159,8 @@ impl sema {
 					ret
 				}
 			}
-			self.pushErr(f.Token, LogMsg.DuplicatedIdent, f.Ident)
-			self.pushSuggestion(LogMsg.RenameForAvoidDuplication)
+			self.pushErr(f.Token, build::LogMsg.DuplicatedIdent, f.Ident)
+			self.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
 		}
 	}
 
@@ -2180,9 +2180,9 @@ impl sema {
 		ret self.checkFuncDeclsBy(self.file.Funcs)
 	}
 
-	fn pushCycleError(self, &st1: str, &st2: str, mut &message: StrBuilder) {
+	fn pushCycleError(self, &st1: str, &st2: str, mut &message: strings::StrBuilder) {
 		const Padding = 7
-		refersTo := Logf(LogMsg.RefersTo, st1, st2)
+		refersTo := build::Logf(build::LogMsg.RefersTo, st1, st2)
 		m := message.Str()
 		message.WriteStr(strings::Repeat(" ", Padding))
 		message.WriteStr(refersTo)
@@ -2190,7 +2190,7 @@ impl sema {
 		message.WriteStr(m)
 	}
 
-	fn checkCrossCycle(self, &st1: &Struct, &st2: &Struct, mut &message: StrBuilder): bool {
+	fn checkCrossCycle(self, &st1: &Struct, &st2: &Struct, mut &message: strings::StrBuilder): bool {
 		for _, u in st2.Uses {
 			if u == st1 {
 				self.pushCycleError(st2.Ident, u.Ident, message)
@@ -2240,14 +2240,14 @@ impl sema {
 		}
 	}
 
-	fn checkDataForTypeInference(mut self, &d: &Data, &err_token: &Token) {
+	fn checkDataForTypeInference(mut self, &d: &Data, &err_token: &lex::Token) {
 		match {
 		| d.IsNil():
-			self.pushErr(err_token, LogMsg.NilForTypeInference)
+			self.pushErr(err_token, build::LogMsg.NilForTypeInference)
 		| d.IsVoid():
-			self.pushErr(err_token, LogMsg.VoidForTypeInference)
+			self.pushErr(err_token, build::LogMsg.VoidForTypeInference)
 		| d.Kind.Variadic:
-			self.pushErr(err_token, LogMsg.InvalidExprForTypeInference)
+			self.pushErr(err_token, build::LogMsg.InvalidExprForTypeInference)
 		}
 	}
 
@@ -2286,12 +2286,12 @@ impl sema {
 		}
 
 		if v.Reference && !isValidForRef(v.Kind.Kind) {
-			self.pushErr(v.Token, LogMsg.RefPointsToInvalidType, v.Kind.Kind.Str())
+			self.pushErr(v.Token, build::LogMsg.RefPointsToInvalidType, v.Kind.Kind.Str())
 		}
 
 		if v.Constant {
 			if !v.Value.Data.IsConst() && !v.Value.Data.Kind.comptime() {
-				self.pushErr(v.Value.Expr.Token, LogMsg.ExprNotConst)
+				self.pushErr(v.Value.Expr.Token, build::LogMsg.ExprNotConst)
 			}
 		} else {
 			v.Value.Data.Constant = nil
@@ -2362,7 +2362,7 @@ impl sema {
 
 	// Checks new generics function instance.
 	// If instance is already exist, f will point to exist instantantiation.
-	fn checkGenericFn(mut &self, mut &f: &FnIns, mut &et: &Token): (ok: bool, exist: bool) {
+	fn checkGenericFn(mut &self, mut &f: &FnIns, mut &et: &lex::Token): (ok: bool, exist: bool) {
 		ok = self.reloadFnInsTypes(f)
 		f.reloaded = true
 		if !ok {
@@ -2408,7 +2408,7 @@ impl sema {
 	// Checks environment-dependent parts of structure instance.
 	// Which is contains fields and generic-type constraints.
 	// If generic instance will be check, errorToken should be passed.
-	fn checkStructEnv(mut &self, mut &s: &StructIns, mut errorToken: &Token): (ok: bool) {
+	fn checkStructEnv(mut &self, mut &s: &StructIns, mut errorToken: &lex::Token): (ok: bool) {
 		mut tc := typeChecker{
 			s: s.Decl.sema,
 			rootLookup: s.Decl.sema,
@@ -2505,7 +2505,7 @@ impl sema {
 		ret
 	}
 
-	fn precheckStructIns(mut &self, mut &s: &StructIns, mut errorToken: &Token): (ok: bool) {
+	fn precheckStructIns(mut &self, mut &s: &StructIns, mut errorToken: &lex::Token): (ok: bool) {
 		ok = self.checkStructEnv(s, errorToken)
 		if !ok {
 			ret false
@@ -2669,7 +2669,7 @@ impl sema {
 		mrc := missingRetChecker.new()
 		ok := mrc.check(f.Scope)
 		if !ok {
-			self.pushErr(f.Decl.Token, LogMsg.MissingRet)
+			self.pushErr(f.Decl.Token, build::LogMsg.MissingRet)
 		}
 	}
 
@@ -2686,7 +2686,7 @@ impl sema {
 		}
 	}
 
-	fn checkFnInsCaller(mut &self, mut &f: &FnIns, mut caller: &Token) {
+	fn checkFnInsCaller(mut &self, mut &f: &FnIns, mut caller: &lex::Token) {
 		if f.Decl.Binded {
 			ret
 		}
@@ -2729,8 +2729,8 @@ impl sema {
 
 	fn checkTestFn(mut self, mut &f: &FnIns) {
 		if f.Decl.Public {
-			self.pushErr(f.Decl.Token, LogMsg.PubTestFn)
-			self.pushSuggestion(LogMsg.RemovePubModifier)
+			self.pushErr(f.Decl.Token, build::LogMsg.PubTestFn)
+			self.pushSuggestion(build::LogMsg.RemovePubModifier)
 			ret
 		}
 
@@ -2740,22 +2740,22 @@ impl sema {
 			len(f.Params) != 1 ||
 			f.Decl.Params[0].Mutable ||
 			f.Decl.Params[0].Reference {
-			self.pushErr(f.Decl.Token, LogMsg.WrongTestFnDecl)
-			self.pushSuggestion(LogMsg.UseExpectedTestFnDecl)
+			self.pushErr(f.Decl.Token, build::LogMsg.WrongTestFnDecl)
+			self.pushSuggestion(build::LogMsg.UseExpectedTestFnDecl)
 			ret
 		}
 
 		mut sptr := f.Params[0].Kind.Sptr()
 		if sptr == nil {
-			self.pushErr(f.Decl.Token, LogMsg.WrongTestFnDecl)
-			self.pushSuggestion(LogMsg.UseExpectedTestFnDecl)
+			self.pushErr(f.Decl.Token, build::LogMsg.WrongTestFnDecl)
+			self.pushSuggestion(build::LogMsg.UseExpectedTestFnDecl)
 			ret
 		}
 
 		s := sptr.Elem.Struct()
 		if s == nil || !isStdPackage(s.Decl.Token.File.Path, "testing") {
-			self.pushErr(f.Decl.Token, LogMsg.WrongTestFnDecl)
-			self.pushSuggestion(LogMsg.UseExpectedTestFnDecl)
+			self.pushErr(f.Decl.Token, build::LogMsg.WrongTestFnDecl)
+			self.pushSuggestion(build::LogMsg.UseExpectedTestFnDecl)
 			ret
 		}
 	}
@@ -2776,7 +2776,7 @@ impl sema {
 			ok := self.reloadFnInsTypes(ins)
 			ins.reloaded = true
 
-			if ok && hasDirective(f.Directives, Directive.Test) {
+			if ok && hasDirective(f.Directives, build::Directive.Test) {
 				self.checkTestFn(ins)
 			}
 		}
@@ -3038,7 +3038,7 @@ push:
 	}
 }
 
-fn pushRuntimeToStr(mut &s: &sema, mut &t: &TypeKind, mut &token: &Token,
+fn pushRuntimeToStr(mut &s: &sema, mut &t: &TypeKind, mut &token: &lex::Token,
 	mut refers: &ReferenceStack) {
 	if s.meta.runtime == nil || t.IsNil() {
 		ret

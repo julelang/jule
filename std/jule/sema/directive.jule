@@ -3,8 +3,8 @@
 // license that can be found in the LICENSE file.
 
 use ast for std::jule::ast
-use std::jule::build::{Directive, LogMsg}
-use std::jule::lex::{TokenId}
+use build for std::jule::build
+use lex for std::jule::lex
 
 struct directiveChecker {
 	s: &sema
@@ -21,11 +21,11 @@ impl directiveChecker {
 			}
 			fall
 		|:
-			self.s.pushErr(d.Tag, LogMsg.UnsupportedDirective, d.Tag.Kind)
+			self.s.pushErr(d.Tag, build::LogMsg.UnsupportedDirective, d.Tag.Kind)
 		}
 
 		if len(d.Args) > 0 {
-			self.s.pushErr(d.Args[0], LogMsg.InvalidSyntax)
+			self.s.pushErr(d.Args[0], build::LogMsg.InvalidSyntax)
 		}
 	}
 
@@ -37,11 +37,11 @@ impl directiveChecker {
 			}
 			fall
 		|:
-			self.s.pushErr(d.Tag, LogMsg.UnsupportedDirective, d.Tag.Kind)
+			self.s.pushErr(d.Tag, build::LogMsg.UnsupportedDirective, d.Tag.Kind)
 		}
 
 		if len(d.Args) > 0 {
-			self.s.pushErr(d.Args[0], LogMsg.InvalidSyntax)
+			self.s.pushErr(d.Args[0], build::LogMsg.InvalidSyntax)
 		}
 	}
 
@@ -49,35 +49,35 @@ impl directiveChecker {
 		match type self.o {
 		| &Struct:
 			if !(&Struct)(self.o).Binded {
-				self.s.pushErr(d.Tag, LogMsg.UnsupportedDirective, d.Tag.Kind)
+				self.s.pushErr(d.Tag, build::LogMsg.UnsupportedDirective, d.Tag.Kind)
 			}
 		| &Fn:
 			if !(&Fn)(self.o).Binded {
-				self.s.pushErr(d.Tag, LogMsg.UnsupportedDirective, d.Tag.Kind)
+				self.s.pushErr(d.Tag, build::LogMsg.UnsupportedDirective, d.Tag.Kind)
 			}
 		| &Var:
 			if !(&Var)(self.o).Binded {
-				self.s.pushErr(d.Tag, LogMsg.UnsupportedDirective, d.Tag.Kind)
+				self.s.pushErr(d.Tag, build::LogMsg.UnsupportedDirective, d.Tag.Kind)
 			}
 		|:
-			self.s.pushErr(d.Tag, LogMsg.UnsupportedDirective, d.Tag.Kind)
+			self.s.pushErr(d.Tag, build::LogMsg.UnsupportedDirective, d.Tag.Kind)
 		}
 
 		if len(d.Args) == 0 {
-			self.s.pushErr(d.Tag, LogMsg.MissingExpr)
+			self.s.pushErr(d.Tag, build::LogMsg.MissingExpr)
 			ret
 		} else if len(d.Args) > 1 {
-			self.s.pushErr(d.Args[1], LogMsg.ArgumentOverflow, d.Tag.Kind)
+			self.s.pushErr(d.Args[1], build::LogMsg.ArgumentOverflow, d.Tag.Kind)
 		}
 
 		arg := d.Args[0]
-		if arg.Id != TokenId.Lit {
-			self.s.pushErr(arg, LogMsg.InvalidSyntax)
+		if arg.Id != lex::TokenId.Lit {
+			self.s.pushErr(arg, build::LogMsg.InvalidSyntax)
 			ret
 		}
 
 		if arg.Kind[0] != '"' {
-			self.s.pushErr(arg, LogMsg.InvalidSyntax)
+			self.s.pushErr(arg, build::LogMsg.InvalidSyntax)
 			ret
 		}
 
@@ -87,11 +87,11 @@ impl directiveChecker {
 		// Push relevant directives.
 		match type self.o {
 		| &Struct:
-			if findDirective(*self.d, Directive.Typedef) == nil {
+			if findDirective(*self.d, build::Directive.Typedef) == nil {
 				mut typedef := &ast::Directive{
 					Tag: d.Tag,
 				}
-				typedef.Tag.Kind = Directive.Typedef
+				typedef.Tag.Kind = build::Directive.Typedef
 				*self.d = append(*self.d, typedef)
 			}
 		}
@@ -101,36 +101,36 @@ impl directiveChecker {
 		match type self.o {
 		| &Struct:
 			if (&Struct)(self.o).Binded {
-				self.s.pushErr(d.Tag, LogMsg.UnsupportedDirective, d.Tag.Kind)
+				self.s.pushErr(d.Tag, build::LogMsg.UnsupportedDirective, d.Tag.Kind)
 			}
 		| &Fn:
 			mut f := (&Fn)(self.o)
 			if f.Binded || f.IsEntryPoint() || f.IsInit() {
-				self.s.pushErr(d.Tag, LogMsg.UnsupportedDirective, d.Tag.Kind)
+				self.s.pushErr(d.Tag, build::LogMsg.UnsupportedDirective, d.Tag.Kind)
 			}
 		| &Var:
 			if (&Var)(self.o).Binded {
-				self.s.pushErr(d.Tag, LogMsg.UnsupportedDirective, d.Tag.Kind)
+				self.s.pushErr(d.Tag, build::LogMsg.UnsupportedDirective, d.Tag.Kind)
 			}
 		|:
-			self.s.pushErr(d.Tag, LogMsg.UnsupportedDirective, d.Tag.Kind)
+			self.s.pushErr(d.Tag, build::LogMsg.UnsupportedDirective, d.Tag.Kind)
 		}
 
 		if len(d.Args) == 0 {
 			ret
 		}
 		if len(d.Args) > 1 {
-			self.s.pushErr(d.Args[1], LogMsg.ArgumentOverflow, d.Tag.Kind)
+			self.s.pushErr(d.Args[1], build::LogMsg.ArgumentOverflow, d.Tag.Kind)
 		}
 
 		arg := d.Args[0]
-		if arg.Id != TokenId.Lit {
-			self.s.pushErr(arg, LogMsg.InvalidSyntax)
+		if arg.Id != lex::TokenId.Lit {
+			self.s.pushErr(arg, build::LogMsg.InvalidSyntax)
 			ret
 		}
 
 		if arg.Kind[0] != '"' {
-			self.s.pushErr(arg, LogMsg.InvalidSyntax)
+			self.s.pushErr(arg, build::LogMsg.InvalidSyntax)
 			ret
 		}
 
@@ -146,16 +146,16 @@ impl directiveChecker {
 				break
 			}
 			if f.IsMethod() {
-				self.s.pushErr(f.Token, LogMsg.TestMethod)
+				self.s.pushErr(f.Token, build::LogMsg.TestMethod)
 				break
 			}
 			fall
 		|:
-			self.s.pushErr(d.Tag, LogMsg.UnsupportedDirective, d.Tag.Kind)
+			self.s.pushErr(d.Tag, build::LogMsg.UnsupportedDirective, d.Tag.Kind)
 		}
 
 		if len(d.Args) > 0 {
-			self.s.pushErr(d.Args[0], LogMsg.InvalidSyntax)
+			self.s.pushErr(d.Args[0], build::LogMsg.InvalidSyntax)
 		}
 	}
 
@@ -164,33 +164,33 @@ impl directiveChecker {
 		| &Fn:
 			f := (&Fn)(self.o)
 			if f.Binded || f.IsInit() || f.IsEntryPoint() || f.IsMethod() || len(f.Generics) > 0 {
-				self.s.pushErr(d.Tag, LogMsg.UnsupportedDirective, d.Tag.Kind)
+				self.s.pushErr(d.Tag, build::LogMsg.UnsupportedDirective, d.Tag.Kind)
 				ret
 			}
 		| &Var:
 			v := (&Var)(self.o)
 			if v.Binded || v.Constant {
-				self.s.pushErr(d.Tag, LogMsg.UnsupportedDirective, d.Tag.Kind)
+				self.s.pushErr(d.Tag, build::LogMsg.UnsupportedDirective, d.Tag.Kind)
 			}
 		|:
-			self.s.pushErr(d.Tag, LogMsg.UnsupportedDirective, d.Tag.Kind)
+			self.s.pushErr(d.Tag, build::LogMsg.UnsupportedDirective, d.Tag.Kind)
 			ret
 		}
 		if len(d.Args) > 1 {
-			self.s.pushErr(d.Args[1], LogMsg.ArgumentOverflow, d.Tag.Kind)
+			self.s.pushErr(d.Args[1], build::LogMsg.ArgumentOverflow, d.Tag.Kind)
 			ret
 		}
 		if len(d.Args) < 1 {
-			self.s.pushErr(d.Tag, LogMsg.MissingExpr)
+			self.s.pushErr(d.Tag, build::LogMsg.MissingExpr)
 			ret
 		}
 		arg := d.Args[0]
-		if arg.Id != TokenId.Lit {
-			self.s.pushErr(arg, LogMsg.InvalidSyntax)
+		if arg.Id != lex::TokenId.Lit {
+			self.s.pushErr(arg, build::LogMsg.InvalidSyntax)
 			ret
 		}
 		if arg.Kind[0] != '"' {
-			self.s.pushErr(arg, LogMsg.InvalidSyntax)
+			self.s.pushErr(arg, build::LogMsg.InvalidSyntax)
 			ret
 		}
 		// remove quotes
@@ -199,23 +199,23 @@ impl directiveChecker {
 
 	fn checkDirective(mut self, mut &d: &ast::Directive) {
 		match d.Tag.Kind {
-		| Directive.Cdef:
+		| build::Directive.Cdef:
 			self.checkCdef(d)
-		| Directive.Typedef:
+		| build::Directive.Typedef:
 			self.checkTypedef(d)
-		| Directive.Namespace:
+		| build::Directive.Namespace:
 			self.checkNamespace(d)
-		| Directive.Deprecated:
+		| build::Directive.Deprecated:
 			self.checkDeprecated(d)
-		| Directive.Test:
+		| build::Directive.Test:
 			self.checkTest(d)
-		| Directive.Export:
+		| build::Directive.Export:
 			self.checkExport(d)
-		| Directive.Build
-		| Directive.Pass:
-			self.s.pushErr(d.Tag, LogMsg.UnsupportedDirective, d.Tag.Kind)
+		| build::Directive.Build
+		| build::Directive.Pass:
+			self.s.pushErr(d.Tag, build::LogMsg.UnsupportedDirective, d.Tag.Kind)
 		|:
-			self.s.pushErr(d.Tag, LogMsg.InvalidLabel, d.Tag.Kind)
+			self.s.pushErr(d.Tag, build::LogMsg.InvalidLabel, d.Tag.Kind)
 		}
 	}
 
