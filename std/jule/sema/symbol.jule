@@ -495,9 +495,13 @@ impl symBuilder {
 	}
 
 	fn getAsLinkPath(mut &self, mut path: str): str {
+		mut sb := strings::StrBuilder.New(len(path))
 		if strings::HasPrefix(path, build::PathStdlib) {
-			path = path[len(build::PathStdlib):]
-			ret "std" + strings::Replace(path, str(path::Separator), lex::TokenKind.DblColon, -1)
+			path = path[len(build::PathStdlib):] // cut absolute path prefix
+			sb.WriteStr(`"std`)
+			sb.WriteStr(strings::Replace(path, str(path::Separator), build::ImportPathSep, -1))
+			sb.WriteByte('"')
+			ret sb.Str()
 		}
 
 		root, _ := path::Abs(self.importer.GetModPath())
@@ -505,7 +509,10 @@ impl symBuilder {
 		if path[0] == path::Separator {
 			path = path[1:]
 		}
-		ret strings::Replace(path, str(path::Separator), lex::TokenKind.DblColon, -1)
+		sb.WriteByte('"')
+		sb.WriteStr(strings::Replace(path, str(path::Separator), build::ImportPathSep, -1))
+		sb.WriteByte('"')
+		ret sb.Str()
 	}
 
 	fn pushCycleError(mut &self, &sb: &symBuilder, path: str, mut &message: strings::StrBuilder) {
