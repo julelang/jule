@@ -9,6 +9,7 @@ use "std/jule/lex"
 use "std/jule/internal/mod"
 use "std/jule/types"
 use "std/strings"
+use "std/unicode/utf8"
 
 fn isValidModelForRef(mut &m: ExprModel): bool {
 	match type m {
@@ -476,24 +477,48 @@ impl sema {
 		ret false
 	}
 
+	fn checkAutoAlias(mut self, mut &imp: &ImportInfo): bool {
+		if imp.LinkPath == "std/unsafe" {
+			// the "std/unsafe" package is able to use unsafe keyword as alias
+			ret true
+		}
+		valid := isValidImpAlias(imp.Alias)
+		if valid {
+			if self.isUseAliasDuplication(imp) {
+				self.pushErr(imp.Decl.Path, build::LogMsg.DuplicatedUseAlias, imp.Alias)
+				self.pushSuggestion(build::LogMsg.GiveAnAliasManually, imp.Decl.Path.Kind)
+			}
+		} else {
+			self.pushErr(imp.Decl.Path, build::LogMsg.AutoAliasFail, imp.Decl.Path.Kind)
+			self.pushSuggestion(build::LogMsg.GiveAnAliasManually, imp.Decl.Path.Kind)
+		}
+		ret valid
+	}
+
 	fn checkImport(mut self, mut &imp: &ImportInfo): bool {
-		if imp.Binded || len(imp.Package.Files) == 0 {
+		if imp.Binded {
 			ret true
 		}
 
-		// Check special cases for "std/unsafe".
-		if imp.LinkPath == "std/unsafe" && imp.Decl.Alias != nil {
-			self.pushErr(imp.Decl.Alias, build::LogMsg.ExpectedPlainUseDecl, `use "std/unsafe"`)
-			ret false
-		}
-
-		if len(imp.Alias) != 0 {
+		if imp.Decl.Alias != nil { // custom alias found
 			if lex::IsIgnoreIdent(imp.Alias) {
 				self.pushErr(imp.Decl.Token, build::LogMsg.IgnoreIdent)
 			} else if self.isUseAliasDuplication(imp) {
 				self.pushErr(imp.Decl.Token, build::LogMsg.DuplicatedUseAlias, imp.Alias)
 				self.pushSuggestion(build::LogMsg.RenameUseAliasAvoidDuplication)
 			}
+
+			// Check special cases for the "std/unsafe" package.
+			if imp.LinkPath == "std/unsafe" {
+				self.pushErr(imp.Decl.Alias, build::LogMsg.ExpectedPlainUseDecl, `use "std/unsafe"`)
+				ret false
+			}
+		} else if !self.checkAutoAlias(imp) {
+			ret false
+		}
+
+		if len(imp.Package.Files) == 0 {
+			ret true
 		}
 
 		if !imp.Duplicate {
@@ -2823,4 +2848,30 @@ fn pushRuntimeToStr(mut &s: &sema, mut &t: &TypeKind, mut &token: &lex::Token,
 	if refers != nil {
 		refers.Push(f)
 	}
+}
+
+// Reports whether the alias valid for the import alias.
+// Designed to check auto aliases.
+fn isValidImpAlias(mut alias: str): (valid: bool) {
+	if lex::IsIgnoreIdent(alias) {
+		ret false
+	}
+	if lex::IsKeyword(alias) {
+		ret false
+	}
+	mut r, mut size, := utf8::DecodeRuneStr(alias)
+	if r != '_' && !lex::IsLetter(r) {
+		ret false
+	}
+	for {
+		alias = alias[size:]
+		if len(alias) == 0 {
+			break
+		}
+		r, size, = utf8::DecodeRuneStr(alias)
+		if r != '_' && !('0' <= r && r <= '9') && !lex::IsLetter(r) {
+			ret false
+		}
+	}
+	ret true
 }

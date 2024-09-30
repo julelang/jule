@@ -8,6 +8,8 @@ use "std/jule/ast"
 use "std/jule/build"
 use "std/jule/lex"
 use "std/strings"
+use "std/unicode"
+use "std/unicode/utf8"
 
 // Stack for symbol references.
 // It used by Sema to store necessary references.
@@ -418,15 +420,19 @@ impl symBuilder {
 	// Checks import path and returns as filepath if no error exist.
 	fn checkImpPath(mut &self, mut &decl: &ast::UseDecl): (std: bool, filepath: str) {
 		path := decl.Path.Kind[1:len(decl.Path.Kind)-1] // remove quotes
+		if strings::HasSuffix(path, build::ImportPathSep) {
+			self.pushErr(decl.Path, build::LogMsg.InvalidImportPath, decl.Path.Kind)
+			ret
+		}
 		parts := strings::Split(path, build::ImportPathSep, -1)
 		if len(parts) == 0 {
-			self.pushErr(decl.Path, build::LogMsg.UseNotFound, decl.Path.Kind)
+			self.pushErr(decl.Path, build::LogMsg.InvalidImportPath, decl.Path.Kind)
 			ret
 		}
 		std = parts[0] == "std"
 		for _, part in parts {
-			if part == "" {
-				self.pushErr(decl.Path, build::LogMsg.UseNotFound, decl.Path.Kind)
+			if part == "" || lex::IsIgnoreIdent(part) {
+				self.pushErr(decl.Path, build::LogMsg.InvalidImportPath, decl.Path.Kind)
 				ret false, ""
 			}
 			filepath = path::Join(filepath, part)
