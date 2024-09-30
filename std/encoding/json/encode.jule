@@ -79,7 +79,7 @@ impl jsonEncoder {
 
 	fn encodeFloat(mut self, f: f64, bits: int)! {
 		if math::IsNaN(f) || math::IsInf(f, 0) {
-			error(JSONEncodeError.UnsupportedFloatValue)
+			error(EncodeError.UnsupportedFloatValue)
 		}
 		mut fmt := 'f'
 		abs := math::Abs(f)
@@ -245,7 +245,7 @@ impl jsonEncoder {
 		| comptime::Kind.U64:
 			break
 		|:
-			error(JSONEncodeError.UnsupportedType)
+			error(EncodeError.UnsupportedType)
 		}
 		if t == nil {
 			self.encodeNil()
@@ -350,7 +350,7 @@ impl jsonEncoder {
 		const tt = comptime::TypeOf(T)
 		const match {
 		| tt.Binded():
-			error(JSONEncodeError.UnsupportedType)
+			error(EncodeError.UnsupportedType)
 		}
 		const match type T {
 		| int | i8 | i16 | i32 | i64:
@@ -392,7 +392,7 @@ impl jsonEncoder {
 		| comptime::Kind.Slice:
 			self.encodeSlice[T, Flag](t) else { error(error) }
 		|:
-			error(JSONEncodeError.UnsupportedType)
+			error(EncodeError.UnsupportedType)
 		}
 	}
 }
@@ -417,11 +417,11 @@ fn encoder(): jsonEncoder {
 // Encoding details:
 //   Since this function designed for comptime type analysis, the type [T] should
 //   be valid type for comptime. The type [any], which is stores dynamic type, is not valid.
-//   Any unsupported type causes exceptional with [JSONEncodeError.UnsupportedType].
+//   Any unsupported type causes exceptional with [EncodeError.UnsupportedType].
 //
 //   Signed/Unsigned Integers, Floating-Points:
 //     Encode as JSON numbers.
-//     For floating-points, NaN or ±Inf will cause exceptional with [JSONEncodeError.UnsupportedFloatValue].
+//     For floating-points, NaN or ±Inf will cause exceptional with [EncodeError.UnsupportedFloatValue].
 //
 //   Booleans:
 //     Encode as JSON booleans.
@@ -449,7 +449,7 @@ fn encoder(): jsonEncoder {
 //     If map is nil, encode as null JSON value.
 //     The keys of the map always will be quoted.
 //     Also map's key type only can be: signed integer, unsigned integer and string.
-//     Other types will cause exceptional with [JSONEncodeError.UnsupportedType].
+//     Other types will cause exceptional with [EncodeError.UnsupportedType].
 //
 //   Smart Pointers:
 //     If smart pointer is nil, encode as null JSON value.

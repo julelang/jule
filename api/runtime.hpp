@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-// Declarations of the exported defines of the [std::runtime] package.
+// Declarations of the exported defines of the "std/runtime" package.
 // Implemented by compiler via generation object code for the package.
 
 #ifndef __JULE_RUNTIME_HPP
