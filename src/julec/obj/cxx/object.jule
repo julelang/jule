@@ -10,7 +10,7 @@ use "std/conv"
 use "std/fs/path"
 use "std/jule"
 use "std/jule/build"
-use "std/jule/lex"
+use "std/jule/token"
 use "std/jule/sema"
 use "std/jule/types"
 use "std/strings"
@@ -374,7 +374,7 @@ impl ObjectCoder {
 			self.anyObj.WriteStr("_eq(void *alloc, void *other) noexcept { ")
 			if t.Comparable() {
 				self.anyObj.WriteStr("return ")
-				self.ec._unsafeBinary(self.anyObj, lmodel, rmodel, t, t, lex::TokenId.Eqs, lex::TokenKind.Eqs)
+				self.ec._unsafeBinary(self.anyObj, lmodel, rmodel, t, t, token::Id.Eqs, token::Kind.Eqs)
 				self.anyObj.WriteStr("; }\n")
 			} else {
 				self.anyObj.WriteStr(`__jule_panic((`)
@@ -506,7 +506,7 @@ impl ObjectCoder {
 	}
 
 	// Writes location information of token as cstr bytes.
-	fn locInfo(mut &self, &t: &lex::Token) {
+	fn locInfo(mut &self, &t: &token::Token) {
 		&loc := t.File.Path
 
 		// Normalize path if production compilation enabled.
@@ -720,7 +720,7 @@ impl ObjectCoder {
 			identCoder.field(fIdent, f.Decl)
 			lmodel += unsafe { unsafe::BytesStr(fIdent.Buf()) }
 			rmodel += unsafe { unsafe::BytesStr(fIdent.Buf()) }
-			self.ec._unsafeBinary(self.Buf, lmodel, rmodel, f.Kind, f.Kind, lex::TokenId.Eqs, lex::TokenKind.Eqs)
+			self.ec._unsafeBinary(self.Buf, lmodel, rmodel, f.Kind, f.Kind, token::Id.Eqs, token::Kind.Eqs)
 			lmodel = lmodel[:len(lmodel)-fIdent.Len()]
 			rmodel = lmodel[:len(rmodel)-fIdent.Len()]
 		}
@@ -866,7 +866,7 @@ impl ObjectCoder {
 		obj::IterTraitMethods(t, fn(mut &m: &sema::Fn) {
 			mut ins := m.Instances[0]
 			for (i, mut ip) in ins.Params[1:] {
-				if lex::IsAnonIdent(ip.Decl.Ident) {
+				if token::IsAnonIdent(ip.Decl.Ident) {
 					ip.Decl.Ident = "_" + conv::Itoa(i)
 				}
 			}
@@ -944,7 +944,7 @@ impl ObjectCoder {
 	}
 
 	fn var(mut &self, mut v: &sema::Var) {
-		if lex::IsIgnoreIdent(v.Ident) {
+		if token::IsIgnoreIdent(v.Ident) {
 			ret
 		}
 		if v.Value != nil && v.Value.Expr != nil {
@@ -1373,7 +1373,7 @@ impl ObjectCoder {
 }
 
 // Concatenate all strings into single string.
-fn concatAllParts(parts: ...&lex::Token): []byte {
+fn concatAllParts(parts: ...&token::Token): []byte {
 	mut n := 0
 	for _, part in parts {
 		n += len(part.Kind)

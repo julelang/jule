@@ -7,7 +7,7 @@ use "obj"
 use "opt"
 use "std/conv"
 use "std/jule/constant"
-use "std/jule/lex"
+use "std/jule/token"
 use "std/jule/sema"
 use "std/strings"
 
@@ -523,7 +523,7 @@ impl scopeCoder {
 	}
 
 	fn operatorOverloadingAssign(mut &self, mut &s: &sema::StructIns, mut &l: &sema::OperandExprModel,
-		mut &r: &sema::OperandExprModel, op: lex::TokenId) {
+		mut &r: &sema::OperandExprModel, op: token::Id) {
 		const Unary = false
 		mut f := obj::FindOperator(s, op, Unary)
 		if f == nil {
@@ -539,19 +539,19 @@ impl scopeCoder {
 
 	fn assign(mut &self, mut a: &sema::Assign) {
 		match a.Op.Id {
-		| lex::TokenId.SolidusEq | lex::TokenId.PercentEq:
+		| token::Id.SolidusEq | token::Id.PercentEq:
 			// Do not check division safety of structures and skip if safety disabled.
 			if env::Safety && a.Left.Kind.Struct() == nil {
 				self.divByZeroAssign(a)
 				ret
 			}
-		| lex::TokenId.ShlEq:
+		| token::Id.ShlEq:
 			// Do not check shifting of structures.
 			if a.Left.Kind.Struct() == nil {
 				self.shl(a)
 				ret
 			}
-		| lex::TokenId.ShrEq:
+		| token::Id.ShrEq:
 			// Do not check shifting of structures.
 			if a.Left.Kind.Struct() == nil {
 				self.shr(a)
@@ -559,7 +559,7 @@ impl scopeCoder {
 			}
 		}
 
-		if a.Op.Id != lex::TokenId.Eq && a.Left.Kind.Struct() != nil {
+		if a.Op.Id != token::Id.Eq && a.Left.Kind.Struct() != nil {
 			mut s := a.Left.Kind.Struct()
 			self.operatorOverloadingAssign(s, a.Left, a.Right, a.Op.Id)
 			ret

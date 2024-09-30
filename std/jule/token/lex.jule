@@ -7,97 +7,97 @@ use "std/jule/build"
 use "std/unicode/utf8"
 
 // Lexer mode.
-enum LexMode {
+enum Mode {
 	Standard: 0 << 0, // Standard mode.
 	Comment: 1 << 0,  // Standard mode + comments.
 }
 
 struct kindPair {
-	kind: TokenKind
-	id:   TokenId
+	kind: Kind
+	id:   Id
 }
 
 static keywords: [...]kindPair = [
-	{TokenKind.Const, TokenId.Const},
-	{TokenKind.Ret, TokenId.Ret},
-	{TokenKind.Type, TokenId.Type},
-	{TokenKind.For, TokenId.For},
-	{TokenKind.Break, TokenId.Break},
-	{TokenKind.Cont, TokenId.Cont},
-	{TokenKind.In, TokenId.In},
-	{TokenKind.If, TokenId.If},
-	{TokenKind.Else, TokenId.Else},
-	{TokenKind.Use, TokenId.Use},
-	{TokenKind.Goto, TokenId.Goto},
-	{TokenKind.Enum, TokenId.Enum},
-	{TokenKind.Struct, TokenId.Struct},
-	{TokenKind.Co, TokenId.Co},
-	{TokenKind.Match, TokenId.Match},
-	{TokenKind.Self, TokenId.Self},
-	{TokenKind.Trait, TokenId.Trait},
-	{TokenKind.Impl, TokenId.Impl},
-	{TokenKind.Cpp, TokenId.Cpp},
-	{TokenKind.Fall, TokenId.Fall},
-	{TokenKind.Fn, TokenId.Fn},
-	{TokenKind.Let, TokenId.Let},
-	{TokenKind.Unsafe, TokenId.Unsafe},
-	{TokenKind.Mut, TokenId.Mut},
-	{TokenKind.Defer, TokenId.Defer},
-	{TokenKind.Static, TokenId.Static},
-	{TokenKind.Error, TokenId.Error},
-	{TokenKind.Map, TokenId.Map},
+	{Kind.Const, Id.Const},
+	{Kind.Ret, Id.Ret},
+	{Kind.Type, Id.Type},
+	{Kind.For, Id.For},
+	{Kind.Break, Id.Break},
+	{Kind.Cont, Id.Cont},
+	{Kind.In, Id.In},
+	{Kind.If, Id.If},
+	{Kind.Else, Id.Else},
+	{Kind.Use, Id.Use},
+	{Kind.Goto, Id.Goto},
+	{Kind.Enum, Id.Enum},
+	{Kind.Struct, Id.Struct},
+	{Kind.Co, Id.Co},
+	{Kind.Match, Id.Match},
+	{Kind.Self, Id.Self},
+	{Kind.Trait, Id.Trait},
+	{Kind.Impl, Id.Impl},
+	{Kind.Cpp, Id.Cpp},
+	{Kind.Fall, Id.Fall},
+	{Kind.Fn, Id.Fn},
+	{Kind.Let, Id.Let},
+	{Kind.Unsafe, Id.Unsafe},
+	{Kind.Mut, Id.Mut},
+	{Kind.Defer, Id.Defer},
+	{Kind.Static, Id.Static},
+	{Kind.Error, Id.Error},
+	{Kind.Map, Id.Map},
 ]
 
 static basicOps: [...]kindPair = [
-	{TokenKind.DblColon, TokenId.DblColon},
-	{TokenKind.ColonEq, TokenId.ColonEq},
-	{TokenKind.Colon, TokenId.Colon},
-	{TokenKind.Semicolon, TokenId.Semicolon},
-	{TokenKind.Comma, TokenId.Comma},
-	{TokenKind.TripleDot, TokenId.TripleDot},
-	{TokenKind.Dot, TokenId.Dot},
-	{TokenKind.PlusEq, TokenId.PlusEq},
-	{TokenKind.MinusEq, TokenId.MinusEq},
-	{TokenKind.StarEq, TokenId.StarEq},
-	{TokenKind.SolidusEq, TokenId.SolidusEq},
-	{TokenKind.PercentEq, TokenId.PercentEq},
-	{TokenKind.ShlEq, TokenId.ShlEq},
-	{TokenKind.ShrEq, TokenId.ShrEq},
-	{TokenKind.CaretEq, TokenId.CaretEq},
-	{TokenKind.AmperEq, TokenId.AmperEq},
-	{TokenKind.VlineEq, TokenId.VlineEq},
-	{TokenKind.Eqs, TokenId.Eqs},
-	{TokenKind.NotEq, TokenId.NotEq},
-	{TokenKind.GtEq, TokenId.GtEq},
-	{TokenKind.LtEq, TokenId.LtEq},
-	{TokenKind.DblAmper, TokenId.DblAmper},
-	{TokenKind.DblVline, TokenId.DblVline},
-	{TokenKind.Shl, TokenId.Shl},
-	{TokenKind.Shr, TokenId.Shr},
-	{TokenKind.DblPlus, TokenId.DblPlus},
-	{TokenKind.DblMinus, TokenId.DblMinus},
-	{TokenKind.Plus, TokenId.Plus},
-	{TokenKind.Minus, TokenId.Minus},
-	{TokenKind.Star, TokenId.Star},
-	{TokenKind.Solidus, TokenId.Solidus},
-	{TokenKind.Percent, TokenId.Percent},
-	{TokenKind.Amper, TokenId.Amper},
-	{TokenKind.Vline, TokenId.Vline},
-	{TokenKind.Caret, TokenId.Caret},
-	{TokenKind.Excl, TokenId.Excl},
-	{TokenKind.Lt, TokenId.Lt},
-	{TokenKind.Gt, TokenId.Gt},
-	{TokenKind.Eq, TokenId.Eq},
-	{TokenKind.Hash, TokenId.Hash},
-	{TokenKind.LBrace, TokenId.LBrace},
-	{TokenKind.RBrace, TokenId.RBrace},
-	{TokenKind.LBracket, TokenId.LBracket},
-	{TokenKind.RBracket, TokenId.RBracket},
-	{TokenKind.LParent, TokenId.LParent},
-	{TokenKind.RParent, TokenId.RParent},
+	{Kind.DblColon, Id.DblColon},
+	{Kind.ColonEq, Id.ColonEq},
+	{Kind.Colon, Id.Colon},
+	{Kind.Semicolon, Id.Semicolon},
+	{Kind.Comma, Id.Comma},
+	{Kind.TripleDot, Id.TripleDot},
+	{Kind.Dot, Id.Dot},
+	{Kind.PlusEq, Id.PlusEq},
+	{Kind.MinusEq, Id.MinusEq},
+	{Kind.StarEq, Id.StarEq},
+	{Kind.SolidusEq, Id.SolidusEq},
+	{Kind.PercentEq, Id.PercentEq},
+	{Kind.ShlEq, Id.ShlEq},
+	{Kind.ShrEq, Id.ShrEq},
+	{Kind.CaretEq, Id.CaretEq},
+	{Kind.AmperEq, Id.AmperEq},
+	{Kind.VlineEq, Id.VlineEq},
+	{Kind.Eqs, Id.Eqs},
+	{Kind.NotEq, Id.NotEq},
+	{Kind.GtEq, Id.GtEq},
+	{Kind.LtEq, Id.LtEq},
+	{Kind.DblAmper, Id.DblAmper},
+	{Kind.DblVline, Id.DblVline},
+	{Kind.Shl, Id.Shl},
+	{Kind.Shr, Id.Shr},
+	{Kind.DblPlus, Id.DblPlus},
+	{Kind.DblMinus, Id.DblMinus},
+	{Kind.Plus, Id.Plus},
+	{Kind.Minus, Id.Minus},
+	{Kind.Star, Id.Star},
+	{Kind.Solidus, Id.Solidus},
+	{Kind.Percent, Id.Percent},
+	{Kind.Amper, Id.Amper},
+	{Kind.Vline, Id.Vline},
+	{Kind.Caret, Id.Caret},
+	{Kind.Excl, Id.Excl},
+	{Kind.Lt, Id.Lt},
+	{Kind.Gt, Id.Gt},
+	{Kind.Eq, Id.Eq},
+	{Kind.Hash, Id.Hash},
+	{Kind.LBrace, Id.LBrace},
+	{Kind.RBrace, Id.RBrace},
+	{Kind.LBracket, Id.LBracket},
+	{Kind.RBracket, Id.RBracket},
+	{Kind.LParent, Id.LParent},
+	{Kind.RParent, Id.RParent},
 ]
 
-fn makeErr(row: int, col: int, &f: &File, fmt: build::LogMsg, args: ...any): build::Log {
+fn makeErr(row: int, col: int, &f: &Fileset, fmt: build::LogMsg, args: ...any): build::Log {
 	ret build::Log{
 		Kind: build::LogKind.Error,
 		Row: row,
@@ -434,9 +434,9 @@ fn byteEscape(&txt: []byte): (seq: str) {
 }
 
 struct lex {
-	mode:   LexMode
+	mode:   Mode
 	tokens: []&Token
-	file:   &File
+	file:   &Fileset
 	pos:    int
 	column: int
 	row:    int
@@ -460,7 +460,7 @@ impl lex {
 		self.newLine()
 		for self.pos < len(self.file.Data) {
 			mut token := self.token()
-			if token.Id != TokenId.Na {
+			if token.Id != Id.NA {
 				self.tokens = append(self.tokens, token)
 			}
 		}
@@ -527,8 +527,8 @@ impl lex {
 				break
 			}
 		}
-		if self.mode&LexMode.Comment == LexMode.Comment {
-			token.Id = TokenId.Comment
+		if self.mode&Mode.Comment == Mode.Comment {
+			token.Id = Id.Comment
 			token.Kind = str(self.file.Data[start:self.pos])
 		}
 	}
@@ -550,8 +550,8 @@ impl lex {
 				self.file.Data[self.pos+1] == '/' {
 				self.column += 2
 				self.pos += 2
-				if self.mode&LexMode.Comment == LexMode.Comment {
-					token.Id = TokenId.Comment
+				if self.mode&Mode.Comment == Mode.Comment {
+					token.Id = Id.Comment
 					token.Kind = str(self.file.Data[start:self.pos])
 				}
 				ret
@@ -704,7 +704,7 @@ impl lex {
 		self.column = 1
 	}
 
-	fn isOp(mut self, &txt: []byte, kind: str, id: TokenId, mut &t: &Token): bool {
+	fn isOp(mut self, &txt: []byte, kind: str, id: Id, mut &t: &Token): bool {
 		if !bytesHasPrefix(txt, kind) {
 			ret false
 		}
@@ -729,7 +729,7 @@ impl lex {
 			ret false
 		}
 		t.Kind = lex
-		t.Id = TokenId.Ident
+		t.Id = Id.Ident
 		ret true
 	}
 
@@ -739,7 +739,7 @@ impl lex {
 			ret false
 		}
 		t.Kind = lex
-		t.Id = TokenId.Lit
+		t.Id = Id.Lit
 		ret true
 	}
 
@@ -747,7 +747,7 @@ impl lex {
 	fn token(mut self): &Token {
 		mut t := &Token{
 			File: self.file,
-			Id: TokenId.Na,
+			Id: Id.NA,
 		}
 
 		txt := self.resume()
@@ -766,16 +766,16 @@ impl lex {
 			break
 		| txt[0] == '\'':
 			t.Kind = self.lexRune(txt)
-			t.Id = TokenId.Lit
+			t.Id = Id.Lit
 			ret t
 		| txt[0] == '"' || txt[0] == '`':
 			t.Kind = self.lexStr()
-			t.Id = TokenId.Lit
+			t.Id = Id.Lit
 			ret t
-		| bytesHasPrefix(txt, TokenKind.LnComment):
+		| bytesHasPrefix(txt, Kind.LnComment):
 			self.lexLineComment(t)
 			ret t
-		| bytesHasPrefix(txt, TokenKind.RangLComment):
+		| bytesHasPrefix(txt, Kind.RangLComment):
 			self.lexRangeComment(t)
 			ret t
 		| self.lexBasicOps(txt, t):
@@ -803,7 +803,7 @@ impl lex {
 // Lex source code into fileset.
 // Returns nil if f == nil.
 // Returns nil slice for errors if no any error.
-fn Lex(mut f: &File, mode: LexMode): []build::Log {
+fn Lex(mut f: &Fileset, mode: Mode): []build::Log {
 	if f == nil {
 		ret nil
 	}

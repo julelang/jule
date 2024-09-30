@@ -6,7 +6,7 @@ use "std/fs"
 use "std/fs/path"
 use "std/jule/ast"
 use "std/jule/build"
-use "std/jule/lex"
+use "std/jule/token"
 use "std/strings"
 use "std/unicode"
 use "std/unicode/utf8"
@@ -61,7 +61,7 @@ impl ReferenceStack {
 
 // Directive pass.
 struct Pass {
-	Token: &lex::Token
+	Token: &token::Token
 	Text:  str
 }
 
@@ -303,11 +303,11 @@ impl symBuilder {
 		ret root
 	}
 
-	fn pushErr(mut self, &token: &lex::Token, fmt: build::LogMsg, args: ...any) {
+	fn pushErr(mut self, &token: &token::Token, fmt: build::LogMsg, args: ...any) {
 		self.errors = append(self.errors, compilerErr(token, true, fmt, args...))
 	}
 
-	fn pushErrText(mut self, &token: &lex::Token, fmt: build::LogMsg, args: ...any) {
+	fn pushErrText(mut self, &token: &token::Token, fmt: build::LogMsg, args: ...any) {
 		self.errors = append(self.errors, compilerErr(token, false, fmt, args...))
 	}
 
@@ -431,7 +431,7 @@ impl symBuilder {
 		}
 		std = parts[0] == "std"
 		for _, part in parts {
-			if part == "" || lex::IsIgnoreIdent(part) {
+			if part == "" || token::IsIgnoreIdent(part) {
 				self.pushErr(decl.Path, build::LogMsg.InvalidImportPath, decl.Path.Kind)
 				ret false, ""
 			}
@@ -534,7 +534,7 @@ impl symBuilder {
 		message.WriteStr(m)
 	}
 
-	fn pushCrossCycleError(mut &self, &target: &symBuilder, &imp: &ImportInfo, &errorToken: &lex::Token) {
+	fn pushCrossCycleError(mut &self, &target: &symBuilder, &imp: &ImportInfo, &errorToken: &token::Token) {
 		mut message := strings::Builder.New(1 << 5)
 
 		self.pushCycleError(self, imp.Path, message)
@@ -715,7 +715,7 @@ impl symBuilder {
 		}
 
 		arg := d.Args[0]
-		if arg.Id != lex::TokenId.Lit {
+		if arg.Id != token::Id.Lit {
 			self.pushErr(arg, build::LogMsg.InvalidSyntax)
 			ret
 		}

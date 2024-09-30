@@ -8,7 +8,7 @@
 use "std/conv"
 use "std/jule/ast"
 use "std/jule/build"
-use "std/jule/lex"
+use "std/jule/token"
 use "std/jule/types"
 use "std/strings"
 
@@ -25,7 +25,7 @@ struct TypeAlias {
 	Binded:   bool
 	Used:     bool
 	Generic:  bool
-	Token:    &lex::Token
+	Token:    &token::Token
 	Ident:    str
 	Kind:     &TypeSymbol
 	Refers:   []any        // Referred identifiers, except binded ones.
@@ -775,7 +775,7 @@ struct typeChecker {
 	// If this not nil, type dependencies will push into stack.
 	refers: &ReferenceStack
 
-	errorToken: &lex::Token
+	errorToken: &token::Token
 
 	// This identifiers ignored and
 	// appends as primitive type.
@@ -817,7 +817,7 @@ struct typeChecker {
 }
 
 impl typeChecker {
-	fn pushErr(mut self, token: &lex::Token, fmt: build::LogMsg, args: ...any) {
+	fn pushErr(mut self, token: &token::Token, fmt: build::LogMsg, args: ...any) {
 		self.s.pushErr(token, fmt, args...)
 	}
 
@@ -1070,7 +1070,7 @@ impl typeChecker {
 		ret t
 	}
 
-	fn checkStructIns(mut self, mut &ins: &StructIns, mut &errorToken: &lex::Token): (ok: bool) {
+	fn checkStructIns(mut self, mut &ins: &StructIns, mut &errorToken: &token::Token): (ok: bool) {
 		if ins.Checked {
 			ret true
 		}
@@ -1152,7 +1152,7 @@ impl typeChecker {
 		ret ins
 	}
 
-	fn fromStructIns(mut self, mut &ins: &StructIns, mut token: &lex::Token): &StructIns {
+	fn fromStructIns(mut self, mut &ins: &StructIns, mut token: &token::Token): &StructIns {
 		mut existInstance := ins.Decl.appendInstance(ins)
 		if existInstance != nil {
 			if !self.s.checkConstraintsStruct(ins, token, existInstance) {
@@ -1798,7 +1798,7 @@ fn getStructFromKind(mut k: &TypeKind): &Struct {
 }
 
 fn applyImplicitCast(mut &s: &sema, mut &dest: &TypeKind, mut &d: &Data,
-	mut &token: &lex::Token, mut refers: &ReferenceStack) {
+	mut &token: &token::Token, mut refers: &ReferenceStack) {
 	if d.Kind.IsNil() {
 		ret
 	}

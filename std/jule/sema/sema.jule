@@ -6,7 +6,7 @@ use "std/jule/ast"
 use "std/jule/build"
 use "std/jule/constant"
 use "std/jule/internal/mod"
-use "std/jule/lex"
+use "std/jule/token"
 use "std/jule/types"
 use "std/strings"
 use "std/unicode/utf8"
@@ -20,7 +20,7 @@ fn isValidModelForRef(mut &m: ExprModel): bool {
 		ret model.Field != nil && isValidModelForRef(model.Expr.Model)
 	| &UnaryExprModel:
 		mut unary := (&UnaryExprModel)(m)
-		if unary.Op.Id != lex::TokenId.Star {
+		if unary.Op.Id != token::Id.Star {
 			ret false
 		}
 		// Return true because of raw pointer dereferencing is an Unsafe Jule feature.
@@ -45,7 +45,7 @@ fn isValidModelForRef(mut &m: ExprModel): bool {
 	}
 }
 
-fn compilerErr(&token: &lex::Token, line: bool, fmt: build::LogMsg, args: ...any): build::Log {
+fn compilerErr(&token: &token::Token, line: bool, fmt: build::LogMsg, args: ...any): build::Log {
 	mut log := build::Log{
 		Kind: build::LogKind.Error,
 		Row: token.Row,
@@ -66,7 +66,7 @@ fn appendRetVars(mut &dest: []&Var, mut &f: &FnIns) {
 
 	mut types := f.Types()
 	for (i, mut ident) in f.Decl.Result.Idents {
-		if lex::IsIgnoreIdent(ident.Kind) || lex::IsAnonIdent(ident.Kind) {
+		if token::IsIgnoreIdent(ident.Kind) || token::IsAnonIdent(ident.Kind) {
 			continue
 		}
 		dest = append(dest, &Var{
@@ -95,7 +95,7 @@ fn appendParamVars(mut &dest: []&Var, mut &f: &FnIns) {
 	}
 
 	for (_, mut p) in f.Params {
-		if lex::IsIgnoreIdent(p.Decl.Ident) || lex::IsAnonIdent(p.Decl.Ident) {
+		if token::IsIgnoreIdent(p.Decl.Ident) || token::IsAnonIdent(p.Decl.Ident) {
 			continue
 		}
 
@@ -190,7 +190,7 @@ fn appendGenericTypeAliases(mut &dest: []&TypeAlias, mut &f: &FnIns) {
 	}
 }
 
-fn findFile(mut &files: []&SymTab, &handler: &lex::File): &SymTab {
+fn findFile(mut &files: []&SymTab, &handler: &token::Fileset): &SymTab {
 	for (_, mut fl) in files {
 		if fl.File == handler {
 			ret fl
@@ -355,7 +355,7 @@ impl sema {
 	fn getCurrentFile(mut self): &SymTab { ret self.file }
 	fn setCurrentFile(mut self, mut f: &SymTab) { self.file = f }
 
-	fn pushErr(mut self, token: &lex::Token, fmt: build::LogMsg, args: ...any) {
+	fn pushErr(mut self, token: &token::Token, fmt: build::LogMsg, args: ...any) {
 		self.errors = append(self.errors, compilerErr(token, true, fmt, args...))
 	}
 
@@ -366,7 +366,7 @@ impl sema {
 
 	// Reports whether define is accessible in the current package.
 	// The public and token parameters belongs to define which is accessed.
-	fn isAccessibleDefine(self, public: bool, token: &lex::Token): bool {
+	fn isAccessibleDefine(self, public: bool, token: &token::Token): bool {
 		if public || token.File == nil {
 			// defins is public or built-in
 			ret true
@@ -407,7 +407,7 @@ impl sema {
 		dc.check()
 	}
 
-	fn checkGenericQuantity(mut self, required: int, given: int, token: &lex::Token): (ok: bool) {
+	fn checkGenericQuantity(mut self, required: int, given: int, token: &token::Token): (ok: bool) {
 		match {
 		| required == 0 && given > 0:
 			self.pushErr(token, build::LogMsg.NotHasGenerics)
@@ -441,7 +441,7 @@ impl sema {
 		ret nil
 	}
 
-	fn checkImportSelection[T](mut self, &ident: &lex::Token, &s: T): bool {
+	fn checkImportSelection[T](mut self, &ident: &token::Token, &s: T): bool {
 		if !self.isAccessibleDefine(s.Public, s.Token) {
 			self.pushErr(ident, build::LogMsg.IdentIsNotAccessible, ident.Kind)
 			self.pushSuggestion(build::LogMsg.MakePubToAccess)
@@ -455,7 +455,7 @@ impl sema {
 		ret true
 	}
 
-	fn checkImportsAllSelectionsFromCollection[T](mut self, &s: []T, &et: &lex::Token): bool {
+	fn checkImportsAllSelectionsFromCollection[T](mut self, &s: []T, &et: &token::Token): bool {
 		mut ok := true
 		for _, d in s {
 			if d.Public {
@@ -501,7 +501,7 @@ impl sema {
 		}
 
 		if imp.Decl.Alias != nil { // custom alias found
-			if lex::IsIgnoreIdent(imp.Alias) {
+			if token::IsIgnoreIdent(imp.Alias) {
 				self.pushErr(imp.Decl.Token, build::LogMsg.IgnoreIdent)
 			} else if self.isUseAliasDuplication(imp) {
 				self.pushErr(imp.Decl.Token, build::LogMsg.DuplicatedUseAlias, imp.Alias)
@@ -709,7 +709,7 @@ impl sema {
 	}
 
 	fn checkAssignType(mut &self, destIsRef: bool, mut &dest: &TypeKind,
-		mut &d: &Data, mut errorToken: &lex::Token, mut refers: &ReferenceStack): bool {
+		mut &d: &Data, mut errorToken: &token::Token, mut refers: &ReferenceStack): bool {
 		if d.Decl {
 			self.pushErr(errorToken, build::LogMsg.InvalidExpr)
 			ret false
@@ -752,7 +752,7 @@ impl sema {
 	}
 
 	fn _checkTypeCompatibility(mut &self, mut &dest: &TypeKind, mut &src: &TypeKind,
-		mut errorToken: &lex::Token): bool {
+		mut errorToken: &token::Token): bool {
 		if src == nil {
 			ret false
 		}
@@ -770,7 +770,7 @@ impl sema {
 	}
 
 	fn checkTypeCompatibility(mut &self, mut &dest: &TypeKind,
-		mut &src: &TypeKind, mut &errorToken: &lex::Token): bool {
+		mut &src: &TypeKind, mut &errorToken: &token::Token): bool {
 		if self._checkTypeCompatibility(dest, src, errorToken) {
 			ret true
 		}
@@ -779,7 +779,7 @@ impl sema {
 	}
 
 	fn pushCompatiblityError(mut self, mut &dest: &TypeKind, mut &src: &Data,
-		mut &errorToken: &lex::Token) {
+		mut &errorToken: &token::Token) {
 		if src.untyped {
 			match {
 			| src.Constant.IsI64():
@@ -797,7 +797,7 @@ impl sema {
 	}
 
 	fn checkTypeCompatibility1(mut &self, mut &dest: &TypeKind, mut &src: &Data,
-		mut &errorToken: &lex::Token): bool {
+		mut &errorToken: &token::Token): bool {
 		if self._checkTypeCompatibility(dest, src.Kind, errorToken) {
 			ret true
 		}
@@ -875,7 +875,7 @@ impl sema {
 		ret ins
 	}
 
-	fn checkConstraintsFn(mut &self, mut &f: &FnIns, mut &et: &lex::Token, mut exist: &FnIns): bool {
+	fn checkConstraintsFn(mut &self, mut &f: &FnIns, mut &et: &token::Token, mut exist: &FnIns): bool {
 		mut cc := self.constraintChecker()
 		cc.et = et
 		cc.fi = f
@@ -889,7 +889,7 @@ impl sema {
 		ret cc.check()
 	}
 
-	fn checkConstraintsStruct(mut &self, mut &s: &StructIns, mut &et: &lex::Token, mut exist: &StructIns): bool {
+	fn checkConstraintsStruct(mut &self, mut &s: &StructIns, mut &et: &token::Token, mut exist: &StructIns): bool {
 		mut cc := self.constraintChecker()
 		cc.et = et
 		cc.si = s
@@ -985,7 +985,7 @@ impl sema {
 		})
 	}
 
-	fn checkRefValidityForInitExpr(mut &self, leftMut: bool, mut &d: &Data, mut &errorToken: &lex::Token): bool {
+	fn checkRefValidityForInitExpr(mut &self, leftMut: bool, mut &d: &Data, mut &errorToken: &token::Token): bool {
 		if !isValidModelForRef(d.Model) {
 			self.pushErr(errorToken, build::LogMsg.RefAssignNonVar)
 			ret false
@@ -1030,7 +1030,7 @@ impl sema {
 	}
 
 	fn checkValidityForInitExpr(mut &self, leftMut: bool, leftRef: bool,
-		&leftKind: &TypeKind, mut &d: &Data, mut &errorToken: &lex::Token): bool {
+		&leftKind: &TypeKind, mut &d: &Data, mut &errorToken: &token::Token): bool {
 		if leftMut && !d.Mutable {
 			// Check classical assignment mutability.
 			if d.Kind.Mutable() || d.Kind.Variadic {
@@ -1081,7 +1081,7 @@ impl sema {
 	}
 
 	fn checkTypeAliasDecl(mut &self, mut &ta: &TypeAlias, mut l: Lookup) {
-		if lex::IsIgnoreIdent(ta.Ident) {
+		if token::IsIgnoreIdent(ta.Ident) {
 			self.pushErr(ta.Token, build::LogMsg.IgnoreIdent)
 		}
 		self.checkTypeAliasDeclKind(ta, l)
@@ -1089,7 +1089,7 @@ impl sema {
 
 	// Checks type alias declaration with duplicated identifiers.
 	fn checkTypeAliasDeclDup(mut &self, mut &ta: &TypeAlias) {
-		if lex::IsIgnoreIdent(ta.Ident) {
+		if token::IsIgnoreIdent(ta.Ident) {
 			self.pushErr(ta.Token, build::LogMsg.IgnoreIdent)
 		}
 		if self.isDuplicatedIdent(uintptr(ta), ta.Ident, ta.Binded) {
@@ -1116,7 +1116,7 @@ impl sema {
 		for _, item in items {
 			if item.Ident == "" {
 				continue
-			} else if lex::IsIgnoreIdent(item.Ident) {
+			} else if token::IsIgnoreIdent(item.Ident) {
 				self.pushErr(item.Token, build::LogMsg.IgnoreIdent)
 			} else {
 				for _, citem in items {
@@ -1241,7 +1241,7 @@ impl sema {
 	}
 
 	fn checkEnumDecl(mut &self, mut &e: &Enum) {
-		if lex::IsIgnoreIdent(e.Ident) {
+		if token::IsIgnoreIdent(e.Ident) {
 			self.pushErr(e.Token, build::LogMsg.IgnoreIdent)
 		} else if self.isDuplicatedIdent(uintptr(e), e.Ident, false) {
 			self.pushErr(e.Token, build::LogMsg.DuplicatedIdent, e.Ident)
@@ -1282,7 +1282,7 @@ impl sema {
 	}
 
 	fn checkTypeEnumDecl(mut &self, mut &e: &TypeEnum) {
-		if lex::IsIgnoreIdent(e.Ident) {
+		if token::IsIgnoreIdent(e.Ident) {
 			self.pushErr(e.Token, build::LogMsg.IgnoreIdent)
 		} else if self.isDuplicatedIdent(uintptr(e), e.Ident, false) {
 			self.pushErr(e.Token, build::LogMsg.DuplicatedIdent, e.Ident)
@@ -1347,7 +1347,7 @@ impl sema {
 	fn checkDeclGenerics(mut self, &generics: []&ast::GenericDecl): (ok: bool) {
 		ok = true
 		for i, g in generics {
-			if lex::IsIgnoreIdent(g.Ident) {
+			if token::IsIgnoreIdent(g.Ident) {
 				self.pushErr(g.Token, build::LogMsg.IgnoreIdent)
 				ok = false
 				continue
@@ -1391,10 +1391,10 @@ impl sema {
 				| j >= i:
 					// Skip current and following parameters.
 					break paramsLookup
-				| lex::IsIgnoreIdent(p.Ident)
-				| lex::IsIgnoreIdent(jp.Ident)
-				| lex::IsAnonIdent(p.Ident)
-				| lex::IsAnonIdent(jp.Ident):
+				| token::IsIgnoreIdent(p.Ident)
+				| token::IsIgnoreIdent(jp.Ident)
+				| token::IsAnonIdent(p.Ident)
+				| token::IsAnonIdent(jp.Ident):
 					// Skip anonymous parameters.
 					break paramsLookup
 				| p.Ident == jp.Ident:
@@ -1416,7 +1416,7 @@ impl sema {
 
 		// Check duplications.
 		for i, v in f.Result.Idents {
-			if lex::IsIgnoreIdent(v.Kind) || lex::IsAnonIdent(v.Kind) {
+			if token::IsIgnoreIdent(v.Kind) || token::IsAnonIdent(v.Kind) {
 				continue // Skip anonymous return variables.
 			}
 			// Lookup in generics.
@@ -1574,9 +1574,9 @@ impl sema {
 	}
 
 	fn checkTraitDeclMethod(mut &self, mut &f: &Fn) {
-		if lex::IsIgnoreIdent(f.Ident) {
+		if token::IsIgnoreIdent(f.Ident) {
 			self.pushErr(f.Token, build::LogMsg.IgnoreIdent)
-		} else if lex::IsAnonIdent(f.Ident) {
+		} else if token::IsAnonIdent(f.Ident) {
 			self.pushErr(f.Token, build::LogMsg.AnonFn)
 		}
 		f.sema = self
@@ -1624,7 +1624,7 @@ impl sema {
 	}
 
 	fn checkTraitDecl(mut &self, mut &t: &Trait) {
-		if lex::IsIgnoreIdent(t.Ident) {
+		if token::IsIgnoreIdent(t.Ident) {
 			self.pushErr(t.Token, build::LogMsg.IgnoreIdent)
 		} else if self.isDuplicatedIdent(uintptr(t), t.Ident, false) {
 			self.pushErr(t.Token, build::LogMsg.DuplicatedIdent, t.Ident)
@@ -1779,7 +1779,7 @@ impl sema {
 	// Checks variable declaration.
 	// Will not check duplicated identifiers.
 	fn checkVarDecl(mut &self, mut &decl: &Var, mut l: Lookup) {
-		if lex::IsIgnoreIdent(decl.Ident) {
+		if token::IsIgnoreIdent(decl.Ident) {
 			self.pushErr(decl.Token, build::LogMsg.IgnoreIdent)
 		}
 
@@ -1904,7 +1904,7 @@ impl sema {
 	}
 
 	fn checkStructDecl(mut &self, mut &s: &Struct) {
-		if lex::IsIgnoreIdent(s.Ident) {
+		if token::IsIgnoreIdent(s.Ident) {
 			self.pushErr(s.Token, build::LogMsg.IgnoreIdent)
 		} else if self.isDuplicatedIdent(uintptr(s), s.Ident, s.Binded) {
 			self.pushErr(s.Token, build::LogMsg.DuplicatedIdent, s.Ident)
@@ -1939,7 +1939,7 @@ impl sema {
 	}
 
 	fn checkFuncDecl(mut &self, mut &f: &Fn) {
-		if lex::IsIgnoreIdent(f.Ident) {
+		if token::IsIgnoreIdent(f.Ident) {
 			self.pushErr(f.Token, build::LogMsg.IgnoreIdent)
 		} else if f.IsAnon() {
 			self.pushErr(f.Token, build::LogMsg.AnonFn)
@@ -2036,7 +2036,7 @@ impl sema {
 		}
 	}
 
-	fn checkDataForTypeInference(mut self, &d: &Data, &errToken: &lex::Token) {
+	fn checkDataForTypeInference(mut self, &d: &Data, &errToken: &token::Token) {
 		match {
 		| d.IsNil():
 			self.pushErr(errToken, build::LogMsg.NilForTypeInference)
@@ -2158,7 +2158,7 @@ impl sema {
 
 	// Checks new generics function instance.
 	// If instance is already exist, f will point to exist instantantiation.
-	fn checkGenericFn(mut &self, mut &f: &FnIns, mut &et: &lex::Token): (ok: bool, exist: bool) {
+	fn checkGenericFn(mut &self, mut &f: &FnIns, mut &et: &token::Token): (ok: bool, exist: bool) {
 		ok = self.reloadFnInsTypes(f)
 		f.reloaded = true
 		if !ok {
@@ -2204,7 +2204,7 @@ impl sema {
 	// Checks environment-dependent parts of structure instance.
 	// Which is contains fields and generic-type constraints.
 	// If generic instance will be check, errorToken should be passed.
-	fn checkStructEnv(mut &self, mut &s: &StructIns, mut errorToken: &lex::Token): (ok: bool) {
+	fn checkStructEnv(mut &self, mut &s: &StructIns, mut errorToken: &token::Token): (ok: bool) {
 		mut tc := typeChecker{
 			s: s.Decl.sema,
 			rootLookup: s.Decl.sema,
@@ -2301,7 +2301,7 @@ impl sema {
 		ret
 	}
 
-	fn precheckStructIns(mut &self, mut &s: &StructIns, mut errorToken: &lex::Token): (ok: bool) {
+	fn precheckStructIns(mut &self, mut &s: &StructIns, mut errorToken: &token::Token): (ok: bool) {
 		ok = self.checkStructEnv(s, errorToken)
 		if !ok {
 			ret false
@@ -2482,7 +2482,7 @@ impl sema {
 		}
 	}
 
-	fn checkFnInsCaller(mut &self, mut &f: &FnIns, mut caller: &lex::Token) {
+	fn checkFnInsCaller(mut &self, mut &f: &FnIns, mut caller: &token::Token) {
 		if f.Decl.Binded {
 			ret
 		}
@@ -2834,7 +2834,7 @@ push:
 	}
 }
 
-fn pushRuntimeToStr(mut &s: &sema, mut &t: &TypeKind, mut &token: &lex::Token,
+fn pushRuntimeToStr(mut &s: &sema, mut &t: &TypeKind, mut &token: &token::Token,
 	mut refers: &ReferenceStack) {
 	if s.meta.runtime == nil || t.IsNil() {
 		ret
@@ -2853,14 +2853,14 @@ fn pushRuntimeToStr(mut &s: &sema, mut &t: &TypeKind, mut &token: &lex::Token,
 // Reports whether the alias valid for the import alias.
 // Designed to check auto aliases.
 fn isValidImpAlias(mut alias: str): (valid: bool) {
-	if lex::IsIgnoreIdent(alias) {
+	if token::IsIgnoreIdent(alias) {
 		ret false
 	}
-	if lex::IsKeyword(alias) {
+	if token::IsKeyword(alias) {
 		ret false
 	}
 	mut r, mut size := utf8::DecodeRuneStr(alias)
-	if r != '_' && !lex::IsLetter(r) {
+	if r != '_' && !token::IsLetter(r) {
 		ret false
 	}
 	for {
@@ -2869,7 +2869,7 @@ fn isValidImpAlias(mut alias: str): (valid: bool) {
 			break
 		}
 		r, size = utf8::DecodeRuneStr(alias)
-		if r != '_' && !('0' <= r && r <= '9') && !lex::IsLetter(r) {
+		if r != '_' && !('0' <= r && r <= '9') && !token::IsLetter(r) {
 			ret false
 		}
 	}

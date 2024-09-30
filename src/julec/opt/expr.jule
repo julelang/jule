@@ -5,7 +5,7 @@
 use "env"
 use "obj"
 use "std/jule/constant"
-use "std/jule/lex"
+use "std/jule/token"
 use "std/jule/sema"
 use "std/jule/types"
 use "std/math"
@@ -39,16 +39,16 @@ impl exprOptimizer {
 			ret false
 		}
 		match m.Op.Id {
-		| lex::TokenId.Eqs
-		| lex::TokenId.LtEq
-		| lex::TokenId.GtEq:
+		| token::Id.Eqs
+		| token::Id.LtEq
+		| token::Id.GtEq:
 			// Operators used with itself: ==, <=, >=.
 			// Evaluation will be always true.
 			*self.model = constant::Const.NewBool(true)
 			ret true
-		| lex::TokenId.NotEq
-		| lex::TokenId.Lt
-		| lex::TokenId.Gt:
+		| token::Id.NotEq
+		| token::Id.Lt
+		| token::Id.Gt:
 			// Operators used with itself: !=, <, >.
 			// Evaluation will be always false.
 			*self.model = constant::Const.NewBool(false)
@@ -78,7 +78,7 @@ impl exprOptimizer {
 		}
 		mut c := (&constant::Const)(m.Right.Model)
 		match m.Op.Id {
-		| lex::TokenId.DblAmper:
+		| token::Id.DblAmper:
 			if c.ReadBool() {
 				// Use left operand as model directly.
 				// Logical and with constant true exprssion is always will be true.
@@ -92,7 +92,7 @@ impl exprOptimizer {
 				*self.model = c
 			}
 			ret true
-		| lex::TokenId.DblVline:
+		| token::Id.DblVline:
 			if c.ReadBool() {
 				// Logical or with constant true expression.
 				// Binary expression is always will be true.
@@ -116,7 +116,7 @@ impl exprOptimizer {
 		if lp == nil || !lp.IsStr() {
 			ret false
 		}
-		if m.Op.Id != lex::TokenId.Eqs && m.Op.Id != lex::TokenId.NotEq {
+		if m.Op.Id != token::Id.Eqs && m.Op.Id != token::Id.NotEq {
 			ret false
 		}
 		match type m.Left.Model {
@@ -134,7 +134,7 @@ impl exprOptimizer {
 		}
 		mut c := (&constant::Const)(m.Right.Model)
 		match m.Op.Id {
-		| lex::TokenId.Eqs:
+		| token::Id.Eqs:
 			if c.ReadStr() == "" {
 				mut model := any(&EmptyCompareExprModel{
 					Expr: m.Left.Model,
@@ -149,7 +149,7 @@ impl exprOptimizer {
 				NotEq: false,
 			})
 			*self.model = unsafe { *(*sema::ExprModel)(&model) }
-		| lex::TokenId.NotEq:
+		| token::Id.NotEq:
 			if c.ReadStr() == "" {
 				mut model := any(&EmptyCompareExprModel{
 					Expr: m.Left.Model,
@@ -173,7 +173,7 @@ impl exprOptimizer {
 			if !Str {
 				ret false
 			}
-			if c.ReadStr() == "" && m.Op.Id == lex::TokenId.Plus {
+			if c.ReadStr() == "" && m.Op.Id == token::Id.Plus {
 				// Concatenation with empty string, use the non-constnat operand's model.
 				*self.model = nc.Model
 				ret true
@@ -187,8 +187,8 @@ impl exprOptimizer {
 			ret false
 		}
 		match m.Op.Id {
-		| lex::TokenId.Shl
-		| lex::TokenId.Shr:
+		| token::Id.Shl
+		| token::Id.Shr:
 			// If the constant expression is shifter, use the right operand's model.
 			if nc == m.Left {
 				*self.model = nc.Model
@@ -198,12 +198,12 @@ impl exprOptimizer {
 			// Use zero-constant directly.
 			*self.model = c
 			ret true
-		| lex::TokenId.Star:
+		| token::Id.Star:
 			c.SetI64(0)
 			*self.model = c
 			ret true
-		| lex::TokenId.Plus
-		| lex::TokenId.Minus:
+		| token::Id.Plus
+		| token::Id.Minus:
 			*self.model = nc.Model
 			ret true
 		}
@@ -237,12 +237,12 @@ impl exprOptimizer {
 			if !isBoundaryValidType(blc.Expr.Kind) {
 				ret
 			}
-			if m.Op.Id != lex::TokenId.Gt && m.Op.Id != lex::TokenId.Eqs {
+			if m.Op.Id != token::Id.Gt && m.Op.Id != token::Id.Eqs {
 				ret
 			}
 			// len(x) > y, len(x) == y (constant)
 			// Max guaranteed size of x is y.
-			if m.Op.Id == lex::TokenId.Eqs {
+			if m.Op.Id == token::Id.Eqs {
 				match type m.Right.Model {
 				| &constant::Const:
 					mut c := new(constant::Const, *(&constant::Const)(m.Right.Model)) // Do not mutate binary operand.
@@ -260,12 +260,12 @@ impl exprOptimizer {
 			if !isBoundaryValidType(blc.Expr.Kind) {
 				ret
 			}
-			if m.Op.Id != lex::TokenId.Lt && m.Op.Id != lex::TokenId.Eqs {
+			if m.Op.Id != token::Id.Lt && m.Op.Id != token::Id.Eqs {
 				ret
 			}
 			// y < len(x), y (constant) == len(x)
 			// Max guaranteed size of x is y.
-			if m.Op.Id == lex::TokenId.Eqs {
+			if m.Op.Id == token::Id.Eqs {
 				match type m.Left.Model {
 				| &constant::Const:
 					mut c := new(constant::Const, *(&constant::Const)(m.Left.Model)) // Do not mutate binary operand.
@@ -292,7 +292,7 @@ impl exprOptimizer {
 			| &constant::Const:
 				// No need to check whether constant variable is nil.
 				// It only can be nil.
-				self.data.nils.pushVar(var, m.Op.Id == lex::TokenId.NotEq)
+				self.data.nils.pushVar(var, m.Op.Id == token::Id.NotEq)
 			}
 			ret
 		}
@@ -305,7 +305,7 @@ impl exprOptimizer {
 			| &constant::Const:
 				// No need to check whether constant variable is nil.
 				// It only can be nil.
-				self.data.nils.pushVar(var, m.Op.Id == lex::TokenId.NotEq)
+				self.data.nils.pushVar(var, m.Op.Id == token::Id.NotEq)
 			}
 			ret
 		}
@@ -354,42 +354,42 @@ impl exprOptimizer {
 		}
 
 		match m.Op.Id {
-		| lex::TokenId.Star:
+		| token::Id.Star:
 			ok, x := checkForBitShiftOpt(m.Left, m.Right)
 			if ok {
-				m.Op = new(lex::Token, *m.Op)
-				m.Op.Id = lex::TokenId.Shl
-				m.Op.Kind = lex::TokenKind.Shl
+				m.Op = new(token::Token, *m.Op)
+				m.Op.Id = token::Id.Shl
+				m.Op.Kind = token::Kind.Shl
 				mut c := (&constant::Const)(m.Right.Model)
 				c.SetU64(x)
 				// No need to set model as UnsafeBinaryExprModel,
 				// shl is not checked at runtime, so it is optimize enough.
 				ret
 			}
-		| lex::TokenId.Solidus:
+		| token::Id.Solidus:
 			ok, x := checkForBitShiftOpt(m.Left, m.Right)
 			if ok {
-				m.Op = new(lex::Token, *m.Op)
-				m.Op.Id = lex::TokenId.Shr
-				m.Op.Kind = lex::TokenKind.Shr
+				m.Op = new(token::Token, *m.Op)
+				m.Op.Id = token::Id.Shr
+				m.Op.Kind = token::Kind.Shr
 				mut c := (&constant::Const)(m.Right.Model)
 				c.SetU64(x)
 				// No need to set model as UnsafeBinaryExprModel,
 				// shr is not checked at runtime, so it is optimize enough.
 				ret
 			}
-		| lex::TokenId.Percent:
+		| token::Id.Percent:
 			mut c := (&constant::Const)(m.Right.Model)
 			if c.AsF64() == 0b10 {
-				m.Op = new(lex::Token, *m.Op)
-				m.Op.Id = lex::TokenId.Amper
-				m.Op.Kind = lex::TokenKind.Amper
+				m.Op = new(token::Token, *m.Op)
+				m.Op.Id = token::Id.Amper
+				m.Op.Kind = token::Kind.Amper
 				c.SetI64(1)
 				// No need to set model as UnsafeBinaryExprModel,
 				// bitwise and is not checked at runtime, so it is optimize enough.
 				ret
 			}
-		| lex::TokenId.Shl | lex::TokenId.Shr:
+		| token::Id.Shl | token::Id.Shr:
 			// semantic anlayzer guarantees right operator is unsigned if constant
 			z := types::BitSizeOf(lp.Kind)
 			s := (&constant::Const)(m.Right.Model).AsU64()
@@ -414,11 +414,11 @@ impl exprOptimizer {
 			ret
 		}
 		match m.Op.Id {
-		| lex::TokenId.Star:
+		| token::Id.Star:
 			match type m.Expr.Model {
 			| &sema::UnaryExprModel:
 				mut um := (&sema::UnaryExprModel)(m.Expr.Model)
-				if um.Op.Id == lex::TokenId.Amper {
+				if um.Op.Id == token::Id.Amper {
 					// Remove pointer overhead.
 					// Expression is: *(&x)
 					// Simplify to: x
@@ -440,7 +440,7 @@ impl exprOptimizer {
 				// Now this varible is safe until it mutated.
 				self.data.nils.pushVar(var, true)
 			}
-		| lex::TokenId.Amper:
+		| token::Id.Amper:
 			match type m.Expr.Model {
 			| &sema::Var:
 				mut v := (&sema::Var)(m.Expr.Model)

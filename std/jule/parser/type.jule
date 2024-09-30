@@ -4,13 +4,13 @@
 
 use "std/jule/ast"
 use "std/jule/build"
-use "std/jule/lex"
+use "std/jule/token"
 
 fn buildVoidType(): &ast::TypeDecl {
 	ret new(ast::TypeDecl)
 }
 
-fn buildPrimType(mut t: &lex::Token): &ast::TypeDecl {
+fn buildPrimType(mut t: &token::Token): &ast::TypeDecl {
 	ret &ast::TypeDecl{
 		Token: t,
 		Kind: &ast::IdentTypeDecl{
@@ -22,13 +22,13 @@ fn buildPrimType(mut t: &lex::Token): &ast::TypeDecl {
 
 struct typeBuilder {
 	p:      &parser
-	tokens: []&lex::Token
+	tokens: []&token::Token
 	i:      *int
 	err:    bool
 }
 
 impl typeBuilder {
-	fn pushErr(mut self, token: &lex::Token, fmt: build::LogMsg) {
+	fn pushErr(mut self, token: &token::Token, fmt: build::LogMsg) {
 		if self.err {
 			self.p.pushErr(token, fmt)
 		}
@@ -47,7 +47,7 @@ impl typeBuilder {
 		}
 		mut ns := new(ast::NamespaceTypeDecl)
 		ns.Namespace = self.tokens[*self.i]
-		if ns.Namespace.Id != lex::TokenId.Ident && ns.Namespace.Id != lex::TokenId.Unsafe {
+		if ns.Namespace.Id != token::Id.Ident && ns.Namespace.Id != token::Id.Unsafe {
 			self.pushErr(ns.Namespace, build::LogMsg.InvalidSyntax)
 			self.pushSuggestion(build::LogMsg.ExpectedIdentifier)
 		}
@@ -57,7 +57,7 @@ impl typeBuilder {
 			self.pushSuggestion(build::LogMsg.ExpectedDblColon)
 			ret nil
 		}
-		if self.tokens[*self.i].Id != lex::TokenId.DblColon {
+		if self.tokens[*self.i].Id != token::Id.DblColon {
 			self.pushErr(self.tokens[*self.i], build::LogMsg.InvalidSyntax)
 			self.pushSuggestion(build::LogMsg.ExpectedDblColon)
 			ret nil
@@ -78,7 +78,7 @@ impl typeBuilder {
 			ret nil
 		}
 		token := self.tokens[*self.i]
-		if token.Id != lex::TokenId.LBracket {
+		if token.Id != token::Id.LBracket {
 			ret nil
 		}
 
@@ -100,15 +100,15 @@ impl typeBuilder {
 		ret types
 	}
 
-	unsafe fn identGenerics(mut self): [][]&lex::Token {
+	unsafe fn identGenerics(mut self): [][]&token::Token {
 		first := *self.i
 		mut rangeN := 0
 		for *self.i < len(self.tokens); *self.i++ {
 			token := self.tokens[*self.i]
 			match token.Id {
-			| lex::TokenId.LBracket:
+			| token::Id.LBracket:
 				rangeN++
-			| lex::TokenId.RBracket:
+			| token::Id.RBracket:
 				rangeN--
 			}
 			if rangeN == 0 {
@@ -117,7 +117,7 @@ impl typeBuilder {
 			}
 		}
 		mut tokens := self.tokens[first+1 : *self.i-1] // Take range of brackets.
-		mut parts, errors := parts(tokens, lex::TokenId.Comma, true)
+		mut parts, errors := parts(tokens, token::Id.Comma, true)
 		if self.err {
 			self.p.errors = append(self.p.errors, errors...)
 		}
@@ -126,7 +126,7 @@ impl typeBuilder {
 
 	unsafe fn buildIdent(mut self): &ast::TypeDecl {
 		mut next := *self.i+1 < len(self.tokens)
-		if next && self.tokens[*self.i+1].Id == lex::TokenId.DblColon {
+		if next && self.tokens[*self.i+1].Id == token::Id.DblColon {
 			ret self.buildNamespace()
 		}
 		mut token := self.tokens[*self.i]
@@ -140,7 +140,7 @@ impl typeBuilder {
 			Token: token,
 			Kind: it,
 		}
-		if !next || self.tokens[*self.i].Id != lex::TokenId.Dot {
+		if !next || self.tokens[*self.i].Id != token::Id.Dot {
 			it.Generics = self.buildGenerics()
 			ret itd
 		}
@@ -149,7 +149,7 @@ impl typeBuilder {
 			ret itd
 		}
 		*self.i++
-		if self.tokens[*self.i].Id != lex::TokenId.Ident {
+		if self.tokens[*self.i].Id != token::Id.Ident {
 			self.pushErr(self.tokens[*self.i-1], build::LogMsg.InvalidSyntax)
 			ret itd
 		}
@@ -169,7 +169,7 @@ impl typeBuilder {
 	}
 
 	unsafe fn buildCppLink(mut self): &ast::TypeDecl {
-		if *self.i+1 >= len(self.tokens) || self.tokens[*self.i+1].Id != lex::TokenId.Dot {
+		if *self.i+1 >= len(self.tokens) || self.tokens[*self.i+1].Id != token::Id.Dot {
 			self.pushErr(self.tokens[*self.i], build::LogMsg.InvalidSyntax)
 			ret nil
 		}
@@ -202,7 +202,7 @@ impl typeBuilder {
 		}
 
 		*self.i++
-		if self.tokens[*self.i].Id == lex::TokenId.Unsafe {
+		if self.tokens[*self.i].Id == token::Id.Unsafe {
 			*self.i++
 			ret &ast::TypeDecl{
 				Token: token,
@@ -262,7 +262,7 @@ impl typeBuilder {
 	}
 
 	unsafe fn buildArr(mut self): &ast::TypeDecl {
-		mut exprTokens := range(*self.i, lex::TokenId.LBracket, lex::TokenId.RBracket, self.tokens)
+		mut exprTokens := range(*self.i, token::Id.LBracket, token::Id.RBracket, self.tokens)
 		if *self.i >= len(self.tokens) {
 			self.pushErr(self.tokens[*self.i-1], build::LogMsg.MissingType)
 			ret nil
@@ -278,7 +278,7 @@ impl typeBuilder {
 		}
 
 		mut token := exprTokens[0]
-		if len(exprTokens) == 1 && token.Id == lex::TokenId.TripleDot {
+		if len(exprTokens) == 1 && token.Id == token::Id.TripleDot {
 			// Ignore.
 		} else {
 			arrt.Size = self.p.buildExpr(exprTokens)
@@ -299,7 +299,7 @@ impl typeBuilder {
 		}
 
 		// Get key type tokens without brackets.
-		mut keyTokens := range(*self.i, lex::TokenId.LBracket, lex::TokenId.RBracket, self.tokens)
+		mut keyTokens := range(*self.i, token::Id.LBracket, token::Id.RBracket, self.tokens)
 		if *self.i >= len(self.tokens) {
 			self.pushErr(self.tokens[*self.i-1], build::LogMsg.MissingType)
 			ret nil
@@ -337,7 +337,7 @@ impl typeBuilder {
 		}
 		*self.i++
 		token = self.tokens[*self.i]
-		if token.Id == lex::TokenId.RBracket {
+		if token.Id == token::Id.RBracket {
 			ret self.buildSlc()
 		}
 		*self.i-- // Point to left bracket.
@@ -347,12 +347,12 @@ impl typeBuilder {
 	unsafe fn step(mut self): &ast::TypeDecl {
 		token := self.tokens[*self.i]
 		match token.Id {
-		| lex::TokenId.Ident:
+		| token::Id.Ident:
 			ret self.buildIdent()
-		| lex::TokenId.Cpp:
+		| token::Id.Cpp:
 			ret self.buildCppLink()
-		| lex::TokenId.Unsafe:
-			if len(self.tokens)-*self.i > 1 && self.tokens[*self.i+1].Id == lex::TokenId.Fn {
+		| token::Id.Unsafe:
+			if len(self.tokens)-*self.i > 1 && self.tokens[*self.i+1].Id == token::Id.Fn {
 				// unsafe function
 				*self.i++ // point to function keyword
 				mut f := self.buildFn()
@@ -361,21 +361,21 @@ impl typeBuilder {
 				}
 				ret f
 			}
-		| lex::TokenId.Fn:
+		| token::Id.Fn:
 			ret self.buildFn()
-		| lex::TokenId.Star:
+		| token::Id.Star:
 			ret self.buildPtr()
-		| lex::TokenId.Amper:
+		| token::Id.Amper:
 			ret self.buildSptr()
-		| lex::TokenId.DblAmper:
+		| token::Id.DblAmper:
 			ret &ast::TypeDecl{
 				Kind: &ast::SptrTypeDecl{
 					Elem: self.buildSptr(),
 				},
 			}
-		| lex::TokenId.LBracket:
+		| token::Id.LBracket:
 			ret self.buildEnumerable()
-		| lex::TokenId.Map:
+		| token::Id.Map:
 			ret self.buildMap()
 		}
 		*self.i++

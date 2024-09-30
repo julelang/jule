@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use "std/jule/lex"
+use "std/jule/token"
 
 // Type of AST Node's data.
 enum NodeData: type {
@@ -18,14 +18,14 @@ enum NodeData: type {
 
 // AST Node.
 struct Node {
-	Token: &lex::Token
+	Token: &token::Token
 	Data:  NodeData
 }
 
 // Directive.
 struct Directive {
-	Tag:  &lex::Token
-	Args: []&lex::Token
+	Tag:  &token::Token
+	Args: []&token::Token
 }
 
 // Kind type of type declarations.
@@ -53,13 +53,13 @@ enum TypeDeclKind: type {
 // For function types:
 //  - Function types represented by &FnDecl.
 struct TypeDecl {
-	Token: &lex::Token
+	Token: &token::Token
 	Kind:  TypeDeclKind
 }
 
 // Identifier type.
 struct IdentTypeDecl {
-	Token:    &lex::Token
+	Token:    &token::Token
 	Ident:    str
 	Binded:   bool
 	Generics: []&TypeDecl
@@ -72,7 +72,7 @@ struct SubIdentTypeDecl {
 
 // Namespace chain type.
 struct NamespaceTypeDecl {
-	Namespace: &lex::Token // Namespace token.
+	Namespace: &token::Token // Namespace token.
 	Kind:      &TypeDecl   // Type of identifier.
 }
 
@@ -127,7 +127,7 @@ struct MapTypeDecl {
 // Kind and Idents is nil for void type.
 struct RetTypeDecl {
 	Kind:   &TypeDecl
-	Idents: []&lex::Token
+	Idents: []&token::Token
 }
 
 // Type of Expr's data.
@@ -157,8 +157,8 @@ enum ExprData: type {
 
 // Expression.
 struct Expr {
-	Token: &lex::Token
-	End:   &lex::Token
+	Token: &token::Token
+	End:   &token::Token
 	Kind:  ExprData
 }
 
@@ -169,7 +169,7 @@ struct RangeExpr {
 
 // Use expression.
 struct UseExpr {
-	Token: &lex::Token
+	Token: &token::Token
 	Expr:  &Expr
 }
 
@@ -180,19 +180,19 @@ struct TupleExpr {
 
 // Literal expression.
 struct LitExpr {
-	Token: &lex::Token
+	Token: &token::Token
 	Value: str
 }
 
 // Unsafe expression.
 struct UnsafeExpr {
-	Token: &lex::Token // Token of unsafe keyword.
+	Token: &token::Token // Token of unsafe keyword.
 	Expr:  &Expr
 }
 
 // Identifier expression.
 struct IdentExpr {
-	Token:  &lex::Token // Token of identifier.
+	Token:  &token::Token // Token of identifier.
 	Ident:  str
 	Binded: bool
 }
@@ -200,19 +200,19 @@ struct IdentExpr {
 impl IdentExpr {
 	// Reports whether identifier is self keyword.
 	fn IsSelf(self): bool {
-		ret self.Ident == lex::TokenKind.Self
+		ret self.Ident == token::Kind.Self
 	}
 }
 
 // Unary expression.
 struct UnaryExpr {
-	Op:   &lex::Token
+	Op:   &token::Token
 	Expr: &Expr
 }
 
 // Variadiced expression.
 struct VariadicExpr {
-	Token: &lex::Token
+	Token: &token::Token
 	Expr:  &Expr
 }
 
@@ -224,26 +224,26 @@ struct CastExpr {
 
 // Namespace identifier selection expression.
 struct NamespaceExpr {
-	Namespace: &lex::Token // Tokens of namespace identifier.
-	Ident:     &lex::Token // Token of selected identifier.
+	Namespace: &token::Token // Tokens of namespace identifier.
+	Ident:     &token::Token // Token of selected identifier.
 }
 
 // Object sub identifier selection expression.
 struct SubIdentExpr {
 	Expr:  &Expr       // Selected object.
-	Ident: &lex::Token // TOken of selected identifier.
+	Ident: &token::Token // TOken of selected identifier.
 }
 
 // Binary operation.
 struct BinaryExpr {
 	Left:  &Expr
 	Right: &Expr
-	Op:    &lex::Token
+	Op:    &token::Token
 }
 
 // Function call expression kind.
 struct FnCallExpr {
-	Token:     &lex::Token
+	Token:     &token::Token
 	Expr:      &Expr
 	Args:      []&Expr
 	Exception: &ScopeTree // Exception handling scope.
@@ -266,7 +266,7 @@ impl FnCallExpr {
 
 // Field-Expression pair.
 struct FieldExprPair {
-	Field: &lex::Token // Field identifier token.
+	Field: &token::Token // Field identifier token.
 	Expr:  &Expr
 }
 
@@ -279,15 +279,15 @@ impl FieldExprPair {
 
 // Struct literal instiating expression.
 struct StructLit {
-	End:   &lex::Token
+	End:   &token::Token
 	Kind:  &TypeDecl
 	Exprs: []&Expr // Possible types: &FieldExprPair, and other expressions.
 }
 
 // Anonymous brace instiating expression.
 struct BraceLit {
-	Token: &lex::Token
-	End:   &lex::Token
+	Token: &token::Token
+	End:   &token::Token
 	Exprs: []&Expr
 }
 
@@ -302,14 +302,14 @@ impl BraceLit {
 struct KeyValPair {
 	Key:   &Expr
 	Val:   &Expr
-	Colon: &lex::Token
+	Colon: &token::Token
 }
 
 // Slice initiating expression.
 // Also represents array initiating expression.
 struct SliceExpr {
-	Token: &lex::Token
-	End:   &lex::Token
+	Token: &token::Token
+	End:   &token::Token
 	Exprs: []&Expr
 }
 
@@ -322,16 +322,16 @@ impl SliceExpr {
 
 // Indexing expression.
 struct IndexingExpr {
-	Token: &lex::Token
-	End:   &lex::Token
+	Token: &token::Token
+	End:   &token::Token
 	Expr:  &Expr // Value expression to indexing.
 	Index: &Expr // Index value expression.
 }
 
 // Slicing expression.
 struct SlicingExpr {
-	Token: &lex::Token
-	End:   &lex::Token
+	Token: &token::Token
+	End:   &token::Token
 	Expr:  &Expr // Value expression to slicing.
 	Start: &Expr // Start index value expression.
 	To:    &Expr // To index value expression.
@@ -344,31 +344,31 @@ struct Constraint {
 
 // Generic type declaration.
 struct GenericDecl {
-	Token:      &lex::Token
+	Token:      &token::Token
 	Ident:      str
 	Constraint: &Constraint
 }
 
 // Label statement.
 struct LabelSt {
-	Token: &lex::Token
+	Token: &token::Token
 	Ident: str
 }
 
 // Goto statement.
 struct GotoSt {
-	Token: &lex::Token
-	Label: &lex::Token
+	Token: &token::Token
+	Label: &token::Token
 }
 
 // Fall statement.
 struct FallSt {
-	Token: &lex::Token
+	Token: &token::Token
 }
 
 // Left expression of assign statement.
 struct AssignLeft {
-	Token:     &lex::Token
+	Token:     &token::Token
 	Mutable:   bool
 	Reference: bool
 	Ident:     str
@@ -378,7 +378,7 @@ struct AssignLeft {
 // Assign statement.
 struct AssignSt {
 	Declarative: bool
-	Setter:      &lex::Token
+	Setter:      &token::Token
 	Left:        []&AssignLeft
 	Right:       &Expr
 }
@@ -404,7 +404,7 @@ enum StmtData: type {
 
 // Statement.
 struct Stmt {
-	Token: &lex::Token
+	Token: &token::Token
 	Data:  StmtData
 }
 
@@ -414,12 +414,12 @@ struct ScopeTree {
 	Unsafety: bool
 	Deferred: bool
 	Stmts:    []Stmt
-	End:      &lex::Token
+	End:      &token::Token
 }
 
 // Parameter.
 struct ParamDecl {
-	Token:     &lex::Token
+	Token:     &token::Token
 	Mutable:   bool
 	Variadic:  bool
 	Reference: bool
@@ -442,7 +442,7 @@ impl ParamDecl {
 // Function declaration.
 // Also represents anonymous function expression.
 struct FnDecl {
-	Token:       &lex::Token
+	Token:       &token::Token
 	Global:      bool
 	Unsafety:    bool
 	Public:      bool
@@ -460,15 +460,15 @@ struct FnDecl {
 impl FnDecl {
 	// Reports whether function is anonymous.
 	fn IsAnon(self): bool {
-		ret self.Ident == lex::Ident.Anon
+		ret self.Ident == token::Ident.Anon
 	}
 }
 
 // Variable declaration.
 struct VarDecl {
 	Scope:      &ScopeTree // nil for global scopes
-	Token:      &lex::Token
-	Setter:     &lex::Token
+	Token:      &token::Token
+	Setter:     &token::Token
 	Ident:      str
 	Binded:     bool
 	Public:     bool
@@ -483,7 +483,7 @@ struct VarDecl {
 
 // Return statement.
 struct RetSt {
-	Token: &lex::Token
+	Token: &token::Token
 	Expr:  &Expr
 }
 
@@ -496,7 +496,7 @@ enum IterKind: type {
 // Iteration.
 struct Iter {
 	Comptime: bool
-	Token:    &lex::Token
+	Token:    &token::Token
 	Kind:     IterKind
 	Scope:    &ScopeTree
 }
@@ -510,7 +510,7 @@ impl Iter {
 struct WhileKind {
 	Expr:      &Expr
 	Next:      StmtData // Nil if kind is while-next iteration.
-	NextToken: &lex::Token
+	NextToken: &token::Token
 }
 
 impl WhileKind {
@@ -522,7 +522,7 @@ impl WhileKind {
 
 // Range iteration kind.
 struct RangeKind {
-	InToken: &lex::Token // Token of "in" keyword
+	InToken: &token::Token // Token of "in" keyword
 	Expr:    &Expr
 	KeyA:    &VarDecl // first key of range
 	KeyB:    &VarDecl // second key of range
@@ -530,26 +530,26 @@ struct RangeKind {
 
 // Break statement.
 struct BreakSt {
-	Token: &lex::Token
-	Label: &lex::Token
+	Token: &token::Token
+	Label: &token::Token
 }
 
 // Continue statement.
 struct ContSt {
-	Token: &lex::Token
-	Label: &lex::Token
+	Token: &token::Token
+	Label: &token::Token
 }
 
 // If condition.
 struct If {
-	Token: &lex::Token
+	Token: &token::Token
 	Expr:  &Expr
 	Scope: &ScopeTree
 }
 
 // Else condition.
 struct Else {
-	Token: &lex::Token
+	Token: &token::Token
 	Scope: &ScopeTree
 }
 
@@ -565,14 +565,14 @@ struct TypeAliasDecl {
 	Scope:  &ScopeTree
 	Public: bool
 	Binded: bool
-	Token:  &lex::Token
+	Token:  &token::Token
 	Ident:  str
 	Kind:   &TypeDecl
 }
 
 // Case of match-case.
 struct Case {
-	Token: &lex::Token
+	Token: &token::Token
 	Scope: &ScopeTree
 
 	// Holds expression.
@@ -583,8 +583,8 @@ struct Case {
 // Match-Case.
 struct MatchCase {
 	Comptime:  bool
-	Token:     &lex::Token
-	End:       &lex::Token
+	Token:     &token::Token
+	End:       &token::Token
 	TypeMatch: bool
 	Expr:      &Expr
 	Cases:     []&Case
@@ -593,15 +593,15 @@ struct MatchCase {
 
 // Use declaration statement.
 struct UseDecl {
-	Token:  &lex::Token
-	Path:   &lex::Token // Use declaration path token.
-	Alias:  &lex::Token // Custom alias. Nil if not given.
+	Token:  &token::Token
+	Path:   &token::Token // Use declaration path token.
+	Alias:  &token::Token // Custom alias. Nil if not given.
 	Binded: bool        // Bind use declaration.
 }
 
 // Enum item.
 struct EnumItemDecl {
-	Token: &lex::Token
+	Token: &token::Token
 	Ident: str
 	Expr:  &Expr // Nil for auto expression.
 }
@@ -615,12 +615,12 @@ impl EnumItemDecl {
 
 // Enum declaration.
 struct EnumDecl {
-	Token:  &lex::Token
+	Token:  &token::Token
 	Public: bool
 	Ident:  str
 	Kind:   &TypeDecl
 	Items:  []&EnumItemDecl
-	End:    &lex::Token
+	End:    &token::Token
 }
 
 impl EnumDecl {
@@ -632,23 +632,23 @@ impl EnumDecl {
 
 // TypeEnum item.
 struct TypeEnumItemDecl {
-	Token: &lex::Token
+	Token: &token::Token
 	Ident: str
 	Kind:  &TypeDecl
 }
 
 // TypeEnum declaration.
 struct TypeEnumDecl {
-	Token:  &lex::Token
+	Token:  &token::Token
 	Public: bool
 	Ident:  str
 	Items:  []&TypeEnumItemDecl
-	End:    &lex::Token
+	End:    &token::Token
 }
 
 // Field declaration.
 struct FieldDecl {
-	Token:   &lex::Token
+	Token:   &token::Token
 	Public:  bool
 	Mutable: bool // Interior mutability.
 	Ident:   str
@@ -658,8 +658,8 @@ struct FieldDecl {
 
 // Structure declaration.
 struct StructDecl {
-	Token:      &lex::Token
-	End:        &lex::Token
+	Token:      &token::Token
+	End:        &token::Token
 	Ident:      str
 	Fields:     []&FieldDecl
 	Public:     bool
@@ -670,8 +670,8 @@ struct StructDecl {
 
 // Trait declaration.
 struct TraitDecl {
-	Token:    &lex::Token
-	End:      &lex::Token
+	Token:    &token::Token
+	End:      &token::Token
 	Ident:    str
 	Public:   bool
 	Inherits: []&TypeDecl
@@ -680,7 +680,7 @@ struct TraitDecl {
 
 // Implementation.
 struct Impl {
-	End: &lex::Token
+	End: &token::Token
 
 	// This token available for these cases:
 	//  - Implementation trait to structure, represents trait's type.

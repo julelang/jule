@@ -4,7 +4,7 @@
 
 use "std/jule/ast"
 use "std/jule/build"
-use "std/jule/lex"
+use "std/jule/token"
 
 // Eval directive expression.
 // Directive expressions are logial expressions and uses varaibles.
@@ -18,7 +18,7 @@ struct directiveEval {
 }
 
 impl directiveEval {
-	fn pushErr(mut self, t: &lex::Token, fmt: build::LogMsg, args: ...any) {
+	fn pushErr(mut self, t: &token::Token, fmt: build::LogMsg, args: ...any) {
 		self.logs = append(self.logs, build::Log{
 			Kind: build::LogKind.Error,
 			Row: t.Row,
@@ -30,18 +30,18 @@ impl directiveEval {
 
 	// Split operans by binary operators.
 	// Skips range of parentheses.
-	fn splitOperans(mut self, op: lex::TokenId, mut &tokens: []&lex::Token): [][]&lex::Token {
-		mut parts := make([][]&lex::Token, 0, 10)
+	fn splitOperans(mut self, op: token::Id, mut &tokens: []&token::Token): [][]&token::Token {
+		mut parts := make([][]&token::Token, 0, 10)
 		mut i := 0
 		mut rangeN := 0
 		mut last := 0
 		for i < len(tokens)-1; i++ {
 			b := tokens[i]
 			match b.Id {
-			| lex::TokenId.LParent:
+			| token::Id.LParent:
 				rangeN++
 				continue
-			| lex::TokenId.RParent:
+			| token::Id.RParent:
 				rangeN--
 			}
 			if rangeN > 0 || b.Id != op {
@@ -75,8 +75,8 @@ impl directiveEval {
 
 	// Eval directive expression part.
 	// Accepts unary operators.
-	fn evalDirectivePart(mut self, mut part: []&lex::Token): bool {
-		logicalNot := part[0].Id == lex::TokenId.Excl
+	fn evalDirectivePart(mut self, mut part: []&token::Token): bool {
+		logicalNot := part[0].Id == token::Id.Excl
 		if logicalNot {
 			part = part[1:]
 		}
@@ -101,25 +101,25 @@ impl directiveEval {
 
 		mut result := false
 
-		mut logicalOrParts := self.splitOperans(lex::TokenId.DblVline, self.d.Args)
+		mut logicalOrParts := self.splitOperans(token::Id.DblVline, self.d.Args)
 		if logicalOrParts == nil {
 			ret false
 		}
 
 		for (_, mut part) in logicalOrParts {
 			mut and := true
-			mut logicalAndParts := self.splitOperans(lex::TokenId.DblAmper, part)
+			mut logicalAndParts := self.splitOperans(token::Id.DblAmper, part)
 			if logicalAndParts == nil {
 				ret false
 			}
 
 			for (_, mut andPart) in logicalAndParts {
 				first := andPart[0]
-				if first.Id == lex::TokenId.LParent {
+				if first.Id == token::Id.LParent {
 					end := andPart[len(andPart)-1]
 
 					// Missing close.
-					if end.Id != lex::TokenId.RParent {
+					if end.Id != token::Id.RParent {
 						self.pushErr(first, build::LogMsg.WaitCloseParent)
 						ret false
 					}

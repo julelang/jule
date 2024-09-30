@@ -10,7 +10,7 @@ use stdenv "std/env"
 use "std/fmt"
 use "std/jule/build"
 use "std/jule/constant"
-use "std/jule/lex"
+use "std/jule/token"
 use "std/jule/sema"
 use "std/jule/types"
 use "std/math"
@@ -151,7 +151,7 @@ impl exprCoder {
 		}
 	}
 
-	fn operatorOverloadingUnary(mut &self, mut &s: &sema::StructIns, op: lex::TokenId, mut e: compExprModel) {
+	fn operatorOverloadingUnary(mut &self, mut &s: &sema::StructIns, op: token::Id, mut e: compExprModel) {
 		const Unary = true
 		mut f := obj::FindOperator(s, op, Unary)
 		if f == nil {
@@ -163,7 +163,7 @@ impl exprCoder {
 		self.oc.write(")")
 	}
 
-	fn divByZeroBinary(mut &self, &op: &lex::Token, mut &l: &sema::OperandExprModel, mut &r: &sema::OperandExprModel) {
+	fn divByZeroBinary(mut &self, &op: &token::Token, mut &l: &sema::OperandExprModel, mut &r: &sema::OperandExprModel) {
 		const xVar = "__jule_x"
 		const yVar = "__jule_y"
 		self.oc.write("({ ")
@@ -191,11 +191,11 @@ impl exprCoder {
 		self.oc.write(")(")
 		self.oc.write(xVar)
 		match op.Id {
-		| lex::TokenId.Solidus
-		| lex::TokenId.SolidusEq:
+		| token::Id.Solidus
+		| token::Id.SolidusEq:
 			self.oc.write(" / ")
-		| lex::TokenId.Percent
-		| lex::TokenId.PercentEq:
+		| token::Id.Percent
+		| token::Id.PercentEq:
 			self.oc.write(" % ")
 		}
 		self.oc.write(yVar)
@@ -203,7 +203,7 @@ impl exprCoder {
 	}
 
 	fn _unsafeBinary(mut &self, mut &buf: strings::Builder, &l: str, &r: str,
-		mut &lk: &sema::TypeKind, mut &rk: &sema::TypeKind, op: lex::TokenId, kind: str) {
+		mut &lk: &sema::TypeKind, mut &rk: &sema::TypeKind, op: token::Id, kind: str) {
 		// Operator overloading.
 		if lk.Struct() != nil {
 			mut s := lk.Struct()
@@ -212,14 +212,14 @@ impl exprCoder {
 		}
 
 		// Special cases for comparable types.
-		if op == lex::TokenId.Eqs || op == lex::TokenId.NotEq {
+		if op == token::Id.Eqs || op == token::Id.NotEq {
 			match {
 			| obj::IsAny(lk):
 				// If this binary operator comparing <any> type.
 				// The left operand is will be <any> one always.
 				if !rk.IsNil() && !obj::IsAny(rk) {
 					buf.WriteByte('(')
-					if op == lex::TokenId.NotEq {
+					if op == token::Id.NotEq {
 						buf.WriteByte('!')
 					}
 					i := self.oc.pushAnyType(rk)
@@ -238,7 +238,7 @@ impl exprCoder {
 				arr := lk.Arr()
 				mut f := obj::RuntimeFindFn(self.oc.ir.Runtime, obj::RuntimeFunc.arrayCmp)
 				mut ins := obj::FindFnGenericInstance(f, arr.Elem)
-				if op == lex::TokenId.NotEq {
+				if op == token::Id.NotEq {
 					buf.WriteByte('!')
 				}
 				identCoder.funcIns(buf, ins)
@@ -254,7 +254,7 @@ impl exprCoder {
 		}
 
 		match op {
-		| lex::TokenId.Plus | lex::TokenId.Minus | lex::TokenId.Star | lex::TokenId.Shl:
+		| token::Id.Plus | token::Id.Minus | token::Id.Star | token::Id.Shl:
 			// guarantee unsigned integer wrap around
 			lp := lk.Prim()
 			if lp != nil && types::IsUnsigInt(lp.Kind) {
@@ -343,19 +343,19 @@ impl exprCoder {
 
 	fn binary(mut &self, mut m: &sema::BinaryExprModel) {
 		match m.Op.Id {
-		| lex::TokenId.Solidus | lex::TokenId.Percent:
+		| token::Id.Solidus | token::Id.Percent:
 			// Do not check division safety of structures and skip if safety disabled.
 			if env::Safety && m.Left.Kind.Struct() == nil {
 				self.divByZeroBinary(m.Op, m.Left, m.Right)
 				ret
 			}
-		| lex::TokenId.Shl:
+		| token::Id.Shl:
 			// Do not check shifting of structures.
 			if m.Left.Kind.Struct() == nil {
 				self.shl(m.Left, m.Right)
 				ret
 			}
-		| lex::TokenId.Shr:
+		| token::Id.Shr:
 			// Do not check shifting of structures.
 			if m.Left.Kind.Struct() == nil {
 				self.shr(m.Left, m.Right)
@@ -394,12 +394,12 @@ impl exprCoder {
 		}
 
 		match m.Op.Id {
-		| lex::TokenId.Caret:
+		| token::Id.Caret:
 			self.oc.write("(~(")
 			self.possibleRefExpr(m.Expr.Model)
 			self.oc.write("))")
 			ret
-		| lex::TokenId.Star:
+		| token::Id.Star:
 			if env::Production || m.Expr.Kind.Sptr() == nil {
 				break
 			}
@@ -1346,7 +1346,7 @@ impl exprCoder {
 			match type m.Err.Model {
 			| &sema::Var:
 				v := (&sema::Var)(m.Err.Model)
-				if v.Ident == lex::TokenKind.Error {
+				if v.Ident == token::Kind.Error {
 					self.oc.write("jule::VoidExceptional{.error=std::move(except.error)}")
 					ret
 				}
@@ -1358,7 +1358,7 @@ impl exprCoder {
 			match type m.Err.Model {
 			| &sema::Var:
 				v := (&sema::Var)(m.Err.Model)
-				if v.Ident == lex::TokenKind.Error {
+				if v.Ident == token::Kind.Error {
 					self.oc.write(">{.error=except.error}")
 					ret
 				}
@@ -2014,17 +2014,17 @@ fn utoa(mut &s: strings::Builder, x: u64) {
 }
 
 fn operatorOverloadingBinary(mut &buf: strings::Builder, mut &s: &sema::StructIns, &l: str,
-	&r: str, op: lex::TokenId, kind: str) {
+	&r: str, op: token::Id, kind: str) {
 	const Unary = false
 	mut f := (&sema::FnIns)(nil)
-	if op == lex::TokenId.NotEq {
-		f = obj::FindOperator(s, lex::TokenId.Eqs, Unary)
+	if op == token::Id.NotEq {
+		f = obj::FindOperator(s, token::Id.Eqs, Unary)
 		buf.WriteByte('!')
 	} else {
 		f = obj::FindOperator(s, op, Unary)
 	}
 	if f == nil {
-		if op == lex::TokenId.Eqs || op == lex::TokenId.NotEq {
+		if op == token::Id.Eqs || op == token::Id.NotEq {
 			// Equal method not exist. Compiler will create, use default method.
 			identCoder.structureIns(buf, s)
 			buf.WriteStr(structDefaultEqMethodSuffix)
