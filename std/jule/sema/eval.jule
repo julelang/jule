@@ -3889,17 +3889,17 @@ impl binaryEval {
 		if self.l.IsConst() && self.l.untyped {
 			ret true
 		}
-		if lk == types::TypeKind.F32 {
+		if lk == types::Kind.F32 {
 			if self.r.IsConst() && self.r.untyped {
 				ret floatAssignable(lk, self.r)
 			}
-			ret rk == types::TypeKind.F32
+			ret rk == types::Kind.F32
 		}
-		if lk == types::TypeKind.F64 {
+		if lk == types::Kind.F64 {
 			if self.r.IsConst() && self.r.untyped {
 				ret floatAssignable(lk, self.r)
 			}
-			ret rk == types::TypeKind.F64
+			ret rk == types::Kind.F64
 		}
 		if self.r.IsConst() && self.r.untyped {
 			ret intAssignable(lk, self.r)
@@ -4370,16 +4370,16 @@ fn findBuiltinsImport(&ident: str, imp: &ImportInfo): any {
 // thing for unsigned data and signed kinds.
 fn fitBitsize(mut &d: &Data) {
 	mut prim := d.Kind.Prim()
-	z := types::BitsizeOf(prim.Str())
+	z := types::BitSizeOf(prim.Str())
 	match {
 	| d.Constant.IsI64():
-		k := types::BitsizeOfInt(d.Constant.ReadI64())
+		k := types::BitSizeOfInt(d.Constant.ReadI64())
 		if k > z || types::IsUnsigInt(prim.Kind) {
 			d.Constant.Kind = types::IntFromBits(k)
 			d.Kind = findBuiltinTypeAlias(d.Constant.Kind).Kind.Kind
 		}
 	| d.Constant.IsU64():
-		k := types::BitsizeOfUint(d.Constant.ReadU64())
+		k := types::BitSizeOfUint(d.Constant.ReadU64())
 		if k > z || types::IsSigInt(prim.Kind) {
 			d.Constant.Kind = types::UintFromBits(k)
 			d.Kind = findBuiltinTypeAlias(d.Constant.Kind).Kind.Kind
@@ -4389,7 +4389,7 @@ fn fitBitsize(mut &d: &Data) {
 			// z is already equals to biggest bitsize.
 			ret
 		}
-		k := types::BitsizeOfFloat(d.Constant.ReadF64())
+		k := types::BitSizeOfFloat(d.Constant.ReadF64())
 		if k > z {
 			d.Constant.Kind = types::FloatFromBits(k)
 			d.Kind = findBuiltinTypeAlias(d.Constant.Kind).Kind.Kind
@@ -4466,8 +4466,8 @@ fn isPtrArithmeticCompatible(mut &l: &Data, mut &r: &Data): bool {
 		ret l.Kind.Ptr().Elem.Equal(ptr.Elem)
 	}
 	if r.IsConst() && r.untyped {
-		ret intAssignable(types::TypeKind.Int, r) ||
-			intAssignable(types::TypeKind.Uint, r)
+		ret intAssignable(types::Kind.Int, r) ||
+			intAssignable(types::Kind.Uint, r)
 	}
 
 	mut tcc := typeCompatibilityChecker{
@@ -4556,7 +4556,7 @@ fn applyCastModelByEnum(mut &s: &sema, mut &d: &Data, mut e: &Enum,
 fn castConstByType(&t: str, mut &d: &Data) {
 	match {
 	| types::IsSigInt(t):
-		match types::BitsizeOf(types::RealKindOf(t)) {
+		match types::BitSizeOf(types::RealKindOf(t)) {
 		| 1 << 6:
 			d.Constant.SetI64(d.Constant.AsI64())
 		| 1 << 5:
@@ -4567,7 +4567,7 @@ fn castConstByType(&t: str, mut &d: &Data) {
 			d.Constant.SetI64(i64(i8(d.Constant.AsI64())))
 		}
 	| types::IsUnsigInt(t):
-		match types::BitsizeOf(types::RealKindOf(t)) {
+		match types::BitSizeOf(types::RealKindOf(t)) {
 		| 1 << 6:
 			d.Constant.SetU64(d.Constant.AsU64())
 		| 1 << 5:
@@ -4578,7 +4578,7 @@ fn castConstByType(&t: str, mut &d: &Data) {
 			d.Constant.SetU64(u64(u8(d.Constant.AsU64())))
 		}
 	| types::IsFloat(t):
-		match types::BitsizeOf(types::RealKindOf(t)) {
+		match types::BitSizeOf(types::RealKindOf(t)) {
 		| 1 << 6:
 			d.Constant.SetF64(d.Constant.AsF64())
 		| 1 << 5:
