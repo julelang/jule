@@ -589,8 +589,32 @@ impl symBuilder {
 	//  - mod: module that imports relevant package.
 	//  - path: path of package that importing.
 	fn checkPackageAccessibility(mut self, &decl: &ast::UseDecl, &mod: str, &path: str) {
-		if self.importer.GetModPath() != mod && strings::Contains(path, "internal") {
+		if self.importer.GetModPath() == mod {
+			ret
+		}
+		const InternalName = "internal"
+		i := strings::Find(path, InternalName)
+		if i == -1 {
+			ret
+		}
+		if i == 0 {
+			// "internal" or "internal/" ?
+			if len(path)-len(InternalName) == 0 ||
+				strings::HasPrefix(path, InternalName+build::ImportPathSep) {
+				self.pushErr(decl.Token, build::LogMsg.UseDeclForInternal)
+			}
+			ret
+		}
+		// "/internal" ?
+		if path[i-1:] == build::ImportPathSep+InternalName {
 			self.pushErr(decl.Token, build::LogMsg.UseDeclForInternal)
+			ret
+		}
+		// "/internal/" ?
+		n := i + len(InternalName) + 1
+		if n < len(path) && path[i-1:n] == build::ImportPathSep+InternalName+build::ImportPathSep {
+			self.pushErr(decl.Token, build::LogMsg.UseDeclForInternal)
+			ret
 		}
 	}
 
