@@ -40,7 +40,7 @@ This stage is the stage where the compiler generates object code.
 
 ### 1. Lexer
 
-The package [``./lex``](https://github.com/julelang/jule/tree/master/std/jule/lex) is Lexer. \
+The package [``./token``](https://github.com/julelang/jule/tree/master/std/jule/token) is Lexer. \
 Makes lexical analysis and segments Jule source code into tokens.
 
 ### 2. Parser
