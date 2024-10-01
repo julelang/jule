@@ -19,11 +19,11 @@ type builtinCaller: fn(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &d: &Data):
 
 fn findBuiltinFunc(&ident: str): &FnIns {
 	match ident {
-	| "out":
-		static mut f = &FnIns{caller: builtinCallerOut}
+	| "print":
+		static mut f = &FnIns{caller: builtinCallerPrint}
 		ret f
-	| "outln":
-		static mut f = &FnIns{caller: builtinCallerOutln}
+	| "println":
+		static mut f = &FnIns{caller: builtinCallerPrintln}
 		ret f
 	| "new":
 		static mut f = &FnIns{caller: builtinCallerNew}
@@ -301,13 +301,13 @@ fn builtinCallerError(mut &e: &eval, mut &fc: &ast::FnCallExpr): &Data {
 	ret d
 }
 
-fn builtinCallerOut(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+fn builtinCallerPrint(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
 	if len(fc.Args) < 1 {
 		e.pushErr(fc.Token, build::LogMsg.MissingExprFor, "v")
 		ret nil
 	}
 	if len(fc.Args) > 1 {
-		e.pushErr(fc.Args[1].Token, build::LogMsg.ArgumentOverflow, "out")
+		e.pushErr(fc.Args[1].Token, build::LogMsg.ArgumentOverflow, "print")
 	}
 
 	mut arg := fc.Args[0]
@@ -324,18 +324,18 @@ fn builtinCallerOut(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &D
 	pushRuntimeToStr(e.s, expr.Kind, arg.Token, e.getOwnerRefers())
 
 	mut d := buildVoidData()
-	d.Model = &BuiltinOutCallExprModel{Expr: expr}
+	d.Model = &BuiltinPrintCallExprModel{Expr: expr}
 	ret d
 }
 
-fn builtinCallerOutln(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &d: &Data): &Data {
-	d = builtinCallerOut(e, fc, d)
+fn builtinCallerPrintln(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &d: &Data): &Data {
+	d = builtinCallerPrint(e, fc, d)
 	if d == nil {
 		ret nil
 	}
 
-	d.Model = &BuiltinOutlnCallExprModel{
-		Expr: (&BuiltinOutCallExprModel)(d.Model).Expr,
+	d.Model = &BuiltinPrintlnCallExprModel{
+		Expr: (&BuiltinPrintCallExprModel)(d.Model).Expr,
 	}
 	ret d
 }
