@@ -32,9 +32,9 @@ It contains the reference compiler, API, and standard library.
 - Easy low-level programming
 - High [interoperability](https://manual.jule.dev/integrated-jule/interoperability/) with C, C++, Objective-C and Objective-C++
 - Disable variable shadowing by default, immutability by default, boundary checking, no uninitialized memory
-- The [API](https://manual.jule.dev/api/) written in C++ and allows extend Jule thanks to interoperability
+- The [API](https://manual.jule.dev/api/) written in Jule and C++ and allows extend Jule with C++ thanks to interoperability
 
-![image](https://github.com/julelang/jule/assets/54983926/e8b28748-9212-4db8-9f7b-0b0d33dc878b)
+![image](https://github.com/user-attachments/assets/0a6aee7c-6f0c-4ec1-96f8-d02b7fdc034c)
 
 > [!IMPORTANT]
 > Jule does not have a stable version yet and is still being developed to become more stable.
