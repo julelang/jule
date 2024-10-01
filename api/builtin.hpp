@@ -16,14 +16,14 @@ namespace jule
     typedef jule::U8 Byte;  // builtin: type byte: u8
     typedef jule::I32 Rune; // builtin: type rune: i32
 
-    inline void out(const jule::Str &obj) noexcept
+    inline void print(const jule::Str &obj) noexcept
     {
         __jule_writeStdout(obj.fake_slice());
     }
 
-    inline void outln(const jule::Str &obj) noexcept
+    inline void println(const jule::Str &obj) noexcept
     {
-        jule::out(obj);
+        jule::print(obj);
         __jule_writeStdout(jule::Str::lit("\n", 1).fake_slice());
     }
 
