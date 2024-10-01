@@ -607,6 +607,12 @@ impl scopeCoder {
 		self.oc.write("({\n")
 		self.oc.addIndent()
 
+		// tuple expressions may have reference for receiver memory
+		// since receivers implemented as pointers they should take the pointer
+		// to the actual expression of tuple
+		// therefore do not generate temporary variable for references
+		// they should take pointer from the tuple data
+
 		mut tup := (&sema::TupleExprModel)(a.Right)
 
 		for (i, mut r) in tup.Datas {
@@ -616,16 +622,31 @@ impl scopeCoder {
 				match type l.Model {
 				| &sema::Var:
 					mut v := (&sema::Var)(l.Model)
-					// If variable is reference and uninitialized,
-					// it should be declared in this multiple-assignment.
-					if v.Reference && !v.IsInitialized() {
-						identCoder.var(self.oc.Buf, v)
-						self.oc.write(" = &(")
-						self.oc.ec.possibleRefExpr(r.Model)
-						self.oc.write(");\n")
-						a.Left[i] = nil // Ignore handling for following statements.
-						continue
+					if !v.Reference {
+						break
 					}
+					// left expression is a reference variable
+					// lookup declared variables in this assignment
+					// so we can detetermine reference variable is declared or assigned
+					for _, dv in a.Decls {
+						if v == dv {
+							goto found
+						}
+					}
+					// variable is not exist in declared variables
+					// it can take temporary variable strategy
+					// it just takes assignment to the pointing data
+					// not takes pointer of the lvalue data
+					break
+				found:
+					// variable is declaring now
+					// takes pointer from the lvalue tuple data
+					identCoder.var(self.oc.Buf, v)
+					self.oc.write(" = &(")
+					self.oc.ec.possibleRefExpr(r.Model)
+					self.oc.write(");\n")
+					a.Left[i] = nil // Ignore handling for following statements.
+					continue
 				}
 				self.oc.tc.kind(self.oc.Buf, l.Kind)
 				self.oc.write(" ")
