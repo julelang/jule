@@ -2,145 +2,223 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-// Integer type of random seeds.
-type Seed: u64
+// The Jule code is a modified version of the original Go code from
+// https://github.com/golang/go/blob/go1.22.5/src/math/rand/v2/rand.go and came with this notice.
+//
+// ====================================================
+// Copyright (c) 2009 The Go Authors. All rights reserved.
+// 
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+// 
+//    * Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+//    * Redistributions in binary form must reproduce the above
+// copyright notice, this list of conditions and the following disclaimer
+// in the documentation and/or other materials provided with the
+// distribution.
+//    * Neither the name of Google Inc. nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+// 
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// ====================================================
 
-// This structure implements a type of pseudo random number generator (PRNG).
-// The seed must be given manually for each instance.
-//
-// Seeds:
-//  Seed is a number of seeds used to simulate randomness.
-//  The order and numbers produced vary depending on the seed.
-//  Since PRNGs are inherently deterministic, using a fixed seed
-//  means your program will generate the same numbers every time.
-//
-// If you want to achieve randomness somehow, use a variable seed.
-// A simple solution for seeds that will create the illusion of randomness
-// is to use time. Unix-time seconds could be a simple seed solution.
-//
-// Ranges:
-//  This structure by default provides a function to simulate
-// randomness between two numbers. But a way to do this can be suggested.
-//  Here is basic range formula:
-//    ƒ(x) -> rand.nextn(max - min) + min
-//
-//  With this formula, randomness can be made in the [min, max) range.
+use "std/math/bits"
+
+const is32bit = ^uint(0)>>32 == 0
+
+// Implements a type of pseudo random number generator (PRNG).
+// Outputs might be easily predictable regardless of how it's seeded.
+// For random numbers suitable for security-sensitive work, it is not recommended.
 struct Rand {
-	mut seed: Seed
+	src: Source
 }
 
 impl Rand {
-	const seedMask = 1<<63 - 1
-
-	// Returns new PRNG for seed.
-	static fn New(seed: Seed): &Rand {
-		mut rand := new(Rand)
-		rand.setSeed(seed)
-		ret rand
-	}
-}
-
-impl Rand {
-	// Sets seed.
-	fn setSeed(self, seed: Seed) {
-		self.seed = seed & Rand.seedMask
-		self.seed += self.seed * (seed >> (1 << 3))
+	// Returns new Rand that uses random values from src
+	// to generate other random values.
+	static fn New(src: Source): &Rand {
+		ret &Rand{src: unsafe { *(&src) }}
 	}
 
-	// Processes, sets, and returns new seed.
-	fn snext(self): Seed {
-		const NextMask = 0x41C64E6D
-		self.setSeed((self.seed*NextMask + 0x3039) & Rand.seedMask)
-		ret self.seed
+	// Returns a pseudo-random 64-bit value as u64.
+	fn U64(self): u64 { ret self.src.U64() }
+
+	// Returns a pseudo-random 32-bit value as u32.
+	fn U32(self): u32 { ret u32(self.U64() >> 32) }
+
+	// Returns a non-negative pseudo-random 64-bit value as i64.
+	fn I64(self): i64 { ret i64(^(self.U64() & (1 << 63))) }
+
+	// Returns a non-negative pseudo-random 32-bit value as i32.
+	fn I32(self): i32 { ret i32(self.U64() >> 33) }
+
+	// Returns a non-negative pseudo-random int.
+	fn Int(self): int { ret int(uint(self.U64()) << 1 >> 1) }
+
+	// Returns, as a u64, a non-negative pseudo-random number in the half-open interval [0,n).
+	// It panics if n == 0.
+	fn U64n(self, n: u64): u64 {
+		if n == 0 {
+			panic("math/rand: U64n: invalid argument")
+		}
+		ret self.u64n(n)
 	}
 
-	// Returns a non-genative pseudo-random
-	// 63-bit signed integer as an 64-bit signed integer.
-	fn Next63(self): i64 {
-		const RngMax = 1 << 63
-		const RngMask = RngMax - 1
-		ret i64(self.snext() & RngMask)
+	// Returns, as an i64, a non-negative pseudo-random number in the half-open interval [0,n).
+	// It panics if n == 0.
+	fn I64n(self, n: i64): i64 {
+		if n == 0 {
+			panic("math/rand: I64n: invalid argument")
+		}
+		ret i64(self.u64n(u64(n)))
 	}
 
-	// Returns a non-genative pseudo-random
-	// 31-bit signed integer as an 31-bit signed integer.
-	fn Next31(self): i32 {
-		ret i32(self.Next63() >> 32)
+	// The no-bounds-checks version of Next64N.
+	fn u64n(self, n: u64): u64 {
+		if is32bit && u64(u32(n)) == n {
+			ret u64(self.u32n(u32(n)))
+		}
+		if n&(n-1) == 0 { // n is power of two, can mask
+			ret self.U64() & (n - 1)
+		}
+
+		// Suppose we have a u64 x uniform in the range [0,2⁶⁴)
+		// and want to reduce it to the range [0,n) preserving exact uniformity.
+		// We can simulate a scaling arbitrary precision x * (n/2⁶⁴) by
+		// the high bits of a double-width multiply of x*n, meaning (x*n)/2⁶⁴.
+		// Since there are 2⁶⁴ possible inputs x and only n possible outputs,
+		// the output is necessarily biased if n does not divide 2⁶⁴.
+		// In general (x*n)/2⁶⁴ = k for x*n in [k*2⁶⁴,(k+1)*2⁶⁴).
+		// There are either floor(2⁶⁴/n) or ceil(2⁶⁴/n) possible products
+		// in that range, depending on k.
+		// But suppose we reject the sample and try again when
+		// x*n is in [k*2⁶⁴, k*2⁶⁴+(2⁶⁴%n)), meaning rejecting fewer than n possible
+		// outcomes out of the 2⁶⁴.
+		// Now there are exactly floor(2⁶⁴/n) possible ways to produce
+		// each output value k, so we've restored uniformity.
+		// To get valid u64 math, 2⁶⁴ % n = (2⁶⁴ - n) % n = -n % n,
+		// so the direct implementation of this algorithm would be:
+		//
+		//	mut hi, mut lo := bits::Mul64(self.U64(), n)
+		//	thresh := -n % n
+		//	for lo < thresh {
+		//		hi, lo = bits::Mul64(self.U64(), n)
+		//	}
+		//
+		// That still leaves an expensive 64-bit division that we would rather avoid.
+		// We know that thresh < n, and n is usually much less than 2⁶⁴, so we can
+		// avoid the last four lines unless lo < n.
+		//
+		// See also:
+		// https://lemire.me/blog/2016/06/27/a-fast-alternative-to-the-modulo-reduction
+		// https://lemire.me/blog/2016/06/30/fast-random-shuffling
+		mut hi, mut lo := bits::Mul64(self.U64(), n)
+		if lo < n {
+			thresh := -n % n
+			for lo < thresh {
+				hi, lo = bits::Mul64(self.U64(), n)
+			}
+		}
+		ret hi
 	}
 
-	// Returns a non-genative pseudo-random int.
-	fn Next(self): int {
-		u := uint(self.Next63())
-		ret int(u << 1 >> 1) // clear sign bit if int == int32
+	// Identical computation to u64n but optimized for 32-bit systems.
+	fn u32n(self, n: u32): u32 {
+		if n&(n-1) == 0 { // n is power of two, can mask
+			ret u32(self.U64()) & (n - 1)
+		}
+		// On 64-bit systems we still use the u64 code below because
+		// the probability of a random u64 lo being < a u32 n is near zero,
+		// meaning the unbiasing loop almost never runs.
+		// On 32-bit systems, here we need to implement that same logic in 32-bit math,
+		// both to preserve the exact output sequence observed on 64-bit machines
+		// and to preserve the optimization that the unbiasing loop almost never runs.
+		//
+		// We want to compute
+		// 	hi, lo := bits::Mul64(self.U64(), n)
+		// In terms of 32-bit halves, this is:
+		// 	x1:x0 := self.U64()
+		// 	0:hi, lo1:lo0 := bits::Mul64(x1:x0, 0:n)
+		// Writing out the multiplication in terms of bits::Mul32 allows
+		// using direct hardware instructions and avoiding
+		// the computations involving these zeros.
+		mut x := self.U64()
+		mut lo1a, mut lo0 := bits::Mul32(u32(x), n)
+		mut hi, mut lo1b := bits::Mul32(u32(x>>32), n)
+		mut lo1, mut c := bits::Add32(lo1a, lo1b, 0)
+		hi += c
+		if lo1 == 0 && lo0 < u32(n) {
+			n64 := u64(n)
+			thresh := u32(-n64 % n64)
+			for lo1 == 0 && lo0 < thresh {
+				x = self.U64()
+				lo1a, lo0 = bits::Mul32(u32(x), n)
+				hi, lo1b = bits::Mul32(u32(x>>32), n)
+				lo1, c = bits::Add32(lo1a, lo1b, 0)
+				hi += c
+			}
+		}
+		ret hi
 	}
 
-	// Returns a non-genative pseudo-random in [0, n) range
-	// 63-bit signed integer as an 64-bit signed integer.
-	// If n <= 0, it panics.
-	fn Nextn63(self, n: i64): i64 {
+	// Returns, as an i32, a non-negative pseudo-random number in the half-open interval [0,n).
+	// It panics if n <= 0.
+	fn I32n(self, n: i32): i32 {
 		if n <= 0 {
-			panic("rand: Rand.Nextn63: invalid argument")
+			panic("math/rand: I32n: invalid argument")
 		}
-		if n&(n-1) == 0 {
-			ret self.Next63() & (n - 1)
-		}
-		max := i64(1<<63 - 1 - (1<<63)%u64(n))
-		mut v := self.Next63()
-		for v > max {
-			v = self.Next63()
-		}
-		ret v % n
+		ret i32(self.u64n(u64(n)))
 	}
 
-	// Returns a non-genative pseudo-random in [0, n) range
-	// 31-bit signed integer as an 31-bit signed integer.
-	// If n <= 0, it panics.
-	fn Nextn31(self, n: i32): i32 {
+	// Returns, as a u32, a non-negative pseudo-random number in the half-open interval [0,n).
+	// It panics if n == 0.
+	fn U32n(self, n: u32): u32 {
+		if n == 0 {
+			panic("math/rand: U32n: invalid argument")
+		}
+		ret u32(self.u64n(u64(n)))
+	}
+
+	// Returns, as an int, a non-negative pseudo-random number in the half-open interval [0,n).
+	// It panics if n <= 0.
+	fn Intn(self, n: int): int {
 		if n <= 0 {
-			panic("rand: Rand.nextn31: invalid argument")
+			panic("math/rand: Intn: invalid argument")
 		}
-		if n&(n-1) == 0 {
-			ret self.Next31() & (n - 1)
-		}
-		max := i32(1<<31 - 1 - (1<<31)%u32(n))
-		mut v := self.Next31()
-		for v > max {
-			v = self.Next31()
-		}
-		ret v % n
+		ret int(self.u64n(u64(n)))
 	}
 
-	// Returns a non-genative pseudo-random in [0, n) range as int.
-	// If n <= 0, it panics.
-	fn Nextn(self, n: int): int {
-		if n <= 0 {
-			panic("rand: Rand.nextn: invalid argument")
+	// Returns, as a uint, a non-negative pseudo-random number in the half-open interval [0,n).
+	// It panics if n == 0.
+	fn Uintn(self, n: uint): uint {
+		if n == 0 {
+			panic("math/rand: Uintn: invalid argument")
 		}
-		if n <= 1<<31-1 {
-			ret int(self.Nextn31(i32(n)))
-		}
-		ret int(self.Nextn63(i64(n)))
+		ret uint(self.u64n(u64(n)))
 	}
 
-	// Returns a non-genative pseudo-random in [0.0, 1.0) range
-	// as f64 floating-point.
-	fn Fnext64(self): f64 {
-	sample:
-		f := f64(self.Next63()) / (1 << 63)
-		if f == 1 {
-			goto sample
-		}
-		ret f
+	// Returns, as a f64, a pseudo-random number in the half-open interval [0.0,1.0).
+	fn F64(self): f64 {
+		// There are exactly 1<<53 f64s in [0,1). Use Intn(1<<53) / (1<<53).
+		ret f64(self.U64()<<11>>11) / (1 << 53)
 	}
 
-	// Returns a non-genative pseudo-random in [0.0, 1.0) range
-	// as f32 floating-point.
-	fn Fnext32(self): f32 {
-	sample:
-		f := f32(self.Fnext64())
-		if f == 1 {
-			goto sample
-		}
-		ret f
+	// Returns, as a f32, a pseudo-random number in the half-open interval [0.0,1.0).
+	fn F32(self): f32 {
+		// There are exactly 1<<24 f32s in [0,1). Use Intn(1<<24) / (1<<24).
+		ret f32(self.U32()<<8>>8) / (1 << 24)
 	}
 }
