@@ -7,7 +7,7 @@ use "std/jule/build"
 use "std/unicode/utf8"
 
 // Lexer mode.
-enum Mode {
+enum LexMode {
 	Standard: 0 << 0, // Standard mode.
 	Comment: 1 << 0,  // Standard mode + comments.
 }
@@ -434,7 +434,7 @@ fn byteEscape(&txt: []byte): (seq: str) {
 }
 
 struct lex {
-	mode:   Mode
+	mode:   LexMode
 	tokens: []&Token
 	file:   &Fileset
 	pos:    int
@@ -527,7 +527,7 @@ impl lex {
 				break
 			}
 		}
-		if self.mode&Mode.Comment == Mode.Comment {
+		if self.mode&LexMode.Comment == LexMode.Comment {
 			token.Id = Id.Comment
 			token.Kind = str(self.file.Data[start:self.pos])
 		}
@@ -550,7 +550,7 @@ impl lex {
 				self.file.Data[self.pos+1] == '/' {
 				self.column += 2
 				self.pos += 2
-				if self.mode&Mode.Comment == Mode.Comment {
+				if self.mode&LexMode.Comment == LexMode.Comment {
 					token.Id = Id.Comment
 					token.Kind = str(self.file.Data[start:self.pos])
 				}
@@ -803,7 +803,7 @@ impl lex {
 // Lex source code into fileset.
 // Returns nil if f == nil.
 // Returns nil slice for errors if no any error.
-fn Lex(mut f: &Fileset, mode: Mode): []build::Log {
+fn Lex(mut f: &Fileset, mode: LexMode): []build::Log {
 	if f == nil {
 		ret nil
 	}
