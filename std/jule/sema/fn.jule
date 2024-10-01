@@ -2,20 +2,20 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use ast for std::jule::ast
-use build for std::jule::build
-use lex for std::jule::lex
-use strings for std::internal::strings
+use "std/internal/strings"
+use "std/jule/ast"
+use "std/jule/build"
+use "std/jule/token"
 
 // Return type.
 struct RetType {
 	Kind:   &TypeSymbol
-	Idents: []&lex::Token
+	Idents: []&token::Token
 }
 
 // Parameter.
 struct Param {
-	Token:     &lex::Token
+	Token:     &token::Token
 	Mutable:   bool
 	Variadic:  bool
 	Reference: bool
@@ -45,7 +45,7 @@ impl Param {
 struct Fn {
 	sema: &sema
 
-	Token:       &lex::Token
+	Token:       &token::Token
 	Global:      bool
 	Unsafety:    bool
 	Public:      bool
@@ -97,7 +97,7 @@ impl Fn {
 
 	// Reports whether function is anonymous function.
 	fn IsAnon(self): bool {
-		ret lex::IsAnonIdent(self.Ident)
+		ret token::IsAnonIdent(self.Ident)
 	}
 
 	// Reports whether function has return variable(s).
@@ -173,7 +173,7 @@ impl ParamIns {
 	// Implement: Kind
 	// Returns ParamIns's type kind as string.
 	fn Str(self): str {
-		mut s := strings::StrBuilder.New(1 << 5)
+		mut s := strings::Builder.New(1 << 5)
 		if self.Decl.Mutable {
 			s.WriteStr("mut ")
 		}
@@ -357,7 +357,7 @@ impl FnIns {
 	// Appends identifier to kind of this instance.
 	// Does not appends identifier of this instance to kind if self.Decl is nil reference.
 	fn GetKindStr(self, ident: bool): str {
-		mut s := strings::StrBuilder.New(1 << 5)
+		mut s := strings::Builder.New(1 << 5)
 
 		if self.Decl != nil && self.Decl.Unsafety {
 			s.WriteStr("unsafe ")

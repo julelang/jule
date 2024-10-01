@@ -2,11 +2,12 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use env
-use ast for std::jule::ast
-use build for std::jule::build
-use importer for std::jule::importer
-use sema for std::jule::sema
+use "env"
+use "std/jule/ast"
+use "std/jule/build"
+use "std/jule/importer"
+use "std/jule/sema"
+use "std/jule/token"
 
 // Intermediate representation of code for compiler.
 struct IR {
@@ -14,7 +15,7 @@ struct IR {
 	Root:    str
 	Passes:  []str
 	Main:    &sema::Package
-	Runtime: &sema::ImportInfo // std::runtime
+	Runtime: &sema::ImportInfo // "std/runtime"
 	Used:    []&sema::ImportInfo
 	Ordered: OrderedDefines
 }
@@ -26,8 +27,8 @@ impl IR {
 	// - Returns (nil, nil) logs if path has not any Jule file.
 	// - Returns (nil, logs) if exist any log.
 	// - Returns IR and nil logs if everything is fine.
-	static fn Build(path: str, flags: sema::SemaFlag): (&IR, []build::Log) {
-		mut importer := importer::JuleImporter.New(buildCompileInfo())
+	static fn Build(path: str, flags: sema::Flag): (&IR, []build::Log) {
+		mut importer := importer::Importer.New(buildCompileInfo())
 		const UpdateMod = true // Use root module for project if exist.
 		mut files, mut logs := importer.ImportPackage(path, UpdateMod)
 		if len(logs) > 0 {
@@ -39,7 +40,7 @@ impl IR {
 			ret nil, nil
 		}
 
-		// Push std::runtime package to first file.
+		// Push runtime package to first file.
 		// Each Jule program should import this standard package.
 		mut firstFile := files[0]
 		pushRuntimeToAST(firstFile)
@@ -57,7 +58,7 @@ impl IR {
 		ir.Passes = getAllUniquePasses(ir.Main, ir.Used)
 
 		// Set up special packages.
-		ir.Runtime = pkg.Files[0].Imports[0] // std::runtime
+		ir.Runtime = pkg.Files[0].Imports[0] // runtime package
 
 		ret ir, nil
 	}
@@ -174,16 +175,13 @@ fn buildCompileInfo(): importer::CompileInfo {
 	ret info
 }
 
-// See [std::jule] developer reference (9).
+// See "std/jule" developer reference (9).
 fn pushRuntimeToAST(mut &f: &ast::AST) {
 	mut decl := &ast::UseDecl{
 		Token: nil, // Nil token is a flag for implicit declaration.
-		LinkPath: "std::runtime",
-		Alias: "",
-		Full: false,
-		Selected: nil,
+		Path: &token::Token{Id: token::Id.Lit, Kind: `"std/runtime"`},
+		Alias: nil,
 		Binded: false,
-		Std: true,
 	}
 	f.UseDecls = append(f.UseDecls, decl)
 	if len(f.UseDecls) > 1 {

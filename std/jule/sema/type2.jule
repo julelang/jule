@@ -4,14 +4,14 @@
 
 // This file reserved for type compatibility checking.
 
-use conv for std::conv
-use math for std::math
-use ast for std::jule::ast
-use build for std::jule::build
-use lit for std::jule::constant::lit
-use lex for std::jule::lex
-use strings for std::internal::strings
-use types for std::jule::types
+use "std/conv"
+use "std/internal/strings"
+use "std/jule/ast"
+use "std/jule/build"
+use "std/jule/constant/lit"
+use "std/jule/token"
+use "std/jule/types"
+use "std/math"
 
 fn traitHasReferenceReceiver(&t: &Trait): bool {
 	for _, f in t.Methods {
@@ -30,7 +30,7 @@ fn traitHasReferenceReceiver(&t: &Trait): bool {
 
 fn floatAssignable(&kind: str, &d: &Data): bool {
 	value := conv::FmtFloat(d.Constant.AsF64(), 'g', -1, 64)
-	ret types::CheckBitFloat(value, types::BitsizeOf(kind))
+	ret types::CheckBitFloat(value, types::BitSizeOf(kind))
 }
 
 fn sigAssignable(kind: str, &d: &Data): bool {
@@ -58,7 +58,7 @@ fn sigAssignable(kind: str, &d: &Data): bool {
 
 fn unsigAssignable(kind: str, &d: &Data): bool {
 	max := types::Max(kind)
-	if d.IsRune && kind == types::TypeKind.U8 {
+	if d.IsRune && kind == types::Kind.U8 {
 		ret lit::IsAscii(rune(d.Constant.ReadI64()))
 	}
 
@@ -100,7 +100,7 @@ struct typeCompatibilityChecker {
 	s:          &sema // Used for error logging.
 	dest:       &TypeKind
 	src:        &TypeKind
-	errorToken: &lex::Token
+	errorToken: &token::Token
 }
 
 impl typeCompatibilityChecker {
@@ -236,7 +236,7 @@ struct assignTypeChecker {
 	s:          &sema // Used for error logging and type checking.
 	dest:       &TypeKind
 	d:          &Data
-	errorToken: &lex::Token
+	errorToken: &token::Token
 	refers:     &ReferenceStack
 }
 
@@ -336,7 +336,7 @@ struct dynamicTypeAnnotation {
 	f:          &FnIns
 	p:          &ParamIns
 	a:          &Data
-	errorToken: &lex::Token
+	errorToken: &token::Token
 	k:          *&TypeKind
 	c:          &ast::TypeDecl
 	ignored:    []&TypeKind // Ignored generics.
@@ -656,7 +656,7 @@ impl dynamicTypeAnnotation {
 struct fnCallArgChecker {
 	e:                 &eval
 	args:              []&ast::Expr
-	errorToken:        &lex::Token
+	errorToken:        &token::Token
 	f:                 &FnIns
 	dynamicAnnotation: bool
 	argModels:         []ExprModel
@@ -664,7 +664,7 @@ struct fnCallArgChecker {
 }
 
 impl fnCallArgChecker {
-	fn pushErrToken(mut self, token: &lex::Token, fmt: build::LogMsg, args: ...any) {
+	fn pushErrToken(mut self, token: &token::Token, fmt: build::LogMsg, args: ...any) {
 		self.e.s.pushErr(token, fmt, args...)
 	}
 
@@ -699,7 +699,7 @@ impl fnCallArgChecker {
 		|:
 			log = build::LogMsg.MissingArgs
 		}
-		mut err := strings::StrBuilder.New(1 << 5)
+		mut err := strings::Builder.New(1 << 5)
 		err.WriteStr(self.f.Decl.Ident)
 		err.WriteStr("\n       want (")
 		for i, p in params {
@@ -713,7 +713,7 @@ impl fnCallArgChecker {
 		ret false
 	}
 
-	fn checkArg(mut self, mut &p: &ParamIns, mut &arg: &Data, mut &errorToken: &lex::Token): (ok: bool) {
+	fn checkArg(mut self, mut &p: &ParamIns, mut &arg: &Data, mut &errorToken: &token::Token): (ok: bool) {
 		if self.dynamicAnnotation && parameterUsesGenerics(p, self.f.Decl.Generics) {
 			// Accept as fail if parameter is variadic or expression is invalid.
 			ok = !p.Decl.Variadic && isGoodValueToInfer(arg)
@@ -921,13 +921,13 @@ fn checkMutRiskOfStructLit(mut &s: &sema, &m: &StructLitExprModel) {
 
 struct structLitChecker {
 	e:          &eval
-	errorToken: &lex::Token
+	errorToken: &token::Token
 	s:          &StructIns
 	args:       []&StructArgExprModel
 }
 
 impl structLitChecker {
-	fn pushErr(mut self, token: &lex::Token, fmt: build::LogMsg, args: ...any) {
+	fn pushErr(mut self, token: &token::Token, fmt: build::LogMsg, args: ...any) {
 		self.e.pushErr(token, fmt, args...)
 	}
 
@@ -936,7 +936,7 @@ impl structLitChecker {
 		self.e.pushSuggestion(fmt, args...)
 	}
 
-	fn pushMatch(mut self, mut &f: &FieldIns, mut &d: &Data, mut &errorToken: &lex::Token) {
+	fn pushMatch(mut self, mut &f: &FieldIns, mut &d: &Data, mut &errorToken: &token::Token) {
 		const Reference = false
 		// If evaluated for the immutable memory, check as immutable.
 		// But if field in scope of the interior mutability, check as mutable.
@@ -1074,7 +1074,7 @@ impl structLitChecker {
 				ret
 			}
 
-			mut idents := strings::StrBuilder.New(1 << 5)
+			mut idents := strings::Builder.New(1 << 5)
 			for diff > 0; diff-- {
 				idents.WriteStr(", ")
 				idents.WriteStr(self.s.Fields[n-diff].Decl.Ident)
@@ -1100,11 +1100,11 @@ impl rangeChecker {
 	}
 
 	fn setSizeKey(mut self) {
-		if self.rang.KeyA == nil || lex::IsIgnoreIdent(self.rang.KeyA.Ident) {
+		if self.rang.KeyA == nil || token::IsIgnoreIdent(self.rang.KeyA.Ident) {
 			ret
 		}
 		self.Kind.KeyA = self.buildVar(self.rang.KeyA)
-		self.Kind.KeyA.Kind = findBuiltinTypeAlias(PrimKind.Int).Kind
+		self.Kind.KeyA.Kind = findBuiltinTypeAlias(types::Kind.Int).Kind
 	}
 
 	// Check range expression validity.
@@ -1128,7 +1128,7 @@ impl rangeChecker {
 
 	fn checkSlice(mut self) {
 		self.setSizeKey()
-		if self.rang.KeyB == nil || lex::IsIgnoreIdent(self.rang.KeyB.Ident) {
+		if self.rang.KeyB == nil || token::IsIgnoreIdent(self.rang.KeyB.Ident) {
 			ret
 		}
 
@@ -1141,7 +1141,7 @@ impl rangeChecker {
 
 	fn checkArray(mut self) {
 		self.setSizeKey()
-		if self.rang.KeyB == nil || lex::IsIgnoreIdent(self.rang.KeyB.Ident) {
+		if self.rang.KeyB == nil || token::IsIgnoreIdent(self.rang.KeyB.Ident) {
 			ret
 		}
 
@@ -1153,7 +1153,7 @@ impl rangeChecker {
 	}
 
 	fn checkMapKeyA(mut self) {
-		if self.rang.KeyA == nil || lex::IsIgnoreIdent(self.rang.KeyA.Ident) {
+		if self.rang.KeyA == nil || token::IsIgnoreIdent(self.rang.KeyA.Ident) {
 			ret
 		}
 
@@ -1168,7 +1168,7 @@ impl rangeChecker {
 	}
 
 	fn checkMapKeyB(mut self) {
-		if self.rang.KeyB == nil || lex::IsIgnoreIdent(self.rang.KeyB.Ident) {
+		if self.rang.KeyB == nil || token::IsIgnoreIdent(self.rang.KeyB.Ident) {
 			ret
 		}
 
@@ -1189,11 +1189,11 @@ impl rangeChecker {
 
 	fn checkStr(mut self) {
 		self.setSizeKey()
-		if self.rang.KeyB == nil || lex::IsIgnoreIdent(self.rang.KeyB.Ident) {
+		if self.rang.KeyB == nil || token::IsIgnoreIdent(self.rang.KeyB.Ident) {
 			ret
 		}
 		self.Kind.KeyB = self.buildVar(self.rang.KeyB)
-		self.Kind.KeyB.Kind = findBuiltinTypeAlias(PrimKind.U8).Kind
+		self.Kind.KeyB.Kind = findBuiltinTypeAlias(types::Kind.U8).Kind
 	}
 
 	fn checkComptime(mut self) {
@@ -1204,7 +1204,7 @@ impl rangeChecker {
 		if self.rang.KeyB != nil && self.rang.KeyB.Mutable {
 			self.sc.s.pushErr(self.rang.KeyB.Token, build::LogMsg.CannotBeMut, self.rang.KeyB.Ident)
 		}
-		if self.rang.KeyB == nil || lex::IsIgnoreIdent(self.rang.KeyB.Ident) {
+		if self.rang.KeyB == nil || token::IsIgnoreIdent(self.rang.KeyB.Ident) {
 			ret
 		}
 		self.Kind.KeyB = self.buildVar(self.rang.KeyB)
@@ -1259,9 +1259,9 @@ impl rangeChecker {
 struct retTypeChecker {
 	sc:         &scopeChecker
 	f:          &FnIns
-	types:      []&TypeKind // Return types.
-	exprs:      []&ast::Expr     // Return expressions.
-	errorToken: &lex::Token
+	types:      []&TypeKind  // Return types.
+	exprs:      []&ast::Expr // Return expressions.
+	errorToken: &token::Token
 	model:      ExprModel
 }
 
@@ -1356,14 +1356,14 @@ impl retTypeChecker {
 		}
 		ret true
 	err:
-		mut wanted := strings::StrBuilder.New(1 << 5)
+		mut wanted := strings::Builder.New(1 << 5)
 		for i, t in self.types {
 			wanted.WriteStr(t.Str())
 			if len(self.types)-i > 1 {
 				wanted.WriteStr(", ")
 			}
 		}
-		mut given := strings::StrBuilder.New(1 << 5)
+		mut given := strings::Builder.New(1 << 5)
 		for i, t in tup.Types {
 			given.WriteStr(t.Str())
 			if len(self.types)-i > 1 {

@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use obj
-use env
-use opt
-use conv for std::conv
-use lex for std::jule::lex
-use constant for std::jule::constant
-use sema for std::jule::sema
-use strings for std::strings
+use "env"
+use "obj"
+use "opt"
+use "std/conv"
+use "std/jule/constant"
+use "std/jule/sema"
+use "std/jule/token"
+use "std/strings"
 
 const closureCtxIdent = "__jule_closure_ctx"
 const matchExpr = "_match_expr"
@@ -91,7 +91,7 @@ impl scopeCoder {
 	}
 
 	fn rangeIndexIter(mut &self, mut &it: &sema::RangeIter) {
-		mut sb := strings::StrBuilder.New(1 << 6)
+		mut sb := strings::Builder.New(1 << 6)
 		identCoder.iterBegin(sb, uintptr(it))
 		begin := sb.Str()
 		sb.Clear()
@@ -158,7 +158,7 @@ impl scopeCoder {
 	}
 
 	fn rangeHashmapIter(mut &self, mut &it: &sema::RangeIter) {
-		mut sb := strings::StrBuilder.New(1 << 6)
+		mut sb := strings::Builder.New(1 << 6)
 		identCoder.iterBegin(sb, uintptr(it))
 		begin := sb.Str()
 		sb.Clear()
@@ -241,7 +241,7 @@ impl scopeCoder {
 	}
 
 	fn strRuneIter(mut &self, mut it: &opt::StrRuneIter) {
-		mut sb := strings::StrBuilder.New(1 << 6)
+		mut sb := strings::Builder.New(1 << 6)
 		identCoder.iterBegin(sb, uintptr(it.Base))
 		begin := sb.Str()
 		sb.Clear()
@@ -523,11 +523,11 @@ impl scopeCoder {
 	}
 
 	fn operatorOverloadingAssign(mut &self, mut &s: &sema::StructIns, mut &l: &sema::OperandExprModel,
-		mut &r: &sema::OperandExprModel, op: lex::TokenId) {
+		mut &r: &sema::OperandExprModel, op: token::Id) {
 		const Unary = false
 		mut f := obj::FindOperator(s, op, Unary)
 		if f == nil {
-			panic("binary operator overloading is not exist, this is an implementation mistake")
+			panic("cxx: binary operator overloading is not exist, this is an implementation mistake")
 		}
 		identCoder.funcIns(self.oc.Buf, f)
 		self.oc.write("(&")
@@ -539,19 +539,19 @@ impl scopeCoder {
 
 	fn assign(mut &self, mut a: &sema::Assign) {
 		match a.Op.Id {
-		| lex::TokenId.SolidusEq | lex::TokenId.PercentEq:
+		| token::Id.SolidusEq | token::Id.PercentEq:
 			// Do not check division safety of structures and skip if safety disabled.
 			if env::Safety && a.Left.Kind.Struct() == nil {
 				self.divByZeroAssign(a)
 				ret
 			}
-		| lex::TokenId.ShlEq:
+		| token::Id.ShlEq:
 			// Do not check shifting of structures.
 			if a.Left.Kind.Struct() == nil {
 				self.shl(a)
 				ret
 			}
-		| lex::TokenId.ShrEq:
+		| token::Id.ShrEq:
 			// Do not check shifting of structures.
 			if a.Left.Kind.Struct() == nil {
 				self.shr(a)
@@ -559,7 +559,7 @@ impl scopeCoder {
 			}
 		}
 
-		if a.Op.Id != lex::TokenId.Eq && a.Left.Kind.Struct() != nil {
+		if a.Op.Id != token::Id.Eq && a.Left.Kind.Struct() != nil {
 			mut s := a.Left.Kind.Struct()
 			self.operatorOverloadingAssign(s, a.Left, a.Right, a.Op.Id)
 			ret
@@ -733,7 +733,7 @@ impl scopeCoder {
 		| &sema::FnCallExprModel:
 			self.multiAssignFn(a)
 		|:
-			panic("this panic call should be unreachable")
+			panic("cxx: this panic call should be unreachable")
 		}
 	}
 
@@ -910,7 +910,7 @@ impl scopeCoder {
 			self.oc.ec.model(r.Expr)
 			self.oc.write(");\n")
 		|:
-			panic("implementation mistake, this panic call should be unreachable")
+			panic("cxx: implementation mistake, this panic call should be unreachable")
 		}
 	}
 

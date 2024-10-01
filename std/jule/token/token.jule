@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use unicode for std::unicode
-use utf8 for std::unicode::utf8
-use strings for std::strings
+use "std/strings"
+use "std/unicode"
+use "std/unicode/utf8"
 
 // Punctuations.
 static Puncts: [...]rune = [
@@ -53,63 +53,63 @@ static Spaces: [...]rune = [
 ]
 
 // Kind list of unary operators.
-static UnaryOps: [...]TokenId = [
-	TokenId.Minus,
-	TokenId.Plus,
-	TokenId.Caret,
-	TokenId.Excl,
-	TokenId.Star,
-	TokenId.Amper,
+static UnaryOps: [...]Id = [
+	Id.Minus,
+	Id.Plus,
+	Id.Caret,
+	Id.Excl,
+	Id.Star,
+	Id.Amper,
 ]
 
 // Kind list of binary operators.
-static BinOps: [...]TokenId = [
-	TokenId.Plus,
-	TokenId.Minus,
-	TokenId.Star,
-	TokenId.Solidus,
-	TokenId.Percent,
-	TokenId.Amper,
-	TokenId.Vline,
-	TokenId.Caret,
-	TokenId.Shl,
-	TokenId.Shr,
-	TokenId.Lt,
-	TokenId.Gt,
-	TokenId.LtEq,
-	TokenId.GtEq,
-	TokenId.DblAmper,
-	TokenId.DblVline,
-	TokenId.Eqs,
-	TokenId.NotEq,
+static BinOps: [...]Id = [
+	Id.Plus,
+	Id.Minus,
+	Id.Star,
+	Id.Solidus,
+	Id.Percent,
+	Id.Amper,
+	Id.Vline,
+	Id.Caret,
+	Id.Shl,
+	Id.Shr,
+	Id.Lt,
+	Id.Gt,
+	Id.LtEq,
+	Id.GtEq,
+	Id.DblAmper,
+	Id.DblVline,
+	Id.Eqs,
+	Id.NotEq,
 ]
 
 // Kind list of weak operators.
 // These operators are weak, can used as part of expression.
-static WeakOps: [...]TokenId = [
-	TokenId.TripleDot,
-	TokenId.Colon,
+static WeakOps: [...]Id = [
+	Id.TripleDot,
+	Id.Colon,
 ]
 
 // List of postfix operators.
-static PostfixOps: [...]TokenId = [
-	TokenId.DblPlus,
-	TokenId.DblMinus,
+static PostfixOps: [...]Id = [
+	Id.DblPlus,
+	Id.DblMinus,
 ]
 
 // List of assign operators.
-static AssignOps: [...]TokenId = [
-	TokenId.Eq,
-	TokenId.PlusEq,
-	TokenId.MinusEq,
-	TokenId.SolidusEq,
-	TokenId.StarEq,
-	TokenId.PercentEq,
-	TokenId.ShrEq,
-	TokenId.ShlEq,
-	TokenId.VlineEq,
-	TokenId.AmperEq,
-	TokenId.CaretEq,
+static AssignOps: [...]Id = [
+	Id.Eq,
+	Id.PlusEq,
+	Id.MinusEq,
+	Id.SolidusEq,
+	Id.StarEq,
+	Id.PercentEq,
+	Id.ShrEq,
+	Id.ShlEq,
+	Id.VlineEq,
+	Id.AmperEq,
+	Id.CaretEq,
 ]
 
 // Special identifiers.
@@ -119,8 +119,8 @@ enum Ident: str {
 }
 
 // Token identities.
-enum TokenId: uint {
-	Na,
+enum Id: uint {
+	NA,
 	Ident,
 	Ret,
 	Semicolon,
@@ -201,7 +201,7 @@ enum TokenId: uint {
 }
 
 // Token kinds.
-enum TokenKind: str {
+enum Kind: str {
 	DblColon: "::",
 	Colon: ":",
 	Semicolon: ";",
@@ -283,11 +283,11 @@ enum TokenKind: str {
 
 // Token is lexer token.
 struct Token {
-	File:   &File
+	File:   &Fileset
 	Row:    int
 	Column: int
 	Kind:   str
-	Id:     TokenId
+	Id:     Id
 }
 
 impl Token {
@@ -299,29 +299,29 @@ impl Token {
 	// to handle expression assignments.
 	fn Prec(self): byte {
 		match self.Id {
-		| TokenId.Star
-		| TokenId.Percent
-		| TokenId.Solidus
-		| TokenId.Shr
-		| TokenId.Shl
-		| TokenId.Amper:
+		| Id.Star
+		| Id.Percent
+		| Id.Solidus
+		| Id.Shr
+		| Id.Shl
+		| Id.Amper:
 			ret 5
-		| TokenId.Plus
-		| TokenId.Minus
-		| TokenId.Vline
-		| TokenId.Caret:
+		| Id.Plus
+		| Id.Minus
+		| Id.Vline
+		| Id.Caret:
 			ret 4
-		| TokenId.Eqs
-		| TokenId.NotEq
-		| TokenId.Eq
-		| TokenId.Lt
-		| TokenId.LtEq
-		| TokenId.Gt
-		| TokenId.GtEq:
+		| Id.Eqs
+		| Id.NotEq
+		| Id.Eq
+		| Id.Lt
+		| Id.LtEq
+		| Id.Gt
+		| Id.GtEq:
 			ret 3
-		| TokenId.DblAmper:
+		| Id.DblAmper:
 			ret 2
-		| TokenId.DblVline:
+		| Id.DblVline:
 			ret 1
 		|:
 			ret 0
@@ -330,7 +330,7 @@ impl Token {
 }
 
 // Reports whether kind is unary operator.
-fn IsUnaryOp(id: TokenId): bool {
+fn IsUnaryOp(id: Id): bool {
 	for _, op in UnaryOps {
 		if id == op {
 			ret true
@@ -340,7 +340,7 @@ fn IsUnaryOp(id: TokenId): bool {
 }
 
 // Reports whether kind is binary operator.
-fn IsBinOp(id: TokenId): bool {
+fn IsBinOp(id: Id): bool {
 	for _, op in BinOps {
 		if id == op {
 			ret true
@@ -350,7 +350,7 @@ fn IsBinOp(id: TokenId): bool {
 }
 
 // Reports whether kind is weak operator.
-fn IsWeakOp(id: TokenId): bool {
+fn IsWeakOp(id: Id): bool {
 	for _, op in WeakOps {
 		if id == op {
 			ret true
@@ -444,6 +444,16 @@ fn IsIdentRune(s: str): bool {
 	ret true
 }
 
+// Reports whether s is keyword.
+fn IsKeyword(s: str): bool {
+	for _, op in keywords {
+		if s == op.kind {
+			ret true
+		}
+	}
+	ret false
+}
+
 // Reports whether byte is decimal sequence.
 fn IsDecimal(b: byte): bool { ret '0' <= b && b <= '9' }
 
@@ -469,19 +479,19 @@ fn IsHex(b: byte): bool {
 
 // Reports given token id is allow for
 // assignment left-expression or not.
-fn IsAssign(id: TokenId): bool {
-	ret (id == TokenId.Ident ||
-		id == TokenId.Cpp ||
-		id == TokenId.Let ||
-		id == TokenId.Mut ||
-		id == TokenId.Self ||
-		id == TokenId.LParent ||
-		id == TokenId.Star ||
-		id == TokenId.Amper)
+fn IsAssign(id: Id): bool {
+	ret (id == Id.Ident ||
+		id == Id.Cpp ||
+		id == Id.Let ||
+		id == Id.Mut ||
+		id == Id.Self ||
+		id == Id.LParent ||
+		id == Id.Star ||
+		id == Id.Amper)
 }
 
 // Reports whether operator kind is postfix operator.
-fn IsPostfixOp(id: TokenId): bool {
+fn IsPostfixOp(id: Id): bool {
 	for _, op in PostfixOps {
 		if id == op {
 			ret true
@@ -491,7 +501,7 @@ fn IsPostfixOp(id: TokenId): bool {
 }
 
 // Reports whether operator kind is assignment operator.
-fn IsAssignOp(id: TokenId): bool {
+fn IsAssignOp(id: Id): bool {
 	if IsPostfixOp(id) {
 		ret true
 	}

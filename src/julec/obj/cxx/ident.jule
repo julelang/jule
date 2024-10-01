@@ -2,20 +2,20 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use env
-use obj
-use std::unsafe
-use conv for std::conv
-use build for std::jule::build
-use lex for std::jule::lex
-use sema for std::jule::sema
-use utf8 for std::unicode::utf8
-use strings for std::strings
+use "env"
+use "obj"
+use "std/conv"
+use "std/jule/build"
+use "std/jule/sema"
+use "std/jule/token"
+use "std/strings"
+use "std/unicode/utf8"
+use "std/unsafe"
 
 // Identifier of initialize function caller function.
 const initCallerIdent = "__jule_call_initializers"
 
-struct identCoder {}
+struct identCoder{}
 
 impl identCoder {
 	const Self = "_self_"
@@ -23,7 +23,7 @@ impl identCoder {
 	// Write identifiers to buf. If identifier contains unicode runes,
 	// handle as ASCII characters. Some backend compilers are not supports
 	// unicode identifiers and causes compile errors.
-	static fn writeIdentTo(mut &buf: strings::StrBuilder, &ident: str) {
+	static fn writeIdentTo(mut &buf: strings::Builder, &ident: str) {
 		for _, b in ident {
 			if b >= utf8::RuneSelf {
 				// ident contains unicode runes.
@@ -51,7 +51,7 @@ impl identCoder {
 	// Parameters:
 	//   - ident: Identifier.
 	//   - addr:  Pointer address of package file handler.
-	static fn toOut(mut &buf: strings::StrBuilder, ident: str, addr: uintptr) {
+	static fn toOut(mut &buf: strings::Builder, ident: str, addr: uintptr) {
 		buf.WriteByte('_')
 		if addr != 0 {
 			buf.WriteStr(conv::FmtUint(u64(addr), 0xF))
@@ -66,7 +66,7 @@ impl identCoder {
 	//   - row:   Row of definition.
 	//   - col:   Column of definition.
 	//   - ident: Identifier of definition.
-	static fn toLocal(mut &buf: strings::StrBuilder, row: int, col: int, &ident: str) {
+	static fn toLocal(mut &buf: strings::Builder, row: int, col: int, &ident: str) {
 		buf.WriteByte('_')
 		buf.WriteStr(conv::Itoa(row))
 		buf.WriteStr(conv::Itoa(col))
@@ -74,7 +74,7 @@ impl identCoder {
 		identCoder.writeIdentTo(buf, ident)
 	}
 
-	static fn func(mut &buf: strings::StrBuilder, mut &f: &sema::Fn) {
+	static fn func(mut &buf: strings::Builder, mut &f: &sema::Fn) {
 		match {
 		| f.Binded:
 			buf.WriteStr(f.Ident)
@@ -95,7 +95,7 @@ impl identCoder {
 		identCoder.toOut(buf, f.Ident, uintptr(f))
 	}
 
-	static fn funcIns(mut &buf: strings::StrBuilder, mut &f: &sema::FnIns) {
+	static fn funcIns(mut &buf: strings::Builder, mut &f: &sema::FnIns) {
 		if f.IsBuiltin() {
 			// Do not use [identCoder.writeIdentTo] for this.
 			// Built-in functions are always ASCII.
@@ -110,12 +110,12 @@ impl identCoder {
 		identCoder.toOut(buf, f.Decl.Ident, uintptr(f))
 	}
 
-	static fn traitDecl(mut &buf: strings::StrBuilder, t: &sema::Trait) {
+	static fn traitDecl(mut &buf: strings::Builder, t: &sema::Trait) {
 		identCoder.toOut(buf, t.Ident, uintptr(t))
 	}
 
-	static fn param(mut &buf: strings::StrBuilder, &p: &sema::Param) {
-		if lex::IsAnonIdent(p.Ident) || lex::IsIgnoreIdent(p.Ident) {
+	static fn param(mut &buf: strings::Builder, &p: &sema::Param) {
+		if token::IsAnonIdent(p.Ident) || token::IsIgnoreIdent(p.Ident) {
 			ret
 		}
 		if p.IsSelf() {
@@ -129,7 +129,7 @@ impl identCoder {
 		identCoder.toLocal(buf, p.Token.Row, p.Token.Column, p.Ident)
 	}
 
-	static fn structure(mut &buf: strings::StrBuilder, &s: &sema::Struct) {
+	static fn structure(mut &buf: strings::Builder, &s: &sema::Struct) {
 		if s.Binded {
 			if !obj::HasDirective(s.Directives, build::Directive.Typedef) {
 				buf.WriteStr("struct ")
@@ -140,7 +140,7 @@ impl identCoder {
 		identCoder.toOut(buf, s.Ident, uintptr(s))
 	}
 
-	static fn structureIns(mut &buf: strings::StrBuilder, &s: &sema::StructIns) {
+	static fn structureIns(mut &buf: strings::Builder, &s: &sema::StructIns) {
 		if s.Decl.Binded || len(s.Generics) == 0 {
 			identCoder.structure(buf, s.Decl)
 			ret
@@ -148,7 +148,7 @@ impl identCoder {
 		identCoder.toOut(buf, s.Decl.Ident, uintptr(s))
 	}
 
-	static fn field(mut &buf: strings::StrBuilder, &f: &sema::Field) {
+	static fn field(mut &buf: strings::Builder, &f: &sema::Field) {
 		if f.Owner.Binded {
 			buf.WriteStr(f.Ident)
 			ret
@@ -158,13 +158,13 @@ impl identCoder {
 	}
 
 	// Returns output identifier of variable.
-	static fn var(mut &buf: strings::StrBuilder, mut v: &sema::Var) {
+	static fn var(mut &buf: strings::Builder, mut v: &sema::Var) {
 		match {
 		| v.Binded:
 			buf.WriteStr(v.Ident)
-		| v.Ident == lex::TokenKind.Error:
+		| v.Ident == token::Kind.Error:
 			buf.WriteStr("except.error")
-		| v.Ident == lex::TokenKind.Self:
+		| v.Ident == token::Kind.Self:
 			buf.WriteStr(identCoder.Self)
 		| v.RetOrder == -1:
 			// The single return variable is just this one.
@@ -185,32 +185,32 @@ impl identCoder {
 		}
 	}
 
-	static fn iterBegin(mut &buf: strings::StrBuilder, it: uintptr) {
+	static fn iterBegin(mut &buf: strings::Builder, it: uintptr) {
 		buf.WriteStr("_iter_begin_")
 		buf.WriteStr(conv::FmtUint(u64(it), 0xF))
 	}
 
-	static fn iterEnd(mut &buf: strings::StrBuilder, it: uintptr) {
+	static fn iterEnd(mut &buf: strings::Builder, it: uintptr) {
 		buf.WriteStr("_iter_end_")
 		buf.WriteStr(conv::FmtUint(u64(it), 0xF))
 	}
 
-	static fn iterNext(mut &buf: strings::StrBuilder, it: uintptr) {
+	static fn iterNext(mut &buf: strings::Builder, it: uintptr) {
 		buf.WriteStr("_iter_next_")
 		buf.WriteStr(conv::FmtUint(u64(it), 0xF))
 	}
 
-	static fn label(mut &buf: strings::StrBuilder, u: uintptr) {
+	static fn label(mut &buf: strings::Builder, u: uintptr) {
 		buf.WriteStr("_julec_label_")
 		buf.WriteStr(conv::FmtUint(u64(u), 0xF))
 	}
 
-	static fn matchEnd(mut &buf: strings::StrBuilder, m: uintptr) {
+	static fn matchEnd(mut &buf: strings::Builder, m: uintptr) {
 		buf.WriteStr("_match_end_")
 		buf.WriteStr(conv::FmtUint(u64(m), 0xF))
 	}
 
-	static fn caseBegin(mut &buf: strings::StrBuilder, c: uintptr) {
+	static fn caseBegin(mut &buf: strings::Builder, c: uintptr) {
 		buf.WriteStr("_case_begin_")
 		buf.WriteStr(conv::FmtUint(u64(c), 0xF))
 	}

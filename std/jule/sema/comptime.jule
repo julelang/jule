@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use ast for std::jule::ast
-use build for std::jule::build
-use lex for std::jule::lex
-use constant for std::jule::constant
-use types for std::jule::types
+use "std/jule/ast"
+use "std/jule/build"
+use "std/jule/constant"
+use "std/jule/token"
+use "std/jule/types"
 
 // All comptime-structure methods starts with underscore (_).
 
@@ -97,7 +97,7 @@ impl comptimeRangeKind for comptimeStructFields {
 			keyA.Value = &Value{
 				Data: new(Data),
 			}
-			keyA.Kind = findBuiltinTypeAlias(PrimKind.Int).Kind
+			keyA.Kind = findBuiltinTypeAlias(types::Kind.Int).Kind
 		}
 		if keyB != nil {
 			keyB.Constant = true
@@ -210,7 +210,7 @@ impl comptimeRangeKind for comptimeStatics {
 			keyA.Value = &Value{
 				Data: new(Data),
 			}
-			keyA.Kind = findBuiltinTypeAlias(PrimKind.Int).Kind
+			keyA.Kind = findBuiltinTypeAlias(types::Kind.Int).Kind
 		}
 		if keyB != nil {
 			keyB.Constant = true
@@ -308,7 +308,7 @@ impl comptimeRangeKind for comptimeEnumFields {
 			keyA.Value = &Value{
 				Data: new(Data),
 			}
-			keyA.Kind = findBuiltinTypeAlias(PrimKind.Int).Kind
+			keyA.Kind = findBuiltinTypeAlias(types::Kind.Int).Kind
 		}
 		if keyB != nil {
 			keyB.Constant = true
@@ -441,7 +441,7 @@ impl comptimeRangeKind for comptimeParams {
 			keyA.Value = &Value{
 				Data: new(Data),
 			}
-			keyA.Kind = findBuiltinTypeAlias(PrimKind.Int).Kind
+			keyA.Kind = findBuiltinTypeAlias(types::Kind.Int).Kind
 		}
 		if keyB != nil {
 			keyB.Constant = true
@@ -501,7 +501,7 @@ impl comptimeRangeKind for comptimeTypeInfos {
 			keyA.Value = &Value{
 				Data: new(Data),
 			}
-			keyA.Kind = findBuiltinTypeAlias(PrimKind.Int).Kind
+			keyA.Kind = findBuiltinTypeAlias(types::Kind.Int).Kind
 		}
 		if keyB != nil {
 			keyB.Constant = true
@@ -675,10 +675,10 @@ impl comptimeTypeInfo {
 			| prim.IsUintptr():
 				item = enm.FindItem("Uintptr")
 			|:
-				panic("Kind(): unimplemented type for std::comptime: " + self.base.Str())
+				panic("sema: Kind(): unimplemented type for std::comptime: " + self.base.Str())
 			}
 		|:
-			panic("Kind(): unimplemented type for std::comptime: " + self.base.Str())
+			panic("sema: Kind(): unimplemented type for std::comptime: " + self.base.Str())
 		}
 		ret evalEnumStatic(e.s, enm, item, fc.Token, e.getOwnerRefers())
 	}
@@ -693,7 +693,7 @@ impl comptimeTypeInfo {
 			e.pushErr(fc.Token, build::LogMsg.InvalidTypeForFn, self.base.Str(), "Bits")
 			ret nil
 		}
-		n := types::BitsizeOf(prim.Kind)
+		n := types::BitSizeOf(prim.Kind)
 		if n == -1 {
 			e.pushErr(fc.Token, build::LogMsg.InvalidTypeForFn, self.base.Str(), "Bits")
 			ret nil
@@ -1195,7 +1195,7 @@ impl comptimeValue {
 		}
 		prim := d.Kind.Prim()
 		if prim == nil || !prim.IsStr() {
-			e.pushErr(arg.Token, build::LogMsg.IncompatibleTypes, PrimKind.Str, d.Kind.Str())
+			e.pushErr(arg.Token, build::LogMsg.IncompatibleTypes, types::Kind.Str, d.Kind.Str())
 			ret nil
 		}
 		ident := d.Constant.ReadStr()
@@ -1237,7 +1237,7 @@ impl comptimeValue {
 		}
 		prim := d.Kind.Prim()
 		if prim == nil || !prim.IsStr() {
-			e.pushErr(arg.Token, build::LogMsg.IncompatibleTypes, PrimKind.Str, d.Kind.Str())
+			e.pushErr(arg.Token, build::LogMsg.IncompatibleTypes, types::Kind.Str, d.Kind.Str())
 			ret nil
 		}
 		ident := d.Constant.ReadStr()
@@ -1329,7 +1329,7 @@ impl comptimeRangeKind for comptimeFiles {
 			keyA.Value = &Value{
 				Data: new(Data),
 			}
-			keyA.Kind = findBuiltinTypeAlias(PrimKind.Int).Kind
+			keyA.Kind = findBuiltinTypeAlias(types::Kind.Int).Kind
 		}
 		if keyB != nil {
 			keyB.Constant = true
@@ -1468,7 +1468,7 @@ impl comptimeRangeKind for comptimeDecls {
 			keyA.Value = &Value{
 				Data: new(Data),
 			}
-			keyA.Kind = findBuiltinTypeAlias(PrimKind.Int).Kind
+			keyA.Kind = findBuiltinTypeAlias(types::Kind.Int).Kind
 		}
 		if keyB != nil {
 			keyB.Constant = true
@@ -2037,7 +2037,7 @@ fn buildAsComptimeMethodData(mut &f: &FnIns): &Data {
 
 fn findComptimePackage(mut &s: &sema): &ImportInfo {
 	ret s.SelectPackage(fn(pkg: &ImportInfo): bool {
-		ret pkg.LinkPath == "std::comptime"
+		ret pkg.LinkPath == "std/comptime"
 	})
 }
 

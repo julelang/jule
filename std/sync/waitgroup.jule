@@ -2,20 +2,20 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use atomic for std::sync::atomic
+use "std/sync/atomic"
 
 // Do not copy an instance of WaitGroup, use a ref or pointer instead.
 //
 // usage: in main thread:
-// `wg: std::sync::WaitGroup
-// `wg.add(delta)` before starting tasks with `co ...`
-// `wg.wait()` to wait for all tasks to have finished
+// `wg: sync::WaitGroup
+// `wg.Add(delta)` before starting tasks with `co ...`
+// `wg.Eait()` to wait for all tasks to have finished
 //
 // in each parallel job:
 // `wg.done()` when finished
 struct WaitGroup {
-	taskN: atomic::AtomicU32 // current task count - reading/writing should be atomic
-	waitN: atomic::AtomicU32 // current wait count - reading/writing should be atomic
+	taskN: atomic::U32 // current task count - reading/writing should be atomic
+	waitN: atomic::U32 // current wait count - reading/writing should be atomic
 }
 
 impl WaitGroup {
@@ -31,7 +31,7 @@ impl WaitGroup {
 		oldTask := int(self.taskN.Add(u32(delta), atomic::MemoryOrder.Relaxed))
 		nTask := oldTask + delta
 		if nTask < 0 {
-			panic("std:sync: WaitGroup.Add: negative number of tasks")
+			panic("sync: WaitGroup.Add: negative number of tasks")
 		}
 
 		// Number of tasks still greater than zero.
@@ -68,6 +68,7 @@ impl WaitGroup {
 		self.waitN.Add(1, atomic::MemoryOrder.Relaxed)
 
 		// Wait for clearing waiters.
-		for self.waitN.Load(atomic::MemoryOrder.Relaxed) != 0 {}
+		for self.waitN.Load(atomic::MemoryOrder.Relaxed) != 0 {
+		}
 	}
 }

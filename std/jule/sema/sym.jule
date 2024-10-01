@@ -2,12 +2,14 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use fs for std::fs
-use path for std::fs::path
-use ast for std::jule::ast
-use build for std::jule::build
-use lex for std::jule::lex
-use strings for std::strings
+use "std/fs"
+use "std/fs/path"
+use "std/jule/ast"
+use "std/jule/build"
+use "std/jule/token"
+use "std/strings"
+use "std/unicode"
+use "std/unicode/utf8"
 
 // Stack for symbol references.
 // It used by Sema to store necessary references.
@@ -59,7 +61,7 @@ impl ReferenceStack {
 
 // Directive pass.
 struct Pass {
-	Token: &lex::Token
+	Token: &token::Token
 	Text:  str
 }
 
@@ -301,11 +303,11 @@ impl symBuilder {
 		ret root
 	}
 
-	fn pushErr(mut self, &token: &lex::Token, fmt: build::LogMsg, args: ...any) {
+	fn pushErr(mut self, &token: &token::Token, fmt: build::LogMsg, args: ...any) {
 		self.errors = append(self.errors, compilerErr(token, true, fmt, args...))
 	}
 
-	fn pushErrText(mut self, &token: &lex::Token, fmt: build::LogMsg, args: ...any) {
+	fn pushErrText(mut self, &token: &token::Token, fmt: build::LogMsg, args: ...any) {
 		self.errors = append(self.errors, compilerErr(token, false, fmt, args...))
 	}
 
@@ -323,11 +325,11 @@ impl symBuilder {
 
 		// Exist?
 		info := fs::Status.Of(path) else {
-			self.pushErr(decl.Token, build::LogMsg.UseNotFound, decl.LinkPath)
+			self.pushErr(decl.Token, build::LogMsg.UseNotFound, decl.Path.Kind)
 			ret false
 		}
 		if info.IsDir() {
-			self.pushErr(decl.Token, build::LogMsg.UseNotFound, decl.LinkPath)
+			self.pushErr(decl.Token, build::LogMsg.UseNotFound, decl.Path.Kind)
 			ret false
 		}
 
@@ -335,10 +337,10 @@ impl symBuilder {
 	}
 
 	fn buildCppHeaderImport(mut self, mut &decl: &ast::UseDecl): &ImportInfo {
-		mut path := decl.LinkPath
+		mut path := decl.Path.Kind[1:len(decl.Path.Kind)-1] // remove quotes
 
-		if !build::IsStdHeaderPath(decl.LinkPath) {
-			path = path::Join(decl.Token.File.Dir(), decl.LinkPath)
+		if !build::IsStdHeaderPath(path) {
+			path = path::Join(decl.Token.File.Dir(), path)
 			mut ok := self.checkCppUseDeclPath(decl, path)
 			if !ok {
 				ret nil
@@ -347,124 +349,137 @@ impl symBuilder {
 			// Set to absolute path for correct include path.
 			path, ok = path::Abs(path)
 			if !ok {
-				self.pushErr(decl.Token, build::LogMsg.UseNotFound, decl.LinkPath)
+				self.pushErr(decl.Token, build::LogMsg.UseNotFound, decl.Path.Kind)
 			}
 		}
 
 		ret &ImportInfo{
-			Token: decl.Token,
+			Decl: decl,
 			Path: path,
-			LinkPath: decl.LinkPath,
-			Ident: "", // Cpp headers haven't identifiers.
+			LinkPath: decl.Path.Kind,
 			Binded: true,
 			Std: false,
 			Package: nil, // Cpp headers haven't symbol table.
 		}
 	}
 
-	fn buildStdImport(mut self, mut &decl: &ast::UseDecl): &ImportInfo {
-		// No need to check blank identifiers for standart packages.
-		mut path := decl.LinkPath[len("std::"):] // Skip "std::" prefix.
-		path = strings::Replace(path, lex::TokenKind.DblColon, str(path::Separator), -1)
-		path = path::Join(build::PathStdlib, path)
-		path, ok := path::Abs(path)
-		if !ok {
-			self.pushErr(decl.Token, build::LogMsg.UseNotFound, decl.LinkPath)
-			ret nil
-		}
-
-		// Exist?
-		info := fs::Status.Of(path) else {
-			self.pushErr(decl.Token, build::LogMsg.UseNotFound, decl.LinkPath)
-			ret nil
-		}
-		if !info.IsDir() {
-			self.pushErr(decl.Token, build::LogMsg.UseNotFound, decl.LinkPath)
-			ret nil
-		}
-
-		// Select last identifier of namespace chain.
-		i := strings::FindLast(decl.LinkPath, lex::TokenKind.DblColon) + 1
-		ident := decl.LinkPath[i:]
-
-		ret &ImportInfo{
-			ImportAll: decl.Full,
-			Token: decl.Token, // Use decl token for correct implementation. See developer refernece (9).
-			Path: path,
-			LinkPath: decl.LinkPath,
-			Ident: ident,
-			Alias: decl.Alias,
-			Binded: false,
-			Std: true,
-			Package: &Package{
-				Files: nil, // Appends by import algorithm.
-			},
-		}
-	}
-
-	fn buildIdentImport(mut &self, mut &decl: &ast::UseDecl): &ImportInfo {
-		if decl.LinkPath == "_" ||
-			strings::Find(decl.LinkPath, "::_::") != -1 ||
-			strings::HasSuffix(decl.LinkPath, "::_") {
-			self.pushErr(decl.Token, build::LogMsg.BlankIdentInUseDecl)
-			ret nil
-		}
-
+	// Checks and returns absolute path of import filepath.
+	// Designed for non-std package paths.
+	// Returns empty string if error occurs.
+	fn checkAbsPath(mut &self, mut filepath: str, mut &decl: &ast::UseDecl): str {
 		modPath := self.importer.GetModPath()
 		if len(modPath) == 0 {
-			self.pushErr(decl.Token, build::LogMsg.ModuleNotFound)
+			self.pushErr(decl.Path, build::LogMsg.ModuleNotFound)
 			self.pushSuggestion(build::LogMsg.UseModInit)
-			ret nil
+			ret ""
 		}
 
-		mut path := decl.LinkPath
-		path = strings::Replace(path, lex::TokenKind.DblColon, str(path::Separator), -1)
-		path = path::Join(modPath, path)
-
-		path, ok := path::Abs(path)
+		filepath = path::Join(modPath, filepath)
+		filepath, ok := path::Abs(filepath)
 		if !ok {
-			self.pushErr(decl.Token, build::LogMsg.UseNotFound, decl.LinkPath)
-			ret nil
+			self.pushErr(decl.Path, build::LogMsg.UseNotFound, decl.Path.Kind)
+			ret ""
 		}
 
 		// Exist?
-		info := fs::Status.Of(path) else {
-			self.pushErr(decl.Token, build::LogMsg.UseNotFound, decl.LinkPath)
-			ret nil
+		info := fs::Status.Of(filepath) else {
+			self.pushErr(decl.Path, build::LogMsg.UseNotFound, decl.Path.Kind)
+			ret ""
 		}
 		if !info.IsDir() {
-			self.pushErr(decl.Token, build::LogMsg.UseNotFound, decl.LinkPath)
-			ret nil
+			self.pushErr(decl.Path, build::LogMsg.UseNotFound, decl.Path.Kind)
+			ret ""
 		}
 
-		// Select last identifier of namespace chain.
-		i := strings::FindLast(decl.LinkPath, lex::TokenKind.DblColon) + 1
-		ident := decl.LinkPath[i:]
+		ret filepath
+	}
 
-		ret &ImportInfo{
-			ImportAll: decl.Full,
-			Token: decl.Token,
-			Path: path,
-			LinkPath: decl.LinkPath,
-			Ident: ident,
-			Alias: decl.Alias,
-			Binded: false,
-			Std: false,
-			Package: &Package{
-				Files: nil, // Appends by import algorithm.
-			},
+	// Same as the [checkAbsPath] method but designed for std package paths.
+	fn checkStdAbsPath(mut &self, mut filepath: str, mut &decl: &ast::UseDecl): str {
+		filepath = filepath[len("std")+1:] // cut "std" + pathsep prefix
+		filepath = path::Join(build::PathStdlib, filepath)
+		filepath, ok := path::Abs(filepath)
+		if !ok {
+			self.pushErr(decl.Path, build::LogMsg.UseNotFound, decl.Path.Kind)
+			ret ""
 		}
+
+		// Exist?
+		info := fs::Status.Of(filepath) else {
+			self.pushErr(decl.Path, build::LogMsg.UseNotFound, decl.Path.Kind)
+			ret ""
+		}
+		if !info.IsDir() {
+			self.pushErr(decl.Path, build::LogMsg.UseNotFound, decl.Path.Kind)
+			ret ""
+		}
+
+		ret filepath
+	}
+
+	// Checks import path and returns as filepath if no error exist.
+	fn checkImpPath(mut &self, mut &decl: &ast::UseDecl): (std: bool, filepath: str) {
+		path := decl.Path.Kind[1:len(decl.Path.Kind)-1] // remove quotes
+		if strings::HasSuffix(path, build::ImportPathSep) {
+			self.pushErr(decl.Path, build::LogMsg.InvalidImportPath, decl.Path.Kind)
+			ret
+		}
+		parts := strings::Split(path, build::ImportPathSep, -1)
+		if len(parts) == 0 {
+			self.pushErr(decl.Path, build::LogMsg.InvalidImportPath, decl.Path.Kind)
+			ret
+		}
+		std = parts[0] == "std"
+		for _, part in parts {
+			if part == "" || token::IsIgnoreIdent(part) {
+				self.pushErr(decl.Path, build::LogMsg.InvalidImportPath, decl.Path.Kind)
+				ret false, ""
+			}
+			filepath = path::Join(filepath, part)
+		}
+
+		// build absolute path
+		if std {
+			filepath = self.checkStdAbsPath(filepath, decl)
+		} else {
+			filepath = self.checkAbsPath(filepath, decl)
+		}
+		ret
+	}
+
+	// Assigns an alias to import.
+	fn assignAlias(mut &self, mut &imp: &ImportInfo) {
+		mut i := strings::FindLast(imp.LinkPath, build::ImportPathSep)
+		i++ // skip separator and also if -1 it takes full path
+		path := imp.LinkPath[i:]
+		imp.Alias = path
 	}
 
 	fn buildImport(mut &self, mut &decl: &ast::UseDecl): &ImportInfo {
-		match {
-		| decl.Binded:
+		if decl.Binded {
 			ret self.buildCppHeaderImport(decl)
-		| decl.Std:
-			ret self.buildStdImport(decl)
-		|:
-			ret self.buildIdentImport(decl)
 		}
+		std, filepath := self.checkImpPath(decl)
+		if filepath == "" { // error occured
+			ret nil
+		}
+
+		mut imp := &ImportInfo{
+			Decl: decl,
+			Path: filepath,
+			LinkPath: decl.Path.Kind[1:len(decl.Path.Kind)-1],
+			Binded: false,
+			Std: std,
+			Package: &Package{
+				Files: nil, // Appends by import algorithm.
+			},
+		}
+		if decl.Alias != nil {
+			imp.Alias = decl.Alias.Kind
+		} else {
+			self.assignAlias(imp)
+		}
+		ret imp
 	}
 
 	fn findUseDecl(mut self, &pkg: &ImportInfo): &ImportInfo {
@@ -480,30 +495,19 @@ impl symBuilder {
 		if lpkg == nil {
 			ret true
 		}
-		self.pushErr(pkg.Token, build::LogMsg.DuplicateUseDecl, pkg.LinkPath)
+		self.pushErr(pkg.Decl.Token, build::LogMsg.DuplicateUseDecl, pkg.LinkPath)
 		self.pushSuggestion(build::LogMsg.RemoveUseDeclAvoidDuplication)
 		ret false
 	}
 
-	fn implImportSelections(mut self, mut &imp: &ImportInfo, mut &decl: &ast::UseDecl) {
-		imp.Selected = decl.Selected
-		for _, item in imp.Selected {
-			for _, citem in imp.Selected {
-				if item == citem {
-					break
-				} else if item.Kind == citem.Kind {
-					self.pushErr(item, build::LogMsg.DuplicatedUseSelection, item.Kind)
-					self.pushSuggestion(build::LogMsg.RemoveUseSelectionAvoidDupliation)
-					break
-				}
-			}
-		}
-	}
-
 	fn getAsLinkPath(mut &self, mut path: str): str {
+		mut sb := strings::Builder.New(len(path))
 		if strings::HasPrefix(path, build::PathStdlib) {
-			path = path[len(build::PathStdlib):]
-			ret "std" + strings::Replace(path, str(path::Separator), lex::TokenKind.DblColon, -1)
+			path = path[len(build::PathStdlib):] // cut absolute path prefix
+			sb.WriteStr(`"std`)
+			sb.WriteStr(strings::Replace(path, str(path::Separator), build::ImportPathSep, -1))
+			sb.WriteByte('"')
+			ret sb.Str()
 		}
 
 		root, _ := path::Abs(self.importer.GetModPath())
@@ -511,10 +515,13 @@ impl symBuilder {
 		if path[0] == path::Separator {
 			path = path[1:]
 		}
-		ret strings::Replace(path, str(path::Separator), lex::TokenKind.DblColon, -1)
+		sb.WriteByte('"')
+		sb.WriteStr(strings::Replace(path, str(path::Separator), build::ImportPathSep, -1))
+		sb.WriteByte('"')
+		ret sb.Str()
 	}
 
-	fn pushCycleError(mut &self, &sb: &symBuilder, path: str, mut &message: strings::StrBuilder) {
+	fn pushCycleError(mut &self, &sb: &symBuilder, path: str, mut &message: strings::Builder) {
 		const Padding = 7
 		refersTo := build::Logf(
 			build::LogMsg.RefersTo,
@@ -527,8 +534,8 @@ impl symBuilder {
 		message.WriteStr(m)
 	}
 
-	fn pushCrossCycleError(mut &self, &target: &symBuilder, &imp: &ImportInfo, &errorToken: &lex::Token) {
-		mut message := strings::StrBuilder.New(1 << 5)
+	fn pushCrossCycleError(mut &self, &target: &symBuilder, &imp: &ImportInfo, &errorToken: &token::Token) {
+		mut message := strings::Builder.New(1 << 5)
 
 		self.pushCycleError(self, imp.Path, message)
 
@@ -582,8 +589,32 @@ impl symBuilder {
 	//  - mod: module that imports relevant package.
 	//  - path: path of package that importing.
 	fn checkPackageAccessibility(mut self, &decl: &ast::UseDecl, &mod: str, &path: str) {
-		if self.importer.GetModPath() != mod && strings::Contains(path, "internal") {
+		if self.importer.GetModPath() == mod {
+			ret
+		}
+		const InternalName = "internal"
+		i := strings::Find(path, InternalName)
+		if i == -1 {
+			ret
+		}
+		if i == 0 {
+			// "internal" or "internal/" ?
+			if len(path)-len(InternalName) == 0 ||
+				strings::HasPrefix(path, InternalName+build::ImportPathSep) {
+				self.pushErr(decl.Token, build::LogMsg.UseDeclForInternal)
+			}
+			ret
+		}
+		// "/internal" ?
+		if path[i-1:] == build::ImportPathSep+InternalName {
 			self.pushErr(decl.Token, build::LogMsg.UseDeclForInternal)
+			ret
+		}
+		// "/internal/" ?
+		n := i + len(InternalName) + 1
+		if n < len(path) && path[i-1:n] == build::ImportPathSep+InternalName+build::ImportPathSep {
+			self.pushErr(decl.Token, build::LogMsg.UseDeclForInternal)
+			ret
 		}
 	}
 
@@ -630,7 +661,6 @@ impl symBuilder {
 				imp.Package.Files = append(imp.Package.Files, table)
 			}
 		}
-		self.implImportSelections(imp, decl)
 		ret true
 	}
 
@@ -709,7 +739,7 @@ impl symBuilder {
 		}
 
 		arg := d.Args[0]
-		if arg.Id != lex::TokenId.Lit {
+		if arg.Id != token::Id.Lit {
 			self.pushErr(arg, build::LogMsg.InvalidSyntax)
 			ret
 		}
@@ -758,5 +788,5 @@ impl symBuilder {
 // Reports whether imp is implicitly imported.
 // See developer reference (9).
 fn isImplicitImport(imp: &ImportInfo): bool {
-	ret imp.Token == nil
+	ret imp.Decl.Token == nil
 }

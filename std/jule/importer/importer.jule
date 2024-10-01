@@ -2,16 +2,16 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use fs for std::fs
-use path for std::fs::path
-use ast for std::jule::ast
-use build for std::jule::build
-use mod for std::jule::internal::mod
-use lex for std::jule::lex
-use parser for std::jule::parser
-use sema for std::jule::sema
-use process for std::process
-use strings for std::strings
+use "std/fs"
+use "std/fs/path"
+use "std/jule/ast"
+use "std/jule/build"
+use "std/jule/internal/mod"
+use "std/jule/parser"
+use "std/jule/sema"
+use "std/jule/token"
+use "std/process"
+use "std/strings"
 
 // Read buffer by file path.
 fn readBuff(path: str): []byte {
@@ -33,17 +33,17 @@ fn flatCompilerErr(text: str): build::Log {
 }
 
 // Default importer for the reference Jule compiler.
-struct JuleImporter {
+struct Importer {
 	mods: []str
 	mod:  str
 	pkgs: []&sema::ImportInfo
 	vars: []str
 }
 
-impl JuleImporter {
+impl Importer {
 	// Returns new importer instance by compile information.
-	static fn New(info: CompileInfo): &JuleImporter {
-		mut imp := &JuleImporter{
+	static fn New(info: CompileInfo): &Importer {
+		mut imp := &Importer{
 			mods: [build::PathStdlib],
 		}
 		initVars(imp.vars, info)
@@ -58,7 +58,7 @@ impl JuleImporter {
 	}
 }
 
-impl sema::Importer for JuleImporter {
+impl sema::Importer for Importer {
 	fn SetModPath(mut self, path: str) {
 		self.mod = path
 	}
@@ -105,9 +105,9 @@ impl sema::Importer for JuleImporter {
 			}
 
 			_path := path::Join(path, dirent.Name)
-			mut file := lex::NewFileSet(_path)
+			mut file := token::Fileset.New(_path)
 			file.Fill(readBuff(file.Path))
-			mut errors := lex::Lex(file, lex::LexMode.Standard)
+			mut errors := token::Lex(file, token::Mode.Standard)
 			if len(errors) > 0 {
 				ret nil, errors
 			}
@@ -163,7 +163,7 @@ impl sema::Importer for JuleImporter {
 	}
 }
 
-impl JuleImporter {
+impl Importer {
 	// Reports whether file passes build directives.
 	fn isPassBuildDirectives(mut self, mut &file: &ast::AST): (bool, []build::Log) {
 		for (_, mut td) in file.TopDirectives {

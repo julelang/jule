@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use path for std::fs::path
-use ast for std::jule::ast
-use build for std::jule::build
-use lex for std::jule::lex
-use strings for std::strings
+use "std/fs/path"
+use "std/jule/ast"
+use "std/jule/build"
+use "std/jule/token"
+use "std/strings"
 
 // Importer.
 // Used by semantic analyzer for import use declarations.
@@ -148,23 +148,20 @@ fn defByIdentPackage(mut &files: []&SymTab, &ident: str, binded: bool): any {
 // Import information.
 // Represents imported package by use declaration.
 struct ImportInfo {
-	// Use declaration token.
-	Token: &lex::Token
+	// Declaration.
+	Decl: &ast::UseDecl
 
 	// Absolute path.
 	Path: str
 
 	// Use declaration path string.
+	// Quotes are not included.
 	LinkPath: str
-
-	// Package identifier (aka package name).
-	// Empty if package is cpp header.
-	Ident: str
 
 	// Package alias identifier.
 	Alias: str
 
-	// True if imported with Importer.get_import function.
+	// True if imported with Importer.GetImport function.
 	Duplicate: bool
 
 	// Is binded use declaration.
@@ -172,12 +169,6 @@ struct ImportInfo {
 
 	// Is standard library package.
 	Std: bool
-
-	// Is imported all defines implicitly.
-	ImportAll: bool
-
-	// Identifiers of selected definition.
-	Selected: []&lex::Token
 
 	// Nil if package is cpp header.
 	Package: &Package
@@ -196,7 +187,7 @@ impl Lookup for ImportInfo {
 	// Lookups by import way such as identifier selection.
 	// Just lookups non-binded defines.
 	fn FindVar(mut self, ident: str, _: bool): &Var {
-		if !self.isLookupable(ident) {
+		if !self.isLookupable() {
 			ret nil
 		}
 		ret findVarInPackage(self.Package.Files, ident, false)
@@ -208,7 +199,7 @@ impl Lookup for ImportInfo {
 	// Lookups by import way such as identifier selection.
 	// Just lookups non-binded defines.
 	fn FindTypeAlias(mut self, ident: str, _: bool): &TypeAlias {
-		if !self.isLookupable(ident) {
+		if !self.isLookupable() {
 			ret nil
 		}
 		ret findTypeAliasInPackage(self.Package.Files, ident, false)
@@ -220,7 +211,7 @@ impl Lookup for ImportInfo {
 	// Lookups by import way such as identifier selection.
 	// Just lookups non-binded defines.
 	fn FindStruct(mut self, ident: str, _: bool): &Struct {
-		if !self.isLookupable(ident) {
+		if !self.isLookupable() {
 			ret nil
 		}
 		ret findStructInPackage(self.Package.Files, ident, false)
@@ -232,7 +223,7 @@ impl Lookup for ImportInfo {
 	// Lookups by import way such as identifier selection.
 	// Just lookups non-binded defines.
 	fn FindFn(mut self, ident: str, _: bool): &Fn {
-		if !self.isLookupable(ident) {
+		if !self.isLookupable() {
 			ret nil
 		}
 		ret findFnInPackage(self.Package.Files, ident, false)
@@ -243,7 +234,7 @@ impl Lookup for ImportInfo {
 	//
 	// Lookups by import way such as identifier selection.
 	fn FindTrait(mut self, ident: str): &Trait {
-		if !self.isLookupable(ident) {
+		if !self.isLookupable() {
 			ret nil
 		}
 		ret findTraitInPackage(self.Package.Files, ident)
@@ -254,7 +245,7 @@ impl Lookup for ImportInfo {
 	//
 	// Lookups by import way such as identifier selection.
 	fn FindEnum(mut self, ident: str): &Enum {
-		if !self.isLookupable(ident) {
+		if !self.isLookupable() {
 			ret nil
 		}
 		ret findEnumInPackage(self.Package.Files, ident)
@@ -265,7 +256,7 @@ impl Lookup for ImportInfo {
 	//
 	// Lookups by import way such as identifier selection.
 	fn FindTypeEnum(mut self, ident: str): &TypeEnum {
-		if !self.isLookupable(ident) {
+		if !self.isLookupable() {
 			ret nil
 		}
 		ret findTypeEnumInPackage(self.Package.Files, ident)
@@ -273,38 +264,11 @@ impl Lookup for ImportInfo {
 }
 
 impl ImportInfo {
-	fn isLookupable(self, &ident: str): bool {
+	fn isLookupable(self): bool {
 		if self.Binded {
 			ret false
 		}
-
-		if !self.ImportAll {
-			if len(self.Alias) != 0 || self.existIdent(lex::TokenKind.Self) {
-				ret true
-			}
-
-			if len(self.Selected) > 0 {
-				if !self.existIdent(ident) {
-					ret false
-				}
-			}
-		}
 		ret true
-	}
-
-	// Reports whether identifier is selected.
-	fn existIdent(self, ident: str): bool {
-		for _, sident in self.Selected {
-			if sident.Kind == ident {
-				ret true
-			}
-		}
-
-		ret false
-	}
-
-	fn isAccessibleViaSelection(self): bool {
-		ret self.ImportAll || len(self.Selected) == 0 || self.existIdent(lex::TokenKind.Self)
 	}
 }
 

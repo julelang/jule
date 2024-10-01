@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use integ for std::jule::integrated
-use fastbytes for std::internal::fastbytes
-use mem for std::mem
-use sys for std::sys
-use strings for std::internal::strings
-use utf16 for std::unicode::utf16
+use "std/internal/fastbytes"
+use "std/internal/strings"
+use integ "std/jule/integrated"
+use "std/mem"
+use "std/sys"
+use "std/unicode/utf16"
 
 cpp type HANDLE: *unsafe
 
@@ -40,7 +40,7 @@ struct cmdAttrs {
 impl Cmd {
 	fn spawn(self)! {
 		if self.attrs.hProcess != nil {
-			panic("command is already spawned")
+			panic("process: command is already spawned")
 		}
 		mut startupInfo := cpp.STARTUPINFOW{}
 		mut processInfo := cpp.PROCESS_INFORMATION{}
@@ -71,7 +71,7 @@ impl Cmd {
 
 	fn kill(self)! {
 		if self.attrs.hProcess == nil {
-			panic("command is not spawned")
+			panic("process: command is not spawned")
 		}
 		if unsafe { cpp.TerminateProcess(self.attrs.hProcess, 0) } {
 			self.attrs.hProcess = nil
@@ -83,7 +83,7 @@ impl Cmd {
 
 	fn wait(self)!: int {
 		if self.attrs.hProcess == nil {
-			panic("command is not spawned")
+			panic("process: command is not spawned")
 		}
 		unsafe { cpp.WaitForSingleObject(self.attrs.hProcess, cpp.INFINITE) }
 		mut exitCode := integ::LongLong(-1)
@@ -99,7 +99,7 @@ impl Cmd {
 }
 
 // Escapes the string s, as per escapeArg, appends the result to s.
-fn appendEscapeArg(mut &s: strings::StrBuilder, arg: str) {
+fn appendEscapeArg(mut &s: strings::Builder, arg: str) {
 	if len(arg) == 0 {
 		s.WriteStr(`""`)
 		ret
@@ -161,7 +161,7 @@ fn appendEscapeArg(mut &s: strings::StrBuilder, arg: str) {
 // Builds a command line out of args by escaping "special"
 // characters and joining the arguments with spaces.
 fn makeCmdLine(args: []str): str {
-	mut s := strings::StrBuilder.New(1 << 4)
+	mut s := strings::Builder.New(1 << 4)
 	for _, arg in args {
 		if s.Len() > 0 {
 			s.WriteByte(' ')

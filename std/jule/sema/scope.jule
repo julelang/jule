@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use ast for std::jule::ast
-use build for std::jule::build
-use constant for std::jule::constant
-use lex for std::jule::lex
-use types for std::jule::types
+use "std/jule/ast"
+use "std/jule/build"
+use "std/jule/constant"
+use "std/jule/token"
+use "std/jule/types"
 
 // Statement type.
 enum Stmt: type {
@@ -94,13 +94,13 @@ fn getExprModels(mut &m: ast::ExprData): []ast::ExprData {
 	}
 }
 
-fn checkMut(mut &s: &sema, &left: &Data, mut right: &Data, op: &lex::Token): (ok: bool) {
+fn checkMut(mut &s: &sema, &left: &Data, mut right: &Data, op: &token::Token): (ok: bool) {
 	match {
 	| !left.Mutable:
 		s.pushErr(op, build::LogMsg.AssignToNonMut)
 		ret false
 	| right != nil && !right.Mutable && right.Kind.Mutable():
-		if op.Id != lex::TokenId.Eq && right.Kind.Struct() != nil {
+		if op.Id != token::Id.Eq && right.Kind.Struct() != nil {
 			// If operator is not assignment, and kind is structure, allow.
 			// Operator overloading uses immutable copy of right operand.
 			// It's safe.
@@ -113,7 +113,7 @@ fn checkMut(mut &s: &sema, &left: &Data, mut right: &Data, op: &lex::Token): (ok
 	}
 }
 
-fn checkAssign(mut &s: &sema, mut &left: &Data, mut right: &Data, op: &lex::Token): (ok: bool) {
+fn checkAssign(mut &s: &sema, mut &left: &Data, mut right: &Data, op: &token::Token): (ok: bool) {
 	f := left.Kind.Fn()
 	if f != nil && f.Decl != nil && f.Decl.Global {
 		s.pushErr(op, build::LogMsg.AssignTypeNotSupportValue)
@@ -246,7 +246,7 @@ struct Label {
 // Goto statement.
 struct GotoSt {
 	Ident: str
-	Token: &lex::Token
+	Token: &token::Token
 	Label: &Label
 	Scope: &Scope // Owner scope.
 	Index: int    // Index of statement.
@@ -262,7 +262,7 @@ struct Postfix {
 struct Assign {
 	Left:  &OperandExprModel
 	Right: &OperandExprModel
-	Op:    &lex::Token
+	Op:    &token::Token
 }
 
 // Multi-declarative assignment.
@@ -314,14 +314,14 @@ struct RetSt {
 }
 
 struct scopeLabel {
-	token: &lex::Token
+	token: &token::Token
 	node:  &Label
 	used:  bool
 }
 
 // Scope checker.
 struct scopeChecker {
-	calledFrom: &lex::Token
+	calledFrom: &token::Token
 	s:          &sema
 	owner:      &FnIns // See developer reference (1).
 	parent:     &scopeChecker
@@ -609,7 +609,7 @@ impl scopeChecker {
 			if v.Scope == nil { // Ignore globals.
 				ret false
 			}
-			ret v.Scope == self.scope || !self.s.isFlag(SemaFlag.Shadowing)
+			ret v.Scope == self.scope || !self.s.isFlag(Flag.Shadowing)
 		}
 
 		ta := self.FindTypeAlias(ident, false)
@@ -617,7 +617,7 @@ impl scopeChecker {
 			if ta.Scope == nil { // Ignore globals.
 				ret false
 			}
-			ret ta.Scope == self.tree || !self.s.isFlag(SemaFlag.Shadowing)
+			ret ta.Scope == self.tree || !self.s.isFlag(Flag.Shadowing)
 		}
 
 		ret false
@@ -704,7 +704,7 @@ impl scopeChecker {
 		self.scope.Stmts = append(self.scope.Stmts, s)
 	}
 
-	fn processErrorCall(mut &self, mut &m: &BuiltinErrorCallExprModel, err: &lex::Token) {
+	fn processErrorCall(mut &self, mut &m: &BuiltinErrorCallExprModel, err: &token::Token) {
 		if self.isDeferred() {
 			self.s.pushErr(err, build::LogMsg.ErrorInDeferred)
 		}
@@ -863,13 +863,13 @@ impl scopeChecker {
 
 	fn checkComptimeRangeIter(mut &self, mut &it: &ast::Iter, mut &kind: &RangeIter, mut &d: &Data) {
 		if kind.KeyA != nil {
-			if !self.s.isFlag(SemaFlag.Shadowing) && self.isDuplicatedIdent(0, kind.KeyA.Ident) {
+			if !self.s.isFlag(Flag.Shadowing) && self.isDuplicatedIdent(0, kind.KeyA.Ident) {
 				self.s.pushErr(kind.KeyA.Token, build::LogMsg.DuplicatedIdent, kind.KeyA.Ident)
 				self.s.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
 			}
 		}
 		if kind.KeyB != nil {
-			if !self.s.isFlag(SemaFlag.Shadowing) && self.isDuplicatedIdent(0, kind.KeyB.Ident) {
+			if !self.s.isFlag(Flag.Shadowing) && self.isDuplicatedIdent(0, kind.KeyB.Ident) {
 				self.s.pushErr(kind.KeyB.Token, build::LogMsg.DuplicatedIdent, kind.KeyB.Ident)
 				self.s.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
 			}
@@ -957,7 +957,7 @@ impl scopeChecker {
 		mut scope := self.getChild()
 
 		if kind.KeyA != nil {
-			if !self.s.isFlag(SemaFlag.Shadowing) && self.isDuplicatedIdent(0, kind.KeyA.Ident) {
+			if !self.s.isFlag(Flag.Shadowing) && self.isDuplicatedIdent(0, kind.KeyA.Ident) {
 				self.s.pushErr(kind.KeyA.Token, build::LogMsg.DuplicatedIdent, kind.KeyA.Ident)
 				self.s.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
 			}
@@ -966,7 +966,7 @@ impl scopeChecker {
 		}
 
 		if kind.KeyB != nil {
-			if !self.s.isFlag(SemaFlag.Shadowing) && self.isDuplicatedIdent(0, kind.KeyB.Ident) {
+			if !self.s.isFlag(Flag.Shadowing) && self.isDuplicatedIdent(0, kind.KeyB.Ident) {
 				self.s.pushErr(kind.KeyB.Token, build::LogMsg.DuplicatedIdent, kind.KeyB.Ident)
 				self.s.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
 			}
@@ -1176,7 +1176,7 @@ impl scopeChecker {
 	}
 
 	fn isNewAssignIdent(mut self, ident: str): bool {
-		if lex::IsIgnoreIdent(ident) || ident == "" {
+		if token::IsIgnoreIdent(ident) || ident == "" {
 			ret false
 		}
 		ret self.table.defByIdent(ident, false) == nil
@@ -1207,25 +1207,25 @@ impl scopeChecker {
 		// Should follow this method.
 		let mut overload: &FnIns = nil
 		match a.Setter.Id {
-		| lex::TokenId.PlusEq:
+		| token::Id.PlusEq:
 			overload = s.Operators.AddAssign
-		| lex::TokenId.MinusEq:
+		| token::Id.MinusEq:
 			overload = s.Operators.SubAssign
-		| lex::TokenId.SolidusEq:
+		| token::Id.SolidusEq:
 			overload = s.Operators.DivAssign
-		| lex::TokenId.StarEq:
+		| token::Id.StarEq:
 			overload = s.Operators.MulAssign
-		| lex::TokenId.PercentEq:
+		| token::Id.PercentEq:
 			overload = s.Operators.ModAssign
-		| lex::TokenId.ShlEq:
+		| token::Id.ShlEq:
 			overload = s.Operators.ShlAssign
-		| lex::TokenId.ShrEq:
+		| token::Id.ShrEq:
 			overload = s.Operators.ShrAssign
-		| lex::TokenId.VlineEq:
+		| token::Id.VlineEq:
 			overload = s.Operators.BitOrAssign
-		| lex::TokenId.AmperEq:
+		| token::Id.AmperEq:
 			overload = s.Operators.BitAndAssign
-		| lex::TokenId.CaretEq:
+		| token::Id.CaretEq:
 			overload = s.Operators.BitXorAssign
 		|:
 			self.s.pushErr(a.Setter, build::LogMsg.OperatorNotForJuleType, a.Setter.Kind, s.Str())
@@ -1244,7 +1244,7 @@ impl scopeChecker {
 	fn checkSingleAssign(mut &self, mut &a: &ast::AssignSt) {
 		let mut l: &Data = nil
 
-		if !lex::IsIgnoreIdent(a.Left[0].Ident) {
+		if !token::IsIgnoreIdent(a.Left[0].Ident) {
 			mut expr := a.Left[0].Expr
 			l = self.s.eval(self).evalExpr(expr)
 			if l == nil {
@@ -1270,7 +1270,7 @@ impl scopeChecker {
 			if r.Kind.Void() {
 				self.s.pushErr(a.Right.Token, build::LogMsg.InvalidExpr)
 			}
-			if a.Setter.Id != lex::TokenId.Eq {
+			if a.Setter.Id != token::Id.Eq {
 				self.s.pushErr(a.Setter, build::LogMsg.InvalidSyntax)
 			}
 			self.scope.Stmts = append(self.scope.Stmts, r)
@@ -1296,7 +1296,7 @@ impl scopeChecker {
 		}
 		self.scope.Stmts = append(self.scope.Stmts, &Assign{Left: lm, Right: rm, Op: a.Setter})
 
-		if a.Setter.Id == lex::TokenId.Eq {
+		if a.Setter.Id == token::Id.Eq {
 			mut checker := assignTypeChecker{
 				s: self.s,
 				dest: l.Kind,
@@ -1325,7 +1325,7 @@ impl scopeChecker {
 
 	fn processEndPartOfMultiAssign(mut &self, mut &st: &MultiAssign, mut &a: &ast::AssignSt,
 		mut &lexpr: &ast::AssignLeft, mut &l: &Data, mut &r: &Data, strict: bool) {
-		if !lexpr.Reference && lex::IsIgnoreIdent(lexpr.Ident) {
+		if !lexpr.Reference && token::IsIgnoreIdent(lexpr.Ident) {
 			if r.Kind.Void() {
 				self.s.pushErr(a.Right.Token, build::LogMsg.InvalidExpr)
 			}
@@ -1351,7 +1351,7 @@ impl scopeChecker {
 				self.stop()
 				ret
 			}
-			if lex::IsIgnoreIdent(lexpr.Ident) {
+			if token::IsIgnoreIdent(lexpr.Ident) {
 				self.s.pushErr(lexpr.Token, build::LogMsg.IgnoreIdent)
 			}
 
@@ -1400,7 +1400,7 @@ impl scopeChecker {
 	}
 
 	fn checkMultiAssign(mut &self, mut &a: &ast::AssignSt) {
-		if a.Setter.Id != lex::TokenId.Eq && a.Setter.Id != lex::TokenId.ColonEq {
+		if a.Setter.Id != token::Id.Eq && a.Setter.Id != token::Id.ColonEq {
 			self.s.pushErr(a.Setter, build::LogMsg.InvalidSyntax)
 			ret
 		}
@@ -1439,7 +1439,7 @@ impl scopeChecker {
 		for i in a.Left {
 			mut lexpr := a.Left[i]
 			let mut l: &Data = nil
-			if !lex::IsIgnoreIdent(lexpr.Ident) {
+			if !token::IsIgnoreIdent(lexpr.Ident) {
 				if !a.Declarative {
 					goto eval
 				}
@@ -1468,7 +1468,7 @@ impl scopeChecker {
 
 	fn checkAssignSt(mut &self, mut a: &ast::AssignSt) {
 		match {
-		| lex::IsPostfixOp(a.Setter.Id):
+		| token::IsPostfixOp(a.Setter.Id):
 			self.checkPostfix(a)
 		| len(a.Left) == 1:
 			self.checkSingleAssign(a)
@@ -1589,7 +1589,7 @@ impl scopeChecker {
 		ret def
 	}
 
-	fn checkComptimePanic(mut &self, mut callToken: &lex::Token, &s: &Scope) {
+	fn checkComptimePanic(mut &self, mut callToken: &token::Token, &s: &Scope) {
 		if len(s.Stmts) != 1 {
 			ret
 		}
@@ -1624,7 +1624,7 @@ impl scopeChecker {
 	fn processConstMatch(mut &self, mut &tm: &Match, mut &m: &ast::MatchCase) {
 		for (i, mut c) in tm.Cases {
 			if c.Scope != nil {
-				let mut token: &lex::Token = nil
+				let mut token: &token::Token = nil
 				if !tm.TypeMatch && len(c.Scope.Stmts) > 0 {
 					token = m.Cases[i].Scope.Stmts[0].Token
 				}
@@ -1638,7 +1638,7 @@ impl scopeChecker {
 			tm.Cases = nil
 			tm.Default = self.checkDefault(tm, m.Default)
 			if tm.Default != nil {
-				let mut token: &lex::Token = nil
+				let mut token: &token::Token = nil
 				if !tm.TypeMatch {
 					token = m.Default.Scope.Stmts[0].Token
 				}
@@ -2089,7 +2089,7 @@ impl scopeChecker {
 
 	fn checkVars(mut self) {
 		for _, v in self.table.Vars {
-			if !v.Used && !v.Constant && !lex::IsIgnoreIdent(v.Ident) && !lex::IsAnonIdent(v.Ident) {
+			if !v.Used && !v.Constant && !token::IsIgnoreIdent(v.Ident) && !token::IsAnonIdent(v.Ident) {
 				self.s.pushErr(v.Token, build::LogMsg.DeclaredButNotUsed, v.Ident)
 			}
 		}
@@ -2097,7 +2097,7 @@ impl scopeChecker {
 
 	fn checkAliases(mut self) {
 		for _, a in self.table.TypeAliases {
-			if !a.Used && !lex::IsIgnoreIdent(a.Ident) && !lex::IsAnonIdent(a.Ident) {
+			if !a.Used && !token::IsIgnoreIdent(a.Ident) && !token::IsAnonIdent(a.Ident) {
 				self.s.pushErr(a.Token, build::LogMsg.DeclaredButNotUsed, a.Ident)
 			}
 		}
@@ -2137,28 +2137,28 @@ impl scopeChecker {
 	}
 }
 
-fn removeEqFromOp(op: lex::TokenId): lex::TokenId {
+fn removeEqFromOp(op: token::Id): token::Id {
 	match op {
-	| lex::TokenId.PlusEq:
-		ret lex::TokenId.Plus
-	| lex::TokenId.MinusEq:
-		ret lex::TokenId.Minus
-	| lex::TokenId.StarEq:
-		ret lex::TokenId.Star
-	| lex::TokenId.SolidusEq:
-		ret lex::TokenId.Solidus
-	| lex::TokenId.PercentEq:
-		ret lex::TokenId.Percent
-	| lex::TokenId.ShlEq:
-		ret lex::TokenId.Shl
-	| lex::TokenId.ShrEq:
-		ret lex::TokenId.Shr
-	| lex::TokenId.CaretEq:
-		ret lex::TokenId.Caret
-	| lex::TokenId.AmperEq:
-		ret lex::TokenId.Amper
-	| lex::TokenId.VlineEq:
-		ret lex::TokenId.Vline
+	| token::Id.PlusEq:
+		ret token::Id.Plus
+	| token::Id.MinusEq:
+		ret token::Id.Minus
+	| token::Id.StarEq:
+		ret token::Id.Star
+	| token::Id.SolidusEq:
+		ret token::Id.Solidus
+	| token::Id.PercentEq:
+		ret token::Id.Percent
+	| token::Id.ShlEq:
+		ret token::Id.Shl
+	| token::Id.ShrEq:
+		ret token::Id.Shr
+	| token::Id.CaretEq:
+		ret token::Id.Caret
+	| token::Id.AmperEq:
+		ret token::Id.Amper
+	| token::Id.VlineEq:
+		ret token::Id.Vline
 	|:
 		ret op
 	}

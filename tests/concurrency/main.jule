@@ -2,26 +2,26 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use std::sync::{WaitGroup}
-use std::sync::atomic::{AtomicInt, MemoryOrder}
+use "std/sync"
+use "std/sync/atomic"
 
-static mut n: AtomicInt = AtomicInt.New(0)
+static mut n = atomic::AtomicInt.New(0)
 
-fn addToN(mut wg: *WaitGroup) {
-	unsafe defer { wg.Done() }
-	n.Add(1, MemoryOrder.Relaxed)
+fn addToN(mut wg: &sync::WaitGroup) {
+	n.Add(1, atomic::MemoryOrder.Relaxed)
+	wg.Done()
 }
 
 fn main() {
-	let mut wg = WaitGroup{}
+	let mut wg = sync::WaitGroup.New()
 
 	let mut j = 0
 	for j < 100; j++ {
 		wg.Add(1)
-		co addToN(&wg)
+		co addToN(wg)
 	}
 
 	wg.Wait()
 
-	outln(n.Load(MemoryOrder.Relaxed))
+	outln(n.Load(atomic::MemoryOrder.Relaxed))
 }

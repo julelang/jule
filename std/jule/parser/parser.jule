@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use path for std::fs::path
-use ast for std::jule::ast
-use lex for std::jule::lex
-use build for std::jule::build
-use mod for std::jule::internal::mod
-use strings for std::strings
+use "std/fs/path"
+use "std/jule/ast"
+use "std/jule/build"
+use "std/jule/internal/mod"
+use "std/jule/token"
+use "std/strings"
 
-fn makeErr(row: int, col: int, &f: &lex::File, fmt: build::LogMsg, args: ...any): build::Log {
+fn makeErr(row: int, col: int, &f: &token::Fileset, fmt: build::LogMsg, args: ...any): build::Log {
 	ret build::Log{
 		Kind: build::LogKind.Error,
 		Row: row,
@@ -27,7 +27,7 @@ fn makeErr(row: int, col: int, &f: &lex::File, fmt: build::LogMsg, args: ...any)
 // Special cases are:
 //  range(i, open, close, tokens) = nil if i > len(tokens)
 //  range(i, open, close, tokens) = nil if tokens[i].Id != open
-fn range(mut &i: int, open: lex::TokenId, close: lex::TokenId, mut &tokens: []&lex::Token): []&lex::Token {
+fn range(mut &i: int, open: token::Id, close: token::Id, mut &tokens: []&token::Token): []&token::Token {
 	if i >= len(tokens) {
 		ret nil
 	}
@@ -57,14 +57,14 @@ fn range(mut &i: int, open: lex::TokenId, close: lex::TokenId, mut &tokens: []&l
 // Special cases are;
 //  rangeLast(tokens) = tokens, nil if len(tokens) == 0
 //  rangeLast(tokens) = tokens, nil if tokens is not has range at last
-fn rangeLast(mut &tokens: []&lex::Token): (cutted: []&lex::Token, cut: []&lex::Token) {
+fn rangeLast(mut &tokens: []&token::Token): (cutted: []&token::Token, cut: []&token::Token) {
 	if len(tokens) == 0 {
 		ret tokens, nil
 	}
 	first := tokens[len(tokens)-1].Id
-	if first != lex::TokenId.RBrace &&
-		first != lex::TokenId.LBracket &&
-		first != lex::TokenId.RParent {
+	if first != token::Id.RBrace &&
+		first != token::Id.LBracket &&
+		first != token::Id.RParent {
 		ret tokens, nil
 	}
 	mut braceN := 0
@@ -72,14 +72,14 @@ fn rangeLast(mut &tokens: []&lex::Token): (cutted: []&lex::Token, cut: []&lex::T
 	for i >= 0; i-- {
 		token := tokens[i]
 		match token.Id {
-		| lex::TokenId.RBrace
-		| lex::TokenId.RBracket
-		| lex::TokenId.RParent:
+		| token::Id.RBrace
+		| token::Id.RBracket
+		| token::Id.RParent:
 			braceN++
 			continue
-		| lex::TokenId.LBrace
-		| lex::TokenId.LBracket
-		| lex::TokenId.LParent:
+		| token::Id.LBrace
+		| token::Id.LBracket
+		| token::Id.LParent:
 			braceN--
 		}
 		if braceN == 0 {
@@ -95,7 +95,7 @@ fn rangeLast(mut &tokens: []&lex::Token): (cutted: []&lex::Token, cut: []&lex::T
 //
 // Special case is;
 //  parts(tokens) = nil if len(tokens) == 0
-fn parts(mut &tokens: []&lex::Token, id: lex::TokenId, exprMust: bool): (parts: [][]&lex::Token, errors: []build::Log) {
+fn parts(mut &tokens: []&token::Token, id: token::Id, exprMust: bool): (parts: [][]&token::Token, errors: []build::Log) {
 	if len(tokens) == 0 {
 		ret nil, nil
 	}
@@ -103,9 +103,9 @@ fn parts(mut &tokens: []&lex::Token, id: lex::TokenId, exprMust: bool): (parts: 
 	mut last := 0
 	for i, token in tokens {
 		match token.Id {
-		| lex::TokenId.LBrace | lex::TokenId.LBracket | lex::TokenId.LParent:
+		| token::Id.LBrace | token::Id.LBracket | token::Id.LParent:
 			rangeN++
-		| lex::TokenId.RBrace | lex::TokenId.RBracket | lex::TokenId.RParent:
+		| token::Id.RBrace | token::Id.RBracket | token::Id.RParent:
 			rangeN--
 		| id:
 			if rangeN > 0 {
@@ -125,20 +125,20 @@ fn parts(mut &tokens: []&lex::Token, id: lex::TokenId, exprMust: bool): (parts: 
 	ret
 }
 
-fn getCloseOfBrace(left: lex::TokenId): lex::TokenId {
+fn getCloseOfBrace(left: token::Id): token::Id {
 	match left {
-	| lex::TokenId.RParent:
-		ret lex::TokenId.LParent
-	| lex::TokenId.RBrace:
-		ret lex::TokenId.LBrace
-	| lex::TokenId.RBracket:
-		ret lex::TokenId.LBracket
+	| token::Id.RParent:
+		ret token::Id.LParent
+	| token::Id.RBrace:
+		ret token::Id.LBrace
+	| token::Id.RBracket:
+		ret token::Id.LBracket
 	|:
 		ret left
 	}
 }
 
-fn compilerErr(&token: &lex::Token, &fmt: build::LogMsg, args: ...any): build::Log {
+fn compilerErr(&token: &token::Token, &fmt: build::LogMsg, args: ...any): build::Log {
 	ret build::Log{
 		Kind: build::LogKind.Error,
 		Row: token.Row,
@@ -166,7 +166,7 @@ impl parser {
 	fn stopped(self): bool { ret self.ast == nil }
 
 	// Appends error by specified token, key and args.
-	fn pushErr(mut self, token: &lex::Token, fmt: build::LogMsg, args: ...any) {
+	fn pushErr(mut self, token: &token::Token, fmt: build::LogMsg, args: ...any) {
 		self.errors = append(self.errors, compilerErr(token, fmt, args...))
 	}
 
@@ -175,11 +175,11 @@ impl parser {
 		unsafe { pushSuggestion(&self.errors[len(self.errors)-1], fmt, args...) }
 	}
 
-	fn buildExpr(mut &self, mut &tokens: []&lex::Token): &ast::Expr {
+	fn buildExpr(mut &self, mut &tokens: []&token::Token): &ast::Expr {
 		ret self.ep.buildFromTokens(tokens)
 	}
 
-	fn buildDirective(mut self, mut tokens: []&lex::Token): &ast::Directive {
+	fn buildDirective(mut self, mut tokens: []&token::Token): &ast::Directive {
 		if len(tokens) == 1 {
 			self.pushErr(tokens[0], build::LogMsg.InvalidSyntax)
 			ret nil
@@ -207,7 +207,7 @@ impl parser {
 		self.directives = append(self.directives, d)
 	}
 
-	fn buildScope(mut &self, mut &tokens: []&lex::Token, mut end: &lex::Token): &ast::ScopeTree {
+	fn buildScope(mut &self, mut &tokens: []&token::Token, mut end: &token::Token): &ast::ScopeTree {
 		mut s := newScope()
 		s.End = end
 		mut sp := scopeParser{
@@ -217,7 +217,7 @@ impl parser {
 		ret s
 	}
 
-	unsafe fn _buildType(mut &self, mut &tokens: []&lex::Token,
+	unsafe fn _buildType(mut &self, mut &tokens: []&token::Token,
 		mut i: *int, err: bool): (&ast::TypeDecl, bool) {
 		mut tb := typeBuilder{
 			p: self,
@@ -229,7 +229,7 @@ impl parser {
 	}
 
 	// Builds AST model of data-type.
-	unsafe fn buildType(mut &self, mut &tokens: []&lex::Token,
+	unsafe fn buildType(mut &self, mut &tokens: []&token::Token,
 		mut i: *int, err: bool): (&ast::TypeDecl, bool) {
 		token := tokens[*i]
 		mut t, ok := self._buildType(tokens, i, err)
@@ -239,7 +239,7 @@ impl parser {
 		ret t, ok
 	}
 
-	fn buildTypeAliasDecl(mut &self, mut &tokens: []&lex::Token): &ast::TypeAliasDecl {
+	fn buildTypeAliasDecl(mut &self, mut &tokens: []&token::Token): &ast::TypeAliasDecl {
 		mut i := 1 // Skip "type" keyword.
 		if i >= len(tokens) {
 			self.pushErr(tokens[i-1], build::LogMsg.InvalidSyntax)
@@ -250,7 +250,7 @@ impl parser {
 			Ident: tokens[1].Kind,
 		}
 		mut token := tokens[i]
-		if token.Id != lex::TokenId.Ident {
+		if token.Id != token::Id.Ident {
 			self.pushErr(token, build::LogMsg.InvalidSyntax)
 			self.pushSuggestion(build::LogMsg.ExpectedIdentifier)
 		}
@@ -260,7 +260,7 @@ impl parser {
 			ret tad
 		}
 		token = tokens[i]
-		if token.Id != lex::TokenId.Colon {
+		if token.Id != token::Id.Colon {
 			self.pushErr(tokens[i-1], build::LogMsg.InvalidSyntax)
 			self.pushSuggestion(build::LogMsg.ExpectedColon)
 			ret tad
@@ -279,12 +279,12 @@ impl parser {
 		ret tad
 	}
 
-	fn buildVarTypeAndExpr(mut &self, mut &v: &ast::VarDecl, mut &tokens: []&lex::Token) {
+	fn buildVarTypeAndExpr(mut &self, mut &v: &ast::VarDecl, mut &tokens: []&token::Token) {
 		mut i := 0
 		mut tok := tokens[i]
-		if tok.Id == lex::TokenId.Colon {
+		if tok.Id == token::Id.Colon {
 			i++ // Skip type annotation operator (:)
-			if i >= len(tokens) || tokens[i].Id == lex::TokenId.Eq {
+			if i >= len(tokens) || tokens[i].Id == token::Id.Eq {
 				self.pushErr(tok, build::LogMsg.MissingType)
 				ret
 			}
@@ -298,7 +298,7 @@ impl parser {
 			}
 		}
 
-		if tok.Id != lex::TokenId.Eq {
+		if tok.Id != token::Id.Eq {
 			self.pushErr(tok, build::LogMsg.InvalidSyntax)
 			ret
 		}
@@ -312,9 +312,9 @@ impl parser {
 		v.Expr = self.buildExpr(exprTokens)
 	}
 
-	fn buildVarCommon(mut &self, mut &v: &ast::VarDecl, mut tokens: []&lex::Token) {
+	fn buildVarCommon(mut &self, mut &v: &ast::VarDecl, mut tokens: []&token::Token) {
 		v.Token = tokens[0]
-		if v.Token.Id != lex::TokenId.Ident {
+		if v.Token.Id != token::Id.Ident {
 			self.pushErr(v.Token, build::LogMsg.InvalidSyntax)
 			self.pushSuggestion(build::LogMsg.ExpectedIdentifier)
 			ret
@@ -328,13 +328,13 @@ impl parser {
 		}
 	}
 
-	fn buildVarBegin(mut self, mut &v: &ast::VarDecl, mut &tokens: []&lex::Token) {
+	fn buildVarBegin(mut self, mut &v: &ast::VarDecl, mut &tokens: []&token::Token) {
 		tok := tokens[0]
 		match tok.Id {
-		| lex::TokenId.Static:
+		| token::Id.Static:
 			v.Statically = true
 			fall
-		| lex::TokenId.Let:
+		| token::Id.Let:
 			// Initialize 1 for skip the let keyword
 			if len(tokens) == 1 {
 				tokens = nil
@@ -342,12 +342,12 @@ impl parser {
 				ret
 			}
 			tokens = tokens[1:]
-			if tokens[0].Id == lex::TokenId.Mut {
+			if tokens[0].Id == token::Id.Mut {
 				v.Mutable = true
 				// Skip the mut keyword
 				tokens = tokens[1:]
 			}
-		| lex::TokenId.Const:
+		| token::Id.Const:
 			v.Constant = true
 			tokens = tokens[1:]
 		|:
@@ -356,7 +356,7 @@ impl parser {
 		}
 	}
 
-	fn buildVar(mut &self, mut tokens: []&lex::Token): &ast::VarDecl {
+	fn buildVar(mut &self, mut tokens: []&token::Token): &ast::VarDecl {
 		mut v := &ast::VarDecl{
 			Token: tokens[0],
 		}
@@ -364,7 +364,7 @@ impl parser {
 		if len(tokens) == 0 {
 			ret nil
 		}
-		if tokens[0].Id == lex::TokenId.Amper {
+		if tokens[0].Id == token::Id.Amper {
 			v.Reference = true
 			if len(tokens) == 1 {
 				ret nil
@@ -375,17 +375,17 @@ impl parser {
 		ret v
 	}
 
-	fn buildGeneric(mut &self, mut &tokens: []&lex::Token): &ast::GenericDecl {
+	fn buildGeneric(mut &self, mut &tokens: []&token::Token): &ast::GenericDecl {
 		mut g := &ast::GenericDecl{
 			Token: tokens[0],
 		}
-		if g.Token.Id != lex::TokenId.Ident {
+		if g.Token.Id != token::Id.Ident {
 			self.pushErr(g.Token, build::LogMsg.InvalidSyntax)
 			self.pushSuggestion(build::LogMsg.ExpectedIdentifier)
 		}
 		g.Ident = g.Token.Kind
 		if len(tokens) > 1 {
-			if tokens[1].Id != lex::TokenId.Colon {
+			if tokens[1].Id != token::Id.Colon {
 				self.pushErr(tokens[1], build::LogMsg.InvalidSyntax)
 				ret nil
 			}
@@ -394,7 +394,7 @@ impl parser {
 				ret nil
 			}
 			mut constraintTokens := tokens[2:]
-			mut parts, errors := parts(constraintTokens, lex::TokenId.Vline, true)
+			mut parts, errors := parts(constraintTokens, token::Id.Vline, true)
 			if len(errors) > 0 {
 				self.errors = append(self.errors, errors...)
 				ret nil
@@ -412,13 +412,13 @@ impl parser {
 		ret g
 	}
 
-	fn buildGenerics(mut &self, mut &tokens: []&lex::Token, &errorToken: &lex::Token): []&ast::GenericDecl {
+	fn buildGenerics(mut &self, mut &tokens: []&token::Token, &errorToken: &token::Token): []&ast::GenericDecl {
 		if len(tokens) == 0 {
 			self.pushErr(errorToken, build::LogMsg.MissingExpr)
 			ret nil
 		}
 
-		mut parts, errors := parts(tokens, lex::TokenId.Comma, true)
+		mut parts, errors := parts(tokens, token::Id.Comma, true)
 		if len(errors) > 0 {
 			self.errors = append(self.errors, errors...)
 			ret nil
@@ -432,7 +432,7 @@ impl parser {
 		ret generics
 	}
 
-	fn buildSelfParam(mut self, mut tokens: []&lex::Token): &ast::ParamDecl {
+	fn buildSelfParam(mut self, mut tokens: []&token::Token): &ast::ParamDecl {
 		if len(tokens) == 0 {
 			ret nil
 		}
@@ -440,7 +440,7 @@ impl parser {
 		mut param := new(ast::ParamDecl)
 
 		// Detects mut keyword.
-		if tokens[0].Id == lex::TokenId.Mut {
+		if tokens[0].Id == token::Id.Mut {
 			param.Mutable = true
 			if len(tokens) == 1 {
 				self.pushErr(tokens[0], build::LogMsg.InvalidSyntax)
@@ -449,10 +449,10 @@ impl parser {
 			tokens = tokens[1:]
 		}
 
-		mut ident := strings::StrBuilder.New(5)
+		mut ident := strings::Builder.New(5)
 
-		if tokens[0].Id == lex::TokenId.Amper {
-			ident.WriteStr(lex::TokenKind.Amper)
+		if tokens[0].Id == token::Id.Amper {
+			ident.WriteStr(token::Kind.Amper)
 			if len(tokens) == 1 {
 				self.pushErr(tokens[0], build::LogMsg.InvalidSyntax)
 				ret nil
@@ -460,8 +460,8 @@ impl parser {
 			tokens = tokens[1:]
 		}
 
-		if tokens[0].Id == lex::TokenId.Self {
-			ident.WriteStr(lex::TokenKind.Self)
+		if tokens[0].Id == token::Id.Self {
+			ident.WriteStr(token::Kind.Self)
 			param.Token = tokens[0]
 			if len(tokens) != 1 {
 				self.pushErr(tokens[1], build::LogMsg.InvalidSyntax)
@@ -472,10 +472,10 @@ impl parser {
 		ret param
 	}
 
-	fn paramTypeBegin(mut self, mut &param: &ast::ParamDecl, mut &i: int, &tokens: []&lex::Token) {
+	fn paramTypeBegin(mut self, mut &param: &ast::ParamDecl, mut &i: int, &tokens: []&token::Token) {
 		for i < len(tokens); i++ {
 			token := tokens[i]
-			if token.Id != lex::TokenId.TripleDot {
+			if token.Id != token::Id.TripleDot {
 				ret
 			}
 
@@ -487,7 +487,7 @@ impl parser {
 		}
 	}
 
-	fn buildParamType(mut &self, mut &param: &ast::ParamDecl, mut &tokens: []&lex::Token) {
+	fn buildParamType(mut &self, mut &param: &ast::ParamDecl, mut &tokens: []&token::Token) {
 		mut i := 0
 		self.paramTypeBegin(param, i, tokens)
 		if i >= len(tokens) {
@@ -500,7 +500,7 @@ impl parser {
 		}
 	}
 
-	fn buildParamBody(mut &self, mut &param: &ast::ParamDecl, mut tokens: []&lex::Token) {
+	fn buildParamBody(mut &self, mut &param: &ast::ParamDecl, mut tokens: []&token::Token) {
 		mut tok := tokens[0]
 		if len(tokens) == 1 {
 			// Just identifier token.
@@ -510,8 +510,8 @@ impl parser {
 			self.pushErr(tok, build::LogMsg.MissingType)
 			ret
 		}
-		if tokens[1].Id != lex::TokenId.Colon {
-			param.Ident = lex::Ident.Anon
+		if tokens[1].Id != token::Id.Colon {
+			param.Ident = token::Ident.Anon
 			self.buildParamType(param, tokens)
 			ret
 		}
@@ -520,13 +520,13 @@ impl parser {
 		self.buildParamType(param, tokens)
 	}
 
-	fn buildParam(mut &self, mut tokens: []&lex::Token): &ast::ParamDecl {
+	fn buildParam(mut &self, mut tokens: []&token::Token): &ast::ParamDecl {
 		mut param := &ast::ParamDecl{
 			Token: tokens[0],
 		}
 
 		// Detects mut keyword.
-		if param.Token.Id == lex::TokenId.Mut {
+		if param.Token.Id == token::Id.Mut {
 			param.Mutable = true
 			if len(tokens) == 1 {
 				self.pushErr(tokens[0], build::LogMsg.InvalidSyntax)
@@ -538,13 +538,13 @@ impl parser {
 
 		// Catch reference parameters.
 		if len(tokens) >= 3 {
-			if param.Token.Id == lex::TokenId.Amper {
+			if param.Token.Id == token::Id.Amper {
 				if len(tokens) == 1 {
 					self.pushErr(tokens[0], build::LogMsg.InvalidSyntax)
 					ret nil
 				}
 
-				if tokens[1].Id == lex::TokenId.Ident && tokens[2].Id == lex::TokenId.Colon {
+				if tokens[1].Id == token::Id.Ident && tokens[2].Id == token::Id.Colon {
 					param.Reference = true
 					tokens = tokens[1:]
 					param.Token = tokens[0]
@@ -552,9 +552,9 @@ impl parser {
 			}
 		}
 
-		if param.Token.Id != lex::TokenId.Ident {
+		if param.Token.Id != token::Id.Ident {
 			// Just data type
-			param.Ident = lex::Ident.Anon
+			param.Ident = token::Ident.Anon
 			self.buildParamType(param, tokens)
 		} else {
 			self.buildParamBody(param, tokens)
@@ -578,13 +578,13 @@ impl parser {
 						Ident: param.Token.Kind,
 					},
 				}
-				param.Ident = lex::Ident.Anon
+				param.Ident = token::Ident.Anon
 			}
 		}
 	}
 
-	fn buildParams(mut &self, mut &tokens: []&lex::Token, method: bool): []&ast::ParamDecl {
-		mut parts, errs := parts(tokens, lex::TokenId.Comma, true)
+	fn buildParams(mut &self, mut &tokens: []&token::Token, method: bool): []&ast::ParamDecl {
+		mut parts, errs := parts(tokens, token::Id.Comma, true)
 		self.errors = append(self.errors, errs...)
 		if len(parts) == 0 {
 			ret nil
@@ -613,7 +613,7 @@ impl parser {
 		ret params
 	}
 
-	fn buildMultiRetType(mut &self, mut &tokens: []&lex::Token, mut &i: int): (t: &ast::RetTypeDecl, ok: bool) {
+	fn buildMultiRetType(mut &self, mut &tokens: []&token::Token, mut &i: int): (t: &ast::RetTypeDecl, ok: bool) {
 		t = new(ast::RetTypeDecl)
 		i++
 		if i >= len(tokens) {
@@ -623,16 +623,16 @@ impl parser {
 		}
 
 		i-- // For point to parentheses - ( -
-		mut rangeTokens := range(i, lex::TokenId.LParent, lex::TokenId.RParent, tokens)
+		mut rangeTokens := range(i, token::Id.LParent, token::Id.RParent, tokens)
 
-		mut parts, errs := parts(rangeTokens, lex::TokenId.Comma, true)
+		mut parts, errs := parts(rangeTokens, token::Id.Comma, true)
 		self.errors = append(self.errors, errs...)
 		if len(parts) == 0 {
 			ret
 		}
 
 		mut types := make([]&ast::TypeDecl, 0, len(parts))
-		t.Idents = make([]&lex::Token, 0, len(parts))
+		t.Idents = make([]&token::Token, 0, len(parts))
 		for (_, mut part) in parts {
 			if len(part) == 0 {
 				continue
@@ -643,7 +643,7 @@ impl parser {
 			// Check type annotation.
 			if len(part) > 1 {
 				token = part[1]
-				if token.Id == lex::TokenId.Colon {
+				if token.Id == token::Id.Colon {
 					offset = 2
 					if len(part) < 3 {
 						self.pushErr(token, build::LogMsg.MissingType)
@@ -654,8 +654,8 @@ impl parser {
 
 			token = part[0]
 			if offset != 2 {
-				mut newToken := new(lex::Token, *token)
-				newToken.Kind = lex::Ident.Anon
+				mut newToken := new(token::Token, *token)
+				newToken.Kind = token::Ident.Anon
 				t.Idents = append(t.Idents, newToken)
 			} else {
 				t.Idents = append(t.Idents, token)
@@ -684,7 +684,7 @@ impl parser {
 	}
 
 	// Builds function return type from tokens.
-	fn buildRetType(mut &self, mut &tokens: []&lex::Token, mut &i: int): (t: &ast::RetTypeDecl, ok: bool) {
+	fn buildRetType(mut &self, mut &tokens: []&token::Token, mut &i: int): (t: &ast::RetTypeDecl, ok: bool) {
 		t = new(ast::RetTypeDecl)
 		if i >= len(tokens) {
 			ret
@@ -692,11 +692,11 @@ impl parser {
 
 		mut token := tokens[i]
 		match token.Id {
-		| lex::TokenId.LBrace:
+		| token::Id.LBrace:
 			ret
-		| lex::TokenId.Eq:
+		| token::Id.Eq:
 			ret
-		| lex::TokenId.Colon:
+		| token::Id.Colon:
 			if i+1 >= len(tokens) {
 				self.pushErr(token, build::LogMsg.MissingType)
 				ret
@@ -705,10 +705,10 @@ impl parser {
 			i++
 			token = tokens[i]
 			match token.Id {
-			| lex::TokenId.LParent:
+			| token::Id.LParent:
 				t, ok = self.buildMultiRetType(tokens, i)
 				ret
-			| lex::TokenId.LBrace:
+			| token::Id.LBrace:
 				self.pushErr(token, build::LogMsg.MissingType)
 				ret
 			}
@@ -723,13 +723,13 @@ impl parser {
 	// Build function prototype.
 	// Body is not necessary for successfull parsing.
 	// Just declration.
-	fn buildFnPrototype(mut &self, mut &tokens: []&lex::Token, mut &i: int, method: bool): &ast::FnDecl {
+	fn buildFnPrototype(mut &self, mut &tokens: []&token::Token, mut &i: int, method: bool): &ast::FnDecl {
 		mut f := &ast::FnDecl{
 			Token: tokens[i],
 		}
 
 		// Detect static keyword.
-		if f.Token.Id == lex::TokenId.Static {
+		if f.Token.Id == token::Id.Static {
 			f.Statically = true
 			i++
 			if i >= len(tokens) {
@@ -740,7 +740,7 @@ impl parser {
 		}
 
 		// Detect unsafe keyword.
-		if f.Token.Id == lex::TokenId.Unsafe {
+		if f.Token.Id == token::Id.Unsafe {
 			f.Unsafety = true
 			i++
 			if i >= len(tokens) {
@@ -758,7 +758,7 @@ impl parser {
 		}
 
 		tok := tokens[i]
-		if tok.Id == lex::TokenId.Ident {
+		if tok.Id == token::Id.Ident {
 			i++
 			if i >= len(tokens) {
 				self.pushErr(f.Token, build::LogMsg.InvalidSyntax)
@@ -766,28 +766,28 @@ impl parser {
 			}
 			f.Ident = tok.Kind
 		} else {
-			f.Ident = lex::Ident.Anon
+			f.Ident = token::Ident.Anon
 		}
 
 		errorToken := tokens[i]
-		mut genericsTokens := range(i, lex::TokenId.LBracket, lex::TokenId.RBracket, tokens)
+		mut genericsTokens := range(i, token::Id.LBracket, token::Id.RBracket, tokens)
 		if genericsTokens != nil {
 			f.Generics = self.buildGenerics(genericsTokens, errorToken)
 		}
 
-		if tokens[i].Id != lex::TokenId.LParent {
+		if tokens[i].Id != token::Id.LParent {
 			self.pushErr(tokens[i], build::LogMsg.MissingFnParentheses)
 			ret nil
 		}
 
-		mut paramsToks := range(i, lex::TokenId.LParent, lex::TokenId.RParent, tokens)
+		mut paramsToks := range(i, token::Id.LParent, token::Id.RParent, tokens)
 		if len(paramsToks) > 0 {
 			f.Params = self.buildParams(paramsToks, method)
 		}
 
 		if i < len(tokens) {
 			token := tokens[i]
-			if token.Id == lex::TokenId.Excl {
+			if token.Id == token::Id.Excl {
 				f.Exceptional = true
 				i++
 			}
@@ -800,7 +800,7 @@ impl parser {
 
 	// Parses function define.
 	// Prototype and body.
-	fn buildFn(mut &self, mut &tokens: []&lex::Token, method: bool, prototype: bool): &ast::FnDecl {
+	fn buildFn(mut &self, mut &tokens: []&token::Token, method: bool, prototype: bool): &ast::FnDecl {
 		mut i := 0
 		mut f := self.buildFnPrototype(tokens, i, method)
 		if prototype {
@@ -818,7 +818,7 @@ impl parser {
 			self.pushSuggestion(build::LogMsg.ExpectedBody)
 			ret nil
 		}
-		mut blockTokens := range(i, lex::TokenId.LBrace, lex::TokenId.RBrace, tokens)
+		mut blockTokens := range(i, token::Id.LBrace, token::Id.RBrace, tokens)
 		if blockTokens != nil {
 			f.Scope = self.buildScope(blockTokens, tokens[i-1])
 			f.Scope.Unsafety = f.Unsafety
@@ -834,200 +834,49 @@ impl parser {
 		ret f
 	}
 
-	fn getUseDeclSelectors(mut self, mut tokens: []&lex::Token): []&lex::Token {
-		mut i := 0
-		tokens = range(i, lex::TokenId.LBrace, lex::TokenId.RBrace, tokens)
-		mut parts, errs := parts(tokens, lex::TokenId.Comma, true)
-		if len(errs) > 0 {
-			self.errors = append(self.errors, errs...)
-			ret nil
-		}
-
-		mut selectors := make([]&lex::Token, 0, len(parts))
-		for (_, mut part) in parts {
-			if len(part) > 1 {
-				self.pushErr(part[1], build::LogMsg.InvalidSyntax)
-			}
-			mut tok := part[0]
-			if tok.Id != lex::TokenId.Ident && tok.Id != lex::TokenId.Self {
-				self.pushErr(tok, build::LogMsg.InvalidSyntax)
-				self.pushSuggestion(build::LogMsg.ExpectedIdentifier)
-				continue
-			}
-			selectors = append(selectors, tok)
-		}
-		ret selectors
-	}
-
-	fn buildBindUseDecl(mut self, mut &decl: &ast::UseDecl, &tokens: []&lex::Token) {
+	fn buildBindUseDecl(mut self, mut &decl: &ast::UseDecl, mut &tokens: []&token::Token) {
 		if len(tokens) > 1 {
 			self.pushErr(tokens[1], build::LogMsg.InvalidSyntax)
 		}
-		token := tokens[0]
-		if token.Id != lex::TokenId.Lit || (token.Kind[0] != '`' && token.Kind[0] != '"') {
+		mut token := tokens[0]
+		if token.Id != token::Id.Lit || !token::IsStr(token.Kind) {
 			self.pushErr(token, build::LogMsg.InvalidExpr)
 			ret
 		}
 		decl.Binded = true
-		decl.LinkPath = token.Kind[1:len(token.Kind)-1]
+		decl.Path = token
 	}
 
-	fn useDeclTokstoa(mut self, &tokens: []&lex::Token): str {
-		mut n := 0
-		for _, token in tokens {
-			if token.Id != lex::TokenId.Ident && token.Id != lex::TokenId.DblColon {
-				self.pushErr(token, build::LogMsg.InvalidSyntax)
-			}
-			n += len(token.Kind)
-		}
-		mut s := strings::StrBuilder.New(n)
-		for _, token in tokens {
-			s.WriteStr(token.Kind)
-		}
-		ret s.Str()
-	}
-
-	fn buildStdUseDecl(mut self, mut &decl: &ast::UseDecl, mut tokens: []&lex::Token) {
-		decl.Std = true
-
-		mut token := tokens[0]
-		if len(tokens) < 3 {
-			self.pushErr(token, build::LogMsg.InvalidSyntax)
-			ret
-		}
-
-		tokens = tokens[2:]
-		token = tokens[len(tokens)-1]
-		match token.Id {
-		| lex::TokenId.DblColon:
-			self.pushErr(token, build::LogMsg.InvalidSyntax)
-			ret
-		| lex::TokenId.RBrace:
-			let mut selectors: []&lex::Token = nil
-			tokens, selectors = rangeLast(tokens)
-			decl.Selected = self.getUseDeclSelectors(selectors)
-			if len(tokens) == 0 {
-				self.pushErr(token, build::LogMsg.InvalidSyntax)
-				ret
-			}
-			token = tokens[len(tokens)-1]
-			if token.Id != lex::TokenId.DblColon {
-				self.pushErr(token, build::LogMsg.InvalidSyntax)
-				ret
-			}
-			tokens = tokens[:len(tokens)-1]
-			if len(tokens) == 0 {
-				self.pushErr(token, build::LogMsg.InvalidSyntax)
-				ret
-			}
-		| lex::TokenId.Star:
-			tokens = tokens[:len(tokens)-1]
-			if len(tokens) == 0 {
-				self.pushErr(token, build::LogMsg.InvalidSyntax)
-				ret
-			}
-			token = tokens[len(tokens)-1]
-			if token.Id != lex::TokenId.DblColon {
-				self.pushErr(token, build::LogMsg.InvalidSyntax)
-				ret
-			}
-			tokens = tokens[:len(tokens)-1]
-			if len(tokens) == 0 {
-				self.pushErr(token, build::LogMsg.InvalidSyntax)
-				ret
-			}
-			decl.Full = true
-		}
-		if len(tokens) == 1 && tokens[0].Id == lex::TokenId.Unsafe { // Is std::unsafe?
-			decl.LinkPath = "std::unsafe"
-		} else {
-			decl.LinkPath = "std::" + self.useDeclTokstoa(tokens)
-		}
-	}
-
-	fn buildIdentUseDecl(mut self, mut &decl: &ast::UseDecl, mut tokens: []&lex::Token) {
-		decl.Std = false
-
-		mut token := tokens[len(tokens)-1]
-		match token.Id {
-		| lex::TokenId.DblColon:
-			self.pushErr(token, build::LogMsg.InvalidSyntax)
-			ret
-		| lex::TokenId.RBrace:
-			let mut selectors: []&lex::Token = nil
-			tokens, selectors = rangeLast(tokens)
-			decl.Selected = self.getUseDeclSelectors(selectors)
-			if len(tokens) == 0 {
-				self.pushErr(token, build::LogMsg.InvalidSyntax)
-				ret
-			}
-			token = tokens[len(tokens)-1]
-			if token.Id != lex::TokenId.DblColon {
-				self.pushErr(token, build::LogMsg.InvalidSyntax)
-				ret
-			}
-			tokens = tokens[:len(tokens)-1]
-			if len(tokens) == 0 {
-				self.pushErr(token, build::LogMsg.InvalidSyntax)
-				ret
-			}
-		| lex::TokenId.Star:
-			tokens = tokens[:len(tokens)-1]
-			if len(tokens) == 0 {
-				self.pushErr(token, build::LogMsg.InvalidSyntax)
-				ret
-			}
-			token = tokens[len(tokens)-1]
-			if token.Id != lex::TokenId.DblColon {
-				self.pushErr(token, build::LogMsg.InvalidSyntax)
-				ret
-			}
-			tokens = tokens[:len(tokens)-1]
-			if len(tokens) == 0 {
-				self.pushErr(token, build::LogMsg.InvalidSyntax)
-				ret
-			}
-			decl.Full = true
-		}
-
-		decl.LinkPath = self.useDeclTokstoa(tokens)
-	}
-
-	fn parseUseDecl(mut self, mut &decl: &ast::UseDecl, mut tokens: []&lex::Token) {
+	fn parseUseDecl(mut self, mut &decl: &ast::UseDecl, mut tokens: []&token::Token) {
 		if decl.Binded {
 			self.buildBindUseDecl(decl, tokens)
 			ret
 		}
 
 		mut token := tokens[0]
-		if token.Id != lex::TokenId.Ident {
+		if token.Id != token::Id.Ident && token.Id != token::Id.Lit && !token::IsStr(token.Kind) {
 			self.pushErr(token, build::LogMsg.InvalidSyntax)
-			self.pushSuggestion(build::LogMsg.ExpectedIdentifier)
 			ret
 		}
 
-		if len(tokens) > 2 && tokens[1].Id == lex::TokenId.For {
-			decl.Alias = token.Kind
-			if tokens[2].Id != lex::TokenId.Ident {
+		if token.Id == token::Id.Ident { // custom alias exist
+			decl.Alias = token
+			tokens = tokens[1:]
+			if len(tokens) == 0 {
 				self.pushErr(token, build::LogMsg.InvalidSyntax)
-				self.pushSuggestion(build::LogMsg.ExpectedIdentifier)
 				ret
 			}
-			tokens = tokens[2:]
 			token = tokens[0]
+			if token.Id != token::Id.Lit || !token::IsStr(token.Kind) {
+				self.pushErr(token, build::LogMsg.InvalidSyntax)
+				ret
+			}
 		}
 
-		const StdlibPrefix = "std"
-
-		match {
-		| token.Kind == StdlibPrefix:
-			self.buildStdUseDecl(decl, tokens)
-		|:
-			self.buildIdentUseDecl(decl, tokens)
-		}
+		decl.Path = token
 	}
 
-	fn buildUseDecl(mut self, mut tokens: []&lex::Token, binded: bool): &ast::UseDecl {
+	fn buildUseDecl(mut self, mut tokens: []&token::Token, binded: bool): &ast::UseDecl {
 		mut decl := &ast::UseDecl{
 			Token: tokens[0], // See developer reference (9).
 			Binded: binded,
@@ -1041,28 +890,28 @@ impl parser {
 		ret decl
 	}
 
-	fn buildTypeEnumItemKind(mut &self, mut &i: int, mut &tokens: []&lex::Token): &ast::TypeDecl {
+	fn buildTypeEnumItemKind(mut &self, mut &i: int, mut &tokens: []&token::Token): &ast::TypeDecl {
 		mut braceN := 0
 		exprStart := i
 		for i < len(tokens); i++ {
 			t := tokens[i]
 			match t.Id {
-			| lex::TokenId.LBrace
-			| lex::TokenId.LBracket
-			| lex::TokenId.LParent:
+			| token::Id.LBrace
+			| token::Id.LBracket
+			| token::Id.LParent:
 				braceN++
 				continue
-			| lex::TokenId.RBrace
-			| lex::TokenId.RBracket
-			| lex::TokenId.RParent:
+			| token::Id.RBrace
+			| token::Id.RBracket
+			| token::Id.RParent:
 				braceN--
 			}
 			if braceN > 0 {
 				continue
 			}
-			if t.Id == lex::TokenId.Comma || i+1 >= len(tokens) {
-				let mut kindTokens: []&lex::Token = nil
-				if t.Id == lex::TokenId.Comma {
+			if t.Id == token::Id.Comma || i+1 >= len(tokens) {
+				let mut kindTokens: []&token::Token = nil
+				if t.Id == token::Id.Comma {
 					kindTokens = tokens[exprStart:i]
 				} else {
 					kindTokens = tokens[exprStart:]
@@ -1078,19 +927,19 @@ impl parser {
 		ret nil
 	}
 
-	fn buildTypeEnumItems(mut &self, mut &tokens: []&lex::Token): []&ast::TypeEnumItemDecl {
+	fn buildTypeEnumItems(mut &self, mut &tokens: []&token::Token): []&ast::TypeEnumItemDecl {
 		mut items := make([]&ast::TypeEnumItemDecl, 0, 1)
 		mut i := 0
 		for i < len(tokens); i++ {
 			mut t := tokens[i]
 			mut item := new(ast::TypeEnumItemDecl)
 			item.Token = t
-			if item.Token.Id == lex::TokenId.Ident && len(tokens)-i > 2 {
+			if item.Token.Id == token::Id.Ident && len(tokens)-i > 2 {
 				t = tokens[i+1]
-				if t.Id == lex::TokenId.Colon {
+				if t.Id == token::Id.Colon {
 					item.Ident = item.Token.Kind
 					i += 2
-					if i >= len(tokens) || tokens[i].Id == lex::TokenId.Comma {
+					if i >= len(tokens) || tokens[i].Id == token::Id.Comma {
 						self.pushErr(t, build::LogMsg.MissingType)
 						continue
 					}
@@ -1102,19 +951,19 @@ impl parser {
 		ret items
 	}
 
-	fn buildTypeEnumDecl(mut &self, mut &tokens: []&lex::Token): &ast::TypeEnumDecl {
+	fn buildTypeEnumDecl(mut &self, mut &tokens: []&token::Token): &ast::TypeEnumDecl {
 		mut i := 1
 		mut e := &ast::TypeEnumDecl{
 			// Skip "enum" tokens.
 			Token: tokens[i],
 		}
-		if e.Token.Id != lex::TokenId.Ident {
+		if e.Token.Id != token::Id.Ident {
 			self.pushErr(e.Token, build::LogMsg.InvalidSyntax)
 			self.pushSuggestion(build::LogMsg.ExpectedIdentifier)
 		}
 		e.Ident = e.Token.Kind
 		i += 3 // Skip "identifier: type" tokens.
-		mut itemTokens := range(i, lex::TokenId.LBrace, lex::TokenId.RBrace, tokens)
+		mut itemTokens := range(i, token::Id.LBrace, token::Id.RBrace, tokens)
 		if itemTokens == nil {
 			self.stop()
 			self.pushErr(e.Token, build::LogMsg.BodyNotExist)
@@ -1129,28 +978,28 @@ impl parser {
 		ret e
 	}
 
-	fn buildEnumItemExpr(mut &self, mut &i: int, mut &tokens: []&lex::Token): &ast::Expr {
+	fn buildEnumItemExpr(mut &self, mut &i: int, mut &tokens: []&token::Token): &ast::Expr {
 		mut braceN := 0
 		exprStart := i
 		for i < len(tokens); i++ {
 			t := tokens[i]
 			match t.Id {
-			| lex::TokenId.LBrace
-			| lex::TokenId.LBracket
-			| lex::TokenId.LParent:
+			| token::Id.LBrace
+			| token::Id.LBracket
+			| token::Id.LParent:
 				braceN++
 				continue
-			| lex::TokenId.RBrace
-			| lex::TokenId.RBracket
-			| lex::TokenId.RParent:
+			| token::Id.RBrace
+			| token::Id.RBracket
+			| token::Id.RParent:
 				braceN--
 			}
 			if braceN > 0 {
 				continue
 			}
-			if t.Id == lex::TokenId.Comma || i+1 >= len(tokens) {
-				let mut exprTokens: []&lex::Token = nil
-				if t.Id == lex::TokenId.Comma {
+			if t.Id == token::Id.Comma || i+1 >= len(tokens) {
+				let mut exprTokens: []&token::Token = nil
+				if t.Id == token::Id.Comma {
 					exprTokens = tokens[exprStart:i]
 				} else {
 					exprTokens = tokens[exprStart:]
@@ -1161,19 +1010,19 @@ impl parser {
 		ret nil
 	}
 
-	fn buildEnumItems(mut &self, mut &tokens: []&lex::Token): []&ast::EnumItemDecl {
+	fn buildEnumItems(mut &self, mut &tokens: []&token::Token): []&ast::EnumItemDecl {
 		mut items := make([]&ast::EnumItemDecl, 0, 1)
 		mut i := 0
 		for i < len(tokens); i++ {
 			mut t := tokens[i]
 			mut item := new(ast::EnumItemDecl)
 			item.Token = t
-			if item.Token.Id != lex::TokenId.Ident {
+			if item.Token.Id != token::Id.Ident {
 				self.pushErr(item.Token, build::LogMsg.InvalidSyntax)
 				self.pushSuggestion(build::LogMsg.ExpectedIdentifier)
 			}
 			item.Ident = item.Token.Kind
-			if i+1 >= len(tokens) || tokens[i+1].Id == lex::TokenId.Comma {
+			if i+1 >= len(tokens) || tokens[i+1].Id == token::Id.Comma {
 				if i+1 < len(tokens) {
 					i++
 				}
@@ -1183,12 +1032,12 @@ impl parser {
 			i++
 			t = tokens[i]
 			i++
-			if t.Id != lex::TokenId.Colon {
+			if t.Id != token::Id.Colon {
 				self.pushErr(t, build::LogMsg.InvalidSyntax)
 				self.pushSuggestion(build::LogMsg.ExpectedColonForAssign)
 				continue
 			}
-			if i >= len(tokens) || tokens[i].Id == lex::TokenId.Comma {
+			if i >= len(tokens) || tokens[i].Id == token::Id.Comma {
 				self.pushErr(t, build::LogMsg.MissingExpr)
 				continue
 			}
@@ -1198,7 +1047,7 @@ impl parser {
 		ret items
 	}
 
-	fn buildEnumDecl(mut &self, mut &tokens: []&lex::Token): &ast::EnumDecl {
+	fn buildEnumDecl(mut &self, mut &tokens: []&token::Token): &ast::EnumDecl {
 		if len(tokens) < 3 {
 			self.pushErr(tokens[0], build::LogMsg.InvalidSyntax)
 			ret nil
@@ -1206,13 +1055,13 @@ impl parser {
 		mut e := &ast::EnumDecl{
 			Token: tokens[1],
 		}
-		if e.Token.Id != lex::TokenId.Ident {
+		if e.Token.Id != token::Id.Ident {
 			self.pushErr(e.Token, build::LogMsg.InvalidSyntax)
 			self.pushSuggestion(build::LogMsg.ExpectedIdentifier)
 		}
 		e.Ident = e.Token.Kind
 		mut i := 2
-		if tokens[i].Id == lex::TokenId.Colon {
+		if tokens[i].Id == token::Id.Colon {
 			i++
 			if i >= len(tokens) {
 				self.pushErr(tokens[i-1], build::LogMsg.InvalidSyntax)
@@ -1228,7 +1077,7 @@ impl parser {
 		} else {
 			e.Kind = nil
 		}
-		mut itemTokens := range(i, lex::TokenId.LBrace, lex::TokenId.RBrace, tokens)
+		mut itemTokens := range(i, token::Id.LBrace, token::Id.RBrace, tokens)
 		if itemTokens == nil {
 			self.stop()
 			self.pushErr(e.Token, build::LogMsg.BodyNotExist)
@@ -1243,19 +1092,19 @@ impl parser {
 		ret e
 	}
 
-	fn buildNodeEnumDecl(mut &self, mut &tokens: []&lex::Token): ast::NodeData {
-		if len(tokens) > 3 && tokens[2].Id == lex::TokenId.Colon {
-			if tokens[3].Id == lex::TokenId.Type {
+	fn buildNodeEnumDecl(mut &self, mut &tokens: []&token::Token): ast::NodeData {
+		if len(tokens) > 3 && tokens[2].Id == token::Id.Colon {
+			if tokens[3].Id == token::Id.Type {
 				ret self.buildTypeEnumDecl(tokens)
 			}
 		}
 		ret self.buildEnumDecl(tokens)
 	}
 
-	fn buildField(mut &self, mut tokens: []&lex::Token): &ast::FieldDecl {
+	fn buildField(mut &self, mut tokens: []&token::Token): &ast::FieldDecl {
 		mut f := new(ast::FieldDecl)
 
-		f.Mutable = tokens[0].Id == lex::TokenId.Mut
+		f.Mutable = tokens[0].Id == token::Id.Mut
 		if f.Mutable {
 			if len(tokens) == 1 {
 				self.pushErr(tokens[0], build::LogMsg.InvalidSyntax)
@@ -1265,7 +1114,7 @@ impl parser {
 		}
 
 		f.Token = tokens[0]
-		if f.Token.Id != lex::TokenId.Ident {
+		if f.Token.Id != token::Id.Ident {
 			self.pushErr(f.Token, build::LogMsg.InvalidSyntax)
 			self.pushSuggestion(build::LogMsg.ExpectedIdentifier)
 			ret nil
@@ -1275,7 +1124,7 @@ impl parser {
 		if len(tokens) == 1 {
 			self.pushErr(tokens[0], build::LogMsg.MissingType)
 			ret nil
-		} else if len(tokens) < 3 || tokens[1].Id != lex::TokenId.Colon {
+		} else if len(tokens) < 3 || tokens[1].Id != token::Id.Colon {
 			self.pushErr(tokens[1], build::LogMsg.MissingType)
 			ret nil
 		}
@@ -1285,7 +1134,7 @@ impl parser {
 		f.Kind, _ = unsafe { self.buildType(tokens, &i, true) }
 		if i < len(tokens) {
 			token := tokens[i]
-			if token.Id != lex::TokenId.Eq {
+			if token.Id != token::Id.Eq {
 				self.pushErr(tokens[i], build::LogMsg.InvalidSyntax)
 				ret nil
 			}
@@ -1301,7 +1150,7 @@ impl parser {
 		ret f
 	}
 
-	fn buildStructDeclFields(mut &self, mut tokens: []&lex::Token): []&ast::FieldDecl {
+	fn buildStructDeclFields(mut &self, mut tokens: []&token::Token): []&ast::FieldDecl {
 		let mut fields: []&ast::FieldDecl = nil
 		mut stmts := splitStmts(tokens)
 		for (_, mut stmt) in stmts {
@@ -1312,7 +1161,7 @@ impl parser {
 		ret fields
 	}
 
-	fn buildStructDecl(mut &self, mut &tokens: []&lex::Token): &ast::StructDecl {
+	fn buildStructDecl(mut &self, mut &tokens: []&token::Token): &ast::StructDecl {
 		if len(tokens) < 3 {
 			self.pushErr(tokens[0], build::LogMsg.InvalidSyntax)
 			ret nil
@@ -1322,7 +1171,7 @@ impl parser {
 		mut s := &ast::StructDecl{
 			Token: tokens[i],
 		}
-		if s.Token.Id != lex::TokenId.Ident {
+		if s.Token.Id != token::Id.Ident {
 			self.pushErr(s.Token, build::LogMsg.InvalidSyntax)
 			self.pushSuggestion(build::LogMsg.ExpectedIdentifier)
 		}
@@ -1334,7 +1183,7 @@ impl parser {
 		s.Ident = s.Token.Kind
 
 		errorToken := tokens[i]
-		mut genericsTokens := range(i, lex::TokenId.LBracket, lex::TokenId.RBracket, tokens)
+		mut genericsTokens := range(i, token::Id.LBracket, token::Id.RBracket, tokens)
 		if genericsTokens != nil {
 			s.Generics = self.buildGenerics(genericsTokens, errorToken)
 		}
@@ -1344,7 +1193,7 @@ impl parser {
 			ret s
 		}
 
-		mut bodyTokens := range(i, lex::TokenId.LBrace, lex::TokenId.RBrace, tokens)
+		mut bodyTokens := range(i, token::Id.LBrace, token::Id.RBrace, tokens)
 		if bodyTokens == nil {
 			self.stop()
 			self.pushErr(s.Token, build::LogMsg.BodyNotExist)
@@ -1379,7 +1228,7 @@ impl parser {
 		}
 	}
 
-	fn buildTraitBody(mut &self, mut &t: &ast::TraitDecl, mut tokens: []&lex::Token) {
+	fn buildTraitBody(mut &self, mut &t: &ast::TraitDecl, mut tokens: []&token::Token) {
 		mut stmts := splitStmts(tokens)
 		for (_, mut stmt) in stmts {
 			tokens = stmt.tokens
@@ -1387,7 +1236,7 @@ impl parser {
 				continue
 			}
 			match tokens[0].Id {
-			| lex::TokenId.Fn:
+			| token::Id.Fn:
 				mut f := self.buildFn(tokens, true, true)
 				if f == nil {
 					break
@@ -1411,7 +1260,7 @@ impl parser {
 		}
 	}
 
-	fn buildTraitDecl(mut &self, mut &tokens: []&lex::Token): &ast::TraitDecl {
+	fn buildTraitDecl(mut &self, mut &tokens: []&token::Token): &ast::TraitDecl {
 		if len(tokens) < 3 {
 			self.pushErr(tokens[0], build::LogMsg.InvalidSyntax)
 			ret nil
@@ -1419,13 +1268,13 @@ impl parser {
 		mut t := &ast::TraitDecl{
 			Token: tokens[1],
 		}
-		if t.Token.Id != lex::TokenId.Ident {
+		if t.Token.Id != token::Id.Ident {
 			self.pushErr(t.Token, build::LogMsg.InvalidSyntax)
 			self.pushSuggestion(build::LogMsg.ExpectedIdentifier)
 		}
 		t.Ident = t.Token.Kind
 		mut i := 2
-		mut bodyTokens := range(i, lex::TokenId.LBrace, lex::TokenId.RBrace, tokens)
+		mut bodyTokens := range(i, token::Id.LBrace, token::Id.RBrace, tokens)
 		if bodyTokens == nil {
 			self.stop()
 			self.pushErr(t.Token, build::LogMsg.BodyNotExist)
@@ -1441,7 +1290,7 @@ impl parser {
 		ret t
 	}
 
-	fn buildBindFn(mut &self, mut tokens: []&lex::Token): &ast::FnDecl {
+	fn buildBindFn(mut &self, mut tokens: []&token::Token): &ast::FnDecl {
 		tokens = tokens[1:] // Remove "cpp" keyword.
 		mut f := self.buildFn(tokens, false, true)
 		if f != nil {
@@ -1451,7 +1300,7 @@ impl parser {
 		ret f
 	}
 
-	fn buildBindVar(mut &self, mut tokens: []&lex::Token): &ast::VarDecl {
+	fn buildBindVar(mut &self, mut tokens: []&token::Token): &ast::VarDecl {
 		tokens = tokens[1:] // Remove "cpp" keyword.
 		mut v := self.buildVar(tokens)
 		if v != nil {
@@ -1464,7 +1313,7 @@ impl parser {
 		ret v
 	}
 
-	fn buildBindStruct(mut &self, mut tokens: []&lex::Token): &ast::StructDecl {
+	fn buildBindStruct(mut &self, mut tokens: []&token::Token): &ast::StructDecl {
 		tokens = tokens[1:] // Remove "cpp" keyword.
 		mut s := self.buildStructDecl(tokens)
 		if s != nil {
@@ -1478,7 +1327,7 @@ impl parser {
 		ret s
 	}
 
-	fn buildBindTypeAlias(mut &self, mut tokens: []&lex::Token): &ast::TypeAliasDecl {
+	fn buildBindTypeAlias(mut &self, mut tokens: []&token::Token): &ast::TypeAliasDecl {
 		tokens = tokens[1:] // Remove "cpp" keyword.
 		mut t := self.buildTypeAliasDecl(tokens)
 		if t != nil {
@@ -1488,7 +1337,7 @@ impl parser {
 		ret t
 	}
 
-	fn buildBindUse(mut &self, mut tokens: []&lex::Token): &ast::UseDecl {
+	fn buildBindUse(mut &self, mut tokens: []&token::Token): &ast::UseDecl {
 		if len(tokens) == 1 {
 			self.pushErr(tokens[0], build::LogMsg.InvalidSyntax)
 			ret nil
@@ -1499,7 +1348,7 @@ impl parser {
 		ret self.buildUseDecl(tokens, Binded)
 	}
 
-	fn buildBind(mut &self, mut &tokens: []&lex::Token): ast::NodeData {
+	fn buildBind(mut &self, mut &tokens: []&token::Token): ast::NodeData {
 		mut token := tokens[0]
 		if len(tokens) == 1 {
 			self.pushErr(token, build::LogMsg.InvalidSyntax)
@@ -1507,15 +1356,15 @@ impl parser {
 		}
 		token = tokens[1]
 		match token.Id {
-		| lex::TokenId.Fn
-		| lex::TokenId.Unsafe:
+		| token::Id.Fn
+		| token::Id.Unsafe:
 			ret self.buildBindFn(tokens)
-		| lex::TokenId.Const
-		| lex::TokenId.Let:
+		| token::Id.Const
+		| token::Id.Let:
 			ret self.buildBindVar(tokens)
-		| lex::TokenId.Struct:
+		| token::Id.Struct:
 			ret self.buildBindStruct(tokens)
-		| lex::TokenId.Type:
+		| token::Id.Type:
 			ret self.buildBindTypeAlias(tokens)
 		|:
 			self.pushErr(token, build::LogMsg.InvalidSyntax)
@@ -1523,10 +1372,10 @@ impl parser {
 		ret nil
 	}
 
-	fn getMethod(mut &self, mut &tokens: []&lex::Token): &ast::FnDecl {
+	fn getMethod(mut &self, mut &tokens: []&token::Token): &ast::FnDecl {
 		mut i := 0
 		mut token := tokens[i]
-		if token.Id == lex::TokenId.Static {
+		if token.Id == token::Id.Static {
 			if i+1 >= len(tokens) {
 				self.pushErr(token, build::LogMsg.InvalidSyntax)
 				ret nil
@@ -1535,7 +1384,7 @@ impl parser {
 			token = tokens[i]
 		}
 
-		if token.Id == lex::TokenId.Unsafe {
+		if token.Id == token::Id.Unsafe {
 			if i+1 >= len(tokens) {
 				self.pushErr(token, build::LogMsg.InvalidSyntax)
 				ret nil
@@ -1544,7 +1393,7 @@ impl parser {
 			token = tokens[i]
 		}
 
-		if token.Id != lex::TokenId.Fn {
+		if token.Id != token::Id.Fn {
 			self.pushErr(token, build::LogMsg.InvalidSyntax)
 			ret nil
 		}
@@ -1552,26 +1401,26 @@ impl parser {
 		ret self.buildFn(tokens, true, false)
 	}
 
-	fn parseImplBody(mut &self, mut &ipl: &ast::Impl, mut &tokens: []&lex::Token) {
+	fn parseImplBody(mut &self, mut &ipl: &ast::Impl, mut &tokens: []&token::Token) {
 		mut stmts := splitStmts(tokens)
 		for (_, mut stmt) in stmts {
 			tokens = stmt.tokens
 			mut token := tokens[0]
 			match token.Id {
-			| lex::TokenId.Hash:
+			| token::Id.Hash:
 				self.pushDirective(self.buildDirective(tokens))
 				continue
 			}
 
 			match token.Id {
-			| lex::TokenId.Const:
+			| token::Id.Const:
 				mut v := self.buildVar(tokens)
 				if v != nil {
 					ipl.Statics = append(ipl.Statics, v)
 				}
-			| lex::TokenId.Static
-			| lex::TokenId.Fn
-			| lex::TokenId.Unsafe:
+			| token::Id.Static
+			| token::Id.Fn
+			| token::Id.Unsafe:
 				mut f := self.getMethod(tokens)
 				if f != nil {
 					self.checkMethodReceiver(f)
@@ -1585,7 +1434,7 @@ impl parser {
 		}
 	}
 
-	fn buildImpl(mut &self, mut tokens: []&lex::Token): &ast::Impl {
+	fn buildImpl(mut &self, mut tokens: []&token::Token): &ast::Impl {
 		mut token := tokens[0]
 		if len(tokens) < 2 {
 			self.pushErr(token, build::LogMsg.InvalidSyntax)
@@ -1608,8 +1457,8 @@ impl parser {
 		}
 
 		token = tokens[i]
-		if token.Id != lex::TokenId.For {
-			if token.Id == lex::TokenId.LBrace {
+		if token.Id != token::Id.For {
+			if token.Id == token::Id.LBrace {
 				// This implementation is single.
 				// Just implements to destination.
 				// Therefore, swap Base and Dest tokens.
@@ -1641,7 +1490,7 @@ impl parser {
 		}
 
 	body:
-		mut bodyTokens := range(i, lex::TokenId.LBrace, lex::TokenId.RBrace, tokens)
+		mut bodyTokens := range(i, token::Id.LBrace, token::Id.RBrace, tokens)
 		if bodyTokens == nil {
 			self.stop()
 			self.pushErr(token, build::LogMsg.BodyNotExist)
@@ -1656,32 +1505,32 @@ impl parser {
 		ret ipl
 	}
 
-	fn buildNodeData(mut &self, mut &tokens: []&lex::Token): ast::NodeData {
+	fn buildNodeData(mut &self, mut &tokens: []&token::Token): ast::NodeData {
 		mut token := tokens[0]
 		match token.Id {
-		| lex::TokenId.Fn
-		| lex::TokenId.Unsafe:
+		| token::Id.Fn
+		| token::Id.Unsafe:
 			mut f := self.buildFn(tokens, false, false)
 			if f != nil {
 				f.Global = true
 			}
 			ret f
-		| lex::TokenId.Let
-		| lex::TokenId.Const
-		| lex::TokenId.Mut
-		| lex::TokenId.Static:
+		| token::Id.Let
+		| token::Id.Const
+		| token::Id.Mut
+		| token::Id.Static:
 			ret self.buildVar(tokens)
-		| lex::TokenId.Type:
+		| token::Id.Type:
 			ret self.buildTypeAliasDecl(tokens)
-		| lex::TokenId.Enum:
+		| token::Id.Enum:
 			ret self.buildNodeEnumDecl(tokens)
-		| lex::TokenId.Struct:
+		| token::Id.Struct:
 			ret self.buildStructDecl(tokens)
-		| lex::TokenId.Trait:
+		| token::Id.Trait:
 			ret self.buildTraitDecl(tokens)
-		| lex::TokenId.Impl:
+		| token::Id.Impl:
 			ret self.buildImpl(tokens)
-		| lex::TokenId.Cpp:
+		| token::Id.Cpp:
 			ret self.buildBind(tokens)
 		|:
 			self.pushErr(token, build::LogMsg.InvalidSyntax)
@@ -1727,27 +1576,27 @@ impl parser {
 		}
 	}
 
-	fn pushMetaNodes(mut &self, mut &tokens: []&lex::Token): bool {
+	fn pushMetaNodes(mut &self, mut &tokens: []&token::Token): bool {
 		match tokens[0].Id {
-		| lex::TokenId.Use:
+		| token::Id.Use:
 			const Binded = false
 			mut decl := self.buildUseDecl(tokens, Binded)
 			self.pushUseDecl(decl)
 			ret true
-		| lex::TokenId.Cpp:
-			if len(tokens) > 1 && tokens[1].Id == lex::TokenId.Use {
+		| token::Id.Cpp:
+			if len(tokens) > 1 && tokens[1].Id == token::Id.Use {
 				mut decl := self.buildBindUse(tokens)
 				self.pushUseDecl(decl)
 				ret true
 			}
-		| lex::TokenId.Hash:
+		| token::Id.Hash:
 			self.pushDirective(self.buildDirective(tokens))
 			ret true
 		}
 		ret false
 	}
 
-	fn parseNode(mut &self, mut &st: []&lex::Token): ast::Node {
+	fn parseNode(mut &self, mut &st: []&token::Token): ast::Node {
 		mut node := ast::Node{
 			Token: st[0],
 		}
@@ -1771,7 +1620,7 @@ impl parser {
 		ret node
 	}
 
-	fn appendNode(mut &self, mut &st: []&lex::Token) {
+	fn appendNode(mut &self, mut &st: []&token::Token) {
 		if len(st) == 0 {
 			ret
 		}
@@ -1781,7 +1630,7 @@ impl parser {
 		}
 	}
 
-	fn removeRange(self, mut i: int, id: lex::TokenId, &tokens: []&lex::Token, mut &ranges: []int) {
+	fn removeRange(self, mut i: int, id: token::Id, &tokens: []&token::Token, mut &ranges: []int) {
 		close := getCloseOfBrace(id)
 		for i >= 0; i-- {
 			tok := tokens[ranges[i]]
@@ -1793,26 +1642,26 @@ impl parser {
 		}
 	}
 
-	fn pushWrongOrderCloseErr(mut self, &t: &lex::Token, &tokens: []&lex::Token, &ranges: []int) {
+	fn pushWrongOrderCloseErr(mut self, &t: &token::Token, &tokens: []&token::Token, &ranges: []int) {
 		match tokens[ranges[len(ranges)-1]].Id {
-		| lex::TokenId.LParent:
+		| token::Id.LParent:
 			self.pushErr(t, build::LogMsg.ExpectedParentClose)
-		| lex::TokenId.LBrace:
+		| token::Id.LBrace:
 			self.pushErr(t, build::LogMsg.ExpectedBraceClose)
-		| lex::TokenId.LBracket:
+		| token::Id.LBracket:
 			self.pushErr(t, build::LogMsg.ExpectedBracketClose)
 		}
 	}
 
-	fn pushRangeClose(mut self, t: &lex::Token, left: lex::TokenId, &tokens: []&lex::Token, mut &ranges: []int) {
+	fn pushRangeClose(mut self, t: &token::Token, left: token::Id, &tokens: []&token::Token, mut &ranges: []int) {
 		n := len(ranges)
 		if n == 0 {
 			match t.Id {
-			| lex::TokenId.RBracket:
+			| token::Id.RBracket:
 				self.pushErr(t, build::LogMsg.ExtraClosedBracket)
-			| lex::TokenId.RBrace:
+			| token::Id.RBrace:
 				self.pushErr(t, build::LogMsg.ExtraClosedBrace)
-			| lex::TokenId.RParent:
+			| token::Id.RParent:
 				self.pushErr(t, build::LogMsg.ExtraClosedParent)
 			}
 			ret
@@ -1822,38 +1671,38 @@ impl parser {
 		self.removeRange(n-1, t.Id, tokens, ranges)
 	}
 
-	fn checkRanges(mut self, &tokens: []&lex::Token) {
+	fn checkRanges(mut self, &tokens: []&token::Token) {
 		let mut ranges: []int = nil
 
 		for i, token in tokens {
 			match token.Id {
-			| lex::TokenId.LParent
-			| lex::TokenId.LBrace
-			| lex::TokenId.LBracket:
+			| token::Id.LParent
+			| token::Id.LBrace
+			| token::Id.LBracket:
 				ranges = append(ranges, i)
-			| lex::TokenId.RParent:
-				self.pushRangeClose(token, lex::TokenId.LParent, tokens, ranges)
-			| lex::TokenId.RBrace:
-				self.pushRangeClose(token, lex::TokenId.LBrace, tokens, ranges)
-			| lex::TokenId.RBracket:
-				self.pushRangeClose(token, lex::TokenId.LBracket, tokens, ranges)
+			| token::Id.RParent:
+				self.pushRangeClose(token, token::Id.LParent, tokens, ranges)
+			| token::Id.RBrace:
+				self.pushRangeClose(token, token::Id.LBrace, tokens, ranges)
+			| token::Id.RBracket:
+				self.pushRangeClose(token, token::Id.LBracket, tokens, ranges)
 			}
 		}
 
 		for _, i in ranges {
 			token := tokens[i]
 			match token.Id {
-			| lex::TokenId.LParent:
+			| token::Id.LParent:
 				self.pushErr(token, build::LogMsg.WaitCloseParent)
-			| lex::TokenId.LBrace:
+			| token::Id.LBrace:
 				self.pushErr(token, build::LogMsg.WaitCloseBrace)
-			| lex::TokenId.LBracket:
+			| token::Id.LBracket:
 				self.pushErr(token, build::LogMsg.WaitCloseBracket)
 			}
 		}
 	}
 
-	fn parse(mut &self, mut &f: &lex::File) {
+	fn parse(mut &self, mut &f: &token::Fileset) {
 		self.ast = &ast::AST{
 			File: f,
 		}
@@ -1875,7 +1724,7 @@ impl parser {
 			if len(stmt.tokens) < 2 {
 				ret
 			}
-			if stmt.tokens[0].Id != lex::TokenId.Hash {
+			if stmt.tokens[0].Id != token::Id.Hash {
 				break
 			}
 			if !build::IsTopDirective(stmt.tokens[1].Kind) {

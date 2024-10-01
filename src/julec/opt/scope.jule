@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use obj
-use env
-use path for std::fs::path
-use build for std::jule::build
-use constant for std::jule::constant
-use lex for std::jule::lex
-use sema for std::jule::sema
-use strings for std::strings
+use "env"
+use "obj"
+use "std/fs/path"
+use "std/jule/build"
+use "std/jule/constant"
+use "std/jule/sema"
+use "std/jule/token"
+use "std/strings"
 
 // Scope optimizer that applies target-independent optimizations.
 struct scopeOptimizer {
@@ -345,7 +345,7 @@ impl scopeOptimizer {
 	}
 
 	fn substr(mut &self, mut a: &sema::Assign): bool {
-		if a.Op.Id != lex::TokenId.Eq {
+		if a.Op.Id != token::Id.Eq {
 			ret false
 		}
 		match type a.Right.Model {
@@ -391,7 +391,7 @@ impl scopeOptimizer {
 	}
 
 	fn optimizeAssign(mut &self, mut assign: &sema::Assign) {
-		if assign.Op.Id == lex::TokenId.Eq &&
+		if assign.Op.Id == token::Id.Eq &&
 			equalModels(assign.Left.Model, assign.Right.Model) {
 			self.removeCurrent()
 			self.i-- // In next iteration, point to correct statement.
@@ -435,27 +435,27 @@ impl scopeOptimizer {
 		exprOptimizer.optimizeData(assign.Right.Model, self.data)
 
 		match assign.Op.Id {
-		| lex::TokenId.SolidusEq | lex::TokenId.PercentEq | lex::TokenId.ShlEq | lex::TokenId.ShrEq:
+		| token::Id.SolidusEq | token::Id.PercentEq | token::Id.ShlEq | token::Id.ShrEq:
 			// Do not check structures.
 			if !Math || assign.Left.Kind.Struct() != nil {
 				break
 			}
 			oldId, oldKind := assign.Op.Id, assign.Op.Kind
 			match assign.Op.Id {
-			| lex::TokenId.SolidusEq:
-				assign.Op.Id = lex::TokenId.Solidus
-				assign.Op.Kind = lex::TokenKind.Solidus
-			| lex::TokenId.PercentEq:
-				assign.Op.Id = lex::TokenId.Percent
-				assign.Op.Kind = lex::TokenKind.Percent
-			| lex::TokenId.ShlEq:
-				assign.Op.Id = lex::TokenId.Shl
-				assign.Op.Kind = lex::TokenKind.Shl
-			| lex::TokenId.ShrEq:
-				assign.Op.Id = lex::TokenId.Shr
-				assign.Op.Kind = lex::TokenKind.Shr
+			| token::Id.SolidusEq:
+				assign.Op.Id = token::Id.Solidus
+				assign.Op.Kind = token::Kind.Solidus
+			| token::Id.PercentEq:
+				assign.Op.Id = token::Id.Percent
+				assign.Op.Kind = token::Kind.Percent
+			| token::Id.ShlEq:
+				assign.Op.Id = token::Id.Shl
+				assign.Op.Kind = token::Kind.Shl
+			| token::Id.ShrEq:
+				assign.Op.Id = token::Id.Shr
+				assign.Op.Kind = token::Kind.Shr
 			|:
-				panic("implementation mistake, this panic call should be unreachable")
+				panic("opt: implementation mistake, this panic call should be unreachable")
 			}
 			mut b := &sema::BinaryExprModel{
 				Op: assign.Op,
@@ -468,9 +468,9 @@ impl scopeOptimizer {
 				// Binary model optimized.
 				// Use optimized model directly.
 				assign.Right = new(sema::OperandExprModel, *assign.Right)
-				b.Op = new(lex::Token, *b.Op) // Unsafe model wraps original model. Save token.
-				assign.Op.Id = lex::TokenId.Eq
-				assign.Op.Kind = lex::TokenKind.Eq
+				b.Op = new(token::Token, *b.Op) // Unsafe model wraps original model. Save token.
+				assign.Op.Id = token::Id.Eq
+				assign.Op.Kind = token::Kind.Eq
 				assign.Right.Model = model
 				ret
 			}
@@ -672,7 +672,7 @@ fn isUnreachableExpr(&expr: sema::ExprModel): bool {
 		ret c.IsBool() && !c.ReadBool()
 	| &sema::BinaryExprModel:
 		m := (&sema::BinaryExprModel)(expr)
-		if m.Op.Id == lex::TokenId.DblAmper {
+		if m.Op.Id == token::Id.DblAmper {
 			ret isUnreachableExpr(m.Left.Model) ||
 				isUnreachableExpr(m.Right.Model)
 		}

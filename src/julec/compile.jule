@@ -2,33 +2,20 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use env
-use opt::{self, OptLevel, Optimizer}
-use handle::{AnsiEscape, Logger, Throw}
-use obj::{IR}
-use cxx for obj::cxx
-use std::flag::{FlagSet}
-use std::fs::{FsError, OFlag, File, Directory, Status}
-use path for std::fs::path
-use integrated for std::jule::integrated
-use std::jule::sema::{
-	ImportInfo,
-	Package,
-	SemaFlag,
-}
-use build for std::jule::build::{
-	self,
-	LogMsg,
-	Log,
-	PathStdlib,
-	EntryPoint,
-	InitFn,
-	Logf,
-	IsValidCppExt,
-}
-use types for std::jule::types
-use std::process::{ProcessError, Cmd}
-use strings for std::strings::{StrBuilder}
+use "env"
+use "handle"
+use "obj"
+use "obj/cxx"
+use "opt"
+use "std/flag"
+use "std/fs"
+use "std/fs/path"
+use "std/jule/build"
+use integ "std/jule/integrated"
+use "std/jule/sema"
+use "std/jule/types"
+use "std/process"
+use "std/strings"
 
 static mut OutDir = "dist"
 static mut OutName = "ir.cpp"
@@ -40,24 +27,24 @@ fn init() {
 	env::Compiler = "clang"
 }
 
-fn openOutput(&path: str): &File {
+fn openOutput(&path: str): &fs::File {
 	dir := path::Dir(path)
 
-	Status.Of(dir) else {
-		Directory.Create(dir) else {
-			Throw("a problem occurs when code generation")
+	fs::Status.Of(dir) else {
+		fs::Directory.Create(dir) else {
+			handle::Throw("a problem occurs when code generation")
 		}
 	}
 
-	ret File.Create(path) else {
-		Throw("a problem occurs when code generation")
+	ret fs::File.Create(path) else {
+		handle::Throw("a problem occurs when code generation")
 		use nil
 	}
 }
 
 // Remove generated objects for compilation.
 fn clearObjects() {
-	File.Remove(getCompilePath()) else {
+	fs::File.Remove(getCompilePath()) else {
 		outln("a problem occurs when object cleaning")
 		ret
 	}
@@ -65,23 +52,23 @@ fn clearObjects() {
 	// All created objects are cleaned.
 	// So, deletes directory if empty after cleaned all objects,
 	// if not, leaves the directory.
-	Directory.Remove(OutDir) else {}
+	fs::Directory.Remove(OutDir) else {}
 }
 
 // Compie generated IR.
 fn compileIr(compiler: str, compilerCmd: str) {
-	mut cmd := Cmd.New(compiler)
+	mut cmd := process::Cmd.New(compiler)
 	cmd.Args = strings::Split(compilerCmd, " ", -1)
 	cmd.Spawn() else {
 		match error {
-		| ProcessError.NotExist:
-			AnsiEscape.Print(AnsiEscape.RedSeq, "back-end compiler could not used because of compiler path is not exist")
-		| ProcessError.Denied:
-			AnsiEscape.Print(AnsiEscape.RedSeq, "back-end compiler could not used because of permission denied")
+		| process::ProcessError.NotExist:
+			handle::AnsiEscape.Print(handle::AnsiEscape.RedSeq, "back-end compiler could not used because of compiler path is not exist")
+		| process::ProcessError.Denied:
+			handle::AnsiEscape.Print(handle::AnsiEscape.RedSeq, "back-end compiler could not used because of permission denied")
 		|:
-			AnsiEscape.Print(AnsiEscape.RedSeq, "back-end compiler could not used because of unknown problem")
+			handle::AnsiEscape.Print(handle::AnsiEscape.RedSeq, "back-end compiler could not used because of unknown problem")
 		}
-		Throw("")
+		handle::Throw("")
 	}
 	status := cmd.Wait()!
 	if status != 0 {
@@ -89,8 +76,8 @@ fn compileIr(compiler: str, compilerCmd: str) {
 >>> please check errors above
 >>> is this a compiler problem, please report us: https://github.com/julelang/jule/issues/new/choose`
 
-		AnsiEscape.Print(AnsiEscape.RedSeq, errorMessage)
-		Throw("")
+		handle::AnsiEscape.Print(handle::AnsiEscape.RedSeq, errorMessage)
+		handle::Throw("")
 	}
 
 	clearObjects()
@@ -101,10 +88,10 @@ fn isCppSourceFile(path: str): bool {
 	if offset == -1 {
 		ret false
 	}
-	ret IsValidCppExt(path[offset:])
+	ret build::IsValidCppExt(path[offset:])
 }
 
-fn pushCompCmdClang(mut &cmd: StrBuilder) {
+fn pushCompCmdClang(mut &cmd: strings::Builder) {
 	// Disable all warnings.
 	cmd.WriteStr("-Wno-everything ")
 
@@ -130,7 +117,7 @@ fn pushCompCmdClang(mut &cmd: StrBuilder) {
 	}
 }
 
-fn pushCompCmdGcc(mut &cmd: StrBuilder) {
+fn pushCompCmdGcc(mut &cmd: strings::Builder) {
 	// Disable all warnings.
 	cmd.WriteStr("-w ")
 
@@ -156,9 +143,9 @@ fn pushCompCmdGcc(mut &cmd: StrBuilder) {
 }
 
 // Generate compile command for backend-compiler.
-fn genCompileCmd(sourcePath: str, &ir: &IR): (str, str) {
+fn genCompileCmd(sourcePath: str, &ir: &obj::IR): (str, str) {
 	&compiler := env::CompilerPath
-	mut cmd := StrBuilder.New(1 << 6)
+	mut cmd := strings::Builder.New(1 << 6)
 
 	match env::Compiler {
 	| "gcc":
@@ -202,15 +189,15 @@ fn getCompilePath(): str {
 	ret path::Join(OutDir, OutName)
 }
 
-fn applyTargetIndependentOptimizations(mut &ir: &IR) {
-	mut opt := Optimizer.New(ir)
+fn applyTargetIndependentOptimizations(mut &ir: &obj::IR) {
+	mut opt := opt::Optimizer.New(ir)
 	opt.Optimize()
 }
 
 fn checkCompilerFlag() {
 	match env::Compiler {
 	| "":
-		Throw("missing option value: --compiler")
+		handle::Throw("missing option value: --compiler")
 	| "clang":
 		if env::CompilerPath == "" {
 			env::CompilerPath = "clang++"
@@ -220,7 +207,7 @@ fn checkCompilerFlag() {
 			env::CompilerPath = "g++"
 		}
 	|:
-		Throw("invalid option value for --compiler: " + env::Compiler)
+		handle::Throw("invalid option value for --compiler: " + env::Compiler)
 	}
 }
 
@@ -228,7 +215,7 @@ fn checkTargetArch(arch: str) {
 	if arch != build::DistArch.Amd64 &&
 		arch != build::DistArch.Arm64 &&
 		arch != build::DistArch.I386 {
-		Throw("--target: unsupported/undefined architecture: " + arch)
+		handle::Throw("--target: unsupported/undefined architecture: " + arch)
 	}
 }
 
@@ -236,18 +223,18 @@ fn checkTargetOs(os: str) {
 	if os != build::DistOs.Windows &&
 		os != build::DistOs.Linux &&
 		os != build::DistOs.Darwin {
-		Throw("--target: unsupported/undefined operating system: " + os)
+		handle::Throw("--target: unsupported/undefined operating system: " + os)
 	}
 }
 
 fn checkTargetFlag(&target: str) {
 	if target == "" {
-		Throw("missing option value: --target")
+		handle::Throw("missing option value: --target")
 	}
 
 	parts := strings::Split(target, "-", -1)
 	if len(parts) != 2 {
-		Throw("--target: undefined platform target format: " + target)
+		handle::Throw("--target: undefined platform target format: " + target)
 	}
 
 	os, arch := parts[0], parts[1]
@@ -265,16 +252,16 @@ fn checkTargetFlag(&target: str) {
 
 fn checkOptFlag(&opt: str) {
 	if opt == "" {
-		Throw("missing option value: --opt")
+		handle::Throw("missing option value: --opt")
 	}
 
 	match opt {
 	| "L0":
 		break
 	| "L1":
-		opt::PushOptLevel(OptLevel.L1)
+		opt::PushOptLevel(opt::OptLevel.L1)
 	|:
-		Throw("--opt: invalid optimization level: " + opt)
+		handle::Throw("--opt: invalid optimization level: " + opt)
 	}
 }
 
@@ -285,7 +272,7 @@ fn checkCppStdFlag() {
 	| "cpp20":
 		break
 	|:
-		Throw("--cppstd: invalid cpp standard: " + env::CppStd)
+		handle::Throw("--cppstd: invalid cpp standard: " + env::CppStd)
 	}
 }
 
@@ -293,7 +280,7 @@ fn checkFlags(&args: []str): []str {
 	mut opt := "L0"
 	mut target := "native-native"
 
-	mut fs := FlagSet.New()
+	mut fs := flag::FlagSet.New()
 
 	fs.AddVar[str](unsafe { (&str)(&opt) }, "opt", 0, "Optimization level")
 	fs.AddVar[str](unsafe { (&str)(&target) }, "target", 0, "Target system")
@@ -322,7 +309,7 @@ fn checkFlags(&args: []str): []str {
 	fs.AddVar[bool](unsafe { (&bool)(&opt::Dynamic) }, "opt-dynamic", 0, "Dynamic programming optimizations")
 
 	mut content := fs.Parse(args) else {
-		Throw(str(error))
+		handle::Throw(str(error))
 		use nil // Avoid error.
 	}
 
@@ -334,46 +321,46 @@ fn checkFlags(&args: []str): []str {
 	ret content
 }
 
-fn setupSemaFlags(mut &flags: SemaFlag) {
+fn setupSemaFlags(mut &flags: sema::Flag) {
 	if env::Shadowing {
-		flags |= SemaFlag.Shadowing
+		flags |= sema::Flag.Shadowing
 	}
 }
 
-fn buildIr(&args: []str): &IR {
+fn buildIr(&args: []str): &obj::IR {
 	content := checkFlags(args)
 
-	mut semaFlags := SemaFlag.Default
+	mut semaFlags := sema::Flag.Default
 	setupSemaFlags(semaFlags)
 
 	if len(content) == 0 {
-		Throw(Logf(LogMsg.MissingCompilePath))
+		handle::Throw(build::Logf(build::LogMsg.MissingCompilePath))
 	} else if len(content) > 1 {
-		Throw("undefined content: " + content[1])
+		handle::Throw("undefined content: " + content[1])
 	}
 	mut path, ok := path::Abs(content[0])
 	if !ok {
-		Throw("compile path could not processed because of a problem")
+		handle::Throw("compile path could not processed because of a problem")
 	}
 
 	// Check standard library.
-	inf := Status.Of(PathStdlib) else {
-		Throw(Logf(LogMsg.StdlibNotExist))
+	inf := fs::Status.Of(build::PathStdlib) else {
+		handle::Throw(build::Logf(build::LogMsg.StdlibNotExist))
 		ret nil // Avoid error.
 	}
 	if !inf.IsDir() {
-		Throw(Logf(LogMsg.StdlibNotExist))
+		handle::Throw(build::Logf(build::LogMsg.StdlibNotExist))
 	}
 
-	mut ir, logs := IR.Build(path, semaFlags)
+	mut ir, logs := obj::IR.Build(path, semaFlags)
 
 	if ir == nil && logs == nil {
-		Throw(Logf(LogMsg.NoFileInEntryPackage, path))
+		handle::Throw(build::Logf(build::LogMsg.NoFileInEntryPackage, path))
 	}
 
 	if logs != nil {
-		Logger.PrintLogs(logs)
-		Throw("")
+		handle::Logger.PrintLogs(logs)
+		handle::Throw("")
 	}
 
 	ret ir
@@ -391,9 +378,9 @@ fn compileCommand(mut &args: []str) {
 	const Binded = false
 
 	if !env::Test {
-		mut main := ir.Main.FindFn(EntryPoint, Binded)
+		mut main := ir.Main.FindFn(build::EntryPoint, Binded)
 		if main == nil {
-			Throw(Logf(LogMsg.NoEntryPoint))
+			handle::Throw(build::Logf(build::LogMsg.NoEntryPoint))
 		}
 	}
 
@@ -418,7 +405,7 @@ fn compileCommand(mut &args: []str) {
 
 	mut file := openOutput(compPath)
 	file.Write(unsafe { oc.Buf.Buf() }) else {
-		Throw("object code could not write")
+		handle::Throw("object code could not write")
 	}
 	file.Close()!
 

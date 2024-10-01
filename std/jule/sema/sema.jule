@@ -2,13 +2,14 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use ast for std::jule::ast
-use build for std::jule::build
-use constant for std::jule::constant
-use lex for std::jule::lex
-use mod for std::jule::internal::mod
-use types for std::jule::types
-use strings for std::strings
+use "std/jule/ast"
+use "std/jule/build"
+use "std/jule/constant"
+use "std/jule/internal/mod"
+use "std/jule/token"
+use "std/jule/types"
+use "std/strings"
+use "std/unicode/utf8"
 
 fn isValidModelForRef(mut &m: ExprModel): bool {
 	match type m {
@@ -19,7 +20,7 @@ fn isValidModelForRef(mut &m: ExprModel): bool {
 		ret model.Field != nil && isValidModelForRef(model.Expr.Model)
 	| &UnaryExprModel:
 		mut unary := (&UnaryExprModel)(m)
-		if unary.Op.Id != lex::TokenId.Star {
+		if unary.Op.Id != token::Id.Star {
 			ret false
 		}
 		// Return true because of raw pointer dereferencing is an Unsafe Jule feature.
@@ -44,7 +45,7 @@ fn isValidModelForRef(mut &m: ExprModel): bool {
 	}
 }
 
-fn compilerErr(&token: &lex::Token, line: bool, fmt: build::LogMsg, args: ...any): build::Log {
+fn compilerErr(&token: &token::Token, line: bool, fmt: build::LogMsg, args: ...any): build::Log {
 	mut log := build::Log{
 		Kind: build::LogKind.Error,
 		Row: token.Row,
@@ -58,18 +59,6 @@ fn compilerErr(&token: &lex::Token, line: bool, fmt: build::LogMsg, args: ...any
 	ret log
 }
 
-fn impIsLookupable(&i: &ImportInfo, &ident: str): bool {
-	if i.Binded {
-		ret false
-	}
-	if !i.ImportAll {
-		if len(i.Selected) > 0 {
-			ret i.existIdent(ident)
-		}
-	}
-	ret i.ImportAll
-}
-
 fn appendRetVars(mut &dest: []&Var, mut &f: &FnIns) {
 	if f.Decl.IsVoid() || f.Result == nil {
 		ret
@@ -77,7 +66,7 @@ fn appendRetVars(mut &dest: []&Var, mut &f: &FnIns) {
 
 	mut types := f.Types()
 	for (i, mut ident) in f.Decl.Result.Idents {
-		if lex::IsIgnoreIdent(ident.Kind) || lex::IsAnonIdent(ident.Kind) {
+		if token::IsIgnoreIdent(ident.Kind) || token::IsAnonIdent(ident.Kind) {
 			continue
 		}
 		dest = append(dest, &Var{
@@ -106,7 +95,7 @@ fn appendParamVars(mut &dest: []&Var, mut &f: &FnIns) {
 	}
 
 	for (_, mut p) in f.Params {
-		if lex::IsIgnoreIdent(p.Decl.Ident) || lex::IsAnonIdent(p.Decl.Ident) {
+		if token::IsIgnoreIdent(p.Decl.Ident) || token::IsAnonIdent(p.Decl.Ident) {
 			continue
 		}
 
@@ -201,7 +190,7 @@ fn appendGenericTypeAliases(mut &dest: []&TypeAlias, mut &f: &FnIns) {
 	}
 }
 
-fn findFile(mut &files: []&SymTab, &handler: &lex::File): &SymTab {
+fn findFile(mut &files: []&SymTab, &handler: &token::Fileset): &SymTab {
 	for (_, mut fl) in files {
 		if fl.File == handler {
 			ret fl
@@ -216,7 +205,7 @@ unsafe fn pushSuggestion(mut log: *build::Log, fmt: build::LogMsg, args: ...any)
 
 struct commonSemaMeta {
 	comptimeTypeInfos: []&comptimeTypeInfo
-	runtime:           &ImportInfo // Implicitly imported [std::runtime] package.
+	runtime:           &ImportInfo // Implicitly imported "std/runtime" package.
 }
 
 impl commonSemaMeta {
@@ -238,7 +227,7 @@ struct sema {
 	errors: []build::Log
 	files:  []&SymTab // Package files.
 	file:   &SymTab   // Current package file.
-	flags:  SemaFlag
+	flags:  Flag
 	meta:   &commonSemaMeta
 }
 
@@ -265,23 +254,6 @@ impl Lookup for sema {
 		if v != nil {
 			ret v
 		}
-
-		// If identifier is not public, it should be built-in or package define.
-		if !mod::IsPub(ident) {
-			ret nil
-		}
-
-		// Lookup current file's public denifes of imported packages.
-		for (_, mut imp) in self.file.Imports {
-			if !impIsLookupable(imp, ident) {
-				continue
-			}
-			v = imp.FindVar(ident, binded)
-			if v != nil && self.isAccessibleDefine(v.Public, v.Token) {
-				ret v
-			}
-		}
-
 		ret nil
 	}
 
@@ -297,23 +269,6 @@ impl Lookup for sema {
 		if ta != nil {
 			ret ta
 		}
-
-		// If identifier is not public, it should be built-in or package define.
-		if !mod::IsPub(ident) {
-			ret nil
-		}
-
-		// Lookup current file's public denifes of imported packages.
-		for (_, mut imp) in self.file.Imports {
-			if !impIsLookupable(imp, ident) {
-				continue
-			}
-			ta = imp.FindTypeAlias(ident, binded)
-			if ta != nil && self.isAccessibleDefine(ta.Public, ta.Token) {
-				ret ta
-			}
-		}
-
 		ret nil
 	}
 
@@ -328,22 +283,6 @@ impl Lookup for sema {
 		mut s := findStructInPackage(self.files, ident, binded)
 		if s != nil {
 			ret s
-		}
-
-		// If identifier is not public, it should be built-in or package define.
-		if !mod::IsPub(ident) {
-			ret nil
-		}
-
-		// Lookup current file's public denifes of imported packages.
-		for (_, mut imp) in self.file.Imports {
-			if !impIsLookupable(imp, ident) {
-				continue
-			}
-			s = imp.FindStruct(ident, binded)
-			if s != nil && self.isAccessibleDefine(s.Public, s.Token) {
-				ret s
-			}
 		}
 		ret nil
 	}
@@ -360,23 +299,6 @@ impl Lookup for sema {
 		if f != nil {
 			ret f
 		}
-
-		// If identifier is not public, it should be built-in or package define.
-		if !mod::IsPub(ident) {
-			ret nil
-		}
-
-		// Lookup current file's public denifes of imported packages.
-		for (_, mut imp) in self.file.Imports {
-			if !impIsLookupable(imp, ident) {
-				continue
-			}
-			f = imp.FindFn(ident, binded)
-			if f != nil && self.isAccessibleDefine(f.Public, f.Token) {
-				ret f
-			}
-		}
-
 		ret nil
 	}
 
@@ -392,23 +314,6 @@ impl Lookup for sema {
 		if t != nil {
 			ret t
 		}
-
-		// If identifier is not public, it should be built-in or package define.
-		if !mod::IsPub(ident) {
-			ret nil
-		}
-
-		// Lookup current file's public denifes of imported packages.
-		for (_, mut imp) in self.file.Imports {
-			if !impIsLookupable(imp, ident) {
-				continue
-			}
-			t = imp.FindTrait(ident)
-			if t != nil && self.isAccessibleDefine(t.Public, t.Token) {
-				ret t
-			}
-		}
-
 		ret nil
 	}
 
@@ -424,23 +329,6 @@ impl Lookup for sema {
 		if e != nil {
 			ret e
 		}
-
-		// If identifier is not public, it should be built-in or package define.
-		if !mod::IsPub(ident) {
-			ret nil
-		}
-
-		// Lookup current file's public denifes of imported packages.
-		for (_, mut imp) in self.file.Imports {
-			if !impIsLookupable(imp, ident) {
-				continue
-			}
-			e = imp.FindEnum(ident)
-			if e != nil && self.isAccessibleDefine(e.Public, e.Token) {
-				ret e
-			}
-		}
-
 		ret nil
 	}
 
@@ -456,35 +344,18 @@ impl Lookup for sema {
 		if e != nil {
 			ret e
 		}
-
-		// If identifier is not public, it should be built-in or package define.
-		if !mod::IsPub(ident) {
-			ret nil
-		}
-
-		// Lookup current file's public denifes of imported packages.
-		for (_, mut imp) in self.file.Imports {
-			if !impIsLookupable(imp, ident) {
-				continue
-			}
-			e = imp.FindTypeEnum(ident)
-			if e != nil && self.isAccessibleDefine(e.Public, e.Token) {
-				ret e
-			}
-		}
-
 		ret nil
 	}
 }
 
 impl sema {
 	// Reports whether flags has given flag.
-	fn isFlag(self, flags: SemaFlag): bool { ret self.flags&flags == flags }
+	fn isFlag(self, flags: Flag): bool { ret self.flags&flags == flags }
 
 	fn getCurrentFile(mut self): &SymTab { ret self.file }
 	fn setCurrentFile(mut self, mut f: &SymTab) { self.file = f }
 
-	fn pushErr(mut self, token: &lex::Token, fmt: build::LogMsg, args: ...any) {
+	fn pushErr(mut self, token: &token::Token, fmt: build::LogMsg, args: ...any) {
 		self.errors = append(self.errors, compilerErr(token, true, fmt, args...))
 	}
 
@@ -495,7 +366,7 @@ impl sema {
 
 	// Reports whether define is accessible in the current package.
 	// The public and token parameters belongs to define which is accessed.
-	fn isAccessibleDefine(self, public: bool, token: &lex::Token): bool {
+	fn isAccessibleDefine(self, public: bool, token: &token::Token): bool {
 		if public || token.File == nil {
 			// defins is public or built-in
 			ret true
@@ -507,7 +378,7 @@ impl sema {
 			ret true
 		}
 		// define is not public or in-package define
-		// but it may come from the std::runtime package
+		// but it may come from the runtime package
 		// so allow access if standard library package tries
 		if isStdPackage(tokenDir, "runtime") && isStdPackage(selfDir, "") {
 			ret true
@@ -523,14 +394,6 @@ impl sema {
 			if f.isDuplicatedIdent(itself, ident, binded) {
 				ret true
 			}
-
-			for _, imp in f.Imports {
-				for _, selected in imp.Selected {
-					if selected.Kind == ident {
-						ret true
-					}
-				}
-			}
 		}
 		ret false
 	}
@@ -544,7 +407,7 @@ impl sema {
 		dc.check()
 	}
 
-	fn checkGenericQuantity(mut self, required: int, given: int, token: &lex::Token): (ok: bool) {
+	fn checkGenericQuantity(mut self, required: int, given: int, token: &token::Token): (ok: bool) {
 		match {
 		| required == 0 && given > 0:
 			self.pushErr(token, build::LogMsg.NotHasGenerics)
@@ -563,19 +426,6 @@ impl sema {
 		}
 	}
 
-	fn isDuplicatedImportSelection(self, itself: uintptr, &ident: str): bool {
-		for _, imp in self.file.Imports {
-			if uintptr(imp) == itself {
-				// Don't scan trailing imports.
-				break
-			}
-			if imp.existIdent(ident) {
-				ret true
-			}
-		}
-		ret false
-	}
-
 	fn getImportDef(self, &ident: str, mut &imp: &ImportInfo): any {
 		if findPackageBuiltinDef(imp.LinkPath, ident) != nil {
 			ret true
@@ -591,7 +441,7 @@ impl sema {
 		ret nil
 	}
 
-	fn checkImportSelection[T](mut self, &ident: &lex::Token, &s: T): bool {
+	fn checkImportSelection[T](mut self, &ident: &token::Token, &s: T): bool {
 		if !self.isAccessibleDefine(s.Public, s.Token) {
 			self.pushErr(ident, build::LogMsg.IdentIsNotAccessible, ident.Kind)
 			self.pushSuggestion(build::LogMsg.MakePubToAccess)
@@ -605,56 +455,7 @@ impl sema {
 		ret true
 	}
 
-	fn checkImportSelectedSelections(mut self, mut &imp: &ImportInfo): (ok: bool) {
-		ok = true
-		for _, ident in imp.Selected {
-			if ident.Kind == lex::TokenKind.Self {
-				continue
-			}
-
-			if self.isDuplicatedImportSelection(uintptr(imp), ident.Kind) {
-				self.pushErr(ident, build::LogMsg.DuplicatedIdent, ident.Kind)
-				self.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
-				ok = false
-				continue
-			}
-
-			mut def := self.getImportDef(ident.Kind, imp)
-			match type def {
-			| bool:
-				// Pass, built-in.
-				continue
-			| &Var:
-				mut v := (&Var)(def)
-				ok = self.checkImportSelection(ident, v) && ok
-			| &TypeAlias:
-				mut ta := (&TypeAlias)(def)
-				ok = self.checkImportSelection(ident, ta) && ok
-			| &Struct:
-				mut s := (&Struct)(def)
-				ok = self.checkImportSelection(ident, s) && ok
-			| &Trait:
-				mut t := (&Trait)(def)
-				ok = self.checkImportSelection(ident, t) && ok
-			| &Enum:
-				mut e := (&Enum)(def)
-				ok = self.checkImportSelection(ident, e) && ok
-			| &TypeEnum:
-				mut e := (&TypeEnum)(def)
-				ok = self.checkImportSelection(ident, e) && ok
-			| &Fn:
-				mut f := (&Fn)(def)
-				ok = self.checkImportSelection(ident, f) && ok
-			|:
-				self.pushErr(ident, build::LogMsg.IdentNotExist, ident.Kind)
-				ok = false
-				continue
-			}
-		}
-		ret
-	}
-
-	fn checkImportsAllSelectionsFromCollection[T](mut self, &s: []T, &et: &lex::Token): bool {
+	fn checkImportsAllSelectionsFromCollection[T](mut self, &s: []T, &et: &token::Token): bool {
 		mut ok := true
 		for _, d in s {
 			if d.Public {
@@ -662,29 +463,6 @@ impl sema {
 			}
 		}
 		ret ok
-	}
-
-	fn checkImportAllSelections(mut self, &imp: &ImportInfo): (ok: bool) {
-		ok = true
-		for _, file in imp.Package.Files {
-			ok = self.checkImportsAllSelectionsFromCollection(file.Vars, imp.Token) && ok
-			ok = self.checkImportsAllSelectionsFromCollection(file.TypeAliases, imp.Token) && ok
-			ok = self.checkImportsAllSelectionsFromCollection(file.Structs, imp.Token) && ok
-			ok = self.checkImportsAllSelectionsFromCollection(file.Funcs, imp.Token) && ok
-			ok = self.checkImportsAllSelectionsFromCollection(file.Traits, imp.Token) && ok
-			ok = self.checkImportsAllSelectionsFromCollection(file.Enums, imp.Token) && ok
-			ok = self.checkImportsAllSelectionsFromCollection(file.TypeEnums, imp.Token) && ok
-		}
-		ret
-	}
-
-	fn checkImportSelections(mut self, mut &imp: &ImportInfo): (ok: bool) {
-		if len(imp.Selected) > 0 {
-			ret self.checkImportSelectedSelections(imp)
-		} else if imp.ImportAll {
-			ret self.checkImportAllSelections(imp)
-		}
-		ret true
 	}
 
 	fn isUseAliasDuplication(mut self, &imp: &ImportInfo): bool {
@@ -695,34 +473,52 @@ impl sema {
 			if imp2.Alias == imp.Alias {
 				ret true
 			}
-			// Catch identifiers of other use declarations.
-			if imp2.Ident == imp2.LinkPath && imp2.Ident == imp.Alias {
-				ret true
-			}
 		}
 		ret false
 	}
 
+	fn checkAutoAlias(mut self, mut &imp: &ImportInfo): bool {
+		if imp.LinkPath == "std/unsafe" {
+			// the "std/unsafe" package is able to use unsafe keyword as alias
+			ret true
+		}
+		valid := isValidImpAlias(imp.Alias)
+		if valid {
+			if self.isUseAliasDuplication(imp) {
+				self.pushErr(imp.Decl.Path, build::LogMsg.DuplicatedUseAlias, imp.Alias)
+				self.pushSuggestion(build::LogMsg.GiveAnAliasManually, imp.Decl.Path.Kind)
+			}
+		} else {
+			self.pushErr(imp.Decl.Path, build::LogMsg.AutoAliasFail, imp.Decl.Path.Kind)
+			self.pushSuggestion(build::LogMsg.GiveAnAliasManually, imp.Decl.Path.Kind)
+		}
+		ret valid
+	}
+
 	fn checkImport(mut self, mut &imp: &ImportInfo): bool {
-		if imp.Binded || len(imp.Package.Files) == 0 {
+		if imp.Binded {
 			ret true
 		}
 
-		// Check special cases for std::unsafe.
-		if imp.LinkPath == "std::unsafe" {
-			if imp.ImportAll || imp.Alias != "" || len(imp.Selected) > 0 {
-				self.pushErr(imp.Token, build::LogMsg.ExpectedPlainUseDecl, "use std::unsafe")
-				ret false
-			}
-		}
-
-		if len(imp.Alias) != 0 {
-			if lex::IsIgnoreIdent(imp.Alias) {
-				self.pushErr(imp.Token, build::LogMsg.IgnoreIdent)
+		if imp.Decl.Alias != nil { // custom alias found
+			if token::IsIgnoreIdent(imp.Alias) {
+				self.pushErr(imp.Decl.Token, build::LogMsg.IgnoreIdent)
 			} else if self.isUseAliasDuplication(imp) {
-				self.pushErr(imp.Token, build::LogMsg.DuplicatedUseAlias, imp.Alias)
+				self.pushErr(imp.Decl.Token, build::LogMsg.DuplicatedUseAlias, imp.Alias)
 				self.pushSuggestion(build::LogMsg.RenameUseAliasAvoidDuplication)
 			}
+
+			// Check special cases for the "std/unsafe" package.
+			if imp.LinkPath == "std/unsafe" {
+				self.pushErr(imp.Decl.Alias, build::LogMsg.ExpectedPlainUseDecl, `use "std/unsafe"`)
+				ret false
+			}
+		} else if !self.checkAutoAlias(imp) {
+			ret false
+		}
+
+		if len(imp.Package.Files) == 0 {
+			ret true
 		}
 
 		if !imp.Duplicate {
@@ -737,7 +533,7 @@ impl sema {
 				ret false
 			}
 		}
-		ret self.checkImportSelections(imp)
+		ret true
 	}
 
 	fn checkImports(mut self) {
@@ -913,7 +709,7 @@ impl sema {
 	}
 
 	fn checkAssignType(mut &self, destIsRef: bool, mut &dest: &TypeKind,
-		mut &d: &Data, mut errorToken: &lex::Token, mut refers: &ReferenceStack): bool {
+		mut &d: &Data, mut errorToken: &token::Token, mut refers: &ReferenceStack): bool {
 		if d.Decl {
 			self.pushErr(errorToken, build::LogMsg.InvalidExpr)
 			ret false
@@ -956,7 +752,7 @@ impl sema {
 	}
 
 	fn _checkTypeCompatibility(mut &self, mut &dest: &TypeKind, mut &src: &TypeKind,
-		mut errorToken: &lex::Token): bool {
+		mut errorToken: &token::Token): bool {
 		if src == nil {
 			ret false
 		}
@@ -974,7 +770,7 @@ impl sema {
 	}
 
 	fn checkTypeCompatibility(mut &self, mut &dest: &TypeKind,
-		mut &src: &TypeKind, mut &errorToken: &lex::Token): bool {
+		mut &src: &TypeKind, mut &errorToken: &token::Token): bool {
 		if self._checkTypeCompatibility(dest, src, errorToken) {
 			ret true
 		}
@@ -983,7 +779,7 @@ impl sema {
 	}
 
 	fn pushCompatiblityError(mut self, mut &dest: &TypeKind, mut &src: &Data,
-		mut &errorToken: &lex::Token) {
+		mut &errorToken: &token::Token) {
 		if src.untyped {
 			match {
 			| src.Constant.IsI64():
@@ -1001,7 +797,7 @@ impl sema {
 	}
 
 	fn checkTypeCompatibility1(mut &self, mut &dest: &TypeKind, mut &src: &Data,
-		mut &errorToken: &lex::Token): bool {
+		mut &errorToken: &token::Token): bool {
 		if self._checkTypeCompatibility(dest, src.Kind, errorToken) {
 			ret true
 		}
@@ -1079,7 +875,7 @@ impl sema {
 		ret ins
 	}
 
-	fn checkConstraintsFn(mut &self, mut &f: &FnIns, mut &et: &lex::Token, mut exist: &FnIns): bool {
+	fn checkConstraintsFn(mut &self, mut &f: &FnIns, mut &et: &token::Token, mut exist: &FnIns): bool {
 		mut cc := self.constraintChecker()
 		cc.et = et
 		cc.fi = f
@@ -1093,7 +889,7 @@ impl sema {
 		ret cc.check()
 	}
 
-	fn checkConstraintsStruct(mut &self, mut &s: &StructIns, mut &et: &lex::Token, mut exist: &StructIns): bool {
+	fn checkConstraintsStruct(mut &self, mut &s: &StructIns, mut &et: &token::Token, mut exist: &StructIns): bool {
 		mut cc := self.constraintChecker()
 		cc.et = et
 		cc.si = s
@@ -1189,7 +985,7 @@ impl sema {
 		})
 	}
 
-	fn checkRefValidityForInitExpr(mut &self, leftMut: bool, mut &d: &Data, mut &errorToken: &lex::Token): bool {
+	fn checkRefValidityForInitExpr(mut &self, leftMut: bool, mut &d: &Data, mut &errorToken: &token::Token): bool {
 		if !isValidModelForRef(d.Model) {
 			self.pushErr(errorToken, build::LogMsg.RefAssignNonVar)
 			ret false
@@ -1234,7 +1030,7 @@ impl sema {
 	}
 
 	fn checkValidityForInitExpr(mut &self, leftMut: bool, leftRef: bool,
-		&leftKind: &TypeKind, mut &d: &Data, mut &errorToken: &lex::Token): bool {
+		&leftKind: &TypeKind, mut &d: &Data, mut &errorToken: &token::Token): bool {
 		if leftMut && !d.Mutable {
 			// Check classical assignment mutability.
 			if d.Kind.Mutable() || d.Kind.Variadic {
@@ -1285,7 +1081,7 @@ impl sema {
 	}
 
 	fn checkTypeAliasDecl(mut &self, mut &ta: &TypeAlias, mut l: Lookup) {
-		if lex::IsIgnoreIdent(ta.Ident) {
+		if token::IsIgnoreIdent(ta.Ident) {
 			self.pushErr(ta.Token, build::LogMsg.IgnoreIdent)
 		}
 		self.checkTypeAliasDeclKind(ta, l)
@@ -1293,7 +1089,7 @@ impl sema {
 
 	// Checks type alias declaration with duplicated identifiers.
 	fn checkTypeAliasDeclDup(mut &self, mut &ta: &TypeAlias) {
-		if lex::IsIgnoreIdent(ta.Ident) {
+		if token::IsIgnoreIdent(ta.Ident) {
 			self.pushErr(ta.Token, build::LogMsg.IgnoreIdent)
 		}
 		if self.isDuplicatedIdent(uintptr(ta), ta.Ident, ta.Binded) {
@@ -1320,7 +1116,7 @@ impl sema {
 		for _, item in items {
 			if item.Ident == "" {
 				continue
-			} else if lex::IsIgnoreIdent(item.Ident) {
+			} else if token::IsIgnoreIdent(item.Ident) {
 				self.pushErr(item.Token, build::LogMsg.IgnoreIdent)
 			} else {
 				for _, citem in items {
@@ -1374,7 +1170,7 @@ impl sema {
 			| u64:
 				item.Value.Data.Constant = constant::Const.NewU64(n)
 			|:
-				panic("unimplemented enum int type, this panic call should be unreachable")
+				panic("sema: unimplemented enum int type, this panic call should be unreachable")
 			}
 			item.Value.Data.Model = item.Value.Data.Constant
 		} else {
@@ -1394,7 +1190,7 @@ impl sema {
 			| u64:
 				n = item.Value.Data.Constant.ReadU64()
 			|:
-				panic("unimplemented enum int type, this panic call should be unreachable")
+				panic("sema: unimplemented enum int type, this panic call should be unreachable")
 			}
 		}
 	}
@@ -1407,7 +1203,7 @@ impl sema {
 		| u64:
 			max = types::MaxU(prim.Str())
 		|:
-			panic("unimplemented enum int type, this panic call should be unrechable")
+			panic("sema: unimplemented enum int type, this panic call should be unrechable")
 		}
 
 		mut eval := self.eval(self)
@@ -1421,7 +1217,7 @@ impl sema {
 			| u64:
 				n = first.Value.Data.Constant.AsU64()
 			|:
-				panic("unimplemented enum int type, this panic call should be unreachable")
+				panic("sema: unimplemented enum int type, this panic call should be unreachable")
 			}
 		}
 		for (_, mut item) in e.Items[1:] {
@@ -1445,7 +1241,7 @@ impl sema {
 	}
 
 	fn checkEnumDecl(mut &self, mut &e: &Enum) {
-		if lex::IsIgnoreIdent(e.Ident) {
+		if token::IsIgnoreIdent(e.Ident) {
 			self.pushErr(e.Token, build::LogMsg.IgnoreIdent)
 		} else if self.isDuplicatedIdent(uintptr(e), e.Ident, false) {
 			self.pushErr(e.Token, build::LogMsg.DuplicatedIdent, e.Ident)
@@ -1465,7 +1261,7 @@ impl sema {
 			}
 		} else {
 			// Set to default type.
-			e.Kind = findBuiltinTypeAlias(PrimKind.Int).Kind
+			e.Kind = findBuiltinTypeAlias(types::Kind.Int).Kind
 		}
 
 		mut t := e.Kind.Kind.Prim()
@@ -1486,7 +1282,7 @@ impl sema {
 	}
 
 	fn checkTypeEnumDecl(mut &self, mut &e: &TypeEnum) {
-		if lex::IsIgnoreIdent(e.Ident) {
+		if token::IsIgnoreIdent(e.Ident) {
 			self.pushErr(e.Token, build::LogMsg.IgnoreIdent)
 		} else if self.isDuplicatedIdent(uintptr(e), e.Ident, false) {
 			self.pushErr(e.Token, build::LogMsg.DuplicatedIdent, e.Ident)
@@ -1551,7 +1347,7 @@ impl sema {
 	fn checkDeclGenerics(mut self, &generics: []&ast::GenericDecl): (ok: bool) {
 		ok = true
 		for i, g in generics {
-			if lex::IsIgnoreIdent(g.Ident) {
+			if token::IsIgnoreIdent(g.Ident) {
 				self.pushErr(g.Token, build::LogMsg.IgnoreIdent)
 				ok = false
 				continue
@@ -1595,10 +1391,10 @@ impl sema {
 				| j >= i:
 					// Skip current and following parameters.
 					break paramsLookup
-				| lex::IsIgnoreIdent(p.Ident)
-				| lex::IsIgnoreIdent(jp.Ident)
-				| lex::IsAnonIdent(p.Ident)
-				| lex::IsAnonIdent(jp.Ident):
+				| token::IsIgnoreIdent(p.Ident)
+				| token::IsIgnoreIdent(jp.Ident)
+				| token::IsAnonIdent(p.Ident)
+				| token::IsAnonIdent(jp.Ident):
 					// Skip anonymous parameters.
 					break paramsLookup
 				| p.Ident == jp.Ident:
@@ -1620,7 +1416,7 @@ impl sema {
 
 		// Check duplications.
 		for i, v in f.Result.Idents {
-			if lex::IsIgnoreIdent(v.Kind) || lex::IsAnonIdent(v.Kind) {
+			if token::IsIgnoreIdent(v.Kind) || token::IsAnonIdent(v.Kind) {
 				continue // Skip anonymous return variables.
 			}
 			// Lookup in generics.
@@ -1692,7 +1488,7 @@ impl sema {
 		}
 	}
 
-	fn catchTraitInheritCycle(mut &self, t1: &Trait, mut t2: &Trait, mut &message: strings::StrBuilder): (ok: bool) {
+	fn catchTraitInheritCycle(mut &self, t1: &Trait, mut t2: &Trait, mut &message: strings::Builder): (ok: bool) {
 		ok = true
 		for (_, mut i) in t2.Inherits {
 			if i.Kind == nil {
@@ -1738,7 +1534,7 @@ impl sema {
 				self.pushErr(it.Decl.Token, build::LogMsg.IllegalCycleRefersItself, t.Ident)
 				ok = false
 			} else {
-				mut message := strings::StrBuilder.New(1 << 6)
+				mut message := strings::Builder.New(1 << 6)
 				ok = ok && self.catchTraitInheritCycle(t, t2, message)
 				if message.Len() > 0 {
 					mut errMsg := message.Str()
@@ -1778,9 +1574,9 @@ impl sema {
 	}
 
 	fn checkTraitDeclMethod(mut &self, mut &f: &Fn) {
-		if lex::IsIgnoreIdent(f.Ident) {
+		if token::IsIgnoreIdent(f.Ident) {
 			self.pushErr(f.Token, build::LogMsg.IgnoreIdent)
-		} else if lex::IsAnonIdent(f.Ident) {
+		} else if token::IsAnonIdent(f.Ident) {
 			self.pushErr(f.Token, build::LogMsg.AnonFn)
 		}
 		f.sema = self
@@ -1828,7 +1624,7 @@ impl sema {
 	}
 
 	fn checkTraitDecl(mut &self, mut &t: &Trait) {
-		if lex::IsIgnoreIdent(t.Ident) {
+		if token::IsIgnoreIdent(t.Ident) {
 			self.pushErr(t.Token, build::LogMsg.IgnoreIdent)
 		} else if self.isDuplicatedIdent(uintptr(t), t.Ident, false) {
 			self.pushErr(t.Token, build::LogMsg.DuplicatedIdent, t.Ident)
@@ -1983,7 +1779,7 @@ impl sema {
 	// Checks variable declaration.
 	// Will not check duplicated identifiers.
 	fn checkVarDecl(mut &self, mut &decl: &Var, mut l: Lookup) {
-		if lex::IsIgnoreIdent(decl.Ident) {
+		if token::IsIgnoreIdent(decl.Ident) {
 			self.pushErr(decl.Token, build::LogMsg.IgnoreIdent)
 		}
 
@@ -2108,7 +1904,7 @@ impl sema {
 	}
 
 	fn checkStructDecl(mut &self, mut &s: &Struct) {
-		if lex::IsIgnoreIdent(s.Ident) {
+		if token::IsIgnoreIdent(s.Ident) {
 			self.pushErr(s.Token, build::LogMsg.IgnoreIdent)
 		} else if self.isDuplicatedIdent(uintptr(s), s.Ident, s.Binded) {
 			self.pushErr(s.Token, build::LogMsg.DuplicatedIdent, s.Ident)
@@ -2143,7 +1939,7 @@ impl sema {
 	}
 
 	fn checkFuncDecl(mut &self, mut &f: &Fn) {
-		if lex::IsIgnoreIdent(f.Ident) {
+		if token::IsIgnoreIdent(f.Ident) {
 			self.pushErr(f.Token, build::LogMsg.IgnoreIdent)
 		} else if f.IsAnon() {
 			self.pushErr(f.Token, build::LogMsg.AnonFn)
@@ -2180,7 +1976,7 @@ impl sema {
 		ret self.checkFuncDeclsBy(self.file.Funcs)
 	}
 
-	fn pushCycleError(self, &st1: str, &st2: str, mut &message: strings::StrBuilder) {
+	fn pushCycleError(self, &st1: str, &st2: str, mut &message: strings::Builder) {
 		const Padding = 7
 		refersTo := build::Logf(build::LogMsg.RefersTo, st1, st2)
 		m := message.Str()
@@ -2190,7 +1986,7 @@ impl sema {
 		message.WriteStr(m)
 	}
 
-	fn checkCrossCycle(self, &st1: &Struct, &st2: &Struct, mut &message: strings::StrBuilder): bool {
+	fn checkCrossCycle(self, &st1: &Struct, &st2: &Struct, mut &message: strings::Builder): bool {
 		for _, u in st2.Uses {
 			if u == st1 {
 				self.pushCycleError(st2.Ident, u.Ident, message)
@@ -2240,14 +2036,14 @@ impl sema {
 		}
 	}
 
-	fn checkDataForTypeInference(mut self, &d: &Data, &err_token: &lex::Token) {
+	fn checkDataForTypeInference(mut self, &d: &Data, &errToken: &token::Token) {
 		match {
 		| d.IsNil():
-			self.pushErr(err_token, build::LogMsg.NilForTypeInference)
+			self.pushErr(errToken, build::LogMsg.NilForTypeInference)
 		| d.IsVoid():
-			self.pushErr(err_token, build::LogMsg.VoidForTypeInference)
+			self.pushErr(errToken, build::LogMsg.VoidForTypeInference)
 		| d.Kind.Variadic:
-			self.pushErr(err_token, build::LogMsg.InvalidExprForTypeInference)
+			self.pushErr(errToken, build::LogMsg.InvalidExprForTypeInference)
 		}
 	}
 
@@ -2362,7 +2158,7 @@ impl sema {
 
 	// Checks new generics function instance.
 	// If instance is already exist, f will point to exist instantantiation.
-	fn checkGenericFn(mut &self, mut &f: &FnIns, mut &et: &lex::Token): (ok: bool, exist: bool) {
+	fn checkGenericFn(mut &self, mut &f: &FnIns, mut &et: &token::Token): (ok: bool, exist: bool) {
 		ok = self.reloadFnInsTypes(f)
 		f.reloaded = true
 		if !ok {
@@ -2408,7 +2204,7 @@ impl sema {
 	// Checks environment-dependent parts of structure instance.
 	// Which is contains fields and generic-type constraints.
 	// If generic instance will be check, errorToken should be passed.
-	fn checkStructEnv(mut &self, mut &s: &StructIns, mut errorToken: &lex::Token): (ok: bool) {
+	fn checkStructEnv(mut &self, mut &s: &StructIns, mut errorToken: &token::Token): (ok: bool) {
 		mut tc := typeChecker{
 			s: s.Decl.sema,
 			rootLookup: s.Decl.sema,
@@ -2505,7 +2301,7 @@ impl sema {
 		ret
 	}
 
-	fn precheckStructIns(mut &self, mut &s: &StructIns, mut errorToken: &lex::Token): (ok: bool) {
+	fn precheckStructIns(mut &self, mut &s: &StructIns, mut errorToken: &token::Token): (ok: bool) {
 		ok = self.checkStructEnv(s, errorToken)
 		if !ok {
 			ret false
@@ -2526,7 +2322,7 @@ impl sema {
 				f.Generics = append(f.Generics, &InsGeneric{Kind: arr.Elem})
 				ok, _ = self.checkGenericFn(f, field.Decl.Token)
 				if !ok {
-					panic("arrayCmp evaluation failed, this is an implementation mistake")
+					panic("sema: arrayCmp evaluation failed, this is an implementation mistake")
 				}
 				s.Refers.Push(f)
 			}
@@ -2686,7 +2482,7 @@ impl sema {
 		}
 	}
 
-	fn checkFnInsCaller(mut &self, mut &f: &FnIns, mut caller: &lex::Token) {
+	fn checkFnInsCaller(mut &self, mut &f: &FnIns, mut caller: &token::Token) {
 		if f.Decl.Binded {
 			ret
 		}
@@ -3038,7 +2834,7 @@ push:
 	}
 }
 
-fn pushRuntimeToStr(mut &s: &sema, mut &t: &TypeKind, mut &token: &lex::Token,
+fn pushRuntimeToStr(mut &s: &sema, mut &t: &TypeKind, mut &token: &token::Token,
 	mut refers: &ReferenceStack) {
 	if s.meta.runtime == nil || t.IsNil() {
 		ret
@@ -3052,4 +2848,30 @@ fn pushRuntimeToStr(mut &s: &sema, mut &t: &TypeKind, mut &token: &lex::Token,
 	if refers != nil {
 		refers.Push(f)
 	}
+}
+
+// Reports whether the alias valid for the import alias.
+// Designed to check auto aliases.
+fn isValidImpAlias(mut alias: str): (valid: bool) {
+	if token::IsIgnoreIdent(alias) {
+		ret false
+	}
+	if token::IsKeyword(alias) {
+		ret false
+	}
+	mut r, mut size := utf8::DecodeRuneStr(alias)
+	if r != '_' && !token::IsLetter(r) {
+		ret false
+	}
+	for {
+		alias = alias[size:]
+		if len(alias) == 0 {
+			break
+		}
+		r, size = utf8::DecodeRuneStr(alias)
+		if r != '_' && !('0' <= r && r <= '9') && !token::IsLetter(r) {
+			ret false
+		}
+	}
+	ret true
 }

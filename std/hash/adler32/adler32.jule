@@ -45,7 +45,25 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // ====================================================
 
-use hash for std::hash
+use "std/hash"
+
+// The size of an Adler-32 checksum in bytes.
+const Size = 4
+
+// Returns a new hash::Hash32 computing the Adler-32 checksum. Its
+// Sum method will lay the value out in big-endian byte order.
+fn New(): hash::Hash32 {
+	mut d := new(adler32)
+	d.Reset()
+	ret d
+}
+
+// Returns the Adler-32 checksum of data.
+fn Checksum(data: []byte): u32 {
+	mut d := adler32{d: 1}
+	d.update(data)
+	ret u32(d.d)
+}
 
 // Largest prime that is less than 65536.
 const mod = 65521
@@ -62,31 +80,13 @@ const marshaledSize = len(magic) + 4
 // The low 16 bits are s1, the high 16 bits are s2.
 type digest: u32
 
-struct Adler32 {
+struct adler32 {
 	d: digest
 }
 
-impl hash::Hash32 for Adler32 {}
+impl hash::Hash32 for adler32 {}
 
-impl Adler32 {
-	// The size of an Adler-32 checksum in bytes.
-	const Size = 4
-
-	// Returns a new hash::Hash32 computing the Adler-32 checksum. Its
-	// Sum method will lay the value out in big-endian byte order.
-	static fn New(): hash::Hash32 {
-		mut d := new(Adler32)
-		d.Reset()
-		ret d
-	}
-
-	// Returns the Adler-32 checksum of data.
-	static fn Checksum(data: []byte): u32 {
-		mut d := Adler32{d: 1}
-		d.update(data)
-		ret u32(d.d)
-	}
-
+impl adler32 {
 	// Add p to the running checksum.
 	fn update(mut self, p: []byte) {
 		mut s1 := u32(self.d & 0xffff)
@@ -125,7 +125,7 @@ impl Adler32 {
 		self.d = 1
 	}
 
-	fn Size(self): int { ret Adler32.Size }
+	fn Size(self): int { ret Size }
 
 	fn BlockSize(self): int { ret 4 }
 

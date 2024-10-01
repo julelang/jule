@@ -9,7 +9,7 @@ That's why paths are adjusted accordingly.
 
 # Introduction to JuleC
 
-> Some important parts of the reference compiler are publicly available in the standard library. See [`std::jule`](https://github.com/julelang/jule/tree/master/std/jule) library.
+> Some important parts of the reference compiler are publicly available in the standard library. See [`std/jule`](https://github.com/julelang/jule/tree/master/std/jule) library.
 
 <img width="1617" alt="JuleC" src="https://github.com/julelang/jule/assets/54983926/648b9942-8662-4ba0-9ff8-bf66c32e0ba6">
 
@@ -40,7 +40,7 @@ This stage is the stage where the compiler generates object code.
 
 ### 1. Lexer
 
-The package [``./lex``](https://github.com/julelang/jule/tree/master/std/jule/lex) is Lexer. \
+The package [``./token``](https://github.com/julelang/jule/tree/master/std/jule/token) is Lexer. \
 Makes lexical analysis and segments Jule source code into tokens.
 
 ### 2. Parser
