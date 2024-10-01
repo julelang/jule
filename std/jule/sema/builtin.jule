@@ -201,19 +201,6 @@ fn findBuiltinDef(&ident: str): any {
 	ret nil
 }
 
-fn findBuiltinDefStdDebug(&ident: str): any {
-	match ident {
-	| "Out":
-		static mut f = &FnIns{caller: builtinCallerStdDebugOut}
-		ret f
-	| "Outln":
-		static mut f = &FnIns{caller: builtinCallerStdDebugOutln}
-		ret f
-	|:
-		ret nil
-	}
-}
-
 fn findBuiltinDefStdMem(&ident: str): any {
 	match ident {
 	| "SizeOf":
@@ -274,8 +261,6 @@ fn findPackageBuiltinDef(&linkPath: str, &ident: str): any {
 	match linkPath {
 	| "std/comptime":
 		ret findBuiltinDefStdComptime(ident)
-	| "std/debug":
-		ret findBuiltinDefStdDebug(ident)
 	| "std/mem":
 		ret findBuiltinDefStdMem(ident)
 	| "std/jule/integrated":
@@ -1115,22 +1100,4 @@ fn builtinCallerStdJuleIntegratedEmit(mut &e: &eval, mut &fc: &ast::FnCallExpr, 
 
 	r.Model = model
 	ret r
-}
-
-fn builtinCallerStdDebugOut(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &d: &Data): &Data {
-	d = builtinCallerOut(e, fc, d)
-	if d == nil {
-		ret nil
-	}
-	(&BuiltinOutCallExprModel)(d.Model).Debug = true
-	ret d
-}
-
-fn builtinCallerStdDebugOutln(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &d: &Data): &Data {
-	d = builtinCallerOutln(e, fc, d)
-	if d == nil {
-		ret nil
-	}
-	(&BuiltinOutlnCallExprModel)(d.Model).Debug = true
-	ret d
 }
