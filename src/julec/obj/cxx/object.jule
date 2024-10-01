@@ -650,22 +650,6 @@ impl ObjectCoder {
 		self.write(";")
 	}
 
-	fn structureDestructor(mut &self, mut &s: &sema::StructIns) {
-		// Dispose method must be non-static
-		const Static = false
-		mut disposeMethod := s.FindMethod("Dispose", Static)
-		mut disposed := sema::FuncPattern.Dispose(disposeMethod)
-		// Call destructor if implemented.
-		if !disposed {
-			ret
-		}
-		self.write("~")
-		identCoder.structureIns(self.Buf, s)
-		self.write("(void) { ")
-		identCoder.func(self.Buf, disposeMethod)
-		self.write("(this); }")
-	}
-
 	fn structureOperatorEq(mut &self, ident: str, mut &s: &sema::StructIns, decl: bool) {
 		if !defaultEq(s) {
 			ret
@@ -760,10 +744,6 @@ impl ObjectCoder {
 			self.fieldDecl(f)
 			self.write("\n")
 		}
-
-		self.indent()
-		self.structureDestructor(s)
-		self.write("\n\n")
 
 		self.doneIndent()
 		self.indent()
@@ -1393,12 +1373,7 @@ fn isHeadDecl(mut &m: &sema::Fn): bool {
 	if len(m.Generics) > 0 || len(m.Instances) == 0 {
 		ret false
 	}
-	if obj::IsOpMethod(m) {
-		ret true
-	}
-	mut mi := m.Instances[0]
-	const Static = false
-	ret sema::FuncPattern.Dispose(mi.Owner.FindMethod("Dispose", Static))
+	ret obj::IsOpMethod(m)
 }
 
 // Reports whether structure needs default compare method.
