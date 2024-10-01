@@ -571,8 +571,6 @@ impl eval {
 			goto data
 		}
 
-		v.Used = true
-
 		match type self.lookup {
 		| &sema:
 			// Check cycles for global scope.
@@ -604,9 +602,12 @@ impl eval {
 			self.pushReference[&Var](v)
 		}
 
-		// TODO: merge following separated checking analysis for variables.
-		if !v.Binded && v.Constant && v.Scope == nil && (v.Value == nil || v.Value.Data == nil) {
-			// Save source file of global constant variable.
+		// Kind or value is nil, no determined.
+		// In other word, not analyzed yet.
+		// But this variable is dependency, therefore check this for eval.
+		// Do not check if v.Used is true. It means it already analyzed.
+		if !v.Used && !v.Binded && v.Scope == nil && (v.Value == nil || v.Value.Data == nil) {
+			// Save source file of global variable.
 			// Use it for evaluation and checking for correct analysis.
 			// Otherwise, evaluation problems may occur.
 			// Especially if variable uses use declaration namespaces in expression.
@@ -614,46 +615,21 @@ impl eval {
 			mut file := self.s.getCurrentFile()
 			self.s.setCurrentFile(varfile)
 
-			// Eval constant dependent variable.
+			// Variable is in global scope.
+			// Use sema for lookup.
 			self.s.checkVar(v, self.s)
 
 			// Save the original file.
 			self.s.setCurrentFile(file)
 
 			if v.Value == nil || v.Value.Data == nil {
+				v.Used = true // Mark for analyze.
 				// Skip error.
 				ret nil
 			}
 		}
 
-		// Kind is nil, no determined.
-		// In other word, not analyzed yet.
-		// But this variable is dependency, therefore check this for eval.
-		if v.Kind == nil || v.Kind.Kind == nil {
-			// Just necessary for global scope, therefore
-			// execute if only scope is nil aka variable is not in global scope.
-			if v.Scope != nil {
-				ret nil
-			}
-
-			// Save source file of constant variable.
-			// Use it for evaluation and checking for correct analysis.
-			// Otherwise, evaluation problems may occur.
-			// Especially if variable uses use declaration namespaces in expression.
-			mut varfile := findVarFileInPackage(self.s.files, v)
-			mut file := self.s.getCurrentFile()
-			self.s.setCurrentFile(varfile)
-
-			self.s.checkVar(v, self.lookup)
-
-			// Save the original file.
-			self.s.setCurrentFile(file)
-
-			// Ignore eval, because analyze is failed.
-			if v.Kind == nil || v.Kind.Kind == nil {
-				ret nil
-			}
-		}
+		v.Used = true
 
 	data:
 		mut d := &Data{
