@@ -602,10 +602,12 @@ impl eval {
 			self.pushReference[&Var](v)
 		}
 
-		// Kind or value is nil, no determined.
+		// Value is nil, kind is not determined.
 		// In other word, not analyzed yet.
 		// But this variable is dependency, therefore check this for eval.
 		// Do not check if v.Used is true. It means it already analyzed.
+		// If variable is global, it should be have initialize expression.
+		// So, nil value means something may be wrong.
 		if !v.Used && !v.Binded && v.Scope == nil && (v.Value == nil || v.Value.Data == nil) {
 			// Save source file of global variable.
 			// Use it for evaluation and checking for correct analysis.
@@ -621,15 +623,14 @@ impl eval {
 
 			// Save the original file.
 			self.s.setCurrentFile(file)
-
-			if v.Value == nil || v.Value.Data == nil {
-				v.Used = true // Mark for analyze.
-				// Skip error.
-				ret nil
-			}
 		}
-
+		// variable guaranteed to be checked
+		// any missing information means analysis failed
+		// kind should not be nil because each variable must have a valid type
 		v.Used = true
+		if v.Kind == nil || v.Kind.Kind == nil {
+			ret nil
+		}
 
 	data:
 		mut d := &Data{
