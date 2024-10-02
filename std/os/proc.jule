@@ -4,6 +4,7 @@
 
 use "std/runtime"
 use "std/sys"
+use "std/os/internal"
 
 // Causes the current program to exit with the given status code.
 // Conventionally, code zero indicates success, non-zero an error.
@@ -32,7 +33,11 @@ fn Env(): []str {
 // Possible errors (Error):
 //  Denied
 fn Getwd()!: str {
-	ret getwd() else { error(error) }
+	wd := internal::Getwd()
+	if wd == "" {
+		error(getLastOsError())
+	}
+	ret wd
 }
 
 // Changes the current working directory to the given directory.
@@ -44,5 +49,8 @@ fn Chdir(path: str)! {
 	if path == "" {
 		error(Error.NotDir)
 	}
-	chdir(path) else { error(error) }
+	ok := internal::Chdir(path)
+	if !ok {
+		error(getLastOsError())
+	}
 }

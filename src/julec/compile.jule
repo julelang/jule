@@ -8,7 +8,6 @@ use "obj"
 use "obj/cxx"
 use "opt"
 use "std/flag"
-use "std/fs"
 use "std/jule/build"
 use integ "std/jule/integrated"
 use "std/jule/sema"
@@ -27,16 +26,16 @@ fn init() {
 	env::Compiler = "clang"
 }
 
-fn openOutput(&path: str): &fs::File {
+fn openOutput(&path: str): &os::File {
 	dir := filepath::Dir(path)
 
-	fs::Status.Of(dir) else {
-		fs::Directory.Create(dir) else {
+	os::Stat.Of(dir) else {
+		os::Dir.Create(dir) else {
 			handle::Throw("a problem occurs when code generation")
 		}
 	}
 
-	ret fs::File.Create(path) else {
+	ret os::File.Create(path) else {
 		handle::Throw("a problem occurs when code generation")
 		use nil
 	}
@@ -44,7 +43,7 @@ fn openOutput(&path: str): &fs::File {
 
 // Remove generated objects for compilation.
 fn clearObjects() {
-	fs::File.Remove(getCompilePath()) else {
+	os::File.Remove(getCompilePath()) else {
 		println("a problem occurs when object cleaning")
 		ret
 	}
@@ -52,7 +51,7 @@ fn clearObjects() {
 	// All created objects are cleaned.
 	// So, deletes directory if empty after cleaned all objects,
 	// if not, leaves the directory.
-	fs::Directory.Remove(OutDir) else {}
+	os::Dir.Remove(OutDir) else {}
 }
 
 // Compie generated IR.
@@ -344,7 +343,7 @@ fn buildIr(&args: []str): &obj::IR {
 	}
 
 	// Check standard library.
-	inf := fs::Status.Of(build::PathStdlib) else {
+	inf := os::Stat.Of(build::PathStdlib) else {
 		handle::Throw(build::Logf(build::LogMsg.StdlibNotExist))
 		ret nil // Avoid error.
 	}

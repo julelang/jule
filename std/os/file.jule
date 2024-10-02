@@ -1,4 +1,4 @@
-// Copyright 2023-2024 The Jule Programming Language.
+// Copyright 2024 The Jule Programming Language.
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
@@ -42,7 +42,7 @@ struct File {
 
 impl File {
 	// Returns new &File by handle.
-	static fn New(handle: uintptr): &File {
+	static unsafe fn New(handle: uintptr): &File {
 		ret &File{
 			handle: handle,
 		}
@@ -52,6 +52,7 @@ impl File {
 	// it is truncated. If the file does not exist, it is created with mode 0666
 	// (before umask). If successful, methods on the returned File can
 	// be used for I/O; the associated file descriptor has mode OFlag.Rdwr.
+	// Calls internally `File.Open` and forwards any exceptional.
 	static fn Create(path: str)!: &File {
 		ret File.Open(path, OFlag.Rdwr|OFlag.Create|OFlag.Trunc, 0666) else { error(error) }
 	}
@@ -60,14 +61,14 @@ impl File {
 	// First, learns byte-size of file.
 	// Then reads bytes and returns buffer.
 	//
-	// Possible errors:
+	// Possible errors (FSError):
 	//  Denied Exist Signal SyncIO IO IsDir Loop PerProcessLimit LongPath
 	//  SystemWideLimit NotExist UnableStream NoSpace NotDir Device Overflow
 	//  ReadOnly Retry Busy Device Seek InsufficientMemory Buffer
 	static fn Read(path: str)!: []byte {
-		s := Status.Of(path) else { error(error) }
+		s := Stat.Of(path) else { error(error) }
 		if !s.IsReg() {
-			error(Error.IsDir)
+			error(FSError.IsDir)
 		}
 
 		mut sz := int(s.Size())
@@ -102,6 +103,7 @@ impl File {
 	// otherwise truncates it before writing, without changing permissions.
 	// Since requires multiple system calls to complete, a failure mid-operation
 	// can leave the file in a partially written state.
+	// Calls internally `File.Open`, `File.Write`, `File.Close` and forwards any exceptional.
 	static fn Write(path: str, data: []byte, perm: int)! {
 		mut f := File.Open(path, OFlag.Wronly|OFlag.Create|OFlag.Trunc, perm) else { error(error) }
 		mut n := 0
@@ -117,7 +119,7 @@ impl File {
 	// whence: 0 (Seek.Set) means, relative to the origin of the file, 1 (Seek.Cur)
 	// means relative to the current offset, and 2 (Seek.End) means relative to end.
 	//
-	// Possible errors:
+	// Possible errors (FSError):
 	//  InvalidDescriptor SyncIO Overflow Seek
 	fn Seek(mut self, offset: int, origin: Seek)!: int {
 		pos := sys::Seek(int(self.handle), offset, int(origin))
@@ -129,7 +131,7 @@ impl File {
 
 	// Closes file handle.
 	//
-	// Possible errors:
+	// Possible errors (FSError):
 	//  InvalidDescriptor Signal IO
 	fn Close(mut self)! {
 		if sys::Close(int(self.handle)) == -1 {

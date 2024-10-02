@@ -5,23 +5,16 @@
 use integ "std/jule/integrated"
 use "std/sys"
 
-// Possible errors:
-//  Denied
-fn getwd()!: str {
+fn Getwd(): str {
 	let mut buf: [sys::MAX_PATH + 1]u16
 	n := unsafe { sys::GetCurrentDirectory(u32(len(buf)), &buf[0]) }
 	if n == 0 {
-		error(getLastOsError())
+		ret ""
 	}
 	ret unsafe { integ::U16PtrToStr(&buf[0]) }
 }
 
-// Possible errors:
-//  Denied NotExist Device
-fn chdir(path: str)! {
+fn Chdir(path: str): (ok: bool) {
 	utf16Path := integ::UTF16FromStr(path)
-	if unsafe { sys::SetCurrentDirectory(&utf16Path[0]) } {
-		ret
-	}
-	error(getLastOsError())
+	ret unsafe { sys::SetCurrentDirectory(&utf16Path[0]) }
 }

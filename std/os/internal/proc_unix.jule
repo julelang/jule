@@ -5,24 +5,17 @@
 use integ "std/jule/integrated"
 use "std/sys"
 
-// Possible errors:
-//  Denied
-fn getwd()!: str {
+fn Getwd(): str {
 	mut buf := unsafe { sys::Getcwd(nil, 0) }
 	if buf == nil {
-		error(getLastOsError())
+		ret ""
 	}
 	pwd := unsafe { integ::BytePtrToStr(buf) }
 	unsafe { integ::Free(buf) }
 	ret pwd
 }
 
-// Possible errors:
-//  Denied IO Loop LongPath NotExist NotDir InsufficientMemory
-fn chdir(path: str)! {
+fn Chdir(path: str): (ok: bool) {
 	s := integ::StrToBytes(path)
-	if unsafe { sys::Chdir(&s[0]) } == 0 {
-		ret
-	}
-	error(getLastOsError())
+	ret unsafe { sys::Chdir(&s[0]) } == 0
 }

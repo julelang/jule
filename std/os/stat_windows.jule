@@ -1,17 +1,17 @@
-// Copyright 2023-2024 The Jule Programming Language.
+// Copyright 2024 The Jule Programming Language.
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
 use integ "std/jule/integrated"
 use "std/sys"
 
-impl Status {
-	// Returns a Status describing the path.
+impl Stat {
+	// Returns a Stat describing the path.
 	//
-	// Possible errors: Denied IO Loop LongPath NotExist NotDir Overflow
-	static fn Of(path: str)!: &Status {
+	// Possible errors (FSError): Denied IO Loop LongPath NotExist NotDir Overflow
+	static fn Of(path: str)!: &Stat {
 		if path == "" {
-			error(Error.NotExist)
+			error(FSError.NotExist)
 		}
 		utf16Path := integ::UTF16FromStr(path)
 		mut handle := sys::SysStat{}
@@ -19,12 +19,12 @@ impl Status {
 		if code == -1 {
 			error(getLastFsError())
 		}
-		mut stat := new(Status)
+		mut stat := new(Stat)
 		stat.size = handle.st_size
 		if handle.st_mode&sys::S_IFDIR == sys::S_IFDIR {
-			stat.mode |= statusMode.Dir
+			stat.mode |= statMode.Dir
 		} else if handle.st_mode&sys::S_IFREG == sys::S_IFREG {
-			stat.mode |= statusMode.Reg
+			stat.mode |= statMode.Reg
 		}
 		ret stat
 	}

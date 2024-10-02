@@ -1,4 +1,4 @@
-// Copyright 2023-2024 The Jule Programming Language.
+// Copyright 2024 The Jule Programming Language.
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
@@ -6,13 +6,13 @@ use integ "std/jule/integrated"
 use "std/os/filepath"
 use "std/sys"
 
-impl Directory {
+impl Dir {
 	// Reads the named directory and returs all its directory entries can read.
 	//
-	// Possible errors:
+	// Possible errors (FSError):
 	//  Denied InvalidDescriptor PerProcessLimit SystemWideLimit
 	//  NotExist InsufficientMemory NotDir
-	static fn Read(path: str)!: (dirents: []&DirEntry) {
+	static fn Read(path: str)!: (dirents: []Dir) {
 		s := integ::StrToBytes(path)
 		mut dir := unsafe { sys::Opendir(&s[0]) }
 		if dir == nil {
@@ -24,8 +24,8 @@ impl Directory {
 				break
 			}
 			name := unsafe { integ::BytePtrToStr((*u8)(dirent.d_name)) }
-			mut stat := Status.Of(filepath::Join(path, name)) else { error(error) }
-			dirents = append(dirents, &DirEntry{
+			mut stat := Stat.Of(filepath::Join(path, name)) else { error(error) }
+			dirents = append(dirents, Dir{
 				Name: name,
 				Stat: stat,
 			})
@@ -36,7 +36,7 @@ impl Directory {
 
 	// Creates directory.
 	//
-	// Possible errors: Denied Exist ReadOnly NoSpace
+	// Possible errors (FSError): Denied Exist ReadOnly NoSpace
 	static fn Create(path: str)! {
 		// NOTICE
 		// Also can has EMLINK error-code.
@@ -49,7 +49,7 @@ impl Directory {
 
 	// Removes empty directory.
 	//
-	// Possible errors: Denined NotExist NotEmpty SyncIO IO Loop NotDir
+	// Possible errors (FSError): Denined NotExist NotEmpty SyncIO IO Loop NotDir
 	static fn Remove(path: str)! {
 		s := integ::StrToBytes(path)
 		if unsafe { sys::Rmdir(&s[0]) } != 0 {

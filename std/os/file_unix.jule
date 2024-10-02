@@ -1,12 +1,10 @@
-// Copyright 2023-2024 The Jule Programming Language.
+// Copyright 2024 The Jule Programming Language.
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
 use integ "std/jule/integrated"
 use "std/runtime"
 use "std/sys"
-use "std/unicode/utf16"
-use "std/unicode/utf8"
 
 impl File {
 	// Opens file stream with named file, specified flag
@@ -15,26 +13,26 @@ impl File {
 	// mode (before umask). If successful, returns File reference with handle
 	// to file stream and the reference can used for I/O operations.
 	//
-	// Possible errors:
+	// Possible errors (FSError):
 	//  Denied Exist Signal SyncIO IO IsDir Loop PerProcessLimit LongPath
 	//  SystemWideLimit NotExist UnableStream NoSpace NotDir Device Overflow
 	//  ReadOnly Retry Busy
 	static fn Open(path: str, flag: OFlag, mode: int)!: &File {
-		utf16Path := integ::UTF16FromStr(path)
-		handle := unsafe { sys::Wopen(&utf16Path[0], int(flag), mode) }
+		s := integ::StrToBytes(path)
+		handle := unsafe { sys::Open(&s[0], int(flag), mode) }
 		if handle == -1 {
 			error(getLastFsError())
 		}
-		ret File.New(uintptr(handle))
+		ret unsafe { File.New(uintptr(handle)) }
 	}
 
 	// Removes named file.
 	//
-	// Possible errors:
+	// Possible errors (FSError):
 	//  Denined Busy LongPath NotExist InsufficientMemory NotDir
 	static fn Remove(path: str)! {
-		utf16Path := integ::UTF16FromStr(path)
-		if unsafe { !sys::DeleteFile(&utf16Path[0]) } {
+		s := integ::StrToBytes(path)
+		if unsafe { sys::Unlink(&s[0]) } != 0 {
 			error(getLastFsError())
 		}
 	}
@@ -44,23 +42,14 @@ impl File {
 	// Writes bytes to handle and returns writed byte count.
 	// The number of bytes written can never exceed the length of the buf.
 	//
-	// Possible errors:
+	// Possible errors (FSError):
 	//  Retry InvalidDescriptor Big Signal IO NoSpace Pipe Range SyncIO
 	//  Seek Device Buffer
 	fn Write(mut self, buf: []byte)!: (n: int) {
 		if len(buf) == 0 {
 			ret 0
 		}
-
 		runtime::handleRW(buf)
-		if isConsoleHandle(self.handle) {
-			n = unsafe { runtime::writeConsole(self.handle, buf) }
-			if n == -1 {
-				error(getLastFsError())
-			}
-			ret n
-		}
-
 		n = unsafe { sys::Write(int(self.handle), &buf[0], uint(len(buf))) }
 		if n == -1 {
 			error(getLastFsError())
@@ -74,33 +63,18 @@ impl File {
 	// the buffer will not cause an overflow. Offset will be shifted
 	// by the number of bytes read.
 	//
-	// Possible errors:
+	// Possible errors (FSError):
 	//  Retry InvalidDescriptor Signal SyncIO IO IsDir Overflow Buffer
 	//  InsufficientMemory Device Seek
 	fn Read(mut self, mut buf: []byte)!: (n: int) {
 		if len(buf) == 0 {
 			ret 0
 		}
-
 		runtime::handleRW(buf)
-		if isConsoleHandle(self.handle) {
-			n = unsafe { runtime::readConsole(self.handle, buf) }
-			if n == -1 {
-				error(getLastFsError())
-			}
-			ret n
-		}
-
 		n = unsafe { sys::Read(int(self.handle), &buf[0], uint(len(buf))) }
 		if n == -1 {
 			error(getLastFsError())
 		}
 		ret n
 	}
-}
-
-fn isConsoleHandle(handle: uintptr): bool {
-	ret handle == sys::STDIN ||
-		handle == sys::STDOUT ||
-		handle == sys::STDERR
 }
