@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use "std/fs/path"
+use "std/os/filepath"
 use integ "std/jule/integrated"
 use "std/sys"
 
@@ -13,7 +13,7 @@ impl Directory {
 	//  Denied InvalidDescriptor PerProcessLimit SystemWideLimit
 	//  NotExist InsufficientMemory NotDir
 	static fn Read(path: str)!: (dirents: []&DirEntry) {
-		utf16Path := integ::UTF16FromStr(path::Join(path, "*"))
+		utf16Path := integ::UTF16FromStr(filepath::Join(path, "*"))
 		mut data := sys::Win32FindData{}
 		handle := unsafe { sys::FindFirstFile(&utf16Path[0], &data) }
 		if handle == sys::InvalidHandle {
@@ -23,7 +23,7 @@ impl Directory {
 			mut entry := &DirEntry{
 				Name: unsafe { integ::U16PtrToStr((*u16)(data.cFileName)) },
 			}
-			entry.Stat = Status.Of(path::Join(path, entry.Name)) else { error(error) }
+			entry.Stat = Status.Of(filepath::Join(path, entry.Name)) else { error(error) }
 			dirents = append(dirents, entry)
 			if unsafe { sys::FindNextFile(handle, &data) } == 0 {
 				break

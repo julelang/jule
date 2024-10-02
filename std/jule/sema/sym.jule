@@ -3,10 +3,10 @@
 // license that can be found in the LICENSE file.
 
 use "std/fs"
-use "std/fs/path"
 use "std/jule/ast"
 use "std/jule/build"
 use "std/jule/token"
+use "std/os/filepath"
 use "std/strings"
 use "std/unicode"
 use "std/unicode/utf8"
@@ -317,7 +317,7 @@ impl symBuilder {
 	}
 
 	fn checkCppUseDeclPath(mut self, &decl: &ast::UseDecl, &path: str): (ok: bool) {
-		ext := path::Ext(path)
+		ext := filepath::Ext(path)
 		if !build::IsValidHeaderExt(ext) && !build::IsValidCppExt(ext) {
 			self.pushErr(decl.Token, build::LogMsg.InvalidCppExt, ext)
 			ret false
@@ -340,14 +340,14 @@ impl symBuilder {
 		mut path := decl.Path.Kind[1:len(decl.Path.Kind)-1] // remove quotes
 
 		if !build::IsStdHeaderPath(path) {
-			path = path::Join(decl.Token.File.Dir(), path)
+			path = filepath::Join(decl.Token.File.Dir(), path)
 			mut ok := self.checkCppUseDeclPath(decl, path)
 			if !ok {
 				ret nil
 			}
 
 			// Set to absolute path for correct include path.
-			path, ok = path::Abs(path)
+			path, ok = filepath::Abs(path)
 			if !ok {
 				self.pushErr(decl.Token, build::LogMsg.UseNotFound, decl.Path.Kind)
 			}
@@ -374,8 +374,8 @@ impl symBuilder {
 			ret ""
 		}
 
-		filepath = path::Join(modPath, filepath)
-		filepath, ok := path::Abs(filepath)
+		filepath = filepath::Join(modPath, filepath)
+		filepath, ok := filepath::Abs(filepath)
 		if !ok {
 			self.pushErr(decl.Path, build::LogMsg.UseNotFound, decl.Path.Kind)
 			ret ""
@@ -397,8 +397,8 @@ impl symBuilder {
 	// Same as the [checkAbsPath] method but designed for std package paths.
 	fn checkStdAbsPath(mut &self, mut filepath: str, mut &decl: &ast::UseDecl): str {
 		filepath = filepath[len("std")+1:] // cut "std" + pathsep prefix
-		filepath = path::Join(build::PathStdlib, filepath)
-		filepath, ok := path::Abs(filepath)
+		filepath = filepath::Join(build::PathStdlib, filepath)
+		filepath, ok := filepath::Abs(filepath)
 		if !ok {
 			self.pushErr(decl.Path, build::LogMsg.UseNotFound, decl.Path.Kind)
 			ret ""
@@ -435,7 +435,7 @@ impl symBuilder {
 				self.pushErr(decl.Path, build::LogMsg.InvalidImportPath, decl.Path.Kind)
 				ret false, ""
 			}
-			filepath = path::Join(filepath, part)
+			filepath = filepath::Join(filepath, part)
 		}
 
 		// build absolute path
@@ -505,18 +505,18 @@ impl symBuilder {
 		if strings::HasPrefix(path, build::PathStdlib) {
 			path = path[len(build::PathStdlib):] // cut absolute path prefix
 			sb.WriteStr(`"std`)
-			sb.WriteStr(strings::Replace(path, str(path::Separator), build::ImportPathSep, -1))
+			sb.WriteStr(strings::Replace(path, str(filepath::Separator), build::ImportPathSep, -1))
 			sb.WriteByte('"')
 			ret sb.Str()
 		}
 
-		root, _ := path::Abs(self.importer.GetModPath())
+		root, _ := filepath::Abs(self.importer.GetModPath())
 		path = path[len(root):]
-		if path[0] == path::Separator {
+		if path[0] == filepath::Separator {
 			path = path[1:]
 		}
 		sb.WriteByte('"')
-		sb.WriteStr(strings::Replace(path, str(path::Separator), build::ImportPathSep, -1))
+		sb.WriteStr(strings::Replace(path, str(filepath::Separator), build::ImportPathSep, -1))
 		sb.WriteByte('"')
 		ret sb.Str()
 	}
