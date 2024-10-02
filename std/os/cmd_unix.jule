@@ -59,19 +59,19 @@ fn setenv(&envv: []str)! {
 	for _, env in envv {
 		i := fastbytes::FindByteStr(env, '=')
 		if i == -1 {
-			error(ProcessError.Env)
+			error(CmdError.Env)
 		}
 		unsafe {
 			key := integ::StrToBytes(env[:i])
 			if len(env)-i == 1 {
 				val := "\x00"
 				if cpp.setenv((*integ::Char)(&key[0]), (*integ::Char)(&val[0]), Overwrite) == -1 {
-					error(ProcessError.Env)
+					error(CmdError.Env)
 				}
 			} else {
 				val := integ::StrToBytes(env[i+1:])
 				if cpp.setenv((*integ::Char)(&key[0]), (*integ::Char)(&val[0]), Overwrite) == -1 {
-					error(ProcessError.Env)
+					error(CmdError.Env)
 				}
 			}
 		}
@@ -86,17 +86,17 @@ impl Cmd {
 		path := self.path
 		let pipe: [2]integ::Int
 		if unsafe { cpp.pipe(&pipe[0]) } == -1 {
-			error(ProcessError.Spawn)
+			error(CmdError.Spawn)
 		}
 		if sys::Fcntl(int(pipe[1]), cpp.F_SETFD, cpp.fcntl(int(pipe[1]), cpp.F_GETFD)|cpp.FD_CLOEXEC) == -1 {
 			sys::Close(int(pipe[0]))
 			sys::Close(int(pipe[1]))
-			error(ProcessError.Spawn)
+			error(CmdError.Spawn)
 		}
 		self.attrs.pid = cpp.fork()
 		match self.attrs.pid {
 		| -1:
-			error(ProcessError.Spawn)
+			error(CmdError.Spawn)
 		| 0:
 			sys::Close(int(pipe[0]))
 			mut args := make([]str, 1, 1+len(self.Args))
@@ -116,7 +116,7 @@ impl Cmd {
 			if n != 0 {
 				self.attrs.pid = invalidPid
 				code, _ := unsafe { conv::AtoiBp(&buf[0], n) }
-				error(processErrorFromCode(code))
+				error(cmdErrorFromCode(code))
 			}
 		}
 	}
@@ -126,7 +126,7 @@ impl Cmd {
 			panic("process: command is not spawned")
 		}
 		if cpp.kill(self.attrs.pid, 1) != 0 {
-			error(getLastProcessError())
+			error(getLastCmdError())
 		}
 		self.attrs.pid = invalidPid
 	}
@@ -138,10 +138,26 @@ impl Cmd {
 		mut stat := 0
 		unsafe {
 			if cpp.waitpid(self.attrs.pid, (*integ::Int)(&stat), 0) == -1 {
-				error(getLastProcessError())
+				error(getLastCmdError())
 			}
 		}
 		self.attrs.pid = invalidPid
 		ret cpp.WEXITSTATUS(stat)
 	}
+}
+
+fn cmdErrorFromCode(code: int): CmdError {
+	match code {
+	| sys::EACCES:
+		ret CmdError.Denied
+	| sys::ENOENT:
+		ret CmdError.NotExist
+	|:
+		ret CmdError.Other
+	}
+}
+
+// Returns last Cmd error by errno.
+fn getLastCmdError(): CmdError {
+	ret cmdErrorFromCode(sys::GetLastErrno())
 }

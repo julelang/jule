@@ -2,7 +2,16 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-// Cmd runs a command in the operating system.
+// Cmd error codes.
+enum CmdError {
+	Denied,   // Permission is not enough.
+	NotExist, // One or more components of the new process path name of the file do not exist or is a null pathname.
+	Env,      // Environment variables are represented in wrong format or an error occurred when assigning.
+	Spawn,    // An error occurred spawning.
+	Other,    // Other system error.
+}
+
+// Runs a command in the operating system.
 // There is no pipe for the output of the command,
 // so any output will appear on the standard output.
 //
@@ -32,6 +41,7 @@ impl Cmd {
 	// Spawns new child-process and executes command.
 	// Panics if command is already spawned.
 	// Use the [Wait] or [Kill] method to make respawnable.
+	// Exceptionals will always be CmdError.
 	fn Spawn(self)! {
 		self.spawn() else { error(error) }
 	}
@@ -39,6 +49,7 @@ impl Cmd {
 	// Kills process.
 	// Fails if process is not alive.
 	// Panics if command is not spawned.
+	// Exceptionals will always be CmdError.
 	fn Kill(self)! {
 		self.kill() else { error(error) }
 	}
@@ -46,6 +57,7 @@ impl Cmd {
 	// Waits complete for running of process.
 	// Returns exit code of process.
 	// Panics if command is not spawned.
+	// Exceptionals will always be CmdError.
 	fn Wait(self)!: int {
 		ret self.wait() else { error(error) }
 	}
