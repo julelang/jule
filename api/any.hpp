@@ -53,7 +53,8 @@ namespace jule
         template <typename T>
         Any(const jule::Ptr<T> &ref, jule::Any::Type *type) noexcept
         {
-            if (ref == nullptr) {
+            if (ref == nullptr)
+            {
                 // Pointer is nil, so can't able to use as base allocation.
                 // Make a nil any.
                 return;
@@ -177,6 +178,10 @@ namespace jule
 
         inline jule::Any &operator=(const jule::Any &src) noexcept
         {
+            // Assignment to itself.
+            if (this->data == src.data)
+                return *this;
+
             this->dealloc();
             this->data = src.data;
             this->type = src.type;

@@ -35,7 +35,7 @@ namespace jule
             auto buf = new (std::nothrow) jule::U8[len];
             if (!buf)
                 __jule_panic_s(__JULE_ERROR__MEMORY_ALLOCATION_FAILED
-                            "\nruntime: memory allocation failed for string");
+                               "\nruntime: memory allocation failed for string");
             std::memset(buf, 0, len);
             return buf;
         }
@@ -395,6 +395,14 @@ namespace jule
 
         jule::Str &operator=(const jule::Str &str)
         {
+            // Assignment to itself.
+            if (this->buffer.alloc == str.buffer.alloc)
+            {
+                this->_len = str._len;
+                this->_slice = str._slice;
+                return *this;
+            }
+            this->dealloc();
             this->buffer = str.buffer;
             this->_slice = str._slice;
             this->_len = str._len;
@@ -403,6 +411,7 @@ namespace jule
 
         jule::Str &operator=(jule::Str &&str)
         {
+            this->dealloc();
             this->buffer = std::move(str.buffer);
             this->_slice = str._slice;
             this->_len = str._len;
@@ -425,22 +434,22 @@ namespace jule
 
         jule::Bool operator<(const jule::Str &str) const noexcept
         {
-            return __jule_compareStr((jule::Str*)this, (jule::Str*)&str) == -1;
+            return __jule_compareStr((jule::Str *)this, (jule::Str *)&str) == -1;
         }
 
         inline jule::Bool operator<=(const jule::Str &str) const noexcept
         {
-            return __jule_compareStr((jule::Str*)this, (jule::Str*)&str) <= 0;
+            return __jule_compareStr((jule::Str *)this, (jule::Str *)&str) <= 0;
         }
 
         jule::Bool operator>(const jule::Str &str) const noexcept
         {
-            return __jule_compareStr((jule::Str*)this, (jule::Str*)&str) == +1;
+            return __jule_compareStr((jule::Str *)this, (jule::Str *)&str) == +1;
         }
 
         inline jule::Bool operator>=(const jule::Str &str) const noexcept
         {
-            return __jule_compareStr((jule::Str*)this, (jule::Str*)&str) >= 0;
+            return __jule_compareStr((jule::Str *)this, (jule::Str *)&str) >= 0;
         }
     };
 } // namespace jule

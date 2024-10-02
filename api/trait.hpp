@@ -81,7 +81,8 @@ namespace jule
         template <typename T>
         Trait(const jule::Ptr<T> &ref, jule::Trait::Type *type) noexcept
         {
-            if (ref == nullptr) {
+            if (ref == nullptr)
+            {
                 // Pointer is nil, so can't able to use as base allocation.
                 // Make a nil trait.
                 return;
@@ -227,6 +228,10 @@ namespace jule
 
         inline jule::Trait &operator=(const jule::Trait &src) noexcept
         {
+            // Assignment to itself.
+            if (this->data.alloc == src.data.alloc)
+                return *this;
+
             this->dealloc();
             this->__get_copy(src);
             return *this;

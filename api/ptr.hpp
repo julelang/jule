@@ -66,7 +66,7 @@ namespace jule
             buffer.alloc = new (std::nothrow) T;
             if (!buffer.alloc)
                 __jule_panic_s(__JULE_ERROR__MEMORY_ALLOCATION_FAILED
-                            "\nruntime: memory allocation failed for heap of smart pointer");
+                               "\nruntime: memory allocation failed for heap of smart pointer");
 
             *buffer.alloc = instance;
             buffer.ref = ref;
@@ -262,8 +262,9 @@ namespace jule
         jule::Ptr<T> &operator=(const jule::Ptr<T> &src) noexcept
         {
             // Assignment to itself.
-            if (this->alloc != nullptr && this->alloc == src.alloc)
+            if (this->alloc == src.alloc)
                 return *this;
+
             this->dealloc();
             this->__get_copy(src);
             return *this;

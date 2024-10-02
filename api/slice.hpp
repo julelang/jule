@@ -165,7 +165,7 @@ namespace jule
             Item *alloc = new (std::nothrow) Item[cap];
             if (!alloc)
                 __jule_panic_s(__JULE_ERROR__MEMORY_ALLOCATION_FAILED
-                            "\nruntime: heap allocation failed of slice");
+                               "\nruntime: heap allocation failed of slice");
 
 #ifdef __JULE_DISABLE__REFERENCE_COUNTING
             this->data = jule::Ptr<Item>::make(alloc, nullptr);
@@ -438,6 +438,14 @@ namespace jule
 
         jule::Slice<Item> &operator=(const jule::Slice<Item> &src) noexcept
         {
+            // Assignment to itself.
+            if (this->data.alloc == src.data.alloc)
+            {
+                this->_len = src._len;
+                this->_cap = src._cap;
+                this->_slice = src._slice;
+                return *this;
+            }
             this->dealloc();
             this->__get_copy(src);
             return *this;
