@@ -42,9 +42,9 @@ const structDefaultEqMethodSuffix = "_eq"
 const indentKind = '\t'
 
 // General pointer type for GC pointers.
-static mut generalGCPtr = &sema::TypeKind{
+static mut generalGCPtr = &sema::Type{
 	Kind: &sema::Sptr{
-		Elem: &sema::TypeKind{
+		Elem: &sema::Type{
 			Kind: &sema::Prim{
 				Kind: types::Kind.Uintptr,
 			},
@@ -89,13 +89,13 @@ struct ObjectCoder {
 	ir:          &obj::IR
 	info:        SerializationInfo
 	anons:       []&anonHash
-	deallocated: []&sema::TypeKind // GC deallocated types for dynamic programming.
+	deallocated: []&sema::Type // GC deallocated types for dynamic programming.
 
 	// Current indentation.
 	indentBuffer: []byte
 
 	resultMap:    map[str]bool
-	anyTypeMap:   []&sema::TypeKind
+	anyTypeMap:   []&sema::Type
 	traitCastMap: []traitCast
 	coSpawnMap:   []&sema::FnIns
 	traitMap:     []&traitHash
@@ -152,7 +152,7 @@ impl ObjectCoder {
 		self.Buf.Write(self.indentBuffer)!
 	}
 
-	fn findAnyType(mut &self, mut &t: &sema::TypeKind): int {
+	fn findAnyType(mut &self, mut &t: &sema::Type): int {
 		for (i, mut at) in self.anyTypeMap {
 			if at.Equal(t) {
 				ret i
@@ -264,7 +264,7 @@ impl ObjectCoder {
 		ret i
 	}
 
-	fn pushDealloc(mut &self, mut t: &sema::TypeKind): int {
+	fn pushDealloc(mut &self, mut t: &sema::Type): int {
 		for i, dt in self.deallocated {
 			if dt.Equal(t) {
 				ret i
@@ -322,7 +322,7 @@ impl ObjectCoder {
 		ret
 	}
 
-	fn pushAnyType(mut &self, mut t: &sema::TypeKind): int {
+	fn pushAnyType(mut &self, mut t: &sema::Type): int {
 		mut orig := t
 		if t.Enum() != nil {
 			t = t.Enum().Kind.Kind
@@ -615,7 +615,7 @@ impl ObjectCoder {
 					if !p.Decl.IsRef() {
 						kind.WriteStr("*")!
 					}
-					p.Kind = &sema::TypeKind{
+					p.Kind = &sema::Type{
 						Kind: &customType{
 							kind: kind.Str(),
 						},
@@ -1106,7 +1106,7 @@ impl ObjectCoder {
 		self.addIndent()
 		self.indent()
 		self.write(".dealloc=" + deallocatedTypeIdent)
-		self.write(conv::Itoa(self.pushDealloc(&sema::TypeKind{Kind: s})))
+		self.write(conv::Itoa(self.pushDealloc(&sema::Type{Kind: s})))
 		self.write(",\n")
 		self.traitDataMethods(hash, s)
 		self.doneIndent()

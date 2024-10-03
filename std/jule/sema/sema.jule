@@ -114,7 +114,7 @@ fn appendParamVars(mut &dest: []&Var, mut &f: &FnIns) {
 
 		match {
 		| p.Decl.IsSelf():
-			v.Kind.Kind = &TypeKind{
+			v.Kind.Kind = &Type{
 				Variadic: false,
 				Kind: f.Owner,
 			}
@@ -123,17 +123,17 @@ fn appendParamVars(mut &dest: []&Var, mut &f: &FnIns) {
 			if p.Decl.IsRef() {
 				v.Ident = v.Ident[1:] // Remove reference sign.
 				v.Kind.Kind.Kind = &Sptr{
-					Elem: &TypeKind{
+					Elem: &Type{
 						BindIdent: v.Kind.Kind.BindIdent,
 						Kind: v.Kind.Kind.Kind,
 					},
 				}
 			}
 		| p.Decl.Variadic:
-			v.Kind.Kind = &TypeKind{
+			v.Kind.Kind = &Type{
 				Variadic: false,
 				Kind: &Slc{
-					Elem: &TypeKind{
+					Elem: &Type{
 						BindIdent: p.Kind.BindIdent,
 						Kind: p.Kind.Kind,
 					},
@@ -209,7 +209,7 @@ struct commonSemaMeta {
 }
 
 impl commonSemaMeta {
-	fn pushComptimeTypeInfo(mut self, mut &t: &TypeKind): &comptimeTypeInfo {
+	fn pushComptimeTypeInfo(mut self, mut &t: &Type): &comptimeTypeInfo {
 		for (_, mut t2) in self.comptimeTypeInfos {
 			if t2.base.BindIdent == t.BindIdent && t2.base.Equal(t) {
 				ret t2
@@ -616,7 +616,7 @@ impl sema {
 
 	// Builds type, builds result as kind and collects referred type aliases.
 	fn buildTypeWithRefers(mut &self, mut &t: &ast::TypeDecl, mut l: Lookup,
-		mut generics: []&TypeAlias, mut referencer: &referencer): &TypeKind {
+		mut generics: []&TypeAlias, mut referencer: &referencer): &Type {
 		ret self.typeChecker(l, generics, referencer).checkDecl(t)
 	}
 
@@ -642,7 +642,7 @@ impl sema {
 	}
 
 	// Same as the checkType but takes referencer.
-	fn checkTypeRefers(mut &self, mut &t: &ast::TypeDecl, mut l: Lookup, mut refers: &ReferenceStack): &TypeKind {
+	fn checkTypeRefers(mut &self, mut &t: &ast::TypeDecl, mut l: Lookup, mut refers: &ReferenceStack): &Type {
 		mut tc := &typeChecker{
 			s: self,
 			rootLookup: l,
@@ -655,7 +655,7 @@ impl sema {
 	// Builds type with type aliases for generics.
 	// Returns nil if error occur or failed.
 	fn buildTypeWithGenerics(mut &self, mut &t: &ast::TypeDecl,
-		mut generics: []&TypeAlias, mut refers: &ReferenceStack): &TypeKind {
+		mut generics: []&TypeAlias, mut refers: &ReferenceStack): &Type {
 		mut tc := &typeChecker{
 			s: self,
 			rootLookup: self,
@@ -667,12 +667,12 @@ impl sema {
 	}
 
 	// Same as self.buildTypeWithGenerics but not uses any generics.
-	fn buildType(mut &self, mut &t: &ast::TypeDecl): &TypeKind {
+	fn buildType(mut &self, mut &t: &ast::TypeDecl): &Type {
 		ret self.buildTypeWithGenerics(t, nil, nil)
 	}
 
 	// Select type with name selection.
-	fn selectType(mut &self, mut &t: &ast::TypeDecl): &TypeKind {
+	fn selectType(mut &self, mut &t: &ast::TypeDecl): &Type {
 		mut tc := &typeChecker{
 			s: self,
 			rootLookup: self,
@@ -684,7 +684,7 @@ impl sema {
 
 	// Returns eval instance for configuration with
 	// type prefix and checks var dependencies.
-	fn evalpd(mut &self, mut l: Lookup, mut p: &TypeKind, mut owner: &Var): &eval {
+	fn evalpd(mut &self, mut l: Lookup, mut p: &Type, mut owner: &Var): &eval {
 		mut e := &eval{
 			s: self,
 			lookup: l,
@@ -699,7 +699,7 @@ impl sema {
 	}
 
 	// Returns eval instance for configuration with type prefix.
-	fn evalp(mut &self, mut l: Lookup, mut p: &TypeKind): &eval {
+	fn evalp(mut &self, mut l: Lookup, mut p: &Type): &eval {
 		ret self.evalpd(l, p, nil)
 	}
 
@@ -708,7 +708,7 @@ impl sema {
 		ret self.evalp(l, nil)
 	}
 
-	fn checkAssignType(mut &self, destIsRef: bool, mut &dest: &TypeKind,
+	fn checkAssignType(mut &self, destIsRef: bool, mut &dest: &Type,
 		mut &d: &Data, mut errorToken: &token::Token, mut refers: &ReferenceStack): bool {
 		if d.Decl {
 			self.pushErr(errorToken, build::LogMsg.InvalidExpr)
@@ -751,7 +751,7 @@ impl sema {
 		ret true
 	}
 
-	fn _checkTypeCompatibility(mut &self, mut &dest: &TypeKind, mut &src: &TypeKind,
+	fn _checkTypeCompatibility(mut &self, mut &dest: &Type, mut &src: &Type,
 		mut errorToken: &token::Token): bool {
 		if src == nil {
 			ret false
@@ -769,8 +769,8 @@ impl sema {
 		ret tcc.check()
 	}
 
-	fn checkTypeCompatibility(mut &self, mut &dest: &TypeKind,
-		mut &src: &TypeKind, mut &errorToken: &token::Token): bool {
+	fn checkTypeCompatibility(mut &self, mut &dest: &Type,
+		mut &src: &Type, mut &errorToken: &token::Token): bool {
 		if self._checkTypeCompatibility(dest, src, errorToken) {
 			ret true
 		}
@@ -778,7 +778,7 @@ impl sema {
 		ret false
 	}
 
-	fn pushCompatiblityError(mut self, mut &dest: &TypeKind, mut &src: &Data,
+	fn pushCompatiblityError(mut self, mut &dest: &Type, mut &src: &Data,
 		mut &errorToken: &token::Token) {
 		if src.untyped {
 			match {
@@ -796,7 +796,7 @@ impl sema {
 		self.pushErr(errorToken, build::LogMsg.IncompatibleTypes, dest.Str(), src.Kind.Str())
 	}
 
-	fn checkTypeCompatibility1(mut &self, mut &dest: &TypeKind, mut &src: &Data,
+	fn checkTypeCompatibility1(mut &self, mut &dest: &Type, mut &src: &Data,
 		mut &errorToken: &token::Token): bool {
 		if self._checkTypeCompatibility(dest, src.Kind, errorToken) {
 			ret true
@@ -811,8 +811,8 @@ impl sema {
 	// Useful:
 	//   - For non-generic type parsed string type kinds.
 	//   - For checking non-generic types.
-	fn buildNonGenericTypeKind(mut &self, mut &ast: &ast::TypeDecl,
-		mut &generics: []&ast::GenericDecl, mut &ignored: []&TypeKind): &TypeKind {
+	fn buildNonGenericType(mut &self, mut &ast: &ast::TypeDecl,
+		mut &generics: []&ast::GenericDecl, mut &ignored: []&Type): &Type {
 		mut tc := &typeChecker{
 			s: self,
 			rootLookup: self,
@@ -823,7 +823,7 @@ impl sema {
 		ret tc.checkDecl(ast)
 	}
 
-	fn buildFnNonGenericTypeKinds(mut &self, mut f: &FnIns, mut &ignored: []&TypeKind): (ok: bool) {
+	fn buildFnNonGenericTypes(mut &self, mut f: &FnIns, mut &ignored: []&Type): (ok: bool) {
 		let mut generics: []&ast::GenericDecl = nil
 		if f.Decl.IsMethod() {
 			generics = append(f.Decl.Generics, f.Decl.Owner.Generics...)
@@ -834,12 +834,12 @@ impl sema {
 			ok = true
 			for (_, mut p) in f.Params {
 				if !p.Decl.IsSelf() {
-					p.Kind = sema.buildNonGenericTypeKind(p.Decl.Kind.Decl, generics, unsafe { ignored })
+					p.Kind = sema.buildNonGenericType(p.Decl.Kind.Decl, generics, unsafe { ignored })
 					ok = ok && p.Kind != nil
 				}
 			}
 			if !f.Decl.IsVoid() {
-				f.Result = sema.buildNonGenericTypeKind(f.Decl.Result.Kind.Decl, generics, unsafe { ignored })
+				f.Result = sema.buildNonGenericType(f.Decl.Result.Kind.Decl, generics, unsafe { ignored })
 				ok = ok && f.Result != nil
 			}
 			ret
@@ -958,15 +958,15 @@ impl sema {
 						continue
 					}
 					if p.Decl.IsRef() {
-						p.Kind = &TypeKind{
+						p.Kind = &Type{
 							Kind: &Sptr{
-								Elem: &TypeKind{
+								Elem: &Type{
 									Kind: f.Owner,
 								},
 							},
 						}
 					} else {
-						p.Kind = &TypeKind{Kind: f.Owner}
+						p.Kind = &Type{Kind: f.Owner}
 					}
 				} else {
 					p.Kind = sema.buildTypeWithGenerics(p.Decl.Kind.Decl, generics, f.Refers)
@@ -1030,7 +1030,7 @@ impl sema {
 	}
 
 	fn checkValidityForInitExpr(mut &self, leftMut: bool, leftRef: bool,
-		&leftKind: &TypeKind, mut &d: &Data, mut &errorToken: &token::Token): bool {
+		&leftKind: &Type, mut &d: &Data, mut &errorToken: &token::Token): bool {
 		if leftMut && !d.Mutable {
 			// Check classical assignment mutability.
 			if d.Kind.Mutable() || d.Kind.Variadic {
@@ -1311,10 +1311,10 @@ impl sema {
 		}
 		if len(e.Items) == 1 {
 			mut item := e.Items[0]
-			tk := TypeKind{
+			tk := Type{
 				Kind: e,
 			}
-			if item.Kind.Kind != nil && item.Kind.Kind.Equal(unsafe { (&TypeKind)(&tk) }) {
+			if item.Kind.Kind != nil && item.Kind.Kind.Equal(unsafe { (&Type)(&tk) }) {
 				self.pushErr(item.Token, build::LogMsg.IllegalCycleRefersItself, e.Str())
 			}
 		}
@@ -2836,7 +2836,7 @@ push:
 	}
 }
 
-fn pushRuntimeToStr(mut &s: &sema, mut &t: &TypeKind, mut &token: &token::Token,
+fn pushRuntimeToStr(mut &s: &sema, mut &t: &Type, mut &token: &token::Token,
 	mut refers: &ReferenceStack) {
 	if s.meta.runtime == nil || t.IsNil() {
 		ret

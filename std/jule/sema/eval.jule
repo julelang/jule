@@ -20,7 +20,7 @@ struct Data {
 	// Since data is constant numeric, it also implies kind is primitive.
 	untyped: bool
 
-	Kind:      &TypeKind
+	Kind:      &Type
 	Mutable:   bool
 	Reference: bool
 	Lvalue:    bool
@@ -78,7 +78,7 @@ struct Value {
 struct eval {
 	s:          &sema // Used for error logging.
 	lookup:     Lookup
-	prefix:     &TypeKind
+	prefix:     &Type
 	unsafety:   bool
 	immutable:  bool // This expression will assigned to immutable memory.
 	ignored:    bool // Evaluated expression is not for assignment or something else.
@@ -135,21 +135,21 @@ impl eval {
 
 		match {
 		| types::IsFloat(prim.Str()):
-			d.Kind = new(TypeKind, *self.prefix)
+			d.Kind = new(Type, *self.prefix)
 			d.Constant.SetF64(d.Constant.AsF64())
 			d.Constant.Kind = prim.Kind
 		| types::IsSigInt(prim.Str()):
 			if !sigAssignable(prim.Str(), d) {
 				ret false
 			}
-			d.Kind = new(TypeKind, *self.prefix)
+			d.Kind = new(Type, *self.prefix)
 			d.Constant.SetI64(d.Constant.AsI64())
 			d.Constant.Kind = prim.Kind
 		| types::IsUnsigInt(prim.Str()):
 			if !unsigAssignable(prim.Str(), d) {
 				ret false
 			}
-			d.Kind = new(TypeKind, *self.prefix)
+			d.Kind = new(Type, *self.prefix)
 			d.Constant.SetU64(d.Constant.AsU64())
 			d.Constant.Kind = prim.Kind
 		}
@@ -376,7 +376,7 @@ impl eval {
 	fn _evalEnum(self, mut enm: &Enum): &Data {
 		ret &Data{
 			Decl: true,
-			Kind: &TypeKind{
+			Kind: &Type{
 				Kind: enm,
 			},
 		}
@@ -394,7 +394,7 @@ impl eval {
 	fn _evalTypeEnum(self, mut enm: &TypeEnum): &Data {
 		ret &Data{
 			Decl: true,
-			Kind: &TypeKind{
+			Kind: &Type{
 				Kind: enm,
 			},
 		}
@@ -412,7 +412,7 @@ impl eval {
 	fn _evalStruct(self, mut s: &StructIns): &Data {
 		mut d := &Data{
 			Decl: true,
-			Kind: &TypeKind{
+			Kind: &Type{
 				Kind: s,
 			},
 			Model: s,
@@ -454,7 +454,7 @@ impl eval {
 
 	fn evalFnIns(self, mut f: &FnIns): &Data {
 		ret &Data{
-			Kind: &TypeKind{
+			Kind: &Type{
 				Kind: f,
 			},
 			Model: f,
@@ -681,7 +681,7 @@ impl eval {
 		|:
 			d = &Data{
 				Decl: true,
-				Kind: &TypeKind{
+				Kind: &Type{
 					Kind: ta.Kind.Kind.Kind,
 				},
 			}
@@ -830,14 +830,14 @@ impl eval {
 
 		ret &Data{
 			Mutable: true,
-			Kind: &TypeKind{
+			Kind: &Type{
 				Kind: arr,
 			},
 			Model: model,
 		}
 	}
 
-	fn evalExpSlc(mut &self, mut s: &ast::SliceExpr, mut t: &TypeKind, mut first: ExprModel): &Data {
+	fn evalExpSlc(mut &self, mut s: &ast::SliceExpr, mut t: &Type, mut first: ExprModel): &Data {
 		mut slc := &Slc{
 			Elem: t,
 		}
@@ -868,7 +868,7 @@ impl eval {
 
 		ret &Data{
 			Mutable: true,
-			Kind: &TypeKind{
+			Kind: &Type{
 				Kind: slc,
 			},
 			Model: model,
@@ -1349,7 +1349,7 @@ impl eval {
 
 	fn slicingArr(self, mut &d: &Data) {
 		mut elemType := d.Kind.Arr().Elem
-		d.Kind = &TypeKind{
+		d.Kind = &Type{
 			Kind: &Slc{
 				Elem: elemType,
 			},
@@ -1456,7 +1456,7 @@ impl eval {
 		ret d
 	}
 
-	fn castPtr(mut self, mut t: &TypeKind, mut d: &Data, errorToken: &token::Token) {
+	fn castPtr(mut self, mut t: &Type, mut d: &Data, errorToken: &token::Token) {
 		d.Constant = nil
 		d.untyped = false
 		sptr := d.Kind.Sptr()
@@ -1478,7 +1478,7 @@ impl eval {
 		}
 	}
 
-	fn castStruct(mut self, mut t: &TypeKind, mut d: &Data, errorToken: &token::Token) {
+	fn castStruct(mut self, mut t: &Type, mut d: &Data, errorToken: &token::Token) {
 		d.Constant = nil
 		d.untyped = false
 		mut tr := d.Kind.Trait()
@@ -1495,7 +1495,7 @@ impl eval {
 		}
 	}
 
-	fn castRef(mut self, mut t: &TypeKind, mut d: &Data, errorToken: &token::Token) {
+	fn castRef(mut self, mut t: &Type, mut d: &Data, errorToken: &token::Token) {
 		d.Constant = nil
 		d.untyped = false
 		mut sptr := t.Sptr()
@@ -1518,7 +1518,7 @@ impl eval {
 		self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, d.Kind.Str(), t.Str())
 	}
 
-	fn castSlc(mut self, mut t: &TypeKind, mut d: &Data, errorToken: &token::Token) {
+	fn castSlc(mut self, mut t: &Type, mut d: &Data, errorToken: &token::Token) {
 		c := d.Constant
 		d.Constant = nil
 		d.untyped = false
@@ -1620,7 +1620,7 @@ impl eval {
 		}
 	}
 
-	fn castInt(mut self, mut t: &TypeKind, mut d: &Data, errorToken: &token::Token) {
+	fn castInt(mut self, mut t: &Type, mut d: &Data, errorToken: &token::Token) {
 		if d.IsConst() {
 			prim := t.Prim()
 			match {
@@ -1666,7 +1666,7 @@ impl eval {
 		self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, d.Kind.Str(), t.Str())
 	}
 
-	fn castNum(mut self, mut t: &TypeKind, mut d: &Data, errorToken: &token::Token) {
+	fn castNum(mut self, mut t: &Type, mut d: &Data, errorToken: &token::Token) {
 		if d.IsConst() {
 			prim := t.Prim()
 			match {
@@ -1697,7 +1697,7 @@ impl eval {
 		self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, d.Kind.Str(), t.Str())
 	}
 
-	fn castPrim(mut self, mut t: &TypeKind, mut d: &Data, errorToken: &token::Token) {
+	fn castPrim(mut self, mut t: &Type, mut d: &Data, errorToken: &token::Token) {
 		prim := t.Prim()
 		match {
 		| prim.IsAny():
@@ -1713,7 +1713,7 @@ impl eval {
 		}
 	}
 
-	fn castConstant(mut self, mut &t: &TypeKind, mut &d: &Data) {
+	fn castConstant(mut self, mut &t: &Type, mut &d: &Data) {
 		if d == nil || !d.IsConst() {
 			ret
 		}
@@ -1722,7 +1722,7 @@ impl eval {
 		d.Model = d.Constant
 	}
 
-	fn castTypeEnum(mut self, mut &t: &TypeKind, mut &d: &Data, mut &errorToken: &token::Token) {
+	fn castTypeEnum(mut self, mut &t: &Type, mut &d: &Data, mut &errorToken: &token::Token) {
 		n := len(self.s.errors)
 		if !self.s.checkTypeCompatibility(d.Kind, t, errorToken) {
 			self.s.errors = self.s.errors[:n]
@@ -1732,7 +1732,7 @@ impl eval {
 		d.untyped = false
 	}
 
-	fn castTypeEnumT(mut self, mut &t: &TypeKind, mut &d: &Data, mut &errorToken: &token::Token) {
+	fn castTypeEnumT(mut self, mut &t: &Type, mut &d: &Data, mut &errorToken: &token::Token) {
 		n := len(self.s.errors)
 		if !self.s.checkTypeCompatibility(t, d.Kind, errorToken) {
 			self.s.errors = self.s.errors[:n]
@@ -1742,7 +1742,7 @@ impl eval {
 		d.untyped = false
 	}
 
-	fn evalCastByTypeNData(mut self, mut t: &TypeKind, mut d: &Data, mut errorToken: &token::Token): &Data {
+	fn evalCastByTypeNData(mut self, mut t: &Type, mut d: &Data, mut errorToken: &token::Token): &Data {
 		if d != nil && d.Decl {
 			self.pushErr(errorToken, build::LogMsg.InvalidExpr)
 			ret nil
@@ -1819,7 +1819,7 @@ impl eval {
 		ret d
 	}
 
-	fn evalCastT(mut &self, mut &t: &TypeKind, mut &e: &ast::Expr, mut &et: &token::Token): &Data {
+	fn evalCastT(mut &self, mut &t: &Type, mut &e: &ast::Expr, mut &et: &token::Token): &Data {
 		mut prefix := self.prefix
 		self.prefix = nil
 		defer { self.prefix = prefix }
@@ -1891,7 +1891,7 @@ impl eval {
 
 		mut d := &Data{
 			Mutable: !self.immutable,
-			Kind: &TypeKind{
+			Kind: &Type{
 				Kind: s,
 			},
 			Model: &StructLitExprModel{
@@ -2109,7 +2109,7 @@ impl eval {
 			if existInstance != nil {
 				f = existInstance
 			}
-		} else if !self.s.buildFnNonGenericTypeKinds(f, fcac.ignored) {
+		} else if !self.s.buildFnNonGenericTypes(f, fcac.ignored) {
 			d = nil
 			ret
 		}
@@ -2267,7 +2267,7 @@ impl eval {
 				Expr: d.Model,
 				Method: ins,
 			}
-			d.Kind = &TypeKind{
+			d.Kind = &Type{
 				Kind: ins,
 			}
 			ret d
@@ -2290,7 +2290,7 @@ impl eval {
 		}
 		ret &Data{
 			Mutable: d.Mutable,
-			Kind: &TypeKind{
+			Kind: &Type{
 				Kind: f.instance(),
 			},
 			Model: &TraitSubIdentExprModel{
@@ -2346,7 +2346,7 @@ impl eval {
 			Method: ins,
 			Owner: s,
 		}
-		d.Kind = &TypeKind{Kind: ins}
+		d.Kind = &Type{Kind: ins}
 		ret d
 	}
 
@@ -2836,7 +2836,7 @@ impl eval {
 
 	fn evalTuple(mut &self, mut tup: &ast::TupleExpr): &Data {
 		mut tupT := new(Tuple)
-		tupT.Types = make([]&TypeKind, 0, len(tup.Expr))
+		tupT.Types = make([]&Type, 0, len(tup.Expr))
 
 		mut model := &TupleExprModel{
 			Datas: make([]&Data, 0, len(tup.Expr)),
@@ -2858,7 +2858,7 @@ impl eval {
 		}
 
 		ret &Data{
-			Kind: &TypeKind{Kind: tupT},
+			Kind: &Type{Kind: tupT},
 			Model: model,
 		}
 	}
@@ -2906,7 +2906,7 @@ impl eval {
 
 		ret &Data{
 			Mutable: true,
-			Kind: &TypeKind{Kind: m},
+			Kind: &Type{Kind: m},
 			Model: model,
 		}
 	}
@@ -2955,7 +2955,7 @@ impl eval {
 		}
 
 		ret &Data{
-			Kind: &TypeKind{Kind: ins},
+			Kind: &Type{Kind: ins},
 			Model: &AnonFnExprModel{
 				Captured: captured,
 				Func: ins,
@@ -3330,7 +3330,7 @@ impl unaryEval {
 		|:
 			match {
 			| canGetPtr(self.d):
-				self.d.Kind = &TypeKind{
+				self.d.Kind = &Type{
 					Kind: &Ptr{Elem: self.d.Kind},
 				}
 				self.d.Model = &UnaryExprModel{
@@ -3358,10 +3358,10 @@ impl unaryEval {
 		}
 		match self.u.Op.Id {
 		| token::Id.Star:
-			self.d.Kind = &TypeKind{Kind: tc.buildPtrFromType(self.d.Kind)}
+			self.d.Kind = &Type{Kind: tc.buildPtrFromType(self.d.Kind)}
 			self.d.Model = self.d.Kind
 		| token::Id.Amper:
-			self.d.Kind = &TypeKind{Kind: tc.buildSptrFromType(self.d.Kind)}
+			self.d.Kind = &Type{Kind: tc.buildSptrFromType(self.d.Kind)}
 			self.d.Model = self.d.Kind
 		|:
 			self.e.pushErr(self.u.Op, build::LogMsg.InvalidExprForUnary, self.u.Op.Kind, self.d.Kind.Str())
@@ -4375,9 +4375,9 @@ fn fitBitsize(mut &d: &Data) {
 }
 
 fn makeStructLitAlloc(mut &d: &Data, mut &lit: &StructLitExprModel) {
-	d.Kind = &TypeKind{
+	d.Kind = &Type{
 		Kind: &Sptr{
-			Elem: &TypeKind{Kind: lit.Strct},
+			Elem: &Type{Kind: lit.Strct},
 		},
 	}
 	d.Model = &AllocStructLitExprModel{
@@ -4457,7 +4457,7 @@ fn isPtrArithmeticCompatible(mut &l: &Data, mut &r: &Data): bool {
 	ret tcc.check()
 }
 
-fn applyRuntimeToStr(mut &s: &sema, mut &from: &TypeKind, mut &to: &TypeKind,
+fn applyRuntimeToStr(mut &s: &sema, mut &from: &Type, mut &to: &Type,
 	mut &token: &token::Token, mut refers: &ReferenceStack) {
 	prim := to.Prim()
 	if prim != nil {
@@ -4472,7 +4472,7 @@ fn applyRuntimeToStr(mut &s: &sema, mut &from: &TypeKind, mut &to: &TypeKind,
 	}
 }
 
-fn applyCastKindModel(mut &s: &sema, mut &d: &Data, mut &t: &TypeKind,
+fn applyCastKindModel(mut &s: &sema, mut &d: &Data, mut &t: &Type,
 	mut &token: &token::Token, mut refers: &ReferenceStack) {
 	applyRuntimeToStr(s, d.Kind, t, token, refers)
 	d.Model = &CastingExprModel{
@@ -4483,7 +4483,7 @@ fn applyCastKindModel(mut &s: &sema, mut &d: &Data, mut &t: &TypeKind,
 	}
 }
 
-fn applyCastKind(mut &s: &sema, mut &d: &Data, mut &t: &TypeKind,
+fn applyCastKind(mut &s: &sema, mut &d: &Data, mut &t: &Type,
 	mut &token: &token::Token, mut refers: &ReferenceStack) {
 	applyCastKindModel(s, d, t, token, refers)
 	d.Kind = t
@@ -4611,7 +4611,7 @@ fn constoa(&c: &constant::Const): str {
 fn evalEnumStatic(mut &s: &sema, mut &enm: &Enum, mut &item: &EnumItem,
 	mut &token: &token::Token, mut refers: &ReferenceStack): &Data {
 	mut d := &Data{
-		Kind: &TypeKind{
+		Kind: &Type{
 			Kind: enm,
 		},
 	}
@@ -4662,8 +4662,8 @@ fn updateRefer[T](mut ref: &ReferenceStack, &old: T, mut &new: T) {
 	}
 }
 
-fn makeVariadic(mut &d: &Data, mut elem: &TypeKind) {
-	d.Kind = &TypeKind{
+fn makeVariadic(mut &d: &Data, mut elem: &Type) {
+	d.Kind = &Type{
 		Variadic: true,
 		Generic: elem.Generic,
 		BindIdent: elem.BindIdent,

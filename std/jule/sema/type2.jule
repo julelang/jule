@@ -98,8 +98,8 @@ fn intAssignable(kind: str, &d: &Data): bool {
 
 struct typeCompatibilityChecker {
 	s:          &sema // Used for error logging.
-	dest:       &TypeKind
-	src:        &TypeKind
+	dest:       &Type
+	src:        &Type
 	errorToken: &token::Token
 }
 
@@ -184,7 +184,7 @@ impl typeCompatibilityChecker {
 		ret self.dest.Equal(self.src)
 	}
 
-	fn typeEnum(self, mut &e: &TypeEnum, mut &t2: &TypeKind): (ok: bool) {
+	fn typeEnum(self, mut &e: &TypeEnum, mut &t2: &Type): (ok: bool) {
 		for (_, mut item) in e.Items {
 			if item.Kind.Kind.Equal(t2) {
 				ret true
@@ -234,7 +234,7 @@ impl typeCompatibilityChecker {
 // Checks value and type compatibility for assignment.
 struct assignTypeChecker {
 	s:          &sema // Used for error logging and type checking.
-	dest:       &TypeKind
+	dest:       &Type
 	d:          &Data
 	errorToken: &token::Token
 	refers:     &ReferenceStack
@@ -337,16 +337,16 @@ struct dynamicTypeAnnotation {
 	p:          &ParamIns
 	a:          &Data
 	errorToken: &token::Token
-	k:          *&TypeKind
+	k:          *&Type
 	c:          &ast::TypeDecl
-	ignored:    []&TypeKind // Ignored generics.
+	ignored:    []&Type // Ignored generics.
 }
 
 impl dynamicTypeAnnotation {
-	fn annotateConstraintElem[T](mut self, mut &k: &TypeKind): bool {
+	fn annotateConstraintElem[T](mut self, mut &k: &Type): bool {
 		match type self.c.Kind {
 		| &T:
-			let mut elem: &TypeKind = nil
+			mut elem := (&Type)(nil)
 			const match type T {
 			| ast::ArrTypeDecl:
 				elem = k.Arr().Elem
@@ -363,7 +363,7 @@ impl dynamicTypeAnnotation {
 		ret false
 	}
 
-	fn annotateConstraintMap(mut self, mut &k: &TypeKind): (ok: bool) {
+	fn annotateConstraintMap(mut self, mut &k: &Type): (ok: bool) {
 		match type self.c.Kind {
 		| &ast::MapTypeDecl:
 			mut m := k.Map()
@@ -378,7 +378,7 @@ impl dynamicTypeAnnotation {
 		ret false
 	}
 
-	fn annotateConstraintTup(mut self, mut &k: &TypeKind): (ok: bool) {
+	fn annotateConstraintTup(mut self, mut &k: &Type): (ok: bool) {
 		match type self.c.Kind {
 		| &ast::TupleTypeDecl:
 			mut tup := (&ast::TupleTypeDecl)(self.c.Kind)
@@ -395,7 +395,7 @@ impl dynamicTypeAnnotation {
 		ret false
 	}
 
-	fn annotateConstraintFn(mut self, mut &k: &TypeKind): (ok: bool) {
+	fn annotateConstraintFn(mut self, mut &k: &Type): (ok: bool) {
 		match type self.c.Kind {
 		| &ast::FnDecl:
 			mut pf := (&ast::FnDecl)(self.c.Kind)
@@ -416,7 +416,7 @@ impl dynamicTypeAnnotation {
 		ret false
 	}
 
-	fn annotateConstraintIdent(mut self, mut &k: &TypeKind): bool {
+	fn annotateConstraintIdent(mut self, mut &k: &Type): bool {
 		mut ident := (&ast::IdentTypeDecl)(self.c.Kind)
 		mut s := k.Struct()
 		for i, g in self.f.Decl.Generics {
@@ -445,7 +445,7 @@ impl dynamicTypeAnnotation {
 		ret false
 	}
 
-	fn annotateConstraint(mut self, mut &k: &TypeKind): bool {
+	fn annotateConstraint(mut self, mut &k: &Type): bool {
 		match type self.c.Kind {
 		| &ast::IdentTypeDecl:
 			ret self.annotateConstraintIdent(k)
@@ -470,7 +470,7 @@ impl dynamicTypeAnnotation {
 		}
 	}
 
-	fn pushGeneric(mut self, mut &k: &TypeKind, i: int) {
+	fn pushGeneric(mut self, mut &k: &Type, i: int) {
 		self.f.Generics[i] = &InsGeneric{Kind: k}
 		mut gd := self.f.Decl.Generics[i]
 		for (_, mut ignored) in self.ignored {
@@ -485,11 +485,11 @@ impl dynamicTypeAnnotation {
 		self.annotateConstraint(k)
 	}
 
-	unsafe fn annotatePrim(mut self, mut &k: &TypeKind): (ok: bool) {
+	unsafe fn annotatePrim(mut self, mut &k: &Type): (ok: bool) {
 		ret self.annotateAny(k)
 	}
 
-	unsafe fn annotateArr(mut self, mut &k: &TypeKind): (ok: bool) {
+	unsafe fn annotateArr(mut self, mut &k: &Type): (ok: bool) {
 		mut parr := (*self.k).Arr()
 		if parr == nil {
 			ret false
@@ -499,7 +499,7 @@ impl dynamicTypeAnnotation {
 		ret self.annotateKind(arr.Elem)
 	}
 
-	unsafe fn annotateSlc(mut self, mut &k: &TypeKind): (ok: bool) {
+	unsafe fn annotateSlc(mut self, mut &k: &Type): (ok: bool) {
 		mut pslc := (*self.k).Slc()
 		if pslc == nil {
 			ret false
@@ -509,7 +509,7 @@ impl dynamicTypeAnnotation {
 		ret self.annotateKind(slc.Elem)
 	}
 
-	unsafe fn checkMapKey(mut self, mut k: *&TypeKind, mut &ck: &TypeKind): (ok: bool) {
+	unsafe fn checkMapKey(mut self, mut k: *&Type, mut &ck: &Type): (ok: bool) {
 		mut old := self.k
 		self.k = k
 		ok = self.annotateKind(ck)
@@ -517,7 +517,7 @@ impl dynamicTypeAnnotation {
 		ret ok
 	}
 
-	unsafe fn annotateMap(mut self, mut &k: &TypeKind): (ok: bool) {
+	unsafe fn annotateMap(mut self, mut &k: &Type): (ok: bool) {
 		mut pmap := (*self.k).Map()
 		if pmap == nil {
 			ret false
@@ -527,7 +527,7 @@ impl dynamicTypeAnnotation {
 			self.checkMapKey(&pmap.Val, m.Val)
 	}
 
-	unsafe fn annotateFn(mut self, mut &k: &TypeKind): (ok: bool) {
+	unsafe fn annotateFn(mut self, mut &k: &Type): (ok: bool) {
 		mut pf := (*self.k).Fn()
 		if pf == nil {
 			ret false
@@ -556,7 +556,7 @@ impl dynamicTypeAnnotation {
 		ret ok
 	}
 
-	unsafe fn annotatePtr(mut self, mut &k: &TypeKind): (ok: bool) {
+	unsafe fn annotatePtr(mut self, mut &k: &Type): (ok: bool) {
 		mut pptr := (*self.k).Ptr()
 		if pptr == nil {
 			ret false
@@ -566,7 +566,7 @@ impl dynamicTypeAnnotation {
 		ret self.annotateKind(ptr.Elem)
 	}
 
-	unsafe fn annotateSptr(mut self, mut &k: &TypeKind): (ok: bool) {
+	unsafe fn annotateSptr(mut self, mut &k: &Type): (ok: bool) {
 		mut ssptr := (*self.k).Sptr()
 		if ssptr == nil {
 			ret false
@@ -576,7 +576,7 @@ impl dynamicTypeAnnotation {
 		ret self.annotateKind(sptr.Elem)
 	}
 
-	unsafe fn annotateStruct(mut self, mut &k: &TypeKind): (ok: bool) {
+	unsafe fn annotateStruct(mut self, mut &k: &Type): (ok: bool) {
 		mut s := (*self.k).Struct()
 		if s == nil {
 			ret false
@@ -598,7 +598,7 @@ impl dynamicTypeAnnotation {
 		ret true
 	}
 
-	unsafe fn annotateAny(mut self, mut &k: &TypeKind): (ok: bool) {
+	unsafe fn annotateAny(mut self, mut &k: &Type): (ok: bool) {
 		kind := (*self.k).Str()
 		for i, g in self.f.Decl.Generics {
 			if kind != g.Ident {
@@ -619,7 +619,7 @@ impl dynamicTypeAnnotation {
 		ret false
 	}
 
-	unsafe fn annotateKind(mut self, mut &k: &TypeKind): (ok: bool) {
+	unsafe fn annotateKind(mut self, mut &k: &Type): (ok: bool) {
 		if self.k == nil || *self.k == nil {
 			ret
 		}
@@ -660,7 +660,7 @@ struct fnCallArgChecker {
 	f:                 &FnIns
 	dynamicAnnotation: bool
 	argModels:         []ExprModel
-	ignored:           []&TypeKind // Ignored generics.
+	ignored:           []&Type // Ignored generics.
 }
 
 impl fnCallArgChecker {
@@ -782,7 +782,7 @@ impl fnCallArgChecker {
 		// Also allocate new type based on [p.Kind] because type should be remain non-variadic.
 		// The [p.Kind] used as prefix and base type.
 		mut oldKind := p.Kind
-		p.Kind = new(TypeKind, *p.Kind)
+		p.Kind = new(Type, *p.Kind)
 		p.Kind.Variadic = false
 		defer {
 			p.Kind.Variadic = false // Set actual type as non-variadic.
@@ -794,7 +794,7 @@ impl fnCallArgChecker {
 
 			match type arg.Kind {
 			| &ast::VariadicExpr:
-				self.e.prefix = &TypeKind{
+				self.e.prefix = &Type{
 					Kind: &Slc{
 						Elem: p.Kind,
 					},
@@ -1113,7 +1113,7 @@ impl rangeChecker {
 	//  - d:   data to check.
 	//  - key: data passed to this key.
 	//  - k:   element kind of expression.
-	fn checkRangeExprValidity(mut self, mut &d: &Data, &key: &Var, mut &k: &TypeKind) {
+	fn checkRangeExprValidity(mut self, mut &d: &Data, &key: &Var, mut &k: &Type) {
 		mut _mut := key.Mutable
 		if _mut && !k.Mutable() {
 			// Bypass mutability error.
@@ -1259,7 +1259,7 @@ impl rangeChecker {
 struct retTypeChecker {
 	sc:         &scopeChecker
 	f:          &FnIns
-	types:      []&TypeKind  // Return types.
+	types:      []&Type      // Return types.
 	exprs:      []&ast::Expr // Return expressions.
 	errorToken: &token::Token
 	model:      ExprModel
@@ -1406,9 +1406,7 @@ impl retTypeChecker {
 	}
 }
 
-fn lenKind(): &TypeKind {
-	ret primInt
-}
+fn lenKind(): &Type { ret primInt }
 
 // Reports whether d is good for dynamic type infer.
 fn isGoodValueToInfer(&d: &Data): bool {
