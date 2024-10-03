@@ -628,7 +628,7 @@ impl eval {
 		// any missing information means analysis failed
 		// kind should not be nil because each variable must have a valid type
 		v.Used = true
-		if v.Kind == nil || v.Kind.Type == nil {
+		if v.TypeSym == nil || v.TypeSym.Type == nil {
 			ret nil
 		}
 
@@ -637,7 +637,7 @@ impl eval {
 			Lvalue: !v.Constant,
 			Mutable: v.Mutable,
 			Reference: v.Reference,
-			Kind: v.Kind.Type,
+			Kind: v.TypeSym.Type,
 			Model: v,
 		}
 		if v.Value != nil && v.Value.Data != nil {
@@ -666,7 +666,7 @@ impl eval {
 
 		ta.Used = true
 
-		mut kind := ta.Kind.Type.Kind
+		mut kind := ta.TypeSym.Type.Kind
 		let mut d: &Data = nil
 		match type kind {
 		| &StructIns:
@@ -682,13 +682,13 @@ impl eval {
 			d = &Data{
 				Decl: true,
 				Kind: &Type{
-					Kind: ta.Kind.Type.Kind,
+					Kind: ta.TypeSym.Type.Kind,
 				},
 			}
 			if ta.Binded {
 				d.Kind.BindIdent = ta.Ident
 			} else {
-				d.Kind.BindIdent = ta.Kind.Type.BindIdent
+				d.Kind.BindIdent = ta.TypeSym.Type.BindIdent
 			}
 			d.Model = d.Kind
 		}
@@ -4353,13 +4353,13 @@ fn fitBitsize(mut &d: &Data) {
 		k := types::BitSizeOfInt(d.Constant.ReadI64())
 		if k > z || types::IsUnsigInt(prim.Kind) {
 			d.Constant.Kind = types::IntFromBits(k)
-			d.Kind = findBuiltinTypeAlias(d.Constant.Kind).Kind.Type
+			d.Kind = findBuiltinTypeAlias(d.Constant.Kind).TypeSym.Type
 		}
 	| d.Constant.IsU64():
 		k := types::BitSizeOfUint(d.Constant.ReadU64())
 		if k > z || types::IsSigInt(prim.Kind) {
 			d.Constant.Kind = types::UintFromBits(k)
-			d.Kind = findBuiltinTypeAlias(d.Constant.Kind).Kind.Type
+			d.Kind = findBuiltinTypeAlias(d.Constant.Kind).TypeSym.Type
 		}
 	| d.Constant.IsF64():
 		if z == 1<<6 {
@@ -4369,7 +4369,7 @@ fn fitBitsize(mut &d: &Data) {
 		k := types::BitSizeOfFloat(d.Constant.ReadF64())
 		if k > z {
 			d.Constant.Kind = types::FloatFromBits(k)
-			d.Kind = findBuiltinTypeAlias(d.Constant.Kind).Kind.Type
+			d.Kind = findBuiltinTypeAlias(d.Constant.Kind).TypeSym.Type
 		}
 	}
 }
@@ -4392,7 +4392,7 @@ fn buildErrorVar(mut &s: &Scope, mut &fc: &ast::FnCallExpr): &Var {
 		Mutable: true,
 		Ident: "error",
 		Token: fc.Token,
-		Kind: findBuiltinTypeAlias(types::Kind.Any).Kind,
+		TypeSym: findBuiltinTypeAlias(types::Kind.Any).TypeSym,
 		Scope: s,
 		Value: &Value{
 			Data: new(Data),

@@ -75,7 +75,7 @@ fn appendRetVars(mut &dest: []&Var, mut &f: &FnIns) {
 			Ident: ident.Kind,
 			Token: ident,
 			Scope: f.Scope,
-			Kind: &TypeSym{
+			TypeSym: &TypeSym{
 				Type: types[i],
 			},
 			Value: &Value{
@@ -105,7 +105,7 @@ fn appendParamVars(mut &dest: []&Var, mut &f: &FnIns) {
 			Mutable: p.Decl.Mutable,
 			Ident: p.Decl.Ident,
 			Token: p.Decl.Token,
-			Kind: new(TypeSym),
+			TypeSym: new(TypeSym),
 			Scope: f.Scope,
 			Value: &Value{
 				Data: new(Data),
@@ -114,7 +114,7 @@ fn appendParamVars(mut &dest: []&Var, mut &f: &FnIns) {
 
 		match {
 		| p.Decl.IsSelf():
-			v.Kind.Type = &Type{
+			v.TypeSym.Type = &Type{
 				Variadic: false,
 				Kind: f.Owner,
 			}
@@ -122,15 +122,15 @@ fn appendParamVars(mut &dest: []&Var, mut &f: &FnIns) {
 
 			if p.Decl.IsRef() {
 				v.Ident = v.Ident[1:] // Remove reference sign.
-				v.Kind.Type.Kind = &Sptr{
+				v.TypeSym.Type.Kind = &Sptr{
 					Elem: &Type{
-						BindIdent: v.Kind.Type.BindIdent,
-						Kind: v.Kind.Type.Kind,
+						BindIdent: v.TypeSym.Type.BindIdent,
+						Kind: v.TypeSym.Type.Kind,
 					},
 				}
 			}
 		| p.Decl.Variadic:
-			v.Kind.Type = &Type{
+			v.TypeSym.Type = &Type{
 				Variadic: false,
 				Kind: &Slc{
 					Elem: &Type{
@@ -140,7 +140,7 @@ fn appendParamVars(mut &dest: []&Var, mut &f: &FnIns) {
 				},
 			}
 		|:
-			v.Kind.Type = p.Kind
+			v.TypeSym.Type = p.Kind
 		}
 
 		dest = append(dest, v)
@@ -170,7 +170,7 @@ fn appendGenericTypeAliases(mut &dest: []&TypeAlias, mut &f: &FnIns) {
 			Scope: f.Decl.Scope,
 			Ident: decl.Ident,
 			Token: decl.Token,
-			Kind: &TypeSym{Type: g.Kind},
+			TypeSym: &TypeSym{Type: g.Kind},
 		})
 	}
 
@@ -184,7 +184,7 @@ fn appendGenericTypeAliases(mut &dest: []&TypeAlias, mut &f: &FnIns) {
 				Scope: f.Decl.Scope,
 				Ident: decl.Ident,
 				Token: decl.Token,
-				Kind: &TypeSym{Type: g.Kind},
+				TypeSym: &TypeSym{Type: g.Kind},
 			})
 		}
 	}
@@ -1068,13 +1068,13 @@ impl sema {
 				self.setCurrentFile(file)
 			}
 		}
-		ok = self.checkTypeSymWithRefers(ta.Kind, l, nil, &referencer{
+		ok = self.checkTypeSymWithRefers(ta.TypeSym, l, nil, &referencer{
 			ident: ta.Ident,
 			owner: ta,
 			refs: &ta.Refers,
 		})
-		if ok && ta.Kind.Type.Arr() != nil && ta.Kind.Type.Arr().Auto {
-			self.pushErr(ta.Kind.Decl.Token, build::LogMsg.ArrayAutoSized)
+		if ok && ta.TypeSym.Type.Arr() != nil && ta.TypeSym.Type.Arr().Auto {
+			self.pushErr(ta.TypeSym.Decl.Token, build::LogMsg.ArrayAutoSized)
 			ok = false
 		}
 		ret
@@ -1261,7 +1261,7 @@ impl sema {
 			}
 		} else {
 			// Set to default type.
-			e.TypeSym = findBuiltinTypeAlias(types::Kind.Int).Kind
+			e.TypeSym = findBuiltinTypeAlias(types::Kind.Int).TypeSym
 		}
 
 		mut t := e.TypeSym.Type.Prim()
@@ -1797,7 +1797,7 @@ impl sema {
 			|:
 				panic("sema: checkVarDecl: unimplemented referencer")
 			}
-			decl.Kind.Type = self.checkTypeSymRefers(decl.Kind.Decl, l, refers)
+			decl.TypeSym.Type = self.checkTypeSymRefers(decl.TypeSym.Decl, l, refers)
 		}
 
 		if decl.Reference {
@@ -2051,17 +2051,17 @@ impl sema {
 	fn checkVarValue(mut &self, mut &v: &Var) {
 		if v.IsTypeInferred() {
 			// Build new TypeSym because auto-type symbols are nil.
-			v.Kind = &TypeSym{Type: v.Value.Data.Kind}
+			v.TypeSym = &TypeSym{Type: v.Value.Data.Kind}
 
 			self.checkDataForTypeInference(v.Value.Data, v.Value.Expr.Token)
 			self.checkValidityForInitExpr(
 				v.Mutable,
 				v.Reference,
-				v.Kind.Type,
+				v.TypeSym.Type,
 				v.Value.Data,
 				v.Value.Expr.Token)
 		} else {
-			mut arr := v.Kind.Type.Arr()
+			mut arr := v.TypeSym.Type.Arr()
 			if arr != nil {
 				if arr.Auto {
 					dataArr := v.Value.Data.Kind.Arr()
@@ -2071,18 +2071,18 @@ impl sema {
 				}
 			}
 
-			if self.checkAssignType(v.Reference, v.Kind.Type, v.Value.Data, v.Value.Expr.Token, v.Refers) {
+			if self.checkAssignType(v.Reference, v.TypeSym.Type, v.Value.Data, v.Value.Expr.Token, v.Refers) {
 				self.checkValidityForInitExpr(
 					v.Mutable,
 					v.Reference,
-					v.Kind.Type,
+					v.TypeSym.Type,
 					v.Value.Data,
 					v.Value.Expr.Token)
 			}
 		}
 
-		if v.Reference && !isValidForRef(v.Kind.Type) {
-			self.pushErr(v.Token, build::LogMsg.RefPointsToInvalidType, v.Kind.Type.Str())
+		if v.Reference && !isValidForRef(v.TypeSym.Type) {
+			self.pushErr(v.Token, build::LogMsg.RefPointsToInvalidType, v.TypeSym.Type.Str())
 		}
 
 		if v.Constant {
@@ -2095,8 +2095,8 @@ impl sema {
 		}
 
 		// Remove kind for avoid more tuple-type errors.
-		if v.Kind.Type.Tup() != nil {
-			v.Kind.Type = nil
+		if v.TypeSym.Type.Tup() != nil {
+			v.TypeSym.Type = nil
 		}
 	}
 
@@ -2107,8 +2107,8 @@ impl sema {
 		}
 
 		mut eval := (&eval)(nil)
-		if decl.Kind != nil {
-			eval = self.evalpd(l, decl.Kind.Type, decl)
+		if decl.TypeSym != nil {
+			eval = self.evalpd(l, decl.TypeSym.Type, decl)
 		} else {
 			eval = self.evalpd(l, nil, decl)
 		}
@@ -2222,7 +2222,7 @@ impl sema {
 				tc.useGenerics = append(tc.useGenerics, &TypeAlias{
 					Ident: decl.Ident,
 					Token: decl.Token,
-					Kind: &TypeSym{Type: g.Kind},
+					TypeSym: &TypeSym{Type: g.Kind},
 				})
 			}
 		}

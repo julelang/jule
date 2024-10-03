@@ -27,7 +27,7 @@ struct TypeAlias {
 	Generic:  bool
 	Token:    &token::Token
 	Ident:    str
-	Kind:     &TypeSym
+	TypeSym:  &TypeSym
 	Refers:   []any        // Referred identifiers, except binded ones.
 	Generics: []&TypeAlias // See developer reference (1).
 }
@@ -974,7 +974,7 @@ impl typeChecker {
 		if !self.inscatch && self.bannedGenerics != nil {
 			self.inscatch = true
 			for _, bg in self.bannedGenerics {
-				if bg == ta || ta.Kind.Type != nil && ta.Kind.Type.Equal(bg.Kind.Type) {
+				if bg == ta || ta.TypeSym.Type != nil && ta.TypeSym.Type.Equal(bg.TypeSym.Type) {
 					self.inscatch = false
 					break
 				}
@@ -999,16 +999,16 @@ impl typeChecker {
 		}
 
 		// Build kind if not builded already.
-		if ta.Kind.Type == nil {
+		if ta.TypeSym.Type == nil {
 			ok := self.s.checkTypeAliasDeclKind(ta, self.lookup)
 			if !ok {
 				ret nil
 			}
 		}
 
-		match type ta.Kind.Type.Kind {
+		match type ta.TypeSym.Type.Kind {
 		| &StructIns:
-			ok := self.checkIllegalCycles(decl, (&StructIns)(ta.Kind.Type.Kind).Decl)
+			ok := self.checkIllegalCycles(decl, (&StructIns)(ta.TypeSym.Type.Kind).Decl)
 			if !ok {
 				ret nil
 			}
@@ -1022,13 +1022,13 @@ impl typeChecker {
 
 		mut tk := &Type{
 			Generic: ta.Generic,
-			Kind: ta.Kind.Type.Kind,
+			Kind: ta.TypeSym.Type.Kind,
 		}
 		self.pushReferenceByKind(tk)
 		if ta.Binded {
 			tk.BindIdent = ta.Ident
 		} else {
-			tk.BindIdent = ta.Kind.Type.BindIdent
+			tk.BindIdent = ta.TypeSym.Type.BindIdent
 		}
 		ret tk
 	}
@@ -1227,14 +1227,14 @@ impl typeChecker {
 					self.pushErr(decl.Token, build::LogMsg.TypeNotSupportsGenerics, decl.Ident)
 					ret nil
 				}
-				mut st := g.Kind.Type.Struct()
+				mut st := g.TypeSym.Type.Struct()
 				if st != nil {
 					ok := self.checkIllegalCycles(decl, st.Decl)
 					if !ok {
 						ret nil
 					}
 				}
-				ret g.Kind.Type.Kind
+				ret g.TypeSym.Type.Kind
 			}
 		}
 
