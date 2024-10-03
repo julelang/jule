@@ -13,19 +13,31 @@ enum Seek: int {
 	End: 2, // Seek relative to the end
 }
 
+// Enum wrapper for type-safe o-flags.
+enum oFlag: int {
+	Rdonly: sys::O_RDONLY,
+	Wronly: sys::O_WRONLY,
+	Rdwr: sys::O_RDWR,
+	Append: sys::O_APPEND,
+	Create: sys::O_CREAT,
+	Excl: sys::O_EXCL,
+	Sync: sys::O_SYNC,
+	Trunc: sys::O_TRUNC,
+}
+
 // Flags to open wrapping those of the underlying system.
 // Not all flags may be implemented on a given system.
-// Exactly one of Rdonly, Wronly, or Rdwr must be specified.
-enum OFlag: int {
-	Rdonly: sys::O_RDONLY, // Open the file read-only
-	Wronly: sys::O_WRONLY, // Open the file write-only
-	Rdwr: sys::O_RDWR,     // Open the file read-write
-	Append: sys::O_APPEND, // Append data to the file when writing
-	Create: sys::O_CREAT,  // Create a new file if none exists
-	Excl: sys::O_EXCL,     // Used with OFlag.Create, file must not exist
-	Sync: sys::O_SYNC,     // Open for synchronous I/O
-	Trunc: sys::O_TRUNC,   // Truncate regular writable file when opened
-}
+// Exactly one of O_RDONLY, O_WRONLY, or O_RDWR must be specified.
+//
+// All flags have the underlying enum type for type safety.
+const O_RDONLY = oFlag.Rdonly // Open the file read-only
+const O_WRONLY = oFlag.Wronly // Open the file write-only
+const O_RDWR = oFlag.Rdwr     // Open the file read-write
+const O_APPEND = oFlag.Append // Append data to the file when writing
+const O_CREATE = oFlag.Create // Create a new file if none exists
+const O_EXCL = oFlag.Excl     // Used with O_CREATE, file must not exist
+const O_SYNC = oFlag.Sync     // Open for synchronous I/O
+const O_TRUNC = oFlag.Trunc   // Truncate regular writable file when opened
 
 // The file stream handle.
 //
@@ -61,10 +73,10 @@ impl File {
 	// Creates or truncates the named file. If the file already exists,
 	// it is truncated. If the file does not exist, it is created with mode 0666
 	// (before umask). If successful, methods on the returned File can
-	// be used for I/O; the associated file descriptor has mode OFlag.Rdwr.
+	// be used for I/O; the associated file descriptor has mode O_RDWR.
 	// Calls internally `File.Open` and forwards any exceptional.
 	static fn Create(path: str)!: &File {
-		ret File.Open(path, OFlag.Rdwr|OFlag.Create|OFlag.Trunc, 0666) else { error(error) }
+		ret File.Open(path, O_RDWR|O_CREATE|O_TRUNC, 0666) else { error(error) }
 	}
 
 	// Reads bytes of file.
@@ -94,7 +106,7 @@ impl File {
 			sz = 1 << 9
 		}
 
-		mut f := File.Open(path, OFlag.Rdonly, 0) else { error(error) }
+		mut f := File.Open(path, O_RDONLY, 0) else { error(error) }
 		mut buf := make([]byte, sz)
 		mut n := 0
 		for n < sz {
@@ -115,7 +127,7 @@ impl File {
 	// can leave the file in a partially written state.
 	// Calls internally `File.Open`, `File.Write`, `File.Close` and forwards any exceptional.
 	static fn Write(path: str, data: []byte, perm: int)! {
-		mut f := File.Open(path, OFlag.Wronly|OFlag.Create|OFlag.Trunc, perm) else { error(error) }
+		mut f := File.Open(path, O_WRONLY|O_CREATE|O_TRUNC, perm) else { error(error) }
 		mut n := 0
 		for n < len(data) {
 			n += f.Write(data[n:]) else { error(error) }
