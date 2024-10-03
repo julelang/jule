@@ -67,6 +67,11 @@ struct anonHash {
 	ident: str
 }
 
+struct traitHash {
+	traitDecl: &sema::Trait
+	methods:   []&sema::Fn // All unique methods of trait, including inherited ones.
+}
+
 struct metadata {
 	concurrent: bool // Whether built-in concurrency used.
 }
@@ -93,6 +98,7 @@ struct ObjectCoder {
 	anyTypeMap:   []&sema::TypeKind
 	traitCastMap: []traitCast
 	coSpawnMap:   []&sema::FnIns
+	traitMap:     []&traitHash
 
 	// Pairs for methods and structure instances.
 	// Used to avoid duplicated wrapper function generation.
@@ -842,8 +848,8 @@ impl ObjectCoder {
 		})
 	}
 
-	fn traitDataTypeMethods(mut &self, mut &t: &sema::Trait) {
-		obj::IterTraitMethods(t, fn(mut &m: &sema::Fn) {
+	fn traitDataTypeMethods(mut &self, mut &hash: &traitHash) {
+		for (_, mut m) in hash.methods {
 			mut ins := m.Instances[0]
 			for (i, mut ip) in ins.Params[1:] {
 				if token::IsAnonIdent(ip.Decl.Ident) {
@@ -852,30 +858,22 @@ impl ObjectCoder {
 			}
 			self.pushResult(m)
 			self.funcDeclTrait(m)
-		})
+		}
 	}
 
 	fn traitDataTypes(mut &self) {
-		obj::IterPackages(self.ir, fn(mut &pkg: &sema::Package) {
-			obj::IterFiles(pkg, fn(mut &file: &sema::SymTab) {
-				for (_, mut t) in file.Traits {
-					if t.Token == nil {
-						continue
-					}
-					self.write("struct ")
-					identCoder.traitDecl(self.Buf, t)
-					self.write("MptrData")
-					self.write(" {\n")
-					self.addIndent()
-					self.indent()
-					self.write("void (*dealloc)(" + typeCoder.Ptr + "<" + typeCoder.Uintptr + ">&);\n")
-					self.traitDataTypeMethods(t)
-					self.doneIndent()
-					self.indent()
-					self.write("};\n\n")
-				}
-			})
-		})
+		for (_, mut hash) in self.traitMap {
+			self.write("struct ")
+			identCoder.traitDecl(self.Buf, hash.traitDecl)
+			self.write("MptrData {\n")
+			self.addIndent()
+			self.indent()
+			self.write("void (*dealloc)(" + typeCoder.Ptr + "<" + typeCoder.Uintptr + ">&);\n")
+			self.traitDataTypeMethods(hash)
+			self.doneIndent()
+			self.indent()
+			self.write("};\n\n")
+		}
 	}
 
 	fn paramIns(mut &self, mut &buf: strings::Builder, mut &p: &sema::ParamIns) {
@@ -1066,22 +1064,19 @@ impl ObjectCoder {
 	}
 
 	fn traitWrappers(mut &self) {
-		obj::IterPackages(self.ir, fn(mut &pkg: &sema::Package) {
-			obj::IterFiles(pkg, fn(mut &file: &sema::SymTab) {
-				for (_, mut t) in file.Traits {
-					if len(t.Implemented) == 0 {
-						continue
-					}
-					obj::IterTraitMethods(t, fn(mut &m: &sema::Fn) {
-						self.traitWrapper(t, m)
-					})
-				}
-			})
-		})
+		for (_, mut hash) in self.traitMap {
+			if len(hash.traitDecl.Implemented) == 0 {
+				continue
+			}
+			for (_, mut m) in hash.methods {
+				self.traitWrapper(hash.traitDecl, m)
+			}
+		}
 	}
 
-	fn traitDataMethods(mut &self, mut &t: &sema::Trait, s: &sema::StructIns) {
-		obj::IterTraitMethods(t, fn(mut &m: &sema::Fn) {
+	// Generates wrapper methods object code for the implemented structure.
+	fn traitDataMethods(mut &self, mut &hash: &traitHash, s: &sema::StructIns) {
+		for (_, mut m) in hash.methods {
 			self.indent()
 			self.write(".")
 			identCoder.func(self.Buf, m)
@@ -1094,12 +1089,13 @@ impl ObjectCoder {
 			self.write("_")
 			self.write(conv::FmtUint(u64(uintptr(s)), 0xF))
 			self.write(",\n")
-		})
+		}
 	}
 
-	fn traitData(mut &self, mut &t: &sema::Trait, i: int, mut &s: &sema::StructIns) {
-		mut ident := strings::Builder.New(len(t.Ident))
-		identCoder.traitDecl(ident, t)
+	// Generates VTM (virtual method table) object code for the trait.
+	fn traitData(mut &self, mut &hash: &traitHash, i: int, mut &s: &sema::StructIns) {
+		mut ident := strings::Builder.New(len(hash.traitDecl.Ident))
+		identCoder.traitDecl(ident, hash.traitDecl)
 		self.write("static ")
 		self.writeBytes(unsafe { ident.Buf() })
 		self.write("MptrData ")
@@ -1112,25 +1108,22 @@ impl ObjectCoder {
 		self.write(".dealloc=" + deallocatedTypeIdent)
 		self.write(conv::Itoa(self.pushDealloc(&sema::TypeKind{Kind: s})))
 		self.write(",\n")
-		self.traitDataMethods(t, s)
+		self.traitDataMethods(hash, s)
 		self.doneIndent()
 		self.write("};\n")
 	}
 
+	// Generates VTM (virtual method table) object code for traits.
 	fn traitDatas(mut &self) {
-		obj::IterPackages(self.ir, fn(mut &pkg: &sema::Package) {
-			obj::IterFiles(pkg, fn(mut &file: &sema::SymTab) {
-				for (_, mut t) in file.Traits {
-					mut i := 0
-					for (_, mut s) in t.Implemented {
-						for (_, mut ins) in s.Instances {
-							self.traitData(t, i, ins)
-							i++
-						}
-					}
+		for (_, mut hash) in self.traitMap {
+			mut i := 0
+			for (_, mut s) in hash.traitDecl.Implemented {
+				for (_, mut ins) in s.Instances {
+					self.traitData(hash, i, ins)
+					i++
 				}
-			})
-		})
+			}
+		}
 	}
 
 	fn globalDecls(mut &self) {
@@ -1283,6 +1276,36 @@ impl ObjectCoder {
 }`)
 	}
 
+	fn buildTraitHash(mut &self, mut &t: &sema::Trait) {
+		mut hash := &traitHash{
+			traitDecl: t,
+			methods: make([]&sema::Fn, 0, len(t.Methods)),
+		}
+		obj::IterTraitMethods(t, fn(mut &m: &sema::Fn) {
+			// lookup and do not add already exist methods
+			for _, em in hash.methods {
+				if em == m {
+					ret
+				}
+			}
+			// m is not exist in hash.methods
+			hash.methods = append(hash.methods, m)
+		})
+		self.traitMap = append(self.traitMap, hash)
+	}
+
+	fn buildTraitHashes(mut &self) {
+		obj::IterPackages(self.ir, fn(mut &pkg: &sema::Package) {
+			obj::IterFiles(pkg, fn(mut &file: &sema::SymTab) {
+				for (_, mut t) in file.Traits {
+					if t.Token != nil {
+						self.buildTraitHash(t)
+					}
+				}
+			})
+		})
+	}
+
 	fn insertBuf(mut &self, mut &buf: strings::Builder, pos: int) {
 		if buf.Len() > 0 {
 			mut head := make([]byte, 0, self.Buf.Len()+buf.Len())
@@ -1311,6 +1334,7 @@ impl ObjectCoder {
 	}
 
 	fn serializeHead(mut &self) {
+		self.buildTraitHashes()
 		self.prepareStructures()
 		self.head()
 		self.write("\n")

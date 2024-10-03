@@ -19,26 +19,14 @@ fn IterFiles(mut &pkg: &sema::Package, f: fn(mut &f: &sema::SymTab)) {
 	}
 }
 
-fn iterTraitInheritMethods(mut &base: &sema::Trait, mut &t: &sema::Trait, f: fn(mut &m: &sema::Fn)) {
-	iterTraitInheritMethods1(base, t, f)
-	for (_, mut m) in t.Methods {
-		if !ContainsTraitMethod(base, m.Ident) { // Do not iterate iterated method.
-			f(m)
-		}
-	}
-}
-
-fn iterTraitInheritMethods1(mut &base: &sema::Trait, mut &t: &sema::Trait, f: fn(mut &m: &sema::Fn)) {
-	for (_, mut inh) in t.Inherits {
-		mut t2 := inh.Kind.Trait()
-		iterTraitInheritMethods(base, t2, f)
-	}
-}
-
 // Iterates methods of trait, including inherited methods.
+// It does not checks already iterated methods.
 fn IterTraitMethods(mut &t: &sema::Trait, f: fn(mut &m: &sema::Fn)) {
 	for (_, mut m) in t.Methods {
 		f(m)
 	}
-	iterTraitInheritMethods1(t, t, f)
+	for (_, mut inh) in t.Inherits {
+		mut it := inh.Kind.Trait()
+		IterTraitMethods(it, f)
+	}
 }
