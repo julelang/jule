@@ -620,9 +620,9 @@ impl sema {
 		ret self.typeChecker(l, generics, referencer).checkDecl(t)
 	}
 
-	// Checks type, builds result as kind and collects referred type aliases.
+	// Checks TypeSYm, builds result as Type and collects referred type aliases.
 	// Skips already checked types.
-	fn checkTypeWithRefers(mut &self, mut &t: &TypeSym, mut l: Lookup,
+	fn checkTypeSymWithRefers(mut &self, mut &t: &TypeSym, mut l: Lookup,
 		mut generics: []&TypeAlias, mut referencer: &referencer): (ok: bool) {
 		if t.checked() {
 			ret true
@@ -635,14 +635,14 @@ impl sema {
 		ret &constraintChecker{s: self}
 	}
 
-	// Checks type and builds result as kind.
+	// Checks type and builds result as Type.
 	// Skips already checked types.
-	fn checkType(mut &self, mut &t: &TypeSym, mut l: Lookup): bool {
-		ret self.checkTypeWithRefers(t, l, nil, nil)
+	fn checkTypeSym(mut &self, mut &t: &TypeSym, mut l: Lookup): bool {
+		ret self.checkTypeSymWithRefers(t, l, nil, nil)
 	}
 
-	// Same as the checkType but takes referencer.
-	fn checkTypeRefers(mut &self, mut &t: &ast::TypeDecl, mut l: Lookup, mut refers: &ReferenceStack): &Type {
+	// Same as the checkTypeSym but takes referencer.
+	fn checkTypeSymRefers(mut &self, mut &t: &ast::TypeDecl, mut l: Lookup, mut refers: &ReferenceStack): &Type {
 		mut tc := &typeChecker{
 			s: self,
 			rootLookup: l,
@@ -1068,7 +1068,7 @@ impl sema {
 				self.setCurrentFile(file)
 			}
 		}
-		ok = self.checkTypeWithRefers(ta.Kind, l, nil, &referencer{
+		ok = self.checkTypeSymWithRefers(ta.Kind, l, nil, &referencer{
 			ident: ta.Ident,
 			owner: ta,
 			refs: &ta.Refers,
@@ -1256,7 +1256,7 @@ impl sema {
 		self.checkEnumItemsDup[&EnumItem](e.Items)
 
 		if e.TypeSym != nil {
-			if !self.checkType(e.TypeSym, self) {
+			if !self.checkTypeSym(e.TypeSym, self) {
 				ret
 			}
 		} else {
@@ -1300,7 +1300,7 @@ impl sema {
 				self.pushErr(item.Token, build::LogMsg.MissingType)
 				continue
 			}
-			ok := self.checkType(item.TypeSym, self)
+			ok := self.checkTypeSym(item.TypeSym, self)
 			if !ok {
 				continue
 			}
@@ -1510,7 +1510,7 @@ impl sema {
 	fn _checkTraitDeclInherits(mut &self, mut &t: &Trait): (ok: bool) {
 		ok = true
 		for (i, mut it) in t.Inherits {
-			if !self.checkType(it, self) {
+			if !self.checkTypeSym(it, self) {
 				ok = false
 				continue
 			}
@@ -1797,7 +1797,7 @@ impl sema {
 			|:
 				panic("sema: checkVarDecl: unimplemented referencer")
 			}
-			decl.Kind.Type = self.checkTypeRefers(decl.Kind.Decl, l, refers)
+			decl.Kind.Type = self.checkTypeSymRefers(decl.Kind.Decl, l, refers)
 		}
 
 		if decl.Reference {
