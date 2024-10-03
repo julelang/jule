@@ -628,7 +628,7 @@ impl eval {
 		// any missing information means analysis failed
 		// kind should not be nil because each variable must have a valid type
 		v.Used = true
-		if v.Kind == nil || v.Kind.Kind == nil {
+		if v.Kind == nil || v.Kind.Type == nil {
 			ret nil
 		}
 
@@ -637,7 +637,7 @@ impl eval {
 			Lvalue: !v.Constant,
 			Mutable: v.Mutable,
 			Reference: v.Reference,
-			Kind: v.Kind.Kind,
+			Kind: v.Kind.Type,
 			Model: v,
 		}
 		if v.Value != nil && v.Value.Data != nil {
@@ -666,7 +666,7 @@ impl eval {
 
 		ta.Used = true
 
-		mut kind := ta.Kind.Kind.Kind
+		mut kind := ta.Kind.Type.Kind
 		let mut d: &Data = nil
 		match type kind {
 		| &StructIns:
@@ -682,13 +682,13 @@ impl eval {
 			d = &Data{
 				Decl: true,
 				Kind: &Type{
-					Kind: ta.Kind.Kind.Kind,
+					Kind: ta.Kind.Type.Kind,
 				},
 			}
 			if ta.Binded {
 				d.Kind.BindIdent = ta.Ident
 			} else {
-				d.Kind.BindIdent = ta.Kind.Kind.BindIdent
+				d.Kind.BindIdent = ta.Kind.Type.BindIdent
 			}
 			d.Model = d.Kind
 		}
@@ -1524,7 +1524,7 @@ impl eval {
 		d.untyped = false
 
 		if d.Kind.Enum() != nil {
-			if d.Kind.Enum().Kind.Kind.Prim() == nil || !d.Kind.Enum().Kind.Kind.Prim().IsStr() {
+			if d.Kind.Enum().Kind.Type.Prim() == nil || !d.Kind.Enum().Kind.Type.Prim().IsStr() {
 				self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, d.Kind.Str(), t.Str())
 				ret
 			}
@@ -1576,7 +1576,7 @@ impl eval {
 	fn castStr(mut self, mut d: &Data, errorToken: &token::Token) {
 		if d.Kind.Enum() != nil {
 			mut e := d.Kind.Enum()
-			if e.Kind.Kind.Prim() != nil && e.Kind.Kind.Prim().IsStr() {
+			if e.Kind.Type.Prim() != nil && e.Kind.Type.Prim().IsStr() {
 				ret
 			}
 		}
@@ -1636,7 +1636,7 @@ impl eval {
 
 		if d.Kind.Enum() != nil {
 			e := d.Kind.Enum()
-			if types::IsNum(e.Kind.Kind.Str()) {
+			if types::IsNum(e.Kind.Type.Str()) {
 				ret
 			}
 		}
@@ -1684,7 +1684,7 @@ impl eval {
 
 		if d.Kind.Enum() != nil {
 			e := d.Kind.Enum()
-			if types::IsNum(e.Kind.Kind.Str()) {
+			if types::IsNum(e.Kind.Type.Str()) {
 				ret
 			}
 		}
@@ -1796,7 +1796,7 @@ impl eval {
 		// Even if the data is not mutable, set as mutable if the type is not mutable-type.
 		d.Mutable = d.Mutable || !d.Kind.Mutable()
 
-		if !d.Decl && (d.Kind.Enum() == nil || !d.Kind.Enum().Kind.Kind.Equal(t)) {
+		if !d.Decl && (d.Kind.Enum() == nil || !d.Kind.Enum().Kind.Type.Equal(t)) {
 			applyCastKind(self.s, d, t, errorToken, self.getOwnerRefers())
 			(&CastingExprModel)(d.Model).Token = errorToken
 		} else {
@@ -1842,7 +1842,7 @@ impl eval {
 		if !ok {
 			ret nil
 		}
-		ret self.evalCastT(t.Kind, c.Expr, c.Kind.Token)
+		ret self.evalCastT(t.Type, c.Expr, c.Kind.Token)
 	}
 
 	fn evalNamespace(mut self, mut s: &ast::NamespaceExpr): &Data {
@@ -1912,10 +1912,10 @@ impl eval {
 			ret nil
 		}
 
-		mut s := t.Kind.Struct()
+		mut s := t.Type.Struct()
 		if s == nil {
-			if t.Kind.Sptr() != nil {
-				s = t.Kind.Sptr().Elem.Struct()
+			if t.Type.Sptr() != nil {
+				s = t.Type.Sptr().Elem.Struct()
 				if s != nil {
 					goto eval
 				}
@@ -1926,7 +1926,7 @@ impl eval {
 
 	eval:
 		mut d := self.evalStructLitExplicit(s, lit.Exprs, lit.Kind.Token)
-		if t.Kind.Sptr() != nil {
+		if t.Type.Sptr() != nil {
 			mut model := (&StructLitExprModel)(d.Model)
 			makeStructLitAlloc(d, model)
 		}
@@ -1945,8 +1945,8 @@ impl eval {
 		}
 		ret &Data{
 			Decl: true,
-			Kind: tk.Kind,
-			Model: tk.Kind,
+			Kind: tk.Type,
+			Model: tk.Type,
 		}
 	}
 
@@ -2231,16 +2231,16 @@ impl eval {
 			ret nil
 		}
 		match {
-		| item.Kind.Kind.Enum() != nil:
-			ret self._evalEnum(item.Kind.Kind.Enum())
-		| item.Kind.Kind.TypeEnum() != nil:
-			ret self._evalTypeEnum(item.Kind.Kind.TypeEnum())
-		| item.Kind.Kind.Struct() != nil:
-			ret self._evalStruct(item.Kind.Kind.Struct())
+		| item.Kind.Type.Enum() != nil:
+			ret self._evalEnum(item.Kind.Type.Enum())
+		| item.Kind.Type.TypeEnum() != nil:
+			ret self._evalTypeEnum(item.Kind.Type.TypeEnum())
+		| item.Kind.Type.Struct() != nil:
+			ret self._evalStruct(item.Kind.Type.Struct())
 		|:
 			mut d := &Data{
 				Decl: true,
-				Kind: item.Kind.Kind,
+				Kind: item.Kind.Type,
 			}
 			d.Model = d.Kind
 			ret d
@@ -3541,9 +3541,9 @@ impl binaryEval {
 		| token::Id.NotEq:
 			mut rkind := self.r.Kind
 			if self.r.Kind.Enum() != nil {
-				rkind = self.r.Kind.Enum().Kind.Kind
+				rkind = self.r.Kind.Enum().Kind.Type
 			}
-			if !self.e.s.checkTypeCompatibility(enm.Kind.Kind, rkind, self.op) {
+			if !self.e.s.checkTypeCompatibility(enm.Kind.Type, rkind, self.op) {
 				ret nil
 			}
 			ret &Data{
@@ -3561,7 +3561,7 @@ impl binaryEval {
 		| token::Id.Lt
 		| token::Id.GtEq
 		| token::Id.LtEq:
-			if !types::IsNum(enm.Kind.Kind.Str()) {
+			if !types::IsNum(enm.Kind.Type.Str()) {
 				self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, enm.Ident)
 				ret nil
 			}
@@ -3591,7 +3591,7 @@ impl binaryEval {
 			fall
 		| token::Id.Vline
 		| token::Id.Caret:
-			if enm.Kind.Kind.Prim() == nil || !types::IsInt(enm.Kind.Kind.Prim().Str()) {
+			if enm.Kind.Type.Prim() == nil || !types::IsInt(enm.Kind.Type.Prim().Str()) {
 				self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, enm.Ident)
 			}
 			ret self.l
@@ -4353,13 +4353,13 @@ fn fitBitsize(mut &d: &Data) {
 		k := types::BitSizeOfInt(d.Constant.ReadI64())
 		if k > z || types::IsUnsigInt(prim.Kind) {
 			d.Constant.Kind = types::IntFromBits(k)
-			d.Kind = findBuiltinTypeAlias(d.Constant.Kind).Kind.Kind
+			d.Kind = findBuiltinTypeAlias(d.Constant.Kind).Kind.Type
 		}
 	| d.Constant.IsU64():
 		k := types::BitSizeOfUint(d.Constant.ReadU64())
 		if k > z || types::IsSigInt(prim.Kind) {
 			d.Constant.Kind = types::UintFromBits(k)
-			d.Kind = findBuiltinTypeAlias(d.Constant.Kind).Kind.Kind
+			d.Kind = findBuiltinTypeAlias(d.Constant.Kind).Kind.Type
 		}
 	| d.Constant.IsF64():
 		if z == 1<<6 {
@@ -4369,7 +4369,7 @@ fn fitBitsize(mut &d: &Data) {
 		k := types::BitSizeOfFloat(d.Constant.ReadF64())
 		if k > z {
 			d.Constant.Kind = types::FloatFromBits(k)
-			d.Kind = findBuiltinTypeAlias(d.Constant.Kind).Kind.Kind
+			d.Kind = findBuiltinTypeAlias(d.Constant.Kind).Kind.Type
 		}
 	}
 }
@@ -4526,7 +4526,7 @@ fn applyCastModelByEnum(mut &s: &sema, mut &d: &Data, mut e: &Enum,
 	if e == nil {
 		ret
 	}
-	applyCastKindModel(s, d, e.Kind.Kind, token, refers)
+	applyCastKindModel(s, d, e.Kind.Type, token, refers)
 }
 
 fn castConstByType(&t: str, mut &d: &Data) {

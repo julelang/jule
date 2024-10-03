@@ -294,7 +294,7 @@ impl ObjectCoder {
 			self.anonObj.WriteStr(anonFnCtxSuffix + "{\n")!
 			for (_, mut v) in m.Captured {
 				self.anonObj.WriteByte(indentKind)! // 1x indent
-				self.tc.kind(self.anonObj, v.Kind.Kind)
+				self.tc.kind(self.anonObj, v.Kind.Type)
 				self.anonObj.WriteByte(' ')!
 				if v.Reference {
 					self.anonObj.WriteByte('*')!
@@ -325,7 +325,7 @@ impl ObjectCoder {
 	fn pushAnyType(mut &self, mut t: &sema::Type): int {
 		mut orig := t
 		if t.Enum() != nil {
-			t = t.Enum().Kind.Kind
+			t = t.Enum().Kind.Type
 		}
 		mut i := self.findAnyType(t)
 		if i != -1 {
@@ -908,7 +908,7 @@ impl ObjectCoder {
 			self.write("static ")
 		}
 
-		self.tc.kind(self.Buf, v.Kind.Kind)
+		self.tc.kind(self.Buf, v.Kind.Type)
 		self.write(" ")
 		if v.Reference {
 			self.write("*")
@@ -945,8 +945,8 @@ impl ObjectCoder {
 			self.varInitExpr(v, fn() { self.write("nullptr") })
 			ret
 		}
-		if shouldInitialized(v.Kind.Kind) {
-			self.varInitExpr(v, fn() { self.ec.initExpr(v.Kind.Kind) })
+		if shouldInitialized(v.Kind.Type) {
+			self.varInitExpr(v, fn() { self.ec.initExpr(v.Kind.Type) })
 			ret
 		}
 		self.varInitExpr(v, nil)
@@ -1128,7 +1128,7 @@ impl ObjectCoder {
 
 	fn globalDecls(mut &self) {
 		for (_, mut v) in self.ir.Ordered.Globals {
-			self.tc.kind(self.Buf, v.Kind.Kind)
+			self.tc.kind(self.Buf, v.Kind.Type)
 			self.write(" ")
 			identCoder.var(self.Buf, v)
 			self.write(";\n")

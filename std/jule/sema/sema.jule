@@ -76,7 +76,7 @@ fn appendRetVars(mut &dest: []&Var, mut &f: &FnIns) {
 			Token: ident,
 			Scope: f.Scope,
 			Kind: &TypeSym{
-				Kind: types[i],
+				Type: types[i],
 			},
 			Value: &Value{
 				Data: new(Data),
@@ -114,7 +114,7 @@ fn appendParamVars(mut &dest: []&Var, mut &f: &FnIns) {
 
 		match {
 		| p.Decl.IsSelf():
-			v.Kind.Kind = &Type{
+			v.Kind.Type = &Type{
 				Variadic: false,
 				Kind: f.Owner,
 			}
@@ -122,15 +122,15 @@ fn appendParamVars(mut &dest: []&Var, mut &f: &FnIns) {
 
 			if p.Decl.IsRef() {
 				v.Ident = v.Ident[1:] // Remove reference sign.
-				v.Kind.Kind.Kind = &Sptr{
+				v.Kind.Type.Kind = &Sptr{
 					Elem: &Type{
-						BindIdent: v.Kind.Kind.BindIdent,
-						Kind: v.Kind.Kind.Kind,
+						BindIdent: v.Kind.Type.BindIdent,
+						Kind: v.Kind.Type.Kind,
 					},
 				}
 			}
 		| p.Decl.Variadic:
-			v.Kind.Kind = &Type{
+			v.Kind.Type = &Type{
 				Variadic: false,
 				Kind: &Slc{
 					Elem: &Type{
@@ -140,7 +140,7 @@ fn appendParamVars(mut &dest: []&Var, mut &f: &FnIns) {
 				},
 			}
 		|:
-			v.Kind.Kind = p.Kind
+			v.Kind.Type = p.Kind
 		}
 
 		dest = append(dest, v)
@@ -170,7 +170,7 @@ fn appendGenericTypeAliases(mut &dest: []&TypeAlias, mut &f: &FnIns) {
 			Scope: f.Decl.Scope,
 			Ident: decl.Ident,
 			Token: decl.Token,
-			Kind: &TypeSym{Kind: g.Kind},
+			Kind: &TypeSym{Type: g.Kind},
 		})
 	}
 
@@ -184,7 +184,7 @@ fn appendGenericTypeAliases(mut &dest: []&TypeAlias, mut &f: &FnIns) {
 				Scope: f.Decl.Scope,
 				Ident: decl.Ident,
 				Token: decl.Token,
-				Kind: &TypeSym{Kind: g.Kind},
+				Kind: &TypeSym{Type: g.Kind},
 			})
 		}
 	}
@@ -627,7 +627,7 @@ impl sema {
 		if t.checked() {
 			ret true
 		}
-		t.Kind = self.buildTypeWithRefers(t.Decl, l, generics, referencer)
+		t.Type = self.buildTypeWithRefers(t.Decl, l, generics, referencer)
 		ret t.checked()
 	}
 
@@ -1073,7 +1073,7 @@ impl sema {
 			owner: ta,
 			refs: &ta.Refers,
 		})
-		if ok && ta.Kind.Kind.Arr() != nil && ta.Kind.Kind.Arr().Auto {
+		if ok && ta.Kind.Type.Arr() != nil && ta.Kind.Type.Arr().Auto {
 			self.pushErr(ta.Kind.Decl.Token, build::LogMsg.ArrayAutoSized)
 			ok = false
 		}
@@ -1153,7 +1153,7 @@ impl sema {
 				}
 
 				mut refers := (&ReferenceStack)(nil) // constant expressions not uses
-				_ = self.checkAssignType(false, e.Kind.Kind, d, item.Token, refers)
+				_ = self.checkAssignType(false, e.Kind.Type, d, item.Token, refers)
 				item.Value.Data = d
 			}
 		}
@@ -1182,7 +1182,7 @@ impl sema {
 				self.pushErr(item.Value.Expr.Token, build::LogMsg.ExprNotConst)
 			}
 			mut refers := (&ReferenceStack)(nil) // constant expressions not uses
-			_ = self.checkAssignType(false, e.Kind.Kind, d, item.Token, refers)
+			_ = self.checkAssignType(false, e.Kind.Type, d, item.Token, refers)
 			item.Value.Data = d
 			const match type Int {
 			| i64:
@@ -1231,7 +1231,7 @@ impl sema {
 	}
 
 	fn checkEnumItemsInt(mut &self, mut &e: &Enum) {
-		prim := e.Kind.Kind.Prim()
+		prim := e.Kind.Type.Prim()
 		match {
 		| types::IsSigInt(prim.Kind):
 			self.checkEnumItemsInt1[i64](prim, e)
@@ -1264,7 +1264,7 @@ impl sema {
 			e.Kind = findBuiltinTypeAlias(types::Kind.Int).Kind
 		}
 
-		mut t := e.Kind.Kind.Prim()
+		mut t := e.Kind.Type.Prim()
 		if t == nil {
 			self.pushErr(e.Token, build::LogMsg.InvalidTypeSource)
 			ret
@@ -1304,7 +1304,7 @@ impl sema {
 			if !ok {
 				continue
 			}
-			p := item.Kind.Kind.Prim()
+			p := item.Kind.Type.Prim()
 			if p != nil && p.IsAny() {
 				self.pushErr(item.Token, build::LogMsg.AnyWithTypeEnum)
 			}
@@ -1314,7 +1314,7 @@ impl sema {
 			tk := Type{
 				Kind: e,
 			}
-			if item.Kind.Kind != nil && item.Kind.Kind.Equal(unsafe { (&Type)(&tk) }) {
+			if item.Kind.Type != nil && item.Kind.Type.Equal(unsafe { (&Type)(&tk) }) {
 				self.pushErr(item.Token, build::LogMsg.IllegalCycleRefersItself, e.Str())
 			}
 		}
@@ -1491,10 +1491,10 @@ impl sema {
 	fn catchTraitInheritCycle(mut &self, t1: &Trait, mut t2: &Trait, mut &message: strings::Builder): (ok: bool) {
 		ok = true
 		for (_, mut i) in t2.Inherits {
-			if i.Kind == nil {
+			if i.Type == nil {
 				continue
 			}
-			mut t3 := i.Kind.Trait()
+			mut t3 := i.Type.Trait()
 			if t1 == t3 {
 				self.pushCycleError(t2.Ident, t3.Ident, message)
 				ret false
@@ -1514,9 +1514,9 @@ impl sema {
 				ok = false
 				continue
 			}
-			mut t2 := it.Kind.Trait()
+			mut t2 := it.Type.Trait()
 			if t2 == nil {
-				self.pushErr(it.Decl.Token, build::LogMsg.InheritedNonTrait, t.Ident, it.Kind.Str())
+				self.pushErr(it.Decl.Token, build::LogMsg.InheritedNonTrait, t.Ident, it.Type.Str())
 				ok = false
 				continue
 			}
@@ -1524,7 +1524,7 @@ impl sema {
 				if j >= i {
 					break
 				}
-				if it2.Kind != nil && it.Kind.Equal(it2.Kind) {
+				if it2.Type != nil && it.Type.Equal(it2.Type) {
 					self.pushErr(it.Decl.Token, build::LogMsg.DuplicatedIdent, t2.Ident)
 					ok = false
 					break
@@ -1550,12 +1550,12 @@ impl sema {
 
 	fn checkTraitDeclInherits(mut &self, mut &t: &Trait) {
 		for (i, mut it) in t.Inherits {
-			mut t1 := it.Kind.Trait()
+			mut t1 := it.Type.Trait()
 			for (j, mut it2) in t.Inherits {
 				if j == i {
 					continue
 				}
-				mut t2 := it2.Kind.Trait()
+				mut t2 := it2.Type.Trait()
 				for (_, mut t1m) in t1.Methods {
 					mut t2m := t2.FindMethod(t1m.Ident)
 					if t2m == nil {
@@ -1797,7 +1797,7 @@ impl sema {
 			|:
 				panic("sema: checkVarDecl: unimplemented referencer")
 			}
-			decl.Kind.Kind = self.checkTypeRefers(decl.Kind.Decl, l, refers)
+			decl.Kind.Type = self.checkTypeRefers(decl.Kind.Decl, l, refers)
 		}
 
 		if decl.Reference {
@@ -2051,17 +2051,17 @@ impl sema {
 	fn checkVarValue(mut &self, mut &v: &Var) {
 		if v.IsTypeInferred() {
 			// Build new TypeSym because auto-type symbols are nil.
-			v.Kind = &TypeSym{Kind: v.Value.Data.Kind}
+			v.Kind = &TypeSym{Type: v.Value.Data.Kind}
 
 			self.checkDataForTypeInference(v.Value.Data, v.Value.Expr.Token)
 			self.checkValidityForInitExpr(
 				v.Mutable,
 				v.Reference,
-				v.Kind.Kind,
+				v.Kind.Type,
 				v.Value.Data,
 				v.Value.Expr.Token)
 		} else {
-			mut arr := v.Kind.Kind.Arr()
+			mut arr := v.Kind.Type.Arr()
 			if arr != nil {
 				if arr.Auto {
 					dataArr := v.Value.Data.Kind.Arr()
@@ -2071,18 +2071,18 @@ impl sema {
 				}
 			}
 
-			if self.checkAssignType(v.Reference, v.Kind.Kind, v.Value.Data, v.Value.Expr.Token, v.Refers) {
+			if self.checkAssignType(v.Reference, v.Kind.Type, v.Value.Data, v.Value.Expr.Token, v.Refers) {
 				self.checkValidityForInitExpr(
 					v.Mutable,
 					v.Reference,
-					v.Kind.Kind,
+					v.Kind.Type,
 					v.Value.Data,
 					v.Value.Expr.Token)
 			}
 		}
 
-		if v.Reference && !isValidForRef(v.Kind.Kind) {
-			self.pushErr(v.Token, build::LogMsg.RefPointsToInvalidType, v.Kind.Kind.Str())
+		if v.Reference && !isValidForRef(v.Kind.Type) {
+			self.pushErr(v.Token, build::LogMsg.RefPointsToInvalidType, v.Kind.Type.Str())
 		}
 
 		if v.Constant {
@@ -2095,8 +2095,8 @@ impl sema {
 		}
 
 		// Remove kind for avoid more tuple-type errors.
-		if v.Kind.Kind.Tup() != nil {
-			v.Kind.Kind = nil
+		if v.Kind.Type.Tup() != nil {
+			v.Kind.Type = nil
 		}
 	}
 
@@ -2108,7 +2108,7 @@ impl sema {
 
 		mut eval := (&eval)(nil)
 		if decl.Kind != nil {
-			eval = self.evalpd(l, decl.Kind.Kind, decl)
+			eval = self.evalpd(l, decl.Kind.Type, decl)
 		} else {
 			eval = self.evalpd(l, nil, decl)
 		}
@@ -2222,7 +2222,7 @@ impl sema {
 				tc.useGenerics = append(tc.useGenerics, &TypeAlias{
 					Ident: decl.Ident,
 					Token: decl.Token,
-					Kind: &TypeSym{Kind: g.Kind},
+					Kind: &TypeSym{Type: g.Kind},
 				})
 			}
 		}
@@ -2814,7 +2814,7 @@ push:
 		t.Implemented = append(t.Implemented, d)
 	}
 	for (_, mut i) in t.Inherits {
-		pushImplemented(i.Kind.Trait(), d)
+		pushImplemented(i.Type.Trait(), d)
 	}
 }
 
@@ -2832,7 +2832,7 @@ push:
 		s.Implements = append(s.Implements, t)
 	}
 	for (_, mut i) in t.Inherits {
-		pushImplements(s, i.Kind.Trait())
+		pushImplements(s, i.Type.Trait())
 	}
 }
 

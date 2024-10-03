@@ -150,7 +150,7 @@ impl Type {
 			}
 			enm := _self.Enum()
 			if enm != nil {
-				ret types::IsNum(enm.Kind.Kind.Str())
+				ret types::IsNum(enm.Kind.Type.Str())
 			}
 			ret false
 		}
@@ -487,16 +487,16 @@ impl Type {
 // Type.
 struct TypeSym {
 	Decl: &ast::TypeDecl // Never changed by semantic analyzer.
-	Kind: &Type
+	Type: &Type
 }
 
 impl TypeSym {
 	// Reports whether type is checked already.
-	fn checked(self): bool { ret self.Kind != nil }
+	fn checked(self): bool { ret self.Type != nil }
 
 	// Removes kind and ready to check.
 	// checked() reports false after this function.
-	fn removeKind(mut self) { self.Kind = nil }
+	fn removeKind(mut self) { self.Type = nil }
 }
 
 // Primitive type.
@@ -974,7 +974,7 @@ impl typeChecker {
 		if !self.inscatch && self.bannedGenerics != nil {
 			self.inscatch = true
 			for _, bg in self.bannedGenerics {
-				if bg == ta || ta.Kind.Kind != nil && ta.Kind.Kind.Equal(bg.Kind.Kind) {
+				if bg == ta || ta.Kind.Type != nil && ta.Kind.Type.Equal(bg.Kind.Type) {
 					self.inscatch = false
 					break
 				}
@@ -999,16 +999,16 @@ impl typeChecker {
 		}
 
 		// Build kind if not builded already.
-		if ta.Kind.Kind == nil {
+		if ta.Kind.Type == nil {
 			ok := self.s.checkTypeAliasDeclKind(ta, self.lookup)
 			if !ok {
 				ret nil
 			}
 		}
 
-		match type ta.Kind.Kind.Kind {
+		match type ta.Kind.Type.Kind {
 		| &StructIns:
-			ok := self.checkIllegalCycles(decl, (&StructIns)(ta.Kind.Kind.Kind).Decl)
+			ok := self.checkIllegalCycles(decl, (&StructIns)(ta.Kind.Type.Kind).Decl)
 			if !ok {
 				ret nil
 			}
@@ -1022,13 +1022,13 @@ impl typeChecker {
 
 		mut tk := &Type{
 			Generic: ta.Generic,
-			Kind: ta.Kind.Kind.Kind,
+			Kind: ta.Kind.Type.Kind,
 		}
 		self.pushReferenceByKind(tk)
 		if ta.Binded {
 			tk.BindIdent = ta.Ident
 		} else {
-			tk.BindIdent = ta.Kind.Kind.BindIdent
+			tk.BindIdent = ta.Kind.Type.BindIdent
 		}
 		ret tk
 	}
@@ -1227,14 +1227,14 @@ impl typeChecker {
 					self.pushErr(decl.Token, build::LogMsg.TypeNotSupportsGenerics, decl.Ident)
 					ret nil
 				}
-				mut st := g.Kind.Kind.Struct()
+				mut st := g.Kind.Type.Struct()
 				if st != nil {
 					ok := self.checkIllegalCycles(decl, st.Decl)
 					if !ok {
 						ret nil
 					}
 				}
-				ret g.Kind.Kind.Kind
+				ret g.Kind.Type.Kind
 			}
 		}
 
@@ -1300,10 +1300,10 @@ impl typeChecker {
 				ret nil
 			}
 			if len(idents)-i == 1 {
-				self.pushReferenceByKind(item.Kind.Kind)
-				ret item.Kind.Kind
+				self.pushReferenceByKind(item.Kind.Type)
+				ret item.Kind.Type
 			}
-			t = item.Kind.Kind.TypeEnum()
+			t = item.Kind.Type.TypeEnum()
 			if t == nil {
 				self.pushErr(self.errorToken, build::LogMsg.InvalidSyntax)
 				ret nil
@@ -1664,7 +1664,7 @@ impl typeChecker {
 			t.removeKind()
 			ret
 		}
-		t.Kind = kind
+		t.Type = kind
 	}
 }
 
