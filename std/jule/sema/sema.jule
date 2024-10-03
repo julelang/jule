@@ -75,7 +75,7 @@ fn appendRetVars(mut &dest: []&Var, mut &f: &FnIns) {
 			Ident: ident.Kind,
 			Token: ident,
 			Scope: f.Scope,
-			Kind: &TypeSymbol{
+			Kind: &TypeSym{
 				Kind: types[i],
 			},
 			Value: &Value{
@@ -105,7 +105,7 @@ fn appendParamVars(mut &dest: []&Var, mut &f: &FnIns) {
 			Mutable: p.Decl.Mutable,
 			Ident: p.Decl.Ident,
 			Token: p.Decl.Token,
-			Kind: new(TypeSymbol),
+			Kind: new(TypeSym),
 			Scope: f.Scope,
 			Value: &Value{
 				Data: new(Data),
@@ -170,7 +170,7 @@ fn appendGenericTypeAliases(mut &dest: []&TypeAlias, mut &f: &FnIns) {
 			Scope: f.Decl.Scope,
 			Ident: decl.Ident,
 			Token: decl.Token,
-			Kind: &TypeSymbol{Kind: g.Kind},
+			Kind: &TypeSym{Kind: g.Kind},
 		})
 	}
 
@@ -184,7 +184,7 @@ fn appendGenericTypeAliases(mut &dest: []&TypeAlias, mut &f: &FnIns) {
 				Scope: f.Decl.Scope,
 				Ident: decl.Ident,
 				Token: decl.Token,
-				Kind: &TypeSymbol{Kind: g.Kind},
+				Kind: &TypeSym{Kind: g.Kind},
 			})
 		}
 	}
@@ -622,7 +622,7 @@ impl sema {
 
 	// Checks type, builds result as kind and collects referred type aliases.
 	// Skips already checked types.
-	fn checkTypeWithRefers(mut &self, mut &t: &TypeSymbol, mut l: Lookup,
+	fn checkTypeWithRefers(mut &self, mut &t: &TypeSym, mut l: Lookup,
 		mut generics: []&TypeAlias, mut referencer: &referencer): (ok: bool) {
 		if t.checked() {
 			ret true
@@ -637,7 +637,7 @@ impl sema {
 
 	// Checks type and builds result as kind.
 	// Skips already checked types.
-	fn checkType(mut &self, mut &t: &TypeSymbol, mut l: Lookup): bool {
+	fn checkType(mut &self, mut &t: &TypeSym, mut l: Lookup): bool {
 		ret self.checkTypeWithRefers(t, l, nil, nil)
 	}
 
@@ -2050,8 +2050,8 @@ impl sema {
 	// Checks value of variable.
 	fn checkVarValue(mut &self, mut &v: &Var) {
 		if v.IsTypeInferred() {
-			// Build new TypeSymbol because auto-type symbols are nil.
-			v.Kind = &TypeSymbol{Kind: v.Value.Data.Kind}
+			// Build new TypeSym because auto-type symbols are nil.
+			v.Kind = &TypeSym{Kind: v.Value.Data.Kind}
 
 			self.checkDataForTypeInference(v.Value.Data, v.Value.Expr.Token)
 			self.checkValidityForInitExpr(
@@ -2222,7 +2222,7 @@ impl sema {
 				tc.useGenerics = append(tc.useGenerics, &TypeAlias{
 					Ident: decl.Ident,
 					Token: decl.Token,
-					Kind: &TypeSymbol{Kind: g.Kind},
+					Kind: &TypeSym{Kind: g.Kind},
 				})
 			}
 		}
