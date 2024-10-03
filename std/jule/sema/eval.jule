@@ -1524,7 +1524,7 @@ impl eval {
 		d.untyped = false
 
 		if d.Kind.Enum() != nil {
-			if d.Kind.Enum().Kind.Type.Prim() == nil || !d.Kind.Enum().Kind.Type.Prim().IsStr() {
+			if d.Kind.Enum().TypeSym.Type.Prim() == nil || !d.Kind.Enum().TypeSym.Type.Prim().IsStr() {
 				self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, d.Kind.Str(), t.Str())
 				ret
 			}
@@ -1576,7 +1576,7 @@ impl eval {
 	fn castStr(mut self, mut d: &Data, errorToken: &token::Token) {
 		if d.Kind.Enum() != nil {
 			mut e := d.Kind.Enum()
-			if e.Kind.Type.Prim() != nil && e.Kind.Type.Prim().IsStr() {
+			if e.TypeSym.Type.Prim() != nil && e.TypeSym.Type.Prim().IsStr() {
 				ret
 			}
 		}
@@ -1636,7 +1636,7 @@ impl eval {
 
 		if d.Kind.Enum() != nil {
 			e := d.Kind.Enum()
-			if types::IsNum(e.Kind.Type.Str()) {
+			if types::IsNum(e.TypeSym.Type.Str()) {
 				ret
 			}
 		}
@@ -1684,7 +1684,7 @@ impl eval {
 
 		if d.Kind.Enum() != nil {
 			e := d.Kind.Enum()
-			if types::IsNum(e.Kind.Type.Str()) {
+			if types::IsNum(e.TypeSym.Type.Str()) {
 				ret
 			}
 		}
@@ -1796,7 +1796,7 @@ impl eval {
 		// Even if the data is not mutable, set as mutable if the type is not mutable-type.
 		d.Mutable = d.Mutable || !d.Kind.Mutable()
 
-		if !d.Decl && (d.Kind.Enum() == nil || !d.Kind.Enum().Kind.Type.Equal(t)) {
+		if !d.Decl && (d.Kind.Enum() == nil || !d.Kind.Enum().TypeSym.Type.Equal(t)) {
 			applyCastKind(self.s, d, t, errorToken, self.getOwnerRefers())
 			(&CastingExprModel)(d.Model).Token = errorToken
 		} else {
@@ -3541,9 +3541,9 @@ impl binaryEval {
 		| token::Id.NotEq:
 			mut rkind := self.r.Kind
 			if self.r.Kind.Enum() != nil {
-				rkind = self.r.Kind.Enum().Kind.Type
+				rkind = self.r.Kind.Enum().TypeSym.Type
 			}
-			if !self.e.s.checkTypeCompatibility(enm.Kind.Type, rkind, self.op) {
+			if !self.e.s.checkTypeCompatibility(enm.TypeSym.Type, rkind, self.op) {
 				ret nil
 			}
 			ret &Data{
@@ -3561,7 +3561,7 @@ impl binaryEval {
 		| token::Id.Lt
 		| token::Id.GtEq
 		| token::Id.LtEq:
-			if !types::IsNum(enm.Kind.Type.Str()) {
+			if !types::IsNum(enm.TypeSym.Type.Str()) {
 				self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, enm.Ident)
 				ret nil
 			}
@@ -3591,7 +3591,7 @@ impl binaryEval {
 			fall
 		| token::Id.Vline
 		| token::Id.Caret:
-			if enm.Kind.Type.Prim() == nil || !types::IsInt(enm.Kind.Type.Prim().Str()) {
+			if enm.TypeSym.Type.Prim() == nil || !types::IsInt(enm.TypeSym.Type.Prim().Str()) {
 				self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, enm.Ident)
 			}
 			ret self.l
@@ -4526,7 +4526,7 @@ fn applyCastModelByEnum(mut &s: &sema, mut &d: &Data, mut e: &Enum,
 	if e == nil {
 		ret
 	}
-	applyCastKindModel(s, d, e.Kind.Type, token, refers)
+	applyCastKindModel(s, d, e.TypeSym.Type, token, refers)
 }
 
 fn castConstByType(&t: str, mut &d: &Data) {

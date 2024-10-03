@@ -1153,7 +1153,7 @@ impl sema {
 				}
 
 				mut refers := (&ReferenceStack)(nil) // constant expressions not uses
-				_ = self.checkAssignType(false, e.Kind.Type, d, item.Token, refers)
+				_ = self.checkAssignType(false, e.TypeSym.Type, d, item.Token, refers)
 				item.Value.Data = d
 			}
 		}
@@ -1182,7 +1182,7 @@ impl sema {
 				self.pushErr(item.Value.Expr.Token, build::LogMsg.ExprNotConst)
 			}
 			mut refers := (&ReferenceStack)(nil) // constant expressions not uses
-			_ = self.checkAssignType(false, e.Kind.Type, d, item.Token, refers)
+			_ = self.checkAssignType(false, e.TypeSym.Type, d, item.Token, refers)
 			item.Value.Data = d
 			const match type Int {
 			| i64:
@@ -1231,7 +1231,7 @@ impl sema {
 	}
 
 	fn checkEnumItemsInt(mut &self, mut &e: &Enum) {
-		prim := e.Kind.Type.Prim()
+		prim := e.TypeSym.Type.Prim()
 		match {
 		| types::IsSigInt(prim.Kind):
 			self.checkEnumItemsInt1[i64](prim, e)
@@ -1255,16 +1255,16 @@ impl sema {
 
 		self.checkEnumItemsDup[&EnumItem](e.Items)
 
-		if e.Kind != nil {
-			if !self.checkType(e.Kind, self) {
+		if e.TypeSym != nil {
+			if !self.checkType(e.TypeSym, self) {
 				ret
 			}
 		} else {
 			// Set to default type.
-			e.Kind = findBuiltinTypeAlias(types::Kind.Int).Kind
+			e.TypeSym = findBuiltinTypeAlias(types::Kind.Int).Kind
 		}
 
-		mut t := e.Kind.Type.Prim()
+		mut t := e.TypeSym.Type.Prim()
 		if t == nil {
 			self.pushErr(e.Token, build::LogMsg.InvalidTypeSource)
 			ret
