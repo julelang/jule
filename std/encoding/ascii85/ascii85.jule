@@ -44,7 +44,9 @@ fn MaxEncodeLen(n: int): int {
 
 // Returns new Ascii85 encoder for stream.
 // Encoder forwards any exception.
-fn NewEncoder(mut w: io::Writer): io::WriterCloser {
+// The Close method of the encoder flushes any pending output.
+// It is an error to call write after calling close.
+fn NewEncoder(mut w: io::Writer): io::WriteCloser {
 	ret encoder.new(w)
 }
 
@@ -201,7 +203,7 @@ struct encoder {
 	out:  []byte // output buffer
 }
 
-impl io::WriterCloser for encoder {
+impl io::WriteCloser for encoder {
 	fn Write(mut self, dest: []byte)!: (n: int) {
 		// Leading fringe.
 		if self.nbuf > 0 {

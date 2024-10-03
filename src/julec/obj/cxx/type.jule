@@ -58,13 +58,13 @@ impl typeCoder {
 		if id != types::Kind.Uintptr {
 			id = types::RealKindOf(id)
 		}
-		buf.WriteStr("jule::")
+		buf.WriteStr("jule::")!
 		if 97 <= id[0] && id[0] <= 122 {
-			buf.WriteByte(id[0] - 32) // To upper first byte.
+			buf.WriteByte(id[0] - 32)! // To upper first byte.
 		} else {
-			buf.WriteByte(id[0])
+			buf.WriteByte(id[0])!
 		}
-		buf.WriteStr(id[1:])
+		buf.WriteStr(id[1:])!
 	}
 
 	// Generates C++ code of Prim TypeKind.
@@ -74,38 +74,38 @@ impl typeCoder {
 
 	// Generates C++ code of Tupe TypeKind.
 	fn tuple(mut self, mut &buf: strings::Builder, mut t: &sema::Tuple) {
-		buf.WriteStr("std::tuple<")
+		buf.WriteStr("std::tuple<")!
 		for (i, mut tk) in t.Types {
 			self.kind(buf, tk)
 			if len(t.Types)-i > 1 {
-				buf.WriteByte(',')
+				buf.WriteByte(',')!
 			}
 		}
-		buf.WriteByte('>')
+		buf.WriteByte('>')!
 	}
 
 	// Generates C++ code of smart pointer type with element type.
 	fn asSptr(mut self, mut &buf: strings::Builder, elem: []byte) {
-		buf.WriteStr(typeCoder.Ptr + "<")
-		buf.Write(elem)
-		buf.WriteByte('>')
+		buf.WriteStr(typeCoder.Ptr + "<")!
+		buf.Write(elem)!
+		buf.WriteByte('>')!
 	}
 
 	// Generates C++ code of smart pointer TypeKind.
 	fn sptr(mut self, mut &buf: strings::Builder, mut sptr: &sema::Sptr) {
-		buf.WriteStr(typeCoder.Ptr + "<")
+		buf.WriteStr(typeCoder.Ptr + "<")!
 		self.kind(buf, sptr.Elem)
-		buf.WriteByte('>')
+		buf.WriteByte('>')!
 	}
 
 	// Generates C++ code of Ptr TypeKind.
 	fn ptr(mut self, mut &buf: strings::Builder, mut p: &sema::Ptr) {
 		const CppPointerMask = "*"
 		if p.IsUnsafe() {
-			buf.WriteStr("void" + CppPointerMask)
+			buf.WriteStr("void" + CppPointerMask)!
 		} else {
 			self.kind(buf, p.Elem)
-			buf.WriteStr(CppPointerMask)
+			buf.WriteStr(CppPointerMask)!
 		}
 	}
 
@@ -116,13 +116,13 @@ impl typeCoder {
 
 	// Generates C++ code of TypeEnum TypeKind.
 	fn typeEnumDecl(mut self, mut &buf: strings::Builder, mut e: &sema::TypeEnum) {
-		buf.WriteStr(typeCoder.Any)
+		buf.WriteStr(typeCoder.Any)!
 	}
 
 	fn asSlice(mut self, mut &buf: strings::Builder, mut elem: &sema::TypeKind) {
-		buf.WriteStr(typeCoder.Slice + "<")
+		buf.WriteStr(typeCoder.Slice + "<")!
 		self.kind(buf, elem)
-		buf.WriteByte('>')
+		buf.WriteByte('>')!
 	}
 
 	// Generates C++ code of Slc TypeKind.
@@ -134,9 +134,9 @@ impl typeCoder {
 	fn mapType(mut self, mut &buf: strings::Builder, mut m: &sema::Map) {
 		mut s := obj::RuntimeFindStruct(self.oc.ir.Runtime, obj::RuntimeStruct._Map)
 		mut ins := obj::FindStructGenericInstance(s, m.Key, m.Val)
-		buf.WriteStr("jule::Ptr<")
+		buf.WriteStr("jule::Ptr<")!
 		identCoder.structureIns(buf, ins)
-		buf.WriteStr(">")
+		buf.WriteStr(">")!
 	}
 
 	// Generates C++ code of Struct TypeKind.
@@ -152,56 +152,56 @@ impl typeCoder {
 		}
 		d := obj::FindDirective(s.Decl.Directives, build::Directive.Namespace)
 		if d != nil {
-			buf.Write(concatAllParts(d.Args...))
-			buf.WriteStr("::")
+			buf.Write(concatAllParts(d.Args...))!
+			buf.WriteStr("::")!
 		}
 		identCoder.structureIns(buf, s)
 		if len(s.Generics) > 0 {
-			buf.WriteByte('<')
+			buf.WriteByte('<')!
 			for (i, mut g) in s.Generics {
 				self.kind(buf, g.Kind)
 				if len(s.Generics)-i > 1 {
-					buf.WriteByte(',')
+					buf.WriteByte(',')!
 				}
 			}
-			buf.WriteByte('>')
+			buf.WriteByte('>')!
 		}
 	}
 
 	// Generates C++ code of Arr TypeKind.
 	fn array(mut self, mut &buf: strings::Builder, mut a: &sema::Arr) {
-		buf.WriteStr(typeCoder.Array + "<")
+		buf.WriteStr(typeCoder.Array + "<")!
 		self.kind(buf, a.Elem)
-		buf.WriteByte(',')
-		buf.WriteStr(conv::Itoa(a.N))
-		buf.WriteByte('>')
+		buf.WriteByte(',')!
+		buf.WriteStr(conv::Itoa(a.N))!
+		buf.WriteByte('>')!
 	}
 
 	// Generates C++ prototype code of parameter.
 	fn param(mut self, mut &buf: strings::Builder, mut &p: &sema::Param) {
 		if p.Variadic {
-			buf.WriteStr(typeCoder.Slice + "<")
+			buf.WriteStr(typeCoder.Slice + "<")!
 			self.kind(buf, p.Kind.Kind)
-			buf.WriteByte('>')
+			buf.WriteByte('>')!
 		} else {
 			self.kind(buf, p.Kind.Kind)
 		}
 		if p.Reference {
-			buf.WriteByte('*')
+			buf.WriteByte('*')!
 		}
 	}
 
 	// Generates C++ prototype code of parameter instance.
 	fn paramIns(mut self, mut &buf: strings::Builder, mut &p: &sema::ParamIns) {
 		if p.Decl.Variadic {
-			buf.WriteStr(typeCoder.Slice + "<")
+			buf.WriteStr(typeCoder.Slice + "<")!
 			self.kind(buf, p.Kind)
-			buf.WriteByte('>')
+			buf.WriteByte('>')!
 		} else {
 			self.kind(buf, p.Kind)
 		}
 		if p.Decl.Reference {
-			buf.WriteByte('*')
+			buf.WriteByte('*')!
 		}
 	}
 
@@ -209,15 +209,15 @@ impl typeCoder {
 	fn funcResult(mut self, mut &buf: strings::Builder, mut &f: &sema::Fn) {
 		if f.IsVoid() {
 			if f.Exceptional {
-				buf.WriteStr("jule::VoidExceptional")
+				buf.WriteStr("jule::VoidExceptional")!
 				ret
 			}
-			buf.WriteStr("void")
+			buf.WriteStr("void")!
 		}
 		if f.Exceptional {
-			buf.WriteStr("jule::Exceptional<")
+			buf.WriteStr("jule::Exceptional<")!
 			self.kind(buf, f.Result.Kind.Kind)
-			buf.WriteByte('>')
+			buf.WriteByte('>')!
 			ret
 		}
 		self.kind(buf, f.Result.Kind.Kind)
@@ -227,16 +227,16 @@ impl typeCoder {
 	fn funcInsResult(mut self, mut &s: strings::Builder, mut &f: &sema::FnIns) {
 		if f.Decl.IsVoid() {
 			if f.Decl.Exceptional {
-				s.WriteStr("jule::VoidExceptional")
+				s.WriteStr("jule::VoidExceptional")!
 			} else {
-				s.WriteStr("void")
+				s.WriteStr("void")!
 			}
 			ret
 		}
 		if f.Decl.Exceptional {
-			s.WriteStr("jule::Exceptional<")
+			s.WriteStr("jule::Exceptional<")!
 			self.rc.codeMut1(s, f.Result)
-			s.WriteByte('>')
+			s.WriteByte('>')!
 			ret
 		}
 		self.rc.codeMut1(s, f.Result)
@@ -250,23 +250,23 @@ impl typeCoder {
 		if len(f.Params) == 0 {
 			ret
 		}
-		buf.WriteByte(',')
+		buf.WriteByte(',')!
 		for (i, mut param) in f.Params {
 			if param.Decl.IsSelf() {
 				continue
 			}
 			self.paramIns(buf, param)
 			if len(f.Params)-i > 1 {
-				buf.WriteByte(',')
+				buf.WriteByte(',')!
 			}
 		}
 	}
 
 	// Generates C++ code of Fn TypeKind.
 	fn func(mut self, mut &buf: strings::Builder, mut f: &sema::FnIns) {
-		buf.WriteStr(typeCoder.Fn + "<")
+		buf.WriteStr(typeCoder.Fn + "<")!
 		self.anonFunc(buf, f)
-		buf.WriteByte('>')
+		buf.WriteByte('>')!
 	}
 
 	// Generates C++ code of TypeKind.
@@ -279,7 +279,7 @@ impl typeCoder {
 			// As we can see here, bind defines use pure identifiers directly.
 			// So, if you hesitate about a type that causes wrong code generation,
 			// write relevant algorithms above this case.
-			buf.WriteStr(k.BindIdent)
+			buf.WriteStr(k.BindIdent)!
 			ret
 		| k.Prim() != nil:
 			self.prim(buf, k.Prim())
@@ -306,7 +306,7 @@ impl typeCoder {
 			self.mapType(buf, k.Map())
 			ret
 		| k.Trait() != nil:
-			buf.WriteStr(typeCoder.Trait)
+			buf.WriteStr(typeCoder.Trait)!
 			ret
 		| k.Arr() != nil:
 			self.array(buf, k.Arr())
@@ -317,9 +317,9 @@ impl typeCoder {
 		}
 		match type k.Kind {
 		| &customType:
-			buf.WriteStr((&customType)(k.Kind).kind)
+			buf.WriteStr((&customType)(k.Kind).kind)!
 		|:
-			buf.WriteStr("[<unimplemented_type_kind>]")
+			buf.WriteStr("[<unimplemented_type_kind>]")!
 		}
 	}
 }
@@ -343,37 +343,37 @@ impl resultCoder {
 	}
 
 	fn ptr(mut self, mut &s: strings::Builder, mut p: &sema::Ptr) {
-		s.WriteStr(resultCoder.Ptr)
+		s.WriteStr(resultCoder.Ptr)!
 		self.codeMut(s, p.Elem)
 	}
 
 	fn sptr(mut self, mut &s: strings::Builder, mut p: &sema::Sptr) {
-		s.WriteStr(resultCoder.Sptr)
+		s.WriteStr(resultCoder.Sptr)!
 		self.codeMut(s, p.Elem)
 	}
 
 	fn mapType(mut self, mut &s: strings::Builder, mut p: &sema::Map) {
-		s.WriteStr(resultCoder.Map)
+		s.WriteStr(resultCoder.Map)!
 		self.codeMut(s, p.Key)
 		self.codeMut(s, p.Val)
 	}
 
 	fn slice(mut self, mut &s: strings::Builder, mut slc: &sema::Slc) {
-		s.WriteStr(resultCoder.Slice)
+		s.WriteStr(resultCoder.Slice)!
 		self.codeMut(s, slc.Elem)
 	}
 
 	fn arr(mut self, mut &s: strings::Builder, mut arr: &sema::Arr) {
-		s.WriteStr(resultCoder.Array)
-		s.WriteStr(conv::FmtInt(i64(arr.N), 16))
+		s.WriteStr(resultCoder.Array)!
+		s.WriteStr(conv::FmtInt(i64(arr.N), 16))!
 		self.codeMut(s, arr.Elem)
 	}
 
 	fn func(mut self, mut &s: strings::Builder, mut f: &sema::FnIns) {
-		s.WriteStr(resultCoder.Fn)
+		s.WriteStr(resultCoder.Fn)!
 		for (_, mut p) in f.Params {
 			if p.Decl.Reference {
-				s.WriteStr(resultCoder.Reference)
+				s.WriteStr(resultCoder.Reference)!
 			}
 			self.codeMut(s, p.Kind)
 		}
@@ -384,15 +384,15 @@ impl resultCoder {
 
 	fn tup(mut self, mut &s: strings::Builder, mut tup: &sema::Tuple) {
 		for (_, mut t) in tup.Types {
-			s.WriteStr("__jule_tuple_")
+			s.WriteStr("__jule_tuple_")!
 			self.codeMut(s, t)
 		}
 	}
 
 	fn codeMut(mut self, mut &s: strings::Builder, mut &t: &sema::TypeKind) {
 		if t.Binded() {
-			s.WriteStr(resultCoder.BindPrefix)
-			s.WriteStr(t.BindIdent)
+			s.WriteStr(resultCoder.BindPrefix)!
+			s.WriteStr(t.BindIdent)!
 			ret
 		}
 		match type t.Kind {
@@ -421,7 +421,7 @@ impl resultCoder {
 			mut trt := (&sema::Trait)(t.Kind)
 			identCoder.traitDecl(s, trt)
 		| &sema::Prim:
-			s.WriteStr((&sema::Prim)(t.Kind).Kind)
+			s.WriteStr((&sema::Prim)(t.Kind).Kind)!
 		| &sema::Tuple:
 			self.tup(s, (&sema::Tuple)(t.Kind))
 		|:

@@ -92,52 +92,52 @@ fn isCppSourceFile(path: str): bool {
 
 fn pushCompCmdClang(mut &cmd: strings::Builder) {
 	// Disable all warnings.
-	cmd.WriteStr("-Wno-everything ")
+	cmd.WriteStr("-Wno-everything ")!
 
 	// Set C++ standard.
-	cmd.WriteStr("--std=")
+	cmd.WriteStr("--std=")!
 	match env::CppStd {
 	| "cpp14":
-		cmd.WriteStr("c++14")
+		cmd.WriteStr("c++14")!
 	| "cpp17":
-		cmd.WriteStr("c++17")
+		cmd.WriteStr("c++17")!
 	| "cpp20":
-		cmd.WriteStr("c++20")
+		cmd.WriteStr("c++20")!
 	}
-	cmd.WriteByte(' ')
+	cmd.WriteByte(' ')!
 
 	if env::Production {
-		cmd.WriteStr("-O3 ")                  // Enable all optimizations.
-		cmd.WriteStr("-flto ")                // Enable LTO.
-		cmd.WriteStr("-DNDEBUG ")             // Define NDEBUG, turn off assertions.
-		cmd.WriteStr("-fomit-frame-pointer ") // Do not use frame pointer.
+		cmd.WriteStr("-O3 ")!                  // Enable all optimizations.
+		cmd.WriteStr("-flto ")!                // Enable LTO.
+		cmd.WriteStr("-DNDEBUG ")!             // Define NDEBUG, turn off assertions.
+		cmd.WriteStr("-fomit-frame-pointer ")! // Do not use frame pointer.
 	} else {
-		cmd.WriteStr("-O0 ") // No optimization.
+		cmd.WriteStr("-O0 ")! // No optimization.
 	}
 }
 
 fn pushCompCmdGcc(mut &cmd: strings::Builder) {
 	// Disable all warnings.
-	cmd.WriteStr("-w ")
+	cmd.WriteStr("-w ")!
 
 	// Set C++ standard.
-	cmd.WriteStr("--std=")
+	cmd.WriteStr("--std=")!
 	match env::CppStd {
 	| "cpp14":
-		cmd.WriteStr("c++14")
+		cmd.WriteStr("c++14")!
 	| "cpp17":
-		cmd.WriteStr("c++17")
+		cmd.WriteStr("c++17")!
 	| "cpp20":
-		cmd.WriteStr("c++20")
+		cmd.WriteStr("c++20")!
 	}
-	cmd.WriteByte(' ')
+	cmd.WriteByte(' ')!
 
 	if env::Production {
-		cmd.WriteStr("-O3 ")                  // Enable all optimizations.
-		cmd.WriteStr("-DNDEBUG ")             // Define NDEBUG, turn off assertions.
-		cmd.WriteStr("-fomit-frame-pointer ") // Do not use frame pointer.
+		cmd.WriteStr("-O3 ")!                  // Enable all optimizations.
+		cmd.WriteStr("-DNDEBUG ")!             // Define NDEBUG, turn off assertions.
+		cmd.WriteStr("-fomit-frame-pointer ")! // Do not use frame pointer.
 	} else {
-		cmd.WriteStr("-O0 ") // No optimization.
+		cmd.WriteStr("-O0 ")! // No optimization.
 	}
 }
 
@@ -156,27 +156,27 @@ fn genCompileCmd(sourcePath: str, &ir: &obj::IR): (str, str) {
 	// Push binded source files.
 	for _, u in ir.Used {
 		if u.Binded && isCppSourceFile(u.Path) {
-			cmd.WriteStr(u.Path)
-			cmd.WriteByte(' ')
+			cmd.WriteStr(u.Path)!
+			cmd.WriteByte(' ')!
 		}
 	}
 
 	if Out != "" {
-		cmd.WriteStr("-o ")
-		cmd.WriteStr(Out)
-		cmd.WriteByte(' ')
+		cmd.WriteStr("-o ")!
+		cmd.WriteStr(Out)!
+		cmd.WriteByte(' ')!
 	}
-	cmd.WriteStr(sourcePath)
+	cmd.WriteStr(sourcePath)!
 
 	// Push passes.
 	for _, pass in ir.Passes {
-		cmd.WriteByte(' ')
-		cmd.WriteStr(pass)
+		cmd.WriteByte(' ')!
+		cmd.WriteStr(pass)!
 	}
 
 	// Link necessary libraries for Windows.
 	if build::OS == build::DistOS.Windows {
-		cmd.WriteStr(" -lshell32")
+		cmd.WriteStr(" -lshell32")!
 	}
 
 	ret compiler, cmd.Str()

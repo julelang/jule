@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/io"
 use "std/jule/integrated"
 use "std/sys"
 
@@ -39,6 +40,15 @@ enum OFlag: int {
 struct File {
 	handle: uintptr
 }
+
+// Impl relevant traits for File.
+impl io::Reader for File {}
+
+impl io::ReadCloser for File {}
+impl io::Writer for File {}
+impl io::WriteCloser for File {}
+impl io::ReadWriter for File {}
+impl io::Stream for File {}
 
 impl File {
 	// Returns new &File by handle.
@@ -133,6 +143,8 @@ impl File {
 	//
 	// Possible errors (FSError):
 	//  InvalidDescriptor Signal IO
+	//
+	// Implements the io::Closer trait.
 	fn Close(mut self)! {
 		if sys::Close(int(self.handle)) == -1 {
 			error(getLastFsError())

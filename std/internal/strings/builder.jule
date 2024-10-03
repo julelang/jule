@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/io"
 use "std/unicode/utf8"
 use "std/unsafe"
 
@@ -9,6 +10,13 @@ use "std/unsafe"
 struct Builder {
 	buf: []byte
 }
+
+// Impl relevant traits for Builder.
+impl io::Writer for Builder {}
+
+impl io::ByteWriter for Builder {}
+impl io::RuneWriter for Builder {}
+impl io::StrWriter for Builder {}
 
 impl Builder {
 	// Returns new string builder with capacity.
@@ -22,27 +30,37 @@ impl Builder {
 	}
 
 	// Writes bytes to buffer.
-	fn Write(mut self, b: []byte) {
+	// Never throws an exceptional.
+	fn Write(mut self, b: []byte)!: (n: int) {
 		self.buf = append(self.buf, b...)
+		ret len(b)
 	}
 
 	// Writes bytes to buffer.
-	fn WriteStr(mut self, s: str) {
+	// Never throws an exceptional.
+	fn WriteStr(mut self, s: str)!: (n: int) {
 		self.buf = append(self.buf, s...)
+		ret len(s)
 	}
 
 	// Writes byte to buffer.
-	fn WriteByte(mut self, b: byte) {
+	// Never throws an exceptional.
+	fn WriteByte(mut self, b: byte)! {
 		self.buf = append(self.buf, b)
 	}
 
 	// Writes rune into buffer.
-	fn WriteRune(mut self, r: rune) {
+	// Returns written byte count.
+	// Never throws an exceptional.
+	fn WriteRune(mut self, r: rune)!: (n: int) {
 		if r < utf8::RuneSelf { // ASCII, fast way.
 			self.buf = append(self.buf, byte(r))
-			ret
+			ret 1
 		}
+		n = len(self.buf)
 		self.buf = utf8::AppendRune(self.buf, r)
+		n = len(self.buf) - n
+		ret
 	}
 
 	// Returns as string, then calls the [Clear] method.

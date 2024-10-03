@@ -1,0 +1,150 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/io"
+use "std/sys"
+use "std/unicode/utf8"
+use "std/unsafe"
+
+// File descriptors for the standard out, standard error and standard input.
+static mut stdin = unsafe { File.New(sys::STDIN) }
+static mut stdout = unsafe { File.New(sys::STDOUT) }
+static mut stderr = unsafe { File.New(sys::STDERR) }
+
+// Returns Stdio for the standard input file descriptor.
+fn Stdin(): &Stdio {
+	static mut stdin = Stdio{file: stdin}
+	ret unsafe { (&Stdio)(&stdin) }
+}
+
+// Returns Stdio for the standard output file descriptor.
+fn Stdout(): &Stdio {
+	static mut stdout = Stdio{file: stdout}
+	ret unsafe { (&Stdio)(&stdout) }
+}
+
+// Returns Stdio for the standard error file descriptor.
+fn Stderr(): &Stdio {
+	static mut stderr = Stdio{file: stderr}
+	ret unsafe { (&Stdio)(&stderr) }
+}
+
+// Safe file handler wrapper for the standard file descriptors.
+// Implements safe and extended functionalities for the standard output,
+// standard error and standard input file descriptors.
+// In general, it is a File wrapper for the handle.
+// Any exceptional will be FsError and forwarded from File's methods.
+struct Stdio {
+	file: &File
+	mode: int
+}
+
+// Impl relevant traits for Stdio.
+impl io::Reader for Stdio {}
+
+impl io::Writer for Stdio {}
+impl io::ReadWriter for Stdio {}
+impl io::ByteReader for Stdio {}
+impl io::ByteWriter for Stdio {}
+impl io::RuneWriter for Stdio {}
+impl io::StrWriter for Stdio {}
+
+impl Stdio {
+	// Returns File handle.
+	// It is unsafe because using File handle directly may be not safe.
+	// Stdio handlers use mutable internal handlers,
+	// so any mutation may will cause issues.
+	unsafe fn File(mut self): &File { ret self.file }
+
+	// Implements the io::Reader trait.
+	// Panics if file descriptor is not standard input.
+	fn Read(mut self, mut buf: []byte)!: (n: int) {
+		if self.file != stdin {
+			panic("os: Stdio.Read: file descriptor is not standard input")
+		}
+		ret self.file.Read(buf) else { error(error) }
+	}
+
+	// Implements the io::Writer trait.
+	// Panics if file descriptor is not standard output or standard error.
+	fn Write(mut self, buf: []byte)!: (n: int) {
+		if self.file != stdout && self.file != stderr {
+			panic("os: Stdio.Write: file descriptor is not standard output or standard error")
+		}
+		ret self.file.Write(buf) else { error(error) }
+	}
+
+	// Implements the io::ByteReader trait.
+	// Panics if file descriptor is not standard input.
+	fn ReadByte(mut self)!: (b: byte, n: int) {
+		if self.file != stdin {
+			panic("os: Stdio.ReadByte: file descriptor is not standard input")
+		}
+		mut buf := unsafe::Slice(&b, 1, 1)
+		n = self.file.Read(buf) else { error(error) }
+		ret
+	}
+
+	// Implements the io::ByteWriter trait.
+	// Panics if file descriptor is not standard output or standard error.
+	fn WriteByte(mut self, b: byte)! {
+		if self.file != stdout && self.file != stderr {
+			panic("os: Stdio.WriteByte: file descriptor is not standard output or standard error")
+		}
+		buf := unsafe::Slice(&b, 1, 1)
+		self.file.Write(buf) else { error(error) }
+	}
+
+	// Implements the io::RuneWriter trait.
+	// Panics if file descriptor is not standard output or standard error.
+	fn WriteRune(mut self, r: rune)!: (n: int) {
+		if self.file != stdout && self.file != stderr {
+			panic("os: Stdio.WriteRune: file descriptor is not standard output or standard error")
+		}
+		n = utf8::RuneLen(r)
+		buf := utf8::AppendRune(make([]byte, n), r)
+		self.file.Write(buf) else { error(error) }
+		ret
+	}
+
+	// Implements the io::WriteStr trait.
+	// Calls the `Stdio.Write` internally and forwards any exceptinal.
+	fn WriteStr(mut self, s: str)!: (n: int) {
+		ret self.Write(unsafe::StrBytes(s)) else { error(error) }
+	}
+
+	// Reads input until the end of the line and returns as string.
+	// Result string is not include newline.
+	// Panics if file descriptor is not standard input.
+	fn ReadLine(mut self)!: str {
+		if self.file != stdin {
+			panic("os: Stdio.ReadLine: file descriptor is not standard input")
+		}
+
+		// Use array as partial buffer for fast access compared to heap-allocated slice.
+		let mut partBuf: [128]byte
+		mut part := unsafe::Slice(&partBuf[0], len(partBuf), len(partBuf))
+
+		const LineDelim = '\n'
+		mut buf := make([]byte, 0)
+		for {
+			n := self.file.Read(part) else { error(error) }
+			if n == 0 {
+				break
+			}
+			if part[n-1] == LineDelim {
+				buf = append(buf, part[:n-1]...)
+				break
+			}
+			buf = append(buf, part[:n]...)
+		}
+
+		// clear carriage return from buffer if exist.
+		if len(buf) > 0 && buf[len(buf)-1] == '\r' {
+			buf = buf[:len(buf)-1]
+		}
+
+		ret unsafe::StrFromBytes(buf)
+	}
+}
