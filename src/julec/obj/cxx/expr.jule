@@ -498,19 +498,19 @@ impl exprCoder {
 	fn casting(mut &self, mut m: &sema::CastingExprModel) {
 		match {
 		| obj::IsAny(m.Type):
-			if m.ExprKind.IsNil() {
+			if m.ExprType.IsNil() {
 				self.oc.write(typeCoder.Any + "()")
 				ret
 			}
-			if m.ExprKind.TypeEnum() != nil {
+			if m.ExprType.TypeEnum() != nil {
 				self.possibleRefExpr(m.Expr.Model)
 				ret
 			}
-			i := self.oc.pushAnyType(m.ExprKind)
+			i := self.oc.pushAnyType(m.ExprType)
 			self.oc.write(typeCoder.Any + "(")
 			match type m.Expr.Model {
 			| &constant::Const:
-				prim := m.ExprKind.Prim()
+				prim := m.ExprType.Prim()
 				if prim != nil && types::IsInt(prim.Kind) {
 					self.oc.write("static_cast<")
 					self.oc.tc.prim(self.oc.Buf, prim)
@@ -527,7 +527,7 @@ impl exprCoder {
 			self.oc.write(conv::Itoa(i))
 			self.oc.write(")")
 			ret
-		| obj::IsAny(m.ExprKind):
+		| obj::IsAny(m.ExprType):
 			self.possibleRefExpr(m.Expr.Model)
 			self.oc.write(".")
 			if m.Type.Sptr() != nil {
@@ -547,7 +547,7 @@ impl exprCoder {
 			self.oc.write(conv::Itoa(self.oc.pushAnyType(m.Type)))
 			self.oc.write(")")
 			ret
-		| m.ExprKind.Ptr() != nil
+		| m.ExprType.Ptr() != nil
 		| m.Type.Ptr() != nil:
 			self.oc.write("((")
 			self.oc.tc.kind(self.oc.Buf, m.Type)
@@ -555,9 +555,9 @@ impl exprCoder {
 			self.possibleRefExpr(m.Expr.Model)
 			self.oc.write("))")
 			ret
-		| m.ExprKind.Trait() != nil:
+		| m.ExprType.Trait() != nil:
 			if m.Type.Trait() != nil {
-				self.castTraitFromTrait(m, m.Type.Trait(), m.ExprKind.Trait())
+				self.castTraitFromTrait(m, m.Type.Trait(), m.ExprType.Trait())
 				ret
 			}
 			self.possibleRefExpr(m.Expr.Model)
@@ -576,9 +576,9 @@ impl exprCoder {
 				self.oc.write("\", ")
 			}
 			self.oc.write("(" + typeCoder.Trait + "::Type*)&")
-			identCoder.traitDecl(self.oc.Buf, m.ExprKind.Trait())
+			identCoder.traitDecl(self.oc.Buf, m.ExprType.Trait())
 			self.oc.write("_mptr_data")
-			self.oc.write(conv::Itoa(obj::FindTraitTypeOffset(m.ExprKind.Trait(), m.Type)))
+			self.oc.write(conv::Itoa(obj::FindTraitTypeOffset(m.ExprType.Trait(), m.Type)))
 			self.oc.write(")")
 			ret
 		| m.Type.Trait() != nil:
@@ -588,13 +588,13 @@ impl exprCoder {
 			self.oc.write(", (" + typeCoder.Trait + "::Type*)&")
 			identCoder.traitDecl(self.oc.Buf, m.Type.Trait())
 			self.oc.write("_mptr_data")
-			self.oc.write(conv::Itoa(obj::FindTraitTypeOffset(m.Type.Trait(), m.ExprKind)))
+			self.oc.write(conv::Itoa(obj::FindTraitTypeOffset(m.Type.Trait(), m.ExprType)))
 			self.oc.write(")")
 			ret
 		}
 		mut prim := m.Type.Prim()
 		if prim != nil && prim.IsStr() {
-			mut eprim := m.ExprKind.Prim()
+			mut eprim := m.ExprType.Prim()
 			if eprim != nil && prim != nil {
 				if eprim.IsU8() {
 					self.oc.write("__jule_strFromByte(")
@@ -605,7 +605,7 @@ impl exprCoder {
 				self.oc.write(")")
 				ret
 			}
-			mut slc := m.ExprKind.Slc()
+			mut slc := m.ExprType.Slc()
 			if slc != nil {
 				eprim = slc.Elem.Prim()
 				// []rune or []byte
@@ -619,7 +619,7 @@ impl exprCoder {
 				ret
 			}
 		}
-		prim = m.ExprKind.Prim()
+		prim = m.ExprType.Prim()
 		if prim != nil && prim.IsStr() {
 			mut slc := m.Type.Slc()
 			if slc != nil {
@@ -1634,7 +1634,7 @@ impl exprCoder {
 
 	fn unsafeCasting(mut &self, mut m: &opt::UnsafeCastingExprModel) {
 		match {
-		| obj::IsAny(m.Base.ExprKind):
+		| obj::IsAny(m.Base.ExprType):
 			self.possibleRefExpr(m.Base.Expr.Model)
 			if m.Base.Type.Sptr() != nil {
 				self.oc.write(".unsafe_cast_ptr<")
