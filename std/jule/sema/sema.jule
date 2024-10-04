@@ -1021,7 +1021,7 @@ impl sema {
 			//  b can mutate it, since it is mutable and can access to field x.
 			//  Therefore, copying interior mutable fields with mutable kind
 			//  must be disallowed if field is accessible for safety reasons.
-			if f.Decl.Mutable && f.Kind.Mutable() &&
+			if f.Decl.Mutable && f.Type.Mutable() &&
 				self.isAccessibleDefine(f.Decl.Public, f.Decl.Token) {
 				ret true
 			}
@@ -2276,15 +2276,15 @@ impl sema {
 				}
 				continue
 			}
-			f.Kind = kind
-			s.Mutable = s.Mutable || (!f.Decl.Mutable && f.Kind.Mutable())
-			s.Comparable = s.Comparable && f.Kind.Comparable()
+			f.Type = kind
+			s.Mutable = s.Mutable || (!f.Decl.Mutable && f.Type.Mutable())
+			s.Comparable = s.Comparable && f.Type.Comparable()
 
 			// Skip this field if not has default value.
 			if f.Decl.Default == nil {
 				continue
 			}
-			eval.prefix = f.Kind
+			eval.prefix = f.Type
 			eval.field = f
 			f.Default = eval.evalExpr(f.Decl.Default)
 
@@ -2295,7 +2295,7 @@ impl sema {
 			}
 
 			const Reference = false // Fields cannot be reference.
-			_ = self.checkAssignType(Reference, f.Kind, f.Default, f.Decl.Default.Token, s.Refers)
+			_ = self.checkAssignType(Reference, f.Type, f.Default, f.Decl.Default.Token, s.Refers)
 		}
 		ret
 	}
@@ -2313,7 +2313,7 @@ impl sema {
 		if s.Comparable && s.Operators.Eq == nil && self.meta.runtime != nil {
 			mut decl := runtimeFindFn(self.meta.runtime, runtimeFunc.arrayCmp)
 			for (_, mut field) in s.Fields {
-				mut arr := field.Kind.Arr()
+				mut arr := field.Type.Arr()
 				if arr == nil {
 					continue
 				}
