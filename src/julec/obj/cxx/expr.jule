@@ -497,7 +497,7 @@ impl exprCoder {
 	//    uses special casting algorithms.
 	fn casting(mut &self, mut m: &sema::CastingExprModel) {
 		match {
-		| obj::IsAny(m.Kind):
+		| obj::IsAny(m.Type):
 			if m.ExprKind.IsNil() {
 				self.oc.write(typeCoder.Any + "()")
 				ret
@@ -530,12 +530,12 @@ impl exprCoder {
 		| obj::IsAny(m.ExprKind):
 			self.possibleRefExpr(m.Expr.Model)
 			self.oc.write(".")
-			if m.Kind.Sptr() != nil {
+			if m.Type.Sptr() != nil {
 				self.oc.write("cast_ptr<")
-				self.oc.tc.kind(self.oc.Buf, m.Kind.Sptr().Elem)
+				self.oc.tc.kind(self.oc.Buf, m.Type.Sptr().Elem)
 			} else {
 				self.oc.write("cast<")
-				self.oc.tc.kind(self.oc.Buf, m.Kind)
+				self.oc.tc.kind(self.oc.Buf, m.Type)
 			}
 			self.oc.write(">(")
 			if !env::Production {
@@ -544,30 +544,30 @@ impl exprCoder {
 				self.oc.write("\", ")
 			}
 			self.oc.write("&" + anyTypeIdent)
-			self.oc.write(conv::Itoa(self.oc.pushAnyType(m.Kind)))
+			self.oc.write(conv::Itoa(self.oc.pushAnyType(m.Type)))
 			self.oc.write(")")
 			ret
 		| m.ExprKind.Ptr() != nil
-		| m.Kind.Ptr() != nil:
+		| m.Type.Ptr() != nil:
 			self.oc.write("((")
-			self.oc.tc.kind(self.oc.Buf, m.Kind)
+			self.oc.tc.kind(self.oc.Buf, m.Type)
 			self.oc.write(")(")
 			self.possibleRefExpr(m.Expr.Model)
 			self.oc.write("))")
 			ret
 		| m.ExprKind.Trait() != nil:
-			if m.Kind.Trait() != nil {
-				self.castTraitFromTrait(m, m.Kind.Trait(), m.ExprKind.Trait())
+			if m.Type.Trait() != nil {
+				self.castTraitFromTrait(m, m.Type.Trait(), m.ExprKind.Trait())
 				ret
 			}
 			self.possibleRefExpr(m.Expr.Model)
 			self.oc.write(".")
-			if m.Kind.Sptr() != nil {
+			if m.Type.Sptr() != nil {
 				self.oc.write("cast_ptr<")
-				self.oc.tc.kind(self.oc.Buf, m.Kind.Sptr().Elem)
+				self.oc.tc.kind(self.oc.Buf, m.Type.Sptr().Elem)
 			} else {
 				self.oc.write("cast<")
-				self.oc.tc.kind(self.oc.Buf, m.Kind)
+				self.oc.tc.kind(self.oc.Buf, m.Type)
 			}
 			self.oc.write(">(")
 			if !env::Production {
@@ -578,21 +578,21 @@ impl exprCoder {
 			self.oc.write("(" + typeCoder.Trait + "::Type*)&")
 			identCoder.traitDecl(self.oc.Buf, m.ExprKind.Trait())
 			self.oc.write("_mptr_data")
-			self.oc.write(conv::Itoa(obj::FindTraitTypeOffset(m.ExprKind.Trait(), m.Kind)))
+			self.oc.write(conv::Itoa(obj::FindTraitTypeOffset(m.ExprKind.Trait(), m.Type)))
 			self.oc.write(")")
 			ret
-		| m.Kind.Trait() != nil:
-			self.oc.tc.kind(self.oc.Buf, m.Kind)
+		| m.Type.Trait() != nil:
+			self.oc.tc.kind(self.oc.Buf, m.Type)
 			self.oc.write("(")
 			self.possibleRefExpr(m.Expr.Model)
 			self.oc.write(", (" + typeCoder.Trait + "::Type*)&")
-			identCoder.traitDecl(self.oc.Buf, m.Kind.Trait())
+			identCoder.traitDecl(self.oc.Buf, m.Type.Trait())
 			self.oc.write("_mptr_data")
-			self.oc.write(conv::Itoa(obj::FindTraitTypeOffset(m.Kind.Trait(), m.ExprKind)))
+			self.oc.write(conv::Itoa(obj::FindTraitTypeOffset(m.Type.Trait(), m.ExprKind)))
 			self.oc.write(")")
 			ret
 		}
-		mut prim := m.Kind.Prim()
+		mut prim := m.Type.Prim()
 		if prim != nil && prim.IsStr() {
 			mut eprim := m.ExprKind.Prim()
 			if eprim != nil && prim != nil {
@@ -621,7 +621,7 @@ impl exprCoder {
 		}
 		prim = m.ExprKind.Prim()
 		if prim != nil && prim.IsStr() {
-			mut slc := m.Kind.Slc()
+			mut slc := m.Type.Slc()
 			if slc != nil {
 				prim = slc.Elem.Prim()
 				// []rune or []byte
@@ -636,7 +636,7 @@ impl exprCoder {
 			}
 		}
 		self.oc.write("static_cast<")
-		self.oc.tc.kind(self.oc.Buf, m.Kind)
+		self.oc.tc.kind(self.oc.Buf, m.Type)
 		self.oc.write(">(")
 		self.possibleRefExpr(m.Expr.Model)
 		self.oc.write(")")
@@ -1636,12 +1636,12 @@ impl exprCoder {
 		match {
 		| obj::IsAny(m.Base.ExprKind):
 			self.possibleRefExpr(m.Base.Expr.Model)
-			if m.Base.Kind.Sptr() != nil {
+			if m.Base.Type.Sptr() != nil {
 				self.oc.write(".unsafe_cast_ptr<")
-				self.oc.tc.kind(self.oc.Buf, m.Base.Kind.Sptr().Elem)
+				self.oc.tc.kind(self.oc.Buf, m.Base.Type.Sptr().Elem)
 			} else {
 				self.oc.write(".unsafe_cast<")
-				self.oc.tc.kind(self.oc.Buf, m.Base.Kind)
+				self.oc.tc.kind(self.oc.Buf, m.Base.Type)
 			}
 			self.oc.write(">()")
 		|:
