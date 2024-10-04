@@ -368,7 +368,7 @@ impl scopeOptimizer {
 		if !Str {
 			ret false
 		}
-		lp := a.Left.Kind.Prim()
+		lp := a.Left.Type.Prim()
 		if lp == nil || !lp.IsStr() {
 			ret false
 		}
@@ -376,7 +376,7 @@ impl scopeOptimizer {
 	}
 
 	fn sliceAssign(mut &self, mut a: &sema::Assign): bool {
-		if !Slice || a.Left.Kind.Slc() == nil {
+		if !Slice || a.Left.Type.Slc() == nil {
 			ret false
 		}
 		// [self.substr] applies this optimization without type dependence.
@@ -399,13 +399,13 @@ impl scopeOptimizer {
 		}
 
 		if self.data.boundary != nil {
-			if isBoundaryRiskyType(assign.Left.Kind) {
+			if isBoundaryRiskyType(assign.Left.Type) {
 				possibleBoundaryRemove(self.data.boundary, assign.Left.Model)
 			}
 		}
 		if self.data.nils != nil {
 			if isGuaranteedNonNilExpr(self.data.nils, assign.Right.Model) {
-				if isNilValidType(assign.Left.Kind) {
+				if isNilValidType(assign.Left.Type) {
 					const safe = true
 					self.data.nils.pushVar(getNilVar(assign.Left.Model), safe)
 				}
@@ -415,9 +415,9 @@ impl scopeOptimizer {
 		}
 		if self.data.dynamic != nil {
 			mut kind := isTypeGuaranteedDynamicData(
-				self.data.dynamic, assign.Right.Kind, assign.Right.Model)
+				self.data.dynamic, assign.Right.Type, assign.Right.Model)
 			if kind != nil {
-				if isDynamicValidType(assign.Left.Kind) {
+				if isDynamicValidType(assign.Left.Type) {
 					self.data.dynamic.pushVar(getDynamicVar(assign.Left.Model), kind)
 				}
 			} else {
@@ -437,7 +437,7 @@ impl scopeOptimizer {
 		match assign.Op.Id {
 		| token::Id.SolidusEq | token::Id.PercentEq | token::Id.ShlEq | token::Id.ShrEq:
 			// Do not check structures.
-			if !Math || assign.Left.Kind.Struct() != nil {
+			if !Math || assign.Left.Type.Struct() != nil {
 				break
 			}
 			oldId, oldKind := assign.Op.Id, assign.Op.Kind

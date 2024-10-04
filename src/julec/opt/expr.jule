@@ -59,7 +59,7 @@ impl exprOptimizer {
 	}
 
 	fn boolCond(self, mut &m: &sema::BinaryExprModel): bool {
-		lp := m.Left.Kind.Prim()
+		lp := m.Left.Type.Prim()
 		if lp == nil || !lp.IsBool() {
 			ret false
 		}
@@ -112,7 +112,7 @@ impl exprOptimizer {
 	}
 
 	fn strCond(self, mut m: &sema::BinaryExprModel): bool {
-		lp := m.Left.Kind.Prim()
+		lp := m.Left.Type.Prim()
 		if lp == nil || !lp.IsStr() {
 			ret false
 		}
@@ -285,7 +285,7 @@ impl exprOptimizer {
 		}
 		mut var := getNilVar(m.Left.Model)
 		if var != invalidNil {
-			if !isNilValidType(m.Left.Kind) {
+			if !isNilValidType(m.Left.Type) {
 				ret
 			}
 			match type m.Right.Model {
@@ -298,7 +298,7 @@ impl exprOptimizer {
 		}
 		var = getNilVar(m.Right.Model)
 		if var != invalidNil {
-			if !isNilValidType(m.Right.Kind) {
+			if !isNilValidType(m.Right.Type) {
 				ret
 			}
 			match type m.Left.Model {
@@ -344,11 +344,11 @@ impl exprOptimizer {
 		// Break optimizations if types are not primitive.
 		// No need for checking whether types are arithmetic,
 		// because relevant operators are conly avaliable for arithmetic primitives.
-		lp := m.Left.Kind.Prim()
+		lp := m.Left.Type.Prim()
 		if lp == nil {
 			ret
 		}
-		rp := m.Right.Kind.Prim()
+		rp := m.Right.Type.Prim()
 		if rp == nil {
 			ret
 		}
@@ -579,7 +579,7 @@ impl exprOptimizer {
 // As a result: returns whether bit-shifting is possible and what nth power of 2^r.
 // Assumes the model r is constant.
 fn checkForBitShiftOpt(&l: &sema::OperandExprModel, &r: &sema::OperandExprModel): (ok: bool, x: u64) {
-	if !types::IsInt(l.Kind.Str()) || !types::IsInt(r.Kind.Str()) {
+	if !types::IsInt(l.Type.Str()) || !types::IsInt(r.Type.Str()) {
 		ret false, 0
 	}
 	x = (&constant::Const)(r.Model).AsU64()

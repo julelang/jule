@@ -168,13 +168,13 @@ impl exprCoder {
 		const xVar = "__jule_x"
 		const yVar = "__jule_y"
 		self.oc.write("({ ")
-		self.oc.tc.kind(self.oc.Buf, l.Kind)
+		self.oc.tc.kind(self.oc.Buf, l.Type)
 		self.oc.write(" ")
 		self.oc.write(xVar)
 		self.oc.write(" = ")
 		self.possibleRefExpr(l.Model)
 		self.oc.write("; ")
-		self.oc.tc.kind(self.oc.Buf, r.Kind)
+		self.oc.tc.kind(self.oc.Buf, r.Type)
 		self.oc.write(" ")
 		self.oc.write(yVar)
 		self.oc.write(" = ")
@@ -188,7 +188,7 @@ impl exprCoder {
 			self.oc.write("\"")
 		}
 		self.oc.write("); ((")
-		self.oc.tc.kind(self.oc.Buf, l.Kind)
+		self.oc.tc.kind(self.oc.Buf, l.Type)
 		self.oc.write(")(")
 		self.oc.write(xVar)
 		match op.Id {
@@ -283,30 +283,30 @@ impl exprCoder {
 		self.possibleRefExpr(m.Right.Model)
 		r := str(unsafe { self.oc.Buf.Buf()[i:] })
 		unsafe { self.oc.Buf.SetBuf(oldbuf) }
-		self._unsafeBinary(self.oc.Buf, l, r, m.Left.Kind, m.Right.Kind, m.Op.Id, m.Op.Kind)
+		self._unsafeBinary(self.oc.Buf, l, r, m.Left.Type, m.Right.Type, m.Op.Id, m.Op.Kind)
 	}
 
 	fn shl(mut &self, mut &l: &sema::OperandExprModel, mut &r: &sema::OperandExprModel) {
 		const xVar = "__jule_x"
 		const yVar = "__jule_y"
 		self.oc.write("({ ")
-		self.oc.tc.kind(self.oc.Buf, l.Kind)
+		self.oc.tc.kind(self.oc.Buf, l.Type)
 		self.oc.write(" ")
 		self.oc.write(xVar)
 		self.oc.write(" = ")
 		self.possibleRefExpr(l.Model)
 		self.oc.write("; ")
-		self.oc.tc.kind(self.oc.Buf, r.Kind)
+		self.oc.tc.kind(self.oc.Buf, r.Type)
 		self.oc.write(" ")
 		self.oc.write(yVar)
 		self.oc.write(" = ")
 		self.possibleRefExpr(r.Model)
 		self.oc.write("; ((")
-		self.oc.tc.kind(self.oc.Buf, l.Kind)
+		self.oc.tc.kind(self.oc.Buf, l.Type)
 		self.oc.write(")(")
 		self.oc.write(yVar)
 		self.oc.write(" >= ")
-		self.oc.write(conv::Itoa(types::BitSizeOf(l.Kind.Prim().Kind)))
+		self.oc.write(conv::Itoa(types::BitSizeOf(l.Type.Prim().Kind)))
 		self.oc.write(" ? 0 : ")
 		self.oc.write(xVar)
 		self.oc.write(" << ")
@@ -318,23 +318,23 @@ impl exprCoder {
 		const xVar = "__jule_x"
 		const yVar = "__jule_y"
 		self.oc.write("({ ")
-		self.oc.tc.kind(self.oc.Buf, l.Kind)
+		self.oc.tc.kind(self.oc.Buf, l.Type)
 		self.oc.write(" ")
 		self.oc.write(xVar)
 		self.oc.write(" = ")
 		self.possibleRefExpr(l.Model)
 		self.oc.write("; ")
-		self.oc.tc.kind(self.oc.Buf, r.Kind)
+		self.oc.tc.kind(self.oc.Buf, r.Type)
 		self.oc.write(" ")
 		self.oc.write(yVar)
 		self.oc.write(" = ")
 		self.possibleRefExpr(r.Model)
 		self.oc.write("; ((")
-		self.oc.tc.kind(self.oc.Buf, l.Kind)
+		self.oc.tc.kind(self.oc.Buf, l.Type)
 		self.oc.write(")(")
 		self.oc.write(yVar)
 		self.oc.write(" >= ")
-		self.oc.write(conv::Itoa(types::BitSizeOf(l.Kind.Prim().Kind)))
+		self.oc.write(conv::Itoa(types::BitSizeOf(l.Type.Prim().Kind)))
 		self.oc.write(" ? 0 : ")
 		self.oc.write(xVar)
 		self.oc.write(" >> ")
@@ -346,19 +346,19 @@ impl exprCoder {
 		match m.Op.Id {
 		| token::Id.Solidus | token::Id.Percent:
 			// Do not check division safety of structures and skip if safety disabled.
-			if env::Safety && m.Left.Kind.Struct() == nil {
+			if env::Safety && m.Left.Type.Struct() == nil {
 				self.divByZeroBinary(m.Op, m.Left, m.Right)
 				ret
 			}
 		| token::Id.Shl:
 			// Do not check shifting of structures.
-			if m.Left.Kind.Struct() == nil {
+			if m.Left.Type.Struct() == nil {
 				self.shl(m.Left, m.Right)
 				ret
 			}
 		| token::Id.Shr:
 			// Do not check shifting of structures.
-			if m.Left.Kind.Struct() == nil {
+			if m.Left.Type.Struct() == nil {
 				self.shr(m.Left, m.Right)
 				ret
 			}
