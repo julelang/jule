@@ -402,7 +402,7 @@ impl dynamicTypeAnnotation {
 			mut f := k.Fn()
 			for (i, mut fp) in f.Params {
 				self.c = pf.Params[i].Kind
-				if self.annotateConstraint(fp.Kind) {
+				if self.annotateConstraint(fp.Type) {
 					ret true
 				}
 			}
@@ -543,8 +543,8 @@ impl dynamicTypeAnnotation {
 		ok = true
 		mut old := self.k
 		for (i, mut fp) in f.Params {
-			self.k = &pf.Params[i].Kind
-			ok = self.annotateKind(fp.Kind) && ok
+			self.k = &pf.Params[i].Type
+			ok = self.annotateKind(fp.Type) && ok
 		}
 
 		if !pf.Decl.IsVoid() {
@@ -648,7 +648,7 @@ impl dynamicTypeAnnotation {
 	}
 
 	unsafe fn annotate(mut self): (ok: bool) {
-		self.k = &self.p.Kind
+		self.k = &self.p.Type
 		ret self.annotateKind(self.a.Type)
 	}
 }
@@ -703,7 +703,7 @@ impl fnCallArgChecker {
 		err.WriteStr(self.f.Decl.Ident)!
 		err.WriteStr("\n       want (")!
 		for i, p in params {
-			err.WriteStr(p.Kind.Str())!
+			err.WriteStr(p.Type.Str())!
 			if len(params)-i > 1 {
 				err.WriteStr(", ")!
 			}
@@ -734,10 +734,10 @@ impl fnCallArgChecker {
 			}
 		}
 
-		if self.e.s.checkValidityForInitExpr(p.Decl.Mutable, p.Decl.Reference, p.Kind, arg, errorToken) {
+		if self.e.s.checkValidityForInitExpr(p.Decl.Mutable, p.Decl.Reference, p.Type, arg, errorToken) {
 			// Check type if validity is good.
 			// Helps to reduce error logs and duplicated logs.
-			ret self.e.s.checkAssignType(p.Decl.Reference, p.Kind, arg, errorToken, self.e.getOwnerRefers())
+			ret self.e.s.checkAssignType(p.Decl.Reference, p.Type, arg, errorToken, self.e.getOwnerRefers())
 		}
 		ret false
 	}
@@ -748,7 +748,7 @@ impl fnCallArgChecker {
 
 		self.e.immutable = !p.Decl.Mutable
 		if !self.dynamicAnnotation && !p.Decl.Variadic {
-			self.e.prefix = p.Kind
+			self.e.prefix = p.Type
 		} else {
 			self.e.prefix = nil
 		}
@@ -771,7 +771,7 @@ impl fnCallArgChecker {
 		mut variadiced := false
 		more := i+1 < len(self.args)
 		mut model := &SliceExprModel{
-			ElemKind: p.Kind,
+			ElemKind: p.Type,
 		}
 
 		mut old := self.e.prefix
@@ -781,12 +781,12 @@ impl fnCallArgChecker {
 		// Some built-in functions passes non-variadic types.
 		// Also allocate new type based on [p.Kind] because type should be remain non-variadic.
 		// The [p.Kind] used as prefix and base type.
-		mut oldKind := p.Kind
-		p.Kind = new(Type, *p.Kind)
-		p.Kind.Variadic = false
+		mut oldKind := p.Type
+		p.Type = new(Type, *p.Type)
+		p.Type.Variadic = false
 		defer {
-			p.Kind.Variadic = false // Set actual type as non-variadic.
-			p.Kind = oldKind
+			p.Type.Variadic = false // Set actual type as non-variadic.
+			p.Type = oldKind
 		}
 
 		for i < len(self.args); i++ {
@@ -796,11 +796,11 @@ impl fnCallArgChecker {
 			| &ast::VariadicExpr:
 				self.e.prefix = &Type{
 					Kind: &Slc{
-						Elem: p.Kind,
+						Elem: p.Type,
 					},
 				}
 			|:
-				self.e.prefix = p.Kind
+				self.e.prefix = p.Type
 			}
 
 			mut d := self.e.eval(arg)
@@ -811,13 +811,13 @@ impl fnCallArgChecker {
 
 			if d.Type.Variadic {
 				variadiced = true
-				p.Kind.Variadic = true
+				p.Type.Variadic = true
 				ok = ok && self.checkArg(p, d, arg.Token)
-				p.Kind.Variadic = false
+				p.Type.Variadic = false
 				match type d.Model {
 				| &SliceExprModel:
 					model = (&SliceExprModel)(d.Model)
-					model.ElemKind = p.Kind
+					model.ElemKind = p.Type
 				|:
 					model = nil
 					self.argModels = append(self.argModels, d.Model)

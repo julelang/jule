@@ -165,7 +165,7 @@ impl ObjectCoder {
 		for i, sf in self.coSpawnMap {
 			if len(sf.Params) == len(f.Params) {
 				for j, sp in sf.Params {
-					if !sp.Kind.Equal(sf.Params[j].Kind) {
+					if !sp.Type.Equal(sf.Params[j].Type) {
 						break
 					}
 				}
@@ -191,7 +191,7 @@ impl ObjectCoder {
 		// setup argument data
 		for (j, mut p) in f.Params {
 			self.coSpawnObj.WriteByte(indentKind)!
-			self.tc.kind(self.coSpawnObj, p.Kind)
+			self.tc.kind(self.coSpawnObj, p.Type)
 			self.coSpawnObj.WriteByte(' ')!
 			self.coSpawnObj.WriteStr(coSpawnArgDataParam)!
 			self.coSpawnObj.WriteStr(conv::Itoa(j))!
@@ -611,11 +611,11 @@ impl ObjectCoder {
 				for (_, mut mins) in m.Instances {
 					mut p := mins.Params[0]
 					mut kind := strings::Builder.New(40)
-					self.tc.kind(kind, p.Kind)
+					self.tc.kind(kind, p.Type)
 					if !p.Decl.IsRef() {
 						kind.WriteStr("*")!
 					}
-					p.Kind = &sema::Type{
+					p.Type = &sema::Type{
 						Kind: &customType{
 							kind: kind.Str(),
 						},
@@ -828,10 +828,10 @@ impl ObjectCoder {
 
 	fn funcDeclTrait(mut &self, mut &f: &sema::Fn) {
 		for (_, mut c) in f.Instances {
-			mut k := c.Params[0].Kind
-			c.Params[0].Kind = generalGCPtr
+			mut k := c.Params[0].Type
+			c.Params[0].Type = generalGCPtr
 			self.funcDeclIns(c, true)
-			c.Params[0].Kind = k
+			c.Params[0].Type = k
 		}
 	}
 
@@ -993,10 +993,10 @@ impl ObjectCoder {
 		nident.WriteStr("_")!
 		nident.WriteStr(conv::FmtUint(u64(uintptr(s)), 0xF))!
 
-		mut k := f.Params[0].Kind
-		f.Params[0].Kind = generalGCPtr
+		mut k := f.Params[0].Type
+		f.Params[0].Type = generalGCPtr
 		self.funcIns(f, nident.Str())
-		f.Params[0].Kind = k
+		f.Params[0].Type = k
 	}
 
 	fn findTraitMetMap(mut &self, mut &m: &sema::Fn): (&sema::FnIns, bool) {
