@@ -435,7 +435,7 @@ impl dynamicTypeAnnotation {
 			for (_, mut ig) in ident.Generics {
 				self.c = ig
 				for (_, mut sg) in s.Generics {
-					if self.annotateConstraint(sg.Kind) {
+					if self.annotateConstraint(sg.Type) {
 						ret true
 					}
 				}
@@ -471,7 +471,7 @@ impl dynamicTypeAnnotation {
 	}
 
 	fn pushGeneric(mut self, mut &k: &Type, i: int) {
-		self.f.Generics[i] = &InsGeneric{Kind: k}
+		self.f.Generics[i] = &InsGeneric{Type: k}
 		mut gd := self.f.Decl.Generics[i]
 		for (_, mut ignored) in self.ignored {
 			if gd.Ident == ignored.Str() {
@@ -587,11 +587,11 @@ impl dynamicTypeAnnotation {
 		}
 		for (i, mut g) in s.Generics {
 			mut g2 := s2.Generics[i]
-			if g.Kind.Equal(g2.Kind) {
+			if g.Type.Equal(g2.Type) {
 				continue
 			}
-			self.k = &g.Kind
-			if !self.annotateKind(g2.Kind) {
+			self.k = &g.Type
+			if !self.annotateKind(g2.Type) {
 				ret false
 			}
 		}
@@ -606,9 +606,9 @@ impl dynamicTypeAnnotation {
 			}
 			t := self.f.Generics[i]
 			match {
-			| t == nil | t.Kind == nil:
+			| t == nil | t.Type == nil:
 				self.pushGeneric(k, i)
-			| !t.Kind.Equal(k):
+			| !t.Type.Equal(k):
 				// Generic already pushed but generic type and current kind
 				// is different, so incompatible.
 				ret false
