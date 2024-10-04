@@ -1846,10 +1846,7 @@ impl eval {
 	}
 
 	fn evalNamespace(mut self, mut s: &ast::NamespaceExpr): &Data {
-		mut imp := self.lookup.SelectPackage(fn(imp: &ImportInfo): bool {
-			ret imp.Alias == s.Namespace.Kind
-		})
-
+		mut imp := findNamespace(self.lookup, s.Namespace.Kind)
 		if imp == nil {
 			self.pushErr(s.Namespace, build::LogMsg.NamespaceNotExist, s.Namespace.Kind)
 			ret nil
@@ -4691,4 +4688,10 @@ fn isVarCaptured(r: &scopeChecker, mut s: &scopeChecker, v: &Var): bool {
 		s = s.parent
 	}
 	ret true
+}
+
+fn findNamespace(mut lookup: Lookup, namespace: str): &ImportInfo {
+	ret lookup.SelectPackage(fn(imp: &ImportInfo): bool {
+		ret imp.Alias == namespace && !isImplicitImport(imp)
+	})
 }
