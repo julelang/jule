@@ -248,8 +248,8 @@ impl assignTypeChecker {
 	fn checkValidity(mut self): bool {
 		mut valid := true
 		match {
-		| self.d.Kind.Fn() != nil:
-			f := self.d.Kind.Fn()
+		| self.d.Type.Fn() != nil:
+			f := self.d.Type.Fn()
 			match {
 			| f.IsBuiltin():
 				self.pushErr(build::LogMsg.BuiltinAsNonFn)
@@ -265,7 +265,7 @@ impl assignTypeChecker {
 				self.s.pushSuggestion(build::LogMsg.InstantiateGenericFnToUseAsAnon)
 				valid = false
 			}
-		| self.d.Kind.Tup() != nil:
+		| self.d.Type.Tup() != nil:
 			self.pushErr(build::LogMsg.TupleAssignToSingle)
 			valid = false
 		}
@@ -306,7 +306,7 @@ impl assignTypeChecker {
 			ret false
 		| self.checkConst():
 			ret true
-		| self.d.Kind.Enum() != nil:
+		| self.d.Type.Enum() != nil:
 			mut dkind := self.dest
 			if self.dest.Enum() != nil {
 				dkind = self.dest.Enum().TypeSym.Type
@@ -316,7 +316,7 @@ impl assignTypeChecker {
 				// Ignore direct comparison if prim is nil or any.
 				break
 			}
-			mut dest := self.d.Kind.Enum().TypeSym.Type
+			mut dest := self.d.Type.Enum().TypeSym.Type
 			ret self.s.checkTypeCompatibility(dest, dkind, self.errorToken)
 		}
 		ret self.s.checkTypeCompatibility1(self.dest, self.d, self.errorToken)
@@ -324,7 +324,7 @@ impl assignTypeChecker {
 
 	fn check(mut self): bool {
 		ok := self.checkCompatibility()
-		if ok && !self.d.Kind.Variadic {
+		if ok && !self.d.Type.Variadic {
 			applyImplicitCast(self.s, self.dest, self.d, self.errorToken, self.refers)
 		}
 		ret ok
@@ -649,7 +649,7 @@ impl dynamicTypeAnnotation {
 
 	unsafe fn annotate(mut self): (ok: bool) {
 		self.k = &self.p.Kind
-		ret self.annotateKind(self.a.Kind)
+		ret self.annotateKind(self.a.Type)
 	}
 }
 
@@ -809,7 +809,7 @@ impl fnCallArgChecker {
 				continue
 			}
 
-			if d.Kind.Variadic {
+			if d.Type.Variadic {
 				variadiced = true
 				p.Kind.Variadic = true
 				ok = ok && self.checkArg(p, d, arg.Token)
@@ -913,8 +913,8 @@ fn checkMutRiskOfStructLit(mut &s: &sema, &m: &StructLitExprModel) {
 			// If there is a mutability risk, it will be logged by [structLitChecker].
 			continue
 		}
-		if !arg.Expr.Mutable && arg.Expr.Kind.Mutable() {
-			s.pushErr(arg.Token, build::LogMsg.AssignNonMutToMut, arg.Expr.Kind.Str())
+		if !arg.Expr.Mutable && arg.Expr.Type.Mutable() {
+			s.pushErr(arg.Token, build::LogMsg.AssignNonMutToMut, arg.Expr.Type.Str())
 		}
 	}
 }
@@ -1132,7 +1132,7 @@ impl rangeChecker {
 			ret
 		}
 
-		mut slc := self.d.Kind.Slc()
+		mut slc := self.d.Type.Slc()
 		self.Kind.KeyB = self.buildVar(self.rang.KeyB)
 		self.Kind.KeyB.TypeSym = &TypeSym{Type: slc.Elem}
 
@@ -1145,7 +1145,7 @@ impl rangeChecker {
 			ret
 		}
 
-		mut arr := self.d.Kind.Arr()
+		mut arr := self.d.Type.Arr()
 		self.Kind.KeyB = self.buildVar(self.rang.KeyB)
 		self.Kind.KeyB.TypeSym = &TypeSym{Type: arr.Elem}
 
@@ -1157,12 +1157,12 @@ impl rangeChecker {
 			ret
 		}
 
-		mut m := self.d.Kind.Map()
+		mut m := self.d.Type.Map()
 		self.Kind.KeyA = self.buildVar(self.rang.KeyA)
 		self.Kind.KeyA.TypeSym = &TypeSym{Type: m.Key}
 
 		mut d := new(Data, *self.d)
-		d.Kind = m.Key
+		d.Type = m.Key
 
 		self.checkRangeExprValidity(d, self.Kind.KeyA, m.Key)
 	}
@@ -1172,12 +1172,12 @@ impl rangeChecker {
 			ret
 		}
 
-		mut m := self.d.Kind.Map()
+		mut m := self.d.Type.Map()
 		self.Kind.KeyB = self.buildVar(self.rang.KeyB)
 		self.Kind.KeyB.TypeSym = &TypeSym{Type: m.Val}
 
 		mut d := new(Data, *self.d)
-		d.Kind = m.Val
+		d.Type = m.Val
 
 		self.checkRangeExprValidity(d, self.Kind.KeyB, m.Val)
 	}
@@ -1211,7 +1211,7 @@ impl rangeChecker {
 	}
 
 	fn checkComptimeRange(mut self): bool {
-		mut range := self.d.Kind.comptimeRange()
+		mut range := self.d.Type.comptimeRange()
 		match type range.kind {
 		| &comptimeStructFields
 		| &comptimeEnumFields
@@ -1230,21 +1230,21 @@ impl rangeChecker {
 
 	fn check(mut self): bool {
 		match {
-		| self.d.Kind.Variadic:
+		| self.d.Type.Variadic:
 			// Fail.
-		| self.d.Kind.Slc() != nil:
+		| self.d.Type.Slc() != nil:
 			self.checkSlice()
 			ret true
-		| self.d.Kind.Arr() != nil:
+		| self.d.Type.Arr() != nil:
 			self.checkArray()
 			ret true
-		| self.d.Kind.Map() != nil:
+		| self.d.Type.Map() != nil:
 			self.checkMap()
 			ret true
-		| self.d.Kind.comptimeRange() != nil:
+		| self.d.Type.comptimeRange() != nil:
 			ret self.checkComptimeRange()
 		|:
-			prim := self.d.Kind.Prim()
+			prim := self.d.Type.Prim()
 			if prim != nil && prim.IsStr() {
 				self.checkStr()
 				ret true
@@ -1305,7 +1305,7 @@ impl retTypeChecker {
 
 			datas = append(datas, d)
 
-			if !d.Mutable && d.Kind.Mutable() {
+			if !d.Mutable && d.Type.Mutable() {
 				self.sc.s.pushErr(self.errorToken, build::LogMsg.RetWithMutTypedNonMut)
 				ret
 			}
@@ -1339,7 +1339,7 @@ impl retTypeChecker {
 			// Evaluation error is enough for developer for now.
 			ret true
 		}
-		mut tup := d.Kind.Tup()
+		mut tup := d.Type.Tup()
 		if tup == nil {
 			ret false
 		}

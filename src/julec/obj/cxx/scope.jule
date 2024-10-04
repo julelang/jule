@@ -165,7 +165,7 @@ impl scopeCoder {
 		identCoder.iterNext(sb, uintptr(it))
 		next := sb.Str()
 
-		mut _map := it.Expr.Kind.Map()
+		mut _map := it.Expr.Type.Map()
 		mut s := obj::RuntimeFindStruct(self.oc.ir.Runtime, obj::RuntimeStruct._Map)
 		mut ins := obj::FindStructGenericInstance(s, _map.Key, _map.Val)
 		const Static = false
@@ -439,11 +439,11 @@ impl scopeCoder {
 
 	fn rangeIter(mut &self, mut it: &sema::RangeIter) {
 		match {
-		| it.Expr.Kind.Slc() != nil:
+		| it.Expr.Type.Slc() != nil:
 			self.rangeIndexIter(it)
-		| it.Expr.Kind.Arr() != nil:
+		| it.Expr.Type.Arr() != nil:
 			self.rangeIndexIter(it)
-		| it.Expr.Kind.Map() != nil:
+		| it.Expr.Type.Map() != nil:
 			self.rangeHashmapIter(it)
 		|:
 			self.rangeIndexIter(it) // Str
@@ -476,7 +476,7 @@ impl scopeCoder {
 		match type model {
 		| &sema::IndexingExprModel:
 			mut iem := (&sema::IndexingExprModel)(model)
-			_map := iem.Expr.Kind.Map()
+			_map := iem.Expr.Type.Map()
 			if _map == nil {
 				break
 			}
@@ -573,7 +573,7 @@ impl scopeCoder {
 	fn mapLookupAssign(mut &self, mut &a: &sema::MultiAssign) {
 		// map lookup right expression always should be indexing
 		mut iem := (&sema::IndexingExprModel)(a.Right)
-		mut _map := iem.Expr.Kind.Map()
+		mut _map := iem.Expr.Type.Map()
 
 		mut s := obj::RuntimeFindStruct(self.oc.ir.Runtime, obj::RuntimeStruct._Map)
 		mut ins := obj::FindStructGenericInstance(s, _map.Key, _map.Val)
@@ -648,7 +648,7 @@ impl scopeCoder {
 					a.Left[i] = nil // Ignore handling for following statements.
 					continue
 				}
-				self.oc.tc.kind(self.oc.Buf, l.Kind)
+				self.oc.tc.kind(self.oc.Buf, l.Type)
 				self.oc.write(" ")
 				identCoder.toOut(self.oc.Buf, assignArgName, uintptr(i))
 				self.oc.write(" = ")
@@ -693,10 +693,10 @@ impl scopeCoder {
 			self.oc.indent()
 			self.assignLeft(l.Model)
 			match {
-			| tup.Types[i].Equal(l.Kind):
+			| tup.Types[i].Equal(l.Type):
 				self.oc.write(" = " + r)
 				self.oc.write(conv::Itoa(i))
-			| obj::IsAny(l.Kind):
+			| obj::IsAny(l.Type):
 				self.oc.write(" = " + typeCoder.Any + "(" + r)
 				self.oc.write(conv::Itoa(i))
 				self.oc.write(", &" + anyTypeIdent)
@@ -706,7 +706,7 @@ impl scopeCoder {
 				// It should be trait.
 				if tup.Types[i].Trait() != nil { // Different traits, cast.
 					self.oc.write(" = ")
-					mut t1 := l.Kind.Trait()
+					mut t1 := l.Type.Trait()
 					mut t2 := tup.Types[i].Trait()
 					self.oc.write(r)
 					self.oc.write(conv::Itoa(i))
@@ -715,7 +715,7 @@ impl scopeCoder {
 					self.oc.write(")")
 					break
 				}
-				t := l.Kind.Trait()
+				t := l.Type.Trait()
 				self.oc.write(" = " + typeCoder.Trait + "(" + r)
 				self.oc.write(conv::Itoa(i))
 				self.oc.write(", (" + typeCoder.Trait + "::Type*)&")
@@ -795,13 +795,13 @@ impl scopeCoder {
 				|:
 					self.oc.write(matchExpr)
 					mut tk := (&sema::Type)(expr.Model)
-					if m.Expr.Kind.Trait() != nil {
+					if m.Expr.Type.Trait() != nil {
 						self.oc.write(".type_is(")
-						self.oc.ec.boolean(expr.Kind.Sptr() != nil)
+						self.oc.ec.boolean(expr.Type.Sptr() != nil)
 						self.oc.write(", (const " + typeCoder.Trait + "::Type*)&")
-						identCoder.traitDecl(self.oc.Buf, m.Expr.Kind.Trait())
+						identCoder.traitDecl(self.oc.Buf, m.Expr.Type.Trait())
 						self.oc.write("_mptr_data")
-						self.oc.write(conv::Itoa(obj::FindTraitTypeOffset(m.Expr.Kind.Trait(), expr.Kind)))
+						self.oc.write(conv::Itoa(obj::FindTraitTypeOffset(m.Expr.Type.Trait(), expr.Type)))
 						self.oc.write(")")
 					} else { // Any type.
 						j := self.oc.pushAnyType(tk)
@@ -1185,7 +1185,7 @@ fn isCopyOptimizable(&expr: &sema::Data): bool {
 }
 
 fn isIterCopyOptimizable(&expr: &sema::Data, &v: &sema::Var): bool {
-	if !expr.Lvalue && !expr.Kind.Mutable() {
+	if !expr.Lvalue && !expr.Type.Mutable() {
 		ret true
 	}
 	ret !v.Mutable && !expr.Mutable

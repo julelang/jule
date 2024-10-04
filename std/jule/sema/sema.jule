@@ -24,17 +24,17 @@ fn isValidModelForRef(mut &m: ExprModel): bool {
 			ret false
 		}
 		// Return true because of raw pointer dereferencing is an Unsafe Jule feature.
-		if unary.Expr.Kind.Ptr() != nil {
+		if unary.Expr.Type.Ptr() != nil {
 			ret true
 		}
 		// Dereferencing should be smart pointer, otherwise return false.
-		if unary.Expr.Kind.Sptr() == nil {
+		if unary.Expr.Type.Sptr() == nil {
 			ret false
 		}
 		ret isValidModelForRef(unary.Expr.Model)
 	| &IndexingExprModel:
 		mut indexing := (&IndexingExprModel)(m)
-		if indexing.Expr.Kind.Arr() == nil {
+		if indexing.Expr.Type.Arr() == nil {
 			// allow only arrays, slice allocations will may be deallocated at runtime
 			// arrays always guaranteed to be have fixed size at runtime
 			ret false
@@ -715,8 +715,8 @@ impl sema {
 			ret false
 		}
 		if destIsRef {
-			if !dest.Equal(d.Kind) {
-				self.pushErr(errorToken, build::LogMsg.IncompatibleTypes, dest.Str(), d.Kind.Str())
+			if !dest.Equal(d.Type) {
+				self.pushErr(errorToken, build::LogMsg.IncompatibleTypes, dest.Str(), d.Type.Str())
 				ret false
 			}
 		} else {
@@ -793,12 +793,12 @@ impl sema {
 				ret
 			}
 		}
-		self.pushErr(errorToken, build::LogMsg.IncompatibleTypes, dest.Str(), src.Kind.Str())
+		self.pushErr(errorToken, build::LogMsg.IncompatibleTypes, dest.Str(), src.Type.Str())
 	}
 
 	fn checkTypeCompatibility1(mut &self, mut &dest: &Type, mut &src: &Data,
 		mut &errorToken: &token::Token): bool {
-		if self._checkTypeCompatibility(dest, src.Kind, errorToken) {
+		if self._checkTypeCompatibility(dest, src.Type, errorToken) {
 			ret true
 		}
 		self.pushCompatiblityError(dest, src, errorToken)
@@ -1033,14 +1033,14 @@ impl sema {
 		&leftKind: &Type, mut &d: &Data, mut &errorToken: &token::Token): bool {
 		if leftMut && !d.Mutable {
 			// Check classical assignment mutability.
-			if d.Kind.Mutable() || d.Kind.Variadic {
-				self.pushErr(errorToken, build::LogMsg.AssignNonMutToMut, d.Kind.Str())
+			if d.Type.Mutable() || d.Type.Variadic {
+				self.pushErr(errorToken, build::LogMsg.AssignNonMutToMut, d.Type.Str())
 				ret false
 			}
 			// Check interior mutability risk for the struct copy.
-			s := d.Kind.Struct()
+			s := d.Type.Struct()
 			if s != nil && self.isMutRiskyStruct(s) {
-				self.pushErr(errorToken, build::LogMsg.CopyWithMutableData, d.Kind.Str())
+				self.pushErr(errorToken, build::LogMsg.CopyWithMutableData, d.Type.Str())
 				ret false
 			}
 		}
@@ -2042,7 +2042,7 @@ impl sema {
 			self.pushErr(errToken, build::LogMsg.NilForTypeInference)
 		| d.IsVoid():
 			self.pushErr(errToken, build::LogMsg.VoidForTypeInference)
-		| d.Kind.Variadic:
+		| d.Type.Variadic:
 			self.pushErr(errToken, build::LogMsg.InvalidExprForTypeInference)
 		}
 	}
@@ -2051,7 +2051,7 @@ impl sema {
 	fn checkVarValue(mut &self, mut &v: &Var) {
 		if v.IsTypeInferred() {
 			// Build new TypeSym because auto-type symbols are nil.
-			v.TypeSym = &TypeSym{Type: v.Value.Data.Kind}
+			v.TypeSym = &TypeSym{Type: v.Value.Data.Type}
 
 			self.checkDataForTypeInference(v.Value.Data, v.Value.Expr.Token)
 			self.checkValidityForInitExpr(
@@ -2064,7 +2064,7 @@ impl sema {
 			mut arr := v.TypeSym.Type.Arr()
 			if arr != nil {
 				if arr.Auto {
-					dataArr := v.Value.Data.Kind.Arr()
+					dataArr := v.Value.Data.Type.Arr()
 					if dataArr != nil {
 						arr.N = dataArr.N
 					}
@@ -2086,7 +2086,7 @@ impl sema {
 		}
 
 		if v.Constant {
-			if !v.Value.Data.IsConst() && !v.Value.Data.Kind.comptime() {
+			if !v.Value.Data.IsConst() && !v.Value.Data.Type.comptime() {
 				self.pushErr(v.Value.Expr.Token, build::LogMsg.ExprNotConst)
 			}
 		} else {

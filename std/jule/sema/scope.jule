@@ -60,17 +60,17 @@ fn findLabelParent(&ident: str, mut scope: &scopeChecker): &scopeLabel {
 }
 
 fn getDatasFromTupleData(mut &d: &Data): []&Data {
-	if d.Kind.Tup() != nil {
+	if d.Type.Tup() != nil {
 		match type d.Model {
 		| &TupleExprModel:
 			ret (&TupleExprModel)(d.Model).Datas
 		|:
-			mut t := d.Kind.Tup()
+			mut t := d.Type.Tup()
 			mut r := make([]&Data, 0, len(t.Types))
 			for (_, mut kind) in t.Types {
 				r = append(r, &Data{
 					Mutable: true, // Function return.
-					Kind: kind,
+					Type: kind,
 				})
 			}
 			ret r
@@ -99,14 +99,14 @@ fn checkMut(mut &s: &sema, &left: &Data, mut right: &Data, op: &token::Token): (
 	| !left.Mutable:
 		s.pushErr(op, build::LogMsg.AssignToNonMut)
 		ret false
-	| right != nil && !right.Mutable && right.Kind.Mutable():
-		if op.Id != token::Id.Eq && right.Kind.Struct() != nil {
+	| right != nil && !right.Mutable && right.Type.Mutable():
+		if op.Id != token::Id.Eq && right.Type.Struct() != nil {
 			// If operator is not assignment, and kind is structure, allow.
 			// Operator overloading uses immutable copy of right operand.
 			// It's safe.
 			ret true
 		}
-		s.pushErr(op, build::LogMsg.AssignNonMutToMut, right.Kind.Str())
+		s.pushErr(op, build::LogMsg.AssignNonMutToMut, right.Type.Str())
 		ret false
 	|:
 		ret true
@@ -114,7 +114,7 @@ fn checkMut(mut &s: &sema, &left: &Data, mut right: &Data, op: &token::Token): (
 }
 
 fn checkAssign(mut &s: &sema, mut &left: &Data, mut right: &Data, op: &token::Token): (ok: bool) {
-	f := left.Kind.Fn()
+	f := left.Type.Fn()
 	if f != nil && f.Decl != nil && f.Decl.Global {
 		s.pushErr(op, build::LogMsg.AssignTypeNotSupportValue)
 		ret false
@@ -285,7 +285,7 @@ struct Match {
 impl Match {
 	// Reports whether match is type-match for generic type.
 	fn IsGenericTypeMatch(self): bool {
-		ret self.TypeMatch && self.Expr != nil && self.Expr.Kind.Generic
+		ret self.TypeMatch && self.Expr != nil && self.Expr.Type.Generic
 	}
 }
 
@@ -755,7 +755,7 @@ impl scopeChecker {
 			ret nil
 		}
 
-		mut prim := d.Kind.Prim()
+		mut prim := d.Type.Prim()
 		if prim == nil || !prim.IsBool() {
 			self.s.pushErr(i.Expr.Token, build::LogMsg.IfRequireBoolExpr)
 			ret nil
@@ -828,7 +828,7 @@ impl scopeChecker {
 				ret
 			}
 
-			prim := d.Kind.Prim()
+			prim := d.Type.Prim()
 			if prim == nil {
 				self.s.pushErr(it.Token, build::LogMsg.IterWhileRequireBoolExpr)
 				ret
@@ -878,7 +878,7 @@ impl scopeChecker {
 		mut rang := (&ast::RangeKind)(it.Kind)
 		makeComptimeRange(d)
 		if d.Decl {
-			self.s.pushErr(rang.Expr.Token, build::LogMsg.InvalidTypeForComptimeIter, d.Kind.Str())
+			self.s.pushErr(rang.Expr.Token, build::LogMsg.InvalidTypeForComptimeIter, d.Type.Str())
 			ret
 		}
 
@@ -893,7 +893,7 @@ impl scopeChecker {
 			ret
 		}
 
-		mut comptime := d.Kind.comptimeRange()
+		mut comptime := d.Type.comptimeRange()
 		comptime.kind.ready(kind.KeyA, kind.KeyB)
 		mut i := 0
 		errors := len(self.s.errors)
@@ -934,7 +934,7 @@ impl scopeChecker {
 			self.checkComptimeRangeIter(it, kind, d)
 			ret
 		}
-		if d.Kind.comptime() {
+		if d.Type.comptime() {
 			self.s.pushErr(rang.Expr.Token, build::LogMsg.ComptimeExprForRuntimeIteration)
 			self.s.pushSuggestion(build::LogMsg.DeclareComptimeForeach)
 			ret
@@ -1156,15 +1156,15 @@ impl scopeChecker {
 
 		_ = checkAssign(self.s, d, nil, a.Setter)
 
-		if d.Kind.Ptr() != nil {
-			mut ptr := d.Kind.Ptr()
+		if d.Type.Ptr() != nil {
+			mut ptr := d.Type.Ptr()
 			if ptr.IsUnsafe() {
-				self.s.pushErr(a.Setter, build::LogMsg.OperatorNotForJuleType, a.Setter.Kind, d.Kind.Str())
+				self.s.pushErr(a.Setter, build::LogMsg.OperatorNotForJuleType, a.Setter.Kind, d.Type.Str())
 				ret
 			}
 		} else {
-			if d.Kind.Prim() == nil || !types::IsNum(d.Kind.Prim().Kind) {
-				self.s.pushErr(a.Setter, build::LogMsg.OperatorNotForJuleType, a.Setter.Kind, d.Kind.Str())
+			if d.Type.Prim() == nil || !types::IsNum(d.Type.Prim().Kind) {
+				self.s.pushErr(a.Setter, build::LogMsg.OperatorNotForJuleType, a.Setter.Kind, d.Type.Str())
 				ret
 			}
 		}
@@ -1189,7 +1189,7 @@ impl scopeChecker {
 	//
 	// See also documentation of the [sema.isMutRiskyStruct] method.
 	fn removeInteriorMutRisk(mut &self, mut &d: &Data) {
-		s := d.Kind.Struct()
+		s := d.Type.Struct()
 		if s == nil {
 			ret
 		}
@@ -1254,7 +1254,7 @@ impl scopeChecker {
 
 		mut eval := (&eval)(nil)
 		if l != nil {
-			eval = self.s.evalp(self, l.Kind)
+			eval = self.s.evalp(self, l.Type)
 		} else {
 			eval = self.s.eval(self)
 		}
@@ -1267,7 +1267,7 @@ impl scopeChecker {
 		self.removeInteriorMutRisk(r)
 
 		if l == nil {
-			if r.Kind.Void() {
+			if r.Type.Void() {
 				self.s.pushErr(a.Right.Token, build::LogMsg.InvalidExpr)
 			}
 			if a.Setter.Id != token::Id.Eq {
@@ -1281,17 +1281,17 @@ impl scopeChecker {
 			ret
 		}
 
-		if r.Kind.Tup() != nil {
+		if r.Type.Tup() != nil {
 			self.s.pushErr(a.Setter, build::LogMsg.MissingMultiAssignIdents)
 			ret
 		}
 
 		mut lm := &OperandExprModel{
-			Kind: l.Kind,
+			Kind: l.Type,
 			Model: l.Model,
 		}
 		mut rm := &OperandExprModel{
-			Kind: r.Kind,
+			Kind: r.Type,
 			Model: r.Model,
 		}
 		self.scope.Stmts = append(self.scope.Stmts, &Assign{Left: lm, Right: rm, Op: a.Setter})
@@ -1299,7 +1299,7 @@ impl scopeChecker {
 		if a.Setter.Id == token::Id.Eq {
 			mut checker := assignTypeChecker{
 				s: self.s,
-				dest: l.Kind,
+				dest: l.Type,
 				d: r,
 				errorToken: a.Setter,
 				refers: self.getOwnerRefers(),
@@ -1310,7 +1310,7 @@ impl scopeChecker {
 			}
 			ret
 		}
-		mut strct := l.Kind.Struct()
+		mut strct := l.Type.Struct()
 		if strct != nil {
 			self.checkStructureAssignOp(strct, a, r)
 			ret
@@ -1326,7 +1326,7 @@ impl scopeChecker {
 	fn processEndPartOfMultiAssign(mut &self, mut &st: &MultiAssign, mut &a: &ast::AssignSt,
 		mut &lexpr: &ast::AssignLeft, mut &l: &Data, mut &r: &Data, strict: bool) {
 		if !lexpr.Reference && token::IsIgnoreIdent(lexpr.Ident) {
-			if r.Kind.Void() {
+			if r.Type.Void() {
 				self.s.pushErr(a.Right.Token, build::LogMsg.InvalidExpr)
 			}
 			st.Left = append(st.Left, nil)
@@ -1372,7 +1372,7 @@ impl scopeChecker {
 				Lvalue: !v.Constant,
 				Mutable: v.Mutable,
 				Reference: v.Reference,
-				Kind: v.TypeSym.Type,
+				Type: v.TypeSym.Type,
 				Model: v,
 			})
 			st.Decls = append(st.Decls, v)
@@ -1392,9 +1392,9 @@ impl scopeChecker {
 		// Set reference false because this is normal assigment.
 		// So, we don't need to check reference assignment should using lvalue.
 		mut reference := false
-		if self.s.checkValidityForInitExpr(l.Mutable, reference, l.Kind, r, lexpr.Token) {
+		if self.s.checkValidityForInitExpr(l.Mutable, reference, l.Type, r, lexpr.Token) {
 			reference = strict // enable reference checking if strict mode enabled
-			self.s.checkAssignType(reference, l.Kind, r, lexpr.Token, self.getOwnerRefers())
+			self.s.checkAssignType(reference, l.Type, r, lexpr.Token, self.getOwnerRefers())
 		}
 		st.Left = append(st.Left, l)
 	}
@@ -1414,11 +1414,11 @@ impl scopeChecker {
 			match type right[0].Model {
 			| &IndexingExprModel:
 				mut iem := (&IndexingExprModel)(right[0].Model)
-				if iem.Expr.Kind.Map() != nil { // Is map lookup.
+				if iem.Expr.Type.Map() != nil { // Is map lookup.
 					strict = true
 					right = [
-						&Data{Mutable: right[0].Mutable, Kind: iem.Expr.Kind.Map().Val},
-						&Data{Kind: primBool},
+						&Data{Mutable: right[0].Mutable, Type: iem.Expr.Type.Map().Val},
+						&Data{Type: primBool},
 					]
 				}
 			}
@@ -1499,22 +1499,22 @@ impl scopeChecker {
 				// Parser always tries to build type declarations for type-match cases.
 				// So, d is should be type declaration already.
 				case.Exprs = append(case.Exprs, d)
-				if countMatchType(m, d.Kind) > 1 {
-					self.s.pushErr(e.Token, build::LogMsg.DuplicateMatchType, d.Kind.Str())
+				if countMatchType(m, d.Type) > 1 {
+					self.s.pushErr(e.Token, build::LogMsg.DuplicateMatchType, d.Type.Str())
 				}
 				if m.Comptime {
-					constMatched = constMatched || expr.Kind.Equal(d.Kind)
+					constMatched = constMatched || expr.Type.Equal(d.Type)
 				} else {
-					if expr.Kind.TypeEnum() != nil {
-						_ = self.s.checkTypeCompatibility(expr.Kind, d.Kind, e.Token)
+					if expr.Type.TypeEnum() != nil {
+						_ = self.s.checkTypeCompatibility(expr.Type, d.Type, e.Token)
 					} else {
-						trt := expr.Kind.Trait()
+						trt := expr.Type.Trait()
 						if trt != nil {
-							_ = self.s.checkTypeCompatibility(expr.Kind, d.Kind, e.Token)
+							_ = self.s.checkTypeCompatibility(expr.Type, d.Type, e.Token)
 						}
 					}
 				}
-				applyRuntimeToStr(self.s, d.Kind, m.Expr.Kind, e.Token, self.getOwnerRefers())
+				applyRuntimeToStr(self.s, d.Type, m.Expr.Type, e.Token, self.getOwnerRefers())
 				continue
 			}
 
@@ -1525,7 +1525,7 @@ impl scopeChecker {
 			}
 
 			if m.Comptime {
-				if !d.IsConst() && d.Kind.comptimeTypeInfo() == nil {
+				if !d.IsConst() && d.Type.comptimeTypeInfo() == nil {
 					self.s.pushErr(e.Token, build::LogMsg.ExprNotConst)
 					self.s.pushSuggestion(build::LogMsg.InvalidExprForConstMatch)
 					continue
@@ -1534,19 +1534,19 @@ impl scopeChecker {
 					if d.IsConst() {
 						constMatched = expr.IsConst() && d.Constant.Eq(*expr.Constant)
 					} else {
-						exprCti := expr.Kind.comptimeTypeInfo()
-						constMatched = exprCti != nil && d.Kind.comptimeTypeInfo().base.Equal(exprCti.base)
+						exprCti := expr.Type.comptimeTypeInfo()
+						constMatched = exprCti != nil && d.Type.comptimeTypeInfo().base.Equal(exprCti.base)
 					}
 				}
 			}
 
 			case.Exprs = append(case.Exprs, d)
 			if !m.Comptime ||
-				expr.Kind.comptimeTypeInfo() == nil ||
-				d.Kind.comptimeTypeInfo() == nil {
+				expr.Type.comptimeTypeInfo() == nil ||
+				d.Type.comptimeTypeInfo() == nil {
 				mut checker := assignTypeChecker{
 					s: self.s,
-					dest: expr.Kind,
+					dest: expr.Type,
 					d: d,
 					errorToken: e.Token,
 					refers: self.getOwnerRefers(),
@@ -1657,16 +1657,16 @@ impl scopeChecker {
 		}
 
 		if m.Comptime {
-			mut cti := d.Kind.comptimeTypeInfo()
+			mut cti := d.Type.comptimeTypeInfo()
 			if cti == nil {
 				if !d.Decl {
 					self.s.pushErr(m.Expr.Token, build::LogMsg.InvalidComptimeTypeMatchExpr)
 					ret
 				}
 			} else {
-				d.Kind = cti.base
+				d.Type = cti.base
 			}
-		} else if d.Decl || !((d.Kind.Prim() != nil && d.Kind.Prim().IsAny()) || d.Kind.Trait() != nil || d.Kind.TypeEnum() != nil) {
+		} else if d.Decl || !((d.Type.Prim() != nil && d.Type.Prim().IsAny()) || d.Type.Trait() != nil || d.Type.TypeEnum() != nil) {
 			self.s.pushErr(m.Expr.Token, build::LogMsg.TypeCaseHasNotValidExpr)
 			ret
 		}
@@ -1698,7 +1698,7 @@ impl scopeChecker {
 		if m.Expr == nil {
 			d = &Data{
 				Constant: constant::Const.NewBool(true),
-				Kind: primBool,
+				Type: primBool,
 			}
 			d.Model = d.Constant
 		} else {
@@ -1714,7 +1714,7 @@ impl scopeChecker {
 				self.s.pushSuggestion(build::LogMsg.InvalidExprForConstMatch)
 				ret
 			}
-		} else if d.Kind.comptime() {
+		} else if d.Type.comptime() {
 			self.s.pushErr(m.Expr.Token, build::LogMsg.ExprNotConst)
 			self.s.pushSuggestion(build::LogMsg.InvalidExprForConstMatch)
 			ret
@@ -2168,20 +2168,20 @@ fn removeEqFromOp(op: token::Id): token::Id {
 // If type is not supported, d.Decl will be true.
 fn makeComptimeRange(mut &d: &Data) {
 	match {
-	| d.Kind.comptimeStructFields() != nil:
-		d.Kind = &Type{Kind: &comptimeRange{d.Kind.comptimeStructFields()}}
-	| d.Kind.comptimeEnumFields() != nil:
-		d.Kind = &Type{Kind: &comptimeRange{d.Kind.comptimeEnumFields()}}
-	| d.Kind.comptimeTypeInfos() != nil:
-		d.Kind = &Type{Kind: &comptimeRange{d.Kind.comptimeTypeInfos()}}
-	| d.Kind.comptimeParams() != nil:
-		d.Kind = &Type{Kind: &comptimeRange{d.Kind.comptimeParams()}}
-	| d.Kind.comptimeStatics() != nil:
-		d.Kind = &Type{Kind: &comptimeRange{d.Kind.comptimeStatics()}}
-	| d.Kind.comptimeFiles() != nil:
-		d.Kind = &Type{Kind: &comptimeRange{d.Kind.comptimeFiles()}}
-	| d.Kind.comptimeDecls() != nil:
-		d.Kind = &Type{Kind: &comptimeRange{d.Kind.comptimeDecls()}}
+	| d.Type.comptimeStructFields() != nil:
+		d.Type = &Type{Kind: &comptimeRange{d.Type.comptimeStructFields()}}
+	| d.Type.comptimeEnumFields() != nil:
+		d.Type = &Type{Kind: &comptimeRange{d.Type.comptimeEnumFields()}}
+	| d.Type.comptimeTypeInfos() != nil:
+		d.Type = &Type{Kind: &comptimeRange{d.Type.comptimeTypeInfos()}}
+	| d.Type.comptimeParams() != nil:
+		d.Type = &Type{Kind: &comptimeRange{d.Type.comptimeParams()}}
+	| d.Type.comptimeStatics() != nil:
+		d.Type = &Type{Kind: &comptimeRange{d.Type.comptimeStatics()}}
+	| d.Type.comptimeFiles() != nil:
+		d.Type = &Type{Kind: &comptimeRange{d.Type.comptimeFiles()}}
+	| d.Type.comptimeDecls() != nil:
+		d.Type = &Type{Kind: &comptimeRange{d.Type.comptimeDecls()}}
 	|:
 		// Flag for failure.
 		d.Decl = true
@@ -2194,7 +2194,7 @@ fn canComptimeMatch(mut &d: &Data): bool {
 	if !isGoodValueToInfer(d) {
 		ret false
 	}
-	ret d.IsConst() || d.Kind.comptimeTypeInfo() != nil
+	ret d.IsConst() || d.Type.comptimeTypeInfo() != nil
 }
 
 fn stmtIsDef(&stmt: Stmt): bool {

@@ -20,7 +20,7 @@ struct Data {
 	// Since data is constant numeric, it also implies kind is primitive.
 	untyped: bool
 
-	Kind:      &Type
+	Type:      &Type
 	Mutable:   bool
 	Reference: bool
 	Lvalue:    bool
@@ -41,12 +41,12 @@ struct Data {
 impl Data {
 	// Reports whether Data is nil literal.
 	fn IsNil(self): bool {
-		ret self.Kind.IsNil()
+		ret self.Type.IsNil()
 	}
 
 	// Reports whether Data is void.
 	fn IsVoid(self): bool {
-		ret self.Kind.Void()
+		ret self.Type.Void()
 	}
 
 	// Reports whether Data is constant expression.
@@ -59,12 +59,12 @@ impl Data {
 	// If reports false, left and right operand should be swapped.
 	// Accepts itself as left operand.
 	fn GoodOperand(self, mut &other: &Data): bool {
-		if other.Kind.TypeEnum() != nil {
+		if other.Type.TypeEnum() != nil {
 			ret false
 		}
-		ret (other.Kind.Prim() == nil || !other.Kind.Prim().IsAny()) &&
-			other.Kind.Trait() == nil &&
-			!self.Kind.IsNil()
+		ret (other.Type.Prim() == nil || !other.Type.Prim().IsAny()) &&
+			other.Type.Trait() == nil &&
+			!self.Type.IsNil()
 	}
 }
 
@@ -124,7 +124,7 @@ impl eval {
 	fn applyNumericPrefix(mut self, mut &d: &Data): bool {
 		if d == nil ||
 			!d.IsConst() ||
-			d.Kind.Prim() == nil ||
+			d.Type.Prim() == nil ||
 			self.prefix == nil {
 			ret false
 		}
@@ -135,21 +135,21 @@ impl eval {
 
 		match {
 		| types::IsFloat(prim.Str()):
-			d.Kind = new(Type, *self.prefix)
+			d.Type = new(Type, *self.prefix)
 			d.Constant.SetF64(d.Constant.AsF64())
 			d.Constant.Kind = prim.Kind
 		| types::IsSigInt(prim.Str()):
 			if !sigAssignable(prim.Str(), d) {
 				ret false
 			}
-			d.Kind = new(Type, *self.prefix)
+			d.Type = new(Type, *self.prefix)
 			d.Constant.SetI64(d.Constant.AsI64())
 			d.Constant.Kind = prim.Kind
 		| types::IsUnsigInt(prim.Str()):
 			if !unsigAssignable(prim.Str(), d) {
 				ret false
 			}
-			d.Kind = new(Type, *self.prefix)
+			d.Type = new(Type, *self.prefix)
 			d.Constant.SetU64(d.Constant.AsU64())
 			d.Constant.Kind = prim.Kind
 		}
@@ -168,7 +168,7 @@ impl eval {
 		ret &Data{
 			Mutable: true,
 			Constant: constant,
-			Kind: primStr,
+			Type: primStr,
 			Model: constant,
 		}
 	}
@@ -180,9 +180,9 @@ impl eval {
 		}
 
 		if r <= 255 {
-			data.Kind = primU8 // Byte
+			data.Type = primU8 // Byte
 		} else {
-			data.Kind = primI32 // Rune
+			data.Type = primI32 // Rune
 		}
 
 		data.Model = &RuneExprModel{Code: r}
@@ -199,7 +199,7 @@ impl eval {
 			untyped: true,
 			Mutable: true,
 			Constant: constant,
-			Kind: primF64,
+			Type: primF64,
 			Model: constant,
 		}
 	}
@@ -237,7 +237,7 @@ impl eval {
 		}
 		if ok {
 			d.Constant = constant::Const.NewI64(sig)
-			d.Kind = primInt
+			d.Type = primInt
 		} else {
 			unsig := conv::ParseUint(lit, base, BitSize) else {
 				self.pushErr(l.Token, build::LogMsg.InvalidNumericRange)
@@ -245,7 +245,7 @@ impl eval {
 				use u64.Max
 			}
 			d.Constant = constant::Const.NewU64(unsig)
-			d.Kind = primUint
+			d.Type = primUint
 		}
 
 		d.Model = d.Constant
@@ -376,7 +376,7 @@ impl eval {
 	fn _evalEnum(self, mut enm: &Enum): &Data {
 		ret &Data{
 			Decl: true,
-			Kind: &Type{
+			Type: &Type{
 				Kind: enm,
 			},
 		}
@@ -394,7 +394,7 @@ impl eval {
 	fn _evalTypeEnum(self, mut enm: &TypeEnum): &Data {
 		ret &Data{
 			Decl: true,
-			Kind: &Type{
+			Type: &Type{
 				Kind: enm,
 			},
 		}
@@ -412,13 +412,13 @@ impl eval {
 	fn _evalStruct(self, mut s: &StructIns): &Data {
 		mut d := &Data{
 			Decl: true,
-			Kind: &Type{
+			Type: &Type{
 				Kind: s,
 			},
 			Model: s,
 		}
 		if s.Decl != nil && s.Decl.Binded {
-			d.Kind.BindIdent = s.Decl.Ident
+			d.Type.BindIdent = s.Decl.Ident
 		}
 		ret d
 	}
@@ -454,7 +454,7 @@ impl eval {
 
 	fn evalFnIns(self, mut f: &FnIns): &Data {
 		ret &Data{
-			Kind: &Type{
+			Type: &Type{
 				Kind: f,
 			},
 			Model: f,
@@ -637,7 +637,7 @@ impl eval {
 			Lvalue: !v.Constant,
 			Mutable: v.Mutable,
 			Reference: v.Reference,
-			Kind: v.TypeSym.Type,
+			Type: v.TypeSym.Type,
 			Model: v,
 		}
 		if v.Value != nil && v.Value.Data != nil {
@@ -681,18 +681,18 @@ impl eval {
 		|:
 			d = &Data{
 				Decl: true,
-				Kind: &Type{
+				Type: &Type{
 					Kind: ta.TypeSym.Type.Kind,
 				},
 			}
 			if ta.Binded {
-				d.Kind.BindIdent = ta.Ident
+				d.Type.BindIdent = ta.Ident
 			} else {
-				d.Kind.BindIdent = ta.TypeSym.Type.BindIdent
+				d.Type.BindIdent = ta.TypeSym.Type.BindIdent
 			}
-			d.Model = d.Kind
+			d.Model = d.Type
 		}
-		d.Kind.Generic = ta.Generic
+		d.Type.Generic = ta.Generic
 		ret d
 	}
 
@@ -744,11 +744,11 @@ impl eval {
 		if d == nil {
 			ret nil
 		}
-		if !d.Kind.Variadicable() {
-			self.pushErr(v.Token, build::LogMsg.VariadicWithNonVariadicable, d.Kind.Str())
+		if !d.Type.Variadicable() {
+			self.pushErr(v.Token, build::LogMsg.VariadicWithNonVariadicable, d.Type.Str())
 			ret nil
 		}
-		makeVariadic(d, d.Kind.Slc().Elem)
+		makeVariadic(d, d.Type.Slc().Elem)
 		ret d
 	}
 
@@ -830,7 +830,7 @@ impl eval {
 
 		ret &Data{
 			Mutable: true,
-			Kind: &Type{
+			Type: &Type{
 				Kind: arr,
 			},
 			Model: model,
@@ -868,7 +868,7 @@ impl eval {
 
 		ret &Data{
 			Mutable: true,
-			Kind: &Type{
+			Type: &Type{
 				Kind: slc,
 			},
 			Model: model,
@@ -903,9 +903,9 @@ impl eval {
 		// Check mutability for first element.
 		const destIsRef = false
 		self.s.checkValidityForInitExpr(!self.immutable, destIsRef,
-			firstElem.Kind, firstElem, firstExpr.Token)
+			firstElem.Type, firstElem, firstExpr.Token)
 
-		mut d := self.evalExpSlc(s, firstElem.Kind, firstElem.Model)
+		mut d := self.evalExpSlc(s, firstElem.Type, firstElem.Model)
 
 		self.prefix = prefix
 		ret d
@@ -917,7 +917,7 @@ impl eval {
 		| build::LogMsg.Empty:
 			ret true
 		| build::LogMsg.InvalidTypeForIndexing:
-			self.pushErr(token, errKey, d.Kind.Str())
+			self.pushErr(token, errKey, d.Type.Str())
 		|:
 			self.pushErr(token, errKey)
 		}
@@ -928,7 +928,7 @@ impl eval {
 		self.checkIntegerIndexingByData(index, i.Token)
 		d.Lvalue = true
 
-		mut ptr := d.Kind.Ptr()
+		mut ptr := d.Type.Ptr()
 		match {
 		| ptr.IsUnsafe():
 			self.pushErr(i.Token, build::LogMsg.UnsafePtrIndexing)
@@ -937,12 +937,12 @@ impl eval {
 			self.pushErr(i.Token, build::LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
 		}
 
-		d.Kind = ptr.Elem
+		d.Type = ptr.Elem
 	}
 
 	fn indexingArr(mut self, mut &d: &Data, mut &index: &Data, mut &i: &ast::IndexingExpr) {
-		mut arr := d.Kind.Arr()
-		d.Kind = arr.Elem
+		mut arr := d.Type.Arr()
+		d.Type = arr.Elem
 		self.checkIntegerIndexingByData(index, i.Token)
 		d.Lvalue = true
 		if index.IsConst() && index.Constant.AsF64() >= f64(arr.N) {
@@ -951,8 +951,8 @@ impl eval {
 	}
 
 	fn indexingSlc(mut self, mut &d: &Data, mut &index: &Data, mut &i: &ast::IndexingExpr) {
-		mut slc := d.Kind.Slc()
-		d.Kind = slc.Elem
+		mut slc := d.Type.Slc()
+		d.Type = slc.Elem
 		self.checkIntegerIndexingByData(index, i.Token)
 		d.Lvalue = true
 
@@ -978,7 +978,7 @@ impl eval {
 		if index == nil {
 			ret
 		}
-		mut m := d.Kind.Map()
+		mut m := d.Type.Map()
 		mut atc := assignTypeChecker{
 			s: self.s,
 			dest: m.Key,
@@ -987,11 +987,11 @@ impl eval {
 			refers: self.getOwnerRefers(),
 		}
 		_ = atc.check()
-		d.Kind = m.Val
+		d.Type = m.Val
 	}
 
 	fn indexingStr(mut self, mut &d: &Data, mut &index: &Data, mut &i: &ast::IndexingExpr) {
-		d.Kind = primU8 // Byte
+		d.Type = primU8 // Byte
 		d.Mutable = false
 		d.Lvalue = true
 
@@ -1034,7 +1034,7 @@ impl eval {
 		}
 		// guaranteed: index >= 0
 		j := int(index.Constant.AsI64())
-		mut ci := d.Kind.comptimeRange()
+		mut ci := d.Type.comptimeRange()
 		if j >= ci.kind.len() {
 			d = nil
 			self.pushErr(i.Index.Token, build::LogMsg.OverflowLimits)
@@ -1045,30 +1045,30 @@ impl eval {
 
 	fn toIndexing(mut self, mut &d: &Data, mut &index: &Data, mut &i: &ast::IndexingExpr) {
 		match {
-		| d.Kind.Ptr() != nil:
+		| d.Type.Ptr() != nil:
 			self.indexingPtr(d, index, i)
 			ret
-		| d.Kind.Arr() != nil:
+		| d.Type.Arr() != nil:
 			self.indexingArr(d, index, i)
 			ret
-		| d.Kind.Slc() != nil:
+		| d.Type.Slc() != nil:
 			self.indexingSlc(d, index, i)
 			ret
-		| d.Kind.Map() != nil:
+		| d.Type.Map() != nil:
 			self.indexingMap(d, index, i)
 			ret
-		| d.Kind.Prim() != nil:
-			prim := d.Kind.Prim()
+		| d.Type.Prim() != nil:
+			prim := d.Type.Prim()
 			match {
 			| prim.IsStr():
 				self.indexingStr(d, index, i)
 				ret
 			}
-		| d.Kind.comptimeRange() != nil:
+		| d.Type.comptimeRange() != nil:
 			self.comptimeRange(d, index, i)
 			ret
 		}
-		self.pushErr(i.Token, build::LogMsg.NotSupportsIndexing, d.Kind.Str())
+		self.pushErr(i.Token, build::LogMsg.NotSupportsIndexing, d.Type.Str())
 	}
 
 	fn pushGenericsFromExprSubIdent(mut &self, mut &sexpr: &ast::SubIdentExpr,
@@ -1153,9 +1153,9 @@ impl eval {
 	}
 
 	fn evalIdentDeclFromIndexing(mut &self, mut &d: &Data, mut &i: &ast::IndexingExpr) {
-		mut s := d.Kind.Struct()
+		mut s := d.Type.Struct()
 		if s == nil {
-			self.pushErr(i.Expr.Token, build::LogMsg.TypeNotSupportsGenerics, d.Kind.Str())
+			self.pushErr(i.Expr.Token, build::LogMsg.TypeNotSupportsGenerics, d.Type.Str())
 			d = nil
 			ret
 		}
@@ -1190,7 +1190,7 @@ impl eval {
 			d = nil
 			ret
 		}
-		d.Kind.Kind = s
+		d.Type.Kind = s
 	}
 
 	// Checks new generics function instance.
@@ -1218,7 +1218,7 @@ impl eval {
 			ret
 		}
 
-		mut f := d.Kind.Fn()
+		mut f := d.Type.Fn()
 		mut genericsLen := 0
 		if f.Decl != nil {
 			genericsLen = len(f.Decl.Generics)
@@ -1236,7 +1236,7 @@ impl eval {
 				d = nil
 				ret
 			}
-			f.Generics = append(f.Generics, &InsGeneric{Kind: k.Kind})
+			f.Generics = append(f.Generics, &InsGeneric{Kind: k.Type})
 		}
 
 		if f.IsBuiltin() {
@@ -1245,7 +1245,7 @@ impl eval {
 
 		ok, _ := self.checkGenericFn(f, i.Expr.Token, d.Model)
 		if ok {
-			d.Kind.Kind = f
+			d.Type.Kind = f
 		} else {
 			d = nil
 		}
@@ -1267,7 +1267,7 @@ impl eval {
 			ret d
 		}
 
-		if d.Kind.Fn() != nil {
+		if d.Type.Fn() != nil {
 			self.evalFnGenericFromIndexing(d, i)
 			ret d
 		}
@@ -1329,7 +1329,7 @@ impl eval {
 		} else {
 			l = &Data{
 				Constant: constant::Const.NewI64(0),
-				Kind: primInt,
+				Type: primInt,
 			}
 			l.Constant.Kind = types::Kind.Int
 			l.Model = l.Constant
@@ -1348,8 +1348,8 @@ impl eval {
 	}
 
 	fn slicingArr(self, mut &d: &Data) {
-		mut elemType := d.Kind.Arr().Elem
-		d.Kind = &Type{
+		mut elemType := d.Type.Arr().Elem
+		d.Type = &Type{
 			Kind: &Slc{
 				Elem: elemType,
 			},
@@ -1402,13 +1402,13 @@ impl eval {
 
 	fn checkSlicing(mut self, mut &d: &Data, &l: &Data, &r: &Data, &s: &ast::SlicingExpr) {
 		match {
-		| d.Kind.Arr() != nil:
+		| d.Type.Arr() != nil:
 			self.slicingArr(d)
 			ret
-		| d.Kind.Slc() != nil:
+		| d.Type.Slc() != nil:
 			ret
-		| d.Kind.Prim() != nil:
-			prim := d.Kind.Prim()
+		| d.Type.Prim() != nil:
+			prim := d.Type.Prim()
 			match {
 			| prim.IsStr():
 				self.slicingStr(d, l, r)
@@ -1416,7 +1416,7 @@ impl eval {
 			}
 		}
 
-		self.pushErr(s.Token, build::LogMsg.NotSupportsSlicing, d.Kind.Str())
+		self.pushErr(s.Token, build::LogMsg.NotSupportsSlicing, d.Type.Str())
 	}
 
 	fn evalSlicing(mut &self, mut s: &ast::SlicingExpr): &Data {
@@ -1459,10 +1459,10 @@ impl eval {
 	fn castPtr(mut self, mut t: &Type, mut d: &Data, errorToken: &token::Token) {
 		d.Constant = nil
 		d.untyped = false
-		sptr := d.Kind.Sptr()
+		sptr := d.Type.Sptr()
 		if sptr != nil {
 			if !t.Ptr().Elem.Equal(sptr.Elem) {
-				self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, d.Kind.Str(), t.Str())
+				self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, d.Type.Str(), t.Str())
 			}
 			ret
 		}
@@ -1472,18 +1472,18 @@ impl eval {
 			ret
 		}
 
-		prim := d.Kind.Prim()
-		if d.Kind.Ptr() == nil && (prim == nil || !types::IsInt(prim.Str())) {
-			self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, d.Kind.Str(), t.Str())
+		prim := d.Type.Prim()
+		if d.Type.Ptr() == nil && (prim == nil || !types::IsInt(prim.Str())) {
+			self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, d.Type.Str(), t.Str())
 		}
 	}
 
 	fn castStruct(mut self, mut t: &Type, mut d: &Data, errorToken: &token::Token) {
 		d.Constant = nil
 		d.untyped = false
-		mut tr := d.Kind.Trait()
+		mut tr := d.Type.Trait()
 		if tr == nil {
-			self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, d.Kind.Str(), t.Str())
+			self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, d.Type.Str(), t.Str())
 			ret
 		}
 
@@ -1491,7 +1491,7 @@ impl eval {
 		self.pushReference[&StructIns](s)
 
 		if !s.Decl.IsImplements(tr) {
-			self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, d.Kind.Str(), t.Str())
+			self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, d.Type.Str(), t.Str())
 		}
 	}
 
@@ -1500,7 +1500,7 @@ impl eval {
 		d.untyped = false
 		mut sptr := t.Sptr()
 
-		mut ptr := d.Kind.Ptr()
+		mut ptr := d.Type.Ptr()
 		if ptr != nil && sptr.Elem.Equal(ptr.Elem) {
 			if !self.isUnsafe() {
 				self.pushErr(errorToken, build::LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
@@ -1515,7 +1515,7 @@ impl eval {
 			ret
 		}
 
-		self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, d.Kind.Str(), t.Str())
+		self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, d.Type.Str(), t.Str())
 	}
 
 	fn castSlc(mut self, mut t: &Type, mut d: &Data, errorToken: &token::Token) {
@@ -1523,20 +1523,20 @@ impl eval {
 		d.Constant = nil
 		d.untyped = false
 
-		if d.Kind.Enum() != nil {
-			if d.Kind.Enum().TypeSym.Type.Prim() == nil || !d.Kind.Enum().TypeSym.Type.Prim().IsStr() {
-				self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, d.Kind.Str(), t.Str())
+		if d.Type.Enum() != nil {
+			if d.Type.Enum().TypeSym.Type.Prim() == nil || !d.Type.Enum().TypeSym.Type.Prim().IsStr() {
+				self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, d.Type.Str(), t.Str())
 				ret
 			}
-		} else if d.Kind.Prim() == nil || !d.Kind.Prim().IsStr() {
-			self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, d.Kind.Str(), t.Str())
+		} else if d.Type.Prim() == nil || !d.Type.Prim().IsStr() {
+			self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, d.Type.Str(), t.Str())
 			ret
 		}
 
 		t = t.Slc().Elem
 		prim := t.Prim()
 		if prim == nil || (!prim.IsU8() && !prim.IsI32()) {
-			self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, d.Kind.Str(), t.Str())
+			self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, d.Type.Str(), t.Str())
 			ret
 		}
 
@@ -1574,8 +1574,8 @@ impl eval {
 	}
 
 	fn castStr(mut self, mut d: &Data, errorToken: &token::Token) {
-		if d.Kind.Enum() != nil {
-			mut e := d.Kind.Enum()
+		if d.Type.Enum() != nil {
+			mut e := d.Type.Enum()
 			if e.TypeSym.Type.Prim() != nil && e.TypeSym.Type.Prim().IsStr() {
 				ret
 			}
@@ -1584,10 +1584,10 @@ impl eval {
 		c := d.Constant
 		d.Constant = nil
 		d.untyped = false
-		if d.Kind.Prim() != nil {
-			prim := d.Kind.Prim()
+		if d.Type.Prim() != nil {
+			prim := d.Type.Prim()
 			if !prim.IsU8() && !prim.IsI32() {
-				self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, types::Kind.Str, d.Kind.Str())
+				self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, types::Kind.Str, d.Type.Str())
 				ret
 			}
 			// Cast constant expressions.
@@ -1606,16 +1606,16 @@ impl eval {
 			ret
 		}
 
-		mut s := d.Kind.Slc()
+		mut s := d.Type.Slc()
 		if s == nil {
-			self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, types::Kind.Str, d.Kind.Str())
+			self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, types::Kind.Str, d.Type.Str())
 			ret
 		}
 
 		mut t := s.Elem
 		prim := t.Prim()
 		if prim == nil || (!prim.IsU8() && !prim.IsI32()) {
-			self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, types::Kind.Str, d.Kind.Str())
+			self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, types::Kind.Str, d.Type.Str())
 			ret
 		}
 	}
@@ -1634,21 +1634,21 @@ impl eval {
 			d.untyped = false
 		}
 
-		if d.Kind.Enum() != nil {
-			e := d.Kind.Enum()
+		if d.Type.Enum() != nil {
+			e := d.Type.Enum()
 			if types::IsNum(e.TypeSym.Type.Str()) {
 				ret
 			}
 		}
 
-		if d.Kind.Sptr() != nil {
+		if d.Type.Sptr() != nil {
 			prim := t.Prim()
 			if !prim.IsUintptr() {
-				self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, d.Kind.Str(), t.Str())
+				self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, d.Type.Str(), t.Str())
 			}
 			ret
 		}
-		if d.Kind.Ptr() != nil {
+		if d.Type.Ptr() != nil {
 			prim := t.Prim()
 			if prim.IsUintptr() {
 				// Ignore case.
@@ -1658,12 +1658,12 @@ impl eval {
 			ret
 		}
 
-		prim := d.Kind.Prim()
+		prim := d.Type.Prim()
 		if prim != nil && types::IsNum(prim.Str()) {
 			ret
 		}
 
-		self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, d.Kind.Str(), t.Str())
+		self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, d.Type.Str(), t.Str())
 	}
 
 	fn castNum(mut self, mut t: &Type, mut d: &Data, errorToken: &token::Token) {
@@ -1682,19 +1682,19 @@ impl eval {
 			d.untyped = false
 		}
 
-		if d.Kind.Enum() != nil {
-			e := d.Kind.Enum()
+		if d.Type.Enum() != nil {
+			e := d.Type.Enum()
 			if types::IsNum(e.TypeSym.Type.Str()) {
 				ret
 			}
 		}
 
-		prim := d.Kind.Prim()
+		prim := d.Type.Prim()
 		if prim != nil && types::IsNum(prim.Str()) {
 			ret
 		}
 
-		self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, d.Kind.Str(), t.Str())
+		self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, d.Type.Str(), t.Str())
 	}
 
 	fn castPrim(mut self, mut t: &Type, mut d: &Data, errorToken: &token::Token) {
@@ -1724,9 +1724,9 @@ impl eval {
 
 	fn castTypeEnum(mut self, mut &t: &Type, mut &d: &Data, mut &errorToken: &token::Token) {
 		n := len(self.s.errors)
-		if !self.s.checkTypeCompatibility(d.Kind, t, errorToken) {
+		if !self.s.checkTypeCompatibility(d.Type, t, errorToken) {
 			self.s.errors = self.s.errors[:n]
-			self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, d.Kind.Str(), t.Str())
+			self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, d.Type.Str(), t.Str())
 		}
 		d.Constant = nil
 		d.untyped = false
@@ -1734,9 +1734,9 @@ impl eval {
 
 	fn castTypeEnumT(mut self, mut &t: &Type, mut &d: &Data, mut &errorToken: &token::Token) {
 		n := len(self.s.errors)
-		if !self.s.checkTypeCompatibility(t, d.Kind, errorToken) {
+		if !self.s.checkTypeCompatibility(t, d.Type, errorToken) {
 			self.s.errors = self.s.errors[:n]
-			self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, d.Kind.Str(), t.Str())
+			self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, d.Type.Str(), t.Str())
 		}
 		d.Constant = nil
 		d.untyped = false
@@ -1755,7 +1755,7 @@ impl eval {
 			}
 			d.Constant = nil // Remove nil constant.
 			d.untyped = false
-		| d.Kind.Prim() != nil && d.Kind.Prim().IsAny():
+		| d.Type.Prim() != nil && d.Type.Prim().IsAny():
 			if t.Enum() != nil {
 				self.pushErr(errorToken, build::LogMsg.EnumCastedFromAny)
 				self.pushSuggestion(build::LogMsg.CastToEnumTypeInsteadOfEnum)
@@ -1768,7 +1768,7 @@ impl eval {
 			// The any type supports casting to any data type.
 			d.Constant = nil
 			d.untyped = false
-		| d.Kind.TypeEnum() != nil:
+		| d.Type.TypeEnum() != nil:
 			self.castTypeEnum(t, d, errorToken)
 		| t.TypeEnum() != nil:
 			self.castTypeEnumT(t, d, errorToken)
@@ -1794,13 +1794,13 @@ impl eval {
 
 		// Keep mutability if data is already mutable.
 		// Even if the data is not mutable, set as mutable if the type is not mutable-type.
-		d.Mutable = d.Mutable || !d.Kind.Mutable()
+		d.Mutable = d.Mutable || !d.Type.Mutable()
 
-		if !d.Decl && (d.Kind.Enum() == nil || !d.Kind.Enum().TypeSym.Type.Equal(t)) {
+		if !d.Decl && (d.Type.Enum() == nil || !d.Type.Enum().TypeSym.Type.Equal(t)) {
 			applyCastKind(self.s, d, t, errorToken, self.getOwnerRefers())
 			(&CastingExprModel)(d.Model).Token = errorToken
 		} else {
-			d.Kind = t
+			d.Type = t
 		}
 
 		// Remove flag.
@@ -1891,7 +1891,7 @@ impl eval {
 
 		mut d := &Data{
 			Mutable: !self.immutable,
-			Kind: &Type{
+			Type: &Type{
 				Kind: s,
 			},
 			Model: &StructLitExprModel{
@@ -1900,7 +1900,7 @@ impl eval {
 			},
 		}
 		if s.Decl.Binded {
-			d.Kind.BindIdent = s.Decl.Ident
+			d.Type.BindIdent = s.Decl.Ident
 		}
 		ret d
 	}
@@ -1945,7 +1945,7 @@ impl eval {
 		}
 		ret &Data{
 			Decl: true,
-			Kind: tk.Type,
+			Type: tk.Type,
 			Model: tk.Type,
 		}
 	}
@@ -1954,7 +1954,7 @@ impl eval {
 		if len(fc.Args) < 1 {
 			self.pushErr(fc.Token, build::LogMsg.MissingExprFor, "v")
 		} else if len(fc.Args) > 1 {
-			self.pushErr(fc.Args[1].Token, build::LogMsg.ArgumentOverflow, d.Kind.Str())
+			self.pushErr(fc.Args[1].Token, build::LogMsg.ArgumentOverflow, d.Type.Str())
 		} else if fc.IsCo {
 			self.pushErr(fc.Token, build::LogMsg.CoForCastingCall)
 			d = nil
@@ -1967,7 +1967,7 @@ impl eval {
 
 		if len(fc.Args) > 0 {
 			mut arg := fc.Args[0]
-			d = self.evalCastT(d.Kind, arg, arg.Token)
+			d = self.evalCastT(d.Type, arg, arg.Token)
 			ret
 		}
 
@@ -1981,7 +1981,7 @@ impl eval {
 			// Built-in functions are not exceptional.
 			self.pushErr(fc.Token, build::LogMsg.HandledUnexceptional)
 		}
-		d = d.Kind.Fn().caller(self, fc, d)
+		d = d.Type.Fn().caller(self, fc, d)
 		if d == nil {
 			ret
 		}
@@ -2035,7 +2035,7 @@ impl eval {
 	}
 
 	fn callFn(mut &self, mut &fc: &ast::FnCallExpr, mut &d: &Data) {
-		mut f := d.Kind.Fn()
+		mut f := d.Type.Fn()
 		if f.IsBuiltin() {
 			self.callBuiltinFn(fc, d)
 			ret
@@ -2142,7 +2142,7 @@ impl eval {
 		if f.Decl.IsVoid() {
 			d = buildVoidData()
 		} else {
-			d.Kind = f.Result
+			d.Type = f.Result
 			d.Lvalue = false
 		}
 
@@ -2207,7 +2207,7 @@ impl eval {
 			ret d
 		}
 
-		if d.Kind.Fn() == nil {
+		if d.Type.Fn() == nil {
 			self.pushErr(fc.Token, build::LogMsg.CallingNonFn)
 			ret nil
 		}
@@ -2240,9 +2240,9 @@ impl eval {
 		|:
 			mut d := &Data{
 				Decl: true,
-				Kind: item.TypeSym.Type,
+				Type: item.TypeSym.Type,
 			}
-			d.Model = d.Kind
+			d.Model = d.Type
 			ret d
 		}
 	}
@@ -2267,7 +2267,7 @@ impl eval {
 				Expr: d.Model,
 				Method: ins,
 			}
-			d.Kind = &Type{
+			d.Type = &Type{
 				Kind: ins,
 			}
 			ret d
@@ -2290,7 +2290,7 @@ impl eval {
 		}
 		ret &Data{
 			Mutable: d.Mutable,
-			Kind: &Type{
+			Type: &Type{
 				Kind: f.instance(),
 			},
 			Model: &TraitSubIdentExprModel{
@@ -2312,7 +2312,7 @@ impl eval {
 			Owner: s,
 		}
 		d.Model = model
-		d.Kind = f.Kind
+		d.Type = f.Kind
 		d.Lvalue = true
 		if f.Decl.Mutable && !d.Mutable {
 			// Interior mutability.
@@ -2346,7 +2346,7 @@ impl eval {
 			Method: ins,
 			Owner: s,
 		}
-		d.Kind = &Type{Kind: ins}
+		d.Type = &Type{Kind: ins}
 		ret d
 	}
 
@@ -2383,7 +2383,7 @@ impl eval {
 			ret &Data{
 				Constant: c,
 				Model: c,
-				Kind: primInt,
+				Type: primInt,
 				untyped: true,
 			}
 		| "Min":
@@ -2392,7 +2392,7 @@ impl eval {
 			ret &Data{
 				Constant: c,
 				Model: c,
-				Kind: primInt,
+				Type: primInt,
 				untyped: true,
 			}
 		|:
@@ -2410,7 +2410,7 @@ impl eval {
 			ret &Data{
 				Constant: c,
 				Model: c,
-				Kind: primUint,
+				Type: primUint,
 				untyped: true,
 			}
 		|:
@@ -2430,7 +2430,7 @@ impl eval {
 			ret &Data{
 				Constant: c,
 				Model: c,
-				Kind: primI8,
+				Type: primI8,
 				untyped: true,
 			}
 		| "Min":
@@ -2439,7 +2439,7 @@ impl eval {
 			ret &Data{
 				Constant: c,
 				Model: c,
-				Kind: primI8,
+				Type: primI8,
 				untyped: true,
 			}
 		|:
@@ -2459,7 +2459,7 @@ impl eval {
 			ret &Data{
 				Constant: c,
 				Model: c,
-				Kind: primI16,
+				Type: primI16,
 				untyped: true,
 			}
 		| "Min":
@@ -2468,7 +2468,7 @@ impl eval {
 			ret &Data{
 				Constant: c,
 				Model: c,
-				Kind: primI16,
+				Type: primI16,
 				untyped: true,
 			}
 		|:
@@ -2488,7 +2488,7 @@ impl eval {
 			ret &Data{
 				Constant: c,
 				Model: c,
-				Kind: primI32,
+				Type: primI32,
 				untyped: true,
 			}
 		| "Min":
@@ -2497,7 +2497,7 @@ impl eval {
 			ret &Data{
 				Constant: c,
 				Model: c,
-				Kind: primI32,
+				Type: primI32,
 				untyped: true,
 			}
 		|:
@@ -2517,7 +2517,7 @@ impl eval {
 			ret &Data{
 				Constant: c,
 				Model: c,
-				Kind: primI64,
+				Type: primI64,
 				untyped: true,
 			}
 		| "Min":
@@ -2526,7 +2526,7 @@ impl eval {
 			ret &Data{
 				Constant: c,
 				Model: c,
-				Kind: primI64,
+				Type: primI64,
 				untyped: true,
 			}
 		|:
@@ -2545,7 +2545,7 @@ impl eval {
 			ret &Data{
 				Constant: c,
 				Model: c,
-				Kind: primU8,
+				Type: primU8,
 				untyped: true,
 			}
 		|:
@@ -2564,7 +2564,7 @@ impl eval {
 			ret &Data{
 				Constant: c,
 				Model: c,
-				Kind: primU16,
+				Type: primU16,
 				untyped: true,
 			}
 		|:
@@ -2583,7 +2583,7 @@ impl eval {
 			ret &Data{
 				Constant: c,
 				Model: c,
-				Kind: primU32,
+				Type: primU32,
 				untyped: true,
 			}
 		|:
@@ -2602,7 +2602,7 @@ impl eval {
 			ret &Data{
 				Constant: c,
 				Model: c,
-				Kind: primU64,
+				Type: primU64,
 				untyped: true,
 			}
 		|:
@@ -2623,7 +2623,7 @@ impl eval {
 			ret &Data{
 				Constant: c,
 				Model: c,
-				Kind: primF32,
+				Type: primF32,
 				untyped: true,
 			}
 		| "Min":
@@ -2632,7 +2632,7 @@ impl eval {
 			ret &Data{
 				Constant: c,
 				Model: c,
-				Kind: primF32,
+				Type: primF32,
 				untyped: true,
 			}
 		| "SmallestNonZero":
@@ -2641,7 +2641,7 @@ impl eval {
 			ret &Data{
 				Constant: c,
 				Model: c,
-				Kind: primF32,
+				Type: primF32,
 				untyped: true,
 			}
 		|:
@@ -2662,7 +2662,7 @@ impl eval {
 			ret &Data{
 				Constant: c,
 				Model: c,
-				Kind: primF64,
+				Type: primF64,
 				untyped: true,
 			}
 		| "Min":
@@ -2671,7 +2671,7 @@ impl eval {
 			ret &Data{
 				Constant: c,
 				Model: c,
-				Kind: primF64,
+				Type: primF64,
 				untyped: true,
 			}
 		| "SmallestNonZero":
@@ -2680,7 +2680,7 @@ impl eval {
 			ret &Data{
 				Constant: c,
 				Model: c,
-				Kind: primF64,
+				Type: primF64,
 				untyped: true,
 			}
 		|:
@@ -2723,16 +2723,16 @@ impl eval {
 
 	fn evalTypeStatic(mut self, mut d: &Data, mut si: &ast::SubIdentExpr): &Data {
 		match {
-		| d.Kind.Prim() != nil:
-			ret self.evalPrimStatic(d.Kind.Prim().Str(), si.Ident)
-		| d.Kind.Enum() != nil:
-			ret self.evalEnumStatic(d.Kind.Enum(), si.Ident)
-		| d.Kind.TypeEnum() != nil:
-			ret self.evalTypeEnumStatic(d.Kind.TypeEnum(), si.Ident)
-		| d.Kind.Struct() != nil:
-			ret self.evalStructStatic(d.Kind.Struct(), si.Ident)
+		| d.Type.Prim() != nil:
+			ret self.evalPrimStatic(d.Type.Prim().Str(), si.Ident)
+		| d.Type.Enum() != nil:
+			ret self.evalEnumStatic(d.Type.Enum(), si.Ident)
+		| d.Type.TypeEnum() != nil:
+			ret self.evalTypeEnumStatic(d.Type.TypeEnum(), si.Ident)
+		| d.Type.Struct() != nil:
+			ret self.evalStructStatic(d.Type.Struct(), si.Ident)
 		|:
-			self.pushErr(si.Ident, build::LogMsg.TypeNotSupportSubFields, d.Kind.Str())
+			self.pushErr(si.Ident, build::LogMsg.TypeNotSupportSubFields, d.Type.Str())
 			ret nil
 		}
 	}
@@ -2740,36 +2740,36 @@ impl eval {
 	fn comptimeObjSubIdent[ComptimeType](mut self, mut &ct: &ComptimeType, &d: &Data, &si: &ast::SubIdentExpr): &Data {
 		mut cd := ct.subIdent(si.Ident.Kind)
 		if cd == nil {
-			self.pushErr(si.Ident, build::LogMsg.ObjHaveNotIdent, d.Kind.Str(), si.Ident.Kind)
+			self.pushErr(si.Ident, build::LogMsg.ObjHaveNotIdent, d.Type.Str(), si.Ident.Kind)
 		}
 		ret cd
 	}
 
 	fn tryComptimeObjSubIdent(mut self, mut &d: &Data, mut si: &ast::SubIdentExpr): (&Data, bool) {
 		match {
-		| d.Kind.comptimeTypeInfo() != nil:
-			mut ct := d.Kind.comptimeTypeInfo()
+		| d.Type.comptimeTypeInfo() != nil:
+			mut ct := d.Type.comptimeTypeInfo()
 			ret self.comptimeObjSubIdent(ct, d, si), true
-		| d.Kind.comptimeStructField() != nil:
-			mut ct := d.Kind.comptimeStructField()
+		| d.Type.comptimeStructField() != nil:
+			mut ct := d.Type.comptimeStructField()
 			ret self.comptimeObjSubIdent(ct, d, si), true
-		| d.Kind.comptimeEnumField() != nil:
-			mut ct := d.Kind.comptimeEnumField()
+		| d.Type.comptimeEnumField() != nil:
+			mut ct := d.Type.comptimeEnumField()
 			ret self.comptimeObjSubIdent(ct, d, si), true
-		| d.Kind.comptimeParam() != nil:
-			mut ct := d.Kind.comptimeParam()
+		| d.Type.comptimeParam() != nil:
+			mut ct := d.Type.comptimeParam()
 			ret self.comptimeObjSubIdent(ct, d, si), true
-		| d.Kind.comptimeStatic() != nil:
-			mut ct := d.Kind.comptimeStatic()
+		| d.Type.comptimeStatic() != nil:
+			mut ct := d.Type.comptimeStatic()
 			ret self.comptimeObjSubIdent(ct, d, si), true
-		| d.Kind.comptimeValue() != nil:
-			mut ct := d.Kind.comptimeValue()
+		| d.Type.comptimeValue() != nil:
+			mut ct := d.Type.comptimeValue()
 			ret self.comptimeObjSubIdent(ct, d, si), true
-		| d.Kind.comptimeFile() != nil:
-			mut ct := d.Kind.comptimeFile()
+		| d.Type.comptimeFile() != nil:
+			mut ct := d.Type.comptimeFile()
 			ret self.comptimeObjSubIdent(ct, d, si), true
-		| d.Kind.comptimeDecl() != nil:
-			mut ct := d.Kind.comptimeDecl()
+		| d.Type.comptimeDecl() != nil:
+			mut ct := d.Type.comptimeDecl()
 			ret self.comptimeObjSubIdent(ct, d, si), true
 		|:
 			ret nil, false
@@ -2789,34 +2789,34 @@ impl eval {
 			}
 		}
 
-		mut kind := d.Kind
+		mut kind := d.Type
 		match {
-		| d.Kind.Ptr() != nil:
-			ptr := d.Kind.Ptr()
+		| d.Type.Ptr() != nil:
+			ptr := d.Type.Ptr()
 			if ptr.IsUnsafe() {
 				break
 			}
 			if !self.isUnsafe() {
 				self.pushErr(si.Ident, build::LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
 			}
-			kind = d.Kind.Ptr().Elem
+			kind = d.Type.Ptr().Elem
 			makeImplicitDeref(d, si.Ident)
-		| d.Kind.Sptr() != nil:
-			kind = d.Kind.Sptr().Elem
+		| d.Type.Sptr() != nil:
+			kind = d.Type.Sptr().Elem
 			makeImplicitDeref(d, si.Ident)
 		}
 
 		match {
-		| d.Kind.Trait() != nil:
-			ret self.evalTraitSubIdent(d, d.Kind.Trait(), si.Ident)
+		| d.Type.Trait() != nil:
+			ret self.evalTraitSubIdent(d, d.Type.Trait(), si.Ident)
 		| kind.Struct() != nil:
 			s := kind.Struct()
 			if isInstancedStruct(s) {
-				mut usedReferenceElem := d.Kind.Sptr() != nil
+				mut usedReferenceElem := d.Type.Sptr() != nil
 				ret self.evalStructSubIdent(d, kind.Struct(), si, usedReferenceElem)
 			}
 		}
-		self.pushErr(si.Ident, build::LogMsg.ObjNotSupportSubFields, d.Kind.Str())
+		self.pushErr(si.Ident, build::LogMsg.ObjNotSupportSubFields, d.Type.Str())
 		ret nil
 	}
 
@@ -2849,7 +2849,7 @@ impl eval {
 				ok = false
 				continue
 			}
-			tupT.Types = append(tupT.Types, d.Kind)
+			tupT.Types = append(tupT.Types, d.Type)
 			model.Datas = append(model.Datas, d)
 		}
 
@@ -2858,7 +2858,7 @@ impl eval {
 		}
 
 		ret &Data{
-			Kind: &Type{Kind: tupT},
+			Type: &Type{Kind: tupT},
 			Model: model,
 		}
 	}
@@ -2906,7 +2906,7 @@ impl eval {
 
 		ret &Data{
 			Mutable: true,
-			Kind: &Type{Kind: m},
+			Type: &Type{Kind: m},
 			Model: model,
 		}
 	}
@@ -2955,7 +2955,7 @@ impl eval {
 		}
 
 		ret &Data{
-			Kind: &Type{Kind: ins},
+			Type: &Type{Kind: ins},
 			Model: &AnonFnExprModel{
 				Captured: captured,
 				Func: ins,
@@ -3029,14 +3029,14 @@ impl eval {
 	// Returns nil if error occurs.
 	fn eval1(mut &self, mut expr: &ast::Expr): &Data {
 		mut d := self.evalExprKind(expr.Kind)
-		if d == nil || d.Kind == nil {
+		if d == nil || d.Type == nil {
 			ret nil
 		}
 
 		match {
-		| d.Kind.Fn() != nil:
+		| d.Type.Fn() != nil:
 			// Check special cases for functions.
-			mut f := d.Kind.Fn()
+			mut f := d.Type.Fn()
 			if f.IsBuiltin() {
 				self.s.pushErr(expr.Token, build::LogMsg.BuiltinNotInvoked)
 				break
@@ -3055,7 +3055,7 @@ impl eval {
 			}
 		| d.Decl:
 			// Check evaluated type declarations.
-			mut s := d.Kind.Struct()
+			mut s := d.Type.Struct()
 			if s == nil {
 				break
 			}
@@ -3077,7 +3077,7 @@ impl eval {
 		if d == nil {
 			ret nil
 		}
-		if (self.owner == nil || !self.owner.Constant) && d.Kind.comptime() {
+		if (self.owner == nil || !self.owner.Constant) && d.Type.comptime() {
 			self.s.pushErr(expr.Token, build::LogMsg.ComptimeAsExpr)
 			ret nil
 		}
@@ -3132,16 +3132,16 @@ impl unaryEval {
 
 	fn minus(mut self) {
 		match {
-		| self.d.Kind == nil:
+		| self.d.Type == nil:
 			self.d = nil
 			ret
-		| self.d.Kind.Prim() != nil:
-			if !types::IsNum(self.d.Kind.Str()) {
+		| self.d.Type.Prim() != nil:
+			if !types::IsNum(self.d.Type.Str()) {
 				self.d = nil
 				ret
 			}
-		| self.d.Kind.Struct() != nil:
-			if self.d.Kind.Struct().Operators.Neg == nil {
+		| self.d.Type.Struct() != nil:
+			if self.d.Type.Struct().Operators.Neg == nil {
 				self.d = nil
 				ret
 			}
@@ -3177,16 +3177,16 @@ impl unaryEval {
 
 	fn plus(mut self) {
 		match {
-		| self.d.Kind == nil:
+		| self.d.Type == nil:
 			self.d = nil
 			ret
-		| self.d.Kind.Prim() != nil:
-			if !types::IsNum(self.d.Kind.Str()) {
+		| self.d.Type.Prim() != nil:
+			if !types::IsNum(self.d.Type.Str()) {
 				self.d = nil
 				ret
 			}
-		| self.d.Kind.Struct() != nil:
-			if self.d.Kind.Struct().Operators.Pos == nil {
+		| self.d.Type.Struct() != nil:
+			if self.d.Type.Struct().Operators.Pos == nil {
 				self.d = nil
 				ret
 			}
@@ -3222,16 +3222,16 @@ impl unaryEval {
 
 	fn caret(mut self) {
 		match {
-		| self.d.Kind == nil:
+		| self.d.Type == nil:
 			self.d = nil
 			ret
-		| self.d.Kind.Prim() != nil:
-			if !types::IsInt(self.d.Kind.Str()) {
+		| self.d.Type.Prim() != nil:
+			if !types::IsInt(self.d.Type.Str()) {
 				self.d = nil
 				ret
 			}
-		| self.d.Kind.Struct() != nil:
-			if self.d.Kind.Struct().Operators.BitNot == nil {
+		| self.d.Type.Struct() != nil:
+			if self.d.Type.Struct().Operators.BitNot == nil {
 				self.d = nil
 				ret
 			}
@@ -3264,7 +3264,7 @@ impl unaryEval {
 	}
 
 	fn excl(mut self) {
-		t := self.d.Kind.Prim()
+		t := self.d.Type.Prim()
 		if t == nil || !t.IsBool() {
 			self.d = nil
 			ret
@@ -3298,20 +3298,20 @@ impl unaryEval {
 		}
 
 		match {
-		| self.d.Kind.Ptr() != nil:
+		| self.d.Type.Ptr() != nil:
 			if !self.e.isUnsafe() {
 				self.e.pushErr(self.u.Op, build::LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
 			}
 
-			mut t := self.d.Kind.Ptr()
+			mut t := self.d.Type.Ptr()
 			if t.IsUnsafe() {
 				self.d = nil
 				ret
 			}
-			self.d.Kind = t.Elem
+			self.d.Type = t.Elem
 			self.d.Mutable = true
-		| self.d.Kind.Sptr() != nil:
-			self.d.Kind = self.d.Kind.Sptr().Elem
+		| self.d.Type.Sptr() != nil:
+			self.d.Type = self.d.Type.Sptr().Elem
 		|:
 			self.d = nil
 			ret
@@ -3330,8 +3330,8 @@ impl unaryEval {
 		|:
 			match {
 			| canGetPtr(self.d):
-				self.d.Kind = &Type{
-					Kind: &Ptr{Elem: self.d.Kind},
+				self.d.Type = &Type{
+					Kind: &Ptr{Elem: self.d.Type},
 				}
 				self.d.Model = &UnaryExprModel{
 					Expr: new(Data, *self.d),
@@ -3358,13 +3358,13 @@ impl unaryEval {
 		}
 		match self.u.Op.Id {
 		| token::Id.Star:
-			self.d.Kind = &Type{Kind: tc.buildPtrFromType(self.d.Kind)}
-			self.d.Model = self.d.Kind
+			self.d.Type = &Type{Kind: tc.buildPtrFromType(self.d.Type)}
+			self.d.Model = self.d.Type
 		| token::Id.Amper:
-			self.d.Kind = &Type{Kind: tc.buildSptrFromType(self.d.Kind)}
-			self.d.Model = self.d.Kind
+			self.d.Type = &Type{Kind: tc.buildSptrFromType(self.d.Type)}
+			self.d.Model = self.d.Type
 		|:
-			self.e.pushErr(self.u.Op, build::LogMsg.InvalidExprForUnary, self.u.Op.Kind, self.d.Kind.Str())
+			self.e.pushErr(self.u.Op, build::LogMsg.InvalidExprForUnary, self.u.Op.Kind, self.d.Type.Str())
 			self.d = nil
 			ret
 		}
@@ -3395,7 +3395,7 @@ impl unaryEval {
 			ret self.d
 		}
 
-		kind := self.d.Kind
+		kind := self.d.Type
 		match self.u.Op.Id {
 		| token::Id.Minus:
 			self.minus()
@@ -3448,39 +3448,39 @@ impl binaryEval {
 	// Reports whether types are compatible.
 	// Also logs error message about incompatibility if types are incompatible.
 	fn checkTypeCompatibility(mut self): bool {
-		ret self.e.s.checkTypeCompatibility1(self.l.Kind, self.r, self.op)
+		ret self.e.s.checkTypeCompatibility1(self.l.Type, self.r, self.op)
 	}
 
 	fn checkStructCommonOperatorCompatibility(mut self): bool {
 		let mut overload: &FnIns = nil
 		match self.op.Id {
 		| token::Id.Shl:
-			overload = self.l.Kind.Struct().Operators.Shl
+			overload = self.l.Type.Struct().Operators.Shl
 		| token::Id.Shr:
-			overload = self.l.Kind.Struct().Operators.Shr
+			overload = self.l.Type.Struct().Operators.Shr
 		| token::Id.Plus:
-			overload = self.l.Kind.Struct().Operators.Add
+			overload = self.l.Type.Struct().Operators.Add
 		| token::Id.Minus:
-			overload = self.l.Kind.Struct().Operators.Sub
+			overload = self.l.Type.Struct().Operators.Sub
 		| token::Id.Solidus:
-			overload = self.l.Kind.Struct().Operators.Div
+			overload = self.l.Type.Struct().Operators.Div
 		| token::Id.Star:
-			overload = self.l.Kind.Struct().Operators.Mul
+			overload = self.l.Type.Struct().Operators.Mul
 		| token::Id.Percent:
-			overload = self.l.Kind.Struct().Operators.Mod
+			overload = self.l.Type.Struct().Operators.Mod
 		| token::Id.Amper:
-			overload = self.l.Kind.Struct().Operators.BitAnd
+			overload = self.l.Type.Struct().Operators.BitAnd
 		| token::Id.Vline:
-			overload = self.l.Kind.Struct().Operators.BitOr
+			overload = self.l.Type.Struct().Operators.BitOr
 		| token::Id.Caret:
-			overload = self.l.Kind.Struct().Operators.BitXor
+			overload = self.l.Type.Struct().Operators.BitXor
 		|:
-			self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Kind.Str())
+			self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
 			ret false
 		}
 
 		if overload == nil {
-			self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Kind.Str())
+			self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
 			ret false
 		}
 
@@ -3489,36 +3489,36 @@ impl binaryEval {
 	}
 
 	fn evalComptimeTypeInfo(mut self): &Data {
-		mut r := self.r.Kind.comptimeTypeInfo()
+		mut r := self.r.Type.comptimeTypeInfo()
 		if r == nil {
-			self.e.pushErr(self.op, build::LogMsg.IncompatibleTypes, "comptimeTypeInfo", self.r.Kind.Str())
+			self.e.pushErr(self.op, build::LogMsg.IncompatibleTypes, "comptimeTypeInfo", self.r.Type.Str())
 			ret nil
 		}
-		mut l := self.l.Kind.comptimeTypeInfo()
+		mut l := self.l.Type.comptimeTypeInfo()
 		match self.op.Id {
 		| token::Id.Eqs:
 			mut constant := constant::Const.NewBool(l.base.Equal(r.base))
 			ret &Data{
-				Kind: primBool,
+				Type: primBool,
 				Constant: constant,
 				Model: constant,
 			}
 		| token::Id.NotEq:
 			mut constant := constant::Const.NewBool(!l.base.Equal(r.base))
 			ret &Data{
-				Kind: primBool,
+				Type: primBool,
 				Constant: constant,
 				Model: constant,
 			}
 		|:
-			self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Kind.Str())
+			self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
 			ret nil
 		}
 	}
 
 	fn evalNil(mut self): &Data {
-		if !self.r.Kind.NilCompatible() {
-			self.e.pushErr(self.op, build::LogMsg.IncompatibleTypes, "nil", self.r.Kind.Str())
+		if !self.r.Type.NilCompatible() {
+			self.e.pushErr(self.op, build::LogMsg.IncompatibleTypes, "nil", self.r.Type.Str())
 			ret nil
 		}
 
@@ -3526,7 +3526,7 @@ impl binaryEval {
 		| token::Id.Eqs
 		| token::Id.NotEq:
 			ret &Data{
-				Kind: primBool,
+				Type: primBool,
 			}
 		|:
 			self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, "nil")
@@ -3535,24 +3535,24 @@ impl binaryEval {
 	}
 
 	fn evalEnum(mut self): &Data {
-		mut enm := self.l.Kind.Enum()
+		mut enm := self.l.Type.Enum()
 		match self.op.Id {
 		| token::Id.Eqs
 		| token::Id.NotEq:
-			mut rkind := self.r.Kind
-			if self.r.Kind.Enum() != nil {
-				rkind = self.r.Kind.Enum().TypeSym.Type
+			mut rkind := self.r.Type
+			if self.r.Type.Enum() != nil {
+				rkind = self.r.Type.Enum().TypeSym.Type
 			}
 			if !self.e.s.checkTypeCompatibility(enm.TypeSym.Type, rkind, self.op) {
 				ret nil
 			}
 			ret &Data{
-				Kind: primBool,
+				Type: primBool,
 			}
 		}
 
-		if self.r.Kind.Enum() == nil || enm != self.r.Kind.Enum() {
-			self.e.pushErr(self.op, build::LogMsg.IncompatibleTypes, enm.Ident, self.r.Kind.Str())
+		if self.r.Type.Enum() == nil || enm != self.r.Type.Enum() {
+			self.e.pushErr(self.op, build::LogMsg.IncompatibleTypes, enm.Ident, self.r.Type.Str())
 			ret nil
 		}
 
@@ -3566,7 +3566,7 @@ impl binaryEval {
 				ret nil
 			}
 			ret &Data{
-				Kind: primBool,
+				Type: primBool,
 			}
 		| token::Id.Amper:
 			first := enm.Items[0]
@@ -3602,7 +3602,7 @@ impl binaryEval {
 	}
 
 	fn evalTypeEnum(mut self): &Data {
-		mut enm := self.l.Kind.TypeEnum()
+		mut enm := self.l.Type.TypeEnum()
 		if !self.checkTypeCompatibility() {
 			ret nil
 		}
@@ -3611,7 +3611,7 @@ impl binaryEval {
 		| token::Id.Eqs
 		| token::Id.NotEq:
 			ret &Data{
-				Kind: primBool,
+				Type: primBool,
 			}
 		|:
 			self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, enm.Str())
@@ -3628,10 +3628,10 @@ impl binaryEval {
 		| token::Id.Eqs
 		| token::Id.NotEq:
 			ret &Data{
-				Kind: primBool,
+				Type: primBool,
 			}
 		|:
-			self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Kind.Str())
+			self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
 			ret nil
 		}
 	}
@@ -3648,23 +3648,23 @@ impl binaryEval {
 				ret nil
 			}
 			ret &Data{
-				Kind: primBool,
+				Type: primBool,
 			}
 		| token::Id.Plus
 		| token::Id.Minus:
-			if self.l.Kind.Ptr() == nil {
+			if self.l.Type.Ptr() == nil {
 				self.l, self.r = self.r, self.l
 			}
-			if self.l.Kind.Ptr().IsUnsafe() {
-				self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Kind.Str())
+			if self.l.Type.Ptr().IsUnsafe() {
+				self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
 			}
 			if !isPtrArithmeticCompatible(self.l, self.r) {
-				self.e.pushErr(self.op, build::LogMsg.IncompatibleTypeForPtrArithmetic, self.r.Kind.Str())
+				self.e.pushErr(self.op, build::LogMsg.IncompatibleTypeForPtrArithmetic, self.r.Type.Str())
 				ret nil
 			}
 			ret self.l
 		|:
-			self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Kind.Str())
+			self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
 			ret nil
 		}
 	}
@@ -3680,7 +3680,7 @@ impl binaryEval {
 			if self.e.s.meta.runtime != nil {
 				// Add instance to relevant runtime function for array element type if not exist.
 				mut f := runtimeFindFn(self.e.s.meta.runtime, runtimeFunc.arrayCmp).instanceForce()
-				f.Generics = append(f.Generics, &InsGeneric{Kind: self.l.Kind.Arr().Elem})
+				f.Generics = append(f.Generics, &InsGeneric{Kind: self.l.Type.Arr().Elem})
 				ok, _ := self.e.s.checkGenericFn(f, self.op)
 				if !ok {
 					panic("sema: arrayCmp evaluation failed, this is an implementation mistake")
@@ -3688,10 +3688,10 @@ impl binaryEval {
 				self.e.pushReference[&FnIns](f)
 			}
 			ret &Data{
-				Kind: primBool,
+				Type: primBool,
 			}
 		|:
-			self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Kind.Str())
+			self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
 			ret nil
 		}
 	}
@@ -3699,36 +3699,36 @@ impl binaryEval {
 	fn evalStruct(mut self): &Data {
 		match self.op.Id {
 		| token::Id.Gt:
-			if self.l.Kind.Struct().Operators.Gt == nil {
-				self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Kind.Str())
+			if self.l.Type.Struct().Operators.Gt == nil {
+				self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
 				ret nil
 			}
 			ret &Data{
-				Kind: primBool,
+				Type: primBool,
 			}
 		| token::Id.GtEq:
-			if self.l.Kind.Struct().Operators.GtEq == nil {
-				self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Kind.Str())
+			if self.l.Type.Struct().Operators.GtEq == nil {
+				self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
 				ret nil
 			}
 			ret &Data{
-				Kind: primBool,
+				Type: primBool,
 			}
 		| token::Id.Lt:
-			if self.l.Kind.Struct().Operators.Lt == nil {
-				self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Kind.Str())
+			if self.l.Type.Struct().Operators.Lt == nil {
+				self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
 				ret nil
 			}
 			ret &Data{
-				Kind: primBool,
+				Type: primBool,
 			}
 		| token::Id.LtEq:
-			if self.l.Kind.Struct().Operators.LtEq == nil {
-				self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Kind.Str())
+			if self.l.Type.Struct().Operators.LtEq == nil {
+				self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
 				ret nil
 			}
 			ret &Data{
-				Kind: primBool,
+				Type: primBool,
 			}
 		| token::Id.Eqs
 		| token::Id.NotEq:
@@ -3736,7 +3736,7 @@ impl binaryEval {
 				ret nil
 			}
 			ret &Data{
-				Kind: primBool,
+				Type: primBool,
 			}
 		}
 
@@ -3755,10 +3755,10 @@ impl binaryEval {
 		| token::Id.Eqs
 		| token::Id.NotEq:
 			ret &Data{
-				Kind: primBool,
+				Type: primBool,
 			}
 		|:
-			self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Kind.Str())
+			self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
 			ret nil
 		}
 	}
@@ -3767,9 +3767,9 @@ impl binaryEval {
 		match self.op.Id {
 		| token::Id.Eqs
 		| token::Id.NotEq:
-			applyImplicitCast(self.e.s, self.l.Kind, self.r, self.op, self.e.getOwnerRefers())
+			applyImplicitCast(self.e.s, self.l.Type, self.r, self.op, self.e.getOwnerRefers())
 			ret &Data{
-				Kind: primBool,
+				Type: primBool,
 			}
 		|:
 			self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, types::Kind.Any)
@@ -3789,13 +3789,13 @@ impl binaryEval {
 		| token::Id.DblVline:
 			ret self.l
 		|:
-			self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Kind.Str())
+			self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
 			ret nil
 		}
 	}
 
 	fn evalStr(mut self): &Data {
-		mut rk := self.r.Kind.Str()
+		mut rk := self.r.Type.Str()
 		if rk != types::Kind.Str {
 			self.e.pushErr(self.op, build::LogMsg.IncompatibleTypes, types::Kind.Str, rk)
 			ret nil
@@ -3811,7 +3811,7 @@ impl binaryEval {
 		| token::Id.GtEq
 		| token::Id.LtEq:
 			ret &Data{
-				Kind: primBool,
+				Type: primBool,
 			}
 		|:
 			self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, types::Kind.Str)
@@ -3820,18 +3820,18 @@ impl binaryEval {
 	}
 
 	fn setTypeToGreater(mut self) {
-		lp := self.l.Kind.Prim()
-		rp := self.r.Kind.Prim()
+		lp := self.l.Type.Prim()
+		rp := self.r.Type.Prim()
 		if self.l.untyped && !self.r.untyped {
-			self.l.Kind = self.r.Kind
+			self.l.Type = self.r.Type
 			self.l.Constant.Kind = rp.Kind
 			self.l.untyped = false
 		} else if !self.l.untyped && self.r.untyped {
-			self.r.Kind = self.l.Kind
+			self.r.Type = self.l.Type
 			self.r.Constant.Kind = lp.Kind
 			self.r.untyped = false
 		} else if self.l.untyped && self.r.untyped {
-			self.r.Kind = self.l.Kind
+			self.r.Type = self.l.Type
 			self.r.Constant.Kind = lp.Kind
 			self.r.untyped = false
 		}
@@ -3839,7 +3839,7 @@ impl binaryEval {
 
 	fn checkModData(mut self, mut &d: &Data) {
 		if !d.IsConst() {
-			if d.Kind.Prim() == nil || !types::IsInt(d.Kind.Prim().Kind) {
+			if d.Type.Prim() == nil || !types::IsInt(d.Type.Prim().Kind) {
 				self.e.pushErr(self.op, build::LogMsg.ModuloWithNotInt)
 			}
 			ret
@@ -3887,20 +3887,20 @@ impl binaryEval {
 	// Operator guaranteed to be << or >>.
 	// Operands should be guaranteed in original order.
 	fn shift(mut self): &Data {
-		lk := self.l.Kind.Prim()
+		lk := self.l.Type.Prim()
 		if lk == nil {
-			self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Kind.Str())
+			self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
 			ret nil
 		}
-		rk := self.r.Kind.Prim()
+		rk := self.r.Type.Prim()
 		if rk == nil {
-			self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, self.r.Kind.Str())
+			self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, self.r.Type.Str())
 			ret nil
 		}
 		// primitive guaranteed
 
 		if !types::IsNum(lk.Kind) || !types::IsNum(rk.Kind) {
-			self.e.s.pushCompatiblityError(self.l.Kind, self.r, self.op)
+			self.e.s.pushCompatiblityError(self.l.Type, self.r, self.op)
 			ret nil
 		}
 		// number guaranteed
@@ -3912,10 +3912,10 @@ impl binaryEval {
 				ret nil
 			} else if intAssignable(types::Kind.I64, self.l) {
 				self.l.Constant.SetI64(self.l.Constant.AsI64())
-				self.l.Kind = primI64
+				self.l.Type = primI64
 			} else if intAssignable(types::Kind.U64, self.l) {
 				self.l.Constant.SetU64(self.l.Constant.AsU64())
-				self.l.Kind = primU64
+				self.l.Type = primU64
 			}
 		}
 		if !types::IsInt(rk.Kind) {
@@ -3925,10 +3925,10 @@ impl binaryEval {
 				ret nil
 			} else if intAssignable(types::Kind.I64, self.r) {
 				self.r.Constant.SetI64(self.r.Constant.AsI64())
-				self.r.Kind = primI64
+				self.r.Type = primI64
 			} else if intAssignable(types::Kind.U64, self.r) {
 				self.r.Constant.SetU64(self.r.Constant.AsU64())
-				self.r.Kind = primU64
+				self.r.Type = primU64
 			}
 		}
 		// integer guaranteed
@@ -3942,10 +3942,10 @@ impl binaryEval {
 	}
 
 	fn evalFloat(mut self): &Data {
-		lk := self.l.Kind.Prim().Kind // Float guaranteed.
-		rk := self.r.Kind.Prim().Kind // Primitive guaranteed.
+		lk := self.l.Type.Prim().Kind // Float guaranteed.
+		rk := self.r.Type.Prim().Kind // Primitive guaranteed.
 		if !self.numbersAreCompatibile(lk, rk) {
-			self.e.s.pushCompatiblityError(self.l.Kind, self.r, self.op)
+			self.e.s.pushCompatiblityError(self.l.Type, self.r, self.op)
 			ret nil
 		}
 
@@ -3959,7 +3959,7 @@ impl binaryEval {
 		| token::Id.LtEq:
 			self.setTypeToGreater()
 			ret &Data{
-				Kind: primBool,
+				Type: primBool,
 			}
 		}
 
@@ -3991,11 +3991,11 @@ impl binaryEval {
 	}
 
 	fn evalInt(mut self): &Data {
-		lk := self.l.Kind.Prim().Kind // Integer guaranteed.
-		rk := self.r.Kind.Prim().Kind // Primitive guaranteed.
+		lk := self.l.Type.Prim().Kind // Integer guaranteed.
+		rk := self.r.Type.Prim().Kind // Primitive guaranteed.
 
 		if !self.numbersAreCompatibile(lk, rk) {
-			self.e.s.pushCompatiblityError(self.l.Kind, self.r, self.op)
+			self.e.s.pushCompatiblityError(self.l.Type, self.r, self.op)
 			ret nil
 		}
 
@@ -4008,7 +4008,7 @@ impl binaryEval {
 		| token::Id.GtEq
 		| token::Id.LtEq:
 			ret &Data{
-				Kind: primBool,
+				Type: primBool,
 			}
 		}
 
@@ -4039,7 +4039,7 @@ impl binaryEval {
 	}
 
 	fn evalPrim(mut self): &Data {
-		prim := self.l.Kind.Prim()
+		prim := self.l.Type.Prim()
 		match {
 		| prim.IsBool():
 			ret self.evalBool()
@@ -4047,8 +4047,8 @@ impl binaryEval {
 			ret self.evalStr()
 		}
 
-		if self.r.Kind.Prim() == nil {
-			self.e.pushErr(self.op, build::LogMsg.IncompatibleTypes, prim.Str(), self.r.Kind.Str())
+		if self.r.Type.Prim() == nil {
+			self.e.pushErr(self.op, build::LogMsg.IncompatibleTypes, prim.Str(), self.r.Type.Str())
 			ret nil
 		}
 
@@ -4068,11 +4068,11 @@ impl binaryEval {
 		if !comparing {
 			ret
 		}
-		if !self.l.Kind.Comparable() && !self.r.Kind.IsNil() {
-			self.e.pushErr(self.op, build::LogMsg.TypeIsNotComparable, self.l.Kind.Str())
+		if !self.l.Type.Comparable() && !self.r.Type.IsNil() {
+			self.e.pushErr(self.op, build::LogMsg.TypeIsNotComparable, self.l.Type.Str())
 			ok = false
-		} else if !self.r.Kind.Comparable() && !self.l.Kind.IsNil() {
-			self.e.pushErr(self.op, build::LogMsg.TypeIsNotComparable, self.r.Kind.Str())
+		} else if !self.r.Type.Comparable() && !self.l.Type.IsNil() {
+			self.e.pushErr(self.op, build::LogMsg.TypeIsNotComparable, self.r.Type.Str())
 			ok = false
 		}
 		ret ok
@@ -4086,7 +4086,7 @@ impl binaryEval {
 
 		// Structure may have operator overloading.
 		// Handle them if left operand is struct.
-		if self.l.Kind.Struct() != nil {
+		if self.l.Type.Struct() != nil {
 			ret self.evalStruct()
 		}
 
@@ -4096,55 +4096,55 @@ impl binaryEval {
 		}
 
 		match {
-		| self.l.Kind.Void():
+		| self.l.Type.Void():
 			self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, "void")
 			ret nil
-		| self.r.Kind.comptimeTypeInfo() != nil:
+		| self.r.Type.comptimeTypeInfo() != nil:
 			self.l, self.r = self.r, self.l
 			fall
-		| self.l.Kind.comptimeTypeInfo() != nil:
+		| self.l.Type.comptimeTypeInfo() != nil:
 			ret self.evalComptimeTypeInfo()
-		| self.r.Kind.Prim() != nil && self.r.Kind.Prim().IsAny():
+		| self.r.Type.Prim() != nil && self.r.Type.Prim().IsAny():
 			self.l, self.r = self.r, self.l
 			fall
-		| self.r.Kind.IsNil():
+		| self.r.Type.IsNil():
 			self.l, self.r = self.r, self.l
 			fall
-		| self.l.Kind.IsNil():
+		| self.l.Type.IsNil():
 			ret self.evalNil()
-		| self.l.Kind.Prim() != nil && self.l.Kind.Prim().IsAny():
+		| self.l.Type.Prim() != nil && self.l.Type.Prim().IsAny():
 			ret self.evalAny()
-		| self.r.Kind.TypeEnum() != nil:
+		| self.r.Type.TypeEnum() != nil:
 			self.l, self.r = self.r, self.l
 			fall
-		| self.l.Kind.TypeEnum() != nil:
+		| self.l.Type.TypeEnum() != nil:
 			ret self.evalTypeEnum()
-		| self.r.Kind.Enum() != nil:
+		| self.r.Type.Enum() != nil:
 			self.l, self.r = self.r, self.l
 			fall
-		| self.l.Kind.Enum() != nil:
+		| self.l.Type.Enum() != nil:
 			ret self.evalEnum()
-		| self.r.Kind.Sptr() != nil:
+		| self.r.Type.Sptr() != nil:
 			self.l, self.r = self.r, self.l
 			fall
-		| self.l.Kind.Sptr() != nil:
+		| self.l.Type.Sptr() != nil:
 			ret self.evalSptr()
-		| self.r.Kind.Ptr() != nil:
+		| self.r.Type.Ptr() != nil:
 			self.l, self.r = self.r, self.l
 			fall
-		| self.l.Kind.Ptr() != nil:
+		| self.l.Type.Ptr() != nil:
 			ret self.evalPtr()
-		| self.l.Kind.Arr() != nil:
+		| self.l.Type.Arr() != nil:
 			ret self.evalArr()
-		| self.r.Kind.Trait() != nil:
+		| self.r.Type.Trait() != nil:
 			self.l, self.r = self.r, self.l
 			fall
-		| self.l.Kind.Trait() != nil:
+		| self.l.Type.Trait() != nil:
 			ret self.evalTrait()
-		| self.l.Kind.Prim() != nil:
+		| self.l.Type.Prim() != nil:
 			ret self.evalPrim()
 		|:
-			self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Kind.Str())
+			self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
 			ret nil
 		}
 	}
@@ -4194,7 +4194,7 @@ impl binaryEval {
 				self.e.pushErr(self.op, build::LogMsg.DivByZero)
 			}
 			d.Constant = self.l.Constant
-			mut prim := d.Kind.Prim()
+			mut prim := d.Type.Prim()
 			match {
 			| types::IsSigInt(prim.Kind):
 				d.Constant.SetI64(d.Constant.AsI64())
@@ -4224,11 +4224,11 @@ impl binaryEval {
 			d.Constant = self.l.Constant
 		}
 		d.Model = d.Constant
-		applyCastModelByEnum(self.e.s, d, d.Kind.Enum(), self.op, self.e.getOwnerRefers())
+		applyCastModelByEnum(self.e.s, d, d.Type.Enum(), self.op, self.e.getOwnerRefers())
 	}
 
 	fn checkData(mut self, mut &d: &Data) {
-		f := d.Kind.Fn()
+		f := d.Type.Fn()
 		if f != nil && f.Decl != nil && f.Decl.IsMethod() {
 			self.e.pushErr(self.op, build::LogMsg.InvalidExprForBinary)
 		}
@@ -4257,11 +4257,11 @@ impl binaryEval {
 
 		d.Model = &BinaryExprModel{
 			Left: &OperandExprModel{
-				Kind: l.Kind,
+				Kind: l.Type,
 				Model: l.Model,
 			},
 			Right: &OperandExprModel{
-				Kind: r.Kind,
+				Kind: r.Type,
 				Model: r.Model,
 			},
 			Op: self.op,
@@ -4301,15 +4301,15 @@ impl binaryEval {
 		}
 
 		mut l := self.e.evalExpr1(op.Left)
-		if l == nil || l.Kind == nil {
+		if l == nil || l.Type == nil {
 			ret nil
 		}
 
 		mut prefix := self.e.prefix
-		self.e.prefix = l.Kind
+		self.e.prefix = l.Type
 		defer { self.e.prefix = prefix }
 		mut r := self.e.evalExpr1(op.Right)
-		if r == nil || r.Kind == nil {
+		if r == nil || r.Type == nil {
 			ret nil
 		}
 
@@ -4346,20 +4346,20 @@ fn findBuiltinsImport(&ident: str, imp: &ImportInfo): any {
 // If data is signed but kind is unsigned, type will be fit to signed and same
 // thing for unsigned data and signed kinds.
 fn fitBitsize(mut &d: &Data) {
-	mut prim := d.Kind.Prim()
+	mut prim := d.Type.Prim()
 	z := types::BitSizeOf(prim.Str())
 	match {
 	| d.Constant.IsI64():
 		k := types::BitSizeOfInt(d.Constant.ReadI64())
 		if k > z || types::IsUnsigInt(prim.Kind) {
 			d.Constant.Kind = types::IntFromBits(k)
-			d.Kind = findBuiltinTypeAlias(d.Constant.Kind).TypeSym.Type
+			d.Type = findBuiltinTypeAlias(d.Constant.Kind).TypeSym.Type
 		}
 	| d.Constant.IsU64():
 		k := types::BitSizeOfUint(d.Constant.ReadU64())
 		if k > z || types::IsSigInt(prim.Kind) {
 			d.Constant.Kind = types::UintFromBits(k)
-			d.Kind = findBuiltinTypeAlias(d.Constant.Kind).TypeSym.Type
+			d.Type = findBuiltinTypeAlias(d.Constant.Kind).TypeSym.Type
 		}
 	| d.Constant.IsF64():
 		if z == 1<<6 {
@@ -4369,13 +4369,13 @@ fn fitBitsize(mut &d: &Data) {
 		k := types::BitSizeOfFloat(d.Constant.ReadF64())
 		if k > z {
 			d.Constant.Kind = types::FloatFromBits(k)
-			d.Kind = findBuiltinTypeAlias(d.Constant.Kind).TypeSym.Type
+			d.Type = findBuiltinTypeAlias(d.Constant.Kind).TypeSym.Type
 		}
 	}
 }
 
 fn makeStructLitAlloc(mut &d: &Data, mut &lit: &StructLitExprModel) {
-	d.Kind = &Type{
+	d.Type = &Type{
 		Kind: &Sptr{
 			Elem: &Type{Kind: lit.Strct},
 		},
@@ -4428,7 +4428,7 @@ fn isOkForShifting(mut &d: &Data): bool {
 			ret false
 		}
 	}
-	prim := d.Kind.Prim()
+	prim := d.Type.Prim()
 	ret prim != nil && types::IsInt(prim.Str())
 }
 
@@ -4437,9 +4437,9 @@ fn isInstancedStruct(s: &StructIns): bool {
 }
 
 fn isPtrArithmeticCompatible(mut &l: &Data, mut &r: &Data): bool {
-	ptr := r.Kind.Ptr()
+	ptr := r.Type.Ptr()
 	if ptr != nil {
-		ret l.Kind.Ptr().Elem.Equal(ptr.Elem)
+		ret l.Type.Ptr().Elem.Equal(ptr.Elem)
 	}
 	if r.IsConst() && r.untyped {
 		ret intAssignable(types::Kind.Int, r) ||
@@ -4448,7 +4448,7 @@ fn isPtrArithmeticCompatible(mut &l: &Data, mut &r: &Data): bool {
 
 	mut tcc := typeCompatibilityChecker{
 		dest: primInt,
-		src: r.Kind,
+		src: r.Type,
 	}
 	if tcc.check() {
 		ret true
@@ -4474,24 +4474,24 @@ fn applyRuntimeToStr(mut &s: &sema, mut &from: &Type, mut &to: &Type,
 
 fn applyCastKindModel(mut &s: &sema, mut &d: &Data, mut &t: &Type,
 	mut &token: &token::Token, mut refers: &ReferenceStack) {
-	applyRuntimeToStr(s, d.Kind, t, token, refers)
+	applyRuntimeToStr(s, d.Type, t, token, refers)
 	d.Model = &CastingExprModel{
 		Token: token,
 		Expr: new(Data, *d),
 		Kind: t,
-		ExprKind: d.Kind,
+		ExprKind: d.Type,
 	}
 }
 
 fn applyCastKind(mut &s: &sema, mut &d: &Data, mut &t: &Type,
 	mut &token: &token::Token, mut refers: &ReferenceStack) {
 	applyCastKindModel(s, d, t, token, refers)
-	d.Kind = t
+	d.Type = t
 }
 
 fn buildVoidData(): &Data {
 	ret &Data{
-		Kind: primVoid,
+		Type: primVoid,
 	}
 }
 
@@ -4502,17 +4502,17 @@ fn checkDataForIntegerIndexing(mut &s: &sema, mut &d: &Data,
 	}
 
 	match {
-	| d.Kind.Prim() == nil:
+	| d.Type.Prim() == nil:
 		ret build::LogMsg.InvalidTypeForIndexing
-	| !types::IsInt(d.Kind.Prim().Str()):
+	| !types::IsInt(d.Type.Prim().Str()):
 		ret build::LogMsg.InvalidTypeForIndexing
 	| d.IsConst():
 		if d.Constant.AsF64() < 0 {
 			ret build::LogMsg.OverflowLimits
 		}
-	| d.Kind.Prim() == nil
+	| d.Type.Prim() == nil
 	| d.IsConst()
-	| types::RealKindOf(d.Kind.Prim().Str()) != types::RealKindOf(types::Kind.Int):
+	| types::RealKindOf(d.Type.Prim().Str()) != types::RealKindOf(types::Kind.Int):
 		applyCastKind(s, d, primInt, token, refers)
 	}
 	ret build::LogMsg.Empty
@@ -4611,7 +4611,7 @@ fn constoa(&c: &constant::Const): str {
 fn evalEnumStatic(mut &s: &sema, mut &enm: &Enum, mut &item: &EnumItem,
 	mut &token: &token::Token, mut refers: &ReferenceStack): &Data {
 	mut d := &Data{
-		Kind: &Type{
+		Type: &Type{
 			Kind: enm,
 		},
 	}
@@ -4663,7 +4663,7 @@ fn updateRefer[T](mut ref: &ReferenceStack, &old: T, mut &new: T) {
 }
 
 fn makeVariadic(mut &d: &Data, mut elem: &Type) {
-	d.Kind = &Type{
+	d.Type = &Type{
 		Variadic: true,
 		Generic: elem.Generic,
 		BindIdent: elem.BindIdent,

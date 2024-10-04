@@ -388,8 +388,8 @@ impl exprCoder {
 
 	fn unary(mut &self, mut m: &sema::UnaryExprModel) {
 		// Operator overloading.
-		if m.Expr.Kind.Struct() != nil {
-			mut s := m.Expr.Kind.Struct()
+		if m.Expr.Type.Struct() != nil {
+			mut s := m.Expr.Type.Struct()
 			self.operatorOverloadingUnary(s, m.Op.Id, m.Expr.Model)
 			ret
 		}
@@ -401,7 +401,7 @@ impl exprCoder {
 			self.oc.write("))")
 			ret
 		| token::Id.Star:
-			if env::Production || m.Expr.Kind.Sptr() == nil {
+			if env::Production || m.Expr.Type.Sptr() == nil {
 				break
 			}
 			self.possibleRefExpr(m.Expr.Model)
@@ -718,10 +718,10 @@ impl exprCoder {
 				mut ssie := (&sema::StructSubIdentExprModel)(m.Expr)
 				match {
 				| m.Func.Decl.Params[0].IsRef()
-				| ssie.Expr.Kind.Sptr() != nil:
+				| ssie.Expr.Type.Sptr() != nil:
 					break
 				|:
-					if ssie.Expr.Kind.Struct() != nil {
+					if ssie.Expr.Type.Struct() != nil {
 						if !ssie.Expr.Lvalue {
 							self.oc.write("({ auto _wrap_copy = ")
 							self.model(ssie.Expr.Model)
@@ -784,7 +784,7 @@ impl exprCoder {
 				| m.Func.Decl.Params[0].IsRef():
 					// Ignore dereferencing, use data directly to call method.
 					_ = self.writeReceiver(ssie.Expr.Model)
-				| ssie.Expr.Kind.Sptr() != nil:
+				| ssie.Expr.Type.Sptr() != nil:
 					// Ignore dereferencing, use data directly to call [ptr] method.
 					safe := self.writeReceiver(ssie.Expr.Model)
 					if safe {
@@ -797,7 +797,7 @@ impl exprCoder {
 						self.oc.write(")")
 					}
 				|:
-					if ssie.Expr.Kind.Struct() != nil {
+					if ssie.Expr.Type.Struct() != nil {
 						match type ssie.Expr.Model {
 						| &sema::Var:
 							v := (&sema::Var)(ssie.Expr.Model)
@@ -812,7 +812,7 @@ impl exprCoder {
 					}
 					if wrapped {
 						self.oc.write("_wrap_copy")
-					} else if ssie.Expr.Kind.Ptr() == nil {
+					} else if ssie.Expr.Type.Ptr() == nil {
 						self.model(ssie.Expr.Model)
 					} else {
 						// Ignore dereferencing, use data directly to call method.
@@ -917,7 +917,7 @@ impl exprCoder {
 	}
 
 	fn writeUseExpr(mut &self, mut &f: &sema::FnIns, mut d: &sema::Data) {
-		if d.Kind.Tup() == nil {
+		if d.Type.Tup() == nil {
 			self.possibleRefExpr(d.Model)
 			self.oc.write(";")
 			ret
@@ -1062,8 +1062,8 @@ impl exprCoder {
 
 		// Index access with safety measures.
 		match {
-		| m.Expr.Kind.Map() != nil:
-			mut _map := m.Expr.Kind.Map()
+		| m.Expr.Type.Map() != nil:
+			mut _map := m.Expr.Type.Map()
 			mut s := obj::RuntimeFindStruct(self.oc.ir.Runtime, obj::RuntimeStruct._Map)
 			mut ins := obj::FindStructGenericInstance(s, _map.Key, _map.Val)
 			const Static = false
@@ -1075,7 +1075,7 @@ impl exprCoder {
 			self.possibleRefExpr(m.Index.Model)
 			self.oc.write(")")
 		| env::Production
-		| m.Expr.Kind.Ptr() != nil
+		| m.Expr.Type.Ptr() != nil
 		| obj::IsExprComesFromBind(m.Expr):
 			self.possibleRefExpr(m.Expr.Model)
 			self.oc.write("[")
@@ -1096,8 +1096,8 @@ impl exprCoder {
 		// Index access with safety measures.
 		match {
 		| env::Production
-		| m.Node.Expr.Kind.Ptr() != nil
-		| m.Node.Expr.Kind.Map() != nil:
+		| m.Node.Expr.Type.Ptr() != nil
+		| m.Node.Expr.Type.Map() != nil:
 			self.oc.write("[")
 			self.possibleRefExpr(m.Node.Index.Model)
 			self.oc.write("]")
@@ -1310,7 +1310,7 @@ impl exprCoder {
 	fn printCall(mut &self, mut m: &sema::BuiltinPrintCallExprModel) {
 		self.oc.write("jule::print(")
 		mut decl := obj::RuntimeFindFn(self.oc.ir.Runtime, obj::RuntimeFunc.toStr)
-		mut f := obj::FindFnGenericInstance(decl, m.Expr.Kind)
+		mut f := obj::FindFnGenericInstance(decl, m.Expr.Type)
 		identCoder.funcIns(self.oc.Buf, f)
 		self.oc.write("(")
 		self.possibleRefExpr(m.Expr.Model)
@@ -1320,7 +1320,7 @@ impl exprCoder {
 	fn printlnCall(mut &self, mut m: &sema::BuiltinPrintlnCallExprModel) {
 		self.oc.write("jule::println(")
 		mut decl := obj::RuntimeFindFn(self.oc.ir.Runtime, obj::RuntimeFunc.toStr)
-		mut f := obj::FindFnGenericInstance(decl, m.Expr.Kind)
+		mut f := obj::FindFnGenericInstance(decl, m.Expr.Type)
 		identCoder.funcIns(self.oc.Buf, f)
 		self.oc.write("(")
 		self.possibleRefExpr(m.Expr.Model)
@@ -1361,7 +1361,7 @@ impl exprCoder {
 			self.oc.write(">{.error=" + typeCoder.Any + "(")
 		}
 		self.possibleRefExpr(m.Err.Model)
-		i := self.oc.pushAnyType(m.Err.Kind)
+		i := self.oc.pushAnyType(m.Err.Type)
 		self.oc.write(", &" + anyTypeIdent)
 		self.oc.write(conv::Itoa(i))
 		self.oc.write(")}")
@@ -1376,7 +1376,7 @@ impl exprCoder {
 	}
 
 	fn lenCall(mut &self, mut m: &sema::BuiltinLenCallExprModel) {
-		mut _map := m.Expr.Kind.Map()
+		mut _map := m.Expr.Type.Map()
 		if _map != nil {
 			mut s := obj::RuntimeFindStruct(self.oc.ir.Runtime, obj::RuntimeStruct._Map)
 			mut ins := obj::FindStructGenericInstance(s, _map.Key, _map.Val)
@@ -1398,7 +1398,7 @@ impl exprCoder {
 	}
 
 	fn deleteCall(mut &self, mut m: &sema::BuiltinDeleteCallExprModel) {
-		mut _map := m.Dest.Kind.Map()
+		mut _map := m.Dest.Type.Map()
 		if _map == nil {
 			panic("cxx: deleteCall: destination is not map")
 		}
@@ -1478,7 +1478,7 @@ impl exprCoder {
 		| &sema::UnaryExprModel:
 			// Use raw pointer directly if exist.
 			mut u := (&sema::UnaryExprModel)(m.Dest)
-			if u.Expr.Kind.Ptr() != nil {
+			if u.Expr.Type.Ptr() != nil {
 				self.oc.write(" *" + destIdent + " = ")
 				self.possibleRefExpr(u.Expr.Model)
 				self.oc.write("; ")
@@ -1623,7 +1623,7 @@ impl exprCoder {
 
 	fn unsafeDeref(mut &self, mut m: &opt::UnsafeDerefExprModel) {
 		match {
-		| m.Base.Expr.Kind.Sptr() != nil:
+		| m.Base.Expr.Type.Sptr() != nil:
 			self.oc.write("(*")
 			self.possibleRefExpr(m.Base.Expr.Model)
 			self.oc.write(".alloc)")

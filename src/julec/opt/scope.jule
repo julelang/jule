@@ -223,7 +223,7 @@ impl scopeOptimizer {
 			}
 			if len(case.Exprs) == 1 && self.data.dynamic != nil {
 				// We can know the exact kind of dynamic type if expression is single.
-				mut kind := isTypeGuaranteedDynamicData(self.data.dynamic, case.Exprs[0].Kind, nil)
+				mut kind := isTypeGuaranteedDynamicData(self.data.dynamic, case.Exprs[0].Type, nil)
 				if kind != nil {
 					self.data.dynamic.pushVar(var, kind)
 				} else {
@@ -556,13 +556,13 @@ impl scopeOptimizer {
 		for (i, mut l) in assign.Left {
 			if l != nil {
 				if self.data.boundary != nil {
-					if isBoundaryRiskyType(l.Kind) {
+					if isBoundaryRiskyType(l.Type) {
 						possibleBoundaryRemove(self.data.boundary, l.Model)
 					}
 				}
 				if self.data.nils != nil {
 					if tup != nil && isGuaranteedNonNilExpr(self.data.nils, tup.Datas[i].Model) {
-						if isNilValidType(l.Kind) {
+						if isNilValidType(l.Type) {
 							const safe = true
 							self.data.nils.pushVar(getNilVar(l.Model), safe)
 						}
@@ -572,9 +572,9 @@ impl scopeOptimizer {
 				}
 				if self.data.dynamic != nil && tup != nil {
 					mut kind := isTypeGuaranteedDynamicData(
-						self.data.dynamic, tup.Datas[i].Kind, tup.Datas[i].Model)
+						self.data.dynamic, tup.Datas[i].Type, tup.Datas[i].Model)
 					if kind != nil {
-						if isDynamicValidType(l.Kind) {
+						if isDynamicValidType(l.Type) {
 							self.data.dynamic.pushVar(getDynamicVar(l.Model), kind)
 						}
 					} else {

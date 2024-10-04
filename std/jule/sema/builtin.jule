@@ -294,7 +294,7 @@ fn builtinCallerError(mut &e: &eval, mut &fc: &ast::FnCallExpr): &Data {
 		ret nil
 	}
 
-	applyRuntimeToStr(e.s, expr.Kind, primAny, token, e.getOwnerRefers())
+	applyRuntimeToStr(e.s, expr.Type, primAny, token, e.getOwnerRefers())
 
 	mut d := buildVoidData()
 	d.Model = &BuiltinErrorCallExprModel{Err: expr}
@@ -316,12 +316,12 @@ fn builtinCallerPrint(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): 
 		ret nil
 	}
 
-	if !isBuiltinStrConvertable(expr.Kind) {
+	if !isBuiltinStrConvertable(expr.Type) {
 		e.pushErr(arg.Token, build::LogMsg.InvalidExpr)
 		ret nil
 	}
 
-	pushRuntimeToStr(e.s, expr.Kind, arg.Token, e.getOwnerRefers())
+	pushRuntimeToStr(e.s, expr.Type, arg.Token, e.getOwnerRefers())
 
 	mut d := buildVoidData()
 	d.Model = &BuiltinPrintCallExprModel{Expr: expr}
@@ -359,23 +359,23 @@ fn builtinCallerNew(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &d: &Data): &D
 		ret nil
 	}
 
-	if !isValidForSptrType(t.Kind) {
-		mut s := t.Kind.Struct()
+	if !isValidForSptrType(t.Type) {
+		mut s := t.Type.Struct()
 		if s != nil && s.Decl != nil && s.Decl.Binded {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.BindedStructForRef)
 		}
 		ret nil
 	}
 
-	d.Kind = &Type{
+	d.Type = &Type{
 		Kind: &Sptr{
-			Elem: t.Kind,
+			Elem: t.Type,
 		},
 	}
 
 	if len(fc.Args) == 2 { // Initialize expression.
 		mut old := e.prefix
-		e.prefix = t.Kind
+		e.prefix = t.Type
 
 		mut init := e.evalExpr(fc.Args[1])
 
@@ -385,17 +385,17 @@ fn builtinCallerNew(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &d: &Data): &D
 			mut token := fc.Args[1].Token
 			const Reference = false
 			e.s.checkValidityForInitExpr(
-				!e.immutable, Reference, t.Kind, init, token)
-			_ = e.s.checkAssignType(false, t.Kind, init, token, e.getOwnerRefers())
+				!e.immutable, Reference, t.Type, init, token)
+			_ = e.s.checkAssignType(false, t.Type, init, token, e.getOwnerRefers())
 
 			d.Model = &BuiltinNewCallExprModel{
-				Kind: t.Kind,
+				Kind: t.Type,
 				Init: init.Model,
 			}
 		}
 	} else {
 		d.Model = &BuiltinNewCallExprModel{
-			Kind: t.Kind,
+			Kind: t.Type,
 		}
 	}
 
@@ -416,7 +416,7 @@ fn builtinCallerPanic(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): 
 		ret nil
 	}
 
-	if expr.Kind.Prim() == nil || !expr.Kind.Prim().IsStr() {
+	if expr.Type.Prim() == nil || !expr.Type.Prim().IsStr() {
 		e.pushErr(fc.Token, build::LogMsg.PanicedWithNonStr)
 	}
 
@@ -449,14 +449,14 @@ fn builtinCallerMake(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &d: &Data): &
 	if !t.Decl {
 		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidType)
 		ret nil
-	} else if t.Kind.Slc() == nil {
-		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidTypeForFn, t.Kind.Str(), "make")
+	} else if t.Type.Slc() == nil {
+		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidTypeForFn, t.Type.Str(), "make")
 		ret nil
 	}
 
-	d.Kind = t.Kind
+	d.Type = t.Type
 
-	mut lenExpr := e.s.evalp(e.lookup, t.Kind).evalExpr(fc.Args[1])
+	mut lenExpr := e.s.evalp(e.lookup, t.Type).evalExpr(fc.Args[1])
 	if lenExpr == nil {
 		ret nil
 	}
@@ -464,12 +464,12 @@ fn builtinCallerMake(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &d: &Data): &
 	e.checkIntegerIndexingByData(lenExpr, fc.Args[1].Token)
 
 	mut model := &BuiltinMakeCallExprModel{
-		Kind: t.Kind,
+		Kind: t.Type,
 		Len: lenExpr.Model,
 	}
 	d.Model = model
 	if len(fc.Args) == 3 {
-		mut capExpr := e.s.evalp(e.lookup, t.Kind).evalExpr(fc.Args[2])
+		mut capExpr := e.s.evalp(e.lookup, t.Type).evalExpr(fc.Args[2])
 		if capExpr == nil {
 			ret d
 		}
@@ -495,7 +495,7 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &d: &Data):
 		ret nil
 	}
 
-	mut s := t.Kind.Slc()
+	mut s := t.Type.Slc()
 	if s == nil {
 		e.pushErr(firstArg.Token, build::LogMsg.InvalidExpr)
 		ret nil
@@ -504,19 +504,19 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &d: &Data):
 	const reference = false // Element parameter is not reference.
 	const mutable = true    // Element parameter is mutable.
 
-	if e.s.checkValidityForInitExpr(mutable, reference, t.Kind, t, firstArg.Token) {
+	if e.s.checkValidityForInitExpr(mutable, reference, t.Type, t, firstArg.Token) {
 		// Check type if validity is good.
 		// Helps to reduce error logs and duplicated logs.
-		_ = e.s.checkAssignType(reference, t.Kind, t, firstArg.Token, e.getOwnerRefers())
+		_ = e.s.checkAssignType(reference, t.Type, t, firstArg.Token, e.getOwnerRefers())
 	}
 
 	mut prefix := e.prefix
-	e.prefix = t.Kind
+	e.prefix = t.Type
 	defer { e.prefix = prefix }
 
 	d = &Data{
 		Mutable: true,
-		Kind: t.Kind,
+		Type: t.Type,
 	}
 	mut secondArg := fc.Args[1]
 	match type secondArg.Kind {
@@ -530,7 +530,7 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &d: &Data):
 			ret nil
 		}
 		if s.Elem.Prim() != nil && s.Elem.Prim().IsU8() { // []byte
-			if e1.Kind.Prim() != nil && e1.Kind.Prim().IsStr() {
+			if e1.Type.Prim() != nil && e1.Type.Prim().IsStr() {
 				// append([]byte, str...)
 				makeVariadic(e1, primU8)
 				d.Model = &BuiltinAppendCallExprModel{
@@ -541,8 +541,8 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &d: &Data):
 			}
 		}
 
-		if !e1.Kind.Variadicable() {
-			e.pushErr(secondArg.Token, build::LogMsg.VariadicWithNonVariadicable, e1.Kind.Str())
+		if !e1.Type.Variadicable() {
+			e.pushErr(secondArg.Token, build::LogMsg.VariadicWithNonVariadicable, e1.Type.Str())
 			ret nil
 		}
 		makeVariadic(e1, s.Elem)
@@ -551,15 +551,15 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &d: &Data):
 		// This is should be made to avoid mutability error for base type of slice.
 		// Element types should still be checked.
 		// Since the variadiced slice will not mutated, just check mutability risk of elements.
-		e1.Kind.Variadic = false
+		e1.Type.Variadic = false
 
 		if e.s.checkValidityForInitExpr(mutable, reference, s.Elem, e1, secondArg.Token) {
-			e1.Kind.Variadic = true
+			e1.Type.Variadic = true
 			// Check type if validity is good.
 			// Helps to reduce error logs and duplicated logs.
 			_ = e.s.checkAssignType(reference, s.Elem, e1, secondArg.Token, e.getOwnerRefers())
 		} else {
-			e1.Kind.Variadic = true
+			e1.Type.Variadic = true
 		}
 		d.Model = &BuiltinAppendCallExprModel{
 			Dest: t.Model,
@@ -582,7 +582,7 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &d: &Data):
 		if e1 == nil {
 			ret nil
 		}
-		if e1.Kind.Variadic {
+		if e1.Type.Variadic {
 			e.pushErr(arg.Token, build::LogMsg.MoreArgsWithVariadiced)
 		}
 		if e.s.checkValidityForInitExpr(mutable, reference, s.Elem, e1, arg.Token) {
@@ -608,24 +608,24 @@ fn callerCopySlice(mut &dest: &Data, mut &e: &eval, mut &fc: &ast::FnCallExpr, m
 	if src == nil {
 		ret nil
 	}
-	mut slc := src.Kind.Slc()
+	mut slc := src.Type.Slc()
 
 	if slc != nil {
 		if !src.Mutable && slc.Elem.Mutable() {
 			e.pushErr(fc.Args[1].Token, build::LogMsg.MutOperationOnImmut)
 		}
-		if !dest.Kind.Equal(src.Kind) {
-			e.pushErr(fc.Args[1].Token, build::LogMsg.IncompatibleTypes, dest.Kind.Str(), src.Kind.Str())
+		if !dest.Type.Equal(src.Type) {
+			e.pushErr(fc.Args[1].Token, build::LogMsg.IncompatibleTypes, dest.Type.Str(), src.Type.Str())
 		}
 	} else {
-		destPrim := dest.Kind.Slc().Elem.Prim()
-		prim := src.Kind.Prim()
+		destPrim := dest.Type.Slc().Elem.Prim()
+		prim := src.Type.Prim()
 		if destPrim == nil || prim == nil || !prim.IsStr() || !destPrim.IsU8() {
-			e.pushErr(fc.Args[1].Token, build::LogMsg.IncompatibleTypes, dest.Kind.Str(), src.Kind.Str())
+			e.pushErr(fc.Args[1].Token, build::LogMsg.IncompatibleTypes, dest.Type.Str(), src.Type.Str())
 		}
 	}
 
-	d.Kind = lenKind()
+	d.Type = lenKind()
 	d.Model = &BuiltinCopyCallExprModel{
 		Dest: dest,
 		Src: src,
@@ -650,7 +650,7 @@ fn builtinCallerCopy(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &d: &Data): &
 	match {
 	| dest == nil:
 		ret nil
-	| dest.Kind.Slc() != nil:
+	| dest.Type.Slc() != nil:
 		ret callerCopySlice(dest, e, fc, d)
 	|:
 		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidType)
@@ -659,7 +659,7 @@ fn builtinCallerCopy(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &d: &Data): &
 }
 
 fn callerLenSlice(mut &expr: &Data, mut &d: &Data): &Data {
-	d.Kind = lenKind()
+	d.Type = lenKind()
 	d.Model = &BuiltinLenCallExprModel{
 		Expr: expr,
 	}
@@ -667,7 +667,7 @@ fn callerLenSlice(mut &expr: &Data, mut &d: &Data): &Data {
 }
 
 fn callerLenMap(mut &expr: &Data, mut &d: &Data): &Data {
-	d.Kind = lenKind()
+	d.Type = lenKind()
 	d.Model = &BuiltinLenCallExprModel{
 		Expr: expr,
 	}
@@ -675,14 +675,14 @@ fn callerLenMap(mut &expr: &Data, mut &d: &Data): &Data {
 }
 
 fn callerLenArr(mut &expr: &Data, mut &d: &Data): &Data {
-	d.Kind = lenKind()
-	d.Constant = constant::Const.NewI64(i64(expr.Kind.Arr().N))
+	d.Type = lenKind()
+	d.Constant = constant::Const.NewI64(i64(expr.Type.Arr().N))
 	d.Model = d.Constant
 	ret d
 }
 
 fn callerLenStr(mut &expr: &Data, mut &d: &Data): &Data {
-	d.Kind = lenKind()
+	d.Type = lenKind()
 	if expr.IsConst() {
 		d.Constant = constant::Const.NewI64(i64(len(expr.Constant.ReadStr())))
 		d.Model = d.Constant
@@ -695,7 +695,7 @@ fn callerLenStr(mut &expr: &Data, mut &d: &Data): &Data {
 }
 
 fn callerLenComptime(mut &d: &Data, n: int): &Data {
-	d.Kind = lenKind()
+	d.Type = lenKind()
 	d.Constant = constant::Const.NewI64(i64(n))
 	d.Model = d.Constant
 	ret d
@@ -713,28 +713,28 @@ fn builtinCallerLen(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &d: &Data): &D
 	match {
 	| dest == nil:
 		ret nil
-	| dest.Kind.Slc() != nil:
+	| dest.Type.Slc() != nil:
 		ret callerLenSlice(dest, d)
-	| dest.Kind.Arr() != nil:
+	| dest.Type.Arr() != nil:
 		ret callerLenArr(dest, d)
-	| dest.Kind.Map() != nil:
+	| dest.Type.Map() != nil:
 		ret callerLenMap(dest, d)
-	| dest.Kind.Prim() != nil && dest.Kind.Prim().IsStr():
+	| dest.Type.Prim() != nil && dest.Type.Prim().IsStr():
 		ret callerLenStr(dest, d)
-	| dest.Kind.comptimeStructFields() != nil:
-		ret callerLenComptime(d, len(dest.Kind.comptimeStructFields().fields))
-	| dest.Kind.comptimeEnumFields() != nil:
-		ret callerLenComptime(d, len(dest.Kind.comptimeEnumFields().fields))
-	| dest.Kind.comptimeTypeInfos() != nil:
-		ret callerLenComptime(d, len(dest.Kind.comptimeTypeInfos().types))
-	| dest.Kind.comptimeParams() != nil:
-		ret callerLenComptime(d, len(dest.Kind.comptimeParams().params))
-	| dest.Kind.comptimeStatics() != nil:
-		ret callerLenComptime(d, len(dest.Kind.comptimeStatics().fields))
-	| dest.Kind.comptimeFiles() != nil:
-		ret callerLenComptime(d, len(dest.Kind.comptimeFiles().files))
-	| dest.Kind.comptimeDecls() != nil:
-		ret callerLenComptime(d, len(dest.Kind.comptimeDecls().decls))
+	| dest.Type.comptimeStructFields() != nil:
+		ret callerLenComptime(d, len(dest.Type.comptimeStructFields().fields))
+	| dest.Type.comptimeEnumFields() != nil:
+		ret callerLenComptime(d, len(dest.Type.comptimeEnumFields().fields))
+	| dest.Type.comptimeTypeInfos() != nil:
+		ret callerLenComptime(d, len(dest.Type.comptimeTypeInfos().types))
+	| dest.Type.comptimeParams() != nil:
+		ret callerLenComptime(d, len(dest.Type.comptimeParams().params))
+	| dest.Type.comptimeStatics() != nil:
+		ret callerLenComptime(d, len(dest.Type.comptimeStatics().fields))
+	| dest.Type.comptimeFiles() != nil:
+		ret callerLenComptime(d, len(dest.Type.comptimeFiles().files))
+	| dest.Type.comptimeDecls() != nil:
+		ret callerLenComptime(d, len(dest.Type.comptimeDecls().decls))
 	|:
 		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidExpr)
 		ret nil
@@ -742,7 +742,7 @@ fn builtinCallerLen(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &d: &Data): &D
 }
 
 fn callerCapSlice(mut &expr: &Data, mut &d: &Data): &Data {
-	d.Kind = lenKind()
+	d.Type = lenKind()
 	d.Model = &BuiltinCapCallExprModel{
 		Expr: expr,
 	}
@@ -764,7 +764,7 @@ fn builtinCallerCap(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &d: &Data): &D
 	| dest.Decl:
 		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidExpr)
 		ret nil
-	| dest.Kind.Slc() != nil:
+	| dest.Type.Slc() != nil:
 		ret callerCapSlice(dest, d)
 	|:
 		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidExpr)
@@ -790,7 +790,7 @@ fn callerDeleteMap(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &expr: &Data, m
 			ret nil
 		|:
 			const Reference = false
-			mut keyType := expr.Kind.Map().Key
+			mut keyType := expr.Type.Map().Key
 			if !e.s.checkAssignType(Reference, keyType, key, fc.Args[1].Token, e.getOwnerRefers()) {
 				ret nil
 			}
@@ -816,7 +816,7 @@ fn builtinCallerDelete(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &d: &Data):
 	| dest.Decl:
 		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidExpr)
 		ret nil
-	| dest.Kind.Map() != nil:
+	| dest.Type.Map() != nil:
 		ret callerDeleteMap(e, fc, dest, d)
 	|:
 		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidExpr)
@@ -837,7 +837,7 @@ fn builtinCallerStdComptimeTypeOf(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut 
 	if d == nil {
 		ret nil
 	}
-	f := d.Kind.Fn()
+	f := d.Type.Fn()
 	if f != nil {
 		if f.IsBuiltin() {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidTypeForTypeOf, "<built-in fn>")
@@ -848,16 +848,16 @@ fn builtinCallerStdComptimeTypeOf(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut 
 			ret nil
 		}
 	}
-	s := d.Kind.Struct()
+	s := d.Type.Struct()
 	if s != nil && len(s.Generics) != len(s.Decl.Generics) {
 		e.pushErr(fc.Args[0].Token, build::LogMsg.HasGenerics)
 		ret nil
 	}
-	if d.Kind.comptime() {
-		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidTypeForTypeOf, d.Kind.Str())
+	if d.Type.comptime() {
+		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidTypeForTypeOf, d.Type.Str())
 		ret nil
 	}
-	ret buildComptimeTypeInfoData(e.s, d.Kind)
+	ret buildComptimeTypeInfoData(e.s, d.Type)
 }
 
 fn builtinCallerStdComptimeValueOf(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
@@ -874,7 +874,7 @@ fn builtinCallerStdComptimeValueOf(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut
 	}
 	// Do not allow value if has unsupported type for type infer.
 	if !isGoodValueToInfer(d) {
-		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidTypeForFn, d.Kind.Str(), "ValueOf")
+		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidTypeForFn, d.Type.Str(), "ValueOf")
 		ret nil
 	}
 	ret buildComptimeValue(d)
@@ -886,7 +886,7 @@ fn builtinCallerStdComptimeLine(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &_
 	}
 	mut constant := constant::Const.NewI64(i64(fc.Token.Row))
 	ret &Data{
-		Kind: primInt,
+		Type: primInt,
 		Constant: constant,
 		Model: constant,
 	}
@@ -897,7 +897,7 @@ fn builtinCallerStdComptimeFile(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &_
 		e.pushErr(fc.Args[1].Token, build::LogMsg.ArgumentOverflow, "File")
 	}
 	ret &Data{
-		Kind: &Type{
+		Type: &Type{
 			Kind: &comptimeFile{
 				file: e.s.file,
 			},
@@ -910,7 +910,7 @@ fn builtinCallerStdComptimeFiles(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &
 		e.pushErr(fc.Args[1].Token, build::LogMsg.ArgumentOverflow, "Files")
 	}
 	ret &Data{
-		Kind: &Type{
+		Type: &Type{
 			Kind: &comptimeFiles{
 				files: e.s.files,
 			},
@@ -964,9 +964,9 @@ fn builtinCallerStdComptimeTypeAlias(mut &e: &eval, mut &fc: &ast::FnCallExpr, m
 		ret nil
 	}
 	if t.Decl {
-		alias.TypeSym.Type = t.Kind
+		alias.TypeSym.Type = t.Type
 	} else {
-		mut cti := t.Kind.comptimeTypeInfo()
+		mut cti := t.Type.comptimeTypeInfo()
 		if cti == nil {
 			e.pushErr(fc.Args[1].Token, build::LogMsg.InvalidSyntax)
 			e.pushSuggestion(build::LogMsg.ExpectedType)
@@ -980,7 +980,7 @@ fn builtinCallerStdComptimeTypeAlias(mut &e: &eval, mut &fc: &ast::FnCallExpr, m
 
 fn builtinCallerStdMemSizeOf(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
 	mut result := &Data{
-		Kind: primUint,
+		Type: primUint,
 	}
 
 	if len(fc.Args) < 1 {
@@ -995,8 +995,8 @@ fn builtinCallerStdMemSizeOf(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &_: &
 	if d == nil {
 		ret result
 	}
-	if !validTypeForXof(d.Kind) {
-		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidTypeForFn, d.Kind.Str(), "SizeOf")
+	if !validTypeForXof(d.Type) {
+		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidTypeForFn, d.Type.Str(), "SizeOf")
 	}
 
 	result.Model = &SizeofExprModel{Expr: d.Model}
@@ -1005,7 +1005,7 @@ fn builtinCallerStdMemSizeOf(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &_: &
 
 fn builtinCallerStdMemAlignOf(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
 	mut result := &Data{
-		Kind: primUint,
+		Type: primUint,
 	}
 
 	if len(fc.Args) < 1 {
@@ -1020,8 +1020,8 @@ fn builtinCallerStdMemAlignOf(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &_: 
 	if d == nil {
 		ret result
 	}
-	if !validTypeForXof(d.Kind) {
-		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidTypeForFn, d.Kind.Str(), "AlignOf")
+	if !validTypeForXof(d.Type) {
+		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidTypeForFn, d.Type.Str(), "AlignOf")
 	}
 
 	result.Model = &AlignofExprModel{Expr: d.Model}
@@ -1042,7 +1042,7 @@ fn builtinCallerStdMemFree(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &_: &Da
 		ret nil
 	}
 
-	if !d.Kind.GC() {
+	if !d.Type.GC() {
 		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidExpr)
 	}
 
@@ -1066,8 +1066,8 @@ fn builtinCallerStdJuleIntegratedEmit(mut &e: &eval, mut &fc: &ast::FnCallExpr, 
 		ret nil
 	}
 
-	if argd.Kind.Prim() == nil || !argd.Kind.Prim().IsStr() {
-		e.pushErr(fc.Args[0].Token, build::LogMsg.IncompatibleTypes, types::Kind.Str, argd.Kind.Str())
+	if argd.Type.Prim() == nil || !argd.Type.Prim().IsStr() {
+		e.pushErr(fc.Args[0].Token, build::LogMsg.IncompatibleTypes, types::Kind.Str, argd.Type.Str())
 		ret nil
 	}
 
@@ -1078,9 +1078,9 @@ fn builtinCallerStdJuleIntegratedEmit(mut &e: &eval, mut &fc: &ast::FnCallExpr, 
 
 	mut r := buildVoidData()
 
-	mut f := d.Kind.Fn()
+	mut f := d.Type.Fn()
 	if len(f.Generics) > 0 {
-		r.Kind = f.Generics[0].Kind
+		r.Type = f.Generics[0].Kind
 	}
 
 	mut model := &BackendEmitExprModel{

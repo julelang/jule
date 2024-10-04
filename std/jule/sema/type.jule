@@ -1407,7 +1407,7 @@ impl typeChecker {
 			if !size.IsConst() {
 				self.pushErr(decl.Size.Token, build::LogMsg.ExprNotConst)
 				ret nil
-			} else if size.Kind.Prim() == nil || !types::IsInt(size.Kind.Prim().Kind) {
+			} else if size.Type.Prim() == nil || !types::IsInt(size.Type.Prim().Kind) {
 				self.pushErr(decl.Size.Token, build::LogMsg.ArraySizeIsNotInt)
 				ret nil
 			}
@@ -1799,12 +1799,12 @@ fn getStructFromKind(mut k: &Type): &Struct {
 
 fn applyImplicitCast(mut &s: &sema, mut &dest: &Type, mut &d: &Data,
 	mut &token: &token::Token, mut refers: &ReferenceStack) {
-	if d.Kind.IsNil() {
+	if d.Type.IsNil() {
 		ret
 	}
 	destPrim := dest.Prim()
 	if destPrim != nil && destPrim.IsAny() {
-		prim := d.Kind.Prim()
+		prim := d.Type.Prim()
 		if prim == nil || !prim.IsAny() {
 			applyCastKind(s, d, dest, token, refers)
 		}
@@ -1813,14 +1813,14 @@ fn applyImplicitCast(mut &s: &sema, mut &dest: &Type, mut &d: &Data,
 
 	dt := dest.Trait()
 	if dt != nil {
-		bt := d.Kind.Trait()
+		bt := d.Type.Trait()
 		if bt == nil || bt != dt {
 			applyCastKindModel(s, d, dest, token, refers)
 			ret
 		}
 	}
 
-	if dest.TypeEnum() != nil && d.Kind.TypeEnum() == nil {
+	if dest.TypeEnum() != nil && d.Type.TypeEnum() == nil {
 		applyCastKindModel(s, d, dest, token, refers)
 		ret
 	}

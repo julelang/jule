@@ -234,7 +234,7 @@ impl exprOptimizer {
 		match type m.Left.Model {
 		| &sema::BuiltinLenCallExprModel:
 			mut blc := (&sema::BuiltinLenCallExprModel)(m.Left.Model)
-			if !isBoundaryValidType(blc.Expr.Kind) {
+			if !isBoundaryValidType(blc.Expr.Type) {
 				ret
 			}
 			if m.Op.Id != token::Id.Gt && m.Op.Id != token::Id.Eqs {
@@ -257,7 +257,7 @@ impl exprOptimizer {
 		match type m.Right.Model {
 		| &sema::BuiltinLenCallExprModel:
 			mut blc := (&sema::BuiltinLenCallExprModel)(m.Right.Model)
-			if !isBoundaryValidType(blc.Expr.Kind) {
+			if !isBoundaryValidType(blc.Expr.Type) {
 				ret
 			}
 			if m.Op.Id != token::Id.Lt && m.Op.Id != token::Id.Eqs {
@@ -430,7 +430,7 @@ impl exprOptimizer {
 			if !Access {
 				ret
 			}
-			if self.data.nils != nil && isNilValidType(m.Expr.Kind) {
+			if self.data.nils != nil && isNilValidType(m.Expr.Type) {
 				var := getNilVar(m.Expr.Model)
 				if self.data.nils.isSafe(var) {
 					mut model := any(&UnsafeDerefExprModel{Base: m})
@@ -455,7 +455,7 @@ impl exprOptimizer {
 	fn structureLit(self, mut m: &sema::StructLitExprModel) {
 		for (_, mut arg) in m.Args {
 			if self.data.boundary != nil {
-				if isBoundaryRiskyType(arg.Expr.Kind) {
+				if isBoundaryRiskyType(arg.Expr.Type) {
 					possibleBoundaryRemove(self.data.boundary, arg)
 				}
 			}
@@ -522,7 +522,7 @@ impl exprOptimizer {
 			ret
 		}
 
-		array := m.Expr.Kind.Arr() != nil
+		array := m.Expr.Type.Arr() != nil
 		// Constants checked by semantic analysis for arrays, safe.
 		if array && m.Index.IsConst() {
 			mut model := any(&UnsafeIndexingExprModel{Node: m})
@@ -530,7 +530,7 @@ impl exprOptimizer {
 			ret
 		}
 
-		if self.data.boundary != nil && isBoundaryValidType(m.Expr.Kind) {
+		if self.data.boundary != nil && isBoundaryValidType(m.Expr.Type) {
 			var := getBoundaryVar(m.Expr.Model)
 			if self.data.boundary.fitsMaxSize(var, m.Index.Model) {
 				mut model := any(&UnsafeIndexingExprModel{Node: m})
