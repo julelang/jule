@@ -1,0 +1,57 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/comptime"
+use "std/jule/sema"
+
+// Linkpath of common packages.
+const linkpathStrings = "std/strings"
+
+// Program metadata for the main IR.
+// All required packages use this metada collection instead of
+// transferring data between algorithms.
+// It is safe to read for concurrent implementations.
+// In good practice, it should be build once.
+// Default value is nil, but it should be initialized before relevant algorithms.
+// This variable always assumed as non-nil.
+static mut ProgramMeta = (&Meta)(nil)
+
+// Metadata for strings::Builder.
+struct MetaStrBuilder {
+	Write: &sema::FnIns
+	WriteByte: &sema::FnIns
+	WriteRune: &sema::FnIns
+	WriteStr: &sema::FnIns
+}
+
+// Metadata for common objects.
+struct Meta {
+	StrBuilder: &MetaStrBuilder
+}
+
+impl Meta {
+	// Collects whole possible metadata from IR.
+	static fn Collect(mut ir: &IR): &Meta {
+		mut meta := new(Meta)
+		meta.StrBuilder = Meta.CollectStrBuilder(ir)
+		ret meta
+	}
+
+	// Collects strings::Builder metadata from IR if possible.
+	static fn CollectStrBuilder(mut &ir: &IR): &MetaStrBuilder {
+		const Binded = false
+		const Static = false
+		mut p := SelectImport(ir.Used, linkpathStrings)
+		if p == nil {
+			ret nil
+		}
+		mut b := p.FindTypeAlias("Builder", Binded).TypeSym.Type.Struct()
+		mut meta := new(MetaStrBuilder)
+		const metav = comptime::ValueOf(*meta)
+		const for _, f in metav.Type().Decl().Fields() {
+			metav.Field(f.Name()).Unwrap() = b.FindMethod(f.Name(), Static).Instances[0]
+		}
+		ret meta
+	}
+}

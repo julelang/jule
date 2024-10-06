@@ -259,6 +259,8 @@ fn checkOptFlag(&opt: str) {
 		break
 	| "L1":
 		opt::PushOptLevel(opt::OptLevel.L1)
+	| "L2":
+		opt::PushOptLevel(opt::OptLevel.L2)
 	|:
 		handle::Throw("--opt: invalid optimization level: " + opt)
 	}
@@ -306,6 +308,7 @@ fn checkFlags(&args: []str): []str {
 	fs.AddVar[bool](unsafe { (&bool)(&opt::Exceptional) }, "opt-exceptional", 0, "Exceptional optimizations")
 	fs.AddVar[bool](unsafe { (&bool)(&opt::Iter) }, "opt-iter", 0, "Iterations optimizations")
 	fs.AddVar[bool](unsafe { (&bool)(&opt::Dynamic) }, "opt-dynamic", 0, "Dynamic programming optimizations")
+	fs.AddVar[bool](unsafe { (&bool)(&opt::StdStrings) }, "opt-std-strings", 0, "Special optimizations for the std/strings package")
 
 	mut content := fs.Parse(args) else {
 		handle::Throw(str(error))
@@ -382,6 +385,9 @@ fn compileCommand(mut &args: []str) {
 			handle::Throw(build::Logf(build::LogMsg.NoEntryPoint))
 		}
 	}
+
+	// Build program metadata by IR.
+	obj::ProgramMeta = obj::Meta.Collect(ir)
 
 	applyTargetIndependentOptimizations(ir)
 

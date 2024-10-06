@@ -24,9 +24,13 @@ impl Optimizer {
 		}
 	}
 
+	fn optimizeExpr(mut self, mut &model: sema::ExprModel) {
+		exprOptimizer.optimize(model)
+	}
+
 	fn optimizeGlobal(mut self, mut &v: &sema::Var) {
 		if !v.Binded {
-			exprOptimizer.optimize(v.Value.Data.Model)
+			self.optimizeExpr(v.Value.Data.Model)
 		}
 	}
 
@@ -47,7 +51,7 @@ impl Optimizer {
 		for (_, mut ins) in s.Instances {
 			for (_, mut f) in ins.Fields {
 				if f.Default != nil {
-					exprOptimizer.optimize(f.Default.Model)
+					self.optimizeExpr(f.Default.Model)
 				}
 			}
 			for (_, mut m) in ins.Methods {
@@ -112,7 +116,7 @@ impl Optimizer {
 }
 
 fn detectEnabled() {
-	exprEnabled = Ptr || Math || Access || Cond
+	exprEnabled = StdStrings || Ptr || Math || Access || Cond
 	scopeEnabled = Cond || Append || Copy || Str || Slice || Assign || Exceptional ||
 		Iter || Dynamic
 }

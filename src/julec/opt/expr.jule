@@ -4,6 +4,7 @@
 
 use "env"
 use "obj"
+use "std/comptime"
 use "std/jule/constant"
 use "std/jule/sema"
 use "std/jule/token"
@@ -510,10 +511,30 @@ impl exprOptimizer {
 		scopt.optimize()
 	}
 
+	fn optimizeStrBuilderCall(self, mut &m: &sema::FnCallExprModel) {
+		// Some strings::Builder methods are not real-exceptional implementations.
+		// They just implements interfaces and not throws any exceptional.
+		// Therefore we can remove exceptional handling algorithms for these method calls.
+		const meta = comptime::ValueOf(*obj::ProgramMeta.StrBuilder)
+		const for _, f in meta.Type().Decl().Fields() {
+			if meta.Field(f.Name()).Unwrap() == m.Func {
+				mut model := any(&FnCallIgnoreExceptionalExprModel{Base: m})
+				*self.model = unsafe { *(*sema::ExprModel)(&model) }
+
+				// Return function, skip following if statements if exist.
+				ret
+			}
+		}
+	}
+
 	fn funcCall(self, mut m: &sema::FnCallExprModel) {
 		self.args(m.Func.Params, m.Args)
 		if m.Except != nil {
 			self.scope(m.Except)
+		}
+		match {
+		| StdStrings && obj::ProgramMeta.StrBuilder != nil:
+			self.optimizeStrBuilderCall(m)
 		}
 	}
 

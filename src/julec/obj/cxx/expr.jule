@@ -33,6 +33,7 @@ enum compExprModel: type {
 	&opt::EmptyCompareExprModel,
 	&opt::UnsafeDerefExprModel,
 	&opt::UnsafeCastingExprModel,
+	&opt::FnCallIgnoreExceptionalExprModel,
 }
 
 struct exprCoder {
@@ -937,7 +938,7 @@ impl exprCoder {
 		self.oc.write("};")
 	}
 
-	fn funcCall(mut &self, mut m: &sema::FnCallExprModel) {
+	fn funcCall(mut &self, mut m: &sema::FnCallExprModel, ignoreExceptional: bool) {
 		if m.IsCo {
 			// Do not check for exceptionals,
 			// exceptional functions cannot be called with co.
@@ -948,6 +949,16 @@ impl exprCoder {
 			!m.Func.Decl.Exceptional ||
 			m.Except != nil && len(m.Except.Stmts) == 0 {
 			self.pureFuncCall(m)
+			ret
+		}
+
+		if ignoreExceptional {
+			// Ignore exceptional mode is on.
+			// Just call function purely and use return value of exceptional if exist.
+			self.pureFuncCall(m)
+			if m.Func.Result != nil {
+				self.oc.write(".result")
+			}
 			ret
 		}
 
@@ -1678,7 +1689,7 @@ impl exprCoder {
 		| &sema::CastingExprModel:
 			self.casting((&sema::CastingExprModel)(m))
 		| &sema::FnCallExprModel:
-			self.funcCall((&sema::FnCallExprModel)(m))
+			self.funcCall((&sema::FnCallExprModel)(m), false)
 		| &sema::SliceExprModel:
 			self.slice((&sema::SliceExprModel)(m))
 		| &sema::ArrayExprModel:
@@ -1743,6 +1754,8 @@ impl exprCoder {
 			self.unsafeDeref((&opt::UnsafeDerefExprModel)(m))
 		| &opt::UnsafeCastingExprModel:
 			self.unsafeCasting((&opt::UnsafeCastingExprModel)(m))
+		| &opt::FnCallIgnoreExceptionalExprModel:
+			self.funcCall((&opt::FnCallIgnoreExceptionalExprModel)(m).Base, true)
 		|:
 			self.oc.write("<unimplemented_expression_model>")
 		}
