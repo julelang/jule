@@ -390,6 +390,13 @@ impl exprOptimizer {
 				// bitwise and is not checked at runtime, so it is optimize enough.
 				ret
 			}
+		| token::Id.Caret:
+			// Optimize x^0 computations to x.
+			s := (&constant::Const)(m.Right.Model).AsF64()
+			if s == 0 {
+				*self.model = m.Left.Model
+				ret
+			}
 		| token::Id.Shl | token::Id.Shr:
 			// semantic anlayzer guarantees right operator is unsigned if constant
 			z := types::BitSizeOf(lp.Kind)

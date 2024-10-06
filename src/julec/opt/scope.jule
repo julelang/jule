@@ -435,7 +435,8 @@ impl scopeOptimizer {
 		exprOptimizer.optimizeData(assign.Right.Model, self.data)
 
 		match assign.Op.Id {
-		| token::Id.SolidusEq | token::Id.PercentEq | token::Id.ShlEq | token::Id.ShrEq:
+		| token::Id.CaretEq | token::Id.SolidusEq | token::Id.PercentEq
+		| token::Id.ShlEq | token::Id.ShrEq:
 			// Do not check structures.
 			if !Math || assign.Left.Type.Struct() != nil {
 				break
@@ -454,6 +455,9 @@ impl scopeOptimizer {
 			| token::Id.ShrEq:
 				assign.Op.Id = token::Id.Shr
 				assign.Op.Kind = token::Kind.Shr
+			| token::Id.CaretEq:
+				assign.Op.Id = token::Id.Caret
+				assign.Op.Kind = token::Kind.Caret
 			|:
 				panic("opt: implementation mistake, this panic call should be unreachable")
 			}
@@ -467,6 +471,12 @@ impl scopeOptimizer {
 			if model != b {
 				// Binary model optimized.
 				// Use optimized model directly.
+				if assign.Op.Id == token::Id.Caret {
+					// If caret operator optimized, it is equal to self assignment.
+					// Remove this unnecessary statement.
+					self.removeCurrent()
+					ret
+				}
 				assign.Right = new(sema::OperandExprModel, *assign.Right)
 				b.Op = new(token::Token, *b.Op) // Unsafe model wraps original model. Save token.
 				assign.Op.Id = token::Id.Eq
