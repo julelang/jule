@@ -377,17 +377,16 @@ fn compileCommand(mut &args: []str) {
 	}
 	mut ir := buildIr(args)
 
-	const Binded = false
+	// Build program metadata by IR.
+	obj::ProgramMeta = obj::Meta.Collect(ir)
 
 	if !env::Test {
-		mut main := ir.Main.FindFn(build::EntryPoint, Binded)
-		if main == nil {
+		const Binded = false
+		obj::ProgramMeta.EntryPoint = ir.Main.FindFn(build::EntryPoint, Binded)
+		if obj::ProgramMeta.EntryPoint == nil {
 			handle::Throw(build::Logf(build::LogMsg.NoEntryPoint))
 		}
 	}
-
-	// Build program metadata by IR.
-	obj::ProgramMeta = obj::Meta.Collect(ir)
 
 	applyTargetIndependentOptimizations(ir)
 
