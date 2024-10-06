@@ -87,7 +87,14 @@ impl scopeOptimizer {
 			}
 			ret
 		}
+
+		// CAST production is equals to &Data statement for "_ = EXPR" assignments.
+		// And there is no informative or useful optimization data for some optimizations.
+		// Therefore avoid using this expressions as useful data for relevant optimizations.
+		dataFlags := self.data.flags
+		self.data.flags |= dataFlag.NoConditional
 		exprOptimizer.optimizeData(d.Model, self.data)
+		self.data.flags = dataFlags
 	}
 
 	fn optimizeVar(mut &self, mut v: &sema::Var) {
