@@ -174,7 +174,7 @@ impl exprOptimizer {
 		ret true
 	}
 
-	fn tryNeutralElement1(self, mut &m: &sema::BinaryExprModel, mut c: &constant::Const, &nc: &sema::OperandExprModel): bool {
+	fn tryNeutralElement1(self, mut &m: &sema::BinaryExprModel, mut c: &constant::Const, mut &nc: &sema::OperandExprModel): bool {
 		if c.IsStr() { // Constant is string, check for string optimizations.
 			if !Str {
 				ret false
@@ -205,6 +205,12 @@ impl exprOptimizer {
 			*self.model = c
 			ret true
 		| token::Id.Star:
+			if types::IsFloat(nc.Type.Prim().Kind) {
+				// If type is float, do not apply this optimization.
+				// Because multiplication with zero is not equals to zero always.
+				// For example, 0*NaN != 0.
+				break
+			}
 			c.SetI64(0)
 			*self.model = c
 			ret true
