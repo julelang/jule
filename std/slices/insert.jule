@@ -1,0 +1,151 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+// The Jule code is a modified version of the original Go code from
+// https://github.com/golang/go/blob/2bffb8b3fb2d9137ccfa87fc35137371b86a2e96/src/slices/slices.go and came with this notice.
+//
+// ====================================================
+// Copyright (c) 2009 The Go Authors. All rights reserved.
+// 
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+// 
+//    * Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+//    * Redistributions in binary form must reproduce the above
+// copyright notice, this list of conditions and the following disclaimer
+// in the documentation and/or other materials provided with the
+// distribution.
+//    * Neither the name of Google Inc. nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+// 
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// ====================================================
+
+use "std/mem"
+
+// Rotates s left by r spaces.
+// sFinal[i] = sOrig[i+r], wrapping around.
+fn rotateLeft[E](mut s: []E, r: int) {
+	Reverse(s[:r])
+	Reverse(s[r:])
+	Reverse(s)
+}
+
+fn rotateRight[E](mut s: []E, r: int) {
+	rotateLeft(s, len(s)-r)
+}
+
+// overlaps reports whether the memory ranges a[:len(a)] and b[:len(b)] overlap.
+fn overlaps[E](a: []E, b: []E): bool {
+	if len(a) == 0 || len(b) == 0 {
+		ret false
+	}
+	elemSize := mem::SizeOf(E)
+	if elemSize == 0 {
+		ret false
+	}
+	ret &a[0] <= &b[len(b)-1]+(elemSize-1) &&
+		&b[0] <= &a[len(a)-1]+(elemSize-1)
+}
+
+// Inserts the values v... into s at index i,
+// returning the modified slice.
+// The elements at s[i:] are shifted up to make room.
+// In the returned slice r, r[i] == v[0],
+// and, if i < len(s), r[i+len(v)] == value originally at r[i].
+// Insert panics if i > len(s).
+// This function is O(len(s) + len(v)).
+fn Insert[S: []E, E](mut s: S, i: int, v: ...E): S {
+	_ = s[i:] // bounds check
+
+	m := len(v)
+	if m == 0 {
+		ret s
+	}
+	n := len(s)
+	if i == n {
+		ret append(s, v...)
+	}
+	if n+m > cap(s) {
+		// Use append rather than make so that we bump the size of
+		// the slice up to the next storage class.
+		// This is what Grow does but we don't call Grow because
+		// that might copy the values twice.
+		mut s2 := append(s[:i], make(S, n+m-i)...)
+		copy(s2[i:], v)
+		copy(s2[i+m:], s[i:])
+		ret s2
+	}
+	s = s[:n+m]
+
+	// before:
+	// s: aaaaaaaabbbbccccccccdddd
+	//            ^   ^       ^   ^
+	//            i  i+m      n  n+m
+	// after:
+	// s: aaaaaaaavvvvbbbbcccccccc
+	//            ^   ^       ^   ^
+	//            i  i+m      n  n+m
+	//
+	// a are the values that don't move in s.
+	// v are the values copied in from v.
+	// b and c are the values from s that are shifted up in index.
+	// d are the values that get overwritten, never to be seen again.
+
+	if !overlaps(v, s[i+m:]) {
+		// Easy case - v does not overlap either the c or d regions.
+		// (It might be in some of a or b, or elsewhere entirely.)
+		// The data we copy up doesn't write to v at all, so just do it.
+
+		copy(s[i+m:], s[i:])
+
+		// Now we have
+		// s: aaaaaaaabbbbbbbbcccccccc
+		//            ^   ^       ^   ^
+		//            i  i+m      n  n+m
+		// Note the b values are duplicated.
+
+		copy(s[i:], v)
+
+		// Now we have
+		// s: aaaaaaaavvvvbbbbcccccccc
+		//            ^   ^       ^   ^
+		//            i  i+m      n  n+m
+		// That's the result we want.
+		ret s
+	}
+
+	// The hard case - v overlaps c or d. We can't just shift up
+	// the data because we'd move or clobber the values we're trying
+	// to insert.
+	// So instead, write v on top of d, then rotate.
+	copy(s[n:], v)
+
+	// Now we have
+	// s: aaaaaaaabbbbccccccccvvvv
+	//            ^   ^       ^   ^
+	//            i  i+m      n  n+m
+
+	rotateRight(s[i:], m)
+
+	// Now we have
+	// s: aaaaaaaavvvvbbbbcccccccc
+	//            ^   ^       ^   ^
+	//            i  i+m      n  n+m
+	// That's the result we want.
+	ret s
+}
