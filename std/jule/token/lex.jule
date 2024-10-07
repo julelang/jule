@@ -142,7 +142,7 @@ fn floatFmtE(&txt: []byte, mut i: int): (lit: str) {
 	first := i
 	for i < len(txt); i++ {
 		b = txt[i]
-		if b != '_' && !IsDecimal(b) {
+		if b != '_' && !IsDecimal(rune(b)) {
 			break
 		}
 	}
@@ -167,7 +167,7 @@ loop:
 	for i < len(txt); i++ {
 		b := txt[i]
 		match {
-		| b == '_' | IsDecimal(b):
+		| b == '_' | IsDecimal(rune(b)):
 			continue
 		| isFloatFmtP(b, i):
 			ret floatFmtP(txt, i)
@@ -202,7 +202,7 @@ fn floatNum(&txt: []byte, mut i: int): (lit: str) {
 		if i > 1 && (b == 'e' || b == 'E') {
 			ret floatFmtE(txt, i)
 		}
-		if b != '_' && !IsDecimal(b) {
+		if b != '_' && !IsDecimal(rune(b)) {
 			break
 		}
 	}
@@ -225,7 +225,7 @@ loop:
 			continue
 		| isFloatFmtE(b, i):
 			ret floatFmtE(txt, i)
-		| !IsDecimal(b):
+		| !IsDecimal(rune(b)):
 			break loop
 		}
 	}
@@ -247,7 +247,7 @@ fn binaryNum(&txt: []byte): (lit: str) {
 	const BinaryStart = 2
 	mut i := BinaryStart
 	for i < len(txt); i++ {
-		if txt[i] != '_' && !IsBinary(txt[i]) {
+		if txt[i] != '_' && !IsBinary(rune(txt[i])) {
 			break
 		}
 	}
@@ -275,7 +275,7 @@ loop:
 	for i < len(txt); i++ {
 		b := txt[i]
 		match {
-		| b == '_' | IsDecimal(b):
+		| b == '_' | IsDecimal(rune(b)):
 			continue
 		| isFloatFmtP(b, i):
 			ret true
@@ -346,7 +346,7 @@ fn octalNum(&txt: []byte): (lit: str) {
 		if isFloatFmtE(b, i) {
 			ret floatFmtE(txt, i)
 		}
-		if b != '_' && !IsOctal(b) {
+		if b != '_' && !IsOctal(rune(b)) {
 			break
 		}
 	}
@@ -379,7 +379,7 @@ loop:
 			ret floatFmtP(txt, i)
 		| isFloatFmtDotnp(txt, i):
 			ret floatFmtDotnp(txt, i)
-		| b != '_' && !IsHex(b):
+		| b != '_' && !IsHex(rune(b)):
 			break loop
 		}
 	}
@@ -398,7 +398,7 @@ fn hexEscape(&txt: []byte, n: int): (seq: str) {
 	const HexStart = 2
 	mut i := HexStart
 	for i < n; i++ {
-		if !IsHex(txt[i]) {
+		if !IsHex(rune(txt[i])) {
 			ret
 		}
 	}
@@ -427,7 +427,7 @@ fn byteEscape(&txt: []byte): (seq: str) {
 	if len(txt) < 4 {
 		ret
 	}
-	if !IsOctal(txt[1]) || !IsOctal(txt[2]) || !IsOctal(txt[3]) {
+	if !IsOctal(rune(txt[1])) || !IsOctal(rune(txt[2])) || !IsOctal(rune(txt[3])) {
 		ret
 	}
 	ret str(txt[:4])
@@ -479,7 +479,7 @@ impl lex {
 
 		for i < len(ln) {
 			pr, n := utf8::DecodeRune(ln[i:])
-			if pr != '_' && !IsDecimal(byte(pr)) && !IsLetter(pr) {
+			if pr != '_' && !IsDecimal(pr) && !IsLetter(pr) {
 				self.pos += i
 				ret str(ln[:i])
 			}
