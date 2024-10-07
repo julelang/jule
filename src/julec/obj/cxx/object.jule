@@ -13,6 +13,7 @@ use "std/jule/sema"
 use "std/jule/token"
 use "std/jule/types"
 use "std/os/filepath"
+use "std/slices"
 use "std/strings"
 use "std/time"
 use "std/unsafe"
@@ -1309,11 +1310,9 @@ impl ObjectCoder {
 
 	fn insertBuf(mut &self, mut &buf: strings::Builder, pos: int) {
 		if buf.Len() > 0 {
-			mut head := make([]byte, 0, self.Buf.Len()+buf.Len())
-			head = append(head, unsafe { self.Buf.Buf() }[:pos]...)
-			head = append(head, unsafe { buf.Buf() }...)
-			head = append(head, unsafe { self.Buf.Buf() }[pos:]...)
-			unsafe { self.Buf.SetBuf(head) }
+			mut ibuf := unsafe { self.Buf.Buf() }
+			ibuf = slices::Insert(ibuf, pos, unsafe { buf.Buf()... })
+			unsafe { self.Buf.SetBuf(ibuf) }
 		}
 	}
 
