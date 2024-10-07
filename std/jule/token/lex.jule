@@ -5,6 +5,7 @@
 use "std/internal/strings"
 use "std/jule/build"
 use "std/unicode/utf8"
+use "std/unsafe"
 
 // Lexer mode.
 enum LexMode {
@@ -150,7 +151,7 @@ fn floatFmtE(&txt: []byte, mut i: int): (lit: str) {
 	if i == first {
 		ret ""
 	}
-	ret str(txt[:i])
+	ret unsafe::StrFromBytes(txt[:i])
 }
 
 fn floatFmtP(&txt: []byte, i: int): str {
@@ -191,11 +192,11 @@ fn floatFmtDotp(&txt: []byte, mut i: int): str {
 fn floatNum(&txt: []byte, mut i: int): (lit: str) {
 	i++ // Skip dot
 	if i >= len(txt) {
-		ret str(txt)
+		ret unsafe::StrFromBytes(txt)
 	}
 	if txt[i] == '_' {
 		i--
-		ret str(txt[:i])
+		ret unsafe::StrFromBytes(txt[:i])
 	}
 	for i < len(txt); i++ {
 		b := txt[i]
@@ -210,7 +211,7 @@ fn floatNum(&txt: []byte, mut i: int): (lit: str) {
 	if i == 1 { // Just dot
 		ret
 	}
-	ret str(txt[:i])
+	ret unsafe::StrFromBytes(txt[:i])
 }
 
 fn commonNum(&txt: []byte): (lit: str) {
@@ -233,7 +234,7 @@ loop:
 	if i == 0 {
 		ret
 	}
-	ret str(txt[:i])
+	ret unsafe::StrFromBytes(txt[:i])
 }
 
 fn binaryNum(&txt: []byte): (lit: str) {
@@ -255,7 +256,7 @@ fn binaryNum(&txt: []byte): (lit: str) {
 	if i == BinaryStart {
 		ret
 	}
-	ret str(txt[:i])
+	ret unsafe::StrFromBytes(txt[:i])
 }
 
 fn isFloatFmtE(b: byte, i: int): bool {
@@ -354,7 +355,7 @@ fn octalNum(&txt: []byte): (lit: str) {
 	if i == octalStart {
 		ret
 	}
-	ret str(txt[:i])
+	ret unsafe::StrFromBytes(txt[:i])
 }
 
 fn hexNum(&txt: []byte): (lit: str) {
@@ -387,7 +388,7 @@ loop:
 	if i == HexStart {
 		ret
 	}
-	ret str(txt[:i])
+	ret unsafe::StrFromBytes(txt[:i])
 }
 
 fn hexEscape(&txt: []byte, n: int): (seq: str) {
@@ -403,7 +404,7 @@ fn hexEscape(&txt: []byte, n: int): (seq: str) {
 		}
 	}
 
-	seq = str(txt[:n])
+	seq = unsafe::StrFromBytes(txt[:n])
 	ret
 }
 
@@ -430,7 +431,7 @@ fn byteEscape(&txt: []byte): (seq: str) {
 	if !IsOctal(rune(txt[1])) || !IsOctal(rune(txt[2])) || !IsOctal(rune(txt[3])) {
 		ret
 	}
-	ret str(txt[:4])
+	ret unsafe::StrFromBytes(txt[:4])
 }
 
 struct lex {
@@ -481,13 +482,13 @@ impl lex {
 			pr, n := utf8::DecodeRune(ln[i:])
 			if pr != '_' && !IsDecimal(pr) && !IsLetter(pr) {
 				self.pos += i
-				ret str(ln[:i])
+				ret unsafe::StrFromBytes(ln[:i])
 			}
 			i += n
 		}
 
 		self.pos += len(ln)
-		ret str(ln)
+		ret unsafe::StrFromBytes(ln)
 	}
 
 	// Resume to lex from position.
@@ -529,7 +530,7 @@ impl lex {
 		}
 		if self.mode&LexMode.Comment == LexMode.Comment {
 			token.Id = Id.Comment
-			token.Kind = str(self.file.Data[start:self.pos])
+			token.Kind = unsafe::StrFromBytes(self.file.Data[start:self.pos])
 		}
 	}
 
@@ -552,7 +553,7 @@ impl lex {
 				self.pos += 2
 				if self.mode&LexMode.Comment == LexMode.Comment {
 					token.Id = Id.Comment
-					token.Kind = str(self.file.Data[start:self.pos])
+					token.Kind = unsafe::StrFromBytes(self.file.Data[start:self.pos])
 				}
 				ret
 			}
@@ -592,7 +593,7 @@ impl lex {
 		match txt[1] {
 		| '\\' | '\'' | '"' | 'a' | 'b' | 'f' | 'n' | 'r' | 't' | 'v':
 			self.pos += 2
-			ret str(txt[:2])
+			ret unsafe::StrFromBytes(txt[:2])
 		| 'U':
 			seq = bigUnicodePointEscape(txt)
 		| 'u':
