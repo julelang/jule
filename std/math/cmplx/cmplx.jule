@@ -106,17 +106,70 @@ impl Cmplx {
 	}
 
 	// Divides complex numbers and sets result to self.
-	// Result will be NaN if denominator is zero.
-	fn div(mut self, c: Cmplx) {
-		denominator := c.Real()*c.Real() + c.Imag()*c.Imag()
-		if denominator == 0 {
-			self.imag = math::NaN()
-			self.real = math::NaN()
-			ret
+	fn div(mut self, m: Cmplx) {
+		// Algorithm for robust complex division as described in
+		// Robert L. Smith: Algorithm 116: Complex division. Commun. ACM 5(8): 435 (1962).
+		mut r, mut i := 0.0, 0.0
+
+		if math::Abs(m.Real()) >= math::Abs(m.Imag()) {
+			if m.Real() == 0 {
+				r = math::NaN()
+				i = math::NaN()
+			} else {
+				ratio := m.Imag() / m.Real()
+				denom := m.Real() + ratio*m.Imag()
+				if denom == 0 {
+					r = math::NaN()
+					i = math::NaN()
+				} else {
+					r = (self.Real() + self.Imag()*ratio) / denom
+					i = (self.Imag() - self.Real()*ratio) / denom
+				}
+			}
+		} else {
+			if m.Imag() == 0 {
+				r = math::NaN()
+				i = math::NaN()
+			} else {
+				ratio := m.Real() / m.Imag()
+				denom := m.Imag() + ratio*m.Real()
+				if denom == 0 {
+					r = math::NaN()
+					i = math::NaN()
+				} else {
+					r = (self.Real()*ratio + self.Imag()) / denom
+					i = (self.Imag()*ratio - self.Real()) / denom
+				}
+			}
 		}
-		numerator := self.Real()*c.Real() + self.Imag()*c.Imag()
-		self.imag = (self.Imag()*c.Real() - self.Real()*c.Imag()) / denominator
-		self.real = numerator / denominator
+
+		if math::IsNaN(r) && math::IsNaN(i) {
+			// Correct final result to infinities and zeros if applicable.
+			// Matches C99: ISO/IEC 9899:1999 - G.5.1  Multiplicative operators.
+
+			mut a, mut b := self.Real(), self.Imag()
+			mut c, mut d := m.Real(), m.Imag()
+
+			static inf = math::F64FromBits(0x7FF0000000000000)
+
+			match {
+			| m.IsZero() && (!math::IsNaN(a) || !math::IsNaN(b)):
+				r = math::Copysign(inf, c) * a
+				i = math::Copysign(inf, c) * b
+			| (isInf(a) || isInf(b)) && isFinite(c) && isFinite(d):
+				a = inf2one(a)
+				b = inf2one(b)
+				r = inf * (a*c + b*d)
+				i = inf * (b*c - a*d)
+			| (isInf(c) || isInf(d)) && isFinite(a) && isFinite(b):
+				c = inf2one(c)
+				d = inf2one(d)
+				r = 0 * (a*c + b*d)
+				i = 0 * (b*c - a*d)
+			}
+		}
+
+		self.real, self.imag = r, i
 	}
 
 	// Unary minus operator.
@@ -145,4 +198,24 @@ impl Cmplx {
 	fn IsZero(self): bool {
 		ret self.Real() == 0 && self.Imag() == 0
 	}
+}
+
+// Reports whether f is neither NaN nor an infinity.
+fn isFinite(f: f64): bool {
+	ret !math::IsNaN(f - f)
+}
+
+// Reports whether f is an infinity.
+fn isInf(f: f64): bool {
+	ret !math::IsNaN(f) && !isFinite(f)
+}
+
+// Returns a signed 1 if f is an infinity and a signed 0 otherwise.
+// The sign of the result is the sign of f.
+fn inf2one(f: f64): f64 {
+	mut g := 0.0
+	if math::IsInf(f, 0) {
+		g = 1.0
+	}
+	ret math::Copysign(g, f)
 }

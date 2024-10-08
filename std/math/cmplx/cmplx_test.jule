@@ -1,0 +1,43 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+#build test
+
+use "std/math"
+use "std/testing"
+
+struct arithTest {
+	l: Cmplx // Left operand.
+	r: Cmplx // Right operand.
+	p: Cmplx // Prod.
+}
+
+static divTests: []arithTest = [
+	{Cmplx.New(15, 2), Cmplx.New(32, 3), Cmplx.New(0.47047434656340753, 0.018393030009680542)},
+	{Cmplx.NaN(), Cmplx.New(32, 3), Cmplx.NaN()},
+	{Cmplx.New(15, 2), Cmplx.NaN(), Cmplx.NaN()},
+	{Cmplx.New(15, 2), Cmplx.Inf(1), Cmplx.New(0, -0)},
+	{Cmplx.Inf(1), Cmplx.New(32, 3), Cmplx.New(math::Inf(1), math::NaN())},
+]
+
+fn eqf(a: f64, b: f64): bool {
+	if math::IsNaN(a) {
+		ret math::IsNaN(b)
+	}
+	ret a == b
+}
+
+fn eq(a: Cmplx, b: Cmplx): bool {
+	ret eqf(a.Real(), b.Real()) && eqf(a.Imag(), b.Imag())
+}
+
+#test
+fn testDiv(t: &testing::T) {
+	for _, test in divTests {
+		p := test.l.Div(test.r)
+		if !eq(p, test.p) {
+			t.Errorf("{} / {} != {}, found {}", test.l, test.r, test.p, p)
+		}
+	}
+}
