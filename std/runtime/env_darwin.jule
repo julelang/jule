@@ -8,15 +8,23 @@ use "std/sys"
 cpp use "<mach-o/dyld.h>"
 
 cpp unsafe fn _NSGetExecutablePath(b: *integ::Char, *u32): bool
+cpp unsafe fn realpath(path: *integ::Char, resolved: *integ::Char): *integ::Char
 
 fn executable(): str {
 	let mut buf: [sys::PATH_MAX]byte = [0, ...]
 	size := u32(len(buf))
 	mut p := &buf[0]
 	unsafe {
-		if !cpp._NSGetExecutablePath((*integ::Char)(p), &size) {
-			ret integ::BytePtrToStr(p)
+		if cpp._NSGetExecutablePath((*integ::Char)(p), &size) {
+			panic("runtime: executable path read error")
 		}
+		// The _NSGetExecutablePath function may returns symlink path for the real executable.
+		// We should resolve path with the realpath function to reach the real path of the executable file.
+		let mut real: [sys::PATH_MAX]byte = [0, ...]
+		mut rp := &real[0]
+		if cpp.realpath((*integ::Char)(p), (*integ::Char)(rp)) == nil {
+			panic("runtime: executable path read error")
+		}
+		ret integ::BytePtrToStr(rp)
 	}
-	panic("runtime: executable path read error")
 }
