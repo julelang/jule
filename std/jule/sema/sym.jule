@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/jule"
 use "std/jule/ast"
 use "std/jule/build"
 use "std/jule/token"
@@ -420,11 +421,11 @@ impl symBuilder {
 	// Checks import path and returns as filepath if no error exist.
 	fn checkImpPath(mut &self, mut &decl: &ast::UseDecl): (std: bool, filepath: str) {
 		path := decl.Path.Kind[1:len(decl.Path.Kind)-1] // remove quotes
-		if strings::HasSuffix(path, build::ImportPathSep) {
+		if strings::HasSuffix(path, jule::ImportPathSep) {
 			self.pushErr(decl.Path, build::LogMsg.InvalidImportPath, decl.Path.Kind)
 			ret
 		}
-		parts := strings::SplitAll(path, build::ImportPathSep)
+		parts := strings::SplitAll(path, jule::ImportPathSep)
 		if len(parts) == 0 {
 			self.pushErr(decl.Path, build::LogMsg.InvalidImportPath, decl.Path.Kind)
 			ret
@@ -449,7 +450,7 @@ impl symBuilder {
 
 	// Assigns an alias to import.
 	fn assignAlias(mut &self, mut &imp: &ImportInfo) {
-		mut i := strings::FindLast(imp.LinkPath, build::ImportPathSep)
+		mut i := strings::FindLast(imp.LinkPath, jule::ImportPathSep)
 		i++ // skip separator and also if -1 it takes full path
 		path := imp.LinkPath[i:]
 		imp.Alias = path
@@ -505,7 +506,7 @@ impl symBuilder {
 		if strings::HasPrefix(path, build::PathStdlib) {
 			path = path[len(build::PathStdlib):] // cut absolute path prefix
 			sb.WriteStr(`"std`)!
-			sb.WriteStr(strings::ReplaceAll(path, str(filepath::Separator), build::ImportPathSep))!
+			sb.WriteStr(strings::ReplaceAll(path, str(filepath::Separator), jule::ImportPathSep))!
 			sb.WriteByte('"')!
 			ret sb.Str()
 		}
@@ -516,7 +517,7 @@ impl symBuilder {
 			path = path[1:]
 		}
 		sb.WriteByte('"')!
-		sb.WriteStr(strings::ReplaceAll(path, str(filepath::Separator), build::ImportPathSep))!
+		sb.WriteStr(strings::ReplaceAll(path, str(filepath::Separator), jule::ImportPathSep))!
 		sb.WriteByte('"')!
 		ret sb.Str()
 	}
@@ -600,19 +601,19 @@ impl symBuilder {
 		if i == 0 {
 			// "internal" or "internal/" ?
 			if len(path)-len(InternalName) == 0 ||
-				strings::HasPrefix(path, InternalName+build::ImportPathSep) {
+				strings::HasPrefix(path, InternalName+jule::ImportPathSep) {
 				self.pushErr(decl.Token, build::LogMsg.UseDeclForInternal)
 			}
 			ret
 		}
 		// "/internal" ?
-		if path[i-1:] == build::ImportPathSep+InternalName {
+		if path[i-1:] == jule::ImportPathSep+InternalName {
 			self.pushErr(decl.Token, build::LogMsg.UseDeclForInternal)
 			ret
 		}
 		// "/internal/" ?
 		n := i + len(InternalName) + 1
-		if n < len(path) && path[i-1:n] == build::ImportPathSep+InternalName+build::ImportPathSep {
+		if n < len(path) && path[i-1:n] == jule::ImportPathSep+InternalName+jule::ImportPathSep {
 			self.pushErr(decl.Token, build::LogMsg.UseDeclForInternal)
 			ret
 		}
