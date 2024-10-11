@@ -1791,6 +1791,17 @@ impl eval {
 		if d == nil {
 			ret nil
 		}
+		// casting applied successfully
+
+		if t.Binded() || d.Type.Binded() {
+			// if destination or expression type is binded, it requires Unsafe Jule for this.
+			// Push error if Unsafe Jule is not available. But do not return nil data,
+			// casting is valid, just Unsafe Jule is missing. Push only information error for that.
+			if !self.isUnsafe() {
+				self.pushErr(errorToken, build::LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
+				self.pushSuggestion(build::LogMsg.CastingBindedTypesRequiresUnsafeJule)
+			}
+		}
 
 		// Keep mutability if data is already mutable.
 		// Even if the data is not mutable, set as mutable if the type is not mutable-type.
