@@ -53,12 +53,6 @@ namespace jule
         template <typename T>
         Any(const jule::Ptr<T> &ref, jule::Any::Type *type) noexcept
         {
-            if (ref == nullptr)
-            {
-                // Pointer is nil, so can't able to use as base allocation.
-                // Make a nil any.
-                return;
-            }
             this->type = type;
             this->data = ref.template as<jule::Uintptr>();
         }
@@ -217,7 +211,7 @@ namespace jule
 
         constexpr jule::Bool operator==(std::nullptr_t) const noexcept
         {
-            return !this->data.alloc;
+            return !this->type;
         }
 
         constexpr jule::Bool operator!=(std::nullptr_t) const noexcept
