@@ -88,9 +88,11 @@ impl Cmd {
 		if unsafe { cpp.pipe(&pipe[0]) } == -1 {
 			error(CmdError.Spawn)
 		}
-		if sys::Fcntl(int(pipe[1]), cpp.F_SETFD, cpp.fcntl(int(pipe[1]), cpp.F_GETFD)|cpp.FD_CLOEXEC) == -1 {
-			sys::Close(int(pipe[0]))
-			sys::Close(int(pipe[1]))
+		pipe0 := unsafe { int(pipe[0]) }
+		pipe1 := unsafe { int(pipe[1]) }
+		if sys::Fcntl(pipe1, cpp.F_SETFD, cpp.fcntl(pipe1, cpp.F_GETFD)|cpp.FD_CLOEXEC) == -1 {
+			sys::Close(pipe0)
+			sys::Close(pipe1)
 			error(CmdError.Spawn)
 		}
 		self.attrs.pid = cpp.fork()
@@ -98,21 +100,21 @@ impl Cmd {
 		| -1:
 			error(CmdError.Spawn)
 		| 0:
-			sys::Close(int(pipe[0]))
+			sys::Close(pipe0)
 			mut args := make([]str, 1, 1+len(self.Args))
 			args[0] = path
 			args = append(args, self.Args...)
 			setenv(self.Env) else { error(error) }
 			execvp(path, args)
 			code := conv::Itoa(sys::GetLastErrno())
-			unsafe { sys::Write(int(pipe[1]), &code[0], uint(len(code))) }
-			sys::Close(int(pipe[1]))
+			unsafe { sys::Write(pipe1, &code[0], uint(len(code))) }
+			sys::Close(pipe1)
 			Exit(1)
 		|:
-			sys::Close(int(pipe[1]))
+			sys::Close(pipe1)
 			let mut buf: [16]byte
-			n := unsafe { sys::Read(int(pipe[0]), &buf[0], uint(len(buf))) }
-			sys::Close(int(pipe[0]))
+			n := unsafe { sys::Read(pipe0, &buf[0], uint(len(buf))) }
+			sys::Close(pipe0)
 			if n != 0 {
 				self.attrs.pid = invalidPid
 				code, _ := unsafe { conv::AtoiBp(&buf[0], n) }
