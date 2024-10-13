@@ -459,7 +459,7 @@ impl lex {
 	fn lex(mut self) {
 		self.errors = nil
 		self.newLine()
-		for self.pos < len(self.file.Data) {
+		for self.pos < len(self.file.data) {
 			mut token := self.token()
 			if token.Id != Id.NA {
 				self.tokens = append(self.tokens, token)
@@ -495,8 +495,8 @@ impl lex {
 	fn resume(mut self): []byte {
 		// Skip spaces.
 		mut i := self.pos
-		for i < len(self.file.Data); i++ {
-			r := rune(self.file.Data[i])
+		for i < len(self.file.data); i++ {
+			r := rune(self.file.data[i])
 			if IsSpace(r) {
 				self.pos++
 				match r {
@@ -509,12 +509,12 @@ impl lex {
 			}
 
 			mut j := i
-			for j < len(self.file.Data); j++ {
-				if self.file.Data[j] == '\n' {
+			for j < len(self.file.data); j++ {
+				if self.file.data[j] == '\n' {
 					break
 				}
 			}
-			ret self.file.Data[i:j]
+			ret self.file.data[i:j]
 		}
 		ret nil
 	}
@@ -522,23 +522,23 @@ impl lex {
 	fn lexLineComment(mut self, mut &token: &Token) {
 		start := self.pos
 		self.pos += 2
-		for self.pos < len(self.file.Data); self.pos++ {
-			r := self.file.Data[self.pos]
+		for self.pos < len(self.file.data); self.pos++ {
+			r := self.file.data[self.pos]
 			if r == '\n' || r == '\r' {
 				break
 			}
 		}
 		if self.mode&LexMode.Comment == LexMode.Comment {
 			token.Id = Id.Comment
-			token.Kind = unsafe::StrFromBytes(self.file.Data[start:self.pos])
+			token.Kind = unsafe::StrFromBytes(self.file.data[start:self.pos])
 		}
 	}
 
 	fn lexRangeComment(mut self, mut &token: &Token) {
 		start := self.pos
 		self.pos += 2
-		for self.pos < len(self.file.Data); self.pos++ {
-			r := self.file.Data[self.pos]
+		for self.pos < len(self.file.data); self.pos++ {
+			r := self.file.data[self.pos]
 			if r == '\r' {
 				continue
 			}
@@ -547,13 +547,13 @@ impl lex {
 				continue
 			}
 			self.column += 1
-			if self.pos+1 < len(self.file.Data) && r == '*' &&
-				self.file.Data[self.pos+1] == '/' {
+			if self.pos+1 < len(self.file.data) && r == '*' &&
+				self.file.data[self.pos+1] == '/' {
 				self.column += 2
 				self.pos += 2
 				if self.mode&LexMode.Comment == LexMode.Comment {
 					token.Id = Id.Comment
-					token.Kind = unsafe::StrFromBytes(self.file.Data[start:self.pos])
+					token.Kind = unsafe::StrFromBytes(self.file.data[start:self.pos])
 				}
 				ret
 			}
@@ -665,14 +665,14 @@ impl lex {
 
 	fn lexStr(mut self): str {
 		mut s := strings::Builder.New(1 << 4)
-		mark := self.file.Data[self.pos]
+		mark := self.file.data[self.pos]
 		self.pos++ // Skip mark
 		raw := mark == '`'
 		s.WriteByte(mark)!
 		self.column++
 
-		for self.pos < len(self.file.Data) {
-			ch := self.file.Data[self.pos]
+		for self.pos < len(self.file.data) {
+			ch := self.file.data[self.pos]
 			if ch == '\r' {
 				continue
 			}
@@ -684,7 +684,7 @@ impl lex {
 					ret ""
 				}
 			}
-			mut part := self.file.Data[self.pos:]
+			mut part := self.file.data[self.pos:]
 			r := self.getRune(part, raw)
 			s.WriteStr(r)!
 			self.column += utf8::RuneCountStr(r)

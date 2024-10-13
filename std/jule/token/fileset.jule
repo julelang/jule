@@ -2,12 +2,16 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/unsafe"
 use "std/os/filepath"
 
 // Fileset for lexing.
 struct Fileset {
+	// Data should be private, because lexical analysis uses same allocation as much as possible.
+	// And mutating this field may cause mutations of string copies.
+	data: []byte
+
 	Path:   str
-	Data:   []byte
 	Tokens: []&Token
 }
 
@@ -19,9 +23,18 @@ impl Fileset {
 		}
 	}
 
-	// Fill data.
-	fn Fill(mut self, mut data: []byte) {
-		self.Data = data
+	// Fills data.
+	// Not uses mutable copy of data, allocates new copy.
+	fn Fill(mut self, data: []byte) {
+		self.data = append(make([]byte, 0, len(data)), data...)
+	}
+
+	// Fills data.
+	// Uses mutable copy of data, not allocated new copy.
+	// But it is unsafe, because any mutation on the data may cause inconsistent results.
+	// However, it is efficient way to use already allocated datas.
+	unsafe fn FillMut(mut self, mut data: []byte) {
+		self.data = data
 	}
 
 	// Returns directory of file's path.
@@ -45,13 +58,13 @@ impl Fileset {
 		mut n := 0
 		mut lineStart := 0
 		mut i := 0
-		for i < len(self.Data); i++ {
-			if self.Data[i] != '\n' {
+		for i < len(self.data); i++ {
+			if self.data[i] != '\n' {
 				continue
 			}
 			n++
 			if n == row {
-				ret str(self.Data[lineStart:i])
+				ret unsafe::StrFromBytes(self.data[lineStart:i])
 			}
 			lineStart = i + 1
 		}
