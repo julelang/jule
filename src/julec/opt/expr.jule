@@ -117,6 +117,18 @@ impl exprOptimizer {
 		ret false
 	}
 
+	fn arrayCond(self, mut m: &sema::BinaryExprModel): bool {
+		mut arr := m.Left.Type.Arr()
+		if arr == nil || arr.N != 0 {
+			ret false
+		}
+		// type of the right operand should be the same array type with the left operand
+		// there is no element to compare, so simplify expression to "true" expression
+		// because arrays have same types and size with no element, this always results as "true"
+		*self.model = constant::Const.NewBool(true)
+		ret true
+	}
+
 	fn strCond(self, mut m: &sema::BinaryExprModel): bool {
 		lp := m.Left.Type.Prim()
 		if lp == nil || !lp.IsStr() {
@@ -348,9 +360,20 @@ impl exprOptimizer {
 			self.checkBinaryForNil(m)
 		}
 
+		if Str {
+			if self.strCond(m) {
+				ret
+			}
+		}
+
+		if Array {
+			if self.arrayCond(m) {
+				ret
+			}
+		}
+
 		if Cond {
 			match {
-			| self.strCond(m)
 			| self.boolCond(m)
 			| self.selfCmpCond(m):
 				ret
