@@ -346,15 +346,6 @@ impl exprOptimizer {
 			ret
 		}
 
-		// Check whether the right operand is constant for safety.
-		// The following algorithms assumes the right operand is constant.
-		match type m.Right.Model {
-		| &constant::Const:
-			break
-		|:
-			ret
-		}
-
 		// Break optimizations if types are not primitive.
 		// No need for checking whether types are arithmetic,
 		// because relevant operators are conly avaliable for arithmetic primitives.
@@ -364,6 +355,30 @@ impl exprOptimizer {
 		}
 		rp := m.Right.Type.Prim()
 		if rp == nil {
+			ret
+		}
+
+		match m.Op.Id {
+		| token::Id.Plus:
+			// If type is integer and expressions is like "x+x", then we can simplfy to "x<<1" which is faster.
+			// Floating-point types is exceptional because we cannot predict the result because of NaN or similar values.
+			// Also floating-point types are not supports bit shifting operators.
+			if !types::IsInt(lp.Kind) || !equalModels(m.Left.Model, m.Right.Model) {
+				break
+			}
+			m.Op = new(token::Token, *m.Op)
+			m.Op.Id = token::Id.Shl
+			m.Op.Kind = token::Kind.Shl
+			m.Right.Model = constant::Const.NewU64(1)
+			ret
+		}
+
+		// Check whether the right operand is constant for safety.
+		// The following algorithms assumes the right operand is constant.
+		match type m.Right.Model {
+		| &constant::Const:
+			break
+		|:
 			ret
 		}
 

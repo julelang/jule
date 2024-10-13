@@ -443,13 +443,16 @@ impl scopeOptimizer {
 
 		match assign.Op.Id {
 		| token::Id.CaretEq | token::Id.SolidusEq | token::Id.PercentEq
-		| token::Id.ShlEq | token::Id.ShrEq:
+		| token::Id.ShlEq | token::Id.ShrEq | token::Id.PlusEq | token::Id.MinusEq:
 			// Do not check structures.
 			if !Math || assign.Left.Type.Struct() != nil {
 				break
 			}
 			oldId, oldKind := assign.Op.Id, assign.Op.Kind
 			match assign.Op.Id {
+			| token::Id.PlusEq:
+				assign.Op.Id = token::Id.Plus
+				assign.Op.Kind = token::Kind.Plus
 			| token::Id.SolidusEq:
 				assign.Op.Id = token::Id.Solidus
 				assign.Op.Kind = token::Kind.Solidus
@@ -475,7 +478,7 @@ impl scopeOptimizer {
 			}
 			mut model := sema::ExprModel(b)
 			exprOptimizer.optimizeData(model, self.data)
-			if model != b {
+			if model != b || b.Op != assign.Op {
 				// Binary model optimized.
 				// Use optimized model directly.
 				if assign.Op.Id == token::Id.Caret {
