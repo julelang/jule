@@ -371,6 +371,16 @@ impl exprOptimizer {
 			m.Op.Kind = token::Kind.Shl
 			m.Right.Model = constant::Const.NewU64(1)
 			ret
+		| token::Id.Minus:
+			// If type is integer and expressions is like "x-x", then we can simplfy to "0" which is cheaper.
+			// Floating-point types is exceptional because we cannot predict the result because of NaN or similar values.
+			if !types::IsInt(lp.Kind) || !equalModels(m.Left.Model, m.Right.Model) {
+				break
+			}
+			mut c := constant::Const.NewU64(0)
+			c.Kind = lp.Kind
+			*self.model = c
+			ret
 		}
 
 		// Check whether the right operand is constant for safety.
