@@ -323,6 +323,25 @@ impl exprOptimizer {
 		}
 	}
 
+	// Applies optimization for binary shiftings.
+	// This method assumes the right operand is constant.
+	fn shift(self, mut m: &sema::BinaryExprModel) {
+		// semantic anlayzer guarantees right operator is unsigned if constant
+		z := types::BitSizeOf(m.Left.Type.Prim().Kind)
+		s := (&constant::Const)(m.Right.Model).AsU64()
+		if s >= u64(z) {
+			// shifting greater than bitsize of the left operand
+			// discard all bits, result always equals to zero
+			*self.model = constant::Const.NewU64(0)
+			ret
+		}
+		// Set model to unsafe binary.
+		// Value is not overflows the bitsize of the type.
+		// So we can remove runtime cost of shifter checking.
+		mut model := any(&UnsafeBinaryExprModel{Node: m})
+		*self.model = unsafe { *(*sema::ExprModel)(&model) }
+	}
+
 	fn binary(self, mut m: &sema::BinaryExprModel) {
 		if self.data.flags&dataFlag.NoConditional != dataFlag.NoConditional {
 			self.checkBinaryForBoundary(m)
@@ -370,6 +389,10 @@ impl exprOptimizer {
 			m.Op.Id = token::Id.Shl
 			m.Op.Kind = token::Kind.Shl
 			m.Right.Model = constant::Const.NewU64(1)
+			// Set model to unsafe expression model. Because it is safe.
+			// We can remove runtime cost of shifter checking.
+			mut model := any(&UnsafeBinaryExprModel{Node: m})
+			*self.model = unsafe { *(*sema::ExprModel)(&model) }
 			ret
 		| token::Id.Minus:
 			// If type is integer and expressions is like "x-x", then we can simplfy to "0" which is cheaper.
@@ -401,8 +424,7 @@ impl exprOptimizer {
 				m.Op.Kind = token::Kind.Shl
 				mut c := (&constant::Const)(m.Right.Model)
 				c.SetU64(x)
-				// No need to set model as UnsafeBinaryExprModel,
-				// shl is not checked at runtime, so it is optimize enough.
+				self.shift(m) // We should try to optimize new optimized shifting expression.
 				ret
 			}
 		| token::Id.Solidus:
@@ -413,8 +435,7 @@ impl exprOptimizer {
 				m.Op.Kind = token::Kind.Shr
 				mut c := (&constant::Const)(m.Right.Model)
 				c.SetU64(x)
-				// No need to set model as UnsafeBinaryExprModel,
-				// shr is not checked at runtime, so it is optimize enough.
+				self.shift(m) // We should try to optimize new optimized shifting expression.
 				ret
 			}
 		| token::Id.Percent:
@@ -436,15 +457,8 @@ impl exprOptimizer {
 				ret
 			}
 		| token::Id.Shl | token::Id.Shr:
-			// semantic anlayzer guarantees right operator is unsigned if constant
-			z := types::BitSizeOf(lp.Kind)
-			s := (&constant::Const)(m.Right.Model).AsU64()
-			if s >= u64(z) {
-				// shifting greater than bitsize of the left operand
-				// discard all bits, result always equals to zero
-				*self.model = constant::Const.NewU64(0)
-				ret
-			}
+			self.shift(m)
+			ret
 		|:
 			// Eliminate unsupported operators.
 			ret
