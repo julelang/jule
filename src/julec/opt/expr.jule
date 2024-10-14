@@ -609,6 +609,40 @@ impl exprOptimizer {
 		}
 	}
 
+	fn lenCall(self, mut m: &sema::BuiltinLenCallExprModel) {
+		if !Len {
+			// skip optimizations if relevant flag is not passed
+			ret
+		}
+		match type m.Expr.Model {
+		| &sema::CastingExprModel:
+			break
+		|:
+			ret
+		}
+		mut c := (&sema::CastingExprModel)(m.Expr.Model)
+		mut prim := c.Expr.Type.Prim()
+		if prim == nil || !prim.IsStr() {
+			ret
+		}
+		// len((?)(str))
+		mut slc := c.Type.Slc()
+		if slc == nil {
+			ret
+		}
+		prim = slc.Elem.Prim()
+		if prim == nil {
+			ret
+		}
+		// len(([]?)(str))
+		match {
+		| prim.IsU8():
+			// len(([]byte)(str))
+			// simplify expression to len(str), avoid making byte slice allocation
+			m.Expr = c.Expr
+		}
+	}
+
 	fn funcCall(self, mut m: &sema::FnCallExprModel) {
 		self.args(m.Func.Params, m.Args)
 		if m.Except != nil {
@@ -662,6 +696,8 @@ impl exprOptimizer {
 				unsafe { self.casting((&sema::CastingExprModel)(m)) }
 			| &sema::FnCallExprModel:
 				unsafe { self.funcCall((&sema::FnCallExprModel)(m)) }
+			| &sema::BuiltinLenCallExprModel:
+				unsafe { self.lenCall((&sema::BuiltinLenCallExprModel)(m)) }
 			| &sema::IndexingExprModel:
 				unsafe { self.indexing((&sema::IndexingExprModel)(m)) }
 			| &sema::AnonFnExprModel:
