@@ -10,19 +10,6 @@ use "std/jule/ast"
 use "std/jule/build"
 use "std/jule/sema"
 
-struct specialCaseDefines {
-	runtime_Map:         &sema::Struct
-	runtime_mapIterator: &sema::Struct
-}
-
-impl specialCaseDefines {
-	// Reports whether all methods live of structure.
-	fn isAllMethodsLive(self, s: &sema::Struct): bool {
-		ret s == self.runtime_Map ||
-			s == self.runtime_mapIterator
-	}
-}
-
 struct liveTable {
 	vars:    []&sema::Var
 	fns:     []&sema::FnIns
@@ -33,7 +20,6 @@ struct liveTable {
 struct ObjectDeadCode {
 	live: liveTable
 	ir:   &obj::IR
-	scd:  specialCaseDefines
 }
 
 impl ObjectDeadCode {
@@ -82,7 +68,7 @@ impl ObjectDeadCode {
 		}
 		self.pushLive[&sema::StructIns](s)
 		self.setReferencesAsLive(s.Refers)
-		allLive := self.scd.isAllMethodsLive(s.Decl)
+		allLive := isAllMethodsLive(s.Decl)
 		for (_, mut m) in s.Methods {
 			for (_, mut ins) in m.Instances {
 				if self.isLive[&sema::FnIns](ins) {
@@ -370,13 +356,7 @@ impl ObjectDeadCode {
 		self.removeDeadsPackage(self.ir.Main)
 	}
 
-	fn collectSpecialCaseDefines(mut &self) {
-		self.scd.runtime_Map = obj::RuntimeFindStruct(self.ir.Runtime, obj::RuntimeStruct._Map)
-		self.scd.runtime_mapIterator = obj::RuntimeFindStruct(self.ir.Runtime, obj::RuntimeStruct.mapIterator)
-	}
-
 	fn elimanate(mut &self) {
-		self.collectSpecialCaseDefines()
 		self.collectLive()
 		self.removeDeads()
 	}
@@ -385,4 +365,10 @@ impl ObjectDeadCode {
 fn EliminateDefines(mut &ir: &obj::IR) {
 	mut ocd := ObjectDeadCode.new(ir)
 	ocd.elimanate()
+}
+
+// Reports whether all methods live of structure.
+fn isAllMethodsLive(s: &sema::Struct): bool {
+	ret s == obj::ProgramMeta.Runtime.Map ||
+		s == obj::ProgramMeta.Runtime.MapIterator
 }

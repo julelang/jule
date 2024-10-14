@@ -238,8 +238,7 @@ impl exprCoder {
 				// If this binary operator comparing array type.
 				// The left operand is will be array one always.
 				arr := lk.Arr()
-				mut f := obj::RuntimeFindFn(self.oc.ir.Runtime, obj::RuntimeFunc.arrayCmp)
-				mut ins := obj::FindFnGenericInstance(f, arr.Elem)
+				mut ins := obj::FindFnGenericInstance(obj::ProgramMeta.Runtime.ArrayCmp, arr.Elem)
 				if op == token::Id.NotEq {
 					buf.WriteByte('!')!
 				}
@@ -1075,8 +1074,7 @@ impl exprCoder {
 		match {
 		| m.Expr.Type.Map() != nil:
 			mut _map := m.Expr.Type.Map()
-			mut s := obj::RuntimeFindStruct(self.oc.ir.Runtime, obj::RuntimeStruct._Map)
-			mut ins := obj::FindStructGenericInstance(s, _map.Key, _map.Val)
+			mut ins := obj::FindStructGenericInstance(obj::ProgramMeta.Runtime.Map, _map.Key, _map.Val)
 			const Static = false
 			mut f := ins.FindMethod("get", Static).Instances[0]
 			identCoder.funcIns(self.oc.Buf, f)
@@ -1151,8 +1149,7 @@ impl exprCoder {
 	}
 
 	fn mapExpr(mut &self, mut m: &sema::MapExprModel) {
-		mut s := obj::RuntimeFindStruct(self.oc.ir.Runtime, obj::RuntimeStruct._Map)
-		mut ins := obj::FindStructGenericInstance(s, m.Kind.Key, m.Kind.Val)
+		mut ins := obj::FindStructGenericInstance(obj::ProgramMeta.Runtime.Map, m.Kind.Key, m.Kind.Val)
 		const Static = true
 		mut maker := ins.FindMethod("make", Static).Instances[0]
 		if len(m.Entries) == 0 {
@@ -1320,8 +1317,7 @@ impl exprCoder {
 
 	fn printCall(mut &self, mut m: &sema::BuiltinPrintCallExprModel) {
 		self.oc.write("jule::print(")
-		mut decl := obj::RuntimeFindFn(self.oc.ir.Runtime, obj::RuntimeFunc.toStr)
-		mut f := obj::FindFnGenericInstance(decl, m.Expr.Type)
+		mut f := obj::FindFnGenericInstance(obj::ProgramMeta.Runtime.ToStr, m.Expr.Type)
 		identCoder.funcIns(self.oc.Buf, f)
 		self.oc.write("(")
 		self.possibleRefExpr(m.Expr.Model)
@@ -1330,8 +1326,7 @@ impl exprCoder {
 
 	fn printlnCall(mut &self, mut m: &sema::BuiltinPrintlnCallExprModel) {
 		self.oc.write("jule::println(")
-		mut decl := obj::RuntimeFindFn(self.oc.ir.Runtime, obj::RuntimeFunc.toStr)
-		mut f := obj::FindFnGenericInstance(decl, m.Expr.Type)
+		mut f := obj::FindFnGenericInstance(obj::ProgramMeta.Runtime.ToStr, m.Expr.Type)
 		identCoder.funcIns(self.oc.Buf, f)
 		self.oc.write("(")
 		self.possibleRefExpr(m.Expr.Model)
@@ -1389,8 +1384,7 @@ impl exprCoder {
 	fn lenCall(mut &self, mut m: &sema::BuiltinLenCallExprModel) {
 		mut _map := m.Expr.Type.Map()
 		if _map != nil {
-			mut s := obj::RuntimeFindStruct(self.oc.ir.Runtime, obj::RuntimeStruct._Map)
-			mut ins := obj::FindStructGenericInstance(s, _map.Key, _map.Val)
+			mut ins := obj::FindStructGenericInstance(obj::ProgramMeta.Runtime.Map, _map.Key, _map.Val)
 			const Static = false
 			mut f := ins.FindMethod("len", Static).Instances[0]
 			identCoder.funcIns(self.oc.Buf, f)
@@ -1413,8 +1407,7 @@ impl exprCoder {
 		if _map == nil {
 			panic("cxx: deleteCall: destination is not map")
 		}
-		mut s := obj::RuntimeFindStruct(self.oc.ir.Runtime, obj::RuntimeStruct._Map)
-		mut ins := obj::FindStructGenericInstance(s, _map.Key, _map.Val)
+		mut ins := obj::FindStructGenericInstance(obj::ProgramMeta.Runtime.Map, _map.Key, _map.Val)
 		const Static = false
 		if m.Key != nil {
 			mut f := ins.FindMethod("del", Static).Instances[0]

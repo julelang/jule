@@ -28,7 +28,18 @@ struct MetaStrBuilder {
 
 // Metadata for the runtime package.
 struct MetaRuntime {
-	RuneCount: &sema::FnIns
+	ToStr:        &sema::Fn
+	ArrayCmp:     &sema::Fn
+	RCAdd:        &sema::FnIns
+	RCLoad:       &sema::FnIns
+	RCDrop:       &sema::FnIns
+	RCAddAtomic:  &sema::FnIns
+	RCLoadAtomic: &sema::FnIns
+	RCDropAtomic: &sema::FnIns
+	RuneCount:    &sema::FnIns
+
+	Map:         &sema::Struct
+	MapIterator: &sema::Struct
 }
 
 // Metadata for common objects.
@@ -54,8 +65,22 @@ impl Meta {
 			ret nil
 		}
 		mut meta := new(MetaRuntime)
-		const Binded = false
-		meta.RuneCount = p.FindFn("runeCount", Binded).Instances[0]
+
+		// Functions.
+		meta.ToStr = RuntimeFindFn(p, "toStr")
+		meta.ArrayCmp = RuntimeFindFn(p, "arrayCmp")
+		meta.RCAdd = RuntimeFindFn(p, "_RCAdd").Instances[0]
+		meta.RCLoad = RuntimeFindFn(p, "_RCLoad").Instances[0]
+		meta.RCDrop = RuntimeFindFn(p, "_RCDrop").Instances[0]
+		meta.RCAddAtomic = RuntimeFindFn(p, "_RCAddAtomic").Instances[0]
+		meta.RCLoadAtomic = RuntimeFindFn(p, "_RCLoadAtomic").Instances[0]
+		meta.RCDropAtomic = RuntimeFindFn(p, "_RCDropAtomic").Instances[0]
+		meta.RuneCount = RuntimeFindFn(p, "runeCount").Instances[0]
+
+		// Structs.
+		meta.Map = RuntimeFindStruct(p, "_Map")
+		meta.MapIterator = RuntimeFindStruct(p, "mapIterator")
+
 		ret meta
 	}
 
