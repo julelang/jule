@@ -640,6 +640,15 @@ impl exprOptimizer {
 			// len(([]byte)(str))
 			// simplify expression to len(str), avoid making byte slice allocation
 			m.Expr = c.Expr
+		| prim.IsI32():
+			// len(([]rune)(str))
+			// simplify expression to runtime::runeCount, avoid making rune slice allocation
+			mut func := obj::ProgramMeta.Runtime.RuneCount
+			*self.model = &sema::FnCallExprModel{
+				Func: func,
+				Expr: func,
+				Args: [c.Expr.Model],
+			}
 		}
 	}
 

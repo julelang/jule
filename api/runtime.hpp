@@ -44,5 +44,6 @@ jule::Str __jule_strFromByte(jule::U8 b);
 jule::Str __jule_strFromRune(jule::I32 r);
 void __jule_runeStep(jule::U8 *s, jule::Int len, jule::I32 *r, jule::Int *outLen);
 jule::Bool __jule_coSpawn(void *func, void *args);
+jule::Int __jule_runeCount(jule::Str s);
 
 #endif // #ifndef __JULE_RUNTIME_HPP

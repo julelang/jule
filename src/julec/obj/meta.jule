@@ -6,6 +6,7 @@ use "std/comptime"
 use "std/jule/sema"
 
 // Linkpath of common packages.
+const linkpathRuntime = "std/runtime"
 const linkpathStrings = "std/strings"
 
 // Program metadata for the main IR.
@@ -17,7 +18,7 @@ const linkpathStrings = "std/strings"
 // This variable always assumed as non-nil.
 static mut ProgramMeta = (&Meta)(nil)
 
-// Metadata for strings::Builder.
+// Metadata for the strings::Builder.
 struct MetaStrBuilder {
 	Write:     &sema::FnIns
 	WriteByte: &sema::FnIns
@@ -25,8 +26,14 @@ struct MetaStrBuilder {
 	WriteStr:  &sema::FnIns
 }
 
+// Metadata for the runtime package.
+struct MetaRuntime {
+	RuneCount: &sema::FnIns
+}
+
 // Metadata for common objects.
 struct Meta {
+	Runtime:    &MetaRuntime
 	StrBuilder: &MetaStrBuilder
 	EntryPoint: &sema::Fn
 }
@@ -35,11 +42,24 @@ impl Meta {
 	// Collects whole possible metadata from IR.
 	static fn Collect(mut ir: &IR): &Meta {
 		mut meta := new(Meta)
+		meta.Runtime = Meta.CollectRuntime(ir)
 		meta.StrBuilder = Meta.CollectStrBuilder(ir)
 		ret meta
 	}
 
-	// Collects strings::Builder metadata from IR if possible.
+	// Collects MetaRuntime from IR if possible.
+	static fn CollectRuntime(mut &ir: &IR): &MetaRuntime {
+		mut p := SelectImport(ir.Used, linkpathRuntime)
+		if p == nil {
+			ret nil
+		}
+		mut meta := new(MetaRuntime)
+		const Binded = false
+		meta.RuneCount = p.FindFn("runeCount", Binded).Instances[0]
+		ret meta
+	}
+
+	// Collects MetaStrBuilder from IR if possible.
 	static fn CollectStrBuilder(mut &ir: &IR): &MetaStrBuilder {
 		const Binded = false
 		const Static = false
