@@ -340,6 +340,18 @@ impl scopeOptimizer {
 					})
 					ret
 				}
+			| &sema::SliceExprModel:
+				// make slice expression model iteration as array iteration
+				mut slc := (&sema::SliceExprModel)(it.Expr.Model)
+				mut arr := &sema::Arr{
+					N: len(slc.Elems),
+					Elem: slc.ElemType,
+				}
+				it.Expr.Type.Kind = arr
+				it.Expr.Model = &sema::ArrayExprModel{
+					Kind: arr,
+					Elems: slc.Elems,
+				}
 			}
 		}
 		exprOptimizer.optimizeData(it.Expr.Model, self.data)
