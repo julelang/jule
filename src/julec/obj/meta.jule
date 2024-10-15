@@ -8,6 +8,7 @@ use "std/jule/sema"
 // Linkpath of common packages.
 const linkpathRuntime = "std/runtime"
 const linkpathStrings = "std/strings"
+const linkpathMathCmplx = "std/math/cmplx"
 
 // Program metadata for the main IR.
 // All required packages use this metada collection instead of
@@ -42,10 +43,26 @@ struct MetaRuntime {
 	MapIterator: &sema::Struct
 }
 
+// Metadata for the std/math/cmplx package.
+struct MetaMathCmplx {
+	Cmplx: &sema::StructIns // Cmplx
+
+	CmplxAdd:  &sema::FnIns // Cmplx.Add
+	CmplxSub:  &sema::FnIns // Cmplx.Sub
+	CmplxMul:  &sema::FnIns // Cmplx.Mul
+	CmplxDiv:  &sema::FnIns // Cmplx.Div
+	CmplxAddZ: &sema::FnIns // Cmplx.add
+	CmplxSubZ: &sema::FnIns // Cmplx.sub
+	CmplxMulZ: &sema::FnIns // Cmplx.mul
+	CmplxDivZ: &sema::FnIns // Cmplx.div
+}
+
 // Metadata for common objects.
 struct Meta {
 	Runtime:    &MetaRuntime
 	StrBuilder: &MetaStrBuilder
+	MathCmplx:  &MetaMathCmplx
+
 	EntryPoint: &sema::Fn
 }
 
@@ -55,6 +72,7 @@ impl Meta {
 		mut meta := new(Meta)
 		meta.Runtime = Meta.CollectRuntime(ir)
 		meta.StrBuilder = Meta.CollectStrBuilder(ir)
+		meta.MathCmplx = Meta.CollectMathCmplx(ir)
 		ret meta
 	}
 
@@ -98,6 +116,28 @@ impl Meta {
 		const for _, f in metav.Type().Decl().Fields() {
 			metav.Field(f.Name()).Unwrap() = b.FindMethod(f.Name(), Static).Instances[0]
 		}
+		ret meta
+	}
+
+	// Collects MetaMathCmplx from IR if possible.
+	static fn CollectMathCmplx(mut &ir: &IR): &MetaMathCmplx {
+		mut p := SelectImport(ir.Used, linkpathMathCmplx)
+		if p == nil {
+			ret nil
+		}
+		mut meta := new(MetaMathCmplx)
+
+		const Static = false
+		meta.Cmplx = RuntimeFindStruct(p, "Cmplx").Instances[0]
+		meta.CmplxAdd = meta.Cmplx.FindMethod("Add", Static).Instances[0]
+		meta.CmplxSub = meta.Cmplx.FindMethod("Sub", Static).Instances[0]
+		meta.CmplxMul = meta.Cmplx.FindMethod("Mul", Static).Instances[0]
+		meta.CmplxDiv = meta.Cmplx.FindMethod("Div", Static).Instances[0]
+		meta.CmplxAddZ = meta.Cmplx.FindMethod("add", Static).Instances[0]
+		meta.CmplxSubZ = meta.Cmplx.FindMethod("sub", Static).Instances[0]
+		meta.CmplxMulZ = meta.Cmplx.FindMethod("mul", Static).Instances[0]
+		meta.CmplxDivZ = meta.Cmplx.FindMethod("div", Static).Instances[0]
+
 		ret meta
 	}
 }

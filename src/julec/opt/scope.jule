@@ -409,6 +409,48 @@ impl scopeOptimizer {
 		exprOptimizer.optimizeData(postfix.Expr, self.data)
 	}
 
+	fn cmplxAssign(mut &self, mut &assign: &sema::Assign): bool {
+		if !StdMathCmplx || assign.Op.Id != token::Id.Eq || obj::ProgramMeta.MathCmplx == nil {
+			ret false
+		}
+		mut s := assign.Left.Type.Struct()
+		if s == nil || s != obj::ProgramMeta.MathCmplx.Cmplx {
+			ret false
+		}
+		match type assign.Right.Model {
+		| &sema::FnCallExprModel:
+			break
+		|:
+			ret false
+		}
+		mut fc := (&sema::FnCallExprModel)(assign.Right.Model)
+		match type fc.Expr {
+		| &sema::StructSubIdentExprModel:
+			break
+		|:
+			ret false
+		}
+		mut siem := (&sema::StructSubIdentExprModel)(fc.Expr)
+		if !equalModels(assign.Left.Model, siem.Expr.Model) {
+			ret false
+		}
+		match fc.Func {
+		| obj::ProgramMeta.MathCmplx.CmplxAdd:
+			fc.Func = obj::ProgramMeta.MathCmplx.CmplxAddZ
+		| obj::ProgramMeta.MathCmplx.CmplxSub:
+			fc.Func = obj::ProgramMeta.MathCmplx.CmplxSubZ
+		| obj::ProgramMeta.MathCmplx.CmplxMul:
+			fc.Func = obj::ProgramMeta.MathCmplx.CmplxMulZ
+		| obj::ProgramMeta.MathCmplx.CmplxDiv:
+			fc.Func = obj::ProgramMeta.MathCmplx.CmplxDivZ
+		|:
+			ret false
+		}
+		siem.Method = fc.Func
+		self.setCurrentStmt(&sema::Data{Model: fc})
+		ret true
+	}
+
 	fn optimizeAssign(mut &self, mut assign: &sema::Assign) {
 		if assign.Op.Id == token::Id.Eq &&
 			equalModels(assign.Left.Model, assign.Right.Model) {
@@ -446,7 +488,8 @@ impl scopeOptimizer {
 
 		match {
 		| self.strAssign(assign)
-		| self.sliceAssign(assign):
+		| self.sliceAssign(assign)
+		| self.cmplxAssign(assign):
 			ret
 		}
 
