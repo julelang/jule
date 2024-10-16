@@ -75,18 +75,22 @@ struct Value {
 	Data: &Data
 }
 
+// Informations about expressions that evaluating for assignments.
+struct target {
+	ignored: bool // whether the destination ignores the evaluated expression.
+	mutable: bool // Will be assigned to the mutable storage.
+}
+
 // Evaluator.
 struct eval {
 	s:          &sema // Used for error logging.
 	lookup:     Lookup
 	prefix:     &Type
 	unsafety:   bool
-	immutable:  bool // This expression will assigned to immutable memory.
-	ignored:    bool // Evaluated expression is not for assignment or something else.
 	disBuiltin: bool // Disallow/suppress Jule's built-in defines.
 	owner:      &Var
 	field:      &FieldIns // Field of this default expression. Used for checking cycles and dependency collection.
-	arg:        bool      // This expression evaluating for argument.
+	target:     target
 }
 
 impl eval {
@@ -817,7 +821,7 @@ impl eval {
 				continue
 			}
 			const destIsRef = false
-			if self.s.checkValidityForInitExpr(!self.immutable, destIsRef, arr.Elem, d, elem.Token) {
+			if self.s.checkValidityForInitExpr(self.target.mutable, destIsRef, arr.Elem, d, elem.Token) {
 				_ = self.s.checkAssignType(destIsRef, arr.Elem, d, elem.Token, self.getOwnerRefers())
 			}
 			model.Elems = append(model.Elems, d.Model)
@@ -859,7 +863,7 @@ impl eval {
 			mut d := self.evalExpr(elem)
 			if d != nil {
 				const destIsRef = false
-				if self.s.checkValidityForInitExpr(!self.immutable, destIsRef, slc.Elem, d, elem.Token) {
+				if self.s.checkValidityForInitExpr(self.target.mutable, destIsRef, slc.Elem, d, elem.Token) {
 					_ = self.s.checkAssignType(destIsRef, slc.Elem, d, elem.Token, self.getOwnerRefers())
 				}
 				model.Elems = append(model.Elems, d.Model)
@@ -903,7 +907,7 @@ impl eval {
 
 		// Check mutability for first element.
 		const destIsRef = false
-		self.s.checkValidityForInitExpr(!self.immutable, destIsRef,
+		self.s.checkValidityForInitExpr(self.target.mutable, destIsRef,
 			firstElem.Type, firstElem, firstExpr.Token)
 
 		mut d := self.evalExpSlc(s, firstElem.Type, firstElem.Model)
@@ -1896,7 +1900,7 @@ impl eval {
 		slc.check(exprs)
 
 		mut d := &Data{
-			Mutable: !self.immutable,
+			Mutable: self.target.mutable,
 			Type: &Type{
 				Kind: s,
 			},
@@ -2014,7 +2018,7 @@ impl eval {
 	}
 
 	fn processExceptionalHandler(mut self, mut &f: &FnIns, mut &fc: &ast::FnCallExpr, mut &d: &Data) {
-		resultNeeded := !f.Decl.IsVoid() && (self.arg || !self.ignored)
+		resultNeeded := !self.target.ignored && !f.Decl.IsVoid()
 		let mut csc: &scopeChecker = nil
 		let mut ch: &Scope = nil
 
@@ -2025,7 +2029,7 @@ impl eval {
 		mut sc := (&scopeChecker)(self.lookup)
 		csc = sc.newChildChecker()
 		if resultNeeded {
-			csc.result = f
+			csc.result = &result{func: f, mutable: self.target.mutable}
 		}
 		ch = sc.getChild()
 		fc.Exception.Parent = sc.tree
@@ -2054,7 +2058,7 @@ impl eval {
 		}
 
 		if !d.Mutable && f.Decl.IsMethod() && !f.Decl.Statically && f.Decl.Params[0].Mutable {
-			if !self.immutable {
+			if self.target.mutable {
 				self.pushErr(fc.Token, build::LogMsg.MutOperationOnImmut)
 			} else {
 				// Caught mutability risk of immutable literals.
@@ -2895,10 +2899,10 @@ impl eval {
 			}
 
 			const destIsRef = false
-			if self.s.checkValidityForInitExpr(!self.immutable, destIsRef, m.Key, key, pair.Key.Token) {
+			if self.s.checkValidityForInitExpr(self.target.mutable, destIsRef, m.Key, key, pair.Key.Token) {
 				_ = self.s.checkAssignType(destIsRef, m.Key, key, pair.Key.Token, self.getOwnerRefers())
 			}
-			if self.s.checkValidityForInitExpr(!self.immutable, destIsRef, m.Val, val, pair.Val.Token) {
+			if self.s.checkValidityForInitExpr(self.target.mutable, destIsRef, m.Val, val, pair.Val.Token) {
 				_ = self.s.checkAssignType(destIsRef, m.Val, val, pair.Val.Token, self.getOwnerRefers())
 			}
 

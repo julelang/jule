@@ -319,6 +319,12 @@ struct scopeLabel {
 	used:  bool
 }
 
+// Result information for the use statements.
+struct result {
+	func:    &FnIns // Handling function.
+	mutable: bool   // Whether will be assigned to mutable storage.
+}
+
 // Scope checker.
 struct scopeChecker {
 	calledFrom: &token::Token
@@ -329,7 +335,7 @@ struct scopeChecker {
 	table:      &SymTab
 	scope:      &Scope
 	tree:       &ast::ScopeTree
-	result:     &FnIns // Result type for last statement.
+	result:     &result // Result type for the use statement.
 	it:         uintptr
 	cse:        uintptr
 	captured:   &[]&Var        // Anonymous function's captured variables will be stored here.
@@ -719,7 +725,7 @@ impl scopeChecker {
 
 	fn checkExpr(mut &self, mut expr: &ast::Expr) {
 		mut eval := self.s.eval(self)
-		eval.ignored = true
+		eval.target.ignored = true
 		mut d := eval.evalExpr(expr)
 		if d == nil || d.Model == nil {
 			// Skip nil data, because evaluation failed and error documented (it should be) already.
@@ -921,7 +927,14 @@ impl scopeChecker {
 	fn checkRangeIter(mut &self, mut &it: &ast::Iter) {
 		mut rang := (&ast::RangeKind)(it.Kind)
 
-		mut d := self.s.eval(self).evalExpr1(rang.Expr)
+		// Evaluate expression as mutable. Because we can't know type of the expression,
+		// so we can't able to determine whether expression should be mutable by type.
+		// We should evaluate expression as mutable target, because if type have mutability,
+		// the iteration variables may mutate the range expression.
+		mut eval := self.s.eval(self)
+		eval.target.mutable = true
+
+		mut d := eval.evalExpr1(rang.Expr)
 		if d == nil {
 			ret
 		}
@@ -1148,8 +1161,11 @@ impl scopeChecker {
 			ret
 		}
 
+		mut eval := self.s.eval(self)
+		eval.target.mutable = true
+
 		mut expr := a.Left[0].Expr
-		mut d := self.s.eval(self).evalExpr(expr)
+		mut d := eval.evalExpr(expr)
 		if d == nil {
 			ret
 		}
@@ -1246,7 +1262,9 @@ impl scopeChecker {
 
 		if !token::IsIgnoreIdent(a.Left[0].Ident) {
 			mut expr := a.Left[0].Expr
-			l = self.s.eval(self).evalExpr(expr)
+			mut eval := self.s.eval(self)
+			eval.target.mutable = true
+			l = eval.evalExpr(expr)
 			if l == nil {
 				ret
 			}
@@ -1258,6 +1276,7 @@ impl scopeChecker {
 		} else {
 			eval = self.s.eval(self)
 		}
+		eval.target.mutable = true
 		eval.unsafety = self.isUnsafe()
 		mut r := eval.evalExpr(a.Right)
 		if r == nil {
@@ -1404,7 +1423,8 @@ impl scopeChecker {
 			self.s.pushErr(a.Setter, build::LogMsg.InvalidSyntax)
 			ret
 		}
-		mut rd := self.s.eval(self).evalExpr(a.Right)
+		mut eval := self.s.eval(self)
+		mut rd := eval.evalExpr(a.Right) // eval as taget is not mutable for right operand, mutability will be check after
 		if rd == nil {
 			ret
 		}
@@ -1433,6 +1453,9 @@ impl scopeChecker {
 			ret
 		}
 
+		// evaluate left operands as mutable because they will be mutated because of assignment
+		eval.target.mutable = true
+
 		mut st := &MultiAssign{
 			Right: rd.Model,
 		}
@@ -1453,7 +1476,7 @@ impl scopeChecker {
 					}
 				}
 			eval:
-				l = self.s.eval(self).evalExpr(lexpr.Expr)
+				l = eval.evalExpr(lexpr.Expr)
 				if l == nil {
 					continue
 				}
@@ -1880,6 +1903,7 @@ impl scopeChecker {
 			sc: self,
 			f: rt.Func,
 			errorToken: r.Token,
+			mutable: true,
 		}
 		ok := rtc.check(r.Expr)
 		if !ok {
@@ -1957,7 +1981,8 @@ impl scopeChecker {
 			mut rtc := &retTypeChecker{
 				sc: self,
 				errorToken: ue.Expr.Token,
-				types: self.result.Types(),
+				types: self.result.func.Types(),
+				mutable: self.result.mutable,
 			}
 			_ = rtc.check(ue.Expr)
 		| &ast::Expr:

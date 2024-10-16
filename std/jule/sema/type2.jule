@@ -744,9 +744,9 @@ impl fnCallArgChecker {
 
 	fn push(mut self, mut &p: &ParamIns, mut arg: &ast::Expr): (ok: bool) {
 		mut old := self.e.prefix
-		oldImmut := self.e.immutable
+		oldMut := self.e.target.mutable
 
-		self.e.immutable = !p.Decl.Mutable
+		self.e.target.mutable = p.Decl.Mutable
 		if !self.dynamicAnnotation && !p.Decl.Variadic {
 			self.e.prefix = p.Type
 		} else {
@@ -755,7 +755,7 @@ impl fnCallArgChecker {
 		mut d := self.e.evalExpr(arg)
 
 		self.e.prefix = old
-		self.e.immutable = oldImmut
+		self.e.target.mutable = oldMut
 
 		if d == nil {
 			ret false
@@ -848,8 +848,8 @@ impl fnCallArgChecker {
 	}
 
 	fn checkArgs(mut self, mut &params: []&ParamIns): (ok: bool) {
-		arg := self.e.arg
-		self.e.arg = true
+		target := self.e.target
+		self.e.target.ignored = false
 
 		ok = true
 		mut i := 0
@@ -874,7 +874,7 @@ impl fnCallArgChecker {
 			i++
 		}
 
-		self.e.arg = arg
+		self.e.target = target
 		ret ok
 	}
 
@@ -941,8 +941,8 @@ impl structLitChecker {
 		// If evaluated for the immutable memory, check as immutable.
 		// But if field in scope of the interior mutability, check as mutable.
 		// Do not accept as risky if structure is not have any method.
-		// Because if there is not method, no risk for interior mutability.
-		mutable := !self.e.immutable || (f.Decl.Mutable && len(self.s.Methods) > 0)
+		// Because if there is no method, no risk for interior mutability.
+		mutable := self.e.target.mutable || (f.Decl.Mutable && len(self.s.Methods) > 0)
 		if self.e.s.checkValidityForInitExpr(mutable, Reference, f.Type, d, errorToken) {
 			// Check type if validity is good.
 			// Helps to reduce error logs and duplicated logs.
@@ -1263,6 +1263,7 @@ struct retTypeChecker {
 	exprs:      []&ast::Expr // Return expressions.
 	errorToken: &token::Token
 	model:      ExprModel
+	mutable:    bool // Whether the return expression should be mutable.
 }
 
 impl retTypeChecker {
@@ -1290,6 +1291,7 @@ impl retTypeChecker {
 		}
 		mut datas := make([]&Data, 0, len(self.exprs))
 		mut eval := self.sc.s.eval(self.sc)
+		eval.target.mutable = self.mutable
 		for (i, mut expr) in self.exprs {
 			if i >= len(self.types) {
 				break
@@ -1305,7 +1307,7 @@ impl retTypeChecker {
 
 			datas = append(datas, d)
 
-			if !d.Mutable && d.Type.Mutable() {
+			if self.mutable && !d.Mutable && d.Type.Mutable() {
 				self.sc.s.pushErr(self.errorToken, build::LogMsg.RetWithMutTypedNonMut)
 				ret
 			}
