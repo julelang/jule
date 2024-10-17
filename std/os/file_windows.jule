@@ -14,11 +14,6 @@ impl File {
 	// not exist and O_CREATE flag is passed, will created with
 	// mode (before umask). If successful, returns File reference with handle
 	// to file stream and the reference can used for I/O operations.
-	//
-	// Possible errors (FSError):
-	//  Denied Exist Signal SyncIO IO IsDir Loop PerProcessLimit LongPath
-	//  SystemWideLimit NotExist UnableStream NoSpace NotDir Device Overflow
-	//  ReadOnly Retry Busy
 	static fn Open(path: str, flag: oFlag, mode: int)!: &File {
 		utf16Path := integ::UTF16FromStr(path)
 		handle := unsafe { sys::Wopen(&utf16Path[0], int(flag), mode) }
@@ -29,13 +24,10 @@ impl File {
 	}
 
 	// Removes named file.
-	//
-	// Possible errors (FSError):
-	//  Denined Busy LongPath NotExist InsufficientMemory NotDir
 	static fn Remove(path: str)! {
 		utf16Path := integ::UTF16FromStr(path)
 		if unsafe { !sys::DeleteFile(&utf16Path[0]) } {
-			error(getLastFsError())
+			error(getLastFsErrorWindows())
 		}
 	}
 }
@@ -43,10 +35,6 @@ impl File {
 impl File {
 	// Writes bytes to handle and returns writed byte count.
 	// The number of bytes written can never exceed the length of the buf.
-	//
-	// Possible errors (FSError):
-	//  Retry InvalidDescriptor Big Signal IO NoSpace Pipe Range SyncIO
-	//  Seek Device Buffer
 	//
 	// Implements the io::Writer trait.
 	fn Write(mut self, buf: []byte)!: (n: int) {
@@ -75,10 +63,6 @@ impl File {
 	// If the buf is larger than the number of bytes that can be read,
 	// the buffer will not cause an overflow. Offset will be shifted
 	// by the number of bytes read.
-	//
-	// Possible errors (FSError):
-	//  Retry InvalidDescriptor Signal SyncIO IO IsDir Overflow Buffer
-	//  InsufficientMemory Device Seek
 	//
 	// Implements the io::Reader trait.
 	fn Read(mut self, mut buf: []byte)!: (n: int) {

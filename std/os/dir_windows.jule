@@ -8,10 +8,6 @@ use "std/sys"
 
 impl Dir {
 	// Reads the named directory and returs all its directory entries can read.
-	//
-	// Possible errors (FSError):
-	//  Denied InvalidDescriptor PerProcessLimit SystemWideLimit
-	//  NotExist InsufficientMemory NotDir
 	static fn Read(path: str)!: (dirents: []Dir) {
 		utf16Path := integ::UTF16FromStr(filepath::Join(path, "*"))
 		mut data := sys::Win32FindData{}
@@ -34,8 +30,6 @@ impl Dir {
 	}
 
 	// Creates directory.
-	//
-	// Possible errors (FSError): Denied Exist ReadOnly NoSpace
 	static fn Create(path: str)! {
 		// NOTICE
 		// Also can has EMLINK error-code.
@@ -43,17 +37,15 @@ impl Dir {
 
 		utf16Path := integ::UTF16FromStr(path)
 		if unsafe { !sys::CreateDirectory(&utf16Path[0]) } {
-			error(getLastFsError())
+			error(getLastFsErrorWindows())
 		}
 	}
 
 	// Removes empty directory.
-	//
-	// Possible errors (FSError): Denined NotExist NotEmpty SyncIO IO Loop NotDir
 	static fn Remove(path: str)! {
 		utf16Path := integ::UTF16FromStr(path)
 		if unsafe { !sys::RemoveDirectory(&utf16Path[0]) } {
-			error(getLastFsError())
+			error(getLastFsErrorWindows())
 		}
 	}
 }

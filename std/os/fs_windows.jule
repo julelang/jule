@@ -1,0 +1,36 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/sys"
+
+// Returns last filesystem error by GetLastError.
+// Useful for error handling of Windows API functions.
+fn getLastFsErrorWindows(): FSError {
+	err := sys::GetLastError()
+	match err {
+	| sys::ERROR_FILE_NOT_FOUND
+	| sys::ERROR_PATH_NOT_FOUND
+	| sys::ERROR_INVALID_NAME:
+		ret FSError.NotExist
+	| sys::ERROR_ACCESS_DENIED
+	| sys::ERROR_CURRENT_DIRECTORY
+	| sys::ERROR_LOCK_VIOLATION
+	| sys::ERROR_NOT_SUPPORTED:
+		ret FSError.Denied
+	| sys::ERROR_WRITE_PROTECT:
+		ret FSError.ReadOnly
+	| sys::ERROR_DISK_FULL:
+		ret FSError.NoSpace
+	| sys::ERROR_DIR_NOT_EMPTY:
+		ret FSError.NotEmpty
+	| sys::ERROR_ALREADY_EXIST:
+		ret FSError.Exist
+	| sys::ERROR_FILENAME_EXCED_RANGE:
+		ret FSError.LongPath
+	| sys::ERROR_INVALID_PARAMETER:
+		ret FSError.InvalidDescriptor
+	|:
+		ret FSError.IO
+	}
+}
