@@ -41,7 +41,10 @@ unsafe fn connectSocket(handle: netHandle, sockAddr: *sys::Sockaddr, sockLen: ui
 		connectSocketNoTimeout(handle, sockAddr, sockLen) else { error(error) }
 		ret
 	}
-	tv := timevalFromDuration(timeout)
+	tv, ok := timevalFromDuration(timeout)
+	if !ok {
+		error(Error.InvalidTimeout)
+	}
 	if tv.tv_sec == 0 && tv.tv_usec == 0 {
 		connectSocketNoTimeout(handle, sockAddr, sockLen) else { error(error) }
 		ret
@@ -114,7 +117,10 @@ fn sendto(&conn: UdpConn, &buf: []byte)!: int {
 }
 
 fn setSocketTimeout(handle: netHandle, scope: int, timeout: time::DurInt)! {
-	tv := timevalFromDuration(timeout)
+	tv, ok := timevalFromDuration(timeout)
+	if !ok {
+		error(Error.InvalidTimeout)
+	}
 	unsafe {
 		if sys::Setsockopt(handle, sys::SOL_SOCKET, scope, (*integ::Char)(&tv), int(mem::SizeOf(tv))) < 0 {
 			error(lastErrorCode())

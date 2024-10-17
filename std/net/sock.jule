@@ -77,6 +77,7 @@ fn Connect(network: Network, addr: str)!: Conn {
 // For UDP networks, timeout will be ignored.
 // Timeout precision is microseconds.
 // If the timeout is below one microsecond it will be ignored.
+// If timeout is invalid or out of range, throws exceptional with Error.InvalidTimeout.
 fn ConnectTimeout(network: Network, addr: str, timeout: time::DurInt)!: Conn {
 	match network {
 	| Network.Tcp | Network.Tcp4 | Network.Tcp6:
@@ -100,10 +101,9 @@ unsafe fn connectSocketNoTimeout(handle: netHandle, sockAddr: *sys::Sockaddr, so
 	}
 }
 
-fn timevalFromDuration(timeout: time::DurInt): sys::Timeval {
+fn timevalFromDuration(timeout: time::DurInt): (tv: sys::Timeval, ok: bool) {
 	sec := i64(time::Duration.Seconds(timeout))
-	mut tv := sys::Timeval{}
-	tv.tv_sec = sec
-	tv.tv_usec = time::Duration.Microseconds(timeout - (time::Duration.Second * sec))
-	ret tv
+	usec := time::Duration.Microseconds(timeout - (time::Duration.Second * sec))
+	ok = sys::NewTimeval(sec, usec, tv)
+	ret
 }
