@@ -1,0 +1,48 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/mem"
+
+#typedef
+cpp struct timeval {
+	tv_sec:  secType  // Seconds.
+	tv_usec: usecType // Microseconds.
+}
+
+// C's timeval structure.
+type Timeval: cpp.timeval
+
+fn checkBits(n: i64, bits: uint): bool {
+	const maxBits = 64
+	if bits < maxBits {
+		if n < 0 {
+			limit := i64(-1) << (bits - 1)
+			if n < limit {
+				ret false
+			}
+		} else {
+			limit := i64(1) << (bits - 1) - 1
+			if n > limit {
+				ret false
+			}
+		}
+	}
+	ret true
+}
+
+// Creates new Timeval by sec and usec.
+// Sets fields of the out.
+// Reports whether sec and usec have valid range.
+// If sec or usec have invalid range, out will not be mutated.
+fn NewTimeval(sec: i64, usec: i64, mut &out: Timeval): bool {
+	if !checkBits(sec, mem::SizeOf(out.tv_sec) * 8) {
+		ret false
+	}
+	if !checkBits(usec, mem::SizeOf(out.tv_usec) * 8) {
+		ret false
+	}
+	out.tv_sec = unsafe { (secType)(sec) }
+	out.tv_usec = unsafe { (usecType)(usec) }
+	ret true
+}
