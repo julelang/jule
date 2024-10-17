@@ -34,6 +34,7 @@ enum compExprModel: type {
 	&opt::UnsafeDerefExprModel,
 	&opt::UnsafeCastingExprModel,
 	&opt::FnCallIgnoreExceptionalExprModel,
+	&opt::StrConcatExprModel,
 }
 
 struct exprCoder {
@@ -1653,6 +1654,28 @@ impl exprCoder {
 		}
 	}
 
+	fn strConcat(mut &self, mut m: &opt::StrConcatExprModel) {
+		self.oc.write("({ " + typeCoder.Int + " size = 0; ")
+		for i, p in m.Parts {
+			ident := "part" + conv::Itoa(i)
+			self.oc.write(typeCoder.Str + " ")
+			self.oc.write(ident)
+			self.oc.write(" = std::move(")
+			self.possibleRefExpr(p)
+			self.oc.write("); size += ")
+			self.oc.write(ident)
+			self.oc.write(".len(); ")
+		}
+		self.oc.write("jule::Slice<" + typeCoder.U8 + "> buf; buf.alloc_new(0, size); ")
+		for i in m.Parts {
+			ident := "part" + conv::Itoa(i)
+			self.oc.write("buf.append(")
+			self.oc.write(ident)
+			self.oc.write("); ")
+		}
+		self.oc.write(typeCoder.Str + " result; result._len = buf._len; result.buffer = std::move(buf.data); result._slice = buf._slice; std::move(result); })")
+	}
+
 	fn model(mut &self, mut m: compExprModel) {
 		match type m {
 		| str:
@@ -1749,6 +1772,8 @@ impl exprCoder {
 			self.unsafeCasting((&opt::UnsafeCastingExprModel)(m))
 		| &opt::FnCallIgnoreExceptionalExprModel:
 			self.funcCall((&opt::FnCallIgnoreExceptionalExprModel)(m).Base, true)
+		| &opt::StrConcatExprModel:
+			self.strConcat((&opt::StrConcatExprModel)(m))
 		|:
 			self.oc.write("<unimplemented_expression_model>")
 		}

@@ -129,7 +129,7 @@ impl exprOptimizer {
 		ret true
 	}
 
-	fn strCond(self, mut m: &sema::BinaryExprModel): bool {
+	fn strCond(self, mut &m: &sema::BinaryExprModel): bool {
 		lp := m.Left.Type.Prim()
 		if lp == nil || !lp.IsStr() {
 			ret false
@@ -183,6 +183,65 @@ impl exprOptimizer {
 			})
 			*self.model = unsafe { *(*sema::ExprModel)(&model) }
 		}
+		ret true
+	}
+
+	// Tries to optimize string concatenations and reports whether applied.
+	fn strConcat(self, mut &m: &sema::BinaryExprModel): bool {
+		lp := m.Left.Type.Prim()
+		if lp == nil || !lp.IsStr() {
+			ret false
+		}
+		if m.Op.Id != token::Id.Plus {
+			ret false
+		}
+
+		// Check the left operand of the binary expression to determine we need to optimize it specifically.
+		// Use the left perand because of CAST structure.
+		// See the variable step and function body documentation about binary expressions.
+		match type m.Left.Model {
+		| &sema::BinaryExprModel:
+			// the left operand expression is binary expression
+			// the expression is like: "x + y + ..."
+			// we can optimize it
+			break
+		|:
+			// expression is like: "x + y"
+			// there is no need to optimize it
+			ret false
+		}
+
+		mut model := new(StrConcatExprModel)
+		let mut step: fn(m: sema::ExprModel)
+		// Point to the step variable in the closure. Otherwise it will be copied,
+		// so the step function remains as nil, which is causes nil dereferencing.
+		&_step := step
+		step = fn(m: sema::ExprModel) {
+			match type m {
+			| &sema::BinaryExprModel:
+				// First, handle the left operand.
+				// Parts should be in same addition order of the source code.
+				// By operator precedence and CAST production,
+				// the first node of the CAST is always the last binary expression.
+				// For exampple:
+				//   _ = "foo" + x + "bar" + "baz"
+				//                         ^
+				//  In the expression above, the first binary expression node will be pointed one.
+				//  So handle `"foo" + x + "bar"` expression first, then the right operand `+ "baz"`.
+				//  So, recursively handle the left binary expression operands,
+				//  and push the expression models by left-to-right order.
+				unsafe { _step((&sema::BinaryExprModel)(m).Left.Model) }
+				unsafe { _step((&sema::BinaryExprModel)(m).Right.Model) }
+			|:
+				model.Parts = append(model.Parts, m)
+			}
+		}
+		// Start handling from the last binary expression m.
+		// See documentation of the step function about binary expressions.
+		step(m)
+
+		mut anyModel := any(model)
+		*self.model = unsafe { *(*sema::ExprModel)(&anyModel) }
 		ret true
 	}
 
@@ -361,8 +420,9 @@ impl exprOptimizer {
 		}
 
 		if Str {
-			if self.strCond(m) {
-				ret
+			match {
+			| self.strCond(m)
+			| self.strConcat(m):
 			}
 		}
 
