@@ -46,64 +46,75 @@ fn checkArch(arg: str): (ok: bool, exist: bool) {
 	ret
 }
 
-// Reports whether file path passes file annotation by current system.
-fn isPassFileAnnotation(mut p: str): bool {
-	p = filepath::Base(p)
-	n := len(p)
-	p = p[:n-len(filepath::Ext(p))]
+impl Importer {
+	// Reports whether file path passes file annotation by current system.
+	fn isPassFileAnnotation(self, mut p: str): bool {
+		p = filepath::Base(p)
+		n := len(p)
+		p = p[:n-len(filepath::Ext(p))]
 
-	// a1 is the second annotation.
-	// Should be architecture annotation if exist annotation 2 (aka a2),
-	// can operating system or architecture annotation if not.
-	mut a1 := ""
-	// a2 is first filter.
-	// Should be operating system filter if exist and valid annotation.
-	mut a2 := ""
+		if strings::HasSuffix(p, "_test") {
+			if findVar(self.vars, "test") == -1 {
+				// file have _test suffix and test compilation is not enabled
+				// so this file should be ignored
+				ret false
+			}
+			p = p[:len(p)-len("_test")]
+		}
 
-	// Annotation 1
-	mut i := strings::FindLastByte(p, '_')
-	if i == -1 {
-		// Check file name directly if not exist any _ character.
-		mut ok, mut exist := checkOs(p)
+		// a1 is the second annotation.
+		// Should be architecture annotation if exist annotation 2 (aka a2),
+		// can operating system or architecture annotation if not.
+		mut a1 := ""
+		// a2 is first filter.
+		// Should be operating system filter if exist and valid annotation.
+		mut a2 := ""
+
+		// Annotation 1
+		mut i := strings::FindLastByte(p, '_')
+		if i == -1 {
+			// Check file name directly if not exist any _ character.
+			mut ok, mut exist := checkOs(p)
+			if exist {
+				ret ok
+			}
+			ok, exist = checkArch(p)
+			ret !exist || ok
+		}
+		if i+1 >= n {
+			ret true
+		}
+		a1 = p[i+1:]
+
+		p = p[:i]
+
+		// Annotation 2
+		i = strings::FindLastByte(p, '_')
+		if i != -1 {
+			a2 = p[i+1:]
+		}
+
+		if a2 == "" {
+			mut ok, mut exist := checkOs(a1)
+			if exist {
+				ret ok
+			}
+			ok, exist = checkArch(a1)
+			ret !exist || ok
+		}
+
+		mut ok, mut exist := checkArch(a1)
 		if exist {
-			ret ok
+			if !ok {
+				ret false
+			}
+			ok, exist = checkOs(a2)
+			ret !exist || ok
 		}
-		ok, exist = checkArch(p)
+
+		// a1 is not architecture, for this reason bad couple pattern.
+		// Accept as one pattern, so a1 can be platform.
+		ok, exist = checkOs(a1)
 		ret !exist || ok
 	}
-	if i+1 >= n {
-		ret true
-	}
-	a1 = p[i+1:]
-
-	p = p[:i]
-
-	// Annotation 2
-	i = strings::FindLastByte(p, '_')
-	if i != -1 {
-		a2 = p[i+1:]
-	}
-
-	if a2 == "" {
-		mut ok, mut exist := checkOs(a1)
-		if exist {
-			ret ok
-		}
-		ok, exist = checkArch(a1)
-		ret !exist || ok
-	}
-
-	mut ok, mut exist := checkArch(a1)
-	if exist {
-		if !ok {
-			ret false
-		}
-		ok, exist = checkOs(a2)
-		ret !exist || ok
-	}
-
-	// a1 is not architecture, for this reason bad couple pattern.
-	// Accept as one pattern, so a1 can be platform.
-	ok, exist = checkOs(a1)
-	ret !exist || ok
 }
