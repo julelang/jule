@@ -30,7 +30,39 @@ struct data {
 	flags:    dataFlag
 }
 
+fn _removeDeads[CommonCollection](mut &alive: CommonCollection, &other: CommonCollection, invalid: uintptr) {
+lookup:
+	for _, v in alive.vars {
+		if v.var == invalid {
+			continue
+		}
+		for _, ov in other.vars {
+			if v.var == ov.var {
+				continue lookup
+			}
+		}
+		// variable |v| is not dead but other data is not have this variable
+		// so it should be dead, remove it
+		alive.removeVar(v.var)
+	}
+}
+
 impl data {
+	// Remove the alive variables wich is not alive in other data.
+	fn removeDeads(mut self, &other: &data) {
+		if self.boundary != nil && other.boundary != nil {
+			_removeDeads(self.boundary, other.boundary, invalidBoundary)
+		}
+		if self.nils != nil && other.nils != nil {
+			_removeDeads(self.nils, other.nils, invalidNil)
+		}
+		if self.dynamic != nil && other.dynamic != nil {
+			_removeDeads(self.dynamic, other.dynamic, invalidDynamic)
+		}
+	}
+
+	// Returns checkpoint copy of the data.
+	// The copy is a immutable hard-copy.
 	fn getCheckpoint(mut self): dataCheckpoint {
 		mut c := dataCheckpoint{}
 		if self.boundary != nil {
@@ -51,7 +83,16 @@ impl data {
 		ret c
 	}
 
-	fn loadCheckpoint(mut self, mut &c: dataCheckpoint) {
+	// Like the getCheckpoint(), but uses immutable copy of the internal data.
+	fn getMutCheckpoint(mut self): dataCheckpoint {
+		ret dataCheckpoint{
+			boundary: self.boundary,
+			nils: self.nils,
+			dynamic: self.dynamic,
+		}
+	}
+
+	fn loadCheckpoint(mut self, mut c: dataCheckpoint) {
 		self.boundary = c.boundary
 		self.nils = c.nils
 		self.dynamic = c.dynamic

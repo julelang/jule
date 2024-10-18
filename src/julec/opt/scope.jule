@@ -75,7 +75,7 @@ impl scopeOptimizer {
 					ret
 				}
 			}
-			exprOptimizer.optimizeData(d.Model, self.data)
+			exprOptimizer.optimizeData(d.Model, self.data, self)
 			if Exceptional &&
 				m.Func.Decl.Exceptional &&
 				m.Except != nil &&
@@ -93,7 +93,7 @@ impl scopeOptimizer {
 		// Therefore avoid using this expressions as useful data for relevant optimizations.
 		dataFlags := self.data.flags
 		self.data.flags |= dataFlag.NoConditional
-		exprOptimizer.optimizeData(d.Model, self.data)
+		exprOptimizer.optimizeData(d.Model, self.data, self)
 		self.data.flags = dataFlags
 	}
 
@@ -114,23 +114,32 @@ impl scopeOptimizer {
 					}
 				}
 			}
-			exprOptimizer.optimizeData(v.Value.Data.Model, self.data)
+			exprOptimizer.optimizeData(v.Value.Data.Model, self.data, self)
 		}
 	}
 
 	fn optimizeConditional(mut &self, mut c: &sema::Conditional) {
+		// Handle like optimizeChildHard(), but avoid calling this method for each scope.
+		// So wrap same functionality and apply optimizations by calling the optimizeChild().
+		// See documentation of the optimizeChildHard() for more information about difference.
+		mut alive := data{}
+		alive.loadCheckpoint(self.data.getCheckpoint())
+
+		// Use checkpoint for the self.data to use same data for each child scope.
 		mut checkpoint := self.data.getCheckpoint()
+
 		for (_, mut elif) in c.Elifs {
-			exprOptimizer.optimizeData(elif.Expr, self.data)
+			exprOptimizer.optimizeData(elif.Expr, self.data, self)
 			self.optimizeChild(elif.Scope)
-			if len(c.Elifs) > 1 || c.Default != nil {
-				self.data.loadCheckpoint(checkpoint)
-			}
+			alive.removeDeads(self.data)
+			self.data.loadCheckpoint(checkpoint)
 		}
 		if c.Default != nil {
 			self.optimizeChild(c.Default.Scope)
-			self.data.loadCheckpoint(checkpoint)
+			alive.removeDeads(self.data)
 		}
+
+		self.data.loadCheckpoint(alive.getMutCheckpoint())
 
 		if !Cond {
 			ret
@@ -223,10 +232,19 @@ impl scopeOptimizer {
 		if Dynamic && m.TypeMatch {
 			var = getDynamicVar(m.Expr.Model)
 		}
+
+		// Handle like optimizeChildHard(), but avoid calling this method for each scope.
+		// So wrap same functionality and apply optimizations by calling the optimizeChild().
+		// See documentation of the optimizeChildHard() for more information about difference.
+		mut alive := data{}
+		alive.loadCheckpoint(self.data.getCheckpoint())
+
+		// Use checkpoint for the self.data to use same data for each child scope.
 		mut checkpoint := self.data.getCheckpoint()
+
 		for (_, mut case) in m.Cases {
 			for (_, mut expr) in case.Exprs {
-				exprOptimizer.optimizeData(expr.Model, self.data)
+				exprOptimizer.optimizeData(expr.Model, self.data, self)
 			}
 			if len(case.Exprs) == 1 && self.data.dynamic != nil {
 				// We can know the exact kind of dynamic type if expression is single.
@@ -238,14 +256,15 @@ impl scopeOptimizer {
 				}
 			}
 			self.optimizeChild(case.Scope)
-			if len(m.Cases) > 1 || m.Default != nil {
-				self.data.loadCheckpoint(checkpoint)
-			}
+			alive.removeDeads(self.data)
+			self.data.loadCheckpoint(checkpoint)
 		}
 		if m.Default != nil {
 			self.optimizeChild(m.Default.Scope)
-			self.data.loadCheckpoint(checkpoint)
+			alive.removeDeads(self.data)
 		}
+
+		self.data.loadCheckpoint(alive.getMutCheckpoint())
 
 		if !Cond {
 			ret
@@ -307,7 +326,7 @@ impl scopeOptimizer {
 			// Add index variable to boundary analysis.
 			self.data.boundary.pushVar(getBoundaryVar(it.Expr.Model), it.KeyA)
 		}
-		self.optimizeChild(it.Scope)
+		self.optimizeChildHard(it.Scope)
 
 		if Iter {
 			match type it.Expr.Model {
@@ -333,7 +352,7 @@ impl scopeOptimizer {
 				| prim.IsI32():
 					// Expression is: []rune(str)
 					// Avoid making allocation, iterate runes of string.
-					exprOptimizer.optimizeData(cem.Expr.Model, self.data) // Optimize string expression.
+					exprOptimizer.optimizeData(cem.Expr.Model, self.data, self) // Optimize string expression.
 					self.setCurrentStmt(&StrRuneIter{
 						Expr: cem.Expr,
 						Base: it,
@@ -354,13 +373,13 @@ impl scopeOptimizer {
 				}
 			}
 		}
-		exprOptimizer.optimizeData(it.Expr.Model, self.data)
+		exprOptimizer.optimizeData(it.Expr.Model, self.data, self)
 	}
 
 	fn optimizeWhileIter(mut &self, mut it: &sema::WhileIter) {
-		exprOptimizer.optimizeData(it.Expr, self.data)
+		exprOptimizer.optimizeData(it.Expr, self.data, self)
 		self.optimizeStmt(it.Next)
-		self.optimizeChild(it.Scope)
+		self.optimizeChildHard(it.Scope)
 	}
 
 	fn substr(mut &self, mut a: &sema::Assign): bool {
@@ -406,7 +425,7 @@ impl scopeOptimizer {
 		if self.data.boundary != nil {
 			possibleBoundaryRemove(self.data.boundary, postfix.Expr)
 		}
-		exprOptimizer.optimizeData(postfix.Expr, self.data)
+		exprOptimizer.optimizeData(postfix.Expr, self.data, self)
 	}
 
 	fn cmplxAssign(mut &self, mut &assign: &sema::Assign): bool {
@@ -493,8 +512,8 @@ impl scopeOptimizer {
 			ret
 		}
 
-		exprOptimizer.optimizeData(assign.Left.Model, self.data)
-		exprOptimizer.optimizeData(assign.Right.Model, self.data)
+		exprOptimizer.optimizeData(assign.Left.Model, self.data, self)
+		exprOptimizer.optimizeData(assign.Right.Model, self.data, self)
 
 		match assign.Op.Id {
 		| token::Id.CaretEq | token::Id.SolidusEq | token::Id.PercentEq
@@ -535,7 +554,7 @@ impl scopeOptimizer {
 				Right: assign.Right,
 			}
 			mut model := sema::ExprModel(b)
-			exprOptimizer.optimizeData(model, self.data)
+			exprOptimizer.optimizeData(model, self.data, self)
 			if model != b || b.Op != assign.Op {
 				// Binary model optimized.
 				// Use optimized model directly.
@@ -687,17 +706,17 @@ impl scopeOptimizer {
 						possibleDynamicRemove(checkpoint.dynamic, l.Model)
 					}
 				}
-				exprOptimizer.optimizeData(l.Model, self.data)
+				exprOptimizer.optimizeData(l.Model, self.data, self)
 			}
 		}
-		exprOptimizer.optimizeData(assign.Right, self.data)
+		exprOptimizer.optimizeData(assign.Right, self.data, self)
 
 		// Load data to optimized checkpoint.
 		self.data.loadCheckpoint(checkpoint)
 	}
 
 	fn optimizeRet(mut &self, mut r: &sema::RetSt) {
-		exprOptimizer.optimizeData(r.Expr, self.data)
+		exprOptimizer.optimizeData(r.Expr, self.data, self)
 
 		// Break algorithm is exceptional-specific optimizations are not enabled.
 		// The following algorithms tries to apply specific optimizations for exceptionals.
@@ -723,7 +742,7 @@ impl scopeOptimizer {
 	fn optimizeStmt(mut &self, mut stmt: sema::Stmt) {
 		match type stmt {
 		| &sema::Scope:
-			self.optimizeChild((&sema::Scope)(stmt))
+			self.optimizeChildHard((&sema::Scope)(stmt))
 		| &sema::Data:
 			self.optimizeData((&sema::Data)(stmt))
 		| &sema::Var:
@@ -735,7 +754,7 @@ impl scopeOptimizer {
 		| &sema::WhileIter:
 			self.optimizeWhileIter((&sema::WhileIter)(stmt))
 		| &sema::InfIter:
-			self.optimizeChild((&sema::InfIter)(stmt).Scope)
+			self.optimizeChildHard((&sema::InfIter)(stmt).Scope)
 		| &sema::Assign:
 			self.optimizeAssign((&sema::Assign)(stmt))
 		| &sema::MultiAssign:
@@ -749,11 +768,56 @@ impl scopeOptimizer {
 		}
 	}
 
+	// Optimizes child scope using mutable data.
 	fn optimizeChild(mut &self, mut child: &sema::Scope) {
 		mut so := scopeOptimizer.new(child)
 		so.parent = self
 		so.data = self.data
 		so.optimize()
+	}
+
+	// Optimizes child scope using responsive data.
+	// This child optimization algorithm is safer but slower.
+	// It should be used when the child scope may mutate the data,
+	// because optimization may conflict and mutable data may cause issues.
+	// This optimizer method will use responsive data to detect conflicts and other cases.
+	//
+	// For example;
+	//
+	//   z := getSlice()
+	//   mut x := (&int)(nil)
+	//   for in z {
+	//       x = new(int)
+	//   }
+	//   println(*x)
+	//
+	//   In the example code above, the variable |x| may optimized to unsafe dereferencing,
+	//   which is removes the nil checking. It probably will appear when the scope of the
+	//   iteration optimized with the optimizeChild method. Since the using mutable data,
+	//   the variable |x| will be marked as non-nil because of `new(int)` assignment.
+	//   But, the iteration may not iterate even once. So, the variable |x| may still remain nil.
+	//   In this case, the program behavior will be unsafe because of optimization mistake.
+	//
+	//   This optimizer method, uses responsive data. So handles dead variables and mutations.
+	//   For example, if scope code will assign the variable |x| to nil,
+	//   it remove the alive state of the variable |x|. Another example,
+	//   example case is not appear when used this method. Because it uses an immutable copy,
+	//   internally, so child optimizer will not mutate the checkpoint.
+	//   Removes possibly dead variables if checkpoint marks as alive after child optimizer,
+	//   and ignored possibly alive variables to avoid mistakes such as example case.
+	fn optimizeChildHard(mut &self, mut child: &sema::Scope) {
+		// Create the immutable copy of the data to determine alive and dead data.
+		// As described in the method documentation.
+		mut alive := data{}
+		alive.loadCheckpoint(self.data.getCheckpoint())
+
+		self.optimizeChild(child)
+
+		// Remove possibly dead variables after child optimization.
+		alive.removeDeads(self.data)
+
+		// Load alive as data.
+		self.data.loadCheckpoint(alive.getMutCheckpoint())
 	}
 
 	// Optimizes scope by enabled optimizations.

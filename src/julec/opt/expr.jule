@@ -16,20 +16,22 @@ struct exprOptimizer {
 	mut model:     &sema::ExprModel
 	mut data:      &data // Should be non-nil guaranteed.
 	mut inspector: &obj::ExprInspector
+	mut scopeOpt:  &scopeOptimizer
 }
 
 impl exprOptimizer {
 	static fn optimize(mut &model: sema::ExprModel) {
-		exprOptimizer.optimizeData(model, emptyData)
+		exprOptimizer.optimizeData(model, emptyData, nil)
 	}
 
-	static fn optimizeData(mut &model: sema::ExprModel, mut &d: &data) {
+	static fn optimizeData(mut &model: sema::ExprModel, mut &d: &data, mut s: &scopeOptimizer) {
 		// Do optimizatitons if any enabled.
 		if exprEnabled {
 			mut exop := &exprOptimizer{
 				model: unsafe { (&sema::ExprModel)(&model) },
 				data: d,
 				inspector: obj::ExprInspector.New(),
+				scopeOpt: s,
 			}
 			exop.do()
 		}
@@ -647,9 +649,22 @@ impl exprOptimizer {
 		}
 	}
 
-	fn scope(self, mut &s: &sema::Scope) {
+	// Tries to optimize scope.
+	// If the |child| true and |self.scopeOpt| is not nil, calls the optimizeChildHard().
+	// Otherwise optimizes the scope with immutable copy of the data if exist.
+	fn scope(self, mut &s: &sema::Scope, child: bool) {
+		if child && self.scopeOpt != nil {
+			self.scopeOpt.optimizeChildHard(s)
+			ret
+		}
 		mut scopt := scopeOptimizer.new(s)
-		scopt.data = self.data
+		if self.data != nil {
+			// If data exist, use it as immutable copy.
+			// Because this scope is not child.
+			// So, assume the child is not affect the parent.
+			scopt.data = new(data)
+			scopt.data.loadCheckpoint(self.data.getCheckpoint())
+		}
 		scopt.optimize()
 	}
 
@@ -662,7 +677,6 @@ impl exprOptimizer {
 			if meta.Field(f.Name()).Unwrap() == m.Func {
 				mut model := any(&FnCallIgnoreExceptionalExprModel{Base: m})
 				*self.model = unsafe { *(*sema::ExprModel)(&model) }
-
 				// Return function, skip following if statements if exist.
 				ret
 			}
@@ -715,7 +729,10 @@ impl exprOptimizer {
 	fn funcCall(self, mut m: &sema::FnCallExprModel) {
 		self.args(m.Func.Params, m.Args)
 		if m.Except != nil {
-			self.scope(m.Except)
+			// Handle exceptional handler scope as child.
+			// Because it is actually a child scope.
+			const Child = true
+			self.scope(m.Except, Child)
 		}
 		match {
 		| StdStrings && obj::ProgramMeta.StrBuilder != nil:
@@ -748,7 +765,12 @@ impl exprOptimizer {
 	}
 
 	fn anonFunc(self, mut m: &sema::AnonFnExprModel) {
-		self.scope(m.Func.Scope)
+		// Do not handle anonymous function body as child scope.
+		// Handle it with separate block. There is no direct affect to parent scope.
+		// It is possible with references, but it is unsafe operation.
+		// So optimizer is not have to thing such cases.
+		const Child = false
+		self.scope(m.Func.Scope, Child)
 	}
 
 	fn do(self) {
