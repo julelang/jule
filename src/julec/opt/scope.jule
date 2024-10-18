@@ -582,10 +582,12 @@ impl scopeOptimizer {
 		}
 	}
 
-	fn tryOptimizeSwap(mut &self, mut &assign: &sema::MultiAssign): bool {
+	// Tries to optimize swap assignments, such as "x, y = y, x", and reports whether optimization applied.
+	// Also reports whether additional analysis is required such as expression optimizations for operands.
+	fn tryOptimizeSwap(mut &self, mut &assign: &sema::MultiAssign): (applied: bool, analysis: bool) {
 		if !Assign || len(assign.Left) != 2 ||
 			assign.Left[0] == nil || assign.Left[1] == nil {
-			ret false
+			ret false, false
 		}
 		let mut tup: &sema::TupleExprModel
 		match type assign.Right {
@@ -593,7 +595,7 @@ impl scopeOptimizer {
 			tup = (&sema::TupleExprModel)(assign.Right)
 		}
 		if tup == nil || len(tup.Datas) != 2 {
-			ret false
+			ret false, false
 		}
 
 		// Catch self assignments.
@@ -601,30 +603,56 @@ impl scopeOptimizer {
 			obj::EqualModels(assign.Left[1].Model, tup.Datas[1].Model) {
 			self.removeCurrent()
 			self.i-- // In next iteration, point to correct statement.
-			ret true
+			// Optimization applied but additional analysis is not necessary.
+			// Because this statement is removed. Do not affect the behavior of the program.
+			ret true, false
 		}
 
 		// Catch swaps.
 		if !obj::EqualModels(assign.Left[0].Model, tup.Datas[1].Model) ||
 			!obj::EqualModels(assign.Left[1].Model, tup.Datas[0].Model) {
-			ret false
+			ret false, false
 		}
 		mut model := &SwapExprModel{
 			Left: assign.Left[0],
 			Right: assign.Left[1],
 		}
-		exprOptimizer.optimizeData(model.Left.Model, self.data)
-		exprOptimizer.optimizeData(model.Right.Model, self.data)
 		self.setCurrentStmt(model)
-		ret true
+		// Do not optimize the operands.
+		// The additional analysis will do it.
+		ret true, true
 	}
 
 	fn optimizeMultiAssign(mut &self, mut assign: &sema::MultiAssign) {
-		if self.tryOptimizeSwap(assign) {
-			// Swap operation can skip the following algorithm.
-			// As far as tested, following analysis are not necessary.
-			ret
+		{
+			applied, analysis := self.tryOptimizeSwap(assign)
+			if applied && !analysis {
+				ret
+			}
 		}
+
+		// Use self.data to determine whether optimization opportunities.
+		// But use this checkpoint for optimizations. Because,
+		// any swap expression may cause conflicts.
+		// For example, --opt-dynamic optimizations;
+		//
+		//   mut x := any(nil)
+		//   mut y := any(20)
+		//   x, y = y, x
+		//   _ = int(y)
+		//
+		//   In the example program above, the "int(y)" expression will be optimized to unsafe,
+		//   which is removes the type checking. But the variable |y| will be nil.
+		//   This bug appears because of using common optimization data.
+		//   First, the variable |x| takes the value of the variable |y|,
+		//   which is non-nil and type-is-nil guaranteed. Then the variable |y|
+		//   takes the value of the variable |x|. It should be nil, but it's not.
+		//   Because the variable |x| will be marked like |y|, since common data used.
+		//   So use the self.data to determine optimization opportunities,
+		//   but apply optimization data update on the checkpoint copy to avoid conflicts.
+		//
+		// Do not forget load checkpoint to self.data to keep updated data.
+		mut checkpoint := self.data.getCheckpoint()
 
 		mut tup := (&sema::TupleExprModel)(nil)
 		match type assign.Right {
@@ -635,17 +663,17 @@ impl scopeOptimizer {
 			if l != nil {
 				if self.data.boundary != nil {
 					if isBoundaryRiskyType(l.Type) {
-						possibleBoundaryRemove(self.data.boundary, l.Model)
+						possibleBoundaryRemove(checkpoint.boundary, l.Model)
 					}
 				}
 				if self.data.nils != nil {
 					if tup != nil && isGuaranteedNonNilExpr(self.data.nils, tup.Datas[i].Model) {
 						if isNilValidType(l.Type) {
 							const safe = true
-							self.data.nils.pushVar(getNilVar(l.Model), safe)
+							checkpoint.nils.pushVar(getNilVar(l.Model), safe)
 						}
 					} else {
-						possibleNilRemove(self.data.nils, l.Model)
+						possibleNilRemove(checkpoint.nils, l.Model)
 					}
 				}
 				if self.data.dynamic != nil && tup != nil {
@@ -653,16 +681,19 @@ impl scopeOptimizer {
 						self.data.dynamic, tup.Datas[i].Type, tup.Datas[i].Model)
 					if kind != nil {
 						if isDynamicValidType(l.Type) {
-							self.data.dynamic.pushVar(getDynamicVar(l.Model), kind)
+							checkpoint.dynamic.pushVar(getDynamicVar(l.Model), kind)
 						}
 					} else {
-						possibleDynamicRemove(self.data.dynamic, l.Model)
+						possibleDynamicRemove(checkpoint.dynamic, l.Model)
 					}
 				}
 				exprOptimizer.optimizeData(l.Model, self.data)
 			}
 		}
 		exprOptimizer.optimizeData(assign.Right, self.data)
+
+		// Load data to optimized checkpoint.
+		self.data.loadCheckpoint(checkpoint)
 	}
 
 	fn optimizeRet(mut &self, mut r: &sema::RetSt) {
