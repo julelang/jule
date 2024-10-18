@@ -370,7 +370,7 @@ impl scopeOptimizer {
 		match type a.Right.Model {
 		| &sema::SlicingExprModel:
 			mut sem := (&sema::SlicingExprModel)(a.Right.Model)
-			if equalModels(a.Left.Model, sem.Expr) {
+			if obj::EqualModels(a.Left.Model, sem.Expr) {
 				self.setCurrentStmt(&MutSlicingExprModel{
 					Token: sem.Token,
 					Expr: sem.Expr,
@@ -431,7 +431,7 @@ impl scopeOptimizer {
 			ret false
 		}
 		mut siem := (&sema::StructSubIdentExprModel)(fc.Expr)
-		if !equalModels(assign.Left.Model, siem.Expr.Model) {
+		if !obj::EqualModels(assign.Left.Model, siem.Expr.Model) {
 			ret false
 		}
 		match fc.Func {
@@ -453,7 +453,7 @@ impl scopeOptimizer {
 
 	fn optimizeAssign(mut &self, mut assign: &sema::Assign) {
 		if assign.Op.Id == token::Id.Eq &&
-			equalModels(assign.Left.Model, assign.Right.Model) {
+			obj::EqualModels(assign.Left.Model, assign.Right.Model) {
 			self.removeCurrent()
 			self.i-- // In next iteration, point to correct statement.
 			ret
@@ -597,16 +597,16 @@ impl scopeOptimizer {
 		}
 
 		// Catch self assignments.
-		if equalModels(assign.Left[0].Model, tup.Datas[0].Model) &&
-			equalModels(assign.Left[1].Model, tup.Datas[1].Model) {
+		if obj::EqualModels(assign.Left[0].Model, tup.Datas[0].Model) &&
+			obj::EqualModels(assign.Left[1].Model, tup.Datas[1].Model) {
 			self.removeCurrent()
 			self.i-- // In next iteration, point to correct statement.
 			ret true
 		}
 
 		// Catch swaps.
-		if !equalModels(assign.Left[0].Model, tup.Datas[1].Model) ||
-			!equalModels(assign.Left[1].Model, tup.Datas[0].Model) {
+		if !obj::EqualModels(assign.Left[0].Model, tup.Datas[1].Model) ||
+			!obj::EqualModels(assign.Left[1].Model, tup.Datas[0].Model) {
 			ret false
 		}
 		mut model := &SwapExprModel{

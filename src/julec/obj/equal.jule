@@ -10,7 +10,8 @@ struct anyData {
 	typePtr: *unsafe
 }
 
-fn typeData(&m: sema::ExprModel): uintptr {
+// Returns data pointer address in uintptr of ExprModel.
+fn TypeData(&m: sema::ExprModel): uintptr {
 	ret uintptr(unsafe { (*anyData)(&m).typePtr })
 }
 
@@ -37,34 +38,34 @@ fn equalCasting(l: &sema::CastingExprModel, r: &sema::CastingExprModel): bool {
 	if !l.Type.Equal(r.Type) {
 		ret false
 	}
-	ret equalModels(l.Expr.Model, r.Expr.Model)
+	ret EqualModels(l.Expr.Model, r.Expr.Model)
 }
 
 fn equalUnary(l: &sema::UnaryExprModel, r: &sema::UnaryExprModel): bool {
 	if l.Op.Id != r.Op.Id || l.Op.Kind != r.Op.Kind {
 		ret false
 	}
-	ret equalModels(l.Expr.Model, r.Expr.Model)
+	ret EqualModels(l.Expr.Model, r.Expr.Model)
 }
 
 fn equalIndexing(l: &sema::IndexingExprModel, r: &sema::IndexingExprModel): bool {
-	ret equalModels(l.Expr.Model, r.Expr.Model) &&
-		equalModels(l.Index.Model, r.Index.Model)
+	ret EqualModels(l.Expr.Model, r.Expr.Model) &&
+		EqualModels(l.Index.Model, r.Index.Model)
 }
 
 fn equalBinary(l: &sema::BinaryExprModel, r: &sema::BinaryExprModel): bool {
 	if l.Op.Id != r.Op.Id || l.Op.Kind != r.Op.Kind {
 		ret false
 	}
-	ret equalModels(l.Left.Model, r.Left.Model) &&
-		equalModels(l.Right.Model, r.Right.Model)
+	ret EqualModels(l.Left.Model, r.Left.Model) &&
+		EqualModels(l.Right.Model, r.Right.Model)
 }
 
 // Reports whether expressions are equal.
 // Designed lvalue equality comparison oriented,
 // such as swap statement value comparisons.
-fn equalModels(l: sema::ExprModel, r: sema::ExprModel): bool {
-	if typeData(l) != typeData(r) {
+fn EqualModels(l: sema::ExprModel, r: sema::ExprModel): bool {
+	if TypeData(l) != TypeData(r) {
 		ret false
 	}
 	match type l {
@@ -73,7 +74,7 @@ fn equalModels(l: sema::ExprModel, r: sema::ExprModel): bool {
 	| &sema::StructSubIdentExprModel:
 		li := (&sema::StructSubIdentExprModel)(l)
 		ri := (&sema::StructSubIdentExprModel)(r)
-		ret li.Field == ri.Field && equalModels(li.Expr.Model, ri.Expr.Model)
+		ret li.Field == ri.Field && EqualModels(li.Expr.Model, ri.Expr.Model)
 	| &constant::Const:
 		ret equalConst((&constant::Const)(l), (&constant::Const)(r))
 	| &sema::CastingExprModel:
