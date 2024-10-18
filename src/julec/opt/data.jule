@@ -17,9 +17,9 @@ static mut emptyData = new(data)
 
 // Immutable copy for data.
 struct dataCheckpoint {
-	boundary: boundary
-	nils:     nils
-	dynamic:  dynamic
+	boundary: &boundary
+	nils:     &nils
+	dynamic:  &dynamic
 }
 
 // All-in-one all analysis information structures.
@@ -33,18 +33,27 @@ struct data {
 impl data {
 	fn getCheckpoint(mut self): dataCheckpoint {
 		mut c := dataCheckpoint{}
-		c.boundary.vars = append(make([]boundaryVar, 0), self.boundary.vars...)
-		for i in c.boundary.vars {
-			c.boundary.vars[i].maxSize = append(make([]sema::ExprModel, 0), c.boundary.vars[i].maxSize...)
+		if self.boundary != nil {
+			c.boundary = new(boundary)
+			c.boundary.vars = append(make([]boundaryVar, 0), self.boundary.vars...)
+			for i in c.boundary.vars {
+				c.boundary.vars[i].maxSize = append(make([]sema::ExprModel, 0), c.boundary.vars[i].maxSize...)
+			}
 		}
-		c.nils.vars = append(make([]nilVar, 0), self.nils.vars...)
-		c.dynamic.vars = append(make([]dynamicVar, 0), self.dynamic.vars...)
+		if self.nils != nil {
+			c.nils = new(nils)
+			c.nils.vars = append(make([]nilVar, 0), self.nils.vars...)
+		}
+		if self.dynamic != nil {
+			c.dynamic = new(dynamic)
+			c.dynamic.vars = append(make([]dynamicVar, 0), self.dynamic.vars...)
+		}
 		ret c
 	}
 
 	fn loadCheckpoint(mut self, mut &c: dataCheckpoint) {
-		*self.boundary = c.boundary
-		*self.nils = c.nils
-		*self.dynamic = c.dynamic
+		self.boundary = c.boundary
+		self.nils = c.nils
+		self.dynamic = c.dynamic
 	}
 }
