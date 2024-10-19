@@ -52,7 +52,30 @@ namespace jule
     inline jule::Int __copy(const Dest &dest, const Src &src) noexcept
     {
         const jule::Int len = src.len() > dest.len() ? dest.len() : src.len();
-        std::copy(src._slice, src._slice + len, dest._slice);
+        if (len == 0)
+            return 0;
+        auto d = dest._slice;
+        auto s = src._slice;
+        if (d > s && d-s < len) {
+            // to overlaps with from
+            // <from...>
+            //        <to...>
+            // copy in reverse, to avoid overwriting from
+            const jule::Int i = len - 1;
+            const auto first = s;
+            d += i;
+            s += i;
+            while (first <= s)
+                *d-- = *s--;
+        } else {
+            // to overlaps with from
+            //      <from...>
+            // <to...>
+            // copy in reverse, to avoid overwriting from
+            const auto end = s + len;
+            while (s < end)
+                *d++ = *s++;
+        }
         return len;
     }
 
