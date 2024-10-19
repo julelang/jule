@@ -9,6 +9,7 @@ use "std/jule/constant"
 use "std/jule/sema"
 use "std/jule/token"
 use "std/os/filepath"
+use "std/slices"
 use "std/strings"
 
 // Scope optimizer that applies target-independent optimizations.
@@ -601,36 +602,66 @@ impl scopeOptimizer {
 		}
 	}
 
+	// Normalizes multi-assign expression.
+	// Simplifies possible operands and removes them.
+	// Designed for tuple expressions, so the right expression should be tuple.
+	fn normalizeAssign(mut &self, mut &assign: &sema::MultiAssign, mut &tup: &sema::TupleExprModel) {
+		mut i := 0
+		for i < len(assign.Left) {
+			mut l := assign.Left[i]
+			mut r := tup.Datas[i]
+			if l == nil && r != nil {
+				// expression is assigned to blank identifier
+				// so we can handle as expression statement
+
+				// insert + 1 offset because this statement should not be shifted
+				// also following statement optimizations may apply
+				// some optimizations on the new inserted assign statements
+				offset := self.i + 1
+				self.scope.Stmts = slices::Insert(self.scope.Stmts, offset, r)
+				goto remove
+			}
+			if l != nil && r != nil {
+				match {
+				| r.IsConst():
+					// expression is constant, can simplify as single assignment
+					
+					// insert + 1 offset because this statement should not be shifted
+					// also following statement optimizations may apply
+					// some optimizations on the new inserted assign statements
+					offset := self.i + 1
+					self.scope.Stmts = slices::Insert(self.scope.Stmts, offset, &sema::Assign{
+						Left: &sema::OperandExprModel{Type: l.Type, Model: l.Model},
+						Right: &sema::OperandExprModel{Type: r.Type, Model: r.Model},
+						Op: assign.Op,
+					})
+					goto remove
+				| obj::EqualModels(l.Model, r.Model):
+					// self assignment detected, remove it
+					goto remove
+				}
+			}
+			// not any case matched or jumped to remove
+			// so continue without removing
+			i++
+			continue
+		remove:
+			assign.Left = append(assign.Left[:i], assign.Left[i+1:]...)
+			tup.Datas = append(tup.Datas[:i], tup.Datas[i+1:]...)
+		}
+	}
+
 	// Tries to optimize swap assignments, such as "x, y = y, x", and reports whether optimization applied.
-	// Also reports whether additional analysis is required such as expression optimizations for operands.
-	fn tryOptimizeSwap(mut &self, mut &assign: &sema::MultiAssign): (applied: bool, analysis: bool) {
-		if !Assign || len(assign.Left) != 2 ||
+	// Designed for tuple expressions, so the right expression should be tuple.
+	fn tryOptimizeSwap(mut &self, mut &assign: &sema::MultiAssign, mut &tup: &sema::TupleExprModel): (applied: bool) {
+		if len(tup.Datas) != 2 || len(assign.Left) != 2 ||
 			assign.Left[0] == nil || assign.Left[1] == nil {
-			ret false, false
+			ret false
 		}
-		let mut tup: &sema::TupleExprModel
-		match type assign.Right {
-		| &sema::TupleExprModel:
-			tup = (&sema::TupleExprModel)(assign.Right)
-		}
-		if tup == nil || len(tup.Datas) != 2 {
-			ret false, false
-		}
-
-		// Catch self assignments.
-		if obj::EqualModels(assign.Left[0].Model, tup.Datas[0].Model) &&
-			obj::EqualModels(assign.Left[1].Model, tup.Datas[1].Model) {
-			self.removeCurrent()
-			self.i-- // In next iteration, point to correct statement.
-			// Optimization applied but additional analysis is not necessary.
-			// Because this statement is removed. Do not affect the behavior of the program.
-			ret true, false
-		}
-
 		// Catch swaps.
 		if !obj::EqualModels(assign.Left[0].Model, tup.Datas[1].Model) ||
 			!obj::EqualModels(assign.Left[1].Model, tup.Datas[0].Model) {
-			ret false, false
+			ret false
 		}
 		mut model := &SwapExprModel{
 			Left: assign.Left[0],
@@ -639,13 +670,139 @@ impl scopeOptimizer {
 		self.setCurrentStmt(model)
 		// Do not optimize the operands.
 		// The additional analysis will do it.
-		ret true, true
+		ret true
+	}
+
+	// Tries to split multi-assign into single assign statements.
+	// Designed for tuple expressions, so the right expression should be tuple.
+	fn splitAssign(mut &self, mut &assign: &sema::MultiAssign, mut &tup: &sema::TupleExprModel) {
+		// Optimize only variables, because we cannot know other possibilities.
+		// For example, "*x" and "*y" or "x[y]" and "z[z]" may point to same memory.
+		// Therefore, we can just able to split variable assignments.
+
+		// Make guaranteed that both operands just use variables.
+		for i in tup.Datas {
+			r := tup.Datas[i]
+			l := assign.Left[i]
+			if l != nil {
+				match type l.Model {
+				| &sema::Var:
+					break
+				|:
+					ret
+				}
+			}
+			if r != nil {
+				match type r.Model {
+				| &sema::Var:
+					break
+				|:
+					ret
+				}
+			}
+		}
+
+		z := self.i
+		mut i := 0
+	lookup:
+		for i < len(assign.Left) {
+			mut l := assign.Left[i]
+			if l == nil {
+				i++
+				continue
+			}
+			match type l.Model {
+			| &sema::Var:
+				break
+			|:
+				i++
+				continue
+			}
+			v := (&sema::Var)(l.Model)
+
+			// check whether variable used in different operand in left or right
+			for j, jl in assign.Left {
+				for j != i && jl != nil && jl.Model == v {
+					// exist in left operands, skip this variable
+					i++
+					continue lookup
+				}
+			}
+			for j, jl in tup.Datas {
+				for j != i && jl != nil && jl.Model == v {
+					// exist in right operands, skip this variable
+					i++
+					continue lookup
+				}
+			}
+
+			// can handle as single assignment statement
+			mut r := tup.Datas[i]
+
+			// insert + 1 offset because this statement should not be shifted
+			// also following statement optimizations may apply
+			// some optimizations on the new inserted assign statements
+			offset := self.i + 1
+			self.scope.Stmts = slices::Insert(self.scope.Stmts, offset, &sema::Assign{
+				Left: &sema::OperandExprModel{Type: l.Type, Model: l.Model},
+				Right: &sema::OperandExprModel{Type: r.Type, Model: r.Model},
+				Op: assign.Op,
+			})
+
+			// remove operands
+			assign.Left = append(assign.Left[:i], assign.Left[i+1:]...)
+			tup.Datas = append(tup.Datas[:i], tup.Datas[i+1:]...)
+		}
+		self.i = z
 	}
 
 	fn optimizeMultiAssign(mut &self, mut assign: &sema::MultiAssign) {
-		{
-			applied, analysis := self.tryOptimizeSwap(assign)
-			if applied && !analysis {
+		// Get tuple expression if exist.
+		// If there is a tuple expression, it means this multi-assign statement is:
+		//   like: x, y, z = a, b, c
+		//   not:  x, y, z = myFunc()
+		mut tup := (&sema::TupleExprModel)(nil)
+		match type assign.Right {
+		| &sema::TupleExprModel:
+			tup = (&sema::TupleExprModel)(assign.Right)
+		}
+
+		// Do optimizations first, because statements may be simplified.
+		// So, assignment analysis will be done in this form. Avoid making twice or more.
+		// Also optimized expressions may effect the analysis of the optimizations.
+		// Use pure expression models for optimization analysis.
+		if Assign && tup != nil {
+			// Normalize assignment first, following optimization attempts will be more easy.
+			// Expressions will be more simple, so analysis may have optimization chance.
+			self.normalizeAssign(assign, tup)
+
+			// Split assignments as a signle assignment if possible.
+			// Because multi-assign expressions use temporary values.
+			// So, remove temporary variables using single assignments if possible.
+			self.splitAssign(assign, tup)
+
+			// Try to optimize swap assignment if possible.
+			// Do it now, because assignment may be splitted,
+			// so optimization may be possible compared to non-splitted form.
+			self.tryOptimizeSwap(assign, tup)
+
+			// after all of these optimizations,
+			// remove this statement if all operands are removed
+			if len(assign.Left) == 0 {
+				self.removeCurrent()
+				ret // Assignment removed, following analysis is not necessary.
+			}
+			// There is single operand.
+			// We can simplify to single assignment statement.
+			if len(assign.Left) == 1 {
+				mut l := assign.Left[0]
+				mut r := tup.Datas[0]
+				self.setCurrentStmt(&sema::Assign{
+					Left: &sema::OperandExprModel{Type: l.Type, Model: l.Model},
+					Right: &sema::OperandExprModel{Type: r.Type, Model: r.Model},
+					Op: assign.Op,
+				})
+				self.i-- // to handle simplified form of this assignment in analysis
 				ret
 			}
 		}
@@ -673,11 +830,6 @@ impl scopeOptimizer {
 		// Do not forget load checkpoint to self.data to keep updated data.
 		mut checkpoint := self.data.getCheckpoint()
 
-		mut tup := (&sema::TupleExprModel)(nil)
-		match type assign.Right {
-		| &sema::TupleExprModel:
-			tup = (&sema::TupleExprModel)(assign.Right)
-		}
 		for (i, mut l) in assign.Left {
 			if l != nil {
 				if self.data.boundary != nil {
