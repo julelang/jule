@@ -11,22 +11,12 @@ use "std/jule/token"
 use "std/jule/types"
 use "std/math"
 
-enum exprFlag {
-	// Default optimization profile.
-	Default,
-
-	// Any possible informative expression will not be considered
-	// as optimization informative data.
-	NotInformative,
-}
-
 // Expression optimizer that applies target-independent optimizations.
 struct exprOptimizer {
 	mut model:     &sema::ExprModel
 	mut data:      &data // Should be non-nil guaranteed.
 	mut inspector: &obj::ExprInspector
 	mut scopeOpt:  &scopeOptimizer
-	mut flags:     exprFlag
 }
 
 impl exprOptimizer {
@@ -78,7 +68,6 @@ impl exprOptimizer {
 		mut _check := unsafe { (&bool)(&check) } // reference for the check variable used from closure
 
 		exop.inspector.Inspect(*exop.model, fn(mut &m: sema::ExprModel) {
-			exop.model = unsafe { (&sema::ExprModel)(&m) }
 			if *_check {
 				match type m {
 				| &sema::BinaryExprModel:
@@ -487,46 +476,20 @@ impl exprOptimizer {
 		*self.model = unsafe { *(*sema::ExprModel)(&model) }
 	}
 
-	fn binary(self, mut m: &sema::BinaryExprModel) {
-		if Str {
-			match {
-			| self.strCond(m)
-			| self.strConcat(m):
-			}
-		}
-
-		if Array {
-			if self.arrayCond(m) {
-				ret
-			}
-		}
-
-		if Cond {
-			match {
-			| self.boolCond(m)
-			| self.selfCmpCond(m):
-				ret
-			}
-		}
-
-		if self.tryNeutralElement(m) {
-			ret
-		}
-
-		if !Math {
-			ret
-		}
-
+	// Tries to optimize binary expression with --opt-math optimization flag.
+	// Assumes the math optimizations are enabled.
+	// Reports whether optimization applied.
+	fn binaryMath(self, mut &m: &sema::BinaryExprModel): (applied: bool) {
 		// Break optimizations if types are not primitive.
 		// No need for checking whether types are arithmetic,
 		// because relevant operators are conly avaliable for arithmetic primitives.
 		lp := m.Left.Type.Prim()
 		if lp == nil {
-			ret
+			ret false
 		}
 		rp := m.Right.Type.Prim()
 		if rp == nil {
-			ret
+			ret false
 		}
 
 		match m.Op.Id {
@@ -545,7 +508,7 @@ impl exprOptimizer {
 			// We can remove runtime cost of shifter checking.
 			mut model := any(&UnsafeBinaryExprModel{Node: m})
 			*self.model = unsafe { *(*sema::ExprModel)(&model) }
-			ret
+			ret true
 		| token::Id.Minus:
 			// If type is integer and expressions is like "x-x", then we can simplfy to "0" which is cheaper.
 			// Floating-point types is exceptional because we cannot predict the result because of NaN or similar values.
@@ -555,7 +518,7 @@ impl exprOptimizer {
 			mut c := constant::Const.NewU64(0)
 			c.Kind = lp.Kind
 			*self.model = c
-			ret
+			ret true
 		}
 
 		// Check whether the right operand is constant for safety.
@@ -564,7 +527,7 @@ impl exprOptimizer {
 		| &constant::Const:
 			break
 		|:
-			ret
+			ret false
 		}
 
 		match m.Op.Id {
@@ -577,7 +540,7 @@ impl exprOptimizer {
 				mut c := (&constant::Const)(m.Right.Model)
 				c.SetU64(x)
 				self.shift(m) // We should try to optimize new optimized shifting expression.
-				ret
+				ret true
 			}
 		| token::Id.Solidus:
 			ok, x := checkForBitShiftOpt(m.Left, m.Right)
@@ -588,7 +551,7 @@ impl exprOptimizer {
 				mut c := (&constant::Const)(m.Right.Model)
 				c.SetU64(x)
 				self.shift(m) // We should try to optimize new optimized shifting expression.
-				ret
+				ret true
 			}
 		| token::Id.Percent:
 			mut c := (&constant::Const)(m.Right.Model)
@@ -599,26 +562,103 @@ impl exprOptimizer {
 				c.SetI64(1)
 				// No need to set model as UnsafeBinaryExprModel,
 				// bitwise and is not checked at runtime, so it is optimize enough.
-				ret
+				ret true
 			}
 		| token::Id.Caret:
 			// Optimize x^0 computations to x.
 			s := (&constant::Const)(m.Right.Model).AsF64()
 			if s == 0 {
 				*self.model = m.Left.Model
-				ret
+				ret true
 			}
 		| token::Id.Shl | token::Id.Shr:
 			self.shift(m)
-			ret
+			ret true
 		|:
 			// Eliminate unsupported operators.
-			ret
+			ret false
 		}
 		// Update model as UnsafeBinaryExprModel because it is safe, comptime checked.
 		// There is no risk like zero-division.
 		mut model := any(&UnsafeBinaryExprModel{Node: m})
 		*self.model = unsafe { *(*sema::ExprModel)(&model) }
+		ret true
+	}
+
+	fn binary(self, mut m: &sema::BinaryExprModel) {
+		if Str {
+			match {
+			| self.strCond(m)
+			| self.strConcat(m):
+				goto end
+			}
+		}
+		if Array && self.arrayCond(m) {
+			goto end
+		}
+		if Cond {
+			match {
+			| self.boolCond(m)
+			| self.selfCmpCond(m):
+				goto end
+			}
+		}
+		if self.tryNeutralElement(m) {
+			goto end
+		}
+		if Math && self.binaryMath(m) {
+			goto end
+		}
+
+	end:
+		if m.Op.Id == token::Id.DblVline {
+			// Binary expression uses the || operator.
+			// We should ignore optimization information updates.
+			// Because we can't whether they are really informative.
+			// For example:
+			//
+			//    x := (&int)(nil)
+			//    y := (&int)(nil)
+			//    if x != nil || *y == 20 {
+			//        println(*y)
+			//    }
+			//
+			//    In the example code above, we can't assume |y| is dereferenced, so checked.
+			//    Optimization analysis will update the optimization data. So,
+			//    if we don't use immutable checkpoint copy, the optimizer will
+			//    optimize |*y| expression of the println call, which is dangerous.
+			//    Therefore we have to handle data for operands.
+			//    To achieve that, get immutable checkpoint, optimize operands,
+			//    then load data to checkpoint copy.
+			//
+			// There is another issue. Internal data usage should be allowed.
+			// For example:
+			//
+			//    if x != nil || foo(*y, *y)
+			//
+			//    In the example code above, if the function |foo| called,
+			//    we know the |y| dereferenced twice. So, able to optimize the
+			//    second dereferencing. It should be allowed. So, the checkpoint
+			//    will help for that also. We can use data for the internal optimizations,
+			//    then ignore the optimization updates and restore to the checkpoint.
+			mut checkpoint := data{}
+			checkpoint.loadCheckpoint(self.data.getCheckpoint())
+
+			unsafe { self.inspector.InspectStep(m.Left.Model) }
+			// Load from hard copy checkpoint of checkpoint data here.
+			// Because soft checkpoint loading uses direct data.
+			// So if data mutated, checkpoint will be mutated also.
+			// We may lost the checkpoint data, therefore use hard-copy.
+			self.data.loadCheckpoint(checkpoint.getCheckpoint())
+
+			unsafe { self.inspector.InspectStep(m.Right.Model) }
+			// There is no risk for checkpoint data mutation. Do soft load.
+			self.data.loadCheckpoint(checkpoint.getMutCheckpoint())
+
+			// Childs are optmized. Now, we can skip childs of binary expression.
+			// Avoid duplicated analysis.
+			self.inspector.SkipChild = true
+		}
 	}
 
 	fn unary(self, mut m: &sema::UnaryExprModel) {
@@ -635,22 +675,16 @@ impl exprOptimizer {
 					// Expression is: *(&x)
 					// Simplify to: x
 					*self.model = um.Expr.Model
-					ret
 				}
 				ret
 			}
-			if !Access {
-				ret
-			}
-			if self.data.nils != nil && isNilValidType(m.Expr.Type) {
+			if Access && self.data.nils != nil && isNilValidType(m.Expr.Type) {
 				var := getNilVar(m.Expr.Model)
 				if self.data.nils.isSafe(var) {
 					mut model := any(&UnsafeDerefExprModel{Base: m})
 					*self.model = unsafe { *(*sema::ExprModel)(&model) }
-					ret
-				}
-				// Now this varible is safe until it mutated.
-				if self.flags&exprFlag.NotInformative != exprFlag.NotInformative {
+				} else {
+					// Now this varible is safe until it mutated.
 					self.data.nils.pushVar(var, true)
 				}
 			}
@@ -691,10 +725,8 @@ impl exprOptimizer {
 			self.inspector.SkipChild = true
 			ret
 		}
-		if self.flags&exprFlag.NotInformative != exprFlag.NotInformative {
-			if self.data.dynamic != nil && valid {
-				self.data.dynamic.pushVar(var, m.Type)
-			}
+		if self.data.dynamic != nil && valid {
+			self.data.dynamic.pushVar(var, m.Type)
 		}
 	}
 
@@ -831,9 +863,7 @@ impl exprOptimizer {
 				*self.model = unsafe { *(*sema::ExprModel)(&model) }
 				ret
 			}
-			if self.flags&exprFlag.NotInformative != exprFlag.NotInformative {
-				self.data.boundary.pushVar(var, m.Index.Model)
-			}
+			self.data.boundary.pushVar(var, m.Index.Model)
 		}
 	}
 
@@ -847,6 +877,7 @@ impl exprOptimizer {
 	}
 
 	fn inspectStep(self, mut &m: sema::ExprModel) {
+		self.model = unsafe { (&sema::ExprModel)(&m) }
 		match type m {
 		| &sema::BinaryExprModel:
 			self.binary((&sema::BinaryExprModel)(m))
@@ -869,10 +900,7 @@ impl exprOptimizer {
 
 	fn do(self) {
 		self.inspector.Inspect(*self.model, fn(mut &m: sema::ExprModel) {
-			unsafe {
-				self.model = (&sema::ExprModel)(&m)
-				self.inspectStep(m)
-			}
+			unsafe { self.inspectStep(m) }
 		})
 	}
 }
