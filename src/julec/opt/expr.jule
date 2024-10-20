@@ -11,12 +11,22 @@ use "std/jule/token"
 use "std/jule/types"
 use "std/math"
 
+enum exprFlag {
+	// Default optimization profile.
+	Default,
+
+	// Any possible informative expression will not be considered
+	// as optimization informative data.
+	NotInformative,
+}
+
 // Expression optimizer that applies target-independent optimizations.
 struct exprOptimizer {
 	mut model:     &sema::ExprModel
 	mut data:      &data // Should be non-nil guaranteed.
 	mut inspector: &obj::ExprInspector
 	mut scopeOpt:  &scopeOptimizer
+	mut flags:     exprFlag
 }
 
 impl exprOptimizer {
@@ -24,17 +34,79 @@ impl exprOptimizer {
 		exprOptimizer.optimizeData(model, emptyData, nil)
 	}
 
+	static fn new(mut &model: sema::ExprModel, mut &d: &data, mut s: &scopeOptimizer): &exprOptimizer {
+		ret &exprOptimizer{
+			model: unsafe { (&sema::ExprModel)(&model) },
+			data: d,
+			inspector: obj::ExprInspector.New(),
+			scopeOpt: s,
+		}
+	}
+
 	static fn optimizeData(mut &model: sema::ExprModel, mut &d: &data, mut s: &scopeOptimizer) {
 		// Do optimizatitons if any enabled.
 		if exprEnabled {
-			mut exop := &exprOptimizer{
-				model: unsafe { (&sema::ExprModel)(&model) },
-				data: d,
-				inspector: obj::ExprInspector.New(),
-				scopeOpt: s,
-			}
+			mut exop := exprOptimizer.new(model, d, s)
 			exop.do()
 		}
+	}
+
+	// Like the optimizeData method, but any conditional expression
+	// (such as x != nil) will be considered as optimization informative data.
+	// Designed for conditional structures like if or match statements.
+	static fn optimizeConditionalData(mut &model: sema::ExprModel, mut &d: &data, mut s: &scopeOptimizer) {
+		// Do optimizatitons if any enabled.
+		if !exprEnabled {
+			ret
+		}
+		mut exop := exprOptimizer.new(model, d, s)
+		match type model {
+		| &sema::BinaryExprModel:
+			// Binary expression model.
+			// It should be handled in separate optimization routine.
+			break
+		|:
+			// Normal expressions. Not binary, such as "test(*x)".
+			// This expression is will be executed eventually.
+			// Therefore, use ordinary optimization routine.
+			exop.do()
+			ret
+		}
+
+		// check is a flag to determine binary expression can check for conditional analysis.
+		mut check := true
+		mut _check := unsafe { (&bool)(&check) } // reference for the check variable used from closure
+
+		exop.inspector.Inspect(*exop.model, fn(mut &m: sema::ExprModel) {
+			exop.model = unsafe { (&sema::ExprModel)(&m) }
+			if *_check {
+				match type m {
+				| &sema::BinaryExprModel:
+					mut binary := (&sema::BinaryExprModel)(m)
+
+					// Do not continue to checking. Binay expression is using || operator.
+					// So we can't know whether operands are guaranteed to be executed.
+					// For example:
+					//
+					//   if x != nil || y != nil { ... }
+					//
+					//   In the example code above, we can't know which operand is not nil.
+					//
+					// It also requires all binary expressions should be &&.
+					// Because the first node is the root binary expression.
+					// And by the CAST production, the || operator cames first than && operator.
+					// So it breaks if binary expression is not uses only the && operator.
+					*_check = binary.Op.Id != token::Id.DblVline
+					if !*_check {
+						break
+					}
+
+					exop.checkBinaryForBoundary(binary)
+					exop.checkBinaryForNil(binary)
+				}
+			}
+			exop.inspectStep(m)
+		})
 	}
 
 	fn selfCmpCond(self, mut &m: &sema::BinaryExprModel): bool {
@@ -416,11 +488,6 @@ impl exprOptimizer {
 	}
 
 	fn binary(self, mut m: &sema::BinaryExprModel) {
-		if self.data.flags&dataFlag.NoConditional != dataFlag.NoConditional {
-			self.checkBinaryForBoundary(m)
-			self.checkBinaryForNil(m)
-		}
-
 		if Str {
 			match {
 			| self.strCond(m)
@@ -583,7 +650,9 @@ impl exprOptimizer {
 					ret
 				}
 				// Now this varible is safe until it mutated.
-				self.data.nils.pushVar(var, true)
+				if self.flags&exprFlag.NotInformative != exprFlag.NotInformative {
+					self.data.nils.pushVar(var, true)
+				}
 			}
 		| token::Id.Amper:
 			match type m.Expr.Model {
@@ -622,8 +691,10 @@ impl exprOptimizer {
 			self.inspector.SkipChild = true
 			ret
 		}
-		if self.data.dynamic != nil && valid {
-			self.data.dynamic.pushVar(var, m.Type)
+		if self.flags&exprFlag.NotInformative != exprFlag.NotInformative {
+			if self.data.dynamic != nil && valid {
+				self.data.dynamic.pushVar(var, m.Type)
+			}
 		}
 	}
 
@@ -760,7 +831,9 @@ impl exprOptimizer {
 				*self.model = unsafe { *(*sema::ExprModel)(&model) }
 				ret
 			}
-			self.data.boundary.pushVar(var, m.Index.Model)
+			if self.flags&exprFlag.NotInformative != exprFlag.NotInformative {
+				self.data.boundary.pushVar(var, m.Index.Model)
+			}
 		}
 	}
 
@@ -773,26 +846,32 @@ impl exprOptimizer {
 		self.scope(m.Func.Scope, Child)
 	}
 
+	fn inspectStep(self, mut &m: sema::ExprModel) {
+		match type m {
+		| &sema::BinaryExprModel:
+			self.binary((&sema::BinaryExprModel)(m))
+		| &sema::UnaryExprModel:
+			self.unary((&sema::UnaryExprModel)(m))
+		| &sema::StructLitExprModel:
+			self.structureLit((&sema::StructLitExprModel)(m))
+		| &sema::CastingExprModel:
+			self.casting((&sema::CastingExprModel)(m))
+		| &sema::FnCallExprModel:
+			self.funcCall((&sema::FnCallExprModel)(m))
+		| &sema::BuiltinLenCallExprModel:
+			self.lenCall((&sema::BuiltinLenCallExprModel)(m))
+		| &sema::IndexingExprModel:
+			self.indexing((&sema::IndexingExprModel)(m))
+		| &sema::AnonFnExprModel:
+			self.anonFunc((&sema::AnonFnExprModel)(m))
+		}
+	}
+
 	fn do(self) {
 		self.inspector.Inspect(*self.model, fn(mut &m: sema::ExprModel) {
-			unsafe { self.model = (&sema::ExprModel)(&m) }
-			match type m {
-			| &sema::BinaryExprModel:
-				unsafe { self.binary((&sema::BinaryExprModel)(m)) }
-			| &sema::UnaryExprModel:
-				unsafe { self.unary((&sema::UnaryExprModel)(m)) }
-			| &sema::StructLitExprModel:
-				unsafe { self.structureLit((&sema::StructLitExprModel)(m)) }
-			| &sema::CastingExprModel:
-				unsafe { self.casting((&sema::CastingExprModel)(m)) }
-			| &sema::FnCallExprModel:
-				unsafe { self.funcCall((&sema::FnCallExprModel)(m)) }
-			| &sema::BuiltinLenCallExprModel:
-				unsafe { self.lenCall((&sema::BuiltinLenCallExprModel)(m)) }
-			| &sema::IndexingExprModel:
-				unsafe { self.indexing((&sema::IndexingExprModel)(m)) }
-			| &sema::AnonFnExprModel:
-				unsafe { self.anonFunc((&sema::AnonFnExprModel)(m)) }
+			unsafe {
+				self.model = (&sema::ExprModel)(&m)
+				self.inspectStep(m)
 			}
 		})
 	}

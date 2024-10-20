@@ -81,14 +81,7 @@ impl scopeOptimizer {
 			}
 			ret
 		}
-
-		// CAST production is equals to &Data statement for "_ = EXPR" assignments.
-		// And there is no informative or useful optimization data for some optimizations.
-		// Therefore avoid using this expressions as useful data for relevant optimizations.
-		dataFlags := self.data.flags
-		self.data.flags |= dataFlag.NoConditional
 		exprOptimizer.optimizeData(d.Model, self.data, self)
-		self.data.flags = dataFlags
 	}
 
 	fn optimizeVar(mut &self, mut v: &sema::Var) {
@@ -123,7 +116,7 @@ impl scopeOptimizer {
 		mut checkpoint := self.data.getCheckpoint()
 
 		for (_, mut elif) in c.Elifs {
-			exprOptimizer.optimizeData(elif.Expr, self.data, self)
+			exprOptimizer.optimizeConditionalData(elif.Expr, self.data, self)
 			self.optimizeChild(elif.Scope)
 			alive.removeDeads(self.data)
 			self.data.loadCheckpoint(checkpoint)
@@ -238,7 +231,7 @@ impl scopeOptimizer {
 
 		for (_, mut case) in m.Cases {
 			for (_, mut expr) in case.Exprs {
-				exprOptimizer.optimizeData(expr.Model, self.data, self)
+				exprOptimizer.optimizeConditionalData(expr.Model, self.data, self)
 			}
 			if len(case.Exprs) == 1 && self.data.dynamic != nil {
 				// We can know the exact kind of dynamic type if expression is single.
