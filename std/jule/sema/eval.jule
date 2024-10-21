@@ -2843,7 +2843,7 @@ impl eval {
 		ret self.evalObjSubIdent(d, si)
 	}
 
-	fn evalTuple(mut &self, mut tup: &ast::TupleExpr): &Data {
+	fn evalTupleFunc(mut &self, mut tup: &ast::TupleExpr, part: fn(mut &expr: &ast::Expr): &Data): &Data {
 		mut tupT := new(Tuple)
 		tupT.Types = make([]&Type, 0, len(tup.Expr))
 
@@ -2853,7 +2853,7 @@ impl eval {
 
 		mut ok := true
 		for (_, mut expr) in tup.Expr {
-			mut d := self.evalExpr(expr)
+			mut d := part(expr)
 			if d == nil {
 				ok = false
 				continue
@@ -2870,6 +2870,12 @@ impl eval {
 			Type: &Type{Kind: tupT},
 			Model: model,
 		}
+	}
+
+	fn evalTuple(mut &self, mut tup: &ast::TupleExpr): &Data {
+		ret self.evalTupleFunc(tup, fn(mut &expr: &ast::Expr): &Data {
+			ret self.evalExpr(expr)
+		})
 	}
 
 	fn evalMap(mut &self, mut m: &Map, mut lit: &ast::BraceLit): &Data {

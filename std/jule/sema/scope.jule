@@ -1419,18 +1419,71 @@ impl scopeChecker {
 		st.Left = append(st.Left, l)
 	}
 
+	fn getRightExprsOfMultiAssign(mut &self, mut a: &ast::AssignSt,
+		mut eval: &eval): (parts: []&Data, right: &Data, ok: bool) {
+		updateMut := fn(i: int) {
+			l := a.Left[i]
+			// Mark target as mutable because if an expression can take assignment
+			// it should be a mutable memory, but set as immutable if variable declaring
+			// and it is not mutable.
+			//
+			// This is not actually a mutability safety checking.
+			// This just makes responsive-mutability possible and correct.
+			eval.target.mutable = !token::IsIgnoreIdent(l.Ident) // if assigned to blank identifier, there is no mutability risk
+			match {
+			| a.Declarative && eval.target.mutable:
+				if l.Mutable && l.Reference {
+					eval.target.mutable = l.Mutable
+					break
+				}
+				match type l.Expr.Kind {
+				| &ast::IdentExpr:
+					if self.isNewAssignIdent(l.Ident) {
+						eval.target.mutable = l.Mutable
+					}
+				}
+			}
+		}
+
+		match type a.Right.Kind {
+		| &ast::TupleExpr:
+			i := 0
+			mut _i := unsafe { (&int)(&i) } // reference pointer for closure
+			right = eval.evalTupleFunc((&ast::TupleExpr)(a.Right.Kind), fn(mut &expr: &ast::Expr): &Data {
+				if *_i >= len(a.Left) {
+					ret nil
+				}
+				updateMut(*_i)
+				ret eval.evalExpr(expr)
+			})
+		|:
+			// Map-lookup assignments may evaluated here.
+			// It is mutability safe even if map stored in immutable memory and have mutable type value.
+			// Because mutability will be checked by assignment analysis.
+			updateMut(0)
+			right = eval.evalExpr(a.Right)
+		}
+		if right == nil {
+			ret
+		}
+		parts = getDatasFromTupleData(right)
+		ok = true
+		ret
+	}
+
 	fn checkMultiAssign(mut &self, mut &a: &ast::AssignSt) {
 		if a.Setter.Id != token::Id.Eq && a.Setter.Id != token::Id.ColonEq {
 			self.s.pushErr(a.Setter, build::LogMsg.InvalidSyntax)
 			ret
 		}
+
 		mut eval := self.s.eval(self)
-		mut rd := eval.evalExpr(a.Right) // eval as taget is not mutable for right operand, mutability will be check after
-		if rd == nil {
+		mut right, rightData, ok := self.getRightExprsOfMultiAssign(a, eval)
+		if !ok {
 			ret
 		}
-		mut strict := false // Any type compatibility analysis requires exact same type.
-		mut right := getDatasFromTupleData(rd)
+
+		mut strict := false // any type compatibility analysis requires exact same type
 		if len(right) == 1 {
 			match type right[0].Model {
 			| &IndexingExprModel:
@@ -1458,7 +1511,7 @@ impl scopeChecker {
 		eval.target.mutable = true
 
 		mut st := &MultiAssign{
-			Right: rd.Model,
+			Right: rightData.Model,
 			Op: a.Setter,
 		}
 		for i in a.Left {
