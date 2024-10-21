@@ -44,124 +44,9 @@ fn newScopeChecker(mut &s: &sema, mut owner: &FnIns): &scopeChecker {
 	ret base
 }
 
-// Returns label by identifier.
-// Returns nil if not exist any label in this identifier.
-// Lookups given scope and parent scopes.
-fn findLabelParent(&ident: str, mut scope: &scopeChecker): &scopeLabel {
-	mut label := scope.findLabelScope(ident)
-	for label == nil {
-		if scope.parent == nil || scope.owner != nil {
-			ret nil
-		}
-		scope = scope.parent
-		label = scope.findLabelScope(ident)
-	}
-	ret label
-}
-
-fn getDatasFromTupleData(mut &d: &Data): []&Data {
-	if d.Type.Tup() != nil {
-		match type d.Model {
-		| &TupleExprModel:
-			ret (&TupleExprModel)(d.Model).Datas
-		|:
-			mut t := d.Type.Tup()
-			mut r := make([]&Data, 0, len(t.Types))
-			for (_, mut kind) in t.Types {
-				r = append(r, &Data{
-					Mutable: true, // Function return.
-					Type: kind,
-				})
-			}
-			ret r
-		}
-	} else {
-		ret [d]
-	}
-}
-
-fn getExprModels(mut &m: ast::ExprData): []ast::ExprData {
-	match type m {
-	| &ast::TupleExpr:
-		mut tup := (&ast::TupleExpr)(m)
-		mut models := make([]ast::ExprData, 0, len(tup.Expr))
-		for (_, mut expr) in tup.Expr {
-			models = append(models, expr.Kind)
-		}
-		ret models
-	|:
-		ret [m]
-	}
-}
-
-fn checkMut(mut &s: &sema, &left: &Data, mut right: &Data, op: &token::Token): (ok: bool) {
-	match {
-	| !left.Mutable:
-		s.pushErr(op, build::LogMsg.AssignToNonMut)
-		ret false
-	| right != nil && !right.Mutable && right.Type.Mutable():
-		if op.Id != token::Id.Eq && right.Type.Struct() != nil {
-			// If operator is not assignment, and kind is structure, allow.
-			// Operator overloading uses immutable copy of right operand.
-			// It's safe.
-			ret true
-		}
-		s.pushErr(op, build::LogMsg.AssignNonMutToMut, right.Type.Str())
-		ret false
-	|:
-		ret true
-	}
-}
-
-fn checkAssign(mut &s: &sema, mut &left: &Data, mut right: &Data, op: &token::Token): (ok: bool) {
-	f := left.Type.Fn()
-	if f != nil && f.Decl != nil && f.Decl.Global {
-		s.pushErr(op, build::LogMsg.AssignTypeNotSupportValue)
-		ret false
-	}
-
-	match {
-	| left.IsConst():
-		s.pushErr(op, build::LogMsg.AssignConst)
-		s.pushSuggestion(build::LogMsg.RemoveConstToAssign)
-		ret false
-	| !left.Lvalue:
-		s.pushErr(op, build::LogMsg.AssignRequireLvalue)
-		ret false
-	| !checkMut(s, left, right, op):
-		ret false
-	|:
-		ret true
-	}
-}
-
-fn isValidAstStForNextSt(mut &n: ast::StmtData): bool {
-	match type n {
-	| &ast::AssignSt:
-		ret !(&ast::AssignSt)(n).Declarative
-	| &ast::Expr:
-		ret true
-	|:
-		ret false
-	}
-}
-
-fn isValidStForNextSt(&st: Stmt): bool {
-	match type st {
-	| &Postfix
-	| &Assign
-	| &MultiAssign:
-		ret true
-	| &Data:
-		match type (&Data)(st).Model {
-		| &FnCallExprModel:
-			ret true
-		|:
-			ret false
-		}
-	|:
-		ret false
-	}
+struct exprPart {
+	data: &Data
+	expr: &ast::Expr
 }
 
 // Scope.
@@ -1344,9 +1229,9 @@ impl scopeChecker {
 	}
 
 	fn processEndPartOfMultiAssign(mut &self, mut &st: &MultiAssign, mut &a: &ast::AssignSt,
-		mut &lexpr: &ast::AssignLeft, mut &l: &Data, mut &r: &Data, strict: bool) {
+		mut &lexpr: &ast::AssignLeft, mut &l: &Data, mut &r: exprPart, strict: bool) {
 		if !lexpr.Reference && token::IsIgnoreIdent(lexpr.Ident) {
-			if r.Type.Void() {
+			if r.data.Type.Void() {
 				self.s.pushErr(a.Right.Token, build::LogMsg.InvalidExpr)
 			}
 			st.Left = append(st.Left, nil)
@@ -1383,8 +1268,8 @@ impl scopeChecker {
 				Reference: lexpr.Reference,
 				Scope: self.scope,
 				Value: &Value{
-					Expr: a.Right,
-					Data: r,
+					Expr: r.expr,
+					Data: r.data,
 				},
 			}
 			self.s.checkVarValue(v)
@@ -1405,22 +1290,22 @@ impl scopeChecker {
 			self.s.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
 		}
 
-		if !checkAssign(self.s, l, r, lexpr.Token) {
+		if !checkAssign(self.s, l, r.data, lexpr.Token) {
 			ret
 		}
 
 		// Set reference false because this is normal assigment.
 		// So, we don't need to check reference assignment should using lvalue.
 		mut reference := false
-		if self.s.checkValidityForInitExpr(l.Mutable, reference, l.Type, r, lexpr.Token) {
+		if self.s.checkValidityForInitExpr(l.Mutable, reference, l.Type, r.data, r.expr.Token) {
 			reference = strict // enable reference checking if strict mode enabled
-			self.s.checkAssignType(reference, l.Type, r, lexpr.Token, self.getOwnerRefers())
+			self.s.checkAssignType(reference, l.Type, r.data, r.expr.Token, self.getOwnerRefers())
 		}
 		st.Left = append(st.Left, l)
 	}
 
 	fn getRightExprsOfMultiAssign(mut &self, mut a: &ast::AssignSt,
-		mut eval: &eval): (parts: []&Data, right: &Data, ok: bool) {
+		mut eval: &eval): (parts: []exprPart, right: &Data, ok: bool) {
 		updateMut := fn(i: int) {
 			l := a.Left[i]
 			// Mark target as mutable because if an expression can take assignment
@@ -1447,14 +1332,21 @@ impl scopeChecker {
 
 		match type a.Right.Kind {
 		| &ast::TupleExpr:
+			mut tup := (&ast::TupleExpr)(a.Right.Kind)
+			parts = make([]exprPart, 0, len(tup.Expr))
 			i := 0
 			mut _i := unsafe { (&int)(&i) } // reference pointer for closure
-			right = eval.evalTupleFunc((&ast::TupleExpr)(a.Right.Kind), fn(mut &expr: &ast::Expr): &Data {
+			mut _parts := unsafe { (&[]exprPart)(&parts) }
+			right = eval.evalTupleFunc(tup, fn(mut &expr: &ast::Expr): &Data {
 				if *_i >= len(a.Left) {
 					ret nil
 				}
 				updateMut(*_i)
-				ret eval.evalExpr(expr)
+				mut d := eval.evalExpr(expr)
+				if d != nil {
+					*_parts = append(*_parts, exprPart{d, expr})
+				}
+				ret d
 			})
 		|:
 			// Map-lookup assignments may evaluated here.
@@ -1462,11 +1354,26 @@ impl scopeChecker {
 			// Because mutability will be checked by assignment analysis.
 			updateMut(0)
 			right = eval.evalExpr(a.Right)
+			if right == nil {
+				ret
+			}
+			
+			if right.Type.Tup() != nil {
+				mut t := right.Type.Tup()
+				parts = make([]exprPart, 0, len(t.Types))
+				for (_, mut kind) in t.Types {
+					parts = append(parts, exprPart{
+						&Data{
+							Mutable: true, // Function return.
+							Type: kind,
+						},
+						a.Right,
+					})
+				}
+			} else {
+				parts = [{right, a.Right}]
+			}
 		}
-		if right == nil {
-			ret
-		}
-		parts = getDatasFromTupleData(right)
 		ok = true
 		ret
 	}
@@ -1485,14 +1392,14 @@ impl scopeChecker {
 
 		mut strict := false // any type compatibility analysis requires exact same type
 		if len(right) == 1 {
-			match type right[0].Model {
+			match type right[0].data.Model {
 			| &IndexingExprModel:
-				mut iem := (&IndexingExprModel)(right[0].Model)
+				mut iem := (&IndexingExprModel)(right[0].data.Model)
 				if iem.Expr.Type.Map() != nil { // Is map lookup.
 					strict = true
 					right = [
-						&Data{Mutable: right[0].Mutable, Type: iem.Expr.Type.Map().Val},
-						&Data{Type: primBool},
+						{&Data{Mutable: right[0].data.Mutable, Type: iem.Expr.Type.Map().Val}, right[0].expr},
+						{&Data{Type: primBool}, right[0].expr},
 					]
 				}
 			}
@@ -1538,7 +1445,7 @@ impl scopeChecker {
 			end:
 			}
 			mut r := right[i]
-			self.removeInteriorMutRisk(r)
+			self.removeInteriorMutRisk(r.data)
 			self.processEndPartOfMultiAssign(st, a, lexpr, l, r, strict)
 		}
 		self.scope.Stmts = append(self.scope.Stmts, st)
@@ -2308,4 +2215,120 @@ loop:
 		}
 	}
 	ret n
+}
+
+// Returns label by identifier.
+// Returns nil if not exist any label in this identifier.
+// Lookups given scope and parent scopes.
+fn findLabelParent(&ident: str, mut scope: &scopeChecker): &scopeLabel {
+	mut label := scope.findLabelScope(ident)
+	for label == nil {
+		if scope.parent == nil || scope.owner != nil {
+			ret nil
+		}
+		scope = scope.parent
+		label = scope.findLabelScope(ident)
+	}
+	ret label
+}
+
+/*fn getDatasFromTupleData(mut &d: &Data): []&Data {
+	if d.Type.Tup() != nil {
+		match type d.Model {
+		| &TupleExprModel:
+			ret (&TupleExprModel)(d.Model).Datas
+		|:
+			mut t := d.Type.Tup()
+			mut r := make([]&Data, 0, len(t.Types))
+			for (_, mut kind) in t.Types {
+				r = append(r, &Data{
+					Mutable: true, // Function return.
+					Type: kind,
+				})
+			}
+			ret r
+		}
+	} else {
+		ret [d]
+	}
+}*/
+
+fn getExprModels(mut &m: ast::ExprData): []ast::ExprData {
+	match type m {
+	| &ast::TupleExpr:
+		mut tup := (&ast::TupleExpr)(m)
+		mut models := make([]ast::ExprData, 0, len(tup.Expr))
+		for (_, mut expr) in tup.Expr {
+			models = append(models, expr.Kind)
+		}
+		ret models
+	|:
+		ret [m]
+	}
+}
+
+fn checkAssignMut(mut &s: &sema, &left: &Data, mut right: &Data, op: &token::Token): (ok: bool) {
+	match {
+	| !left.Mutable:
+		s.pushErr(op, build::LogMsg.AssignToNonMut)
+		ret false
+	| right != nil && !right.Mutable && right.Type.Mutable():
+		if op.Id != token::Id.Eq && right.Type.Struct() != nil {
+			// If operator is not assignment, and kind is structure, allow.
+			// Operator overloading uses immutable copy of right operand.
+			// It's safe.
+			ret true
+		}
+		s.pushErr(op, build::LogMsg.AssignNonMutToMut, right.Type.Str())
+		ret false
+	|:
+		ret true
+	}
+}
+
+fn checkAssign(mut &s: &sema, mut &left: &Data, mut right: &Data, op: &token::Token): (ok: bool) {
+	f := left.Type.Fn()
+	if f != nil && f.Decl != nil && f.Decl.Global {
+		s.pushErr(op, build::LogMsg.AssignTypeNotSupportValue)
+		ret false
+	}
+	match {
+	| left.IsConst():
+		s.pushErr(op, build::LogMsg.AssignConst)
+		s.pushSuggestion(build::LogMsg.RemoveConstToAssign)
+		ret false
+	| !left.Lvalue:
+		s.pushErr(op, build::LogMsg.AssignRequireLvalue)
+		ret false
+	}
+	ret checkAssignMut(s, left, right, op)
+}
+
+fn isValidAstStForNextSt(mut &n: ast::StmtData): bool {
+	match type n {
+	| &ast::AssignSt:
+		ret !(&ast::AssignSt)(n).Declarative
+	| &ast::Expr:
+		ret true
+	|:
+		ret false
+	}
+}
+
+fn isValidStForNextSt(&st: Stmt): bool {
+	match type st {
+	| &Postfix
+	| &Assign
+	| &MultiAssign:
+		ret true
+	| &Data:
+		match type (&Data)(st).Model {
+		| &FnCallExprModel:
+			ret true
+		|:
+			ret false
+		}
+	|:
+		ret false
+	}
 }
