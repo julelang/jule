@@ -1,0 +1,29 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/internal/zbits"
+
+type _DWORD: u32
+
+cpp fn Sleep(_DWORD)
+
+// See documentation of the sleep function.
+fn _sleep(dur: sleepDuration) {
+	mut ms := dur / _Millisecond
+	if ms == 0 {
+		// Less than a millisecond, Windows's Sleep function have no precision <1ms.
+		// To make guaranteed at least given duration is elapsed, sleep for a millisecond.
+		ms = 1
+	}
+	const dwordBits = 32
+	limit := i64(1) << (dwordBits)
+	for ; ms -= limit {
+		if ms <= limit {
+			cpp.Sleep(unsafe { _DWORD(ms) })
+			break
+		} else {
+			cpp.Sleep(unsafe { _DWORD(limit) })
+		}
+	}
+}

@@ -1,0 +1,29 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/internal/zbits"
+use "std/mem"
+
+cpp unsafe fn nanosleep(*cpp.timespec, *cpp.timespec): int
+
+// See documentation of the sleep function.
+fn _sleep(dur: sleepDuration) {
+	mut sec := dur / _Second
+	nsec := dur % _Second // always fits in timespec.tv_nsec
+
+	mut req := cpp.timespec{}
+	secBits := mem::SizeOf(req.tv_sec) * 8
+	limit := i64(1)<<(secBits-1) - 1
+	for ; sec -= limit {
+		if sec <= limit {
+			req.tv_sec = sec
+			req.tv_nsec = nsec
+			unsafe { cpp.nanosleep(&req, nil) }
+			break
+		} else {
+			req.tv_sec = limit
+			unsafe { cpp.nanosleep(&req, nil) }
+		}
+	}
+}
