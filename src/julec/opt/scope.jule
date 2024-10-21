@@ -782,12 +782,24 @@ impl scopeOptimizer {
 			// We can simplify to single assignment statement.
 			if len(assign.Left) == 1 {
 				mut l := assign.Left[0]
-				mut r := tup.Datas[0]
-				self.setCurrentStmt(&sema::Assign{
-					Left: &sema::OperandExprModel{Type: l.Type, Model: l.Model},
-					Right: &sema::OperandExprModel{Type: r.Type, Model: r.Model},
-					Op: assign.Op,
-				})
+				match type l.Model {
+				| &sema::Var:
+					mut v := (&sema::Var)(l.Model)
+					if obj::FindVar(v, assign.Decls) >= 0 {
+						// variable declared now, do not handle it like a assignment
+						self.setCurrentStmt(v)
+						goto end
+					}
+				}
+				{
+					mut r := tup.Datas[0]
+					self.setCurrentStmt(&sema::Assign{
+						Left: &sema::OperandExprModel{Type: l.Type, Model: l.Model},
+						Right: &sema::OperandExprModel{Type: r.Type, Model: r.Model},
+						Op: assign.Op,
+					})
+				}
+			end:
 				self.i-- // to handle simplified form of this assignment in analysis
 				ret
 			}
