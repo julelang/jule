@@ -626,6 +626,31 @@ impl scopeOptimizer {
 					// self assignment detected, remove it
 					goto remove
 				}
+
+				// Constant expressions are lost their constant attribute when
+				// yhey assigned to non-constant memory such as variables.
+				// So, we need to separate attention for variable declarations.
+				// Also variable declarations are may suitable for normalization.
+				match type l.Model {
+				| &sema::Var:
+					mut v := (&sema::Var)(l.Model)
+					if obj::FindVar(v, assign.Decls) == -1 {
+						// expression is variable but it is not declaring now
+						break
+					}
+					match type r.Model {
+					| &constant::Const:
+						// Expression model is constant. So, expression is constant.
+						// We can simplify it.
+
+						// insert + 1 offset because this statement should not be shifted
+						// also following statement optimizations may apply
+						// some optimizations on the new inserted assign statements
+						offset := self.i + 1
+						self.scope.Stmts = slices::Insert(self.scope.Stmts, offset, v)
+						goto remove
+					}
+				}
 			}
 			// not any case matched or jumped to remove
 			// so continue without removing
