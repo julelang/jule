@@ -1263,8 +1263,9 @@ impl rangeChecker {
 struct retTypeChecker {
 	sc:         &scopeChecker
 	f:          &FnIns
-	types:      []&Type      // Return types.
-	exprs:      []&ast::Expr // Return expressions.
+	types:      []&Type // Return types.
+	exprs:      []&Data // Return expressions.
+	exprDecls:  []&ast::Expr
 	errorToken: &token::Token
 	model:      ExprModel
 	mutable:    bool // Whether the return expression should be mutable.
@@ -1277,82 +1278,67 @@ impl retTypeChecker {
 		}
 	}
 
-	fn prepareExprs(mut self, mut &e: &ast::Expr) {
+	fn prepareExprs(mut self, mut &e: &ast::Expr): (ok: bool) {
 		if e == nil {
-			ret
+			ret true
 		}
 		match type e.Kind {
 		| &ast::TupleExpr:
-			self.exprs = (&ast::TupleExpr)(e.Kind).Expr
+			self.exprDecls = (&ast::TupleExpr)(e.Kind).Expr
 		|:
-			self.exprs = append(self.exprs, e)
+			self.exprDecls = [e]
 		}
+		ok = true
+		mut eval := self.sc.s.eval(self.sc)
+		eval.target.mutable = self.mutable
+		for (i, mut expr) in self.exprDecls {
+			if i < len(self.types) {
+				eval.prefix = self.types[i]
+			}
+			mut d := eval.evalExpr(expr)
+			ok = ok && d != nil
+			if ok {
+				self.exprs = append(self.exprs, d)
+			}
+		}
+		ret
 	}
 
 	fn checkExprs(mut self) {
 		if len(self.exprs) == 0 {
 			ret
 		}
-		mut datas := make([]&Data, 0, len(self.exprs))
-		mut eval := self.sc.s.eval(self.sc)
-		eval.target.mutable = self.mutable
-		for (i, mut expr) in self.exprs {
-			if i >= len(self.types) {
-				break
-			}
-
-			mut t := self.types[i]
-
-			eval.prefix = t
-			mut d := eval.evalExpr(expr)
-			if d == nil {
-				continue
-			}
-
-			datas = append(datas, d)
-
+		for (i, mut d) in self.exprs {
+			mut expr := self.exprDecls[i]
 			if self.mutable && !d.Mutable && d.Type.Mutable() {
-				self.sc.s.pushErr(self.errorToken, build::LogMsg.RetWithMutTypedNonMut)
+				self.sc.s.pushErr(expr.Token, build::LogMsg.RetWithMutTypedNonMut)
 				ret
 			}
-
 			mut ac := assignTypeChecker{
 				s: self.sc.s,
-				dest: t,
+				dest: self.types[i],
 				d: d,
-				errorToken: self.errorToken,
+				errorToken: expr.Token,
 				refers: self.sc.getHardRoot().owner.Refers,
 			}
 			ac.check()
 		}
 
 		// Set Model.
-		if len(datas) > 1 { // Tuple
-			self.model = &TupleExprModel{
-				Datas: datas,
-			}
-		} else if len(datas) == 1 {
-			self.model = datas[0].Model
+		if len(self.exprs) > 1 { // Tuple
+			self.model = &TupleExprModel{Datas: self.exprs}
+		} else if len(self.exprs) == 1 {
+			self.model = self.exprs[0].Model
 		}
 	}
 
-	// Assumes len(self.exprs) == 0 and kind is [&ast::FnCallExpr].
-	fn tryFuncMultiRetForward(mut self): bool {
-		mut eval := self.sc.s.eval(self.sc)
-		mut d := eval.evalExpr(self.exprs[0])
-		if d == nil {
-			// Return true to skip following "false" handling errors.
-			// Evaluation error is enough for developer for now.
-			ret true
-		}
-		mut tup := d.Type.Tup()
-		if tup == nil {
-			ret false
-		}
+	// Assumes the len(self.exprs) == 1 and self.exprs[0].Type.Tup() != nil.
+	fn tryFuncMultiRetForward(mut self) {
+		mut tup := self.exprs[0].Type.Tup()
 		if len(tup.Types) != len(self.types) {
 			goto err
 		}
-		self.model = d.Model
+		self.model = self.exprs[0].Model
 		for i in self.types {
 			mut t1 := self.types[i]
 			mut t2 := tup.Types[i]
@@ -1360,8 +1346,12 @@ impl retTypeChecker {
 				goto err
 			}
 		}
-		ret true
+		ret
 	err:
+		self.notFitVariables()
+	}
+
+	fn notFitVariables(mut self) {
 		mut wanted := strings::Builder.New(1 << 5)
 		for i, t in self.types {
 			wanted.WriteStr(t.Str())!
@@ -1370,43 +1360,42 @@ impl retTypeChecker {
 			}
 		}
 		mut given := strings::Builder.New(1 << 5)
-		for i, t in tup.Types {
-			given.WriteStr(t.Str())!
-			if len(self.types)-i > 1 {
+		for i, d in self.exprs {
+			given.WriteStr(d.Type.Str())!
+			if len(self.exprs)-i > 1 {
 				given.WriteStr(", ")!
 			}
 		}
-		self.sc.s.pushErr(self.errorToken, build::LogMsg.WrongRetForward, wanted.Str(), given.Str())
-		ret false
+		if len(self.exprs) < len(self.types) {
+			self.sc.s.pushErr(self.errorToken, build::LogMsg.NotEnoughVariablesForRet, wanted.Str(), given.Str())
+		} else {
+			self.sc.s.pushErr(self.errorToken, build::LogMsg.TooManyVariablesForRet, wanted.Str(), given.Str())
+		}
 	}
 
 	fn check(mut self, mut &e: &ast::Expr): bool {
 		self.prepareTypes()
-		self.prepareExprs(e)
-		match {
-		| len(self.exprs) == 0 && len(self.types) > 0:
-			if !self.f.Decl.AnyVar() {
-				self.sc.s.pushErr(self.errorToken, build::LogMsg.RequireRetExpr)
-				ret false
-			}
-			ret true
-		| len(self.exprs) > 0 && self.f != nil && self.f.Decl.IsVoid():
-			self.sc.s.pushErr(self.errorToken, build::LogMsg.VoidFnRetExpr)
+		mut ok := self.prepareExprs(e)
+		if !ok {
 			ret false
-		| len(self.exprs) == 1 && len(self.types) > 1:
-			match type self.exprs[0].Kind {
-			| &ast::FnCallExpr:
-				if self.tryFuncMultiRetForward() {
-					ret true
-				}
-			}
-			self.sc.s.pushErr(self.errorToken, build::LogMsg.MissingMultiRet)
-			ret false
-		| len(self.exprs) < len(self.types):
-			self.sc.s.pushErr(self.errorToken, build::LogMsg.MissingMultiRet)
-		| len(self.exprs) > len(self.types):
-			self.sc.s.pushErr(self.errorToken, build::LogMsg.OverflowRet)
 		}
+
+		// Check whether we have enough variables for return.
+		match {
+		| len(self.exprs) == 0 && len(self.types) > 0 && self.f.Decl.AnyVar():
+			ret true
+		| len(self.exprs) == 1 && len(self.types) > 1 && self.exprs[0].Type.Tup() != nil:
+			match type self.exprs[0].Model {
+			| &FnCallExprModel:
+				self.tryFuncMultiRetForward()
+				ret true
+			}
+			fall
+		| len(self.exprs) != len(self.types):
+			self.notFitVariables()
+			ret false
+		}
+
 		self.checkExprs()
 		ret true
 	}
