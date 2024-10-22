@@ -1,0 +1,328 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/math/bits"
+use "std/math/rand"
+
+// This file implements unsigned multi-precision integers (natural
+// numbers). The []Word type can be used nas natural number representation.
+// They are the building blocks for the implementation
+// of signed integers, rationals, and floating-point numbers.
+//
+// Caution: This implementation relies on the function "alias"
+//          which assumes that (nat) slice capacities are never
+//          changed (no 3-operand slice expressions). If that
+//          changes, alias needs to be updated for correctness.
+
+// An unsigned integer x of the form
+//
+//  x = x[n-1]*_B^(n-1) + x[n-2]*_B^(n-2) + ... + x[1]*_B + x[0]
+//
+// with 0 <= x[i] < _B and 0 <= i < n is stored in a slice of length n,
+// with the digits x[i] as the slice elements.
+//
+// A number is normalized if the slice contains no leading 0 digits.
+// During arithmetic operations, denormalized values may occur but are
+// always normalized before returning the final result. The normalized
+// representation of 0 is the empty or nil slice (length = 0).
+
+// Represents a single digit of a multi-precision unsigned integer.
+type Word: uint
+
+const _S = _W / 8 // word size in bytes
+
+const _W = bits::UintSize // word size in bits
+const _B = uint(0)        //1 << _W        // digit base
+const _M = _B - 1         // digit mask
+
+static mut wordOne = []Word([1])
+static mut wordTwo = []Word([2])
+static mut wordFive = []Word([5])
+static mut wordTen = []Word([10])
+
+fn makeW(mut z: []Word, n: int): []Word {
+	if n <= cap(z) {
+		ret z[:n] // reuse z
+	}
+	if n == 1 {
+		// Most nats start small and stay that way; don't over-allocate.
+		ret make([]Word, 1)
+	}
+	// Choosing a good value for e has significant performance impact
+	// because it increases the chance that a value can be reused.
+	const e = 4 // extra capacity
+	ret make([]Word, n, n+e)
+}
+
+// Returns words of len n. The contents may not be zero.
+fn getW(n: int): []Word {
+	mut z := makeW(nil, n)
+	if n > 0 {
+		z[0] = 0xfedcb // break code expecting zero
+	}
+	ret z
+}
+
+// Set words by words.
+fn setWW(mut &z: []Word, x: []Word) {
+	z = makeW(z, len(x))
+	copy(z, x)
+}
+
+fn setWV(mut &z: []Word, x: Word) {
+	if x == 0 {
+		z = z[:0]
+		ret
+	}
+	z = makeW(z, 1)
+	z[0] = x
+}
+
+fn setWU64(mut &z: []Word, x: u64) {
+	// single-word value
+	w := Word(x)
+	if u64(w) == x {
+		setWV(z, w)
+		ret
+	}
+	// 2-word value
+	z = makeW(z, 2)
+	z[1] = Word(x >> 32)
+	z[0] = Word(x)
+}
+
+fn clearW(mut z: []Word) {
+	for i in z {
+		z[i] = 0
+	}
+}
+
+fn normW(mut z: []Word): []Word {
+	mut i := len(z)
+	for i > 0 && z[i-1] == 0 {
+		i--
+	}
+	ret z[0:i]
+}
+
+fn cloneW(z: []Word): []Word {
+	mut r := make([]Word, len(z))
+	copy(r, z)
+	ret r
+}
+
+// Returns the number of leading zeros in x.
+// Wraps bits::LeadingZeros call for convenience.
+fn nlz(x: Word): uint {
+	ret uint(bits::LeadingZeros(uint(x)))
+}
+
+// Returns the length of z in bits.
+// Unlike most methods, it works even if z is not normalized.
+fn bitLenW(z: []Word): int {
+	// This function is may used in cryptographic operations. It must not leak
+	// anything but the Int's sign and bit size through side-channels. Any
+	// changes must be reviewed by a security expert.
+	mut i := len(z) - 1
+	if i >= 0 {
+		// bits::Len uses a lookup table for the low-order bits on some
+		// architectures. Neutralize any input-dependent behavior by setting all
+		// bits after the first one bit.
+		mut top := uint(z[i])
+		top |= top >> 1
+		top |= top >> 2
+		top |= top >> 4
+		top |= top >> 8
+		top |= top >> 16
+		top |= top >> 32
+		ret i*_W + bits::Len(top)
+	}
+	ret 0
+}
+
+fn cmpW(x: []Word, y: []Word): (r: int) {
+	m := len(x)
+	n := len(y)
+	if m != n || m == 0 {
+		match {
+		| m < n:
+			r = -1
+		| m > n:
+			r = 1
+		}
+		ret
+	}
+
+	mut i := m - 1
+	for i > 0 && x[i] == y[i] {
+		i--
+	}
+
+	match {
+	| x[i] < y[i]:
+		r = -1
+	| x[i] > y[i]:
+		r = 1
+	}
+	ret
+}
+
+// Reports whether x and y share the same base array.
+//
+// Note: alias assumes that the capacity of underlying arrays
+// is never changed for nat values; i.e. that there are
+// no 3-operand slice expressions in this code (or worse,
+// reflect-based operations to the same effect).
+fn aliasW(x: []Word, y: []Word): bool {
+	ret cap(x) > 0 && cap(y) > 0 && &x[0:cap(x)][cap(x)-1] == &y[0:cap(y)][cap(y)-1]
+}
+
+fn sameW(x: []Word, y: []Word): bool {
+	ret len(x) == len(y) && len(x) > 0 && &x[0] == &y[0]
+}
+
+// Returns the number of consecutive least significant zero bits of z.
+fn trailingZeroBitsW(z: []Word): uint {
+	if len(z) == 0 {
+		ret 0
+	}
+	mut i := uint(0)
+	for z[i] == 0 {
+		i++
+	}
+	// z[i] != 0
+	ret i*_W + uint(bits::TrailingZeros(uint(z[i])))
+}
+
+// Returns the least significant 64 bits of z.
+fn low64W(z: []Word): u64 {
+	if len(z) == 0 {
+		ret 0
+	}
+	v := u64(z[0])
+	if _W == 32 && len(z) > 1 {
+		ret u64(z[1])<<32 | v
+	}
+	ret v
+}
+
+// Returns the value of the i'th bit, with lsb == bit 0.
+fn bitW(z: []Word, i: uint): uint {
+	j := i / _W
+	if j >= uint(len(z)) {
+		ret 0
+	}
+	// 0 <= j < len(z)
+	ret uint(z[j] >> (i % _W) & 1)
+}
+
+fn andW(x: []Word, y: []Word): []Word {
+	mut m := len(x)
+	n := len(y)
+	if m > n {
+		m = n
+	}
+	// m <= n
+
+	mut z := makeW(nil, m)
+	mut i := 0
+	for i < m; i++ {
+		z[i] = x[i] & y[i]
+	}
+
+	ret normW(z)
+}
+
+fn andNotW(x: []Word, y: []Word): []Word {
+	m := len(x)
+	mut n := len(y)
+	if n > m {
+		n = m
+	}
+	// m >= n
+
+	mut z := makeW(nil, m)
+	mut i := 0
+	for i < n; i++ {
+		z[i] = x[i] & ^y[i]
+	}
+	copy(z[n:m], x[n:m])
+	ret normW(z)
+}
+
+fn orW(x: []Word, y: []Word): []Word {
+	mut m := len(x)
+	mut n := len(y)
+	s := x
+	if m < n {
+		n, m = m, n
+		unsafe { *(&s) = *(&y) }
+	}
+	// m >= n
+
+	mut z := makeW(nil, m)
+	mut i := 0
+	for i < n; i++ {
+		z[i] = x[i] | y[i]
+	}
+	copy(z[n:m], s[n:m])
+
+	ret normW(z)
+}
+
+fn xorW(x: []Word, y: []Word): []Word {
+	mut m := len(x)
+	mut n := len(y)
+	s := x
+	if m < n {
+		n, m = m, n
+		unsafe { *(&s) = *(&y) }
+	}
+	// m >= n
+
+	mut z := makeW(nil, m)
+	mut i := 0
+	for i < n; i++ {
+		z[i] = x[i] ^ y[i]
+	}
+	copy(z[n:m], s[n:m])
+
+	ret normW(z)
+}
+
+// Creates a random integer in [0..limit), using the space in z if
+// possible. n is the bit length of limit.
+fn randomW(mut &z: []Word, rand: &rand::Rand, limit: []Word, n: int) {
+	if aliasW(z, limit) {
+		z = nil // z is an alias for limit - cannot reuse
+	}
+	z = makeW(z, len(limit))
+
+	mut bitLengthOfMSW := uint(n % _W)
+	if bitLengthOfMSW == 0 {
+		bitLengthOfMSW = _W
+	}
+	mask := Word((1 << bitLengthOfMSW) - 1)
+
+	for {
+		const match _W {
+		| 32:
+			for i in z {
+				z[i] = Word(rand.U32())
+			}
+		| 64:
+			for i in z {
+				z[i] = Word(rand.U32()) | Word(rand.U32())<<32
+			}
+		|:
+			panic("math/big: unknown word size")
+		}
+		z[len(limit)-1] &= mask
+		if cmpW(z, limit) < 0 {
+			break
+		}
+	}
+
+	z = normW(z)
+}

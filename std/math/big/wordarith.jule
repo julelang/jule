@@ -1,0 +1,1343 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/math/bits"
+
+// Many of the loops in this file are of the form
+//   mut i := 0
+//   for i < len(z) && i < len(x) && i < len(y); i++
+// i < len(z) is the real condition.
+// However, checking i < len(x) && i < len(y) as well is faster than
+// having the compiler do a bounds check in the body of the loop;
+// remarkably it is even faster than hoisting the bounds check
+// out of the loop, by doing something like
+//   _, _ = x[len(z)-1], y[len(z)-1]
+// There are other ways to hoist the bounds check out of the loop,
+// but the compiler's BCE isn't powerful enough for them (yet?).
+
+// ----------------------------------------------------------------------------
+// Elementary operations on words
+//
+// These operations are used by the vector operations below.
+
+// z1<<_W + z0 = x*y
+fn mulWW(x: Word, y: Word): (z1: Word, z0: Word) {
+	hi, lo := bits::Mul(uint(x), uint(y))
+	ret Word(hi), Word(lo)
+}
+
+// z1<<_W + z0 = x*y + c
+fn mulAddWWW(x: Word, y: Word, c: Word): (z1: Word, z0: Word) {
+	hi, mut lo := bits::Mul(uint(x), uint(y))
+	lo, cc := bits::Add(lo, uint(c), 0)
+	ret Word(hi + cc), Word(lo)
+}
+
+// The resulting carry c is either 0 or 1.
+fn addVV(mut z: []Word, x: []Word, y: []Word): (c: Word) {
+	// The comment near the top of this file discusses this for loop condition.
+	mut i := 0
+	for i < len(z) && i < len(x) && i < len(y); i++ {
+		zi, cc := bits::Add(uint(x[i]), uint(y[i]), uint(c))
+		z[i] = Word(zi)
+		c = Word(cc)
+	}
+	ret
+}
+
+// The resulting carry c is either 0 or 1.
+fn subVV(mut z: []Word, x: []Word, y: []Word): (c: Word) {
+	// The comment near the top of this file discusses this for loop condition.
+	mut i := 0
+	for i < len(z) && i < len(x) && i < len(y); i++ {
+		zi, cc := bits::Sub(uint(x[i]), uint(y[i]), uint(c))
+		z[i] = Word(zi)
+		c = Word(cc)
+	}
+	ret
+}
+
+// The resulting carry c is either 0 or 1.
+fn addVW(mut z: []Word, x: []Word, y: Word): (c: Word) {
+	c = y
+	// The comment near the top of this file discusses this for loop condition.
+	mut i := 0
+	for i < len(z) && i < len(x); i++ {
+		zi, cc := bits::Add(uint(x[i]), uint(c), 0)
+		z[i] = Word(zi)
+		c = Word(cc)
+	}
+	ret
+}
+
+// addVWlarge is addVW, but intended for large z.
+// The only difference is that we check on every iteration
+// whether we are done with carries,
+// and if so, switch to a much faster copy instead.
+// This is only a good idea for large z,
+// because the overhead of the check and the function call
+// outweigh the benefits when z is small.
+fn addVWlarge(mut z: []Word, x: []Word, y: Word): (c: Word) {
+	c = y
+	// The comment near the top of this file discusses this for loop condition.
+	mut i := 0
+	for i < len(z) && i < len(x); i++ {
+		if c == 0 {
+			copy(z[i:], x[i:])
+			ret
+		}
+		zi, cc := bits::Add(uint(x[i]), uint(c), 0)
+		z[i] = Word(zi)
+		c = Word(cc)
+	}
+	ret
+}
+
+fn subVW(mut z: []Word, x: []Word, y: Word): (c: Word) {
+	c = y
+	// The comment near the top of this file discusses this for loop condition.
+	mut i := 0
+	for i < len(z) && i < len(x); i++ {
+		zi, cc := bits::Sub(uint(x[i]), uint(c), 0)
+		z[i] = Word(zi)
+		c = Word(cc)
+	}
+	ret
+}
+
+// Is to subVW as addVWlarge is to addVW.
+fn subVWlarge(mut z: []Word, x: []Word, y: Word): (c: Word) {
+	c = y
+	// The comment near the top of this file discusses this for loop condition.
+	mut i := 0
+	for i < len(z) && i < len(x); i++ {
+		if c == 0 {
+			copy(z[i:], x[i:])
+			ret
+		}
+		zi, cc := bits::Sub(uint(x[i]), uint(c), 0)
+		z[i] = Word(zi)
+		c = Word(cc)
+	}
+	ret
+}
+
+fn shlVU(mut z: []Word, x: []Word, mut s: uint): (c: Word) {
+	if s == 0 {
+		copy(z, x)
+		ret
+	}
+	if len(z) == 0 {
+		ret
+	}
+	s &= _W - 1 // hint to the compiler that shifts by s don't need guard code
+	mut ŝ := _W - s
+	ŝ &= _W - 1 // ditto
+	c = x[len(z)-1] >> ŝ
+	mut i := len(z) - 1
+	for i > 0; i-- {
+		z[i] = x[i]<<s | x[i-1]>>ŝ
+	}
+	z[0] = x[0] << s
+	ret
+}
+
+fn shrVU(mut z: []Word, x: []Word, mut s: uint): (c: Word) {
+	if s == 0 {
+		copy(z, x)
+		ret
+	}
+	if len(z) == 0 {
+		ret
+	}
+	if len(x) != len(z) {
+		// This is an invariant guaranteed by the caller.
+		panic("math/big: shrVU_g: len(x) != len(z)")
+	}
+	s &= _W - 1 // hint to the compiler that shifts by s don't need guard code
+	mut ŝ := _W - s
+	ŝ &= _W - 1 // ditto
+	c = x[0] << ŝ
+	mut i := 1
+	for i < len(z); i++ {
+		z[i-1] = x[i-1]>>s | x[i]<<ŝ
+	}
+	z[len(z)-1] = x[len(z)-1] >> s
+	ret
+}
+
+fn mulAddVWW(mut z: []Word, x: []Word, y: Word, r: Word): (c: Word) {
+	c = r
+	// The comment near the top of this file discusses this for loop condition.
+	mut i := 0
+	for i < len(z) && i < len(x); i++ {
+		c, z[i] = mulAddWWW(x[i], y, c)
+	}
+	ret
+}
+
+fn addMulVVW(mut z: []Word, x: []Word, y: Word): (c: Word) {
+	// The comment near the top of this file discusses this for loop condition.
+	mut i := 0
+	for i < len(z) && i < len(x); i++ {
+		z1, z0 := mulAddWWW(x[i], y, z[i])
+		lo, cc := bits::Add(uint(z0), uint(c), 0)
+		c, z[i] = Word(cc), Word(lo)
+		c += z1
+	}
+	ret
+}
+
+// q = ( x1 << _W + x0 - r)/y. m = floor(( _B^2 - 1 ) / d - _B). Requiring x1<y.
+// An approximate reciprocal with a reference to "Improved Division by Invariant Integers
+// (IEEE Transactions on Computers, 11 Jun. 2010)"
+fn divWW(mut x1: Word, mut x0: Word, mut y: Word, m: Word): (q: Word, r: Word) {
+	s := nlz(y)
+	if s != 0 {
+		x1 = x1<<s | x0>>(_W-s)
+		x0 <<= s
+		y <<= s
+	}
+	d := uint(y)
+	// We know that
+	//   m = ⎣(B^2-1)/d⎦-B
+	//   ⎣(B^2-1)/d⎦ = m+B
+	//   (B^2-1)/d = m+B+delta1    0 <= delta1 <= (d-1)/d
+	//   B^2/d = m+B+delta2        0 <= delta2 <= 1
+	// The quotient we're trying to compute is
+	//   quotient = ⎣(x1*B+x0)/d⎦
+	//            = ⎣(x1*B*(B^2/d)+x0*(B^2/d))/B^2⎦
+	//            = ⎣(x1*B*(m+B+delta2)+x0*(m+B+delta2))/B^2⎦
+	//            = ⎣(x1*m+x1*B+x0)/B + x0*m/B^2 + delta2*(x1*B+x0)/B^2⎦
+	// The latter two terms of this three-term sum are between 0 and 1.
+	// So we can compute just the first term, and we will be low by at most 2.
+	mut t1, t0 := bits::Mul(uint(m), uint(x1))
+	_, c := bits::Add(t0, uint(x0), 0)
+	t1, _ = bits::Add(t1, uint(x1), c)
+	// The quotient is either t1, t1+1, or t1+2.
+	// We'll try t1 and adjust if needed.
+	mut qq := t1
+	// compute remainder r=x-d*q.
+	dq1, dq0 := bits::Mul(d, qq)
+	mut r0, b := bits::Sub(uint(x0), dq0, 0)
+	r1, _ := bits::Sub(uint(x1), dq1, b)
+	// The remainder we just computed is bounded above by B+d:
+	// r = x1*B + x0 - d*q.
+	//   = x1*B + x0 - d*⎣(x1*m+x1*B+x0)/B⎦
+	//   = x1*B + x0 - d*((x1*m+x1*B+x0)/B-alpha)                                   0 <= alpha < 1
+	//   = x1*B + x0 - x1*d/B*m                         - x1*d - x0*d/B + d*alpha
+	//   = x1*B + x0 - x1*d/B*⎣(B^2-1)/d-B⎦             - x1*d - x0*d/B + d*alpha
+	//   = x1*B + x0 - x1*d/B*⎣(B^2-1)/d-B⎦             - x1*d - x0*d/B + d*alpha
+	//   = x1*B + x0 - x1*d/B*((B^2-1)/d-B-beta)        - x1*d - x0*d/B + d*alpha   0 <= beta < 1
+	//   = x1*B + x0 - x1*B + x1/B + x1*d + x1*d/B*beta - x1*d - x0*d/B + d*alpha
+	//   =        x0        + x1/B        + x1*d/B*beta        - x0*d/B + d*alpha
+	//   = x0*(1-d/B) + x1*(1+d*beta)/B + d*alpha
+	//   <  B*(1-d/B) +  d*B/B          + d          because x0<B (and 1-d/B>0), x1<d, 1+d*beta<=B, alpha<1
+	//   =  B - d     +  d              + d
+	//   = B+d
+	// So r1 can only be 0 or 1. If r1 is 1, then we know q was too small.
+	// Add 1 to q and subtract d from r. That guarantees that r is <B, so
+	// we no longer need to keep track of r1.
+	if r1 != 0 {
+		qq++
+		r0 -= d
+	}
+	// If the remainder is still too large, increment q one more time.
+	if r0 >= d {
+		qq++
+		r0 -= d
+	}
+	ret Word(qq), Word(r0 >> s)
+}
+
+// Returns the reciprocal of the divisor. rec = floor(( _B^2 - 1 ) / u - _B). u = d1 << nlz(d1).
+fn reciprocalWord(d1: Word): Word {
+	u := uint(d1 << nlz(d1))
+	x1 := ^u
+	x0 := uint(_M)
+	rec, _ := bits::Div(x1, x0, u) // (_B^2-1)/U-_B = (_B*(_M-C)+_M)/U
+	ret Word(rec)
+}
+
+// Base function for common addition computations.
+fn addW(mut &z: []Word, x: []Word, y: []Word) {
+	m := len(x)
+	n := len(y)
+
+	if m < n {
+		addW(z, y, x)
+		ret
+	}
+
+	match {
+	| m == 0:
+		// n == 0 because m >= n; result is 0
+		z = z[:0]
+		ret
+	| n == 0:
+		// result is x
+		setWW(z, x)
+		ret
+	}
+	// m > 0
+
+	z = makeW(z, m+1)
+	mut c := addVV(z[0:n], x, y)
+	if m > n {
+		c = addVW(z[n:m], x[n:], c)
+	}
+	z[m] = c
+	z = normW(z)
+}
+
+// Base function for common subtraction computations.
+fn subW(mut &z: []Word, x: []Word, y: []Word) {
+	m := len(x)
+	n := len(y)
+
+	match {
+	| m < n:
+		panic("math/big: nat.SubAssign: underflow")
+	| m == 0:
+		// n == 0 because m >= n; result is 0
+		z = z[:0]
+		ret
+	| n == 0:
+		// result is x
+		setWW(z, x)
+		ret
+	}
+	// m > 0
+
+	z = makeW(z, m)
+	mut c := subVV(z[0:n], x, y)
+	if m > n {
+		c = subVW(z[n:], x[n:], c)
+	}
+	if c != 0 {
+		panic("math/big: nat.SubAssign: underflow")
+	}
+	z = normW(z)
+}
+
+fn mulAddWW(mut &z: []Word, x: []Word, y: Word, r: Word) {
+	m := len(x)
+	if m == 0 || y == 0 {
+		setWV(z, r) // result is r
+		ret
+	}
+	// m > 0
+
+	z = makeW(z, m+1)
+	z[m] = mulAddVWW(z[0:m], x, y, r)
+	z = normW(z)
+}
+
+// Operands that are shorter than karatsubaThreshold are multiplied using
+// "grade school" multiplication; for longer operands the Karatsuba algorithm
+// is used.
+const karatsubaThreshold = 40
+
+// Computes an approximation to the maximum k <= n such that
+// k = p<<i for a number p <= threshold and an i >= 0. Thus, the
+// result is the largest number that can be divided repeatedly by 2 before
+// becoming about the value of threshold.
+fn karatsubaLen(mut n: int, threshold: int): int {
+	mut i := uint(0)
+	for n > threshold {
+		n >>= 1
+		i++
+	}
+	ret n << i
+}
+
+// Multiplies x and y and leaves the result in z.
+// The (non-normalized) result is placed in z[0 : len(x) + len(y)].
+fn basicMul(mut &z: []Word, x: []Word, y: []Word) {
+	clearW(z[0:len(x)+len(y)]) // initialize z
+	for i, d in y {
+		if d != 0 {
+			z[len(x)+i] = addMulVVW(z[i:i+len(x)], x, d)
+		}
+	}
+}
+
+// Fast version of z[0:n+n>>1].add(z[0:n+n>>1], x[0:n]) w/o bounds checks.
+// Factored out for readability - do not use outside karatsuba.
+fn karatsubaAdd(mut z: []Word, x: []Word, n: int) {
+	c := addVV(z[0:n], z, x)
+	if c != 0 {
+		addVW(z[n:n+n>>1], z[n:], c)
+	}
+}
+
+// Like karatsubaAdd, but does subtract.
+fn karatsubaSub(mut z: []Word, x: []Word, n: int) {
+	c := subVV(z[0:n], z, x)
+	if c != 0 {
+		subVW(z[n:n+n>>1], z[n:], c)
+	}
+}
+
+// Multiplies x and y and leaves the result in z.
+// Both x and y must have the same length n and n must be a
+// power of 2. The result vector z must have len(z) >= 6*n.
+// The (non-normalized) result is placed in z[0 : 2*n].
+fn karatsuba(mut z: []Word, x: []Word, y: []Word) {
+	n := len(y)
+
+	// Switch to basic multiplication if numbers are odd or small.
+	// (n is always even if karatsubaThreshold is even, but be
+	// conservative)
+	if n&1 != 0 || n < karatsubaThreshold || n < 2 {
+		basicMul(z, x, y)
+		ret
+	}
+	// n&1 == 0 && n >= karatsubaThreshold && n >= 2
+
+	// Karatsuba multiplication is based on the observation that
+	// for two numbers x and y with:
+	//
+	//   x = x1*b + x0
+	//   y = y1*b + y0
+	//
+	// the product x*y can be obtained with 3 products z2, z1, z0
+	// instead of 4:
+	//
+	//   x*y = x1*y1*b*b + (x1*y0 + x0*y1)*b + x0*y0
+	//       =    z2*b*b +              z1*b +    z0
+	//
+	// with:
+	//
+	//   xd = x1 - x0
+	//   yd = y0 - y1
+	//
+	//   z1 =      xd*yd                    + z2 + z0
+	//      = (x1-x0)*(y0 - y1)             + z2 + z0
+	//      = x1*y0 - x1*y1 - x0*y0 + x0*y1 + z2 + z0
+	//      = x1*y0 -    z2 -    z0 + x0*y1 + z2 + z0
+	//      = x1*y0                 + x0*y1
+
+	// split x, y into "digits"
+	n2 := n >> 1              // n2 >= 1
+	x1, x0 := x[n2:], x[0:n2] // x = x1*b + y0
+	y1, y0 := y[n2:], y[0:n2] // y = y1*b + y0
+
+	// z is used for the result and temporary storage:
+	//
+	//   6*n     5*n     4*n     3*n     2*n     1*n     0*n
+	// z = [z2 copy|z0 copy| xd*yd | yd:xd | x1*y1 | x0*y0 ]
+	//
+	// For each recursive call of karatsuba, an unused slice of
+	// z is passed in that has (at least) half the length of the
+	// caller's z.
+
+	// compute z0 and z2 with the result "in place" in z
+	karatsuba(z, x0, y0)     // z0 = x0*y0
+	karatsuba(z[n:], x1, y1) // z2 = x1*y1
+
+	// compute xd (or the negative value if underflow occurs)
+	mut s := 1 // sign of product xd*yd
+	mut xd := z[2*n : 2*n+n2]
+	if subVV(xd, x1, x0) != 0 { // x1-x0
+		s = -s
+		subVV(xd, x0, x1) // x0-x1
+	}
+
+	// compute yd (or the negative value if underflow occurs)
+	mut yd := z[2*n+n2 : 3*n]
+	if subVV(yd, y0, y1) != 0 { // y0-y1
+		s = -s
+		subVV(yd, y1, y0) // y1-y0
+	}
+
+	// p = (x1-x0)*(y0-y1) == x1*y0 - x1*y1 - x0*y0 + x0*y1 for s > 0
+	// p = (x0-x1)*(y0-y1) == x0*y0 - x0*y1 - x1*y0 + x1*y1 for s < 0
+	mut p := z[n*3:]
+	karatsuba(p, xd, yd)
+
+	// save original z2:z0
+	// (ok to use upper half of z since we're done recurring)
+	mut r := z[n*4:]
+	copy(r, z[:n*2])
+
+	// add up all partial products
+	//
+	//   2*n     n     0
+	// z = [ z2  | z0  ]
+	//   +    [ z0  ]
+	//   +    [ z2  ]
+	//   +    [  p  ]
+	//
+	karatsubaAdd(z[n2:], r, n)
+	karatsubaAdd(z[n2:], r[n:], n)
+	if s > 0 {
+		karatsubaAdd(z[n2:], p, n)
+	} else {
+		karatsubaSub(z[n2:], p, n)
+	}
+}
+
+fn max(a: int, b: int): int {
+	if a > b {
+		ret a
+	}
+	ret b
+}
+
+// Base function for common multiplication computations.
+fn mulW(mut &z: []Word, mut x: []Word, mut y: []Word) {
+	m := len(x)
+	n := len(y)
+
+	if m < n {
+		mulW(z, y, x)
+		ret
+	}
+
+	match {
+	| m == 0 || n == 0:
+		z = z[:0]
+		ret
+	| n == 1:
+		mulAddWW(z, x, y[0], 0)
+		ret
+	}
+	// m >= n > 1
+
+	// determine if z can be reused
+	if aliasW(z, x) || aliasW(z, y) {
+		z = nil // z is an alias for x or y - cannot reuse
+	}
+
+	// use basic multiplication if the numbers are small
+	if n < karatsubaThreshold {
+		z = makeW(z, m+n)
+		basicMul(z, x, y)
+		z = normW(z)
+		ret
+	}
+	// m >= n && n >= karatsubaThreshold && n >= 2
+
+	// determine Karatsuba length k such that
+	//
+	//   x = xh*b + x0  (0 <= x0 < b)
+	//   y = yh*b + y0  (0 <= y0 < b)
+	//   b = 1<<(_W*k)  ("base" of digits xi, yi)
+	//
+	k := karatsubaLen(n, karatsubaThreshold)
+	// k <= n
+
+	// multiply x0 and y0 via Karatsuba
+	mut x0 := x[0:k]            // x0 is not normalized
+	mut y0 := y[0:k]            // y0 is not normalized
+	z = makeW(z, max(6*k, m+n)) // enough space for karatsuba of x0*y0 and full result of x*y
+	karatsuba(z, x0, y0)
+	z = z[0:m+n]    // z has final length but may be incomplete
+	clearW(z[2*k:]) // upper portion of z is garbage (and 2*k <= m+n since k <= n <= m)
+
+	// If xh != 0 or yh != 0, add the missing terms to z. For
+	//
+	//   xh = xi*b^i + ... + x2*b^2 + x1*b (0 <= xi < b)
+	//   yh =                         y1*b (0 <= y1 < b)
+	//
+	// the missing terms are
+	//
+	//   x0*y1*b and xi*y0*b^i, xi*y1*b^(i+1) for i > 0
+	//
+	// since all the yi for i > 1 are 0 by choice of k: If any of them
+	// were > 0, then yh >= b^2 and thus y >= b^2. Then k' = k*2 would
+	// be a larger valid threshold contradicting the assumption about k.
+	//
+	if k < n || m != n {
+		mut t := getW(3 * k)
+
+		// add x0*y1*b
+		x0 = normW(x0)
+		mut y1 := y[k:] // y1 is normalized because y is
+		mulW(t, x0, y1) // update t so we don't lose t's underlying array
+		addAtW(z, t, k)
+
+		// add xi*y0<<i, xi*y1*b<<(i+k)
+		y0 = normW(y0)
+		mut i := k
+		for i < len(x); i += k {
+			mut xi := x[i:]
+			if len(xi) > k {
+				xi = xi[:k]
+			}
+			xi = normW(xi)
+			mulW(t, xi, y0)
+			addAtW(z, t, i)
+			mulW(t, xi, y1)
+			addAtW(z, t, i+k)
+		}
+	}
+
+	z = normW(z)
+}
+
+// Implements z += x<<(_W*i); z must be long enough.
+// (we don't use other add variants because we need z to stay the same
+// slice, and we don't need to normalize z after each addition)
+fn addAtW(mut z: []Word, x: []Word, i: int) {
+	n := len(x)
+	if n > 0 {
+		c := addVV(z[i:i+n], z[i:], x)
+		if c != 0 {
+			j := i + n
+			if j < len(z) {
+				addVW(z[j:], z[j:], c)
+			}
+		}
+	}
+}
+
+// Operands that are shorter than basicSqrThreshold are squared using
+// "grade school" multiplication; for operands longer than karatsubaSqrThreshold
+// we use the Karatsuba algorithm optimized for x == y.
+const basicSqrThreshold = 20
+const karatsubaSqrThreshold = 260
+
+// Sets z = x² and is asymptotically faster than basicMul
+// by about a factor of 2, but slower for small arguments due to overhead.
+// Requirements: len(x) > 0, len(z) == 2*len(x)
+// The (non-normalized) result is placed in z.
+fn basicSqr(mut z: []Word, x: []Word) {
+	n := len(x)
+	mut t := getW(2 * n)
+	clearW(t)
+	z[1], z[0] = mulWW(x[0], x[0]) // the initial square
+	mut i := 1
+	for i < n; i++ {
+		d := x[i]
+		// z collects the squares x[i] * x[i]
+		z[2*i+1], z[2*i] = mulWW(d, d)
+		// t collects the products x[i] * x[j] where j < i
+		t[2*i] = addMulVVW(t[i:2*i], x[0:i], d)
+	}
+	t[2*n-1] = shlVU(t[1:2*n-1], t[1:2*n-1], 1) // double the j < i products
+	addVV(z, z, t)                              // combine the result
+}
+
+// Squares x and leaves the result in z.
+// len(x) must be a power of 2 and len(z) >= 6*len(x).
+// The (non-normalized) result is placed in z[0 : 2*len(x)].
+//
+// The algorithm and the layout of z are the same as for karatsuba.
+fn karatsubaSqr(mut z: []Word, x: []Word) {
+	n := len(x)
+
+	if n&1 != 0 || n < karatsubaSqrThreshold || n < 2 {
+		basicSqr(z[:2*n], x)
+		ret
+	}
+
+	n2 := n >> 1
+	x1, x0 := x[n2:], x[0:n2]
+
+	karatsubaSqr(z, x0)
+	karatsubaSqr(z[n:], x1)
+
+	// s = sign(xd*yd) == -1 for xd != 0; s == 1 for xd == 0
+	mut xd := z[2*n : 2*n+n2]
+	if subVV(xd, x1, x0) != 0 {
+		subVV(xd, x0, x1)
+	}
+
+	mut p := z[n*3:]
+	karatsubaSqr(p, xd)
+
+	mut r := z[n*4:]
+	copy(r, z[:n*2])
+
+	karatsubaAdd(z[n2:], r, n)
+	karatsubaAdd(z[n2:], r[n:], n)
+	karatsubaSub(z[n2:], p, n) // s == -1 for p != 0; s == 1 for p == 0
+}
+
+// Base function for common square computations.
+// Based on karatsuba algorithm but optimized for square computations.
+// z = x²
+fn sqrW(mut &z: []Word, mut x: []Word) {
+	n := len(x)
+	match {
+	| n == 0:
+		z = z[:0]
+		ret
+	| n == 1:
+		d := x[0]
+		z = makeW(z, 2)
+		z[1], z[0] = mulWW(d, d)
+		z = normW(z)
+		ret
+	}
+
+	if aliasW(z, x) {
+		z = nil // z is an alias for x - cannot reuse
+	}
+
+	if n < basicSqrThreshold {
+		z = makeW(z, 2*n)
+		basicMul(z, x, x)
+		z = normW(z)
+		ret
+	}
+
+	if n < karatsubaSqrThreshold {
+		z = makeW(z, 2*n)
+		basicSqr(z, x)
+		z = normW(z)
+		ret
+	}
+
+	// Use Karatsuba multiplication optimized for x == y.
+	// The algorithm and layout of z are the same as for mul.
+	// z = (x1*b + x0)^2 = x1^2*b^2 + 2*x1*x0*b + x0^2
+
+	k := karatsubaLen(n, karatsubaSqrThreshold)
+
+	mut x0 := x[0:k]
+	z = makeW(z, max(6*k, 2*n))
+	karatsubaSqr(z, x0) // z = x0^2
+	z = z[0:2*n]
+	clearW(z[2*k:])
+
+	if k < n {
+		mut t := getW(2 * k)
+		x0 = normW(x0)
+		mut x1 := x[k:]
+		mulW(t, x0, x1)
+		addAtW(z, t, k)
+		addAtW(z, t, k) // z = 2*x1*x0*b + x0^2
+		sqrW(t, x1)
+		addAtW(z, t, 2*k) // z = x1^2*b^2 + 2*x1*x0*b + x0^2
+	}
+
+	z = normW(z)
+}
+
+// Computes z mod m = x*y*2**(-n*_W) mod m,
+// assuming k = -1/m mod 2**_W.
+// z is used for storing the result which is calculated;
+// z must not alias x, y or m.
+// See Gueron, "Efficient Software Implementations of Modular Exponentiation".
+// https://eprint.iacr.org/2011/239.pdf
+// In the terminology of that paper, this is an "Almost Montgomery Multiplication":
+// x and y are required to satisfy 0 <= z < 2**(n*_W) and then the result
+// z is guaranteed to satisfy 0 <= z < 2**(n*_W), but it may not be < m.
+fn montgomery(mut &z: []Word, x: []Word, y: []Word, m: []Word, k: Word, n: int) {
+	// This code assumes x, y, m are all the same length, n.
+	// (required by addMulVVW and the for loop).
+	// It also assumes that x, y are already reduced mod m,
+	// or else the result will not be properly reduced.
+	if len(x) != n || len(y) != n || len(m) != n {
+		panic("math/big: mismatched montgomery number lengths")
+	}
+	z = makeW(z, n*2)
+	clearW(z)
+	mut c := Word(0)
+	mut i := 0
+	for i < n; i++ {
+		d := y[i]
+		c2 := addMulVVW(z[i:n+i], x, d)
+		t := z[i] * k
+		c3 := addMulVVW(z[i:n+i], m, t)
+		cx := c + c2
+		cy := cx + c3
+		z[n+i] = cy
+		if cx < c2 || cy < c3 {
+			c = 1
+		} else {
+			c = 0
+		}
+	}
+	if c != 0 {
+		subVV(z[:n], z[n:], m)
+	} else {
+		copy(z[:n], z[n:])
+	}
+	z = z[:n]
+}
+
+// Calculates x**y mod m where m = m1 × m2 for m1 = 2ⁿ and m2 odd.
+// It uses two recursive calls to expWW for x**y mod m1 and x**y mod m2
+// and then uses the Chinese Remainder Theorem to combine the results.
+// The recursive call using m1 will use expWWWindowed,
+// while the recursive call using m2 will use expWWMontgomery.
+// For more details, see Ç. K. Koç, “Montgomery Reduction with Even Modulus”,
+// IEE Proceedings: Computers and Digital Techniques, 141(5) 314-316, September 1994.
+// http://www.people.vcu.edu/~jwang3/CMSC691/j34monex.pdf
+fn expWWMontgomeryEven(mut &z: []Word, mut x: []Word, y: []Word, m: []Word) {
+	// Split m = m₁ × m₂ where m₁ = 2ⁿ
+	n := trailingZeroBitsW(m)
+	mut m1 := []Word(nil)
+	lshW(m1, wordOne, n)
+	mut m2 := []Word(nil)
+	rshW(m2, m, n)
+
+	// We want z = x**y mod m.
+	// z₁ = x**y mod m1 = (x**y mod m) mod m1 = z mod m1
+	// z₂ = x**y mod m2 = (x**y mod m) mod m2 = z mod m2
+	// (We are using the math/big convention for names here,
+	// where the computation is z = x**y mod m, so its parts are z1 and z2.
+	// The paper is computing x = a**e mod n; it refers to these as x2 and z1.)
+	mut z1 := []Word(nil)
+	expWW(z1, x, y, m1, false)
+	mut z2 := []Word(nil)
+	expWW(z2, x, y, m2, false)
+
+	// Reconstruct z from z₁, z₂ using CRT, using algorithm from paper,
+	// which uses only a single modInverse (and an easy one at that).
+	//	p = (z₁ - z₂) × m₂⁻¹ (mod m₁)
+	//	z = z₂ + p × m₂
+	// The final addition is in range because:
+	//	z = z₂ + p × m₂
+	//	  ≤ z₂ + (m₁-1) × m₂
+	//	  < m₂ + (m₁-1) × m₂
+	//	  = m₁ × m₂
+	//	  = m.
+	setWW(z, z2)
+
+	// Compute (z₁ - z₂) mod m1 [m1 == 2**n] into z1.
+	subMod2N(z1, z1, z2, n)
+
+	// Reuse z2 for p = (z₁ - z₂) [in z1] * m2⁻¹ (mod m₁ [= 2ⁿ]).
+	mut m2inv := []Word(nil)
+	modInverseW(m2inv, m2, m1)
+	mulW(z2, z1, m2inv)
+	truncW(z2, z2, n)
+
+	// Reuse z1 for p * m2.
+	mulW(z1, z2, m2)
+	addW(z, z, z1)
+}
+
+fn modInverseW(mut &z: []Word, mut g: []Word, mut n: []Word) {
+	mut gi := Int{abs: g}
+	mut ni := Int{abs: n}
+	z = gi.ModInverse(ni).abs
+}
+
+// Calculates x**y mod m using a fixed, 4-bit window.
+// Uses Montgomery representation.
+fn expWWMontgomery(mut &z: []Word, mut x: []Word, y: []Word, m: []Word) {
+	numWords := len(m)
+
+	// We want the lengths of x and m to be equal.
+	// It is OK if x >= m as long as len(x) == len(m).
+	if len(x) > numWords {
+		mut tz := []Word(nil)
+		mut z2 := []Word(nil)
+		divW(tz, z2, x, m)
+		x = z2
+		// Note: now len(x) <= numWords, not guaranteed ==.
+	}
+	if len(x) < numWords {
+		mut rr := make([]Word, numWords)
+		copy(rr, x)
+		x = rr
+	}
+
+	// Ideally the precomputations would be performed outside, and reused
+	// k0 = -m**-1 mod 2**_W. Algorithm from: Dumas, J.G. "On Newton–Raphson
+	// Iteration for Multiplicative Inverses Modulo Prime Powers".
+	mut k0 := 2 - m[0]
+	mut t := m[0] - 1
+	mut i := 1
+	for i < _W; i <<= 1 {
+		t *= t
+		k0 *= (t + 1)
+	}
+	k0 = -k0
+
+	// RR = 2**(2*_W*len(m)) mod m
+	mut RR := []Word(nil)
+	setWV(RR, 1)
+	mut zz := []Word(nil)
+	lshW(zz, RR, uint(2*numWords*_W))
+	mut tz := []Word(nil)
+	divW(tz, RR, zz, m)
+	if len(RR) < numWords {
+		zz = makeW(zz, numWords)
+		copy(zz, RR)
+		RR = zz
+	}
+	// one = 1, with equal length to that of m
+	mut one := make([]Word, numWords)
+	one[0] = 1
+
+	const n = 1 << 2
+	// powers[i] contains x^i
+	let mut powers: [1 << n][]Word
+	montgomery(powers[0], one, RR, m, k0, numWords)
+	montgomery(powers[1], x, RR, m, k0, numWords)
+	i = 2
+	for i < 1<<n; i++ {
+		montgomery(powers[i], powers[i-1], powers[1], m, k0, numWords)
+	}
+
+	// initialize z = 1 (Montgomery 1)
+	z = makeW(z, numWords)
+	copy(z, powers[0])
+
+	zz = makeW(zz, numWords)
+
+	// same windowed exponent, but with Montgomery multiplications
+	i = len(y) - 1
+	for i >= 0; i-- {
+		mut yi := y[i]
+		mut j := 0
+		for j < _W; j += n {
+			if i != len(y)-1 || j != 0 {
+				montgomery(zz, z, z, m, k0, numWords)
+				montgomery(z, zz, zz, m, k0, numWords)
+				montgomery(zz, z, z, m, k0, numWords)
+				montgomery(z, zz, zz, m, k0, numWords)
+			}
+			montgomery(zz, z, powers[yi>>(_W-n)], m, k0, numWords)
+			z, zz = zz, z
+			yi <<= n
+		}
+	}
+	// convert to regular number
+	montgomery(zz, z, one, m, k0, numWords)
+
+	// One last reduction, just in case.
+	if cmpW(zz, m) >= 0 {
+		// Common case is m has high bit set; in that case,
+		// since zz is the same length as m, there can be just
+		// one multiple of m to remove. Just subtract.
+		// We think that the subtract should be sufficient in general,
+		// so do that unconditionally, but double-check,
+		// in case our beliefs are wrong.
+		// The div is not expected to be reached.
+		subW(zz, zz, m)
+		if cmpW(zz, m) >= 0 {
+			tz = []Word(nil)
+			mut r := []Word(nil)
+			divW(tz, r, zz, m)
+			zz = r
+		}
+	}
+
+	z = normW(zz)
+}
+
+// Calculates x**y mod m using a fixed, 4-bit window, where m = 2**logM.
+fn expWWWindowed(mut &z: []Word, mut x: []Word, y: []Word, logM: uint) {
+	if len(y) <= 1 {
+		panic("math/big: misuse of expWWWindowed")
+	}
+	if x[0]&1 == 0 {
+		// len(y) > 1, so y  > logM.
+		// x is even, so x**y is a multiple of 2**y which is a multiple of 2**logM.
+		setWV(z, 0)
+		ret
+	}
+	if logM == 1 {
+		setWV(z, 1)
+		ret
+	}
+
+	// zz is used to avoid allocating in mul as otherwise
+	// the arguments would alias.
+	w := int((logM + _W - 1) / _W)
+	mut zz := getW(w)
+
+	const n = 1 << 2
+	// powers[i] contains x^i.
+	let mut powers: [1 << n][]Word
+	for i in powers {
+		powers[i] = getW(w)
+	}
+	setWW(powers[0], wordOne)
+	truncW(powers[1], x, logM)
+	mut i := 2
+	for i < 1<<n; i += 2 {
+		mut p2, mut p, mut p1 := powers[i/2], &powers[i], &powers[i+1]
+		unsafe {
+			sqrW(*p, p2)
+			truncW(*p, *p, logM)
+			mulW(*p1, *p, x)
+			truncW(*p1, *p1, logM)
+		}
+	}
+
+	// Because phi(2**logM) = 2**(logM-1), x**(2**(logM-1)) = 1,
+	// so we can compute x**(y mod 2**(logM-1)) instead of x**y.
+	// That is, we can throw away all but the bottom logM-1 bits of y.
+	// Instead of allocating a new y, we start reading y at the right word
+	// and truncate it appropriately at the start of the loop.
+	i = len(y) - 1
+	mtop := int((logM - 2) / _W) // -2 because the top word of N bits is the (N-1)/W'th word.
+	mut mmask := ^Word(0)
+	mbits := (logM - 1) & (_W - 1)
+	if mbits != 0 {
+		mmask = (1 << mbits) - 1
+	}
+	if i > mtop {
+		i = mtop
+	}
+	mut advance := false
+	setWV(z, 1)
+	for i >= 0; i-- {
+		mut yi := y[i]
+		if i == mtop {
+			yi &= mmask
+		}
+		mut j := 0
+		for j < _W; j += n {
+			if advance {
+				// Account for use of 4 bits in previous iteration.
+				// Unrolled loop for significant performance
+				// gain. Use go test -bench=".*" in crypto/rsa
+				// to check performance before making changes.
+				sqrW(zz, z)
+				zz, z = z, zz
+				truncW(z, z, logM)
+
+				sqrW(zz, z)
+				zz, z = z, zz
+				truncW(z, z, logM)
+
+				sqrW(zz, z)
+				zz, z = z, zz
+				truncW(z, z, logM)
+
+				sqrW(zz, z)
+				zz, z = z, zz
+				truncW(z, z, logM)
+			}
+
+			mulW(zz, z, powers[yi>>(_W-n)])
+			zz, z = z, zz
+			truncW(z, z, logM)
+
+			yi <<= n
+			advance = true
+		}
+	}
+
+	z = normW(z)
+}
+
+// If m != 0 (i.e., len(m) != 0), expWW sets z to x**y mod m;
+// otherwise it sets z to x**y. The result is the value of z.
+fn expWW(mut &z: []Word, mut x: []Word, y: []Word, m: []Word, slow: bool) {
+	if aliasW(z, x) || aliasW(z, y) {
+		// We cannot allow in-place modification of x or y.
+		z = nil
+	}
+
+	// x**y mod 1 == 0
+	if len(m) == 1 && m[0] == 1 {
+		setWV(z, 0)
+		ret
+	}
+	// m == 0 || m > 1
+
+	// x**0 == 1
+	if len(y) == 0 {
+		setWV(z, 1)
+		ret
+	}
+	// y > 0
+
+	// 0**y = 0
+	if len(x) == 0 {
+		setWV(z, 0)
+		ret
+	}
+	// x > 0
+
+	// 1**y = 1
+	if len(x) == 1 && x[0] == 1 {
+		setWV(z, 1)
+		ret
+	}
+	// x > 1
+
+	// x**1 == x
+	if len(y) == 1 && y[0] == 1 {
+		if len(m) != 0 {
+			remW(z, x, m)
+			ret
+		}
+		setWW(z, x)
+		ret
+	}
+	// y > 1
+
+	if len(m) != 0 {
+		// We likely end up being as long as the modulus.
+		z = makeW(z, len(m))
+
+		// If the exponent is large, we use the Montgomery method for odd values,
+		// and a 4-bit, windowed exponentiation for powers of two,
+		// and a CRT-decomposed Montgomery method for the remaining values
+		// (even values times non-trivial odd values, which decompose into one
+		// instance of each of the first two cases).
+		if len(y) > 1 && !slow {
+			if m[0]&1 == 1 {
+				expWWMontgomery(z, x, y, m)
+				ret
+			}
+			logM, ok := isPow2(m)
+			if ok {
+				expWWWindowed(z, x, y, logM)
+				ret
+			}
+			expWWMontgomeryEven(z, x, y, m)
+			ret
+		}
+	}
+	setWW(z, x)
+	mut v := y[len(y)-1] // v > 0 because y is normalized and y > 0
+	shift := nlz(v) + 1
+	v <<= shift
+	mut q := []Word(nil)
+
+	const mask = 1 << (_W - 1)
+
+	// We walk through the bits of the exponent one by one. Each time we
+	// see a bit, we square, thus doubling the power. If the bit is a one,
+	// we also multiply by x, thus adding one to the power.
+
+	w := _W - int(shift)
+	// zz and r are used to avoid allocating in mul and div as
+	// otherwise the arguments would alias.
+	mut zz := []Word(nil)
+	mut r := []Word(nil)
+	mut i := 0
+	for i < w; i++ {
+		sqrW(zz, z)
+		zz, z = z, zz
+
+		if v&mask != 0 {
+			mulW(zz, z, x)
+			zz, z = z, zz
+		}
+
+		if len(m) != 0 {
+			divW(zz, r, z, m)
+			zz, r, q, z = q, z, zz, r
+		}
+
+		v <<= 1
+	}
+
+	i = len(y) - 2
+	for i >= 0; i-- {
+		v = y[i]
+
+		mut j := 0
+		for j < _W; j++ {
+			sqrW(zz, z)
+			zz, z = z, zz
+
+			if v&mask != 0 {
+				mulW(zz, z, x)
+				zz, z = z, zz
+			}
+
+			if len(m) != 0 {
+				divW(zz, r, z, m)
+				zz, r, q, z = q, z, zz, r
+			}
+
+			v <<= 1
+		}
+	}
+
+	z = normW(z)
+}
+
+// Returns i, true when z == 2**i and 0, false otherwise.
+fn isPow2(z: []Word): (uint, bool) {
+	mut i := uint(0)
+	for z[i] == 0 {
+		i++
+	}
+	if i == uint(len(z))-1 && z[i]&(z[i]-1) == 0 {
+		ret i*_W + uint(bits::TrailingZeros(uint(z[i]))), true
+	}
+	ret 0, false
+}
+
+// z = x << s
+fn lshW(mut &z: []Word, x: []Word, s: uint) {
+	if s == 0 {
+		if sameW(z, x) {
+			ret
+		}
+		if !aliasW(z, x) {
+			setWW(z, x)
+			ret
+		}
+	}
+
+	m := len(x)
+	if m == 0 {
+		z = z[:0]
+		ret
+	}
+	// m > 0
+
+	n := m + int(s/_W)
+	z = makeW(z, n+1)
+	z[n] = shlVU(z[n-m:n], x, s%_W)
+	clearW(z[0:n-m])
+
+	z = normW(z)
+}
+
+// z = x >> s
+fn rshW(mut &z: []Word, x: []Word, s: uint) {
+	if s == 0 {
+		if sameW(z, x) {
+			ret
+		}
+		if !aliasW(z, x) {
+			setWW(z, x)
+			ret
+		}
+	}
+
+	m := len(x)
+	n := m - int(s/_W)
+	if n <= 0 {
+		z = z[:0]
+		ret
+	}
+	// n > 0
+
+	z = makeW(z, n)
+	shrVU(z, x[m-n:], s%_W)
+
+	z = normW(z)
+}
+
+// z = x mod 2ⁿ.
+fn truncW(mut &z: []Word, x: []Word, n: uint) {
+	w := (n + _W - 1) / _W
+	if uint(len(x)) < w {
+		setWW(z, x)
+		ret
+	}
+	z = makeW(z, int(w))
+	copy(z, x)
+	if n%_W != 0 {
+		z[len(z)-1] &= 1<<(n%_W) - 1
+	}
+	z = normW(z)
+}
+
+// z = (x - y) mod 2ⁿ.
+fn subMod2N(mut &z: []Word, mut x: []Word, mut y: []Word, n: uint) {
+	if uint(bitLenW(x)) > n {
+		if aliasW(z, x) {
+			// ok to overwrite x in place
+			truncW(x, x, n)
+		} else {
+			mut xn := []Word(nil)
+			truncW(xn, x, n)
+			x = xn
+		}
+	}
+	if uint(bitLenW(y)) > n {
+		if aliasW(z, y) {
+			// ok to overwrite y in place
+			truncW(y, y, n)
+		} else {
+			mut yn := []Word(nil)
+			truncW(yn, y, n)
+			y = yn
+		}
+	}
+	if cmpW(x, y) >= 0 {
+		subW(z, x, y)
+		ret
+	}
+	// x - y < 0; x - y mod 2ⁿ = x - y + 2ⁿ = 2ⁿ - (y - x) = 1 + 2ⁿ-1 - (y - x) = 1 + ^(y - x).
+	subW(z, y, x)
+	for uint(len(z))*_W < n {
+		z = append(z, 0)
+	}
+	for i in z {
+		z[i] = ^z[i]
+	}
+	truncW(z, z, n)
+	addW(z, z, wordOne)
+}
+
+// Sets z = |√x|
+fn sqrtW(mut &z: []Word, x: []Word) {
+	if cmpW(x, wordOne) <= 0 {
+		setWW(z, x)
+		ret
+	}
+	if aliasW(z, x) {
+		z = nil
+	}
+
+	// Start with value known to be too large and repeat "z = ⌊(z + ⌊x/z⌋)/2⌋" until it stops getting smaller.
+	// See Brent and Zimmermann, Modern Computer Arithmetic, Algorithm 1.13 (SqrtInt).
+	// https://members.loria.fr/PZimmermann/mca/pub226.html
+	// If x is one less than a perfect square, the sequence oscillates between the correct z and z+1;
+	// otherwise it converges to the correct z and stays there.
+	mut z2 := []Word(nil)
+	mut z1 := []Word(nil)
+	setWU64(z1, 1)
+	lshW(z1, z1, uint(bitLenW(x)+1)/2) // must be ≥ √x
+	mut n := 0
+	for {
+		mut r := []Word(nil)
+		divW(z2, r, x, z1)
+		addW(z2, z2, z1)
+		rshW(z2, z2, 1)
+		if cmpW(z2, z1) >= 0 {
+			// z1 is answer.
+			// Figure out whether z1 or z2 is currently aliased to z by looking at loop count.
+			if n&1 == 0 {
+				z = z1
+				ret
+			}
+			setWW(z, z1)
+			ret
+		}
+		z1, z2 = z2, z1
+		n++
+	}
+}
+
+// Computes the product of all the unsigned integers in the
+// range [a, b] inclusively. If a > b (empty range), the result is 1.
+// Sets result to z.
+fn mulRangeW(mut &z: []Word, a: u64, b: u64) {
+	match {
+	| a == 0:
+		// cut long ranges short (optimization)
+		setWU64(z, 0)
+		ret
+	| a > b:
+		setWU64(z, 1)
+		ret
+	| a == b:
+		setWU64(z, a)
+		ret
+	| a+1 == b:
+		mut aw := []Word(nil)
+		mut bw := []Word(nil)
+		setWU64(aw, a)
+		setWU64(bw, b)
+		mulW(z, aw, bw)
+		ret
+	}
+	m := a + (b-a)/2 // avoid overflow
+	mut amw := []Word(nil)
+	mulRangeW(amw, a, m) // amw = a * m
+	mulRangeW(z, m+1, b) // z = m+1 * b
+	mulW(z, amw, z)      // z = z * amw
+}

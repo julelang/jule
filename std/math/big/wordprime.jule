@@ -1,0 +1,260 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/math/rand"
+
+// Reports whether n passes reps rounds of the Miller-Rabin primality test,
+// using pseudo-randomly chosen bases. If force2 is true,
+// one of the rounds is forced to use base 2.
+// See Handbook of Applied Cryptography, p. 139, Algorithm 4.24.
+// The number n is known to be non-zero.
+fn probablyPrimeMillerRabinW(n: []Word, reps: int, force2: bool): bool {
+	mut nm1 := []Word(nil)
+	subW(nm1, n, wordOne)
+
+	// determine q, k such that nm1 = q << k
+	k := trailingZeroBitsW(nm1)
+	mut q := []Word(nil)
+	rshW(q, nm1, k)
+
+	mut nm3 := []Word(nil)
+	subW(nm3, nm1, wordTwo)
+
+	rand := rand::Rand.New(rand::NewSource(u64(n[0])))
+
+	mut x := []Word(nil)
+	mut y := []Word(nil)
+	mut quotient := []Word(nil)
+	nm3Len := bitLenW(nm3)
+
+	mut i := 0
+nextRandom:
+	for i < reps; i++ {
+		if i == reps-1 && force2 {
+			setWW(x, wordTwo)
+		} else {
+			randomW(x, rand, nm3, nm3Len)
+			addW(x, x, wordTwo)
+		}
+		expWW(y, x, q, n, false)
+		if cmpW(y, wordOne) == 0 || cmpW(y, nm1) == 0 {
+			continue
+		}
+		mut j := uint(1)
+		for j < k; j++ {
+			sqrW(y, y)
+			divW(quotient, y, y, n)
+			if cmpW(y, nm1) == 0 {
+				continue nextRandom
+			}
+			if cmpW(y, wordOne) == 0 {
+				ret false
+			}
+		}
+		ret false
+	}
+
+	ret true
+}
+
+// Reports whether n passes the "almost extra strong" Lucas probable prime test,
+// using Baillie-OEIS parameter selection. This corresponds to "AESLPSP" on Jacobsen's tables (link below).
+// The combination of this test and a Miller-Rabin/Fermat test with base 2 gives a Baillie-PSW test.
+//
+// References:
+//
+// Baillie and Wagstaff, "Lucas Pseudoprimes", Mathematics of Computation 35(152),
+// October 1980, pp. 1391-1417, especially page 1401.
+// https://www.ams.org/journals/mcom/1980-35-152/S0025-5718-1980-0583518-6/S0025-5718-1980-0583518-6.pdf
+//
+// Grantham, "Frobenius Pseudoprimes", Mathematics of Computation 70(234),
+// March 2000, pp. 873-891.
+// https://www.ams.org/journals/mcom/2001-70-234/S0025-5718-00-01197-2/S0025-5718-00-01197-2.pdf
+//
+// Baillie, "Extra strong Lucas pseudoprimes", OEIS A217719, https://oeis.org/A217719.
+//
+// Jacobsen, "Pseudoprime Statistics, Tables, and Data", http://ntheory.org/pseudoprimes.html.
+//
+// Nicely, "The Baillie-PSW Primality Test", https://web.archive.org/web/20191121062007/http://www.trnicely.net/misc/bpsw.html.
+// (Note that Nicely's definition of the "extra strong" test gives the wrong Jacobi condition,
+// as pointed out by Jacobsen.)
+//
+// Crandall and Pomerance, Prime Numbers: A Computational Perspective, 2nd ed.
+// Springer, 2005.
+fn probablyPrimeLucasW(mut n: []Word): bool {
+	// Discard 0, 1.
+	if len(n) == 0 || cmpW(n, wordOne) == 0 {
+		ret false
+	}
+	// Two is the only even prime.
+	// Already checked by caller, but here to allow testing in isolation.
+	if n[0]&1 == 0 {
+		ret cmpW(n, wordTwo) == 0
+	}
+
+	// Baillie-OEIS "method C" for choosing D, P, Q,
+	// as in https://oeis.org/A217719/a217719.txt:
+	// try increasing P ≥ 3 such that D = P² - 4 (so Q = 1)
+	// until Jacobi(D, n) = -1.
+	// The search is expected to succeed for non-square n after just a few trials.
+	// After more than expected failures, check whether n is square
+	// (which would cause Jacobi(D, n) = 1 for all D not dividing n).
+	mut p := Word(3)
+	mut d := []Word([1])
+	mut t1 := []Word(nil) // temp
+	intD := Int{abs: d}
+	intN := Int{abs: n}
+	for ; p++ {
+		if p > 10000 {
+			// This is widely believed to be impossible.
+			// If we get a report, we'll want the exact number n.
+			panic("math/big: internal error: cannot find (D/n) = -1 for " + intN.Str())
+		}
+		d[0] = p*p - 4
+		j := Int.Jacobi(intD, intN)
+		if j == -1 {
+			break
+		}
+		if j == 0 {
+			// d = p²-4 = (p-2)(p+2).
+			// If (d/n) == 0 then d shares a prime factor with n.
+			// Since the loop proceeds in increasing p and starts with p-2==1,
+			// the shared prime factor must be p+2.
+			// If p+2 == n, then n is prime; otherwise p+2 is a proper factor of n.
+			ret len(n) == 1 && n[0] == p+2
+		}
+		if p == 40 {
+			// We'll never find (d/n) = -1 if n is a square.
+			// If n is a non-square we expect to find a d in just a few attempts on average.
+			// After 40 attempts, take a moment to check if n is indeed a square.
+			sqrtW(t1, n)
+			sqrtW(t1, t1)
+			if cmpW(t1, n) == 0 {
+				ret false
+			}
+		}
+	}
+
+	// Grantham definition of "extra strong Lucas pseudoprime", after Thm 2.3 on p. 876
+	// (D, P, Q above have become Δ, b, 1):
+	//
+	// Let U_n = U_n(b, 1), V_n = V_n(b, 1), and Δ = b²-4.
+	// An extra strong Lucas pseudoprime to base b is a composite n = 2^r s + Jacobi(Δ, n),
+	// where s is odd and gcd(n, 2*Δ) = 1, such that either (i) U_s ≡ 0 mod n and V_s ≡ ±2 mod n,
+	// or (ii) V_{2^t s} ≡ 0 mod n for some 0 ≤ t < r-1.
+	//
+	// We know gcd(n, Δ) = 1 or else we'd have found Jacobi(d, n) == 0 above.
+	// We know gcd(n, 2) = 1 because n is odd.
+	//
+	// Arrange s = (n - Jacobi(Δ, n)) / 2^r = (n+1) / 2^r.
+	mut s := []Word(nil)
+	addW(s, n, wordOne)
+	r := int(trailingZeroBitsW(s))
+	rshW(s, s, uint(r))
+
+	mut nm2 := []Word(nil)
+	subW(nm2, n, wordTwo) // n-2
+
+	// We apply the "almost extra strong" test, which checks the above conditions
+	// except for U_s ≡ 0 mod n, which allows us to avoid computing any U_k values.
+	// Jacobsen points out that maybe we should just do the full extra strong test:
+	// "It is also possible to recover U_n using Crandall and Pomerance equation 3.13:
+	// U_n = D^-1 (2V_{n+1} - PV_n) allowing us to run the full extra-strong test
+	// at the cost of a single modular inversion. This computation is easy and fast in GMP,
+	// so we can get the full extra-strong test at essentially the same performance as the
+	// almost extra strong test."
+
+	// Compute Lucas sequence V_s(b, 1), where:
+	//
+	//	V(0) = 2
+	//	V(1) = P
+	//	V(k) = P V(k-1) - Q V(k-2).
+	//
+	// (Remember that due to method C above, P = b, Q = 1.)
+	//
+	// In general V(k) = α^k + β^k, where α and β are roots of x² - Px + Q.
+	// Crandall and Pomerance (p.147) observe that for 0 ≤ j ≤ k,
+	//
+	//	V(j+k) = V(j)V(k) - V(k-j).
+	//
+	// So in particular, to quickly double the subscript:
+	//
+	//	V(2k) = V(k)² - 2
+	//	V(2k+1) = V(k) V(k+1) - P
+	//
+	// We can therefore start with k=0 and build up to k=s in log₂(s) steps.
+	mut natP := []Word(nil)
+	setWV(natP, p)
+	mut vk := []Word(nil)
+	setWV(vk, 2)
+	mut vk1 := []Word(nil)
+	setWV(vk1, p)
+	mut t2 := []Word(nil) // temp
+	mut i := int(bitLenW(s))
+	for i >= 0; i-- {
+		if bitW(s, uint(i)) != 0 {
+			// k' = 2k+1
+			// V(k') = V(2k+1) = V(k) V(k+1) - P.
+			mulW(t1, vk, vk1)
+			addW(t1, t1, n)
+			subW(t1, t1, natP)
+			divW(t2, vk, t1, n)
+			// V(k'+1) = V(2k+2) = V(k+1)² - 2.
+			sqrW(t1, vk1)
+			addW(t1, t1, nm2)
+			divW(t2, vk1, t1, n)
+		} else {
+			// k' = 2k
+			// V(k'+1) = V(2k+1) = V(k) V(k+1) - P.
+			mulW(t1, vk, vk1)
+			addW(t1, t1, n)
+			subW(t1, t1, natP)
+			divW(t2, vk1, t1, n)
+			// V(k') = V(2k) = V(k)² - 2
+			sqrW(t1, vk)
+			addW(t1, t1, nm2)
+			divW(t2, vk, t1, n)
+		}
+	}
+
+	// Now k=s, so vk = V(s). Check V(s) ≡ ±2 (mod n).
+	if cmpW(vk, wordTwo) == 0 || cmpW(vk, nm2) == 0 {
+		// Check U(s) ≡ 0.
+		// As suggested by Jacobsen, apply Crandall and Pomerance equation 3.13:
+		//
+		//	U(k) = D⁻¹ (2 V(k+1) - P V(k))
+		//
+		// Since we are checking for U(k) == 0 it suffices to check 2 V(k+1) == P V(k) mod n,
+		// or P V(k) - 2 V(k+1) == 0 mod n.
+		mulW(t1, vk, natP)
+		lshW(t2, vk1, 1)
+		if cmpW(t1, t2) < 0 {
+			t1, t2 = t2, t1
+		}
+		subW(t1, t1, t2)
+		divW(t2, vk1, t1, n)
+		if len(vk1) == 0 {
+			ret true
+		}
+	}
+
+	// Check V(2^t s) ≡ 0 mod n for some 0 ≤ t < r-1.
+	mut t := 0
+	for t < r-1; t++ {
+		if len(vk) == 0 { // vk == 0
+			ret true
+		}
+		// Optimization: V(k) = 2 is a fixed point for V(k') = V(k)² - 2,
+		// so if V(k) = 2, we can stop: we will never find a future V(k) == 0.
+		if len(vk) == 1 && vk[0] == 2 { // vk == 2
+			ret false
+		}
+		// k' = 2k
+		// V(k') = V(2k) = V(k)² - 2
+		sqrW(t1, vk)
+		subW(t1, t1, wordTwo)
+		divW(t2, vk, t1, n)
+	}
+	ret false
+}
