@@ -7,7 +7,27 @@ use "std/unsafe"
 static mut intZero = Int{}
 static mut intOne = Int{abs: wordOne}
 
-// Arbitrary big integer.
+// An Int represents a signed multi-precision integer.
+// The zero value for an Int represents the value 0.
+//
+// Copying is completely safe and there is no additional allocation cost.
+// A common buffer is used within the scope of interior mutability.
+// The value returned as a result of any calculation must be independent of the
+// parameters taken or must not change it. Therefore, even a simple addition or
+// subtraction operation can realize a new internal allocation.
+// Some methods may continue to use common allocation without any changes
+// if possible, but this is not a guarantee. This implementation cares adhering to
+// Jule's mechanics, such as immutability, and keeping side effects on common buffers
+// as minimal as possible. If more control over common allocations is required at
+// the expense of ignoring that points, this implementation may not be a good choice.
+//
+// Note that methods may leak the Int's value through timing side-channels.
+// Because of this and because of the scope and complexity of the
+// implementation, Int is not well-suited to implement cryptographic operations.
+// The standard library avoids exposing non-trivial Int methods to
+// attacker-controlled inputs and the determination of whether a bug in std/math/big
+// is considered a security vulnerability might depend on the impact on the
+// standard library.
 struct Int {
 	mut abs: []Word
 	mut neg: bool
