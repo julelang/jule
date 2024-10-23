@@ -22,19 +22,19 @@ const collectionIdent = "__jule_collection"
 const collectionItIdent = "it"
 
 // Common group of semantic analysis expression model types and optimizer specific types.
-enum compExprModel: type {
-	ExprModel: sema::ExprModel,
+enum compExpr: type {
+	Expr: sema::Expr,
 	str,  // For built-in expressions.
 	&str, // For built-in expressions.
-	&opt::UnsafeBinaryExprModel,
-	&opt::UnsafeIndexingExprModel,
-	&opt::StrCompExprModel,
-	&opt::RefExprModel,
-	&opt::EmptyCompareExprModel,
-	&opt::UnsafeDerefExprModel,
-	&opt::UnsafeCastingExprModel,
-	&opt::FnCallIgnoreExceptionalExprModel,
-	&opt::StrConcatExprModel,
+	&opt::UnsafeBinaryExpr,
+	&opt::UnsafeIndexingExpr,
+	&opt::StrCompExpr,
+	&opt::RefExpr,
+	&opt::EmptyCompareExpr,
+	&opt::UnsafeDerefExpr,
+	&opt::UnsafeCastingExpr,
+	&opt::FnCallIgnoreExceptionalExpr,
+	&opt::StrConcatExpr,
 }
 
 struct exprCoder {
@@ -154,7 +154,7 @@ impl exprCoder {
 		}
 	}
 
-	fn operatorOverloadingUnary(mut &self, mut &s: &sema::StructIns, op: token::Id, mut e: compExprModel) {
+	fn operatorOverloadingUnary(mut &self, mut &s: &sema::StructIns, op: token::Id, mut e: compExpr) {
 		const Unary = true
 		mut f := obj::FindOperator(s, op, Unary)
 		if f == nil {
@@ -166,7 +166,7 @@ impl exprCoder {
 		self.oc.write(")")
 	}
 
-	fn divByZeroBinary(mut &self, &op: &token::Token, mut &l: &sema::OperandExprModel, mut &r: &sema::OperandExprModel) {
+	fn divByZeroBinary(mut &self, &op: &token::Token, mut &l: &sema::OperandExpr, mut &r: &sema::OperandExpr) {
 		const xVar = "__jule_x"
 		const yVar = "__jule_y"
 		self.oc.write("({ ")
@@ -275,7 +275,7 @@ impl exprCoder {
 		buf.WriteByte(')')!
 	}
 
-	fn unsafeBinary(mut &self, mut m: &sema::BinaryExprModel) {
+	fn unsafeBinary(mut &self, mut m: &sema::BinaryExpr) {
 		i := self.oc.Buf.Len()
 		mut oldbuf := unsafe { self.oc.Buf.Buf() }
 		self.possibleRefExpr(m.Left.Model)
@@ -287,7 +287,7 @@ impl exprCoder {
 		self._unsafeBinary(self.oc.Buf, l, r, m.Left.Type, m.Right.Type, m.Op.Id, m.Op.Kind)
 	}
 
-	fn shl(mut &self, mut &l: &sema::OperandExprModel, mut &r: &sema::OperandExprModel) {
+	fn shl(mut &self, mut &l: &sema::OperandExpr, mut &r: &sema::OperandExpr) {
 		const xVar = "__jule_x"
 		const yVar = "__jule_y"
 		self.oc.write("({ ")
@@ -315,7 +315,7 @@ impl exprCoder {
 		self.oc.write(")); })")
 	}
 
-	fn shr(mut &self, mut &l: &sema::OperandExprModel, mut &r: &sema::OperandExprModel) {
+	fn shr(mut &self, mut &l: &sema::OperandExpr, mut &r: &sema::OperandExpr) {
 		const xVar = "__jule_x"
 		const yVar = "__jule_y"
 		self.oc.write("({ ")
@@ -343,7 +343,7 @@ impl exprCoder {
 		self.oc.write(")); })")
 	}
 
-	fn binary(mut &self, mut m: &sema::BinaryExprModel) {
+	fn binary(mut &self, mut m: &sema::BinaryExpr) {
 		match m.Op.Id {
 		| token::Id.Solidus | token::Id.Percent:
 			// Do not check division safety of structures and skip if safety disabled.
@@ -387,7 +387,7 @@ impl exprCoder {
 		self.oc.tc.structureIns(self.oc.Buf, m)
 	}
 
-	fn unary(mut &self, mut m: &sema::UnaryExprModel) {
+	fn unary(mut &self, mut m: &sema::UnaryExpr) {
 		// Operator overloading.
 		if m.Expr.Type.Struct() != nil {
 			mut s := m.Expr.Type.Struct()
@@ -418,7 +418,7 @@ impl exprCoder {
 		self.oc.write("))")
 	}
 
-	fn structureLit(mut &self, mut m: &sema::StructLitExprModel) {
+	fn structureLit(mut &self, mut m: &sema::StructLitExpr) {
 		if m.Strct.Decl.Binded {
 			self.oc.write("(")
 		}
@@ -461,7 +461,7 @@ impl exprCoder {
 		self.oc.write("}")
 	}
 
-	fn allocStructure(mut &self, mut m: &sema::AllocStructLitExprModel) {
+	fn allocStructure(mut &self, mut m: &sema::AllocStructLitExpr) {
 		self.oc.write("jule::new_ptr<")
 		self.structureIns(m.Lit.Strct)
 		self.oc.write(">(")
@@ -469,7 +469,7 @@ impl exprCoder {
 		self.oc.write(")")
 	}
 
-	fn possibleRefExpr(mut &self, expr: compExprModel) {
+	fn possibleRefExpr(mut &self, expr: compExpr) {
 		match type expr {
 		| &sema::Var:
 			v := (&sema::Var)(expr)
@@ -483,7 +483,7 @@ impl exprCoder {
 		self.model(expr)
 	}
 
-	fn castTraitFromTrait(mut &self, mut &m: &sema::CastingExprModel, mut t1: &sema::Trait, mut t2: &sema::Trait) {
+	fn castTraitFromTrait(mut &self, mut &m: &sema::CastingExpr, mut t1: &sema::Trait, mut t2: &sema::Trait) {
 		self.possibleRefExpr(m.Expr.Model)
 		self.oc.write(".map(")
 		self.oc.pushAndWriteMaskMapper(t1, t2)
@@ -496,7 +496,7 @@ impl exprCoder {
 	//  - The any type castings should be came first than others.
 	//    Otherwise, code generation might be wrong because <any> the
 	//    uses special casting algorithms.
-	fn casting(mut &self, mut m: &sema::CastingExprModel) {
+	fn casting(mut &self, mut m: &sema::CastingExpr) {
 		match {
 		| obj::IsAny(m.Type):
 			if m.ExprType.IsNil() {
@@ -643,7 +643,7 @@ impl exprCoder {
 		self.oc.write(")")
 	}
 
-	fn args(mut &self, mut &m: &sema::FnCallExprModel) {
+	fn args(mut &self, mut &m: &sema::FnCallExpr) {
 		mut j := 0
 		if m.Func.Owner != nil && !m.Func.Decl.Statically ||
 			len(m.Func.Params) > 0 && m.Func.Params[0].Decl.IsSelf() {
@@ -674,13 +674,13 @@ impl exprCoder {
 		}
 	}
 
-	fn modelForCall(mut &self, mut expr: compExprModel) {
+	fn modelForCall(mut &self, mut expr: compExpr) {
 		match type expr {
 		| &sema::FnIns:
 			self.funcIns((&sema::FnIns)(expr))
 			ret
-		| &sema::StructSubIdentExprModel:
-			mut ssie := (&sema::StructSubIdentExprModel)(expr)
+		| &sema::StructSubIdentExpr:
+			mut ssie := (&sema::StructSubIdentExpr)(expr)
 			if ssie.Method != nil {
 				self.funcIns(ssie.Method)
 				ret
@@ -689,15 +689,15 @@ impl exprCoder {
 		self.possibleRefExpr(expr)
 	}
 
-	fn pushCallInf(mut &self, &m: &sema::FnCallExprModel) {
+	fn pushCallInf(mut &self, &m: &sema::FnCallExpr) {
 		if env::Production || !m.Func.Anon {
 			self.oc.write("(")
 			ret
 		}
 		if m.Func.Anon {
 			match type m.Expr {
-			| &sema::StructSubIdentExprModel:
-				if (&sema::StructSubIdentExprModel)(m.Expr).Field.Decl.Owner.Binded {
+			| &sema::StructSubIdentExpr:
+				if (&sema::StructSubIdentExpr)(m.Expr).Field.Decl.Owner.Binded {
 					self.oc.write("(")
 					ret
 				}
@@ -712,11 +712,11 @@ impl exprCoder {
 		}
 	}
 
-	fn isWrapped(mut &self, mut &m: &sema::FnCallExprModel): bool {
+	fn isWrapped(mut &self, mut &m: &sema::FnCallExpr): bool {
 		if !m.Func.IsBuiltin() && len(m.Func.Decl.Params) > 0 && m.Func.Decl.Params[0].IsSelf() {
 			match type m.Expr {
-			| &sema::StructSubIdentExprModel:
-				mut ssie := (&sema::StructSubIdentExprModel)(m.Expr)
+			| &sema::StructSubIdentExpr:
+				mut ssie := (&sema::StructSubIdentExpr)(m.Expr)
 				match {
 				| m.Func.Decl.Params[0].IsRef()
 				| ssie.Expr.Type.Sptr() != nil:
@@ -736,20 +736,20 @@ impl exprCoder {
 		ret false
 	}
 
-	fn writeReceiver(mut &self, mut m: compExprModel): (safeDeref: bool) {
+	fn writeReceiver(mut &self, mut m: compExpr): (safeDeref: bool) {
 		match type m {
-		| &sema::UnaryExprModel:
-			self.possibleRefExpr((&sema::UnaryExprModel)(m).Expr.Model)
+		| &sema::UnaryExpr:
+			self.possibleRefExpr((&sema::UnaryExpr)(m).Expr.Model)
 			ret true
-		| &opt::UnsafeDerefExprModel:
-			self.possibleRefExpr((&opt::UnsafeDerefExprModel)(m).Base.Expr.Model)
+		| &opt::UnsafeDerefExpr:
+			self.possibleRefExpr((&opt::UnsafeDerefExpr)(m).Base.Expr.Model)
 			ret false
 		|:
 			panic("cxx: implementation mistake, this panic call should be unreachable")
 		}
 	}
 
-	fn pureFuncCall(mut &self, mut &m: &sema::FnCallExprModel) {
+	fn pureFuncCall(mut &self, mut &m: &sema::FnCallExpr) {
 		wrapped := self.isWrapped(m)
 		self.modelForCall(m.Expr)
 		if !m.Func.IsBuiltin() {
@@ -779,8 +779,8 @@ impl exprCoder {
 		}
 		if !m.Func.IsBuiltin() && len(m.Func.Decl.Params) > 0 && m.Func.Decl.Params[0].IsSelf() {
 			match type m.Expr {
-			| &sema::StructSubIdentExprModel:
-				mut ssie := (&sema::StructSubIdentExprModel)(m.Expr)
+			| &sema::StructSubIdentExpr:
+				mut ssie := (&sema::StructSubIdentExpr)(m.Expr)
 				match {
 				| m.Func.Decl.Params[0].IsRef():
 					// Ignore dereferencing, use data directly to call method.
@@ -817,14 +817,14 @@ impl exprCoder {
 						self.model(ssie.Expr.Model)
 					} else {
 						// Ignore dereferencing, use data directly to call method.
-						self.possibleRefExpr((&sema::UnaryExprModel)(ssie.Expr.Model).Expr.Model)
+						self.possibleRefExpr((&sema::UnaryExpr)(ssie.Expr.Model).Expr.Model)
 					}
 				}
 				if len(m.Args) > 0 {
 					self.oc.write(", ")
 				}
-			| &sema::TraitSubIdentExprModel:
-				self.possibleRefExpr((&sema::TraitSubIdentExprModel)(m.Expr).Expr)
+			| &sema::TraitSubIdentExpr:
+				self.possibleRefExpr((&sema::TraitSubIdentExpr)(m.Expr).Expr)
 				self.oc.write(".data")
 				if len(m.Args) > 0 {
 					self.oc.write(", ")
@@ -839,7 +839,7 @@ impl exprCoder {
 		}
 	}
 
-	fn coFuncCall(mut &self, mut &m: &sema::FnCallExprModel) {
+	fn coFuncCall(mut &self, mut &m: &sema::FnCallExpr) {
 		self.oc.write("{\n")
 		self.oc.addIndent()
 		self.oc.indent()
@@ -923,7 +923,7 @@ impl exprCoder {
 			self.oc.write(";")
 			ret
 		}
-		mut tup := (&sema::TupleExprModel)(d.Model)
+		mut tup := (&sema::TupleExpr)(d.Model)
 		self.oc.tc.rc.tup(self.oc.Buf, f.Result.Tup())
 		self.oc.write("{")
 		for i, data in tup.Datas {
@@ -938,7 +938,7 @@ impl exprCoder {
 		self.oc.write("};")
 	}
 
-	fn funcCall(mut &self, mut m: &sema::FnCallExprModel, ignoreExceptional: bool) {
+	fn funcCall(mut &self, mut m: &sema::FnCallExpr, ignoreExceptional: bool) {
 		if m.IsCo {
 			// Do not check for exceptionals,
 			// exceptional functions cannot be called with co.
@@ -1021,7 +1021,7 @@ impl exprCoder {
 		self.oc.write("})")
 	}
 
-	fn slice(mut &self, mut m: &sema::SliceExprModel) {
+	fn slice(mut &self, mut m: &sema::SliceExpr) {
 		if len(m.Elems) == 0 {
 			self.oc.tc.asSlice(self.oc.Buf, m.ElemType)
 			self.oc.write("()")
@@ -1050,7 +1050,7 @@ impl exprCoder {
 		self.oc.write("; })")
 	}
 
-	fn indexing(mut &self, mut m: &sema::IndexingExprModel) {
+	fn indexing(mut &self, mut m: &sema::IndexingExpr) {
 		match type m.Expr.Model {
 		| &constant::Const:
 			// Cosntant string indexed. Use fast way, avoid making literal.
@@ -1101,7 +1101,7 @@ impl exprCoder {
 		}
 	}
 
-	fn unsafeIndexing(mut &self, mut m: &opt::UnsafeIndexingExprModel) {
+	fn unsafeIndexing(mut &self, mut m: &opt::UnsafeIndexingExpr) {
 		self.possibleRefExpr(m.Node.Expr.Model)
 		// Index access with safety measures.
 		match {
@@ -1118,7 +1118,7 @@ impl exprCoder {
 		}
 	}
 
-	fn anonFunc(mut &self, mut m: &sema::AnonFnExprModel) {
+	fn anonFunc(mut &self, mut m: &sema::AnonFnExpr) {
 		closure := obj::IsClosure(m)
 		ident := self.oc.pushAnonFn(m)
 		self.oc.write("jule::__new_closure<")
@@ -1149,7 +1149,7 @@ impl exprCoder {
 		}
 	}
 
-	fn mapExpr(mut &self, mut m: &sema::MapExprModel) {
+	fn mapExpr(mut &self, mut m: &sema::MapExpr) {
 		mut ins := obj::FindStructGenericInstance(obj::ProgramMeta.Runtime.Map, m.Kind.Key, m.Kind.Val)
 		const Static = true
 		mut maker := ins.FindMethod("make", Static).Instances[0]
@@ -1184,7 +1184,7 @@ impl exprCoder {
 		self.oc.write("; })")
 	}
 
-	fn slicing(mut &self, mut m: &sema::SlicingExprModel) {
+	fn slicing(mut &self, mut m: &sema::SlicingExpr) {
 		self.possibleRefExpr(m.Expr)
 		self.oc.write(".slice(")
 		if !env::Production {
@@ -1200,7 +1200,7 @@ impl exprCoder {
 		self.oc.write(")")
 	}
 
-	fn traitSub(mut &self, mut m: &sema::TraitSubIdentExprModel) {
+	fn traitSub(mut &self, mut m: &sema::TraitSubIdentExpr) {
 		self.oc.write("((")
 		identCoder.traitDecl(self.oc.Buf, m.Trt)
 		self.oc.write("MptrData")
@@ -1216,7 +1216,7 @@ impl exprCoder {
 		identCoder.func(self.oc.Buf, m.Method)
 	}
 
-	fn structureSub(mut &self, mut m: &sema::StructSubIdentExprModel) {
+	fn structureSub(mut &self, mut m: &sema::StructSubIdentExpr) {
 		self.possibleRefExpr(m.Expr.Model)
 		if m.Field == nil {
 			ret
@@ -1225,7 +1225,7 @@ impl exprCoder {
 		identCoder.field(self.oc.Buf, m.Field.Decl)
 	}
 
-	fn array(mut &self, mut m: &sema::ArrayExprModel) {
+	fn array(mut &self, mut m: &sema::ArrayExpr) {
 		// Plain initialization if array is zero-length or
 		// no specific expression and not able to init elements.
 		if m.Kind.N == 0 || len(m.Elems) == 0 && !ableToInit(m.Kind.Elem) {
@@ -1293,7 +1293,7 @@ impl exprCoder {
 		identCoder.funcIns(self.oc.Buf, m)
 	}
 
-	fn tuple(mut &self, mut m: &sema::TupleExprModel) {
+	fn tuple(mut &self, mut m: &sema::TupleExpr) {
 		for (i, mut d) in m.Datas {
 			self.possibleRefExpr(d.Model)
 			self.oc.write(";")
@@ -1304,7 +1304,7 @@ impl exprCoder {
 		}
 	}
 
-	fn newCall(mut &self, mut m: &sema::BuiltinNewCallExprModel) {
+	fn newCall(mut &self, mut m: &sema::BuiltinNewCallExpr) {
 		self.oc.write("jule::new_ptr<")
 		self.oc.tc.kind(self.oc.Buf, m.Type)
 		self.oc.write(">(")
@@ -1316,7 +1316,7 @@ impl exprCoder {
 		self.oc.write(")")
 	}
 
-	fn printCall(mut &self, mut m: &sema::BuiltinPrintCallExprModel) {
+	fn printCall(mut &self, mut m: &sema::BuiltinPrintCallExpr) {
 		self.oc.write("jule::print(")
 		mut f := obj::FindFnGenericInstance(obj::ProgramMeta.Runtime.ToStr, m.Expr.Type)
 		identCoder.funcIns(self.oc.Buf, f)
@@ -1325,7 +1325,7 @@ impl exprCoder {
 		self.oc.write("))")
 	}
 
-	fn printlnCall(mut &self, mut m: &sema::BuiltinPrintlnCallExprModel) {
+	fn printlnCall(mut &self, mut m: &sema::BuiltinPrintlnCallExpr) {
 		self.oc.write("jule::println(")
 		mut f := obj::FindFnGenericInstance(obj::ProgramMeta.Runtime.ToStr, m.Expr.Type)
 		identCoder.funcIns(self.oc.Buf, f)
@@ -1334,7 +1334,7 @@ impl exprCoder {
 		self.oc.write("))")
 	}
 
-	fn panicCall(mut &self, mut m: &sema::BuiltinPanicCallExprModel) {
+	fn panicCall(mut &self, mut m: &sema::BuiltinPanicCallExpr) {
 		self.oc.write("__jule_panic_s(")
 		self.possibleRefExpr(m.Expr)
 		self.oc.write(` + jule::Str("\nlocation: `)
@@ -1342,7 +1342,7 @@ impl exprCoder {
 		self.oc.write("\"));")
 	}
 
-	fn errorCall(mut &self, mut m: &sema::BuiltinErrorCallExprModel) {
+	fn errorCall(mut &self, mut m: &sema::BuiltinErrorCallExpr) {
 		self.oc.write("return ")
 		if m.Func.Decl.IsVoid() {
 			match type m.Err.Model {
@@ -1374,7 +1374,7 @@ impl exprCoder {
 		self.oc.write(")}")
 	}
 
-	fn copyCall(mut &self, mut m: &sema::BuiltinCopyCallExprModel) {
+	fn copyCall(mut &self, mut m: &sema::BuiltinCopyCallExpr) {
 		self.oc.write("jule::copy(")
 		self.possibleRefExpr(m.Dest.Model)
 		self.oc.write(", ")
@@ -1382,7 +1382,7 @@ impl exprCoder {
 		self.oc.write(")")
 	}
 
-	fn lenCall(mut &self, mut m: &sema::BuiltinLenCallExprModel) {
+	fn lenCall(mut &self, mut m: &sema::BuiltinLenCallExpr) {
 		mut _map := m.Expr.Type.Map()
 		if _map != nil {
 			mut ins := obj::FindStructGenericInstance(obj::ProgramMeta.Runtime.Map, _map.Key, _map.Val)
@@ -1398,12 +1398,12 @@ impl exprCoder {
 		self.oc.write(".len()")
 	}
 
-	fn capCall(mut &self, mut m: &sema::BuiltinCapCallExprModel) {
+	fn capCall(mut &self, mut m: &sema::BuiltinCapCallExpr) {
 		self.possibleRefExpr(m.Expr.Model)
 		self.oc.write(".cap()")
 	}
 
-	fn deleteCall(mut &self, mut m: &sema::BuiltinDeleteCallExprModel) {
+	fn deleteCall(mut &self, mut m: &sema::BuiltinDeleteCallExpr) {
 		mut _map := m.Dest.Type.Map()
 		if _map == nil {
 			panic("cxx: deleteCall: destination is not map")
@@ -1427,7 +1427,7 @@ impl exprCoder {
 		}
 	}
 
-	fn makeCallSlice(mut &self, mut &m: &sema::BuiltinMakeCallExprModel) {
+	fn makeCallSlice(mut &self, mut &m: &sema::BuiltinMakeCallExpr) {
 		mut slice := m.Type.Slc()
 		init := ableToInit(slice.Elem)
 		if init {
@@ -1451,7 +1451,7 @@ impl exprCoder {
 		self.oc.write(" " + collectionIdent + "; })")
 	}
 
-	fn makeCallStr(mut &self, mut &m: &sema::BuiltinMakeCallExprModel) {
+	fn makeCallStr(mut &self, mut &m: &sema::BuiltinMakeCallExpr) {
 		self.oc.write(typeCoder.Str)
 		self.oc.write("::alloc(")
 		self.possibleRefExpr(m.Len)
@@ -1462,7 +1462,7 @@ impl exprCoder {
 		self.oc.write(")")
 	}
 
-	fn makeCall(mut &self, mut m: &sema::BuiltinMakeCallExprModel) {
+	fn makeCall(mut &self, mut m: &sema::BuiltinMakeCallExpr) {
 		if m.Type.Slc() != nil {
 			self.makeCallSlice(m)
 			ret
@@ -1470,7 +1470,7 @@ impl exprCoder {
 		self.makeCallStr(m)
 	}
 
-	fn pushToSlice(mut &self, mut m: &opt::PushToSliceExprModel) {
+	fn pushToSlice(mut &self, mut m: &opt::PushToSliceExpr) {
 		// Use l-value advantage and define reference variable to destination
 		// in the child scope to avoid potential repeated high-cost memory access overhead.
 		const destIdent = "__jule_push_dest"
@@ -1480,9 +1480,9 @@ impl exprCoder {
 
 		mut ptr := false
 		match type m.Dest {
-		| &sema::UnaryExprModel:
+		| &sema::UnaryExpr:
 			// Use raw pointer directly if exist.
-			mut u := (&sema::UnaryExprModel)(m.Dest)
+			mut u := (&sema::UnaryExpr)(m.Dest)
 			if u.Expr.Type.Ptr() != nil {
 				self.oc.write(" *" + destIdent + " = ")
 				self.possibleRefExpr(u.Expr.Model)
@@ -1530,7 +1530,7 @@ impl exprCoder {
 		self.oc.write("}")
 	}
 
-	fn appendToSlice(mut &self, mut m: &opt::AppendToSliceExprModel) {
+	fn appendToSlice(mut &self, mut m: &opt::AppendToSliceExpr) {
 		self.oc.write("(")
 		self.possibleRefExpr(m.Dest)
 		self.oc.write(").append(")
@@ -1538,7 +1538,7 @@ impl exprCoder {
 		self.oc.write(");")
 	}
 
-	fn appendCall(mut &self, mut m: &sema::BuiltinAppendCallExprModel) {
+	fn appendCall(mut &self, mut m: &sema::BuiltinAppendCallExpr) {
 		self.oc.write("jule::append(")
 		self.possibleRefExpr(m.Dest)
 		self.oc.write(",")
@@ -1546,19 +1546,19 @@ impl exprCoder {
 		self.oc.write(")")
 	}
 
-	fn sizeof(mut &self, mut m: &sema::SizeofExprModel) {
+	fn sizeof(mut &self, mut m: &sema::SizeofExpr) {
 		self.oc.write("sizeof(")
 		self.possibleRefExpr(m.Expr)
 		self.oc.write(")")
 	}
 
-	fn alignof(mut &self, mut m: &sema::AlignofExprModel) {
+	fn alignof(mut &self, mut m: &sema::AlignofExpr) {
 		self.oc.write("alignof(")
 		self.possibleRefExpr(m.Expr)
 		self.oc.write(")")
 	}
 
-	fn runeLit(mut &self, m: &sema::RuneExprModel) {
+	fn runeLit(mut &self, m: &sema::RuneExpr) {
 		if m.Code <= 127 { // ASCII.
 			self.oc.Buf.WriteByte('\'')!
 			mut b := sbtoa(byte(m.Code))
@@ -1572,11 +1572,11 @@ impl exprCoder {
 		itoa(self.oc.Buf, i64(m.Code))
 	}
 
-	fn structureStatic(mut &self, mut m: &sema::StructStaticIdentExprModel) {
+	fn structureStatic(mut &self, mut m: &sema::StructStaticIdentExpr) {
 		identCoder.funcIns(self.oc.Buf, m.Method)
 	}
 
-	fn backendEmit(mut &self, mut m: &sema::BackendEmitExprModel) {
+	fn backendEmit(mut &self, mut m: &sema::BackendEmitExpr) {
 		if len(m.Exprs) == 0 {
 			self.oc.write(m.Code)
 			ret
@@ -1592,7 +1592,7 @@ impl exprCoder {
 		self.oc.write(fmt::Format(m.Code, args...))
 	}
 
-	fn free(mut &self, mut m: &sema::FreeExprModel) {
+	fn free(mut &self, mut m: &sema::FreeExpr) {
 		self.possibleRefExpr(m.Expr)
 		if env::RC {
 			self.oc.write(".dealloc()")
@@ -1601,7 +1601,7 @@ impl exprCoder {
 		self.oc.write(".__free()")
 	}
 
-	fn strComp(mut &self, mut m: &opt::StrCompExprModel) {
+	fn strComp(mut &self, mut m: &opt::StrCompExpr) {
 		if m.NotEq {
 			self.oc.write("(!")
 		}
@@ -1617,7 +1617,7 @@ impl exprCoder {
 		}
 	}
 
-	fn emptyCompare(mut &self, mut m: &opt::EmptyCompareExprModel) {
+	fn emptyCompare(mut &self, mut m: &opt::EmptyCompareExpr) {
 		if m.Neg {
 			self.oc.write("!")
 		}
@@ -1626,7 +1626,7 @@ impl exprCoder {
 		self.oc.write(").empty()")
 	}
 
-	fn unsafeDeref(mut &self, mut m: &opt::UnsafeDerefExprModel) {
+	fn unsafeDeref(mut &self, mut m: &opt::UnsafeDerefExpr) {
 		match {
 		| m.Base.Expr.Type.Sptr() != nil:
 			self.oc.write("(*")
@@ -1637,7 +1637,7 @@ impl exprCoder {
 		}
 	}
 
-	fn unsafeCasting(mut &self, mut m: &opt::UnsafeCastingExprModel) {
+	fn unsafeCasting(mut &self, mut m: &opt::UnsafeCastingExpr) {
 		match {
 		| obj::IsAny(m.Base.ExprType):
 			self.possibleRefExpr(m.Base.Expr.Model)
@@ -1654,7 +1654,7 @@ impl exprCoder {
 		}
 	}
 
-	fn strConcat(mut &self, mut m: &opt::StrConcatExprModel) {
+	fn strConcat(mut &self, mut m: &opt::StrConcatExpr) {
 		self.oc.write("({ " + typeCoder.Int + " size = 0; ")
 		for i, p in m.Parts {
 			ident := "part" + conv::Itoa(i)
@@ -1676,7 +1676,7 @@ impl exprCoder {
 		self.oc.write(typeCoder.Str + " result; result._len = buf._len; result.buffer = std::move(buf.data); result._slice = buf._slice; std::move(result); })")
 	}
 
-	fn model(mut &self, mut m: compExprModel) {
+	fn model(mut &self, mut m: compExpr) {
 		match type m {
 		| str:
 			self.oc.write(str(m))
@@ -1692,88 +1692,88 @@ impl exprCoder {
 			self.structureIns((&sema::StructIns)(m))
 		| &sema::FnIns:
 			self.funcInsCommon((&sema::FnIns)(m))
-		| &opt::UnsafeBinaryExprModel:
-			self.unsafeBinary((&opt::UnsafeBinaryExprModel)(m).Node)
-		| &sema::BinaryExprModel:
-			self.binary((&sema::BinaryExprModel)(m))
-		| &sema::UnaryExprModel:
-			self.unary((&sema::UnaryExprModel)(m))
-		| &sema::StructLitExprModel:
-			self.structureLit((&sema::StructLitExprModel)(m))
-		| &sema::AllocStructLitExprModel:
-			self.allocStructure((&sema::AllocStructLitExprModel)(m))
-		| &sema::CastingExprModel:
-			self.casting((&sema::CastingExprModel)(m))
-		| &sema::FnCallExprModel:
-			self.funcCall((&sema::FnCallExprModel)(m), false)
-		| &sema::SliceExprModel:
-			self.slice((&sema::SliceExprModel)(m))
-		| &sema::ArrayExprModel:
-			self.array((&sema::ArrayExprModel)(m))
-		| &opt::UnsafeIndexingExprModel:
-			self.unsafeIndexing((&opt::UnsafeIndexingExprModel)(m))
-		| &sema::IndexingExprModel:
-			self.indexing((&sema::IndexingExprModel)(m))
-		| &sema::AnonFnExprModel:
-			self.anonFunc((&sema::AnonFnExprModel)(m))
-		| &sema::MapExprModel:
-			self.mapExpr((&sema::MapExprModel)(m))
-		| &sema::SlicingExprModel:
-			self.slicing((&sema::SlicingExprModel)(m))
-		| &sema::TraitSubIdentExprModel:
-			self.traitSub((&sema::TraitSubIdentExprModel)(m))
-		| &sema::StructSubIdentExprModel:
-			self.structureSub((&sema::StructSubIdentExprModel)(m))
-		| &sema::TupleExprModel:
-			self.tuple((&sema::TupleExprModel)(m))
-		| &sema::BuiltinPrintCallExprModel:
-			self.printCall((&sema::BuiltinPrintCallExprModel)(m))
-		| &sema::BuiltinPrintlnCallExprModel:
-			self.printlnCall((&sema::BuiltinPrintlnCallExprModel)(m))
-		| &sema::BuiltinNewCallExprModel:
-			self.newCall((&sema::BuiltinNewCallExprModel)(m))
-		| &sema::BuiltinPanicCallExprModel:
-			self.panicCall((&sema::BuiltinPanicCallExprModel)(m))
-		| &sema::BuiltinErrorCallExprModel:
-			self.errorCall((&sema::BuiltinErrorCallExprModel)(m))
-		| &sema::BuiltinMakeCallExprModel:
-			self.makeCall((&sema::BuiltinMakeCallExprModel)(m))
-		| &sema::BuiltinAppendCallExprModel:
-			self.appendCall((&sema::BuiltinAppendCallExprModel)(m))
-		| &sema::BuiltinCopyCallExprModel:
-			self.copyCall((&sema::BuiltinCopyCallExprModel)(m))
-		| &sema::BuiltinLenCallExprModel:
-			self.lenCall((&sema::BuiltinLenCallExprModel)(m))
-		| &sema::BuiltinCapCallExprModel:
-			self.capCall((&sema::BuiltinCapCallExprModel)(m))
-		| &sema::BuiltinDeleteCallExprModel:
-			self.deleteCall((&sema::BuiltinDeleteCallExprModel)(m))
-		| &sema::SizeofExprModel:
-			self.sizeof((&sema::SizeofExprModel)(m))
-		| &sema::AlignofExprModel:
-			self.alignof((&sema::AlignofExprModel)(m))
-		| &sema::RuneExprModel:
-			self.runeLit((&sema::RuneExprModel)(m))
-		| &sema::StructStaticIdentExprModel:
-			self.structureStatic((&sema::StructStaticIdentExprModel)(m))
-		| &sema::BackendEmitExprModel:
-			self.backendEmit((&sema::BackendEmitExprModel)(m))
-		| &sema::FreeExprModel:
-			self.free((&sema::FreeExprModel)(m))
-		| &opt::StrCompExprModel:
-			self.strComp((&opt::StrCompExprModel)(m))
-		| &opt::RefExprModel:
-			self.var((&opt::RefExprModel)(m).Var)
-		| &opt::EmptyCompareExprModel:
-			self.emptyCompare((&opt::EmptyCompareExprModel)(m))
-		| &opt::UnsafeDerefExprModel:
-			self.unsafeDeref((&opt::UnsafeDerefExprModel)(m))
-		| &opt::UnsafeCastingExprModel:
-			self.unsafeCasting((&opt::UnsafeCastingExprModel)(m))
-		| &opt::FnCallIgnoreExceptionalExprModel:
-			self.funcCall((&opt::FnCallIgnoreExceptionalExprModel)(m).Base, true)
-		| &opt::StrConcatExprModel:
-			self.strConcat((&opt::StrConcatExprModel)(m))
+		| &opt::UnsafeBinaryExpr:
+			self.unsafeBinary((&opt::UnsafeBinaryExpr)(m).Node)
+		| &sema::BinaryExpr:
+			self.binary((&sema::BinaryExpr)(m))
+		| &sema::UnaryExpr:
+			self.unary((&sema::UnaryExpr)(m))
+		| &sema::StructLitExpr:
+			self.structureLit((&sema::StructLitExpr)(m))
+		| &sema::AllocStructLitExpr:
+			self.allocStructure((&sema::AllocStructLitExpr)(m))
+		| &sema::CastingExpr:
+			self.casting((&sema::CastingExpr)(m))
+		| &sema::FnCallExpr:
+			self.funcCall((&sema::FnCallExpr)(m), false)
+		| &sema::SliceExpr:
+			self.slice((&sema::SliceExpr)(m))
+		| &sema::ArrayExpr:
+			self.array((&sema::ArrayExpr)(m))
+		| &opt::UnsafeIndexingExpr:
+			self.unsafeIndexing((&opt::UnsafeIndexingExpr)(m))
+		| &sema::IndexingExpr:
+			self.indexing((&sema::IndexingExpr)(m))
+		| &sema::AnonFnExpr:
+			self.anonFunc((&sema::AnonFnExpr)(m))
+		| &sema::MapExpr:
+			self.mapExpr((&sema::MapExpr)(m))
+		| &sema::SlicingExpr:
+			self.slicing((&sema::SlicingExpr)(m))
+		| &sema::TraitSubIdentExpr:
+			self.traitSub((&sema::TraitSubIdentExpr)(m))
+		| &sema::StructSubIdentExpr:
+			self.structureSub((&sema::StructSubIdentExpr)(m))
+		| &sema::TupleExpr:
+			self.tuple((&sema::TupleExpr)(m))
+		| &sema::BuiltinPrintCallExpr:
+			self.printCall((&sema::BuiltinPrintCallExpr)(m))
+		| &sema::BuiltinPrintlnCallExpr:
+			self.printlnCall((&sema::BuiltinPrintlnCallExpr)(m))
+		| &sema::BuiltinNewCallExpr:
+			self.newCall((&sema::BuiltinNewCallExpr)(m))
+		| &sema::BuiltinPanicCallExpr:
+			self.panicCall((&sema::BuiltinPanicCallExpr)(m))
+		| &sema::BuiltinErrorCallExpr:
+			self.errorCall((&sema::BuiltinErrorCallExpr)(m))
+		| &sema::BuiltinMakeCallExpr:
+			self.makeCall((&sema::BuiltinMakeCallExpr)(m))
+		| &sema::BuiltinAppendCallExpr:
+			self.appendCall((&sema::BuiltinAppendCallExpr)(m))
+		| &sema::BuiltinCopyCallExpr:
+			self.copyCall((&sema::BuiltinCopyCallExpr)(m))
+		| &sema::BuiltinLenCallExpr:
+			self.lenCall((&sema::BuiltinLenCallExpr)(m))
+		| &sema::BuiltinCapCallExpr:
+			self.capCall((&sema::BuiltinCapCallExpr)(m))
+		| &sema::BuiltinDeleteCallExpr:
+			self.deleteCall((&sema::BuiltinDeleteCallExpr)(m))
+		| &sema::SizeofExpr:
+			self.sizeof((&sema::SizeofExpr)(m))
+		| &sema::AlignofExpr:
+			self.alignof((&sema::AlignofExpr)(m))
+		| &sema::RuneExpr:
+			self.runeLit((&sema::RuneExpr)(m))
+		| &sema::StructStaticIdentExpr:
+			self.structureStatic((&sema::StructStaticIdentExpr)(m))
+		| &sema::BackendEmitExpr:
+			self.backendEmit((&sema::BackendEmitExpr)(m))
+		| &sema::FreeExpr:
+			self.free((&sema::FreeExpr)(m))
+		| &opt::StrCompExpr:
+			self.strComp((&opt::StrCompExpr)(m))
+		| &opt::RefExpr:
+			self.var((&opt::RefExpr)(m).Var)
+		| &opt::EmptyCompareExpr:
+			self.emptyCompare((&opt::EmptyCompareExpr)(m))
+		| &opt::UnsafeDerefExpr:
+			self.unsafeDeref((&opt::UnsafeDerefExpr)(m))
+		| &opt::UnsafeCastingExpr:
+			self.unsafeCasting((&opt::UnsafeCastingExpr)(m))
+		| &opt::FnCallIgnoreExceptionalExpr:
+			self.funcCall((&opt::FnCallIgnoreExceptionalExpr)(m).Base, true)
+		| &opt::StrConcatExpr:
+			self.strConcat((&opt::StrConcatExpr)(m))
 		|:
 			self.oc.write("<unimplemented_expression_model>")
 		}

@@ -26,7 +26,7 @@ struct Data {
 	Reference: bool
 	Lvalue:    bool
 	IsRune:    bool
-	Model:     ExprModel
+	Model:     Expr
 
 	// True if kind is declaration such as:
 	//  - &Enum
@@ -190,7 +190,7 @@ impl eval {
 			data.Type = primI32 // Rune
 		}
 
-		data.Model = &RuneExprModel{Code: r}
+		data.Model = &RuneExpr{Code: r}
 		data.Mutable = true
 		data.IsRune = true
 		data.untyped = true
@@ -805,13 +805,13 @@ impl eval {
 			}
 		}
 
-		mut model := &ArrayExprModel{
+		mut model := &ArrayExpr{
 			Kind: arr,
 		}
 		if filled {
-			model.Elems = make([]ExprModel, 0, 2)
+			model.Elems = make([]Expr, 0, 2)
 		} else {
-			model.Elems = make([]ExprModel, 0, len(s.Exprs))
+			model.Elems = make([]Expr, 0, len(s.Exprs))
 		}
 
 		mut prefix := self.prefix
@@ -843,15 +843,15 @@ impl eval {
 		}
 	}
 
-	fn evalExpSlc(mut &self, mut s: &ast::SliceExpr, mut t: &Type, mut first: ExprModel): &Data {
+	fn evalExpSlc(mut &self, mut s: &ast::SliceExpr, mut t: &Type, mut first: Expr): &Data {
 		mut slc := &Slc{
 			Elem: t,
 		}
 
 		mut i := 0
-		mut model := &SliceExprModel{
+		mut model := &SliceExpr{
 			ElemType: t,
-			Elems: make([]ExprModel, 0, len(s.Exprs)),
+			Elems: make([]Expr, 0, len(s.Exprs)),
 		}
 		if first != nil {
 			model.Elems = append(model.Elems, first)
@@ -967,8 +967,8 @@ impl eval {
 			ret
 		}
 		match type d.Model {
-		| &SliceExprModel:
-			mut m := (&SliceExprModel)(d.Model)
+		| &SliceExpr:
+			mut m := (&SliceExpr)(d.Model)
 			indx := index.Constant.AsF64()
 			if indx >= f64(len(m.Elems)) {
 				self.pushErr(i.Token, build::LogMsg.OverflowLimits)
@@ -1201,7 +1201,7 @@ impl eval {
 
 	// Checks new generics function instance.
 	// If instance is already exist, f will point to exist instantantiation.
-	fn checkGenericFn(mut &self, mut &f: &FnIns, mut &et: &token::Token, mut &model: ExprModel): (ok: bool, exist: bool) {
+	fn checkGenericFn(mut &self, mut &f: &FnIns, mut &et: &token::Token, mut &model: Expr): (ok: bool, exist: bool) {
 		mut old := f
 		ok, exist = self.s.checkGenericFn(f, et)
 		if ok && exist {
@@ -1303,7 +1303,7 @@ impl eval {
 		} else if d.Decl {
 			d.Decl = false
 		} else {
-			d.Model = &IndexingExprModel{
+			d.Model = &IndexingExpr{
 				Token: i.Token,
 				Expr: new(Data, oldData),
 				Index: index,
@@ -1449,7 +1449,7 @@ impl eval {
 		} else if d.Decl {
 			d.Decl = false
 		} else {
-			mut model := &SlicingExprModel{
+			mut model := &SlicingExpr{
 				Token: s.Token,
 				Expr: d.Model,
 				Left: l.Model,
@@ -1551,9 +1551,9 @@ impl eval {
 			match {
 			| prim.IsU8():
 				s := c.ReadStr()
-				mut model := &SliceExprModel{
+				mut model := &SliceExpr{
 					ElemType: t,
-					Elems: make([]ExprModel, 0, len(s)),
+					Elems: make([]Expr, 0, len(s)),
 				}
 				for _, b in s {
 					mut bc := constant::Const.NewU64(u64(b))
@@ -1564,9 +1564,9 @@ impl eval {
 				d.Decl = true // Prevent model changing.
 			| prim.IsI32():
 				runes := []rune(c.ReadStr())
-				mut model := &SliceExprModel{
+				mut model := &SliceExpr{
 					ElemType: t,
-					Elems: make([]ExprModel, 0, len(runes)),
+					Elems: make([]Expr, 0, len(runes)),
 				}
 				for _, r in runes {
 					mut rc := constant::Const.NewI64(i64(r))
@@ -1812,7 +1812,7 @@ impl eval {
 
 		if !d.Decl && (d.Type.Enum() == nil || !d.Type.Enum().TypeSym.Type.Equal(t)) {
 			applyCastKind(self.s, d, t, errorToken, self.getOwnerRefers())
-			(&CastingExprModel)(d.Model).Token = errorToken
+			(&CastingExpr)(d.Model).Token = errorToken
 		} else {
 			d.Type = t
 		}
@@ -1905,7 +1905,7 @@ impl eval {
 			Type: &Type{
 				Kind: s,
 			},
-			Model: &StructLitExprModel{
+			Model: &StructLitExpr{
 				Strct: s,
 				Args: slc.args,
 			},
@@ -1938,7 +1938,7 @@ impl eval {
 	eval:
 		mut d := self.evalStructLitExplicit(s, lit.Exprs, lit.Kind.Token)
 		if t.Type.Sptr() != nil {
-			mut model := (&StructLitExprModel)(d.Model)
+			mut model := (&StructLitExpr)(d.Model)
 			makeStructLitAlloc(d, model)
 		}
 		ret d
@@ -2023,7 +2023,7 @@ impl eval {
 		let mut csc: &scopeChecker = nil
 		let mut ch: &Scope = nil
 
-		mut model := (&FnCallExprModel)(d.Model)
+		mut model := (&FnCallExpr)(d.Model)
 
 		// self.lookup is always scopeChecker because exceptionals are
 		// not allowed in global scope.
@@ -2157,7 +2157,7 @@ impl eval {
 			d.Lvalue = false
 		}
 
-		mut model := &FnCallExprModel{
+		mut model := &FnCallExpr{
 			Token: fc.Token,
 			Func: f,
 			Expr: callModel,
@@ -2273,7 +2273,7 @@ impl eval {
 			mut ins := method.instance()
 			ins.Owner = s
 			self.pushReference[&FnIns](ins)
-			d.Model = &StructStaticIdentExprModel{
+			d.Model = &StructStaticIdentExpr{
 				Structure: s,
 				Expr: d.Model,
 				Method: ins,
@@ -2304,7 +2304,7 @@ impl eval {
 			Type: &Type{
 				Kind: f.instance(),
 			},
-			Model: &TraitSubIdentExprModel{
+			Model: &TraitSubIdentExpr{
 				Token: ident,
 				Expr: d.Model,
 				Method: f,
@@ -2316,7 +2316,7 @@ impl eval {
 	// This method evaluates expressions, will not check public availability.
 	// The tok parameter should be identifier to accessed.
 	fn evalStructSubIdentField(mut self, mut &d: &Data, mut &s: &StructIns, mut &tok: &token::Token, mut &f: &FieldIns): &Data {
-		mut model := &StructSubIdentExprModel{
+		mut model := &StructSubIdentExpr{
 			Token: tok,
 			Expr: new(Data, *d),
 			Field: f,
@@ -2351,7 +2351,7 @@ impl eval {
 		ins.Owner = s
 		self.pushReference[&FnIns](ins)
 		mut model := new(Data, *d)
-		d.Model = &StructSubIdentExprModel{
+		d.Model = &StructSubIdentExpr{
 			Token: tok,
 			Expr: model,
 			Method: ins,
@@ -2847,7 +2847,7 @@ impl eval {
 		mut tupT := new(Tuple)
 		tupT.Types = make([]&Type, 0, len(tup.Expr))
 
-		mut model := &TupleExprModel{
+		mut model := &TupleExpr{
 			Datas: make([]&Data, 0, len(tup.Expr)),
 		}
 
@@ -2879,7 +2879,7 @@ impl eval {
 	}
 
 	fn evalMap(mut &self, mut m: &Map, mut lit: &ast::BraceLit): &Data {
-		mut model := &MapExprModel{
+		mut model := &MapExpr{
 			Kind: m,
 		}
 
@@ -2913,7 +2913,7 @@ impl eval {
 				_ = self.s.checkAssignType(destIsRef, m.Val, val, pair.Val.Token, self.getOwnerRefers())
 			}
 
-			model.Entries = append(model.Entries, &KeyValPairExprModel{
+			model.Entries = append(model.Entries, &KeyValPairExpr{
 				Key: key.Model,
 				Val: val.Model,
 			})
@@ -2971,7 +2971,7 @@ impl eval {
 
 		ret &Data{
 			Type: &Type{Kind: ins},
-			Model: &AnonFnExprModel{
+			Model: &AnonFnExpr{
 				Captured: captured,
 				Func: ins,
 				Global: self.isGlobal(),
@@ -3184,7 +3184,7 @@ impl unaryEval {
 			ret
 		}
 
-		self.d.Model = &UnaryExprModel{
+		self.d.Model = &UnaryExpr{
 			Expr: new(Data, *self.d),
 			Op: self.u.Op,
 		}
@@ -3229,7 +3229,7 @@ impl unaryEval {
 			ret
 		}
 
-		self.d.Model = &UnaryExprModel{
+		self.d.Model = &UnaryExpr{
 			Expr: new(Data, *self.d),
 			Op: self.u.Op,
 		}
@@ -3299,7 +3299,7 @@ impl unaryEval {
 			ret
 		}
 
-		self.d.Model = &UnaryExprModel{
+		self.d.Model = &UnaryExpr{
 			Expr: new(Data, *self.d),
 			Op: self.u.Op,
 		}
@@ -3327,14 +3327,14 @@ impl unaryEval {
 			ret
 		}
 
-		self.d.Model = &UnaryExprModel{
+		self.d.Model = &UnaryExpr{
 			Expr: new(Data, *self.d),
 			Op: self.u.Op,
 		}
 	}
 
 	fn star(mut self) {
-		self.d.Model = &UnaryExprModel{
+		self.d.Model = &UnaryExpr{
 			Expr: new(Data, *self.d),
 			Op: self.u.Op,
 		}
@@ -3366,8 +3366,8 @@ impl unaryEval {
 
 	fn amper(mut self) {
 		match type self.d.Model {
-		| &StructLitExprModel:
-			mut lit := (&StructLitExprModel)(self.d.Model)
+		| &StructLitExpr:
+			mut lit := (&StructLitExpr)(self.d.Model)
 			makeStructLitAlloc(self.d, lit)
 		|:
 			match {
@@ -3375,7 +3375,7 @@ impl unaryEval {
 				self.d.Type = &Type{
 					Kind: &Ptr{Elem: self.d.Type},
 				}
-				self.d.Model = &UnaryExprModel{
+				self.d.Model = &UnaryExpr{
 					Expr: new(Data, *self.d),
 					Op: self.u.Op,
 				}
@@ -4297,12 +4297,12 @@ impl binaryEval {
 			l, r = r, l
 		}
 
-		d.Model = &BinaryExprModel{
-			Left: &OperandExprModel{
+		d.Model = &BinaryExpr{
+			Left: &OperandExpr{
 				Type: l.Type,
 				Model: l.Model,
 			},
-			Right: &OperandExprModel{
+			Right: &OperandExpr{
 				Type: r.Type,
 				Model: r.Model,
 			},
@@ -4416,13 +4416,13 @@ fn fitBitsize(mut &d: &Data) {
 	}
 }
 
-fn makeStructLitAlloc(mut &d: &Data, mut &lit: &StructLitExprModel) {
+fn makeStructLitAlloc(mut &d: &Data, mut &lit: &StructLitExpr) {
 	d.Type = &Type{
 		Kind: &Sptr{
 			Elem: &Type{Kind: lit.Strct},
 		},
 	}
-	d.Model = &AllocStructLitExprModel{
+	d.Model = &AllocStructLitExpr{
 		Lit: lit,
 	}
 }
@@ -4517,7 +4517,7 @@ fn applyRuntimeToStr(mut &s: &sema, mut &from: &Type, mut &to: &Type,
 fn applyCastKindModel(mut &s: &sema, mut &d: &Data, mut &t: &Type,
 	mut &token: &token::Token, mut refers: &ReferenceStack) {
 	applyRuntimeToStr(s, d.Type, t, token, refers)
-	d.Model = &CastingExprModel{
+	d.Model = &CastingExpr{
 		Token: token,
 		Expr: new(Data, *d),
 		Type: t,
@@ -4605,14 +4605,14 @@ fn castConstByType(&t: str, mut &d: &Data) {
 	}
 }
 
-fn updateModelToGenericIns(mut &m: ExprModel, mut &f: &FnIns) {
+fn updateModelToGenericIns(mut &m: Expr, mut &f: &FnIns) {
 	match type m {
 	| &FnIns:
 		m = f
-	| &StructSubIdentExprModel:
-		(&StructSubIdentExprModel)(m).Method = f
-	| &StructStaticIdentExprModel:
-		(&StructStaticIdentExprModel)(m).Method = f
+	| &StructSubIdentExpr:
+		(&StructSubIdentExpr)(m).Method = f
+	| &StructStaticIdentExpr:
+		(&StructStaticIdentExpr)(m).Method = f
 	}
 }
 
@@ -4668,17 +4668,17 @@ fn evalEnumStatic(mut &s: &sema, mut &enm: &Enum, mut &item: &EnumItem,
 // Reports whether expression model is literal-based.
 // Works for literals, sub-idents and castings.
 // Returns nil if not, otherwise returns the literal model.
-fn isLitBased(mut &m: ExprModel): &StructLitExprModel {
+fn isLitBased(mut &m: Expr): &StructLitExpr {
 	match type m {
-	| &StructLitExprModel:
-		ret (&StructLitExprModel)(m)
-	| &AllocStructLitExprModel:
-		ret (&AllocStructLitExprModel)(m).Lit
-	| &StructSubIdentExprModel:
-		mut ssi := (&StructSubIdentExprModel)(m)
+	| &StructLitExpr:
+		ret (&StructLitExpr)(m)
+	| &AllocStructLitExpr:
+		ret (&AllocStructLitExpr)(m).Lit
+	| &StructSubIdentExpr:
+		mut ssi := (&StructSubIdentExpr)(m)
 		ret isLitBased(ssi.Expr.Model)
-	| &CastingExprModel:
-		mut c := (&CastingExprModel)(m)
+	| &CastingExpr:
+		mut c := (&CastingExpr)(m)
 		ret isLitBased(c.Expr.Model)
 	|:
 		ret nil
@@ -4686,7 +4686,7 @@ fn isLitBased(mut &m: ExprModel): &StructLitExprModel {
 }
 
 fn makeImplicitDeref(mut &d: &Data, mut baseToken: &token::Token) {
-	mut unary := &UnaryExprModel{
+	mut unary := &UnaryExpr{
 		Expr: new(Data, *d),
 		Op: new(token::Token, *baseToken),
 	}

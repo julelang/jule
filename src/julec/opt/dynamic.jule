@@ -73,7 +73,7 @@ impl dynamic {
 	}
 }
 
-fn possibleDynamicRemove(mut &d: &dynamic, m: sema::ExprModel) {
+fn possibleDynamicRemove(mut &d: &dynamic, m: sema::Expr) {
 	if d != nil {
 		_ = d.removeVar(getDynamicVar(m))
 	}
@@ -81,7 +81,7 @@ fn possibleDynamicRemove(mut &d: &dynamic, m: sema::ExprModel) {
 
 fn isDynamicValidType(mut t: &sema::Type): bool { ret obj::IsAny(t) }
 
-fn isTypeGuaranteedDynamicData(mut &dy: &dynamic, mut t: &sema::Type, mut m: sema::ExprModel): &sema::Type {
+fn isTypeGuaranteedDynamicData(mut &dy: &dynamic, mut t: &sema::Type, mut m: sema::Expr): &sema::Type {
 	if t.IsNil() {
 		ret nil
 	}
@@ -93,8 +93,8 @@ fn isTypeGuaranteedDynamicData(mut &dy: &dynamic, mut t: &sema::Type, mut m: sem
 		ret nil
 	}
 	match type m {
-	| &sema::CastingExprModel:
-		mut cem := (&sema::CastingExprModel)(m)
+	| &sema::CastingExpr:
+		mut cem := (&sema::CastingExpr)(m)
 		ret isTypeGuaranteedDynamicData(dy, cem.ExprType, cem.Expr.Model)
 	}
 	var := getDynamicVar(m)
@@ -109,7 +109,7 @@ fn isTypeGuaranteedDynamicData(mut &dy: &dynamic, mut t: &sema::Type, mut m: sem
 	ret nil
 }
 
-fn getDynamicVar(m: sema::ExprModel): uintptr {
+fn getDynamicVar(m: sema::Expr): uintptr {
 	if !Dynamic {
 		ret invalidDynamic
 	}
@@ -123,10 +123,10 @@ fn getDynamicVar(m: sema::ExprModel): uintptr {
 		// Variable is reference, it should be initialized at source code.
 		// Investigate the initial expression for variable address.
 		ret getDynamicVar(v.Value.Data.Model)
-	| &sema::StructSubIdentExprModel:
-		ret uintptr((&sema::StructSubIdentExprModel)(m).Field)
-	| &sema::UnaryExprModel:
-		uem := (&sema::UnaryExprModel)(m)
+	| &sema::StructSubIdentExpr:
+		ret uintptr((&sema::StructSubIdentExpr)(m).Field)
+	| &sema::UnaryExpr:
+		uem := (&sema::UnaryExpr)(m)
 		if uem.Op.Id == token::Id.Star { // Dereferencing.
 			ret getDynamicVar(uem.Expr.Model)
 		}

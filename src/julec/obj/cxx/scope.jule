@@ -21,11 +21,11 @@ static assignArgName = "__jule_assign_arg"
 // Common group of semantic analysis stmt types and optimizer specific types.
 enum compStmt: type {
 	Stmt: sema::Stmt,
-	&opt::PushToSliceExprModel,
-	&opt::AppendToSliceExprModel,
-	&opt::MutSlicingExprModel,
-	&opt::SwapExprModel,
-	&opt::ExceptionalForwardingExprModel,
+	&opt::PushToSliceExpr,
+	&opt::AppendToSliceExpr,
+	&opt::MutSlicingExpr,
+	&opt::SwapExpr,
+	&opt::ExceptionalForwardingExpr,
 	&opt::StrRuneIter,
 }
 
@@ -470,10 +470,10 @@ impl scopeCoder {
 		self.oc.write(p.Op)
 	}
 
-	fn assignLeft(mut &self, mut &model: sema::ExprModel) {
+	fn assignLeft(mut &self, mut &model: sema::Expr) {
 		match type model {
-		| &sema::IndexingExprModel:
-			mut iem := (&sema::IndexingExprModel)(model)
+		| &sema::IndexingExpr:
+			mut iem := (&sema::IndexingExpr)(model)
 			_map := iem.Expr.Type.Map()
 			if _map == nil {
 				break
@@ -519,8 +519,8 @@ impl scopeCoder {
 		self.oc.ec.divByZeroBinary(a.Op, a.Left, a.Right)
 	}
 
-	fn operatorOverloadingAssign(mut &self, mut &s: &sema::StructIns, mut &l: &sema::OperandExprModel,
-		mut &r: &sema::OperandExprModel, op: token::Id) {
+	fn operatorOverloadingAssign(mut &self, mut &s: &sema::StructIns, mut &l: &sema::OperandExpr,
+		mut &r: &sema::OperandExpr, op: token::Id) {
 		const Unary = false
 		mut f := obj::FindOperator(s, op, Unary)
 		if f == nil {
@@ -580,7 +580,7 @@ impl scopeCoder {
 
 	fn mapLookupAssign(mut &self, mut &a: &sema::MultiAssign) {
 		// map lookup right expression always should be indexing
-		mut iem := (&sema::IndexingExprModel)(a.Right)
+		mut iem := (&sema::IndexingExpr)(a.Right)
 		mut _map := iem.Expr.Type.Map()
 
 		mut ins := obj::FindStructGenericInstance(obj::ProgramMeta.Runtime.Map, _map.Key, _map.Val)
@@ -620,7 +620,7 @@ impl scopeCoder {
 		// therefore do not generate temporary variable for references
 		// they should take pointer from the tuple data
 
-		mut tup := (&sema::TupleExprModel)(a.Right)
+		mut tup := (&sema::TupleExpr)(a.Right)
 
 		for (i, mut r) in tup.Datas {
 			self.oc.indent()
@@ -685,7 +685,7 @@ impl scopeCoder {
 		self.oc.addIndent()
 		self.oc.indent()
 
-		mut f := (&sema::FnCallExprModel)(a.Right)
+		mut f := (&sema::FnCallExpr)(a.Right)
 		self.oc.tc.rc.codeMut1(self.oc.Buf, f.Func.Result)
 		self.oc.write(" " + assignResultName + " = ")
 		self.oc.ec.possibleRefExpr(a.Right)
@@ -750,15 +750,15 @@ impl scopeCoder {
 
 		// Special cases.
 		match type a.Right {
-		| &sema::IndexingExprModel: // Map lookup.
+		| &sema::IndexingExpr: // Map lookup.
 			self.mapLookupAssign(a)
 			ret
 		}
 
 		match type a.Right {
-		| &sema::TupleExprModel:
+		| &sema::TupleExpr:
 			self.multiAssignTup(a)
-		| &sema::FnCallExprModel:
+		| &sema::FnCallExpr:
 			self.multiAssignFn(a)
 		|:
 			panic("cxx: this panic call should be unreachable")
@@ -923,8 +923,8 @@ impl scopeCoder {
 			ret
 		}
 		match type r.Expr {
-		| &sema::TupleExprModel:
-			mut datas := (&sema::TupleExprModel)(r.Expr).Datas
+		| &sema::TupleExpr:
+			mut datas := (&sema::TupleExpr)(r.Expr).Datas
 			for i, data in datas {
 				self.oc.write(resultName + "." + resultArgName)
 				self.oc.write(conv::Itoa(i))
@@ -933,7 +933,7 @@ impl scopeCoder {
 				self.oc.write(";\n")
 				self.oc.indent()
 			}
-		| &sema::FnCallExprModel:
+		| &sema::FnCallExpr:
 			self.oc.write(resultName + " = std::move(")
 			self.oc.ec.model(r.Expr)
 			self.oc.write(");\n")
@@ -984,7 +984,7 @@ impl scopeCoder {
 		}
 	}
 
-	fn mutSlicing(mut &self, mut m: &opt::MutSlicingExprModel) {
+	fn mutSlicing(mut &self, mut m: &opt::MutSlicingExpr) {
 		self.oc.write("(")
 		self.oc.ec.possibleRefExpr(m.Expr)
 		self.oc.write(").mut_slice(")
@@ -1001,7 +1001,7 @@ impl scopeCoder {
 		self.oc.write(");")
 	}
 
-	fn swap(mut &self, mut m: &opt::SwapExprModel) {
+	fn swap(mut &self, mut m: &opt::SwapExpr) {
 		self.oc.write("std::swap(")
 		self.oc.ec.possibleRefExpr(m.Left.Model)
 		self.oc.write(", ")
@@ -1009,7 +1009,7 @@ impl scopeCoder {
 		self.oc.write(")")
 	}
 
-	fn exceptionalForwarding(mut &self, mut m: &opt::ExceptionalForwardingExprModel) {
+	fn exceptionalForwarding(mut &self, mut m: &opt::ExceptionalForwardingExpr) {
 		self.oc.write("return ")
 		self.oc.ec.pureFuncCall(m.Expr)
 	}
@@ -1054,16 +1054,16 @@ impl scopeCoder {
 			self.breakSt((&sema::BreakSt)(st))
 		| &sema::RetSt:
 			self.retSt((&sema::RetSt)(st))
-		| &opt::PushToSliceExprModel:
-			self.oc.ec.pushToSlice((&opt::PushToSliceExprModel)(st))
-		| &opt::AppendToSliceExprModel:
-			self.oc.ec.appendToSlice((&opt::AppendToSliceExprModel)(st))
-		| &opt::MutSlicingExprModel:
-			self.mutSlicing((&opt::MutSlicingExprModel)(st))
-		| &opt::SwapExprModel:
-			self.swap((&opt::SwapExprModel)(st))
-		| &opt::ExceptionalForwardingExprModel:
-			self.exceptionalForwarding((&opt::ExceptionalForwardingExprModel)(st))
+		| &opt::PushToSliceExpr:
+			self.oc.ec.pushToSlice((&opt::PushToSliceExpr)(st))
+		| &opt::AppendToSliceExpr:
+			self.oc.ec.appendToSlice((&opt::AppendToSliceExpr)(st))
+		| &opt::MutSlicingExpr:
+			self.mutSlicing((&opt::MutSlicingExpr)(st))
+		| &opt::SwapExpr:
+			self.swap((&opt::SwapExpr)(st))
+		| &opt::ExceptionalForwardingExpr:
+			self.exceptionalForwarding((&opt::ExceptionalForwardingExpr)(st))
 		| &opt::StrRuneIter:
 			self.strRuneIter((&opt::StrRuneIter)(st))
 		|:
@@ -1135,7 +1135,7 @@ impl scopeCoder {
 		}
 	}
 
-	fn anonFuncScope(mut &self, mut m: &sema::AnonFnExprModel, ident: str) {
+	fn anonFuncScope(mut &self, mut m: &sema::AnonFnExpr, ident: str) {
 		if m.Func.Scope == nil {
 			ret
 		}
@@ -1185,7 +1185,7 @@ fn isCopyOptimizable(&expr: &sema::Data): bool {
 		ret false
 	}
 	match type expr.Model {
-	| &sema::SlicingExprModel:
+	| &sema::SlicingExpr:
 		ret false
 	}
 	ret true
@@ -1198,7 +1198,7 @@ fn isIterCopyOptimizable(&expr: &sema::Data, &v: &sema::Var): bool {
 	ret !v.Mutable && !expr.Mutable
 }
 
-fn captureVarHandling(mut &oc: &ObjectCoder, mut &m: &sema::AnonFnExprModel, mut &v: &sema::Var): bool {
+fn captureVarHandling(mut &oc: &ObjectCoder, mut &m: &sema::AnonFnExpr, mut &v: &sema::Var): bool {
 	for _, cv in m.Captured {
 		if cv == v {
 			oc.write(closureCtxIdent + ".alloc->")

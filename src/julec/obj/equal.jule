@@ -10,8 +10,8 @@ struct anyData {
 	typePtr: *unsafe
 }
 
-// Returns data pointer address in uintptr of ExprModel.
-fn TypeData(&m: sema::ExprModel): uintptr {
+// Returns data pointer address in uintptr of Expr.
+fn TypeData(&m: sema::Expr): uintptr {
 	ret uintptr(unsafe { (*anyData)(&m).typePtr })
 }
 
@@ -34,26 +34,26 @@ fn equalConst(l: &constant::Const, r: &constant::Const): bool {
 	}
 }
 
-fn equalCasting(l: &sema::CastingExprModel, r: &sema::CastingExprModel): bool {
+fn equalCasting(l: &sema::CastingExpr, r: &sema::CastingExpr): bool {
 	if !l.Type.Equal(r.Type) {
 		ret false
 	}
 	ret EqualModels(l.Expr.Model, r.Expr.Model)
 }
 
-fn equalUnary(l: &sema::UnaryExprModel, r: &sema::UnaryExprModel): bool {
+fn equalUnary(l: &sema::UnaryExpr, r: &sema::UnaryExpr): bool {
 	if l.Op.Id != r.Op.Id || l.Op.Kind != r.Op.Kind {
 		ret false
 	}
 	ret EqualModels(l.Expr.Model, r.Expr.Model)
 }
 
-fn equalIndexing(l: &sema::IndexingExprModel, r: &sema::IndexingExprModel): bool {
+fn equalIndexing(l: &sema::IndexingExpr, r: &sema::IndexingExpr): bool {
 	ret EqualModels(l.Expr.Model, r.Expr.Model) &&
 		EqualModels(l.Index.Model, r.Index.Model)
 }
 
-fn equalBinary(l: &sema::BinaryExprModel, r: &sema::BinaryExprModel): bool {
+fn equalBinary(l: &sema::BinaryExpr, r: &sema::BinaryExpr): bool {
 	if l.Op.Id != r.Op.Id || l.Op.Kind != r.Op.Kind {
 		ret false
 	}
@@ -64,27 +64,27 @@ fn equalBinary(l: &sema::BinaryExprModel, r: &sema::BinaryExprModel): bool {
 // Reports whether expressions are equal.
 // Designed lvalue equality comparison oriented,
 // such as swap statement value comparisons.
-fn EqualModels(l: sema::ExprModel, r: sema::ExprModel): bool {
+fn EqualModels(l: sema::Expr, r: sema::Expr): bool {
 	if TypeData(l) != TypeData(r) {
 		ret false
 	}
 	match type l {
 	| &sema::Var:
 		ret (&sema::Var)(l) == (&sema::Var)(r)
-	| &sema::StructSubIdentExprModel:
-		li := (&sema::StructSubIdentExprModel)(l)
-		ri := (&sema::StructSubIdentExprModel)(r)
+	| &sema::StructSubIdentExpr:
+		li := (&sema::StructSubIdentExpr)(l)
+		ri := (&sema::StructSubIdentExpr)(r)
 		ret li.Field == ri.Field && EqualModels(li.Expr.Model, ri.Expr.Model)
 	| &constant::Const:
 		ret equalConst((&constant::Const)(l), (&constant::Const)(r))
-	| &sema::CastingExprModel:
-		ret equalCasting((&sema::CastingExprModel)(l), (&sema::CastingExprModel)(r))
-	| &sema::UnaryExprModel:
-		ret equalUnary((&sema::UnaryExprModel)(l), (&sema::UnaryExprModel)(r))
-	| &sema::IndexingExprModel:
-		ret equalIndexing((&sema::IndexingExprModel)(l), (&sema::IndexingExprModel)(r))
-	| &sema::BinaryExprModel:
-		ret equalBinary((&sema::BinaryExprModel)(l), (&sema::BinaryExprModel)(r))
+	| &sema::CastingExpr:
+		ret equalCasting((&sema::CastingExpr)(l), (&sema::CastingExpr)(r))
+	| &sema::UnaryExpr:
+		ret equalUnary((&sema::UnaryExpr)(l), (&sema::UnaryExpr)(r))
+	| &sema::IndexingExpr:
+		ret equalIndexing((&sema::IndexingExpr)(l), (&sema::IndexingExpr)(r))
+	| &sema::BinaryExpr:
+		ret equalBinary((&sema::BinaryExpr)(l), (&sema::BinaryExpr)(r))
 	|:
 		ret false
 	}

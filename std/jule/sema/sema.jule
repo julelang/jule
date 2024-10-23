@@ -12,15 +12,15 @@ use "std/jule/types"
 use "std/strings"
 use "std/unicode/utf8"
 
-fn isValidModelForRef(mut &m: ExprModel): bool {
+fn isValidModelForRef(mut &m: Expr): bool {
 	match type m {
 	| &Var:
 		ret true
-	| &StructSubIdentExprModel:
-		mut model := (&StructSubIdentExprModel)(m)
+	| &StructSubIdentExpr:
+		mut model := (&StructSubIdentExpr)(m)
 		ret model.Field != nil && isValidModelForRef(model.Expr.Model)
-	| &UnaryExprModel:
-		mut unary := (&UnaryExprModel)(m)
+	| &UnaryExpr:
+		mut unary := (&UnaryExpr)(m)
 		if unary.Op.Id != token::Id.Star {
 			ret false
 		}
@@ -33,8 +33,8 @@ fn isValidModelForRef(mut &m: ExprModel): bool {
 			ret false
 		}
 		ret isValidModelForRef(unary.Expr.Model)
-	| &IndexingExprModel:
-		mut indexing := (&IndexingExprModel)(m)
+	| &IndexingExpr:
+		mut indexing := (&IndexingExpr)(m)
 		if indexing.Expr.Type.Arr() == nil {
 			// allow only arrays, slice allocations will may be deallocated at runtime
 			// arrays always guaranteed to be have fixed size at runtime
@@ -2773,8 +2773,8 @@ impl missingRetChecker {
 				}
 			| &Data:
 				match type (&Data)(st).Model {
-				| &BuiltinPanicCallExprModel
-				| &BuiltinErrorCallExprModel:
+				| &BuiltinPanicCallExpr
+				| &BuiltinErrorCallExpr:
 					ret true
 				}
 			| &Conditional:

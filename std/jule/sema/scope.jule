@@ -68,7 +68,7 @@ struct Scope {
 
 // Chain conditional node.
 struct If {
-	Expr:  ExprModel
+	Expr:  Expr
 	Scope: &Scope
 }
 
@@ -90,9 +90,9 @@ struct InfIter {
 
 // While iteration.
 struct WhileIter {
-	Scope: &Scope    // See developer reference (11).
-	Expr:  ExprModel // Can be nil if iteration is while-next kind.
-	Next:  Stmt      // Nil if iteration is not while-next kind.
+	Scope: &Scope // See developer reference (11).
+	Expr:  Expr   // Can be nil if iteration is while-next kind.
+	Next:  Stmt   // Nil if iteration is not while-next kind.
 }
 
 impl WhileIter {
@@ -139,14 +139,14 @@ struct GotoSt {
 
 // Postfix assignment.
 struct Postfix {
-	Expr: ExprModel
+	Expr: Expr
 	Op:   str
 }
 
 // Assigment.
 struct Assign {
-	Left:  &OperandExprModel
-	Right: &OperandExprModel
+	Left:  &OperandExpr
+	Right: &OperandExpr
 	Op:    &token::Token
 }
 
@@ -154,7 +154,7 @@ struct Assign {
 struct MultiAssign {
 	Decls: []&Var
 	Left:  []&Data // Nil Model:s represents ingored expressions.
-	Right: ExprModel
+	Right: Expr
 	Op:    &token::Token
 }
 
@@ -196,7 +196,7 @@ struct FallSt {
 // Return statement.
 struct RetSt {
 	Func: &FnIns
-	Expr: ExprModel
+	Expr: Expr
 }
 
 struct scopeLabel {
@@ -596,7 +596,7 @@ impl scopeChecker {
 		self.scope.Stmts = append(self.scope.Stmts, s)
 	}
 
-	fn processErrorCall(mut &self, mut &m: &BuiltinErrorCallExprModel, err: &token::Token) {
+	fn processErrorCall(mut &self, mut &m: &BuiltinErrorCallExpr, err: &token::Token) {
 		if self.isDeferred() {
 			self.s.pushErr(err, build::LogMsg.ErrorInDeferred)
 		}
@@ -620,19 +620,19 @@ impl scopeChecker {
 		}
 
 		match type d.Model {
-		| &BuiltinErrorCallExprModel:
-			mut m := (&BuiltinErrorCallExprModel)(d.Model)
+		| &BuiltinErrorCallExpr:
+			mut m := (&BuiltinErrorCallExpr)(d.Model)
 			self.processErrorCall(m, expr.Token)
 			self.scope.Stmts = append(self.scope.Stmts, d)
-		| &BackendEmitExprModel
-		| &BuiltinAppendCallExprModel
-		| &BuiltinPrintCallExprModel
-		| &BuiltinPrintlnCallExprModel
-		| &BuiltinPanicCallExprModel
-		| &BuiltinCopyCallExprModel
-		| &BuiltinDeleteCallExprModel
-		| &FreeExprModel
-		| &FnCallExprModel:
+		| &BackendEmitExpr
+		| &BuiltinAppendCallExpr
+		| &BuiltinPrintCallExpr
+		| &BuiltinPrintlnCallExpr
+		| &BuiltinPanicCallExpr
+		| &BuiltinCopyCallExpr
+		| &BuiltinDeleteCallExpr
+		| &FreeExpr
+		| &FnCallExpr:
 			self.scope.Stmts = append(self.scope.Stmts, d)
 		|:
 			self.s.pushErr(expr.Token, build::LogMsg.InvalidSyntax)
@@ -1191,11 +1191,11 @@ impl scopeChecker {
 			ret
 		}
 
-		mut lm := &OperandExprModel{
+		mut lm := &OperandExpr{
 			Type: l.Type,
 			Model: l.Model,
 		}
-		mut rm := &OperandExprModel{
+		mut rm := &OperandExpr{
 			Type: r.Type,
 			Model: r.Model,
 		}
@@ -1357,7 +1357,7 @@ impl scopeChecker {
 			if right == nil {
 				ret
 			}
-			
+
 			if right.Type.Tup() != nil {
 				mut t := right.Type.Tup()
 				parts = make([]exprPart, 0, len(t.Types))
@@ -1393,8 +1393,8 @@ impl scopeChecker {
 		mut strict := false // any type compatibility analysis requires exact same type
 		if len(right) == 1 {
 			match type right[0].data.Model {
-			| &IndexingExprModel:
-				mut iem := (&IndexingExprModel)(right[0].data.Model)
+			| &IndexingExpr:
+				mut iem := (&IndexingExpr)(right[0].data.Model)
 				if iem.Expr.Type.Map() != nil { // Is map lookup.
 					strict = true
 					right = [
@@ -1583,8 +1583,8 @@ impl scopeChecker {
 		| &Data:
 			d := (&Data)(stmt)
 			match type d.Model {
-			| &BuiltinPanicCallExprModel:
-				mut m := (&BuiltinPanicCallExprModel)(d.Model)
+			| &BuiltinPanicCallExpr:
+				mut m := (&BuiltinPanicCallExpr)(d.Model)
 				match type m.Expr {
 				| &constant::Const:
 					c := (&constant::Const)(m.Expr)
@@ -1954,8 +1954,8 @@ impl scopeChecker {
 				ret
 			}
 			match type d.Model {
-			| &BuiltinErrorCallExprModel:
-				mut m := (&BuiltinErrorCallExprModel)(d.Model)
+			| &BuiltinErrorCallExpr:
+				mut m := (&BuiltinErrorCallExpr)(d.Model)
 				self.processErrorCall(m, expr.Token)
 				self.scope.Stmts = append(self.scope.Stmts, d)
 			|:
@@ -2235,8 +2235,8 @@ fn findLabelParent(&ident: str, mut scope: &scopeChecker): &scopeLabel {
 /*fn getDatasFromTupleData(mut &d: &Data): []&Data {
 	if d.Type.Tup() != nil {
 		match type d.Model {
-		| &TupleExprModel:
-			ret (&TupleExprModel)(d.Model).Datas
+		| &TupleExpr:
+			ret (&TupleExpr)(d.Model).Datas
 		|:
 			mut t := d.Type.Tup()
 			mut r := make([]&Data, 0, len(t.Types))
@@ -2253,7 +2253,7 @@ fn findLabelParent(&ident: str, mut scope: &scopeChecker): &scopeLabel {
 	}
 }*/
 
-fn getExprModels(mut &m: ast::ExprData): []ast::ExprData {
+fn getExprs(mut &m: ast::ExprData): []ast::ExprData {
 	match type m {
 	| &ast::TupleExpr:
 		mut tup := (&ast::TupleExpr)(m)
@@ -2323,7 +2323,7 @@ fn isValidStForNextSt(&st: Stmt): bool {
 		ret true
 	| &Data:
 		match type (&Data)(st).Model {
-		| &FnCallExprModel:
+		| &FnCallExpr:
 			ret true
 		|:
 			ret false

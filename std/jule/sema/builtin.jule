@@ -297,7 +297,7 @@ fn builtinCallerError(mut &e: &eval, mut &fc: &ast::FnCallExpr): &Data {
 	applyRuntimeToStr(e.s, expr.Type, primAny, token, e.getOwnerRefers())
 
 	mut d := buildVoidData()
-	d.Model = &BuiltinErrorCallExprModel{Err: expr}
+	d.Model = &BuiltinErrorCallExpr{Err: expr}
 	ret d
 }
 
@@ -324,7 +324,7 @@ fn builtinCallerPrint(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): 
 	pushRuntimeToStr(e.s, expr.Type, arg.Token, e.getOwnerRefers())
 
 	mut d := buildVoidData()
-	d.Model = &BuiltinPrintCallExprModel{Expr: expr}
+	d.Model = &BuiltinPrintCallExpr{Expr: expr}
 	ret d
 }
 
@@ -334,8 +334,8 @@ fn builtinCallerPrintln(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &d: &Data)
 		ret nil
 	}
 
-	d.Model = &BuiltinPrintlnCallExprModel{
-		Expr: (&BuiltinPrintCallExprModel)(d.Model).Expr,
+	d.Model = &BuiltinPrintlnCallExpr{
+		Expr: (&BuiltinPrintCallExpr)(d.Model).Expr,
 	}
 	ret d
 }
@@ -380,13 +380,13 @@ fn builtinCallerNew(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &d: &Data): &D
 				e.target.mutable, Reference, t.Type, init, token)
 			_ = e.s.checkAssignType(false, t.Type, init, token, e.getOwnerRefers())
 
-			d.Model = &BuiltinNewCallExprModel{
+			d.Model = &BuiltinNewCallExpr{
 				Type: t.Type,
 				Init: init.Model,
 			}
 		}
 	} else {
-		d.Model = &BuiltinNewCallExprModel{
+		d.Model = &BuiltinNewCallExpr{
 			Type: t.Type,
 		}
 	}
@@ -413,7 +413,7 @@ fn builtinCallerPanic(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): 
 	}
 
 	mut d := buildVoidData()
-	d.Model = &BuiltinPanicCallExprModel{
+	d.Model = &BuiltinPanicCallExpr{
 		Token: fc.Token,
 		Expr: expr.Model,
 	}
@@ -455,7 +455,7 @@ fn builtinCallerMake(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &d: &Data): &
 
 	e.checkIntegerIndexingByData(lenExpr, fc.Args[1].Token)
 
-	mut model := &BuiltinMakeCallExprModel{
+	mut model := &BuiltinMakeCallExpr{
 		Type: t.Type,
 		Len: lenExpr.Model,
 	}
@@ -525,7 +525,7 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &d: &Data):
 			if e1.Type.Prim() != nil && e1.Type.Prim().IsStr() {
 				// append([]byte, str...)
 				makeVariadic(e1, primU8)
-				d.Model = &BuiltinAppendCallExprModel{
+				d.Model = &BuiltinAppendCallExpr{
 					Dest: t.Model,
 					Elements: e1.Model,
 				}
@@ -553,7 +553,7 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &d: &Data):
 		} else {
 			e1.Type.Variadic = true
 		}
-		d.Model = &BuiltinAppendCallExprModel{
+		d.Model = &BuiltinAppendCallExpr{
 			Dest: t.Model,
 			Elements: e1.Model,
 		}
@@ -565,9 +565,9 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &d: &Data):
 		ret nil
 	}
 
-	mut slice := &SliceExprModel{
+	mut slice := &SliceExpr{
 		ElemType: s.Elem,
-		Elems: make([]ExprModel, 0, len(fc.Args)-1),
+		Elems: make([]Expr, 0, len(fc.Args)-1),
 	}
 	for (_, mut arg) in fc.Args[1:] {
 		e1 = e.evalExpr(arg)
@@ -584,7 +584,7 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &d: &Data):
 		}
 		slice.Elems = append(slice.Elems, e1.Model)
 	}
-	d.Model = &BuiltinAppendCallExprModel{
+	d.Model = &BuiltinAppendCallExpr{
 		Dest: t.Model,
 		Elements: slice,
 	}
@@ -618,7 +618,7 @@ fn callerCopySlice(mut &dest: &Data, mut &e: &eval, mut &fc: &ast::FnCallExpr, m
 	}
 
 	d.Type = lenKind()
-	d.Model = &BuiltinCopyCallExprModel{
+	d.Model = &BuiltinCopyCallExpr{
 		Dest: dest,
 		Src: src,
 	}
@@ -652,7 +652,7 @@ fn builtinCallerCopy(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &d: &Data): &
 
 fn callerLenSlice(mut &expr: &Data, mut &d: &Data): &Data {
 	d.Type = lenKind()
-	d.Model = &BuiltinLenCallExprModel{
+	d.Model = &BuiltinLenCallExpr{
 		Expr: expr,
 	}
 	ret d
@@ -660,7 +660,7 @@ fn callerLenSlice(mut &expr: &Data, mut &d: &Data): &Data {
 
 fn callerLenMap(mut &expr: &Data, mut &d: &Data): &Data {
 	d.Type = lenKind()
-	d.Model = &BuiltinLenCallExprModel{
+	d.Model = &BuiltinLenCallExpr{
 		Expr: expr,
 	}
 	ret d
@@ -679,7 +679,7 @@ fn callerLenStr(mut &expr: &Data, mut &d: &Data): &Data {
 		d.Constant = constant::Const.NewI64(i64(len(expr.Constant.ReadStr())))
 		d.Model = d.Constant
 	} else {
-		d.Model = &BuiltinLenCallExprModel{
+		d.Model = &BuiltinLenCallExpr{
 			Expr: expr,
 		}
 	}
@@ -735,7 +735,7 @@ fn builtinCallerLen(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &d: &Data): &D
 
 fn callerCapSlice(mut &expr: &Data, mut &d: &Data): &Data {
 	d.Type = lenKind()
-	d.Model = &BuiltinCapCallExprModel{
+	d.Model = &BuiltinCapCallExpr{
 		Expr: expr,
 	}
 	ret d
@@ -769,7 +769,7 @@ fn callerDeleteMap(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &expr: &Data, m
 		e.pushErr(fc.Args[0].Token, build::LogMsg.MutOperationOnImmut)
 	}
 	d = buildVoidData()
-	mut model := &BuiltinDeleteCallExprModel{
+	mut model := &BuiltinDeleteCallExpr{
 		Dest: expr,
 	}
 	if len(fc.Args) == 2 {
@@ -991,7 +991,7 @@ fn builtinCallerStdMemSizeOf(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &_: &
 		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidTypeForFn, d.Type.Str(), "SizeOf")
 	}
 
-	result.Model = &SizeofExprModel{Expr: d.Type}
+	result.Model = &SizeofExpr{Expr: d.Type}
 	ret result
 }
 
@@ -1016,7 +1016,7 @@ fn builtinCallerStdMemAlignOf(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &_: 
 		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidTypeForFn, d.Type.Str(), "AlignOf")
 	}
 
-	result.Model = &AlignofExprModel{Expr: d.Type}
+	result.Model = &AlignofExpr{Expr: d.Type}
 	ret result
 }
 
@@ -1039,7 +1039,7 @@ fn builtinCallerStdMemFree(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &_: &Da
 	}
 
 	mut result := buildVoidData()
-	result.Model = &FreeExprModel{Expr: d.Model}
+	result.Model = &FreeExpr{Expr: d.Model}
 	ret result
 }
 
@@ -1075,12 +1075,12 @@ fn builtinCallerStdJuleIntegratedEmit(mut &e: &eval, mut &fc: &ast::FnCallExpr, 
 		r.Type = f.Generics[0].Type
 	}
 
-	mut model := &BackendEmitExprModel{
+	mut model := &BackendEmitExpr{
 		Code: argd.Constant.ReadStr(),
 	}
 
 	if len(fc.Args) > 1 {
-		model.Exprs = make([]ExprModel, 0, len(fc.Args)-1)
+		model.Exprs = make([]Expr, 0, len(fc.Args)-1)
 		for (_, mut arg) in fc.Args[1:] {
 			argd = e.eval1(arg)
 			if argd == nil {

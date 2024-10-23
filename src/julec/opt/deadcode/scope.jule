@@ -45,7 +45,7 @@ impl scopeDeadCode {
 		unsafe { sdc.optimizeStmts() }
 	}
 
-	fn optimizeExprModel(mut &self, mut &model: sema::ExprModel) {
+	fn optimizeExpr(mut &self, mut &model: sema::Expr) {
 		edc := exprDeadCode.new(self)
 		edc.optimize(model)
 	}
@@ -90,12 +90,12 @@ impl scopeDeadCode {
 	}
 
 	fn optimizeRangeIter(mut &self, mut it: &sema::RangeIter) {
-		self.optimizeExprModel(it.Expr.Model)
+		self.optimizeExpr(it.Expr.Model)
 		self.optimizeBodyChild(it.Scope)
 	}
 
 	fn optimizeWhileIter(mut &self, mut it: &sema::WhileIter) {
-		self.optimizeExprModel(it.Expr)
+		self.optimizeExpr(it.Expr)
 		if it.Next != nil {
 			self.optimizeStmt(it.Next)
 		}
@@ -109,7 +109,7 @@ impl scopeDeadCode {
 	fn optimizeConditional(mut &self, mut c: &sema::Conditional) {
 		for (_, mut case) in c.Elifs {
 			if case != nil {
-				self.optimizeExprModel(case.Expr)
+				self.optimizeExpr(case.Expr)
 				self.optimizeBodyChild(case.Scope)
 			}
 		}
@@ -127,7 +127,7 @@ impl scopeDeadCode {
 	fn optimizeMatch(mut &self, mut m: &sema::Match) {
 		for (_, mut case) in m.Cases {
 			for (_, mut expr) in case.Exprs {
-				self.optimizeExprModel(expr.Model)
+				self.optimizeExpr(expr.Model)
 			}
 			self.optimizeBodyChild(case.Scope)
 		}
@@ -143,17 +143,17 @@ impl scopeDeadCode {
 	}
 
 	fn optimizeAssign(mut &self, mut assign: &sema::Assign) {
-		self.optimizeExprModel(assign.Left.Model)
-		self.optimizeExprModel(assign.Right.Model)
+		self.optimizeExpr(assign.Left.Model)
+		self.optimizeExpr(assign.Right.Model)
 	}
 
 	fn optimizeMultiAssign(mut &self, mut assign: &sema::MultiAssign) {
 		for (_, mut l) in assign.Left {
 			if l != nil {
-				self.optimizeExprModel(l.Model)
+				self.optimizeExpr(l.Model)
 			}
 		}
-		self.optimizeExprModel(assign.Right)
+		self.optimizeExpr(assign.Right)
 	}
 
 	fn optimizeStmt(mut &self, mut st: sema::Stmt) {
@@ -185,13 +185,13 @@ impl scopeDeadCode {
 				break
 			}
 			match type d.Model {
-			| &sema::BuiltinErrorCallExprModel
-			| &sema::BuiltinPanicCallExprModel:
+			| &sema::BuiltinErrorCallExpr
+			| &sema::BuiltinPanicCallExpr:
 				// Remove followed statements of the function call.
 				// Unreachable code.
 				self.eliminateFollowed()
 			|:
-				self.optimizeExprModel(d.Model)
+				self.optimizeExpr(d.Model)
 			}
 		| &sema::RetSt:
 			// Remove followed statements of the return statement.

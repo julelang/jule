@@ -659,7 +659,7 @@ struct fnCallArgChecker {
 	errorToken:        &token::Token
 	f:                 &FnIns
 	dynamicAnnotation: bool
-	argModels:         []ExprModel
+	argModels:         []Expr
 	ignored:           []&Type // Ignored generics.
 }
 
@@ -770,7 +770,7 @@ impl fnCallArgChecker {
 		ok = true
 		mut variadiced := false
 		more := i+1 < len(self.args)
-		mut model := &SliceExprModel{
+		mut model := &SliceExpr{
 			ElemType: p.Type,
 		}
 
@@ -818,8 +818,8 @@ impl fnCallArgChecker {
 				ok = ok && self.checkArg(p, d, arg.Token)
 				p.Type.Variadic = false
 				match type d.Model {
-				| &SliceExprModel:
-					model = (&SliceExprModel)(d.Model)
+				| &SliceExpr:
+					model = (&SliceExpr)(d.Model)
 					model.ElemType = p.Type
 				|:
 					model = nil
@@ -910,7 +910,7 @@ impl fnCallArgChecker {
 // Assumes evaluated by [structLitChecker].
 // Therefore, it will not check interior mutability risks.
 // Assumes mutable structure literal and checks field assignments.
-fn checkMutRiskOfStructLit(mut &s: &sema, &m: &StructLitExprModel) {
+fn checkMutRiskOfStructLit(mut &s: &sema, &m: &StructLitExpr) {
 	for _, arg in m.Args {
 		if arg.Field.Decl.Mutable {
 			// Skip this field.
@@ -927,7 +927,7 @@ struct structLitChecker {
 	e:          &eval
 	errorToken: &token::Token
 	s:          &StructIns
-	args:       []&StructArgExprModel
+	args:       []&StructArgExpr
 }
 
 impl structLitChecker {
@@ -952,7 +952,7 @@ impl structLitChecker {
 			// Helps to reduce error logs and duplicated logs.
 			_ = self.e.s.checkAssignType(false, f.Type, d, errorToken, self.e.getOwnerRefers())
 		}
-		self.args = append(self.args, &StructArgExprModel{
+		self.args = append(self.args, &StructArgExpr{
 			Token: errorToken,
 			Field: f,
 			Expr: d,
@@ -1267,7 +1267,7 @@ struct retTypeChecker {
 	exprs:      []&Data // Return expressions.
 	exprDecls:  []&ast::Expr
 	errorToken: &token::Token
-	model:      ExprModel
+	model:      Expr
 	mutable:    bool // Whether the return expression should be mutable.
 }
 
@@ -1326,7 +1326,7 @@ impl retTypeChecker {
 
 		// Set Model.
 		if len(self.exprs) > 1 { // Tuple
-			self.model = &TupleExprModel{Datas: self.exprs}
+			self.model = &TupleExpr{Datas: self.exprs}
 		} else if len(self.exprs) == 1 {
 			self.model = self.exprs[0].Model
 		}
@@ -1386,7 +1386,7 @@ impl retTypeChecker {
 			ret true
 		| len(self.exprs) == 1 && len(self.types) > 1 && self.exprs[0].Type.Tup() != nil:
 			match type self.exprs[0].Model {
-			| &FnCallExprModel:
+			| &FnCallExpr:
 				self.tryFuncMultiRetForward()
 				ret true
 			}
