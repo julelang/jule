@@ -41,29 +41,23 @@ For example:
   ```
   In this example above `Test[T]` and `Test[Y]` declaring same thing which is good. Also `Test[T2, Y]` (which is declares different generic instance for owner structure) is valid because there is plain usage of it's own generics. But latest return statement declares `Test[Test[T1, T2], T2]` type which is causes cycle. `T2` is plain usage, but `Test[T1, T2]` is nested usage not plain, causes cycle. Same rules are works for slices, pointers or etc. Plain usage is just the generic, not else.
 
-- **(7)** Semantic analysis should analysis structures first. If methods have operator overloads, these will cause problems in the analysis because they are not analyzed and qualified accordingly. Therefore, structures need to be analyzed before functions.
+- **(7)** Check `enum` declarations first before using them or any using possibility appears. Enum fields should be evaluated before evaluate algorithms executed. Otherwise, probably program will panic because of unevaluated enum field(s) when tried to use.
 
-    - **(7.1)** When analyzing structures, operator overload methods must first be made ready for control and qualified. If an operator tries to use overloading, one of whose construction methods has not yet been analyzed, it will cause analysis errors.
+    - **(7.1)** This is not apply for type enums. Type enum's fields are type alias actually. They are should anaylsis like type aliases.
 
-    - **(7.2)** Operators must be checkec and assigned to structures before analysis of methods and others. Because problems can occur if you analysis operators structure by structure. Semantic will analyze structures file by file. Therefore if an operator tries to use overloading from other file, one of whose construction methods has not yet been assigned, it will cause analysis errors.
-
-- **(8)** Check `enum` declarations first before using them or any using possibility appears. Enum fields should be evaluated before evaluate algorithms executed. Otherwise, probably program will panic because of unevaluated enum field(s) when tried to use.
-
-    - **(8.1)** This is not apply for type enums. Type enum's fields are type alias actually. They are should anaylsis like type aliases.
-
-- **(9)** Semantic analysis supports built-in use declarations for developers, but this functionality is not for common purposes. These declarations do not cause problems in duplication analysis. For example, you added the `x` package as embedded in the AST, but the source also contains a use declaration for this package, in which case a conflict does not occur.\
+- **(8)** Semantic analysis supports built-in use declarations for developers, but this functionality is not for common purposes. These declarations do not cause problems in duplication analysis. For example, you added the `x` package as embedded in the AST, but the source also contains a use declaration for this package, in which case a conflict does not occur.\
 \
 These packages are specially processed and treated differently than standard use declarations. These treatments only apply to supported packages. To see relevant treatments, see implicit imports section of the reference.\
 \
 Typical uses are things like capturing or tracing private behavior. For example, the reference Jule compiler may embed the `std/runtime` package for some special calls. The semantic analyzer makes the necessary private calls for this embedded package when necessary. For example, appends instance to array compare generic method for array comparions.
-    - **(9.1)** The `Token` field is used to distinguish specific packages. If the `Token` field of the AST element is set to `nil`, the package built-in use declaration is considered. Accordingly, AST must always set the `Token` field for each use declaration which is not implicitly imported.
-    - **(9.2)** Semantic analyzer will ignore implicit use declaration for duplication analysis. So, built-in implicit imported packages may be duplicated if placed source file contains separate use declaration for the same package.
-    - **(9.3)** These packages should be placed as first use declarations of the main package's first file.
-    - **(9.4)** Semantic analyzer will not collect references for some defines of these packages. So any definition will not have a collection of references if not supported. But references may collected if used in ordinary way unlike implicit instantiation by semantic anlayzer.
-- **(10)** Jule can handle supported types bidirectionally for binary expressions (`s == nil || nil == s` or etc.). However, when creating CAST, some types in binary expressions must always be left operand. These types are; `any`, type enums, enums, smart pointers, raw pointers and traits.
-    - **(10.1)** For these special types, the type that is the left operand can normally be left or right operand. It is only guaranteed if the expression of the relevant type is in the left operand. There may be a shift in the original order.
-    - **(10.2)** In the case of a `nil` comparison, the right operand should always be `nil`.
-**(11)** The `Scope` field of iteration or match expressions must be the first one. Accordingly, coverage data of the relevant type can be obtained by reinterpreting types such as `uintptr` with Unsafe Jule.
+    - **(8.1)** The `Token` field is used to distinguish specific packages. If the `Token` field of the AST element is set to `nil`, the package built-in use declaration is considered. Accordingly, AST must always set the `Token` field for each use declaration which is not implicitly imported.
+    - **(8.2)** Semantic analyzer will ignore implicit use declaration for duplication analysis. So, built-in implicit imported packages may be duplicated if placed source file contains separate use declaration for the same package.
+    - **(8.3)** These packages should be placed as first use declarations of the main package's first file.
+    - **(8.4)** Semantic analyzer will not collect references for some defines of these packages. So any definition will not have a collection of references if not supported. But references may collected if used in ordinary way unlike implicit instantiation by semantic anlayzer.
+- **(9)** Jule can handle supported types bidirectionally for binary expressions (`s == nil || nil == s` or etc.). However, when creating CAST, some types in binary expressions must always be left operand. These types are; `any`, type enums, enums, smart pointers, raw pointers and traits.
+    - **(9.1)** For these special types, the type that is the left operand can normally be left or right operand. It is only guaranteed if the expression of the relevant type is in the left operand. There may be a shift in the original order.
+    - **(9.2)** In the case of a `nil` comparison, the right operand should always be `nil`.
+**(10)** The `Scope` field of iteration or match expressions must be the first one. Accordingly, coverage data of the relevant type can be obtained by reinterpreting types such as `uintptr` with Unsafe Jule.
 
 ### Implicit Imports
 

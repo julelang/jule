@@ -155,18 +155,6 @@ impl exprCoder {
 		}
 	}
 
-	fn operatorOverloadingUnary(mut &self, mut &s: &sema::StructIns, op: token::Id, mut e: compExpr) {
-		const Unary = true
-		mut f := obj::FindOperator(s, op, Unary)
-		if f == nil {
-			panic("cxx: unary operator overloading is not exist, this is an implementation mistake")
-		}
-		identCoder.funcIns(self.oc.Buf, f)
-		self.oc.write("(&")
-		self.possibleRefExpr(e)
-		self.oc.write(")")
-	}
-
 	fn divByZeroBinary(mut &self, &op: &token::Token, mut &l: &sema::OperandExpr, mut &r: &sema::OperandExpr) {
 		const xVar = "__jule_x"
 		const yVar = "__jule_y"
@@ -208,10 +196,9 @@ impl exprCoder {
 
 	fn _unsafeBinary(mut &self, mut &buf: strings::Builder, &l: str, &r: str,
 		mut &lk: &sema::Type, mut &rk: &sema::Type, op: token::Id, kind: str) {
-		// Operator overloading.
 		if lk.Struct() != nil {
 			mut s := lk.Struct()
-			operatorOverloadingBinary(buf, s, l, r, op, kind)
+			structBinary(buf, s, l, r, op, kind)
 			ret
 		}
 
@@ -347,23 +334,16 @@ impl exprCoder {
 	fn binary(mut &self, mut m: &sema::BinaryExpr) {
 		match m.Op.Id {
 		| token::Id.Solidus | token::Id.Percent:
-			// Do not check division safety of structures and skip if safety disabled.
-			if env::Safety && m.Left.Type.Struct() == nil {
+			if env::Safety {
 				self.divByZeroBinary(m.Op, m.Left, m.Right)
 				ret
 			}
 		| token::Id.Shl:
-			// Do not check shifting of structures.
-			if m.Left.Type.Struct() == nil {
-				self.shl(m.Left, m.Right)
-				ret
-			}
+			self.shl(m.Left, m.Right)
+			ret
 		| token::Id.Shr:
-			// Do not check shifting of structures.
-			if m.Left.Type.Struct() == nil {
-				self.shr(m.Left, m.Right)
-				ret
-			}
+			self.shr(m.Left, m.Right)
+			ret
 		}
 		self.unsafeBinary(m)
 	}
@@ -389,13 +369,6 @@ impl exprCoder {
 	}
 
 	fn unary(mut &self, mut m: &sema::UnaryExpr) {
-		// Operator overloading.
-		if m.Expr.Type.Struct() != nil {
-			mut s := m.Expr.Type.Struct()
-			self.operatorOverloadingUnary(s, m.Op.Id, m.Expr.Model)
-			ret
-		}
-
 		match m.Op.Id {
 		| token::Id.Caret:
 			self.oc.write("(~(")
@@ -2048,27 +2021,13 @@ fn utoa(mut &s: strings::Builder, x: u64) {
 	s.WriteStr("LU")!
 }
 
-fn operatorOverloadingBinary(mut &buf: strings::Builder, mut &s: &sema::StructIns, &l: str,
+fn structBinary(mut &buf: strings::Builder, mut &s: &sema::StructIns, &l: str,
 	&r: str, op: token::Id, kind: str) {
-	const Unary = false
-	mut f := (&sema::FnIns)(nil)
-	if op == token::Id.NotEq {
-		f = obj::FindOperator(s, token::Id.Eqs, Unary)
-		buf.WriteByte('!')!
-	} else {
-		f = obj::FindOperator(s, op, Unary)
+	if op != token::Id.Eqs && op != token::Id.NotEq {
+		panic("cxx: unsupported token occurred for structure binary, this is an implementation mistake")
 	}
-	if f == nil {
-		if op == token::Id.Eqs || op == token::Id.NotEq {
-			// Equal method not exist. Compiler will create, use default method.
-			identCoder.structureIns(buf, s)
-			buf.WriteStr(structDefaultEqMethodSuffix)!
-			goto common
-		}
-		panic("cxx: binary operator overloading is not exist, this is an implementation mistake")
-	}
-	identCoder.funcIns(buf, f)
-common:
+	identCoder.structureIns(buf, s)
+	buf.WriteStr(structDefaultEqMethodSuffix)!
 	buf.WriteStr("(&")!
 	buf.WriteStr(l)!
 	buf.WriteStr(", ")!

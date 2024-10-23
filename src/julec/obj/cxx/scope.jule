@@ -519,41 +519,19 @@ impl scopeCoder {
 		self.oc.ec.divByZeroBinary(a.Op, a.Left, a.Right)
 	}
 
-	fn operatorOverloadingAssign(mut &self, mut &s: &sema::StructIns, mut &l: &sema::OperandExpr,
-		mut &r: &sema::OperandExpr, op: token::Id) {
-		const Unary = false
-		mut f := obj::FindOperator(s, op, Unary)
-		if f == nil {
-			panic("cxx: binary operator overloading is not exist, this is an implementation mistake")
-		}
-		identCoder.funcIns(self.oc.Buf, f)
-		self.oc.write("(&")
-		self.assignLeft(l.Model)
-		self.oc.write(", ")
-		self.oc.ec.possibleRefExpr(r.Model)
-		self.oc.write(")")
-	}
-
 	fn assign(mut &self, mut a: &sema::Assign) {
 		match a.Op.Id {
 		| token::Id.SolidusEq | token::Id.PercentEq:
-			// Do not check division safety of structures and skip if safety disabled.
-			if env::Safety && a.Left.Type.Struct() == nil {
+			if env::Safety {
 				self.divByZeroAssign(a)
 				ret
 			}
 		| token::Id.ShlEq:
-			// Do not check shifting of structures.
-			if a.Left.Type.Struct() == nil {
-				self.shl(a)
-				ret
-			}
+			self.shl(a)
+			ret
 		| token::Id.ShrEq:
-			// Do not check shifting of structures.
-			if a.Left.Type.Struct() == nil {
-				self.shr(a)
-				ret
-			}
+			self.shr(a)
+			ret
 		}
 
 		// optimize may optimize multi-assign statements
@@ -565,12 +543,6 @@ impl scopeCoder {
 		if a.Op.Id == token::Id.ColonEq {
 			op = token::Id.Eq
 			kind = token::Kind.Eq
-		}
-
-		if op != token::Id.Eq && a.Left.Type.Struct() != nil {
-			mut s := a.Left.Type.Struct()
-			self.operatorOverloadingAssign(s, a.Left, a.Right, op)
-			ret
 		}
 
 		self.assignLeft(a.Left.Model)

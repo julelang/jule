@@ -2187,13 +2187,6 @@ impl sema {
 		self.checkFnIns(ins)
 	}
 
-	fn checkStructInsOp(mut &self, mut &s: &StructIns, mut &f: &Fn, p: fn(f: &Fn): bool): &FnIns {
-		if f == nil || len(f.Generics) > 0 || !p(f) {
-			ret nil
-		}
-		ret f.Instances[0]
-	}
-
 	// Checks environment-dependent parts of structure instance.
 	// Which is contains fields and generic-type constraints.
 	// If generic instance will be check, errorToken should be passed.
@@ -2305,7 +2298,7 @@ impl sema {
 		// If structure instance is comparable and have not custom compare method,
 		// compiler will use default compare method. If There is array field,
 		// push instance for runtime function.
-		if s.Comparable && s.Operators.Eq == nil && self.meta.runtime != nil {
+		if s.Comparable && self.meta.runtime != nil {
 			mut decl := runtimeFindFn(self.meta.runtime, runtimeFunc.arrayCmp)
 			for (_, mut field) in s.Fields {
 				mut arr := field.Type.Arr()
@@ -2348,94 +2341,6 @@ impl sema {
 			ret
 		}
 
-		// NOTICE:
-		// Do not check zero instance case, operator overloading
-		// checker will create an instance if not exist.
-		for (_, mut ins) in s.Instances {
-			self.checkStructIns(ins)
-		}
-	}
-
-	fn checkStructTypes(mut &self) {
-		for (_, mut s) in self.file.Structs {
-			self.checkTypeStruct(s)
-		}
-	}
-
-	fn checkStructInsOperators(mut &self, mut s: &StructIns) {
-		for (_, mut m) in s.Methods {
-			match m.Ident {
-			| "Eq":
-				s.Operators.Eq = self.checkStructInsOp(s, m, FuncPattern.Eq)
-				s.Comparable = s.Operators.Eq != nil
-			| "Gt":
-				s.Operators.Gt = self.checkStructInsOp(s, m, FuncPattern.Gt)
-			| "GtEq":
-				s.Operators.GtEq = self.checkStructInsOp(s, m, FuncPattern.GtEq)
-			| "Lt":
-				s.Operators.Lt = self.checkStructInsOp(s, m, FuncPattern.Lt)
-			| "LtEq":
-				s.Operators.LtEq = self.checkStructInsOp(s, m, FuncPattern.LtEq)
-			| "Shl":
-				s.Operators.Shl = self.checkStructInsOp(s, m, FuncPattern.Shl)
-			| "Shr":
-				s.Operators.Shr = self.checkStructInsOp(s, m, FuncPattern.Shr)
-			| "Add":
-				s.Operators.Add = self.checkStructInsOp(s, m, FuncPattern.Add)
-			| "Sub":
-				s.Operators.Sub = self.checkStructInsOp(s, m, FuncPattern.Sub)
-			| "Div":
-				s.Operators.Div = self.checkStructInsOp(s, m, FuncPattern.Div)
-			| "Mul":
-				s.Operators.Mul = self.checkStructInsOp(s, m, FuncPattern.Mul)
-			| "Mod":
-				s.Operators.Mod = self.checkStructInsOp(s, m, FuncPattern.Mod)
-			| "BitAnd":
-				s.Operators.BitAnd = self.checkStructInsOp(s, m, FuncPattern.BitAnd)
-			| "BitOr":
-				s.Operators.BitOr = self.checkStructInsOp(s, m, FuncPattern.BitOr)
-			| "BitXor":
-				s.Operators.BitXor = self.checkStructInsOp(s, m, FuncPattern.BitXor)
-			| "Neg":
-				s.Operators.Neg = self.checkStructInsOp(s, m, FuncPattern.Neg)
-			| "Pos":
-				s.Operators.Pos = self.checkStructInsOp(s, m, FuncPattern.Pos)
-			| "BitNot":
-				s.Operators.BitNot = self.checkStructInsOp(s, m, FuncPattern.BitNot)
-			| "AddAssign":
-				s.Operators.AddAssign = self.checkStructInsOp(s, m, FuncPattern.AddAssign)
-			| "SubAssign":
-				s.Operators.SubAssign = self.checkStructInsOp(s, m, FuncPattern.SubAssign)
-			| "DivAssign":
-				s.Operators.DivAssign = self.checkStructInsOp(s, m, FuncPattern.DivAssign)
-			| "MulAssign":
-				s.Operators.MulAssign = self.checkStructInsOp(s, m, FuncPattern.MulAssign)
-			| "ModAssign":
-				s.Operators.ModAssign = self.checkStructInsOp(s, m, FuncPattern.ModAssign)
-			| "ShlAssign":
-				s.Operators.ShlAssign = self.checkStructInsOp(s, m, FuncPattern.ShlAssign)
-			| "ShrAssign":
-				s.Operators.ShrAssign = self.checkStructInsOp(s, m, FuncPattern.ShrAssign)
-			| "BitOrAssign":
-				s.Operators.BitOrAssign = self.checkStructInsOp(s, m, FuncPattern.BitOrAssign)
-			| "BitAndAssign":
-				s.Operators.BitAndAssign = self.checkStructInsOp(s, m, FuncPattern.BitAndAssign)
-			| "BitXorAssign":
-				s.Operators.BitXorAssign = self.checkStructInsOp(s, m, FuncPattern.BitXorAssign)
-			}
-		}
-	}
-
-	fn precheckStructType(mut &self, mut &s: &Struct) {
-		if s.Binded {
-			ret
-		}
-
-		// Generic instances are checked instantly.
-		if len(s.Generics) > 0 {
-			ret
-		}
-
 		if len(s.Instances) == 0 {
 			mut ins := s.instance()
 			ins.Checked = true
@@ -2446,12 +2351,14 @@ impl sema {
 			}
 		}
 
-		self.checkStructInsOperators(s.Instances[0])
+		for (_, mut ins) in s.Instances {
+			self.checkStructIns(ins)
+		}
 	}
 
-	fn precheckStructTypes(mut &self) {
+	fn checkStructTypes(mut &self) {
 		for (_, mut s) in self.file.Structs {
-			self.precheckStructType(s)
+			self.checkTypeStruct(s)
 		}
 	}
 
@@ -2601,9 +2508,6 @@ impl sema {
 			self.setCurrentFile(f)
 			self.checkGlobals()
 			self.precheckFuncs()
-			// Check structures first, see developer reference (7).
-			// Check operators first, see developer reference (7.1), and (7.2).
-			self.precheckStructTypes()
 		}
 		if len(self.errors) > 0 {
 			ret
@@ -2652,7 +2556,7 @@ impl sema {
 		}
 
 		// Check enums here.
-		// See developer reference (8).
+		// See developer reference (7).
 		self.checkEnums()
 		if len(self.errors) != 0 {
 			ret

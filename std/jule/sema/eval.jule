@@ -55,7 +55,7 @@ impl Data {
 		ret self.Constant != nil
 	}
 
-	// See developer reference (10.2).
+	// See developer reference (9.2).
 	// Reports left and right operand is good order.
 	// If reports false, left and right operand should be swapped.
 	// Accepts itself as left operand.
@@ -3155,11 +3155,6 @@ impl unaryEval {
 				self.d = nil
 				ret
 			}
-		| self.d.Type.Struct() != nil:
-			if self.d.Type.Struct().Operators.Neg == nil {
-				self.d = nil
-				ret
-			}
 		|:
 			self.d = nil
 			ret
@@ -3200,11 +3195,6 @@ impl unaryEval {
 				self.d = nil
 				ret
 			}
-		| self.d.Type.Struct() != nil:
-			if self.d.Type.Struct().Operators.Pos == nil {
-				self.d = nil
-				ret
-			}
 		|:
 			self.d = nil
 			ret
@@ -3242,11 +3232,6 @@ impl unaryEval {
 			ret
 		| self.d.Type.Prim() != nil:
 			if !types::IsInt(self.d.Type.Str()) {
-				self.d = nil
-				ret
-			}
-		| self.d.Type.Struct() != nil:
-			if self.d.Type.Struct().Operators.BitNot == nil {
 				self.d = nil
 				ret
 			}
@@ -3493,43 +3478,6 @@ impl binaryEval {
 		ret self.e.s.checkTypeCompatibility1(self.l.Type, self.r, self.op)
 	}
 
-	fn checkStructCommonOperatorCompatibility(mut self): bool {
-		let mut overload: &FnIns = nil
-		match self.op.Id {
-		| token::Id.Shl:
-			overload = self.l.Type.Struct().Operators.Shl
-		| token::Id.Shr:
-			overload = self.l.Type.Struct().Operators.Shr
-		| token::Id.Plus:
-			overload = self.l.Type.Struct().Operators.Add
-		| token::Id.Minus:
-			overload = self.l.Type.Struct().Operators.Sub
-		| token::Id.Solidus:
-			overload = self.l.Type.Struct().Operators.Div
-		| token::Id.Star:
-			overload = self.l.Type.Struct().Operators.Mul
-		| token::Id.Percent:
-			overload = self.l.Type.Struct().Operators.Mod
-		| token::Id.Amper:
-			overload = self.l.Type.Struct().Operators.BitAnd
-		| token::Id.Vline:
-			overload = self.l.Type.Struct().Operators.BitOr
-		| token::Id.Caret:
-			overload = self.l.Type.Struct().Operators.BitXor
-		|:
-			self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
-			ret false
-		}
-
-		if overload == nil {
-			self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
-			ret false
-		}
-
-		mut p := overload.Params[1]
-		ret self.e.s.checkAssignType(p.Decl.Reference, p.Type, self.r, self.op, self.e.getOwnerRefers())
-	}
-
 	fn evalComptimeTypeInfo(mut self): &Data {
 		mut r := self.r.Type.comptimeTypeInfo()
 		if r == nil {
@@ -3740,38 +3688,6 @@ impl binaryEval {
 
 	fn evalStruct(mut self): &Data {
 		match self.op.Id {
-		| token::Id.Gt:
-			if self.l.Type.Struct().Operators.Gt == nil {
-				self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
-				ret nil
-			}
-			ret &Data{
-				Type: primBool,
-			}
-		| token::Id.GtEq:
-			if self.l.Type.Struct().Operators.GtEq == nil {
-				self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
-				ret nil
-			}
-			ret &Data{
-				Type: primBool,
-			}
-		| token::Id.Lt:
-			if self.l.Type.Struct().Operators.Lt == nil {
-				self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
-				ret nil
-			}
-			ret &Data{
-				Type: primBool,
-			}
-		| token::Id.LtEq:
-			if self.l.Type.Struct().Operators.LtEq == nil {
-				self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
-				ret nil
-			}
-			ret &Data{
-				Type: primBool,
-			}
 		| token::Id.Eqs
 		| token::Id.NotEq:
 			if !self.checkTypeCompatibility() {
@@ -3780,12 +3696,10 @@ impl binaryEval {
 			ret &Data{
 				Type: primBool,
 			}
-		}
-
-		if !self.checkStructCommonOperatorCompatibility() {
+		|:
+			self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
 			ret nil
 		}
-		ret self.l
 	}
 
 	fn evalTrait(mut self): &Data {
@@ -4126,12 +4040,6 @@ impl binaryEval {
 			ret nil
 		}
 
-		// Structure may have operator overloading.
-		// Handle them if left operand is struct.
-		if self.l.Type.Struct() != nil {
-			ret self.evalStruct()
-		}
-
 		// Shift operators.
 		if self.op.Id == token::Id.Shl || self.op.Id == token::Id.Shr {
 			ret self.shift()
@@ -4185,6 +4093,8 @@ impl binaryEval {
 			ret self.evalTrait()
 		| self.l.Type.Prim() != nil:
 			ret self.evalPrim()
+		| self.l.Type.Struct() != nil:
+			ret self.evalStruct()
 		|:
 			self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
 			ret nil
@@ -4291,7 +4201,7 @@ impl binaryEval {
 			}
 		}
 
-		// See developer reference (10).
+		// See developer reference (9).
 		mut l, mut r := self.l, self.r
 		if !l.GoodOperand(r) {
 			l, r = r, l

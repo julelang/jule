@@ -4,7 +4,6 @@
 
 use "env"
 use "obj"
-use "std/comptime"
 use "std/jule"
 use "std/jule/ast"
 use "std/jule/build"
@@ -89,18 +88,6 @@ impl ObjectDeadCode {
 				if obj::IsTraitMethod(s, ins) {
 					self.pushLive[&sema::FnIns](ins)
 					self.setReferencesAsLive(ins.Refers)
-				}
-
-				// Set operator overloading methods as alive.
-				// Just cannot trace whether operator overloading is used yet.
-				// So, removing these methods may cause compilation problems.
-				const vs = comptime::ValueOf(*s)
-				const om = vs.Field("Operators")
-				const for _, field in om.Type().Decl().Fields() {
-					if ins == om.Field(field.Name()).Unwrap() {
-						self.pushLive[&sema::FnIns](ins)
-						self.setReferencesAsLive(ins.Refers)
-					}
 				}
 
 				// Set reserved methods as alive.

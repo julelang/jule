@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use "std/comptime"
 use "std/jule/build"
 use "std/jule/sema"
 use "std/os/filepath"
@@ -48,22 +47,6 @@ fn IsAny(mut &t: &sema::Type): bool {
 // Reports whether anonymous function is closure.
 fn IsClosure(&m: &sema::AnonFnExpr): bool { ret len(m.Captured) > 0 }
 
-// Reports whether the m is operator overloading method.
-fn IsOpMethod(&m: &sema::Fn): bool {
-	if len(m.Generics) > 0 || len(m.Instances) == 0 {
-		ret false
-	}
-	mi := m.Instances[0]
-	const tableT = comptime::TypeOf(mi.Owner.Operators).Decl()
-	const tableV = comptime::ValueOf(mi.Owner.Operators)
-	const for _, field in tableT.Fields() {
-		if mi == tableV.Field(field.Name()).Unwrap() {
-			ret true
-		}
-	}
-	ret false
-}
-
 // Reports the f function of owner is implements a trait's method.
 fn IsTraitMethod(mut &owner: &sema::StructIns, &f: &sema::FnIns): bool {
 	for (_, mut t) in owner.Decl.Implements {
@@ -86,7 +69,7 @@ fn IsStdPackage(f: str, p: str): bool {
 }
 
 // Reports whether imp is implicitly imported.
-// See developer reference (9).
+// See "std/jule/sema" developer reference (8).
 fn IsImplicitImport(imp: &sema::ImportInfo): bool {
 	ret imp.Decl.Token == nil
 }

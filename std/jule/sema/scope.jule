@@ -85,12 +85,12 @@ struct Conditional {
 
 // Infinity iteration.
 struct InfIter {
-	Scope: &Scope // See developer reference (11).
+	Scope: &Scope // See developer reference (10).
 }
 
 // While iteration.
 struct WhileIter {
-	Scope: &Scope // See developer reference (11).
+	Scope: &Scope // See developer reference (10).
 	Expr:  Expr   // Can be nil if iteration is while-next kind.
 	Next:  Stmt   // Nil if iteration is not while-next kind.
 }
@@ -104,7 +104,7 @@ impl WhileIter {
 
 // Range iteration.
 struct RangeIter {
-	Scope: &Scope // See developer reference (11).
+	Scope: &Scope // See developer reference (10).
 	Expr:  &Data
 	KeyA:  &Var
 	KeyB:  &Var
@@ -160,7 +160,7 @@ struct MultiAssign {
 
 // Match-Case.
 struct Match {
-	Scope:     &Scope // Owner scope. See developer reference (11).
+	Scope:     &Scope // Owner scope. See developer reference (10).
 	Expr:      &Data
 	TypeMatch: bool
 	Comptime:  bool
@@ -1104,45 +1104,6 @@ impl scopeChecker {
 		d.Mutable = true
 	}
 
-	fn checkStructureAssignOp(mut &self, mut &s: &StructIns, mut &a: &ast::AssignSt, mut &r: &Data): bool {
-		// This method adopted from [binaryEval.checkStructCommonOperatorCompatibility].
-		// Should follow this method.
-		let mut overload: &FnIns = nil
-		match a.Setter.Id {
-		| token::Id.PlusEq:
-			overload = s.Operators.AddAssign
-		| token::Id.MinusEq:
-			overload = s.Operators.SubAssign
-		| token::Id.SolidusEq:
-			overload = s.Operators.DivAssign
-		| token::Id.StarEq:
-			overload = s.Operators.MulAssign
-		| token::Id.PercentEq:
-			overload = s.Operators.ModAssign
-		| token::Id.ShlEq:
-			overload = s.Operators.ShlAssign
-		| token::Id.ShrEq:
-			overload = s.Operators.ShrAssign
-		| token::Id.VlineEq:
-			overload = s.Operators.BitOrAssign
-		| token::Id.AmperEq:
-			overload = s.Operators.BitAndAssign
-		| token::Id.CaretEq:
-			overload = s.Operators.BitXorAssign
-		|:
-			self.s.pushErr(a.Setter, build::LogMsg.OperatorNotForJuleType, a.Setter.Kind, s.Str())
-			ret false
-		}
-
-		if overload == nil {
-			self.s.pushErr(a.Setter, build::LogMsg.OperatorNotForJuleType, a.Setter.Kind, s.Str())
-			ret false
-		}
-
-		mut p := overload.Params[1]
-		ret self.s.checkAssignType(p.Decl.Reference, p.Type, r, a.Setter, self.getOwnerRefers())
-	}
-
 	fn checkSingleAssign(mut &self, mut &a: &ast::AssignSt) {
 		let mut l: &Data = nil
 
@@ -1213,11 +1174,6 @@ impl scopeChecker {
 				rm.Model = r.Model
 				lm.Model = l.Model
 			}
-			ret
-		}
-		mut strct := l.Type.Struct()
-		if strct != nil {
-			self.checkStructureAssignOp(strct, a, r)
 			ret
 		}
 		id := a.Setter.Id
@@ -2273,12 +2229,6 @@ fn checkAssignMut(mut &s: &sema, &left: &Data, mut right: &Data, op: &token::Tok
 		s.pushErr(op, build::LogMsg.AssignToNonMut)
 		ret false
 	| right != nil && !right.Mutable && right.Type.Mutable():
-		if op.Id != token::Id.Eq && right.Type.Struct() != nil {
-			// If operator is not assignment, and kind is structure, allow.
-			// Operator overloading uses immutable copy of right operand.
-			// It's safe.
-			ret true
-		}
 		s.pushErr(op, build::LogMsg.AssignNonMutToMut, right.Type.Str())
 		ret false
 	|:

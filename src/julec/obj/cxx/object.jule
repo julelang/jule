@@ -652,7 +652,7 @@ impl ObjectCoder {
 	}
 
 	fn structureOperatorEq(mut &self, ident: str, mut &s: &sema::StructIns, decl: bool) {
-		if !defaultEq(s) {
+		if !s.Comparable {
 			ret
 		}
 		self.write("\n")
@@ -729,12 +729,6 @@ impl ObjectCoder {
 	}
 
 	fn structureInsDecl(mut &self, mut &s: &sema::StructIns) {
-		for (_, mut m) in s.Methods {
-			// Operator methods are declared by [structureDecl].
-			if isHeadDecl(m) {
-				self.funcDecl(m, false)
-			}
-		}
 		self.write("struct ")
 		identCoder.structureIns(self.Buf, s)
 		self.write(" {\n")
@@ -774,11 +768,8 @@ impl ObjectCoder {
 			if s.Token != nil {
 				for (_, mut ins) in s.Instances {
 					for (_, mut m) in ins.Methods {
-						// Operator methods are declared by [structureDecl].
-						if !isHeadDecl(m) {
-							self.pushResult(m)
-							self.funcDecl(m, false)
-						}
+						self.pushResult(m)
+						self.funcDecl(m, false)
 					}
 				}
 			}
@@ -1384,17 +1375,4 @@ fn concatAllParts(parts: ...&token::Token): []byte {
 		s.WriteStr(p.Kind)!
 	}
 	ret unsafe { s.Buf() }
-}
-
-// Reports whether the m is a method which is declarated top of the struct.
-fn isHeadDecl(mut &m: &sema::Fn): bool {
-	if len(m.Generics) > 0 || len(m.Instances) == 0 {
-		ret false
-	}
-	ret obj::IsOpMethod(m)
-}
-
-// Reports whether structure needs default compare method.
-fn defaultEq(&s: &sema::StructIns): bool {
-	ret s.Comparable && s.Operators.Eq == nil
 }
