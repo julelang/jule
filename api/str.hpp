@@ -53,6 +53,10 @@ namespace jule
             return jule::Str::lit(s, std::strlen(s));
         }
 
+        static inline jule::Str unsafe_from_bytes(const jule::Slice<jule::U8> &bytes) noexcept {
+            return jule::Str::lit(reinterpret_cast<const char*>(bytes.begin()), bytes.len());
+        }
+
         // Returns element by index.
         // Includes safety checking.
         // Designed for constant strings.

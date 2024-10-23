@@ -192,6 +192,34 @@ impl exprOptimizer {
 		ret true
 	}
 
+	// Optimizes string conversions if possible.
+	// It may apply optimizations with unsafe behaviors.
+	// So make sure this optimizations are always safe for the scope.
+	fn strConv(self, mut &m: &sema::OperandExpr) {
+		p := m.Type.Prim()
+		if p == nil || !p.IsStr() {
+			ret
+		}
+		match type m.Model {
+		| &sema::CastingExpr:
+			// str(?)
+			mut c := (&sema::CastingExpr)(m.Model)
+			mut s := c.Expr.Type.Slc()
+			if s == nil {
+				break
+			}
+			sp := s.Elem.Prim()
+			if sp == nil {
+				break
+			}
+			if sp.IsU8() {
+				// str([]byte)
+				mut model := any(&StrFromBytes{Expr: c.Expr.Model})
+				m.Model = unsafe { *(*sema::Expr)(&model) }
+			}
+		}
+	}
+
 	fn strCond(self, mut &m: &sema::BinaryExpr): bool {
 		lp := m.Left.Type.Prim()
 		if lp == nil || !lp.IsStr() {
@@ -293,8 +321,14 @@ impl exprOptimizer {
 				//  So handle `"foo" + x + "bar"` expression first, then the right operand `+ "baz"`.
 				//  So, recursively handle the left binary expression operands,
 				//  and push the expression models by left-to-right order.
-				unsafe { _step((&sema::BinaryExpr)(m).Left.Model) }
-				unsafe { _step((&sema::BinaryExpr)(m).Right.Model) }
+				mut binary := (&sema::BinaryExpr)(m)
+				unsafe {
+					// Apply common optimizations for each binary expression.
+					self.binaryStrCommon(binary)
+
+					_step(binary.Left.Model)
+					_step(binary.Right.Model)
+				}
 			|:
 				model.Parts = append(model.Parts, m)
 			}
@@ -585,8 +619,16 @@ impl exprOptimizer {
 		ret true
 	}
 
+	// Common string optimizations for binary expressions.
+	// Always make sure this optimization will not block the following analysis.
+	fn binaryStrCommon(self, mut &m: &sema::BinaryExpr) {
+		self.strConv(m.Left)
+		self.strConv(m.Right)
+	}
+
 	fn binary(self, mut m: &sema::BinaryExpr) {
 		if Str {
+			self.binaryStrCommon(m)
 			match {
 			| self.strCond(m)
 			| self.strConcat(m):
