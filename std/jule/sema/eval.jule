@@ -1766,41 +1766,45 @@ impl eval {
 			ret nil
 		}
 
-		match {
-		| d.IsNil():
-			if !t.NilCompatible() {
-				self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, "<nil>", t.Str())
+		// if actual types are equal, allow casting
+		// otherwise check casting in more detail
+		if !d.Type.deepActualEqual(t) {
+			match {
+			| d.IsNil():
+				if !t.NilCompatible() {
+					self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, "<nil>", t.Str())
+				}
+				d.Constant = nil // Remove nil constant.
+				d.untyped = false
+			| d.Type.Prim() != nil && d.Type.Prim().IsAny():
+				if t.TypeEnum() != nil {
+					self.pushErr(errorToken, build::LogMsg.TypeEnumCastedFromAny)
+				}
+				d.Constant = nil
+				d.untyped = false
+			| t.Prim() != nil && t.Prim().IsAny():
+				// The any type supports casting to any data type.
+				d.Constant = nil
+				d.untyped = false
+			| d.Type.TypeEnum() != nil:
+				self.castTypeEnum(t, d, errorToken)
+			| t.TypeEnum() != nil:
+				self.castTypeEnumT(t, d, errorToken)
+			| t.Ptr() != nil:
+				self.castPtr(t, d, errorToken)
+			| t.Sptr() != nil:
+				self.castRef(t, d, errorToken)
+			| t.Slc() != nil:
+				self.castSlc(t, d, errorToken)
+			| t.Struct() != nil:
+				self.castStruct(t, d, errorToken)
+			| t.Prim() != nil:
+				self.castPrim(t, d, errorToken)
+				self.castConstant(t, d)
+			|:
+				self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCasting, t.Str())
+				d = nil
 			}
-			d.Constant = nil // Remove nil constant.
-			d.untyped = false
-		| d.Type.Prim() != nil && d.Type.Prim().IsAny():
-			if t.TypeEnum() != nil {
-				self.pushErr(errorToken, build::LogMsg.TypeEnumCastedFromAny)
-			}
-			d.Constant = nil
-			d.untyped = false
-		| t.Prim() != nil && t.Prim().IsAny():
-			// The any type supports casting to any data type.
-			d.Constant = nil
-			d.untyped = false
-		| d.Type.TypeEnum() != nil:
-			self.castTypeEnum(t, d, errorToken)
-		| t.TypeEnum() != nil:
-			self.castTypeEnumT(t, d, errorToken)
-		| t.Ptr() != nil:
-			self.castPtr(t, d, errorToken)
-		| t.Sptr() != nil:
-			self.castRef(t, d, errorToken)
-		| t.Slc() != nil:
-			self.castSlc(t, d, errorToken)
-		| t.Struct() != nil:
-			self.castStruct(t, d, errorToken)
-		| t.Prim() != nil:
-			self.castPrim(t, d, errorToken)
-			self.castConstant(t, d)
-		|:
-			self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCasting, t.Str())
-			d = nil
 		}
 
 		if d == nil {
