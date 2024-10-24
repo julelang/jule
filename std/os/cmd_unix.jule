@@ -25,7 +25,7 @@ cpp let F_SETFD: int
 cpp let FD_CLOEXEC: int
 
 // Type of a process id.
-type pid: int
+type pid = int
 
 const invalidPid = -1
 
@@ -106,7 +106,7 @@ impl Cmd {
 			args = append(args, self.Args...)
 			setenv(self.Env) else { error(error) }
 			execvp(path, args)
-			code := conv::Itoa(sys::GetLastErrno())
+			code := conv::Itoa(int(sys::GetLastErrno()))
 			unsafe { sys::Write(pipe1, &code[0], uint(len(code))) }
 			sys::Close(pipe1)
 			Exit(1)
@@ -118,7 +118,7 @@ impl Cmd {
 			if n != 0 {
 				self.attrs.pid = invalidPid
 				code, _ := unsafe { conv::AtoiBp(&buf[0], n) }
-				error(cmdErrorFromCode(code))
+				error(cmdErrorFromCode(sys::Errno(code)))
 			}
 		}
 	}
@@ -148,7 +148,7 @@ impl Cmd {
 	}
 }
 
-fn cmdErrorFromCode(code: int): CmdError {
+fn cmdErrorFromCode(code: sys::Errno): CmdError {
 	match code {
 	| sys::EACCES:
 		ret CmdError.Denied
