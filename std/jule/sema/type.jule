@@ -21,6 +21,7 @@ struct InsGeneric {
 // Type alias.
 struct TypeAlias {
 	Scope:    &ast::ScopeTree
+	Strict:   bool
 	Public:   bool
 	Binded:   bool
 	Used:     bool
@@ -87,13 +88,43 @@ impl Type {
 	// Reports whether kind is "nil".
 	fn IsNil(self): bool { ret self.Kind == nil }
 
-	// Reports whether kind is "void".
+	// Reports whether actual kind is "void".
 	fn Void(self): bool {
 		prim := unsafe { (*(&self)).Prim() }
 		ret prim != nil && prim.Kind == "void"
 	}
 
-	// Reports whether kind is comparable.
+	// Returns actual kind of the type, so returns the root type.
+	// If kind is a struct, which is implemented by the type statement,
+	// see developer reference (11) for details, returns the actual kind of
+	// the source type of the struct.
+	fn ActualKind(mut self): Kind {
+		match type self.Kind {
+		| &StructIns:
+			mut s := (&StructIns)(self.Kind)
+			if s.Source != nil {
+				ret s.Source.ActualKind()
+			}
+		}
+		ret self.Kind
+	}
+
+	// Reports whether actual kinds are equal.
+	fn ActualEqual(self, other: &Type): bool {
+		if self.IsNil() {
+			ret other.IsNil()
+		}
+		if self.Binded() || other.Binded() {
+			ret self.Binded() == other.Binded() && self.BindIdent == other.BindIdent
+		}
+		l := unsafe { (*(&self)).ActualKind() }
+		r := unsafe { (*(&other)).ActualKind() }
+		lt := Type{Kind: l}
+		rt := Type{Kind: r}
+		ret (unsafe { (&Type)(&lt) }).Equal(unsafe { (&Type)(&rt) })
+	}
+
+	// Reports whether actual kind is comparable.
 	fn Comparable(self): bool {
 		unsafe {
 			mut _self := &self
@@ -107,7 +138,7 @@ impl Type {
 		}
 	}
 
-	// Reports whether kind is mutable.
+	// Reports whether actual kind is mutable.
 	fn Mutable(self): bool {
 		unsafe {
 			mut _self := &self
@@ -130,7 +161,7 @@ impl Type {
 		}
 	}
 
-	// Reports whether kind supports ordered constrait.
+	// Reports whether actual kind supports ordered constrait.
 	fn Ordered(self): bool {
 		unsafe {
 			mut _self := &self
@@ -149,7 +180,7 @@ impl Type {
 		}
 	}
 
-	// Reports whether kind is nil compatible.
+	// Reports whether actual kind is nil compatible.
 	fn NilCompatible(self): bool {
 		unsafe {
 			mut _self := &self
@@ -170,7 +201,7 @@ impl Type {
 		}
 	}
 
-	// Reports whether kind performs garbage collection.
+	// Reports whether actual kind performs garbage collection.
 	fn GC(self): bool {
 		unsafe {
 			mut _self := &self
@@ -183,96 +214,112 @@ impl Type {
 		}
 	}
 
-	// Reports whether kind is variadicable.
+	// Reports whether actual kind is variadicable.
 	fn Variadicable(self): bool {
-		unsafe {
-			mut _self := &self
-			ret _self.Slc() != nil
-		}
+		mut _self := &self
+		ret unsafe { _self.Slc() != nil }
 	}
 
-	// Returns primitive type if kind is primitive type, nil reference if not.
+	// Returns primitive type if actual kind is primitive type, nil reference if not.
 	fn Prim(mut self): &Prim {
-		match type self.Kind {
+		mut kind := self.ActualKind()
+		match type kind {
 		| &Prim:
-			ret (&Prim)(self.Kind)
+			ret (&Prim)(kind)
 		|:
 			ret nil
 		}
 	}
 
-	// Returns reference type if kind is smart pointer, nil reference if not.
+	// Returns reference type if actual kind is smart pointer, nil reference if not.
 	fn Sptr(mut self): &Sptr {
-		match type self.Kind {
+		mut kind := self.ActualKind()
+		match type kind {
 		| &Sptr:
-			ret (&Sptr)(self.Kind)
+			ret (&Sptr)(kind)
 		|:
 			ret nil
 		}
 	}
 
-	// Returns pointer type if kind is pointer, nil reference if not.
+	// Returns pointer type if actual kind is pointer, nil reference if not.
 	fn Ptr(mut self): &Ptr {
-		match type self.Kind {
+		mut kind := self.ActualKind()
+		match type kind {
 		| &Ptr:
-			ret (&Ptr)(self.Kind)
+			ret (&Ptr)(kind)
 		|:
 			ret nil
 		}
 	}
 
-	// Returns enum type if kind is enum, nil reference if not.
+	// Returns enum type if actual kind is enum, nil reference if not.
 	fn Enum(mut self): &Enum {
-		match type self.Kind {
+		mut kind := self.ActualKind()
+		match type kind {
 		| &Enum:
-			ret (&Enum)(self.Kind)
+			ret (&Enum)(kind)
 		|:
 			ret nil
 		}
 	}
 
-	// Returns type enum if kind is type enum, nil reference if not.
+	// Returns type enum if actual kind is type enum, nil reference if not.
 	fn TypeEnum(mut self): &TypeEnum {
-		match type self.Kind {
+		mut kind := self.ActualKind()
+		match type kind {
 		| &TypeEnum:
-			ret (&TypeEnum)(self.Kind)
+			ret (&TypeEnum)(kind)
 		|:
 			ret nil
 		}
 	}
 
-	// Returns array type if kind is array, nil reference if not.
+	// Returns array type if actual kind is array, nil reference if not.
 	fn Arr(mut self): &Arr {
-		match type self.Kind {
+		mut kind := self.ActualKind()
+		match type kind {
 		| &Arr:
-			ret (&Arr)(self.Kind)
+			ret (&Arr)(kind)
 		|:
 			ret nil
 		}
 	}
 
-	// Returns slice type if kind is slice, nil reference if not.
+	// Returns slice type if actual kind is slice, nil reference if not.
 	fn Slc(mut self): &Slc {
-		match type self.Kind {
+		mut kind := self.ActualKind()
+		match type kind {
 		| &Slc:
-			ret (&Slc)(self.Kind)
+			ret (&Slc)(kind)
 		|:
 			ret nil
 		}
 	}
 
-	// Returns fn type if kind is function, nil reference if not.
+	// Returns fn type if actual kind is function, nil reference if not.
 	fn Fn(mut self): &FnIns {
-		match type self.Kind {
+		mut kind := self.ActualKind()
+		match type kind {
 		| &FnIns:
-			ret (&FnIns)(self.Kind)
+			ret (&FnIns)(kind)
 		|:
 			ret nil
 		}
 	}
 
-	// Returns struct type if kind is structure, nil reference if not.
+	// Returns struct type if actual kind is structure, nil reference if not.
 	fn Struct(mut self): &StructIns {
+		mut kind := self.ActualKind()
+		match type kind {
+		| &StructIns:
+			ret (&StructIns)(kind)
+		|:
+			ret nil
+		}
+	}
+
+	fn softStruct(mut self): &StructIns {
 		match type self.Kind {
 		| &StructIns:
 			ret (&StructIns)(self.Kind)
@@ -281,31 +328,34 @@ impl Type {
 		}
 	}
 
-	// Returns trait type if kind is trait, nil reference if not.
+	// Returns trait type if actual kind is trait, nil reference if not.
 	fn Trait(mut self): &Trait {
-		match type self.Kind {
+		mut kind := self.ActualKind()
+		match type kind {
 		| &Trait:
-			ret (&Trait)(self.Kind)
+			ret (&Trait)(kind)
 		|:
 			ret nil
 		}
 	}
 
-	// Returns map type if kind is map, nil reference if not.
+	// Returns map type if actual kind is map, nil reference if not.
 	fn Map(mut self): &Map {
-		match type self.Kind {
+		mut kind := self.ActualKind()
+		match type kind {
 		| &Map:
-			ret (&Map)(self.Kind)
+			ret (&Map)(kind)
 		|:
 			ret nil
 		}
 	}
 
-	// Returns tuple type if kind is tuple, nil reference if not.
+	// Returns tuple type if actual kind is tuple, nil reference if not.
 	fn Tup(mut self): &Tuple {
-		match type self.Kind {
+		mut kind := self.ActualKind()
+		match type kind {
 		| &Tuple:
-			ret (&Tuple)(self.Kind)
+			ret (&Tuple)(kind)
 		|:
 			ret nil
 		}
@@ -505,11 +555,11 @@ impl Kind for Prim {
 
 	// Reports whether types are same.
 	fn Equal(&self, other: &Type): bool {
-		prim := unsafe { (*(&other)).Prim() }
-		if prim == nil {
-			ret false
+		match type other.Kind {
+		| &Prim:
+			ret self.Kind == (&Prim)(other.Kind).Kind
 		}
-		ret self.Kind == prim.Kind
+		ret false
 	}
 }
 
@@ -582,11 +632,11 @@ impl Kind for Sptr {
 
 	// Reports whether types are same.
 	fn Equal(&self, other: &Type): bool {
-		sptr := unsafe { (*(&other)).Sptr() }
-		if sptr == nil {
-			ret false
+		match type other.Kind {
+		| &Sptr:
+			ret self.Elem.Equal((&Sptr)(other.Kind).Elem)
 		}
-		ret self.Elem.Equal(sptr.Elem)
+		ret false
 	}
 }
 
@@ -601,11 +651,11 @@ impl Kind for Slc {
 
 	// Reports whether types are same.
 	fn Equal(&self, other: &Type): bool {
-		slc := unsafe { (*(&other)).Slc() }
-		if slc == nil {
-			ret false
+		match type other.Kind {
+		| &Slc:
+			ret self.Elem.Equal((&Slc)(other.Kind).Elem)
 		}
-		ret self.Elem.Equal(slc.Elem)
+		ret false
 	}
 }
 
@@ -630,21 +680,21 @@ impl Kind for Tuple {
 
 	// Reports whether types are same.
 	fn Equal(&self, other: &Type): bool {
-		tup := unsafe { (*(&other)).Tup() }
-		if tup == nil {
-			ret false
-		}
-		if len(self.Types) != len(tup.Types) {
-			ret false
-		}
-		mut i := 0
-		for i < len(self.Types); i++ {
-			if !self.Types[i].Equal(tup.Types[i]) {
+		match type other.Kind {
+		| &Tuple:
+			tup := (&Tuple)(other.Kind)
+			if len(self.Types) != len(tup.Types) {
 				ret false
 			}
+			mut i := 0
+			for i < len(self.Types); i++ {
+				if !self.Types[i].Equal(tup.Types[i]) {
+					ret false
+				}
+			}
+			ret true
 		}
-
-		ret true
+		ret false
 	}
 }
 
@@ -667,11 +717,13 @@ impl Kind for Map {
 
 	// Reports whether types are same.
 	fn Equal(&self, other: &Type): bool {
-		m := unsafe { (*(&other)).Map() }
-		if m == nil {
-			ret false
+		match type other.Kind {
+		| &Map:
+			m := (&Map)(other.Kind)
+			ret self.Key.Equal(m.Key) && self.Val.Equal(m.Val)
+			
 		}
-		ret self.Key.Equal(m.Key) && self.Val.Equal(m.Val)
+		ret false
 	}
 }
 
@@ -695,11 +747,12 @@ impl Kind for Arr {
 
 	// Reports whether types are same.
 	fn Equal(&self, other: &Type): bool {
-		arr := unsafe { (*(&other)).Arr() }
-		if arr == nil {
-			ret false
+		match type other.Kind {
+		| &Arr:
+			arr := (&Arr)(other.Kind)
+			ret self.N == arr.N && self.Elem.Equal(arr.Elem)
 		}
-		ret self.N == arr.N && self.Elem.Equal(arr.Elem)
+		ret false
 	}
 }
 
@@ -719,17 +772,19 @@ impl Kind for Ptr {
 
 	// Reports whether types are same.
 	fn Equal(&self, other: &Type): bool {
-		ptr := unsafe { (*(&other)).Ptr() }
-		match {
-		| ptr == nil:
-			ret false
-		| self.IsUnsafe():
-			ret ptr.IsUnsafe()
-		| ptr.IsUnsafe():
-			ret self.IsUnsafe()
-		|:
-			ret self.Elem.Equal(ptr.Elem)
+		match type other.Kind {
+		| &Ptr:
+			ptr := (&Ptr)(other.Kind)
+			match {
+			| self.IsUnsafe():
+				ret ptr.IsUnsafe()
+			| ptr.IsUnsafe():
+				ret self.IsUnsafe()
+			|:
+				ret self.Elem.Equal(ptr.Elem)
+			}
 		}
+		ret false
 	}
 }
 
@@ -993,17 +1048,19 @@ impl typeChecker {
 
 		// Build kind if not builded already.
 		if ta.TypeSym.Type == nil {
-			ok := self.s.checkTypeAliasDeclKind(ta, self.lookup)
+			ok := self.s.checkTypeAliasDecl(ta, self.lookup)
 			if !ok {
 				ret nil
 			}
 		}
 
-		match type ta.TypeSym.Type.Kind {
-		| &StructIns:
-			ok := self.checkIllegalCycles(decl, (&StructIns)(ta.TypeSym.Type.Kind).Decl)
-			if !ok {
-				ret nil
+		{
+			mut s := ta.TypeSym.Type.Struct()
+			if s != nil {
+				ok := self.checkIllegalCycles(decl, s.Decl)
+				if !ok {
+					ret nil
+				}
 			}
 		}
 
@@ -1800,4 +1857,17 @@ fn applyImplicitCast(mut &s: &sema, mut &dest: &Type, mut &d: &Data,
 // Reports whether type is valid for SizeOf/AlignOf functions.
 fn validTypeForXof(mut &t: &Type): bool {
 	ret !t.Void() && t.Fn() == nil && t.Tup() == nil && !t.comptime()
+}
+
+// Initializes new structure for strict types.
+// See developer reference (11) for details.
+fn initNewStructType(ident: str, mut source: &Type): &StructIns {
+	mut s := new(Struct)
+	s.Ident = ident
+	mut ins := s.instance()
+	s.appendInstance(ins)
+	ins.Source = source
+	ins.Comparable = source.Comparable()
+	ins.Mutable = source.Mutable()
+	ret ins
 }

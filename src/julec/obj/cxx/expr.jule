@@ -471,6 +471,11 @@ impl exprCoder {
 	//    Otherwise, code generation might be wrong because <any> the
 	//    uses special casting algorithms.
 	fn casting(mut &self, mut m: &sema::CastingExpr) {
+		if m.Type.ActualEqual(m.ExprType) {
+			self.possibleRefExpr(m.Expr.Model)
+			ret
+		}
+
 		match {
 		| obj::IsAny(m.Type):
 			if m.ExprType.IsNil() {
@@ -719,7 +724,8 @@ impl exprCoder {
 			self.possibleRefExpr((&opt::UnsafeDerefExpr)(m).Base.Expr.Model)
 			ret false
 		|:
-			panic("cxx: implementation mistake, this panic call should be unreachable")
+			self.possibleRefExpr(m)
+			ret false
 		}
 	}
 
@@ -759,39 +765,43 @@ impl exprCoder {
 				| m.Func.Decl.Params[0].IsRef():
 					// Ignore dereferencing, use data directly to call method.
 					_ = self.writeReceiver(ssie.Expr.Model)
-				| ssie.Expr.Type.Sptr() != nil:
-					// Ignore dereferencing, use data directly to call [ptr] method.
-					safe := self.writeReceiver(ssie.Expr.Model)
-					if safe {
-						self.oc.write(".ptr(")
-						if !env::Production {
-							self.oc.write("\"")
-							self.oc.locInfo(m.Token)
-							self.oc.write("\"")
-						}
-						self.oc.write(")")
-					}
 				|:
-					if ssie.Expr.Type.Struct() != nil {
-						match type ssie.Expr.Model {
-						| &sema::Var:
-							v := (&sema::Var)(ssie.Expr.Model)
-							if v.Reference {
-								break
+					match type ssie.Expr.Type.Kind {
+					| &sema::Sptr:
+						// Ignore dereferencing, use data directly to call [ptr] method.
+						safe := self.writeReceiver(ssie.Expr.Model)
+						if safe {
+							self.oc.write(".ptr(")
+							if !env::Production {
+								self.oc.write("\"")
+								self.oc.locInfo(m.Token)
+								self.oc.write("\"")
 							}
-							fall
-						|:
-							// Add address taking operation for non-pointers.
-							self.oc.write("&")
+							self.oc.write(")")
 						}
-					}
-					if wrapped {
-						self.oc.write("_wrap_copy")
-					} else if ssie.Expr.Type.Ptr() == nil {
-						self.model(ssie.Expr.Model)
-					} else {
-						// Ignore dereferencing, use data directly to call method.
-						self.possibleRefExpr((&sema::UnaryExpr)(ssie.Expr.Model).Expr.Model)
+					|:
+						match type ssie.Expr.Type.Kind {
+						| &sema::StructIns:
+							match type ssie.Expr.Model {
+							| &sema::Var:
+								v := (&sema::Var)(ssie.Expr.Model)
+								if v.Reference {
+									break
+								}
+								fall
+							|:
+								// Add address taking operation for non-pointers.
+								self.oc.write("&")
+							}
+						}
+						if wrapped {
+							self.oc.write("_wrap_copy")
+						} else if ssie.Expr.Type.Ptr() == nil {
+							self.model(ssie.Expr.Model)
+						} else {
+							// Ignore dereferencing, use data directly to call method.
+							self.possibleRefExpr((&sema::UnaryExpr)(ssie.Expr.Model).Expr.Model)
+						}
 					}
 				}
 				if len(m.Args) > 0 {

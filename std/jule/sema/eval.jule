@@ -881,17 +881,26 @@ impl eval {
 		}
 	}
 
-	fn evalSliceExpr(mut &self, mut s: &ast::SliceExpr): &Data {
+	fn evalSliceExpr(mut &self, mut s: &ast::SliceExpr): (d: &Data) {
 		if self.prefix != nil {
 			match {
 			| self.prefix.Arr() != nil:
-				ret self.evalArr(s)
+				d = self.evalArr(s)
 			| self.prefix.Slc() != nil:
 				mut pt := self.prefix.Slc()
-				ret self.evalExpSlc(s, pt.Elem, nil)
+				d = self.evalExpSlc(s, pt.Elem, nil)
+			|:
+				goto autoDetermine
 			}
+			if d != nil {
+				mut strct := self.prefix.softStruct()
+				if strct != nil && strct.Source != nil {
+					d.Type = &Type{Kind: strct}
+				}
+			}
+			ret
 		}
-
+	autoDetermine:
 		mut prefix := self.prefix
 		self.prefix = nil
 
@@ -911,7 +920,7 @@ impl eval {
 		self.s.checkValidityForInitExpr(self.target.mutable, destIsRef,
 			firstElem.Type, firstElem, firstExpr.Token)
 
-		mut d := self.evalExpSlc(s, firstElem.Type, firstElem.Model)
+		d = self.evalExpSlc(s, firstElem.Type, firstElem.Model)
 
 		self.prefix = prefix
 		ret d
@@ -1579,6 +1588,12 @@ impl eval {
 		}
 	}
 
+	fn castBool(mut self, mut d: &Data, errorToken: &token::Token) {
+		if !d.Type.Equal(primBool) {
+			self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, str(types::Kind.Bool), d.Type.Str())
+		}
+	}
+
 	fn castStr(mut self, mut d: &Data, errorToken: &token::Token) {
 		if d.Type.Enum() != nil {
 			mut e := d.Type.Enum()
@@ -1590,8 +1605,11 @@ impl eval {
 		c := d.Constant
 		d.Constant = nil
 		d.untyped = false
-		if d.Type.Prim() != nil {
-			prim := d.Type.Prim()
+		mut prim := d.Type.Prim()
+		if prim != nil {
+			if prim.IsStr() {
+				ret
+			}
 			if !prim.IsU8() && !prim.IsI32() {
 				self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, str(types::Kind.Str), d.Type.Str())
 				ret
@@ -1619,7 +1637,7 @@ impl eval {
 		}
 
 		mut t := s.Elem
-		prim := t.Prim()
+		prim = t.Prim()
 		if prim == nil || (!prim.IsU8() && !prim.IsI32()) {
 			self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, str(types::Kind.Str), d.Type.Str())
 			ret
@@ -1710,6 +1728,8 @@ impl eval {
 			panic("sema: castPrim: any case should be unreachable in this routine")
 		| prim.IsStr():
 			self.castStr(d, errorToken)
+		| prim.IsBool():
+			self.castBool(d, errorToken)
 		| types::IsInt(prim.Str()):
 			self.castInt(t, d, errorToken)
 		| types::IsNum(prim.Str()):
@@ -1937,10 +1957,20 @@ impl eval {
 
 	eval:
 		mut d := self.evalStructLitExplicit(s, lit.Exprs, lit.Kind.Token)
-		if t.Type.Sptr() != nil {
+		match type t.Type.Kind {
+		| &Sptr:
 			mut model := (&StructLitExpr)(d.Model)
 			makeStructLitAlloc(d, model)
 		}
+
+		if d != nil {
+			mut strct := t.Type.softStruct()
+			if strct != nil && strct.Source != nil {
+				(&StructLitExpr)(d.Model).Strct = strct
+				d.Type = &Type{Kind: strct}
+			}
+		}
+
 		ret d
 	}
 
@@ -2338,6 +2368,19 @@ impl eval {
 		ret d
 	}
 
+	// Like evalStructSubIdent, but checks only for fields.
+	fn evalStructSubIdentFieldOnly(mut self, mut d: &Data, mut s: &StructIns, mut si: &ast::SubIdentExpr): (&Data, found: bool) {
+		mut f := s.FindField(si.Ident.Kind)
+		if f != nil {
+			if !self.s.isAccessibleDefine(f.Decl.Public, f.Decl.Token) {
+				self.pushErr(si.Ident, build::LogMsg.IdentIsNotAccessible, f.Decl.Ident)
+				self.pushSuggestion(build::LogMsg.MakePubToAccess)
+			}
+			ret self.evalStructSubIdentField(d, s, si.Ident, f), true
+		}
+		ret nil, false
+	}
+
 	// This method evaluates expressions, will not check public availability.
 	// The tok parameter should be identifier to accessed.
 	fn evalStructSubIdentMethod(mut self, mut &d: &Data, mut &s: &StructIns, mut &tok: &token::Token, mut &m: &Fn, ref: bool): &Data {
@@ -2362,13 +2405,17 @@ impl eval {
 	}
 
 	fn evalStructSubIdent(mut self, mut d: &Data, mut s: &StructIns, mut si: &ast::SubIdentExpr, ref: bool): &Data {
-		mut f := s.FindField(si.Ident.Kind)
-		if f != nil {
-			if !self.s.isAccessibleDefine(f.Decl.Public, f.Decl.Token) {
-				self.pushErr(si.Ident, build::LogMsg.IdentIsNotAccessible, f.Decl.Ident)
-				self.pushSuggestion(build::LogMsg.MakePubToAccess)
+		{
+			mut tempS := s
+			if s.Source != nil {
+				tempS = s.Source.Struct()
 			}
-			ret self.evalStructSubIdentField(d, s, si.Ident, f)
+			if tempS != nil {
+				mut r, found := self.evalStructSubIdentFieldOnly(d, tempS, si)
+				if found {
+					ret r
+				}
+			}
 		}
 
 		const Static = false
@@ -2740,8 +2787,8 @@ impl eval {
 			ret self.evalEnumStatic(d.Type.Enum(), si.Ident)
 		| d.Type.TypeEnum() != nil:
 			ret self.evalTypeEnumStatic(d.Type.TypeEnum(), si.Ident)
-		| d.Type.Struct() != nil:
-			ret self.evalStructStatic(d.Type.Struct(), si.Ident)
+		| d.Type.softStruct() != nil:
+			ret self.evalStructStatic(d.Type.softStruct(), si.Ident)
 		|:
 			self.pushErr(si.Ident, build::LogMsg.TypeNotSupportSubFields, d.Type.Str())
 			ret nil
@@ -2799,31 +2846,37 @@ impl eval {
 			}
 		}
 		mut kind := d.Type
-		match {
-		| d.Type.Ptr() != nil:
-			ptr := d.Type.Ptr()
+		match type d.Type.Kind {
+		| &Ptr:
+			mut ptr := (&Ptr)(d.Type.Kind)
 			if ptr.IsUnsafe() {
 				break
 			}
 			if !self.isUnsafe() {
 				self.pushErr(si.Ident, build::LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
 			}
-			kind = d.Type.Ptr().Elem
+			kind = ptr.Elem
 			makeImplicitDeref(d, si.Ident)
-		| d.Type.Sptr() != nil:
-			kind = d.Type.Sptr().Elem
+		| &Sptr:
+			mut sptr := (&Sptr)(d.Type.Kind)
+			kind = sptr.Elem
 			makeImplicitDeref(d, si.Ident)
 		}
 
-		match {
-		| d.Type.Trait() != nil:
-			ret self.evalTraitSubIdent(d, d.Type.Trait(), si.Ident)
-		| kind.Struct() != nil:
-			s := kind.Struct()
-			if isInstancedStruct(s) {
-				mut usedReferenceElem := d.Type.Sptr() != nil
-				ret self.evalStructSubIdent(d, kind.Struct(), si, usedReferenceElem)
+		match type kind.Kind {
+		| &StructIns:
+			mut s := (&StructIns)(kind.Kind)
+			if s.Source != nil || isInstancedStruct(s) {
+				mut usedReferenceElem := false
+				match type d.Type.Kind {
+				| &Sptr:
+					usedReferenceElem = true
+				}
+				ret self.evalStructSubIdent(d, s, si, usedReferenceElem)
 			}
+		}
+		if d.Type.Trait() != nil {
+			ret self.evalTraitSubIdent(d, d.Type.Trait(), si.Ident)
 		}
 		self.pushErr(si.Ident, build::LogMsg.ObjNotSupportSubFields, d.Type.Str())
 		ret nil
@@ -2926,19 +2979,30 @@ impl eval {
 		}
 	}
 
-	fn evalBraceLit(mut &self, mut lit: &ast::BraceLit): &Data {
+	fn evalBraceLit(mut &self, mut lit: &ast::BraceLit): (d: &Data) {
 		match {
 		| self.prefix == nil:
 			self.pushErr(lit.Token, build::LogMsg.InvalidSyntax)
 			ret nil
 		| self.prefix.Map() != nil:
-			ret self.evalMap(self.prefix.Map(), lit)
+			d = self.evalMap(self.prefix.Map(), lit)
 		| self.prefix.Struct() != nil:
-			ret self.evalStructLitExplicit(self.prefix.Struct(), lit.Exprs, lit.Token)
+			d = self.evalStructLitExplicit(self.prefix.Struct(), lit.Exprs, lit.Token)
 		|:
 			self.pushErr(lit.Token, build::LogMsg.InvalidSyntax)
 			ret nil
 		}
+		if d != nil {
+			mut strct := self.prefix.softStruct()
+			if strct != nil && strct.Source != nil {
+				d.Type = &Type{Kind: strct}
+				match type d.Model {
+				| &StructLitExpr:
+					(&StructLitExpr)(d.Model).Strct = strct
+				}
+			}
+		}
+		ret
 	}
 
 	fn evalAnonFunc(mut &self, mut decl: &ast::FnDecl): &Data {
