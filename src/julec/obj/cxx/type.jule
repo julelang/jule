@@ -282,7 +282,7 @@ impl typeCoder {
 			// As we can see here, bind defines use pure identifiers directly.
 			// So, if you hesitate about a type that causes wrong code generation,
 			// write relevant algorithms above this case.
-			buf.WriteStr(getBindIdent(k))!
+			buf.WriteStr(obj::GetBindIdent(k))!
 			ret
 		| k.Prim() != nil:
 			self.prim(buf, k.Prim())
@@ -402,7 +402,7 @@ impl resultCoder {
 			//   if namespace directive will not be removed in the future,
 			//   fix this conflict issues
 			s.WriteStr(resultCoder.BindPrefix)!
-			s.WriteStr(getBindIdent(t))!
+			s.WriteStr(obj::GetBindIdent(t))!
 			ret
 		}
 		match type t.Kind {
@@ -490,18 +490,4 @@ fn shouldInitialized(mut &t: &sema::Type): bool {
 	|:
 		ret true
 	}
-}
-
-fn getBindIdent(t: &sema::Type): str {
-	match type t.Kind {
-	| &sema::StructIns:
-		s := (&sema::StructIns)(t.Kind)
-		if s.Decl.Binded {
-			ret s.Decl.Ident
-		}
-		if s.Source != nil {
-			ret getBindIdent(s.Source)
-		}
-	}
-	ret ""
 }

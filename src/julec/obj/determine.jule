@@ -29,7 +29,7 @@ fn IsExprComesFromBind(&d: &sema::Data): bool {
 	| &sema::Var:
 		ret (&sema::Var)(d.Model).Binded
 	| &sema::StructSubIdentExpr:
-		ret (&sema::StructSubIdentExpr)(d.Model).Owner.Decl.Binded
+		ret IsStructBinded((&sema::StructSubIdentExpr)(d.Model).Owner)
 	|:
 		ret false
 	}
@@ -72,4 +72,19 @@ fn IsStdPackage(f: str, p: str): bool {
 // See "std/jule/sema" developer reference (8).
 fn IsImplicitImport(imp: &sema::ImportInfo): bool {
 	ret imp.Decl.Token == nil
+}
+
+// Reports whether structure is represents binded type.
+// Assumes the source type is struct if exist.
+fn IsStructBinded(s: &sema::StructIns): bool {
+	if s.Decl.Binded {
+		ret true
+	}
+	if s.Source != nil {
+		match type s.Source.Kind {
+		| &sema::StructIns:
+			ret IsStructBinded((&sema::StructIns)(s.Source.Kind))
+		}
+	}
+	ret false
 }
