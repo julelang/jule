@@ -41,7 +41,6 @@ trait Kind {
 
 // Evaluated type declaration.
 struct Type {
-	BindIdent: str
 	Generic:   bool
 	Variadic:  bool
 	Kind:      Kind
@@ -59,13 +58,7 @@ impl Kind for Type {
 		if self.Variadic {
 			kind.WriteStr("...")!
 		}
-
-		if self.Binded() {
-			kind.WriteStr("cpp.")!
-			kind.WriteStr(self.BindIdent)!
-		} else {
-			kind.WriteStr(self.Kind.Str())!
-		}
+		kind.WriteStr(self.Kind.Str())!
 		ret kind.Str()
 	}
 
@@ -74,16 +67,22 @@ impl Kind for Type {
 		if self.IsNil() {
 			ret other.IsNil()
 		}
-		if self.Binded() || other.Binded() {
-			ret self.Binded() == other.Binded() && self.BindIdent == other.BindIdent
-		}
 		ret self.Kind.Equal(other)
 	}
 }
 
 impl Type {
 	// Reports whether type is binded kind.
-	fn Binded(self): bool { ret len(self.BindIdent) != 0 }
+	fn Binded(self): bool {
+		match type self.Kind {
+		| &StructIns:
+			s := (&StructIns)(self.Kind)
+			if s.Decl.Binded && s.Source != nil {
+				ret true
+			}
+		}
+		ret false
+	}
 
 	// Reports whether kind is "nil".
 	fn IsNil(self): bool { ret self.Kind == nil }
@@ -110,12 +109,12 @@ impl Type {
 	}
 
 	// Reports whether actual kinds are equal.
-	fn ActualEqual(self, other: &Type): bool {
+	fn ActualEqual(&self, other: &Type): bool {
 		if self.IsNil() {
 			ret other.IsNil()
 		}
 		if self.Binded() || other.Binded() {
-			ret self.Binded() == other.Binded() && self.BindIdent == other.BindIdent
+			ret self.Equal(other)
 		}
 		l := unsafe { (*(&self)).ActualKind() }
 		r := unsafe { (*(&other)).ActualKind() }
@@ -1075,11 +1074,6 @@ impl typeChecker {
 			Kind: ta.TypeSym.Type.Kind,
 		}
 		self.pushReferenceByKind(tk)
-		if ta.Binded {
-			tk.BindIdent = ta.Ident
-		} else {
-			tk.BindIdent = ta.TypeSym.Type.BindIdent
-		}
 		ret tk
 	}
 
@@ -1673,11 +1667,6 @@ impl typeChecker {
 			| &Prim:
 				if self.ignoredGenerics != nil {
 					unsafe { *self.ignoredGenerics = append(*self.ignoredGenerics, tk) }
-				}
-			| &StructIns:
-				s := (&StructIns)(kind)
-				if s.Decl != nil && s.Decl.Binded {
-					tk.BindIdent = s.Decl.Ident
 				}
 			}
 			ret tk

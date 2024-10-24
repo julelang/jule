@@ -125,7 +125,6 @@ fn appendParamVars(mut &dest: []&Var, mut &f: &FnIns) {
 				v.Ident = v.Ident[1:] // Remove reference sign.
 				v.TypeSym.Type.Kind = &Sptr{
 					Elem: &Type{
-						BindIdent: v.TypeSym.Type.BindIdent,
 						Kind: v.TypeSym.Type.Kind,
 					},
 				}
@@ -135,7 +134,6 @@ fn appendParamVars(mut &dest: []&Var, mut &f: &FnIns) {
 				Variadic: false,
 				Kind: &Slc{
 					Elem: &Type{
-						BindIdent: p.Type.BindIdent,
 						Kind: p.Type.Kind,
 					},
 				},
@@ -212,7 +210,7 @@ struct commonSemaMeta {
 impl commonSemaMeta {
 	fn pushComptimeTypeInfo(mut self, mut &t: &Type): &comptimeTypeInfo {
 		for (_, mut t2) in self.comptimeTypeInfos {
-			if t2.base.BindIdent == t.BindIdent && t2.base.Equal(t) {
+			if t2.base.Equal(t) {
 				ret t2
 			}
 		}
@@ -1105,6 +1103,7 @@ impl sema {
 		mut s := initNewStructType(ta.Ident, ta.TypeSym.Type)
 		s.Checked = true
 		s.Decl.sema = self
+		s.Decl.Binded = ta.Binded
 		s.Decl.Token = ta.Token
 		s.Decl.Public = ta.Public
 		ta.TypeSym.Type = &Type{Kind: s}
