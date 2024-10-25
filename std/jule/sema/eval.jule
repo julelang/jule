@@ -1580,13 +1580,14 @@ impl eval {
 		}
 	}
 
-	fn castBool(mut self, mut d: &Data, errorToken: &token::Token) {
-		if !d.Type.Equal(primBool) {
-			self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, str(types::Kind.Bool), d.Type.Str())
+	fn castBool(mut self, mut t: &Type, mut d: &Data, errorToken: &token::Token) {
+		prim := d.Type.Prim()
+		if prim == nil || !prim.IsBool() {
+			self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, t.Str(), d.Type.Str())
 		}
 	}
 
-	fn castStr(mut self, mut d: &Data, errorToken: &token::Token) {
+	fn castStr(mut self, mut t: &Type, mut d: &Data, errorToken: &token::Token) {
 		if d.Type.Enum() != nil {
 			mut e := d.Type.Enum()
 			if e.TypeSym.Type.Prim() != nil && e.TypeSym.Type.Prim().IsStr() {
@@ -1603,7 +1604,7 @@ impl eval {
 				ret
 			}
 			if !prim.IsU8() && !prim.IsI32() {
-				self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, str(types::Kind.Str), d.Type.Str())
+				self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, t.Str(), d.Type.Str())
 				ret
 			}
 			// Cast constant expressions.
@@ -1624,14 +1625,14 @@ impl eval {
 
 		mut s := d.Type.Slc()
 		if s == nil {
-			self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, str(types::Kind.Str), d.Type.Str())
+			self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, t.Str(), d.Type.Str())
 			ret
 		}
 
-		mut t := s.Elem
+		t = s.Elem
 		prim = t.Prim()
 		if prim == nil || (!prim.IsU8() && !prim.IsI32()) {
-			self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, str(types::Kind.Str), d.Type.Str())
+			self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, t.Str(), d.Type.Str())
 			ret
 		}
 	}
@@ -1719,9 +1720,9 @@ impl eval {
 		| prim.IsAny():
 			panic("sema: castPrim: any case should be unreachable in this routine")
 		| prim.IsStr():
-			self.castStr(d, errorToken)
+			self.castStr(t, d, errorToken)
 		| prim.IsBool():
-			self.castBool(d, errorToken)
+			self.castBool(t, d, errorToken)
 		| types::IsInt(prim.Str()):
 			self.castInt(t, d, errorToken)
 		| types::IsNum(prim.Str()):
@@ -3785,7 +3786,7 @@ impl binaryEval {
 				Type: primBool,
 			}
 		|:
-			self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, str(types::Kind.Any))
+			self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
 			ret nil
 		}
 	}
@@ -3808,9 +3809,9 @@ impl binaryEval {
 	}
 
 	fn evalStr(mut self): &Data {
-		mut rk := self.r.Type.Str()
-		if rk != types::Kind.Str {
-			self.e.pushErr(self.op, build::LogMsg.IncompatibleTypes, str(types::Kind.Str), rk)
+		prim := self.r.Type.Prim()
+		if prim == nil || !prim.IsStr() {
+			self.e.pushErr(self.op, build::LogMsg.IncompatibleTypes, self.l.Type.Str(), self.r.Type.Str())
 			ret nil
 		}
 
@@ -3827,7 +3828,7 @@ impl binaryEval {
 				Type: primBool,
 			}
 		|:
-			self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, str(types::Kind.Str))
+			self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
 			ret nil
 		}
 	}
