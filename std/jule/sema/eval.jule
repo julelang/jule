@@ -171,6 +171,7 @@ impl eval {
 		mut constant := constant::Const.NewStr(s)
 
 		ret &Data{
+			untyped: true,
 			Mutable: true,
 			Constant: constant,
 			Type: primStr,
@@ -3536,6 +3537,16 @@ impl binaryEval {
 		ret self.e.s.checkTypeCompatibility1(self.l.Type, self.r, self.op)
 	}
 
+	// Like the checkTypeCompatbility method, but tries to be compatible with
+	// constant operands. Such as; "ordinary str" == MyStr("strict typed string")
+	fn checkTypeCompatibility1(mut self): bool {
+		if self.l.IsConst() && self.l.untyped {
+			self.l, self.r = self.r, self.l
+		}
+		const Ref = false
+		ret self.e.s.checkAssignType(Ref, self.l.Type, self.r, self.op, nil)
+	}
+
 	fn evalComptimeTypeInfo(mut self): &Data {
 		mut r := self.r.Type.comptimeTypeInfo()
 		if r == nil {
@@ -3791,7 +3802,7 @@ impl binaryEval {
 	}
 
 	fn evalBool(mut self): &Data {
-		if !self.checkTypeCompatibility() {
+		if !self.checkTypeCompatibility1() {
 			ret nil
 		}
 
@@ -3808,7 +3819,7 @@ impl binaryEval {
 	}
 
 	fn evalStr(mut self): &Data {
-		if !self.checkTypeCompatibility() {
+		if !self.checkTypeCompatibility1() {
 			ret nil
 		}
 

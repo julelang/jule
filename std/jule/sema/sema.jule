@@ -707,6 +707,7 @@ impl sema {
 		ret self.evalp(l, nil)
 	}
 
+	// Do not checks mutability.
 	fn checkAssignType(mut &self, destIsRef: bool, mut &dest: &Type,
 		mut &d: &Data, mut errorToken: &token::Token, mut refers: &ReferenceStack): bool {
 		if d.Decl {
@@ -2793,7 +2794,7 @@ push:
 
 fn pushRuntimeToStr(mut &s: &sema, mut &t: &Type, mut &token: &token::Token,
 	mut refers: &ReferenceStack) {
-	if s.meta.runtime == nil || t.IsNil() {
+	if s.meta.runtime == nil || t.IsNil() || refers == nil {
 		ret
 	}
 	mut f := runtimeFindFn(s.meta.runtime, runtimeFunc.toStr).instanceForce()
@@ -2802,9 +2803,7 @@ fn pushRuntimeToStr(mut &s: &sema, mut &t: &Type, mut &token: &token::Token,
 	if !ok {
 		panic("sema: toStr evaluation failed, this is an implementation mistake")
 	}
-	if refers != nil {
-		refers.Push(f)
-	}
+	refers.Push(f)
 }
 
 // Reports whether the alias valid for the import alias.
