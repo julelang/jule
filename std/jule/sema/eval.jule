@@ -3583,7 +3583,6 @@ impl binaryEval {
 	}
 
 	fn evalEnum(mut self): &Data {
-		mut enm := self.l.Type.Enum()
 		match self.op.Id {
 		| token::Id.Eqs
 		| token::Id.NotEq:
@@ -3591,6 +3590,7 @@ impl binaryEval {
 			if self.r.Type.Enum() != nil {
 				rkind = self.r.Type.Enum().TypeSym.Type
 			}
+			mut enm := self.l.Type.Enum()
 			if !self.e.s.checkTypeCompatibility(enm.TypeSym.Type, rkind, self.op) {
 				ret nil
 			}
@@ -3599,8 +3599,7 @@ impl binaryEval {
 			}
 		}
 
-		if self.r.Type.Enum() == nil || enm != self.r.Type.Enum() {
-			self.e.pushErr(self.op, build::LogMsg.IncompatibleTypes, enm.Ident, self.r.Type.Str())
+		if !self.checkTypeCompatibility() {
 			ret nil
 		}
 
@@ -3609,15 +3608,15 @@ impl binaryEval {
 		| token::Id.Lt
 		| token::Id.GtEq
 		| token::Id.LtEq:
-			if !types::IsNum(enm.TypeSym.Type.Prim().Str()) {
-				self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, enm.Ident)
+			if !types::IsNum(self.l.Type.Enum().TypeSym.Type.Prim().Str()) {
+				self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
 				ret nil
 			}
 			ret &Data{
 				Type: primBool,
 			}
 		| token::Id.Amper:
-			first := enm.Items[0]
+			first := self.l.Type.Enum().Items[0]
 			match {
 			| first.Value.Data.Constant.IsI64():
 				if first.Value.Data.Constant.ReadI64() == 0 {
@@ -3633,24 +3632,24 @@ impl binaryEval {
 				panic("sema: unimplemented enum type, this panic call should be unreachable")
 			}
 		err:
-			self.e.pushErr(self.op, build::LogMsg.AmperOpForEnum, enm.Ident, self.op.Kind)
+			self.e.pushErr(self.op, build::LogMsg.AmperOpForEnum, self.l.Type.Str(), self.op.Kind)
 			self.e.pushSuggestion(build::LogMsg.DefineZeroDefaultToUseAmper)
 		next:
 			fall
 		| token::Id.Vline
 		| token::Id.Caret:
+			mut enm := self.l.Type.Enum()
 			if enm.TypeSym.Type.Prim() == nil || !types::IsInt(enm.TypeSym.Type.Prim().Str()) {
-				self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, enm.Ident)
+				self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
 			}
 			ret self.l
 		|:
-			self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, enm.Ident)
+			self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
 			ret nil
 		}
 	}
 
 	fn evalTypeEnum(mut self): &Data {
-		mut enm := self.l.Type.TypeEnum()
 		if !self.checkTypeCompatibility() {
 			ret nil
 		}
@@ -3662,7 +3661,7 @@ impl binaryEval {
 				Type: primBool,
 			}
 		|:
-			self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, enm.Str())
+			self.e.pushErr(self.op, build::LogMsg.OperatorNotForJuleType, self.op.Kind, self.l.Type.Str())
 			ret nil
 		}
 	}
@@ -3809,9 +3808,7 @@ impl binaryEval {
 	}
 
 	fn evalStr(mut self): &Data {
-		prim := self.r.Type.Prim()
-		if prim == nil || !prim.IsStr() {
-			self.e.pushErr(self.op, build::LogMsg.IncompatibleTypes, self.l.Type.Str(), self.r.Type.Str())
+		if !self.checkTypeCompatibility() {
 			ret nil
 		}
 
@@ -3873,8 +3870,11 @@ impl binaryEval {
 		self.checkModData(self.r)
 	}
 
-	fn numbersAreCompatibile(self, &lk: str, &rk: str): bool {
+	fn numbersAreCompatibile(mut self): bool {
+		lk := self.l.Type.Prim().Kind
+		rk := self.r.Type.Prim().Kind
 		if !types::IsNum(rk) {
+			self.e.s.pushCompatiblityError(self.l.Type, self.r, self.op)
 			ret false
 		}
 		if self.l.IsConst() && self.l.untyped {
@@ -3882,20 +3882,40 @@ impl binaryEval {
 		}
 		if lk == types::Kind.F32 {
 			if self.r.IsConst() && self.r.untyped {
-				ret floatAssignable(lk, self.r)
+				if !floatAssignable(lk, self.r) {
+					self.e.s.pushCompatiblityError(self.l.Type, self.r, self.op)
+					ret false
+				}
+				ret true
 			}
-			ret rk == types::Kind.F32
+			if rk != types::Kind.F32 {
+				self.e.s.pushCompatiblityError(self.l.Type, self.r, self.op)
+				ret false
+			}
+			ret true
 		}
 		if lk == types::Kind.F64 {
 			if self.r.IsConst() && self.r.untyped {
-				ret floatAssignable(lk, self.r)
+				if !floatAssignable(lk, self.r) {
+					self.e.s.pushCompatiblityError(self.l.Type, self.r, self.op)
+					ret false
+				}
+				ret true
 			}
-			ret rk == types::Kind.F64
+			if rk != types::Kind.F64 {
+				self.e.s.pushCompatiblityError(self.l.Type, self.r, self.op)
+				ret false
+			}
+			ret true
 		}
 		if self.r.IsConst() && self.r.untyped {
-			ret intAssignable(lk, self.r)
+			if !intAssignable(lk, self.r) {
+				self.e.s.pushCompatiblityError(self.l.Type, self.r, self.op)
+				ret false
+			}
+			ret true
 		}
-		ret lk == rk
+		ret self.checkTypeCompatibility()
 	}
 
 	// Operator guaranteed to be << or >>.
@@ -3922,7 +3942,7 @@ impl binaryEval {
 		if !types::IsInt(lk.Kind) {
 			// should be floating-point
 			if !self.l.IsConst() || !self.l.untyped {
-				self.e.pushErr(self.op, build::LogMsg.IncompatibleTypes, lk.Kind, rk.Kind)
+				self.e.pushErr(self.op, build::LogMsg.IncompatibleTypes, self.l.Type.Str(), self.r.Type.Str())
 				ret nil
 			} else if intAssignable(types::Kind.I64, self.l) {
 				self.l.Constant.SetI64(self.l.Constant.AsI64())
@@ -3935,7 +3955,7 @@ impl binaryEval {
 		if !types::IsInt(rk.Kind) {
 			// should be floating-point
 			if !self.r.IsConst() || !self.l.untyped {
-				self.e.pushErr(self.op, build::LogMsg.IncompatibleTypes, lk.Kind, rk.Kind)
+				self.e.pushErr(self.op, build::LogMsg.IncompatibleTypes, self.l.Type.Str(), self.r.Type.Str())
 				ret nil
 			} else if intAssignable(types::Kind.I64, self.r) {
 				self.r.Constant.SetI64(self.r.Constant.AsI64())
@@ -3956,10 +3976,7 @@ impl binaryEval {
 	}
 
 	fn evalFloat(mut self): &Data {
-		lk := self.l.Type.Prim().Kind // Float guaranteed.
-		rk := self.r.Type.Prim().Kind // Primitive guaranteed.
-		if !self.numbersAreCompatibile(lk, rk) {
-			self.e.s.pushCompatiblityError(self.l.Type, self.r, self.op)
+		if !self.numbersAreCompatibile() {
 			ret nil
 		}
 
@@ -3991,8 +4008,8 @@ impl binaryEval {
 			self.setTypeToGreater()
 			ret self.l
 		| token::Id.Percent:
-			if !types::IsInt(rk) {
-				self.e.pushErr(self.op, build::LogMsg.IncompatibleTypes, lk, rk)
+			if !types::IsInt(self.r.Type.Prim().Kind) {
+				self.e.pushErr(self.op, build::LogMsg.IncompatibleTypes, self.l.Type.Str(), self.r.Type.Str())
 				ret nil
 			}
 			self.mod()
@@ -4005,11 +4022,7 @@ impl binaryEval {
 	}
 
 	fn evalInt(mut self): &Data {
-		lk := self.l.Type.Prim().Kind // Integer guaranteed.
-		rk := self.r.Type.Prim().Kind // Primitive guaranteed.
-
-		if !self.numbersAreCompatibile(lk, rk) {
-			self.e.s.pushCompatiblityError(self.l.Type, self.r, self.op)
+		if !self.numbersAreCompatibile() {
 			ret nil
 		}
 
