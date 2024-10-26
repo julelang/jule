@@ -13,11 +13,21 @@ fn testDecodeStr(t: &testing::T) {
 		}
 		mut s := ""
 		Decode(case.output, s) else {
-			t.Errorf("Decode(case.output) failed")
+			t.Errorf("Decode(case.output, s) failed")
 			ret
 		}
 		if s != case.input {
 			t.Errorf("expected {} for {}, found {}", case.input, case.output, s)
+		}
+
+		type Str: str
+		mut s2 := Str("")
+		Decode(case.output, s2) else {
+			t.Errorf("Decode(case.output, s2) failed")
+			ret
+		}
+		if s2 != Str(case.input) {
+			t.Errorf("expected {} for {}, found {}; s2", case.input, case.output, s2)
 		}
 	}
 }
@@ -36,6 +46,19 @@ fn testDecodeMapStrKey(t: &testing::T) {
 	t.Assert(ok, `m["bar"] is not exist`)
 	_, ok := m["baz"]
 	t.Assert(ok, `m["baz"] is not exist`)
+
+	type Str: str
+	let mut m2: map[Str]Str = nil
+	Decode([]byte(json), m2) else {
+		t.Errorf("Decode({}, map[Str]Str) failed", json)
+		ret
+	}
+	_, ok = m2["foo"]
+	t.Assert(ok, `m2["foo"] is not exist`)
+	_, ok = m2["bar"]
+	t.Assert(ok, `m2["bar"] is not exist`)
+	_, ok := m2["baz"]
+	t.Assert(ok, `m2["baz"] is not exist`)
 }
 
 #test
@@ -52,6 +75,19 @@ fn testDecodeMapNumKey(t: &testing::T) {
 	t.Assert(ok, `m[49] is not exist`)
 	_, ok := m[0]
 	t.Assert(ok, `m[0] is not exist`)
+
+	type Int: int
+	let mut m2: map[Int]str = nil
+	Decode([]byte(json), m2) else {
+		t.Errorf("Decode({}, map[Int]str) failed", json)
+		ret
+	}
+	_, ok = m2[234]
+	t.Assert(ok, `m2[234] is not exist`)
+	_, ok = m2[49]
+	t.Assert(ok, `m2[49] is not exist`)
+	_, ok := m2[0]
+	t.Assert(ok, `m2[0] is not exist`)
 }
 
 #test
@@ -59,12 +95,22 @@ fn testDecodeArray(t: &testing::T) {
 	const json = `["foo", "bar", "baz"]`
 	let mut a: [3]str
 	Decode([]byte(json), a) else {
-		t.Errorf("Decode({}) failed", json)
+		t.Errorf("Decode({}, a) failed", json)
 		ret
 	}
 	t.Assert(a[0] == "foo", `a[0] != "foo"`)
 	t.Assert(a[1] == "bar", `a[1] != "bar"`)
 	t.Assert(a[2] == "baz", `a[2] != "baz"`)
+
+	type Str: str
+	let mut a2: [3]Str
+	Decode([]byte(json), a2) else {
+		t.Errorf("Decode({}, a2) failed", json)
+		ret
+	}
+	t.Assert(a2[0] == "foo", `a2[0] != "foo"`)
+	t.Assert(a2[1] == "bar", `a2[1] != "bar"`)
+	t.Assert(a2[2] == "baz", `a2[2] != "baz"`)
 }
 
 #test
@@ -87,13 +133,24 @@ fn testDecodeSlice(t: &testing::T) {
 	const json = `["foo", "bar", "baz"]`
 	mut s := []str(nil)
 	Decode([]byte(json), s) else {
-		t.Errorf("Decode({}) failed", json)
+		t.Errorf("Decode({}, s) failed", json)
 		ret
 	}
 	t.Assert(len(s) == 3, `len(s) != 3`)
 	t.Assert(s[0] == "foo", `s[0] != "foo"`)
 	t.Assert(s[1] == "bar", `s[1] != "bar"`)
 	t.Assert(s[2] == "baz", `s[2] != "baz"`)
+
+	type Str: str
+	mut s2 := []Str(nil)
+	Decode([]byte(json), s2) else {
+		t.Errorf("Decode({}, s) failed", json)
+		ret
+	}
+	t.Assert(len(s2) == 3, `len(s2) != 3`)
+	t.Assert(s2[0] == "foo", `s2[0] != "foo"`)
+	t.Assert(s2[1] == "bar", `s2[1] != "bar"`)
+	t.Assert(s2[2] == "baz", `s2[2] != "baz"`)
 }
 
 #test
@@ -112,6 +169,8 @@ fn testDecodeSliceWithRemainder(t: &testing::T) {
 
 #test
 fn testDecodeByteSlice(t: &testing::T) {
+	type byte2: byte
+	type byteSlice: []byte2
 	for _, case in encodeByteSliceCases {
 		mut bytes := []byte(nil)
 		Decode(case.output, bytes) else {
@@ -124,6 +183,23 @@ fn testDecodeByteSlice(t: &testing::T) {
 		}
 		for i in bytes {
 			if bytes[i] != case.input[i] {
+				t.Errorf("expected {} for {}, found {}", case.input, case.output, bytes)
+				break
+			}
+		}
+	}
+	for _, case in encodeByteSliceCases {
+		mut bytes := byteSlice(nil)
+		Decode(case.output, bytes) else {
+			t.Errorf("Decode({}) failed", case.output)
+			ret
+		}
+		if len(bytes) != len(case.input) {
+			t.Errorf("expected {} for {}, found {}", case.input, case.output, bytes)
+			continue
+		}
+		for i in bytes {
+			if bytes[i] != byte2(case.input[i]) {
 				t.Errorf("expected {} for {}, found {}", case.input, case.output, bytes)
 				break
 			}
