@@ -284,12 +284,29 @@ impl assignTypeChecker {
 	}
 
 	fn checkConst(mut self): bool {
-		// Since untyped literals only can be primitive numeric types and constants,
-		// do not check this cases, just check whether self.d is untyped literal.
-		if !self.d.untyped || self.dest.Prim() == nil {
+		if !self.d.IsConst() {
 			ret false
 		}
-		kind := self.dest.Prim().Kind
+		mut prim := self.dest.Prim()
+		if prim == nil {
+			ret false
+		}
+		if self.d.Type.Kind != self.d.Type.ActualKind() {
+			// Just allow implicit casting for actual types.
+			ret false
+		}
+		match {
+		| prim.IsStr():
+			prim = self.d.Type.Prim()
+			ret prim != nil && prim.IsStr()
+		| prim.IsBool():
+			prim = self.d.Type.Prim()
+			ret prim != nil && prim.IsBool()
+		}
+		if !self.d.untyped {
+			ret false
+		}
+		kind := prim.Kind
 		match {
 		| types::IsFloat(kind):
 			if !floatAssignable(kind, self.d) {
