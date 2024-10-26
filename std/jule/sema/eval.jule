@@ -186,9 +186,9 @@ impl eval {
 		}
 
 		if r <= 255 {
-			data.Type = primU8 // Byte
+			data.Type = findBuiltinTypeAlias("byte").TypeSym.Type
 		} else {
-			data.Type = primI32 // Rune
+			data.Type = findBuiltinTypeAlias("rune").TypeSym.Type
 		}
 
 		data.Model = &RuneExpr{Code: r}
@@ -999,7 +999,7 @@ impl eval {
 	}
 
 	fn indexingStr(mut self, mut &d: &Data, mut &index: &Data, mut &i: &ast::IndexingExpr) {
-		d.Type = primU8 // Byte
+		d.Type = findBuiltinTypeAlias("byte").TypeSym.Type
 		d.Mutable = false
 		d.Lvalue = true
 
@@ -1009,13 +1009,13 @@ impl eval {
 
 		self.checkIntegerIndexingByData(index, i.Token)
 
+		d.untyped = d.IsConst()
 		if !index.IsConst() {
 			d.Constant = nil
-			d.untyped = false
 			ret
 		}
 
-		if d.IsConst() {
+		if d.untyped {
 			j := index.Constant.AsI64()
 			s := d.Constant.ReadStr()
 			if int(j) >= len(s) {
@@ -2742,42 +2742,48 @@ impl eval {
 		}
 	}
 
-	fn evalPrimStatic(mut self, kind: str, ident: &token::Token): &Data {
+	fn evalPrimStatic(mut self, mut t: &Type, ident: &token::Token): (d: &Data) {
+		kind := t.Prim().Kind
 		match kind {
 		| types::Kind.Int:
-			ret self.evalIntTypeStatic(ident)
+			d = self.evalIntTypeStatic(ident)
 		| types::Kind.Uint:
-			ret self.evalUintTypeStatic(ident)
+			d = self.evalUintTypeStatic(ident)
 		| types::Kind.I8:
-			ret self.evalI8TypeStatic(ident)
+			d = self.evalI8TypeStatic(ident)
 		| types::Kind.I16:
-			ret self.evalI16TypeStatic(ident)
+			d = self.evalI16TypeStatic(ident)
 		| types::Kind.I32:
-			ret self.evalI32TypeStatic(ident)
+			d = self.evalI32TypeStatic(ident)
 		| types::Kind.I64:
-			ret self.evalI64TypeStatic(ident)
+			d = self.evalI64TypeStatic(ident)
 		| types::Kind.U8:
-			ret self.evalU8TypeStatic(ident)
+			d = self.evalU8TypeStatic(ident)
 		| types::Kind.U16:
-			ret self.evalU16TypeStatic(ident)
+			d = self.evalU16TypeStatic(ident)
 		| types::Kind.U32:
-			ret self.evalU32TypeStatic(ident)
+			d = self.evalU32TypeStatic(ident)
 		| types::Kind.U64:
-			ret self.evalU64TypeStatic(ident)
+			d = self.evalU64TypeStatic(ident)
 		| types::Kind.F32:
-			ret self.evalF32TypeStatic(ident)
+			d = self.evalF32TypeStatic(ident)
 		| types::Kind.F64:
-			ret self.evalF64TypeStatic(ident)
+			d = self.evalF64TypeStatic(ident)
 		|:
 			self.pushErr(ident, build::LogMsg.TypeHaveNotIdent, kind, ident.Kind)
 			ret nil
 		}
+		if d != nil && t.Kind != t.ActualKind() {
+			// Type is not actual, return as non-actual typed.
+			d.Type = t
+		}
+		ret
 	}
 
 	fn evalTypeStatic(mut self, mut d: &Data, mut si: &ast::SubIdentExpr): &Data {
 		match {
 		| d.Type.Prim() != nil:
-			ret self.evalPrimStatic(d.Type.Prim().Str(), si.Ident)
+			ret self.evalPrimStatic(d.Type, si.Ident)
 		| d.Type.Enum() != nil:
 			ret self.evalEnumStatic(d.Type.Enum(), si.Ident)
 		| d.Type.TypeEnum() != nil:
@@ -3846,15 +3852,21 @@ impl binaryEval {
 		rp := self.r.Type.Prim()
 		if self.l.untyped && !self.r.untyped {
 			self.l.Type = self.r.Type
-			self.l.Constant.Kind = rp.Kind
+			if self.l.IsConst() {
+				self.l.Constant.Kind = rp.Kind
+			}
 			self.l.untyped = false
 		} else if !self.l.untyped && self.r.untyped {
 			self.r.Type = self.l.Type
-			self.r.Constant.Kind = lp.Kind
+			if self.r.IsConst() {
+				self.r.Constant.Kind = lp.Kind
+			}
 			self.r.untyped = false
 		} else if self.l.untyped && self.r.untyped {
 			self.r.Type = self.l.Type
-			self.r.Constant.Kind = lp.Kind
+			if self.r.IsConst() {
+				self.r.Constant.Kind = lp.Kind
+			}
 			self.r.untyped = false
 		}
 	}

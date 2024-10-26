@@ -284,15 +284,11 @@ impl assignTypeChecker {
 	}
 
 	fn checkConst(mut self): bool {
-		if !self.d.IsConst() {
+		if !self.d.untyped {
 			ret false
 		}
 		mut prim := self.dest.Prim()
 		if prim == nil {
-			ret false
-		}
-		if self.d.Type.Kind != self.d.Type.ActualKind() {
-			// Just allow implicit casting for actual types.
 			ret false
 		}
 		match {
@@ -303,8 +299,9 @@ impl assignTypeChecker {
 			prim = self.d.Type.Prim()
 			ret prim != nil && prim.IsBool()
 		}
-		if !self.d.untyped {
-			ret false
+		if !self.d.IsConst() {
+			// Allow if value is untyped and actual kinds are equal.
+			ret self.dest.ActualEqual(self.d.Type)
 		}
 		kind := prim.Kind
 		match {
@@ -1225,7 +1222,7 @@ impl rangeChecker {
 			ret
 		}
 		self.Kind.KeyB = self.buildVar(self.rang.KeyB)
-		self.Kind.KeyB.TypeSym = findBuiltinTypeAlias(types::Kind.U8).TypeSym
+		self.Kind.KeyB.TypeSym = findBuiltinTypeAlias("byte").TypeSym
 	}
 
 	fn checkComptime(mut self) {
