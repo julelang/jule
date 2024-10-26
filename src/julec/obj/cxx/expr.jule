@@ -697,18 +697,21 @@ impl exprCoder {
 			match type m.Expr {
 			| &sema::StructSubIdentExpr:
 				mut ssie := (&sema::StructSubIdentExpr)(m.Expr)
+				if ssie.Expr.Lvalue {
+					ret false
+				}
 				match {
 				| m.Func.Decl.Params[0].IsRef()
 				| ssie.Expr.Type.Sptr() != nil:
-					break
+					ret false
 				|:
-					if ssie.Expr.Type.Struct() != nil {
-						if !ssie.Expr.Lvalue {
-							self.oc.write("({ auto _wrap_copy = ")
-							self.model(ssie.Expr.Model)
-							self.oc.write("; ")
-							ret true
-						}
+					// Check whether expression type is struct to caught strict type alias structs.
+					match type ssie.Expr.Type.Kind {
+					| &sema::StructIns:
+						self.oc.write("({ auto _wrap_copy = ")
+						self.model(ssie.Expr.Model)
+						self.oc.write("; ")
+						ret true
 					}
 				}
 			}
