@@ -41,9 +41,9 @@ trait Kind {
 
 // Evaluated type declaration.
 struct Type {
-	Generic:   bool
-	Variadic:  bool
-	Kind:      Kind
+	Generic:  bool
+	Variadic: bool
+	Kind:     Kind
 }
 
 impl Kind for Type {
@@ -735,7 +735,6 @@ impl Kind for Map {
 		| &Map:
 			m := (&Map)(other.Kind)
 			ret self.Key.Equal(m.Key) && self.Val.Equal(m.Val)
-			
 		}
 		ret false
 	}
@@ -1018,7 +1017,7 @@ impl typeChecker {
 		ret true
 	}
 
-	fn fromTypeAlias(mut self, &decl: &ast::IdentTypeDecl, mut &ta: &TypeAlias): Kind {
+	fn fromTypeAlias(mut self, mut &decl: &ast::IdentTypeDecl, mut &ta: &TypeAlias): Kind {
 		if !self.s.isAccessibleDefine(ta.Public, ta.Token) {
 			self.pushErr(decl.Token, build::LogMsg.IdentNotExist, decl.Ident)
 			ret nil
@@ -1065,6 +1064,17 @@ impl typeChecker {
 			ok := self.s.checkTypeAliasDecl(ta, self.lookup)
 			if !ok {
 				ret nil
+			}
+		}
+
+		if ta.Strict && self.s.step&stepFlag.DeclsChecked == stepFlag.DeclsChecked {
+			// Check strict type structure if impl statements are implemented.
+			mut s := ta.TypeSym.Type.softStruct()
+			if !s.Checked {
+				ok := self.checkStructIns(s, decl.Token)
+				if !ok {
+					ret nil
+				}
 			}
 		}
 

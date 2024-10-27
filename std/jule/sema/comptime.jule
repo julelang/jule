@@ -560,8 +560,8 @@ impl comptimeTypeInfo {
 		}
 		mut decl := comptimeDeclType(nil)
 		match {
-		| self.base.Struct() != nil:
-			decl = self.base.Struct().Decl
+		| self.base.softStruct() != nil:
+			decl = self.base.softStruct().Decl
 		| self.base.Trait() != nil:
 			decl = self.base.Trait()
 		| self.base.Enum() != nil:
@@ -1216,11 +1216,12 @@ impl comptimeValue {
 		}
 		mut ref := false
 		mut s := (&StructIns)(nil)
-		if self.data.Type.Sptr() != nil {
-			s = self.data.Type.Sptr().Elem.Struct()
+		match type self.data.Type.Kind {
+		| &Sptr:
+			s = (&Sptr)(self.data.Type.Kind).Elem.softStruct()
 			ref = true
-		} else {
-			s = self.data.Type.Struct()
+		| &StructIns:
+			s = (&StructIns)(self.data.Type.Kind)
 		}
 		if s == nil {
 			e.pushErr(fc.Token, build::LogMsg.InvalidTypeForFn, self.data.Type.Str(), "Method")

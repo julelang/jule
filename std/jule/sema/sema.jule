@@ -220,6 +220,12 @@ impl commonSemaMeta {
 	}
 }
 
+enum stepFlag {
+	NA: 0,
+	DeclsChecked: 1 << 0,
+	Done: 1 << 1,
+}
+
 // Semantic analyzer for tables.
 // Accepts tables as files of package.
 struct sema {
@@ -228,6 +234,7 @@ struct sema {
 	file:   &SymTab   // Current package file.
 	flags:  Flag
 	meta:   &commonSemaMeta
+	step:   stepFlag
 }
 
 impl Lookup for sema {
@@ -1099,7 +1106,6 @@ impl sema {
 		// Type alias is strict, make strict type alias analysis.
 		// See developer reference (11).
 		mut s := initNewStructType(ta.Ident, ta.TypeSym.Type)
-		s.Checked = true
 		s.Decl.sema = self
 		s.Decl.Binded = ta.Binded
 		s.Decl.Token = ta.Token
@@ -2405,15 +2411,6 @@ impl sema {
 		for (_, mut s) in self.file.Structs {
 			self.checkTypeStruct(s)
 		}
-		for (_, mut ta) in self.file.TypeAliases {
-			if ta.Strict {
-				mut s := (&StructIns)(ta.TypeSym.Type.Kind)
-				ok := self.precheckStructIns(s, nil)
-				if ok {
-					self.checkStructIns(s)
-				}
-			}
-		}
 	}
 
 	fn checkRets(mut self, mut &f: &FnIns) {
@@ -2569,6 +2566,19 @@ impl sema {
 		if len(self.errors) > 0 {
 			ret
 		}
+
+		// Check
+		for (_, mut ta) in self.file.TypeAliases {
+			if ta.Strict {
+				mut s := (&StructIns)(ta.TypeSym.Type.Kind)
+				s.Checked = true
+				ok := self.precheckStructIns(s, nil)
+				if ok {
+					self.checkStructIns(s)
+				}
+			}
+		}
+
 		for (_, mut f) in self.files {
 			self.setCurrentFile(f)
 			self.checkFuncs()
@@ -2624,7 +2634,9 @@ impl sema {
 			ret
 		}
 
+		self.step |= stepFlag.DeclsChecked
 		self.checkPackageTypes()
+		self.step |= stepFlag.Done
 	}
 }
 
