@@ -330,6 +330,11 @@ impl eval {
 		}
 
 		if !binded {
+			mut t := self.lookup.FindTrait(ident)
+			if t != nil {
+				ret t
+			}
+
 			mut enm := self.lookup.FindEnum(ident)
 			if enm != nil {
 				ret enm
@@ -714,6 +719,15 @@ impl eval {
 		ret d
 	}
 
+	fn evalTrait(mut self, mut t: &Trait): &Data {
+		ret &Data{
+			Decl: true,
+			Type: &Type{
+				Kind: t,
+			},
+		}
+	}
+
 	fn evalDef(mut self, mut &def: any, mut ident: &token::Token): &Data {
 		match type def {
 		| &Var:
@@ -733,6 +747,8 @@ impl eval {
 			ret self.evalFnIns((&FnIns)(def))
 		| &TypeAlias:
 			ret self.evalTypeAlias((&TypeAlias)(def), ident)
+		| &Trait:
+			ret self.evalTrait((&Trait)(def))
 		}
 		self.pushErr(ident, build::LogMsg.IdentNotExist, ident.Kind)
 		ret nil
