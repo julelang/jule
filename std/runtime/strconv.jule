@@ -176,7 +176,7 @@ fn structToStr[T](x: T): str {
 	const t = comptime::TypeOf(T)
 	const v = comptime::ValueOf(x)
 
-	// lookup for reserved str function
+	// Lookup for the reserved Str method.
 	const for _, method in t.Decl().Methods() {
 		const match method.Name() {
 		| "Str":
@@ -222,6 +222,25 @@ fn toStr[T](x: T): str {
 		if x == nil {
 			ret "<nil>"
 		}
+	| t.Strict():
+		// Lookup for the reserved Str method for the strict type like structures.
+		const v = comptime::ValueOf(x)
+		const for _, method in t.Decl().Methods() {
+			const match method.Name() {
+			| "Str":
+				const methodv = v.Method(method.Name())
+				const match {
+				| methodv.Type().Result().Kind() == comptime::Kind.Str:
+					const params = method.Params()
+					const match {
+					| len(params) == 1 && !params[0].Mutable():
+						ret methodv.Unwrap()()
+					}
+				}
+			}
+		}
+		// If strict type have not the reserved Str method, handle by the source type.
+		// Following analysis will do that.
 	}
 
 	const match t.Kind() {
