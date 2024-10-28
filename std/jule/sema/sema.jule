@@ -222,8 +222,9 @@ impl commonSemaMeta {
 
 enum stepFlag {
 	NA: 0,
-	DeclsChecked: 1 << 0,
-	Done: 1 << 1,
+	ImplsImplemented: 1 << 0,
+	DeclsChecked: 1 << 1,
+	Done: 1 << 2,
 }
 
 // Semantic analyzer for tables.
@@ -2567,14 +2568,17 @@ impl sema {
 			ret
 		}
 
-		// Check
-		for (_, mut ta) in self.file.TypeAliases {
-			if ta.Strict {
-				mut s := (&StructIns)(ta.TypeSym.Type.Kind)
-				s.Checked = true
-				ok := self.precheckStructIns(s, nil)
-				if ok {
-					self.checkStructIns(s)
+		// Check structures of strict type aliases.
+		for (_, mut f) in self.files {
+			self.setCurrentFile(f)
+			for (_, mut ta) in self.file.TypeAliases {
+				if ta.Strict {
+					mut s := (&StructIns)(ta.TypeSym.Type.Kind)
+					s.Checked = true
+					ok := self.precheckStructIns(s, nil)
+					if ok {
+						self.checkTypeStruct(s.Decl)
+					}
 				}
 			}
 		}
@@ -2621,6 +2625,7 @@ impl sema {
 		if len(self.errors) != 0 {
 			ret
 		}
+		self.step |= stepFlag.ImplsImplemented
 
 		// Check enums here.
 		// See developer reference (7).
