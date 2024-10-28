@@ -711,15 +711,22 @@ impl fnCallArgChecker {
 		if n > 0 && params[0].Decl.IsSelf() {
 			n--
 		}
+		variadic := n > 0 && params[len(params)-1].Decl.Variadic
+		if variadic {
+			n--
+		}
 
 		mut diff := n - len(self.args)
 		mut log := build::LogMsg.Empty
 		match {
 		| diff == 0:
 			ret true
-		| n > 0 && params[n-1].Decl.Variadic:
-			ret true
-		| diff < 0 || diff > len(params):
+		| diff < 0:
+			if variadic {
+				ret true
+			}
+			fall
+		| diff > n:
 			log = build::LogMsg.ArgumentOverflow
 		|:
 			log = build::LogMsg.MissingArgs
