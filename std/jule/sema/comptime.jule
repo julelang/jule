@@ -967,8 +967,29 @@ impl comptimeTypeInfo {
 		}
 	}
 
+	fn _Strict(mut &self, mut &e: &eval, mut &fc: &ast::FnCallExpr): &Data {
+		if len(fc.Args) > 0 {
+			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Strict")
+			ret nil
+		}
+		s := self.base.softStruct()
+		mut constant := constant::Const.NewBool(s != nil && s.Source != nil)
+		ret &Data{
+			Type: primBool,
+			Constant: constant,
+			Model: constant,
+		}
+	}
+
 	fn subIdent(mut &self, &ident: str): &Data {
 		match ident {
+		| "Strict":
+			mut method := &FnIns{
+				caller: fn(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+					ret self._Strict(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
 		| "Decl":
 			mut method := &FnIns{
 				caller: fn(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
