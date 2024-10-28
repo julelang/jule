@@ -125,7 +125,6 @@ fn appendParamVars(mut &dest: []&Var, mut &f: &FnIns) {
 				v.Ident = v.Ident[1:] // Remove reference sign.
 				v.TypeSym.Type.Kind = &Sptr{
 					Elem: &Type{
-						BindIdent: v.TypeSym.Type.BindIdent,
 						Kind: v.TypeSym.Type.Kind,
 					},
 				}
@@ -135,7 +134,6 @@ fn appendParamVars(mut &dest: []&Var, mut &f: &FnIns) {
 				Variadic: false,
 				Kind: &Slc{
 					Elem: &Type{
-						BindIdent: p.Type.BindIdent,
 						Kind: p.Type.Kind,
 					},
 				},
@@ -212,7 +210,7 @@ struct commonSemaMeta {
 impl commonSemaMeta {
 	fn pushComptimeTypeInfo(mut self, mut &t: &Type): &comptimeTypeInfo {
 		for (_, mut t2) in self.comptimeTypeInfos {
-			if t2.base.BindIdent == t.BindIdent && t2.base.Equal(t) {
+			if t2.base.Equal(t) {
 				ret t2
 			}
 		}
@@ -220,6 +218,12 @@ impl commonSemaMeta {
 		self.comptimeTypeInfos = append(self.comptimeTypeInfos, t1)
 		ret t1
 	}
+}
+
+enum stepFlag {
+	NA: 0,
+	DeclsChecked: 1 << 0,
+	Done: 1 << 1,
 }
 
 // Semantic analyzer for tables.
@@ -230,6 +234,7 @@ struct sema {
 	file:   &SymTab   // Current package file.
 	flags:  Flag
 	meta:   &commonSemaMeta
+	step:   stepFlag
 }
 
 impl Lookup for sema {
@@ -709,6 +714,7 @@ impl sema {
 		ret self.evalp(l, nil)
 	}
 
+	// Do not checks mutability.
 	fn checkAssignType(mut &self, destIsRef: bool, mut &dest: &Type,
 		mut &d: &Data, mut errorToken: &token::Token, mut refers: &ReferenceStack): bool {
 		if d.Decl {
@@ -781,7 +787,7 @@ impl sema {
 
 	fn pushCompatiblityError(mut self, mut &dest: &Type, mut &src: &Data,
 		mut &errorToken: &token::Token) {
-		if src.untyped {
+		if src.untyped && src.IsConst() {
 			match {
 			| src.Constant.IsI64():
 				self.pushErr(errorToken, build::LogMsg.IncompatibleTypes, dest.Str(), "untyped integer")
@@ -1078,23 +1084,43 @@ impl sema {
 		ret
 	}
 
-	fn checkTypeAliasDecl(mut &self, mut &ta: &TypeAlias, mut l: Lookup) {
+	fn checkTypeAliasDecl(mut &self, mut &ta: &TypeAlias, mut l: Lookup): (ok: bool) {
 		if token::IsIgnoreIdent(ta.Ident) {
 			self.pushErr(ta.Token, build::LogMsg.IgnoreIdent)
 		}
-		self.checkTypeAliasDeclKind(ta, l)
+		if ta.TypeSym.Type != nil {
+			// already checked
+			ret true
+		}
+		ok = self.checkTypeAliasDeclKind(ta, l)
+		if !ok {
+			ret false
+		}
+		if !ta.Strict {
+			if ta.Binded {
+				self.pushErr(ta.Token, build::LogMsg.BindedAsSoftType)
+				self.pushSuggestion(build::LogMsg.DefineAsStrictAlias, ta.Ident)
+			}
+			ret true
+		}
+		// Type alias is strict, make strict type alias analysis.
+		// See developer reference (11).
+		mut s := initNewStructType(ta.Ident, ta.TypeSym.Type)
+		s.Decl.sema = self
+		s.Decl.Binded = ta.Binded
+		s.Decl.Token = ta.Token
+		s.Decl.Public = ta.Public
+		ta.TypeSym.Type = &Type{Kind: s}
+		ret true
 	}
 
 	// Checks type alias declaration with duplicated identifiers.
 	fn checkTypeAliasDeclDup(mut &self, mut &ta: &TypeAlias) {
-		if token::IsIgnoreIdent(ta.Ident) {
-			self.pushErr(ta.Token, build::LogMsg.IgnoreIdent)
-		}
 		if self.isDuplicatedIdent(uintptr(ta), ta.Ident, ta.Binded) {
 			self.pushErr(ta.Token, build::LogMsg.DuplicatedIdent, ta.Ident)
 			self.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
 		}
-		self.checkTypeAliasDeclKind(ta, self)
+		self.checkTypeAliasDecl(ta, self)
 	}
 
 	// Checks current package file's type alias declarations.
@@ -1694,18 +1720,29 @@ impl sema {
 			}
 			dest.Statics = append(dest.Statics, v)
 		}
+
+		if len(dest.Instances) == 1 {
+			// We have an instance. It's should be impossible if structure is not
+			// constructed by a strict type alias. If so, update data of the instance.
+			mut s := dest.Instances[0]
+			if s.Source != nil {
+				s.Methods = dest.Methods
+				s.Statics = dest.Statics
+			}
+		}
+
 		ret
 	}
 
 	// Implement trait to destination.
 	fn implTrait(mut &self, mut &decl: &Impl) {
-		mut base_t := self.selectType(decl.Base)
-		if base_t == nil {
+		mut baseT := self.selectType(decl.Base)
+		if baseT == nil {
 			ret
 		}
-		mut base := base_t.Trait()
+		mut base := baseT.Trait()
 		if base == nil {
-			self.pushErr(decl.Base.Token, build::LogMsg.ImplInvalidBase, base_t.Str())
+			self.pushErr(decl.Base.Token, build::LogMsg.ImplInvalidBase, baseT.Str())
 			self.pushSuggestion(build::LogMsg.ExpectedTrait)
 			ret
 		}
@@ -1714,7 +1751,7 @@ impl sema {
 		if destT == nil {
 			ret
 		}
-		mut destS := destT.Struct()
+		mut destS := destT.softStruct()
 		if destS == nil {
 			self.pushErr(decl.Dest.Token, build::LogMsg.ImplInvalidDest, destT.Str())
 			self.pushSuggestion(build::LogMsg.ExpectedStruct)
@@ -1746,7 +1783,7 @@ impl sema {
 		if destT == nil {
 			ret
 		}
-		mut destS := destT.Struct()
+		mut destS := destT.softStruct()
 		if destS == nil {
 			self.pushErr(decl.Dest.Token, build::LogMsg.ImplInvalidDest, destT.Str())
 			self.pushSuggestion(build::LogMsg.ExpectedStruct)
@@ -1923,6 +1960,20 @@ impl sema {
 	fn checkStructDecls(mut &self): (ok: bool) {
 		for (_, mut s) in self.file.Structs {
 			self.checkStructDecl(s)
+			// Break checking if type alias has error.
+			if len(self.errors) > 0 {
+				ret false
+			}
+		}
+		for (_, mut ta) in self.file.TypeAliases {
+			if !ta.Strict {
+				continue
+			}
+			mut s := (&StructIns)(ta.TypeSym.Type.Kind).Decl
+			match {
+			| !self.checkStructImpls(s):
+			| !self.checkFuncDeclsBy(s.Methods):
+			}
 			// Break checking if type alias has error.
 			if len(self.errors) > 0 {
 				ret false
@@ -2452,12 +2503,15 @@ impl sema {
 			ret
 		}
 
-		s := sptr.Elem.Struct()
-		if s == nil || !isStdPackage(s.Decl.Token.File.Path, "testing") {
-			self.pushErr(f.Decl.Token, build::LogMsg.WrongTestFnDecl)
-			self.pushSuggestion(build::LogMsg.UseExpectedTestFnDecl)
-			ret
+		match type sptr.Elem.Kind {
+		| &StructIns:
+			s := (&StructIns)(sptr.Elem.Kind)
+			if s.Source == nil && isStdPackage(s.Decl.Token.File.Path, "testing") {
+				ret
+			}
 		}
+		self.pushErr(f.Decl.Token, build::LogMsg.WrongTestFnDecl)
+		self.pushSuggestion(build::LogMsg.UseExpectedTestFnDecl)
 	}
 
 	fn precheckFunc(mut &self, mut &f: &Fn) {
@@ -2512,6 +2566,19 @@ impl sema {
 		if len(self.errors) > 0 {
 			ret
 		}
+
+		// Check
+		for (_, mut ta) in self.file.TypeAliases {
+			if ta.Strict {
+				mut s := (&StructIns)(ta.TypeSym.Type.Kind)
+				s.Checked = true
+				ok := self.precheckStructIns(s, nil)
+				if ok {
+					self.checkStructIns(s)
+				}
+			}
+		}
+
 		for (_, mut f) in self.files {
 			self.setCurrentFile(f)
 			self.checkFuncs()
@@ -2567,7 +2634,9 @@ impl sema {
 			ret
 		}
 
+		self.step |= stepFlag.DeclsChecked
 		self.checkPackageTypes()
+		self.step |= stepFlag.Done
 	}
 }
 
@@ -2737,7 +2806,7 @@ push:
 
 fn pushRuntimeToStr(mut &s: &sema, mut &t: &Type, mut &token: &token::Token,
 	mut refers: &ReferenceStack) {
-	if s.meta.runtime == nil || t.IsNil() {
+	if s.meta.runtime == nil || t.IsNil() || refers == nil {
 		ret
 	}
 	mut f := runtimeFindFn(s.meta.runtime, runtimeFunc.toStr).instanceForce()
@@ -2746,9 +2815,7 @@ fn pushRuntimeToStr(mut &s: &sema, mut &t: &Type, mut &token: &token::Token,
 	if !ok {
 		panic("sema: toStr evaluation failed, this is an implementation mistake")
 	}
-	if refers != nil {
-		refers.Push(f)
-	}
+	refers.Push(f)
 }
 
 // Reports whether the alias valid for the import alias.

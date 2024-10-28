@@ -39,6 +39,24 @@ enum Kind {
 // Cannot assign to memory, just available in compile-time.
 // The expression is evaluated to determine type in compile-time and
 // will not executed at runtime.
+//
+// All type information functionalities uses actual type
+// (may there are exception cases). To examine and match actual types,
+// comptime type information handling is useful.
+// For example:
+//
+//    type ByteSlice: []byte
+//    const t = comptime::TypeOf(ByteSlice)
+//    const match type t.Kind() {
+//    | comptime::Kind.Slice:
+//        const match type t.Elem().Kind() {
+//        | comptime::Kind.Byte:
+//            ...
+//        }
+//    }
+//
+//    In the example code above, the ByteSlice type is a strict type alias.
+//    But we can examine the actual type with comptime type information api.
 // fn TypeOf(TYPE || EXPRESSION): comptimeTypeInfo
 
 /* >>> Hint comptimeTypeInfos implementation.
@@ -61,12 +79,14 @@ impl comptimeTypeInfo {
 	// Returns as constant expression.
 	fn Kind(self): Kind
 
-	// Returns string value of type.
+	// Returns string value of type (not actual type).
 	// Returns as constant expression.
 	fn Str(self): str
 
 	// Returns declaration information for type.
 	// Supports only structs, traits, enums, type enums, and functions.
+	// For structures that constructed by the strict type alias,
+	// it returns declaration information for the relevant implicit struct declaration.
 	fn Decl(self): comptimeDecl
 
 	// Returns bitsize of type.

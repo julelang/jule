@@ -189,6 +189,7 @@ struct FieldIns {
 
 // Structure instance.
 struct StructIns {
+	Source:     &Type // See developer reference (11).
 	Checked:    bool
 	Decl:       &Struct
 	Generics:   []&InsGeneric
@@ -205,6 +206,9 @@ impl Kind for StructIns {
 	// Returns Struct's type kind as string.
 	fn Str(self): str {
 		mut kind := strings::Builder.New(1 << 5)
+		if self.Decl.Binded {
+			kind.WriteStr("cpp.")!
+		}
 		kind.WriteStr(self.Decl.Ident)!
 		if len(self.Generics) > 0 {
 			kind.WriteByte('[')!
@@ -221,19 +225,26 @@ impl Kind for StructIns {
 
 	// Reports whether types are same.
 	fn Equal(&self, other: &Type): bool {
+		match type other.Kind {
+		| &StructIns:
+			s := (&StructIns)(other.Kind)
+			if s.Source != nil {
+				ret self == s
+			}
+		|:
+			if self.Source != nil {
+				ret false
+			}
+		}
+
 		s := unsafe { (*(&other)).Struct() }
-		if s == nil {
+		if s == nil ||
+			self.Decl != s.Decl ||
+			len(self.Generics) != len(s.Generics) {
 			ret false
 		}
 
-		if self.Decl != s.Decl {
-			ret false
-		}
-
-		if len(self.Generics) != len(s.Generics) {
-			ret false
-		}
-
+		// Check whether generics are matched.
 		mut i := 0
 		for i < len(self.Generics); i++ {
 			if !self.Generics[i].Type.Equal(s.Generics[i].Type) {
@@ -254,7 +265,7 @@ impl StructIns {
 		}
 		for i, g in self.Generics {
 			g2 := s.Generics[i]
-			if g.Type.BindIdent != g2.Type.BindIdent || !g.Type.Equal(g2.Type) {
+			if !g.Type.Equal(g2.Type) {
 				ret false
 			}
 		}

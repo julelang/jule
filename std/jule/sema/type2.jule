@@ -115,15 +115,9 @@ impl typeCompatibilityChecker {
 		mut trt := self.dest.Trait()
 		mut ref := false
 		match {
-		| self.src.Sptr() != nil:
-			ref = true
-			self.src = self.src.Sptr().Elem
-			if self.src.Struct() == nil {
-				ret false
-			}
-			fall
-		| self.src.Struct() != nil:
-			s := self.src.Struct()
+		| self.src.softStruct() != nil:
+		strct:
+			s := self.src.softStruct()
 			if !s.Decl.IsImplements(trt) {
 				ret false
 			}
@@ -132,6 +126,13 @@ impl typeCompatibilityChecker {
 				ret false
 			}
 			ret true
+		| self.src.Sptr() != nil:
+			ref = true
+			self.src = self.src.Sptr().Elem
+			if self.src.softStruct() == nil {
+				ret false
+			}
+			goto strct
 		| self.src.Trait() != nil:
 			mut base := self.src.Trait()
 			if trt == base {
@@ -158,9 +159,8 @@ impl typeCompatibilityChecker {
 				}
 			}
 			ret true
-		|:
-			ret false
 		}
+		ret false
 	}
 
 	fn checkPtr(mut self): (ok: bool) {
@@ -209,22 +209,33 @@ impl typeCompatibilityChecker {
 	}
 
 	fn check(mut self): (ok: bool) {
-		if self.dest.Ptr() != nil {
-			ret self.checkPtr()
-		}
-		if self.dest.NilCompatible() {
-			if self.src.IsNil() {
-				ret true
-			}
-		}
-
 		match {
-		| self.dest.Prim() != nil:
-			ret self.checkPrim()
+		| self.dest.NilCompatible() && self.src.IsNil():
+			ret true
 		| self.dest.TypeEnum() != nil:
 			ret self.checkTypeEnum()
 		| self.dest.Trait() != nil:
 			ret self.checkTrait()
+		}
+
+		prim := self.dest.Prim()
+		if prim != nil && !self.dest.Variadic && prim.IsAny() {
+			ret true
+		}
+		if prim != nil {
+			ret self.checkPrim()
+		}
+
+		if self.dest.Kind != self.dest.ActualKind() ||
+			self.src.Kind != self.src.ActualKind() {
+			// dest or src type is created by the strict type alias
+			// they should be the same type
+			ret self.dest.Equal(self.src)
+		}
+
+		match {
+		| self.dest.Ptr() != nil:
+			ret self.checkPtr()
 		|:
 			ret self.dest.Equal(self.src)
 		}
@@ -273,12 +284,26 @@ impl assignTypeChecker {
 	}
 
 	fn checkConst(mut self): bool {
-		// Since untyped literals only can be primitive numeric types and constants,
-		// do not check this cases, just check whether self.d is untyped literal.
-		if !self.d.untyped || self.dest.Prim() == nil {
+		if !self.d.untyped {
 			ret false
 		}
-		kind := self.dest.Prim().Kind
+		mut prim := self.dest.Prim()
+		if prim == nil {
+			ret false
+		}
+		match {
+		| prim.IsStr():
+			prim = self.d.Type.Prim()
+			ret prim != nil && prim.IsStr()
+		| prim.IsBool():
+			prim = self.d.Type.Prim()
+			ret prim != nil && prim.IsBool()
+		}
+		if !self.d.IsConst() {
+			// Allow if value is untyped and actual kinds are equal.
+			ret self.dest.ActualEqual(self.d.Type)
+		}
+		kind := prim.Kind
 		match {
 		| types::IsFloat(kind):
 			if !floatAssignable(kind, self.d) {
@@ -1197,7 +1222,7 @@ impl rangeChecker {
 			ret
 		}
 		self.Kind.KeyB = self.buildVar(self.rang.KeyB)
-		self.Kind.KeyB.TypeSym = findBuiltinTypeAlias(types::Kind.U8).TypeSym
+		self.Kind.KeyB.TypeSym = findBuiltinTypeAlias("byte").TypeSym
 	}
 
 	fn checkComptime(mut self) {

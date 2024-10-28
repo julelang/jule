@@ -541,11 +541,11 @@ impl ObjectCoder {
 		self.write(jule::Version)
 		self.write("\n")
 		self.write("// Date: ")
-		self.write(conv::FmtUint(abs.Day, 10))
+		self.write(conv::FmtUint(u64(abs.Day), 10))
 		self.write("/")
-		self.write(conv::FmtUint(abs.Month, 10))
+		self.write(conv::FmtUint(u64(abs.Month), 10))
 		self.write("/")
-		self.write(conv::FmtUint(abs.Year, 10))
+		self.write(conv::FmtUint(u64(abs.Year), 10))
 		self.write(" (DD/MM/YYYY) UTC\n//\n// Recomended Compile Command;\n// ")
 		self.write(self.info.Compiler)
 		self.write(" ")
@@ -763,15 +763,19 @@ impl ObjectCoder {
 		}
 	}
 
+	fn structureMethodDecls1(mut &self, mut &s: &sema::Struct) {
+		for (_, mut ins) in s.Instances {
+			for (_, mut m) in ins.Methods {
+				self.pushResult(m)
+				self.funcDecl(m, false)
+			}
+		}
+	}
+
 	fn structureMethodDecls(mut &self) {
 		for (_, mut s) in self.ir.Ordered.Structs {
 			if s.Token != nil {
-				for (_, mut ins) in s.Instances {
-					for (_, mut m) in ins.Methods {
-						self.pushResult(m)
-						self.funcDecl(m, false)
-					}
-				}
+				self.structureMethodDecls1(s)
 			}
 		}
 	}
@@ -1147,8 +1151,11 @@ impl ObjectCoder {
 	}
 
 	fn structureIns(mut &self, mut &s: &sema::StructIns) {
-		const DeclOnly = false
-		self.structureOperators(s, DeclOnly)
+		if s.Source == nil {
+			// source type will implement
+			const DeclOnly = false
+			self.structureOperators(s, DeclOnly)
+		}
 		self.structureMethods(s)
 	}
 

@@ -58,6 +58,8 @@ Typical uses are things like capturing or tracing private behavior. For example,
     - **(9.1)** For these special types, the type that is the left operand can normally be left or right operand. It is only guaranteed if the expression of the relevant type is in the left operand. There may be a shift in the original order.
     - **(9.2)** In the case of a `nil` comparison, the right operand should always be `nil`.
 **(10)** The `Scope` field of iteration or match expressions must be the first one. Accordingly, coverage data of the relevant type can be obtained by reinterpreting types such as `uintptr` with Unsafe Jule.
+**(11)** Strict type aliases behave very similar to structs. For this reason, they are treated as a struct on CAST. They always have an instance. The data structure that represents a structure instance provides source type data that essentially contains what type it refers to. This data is only set if the structure was created by a strict type alias.
+    - **(11.1)** If a struct instance is created by a strict type alias (easily identified by looking at the source type data) and declared binded, the binded indicates that it was created by a strict type alias defined for a type. If a structure does not have source type data and the declaration is described as binded, this is a ordinary binded struct declaration.
 
 ### Implicit Imports
 

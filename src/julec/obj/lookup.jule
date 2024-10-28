@@ -62,10 +62,16 @@ fn FindTraitTypeOffset(t: &sema::Trait, mut k: &sema::Type): int {
 		ret emptyTraitOffset
 	}
 	let mut s: &sema::StructIns = nil
-	if k.Sptr() != nil {
-		k = k.Sptr().Elem
+	match type k.Kind {
+	| &sema::Sptr:
+		k = (&sema::Sptr)(k.Kind).Elem
+		match type k.Kind {
+		| &sema::StructIns:
+			s = (&sema::StructIns)(k.Kind)
+		}
+	| &sema::StructIns:
+		s = (&sema::StructIns)(k.Kind)
 	}
-	s = k.Struct()
 	if s == nil {
 		ret -1
 	}
@@ -123,4 +129,20 @@ fn FindVar(v: &sema::Var, vars: []&sema::Var): int {
 		}
 	}
 	ret -1
+}
+
+// Returns bind identifier of type if binded.
+// Returns empty string if t is not binded.
+fn GetBindIdent(t: &sema::Type): str {
+	match type t.Kind {
+	| &sema::StructIns:
+		s := (&sema::StructIns)(t.Kind)
+		if s.Decl.Binded {
+			ret s.Decl.Ident
+		}
+		if s.Source != nil {
+			ret GetBindIdent(s.Source)
+		}
+	}
+	ret ""
 }

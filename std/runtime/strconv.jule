@@ -223,24 +223,20 @@ fn toStr[T](x: T): str {
 			ret "<nil>"
 		}
 	}
-	const match type T {
-	| str:
-		ret x
-	| int | i8 | i16 | i32 | i64:
-		ret i64ToStr(i64(x))
-	| uint | uintptr | u8 | u16 | u32 | u64:
-		ret u64ToStr(u64(x))
-	| f32 | f64:
-		ret f64ToStr(f64(x))
-	| bool:
-		ret boolToStr(x)
-	| any:
-		if x == nil {
-			ret "<nil>"
-		}
-		ret unsafe { integ::Emit[str]("{}.type->to_str({}.data.alloc)", x, x) }
-	}
+
 	const match t.Kind() {
+	| comptime::Kind.Str:
+		ret str(x)
+	| comptime::Kind.Int | comptime::Kind.I8 | comptime::Kind.I16 | comptime::Kind.I32 | comptime::Kind.I64:
+		ret i64ToStr(i64(x))
+	| comptime::Kind.Uint | comptime::Kind.Uintptr | comptime::Kind.U8 | comptime::Kind.U16 | comptime::Kind.U32 | comptime::Kind.U64:
+		ret i64ToStr(i64(x))
+	| comptime::Kind.F32 | comptime::Kind.F64:
+		ret f64ToStr(f64(x))
+	| comptime::Kind.Bool:
+		ret boolToStr(bool(x))
+	| comptime::Kind.Any:
+		ret unsafe { integ::Emit[str]("{}.type->to_str({}.data.alloc)", x, x) }
 	| comptime::Kind.Trait:
 		ret unsafe { ptrToStr(integ::Emit[*uint]("{}.data.alloc", x, x)) }
 	| comptime::Kind.TypeEnum:
@@ -258,10 +254,10 @@ fn toStr[T](x: T): str {
 		ret unsafe { ptrToStr((*unsafe)(uintptr(x))) }
 	| comptime::Kind.Ptr
 	| comptime::Kind.UnsafePtr:
-		ret ptrToStr(x)
+		ret ptrToStr(unsafe { (*unsafe)(uintptr(x)) })
 	| comptime::Kind.Enum:
 		comptime::TypeAlias(elemType, t.Elem())
-		ret toStr[elemType](x)
+		ret toStr(elemType(x))
 	}
 	panic("runtime: unsupported type for toStr")
 }

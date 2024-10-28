@@ -176,7 +176,7 @@ impl jsonEncoder {
 		self.buf.writeByte('"')
 	}
 
-	fn encodeByteSlice(mut self, &s: []byte) {
+	fn encodeByteSlice(mut self, s: []byte) {
 		const Padding = true // Padding for Base64 encoding.
 		self.buf.writeByte('"')
 		self.buf.write(base64::Encode(s, Padding))
@@ -338,9 +338,9 @@ impl jsonEncoder {
 			self.encodeNil()
 			ret
 		}
-		const match type T {
-		| []byte:
-			self.encodeByteSlice(t)
+		const match comptime::TypeOf(T).Elem().Kind() {
+		| comptime::Kind.U8:
+			self.encodeByteSlice([]byte(t))
 		|:
 			self.encodeArray[T, Flag](t) else { error(error) }
 		}
@@ -352,27 +352,25 @@ impl jsonEncoder {
 		| tt.Binded():
 			error(EncodeError.UnsupportedType)
 		}
-		const match type T {
-		| int | i8 | i16 | i32 | i64:
+		const match tt.Kind() {
+		| comptime::Kind.Int | comptime::Kind.I8 | comptime::Kind.I16 | comptime::Kind.I32 | comptime::Kind.I64:
 			self.encodeInt(i64(t))
 			ret
-		| uint | uintptr | u8 | u16 | u32 | u64:
+		| comptime::Kind.Uint | comptime::Kind.U8 | comptime::Kind.U16 | comptime::Kind.U32 | comptime::Kind.U64:
 			self.encodeUint(u64(t))
 			ret
-		| f32:
+		| comptime::Kind.F32:
 			self.encodeFloat(f64(t), 1<<5) else { error(error) }
 			ret
-		| f64:
-			self.encodeFloat(t, 1<<6) else { error(error) }
+		| comptime::Kind.F64:
+			self.encodeFloat(f64(t), 1<<6) else { error(error) }
 			ret
-		| bool:
-			self.encodeBool(t)
+		| comptime::Kind.Bool:
+			self.encodeBool(bool(t))
 			ret
-		| str:
-			self.encodeStr(t)
+		| comptime::Kind.Str:
+			self.encodeStr(str(t))
 			ret
-		}
-		const match tt.Kind() {
 		| comptime::Kind.SmartPtr:
 			// Avoid to implement as a function.
 			// Fills call stack faster especially with recursive structures.

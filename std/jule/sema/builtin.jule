@@ -15,7 +15,7 @@ use "std/jule/types"
 //  e: Caller owner Eval instance.
 //  fc: Function call expression.
 //  d: Data instance for evaluated expression of function.
-type builtinCaller: fn(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &d: &Data): &Data
+type builtinCaller = fn(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &d: &Data): &Data
 
 fn findBuiltinFunc(&ident: str): &FnIns {
 	match ident {
@@ -54,12 +54,25 @@ fn findBuiltinFunc(&ident: str): &FnIns {
 	}
 }
 
-fn primTypeAlias(mut &k: &Type): &TypeAlias {
+fn primTypeAlias(ident: str, mut &k: &Type, strict: bool): &TypeAlias {
+	if !strict {
+		ret &TypeAlias{
+			Ident: ident,
+			Public: true,
+			TypeSym: &TypeSym{
+				Type: k,
+			},
+		}
+	}
+	mut s := initNewStructType(ident, k)
+	s.Checked = true
+	s.Decl.Public = true
 	ret &TypeAlias{
 		Public: true,
+		Ident: ident,
 		TypeSym: &TypeSym{
-			Type: k,
-		},
+			Type: &Type{Kind: s},
+		}
 	}
 }
 
@@ -108,6 +121,7 @@ fn findBuiltinVar(&ident: str): &Var {
 			Value: &Value{
 				Data: &Data{
 					Constant: constant::Const.NewBool(true),
+					untyped: true,
 				},
 			},
 		}
@@ -121,6 +135,7 @@ fn findBuiltinVar(&ident: str): &Var {
 			Value: &Value{
 				Data: &Data{
 					Constant: constant::Const.NewBool(false),
+					untyped: true,
 				},
 			},
 		}
@@ -133,52 +148,58 @@ fn findBuiltinVar(&ident: str): &Var {
 fn findBuiltinTypeAlias(ident: str): &TypeAlias {
 	match ident {
 	| "any":
-		static mut t = primTypeAlias(primAny)
+		static mut t = primTypeAlias("any", primAny, false)
 		ret t
 	| "str":
-		static mut t = primTypeAlias(primStr)
+		static mut t = primTypeAlias("str", primStr, false)
 		ret t
 	| "bool":
-		static mut t = primTypeAlias(primBool)
+		static mut t = primTypeAlias("bool", primBool, false)
 		ret t
 	| "uintptr":
-		static mut t = primTypeAlias(primUintptr)
+		static mut t = primTypeAlias("uintptr", primUintptr, false)
 		ret t
 	| "uint":
-		static mut t = primTypeAlias(primUint)
+		static mut t = primTypeAlias("uint", primUint, false)
 		ret t
 	| "int":
-		static mut t = primTypeAlias(primInt)
+		static mut t = primTypeAlias("int", primInt, false)
 		ret t
 	| "i8":
-		static mut t = primTypeAlias(primI8)
+		static mut t = primTypeAlias("i8", primI8, false)
 		ret t
 	| "i16":
-		static mut t = primTypeAlias(primI16)
+		static mut t = primTypeAlias("i16", primI16, false)
+		ret t
+	| "i32":
+		static mut t = primTypeAlias("i32", primI32, false)
 		ret t
 	| "i64":
-		static mut t = primTypeAlias(primI64)
+		static mut t = primTypeAlias("i64", primI64, false)
+		ret t
+	| "u8":
+		static mut t = primTypeAlias("u8", primU8, false)
 		ret t
 	| "u16":
-		static mut t = primTypeAlias(primU16)
+		static mut t = primTypeAlias("u16", primU16, false)
 		ret t
 	| "u32":
-		static mut t = primTypeAlias(primU32)
+		static mut t = primTypeAlias("u32", primU32, false)
 		ret t
 	| "u64":
-		static mut t = primTypeAlias(primU64)
+		static mut t = primTypeAlias("u64", primU64, false)
 		ret t
 	| "f32":
-		static mut t = primTypeAlias(primF32)
+		static mut t = primTypeAlias("f32", primF32, false)
 		ret t
 	| "f64":
-		static mut t = primTypeAlias(primF64)
+		static mut t = primTypeAlias("f64", primF64, false)
 		ret t
-	| "byte" | "u8":
-		static mut t = primTypeAlias(primU8)
+	| "byte":
+		static mut t = primTypeAlias("byte", primU8, true)
 		ret t
-	| "rune" | "i32":
-		static mut t = primTypeAlias(primI32)
+	| "rune":
+		static mut t = primTypeAlias("rune", primI32, false)
 		ret t
 	|:
 		ret nil
@@ -1059,7 +1080,7 @@ fn builtinCallerStdJuleIntegratedEmit(mut &e: &eval, mut &fc: &ast::FnCallExpr, 
 	}
 
 	if argd.Type.Prim() == nil || !argd.Type.Prim().IsStr() {
-		e.pushErr(fc.Args[0].Token, build::LogMsg.IncompatibleTypes, str(types::Kind.Str), argd.Type.Str())
+		e.pushErr(fc.Args[0].Token, build::LogMsg.IncompatibleTypes, argd.Type.Str(), argd.Type.Str())
 		ret nil
 	}
 

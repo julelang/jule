@@ -77,17 +77,17 @@ const SO_SNDTIMEO = 0x1005
 
 // C's FD_ZERO macro.
 unsafe fn FdZero(mut fd: *Fd) {
-	cpp.FD_ZERO(fd)
+	cpp.FD_ZERO((*cpp.fd_set)(fd))
 }
 
 // C's FD_SET macro.
 unsafe fn FdSet(handle: uint, mut fd: *Fd) {
-	cpp.FD_SET(handle, fd)
+	cpp.FD_SET(handle, (*cpp.fd_set)(fd))
 }
 
 // C's FD_ISSET macro.
 unsafe fn FdIsset(handle: uint, mut fd: *Fd): int {
-	ret cpp.FD_ISSET(handle, fd)
+	ret cpp.FD_ISSET(handle, (*cpp.fd_set)(fd))
 }
 
 // C's socket function.
@@ -97,12 +97,12 @@ fn Socket(domain: int, t: int, protocol: int): uint {
 
 // C's bind function.
 unsafe fn Bind(handle: uint, addr: *Sockaddr, len: uint): int {
-	ret cpp.bind(handle, addr, len)
+	ret cpp.bind(handle, (*cpp.sockaddr)(addr), len)
 }
 
 // C's connect function.
 unsafe fn Connect(handle: uint, addr: *Sockaddr, len: uint): int {
-	ret cpp.connect(handle, addr, len)
+	ret cpp.connect(handle, (*cpp.sockaddr)(addr), len)
 }
 
 // C's listen function.
@@ -112,7 +112,7 @@ fn Listen(handle: uint, backlog: int): int {
 
 // C's accept function.
 unsafe fn Accept(handle: uint, addr: *Sockaddr, len: *integ::Int): uint {
-	ret cpp.accept(handle, addr, len)
+	ret cpp.accept(handle, (*cpp.sockaddr)(addr), len)
 }
 
 // C's recv function.
@@ -122,7 +122,7 @@ unsafe fn Recv(handle: uint, mut buf: *byte, len: uint, flags: int): int {
 
 // C's recvfrom function.
 unsafe fn Recvfrom(handle: uint, mut buf: *byte, len: int, flags: int, from: *Sockaddr, fromLen: *integ::Int): int {
-	ret cpp.recvfrom(handle, (*integ::Char)(buf), len, flags, from, fromLen)
+	ret cpp.recvfrom(handle, (*integ::Char)(buf), len, flags, (*cpp.sockaddr)(from), fromLen)
 }
 
 // C's send function.
@@ -132,7 +132,7 @@ unsafe fn Send(handle: uint, mut buf: *byte, len: uint, flags: int): int {
 
 // C's sendto function.
 unsafe fn Sendto(handle: uint, mut buf: *byte, len: int, flags: int, to: *Sockaddr, toLen: integ::Int): int {
-	ret cpp.sendto(handle, (*integ::Char)(buf), len, flags, to, toLen)
+	ret cpp.sendto(handle, (*integ::Char)(buf), len, flags, (*cpp.sockaddr)(to), toLen)
 }
 
 // C's closesocket function.
@@ -142,7 +142,7 @@ fn CloseSocket(handle: uint): int {
 
 // C's WSAStartup function.
 unsafe fn WSAStartup(verReq: u16, mut data: *WsaData): int {
-	ret cpp.WSAStartup(verReq, data)
+	ret cpp.WSAStartup(verReq, (*cpp.WSADATA)(data))
 }
 
 // C's MAKEWORD macro.
@@ -167,5 +167,5 @@ unsafe fn Ioctlsocket(handle: uint, cmd: integ::Long, arg: *integ::UnsignedLong)
 
 // C's getsockname function.
 unsafe fn Getsockname(handle: uint, addr: *Sockaddr, len: *integ::Int): int {
-	ret cpp.getsockname(handle, addr, len)
+	ret cpp.getsockname(handle, (*cpp.sockaddr)(addr), len)
 }

@@ -146,7 +146,11 @@ impl typeCoder {
 	// Generates C++ code of Struct instance type.
 	fn structureIns(mut self, mut &buf: strings::Builder, mut s: &sema::StructIns) {
 		if !s.Decl.Binded {
-			identCoder.structureIns(buf, s)
+			if s.Source != nil {
+				self.kind(buf, s.Source)
+			} else {
+				identCoder.structureIns(buf, s)
+			}
 			ret
 		}
 		d := obj::FindDirective(s.Decl.Directives, build::Directive.Namespace)
@@ -278,7 +282,7 @@ impl typeCoder {
 			// As we can see here, bind defines use pure identifiers directly.
 			// So, if you hesitate about a type that causes wrong code generation,
 			// write relevant algorithms above this case.
-			buf.WriteStr(k.BindIdent)!
+			buf.WriteStr(obj::GetBindIdent(k))!
 			ret
 		| k.Prim() != nil:
 			self.prim(buf, k.Prim())
@@ -396,9 +400,9 @@ impl resultCoder {
 			//   so same identifier may exist in different namespaces
 			//   this makes the result identifier is non-unique
 			//   if namespace directive will not be removed in the future,
-			//   this this conflict problems
+			//   fix this conflict issues
 			s.WriteStr(resultCoder.BindPrefix)!
-			s.WriteStr(t.BindIdent)!
+			s.WriteStr(obj::GetBindIdent(t))!
 			ret
 		}
 		match type t.Kind {
