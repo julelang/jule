@@ -991,25 +991,27 @@ impl structLitChecker {
 			self.pushErr(pair.Field, build::LogMsg.IdentNotExist, pair.Field.Kind)
 			ret
 		}
-		if !self.e.s.isAccessibleDefine(f.Decl.Public, f.Decl.Token) {
-			self.pushErr(pair.Field, build::LogMsg.IdentIsNotAccessible, pair.Field.Kind)
-			self.pushSuggestion(build::LogMsg.MakePubToAccess)
-		}
 
 		// Check duplications.
-	dup_lookup:
+	dupLookup:
 		for (_, mut expr) in exprs {
 			match type expr.Kind {
 			| &ast::FieldExprPair:
 				mut dpair := (&ast::FieldExprPair)(expr.Kind)
 				match {
 				| pair == dpair:
-					break dup_lookup
+					break dupLookup
 				| pair.Field.Kind == dpair.Field.Kind:
 					self.pushErr(pair.Field, build::LogMsg.AlreadyHasExpr, pair.Field.Kind)
-					break dup_lookup
+					ret
 				}
 			}
+		}
+
+		if !self.e.s.isAccessibleDefine(f.Decl.Public, f.Decl.Token) {
+			self.pushErr(pair.Field, build::LogMsg.IdentIsNotAccessible, pair.Field.Kind)
+			self.pushSuggestion(build::LogMsg.MakePubToAccess)
+			ret
 		}
 
 		mut prefix := self.e.prefix
