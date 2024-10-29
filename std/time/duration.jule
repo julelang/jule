@@ -3,95 +3,95 @@
 // license that can be found in the LICENSE file.
 
 use "std/runtime"
-
-// Integer type of durations.
-type DurInt: runtime::sleepDuration
+use "std/unsafe"
 
 // Stops execution of the caller thread by stated duration.
 // This function only affects execution of caller thread, not process.
 // If duration is <=0, function will return immediately.
 // It guarantees sleeping at least for the stated duration.
-fn Sleep(mut dur: DurInt) {
+fn Sleep(mut dur: Duration) {
 	if dur >= 0 {
 		runtime::sleep(runtime::sleepDuration(dur))
 	}
 }
 
-// Duration is the time between two times.
-struct Duration{}
+// A Duration represents the elapsed time between two instants
+// as an i64 nanosecond count. The representation limits the
+// largest representable duration to approximately 290 years.
+type Duration: runtime::sleepDuration
+
+const durationMin = Duration(runtime::sleepDuration.Min)
+const durationMax = Duration(runtime::sleepDuration.Max)
+
+// A nanosecond.
+const Nanosecond = Duration(runtime::_Nanosecond)
+
+// Nanoseconds in microsecond.
+// How many nanoseconds are in microsecond.
+const Microsecond = Duration(runtime::_Microsecond)
+
+// Nanoseconds in millisecond.
+// How many nanoseconds are in millisecond.
+const Millisecond = Duration(runtime::_Millisecond)
+
+// Nanoseconds in second.
+// How many nanoseconds are in second.
+const Second = Duration(runtime::_Second)
+
+// Nanoseconds in minute.
+// How many nanoseconds are in minute.
+const Minute = Duration(runtime::_Minute)
+
+// Nanoseconds in hour.
+// How many nanoseconds are in hour.
+const Hour = Duration(runtime::_Hour)
 
 impl Duration {
-	const min = DurInt.Min
-	const max = DurInt.Max
-
-	// A nanosecond.
-	const Nanosecond: DurInt = runtime::_Nanosecond
-
-	// Nanoseconds in microsecond.
-	// How many nanoseconds are in microsecond.
-	const Microsecond: DurInt = runtime::_Microsecond
-
-	// Nanoseconds in millisecond.
-	// How many nanoseconds are in millisecond.
-	const Millisecond: DurInt = runtime::_Millisecond
-
-	// Nanoseconds in second.
-	// How many nanoseconds are in second.
-	const Second: DurInt = runtime::_Second
-
-	// Nanoseconds in minute.
-	// How many nanoseconds are in minute.
-	const Minute: DurInt = runtime::_Minute
-
-	// Nanoseconds in hour.
-	// How many nanoseconds are in hour.
-	const Hour: DurInt = runtime::_Hour
-
 	// Returns duration as nanoseconds.
-	static fn Nanoseconds(d: DurInt): DurInt {
-		ret d
+	fn Nanoseconds(self): Duration {
+		ret self
 	}
 
 	// Returns duration as microseconds.
-	static fn Microseconds(d: DurInt): DurInt {
-		ret d / Duration.Microsecond
+	fn Microseconds(self): Duration {
+		ret self / Microsecond
 	}
 
 	// Returns duration as milliseconds.
-	static fn Milliseconds(d: DurInt): DurInt {
-		ret d / Duration.Millisecond
+	fn Milliseconds(self): Duration {
+		ret self / Millisecond
 	}
 
 	// Returns duration as floating-point seconds.
-	static fn Seconds(d: DurInt): f64 {
-		sec := d / Duration.Second
-		nsec := d % Duration.Second
+	fn Seconds(self): f64 {
+		sec := self / Second
+		nsec := self % Second
 		ret f64(sec) + f64(nsec)/1e9
 	}
 
 	// Returns duration as floating-point minutes.
-	static fn Minutes(d: DurInt): f64 {
-		min := d / Duration.Minute
-		nsec := d % Duration.Minute
+	fn Minutes(self): f64 {
+		min := self / Minute
+		nsec := self % Minute
 		ret f64(min) + f64(nsec)/(60*1e9)
 	}
 
 	// Returns duration as floating-point hours.
-	static fn Hours(d: DurInt): f64 {
-		hour := d / Duration.Hour
-		nsec := d % Duration.Hour
+	fn Hours(self): f64 {
+		hour := self / Hour
+		nsec := self % Hour
 		ret f64(hour) + f64(nsec)/(60*60*1e9)
 	}
 
 	// Returns absolute value of duration.
-	static fn Abs(d: DurInt): DurInt {
+	fn Abs(self): Duration {
 		match {
-		| d >= 0:
-			ret d
-		| d == Duration.min:
-			ret Duration.max
+		| self >= 0:
+			ret self
+		| self == durationMin:
+			ret durationMax
 		|:
-			ret -d
+			ret -self
 		}
 	}
 
@@ -99,17 +99,17 @@ impl Duration {
 	// Leading zero units are omitted. As a special case, durations less than one
 	// second format use a smaller unit (milli-, micro-, or nanoseconds) to ensure
 	// that the leading digit is non-zero. The zero duration formats as 0s.
-	static fn Str(d: DurInt): str {
+	fn Str(self): str {
 		mut buf := make([]byte, 1<<5)
-		n := formatDuration(d, buf)
+		n := formatDuration(self, buf)
 		buf = buf[n:]
-		ret str(buf)
+		ret unsafe::StrFromBytes(buf)
 	}
 }
 
 // Formats the representation of d into the end of buf and
 // returns the offset of the first character.
-fn formatDuration(d: DurInt, mut buf: []byte): int {
+fn formatDuration(d: Duration, mut buf: []byte): int {
 	// Largest time is 2540400h10m10.000000000s
 	mut w := len(buf)
 
@@ -119,7 +119,7 @@ fn formatDuration(d: DurInt, mut buf: []byte): int {
 		u = -u
 	}
 
-	if u < u64(Duration.Second) {
+	if u < u64(Second) {
 		// Special case: if duration is smaller than a second,
 		// use smaller units, like 1.2ms
 		mut prec := 0
@@ -130,11 +130,11 @@ fn formatDuration(d: DurInt, mut buf: []byte): int {
 		| u == 0:
 			buf[w] = '0'
 			ret w
-		| u < u64(Duration.Microsecond):
+		| u < u64(Microsecond):
 			// print nanoseconds
 			prec = 0
 			buf[w] = 'n'
-		| u < u64(Duration.Millisecond):
+		| u < u64(Millisecond):
 			// print microseconds
 			prec = 3
 			// U+00B5 'µ' micro sign == 0xC2 0xB5
