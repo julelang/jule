@@ -78,7 +78,7 @@ fn Connect(network: Network, addr: str)!: Conn {
 // Timeout precision is microseconds.
 // If the timeout is below one microsecond it will be ignored.
 // If timeout is invalid or out of range, throws exceptional with Error.InvalidTimeout.
-fn ConnectTimeout(network: Network, addr: str, timeout: time::DurInt)!: Conn {
+fn ConnectTimeout(network: Network, addr: str, timeout: time::Duration)!: Conn {
 	match network {
 	| Network.Tcp | Network.Tcp4 | Network.Tcp6:
 		ret tcpConnect(network, addr, timeout) else { error(error) }
@@ -101,9 +101,9 @@ unsafe fn connectSocketNoTimeout(handle: netHandle, sockAddr: *sys::Sockaddr, so
 	}
 }
 
-fn timevalFromDuration(timeout: time::DurInt): (tv: sys::Timeval, ok: bool) {
-	sec := i64(time::Duration.Seconds(timeout))
-	usec := i64(time::Duration.Microseconds(timeout - (time::Duration.Second * time::DurInt(sec))))
+fn timevalFromDuration(timeout: time::Duration): (tv: sys::Timeval, ok: bool) {
+	sec := i64(timeout.Seconds())
+	usec := i64((timeout - time::Duration(i64(time::Second)*sec)).Microseconds())
 	ok = sys::NewTimeval(sec, usec, tv)
 	ret
 }
