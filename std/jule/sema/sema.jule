@@ -2165,6 +2165,7 @@ impl sema {
 	// Evaluateds value of variable and checks.
 	// Assumes the variable is global.
 	fn checkVar(mut &self, mut &decl: &Var, mut l: Lookup) {
+		decl.Checked = true
 		self.evalVarValue(decl, l)
 		if decl.Value.Data == nil {
 			ret // Skip checks if error ocurrs.
@@ -2342,31 +2343,32 @@ impl sema {
 
 	fn precheckStructIns(mut &self, mut &s: &StructIns, mut errorToken: &token::Token): (ok: bool) {
 		ok = self.checkStructEnv(s, errorToken)
-		if !ok {
-			ret false
-		}
-
-		// See implicit imports reference (1).
-		// If structure instance is comparable and have not custom compare method,
-		// compiler will use default compare method. If There is array field,
-		// push instance for runtime function.
-		if s.Comparable && self.meta.runtime != nil {
-			mut decl := runtimeFindFn(self.meta.runtime, runtimeFunc.arrayCmp)
-			for (_, mut field) in s.Fields {
-				mut arr := field.Type.Arr()
-				if arr == nil {
-					continue
+		if ok {
+			// See implicit imports reference (1).
+			// If structure instance is comparable and have not custom compare method,
+			// compiler will use default compare method. If There is array field,
+			// push instance for runtime function.
+			if s.Comparable && self.meta.runtime != nil {
+				mut decl := runtimeFindFn(self.meta.runtime, runtimeFunc.arrayCmp)
+				for (_, mut field) in s.Fields {
+					mut arr := field.Type.Arr()
+					if arr == nil {
+						continue
+					}
+					mut f := decl.instanceForce()
+					f.Generics = append(f.Generics, &InsGeneric{Type: arr.Elem})
+					gok, _ := self.checkGenericFn(f, field.Decl.Token)
+					if !gok {
+						panic("sema: arrayCmp evaluation failed, this is an implementation mistake")
+					}
+					s.Refers.Push(f)
 				}
-				mut f := decl.instanceForce()
-				f.Generics = append(f.Generics, &InsGeneric{Type: arr.Elem})
-				ok, _ = self.checkGenericFn(f, field.Decl.Token)
-				if !ok {
-					panic("sema: arrayCmp evaluation failed, this is an implementation mistake")
-				}
-				s.Refers.Push(f)
 			}
 		}
 
+		// Check instances even environment-based checking failed,
+		// because prechecked structures are assumes they are
+		// have checked instances for non-generic methods.
 		for (_, mut f) in s.Methods {
 			if len(f.Generics) == 0 {
 				if self.readyToCheckFn(s, f) == nil {
@@ -2374,7 +2376,7 @@ impl sema {
 				}
 			}
 		}
-		ret true
+		ret
 	}
 
 	fn checkStructIns(mut &self, mut &s: &StructIns) {
