@@ -2817,14 +2817,16 @@ impl eval {
 
 	fn evalTypeStatic(mut self, mut d: &Data, mut si: &ast::SubIdentExpr): &Data {
 		match {
+		| d.Type.softStruct() != nil:
+			// Eval soft structures first, because strict type aliases may
+			// jump into other cases. So caught they here.
+			ret self.evalStructStatic(d.Type.softStruct(), si.Ident)
 		| d.Type.Prim() != nil:
 			ret self.evalPrimStatic(d.Type, si.Ident)
 		| d.Type.Enum() != nil:
 			ret self.evalEnumStatic(d.Type.Enum(), si.Ident)
 		| d.Type.TypeEnum() != nil:
 			ret self.evalTypeEnumStatic(d.Type.TypeEnum(), si.Ident)
-		| d.Type.softStruct() != nil:
-			ret self.evalStructStatic(d.Type.softStruct(), si.Ident)
 		|:
 			self.pushErr(si.Ident, build::LogMsg.TypeNotSupportSubFields, d.Type.Str())
 			ret nil
