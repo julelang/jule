@@ -13,18 +13,21 @@ fn ptrToStr(p: *unsafe): str {
 		ret "<nil>"
 	}
 	const numbers = "0123456789abcdef"
-	mut buf := make([]byte, 0, 12)
-	buf = append(buf, "0x"...)
-	mut z := uintptr(p)
-	for z > 0 {
-		buf = append(buf, numbers[z%16])
-		z >>= 4
+	mut buf := make([]byte, 100)
+	mut i := len(buf) - 1
+	mut n := u64(uintptr(p))
+	for i > 0; i-- {
+		buf[i] = numbers[n%16]
+		if n < 16 {
+			break
+		}
+		n /= 16
 	}
-	mut i := 0
-	for i < len(buf)>>1; i++ {
-		buf[i+2], buf[len(buf)-i-1] = buf[len(buf)-i-1], buf[i+2]
-	}
-	ret unsafe::StrFromBytes(buf)
+	i--
+	buf[i] = 'x'
+	i--
+	buf[i] = '0'
+	ret unsafe::StrFromBytes(buf[i:])
 }
 
 // Returns boolean in string form.
