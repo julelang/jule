@@ -321,11 +321,37 @@ impl ObjectDeadCode {
 		}
 	}
 
+	fn removeDeadStrictTypeAliases(mut &self, mut &aliases: []&sema::TypeAlias) {
+		mut i := 0
+		for i < len(aliases) {
+			mut ta := aliases[i]
+			if ta.Strict {
+				mut s := (&sema::StructIns)(ta.TypeSym.Type.Kind).Decl
+				mut j := 0
+				for j < len(s.Instances) {
+					mut ins := s.Instances[j]
+					self.removeDeadFns(ins.Methods)
+					if len(ins.Methods) != 0 || self.isLive[&sema::StructIns](ins) {
+						j++
+						continue
+					}
+					s.Instances = append(s.Instances[:j], s.Instances[j+1:]...)
+				}
+				if len(s.Instances) == 0 {
+					aliases = append(aliases[:i], aliases[i+1:]...)
+					continue
+				}
+			}
+			i++
+		}
+	}
+
 	fn removeDeadsFile(mut &self, mut &file: &sema::SymTab) {
 		self.removeDeadFns(file.Funcs)
 		self.removeDeadStructs(file.Structs)
 		self.removeDeadTraits(file.Traits)
 		self.removeDeadGlobals(file.Vars)
+		self.removeDeadStrictTypeAliases(file.TypeAliases)
 	}
 
 	fn removeDeadsPackage(mut &self, mut &pkg: &sema::Package) {
