@@ -76,7 +76,7 @@ unsafe fn castU64(m: *metadata): u64 {
 }
 
 // Returns the minimum number of groups needed to store |n| elems.
-fn numGroups(n: int): (groups: int) {
+fn numGroups(n: u32): (groups: u32) {
 	groups = (n + maxAvgGroupLoad - 1) / maxAvgGroupLoad
 	if groups == 0 {
 		groups = 1
@@ -121,9 +121,9 @@ struct group[Key: comparable, Val] {
 struct _Map[Key: comparable, Val] {
 	ctrl:     []metadata
 	groups:   []group[Key, Val]
-	resident: int
-	dead:     int
-	limit:    int
+	resident: u32
+	dead:     u32
+	limit:    u32
 }
 
 impl _Map {
@@ -132,7 +132,7 @@ impl _Map {
 		ret new(_Map[Key, Val])
 	}
 
-	fn initData(mut self, cap: int) {
+	fn initData(mut self, cap: u32) {
 		groups := numGroups(cap)
 		self.ctrl = make([]metadata, groups)
 		self.groups = make([]group[Key, Val], groups)
@@ -148,7 +148,7 @@ impl _Map {
 		ret hash(unsafe::StrBytes(bytes))
 	}
 
-	fn rehash(mut self, n: int) {
+	fn rehash(mut self, n: u32) {
 		if self.groups == nil {
 			// no need for rehashing just handle nil data
 			self.initData(mapInitialSize)
@@ -174,13 +174,13 @@ impl _Map {
 		}
 	}
 
-	fn nextSize(self): (n: int) {
+	fn nextSize(self): (n: u32) {
 		if self.groups == nil {
 			ret mapInitialSize
 		}
-		n = len(self.groups) << 2
-		if self.dead >= (self.resident>>1) {
-			n = len(self.groups)
+		n = u32(len(self.groups)) << 2
+		if self.dead >= self.resident>>1 {
+			n = u32(len(self.groups))
 		}
 		ret
 	}
@@ -349,12 +349,12 @@ impl _Map {
 		if self == nil {
 			ret 0
 		}
-		ret self.resident - self.dead
+		ret int(self.resident - self.dead)
 	}
 
 	// Returns the number of additional elements
 	// the can be added before resizing.
-	fn cap(self): int { ret self.limit - self.resident }
+	fn cap(self): int { ret int(self.limit - self.resident) }
 
 	fn iterator(mut &self): mapIterator[Key, Val] {
 		mut iterator := mapIterator[Key, Val]{m: self}
