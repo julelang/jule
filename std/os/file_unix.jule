@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/internal/poll"
 use integ "std/jule/integrated"
 use "std/runtime"
 use "std/sys"
@@ -18,7 +19,7 @@ impl File {
 		if handle == -1 {
 			error(getLastFsError())
 		}
-		ret unsafe { File.New(uintptr(handle)) }
+		ret &File{fd: poll::FD.New(u64(handle), poll::FDKind.File)}
 	}
 
 	// Removes named file.
@@ -36,15 +37,11 @@ impl File {
 	//
 	// Implements the io::Writer trait.
 	fn Write(mut self, buf: []byte)!: (n: int) {
-		if len(buf) == 0 {
-			ret 0
-		}
-		runtime::handleRW(buf)
-		n = unsafe { sys::Write(int(self.handle), &buf[0], uint(len(buf))) }
-		if n == -1 {
+		n, ok := self.fd.Write(buf)
+		if !ok {
 			error(getLastFsError())
 		}
-		ret n
+		ret
 	}
 
 	// Read bytes to buffer from handle and returns readed byte count.
@@ -55,14 +52,10 @@ impl File {
 	//
 	// Implements the io::Reader trait.
 	fn Read(mut self, mut buf: []byte)!: (n: int) {
-		if len(buf) == 0 {
-			ret 0
-		}
-		runtime::handleRW(buf)
-		n = unsafe { sys::Read(int(self.handle), &buf[0], uint(len(buf))) }
-		if n == -1 {
+		n, ok := self.fd.Read(buf)
+		if !ok {
 			error(getLastFsError())
 		}
-		ret n
+		ret
 	}
 }

@@ -2,7 +2,43 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-// Handles data b by operating system and other implementation critical dependations.
-// Call this function for the data before Read/Write calls.
-// It may will mutate the length of b, but not bytes.
-fn handleRW(&b: []byte) { _handleRW(b) }
+use "std/internal/poll"
+use "std/sys"
+
+// File descriptors for the standard input/output.
+static mut stdin = poll::FD.New(u64(sys::STDIN), poll::FDKind.Console)
+static mut stdout = poll::FD.New(u64(sys::STDOUT), poll::FDKind.Console)
+static mut stderr = poll::FD.New(u64(sys::STDERR), poll::FDKind.Console)
+
+// Writes to stdout.
+// Returns written byte count if success, -1 otherwise.
+#export "__jule_writeStdout"
+fn writeStdout(buf: []byte): int {
+	mut n, ok := stdout.Write(buf)
+	if !ok {
+		n = -1
+	}
+	ret n
+}
+
+// Writes to stderr.
+// Returns written byte count if success, -1 otherwise.
+#export "__jule_writeStderr"
+fn writeStderr(buf: []byte): int {
+	mut n, ok := stderr.Write(buf)
+	if !ok {
+		n = -1
+	}
+	ret n
+}
+
+// Reads from stdin.
+// Returns readed byte count if success, -1 otherwise.
+#export "__jule_readStdin"
+fn readStdin(mut buf: []byte): int {
+	mut n, ok := stdin.Read(buf)
+	if !ok {
+		n = -1
+	}
+	ret n
+}

@@ -1,0 +1,57 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/mem"
+use "std/sys"
+
+// Kinds of FD.
+enum FDKind {
+	File,         // Standard file descriptor.
+	Socket,       // Socket file descriptor, not connectionless, such as TCP.
+	SocketNoConn, // Like Socket kind, but connectionless, such as UDP.
+	Console,      // Console file descriptor.
+}
+
+impl FD {
+	// Returns new FD by file and kind.
+	static fn New(file: u64, kind: FDKind): &FD {
+		ret &FD{
+			File: file,
+			Kind: kind,
+		}
+	}
+
+	// Like Read, but wraps the recvfrom syscall.
+	fn ReadV4(mut self, mut buf: []byte, addr: sys::SockaddrIn): (n: int, ok: bool) {
+		addrLen := mem::SizeOf(addr)
+		ret unsafe { self.ReadV(buf, (*sys::Sockaddr)(&addr), addrLen) }
+	}
+
+	// Like Read, but wraps the recvfrom syscall.
+	fn ReadV6(mut self, mut buf: []byte, addr: sys::SockaddrIn6): (n: int, ok: bool) {
+		addrLen := mem::SizeOf(addr)
+		ret unsafe { self.ReadV(buf, (*sys::Sockaddr)(&addr), addrLen) }
+	}
+
+	// Like Write, but wraps the sendto syscall.
+	fn WriteV4(mut self, buf: []byte, addr: sys::SockaddrIn): (n: int, ok: bool) {
+		addrLen := mem::SizeOf(addr)
+		ret unsafe { self.WriteV(buf, (*sys::Sockaddr)(&addr), addrLen) }
+	}
+
+	// Like Write, but wraps the sendo syscall.
+	fn WriteV6(mut self, buf: []byte, addr: sys::SockaddrIn6): (n: int, ok: bool) {
+		addrLen := mem::SizeOf(addr)
+		ret unsafe { self.WriteV(buf, (*sys::Sockaddr)(&addr), addrLen) }
+	}
+
+	// Sets offset to next Read/Write operation and returns the new offset.
+	// whence: 0 (Seek.Set) means, relative to the origin of the file, 1 (Seek.Cur)
+	// means relative to the current offset, and 2 (Seek.End) means relative to end.
+	fn Seek(mut self, offset: int, origin: int): (pos: int, ok: bool) {
+		pos = sys::Seek(int(self.File), offset, origin)
+		ok = pos != -1
+		ret
+	}
+}

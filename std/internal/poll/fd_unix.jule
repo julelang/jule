@@ -1,0 +1,138 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/sys"
+
+// This information adopted from the Go programming language:
+//
+// Darwin and FreeBSD can't read or write 2GB+ files at a time,
+// even on 64-bit systems.
+// The same is true of socket implementations on many systems.
+// See golang.org/issue/7812 and golang.org/issue/16266.
+// Use 1GB instead of, say, 2GB-1, to keep subsequent reads aligned.
+const maxRW = 1 << 30
+
+// FD is a file descriptor.
+// Provides internal, common implementation for
+// file descriptors, console handles, and sockets.
+struct FD {
+	// The file descriptor should be compatible
+	// with pointers and other integer kinds such as UNIX file descriptors.
+	File: u64
+	Kind: FDKind
+}
+
+impl FD {
+	// Writes bytes to the file descriptor and returns writed byte count.
+	// The number of bytes written can never exceed the length of the buf.
+	fn Write(mut self, buf: []byte): (n: int, ok: bool) {
+		if len(buf) == 0 {
+			// If the caller wanted a zero byte write, return immediately
+			// without trying to write.
+			ret 0, true
+		}
+		// File and console descriptors, also socket descriptors, can use the Write function.
+		// But other kinds are not supported. For socket descriptors, correct use case
+		// will be equivalent to send syscall.
+		if self.Kind != FDKind.File && self.Kind != FDKind.Console && self.Kind != FDKind.Socket {
+			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for Write")
+		}
+		for {
+			mut max := len(buf)
+			if max-n > maxRW {
+				max = n + maxRW
+			}
+			part := buf[n:max]
+			nn := unsafe { sys::Write(int(self.File), &part[0], uint(len(part))) }
+			if nn > 0 {
+				n += nn
+			}
+			ok = nn != -1
+			if n == len(buf) || !ok {
+				ret
+			}
+		}
+	}
+
+	// Like Write, but wraps sendto syscall.
+	// General for V4 and V6. Unsafe variant.
+	unsafe fn WriteV(mut self, buf: []byte, addr: *sys::Sockaddr, addrLen: uint): (n: int, ok: bool) {
+		if len(buf) == 0 {
+			// If the caller wanted a zero byte read, return immediately
+			// without trying to read.
+			ret 0, true
+		}
+		if self.Kind != FDKind.SocketNoConn {
+			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for ReadV")
+		}
+		for {
+			mut max := len(buf)
+			if max-n > maxRW {
+				max = n + maxRW
+			}
+			part := buf[n:max]
+			nn := sys::Sendto(int(self.File), &part[0], uint(len(part)), 0, addr, u32(addrLen))
+			if nn > 0 {
+				n += nn
+			}
+			ok = nn >= 0
+			if n == len(buf) || !ok {
+				ret
+			}
+		}
+		ret
+	}
+
+	// Read bytes to buffer from the file descriptor and returns readed byte count.
+	// The number of bytes readed can never exceed the length of the buf.
+	// If the buf is larger than the number of bytes that can be read,
+	// the buffer will not cause an overflow. Offset will be shifted
+	// by the number of bytes read.
+	fn Read(mut self, mut buf: []byte): (n: int, ok: bool) {
+		if len(buf) == 0 {
+			// If the caller wanted a zero byte read, return immediately
+			// without trying to read.
+			ret 0, true
+		}
+		// File and console descriptors, also socket descriptors, can use the Read function.
+		// But other kinds are not supported. For socket descriptors, correct use case
+		// will be equivalent to recv syscall.
+		if self.Kind != FDKind.File && self.Kind != FDKind.Console && self.Kind != FDKind.Socket {
+			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for Read")
+		}
+		if len(buf) > maxRW {
+			buf = buf[:maxRW]
+		}
+		n = unsafe { sys::Read(int(self.File), &buf[0], uint(len(buf))) }
+		ok = n != -1
+		ret
+	}
+
+	// Like Read, but wraps recvfrom syscall.
+	// General for V4 and V6. Unsafe variant.
+	unsafe fn ReadV(mut self, mut buf: []byte, addr: *sys::Sockaddr, addrLen: uint): (n: int, ok: bool) {
+		if len(buf) == 0 {
+			// If the caller wanted a zero byte read, return immediately
+			// without trying to read.
+			ret 0, true
+		}
+		if self.Kind != FDKind.SocketNoConn {
+			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for ReadV")
+		}
+		if len(buf) > maxRW {
+			buf = buf[:maxRW]
+		}
+
+		addrLenI := u32(addrLen)
+		n = sys::Recvfrom(int(self.File), &buf[0], uint(len(buf)), 0, addr, &addrLenI)
+		ok = n >= 0
+		ret
+	}
+
+	// Closes file descriptor.
+	fn Close(mut self): (ok: bool) {
+		// All kinds are supports the Close function.
+		ret sys::Close(int(self.File)) != -1
+	}
+}

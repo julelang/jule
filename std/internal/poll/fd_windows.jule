@@ -1,0 +1,280 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use integ "std/jule/integrated"
+use "std/sys"
+use "std/unicode/utf16"
+use "std/unicode/utf8"
+
+// This information adopted from the Go programming language:
+//
+// Windows ReadFile and WSARecv use DWORD (u32) parameter to pass buffer length.
+// This prevents us reading blocks larger than 4GB.
+// See golang.org/issue/26923.
+const maxRW = 1 << 30 // 1GB is large enough and keeps subsequent reads aligned
+
+// FD is a file descriptor.
+// Provides internal, common implementation for
+// file descriptors, console handles, and sockets.
+struct FD {
+	// The file descriptor should be compatible
+	// with pointers and other integer kinds such as UNIX file descriptors.
+	File: u64
+	Kind: FDKind
+
+	// For console input/output.
+	lastbits:       []byte // first few bytes of the last incomplete rune in last write
+	readu16:        []u16  // buffer to hold u16s obtained with ReadConsole
+	readbyte:       []byte // buffer to hold decoding of readu16 from utf16 to utf8
+	readbyteOffset: int    // readbyte[readOffset:] is yet to be consumed with file.Read
+}
+
+impl FD {
+	// Writes bytes to the file descriptor and returns writed byte count.
+	// The number of bytes written can never exceed the length of the buf.
+	fn Write(mut self, buf: []byte): (n: int, ok: bool) {
+		if len(buf) == 0 {
+			// If the caller wanted a zero byte write, return immediately
+			// without trying to write.
+			ret 0, true
+		}
+
+		mut buf2 := unsafe { *(&buf) } // break immutability, do not mutable the content
+		for len(buf2) > 0 {
+			mut b := buf2
+			if len(b) > maxRW {
+				b = b[:maxRW]
+			}
+			mut nn := 0
+			match self.Kind {
+			| FDKind.Console:
+				nn = self.writeConsole(b)
+			| FDKind.File:
+				nn = unsafe { sys::Write(int(self.File), &b[0], uint(len(b))) }
+			| FDKind.Socket:
+				nn = unsafe { sys::Send(uint(self.File), &b[0], uint(len(buf)), 0) }
+				if nn < 0 {
+					nn = -1
+				}
+			|:
+				panic("std/internal/poll: unimplemented/unsupported file descriptor kind for Write")
+			}
+			ok = nn != -1
+			if !ok {
+				ret
+			}
+			n += nn
+			buf2 = buf2[n:]
+		}
+		ret n, true
+	}
+
+	// Like Write, but wraps sendto syscall.
+	// General for V4 and V6. Unsafe variant.
+	unsafe fn WriteV(mut self, buf: []byte, addr: *sys::Sockaddr, addrLen: uint): (n: int, ok: bool) {
+		if len(buf) == 0 {
+			// If the caller wanted a zero byte read, return immediately
+			// without trying to read.
+			ret 0, true
+		}
+		if self.Kind != FDKind.SocketNoConn {
+			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for ReadV")
+		}
+		for {
+			mut max := len(buf)
+			if max-n > maxRW {
+				max = n + maxRW
+			}
+			part := buf[n:max]
+			nn := sys::Sendto(uint(self.File), &part[0], len(part), 0, addr, integ::Int(addrLen))
+			if nn > 0 {
+				n += nn
+			}
+			ok = nn >= 0
+			if n == len(buf) || !ok {
+				ret
+			}
+		}
+		ret
+	}
+
+	// Writes buf to console handle, returns writed byte count.
+	// Returns -1 if error occurred.
+	fn writeConsole(mut self, mut buf: []byte): (n: int) {
+		n = len(buf)
+		mut runes := make([]rune, 0, 256)
+		if len(self.lastbits) > 0 {
+			buf = append(self.lastbits, buf...)
+			self.lastbits = nil
+		}
+		for len(buf) >= utf8::UTFMax || utf8::FullRune(buf) {
+			r, l := utf8::DecodeRune(buf)
+			runes = append(runes, r)
+			buf = buf[l:]
+		}
+		if len(buf) > 0 {
+			self.lastbits = make([]byte, len(buf))
+			copy(self.lastbits, buf)
+		}
+		// This information adopted from the Go programming language:
+		//
+		// sys::WriteConsole seems to fail, if given large buffer.
+		// So limit the buffer to 16000 characters. This number was
+		// discovered by experimenting with sys::WriteConsole.
+		const maxWrite = 16000
+		for len(runes) > 0 {
+			mut m := len(runes)
+			if m > maxWrite {
+				m = maxWrite
+			}
+			chunk := runes[:m]
+			runes = runes[m:]
+			mut u16s := utf16::Encode(chunk)
+			for len(u16s) > 0 {
+				mut written := u32(0)
+				ok := unsafe { sys::WriteConsole(sys::Handle(self.File), &u16s[0], u32(len(u16s)), written, nil) }
+				if !ok {
+					ret -1
+				}
+				u16s = u16s[written:]
+			}
+		}
+		ret
+	}
+
+	// Read bytes to buffer from the file descriptor and returns readed byte count.
+	// The number of bytes readed can never exceed the length of the buf.
+	// If the buf is larger than the number of bytes that can be read,
+	// the buffer will not cause an overflow. Offset will be shifted
+	// by the number of bytes read.
+	fn Read(mut self, mut buf: []byte): (n: int, ok: bool) {
+		if len(buf) == 0 {
+			// If the caller wanted a zero byte read, return immediately
+			// without trying to read.
+			ret 0, true
+		}
+
+		if len(buf) > maxRW {
+			buf = buf[:maxRW]
+		}
+
+		match self.Kind {
+		| FDKind.Console:
+			n, ok = self.readConsole(buf)
+		| FDKind.File:
+			n = unsafe { sys::Read(int(self.File), &buf[0], uint(len(buf))) }
+			ok = n != -1
+		| FDKind.Socket:
+			n = unsafe { sys::Recv(uint(self.File), &buf[0], uint(len(buf)), 0) }
+			ok = n >= 0
+			if !ok {
+				n = -1
+			}
+		|:
+			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for Read")
+		}
+		ret
+	}
+
+	// Like Read, but wraps recvfrom syscall.
+	// General for V4 and V6. Unsafe variant.
+	unsafe fn ReadV(mut self, mut buf: []byte, addr: *sys::Sockaddr, addrLen: uint): (n: int, ok: bool) {
+		if len(buf) == 0 {
+			// If the caller wanted a zero byte read, return immediately
+			// without trying to read.
+			ret 0, true
+		}
+		if self.Kind != FDKind.SocketNoConn {
+			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for ReadV")
+		}
+		if len(buf) > maxRW {
+			buf = buf[:maxRW]
+		}
+		addrLenI := integ::Int(addrLen)
+		n = sys::Recvfrom(uint(self.File), &buf[0], len(buf), 0, addr, &addrLenI)
+		ok = n >= 0
+		ret
+	}
+
+	// Reads from console handle into buf to console handle, returns readed byte count.
+	fn readConsole(mut self, mut buf: []byte): (n: int, ok: bool) {
+		if self.readu16 == nil {
+			// This information adopted from the Go programming language:
+			//
+			// Note: sys::ReadConsole fails for very large buffers.
+			// The limit is somewhere around (but not exactly) 16384.
+			// Stay well below.
+			self.readu16 = make([]u16, 0, 10000)
+			self.readbyte = make([]byte, 0, 4*cap(self.readu16))
+		}
+
+		for self.readbyteOffset >= len(self.readbyte) {
+			n = cap(self.readu16) - len(self.readu16)
+			if n > len(buf) {
+				n = len(buf)
+			}
+			mut nw := u32(0)
+			ok = unsafe { sys::ReadConsole(sys::Handle(self.File), &self.readu16[:len(self.readu16)+1][len(self.readu16)], u32(n), nw) }
+			if !ok {
+				ret 0, false
+			}
+			u16s := self.readu16[:len(self.readu16)+int(nw)]
+			self.readu16 = self.readu16[:0]
+			mut b := self.readbyte[:0]
+			mut i := 0
+			for i < len(u16s); i++ {
+				mut r := rune(u16s[i])
+				if utf16::IsSurrogate(r) {
+					if i+1 == len(u16s) {
+						if nw > 0 {
+							// Save half surrogate pair for next time.
+							self.readu16 = self.readu16[:1]
+							self.readu16[0] = u16(r)
+							break
+						}
+						r = utf8::RuneError
+					} else {
+						r = utf16::DecodeRune(r, rune(u16s[i+1]))
+						if r != utf8::RuneError {
+							i++
+						}
+					}
+				}
+				b = utf8::AppendRune(b, r)
+			}
+			self.readbyte = b
+			self.readbyteOffset = 0
+			if nw == 0 {
+				break
+			}
+		}
+
+		src := self.readbyte[self.readbyteOffset:]
+		mut i := 0
+		for i < len(src) && i < len(buf); i++ {
+			x := src[i]
+			if x == 0x1A { // Ctrl-Z
+				if i == 0 {
+					self.readbyteOffset++
+				}
+				break
+			}
+			buf[i] = x
+		}
+		self.readbyteOffset += i
+		ret i, true
+	}
+
+	// Closes file descriptor.
+	fn Close(mut self): (ok: bool) {
+		match self.Kind {
+		| FDKind.File | FDKind.Console:
+			ret sys::Close(int(self.File)) != -1
+		| FDKind.Socket | FDKind.SocketNoConn:
+			ret sys::CloseSocket(uint(self.File)) >= 0
+		|:
+			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for Close")
+		}
+	}
+}

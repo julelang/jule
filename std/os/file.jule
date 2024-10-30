@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/internal/poll"
 use "std/io"
 use "std/jule/integrated"
 use "std/sys"
@@ -50,7 +51,7 @@ const O_TRUNC = oFlag.Trunc   // Truncate regular writable file when opened
 // for console handlers depending on the operating system.
 // For example, Windows has an overhead for UTF-16 processing.
 struct File {
-	handle: uintptr
+	fd: &poll::FD
 }
 
 // Impl relevant traits for File.
@@ -63,13 +64,6 @@ impl io::ReadWriter for File {}
 impl io::Stream for File {}
 
 impl File {
-	// Returns new &File by handle.
-	static unsafe fn New(handle: uintptr): &File {
-		ret &File{
-			handle: handle,
-		}
-	}
-
 	// Creates or truncates the named file. If the file already exists,
 	// it is truncated. If the file does not exist, it is created with mode 0666
 	// (before umask). If successful, methods on the returned File can
@@ -92,7 +86,8 @@ impl File {
 		if sz != int(s.Size()) {
 			sz = 0
 		}
-		// Following information adopted from Go;
+		// Following information adopted from Go:
+		//
 		// If a file claims a small size, read at least 512 bytes.
 		// In particular, files in Linux's /proc claim size 0 but
 		// then do not work right if read in small pieces,
@@ -123,10 +118,7 @@ impl File {
 	// Calls internally `File.Open`, `File.Write`, `File.Close` and forwards any exceptional.
 	static fn Write(path: str, data: []byte, perm: int)! {
 		mut f := File.Open(path, O_WRONLY|O_CREATE|O_TRUNC, perm) else { error(error) }
-		mut n := 0
-		for n < len(data) {
-			n += f.Write(data[n:]) else { error(error) }
-		}
+		f.Write(data) else { error(error) }
 		f.Close() else { error(error) }
 	}
 }
@@ -136,8 +128,8 @@ impl File {
 	// whence: 0 (Seek.Set) means, relative to the origin of the file, 1 (Seek.Cur)
 	// means relative to the current offset, and 2 (Seek.End) means relative to end.
 	fn Seek(mut self, offset: int, origin: Seek)!: int {
-		pos := sys::Seek(int(self.handle), offset, int(origin))
-		if pos == -1 {
+		pos, ok := self.fd.Seek(offset, int(origin))
+		if !ok {
 			error(getLastFsError())
 		}
 		ret pos
@@ -147,7 +139,8 @@ impl File {
 	//
 	// Implements the io::Closer trait.
 	fn Close(mut self)! {
-		if sys::Close(int(self.handle)) == -1 {
+		ok := self.fd.Close()
+		if !ok {
 			error(getLastFsError())
 		}
 	}

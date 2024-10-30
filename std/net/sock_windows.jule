@@ -7,19 +7,13 @@ use "std/mem"
 use "std/runtime"
 use "std/sys"
 use "std/time"
-
-type netHandle = uint
-type addrLen = integ::Int
+use "std/internal/poll"
 
 fn lastErrorCode(): int {
 	ret sys::WSAGetLastError()
 }
 
-fn closeSocket(handle: netHandle): bool {
-	ret sys::CloseSocket(handle) >= 0
-}
-
-fn setSocketBlockingMode(handle: netHandle, mode: integ::UnsignedLong)! {
+fn setSocketBlockingMode(handle: poll::NetHandle, mode: integ::UnsignedLong)! {
 	FIONBIO := 0x80000000 | (unsafe { (integ::Long)(mem::SizeOf(integ::UnsignedLong) & 0x7F) } << 16) | ('f' << 8) | 126
 	unsafe {
 		if sys::Ioctlsocket(handle, FIONBIO, &mode) == sys::SOCKET_ERROR {
@@ -28,15 +22,15 @@ fn setSocketBlockingMode(handle: netHandle, mode: integ::UnsignedLong)! {
 	}
 }
 
-fn closeSocketBlockingMode(handle: netHandle)! {
+fn closeSocketBlockingMode(handle: poll::NetHandle)! {
 	setSocketBlockingMode(handle, 1) else { error(error) }
 }
 
-fn openSocketBlockingMode(handle: netHandle)! {
+fn openSocketBlockingMode(handle: poll::NetHandle)! {
 	setSocketBlockingMode(handle, 0) else { error(error) }
 }
 
-unsafe fn connectSocket(handle: netHandle, sockAddr: *sys::Sockaddr, sockLen: uint, timeout: time::Duration)! {
+unsafe fn connectSocket(handle: poll::NetHandle, sockAddr: *sys::Sockaddr, sockLen: uint, timeout: time::Duration)! {
 	if timeout == 0 {
 		connectSocketNoTimeout(handle, sockAddr, sockLen) else { error(error) }
 		ret
@@ -80,43 +74,7 @@ unsafe fn connectSocket(handle: netHandle, sockAddr: *sys::Sockaddr, sockLen: ui
 	openSocketBlockingMode(handle) else { error(error) }
 }
 
-fn recvfrom(&conn: UdpConn, mut &buf: []byte)!: int {
-	runtime::handleRW(buf)
-	if conn.v6 {
-		addrLen := unsafe { addrLen(mem::SizeOf(conn.sockaddr6)) }
-		n := unsafe { sys::Recvfrom(conn.handle, &buf[0], len(buf), 0, (*sys::Sockaddr)(&conn.sockaddr6), &addrLen) }
-		if n >= 0 {
-			ret int(n)
-		}
-	} else {
-		addrLen := unsafe { addrLen(mem::SizeOf(conn.sockaddr4)) }
-		n := unsafe { sys::Recvfrom(conn.handle, &buf[0], len(buf), 0, (*sys::Sockaddr)(&conn.sockaddr4), &addrLen) }
-		if n >= 0 {
-			ret int(n)
-		}
-	}
-	error(lastErrorCode())
-}
-
-fn sendto(&conn: UdpConn, &buf: []byte)!: int {
-	runtime::handleRW(buf)
-	if conn.v6 {
-		addrLen := unsafe { addrLen(mem::SizeOf(conn.sockaddr6)) }
-		n := unsafe { sys::Sendto(conn.handle, &buf[0], len(buf), 0, (*sys::Sockaddr)(&conn.sockaddr6), addrLen) }
-		if n >= 0 {
-			ret int(n)
-		}
-	} else {
-		addrLen := unsafe { addrLen(mem::SizeOf(conn.sockaddr4)) }
-		n := unsafe { sys::Sendto(conn.handle, &buf[0], len(buf), 0, (*sys::Sockaddr)(&conn.sockaddr4), addrLen) }
-		if n >= 0 {
-			ret int(n)
-		}
-	}
-	error(lastErrorCode())
-}
-
-fn setSocketTimeout(handle: netHandle, scope: int, timeout: time::Duration)! {
+fn setSocketTimeout(handle: poll::NetHandle, scope: int, timeout: time::Duration)! {
 	tv, ok := timevalFromDuration(timeout)
 	if !ok {
 		error(Error.InvalidTimeout)

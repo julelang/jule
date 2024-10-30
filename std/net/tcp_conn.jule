@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/internal/poll"
 use "std/io"
 use "std/runtime"
 use "std/sys"
@@ -10,9 +11,9 @@ use "std/time"
 // TCP connection.
 // In most cases, represents TCP client.
 struct TcpConn {
-	mut handle: netHandle = sys::INVALID_SOCKET
-	v6:         bool
-	Addr:       &TcpAddr
+	mut fd: &poll::FD
+	v6:     bool
+	Addr:   &TcpAddr
 }
 
 impl Conn for TcpConn {}
@@ -32,19 +33,18 @@ impl TcpConn {
 	// connection state is closed.
 	// All exceptionals are error code of implementation.
 	fn Read(mut self, mut buf: []byte)!: int {
-		if self.handle == sys::INVALID_SOCKET {
+		if self.fd == nil {
 			panic("net: TcpConn.Read: connection is closed")
 		}
 		if len(buf) == 0 {
 			ret 0
 		}
-		runtime::handleRW(buf)
-		n := unsafe { sys::Recv(self.handle, &buf[0], uint(len(buf)), 0) }
-		if n > 0 {
+		n, ok := self.fd.Read(buf)
+		if ok {
+			if n == 0 {
+				self.Close()!
+			}
 			ret n
-		} else if n == 0 {
-			self.Close()!
-			ret 0
 		}
 		error(lastErrorCode())
 	}
@@ -53,18 +53,14 @@ impl TcpConn {
 	// The number of bytes written can never exceed the length of the buffer.
 	// All exceptionals are error code of implementation.
 	fn Write(mut self, buf: []byte)!: int {
-		if self.handle == sys::INVALID_SOCKET {
+		if self.fd == nil {
 			panic("net: TcpConn.Write: connection is closed")
 		}
-		if len(buf) == 0 {
-			ret 0
+		n, ok := self.fd.Write(buf)
+		if ok {
+			ret n
 		}
-		runtime::handleRW(buf)
-		n := unsafe { sys::Send(self.handle, &buf[0], uint(len(buf)), 0) }
-		if n < 0 {
-			error(lastErrorCode())
-		}
-		ret n
+		error(lastErrorCode())
 	}
 
 	// Sets read timeout for connection.
@@ -73,10 +69,10 @@ impl TcpConn {
 	// The zero timeout, clears current timeout if exist.
 	// All exceptionals are error code of implementation.
 	fn SetReadTimeout(mut self, timeout: time::Duration)! {
-		if self.handle == sys::INVALID_SOCKET {
+		if self.fd == nil {
 			panic("net: TcpConn.SetReadTimeout: connection is closed")
 		}
-		setSocketTimeout(self.handle, sys::SO_RCVTIMEO, timeout) else { error(error) }
+		setSocketTimeout(poll::NetHandle(self.fd.File), sys::SO_RCVTIMEO, timeout) else { error(error) }
 	}
 
 	// Sets write timeout for connection.
@@ -85,17 +81,17 @@ impl TcpConn {
 	// The zero timeout, clears current timeout if exist.
 	// All exceptionals are error code of implementation.
 	fn SetWriteTimeout(mut self, timeout: time::Duration)! {
-		if self.handle == sys::INVALID_SOCKET {
+		if self.fd == nil {
 			panic("net: TcpConn.SetReadTimeout: connection is closed")
 		}
-		setSocketTimeout(self.handle, sys::SO_SNDTIMEO, timeout) else { error(error) }
+		setSocketTimeout(poll::NetHandle(self.fd.File), sys::SO_SNDTIMEO, timeout) else { error(error) }
 	}
 
 	// Returns network name which is connected.
 	// If connection closed, returns Network.Tcp as a general network.
 	fn Network(self): Network {
 		match {
-		| self.handle == sys::INVALID_SOCKET:
+		| self.fd == nil:
 			ret Network.Tcp
 		| self.v6:
 			ret Network.Tcp6
@@ -107,13 +103,14 @@ impl TcpConn {
 	// Closes connection.
 	// All exceptionals are error code of implementation.
 	fn Close(mut self)! {
-		if self.handle == sys::INVALID_SOCKET {
+		if self.fd == nil {
 			ret
 		}
-		if !closeSocket(self.handle) {
+		ok := self.fd.Close()
+		if !ok {
 			error(lastErrorCode())
 		}
-		self.handle = sys::INVALID_SOCKET
+		self.fd = nil
 		self.v6 = false
 	}
 }
