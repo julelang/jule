@@ -8,9 +8,7 @@ use "std/unsafe"
 const hexDigit = "0123456789abcdef"
 
 // Physical hardware address.
-struct HardwareAddr {
-	Addr: []byte
-}
+type HardwareAddr: []byte
 
 impl HardwareAddr {
 	// Parses s as an IEEE 802 MAC-48, EUI-48, EUI-64, or a 20-octet
@@ -39,7 +37,7 @@ impl HardwareAddr {
 			if n != 6 && n != 8 && n != 20 {
 				error(AddrError.Unable)
 			}
-			mut hAddr := make([]byte, n)
+			mut hAddr := make(HardwareAddr, n)
 			mut x, mut i := 0, 0
 			for i < n {
 				(hAddr[i]), ok := xtoi(addrB[x:], addr[2])
@@ -49,9 +47,7 @@ impl HardwareAddr {
 				i++
 				x += 3
 			}
-			ret HardwareAddr{
-				Addr: hAddr,
-			}
+			ret hAddr
 		} else if addr[4] == '.' {
 			if (len(addr)+1)%5 != 0 {
 				error(AddrError.Unable)
@@ -60,7 +56,7 @@ impl HardwareAddr {
 			if n != 6 && n != 8 && n != 20 {
 				error(AddrError.Unable)
 			}
-			mut hAddr := make([]byte, n)
+			mut hAddr := make(HardwareAddr, n)
 			mut x, mut i := 0, 0
 			for i < n {
 				(hAddr[i]), mut ok := xtoi(addrB[x:x+2], 0)
@@ -74,20 +70,18 @@ impl HardwareAddr {
 				i += 2
 				x += 5
 			}
-			ret HardwareAddr{
-				Addr: hAddr,
-			}
+			ret hAddr
 		}
 		error(AddrError.Unable)
 	}
 
 	// Returns address in string form.
 	fn Str(self): str {
-		if len(self.Addr) == 0 {
+		if len(self) == 0 {
 			ret ""
 		}
-		mut buf := strings::Builder.New(len(self.Addr)*3 - 1)
-		for i, b in self.Addr {
+		mut buf := strings::Builder.New(len(self)*3 - 1)
+		for i, b in self {
 			if i > 0 {
 				buf.WriteByte(':')!
 			}

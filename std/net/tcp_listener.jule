@@ -9,46 +9,46 @@ use "std/time"
 
 // TCP listener.
 // In most cases, represents TCP server.
-struct TcpListener {
-	addr:   &TcpAddr
+struct TCPListener {
+	addr:   &TCPAddr
 	mut v6: bool
 	mut fd: &poll::FD
 }
 
-impl Listener for TcpListener {}
+impl Listener for TCPListener {}
 
-impl TcpListener {
+impl TCPListener {
 	// Binds new TCP listener and starts listening given address.
-	// Returns relevant created &TcpListener if success.
+	// Returns relevant created &TCPListener if success.
 	// If addr is not a valid address, it will forward relevant parse exceptionals.
 	// In addition, any bind and listening error will be return as exceptional.
 	//
-	// See the [Connect] function for a description of the addr parameter.
-	static fn Bind(addr: str)!: &TcpListener {
-		ret tcpBind(Network.Tcp, addr) else { error(error) }
+	// See the [Dial] function for a description of the addr parameter.
+	static fn Bind(addr: str)!: &TCPListener {
+		ret tcpBind(Network.TCP, addr) else { error(error) }
 	}
 
 	// Connects to TCP listener by given address.
-	// Returns relevant created &TcpConn if success.
+	// Returns relevant created &TCPConn if success.
 	// If addr is not a valid address, it will forward relevant parse exceptionals.
 	// In addition, any bind and listening error will be return as exceptional.
 	//
-	// See the [Connect] function for a description of the addr parameter.
-	static fn Connect(addr: str)!: &TcpConn {
-		ret tcpConnect(Network.Tcp, addr, 0) else { error(error) }
+	// See the [Dial] function for a description of the addr parameter.
+	static fn Dial(addr: str)!: &TCPConn {
+		ret tcpDial(Network.TCP, addr, 0) else { error(error) }
 	}
 
-	// Same as TcpListener.Connect, but uses timeout.
-	static fn ConnectTimeout(addr: str, timeout: time::Duration)!: &TcpConn {
-		ret tcpConnect(Network.Tcp, addr, timeout) else { error(error) }
+	// Same as TCPListener.Dial, but uses timeout.
+	static fn DialTimeout(addr: str, timeout: time::Duration)!: &TCPConn {
+		ret tcpDial(Network.TCP, addr, timeout) else { error(error) }
 	}
 
-	// Accepts incoming connection, returns &TcpConn.
+	// Accepts incoming connection, returns &TCPConn.
 	// All exceptionals are error code of implementation.
 	// Panics if connection is closed.
 	fn Accept(self)!: Conn {
 		if self.fd == nil {
-			panic("net: TcpListener.Accept: connection is not open")
+			panic("net: TCPListener.Accept: connection is not open")
 		}
 		if self.v6 { // IPv6
 			mut clientAddr := sys::SockaddrIn6{}
@@ -57,18 +57,16 @@ impl TcpListener {
 			if handle < 0 {
 				error(lastErrorCode())
 			}
-			mut ip := Ip{
-				Addr: make([]byte, Ipv6.Len),
-			}
+			mut ip := make(IP, IPv6.Len)
 			unsafe {
 				getSocketAddr(handle, (*sys::Sockaddr)(&clientAddr), clientAddrLen) else { error(error) }
 			}
-			for i in ip.Addr {
-				ip.Addr[i] = clientAddr.sin6_addr.s6_addr[i]
+			for i in ip {
+				ip[i] = clientAddr.sin6_addr.s6_addr[i]
 			}
-			ret &TcpConn{
-				Addr: &TcpAddr{
-					Ip: ip,
+			ret &TCPConn{
+				Addr: &TCPAddr{
+					IP: ip,
 					Port: int(ntohs(int(clientAddr.sin6_port))),
 				},
 				fd: poll::FD.New(u64(handle), poll::FDKind.Socket),
@@ -81,16 +79,14 @@ impl TcpListener {
 			if handle < 0 {
 				error(lastErrorCode())
 			}
-			mut ip := Ip{
-				Addr: make([]byte, Ipv4.Len),
-			}
+			mut ip := make(IP, IPv4.Len)
 			unsafe {
 				getSocketAddr(handle, (*sys::Sockaddr)(&clientAddr), clientAddrLen) else { error(error) }
 			}
-			bePutU64v4(ip.Addr, u64(clientAddr.sin_addr.s_addr))
-			ret &TcpConn{
-				Addr: &TcpAddr{
-					Ip: ip,
+			bePutU64v4(ip, u64(clientAddr.sin_addr.s_addr))
+			ret &TCPConn{
+				Addr: &TCPAddr{
+					IP: ip,
 					Port: int(ntohs(int(clientAddr.sin_port))),
 				},
 				fd: poll::FD.New(u64(handle), poll::FDKind.Socket),
@@ -99,15 +95,15 @@ impl TcpListener {
 	}
 
 	// Returns network name which is listening.
-	// If connection closed, returns Network.Tcp as a general network.
+	// If connection closed, returns Network.TCP as a general network.
 	fn Network(self): Network {
 		match {
 		| self.fd == nil:
-			ret Network.Tcp
+			ret Network.TCP
 		| self.v6:
-			ret Network.Tcp6
+			ret Network.TCP6
 		|:
-			ret Network.Tcp4
+			ret Network.TCP4
 		}
 	}
 
@@ -125,13 +121,13 @@ impl TcpListener {
 	}
 }
 
-fn tcpBind(network: Network, &addr: str)!: &TcpListener {
-	mut tcpAddr := TcpAddr.Resolve(network, addr) else { error(error) }
+fn tcpBind(network: Network, &addr: str)!: &TCPListener {
+	mut tcpAddr := TCPAddr.Resolve(network, addr) else { error(error) }
 	mut fd := (&poll::FD)(nil)
 	mut v6 := false
-	if tcpAddr.Ip.Empty() {
+	if tcpAddr.IP.Empty() {
 		match network {
-		| Network.Tcp | Network.Tcp4:
+		| Network.TCP | Network.TCP4:
 			mut handle := sys::Socket(sys::AF_INET, sys::SOCK_STREAM, sys::IPPROTO_TCP)
 			if handle < 0 {
 				error(lastErrorCode())
@@ -149,7 +145,7 @@ fn tcpBind(network: Network, &addr: str)!: &TcpListener {
 					error(lastErrorCode())
 				}
 			}
-		| Network.Tcp6:
+		| Network.TCP6:
 			v6 = true
 			handle := sys::Socket(sys::AF_INET6, sys::SOCK_STREAM, sys::IPPROTO_TCP)
 			if handle < 0 {
@@ -171,9 +167,9 @@ fn tcpBind(network: Network, &addr: str)!: &TcpListener {
 			error(AddrError.UnknownNetwork)
 		}
 	} else {
-		mut ipv4 := tcpAddr.Ip.To4()
+		mut ipv4 := tcpAddr.IP.To4()
 		if ipv4.Empty() {
-			if network == Network.Tcp4 {
+			if network == Network.TCP4 {
 				error(AddrError.NoSuitable)
 			}
 			v6 = true
@@ -186,7 +182,7 @@ fn tcpBind(network: Network, &addr: str)!: &TcpListener {
 
 			mut sockAddr := sys::SockaddrIn6{}
 			sockAddr.sin6_family = sys::AF_INET6
-			for i, b in tcpAddr.Ip.Addr {
+			for i, b in tcpAddr.IP {
 				sockAddr.sin6_addr.s6_addr[i] = b
 			}
 			sockAddr.sin6_port = htons(tcpAddr.Port)
@@ -197,10 +193,10 @@ fn tcpBind(network: Network, &addr: str)!: &TcpListener {
 				}
 			}
 		} else {
-			if network == Network.Tcp6 {
+			if network == Network.TCP6 {
 				error(AddrError.NoSuitable)
 			}
-			tcpAddr.Ip = ipv4
+			tcpAddr.IP = ipv4
 			handle := sys::Socket(sys::AF_INET, sys::SOCK_STREAM, sys::IPPROTO_TCP)
 			if handle < 0 {
 				error(lastErrorCode())
@@ -211,7 +207,7 @@ fn tcpBind(network: Network, &addr: str)!: &TcpListener {
 			mut sockAddr := sys::SockaddrIn{}
 			sockAddr.sin_family = sys::AF_INET
 			sockAddr.sin_port = htons(tcpAddr.Port)
-			sockAddr.sin_addr.s_addr = u32(beU64v4(tcpAddr.Ip.Addr))
+			sockAddr.sin_addr.s_addr = u32(beU64v4(tcpAddr.IP))
 			unsafe {
 				if sys::Bind(handle, (*sys::Sockaddr)(&sockAddr), mem::SizeOf(sockAddr)) != 0 {
 					fd.Close()
@@ -225,20 +221,20 @@ fn tcpBind(network: Network, &addr: str)!: &TcpListener {
 		fd.Close()
 		error(lastErrorCode())
 	}
-	ret &TcpListener{
+	ret &TCPListener{
 		v6: v6,
 		addr: tcpAddr,
 		fd: fd,
 	}
 }
 
-fn tcpConnect(network: Network, &addr: str, timeout: time::Duration)!: &TcpConn {
-	mut tcpAddr := TcpAddr.Resolve(network, addr) else { error(error) }
+fn tcpDial(network: Network, &addr: str, timeout: time::Duration)!: &TCPConn {
+	mut tcpAddr := TCPAddr.Resolve(network, addr) else { error(error) }
 	mut fd := (&poll::FD)(nil)
 	mut v6 := false
-	if tcpAddr.Ip.Empty() {
+	if tcpAddr.IP.Empty() {
 		match network {
-		| Network.Tcp | Network.Tcp4:
+		| Network.TCP | Network.TCP4:
 			handle := sys::Socket(sys::AF_INET, sys::SOCK_STREAM, sys::IPPROTO_TCP)
 			if handle < 0 {
 				error(lastErrorCode())
@@ -256,7 +252,7 @@ fn tcpConnect(network: Network, &addr: str, timeout: time::Duration)!: &TcpConn 
 					error(error)
 				}
 			}
-		| Network.Tcp6:
+		| Network.TCP6:
 			handle := sys::Socket(sys::AF_INET6, sys::SOCK_STREAM, sys::IPPROTO_TCP)
 			if handle < 0 {
 				error(lastErrorCode())
@@ -277,9 +273,9 @@ fn tcpConnect(network: Network, &addr: str, timeout: time::Duration)!: &TcpConn 
 			error(AddrError.UnknownNetwork)
 		}
 	} else {
-		mut ipv4 := tcpAddr.Ip.To4()
+		mut ipv4 := tcpAddr.IP.To4()
 		if ipv4.Empty() {
-			if network == Network.Tcp4 {
+			if network == Network.TCP4 {
 				error(AddrError.NoSuitable)
 			}
 			v6 = true
@@ -292,7 +288,7 @@ fn tcpConnect(network: Network, &addr: str, timeout: time::Duration)!: &TcpConn 
 
 			mut sockAddr := sys::SockaddrIn6{}
 			sockAddr.sin6_family = sys::AF_INET6
-			for i, b in tcpAddr.Ip.Addr {
+			for i, b in tcpAddr.IP {
 				sockAddr.sin6_addr.s6_addr[i] = b
 			}
 			sockAddr.sin6_port = htons(tcpAddr.Port)
@@ -303,10 +299,10 @@ fn tcpConnect(network: Network, &addr: str, timeout: time::Duration)!: &TcpConn 
 				}
 			}
 		} else {
-			if network == Network.Tcp6 {
+			if network == Network.TCP6 {
 				error(AddrError.NoSuitable)
 			}
-			tcpAddr.Ip = ipv4
+			tcpAddr.IP = ipv4
 			handle := sys::Socket(sys::AF_INET, sys::SOCK_STREAM, sys::IPPROTO_TCP)
 			if handle < 0 {
 				error(lastErrorCode())
@@ -317,7 +313,7 @@ fn tcpConnect(network: Network, &addr: str, timeout: time::Duration)!: &TcpConn 
 			mut sockAddr := sys::SockaddrIn{}
 			sockAddr.sin_family = sys::AF_INET
 			sockAddr.sin_port = htons(tcpAddr.Port)
-			sockAddr.sin_addr.s_addr = u32(beU64v4(tcpAddr.Ip.Addr))
+			sockAddr.sin_addr.s_addr = u32(beU64v4(tcpAddr.IP))
 			unsafe {
 				connectSocket(handle, (*sys::Sockaddr)(&sockAddr), mem::SizeOf(sockAddr), timeout) else {
 					fd.Close()
@@ -326,7 +322,7 @@ fn tcpConnect(network: Network, &addr: str, timeout: time::Duration)!: &TcpConn 
 			}
 		}
 	}
-	ret &TcpConn{
+	ret &TCPConn{
 		Addr: tcpAddr,
 		fd: fd,
 		v6: v6,

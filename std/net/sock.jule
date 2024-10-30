@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/internal/poll"
 use "std/sys"
 use "std/time"
-use "std/internal/poll"
 
 // Listens the address on the named network.
 // It will forward any exceptional from network connectors.
@@ -12,10 +12,10 @@ use "std/internal/poll"
 // For UDP network, the [ListenUDP] function should be used.
 // If the network parameter is points udp network, function will panic.
 //
-// See the [Connect] function for a description of the network and addr parameters.
+// See the [Dial] function for a description of the network and addr parameters.
 fn Listen(network: Network, addr: str)!: Listener {
 	match network {
-	| Network.Tcp | Network.Tcp4 | Network.Tcp6:
+	| Network.TCP | Network.TCP4 | Network.TCP6:
 		ret tcpBind(network, addr) else { error(error) }
 	|:
 		error(AddrError.UnknownNetwork)
@@ -26,8 +26,8 @@ fn Listen(network: Network, addr: str)!: Listener {
 // It will forward any exceptional from network connectors.
 // Just for UDP networks.
 //
-// See the [Connect] function for a description of the network and addr parameters.
-fn ListenUDP(network: Network, addr: str)!: &UdpConn {
+// See the [Dial] function for a description of the network and addr parameters.
+fn ListenUDP(network: Network, addr: str)!: &UDPConn {
 	ret udpBind(network, addr) else { error(error) }
 }
 
@@ -70,21 +70,21 @@ fn ListenUDP(network: Network, addr: str)!: &UdpConn {
 //  is converted to IPv4 successfully, will use Udp4, otherwise IPv6 and Udp6 preferred.
 //
 // It will forward any exceptional from network connectors.
-fn Connect(network: Network, addr: str)!: Conn {
-	ret ConnectTimeout(network, addr, 0) else { error(error) }
+fn Dial(network: Network, addr: str)!: Conn {
+	ret DialTimeout(network, addr, 0) else { error(error) }
 }
 
-// Same as Connect, but uses timeout.
+// Same as Dial, but uses timeout.
 // For UDP networks, timeout will be ignored.
 // Timeout precision is microseconds.
 // If the timeout is below one microsecond it will be ignored.
 // If timeout is invalid or out of range, throws exceptional with Error.InvalidTimeout.
-fn ConnectTimeout(network: Network, addr: str, timeout: time::Duration)!: Conn {
+fn DialTimeout(network: Network, addr: str, timeout: time::Duration)!: Conn {
 	match network {
-	| Network.Tcp | Network.Tcp4 | Network.Tcp6:
-		ret tcpConnect(network, addr, timeout) else { error(error) }
-	| Network.Udp | Network.Udp4 | Network.Udp6:
-		ret udpConnect(network, addr) else { error(error) }
+	| Network.TCP | Network.TCP4 | Network.TCP6:
+		ret tcpDial(network, addr, timeout) else { error(error) }
+	| Network.UDP | Network.UDP4 | Network.UDP6:
+		ret udpDial(network, addr) else { error(error) }
 	|:
 		error(AddrError.UnknownNetwork)
 	}

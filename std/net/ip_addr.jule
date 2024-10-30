@@ -7,46 +7,46 @@ use "std/internal/strings"
 use "std/unsafe"
 
 // Returns the address of the IPv4 address given by the 4-bytes representation.
-fn ipAddrFrom4(addr: []byte): u128 {
+fn ipAddrFrom4(ip: IP): u128 {
 	ret u128{
 		hi: 0,
-		lo: 0xFFFF00000000 | u64(addr[0])<<24 | u64(addr[1])<<16 | u64(addr[2])<<8 | u64(addr[3]),
+		lo: 0xFFFF00000000 | u64(ip[0])<<24 | u64(ip[1])<<16 | u64(ip[2])<<8 | u64(ip[3]),
 	}
 }
 
 // Returns the address of the IPv6 address given by the 16-bytes representation.
-fn ipAddrFrom16(addr: []byte): u128 {
+fn ipAddrFrom16(ip: IP): u128 {
 	ret u128{
-		hi: beU64(addr[:8]),
-		lo: beU64(addr[8:]),
+		hi: beU64(ip[:8]),
+		lo: beU64(ip[8:]),
 	}
 }
 
-fn beU64(b: []byte): u64 {
-	ret u64(b[7]) | u64(b[6])<<8 | u64(b[5])<<16 | u64(b[4])<<24 |
-		u64(b[3])<<32 | u64(b[2])<<40 | u64(b[1])<<48 | u64(b[0])<<56
+fn beU64(ip: IP): u64 {
+	ret u64(ip[7]) | u64(ip[6])<<8 | u64(ip[5])<<16 | u64(ip[4])<<24 |
+		u64(ip[3])<<32 | u64(ip[2])<<40 | u64(ip[1])<<48 | u64(ip[0])<<56
 }
 
-fn beU64v4(b: []byte): u64 {
-	ret u64(b[3])<<24 | u64(b[2])<<16 | u64(b[1])<<8 | u64(b[0])
+fn beU64v4(ip: IP): u64 {
+	ret u64(ip[3])<<24 | u64(ip[2])<<16 | u64(ip[1])<<8 | u64(ip[0])
 }
 
-fn bePutU64v4(mut b: []byte, v: u64) {
-	b[3] = byte(v >> 24)
-	b[2] = byte(v >> 16)
-	b[1] = byte(v >> 8)
-	b[0] = byte(v)
+fn bePutU64v4(mut ip: IP, v: u64) {
+	ip[3] = byte(v >> 24)
+	ip[2] = byte(v >> 16)
+	ip[1] = byte(v >> 8)
+	ip[0] = byte(v)
 }
 
-fn bePutU64(mut b: []byte, v: u64) {
-	b[7] = byte(v)
-	b[6] = byte(v >> 8)
-	b[5] = byte(v >> 16)
-	b[4] = byte(v >> 24)
-	b[3] = byte(v >> 32)
-	b[2] = byte(v >> 40)
-	b[1] = byte(v >> 48)
-	b[0] = byte(v >> 56)
+fn bePutU64(mut ip: IP, v: u64) {
+	ip[7] = byte(v)
+	ip[6] = byte(v >> 8)
+	ip[5] = byte(v >> 16)
+	ip[4] = byte(v >> 24)
+	ip[3] = byte(v >> 32)
+	ip[2] = byte(v >> 40)
+	ip[1] = byte(v >> 48)
+	ip[0] = byte(v >> 56)
 }
 
 // Returns the i'th byte of ip. If ip is not an IPv4, v4 returns
@@ -141,7 +141,7 @@ fn str16(ip: u128): str {
 	ret s.Str()
 }
 
-fn parseIPv4Fields(&addr: str, off: int, end: int, mut fields: []byte)! {
+fn parseIPv4Fields(&addr: str, off: int, end: int, mut ip: IP)! {
 	mut val, mut pos := 0, 0
 	mut digLen := 0 // number of digits in current octet
 	s := unsafe::StrBytes(addr)[off:end]
@@ -167,7 +167,7 @@ fn parseIPv4Fields(&addr: str, off: int, end: int, mut fields: []byte)! {
 			if pos == 3 {
 				error(AddrError.TooLong)
 			}
-			fields[pos] = byte(val)
+			ip[pos] = byte(val)
 			pos++
 			val = 0
 			digLen = 0
@@ -178,17 +178,17 @@ fn parseIPv4Fields(&addr: str, off: int, end: int, mut fields: []byte)! {
 	if pos < 3 {
 		error(AddrError.TooShort)
 	}
-	fields[3] = byte(val)
+	ip[3] = byte(val)
 }
 
-fn parseIPv4(&addr: str)!: Ip {
-	mut fields := make([]byte, 4)
-	parseIPv4Fields(addr, 0, len(addr), fields) else { error(error) }
-	ret Ip{Addr: fields}
+fn parseIPv4(&addr: str)!: IP {
+	mut ip := make(IP, 4)
+	parseIPv4Fields(addr, 0, len(addr), ip) else { error(error) }
+	ret ip
 }
 
 // Parses addr as an IPv6 address (in form "2001:db8::68").
-fn parseIPv6(&addr: str)!: TcpAddr {
+fn parseIPv6(&addr: str)!: TCPAddr {
 	mut s := unsafe::StrBytes(addr)
 
 	// Split off the zone right from the start. Yes it's a second scan
@@ -205,7 +205,7 @@ fn parseIPv6(&addr: str)!: TcpAddr {
 		}
 	}
 
-	mut ip := make([]byte, 16)
+	mut ip := make(IP, 16)
 	mut ellipsis := -1 // Position of ellipsis in IP.
 
 	// Might have leading ellipsis.
@@ -214,8 +214,8 @@ fn parseIPv6(&addr: str)!: TcpAddr {
 		s = s[2:]
 		// Might be only ellipsis.
 		if len(s) == 0 {
-			mut tcpAddr := TcpAddr{
-				Ip: Ipv6.Unspecified().To16(),
+			mut tcpAddr := TCPAddr{
+				IP: IPv6.Unspecified().To16(),
 				Zone: str(zone),
 			}
 			ret tcpAddr
@@ -334,11 +334,11 @@ fn parseIPv6(&addr: str)!: TcpAddr {
 	u128addr := ipAddrFrom16(ip)
 	bePutU64(ip[:8], u128addr.hi)
 	bePutU64(ip[8:], u128addr.lo)
-	mut tcpAddr := TcpAddr{
-		Ip: Ip{Addr: ip},
+	mut tcpAddr := TCPAddr{
+		IP: ip,
 		Zone: str(zone),
 	}
-	tcpAddr.Ip = tcpAddr.Ip.To16()
+	tcpAddr.IP = tcpAddr.IP.To16()
 	ret tcpAddr
 }
 

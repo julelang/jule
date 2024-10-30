@@ -10,19 +10,19 @@ use "std/time"
 
 // TCP connection.
 // In most cases, represents TCP client.
-struct TcpConn {
+struct TCPConn {
 	mut fd: &poll::FD
 	v6:     bool
-	Addr:   &TcpAddr
+	Addr:   &TCPAddr
 }
 
-impl Conn for TcpConn {}
-impl io::Reader for TcpConn {}
-impl io::Writer for TcpConn {}
-impl io::Stream for TcpConn {}
-impl io::WriteCloser for TcpConn {}
+impl Conn for TCPConn {}
+impl io::Reader for TCPConn {}
+impl io::Writer for TCPConn {}
+impl io::Stream for TCPConn {}
+impl io::WriteCloser for TCPConn {}
 
-impl TcpConn {
+impl TCPConn {
 	// Read bytes to buffer from connection and returns readed byte count.
 	// The number of bytes readed can never exceed the length of the buffer.
 	// If the buffer is larger than the number of bytes that can be read,
@@ -34,7 +34,7 @@ impl TcpConn {
 	// All exceptionals are error code of implementation.
 	fn Read(mut self, mut buf: []byte)!: int {
 		if self.fd == nil {
-			panic("net: TcpConn.Read: connection is closed")
+			panic("net: TCPConn.Read: connection is closed")
 		}
 		if len(buf) == 0 {
 			ret 0
@@ -54,7 +54,7 @@ impl TcpConn {
 	// All exceptionals are error code of implementation.
 	fn Write(mut self, buf: []byte)!: int {
 		if self.fd == nil {
-			panic("net: TcpConn.Write: connection is closed")
+			panic("net: TCPConn.Write: connection is closed")
 		}
 		n, ok := self.fd.Write(buf)
 		if ok {
@@ -70,7 +70,7 @@ impl TcpConn {
 	// All exceptionals are error code of implementation.
 	fn SetReadTimeout(mut self, timeout: time::Duration)! {
 		if self.fd == nil {
-			panic("net: TcpConn.SetReadTimeout: connection is closed")
+			panic("net: TCPConn.SetReadTimeout: connection is closed")
 		}
 		setSocketTimeout(poll::NetHandle(self.fd.File), sys::SO_RCVTIMEO, timeout) else { error(error) }
 	}
@@ -82,21 +82,21 @@ impl TcpConn {
 	// All exceptionals are error code of implementation.
 	fn SetWriteTimeout(mut self, timeout: time::Duration)! {
 		if self.fd == nil {
-			panic("net: TcpConn.SetReadTimeout: connection is closed")
+			panic("net: TCPConn.SetReadTimeout: connection is closed")
 		}
 		setSocketTimeout(poll::NetHandle(self.fd.File), sys::SO_SNDTIMEO, timeout) else { error(error) }
 	}
 
 	// Returns network name which is connected.
-	// If connection closed, returns Network.Tcp as a general network.
+	// If connection closed, returns Network.TCP as a general network.
 	fn Network(self): Network {
 		match {
 		| self.fd == nil:
-			ret Network.Tcp
+			ret Network.TCP
 		| self.v6:
-			ret Network.Tcp6
+			ret Network.TCP6
 		|:
-			ret Network.Tcp4
+			ret Network.TCP4
 		}
 	}
 
