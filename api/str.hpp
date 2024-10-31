@@ -62,8 +62,8 @@ namespace jule
         }
 
         Str(void) : _len(0) {};
-        Str(const jule::Str &src) : buffer(src.buffer), _len(src._len), _slice(src._slice) {}
-        Str(jule::Str &&src) : buffer(std::move(src.buffer)), _len(src._len), _slice(src._slice) {}
+        Str(const jule::Str &src) : buffer(src.buffer), _slice(src._slice), _len(src._len) {}
+        Str(jule::Str &&src) : buffer(std::move(src.buffer)), _slice(src._slice), _len(src._len) {}
         Str(const std::basic_string<jule::U8> &src) : Str(src.c_str(), src.c_str() + src.size()) {}
         Str(const char *src, const jule::Int &len) : Str(reinterpret_cast<const jule::U8 *>(src), len) {}
         Str(const jule::U8 *src, const jule::Int &len) : jule::Str(src, src + len) {}

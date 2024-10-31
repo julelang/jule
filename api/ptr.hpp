@@ -254,7 +254,7 @@ namespace jule
                 strncpy(message, __JULE_ERROR__INVALID_MEMORY, 47);
                 strncpy(message + 47, "\nruntime: smart pointer is nil\nfile: ", 38);
                 strncpy(message + 84, file, n);
-                message[84 + n] = NULL;
+                message[84 + n] = '\0';
                 __jule_panic((jule::U8 *)message, 84 + n);
 #else
                 __jule_panic((jule::U8 *)__JULE_ERROR__INVALID_MEMORY "\nruntime: smart pointer is nil", 77);
