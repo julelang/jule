@@ -280,6 +280,12 @@ namespace jule
             return *this;
         }
 
+        jule::Ptr<T> &operator=(const std::nullptr_t &) noexcept
+        {
+            this->dealloc();
+            return *this;
+        }
+
         inline jule::Bool operator==(const std::nullptr_t &) const noexcept
         {
             return this->alloc == nullptr;
