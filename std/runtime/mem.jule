@@ -7,3 +7,48 @@
 fn ptrEqual(a: *unsafe, b: *unsafe): bool {
 	ret a == b
 }
+
+struct strBase {
+	buffer: &byte
+	slice:  *byte
+	len:    int
+}
+
+// Returns string based on b, the parameter b means first byte of string.
+// The returned string uses n as length.
+// Will not perform garbage collection.
+#export "__jule_strBytePtr"
+unsafe fn strBytePtr(b: *byte, n: int): str {
+	mut s := ""
+	mut sb := (*strBase)(&s)
+	sb.buffer = (&byte)(*(&b))
+	sb.slice = (*byte)(sb.buffer)
+	sb.len = n
+	ret s
+}
+
+struct sliceBase[Elem] {
+	data:  &Elem
+	slice: *Elem
+	len:   int
+	cap:   int
+}
+
+// Returns slice based on e, the parameter e means first element of slice.
+// Will not perform garbage collection.
+unsafe fn slice[Elem](mut e: *Elem, len: int, cap: int): []Elem {
+	mut buf := []Elem(nil)
+	mut sb := (*sliceBase[Elem])(&buf)
+	sb.data = (&Elem)(e)
+	sb.slice = (*Elem)(sb.data)
+	sb.len = len
+	sb.cap = cap
+	ret buf
+}
+
+// Returns slice based on b, the parameter b means first element of slice.
+// Will not perform garbage collection.
+#export "__jule_sliceBytePtr"
+unsafe fn sliceBytePtr(mut b: *byte, len: int, cap: int): []byte {
+	ret slice(b, len, cap)
+}
