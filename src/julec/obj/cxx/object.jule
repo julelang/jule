@@ -503,13 +503,17 @@ impl ObjectCoder {
 				}
 			}
 		}
-		self.anyObj.WriteStr(" __jule_panic_s(\"trait casting failed because of an implementation mistake, this is a JuleC bug\"); return nullptr; }\n")!
+		self.anyObj.WriteStr("__jule_panicStr(")!
+		strLit(self.anyObj, "trait casting failed because of an implementation mistake, this is a JuleC bug", "78")
+		self.anyObj.WriteStr("); return nullptr; }\n")!
 	}
 
 	// Writes location information of token as cstr bytes.
-	fn locInfo(mut &self, &t: &token::Token) {
+	// Returns count of written bytes.
+	fn locInfo(mut &self, &t: &token::Token): int {
 		&loc := t.File.Path
 
+		n := self.Buf.Len()
 		// Normalize path if production compilation enabled.
 		if env::Production {
 			match {
@@ -531,6 +535,7 @@ impl ObjectCoder {
 		self.write(conv::Itoa(t.Row))
 		self.write(":")
 		self.write(conv::Itoa(t.Column))
+		ret self.Buf.Len() - n
 	}
 
 	fn head(mut &self) {

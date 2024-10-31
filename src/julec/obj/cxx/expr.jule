@@ -60,12 +60,7 @@ impl exprCoder {
 			ret
 		}
 		len := conv::FmtInt(i64(len(content)), 10)
-		self.oc.write(typeCoder.Str)
-		self.oc.write("::lit(")
-		cstrLit(self.oc.Buf, content)
-		self.oc.write(", ")
-		self.oc.write(len)
-		self.oc.write(")")
+		strLit(self.oc.Buf, content, len)
 	}
 
 	fn boolean(mut &self, b: bool) {
@@ -172,12 +167,18 @@ impl exprCoder {
 		self.possibleRefExpr(r.Model)
 		self.oc.write("; if (")
 		self.oc.write(yVar)
-		self.oc.write(` == 0) __jule_panic_s("runtime: divide by zero"`)
-		if !env::Production {
-			self.oc.write(" \"\\nlocation: ")
-			self.oc.locInfo(op)
+		self.oc.write(` == 0) __jule_panicStr(`)
+		strLitF(self.oc.Buf, fn(): int {
+			self.oc.write("\"runtime: divide by zero")
+			mut len := 23 // runtime: divide by zero
+			if !env::Production {
+				self.oc.write("\\nlocation: ")
+				len += 11 // \nlocation:
+				len += unsafe { self.oc.locInfo(op) }
+			}
 			self.oc.write("\"")
-		}
+			ret len
+		})
 		self.oc.write("); ((")
 		self.oc.tc.kind(self.oc.Buf, l.Type)
 		self.oc.write(")(")
@@ -997,9 +998,17 @@ impl exprCoder {
 			}
 			self.oc.doneIndent()
 		} else {
-			self.oc.write(`if (!except.ok()) __jule_panic_s(jule::Str("unhandled exceptional: ") + except.error.type->to_str(except.error.data) + jule::Str("\nlocation: `)
-			self.oc.locInfo(m.Token)
-			self.oc.write("\"));\n")
+			self.oc.write(`if (!except.ok()) __jule_panicStr(`)
+			strLit(self.oc.Buf, "unhandled exceptional: ", "23")
+			self.oc.write(" + except.error.type->to_str(except.error.data) + ")
+			strLitF(self.oc.Buf, fn(): int {
+				self.oc.write("\"\\nlocation: ")
+				mut len := 11 // \nlocation: 
+				len += self.oc.locInfo(m.Token)
+				self.oc.write("\"")
+				ret len
+			})
+			self.oc.write(");\n")
 			if !m.Func.Decl.IsVoid() {
 				self.oc.indent()
 				self.oc.write("(except.result);\n")
@@ -1325,11 +1334,18 @@ impl exprCoder {
 	}
 
 	fn panicCall(mut &self, mut m: &sema::BuiltinPanicCallExpr) {
-		self.oc.write("__jule_panic_s(")
+		self.oc.write("__jule_panicStr(")
 		self.possibleRefExpr(m.Expr)
-		self.oc.write(` + jule::Str("\nlocation: `)
-		self.oc.locInfo(m.Token)
-		self.oc.write("\"));")
+		self.oc.write(" + ")
+		strLit(self.oc.Buf, "\nlocation: ", "12")
+		self.oc.write(" + ")
+		strLitF(self.oc.Buf, fn(): int {
+			self.oc.write("\"")
+			len := self.oc.locInfo(m.Token)
+			self.oc.write("\"")
+			ret len
+		})
+		self.oc.write(");")
 	}
 
 	fn errorCall(mut &self, mut m: &sema::BuiltinErrorCallExpr) {
@@ -2048,5 +2064,47 @@ fn structBinary(mut &buf: strings::Builder, mut &s: &sema::StructIns, &l: str,
 	buf.WriteStr(l)!
 	buf.WriteStr(", ")!
 	buf.WriteStr(r)!
+	buf.WriteByte(')')!
+}
+
+// Writes string literal expression for constant literal to buf.
+// Literal is not including quotes, just string content in bytes.
+fn strLit(mut &buf: strings::Builder, lit: str, len: str) {
+	identCoder.funcIns(buf, obj::ProgramMeta.Runtime.StrBytePtr)
+	buf.WriteStr("((" + typeCoder.U8 + "*)")!
+	cstrLit(buf, lit)
+	buf.WriteByte(',')!
+	buf.WriteStr(len)!
+	buf.WriteByte(')')!
+}
+
+// Same as the strLit function, but uses the lit function to write content.
+// The lit function should return the length of content.
+fn strLitF(mut &buf: strings::Builder, lit: fn(): int) {
+	identCoder.funcIns(buf, obj::ProgramMeta.Runtime.StrBytePtr)
+	buf.WriteStr("((" + typeCoder.U8 + "*)")!
+	len := conv::Itoa(lit())
+	buf.WriteByte(',')!
+	buf.WriteStr(len)!
+	buf.WriteByte(')')!
+}
+
+// Like the strLit function, but writes as slice (will not perform allocation).
+fn strLitAsSlice(mut &buf: strings::Builder, lit: str, len: str) {
+	identCoder.funcIns(buf, obj::ProgramMeta.Runtime.SliceBytePtr)
+	buf.WriteStr("((" + typeCoder.U8 + "*)")!
+	cstrLit(buf, lit)
+	buf.WriteByte(',')!
+	buf.WriteStr(len)!
+	buf.WriteByte(',')!
+	buf.WriteStr(len)!
+	buf.WriteByte(')')!
+}
+
+// Returns string expr as byte slice (will not perform allocation).
+fn strToSlice(mut &buf: strings::Builder, expr: str) {
+	identCoder.funcIns(buf, obj::ProgramMeta.Runtime.StrAsSlice)
+	buf.WriteByte('(')!
+	buf.WriteStr(expr)!
 	buf.WriteByte(')')!
 }

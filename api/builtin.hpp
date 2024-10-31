@@ -18,13 +18,13 @@ namespace jule
 
     inline void print(const jule::Str &obj) noexcept
     {
-        __jule_writeStdout(obj.fake_slice());
+        __jule_writeStdout(__jule_sliceBytePtr(obj._slice, obj.len(), obj.len()));
     }
 
     inline void println(const jule::Str &obj) noexcept
     {
         jule::print(obj);
-        __jule_writeStdout(jule::Str::lit("\n", 1).fake_slice());
+        __jule_writeStdout(__jule_sliceBytePtr((jule::U8*)"\n", 1, 1));
     }
 
     // Returns itself of slice if slice has enough capacity for +n elements.
