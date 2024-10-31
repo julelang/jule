@@ -9,10 +9,10 @@
 #include <initializer_list>
 
 #include "runtime.hpp"
-#include "panic.hpp"
 #include "error.hpp"
 #include "ptr.hpp"
 #include "types.hpp"
+#include "str.hpp"
 
 namespace jule
 {
@@ -32,11 +32,11 @@ namespace jule
         static jule::Slice<Item> alloc(const jule::Int &len, const jule::Int &cap) noexcept
         {
             if (len < 0)
-                __jule_panic_s("runtime: []T: slice allocation length lower than zero");
+                __jule_panic((jule::U8 *)"runtime: []T: slice allocation length lower than zero", 53);
             if (cap < 0)
-                __jule_panic_s("runtime: []T: slice allocation capacity lower than zero");
+                __jule_panic((jule::U8 *)"runtime: []T: slice allocation capacity lower than zero", 55);
             if (len > cap)
-                __jule_panic_s("runtime: []T: slice allocation length greater than capacity");
+                __jule_panic((jule::U8 *)"runtime: []T: slice allocation length greater than capacity", 59);
             jule::Slice<Item> buffer;
             buffer.alloc_new(len, cap);
             return buffer;
@@ -45,11 +45,11 @@ namespace jule
         static jule::Slice<Item> alloc(const jule::Int &len, const jule::Int &cap, const Item &def) noexcept
         {
             if (len < 0)
-                __jule_panic_s("runtime: []T: slice allocation length lower than zero");
+                __jule_panic((jule::U8 *)"runtime: []T: slice allocation length lower than zero", 53);
             if (cap < 0)
-                __jule_panic_s("runtime: []T: slice allocation capacity lower than zero");
+                __jule_panic((jule::U8 *)"runtime: []T: slice allocation capacity lower than zero", 55);
             if (len > cap)
-                __jule_panic_s("runtime: []T: slice allocation length greater than capacity");
+                __jule_panic((jule::U8 *)"runtime: []T: slice allocation length greater than capacity", 59);
             jule::Slice<Item> buffer;
             buffer.alloc_new(len, cap, def);
             return buffer;
@@ -113,11 +113,11 @@ namespace jule
             if (this->operator==(nullptr))
             {
 #ifndef __JULE_ENABLE__PRODUCTION
-                std::string error = __JULE_ERROR__INVALID_MEMORY "\nruntime: slice is nil\nfile: ";
+                jule::Str error = __JULE_ERROR__INVALID_MEMORY "\nruntime: slice is nil\nfile: ";
                 error += file;
-                __jule_panic_s(error);
+                __jule_panicStr(error);
 #else
-                __jule_panic_s(__JULE_ERROR__INVALID_MEMORY "\nruntime: slice is nil");
+                __jule_panicStr(__JULE_ERROR__INVALID_MEMORY "\nruntime: slice is nil");
 #endif
             }
         }
@@ -164,7 +164,7 @@ namespace jule
             __jule_pseudoMalloc(cap, sizeof(Item));
             Item *alloc = new (std::nothrow) Item[cap];
             if (!alloc)
-                __jule_panic_s("runtime: memory allocation failed for heap-array of slice");
+                __jule_panic((jule::U8 *)"runtime: memory allocation failed for heap-array of slice", 57);
 
 #ifdef __JULE_DISABLE__REFERENCE_COUNTING
             this->data = jule::Ptr<Item>::make(alloc, nullptr);
@@ -224,14 +224,14 @@ namespace jule
                 );
             if (start < 0 || end < 0 || start > end || end > this->_cap)
             {
-                std::string error;
+                jule::Str error;
                 __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(error, start, end, this->len(), "capacity");
                 error += "\nruntime: slice slicing with out of range indexes";
 #ifndef __JULE_ENABLE__PRODUCTION
                 error += "\nfile: ";
                 error += file;
 #endif
-                __jule_panic_s(error);
+                __jule_panicStr(error);
             }
 #endif
             this->_slice += start;
@@ -284,14 +284,14 @@ namespace jule
                 );
             if (start < 0 || end < 0 || start > end || end > this->_cap)
             {
-                std::string error;
+                jule::Str error;
                 __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(error, start, end, this->len(), "capacity");
                 error += "\nruntime: slice slicing with out of range indexes";
 #ifndef __JULE_ENABLE__PRODUCTION
                 error += "\nfile: ";
                 error += file;
 #endif
-                __jule_panic_s(error);
+                __jule_panicStr(error);
             }
 #endif
             jule::Slice<Item> slice;
@@ -413,14 +413,14 @@ namespace jule
             );
             if (this->empty() || index < 0 || this->len() <= index)
             {
-                std::string error;
+                jule::Str error;
                 __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(error, index, this->len());
                 error += "\nruntime: slice indexing with out of range index";
 #ifndef __JULE_ENABLE__PRODUCTION
                 error += "\nfile: ";
                 error += file;
 #endif
-                __jule_panic_s(error);
+                __jule_panicStr(error);
             }
 #endif
             return this->__at(index);

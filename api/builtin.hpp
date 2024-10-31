@@ -24,7 +24,7 @@ namespace jule
     inline void println(const jule::Str &obj) noexcept
     {
         jule::print(obj);
-        __jule_writeStdout(__jule_sliceBytePtr((jule::U8*)"\n", 1, 1));
+        __jule_writeStdout(__jule_sliceBytePtr((jule::U8 *)"\n", 1, 1));
     }
 
     // Returns itself of slice if slice has enough capacity for +n elements.
@@ -56,7 +56,8 @@ namespace jule
             return 0;
         auto d = dest._slice;
         auto s = src._slice;
-        if (d > s && d-s < len) {
+        if (d > s && d - s < len)
+        {
             // to overlaps with from
             // <from...>
             //        <to...>
@@ -67,7 +68,9 @@ namespace jule
             s += i;
             while (first <= s)
                 *d-- = *s--;
-        } else {
+        }
+        else
+        {
             // to overlaps with from
             //      <from...>
             // <to...>

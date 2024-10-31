@@ -5,12 +5,9 @@
 #ifndef __JULE_PTR_HPP
 #define __JULE_PTR_HPP
 
-#include <string>
-
 #include "runtime.hpp"
 #include "types.hpp"
 #include "error.hpp"
-#include "panic.hpp"
 
 namespace jule
 {
@@ -66,7 +63,7 @@ namespace jule
             __jule_pseudoMalloc(1, sizeof(T));
             buffer.alloc = new (std::nothrow) T;
             if (!buffer.alloc)
-                __jule_panic_s("runtime: memory allocation failed for heap of smart pointer");
+                __jule_panic((jule::U8 *)"runtime: memory allocation failed for heap of smart pointer", 59);
 
             *buffer.alloc = instance;
             buffer.ref = ref;
@@ -250,11 +247,17 @@ namespace jule
             if (this->operator==(nullptr))
             {
 #ifndef __JULE_ENABLE__PRODUCTION
-                std::string error = __JULE_ERROR__INVALID_MEMORY "\nruntime: smart pointer is nil\nfile: ";
-                error += file;
-                __jule_panic_s(error);
+                auto n = strlen(file);
+                char *message = new (std::nothrow) char[84 + n];
+                if (!message)
+                    __jule_panic((jule::U8 *)"runtime: memory allocation failed for invalid memory dereferencing error of smart pointer", 89);
+                strncpy(message, __JULE_ERROR__INVALID_MEMORY, 47);
+                strncpy(message + 47, "\nruntime: smart pointer is nil\nfile: ", 38);
+                strncpy(message + 84, file, n);
+                message[84 + n] = NULL;
+                __jule_panic((jule::U8 *)message, 84 + n);
 #else
-                __jule_panic_s(__JULE_ERROR__INVALID_MEMORY "\nruntime: smart pointer is nil");
+                __jule_panic((jule::U8 *)__JULE_ERROR__INVALID_MEMORY "\nruntime: smart pointer is nil", 77);
 #endif
             }
         }

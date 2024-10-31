@@ -6,6 +6,7 @@
 #define __JULE_ERROR_HPP
 
 #include "types.hpp"
+#include "runtime.hpp"
 
 #define __JULE_ERROR__INVALID_MEMORY "invalid memory address or nil pointer deference"
 #define __JULE_ERROR__INCOMPATIBLE_TYPE "incompatible type"
@@ -15,30 +16,16 @@
 
 #define __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(STR, START, END, LEN, SIZE_TYPE) \
     STR += __JULE_ERROR__INDEX_OUT_OF_RANGE " [";                                      \
-    __jule_push_int_to_str(STR, START);                                                \
+    STR += __jule_i64ToStr((jule::I64)START);                                          \
     STR += ":";                                                                        \
-    __jule_push_int_to_str(STR, END);                                                  \
+    STR += __jule_i64ToStr((jule::I64)END);                                            \
     STR += "] with " SIZE_TYPE " ";                                                    \
-    STR += std::to_string(LEN)
+    STR += __jule_i64ToStr((jule::I64)LEN)
 
 #define __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(STR, INDEX, LEN) \
     STR += __JULE_ERROR__INDEX_OUT_OF_RANGE " [";              \
-    __jule_push_int_to_str(STR, INDEX);                        \
+    STR += __jule_i64ToStr((jule::I64)INDEX);                  \
     STR += "] with length ";                                   \
-    STR += std::to_string(LEN)
-
-// Push int to string buffer in decimal format.
-// This function designed to avoid using of std::to_string.
-#define __jule_push_int_to_str(s, i)                   \
-    {                                                  \
-        auto j = i;                                    \
-        if (i < 0)                                     \
-        {                                              \
-            j = -j;                                    \
-            s.push_back('-');                          \
-        }                                              \
-        for (auto len = s.length(); j > 0; j /= 10)    \
-            s.insert(s.begin() + len, (j % 10) + '0'); \
-    }
+    STR += __jule_i64ToStr((jule::I64)LEN)
 
 #endif // ifndef __JULE_ERROR_HPP

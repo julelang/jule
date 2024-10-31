@@ -7,11 +7,10 @@
 
 #include <initializer_list>
 
-#include "panic.hpp"
 #include "error.hpp"
-#include "panic.hpp"
 #include "types.hpp"
 #include "slice.hpp"
+#include "str.hpp"
 
 namespace jule
 {
@@ -68,14 +67,14 @@ namespace jule
 #ifndef __JULE_DISABLE__SAFETY
             if (start < 0 || end < 0 || start > end || end > N)
             {
-                std::string error;
+                jule::Str error;
                 __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(error, start, end, N, "length");
                 error += "\nruntime: array slicing with out of range indexes";
 #ifndef __JULE_ENABLE__PRODUCTION
                 error += "\nfile: ";
                 error += file;
 #endif
-                __jule_panic_s(error);
+                __jule_panicStr(error);
             }
 #endif
             if (start == end)
@@ -150,14 +149,14 @@ namespace jule
 #ifndef __JULE_DISABLE__SAFETY
             if (this->empty() || index < 0 || N <= index)
             {
-                std::string error;
+                jule::Str error;
                 __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(error, index, N);
                 error += "\nruntime: array indexing with out of range index";
 #ifndef __JULE_ENABLE__PRODUCTION
                 error += "\nfile: ";
                 error += file;
 #endif
-                __jule_panic_s(error);
+                __jule_panicStr(error);
             }
 #endif
             return this->__at(index);

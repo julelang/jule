@@ -5,14 +5,11 @@
 #ifndef __JULE_TRAIT_HPP
 #define __JULE_TRAIT_HPP
 
-#include <string>
-#include <cstring>
-
 #include "runtime.hpp"
 #include "types.hpp"
-#include "panic.hpp"
 #include "error.hpp"
 #include "ptr.hpp"
+#include "str.hpp"
 
 namespace jule
 {
@@ -69,7 +66,7 @@ namespace jule
             __jule_pseudoMalloc(1, sizeof(T));
             T *alloc = new (std::nothrow) T;
             if (!alloc)
-                __jule_panic_s("runtime: memory allocation failed for data of <trait>\nfile: /api/trait.hpp");
+                __jule_panic((jule::U8 *)"runtime: memory allocation failed for data of <trait>\nfile: /api/trait.hpp", 74);
 
             *alloc = data;
 #ifdef __JULE_DISABLE__REFERENCE_COUNTING
@@ -120,11 +117,11 @@ namespace jule
             if (this->operator==(nullptr))
             {
 #ifndef __JULE_ENABLE__PRODUCTION
-                std::string error = __JULE_ERROR__INVALID_MEMORY "\nfile: ";
+                jule::Str error = __JULE_ERROR__INVALID_MEMORY "\nfile: ";
                 error += file;
-                __jule_panic_s(error);
+                __jule_panicStr(error);
 #else
-                __jule_panic_s(__JULE_ERROR__INVALID_MEMORY "\nfile: /api/trait.hpp");
+                __jule_panicStr(__JULE_ERROR__INVALID_MEMORY "\nfile: /api/trait.hpp");
 #endif
             }
         }
@@ -168,11 +165,11 @@ namespace jule
             if (!this->type_is(false, type))
             {
 #ifndef __JULE_ENABLE__PRODUCTION
-                std::string error = __JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: trait casted to incompatible type\nfile: ";
+                jule::Str error = __JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: trait casted to incompatible type\nfile: ";
                 error += file;
-                __jule_panic_s(error);
+                __jule_panicStr(error);
 #else
-                __jule_panic_s(__JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: trait casted to incompatible type");
+                __jule_panicStr(__JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: trait casted to incompatible type");
 #endif
             }
 #endif
@@ -195,11 +192,11 @@ namespace jule
             if (!this->type_is(true, type))
             {
 #ifndef __JULE_ENABLE__PRODUCTION
-                std::string error = __JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: trait casted to incompatible type\nfile: ";
+                jule::Str error = __JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: trait casted to incompatible type\nfile: ";
                 error += file;
-                __jule_panic_s(error);
+                __jule_panicStr(error);
 #else
-                __jule_panic_s(__JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: trait casted to incompatible type");
+                __jule_panicStr(__JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: trait casted to incompatible type");
 #endif
             }
 #endif

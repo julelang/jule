@@ -5,15 +5,14 @@
 #ifndef __JULE_FN_HPP
 #define __JULE_FN_HPP
 
-#include <string>
 #include <cstddef>
 #include <thread>
 
 #include "runtime.hpp"
 #include "types.hpp"
 #include "error.hpp"
-#include "panic.hpp"
 #include "ptr.hpp"
+#include "str.hpp"
 
 namespace jule
 {
@@ -57,9 +56,9 @@ namespace jule
 #ifndef __JULE_DISABLE__SAFETY
             if (this->f == nullptr)
 #ifndef __JULE_ENABLE__PRODUCTION
-                __jule_panic_s((std::string(__JULE_ERROR__INVALID_MEMORY) + "\nfile: ") + file);
+                __jule_panicStr(jule::Str(__JULE_ERROR__INVALID_MEMORY "\nfile: ") + file);
 #else
-                __jule_panic_s(__JULE_ERROR__INVALID_MEMORY);
+                __jule_panicStr(__JULE_ERROR__INVALID_MEMORY);
 #endif // PRODUCTION
 #endif // SAFETY
             return this->f(this->ctx, args...);

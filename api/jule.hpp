@@ -25,7 +25,6 @@ CONFIGURATION DEFINES
 #include "error.hpp"
 #include "exceptional.hpp"
 #include "fn.hpp"
-#include "panic.hpp"
 #include "platform.hpp"
 #include "ptr.hpp"
 #include "slice.hpp"

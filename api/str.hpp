@@ -7,14 +7,11 @@
 
 #include <string>
 #include <cstring>
-#include <vector>
 
 #include "runtime.hpp"
 #include "impl_flag.hpp"
-#include "panic.hpp"
 #include "types.hpp"
 #include "error.hpp"
-#include "panic.hpp"
 #include "ptr.hpp"
 
 namespace jule
@@ -34,7 +31,7 @@ namespace jule
             __jule_pseudoMalloc(len, sizeof(jule::U8));
             auto buf = new (std::nothrow) jule::U8[len];
             if (!buf)
-                __jule_panic_s("runtime: memory allocation failed for heap-array of string");
+                __jule_panic((jule::U8 *)"runtime: memory allocation failed for heap-array of string", 58);
             std::memset(buf, 0, len);
             return buf;
         }
@@ -51,14 +48,14 @@ namespace jule
 #ifndef __JULE_DISABLE__SAFETY
             if (n == 0 || i < 0 || n <= i)
             {
-                std::string error;
+                jule::Str error;
                 __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(error, i, n);
                 error += "\nruntime: string indexing with out of range index";
 #ifndef __JULE_ENABLE__PRODUCTION
                 error += "\nfile: ";
                 error += file;
 #endif
-                __jule_panic_s(error);
+                __jule_panicStr(error);
             }
 #endif
             return s[i];
@@ -73,7 +70,6 @@ namespace jule
         Str(const jule::U8 *src) : Str(src, src + std::strlen(reinterpret_cast<const char *>(src))) {}
         Str(const std::string &src) : Str(reinterpret_cast<const jule::U8 *>(src.c_str()),
                                           reinterpret_cast<const jule::U8 *>(src.c_str() + src.size())) {}
-        Str(const std::vector<U8> &src) : Str(src.data(), src.data() + src.size()) {}
 
         Str(const char *src) : Str(reinterpret_cast<const jule::U8 *>(src),
                                    reinterpret_cast<const jule::U8 *>(src) + std::strlen(reinterpret_cast<const char *>(src))) {}
@@ -169,14 +165,14 @@ namespace jule
 #ifndef __JULE_DISABLE__SAFETY
             if (start < 0 || end < 0 || start > end || end > this->len())
             {
-                std::string error;
+                jule::Str error;
                 __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(error, start, end, this->len(), "length");
                 error += "\nruntime: string slicing with out of range indexes";
 #ifndef __JULE_ENABLE__PRODUCTION
                 error += "\nfile:";
                 error += file;
 #endif
-                __jule_panic_s(error);
+                __jule_panicStr(error);
             }
 #endif
             this->_slice += start;
@@ -221,14 +217,14 @@ namespace jule
 #ifndef __JULE_DISABLE__SAFETY
             if (start < 0 || end < 0 || start > end || end > this->_len)
             {
-                std::string error;
+                jule::Str error;
                 __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(error, start, end, this->_len, "length");
                 error += "\nruntime: string slicing with out of range indexes";
 #ifndef __JULE_ENABLE__PRODUCTION
                 error += "\nfile:";
                 error += file;
 #endif
-                __jule_panic_s(error);
+                __jule_panicStr(error);
             }
 #endif
             jule::Str s;
@@ -292,14 +288,14 @@ namespace jule
 #ifndef __JULE_DISABLE__SAFETY
             if (this->empty() || index < 0 || this->len() <= index)
             {
-                std::string error;
+                jule::Str error;
                 __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(error, index, this->len());
                 error += "\nruntime: string indexing with out of range index";
 #ifndef __JULE_ENABLE__PRODUCTION
                 error += "\nfile: ";
                 error += file;
 #endif
-                __jule_panic_s(error);
+                __jule_panicStr(error);
             }
 #endif
             return this->__at(index);
