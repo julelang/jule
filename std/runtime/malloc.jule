@@ -1,0 +1,77 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/internal/implflags"
+
+// C's free function.
+cpp fn free(*unsafe)
+
+// C's malloc function.
+cpp fn malloc(uint): *unsafe
+
+// _64bit = 1 on 64-bit systems, 0 on 32-bit systems
+const _64bit = 1 << (^uintptr(0) >> 63) / 2
+
+// The informations of the comment is heavily adopted from the Go programming language.
+//
+// The number of bits in a heap address. On amd64, addresses are sign-extended
+// beyond heapAddrBits. On other arches, they are zero-extended.
+//
+// On most 64-bit platforms, we limit this to 48 bits based on a
+// combination of hardware and OS limitations.
+//
+// amd64 hardware limits addresses to 48 bits, sign-extended
+// to 64 bits. Addresses where the top 16 bits are not either
+// all 0 or all 1 are "non-canonical" and invalid.
+// In 2017, amd64 hardware added support for 57 bit addresses;
+// however, currently only Linux supports this extension and the
+// kernel will never choose an address above 1<<47 mostly.
+//
+// arm64 hardware (as of ARMv8) limits user addresses to 48
+// bits, in the range [0, 1<<48).
+//
+// On Linux, Jule leans on stricter OS limits. Based
+// on Linux's processor.h, the user address space is limited as
+// follows on 64-bit architectures:
+//
+// Architecture  Name              Maximum Value (exclusive)
+// ---------------------------------------------------------------------
+// amd64         TASK_SIZE_MAX     0x007ffffffff000 (47 bit addresses)
+// arm64         TASK_SIZE_64      0x01000000000000 (48 bit addresses)
+//
+// These limits may increase over time, but are currently at
+// most 48 bits. On all architectures, Linux
+// starts placing mmap'd regions at addresses that are
+// significantly below 48 bits, so even if it's possible to
+// exceed Jule's 48 bit limit, it's extremely unlikely in
+// practice.
+//
+// On 32-bit platforms, we accept the full 32-bit address
+// space because doing so is cheap.
+const heapAddrBits = _64bit*48 + (1-_64bit)*32
+
+// The maximum size of an allocation. On 64-bit,
+// it's theoretically possible to allocate 1<<heapAddrBits bytes. On
+// 32-bit, however, this is one less than 1<<32 because the
+// number of bytes in the address space doesn't actually fit
+// in a uintptr.
+const maxAlloc = (1 << heapAddrBits) - (1-_64bit)*1
+
+// Pseudo memory allocation, for allocation checking and documentation purposes.
+// Any runtime allocation must be follow this implementation documentation.
+// Pseudo allocates linear memory on the heap. The |n| is non-negative count of elements.
+// The |size| is size in bytes of the single instance of a type which is will be allocated.
+// Panics if |n*size > maxAlloc || n > max(int)|, also panics if allocation failed.
+// Returns pointer to the allocation (pointer to the first cell if n>1).
+// The allocated memory will not be initialized by default.
+//
+// Calling this function, performs allocation size checking as described
+// and panics if conditions are met.
+#export "__jule_pseudoMalloc"
+fn pseudoMalloc(n: i64, size: uint) {
+	allocSize := uint(n) * size
+	if allocSize > maxAlloc {
+		panic("runtime: malloc: allocation size is exceeds maximum allocation size")
+	}
+}

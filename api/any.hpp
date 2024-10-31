@@ -38,9 +38,10 @@ namespace jule
         Any(const T &data, jule::Any::Type *type) noexcept
         {
             this->type = type;
+            __jule_pseudoMalloc(1, sizeof(T));
             T *alloc = new (std::nothrow) T;
             if (!alloc)
-                __jule_panic_s(__JULE_ERROR__MEMORY_ALLOCATION_FAILED "\nfile: /api/any.hpp");
+                __jule_panic_s("runtime: memory allocation failed for data of <any>\nfile: /api/any.hpp");
 
             *alloc = data;
 #ifdef __JULE_DISABLE__REFERENCE_COUNTING

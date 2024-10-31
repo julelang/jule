@@ -16,7 +16,6 @@
 
 namespace jule
 {
-
     // Built-in slice type.
     template <typename Item>
     class Slice;
@@ -162,10 +161,10 @@ namespace jule
         {
             this->dealloc();
 
+            __jule_pseudoMalloc(cap, sizeof(Item));
             Item *alloc = new (std::nothrow) Item[cap];
             if (!alloc)
-                __jule_panic_s(__JULE_ERROR__MEMORY_ALLOCATION_FAILED
-                               "\nruntime: heap allocation failed of slice");
+                __jule_panic_s("runtime: memory allocation failed for heap-array of slice");
 
 #ifdef __JULE_DISABLE__REFERENCE_COUNTING
             this->data = jule::Ptr<Item>::make(alloc, nullptr);

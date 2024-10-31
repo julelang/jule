@@ -32,10 +32,10 @@ namespace jule
 
         static jule::U8 *alloc(const jule::Int len) noexcept
         {
+            __jule_pseudoMalloc(len, sizeof(jule::U8));
             auto buf = new (std::nothrow) jule::U8[len];
             if (!buf)
-                __jule_panic_s(__JULE_ERROR__MEMORY_ALLOCATION_FAILED
-                               "\nruntime: memory allocation failed for string");
+                __jule_panic_s("runtime: memory allocation failed for heap-array of string");
             std::memset(buf, 0, len);
             return buf;
         }
