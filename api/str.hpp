@@ -12,7 +12,6 @@
 #include "runtime.hpp"
 #include "impl_flag.hpp"
 #include "panic.hpp"
-#include "slice.hpp"
 #include "types.hpp"
 #include "error.hpp"
 #include "panic.hpp"
@@ -38,23 +37,6 @@ namespace jule
                 __jule_panic_s("runtime: memory allocation failed for heap-array of string");
             std::memset(buf, 0, len);
             return buf;
-        }
-
-        static jule::Str lit(const char *s, const jule::Int n) noexcept
-        {
-            jule::Str str;
-            str._slice = const_cast<jule::U8 *>(reinterpret_cast<const jule::U8 *>(s));
-            str._len = n;
-            return str;
-        }
-
-        static jule::Str lit(const char *s) noexcept
-        {
-            return jule::Str::lit(s, std::strlen(s));
-        }
-
-        static inline jule::Str unsafe_from_bytes(const jule::Slice<jule::U8> &bytes) noexcept {
-            return jule::Str::lit(reinterpret_cast<const char*>(bytes.begin()), bytes.len());
         }
 
         // Returns element by index.
@@ -290,17 +272,6 @@ namespace jule
                 file,
 #endif
                 0, this->_len);
-        }
-
-        jule::Slice<jule::U8> fake_slice(void) const
-        {
-            jule::Slice<jule::U8> slice;
-            slice.data.alloc = const_cast<Iterator>(this->begin());
-            slice.data.ref = nullptr;
-            slice._slice = slice.data.alloc;
-            slice._len = this->_len;
-            slice._cap = this->_len;
-            return slice;
         }
 
         // Returns element by index.
