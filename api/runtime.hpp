@@ -50,5 +50,6 @@ void __jule_pseudoMalloc(jule::Int n, jule::Uint size);
 jule::Str __jule_strBytePtr(jule::U8 *b, jule::Int n);
 jule::Slice<jule::U8> __jule_sliceBytePtr(jule::U8 *b, jule::Int len, jule::Int cap);
 jule::Slice<jule::U8> __jule_strAsSlice(jule::Str s);
+jule::Str __jule_sliceAsStr(jule::Slice<jule::U8> b);
 
 #endif // #ifndef __JULE_RUNTIME_HPP
