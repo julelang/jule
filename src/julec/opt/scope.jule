@@ -713,6 +713,25 @@ impl scopeOptimizer {
 			}
 		}
 
+		// resports whether m used in different operand in left or right
+		// if checkTup equals to false, tuple expression will not be checked
+		existInOperands := fn(i: int, m: sema::Expr, checkTup: bool): bool {
+			// check whether variable used in different operand in left or right
+			for j, jl in unsafe { assign.Left } {
+				for j != i && jl != nil && obj::EqualModels(jl.Model, m) {
+					ret true
+				}
+			}
+			if checkTup {
+				for j, jl in unsafe { tup.Datas } {
+					for j != i && jl != nil && obj::EqualModels(jl.Model, m) {
+						ret true
+					}
+				}
+			}
+			ret false
+		}
+
 		z := self.i
 		mut i := 0
 	lookup:
@@ -722,33 +741,19 @@ impl scopeOptimizer {
 				i++
 				continue
 			}
-			match type l.Model {
-			| &sema::Var:
-				break
-			|:
-				i++
-				continue
-			}
-			v := (&sema::Var)(l.Model)
 
-			// check whether variable used in different operand in left or right
-			for j, jl in assign.Left {
-				for j != i && jl != nil && jl.Model == v {
-					// exist in left operands, skip this variable
-					i++
-					continue lookup
-				}
-			}
-			for j, jl in tup.Datas {
-				for j != i && jl != nil && jl.Model == v {
-					// exist in right operands, skip this variable
-					i++
-					continue lookup
-				}
-			}
-
-			// can handle as single assignment statement
 			mut r := tup.Datas[i]
+
+			// check l.Model in left operand and right operand. Because l.Model
+			// will be mutated, so if it exist in right operand, cannot split.
+			// But for r.Model, checking only left operand is safe. So,
+			// check for mutatation risk.
+			if existInOperands(i, l.Model, true) || existInOperands(i, r.Model, false) {
+				// exist in left operands, skip this variable
+				i++
+				continue lookup
+			}
+			// can handle as single assignment statement
 
 			// insert + 1 offset because this statement should not be shifted
 			// also following statement optimizations may apply
