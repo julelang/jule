@@ -924,6 +924,16 @@ impl ObjectCoder {
 			if v.Value.Data.Model != nil {
 				if v.Reference {
 					self.varInitExpr(v, fn() {
+						match type v.Value.Data.Model {
+						| &sema::Var:
+							// If value is variable, check whether it is a reference.
+							// Because references implemented as raw pointers.
+							// So, do not take address of them, use directly them.
+							if (&sema::Var)(v.Value.Data.Model).Reference {
+								self.ec.model(v.Value.Data.Model)
+								ret
+							}
+						}
 						self.write("&(")
 						self.ec.model(v.Value.Data.Model)
 						self.write(")")
