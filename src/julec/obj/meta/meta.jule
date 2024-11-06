@@ -1,0 +1,150 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "obj"
+use "std/comptime"
+use "std/jule/sema"
+
+// Linkpath of common packages.
+const linkpathRuntime = "std/runtime"
+const linkpathStrings = "std/strings"
+const linkpathMathCmplx = "std/math/cmplx"
+
+// Program metadata for the main IR.
+// All required packages use this metada collection instead of
+// transferring data between algorithms.
+// It is safe to read for concurrent implementations.
+// In good practice, it should be build once.
+// Default value is nil, but it should be initialized before relevant algorithms.
+// This variable always assumed as non-nil.
+static mut Program = (&Meta)(nil)
+
+// Metadata for the strings::Builder.
+struct StrBuilder {
+	Write:     &sema::FnIns
+	WriteByte: &sema::FnIns
+	WriteRune: &sema::FnIns
+	WriteStr:  &sema::FnIns
+}
+
+// Metadata for the runtime package.
+struct Runtime {
+	ToStr:        &sema::Fn
+	ArrayCmp:     &sema::Fn
+	RCAdd:        &sema::FnIns
+	RCLoad:       &sema::FnIns
+	RCDrop:       &sema::FnIns
+	RCAddAtomic:  &sema::FnIns
+	RCLoadAtomic: &sema::FnIns
+	RCDropAtomic: &sema::FnIns
+	RuneCount:    &sema::FnIns
+	StrBytePtr:   &sema::FnIns
+	SliceBytePtr: &sema::FnIns
+	StrAsSlice:   &sema::FnIns
+	SliceAsStr:   &sema::FnIns
+
+	Map:         &sema::Struct
+	MapIterator: &sema::Struct
+}
+
+// Metadata for the std/math/cmplx package.
+struct MathCmplx {
+	Cmplx: &sema::StructIns // Cmplx
+
+	CmplxAdd:  &sema::FnIns // Cmplx.Add
+	CmplxSub:  &sema::FnIns // Cmplx.Sub
+	CmplxMul:  &sema::FnIns // Cmplx.Mul
+	CmplxDiv:  &sema::FnIns // Cmplx.Div
+	CmplxAddZ: &sema::FnIns // Cmplx.add
+	CmplxSubZ: &sema::FnIns // Cmplx.sub
+	CmplxMulZ: &sema::FnIns // Cmplx.mul
+	CmplxDivZ: &sema::FnIns // Cmplx.div
+}
+
+// Metadata for common objects.
+struct Meta {
+	Runtime:    &Runtime
+	StrBuilder: &StrBuilder
+	MathCmplx:  &MathCmplx
+
+	EntryPoint: &sema::Fn
+}
+
+// Collects whole possible metadata from IR.
+fn Collect(mut ir: &obj::IR): &Meta {
+	mut meta := new(Meta)
+	meta.Runtime = CollectRuntime(ir)
+	meta.StrBuilder = CollectStrBuilder(ir)
+	meta.MathCmplx = CollectMathCmplx(ir)
+	ret meta
+}
+
+// Collects Runtime from IR if possible.
+fn CollectRuntime(mut &ir: &obj::IR): &Runtime {
+	mut p := obj::SelectImport(ir.Used, linkpathRuntime)
+	if p == nil {
+		ret nil
+	}
+	mut meta := new(Runtime)
+
+	// Functions.
+	meta.ToStr = obj::RuntimeFindFn(p, "toStr")
+	meta.ArrayCmp = obj::RuntimeFindFn(p, "arrayCmp")
+	meta.RCAdd = obj::RuntimeFindFn(p, "_RCAdd").Instances[0]
+	meta.RCLoad = obj::RuntimeFindFn(p, "_RCLoad").Instances[0]
+	meta.RCDrop = obj::RuntimeFindFn(p, "_RCDrop").Instances[0]
+	meta.RCAddAtomic = obj::RuntimeFindFn(p, "_RCAddAtomic").Instances[0]
+	meta.RCLoadAtomic = obj::RuntimeFindFn(p, "_RCLoadAtomic").Instances[0]
+	meta.RCDropAtomic = obj::RuntimeFindFn(p, "_RCDropAtomic").Instances[0]
+	meta.RuneCount = obj::RuntimeFindFn(p, "runeCount").Instances[0]
+	meta.StrBytePtr = obj::RuntimeFindFn(p, "strBytePtr").Instances[0]
+	meta.SliceBytePtr = obj::RuntimeFindFn(p, "sliceBytePtr").Instances[0]
+	meta.StrAsSlice = obj::RuntimeFindFn(p, "strAsSlice").Instances[0]
+	meta.SliceAsStr = obj::RuntimeFindFn(p, "sliceAsStr").Instances[0]
+
+	// Structs.
+	meta.Map = obj::RuntimeFindStruct(p, "_Map")
+	meta.MapIterator = obj::RuntimeFindStruct(p, "mapIterator")
+
+	ret meta
+}
+
+// Collects StrBuilder from IR if possible.
+fn CollectStrBuilder(mut &ir: &obj::IR): &StrBuilder {
+	const Binded = false
+	const Static = false
+	mut p := obj::SelectImport(ir.Used, linkpathStrings)
+	if p == nil {
+		ret nil
+	}
+	mut b := p.FindTypeAlias("Builder", Binded).TypeSym.Type.Struct()
+	mut meta := new(StrBuilder)
+	const metav = comptime::ValueOf(*meta)
+	const for _, f in metav.Type().Decl().Fields() {
+		metav.Field(f.Name()).Unwrap() = b.FindMethod(f.Name(), Static).Instances[0]
+	}
+	ret meta
+}
+
+// Collects MathCmplx from IR if possible.
+fn CollectMathCmplx(mut &ir: &obj::IR): &MathCmplx {
+	mut p := obj::SelectImport(ir.Used, linkpathMathCmplx)
+	if p == nil {
+		ret nil
+	}
+	mut meta := new(MathCmplx)
+
+	const Static = false
+	meta.Cmplx = obj::RuntimeFindStruct(p, "Cmplx").Instances[0]
+	meta.CmplxAdd = meta.Cmplx.FindMethod("Add", Static).Instances[0]
+	meta.CmplxSub = meta.Cmplx.FindMethod("Sub", Static).Instances[0]
+	meta.CmplxMul = meta.Cmplx.FindMethod("Mul", Static).Instances[0]
+	meta.CmplxDiv = meta.Cmplx.FindMethod("Div", Static).Instances[0]
+	meta.CmplxAddZ = meta.Cmplx.FindMethod("add", Static).Instances[0]
+	meta.CmplxSubZ = meta.Cmplx.FindMethod("sub", Static).Instances[0]
+	meta.CmplxMulZ = meta.Cmplx.FindMethod("mul", Static).Instances[0]
+	meta.CmplxDivZ = meta.Cmplx.FindMethod("div", Static).Instances[0]
+
+	ret meta
+}

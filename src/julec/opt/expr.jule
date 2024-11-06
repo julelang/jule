@@ -4,6 +4,7 @@
 
 use "env"
 use "obj"
+use "obj/meta"
 use "std/comptime"
 use "std/jule/constant"
 use "std/jule/sema"
@@ -817,7 +818,7 @@ impl exprOptimizer {
 		// Some strings::Builder methods are not real-exceptional implementations.
 		// They just implements interfaces and not throws any exceptional.
 		// Therefore we can remove exceptional handling algorithms for these method calls.
-		const meta = comptime::ValueOf(*obj::ProgramMeta.StrBuilder)
+		const meta = comptime::ValueOf(*meta::Program.StrBuilder)
 		const for _, f in meta.Type().Decl().Fields() {
 			if meta.Field(f.Name()).Unwrap() == m.Func {
 				mut model := any(&FnCallIgnoreExceptionalExpr{Base: m})
@@ -862,7 +863,7 @@ impl exprOptimizer {
 		| prim.IsI32():
 			// len(([]rune)(str))
 			// simplify expression to runtime::runeCount, avoid making rune slice allocation
-			mut func := obj::ProgramMeta.Runtime.RuneCount
+			mut func := meta::Program.Runtime.RuneCount
 			*self.model = &sema::FnCallExpr{
 				Func: func,
 				Expr: func,
@@ -880,7 +881,7 @@ impl exprOptimizer {
 			self.scope(m.Except, Child)
 		}
 		match {
-		| StdStrings && obj::ProgramMeta.StrBuilder != nil:
+		| StdStrings && meta::Program.StrBuilder != nil:
 			self.optimizeStrBuilderCall(m)
 		}
 	}

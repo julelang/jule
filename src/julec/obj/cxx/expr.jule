@@ -4,6 +4,7 @@
 
 use "env"
 use "obj"
+use "obj/meta"
 use "opt"
 use "std/conv"
 use "std/fmt"
@@ -228,7 +229,7 @@ impl exprCoder {
 				// If this binary operator comparing array type.
 				// The left operand is will be array one always.
 				arr := lk.Arr()
-				mut ins := obj::FindFnGenericInstance(obj::ProgramMeta.Runtime.ArrayCmp, arr.Elem)
+				mut ins := obj::FindFnGenericInstance(meta::Program.Runtime.ArrayCmp, arr.Elem)
 				if op == token::Id.NotEq {
 					buf.WriteByte('!')!
 				}
@@ -1003,7 +1004,7 @@ impl exprCoder {
 			self.oc.write(" + except.error.type->to_str(except.error.data) + ")
 			strLitF(self.oc.Buf, fn(): int {
 				self.oc.write("\"\\nlocation: ")
-				mut len := 11 // \nlocation: 
+				mut len := 11 // \nlocation:
 				len += self.oc.locInfo(m.Token)
 				self.oc.write("\"")
 				ret len
@@ -1074,7 +1075,7 @@ impl exprCoder {
 		match {
 		| m.Expr.Type.Map() != nil:
 			mut _map := m.Expr.Type.Map()
-			mut ins := obj::FindStructGenericInstance(obj::ProgramMeta.Runtime.Map, _map.Key, _map.Val)
+			mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Map, _map.Key, _map.Val)
 			const Static = false
 			mut f := ins.FindMethod("get", Static).Instances[0]
 			identCoder.funcIns(self.oc.Buf, f)
@@ -1149,7 +1150,7 @@ impl exprCoder {
 	}
 
 	fn mapExpr(mut &self, mut m: &sema::MapExpr) {
-		mut ins := obj::FindStructGenericInstance(obj::ProgramMeta.Runtime.Map, m.Kind.Key, m.Kind.Val)
+		mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Map, m.Kind.Key, m.Kind.Val)
 		const Static = true
 		mut maker := ins.FindMethod("make", Static).Instances[0]
 		if len(m.Entries) == 0 {
@@ -1317,7 +1318,7 @@ impl exprCoder {
 
 	fn printCall(mut &self, mut m: &sema::BuiltinPrintCallExpr) {
 		self.oc.write("jule::print(")
-		mut f := obj::FindFnGenericInstance(obj::ProgramMeta.Runtime.ToStr, m.Expr.Type)
+		mut f := obj::FindFnGenericInstance(meta::Program.Runtime.ToStr, m.Expr.Type)
 		identCoder.funcIns(self.oc.Buf, f)
 		self.oc.write("(")
 		self.possibleRefExpr(m.Expr.Model)
@@ -1326,7 +1327,7 @@ impl exprCoder {
 
 	fn printlnCall(mut &self, mut m: &sema::BuiltinPrintlnCallExpr) {
 		self.oc.write("jule::println(")
-		mut f := obj::FindFnGenericInstance(obj::ProgramMeta.Runtime.ToStr, m.Expr.Type)
+		mut f := obj::FindFnGenericInstance(meta::Program.Runtime.ToStr, m.Expr.Type)
 		identCoder.funcIns(self.oc.Buf, f)
 		self.oc.write("(")
 		self.possibleRefExpr(m.Expr.Model)
@@ -1391,7 +1392,7 @@ impl exprCoder {
 	fn lenCall(mut &self, mut m: &sema::BuiltinLenCallExpr) {
 		mut _map := m.Expr.Type.Map()
 		if _map != nil {
-			mut ins := obj::FindStructGenericInstance(obj::ProgramMeta.Runtime.Map, _map.Key, _map.Val)
+			mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Map, _map.Key, _map.Val)
 			const Static = false
 			mut f := ins.FindMethod("len", Static).Instances[0]
 			identCoder.funcIns(self.oc.Buf, f)
@@ -1414,7 +1415,7 @@ impl exprCoder {
 		if _map == nil {
 			panic("cxx: deleteCall: destination is not map")
 		}
-		mut ins := obj::FindStructGenericInstance(obj::ProgramMeta.Runtime.Map, _map.Key, _map.Val)
+		mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Map, _map.Key, _map.Val)
 		const Static = false
 		if m.Key != nil {
 			mut f := ins.FindMethod("del", Static).Instances[0]
@@ -1683,7 +1684,7 @@ impl exprCoder {
 	}
 
 	fn strFromBytes(mut &self, mut m: &opt::StrFromBytes) {
-		identCoder.funcIns(self.oc.Buf, obj::ProgramMeta.Runtime.SliceAsStr)
+		identCoder.funcIns(self.oc.Buf, meta::Program.Runtime.SliceAsStr)
 		self.oc.write("(")
 		self.possibleRefExpr(m.Expr)
 		self.oc.write(")")
@@ -2071,7 +2072,7 @@ fn structBinary(mut &buf: strings::Builder, mut &s: &sema::StructIns, &l: str,
 // Writes string literal expression for constant literal to buf.
 // Literal is not including quotes, just string content in bytes.
 fn strLit(mut &buf: strings::Builder, lit: str, len: str) {
-	identCoder.funcIns(buf, obj::ProgramMeta.Runtime.StrBytePtr)
+	identCoder.funcIns(buf, meta::Program.Runtime.StrBytePtr)
 	buf.WriteStr("((" + typeCoder.U8 + "*)")!
 	cstrLit(buf, lit)
 	buf.WriteByte(',')!
@@ -2082,7 +2083,7 @@ fn strLit(mut &buf: strings::Builder, lit: str, len: str) {
 // Same as the strLit function, but uses the lit function to write content.
 // The lit function should return the length of content.
 fn strLitF(mut &buf: strings::Builder, lit: fn(): int) {
-	identCoder.funcIns(buf, obj::ProgramMeta.Runtime.StrBytePtr)
+	identCoder.funcIns(buf, meta::Program.Runtime.StrBytePtr)
 	buf.WriteStr("((" + typeCoder.U8 + "*)")!
 	len := conv::Itoa(lit())
 	buf.WriteByte(',')!
@@ -2092,7 +2093,7 @@ fn strLitF(mut &buf: strings::Builder, lit: fn(): int) {
 
 // Like the strLit function, but writes as slice (will not perform allocation).
 fn strLitAsSlice(mut &buf: strings::Builder, lit: str, len: str) {
-	identCoder.funcIns(buf, obj::ProgramMeta.Runtime.SliceBytePtr)
+	identCoder.funcIns(buf, meta::Program.Runtime.SliceBytePtr)
 	buf.WriteStr("((" + typeCoder.U8 + "*)")!
 	cstrLit(buf, lit)
 	buf.WriteByte(',')!
@@ -2104,7 +2105,7 @@ fn strLitAsSlice(mut &buf: strings::Builder, lit: str, len: str) {
 
 // Returns string expr as byte slice (will not perform allocation).
 fn strToSlice(mut &buf: strings::Builder, expr: str) {
-	identCoder.funcIns(buf, obj::ProgramMeta.Runtime.StrAsSlice)
+	identCoder.funcIns(buf, meta::Program.Runtime.StrAsSlice)
 	buf.WriteByte('(')!
 	buf.WriteStr(expr)!
 	buf.WriteByte(')')!
