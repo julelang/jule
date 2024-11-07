@@ -2422,6 +2422,40 @@ impl sema {
 		}
 	}
 
+	fn precheckStructType(mut &self, mut &s: &Struct) {
+		if s.Binded {
+			ret
+		}
+
+		// Generic instances are checked instantly.
+		if len(s.Generics) > 0 {
+			ret
+		}
+
+		if len(s.Instances) == 0 {
+			mut ins := s.instance()
+			s.appendInstance(ins) // Append instance before precheck.
+		}
+
+		// Precheck is instance is not checked already.
+		{
+			mut ins := s.Instances[0]
+			if !ins.Checked {
+				ins.Checked = true
+				ok := self.precheckStructIns(ins, nil)
+				if !ok {
+					ret
+				}
+			}
+		}
+	}
+
+	fn precheckStructTypes(mut &self) {
+		for (_, mut s) in self.file.Structs {
+			self.precheckStructType(s)
+		}
+	}
+
 	fn checkRets(mut self, mut &f: &FnIns) {
 		if f.Decl.IsVoid() {
 			ret
@@ -2567,10 +2601,24 @@ impl sema {
 	// Checks all types of all package files.
 	// Breaks checking if checked file failed.
 	fn checkPackageTypes(mut &self) {
+		// Precheck necessary types first.
 		for (_, mut f) in self.files {
 			self.setCurrentFile(f)
 			self.checkGlobals()
+		}
+		if len(self.errors) > 0 {
+			ret
+		}
+		for (_, mut f) in self.files {
+			self.setCurrentFile(f)
 			self.precheckFuncs()
+		}
+		if len(self.errors) > 0 {
+			ret
+		}
+		for (_, mut f) in self.files {
+			self.setCurrentFile(f)
+			self.precheckStructTypes()
 		}
 		if len(self.errors) > 0 {
 			ret
