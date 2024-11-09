@@ -81,6 +81,7 @@ struct ObjectCoder {
 	// Internal buffer which is commonly used.
 	Buf: strings::Builder
 
+	resultProto: strings::Builder // Prototype declarations of the result declarations.
 	resultDecls: strings::Builder // Struct wrappers for multi-ret function types.
 	anyObj:      strings::Builder // Type handlers and others for the <any> type.
 	anonObj:     strings::Builder // Anonymous functions.
@@ -109,9 +110,10 @@ struct ObjectCoder {
 	sc: &scopeCoder
 	tc: &typeCoder
 
-	headPos: int
-	declPos: int
-	wrapPos: int
+	headPos:  int
+	declPos:  int
+	wrapPos:  int
+	plainPos: int
 
 	meta: metadata
 }
@@ -430,8 +432,11 @@ impl ObjectCoder {
 			ret
 		}
 		self.resultMap[s] = false
+		self.resultProto.WriteStr("struct ")!
 		self.resultDecls.WriteStr("struct ")!
 		self.resultDecls.WriteStr(s)!
+		self.resultProto.WriteStr(s)!
+		self.resultProto.WriteStr(";\n")!
 		self.resultDecls.WriteStr(" {\n")!
 		for (i, mut t) in f.Result.Tup().Types {
 			self.resultDecls.WriteByte(indentKind)!
@@ -1143,6 +1148,7 @@ impl ObjectCoder {
 
 	fn decls(mut &self) {
 		self.structurePlainDecls()
+		self.plainPos = self.Buf.Len()
 		self.structureDecls()
 		self.headPos = self.Buf.Len()
 		self.structureMethodDecls()
@@ -1363,6 +1369,11 @@ impl ObjectCoder {
 		// Concurrency analysis done.
 		// Implement RC functions.
 		self.implementRC()
+
+		self.insertBuf(self.resultProto, self.plainPos)
+		self.headPos += self.resultProto.Len()
+		self.wrapPos += self.resultProto.Len()
+		self.declPos += self.resultProto.Len()
 
 		self.insertBuf(self.deallocObj, self.wrapPos)
 		self.wrapPos += self.deallocObj.Len()
