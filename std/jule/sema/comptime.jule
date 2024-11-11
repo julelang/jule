@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/conv"
 use "std/jule/ast"
 use "std/jule/build"
 use "std/jule/constant"
@@ -1230,6 +1231,41 @@ impl comptimeValue {
 		ret buildComptimeValue(d)
 	}
 
+	fn _FieldByIndex(mut &self, mut &e: &eval, mut &fc: &ast::FnCallExpr): &Data {
+		if len(fc.Args) > 1 {
+			e.pushErr(fc.Args[1].Token, build::LogMsg.ArgumentOverflow, "FieldByIndex")
+			ret nil
+		}
+		mut s := self.data.Type.Struct()
+		if s == nil {
+			e.pushErr(fc.Token, build::LogMsg.InvalidTypeForFn, self.data.Type.Str(), "Field")
+			ret nil
+		}
+		mut arg := fc.Args[0]
+		mut d := e.evalExpr(arg)
+		if d == nil {
+			ret nil
+		}
+		if !d.IsConst() {
+			e.pushErr(arg.Token, build::LogMsg.ExprNotConst)
+			ret nil
+		}
+		log := checkDataForIntegerIndexing(e.s, d, arg.Token,e.getOwnerRefers())
+		if log != build::LogMsg.Empty {
+			e.pushErr(arg.Token, log)
+			ret nil
+		}
+		i := d.Constant.AsU64()
+		if i >= u64(len(s.Fields)) {
+			e.pushErr(arg.Token, build::LogMsg.IndexOutOfRange, conv::FmtUint(i, 10), conv::Itoa(len(s.Fields)))
+			ret nil
+		}
+		mut f := s.Fields[i]
+		d = new(Data, *self.data)
+		d = e.evalStructSubIdentField(d, s, arg.Token, f)
+		ret buildComptimeValue(d)
+	}
+
 	fn _Method(mut &self, mut &e: &eval, mut &fc: &ast::FnCallExpr): &Data {
 		if len(fc.Args) > 1 {
 			e.pushErr(fc.Args[1].Token, build::LogMsg.ArgumentOverflow, "Method")
@@ -1318,6 +1354,13 @@ impl comptimeValue {
 			mut method := &FnIns{
 				caller: fn(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
 					ret self._Field(e, fc)
+				},
+			}
+			ret buildAsComptimeMethodData(method)
+		| "FieldByIndex":
+			mut method := &FnIns{
+				caller: fn(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): &Data {
+					ret self._FieldByIndex(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
