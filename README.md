@@ -34,8 +34,6 @@ It contains the reference compiler, API, and standard library.
 - Disable variable shadowing by default, immutability by default, boundary checking, no uninitialized memory
 - The [API](https://manual.jule.dev/api/) written in Jule and C++ and allows extend Jule with C++ thanks to interoperability
 
-![image](https://github.com/user-attachments/assets/0a6aee7c-6f0c-4ec1-96f8-d02b7fdc034c)
-
 > [!IMPORTANT]
 > Jule does not have a stable version yet and is still being developed to become more stable.
 > Some commits may not be fully honored due to some compiler/API errors.
