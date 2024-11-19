@@ -4,7 +4,26 @@
 
 cpp use "<time.h>"
 
+cpp type clockid_t: int
+
+cpp unsafe fn clock_gettime(id: cpp.clockid_t, mut tp: *cpp.timespec): int
+
 cpp struct timespec {
 	tv_sec:  i64
 	tv_nsec: i64
+}
+
+// Returns system-wide realtime clock in seconds and nanoseconds.
+// The nanoseconds is not a second yet, always in range (0, 999999999).
+fn timeNow(): (sec: i64, nsec: i64) {
+	// Identifier for system-wide realtime clock.
+	// All possible platforms use 0 for this one, as fas as tested.
+	const CLOCK_REALTIME = 0
+
+	mut ts := cpp.timespec{}
+	if unsafe { cpp.clock_gettime(cpp.clockid_t(CLOCK_REALTIME), &ts) } == -1 {
+		panic("runtime: timeNow failed")
+	}
+	sec, nsec = ts.tv_sec, ts.tv_nsec
+	ret
 }
