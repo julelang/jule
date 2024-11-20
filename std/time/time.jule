@@ -4,6 +4,14 @@
 
 use "std/runtime"
 
+// The unsigned zero year for internal Unix time calculations.
+// Must be 1 mod 400, and times before it will not compute correctly,
+// but otherwise can be changed at will.
+const absoluteZeroYear = -292277022399
+
+// Offsets to convert between internal and absolute or Unix times.
+const absoluteToUnix = -9223372028715321600
+
 // A Time represents an instant in time with nanosecond precision.
 //
 // Zero-value indicates the beginning of Unix time, i.e. zero seconds.
@@ -53,24 +61,7 @@ struct AbsTime {
 impl AbsTime {
 	// Returns absolute time in Unix time.
 	fn Unix(self): i64 {
-		mut leap := false
-		mut y := self.Year - unixYearOffset
-		mut m := self.Month - unixMonthOffset
-		if m >= 12 || m < 0 {
-			mut adj := m / 12
-			m %= 12
-			if m < 0 {
-				adj--
-				m += 12
-			}
-			y += adj
-		}
-		mut t := unixYearToSeconds(y, leap)
-		t += unixMonthToSeconds(m, leap)
-		t += day * i64(self.Day-1)
-		t += hour * i64(self.Hour)
-		t += 60 * i64(self.Minute)
-		t += i64(self.Second)
-		ret t
+		ret absUnix(i64(self.Year), i64(self.Month), i64(self.Day),
+			i64(self.Hour), i64(self.Minute), i64(self.Second))
 	}
 }

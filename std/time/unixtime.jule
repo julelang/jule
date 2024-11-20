@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-const hour = 3600
-const day = hour * 24
+const secPerHour = 3600
+const secPerDay = secPerHour * 24
 
 const unixYearOffset = 1900 // unix-year offset by today
 const unixMonthOffset = 1   // unix-month offset by today
@@ -18,7 +18,7 @@ const daysPer4Y = daysPerY*4 + 1
 
 // 2000-03-01 (mod 400 year, immediately after feb29
 const _2000_03_01 = 946684800
-const modApoch = _2000_03_01 + day*(31+29)
+const modApoch = _2000_03_01 + secPerDay*(31+29)
 
 // Days in month.
 static mdays: [...]i64 = [31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29]
@@ -26,10 +26,10 @@ static mdays: [...]i64 = [31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29]
 // Returns new absolute time by Unix time without nanoseconds.
 fn UnixAbs(sec: i64): AbsTime {
 	secs := sec - modApoch
-	mut days := secs / day
-	mut remSecs := secs % day
+	mut days := secs / secPerDay
+	mut remSecs := secs % secPerDay
 	if remSecs < 0 {
-		remSecs += day
+		remSecs += secPerDay
 		days--
 	}
 
@@ -87,98 +87,82 @@ fn UnixAbs(sec: i64): AbsTime {
 		at.WeekDay += 7
 	}
 	at.YearDay = int(yDay)
-	at.Hour = int(remSecs / hour)
+	at.Hour = int(remSecs / secPerHour)
 	at.Minute = int(remSecs / 60 % 60)
 	at.Second = int(remSecs % 60)
 	ret at
 }
 
-fn unixYearToSeconds(y: int, mut &leap: bool): i64 {
-	if y-2 <= 136 {
-		mut leaps := (y - 68) >> 2
-		leap = (y-68)&3 == 0
-		if leap {
-			leaps--
-		}
-		ret i64(31536000*(y-70) + day*leaps)
-	}
-
-	mut leaps := int(0)
-	mut centuries := int(0)
-	mut cycles := (y - 100) / 400
-	mut rem := (y - 100) % 400
-	if rem < 0 {
-		cycles--
-		rem += 400
-	}
-	if rem == 0 {
-		leap = true
-		centuries = 0
-		leaps = 0
-	} else {
-		if rem >= 200 {
-			if rem >= 300 {
-				centuries = 3
-				rem -= 300
-			} else {
-				centuries = 2
-				rem -= 200
-			}
-		} else {
-			if rem >= 100 {
-				centuries = 1
-				rem -= 100
-			} else {
-				centuries = 0
-			}
-		}
-		if rem == 0 {
-			leap = false
-			leaps = 0
-		} else {
-			leaps = rem / 4
-			rem %= 4
-			leap = rem == 0
-		}
-	}
-
-	leaps += 97*cycles + 24*centuries
-	if leap {
-		leaps++
-	}
-
-	ret i64((y-100)*31536000 + leaps*day + 946684800 + day)
+fn isLeap(year: i64): bool {
+	ret year%4 == 0 && (year%100 != 0 || year%400 == 0)
 }
 
-fn unixMonthToSeconds(m: int, leap: bool): i64 {
-	// Set seconds through month.
-	mut t := i64(0)
-	match m {
-	| 1:
-		t = 31 * day
-	| 2:
-		t = 59 * day
-	| 3:
-		t = 90 * day
-	| 4:
-		t = 120 * day
-	| 5:
-		t = 151 * day
-	| 6:
-		t = 181 * day
-	| 7:
-		t = 212 * day
-	| 8:
-		t = 243 * day
-	| 9:
-		t = 273 * day
-	| 10:
-		t = 304 * day
-	| 11:
-		t = 334 * day
+// Takes a year and returns the number of days from
+// the absolute epoch to the start of that year.
+// This is basically (year - zeroYear) * 365, but accounting for leap days.
+fn daysSinceEpoch(year: i64): u64 {
+	mut y := u64(year - absoluteZeroYear)
+
+	// Add in days from 400-year cycles.
+	mut n := y / 400
+	y -= 400 * n
+	mut d := daysPer400Y * n
+
+	// Add in 100-year cycles.
+	n = y / 100
+	y -= 100 * n
+	d += daysPer100Y * n
+
+	// Add in 4-year cycles.
+	n = y / 4
+	y -= 4 * n
+	d += daysPer4Y * n
+
+	// Add in non-leap years.
+	n = y
+	d += 365 * n
+
+	ret d
+}
+
+// daysBefore[m] counts the number of days in a non-leap year
+// before month m begins. There is an entry for m=12, counting
+// the number of days before January of next year (365).
+static daysBefore: [...]i32 = [
+	0,
+	31,
+	31 + 28,
+	31 + 28 + 31,
+	31 + 28 + 31 + 30,
+	31 + 28 + 31 + 30 + 31,
+	31 + 28 + 31 + 30 + 31 + 30,
+	31 + 28 + 31 + 30 + 31 + 30 + 31,
+	31 + 28 + 31 + 30 + 31 + 30 + 31 + 31,
+	31 + 28 + 31 + 30 + 31 + 30 + 31 + 31 + 30,
+	31 + 28 + 31 + 30 + 31 + 30 + 31 + 31 + 30 + 31,
+	31 + 28 + 31 + 30 + 31 + 30 + 31 + 31 + 30 + 31 + 30,
+	31 + 28 + 31 + 30 + 31 + 30 + 31 + 31 + 30 + 31 + 30 + 31,
+]
+
+// Returns absolute time as Unix time.
+fn absUnix(mut year: i64, mut month: i64, mut day: i64,
+	mut hour: i64, mut minute: i64, mut second: i64): i64 {
+	// Compute days since the absolute epoch.
+	mut d := daysSinceEpoch(year)
+
+	// Add in days before this month.
+	d += u64(daysBefore[month-1])
+	if isLeap(year) && month >= 3 {
+		d++ // February 29
 	}
-	if leap && m >= 2 {
-		t += day
-	}
-	ret t
+
+	// Add in days before today.
+	d += u64(day - 1)
+
+	// Add in time elapsed today.
+	mut abs := d * secPerDay
+	abs += u64(hour*secPerHour + minute*60 + second)
+
+	unix := i64(abs) + absoluteToUnix
+	ret unix
 }
