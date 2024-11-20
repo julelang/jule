@@ -27,27 +27,44 @@ static unixAbsTests = []unixTest([
 	{-125253072662, {Year: -2000, Month: 11, Day: 20, Hour: 15, Minute: 48, Second: 58}},
 ])
 
+fn absEqual(a1: AbsTime, a2: AbsTime): bool {
+	ret a1.Year == a2.Year &&
+		a1.Month == a2.Month &&
+		a1.Day == a2.Day &&
+		a1.Hour == a2.Hour &&
+		a1.Minute == a2.Minute &&
+		a1.Second == a2.Second
+}
+
+#test
+fn testUnix(t: &testing::T) {
+	for i, test in unixAbsTests {
+		time := Unix(test.sec, 0)
+		unixtime := time.Unix()
+		if unixtime != test.sec || !absEqual(UnixAbs(unixtime), test.abs) {
+			t.Errorf("#{} conversion failed", i)
+			continue
+		}
+	}
+}
+
 #test
 fn testUnixAbs(t: &testing::T) {
 	for i, test in unixAbsTests {
 		abs := UnixAbs(test.sec)
-		if abs.Year != test.abs.Year ||
-			abs.Month != test.abs.Month ||
-			abs.Day != test.abs.Day ||
-			abs.Hour != test.abs.Hour ||
-			abs.Minute != test.abs.Minute ||
-			abs.Second != test.abs.Second {
+		if !absEqual(abs, test.abs) {
 			t.Errorf("#{} conversion failed", i)
 		}
 	}
 }
 
 #test
-fn testAbsUnix(t: &testing::T) {
+fn testDate(t: &testing::T) {
 	for i, test in unixAbsTests {
-		unixtime := test.abs.Unix()
-		if unixtime != test.sec {
-		println(unixtime)
+		unixtime := Date(
+			test.abs.Year, test.abs.Month, test.abs.Day,
+			test.abs.Hour, test.abs.Minute, test.abs.Second, 0)
+		if unixtime.Unix() != test.sec {
 			t.Errorf("#{} conversion failed", i)
 		}
 	}

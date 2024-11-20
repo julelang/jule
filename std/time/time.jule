@@ -24,7 +24,7 @@ struct Time {
 }
 
 impl Time {
-	// Returns time in Unix time, nanoseconds will be ignored.
+	// Returns time in Unix time.
 	fn Unix(self): i64 {
 		ret self.sec
 	}
@@ -37,11 +37,18 @@ fn Now(): Time {
 }
 
 // Returns new time by Unix time with nanoseconds.
-// It is not valid to pass nanoseconds outside the range (0, 999999999).
-// Any invalid range will cause panic.
-fn Unix(sec: i64, nsec: i64): Time {
+// It is valid to pass nsec outside the range (0, 999999999).
+// Not all sec values have a corresponding time value. One such
+// value is 1<<63-1 (the largest i64 value).
+fn Unix(mut sec: i64, mut nsec: i64): Time {
 	if nsec < 0 || nsec >= 1e9 {
-		panic("std/time: Unix: invalid nanoseconds range")
+		n := nsec / 1e9
+		sec += n
+		nsec -= n * 1e9
+		if nsec < 0 {
+			nsec += 1e9
+			sec--
+		}
 	}
 	ret Time{sec: sec, nsec: nsec}
 }
@@ -58,10 +65,211 @@ struct AbsTime {
 	Hour:    int
 }
 
-impl AbsTime {
-	// Returns absolute time in Unix time.
-	fn Unix(self): i64 {
-		ret absUnix(i64(self.Year), i64(self.Month), i64(self.Day),
-			i64(self.Hour), i64(self.Minute), i64(self.Second))
+const secPerHour = 3600
+const secPerDay = secPerHour * 24
+
+const unixYearOffset = 1900 // unix-year offset by today
+const unixMonthOffset = 1   // unix-month offset by today
+
+const nsecPerMsec = 1000000
+const nsecPerSec = nsecPerMsec * msecPerSec
+const msecPerSec = 1000
+const daysPerY = 365
+const daysPer400Y = daysPerY*400 + 97
+const daysPer100Y = daysPerY*100 + 24
+const daysPer4Y = daysPerY*4 + 1
+
+// 2000-03-01 (mod 400 year, immediately after feb29
+const _2000_03_01 = 946684800
+const modApoch = _2000_03_01 + secPerDay*(31+29)
+
+// Days in month.
+static mdays: [...]i64 = [31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29]
+
+// Returns new absolute time by Unix time without nanoseconds.
+fn UnixAbs(sec: i64): AbsTime {
+	secs := sec - modApoch
+	mut days := secs / secPerDay
+	mut remSecs := secs % secPerDay
+	if remSecs < 0 {
+		remSecs += secPerDay
+		days--
 	}
+
+	mut qcCycles := days / daysPer400Y
+	mut remDays := days % daysPer400Y
+	if remDays < 0 {
+		remDays += daysPer400Y
+		qcCycles--
+	}
+
+	mut cCycles := remDays / daysPer100Y
+	if cCycles == 4 {
+		cCycles--
+	}
+	remDays -= cCycles * daysPer100Y
+
+	mut qCycles := remDays / daysPer4Y
+	if qCycles == 25 {
+		qCycles--
+	}
+	remDays -= qCycles * daysPer4Y
+
+	mut remYears := remDays / daysPerY
+	if remYears == 4 {
+		remYears--
+	}
+	remDays -= remYears * daysPerY
+
+	mut leap := i64(0)
+	if remYears == 0 && (qCycles > 0 || cCycles == 0) {
+		leap = 1
+	}
+	mut yDay := remDays + 31 + 28 + leap
+	if yDay >= daysPerY+leap {
+		yDay -= daysPerY + leap
+	}
+
+	mut months := u64(0)
+	for mdays[months] <= remDays; months++ {
+		remDays -= mdays[months]
+	}
+
+	mut at := AbsTime{}
+	at.Year = int(remYears + 4*qCycles + 100*cCycles + 400*qcCycles + 100)
+	at.Month = int(months + 2)
+	if at.Month >= 12 {
+		at.Month -= 12
+		at.Year++
+	}
+	at.Month += unixMonthOffset
+	at.Year += unixYearOffset
+	at.Day = int(remDays + 1)
+	at.WeekDay = int((3 + days) % 7)
+	if at.WeekDay <= 0 {
+		at.WeekDay += 7
+	}
+	at.YearDay = int(yDay)
+	at.Hour = int(remSecs / secPerHour)
+	at.Minute = int(remSecs / 60 % 60)
+	at.Second = int(remSecs % 60)
+	ret at
+}
+
+fn isLeap(year: int): bool {
+	ret year%4 == 0 && (year%100 != 0 || year%400 == 0)
+}
+
+// Takes a year and returns the number of days from
+// the absolute epoch to the start of that year.
+// This is basically (year - zeroYear) * 365, but accounting for leap days.
+fn daysSinceEpoch(year: int): u64 {
+	mut y := u64(i64(year) - absoluteZeroYear)
+
+	// Add in days from 400-year cycles.
+	mut n := y / 400
+	y -= 400 * n
+	mut d := daysPer400Y * n
+
+	// Add in 100-year cycles.
+	n = y / 100
+	y -= 100 * n
+	d += daysPer100Y * n
+
+	// Add in 4-year cycles.
+	n = y / 4
+	y -= 4 * n
+	d += daysPer4Y * n
+
+	// Add in non-leap years.
+	n = y
+	d += 365 * n
+
+	ret d
+}
+
+fn norm(mut hi: int, mut lo: int, base: int): (nhi: int, nlo: int) {
+	if lo < 0 {
+		n := (-lo-1)/base + 1
+		hi -= n
+		lo += n * base
+	}
+	if lo >= base {
+		n := lo / base
+		hi += n
+		lo -= n * base
+	}
+	ret hi, lo
+}
+
+// daysBefore[m] counts the number of days in a non-leap year
+// before month m begins. There is an entry for m=12, counting
+// the number of days before January of next year (365).
+static daysBefore: [...]i32 = [
+	0,
+	31,
+	31 + 28,
+	31 + 28 + 31,
+	31 + 28 + 31 + 30,
+	31 + 28 + 31 + 30 + 31,
+	31 + 28 + 31 + 30 + 31 + 30,
+	31 + 28 + 31 + 30 + 31 + 30 + 31,
+	31 + 28 + 31 + 30 + 31 + 30 + 31 + 31,
+	31 + 28 + 31 + 30 + 31 + 30 + 31 + 31 + 30,
+	31 + 28 + 31 + 30 + 31 + 30 + 31 + 31 + 30 + 31,
+	31 + 28 + 31 + 30 + 31 + 30 + 31 + 31 + 30 + 31 + 30,
+	31 + 28 + 31 + 30 + 31 + 30 + 31 + 31 + 30 + 31 + 30 + 31,
+]
+
+// Internal implementation of the Date function, but returns Unix time instead of Time.
+// It normalizes nsecond and updates its value. So remaining nanoseconds is
+// stored in nsecond after normalization.
+// See the Date function for public documentation.
+fn absUnix(mut year: int, mut month: int, mut day: int,
+	mut hour: int, mut minute: int, mut second: int, mut &nsecond: int): i64 {
+	// Normalize month, overflowing into year.
+	year, month = norm(year, month-1, 12)
+	month++ // Switch to [0, 12) range from (0, 12] range.
+
+	// Normalize nsecond, second, minute, hour, overflowing into day.
+	second, nsecond = norm(second, nsecond, 1e9)
+	minute, second := norm(minute, second, 60)
+	hour, minute = norm(hour, minute, 60)
+	day, hour = norm(day, hour, 24)
+
+	// Compute days since the absolute epoch.
+	mut d := daysSinceEpoch(year)
+
+	// Add in days before this month.
+	d += u64(daysBefore[month-1])
+	if isLeap(year) && month >= 3 {
+		d++ // February 29
+	}
+
+	// Add in days before today.
+	d += u64(day - 1)
+
+	// Add in time elapsed today.
+	mut abs := d * secPerDay
+	abs += u64(hour*secPerHour + minute*60 + second)
+
+	// Convert absolute time to Unix time.
+	unix := i64(abs) + absoluteToUnix
+	ret unix
+}
+
+// Returns the Time corresponding to
+//
+//  yyyy-mm-dd hh:mm:ss + nsec nanoseconds
+//
+// in the appropriate zone for that time in the given location.
+//
+// The month, day, hour, minute, second, and nsecond values may be outside
+// their usual ranges and will be normalized during the conversion.
+// For example, October 32 converts to November 1.
+fn Date(year: int, month: int, day: int,
+	hour: int, minute: int, second: int, nsecond: int): (t: Time) {
+	t.sec = absUnix(year, month, day, hour, minute, second, unsafe { *(&nsecond) })
+	t.nsec = i64(nsecond)
+	ret t
 }
