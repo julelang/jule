@@ -11,10 +11,10 @@ use "std/runtime"
 const absoluteZeroYear = -292277022399
 
 // Offsets to convert between internal and absolute or Unix times.
-const absoluteToUnix = -9223372028715321600
+const absoluteToUnix = -9223372028741760000
 
 // Offsets to convert between Unix time and absolute times.
-const unixToAbsolute = 9223372028715321600
+const unixToAbsolute = 9223372028741760000
 
 // Specifies a month of the year (January = 1, ...).
 type Month: int
@@ -138,42 +138,49 @@ impl Time {
 		ret u64(sec + unixToAbsolute)
 	}
 
+	fn absSec(self): absSeconds {
+		ret absSeconds(self.abs())
+	}
+
 	// Returns the year of the time.
 	fn Year(self): int {
-		year, _, _, _ := absDate(self.abs(), false)
-		ret year
+		century, cyear, ayday := self.absSec().days().split()
+		janFeb := ayday.janFeb()
+		ret century.year(cyear, janFeb)
 	}
 
 	// Returns the month of the year specified by the time.
 	fn Month(self): Month {
-		_, month, _, _ := absDate(self.abs(), true)
-		ret month
+		_, _, ayday := self.absSec().days().split()
+		amonth, _ := ayday.split()
+		ret amonth.month(ayday.janFeb())
 	}
 
 	// Returns the day of the month specified by the time.
 	fn Day(self): int {
-		_, _, day, _ := absDate(self.abs(), true)
+		_, _, ayday := self.absSec().days().split()
+		_, day := ayday.split()
 		ret day
 	}
 
 	// Returns the day of the week specified by the time.
 	fn Weekday(self): Weekday {
-		ret absWeekday(self.abs())
+		ret self.absSec().days().weekday()
 	}
 
 	// Returns the hour within the day specified by the time, in the range [0, 23].
 	fn Hour(self): int {
-		ret int(self.abs()%secPerDay) / secPerHour
+		ret int(self.absSec()%secPerDay) / secPerHour
 	}
 
 	// Returns the second offset within the minute specified by the time, in the range [0, 59].
 	fn Second(self): int {
-		ret int(self.abs() % secPerMinute)
+		ret int(self.absSec() % secPerMinute)
 	}
 
 	// Returns the minute offset within the hour specified by the time, in the range [0, 59].
 	fn Minute(self): int {
-		ret int(self.abs()%secPerHour) / secPerMinute
+		ret int(self.absSec()%secPerHour) / secPerMinute
 	}
 
 	// Returns the nanosecond offset within the second specified by the time,
@@ -184,13 +191,12 @@ impl Time {
 
 	// Returns the year, month, and day of the time.
 	fn Date(self): (year: int, month: Month, day: int) {
-		year, month, day, _ = absDate(self.abs(), true)
-		ret
+		ret self.absSec().days().date()
 	}
 
 	// Returns the hour, minute, and second of the time.
 	fn Clock(self): (hour: int, minute: int, second: int) {
-		ret absClock(self.abs())
+		ret self.absSec().clock()
 	}
 
 	// Returns the ISO 8601 year and week number of the time.
@@ -208,105 +214,11 @@ impl Time {
 		// 1      2       3         4        5      6        7
 		// +3     +2      +1        0        -1     -2       -3
 		// the offset to Thursday
-		mut abs := self.abs()
-		mut d := Thursday - absWeekday(abs)
-		// handle Sunday
-		if d == 4 {
-			d = -3
-		}
-		// find the Thursday of the calendar week
-		abs += u64(d) * secPerDay
-		year, _, _, yday := absDate(abs, false)
-		ret year, yday/7 + 1
+		days := self.absSec().days()
+		thu := days + absDays(Thursday-((days-1).weekday()+1))
+		year, yday := thu.yearYday()
+		ret year, (yday-1)/7 + 1
 	}
-}
-
-fn absClock(abs: u64): (hour: int, minute: int, second: int) {
-	second = int(abs % secPerDay)
-	hour = second / secPerHour
-	second -= hour * secPerHour
-	minute = second / secPerMinute
-	second -= minute * secPerMinute
-	ret
-}
-
-fn absWeekday(abs: u64): Weekday {
-	// January 1 of the absolute year, like January 1 of 2001, was a Monday.
-	sec := (abs + u64(Monday)*secPerDay) % secPerWeek
-	ret Weekday(int(sec) / secPerDay)
-}
-
-fn absDate(abs: u64, full: bool): (year: int, month: Month, day: int, yday: int) {
-	// Split into time and day.
-	mut d := abs / secPerDay
-
-	// Account for 400 year cycles.
-	mut n := d / daysPer400Y
-	mut y := 400 * n
-	d -= daysPer400Y * n
-
-	// Cut off 100-year cycles.
-	// The last cycle has one extra leap year, so on the last day
-	// of that year, day / daysPer100Y will be 4 instead of 3.
-	// Cut it back down to 3 by subtracting n>>2.
-	n = d / daysPer100Y
-	n -= n >> 2
-	y += 100 * n
-	d -= daysPer100Y * n
-
-	// Cut off 4-year cycles.
-	// The last cycle has a missing leap year, which does not
-	// affect the computation.
-	n = d / daysPer4Y
-	y += 4 * n
-	d -= daysPer4Y * n
-
-	// Cut off years within a 4-year cycle.
-	// The last year is a leap year, so on the last day of that year,
-	// day / 365 will be 4 instead of 3. Cut it back down to 3
-	// by subtracting n>>2.
-	n = d / 365
-	n -= n >> 2
-	y += n
-	d -= 365 * n
-
-	year = int(i64(y) + absoluteZeroYear)
-	yday = int(d)
-
-	if !full {
-		ret
-	}
-
-	day = yday
-	if isLeap(year) {
-		// Leap year
-		match {
-		| day > 31+29-1:
-			// After leap day; pretend it wasn't there.
-			day--
-		| day == 31+29-1:
-			// Leap day.
-			month = February
-			day = 29
-			ret
-		}
-	}
-
-	// Estimate month on assumption that every month has 31 days.
-	// The estimate may be too low by at most one month, so adjust.
-	month = Month(day / 31)
-	end := int(_daysBefore[month+1])
-	mut begin := 0
-	if day >= end {
-		month++
-		begin = end
-	} else {
-		begin = int(_daysBefore[month])
-	}
-
-	month++ // because January is 1
-	day = day - begin + 1
-	ret
 }
 
 // Returns the current system-time UTC.
@@ -358,11 +270,15 @@ const daysPer4Y = daysPerY*4 + 1
 // Returns new absolute time by Unix time without nanoseconds.
 // Seconds since January 1, 1970 UTC.
 fn UnixAbs(sec: i64): AbsTime {
-	abs := u64(sec) + unixToAbsolute
+	abs := absSeconds(u64(sec) + unixToAbsolute)
+	days := abs.days()
 	mut t := AbsTime{}
-	t.Year, t.Month, t.Day, t.YearDay = absDate(abs, true)
-	t.Weekday = absWeekday(abs)
-	t.Hour, t.Minute, t.Second = absClock(abs)
+	t.Year, t.YearDay = days.yearYday()
+	_, _, ayday := days.split()
+	amonth, (t.Day) := ayday.split()
+	t.Month = amonth.month(ayday.janFeb())
+	t.Weekday = days.weekday()
+	t.Hour, t.Minute, t.Second = abs.clock()
 	ret t
 }
 
@@ -370,32 +286,45 @@ fn isLeap(year: int): bool {
 	ret year%4 == 0 && (year%100 != 0 || year%400 == 0)
 }
 
-// Takes a year and returns the number of days from
-// the absolute epoch to the start of that year.
-// This is basically (year - zeroYear) * 365, but accounting for leap days.
-fn daysSinceEpoch(year: int): u64 {
-	mut y := u64(i64(year) - absoluteZeroYear)
+// Takes a standard year/month/day and returns the
+// number of days from the absolute epoch to that day.
+// The days argument can be out of range and in particular can be negative.
+fn dateToAbsDays(year: i64, month: Month, day: int): absDays {
+	// See “Computations on Times” comment above.
+	mut amonth := u32(month)
+	mut janFeb := u32(0)
+	if amonth < 3 {
+		janFeb = 1
+	}
+	amonth += 12 * janFeb
+	y := u64(year) - u64(janFeb) + absoluteYears
 
-	// Add in days from 400-year cycles.
-	mut n := y / 400
-	y -= 400 * n
-	mut d := daysPer400Y * n
+	// For amonth is in the range [3,14], we want:
+	//
+	//	ayday := (153*amonth - 457) / 5
+	//
+	// (See the “Computations on Times” comment above
+	// as well as Neri and Schneider, section 7.)
+	//
+	// That is equivalent to:
+	//
+	//	ayday := (979*amonth - 2919) >> 5
+	//
+	// and the latter form uses a couple fewer instructions,
+	// so use it, saving a few cycles.
+	// See Neri and Schneider, section 8.3
+	// for more about this optimization.
+	//
+	// (Note that there is no saved division, because the compiler
+	// implements / 5 without division in all cases.)
+	ayday := (979*amonth - 2919) >> 5
 
-	// Add in 100-year cycles.
-	n = y / 100
-	y -= 100 * n
-	d += daysPer100Y * n
+	century := y / 100
+	cyear := u32(y % 100)
+	cday := 1461 * cyear / 4
+	centurydays := 146097 * century / 4
 
-	// Add in 4-year cycles.
-	n = y / 4
-	y -= 4 * n
-	d += daysPer4Y * n
-
-	// Add in non-leap years.
-	n = y
-	d += 365 * n
-
-	ret d
+	ret absDays(centurydays + u64(i64(cday+ayday)+i64(day)-1))
 }
 
 fn norm(mut hi: int, mut lo: int, base: int): (nhi: int, nlo: int) {
@@ -411,25 +340,6 @@ fn norm(mut hi: int, mut lo: int, base: int): (nhi: int, nlo: int) {
 	}
 	ret hi, lo
 }
-
-// _daysBefore[m] counts the number of days in a non-leap year
-// before month m begins. There is an entry for m=12, counting
-// the number of days before January of next year (365).
-static _daysBefore: [...]i32 = [
-	0,
-	31,
-	31 + 28,
-	31 + 28 + 31,
-	31 + 28 + 31 + 30,
-	31 + 28 + 31 + 30 + 31,
-	31 + 28 + 31 + 30 + 31 + 30,
-	31 + 28 + 31 + 30 + 31 + 30 + 31,
-	31 + 28 + 31 + 30 + 31 + 30 + 31 + 31,
-	31 + 28 + 31 + 30 + 31 + 30 + 31 + 31 + 30,
-	31 + 28 + 31 + 30 + 31 + 30 + 31 + 31 + 30 + 31,
-	31 + 28 + 31 + 30 + 31 + 30 + 31 + 31 + 30 + 31 + 30,
-	31 + 28 + 31 + 30 + 31 + 30 + 31 + 31 + 30 + 31 + 30 + 31,
-]
 
 // Internal implementation of the Date function, but returns Unix time instead of Time.
 // It normalizes nsecond and updates its value. So remaining nanoseconds is
@@ -448,24 +358,10 @@ fn absUnix(mut year: int, mut month: Month, mut day: int,
 	hour, minute = norm(hour, minute, 60)
 	day, hour = norm(day, hour, 24)
 
-	// Compute days since the absolute epoch.
-	mut d := daysSinceEpoch(year)
-
-	// Add in days before this month.
-	d += u64(_daysBefore[month-1])
-	if isLeap(year) && month >= March {
-		d++ // February 29
-	}
-
-	// Add in days before today.
-	d += u64(day - 1)
-
-	// Add in time elapsed today.
-	mut abs := d * secPerDay
-	abs += u64(hour*secPerHour + minute*60 + second)
-
-	// Convert absolute time to Unix time.
-	mut unix := i64(abs) + absoluteToUnix
+	// Convert to absolute time and then Unix time.
+	mut unix := i64(dateToAbsDays(i64(year), month, day))*secPerDay +
+		i64(hour*secPerHour+minute*secPerMinute+second) +
+		absoluteToUnix
 
 	// Look for zone offset for expected time, so we can adjust to UTC.
 	// The lookup function expects UTC, so first we pass unix in the
@@ -550,6 +446,15 @@ impl absSeconds {
 	fn days(self): absDays {
 		ret absDays(self / secPerDay)
 	}
+
+	fn clock(self): (hour: int, minute: int, second: int) {
+		second = int(self % secPerDay)
+		hour = second / secPerHour
+		second -= hour * secPerHour
+		minute = second / secPerMinute
+		second -= minute * secPerMinute
+		ret
+	}
 }
 
 impl absDays {
@@ -599,6 +504,30 @@ impl absDays {
 		yday = ayday.yday(janFeb, century.leap(cyear))
 		ret
 	}
+
+	// Converts days into standard year, month, day.
+	fn date(self): (year: int, month: Month, day: int) {
+		century, cyear, ayday := self.split()
+		amonth, day := ayday.split()
+		janFeb := ayday.janFeb()
+		year = century.year(cyear, janFeb)
+		month = amonth.month(janFeb)
+		ret
+	}
+
+	// Returns the day of the week specified by days.
+	fn weekday(self): Weekday {
+		// March 1 of the absolute year, like March 1 of 2000, was a Wednesday.
+		ret Weekday((u64(self) + u64(Wednesday)) % 7)
+	}
+}
+
+impl absMonth {
+	// Returns the standard Month for (m, janFeb).
+	fn month(self, janFeb: absJanFeb): Month {
+		// See “Computations on Times” comment above.
+		ret Month(self) - Month(janFeb)*12
+	}
 }
 
 impl absCentury {
@@ -642,5 +571,25 @@ impl absYday {
 	fn yday(self, janFeb: absJanFeb, leap: absLeap): int {
 		// See “Computations on Times” comment above.
 		ret int(self) + (1 + 31 + 28) + int(leap)&^int(janFeb) - 365*int(janFeb)
+	}
+
+	// Splits ayday into absolute month and standard (1-based) day-in-month.
+	fn split(self): (m: absMonth, mday: int) {
+		// See “Computations on Times” comment above.
+		//
+		// For yday in the range [0,366],
+		//
+		//	amonth := (5 yday + 461) / 153
+		//	mday := (5 yday + 461) % 153 / 5
+		//
+		// is equivalent to:
+		//
+		//	amonth = (2141 yday + 197913) >> 16
+		//	mday = (2141 yday + 197913) & 0xFFFF / 2141
+		//
+		// so do that instead, saving a few cycles.
+		// See Neri and Schneider, section 8.3.
+		d := 2141*u32(self) + 197913
+		ret absMonth(d >> 16), 1 + int((d&0xFFFF)/2141)
 	}
 }
