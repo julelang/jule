@@ -23,7 +23,7 @@ const unixToAbsolute = 9223372028715321600
 // equivalent to Wed Dec 31 1969 23:59:50 UTC+0000.
 struct Time {
 	sec:  i64
-	nsec: i64
+	nsec: i32 // In the range [0, 999999999].
 }
 
 impl Time {
@@ -70,6 +70,12 @@ impl Time {
 	// Returns the minute offset within the hour specified by the time, in the range [0, 59].
 	fn Minute(self): int {
 		ret int(self.abs()%secPerHour) / secPerMinute
+	}
+
+	// Returns the nanosecond offset within the second specified by the time,
+	// in the range [0, 999999999].
+	fn Nanosecond(self): int {
+		ret int(self.nsec)
 	}
 
 	// Returns the year, month, and day of the time.
@@ -175,7 +181,7 @@ fn absDate(abs: u64, full: bool): (year: int, month: int, day: int, yday: int) {
 // Returns the current system time with UTC local.
 fn Now(): Time {
 	sec, nsec := runtime::timeNow()
-	ret Time{sec: sec, nsec: nsec}
+	ret Time{sec: sec, nsec: i32(nsec)}
 }
 
 // Returns new time by Unix time with nanoseconds.
@@ -192,7 +198,7 @@ fn Unix(mut sec: i64, mut nsec: i64): Time {
 			sec--
 		}
 	}
-	ret Time{sec: sec, nsec: nsec}
+	ret Time{sec: sec, nsec: i32(nsec)}
 }
 
 // Absolute time.
@@ -341,6 +347,6 @@ fn absUnix(mut year: int, mut month: int, mut day: int,
 fn Date(year: int, month: int, day: int,
 	hour: int, minute: int, second: int, nsecond: int): (t: Time) {
 	t.sec = absUnix(year, month, day, hour, minute, second, unsafe { *(&nsecond) })
-	t.nsec = i64(nsecond)
+	t.nsec = i32(nsecond)
 	ret t
 }
