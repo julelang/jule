@@ -15,6 +15,22 @@ const absoluteToUnix = -9223372028715321600
 // Offsets to convert between Unix time and absolute times.
 const unixToAbsolute = 9223372028715321600
 
+// Specifies a month of the year (January = 1, ...).
+type Month: int
+
+const January = Month(1)
+const February = Month(2)
+const March = Month(3)
+const April = Month(4)
+const May = Month(5)
+const June = Month(6)
+const July = Month(7)
+const August = Month(8)
+const September = Month(9)
+const October = Month(10)
+const November = Month(11)
+const December = Month(12)
+
 // A Time represents an instant in time with nanosecond precision.
 //
 // Zero-value indicates the beginning of Unix time, i.e. zero seconds.
@@ -46,7 +62,7 @@ impl Time {
 	}
 
 	// Returns the month of the year specified by the time.
-	fn Month(self): int {
+	fn Month(self): Month {
 		_, month, _, _ := absDate(self.abs(), true)
 		ret month
 	}
@@ -84,7 +100,7 @@ impl Time {
 	}
 
 	// Returns the year, month, and day of the time.
-	fn Date(self): (year: int, month: int, day: int) {
+	fn Date(self): (year: int, month: Month, day: int) {
 		year, month, day, _ = absDate(self.abs(), true)
 		ret
 	}
@@ -110,7 +126,7 @@ fn absWeekday(abs: u64): int {
 	ret int(sec) / secPerDay
 }
 
-fn absDate(abs: u64, full: bool): (year: int, month: int, day: int, yday: int) {
+fn absDate(abs: u64, full: bool): (year: int, month: Month, day: int, yday: int) {
 	// Split into time and day.
 	mut d := abs / secPerDay
 
@@ -160,7 +176,7 @@ fn absDate(abs: u64, full: bool): (year: int, month: int, day: int, yday: int) {
 			day--
 		| day == 31+29-1:
 			// Leap day.
-			month = 2
+			month = February
 			day = 29
 			ret
 		}
@@ -168,7 +184,7 @@ fn absDate(abs: u64, full: bool): (year: int, month: int, day: int, yday: int) {
 
 	// Estimate month on assumption that every month has 31 days.
 	// The estimate may be too low by at most one month, so adjust.
-	month = day / 31
+	month = Month(day / 31)
 	end := int(daysBefore[month+1])
 	mut begin := 0
 	if day >= end {
@@ -211,7 +227,7 @@ struct AbsTime {
 	Day:     int
 	Weekday: int
 	YearDay: int
-	Month:   int
+	Month:   Month
 	Year:    int
 	Second:  int
 	Minute:  int
@@ -307,11 +323,12 @@ static daysBefore: [...]i32 = [
 // It normalizes nsecond and updates its value. So remaining nanoseconds is
 // stored in nsecond after normalization.
 // See the Date function for public documentation.
-fn absUnix(mut year: int, mut month: int, mut day: int,
+fn absUnix(mut year: int, mut month: Month, mut day: int,
 	mut hour: int, mut minute: int, mut second: int, mut &nsecond: int): i64 {
 	// Normalize month, overflowing into year.
-	year, month = norm(year, month-1, 12)
-	month++ // Switch to [0, 12) range from (0, 12] range.
+	mut m := int(month - 1)
+	year, m = norm(year, m, 12)
+	month = Month(m + 1) // Switch to [0, 12) range from (0, 12] range.
 
 	// Normalize nsecond, second, minute, hour, overflowing into day.
 	second, nsecond = norm(second, nsecond, 1e9)
@@ -324,7 +341,7 @@ fn absUnix(mut year: int, mut month: int, mut day: int,
 
 	// Add in days before this month.
 	d += u64(daysBefore[month-1])
-	if isLeap(year) && month >= 3 {
+	if isLeap(year) && month >= March {
 		d++ // February 29
 	}
 
@@ -349,7 +366,7 @@ fn absUnix(mut year: int, mut month: int, mut day: int,
 // The month, day, hour, minute, second, and nsecond values may be outside
 // their usual ranges and will be normalized during the conversion.
 // For example, October 32 converts to November 1.
-fn Date(year: int, month: int, day: int,
+fn Date(year: int, month: Month, day: int,
 	hour: int, minute: int, second: int, nsecond: int): (t: Time) {
 	t.sec = absUnix(year, month, day, hour, minute, second, unsafe { *(&nsecond) })
 	t.nsec = i32(nsecond)
