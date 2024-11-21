@@ -1,0 +1,48 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use integ "std/jule/integrated"
+use "std/sys"
+
+fn open(name: str): (uintptr, ok: bool) {
+	sName := integ::StrToBytes(name)
+	fd := unsafe { sys::Open(&sName[0], sys::O_RDONLY, 0) }
+	if fd == -1 {
+		ret 0, false
+	}
+	ret uintptr(fd), true
+}
+
+fn read(fd: uintptr, mut buf: []byte): (n: int, ok: bool) {
+	if len(buf) == 0 {
+		// If the caller wanted a zero byte read, return immediately
+		// without trying to read.
+		ret 0, true
+	}
+	n = unsafe { sys::Read(int(fd), &buf[0], uint(len(buf))) }
+	ok = n != -1
+	ret
+}
+
+fn preadn(fd: uintptr, mut buf: []byte, off: int): (ok: bool) {
+	mut whence := seekStart
+	if off < 0 {
+		whence = seekEnd
+	}
+	if sys::Seek(int(fd), off, whence) == -1 {
+		ret false
+	}
+	for len(buf) > 0 {
+		m := unsafe { sys::Read(int(fd), &buf[0], uint(len(buf))) }
+		if m <= 0 {
+			ret false
+		}
+		buf = buf[m:]
+	}
+	ret true
+}
+
+fn closefd(fd: uintptr) {
+	sys::Close(int(fd))
+}

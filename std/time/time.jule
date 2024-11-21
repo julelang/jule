@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/math/bits"
 use "std/runtime"
 
 // The unsigned zero year for internal Unix time calculations.
@@ -31,6 +32,41 @@ const October = Month(10)
 const November = Month(11)
 const December = Month(12)
 
+fn daysIn(m: Month, year: int): int {
+	if m == February {
+		if isLeap(year) {
+			ret 29
+		}
+		ret 28
+	}
+	// With the special case of February eliminated, the pattern is
+	//	31 30 31 30 31 30 31 31 30 31 30 31
+	// Adding m&1 produces the basic alternation;
+	// adding (m>>3)&1 inverts the alternation starting in August.
+	ret 30 + int((m+m>>3)&1)
+}
+
+// daysBefore returns the number of days in a non-leap year before month m.
+// daysBefore(December+1) returns 365.
+fn daysBefore(m: Month): int {
+	mut adj := 0
+	if m >= March {
+		adj = -2
+	}
+
+	// With the -2 adjustment after February,
+	// we need to compute the running sum of:
+	//	0  31  30  31  30  31  30  31  31  30  31  30  31
+	// which is:
+	//	0  31  61  92 122 153 183 214 245 275 306 336 367
+	// This is almost exactly 367/12×(m-1) except for the
+	// occasonal off-by-one suggesting there may be an
+	// integer approximation of the form (a×m + b)/c.
+	// A brute force search over small a, b, c finds that
+	// (214×m - 211) / 7 computes the function perfectly.
+	ret (214*int(m)-211)/7 + adj
+}
+
 // Specifies a day of the week (Sunday = 0, ...).
 type Weekday: int
 
@@ -51,6 +87,8 @@ const Saturday = Weekday(6)
 struct Time {
 	sec:  i64
 	nsec: i32 // In the range [0, 999999999].
+
+	mut loc: &Location
 }
 
 impl Time {
@@ -59,10 +97,44 @@ impl Time {
 		ret self.sec
 	}
 
-	// Returns the time as an absolute time.
+	fn setLoc(mut self, mut &loc: Location) {
+		if &loc == &utcLoc {
+			self.loc = nil
+			ret
+		}
+		self.loc = unsafe { (&Location)(&loc) }
+	}
+
+	// Returns time with the location set to UTC.
+	fn UTC(self): Time {
+		mut t := self
+		t.setLoc(utcLoc)
+		ret t
+	}
+
+	// Returns time with the location set to local time.
+	fn Local(self): Time {
+		mut t := self
+		t.setLoc(localLoc)
+		ret t
+	}
+
+	// Returns the time as an absolute time, adjusted by the zone offset.
 	// It is called when computing a presentation property like Month or Hour.
 	fn abs(self): u64 {
-		sec := self.Unix()
+		mut l := self.loc
+		if l == nil || l == Local {
+			l = l.get()
+		}
+		mut sec := self.Unix()
+		if l != UTC {
+			if l.cacheZone != nil && l.cacheStart <= sec && sec < l.cacheEnd {
+				sec += i64(l.cacheZone.offset)
+			} else {
+				_, offset, _, _, _ := l.lookup(sec)
+				sec += i64(offset)
+			}
+		}
 		ret u64(sec + unixToAbsolute)
 	}
 
@@ -223,13 +295,13 @@ fn absDate(abs: u64, full: bool): (year: int, month: Month, day: int, yday: int)
 	// Estimate month on assumption that every month has 31 days.
 	// The estimate may be too low by at most one month, so adjust.
 	month = Month(day / 31)
-	end := int(daysBefore[month+1])
+	end := int(_daysBefore[month+1])
 	mut begin := 0
 	if day >= end {
 		month++
 		begin = end
 	} else {
-		begin = int(daysBefore[month])
+		begin = int(_daysBefore[month])
 	}
 
 	month++ // because January is 1
@@ -237,13 +309,14 @@ fn absDate(abs: u64, full: bool): (year: int, month: Month, day: int, yday: int)
 	ret
 }
 
-// Returns the current system time with UTC local.
+// Returns the current system-time UTC.
 fn Now(): Time {
 	sec, nsec := runtime::timeNow()
 	ret Time{sec: sec, nsec: i32(nsec)}
 }
 
 // Returns new time by Unix time with nanoseconds.
+// Seconds since January 1, 1970 UTC.
 // It is valid to pass nsec outside the range [0, 999999999].
 // Not all sec values have a corresponding time value. One such
 // value is 1<<63-1 (the largest i64 value).
@@ -283,6 +356,7 @@ const daysPer100Y = daysPerY*100 + 24
 const daysPer4Y = daysPerY*4 + 1
 
 // Returns new absolute time by Unix time without nanoseconds.
+// Seconds since January 1, 1970 UTC.
 fn UnixAbs(sec: i64): AbsTime {
 	abs := u64(sec) + unixToAbsolute
 	mut t := AbsTime{}
@@ -338,10 +412,10 @@ fn norm(mut hi: int, mut lo: int, base: int): (nhi: int, nlo: int) {
 	ret hi, lo
 }
 
-// daysBefore[m] counts the number of days in a non-leap year
+// _daysBefore[m] counts the number of days in a non-leap year
 // before month m begins. There is an entry for m=12, counting
 // the number of days before January of next year (365).
-static daysBefore: [...]i32 = [
+static _daysBefore: [...]i32 = [
 	0,
 	31,
 	31 + 28,
@@ -362,7 +436,7 @@ static daysBefore: [...]i32 = [
 // stored in nsecond after normalization.
 // See the Date function for public documentation.
 fn absUnix(mut year: int, mut month: Month, mut day: int,
-	mut hour: int, mut minute: int, mut second: int, mut &nsecond: int): i64 {
+	mut hour: int, mut minute: int, mut second: int, mut &nsecond: int, mut &loc: &Location): i64 {
 	// Normalize month, overflowing into year.
 	mut m := int(month - 1)
 	year, m = norm(year, m, 12)
@@ -378,7 +452,7 @@ fn absUnix(mut year: int, mut month: Month, mut day: int,
 	mut d := daysSinceEpoch(year)
 
 	// Add in days before this month.
-	d += u64(daysBefore[month-1])
+	d += u64(_daysBefore[month-1])
 	if isLeap(year) && month >= March {
 		d++ // February 29
 	}
@@ -391,7 +465,23 @@ fn absUnix(mut year: int, mut month: Month, mut day: int,
 	abs += u64(hour*secPerHour + minute*60 + second)
 
 	// Convert absolute time to Unix time.
-	unix := i64(abs) + absoluteToUnix
+	mut unix := i64(abs) + absoluteToUnix
+
+	// Look for zone offset for expected time, so we can adjust to UTC.
+	// The lookup function expects UTC, so first we pass unix in the
+	// hope that it will not be too close to a zone transition,
+	// and then adjust if it is.
+	_, mut offset, start, end, _ := loc.lookup(unix)
+	if offset != 0 {
+		utc := unix - i64(offset)
+		// If utc is valid for the time zone we found, then we have the right offset.
+		// If not, we get the correct offset by looking up utc in the location.
+		if utc < start || utc >= end {
+			_, offset, _, _, _ = loc.lookup(utc)
+		}
+		unix -= i64(offset)
+	}
+
 	ret unix
 }
 
@@ -404,9 +494,153 @@ fn absUnix(mut year: int, mut month: Month, mut day: int,
 // The month, day, hour, minute, second, and nsecond values may be outside
 // their usual ranges and will be normalized during the conversion.
 // For example, October 32 converts to November 1.
+//
+// A daylight savings time transition skips or repeats times.
+// For example, in the United States, March 13, 2011 2:15am never occurred,
+// while November 6, 2011 1:15am occurred twice. In such cases, the
+// choice of time zone, and therefore the time, is not well-defined.
+// Date returns a time that is correct in one of the two zones involved
+// in the transition, but it does not guarantee which.
 fn Date(year: int, month: Month, day: int,
-	hour: int, minute: int, second: int, nsecond: int): (t: Time) {
-	t.sec = absUnix(year, month, day, hour, minute, second, unsafe { *(&nsecond) })
+	hour: int, minute: int, second: int, nsecond: int, loc: &Location): (t: Time) {
+	t.sec = absUnix(year, month, day, hour, minute, second, unsafe { *(&nsecond) }, unsafe { *(&loc) })
 	t.nsec = i32(nsecond)
 	ret t
+}
+
+// Days from March 1 through end of year.
+const marchThruDecember = 31 + 30 + 31 + 30 + 31 + 31 + 30 + 31 + 30 + 31
+
+// The number of years we subtract from internal time to get absolute time.
+// This value must be 0 mod 400, and it defines the “absolute zero instant”
+// mentioned in the “Computations on Times” comment above: March 1, -absoluteYears.
+// Dates before the absolute epoch will not compute correctly,
+// but otherwise the value can be changed as needed.
+const absoluteYears = 292277022400
+
+// Counts the number of seconds since the absolute zero instant.
+type absSeconds: u64
+
+// Counts the number of days since the absolute zero instant.
+type absDays: u64
+
+// Counts the number of centuries since the absolute zero instant.
+type absCentury: u64
+
+// Counts the number of years since the start of a century.
+type absCyear: int
+
+// Counts the number of days since the start of a year.
+// Note that absolute years start on March 1.
+type absYday: int
+
+// Counts the number of months since the start of a year.
+// absMonth=0 denotes March.
+type absMonth: int
+
+// Single bit (0 or 1) denoting whether a given year is a leap year.
+type absLeap: int
+
+// Single bit (0 or 1) denoting whether a given day falls in January or February.
+// That is a special case because the absolute years start in March (unlike normal calendar years).
+type absJanFeb: int
+
+impl absSeconds {
+	// Converts absolute seconds to absolute days.
+	fn days(self): absDays {
+		ret absDays(self / secPerDay)
+	}
+}
+
+impl absDays {
+	// Splits days into century, cyear, ayday.
+	fn split(self): (century: absCentury, cyear: absCyear, ayday: absYday) {
+		// See “Computations on Times” comment above.
+		d := 4*u64(self) + 3
+		century = absCentury(d / 146097)
+
+		// This should be
+		//	cday := uint32(d % 146097) / 4
+		//	cd := 4*cday + 3
+		// which is to say
+		//	cday := uint32(d % 146097) >> 2
+		//	cd := cday<<2 + 3
+		// but of course (x>>2<<2)+3 == x|3,
+		// so do that instead.
+		cd := u32(d%146097) | 3
+
+		// For cdays in the range [0,146097] (100 years), we want:
+		//
+		//	cyear := (4 cdays + 3) / 1461
+		//	yday := (4 cdays + 3) % 1461 / 4
+		//
+		// (See the “Computations on Times” comment above
+		// as well as Neri and Schneider, section 7.)
+		//
+		// That is equivalent to:
+		//
+		//	cyear := (2939745 cdays) >> 32
+		//	yday := (2939745 cdays) & 0xFFFFFFFF / 2939745 / 4
+		//
+		// so do that instead, saving a few cycles.
+		// See Neri and Schneider, section 8.3
+		// for more about this optimization.
+		hi, lo := bits::Mul32(2939745, u32(cd))
+		cyear = absCyear(hi)
+		ayday = absYday(lo / 2939745 / 4)
+		ret
+	}
+
+	// Converts days into the standard year and 1-based yday.
+	fn yearYday(self): (year: int, yday: int) {
+		century, cyear, ayday := self.split()
+		janFeb := ayday.janFeb()
+		year = century.year(cyear, janFeb)
+		yday = ayday.yday(janFeb, century.leap(cyear))
+		ret
+	}
+}
+
+impl absCentury {
+	// Returns 1 if (century, cyear) is a leap year, 0 otherwise.
+	fn leap(self, cyear: absCyear): absLeap {
+		// See “Computations on Times” comment above.
+		mut y4ok := 0
+		if cyear%4 == 0 {
+			y4ok = 1
+		}
+		mut y100ok := 0
+		if cyear != 0 {
+			y100ok = 1
+		}
+		mut y400ok := 0
+		if self%4 == 0 {
+			y400ok = 1
+		}
+		ret absLeap(y4ok & (y100ok | y400ok))
+	}
+
+	// Returns the standard year for (century, cyear, janFeb).
+	fn year(self, cyear: absCyear, janFeb: absJanFeb): int {
+		// See “Computations on Times” comment above.
+		ret int(u64(self)*100-absoluteYears) + int(cyear) + int(janFeb)
+	}
+}
+
+impl absYday {
+	// Returns 1 if the March 1-based ayday is in January or February, 0 otherwise.
+	fn janFeb(self): absJanFeb {
+		// See “Computations on Times” comment above.
+		mut jf := absJanFeb(0)
+		if self >= marchThruDecember {
+			jf = 1
+		}
+		ret jf
+	}
+
+	// Returns the standard 1-based yday for (ayday, janFeb, leap).
+	fn yday(self, janFeb: absJanFeb, leap: absLeap): int {
+		// See “Computations on Times” comment above.
+		ret int(self) + (1 + 31 + 28) + int(leap)&^int(janFeb) - 365*int(janFeb)
+	}
 }

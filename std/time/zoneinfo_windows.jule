@@ -1,0 +1,168 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use integ "std/jule/integrated"
+use "std/unsafe"
+
+#typedef
+cpp struct TIME_ZONE_INFORMATION {}
+cpp unsafe fn GetTimeZoneInformation(mut i: *cpp.TIME_ZONE_INFORMATION): u32
+
+const _TIME_ZONE_ID_INVALID = 0xffffffff
+
+struct systemtime {
+	Year:         u16
+	Month:        u16
+	DayOfWeek:    u16
+	Day:          u16
+	Hour:         u16
+	Minute:       u16
+	Second:       u16
+	Milliseconds: u16
+}
+
+
+// Windows's TIME_ZONE_INFORMATION structure.
+struct timezoneinformation {
+	Bias:         i32
+	StandardName: [32]u16
+	StandardDate: systemtime
+	StandardBias: i32
+	DaylightName: [32]u16
+	DaylightDate: systemtime
+	DaylightBias: i32
+}
+
+// Extracts capital letters from description desc.
+fn extractCAPS(desc: str): str {
+	let mut short: []rune
+	for _, c in []rune(desc) {
+		if 'A' <= c && c <= 'Z' {
+			short = append(short, c)
+		}
+	}
+	ret str(short)
+}
+
+// Returns the abbreviations to use for the given zone z.
+fn abbrev(&z: timezoneinformation): (std: str, dst: str) {
+	stdNameU16 := unsafe::Slice(&z.StandardName[0], len(z.StandardName), len(z.StandardName))
+	stdName := integ::UTF16ToStr(stdNameU16)
+	mut a, mut ok := abbrs[stdName]
+	if !ok {
+		dstNameU16 := unsafe::Slice(&z.DaylightName[0], len(z.DaylightName), len(z.DaylightName))
+		dstName := integ::UTF16ToStr(dstNameU16)
+		// fallback to using capital letters
+		ret extractCAPS(stdName), extractCAPS(dstName)
+	}
+	ret a.std, a.dst
+}
+
+// Returns the pseudo-Unix time (seconds since Jan 1 1970 *LOCAL TIME*)
+// denoted by the system date+time d in the given year.
+// It is up to the caller to convert this local time into a UTC-based time.
+fn pseudoUnix(year: int, &d: systemtime): i64 {
+	// Windows specifies daylight savings information in "day in month" format:
+	// d.Month is month number (1-12)
+	// d.DayOfWeek is appropriate weekday (Sunday=0 to Saturday=6)
+	// d.Day is week within the month (1 to 5, where 5 is last week of the month)
+	// d.Hour, d.Minute and d.Second are absolute time
+	mut day := 1
+	t := Date(year, Month(d.Month), day, int(d.Hour), int(d.Minute), int(d.Second), 0, UTC)
+	mut i := int(d.DayOfWeek) - int(t.Weekday())
+	if i < 0 {
+		i += 7
+	}
+	day += i
+	week := int(d.Day) - 1
+	if week < 4 {
+		day += week * 7
+	} else {
+		// "Last" instance of the day.
+		day += 4 * 7
+		if day > daysIn(Month(d.Month), year) {
+			day -= 7
+		}
+	}
+	ret t.sec + i64(day-1)*secPerDay
+}
+
+fn initLocalFromTZI(&i: timezoneinformation) {
+	mut &l := localLoc
+
+	l.name = "Local"
+
+	mut nzone := 1
+	if i.StandardDate.Month > 0 {
+		nzone++
+	}
+	l.zone = make([]zone, nzone)
+
+	stdname, dstname := abbrev(i)
+
+	mut std := unsafe { (&zone)(&l.zone[0]) }
+	std.name = stdname
+	if nzone == 1 {
+		// No daylight savings.
+		std.offset = -int(i.Bias) * 60
+		l.cacheStart = alpha
+		l.cacheEnd = omega
+		l.cacheZone = std
+		l.tx = make([]zoneTrans, 1)
+		l.tx[0].when = l.cacheStart
+		l.tx[0].index = 0
+		ret
+	}
+
+	// StandardBias must be ignored if StandardDate is not set,
+	// so this computation is delayed until after the nzone==1
+	// return above.
+	std.offset = -int(i.Bias + i.StandardBias) * 60
+
+	mut dst := unsafe { (&zone)(&l.zone[1]) }
+	dst.name = dstname
+	dst.offset = -int(i.Bias + i.DaylightBias) * 60
+	dst.isDST = true
+
+	// Arrange so that d0 is first transition date, d1 second,
+	// i0 is index of zone after first transition, i1 second.
+	mut d0 := unsafe { (&systemtime)(&i.StandardDate) }
+	mut d1 := unsafe { (&systemtime)(&i.DaylightDate) }
+	mut i0 := 0
+	mut i1 := 1
+	if d0.Month > d1.Month {
+		d0, d1 = d1, d0
+		i0, i1 = i1, i0
+	}
+
+	// 2 tx per year, 100 years on each side of this year
+	l.tx = make([]zoneTrans, 400)
+
+	t := Now()
+	year := t.Year()
+	mut txi := 0
+	mut y := year - 100
+	for y < year+100; y++ {
+		mut tx := unsafe { (&zoneTrans)(&l.tx[txi]) }
+		tx.when = pseudoUnix(y, *d0) - i64(l.zone[i1].offset)
+		tx.index = u8(i0)
+		txi++
+
+		tx = unsafe { (&zoneTrans)(&l.tx[txi]) }
+		tx.when = pseudoUnix(y, *d1) - i64(l.zone[i0].offset)
+		tx.index = u8(i1)
+		txi++
+	}
+}
+
+fn initLocal() {
+	mut i := timezoneinformation{}
+	r := unsafe { cpp.GetTimeZoneInformation((*cpp.TIME_ZONE_INFORMATION)(&i)) }
+	if r == _TIME_ZONE_ID_INVALID {
+		// Fall back to UTC.
+		localLoc.name = "UTC"
+		ret
+	}
+	initLocalFromTZI(i)
+}
