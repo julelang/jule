@@ -42,19 +42,6 @@ namespace jule
             return buffer;
         }
 
-        static jule::Slice<Item> alloc(const jule::Int &len, const jule::Int &cap, const Item &def) noexcept
-        {
-            if (len < 0)
-                __jule_panic((jule::U8 *)"runtime: []T: slice allocation length lower than zero", 53);
-            if (cap < 0)
-                __jule_panic((jule::U8 *)"runtime: []T: slice allocation capacity lower than zero", 55);
-            if (len > cap)
-                __jule_panic((jule::U8 *)"runtime: []T: slice allocation length greater than capacity", 59);
-            jule::Slice<Item> buffer;
-            buffer.alloc_new(len, cap, def);
-            return buffer;
-        }
-
         static jule::Slice<Item> make(const std::initializer_list<Item> &src)
         {
             if (src.size() == 0)
@@ -174,15 +161,6 @@ namespace jule
             this->_len = len;
             this->_cap = cap;
             this->_slice = alloc;
-        }
-
-        void alloc_new(const jule::Int &len, const jule::Int &cap, const Item &def) noexcept
-        {
-            this->alloc_new(len, cap);
-
-            // Initialize elements.
-            for (jule::Int i = 0; i < len; ++i)
-                *(this->_slice + i) = def;
         }
 
         using Iterator = Item *;
