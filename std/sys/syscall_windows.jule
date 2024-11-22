@@ -30,6 +30,7 @@ cpp fn GetStdHandle(stdh: uintptr): *unsafe
 cpp unsafe fn CloseHandle(stdh: *unsafe): bool
 cpp unsafe fn _wstat(path: *integ::Wchar, mut handle: *cpp._stat): int
 cpp unsafe fn _wopen(path: *integ::Wchar, flag: int, mode: int): int
+cpp unsafe fn _wgetenv(key: *integ::Wchar): *integ::Wchar
 cpp fn GetLastError(): u32
 cpp unsafe fn GetCurrentDirectoryW(bufflen: u32, buff: *integ::Wchar): u32
 cpp unsafe fn SetCurrentDirectoryW(path: *integ::Wchar): bool
@@ -154,4 +155,16 @@ unsafe fn FindNextFile(h: Handle, mut data: *Win32FindData): int {
 // Call's Windows FindClose function.
 fn FindClose(h: Handle): int {
 	ret unsafe { cpp.FindClose(cpp.HANDLE(h)) }
+}
+
+// Retrieves the value of the environment variable named by the key.
+// It returns the value, which will be empty if the variable is not present.
+unsafe fn Getenv(key: *u16): (val: str, unset: bool) {
+	valPtr := cpp._wgetenv((*integ::Wchar)(key))
+	if valPtr == nil {
+		unset = true
+	} else {
+		val = integ::U16PtrToStr((*u16)(valPtr))
+	}
+	ret
 }
