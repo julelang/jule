@@ -27,26 +27,6 @@ namespace jule
         __jule_writeStdout(__jule_sliceBytePtr((jule::U8 *)"\n", 1, 1));
     }
 
-    // Returns itself of slice if slice has enough capacity for +n elements.
-    // Returns new allocated slice if not.
-    template <typename Item>
-    jule::Slice<Item> alloc_for_append(const jule::Slice<Item> &dest,
-                                       const jule::Int &n) noexcept
-    {
-        if (dest._len + n > dest._cap)
-        {
-            const jule::Int alloc_size = (dest._len + n) << 1;
-            jule::Slice<Item> buffer = jule::Slice<Item>::alloc(0, alloc_size);
-            buffer._len = dest._len;
-            std::move(
-                dest._slice,
-                dest._slice + dest._len,
-                buffer._slice);
-            return buffer;
-        }
-        return dest;
-    }
-
     // Common template for the copy function variants.
     template <typename Dest, typename Src>
     inline jule::Int __copy(const Dest &dest, const Src &src) noexcept
@@ -101,8 +81,7 @@ namespace jule
     {
         if (components._len == 0)
             return dest;
-        if (dest._len + components._len > dest._cap)
-            dest = jule::alloc_for_append(dest, components._len);
+        dest.alloc_for_append(components._len);
         std::copy(
             components._slice,
             components._slice + components._len,
