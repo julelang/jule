@@ -11,5 +11,23 @@ use "std/sys"
 // empty and the boolean will be true.
 fn LookupEnv(key: str): (val: str, unset: bool) {
 	keyPtr := integ::UTF16FromStr(key)
-	ret unsafe { sys::Getenv(&keyPtr[0]) }
+	mut n := u32(100)
+	for {
+		mut b := make([]u16, n)
+		n = unsafe { sys::GetEnvironmentVariable(&keyPtr[0], &b[0], u32(len(b))) }
+		if n == 0 && sys::GetLastError() == sys::ERROR_ENVVAR_NOT_FOUND {
+			ret "", false
+		}
+		if n <= u32(len(b)) {
+			ret integ::UTF16ToStr(b[:n]), true
+		}
+	}
+}
+
+// Sets the value of the environment variable named by the key.
+// Reports whether it successful.
+fn Setenv(key: str, val: str): bool {
+	keyPtr := integ::UTF16FromStr(key)
+	valPtr := integ::UTF16FromStr(val)
+	ret unsafe { sys::SetEnvironmentVariable(&keyPtr[0], &valPtr[0]) }
 }
