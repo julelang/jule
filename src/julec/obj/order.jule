@@ -11,9 +11,10 @@ struct OrderedDefines {
 }
 
 // Reports whether type in correct order by dependencies.
-fn isOrdered[T](&t: &T, s: []&T): bool {
+fn isOrdered[T](&t: &T, s: []&T, partial: bool): bool {
 lookup:
 	for _, d in t.Depends {
+		// Fast way:
 		const match type T {
 		| sema::Var:
 			if d.Constant {
@@ -22,6 +23,15 @@ lookup:
 				continue
 			}
 		}
+
+		if partial {
+			// Dependency and referencer is not in the same package.
+			// Dependency should be ordered correctly, before this reference.
+			if d.Token.File.Dir() != t.Token.File.Dir() {
+				continue
+			}
+		}
+
 		for _, o in s {
 			if d == o {
 				continue lookup
@@ -34,7 +44,11 @@ lookup:
 	ret true
 }
 
-fn order[T](mut s: []&T) {
+// Orders defines s by their dependencies.
+// All dependencies should came before the referencer after order.
+// If partial ordering enabled, it assumes the dependencies from other packages
+// should ordered correctly.
+fn order[T](mut s: []&T, partial: bool) {
 	mut i := 0
 repeat:
 	mut j := i
@@ -47,7 +61,7 @@ iter:
 				continue iter
 			}
 		}
-		if isOrdered(t, s[:i]) {
+		if isOrdered(t, s[:i], partial) {
 			if i != j {
 				s[i], s[j] = s[j], s[i]
 			}

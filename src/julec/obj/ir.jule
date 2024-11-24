@@ -14,10 +14,17 @@ struct IR {
 	// Directory of root package.
 	Root:    str
 	Passes:  []str
-	Main:    &sema::Package
 	Runtime: &sema::ImportInfo // "std/runtime"
-	Used:    []&sema::ImportInfo
 	Ordered: OrderedDefines
+
+	// The main package. Not including in the Used.
+	// The Last dependency of the program, root package of the program.
+	Main:    &sema::Package
+
+	// Imported packages for whole program.
+	// Ordered by first-to-last package.
+	// So, deeply the first use declaration is 0-indexed, then comes others.
+	Used: []&sema::ImportInfo
 }
 
 impl IR {
@@ -82,14 +89,15 @@ impl IR {
 
 	// Returns all structures of main package and used pakcages.
 	// Ignores binded declarations, but appends strict type alias structures also.
+	// Appends used packages first, then the main package.
 	fn GetAllStructures(mut self): []&sema::Struct {
 		let mut buffer: []&sema::Struct = nil
-		self.appendStructs(self.Main, buffer)
 		for (_, mut u) in self.Used {
 			if !u.Binded {
 				self.appendStructs(u.Package, buffer)
 			}
 		}
+		self.appendStructs(self.Main, buffer)
 		ret buffer
 	}
 
@@ -105,23 +113,50 @@ impl IR {
 
 	// Returns all globals of main package and used pakcages.
 	// Ignores binded declarations and constants.
-	fn GetAllGlobals(mut self): []&sema::Var {
+	// If orderDefs is true, orders defines of each package.
+	// Appends used packages first, then the main package.
+	fn GetAllGlobals(mut self, orderDefs: bool): []&sema::Var {
+		// For ordering, all variables should be easy to predict.
+		// They must only have dependency from their own package or used packages.
+		// So, appending globals by used (should be deeply ordered already,
+		// from deeply first dependency to last dependency which is root package)
+		// should be enough. Therefore, perform partial ordering, just for package.
+		// Also globals should be initialized before other packages, by use order.
+		// So, non-partial ordering may break this initialization order.
+		// This order strategy keeps also the package initialization order.
 		let mut buffer: []&sema::Var = nil
-		self.appendGlobals(self.Main, buffer)
+		mut n := len(buffer)
 		for (_, mut u) in self.Used {
 			if !u.Binded {
 				self.appendGlobals(u.Package, buffer)
+				if orderDefs {
+					order(buffer[n:], true)
+				}
+				n = len(buffer)
 			}
+		}
+		self.appendGlobals(self.Main, buffer)
+		if orderDefs {
+			order(buffer[n:], true)
 		}
 		ret buffer
 	}
 
 	// Order defines at update ordered field of instance.
 	fn Order(mut self) {
-		self.Ordered.Globals = self.GetAllGlobals()
+		// Get globals with internal ordering enabled.
+		// See the GetAllGlobals for the ordering details.
+		self.Ordered.Globals = self.GetAllGlobals(true)
+
+		// Do not order like globals, because globals always have dependencies
+		// from their own packages or used packages. So analysis is
+		// easy to predict. But structures, since they can be generic, may
+		// refer to hard to analysis things. This occurs because we have
+		// internally imported packages such as runtime. And the runtime package
+		// may refer to any define of the program, without dependency. So,
+		// import all and order them for correct ordering.
 		self.Ordered.Structs = self.GetAllStructures()
-		order(self.Ordered.Globals)
-		order(self.Ordered.Structs)
+		order(self.Ordered.Structs, false)
 	}
 }
 
