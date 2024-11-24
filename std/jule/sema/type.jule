@@ -812,6 +812,9 @@ struct referencer {
 	refs:  *[]any
 }
 
+const cycleErrEnable = 0b01 // Enables error logging for cycle analysis.
+const cycleErrFail = 0b10 // Means the last cycle analysis reports cycles exist.
+
 // Checks type and builds result as kind.
 // Removes kind if error occurs,
 // so type is not reports true for checked state.
@@ -853,6 +856,7 @@ struct typeChecker {
 	// Current checked type is risky for cycles.
 	// If this field is true, cycle analysis will be executed for type.
 	cycleRisk: bool = true
+	cycleErr: int = cycleErrEnable
 
 	// Disallow/suppress Jule's built-in defines.
 	disBuiltin: bool
@@ -963,11 +967,18 @@ impl typeChecker {
 		ret true
 	}
 
-	// Checks type alias illegal cycles.
+	// Calls isIllegalCycle with error logs.
+	fn checkIllegalCycles(mut self, &ident: &token::Token, mut decl: any): (ok: bool) {
+		ret self.isIllegalCycleSafe(ident, decl, self.cycleErr&cycleErrEnable == cycleErrEnable)
+	}
+
+	// Reports illegal cycles for supported declarations, whether it not exist.
 	// Appends reference to reference if there is no illegal cycle.
 	// Returns true if self.referencer is nil reference.
 	// Returns true if refers is nil.
-	fn checkIllegalCycles(mut self, &ident: &ast::IdentTypeDecl, mut decl: any): (ok: bool) {
+	// If err is true, logs error about cycles.
+	fn isIllegalCycleSafe(mut self, &ident: &token::Token, mut decl: any, err: bool): (ok: bool) {
+		self.cycleErr &= ^cycleErrFail
 		if self.referencer == nil || !self.cycleRisk {
 			ret true
 		}
@@ -986,18 +997,24 @@ impl typeChecker {
 		// Check illegal cycle for itself.
 		// Because refers's owner is decl.
 		if self.referencer.owner == decl {
-			self.pushErr(ident.Token, build::LogMsg.IllegalCycleRefersItself, self.referencer.ident)
+			if err {
+				self.pushErr(ident, build::LogMsg.IllegalCycleRefersItself, self.referencer.ident)
+			}
+			self.cycleErr |= cycleErrFail
 			ret false
 		}
 
 		mut message := strings::Builder.New(1 << 5)
 
 		if !self.checkCrossCycle(decl, message) {
-			mut errMsg := message.Str()
-			message.Clear()
-			self.pushCycleError(self.referencer.owner, decl, message)
-			errMsg += message.Str()
-			self.pushErr(ident.Token, build::LogMsg.IllegalCrossCycle, errMsg)
+			if err {
+				mut errMsg := message.Str()
+				message.Clear()
+				self.pushCycleError(self.referencer.owner, decl, message)
+				errMsg += message.Str()
+				self.pushErr(ident, build::LogMsg.IllegalCrossCycle, errMsg)
+			}
+			self.cycleErr |= cycleErrFail
 			ret false
 		}
 
@@ -1081,8 +1098,8 @@ impl typeChecker {
 		{
 			mut s := ta.TypeSym.Type.Struct()
 			if s != nil {
-				ok := self.checkIllegalCycles(decl, s.Decl)
-				if !ok {
+				ok := self.checkIllegalCycles(decl.Token, s.Decl)
+				if !ok && self.cycleErr&cycleErrEnable == cycleErrEnable {
 					ret nil
 				}
 			}
@@ -1256,8 +1273,8 @@ impl typeChecker {
 			}
 		}
 
-		mut ok := self.checkIllegalCycles(decl, s)
-		if !ok {
+		mut ok := self.checkIllegalCycles(decl.Token, s)
+		if !ok && self.cycleErr&cycleErrEnable == cycleErrEnable {
 			ret nil
 		}
 		self.appendUsedStructReference(s)
@@ -1297,8 +1314,8 @@ impl typeChecker {
 				}
 				mut st := g.TypeSym.Type.Struct()
 				if st != nil {
-					ok := self.checkIllegalCycles(decl, st.Decl)
-					if !ok {
+					ok := self.checkIllegalCycles(decl.Token, st.Decl)
+					if !ok && self.cycleErr&cycleErrEnable == cycleErrEnable {
 						ret nil
 					}
 				}
@@ -1507,20 +1524,52 @@ impl typeChecker {
 	}
 
 	fn buildMap(mut self, mut decl: &ast::MapTypeDecl): &Map {
-		cycleRisk := self.cycleRisk
-		self.cycleRisk = false
-		defer { self.cycleRisk = cycleRisk }
-
+		// Evaluate key type with cycle risk, but do not log errors about it.
+		// We have to do this for checking correct map type dependencies,
+		// cycle types are prevents valid map key types. So, caught them but
+		// do not log as cycle error, log as invalid key type error.
+		// Also remove appended references or depencies after analysis for types.
+		cycleErr := self.cycleErr
+		self.cycleErr &= ^cycleErrFail
+		self.cycleErr &= ^cycleErrEnable
+		mut refCount := 0
+		if self.referencer != nil {
+			match type self.referencer.owner {
+			| &TypeAlias:
+				refCount = unsafe { len(*self.referencer.refs) }
+			| &Struct:
+				refCount = len((&Struct)(self.referencer.owner).Depends)
+			}
+		}
 		mut key := self.checkDecl(decl.Key)
+		if self.referencer != nil {
+			match type self.referencer.owner {
+			| &TypeAlias:
+				unsafe { *self.referencer.refs = (*self.referencer.refs)[:refCount] }
+			| &Struct:
+				mut s := (&Struct)(self.referencer.owner)
+				s.Depends = s.Depends[:refCount]
+			}
+		}
 		if key == nil {
+			self.cycleErr = cycleErr
 			ret nil
 		}
-		if !key.Comparable() {
+		// Check wther key type is valid.
+		// It should be comparable, if cycle analysis failed, we have cycles,
+		// so we have a map type (this type, actually), so it is not comparable.
+		if self.cycleErr&cycleErrFail == cycleErrFail || !key.Comparable() {
+			self.cycleErr = cycleErr
 			self.s.pushErr(decl.Key.Token, build::LogMsg.ConstraintFailed, key.Str(), "Key", str(builtinConstraint.Comparable))
 			ret nil
 		}
+		self.cycleErr = cycleErr
 
+		// Evaluate value type with no cycle risk.
+		cycleRisk := self.cycleRisk
+		self.cycleRisk = false
 		mut val := self.checkDecl(decl.Val)
+		self.cycleRisk = cycleRisk
 		if val == nil {
 			ret nil
 		}
