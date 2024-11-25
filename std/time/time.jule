@@ -166,6 +166,30 @@ impl Time {
 		ret absSeconds(self.abs())
 	}
 
+	// Combination of the Zone and absSec methods,
+	// extracting both return values from a single zone lookup.
+	fn locabs(self): (name: str, offset: int, abs: absSeconds) {
+		mut l := self.loc
+		if l == nil || uintptr(l) == uintptr(&localLoc) {
+			l = l.get()
+		}
+		// Avoid function call if we hit the local time cache.
+		mut sec := self.sec
+		if uintptr(l) != uintptr(&utcLoc) {
+			if l.cacheZone != nil && l.cacheStart <= sec && sec < l.cacheEnd {
+				name = l.cacheZone.name
+				offset = l.cacheZone.offset
+			} else {
+				name, offset, _, _, _ = l.lookup(sec)
+			}
+			sec += i64(offset)
+		} else {
+			name = "UTC"
+		}
+		abs = absSeconds(sec + unixToAbsolute)
+		ret
+	}
+
 	// Adds d seconds to the time.
 	fn addSec(mut self, d: i64) {
 		// Check if the sum of self.sec and d overflows and handle it properly.
