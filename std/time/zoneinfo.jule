@@ -133,6 +133,41 @@ impl Location {
 		ret
 	}
 
+	// Returns information about the time zone with
+	// the given name (such as "EST") at the given pseudo-Unix time
+	// (what the given time of day would be in UTC).
+	fn lookupName(mut &self, name: str, unix: i64): (offset: int, ok: bool) {
+		mut l := self.get()
+
+		// First try for a zone with the right name that was actually
+		// in effect at the given time. (In Sydney, Australia, both standard
+		// and daylight-savings time are abbreviated "EST". Using the
+		// offset helps us pick the right one for the given time.
+		// It's not perfect: during the backward transition we might pick
+		// either one.)
+		for i in l.zone {
+			zone := unsafe { (&zone)(&l.zone[i]) }
+			if zone.name == name {
+				mut nam := ""
+				nam, offset, _, _, _ = l.lookup(unix - i64(zone.offset))
+				if nam == zone.name {
+					ret offset, true
+				}
+			}
+		}
+
+		// Otherwise fall back to an ordinary name match.
+		for i in self.zone {
+			zone := unsafe { (&zone)(&l.zone[i]) }
+			if zone.name == name {
+				ret zone.offset, true
+			}
+		}
+
+		// Otherwise, give up.
+		ret
+	}
+
 	// Returns the index of the time zone to use for times
 	// before the first transition time, or when there are no transition
 	// times.
