@@ -1362,3 +1362,141 @@ fn lookup(tab: []str, val: str)!: (int, str) {
 	}
 	error(ParseError.BadField)
 }
+
+// leadingFraction consumes the leading [0-9]* from s.
+// It is used only for fractions, so does not return an error on overflow,
+// it just stops accumulating precision.
+fn leadingFraction(s: str): (x: u64, scale: f64, rem: str) {
+	mut i := 0
+	scale = 1
+	mut overflow := false
+	for i < len(s); i++ {
+		c := s[i]
+		if c < '0' || c > '9' {
+			break
+		}
+		if overflow {
+			continue
+		}
+		if x > (1<<63-1)/10 {
+			// It's possible for overflow to give a positive number, so take care.
+			overflow = true
+			continue
+		}
+		y := x*10 + u64(c) - '0'
+		if y > 1<<63 {
+			overflow = true
+			continue
+		}
+		x = y
+		scale *= 10
+	}
+	ret x, scale, s[i:]
+}
+
+static unitMap: map[str]u64 = {
+	"ns": u64(Nanosecond),
+	"us": u64(Microsecond),
+	"µs": u64(Microsecond), // U+00B5 = micro symbol
+	"μs": u64(Microsecond), // U+03BC = Greek letter mu
+	"ms": u64(Millisecond),
+	"s": u64(Second),
+	"m": u64(Minute),
+	"h": u64(Hour),
+}
+
+// Parses a duration string and reports whether it successful.
+// A duration string is a possibly signed sequence of
+// decimal numbers, each with optional fraction and a unit suffix,
+// such as "300ms", "-1.5h" or "2h45m".
+// Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+fn ParseDuration(mut s: str): (Duration, bool) {
+	// [-+]?([0-9]*(\.[0-9]*)?[a-z]+)+
+	mut d := u64(0)
+	mut neg := false
+
+	// Consume [-+]?
+	if s != "" {
+		c := s[0]
+		if c == '-' || c == '+' {
+			neg = c == '-'
+			s = s[1:]
+		}
+	}
+	// Special case: if all that is left is "0", this is zero.
+	if s == "0" {
+		ret 0, true
+	}
+	if s == "" {
+		ret 0, false
+	}
+	for s != "" {
+		mut v, mut f := u64(0), u64(0) // integers before, after decimal point
+		mut scale := 1.0               // value = v + f/scale
+
+		// The next character must be [0-9.]
+		if !(s[0] == '.' || '0' <= s[0] && s[0] <= '9') {
+			ret 0, false
+		}
+		// Consume [0-9]*
+		mut pl := len(s)
+		v, s = leadingInt(s) else { ret 0, false }
+		pre := pl != len(s) // whether we consumed anything before a period
+
+		// Consume (\.[0-9]*)?
+		mut post := false
+		if s != "" && s[0] == '.' {
+			s = s[1:]
+			pl = len(s)
+			f, scale, s = leadingFraction(s)
+			post = pl != len(s)
+		}
+		if !pre && !post {
+			// no digits (e.g. ".s" or "-.s")
+			ret 0, false
+		}
+
+		// Consume unit.
+		mut i := 0
+		for i < len(s); i++ {
+			c := s[i]
+			if c == '.' || '0' <= c && c <= '9' {
+				break
+			}
+		}
+		if i == 0 {
+			ret 0, false
+		}
+		u := s[:i]
+		s = s[i:]
+		unit, ok := unitMap[u]
+		if !ok {
+			ret 0, false
+		}
+		if v > 1<<63/unit {
+			// overflow
+			ret 0, false
+		}
+		v *= unit
+		if f > 0 {
+			// f64 is needed to be nanosecond accurate for fractions of hours.
+			// v >= 0 && (f*unit/scale) <= 3.6e+12 (ns/h, h is the largest unit)
+			v += u64(f64(f) * (f64(unit) / scale))
+			if v > 1<<63 {
+				// overflow
+				ret 0, false
+			}
+		}
+		d += v
+		if d > 1<<63 {
+			ret 0, false
+		}
+	}
+	if neg {
+		ret -Duration(d), true
+	}
+	if d > 1<<63-1 {
+		ret 0, false
+	}
+	ret Duration(d), true
+}
