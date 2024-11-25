@@ -553,3 +553,39 @@ fn tzset(mut s: str, lastTxSec: i64, sec: i64): (name: str, offset: int, start: 
 		ret dstName, dstOffset, startSec + ystart, endSec + ystart, dstIsDST, true
 	}
 }
+
+// Returns a [Location] that always uses
+// the given zone name and offset (seconds east of UTC).
+fn FixedZone(name: str, offset: int): &Location {
+	static mut unnamedFixedZones = ([]&Location)(nil)
+	static mut unnamedFixedZonesOnce = sync::Once.New()
+
+	// Most calls to FixedZone have an unnamed zone with an offset by the hour.
+	// Optimize for that case by returning the same *Location for a given hour.
+	const hoursBeforeUTC = 12
+	const hoursAfterUTC = 14
+	hour := offset / 60 / 60
+	if name == "" && -hoursBeforeUTC <= hour && hour <= +hoursAfterUTC && hour*60*60 == offset {
+		unnamedFixedZonesOnce.Do(fn() {
+			unnamedFixedZones = make([]&Location, hoursBeforeUTC+1+hoursAfterUTC)
+			mut hr := -hoursBeforeUTC
+			for hr <= +hoursAfterUTC; hr++ {
+				unnamedFixedZones[hr+hoursBeforeUTC] = fixedZone("", hr*60*60)
+			}
+		})
+		ret unnamedFixedZones[hour+hoursBeforeUTC]
+	}
+	ret fixedZone(name, offset)
+}
+
+fn fixedZone(name: str, offset: int): &Location {
+	mut l := &Location{
+		name: name,
+		zone: [{name, offset, false}],
+		tx: [{alpha, 0, false, false}],
+		cacheStart: alpha,
+		cacheEnd: omega,
+	}
+	l.cacheZone = unsafe { (&zone)(&l.zone[0]) }
+	ret l
+}
