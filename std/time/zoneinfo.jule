@@ -38,8 +38,6 @@ struct Location {
 	cacheZone:  &zone
 }
 
-static localOnce = sync::Once.New()
-
 impl Location {
 	// Returns a descriptive name for the time zone information.
 	fn Str(self): str {
@@ -47,10 +45,11 @@ impl Location {
 	}
 
 	fn get(mut &self): &Location {
+		static localOnce = sync::Once.New()
 		if self == nil {
 			ret unsafe { *(&UTC) }
 		}
-		if self == Local {
+		if uintptr(self) == uintptr(&localLoc) {
 			localOnce.Do(initLocal)
 		}
 		ret self
@@ -589,12 +588,12 @@ fn tzset(mut s: str, lastTxSec: i64, sec: i64): (name: str, offset: int, start: 
 	}
 }
 
+static mut unnamedFixedZones = ([]&Location)(nil)
+static mut unnamedFixedZonesOnce = sync::Once.New()
+
 // Returns a [Location] that always uses
 // the given zone name and offset (seconds east of UTC).
 fn FixedZone(name: str, offset: int): &Location {
-	static mut unnamedFixedZones = ([]&Location)(nil)
-	static mut unnamedFixedZonesOnce = sync::Once.New()
-
 	// Most calls to FixedZone have an unnamed zone with an offset by the hour.
 	// Optimize for that case by returning the same *Location for a given hour.
 	const hoursBeforeUTC = 12

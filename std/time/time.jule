@@ -121,25 +121,25 @@ impl Time {
 		ret self.sec
 	}
 
-	fn setLoc(mut self, mut &loc: Location) {
-		if &loc == &utcLoc {
+	fn setLoc(mut self, loc: &Location) {
+		if uintptr(loc) == uintptr(&utcLoc) {
 			self.loc = nil
 			ret
 		}
-		self.loc = unsafe { (&Location)(&loc) }
+		self.loc = unsafe { *(&loc) }
 	}
 
 	// Returns time with the location set to UTC.
 	fn UTC(self): Time {
 		mut t := self
-		t.setLoc(utcLoc)
+		t.setLoc(unsafe { (&Location)(&utcLoc) })
 		ret t
 	}
 
 	// Returns time with the location set to local time.
 	fn Local(self): Time {
 		mut t := self
-		t.setLoc(localLoc)
+		t.setLoc(unsafe { (&Location)(&localLoc) })
 		ret t
 	}
 
@@ -469,6 +469,7 @@ fn Date(year: int, month: Month, day: int,
 	hour: int, minute: int, second: int, nsecond: int, loc: &Location): (t: Time) {
 	t.sec = absUnix(year, month, day, hour, minute, second, unsafe { *(&nsecond) }, unsafe { *(&loc) })
 	t.nsec = i32(nsecond)
+	t.setLoc(loc)
 	ret t
 }
 

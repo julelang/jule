@@ -1,0 +1,533 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/strings"
+use "std/testing"
+use "std/fmt"
+use "std/conv"
+
+static nextStdChunkTests = [
+	"(2006)-(01)-(02)T(15):(04):(05)(Z07:00)",
+	"(2006)-(01)-(02) (002) (15):(04):(05)",
+	"(2006)-(01) (002) (15):(04):(05)",
+	"(2006)-(002) (15):(04):(05)",
+	"(2006)(002)(01) (15):(04):(05)",
+	"(2006)(002)(04) (15):(04):(05)",
+]
+
+// Maps from nextStdChunk results to the matched strings.
+static stdChunkNames: map[int]str = {
+	0: "",
+	stdLongMonth: "January",
+	stdMonth: "Jan",
+	stdNumMonth: "1",
+	stdZeroMonth: "01",
+	stdLongWeekDay: "Monday",
+	stdWeekDay: "Mon",
+	stdDay: "2",
+	stdUnderDay: "_2",
+	stdZeroDay: "02",
+	stdUnderYearDay: "__2",
+	stdZeroYearDay: "002",
+	stdHour: "15",
+	stdHour12: "3",
+	stdZeroHour12: "03",
+	stdMinute: "4",
+	stdZeroMinute: "04",
+	stdSecond: "5",
+	stdZeroSecond: "05",
+	stdLongYear: "2006",
+	stdYear: "06",
+	stdPM: "PM",
+	stdpm: "pm",
+	stdTZ: "MST",
+	stdISO8601TZ: "Z0700",
+	stdISO8601SecondsTZ: "Z070000",
+	stdISO8601ShortTZ: "Z07",
+	stdISO8601ColonTZ: "Z07:00",
+	stdISO8601ColonSecondsTZ: "Z07:00:00",
+	stdNumTZ: "-0700",
+	stdNumSecondsTz: "-070000",
+	stdNumShortTZ: "-07",
+	stdNumColonTZ: "-07:00",
+	stdNumColonSecondsTZ: "-07:00:00",
+	stdFracSecond0 | 1<<stdArgShift: ".0",
+	stdFracSecond0 | 2<<stdArgShift: ".00",
+	stdFracSecond0 | 3<<stdArgShift: ".000",
+	stdFracSecond0 | 4<<stdArgShift: ".0000",
+	stdFracSecond0 | 5<<stdArgShift: ".00000",
+	stdFracSecond0 | 6<<stdArgShift: ".000000",
+	stdFracSecond0 | 7<<stdArgShift: ".0000000",
+	stdFracSecond0 | 8<<stdArgShift: ".00000000",
+	stdFracSecond0 | 9<<stdArgShift: ".000000000",
+	stdFracSecond9 | 1<<stdArgShift: ".9",
+	stdFracSecond9 | 2<<stdArgShift: ".99",
+	stdFracSecond9 | 3<<stdArgShift: ".999",
+	stdFracSecond9 | 4<<stdArgShift: ".9999",
+	stdFracSecond9 | 5<<stdArgShift: ".99999",
+	stdFracSecond9 | 6<<stdArgShift: ".999999",
+	stdFracSecond9 | 7<<stdArgShift: ".9999999",
+	stdFracSecond9 | 8<<stdArgShift: ".99999999",
+	stdFracSecond9 | 9<<stdArgShift: ".999999999",
+}
+
+#test
+fn testNextStdChunk(t: &testing::T) {
+	// Most bugs in Parse or Format boil down to problems with
+	// the exact detection of format chunk boundaries in the
+	// helper function nextStdChunk (here called as NextStdChunk).
+	// This test checks nextStdChunk's behavior directly,
+	// instead of needing to test it only indirectly through Parse/Format.
+
+	// markChunks returns format with each detected
+	// 'format chunk' parenthesized.
+	// For example showChunks("2006-01-02") == "(2006)-(01)-(02)".
+	markChunks := fn(format: str): str {
+		mut out := ""
+		mut s := format
+		for s != "" {
+			prefix, std, suffix := nextStdChunk(s)
+			out += prefix
+			if std > 0 {
+				out += "(" + stdChunkNames[std] + ")"
+			}
+			s = suffix
+		}
+		ret out
+	}
+
+	noParens := fn(mut r: rune): rune {
+		if r == '(' || r == ')' {
+			ret -1
+		}
+		ret r
+	}
+
+	for _, marked in nextStdChunkTests {
+		// marked is an expected output from markChunks.
+		// If we delete the parens and pass it through markChunks,
+		// we should get the original back.
+		format := strings::Map(marked, noParens)
+		out := markChunks(format)
+		if out != marked {
+			t.Errorf("nextStdChunk parses {} as {}, want {}", format, out, marked)
+		}
+	}
+}
+
+struct timeFormatTest {
+	time:           Time
+	formattedValue: str
+}
+
+static rfc3339Formats = []timeFormatTest([
+	{Date(2008, 9, 17, 20, 4, 26, 0, UTC), "2008-09-17T20:04:26Z"},
+	{Date(1994, 9, 17, 20, 4, 26, 0, FixedZone("EST", -18000)), "1994-09-17T20:04:26-05:00"},
+	{Date(2000, 12, 26, 1, 15, 6, 0, FixedZone("OTO", 15600)), "2000-12-26T01:15:06+04:20"},
+])
+
+#test
+fn testRFC3339Conversion(t: &testing::T) {
+	for _, f in rfc3339Formats {
+		r := f.time.Format(RFC3339)
+		if r != f.formattedValue {
+			t.Errorf("RFC3339:")
+			t.Errorf("  want={}", f.formattedValue)
+			t.Errorf("  have={}", r)
+		}
+	}
+}
+
+struct appendIntTest {
+	input: int
+	width: int
+	want:  str
+}
+
+static appendIntTests = []appendIntTest([
+	{0, 0, "0"},
+	{0, 1, "0"},
+	{0, 2, "00"},
+	{0, 3, "000"},
+	{1, 0, "1"},
+	{1, 1, "1"},
+	{1, 2, "01"},
+	{1, 3, "001"},
+	{-1, 0, "-1"},
+	{-1, 1, "-1"},
+	{-1, 2, "-01"},
+	{-1, 3, "-001"},
+	{99, 2, "99"},
+	{100, 2, "100"},
+	{1, 4, "0001"},
+	{12, 4, "0012"},
+	{123, 4, "0123"},
+	{1234, 4, "1234"},
+	{12345, 4, "12345"},
+	{1, 5, "00001"},
+	{12, 5, "00012"},
+	{123, 5, "00123"},
+	{1234, 5, "01234"},
+	{12345, 5, "12345"},
+	{123456, 5, "123456"},
+	{0, 9, "000000000"},
+	{123, 9, "000000123"},
+	{123456, 9, "000123456"},
+	{123456789, 9, "123456789"},
+])
+
+#test
+fn testAppendInt(t: &testing::T) {
+	let mut got: []byte
+	for _, tt in appendIntTests {
+		got = appendInt(got[:0], tt.input, tt.width)
+		if str(got) != tt.want {
+			t.Errorf("appendInt({}, {}) = {}, want {}", tt.input, tt.width, got, tt.want)
+		}
+	}
+}
+
+struct formatTest {
+	name:   str
+	format: str
+	result: str
+}
+
+static formatTests = []formatTest([
+	{"ANSIC", ANSIC, "Thu Feb  5 05:00:57 2009"},
+	{"UnixDate", UnixDate, "Thu Feb  5 05:00:57 UTC 2009"},
+	{"RubyDate", RubyDate, "Thu Feb 05 05:00:57 +0000 2009"},
+	{"RFC822", RFC822, "05 Feb 09 05:00 UTC"},
+	{"RFC850", RFC850, "Thursday, 05-Feb-09 05:00:57 UTC"},
+	{"RFC1123", RFC1123, "Thu, 05 Feb 2009 05:00:57 UTC"},
+	{"RFC1123Z", RFC1123Z, "Thu, 05 Feb 2009 05:00:57 +0000"},
+	{"RFC3339", RFC3339, "2009-02-05T05:00:57Z"},
+	{"RFC3339Nano", RFC3339Nano, "2009-02-05T05:00:57.0123456Z"},
+	{"Kitchen", Kitchen, "5:00AM"},
+	{"am/pm", "3pm", "5am"},
+	{"AM/PM", "3PM", "5AM"},
+	{"two-digit year", "06 01 02", "09 02 05"},
+	// Three-letter months and days must not be followed by lower-case letter.
+	{"Janet", "Hi Janet, the Month is January", "Hi Janet, the Month is February"},
+	// Time stamps, Fractional seconds.
+	{"Stamp", Stamp, "Feb  5 05:00:57"},
+	{"StampMilli", StampMilli, "Feb  5 05:00:57.012"},
+	{"StampMicro", StampMicro, "Feb  5 05:00:57.012345"},
+	{"StampNano", StampNano, "Feb  5 05:00:57.012345600"},
+	{"DateTime", DateTime, "2009-02-05 05:00:57"},
+	{"DateOnly", DateOnly, "2009-02-05"},
+	{"TimeOnly", TimeOnly, "05:00:57"},
+	{"YearDay", "Jan  2 002 __2 2", "Feb  5 036  36 5"},
+	{"Year", "2006 6 06 _6 __6 ___6", "2009 6 09 _6 __6 ___6"},
+	{"Month", "Jan January 1 01 _1", "Feb February 2 02 _2"},
+	{"DayOfMonth", "2 02 _2 __2", "5 05  5  36"},
+	{"DayOfWeek", "Mon Monday", "Thu Thursday"},
+	{"Hour", "15 3 03 _3", "05 5 05 _5"},
+	{"Minute", "4 04 _4", "0 00 _0"},
+	{"Second", "5 05 _5", "57 57 _57"},
+])
+
+#test
+fn testFormat(t: &testing::T) {
+	time := Unix(0, 1233810057012345600)
+	for _, test in formatTests {
+		result := time.Format(test.format)
+		if result != test.result {
+			t.Errorf("{} expected {} got {}", test.name, test.result, result)
+		}
+	}
+}
+
+#test
+fn testFormatSingleDigits(t: &testing::T) {
+	time := Date(2001, 2, 3, 4, 5, 6, 700000000, UTC)
+	test := formatTest{"single digit format", "3:4:5", "4:5:6"}
+	result := time.Format(test.format)
+	if result != test.result {
+		t.Errorf("{} expected {} got {}", test.name, test.result, result)
+	}
+}
+
+struct parseTest {
+	name:       str
+	format:     str
+	value:      str
+	hasTZ:      int  // contains a time zone with offset, -1: yes, negative, 0: no, 1: yes, positive
+	hasWD:      bool // contains a weekday
+	yearSign:   int  // sign of year, -1 indicates the year is not present in the format
+	fracDigits: int  // number of digits of fractional second
+}
+
+static parseTests = []parseTest([
+	{"ANSIC", ANSIC, "Thu Feb  4 21:00:57 2010", 0, true, 1, 0},
+	{"UnixDate", UnixDate, "Thu Feb  4 21:00:57 PST 2010", 0, true, 1, 0},
+	{"RubyDate", RubyDate, "Thu Feb 04 21:00:57 -0800 2010", -1, true, 1, 0},
+	{"RFC850", RFC850, "Thursday, 04-Feb-10 21:00:57 PST", 0, true, 1, 0},
+	{"RFC1123", RFC1123, "Thu, 04 Feb 2010 21:00:57 PST", 0, true, 1, 0},
+	{"RFC1123Z", RFC1123Z, "Thu, 04 Feb 2010 21:00:57 -0800", -1, true, 1, 0},
+	{"RFC3339", RFC3339, "2010-02-04T21:00:57-08:00", -1, false, 1, 0},
+	{"custom: \"2006-01-02 15:04:05-07\"", "2006-01-02 15:04:05-07", "2010-02-04 21:00:57-08", -1, false, 1, 0},
+	// Optional fractional seconds.
+	{"ANSIC", ANSIC, "Thu Feb  4 21:00:57.0 2010", 0, true, 1, 1},
+	{"UnixDate", UnixDate, "Thu Feb  4 21:00:57.01 PST 2010", 0, true, 1, 2},
+	{"RubyDate", RubyDate, "Thu Feb 04 21:00:57.012 -0800 2010", -1, true, 1, 3},
+	{"RFC850", RFC850, "Thursday, 04-Feb-10 21:00:57.0123 PST", 0, true, 1, 4},
+	{"RFC1123", RFC1123, "Thu, 04 Feb 2010 21:00:57.01234 PST", 0, true, 1, 5},
+	{"RFC1123Z", RFC1123Z, "Thu, 04 Feb 2010 21:00:57.01234 -0800", -1, true, 1, 5},
+	{"RFC3339", RFC3339, "2010-02-04T21:00:57.012345678-08:00", -1, false, 1, 9},
+	{"custom: \"2006-01-02 15:04:05\"", "2006-01-02 15:04:05", "2010-02-04 21:00:57.0", 0, false, 1, 0},
+	// Amount of white space should not matter.
+	{"ANSIC", ANSIC, "Thu Feb 4 21:00:57 2010", 0, true, 1, 0},
+	{"ANSIC", ANSIC, "Thu      Feb     4     21:00:57     2010", 0, true, 1, 0},
+	// Case should not matter
+	{"ANSIC", ANSIC, "THU FEB 4 21:00:57 2010", 0, true, 1, 0},
+	{"ANSIC", ANSIC, "thu feb 4 21:00:57 2010", 0, true, 1, 0},
+	// Fractional seconds.
+	{"millisecond:: dot separator", "Mon Jan _2 15:04:05.000 2006", "Thu Feb  4 21:00:57.012 2010", 0, true, 1, 3},
+	{"microsecond:: dot separator", "Mon Jan _2 15:04:05.000000 2006", "Thu Feb  4 21:00:57.012345 2010", 0, true, 1, 6},
+	{"nanosecond:: dot separator", "Mon Jan _2 15:04:05.000000000 2006", "Thu Feb  4 21:00:57.012345678 2010", 0, true, 1, 9},
+	{"millisecond:: comma separator", "Mon Jan _2 15:04:05,000 2006", "Thu Feb  4 21:00:57.012 2010", 0, true, 1, 3},
+	{"microsecond:: comma separator", "Mon Jan _2 15:04:05,000000 2006", "Thu Feb  4 21:00:57.012345 2010", 0, true, 1, 6},
+	{"nanosecond:: comma separator", "Mon Jan _2 15:04:05,000000000 2006", "Thu Feb  4 21:00:57.012345678 2010", 0, true, 1, 9},
+
+	// Leading zeros in other places should not be taken as fractional seconds.
+	{"zero1", "2006.01.02.15.04.05.0", "2010.02.04.21.00.57.0", 0, false, 1, 1},
+	{"zero2", "2006.01.02.15.04.05.00", "2010.02.04.21.00.57.01", 0, false, 1, 2},
+	// Month and day names only match when not followed by a lower-case letter.
+	{"Janet", "Hi Janet, the Month is January: Jan _2 15:04:05 2006", "Hi Janet, the Month is February: Feb  4 21:00:57 2010", 0, true, 1, 0},
+
+	// GMT with offset.
+	{"GMT-8", UnixDate, "Fri Feb  5 05:00:57 GMT-8 2010", -1, true, 1, 0},
+
+	// Accept any number of fractional second digits (including none) for .999...
+	// In Go 1, .999... was completely ignored in the format, meaning the first two
+	// cases would succeed, but the next four would not. Go 1.1 accepts all six.
+	// decimal "." separator.
+	{"", "2006-01-02 15:04:05.9999 -0700 MST", "2010-02-04 21:00:57 -0800 PST", -1, false, 1, 0},
+	{"", "2006-01-02 15:04:05.999999999 -0700 MST", "2010-02-04 21:00:57 -0800 PST", -1, false, 1, 0},
+	{"", "2006-01-02 15:04:05.9999 -0700 MST", "2010-02-04 21:00:57.0123 -0800 PST", -1, false, 1, 4},
+	{"", "2006-01-02 15:04:05.999999999 -0700 MST", "2010-02-04 21:00:57.0123 -0800 PST", -1, false, 1, 4},
+	{"", "2006-01-02 15:04:05.9999 -0700 MST", "2010-02-04 21:00:57.012345678 -0800 PST", -1, false, 1, 9},
+	{"", "2006-01-02 15:04:05.999999999 -0700 MST", "2010-02-04 21:00:57.012345678 -0800 PST", -1, false, 1, 9},
+	// comma "," separator.
+	{"", "2006-01-02 15:04:05,9999 -0700 MST", "2010-02-04 21:00:57 -0800 PST", -1, false, 1, 0},
+	{"", "2006-01-02 15:04:05,999999999 -0700 MST", "2010-02-04 21:00:57 -0800 PST", -1, false, 1, 0},
+	{"", "2006-01-02 15:04:05,9999 -0700 MST", "2010-02-04 21:00:57.0123 -0800 PST", -1, false, 1, 4},
+	{"", "2006-01-02 15:04:05,999999999 -0700 MST", "2010-02-04 21:00:57.0123 -0800 PST", -1, false, 1, 4},
+	{"", "2006-01-02 15:04:05,9999 -0700 MST", "2010-02-04 21:00:57.012345678 -0800 PST", -1, false, 1, 9},
+	{"", "2006-01-02 15:04:05,999999999 -0700 MST", "2010-02-04 21:00:57.012345678 -0800 PST", -1, false, 1, 9},
+
+	{"", StampNano, "Feb  4 21:00:57.012345678", 0, false, -1, 9},
+	{"", "Jan _2 15:04:05.999", "Feb  4 21:00:57.012300000", 0, false, -1, 4},
+	{"", "Jan _2 15:04:05.999", "Feb  4 21:00:57.012345678", 0, false, -1, 9},
+	{"", "Jan _2 15:04:05.999999999", "Feb  4 21:00:57.0123", 0, false, -1, 4},
+	{"", "Jan _2 15:04:05.999999999", "Feb  4 21:00:57.012345678", 0, false, -1, 9},
+
+	// Day of year.
+	{"", "2006-01-02 002 15:04:05", "2010-02-04 035 21:00:57", 0, false, 1, 0},
+	{"", "2006-01 002 15:04:05", "2010-02 035 21:00:57", 0, false, 1, 0},
+	{"", "2006-002 15:04:05", "2010-035 21:00:57", 0, false, 1, 0},
+	{"", "200600201 15:04:05", "201003502 21:00:57", 0, false, 1, 0},
+	{"", "200600204 15:04:05", "201003504 21:00:57", 0, false, 1, 0},
+
+	// Time zone offsets
+	{"", "2006-01-02T15:04:05Z07", "2010-02-04T21:00:57Z", 0, false, 1, 0},
+	{"", "2006-01-02T15:04:05Z07", "2010-02-04T21:00:57+08", 0, false, 1, 0},
+	{"", "2006-01-02T15:04:05Z07", "2010-02-04T21:00:57-08", -1, false, 1, 0},
+	{"", "2006-01-02T15:04:05Z0700", "2010-02-04T21:00:57Z", 0, false, 1, 0},
+	{"", "2006-01-02T15:04:05Z0700", "2010-02-04T21:00:57+0800", +1, false, 1, 0},
+	{"", "2006-01-02T15:04:05Z0700", "2010-02-04T21:00:57-0800", -1, false, 1, 0},
+	{"", "2006-01-02T15:04:05Z07:00", "2010-02-04T21:00:57Z", 0, false, 1, 0},
+	{"", "2006-01-02T15:04:05Z07:00", "2010-02-04T21:00:57+08:00", +1, false, 1, 0},
+	{"", "2006-01-02T15:04:05Z07:00", "2010-02-04T21:00:57-08:00", -1, false, 1, 0},
+	{"", "2006-01-02T15:04:05Z070000", "2010-02-04T21:00:57Z", 0, false, 1, 0},
+	{"", "2006-01-02T15:04:05Z070000", "2010-02-04T21:00:57+080000", +1, false, 1, 0},
+	{"", "2006-01-02T15:04:05Z070000", "2010-02-04T21:00:57-080000", -1, false, 1, 0},
+	{"", "2006-01-02T15:04:05Z07:00:00", "2010-02-04T21:00:57Z", 0, false, 1, 0},
+	{"", "2006-01-02T15:04:05Z07:00:00", "2010-02-04T21:00:57+08:00:00", +1, false, 1, 0},
+	{"", "2006-01-02T15:04:05Z07:00:00", "2010-02-04T21:00:57-08:00:00", -1, false, 1, 0},
+])
+
+fn checkTime(time: Time, &test: parseTest, t: &testing::T) {
+	// The time should be Thu Feb  4 21:00:57 PST 2010
+	if test.yearSign >= 0 && test.yearSign*time.Year() != 2010 {
+		t.Errorf("{}: bad year: {} not {}", test.name, time.Year(), 2010)
+	}
+	if time.Month() != February {
+		t.Errorf("{}: bad month: {} not {}", test.name, time.Month(), February)
+	}
+	if time.Day() != 4 {
+		t.Errorf("{}: bad day: {} not {}", test.name, time.Day(), 4)
+	}
+	if time.Hour() != 21 {
+		t.Errorf("{}: bad hour: {} not {}", test.name, time.Hour(), 21)
+	}
+	if time.Minute() != 0 {
+		t.Errorf("{}: bad minute: {} not {}", test.name, time.Minute(), 0)
+	}
+	if time.Second() != 57 {
+		t.Errorf("{}: bad second: {} not {}", test.name, time.Second(), 57)
+	}
+	// Nanoseconds must be checked against the precision of the input.
+	nanosec := conv::ParseUint("012345678"[:test.fracDigits]+"000000000"[:9-test.fracDigits], 10, 0) else {
+		panic("checkTime: conv failed")
+		ret
+	}
+	if time.Nanosecond() != int(nanosec) {
+		t.Errorf("{}: bad nanosecond: {} not {}", test.name, time.Nanosecond(), nanosec)
+	}
+	name, offset := time.Zone()
+	if test.hasTZ == -1 && offset != -28800 ||
+		test.hasTZ == +1 && offset != 28800 {
+		t.Errorf("{}: bad tz offset: {} {} not {}", test.name, name, offset, -28800)
+	}
+	if test.hasWD && time.Weekday() != Thursday {
+		t.Errorf("{}: bad weekday: {} not {}", test.name, time.Weekday(), Thursday)
+	}
+}
+
+#test
+fn testParse(t: &testing::T) {
+	for _, test in parseTests {
+		time := Parse(test.format, test.value) else {
+			t.Errorf("{} error: {}", test.name, error)
+			continue
+		}
+		checkTime(time, test, t)
+	}
+}
+
+static rubyTests = []parseTest([
+	{"RubyDate", RubyDate, "Thu Feb 04 21:00:57 -0800 2010", -1, true, 1, 0},
+	// Ignore the time zone in the test. If it parses, it'll be OK.
+	{"RubyDate", RubyDate, "Thu Feb 04 21:00:57 -0000 2010", 0, true, 1, 0},
+	{"RubyDate", RubyDate, "Thu Feb 04 21:00:57 +0000 2010", 0, true, 1, 0},
+	{"RubyDate", RubyDate, "Thu Feb 04 21:00:57 +1130 2010", 0, true, 1, 0},
+])
+
+// Problematic time zone format needs special tests.
+#test
+fn testRubyParse(t: &testing::T) {
+	for _, test in rubyTests {
+		time := Parse(test.format, test.value) else {
+			t.Errorf("{} error: {}", test.name, error)
+			continue
+		}
+		checkTime(time, test, t)
+	}
+}
+
+struct parseTimeZoneTest {
+	value:  str
+	length: int
+	ok:     bool
+}
+
+static parseTimeZoneTests = []parseTimeZoneTest([
+	{"gmt hi there", 0, false},
+	{"GMT hi there", 3, true},
+	{"GMT+12 hi there", 6, true},
+	{"GMT+00 hi there", 6, true},
+	{"GMT+", 3, true},
+	{"GMT+3", 5, true},
+	{"GMT+a", 3, true},
+	{"GMT+3a", 5, true},
+	{"GMT-5 hi there", 5, true},
+	{"GMT-51 hi there", 3, true},
+	{"ChST hi there", 4, true},
+	{"MeST hi there", 4, true},
+	{"MSDx", 3, true},
+	{"MSDY", 0, false}, // four letters must end in T.
+	{"ESAST hi", 5, true},
+	{"ESASTT hi", 0, false}, // run of upper-case letters too long.
+	{"ESATY hi", 0, false},  // five letters must end in T.
+	{"WITA hi", 4, true},    // Issue #18251
+	// Issue #24071
+	{"+03 hi", 3, true},
+	{"-04 hi", 3, true},
+	// Issue #26032
+	{"+00", 3, true},
+	{"-11", 3, true},
+	{"-12", 3, true},
+	{"-23", 3, true},
+	{"-24", 0, false},
+	{"+13", 3, true},
+	{"+14", 3, true},
+	{"+23", 3, true},
+	{"+24", 0, false},
+])
+
+#test
+fn testParseTimeZone(t: &testing::T) {
+	for _, test in parseTimeZoneTests {
+		length, ok := parseTimeZone(test.value)
+		if ok != test.ok {
+			t.Errorf("expected {} for {} got {}", test.ok, test.value, ok)
+		} else if length != test.length {
+			t.Errorf("expected {} for {} got {}", test.length, test.value, length)
+		}
+	}
+}
+
+#test
+fn testFormatFractionalSecondSeparators(t: &testing::T) {
+	tests := [
+		[`15:04:05.000`, `05:00:57.012`],
+		[`15:04:05.999`, `05:00:57.012`],
+		[`15:04:05,000`, `05:00:57,012`],
+		[`15:04:05,999`, `05:00:57,012`],
+	]
+	time := Unix(0, 1233810057012345600)
+	for _, tt in tests {
+		q := time.Format(tt[0])
+		if q != tt[1] {
+			t.Errorf("Format({}) = got {}, want {}", tt[0], q, tt[1])
+		}
+	}
+}
+
+struct longFractionalDigitTest {
+	value: str
+	want:  int
+}
+
+static longFractionalDigitsTests = []longFractionalDigitTest([
+	// 9 digits
+	{"2021-09-29T16:04:33.000000000Z", 0},
+	{"2021-09-29T16:04:33.000000001Z", 1},
+	{"2021-09-29T16:04:33.100000000Z", 100_000_000},
+	{"2021-09-29T16:04:33.100000001Z", 100_000_001},
+	{"2021-09-29T16:04:33.999999999Z", 999_999_999},
+	{"2021-09-29T16:04:33.012345678Z", 12_345_678},
+	// 10 digits, truncates
+	{"2021-09-29T16:04:33.0000000000Z", 0},
+	{"2021-09-29T16:04:33.0000000001Z", 0},
+	{"2021-09-29T16:04:33.1000000000Z", 100_000_000},
+	{"2021-09-29T16:04:33.1000000009Z", 100_000_000},
+	{"2021-09-29T16:04:33.9999999999Z", 999_999_999},
+	{"2021-09-29T16:04:33.0123456789Z", 12_345_678},
+	// 11 digits, truncates
+	{"2021-09-29T16:04:33.10000000000Z", 100_000_000},
+	{"2021-09-29T16:04:33.00123456789Z", 1_234_567},
+	// 12 digits, truncates
+	{"2021-09-29T16:04:33.000123456789Z", 123_456},
+	// 15 digits, truncates
+	{"2021-09-29T16:04:33.9999999999999999Z", 999_999_999},
+])
+
+#test
+fn testParseFractionalSecondsLongerThanNineDigits(t: &testing::T) {
+	for _, tt in longFractionalDigitsTests {
+		for _, format in [RFC3339, RFC3339Nano] {
+			tm := Parse(format, tt.value) else {
+				t.Errorf("Parse({}, {}) error: {}", format, tt.value, error)
+				continue
+			}
+			got := tm.Nanosecond()
+			if got != tt.want {
+				t.Errorf("Parse({}, {}) = got {}, want {}", format, tt.value, got, tt.want)
+			}
+		}
+	}
+}
