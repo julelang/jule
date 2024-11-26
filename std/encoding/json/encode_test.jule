@@ -297,3 +297,131 @@ fn testEncodeBigHead(t: &testing::T) {
 		t.Errorf("Valid() returns false for Encode(bigHead)")
 	}
 }
+
+type abc: int
+
+impl abc {
+	fn EncodeJSON(self)!: []byte {
+		match self {
+		| 1:
+			ret []byte("true")
+		| 0:
+			ret []byte("false")
+		|:
+			panic("unimplemented case")
+		}
+	}
+
+	fn DecodeJSON(mut self, data: []byte)! {
+		match {
+		| str(data) == "true":
+			self = 1
+		| str(data) == "false":
+			self = 0
+		}
+	}
+}
+
+#test
+fn testCustomEncode(t: &testing::T) {
+	mut a := new(abc, 0)
+	mut r := Encode(a) else {
+		t.Errorf("want false, throwed exception")
+		use []byte("false")
+	}
+	if str(r) != "false" {
+		t.Errorf("want false, found {}", str(r))
+	}
+	*a = 1
+	r = Encode(a) else {
+		t.Errorf("want true, throwed exception")
+		use []byte("true")
+	}
+	if str(r) != "true" {
+		t.Errorf("want true, found {}", str(r))
+	}
+}
+
+#test
+fn testCustomEncode1(t: &testing::T) {
+	mut a := abc(0)
+	mut r := Encode(a) else {
+		t.Errorf("want false, throwed exception")
+		use []byte("false")
+	}
+	if str(r) != "false" {
+		t.Errorf("want false, found {}", str(r))
+	}
+	a = 1
+	r = Encode(a) else {
+		t.Errorf("want true, throwed exception")
+		use []byte("true")
+	}
+	if str(r) != "true" {
+		t.Errorf("want true, found {}", str(r))
+	}
+}
+
+type abc2: &int
+
+impl abc2 {
+	fn EncodeJSON(self)!: []byte {
+		match *self {
+		| 1:
+			ret []byte("true")
+		| 0:
+			ret []byte("false")
+		|:
+			panic("unimplemented case")
+		}
+	}
+
+	fn DecodeJSON(mut self, data: []byte)! {
+		match {
+		| str(data) == "true":
+			*self = 1
+		| str(data) == "false":
+			*self = 0
+		}
+	}
+}
+
+#test
+fn testCustomEncode2(t: &testing::T) {
+	mut a := abc2(new(int, 0))
+	mut r := Encode(a) else {
+		t.Errorf("want false, throwed exception")
+		use []byte("false")
+	}
+	if str(r) != "false" {
+		t.Errorf("want false, found {}", str(r))
+	}
+	*a = 1
+	r = Encode(a) else {
+		t.Errorf("want true, throwed exception")
+		use []byte("true")
+	}
+	if str(r) != "true" {
+		t.Errorf("want true, found {}", str(r))
+	}
+}
+
+#test
+fn testCustomEncode3(t: &testing::T) {
+	mut a := new(abc2, new(int, 0))
+	mut r := Encode(a) else {
+		t.Errorf("want false, throwed exception")
+		use []byte("false")
+	}
+	if str(r) != "false" {
+		t.Errorf("want false, found {}", str(r))
+	}
+	**a = 1
+	r = Encode(a) else {
+		t.Errorf("want true, throwed exception")
+		use []byte("true")
+	}
+	if str(r) != "true" {
+		t.Errorf("want true, found {}", str(r))
+	}
+}

@@ -351,6 +351,30 @@ impl jsonEncoder {
 		const match {
 		| tt.Binded():
 			error(EncodeError.UnsupportedType)
+		| tt.Strict() || tt.Kind() == comptime::Kind.Struct:
+			// Before using the default encoding strategy, look for the custom encoder
+			// method and use it, if any. If not exist any custom encoder method,
+			// fallback to default encoding.
+			const for _, method in tt.Decl().Methods() {
+				const match {
+				| method.Name() == "EncodeJSON":
+					const params = method.Params()
+					const match {
+					| len(params) == 1 && !params[0].Mutable():
+						const m = comptime::ValueOf(t).Method(method.Name())
+						const match type m.Type().Result() {
+						| []byte:
+							bytes := m.Unwrap()() else { error(error) }
+							if !Valid(bytes) {
+								error(EncodeError.EncodeJSON)
+							}
+							self.buf.write(bytes)
+							ret
+						}
+					}
+				}
+			}
+			// Fallback to the defult strategy.
 		}
 		const match tt.Kind() {
 		| comptime::Kind.Int | comptime::Kind.I8 | comptime::Kind.I16 | comptime::Kind.I32 | comptime::Kind.I64:
@@ -459,6 +483,17 @@ fn encoder(): jsonEncoder {
 // recursive function calls, resulting in a crash at runtime. As a result of the tests,
 // it is recommended that a data type can carry a maximum of 10000 nested data.
 // However, tousands of nested-data is always risky even below 10000.
+//
+// Custom encoder methods are supported. Any type that supports it must define
+// an appropriate encoder method:
+//
+//	fn EncodeJSON(self)!: []byte
+//
+// For types with this method, this method is called instead of the default
+// encoding strategy and custom encoding is performed. The returned bytes must
+// be a valid JSON value. Otherwise, EncodeError.EncodeJSON exception is thrown.
+// Throwing any exception is considered valid. The thrown exception will be
+// forwarded by the Encode. Successful encoding should not throw any exceptions.
 fn Encode[T](t: T)!: []byte {
 	mut encoder := encoder()
 	encoder.encode[T, encodeFlagType.Plain](t) else { error(error) }
