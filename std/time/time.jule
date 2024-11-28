@@ -108,6 +108,10 @@ const Saturday = Weekday(6)
 // This means the date January 1, 1970. Implementation can also handle
 // the Unix time in the negative plane. For example, -10 seconds should be
 // equivalent to Wed Dec 31 1969 23:59:50 UTC+0000.
+//
+// Using the == operator when comparing a Time instance is often not what
+// is desired. Because this compares not only the time, but also things like
+// the memory address of the location data.
 struct Time {
 	sec:  i64
 	nsec: i32 // In the range [0, 999999999].
@@ -329,6 +333,15 @@ impl Time {
 			ret +1
 		}
 		ret 0
+	}
+
+	// Reports whether self and u represent the same time instant.
+	// Two times can be equal even if they are in different locations.
+	// For example, 6:00 +0200 and 4:00 UTC are Equal.
+	// See the documentation on the Time type for the pitfalls of using == with
+	// Time values; most code should use Equal instead.
+	fn Equal(self, u: Time): bool {
+		ret self.sec == u.sec && self.nsec == u.nsec
 	}
 
 	fn appendTo(self, mut b: []byte)!: []byte {
