@@ -287,6 +287,37 @@ impl Time {
 		year, yday := thu.yearYday()
 		ret year, (yday-1)/7 + 1
 	}
+
+	fn appendTo(self, mut b: []byte)!: []byte {
+		b, ok := appendStrictRFC3339(self, b)
+		if !ok {
+			error(ParseError.InvalidRange)
+		}
+		ret b
+	}
+
+	// Implements the custom text encoder method which is appends to b.
+	// The time is formatted in RFC 3339 format with sub-second precision.
+	// If the timestamp cannot be represented as valid RFC 3339
+	// (e.g., the year is out of range), then throws exception
+	// with the ParseError.InvalidRange.
+	fn AppendText(self, mut b: []byte)!: []byte {
+		ret self.appendTo(b) else { error(error) }
+	}
+
+	// Implements the custom text encoder method.
+	// matches that of calling the [Time.AppendText] method.
+	//
+	// See [Time.AppendText] for more information.
+	fn EncodeText(self)!: []byte {
+		ret self.appendTo(make([]byte, 0, len(RFC3339Nano))) else { error(error) }
+	}
+
+	// Implements the custom text decoder method.
+	// The time must be in the RFC 3339 format.
+	fn DecodeText(mut self, data: []byte)! {
+		self = parseStrictRFC3339(data) else { error(error) }
+	}
 }
 
 // Returns the current system-time UTC.

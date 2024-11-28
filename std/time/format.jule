@@ -1124,12 +1124,12 @@ fn commaOrPeriod(b: byte): bool {
 	ret b == '.' || b == ','
 }
 
-fn parseNanoseconds[bytes: []byte | str](mut value: bytes, mut nbytes: int)!: (ns: int) {
+fn parseNanoseconds[bytes: []byte | str](value: bytes, mut nbytes: int)!: (ns: int) {
 	if !commaOrPeriod(value[0]) {
 		error(ParseError.BadField)
 	}
 	if nbytes > 10 {
-		value = value[:10]
+		unsafe { *(&value) = (*(&value))[:10] } // Break immutability for slicing.
 		nbytes = 10
 	}
 
@@ -1286,15 +1286,15 @@ fn leadingInt[bytes: []byte | str](s: bytes)!: (x: u64, rem: bytes) {
 			error(ParseError.LeadingInt)
 		}
 	}
-	ret x, s[i:]
+	ret x, unsafe { (*(&s))[i:] } // Break immutability for return.
 }
 
 // Duplicates functionality in strconv, but avoids dependency.
-fn atoi[bytes: []byte | str](mut s: bytes)!: (x: int) {
+fn atoi[bytes: []byte | str](s: bytes)!: (x: int) {
 	mut neg := false
 	if len(s) > 0 && (s[0] == '-' || s[0] == '+') {
 		neg = s[0] == '-'
-		s = s[1:]
+		unsafe { *(&s) = (*(&s))[1:] } // Break immutability for slicing.
 	}
 	q, rem := leadingInt(s) else { error(error) }
 	x = int(q)

@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+// RFC 3339 is the most commonly used format.
+// It is implicitly used by the Time.(Encode|Decode)(Text) methods.
+
+use "std/unsafe"
+
 fn appendFormatRFC3339(&t: Time, mut b: []byte, nanos: bool): []byte {
 	_, offset, abs := t.locabs()
 
@@ -45,7 +50,26 @@ fn appendFormatRFC3339(&t: Time, mut b: []byte, nanos: bool): []byte {
 	ret b
 }
 
-fn parseRFC3339[bytes: []byte | str](mut s: bytes, mut local: &Location): (Time, bool) {
+fn appendStrictRFC3339(&t: Time, mut b: []byte): ([]byte, ok: bool) {
+	n0 := len(b)
+	b = appendFormatRFC3339(t, b, true)
+
+	// Not all valid Jule timestamps can be serialized as valid RFC 3339.
+	// Explicitly check for these edge cases.
+	num2 := fn(b: []byte): byte { ret 10*(b[0]-'0') + (b[1] - '0') }
+	match {
+	| b[n0+len("9999")] != '-': // year must be exactly 4 digits wide
+		ret b, false
+	| b[len(b)-1] != 'Z':
+		c := b[len(b)-len("Z07:00")]
+		if ('0' <= c && c <= '9') || num2(b[len(b)-len("07:00"):]) >= 24 {
+			ret b, false
+		}
+	}
+	ret b, true
+}
+
+fn parseRFC3339[bytes: []byte | str](s: bytes, mut local: &Location): (Time, bool) {
 	// parseUint parses s as an unsigned decimal integer and
 	// verifies that it is within some range.
 	// If it is invalid or out-of-range,
@@ -79,7 +103,7 @@ fn parseRFC3339[bytes: []byte | str](mut s: bytes, mut local: &Location): (Time,
 	if !ok || !(s[4] == '-' && s[7] == '-' && s[10] == 'T' && s[13] == ':' && s[16] == ':') {
 		ret Time{}, false
 	}
-	s = s[19:]
+	unsafe { *(&s) = (*(&s))[19:] } // Break immutability for slicing.
 
 	// Parse the fractional second.
 	mut nsec := 0
@@ -88,7 +112,7 @@ fn parseRFC3339[bytes: []byte | str](mut s: bytes, mut local: &Location): (Time,
 		for n < len(s) && isDigit(s, n); n++ {
 		}
 		nsec = parseNanoseconds(s, n) else { use 0 }
-		s = s[n:]
+		unsafe { *(&s) = (*(&s))[n:] } // Break immutability for slicing.
 	}
 
 	// Parse the time zone.
@@ -118,4 +142,33 @@ fn parseRFC3339[bytes: []byte | str](mut s: bytes, mut local: &Location): (Time,
 		}
 	}
 	ret t, true
+}
+
+fn parseStrictRFC3339(b: []byte)!: Time {
+	mut t, ok := parseRFC3339(b, unsafe { *(&Local) })
+	if !ok {
+		t = Parse(RFC3339, unsafe::BytesStr(b)) else { error(error) }
+		// The parse template syntax cannot correctly validate RFC 3339.
+		// Explicitly check for cases that Parse is unable to validate for.
+		num2 := fn(b: []byte): byte { ret 10*(b[0]-'0') + (b[1] - '0') }
+		match {
+		| true:
+			ret t
+		| b[len("2006-01-02T")+1] == ':': // hour must be two digits
+			error(ParseError.InvalidNumber)
+		| b[len("2006-01-02T15:04:05")] == ',': // sub-second separator must be a period
+			error(ParseError.BadField)
+		| b[len(b)-1] != 'Z':
+			match {
+			| num2(b[len(b)-len("07:00"):]) >= 24: // timezone hour must be in range
+				error(ParseError.InvalidRange)
+			| num2(b[len(b)-len("00"):]) >= 60: // timezone minute must be in range
+				error(ParseError.InvalidRange)
+			}
+		|:
+			// unknown error; should not occur
+			error(ParseError.BadField)
+		}
+	}
+	ret t
 }
