@@ -288,6 +288,23 @@ impl Time {
 		ret year, (yday-1)/7 + 1
 	}
 
+	// Returns the time self+d.
+	fn Add(self, d: Duration): Time {
+		mut t := self
+		mut dsec := i64(d / 1e9)
+		mut nsec := t.nsec + i32(d%1e9)
+		if nsec >= 1e9 {
+			dsec++
+			nsec -= 1e9
+		} else if nsec < 0 {
+			dsec--
+			nsec += 1e9
+		}
+		t.nsec = nsec
+		t.addSec(dsec)
+		ret t
+	}
+
 	fn appendTo(self, mut b: []byte)!: []byte {
 		b, ok := appendStrictRFC3339(self, b)
 		if !ok {
