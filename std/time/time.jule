@@ -309,6 +309,23 @@ impl Time {
 		ret t
 	}
 
+	// Returns the duration t(self)-u. If the result exceeds the maximum (or minimum)
+	// value that can be stored in a [Duration], the maximum (or minimum) duration
+	// will be returned.
+	// To compute t-d for a duration d, use t.Add(-d).
+	fn Sub(self, u: Time): Duration {
+		d := Duration(self.sec-u.sec)*Second + Duration(self.nsec-u.nsec)
+		// Check for overflow or underflow.
+		match {
+		| u.Add(d).Equal(self):
+			ret d // d is correct
+		| self.Before(u):
+			ret durationMin // t - u is negative out of range
+		|:
+			ret durationMax // t - u is positive out of range
+		}
+	}
+
 	// Reports whether the time instant is after u.
 	fn After(self, u: Time): bool {
 		ret self.sec > u.sec || self.sec == u.sec && self.nsec > u.nsec
