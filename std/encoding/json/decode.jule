@@ -466,13 +466,42 @@ impl jsonDecoder {
 					}
 				}
 			}
+			b := self.data[self.i]
+			match b {
+			| '"': // String literal
+				const for _, method in tt.Decl().Methods() {
+					const match {
+					| method.Name() == "DecodeText":
+						const params = method.Params()
+						const match {
+						| len(params) == 2 && params[0].Mutable():
+							// Checking params[0] above is safe, because methods
+							// always same the receiver parameter. However,
+							// check params[1] here to avoid index-overflow error.
+							const match {
+							| !params[1].Mutable():
+								const m = comptime::ValueOf(t).Method(method.Name())
+								const match type m.Type().Params()[1].Type() {
+								| []byte:
+									const match m.Type().Result().Kind() {
+									| comptime::Kind.Void:
+										lit := self.scanValidLit() else { error(error) }
+										m.Unwrap()(lit[1:len(lit)-1]) else { error(error) }
+										ret true
+									}
+								}
+							}
+						}
+					}
+				}
+			}
 		}
 		ret false
 	}
 
 	fn value1[T](self, mut &t: T)! {
 		// Before using the default decoding strategy, look for the custom decoder
-		// method and use it, if any. If not exist any custom decoder method,
+		// methods and use it, if any. If not exist any custom decoder method,
 		// fallback to default decoding.
 		ok := self.tryCustomDecode(t) else { error(error) }
 		if ok {
@@ -564,7 +593,7 @@ impl jsonDecoder {
 
 	fn value[T](self, mut &t: T)! {
 		// Before using the default decoding strategy, look for the custom decoder
-		// method and use it, if any. If not exist any custom decoder method,
+		// methods and use it, if any. If not exist any custom decoder method,
 		// fallback to default decoding.
 		ok := self.tryCustomDecode(t) else { error(error) }
 		if ok {
@@ -653,20 +682,9 @@ impl jsonDecoder {
 // it is recommended that a data type can carry a maximum of 10000 nested data.
 // However, tousands of nested-data is always risky even below 10000.
 //
-// Custom decoder methods are supported. Any type that supports it must define
-// an appropriate decoder method:
-//
-//	fn DecodeJSON(self, data: []byte)!
-//
-// For types with this method, this method is called instead of the default
-// decoding strategy and custom decoding is performed. The data parameter is the
-// corresponding data equivalent and is always a validated, error-free JSON data.
-// It is a mutable copy taken from the data used for decoding, so any change may
-// cause mutation in the main data. According to the defined behavior,
-// decoder methods should not mutate the content of the data.
-// Throwing any exception is considered valid. The thrown exception will be
-// forwarded by the Decode. Successful decoding should not throw any exceptions
-// and self should be changed as required.
+// Supported trait implementations by higher-to-lower precedence
+// (having methods without implementing the trait is valid):
+//	JSONDecoder, TextDecoder
 fn Decode[T](data: []byte, mut &t: T)! {
 	decoder := jsonDecoder{
 		data: data,
