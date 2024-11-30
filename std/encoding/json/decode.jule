@@ -441,37 +441,10 @@ impl jsonDecoder {
 		const tt = comptime::TypeOf(T)
 		const match {
 		| tt.Strict() || tt.Kind() == comptime::Kind.Struct:
-			const for _, method in tt.Decl().Methods() {
-				const match {
-				| method.Name() == "DecodeJSON":
-					const params = method.Params()
-					const match {
-					| len(params) == 2 && params[0].Mutable():
-						// Checking params[0] above is safe, because methods
-						// always same the receiver parameter. However,
-						// check params[1] here to avoid index-overflow error.
-						const match {
-						| !params[1].Mutable():
-							const m = comptime::ValueOf(t).Method(method.Name())
-							const match type m.Type().Params()[1].Type() {
-							| []byte:
-								const match m.Type().Result().Kind() {
-								| comptime::Kind.Void:
-									lit := self.scanValidLit() else { error(error) }
-									m.Unwrap()(lit) else { error(error) }
-									ret true
-								}
-							}
-						}
-					}
-				}
-			}
-			b := self.data[self.i]
-			match b {
-			| '"': // String literal
+			const for _, name in ["DecodeJSON", "DecodeText"] {
 				const for _, method in tt.Decl().Methods() {
 					const match {
-					| method.Name() == "DecodeText":
+					| method.Name() == name:
 						const params = method.Params()
 						const match {
 						| len(params) == 2 && params[0].Mutable():
@@ -485,8 +458,21 @@ impl jsonDecoder {
 								| []byte:
 									const match m.Type().Result().Kind() {
 									| comptime::Kind.Void:
-										lit := self.scanValidLit() else { error(error) }
-										m.Unwrap()(lit[1:len(lit)-1]) else { error(error) }
+										const match name {
+										| "DecodeJSON":
+											lit := self.scanValidLit() else { error(error) }
+											m.Unwrap()(lit) else { error(error) }
+										| "DecodeText":
+											b := self.data[self.i]
+											if b == '"' {
+												// Next literal is not string literal.
+												// DecodeText is suitable.
+												lit := self.scanValidLit() else { error(error) }
+												m.Unwrap()(lit[1:len(lit)-1]) else { error(error) }
+											}
+										|:
+											panic("std/encoding/json: unimplemented decoding method")
+										}
 										ret true
 									}
 								}

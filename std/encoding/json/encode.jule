@@ -355,37 +355,30 @@ impl jsonEncoder {
 			// Before using the default encoding strategy, look for the custom encoder
 			// methods and use it, if any. If not exist any custom encoder method,
 			// fallback to default encoding.
-			const for _, method in tt.Decl().Methods() {
-				const match {
-				| method.Name() == "EncodeJSON":
-					const params = method.Params()
+			const for _, name in ["EncodeJSON", "EncodeText"] {
+				const for _, method in tt.Decl().Methods() {
 					const match {
-					| len(params) == 1 && !params[0].Mutable():
-						const m = comptime::ValueOf(t).Method(method.Name())
-						const match type m.Type().Result() {
-						| []byte:
-							bytes := m.Unwrap()() else { error(error) }
-							if !Valid(bytes) {
-								error(EncodeError.EncodeJSON)
+					| method.Name() == name:
+						const params = method.Params()
+						const match {
+						| len(params) == 1 && !params[0].Mutable():
+							const m = comptime::ValueOf(t).Method(method.Name())
+							const match type m.Type().Result() {
+							| []byte:
+								bytes := m.Unwrap()() else { error(error) }
+								const match name {
+								| "EncodeJSON":
+									if !Valid(bytes) {
+										error(EncodeError.EncodeJSON)
+									}
+									self.buf.write(bytes)
+								| "EncodeText":
+									self.encodeStr(unsafe::BytesStr(bytes))
+								|:
+									panic("std/encoding/json: unimplemented encoding method")
+								}
+								ret
 							}
-							self.buf.write(bytes)
-							ret
-						}
-					}
-				}
-			}
-			const for _, method in tt.Decl().Methods() {
-				const match {
-				| method.Name() == "EncodeText":
-					const params = method.Params()
-					const match {
-					| len(params) == 1 && !params[0].Mutable():
-						const m = comptime::ValueOf(t).Method(method.Name())
-						const match type m.Type().Result() {
-						| []byte:
-							bytes := m.Unwrap()() else { error(error) }
-							self.encodeStr(unsafe::BytesStr(bytes))
-							ret
 						}
 					}
 				}
