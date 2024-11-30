@@ -2115,22 +2115,41 @@ fn makeComptimeRange(mut &d: &Data) {
 	match {
 	| d.Type.comptimeStructFields() != nil:
 		d.Type = &Type{Kind: &comptimeRange{d.Type.comptimeStructFields()}}
+		ret
 	| d.Type.comptimeEnumFields() != nil:
 		d.Type = &Type{Kind: &comptimeRange{d.Type.comptimeEnumFields()}}
+		ret
 	| d.Type.comptimeTypeInfos() != nil:
 		d.Type = &Type{Kind: &comptimeRange{d.Type.comptimeTypeInfos()}}
+		ret
 	| d.Type.comptimeParams() != nil:
 		d.Type = &Type{Kind: &comptimeRange{d.Type.comptimeParams()}}
+		ret
 	| d.Type.comptimeStatics() != nil:
 		d.Type = &Type{Kind: &comptimeRange{d.Type.comptimeStatics()}}
+		ret
 	| d.Type.comptimeFiles() != nil:
 		d.Type = &Type{Kind: &comptimeRange{d.Type.comptimeFiles()}}
+		ret
 	| d.Type.comptimeDecls() != nil:
 		d.Type = &Type{Kind: &comptimeRange{d.Type.comptimeDecls()}}
-	|:
-		// Flag for failure.
-		d.Decl = true
+		ret
+	| d.Type.Slc() != nil:
+		match type d.Model {
+		| &SliceExpr:
+			mut s := (&SliceExpr)(d.Model)
+			for _, e in s.Elems {
+				if !e.IsConst() {
+					goto fail
+				}
+			}
+			d.Type = &Type{Kind: &comptimeRange{&comptimeSliceRange{s}}}
+			ret
+		}
 	}
+fail:
+	// Flag for failure.
+	d.Decl = true
 }
 
 // Reports whether d can match at comptime.

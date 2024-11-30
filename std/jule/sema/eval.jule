@@ -838,9 +838,9 @@ impl eval {
 			Kind: arr,
 		}
 		if filled {
-			model.Elems = make([]Expr, 0, 2)
+			model.Elems = make([]&Data, 0, 2)
 		} else {
-			model.Elems = make([]Expr, 0, len(s.Exprs))
+			model.Elems = make([]&Data, 0, len(s.Exprs))
 		}
 
 		mut prefix := self.prefix
@@ -854,7 +854,7 @@ impl eval {
 			if self.s.checkValidityForInitExpr(self.target.mutable, destIsRef, arr.Elem, d, elem.Token) {
 				_ = self.s.checkAssignType(destIsRef, arr.Elem, d, elem.Token, self.getOwnerRefers())
 			}
-			model.Elems = append(model.Elems, d.Model)
+			model.Elems = append(model.Elems, d)
 		}
 		self.prefix = prefix
 
@@ -872,7 +872,7 @@ impl eval {
 		}
 	}
 
-	fn evalExpSlc(mut &self, mut s: &ast::SliceExpr, mut t: &Type, mut first: Expr): &Data {
+	fn evalExpSlc(mut &self, mut s: &ast::SliceExpr, mut t: &Type, mut first: &Data): &Data {
 		mut slc := &Slc{
 			Elem: t,
 		}
@@ -880,7 +880,7 @@ impl eval {
 		mut i := 0
 		mut model := &SliceExpr{
 			ElemType: t,
-			Elems: make([]Expr, 0, len(s.Exprs)),
+			Elems: make([]&Data, 0, len(s.Exprs)),
 		}
 		if first != nil {
 			model.Elems = append(model.Elems, first)
@@ -896,7 +896,7 @@ impl eval {
 				if self.s.checkValidityForInitExpr(self.target.mutable, destIsRef, slc.Elem, d, elem.Token) {
 					_ = self.s.checkAssignType(destIsRef, slc.Elem, d, elem.Token, self.getOwnerRefers())
 				}
-				model.Elems = append(model.Elems, d.Model)
+				model.Elems = append(model.Elems, d)
 			}
 		}
 		self.prefix = prefix
@@ -949,7 +949,7 @@ impl eval {
 		self.s.checkValidityForInitExpr(self.target.mutable, destIsRef,
 			firstElem.Type, firstElem, firstExpr.Token)
 
-		d = self.evalExpSlc(s, firstElem.Type, firstElem.Model)
+		d = self.evalExpSlc(s, firstElem.Type, firstElem)
 
 		self.prefix = prefix
 		ret d
@@ -1011,7 +1011,7 @@ impl eval {
 			if indx >= f64(len(m.Elems)) {
 				self.pushErr(i.Token, build::LogMsg.OverflowLimits)
 			} else {
-				d.Model = m.Elems[u64(indx)]
+				d.Model = m.Elems[u64(indx)].Model
 				d.Decl = true // Set Model: flag.
 			}
 		}
@@ -1578,7 +1578,7 @@ impl eval {
 		}
 
 		t = t.Slc().Elem
-		prim := t.Prim()
+		mut prim := t.Prim()
 		if prim == nil || (!prim.IsU8() && !prim.IsI32()) {
 			self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, d.Type.Str(), t.Str())
 			ret
@@ -1591,12 +1591,15 @@ impl eval {
 				s := c.ReadStr()
 				mut model := &SliceExpr{
 					ElemType: t,
-					Elems: make([]Expr, 0, len(s)),
+					Elems: make([]&Data, 0, len(s)),
 				}
 				for _, b in s {
 					mut bc := constant::Const.NewU64(u64(b))
 					bc.Kind = prim.Kind
-					model.Elems = append(model.Elems, bc)
+					model.Elems = append(model.Elems, &Data{
+						Type: &Type{Kind: prim},
+						Constant: bc,
+					})
 				}
 				d.Model = model
 				d.Decl = true // Prevent model changing.
@@ -1604,12 +1607,15 @@ impl eval {
 				runes := []rune(c.ReadStr())
 				mut model := &SliceExpr{
 					ElemType: t,
-					Elems: make([]Expr, 0, len(runes)),
+					Elems: make([]&Data, 0, len(runes)),
 				}
 				for _, r in runes {
 					mut rc := constant::Const.NewI64(i64(r))
 					rc.Kind = prim.Kind
-					model.Elems = append(model.Elems, rc)
+					model.Elems = append(model.Elems, &Data{
+						Type: &Type{Kind: prim},
+						Constant: rc,
+					})
 				}
 				d.Model = model
 				d.Decl = true // Prevent model changing.

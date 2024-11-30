@@ -2092,6 +2092,51 @@ impl comptimeDecl {
 	}
 }
 
+struct comptimeSliceRange {
+	s: &SliceExpr
+}
+
+impl comptimeRangeKind for comptimeSliceRange {
+	fn ready(mut self, mut &keyA: &Var, mut &keyB: &Var) {
+		if keyA != nil {
+			keyA.Constant = true
+			keyA.Value = &Value{
+				Data: new(Data),
+			}
+			keyA.TypeSym = findBuiltinTypeAlias(types::Kind.Int).TypeSym
+		}
+		if keyB != nil {
+			keyB.Constant = true
+			keyB.Value = &Value{
+				Data: new(Data),
+			}
+			keyB.TypeSym = &TypeSym{
+				Type: self.s.ElemType,
+			}
+		}
+	}
+
+	fn index(mut self, mut &d: &Data, i: int) {
+		panic("sema: index method of comptimeSliceRange should not be used")
+	}
+
+	fn step(mut self, i: int, mut &keyA: &Var, mut &keyB: &Var) {
+		if keyA != nil {
+			// Kind should be assigned by caller.
+			keyA.Value.Data.Constant = constant::Const.NewI64(i64(i))
+			keyA.Value.Data.Model = keyA.Value.Data.Constant
+		}
+		if keyB != nil {
+			// Kind should be assigned by caller.
+			keyB.Value.Data = self.s.Elems[i]
+		}
+	}
+
+	fn len(self): int {
+		ret len(self.s.Elems)
+	}
+}
+
 fn buildAsComptimeMethodData(mut &f: &FnIns): &Data {
 	ret &Data{
 		Type: &Type{

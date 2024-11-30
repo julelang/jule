@@ -26,6 +26,18 @@ impl ExprInspector {
 		}
 	}
 
+	fn args1(mut self, mut args: []&sema::Data) {
+		for i in args {
+			if args[i] == nil {
+				// We may have nil data with no error.
+				// For example, array expressions use nil data for filled mark.
+				continue
+			}
+			// Should be guaranteed that model points to the original memory.
+			self.inspect(unsafe { *(&args[i].Model) })
+		}
+	}
+
 	// Calls internal inspect step by expression model.
 	// It's unsafe because this expression is may not be in ordinary order.
 	// Internal configurations may change and unexpected behavior may occur.
@@ -67,10 +79,10 @@ impl ExprInspector {
 			self.args(fc.Args)
 		| &sema::SliceExpr:
 			mut s := (&sema::SliceExpr)(m)
-			self.args(s.Elems)
+			self.args1(s.Elems)
 		| &sema::ArrayExpr:
 			mut a := (&sema::ArrayExpr)(m)
-			self.args(a.Elems)
+			self.args1(a.Elems)
 		| &sema::IndexingExpr:
 			mut i := (&sema::IndexingExpr)(m)
 			self.inspect(i.Expr.Model)
