@@ -4,39 +4,37 @@
 
 use "std/runtime"
 
-// Memory order for atomic operations.
-// Specifies how memory accesses.
-enum MemoryOrder {
-	// The weakest memory order.
-	// There no synchronization or ordering on read/write access.
-	// Only the operation is guaranteed to be atomic.
-	// Usually performs fastest atomicity performance.
-	Relaxed: runtime::atomicRelaxed,
+type memoryOrder = runtime::atomicMemoryOrder
 
-	// Combined with a load, if the loaded value was written
-	// by a store operation with a Release or stronger order,
-	// all subsequent operations are ordered after that store.
-	// Especially all subsequent uploads will see the data
-	// written before the repository.
-	Acquire: runtime::atomicAcquire,
+// The weakest memory order.
+// There no synchronization or ordering on read/write access.
+// Only the operation is guaranteed to be atomic.
+// Usually performs fastest atomicity performance.
+const Relaxed = memoryOrder(runtime::atomicRelaxed)
 
-	// When combined with a store, all previous operations are
-	// ordered with the Acquire or stronger order before any load
-	// of that value. In particular, all previous writes become
-	// visible to all threads that perform an Acquire or stronger
-	// load of this value.
-	Release: runtime::atomicRelease,
+// Combined with a load, if the loaded value was written
+// by a store operation with a Release or stronger order,
+// all subsequent operations are ordered after that store.
+// Especially all subsequent uploads will see the data
+// written before the repository.
+const Acquire = memoryOrder(runtime::atomicAcquire)
 
-	// Acquire and Release combined.
-	// Aka acquire/release.
-	// For loads it uses Acquire, for stores it uses Release ordering.
-	AcqRel: runtime::atomicAcqRel,
+// When combined with a store, all previous operations are
+// ordered with the Acquire or stronger order before any load
+// of that value. In particular, all previous writes become
+// visible to all threads that perform an Acquire or stronger
+// load of this value.
+const Release = memoryOrder(runtime::atomicRelease)
 
-	// Default memory order for most things.
-	// Aka sequentially consistent.
-	// Operations are sequenced consistently.
-	SeqCst: runtime::atomicSeqCst,
-}
+// Acquire and Release combined.
+// Aka acquire/release.
+// For loads it uses Acquire, for stores it uses Release ordering.
+const AcqRel = memoryOrder(runtime::atomicAcqRel)
+
+// Default memory order for most things.
+// Aka sequentially consistent.
+// Operations are sequenced consistently.
+const SeqCst = memoryOrder(runtime::atomicSeqCst)
 
 struct number[T] {
 	n: T
@@ -44,27 +42,27 @@ struct number[T] {
 
 impl number {
 	// Atomically stores new value and returns the previous value.
-	fn Swap(mut self, new: T, order: MemoryOrder): (old: T) {
+	fn Swap(mut self, new: T, order: memoryOrder): (old: T) {
 		ret unsafe { runtime::atomicSwap[T](&self.n, &new, order) }
 	}
 
 	// Executes the compare-and-swap operation.
-	fn CompareSwap(mut self, old: T, new: T, order: MemoryOrder): (swapped: bool) {
+	fn CompareSwap(mut self, old: T, new: T, order: memoryOrder): (swapped: bool) {
 		ret unsafe { runtime::atomicCompareSwap[T](&self.n, &old, &new, order, order) }
 	}
 
 	// Atomically adds delta to value and returns the previous value.
-	fn Add(mut self, delta: T, order: MemoryOrder): (old: T) {
+	fn Add(mut self, delta: T, order: memoryOrder): (old: T) {
 		ret unsafe { runtime::atomicAdd[T](&self.n, delta, order) }
 	}
 
 	// Atomically reads and returns value.
-	fn Load(self, order: MemoryOrder): T {
+	fn Load(self, order: memoryOrder): T {
 		ret unsafe { runtime::atomicLoad[T](&self.n, order) }
 	}
 
 	// Atomically assigns to value.
-	fn Store(mut self, val: T, order: MemoryOrder) {
+	fn Store(mut self, val: T, order: memoryOrder) {
 		unsafe { runtime::atomicStore[T](&self.n, &val, order) }
 	}
 }
@@ -111,30 +109,30 @@ type Uintptr = number[uintptr]
 
 // Atomically stores new into addr and returns the previous addr value.
 // Only integer types are supported.
-fn Swap[T: int | uint | i8 | i16 | i32 | i64 | u8 | u16 | u32 | u64 | uintptr](mut &addr: T, new: T, order: MemoryOrder): (old: T) {
+fn Swap[T: int | uint | i8 | i16 | i32 | i64 | u8 | u16 | u32 | u64 | uintptr](mut &addr: T, new: T, order: memoryOrder): (old: T) {
 	ret unsafe { runtime::atomicSwap[T](&addr, &new, order) }
 }
 
 // Executes the compare-and-swap operation for value.
 // Only integer types are supported.
-fn CompareSwap[T: int | uint | i8 | i16 | i32 | i64 | u8 | u16 | u32 | u64 | uintptr](mut &addr: T, old: T, new: T, order: MemoryOrder): (swapped: bool) {
+fn CompareSwap[T: int | uint | i8 | i16 | i32 | i64 | u8 | u16 | u32 | u64 | uintptr](mut &addr: T, old: T, new: T, order: memoryOrder): (swapped: bool) {
 	ret unsafe { runtime::atomicCompareSwap[T](&addr, &old, &new, order, order) }
 }
 
 // Atomically adds delta to addr and returns the previous addr value.
 // Only integer types are supported.
-fn Add[T: int | uint | i8 | i16 | i32 | i64 | u8 | u16 | u32 | u64 | uintptr](mut &addr: T, delta: T, order: MemoryOrder): (old: T) {
+fn Add[T: int | uint | i8 | i16 | i32 | i64 | u8 | u16 | u32 | u64 | uintptr](mut &addr: T, delta: T, order: memoryOrder): (old: T) {
 	ret unsafe { runtime::atomicAdd[T](&addr, delta, order) }
 }
 
 // Atomically loads addr.
 // Only integer types are supported.
-fn Load[T: int | uint | i8 | i16 | i32 | i64 | u8 | u16 | u32 | u64 | uintptr](&addr: T, order: MemoryOrder): T {
+fn Load[T: int | uint | i8 | i16 | i32 | i64 | u8 | u16 | u32 | u64 | uintptr](&addr: T, order: memoryOrder): T {
 	ret unsafe { runtime::atomicLoad[T](&addr, order) }
 }
 
 // Atomically stores val into addr.
 // Only integer types are supported.
-fn Store[T: int | uint | i8 | i16 | i32 | i64 | u8 | u16 | u32 | u64 | uintptr](mut &addr: T, val: T, order: MemoryOrder) {
+fn Store[T: int | uint | i8 | i16 | i32 | i64 | u8 | u16 | u32 | u64 | uintptr](mut &addr: T, val: T, order: memoryOrder) {
 	unsafe { runtime::atomicStore[T](&addr, &val, order) }
 }
