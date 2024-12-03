@@ -28,7 +28,7 @@ impl WaitGroup {
 	// and unblocks any wait() calls if task count becomes zero.
 	// Panics if task count reaches below zero.
 	fn Add(mut self, delta: int) {
-		oldTask := int(self.taskN.Add(u32(delta), atomic::Relaxed))
+		oldTask := int(self.taskN.Add(u32(delta), atomic::SeqCst))
 		nTask := oldTask + delta
 		if nTask < 0 {
 			panic("sync: WaitGroup.Add: negative number of tasks")
@@ -42,12 +42,12 @@ impl WaitGroup {
 
 		// Number of tasks reaches to zero, therefore clear waiters.
 		for {
-			nWaiters := self.waitN.Load(atomic::Relaxed)
+			nWaiters := self.waitN.Load(atomic::SeqCst)
 			if nWaiters == 0 {
 				ret
 			}
 
-			if self.waitN.CompareSwap(nWaiters, 0, atomic::Relaxed) {
+			if self.waitN.CompareSwap(nWaiters, 0, atomic::SeqCst) {
 				ret
 			}
 		}
@@ -58,17 +58,17 @@ impl WaitGroup {
 
 	// Blocks until all tasks are done (task count becomes zero)
 	fn Wait(mut self) {
-		nTask := self.taskN.Load(atomic::Relaxed)
+		nTask := self.taskN.Load(atomic::SeqCst)
 		if nTask == 0 {
 			// No task, no need to wait.
 			ret
 		}
 
 		// Register this wait call to waiters.
-		self.waitN.Add(1, atomic::Relaxed)
+		self.waitN.Add(1, atomic::SeqCst)
 
 		// Wait for clearing waiters.
-		for self.waitN.Load(atomic::Relaxed) != 0 {
+		for self.waitN.Load(atomic::SeqCst) != 0 {
 		}
 	}
 }
