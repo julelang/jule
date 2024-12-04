@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-cpp fn GetSystemTimeAsFileTime(mut ft: *cpp.FILETIME)
+cpp unsafe fn GetSystemTimeAsFileTime(mut ft: *cpp.FILETIME)
+cpp unsafe fn QueryPerformanceCounter(mut counter: *cpp.LARGE_INTEGER): bool
 
 #typedef
 cpp struct FILETIME {
@@ -12,23 +13,31 @@ cpp struct FILETIME {
 
 #typedef
 cpp struct LARGE_INTEGER {
-	QuadPart: u64
+	QuadPart: i64
 }
 
 // Returns system-wide realtime clock in seconds and nanoseconds.
 // The nanoseconds is not a second yet, always in range (0, 999999999).
 fn timeNow(): (sec: i64, nsec: i64) {
 	mut ft := cpp.FILETIME{}
-	cpp.GetSystemTimeAsFileTime(&ft) // Returns ticks in UTC
+	unsafe { cpp.GetSystemTimeAsFileTime(&ft) } // Returns ticks in UTC
 	// Get the number of seconds since January 1, 1970 12:00am UTC
 	// FILETIME is in 100-nanosecond intervals since 1601-01-01
 	mut t := cpp.LARGE_INTEGER{}
-	t.QuadPart = u64(ft.dwHighDateTime)
+	t.QuadPart = i64(ft.dwHighDateTime)
 	t.QuadPart <<= 32
-	t.QuadPart |= u64(ft.dwLowDateTime)
+	t.QuadPart |= i64(ft.dwLowDateTime)
 	t.QuadPart -= 116444736000000000 // Convert from 1601 to 1970
 	t.QuadPart = t.QuadPart / 10     // Convert from 100-ns intervals to nanoseconds
 	sec = i64(t.QuadPart / 1000000)
 	nsec = i64(t.QuadPart % 1000000)
 	ret
+}
+
+fn nanotime(): u64 {
+	mut counter := cpp.LARGE_INTEGER{}
+	if unsafe { !cpp.QueryPerformanceCounter(&counter) } {
+		panic("runtime: nanotime failed")
+	}
+	ret u64(counter.QuadPart)
 }
