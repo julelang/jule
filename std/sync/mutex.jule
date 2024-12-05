@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use "std/sync/atomic"
+use "std/runtime"
 
 // Represents an object that can be locked and unlocked.
 trait Locker {
@@ -10,51 +10,46 @@ trait Locker {
 	fn Unlock(self)
 }
 
-const mutexUnlocked = 0
-const mutexLocked = 1
-
 // Muxtex is a primitive used to protect memory in
 // multi-threading situations such as concurrent access.
 //
 // Mutextes are uses internal mutability and internal states.
 // Locking, unlocking and etc is not mutable operations.
 // But there is no internal mutable memory, so mutexes are not use shared memory.
-// Therefore, for correct use, a mutex instance should not be copied.
+// Therefore, for correct use, a mutex instance should not be copied after first use.
 // Otherwise internal state will be copied and not mutated by other instances.
 //
 // Mutexes are not implemented using API of operating system. Implemented in pure Jule.
-// This mutex implementation is not fair and will not optimize starvations.
-// Also it will not check ownership of the mutex,
-// so another thread can unlock the mutex locked by another thread.
+// This mutex implementation will not check ownership of the mutex.
+// So, a locked Mutex is not associated with a particular thread.
+// It is allowed for one thread to lock a Mutex and then
+// arrange for another thread to unlock it.
 struct Mutex {
-	mut state: i32
+	m: runtime::mutex
 }
 
 impl Locker for Mutex {}
 
 impl Mutex {
-	// Locks the mutex. If the mutex is locked by
-	// another thread, it stops the execution of the
-	// algorithm to seize it and waits to lock the mutex.
+	// Locks mutex.
+	// If the lock is already in use, the calling thread
+	// blocks until the mutex is available.
 	fn Lock(self) {
-		for !self.TryLock() {
-		}
+		self.m.lock()
 	}
 
-	// Unlock the mutex you locked and make it open
-	// to locking by the thread.
+	// Unlocks mutex.
+	// It is a run-time error if mutex is not locked on entry to Unlock.
 	fn Unlock(self) {
-		old := atomic::Add(self.state, -mutexLocked, atomic::SeqCst)
-		if old == 0 {
-			panic("sync: Mutex: unlock of unlocked mutex")
-		}
+		self.m.unlock()
 	}
 
-	// Try locking the mutex. But unlike the lock
-	// method, it just tries to lock instead of waiting
-	// to lock. Returns true if the locking was
-	// successful, false otherwise.
+	// Tries to lock mutwx and reports whether it succeeded.
+	//
+	// Note that while correct uses of TryLock do exist, they are rare,
+	// and use of TryLock is often a sign of a deeper problem
+	// in a particular use of mutexes.
 	fn TryLock(self): bool {
-		ret atomic::CompareSwap(self.state, mutexUnlocked, mutexLocked, atomic::SeqCst)
+		ret self.m.tryLock()
 	}
 }

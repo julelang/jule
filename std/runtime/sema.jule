@@ -1,0 +1,204 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/internal/cpu"
+
+struct semaLeaf {
+	ticket: u32  // acquired, boolean
+	deq:    bool // dequeued from list
+	next:   &semaLeaf
+}
+
+// Stores sema space for unique sema.
+struct semaNode {
+	sema: *u32
+	tree: &semaLeaf // Root of tree of the waiters.
+	next: &semaNode
+	prev: &semaNode
+}
+
+const semaRootSize = fmutexSize + sptrSize + 32 // +32 for u32
+
+// Stores all space collections of sema.
+struct semaRoot {
+	lock:  fmutex
+	tree:  &semaNode // Root of tree of unique sema spaces.
+	nwait: u32       // Number of waiters. Read w/o the lock, should be atomic.
+}
+
+impl semaRoot {
+	fn queue(mut self, &sema: u32, mut sl: &semaLeaf, lifo: bool) {
+		mut t := self.tree
+		for t != nil; t = t.next {
+			// Already have sema in list.
+			if t.sema == &sema {
+				if lifo {
+					// Add sl to head of the wait list.
+					sl.next = t.tree
+					t.tree = sl
+				} else {
+					// Add sl to end of the wait list.
+					if t.tree == nil {
+						t.tree = sl
+					} else {
+						mut tsl := t.tree
+						for tsl.next != nil; tsl = tsl.next {
+						}
+						tsl.next = sl
+					}
+				}
+				ret
+			}
+		}
+		// Add new semaNode for sema since it is not exist in the list.
+		mut sn := new(semaNode)
+		sn.sema = &sema
+		sn.tree = sl
+		if self.tree == nil {
+			self.tree = sn
+		} else {
+			t = self.tree
+			for t != nil; t = t.next {
+				if t.tree == nil {
+					// The tree is nil of t, put sn here.
+					// Sema have no waiters, may be out of use.
+					sn.next = t.next
+					sn.prev = t.prev
+					t.prev.next = sn
+					ret
+				}
+			}
+			sn.prev = self.tree
+			self.tree.next = sn
+		}
+	}
+
+	fn dequeue(mut self, &sema: u32): &semaLeaf {
+		mut t := self.tree
+		for t != nil; t = t.next {
+			// Already have sema in list.
+			if t.sema == &sema {
+				if t.tree == nil {
+					break
+				}
+				mut sl := t.tree
+				sl.deq = true
+				t.tree = t.tree.next
+				ret sl
+			}
+		}
+		ret nil
+	}
+}
+
+// Prime to not correlate with any user patterns.
+const semTabSize = 251
+
+struct semTable {
+	root: semaRoot
+	pad:  [cpu::CacheLinePadSize + semaRootSize]byte
+}
+
+static mut semtable: [semTabSize]semTable = []
+
+// Returns sema space collection for the sema from semtable.
+fn semtable_rootFor(&sema: u32): &semaRoot {
+	ret unsafe { (&semaRoot)(&semtable[(uintptr(&sema)>>3)%semTabSize].root) }
+}
+
+fn cansemacquire(&sema: u32): bool {
+	for {
+		v := unsafe { atomicLoad(&sema, atomicSeqCst) }
+		if v == 0 {
+			ret false
+		}
+		new := v - 1
+		if unsafe { atomicCompareSwap(&sema, &v, &new, atomicSeqCst, atomicSeqCst) } {
+			ret true
+		}
+	}
+}
+
+// Puts the current thread into a waiting state and unlocks the lock.
+fn semapark(&lock: fmutex, &deq: bool) {
+	lock.unlock()
+	for !deq {
+		sleep(1e6)
+	}
+}
+
+// Waits until sema > 0 and then atomically decrements it.
+// It is intended as a simple sleep primitive for use by the synchronization
+// library and should not be used directly.
+// If lifo is true, queue waiter at the head of wait queue.
+fn semacquire(&sema: u32, lifo: bool) {
+	// Easy case.
+	if cansemacquire(sema) {
+		ret
+	}
+
+	// Harder case:
+	//	increment waiter count
+	//	try cansemacquire one more time, return if succeeded
+	//	enqueue itself as a waiter
+	//	sleep
+	//	(waiter descriptor is dequeued by signaler)
+	mut root := semtable_rootFor(sema)
+	mut sl := new(semaLeaf)
+	for {
+		root.lock.lock()
+		// Add ourselves to nwait to disable "easy case" in semrelease.
+		unsafe { atomicAdd(&root.nwait, 1, atomicSeqCst) }
+		// Check cansemacquire to avoid missed wakeup.
+		if cansemacquire(sema) {
+			unsafe { atomicAdd(&root.nwait, ^u32(0), atomicSeqCst) }
+			root.lock.unlock()
+			break
+		}
+		// Any semrelease after the cansemacquire knows we're waiting
+		// (we set nwait above), so go to sleep.
+		root.queue(sema, sl, lifo)
+		semapark(root.lock, sl.deq)
+		if sl.ticket != 0 || cansemacquire(sema) {
+			break
+		}
+	}
+}
+
+// Atomically increments sema and notifies a waiting thread
+// if one is blocked in semacquire.
+// It is intended as a simple wakeup primitive for use by the synchronization
+// library and should not be used directly.
+// If handoff is true, pass count directly to the first waiter.
+fn semrelease(&sema: u32, handoff: bool) {
+	mut root := semtable_rootFor(sema)
+	unsafe { atomicAdd(&sema, 1, atomicSeqCst) }
+
+	// Easy case: no waiters?
+	// This check must happen after the atomicAdd, to avoid a missed wakeup
+	// (see loop in semacquire).
+	if unsafe { atomicLoad(&root.nwait, atomicSeqCst) } == 0 {
+		ret
+	}
+
+	// Harder case: search for a waiter and wake it.
+	root.lock.lock()
+	if unsafe { atomicLoad(&root.nwait, atomicSeqCst) } == 0 {
+		// The count is already consumed by another thread,
+		// so no need to wake up another thread.
+		root.lock.unlock()
+		ret
+	}
+
+	mut sl := root.dequeue(sema)
+	if sl != nil {
+		unsafe { atomicAdd(&root.nwait, ^u32(0), atomicSeqCst) }
+	}
+	root.lock.unlock()
+	if sl != nil {
+		if handoff && cansemacquire(sema) {
+			sl.ticket = 1
+		}
+	}
+}
