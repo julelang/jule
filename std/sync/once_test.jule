@@ -1,0 +1,39 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/sync/atomic"
+use "std/testing"
+
+type one: int
+
+impl one {
+	fn Increment(mut self) {
+		self++
+	}
+}
+
+fn run(t: &testing::T, once: &Once, mut o: &one, mut c: &int) {
+	once.Do(fn() { o.Increment() })
+	if *o != 1 {
+		t.Errorf("once failed inside run: {} is not 1", *o)
+	}
+	atomic::Add(*c, 1, atomic::SeqCst)
+}
+
+#test
+fn testOnce(t: &testing::T) {
+	mut o := new(one)
+	mut once := new(Once)
+	mut c := new(int)
+	const N = 10
+	mut i := 0
+	for i < N; i++ {
+		co run(t, once, o, c)
+	}
+	for atomic::Load(*c, atomic::SeqCst) != N {
+	}
+	if *o != 1 {
+		t.Errorf("once failed outside run: {} is not 1", *o)
+	}
+}
