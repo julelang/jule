@@ -107,14 +107,13 @@ fn semtable_rootFor(&sema: u32): &semaRoot {
 	ret unsafe { (&semaRoot)(&semtable[(uintptr(&sema)>>3)%semTabSize].root) }
 }
 
-fn cansemacquire(&sema: u32): bool {
+fn cansemacquire(mut &sema: u32): bool {
 	for {
-		v := unsafe { atomicLoad(&sema, atomicSeqCst) }
+		v := atomicLoad(sema, atomicSeqCst)
 		if v == 0 {
 			ret false
 		}
-		new := v - 1
-		if unsafe { atomicCompareSwap(&sema, &v, &new, atomicSeqCst, atomicSeqCst) } {
+		if atomicCompareAndSwap(sema, v, v-1, atomicSeqCst) {
 			ret true
 		}
 	}
@@ -132,7 +131,7 @@ fn semapark(&lock: fmutex, &deq: bool) {
 // It is intended as a simple sleep primitive for use by the synchronization
 // library and should not be used directly.
 // If lifo is true, queue waiter at the head of wait queue.
-fn semacquire(&sema: u32, lifo: bool) {
+fn semacquire(mut &sema: u32, lifo: bool) {
 	// Easy case.
 	if cansemacquire(sema) {
 		ret
@@ -149,10 +148,10 @@ fn semacquire(&sema: u32, lifo: bool) {
 	for {
 		root.lock.lock()
 		// Add ourselves to nwait to disable "easy case" in semrelease.
-		unsafe { atomicAdd(&root.nwait, 1, atomicSeqCst) }
+		atomicAdd(root.nwait, 1, atomicSeqCst)
 		// Check cansemacquire to avoid missed wakeup.
 		if cansemacquire(sema) {
-			unsafe { atomicAdd(&root.nwait, ^u32(0), atomicSeqCst) }
+			atomicAdd(root.nwait, ^u32(0), atomicSeqCst)
 			root.lock.unlock()
 			break
 		}
@@ -171,20 +170,20 @@ fn semacquire(&sema: u32, lifo: bool) {
 // It is intended as a simple wakeup primitive for use by the synchronization
 // library and should not be used directly.
 // If handoff is true, pass count directly to the first waiter.
-fn semrelease(&sema: u32, handoff: bool) {
+fn semrelease(mut &sema: u32, handoff: bool) {
 	mut root := semtable_rootFor(sema)
-	unsafe { atomicAdd(&sema, 1, atomicSeqCst) }
+	atomicAdd(sema, 1, atomicSeqCst)
 
 	// Easy case: no waiters?
 	// This check must happen after the atomicAdd, to avoid a missed wakeup
 	// (see loop in semacquire).
-	if unsafe { atomicLoad(&root.nwait, atomicSeqCst) } == 0 {
+	if atomicLoad(root.nwait, atomicSeqCst) == 0 {
 		ret
 	}
 
 	// Harder case: search for a waiter and wake it.
 	root.lock.lock()
-	if unsafe { atomicLoad(&root.nwait, atomicSeqCst) } == 0 {
+	if atomicLoad(root.nwait, atomicSeqCst) == 0 {
 		// The count is already consumed by another thread,
 		// so no need to wake up another thread.
 		root.lock.unlock()
@@ -193,7 +192,7 @@ fn semrelease(&sema: u32, handoff: bool) {
 
 	mut sl := root.dequeue(sema)
 	if sl != nil {
-		unsafe { atomicAdd(&root.nwait, ^u32(0), atomicSeqCst) }
+		atomicAdd(root.nwait, ^u32(0), atomicSeqCst)
 	}
 	root.lock.unlock()
 	if sl != nil {

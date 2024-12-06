@@ -28,8 +28,7 @@ impl WaitGroup {
 	// and unblocks any wait() calls if task count becomes zero.
 	// Panics if task count reaches below zero.
 	fn Add(mut self, delta: int) {
-		oldTask := int(self.taskN.Add(u32(delta), atomic::SeqCst))
-		nTask := oldTask + delta
+		nTask := int(self.taskN.Add(u32(delta), atomic::SeqCst))
 		if nTask < 0 {
 			panic("sync: WaitGroup.Add: negative number of tasks")
 		}
@@ -47,7 +46,7 @@ impl WaitGroup {
 				ret
 			}
 
-			if self.waitN.CompareSwap(nWaiters, 0, atomic::SeqCst) {
+			if self.waitN.CompareAndSwap(nWaiters, 0, atomic::SeqCst) {
 				ret
 			}
 		}

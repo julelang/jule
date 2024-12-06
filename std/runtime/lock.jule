@@ -22,16 +22,14 @@ impl fmutex {
 	}
 
 	fn unlock(self) {
-		old := unsafe { atomicAdd(&self.state, -mutexLocked, atomicSeqCst) }
-		if old == 0 {
+		new := atomicAdd(self.state, -mutexLocked, atomicSeqCst)
+		if new != 0 {
 			panic("runtime: mutex: unlock of unlocked mutex")
 		}
 	}
 
 	fn tryLock(self): bool {
-		locked := i32(mutexLocked)
-		unlocked := i32(0)
-		ret unsafe { atomicCompareSwap(&self.state, &unlocked, &locked, atomicSeqCst, atomicSeqCst) }
+		ret atomicCompareAndSwap(self.state, 0, mutexLocked, atomicSeqCst)
 	}
 }
 
@@ -81,9 +79,7 @@ impl mutex {
 	// See the [sync::Mutex.Lock] for documentation.
 	fn lock(self) {
 		// Fast path: grab unlocked mutex.
-		old := i32(0)
-		new := i32(mutexLocked)
-		if unsafe { atomicCompareSwap(&self.state, &old, &new, atomicSeqCst, atomicSeqCst) } {
+		if atomicCompareAndSwap(self.state, 0, mutexLocked, atomicSeqCst) {
 			ret
 		}
 		// Slow path (outlined so that the fast path may be inlined)
@@ -104,9 +100,7 @@ impl mutex {
 				// Try to set mutexWoken flag to inform Unlock
 				// to not wake other blocked threads.
 				if !awoke && old&mutexWoken == 0 && old>>mutexWaiterShift != 0 {
-					old2 := old
-					new := old | mutexWoken
-					awoke = unsafe { atomicCompareSwap(&self.state, &old2, &new, atomicSeqCst, atomicSeqCst) }
+					awoke = atomicCompareAndSwap(self.state, old, old|mutexWoken, atomicSeqCst)
 				}
 				iter <<= 1
 				old = self.state
@@ -135,9 +129,7 @@ impl mutex {
 				}
 				new &= ^mutexWoken
 			}
-			old2 := old
-			new2 := new
-			if unsafe { atomicCompareSwap(&self.state, &old2, &new2, atomicSeqCst, atomicSeqCst) } {
+			if atomicCompareAndSwap(self.state, old, new, atomicSeqCst) {
 				if old&(mutexLocked|mutexStarving) == 0 {
 					break // locked the mutex with CAS
 				}
@@ -166,7 +158,7 @@ impl mutex {
 						// to starvation mode.
 						delta -= mutexStarving
 					}
-					unsafe { atomicAdd(&self.state, delta, atomicSeqCst) }
+					atomicAdd(self.state, delta, atomicSeqCst)
 					break
 				}
 				awoke = true
@@ -188,16 +180,14 @@ impl mutex {
 		// There may be a thread waiting for the mutex, but we are
 		// running now and can try to grab the mutex before that
 		// thread wakes up.
-		new := old | mutexLocked
-		ret unsafe { atomicCompareSwap(&self.state, &old, &new, atomicSeqCst, atomicSeqCst) }
+		ret atomicCompareAndSwap(self.state, old, old|mutexLocked, atomicSeqCst)
 	}
 
 	// Unlocks the mutex.
 	// See the [sync::Mutex.Unlock] for documentation.
 	fn unlock(self) {
 		// Fast path: drop lock bit.
-		mut new := unsafe { atomicAdd(&self.state, -mutexLocked, atomicSeqCst) }
-		new += -mutexLocked
+		new := atomicAdd(self.state, -mutexLocked, atomicSeqCst)
 		if new != 0 {
 			// Outlined slow path to may allow inlining the fast path.
 			self.unlockSlow(new)
@@ -223,9 +213,7 @@ impl mutex {
 				// Grab the right to wake someone.
 				new = (old - 1<<mutexWaiterShift) | mutexWoken
 				{
-					old2 := old
-					new2 := new
-					if unsafe { atomicCompareSwap(&self.state, &old2, &new2, atomicSeqCst, atomicSeqCst) } {
+					if atomicCompareAndSwap(self.state, old, new, atomicSeqCst) {
 						semrelease(self.sema, false)
 						ret
 					}

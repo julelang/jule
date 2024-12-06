@@ -22,7 +22,7 @@ const _RCMo = atomicSeqCst
 fn _RCNew(): _RCPtr {
 	const Bits = comptime::TypeOf(_RCType).Bits()
 	const BitsPerByte = 8
-	mut p := unsafe { (_RCPtr)(cpp.malloc(Bits / BitsPerByte)) }
+	mut p := unsafe { _RCPtr(cpp.malloc(Bits / BitsPerByte)) }
 	if p == nil {
 		panic("runtime: memory allocation failed for reference counting data")
 	}
@@ -44,7 +44,7 @@ unsafe fn _RCLoad(p: _RCPtr): _RCType {
 // Same as _RCLoad but have thread-safe implementation.
 #export "__jule_RCLoadAtomic"
 unsafe fn _RCLoadAtomic(p: _RCPtr): _RCType {
-	ret atomicLoad[_RCType](p, _RCMo)
+	ret atomicLoad[_RCType](*p, _RCMo)
 }
 
 // Adds strong reference to reference pointer.
@@ -61,7 +61,7 @@ unsafe fn _RCAdd(mut p: _RCPtr) {
 // Same as _RCAdd but have thread-safe implementation.
 #export "__jule_RCAddAtomic"
 unsafe fn _RCAddAtomic(mut p: _RCPtr) {
-	atomicAdd[_RCType](p, RCDelta, _RCMo)
+	atomicAdd[_RCType](*p, RCDelta, _RCMo)
 }
 
 // Drops strong reference from reference pointer.
@@ -73,8 +73,8 @@ unsafe fn _RCAddAtomic(mut p: _RCPtr) {
 // See memory model of concurrency.
 #export "__jule_RCDrop"
 unsafe fn _RCDrop(mut p: _RCPtr): bool {
-	// If old data equals to delta, means references zeroed.
-	alive := *p > RCDelta
+	// If new data equals to zero, means references zeroed.
+	alive := *p >= RCDelta
 	*p -= RCDelta
 	ret alive
 }
@@ -82,9 +82,9 @@ unsafe fn _RCDrop(mut p: _RCPtr): bool {
 // Same as _RCDrop but have thread-safe implementation.
 #export "__jule_RCDropAtomic"
 unsafe fn _RCDropAtomic(mut p: _RCPtr): bool {
-	// The atomicAdd function returns old data of pointer.
-	// So if old data equals to delta, means references zeroed.
-	ret atomicAdd[_RCType](p, -RCDelta, _RCMo) > RCDelta
+	// The atomicAdd function returns new data of pointer.
+	// So if new data equals to zero, means references zeroed.
+	ret atomicAdd[_RCType](*p, -RCDelta, _RCMo) >= RCDelta
 }
 
 // Deallocates reference counting data allocation.
