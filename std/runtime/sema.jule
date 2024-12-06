@@ -38,6 +38,7 @@ impl semaRoot {
 		sl.deq = false
 
 		mut t := self.tree
+		mut otru := (&semaNode)(nil)
 		for t != nil; t = t.next {
 			// Already have sema in list.
 			if t.sema == &sema {
@@ -58,8 +59,17 @@ impl semaRoot {
 				}
 				ret
 			}
+			if otru == nil && t.sema == nil {
+				otru = t
+			}
 		}
 		// Add new semaNode for sema since it is not exist in the list.
+		if otru != nil {
+			// Found a node in open to reuse state, so use it.
+			otru.sema = &sema
+			otru.tree = sl
+			ret
+		}
 		mut sn := new(semaNode)
 		sn.sema = &sema
 		sn.tree = sl
@@ -67,18 +77,17 @@ impl semaRoot {
 			self.tree = sn
 		} else {
 			t = self.tree
-			for t != nil; t = t.next {
+			mut last := t
+			for t != nil; t, last = t.next, t {
 				if t.tree == nil {
 					// The tree is nil of t, put sn here.
 					// Sema have no waiters, may be out of use.
-					sn.next = t.next
-					sn.prev = t.prev
-					t.prev.next = sn
+					sn.prev = last
+					last.next = sn
 					ret
 				}
 			}
-			sn.prev = self.tree
-			self.tree.next = sn
+			panic("unreachable")
 		}
 	}
 
@@ -91,8 +100,13 @@ impl semaRoot {
 					break
 				}
 				mut sl := t.tree
-				sl.deq = true
 				t.tree = sl.next
+				// Remove sema if tree reached to nil.
+				// So, open to reuse this allocation for other semas.
+				if t.tree == nil {
+					t.sema = nil
+				}
+				sl.deq = true
 				ret sl
 			}
 		}
@@ -167,7 +181,8 @@ fn semacquire(mut &sema: u32, lifo: bool) {
 		// (we set nwait above), so go to sleep.
 		root.queue(sema, sl, lifo)
 		semapark(root.lock, sl.deq)
-		if sl.ticket != 0 || cansemacquire(sema) {
+		// Try to acquire semaphore before enqueue again.
+		if cansemacquire(sema) {
 			break
 		}
 	}
@@ -177,8 +192,7 @@ fn semacquire(mut &sema: u32, lifo: bool) {
 // if one is blocked in semacquire.
 // It is intended as a simple wakeup primitive for use by the synchronization
 // library and should not be used directly.
-// If handoff is true, pass count directly to the first waiter.
-fn semrelease(mut &sema: u32, handoff: bool) {
+fn semrelease(mut &sema: u32) {
 	mut root := semtable_rootFor(sema)
 	atomicAdd(sema, 1, atomicSeqCst)
 
@@ -203,9 +217,4 @@ fn semrelease(mut &sema: u32, handoff: bool) {
 		atomicAdd(root.nwait, ^u32(0), atomicSeqCst)
 	}
 	root.lock.unlock()
-	if sl != nil {
-		if handoff && cansemacquire(sema) {
-			sl.ticket = 1
-		}
-	}
 }
