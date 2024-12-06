@@ -1,0 +1,47 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/sync/atomic"
+use "std/testing"
+
+fn hammerMutex(m: &Mutex, loops: int, mut c: &int) {
+	mut i := 0
+	for i < loops; i++ {
+		if i%3 == 0 {
+			if m.TryLock() {
+				m.Unlock()
+			}
+			continue
+		}
+		m.Lock()
+		m.Unlock()
+	}
+	atomic::Add(*c, 1, atomic::SeqCst)
+}
+
+#test
+fn testMutex(t: &testing::T) {
+	m := new(Mutex)
+
+	m.Lock()
+	if m.TryLock() {
+		t.Errorf("TryLock succeeded with mutex locked")
+		ret
+	}
+	m.Unlock()
+	if !m.TryLock() {
+		t.Errorf("TryLock failed with mutex unlocked")
+		ret
+	}
+	m.Unlock()
+
+	mut c := new(int)
+	mut i := 0
+	const N = 10
+	for i < N; i++ {
+		co hammerMutex(m, 1000, c)
+	}
+	for atomic::Load(*c, atomic::SeqCst) != N {
+	}
+}
