@@ -74,9 +74,8 @@ unsafe fn _RCAddAtomic(mut p: _RCPtr) {
 #export "__jule_RCDrop"
 unsafe fn _RCDrop(mut p: _RCPtr): bool {
 	// If new data equals to zero, means references zeroed.
-	alive := *p >= RCDelta
 	*p -= RCDelta
-	ret alive
+	ret *p >= RCDelta
 }
 
 // Same as _RCDrop but have thread-safe implementation.
@@ -84,7 +83,7 @@ unsafe fn _RCDrop(mut p: _RCPtr): bool {
 unsafe fn _RCDropAtomic(mut p: _RCPtr): bool {
 	// The atomicAdd function returns new data of pointer.
 	// So if new data equals to zero, means references zeroed.
-	ret atomicAdd[_RCType](*p, -RCDelta, _RCMo) >= RCDelta
+	ret atomicAdd[_RCType](*p, -RCDelta, _RCMo) > RCDelta
 }
 
 // Deallocates reference counting data allocation.
