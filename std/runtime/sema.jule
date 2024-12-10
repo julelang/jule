@@ -218,3 +218,82 @@ fn semrelease(mut &sema: u32) {
 	}
 	root.lock.unlock()
 }
+
+// Checks if a < b, considering a & b running counts that may overflow the
+// 32-bit range, and that their "unwrapped" difference is always less than 2^31.
+fn less(a: u32, b: u32): bool {
+	ret i32(a-b) < 0
+}
+
+// Ticket-based notification list used to implement condition variable primitives.
+// It can be used raw (without any wrapper), but designed for wrapped use cases.
+struct notifyList {
+	// Ticket number of the next waiter.
+	// It is atomically incremented outside the lock.
+	wait: u32
+
+	// Ticket number of the next waiter to be notified. It can
+	// be read outside the lock, but is only written to with lock held.
+	//
+	// Both wait & notify can wrap around, and such cases will be correctly
+	// handled as long as their "unwrapped" difference is bounded by 2^31.
+	// For this not to be the case, we'd need to have 2^31+ threads
+	// blocked on the same condvar, which is currently not possible.
+	notify: u32
+
+	lock: fmutex
+}
+
+// Adds new notify ticked to list l and returns the ticket number.
+fn notifyListAdd(mut &l: notifyList): u32 {
+	ret atomicAdd(l.wait, 1, atomicSeqCst) - 1
+}
+
+// Waits for a notification. If one has been sent since
+// notifyListAdd was called, it returns immediately. Otherwise, it blocks.
+fn notifyListWait(mut &l: notifyList, t: u32) {
+	for {
+		l.lock.lock()
+		if less(t, l.notify) {
+			l.lock.unlock()
+			ret
+		}
+		l.lock.unlock()
+	}
+}
+
+// Notifies one entry in the list.
+fn notifyListNotifyOne(mut &l: notifyList) {
+	// Fast-path: if there are no new waiters since the last notification
+	// we don't need to acquire the lock at all.
+	if atomicLoad(l.wait, atomicSeqCst) == atomicLoad(l.notify, atomicSeqCst) {
+		ret
+	}
+
+	l.lock.lock()
+	// Re-check under the lock if we need to do anything.
+	t := l.notify
+	if t == atomicLoad(l.wait, atomicSeqCst) {
+		l.lock.unlock()
+		ret
+	}
+
+	// Update the next notify ticket number.
+	atomicAdd(l.notify, t+1, atomicSeqCst)
+
+	l.lock.unlock()
+}
+
+// Notifies all entries in the list.
+fn notifyListNotifyAll(mut &l: notifyList) {
+	l.lock.lock()
+
+	// Update the next ticket to be notified. We can set it to the current
+	// value of wait because any previous waiters are already in the list
+	// or will notice that they have already been notified when trying to
+	// add themselves to the list.
+	wait := atomicLoad(l.wait, atomicSeqCst)
+	atomicStore(l.notify, wait, atomicSeqCst)
+
+	l.lock.unlock()
+}

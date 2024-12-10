@@ -1,0 +1,32 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/sync/atomic"
+use "std/testing"
+
+#test
+fn testCond(t: &testing::T) {
+	mut mu := new(Mutex)
+	cond := Cond.New(mu)
+	mut ready := new(bool)
+	mut wg := &WaitGroup{}
+	wg.Add(1)
+	co fn() {
+		cond.Lock()
+		cond.Wait()
+		cond.Unlock()
+		wg.Done()
+	}()
+	for atomic::Load(cond.notify.wait, atomic::SeqCst) == 0 {
+		// Wait until thread starting to wait for condition.
+	}
+	cond.Lock()
+	*ready = true
+	cond.Signal()
+	cond.Unlock()
+	wg.Wait()
+	if !*ready {
+		t.Errorf("condition did not set correctly")
+	}
+}
