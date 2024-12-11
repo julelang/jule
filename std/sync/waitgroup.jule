@@ -2,72 +2,87 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/runtime"
 use "std/sync/atomic"
 
-// Do not copy an instance of WaitGroup, use a ref or pointer instead.
+// A WaitGroup waits for a collection of threads to finish.
+// The main thread calls [WaitGroup.Add] to set the number of
+// threads to wait for. Then each of the threads runs and
+// calls [WaitGroup.Done] when finished. At the same time,
+// [WaitGroup.Wait] can be used to block until all goroutines have finished.
 //
-// usage: in main thread:
-// `wg: sync::WaitGroup
-// `wg.Add(delta)` before starting tasks with `co ...`
-// `wg.Eait()` to wait for all tasks to have finished
-//
-// in each parallel job:
-// `wg.done()` when finished
+// A WaitGroup must not be copied after first use.
 struct WaitGroup {
-	taskN: atomic::U32 // current task count - reading/writing should be atomic
-	waitN: atomic::U32 // current wait count - reading/writing should be atomic
+	state: atomic::U64 // High 32 bits are counter, low 32 bits are waiter count.
+	sema:  u32
 }
 
 impl WaitGroup {
-	// Returns new WaitGroup instance.
+	// Returns new [WaitGroup] instance.
 	static fn New(): &WaitGroup {
 		ret new(WaitGroup)
 	}
 
-	// Increments (+delta) or decrements (-delta) task count by delta
-	// and unblocks any wait() calls if task count becomes zero.
-	// Panics if task count reaches below zero.
+	// Adds delta, which may be negative, to the [WaitGroup] counter.
+	// If the counter becomes zero, all threads blocked on [WaitGroup.Wait] are released.
+	// If the counter goes negative, Add panics.
+	//
+	// Note that calls with a positive delta that occur when the counter is zero
+	// must happen before a Wait. Calls with a negative delta, or calls with a
+	// positive delta that start when the counter is greater than zero, may happen
+	// at any time.
+	// Typically this means the calls to Add should execute before the statement
+	// creating the thread or other event to be waited for.
+	// If a [WaitGroup] is reused to wait for several independent sets of events,
+	// new Add calls must happen after all previous Wait calls have returned.
 	fn Add(mut self, delta: int) {
-		nTask := int(self.taskN.Add(u32(delta), atomic::SeqCst))
-		if nTask < 0 {
-			panic("sync: WaitGroup.Add: negative number of tasks")
+		state := self.state.Add(u64(delta)<<32, atomic::SeqCst)
+		v := i32(state >> 32)
+		mut w := u32(state)
+		if v < 0 {
+			panic("std/sync: negative WaitGroup counter")
 		}
-
-		// Number of tasks still greater than zero.
-		// No need to clear waiters.
-		if nTask != 0 {
+		if w != 0 && delta > 0 && v == i32(delta) {
+			panic("std/sync: WaitGroup misuse: Add called concurrently with Wait")
+		}
+		if v > 0 || w == 0 {
 			ret
 		}
-
-		// Number of tasks reaches to zero, therefore clear waiters.
-		for {
-			nWaiters := self.waitN.Load(atomic::SeqCst)
-			if nWaiters == 0 {
-				ret
-			}
-
-			if self.waitN.CompareAndSwap(nWaiters, 0, atomic::SeqCst) {
-				ret
-			}
+		// This thread has set counter to 0 when waiters > 0.
+		// Now there can't be concurrent mutations of state:
+		// - Adds must not happen concurrently with Wait,
+		// - Wait does not increment waiters if it sees counter == 0.
+		// Still do a cheap sanity check to detect WaitGroup misuse.
+		if self.state.Load(atomic::SeqCst) != state {
+			panic("std/sync: WaitGroup misuse: Add called concurrently with Wait")
+		}
+		// Reset waiters count to 0.
+		self.state.Store(0, atomic::SeqCst)
+		for w != 0; w-- {
+			runtime::semrelease(self.sema)
 		}
 	}
 
-	// Decrements the WaitGroup counter by one.
+	// Decrements the [WaitGroup] counter by one.
 	fn Done(mut self) { self.Add(-1) }
 
-	// Blocks until all tasks are done (task count becomes zero)
+	// Blocks until the [WaitGroup] counter is zero.
 	fn Wait(mut self) {
-		nTask := self.taskN.Load(atomic::SeqCst)
-		if nTask == 0 {
-			// No task, no need to wait.
-			ret
-		}
-
-		// Register this wait call to waiters.
-		self.waitN.Add(1, atomic::SeqCst)
-
-		// Wait for clearing waiters.
-		for self.waitN.Load(atomic::SeqCst) != 0 {
+		for {
+			state := self.state.Load(atomic::SeqCst)
+			v := i32(state >> 32)
+			if v == 0 {
+				// Counter is 0, no need to wait.
+				ret
+			}
+			// Increment waiters count.
+			if self.state.CompareAndSwap(state, state+1, atomic::SeqCst) {
+				runtime::semacquire(self.sema, false)
+				if self.state.Load(atomic::SeqCst) != 0 {
+					panic("std/sync: WaitGroup is resused before previous Wait has returned")
+				}
+				ret
+			}
 		}
 	}
 }
