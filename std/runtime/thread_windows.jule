@@ -6,6 +6,7 @@ use integ "std/jule/integrated"
 use "std/sys"
 
 cpp unsafe fn CreateThread(*unsafe, int, *unsafe, *unsafe, int, *unsafe): *unsafe
+cpp fn SwitchToThread(): bool
 
 unsafe fn _coSpawn(func: *unsafe, args: *unsafe): bool {
 	handle := cpp.CreateThread(nil, 0, integ::Emit[*unsafe]("(unsigned long(*)(void*))({})", func), args, 0, nil)
@@ -14,4 +15,20 @@ unsafe fn _coSpawn(func: *unsafe, args: *unsafe): bool {
 	}
 	sys::CloseHandle(sys::Handle(handle))
 	ret true
+}
+
+fn osyield() {
+	// Maximum attemp count to switch thread.
+	// This is the total number of attempts.
+	const AttempCount = 4
+	if cpp.SwitchToThread() {
+		ret
+	}
+	mut n := 1
+	for n < AttempCount; n++ {
+		if cpp.SwitchToThread() {
+			ret
+		}
+	}
+	panic("runtime: thread scheduling error")
 }
