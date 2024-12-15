@@ -1,0 +1,259 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+// Provides a node of type T for chanQueue.
+// Automatically instantiated by chanQueue.
+struct chanQueueNode[T] {
+	data: T
+	next: &chanQueueNode[T]
+}
+
+// Queue implementation using type T for channels that use type T.
+// Provides read and write in FIFO order. Automatically instantiated by pchan.
+// Designed for channels and should be used with caution. Not thread-safe by itself.
+// Works with a capacity of N for buffered channels, and allocated spaces are reused,
+// with each addition not resulting in a new allocation.
+struct chanQueue[T] {
+	// Pointer to the first node waiting to be read according to FIFO order.
+	// In unbuffered channels, the node is always a single node and is used to store
+	// and read a single value, never nil. In buffered channels,
+	// it can be nil if there is no data waiting to be read.
+	head: &chanQueueNode[T]
+
+	// In unbuffered channels, it is always nil. In buffered channels, it stores
+	// the node at the end of the queue, which is the most recently used and waiting to be read.
+	tail: &chanQueueNode[T]
+
+	// In unbuffered channels, it is always nil. For buffered channels, it stores
+	// previously allocated and available nodes.
+	free: &chanQueueNode[T]
+}
+
+impl chanQueue {
+	// Creates a chanQueue and allocates nodes according to cap.
+	// If cap >= 1, it also sets the last node. If cap >= 1,
+	// the channel is created as buffered, and if cap == 0,
+	// it is created as unbuffered channel.
+	static fn new(mut cap: int): &chanQueue[T] {
+		mut q := new(chanQueue[T])
+		if cap >= 1 {
+			q.free = new(chanQueueNode[T])
+			mut node := q.free
+			for cap > 1; cap-- {
+				node.next = new(chanQueueNode[T])
+				node = node.next
+			}
+		} else {
+			q.head = new(chanQueueNode[T])
+		}
+		ret q
+	}
+
+	// Removes the first node from the queue and returns the data.
+	// Assumes that there is always data in the queue.
+	fn dequeue(mut self): T {
+		// Copy the data before resetting to default.
+		mut data := self.head.data
+		{
+			// Remove the data from the node. Since this is a data type that performs GC,
+			// it will continue to exist until it is removed from the node.
+			// Remove its reference from the queue to allow it to be freed if possible.
+			let mut def: T
+			self.head.data = def
+		}
+		if self.tail != nil || self.free != nil { // buffered channel
+			// Advance the read order.
+			// The first node is now dequeued, so add it directly to the head of the free list.
+			mut node := self.head
+			self.head = node.next
+			if self.head == nil {
+				// Head has reached the end. Set tail to nil.
+				// The next enqueue call will select a node from the free list and
+				// set the head accordingly.
+				self.tail = nil
+			}
+			node.next = self.free
+			self.free = node
+		}
+		ret data
+	}
+
+	// Adds the data to the end of the queue.
+	// If the channel is unbuffered, it always assumes the current data has been read.
+	// If the channel is buffered, it always assumes there is free node to enqueue.
+	fn enqueue(mut self, mut &data: T) {
+		if self.free != nil { // buffered channel
+			// Take the first node from the free list and use it to store the data.
+			mut node := self.free
+			self.free = node.next
+			node.data = data
+			node.next = nil
+			// If tail is nil, initialize a new head.
+			// If there is already a tail, add the new node to the end of queue.
+			// In both cases, set tail to the last node.
+			if self.tail == nil {
+				self.head = node
+			} else {
+				self.tail.next = node
+			}
+			self.tail = node
+		} else {
+			// Unbuffered channel.
+			// Just update the head node.
+			self.head.data = data
+		}
+	}
+}
+
+// Channel state flags.
+const chanClosed = 0b01
+const chanBuffered = 0b10
+
+// Shared section of channel implementation.
+// Regardless of the generic types, each channel initially contains these fields.
+// To abstract away from the generic types and access the internal data in a
+// shared, type-independent manner, may used with Unsafe Jule.
+// It should not be copied.
+struct hchan {
+	lock:  fmutex
+	cap:   int
+	len:   int
+	state: u32
+}
+
+// The channel implementation of the language. The fields are
+// structured according to hchan. The generic type represents the
+// data type of the channel. Instances required at compile-time are
+// automatically instantiated by the compiler. Any channel algorithms that
+// require generic types should be defined under this structure.
+// Type-independent shared algorithms, like hchan, should be defined
+// outside of this structure. A pchan should not be copied after being used.
+// The compiler creates channels in the background using the [pchan[T].new]
+// static method. Behind the scenes, each channel is treated as a smart pointer.
+struct pchan[T] {
+	lock:  fmutex
+	cap:   int
+	len:   int
+	state: u32
+	queue: &chanQueue[T]
+}
+
+impl pchan {
+	// Creates a new channel.
+	// If cap >= 1, it is initialized as a buffered channel,
+	// otherwise, it is initialized as an unbuffered channel.
+	// A negative value for cap will cause a panic.
+	static fn new(cap: int): &pchan[T] {
+		mut ch := new(pchan[T])
+		if cap < 0 {
+			panic("runtime: invalid channel buffer size, it was <0")
+		}
+		ch.cap = cap
+		ch.queue = chanQueue[T].new(ch.cap)
+		if ch.cap > 0 {
+			ch.state |= chanBuffered
+		}
+		ret ch
+	}
+
+	// Returns the channel as a &hchan for general sharing of pchan[T].
+	// The returned &hchan does not exhibit GC behavior and can be used until
+	// the self pointer is freed, after which it should not be used.
+	fn hchan(mut self): &hchan {
+		ret unsafe { (&hchan)((*hchan)(&self)) }
+	}
+
+	// Returns the channel as a *hchan for general sharing of pchan[T].
+	// The returned *hchan can be used until the self pointer is freed,
+	// after which it should not be used.
+	fn phchan(mut self): *hchan {
+		ret unsafe { (*hchan)(&self) }
+	}
+
+	// Closes the channel.
+	fn close(mut self) {
+		self.lock.lock()
+		if self.state&chanClosed != chanClosed {
+			self.state |= chanClosed
+			self.queue.free = nil
+			self.queue.tail = nil
+		}
+		self.lock.unlock()
+	}
+
+	// Sends the data to the channel.
+	fn send(mut self, mut data: T) {
+		self.lock.lock()
+		if self.state&chanBuffered == chanBuffered {
+			// If the capacity is completely consumed, wait until space becomes available.
+			// When some data is read, there will be space in the queue to write.
+			chanpark(self.hchan(), self.len, self.cap)
+			if self.state&chanClosed == chanClosed {
+				panic("runtime: send on closed channel")
+			}
+			self.queue.enqueue(data)
+			self.len++
+		} else {
+			one := 1
+			// If there is data waiting to be read, wait until it is read.
+			chanpark(self.hchan(), self.len, one)
+			if self.state&chanClosed == chanClosed {
+				panic("runtime: send on closed channel")
+			}
+			self.queue.enqueue(data)
+			self.len++
+			// Wait until the length becomes zero.
+			// This means the data has been received.
+			chanpark(self.hchan(), self.len, one)
+		}
+		self.lock.unlock()
+	}
+
+	// Receives the data from the channel.
+	fn recv(mut self): T {
+		self.lock.lock()
+		zero := 0
+		// If there is no data waiting to be read in the queue, wait until there is.
+		chanpark(self.hchan(), zero, self.len)
+		if self.state&chanBuffered == chanBuffered {
+			if self.len == 0 && self.state&chanClosed == chanClosed {
+				// Channel is closed, return default value of the T.
+				self.lock.unlock()
+				let mut def: T
+				ret def
+			}
+		} else {
+			if self.state&chanClosed == chanClosed {
+				// Channel is closed, return default value of the T.
+				self.lock.unlock()
+				let mut def: T
+				ret def
+			}
+		}
+		mut data := self.queue.dequeue()
+		self.len--
+		self.lock.unlock()
+		ret data
+	}
+}
+
+// The channel halts execution until the required condition is met.
+// ch represents the channel, n is the field data used for comparison,
+// and c indicates the value that n should be smaller than.
+// This function must be called with the channel lock held by this thread.
+// Even if the condition is not met, it will return if the channel is in a closed state.
+fn chanpark(ch: &hchan, &n: int, &c: int) {
+	for {
+		if ch.state&chanClosed == chanClosed || n < c {
+			break
+		}
+		// The lock is acquired. This means no changes can occur in the channel.
+		// We must release the lock and immediately switch to a different thread.
+		ch.lock.unlock()
+		osyield()
+		// After the thread wakes up, we must acquire the lock
+		// before reaching the critical section again.
+		ch.lock.lock()
+	}
+}

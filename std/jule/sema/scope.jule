@@ -27,6 +27,7 @@ enum Stmt: type {
 	&FallSt,
 	&BreakSt,
 	&RetSt,
+	&ChanSend,
 }
 
 fn newScopeCheckerBase(mut &s: &sema, mut owner: &FnIns): &scopeChecker {
@@ -197,6 +198,13 @@ struct FallSt {
 struct RetSt {
 	Func: &FnIns
 	Expr: Expr
+}
+
+// Channel send data statement.
+struct ChanSend {
+	Token: &token::Token
+	Chan:  &Data
+	Data:  &Data
 }
 
 struct scopeLabel {
@@ -631,8 +639,10 @@ impl scopeChecker {
 		| &BuiltinPanicCallExpr
 		| &BuiltinCopyCallExpr
 		| &BuiltinDeleteCallExpr
+		| &BuiltinCloseCallExpr
 		| &FreeExpr
-		| &FnCallExpr:
+		| &FnCallExpr
+		| &ChanRecv:
 			self.scope.Stmts = append(self.scope.Stmts, d)
 		|:
 			self.s.pushErr(expr.Token, build::LogMsg.InvalidSyntax)
@@ -1849,6 +1859,46 @@ impl scopeChecker {
 		// Validated at end of scope's analysis.
 	}
 
+	fn checkChanSend(mut &self, mut chs: &ast::ChanSend) {
+		mut eval := self.s.eval(self)
+		mut l := eval.evalExpr(chs.Chan)
+		if l == nil {
+			ret
+		}
+		mut ch := l.Type.Chan()
+		if ch == nil {
+			self.s.pushErr(chs.Chan.Token, build::LogMsg.ExprNotChan)
+			self.s.pushSuggestion(build::LogMsg.RArrowOpExpectsChan)
+			ret
+		}
+		eval.prefix = ch.Elem
+		eval.target.mutable = l.Mutable
+		eval.unsafety = self.isUnsafe()
+		mut r := eval.evalExpr(chs.Data)
+		if r == nil {
+			ret
+		}
+		self.removeInteriorMutRisk(r)
+		if l.Mutable && !r.Mutable && r.Type.Mutable() {
+			self.s.pushErr(chs.Data.Token, build::LogMsg.ImmutDataSendViaMutChan, r.Type.Str())
+		}
+		// Check assignment types and return.
+		mut checker := assignTypeChecker{
+			s: self.s,
+			dest: ch.Elem,
+			d: r,
+			errorToken: chs.Data.Token,
+			refers: self.getOwnerRefers(),
+		}
+		if checker.check() {
+			self.scope.Stmts = append(self.scope.Stmts, &ChanSend{
+				Token: chs.Chan.Token,
+				Chan: l,
+				Data: r,
+			})
+		}
+	}
+
 	fn checkNode(mut &self, mut &node: ast::StmtData) {
 		match type node {
 		| &ast::ScopeTree:
@@ -1881,6 +1931,8 @@ impl scopeChecker {
 			self.checkRet((&ast::RetSt)(node))
 		| &ast::UseExpr:
 			self.checkUseExpr((&ast::UseExpr)(node))
+		| &ast::ChanSend:
+			self.checkChanSend((&ast::ChanSend)(node))
 		|:
 			println("error <unimplemented scope node>")
 		}

@@ -49,6 +49,9 @@ fn findBuiltinFunc(&ident: str): &FnIns {
 	| "delete":
 		static mut f = &FnIns{caller: builtinCallerDelete}
 		ret f
+	| "close":
+		static mut f = &FnIns{caller: builtinCallerClose}
+		ret f
 	|:
 		ret nil
 	}
@@ -442,54 +445,85 @@ fn builtinCallerPanic(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &_: &Data): 
 }
 
 fn builtinCallerMake(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &d: &Data): &Data {
-	if len(fc.Args) < 2 {
-		if len(fc.Args) == 1 {
-			e.pushErr(fc.Token, build::LogMsg.MissingExprFor, "size")
-			ret nil
-		}
-		e.pushErr(fc.Token, build::LogMsg.MissingExprFor, "type, size")
+	if len(fc.Args) == 0 {
+		// All types of the make function, takes at least an argument.
+		// So if function called like make(), push an error and return immediately.
+		e.pushErr(fc.Token, build::LogMsg.MissingExprFor, "type")
 		ret nil
-	} else if len(fc.Args) > 3 {
+	}
+	if len(fc.Args) > 3 {
+		// Any type of make function, can't take more than 3 arguments, but we have.
+		// Push an error and return immediately, do not evaluate the result.
 		e.pushErr(fc.Args[3].Token, build::LogMsg.ArgumentOverflow, "make")
 		ret nil
 	}
-
 	mut t := e.evalExprKind(fc.Args[0].Kind)
-	if t == nil {
+	match {
+	| t == nil:
+		// Expression evaluation failed. Error(s) should be logged already.
+		// Return as nil immediately.
 		ret nil
-	}
-
-	if !t.Decl {
+	| !t.Decl:
+		// Type is not declaration, so it is not a type declaration.
+		// Push an error and return as nil immediately.
 		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidType)
 		ret nil
-	} else if t.Type.Slc() == nil {
+	| t.Type.Chan() != nil:
+		// Type is channel. Make channel initialization.
+		if len(fc.Args) > 2 {
+			// The channel type variants can take up to 2 arguments, but we have more.
+			e.pushErr(fc.Args[2].Token, build::LogMsg.ArgumentOverflow, "make")
+			ret nil
+		}
+		mut model := &BuiltinMakeCallExpr{Type: t.Type}
+		d.Model = model
+		d.Type = t.Type
+		if len(fc.Args) == 2 {
+			// We have buffer size argument, evaluate it.
+			// So channel is buffered.
+			mut capExpr := e.s.eval(e.lookup).evalExpr(fc.Args[1])
+			if capExpr == nil {
+				ret d
+			}
+			e.checkIntegerIndexingByData(capExpr, fc.Args[1].Token)
+			model.Cap = capExpr.Model
+		}
+		ret d
+	| t.Type.Slc() != nil:
+		// Type is slice. Make slice allocation.
+		if len(fc.Args) < 2 {
+			// The slice type variants always must have to length argument for
+			// making slice allocation, but we have not.
+			e.pushErr(fc.Token, build::LogMsg.MissingExprFor, "size")
+			ret nil
+		}
+		d.Type = t.Type
+		mut lenExpr := e.s.evalp(e.lookup, t.Type).evalExpr(fc.Args[1])
+		if lenExpr == nil {
+			ret nil
+		}
+		e.checkIntegerIndexingByData(lenExpr, fc.Args[1].Token)
+		mut model := &BuiltinMakeCallExpr{
+			Type: t.Type,
+			Len: lenExpr.Model,
+		}
+		d.Model = model
+		if len(fc.Args) == 3 {
+			// We have capacity argument, evaluate it.
+			mut capExpr := e.s.evalp(e.lookup, t.Type).evalExpr(fc.Args[2])
+			if capExpr == nil {
+				ret d
+			}
+			e.checkIntegerIndexingByData(capExpr, fc.Args[2].Token)
+			model.Cap = capExpr.Model
+		}
+		ret d
+	|:
+		// Type is not supported by the make function.
+		// Push an error and return as nil immediately.
 		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidTypeForFn, t.Type.Str(), "make")
 		ret nil
 	}
-
-	d.Type = t.Type
-
-	mut lenExpr := e.s.evalp(e.lookup, t.Type).evalExpr(fc.Args[1])
-	if lenExpr == nil {
-		ret nil
-	}
-
-	e.checkIntegerIndexingByData(lenExpr, fc.Args[1].Token)
-
-	mut model := &BuiltinMakeCallExpr{
-		Type: t.Type,
-		Len: lenExpr.Model,
-	}
-	d.Model = model
-	if len(fc.Args) == 3 {
-		mut capExpr := e.s.evalp(e.lookup, t.Type).evalExpr(fc.Args[2])
-		if capExpr == nil {
-			ret d
-		}
-		e.checkIntegerIndexingByData(capExpr, fc.Args[2].Token)
-		model.Cap = capExpr.Model
-	}
-	ret d
 }
 
 fn builtinCallerAppend(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &d: &Data): &Data {
@@ -831,6 +865,34 @@ fn builtinCallerDelete(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &d: &Data):
 		ret nil
 	| dest.Type.Map() != nil:
 		ret callerDeleteMap(e, fc, dest, d)
+	|:
+		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidExpr)
+		ret nil
+	}
+}
+
+fn builtinCallerClose(mut &e: &eval, mut &fc: &ast::FnCallExpr, mut &d: &Data): &Data {
+	if len(fc.Args) < 1 {
+		e.pushErr(fc.Token, build::LogMsg.MissingExprFor, "c")
+		ret nil
+	}
+	if len(fc.Args) > 2 {
+		e.pushErr(fc.Args[1].Token, build::LogMsg.ArgumentOverflow, "close")
+	}
+	mut dest := e.evalExpr(fc.Args[0])
+	match {
+	| dest == nil:
+		ret nil
+	| dest.Decl:
+		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidExpr)
+		ret nil
+	| dest.Type.Chan() != nil:
+		d = buildVoidData()
+		d.Model = &BuiltinCloseCallExpr{
+			Token: fc.Args[0].Token,
+			Chan: dest,
+		}
+		ret d
 	|:
 		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidExpr)
 		ret nil

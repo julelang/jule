@@ -701,6 +701,22 @@ impl exprBuilder {
 		ret nil
 	}
 
+	// First token should be "<-" of the tokens.
+	fn buildChanRecv(mut self, mut &tokens: []&token::Token): &ast::ChanRecv {
+		if len(tokens) == 1 {
+			// Expression is just "<-", invalid syntax.
+			self.pushErr(tokens[0], build::LogMsg.InvalidSyntax)
+			ret nil
+		}
+		mut expr := self.buildFromTokens(tokens[1:])
+		if expr == nil {
+			ret nil
+		}
+		ret &ast::ChanRecv{
+			Expr: expr,
+		}
+	}
+
 	fn buildData(mut self, mut &tokens: []&token::Token): ast::ExprData {
 		match len(tokens) {
 		| 0:
@@ -719,6 +735,13 @@ impl exprBuilder {
 		}
 
 		token = tokens[0]
+		match token.Id {
+		| token::Id.Chan:
+			// Handle channel type declaration.
+			ret self.buildType(tokens)
+		| token::Id.RArrow:
+			ret self.buildChanRecv(tokens)
+		}
 
 		// Unary operators.
 		if token::IsUnaryOp(token.Id) {
@@ -837,7 +860,8 @@ impl exprBuilder {
 fn isTypeOp(&id: token::Id): bool {
 	ret id == token::Id.Amper ||
 		id == token::Id.DblAmper ||
-		id == token::Id.Star
+		id == token::Id.Star ||
+		id == token::Id.Chan
 }
 
 // Reports whether range is potentially part of a type declaration.

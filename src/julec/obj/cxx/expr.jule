@@ -1469,9 +1469,30 @@ impl exprCoder {
 		self.oc.write(")")
 	}
 
+	fn makeCallChan(mut &self, mut &m: &sema::BuiltinMakeCallExpr) {
+		ch := m.Type.Chan()
+		mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Elem)
+		const Static = true
+		mut f := ins.FindMethod("new", Static).Instances[0]
+		identCoder.funcIns(self.oc.Buf, f)
+		self.oc.write("(")
+		if m.Cap == nil {
+			// Channel is not buffered.
+			// We have to initialize it with zero buffer-length.
+			self.oc.write("0")
+		} else {
+			self.possibleRefExpr(m.Cap)
+		}
+		self.oc.write(")")
+	}
+
 	fn makeCall(mut &self, mut m: &sema::BuiltinMakeCallExpr) {
 		if m.Type.Slc() != nil {
 			self.makeCallSlice(m)
+			ret
+		}
+		if m.Type.Chan() != nil {
+			self.makeCallChan(m)
 			ret
 		}
 		self.makeCallStr(m)
@@ -1608,6 +1629,40 @@ impl exprCoder {
 		self.oc.write(".__free()")
 	}
 
+	fn chanRecv(mut &self, mut m: &sema::ChanRecv) {
+		ch := m.Expr.Type.Chan()
+		mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Elem)
+		const Static = false
+		mut f := ins.FindMethod("recv", Static).Instances[0]
+		identCoder.funcIns(self.oc.Buf, f)
+		self.oc.write("(")
+		self.possibleRefExpr(m.Expr.Model)
+		self.oc.write(".ptr(")
+		if !env::Production {
+			self.oc.write("\"")
+			self.oc.locInfo(m.Token)
+			self.oc.write("\"")
+		}
+		self.oc.write("))")
+	}
+
+	fn closeCall(mut &self, mut m: &sema::BuiltinCloseCallExpr) {
+		ch := m.Chan.Type.Chan()
+		mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Elem)
+		const Static = false
+		mut f := ins.FindMethod("close", Static).Instances[0]
+		identCoder.funcIns(self.oc.Buf, f)
+		self.oc.write("(")
+		self.possibleRefExpr(m.Chan.Model)
+		self.oc.write(".ptr(")
+		if !env::Production {
+			self.oc.write("\"")
+			self.oc.locInfo(m.Token)
+			self.oc.write("\"")
+		}
+		self.oc.write("))")
+	}
+
 	fn strComp(mut &self, mut m: &opt::StrCompExpr) {
 		if m.NotEq {
 			self.oc.write("(!")
@@ -1696,18 +1751,16 @@ impl exprCoder {
 			self.oc.write(str(m))
 		| &str:
 			self.oc.write(*(&str)(m))
-		| &sema::Type:
-			self.oc.tc.kind(self.oc.Buf, (&sema::Type)(m))
 		| &constant::Const:
 			self.constant((&constant::Const)(m))
+		| &sema::Type:
+			self.oc.tc.kind(self.oc.Buf, (&sema::Type)(m))
 		| &sema::Var:
 			self.var((&sema::Var)(m))
 		| &sema::StructIns:
 			self.structureIns((&sema::StructIns)(m))
 		| &sema::FnIns:
 			self.funcInsCommon((&sema::FnIns)(m))
-		| &opt::UnsafeBinaryExpr:
-			self.unsafeBinary((&opt::UnsafeBinaryExpr)(m).Node)
 		| &sema::BinaryExpr:
 			self.binary((&sema::BinaryExpr)(m))
 		| &sema::UnaryExpr:
@@ -1774,6 +1827,12 @@ impl exprCoder {
 			self.backendEmit((&sema::BackendEmitExpr)(m))
 		| &sema::FreeExpr:
 			self.free((&sema::FreeExpr)(m))
+		| &sema::ChanRecv:
+			self.chanRecv((&sema::ChanRecv)(m))
+		| &sema::BuiltinCloseCallExpr:
+			self.closeCall((&sema::BuiltinCloseCallExpr)(m))
+		| &opt::UnsafeBinaryExpr:
+			self.unsafeBinary((&opt::UnsafeBinaryExpr)(m).Node)
 		| &opt::StrCompExpr:
 			self.strComp((&opt::StrCompExpr)(m))
 		| &opt::RefExpr:

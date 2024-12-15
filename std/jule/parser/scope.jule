@@ -840,7 +840,8 @@ impl scopeParser {
 			match {
 			| braceN > 0:
 				continue
-			| !token::IsAssignOp(token.Id) && token.Id != token::Id.ColonEq:
+			| !token::IsAssignOp(token.Id) &&
+				token.Id != token::Id.ColonEq && token.Id != token::Id.RArrow:
 				continue
 			}
 
@@ -886,10 +887,27 @@ impl scopeParser {
 		ret lefts
 	}
 
+	fn buildChanSend(mut self, mut &info: &assignInfo): (ast::StmtData, bool) {
+		mut ch := self.p.buildExpr(info.l)
+		if ch == nil {
+			ret nil, false
+		}
+		mut data := self.p.buildExpr(info.r)
+		if data == nil {
+			ret nil, false
+		}
+		ret &ast::ChanSend{Chan: ch, Data: data}, true
+	}
+
 	fn buildPlainAssign(mut self, mut &tokens: []&token::Token): (ast::StmtData, bool) {
 		mut info := self.buildAssignInfo(tokens)
 		if !info.ok {
 			ret nil, false
+		}
+
+		// Caught channel data sends.
+		if info.setter.Id == token::Id.RArrow {
+			ret self.buildChanSend(info)
 		}
 
 		mut assign := &ast::AssignSt{

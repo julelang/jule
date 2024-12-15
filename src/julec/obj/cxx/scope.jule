@@ -957,6 +957,24 @@ impl scopeCoder {
 		}
 	}
 
+	fn chanSend(mut &self, mut m: &sema::ChanSend) {
+		mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, m.Data.Type)
+		const Static = false
+		mut f := ins.FindMethod("send", Static).Instances[0]
+		identCoder.funcIns(self.oc.Buf, f)
+		self.oc.write("(")
+		self.oc.ec.possibleRefExpr(m.Chan.Model)
+		self.oc.write(".ptr(")
+		if !env::Production {
+			self.oc.write("\"")
+			self.oc.locInfo(m.Token)
+			self.oc.write("\"")
+		}
+		self.oc.write("), ")
+		self.oc.ec.possibleRefExpr(m.Data.Model)
+		self.oc.write(")")
+	}
+
 	fn mutSlicing(mut &self, mut m: &opt::MutSlicingExpr) {
 		self.oc.write("(")
 		self.oc.ec.possibleRefExpr(m.Expr)
@@ -1027,6 +1045,8 @@ impl scopeCoder {
 			self.breakSt((&sema::BreakSt)(st))
 		| &sema::RetSt:
 			self.retSt((&sema::RetSt)(st))
+		| &sema::ChanSend:
+			self.chanSend((&sema::ChanSend)(st))
 		| &opt::PushToSliceExpr:
 			self.oc.ec.pushToSlice((&opt::PushToSliceExpr)(st))
 		| &opt::AppendToSliceExpr:

@@ -273,6 +273,13 @@ impl typeCoder {
 		buf.WriteByte('>')!
 	}
 
+	fn channel(mut self, mut &buf: strings::Builder, mut ch: &sema::Chan) {
+		mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Elem)
+		buf.WriteStr("jule::Ptr<")!
+		identCoder.structureIns(buf, ins)
+		buf.WriteStr(">")!
+	}
+
 	// Generates C++ code of type.
 	fn kind(mut self, mut &buf: strings::Builder, mut k: &sema::Type) {
 		match {
@@ -318,6 +325,9 @@ impl typeCoder {
 		| k.Fn() != nil:
 			self.func(buf, k.Fn())
 			ret
+		| k.Chan() != nil:
+			self.channel(buf, k.Chan())
+			ret
 		}
 		match type k.Kind {
 		| &customType:
@@ -340,6 +350,7 @@ impl resultCoder {
 	const Array = "a"
 	const Reference = "r"
 	const Fn = "f"
+	const Chan = "c"
 	const BindPrefix = "b"
 
 	static fn new(mut &tc: &typeCoder): &resultCoder {
@@ -384,6 +395,11 @@ impl resultCoder {
 		if f.Result != nil {
 			self.codeMut(s, f.Result)
 		}
+	}
+
+	fn channel(mut self, mut &s: strings::Builder, mut ch: &sema::Chan) {
+		s.WriteStr(resultCoder.Chan)!
+		self.codeMut(s, ch.Elem)
 	}
 
 	fn tup(mut self, mut &s: strings::Builder, mut tup: &sema::Tuple) {

@@ -159,6 +159,9 @@ impl Type {
 			if _self.Struct() != nil {
 				ret _self.Struct().Mutable
 			}
+			if _self.Chan() != nil {
+				ret _self.Chan().Elem.Mutable()
+			}
 			if _self.Trait() != nil {
 				ret true
 			}
@@ -211,7 +214,8 @@ impl Type {
 				_self.Trait() != nil ||
 				_self.Slc() != nil ||
 				_self.Map() != nil ||
-				_self.TypeEnum() != nil
+				_self.TypeEnum() != nil ||
+				_self.Chan() != nil
 		}
 	}
 
@@ -240,6 +244,17 @@ impl Type {
 		match type kind {
 		| &Prim:
 			ret (&Prim)(kind)
+		|:
+			ret nil
+		}
+	}
+
+	// Returns channel type if actual kind is channel, nil if not.
+	fn Chan(mut self): &Chan {
+		mut kind := self.ActualKind()
+		match type kind {
+		| &Chan:
+			ret (&Chan)(kind)
 		|:
 			ret nil
 		}
@@ -633,6 +648,25 @@ impl Prim {
 
 	// Reports whether type is primitive any.
 	fn IsAny(self): bool { ret self.Kind == types::Kind.Any }
+}
+
+// Channel type.
+struct Chan {
+	Elem: &Type
+}
+
+impl Kind for Chan {
+	// Returns smart pointer kind as string.
+	fn Str(self): str { ret "chan " + self.Elem.Str() }
+
+	// Reports whether types are same.
+	fn Equal(&self, other: &Type): bool {
+		match type other.Kind {
+		| &Chan:
+			ret self.Elem.Equal((&Chan)(other.Kind).Elem)
+		}
+		ret false
+	}
 }
 
 // Smart pointer.
@@ -1421,6 +1455,25 @@ impl typeChecker {
 		ret self.buildSptrFromType(elem)
 	}
 
+	fn buildChan(mut self, mut decl: &ast::ChanTypeDecl): &Chan {
+		cycleRisk := self.cycleRisk
+		self.cycleRisk = false
+		defer { self.cycleRisk = cycleRisk }
+
+		mut elem := self.checkDecl(decl.Elem)
+		if elem == nil {
+			ret nil
+		}
+		if self.s.meta.runtime != nil {
+			mut s := runtimeFindStruct(self.s.meta.runtime, runtimeStruct.pchan)
+			self.appendUsedStructReference(s)
+			mut ins := s.instance()
+			ins.Generics = [&InsGeneric{Type: elem}]
+			_ = self.fromStructIns(ins, decl.Elem.Token)
+		}
+		ret &Chan{Elem: elem}
+	}
+
 	fn buildPtrFromType(mut self, mut &elem: &Type): &Ptr {
 		// Check special cases.
 		match {
@@ -1681,6 +1734,12 @@ impl typeChecker {
 			if t != nil {
 				kind = t
 			}
+		| &ast::ChanTypeDecl:
+			self.inscatch = true
+			mut t := self.buildChan((&ast::ChanTypeDecl)(declKind))
+			if t != nil {
+				kind = t
+			}
 		| &ast::SptrTypeDecl:
 			self.inscatch = true
 			mut t := self.buildSptr((&ast::SptrTypeDecl)(declKind))
@@ -1786,6 +1845,9 @@ impl identTypeLookup {
 		match {
 		| k.Prim() != nil:
 			ret identTypeLookup.prim(ident, k.Prim())
+		| k.Chan() != nil:
+			mut ch := k.Chan()
+			ret identTypeLookup.exist(ident, ch.Elem)
 		| k.Sptr() != nil:
 			mut sptr := k.Sptr()
 			ret identTypeLookup.exist(ident, sptr.Elem)
