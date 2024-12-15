@@ -22,12 +22,12 @@ It contains the reference compiler, API, and standard library.
 ### Key Features
 
 - Optimized for fast and safe programs
-- Empowered compile-time: compile-time reflection, evalutation of constants, zero runtime-cost generics, comptime matching, and much more feature empowered by the standard comptime library
-- Hands-free deterministic memory management with reference-counting, manual management is optional
-- [Easy cross compilation](https://manual.jule.dev/compiler/cross-compilation), generate IR for target platform and imitate target architecture
+- Empowered compile-time: reflection, evalutation, matching, and more by the standard comptime library
+- Deterministic memory management with reference-counting and smart pointers
+- [Easy cross compilation](https://manual.jule.dev/compiler/cross-compilation): generate IR for target platform and imitate tge target architecture
 - Cross platform implemented standard library
 - Built-in support to write tests
-- Built-in support for [concurrent programming](https://manual.jule.dev/concurrency/), empowered by standard library
+- Built-in [concurrency](https://manual.jule.dev/concurrency/): channels, mutexes, condition variables and more
 - Easy error-handling with [exceptionals](https://manual.jule.dev/error-handling/exceptionals), very like optional types
 - Easy low-level programming
 - High [interoperability](https://manual.jule.dev/integrated-jule/interoperability/) with C, C++, Objective-C and Objective-C++
