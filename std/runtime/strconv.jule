@@ -293,6 +293,12 @@ fn toStr[T](x: T): str {
 	| comptime::Kind.Enum:
 		comptime::TypeAlias(elemType, t.Elem())
 		ret toStr(elemType(x))
+	| comptime::Kind.Chan:
+		// Channels are smart pointers behind the scene.
+		// Take raw pointer, handle as &uintptr to read memory address of
+		// smart pointer, and pass to ptrToStr as unsafe raw pointer to
+		// print allocation address of the smart pointer.
+		ret unsafe { ptrToStr((*unsafe)(uintptr(*(*&uintptr)(&x)))) }
 	}
 	panic("runtime: unsupported type for toStr")
 }
