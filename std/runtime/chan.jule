@@ -211,7 +211,18 @@ impl pchan {
 	}
 
 	// Receives the data from the channel.
-	fn recv(mut self): T {
+	// The |ok| is the reference that points to boolean and
+	// it reports whether data dequeued and received successfuly.
+	fn recv(mut self, mut &ok: bool): T {
+		// References are safe, but this method may used by the compiler unsafely.
+		// And we have to support nil references for such a low-level use.
+		// So, If the |ok| reference not implemented as is nil raw pointer
+		// by the compiler, set it. Otherwise, do not touch it. Be safe.
+		//
+		// To determine whether |ok| is nil raw pointer behind the scene,
+		// take raw pointer and compare it with nil. Since taking raw pointer of
+		// the references will result as actual pointer of them, we can determine
+		// whether the reference's raw pointer is nil.
 		self.lock.lock()
 		zero := 0
 		// If there is no data waiting to be read in the queue, wait until there is.
@@ -220,6 +231,9 @@ impl pchan {
 			if self.len == 0 && self.state&chanClosed == chanClosed {
 				// Channel is closed, return default value of the T.
 				self.lock.unlock()
+				if &ok != nil {
+					ok = false
+				}
 				let mut def: T
 				ret def
 			}
@@ -227,6 +241,9 @@ impl pchan {
 			if self.state&chanClosed == chanClosed {
 				// Channel is closed, return default value of the T.
 				self.lock.unlock()
+				if &ok != nil {
+					ok = false
+				}
 				let mut def: T
 				ret def
 			}
@@ -234,6 +251,9 @@ impl pchan {
 		mut data := self.queue.dequeue()
 		self.len--
 		self.lock.unlock()
+		if &ok != nil {
+			ok = true
+		}
 		ret data
 	}
 }

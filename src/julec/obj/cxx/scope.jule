@@ -712,6 +712,32 @@ impl scopeCoder {
 		self.oc.write("})")
 	}
 
+	// Handles channel receive expression assignments like; data, ok := <-c
+	fn chanRecvAssign(mut &self, mut a: &sema::MultiAssign) {
+		if a.Left[0] == nil && a.Left[1] == nil {
+			// Expression is like: _, _ = <-c
+			// Handle as plain expression.
+			self.oc.ec.chanRecv((&sema::ChanRecv)(a.Right), nil)
+			ret
+		}
+		if a.Left[0] != nil {
+			// Received data assigned to this.
+			self.oc.ec.possibleRefExpr(a.Left[0].Model)
+			self.oc.write(" = ")
+		}
+		let mut ok: fn() = nil
+		if a.Left[1] != nil {
+			// The |ok| parameter found.
+			// Pass the memory of the lvalue to the receiver function.
+			ok = fn() {
+				self.oc.write("&(")
+				self.oc.ec.possibleRefExpr(a.Left[1].Model)
+				self.oc.write(")")
+			}
+		}
+		self.oc.ec.chanRecv((&sema::ChanRecv)(a.Right), ok)
+	}
+
 	fn multiAssign(mut &self, mut a: &sema::MultiAssign) {
 		// Write declarations without no initialization.
 		// It will initialize with assignments.
@@ -723,8 +749,11 @@ impl scopeCoder {
 
 		// Special cases.
 		match type a.Right {
-		| &sema::IndexingExpr: // Map lookup.
+		| &sema::IndexingExpr:
 			self.mapLookupAssign(a)
+			ret
+		| &sema::ChanRecv:
+			self.chanRecvAssign(a)
 			ret
 		}
 
