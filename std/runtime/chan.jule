@@ -177,7 +177,6 @@ impl pchan {
 		if self.state&chanClosed != chanClosed {
 			self.state |= chanClosed
 			self.queue.free = nil
-			self.queue.tail = nil
 		}
 		self.lock.unlock()
 	}
@@ -187,7 +186,7 @@ impl pchan {
 		self.lock.lock()
 		if self.state&chanBuffered == chanBuffered {
 			// If the capacity is completely consumed, wait until space becomes available.
-			// When some data is read, there will be space in the queue to write.
+			// When some data is received, there will be space in the queue to write.
 			chanpark(self.hchan(), self.len, self.cap)
 			if self.state&chanClosed == chanClosed {
 				panic("runtime: send on closed channel")
@@ -196,7 +195,7 @@ impl pchan {
 			self.len++
 		} else {
 			one := 1
-			// If there is data waiting to be read, wait until it is read.
+			// If there is data waiting to be received, wait until it is received.
 			chanpark(self.hchan(), self.len, one)
 			if self.state&chanClosed == chanClosed {
 				panic("runtime: send on closed channel")
@@ -225,28 +224,30 @@ impl pchan {
 		// whether the reference's raw pointer is nil.
 		self.lock.lock()
 		zero := 0
-		// If there is no data waiting to be read in the queue, wait until there is.
+		// If there is no data waiting to be received in the queue, wait until there is.
 		chanpark(self.hchan(), zero, self.len)
-		if self.state&chanBuffered == chanBuffered {
-			if self.len == 0 && self.state&chanClosed == chanClosed {
-				// Channel is closed, return default value of the T.
-				self.lock.unlock()
-				if &ok != nil {
-					ok = false
-				}
-				let mut def: T
-				ret def
+		// chanpark returns when the condition met or channel has been closed.
+		// An unbuffered channel cannot have a queue, so its length always varies
+		// between 0 and 1. If there is no data to receive, the only possibility is
+		// that the channel has been closed. If there is data in the queue,
+		// a buffered channel should be able to receive this data, whether
+		// the channel is closed or open. In this case, we can determine whether
+		// the channel is closed and whether there is any data by simply checking
+		// its length. If the length has reached zero, it means the channel is
+		// closed and there is no data left in the queue.
+		if self.len == 0 {
+			// Since the channel is no longer fully functional, set the head and
+			// tail nodes to nil. This drops references to the relevant allocations
+			// without waiting for the channel to go out of scope,
+			// making it easier to gain used memory back.
+			self.queue.head = nil
+			self.queue.tail = nil
+			self.lock.unlock()
+			if &ok != nil {
+				ok = false
 			}
-		} else {
-			if self.state&chanClosed == chanClosed {
-				// Channel is closed, return default value of the T.
-				self.lock.unlock()
-				if &ok != nil {
-					ok = false
-				}
-				let mut def: T
-				ret def
-			}
+			let mut def: T
+			ret def
 		}
 		mut data := self.queue.dequeue()
 		self.len--
