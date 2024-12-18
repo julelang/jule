@@ -370,11 +370,9 @@ impl typeBuilder {
 			ret nil
 		}
 
-		if self.tokens[*self.i].Id == token::Id.RArrow {
-			if !send {
-				self.pushErr(self.tokens[*self.i], build::LogMsg.MakingRecvOnlyChanSendOnly)
-				ret nil
-			}
+		// Check send-only probablity if channel is not recv-only.
+		// Otherwise, accept arrow for element type if exist.
+		if send && self.tokens[*self.i].Id == token::Id.RArrow {
 			recv = false
 			if *self.i+1 >= len(self.tokens) {
 				self.pushErr(self.tokens[*self.i], build::LogMsg.InvalidSyntax)
@@ -383,7 +381,12 @@ impl typeBuilder {
 			*self.i++
 		}
 
-		mut elem := self.step()
+		mut elem := (&ast::TypeDecl)(nil)
+		if send && recv && self.tokens[*self.i].Id == token::Id.LParent {
+			elem = self.buildParenthesesRange()
+		} else {
+			elem = self.step()
+		}
 		if elem == nil {
 			ret nil
 		}
@@ -396,6 +399,24 @@ impl typeBuilder {
 				Elem: elem,
 			},
 		}
+	}
+
+	unsafe fn buildParenthesesRange(mut self): &ast::TypeDecl {
+		token := self.tokens[*self.i] // Save token for error log.
+		mut rangeTokens := range(*self.i, token::Id.LParent, token::Id.RParent, self.tokens)
+		if len(rangeTokens) == 0 {
+			// Empty range.
+			self.pushErr(token, build::LogMsg.MissingType)
+			ret nil
+		}
+		oldOffset := *self.i
+		mut oldTokens := self.tokens
+		self.tokens = rangeTokens
+		*self.i = 0
+		mut t := self.step()
+		*self.i = oldOffset
+		self.tokens = oldTokens
+		ret t
 	}
 
 	unsafe fn step(mut self): &ast::TypeDecl {
