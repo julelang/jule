@@ -343,6 +343,19 @@ impl assignTypeChecker {
 			}
 			mut dest := self.d.Type.Enum().TypeSym.Type
 			ret self.s.checkTypeCompatibility(dest, dkind, self.errorToken)
+		| self.d.Type.Chan() != nil:
+			dc := self.dest.Chan()
+			if dc == nil {
+				break
+			}
+			vc := self.d.Type.Chan()
+			if !dc.Elem.Equal(vc.Elem) {
+				break
+			}
+			if dc.Recv && !vc.Recv || dc.Send && !vc.Send {
+				break
+			}
+			ret true
 		}
 		ret self.s.checkTypeCompatibility1(self.dest, self.d, self.errorToken)
 	}

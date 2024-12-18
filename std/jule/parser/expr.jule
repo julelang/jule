@@ -736,11 +736,14 @@ impl exprBuilder {
 
 		token = tokens[0]
 		match token.Id {
+		| token::Id.RArrow:
+			if len(tokens) > 1 && tokens[1].Id != token::Id.Chan {
+				ret self.buildChanRecv(tokens)
+			}
+			fall
 		| token::Id.Chan:
 			// Handle channel type declaration.
 			ret self.buildType(tokens)
-		| token::Id.RArrow:
-			ret self.buildChanRecv(tokens)
 		}
 
 		// Unary operators.
@@ -861,7 +864,8 @@ fn isTypeOp(&id: token::Id): bool {
 	ret id == token::Id.Amper ||
 		id == token::Id.DblAmper ||
 		id == token::Id.Star ||
-		id == token::Id.Chan
+		id == token::Id.Chan ||
+		id == token::Id.RArrow
 }
 
 // Reports whether range is potentially part of a type declaration.

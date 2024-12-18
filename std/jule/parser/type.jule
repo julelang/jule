@@ -350,8 +350,39 @@ impl typeBuilder {
 			self.pushErr(token, build::LogMsg.InvalidSyntax)
 			ret nil
 		}
-
 		*self.i++
+
+		mut recv := true
+		mut send := true
+
+		if token.Id == token::Id.RArrow {
+			send = false
+			if *self.i+1 >= len(self.tokens) {
+				self.pushErr(token, build::LogMsg.InvalidSyntax)
+				ret nil
+			}
+			token = self.tokens[*self.i]
+			*self.i++
+		}
+
+		if token.Id != token::Id.Chan {
+			self.pushErr(token, build::LogMsg.InvalidSyntax)
+			ret nil
+		}
+
+		if self.tokens[*self.i].Id == token::Id.RArrow {
+			if !send {
+				self.pushErr(self.tokens[*self.i], build::LogMsg.MakingRecvOnlyChanSendOnly)
+				ret nil
+			}
+			recv = false
+			if *self.i+1 >= len(self.tokens) {
+				self.pushErr(self.tokens[*self.i], build::LogMsg.InvalidSyntax)
+				ret nil
+			}
+			*self.i++
+		}
+
 		mut elem := self.step()
 		if elem == nil {
 			ret nil
@@ -360,6 +391,8 @@ impl typeBuilder {
 		ret &ast::TypeDecl{
 			Token: token,
 			Kind: &ast::ChanTypeDecl{
+				Recv: recv,
+				Send: send,
 				Elem: elem,
 			},
 		}
@@ -372,7 +405,7 @@ impl typeBuilder {
 			ret self.buildIdent()
 		| token::Id.Cpp:
 			ret self.buildCppLink()
-		| token::Id.Chan:
+		| token::Id.Chan | token::Id.RArrow:
 			ret self.buildChan()
 		| token::Id.Unsafe:
 			if len(self.tokens)-*self.i > 1 && self.tokens[*self.i+1].Id == token::Id.Fn {

@@ -652,18 +652,29 @@ impl Prim {
 
 // Channel type.
 struct Chan {
+	Recv: bool
+	Send: bool
 	Elem: &Type
 }
 
 impl Kind for Chan {
 	// Returns smart pointer kind as string.
-	fn Str(self): str { ret "chan " + self.Elem.Str() }
+	fn Str(self): str {
+		if self.Recv && self.Send {
+			ret "chan " + self.Elem.Str()
+		} else if self.Recv {
+			ret "<-chan " + self.Elem.Str()
+		} else {
+			ret "chan<- " + self.Elem.Str()
+		}
+	}
 
 	// Reports whether types are same.
 	fn Equal(&self, other: &Type): bool {
 		match type other.Kind {
 		| &Chan:
-			ret self.Elem.Equal((&Chan)(other.Kind).Elem)
+			c := (&Chan)(other.Kind)
+			ret self.Recv == c.Recv && self.Send == c.Send && self.Elem.Equal(c.Elem)
 		}
 		ret false
 	}
@@ -1471,7 +1482,11 @@ impl typeChecker {
 			ins.Generics = [&InsGeneric{Type: elem}]
 			_ = self.fromStructIns(ins, decl.Elem.Token)
 		}
-		ret &Chan{Elem: elem}
+		ret &Chan{
+			Recv: decl.Recv,
+			Send: decl.Send,
+			Elem: elem,
+		}
 	}
 
 	fn buildPtrFromType(mut self, mut &elem: &Type): &Ptr {
