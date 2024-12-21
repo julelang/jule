@@ -394,6 +394,8 @@ impl dynamicTypeAnnotation {
 				elem = k.Ptr().Elem
 			| ast::SptrTypeDecl:
 				elem = k.Sptr().Elem
+			| ast::ChanTypeDecl:
+				elem = k.Chan().Elem
 			}
 			self.c = (&T)(self.c.Kind).Elem
 			ret self.annotateConstraint(elem)
@@ -497,6 +499,8 @@ impl dynamicTypeAnnotation {
 			ret self.annotateConstraintElem[ast::PtrTypeDecl](k)
 		| k.Sptr() != nil:
 			ret self.annotateConstraintElem[ast::SptrTypeDecl](k)
+		| k.Chan() != nil:
+			ret self.annotateConstraintElem[ast::ChanTypeDecl](k)
 		| k.Map() != nil:
 			ret self.annotateConstraintMap(k)
 		| k.Fn() != nil:
@@ -636,6 +640,16 @@ impl dynamicTypeAnnotation {
 		ret true
 	}
 
+	unsafe fn annotateChan(mut self, mut &k: &Type): (ok: bool) {
+		mut c := (*self.k).Chan()
+		if c == nil {
+			ret false
+		}
+		mut c2 := k.Chan()
+		self.k = &c.Elem
+		ret self.annotateKind(c2.Elem)
+	}
+
 	unsafe fn annotateAny(mut self, mut &k: &Type): (ok: bool) {
 		kind := (*self.k).Str()
 		for i, g in self.f.Decl.Generics {
@@ -680,6 +694,8 @@ impl dynamicTypeAnnotation {
 			ret self.annotateSptr(k)
 		| k.Struct() != nil:
 			ret self.annotateStruct(k)
+		| k.Chan() != nil:
+			ret self.annotateChan(k)
 		|:
 			ret false
 		}
