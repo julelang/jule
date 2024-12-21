@@ -6,10 +6,10 @@ It is also used by the official reference compiler JuleC and is developed in par
 ## Packages
 
 - [`ast`](./ast): AST things.
-- [`token`](./token): Lexical analyzer.
 - [`importer`](./importer): Default Jule importer.
-- [`parser`](./parser): Parser.
+- [`parser`](./parser): Parser
 - [`sema`](./sema): Semantic analyzer and CAST (Compilation Abstract Syntax Tree) components.
+- [`token`](./token): Lexical analyzer.
 - [`types`](./types): Elementary package for type safety.
 
 ## Developer Reference
@@ -20,9 +20,9 @@ It is also used by the official reference compiler JuleC and is developed in par
 
 - **(3)** The `generics` field of `sema::TypeAlias` structure is stores all generic types that used in evaluation of destination type kind of type alias. This types are deep references. Stores `*T` or `[]T`, but also stores deep usages such as `MyStruct[T]` or `fn(s: MyStruct[[]*T])` types.
 
-- **(4)** The `owner_alias` field of `sema::TypeChecker` structure is type alias which is uses `TypeChecker` instance to build it's own destination type kind. This is the hard reference to owner. Always points to root type alias of this build even in nested type builds. Used to collect generic dependencies (see (3)) and etc. of type aliaes.
+- **(4)** The `ownerAlias` field of `sema::TypeChecker` structure is type alias which is uses `TypeChecker` instance to build it's own destination type kind. This is the hard reference to owner. Always points to root type alias of this build even in nested type builds. Used to collect generic dependencies (see (3)) and etc. of type aliaes.
 
-- **(5)** Instantiation cycles catched by the `sema::TypeChecker` structure. To catch instatiaton cycles, algorithm uses generic references of type aliases (see (3)). The `banned_generics` field of the `sema::TypeChecker` structure is stores all generics of current scope which is type building performed in. If owner structure (see (2)) has generics and builds itself in it's own scope(s) with it's own generic type(s), causes instantiation cycles. To catch these cycles, checks generic references of used type aliases. If used type alias or it's generic references is exist in banned generics, accepts as a cycle.
+- **(5)** Instantiation cycles catched by the `sema::TypeChecker` structure. To catch instatiaton cycles, algorithm uses generic references of type aliases (see (3)). The `bannedGenerics` field of the `sema::TypeChecker` structure is stores all generics of current scope which is type building performed in. If owner structure (see (2)) has generics and builds itself in it's own scope(s) with it's own generic type(s), causes instantiation cycles. To catch these cycles, checks generic references of used type aliases. If used type alias or it's generic references is exist in banned generics, accepts as a cycle.
 
 - **(6)** The `inscatch` field of the `sema::TypeChecker` structure is represents whether instantiation cycle catching enabled. This should be enable if building type is not owner structure's itself, see (5). Type builder can build owner structure's itself with it's own generic types, but should can't build others. Therefore any type building for generics should enable instantiation cycle catching algorithm except plain form of owner structure's generic types or type aliases for them. \
 \
@@ -73,3 +73,4 @@ Here is the list of custom behaviors for this package;
 - (1) `arrayCmp`: Developed to eliminate the need for the Jule compiler to generate code specifically for array comparisons for each backend and to reduce analysis cost. The semantic analyzer creates the necessary instance for this generic function when an array comparison is made. Thus, the necessary comparison function for each array is programmed at the Jule frontent level.
 - (2): `toStr`: Built-in string conversion function for types. An instance is created in any situation that may be required.
 - (3): `_Map`: Built-in map type implementation. An instance created for each unique map type declaration.
+- (4): `pchan`: Built-in chan type implementation. An instance created for each unique channel type declaration.
