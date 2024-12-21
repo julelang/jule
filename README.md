@@ -62,8 +62,8 @@ Officially, the recommended method to always get the most up-to-date build of co
 If you already have a compiler, you can use build scripts designed for developers by obtaining the latest source code.
 But remember, these are for developers and they compile the compiler for debugging new source code, not for production use. So you can get an inefficient and slow version.
 
-- Learn about: [compile from IR](https://manual.jule.dev/getting-started/install-from-source/compile-from-ir.html)
-- Learn about: [build scripts](https://manual.jule.dev/getting-started/install-from-source/build-scripts.html)
+- Learn about: [compile from IR](https://manual.jule.dev/getting-started/installation/compiling-from-source/compile-from-ir)
+- Learn about: [build scripts](https://manual.jule.dev/getting-started/installation/compiling-from-source/build-scripts)
 
 ## Contributing
 
