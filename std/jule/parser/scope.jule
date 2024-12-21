@@ -5,6 +5,7 @@
 use "std/jule/ast"
 use "std/jule/build"
 use "std/jule/token"
+use "std/slices"
 
 fn newScope(): &ast::ScopeTree {
 	ret new(ast::ScopeTree)
@@ -161,8 +162,7 @@ impl scopeParser {
 	}
 
 	fn insertAsNext(mut self, mut &tokens: []&token::Token) {
-		self.stmts = append(self.stmts[:self.pos+1], self.stmts[self.pos:]...)
-		self.stmts[self.pos+1] = &stmt{tokens: tokens}
+		self.stmts = slices::Insert(self.stmts, self.pos+1, &stmt{tokens: tokens})
 	}
 
 	fn next(mut self): &stmt {
@@ -800,7 +800,7 @@ impl scopeParser {
 
 		// Save followed statement
 		if len(tokens) > 2 {
-			tokens = tokens[2:] // Remove goto keyword and label
+			tokens = tokens[2:] // Remove label identifier and colon.
 			self.insertAsNext(tokens)
 		}
 
