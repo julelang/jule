@@ -351,6 +351,7 @@ impl strScan {
 enum ConvError {
 	NoDigits,   // number has no digits
 	InvalidSep, // '_' must separate successive digits
+	InvalidFormat,
 }
 
 // Scans the number corresponding to the longest possible prefix
@@ -400,7 +401,7 @@ enum ConvError {
 //
 // Returns ConvError in integer form.
 // err = -1 if no error occurred.
-fn scanW(mut s: str, base: int, mut fracOk: bool): (res: []Word, b: int, count: int, err: int) {
+fn scanW(mut &r: strScan, base: int, mut fracOk: bool): (res: []Word, b: int, count: int, err: int) {
 	err = -1
 	// reject invalid bases
 	baseOk := base == 0 ||
@@ -416,8 +417,6 @@ fn scanW(mut s: str, base: int, mut fracOk: bool): (res: []Word, b: int, count: 
 	// and if base == 0.
 	mut prev := '.'
 	mut invalSep := false
-
-	mut r := strScan.new(s)
 
 	// one char look-ahead
 	mut ch, mut end := r.read()
@@ -546,7 +545,8 @@ fn scanW(mut s: str, base: int, mut fracOk: bool): (res: []Word, b: int, count: 
 }
 
 fn fromStrW(s: str): []Word {
-	mut x, _, _, err := scanW(s, 0, false)
+	mut r := strScan.new(s)
+	mut x, _, _, err := scanW(r, 0, false)
 	if err != -1 {
 		panic("math/big: fromStrW: " + conv::Itoa(err))
 	}
