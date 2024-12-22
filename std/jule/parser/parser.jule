@@ -153,7 +153,12 @@ unsafe fn pushSuggestion(mut log: *build::Log, fmt: build::LogMsg, args: ...any)
 	log.Suggestion = build::Logf(fmt, args...)
 }
 
+// Parser modes.
+const defaultParse = 0
+const allowKeywordIdentifiers = 1 << 0 // supported by: functions, structs, and type aliases
+
 struct parser {
+	mode:       int
 	ast:        &ast::AST
 	directives: []&ast::Directive
 	errors:     []build::Log
@@ -173,6 +178,13 @@ impl parser {
 	// Push suggestion to last log.
 	fn pushSuggestion(mut self, fmt: build::LogMsg, args: ...any) {
 		unsafe { pushSuggestion(&self.errors[len(self.errors)-1], fmt, args...) }
+	}
+
+	// Reports whether tok is identifier.
+	// Must be used by definitions that must support the AllowKeywordIdentifiers mode.
+	fn isIdent(mut self, &tok: &token::Token): bool {
+		ret tok.Id == token::Id.Ident ||
+			self.mode&allowKeywordIdentifiers == allowKeywordIdentifiers && token::IsKeyword(tok.Kind)
 	}
 
 	fn buildExpr(mut &self, mut &tokens: []&token::Token): &ast::Expr {
@@ -245,7 +257,7 @@ impl parser {
 			Ident: tokens[1].Kind,
 		}
 		mut token := tokens[i]
-		if token.Id != token::Id.Ident {
+		if !self.isIdent(token) {
 			self.pushErr(token, build::LogMsg.InvalidSyntax)
 			self.pushSuggestion(build::LogMsg.ExpectedIdentifier)
 		}
@@ -315,7 +327,7 @@ impl parser {
 
 	fn buildVarCommon(mut &self, mut &v: &ast::VarDecl, mut tokens: []&token::Token) {
 		v.Token = tokens[0]
-		if v.Token.Id != token::Id.Ident {
+		if !self.isIdent(v.Token) {
 			self.pushErr(v.Token, build::LogMsg.InvalidSyntax)
 			self.pushSuggestion(build::LogMsg.ExpectedIdentifier)
 			ret
@@ -764,7 +776,7 @@ impl parser {
 		}
 
 		tok := tokens[i]
-		if tok.Id == token::Id.Ident {
+		if self.isIdent(tok) {
 			i++
 			if i >= len(tokens) {
 				self.pushErr(f.Token, build::LogMsg.InvalidSyntax)
@@ -1178,7 +1190,7 @@ impl parser {
 		mut s := &ast::StructDecl{
 			Token: tokens[i],
 		}
-		if s.Token.Id != token::Id.Ident {
+		if !self.isIdent(s.Token) {
 			self.pushErr(s.Token, build::LogMsg.InvalidSyntax)
 			self.pushSuggestion(build::LogMsg.ExpectedIdentifier)
 		}
@@ -1355,28 +1367,36 @@ impl parser {
 		ret self.buildUseDecl(tokens, Binded)
 	}
 
-	fn buildBind(mut &self, mut &tokens: []&token::Token): ast::NodeData {
+	fn buildBind(mut &self, mut &tokens: []&token::Token): (data: ast::NodeData) {
 		mut token := tokens[0]
 		if len(tokens) == 1 {
 			self.pushErr(token, build::LogMsg.InvalidSyntax)
 			ret nil
 		}
+
+		// Save mode to restore and set additional required modes.
+		mode := self.mode
+		// Bind defines are may defined by a Jule keyword. It should be valid.
+		// Since they accessed and defined via keyword, it should be safe and clear.
+		self.mode |= allowKeywordIdentifiers
+
 		token = tokens[1]
 		match token.Id {
 		| token::Id.Fn
 		| token::Id.Unsafe:
-			ret self.buildBindFn(tokens)
+			data = self.buildBindFn(tokens)
 		| token::Id.Const
 		| token::Id.Let:
-			ret self.buildBindVar(tokens)
+			data = self.buildBindVar(tokens)
 		| token::Id.Struct:
-			ret self.buildBindStruct(tokens)
+			data = self.buildBindStruct(tokens)
 		| token::Id.Type:
-			ret self.buildBindTypeAlias(tokens)
+			data = self.buildBindTypeAlias(tokens)
 		|:
 			self.pushErr(token, build::LogMsg.InvalidSyntax)
 		}
-		ret nil
+		self.mode = mode // Restore the parser mode.
+		ret
 	}
 
 	fn getMethod(mut &self, mut &tokens: []&token::Token): &ast::FnDecl {

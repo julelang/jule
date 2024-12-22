@@ -67,11 +67,20 @@ impl exprBuilder {
 			ret nil
 		}
 		mut token := tokens[2]
-		if token.Id != token::Id.Ident {
+
+		// Save parser mode and check whether token is identifier.
+		// Alow keywords for checking, then restore the mode immediately.
+		mode := self.p.mode
+		self.p.mode |= allowKeywordIdentifiers
+		isIdent := self.p.isIdent(token)
+		self.p.mode = mode
+
+		if !isIdent {
 			self.pushErr(tokens[2], build::LogMsg.InvalidSyntax)
 			self.pushSuggestion(build::LogMsg.ExpectedIdentifier)
 			ret nil
 		}
+
 		mut expr := buildIdentExpr(token)
 		expr.Binded = true
 		ret expr
