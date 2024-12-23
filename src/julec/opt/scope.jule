@@ -292,6 +292,43 @@ impl scopeOptimizer {
 		}
 	}
 
+	fn optimizeSelect(mut &self, mut slct: &sema::Select) {
+		mut var := invalidDynamic
+
+		// Handle like optimizeChildHard(), but avoid calling this method for each scope.
+		// So wrap same functionality and apply optimizations by calling the optimizeChild().
+		// See documentation of the optimizeChildHard() for more information about difference.
+		mut alive := data{}
+		alive.loadCheckpoint(self.data.getCheckpoint())
+
+		// Use checkpoint for the self.data to use same data for each child scope.
+		mut checkpoint := self.data.getCheckpoint()
+
+		for (_, mut case) in slct.Cases {
+			for (_, mut expr) in case.Exprs {
+				exprOptimizer.optimizeData(expr.Model, self.data, self)
+			}
+			if len(case.Exprs) == 1 && self.data.dynamic != nil {
+				// We can know the exact kind of dynamic type if expression is single.
+				mut kind := isTypeGuaranteedDynamicData(self.data.dynamic, case.Exprs[0].Type, nil)
+				if kind != nil {
+					self.data.dynamic.pushVar(var, kind)
+				} else {
+					self.data.dynamic.removeVar(var)
+				}
+			}
+			self.optimizeChild(case.Scope)
+			alive.removeDeads(self.data)
+			self.data.loadCheckpoint(checkpoint)
+		}
+		if slct.Default != nil {
+			self.optimizeChild(slct.Default.Scope)
+			alive.removeDeads(self.data)
+		}
+
+		self.data.loadCheckpoint(alive.getMutCheckpoint())
+	}
+
 	fn optimizeRangeIter(mut &self, mut it: &sema::RangeIter) {
 		// Optimize scope first, following alrgorithms related with expression.
 		// It might be skip this, so scope optimizater should be guaranteed to run.
@@ -905,19 +942,12 @@ impl scopeOptimizer {
 		self.setCurrentStmt(&ExceptionalForwardingExpr{Expr: fc})
 	}
 
-	fn optimizeChanSend(mut &self, mut chs: &sema::ChanSend) {
-		self.optimizeData(chs.Chan)
-		self.optimizeData(chs.Data)
-	}
-
 	fn optimizeStmt(mut &self, mut stmt: sema::Stmt) {
 		match type stmt {
 		| &sema::Scope:
 			self.optimizeChildHard((&sema::Scope)(stmt))
 		| &sema::Data:
 			self.optimizeData((&sema::Data)(stmt))
-		| &sema::ChanSend:
-			self.optimizeChanSend((&sema::ChanSend)(stmt))
 		| &sema::Var:
 			self.optimizeVar((&sema::Var)(stmt))
 		| &sema::Conditional:
@@ -934,6 +964,8 @@ impl scopeOptimizer {
 			self.optimizeMultiAssign((&sema::MultiAssign)(stmt))
 		| &sema::Match:
 			self.optimizeMatch((&sema::Match)(stmt))
+		| &sema::Select:
+			self.optimizeSelect((&sema::Select)(stmt))
 		| &sema::RetSt:
 			self.optimizeRet((&sema::RetSt)(stmt))
 		| &sema::Postfix:

@@ -27,7 +27,7 @@ enum Stmt: type {
 	&FallSt,
 	&BreakSt,
 	&RetSt,
-	&ChanSend,
+	&Select,
 }
 
 fn newScopeCheckerBase(mut &s: &sema, mut owner: &FnIns): &scopeChecker {
@@ -118,8 +118,9 @@ struct ContSt {
 
 // Break statement.
 struct BreakSt {
-	It:   uintptr
-	Mtch: uintptr
+	It:     uintptr
+	Mtch:   uintptr
+	Select: uintptr
 }
 
 // Label.
@@ -176,9 +177,40 @@ impl Match {
 	}
 }
 
+// Select-Case.
+struct Select {
+	Scope:   &Scope // Owner scope. See developer reference (10).
+	Cases:   []&Case
+	Default: &Case
+}
+
+// Valid owner types for Case.
+enum CaseOwner: type {
+	&Match,
+	&Select,
+}
+
+// Internal wrapper for CaseOwner.
+type caseOwner: CaseOwner
+
+impl caseOwner {
+	// Returns data in uintptr.
+	// Assumes self is not nil.
+	fn asUintptr(self): uintptr {
+		match type self {
+		| &Match:
+			ret uintptr((&Match)(self))
+		| &Select:
+			ret uintptr((&Select)(self))
+		|:
+			panic("unreachable")
+		}
+	}
+}
+
 // Match-Case case.
 struct Case {
-	Owner: &Match
+	Owner: CaseOwner
 	Scope: &Scope
 	Exprs: []&Data
 	Next:  &Case
@@ -198,13 +230,6 @@ struct FallSt {
 struct RetSt {
 	Func: &FnIns
 	Expr: Expr
-}
-
-// Channel send data statement.
-struct ChanSend {
-	Token: &token::Token
-	Chan:  &Data
-	Data:  &Data
 }
 
 struct scopeLabel {
@@ -642,7 +667,8 @@ impl scopeChecker {
 		| &BuiltinCloseCallExpr
 		| &FreeExpr
 		| &FnCallExpr
-		| &ChanRecv:
+		| &ChanRecv
+		| &ChanSend:
 			self.scope.Stmts = append(self.scope.Stmts, d)
 		|:
 			self.s.pushErr(expr.Token, build::LogMsg.InvalidSyntax)
@@ -931,13 +957,15 @@ impl scopeChecker {
 		mut scope := self
 
 	iter:
+		// Check for iterations.
 		if scope.it == ptr {
 			ret true
 		}
 
+		// Check for match and select.
 		if scope.cse != 0 {
-			mtch := unsafe { uintptr((*Case)(scope.cse).Owner) }
-			if mtch == ptr {
+			owner := unsafe { caseOwner((*Case)(scope.cse).Owner).asUintptr() }
+			if owner == ptr {
 				ret true
 			}
 		}
@@ -1539,9 +1567,9 @@ impl scopeChecker {
 		}
 	}
 
-	fn checkDefault(mut &self, mut m: &Match, mut d: &ast::Else): &Case {
+	fn checkDefault(mut &self, mut owner: CaseOwner, mut d: &ast::Else): &Case {
 		mut def := &Case{
-			Owner: m,
+			Owner: owner,
 		}
 		def.Scope = self.checkCaseScope(def, d.Scope)
 		ret def
@@ -1710,6 +1738,60 @@ impl scopeChecker {
 		self.checkCommonMatch(m)
 	}
 
+	fn checkSelectCase(mut &self, mut slct: &Select, i: int, mut c: &ast::Case): &Case {
+		mut case := slct.Cases[i]
+		case.Exprs = make([]&Data, 0, len(c.Exprs))
+		mut eval := self.s.eval(self)
+		for (_, mut e) in c.Exprs {
+			mut d := eval.evalExpr(e)
+			if d == nil {
+				continue
+			}
+			match type d.Model {
+			| &ChanRecv | &ChanSend:
+				case.Exprs = append(case.Exprs, d)
+			|:
+				self.s.pushErr(e.Token, build::LogMsg.InvalidSelectExpr)
+			}
+		}
+		case.Scope = self.checkCaseScope(case, c.Scope)
+		ret case
+	}
+
+	fn checkSelectCases(mut &self, mut &sc: &ast::SelectCase, mut slct: &Select) {
+		slct.Cases = make([]&Case, 0, len(sc.Cases))
+		for i in sc.Cases {
+			mut case := &Case{
+				Owner: slct,
+			}
+			if i > 0 {
+				slct.Cases[i-1].Next = case
+			}
+			slct.Cases = append(slct.Cases, case)
+		}
+
+		if slct.Default != nil && len(sc.Cases) > 0 {
+			slct.Cases[len(slct.Cases)-1].Next = slct.Default
+		}
+
+		for (i, mut c) in sc.Cases {
+			self.checkSelectCase(slct, i, c)
+		}
+	}
+
+	fn checkSelect(mut &self, mut sc: &ast::SelectCase) {
+		mut slct := &Select{
+			Scope: self.scope,
+		}
+		// Push into stmts here. Otherwise, labeled break statements and others
+		// will may log error(s) event semantic is good.
+		self.scope.Stmts = append(self.scope.Stmts, slct)
+		if sc.Default != nil {
+			slct.Default = self.checkDefault(slct, sc.Default)
+		}
+		self.checkSelectCases(sc, slct)
+	}
+
 	fn checkFall(mut &self, f: &ast::FallSt) {
 		if self.cse == 0 ||
 			len(self.scope.Stmts)+1 < len(self.scope.Stmts) ||
@@ -1719,10 +1801,17 @@ impl scopeChecker {
 		}
 
 		mut case := unsafe { (*Case)(self.cse) }
-		if unsafe { case.Owner.Comptime } {
-			self.s.pushErr(f.Token, build::LogMsg.ComptimeFallthrough)
+		match type unsafe { case.Owner } {
+		| &Match:
+			if unsafe { (&Match)(case.Owner).Comptime } {
+				self.s.pushErr(f.Token, build::LogMsg.ComptimeFallthrough)
+				ret
+			}
+		| &Select:
+			self.s.pushErr(f.Token, build::LogMsg.SelectFallthrough)
 			ret
-		} else if unsafe { case.Next } == nil {
+		}
+		if unsafe { case.Next } == nil {
 			self.s.pushErr(f.Token, build::LogMsg.FallthroughIntoFinalCase)
 			self.s.pushSuggestion(build::LogMsg.RemoveFallthroughFromFinalCase)
 			ret
@@ -1771,6 +1860,8 @@ impl scopeChecker {
 				brk.It = uintptr((&WhileIter)(st))
 			| &Match:
 				brk.Mtch = uintptr((&Match)(st))
+			| &Select:
+				brk.Select = uintptr((&Select)(st))
 			|:
 				self.s.pushErr(b.Label, build::LogMsg.InvalidLabel, b.Label.Kind)
 			}
@@ -1784,6 +1875,12 @@ impl scopeChecker {
 
 		if brk.Mtch != 0 {
 			if !self.checkValidBreakLabel(brk.Mtch) {
+				self.s.pushErr(b.Label, build::LogMsg.InvalidLabel, b.Label.Kind)
+			}
+		}
+
+		if brk.Select != 0 {
+			if !self.checkValidBreakLabel(brk.Select) {
 				self.s.pushErr(b.Label, build::LogMsg.InvalidLabel, b.Label.Kind)
 			}
 		}
@@ -1806,7 +1903,8 @@ impl scopeChecker {
 		| scope.it != 0:
 			ret &BreakSt{It: scope.it}
 		| scope.cse != 0:
-			ret &BreakSt{Mtch: unsafe { uintptr((*Case)(scope.cse).Owner) }}
+			owner := caseOwner(unsafe { (*Case)(scope.cse).Owner }).asUintptr()
+			ret &BreakSt{Mtch: owner}
 		}
 
 		self.s.pushErr(b.Token, build::LogMsg.BreakAtOutOfValidScope)
@@ -1866,49 +1964,6 @@ impl scopeChecker {
 		// Validated at end of scope's analysis.
 	}
 
-	fn checkChanSend(mut &self, mut chs: &ast::ChanSend) {
-		mut eval := self.s.eval(self)
-		mut l := eval.evalExpr(chs.Chan)
-		if l == nil {
-			ret
-		}
-		mut ch := l.Type.Chan()
-		if ch == nil {
-			self.s.pushErr(chs.Chan.Token, build::LogMsg.ExprNotChan)
-			self.s.pushSuggestion(build::LogMsg.RArrowOpExpectsChan)
-			ret
-		}
-		if !ch.Send {
-			self.s.pushErr(chs.Chan.Token, build::LogMsg.SendToRecvOnlyChan)
-		}
-		eval.prefix = ch.Elem
-		eval.target.mutable = l.Mutable
-		eval.unsafety = self.isUnsafe()
-		mut r := eval.evalExpr(chs.Data)
-		if r == nil {
-			ret
-		}
-		self.removeInteriorMutRisk(r)
-		if l.Mutable && !r.Mutable && r.Type.Mutable() {
-			self.s.pushErr(chs.Data.Token, build::LogMsg.ImmutDataSendViaMutChan, r.Type.Str())
-		}
-		// Check assignment types and return.
-		mut checker := assignTypeChecker{
-			s: self.s,
-			dest: ch.Elem,
-			d: r,
-			errorToken: chs.Data.Token,
-			refers: self.getOwnerRefers(),
-		}
-		if checker.check() {
-			self.scope.Stmts = append(self.scope.Stmts, &ChanSend{
-				Token: chs.Chan.Token,
-				Chan: l,
-				Data: r,
-			})
-		}
-	}
-
 	fn checkNode(mut &self, mut &node: ast::StmtData) {
 		match type node {
 		| &ast::ScopeTree:
@@ -1933,6 +1988,8 @@ impl scopeChecker {
 			self.checkAssignSt((&ast::AssignSt)(node))
 		| &ast::MatchCase:
 			self.checkMatch((&ast::MatchCase)(node))
+		| &ast::SelectCase:
+			self.checkSelect((&ast::SelectCase)(node))
 		| &ast::FallSt:
 			self.checkFall((&ast::FallSt)(node))
 		| &ast::BreakSt:
@@ -1941,8 +1998,6 @@ impl scopeChecker {
 			self.checkRet((&ast::RetSt)(node))
 		| &ast::UseExpr:
 			self.checkUseExpr((&ast::UseExpr)(node))
-		| &ast::ChanSend:
-			self.checkChanSend((&ast::ChanSend)(node))
 		|:
 			println("error <unimplemented scope node>")
 		}

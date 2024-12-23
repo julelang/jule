@@ -152,8 +152,8 @@ impl scopeParser {
 		ret self.pos+1 >= len(self.stmts)
 	}
 
-	fn pushErr(mut self, token: &token::Token, fmt: build::LogMsg) {
-		self.p.pushErr(token, fmt)
+	fn pushErr(mut self, token: &token::Token, fmt: build::LogMsg, args: ...any) {
+		self.p.pushErr(token, fmt, args...)
 	}
 
 	// Push suggestion to last log.
@@ -749,6 +749,117 @@ impl scopeParser {
 		ret m
 	}
 
+	fn buildSelectCaseExpr(mut self, mut &tokens: []&token::Token, mut &colon: &token::Token): ([]&ast::Expr, bool) {
+		mut exprs := make([]&ast::Expr, 0, 1)
+		mut braceN := 0
+		mut j := 0
+		for (i, mut tok) in tokens {
+			match tok.Id {
+			| token::Id.LParent
+			| token::Id.LBrace
+			| token::Id.LBracket:
+				braceN++
+				continue
+			| token::Id.RParent
+			| token::Id.RBrace
+			| token::Id.RBracket:
+				braceN--
+				continue
+			}
+
+			if braceN != 0 {
+				continue
+			}
+			match {
+			| tok.Id == token::Id.Vline:
+				self.pushErr(tok, build::LogMsg.ExpectedNExpr, "1")
+				tokens = nil
+				ret nil, false
+			| tok.Id == token::Id.Colon:
+				colon = tok
+				mut exprTokens := tokens[j:i]
+				if len(exprTokens) > 0 {
+					exprs = append(exprs, self.p.buildExpr(exprTokens))
+				}
+				tokens = tokens[i+1:]
+				ret exprs, i-j == 0 || len(exprs) != 0
+			}
+		}
+		self.pushErr(tokens[0], build::LogMsg.InvalidSyntax)
+		tokens = nil
+		ret nil, false
+	}
+
+	fn buildSelectCase(mut self, mut &tokens: []&token::Token): (&ast::Case, bool) {
+		mut c := &ast::Case{
+			Token: tokens[0],
+		}
+		tokens = tokens[1:] // Remove case prefix.
+		let mut colon: &token::Token = nil
+		if len(tokens) == 0 {
+			self.pushErr(c.Token, build::LogMsg.InvalidSyntax)
+			ret nil, false
+		}
+		c.Exprs, ok := self.buildSelectCaseExpr(tokens, colon)
+		c.Scope = self.buildCaseScope(tokens)
+		if c.Scope.End == nil {
+			c.Scope.End = colon
+		}
+		isDefault := ok && len(c.Exprs) == 0
+		ret c, isDefault
+	}
+
+	fn buildSelectCases(mut self, mut tokens: []&token::Token): ([]&ast::Case, &ast::Else) {
+		let mut cases: []&ast::Case = nil
+		let mut def: &ast::Else = nil
+		mut defNotLast := false
+		for len(tokens) > 0 {
+			mut tok := tokens[0]
+			if tok.Id != token::Id.Vline {
+				self.pushErr(tok, build::LogMsg.InvalidSyntax)
+				break
+			}
+			mut c, isDefault := self.buildSelectCase(tokens)
+			if isDefault {
+				c.Token = tok
+				if def == nil {
+					def = &ast::Else{
+						Token: c.Token,
+						Scope: c.Scope,
+					}
+				} else {
+					self.pushErr(tok, build::LogMsg.InvalidSyntax)
+				}
+			} else {
+				defNotLast = defNotLast || def != nil
+				cases = append(cases, c)
+			}
+		}
+		if defNotLast {
+			self.pushErr(def.Token, build::LogMsg.DefaultNotLast)
+		}
+		ret cases, def
+	}
+
+	fn buildSelect(mut self, mut tokens: []&token::Token): &ast::SelectCase {
+		mut m := &ast::SelectCase{
+			Token: tokens[0],
+		}
+		mut i := 1 // Start at 1 to skip the "select" keyword.
+		mut blockToks := range(i, token::Id.LBrace, token::Id.RBrace, tokens)
+		if blockToks == nil {
+			self.stop()
+			self.pushErr(m.Token, build::LogMsg.BodyNotExist)
+			self.pushSuggestion(build::LogMsg.ExpectedBody)
+			ret nil
+		} else if i < len(tokens) {
+			self.pushErr(tokens[i], build::LogMsg.InvalidSyntax)
+		}
+		m.End = tokens[i-1]
+		m.Cases, m.Default = self.buildSelectCases(blockToks)
+		ret m
+	}
+
 	fn buildScopeSt(mut self, mut tokens: []&token::Token): &ast::ScopeTree {
 		mut isUnsafe := false
 		mut isDeferred := false
@@ -840,8 +951,7 @@ impl scopeParser {
 			match {
 			| braceN > 0:
 				continue
-			| !token::IsAssignOp(token.Id) &&
-				token.Id != token::Id.ColonEq && token.Id != token::Id.RArrow:
+			| !token::IsAssignOp(token.Id) && token.Id != token::Id.ColonEq:
 				continue
 			}
 
@@ -887,27 +997,10 @@ impl scopeParser {
 		ret lefts
 	}
 
-	fn buildChanSend(mut self, mut &info: &assignInfo): (ast::StmtData, bool) {
-		mut ch := self.p.buildExpr(info.l)
-		if ch == nil {
-			ret nil, false
-		}
-		mut data := self.p.buildExpr(info.r)
-		if data == nil {
-			ret nil, false
-		}
-		ret &ast::ChanSend{Chan: ch, Data: data}, true
-	}
-
 	fn buildPlainAssign(mut self, mut &tokens: []&token::Token): (ast::StmtData, bool) {
 		mut info := self.buildAssignInfo(tokens)
 		if !info.ok {
 			ret nil, false
-		}
-
-		// Caught channel data sends.
-		if info.setter.Id == token::Id.RArrow {
-			ret self.buildChanSend(info)
 		}
 
 		mut assign := &ast::AssignSt{
@@ -1134,6 +1227,8 @@ impl scopeParser {
 			ret self.buildTypeAliasSt(st.tokens)
 		| token::Id.Match:
 			ret self.buildMatchCase(st.tokens)
+		| token::Id.Select:
+			ret self.buildSelect(st.tokens)
 		| token::Id.Unsafe:
 			if len(st.tokens) < 1 {
 				break

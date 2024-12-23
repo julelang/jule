@@ -3141,6 +3141,61 @@ impl eval {
 		ret d
 	}
 
+	fn evalChanSend(mut &self, mut chs: &ast::ChanSend): &Data {
+		mut l := self.evalExpr(chs.Chan)
+		if l == nil {
+			ret nil
+		}
+		mut ch := l.Type.Chan()
+		if ch == nil {
+			self.s.pushErr(chs.Chan.Token, build::LogMsg.ExprNotChan)
+			self.s.pushSuggestion(build::LogMsg.RArrowOpExpectsChan)
+			ret nil
+		}
+		if !ch.Send {
+			self.s.pushErr(chs.Chan.Token, build::LogMsg.SendToRecvOnlyChan)
+		}
+		mut prefix := self.prefix
+		mut mutable := self.target.mutable
+		mut unsafety := self.unsafety
+		self.prefix = ch.Elem
+		self.target.mutable = l.Mutable
+		self.unsafety = self.isUnsafe()
+		mut r := self.evalExpr(chs.Data)
+		self.prefix = prefix
+		self.target.mutable = mutable
+		self.unsafety = unsafety
+		if r == nil {
+			ret nil
+		}
+		match type self.lookup {
+		| &scopeChecker:
+			mut sc := (&scopeChecker)(self.lookup)
+			sc.removeInteriorMutRisk(r)
+		}
+		if l.Mutable && !r.Mutable && r.Type.Mutable() {
+			self.s.pushErr(chs.Data.Token, build::LogMsg.ImmutDataSendViaMutChan, r.Type.Str())
+		}
+		// Check assignment types and return.
+		mut checker := assignTypeChecker{
+			s: self.s,
+			dest: ch.Elem,
+			d: r,
+			errorToken: chs.Data.Token,
+			refers: self.getOwnerRefers(),
+		}
+		if !checker.check() {
+			ret nil
+		}
+		mut d := buildVoidData()
+		d.Model = &ChanSend{
+			Token: chs.Chan.Token,
+			Chan: l,
+			Data: r,
+		}
+		ret d
+	}
+
 	fn evalExprKind(mut &self, mut kind: ast::ExprData): &Data {
 		match type kind {
 		| &ast::RangeExpr:
@@ -3184,6 +3239,8 @@ impl eval {
 			ret self.evalBinary((&ast::BinaryExpr)(kind))
 		| &ast::ChanRecv:
 			ret self.evalChanRecv((&ast::ChanRecv)(kind))
+		| &ast::ChanSend:
+			ret self.evalChanSend((&ast::ChanSend)(kind))
 		|:
 			ret nil
 		}

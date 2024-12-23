@@ -11,6 +11,7 @@ use "std/jule/constant"
 use "std/jule/sema"
 use "std/jule/token"
 use "std/strings"
+use "std/unsafe"
 
 const closureCtxIdent = "__jule_closure_ctx"
 const matchExpr = "_match_expr"
@@ -28,6 +29,12 @@ enum compStmt: type {
 	&opt::SwapExpr,
 	&opt::ExceptionalForwardingExpr,
 	&opt::StrRuneIter,
+}
+
+// Channel and case hash for select.
+struct chanCase {
+	Case: &sema::Case
+	Data: &sema::Data
 }
 
 struct scopeCoder {
@@ -717,7 +724,7 @@ impl scopeCoder {
 		if a.Left[0] == nil && a.Left[1] == nil {
 			// Expression is like: _, _ = <-c
 			// Handle as plain expression.
-			self.oc.ec.chanRecv((&sema::ChanRecv)(a.Right), nil)
+			self.oc.ec.chanRecv((&sema::ChanRecv)(a.Right), nil, false)
 			ret
 		}
 		if a.Left[0] != nil {
@@ -735,7 +742,7 @@ impl scopeCoder {
 				self.oc.write(")")
 			}
 		}
-		self.oc.ec.chanRecv((&sema::ChanRecv)(a.Right), ok)
+		self.oc.ec.chanRecv((&sema::ChanRecv)(a.Right), ok, false)
 	}
 
 	fn multiAssign(mut &self, mut a: &sema::MultiAssign) {
@@ -902,6 +909,155 @@ impl scopeCoder {
 		self.oc.write("}")
 	}
 
+	fn selectSt(mut &self, mut slct: &sema::Select) {
+		if len(slct.Cases) == 0 && slct.Default == nil {
+			// Empty select, yield CPU.
+			identCoder.funcIns(self.oc.Buf, meta::Program.Runtime.Osyield)
+			self.oc.write("()")
+			ret
+		}
+		// Non-empty select.
+		// Generate necessary data and call the select statement function.
+		// See the [runtime::chanSelect] function for documentation.
+		self.oc.write("{\n")
+		self.oc.addIndent()
+		self.oc.indent()
+
+		// Whether it is a blocking select.
+		block := slct.Default == nil
+
+		// Generate code for [runtime::hchan] type.
+		mut hchan := ""
+		{
+			mut sbuf := strings::Builder.New(40)
+			self.oc.tc.structure(sbuf, meta::Program.Runtime.Hchan)
+			hchan = sbuf.Str()
+		}
+
+		// NOTE:
+		// Create array for channels. This implementation will not check
+		// the channel count, but probably total count of channel will not
+		// cause overflow by size.
+		self.oc.tc.asSptr(self.oc.Buf, unsafe::StrBytes(hchan))
+		self.oc.write(" __jule_chans[] = {")
+		// Most common use case, assume 1 chan-recv/chan-send per case.
+		// In the end, len(chans) equals to total count of chans.
+		// All elements, matched by index which returned by the select algorithm.
+		// So chans[i] always the mached case, if exist.
+		mut chans := make([]chanCase, 0, len(slct.Cases))
+		mut &_chans := chans // Used by closure, unsafely.
+		obj::IterCaseExprs(slct.Cases, fn(mut &c: &sema::Case, mut &expr: &sema::Data) {
+			match type expr.Model {
+			| &sema::ChanRecv:
+				unsafe { _chans = append(_chans, chanCase{c, expr}) }
+				mut cr := (&sema::ChanRecv)(expr.Model)
+				self.oc.ec.possibleRefExpr(cr.Expr.Model)
+				self.oc.write(".as<")
+				self.oc.write(hchan)
+				self.oc.write(">(), ")
+			}
+		})
+		recvChans := len(chans) // Total count of chan-recv cases.
+		obj::IterCaseExprs(slct.Cases, fn(mut &c: &sema::Case, mut &expr: &sema::Data) {
+			match type expr.Model {
+			| &sema::ChanSend:
+				unsafe { _chans = append(_chans, chanCase{c, expr}) }
+				mut cr := (&sema::ChanSend)(expr.Model)
+				self.oc.ec.possibleRefExpr(cr.Chan.Model)
+				self.oc.write(".as<")
+				self.oc.write(hchan)
+				self.oc.write(">(), ")
+			}
+		})
+		self.oc.write("};\n")
+		self.oc.indent()
+		self.oc.write(typeCoder.Int)
+		self.oc.write(" __offset = ")
+		identCoder.funcIns(self.oc.Buf, meta::Program.Runtime.ChanSelect)
+		self.oc.write("(__jule_chans, ")
+		self.oc.write(conv::Itoa(len(chans)))
+		self.oc.write(", ")
+		self.oc.write(conv::Itoa(recvChans))
+		self.oc.write(", ")
+		self.oc.write(conv::FmtBool(block))
+		self.oc.write(");\n")
+		self.oc.indent()
+		if !block {
+			// This if condition is unnecessart for blocking select statements.
+			self.oc.write("if (__offset >= 0) {\n")
+			self.oc.addIndent()
+		}
+		self.oc.indent()
+		self.oc.write("switch (__offset) {\n")
+
+		// Generate cases, match them, and execute.
+		genCase := fn(i: int, mut &c: chanCase) {
+			// We have to convert hchan to pchan.
+			// So use custom built-in expression for that.
+			mut sb := strings::Builder.New(40)
+			sb.WriteStr("__jule_chans[")!
+			sb.WriteStr(conv::Itoa(i))!
+			sb.WriteStr("].as<")!
+			match type c.Data.Model {
+			| &sema::ChanRecv:
+				mut cr := (&sema::ChanRecv)(c.Data.Model)
+				mut pchan := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, cr.Expr.Type.Chan().Elem)
+				self.oc.tc.structureIns(sb, pchan)
+				sb.WriteStr(">()")!
+				model := any(sb.Str())
+				cr.Expr.Model = unsafe { *(*sema::Expr)(&model) }
+				self.oc.ec.chanRecv(cr, nil, true)
+			| &sema::ChanSend:
+				mut cs := (&sema::ChanSend)(c.Data.Model)
+				mut pchan := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, cs.Chan.Type.Chan().Elem)
+				self.oc.tc.structureIns(sb, pchan)
+				sb.WriteStr(">()")!
+				model := any(sb.Str())
+				cs.Chan.Model = unsafe { *(*sema::Expr)(&model) }
+				self.oc.ec.chanSend(cs, true)
+			|:
+				panic("unreachable")
+			}
+			self.oc.write(";\n")
+			self.oc.indent()
+			self.scope(c.Case.Scope)
+			self.oc.write("\n")
+		}
+		for (i, mut c) in chans {
+			self.oc.indent()
+			self.oc.write("case ")
+			self.oc.write(conv::Itoa(i))
+			self.oc.write(":\n")
+			self.oc.addIndent()
+			self.oc.indent()
+			genCase(i, c)
+			self.oc.indent()
+			self.oc.write("break;\n")
+			self.oc.doneIndent()
+		}
+		// Closing switch.
+		self.oc.indent()
+		self.oc.write("}\n")
+		self.oc.doneIndent()
+
+		// Closing if.
+		if !block {
+			self.oc.indent()
+			self.oc.write("} else ")
+			self.scope(slct.Default.Scope) // Default scope is should not be nil.
+			self.oc.write("\n")
+			self.oc.doneIndent()
+		}
+
+		self.oc.indent()
+		identCoder.matchEnd(self.oc.Buf, uintptr(slct))
+		self.oc.write(":;\n")
+
+		// Closing inner.
+		self.oc.indent()
+		self.oc.write("}")
+	}
+
 	fn fallSt(mut &self, f: &sema::FallSt) {
 		self.oc.write("goto ")
 		identCoder.caseBegin(self.oc.Buf, f.DestCase)
@@ -909,10 +1065,15 @@ impl scopeCoder {
 
 	fn breakSt(mut &self, b: &sema::BreakSt) {
 		self.oc.write("goto ")
-		if b.It != 0 {
+		match {
+		| b.It != 0:
 			identCoder.iterEnd(self.oc.Buf, b.It)
-		} else {
+		| b.Mtch != 0:
 			identCoder.matchEnd(self.oc.Buf, b.Mtch)
+		| b.Select != 0:
+			identCoder.matchEnd(self.oc.Buf, b.Select)
+		|:
+			panic("unreachable")
 		}
 	}
 
@@ -986,24 +1147,6 @@ impl scopeCoder {
 		}
 	}
 
-	fn chanSend(mut &self, mut m: &sema::ChanSend) {
-		mut ins := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, m.Data.Type)
-		const Static = false
-		mut f := ins.FindMethod("send", Static).Instances[0]
-		identCoder.funcIns(self.oc.Buf, f)
-		self.oc.write("(")
-		self.oc.ec.possibleRefExpr(m.Chan.Model)
-		self.oc.write(".ptr(")
-		if !env::Production {
-			self.oc.write("\"")
-			self.oc.locInfo(m.Token)
-			self.oc.write("\"")
-		}
-		self.oc.write("), ")
-		self.oc.ec.possibleRefExpr(m.Data.Model)
-		self.oc.write(")")
-	}
-
 	fn mutSlicing(mut &self, mut m: &opt::MutSlicingExpr) {
 		self.oc.write("(")
 		self.oc.ec.possibleRefExpr(m.Expr)
@@ -1068,14 +1211,14 @@ impl scopeCoder {
 			self.multiAssign((&sema::MultiAssign)(st))
 		| &sema::Match:
 			self.matchSt((&sema::Match)(st))
+		| &sema::Select:
+			self.selectSt((&sema::Select)(st))
 		| &sema::FallSt:
 			self.fallSt((&sema::FallSt)(st))
 		| &sema::BreakSt:
 			self.breakSt((&sema::BreakSt)(st))
 		| &sema::RetSt:
 			self.retSt((&sema::RetSt)(st))
-		| &sema::ChanSend:
-			self.chanSend((&sema::ChanSend)(st))
 		| &opt::PushToSliceExpr:
 			self.oc.ec.pushToSlice((&opt::PushToSliceExpr)(st))
 		| &opt::AppendToSliceExpr:

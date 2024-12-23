@@ -808,12 +808,12 @@ impl exprBuilder {
 			// Catch slice and array types.
 			ret self.buildType(tokens)
 		}
-		mut rightTokens := tokens[i+1:]
 		if len(leftTokens) == 0 {
 			self.pushErr(tokens[i], build::LogMsg.InvalidSyntax)
 			self.pushSuggestion(build::LogMsg.ExpectedLeftOperand)
 			ret nil
 		}
+		mut rightTokens := tokens[i+1:]
 		if len(rightTokens) == 0 {
 			self.pushErr(tokens[i], build::LogMsg.InvalidSyntax)
 			self.pushSuggestion(build::LogMsg.ExpectedRightOperand)
@@ -826,6 +826,30 @@ impl exprBuilder {
 		}
 	}
 
+	fn buildChanSend(mut self, mut &tokens: []&token::Token, i: int): ast::ExprData {
+		mut leftTokens := tokens[:i]
+		if len(leftTokens) == 0 {
+			self.pushErr(tokens[i], build::LogMsg.InvalidSyntax)
+			self.pushSuggestion(build::LogMsg.ExpectedLeftOperand)
+			ret nil
+		}
+		mut rightTokens := tokens[i+1:]
+		if len(rightTokens) == 0 {
+			self.pushErr(tokens[i], build::LogMsg.InvalidSyntax)
+			self.pushSuggestion(build::LogMsg.ExpectedRightOperand)
+			ret nil
+		}
+		mut ch := self.buildFromTokens(leftTokens)
+		if ch == nil {
+			ret nil
+		}
+		mut data := self.buildFromTokens(rightTokens)
+		if data == nil {
+			ret nil
+		}
+		ret &ast::ChanSend{Chan: ch, Data: data}
+	}
+
 	fn build(mut self, mut &tokens: []&token::Token): ast::ExprData {
 		if tokens[0].Id == token::Id.Map {
 			ret self.buildType(tokens)
@@ -833,6 +857,9 @@ impl exprBuilder {
 		i := findLowestPrecOp(tokens)
 		if i == -1 {
 			ret self.buildData(tokens)
+		}
+		if tokens[i].Id == token::Id.RArrow {
+			ret self.buildChanSend(tokens, i)
 		}
 		ret self.buildBinary(tokens, i)
 	}
@@ -983,7 +1010,8 @@ fn findLowestPrecOp(&tokens: []&token::Token): int {
 	// It's provides optimization, avoid prec != -1 (if not setted) checking.
 	// Always greater than actual precedences.
 	// So, It's will initialized by first precedence without any checking that if not setted.
-	mut prec := byte(255)
+	const MaxPrec = byte(255)
+	mut prec := MaxPrec
 	mut precPos := -1
 
 	mut braceN := 0
@@ -1013,7 +1041,7 @@ fn findLowestPrecOp(&tokens: []&token::Token): int {
 			continue
 		| braceN > 0:
 			continue
-		| !token::IsBinOp(token.Id):
+		| !token::IsBinOp(token.Id) && token.Id != token::Id.RArrow:
 			continue
 		}
 
@@ -1034,8 +1062,14 @@ fn findLowestPrecOp(&tokens: []&token::Token): int {
 			}
 		}
 
-		p := token.Prec()
-		if p != 0 && p <= prec {
+		const InvalidPrec = byte(0)
+		mut p := InvalidPrec
+		if token.Id == token::Id.RArrow {
+			p = MaxPrec
+		} else {
+			p = token.Prec()
+		}
+		if p != InvalidPrec && p <= prec {
 			prec = p
 			precPos = i
 		}

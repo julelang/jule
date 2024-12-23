@@ -164,13 +164,6 @@ impl pchan {
 		ret unsafe { (&hchan)((*hchan)(&self)) }
 	}
 
-	// Returns the channel as a *hchan for general sharing of pchan[T].
-	// The returned *hchan can be used until the self pointer is freed,
-	// after which it should not be used.
-	fn phchan(mut self): *hchan {
-		ret unsafe { (*hchan)(&self) }
-	}
-
 	// Closes the channel.
 	fn close(mut self) {
 		self.lock.lock()
@@ -182,8 +175,11 @@ impl pchan {
 	}
 
 	// Sends the data to the channel.
-	fn send(mut self, mut data: T) {
-		self.lock.lock()
+	// If owned is true, assumes lock is already owned by the current caller.
+	fn send(mut self, mut data: T, owned: bool) {
+		if !owned {
+			self.lock.lock()
+		}
 		if self.state&chanBuffered == chanBuffered {
 			// If the capacity is completely consumed, wait until space becomes available.
 			// When some data is received, there will be space in the queue to write.
@@ -212,7 +208,8 @@ impl pchan {
 	// Receives the data from the channel.
 	// The |ok| is the reference that points to boolean and
 	// it reports whether data dequeued and received successfuly.
-	fn recv(mut self, mut &ok: bool): T {
+	// If owned is true, assumes lock is already owned by the current caller.
+	fn recv(mut self, mut &ok: bool, owned: bool): T {
 		// References are safe, but this method may used by the compiler unsafely.
 		// And we have to support nil references for such a low-level use.
 		// So, If the |ok| reference not implemented as is nil raw pointer
@@ -222,7 +219,9 @@ impl pchan {
 		// take raw pointer and compare it with nil. Since taking raw pointer of
 		// the references will result as actual pointer of them, we can determine
 		// whether the reference's raw pointer is nil.
-		self.lock.lock()
+		if !owned {
+			self.lock.lock()
+		}
 		zero := 0
 		// If there is no data waiting to be received in the queue, wait until there is.
 		chanpark(self.hchan(), zero, self.len)
@@ -277,4 +276,103 @@ fn chanpark(ch: &hchan, &n: int, &c: int) {
 		// before reaching the critical section again.
 		ch.lock.lock()
 	}
+}
+
+// Reports whether channel can receive data.
+// Will locks the mutex, but will not release.
+fn chanCanRecv(&ch: hchan): (r: bool) {
+	ch.lock.lock()
+	r = ch.len > 0
+	ret
+}
+
+// Reports whether channel can send data.
+// Will locks the mutex, but will not release.
+fn chanCanSend(&ch: hchan): (r: bool) {
+	ch.lock.lock()
+	if ch.state&chanBuffered == chanBuffered {
+		r = ch.len < ch.cap
+	} else {
+		r = ch.len == 0
+	}
+	ret
+}
+
+// Select statement implementation for blocking and non-blocking select.
+// If the block is true, behavior is blocking select, otherwise unblocking select.
+// The chans should point to an array with a size equal to totalChans.
+// All receive cases should came first, then send cases. The recvChans should be
+// equal to length of the leading receive cases in the chans.
+// If any case selected, returns the index of selected candidate case by chans.
+// Otherwise returns -1 which means no selected case. It only appears for non-blocking selects.
+// The channel's mutex will be locked already for the selected case.
+unsafe fn chanSelect(chans: *&hchan, totalChans: int, recvChans: int, block: bool): int {
+	mut candidates := make([]&hchan, 0, totalChans)
+Select:
+	mut ch := *(&chans)
+	mut tch := totalChans
+	mut rch := recvChans
+	// Determine receive candidates.
+	tch -= rch
+	for rch > 0; rch, ch = rch-1, ch+1 {
+		if *ch != nil {
+			if chanCanRecv(**ch) {
+				candidates = append(candidates, *ch)
+			} else {
+				// Release the mutex, this channel is not a candidate.
+				(*ch).lock.unlock()
+			}
+		}
+	}
+	// Determine send candidates.
+	for tch > 0; tch, ch = tch-1, ch+1 {
+		if *ch != nil {
+			if chanCanSend(**ch) {
+				candidates = append(candidates, *ch)
+			} else {
+				// Release the mutex, this channel is not a candidate.
+				(*ch).lock.unlock()
+			}
+		}
+	}
+
+	// No candidate fonud.
+	if len(candidates) == 0 {
+		if block {
+			// This is a blocking-select but we have not any candidate.
+			// So select until we have at least 1 eligible channel.
+			goto Select
+		}
+		// Non-blocking select, return as -1.
+		ret -1
+	}
+	// Select a candidate.
+	mut i := 0
+	if len(candidates) > 1 {
+		// There is more than one candidate channels.
+		// Select candidate randomly.
+		i = randInt(nanotime(), len(candidates))
+	}
+	candidateChan := candidates[i]
+
+	// Find selected candidate in chans.
+	// Because selected candidate index may not be equal to chanmap offset of candidate.
+	// So map the selected candidate index to chanmap index for correct selection.
+	// Respond candidate offset by chanmap, not candidatemap.
+	ch = *(&chans)
+	i = 0
+	for *ch != candidateChan {
+		i++
+		ch++
+	}
+
+	// Release all mutexes of candidates except selected one.
+	// Other candidates can be free now.
+	for _, c in candidates {
+		if c != nil && c != candidateChan {
+			(*c).lock.unlock()
+		}
+	}
+
+	ret i
 }
