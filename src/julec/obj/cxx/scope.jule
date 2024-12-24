@@ -48,6 +48,85 @@ impl scopeCoder {
 		}
 	}
 
+	fn rangeChanIter(mut &self, mut it: &sema::RangeIter) {
+		self.oc.write("{\n")
+		self.oc.addIndent()
+		self.oc.indent()
+		self.oc.write("auto expr = ")
+		mut ref := false
+		if opt::Copy && isCopyOptimizable(it.Expr) {
+			ref = true
+			match type it.Expr.Model {
+			| &sema::Var:
+				v := (&sema::Var)(it.Expr.Model)
+				if v.Reference {
+					self.oc.ec.model(it.Expr.Model)
+					break
+				}
+				fall
+			|:
+				self.oc.write("&(")
+				self.oc.ec.model(it.Expr.Model)
+				self.oc.write(")")
+			}
+		} else {
+			self.oc.ec.possibleRefExpr(it.Expr.Model)
+		}
+		self.oc.write(";\n")
+		mut sb := strings::Builder.New(1 << 6)
+		identCoder.iterNext(sb, uintptr(it))
+		next := sb.Str()
+		self.oc.write(next)
+		self.oc.write(":;\n")
+		self.oc.indent()
+		self.oc.write(typeCoder.Bool + " __ok = false;\n")
+		self.oc.indent()
+		writeExpr := fn() {
+			// Write channel receive expression.
+			// Use built-in expression for that.
+			// sb should be cleared already.
+			if ref {
+				sb.WriteByte('*')!
+			}
+			sb.WriteStr("expr")!
+			model := any(sb.Str())
+			mut expr := new(sema::ChanRecv)
+			expr.Token = it.ExprToken
+			expr.Expr = new(sema::Data)
+			expr.Expr.Type = it.Expr.Type
+			expr.Expr.Model = unsafe { *(*sema::Expr)(&model) }
+			self.oc.ec.chanRecv(expr, fn() { self.oc.write("&__ok") }, false)
+		}
+		if it.KeyA != nil {
+			self.oc.varInitExpr(it.KeyA, writeExpr)
+		} else {
+			writeExpr()
+			self.oc.write(";")
+		}
+		self.oc.write("\n")
+		self.oc.indent()
+		self.oc.write("if (__ok) {\n")
+		self.oc.addIndent()
+		self.oc.indent()
+		self.scope(it.Scope)
+		self.oc.write("\n")
+		self.oc.indent()
+		self.oc.write("goto ")
+		self.oc.write(next)
+		self.oc.write(";\n")
+		self.oc.doneIndent()
+		self.oc.indent()
+		self.oc.write("}\n")
+
+		// Close scope.
+		self.oc.indent()
+		identCoder.iterEnd(self.oc.Buf, uintptr(it))
+		self.oc.write(":;\n")
+		self.oc.doneIndent()
+		self.oc.indent()
+		self.oc.write("}")
+	}
+
 	// Common head object-code for iterations of all kind.
 	fn iterHead[T](mut &self, &it: T, mut &ref: bool, begin: str) {
 		self.oc.write("{\n")
@@ -445,6 +524,8 @@ impl scopeCoder {
 
 	fn rangeIter(mut &self, mut it: &sema::RangeIter) {
 		match {
+		| it.Expr.Type.Chan() != nil:
+			self.rangeChanIter(it)
 		| it.Expr.Type.Slc() != nil:
 			self.rangeIndexIter(it)
 		| it.Expr.Type.Arr() != nil:

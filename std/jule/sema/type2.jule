@@ -1268,6 +1268,24 @@ impl rangeChecker {
 		self.Kind.KeyB.TypeSym = findBuiltinTypeAlias("byte").TypeSym
 	}
 
+	fn checkChan(mut self) {
+		mut c := self.d.Type.Chan()
+		if !c.Recv {
+			self.sc.s.pushErr(self.rang.InToken, build::LogMsg.RecvFromSendOnlyChan)
+		}
+		if self.rang.KeyB != nil && !token::IsIgnoreIdent(self.rang.KeyB.Ident) {
+			self.sc.s.pushErr(self.rang.KeyB.Token, build::LogMsg.IterPermitsNVar, c.Str(), "1")
+		}
+		if self.rang.KeyA == nil || token::IsIgnoreIdent(self.rang.KeyA.Ident) {
+			ret
+		}
+		self.Kind.KeyA = self.buildVar(self.rang.KeyA)
+		self.Kind.KeyA.TypeSym = &TypeSym{Type: c.Elem}
+		mut d := new(Data, *self.d)
+		d.Type = c.Elem
+		self.checkRangeExprValidity(d, self.Kind.KeyA, c.Elem)
+	}
+
 	fn checkComptime(mut self) {
 		self.setSizeKey()
 		if self.rang.KeyA != nil && self.rang.KeyA.Mutable {
@@ -1313,6 +1331,9 @@ impl rangeChecker {
 			ret true
 		| self.d.Type.Map() != nil:
 			self.checkMap()
+			ret true
+		| self.d.Type.Chan() != nil:
+			self.checkChan()
 			ret true
 		| self.d.Type.comptimeRange() != nil:
 			ret self.checkComptimeRange()
