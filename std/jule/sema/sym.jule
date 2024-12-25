@@ -318,7 +318,7 @@ impl symBuilder {
 		unsafe { pushSuggestion(&self.errors[len(self.errors)-1], fmt, args...) }
 	}
 
-	fn checkCppUseDeclPath(mut self, &decl: &ast::UseDecl, &path: str): (ok: bool) {
+	fn checkCppUseDeclPath(mut self, &decl: &ast::Use, &path: str): (ok: bool) {
 		ext := filepath::Ext(path)
 		if !build::IsValidHeaderExt(ext) && !build::IsValidCppExt(ext) {
 			self.pushErr(decl.Token, build::LogMsg.InvalidCppExt, ext)
@@ -338,7 +338,7 @@ impl symBuilder {
 		ret true
 	}
 
-	fn buildCppHeaderImport(mut self, mut &decl: &ast::UseDecl): &ImportInfo {
+	fn buildCppHeaderImport(mut self, mut &decl: &ast::Use): &ImportInfo {
 		mut path := decl.Path.Kind[1:len(decl.Path.Kind)-1] // remove quotes
 
 		if !build::IsStdHeaderPath(path) {
@@ -368,7 +368,7 @@ impl symBuilder {
 	// Checks and returns absolute path of import filepath.
 	// Designed for non-std package paths.
 	// Returns empty string if error occurs.
-	fn checkAbsPath(mut &self, mut filepath: str, mut &decl: &ast::UseDecl): str {
+	fn checkAbsPath(mut &self, mut filepath: str, mut &decl: &ast::Use): str {
 		modPath := self.importer.GetModPath()
 		if len(modPath) == 0 {
 			self.pushErr(decl.Path, build::LogMsg.ModuleNotFound)
@@ -397,7 +397,7 @@ impl symBuilder {
 	}
 
 	// Same as the [checkAbsPath] method but designed for std package paths.
-	fn checkStdAbsPath(mut &self, mut filepath: str, mut &decl: &ast::UseDecl): str {
+	fn checkStdAbsPath(mut &self, mut filepath: str, mut &decl: &ast::Use): str {
 		if filepath == "std" {
 			self.pushErr(decl.Path, build::LogMsg.InvalidImportPath, decl.Path.Kind)
 			ret ""
@@ -424,7 +424,7 @@ impl symBuilder {
 	}
 
 	// Checks import path and returns as filepath if no error exist.
-	fn checkImpPath(mut &self, mut &decl: &ast::UseDecl): (std: bool, filepath: str) {
+	fn checkImpPath(mut &self, mut &decl: &ast::Use): (std: bool, filepath: str) {
 		path := decl.Path.Kind[1:len(decl.Path.Kind)-1] // remove quotes
 		if strings::HasSuffix(path, jule::ImportPathSep) {
 			self.pushErr(decl.Path, build::LogMsg.InvalidImportPath, decl.Path.Kind)
@@ -461,7 +461,7 @@ impl symBuilder {
 		imp.Alias = path
 	}
 
-	fn buildImport(mut &self, mut &decl: &ast::UseDecl): &ImportInfo {
+	fn buildImport(mut &self, mut &decl: &ast::Use): &ImportInfo {
 		if decl.Binded {
 			ret self.buildCppHeaderImport(decl)
 		}
@@ -563,7 +563,7 @@ impl symBuilder {
 		self.pushErr(errorToken, build::LogMsg.PkgIllegalCrossCycle, message.Str())
 	}
 
-	fn checkImportCycles(mut &self, imp: &ImportInfo, &decl: &ast::UseDecl): bool {
+	fn checkImportCycles(mut &self, imp: &ImportInfo, &decl: &ast::Use): bool {
 		if imp.Path == self.table.File.Dir() {
 			self.pushErr(decl.Token, build::LogMsg.PkgIllegalCycleRefersItself, self.getAsLinkPath(imp.Path))
 			ret false
@@ -594,7 +594,7 @@ impl symBuilder {
 	//  - decl: relevant use declaration.
 	//  - mod: module that imports relevant package.
 	//  - path: path of package that importing.
-	fn checkPackageAccessibility(mut self, &decl: &ast::UseDecl, &mod: str, &path: str) {
+	fn checkPackageAccessibility(mut self, &decl: &ast::Use, &mod: str, &path: str) {
 		if self.importer.GetModPath() == mod {
 			ret
 		}
@@ -624,7 +624,7 @@ impl symBuilder {
 		}
 	}
 
-	fn importPackage(mut &self, mut &imp: &ImportInfo, mut &decl: &ast::UseDecl): (ok: bool) {
+	fn importPackage(mut &self, mut &imp: &ImportInfo, mut &decl: &ast::Use): (ok: bool) {
 		if imp.Binded {
 			ret true
 		}
@@ -670,7 +670,7 @@ impl symBuilder {
 		ret true
 	}
 
-	fn importUseDecl(mut &self, mut &decl: &ast::UseDecl): &ImportInfo {
+	fn importUseDecl(mut &self, mut &decl: &ast::Use): &ImportInfo {
 		mut imp := self.buildImport(decl)
 		// Break analysis if error occurs.
 		if imp == nil {
