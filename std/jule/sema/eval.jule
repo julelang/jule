@@ -783,7 +783,7 @@ impl eval {
 			self.pushErr(v.Token, build::LogMsg.VariadicWithNonVariadicable, d.Type.Str())
 			ret nil
 		}
-		makeVariadic(d, d.Type.Slc().Elem)
+		makeVariadic(d, d.Type.Slice().Elem)
 		ret d
 	}
 
@@ -872,7 +872,7 @@ impl eval {
 		}
 	}
 
-	fn evalExpSlc(mut &self, mut s: &ast::SliceExpr, mut t: &Type, mut first: &Data): &Data {
+	fn evalExpSlice(mut &self, mut s: &ast::SliceExpr, mut t: &Type, mut first: &Data): &Data {
 		mut slc := &Slc{
 			Elem: t,
 		}
@@ -915,9 +915,9 @@ impl eval {
 			match {
 			| self.prefix.Arr() != nil:
 				d = self.evalArr(s)
-			| self.prefix.Slc() != nil:
-				mut pt := self.prefix.Slc()
-				d = self.evalExpSlc(s, pt.Elem, nil)
+			| self.prefix.Slice() != nil:
+				mut pt := self.prefix.Slice()
+				d = self.evalExpSlice(s, pt.Elem, nil)
 			|:
 				goto autoDetermine
 			}
@@ -949,7 +949,7 @@ impl eval {
 		self.s.checkValidityForInitExpr(self.target.mutable, destIsRef,
 			firstElem.Type, firstElem, firstExpr.Token)
 
-		d = self.evalExpSlc(s, firstElem.Type, firstElem)
+		d = self.evalExpSlice(s, firstElem.Type, firstElem)
 
 		self.prefix = prefix
 		ret d
@@ -994,8 +994,8 @@ impl eval {
 		}
 	}
 
-	fn indexingSlc(mut self, mut &d: &Data, mut &index: &Data, mut &i: &ast::IndexingExpr) {
-		mut slc := d.Type.Slc()
+	fn indexingSlice(mut self, mut &d: &Data, mut &index: &Data, mut &i: &ast::IndexingExpr) {
+		mut slc := d.Type.Slice()
 		d.Type = slc.Elem
 		self.checkIntegerIndexingByData(index, i.Token)
 		d.Lvalue = true
@@ -1095,8 +1095,8 @@ impl eval {
 		| d.Type.Arr() != nil:
 			self.indexingArr(d, index, i)
 			ret
-		| d.Type.Slc() != nil:
-			self.indexingSlc(d, index, i)
+		| d.Type.Slice() != nil:
+			self.indexingSlice(d, index, i)
 			ret
 		| d.Type.Map() != nil:
 			self.indexingMap(d, index, i)
@@ -1449,7 +1449,7 @@ impl eval {
 		| d.Type.Arr() != nil:
 			self.slicingArr(d)
 			ret
-		| d.Type.Slc() != nil:
+		| d.Type.Slice() != nil:
 			ret
 		| d.Type.Prim() != nil:
 			prim := d.Type.Prim()
@@ -1562,7 +1562,7 @@ impl eval {
 		self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, d.Type.Str(), t.Str())
 	}
 
-	fn castSlc(mut self, mut t: &Type, mut d: &Data, errorToken: &token::Token) {
+	fn castSlice(mut self, mut t: &Type, mut d: &Data, errorToken: &token::Token) {
 		c := d.Constant
 		d.Constant = nil
 		d.untyped = false
@@ -1577,7 +1577,7 @@ impl eval {
 			ret
 		}
 
-		t = t.Slc().Elem
+		t = t.Slice().Elem
 		mut prim := t.Prim()
 		if prim == nil || (!prim.IsU8() && !prim.IsI32()) {
 			self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, d.Type.Str(), t.Str())
@@ -1668,7 +1668,7 @@ impl eval {
 			ret
 		}
 
-		mut s := d.Type.Slc()
+		mut s := d.Type.Slice()
 		if s == nil {
 			self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, t.Str(), d.Type.Str())
 			ret
@@ -1840,8 +1840,8 @@ impl eval {
 				self.castPtr(t, d, errorToken)
 			| t.Sptr() != nil:
 				self.castRef(t, d, errorToken)
-			| t.Slc() != nil:
-				self.castSlc(t, d, errorToken)
+			| t.Slice() != nil:
+				self.castSlice(t, d, errorToken)
 			| t.Struct() != nil:
 				self.castStruct(t, d, errorToken)
 			| t.Prim() != nil:
@@ -1907,7 +1907,7 @@ impl eval {
 		mut prefix := self.prefix
 		self.prefix = nil
 		defer { self.prefix = prefix }
-		if t.Slc() != nil {
+		if t.Slice() != nil {
 			match type e.Kind {
 			| &ast::SliceExpr:
 				self.prefix = t

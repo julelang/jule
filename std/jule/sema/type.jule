@@ -148,7 +148,7 @@ impl Type {
 			if _self.Arr() != nil {
 				ret _self.Arr().Elem.Comparable()
 			}
-			ret _self.Map() == nil && _self.Slc() == nil && _self.Fn() == nil
+			ret _self.Map() == nil && _self.Slice() == nil && _self.Fn() == nil
 		}
 	}
 
@@ -172,7 +172,7 @@ impl Type {
 			if _self.Arr() != nil {
 				ret _self.Arr().Elem.Mutable()
 			}
-			ret _self.Slc() != nil ||
+			ret _self.Slice() != nil ||
 				_self.Ptr() != nil ||
 				_self.Sptr() != nil
 		}
@@ -212,7 +212,7 @@ impl Type {
 				_self.Sptr() != nil ||
 				_self.Ptr() != nil ||
 				_self.Trait() != nil ||
-				_self.Slc() != nil ||
+				_self.Slice() != nil ||
 				_self.Map() != nil ||
 				_self.TypeEnum() != nil ||
 				_self.Chan() != nil
@@ -227,7 +227,7 @@ impl Type {
 			if prim != nil {
 				ret prim.IsAny() || prim.IsStr()
 			}
-			ret _self.Sptr() != nil || _self.Slc() != nil || _self.Trait() != nil ||
+			ret _self.Sptr() != nil || _self.Slice() != nil || _self.Trait() != nil ||
 				_self.TypeEnum() != nil || _self.Chan() != nil
 		}
 	}
@@ -235,7 +235,7 @@ impl Type {
 	// Reports whether actual kind is variadicable.
 	fn Variadicable(self): bool {
 		mut _self := &self
-		ret unsafe { _self.Slc() != nil }
+		ret unsafe { _self.Slice() != nil }
 	}
 
 	// Returns primitive type if actual kind is primitive type, nil reference if not.
@@ -316,7 +316,7 @@ impl Type {
 	}
 
 	// Returns slice type if actual kind is slice, nil reference if not.
-	fn Slc(mut self): &Slc {
+	fn Slice(mut self): &Slc {
 		mut kind := self.ActualKind()
 		match type kind {
 		| &Slc:
@@ -1876,8 +1876,8 @@ impl identTypeLookup {
 		| k.Ptr() != nil:
 			mut ptr := k.Ptr()
 			ret identTypeLookup.exist(ident, ptr.Elem)
-		| k.Slc() != nil:
-			mut slc := k.Slc()
+		| k.Slice() != nil:
+			mut slc := k.Slice()
 			ret identTypeLookup.exist(ident, slc.Elem)
 		| k.Arr() != nil:
 			mut arr := k.Arr()
@@ -1962,8 +1962,8 @@ fn getStructFromKind(mut k: &Type): &Struct {
 		ret k.Struct().Decl
 	| k.Sptr() != nil:
 		ret getStructFromKind(k.Sptr().Elem)
-	| k.Slc() != nil:
-		ret getStructFromKind(k.Slc().Elem)
+	| k.Slice() != nil:
+		ret getStructFromKind(k.Slice().Elem)
 	| k.Arr() != nil:
 		ret getStructFromKind(k.Arr().Elem)
 	| k.Ptr() != nil:

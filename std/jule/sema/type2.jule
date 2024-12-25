@@ -389,7 +389,7 @@ impl dynamicTypeAnnotation {
 			| ast::ArrayType:
 				elem = k.Arr().Elem
 			| ast::SliceType:
-				elem = k.Slc().Elem
+				elem = k.Slice().Elem
 			| ast::PtrType:
 				elem = k.Ptr().Elem
 			| ast::SptrType:
@@ -418,7 +418,7 @@ impl dynamicTypeAnnotation {
 		ret false
 	}
 
-	fn annotateConstraintTup(mut self, mut &k: &Type): (ok: bool) {
+	fn annotateConstraintTuple(mut self, mut &k: &Type): (ok: bool) {
 		match type self.c.Kind {
 		| &ast::TupleType:
 			mut tup := (&ast::TupleType)(self.c.Kind)
@@ -435,7 +435,7 @@ impl dynamicTypeAnnotation {
 		ret false
 	}
 
-	fn annotateConstraintFn(mut self, mut &k: &Type): (ok: bool) {
+	fn annotateConstraintFunc(mut self, mut &k: &Type): (ok: bool) {
 		match type self.c.Kind {
 		| &ast::Func:
 			mut pf := (&ast::Func)(self.c.Kind)
@@ -493,7 +493,7 @@ impl dynamicTypeAnnotation {
 		match {
 		| k.Arr() != nil:
 			ret self.annotateConstraintElem[ast::ArrayType](k)
-		| k.Slc() != nil:
+		| k.Slice() != nil:
 			ret self.annotateConstraintElem[ast::SliceType](k)
 		| k.Ptr() != nil:
 			ret self.annotateConstraintElem[ast::PtrType](k)
@@ -504,9 +504,9 @@ impl dynamicTypeAnnotation {
 		| k.Map() != nil:
 			ret self.annotateConstraintMap(k)
 		| k.Fn() != nil:
-			ret self.annotateConstraintFn(k)
+			ret self.annotateConstraintFunc(k)
 		| k.Tup() != nil:
-			ret self.annotateConstraintTup(k)
+			ret self.annotateConstraintTuple(k)
 		|:
 			ret false
 		}
@@ -531,7 +531,7 @@ impl dynamicTypeAnnotation {
 		ret self.annotateAny(k)
 	}
 
-	unsafe fn annotateArr(mut self, mut &k: &Type): (ok: bool) {
+	unsafe fn annotateArray(mut self, mut &k: &Type): (ok: bool) {
 		mut parr := (*self.k).Arr()
 		if parr == nil {
 			ret false
@@ -541,12 +541,12 @@ impl dynamicTypeAnnotation {
 		ret self.annotateKind(arr.Elem)
 	}
 
-	unsafe fn annotateSlc(mut self, mut &k: &Type): (ok: bool) {
-		mut pslc := (*self.k).Slc()
+	unsafe fn annotateSlice(mut self, mut &k: &Type): (ok: bool) {
+		mut pslc := (*self.k).Slice()
 		if pslc == nil {
 			ret false
 		}
-		mut slc := k.Slc()
+		mut slc := k.Slice()
 		self.k = &pslc.Elem
 		ret self.annotateKind(slc.Elem)
 	}
@@ -569,7 +569,7 @@ impl dynamicTypeAnnotation {
 			self.checkMapKey(&pmap.Val, m.Val)
 	}
 
-	unsafe fn annotateFn(mut self, mut &k: &Type): (ok: bool) {
+	unsafe fn annotateFunc(mut self, mut &k: &Type): (ok: bool) {
 		mut pf := (*self.k).Fn()
 		if pf == nil {
 			ret false
@@ -681,13 +681,13 @@ impl dynamicTypeAnnotation {
 		| k.Prim() != nil:
 			ret self.annotatePrim(k)
 		| k.Arr() != nil:
-			ret self.annotateArr(k)
-		| k.Slc() != nil:
-			ret self.annotateSlc(k)
+			ret self.annotateArray(k)
+		| k.Slice() != nil:
+			ret self.annotateSlice(k)
 		| k.Map() != nil:
 			ret self.annotateMap(k)
 		| k.Fn() != nil:
-			ret self.annotateFn(k)
+			ret self.annotateFunc(k)
 		| k.Ptr() != nil:
 			ret self.annotatePtr(k)
 		| k.Sptr() != nil:
@@ -1204,7 +1204,7 @@ impl rangeChecker {
 			ret
 		}
 
-		mut slc := self.d.Type.Slc()
+		mut slc := self.d.Type.Slice()
 		self.Kind.KeyB = self.buildVar(self.rang.KeyB)
 		self.Kind.KeyB.TypeSym = &TypeSym{Type: slc.Elem}
 
@@ -1323,7 +1323,7 @@ impl rangeChecker {
 		match {
 		| self.d.Type.Variadic:
 			// Fail.
-		| self.d.Type.Slc() != nil:
+		| self.d.Type.Slice() != nil:
 			self.checkSlice()
 			ret true
 		| self.d.Type.Arr() != nil:

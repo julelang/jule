@@ -489,7 +489,7 @@ fn builtinCallerMake(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &d: &Data):
 			model.Cap = capExpr.Model
 		}
 		ret d
-	| t.Type.Slc() != nil:
+	| t.Type.Slice() != nil:
 		// Type is slice. Make slice allocation.
 		if len(fc.Args) < 2 {
 			// The slice type variants always must have to length argument for
@@ -542,7 +542,7 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &d: &Data
 		ret nil
 	}
 
-	mut s := t.Type.Slc()
+	mut s := t.Type.Slice()
 	if s == nil {
 		e.pushErr(firstArg.Token, build::LogMsg.InvalidExpr)
 		ret nil
@@ -655,7 +655,7 @@ fn callerCopySlice(mut &dest: &Data, mut &e: &eval, mut &fc: &ast::FuncCallExpr,
 	if src == nil {
 		ret nil
 	}
-	mut slc := src.Type.Slc()
+	mut slc := src.Type.Slice()
 
 	if slc != nil {
 		if !src.Mutable && slc.Elem.Mutable() {
@@ -665,7 +665,7 @@ fn callerCopySlice(mut &dest: &Data, mut &e: &eval, mut &fc: &ast::FuncCallExpr,
 			e.pushErr(fc.Args[1].Token, build::LogMsg.IncompatibleTypes, dest.Type.Str(), src.Type.Str())
 		}
 	} else {
-		destPrim := dest.Type.Slc().Elem.Prim()
+		destPrim := dest.Type.Slice().Elem.Prim()
 		prim := src.Type.Prim()
 		if destPrim == nil || prim == nil || !prim.IsStr() || !destPrim.IsU8() {
 			e.pushErr(fc.Args[1].Token, build::LogMsg.IncompatibleTypes, dest.Type.Str(), src.Type.Str())
@@ -697,7 +697,7 @@ fn builtinCallerCopy(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &d: &Data):
 	match {
 	| dest == nil:
 		ret nil
-	| dest.Type.Slc() != nil:
+	| dest.Type.Slice() != nil:
 		ret callerCopySlice(dest, e, fc, d)
 	|:
 		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidType)
@@ -760,7 +760,7 @@ fn builtinCallerLen(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &d: &Data): 
 	match {
 	| dest == nil:
 		ret nil
-	| dest.Type.Slc() != nil:
+	| dest.Type.Slice() != nil:
 		ret callerLenSlice(dest, d)
 	| dest.Type.Arr() != nil:
 		ret callerLenArr(dest, d)
@@ -811,7 +811,7 @@ fn builtinCallerCap(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &d: &Data): 
 	| dest.Decl:
 		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidExpr)
 		ret nil
-	| dest.Type.Slc() != nil:
+	| dest.Type.Slice() != nil:
 		ret callerCapSlice(dest, d)
 	|:
 		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidExpr)
