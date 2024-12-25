@@ -487,7 +487,7 @@ impl eval {
 		}
 	}
 
-	fn evalFn(mut self, mut f: &Fn, errorToken: &token::Token): &Data {
+	fn evalFunc(mut self, mut f: &Func, errorToken: &token::Token): &Data {
 		if !self.s.isAccessibleDefine(f.Public, f.Token) {
 			self.pushErr(errorToken, build::LogMsg.IdentIsNotAccessible, f.Ident)
 			self.pushSuggestion(build::LogMsg.MakePubToAccess)
@@ -739,10 +739,10 @@ impl eval {
 			ret self.evalTypeEnum((&TypeEnum)(def), ident)
 		| &Struct:
 			ret self.evalStruct((&Struct)(def), ident)
-		| &Fn:
-			mut f := (&Fn)(def)
+		| &Func:
+			mut f := (&Func)(def)
 			if f.Ident != jule::InitFn {
-				ret self.evalFn(f, ident)
+				ret self.evalFunc(f, ident)
 			}
 		| &FnIns:
 			ret self.evalFnIns((&FnIns)(def))
@@ -1241,7 +1241,7 @@ impl eval {
 	// If instance is already exist, f will point to exist instantantiation.
 	fn checkGenericFunc(mut &self, mut &f: &FnIns, mut &et: &token::Token, mut &model: Expr): (ok: bool, exist: bool) {
 		mut old := f
-		ok, exist = self.s.checkGenericFn(f, et)
+		ok, exist = self.s.checkGenericFunc(f, et)
 		if ok && exist {
 			// Update model by exist function instance.
 			// Generic functions returns always new instance, because might be
@@ -2186,7 +2186,7 @@ impl eval {
 
 		if !dynamicAnnotation {
 			if !f.reloaded {
-				ok := self.s.reloadFnInsTypes(f)
+				ok := self.s.reloadFuncInsTypes(f)
 				f.reloaded = true
 				if !ok {
 					d = nil
@@ -2197,7 +2197,7 @@ impl eval {
 			if existInstance != nil {
 				f = existInstance
 			}
-		} else if !self.s.buildFnNonGenericTypes(f, fcac.ignored) {
+		} else if !self.s.buildFuncNonGenericTypes(f, fcac.ignored) {
 			d = nil
 			ret
 		}
@@ -2430,7 +2430,7 @@ impl eval {
 
 	// This method evaluates expressions, will not check public availability.
 	// The tok parameter should be identifier to accessed.
-	fn evalStructSubIdentMethod(mut self, mut &d: &Data, mut &s: &StructIns, mut &tok: &token::Token, mut &m: &Fn, ref: bool): &Data {
+	fn evalStructSubIdentMethod(mut self, mut &d: &Data, mut &s: &StructIns, mut &tok: &token::Token, mut &m: &Func, ref: bool): &Data {
 		if m.Params[0].IsRef() && !ref {
 			self.pushErr(tok, build::LogMsg.RefMethodUsedWithNotRefInstance)
 		}
@@ -3088,9 +3088,9 @@ impl eval {
 			scc.it = 0
 			scc.cse = 0
 			scc.captured = unsafe { (&[]&Var)(&captured) }
-			self.s.checkFnInsSc(ins, scc)
+			self.s.checkFuncInsSc(ins, scc)
 		|:
-			self.s.checkFnIns(ins)
+			self.s.checkFuncIns(ins)
 		}
 
 		ret &Data{
@@ -3901,9 +3901,9 @@ impl binaryEval {
 		| token::Id.NotEq:
 			if self.e.s.meta.runtime != nil {
 				// Add instance to relevant runtime function for array element type if not exist.
-				mut f := runtimeFindFn(self.e.s.meta.runtime, runtimeFunc.arrayCmp).instanceForce()
+				mut f := runtimeFindFunc(self.e.s.meta.runtime, runtimeFunc.arrayCmp).instanceForce()
 				f.Generics = append(f.Generics, &InsGeneric{Type: self.l.Type.Array().Elem})
-				ok, _ := self.e.s.checkGenericFn(f, self.op)
+				ok, _ := self.e.s.checkGenericFunc(f, self.op)
 				if !ok {
 					panic("sema: arrayCmp evaluation failed, this is an implementation mistake")
 				}

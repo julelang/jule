@@ -70,7 +70,7 @@ struct anonHash {
 
 struct traitHash {
 	traitDecl: &sema::Trait
-	methods:   []&sema::Fn // All unique methods of trait, including inherited ones.
+	methods:   []&sema::Func // All unique methods of trait, including inherited ones.
 }
 
 struct metadata {
@@ -398,7 +398,7 @@ impl ObjectCoder {
 			self.anyObj.WriteStr(typeCoder.Str + " " + anyTypeIdent)!
 			self.anyObj.WriteStr(si)!
 			self.anyObj.WriteStr("_to_str(void *alloc) noexcept { return ")!
-			mut f := obj::FindFnGenericInstance(meta::Program.Runtime.ToStr, t)
+			mut f := obj::FindFuncGenericInstance(meta::Program.Runtime.ToStr, t)
 			identCoder.funcIns(self.anyObj, f)
 			self.anyObj.WriteStr("(*reinterpret_cast<")!
 			if t.Ptr() == nil {
@@ -449,7 +449,7 @@ impl ObjectCoder {
 		self.resultDecls.WriteStr("};\n")!
 	}
 
-	fn pushResult(mut &self, mut &f: &sema::Fn) {
+	fn pushResult(mut &self, mut &f: &sema::Func) {
 		if f.IsVoid() || len(f.Result.Idents) <= 1 {
 			ret
 		}
@@ -816,13 +816,13 @@ impl ObjectCoder {
 		self.write(";\n")
 	}
 
-	fn funcDecl(mut &self, mut &f: &sema::Fn, ptr: bool) {
+	fn funcDecl(mut &self, mut &f: &sema::Func, ptr: bool) {
 		for (_, mut c) in f.Instances {
 			self.funcDeclIns(c, ptr)
 		}
 	}
 
-	fn funcDeclTrait(mut &self, mut &f: &sema::Fn) {
+	fn funcDeclTrait(mut &self, mut &f: &sema::Func) {
 		for (_, mut c) in f.Instances {
 			mut k := c.Params[0].Type
 			c.Params[0].Type = generalGCPtr
@@ -984,7 +984,7 @@ impl ObjectCoder {
 		}
 	}
 
-	fn func(mut &self, mut &f: &sema::Fn) {
+	fn func(mut &self, mut &f: &sema::Func) {
 		for (_, mut ins) in f.Instances {
 			self.funcIns(ins, "")
 		}
@@ -1005,7 +1005,7 @@ impl ObjectCoder {
 		f.Params[0].Type = k
 	}
 
-	fn findTraitMetMap(mut &self, mut &m: &sema::Fn): (&sema::FnIns, bool) {
+	fn findTraitMetMap(mut &self, mut &m: &sema::Func): (&sema::FnIns, bool) {
 		mut mins := m.Instances[0]
 		for (mut f, _) in self.traitMetMap {
 			if f.Decl.Public == m.Public &&
@@ -1017,7 +1017,7 @@ impl ObjectCoder {
 		ret mins, false
 	}
 
-	fn traitWrapper(mut &self, mut &t: &sema::Trait, mut &m: &sema::Fn) {
+	fn traitWrapper(mut &self, mut &t: &sema::Trait, mut &m: &sema::Func) {
 	impls:
 		for (_, mut imp) in t.Implemented {
 			mut mepf, exist := self.findTraitMetMap(m)
@@ -1290,9 +1290,9 @@ impl ObjectCoder {
 	fn buildTraitHash(mut &self, mut &t: &sema::Trait) {
 		mut hash := &traitHash{
 			traitDecl: t,
-			methods: make([]&sema::Fn, 0, len(t.Methods)),
+			methods: make([]&sema::Func, 0, len(t.Methods)),
 		}
-		obj::IterTraitMethods(t, fn(mut &m: &sema::Fn) {
+		obj::IterTraitMethods(t, fn(mut &m: &sema::Func) {
 			// lookup and do not add already exist methods
 			for _, em in hash.methods {
 				if em == m {

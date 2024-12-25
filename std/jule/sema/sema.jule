@@ -299,9 +299,9 @@ impl Lookup for sema {
 	// Lookups:
 	//   - Package file's symbol table.
 	//   - Current file's public denifes of imported packages.
-	fn FindFn(mut self, ident: str, binded: bool): &Fn {
+	fn FindFn(mut self, ident: str, binded: bool): &Func {
 		// Lookup package files.
-		mut f := findFnInPackage(self.files, ident, binded)
+		mut f := findFuncInPackage(self.files, ident, binded)
 		if f != nil {
 			ret f
 		}
@@ -830,14 +830,14 @@ impl sema {
 		ret tc.checkDecl(ast)
 	}
 
-	fn buildFnNonGenericTypes(mut &self, mut f: &FnIns, mut &ignored: []&Type): (ok: bool) {
+	fn buildFuncNonGenericTypes(mut &self, mut f: &FnIns, mut &ignored: []&Type): (ok: bool) {
 		let mut generics: []&ast::Generic = nil
 		if f.Decl.IsMethod() {
 			generics = append(f.Decl.Generics, f.Decl.Owner.Generics...)
 		} else {
 			generics = f.Decl.Generics
 		}
-		ret self.basicFnEnvironment(f, fn(mut &sema: &sema): (ok: bool) {
+		ret self.basicFuncEnvironment(f, fn(mut &sema: &sema): (ok: bool) {
 			ok = true
 			for (_, mut p) in f.Params {
 				if !p.Decl.IsSelf() {
@@ -853,7 +853,7 @@ impl sema {
 		})
 	}
 
-	fn getTraitCheckFnKind(mut &self, mut &f: &Fn): &FnIns {
+	fn getTraitCheckFuncKind(mut &self, mut &f: &Func): &FnIns {
 		if len(f.Instances) == 1 {
 			ret f.Instances[0]
 		}
@@ -882,7 +882,7 @@ impl sema {
 		ret ins
 	}
 
-	fn checkConstraintsFn(mut &self, mut &f: &FnIns, mut &et: &token::Token, mut exist: &FnIns): bool {
+	fn checkConstraintsFunc(mut &self, mut &f: &FnIns, mut &et: &token::Token, mut exist: &FnIns): bool {
 		mut cc := self.constraintChecker()
 		cc.et = et
 		cc.fi = f
@@ -913,7 +913,7 @@ impl sema {
 	// Calls algo in the function's native environment.
 	// Errors will be handled.
 	// Returns result of algo.
-	fn basicFnEnvironment(mut &self, mut &f: &FnIns, algo: fn(mut &sema: &sema): bool): bool {
+	fn basicFuncEnvironment(mut &self, mut &f: &FnIns, algo: fn(mut &sema: &sema): bool): bool {
 		mut sema := f.Decl.sema
 		mut old := sema.getCurrentFile()
 		mut file := findFile(sema.files, f.Decl.Token.File)
@@ -932,28 +932,28 @@ impl sema {
 		ret ok
 	}
 
-	// Calls basicFnEnvironment internally but handles generics.
-	fn fnEnvironment(mut &self, mut &f: &FnIns, algo: fn(mut &sema: &sema, mut &generics: []&TypeAlias): bool): bool {
+	// Calls basicFuncEnvironment internally but handles generics.
+	fn funcEnvironment(mut &self, mut &f: &FnIns, algo: fn(mut &sema: &sema, mut &generics: []&TypeAlias): bool): bool {
 		mut size := len(f.Generics)
 		if f.Decl != nil && f.Decl.Owner != nil {
 			size += len(f.Decl.Owner.Generics)
 		}
 		mut generics := make([]&TypeAlias, 0, size)
 		appendGenericTypeAliases(generics, f)
-		ret self.basicFnEnvironment(f, fn(mut &sema: &sema): bool {
+		ret self.basicFuncEnvironment(f, fn(mut &sema: &sema): bool {
 			ret algo(sema, generics)
 		})
 	}
 
-	fn checkFnParamKind(mut &self, mut &p: &ParamIns) {
+	fn checkFuncParamKind(mut &self, mut &p: &ParamIns) {
 		p.Type.Variadic = p.Decl.Variadic
 	}
 
-	fn reloadFnInsTypes(mut &self, mut f: &FnIns): bool {
+	fn reloadFuncInsTypes(mut &self, mut f: &FnIns): bool {
 		if f.IsBuiltin() || f.IsAnon() {
 			ret true
 		}
-		ret self.fnEnvironment(f, fn(mut &sema: &sema, mut &generics: []&TypeAlias): bool {
+		ret self.funcEnvironment(f, fn(mut &sema: &sema, mut &generics: []&TypeAlias): bool {
 			mut ok := true
 			for (_, mut p) in f.Params {
 				if p.Decl.IsSelf() {
@@ -975,7 +975,7 @@ impl sema {
 				} else {
 					p.Type = sema.buildTypeWithGenerics(p.Decl.TypeSym.Decl, generics, f.Refers)
 					if p.Type != nil {
-						self.checkFnParamKind(p)
+						self.checkFuncParamKind(p)
 					} else {
 						ok = false
 					}
@@ -1395,7 +1395,7 @@ impl sema {
 		ret
 	}
 
-	fn checkFnDeclParamsDup(mut self, &f: &Fn): (ok: bool) {
+	fn checkFuncDeclParamsDup(mut self, &f: &Func): (ok: bool) {
 		ok = true
 	check:
 		for i, p in f.Params {
@@ -1432,7 +1432,7 @@ impl sema {
 		ret
 	}
 
-	fn checkFnDeclResultDup(mut self, mut &f: &Fn): (ok: bool) {
+	fn checkFuncDeclResultDup(mut self, mut &f: &Func): (ok: bool) {
 		ok = true
 		if f.IsVoid() {
 			ret
@@ -1477,7 +1477,7 @@ impl sema {
 		ret
 	}
 
-	fn checkFnVariadicParam(mut &self, mut &f: &Fn): bool {
+	fn checkFuncVariadicParam(mut &self, mut &f: &Func): bool {
 		if len(f.Params) == 0 {
 			ret false
 		}
@@ -1490,7 +1490,7 @@ impl sema {
 
 	// Checks generics, parameters and return type.
 	// Not checks scope, and other things.
-	fn checkFnDeclPrototype(mut &self, mut &f: &Fn) {
+	fn checkFuncDeclPrototype(mut &self, mut &f: &Func) {
 		if f.Exceptional && f.Binded {
 			self.pushErr(f.Token, build::LogMsg.BindedExceptional)
 			ret
@@ -1506,9 +1506,9 @@ impl sema {
 
 		match {
 		| !self.checkDeclGenerics(f.Generics):
-		| !self.checkFnDeclParamsDup(f):
-		| !self.checkFnDeclResultDup(f):
-		| !self.checkFnVariadicParam(f):
+		| !self.checkFuncDeclParamsDup(f):
+		| !self.checkFuncDeclResultDup(f):
+		| !self.checkFuncVariadicParam(f):
 		}
 	}
 
@@ -1585,8 +1585,8 @@ impl sema {
 					if t2m == nil {
 						continue
 					}
-					t1f := self.getTraitCheckFnKind(t1m)
-					t2f := self.getTraitCheckFnKind(t2m)
+					t1f := self.getTraitCheckFuncKind(t1m)
+					t2f := self.getTraitCheckFuncKind(t2m)
 					if !t1f.equalTrait(t2f) {
 						self.pushErr(it.Decl.Token, build::LogMsg.IncompatibleInherit,
 							t.Ident, t2.Ident, t1f.GetKindStr(true), t2f.GetKindStr(true))
@@ -1597,16 +1597,16 @@ impl sema {
 		}
 	}
 
-	fn checkTraitDeclMethod(mut &self, mut &f: &Fn) {
+	fn checkTraitDeclMethod(mut &self, mut &f: &Func) {
 		if token::IsIgnoreIdent(f.Ident) {
 			self.pushErr(f.Token, build::LogMsg.IgnoreIdent)
 		} else if token::IsAnonIdent(f.Ident) {
 			self.pushErr(f.Token, build::LogMsg.AnonFn)
 		}
 		f.sema = self
-		self.checkFnDeclPrototype(f)
+		self.checkFuncDeclPrototype(f)
 		mut ins := f.instance()
-		_ = self.reloadFnInsTypes(ins)
+		_ = self.reloadFuncInsTypes(ins)
 		ins.reloaded = true
 		f.appendInstance(ins)
 	}
@@ -1891,9 +1891,9 @@ impl sema {
 		for (_, mut tf) in trt.Methods {
 			mut exist := false
 			mut sf := strct.FindMethod(tf.Ident, tf.Statically)
-			tfK := self.getTraitCheckFnKind(tf)
+			tfK := self.getTraitCheckFuncKind(tf)
 			if sf != nil {
-				mut sfK := self.getTraitCheckFnKind(sf)
+				mut sfK := self.getTraitCheckFuncKind(sf)
 				if sfK != nil {
 					exist = tfK.equalTrait(sfK)
 				}
@@ -1986,12 +1986,12 @@ impl sema {
 		ret true
 	}
 
-	fn checkAnonFuncDecl(mut &self, mut &f: &Fn) {
+	fn checkAnonFuncDecl(mut &self, mut &f: &Func) {
 		f.sema = self
-		self.checkFnDeclPrototype(f)
+		self.checkFuncDeclPrototype(f)
 	}
 
-	fn checkFuncDecl(mut &self, mut &f: &Fn) {
+	fn checkFuncDecl(mut &self, mut &f: &Func) {
 		if token::IsIgnoreIdent(f.Ident) {
 			self.pushErr(f.Token, build::LogMsg.IgnoreIdent)
 		} else if f.IsAnon() {
@@ -2013,7 +2013,7 @@ impl sema {
 		}
 	}
 
-	fn checkFuncDeclsBy(mut &self, mut &funcs: []&Fn): bool {
+	fn checkFuncDeclsBy(mut &self, mut &funcs: []&Func): bool {
 		for (_, mut f) in funcs {
 			self.checkFuncDecl(f)
 			// Break checking if error occurs.
@@ -2188,10 +2188,10 @@ impl sema {
 		}
 	}
 
-	// Returns new FnIns as ready-to-analysis.
+	// Returns new FuncIns as ready-to-analysis.
 	// If function already has a instance, returns existing instance.
 	// Returns nil if have a problem.
-	fn readyToCheckFn(mut &self, mut &s: &StructIns, mut &f: &Fn): &FnIns {
+	fn readyToCheckFunc(mut &self, mut &s: &StructIns, mut &f: &Func): &FnIns {
 		mut ins := f.instance()
 		if len(f.Instances) != 0 {
 			ret ins
@@ -2199,7 +2199,7 @@ impl sema {
 		ins.Owner = s
 		f.appendInstance(ins)
 		ins.reloaded = true
-		if self.reloadFnInsTypes(ins) {
+		if self.reloadFuncInsTypes(ins) {
 			ret ins
 		}
 		ret nil
@@ -2207,15 +2207,15 @@ impl sema {
 
 	// Checks new generics function instance.
 	// If instance is already exist, f will point to exist instantantiation.
-	fn checkGenericFn(mut &self, mut &f: &FnIns, mut &et: &token::Token): (ok: bool, exist: bool) {
-		ok = self.reloadFnInsTypes(f)
+	fn checkGenericFunc(mut &self, mut &f: &FnIns, mut &et: &token::Token): (ok: bool, exist: bool) {
+		ok = self.reloadFuncInsTypes(f)
 		f.reloaded = true
 		if !ok {
 			ret false, false
 		}
 		mut existInstance := f.Decl.appendInstance(f)
 		// TODO: [check] is possible to optimize here using same environment with realoadFnInsTypes?
-		if !self.checkConstraintsFn(f, et, existInstance) {
+		if !self.checkConstraintsFunc(f, et, existInstance) {
 			ret false, false
 		}
 		if existInstance != nil {
@@ -2224,13 +2224,13 @@ impl sema {
 			exist = true
 		} else {
 			// Check generic function instance instantly.
-			self.checkFnInsCaller(f, et)
+			self.checkFuncInsCaller(f, et)
 		}
 		ok = true
 		ret
 	}
 
-	fn checkTypeMethod(mut &self, mut &s: &StructIns, mut &f: &Fn) {
+	fn checkTypeMethod(mut &self, mut &s: &StructIns, mut &f: &Func) {
 		// Generic instances are checked instantly.
 		if len(f.Generics) > 0 {
 			ret
@@ -2240,7 +2240,7 @@ impl sema {
 			// Checked
 			ret
 		}
-		self.checkFnIns(ins)
+		self.checkFuncIns(ins)
 	}
 
 	// Checks environment-dependent parts of structure instance.
@@ -2352,7 +2352,7 @@ impl sema {
 			// compiler will use default compare method. If There is array field,
 			// push instance for runtime function.
 			if s.Comparable && self.meta.runtime != nil {
-				mut decl := runtimeFindFn(self.meta.runtime, runtimeFunc.arrayCmp)
+				mut decl := runtimeFindFunc(self.meta.runtime, runtimeFunc.arrayCmp)
 				for (_, mut field) in s.Fields {
 					mut arr := field.Type.Array()
 					if arr == nil {
@@ -2360,7 +2360,7 @@ impl sema {
 					}
 					mut f := decl.instanceForce()
 					f.Generics = append(f.Generics, &InsGeneric{Type: arr.Elem})
-					gok, _ := self.checkGenericFn(f, field.Decl.Token)
+					gok, _ := self.checkGenericFunc(f, field.Decl.Token)
 					if !gok {
 						panic("sema: arrayCmp evaluation failed, this is an implementation mistake")
 					}
@@ -2374,7 +2374,7 @@ impl sema {
 		// have checked instances for non-generic methods.
 		for (_, mut f) in s.Methods {
 			if len(f.Generics) == 0 {
-				if self.readyToCheckFn(s, f) == nil {
+				if self.readyToCheckFunc(s, f) == nil {
 					ret false
 				}
 			}
@@ -2471,7 +2471,7 @@ impl sema {
 		}
 	}
 
-	fn checkFnInsSc(mut self, mut &f: &FnIns, mut &sc: &scopeChecker) {
+	fn checkFuncInsSc(mut self, mut &f: &FnIns, mut &sc: &scopeChecker) {
 		appendRetVars(sc.table.Vars, f)
 		appendParamVars(sc.table.Vars, f)
 		appendGenericTypeAliases(sc.table.TypeAliases, f)
@@ -2484,7 +2484,7 @@ impl sema {
 		}
 	}
 
-	fn checkFnInsCaller(mut &self, mut &f: &FnIns, mut caller: &token::Token) {
+	fn checkFuncInsCaller(mut &self, mut &f: &FnIns, mut caller: &token::Token) {
 		if f.Decl.Binded {
 			ret
 		}
@@ -2498,7 +2498,7 @@ impl sema {
 
 		mut sc := newScopeChecker(f.Decl.sema, f)
 		sc.calledFrom = caller
-		self.checkFnInsSc(f, sc)
+		self.checkFuncInsSc(f, sc)
 
 		if f.Decl.sema != self {
 			self.errors = append(self.errors, f.Decl.sema.errors...)
@@ -2506,11 +2506,11 @@ impl sema {
 		}
 	}
 
-	fn checkFnIns(mut &self, mut &f: &FnIns) {
-		self.checkFnInsCaller(f, nil)
+	fn checkFuncIns(mut &self, mut &f: &FnIns) {
+		self.checkFuncInsCaller(f, nil)
 	}
 
-	fn checkFunc(mut &self, mut &f: &Fn) {
+	fn checkFunc(mut &self, mut &f: &Func) {
 		if f.Binded {
 			ret
 		}
@@ -2521,11 +2521,11 @@ impl sema {
 		}
 
 		for (_, mut ins) in f.Instances {
-			self.checkFnIns(ins)
+			self.checkFuncIns(ins)
 		}
 	}
 
-	fn checkTestFn(mut self, mut &f: &FnIns) {
+	fn checkTestFunc(mut self, mut &f: &FnIns) {
 		if f.Decl.Public {
 			self.pushErr(f.Decl.Token, build::LogMsg.PubTestFn)
 			self.pushSuggestion(build::LogMsg.RemovePubModifier)
@@ -2561,7 +2561,7 @@ impl sema {
 		self.pushSuggestion(build::LogMsg.UseExpectedTestFnDecl)
 	}
 
-	fn precheckFunc(mut &self, mut &f: &Fn) {
+	fn precheckFunc(mut &self, mut &f: &Func) {
 		if f.Binded {
 			ret
 		}
@@ -2574,11 +2574,11 @@ impl sema {
 		if len(f.Instances) == 0 {
 			mut ins := f.instanceForce()
 			f.Instances = append(f.Instances, ins)
-			ok := self.reloadFnInsTypes(ins)
+			ok := self.reloadFuncInsTypes(ins)
 			ins.reloaded = true
 
 			if ok && hasDirective(f.Directives, build::Directive.Test) {
-				self.checkTestFn(ins)
+				self.checkTestFunc(ins)
 			}
 		}
 	}
@@ -2874,9 +2874,9 @@ fn pushRuntimeToStr(mut &s: &sema, mut &t: &Type, mut &token: &token::Token,
 	if s.meta.runtime == nil || t.IsNil() || refers == nil {
 		ret
 	}
-	mut f := runtimeFindFn(s.meta.runtime, runtimeFunc.toStr).instanceForce()
+	mut f := runtimeFindFunc(s.meta.runtime, runtimeFunc.toStr).instanceForce()
 	f.Generics = append(f.Generics, &InsGeneric{Type: t})
-	ok, _ := s.checkGenericFn(f, token)
+	ok, _ := s.checkGenericFunc(f, token)
 	if !ok {
 		panic("sema: toStr evaluation failed, this is an implementation mistake")
 	}
