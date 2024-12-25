@@ -741,8 +741,8 @@ impl parser {
 	// Build function prototype.
 	// Body is not necessary for successfull parsing.
 	// Just declration.
-	fn buildFnPrototype(mut &self, mut &tokens: []&token::Token, mut &i: int, method: bool): &ast::FnDecl {
-		mut f := &ast::FnDecl{
+	fn buildFuncPrototype(mut &self, mut &tokens: []&token::Token, mut &i: int, method: bool): &ast::Func {
+		mut f := &ast::Func{
 			Token: tokens[i],
 		}
 
@@ -818,9 +818,9 @@ impl parser {
 
 	// Parses function define.
 	// Prototype and body.
-	fn buildFn(mut &self, mut &tokens: []&token::Token, method: bool, prototype: bool): &ast::FnDecl {
+	fn buildFunc(mut &self, mut &tokens: []&token::Token, method: bool, prototype: bool): &ast::Func {
 		mut i := 0
-		mut f := self.buildFnPrototype(tokens, i, method)
+		mut f := self.buildFuncPrototype(tokens, i, method)
 		if prototype {
 			if i < len(tokens) {
 				self.pushErr(tokens[i+1], build::LogMsg.InvalidSyntax)
@@ -1228,7 +1228,7 @@ impl parser {
 		ret s
 	}
 
-	fn checkMethodReceiver(mut self, &f: &ast::FnDecl) {
+	fn checkMethodReceiver(mut self, &f: &ast::Func) {
 		// Static methods cannot have receiver.
 		if f.Statically {
 			if len(f.Params) > 0 && f.Params[0].IsSelf() {
@@ -1256,7 +1256,7 @@ impl parser {
 			}
 			match tokens[0].Id {
 			| token::Id.Fn:
-				mut f := self.buildFn(tokens, true, true)
+				mut f := self.buildFunc(tokens, true, true)
 				if f == nil {
 					break
 				}
@@ -1309,9 +1309,9 @@ impl parser {
 		ret t
 	}
 
-	fn buildBindFn(mut &self, mut tokens: []&token::Token): &ast::FnDecl {
+	fn buildBindFn(mut &self, mut tokens: []&token::Token): &ast::Func {
 		tokens = tokens[1:] // Remove "cpp" keyword.
-		mut f := self.buildFn(tokens, false, true)
+		mut f := self.buildFunc(tokens, false, true)
 		if f != nil {
 			f.Public = false
 			f.Binded = true
@@ -1399,7 +1399,7 @@ impl parser {
 		ret
 	}
 
-	fn getMethod(mut &self, mut &tokens: []&token::Token): &ast::FnDecl {
+	fn getMethod(mut &self, mut &tokens: []&token::Token): &ast::Func {
 		mut i := 0
 		mut token := tokens[i]
 		if token.Id == token::Id.Static {
@@ -1425,7 +1425,7 @@ impl parser {
 			ret nil
 		}
 
-		ret self.buildFn(tokens, true, false)
+		ret self.buildFunc(tokens, true, false)
 	}
 
 	fn parseImplBody(mut &self, mut &ipl: &ast::Impl, mut &tokens: []&token::Token) {
@@ -1451,7 +1451,7 @@ impl parser {
 				mut f := self.getMethod(tokens)
 				if f != nil {
 					self.checkMethodReceiver(f)
-					self.applyFnMeta(f)
+					self.applyFuncMeta(f)
 					ipl.Methods = append(ipl.Methods, f)
 				}
 			|:
@@ -1537,7 +1537,7 @@ impl parser {
 		match token.Id {
 		| token::Id.Fn
 		| token::Id.Unsafe:
-			mut f := self.buildFn(tokens, false, false)
+			mut f := self.buildFunc(tokens, false, false)
 			if f != nil {
 				f.Global = true
 			}
@@ -1565,7 +1565,7 @@ impl parser {
 		}
 	}
 
-	fn applyFnMeta(mut self, mut &f: &ast::FnDecl) {
+	fn applyFuncMeta(mut self, mut &f: &ast::Func) {
 		f.Directives = self.directives
 		self.directives = nil
 	}
@@ -1579,12 +1579,12 @@ impl parser {
 			}
 			v.Directives = self.directives
 			self.directives = nil
-		| &ast::FnDecl:
-			mut f := (&ast::FnDecl)(node.Data)
+		| &ast::Func:
+			mut f := (&ast::Func)(node.Data)
 			if f == nil {
 				ret
 			}
-			self.applyFnMeta(f)
+			self.applyFuncMeta(f)
 		| &ast::Struct:
 			mut sd := (&ast::Struct)(node.Data)
 			if sd == nil {
