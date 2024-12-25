@@ -305,11 +305,11 @@ impl Type {
 	}
 
 	// Returns array type if actual kind is array, nil reference if not.
-	fn Array(mut self): &Arr {
+	fn Array(mut self): &Array {
 		mut kind := self.ActualKind()
 		match type kind {
-		| &Arr:
-			ret (&Arr)(kind)
+		| &Array:
+			ret (&Array)(kind)
 		|:
 			ret nil
 		}
@@ -793,13 +793,13 @@ impl Kind for Map {
 }
 
 // Array type.
-struct Arr {
+struct Array {
 	Auto: bool // Auto-sized array.
 	N:    int
 	Elem: &Type
 }
 
-impl Kind for Arr {
+impl Kind for Array {
 	// Returns array kind as string.
 	fn Str(self): str {
 		mut s := strings::Builder.New(1 << 4)
@@ -813,8 +813,8 @@ impl Kind for Arr {
 	// Reports whether types are same.
 	fn Equal(&self, other: &Type): bool {
 		match type other.Kind {
-		| &Arr:
-			arr := (&Arr)(other.Kind)
+		| &Array:
+			arr := (&Array)(other.Kind)
 			ret self.N == arr.N && self.Elem.Equal(arr.Elem)
 		}
 		ret false
@@ -1549,7 +1549,7 @@ impl typeChecker {
 		}
 	}
 
-	fn buildArray(mut self, mut decl: &ast::ArrayType): &Arr {
+	fn buildArray(mut self, mut decl: &ast::ArrayType): &Array {
 		mut n := 0
 
 		if !decl.AutoSized() {
@@ -1591,7 +1591,7 @@ impl typeChecker {
 			ret nil
 		}
 
-		ret &Arr{
+		ret &Array{
 			Auto: decl.AutoSized(),
 			N: n,
 			Elem: elem,

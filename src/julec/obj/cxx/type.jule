@@ -173,7 +173,7 @@ impl typeCoder {
 	}
 
 	// Generates C++ code of Arr type.
-	fn array(mut self, mut &buf: strings::Builder, mut a: &sema::Arr) {
+	fn array(mut self, mut &buf: strings::Builder, mut a: &sema::Array) {
 		buf.WriteStr(typeCoder.Array + "<")!
 		self.kind(buf, a.Elem)
 		buf.WriteByte(',')!
@@ -378,7 +378,7 @@ impl resultCoder {
 		self.codeMut(s, slc.Elem)
 	}
 
-	fn arr(mut self, mut &s: strings::Builder, mut arr: &sema::Arr) {
+	fn array(mut self, mut &s: strings::Builder, mut arr: &sema::Array) {
 		s.WriteStr(resultCoder.Array)!
 		s.WriteStr(conv::FmtInt(i64(arr.N), 16))!
 		self.codeMut(s, arr.Elem)
@@ -402,7 +402,7 @@ impl resultCoder {
 		self.codeMut(s, ch.Elem)
 	}
 
-	fn tup(mut self, mut &s: strings::Builder, mut tup: &sema::Tuple) {
+	fn tuple(mut self, mut &s: strings::Builder, mut tup: &sema::Tuple) {
 		for (_, mut t) in tup.Types {
 			s.WriteStr("__jule_tuple_")!
 			self.codeMut(s, t)
@@ -431,8 +431,8 @@ impl resultCoder {
 			self.mapType(s, (&sema::Map)(t.Kind))
 		| &sema::Slice:
 			self.slice(s, (&sema::Slice)(t.Kind))
-		| &sema::Arr:
-			self.arr(s, (&sema::Arr)(t.Kind))
+		| &sema::Array:
+			self.array(s, (&sema::Array)(t.Kind))
 		| &sema::FnIns:
 			self.func(s, (&sema::FnIns)(t.Kind))
 		| &sema::Enum:
@@ -450,7 +450,7 @@ impl resultCoder {
 		| &sema::Prim:
 			s.WriteStr((&sema::Prim)(t.Kind).Kind)!
 		| &sema::Tuple:
-			self.tup(s, (&sema::Tuple)(t.Kind))
+			self.tuple(s, (&sema::Tuple)(t.Kind))
 		|:
 			panic("cxx: this panic call should be unreachable")
 		}
@@ -459,7 +459,7 @@ impl resultCoder {
 	fn codeMut1(mut self, mut &s: strings::Builder, mut &t: &sema::Type) {
 		mut tup := t.Tuple()
 		if tup != nil {
-			self.tup(s, tup)
+			self.tuple(s, tup)
 		} else {
 			self.tc.kind(s, t)
 		}
