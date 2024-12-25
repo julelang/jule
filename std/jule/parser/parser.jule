@@ -450,12 +450,12 @@ impl parser {
 		ret generics
 	}
 
-	fn buildSelfParam(mut self, mut tokens: []&token::Token): &ast::ParamDecl {
+	fn buildSelfParam(mut self, mut tokens: []&token::Token): &ast::Param {
 		if len(tokens) == 0 {
 			ret nil
 		}
 
-		mut param := new(ast::ParamDecl)
+		mut param := new(ast::Param)
 
 		// Detects mut keyword.
 		if tokens[0].Id == token::Id.Mut {
@@ -490,7 +490,7 @@ impl parser {
 		ret param
 	}
 
-	fn paramTypeBegin(mut self, mut &param: &ast::ParamDecl, mut &i: int, &tokens: []&token::Token) {
+	fn paramTypeBegin(mut self, mut &param: &ast::Param, mut &i: int, &tokens: []&token::Token) {
 		for i < len(tokens); i++ {
 			token := tokens[i]
 			if token.Id != token::Id.TripleDot {
@@ -505,7 +505,7 @@ impl parser {
 		}
 	}
 
-	fn buildParamType(mut &self, mut &param: &ast::ParamDecl, mut &tokens: []&token::Token) {
+	fn buildParamType(mut &self, mut &param: &ast::Param, mut &tokens: []&token::Token) {
 		mut i := 0
 		self.paramTypeBegin(param, i, tokens)
 		if i >= len(tokens) {
@@ -518,7 +518,7 @@ impl parser {
 		}
 	}
 
-	fn buildParamBody(mut &self, mut &param: &ast::ParamDecl, mut tokens: []&token::Token) {
+	fn buildParamBody(mut &self, mut &param: &ast::Param, mut tokens: []&token::Token) {
 		mut tok := tokens[0]
 		if len(tokens) == 1 {
 			// Just identifier token.
@@ -538,8 +538,8 @@ impl parser {
 		self.buildParamType(param, tokens)
 	}
 
-	fn buildParam(mut &self, mut tokens: []&token::Token): &ast::ParamDecl {
-		mut param := &ast::ParamDecl{
+	fn buildParam(mut &self, mut tokens: []&token::Token): &ast::Param {
+		mut param := &ast::Param{
 			Token: tokens[0],
 		}
 
@@ -581,7 +581,7 @@ impl parser {
 		ret param
 	}
 
-	fn checkParams(mut self, mut &params: []&ast::ParamDecl) {
+	fn checkParams(mut self, mut &params: []&ast::Param) {
 		for (_, mut param) in params {
 			if param.IsSelf() || param.Kind != nil {
 				continue
@@ -601,14 +601,14 @@ impl parser {
 		}
 	}
 
-	fn buildParams(mut &self, mut &tokens: []&token::Token, method: bool): []&ast::ParamDecl {
+	fn buildParams(mut &self, mut &tokens: []&token::Token, method: bool): []&ast::Param {
 		mut parts, errs := parts(tokens, token::Id.Comma, true)
 		self.errors = append(self.errors, errs...)
 		if len(parts) == 0 {
 			ret nil
 		}
 
-		let mut params: []&ast::ParamDecl = nil
+		let mut params: []&ast::Param = nil
 		if method && len(parts) > 0 {
 			mut param := self.buildSelfParam(parts[0])
 			if param != nil && param.IsSelf() {
