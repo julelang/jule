@@ -625,7 +625,7 @@ impl exprCoder {
 		self.oc.write(")")
 	}
 
-	fn args(mut &self, mut &m: &sema::FnCallExpr) {
+	fn args(mut &self, mut &m: &sema::FuncCallExpr) {
 		mut j := 0
 		if m.Func.Owner != nil && !m.Func.Decl.Statically ||
 			len(m.Func.Params) > 0 && m.Func.Params[0].Decl.IsSelf() {
@@ -671,7 +671,7 @@ impl exprCoder {
 		self.possibleRefExpr(expr)
 	}
 
-	fn pushCallInf(mut &self, &m: &sema::FnCallExpr) {
+	fn pushCallInf(mut &self, &m: &sema::FuncCallExpr) {
 		if env::Production || !m.Func.Anon {
 			self.oc.write("(")
 			ret
@@ -694,7 +694,7 @@ impl exprCoder {
 		}
 	}
 
-	fn isWrapped(mut &self, mut &m: &sema::FnCallExpr): bool {
+	fn isWrapped(mut &self, mut &m: &sema::FuncCallExpr): bool {
 		if !m.Func.IsBuiltin() && len(m.Func.Decl.Params) > 0 && m.Func.Decl.Params[0].IsSelf() {
 			match type m.Expr {
 			| &sema::StructSubIdentExpr:
@@ -737,7 +737,7 @@ impl exprCoder {
 		}
 	}
 
-	fn pureFuncCall(mut &self, mut &m: &sema::FnCallExpr) {
+	fn pureFuncCall(mut &self, mut &m: &sema::FuncCallExpr) {
 		wrapped := self.isWrapped(m)
 		self.modelForCall(m.Expr)
 		if !m.Func.IsBuiltin() {
@@ -831,7 +831,7 @@ impl exprCoder {
 		}
 	}
 
-	fn coFuncCall(mut &self, mut &m: &sema::FnCallExpr) {
+	fn coFuncCall(mut &self, mut &m: &sema::FuncCallExpr) {
 		self.oc.write("{\n")
 		self.oc.addIndent()
 		self.oc.indent()
@@ -930,7 +930,7 @@ impl exprCoder {
 		self.oc.write("};")
 	}
 
-	fn funcCall(mut &self, mut m: &sema::FnCallExpr, ignoreExceptional: bool) {
+	fn funcCall(mut &self, mut m: &sema::FuncCallExpr, ignoreExceptional: bool) {
 		if m.IsCo {
 			// Do not check for exceptionals,
 			// exceptional functions cannot be called with co.
@@ -1803,8 +1803,8 @@ impl exprCoder {
 			self.allocStructure((&sema::AllocStructLitExpr)(m))
 		| &sema::CastingExpr:
 			self.casting((&sema::CastingExpr)(m))
-		| &sema::FnCallExpr:
-			self.funcCall((&sema::FnCallExpr)(m), false)
+		| &sema::FuncCallExpr:
+			self.funcCall((&sema::FuncCallExpr)(m), false)
 		| &sema::SliceExpr:
 			self.slice((&sema::SliceExpr)(m))
 		| &sema::ArrayExpr:

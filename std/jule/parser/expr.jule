@@ -326,8 +326,8 @@ impl exprBuilder {
 		ret generics
 	}
 
-	fn buildFnCall(mut self, mut &token: &token::Token, mut &expr: []&token::Token, mut &args: []&token::Token): &ast::FnCallExpr {
-		ret &ast::FnCallExpr{
+	fn buildFuncCall(mut self, mut &token: &token::Token, mut &expr: []&token::Token, mut &args: []&token::Token): &ast::FuncCallExpr {
+		ret &ast::FuncCallExpr{
 			Token: token,
 			Expr: self.buildFromTokens(expr),
 			Args: self.buildArgs(args),
@@ -353,7 +353,7 @@ impl exprBuilder {
 		if isAnonFnHead(exprTokens) {
 			ret self.buildType(tokens)
 		}
-		ret self.buildFnCall(token, exprTokens, argsTokens)
+		ret self.buildFuncCall(token, exprTokens, argsTokens)
 	}
 
 	fn buildUnsafeExpr(mut self, mut tokens: []&token::Token): &ast::UnsafeExpr {
@@ -564,11 +564,11 @@ impl exprBuilder {
 				ret nil
 			}
 			match type d {
-			| &ast::FnCallExpr:
+			| &ast::FuncCallExpr:
 				tokens = tokens[len(exprTokens)+1:] // Get range: {...}
 				mut i := 0
 				mut rangeTokens := range(i, token::Id.LBrace, token::Id.RBrace, tokens)
-				mut model := (&ast::FnCallExpr)(d)
+				mut model := (&ast::FuncCallExpr)(d)
 				if model.Ignored() {
 					self.pushErr(elseToken, build::LogMsg.InvalidSyntax)
 					self.pushSuggestion(build::LogMsg.JustIgnoreOrHandle)
@@ -698,8 +698,8 @@ impl exprBuilder {
 			ret nil
 		}
 		match type d {
-		| &ast::FnCallExpr:
-			(&ast::FnCallExpr)(d).Exception = &ast::ScopeTree{
+		| &ast::FuncCallExpr:
+			(&ast::FuncCallExpr)(d).Exception = &ast::ScopeTree{
 				Deferred: true,
 			}
 			ret d

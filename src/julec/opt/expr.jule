@@ -814,7 +814,7 @@ impl exprOptimizer {
 		scopt.optimize()
 	}
 
-	fn optimizeStrBuilderCall(self, mut &m: &sema::FnCallExpr) {
+	fn optimizeStrBuilderCall(self, mut &m: &sema::FuncCallExpr) {
 		// Some strings::Builder methods are not real-exceptional implementations.
 		// They just implements interfaces and not throws any exceptional.
 		// Therefore we can remove exceptional handling algorithms for these method calls.
@@ -864,7 +864,7 @@ impl exprOptimizer {
 			// len(([]rune)(str))
 			// simplify expression to runtime::runeCount, avoid making rune slice allocation
 			mut func := meta::Program.Runtime.RuneCount
-			*self.model = &sema::FnCallExpr{
+			*self.model = &sema::FuncCallExpr{
 				Func: func,
 				Expr: func,
 				Args: [c.Expr.Model],
@@ -872,7 +872,7 @@ impl exprOptimizer {
 		}
 	}
 
-	fn funcCall(self, mut m: &sema::FnCallExpr) {
+	fn funcCall(self, mut m: &sema::FuncCallExpr) {
 		self.args(m.Func.Params, m.Args)
 		if m.Except != nil {
 			// Handle exceptional handler scope as child.
@@ -930,8 +930,8 @@ impl exprOptimizer {
 			self.structureLit((&sema::StructLitExpr)(m))
 		| &sema::CastingExpr:
 			self.casting((&sema::CastingExpr)(m))
-		| &sema::FnCallExpr:
-			self.funcCall((&sema::FnCallExpr)(m))
+		| &sema::FuncCallExpr:
+			self.funcCall((&sema::FuncCallExpr)(m))
 		| &sema::BuiltinLenCallExpr:
 			self.lenCall((&sema::BuiltinLenCallExpr)(m))
 		| &sema::IndexingExpr:

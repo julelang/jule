@@ -2038,7 +2038,7 @@ impl eval {
 		}
 	}
 
-	fn callTypeFn(mut &self, mut &fc: &ast::FnCallExpr, mut &d: &Data) {
+	fn callTypeFunc(mut &self, mut &fc: &ast::FuncCallExpr, mut &d: &Data) {
 		if len(fc.Args) < 1 {
 			self.pushErr(fc.Token, build::LogMsg.MissingExprFor, "v")
 		} else if len(fc.Args) > 1 {
@@ -2064,7 +2064,7 @@ impl eval {
 		}
 	}
 
-	fn callBuiltinFn(mut &self, mut &fc: &ast::FnCallExpr, mut &d: &Data) {
+	fn callBuiltinFunc(mut &self, mut &fc: &ast::FuncCallExpr, mut &d: &Data) {
 		if !fc.Unhandled() { // Exceptional handled?
 			// Built-in functions are not exceptional.
 			self.pushErr(fc.Token, build::LogMsg.HandledUnexceptional)
@@ -2095,12 +2095,12 @@ impl eval {
 		}
 	}
 
-	fn processExceptionalHandler(mut self, mut &f: &FnIns, mut &fc: &ast::FnCallExpr, mut &d: &Data) {
+	fn processExceptionalHandler(mut self, mut &f: &FnIns, mut &fc: &ast::FuncCallExpr, mut &d: &Data) {
 		resultNeeded := !self.target.ignored && !f.Decl.IsVoid()
 		let mut csc: &scopeChecker = nil
 		let mut ch: &Scope = nil
 
-		mut model := (&FnCallExpr)(d.Model)
+		mut model := (&FuncCallExpr)(d.Model)
 
 		// self.lookup is always scopeChecker because exceptionals are
 		// not allowed in global scope.
@@ -2122,10 +2122,10 @@ impl eval {
 		}
 	}
 
-	fn callFn(mut &self, mut &fc: &ast::FnCallExpr, mut &d: &Data) {
+	fn callFunc(mut &self, mut &fc: &ast::FuncCallExpr, mut &d: &Data) {
 		mut f := d.Type.Fn()
 		if f.IsBuiltin() {
-			self.callBuiltinFn(fc, d)
+			self.callBuiltinFunc(fc, d)
 			ret
 		}
 
@@ -2234,7 +2234,7 @@ impl eval {
 			d.Lvalue = false
 		}
 
-		mut model := &FnCallExpr{
+		mut model := &FuncCallExpr{
 			Token: fc.Token,
 			Func: f,
 			Expr: callModel,
@@ -2271,7 +2271,7 @@ impl eval {
 		}
 	}
 
-	fn evalFnCall(mut &self, mut fc: &ast::FnCallExpr): &Data {
+	fn evalFuncCall(mut &self, mut fc: &ast::FuncCallExpr): &Data {
 		mut prefix := self.prefix
 		self.prefix = nil
 		defer { self.prefix = prefix }
@@ -2291,7 +2291,7 @@ impl eval {
 		}
 
 		if d.Decl {
-			self.callTypeFn(fc, d)
+			self.callTypeFunc(fc, d)
 			ret d
 		}
 
@@ -2300,7 +2300,7 @@ impl eval {
 			ret nil
 		}
 
-		self.callFn(fc, d)
+		self.callFunc(fc, d)
 		ret d
 	}
 
@@ -3225,8 +3225,8 @@ impl eval {
 			ret self.evalStructLit((&ast::StructLit)(kind))
 		| &ast::Type:
 			ret self.evalType((&ast::Type)(kind))
-		| &ast::FnCallExpr:
-			ret self.evalFnCall((&ast::FnCallExpr)(kind))
+		| &ast::FuncCallExpr:
+			ret self.evalFuncCall((&ast::FuncCallExpr)(kind))
 		| &ast::SubIdentExpr:
 			ret self.evalSubIdent((&ast::SubIdentExpr)(kind))
 		| &ast::TupleExpr:
@@ -4594,7 +4594,7 @@ fn makeStructLitAlloc(mut &d: &Data, mut &lit: &StructLitExpr) {
 	}
 }
 
-fn buildErrorVar(mut &s: &Scope, mut &fc: &ast::FnCallExpr): &Var {
+fn buildErrorVar(mut &s: &Scope, mut &fc: &ast::FuncCallExpr): &Var {
 	ret &Var{
 		Used: true,
 		Reference: false,
