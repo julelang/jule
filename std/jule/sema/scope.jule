@@ -17,7 +17,7 @@ enum Stmt: type {
 	&InfIter,
 	&WhileIter,
 	&RangeIter,
-	&ContSt,
+	&Continue,
 	&Label,
 	&Goto,
 	&Postfix,
@@ -113,7 +113,7 @@ struct RangeIter {
 }
 
 // Continue statement.
-struct ContSt {
+struct Continue {
 	It: uintptr
 }
 
@@ -980,14 +980,14 @@ impl scopeChecker {
 		ret false
 	}
 
-	fn checkContValidScope(mut &self, c: &ast::ContSt): &ContSt {
+	fn checkContValidScope(mut &self, c: &ast::Continue): &Continue {
 		if self.isDeferred() {
 			self.s.pushErr(c.Token, build::LogMsg.ContinueAtOutOfValidScope)
 			ret nil
 		}
 
 		if c.Label != nil {
-			ret new(ContSt)
+			ret new(Continue)
 		}
 
 		mut scope := self
@@ -997,14 +997,14 @@ impl scopeChecker {
 			scope = scope.parent
 			goto iter
 		| scope.it != 0:
-			ret &ContSt{It: scope.it}
+			ret &Continue{It: scope.it}
 		}
 
 		self.s.pushErr(c.Token, build::LogMsg.ContinueAtOutOfValidScope)
 		ret nil
 	}
 
-	fn checkCont(mut &self, c: &ast::ContSt) {
+	fn checkCont(mut &self, c: &ast::Continue) {
 		mut cont := self.checkContValidScope(c)
 		if cont == nil {
 			ret
@@ -1980,8 +1980,8 @@ impl scopeChecker {
 			self.checkConditional((&ast::Conditional)(node))
 		| &ast::Iter:
 			self.checkIter((&ast::Iter)(node))
-		| &ast::ContSt:
-			self.checkCont((&ast::ContSt)(node))
+		| &ast::Continue:
+			self.checkCont((&ast::Continue)(node))
 		| &ast::Label:
 			self.checkLabel((&ast::Label)(node))
 		| &ast::Goto:
@@ -2040,7 +2040,7 @@ impl scopeChecker {
 			}
 		| &ast::Goto
 		| &ast::Break
-		| &ast::ContSt
+		| &ast::Continue
 		| &ast::Ret:
 			self.checkNode(stmt.Data)
 		|:
