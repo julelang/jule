@@ -11,7 +11,7 @@ struct scopeDeadCode {
 	s:      &sema::Scope
 	i:      int // Position.
 	labels: &[]&sema::Label
-	gotos:  &[]&sema::GotoSt
+	gotos:  &[]&sema::Goto
 	except: bool
 }
 
@@ -66,7 +66,7 @@ impl scopeDeadCode {
 		}
 	}
 
-	fn pushGoto(mut &self, mut gt: &sema::GotoSt) {
+	fn pushGoto(mut &self, mut gt: &sema::Goto) {
 		mut i := 0
 		for i < len(*self.labels); i++ {
 			if gt.Ident == (*self.labels)[i].Ident {
@@ -197,8 +197,8 @@ impl scopeDeadCode {
 			// Remove followed statements of the return statement.
 			// Unreachable code.
 			self.eliminateFollowed()
-		| &sema::GotoSt:
-			self.pushGoto((&sema::GotoSt)(st))
+		| &sema::Goto:
+			self.pushGoto((&sema::Goto)(st))
 			// Remove followed statements of the return statement.
 			// Unreachable code.
 			self.eliminateFollowed()
@@ -217,11 +217,11 @@ impl scopeDeadCode {
 
 fn eliminateDeadCodeOfScope(mut s: &sema::Scope) {
 	labels := make([]&sema::Label, 0, 1<<4)
-	gotos := make([]&sema::GotoSt, 0, 1<<4)
+	gotos := make([]&sema::Goto, 0, 1<<4)
 	mut sdc := &scopeDeadCode{
 		s: s,
 		labels: unsafe { (&[]&sema::Label)(&labels) },
-		gotos: unsafe { (&[]&sema::GotoSt)(&gotos) },
+		gotos: unsafe { (&[]&sema::Goto)(&gotos) },
 	}
 	unsafe { sdc.optimizeStmts() }
 }

@@ -19,7 +19,7 @@ enum Stmt: type {
 	&RangeIter,
 	&ContSt,
 	&Label,
-	&GotoSt,
+	&Goto,
 	&Postfix,
 	&Assign,
 	&MultiAssign,
@@ -41,7 +41,7 @@ fn newScopeCheckerBase(mut &s: &sema, mut owner: &FnIns): &scopeChecker {
 fn newScopeChecker(mut &s: &sema, mut owner: &FnIns): &scopeChecker {
 	mut base := newScopeCheckerBase(s, owner)
 	base.labels = new([]&scopeLabel, nil)
-	base.gotos = new([]&GotoSt, nil)
+	base.gotos = new([]&Goto, nil)
 	ret base
 }
 
@@ -132,7 +132,7 @@ struct Label {
 }
 
 // Goto statement.
-struct GotoSt {
+struct Goto {
 	Ident: str
 	Token: &token::Token
 	Label: &Label
@@ -260,7 +260,7 @@ struct scopeChecker {
 	cse:        uintptr
 	captured:   &[]&Var        // Anonymous function's captured variables will be stored here.
 	labels:     &[]&scopeLabel // All labels of all scopes.
-	gotos:      &[]&GotoSt     // All gotos of all scopes.
+	gotos:      &[]&Goto       // All gotos of all scopes.
 	i:          int            // Index of current statement.
 }
 
@@ -1070,8 +1070,8 @@ impl scopeChecker {
 		})
 	}
 
-	fn pushGoto(mut &self, mut gt: &ast::GotoSt) {
-		mut st := &GotoSt{
+	fn pushGoto(mut &self, mut gt: &ast::Goto) {
+		mut st := &Goto{
 			Token: gt.Label,
 			Ident: gt.Label.Kind,
 			Scope: self.scope,
@@ -1984,8 +1984,8 @@ impl scopeChecker {
 			self.checkCont((&ast::ContSt)(node))
 		| &ast::LabelSt:
 			self.checkLabel((&ast::LabelSt)(node))
-		| &ast::GotoSt:
-			self.pushGoto((&ast::GotoSt)(node))
+		| &ast::Goto:
+			self.pushGoto((&ast::Goto)(node))
 		| &ast::AssignSt:
 			self.checkAssignSt((&ast::AssignSt)(node))
 		| &ast::Match:
@@ -2038,7 +2038,7 @@ impl scopeChecker {
 			|:
 				ret
 			}
-		| &ast::GotoSt
+		| &ast::Goto
 		| &ast::BreakSt
 		| &ast::ContSt
 		| &ast::Ret:
@@ -2073,7 +2073,7 @@ impl scopeChecker {
 		}
 	}
 
-	fn checkGoto(mut self, mut &gt: &GotoSt, mut &label: &scopeLabel) {
+	fn checkGoto(mut self, mut &gt: &Goto, mut &label: &scopeLabel) {
 		mut n := 0
 		if gt.Scope == label.node.Scope {
 			// Scopes are same and label at above, so it is safe.
