@@ -12,7 +12,7 @@ use "std/jule/sema"
 
 struct liveTable {
 	vars:    []&sema::Var
-	fns:     []&sema::FnIns
+	fns:     []&sema::FuncIns
 	structs: []&sema::StructIns
 	traits:  []&sema::Trait
 }
@@ -32,7 +32,7 @@ impl ObjectDeadCode {
 	fn isLive[T](mut &self, &t: T): bool {
 		let mut live: []T = nil
 		const match type T {
-		| &sema::FnIns:
+		| &sema::FuncIns:
 			live = self.live.fns
 		| &sema::Var:
 			live = self.live.vars
@@ -53,7 +53,7 @@ impl ObjectDeadCode {
 		const match type T {
 		| &sema::Var:
 			self.live.vars = append(self.live.vars, t)
-		| &sema::FnIns:
+		| &sema::FuncIns:
 			self.live.fns = append(self.live.fns, t)
 		| &sema::StructIns:
 			self.live.structs = append(self.live.structs, t)
@@ -71,13 +71,13 @@ impl ObjectDeadCode {
 		allLive := isAllMethodsLive(s.Decl)
 		for (_, mut m) in s.Methods {
 			for (_, mut ins) in m.Instances {
-				if self.isLive[&sema::FnIns](ins) {
+				if self.isLive[&sema::FuncIns](ins) {
 					continue
 				}
 
 				// Push all methods as live if s is built-in map type.
 				if allLive {
-					self.pushLive[&sema::FnIns](ins)
+					self.pushLive[&sema::FuncIns](ins)
 					self.setReferencesAsLive(ins.Refers)
 					continue
 				}
@@ -87,7 +87,7 @@ impl ObjectDeadCode {
 				// Other methods will be marked as live by referenced defines,
 				// no need for special tracking algorithm to caught.
 				if obj::IsTraitMethod(s, ins) {
-					self.pushLive[&sema::FnIns](ins)
+					self.pushLive[&sema::FuncIns](ins)
 					self.setReferencesAsLive(ins.Refers)
 				}
 
@@ -99,7 +99,7 @@ impl ObjectDeadCode {
 				mut _str := s.FindMethod("Str", Binded)
 				if _str != nil && sema::FuncPattern.Str(_str) {
 					mut fins := _str.Instances[0]
-					self.pushLive[&sema::FnIns](fins)
+					self.pushLive[&sema::FuncIns](fins)
 					self.setReferencesAsLive(fins.Refers)
 				}
 			}
@@ -122,16 +122,16 @@ impl ObjectDeadCode {
 				self.pushLive[&sema::Trait](t)
 				for (_, mut ins) in t.Methods {
 					for (_, mut mins) in ins.Instances {
-						if self.isLive[&sema::FnIns](mins) {
+						if self.isLive[&sema::FuncIns](mins) {
 							continue
 						}
-						self.pushLive[&sema::FnIns](mins)
+						self.pushLive[&sema::FuncIns](mins)
 						self.setReferencesAsLive(mins.Refers)
 					}
 				}
-			| &sema::FnIns:
-				mut f := (&sema::FnIns)(ref)
-				if self.isLive[&sema::FnIns](f) {
+			| &sema::FuncIns:
+				mut f := (&sema::FuncIns)(ref)
+				if self.isLive[&sema::FuncIns](f) {
 					break
 				}
 				if f.Owner != nil && !f.Decl.Statically {
@@ -140,7 +140,7 @@ impl ObjectDeadCode {
 						self.setReferencesAsLive(f.Owner.Refers)
 					}
 				}
-				self.pushLive[&sema::FnIns](f)
+				self.pushLive[&sema::FuncIns](f)
 				self.setReferencesAsLive(f.Refers)
 			| &sema::Var:
 				mut v := (&sema::Var)(ref)
@@ -161,8 +161,8 @@ impl ObjectDeadCode {
 			for (_, mut f) in file.Funcs {
 				if f.Ident == jule::InitFn {
 					mut ins := f.Instances[0]
-					if !self.isLive[&sema::FnIns](ins) {
-						self.pushLive[&sema::FnIns](ins)
+					if !self.isLive[&sema::FuncIns](ins) {
+						self.pushLive[&sema::FuncIns](ins)
 					}
 					self.setReferencesAsLive(ins.Refers)
 				}
@@ -187,8 +187,8 @@ impl ObjectDeadCode {
 			for (_, mut f) in file.Funcs {
 				if obj::HasDirective(f.Directives, build::Directive.Export) {
 					for (_, mut ins) in f.Instances {
-						if !self.isLive[&sema::FnIns](ins) {
-							self.pushLive[&sema::FnIns](ins)
+						if !self.isLive[&sema::FuncIns](ins) {
+							self.pushLive[&sema::FuncIns](ins)
 							self.setReferencesAsLive(ins.Refers)
 						}
 					}
@@ -205,10 +205,10 @@ impl ObjectDeadCode {
 				self.pushStructAsLive(ins)
 				for (_, mut m) in ins.Methods {
 					for (_, mut mins) in m.Instances {
-						if self.isLive[&sema::FnIns](mins) {
+						if self.isLive[&sema::FuncIns](mins) {
 							continue
 						}
-						self.pushLive[&sema::FnIns](mins)
+						self.pushLive[&sema::FuncIns](mins)
 						self.setReferencesAsLive(mins.Refers)
 					}
 				}
@@ -217,8 +217,8 @@ impl ObjectDeadCode {
 				for (_, mut f) in file.Funcs {
 					if obj::HasDirective(f.Directives, build::Directive.Test) {
 						mut ins := f.Instances[0]
-						if !self.isLive[&sema::FnIns](ins) {
-							self.pushLive[&sema::FnIns](ins)
+						if !self.isLive[&sema::FuncIns](ins) {
+							self.pushLive[&sema::FuncIns](ins)
 						}
 						self.setReferencesAsLive(ins.Refers)
 					}
@@ -239,8 +239,8 @@ impl ObjectDeadCode {
 		mut main := self.ir.Main.FindFn(jule::EntryPoint, false)
 		if main != nil {
 			mut ins := main.Instances[0]
-			if !self.isLive[&sema::FnIns](ins) {
-				self.pushLive[&sema::FnIns](ins)
+			if !self.isLive[&sema::FuncIns](ins) {
+				self.pushLive[&sema::FuncIns](ins)
 			}
 			self.setReferencesAsLive(ins.Refers)
 		}
@@ -265,7 +265,7 @@ impl ObjectDeadCode {
 			mut j := 0
 			for j < len(f.Instances) {
 				ins := f.Instances[j]
-				if self.isLive[&sema::FnIns](ins) {
+				if self.isLive[&sema::FuncIns](ins) {
 					j++
 					continue
 				}

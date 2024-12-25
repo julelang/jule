@@ -62,7 +62,7 @@ struct Func {
 
 	// Function instances for each unique type combination of function call.
 	// Nil if function is never used.
-	Instances: []&FnIns
+	Instances: []&FuncIns
 }
 
 impl Func {
@@ -113,8 +113,8 @@ impl Func {
 	}
 
 	// Force to new instance.
-	fn instanceForce(mut &self): &FnIns {
-		mut ins := &FnIns{
+	fn instanceForce(mut &self): &FuncIns {
+		mut ins := &FuncIns{
 			Decl: self,
 			Scope: new(Scope),
 			Refers: ReferenceStack.new(),
@@ -132,7 +132,7 @@ impl Func {
 		ret ins
 	}
 
-	fn instance(mut &self): &FnIns {
+	fn instance(mut &self): &FuncIns {
 		// Returns already created instance for just one unique combination.
 		if len(self.Generics) == 0 && len(self.Instances) == 1 {
 			ret self.Instances[0]
@@ -142,7 +142,7 @@ impl Func {
 
 	// Appends function instance.
 	// Returns instance if already instance is already exist, nil if not.
-	fn appendInstance(mut self, mut &ins: &FnIns): &FnIns {
+	fn appendInstance(mut self, mut &ins: &FuncIns): &FuncIns {
 		if len(self.Generics) == 0 {
 			// Skip already created instance for just one unique combination.
 			if len(self.Instances) == 1 {
@@ -208,7 +208,7 @@ impl ParamIns {
 }
 
 // Function instance.
-struct FnIns {
+struct FuncIns {
 	Owner:    &StructIns
 	Decl:     &Func
 	Generics: []&InsGeneric
@@ -224,7 +224,7 @@ struct FnIns {
 	reloaded: bool
 }
 
-impl Kind for FnIns {
+impl Kind for FuncIns {
 	// Implement: Kind
 	// Returns Fn's type kind as string.
 	fn Str(self): str {
@@ -242,9 +242,9 @@ impl Kind for FnIns {
 	}
 }
 
-impl FnIns {
+impl FuncIns {
 	// Reports whether functions are equals.
-	fn EqualFn(&self, &f: &FnIns): bool {
+	fn EqualFn(&self, &f: &FuncIns): bool {
 		if self.Decl.Exceptional != f.Decl.Exceptional {
 			ret false
 		}
@@ -303,7 +303,7 @@ impl FnIns {
 	}
 
 	// Reports whether functions are equals by trait implementation rules.
-	fn equalTrait(&self, &other: &FnIns): bool {
+	fn equalTrait(&self, &other: &FuncIns): bool {
 		if self.Decl.Public != other.Decl.Public {
 			ret false
 		}
@@ -346,7 +346,7 @@ impl FnIns {
 
 	// Reports whether instances are same.
 	// Returns true if declarations and generics are same.
-	fn Same(self, f: &FnIns): bool {
+	fn Same(self, f: &FuncIns): bool {
 		if self.Decl != f.Decl || len(f.Generics) != len(self.Generics) {
 			ret false
 		}

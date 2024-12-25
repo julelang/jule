@@ -461,7 +461,7 @@ impl eval {
 		ret self._evalStruct(ins)
 	}
 
-	fn evalFnIns(self, mut f: &FnIns): &Data {
+	fn evalFuncIns(self, mut f: &FuncIns): &Data {
 		ret &Data{
 			untyped: true,
 			Type: &Type{
@@ -508,8 +508,8 @@ impl eval {
 				ins = exist
 			}
 		}
-		self.pushReference[&FnIns](ins)
-		ret self.evalFnIns(ins)
+		self.pushReference[&FuncIns](ins)
+		ret self.evalFuncIns(ins)
 	}
 
 	fn pushIllegalCycleError(mut self, &v1: &Var, &v2: &Var, mut &message: strings::Builder) {
@@ -744,8 +744,8 @@ impl eval {
 			if f.Ident != jule::InitFn {
 				ret self.evalFunc(f, ident)
 			}
-		| &FnIns:
-			ret self.evalFnIns((&FnIns)(def))
+		| &FuncIns:
+			ret self.evalFuncIns((&FuncIns)(def))
 		| &TypeAlias:
 			ret self.evalTypeAlias((&TypeAlias)(def), ident)
 		| &Trait:
@@ -1239,7 +1239,7 @@ impl eval {
 
 	// Checks new generics function instance.
 	// If instance is already exist, f will point to exist instantantiation.
-	fn checkGenericFunc(mut &self, mut &f: &FnIns, mut &et: &token::Token, mut &model: Expr): (ok: bool, exist: bool) {
+	fn checkGenericFunc(mut &self, mut &f: &FuncIns, mut &et: &token::Token, mut &model: Expr): (ok: bool, exist: bool) {
 		mut old := f
 		ok, exist = self.s.checkGenericFunc(f, et)
 		if ok && exist {
@@ -2076,7 +2076,7 @@ impl eval {
 		d.Mutable = true
 	}
 
-	fn checkFnOfConcurrentCall(mut self, &f: &FnIns, errorToken: &token::Token) {
+	fn checkFnOfConcurrentCall(mut self, &f: &FuncIns, errorToken: &token::Token) {
 		if self.isUnsafe() {
 			ret
 		}
@@ -2095,7 +2095,7 @@ impl eval {
 		}
 	}
 
-	fn processExceptionalHandler(mut self, mut &f: &FnIns, mut &fc: &ast::FuncCallExpr, mut &d: &Data) {
+	fn processExceptionalHandler(mut self, mut &f: &FuncIns, mut &fc: &ast::FuncCallExpr, mut &d: &Data) {
 		resultNeeded := !self.target.ignored && !f.Decl.IsVoid()
 		let mut csc: &scopeChecker = nil
 		let mut ch: &Scope = nil
@@ -2349,7 +2349,7 @@ impl eval {
 
 			mut ins := method.instance()
 			ins.Owner = s
-			self.pushReference[&FnIns](ins)
+			self.pushReference[&FuncIns](ins)
 			d.Model = &StructStaticIdentExpr{
 				Structure: s,
 				Expr: d.Model,
@@ -2439,7 +2439,7 @@ impl eval {
 
 		mut ins := m.instance()
 		ins.Owner = s
-		self.pushReference[&FnIns](ins)
+		self.pushReference[&FuncIns](ins)
 		mut model := new(Data, *d)
 		d.Model = &StructSubIdentExpr{
 			Token: tok,
@@ -3907,7 +3907,7 @@ impl binaryEval {
 				if !ok {
 					panic("sema: arrayCmp evaluation failed, this is an implementation mistake")
 				}
-				self.e.pushReference[&FnIns](f)
+				self.e.pushReference[&FuncIns](f)
 			}
 			ret &Data{
 				Type: primBool,
@@ -4771,9 +4771,9 @@ fn castConstByType(&t: str, mut &d: &Data) {
 	}
 }
 
-fn updateModelToGenericIns(mut &m: Expr, mut &f: &FnIns) {
+fn updateModelToGenericIns(mut &m: Expr, mut &f: &FuncIns) {
 	match type m {
-	| &FnIns:
+	| &FuncIns:
 		m = f
 	| &StructSubIdentExpr:
 		(&StructSubIdentExpr)(m).Method = f

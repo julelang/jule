@@ -99,12 +99,12 @@ struct ObjectCoder {
 	resultMap:    map[str]bool
 	anyTypeMap:   []&sema::Type
 	traitCastMap: []traitCast
-	coSpawnMap:   []&sema::FnIns
+	coSpawnMap:   []&sema::FuncIns
 	traitMap:     []&traitHash
 
 	// Pairs for methods and structure instances.
 	// Used to avoid duplicated wrapper function generation.
-	traitMetMap: map[&sema::FnIns][]uintptr
+	traitMetMap: map[&sema::FuncIns][]uintptr
 
 	ec: &exprCoder
 	sc: &scopeCoder
@@ -164,7 +164,7 @@ impl ObjectCoder {
 		ret -1
 	}
 
-	fn pushCoSpawn(mut &self, mut f: &sema::FnIns): int {
+	fn pushCoSpawn(mut &self, mut f: &sema::FuncIns): int {
 		for i, sf in self.coSpawnMap {
 			if len(sf.Params) == len(f.Params) {
 				for j, sp in sf.Params {
@@ -425,7 +425,7 @@ impl ObjectCoder {
 		ret i
 	}
 
-	fn pushResultIns(mut &self, mut &f: &sema::FnIns) {
+	fn pushResultIns(mut &self, mut &f: &sema::FuncIns) {
 		s := str(self.tc.rc.code(f.Result))
 		_, ok := self.resultMap[s]
 		if ok {
@@ -789,7 +789,7 @@ impl ObjectCoder {
 	// The ident parameter means this function is anon, mostly.
 	// But this parameter not only for anonymous functions.
 	// It also useable as custom identifiers for functions.
-	fn funcHead(mut &self, mut &buf: strings::Builder, mut &f: &sema::FnIns, ptr: bool, ident: str) {
+	fn funcHead(mut &self, mut &buf: strings::Builder, mut &f: &sema::FuncIns, ptr: bool, ident: str) {
 		if !ptr && opt::Inline && !f.Decl.IsEntryPoint() {
 			buf.WriteStr("inline ")!
 		}
@@ -808,7 +808,7 @@ impl ObjectCoder {
 		}
 	}
 
-	fn funcDeclIns(mut &self, mut &f: &sema::FnIns, ptr: bool) {
+	fn funcDeclIns(mut &self, mut &f: &sema::FuncIns, ptr: bool) {
 		self.meta.concurrent = self.meta.concurrent || f.CalledCo
 		self.indent()
 		self.funcHead(self.Buf, f, ptr, "")
@@ -878,7 +878,7 @@ impl ObjectCoder {
 		identCoder.param(buf, p.Decl)
 	}
 
-	fn paramsIns(mut &self, mut &buf: strings::Builder, mut &f: &sema::FnIns) {
+	fn paramsIns(mut &self, mut &buf: strings::Builder, mut &f: &sema::FuncIns) {
 		if !f.AsAnon && len(f.Params) == 0 {
 			buf.WriteStr("(void)")!
 			ret
@@ -974,7 +974,7 @@ impl ObjectCoder {
 		}
 	}
 
-	fn funcIns(mut &self, mut f: &sema::FnIns, ident: str) {
+	fn funcIns(mut &self, mut f: &sema::FuncIns, ident: str) {
 		self.funcHead(self.Buf, f, false, ident)
 		self.paramsIns(self.Buf, f)
 		self.write(" ")
@@ -990,7 +990,7 @@ impl ObjectCoder {
 		}
 	}
 
-	fn funcTrait(mut &self, &s: &sema::StructIns, mut &f: &sema::FnIns) {
+	fn funcTrait(mut &self, &s: &sema::StructIns, mut &f: &sema::FuncIns) {
 		f.Scope = nil
 
 		mut nident := strings::Builder.New(30)
@@ -1005,7 +1005,7 @@ impl ObjectCoder {
 		f.Params[0].Type = k
 	}
 
-	fn findTraitMetMap(mut &self, mut &m: &sema::Func): (&sema::FnIns, bool) {
+	fn findTraitMetMap(mut &self, mut &m: &sema::Func): (&sema::FuncIns, bool) {
 		mut mins := m.Instances[0]
 		for (mut f, _) in self.traitMetMap {
 			if f.Decl.Public == m.Public &&
