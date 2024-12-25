@@ -26,7 +26,7 @@ enum Stmt: type {
 	&Match,
 	&FallSt,
 	&BreakSt,
-	&RetSt,
+	&Ret,
 	&Select,
 }
 
@@ -228,7 +228,7 @@ struct FallSt {
 }
 
 // Return statement.
-struct RetSt {
+struct Ret {
 	Func: &FnIns
 	Expr: Expr
 }
@@ -1924,12 +1924,12 @@ impl scopeChecker {
 		self.scope.Stmts = append(self.scope.Stmts, brk)
 	}
 
-	fn checkRet(mut &self, mut r: &ast::RetSt) {
+	fn checkRet(mut &self, mut r: &ast::Ret) {
 		if self.isDeferred() {
 			self.s.pushErr(r.Token, build::LogMsg.RetInDeferred)
 		}
 
-		mut rt := &RetSt{
+		mut rt := &Ret{
 			Func: self.getRoot().owner,
 		}
 		self.scope.Stmts = append(self.scope.Stmts, rt)
@@ -1996,8 +1996,8 @@ impl scopeChecker {
 			self.checkFall((&ast::Fall)(node))
 		| &ast::BreakSt:
 			self.checkBreak((&ast::BreakSt)(node))
-		| &ast::RetSt:
-			self.checkRet((&ast::RetSt)(node))
+		| &ast::Ret:
+			self.checkRet((&ast::Ret)(node))
 		| &ast::UseExpr:
 			self.checkUseExpr((&ast::UseExpr)(node))
 		|:
@@ -2041,7 +2041,7 @@ impl scopeChecker {
 		| &ast::GotoSt
 		| &ast::BreakSt
 		| &ast::ContSt
-		| &ast::RetSt:
+		| &ast::Ret:
 			self.checkNode(stmt.Data)
 		|:
 			self.checkNode(stmt.Data)
