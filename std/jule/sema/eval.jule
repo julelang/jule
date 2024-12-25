@@ -1239,7 +1239,7 @@ impl eval {
 
 	// Checks new generics function instance.
 	// If instance is already exist, f will point to exist instantantiation.
-	fn checkGenericFn(mut &self, mut &f: &FnIns, mut &et: &token::Token, mut &model: Expr): (ok: bool, exist: bool) {
+	fn checkGenericFunc(mut &self, mut &f: &FnIns, mut &et: &token::Token, mut &model: Expr): (ok: bool, exist: bool) {
 		mut old := f
 		ok, exist = self.s.checkGenericFn(f, et)
 		if ok && exist {
@@ -1255,14 +1255,14 @@ impl eval {
 		ret
 	}
 
-	fn evalFnGenericFromIndexing(mut &self, mut &d: &Data, mut &i: &ast::IndexingExpr) {
+	fn evalFuncGenericFromIndexing(mut &self, mut &d: &Data, mut &i: &ast::IndexingExpr) {
 		mut generics := make([]&ast::Type, 0, 1<<3)
 		if !self.pushGenericsFromData(generics, i.Index) {
 			d = nil
 			ret
 		}
 
-		mut f := d.Type.Fn()
+		mut f := d.Type.Func()
 		mut genericsLen := 0
 		if f.Decl != nil {
 			genericsLen = len(f.Decl.Generics)
@@ -1287,7 +1287,7 @@ impl eval {
 			ret
 		}
 
-		ok, _ := self.checkGenericFn(f, i.Expr.Token, d.Model)
+		ok, _ := self.checkGenericFunc(f, i.Expr.Token, d.Model)
 		if ok {
 			d.Type.Kind = f
 		} else {
@@ -1311,8 +1311,8 @@ impl eval {
 			ret d
 		}
 
-		if d.Type.Fn() != nil {
-			self.evalFnGenericFromIndexing(d, i)
+		if d.Type.Func() != nil {
+			self.evalFuncGenericFromIndexing(d, i)
 			ret d
 		}
 
@@ -2069,7 +2069,7 @@ impl eval {
 			// Built-in functions are not exceptional.
 			self.pushErr(fc.Token, build::LogMsg.HandledUnexceptional)
 		}
-		d = d.Type.Fn().caller(self, fc, d)
+		d = d.Type.Func().caller(self, fc, d)
 		if d == nil {
 			ret
 		}
@@ -2123,7 +2123,7 @@ impl eval {
 	}
 
 	fn callFunc(mut &self, mut &fc: &ast::FuncCallExpr, mut &d: &Data) {
-		mut f := d.Type.Fn()
+		mut f := d.Type.Func()
 		if f.IsBuiltin() {
 			self.callBuiltinFunc(fc, d)
 			ret
@@ -2218,7 +2218,7 @@ impl eval {
 				d = nil
 				ret
 			}
-			ok, _ = self.checkGenericFn(f, fc.Token, d.Model)
+			ok, _ = self.checkGenericFunc(f, fc.Token, d.Model)
 			if !ok {
 				d = nil
 				ret
@@ -2295,7 +2295,7 @@ impl eval {
 			ret d
 		}
 
-		if d.Type.Fn() == nil {
+		if d.Type.Func() == nil {
 			self.pushErr(fc.Token, build::LogMsg.CallingNonFn)
 			ret nil
 		}
@@ -3255,9 +3255,9 @@ impl eval {
 		}
 
 		match {
-		| d.Type.Fn() != nil:
+		| d.Type.Func() != nil:
 			// Check special cases for functions.
-			mut f := d.Type.Fn()
+			mut f := d.Type.Func()
 			if f.IsBuiltin() {
 				self.s.pushErr(expr.Token, build::LogMsg.BuiltinNotInvoked)
 				break
@@ -4437,7 +4437,7 @@ impl binaryEval {
 	}
 
 	fn checkData(mut self, mut &d: &Data) {
-		f := d.Type.Fn()
+		f := d.Type.Func()
 		if f != nil && f.Decl != nil && f.Decl.IsMethod() {
 			self.e.pushErr(self.op, build::LogMsg.InvalidExprForBinary)
 		}

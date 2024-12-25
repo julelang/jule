@@ -148,7 +148,7 @@ impl Type {
 			if _self.Array() != nil {
 				ret _self.Array().Elem.Comparable()
 			}
-			ret _self.Map() == nil && _self.Slice() == nil && _self.Fn() == nil
+			ret _self.Map() == nil && _self.Slice() == nil && _self.Func() == nil
 		}
 	}
 
@@ -208,7 +208,7 @@ impl Type {
 			}
 
 			ret _self.IsNil() ||
-				_self.Fn() != nil ||
+				_self.Func() != nil ||
 				_self.Sptr() != nil ||
 				_self.Ptr() != nil ||
 				_self.Trait() != nil ||
@@ -326,8 +326,8 @@ impl Type {
 		}
 	}
 
-	// Returns fn type if actual kind is function, nil reference if not.
-	fn Fn(mut self): &FnIns {
+	// Returns function type if actual kind is function, nil reference if not.
+	fn Func(mut self): &FnIns {
 		mut kind := self.ActualKind()
 		match type kind {
 		| &FnIns:
@@ -1894,8 +1894,8 @@ impl identTypeLookup {
 				}
 			}
 			ret false
-		| k.Fn() != nil:
-			mut f := k.Fn()
+		| k.Func() != nil:
+			mut f := k.Func()
 			for (_, mut p) in f.Params {
 				if p.Decl.IsSelf() {
 					continue
@@ -1945,7 +1945,7 @@ fn canGetPtr(mut &d: &Data): bool { ret d.Lvalue }
 
 // Reports whether type has built-in string conversion support.
 fn isBuiltinStrConvertable(mut &t: &Type): bool {
-	ret !t.Void() && t.Fn() == nil && t.Tuple() == nil && !t.comptime()
+	ret !t.Void() && t.Func() == nil && t.Tuple() == nil && !t.comptime()
 }
 
 fn buildPrimType(kind: str): &Prim {
@@ -2007,7 +2007,7 @@ fn applyImplicitCast(mut &s: &sema, mut &dest: &Type, mut &d: &Data,
 
 // Reports whether type is valid for SizeOf/AlignOf functions.
 fn validTypeForXof(mut &t: &Type): bool {
-	ret !t.Void() && t.Fn() == nil && t.Tuple() == nil && !t.comptime()
+	ret !t.Void() && t.Func() == nil && t.Tuple() == nil && !t.comptime()
 }
 
 // Initializes new structure for strict types.
