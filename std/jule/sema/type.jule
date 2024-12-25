@@ -145,8 +145,8 @@ impl Type {
 			if _self.Struct() != nil {
 				ret _self.Struct().Comparable
 			}
-			if _self.Arr() != nil {
-				ret _self.Arr().Elem.Comparable()
+			if _self.Array() != nil {
+				ret _self.Array().Elem.Comparable()
 			}
 			ret _self.Map() == nil && _self.Slice() == nil && _self.Fn() == nil
 		}
@@ -169,8 +169,8 @@ impl Type {
 				p := _self.Prim()
 				ret p.IsAny()
 			}
-			if _self.Arr() != nil {
-				ret _self.Arr().Elem.Mutable()
+			if _self.Array() != nil {
+				ret _self.Array().Elem.Mutable()
 			}
 			ret _self.Slice() != nil ||
 				_self.Ptr() != nil ||
@@ -305,7 +305,7 @@ impl Type {
 	}
 
 	// Returns array type if actual kind is array, nil reference if not.
-	fn Arr(mut self): &Arr {
+	fn Array(mut self): &Arr {
 		mut kind := self.ActualKind()
 		match type kind {
 		| &Arr:
@@ -1455,7 +1455,7 @@ impl typeChecker {
 		match {
 		| elem == nil:
 			ret nil
-		| elem.Arr() != nil && elem.Arr().Auto:
+		| elem.Array() != nil && elem.Array().Auto:
 			self.pushErr(self.errorToken, build::LogMsg.ArrayAutoSized)
 			ret nil
 		}
@@ -1501,7 +1501,7 @@ impl typeChecker {
 		match {
 		| elem == nil:
 			ret nil
-		| elem.Arr() != nil && elem.Arr().Auto:
+		| elem.Array() != nil && elem.Array().Auto:
 			self.pushErr(self.errorToken, build::LogMsg.ArrayAutoSized)
 			ret new(Ptr)
 		}
@@ -1539,7 +1539,7 @@ impl typeChecker {
 		match {
 		| elem == nil:
 			ret nil
-		| elem.Arr() != nil && elem.Arr().Auto:
+		| elem.Array() != nil && elem.Array().Auto:
 			self.pushErr(decl.Elem.Token, build::LogMsg.ArrayAutoSized)
 			ret nil
 		}
@@ -1586,7 +1586,7 @@ impl typeChecker {
 		match {
 		| elem == nil:
 			ret nil
-		| elem.Arr() != nil && elem.Arr().Auto:
+		| elem.Array() != nil && elem.Array().Auto:
 			self.pushErr(decl.Elem.Token, build::LogMsg.ArrayAutoSized)
 			ret nil
 		}
@@ -1879,8 +1879,8 @@ impl identTypeLookup {
 		| k.Slice() != nil:
 			mut slc := k.Slice()
 			ret identTypeLookup.exist(ident, slc.Elem)
-		| k.Arr() != nil:
-			mut arr := k.Arr()
+		| k.Array() != nil:
+			mut arr := k.Array()
 			ret identTypeLookup.exist(ident, arr.Elem)
 		| k.Map() != nil:
 			mut m := k.Map()
@@ -1964,8 +1964,8 @@ fn getStructFromKind(mut k: &Type): &Struct {
 		ret getStructFromKind(k.Sptr().Elem)
 	| k.Slice() != nil:
 		ret getStructFromKind(k.Slice().Elem)
-	| k.Arr() != nil:
-		ret getStructFromKind(k.Arr().Elem)
+	| k.Array() != nil:
+		ret getStructFromKind(k.Array().Elem)
 	| k.Ptr() != nil:
 		// Pass pointers.
 		// Cloning just copies pointer address.

@@ -795,9 +795,9 @@ impl eval {
 		ret d
 	}
 
-	fn evalArr(mut &self, mut s: &ast::SliceExpr): &Data {
+	fn evalArray(mut &self, mut s: &ast::SliceExpr): &Data {
 		// Arrays always has type prefixes.
-		mut pt := self.prefix.Arr()
+		mut pt := self.prefix.Array()
 
 		mut arr := &Arr{
 			Auto: false,
@@ -913,8 +913,8 @@ impl eval {
 	fn evalSliceExpr(mut &self, mut s: &ast::SliceExpr): (d: &Data) {
 		if self.prefix != nil {
 			match {
-			| self.prefix.Arr() != nil:
-				d = self.evalArr(s)
+			| self.prefix.Array() != nil:
+				d = self.evalArray(s)
 			| self.prefix.Slice() != nil:
 				mut pt := self.prefix.Slice()
 				d = self.evalExpSlice(s, pt.Elem, nil)
@@ -985,7 +985,7 @@ impl eval {
 	}
 
 	fn indexingArr(mut self, mut &d: &Data, mut &index: &Data, mut &i: &ast::IndexingExpr) {
-		mut arr := d.Type.Arr()
+		mut arr := d.Type.Array()
 		d.Type = arr.Elem
 		self.checkIntegerIndexingByData(index, i.Token)
 		d.Lvalue = true
@@ -1092,7 +1092,7 @@ impl eval {
 		| d.Type.Ptr() != nil:
 			self.indexingPtr(d, index, i)
 			ret
-		| d.Type.Arr() != nil:
+		| d.Type.Array() != nil:
 			self.indexingArr(d, index, i)
 			ret
 		| d.Type.Slice() != nil:
@@ -1392,7 +1392,7 @@ impl eval {
 	}
 
 	fn slicingArr(self, mut &d: &Data) {
-		mut elemType := d.Type.Arr().Elem
+		mut elemType := d.Type.Array().Elem
 		d.Type = &Type{
 			Kind: &Slc{
 				Elem: elemType,
@@ -1446,7 +1446,7 @@ impl eval {
 
 	fn checkSlicing(mut self, mut &d: &Data, &l: &Data, &r: &Data, &s: &ast::SlicingExpr) {
 		match {
-		| d.Type.Arr() != nil:
+		| d.Type.Array() != nil:
 			self.slicingArr(d)
 			ret
 		| d.Type.Slice() != nil:
@@ -3891,7 +3891,7 @@ impl binaryEval {
 		}
 	}
 
-	fn evalArr(mut self): &Data {
+	fn evalArray(mut self): &Data {
 		if !self.checkTypeCompatibility() {
 			ret nil
 		}
@@ -3902,7 +3902,7 @@ impl binaryEval {
 			if self.e.s.meta.runtime != nil {
 				// Add instance to relevant runtime function for array element type if not exist.
 				mut f := runtimeFindFn(self.e.s.meta.runtime, runtimeFunc.arrayCmp).instanceForce()
-				f.Generics = append(f.Generics, &InsGeneric{Type: self.l.Type.Arr().Elem})
+				f.Generics = append(f.Generics, &InsGeneric{Type: self.l.Type.Array().Elem})
 				ok, _ := self.e.s.checkGenericFn(f, self.op)
 				if !ok {
 					panic("sema: arrayCmp evaluation failed, this is an implementation mistake")
@@ -4341,8 +4341,8 @@ impl binaryEval {
 			fall
 		| self.l.Type.Ptr() != nil:
 			ret self.evalPtr()
-		| self.l.Type.Arr() != nil:
-			ret self.evalArr()
+		| self.l.Type.Array() != nil:
+			ret self.evalArray()
 		| self.r.Type.Trait() != nil:
 			self.l, self.r = self.r, self.l
 			fall
