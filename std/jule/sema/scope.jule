@@ -1081,7 +1081,7 @@ impl scopeChecker {
 		*self.gotos = append(*self.gotos, st)
 	}
 
-	fn checkPostfix(mut &self, mut a: &ast::AssignSt) {
+	fn checkPostfix(mut &self, mut a: &ast::Assign) {
 		if len(a.Left) > 1 {
 			self.s.pushErr(a.Setter, build::LogMsg.InvalidSyntax)
 			ret
@@ -1144,7 +1144,7 @@ impl scopeChecker {
 		d.Mutable = true
 	}
 
-	fn checkSingleAssign(mut &self, mut &a: &ast::AssignSt) {
+	fn checkSingleAssign(mut &self, mut &a: &ast::Assign) {
 		let mut l: &Data = nil
 
 		if !token::IsIgnoreIdent(a.Left[0].Ident) {
@@ -1224,7 +1224,7 @@ impl scopeChecker {
 		a.Setter.Id = id
 	}
 
-	fn processEndPartOfMultiAssign(mut &self, mut &st: &MultiAssign, mut &a: &ast::AssignSt,
+	fn processEndPartOfMultiAssign(mut &self, mut &st: &MultiAssign, mut &a: &ast::Assign,
 		mut &lexpr: &ast::AssignLeft, mut &l: &Data, mut &r: exprPart, strict: bool) {
 		if !lexpr.Reference && token::IsIgnoreIdent(lexpr.Ident) {
 			if r.data.Type.Void() {
@@ -1300,7 +1300,7 @@ impl scopeChecker {
 		st.Left = append(st.Left, l)
 	}
 
-	fn getRightExprsOfMultiAssign(mut &self, mut a: &ast::AssignSt,
+	fn getRightExprsOfMultiAssign(mut &self, mut a: &ast::Assign,
 		mut eval: &eval): (parts: []exprPart, right: &Data, ok: bool) {
 		updateMut := fn(i: int) {
 			l := a.Left[i]
@@ -1374,7 +1374,7 @@ impl scopeChecker {
 		ret
 	}
 
-	fn checkMultiAssign(mut &self, mut &a: &ast::AssignSt) {
+	fn checkMultiAssign(mut &self, mut &a: &ast::Assign) {
 		if a.Setter.Id != token::Id.Eq && a.Setter.Id != token::Id.ColonEq {
 			self.s.pushErr(a.Setter, build::LogMsg.InvalidSyntax)
 			ret
@@ -1454,7 +1454,7 @@ impl scopeChecker {
 		self.scope.Stmts = append(self.scope.Stmts, st)
 	}
 
-	fn checkAssignSt(mut &self, mut a: &ast::AssignSt) {
+	fn checkAssign(mut &self, mut a: &ast::Assign) {
 		match {
 		| token::IsPostfixOp(a.Setter.Id):
 			self.checkPostfix(a)
@@ -1986,8 +1986,8 @@ impl scopeChecker {
 			self.checkLabel((&ast::Label)(node))
 		| &ast::Goto:
 			self.pushGoto((&ast::Goto)(node))
-		| &ast::AssignSt:
-			self.checkAssignSt((&ast::AssignSt)(node))
+		| &ast::Assign:
+			self.checkAssign((&ast::Assign)(node))
 		| &ast::Match:
 			self.checkMatch((&ast::Match)(node))
 		| &ast::Select:
@@ -2396,8 +2396,8 @@ fn checkAssign(mut &s: &sema, mut &left: &Data, mut right: &Data, op: &token::To
 
 fn isValidAstStForNextSt(mut &n: ast::StmtData): bool {
 	match type n {
-	| &ast::AssignSt:
-		ret !(&ast::AssignSt)(n).Declarative
+	| &ast::Assign:
+		ret !(&ast::Assign)(n).Declarative
 	| &ast::Expr:
 		ret true
 	|:
