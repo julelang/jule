@@ -19,8 +19,8 @@ use "std/strings"
 use "std/time"
 
 const ctxParamIdent = "__f_ctx"
-const anonFnCtxSuffix = "_ctx"                              // Anon fn identifier suffix for ctx struct identifier.
-const anonFnCtxHandlerSuffix = anonFnCtxSuffix + "_handler" // Anon fn identifier suffix for ctx allocation handler.
+const anonFuncCtxSuffix = "_ctx"                                // Anon fn identifier suffix for ctx struct identifier.
+const anonFuncCtxHandlerSuffix = anonFuncCtxSuffix + "_handler" // Anon fn identifier suffix for ctx allocation handler.
 const anyTypeIdent = "__jule_any_type"
 const deallocatedTypeIdent = "__jule_type_deallocator"
 const traitMethodWrapperPrefix = "__jule_trait_method_wrapper_"
@@ -283,7 +283,7 @@ impl ObjectCoder {
 		ret i
 	}
 
-	fn pushAnonFn(mut &self, mut &m: &sema::AnonFnExpr): (ident: str) {
+	fn pushAnonFunc(mut &self, mut &m: &sema::AnonFnExpr): (ident: str) {
 		self.meta.concurrent = self.meta.concurrent || m.Func.CalledCo
 
 		closure := obj::IsClosure(m)
@@ -294,7 +294,7 @@ impl ObjectCoder {
 			self.anonObj.WriteStr("__jule_anon_")!
 			self.anonObj.WriteStr(conv::FmtUint(u64(uintptr(m.Func)), 0xF))!
 			ident = str(unsafe { self.anonObj.Buf()[l:] })
-			self.anonObj.WriteStr(anonFnCtxSuffix + "{\n")!
+			self.anonObj.WriteStr(anonFuncCtxSuffix + "{\n")!
 			for (_, mut v) in m.Captured {
 				self.anonObj.WriteByte(indentKind)! // 1x indent
 				self.tc.kind(self.anonObj, v.TypeSym.Type)
@@ -310,9 +310,9 @@ impl ObjectCoder {
 			// Ctx handler function.
 			self.anonObj.WriteStr("static void ")!
 			self.anonObj.WriteStr(ident)!
-			self.anonObj.WriteStr(anonFnCtxHandlerSuffix + "(jule::Ptr<" + typeCoder.Uintptr + "> &ptr) { ptr.__as<")!
+			self.anonObj.WriteStr(anonFuncCtxHandlerSuffix + "(jule::Ptr<" + typeCoder.Uintptr + "> &ptr) { ptr.__as<")!
 			self.anonObj.WriteStr(ident)!
-			self.anonObj.WriteStr(anonFnCtxSuffix + ">().dealloc(); }\n")!
+			self.anonObj.WriteStr(anonFuncCtxSuffix + ">().dealloc(); }\n")!
 		} else {
 			ident = "__jule_anon"
 			ident += conv::FmtUint(u64(uintptr(m.Func)), 0xF)
