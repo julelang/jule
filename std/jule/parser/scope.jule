@@ -181,7 +181,7 @@ impl scopeParser {
 		ret s
 	}
 
-	fn buildVarSt(mut self, mut &tokens: []&token::Token): &ast::VarDecl {
+	fn buildVarSt(mut self, mut &tokens: []&token::Token): &ast::Var {
 		mut v := self.p.buildVar(tokens)
 		if v != nil {
 			v.Scope = self.s
@@ -257,11 +257,11 @@ impl scopeParser {
 		ret vars
 	}
 
-	fn buildRangeKindKey(mut self, mut &tokens: []&token::Token): &ast::VarDecl {
+	fn buildRangeKindKey(mut self, mut &tokens: []&token::Token): &ast::Var {
 		if len(tokens) == 0 {
 			ret nil
 		}
-		mut key := &ast::VarDecl{
+		mut key := &ast::Var{
 			Token: tokens[0],
 			Setter: tokens[0],
 		}
@@ -283,8 +283,8 @@ impl scopeParser {
 		ret key
 	}
 
-	fn buildRangeKindKeys(mut self, mut &parts: [][]&token::Token): []&ast::VarDecl {
-		let mut keys: []&ast::VarDecl = nil
+	fn buildRangeKindKeys(mut self, mut &parts: [][]&token::Token): []&ast::Var {
+		mut keys := ([]&ast::Var)(nil)
 		for (_, mut tokens) in parts {
 			keys = append(keys, self.buildRangeKindKey(tokens))
 		}
@@ -1019,11 +1019,11 @@ impl scopeParser {
 			if len(assign.Left) > 1 {
 				ret assign, true
 			}
-			// Single left, use &VarDecl intead if possible.
+			// Single left, use &Var intead if possible.
 			mut left := assign.Left[0]
 			match type left.Expr.Kind {
 			| &ast::IdentExpr:
-				mut decl := &ast::VarDecl{
+				mut decl := &ast::Var{
 					Token: left.Token,
 					Setter: assign.Setter,
 					Ident: left.Ident,
