@@ -316,11 +316,11 @@ impl Type {
 	}
 
 	// Returns slice type if actual kind is slice, nil reference if not.
-	fn Slice(mut self): &Slc {
+	fn Slice(mut self): &Slice {
 		mut kind := self.ActualKind()
 		match type kind {
-		| &Slc:
-			ret (&Slc)(kind)
+		| &Slice:
+			ret (&Slice)(kind)
 		|:
 			ret nil
 		}
@@ -707,19 +707,19 @@ impl Kind for Sptr {
 }
 
 // Slice type.
-struct Slc {
+struct Slice {
 	Elem: &Type
 }
 
-impl Kind for Slc {
+impl Kind for Slice {
 	// Returns slice kind as string.
 	fn Str(self): str { ret "[]" + self.Elem.Str() }
 
 	// Reports whether types are same.
 	fn Equal(&self, other: &Type): bool {
 		match type other.Kind {
-		| &Slc:
-			ret self.Elem.Equal((&Slc)(other.Kind).Elem)
+		| &Slice:
+			ret self.Elem.Equal((&Slice)(other.Kind).Elem)
 		}
 		ret false
 	}
@@ -1528,7 +1528,7 @@ impl typeChecker {
 		}
 	}
 
-	fn buildSlice(mut self, mut decl: &ast::SliceType): &Slc {
+	fn buildSlice(mut self, mut decl: &ast::SliceType): &Slice {
 		cycleRisk := self.cycleRisk
 		self.cycleRisk = false
 		defer { self.cycleRisk = cycleRisk }
@@ -1544,7 +1544,7 @@ impl typeChecker {
 			ret nil
 		}
 
-		ret &Slc{
+		ret &Slice{
 			Elem: elem,
 		}
 	}
