@@ -1116,36 +1116,36 @@ impl eval {
 	}
 
 	fn pushGenericsFromExprSubIdent(mut &self, mut &sexpr: &ast::SubIdentExpr,
-		mut &generics: []&ast::TypeDecl, mut &expr: &ast::Expr): bool {
+		mut &generics: []&ast::Type, mut &expr: &ast::Expr): bool {
 		mut t := new(ast::SubIdentTypeDecl)
 		if !pushSubIdentFromExpr(sexpr, t) {
 			self.pushErr(expr.Token, build::LogMsg.InvalidSyntax)
 			ret false
 		}
-		generics = append(generics, &ast::TypeDecl{Kind: t})
+		generics = append(generics, &ast::Type{Kind: t})
 		ret true
 	}
 
-	fn pushGenericsFromData(mut &self, mut &generics: []&ast::TypeDecl, mut &expr: &ast::Expr): bool {
+	fn pushGenericsFromData(mut &self, mut &generics: []&ast::Type, mut &expr: &ast::Expr): bool {
 		match type expr.Kind {
 		| &ast::UnaryExpr:
 			mut u := (&ast::UnaryExpr)(expr.Kind)
 			match u.Op.Id {
 			| token::Id.Star:
 				mut kind := new(ast::PtrTypeDecl)
-				mut _generics := make([]&ast::TypeDecl, 0, 1)
+				mut _generics := make([]&ast::Type, 0, 1)
 				self.pushGenericsFromData(_generics, u.Expr)
 				kind.Elem = _generics[0]
-				generics = append(generics, &ast::TypeDecl{
+				generics = append(generics, &ast::Type{
 					Token: expr.Token,
 					Kind: kind,
 				})
 			| token::Id.Amper:
 				mut kind := new(ast::SptrTypeDecl)
-				mut _generics := make([]&ast::TypeDecl, 0, 1)
+				mut _generics := make([]&ast::Type, 0, 1)
 				self.pushGenericsFromData(_generics, u.Expr)
 				kind.Elem = _generics[0]
-				generics = append(generics, &ast::TypeDecl{
+				generics = append(generics, &ast::Type{
 					Token: expr.Token,
 					Kind: kind,
 				})
@@ -1153,14 +1153,14 @@ impl eval {
 				self.pushErr(u.Op, build::LogMsg.InvalidType)
 				ret false
 			}
-		| &ast::TypeDecl:
-			generics = append(generics, (&ast::TypeDecl)(expr.Kind))
+		| &ast::Type:
+			generics = append(generics, (&ast::Type)(expr.Kind))
 		| &ast::SubIdentExpr:
 			mut sexpr := (&ast::SubIdentExpr)(expr.Kind)
 			ret self.pushGenericsFromExprSubIdent(sexpr, generics, expr)
 		| &ast::IdentExpr:
 			mut ident := (&ast::IdentExpr)(expr.Kind)
-			generics = append(generics, &ast::TypeDecl{
+			generics = append(generics, &ast::Type{
 				Kind: &ast::IdentTypeDecl{
 					Binded: ident.Binded,
 					Token: ident.Token,
@@ -1179,11 +1179,11 @@ impl eval {
 				Token: ns.Ident,
 				Ident: ns.Ident.Kind,
 			}
-			generics = append(generics, &ast::TypeDecl{
+			generics = append(generics, &ast::Type{
 				Token: decl.Token,
 				Kind: &ast::NamespaceTypeDecl{
 					Namespace: ns.Namespace,
-					Kind: &ast::TypeDecl{
+					Kind: &ast::Type{
 						Token: decl.Token,
 						Kind: decl,
 					},
@@ -1256,7 +1256,7 @@ impl eval {
 	}
 
 	fn evalFnGenericFromIndexing(mut &self, mut &d: &Data, mut &i: &ast::IndexingExpr) {
-		mut generics := make([]&ast::TypeDecl, 0, 1<<3)
+		mut generics := make([]&ast::Type, 0, 1<<3)
 		if !self.pushGenericsFromData(generics, i.Index) {
 			d = nil
 			ret
@@ -2025,7 +2025,7 @@ impl eval {
 		ret self.s.typeChecker(self.lookup, nil, nil)
 	}
 
-	fn evalType(mut self, mut t: &ast::TypeDecl): &Data {
+	fn evalType(mut self, mut t: &ast::Type): &Data {
 		mut tk := buildType(t)
 		ok := self.s.checkTypeSym(tk, self.lookup)
 		if !ok {
@@ -3223,8 +3223,8 @@ impl eval {
 			ret self.evalNamespace((&ast::NamespaceExpr)(kind))
 		| &ast::StructLit:
 			ret self.evalStructLit((&ast::StructLit)(kind))
-		| &ast::TypeDecl:
-			ret self.evalType((&ast::TypeDecl)(kind))
+		| &ast::Type:
+			ret self.evalType((&ast::Type)(kind))
 		| &ast::FnCallExpr:
 			ret self.evalFnCall((&ast::FnCallExpr)(kind))
 		| &ast::SubIdentExpr:
