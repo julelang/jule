@@ -24,8 +24,8 @@ enum Stmt: type {
 	&Assign,
 	&MultiAssign,
 	&Match,
-	&FallSt,
-	&BreakSt,
+	&Fall,
+	&Break,
 	&Ret,
 	&Select,
 }
@@ -118,7 +118,7 @@ struct ContSt {
 }
 
 // Break statement.
-struct BreakSt {
+struct Break {
 	It:     uintptr
 	Mtch:   uintptr
 	Select: uintptr
@@ -223,7 +223,7 @@ impl Case {
 }
 
 // Fall statement.
-struct FallSt {
+struct Fall {
 	DestCase: uintptr
 }
 
@@ -1819,12 +1819,12 @@ impl scopeChecker {
 			ret
 		}
 
-		self.scope.Stmts = append(self.scope.Stmts, &FallSt{
+		self.scope.Stmts = append(self.scope.Stmts, &Fall{
 			DestCase: unsafe { uintptr(case.Next) },
 		})
 	}
 
-	fn checkBreakWithLabel(mut &self, b: &ast::BreakSt): &BreakSt {
+	fn checkBreakWithLabel(mut &self, b: &ast::Break): &Break {
 		mut brk := self.checkPlainBreak(b)
 		if brk == nil {
 			ret nil
@@ -1890,7 +1890,7 @@ impl scopeChecker {
 		ret brk
 	}
 
-	fn checkPlainBreak(mut &self, b: &ast::BreakSt): &BreakSt {
+	fn checkPlainBreak(mut &self, b: &ast::Break): &Break {
 		if self.isDeferred() {
 			self.s.pushErr(b.Token, build::LogMsg.BreakAtOutOfValidScope)
 			ret nil
@@ -1903,17 +1903,17 @@ impl scopeChecker {
 			scope = scope.parent
 			goto iter
 		| scope.it != 0:
-			ret &BreakSt{It: scope.it}
+			ret &Break{It: scope.it}
 		| scope.cse != 0:
 			owner := caseOwner(unsafe { (*Case)(scope.cse).Owner }).asUintptr()
-			ret &BreakSt{Mtch: owner}
+			ret &Break{Mtch: owner}
 		}
 
 		self.s.pushErr(b.Token, build::LogMsg.BreakAtOutOfValidScope)
 		ret nil
 	}
 
-	fn checkBreak(mut &self, b: &ast::BreakSt) {
+	fn checkBreak(mut &self, b: &ast::Break) {
 		if b.Label != nil { // Label given.
 			mut brk := self.checkBreakWithLabel(b)
 			self.scope.Stmts = append(self.scope.Stmts, brk)
@@ -1994,8 +1994,8 @@ impl scopeChecker {
 			self.checkSelect((&ast::Select)(node))
 		| &ast::Fall:
 			self.checkFall((&ast::Fall)(node))
-		| &ast::BreakSt:
-			self.checkBreak((&ast::BreakSt)(node))
+		| &ast::Break:
+			self.checkBreak((&ast::Break)(node))
 		| &ast::Ret:
 			self.checkRet((&ast::Ret)(node))
 		| &ast::UseExpr:
@@ -2039,7 +2039,7 @@ impl scopeChecker {
 				ret
 			}
 		| &ast::Goto
-		| &ast::BreakSt
+		| &ast::Break
 		| &ast::ContSt
 		| &ast::Ret:
 			self.checkNode(stmt.Data)
