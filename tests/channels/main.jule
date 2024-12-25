@@ -1,0 +1,49 @@
+fn rangeIteration() {
+	c := make(chan int, 4)
+	c <- 10
+	c <- 20
+	c <- 30
+	c <- 40
+	close(c)
+	for x in c {
+		println(x)
+	}
+}
+
+fn unbuffered() {
+	c := make(chan int)
+	co fn() {
+		c <- 20
+	}()
+	x, ok := <-c
+	if !ok {
+		panic("invalid receive")
+	}
+	if x != 20 {
+		panic("invalida data")
+	}
+}
+
+fn sendOnly() {
+	c := make(chan<- int, 1)
+	c <- 20
+}
+
+fn recvOnly() {
+	c := fn(): <-chan int {
+		c := make(chan int)
+		close(c)
+		ret c
+	}()
+	_, ok := <-c
+	if ok {
+		panic("invalid receive")
+	}
+}
+
+fn main() {
+	rangeIteration()
+	unbuffered()
+	sendOnly()
+	recvOnly()
+}
