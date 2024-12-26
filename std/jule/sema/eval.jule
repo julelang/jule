@@ -1789,7 +1789,7 @@ impl eval {
 	fn castTypeEnum(mut self, mut &t: &Type, mut &d: &Data, mut &errorToken: &token::Token) {
 		n := len(self.s.errors)
 		if !self.s.checkTypeCompatibility(d.Type, t, errorToken) {
-			self.s.errors = self.s.errors[:n]
+			self.s.errors = self.s.errors[:n] // Remove logges errors by checkTypeCompatibility.
 			self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, d.Type.Str(), t.Str())
 		}
 		d.Constant = nil
@@ -1799,11 +1799,28 @@ impl eval {
 	fn castTypeEnumT(mut self, mut &t: &Type, mut &d: &Data, mut &errorToken: &token::Token) {
 		n := len(self.s.errors)
 		if !self.s.checkTypeCompatibility(t, d.Type, errorToken) {
-			self.s.errors = self.s.errors[:n]
+			self.s.errors = self.s.errors[:n] // Remove logges errors by checkTypeCompatibility.
 			self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, d.Type.Str(), t.Str())
 		}
 		d.Constant = nil
 		d.untyped = false
+	}
+
+	fn castChan(mut self, mut &t: &Type, mut &d: &Data, mut &errorToken: &token::Token) {
+		dc := d.Type.Chan()
+		if dc == nil {
+			self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, d.Type.Str(), t.Str())
+			ret
+		}
+		c := t.Chan()
+		if !dc.Elem.Equal(c.Elem) {
+			self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, d.Type.Str(), t.Str())
+			ret
+		}
+		if c.Recv && !dc.Recv || c.Send && !dc.Send {
+			self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, d.Type.Str(), t.Str())
+			ret
+		}
 	}
 
 	fn evalCastByTypeNData(mut self, mut t: &Type, mut d: &Data, mut errorToken: &token::Token): &Data {
@@ -1847,6 +1864,8 @@ impl eval {
 			| t.Prim() != nil:
 				self.castPrim(t, d, errorToken)
 				self.castConstant(t, d)
+			| t.Chan() != nil:
+				self.castChan(t, d, errorToken)
 			|:
 				self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCasting, t.Str())
 				d = nil
