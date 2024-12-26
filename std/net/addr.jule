@@ -46,7 +46,7 @@ trait Addr {
 // See the [Dial] function for a description of the host and port parameters.
 fn JoinHostPort(host: str, port: str): str {
 	// We assume that host is a literal IPv6 address if host has colons.
-	if byteslite::FindByteStr(host, ':') >= 0 {
+	if byteslite::IndexByteStr(host, ':') >= 0 {
 		ret "[" + host + "]:" + port
 	}
 	ret host + ":" + port
@@ -65,13 +65,13 @@ fn JoinHostPort(host: str, port: str): str {
 // Exceptionals are always will be AddrError.
 fn SplitHostPort(hostport: str)!: (host: str, port: str) {
 	mut j, mut k := 0, 0
-	i := byteslite::FindLastByteStr(hostport, ':')
+	i := byteslite::LastIndexByteStr(hostport, ':')
 	if i == -1 {
 		error(AddrError.MissingPort)
 	}
 	if hostport[0] == '[' {
 		// Expect the first ']' just before the last ':'.
-		end := byteslite::FindByteStr(hostport, ']')
+		end := byteslite::IndexByteStr(hostport, ']')
 		if end == -1 {
 			error(AddrError.MissingRBracket)
 		}
@@ -92,14 +92,14 @@ fn SplitHostPort(hostport: str)!: (host: str, port: str) {
 		j, k = 1, end+1 // There can't be a '[' resp. ']' before these positions.
 	} else {
 		host = hostport[:i]
-		if byteslite::FindByteStr(host, ':') != -1 {
+		if byteslite::IndexByteStr(host, ':') != -1 {
 			error(AddrError.TooManyColons)
 		}
 	}
-	if byteslite::FindByteStr(hostport[j:], '[') != -1 {
+	if byteslite::IndexByteStr(hostport[j:], '[') != -1 {
 		error(AddrError.UnexpectedLBracket)
 	}
-	if byteslite::FindByteStr(hostport[k:], ']') != -1 {
+	if byteslite::IndexByteStr(hostport[k:], ']') != -1 {
 		error(AddrError.UnexpectedRBracket)
 	}
 	port = hostport[i+1:]
