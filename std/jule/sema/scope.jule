@@ -120,7 +120,7 @@ struct Continue {
 // Break statement.
 struct Break {
 	It:     uintptr
-	Mtch:   uintptr
+	Match:  uintptr
 	Select: uintptr
 }
 
@@ -1833,7 +1833,7 @@ impl scopeChecker {
 		// Set pointer to zero.
 		// Pointer will set by label.
 		brk.It = 0
-		brk.Mtch = 0
+		brk.Match = 0
 
 		mut label := findLabelParent(b.Label.Kind, self.parent)
 		if label == nil {
@@ -1861,7 +1861,7 @@ impl scopeChecker {
 			| &WhileIter:
 				brk.It = uintptr((&WhileIter)(st))
 			| &Match:
-				brk.Mtch = uintptr((&Match)(st))
+				brk.Match = uintptr((&Match)(st))
 			| &Select:
 				brk.Select = uintptr((&Select)(st))
 			|:
@@ -1875,8 +1875,8 @@ impl scopeChecker {
 			}
 		}
 
-		if brk.Mtch != 0 {
-			if !self.checkValidBreakLabel(brk.Mtch) {
+		if brk.Match != 0 {
+			if !self.checkValidBreakLabel(brk.Match) {
 				self.s.pushErr(b.Label, build::LogMsg.InvalidLabel, b.Label.Kind)
 			}
 		}
@@ -1906,7 +1906,7 @@ impl scopeChecker {
 			ret &Break{It: scope.it}
 		| scope.cse != 0:
 			owner := caseOwner(unsafe { (*Case)(scope.cse).Owner }).asUintptr()
-			ret &Break{Mtch: owner}
+			ret &Break{Match: owner}
 		}
 
 		self.s.pushErr(b.Token, build::LogMsg.BreakAtOutOfValidScope)
