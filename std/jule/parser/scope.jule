@@ -617,16 +617,23 @@ impl scopeParser {
 			}
 			match {
 			| tok.Id == token::Id.Vline:
-				exprTokens := tokens[j:i]
+				mut exprTokens := tokens[j:i]
 				if len(exprTokens) == 0 {
 					self.pushErr(tok, build::LogMsg.MissingExpr)
 				} else {
-					self.pushCaseExpr(tokens[j:i], tok, typeMatch, exprs)
+					self.pushCaseExpr(exprTokens, tok, typeMatch, exprs)
 				}
 				j = i + 1
 			| tok.Id == token::Id.Colon:
 				colon = tok
-				self.pushCaseExpr(tokens[j:i], tok, typeMatch, exprs)
+				mut exprTokens := tokens[j:i]
+				if len(exprTokens) == 0 && j != 0 {
+					// If we have exression already for this case,
+					// disallow expressionless case. For default case,
+					// allow this, if case is just completely empty.
+					self.pushErr(tok, build::LogMsg.MissingExpr)
+				}
+				self.pushCaseExpr(exprTokens, tok, typeMatch, exprs)
 				tokens = tokens[i+1:]
 				ret exprs, i-j == 0 || len(exprs) != 0
 			}
