@@ -19,16 +19,6 @@ impl io::RuneWriter for Builder {}
 impl io::StrWriter for Builder {}
 
 impl Builder {
-	// Returns new string builder with capacity.
-	static fn New(cap: int): Builder {
-		if cap < 0 {
-			panic("strings: Builder.New: cap < 0")
-		}
-		ret Builder{
-			buf: make([]byte, 0, cap),
-		}
-	}
-
 	// Writes bytes to buffer.
 	// Never throws an exceptional.
 	fn Write(mut self, b: []byte)!: (n: int) {
@@ -61,6 +51,26 @@ impl Builder {
 		self.buf = utf8::AppendRune(self.buf, r)
 		n = len(self.buf) - n
 		ret
+	}
+
+	// Copies the buffer to a new, larger buffer so that there are at least n
+	// bytes of capacity beyond len(self.buf).
+	fn grow(mut self, n: int) {
+		mut buf := make([]byte, len(self.buf), 2*cap(self.buf)+n)
+		copy(buf, self.buf)
+		self.buf = buf
+	}
+
+	// Grows b's capacity, if necessary, to guarantee space for
+	// another n bytes. After Grow(n), at least n bytes can be written to b
+	// without another allocation. If n is negative, panics.
+	fn Grow(mut self, n: int) {
+		if n < 0 {
+			panic("std/strings: Builder.Grow: negative count")
+		}
+		if cap(self.buf)-len(self.buf) < n {
+			self.grow(n)
+		}
 	}
 
 	// Returns buffer as string. Will not reset the underlying content.
