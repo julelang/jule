@@ -452,6 +452,7 @@ fn Map(mapping: fn(mut r: rune): rune, mut s: str): str {
 	// The output buffer b is initialized on demand, the first
 	// time a character differs.
 	mut b := Builder.New(0)
+	mut write := false
 
 	for (i, mut c) in []rune(s) {
 		r := mapping(c)
@@ -468,7 +469,7 @@ fn Map(mapping: fn(mut r: rune): rune, mut s: str): str {
 		} else {
 			width = utf8::RuneLen(c)
 		}
-
+		write = true
 		b.WriteStr(s[:i])!
 		if r >= 0 {
 			b.WriteRune(r)!
@@ -479,7 +480,7 @@ fn Map(mapping: fn(mut r: rune): rune, mut s: str): str {
 	}
 
 	// Fast path for unchanged input.
-	if b.Len() == 0 {
+	if !write {
 		ret s
 	}
 
