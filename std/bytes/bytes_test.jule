@@ -1,0 +1,1000 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/fmt"
+use "std/slices"
+use "std/strings"
+use "std/testing"
+use "std/unicode"
+use "std/unicode/utf8"
+
+static abcd = "abcd"
+static faces = "☺☻☹"
+static commas = "1,2,3,4"
+static dots = "1....2....3....4"
+
+static space = str([]rune(['\t', '\v', '\r', '\f', '\n', '\u0085', '\u00a0', '\u2000', '\u3000']))
+
+static longString = "a" + str(make([]byte, 1<<16)) + "z"
+
+struct binOpTest {
+	a: str
+	b: str
+	i: int
+}
+
+static indexTests: []binOpTest = [
+	{"", "", 0},
+	{"", "a", -1},
+	{"", "foo", -1},
+	{"fo", "foo", -1},
+	{"foo", "baz", -1},
+	{"foo", "foo", 0},
+	{"oofofoofooo", "f", 2},
+	{"oofofoofooo", "foo", 4},
+	{"barfoobarfoo", "foo", 3},
+	{"foo", "", 0},
+	{"foo", "o", 1},
+	{"abcABCabc", "A", 3},
+	// cases with one byte strings - test IndexByte and special case in Index()
+	{"", "a", -1},
+	{"x", "a", -1},
+	{"x", "x", 0},
+	{"abc", "a", 0},
+	{"abc", "b", 1},
+	{"abc", "c", 2},
+	{"abc", "x", -1},
+	{"barfoobarfooyyyzzzyyyzzzyyyzzzyyyxxxzzzyyy", "x", 33},
+	{"fofofofooofoboo", "oo", 7},
+	{"fofofofofofoboo", "ob", 11},
+	{"fofofofofofoboo", "boo", 12},
+	{"fofofofofofoboo", "oboo", 11},
+	{"fofofofofoooboo", "fooo", 8},
+	{"fofofofofofoboo", "foboo", 10},
+	{"fofofofofofoboo", "fofob", 8},
+	{"fofofofofofofoffofoobarfoo", "foffof", 12},
+	{"fofofofofoofofoffofoobarfoo", "foffof", 13},
+	{"fofofofofofofoffofoobarfoo", "foffofo", 12},
+	{"fofofofofoofofoffofoobarfoo", "foffofo", 13},
+	{"fofofofofoofofoffofoobarfoo", "foffofoo", 13},
+	{"fofofofofofofoffofoobarfoo", "foffofoo", 12},
+	{"fofofofofoofofoffofoobarfoo", "foffofoob", 13},
+	{"fofofofofofofoffofoobarfoo", "foffofoob", 12},
+	{"fofofofofoofofoffofoobarfoo", "foffofooba", 13},
+	{"fofofofofofofoffofoobarfoo", "foffofooba", 12},
+	{"fofofofofoofofoffofoobarfoo", "foffofoobar", 13},
+	{"fofofofofofofoffofoobarfoo", "foffofoobar", 12},
+	{"fofofofofoofofoffofoobarfoo", "foffofoobarf", 13},
+	{"fofofofofofofoffofoobarfoo", "foffofoobarf", 12},
+	{"fofofofofoofofoffofoobarfoo", "foffofoobarfo", 13},
+	{"fofofofofofofoffofoobarfoo", "foffofoobarfo", 12},
+	{"fofofofofoofofoffofoobarfoo", "foffofoobarfoo", 13},
+	{"fofofofofofofoffofoobarfoo", "foffofoobarfoo", 12},
+	{"fofofofofoofofoffofoobarfoo", "ofoffofoobarfoo", 12},
+	{"fofofofofofofoffofoobarfoo", "ofoffofoobarfoo", 11},
+	{"fofofofofoofofoffofoobarfoo", "fofoffofoobarfoo", 11},
+	{"fofofofofofofoffofoobarfoo", "fofoffofoobarfoo", 10},
+	{"fofofofofoofofoffofoobarfoo", "foobars", -1},
+	{"foofyfoobarfoobar", "y", 4},
+	{"oooooooooooooooooooooo", "r", -1},
+	{"oxoxoxoxoxoxoxoxoxoxoxoy", "oy", 22},
+	{"oxoxoxoxoxoxoxoxoxoxoxox", "oy", -1},
+	// test fallback to Rabin-Karp.
+	{"000000000000000000000000000000000000000000000000000000000000000000000001", "0000000000000000000000000000000000000000000000000000000000000000001", 5},
+	// test fallback to IndexRune
+	{"oxoxoxoxoxoxoxoxoxoxox☺", "☺", 22},
+	// invalid UTF-8 byte sequence (must be longer than bytealg.MaxBruteForce to
+	// test that we don't use IndexRune)
+	{"xx0123456789012345678901234567890123456789012345678901234567890120123456789012345678901234567890123456xxx\xed\x9f\xc0", "\xed\x9f\xc0", 105},
+]
+
+static lastIndexTests: []binOpTest = [
+	{"", "", 0},
+	{"", "a", -1},
+	{"", "foo", -1},
+	{"fo", "foo", -1},
+	{"foo", "foo", 0},
+	{"foo", "f", 0},
+	{"oofofoofooo", "f", 7},
+	{"oofofoofooo", "foo", 7},
+	{"barfoobarfoo", "foo", 9},
+	{"foo", "", 3},
+	{"foo", "o", 2},
+	{"abcABCabc", "A", 3},
+	{"abcABCabc", "a", 6},
+]
+
+static indexAnyTests: []binOpTest = [
+	{"", "", -1},
+	{"", "a", -1},
+	{"", "abc", -1},
+	{"a", "", -1},
+	{"a", "a", 0},
+	{"\x80", "\xffb", 0},
+	{"aaa", "a", 0},
+	{"abc", "xyz", -1},
+	{"abc", "xcz", 2},
+	{"ab☺c", "x☺yz", 2},
+	{"a☺b☻c☹d", "cx", len("a☺b☻")},
+	{"a☺b☻c☹d", "uvw☻xyz", len("a☺b")},
+	{"aRegExp*", ".(|)*+?^$[]", 7},
+	{dots + dots + dots, " ", -1},
+	{"012abcba210", "\xffb", 4},
+	{"012\x80bcb\x80210", "\xffb", 3},
+	{"0123456\xcf\x80abc", "\xcfb\x80", 10},
+]
+
+static lastIndexAnyTests: []binOpTest = [
+	{"", "", -1},
+	{"", "a", -1},
+	{"", "abc", -1},
+	{"a", "", -1},
+	{"a", "a", 0},
+	{"\x80", "\xffb", 0},
+	{"aaa", "a", 2},
+	{"abc", "xyz", -1},
+	{"abc", "ab", 1},
+	{"ab☺c", "x☺yz", 2},
+	{"a☺b☻c☹d", "cx", len("a☺b☻")},
+	{"a☺b☻c☹d", "uvw☻xyz", len("a☺b")},
+	{"a.RegExp*", ".(|)*+?^$[]", 8},
+	{dots + dots + dots, " ", -1},
+	{"012abcba210", "\xffb", 6},
+	{"012\x80bcb\x80210", "\xffb", 7},
+	{"0123456\xcf\x80abc", "\xcfb\x80", 10},
+]
+
+#test
+fn testIndexAny(t: &testing::T) {
+	for _, tt in indexAnyTests {
+		if len(tt.b) != 1 {
+			continue
+		}
+		a := []byte(tt.a)
+		b := tt.b
+		pos := IndexAny(a, b)
+		if pos != tt.i {
+			t.Errorf(`IndexAny({}, '{}') = {}`, tt.a, b, pos)
+		}
+	}
+}
+
+#test
+fn testLastIndexAny(t: &testing::T) {
+	for _, tt in lastIndexAnyTests {
+		if len(tt.b) != 1 {
+			continue
+		}
+		a := []byte(tt.a)
+		b := tt.b
+		pos := LastIndexAny(a, b)
+		if pos != tt.i {
+			t.Errorf(`LastIndexAny({}, '{}') = {}`, tt.a, b, pos)
+		}
+	}
+}
+
+#test
+fn testIndex(t: &testing::T) {
+	for _, tt in indexTests {
+		if len(tt.b) != 1 {
+			continue
+		}
+		a := []byte(tt.a)
+		b := []byte(tt.b)
+		pos := Index(a, b)
+		if pos != tt.i {
+			t.Errorf(`Index({}, '{}') = {}`, tt.a, b, pos)
+		}
+	}
+}
+
+#test
+fn testLastIndex(t: &testing::T) {
+	for _, tt in lastIndexTests {
+		if len(tt.b) != 1 {
+			continue
+		}
+		a := []byte(tt.a)
+		b := []byte(tt.b)
+		pos := LastIndex(a, b)
+		if pos != tt.i {
+			t.Errorf(`LastIndex({}, '{}') = {}`, tt.a, b, pos)
+		}
+	}
+}
+
+#test
+fn testLastIndexByte(t: &testing::T) {
+	for _, tt in lastIndexTests {
+		if len(tt.b) != 1 {
+			continue
+		}
+		a := []byte(tt.a)
+		b := tt.b[0]
+		pos := LastIndexByte(a, b)
+		if pos != tt.i {
+			t.Errorf(`LastIndexByte({}, '{}') = {}`, tt.a, b, pos)
+		}
+	}
+}
+
+#test
+fn testIndexByte(t: &testing::T) {
+	for _, tt in indexTests {
+		if len(tt.b) != 1 {
+			continue
+		}
+		a := []byte(tt.a)
+		b := tt.b[0]
+		pos := IndexByte(a, b)
+		if pos != tt.i {
+			t.Errorf(`IndexByte({}, '{}') = {}`, tt.a, b, pos)
+		}
+	}
+}
+
+struct indexRuneTest {
+	input: str
+	rune:  rune
+	want:  int
+}
+
+static tests: []indexRuneTest = [
+	{"", 'a', -1},
+	{"", '☺', -1},
+	{"foo", '☹', -1},
+	{"foo", 'o', 1},
+	{"foo☺bar", '☺', 3},
+	{"foo☺☻☹bar", '☹', 9},
+	{"a A x", 'A', 2},
+	{"some_text=some_value", '=', 9},
+	{"☺a", 'a', 3},
+	{"a☻☺b", '☺', 4},
+	{"𠀳𠀗𠀾𠁄𠀧𠁆𠁂𠀫𠀖𠀪𠀲𠀴𠁀𠀨𠀿", '𠀿', 56},
+
+	// 2 bytes
+	{"ӆ", 'ӆ', 0},
+	{"a", 'ӆ', -1},
+	{"  ӆ", 'ӆ', 2},
+	{"  a", 'ӆ', -1},
+	{strings::Repeat("ц", 64) + "ӆ", 'ӆ', 128},                   // test cutover
+	{strings::Repeat("ц", 64), 'ӆ', -1},
+
+	// 3 bytes
+	{"Ꚁ", 'Ꚁ', 0},
+	{"a", 'Ꚁ', -1},
+	{"  Ꚁ", 'Ꚁ', 2},
+	{"  a", 'Ꚁ', -1},
+	{strings::Repeat("Ꙁ", 64) + "Ꚁ", 'Ꚁ', 192},                   // test cutover
+	{strings::Repeat("Ꙁ", 64) + "Ꚁ", '䚀', -1},                    // 'Ꚁ' and '䚀' share the same last two bytes
+
+	// 4 bytes
+	{"𡌀", '𡌀', 0},
+	{"a", '𡌀', -1},
+	{"  𡌀", '𡌀', 2},
+	{"  a", '𡌀', -1},
+	{strings::Repeat("𡋀", 64) + "𡌀", '𡌀', 256},                   // test cutover
+	{strings::Repeat("𡋀", 64) + "𡌀", '𣌀', -1},                    // '𡌀' and '𣌀' share the same last two bytes
+
+	// RuneError should match any invalid UTF-8 byte sequence.
+	{"�", '�', 0},
+	{"\xff", '�', 0},
+	{"☻x�", '�', len("☻x")},
+	{"☻x\xe2\x98", '�', len("☻x")},
+	{"☻x\xe2\x98�", '�', len("☻x")},
+	{"☻x\xe2\x98x", '�', len("☻x")},
+
+	// Invalid rune values should never match.
+	{"a☺b☻c☹d\xe2\x98�\xff�\xed\xa0\x80", -1, -1},
+	{"a☺b☻c☹d\xe2\x98�\xff�\xed\xa0\x80", 0xD800, -1},            // Surrogate pair
+	{"a☺b☻c☹d\xe2\x98�\xff�\xed\xa0\x80", utf8::MaxRune + 1, -1},
+
+	// Test the cutover to bytealg.Index when it is triggered in
+	// the middle of rune that contains consecutive runs of equal bytes.
+	{"aaaaaKKKK\U000bc104", '\U000bc104', 17},                    // cutover: (n + 16) / 8
+	{"aaaaaKKKK鄄", '鄄', 17},
+	{"aaKKKKKa\U000bc104", '\U000bc104', 18},                     // cutover: 4 + n>>4
+	{"aaKKKKKa鄄", '鄄', 18},
+]
+
+#test
+fn testIndexRune(t: &testing::T) {
+	for _, tt in tests {
+		got := IndexRune([]byte(tt.input), tt.rune)
+		if got != tt.want {
+			t.Errorf("IndexRune({}, {}) = {}; want {}", tt.input, tt.rune, got, tt.want)
+		}
+	}
+}
+
+// Test case for any function which accepts and returns a byte slice.
+// For ease of creation, we write the input byte slice as a string.
+struct strTest {
+	input: str
+	out:   []byte
+}
+
+static trimSpaceTests: []strTest = [
+	{"", nil},
+	{"  a", []byte("a")},
+	{"b  ", []byte("b")},
+	{"abc", []byte("abc")},
+	{space + "abc" + space, []byte("abc")},
+	{" ", nil},
+	{"\u3000 ", nil},
+	{" \u3000", nil},
+	{" \t\r\n \t\t\r\r\n\n ", nil},
+	{" \t\r\n x\t\t\r\r\n\n ", []byte("x")},
+	{" \u2000\t\r\n x\t\t\r\r\ny\n \u3000", []byte("x\t\t\r\r\ny")},
+	{"1 \t\r\n2", []byte("1 \t\r\n2")},
+	{" x\x80", []byte("x\x80")},
+	{" x\xc0", []byte("x\xc0")},
+	{"x \xc0\xc0 ", []byte("x \xc0\xc0")},
+	{"x \xc0", []byte("x \xc0")},
+	{"x \xc0 ", []byte("x \xc0")},
+	{"x \xc0\xc0 ", []byte("x \xc0\xc0")},
+	{"x ☺\xc0\xc0 ", []byte("x ☺\xc0\xc0")},
+	{"x ☺ ", []byte("x ☺")},
+]
+
+static upperTests: []strTest = [
+	{"", []byte("")},
+	{"ONLYUPPER", []byte("ONLYUPPER")},
+	{"abc", []byte("ABC")},
+	{"AbC123", []byte("ABC123")},
+	{"azAZ09_", []byte("AZAZ09_")},
+	{"longStrinGwitHmixofsmaLLandcAps", []byte("LONGSTRINGWITHMIXOFSMALLANDCAPS")},
+	{"long\u0250string\u0250with\u0250nonascii\u2C6Fchars", []byte("LONG\u2C6FSTRING\u2C6FWITH\u2C6FNONASCII\u2C6FCHARS")},
+	{"\u0250\u0250\u0250\u0250\u0250", []byte("\u2C6F\u2C6F\u2C6F\u2C6F\u2C6F")},                                           // grows one byte per char
+]
+
+static lowerTests: []strTest = [
+	{"", []byte("")},
+	{"abc", []byte("abc")},
+	{"AbC123", []byte("abc123")},
+	{"azAZ09_", []byte("azaz09_")},
+	{"longStrinGwitHmixofsmaLLandcAps", []byte("longstringwithmixofsmallandcaps")},
+	{"LONG\u2C6FSTRING\u2C6FWITH\u2C6FNONASCII\u2C6FCHARS", []byte("long\u0250string\u0250with\u0250nonascii\u0250chars")},
+	{"\u2C6D\u2C6D\u2C6D\u2C6D\u2C6D", []byte("\u0251\u0251\u0251\u0251\u0251")},                                           // shrinks one byte per char
+]
+
+// Execute f on each test case.  funcName should be the name of f; it's used
+// in failure reports.
+fn runStrTests[F](t: &testing::T, f: F, funcName: str, testCases: []strTest) {
+	for _, tc in testCases {
+		actual := f([]byte(tc.input))
+		if actual == nil && tc.out != nil {
+			t.Errorf("{}({}) = nil; want {}", funcName, tc.input, tc.out)
+		}
+		if actual != nil && tc.out == nil {
+			t.Errorf("{}({}) = {}; want nil", funcName, tc.input, actual)
+		}
+		if !Equal(actual, tc.out) {
+			t.Errorf("{}({}) = {}; want {}", funcName, tc.input, actual, tc.out)
+		}
+	}
+}
+
+#test
+fn testTrimSpace(t: &testing::T) { runStrTests(t, TrimSpace, "TrimSpace", trimSpaceTests) }
+
+#test
+fn testToUpper(t: &testing::T) { runStrTests(t, ToUpper, "ToUpper", upperTests) }
+
+#test
+fn testToLower(t: &testing::T) { runStrTests(t, ToLower, "ToLower", lowerTests) }
+
+struct repeatTest {
+	input: str
+	out:   str
+	count: int
+}
+
+static repeatTests: []repeatTest = [
+	{"", "", 0},
+	{"", "", 1},
+	{"", "", 2},
+	{"-", "", 0},
+	{"-", "-", 1},
+	{"-", "----------", 10},
+	{"abc ", "abc abc abc ", 3},
+	// Tests for results over the chunkLimit
+	{str(rune(0)), str(make([]byte, 1<<16)), 1 << 16},
+	{longString, longString + longString, 2},
+]
+
+#test
+fn testRepeat(t: &testing::T) {
+	for _, tt in repeatTests {
+		tin := []byte(tt.input)
+		tout := []byte(tt.out)
+		a := Repeat(tin, tt.count)
+		if !Equal(a, tout) {
+			t.Errorf("Repeat({}, {}) = {}; want {}", tin, tt.count, a, tout)
+			continue
+		}
+	}
+}
+
+struct runesTest {
+	input: str
+	out:   []rune
+	lossy: bool
+}
+
+static runesTests: []runesTest = [
+	{"", [], false},
+	{" ", [32], false},
+	{"ABC", [65, 66, 67], false},
+	{"abc", [97, 98, 99], false},
+	{"\u65e5\u672c\u8a9e", [26085, 26412, 35486], false},
+	{"ab\x80c", [97, 98, 0xFFFD, 99], true},
+	{"ab\xc0c", [97, 98, 0xFFFD, 99], true},
+]
+
+#test
+fn testRunes(t: &testing::T) {
+	for _, tt in runesTests {
+		tin := []byte(tt.input)
+		a := Runes(tin)
+		if !slices::Equal(a, tt.out) {
+			t.Errorf("Runes({}) = {}; want {}", tin, a, tt.out)
+			continue
+		}
+		if !tt.lossy {
+			// can only test reassembly if we didn't lose information
+			s := str(a)
+			if s != tt.input {
+				t.Errorf("str(Runes({})) = {}; want {}", tin, s, tin)
+			}
+		}
+	}
+}
+
+struct trimTest {
+	f:     str
+	input: str
+	arg:   str
+	out:   str
+}
+
+static trimTests: []trimTest = [
+	{"Trim", "abba", "a", "bb"},
+	{"Trim", "abba", "ab", ""},
+	{"TrimLeft", "abba", "ab", ""},
+	{"TrimRight", "abba", "ab", ""},
+	{"TrimLeft", "abba", "a", "bba"},
+	{"TrimLeft", "abba", "b", "abba"},
+	{"TrimRight", "abba", "a", "abb"},
+	{"TrimRight", "abba", "b", "abba"},
+	{"Trim", "<tag>", "<>", "tag"},
+	{"Trim", "* listitem", " *", "listitem"},
+	{"Trim", `"quote"`, `"`, "quote"},
+	{"Trim", "\u2C6F\u2C6F\u0250\u0250\u2C6F\u2C6F", "\u2C6F", "\u0250\u0250"},
+	{"Trim", "\x80test\xff", "\xff", "test"},
+	{"Trim", " Ġ ", " ", "Ġ"},
+	{"Trim", " Ġİ0", "0 ", "Ġİ"},
+	//empty string tests
+	{"Trim", "abba", "", "abba"},
+	{"Trim", "", "123", ""},
+	{"Trim", "", "", ""},
+	{"TrimLeft", "abba", "", "abba"},
+	{"TrimLeft", "", "123", ""},
+	{"TrimLeft", "", "", ""},
+	{"TrimRight", "abba", "", "abba"},
+	{"TrimRight", "", "123", ""},
+	{"TrimRight", "", "", ""},
+	{"TrimRight", "☺\xc0", "☺", "☺\xc0"},
+	{"TrimPrefix", "aabb", "a", "abb"},
+	{"TrimPrefix", "aabb", "b", "aabb"},
+	{"TrimSuffix", "aabb", "a", "aabb"},
+	{"TrimSuffix", "aabb", "b", "aab"},
+]
+
+struct trimNilTest {
+	f:     str
+	input: []byte
+	arg:   str
+	out:   []byte
+}
+
+static mut trimNilTests: []trimNilTest = [
+	{"Trim", nil, "", nil},
+	{"Trim", [], "", nil},
+	{"Trim", ['a'], "a", nil},
+	{"Trim", ['a', 'a'], "a", nil},
+	{"Trim", ['a'], "ab", nil},
+	{"Trim", ['a', 'b'], "ab", nil},
+	{"Trim", []byte("☺"), "☺", nil},
+	{"TrimLeft", nil, "", nil},
+	{"TrimLeft", [], "", nil},
+	{"TrimLeft", ['a'], "a", nil},
+	{"TrimLeft", ['a', 'a'], "a", nil},
+	{"TrimLeft", ['a'], "ab", nil},
+	{"TrimLeft", ['a', 'b'], "ab", nil},
+	{"TrimLeft", []byte("☺"), "☺", nil},
+	{"TrimRight", nil, "", nil},
+	{"TrimRight", [], "", []},
+	{"TrimRight", ['a'], "a", []},
+	{"TrimRight", ['a', 'a'], "a", []},
+	{"TrimRight", ['a'], "ab", []},
+	{"TrimRight", ['a', 'b'], "ab", []},
+	{"TrimRight", []byte("☺"), "☺", []},
+	{"TrimPrefix", nil, "", nil},
+	{"TrimPrefix", [], "", []},
+	{"TrimPrefix", ['a'], "a", []},
+	{"TrimPrefix", []byte("☺"), "☺", []},
+	{"TrimSuffix", nil, "", nil},
+	{"TrimSuffix", [], "", []},
+	{"TrimSuffix", ['a'], "a", []},
+	{"TrimSuffix", []byte("☺"), "☺", []},
+]
+
+#test
+fn testTrim(t: &testing::T) {
+	toFn := fn(name: str): (fn(mut b: []byte, str): []byte, fn(mut b: []byte, []byte): []byte) {
+		match name {
+		| "Trim":
+			ret Trim, nil
+		| "TrimLeft":
+			ret TrimLeft, nil
+		| "TrimRight":
+			ret TrimRight, nil
+		| "TrimPrefix":
+			ret nil, TrimPrefix
+		| "TrimSuffix":
+			ret nil, TrimSuffix
+		|:
+			t.Errorf("Undefined trim function {}", name)
+			ret nil, nil
+		}
+	}
+
+	for _, tc in trimTests {
+		name := tc.f
+		f, fb := toFn(name)
+		if f == nil && fb == nil {
+			continue
+		}
+		mut actual := ""
+		if f != nil {
+			actual = str(f([]byte(tc.input), tc.arg))
+		} else {
+			actual = str(fb([]byte(tc.input), []byte(tc.arg)))
+		}
+		if actual != tc.out {
+			t.Errorf("{}({}, {}) = {}; want {}", name, tc.input, tc.arg, actual, tc.out)
+		}
+	}
+
+	for (_, mut tc) in trimNilTests {
+		name := tc.f
+		f, fb := toFn(name)
+		if f == nil && fb == nil {
+			continue
+		}
+		let mut actual: []byte
+		if f != nil {
+			actual = f(tc.input, tc.arg)
+		} else {
+			actual = fb(tc.input, []byte(tc.arg))
+		}
+		report := fn(s: []byte): str {
+			if s == nil {
+				ret "nil"
+			} else {
+				ret fmt::Format("{}", s)
+			}
+		}
+		if len(actual) != 0 {
+			t.Errorf("{}({}, {}) returned non-empty value", name, report(tc.input), tc.arg)
+		} else {
+			actualNil := actual == nil
+			outNil := tc.out == nil
+			if actualNil != outNil {
+				t.Errorf("{}({}, {}) got nil {}; want nil {}", name, report(tc.input), tc.arg, actualNil, outNil)
+			}
+		}
+	}
+}
+
+struct trimFuncTest {
+	f:        predicate
+	input:    str
+	trimOut:  []byte
+	leftOut:  []byte
+	rightOut: []byte
+}
+
+static trimFuncTests: []trimFuncTest = [
+	{isSpace, space + " hello " + space,
+		[]byte("hello"),
+		[]byte("hello " + space),
+		[]byte(space + " hello"),
+	},
+	{isDigit, "\u0e50\u0e5212hello34\u0e50\u0e51",
+		[]byte("hello"),
+		[]byte("hello34\u0e50\u0e51"),
+		[]byte("\u0e50\u0e5212hello"),
+	},
+	{isUpper, "\u2C6F\u2C6F\u2C6F\u2C6FABCDhelloEF\u2C6F\u2C6FGH\u2C6F\u2C6F",
+		[]byte("hello"),
+		[]byte("helloEF\u2C6F\u2C6FGH\u2C6F\u2C6F"),
+		[]byte("\u2C6F\u2C6F\u2C6F\u2C6FABCDhello"),
+	},
+	{not(isSpace), "hello" + space + "hello",
+		[]byte(space),
+		[]byte(space + "hello"),
+		[]byte("hello" + space),
+	},
+	{not(isDigit), "hello\u0e50\u0e521234\u0e50\u0e51helo",
+		[]byte("\u0e50\u0e521234\u0e50\u0e51"),
+		[]byte("\u0e50\u0e521234\u0e50\u0e51helo"),
+		[]byte("hello\u0e50\u0e521234\u0e50\u0e51"),
+	},
+	{isValidRune, "ab\xc0a\xc0cd",
+		[]byte("\xc0a\xc0"),
+		[]byte("\xc0a\xc0cd"),
+		[]byte("ab\xc0a\xc0"),
+	},
+	{not(isValidRune), "\xc0a\xc0",
+		[]byte("a"),
+		[]byte("a\xc0"),
+		[]byte("\xc0a"),
+	},
+	// The nils returned by TrimLeftFunc are odd behavior, but we need
+	// to preserve backwards compatibility.
+	{isSpace, "",
+		nil,
+		nil,
+		[]byte(""),
+	},
+	{isSpace, " ",
+		nil,
+		nil,
+		[]byte(""),
+	},
+]
+
+struct trimmer {
+	name: str
+	trim: fn(mut s: []byte, f: fn(mut r: rune): bool): []byte
+	out:  []byte
+}
+
+#test
+fn testTrimFunc(t: &testing::T) {
+	for _, tc in trimFuncTests {
+		let trimmers: []trimmer = [
+			{"TrimFunc", TrimFunc, tc.trimOut},
+			{"TrimLeftFunc", TrimLeftFunc, tc.leftOut},
+			{"TrimRightFunc", TrimRightFunc, tc.rightOut},
+		]
+		for _, trimmer in trimmers {
+			actual := trimmer.trim([]byte(tc.input), tc.f.f)
+			if actual == nil && trimmer.out != nil {
+				t.Errorf("{}({}, {}) = nil; want {}", trimmer.name, tc.input, tc.f.name, trimmer.out)
+			}
+			if actual != nil && trimmer.out == nil {
+				t.Errorf("{}({}, {}) = {}; want nil", trimmer.name, tc.input, tc.f.name, actual)
+			}
+			if !Equal(actual, trimmer.out) {
+				t.Errorf("{}({}, {}) = {}; want {}", trimmer.name, tc.input, tc.f.name, actual, trimmer.out)
+			}
+		}
+	}
+}
+
+struct predicate {
+	f:    fn(mut r: rune): bool
+	name: str
+}
+
+static isSpace = predicate{unicode::IsSpace, "IsSpace"}
+static isDigit = predicate{unicode::IsDigit, "IsDigit"}
+static isUpper = predicate{unicode::IsUpper, "IsUpper"}
+static isValidRune = predicate{
+	fn(mut r: rune): bool {
+		ret r != utf8::RuneError
+	},
+	"IsValidRune",
+}
+
+fn not(p: predicate): predicate {
+	ret predicate{
+		fn(mut r: rune): bool {
+			ret !p.f(r)
+		},
+		"not " + p.name,
+	}
+}
+
+struct indexFuncTest {
+	input: str
+	f:     predicate
+	first: int
+	last:  int
+}
+
+static indexFuncTests: []indexFuncTest = [
+	{"", isValidRune, -1, -1},
+	{"abc", isDigit, -1, -1},
+	{"0123", isDigit, 0, 3},
+	{"a1b", isDigit, 1, 1},
+	{space, isSpace, 0, len(space) - 3},                                               // last rune in space is 3 bytes
+	{"\u0e50\u0e5212hello34\u0e50\u0e51", isDigit, 0, 18},
+	{"\u2C6F\u2C6F\u2C6F\u2C6FABCDhelloEF\u2C6F\u2C6FGH\u2C6F\u2C6F", isUpper, 0, 34},
+	{"12\u0e50\u0e52hello34\u0e50\u0e51", not(isDigit), 8, 12},
+
+	// tests of invalid UTF-8
+	{"\x801", isDigit, 1, 1},
+	{"\x80abc", isDigit, -1, -1},
+	{"\xc0a\xc0", isValidRune, 1, 1},
+	{"\xc0a\xc0", not(isValidRune), 0, 2},
+	{"\xc0☺\xc0", not(isValidRune), 0, 4},
+	{"\xc0☺\xc0\xc0", not(isValidRune), 0, 5},
+	{"ab\xc0a\xc0cd", not(isValidRune), 2, 4},
+	{"a\xe0\x80cd", not(isValidRune), 1, 2},
+]
+
+#test
+fn testIndexFunc(t: &testing::T) {
+	for _, tc in indexFuncTests {
+		first := IndexFunc([]byte(tc.input), tc.f.f)
+		if first != tc.first {
+			t.Errorf("IndexFunc({}, {}) = {}; want {}", tc.input, tc.f.name, first, tc.first)
+		}
+		last := LastIndexFunc([]byte(tc.input), tc.f.f)
+		if last != tc.last {
+			t.Errorf("LastIndexFunc({}, {} = {}; want {}", tc.input, tc.f.name, last, tc.last)
+		}
+	}
+}
+
+struct replaceTest {
+	input: str
+	old:   str
+	new:   str
+	n:     int
+	out:   str
+}
+
+static replaceTests: []replaceTest = [
+	{"hello", "l", "L", 0, "hello"},
+	{"hello", "l", "L", -1, "heLLo"},
+	{"hello", "x", "X", -1, "hello"},
+	{"", "x", "X", -1, ""},
+	{"radar", "r", "<r>", -1, "<r>ada<r>"},
+	{"", "", "<>", -1, "<>"},
+	{"banana", "a", "<>", -1, "b<>n<>n<>"},
+	{"banana", "a", "<>", 1, "b<>nana"},
+	{"banana", "a", "<>", 1000, "b<>n<>n<>"},
+	{"banana", "an", "<>", -1, "b<><>a"},
+	{"banana", "ana", "<>", -1, "b<>na"},
+	{"banana", "", "<>", -1, "<>b<>a<>n<>a<>n<>a<>"},
+	{"banana", "", "<>", 10, "<>b<>a<>n<>a<>n<>a<>"},
+	{"banana", "", "<>", 6, "<>b<>a<>n<>a<>n<>a"},
+	{"banana", "", "<>", 5, "<>b<>a<>n<>a<>na"},
+	{"banana", "", "<>", 1, "<>banana"},
+	{"banana", "a", "a", -1, "banana"},
+	{"banana", "a", "a", 1, "banana"},
+	{"☺☻☹", "", "<>", -1, "<>☺<>☻<>☹<>"},
+]
+
+#test
+fn testReplace(t: &testing::T) {
+	for _, tt in replaceTests {
+		mut input := append([]byte(tt.input), "<spare>"...)
+		input = input[:len(tt.input)]
+		mut out := Replace(input, []byte(tt.old), []byte(tt.new), tt.n)
+		mut s := str(out)
+		if s != tt.out {
+			t.Errorf("Replace({}, {}, {}, {}) = {}, want {}", tt.input, tt.old, tt.new, tt.n, s, tt.out)
+		}
+		if cap(input) == cap(out) && &input[:1][0] == &out[:1][0] {
+			t.Errorf("Replace({}, {}, {}, {}) didn't copy", tt.input, tt.old, tt.new, tt.n)
+		}
+		if tt.n == -1 {
+			out = ReplaceAll(input, []byte(tt.old), []byte(tt.new))
+			s = str(out)
+			if s != tt.out {
+				t.Errorf("ReplaceAll({}, {}, {}) = {}, want {}", tt.input, tt.old, tt.new, s, tt.out)
+			}
+		}
+	}
+}
+
+struct equalFoldTest {
+	s:   str
+	t:   str
+	out: bool
+}
+
+static EqualFoldTests: []equalFoldTest = [
+	{"abc", "abc", true},
+	{"ABcd", "ABcd", true},
+	{"123abc", "123ABC", true},
+	{"αβδ", "ΑΒΔ", true},
+	{"abc", "xyz", false},
+	{"abc", "XYZ", false},
+	{"abcdefghijk", "abcdefghijX", false},
+	{"abcdefghijk", "abcdefghij\u212A", true},
+	{"abcdefghijK", "abcdefghij\u212A", true},
+	{"abcdefghijkz", "abcdefghij\u212Ay", false},
+	{"abcdefghijKz", "abcdefghij\u212Ay", false},
+]
+
+#test
+fn testEqualFold(t: &testing::T) {
+	for _, tt in EqualFoldTests {
+		mut out := EqualFold([]byte(tt.s), []byte(tt.t))
+		if out != tt.out {
+			t.Errorf("EqualFold({}, {}) = {}, want {}", tt.s, tt.t, out, tt.out)
+		}
+		out = EqualFold([]byte(tt.t), []byte(tt.s))
+		if out != tt.out {
+			t.Errorf("EqualFold({}, {}) = {}, want {}", tt.t, tt.s, out, tt.out)
+		}
+	}
+}
+
+struct cutTest {
+	s:      str
+	sep:    str
+	before: str
+	after:  str
+	found:  bool
+}
+
+static cutTests: []cutTest = [
+	{"abc", "b", "a", "c", true},
+	{"abc", "a", "", "bc", true},
+	{"abc", "c", "ab", "", true},
+	{"abc", "abc", "", "", true},
+	{"abc", "", "", "abc", true},
+	{"abc", "d", "abc", "", false},
+	{"", "d", "", "", false},
+	{"", "", "", "", true},
+]
+
+#test
+fn testCut(t: &testing::T) {
+	for _, tt in cutTests {
+		before, after, found := Cut([]byte(tt.s), []byte(tt.sep))
+		if str(before) != tt.before || str(after) != tt.after || found != tt.found {
+			t.Errorf("Cut({}, {}) = {}, {}, {}, want {}, {}, {}", tt.s, tt.sep, before, after, found, tt.before, tt.after, tt.found)
+		}
+	}
+}
+
+static cutPrefixTests: []cutTest = [
+	{"abc", "a", "", "bc", true},
+	{"abc", "abc", "", "", true},
+	{"abc", "", "", "abc", true},
+	{"abc", "d", "", "abc", false},
+	{"", "d", "", "", false},
+	{"", "", "", "", true},
+]
+
+#test
+fn testCutPrefix(t: &testing::T) {
+	for _, tt in cutPrefixTests {
+		after, found := CutPrefix([]byte(tt.s), []byte(tt.sep))
+		if str(after) != tt.after || found != tt.found {
+			t.Errorf("CutPrefix({}, {}) = {}, {}, want {}, {}", tt.s, tt.sep, after, found, tt.after, tt.found)
+		}
+	}
+}
+
+static cutSuffixTests: []cutTest = [
+	{"abc", "bc", "a", "", true},
+	{"abc", "abc", "", "", true},
+	{"abc", "", "abc", "", true},
+	{"abc", "d", "abc", "", false},
+	{"", "d", "", "", false},
+	{"", "", "", "", true},
+]
+
+#test
+fn testCutSuffix(t: &testing::T) {
+	for _, tt in cutSuffixTests {
+		before, found := CutSuffix([]byte(tt.s), []byte(tt.sep))
+		if str(before) != tt.before || found != tt.found {
+			t.Errorf("CutSuffix({}, {}) = {}, {}, want {}, {}", tt.s, tt.sep, before, found, tt.before, tt.found)
+		}
+	}
+}
+
+struct containsTest {
+	b:        []byte
+	subslice: []byte
+	want:     bool
+}
+
+static containsTests: []containsTest = [
+	{[]byte("hello"), []byte("hel"), true},
+	{[]byte("日本語"), []byte("日本"), true},
+	{[]byte("hello"), []byte("Hello, world"), false},
+	{[]byte("東京"), []byte("京東"), false},
+]
+
+#test
+fn testContains(t: &testing::T) {
+	for _, tt in containsTests {
+		got := Contains(tt.b, tt.subslice)
+		if got != tt.want {
+			t.Errorf("Contains({}, {}) = {}, want {}", tt.b, tt.subslice, got, tt.want)
+		}
+	}
+}
+
+struct containsAnyTest {
+	b:        []byte
+	substr:   str
+	expected: bool
+}
+
+static containsAnyTests: []containsAnyTest = [
+	{[]byte(""), "", false},
+	{[]byte(""), "a", false},
+	{[]byte(""), "abc", false},
+	{[]byte("a"), "", false},
+	{[]byte("a"), "a", true},
+	{[]byte("aaa"), "a", true},
+	{[]byte("abc"), "xyz", false},
+	{[]byte("abc"), "xcz", true},
+	{[]byte("a☺b☻c☹d"), "uvw☻xyz", true},
+	{[]byte("aRegExp*"), ".(|)*+?^$[]", true},
+	{[]byte(dots + dots + dots), " ", false},
+]
+
+#test
+fn testContainsAny(t: &testing::T) {
+	for _, ct in containsAnyTests {
+		if ContainsAny(ct.b, ct.substr) != ct.expected {
+			t.Errorf("ContainsAny({}, {}) = {}, want {}",
+				ct.b, ct.substr, !ct.expected, ct.expected)
+		}
+	}
+}
+
+struct containsRuneTest {
+	b:        []byte
+	r:        rune
+	expected: bool
+}
+
+static containsRuneTests: []containsRuneTest = [
+	{[]byte(""), 'a', false},
+	{[]byte("a"), 'a', true},
+	{[]byte("aaa"), 'a', true},
+	{[]byte("abc"), 'y', false},
+	{[]byte("abc"), 'c', true},
+	{[]byte("a☺b☻c☹d"), 'x', false},
+	{[]byte("a☺b☻c☹d"), '☻', true},
+	{[]byte("aRegExp*"), '*', true},
+]
+
+#test
+fn testContainsRune(t: &testing::T) {
+	for _, ct in containsRuneTests {
+		if ContainsRune(ct.b, ct.r) != ct.expected {
+			t.Errorf("ContainsRune({}, {}) = {}, want {}",
+				ct.b, ct.r, !ct.expected, ct.expected)
+		}
+	}
+}
+
+#test
+fn testContainsFunc(t: &testing::T) {
+	for _, ct in containsRuneTests {
+		if ContainsFunc(ct.b, fn(mut r: rune): bool {
+			ret ct.r == r
+		}) != ct.expected {
+			t.Errorf("ContainsFunc({}, fn({})) = {}, want {}",
+				ct.b, ct.r, !ct.expected, ct.expected)
+		}
+	}
+}

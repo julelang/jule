@@ -2,8 +2,28 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/unicode/utf8"
+use "std/unsafe"
+
 // Package byteslite implements algorithms for byte stacks with
 // a minor dependencies, what a cheap algorithm package for byte stacks.
+fn Count(s: []byte, b: byte): int {
+	mut t := 0
+	mut i := 0
+	for i < len(s) {
+		r, n := utf8::DecodeRune(s[i:])
+		if n == 1 && byte(r) == b {
+			t++
+		}
+		i += n
+	}
+	ret t
+}
+
+// Same as Count, but takes string as byte stack.
+fn CountStr(s: str, b: byte): int {
+	ret Count(unsafe::StrBytes(s), b)
+}
 
 // Returns index of first matched item with specified byte,
 // returns -1 if not exist any match. Starts searching at left
@@ -57,4 +77,98 @@ fn LastIndexByteStr(s: str, b: byte): int {
 		ret -1
 	}
 	ret lastIndexByte(&s[0], &s[len(s)-1], b)
+}
+
+// The prime base used in Rabin-Karp algorithm.
+const PrimeRK = 16777619
+
+// Returns the hash and the appropriate multiplicative
+// factor for use in Rabin-Karp algorithm.
+fn HashStr[T: str | []byte](sep: T): (u32, u32) {
+	mut hash := u32(0)
+	mut i := 0
+	for i < len(sep); i++ {
+		hash = hash*PrimeRK + u32(sep[i])
+	}
+	mut pow := u32(1)
+	mut sq := u32(PrimeRK)
+	for i > 0; i >>= 1 {
+		if i&1 != 0 {
+			pow *= sq
+		}
+		sq *= sq
+	}
+	ret hash, pow
+}
+
+// Returns the hash of the reverse of sep and the
+// appropriate multiplicative factor for use in Rabin-Karp algorithm.
+fn HashStrRev[T: str | []byte](sep: T): (u32, u32) {
+	mut hash := u32(0)
+	mut i := len(sep) - 1
+	for i >= 0; i-- {
+		hash = hash*PrimeRK + u32(sep[i])
+	}
+	mut pow := u32(1)
+	mut sq := u32(PrimeRK)
+	i = len(sep)
+	for i > 0; i >>= 1 {
+		if i&1 != 0 {
+			pow *= sq
+		}
+		sq *= sq
+	}
+	ret hash, pow
+}
+
+// Uses the Rabin-Karp search algorithm to return the index of the
+// first occurrence of sep in s, or -1 if not present.
+fn IndexRabinKarp[T: str | []byte](s: T, sep: T): int {
+	// Rabin-Karp search
+	hashss, pow := HashStr(sep)
+	n := len(sep)
+	let mut h: u32
+	mut i := 0
+	for i < n; i++ {
+		h = h*PrimeRK + u32(s[i])
+	}
+	if h == hashss && str(s[:n]) == str(sep) {
+		ret 0
+	}
+	for i < len(s) {
+		h *= PrimeRK
+		h += u32(s[i])
+		h -= pow * u32(s[i-n])
+		i++
+		if h == hashss && str(s[i-n:i]) == str(sep) {
+			ret i - n
+		}
+	}
+	ret -1
+}
+
+// Uses the Rabin-Karp search algorithm to return the last index of the
+// occurrence of sep in s, or -1 if not present.
+fn LastIndexRabinKarp[T: str | []byte](s: T, sep: T): int {
+	// Rabin-Karp search from the end of the string
+	hashss, pow := HashStrRev(sep)
+	n := len(sep)
+	last := len(s) - n
+	let mut h: u32
+	mut i := len(s) - 1
+	for i >= last; i-- {
+		h = h*PrimeRK + u32(s[i])
+	}
+	if h == hashss && str(s[last:]) == str(sep) {
+		ret last
+	}
+	for i >= 0; i-- {
+		h *= PrimeRK
+		h += u32(s[i])
+		h -= pow * u32(s[i+n])
+		if h == hashss && str(s[i:i+n]) == str(sep) {
+			ret i
+		}
+	}
+	ret -1
 }
