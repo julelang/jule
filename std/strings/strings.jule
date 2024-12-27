@@ -3,416 +3,1129 @@
 // license that can be found in the LICENSE file.
 
 use "std/internal/byteslite"
+use "std/math/bits"
+use "std/runtime"
 use "std/unicode"
 use "std/unicode/utf8"
+use "std/unsafe"
 
-// Returns string that equals to concatenation of n-count s.
-// Returns empty string is n <= 0.
-fn Repeat(s: str, mut n: int): str {
-	if n <= 0 {
-		ret ""
-	}
-	if len(s) > int.Max/n {
-		panic("strings: repeat: integer buffer size overflow")
-	}
-	mut ss := Builder.New(len(s) * n)
-	for n > 0; n-- {
-		ss.WriteStr(s)!
-	}
-	ret ss.Str()
-}
+// A 32-byte value, where each bit represents the presence of a
+// given ASCII character in the set. The 128-bits of the lower 16 bytes,
+// starting with the least-significant bit of the lowest word to the
+// most-significant bit of the highest word, map to the full range of all
+// 128 ASCII characters. The 128-bits of the upper 16 bytes will be zeroed,
+// ensuring that any non-ASCII character will be reported as not in the set.
+// This allocates a total of 32 bytes even though the upper half
+// is unused to avoid bounds checks in asciiSet.contains.
+type asciiSet: [8]u32
 
-// Reports string has prefix as specified substring or not.
-fn HasPrefix(s: str, sub: str): bool {
-	ret len(s) >= len(sub) && s[:len(sub)] == sub
-}
-
-// Reports string has suffix as specified substring or not.
-fn HasSuffix(s: str, sub: str): bool {
-	ret len(s) >= len(sub) && s[len(s)-len(sub):] == sub
-}
-
-// Returns index of first matched item with specified substring,
-// returns -1 if not exist any match. Starts searching at left
-// of string to right. Starts searching s at given index.
-// Returns -1, if i < 0 || i >= len(s).
-fn FindAt(s: str, sub: str, mut i: int): int {
-	if i < 0 || len(s) < len(sub) || len(sub) == 0 {
-		ret -1
-	}
-	for i < len(s); i++ {
-		if HasPrefix(s[i:], sub) {
-			ret i
-		}
-	}
-	ret -1
-}
-
-// Returns index of first matched item with specified substring,
-// returns -1 if not exist any match. Starts searching at left
-// of string to right.
-fn Find(s: str, sub: str): int {
-	ret FindAt(s, sub, 0)
-}
-
-// Returns index of first matched item with specified substring,
-// returns -1 if not exist any match. Starts searching at right
-// of string to left. Starts searching s at given index.
-// Returns -1, if i < 0 || i >= len(s).
-fn FindLastAt(s: str, sub: str, i: int): int {
-	mut j := i - len(sub) + 1
-	if len(sub) == 0 || i < 0 || i >= len(s) || j < 0 {
-		ret -1
-	}
-loop:
-	for j >= 0; j-- {
-		mut k := j
-		mut z := 0
-		for z < len(sub); k, z = k+1, z+1 {
-			if s[k] != sub[z] {
-				continue loop
+impl asciiSet {
+	// Creates a set of ASCII characters and reports whether all
+	// characters in chars are ASCII.
+	static fn make(chars: str): (as: asciiSet, ok: bool) {
+		for _, c in chars {
+			if c >= utf8::RuneSelf {
+				ret as, false
 			}
+			as[c/32] |= 1 << (c % 32)
 		}
-		ret j
+		ret as, true
 	}
-	ret -1
-}
 
-// Returns index of first matched item with specified substring,
-// returns -1 if not exist any match. Starts searching at right
-// of string to left.
-fn FindLast(s: str, sub: str): int {
-	ret FindLastAt(s, sub, len(s)-1)
-}
-
-// Returns index of first matched item with finder function,
-// returns -1 if not exist any match. Starts searching at left
-// of string to right. Starts searching s at given index.
-// Returns -1, if i < 0.
-fn FindFnAt(s: str, mut i: int, f: fn(mut rune): bool): int {
-	if i < 0 {
-		ret -1
+	// Reports whether c is inside the set.
+	fn contains(self, c: byte): bool {
+		ret (self[c/32]&(1<<(c%32))) != 0
 	}
-	for i < len(s) {
-		r, n := utf8::DecodeRuneStr(s[i:])
-		if f(r) {
-			ret i
-		}
-		i += n
+}
+
+// Counts the number of non-overlapping instances of substr in s.
+// If substr is an empty string, Count returns 1 + the number of Unicode code points in s.
+fn Count(s: str, substr: str): int {
+	// special case
+	if len(substr) == 0 {
+		ret utf8::RuneCountStr(s) + 1
 	}
-	ret -1
-}
-
-// Returns index of first matched item with finder function,
-// returns -1 if not exist any match. Starts searching at left
-// of string to right.
-fn FindFn(s: str, f: fn(mut rune): bool): int {
-	ret FindFnAt(s, 0, f)
-}
-
-// Returns index of first matched item with finder function,
-// returns -1 if not exist any match. Starts searching at right
-// of string to left. Starts searching s at given index.
-// Returns -1, if i < 0 || i >= len(s).
-fn FindFnLastAt(s: str, mut i: int, f: fn(mut rune): bool): int {
-	if i < 0 || i >= len(s) {
-		ret -1
-	}
-	for i > 0 {
-		r, n := utf8::DecodeRuneStr(s[i:])
-		if f(r) {
-			ret i
-		}
-		i -= n
-	}
-	ret -1
-}
-
-// Returns index of first matched item with finder function,
-// returns -1 if not exist any match. Starts searching at right
-// of string to left.
-fn FindFnLast(s: str, f: fn(mut rune): bool): int {
-	ret FindFnLastAt(s, len(s)-1, f)
-}
-
-// Returns index of first matched item with specified byte,
-// returns -1 if not exist any match. Starts searching at left
-// of string to right.
-fn FindByte(s: str, b: byte): int {
-	ret byteslite::IndexByteStr(s, b)
-}
-
-// Returns index of first matched item with specified byte,
-// returns -1 if not exist any match. Starts searching at right
-// of string to left.
-fn FindLastByte(s: str, b: byte): int {
-	ret byteslite::LastIndexByteStr(s, b)
-}
-
-// Returns index of first matched item with specified rune,
-// returns -1 if not exist any match. Starts searching at left
-// of string to right.
-fn FindRune(s: str, r: rune): int {
-	mut i := 0
-	for i < len(s) {
-		br, n := utf8::DecodeRuneStr(s[i:])
-		if r == br {
-			ret i
-		}
-		i += n
-	}
-	ret -1
-}
-
-// Returns index of first matched item with specified rune,
-// returns -1 if not exist any match. Starts searching at right
-// of string to left.
-fn FindLastRune(s: str, r: rune): int {
-	mut i := len(s)
-	for i > 0 {
-		br, n := utf8::DecodeLastRuneStr(s[:i])
-		if r == br {
-			ret i - 1
-		}
-		i -= n
-	}
-	ret -1
-}
-
-// Returns index of first matched item with any of runes,
-// returns -1 if not exist any match. Starts searching at left
-// of string to right.
-fn FindAny(s: str, runes: str): int {
-	mut i := 0
-	for i < len(s) {
-		r, n := utf8::DecodeRuneStr(s[i:])
-		if FindRune(runes, r) != -1 {
-			ret i
-		}
-		i += n
-	}
-	ret -1
-}
-
-// Returns index of first matched item with any of runes,
-// returns -1 if not exist any match. Starts searching at right
-// of string to left.
-fn FindLastAny(s: str, runes: str): int {
-	mut i := len(s)
-	for i > 0 {
-		r, n := utf8::DecodeLastRuneStr(s[:i])
-		if FindRune(runes, r) != -1 {
-			ret i - 1
-		}
-		i -= n
-	}
-	ret -1
-}
-
-// Splits the string into the specified number of parts to the specified substring.
-// Returns empty slice if n is equals to zero.
-// Returns all parts if n less than zero.
-fn Split(s: str, sub: str, mut n: int): []str {
-	mut cap := n
-	if n < 0 {
-		cap = 1 << 4
-	}
-	mut parts := make([]str, 0, cap)
-	if n == 0 {
-		ret parts
-	}
-	if n < 0 {
-		n = len(s)
-	}
-	mut i := 0
-	for n > 0; n-- {
-		j := FindAt(s, sub, i)
-		if j == -1 {
-			break
-		}
-		parts = append(parts, s[i:j])
-		i = j + len(sub)
-	}
-	if n > 0 && i < len(s) {
-		parts = append(parts, s[i:])
-	}
-	ret parts
-}
-
-// Same as the Split function. But splits all parts.
-// Basically equals to Split(s, sub, -1) call.
-fn SplitAll(s: str, sub: str): []str {
-	ret Split(s, sub, -1)
-}
-
-// Reports whether string includes substring.
-fn Contains(s: str, sub: str): bool {
-	ret FindAt(s, sub, 0) != -1
-}
-
-// Reports whether string includes byte.
-fn ContainsByte(s: str, b: byte): bool {
-	ret FindByte(s, b) != -1
-}
-
-// Reports whether string includes rune.
-fn ContainsRune(s: str, r: rune): bool {
-	ret FindRune(s, r) != -1
-}
-
-// Reports whether string includes any of runes.
-fn ContainsAny(s: str, runes: str): bool {
-	ret FindAny(s, runes) != -1
-}
-
-// Counts the number of non-overlapping instances of substring in s.
-// Returns zero if substring is empty.
-fn Count(s: str, sub: str): int {
-	if len(sub) == 0 {
-		ret 0
+	if len(substr) == 1 {
+		ret byteslite::CountStr(s, substr[0])
 	}
 	mut n := 0
 	mut i := 0
 	for {
-		j := FindAt(s, sub, i)
+		j := Index(s[i:], substr)
 		if j == -1 {
-			break
+			ret n
 		}
 		n++
-		i = j + len(sub)
+		i += j + len(substr)
 	}
-	ret n
 }
 
-// Replaces all substrings matching sub in the string with new.
-// Returns same string if n is equals to zero.
-// Replaces all matches if n less than zero.
-fn Replace(s: str, sub: str, new: str, mut n: int): str {
-	if n == 0 || sub == new {
-		ret s
-	}
+// Reports whether substr is within s.
+fn Contains(s: str, substr: str): bool {
+	ret Index(s, substr) != -1
+}
 
-	m := Count(s, sub)
-	if m == 0 {
-		ret s
-	}
-	if n < 0 || m < n {
-		n = m
-	}
+// Reports whether any of the UTF-8-encoded code points in chars are within s.
+fn ContainsAny(s: str, chars: str): bool {
+	ret IndexAny(s, chars) >= 0
+}
 
-	mut ss := Builder.New((len(s) + n*(len(new)-len(sub))) + 1)
+// Reports whether the rune is contained in the UTF-8-encoded byte slice s.
+fn ContainsRune(s: str, r: rune): bool {
+	ret IndexRune(s, r) >= 0
+}
+
+// Reports whether any of the UTF-8-encoded code points r within b satisfy f(r).
+fn ContainsFunc(s: str, f: fn(mut r: rune): bool): bool {
+	ret IndexFunc(s, f) >= 0
+}
+
+// Returns the index of the first instance of c in b, or -1 if c is not present in s.
+fn IndexByte(s: str, c: byte): int {
+	ret byteslite::IndexByteStr(s, c)
+}
+
+// Returns the index of the last instance of substr in s, or -1 if substr is not present in s.
+fn LastIndex(s: str, substr: str): int {
+	match {
+	| len(substr) == 0:
+		ret len(s)
+	| len(substr) == 1:
+		ret byteslite::LastIndexByteStr(s, substr[0])
+	| len(substr) == len(s):
+		if substr == s {
+			ret 0
+		}
+		ret -1
+	| len(substr) > len(s):
+		ret -1
+	}
+	// Rabin-Karp search from the end of the string
+	hashss, pow := byteslite::HashStrRev(substr)
+	last := len(s) - len(substr)
+	let mut h: u32
+	mut i := len(s) - 1
+	for i >= last; i-- {
+		h = h*byteslite::PrimeRK + u32(s[i])
+	}
+	if h == hashss && s[last:] == substr {
+		ret last
+	}
+	for i >= 0; i-- {
+		h *= byteslite::PrimeRK
+		h += u32(s[i])
+		h -= pow * u32(s[i+len(substr)])
+		if h == hashss && s[i:i+len(substr)] == substr {
+			ret i
+		}
+	}
+	ret -1
+}
+
+// Returns the index of the last instance of c in s, or -1 if c is not present in s.
+fn LastIndexByte(s: str, c: byte): int {
+	ret byteslite::LastIndexByteStr(s, c)
+}
+
+// Returns the index of the first instance of the Unicode code point
+// r, or -1 if rune is not present in s.
+// If r is [utf8.RuneError], it returns the first instance of any
+// invalid UTF-8 byte sequence.
+fn IndexRune(s: str, r: rune): int {
+	match {
+	| 0 <= r && r < utf8::RuneSelf:
+		ret IndexByte(s, byte(r))
+	| r == utf8::RuneError:
+		mut i := 0
+		for i < len(s) {
+			r1, n := utf8::DecodeRuneStr(s[i:])
+			if r1 == utf8::RuneError {
+				ret i
+			}
+			i += n
+		}
+		ret -1
+	| !utf8::ValidRune(r):
+		ret -1
+	|:
+		// Search for rune r using the last byte of its UTF-8 encoded form.
+		// The distribution of the last byte is more uniform compared to the
+		// first byte which has a 78% chance of being [240, 243, 244].
+		let mut b: [utf8::UTFMax]byte
+		n := utf8::EncodeRune(unsafe::Slice(&b[0], len(b), len(b)), r)
+		last := n - 1
+		mut i := last
+		mut fails := 0
+		for i < len(s) {
+			if s[i] != b[last] {
+				o := IndexByte(s[i+1:], b[last])
+				if o < 0 {
+					ret -1
+				}
+				i += o + 1
+			}
+			// Step backwards comparing bytes.
+			mut j := 1
+			for j < n; j++ {
+				if s[i-j] != b[last-j] {
+					goto next
+				}
+			}
+			ret i - last
+		next:
+			fails++
+			i++
+			if fails >= 4+i>>4 && i < len(s) {
+				goto fallback
+			}
+		}
+		ret -1
+
+	fallback:
+		c0 := b[last]
+		c1 := b[last-1] // There are at least 2 chars to match
+	loop:
+		for i < len(s); i++ {
+			if s[i] == c0 && s[i-1] == c1 {
+				mut k := 2
+				for k < n; k++ {
+					if s[i-k] != b[last-k] {
+						continue loop
+					}
+				}
+				ret i - last
+			}
+		}
+		ret -1
+	}
+}
+
+// Returns the index of the first instance of any Unicode code point
+// from chars in s, or -1 if no Unicode code point from chars is present in s.
+fn IndexAny(s: str, chars: str): int {
+	if chars == "" {
+		// Avoid scanning all of s.
+		ret -1
+	}
+	if len(chars) == 1 {
+		// Avoid scanning all of s.
+		mut r := rune(chars[0])
+		if r >= utf8::RuneSelf {
+			r = utf8::RuneError
+		}
+		ret IndexRune(s, r)
+	}
+	if len(s) > 8 {
+		as, isASCII := asciiSet.make(chars)
+		if isASCII {
+			for i, b in s {
+				if as.contains(b) {
+					ret i
+				}
+			}
+			ret -1
+		}
+	}
+	for i, c in []rune(s) {
+		if IndexRune(chars, c) >= 0 {
+			ret i
+		}
+	}
+	ret -1
+}
+
+// Returns the index of the last instance of any Unicode code
+// point from chars in s, or -1 if no Unicode code point from chars is
+// present in s.
+fn LastIndexAny(s: str, chars: str): int {
+	if chars == "" {
+		// Avoid scanning all of s.
+		ret -1
+	}
+	if len(s) == 1 {
+		mut rc := rune(s[0])
+		if rc >= utf8::RuneSelf {
+			rc = utf8::RuneError
+		}
+		if IndexRune(chars, rc) >= 0 {
+			ret 0
+		}
+		ret -1
+	}
+	if len(s) > 8 {
+		as, isASCII := asciiSet.make(chars)
+		if isASCII {
+			mut i := len(s) - 1
+			for i >= 0; i-- {
+				if as.contains(s[i]) {
+					ret i
+				}
+			}
+			ret -1
+		}
+	}
+	mut i := len(s)
+	if len(chars) == 1 {
+		mut rc := rune(chars[0])
+		if rc >= utf8::RuneSelf {
+			rc = utf8::RuneError
+		}
+		for i > 0 {
+			r, size := utf8::DecodeLastRuneStr(s[:i])
+			i -= size
+			if rc == r {
+				ret i
+			}
+		}
+		ret -1
+	}
+	for i > 0 {
+		r, size := utf8::DecodeLastRuneStr(s[:i])
+		i -= size
+		if IndexRune(chars, r) >= 0 {
+			ret i
+		}
+	}
+	ret -1
+}
+
+// Splits s into a slice of UTF-8 strings,
+// one string per Unicode character up to a maximum of n (n < 0 means no limit).
+// Invalid UTF-8 bytes are sliced individually.
+fn explode(mut s: str, mut n: int): []str {
+	l := utf8::RuneCountStr(s)
+	if n < 0 || n > l {
+		n = l
+	}
+	mut a := make([]str, n)
 	mut i := 0
-	for n > 0; n-- {
-		j := FindAt(s, sub, i)
-		if j == -1 {
+	for i < n-1; i++ {
+		_, size := utf8::DecodeRuneStr(s)
+		a[i] = s[:size]
+		s = s[size:]
+	}
+	if n > 0 {
+		a[n-1] = s
+	}
+	ret a
+}
+
+// Generic split: splits after each instance of sep,
+// including sepSave bytes of sep in the subarrays.
+fn genSplit(mut s: str, sep: str, sepSave: int, mut n: int): []str {
+	if n == 0 {
+		ret nil
+	}
+	if sep == "" {
+		ret explode(s, n)
+	}
+	if n < 0 {
+		n = Count(s, sep) + 1
+	}
+
+	if n > len(s)+1 {
+		n = len(s) + 1
+	}
+	mut a := make([]str, n)
+	n--
+	mut i := 0
+	for i < n {
+		m := Index(s, sep)
+		if m < 0 {
 			break
 		}
-		ss.WriteStr(s[i:j])!
-		ss.WriteStr(new)!
-		i = j + len(sub)
+		a[i] = s[:m+sepSave]
+		s = s[m+len(sep):]
+		i++
 	}
-	ss.WriteStr(s[i:])!
-	ret ss.Str()
+	a[i] = s
+	ret a[:i+1]
 }
 
-// Same as the Replace function. But replaces all matched subs.
-// Basically equals to Replace(s, sub, new, -1) call.
-fn ReplaceAll(s: str, sub: str, new: str): str {
-	ret Replace(s, sub, new, -1)
+// Slices s into substrings separated by sep and returns a slice of
+// the substrings between those separators.
+//
+// The count determines the number of substrings to return:
+//   - n > 0: at most n substrings; the last substring will be the unsplit remainder;
+//   - n == 0: the result is nil (zero substrings);
+//   - n < 0: all substrings.
+//
+// Edge cases for s and sep (for example, empty strings) are handled
+// as described in the documentation for [Split].
+//
+// To split around the first instance of a separator, see [Cut].
+fn SplitN(mut s: str, sep: str, n: int): []str { ret genSplit(s, sep, 0, n) }
+
+// Slices s into substrings after each instance of sep and
+// returns a slice of those substrings.
+//
+// The count determines the number of substrings to return:
+//   - n > 0: at most n substrings; the last substring will be the unsplit remainder;
+//   - n == 0: the result is nil (zero substrings);
+//   - n < 0: all substrings.
+//
+// Edge cases for s and sep (for example, empty strings) are handled
+// as described in the documentation for [SplitAfter].
+fn SplitAfterN(mut s: str, sep: str, n: int): []str {
+	ret genSplit(s, sep, len(sep), n)
 }
 
-// Returns a copy of the string s with all its characters modified
-// according to the mapping function. If mapping returns a negative value,
-// the character is dropped from the string with no replacement.
-fn Map(s: str, mapping: fn(mut rune): rune): str {
-	mut ss := Builder.New(len(s) + 1)
-	mut i := 0
-	for i < len(s) {
-		mut r, n := utf8::DecodeRuneStr(s[i:])
-		i += n
-		r = mapping(r)
-		if r >= 0 {
-			ss.WriteRune(r)!
-		}
-	}
-	ret ss.Str()
+// Slices s into all substrings separated by sep and returns a slice of
+// the substrings between those separators.
+//
+// If s does not contain sep and sep is not empty, returns a
+// slice of length 1 whose only element is s.
+//
+// If sep is empty, splits after each UTF-8 sequence. If both s
+// and sep are empty, returns an empty slice.
+//
+// It is equivalent to [SplitN] with a count of -1.
+//
+// To split around the first instance of a separator, see [Cut].
+fn Split(mut s: str, sep: str): []str { ret genSplit(s, sep, 0, -1) }
+
+// Slices s into all substrings after each instance of sep and
+// returns a slice of those substrings.
+//
+// If s does not contain sep and sep is not empty, returns
+// a slice of length 1 whose only element is s.
+//
+// If sep is empty, splits after each UTF-8 sequence. If
+// both s and sep are empty, returns an empty slice.
+//
+// It is equivalent to [SplitAfterN] with a count of -1.
+fn SplitAfter(mut s: str, sep: str): []str {
+	ret genSplit(s, sep, len(sep), -1)
 }
 
-// Returns s with all Unicode letters mapped to their lower case.
-fn ToLower(s: str): str {
-	ret Map(s, unicode::ToLower)
-}
-
-// Returns s with all Unicode letters mapped to their upper case.
-fn ToUpper(s: str): str {
-	ret Map(s, unicode::ToUpper)
-}
-
-// Trims string by specified runes at left.
-// Cutset should include runes to trim.
-fn TrimLeft(mut s: str, cutset: str): str {
-	mut i := 0
-	for i < len(s) {
-		r, n := utf8::DecodeRuneStr(s[i:])
-		if FindRune(cutset, r) == -1 {
-			ret s[i:]
-		}
-		i += n
-	}
-	ret ""
-}
-
-// Trims string by specified runes at right.
-// Cutset should include runes to trim.
-fn TrimRight(s: str, cutset: str): str {
-	mut i := len(s)
-	for i > 0 {
-		r, n := utf8::DecodeLastRuneStr(s[:i])
-		if FindRune(cutset, r) == -1 {
-			ret s[:i]
-		}
-		i -= n
-	}
-	ret ""
-}
-
-// Trims string by specified runes at left and right.
-// Cutset should include runes to trim.
-fn Trim(s: str, cutset: str): str {
-	ret TrimLeft(TrimRight(s, cutset), cutset)
-}
-
-// Concatenates the parts of its first argument to create a single string.
-// The separator sep is placed between parts in the resulting string.
-fn Join(parts: []str, sep: str): str {
-	match len(parts) {
+// Concatenates the elements of its first argument to create a single string. The separator
+// string sep is placed between elements in the resulting string.
+fn Join(elems: []str, sep: str): str {
+	match len(elems) {
 	| 0:
 		ret ""
 	| 1:
-		ret parts[0]
+		ret elems[0]
 	}
+
 	mut n := 0
-	for _, part in parts {
-		n += len(part)
-		n++
+	if len(sep) > 0 {
+		if len(sep) >= int.Max/(len(elems)-1) {
+			panic("std/strings: Join output length overflow")
+		}
+		n += len(sep) * (len(elems) - 1)
 	}
-	mut s := Builder.New(n + 1)
-	s.WriteStr(parts[0])!
-	for _, part in parts[1:] {
-		s.WriteStr(sep)!
-		s.WriteStr(part)!
+	for _, elem in elems {
+		if len(elem) > int.Max-n {
+			panic("std/strings: Join output length overflow")
+		}
+		n += len(elem)
 	}
-	ret s.Str()
+
+	mut b := Builder.New(n)
+	b.WriteStr(elems[0])!
+	for _, s in elems[1:] {
+		b.WriteStr(sep)!
+		b.WriteStr(s)!
+	}
+	ret b.Str()
 }
 
-// Cut slices s around the first instance of sep,
+// Reports whether the string s begins with prefix.
+fn HasPrefix(s: str, prefix: str): bool {
+	ret len(s) >= len(prefix) && s[:len(prefix)] == prefix
+}
+
+// Reports whether the string s ends with suffix.
+fn HasSuffix(s: str, suffix: str): bool {
+	ret len(s) >= len(suffix) && s[len(s)-len(suffix):] == suffix
+}
+
+// Returns a copy of the string s with all its characters modified
+// according to the mapping function. If mapping returns a negative value, the character is
+// dropped from the string with no replacement.
+fn Map(mapping: fn(mut r: rune): rune, mut s: str): str {
+	// In the worst case, the string can grow when mapped, making
+	// things unpleasant. But it's so rare we barge in assuming it's
+	// fine. It could also shrink but that falls out naturally.
+
+	// The output buffer b is initialized on demand, the first
+	// time a character differs.
+	mut b := Builder.New(0)
+
+	for (i, mut c) in []rune(s) {
+		r := mapping(c)
+		if r == c && c != utf8::RuneError {
+			continue
+		}
+
+		mut width := 0
+		if c == utf8::RuneError {
+			c, width = utf8::DecodeRuneStr(s[i:])
+			if width != 1 && r == c {
+				continue
+			}
+		} else {
+			width = utf8::RuneLen(c)
+		}
+
+		b.WriteStr(s[:i])!
+		if r >= 0 {
+			b.WriteRune(r)!
+		}
+
+		s = s[i+width:]
+		break
+	}
+
+	// Fast path for unchanged input.
+	if b.Len() == 0 {
+		ret s
+	}
+
+	for _, c in []rune(s) {
+		r := mapping(c)
+
+		if r >= 0 {
+			// common case
+			// Due to inlining, it is more performant to determine if WriteByte should be
+			// invoked rather than always call WriteRune
+			if r < utf8::RuneSelf {
+				b.WriteByte(byte(r))!
+			} else {
+				// r is not an ASCII rune.
+				b.WriteRune(r)!
+			}
+		}
+	}
+
+	ret b.Str()
+}
+
+// According to static analysis, spaces, dashes, zeros, equals, and tabs
+// are the most commonly repeated string literal,
+// often used for display on fixed-width terminal windows.
+// Pre-declare constants for these for O(1) repetition in the common-case.
+const repeatedSpaces = "" +
+	"                                                                " +
+	"                                                                "
+const repeatedDashes = "" +
+	"----------------------------------------------------------------" +
+	"----------------------------------------------------------------"
+const repeatedZeroes = "" +
+	"0000000000000000000000000000000000000000000000000000000000000000"
+const repeatedEquals = "" +
+	"================================================================" +
+	"================================================================"
+const repeatedTabs = "" +
+	"\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t" +
+	"\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t"
+
+// Returns a new string consisting of count copies of the string s.
+//
+// It panics if count is negative or if the result of (len(s) * count)
+// overflows.
+fn Repeat(s: str, count: int): str {
+	match count {
+	| 0:
+		ret ""
+	| 1:
+		ret s
+	}
+
+	// Since we cannot return an error on overflow,
+	// we should panic if the repeat will generate an overflow.
+	if count < 0 {
+		panic("std/strings: negative Repeat count")
+	}
+	hi, lo := bits::Mul(uint(len(s)), uint(count))
+	if hi > 0 || lo > uint(int.Max) {
+		panic("std/strings: Repeat output length overflow")
+	}
+	n := int(lo) // lo = len(s) * count
+
+	if len(s) == 0 {
+		ret ""
+	}
+
+	// Optimize for commonly repeated strings of relatively short length.
+	match s[0] {
+	| ' ' | '-' | '0' | '=' | '\t':
+		match {
+		| n <= len(repeatedSpaces) && HasPrefix(repeatedSpaces, s):
+			ret repeatedSpaces[:n]
+		| n <= len(repeatedDashes) && HasPrefix(repeatedDashes, s):
+			ret repeatedDashes[:n]
+		| n <= len(repeatedZeroes) && HasPrefix(repeatedZeroes, s):
+			ret repeatedZeroes[:n]
+		| n <= len(repeatedEquals) && HasPrefix(repeatedEquals, s):
+			ret repeatedEquals[:n]
+		| n <= len(repeatedTabs) && HasPrefix(repeatedTabs, s):
+			ret repeatedTabs[:n]
+		}
+	}
+
+	// Past a certain chunk size it is counterproductive to use
+	// larger chunks as the source of the write, as when the source
+	// is too large we are basically just thrashing the CPU D-cache.
+	// So if the result length is larger than an empirically-found
+	// limit (8KB), we stop growing the source string once the limit
+	// is reached and keep reusing the same source string - that
+	// should therefore be always resident in the L1 cache - until we
+	// have completed the construction of the result.
+	// This yields significant speedups (up to +100%) in cases where
+	// the result length is large (roughly, over L2 cache size).
+	const chunkLimit = 8 * 1024
+	mut chunkMax := n
+	if n > chunkLimit {
+		chunkMax = chunkLimit / len(s) * len(s)
+		if chunkMax == 0 {
+			chunkMax = len(s)
+		}
+	}
+
+	mut b := Builder.New(n)
+	b.WriteStr(s)!
+	for b.Len() < n {
+		mut chunk := chunkMax
+		if chunk > b.Len() {
+			chunk = b.Len()
+		}
+		if chunk > n-b.Len() {
+			chunk = n - b.Len()
+		}
+		b.WriteStr(b.Str()[:chunk])!
+	}
+	ret b.Str()
+}
+
+// Returns the index into s of the first Unicode
+// code point satisfying f(c), or -1 if none do.
+fn IndexFunc(s: str, f: fn(mut r: rune): bool): int {
+	ret indexFunc(s, f, true)
+}
+
+// Returns the index into s of the last
+// Unicode code point satisfying f(c), or -1 if none do.
+fn LastIndexFunc(s: str, f: fn(mut r: rune): bool): int {
+	ret lastIndexFunc(s, f, true)
+}
+
+// same as IndexFunc except that if truth==false,
+// the sense of the predicate function is inverted.
+fn indexFunc(s: str, f: fn(mut r: rune): bool, truth: bool): int {
+	mut start := 0
+	for start < len(s) {
+		mut wid := 1
+		mut r := rune(s[start])
+		if r >= utf8::RuneSelf {
+			r, wid = utf8::DecodeRuneStr(s[start:])
+		}
+		if f(r) == truth {
+			ret start
+		}
+		start += wid
+	}
+	ret -1
+}
+
+// Same as LastIndexFunc except that if truth==false,
+// the sense of the predicate function is inverted.
+fn lastIndexFunc(s: str, f: fn(mut r: rune): bool, truth: bool): int {
+	mut i := len(s)
+	for i > 0 {
+		r, size := utf8::DecodeLastRuneStr(s[0:i])
+		i -= size
+		if f(r) == truth {
+			ret i
+		}
+	}
+	ret -1
+}
+
+// Returns a slice of the string s with all leading
+// Unicode code points c satisfying f(c) removed.
+fn TrimLeftFunc(s: str, f: fn(mut r: rune): bool): str {
+	i := indexFunc(s, f, false)
+	if i == -1 {
+		ret ""
+	}
+	ret s[i:]
+}
+
+// Returns a slice of the string s, with all trailing
+// Unicode code points contained in cutset removed.
+//
+// To remove a suffix, use [TrimSuffix] instead.
+fn TrimRight(s: str, cutset: str): str {
+	if len(s) == 0 || cutset == "" {
+		ret s
+	}
+	if len(cutset) == 1 && cutset[0] < utf8::RuneSelf {
+		ret trimRightByte(s, cutset[0])
+	}
+	as, ok := asciiSet.make(cutset)
+	if ok {
+		ret trimRightASCII(s, as)
+	}
+	ret trimRightUnicode(s, cutset)
+}
+
+// Returns a slice of the string s with all trailing
+// Unicode code points c satisfying f(c) removed.
+fn TrimRightFunc(s: str, f: fn(mut r: rune): bool): str {
+	mut i := lastIndexFunc(s, f, false)
+	if i >= 0 && s[i] >= utf8::RuneSelf {
+		_, wid := utf8::DecodeRuneStr(s[i:])
+		i += wid
+	} else {
+		i++
+	}
+	ret s[0:i]
+}
+
+// Returns a slice of the string s with all leading
+// and trailing Unicode code points c satisfying f(c) removed.
+fn TrimFunc(s: str, f: fn(mut r: rune): bool): str {
+	ret TrimRightFunc(TrimLeftFunc(s, f), f)
+}
+
+// Returns s without the provided leading prefix string.
+// If s doesn't start with prefix, s is returned unchanged.
+fn TrimPrefix(s: str, prefix: str): str {
+	if HasPrefix(s, prefix) {
+		ret s[len(prefix):]
+	}
+	ret s
+}
+
+// Returns s without the provided trailing suffix string.
+// If s doesn't end with suffix, s is returned unchanged.
+fn TrimSuffix(s: str, suffix: str): str {
+	if HasSuffix(s, suffix) {
+		ret s[:len(s)-len(suffix)]
+	}
+	ret s
+}
+
+// Returns a slice of the string s with all leading and
+// trailing Unicode code points contained in cutset removed.
+fn Trim(s: str, cutset: str): str {
+	if s == "" || cutset == "" {
+		ret s
+	}
+	if len(cutset) == 1 && cutset[0] < utf8::RuneSelf {
+		ret trimLeftByte(trimRightByte(s, cutset[0]), cutset[0])
+	}
+	as, ok := asciiSet.make(cutset)
+	if ok {
+		ret trimLeftASCII(trimRightASCII(s, as), as)
+	}
+	ret trimLeftUnicode(trimRightUnicode(s, cutset), cutset)
+}
+
+// Returns a slice of the string s with all leading
+// Unicode code points contained in cutset removed.
+//
+// To remove a prefix, use [TrimPrefix] instead.
+fn TrimLeft(s: str, cutset: str): str {
+	if s == "" || cutset == "" {
+		ret s
+	}
+	if len(cutset) == 1 && cutset[0] < utf8::RuneSelf {
+		ret trimLeftByte(s, cutset[0])
+	}
+	as, ok := asciiSet.make(cutset)
+	if ok {
+		ret trimLeftASCII(s, as)
+	}
+	ret trimLeftUnicode(s, cutset)
+}
+
+fn trimLeftByte(mut s: str, c: byte): str {
+	for len(s) > 0 && s[0] == c {
+		s = s[1:]
+	}
+	ret s
+}
+
+fn trimLeftASCII(mut s: str, &as: asciiSet): str {
+	for len(s) > 0 {
+		if !as.contains(s[0]) {
+			break
+		}
+		s = s[1:]
+	}
+	ret s
+}
+
+fn trimLeftUnicode(mut s: str, cutset: str): str {
+	for len(s) > 0 {
+		mut r, mut n := rune(s[0]), 1
+		if r >= utf8::RuneSelf {
+			r, n = utf8::DecodeRuneStr(s)
+		}
+		if !ContainsRune(cutset, r) {
+			break
+		}
+		s = s[n:]
+	}
+	ret s
+}
+
+fn trimRightByte(mut s: str, c: byte): str {
+	for len(s) > 0 && s[len(s)-1] == c {
+		s = s[:len(s)-1]
+	}
+	ret s
+}
+
+fn trimRightASCII(mut s: str, &as: asciiSet): str {
+	for len(s) > 0 {
+		if !as.contains(s[len(s)-1]) {
+			break
+		}
+		s = s[:len(s)-1]
+	}
+	ret s
+}
+
+fn trimRightUnicode(mut s: str, cutset: str): str {
+	for len(s) > 0 {
+		mut r, mut n := rune(s[len(s)-1]), 1
+		if r >= utf8::RuneSelf {
+			r, n = utf8::DecodeLastRuneStr(s)
+		}
+		if !ContainsRune(cutset, r) {
+			break
+		}
+		s = s[:len(s)-n]
+	}
+	ret s
+}
+
+fn isSpaceASCII(c: byte): bool {
+	ret c == '\t' || c == '\n' || c == '\v' || c == '\f' || c == '\r' || c == ' '
+}
+
+// Returns a slice of the string s, with all leading
+// and trailing white space removed, as defined by Unicode.
+fn TrimSpace(s: str): str {
+	// Fast path for ASCII: look for the first ASCII non-space byte
+	mut start := 0
+	for start < len(s); start++ {
+		c := s[start]
+		if c >= utf8::RuneSelf {
+			// If we run into a non-ASCII byte, fall back to the
+			// slower unicode-aware method on the remaining bytes
+			ret TrimFunc(s[start:], unicode::IsSpace)
+		}
+		if !isSpaceASCII(c) {
+			break
+		}
+	}
+
+	// Now look for the first ASCII non-space byte from the end
+	mut stop := len(s)
+	for stop > start; stop-- {
+		c := s[stop-1]
+		if c >= utf8::RuneSelf {
+			// start has been already trimmed above, should trim end only
+			ret TrimRightFunc(s[start:stop], unicode::IsSpace)
+		}
+		if !isSpaceASCII(c) {
+			break
+		}
+	}
+
+	// At this point s[start:stop] starts and ends with an ASCII
+	// non-space bytes, so we're done. Non-ASCII cases have already
+	// been handled above.
+	ret s[start:stop]
+}
+
+// Returns a copy of the string s with the first n
+// non-overlapping instances of old replaced by new.
+// If old is empty, it matches at the beginning of the string
+// and after each UTF-8 sequence, yielding up to k+1 replacements
+// for a k-rune string.
+// If n < 0, there is no limit on the number of replacements.
+fn Replace(s: str, old: str, new: str, mut n: int): str {
+	if old == new || n == 0 {
+		ret s // avoid allocation
+	}
+
+	// Compute number of replacements.
+	{
+		m := Count(s, old)
+		if m == 0 {
+			ret s // avoid allocation
+		} else if n < 0 || m < n {
+			n = m
+		}
+	}
+
+	// Apply replacements to buffer.
+	mut b := Builder.New(len(s) + n*(len(new)-len(old)))
+	mut start := 0
+	mut i := 0
+	for i < n; i++ {
+		mut j := start
+		if len(old) == 0 {
+			if i > 0 {
+				_, wid := utf8::DecodeRuneStr(s[start:])
+				j += wid
+			}
+		} else {
+			j += Index(s[start:], old)
+		}
+		b.WriteStr(s[start:j])!
+		b.WriteStr(new)!
+		start = j + len(old)
+	}
+	b.WriteStr(s[start:])!
+	ret b.Str()
+}
+
+// Returns a copy of the string s with all
+// non-overlapping instances of old replaced by new.
+// If old is empty, it matches at the beginning of the string
+// and after each UTF-8 sequence, yielding up to k+1 replacements
+// for a k-rune string.
+fn ReplaceAll(s: str, old: str, new: str): str {
+	ret Replace(s, old, new, -1)
+}
+
+// Reports whether s and t, interpreted as UTF-8 strings,
+// are equal under simple Unicode case-folding, which is a more general
+// form of case-insensitivity.
+fn EqualFold(mut s: str, mut t: str): bool {
+	// ASCII fast path
+	mut i := 0
+	for i < len(s) && i < len(t); i++ {
+		mut sr := s[i]
+		mut tr := t[i]
+		if sr|tr >= utf8::RuneSelf {
+			goto hasUnicode
+		}
+
+		// Easy case.
+		if tr == sr {
+			continue
+		}
+
+		// Make sr < tr to simplify what follows.
+		if tr < sr {
+			tr, sr = sr, tr
+		}
+		// ASCII only, sr/tr must be upper/lower case
+		if 'A' <= sr && sr <= 'Z' && tr == sr+'a'-'A' {
+			continue
+		}
+		ret false
+	}
+	// Check if we've exhausted both strings.
+	ret len(s) == len(t)
+
+hasUnicode:
+	s = s[i:]
+	t = t[i:]
+	for (_, mut sr) in []rune(s) {
+		// If t is exhausted the strings are not equal.
+		if len(t) == 0 {
+			ret false
+		}
+
+		// Extract first rune from second string.
+		let mut tr: rune
+		if t[0] < utf8::RuneSelf {
+			tr, t = rune(t[0]), t[1:]
+		} else {
+			r, size := utf8::DecodeRuneStr(t)
+			tr, t = r, t[size:]
+		}
+
+		// If they match, keep going; if not, return false.
+
+		// Easy case.
+		if tr == sr {
+			continue
+		}
+
+		// Make sr < tr to simplify what follows.
+		if tr < sr {
+			tr, sr = sr, tr
+		}
+		// Fast check for ASCII.
+		if tr < utf8::RuneSelf {
+			// ASCII only, sr/tr must be upper/lower case
+			if 'A' <= sr && sr <= 'Z' && tr == sr+'a'-'A' {
+				continue
+			}
+			ret false
+		}
+
+		// General case. SimpleFold(x) returns the next equivalent rune > x
+		// or wraps around to smaller values.
+		mut r := unicode::SimpleFold(sr)
+		for r != sr && r < tr {
+			r = unicode::SimpleFold(r)
+		}
+		if r == tr {
+			continue
+		}
+		ret false
+	}
+
+	// First string is empty, so check if the second one is also empty.
+	ret len(t) == 0
+}
+
+// Returns the index of the first instance of substr in s, or -1 if substr is not present in s.
+fn Index(s: str, substr: str): int {
+	match {
+	| len(substr) == 0:
+		ret 0
+	| len(substr) == 1:
+		ret IndexByte(s, substr[0])
+	| len(substr) == len(s):
+		if substr == s {
+			ret 0
+		}
+		ret -1
+	| len(substr) > len(s):
+		ret -1
+	}
+	c0 := substr[0]
+	c1 := substr[1]
+	mut i := 0
+	t := len(s) - len(substr) + 1
+	mut fails := 0
+	for i < t {
+		if s[i] != c0 {
+			o := IndexByte(s[i+1:t], c0)
+			if o < 0 {
+				ret -1
+			}
+			i += o + 1
+		}
+		if s[i+1] == c1 && s[i:i+len(substr)] == substr {
+			ret i
+		}
+		i++
+		fails++
+		if fails >= 4+i>>4 && i < t {
+			// See comment in ../bytes/bytes.go.
+			j := byteslite::IndexRabinKarp(s[i:], substr)
+			if j < 0 {
+				ret -1
+			}
+			ret i + j
+		}
+	}
+	ret -1
+}
+
+// Slices s around the first instance of sep,
 // returning the text before and after sep.
 // The found result reports whether sep appears in s.
 // If sep does not appear in s, cut returns s, "", false.
 fn Cut(s: str, sep: str): (before: str, after: str, found: bool) {
-	i := Find(s, sep)
+	i := Index(s, sep)
 	if i >= 0 {
 		ret s[:i], s[i+len(sep):], true
 	}
 	ret s, "", false
+}
+
+// Returns s without the provided leading prefix string
+// and reports whether it found the prefix.
+// If s doesn't start with prefix, returns s, false.
+// If prefix is the empty string, returns s, true.
+fn CutPrefix(s: str, prefix: str): (after: str, found: bool) {
+	if !HasPrefix(s, prefix) {
+		ret s, false
+	}
+	ret s[len(prefix):], true
+}
+
+// Returns s without the provided ending suffix string
+// and reports whether it found the suffix.
+// If s doesn't end with suffix, returns s, false.
+// If suffix is the empty string, returns s, true.
+fn CutSuffix(s: str, suffix: str): (before: str, found: bool) {
+	if !HasSuffix(s, suffix) {
+		ret s, false
+	}
+	ret s[:len(s)-len(suffix)], true
+}
+
+// Returns s with all Unicode letters mapped to their upper case.
+fn ToUpper(s: str): str {
+	mut isASCII, mut hasLower := true, false
+	for _, c in s {
+		if c >= utf8::RuneSelf {
+			isASCII = false
+			break
+		}
+		hasLower = hasLower || ('a' <= c && c <= 'z')
+	}
+
+	if isASCII { // optimize for ASCII-only strings.
+		if !hasLower {
+			ret s
+		}
+		mut b := Builder.New(len(s))
+		mut pos := 0
+		for (i, mut c) in s {
+			if 'a' <= c && c <= 'z' {
+				c -= 'a' - 'A'
+				if pos < i {
+					b.WriteStr(s[pos:i])!
+				}
+				b.WriteByte(c)!
+				pos = i + 1
+			}
+		}
+		if pos < len(s) {
+			b.WriteStr(s[pos:])!
+		}
+		ret b.Str()
+	}
+	ret Map(unicode::ToUpper, s)
+}
+
+// Returns s with all Unicode letters mapped to their lower case.
+fn ToLower(s: str): str {
+	mut isASCII, mut hasUpper := true, false
+	for _, c in s {
+		if c >= utf8::RuneSelf {
+			isASCII = false
+			break
+		}
+		hasUpper = hasUpper || ('A' <= c && c <= 'Z')
+	}
+
+	if isASCII { // optimize for ASCII-only strings.
+		if !hasUpper {
+			ret s
+		}
+		mut b := Builder.New(len(s))
+		mut pos := 0
+		for (i, mut c) in s {
+			if 'A' <= c && c <= 'Z' {
+				c += 'a' - 'A'
+				if pos < i {
+					b.WriteStr(s[pos:i])!
+				}
+				b.WriteByte(c)!
+				pos = i + 1
+			}
+		}
+		if pos < len(s) {
+			b.WriteStr(s[pos:])!
+		}
+		ret b.Str()
+	}
+	ret Map(unicode::ToLower, s)
 }
