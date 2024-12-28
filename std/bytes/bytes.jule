@@ -131,7 +131,7 @@ fn ContainsRune(b: []byte, r: rune): bool {
 }
 
 // Reports whether any of the UTF-8-encoded code points r within b satisfy f(r).
-fn ContainsFunc(b: []byte, f: fn(mut r: rune): bool): bool {
+fn ContainsFunc(b: []byte, f: fn(rune): bool): bool {
 	ret IndexFunc(b, f) >= 0
 }
 
@@ -532,7 +532,7 @@ fn HasSuffix(s: []byte, suffix: []byte): bool {
 // according to the mapping function. If mapping returns a negative value, the character is
 // dropped from the byte slice with no replacement. The characters in s and the
 // output are interpreted as UTF-8-encoded code points.
-fn Map(mapping: fn(mut r: rune): rune, s: []byte): []byte {
+fn Map(mapping: fn(rune): rune, s: []byte): []byte {
 	// In the worst case, the slice can grow when mapped, making
 	// things unpleasant. But it's so rare we barge in assuming it's
 	// fine. It could also shrink but that falls out naturally.
@@ -611,20 +611,20 @@ fn Repeat(b: []byte, count: int): []byte {
 // Interprets s as a sequence of UTF-8-encoded code points.
 // It returns the byte index in s of the first Unicode
 // code point satisfying f(c), or -1 if none do.
-fn IndexFunc(s: []byte, f: fn(mut r: rune): bool): int {
+fn IndexFunc(s: []byte, f: fn(rune): bool): int {
 	ret indexFunc(s, f, true)
 }
 
 // Interprets s as a sequence of UTF-8-encoded code points.
 // It returns the byte index in s of the last Unicode
 // code point satisfying f(c), or -1 if none do.
-fn LastIndexFunc(s: []byte, f: fn(mut r: rune): bool): int {
+fn LastIndexFunc(s: []byte, f: fn(rune): bool): int {
 	ret lastIndexFunc(s, f, true)
 }
 
 // Same as IndexFunc except that if truth==false,
 // the sense of the predicate function is inverted.
-fn indexFunc(s: []byte, f: fn(mut r: rune): bool, truth: bool): int {
+fn indexFunc(s: []byte, f: fn(rune): bool, truth: bool): int {
 	mut start := 0
 	for start < len(s) {
 		mut wid := 1
@@ -642,7 +642,7 @@ fn indexFunc(s: []byte, f: fn(mut r: rune): bool, truth: bool): int {
 
 // Same as LastIndexFunc except that if truth==false,
 // the sense of the predicate function is inverted.
-fn lastIndexFunc(s: []byte, f: fn(mut r: rune): bool, truth: bool): int {
+fn lastIndexFunc(s: []byte, f: fn(rune): bool, truth: bool): int {
 	mut i := len(s)
 	for i > 0 {
 		mut r, mut size := rune(s[i-1]), 1
@@ -670,7 +670,7 @@ fn containsRune(s: str, r: rune): bool {
 
 // Treats s as UTF-8-encoded bytes and returns a subslice of s by slicing off
 // all leading UTF-8-encoded code points c that satisfy f(c).
-fn TrimLeftFunc(mut s: []byte, f: fn(mut r: rune): bool): []byte {
+fn TrimLeftFunc(mut s: []byte, f: fn(rune): bool): []byte {
 	i := indexFunc(s, f, false)
 	if i == -1 {
 		ret nil
@@ -696,7 +696,7 @@ fn TrimRight(mut s: []byte, cutset: str): []byte {
 
 // Returns a subslice of s by slicing off all trailing
 // UTF-8-encoded code points c that satisfy f(c).
-fn TrimRightFunc(mut s: []byte, f: fn(mut r: rune): bool): []byte {
+fn TrimRightFunc(mut s: []byte, f: fn(rune): bool): []byte {
 	mut i := lastIndexFunc(s, f, false)
 	if i >= 0 && s[i] >= utf8::RuneSelf {
 		_, wid := utf8::DecodeRune(s[i:])
@@ -709,7 +709,7 @@ fn TrimRightFunc(mut s: []byte, f: fn(mut r: rune): bool): []byte {
 
 // Returns a subslice of s by slicing off all leading and trailing
 // UTF-8-encoded code points c that satisfy f(c).
-fn TrimFunc(mut s: []byte, f: fn(mut r: rune): bool): []byte {
+fn TrimFunc(mut s: []byte, f: fn(rune): bool): []byte {
 	ret TrimRightFunc(TrimLeftFunc(s, f), f)
 }
 

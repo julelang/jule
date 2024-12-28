@@ -76,7 +76,7 @@ fn ContainsRune(s: str, r: rune): bool {
 }
 
 // Reports whether any of the UTF-8-encoded code points r within b satisfy f(r).
-fn ContainsFunc(s: str, f: fn(mut r: rune): bool): bool {
+fn ContainsFunc(s: str, f: fn(rune): bool): bool {
 	ret IndexFunc(s, f) >= 0
 }
 
@@ -445,7 +445,7 @@ fn HasSuffix(s: str, suffix: str): bool {
 // Returns a copy of the string s with all its characters modified
 // according to the mapping function. If mapping returns a negative value, the character is
 // dropped from the string with no replacement.
-fn Map(mapping: fn(mut r: rune): rune, mut s: str): str {
+fn Map(mapping: fn(rune): rune, mut s: str): str {
 	// In the worst case, the string can grow when mapped, making
 	// things unpleasant. But it's so rare we barge in assuming it's
 	// fine. It could also shrink but that falls out naturally.
@@ -603,19 +603,19 @@ fn Repeat(s: str, count: int): str {
 
 // Returns the index into s of the first Unicode
 // code point satisfying f(c), or -1 if none do.
-fn IndexFunc(s: str, f: fn(mut r: rune): bool): int {
+fn IndexFunc(s: str, f: fn(rune): bool): int {
 	ret indexFunc(s, f, true)
 }
 
 // Returns the index into s of the last
 // Unicode code point satisfying f(c), or -1 if none do.
-fn LastIndexFunc(s: str, f: fn(mut r: rune): bool): int {
+fn LastIndexFunc(s: str, f: fn(rune): bool): int {
 	ret lastIndexFunc(s, f, true)
 }
 
 // same as IndexFunc except that if truth==false,
 // the sense of the predicate function is inverted.
-fn indexFunc(s: str, f: fn(mut r: rune): bool, truth: bool): int {
+fn indexFunc(s: str, f: fn(rune): bool, truth: bool): int {
 	mut start := 0
 	for start < len(s) {
 		mut wid := 1
@@ -633,7 +633,7 @@ fn indexFunc(s: str, f: fn(mut r: rune): bool, truth: bool): int {
 
 // Same as LastIndexFunc except that if truth==false,
 // the sense of the predicate function is inverted.
-fn lastIndexFunc(s: str, f: fn(mut r: rune): bool, truth: bool): int {
+fn lastIndexFunc(s: str, f: fn(rune): bool, truth: bool): int {
 	mut i := len(s)
 	for i > 0 {
 		r, size := utf8::DecodeLastRuneStr(s[0:i])
@@ -647,7 +647,7 @@ fn lastIndexFunc(s: str, f: fn(mut r: rune): bool, truth: bool): int {
 
 // Returns a slice of the string s with all leading
 // Unicode code points c satisfying f(c) removed.
-fn TrimLeftFunc(s: str, f: fn(mut r: rune): bool): str {
+fn TrimLeftFunc(s: str, f: fn(rune): bool): str {
 	i := indexFunc(s, f, false)
 	if i == -1 {
 		ret ""
@@ -675,7 +675,7 @@ fn TrimRight(s: str, cutset: str): str {
 
 // Returns a slice of the string s with all trailing
 // Unicode code points c satisfying f(c) removed.
-fn TrimRightFunc(s: str, f: fn(mut r: rune): bool): str {
+fn TrimRightFunc(s: str, f: fn(rune): bool): str {
 	mut i := lastIndexFunc(s, f, false)
 	if i >= 0 && s[i] >= utf8::RuneSelf {
 		_, wid := utf8::DecodeRuneStr(s[i:])
@@ -688,7 +688,7 @@ fn TrimRightFunc(s: str, f: fn(mut r: rune): bool): str {
 
 // Returns a slice of the string s with all leading
 // and trailing Unicode code points c satisfying f(c) removed.
-fn TrimFunc(s: str, f: fn(mut r: rune): bool): str {
+fn TrimFunc(s: str, f: fn(rune): bool): str {
 	ret TrimRightFunc(TrimLeftFunc(s, f), f)
 }
 
