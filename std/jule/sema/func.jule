@@ -239,13 +239,15 @@ impl Kind for FuncIns {
 		if f == nil {
 			ret false
 		}
-		ret self.EqualFunc(f)
+		ret self.EqualFunc(f, false)
 	}
 }
 
 impl FuncIns {
 	// Reports whether functions are equal.
-	fn EqualFunc(&self, &f: &FuncIns): bool {
+	// If the responsive is true, checks by responsiveness of functions.
+	// See: https://manual.jule.dev/responsiveness/mutability
+	fn EqualFunc(&self, &f: &FuncIns, responsive: bool): bool {
 		if self.Decl.Exceptional != f.Decl.Exceptional {
 			ret false
 		}
@@ -256,7 +258,8 @@ impl FuncIns {
 			ret false
 		}
 		checkParams := fn(p1: &ParamIns, p2: &ParamIns): bool {
-			if p1.Decl.Mutable != p2.Decl.Mutable {
+			if p1.Decl.Variadic != p2.Decl.Variadic ||
+				p1.Decl.Reference != p2.Decl.Reference {
 				ret false
 			}
 
@@ -272,14 +275,20 @@ impl FuncIns {
 				ret true
 			}
 
-			if p1.Decl.Reference != p2.Decl.Reference {
-				ret false
+			if responsive {
+				if !p1.Type.Equal(p2.Type) {
+					ret false
+				}
+				tmut := p1.Decl.Reference || p1.Decl.Variadic || p1.Type.Mutable()
+				if !tmut {
+					ret true
+				}
+				ret p1.Decl.Mutable || !p2.Decl.Mutable
 			}
 
-			if p1.Decl.Variadic != p2.Decl.Variadic {
+			if p1.Decl.Mutable != p2.Decl.Mutable {
 				ret false
 			}
-
 			ret p1.Type.Equal(p2.Type)
 		}
 
@@ -311,7 +320,7 @@ impl FuncIns {
 		if self.Decl.Ident != other.Decl.Ident {
 			ret false
 		}
-		if !self.EqualFunc(other) {
+		if !self.EqualFunc(other, false) {
 			ret false
 		}
 		if len(self.Decl.Generics) != len(other.Decl.Generics) {
