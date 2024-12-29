@@ -30,12 +30,14 @@ impl boundary {
 		if !isValidBoundaryInfo(maxSize) {
 			ret
 		}
-		for (_, mut v) in self.vars {
+		mut i := 0
+		for i < len(self.vars); i++ {
+			mut &v := unsafe { *(&self.vars[i]) }
 			if v.var == var {
-				for i, max in v.maxSize {
+				for j, max in v.maxSize {
 					if fitsSize(maxSize, max) {
 						// Maximum size is fits, so new size is larger than current size.
-						v.maxSize[i] = maxSize
+						v.maxSize[j] = maxSize
 						ret
 					}
 				}
@@ -44,7 +46,9 @@ impl boundary {
 			}
 		}
 		// Not exist, append new one.
-		for (_, mut v) in self.vars {
+		i = 0
+		for i < len(self.vars); i++ {
+			mut &v := unsafe { *(&self.vars[i]) }
 			if v.var == invalidBoundary {
 				// Empty place, use here instead of append.
 				v.var = var
@@ -57,7 +61,9 @@ impl boundary {
 
 	fn removeVar(mut self, var: uintptr): bool {
 		if var != invalidBoundary {
-			for (_, mut v) in self.vars {
+			mut i := 0
+			for i < len(self.vars); i++ {
+				mut &v := unsafe { *(&self.vars[i]) }
 				if v.var == var {
 					v.var = invalidBoundary
 					v.maxSize = v.maxSize[:0]
@@ -124,10 +130,12 @@ fn fitsSize(e1: sema::Expr, e2: sema::Expr): bool {
 
 fn possibleBoundaryRemove(mut &b: &boundary, model: sema::Expr) {
 	// Clear if size data mutating.
-	for (_, mut v) in b.vars {
-		for i, max in v.maxSize {
+	mut i := 0
+	for i < len(b.vars); i++ {
+		mut &v := unsafe { *(&b.vars[i]) }
+		for j, max in v.maxSize {
 			if obj::EqualModels(max, model) {
-				v.maxSize = append(v.maxSize[:i], v.maxSize[i+1:]...)
+				v.maxSize = append(v.maxSize[:j], v.maxSize[j+1:]...)
 				break
 			}
 		}
