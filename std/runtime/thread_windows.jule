@@ -8,7 +8,15 @@ use "std/sys"
 cpp unsafe fn CreateThread(*unsafe, int, *unsafe, *unsafe, int, *unsafe): *unsafe
 cpp fn SwitchToThread(): bool
 
-unsafe fn _coSpawn(func: *unsafe, args: *unsafe): bool {
+// A low level API function for threads.
+// It doesn't provide much abstraction.
+// It just creates and detaches a thread using API.
+// Reports whether the thread created successfully.
+// The created thread is a native-thread.
+// The |func| parameter should point to the valid function for operating system thread API.
+// The |args| parameter may be nil and should point to the argument data.
+#export "__jule_coSpawn"
+unsafe fn coSpawn(func: *unsafe, args: *unsafe): bool {
 	handle := cpp.CreateThread(nil, 0, integ::Emit[*unsafe]("(unsigned long(*)(void*))({})", func), args, 0, nil)
 	if handle == nil {
 		ret false
