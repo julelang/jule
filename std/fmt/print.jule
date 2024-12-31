@@ -4,17 +4,18 @@
 
 use "std/internal/fmt"
 use "std/internal/stringslite"
+use "std/io"
 use "std/os"
 use "std/unsafe"
 
-// Prints arguments to file by default formatting.
+// Prints arguments to w by default formatting.
 // See documentation of format function for formatting.
-fn Fprint(mut f: &os::File, args: ...any) {
+fn Fprint(mut w: io::Writer, args: ...any) {
 	mut sb := stringslite::Builder{}
 	sb.Grow(20)
 	for _, arg in args {
 		fmt::FmtByDefault(sb, arg)
-		f.Write(unsafe { sb.Buf() }) else {
+		w.Write(unsafe { sb.Buf() }) else {
 			panic("fmt: Fprint: error occurs when printing")
 		}
 		// Do not use the [Clear] method to avoid making new allocations.
@@ -23,19 +24,19 @@ fn Fprint(mut f: &os::File, args: ...any) {
 	}
 }
 
-// Prints arguments to file by default formatting.
+// Prints arguments to w by default formatting.
 // Prints new-line after arguments.
 // See documentation of format function for formatting.
-fn Fprintln(mut f: &os::File, args: ...any) {
-	Fprint(f, args...)
-	Fprintf(f, "\n")
+fn Fprintln(mut w: io::Writer, args: ...any) {
+	Fprint(w, args...)
+	Fprintf(w, "\n")
 }
 
-// Prints result of formatting to file.
+// Prints result of formatting to w.
 // See documentation of format function for formatting.
-fn Fprintf(mut f: &os::File, fmt: str, args: ...any) {
+fn Fprintf(mut w: io::Writer, fmt: str, args: ...any) {
 	format := fmt::Format(fmt, args...)
-	f.Write(format) else {
+	w.Write(format) else {
 		panic("fmt: Fprintf: error occurs when printing")
 	}
 }
@@ -43,18 +44,18 @@ fn Fprintf(mut f: &os::File, fmt: str, args: ...any) {
 // Prints result of formatting to stdout.
 // See documentation of format function for formatting.
 fn Printf(fmt: str, args: ...any) {
-	Fprintf(unsafe { os::Stdout().File() }, fmt, args...)
+	Fprintf(os::Stdout(), fmt, args...)
 }
 
 // Prints arguments by default formatting to stdout.
 fn Print(args: ...any) {
-	Fprint(unsafe { os::Stdout().File() }, args...)
+	Fprint(os::Stdout(), args...)
 }
 
 // Prints arguments by default formatting to stdout.
 // Prints new-line after arguments.
 fn Println(args: ...any) {
-	Fprintln(unsafe { os::Stdout().File() }, args...)
+	Fprintln(os::Stdout(), args...)
 }
 
 // Returns string result of arguments by default formatting.
