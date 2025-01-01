@@ -8,11 +8,30 @@ cpp use "<pthread.h>"
 cpp use "<sched.h>"
 
 cpp unsafe fn pthread_create(*cpp.pthread_t, *unsafe, *unsafe, *unsafe): int
+cpp fn pthread_equal(cpp.pthread_t, cpp.pthread_t): bool
 cpp fn pthread_detach(cpp.pthread_t): int
+cpp fn pthread_self(): cpp.pthread_t
 cpp fn sched_yield(): int
 
 #typedef
 cpp struct pthread_t{}
+
+// Wrapper for operating system thread.
+struct osthread {
+	handle: cpp.pthread_t
+}
+
+impl osthread {
+	// Reports whether the threads are equal.
+	fn equal(self, other: cpp.pthread_t): bool {
+		ret cpp.pthread_equal(self.handle, other)
+	}
+}
+
+// Common head fields for a thread data.
+struct threadData {
+	handle: *cpp.pthread_t
+}
 
 // A low level API function for threads.
 // It doesn't provide much abstraction.
@@ -20,17 +39,32 @@ cpp struct pthread_t{}
 // Reports whether the thread created successfully.
 // The created thread is a native-thread.
 // The |func| parameter should point to the valid function for operating system thread API.
-// The |args| parameter may be nil and should point to the argument data.
+// The |args| parameter may be nil and should point to the thread data.
+// The thread data, should be fit into the threadData struct.
+// So, the head fields of the thread data should be matched fields of the threadData.
 #export "__jule_coSpawn"
-unsafe fn coSpawn(func: *unsafe, args: *unsafe): bool {
-	let t: cpp.pthread_t
-	if cpp.pthread_create(&t, nil, integ::Emit[*unsafe]("(void*(*)(void*))({})", func), args) != 0 {
+unsafe fn coSpawn(func: *unsafe, mut args: *unsafe): bool {
+	mut thread := pushNewThread()
+	(*threadData)(args).handle = &thread.os.handle
+	if cpp.pthread_create(&thread.os.handle, nil, integ::Emit[*unsafe]("(void*(*)(void*))({})", func), args) != 0 {
 		ret false
 	}
-	cpp.pthread_detach(t)
+	threadMutex.unlock()
+	cpp.pthread_detach(thread.os.handle)
 	ret true
+}
+
+fn currentThreadID(): cpp.pthread_t {
+	ret cpp.pthread_self()
 }
 
 fn osyield() {
 	cpp.sched_yield()
+}
+
+fn init() {
+	// Push the main thread to threads.
+	mut thread := pushNewThread()
+	thread.os.handle = currentThreadID()
+	threadMutex.unlock()
 }

@@ -1,0 +1,106 @@
+// Copyright 2024 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+// State flags of threads.
+const threadRunning = 1 << 0
+const threadSuspended = 1 << 1
+const threadClosed = 1 << 2
+
+// A thread instance is represents a spawned thread.
+// Used by the Jule runtime to manage threads.
+struct thread {
+	os:    osthread
+	state: u32
+}
+
+// A thread stack and associated lock.
+// All spawned threads are stored in the threads.
+// When a thread completed, it will be marked as closed.
+// A closed thread instance will not be released, remains allocated and placed
+// in the threads. Subsequent thread generations may use the same allocation
+// of closed threads for the new spawned threads.
+static threadMutex = fmutex{}
+static mut threads = ([]&thread)(nil)
+
+// Pushes a new thread to the main thread stack and sets state as running.
+// Returns the thread representing the created thread.
+// Locks the threadMutex and will not release before return,
+// should be released after pushNewThread.
+fn pushNewThread(): &thread {
+	threadMutex.lock()
+	// Lookup for empty threads to caught ready to reuse thread if exist.
+	for (_, mut t) in threads {
+		if t.state&threadClosed == threadClosed {
+			t.state &= ^threadClosed
+			t.state |= threadRunning
+			ret t
+		}
+	}
+	// We have not any reusable thread, so create a new one.
+	mut t := new(thread)
+	t.state |= threadRunning
+	threads = append(threads, t)
+	ret t
+}
+
+// Suspends the current thread and yields the CPU.
+fn yield() {
+	threadMutex.lock()
+	id := currentThreadID()
+	mut i := -1
+	mut runs := false
+	for (j, mut thread) in threads {
+		if thread.os.equal(id) {
+			thread.state |= threadSuspended
+			i = j
+			break
+		}
+		runs = runs ||
+			thread.state&threadRunning == threadRunning &&
+			thread.state&threadSuspended != threadSuspended
+	}
+	if i == -1 {
+		panic("runtime: thread is not exist")
+	}
+	// There is no running thread found for [0, i].
+	// Lookup to (i, len) for running thread.
+	if !runs {
+		for (_, mut thread) in threads[i+1:] {
+			if thread.state&threadRunning == threadRunning &&
+				thread.state&threadSuspended != threadSuspended {
+				runs = true
+				break
+			}
+		}
+		// We have not any running thread, all of them suspended or closed.
+		// So all threads are locked now, we have a deadlock.
+		if !runs {
+			panic("runtime: all threads are asleep - deadlock!")
+		}
+	}
+	// Unlock the mutex becase other threads may need to lock.
+	// There is nothing to do for this thread, so release.
+	threadMutex.unlock()
+	// Yield the CPU if possible, it may return immediately for the same thread.
+	// However, this part of thread management belongs to the operating system.
+	osyield()
+	// CPU is back for this thread.
+	// Lock mutex again and wake up.
+	threadMutex.lock()
+	threads[i].state &= ^threadSuspended
+	threadMutex.unlock()
+}
+
+// Closes the thread associated with t, if exist.
+fn closeThread(t: *unsafe) {
+	threadMutex.lock()
+	for (_, mut thread) in threads {
+		if &thread.os.handle == t {
+			thread.state &= ^(threadRunning | threadSuspended)
+			thread.state |= threadClosed
+			break
+		}
+	}
+	threadMutex.unlock()
+}

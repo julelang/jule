@@ -38,6 +38,7 @@ const coSpawnMethodSuffix = "_method"   // method suffix for coSpawn data prefix
 const coSpawnArgDataSuffix = "_argdata" // argdata suffix for coSpawn data prefix
 const coSpawnArgDataParam = "__juleCoParam"
 const coSpawnArgDataFunc = "__juleCoFunc"
+const coSpawnThreadData = "__juleThread"
 
 const structDefaultEqMethodSuffix = "_eq"
 const indentKind = '\t'
@@ -183,6 +184,14 @@ impl ObjectCoder {
 		self.coSpawnObj.WriteStr(is)!
 		self.coSpawnObj.WriteStr("{\n")!
 
+		// setup thread data
+		self.coSpawnObj.WriteByte(indentKind)!
+		writeThreadType(self.coSpawnObj)
+		self.coSpawnObj.WriteStr(" *")!
+		self.coSpawnObj.WriteStr(coSpawnThreadData)!
+		self.coSpawnObj.WriteByte(';')!
+		self.coSpawnObj.WriteByte('\n')!
+
 		// setup func data
 		self.coSpawnObj.WriteByte(indentKind)!
 		self.tc.func(self.coSpawnObj, f)
@@ -206,7 +215,7 @@ impl ObjectCoder {
 		self.coSpawnObj.WriteByte('\n')!
 
 		match {
-		| build::OS == build::DistOS.Windows:
+		| build::IsWindows(build::OS):
 			self.coSpawnObj.WriteStr("unsigned long ")!
 		| build::IsUnix(build::OS):
 			self.coSpawnObj.WriteStr("void *")!
@@ -248,6 +257,13 @@ impl ObjectCoder {
 		}
 		self.coSpawnObj.WriteStr(");\n")!
 
+		self.coSpawnObj.WriteByte(indentKind)!
+		identCoder.funcIns(self.coSpawnObj, meta::Program.Runtime.CloseThread)
+		self.coSpawnObj.WriteStr("(")!
+		self.coSpawnObj.WriteStr(argData)!
+		self.coSpawnObj.WriteStr("->")!
+		self.coSpawnObj.WriteStr(coSpawnThreadData)!
+		self.coSpawnObj.WriteStr(");\n")!
 		self.coSpawnObj.WriteByte(indentKind)!
 		self.coSpawnObj.WriteStr("delete ")!
 		self.coSpawnObj.WriteStr(argData)!
@@ -1415,4 +1431,17 @@ fn concatAllParts(parts: ...&token::Token): []byte {
 		s.WriteStr(p.Kind)!
 	}
 	ret unsafe { s.Buf() }
+}
+
+// Writes thread data type for Jule's runtime thread handling.
+// See runtime::coSpawn function for documentation.
+fn writeThreadType(mut &b: strings::Builder) {
+	match {
+	| build::IsWindows(build::OS):
+		b.WriteStr("HANDLE")!
+	| build::IsUnix(build::OS):
+		b.WriteStr("pthread_t")!
+	|:
+		panic("unreachable")
+	}
 }
