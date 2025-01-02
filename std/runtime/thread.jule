@@ -7,11 +7,20 @@ const threadRunning = 1 << 0
 const threadSuspended = 1 << 1
 const threadClosed = 1 << 2
 
+// State flags of threads for suspend reason.
+const reasonNA = 0 << 0
+const reasonRecv = 1 << 3
+const reasonSend = 1 << 4
+
 // A thread instance is represents a spawned thread.
 // Used by the Jule runtime to manage threads.
 struct thread {
 	os:    osthread
 	state: u32
+
+	// Unique identifier for channels.
+	// It used to detect a specific channels.
+	mu: uintptr
 }
 
 // A thread stack and associated lock.
@@ -45,14 +54,16 @@ fn pushNewThread(): &thread {
 }
 
 // Suspends the current thread and yields the CPU.
-fn yield() {
+// If the mu is not zero, assumes it already locked and releases before yield.
+fn yield(mu: uintptr, reason: u32) {
 	threadMutex.lock()
 	id := currentThreadID()
 	mut i := -1
 	mut runs := false
 	for (j, mut thread) in threads {
 		if thread.os.equal(id) {
-			thread.state |= threadSuspended
+			thread.state |= threadSuspended | reason
+			thread.mu = mu
 			i = j
 			break
 		}
@@ -69,25 +80,53 @@ fn yield() {
 		for (_, mut thread) in threads[i+1:] {
 			if thread.state&threadRunning == threadRunning &&
 				thread.state&threadSuspended != threadSuspended {
-				runs = true
-				break
+				goto NoDeadlock
+			}
+		}
+		// There is no running active thread, but we have non-zero mu.
+		// So this thread associated with a channel now, we have a chance.
+		// We have to check mutual suspended threads for channels for it.
+		// All channels may be suspended for each other when using channels.
+		// For example, a thread may be suspended for a channel-send and
+		// now we may be suspend this thread for channel-recv on the same channel.
+		// So two threads are suspended for each other, caught this and wake
+		// suitable one. In such cases, there is no deadlock risk.
+		if mu != 0 {
+			for (_, mut thread) in threads {
+				if thread.mu == mu {
+					for (_, mut lthread) in threads {
+						if lthread.mu == thread.mu {
+							if lthread.state&reasonRecv == reasonRecv &&
+								thread.state&reasonSend == reasonSend {
+								goto NoDeadlock
+							}
+							if lthread.state&reasonSend == reasonSend &&
+								thread.state&reasonRecv == reasonRecv {
+								goto NoDeadlock
+							}
+						}
+					}
+				}
 			}
 		}
 		// We have not any running thread, all of them suspended or closed.
 		// So all threads are locked now, we have a deadlock.
-		if !runs {
-			panic("runtime: all threads are asleep - deadlock!")
-		}
+		panic("runtime: all threads are asleep - deadlock!")
+	NoDeadlock:
 	}
 	// Unlock the mutex becase other threads may need to lock.
-	// There is nothing to do for this thread, so release.
+	// There is nothing to do for this thread for now, so release lock.
 	threadMutex.unlock()
+	if mu != 0 {
+		unsafe { (*fmutex)(mu).unlock() }
+	}
 	// Yield the CPU if possible, it may return immediately for the same thread.
 	// However, this part of thread management belongs to the operating system.
 	osyield()
 	// CPU is back for this thread.
 	// Lock mutex again and wake up.
 	threadMutex.lock()
+	threads[i].mu = 0
 	threads[i].state &= ^threadSuspended
 	threadMutex.unlock()
 }
@@ -97,6 +136,9 @@ fn closeThread(t: *unsafe) {
 	threadMutex.lock()
 	for (_, mut thread) in threads {
 		if &thread.os.handle == t {
+			// Do not reset reasons and mu field.
+			// Because this kind of data may needed.
+			// See the yield function for more details.
 			thread.state &= ^(threadRunning | threadSuspended)
 			thread.state |= threadClosed
 			break

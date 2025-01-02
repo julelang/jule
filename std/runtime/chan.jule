@@ -183,7 +183,7 @@ impl pchan {
 		if self.state&chanBuffered == chanBuffered {
 			// If the capacity is completely consumed, wait until space becomes available.
 			// When some data is received, there will be space in the queue to write.
-			chanpark(self.hchan(), self.len, self.cap)
+			chanpark(self.hchan(), self.len, self.cap, reasonSend)
 			if self.state&chanClosed == chanClosed {
 				panic("runtime: send on closed channel")
 			}
@@ -192,7 +192,7 @@ impl pchan {
 		} else {
 			one := 1
 			// If there is data waiting to be received, wait until it is received.
-			chanpark(self.hchan(), self.len, one)
+			chanpark(self.hchan(), self.len, one, reasonSend)
 			if self.state&chanClosed == chanClosed {
 				panic("runtime: send on closed channel")
 			}
@@ -200,7 +200,7 @@ impl pchan {
 			self.len++
 			// Wait until the length becomes zero.
 			// This means the data has been received.
-			chanpark(self.hchan(), self.len, one)
+			chanpark(self.hchan(), self.len, one, reasonSend)
 		}
 		self.lock.unlock()
 	}
@@ -224,7 +224,7 @@ impl pchan {
 		}
 		zero := 0
 		// If there is no data waiting to be received in the queue, wait until there is.
-		chanpark(self.hchan(), zero, self.len)
+		chanpark(self.hchan(), zero, self.len, reasonRecv)
 		// chanpark returns when the condition met or channel has been closed.
 		// An unbuffered channel cannot have a queue, so its length always varies
 		// between 0 and 1. If there is no data to receive, the only possibility is
@@ -263,15 +263,14 @@ impl pchan {
 // and c indicates the value that n should be smaller than.
 // This function must be called with the channel lock held by this thread.
 // Even if the condition is not met, it will return if the channel is in a closed state.
-fn chanpark(ch: &hchan, &n: int, &c: int) {
+fn chanpark(ch: &hchan, &n: int, &c: int, reason: u32) {
 	for {
 		if ch.state&chanClosed == chanClosed || n < c {
 			break
 		}
 		// The lock is acquired. This means no changes can occur in the channel.
 		// We must release the lock and immediately switch to a different thread.
-		ch.lock.unlock()
-		yield()
+		yield(uintptr(&ch.lock), reason)
 		// After the thread wakes up, we must acquire the lock
 		// before reaching the critical section again.
 		ch.lock.lock()
