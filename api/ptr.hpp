@@ -122,11 +122,11 @@ namespace jule
         // heap allocations are valid or something like that.
         void __free(void) const noexcept
         {
-            __jule_RCFree(this->ref);
-            this->ref = nullptr;
-
             delete this->alloc;
             this->alloc = nullptr;
+
+            __jule_RCFree(this->ref);
+            this->ref = nullptr;
         }
 
         // Drops reference.

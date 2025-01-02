@@ -113,12 +113,12 @@ namespace jule
         // heap allocations are valid or something like that.
         void __free(void) noexcept
         {
-            __jule_RCFree(this->data.ref);
-            this->data.ref = nullptr;
-
             delete[] this->data.alloc;
             this->data.alloc = nullptr;
             this->_slice = nullptr;
+
+            __jule_RCFree(this->data.ref);
+            this->data.ref = nullptr;
         }
 
         void dealloc(void) noexcept
