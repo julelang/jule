@@ -263,7 +263,8 @@ impl pchan {
 // and c indicates the value that n should be smaller than.
 // This function must be called with the channel lock held by this thread.
 // Even if the condition is not met, it will return if the channel is in a closed state.
-fn chanpark(ch: &hchan, &n: int, &c: int, reason: u32) {
+fn chanpark(ch: &hchan, &n: int, &c: int, mut reason: u32) {
+	reason |= reasonStrict
 	for {
 		if ch.state&chanClosed == chanClosed || n < c {
 			break
@@ -271,6 +272,7 @@ fn chanpark(ch: &hchan, &n: int, &c: int, reason: u32) {
 		// The lock is acquired. This means no changes can occur in the channel.
 		// We must release the lock and immediately switch to a different thread.
 		yield(uintptr(&ch.lock), reason)
+		reason &= ^reasonStrict
 		// After the thread wakes up, we must acquire the lock
 		// before reaching the critical section again.
 		ch.lock.lock()

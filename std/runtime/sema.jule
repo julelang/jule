@@ -140,18 +140,32 @@ fn cansemacquire(mut &sema: u32): bool {
 }
 
 // Puts the current thread into a waiting state and unlocks the lock.
-fn semapark(&lock: fmutex, &deq: bool) {
+fn semapark(&lock: fmutex, &deq: bool, opt: u32) {
+	mut reason := u32(reasonNA | reasonStrict)
+	if opt&semaWaitGroup == semaWaitGroup {
+		reason |= reasonWaitGroup
+	}
+	if opt&semaMutex == semaMutex {
+		reason |= reasonMutex
+	}
 	lock.unlock()
 	for !deq {
-		yield(0, reasonNA)
+		yield(0, reason)
+		reason &= ^reasonStrict
 	}
 }
+
+// Semacquaire option flags.
+const semaNA = 0 << 0
+const semaWaitGroup = 1 << 0
+const semaMutex = 1 << 1
 
 // Waits until sema > 0 and then atomically decrements it.
 // It is intended as a simple sleep primitive for use by the synchronization
 // library and should not be used directly.
 // If lifo is true, queue waiter at the head of wait queue.
-fn semacquire(mut &sema: u32, lifo: bool) {
+// wg reports whether the semacqure called by a waitgroup.
+fn semacquire(mut &sema: u32, lifo: bool, opt: u32) {
 	// Easy case.
 	if cansemacquire(sema) {
 		ret
@@ -178,7 +192,7 @@ fn semacquire(mut &sema: u32, lifo: bool) {
 		// Any semrelease after the cansemacquire knows we're waiting
 		// (we set nwait above), so go to sleep.
 		root.queue(sema, sl, lifo)
-		semapark(root.lock, sl.deq)
+		semapark(root.lock, sl.deq, opt)
 		// Try to acquire semaphore before enqueue again.
 		if cansemacquire(sema) {
 			break
@@ -250,6 +264,7 @@ fn notifyListAdd(mut &l: notifyList): u32 {
 // Waits for a notification. If one has been sent since
 // notifyListAdd was called, it returns immediately. Otherwise, it blocks.
 fn notifyListWait(mut &l: notifyList, t: u32) {
+	mut reason := u32(reasonCond | reasonStrict)
 	for {
 		l.lock.lock()
 		if less(t, l.notify) {
@@ -257,7 +272,8 @@ fn notifyListWait(mut &l: notifyList, t: u32) {
 			ret
 		}
 		l.lock.unlock()
-		yield(0, reasonNA)
+		yield(0, reason)
+		reason &= ^reasonStrict
 	}
 }
 

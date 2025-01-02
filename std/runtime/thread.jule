@@ -11,15 +11,26 @@ const threadClosed = 1 << 2
 const reasonNA = 0 << 0
 const reasonRecv = 1 << 3
 const reasonSend = 1 << 4
+const reasonWaitGroup = 1 << 5
+const reasonMutex = 1 << 6
+const reasonCond = 1 << 7
+const reasonStrict = 1 << 8 // See documentation of the checkDeadlock function.
 
 // A thread instance is represents a spawned thread.
 // Used by the Jule runtime to manage threads.
 struct thread {
-	os:    osthread
+	os: osthread
+
+	// Thread state and suspend reasons if thread is suspended.
+	// The reasons may be not zeroed after thread closed or woken.
 	state: u32
 
-	// Unique identifier for channels.
-	// It used to detect a specific channels.
+	// Remaining frame count of the thread for deadlock escape.
+	// See documentation of the checkDeadlock function.
+	frame: int
+
+	// Unique identifier for mutex-sensitive primitives like channels.
+	// It used to detect a specific primitive.
 	mu: uintptr
 }
 
@@ -41,8 +52,9 @@ fn pushNewThread(): &thread {
 	// Lookup for empty threads to caught ready to reuse thread if exist.
 	for (_, mut t) in threads {
 		if t.state&threadClosed == threadClosed {
-			t.state &= ^threadClosed
-			t.state |= threadRunning
+			t.state = threadRunning
+			t.mu = 0
+			t.frame = 0
 			ret t
 		}
 	}
@@ -55,65 +67,26 @@ fn pushNewThread(): &thread {
 
 // Suspends the current thread and yields the CPU.
 // If the mu is not zero, assumes it already locked and releases before yield.
-fn yield(mu: uintptr, reason: u32) {
+fn yield(mu: uintptr, mut reason: u32) {
 	threadMutex.lock()
 	id := currentThreadID()
 	mut i := -1
-	mut runs := false
 	for (j, mut thread) in threads {
 		if thread.os.equal(id) {
+			if reason&reasonStrict == reasonStrict {
+				thread.frame = 4
+				reason &= ^reasonStrict
+			}
 			thread.state |= threadSuspended | reason
 			thread.mu = mu
 			i = j
 			break
 		}
-		runs = runs ||
-			thread.state&threadRunning == threadRunning &&
-			thread.state&threadSuspended != threadSuspended
 	}
 	if i == -1 {
 		panic("runtime: thread is not exist")
 	}
-	// There is no running thread found for [0, i].
-	// Lookup to (i, len) for running thread.
-	if !runs {
-		for (_, mut thread) in threads[i+1:] {
-			if thread.state&threadRunning == threadRunning &&
-				thread.state&threadSuspended != threadSuspended {
-				goto NoDeadlock
-			}
-		}
-		// There is no running active thread, but we have non-zero mu.
-		// So this thread associated with a channel now, we have a chance.
-		// We have to check mutual suspended threads for channels for it.
-		// All channels may be suspended for each other when using channels.
-		// For example, a thread may be suspended for a channel-send and
-		// now we may be suspend this thread for channel-recv on the same channel.
-		// So two threads are suspended for each other, caught this and wake
-		// suitable one. In such cases, there is no deadlock risk.
-		if mu != 0 {
-			for (_, mut thread) in threads {
-				if thread.mu == mu {
-					for (_, mut lthread) in threads {
-						if lthread.mu == thread.mu {
-							if lthread.state&reasonRecv == reasonRecv &&
-								thread.state&reasonSend == reasonSend {
-								goto NoDeadlock
-							}
-							if lthread.state&reasonSend == reasonSend &&
-								thread.state&reasonRecv == reasonRecv {
-								goto NoDeadlock
-							}
-						}
-					}
-				}
-			}
-		}
-		// We have not any running thread, all of them suspended or closed.
-		// So all threads are locked now, we have a deadlock.
-		panic("runtime: all threads are asleep - deadlock!")
-	NoDeadlock:
-	}
+	checkDeadlock(mu, reason)
 	// Unlock the mutex becase other threads may need to lock.
 	// There is nothing to do for this thread for now, so release lock.
 	threadMutex.unlock()
@@ -141,8 +114,272 @@ fn closeThread(t: *unsafe) {
 			// See the yield function for more details.
 			thread.state &= ^(threadRunning | threadSuspended)
 			thread.state |= threadClosed
+			thread.frame = 0
 			break
 		}
 	}
 	threadMutex.unlock()
+}
+
+// Checks deadlock and panics if exist.
+// mut and reason is stores the current thread's parameters to yield CPU.
+fn checkDeadlock(mu: uintptr, reason: u32) {
+	// At this point, we should manage all threads under more diverse conditions.
+	// At the end, we have do frame count analysis.
+	//
+	//	What is parking?
+	//		A parking operation is the process of keeping a thread suspended
+	//		until a specific condition is met. When a thread is suspended due to
+	//		a condition, a parking operation begins. The parking ends when the
+	//		thread is awakened. However, once a thread is woken up and the parking
+	//		operation is completed, there is no need for the thread management
+	//		system to be explicitly notified of the completion. Instead, simply
+	//		indicating that a new parking operation is being initiated is enough
+	//		for the system to handle the subsequent operations appropriately.
+	//
+	//		During a parking operation, if the condition is not met, the thread
+	//		must be suspended until the next opportunity to check the condition.
+	//		This can be achieved by calling the yield function appropriately.
+	//		The yield function will suspend the thread, and when the thread is
+	//		awakened, it will resume from where it left off. This function is
+	//		also crucial for detecting deadlock situations, as it helps identify
+	//		if a thread is blocked and unable to proceed due to certain conditions.
+	//
+	//	Typical implementation for a condition-based parking:
+	//		In a typical parking implementation, the frame count should be updated
+	//		before yielding. This is because a fresh yield attempt is being made,
+	//		and the condition is being re-evaluated. As a result, the thread's
+	//		frame count must be reset. To handle this, the reasonStrict flag
+	//		should be used in every new park operation. The first yield call must
+	//		include the reasonStrict flag, ensuring that the frame count is
+	//		refreshed for the new condition. Subsequent yield calls should avoid
+	//		using the reasonStrict flag until the condition is resolved.
+	//		If reasonStrict is used repeatedly, it would initiate a new condition
+	//		loop for the thread indefinitely and continuously reset the frame count.
+	//
+	//		For example:
+	//
+	//			mut reason := u32(reasonFoo | reasonStrict)
+	//			for {
+	//				if <condition> {
+	//					ret
+	//				}
+	//				yield(0, reason)
+	//				reason &= ^reasonStrict
+	//			}
+	//
+	//		In the example code above, when a new condition park loop is initiated,
+	//		the first yield call is made with the reasonStrict flag. This signals
+	//		that a new park loop is starting and resets the thread's frame count
+	//		accordingly. After that, the flag is removed, and subsequent calls
+	//		are made without the flag. This ensures that the frame count remains
+	//		updated until the park operation is completed, and synchronization
+	//		is correctly managed throughout.
+	//
+	//	Frame count of threads and escape from deadlock:
+	//		Frame analysis is the final phase of deadlock analysis.
+	//		Each thread is assigned a frame count, which is refreshed during
+	//		every new park operation. This frame count is kept optimal to ensure
+	//		accurate synchronization and proper thread management.
+	//
+	//		Frame analysis is typically conducted as a final step after all other
+	//		common conditions have been evaluated. It is used to detect deadlock
+	//		situations, which may arise when threads are unable to make progress
+	//		due to being stuck in suspended states, awaiting resources or conditions
+	//		that cannot be met.
+	//
+	//		Frame analysis is based on allocating a specific number of frame chances
+	//		to each thread, representing opportunities to break free from a suspended
+	//		state. Each frame counts as one chance to escape the analysis.
+	//		For example, a thread with 4 frame chances would undergo deadlock
+	//		analysis up to 4 times, giving it 4 opportunities to move from the
+	//		suspended state to a running state. If it hasn't managed to escape the
+	//		suspended state during the normal analysis phase, each frame grants
+	//		a chance to attempt escaping deadlock.
+	//
+	//		This needs to be done because sometimes, even though it may seem like
+	//		a deadlock, there may actually be at least one thread that has a chance
+	//		to wake up. To ensure this, each thread should be given a certain number
+	//		of frames. For example, consider a condition variable.
+	//		Let there be two threads: one is waiting to receive a signal,
+	//		and the other is sending a signal. The thread sending the signal may
+	//		finish sending the signal and terminate, but the other thread
+	//		immediately goes into the waiting state afterward In this case,
+	//		the normal analysis process might assume that the condition variable
+	//		will never leave the waiting state because there are no other threads
+	//		running. However, at this point, within the frames granted to it,
+	//		the thread is considered to have a chance to wake up. Once it wakes up,
+	//		it can receive the signal that was sent and exit the waiting state.
+	//
+	//		If a thread has exhausted all of its frame rights, its chance of
+	//		waking up for that wait is considered completely nonexistent.
+	//
+	//	WaitGroups:
+	//		If the reason is a WaitGroup, it indicates that the current thread
+	//		has been suspended for a WaitGroup. At this point, we must utilize the
+	//		`|wgRuns|` data. This data must satisfy the condition "`wgRuns >= 1`".
+	//		The rationale for this is that only a single thread might remain
+	//		at the moment, and this thread could potentially enter an infinite
+	//		wait state right now. Therefore, if the frame analysis has not
+	//		escaped from deadlock analysis, we must ensure that there is at least
+	//		one other running thread that the WaitGroup can depend on.
+	//		This guarantees that the suspended thread has a valid reason to wait
+	//		and avoids potential deadlocks.
+	//
+	//		We cannot rely solely on frame analysis for WaitGroup because if a
+	//		different thread is running, this thread can still wake up WaitGroup.
+	//		However, until this happens, the WaitGroup thread may consume frames
+	//		and think that it is deadlocked, so a WaitGroup should not be considered
+	//		a deadlock risk as long as it is a different thread.
+	//
+	//		If |wgRuns| condition is not met, then start consuming the frames of
+	//		the WaitGroup thread, at the end, it will be result as deadlock.
+	//
+	//	Condition Variables:
+	//		Almost same as the WaitGroups, but condition is different.
+	//		For a WaitGroup, it is sufficient to check whether all threads are
+	//		in a waiting state for the same WaitGroup. However,
+	//		for a condition variable, at least one thread must not be waiting for
+	//		either a WaitGroup or a condition variable.
+	//
+	//		The reason for this difference lies in the possibility of two threads
+	//		existing simultaneously—one waiting for a WaitGroup and the other for
+	//		a condition variable. Even in such a scenario, the condition variable
+	//		thread might wake up because a thread could have already signaled it
+	//		before closed or suspended, and the thread waiting on the
+	//		condition variable has not yet processed the signal. Therefore,
+	//		the WaitGroup counter must also account for threads associated with
+	//		condition variables. This is necessary because after a condition variable
+	//		thread processes the signal, the WaitGroup wait may also conclude.
+	//		However, a condition variable should not include all waiting states
+	//		in its counter. A WaitGroup or another waiting condition variable
+	//		cannot signal a condition variable.
+	//
+	//		If |condRuns| condition is not met, then start consuming the frames of
+	//		the condition variable thread, at the end, it will be result as deadlock.
+	//
+	//	Mutexes:
+	//		Mutexes are similar to WaitGroups and condition variables but differ
+	//		in an important aspect: they do not add any lock states to their counters.
+	//		In other words, a thread suspended due to a WaitGroup, condition variable,
+	//		or mutex will not be included in any counters. This is because none of
+	//		these suspended states can unlock the mutex being attempted.
+	//
+	//		It is unnecessary to exclude channel-induced suspended threads from
+	//		mutex lock states. This is because a channel thread will trigger the
+	//		edge case and ensure the required conditions for the channel are met,
+	//		thus catching the potential deadlock.
+	//
+	//	Channels:
+	//		Channels are checked in the same way regardless of whether they are
+	//		buffered or unbuffered. Channels can enter a mutual locking state;
+	//		however, this is not considered a deadlock under appropriate conditions.
+	//		For example, a thread might be suspended while waiting to receive on
+	//		a mutex (and therefore a channel). If no threads are actively running,
+	//		all are in a suspended state—this might appear to be a deadlock.
+	//		However, if another thread is suspended while waiting to send on the
+	//		same channel, this situation does not constitute a deadlock.
+	//		In such cases, the thread waiting to send is expected to wake up first,
+	//		completing its operation and allowing the thread waiting to receive
+	//		to wake up subsequently. This sequential waking ensures that the
+	//		apparent deadlock resolves itself naturally without external intervention.
+	//
+	// 		This scenario should be considered an edge case. Under normal circumstances,
+	//		channels do not require excessive attention because concurrency rarely
+	//		triggers such situations. For this edge case to be triggered,
+	//		the program must have advanced to the frame analysis stage.
+	mut wgRuns := 0
+	mut condRuns := 0
+	mut nonlocked := 0
+	// Return immediately if exist any running and not suspended thread.
+	// Also count the |wgRuns|, |condRuns| and |nonlocked| data at same time.
+	for (_, mut thread) in threads {
+		if thread.state&threadRunning == threadRunning {
+			if thread.state&threadSuspended != threadSuspended {
+				// Thread is not suspended, so works.
+				// No requirement for heavy analysis, return immediately.
+				ret
+			}
+			if thread.state&reasonWaitGroup != reasonWaitGroup {
+				// Reason of this thread is not WaitGroup.
+				// So all threads are not in the wait-state WaitGroups.
+				// We can count this thread |wgRuns|.
+				wgRuns++
+				if thread.state&reasonCond != reasonCond {
+					// Reason of this thread is not WaitGroup and condition variable.
+					// So all threads are not in the mutual infinite wait.
+					// We can count this thread for |condRuns|.
+					condRuns++
+					if thread.state&reasonMutex != reasonMutex {
+						// Reason of this thread is not WaitGroup, condition variable or mutex.
+						// So all threads are not in the mutual infinite wait or locked for a reason.
+						// We can count channels because we caught channel separately.
+						// So if counted channels are in the deadlock, we should caught that.
+						// So we can count this thread for |nonlocked|.
+						nonlocked++
+					}
+				}
+			}
+		}
+	}
+	// We must be count all possible |wgRuns| data here.
+	// So check and return immediately if reason is WaitGroup and |wgRuns| condition met.
+	// See the hard point for documentation.
+	if wgRuns >= 1 && reason&reasonWaitGroup == reasonWaitGroup {
+		ret
+	}
+	// We must be count all possible |condRuns| data here.
+	// So check and return immediately if reason is condition variable and |condRuns| condition met.
+	// See the hard point for documentation.
+	if condRuns >= 1 && reason&reasonCond == reasonCond {
+		ret
+	}
+	// We must be count all possible |nonlocked| data here.
+	// So check and return immediately if reason is Mutexand |nonlocked| condition met.
+	// See the hard point for documentation.
+	if nonlocked >= 1 && reason&reasonMutex == reasonMutex {
+		ret
+	}
+	// There is no running active thread for common cases, but we have non-zero mu.
+	// So this thread associated with a channel now, we have a chance as described
+	// in the channels section of the documentation. Check this edge case for a chance.
+	// We have to check mutual suspended threads for channels.
+	// All channels may be suspended for each other when using channels.
+	// For example, a thread may be suspended for a channel-send and
+	// now we may be suspend this thread for channel-recv on the same channel.
+	// So two threads are suspended for each other, caught this and wake
+	// suitable one. In such cases, there is no deadlock risk.
+	if mu != 0 && (reason&reasonSend == reasonSend || reason&reasonRecv == reasonRecv) {
+		for (_, mut thread) in threads {
+			if thread.mu == mu {
+				for (_, mut lthread) in threads {
+					if lthread.mu == thread.mu {
+						if lthread.state&reasonRecv == reasonRecv &&
+							thread.state&reasonSend == reasonSend {
+							ret
+						}
+						if lthread.state&reasonSend == reasonSend &&
+							thread.state&reasonRecv == reasonRecv {
+							ret
+						}
+					}
+				}
+			}
+		}
+	}
+	// Frame analysis stage. We have to look frames of running threads as
+	// described in the documentation. If any thread have a frame for this step,
+	// evaluate this as running valid thread and return immediately after
+	// removed a frame from thread.
+	for (_, mut thread) in threads {
+		if thread.state&threadRunning == threadRunning {
+			if thread.frame > 0 {
+				thread.frame--
+				ret
+			}
+		}
+	}
+	// We have not any running or ready to woken up thread, all of them suspended or closed.
+	// So all threads are locked, in other words; we have a deadlock.
+	panic("runtime: all threads are asleep - deadlock!")
 }
