@@ -161,12 +161,29 @@ impl eval {
 		ret true
 	}
 
-	fn litStr(self, &l: &ast::LitExpr): &Data {
+	fn pushErrorsFromLitError(mut self, &l: &ast::LitExpr, errors: []lit::Error) {
+		for _, err in errors {
+			self.s.errors = append(self.s.errors, build::Log{
+				Kind: build::LogKind.Error,
+				Row: l.Token.Row,
+				Column: l.Token.Column+err.Offset,
+				Path: l.Token.File.Path,
+				Text: err.Text,
+			})
+		}
+	}
+
+	fn litStr(mut self, &l: &ast::LitExpr): &Data {
 		mut s := ""
 		if token::IsRawStr(l.Value) {
 			s = lit::ToRawStr(l.Value)
 		} else {
-			s = lit::ToStr(l.Value)
+			mut errors := []lit::Error(nil)
+			s, errors = lit::ToStr(l.Value)
+			if len(errors) != 0 {
+				self.pushErrorsFromLitError(l, errors)
+				ret nil
+			}
 		}
 		mut constant := constant::Const.NewStr(s)
 
@@ -179,8 +196,12 @@ impl eval {
 		}
 	}
 
-	fn litRune(self, &l: &ast::LitExpr): &Data {
-		r := lit::ToRune(l.Value)
+	fn litRune(mut self, &l: &ast::LitExpr): &Data {
+		r, errors := lit::ToRune(l.Value)
+		if len(errors) != 0 {
+			self.pushErrorsFromLitError(l, errors)
+			ret nil
+		}
 		mut data := &Data{
 			Constant: constant::Const.NewI64(i64(r)),
 		}

@@ -6,6 +6,12 @@ use "std/conv"
 use "std/unicode/utf8"
 use "std/unsafe"
 
+// An error for literal parsing.
+struct Error {
+	Offset: int
+	Text:   str
+}
+
 // Reports whether rune is byte actually.
 // In other words, whether rune is ACII.
 fn IsAscii(r: rune): bool {
@@ -17,16 +23,16 @@ fn IsAscii(r: rune): bool {
 // Bytes are represents rune literal, allows escape sequences.
 // Returns zero rune if len(lit) == 0.
 // Assumes lit is syntaticaly and semantically correct.
-fn ToRune(mut lit: str): rune {
+fn ToRune(mut lit: str): (rune, errors: []Error) {
 	mut r := rune(0)
 	lit = lit[1:len(lit)-1]
 	if lit[0] == '\\' && len(lit) > 1 {
 		mut i := 0
-		r = runeFromEsqSeq(lit, i)
+		r, _ = runeFromEsqSeq(lit, i, errors)
 	} else {
 		r, _ = utf8::DecodeRuneStr(lit)
 	}
-	ret r
+	ret r, errors
 }
 
 // Returns raw-string value string from literal, includes quotes.
@@ -44,9 +50,9 @@ fn ToRawStr(lit: str): str {
 // Bytes are represents string characters, allows escape sequences.
 // Returns empty string if len(lit) == 0.
 // Assumes lit is syntaticaly and semantically correct.
-fn ToStr(mut lit: str): str {
+fn ToStr(mut lit: str): (str, errors: []Error) {
 	if len(lit) == 2 {
-		ret ""
+		ret "", nil
 	}
 
 	// Means string is just ASCII text without escape sequences.
@@ -59,7 +65,7 @@ fn ToStr(mut lit: str): str {
 	}
 
 	if isPure {
-		ret lit[1:len(lit)-1]
+		ret lit[1:len(lit)-1], nil
 	}
 
 	// String is not pure.
@@ -70,14 +76,14 @@ fn ToStr(mut lit: str): str {
 	for i < len(lit) {
 		b := lit[i]
 		if b == '\\' {
-			strEsqSeq(s, lit, i)
+			strEsqSeq(s, lit, i, errors)
 		} else {
 			r, size := utf8::DecodeRuneStr(lit[i:])
 			i += size
 			s = utf8::AppendRune(s, r)
 		}
 	}
-	ret unsafe::StrFromBytes(s)
+	ret unsafe::StrFromBytes(s), errors
 }
 
 fn tryBtoaCommonEsq(s: str): (seq: byte, ok: bool) {
@@ -110,43 +116,60 @@ fn tryBtoaCommonEsq(s: str): (seq: byte, ok: bool) {
 	ret
 }
 
-fn runeFromEsqSeq(s: str, mut &i: int): rune {
+fn runeFromEsqSeq(s: str, mut &i: int, mut &errors: []Error): (r: rune, isByte: bool) {
 	b, ok := tryBtoaCommonEsq(s[i:])
 	i++ // Skip escape sequence solidus.
 	if ok {
 		i++ // Skip sequence specifier.
-		ret rune(b)
+		ret rune(b), true
 	}
 
 	match s[i] {
 	| 'u':
 		const SeqLen = 5
-		r := rune(conv::ParseUint(s[i+1 : i+SeqLen], 16, 64)!)
+		r = rune(conv::ParseUint(s[i+1 : i+SeqLen], 16, 64)!)
 		i += SeqLen
-		ret r
 	| 'U':
 		const SeqLen = 9
-		r := rune(conv::ParseUint(s[i+1 : i+SeqLen], 16, 64)!)
+		r = rune(conv::ParseUint(s[i+1 : i+SeqLen], 16, 64)!)
 		i += SeqLen
-		ret r
 	| 'x':
+		isByte = true
 		const SeqLen = 3
 		seq := s[i+1 : i+SeqLen]
+		hex := conv::ParseUint(seq, 16, 64)!
+		if hex > 255 {
+			// This should be impossible case, but play safe.
+			errors = append(errors, Error{
+				Offset: i,
+				Text: "hexadecimal escape value "+conv::FmtUint(hex, 10)+" > 255",
+			})
+		}
 		i += SeqLen
-		ret rune(conv::ParseUint(seq, 16, 64)!)
+		r = rune(hex)
 	|:
+		isByte = true
 		const SeqLen = 3
 		seq := s[i:i+SeqLen]
+		octal := conv::ParseUint(seq, 8, 64)!
+		if octal > 255 {
+			errors = append(errors, Error{
+				Offset: i,
+				Text: "octal escape value "+conv::FmtUint(octal, 10)+" > 255",
+			})
+		}
 		i += SeqLen
-		ret rune(conv::ParseUint(seq[1:], 8, 64)!)
+		r = rune(octal)
 	}
+	ret
 }
 
-fn strEsqSeq(mut &buf: []byte, s: str, mut &i: int) {
-	r := runeFromEsqSeq(s, i)
-	if r < utf8::RuneSelf {
+fn strEsqSeq(mut &buf: []byte, s: str, mut &i: int, mut &errors: []Error) {
+	r, isByte := runeFromEsqSeq(s, i, errors)
+	if isByte {
 		buf = append(buf, byte(r))
 		ret
 	}
+	// Unicode code point.
 	buf = utf8::AppendRune(buf, r)
 }
