@@ -14,9 +14,6 @@ type _RCPtr = *_RCType
 // per each reference counting operation.
 const RCDelta = 1
 
-// Atomic memory ordering for reference counting data.
-const _RCMo = atomicSeqCst
-
 // Returns new initialized ready-to-use reference counting data allocation pointer.
 #export "__jule_RCNew"
 fn _RCNew(): _RCPtr {
@@ -44,7 +41,7 @@ unsafe fn _RCLoad(p: _RCPtr): _RCType {
 // Same as _RCLoad but have thread-safe implementation.
 #export "__jule_RCLoadAtomic"
 unsafe fn _RCLoadAtomic(p: _RCPtr): _RCType {
-	ret atomicLoad[_RCType](*p, _RCMo)
+	ret atomicLoad[_RCType](*p, atomicAcquire)
 }
 
 // Adds strong reference to reference pointer.
@@ -61,7 +58,7 @@ unsafe fn _RCAdd(mut p: _RCPtr) {
 // Same as _RCAdd but have thread-safe implementation.
 #export "__jule_RCAddAtomic"
 unsafe fn _RCAddAtomic(mut p: _RCPtr) {
-	atomicAdd[_RCType](*p, RCDelta, _RCMo)
+	atomicAdd[_RCType](*p, RCDelta, atomicRelaxed)
 }
 
 // Drops strong reference from reference pointer.
@@ -83,7 +80,7 @@ unsafe fn _RCDrop(mut p: _RCPtr): bool {
 unsafe fn _RCDropAtomic(mut p: _RCPtr): bool {
 	// The atomicAdd function returns new data of pointer.
 	// So if new data equals to zero, means references zeroed.
-	ret atomicAdd[_RCType](*p, -RCDelta, _RCMo) >= RCDelta
+	ret atomicAdd[_RCType](*p, -RCDelta, atomicAcqRel) >= RCDelta
 }
 
 // Deallocates reference counting data allocation.
