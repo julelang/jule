@@ -32,6 +32,10 @@ struct thread {
 	// Unique identifier for mutex-sensitive primitives like channels.
 	// It used to detect a specific primitive.
 	mu: uintptr
+
+	// Pointer to the next thread.
+	// Threads stored in the thread stack with a singly linked-list.
+	next: &thread
 }
 
 // A thread stack and associated lock.
@@ -41,28 +45,49 @@ struct thread {
 // in the threads. Subsequent thread generations may use the same allocation
 // of closed threads for the new spawned threads.
 static threadMutex = fmutex{}
-static mut threads = ([]&thread)(nil)
+static mut threads = (&thread)(nil)
+
+// Allocates a new thread and sets state as running.
+fn newThread(): &thread {
+	mut t := new(thread)
+	unsafe {
+		// Remove RC pointer and disable GC for thread allocations.
+		// Because allocated threads will never be deallocated.
+		// Avoid GC cost for threads.
+		mut p := (*sptrBase[thread])(&t)
+		_RCFree(p.ref)
+		p.ref = nil
+	}
+	t.state |= threadRunning
+	ret t
+}
 
 // Pushes a new thread to the main thread stack and sets state as running.
 // Returns the thread representing the created thread.
 // Locks the threadMutex and will not release before return,
 // should be released after pushNewThread.
+//
+// This function assumes |threads| is not nil. So we must have a thread pointer
+// associated with a thread in thread stack, it should be the main thread.
+// New created threads should be added to the main thread's tail.
 fn pushNewThread(): &thread {
 	threadMutex.lock()
 	// Lookup for empty threads to caught ready to reuse thread if exist.
-	for (_, mut t) in threads {
+	mut t := threads
+	for t != nil; t = t.next {
 		if t.state&threadClosed == threadClosed {
 			t.state = threadRunning
 			t.mu = 0
 			t.frame = 0
 			ret t
 		}
+		if t.next == nil {
+			break
+		}
 	}
 	// We have not any reusable thread, so create a new one.
-	mut t := new(thread)
-	t.state |= threadRunning
-	threads = append(threads, t)
-	ret t
+	t.next = newThread()
+	ret t.next
 }
 
 // Suspends the current thread and yields the CPU.
@@ -70,22 +95,20 @@ fn pushNewThread(): &thread {
 fn yield(mu: uintptr, mut reason: u32) {
 	threadMutex.lock()
 	id := currentThreadID()
-	mut i := -1
-	for (j, mut thread) in threads {
-		if thread.os.equal(id) {
+	mut t := threads
+	for t != nil; t = t.next {
+		if t.os.equal(id) {
 			if reason&reasonStrict == reasonStrict {
-				thread.frame = 4
+				t.frame = 4
 				reason &= ^reasonStrict
 			}
-			thread.state |= threadSuspended | reason
-			thread.mu = mu
-			i = j
-			break
+			t.state |= threadSuspended | reason
+			t.mu = mu
+			goto Found
 		}
 	}
-	if i == -1 {
-		panic("runtime: thread is not exist")
-	}
+	panic("runtime: thread is not exist")
+Found:
 	checkDeadlock(mu, reason)
 	// Unlock the mutex becase other threads may need to lock.
 	// There is nothing to do for this thread for now, so release lock.
@@ -99,22 +122,23 @@ fn yield(mu: uintptr, mut reason: u32) {
 	// CPU is back for this thread.
 	// Lock mutex again and wake up.
 	threadMutex.lock()
-	threads[i].mu = 0
-	threads[i].state &= ^threadSuspended
+	t.mu = 0
+	t.state &= ^threadSuspended
 	threadMutex.unlock()
 }
 
-// Closes the thread associated with t, if exist.
-fn closeThread(t: *unsafe) {
+// Closes the thread associated with tptr, if exist.
+fn closeThread(tptr: *unsafe) {
 	threadMutex.lock()
-	for (_, mut thread) in threads {
-		if &thread.os.handle == t {
+	mut t := threads
+	for t != nil; t = t.next {
+		if &t.os.handle == tptr {
 			// Do not reset reasons and mu field.
 			// Because this kind of data may needed.
 			// See the yield function for more details.
-			thread.state &= ^(threadRunning | threadSuspended)
-			thread.state |= threadClosed
-			thread.frame = 0
+			t.state &= ^(threadRunning | threadSuspended)
+			t.state |= threadClosed
+			t.frame = 0
 			break
 		}
 	}
@@ -293,24 +317,25 @@ fn checkDeadlock(mu: uintptr, reason: u32) {
 	mut nonlocked := 0
 	// Return immediately if exist any running and not suspended thread.
 	// Also count the |wgRuns|, |condRuns| and |nonlocked| data at same time.
-	for (_, mut thread) in threads {
-		if thread.state&threadRunning == threadRunning {
-			if thread.state&threadSuspended != threadSuspended {
+	mut t := threads
+	for t != nil; t = t.next {
+		if t.state&threadRunning == threadRunning {
+			if t.state&threadSuspended != threadSuspended {
 				// Thread is not suspended, so works.
 				// No requirement for heavy analysis, return immediately.
 				ret
 			}
-			if thread.state&reasonWaitGroup != reasonWaitGroup {
+			if t.state&reasonWaitGroup != reasonWaitGroup {
 				// Reason of this thread is not WaitGroup.
 				// So all threads are not in the wait-state WaitGroups.
 				// We can count this thread |wgRuns|.
 				wgRuns++
-				if thread.state&reasonCond != reasonCond {
+				if t.state&reasonCond != reasonCond {
 					// Reason of this thread is not WaitGroup and condition variable.
 					// So all threads are not in the mutual infinite wait.
 					// We can count this thread for |condRuns|.
 					condRuns++
-					if thread.state&reasonMutex != reasonMutex {
+					if t.state&reasonMutex != reasonMutex {
 						// Reason of this thread is not WaitGroup, condition variable or mutex.
 						// So all threads are not in the mutual infinite wait or locked for a reason.
 						// We can count channels because we caught channel separately.
@@ -350,16 +375,18 @@ fn checkDeadlock(mu: uintptr, reason: u32) {
 	// So two threads are suspended for each other, caught this and wake
 	// suitable one. In such cases, there is no deadlock risk.
 	if mu != 0 && (reason&reasonSend == reasonSend || reason&reasonRecv == reasonRecv) {
-		for (_, mut thread) in threads {
-			if thread.mu == mu {
-				for (_, mut lthread) in threads {
-					if lthread.mu == thread.mu {
-						if lthread.state&reasonRecv == reasonRecv &&
-							thread.state&reasonSend == reasonSend {
+		t = threads
+		for t != nil; t = t.next {
+			if t.mu == mu {
+				mut lt := threads
+				for lt != nil; lt = lt.next {
+					if lt.mu == t.mu {
+						if lt.state&reasonRecv == reasonRecv &&
+							t.state&reasonSend == reasonSend {
 							ret
 						}
-						if lthread.state&reasonSend == reasonSend &&
-							thread.state&reasonRecv == reasonRecv {
+						if lt.state&reasonSend == reasonSend &&
+							t.state&reasonRecv == reasonRecv {
 							ret
 						}
 					}
@@ -371,10 +398,11 @@ fn checkDeadlock(mu: uintptr, reason: u32) {
 	// described in the documentation. If any thread have a frame for this step,
 	// evaluate this as running valid thread and return immediately after
 	// removed a frame from thread.
-	for (_, mut thread) in threads {
-		if thread.state&threadRunning == threadRunning {
-			if thread.frame > 0 {
-				thread.frame--
+	t = threads
+	for t != nil; t = t.next {
+		if t.state&threadRunning == threadRunning {
+			if t.frame > 0 {
+				t.frame--
 				ret
 			}
 		}
