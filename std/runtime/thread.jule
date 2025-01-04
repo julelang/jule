@@ -9,12 +9,13 @@ const threadClosed = 1 << 2
 
 // State flags of threads for suspend reason.
 const reasonNA = 0 << 0
-const reasonRecv = 1 << 3
-const reasonSend = 1 << 4
-const reasonWaitGroup = 1 << 5
-const reasonMutex = 1 << 6
-const reasonCond = 1 << 7
-const reasonStrict = 1 << 8 // See documentation of the checkDeadlock function.
+const reasonRecv = 1 << 3      // Channel-recv.
+const reasonSend = 1 << 4      // Channel-send.
+const reasonWaitGroup = 1 << 5 // WaitGroup.
+const reasonMutex = 1 << 6     // Mutex kind.
+const reasonCond = 1 << 7      // Condition variable.
+const reasonSelect = 1 << 8    // Select statement.
+const reasonStrict = 1 << 9    // See documentation of the checkDeadlock function.
 
 // A thread instance is represents a spawned thread.
 // Used by the Jule runtime to manage threads.
@@ -38,14 +39,20 @@ struct thread {
 	next: &thread
 }
 
+// Special case flags for thread management.
+const threadSC_NA = 0
+const threadSC_EmptySelect = 1 << 0
+
 // A thread stack and associated lock.
 // All spawned threads are stored in the threads.
 // When a thread completed, it will be marked as closed.
 // A closed thread instance will not be released, remains allocated and placed
 // in the threads. Subsequent thread generations may use the same allocation
 // of closed threads for the new spawned threads.
+// threadCases stores special cases for thread management.
 static threadMutex = fmutex{}
 static mut threads = (&thread)(nil)
+static mut threadCases = threadSC_NA
 
 // Allocates a new thread and sets state as running.
 fn newThread(): &thread {
@@ -90,25 +97,32 @@ fn pushNewThread(): &thread {
 	ret t.next
 }
 
-// Suspends the current thread and yields the CPU.
-// If the mu is not zero, assumes it already locked and releases before yield.
-fn yield(mu: uintptr, mut reason: u32) {
-	threadMutex.lock()
+// Returns the thread associated with current thread.
+fn getCurrentThread(): &thread {
 	id := currentThreadID()
 	mut t := threads
 	for t != nil; t = t.next {
 		if t.os.equal(id) {
-			if reason&reasonStrict == reasonStrict {
-				t.frame = 4
-				reason &= ^reasonStrict
-			}
-			t.state |= threadSuspended | reason
-			t.mu = mu
-			goto Found
+			ret t
 		}
 	}
-	panic("runtime: thread is not exist")
-Found:
+	ret nil
+}
+
+// Suspends the current thread and yields the CPU.
+// If the mu is not zero, assumes it already locked and releases before yield.
+fn yield(mu: uintptr, mut reason: u32) {
+	threadMutex.lock()
+	mut t := getCurrentThread()
+	if t == nil {
+		panic("runtime: thread is not exist")
+	}
+	if reason&reasonStrict == reasonStrict {
+		t.frame = 4
+		reason &= ^reasonStrict
+	}
+	t.state |= threadSuspended | reason
+	t.mu = mu
 	checkDeadlock(mu, reason)
 	// Unlock the mutex becase other threads may need to lock.
 	// There is nothing to do for this thread for now, so release lock.
@@ -141,6 +155,15 @@ fn closeThread(tptr: *unsafe) {
 			t.frame = 0
 			break
 		}
+	}
+	// We have empty select special case.
+	// We have to check deadlocks after any thread closed. Because at least
+	// one thread is in deep sleep and we do not know when this thread will wake up.
+	// So, if we have a deadlock, detection may be impossible because empty selects
+	// does not checks deadlocks. So check deadlock after closed a thread to
+	// caught special case deadlock; all threads are in the deep sleep.
+	if threadCases&threadSC_EmptySelect == threadSC_EmptySelect {
+		checkDeadlock(0, reasonNA)
 	}
 	threadMutex.unlock()
 }
@@ -286,7 +309,7 @@ fn checkDeadlock(mu: uintptr, reason: u32) {
 	//		Mutexes are similar to WaitGroups and condition variables but differ
 	//		in an important aspect: they do not add any lock states to their counters.
 	//		In other words, a thread suspended due to a WaitGroup, condition variable,
-	//		or mutex will not be included in any counters. This is because none of
+	//		mutex, or select will not be included in any counters. This is because none of
 	//		these suspended states can unlock the mutex being attempted.
 	//
 	//		It is unnecessary to exclude channel-induced suspended threads from
@@ -335,8 +358,8 @@ fn checkDeadlock(mu: uintptr, reason: u32) {
 					// So all threads are not in the mutual infinite wait.
 					// We can count this thread for |condRuns|.
 					condRuns++
-					if t.state&reasonMutex != reasonMutex {
-						// Reason of this thread is not WaitGroup, condition variable or mutex.
+					if t.state&reasonMutex != reasonMutex && t.state&reasonSelect != reasonSelect {
+						// Reason of this thread is not WaitGroup, condition variable, mutex or select.
 						// So all threads are not in the mutual infinite wait or locked for a reason.
 						// We can count channels because we caught channel separately.
 						// So if counted channels are in the deadlock, we should caught that.

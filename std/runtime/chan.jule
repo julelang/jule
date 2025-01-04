@@ -299,6 +299,9 @@ fn chanCanSend(&ch: hchan): (r: bool) {
 	ret
 }
 
+// Candidate lookup threshold for non-empty select statements before yield CPU.
+const selectThreshold = 5
+
 // Select statement implementation for blocking and non-blocking select.
 // If the block is true, behavior is blocking select, otherwise unblocking select.
 // The chans should point to an array with a size equal to totalChans.
@@ -307,7 +310,44 @@ fn chanCanSend(&ch: hchan): (r: bool) {
 // If any case selected, returns the index of selected candidate case by chans.
 // Otherwise returns -1 which means no selected case. It only appears for non-blocking selects.
 // The channel's mutex will be locked already for the selected case.
+// For empty select statement, chans should be nil.
 unsafe fn chanSelect(chans: *&hchan, totalChans: int, recvChans: int, block: bool): int {
+	// Empty or blocking-select statement.
+	if block || chans == nil {
+		mut t := getCurrentThread()
+		threadMutex.lock()
+		// Add special case for empty select.
+		if chans == nil {
+			threadCases |= threadSC_EmptySelect
+		}
+		// Set thread state as suspended with no reason.
+		// We do not need to frame analysis for this thread.
+		// If we enable the frame analysis for this thread, deadlock analysis caught
+		// any deadlock so slow because we will put this thread into deep sleep.
+		// So do not enable frame analysis, use zero frame count. So we can caught
+		// deadlock immediately if this thread is the only thread. In other cases,
+		// other threads will caught any deadlock if occurs.
+		t.state |= threadSuspended | reasonSelect
+		t.frame = 0
+		// Check deadlock before sleep and release mutex.
+		checkDeadlock(0, reasonSelect)
+		threadMutex.unlock()
+		// Empty select statement. Yield CPU indefinitely.
+		if chans == nil {
+			// Put thread into sleep for a hour.
+			// We do not need to yield CPU, this thread will never continue to run.
+			// It always yields CPU, so put it into deep sleep.
+			// Other threads can caught deadlocks, if any, after this stage.
+			// If this thread is the single thread, we already checked deadlocks.
+			// So put this thread into deep sleep indefinitely, do not waste CPU with fast cycles.
+			for {
+				sleep(1 * _Hour)
+			}
+			panic("unreachable")
+		}
+	}
+	mut it := 0 // Iteration count.
+	// We have channels for cases, evaluate and choice a candidate.
 	mut candidates := make([]&hchan, 0, totalChans)
 Select:
 	mut ch := *(&chans)
@@ -337,11 +377,24 @@ Select:
 		}
 	}
 
-	// No candidate fonud.
+	// No candidate found.
 	if len(candidates) == 0 {
+		// This is a blocking-select but we have not any candidate.
+		// So select until we have at least 1 eligible channel.
 		if block {
-			// This is a blocking-select but we have not any candidate.
-			// So select until we have at least 1 eligible channel.
+			// Increase iteration count and check the value.
+			// If we iterated many times to find a candidate,
+			// stop wasting CPU cycles with fast iterations.
+			// Check deadlock risk and then yield the CPU.
+			it++
+			if it < selectThreshold {
+				threadMutex.lock()
+				checkDeadlock(0, reasonNA)
+				threadMutex.unlock()
+				osyield()
+				it = 0 // Reset iteration count for the next threshold.
+			}
+			// Try again to find a candidate and select it.
 			goto Select
 		}
 		// Non-blocking select, return as -1.
