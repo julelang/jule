@@ -140,7 +140,7 @@ fn cansemacquire(mut &sema: u32): bool {
 }
 
 // Puts the current thread into a waiting state and unlocks the lock.
-fn semapark(&lock: fmutex, &deq: bool, opt: u32) {
+fn semapark(&lock: fmutex, &sema: u32, &deq: bool, opt: u32) {
 	mut reason := u32(reasonNA | reasonStrict)
 	if opt&semaWaitGroup == semaWaitGroup {
 		reason |= reasonWaitGroup
@@ -150,7 +150,7 @@ fn semapark(&lock: fmutex, &deq: bool, opt: u32) {
 	}
 	lock.unlock()
 	for !deq {
-		yield(0, reason)
+		yield(uintptr(&sema), reason)
 		reason &= ^reasonStrict
 	}
 }
@@ -192,7 +192,7 @@ fn semacquire(mut &sema: u32, lifo: bool, opt: u32) {
 		// Any semrelease after the cansemacquire knows we're waiting
 		// (we set nwait above), so go to sleep.
 		root.queue(sema, sl, lifo)
-		semapark(root.lock, sl.deq, opt)
+		semapark(root.lock, sema, sl.deq, opt)
 		// Try to acquire semaphore before enqueue again.
 		if cansemacquire(sema) {
 			break

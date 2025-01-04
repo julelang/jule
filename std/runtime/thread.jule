@@ -30,8 +30,9 @@ struct thread {
 	// See documentation of the checkDeadlock function.
 	frame: int
 
-	// Unique identifier for mutex-sensitive primitives like channels.
+	// Unique identifier for various purposes, usually it is a pointer.
 	// It used to detect a specific primitive.
+	// It may be a mutex pointer for channel, of a sema pointer for mutex.
 	mu: uintptr
 
 	// Pointer to the next thread.
@@ -111,6 +112,7 @@ fn getCurrentThread(): &thread {
 
 // Suspends the current thread and yields the CPU.
 // If the mu is not zero, assumes it already locked and releases before yield.
+// If reason is related with a sema, will not handle mu as a mutex.
 fn yield(mu: uintptr, mut reason: u32) {
 	threadMutex.lock()
 	mut t := getCurrentThread()
@@ -127,7 +129,8 @@ fn yield(mu: uintptr, mut reason: u32) {
 	// Unlock the mutex becase other threads may need to lock.
 	// There is nothing to do for this thread for now, so release lock.
 	threadMutex.unlock()
-	if mu != 0 {
+	// Release mutex if reason is not related with a sema.
+	if mu != 0 && reason&reasonMutex != reasonMutex && reason&reasonWaitGroup != reasonWaitGroup {
 		unsafe { (*fmutex)(mu).unlock() }
 	}
 	// Yield the CPU if possible, it may return immediately for the same thread.
@@ -137,7 +140,7 @@ fn yield(mu: uintptr, mut reason: u32) {
 	// Lock mutex again and wake up.
 	threadMutex.lock()
 	t.mu = 0
-	t.state &= ^threadSuspended
+	t.state &= ^(threadSuspended | reason)
 	threadMutex.unlock()
 }
 
@@ -153,19 +156,19 @@ fn closeThread(tptr: *unsafe) {
 			t.state &= ^(threadRunning | threadSuspended)
 			t.state |= threadClosed
 			t.frame = 0
+			// We have empty select special case.
+			// We have to check deadlocks after any thread closed. Because at least
+			// one thread is in deep sleep and we do not know when this thread will wake up.
+			// So, if we have a deadlock, detection may be impossible because empty selects
+			// does not checks deadlocks. So check deadlock after closed a thread to
+			// caught special case deadlock; all threads are in the deep sleep.
+			if threadCases&threadSC_EmptySelect == threadSC_EmptySelect {
+				checkDeadlock(0, reasonNA)
+			}
+			threadMutex.unlock()
 			break
 		}
 	}
-	// We have empty select special case.
-	// We have to check deadlocks after any thread closed. Because at least
-	// one thread is in deep sleep and we do not know when this thread will wake up.
-	// So, if we have a deadlock, detection may be impossible because empty selects
-	// does not checks deadlocks. So check deadlock after closed a thread to
-	// caught special case deadlock; all threads are in the deep sleep.
-	if threadCases&threadSC_EmptySelect == threadSC_EmptySelect {
-		checkDeadlock(0, reasonNA)
-	}
-	threadMutex.unlock()
 }
 
 // Checks deadlock and panics if exist.
@@ -335,6 +338,19 @@ fn checkDeadlock(mu: uintptr, reason: u32) {
 	//		channels do not require excessive attention because concurrency rarely
 	//		triggers such situations. For this edge case to be triggered,
 	//		the program must have advanced to the frame analysis stage.
+	//
+	// A quick check before heavy analysis:
+	// mu is no zero and reason is mutex. For a fast check, we can try sema value.
+	// If sema is not locked, mutex have a chance, so no deadlock risk.
+	// It also prevents fake deadlock analysis results for mutexes.
+	// For example: all threads tries to lock a mutex and they in the suspended
+	// state but no one locked the mutex yet. In this case common analysis will
+	// result as deadlock due to all threads suspended.
+	if mu != 0 && reason&reasonMutex == reasonMutex {
+		if atomicLoad(unsafe { *(*u32)(mu) }, atomicSeqCst) > 0 {
+			ret
+		}
+	}
 	mut wgRuns := 0
 	mut condRuns := 0
 	mut nonlocked := 0
@@ -423,7 +439,8 @@ fn checkDeadlock(mu: uintptr, reason: u32) {
 	// removed a frame from thread.
 	t = threads
 	for t != nil; t = t.next {
-		if t.state&threadRunning == threadRunning {
+		if t.state&threadRunning == threadRunning &&
+			t.state&threadSuspended == threadSuspended {
 			if t.frame > 0 {
 				t.frame--
 				ret

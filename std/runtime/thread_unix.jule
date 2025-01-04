@@ -44,13 +44,13 @@ struct threadData {
 // So, the head fields of the thread data should be matched fields of the threadData.
 #export "__jule_coSpawn"
 unsafe fn coSpawn(func: *unsafe, mut args: *unsafe): bool {
-	mut thread := pushNewThread()
-	(*threadData)(args).handle = &thread.os.handle
-	if cpp.pthread_create(&thread.os.handle, nil, integ::Emit[*unsafe]("(void*(*)(void*))({})", func), args) != 0 {
+	mut t := pushNewThread()
+	(*threadData)(args).handle = &t.os.handle
+	if cpp.pthread_create(&t.os.handle, nil, integ::Emit[*unsafe]("(void*(*)(void*))({})", func), args) != 0 {
 		ret false
 	}
 	threadMutex.unlock()
-	cpp.pthread_detach(thread.os.handle)
+	cpp.pthread_detach(t.os.handle)
 	ret true
 }
 
