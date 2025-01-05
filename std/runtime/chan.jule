@@ -2,32 +2,25 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-// Provides a node of type T for chanQueue.
-// Automatically instantiated by chanQueue.
-struct chanQueueNode[T] {
-	data: T
-	next: &chanQueueNode[T]
-}
-
 // Queue implementation using type T for channels that use type T.
 // Provides read and write in FIFO order. Automatically instantiated by pchan.
 // Designed for channels and should be used with caution. Not thread-safe by itself.
 // Works with a capacity of N for buffered channels, and allocated spaces are reused,
 // with each addition not resulting in a new allocation.
 struct chanQueue[T] {
-	// Pointer to the first node waiting to be read according to FIFO order.
-	// In unbuffered channels, the node is always a single node and is used to store
-	// and read a single value, never nil. In buffered channels,
-	// it can be nil if there is no data waiting to be read.
-	head: &chanQueueNode[T]
+	// Preallocated buffer for the queue. It performs GC for memory safety.
+	// Always len(buf) == cap(buf).
+	buf: []T
 
-	// In unbuffered channels, it is always nil. In buffered channels, it stores
-	// the node at the end of the queue, which is the most recently used and waiting to be read.
-	tail: &chanQueueNode[T]
+	// Pointer to the first node of the buf.
+	// Used for the direct access to the memory, to avoid bound checking cost.
+	data: *T
 
-	// In unbuffered channels, it is always nil. For buffered channels, it stores
-	// previously allocated and available nodes.
-	free: &chanQueueNode[T]
+	// Read and write offsets of the queue. The read offset always points to the
+	// next node to be read and the write offset always points to the next free
+	// node to be used for enqueuing.
+	r: int
+	w: int
 }
 
 impl chanQueue {
@@ -35,18 +28,14 @@ impl chanQueue {
 	// If cap >= 1, it also sets the last node. If cap >= 1,
 	// the channel is created as buffered, and if cap == 0,
 	// it is created as unbuffered channel.
-	static fn new(mut cap: int): &chanQueue[T] {
-		mut q := new(chanQueue[T])
+	static fn new(cap: int): chanQueue[T] {
+		mut q := chanQueue[T]{}
 		if cap >= 1 {
-			q.free = new(chanQueueNode[T])
-			mut node := q.free
-			for cap > 1; cap-- {
-				node.next = new(chanQueueNode[T])
-				node = node.next
-			}
+			q.buf = make([]T, cap)
 		} else {
-			q.head = new(chanQueueNode[T])
+			q.buf = make([]T, 1)
 		}
+		q.data = unsafe { (*sliceBase[T])(&q.buf).slice }
 		ret q
 	}
 
@@ -54,27 +43,18 @@ impl chanQueue {
 	// Assumes that there is always data in the queue.
 	fn dequeue(mut self): T {
 		// Copy the data before resetting to default.
-		mut data := self.head.data
-		{
+		mut data := unsafe { self.data[self.r] }
+		unsafe {
 			// Remove the data from the node. Since this is a data type that performs GC,
 			// it will continue to exist until it is removed from the node.
 			// Remove its reference from the queue to allow it to be freed if possible.
 			let mut def: T
-			self.head.data = def
+			self.data[self.r] = def
 		}
-		if self.tail != nil || self.free != nil { // buffered channel
-			// Advance the read order.
-			// The first node is now dequeued, so add it directly to the head of the free list.
-			mut node := self.head
-			self.head = node.next
-			if self.head == nil {
-				// Head has reached the end. Set tail to nil.
-				// The next enqueue call will select a node from the free list and
-				// set the head accordingly.
-				self.tail = nil
-			}
-			node.next = self.free
-			self.free = node
+		// Advance the read order.
+		self.r++
+		if self.r == len(self.buf) {
+			self.r = 0
 		}
 		ret data
 	}
@@ -83,25 +63,12 @@ impl chanQueue {
 	// If the channel is unbuffered, it always assumes the current data has been read.
 	// If the channel is buffered, it always assumes there is free node to enqueue.
 	fn enqueue(mut self, mut &data: T) {
-		if self.free != nil { // buffered channel
-			// Take the first node from the free list and use it to store the data.
-			mut node := self.free
-			self.free = node.next
-			node.data = data
-			node.next = nil
-			// If tail is nil, initialize a new head.
-			// If there is already a tail, add the new node to the end of queue.
-			// In both cases, set tail to the last node.
-			if self.tail == nil {
-				self.head = node
-			} else {
-				self.tail.next = node
-			}
-			self.tail = node
-		} else {
-			// Unbuffered channel.
-			// Just update the head node.
-			self.head.data = data
+		// Write data to the next available node in the queue.
+		unsafe { self.data[self.w] = data }
+		// Advance the write order.
+		self.w++
+		if self.w == len(self.buf) {
+			self.w = 0
 		}
 	}
 }
@@ -136,7 +103,7 @@ struct pchan[T] {
 	cap:   int
 	len:   int
 	state: u32
-	queue: &chanQueue[T]
+	queue: chanQueue[T]
 }
 
 impl pchan {
@@ -167,10 +134,7 @@ impl pchan {
 	// Closes the channel.
 	fn close(mut self) {
 		self.lock.lock()
-		if self.state&chanClosed != chanClosed {
-			self.state |= chanClosed
-			self.queue.free = nil
-		}
+		self.state |= chanClosed
 		self.lock.unlock()
 	}
 
@@ -235,12 +199,12 @@ impl pchan {
 		// its length. If the length has reached zero, it means the channel is
 		// closed and there is no data left in the queue.
 		if self.len == 0 {
-			// Since the channel is no longer fully functional, set the head and
-			// tail nodes to nil. This drops references to the relevant allocations
-			// without waiting for the channel to go out of scope,
-			// making it easier to gain used memory back.
-			self.queue.head = nil
-			self.queue.tail = nil
+			// Since the channel is no longer fully functional, set the buffer
+			// to nil. This drops references to the relevant allocations without
+			// waiting for the channel to go out of scope, making it easier
+			// to gain used memory back quicky. Helps to reduce memory consuption.
+			self.queue.buf = nil
+			self.queue.data = nil
 			self.lock.unlock()
 			if &ok != nil {
 				ok = false
