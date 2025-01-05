@@ -27,7 +27,7 @@ It contains the reference compiler, API, and standard library.
 - [Easy cross compilation](https://manual.jule.dev/compiler/cross-compilation): generate IR for target platform and imitate tge target architecture
 - Cross platform implemented standard library
 - Built-in support to write tests
-- Built-in [concurrency](https://manual.jule.dev/concurrency/): channels, mutexes, condition variables and more
+- Built-in [concurrency](https://manual.jule.dev/concurrency/): easy to use managed threads, channels, mutexes, condition variables and more
 - Easy error-handling with [exceptionals](https://manual.jule.dev/error-handling/exceptionals), very like optional types
 - Easy low-level programming
 - High [interoperability](https://manual.jule.dev/integrated-jule/interoperability/) with C, C++, Objective-C and Objective-C++
