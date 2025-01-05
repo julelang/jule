@@ -9,6 +9,7 @@ use "std/jule/constant"
 use "std/jule/internal/mod"
 use "std/jule/token"
 use "std/jule/types"
+use "std/slices"
 use "std/strings"
 use "std/unicode/utf8"
 
@@ -2603,6 +2604,71 @@ impl sema {
 		}
 	}
 
+	// Check initialization cycles for global variables.
+	fn checkInitializationCycles(mut &self) {
+		mut message := new(strings::Builder)
+		message.Grow(1 << 5)
+		pushIllegalCycleError := fn(v1: str, v2: str) {
+			const Padding = 7
+			refersTo := build::Logf(build::LogMsg.RefersTo, v1, v2)
+			message.WriteStr(strings::Repeat(" ", Padding))!
+			message.WriteStr(refersTo)!
+			message.WriteByte('\n')!
+		}
+		mut cached := make([]&ReferenceStack, 0, 10)
+		for (_, mut file) in self.files {
+			for (_, mut v) in file.Vars {
+				cached = cached[:0]
+				let mut refCheck: fn(mut r: &ReferenceStack, owner: str): bool
+				&_refCheck := refCheck
+				refCheck = fn(mut r: &ReferenceStack, owner: str): bool {
+					// We already checked/checking this reference stack.
+					if slices::Contains(cached, r) {
+						ret false
+					}
+					cached = append(cached, r)
+					n := message.Len()
+					mut i := 0
+					for i < r.Len(); i++ {
+						mut ref := r.At(i)
+						match type ref {
+						| &StructIns:
+							mut s := (&StructIns)(ref)
+							if r == s.Refers {
+								break
+							}
+							pushIllegalCycleError(owner, s.Decl.Ident) // Push trace.
+							if unsafe { _refCheck(s.Refers, s.Decl.Ident) } {
+								ret true
+							}
+						| &FuncIns:
+							mut f := (&FuncIns)(ref)
+							if r == f.Refers {
+								break
+							}
+							pushIllegalCycleError(owner, f.Decl.Ident) // Push trace.
+							if unsafe { _refCheck(f.Refers, f.Decl.Ident) } {
+								ret true
+							}
+						| &Var:
+							v2 := (&Var)(ref)
+							pushIllegalCycleError(owner, v2.Ident) // Push trace.
+							if v2 == v {
+								ret true
+							}
+						}
+					}
+					unsafe { message.SetBuf(message.Buf()[:n]) } // Pop last trace.
+					ret false
+				}
+				if refCheck(v.Refers, v.Ident) {
+					self.pushErr(v.Token, build::LogMsg.IllegalCrossCycle, message.Str())
+					ret
+				}
+			}
+		}
+	}
+
 	// Checks all types of all package files.
 	// Breaks checking if checked file failed.
 	fn checkPackageTypes(mut &self) {
@@ -2649,6 +2715,8 @@ impl sema {
 			self.checkFuncs()
 			self.checkStructTypes()
 		}
+
+		self.checkInitializationCycles()
 	}
 
 	fn setFileSemaFields(mut &self) {
