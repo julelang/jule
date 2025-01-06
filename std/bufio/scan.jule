@@ -59,12 +59,9 @@ const MaxTokenSize = 1 << 16 // 64 * 1024
 // A safe [SplitFunc] should handle data without mutating it.
 type SplitFunc: fn(mut data: []byte, atEOF: bool)!: (advance: int, token: []byte)
 
-// Scanner configuration data.
-// All fields will assigned to the default value for the Scanner, for zero value.
-struct ScannerCfg {
-	Split: SplitFunc = SplitLines // The splitter function.
-	Max:   int = MaxTokenSize     // The maximum token size.
-}
+// Scanner state flags.
+const scanEOF = 1 << 0  // Whether the reader at the EOF.
+const scanUsed = 1 << 1 // Whether the Scan method called.
 
 // Provides a convenient interface for reading data such as
 // a file of newline-delimited lines of text. Successive calls to
@@ -80,6 +77,7 @@ struct ScannerCfg {
 // large to fit in the buffer. When a scan stops, the reader may have
 // advanced arbitrarily far past the last token.
 struct Scanner {
+	state:   int
 	r:       io::Reader // The reader provided by the client.
 	split:   SplitFunc  // The splitter function.
 	max:     int        // The maximum token size.
@@ -87,22 +85,16 @@ struct Scanner {
 	start:   int        // First non-processed byte in buf.
 	end:     int        // End of data in buf.
 	empties: int        // Count of successive empty tokens.
-	atEOF:   bool       // Whether the reader at the EOF.
 	mut tok: []byte     // The last readed token.
 }
 
 impl Scanner {
 	// Returns new Scanner for r with the default configuration.
 	static fn New(mut r: io::Reader): &Scanner {
-		ret Scanner.NewCfg(r, {})
-	}
-
-	// Returns new Scanner for r by the custom configuration.
-	static fn NewCfg(mut r: io::Reader, cfg: ScannerCfg): &Scanner {
 		ret &Scanner{
 			r: r,
-			split: cfg.Split,
-			max: cfg.Max,
+			split: ScanLines,
+			max: MaxTokenSize,
 		}
 	}
 
@@ -128,11 +120,12 @@ impl Scanner {
 	// tokens without advancing the input. This is a common error mode for
 	// scanners.
 	fn Scan(mut self)!: bool {
+		self.state |= scanUsed
 		// Loop until we have a token.
 		for {
 			// See if we can get a token with what we already have.
-			if self.end > self.start || self.atEOF {
-				advance, mut token := self.split(self.buf[self.start:self.end], self.atEOF) else { error(error) }
+			if self.end > self.start || self.state&scanEOF == scanEOF {
+				advance, mut token := self.split(self.buf[self.start:self.end], self.state&scanEOF == scanEOF) else { error(error) }
 				if advance < 0 {
 					error(ScanError.NegativeAdvance)
 				}
@@ -153,7 +146,7 @@ impl Scanner {
 					}
 					ret true
 				}
-				if self.atEOF {
+				if self.state&scanEOF == scanEOF {
 					// We have EOF state and the split function will not return
 					// token for this case, guaranteed for the false return.
 					ret false
@@ -196,7 +189,7 @@ impl Scanner {
 				// Read buffer should not be empty.
 				// So, by documentation of the io::Reader,
 				// the zero read count means EOF.
-				self.atEOF = true
+				self.state |= scanEOF
 				// If there is data in the buffer, give the splitter function
 				// a chance to handle data with EOF state. So, do not return here.
 				// Let next iteration step handle this case.
@@ -204,6 +197,34 @@ impl Scanner {
 			}
 			self.end += n
 		}
+	}
+
+	// Sets the split function for the [Scanner].
+	// The default split function is [ScanLines].
+	//
+	// Panics if it is called after scanning has started.
+	fn Split(mut self, split: SplitFunc) {
+		if self.state&scanUsed == scanUsed {
+			panic("std/bufio: Scan.Split: called after Scan")
+		}
+		self.split = split
+	}
+
+	// Sets the initial buffer to use when scanning
+	// and the maximum size of buffer that may be allocated during scanning.
+	// The maximum token size must be less than the larger of max and cap(buf).
+	// If max <= cap(buf), [Scanner.Scan] will use this buffer only and do no allocation.
+	//
+	// By default, [Scanner.Scan] uses an internal buffer and sets the
+	// maximum token size to [MaxTokenSize].
+	//
+	// Panics if it is called after scanning has started.
+	fn Buffer(mut self, mut buf: []byte, max: int) {
+		if self.state&scanUsed == scanUsed {
+			panic("std/bufio: Scan.Buffer: called after Scan")
+		}
+		self.buf = buf[0:cap(buf)]
+		self.max = max
 	}
 }
 
@@ -221,7 +242,7 @@ fn dropCR(mut data: []byte): []byte {
 // by one mandatory newline. In regular expression notation, it is `\r?\n`.
 // The last non-empty line of input will be returned even if it has no
 // newline.
-fn SplitLines(mut data: []byte, atEOF: bool)!: (advance: int, token: []byte) {
+fn ScanLines(mut data: []byte, atEOF: bool)!: (advance: int, token: []byte) {
 	if atEOF && len(data) == 0 {
 		ret 0, nil
 	}
