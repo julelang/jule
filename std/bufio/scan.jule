@@ -29,6 +29,17 @@ const startBufSize = 1 << 12
 // The default maximum token size of the Scanner.
 const MaxTokenSize = 1 << 16 // 64 * 1024
 
+// Special sentinel exception value type. It is intended to be
+// thrown exception by a Split function to indicate that the scanning should stop
+// with no error. If the token being delivered with this exception,
+// the token is the last token.
+//
+// The value is useful to stop processing early or when it is necessary to
+// deliver a final empty token (which is different from a nil token).
+// One could achieve the same behavior with a custom error value but
+// providing one here is tidier.
+type FinalToken: []byte
+
 // The signature of the split function used to tokenize the
 // input. The arguments are an initial substring of the remaining unprocessed
 // data and a flag, atEOF, that reports whether the [Reader] has no more data
@@ -38,6 +49,9 @@ const MaxTokenSize = 1 << 16 // 64 * 1024
 //
 // Any exceptional scanning will stop and data may be lost. A successful read
 // should always return successfully, any exceptional means it failed.
+// If that exceptional is [FinalToken], scanning stops with no error.
+// A non-nil token delivered with [FinalToken] will be the last token,
+// and a nil token with [FinalToken] immediately stops the scanning.
 //
 // Otherwise, the [Scanner] advances the input. If the token is not nil,
 // the [Scanner] returns it to the user. If the token is nil, the
@@ -62,6 +76,7 @@ type SplitFunc: fn(mut data: []byte, atEOF: bool)!: (advance: int, token: []byte
 // Scanner state flags.
 const scanEOF = 1 << 0  // Whether the reader at the EOF.
 const scanUsed = 1 << 1 // Whether the Scan method called.
+const scanDone = 1 << 2 // Scan has finished.
 
 // Provides a convenient interface for reading data such as
 // a file of newline-delimited lines of text. Successive calls to
@@ -120,12 +135,28 @@ impl Scanner {
 	// tokens without advancing the input. This is a common error mode for
 	// scanners.
 	fn Scan(mut self)!: bool {
+		if self.state&scanDone == scanDone {
+			ret false
+		}
 		self.state |= scanUsed
 		// Loop until we have a token.
 		for {
 			// See if we can get a token with what we already have.
 			if self.end > self.start || self.state&scanEOF == scanEOF {
-				advance, mut token := self.split(self.buf[self.start:self.end], self.state&scanEOF == scanEOF) else { error(error) }
+				advance, mut token := self.split(
+					self.buf[self.start:self.end],
+					self.state&scanEOF == scanEOF) else {
+					match type error {
+					| FinalToken:
+						self.tok = []byte(FinalToken(error))
+						self.state |= scanDone
+						// When token is not nil, it means the scanning stops
+						// with a trailing token, and thus the return value
+						// should be true to indicate the existence of the token.
+						ret self.tok != nil
+					}
+					error(error)
+				}
 				if advance < 0 {
 					error(ScanError.NegativeAdvance)
 				}
