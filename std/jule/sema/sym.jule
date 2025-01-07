@@ -534,34 +534,26 @@ impl symBuilder {
 			build::LogMsg.RefersTo,
 			self.getAsLinkPath(sb.table.File.Dir()),
 			self.getAsLinkPath(path))
-		m := message.Str()
 		message.WriteStr(strings::Repeat(" ", Padding))!
 		message.WriteStr(refersTo)!
 		message.WriteByte('\n')!
-		message.WriteStr(m)!
 	}
 
 	fn pushCrossCycleError(mut &self, &target: &symBuilder, &imp: &ImportInfo, &errorToken: &token::Token) {
 		mut message := strings::Builder{}
 		message.Grow(1 << 5)
-
 		self.pushCycleError(self, imp.Path, message)
-
 		mut owner := self.owner
 		mut old := self
-
 		for owner.owner != nil {
 			self.pushCycleError(old.owner, old.table.File.Dir(), message)
-
 			if owner.owner == target {
 				self.pushCycleError(target, owner.table.File.Dir(), message)
 				break
 			}
-
 			old = owner
 			owner = owner.owner
 		}
-
 		self.pushErr(errorToken, build::LogMsg.PkgIllegalCrossCycle, message.Str())
 	}
 
@@ -570,23 +562,16 @@ impl symBuilder {
 			self.pushErr(decl.Token, build::LogMsg.PkgIllegalCycleRefersItself, self.getAsLinkPath(imp.Path))
 			ret false
 		}
-
 		if self.owner == nil {
 			ret true
 		}
-
-		mut owner := self.owner
-	iter:
-		if owner.table.File.Dir() == imp.Path {
-			self.pushCrossCycleError(owner, imp, decl.Token)
-			ret false
+		mut owner := self
+		for owner != nil; owner = owner.owner {
+			if owner.table.File.Dir() == imp.Path {
+				self.pushCrossCycleError(owner, imp, decl.Token)
+				ret false
+			}
 		}
-
-		if owner.owner != nil {
-			owner = owner.owner
-			goto iter
-		}
-
 		ret true
 	}
 
