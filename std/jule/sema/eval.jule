@@ -536,23 +536,24 @@ impl eval {
 	fn pushIllegalCycleError(mut self, &v1: &Var, &v2: &Var, mut &message: strings::Builder) {
 		const Padding = 7
 		refersTo := build::Logf(build::LogMsg.RefersTo, v1.Ident, v2.Ident)
-		buf := unsafe { message.Buf() }
 		message.WriteStr(strings::Repeat(" ", Padding))!
 		message.WriteStr(refersTo)!
 		message.WriteByte('\n')!
-		message.Write(buf)!
 	}
 
 	fn checkCrossCycle(mut self, &v: &Var, mut &message: strings::Builder): bool {
 		for _, d in v.Depends {
+			n := message.Len()
+			self.pushIllegalCycleError(v, d, message)
 			if d == self.owner {
-				self.pushIllegalCycleError(v, d, message)
 				ret false
 			}
+			unsafe { message.SetBuf(message.Buf()[:n]) } // Pop last trace.
+			self.pushIllegalCycleError(v, d, message)
 			if !self.checkCrossCycle(d, message) {
-				self.pushIllegalCycleError(v, d, message)
 				ret false
 			}
+			unsafe { message.SetBuf(message.Buf()[:n]) } // Pop last trace.
 		}
 		ret true
 	}
@@ -576,12 +577,9 @@ impl eval {
 		mut message := strings::Builder{}
 		message.Grow(1 << 5)
 
+		self.pushIllegalCycleError(self.owner, v, message)
 		if !self.checkCrossCycle(v, message) {
-			mut errMsg := message.Str()
-			message.Clear()
-			self.pushIllegalCycleError(self.owner, v, message)
-			errMsg += message.Str()
-			self.pushErr(declToken, build::LogMsg.IllegalCrossCycle, errMsg)
+			self.pushErr(declToken, build::LogMsg.IllegalCrossCycle, message.Str())
 			ret false
 		}
 
