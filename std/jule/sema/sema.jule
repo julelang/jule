@@ -2656,10 +2656,15 @@ impl sema {
 								ret true
 							}
 						| &Var:
-							v2 := (&Var)(ref)
+							mut v2 := (&Var)(ref)
 							pushIllegalCycleError(owner, v2.Ident) // Push trace.
 							if v2 == v {
 								ret true
+							}
+							// Global variable v needs to global variable v2 for initialization.
+							// So add v2 to v.Depends for correct collection of dependencies.
+							if v2.Scope == nil {
+								v.Depends = append(v.Depends, v2)
 							}
 						}
 					}
