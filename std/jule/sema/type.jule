@@ -983,14 +983,12 @@ impl typeChecker {
 				ret ""
 			}
 		}
-		m := message.Str()
 		def1Ident := getIdent(def1)
 		def2Ident := getIdent(def2)
 		refersTo := build::Logf(build::LogMsg.RefersTo, def1Ident, def2Ident)
 		message.WriteStr(strings::Repeat(" ", Padding))!
 		message.WriteStr(refersTo)!
 		message.WriteByte('\n')!
-		message.WriteStr(m)!
 	}
 
 	fn checkCrossCycle(self, decl: any, mut &message: strings::Builder): bool {
@@ -998,26 +996,32 @@ impl typeChecker {
 		| &TypeAlias:
 			ta := (&TypeAlias)(decl)
 			for _, d in ta.Refers {
-				match {
-				| self.referencer.owner == d:
-					self.pushCycleError(ta, d, message)
+				n := message.Len()
+				self.pushCycleError(ta, d, message)
+				if self.referencer.owner == d {
 					ret false
-				| !self.checkCrossCycle(d, message):
+				}
+				unsafe { message.SetBuf(message.Buf()[:n]) } // Pop last trace.
+				if !self.checkCrossCycle(d, message) {
 					self.pushCycleError(ta, d, message)
 					ret false
 				}
+				unsafe { message.SetBuf(message.Buf()[:n]) } // Pop last trace.
 			}
 		| &Struct:
 			s := (&Struct)(decl)
 			for _, d in s.Depends {
-				match {
-				| self.referencer.owner == d:
-					self.pushCycleError(s, d, message)
-					ret false
-				| !self.checkCrossCycle(d, message):
-					self.pushCycleError(s, d, message)
+				n := message.Len()
+				self.pushCycleError(s, d, message)
+				if self.referencer.owner == d {
 					ret false
 				}
+				unsafe { message.SetBuf(message.Buf()[:n]) } // Pop last trace.
+				self.pushCycleError(s, d, message)
+				if !self.checkCrossCycle(d, message) {
+					ret false
+				}
+				unsafe { message.SetBuf(message.Buf()[:n]) } // Pop last trace.
 			}
 		}
 		ret true
@@ -1062,14 +1066,10 @@ impl typeChecker {
 
 		mut message := strings::Builder{}
 		message.Grow(1 << 5)
-
+		self.pushCycleError(self.referencer.owner, decl, message)
 		if !self.checkCrossCycle(decl, message) {
 			if err {
-				mut errMsg := message.Str()
-				message.Clear()
-				self.pushCycleError(self.referencer.owner, decl, message)
-				errMsg += message.Str()
-				self.pushErr(ident, build::LogMsg.IllegalCrossCycle, errMsg)
+				self.pushErr(ident, build::LogMsg.IllegalCrossCycle, message.Str())
 			}
 			self.cycleErr |= cycleErrFail
 			ret false
