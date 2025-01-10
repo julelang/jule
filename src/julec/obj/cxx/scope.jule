@@ -996,10 +996,15 @@ impl scopeCoder {
 	}
 
 	fn selectStmt(mut &self, mut slct: &sema::Select) {
-		if len(slct.Cases) == 0 && slct.Default == nil {
+		if len(slct.Cases) == 0 {
 			// Empty select.
-			identCoder.funcIns(self.oc.Buf, meta::Program.Runtime.ChanSelect)
-			self.oc.write("(nullptr, 0, 0, false);")
+			if slct.Default == nil {
+				identCoder.funcIns(self.oc.Buf, meta::Program.Runtime.ChanSelect)
+				self.oc.write("(nullptr, 0, 0, false);")
+			} else {
+				// Just the default case.
+				self.scope(slct.Default.Scope)
+			}
 			ret
 		}
 		// Non-empty select.
