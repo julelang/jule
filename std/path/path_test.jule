@@ -1,0 +1,232 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/testing"
+
+struct pathCase {
+	path:   str
+	result: str
+}
+
+static cleanCases: []pathCase = [
+	// Already clean
+	{"", "."},
+	{"abc", "abc"},
+	{"abc/def", "abc/def"},
+	{"a/b/c", "a/b/c"},
+	{".", "."},
+	{"..", ".."},
+	{"../..", "../.."},
+	{"../../abc", "../../abc"},
+	{"/abc", "/abc"},
+	{"/", "/"},
+
+	// Remove trailing slash
+	{"abc/", "abc"},
+	{"abc/def/", "abc/def"},
+	{"a/b/c/", "a/b/c"},
+	{"./", "."},
+	{"../", ".."},
+	{"../../", "../.."},
+	{"/abc/", "/abc"},
+
+	// Remove doubled slash
+	{"abc//def//ghi", "abc/def/ghi"},
+	{"//abc", "/abc"},
+	{"///abc", "/abc"},
+	{"//abc//", "/abc"},
+	{"abc//", "abc"},
+
+	// Remove . elements
+	{"abc/./def", "abc/def"},
+	{"/./abc/def", "/abc/def"},
+	{"abc/.", "abc"},
+
+	// Remove .. elements
+	{"abc/def/ghi/../jkl", "abc/def/jkl"},
+	{"abc/def/../ghi/../jkl", "abc/jkl"},
+	{"abc/def/..", "abc"},
+	{"abc/def/../..", "."},
+	{"/abc/def/../..", "/"},
+	{"abc/def/../../..", ".."},
+	{"/abc/def/../../..", "/"},
+	{"abc/def/../../../ghi/jkl/../../../mno", "../../mno"},
+
+	// Combinations
+	{"abc/./../def", "def"},
+	{"abc//./../def", "def"},
+	{"abc/../../././../def", "../../def"},
+]
+
+#test
+fn testClean(t: &testing::T) {
+	for _, c in cleanCases {
+		mut s := Clean(c.path)
+		if s != c.result {
+			t.Errorf("Clean({}) = {}, want {}", c.path, s, c.result)
+		}
+		s = Clean(c.result)
+		if s != c.result {
+			t.Errorf("Clean({}) = {}, want {}", c.result, s, c.result)
+		}
+	}
+}
+
+struct splitCase {
+	path: str
+	dir:  str
+	file: str
+}
+
+static splitCases: []splitCase = [
+	{"a/b", "a/", "b"},
+	{"a/b/", "a/b/", ""},
+	{"a/", "a/", ""},
+	{"a", "", "a"},
+	{"/", "/", ""},
+]
+
+#test
+fn testSplit(t: &testing::T) {
+	for _, c in splitCases {
+		d, f := Split(c.path)
+		if d != c.dir || f != c.file {
+			t.Errorf("Split({}) = {}, {}, want {}, {}", c.path, d, f, c.dir, c.file)
+		}
+	}
+}
+
+struct joinCase {
+	elem: []str
+	path: str
+}
+
+static joinCases: []joinCase = [
+	// zero parameters
+	{[], ""},
+
+	// one parameter
+	{[""], ""},
+	{["a"], "a"},
+
+	// two parameters
+	{["a", "b"], "a/b"},
+	{["a", ""], "a"},
+	{["", "b"], "b"},
+	{["/", "a"], "/a"},
+	{["/", ""], "/"},
+	{["a/", "b"], "a/b"},
+	{["a/", ""], "a"},
+	{["", ""], ""},
+]
+
+#test
+fn testJoin(t: &testing::T) {
+	for _, c in joinCases {
+		p := Join(c.elem...)
+		if p != c.path {
+			t.Errorf("Join({}) = {}, want {}", c.elem, p, c.path)
+		}
+	}
+}
+
+struct extCase {
+	path: str
+	ext:  str
+}
+
+static extCases: []extCase = [
+	{"path.jule", ".jule"},
+	{"path.pb.jule", ".jule"},
+	{"a.dir/b", ""},
+	{"a.dir/b.jule", ".jule"},
+	{"a.dir/", ""},
+]
+
+#test
+fn testExt(t: &testing::T) {
+	for _, c in extCases {
+		x := Ext(c.path)
+		if x != c.ext {
+			t.Errorf("Ext({}) = {}, want {}", c.path, x, c.ext)
+		}
+	}
+}
+
+static baseCases: []pathCase = [
+	// Already clean
+	{"", "."},
+	{".", "."},
+	{"/.", "."},
+	{"/", "/"},
+	{"////", "/"},
+	{"x/", "x"},
+	{"abc", "abc"},
+	{"abc/def", "def"},
+	{"a/b/.x", ".x"},
+	{"a/b/c.", "c."},
+	{"a/b/c.x", "c.x"},
+]
+
+#test
+fn testBase(t: &testing::T) {
+	for _, c in baseCases {
+		s := Base(c.path)
+		if s != c.result {
+			t.Errorf("Base({}) = {}, want {}", c.path, s, c.result)
+		}
+	}
+}
+
+static dirCases: []pathCase = [
+	{"", "."},
+	{".", "."},
+	{"/.", "/"},
+	{"/", "/"},
+	{"////", "/"},
+	{"/foo", "/"},
+	{"x/", "x"},
+	{"abc", "."},
+	{"abc/def", "abc"},
+	{"abc////def", "abc"},
+	{"a/b/.x", "a/b"},
+	{"a/b/c.", "a/b"},
+	{"a/b/c.x", "a/b"},
+]
+
+#test
+fn testDir(t: &testing::T) {
+	for _, c in dirCases {
+		s := Dir(c.path)
+		if s != c.result {
+			t.Errorf("Dir({}) = {}, want {}", c.path, s, c.result)
+		}
+	}
+}
+
+struct absCase {
+	path: str
+	abs:  bool
+}
+
+static absCases: []absCase = [
+	{"", false},
+	{"/", true},
+	{"/usr/bin/gcc", true},
+	{"..", false},
+	{"/a/../bb", true},
+	{".", false},
+	{"./", false},
+	{"lala", false},
+]
+
+#test
+fn testIsAbs(t: &testing::T) {
+	for _, c in absCases {
+		r := IsAbs(c.path)
+		if r != c.abs {
+			t.Errorf("IsAbs({}) = {}, want {}", c.path, r, c.abs)
+		}
+	}
+}
