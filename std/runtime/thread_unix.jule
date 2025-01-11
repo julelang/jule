@@ -62,14 +62,18 @@ fn osyield() {
 	cpp.sched_yield()
 }
 
-fn init() {
+// Reserved function for hard initialization.
+// This function will be called at earlies stages of the program;
+// Before initialization of global variables, and calling other initializer functions.
+// This function must initialize critical data of the typical Jule program.
+fn __init() {
+	// Set numcpu.
+	numcpu = unsafe { int(cpp.sysconf(_SC_NPROCESSORS_ONLN)) }
 	// Push the main thread to threads.
 	// See the documentation of the pushNewThread function.
-	threadMutex.lock()
-	// We already locked the mutex, set maxproc too.
-	numcpu = unsafe { int(cpp.sysconf(_SC_NPROCESSORS_ONLN)) }
+	// The |threads| should be initialized here, because compiler will not do it.
+	// We do not have to lock the mutex for threads, no risk for concurrency.
 	mut t := newThread()
 	t.os.handle = currentThreadID()
 	threads = t
-	threadMutex.unlock()
 }

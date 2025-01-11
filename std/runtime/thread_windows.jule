@@ -63,18 +63,22 @@ fn osyield() {
 	cpp.SwitchToThread()
 }
 
-fn init() {
-	// Push the main thread to threads.
-	// See the documentation of the pushNewThread function.
-	threadMutex.lock()
+// Reserved function for hard initialization.
+// This function will be called at earlies stages of the program;
+// Before initialization of global variables, and calling other initializer functions.
+// This function must initialize critical data of the typical Jule program.
+fn __init() {
+	// Set numcpu.
 	{
-		// We already locked the mutex, set maxproc too.
 		let info: cpp.SYSTEM_INFO
 		unsafe { cpp.GetSystemInfo(&info) }
 		numcpu = int(info.dwNumberOfProcessors)
 	}
+	// Push the main thread to threads.
+	// See the documentation of the pushNewThread function.
+	// The |threads| should be initialized here, because compiler will not do it.
+	// We do not have to lock the mutex for threads, no risk for concurrency.
 	mut t := newThread()
 	t.os.id = currentThreadID()
 	threads = t
-	threadMutex.unlock()
 }

@@ -30,6 +30,12 @@ struct StrBuilder {
 
 // Metadata for the runtime package.
 struct Runtime {
+	Threads: &sema::Var
+	NumCPU:  &sema::Var
+
+	// Hard initializer function of runtime.
+	Init: &sema::FuncIns
+
 	ToStr:        &sema::Func
 	ArrayCmp:     &sema::Func
 	Osyield:      &sema::FuncIns
@@ -93,7 +99,12 @@ fn CollectRuntime(mut &ir: &obj::IR): &Runtime {
 	}
 	mut meta := new(Runtime)
 
+	// Globals.
+	meta.Threads = obj::RuntimeFindGlobal(p, "threads")
+	meta.NumCPU = obj::RuntimeFindGlobal(p, "numcpu")
+
 	// Functions.
+	meta.Init = obj::RuntimeFindFunc(p, "__init").Instances[0]
 	meta.ToStr = obj::RuntimeFindFunc(p, "toStr")
 	meta.ArrayCmp = obj::RuntimeFindFunc(p, "arrayCmp")
 	meta.Osyield = obj::RuntimeFindFunc(p, "osyield").Instances[0]
