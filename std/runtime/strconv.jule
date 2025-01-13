@@ -187,28 +187,36 @@ fn mapToStr[T](x: T): str {
 	ret unsafe::StrFromBytes(buf)
 }
 
-// Returns x in string form with default format.
-fn structToStr[T](x: T): str {
+// Tries to call reserved Str method for type.
+fn tryToCallStr[T](x: T): (str, ok: bool) {
 	const t = comptime::TypeOf(T)
-	const v = comptime::ValueOf(x)
-
-	// Lookup for the reserved Str method.
 	const for _, method in t.Decl().Methods() {
 		const match method.Name() {
 		| "Str":
+			const v = comptime::ValueOf(x)
 			const methodv = v.Method(method.Name())
 			const match {
-			| methodv.Type().Result().Kind() == comptime::Kind.Str:
+			| !methodv.Type().Decl().Exceptional() &&
+				methodv.Type().Result().Kind() == comptime::Kind.Str:
 				const params = method.Params()
 				const match {
 				| len(params) == 1 && !params[0].Mutable():
-					ret methodv.Unwrap()()
+					ret methodv.Unwrap()(), true
 				}
 			}
 		}
 	}
+	ret "", false
+}
 
-	// use algorithm for default formatting
+// Returns x in string form with default format.
+fn structToStr[T](x: T): str {
+	r, ok := tryToCallStr(x)
+	if ok {
+		ret r
+	}
+	const t = comptime::TypeOf(T)
+	const v = comptime::ValueOf(x)
 	mut buf := make([]byte, 0, 20)
 	buf = append(buf, '{')
 	const for i, field in t.Fields() {
@@ -240,20 +248,9 @@ fn toStr[T](x: T): str {
 		}
 	| t.Strict():
 		// Lookup for the reserved Str method for the strict type like structures.
-		const v = comptime::ValueOf(x)
-		const for _, method in t.Decl().Methods() {
-			const match method.Name() {
-			| "Str":
-				const methodv = v.Method(method.Name())
-				const match {
-				| methodv.Type().Result().Kind() == comptime::Kind.Str:
-					const params = method.Params()
-					const match {
-					| len(params) == 1 && !params[0].Mutable():
-						ret methodv.Unwrap()()
-					}
-				}
-			}
+		r, ok := tryToCallStr(x)
+		if ok {
+			ret r
 		}
 		// If strict type have not the reserved Str method, handle by the source type.
 		// Following analysis will do that.
