@@ -38,28 +38,32 @@ impl semaRoot {
 
 		mut t := self.tree
 		mut otru := (&semaNode)(nil)
-		for t != nil; t = t.next {
-			// Already have sema in list.
-			if t.sema == &sema {
-				if lifo {
-					// Add sl to head of the wait list.
-					sl.next = t.tree
-					t.tree = sl
-				} else {
-					// Add sl to end of the wait list.
-					if t.tree == nil {
+		if t != nil {
+			for {
+				// Already have sema in list.
+				if t.sema == &sema {
+					if lifo {
+						// Add sl to head of the wait list.
+						sl.next = t.tree
 						t.tree = sl
 					} else {
+						// Add sl to end of the wait list.
 						mut tsl := t.tree
 						for tsl.next != nil; tsl = tsl.next {
 						}
 						tsl.next = sl
 					}
+					ret
 				}
-				ret
-			}
-			if otru == nil && t.sema == nil {
-				otru = t
+				if otru == nil && t.sema == nil {
+					otru = t
+				}
+				if t.next == nil {
+					// Break iteration here.
+					// If needed the last non-nil node will be used.
+					break
+				}
+				t = t.next
 			}
 		}
 		// Add new semaNode for sema since it is not exist in the list.
@@ -73,19 +77,12 @@ impl semaRoot {
 		sn.sema = &sema
 		sn.tree = sl
 		if self.tree == nil {
+			// Head is nil, so sl will be.
 			self.tree = sn
 		} else {
-			t = self.tree
-			mut last := t
-			for t != nil; t, last = t.next, t {
-				if t.tree == nil {
-					// The tree is nil of t, put sn here.
-					// Sema have no waiters, may be out of use.
-					last.next = sn
-					ret
-				}
-			}
-			panic("unreachable")
+			// Head is not nil and there is no reusable node.
+			// So append sn to nodes.
+			t.next = sn
 		}
 	}
 
