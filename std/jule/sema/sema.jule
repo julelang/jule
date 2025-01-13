@@ -629,12 +629,25 @@ impl sema {
 
 	// Checks TypeSYm, builds result as Type and collects referred type aliases.
 	// Skips already checked types.
+	// See also developer reference (11).
 	fn checkTypeSymWithRefers(mut &self, mut &t: &TypeSym, mut l: Lookup,
 		mut generics: []&TypeAlias, mut referencer: &referencer): (ok: bool) {
+		mut ta := false // Referencer owner is type alias.
 		if t.checked() {
-			ret true
+			match type referencer.owner {
+			| &TypeAlias:
+				ta = true
+			}
+			if !ta {
+				ret true
+			}
 		}
-		t.Type = self.buildTypeWithRefers(t.Decl, l, generics, referencer)
+		mut tt := self.buildTypeWithRefers(t.Decl, l, generics, referencer)
+		if tt == nil || !ta {
+			t.Type = tt
+		} else {
+			(&StructIns)(t.Type.Kind).setSource(tt)
+		}
 		ret t.checked()
 	}
 
@@ -1093,25 +1106,24 @@ impl sema {
 			// already checked
 			ret true
 		}
+		// Type alias is strict, make strict type alias analysis.
+		// See developer reference (11).
+		if ta.Strict {
+			mut s := initNewStructType(ta.Ident, nil)
+			s.Decl.sema = self
+			s.Decl.Binded = ta.Binded
+			s.Decl.Token = ta.Token
+			s.Decl.Public = ta.Public
+			ta.TypeSym.Type = &Type{Kind: s}
+		}
 		ok = self.checkTypeAliasDeclKind(ta, l)
 		if !ok {
 			ret false
 		}
-		if !ta.Strict {
-			if ta.Binded {
-				self.pushErr(ta.Token, build::LogMsg.BindedAsSoftType)
-				self.pushSuggestion(build::LogMsg.DefineAsStrictAlias, ta.Ident)
-			}
-			ret true
+		if !ta.Strict && ta.Binded {
+			self.pushErr(ta.Token, build::LogMsg.BindedAsSoftType)
+			self.pushSuggestion(build::LogMsg.DefineAsStrictAlias, ta.Ident)
 		}
-		// Type alias is strict, make strict type alias analysis.
-		// See developer reference (11).
-		mut s := initNewStructType(ta.Ident, ta.TypeSym.Type)
-		s.Decl.sema = self
-		s.Decl.Binded = ta.Binded
-		s.Decl.Token = ta.Token
-		s.Decl.Public = ta.Public
-		ta.TypeSym.Type = &Type{Kind: s}
 		ret true
 	}
 
