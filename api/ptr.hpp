@@ -130,7 +130,7 @@ namespace jule
         }
 
         // Drops reference.
-        // This function will destruct this instace for reference counting.
+        // This function will destruct this instance for reference counting.
         // Frees memory if reference counting reaches to zero.
         void dealloc(void) const noexcept
         {

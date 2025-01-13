@@ -27,7 +27,7 @@ The AST acts as a tool for the compiler to generate the compiler IR.
 
 The next stage is semantic analysis.
 In the semantic analysis process, type checking is performed for type safety purposes, declarations and definitions are checked, object binding (associating references to a definition with the definition) and some operations are performed.
-As a result of the semantic analysis, the IR to be used by the compiler is also builded.
+As a result of the semantic analysis, the IR to be used by the compiler is also built.
 This IR is different representation from the AST and contains additional information such as references for object binding.
 
 After the front-end is complete, the middle-end comes into play.
@@ -73,6 +73,6 @@ Actually, JuleC just generates C++ code for now.
 
 - **(2)** Definition elemination can performed before other optimizations. Because it's independent from other optimizations. It might be increase performance because of eliminated definitions if performed before other optimizations.
 
-- **(3)** Scope part of deadcoe elimination optimizations, should be executed after other optimizations. Because other optimzations may will change code structure, so some scope deadcode elimination cases may occur. This possible optimizations cannot catched by scope optimizer if scope deadcode elimination optimizations applied before other independent middle-end optimizations.
+- **(3)** Scope part of deadcoe elimination optimizations, should be executed after other optimizations. Because other optimizations may will change code structure, so some scope deadcode elimination cases may occur. This possible optimizations cannot caught by scope optimizer if scope deadcode elimination optimizations applied before other independent middle-end optimizations.
 
 - **(4)** For C/C++ IRs, include linked standard headers before the API. Otherwise it may cause compilation errors. For example, on Windows, `winsock2.h` must be included before `windows.h`. In a case where the API includes `windows.h` it is against this to later include `winsock2.h`.
