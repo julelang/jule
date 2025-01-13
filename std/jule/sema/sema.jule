@@ -1960,6 +1960,14 @@ impl sema {
 		| !self.checkStructImpls(s):
 		| !self.checkFuncDeclsBy(s.Methods):
 		}
+
+		// Here, we need to dispatch the methods again.
+		// At this point, all `impl` statements should already be implemented.
+		// During this process, some instances might have been created without
+		// having the methods. To prevent this from causing errors,
+		// the missing methods added with the `impl` statements must be dispatched
+		// to the instances that have not have these methods.
+		s.dispatchMethods()
 	}
 
 	// Checks current package file's structure declarations.
@@ -2233,16 +2241,9 @@ impl sema {
 	}
 
 	fn checkTypeMethod(mut &self, mut &s: &StructIns, mut &f: &Func) {
-		// Generic instances are checked instantly.
-		if len(f.Generics) > 0 {
-			ret
+		for (_, mut ins) in f.Instances {
+			self.checkFuncIns(ins)
 		}
-		mut ins := f.Instances[0]
-		if len(ins.Scope.Stmts) > 0 {
-			// Checked
-			ret
-		}
-		self.checkFuncIns(ins)
 	}
 
 	// Checks environment-dependent parts of structure instance.
@@ -2400,18 +2401,13 @@ impl sema {
 			ret
 		}
 
-		// Generic instances are checked instantly.
-		if len(s.Generics) > 0 {
-			ret
-		}
-
-		if len(s.Instances) == 0 {
+		if len(s.Generics) == 0 && len(s.Instances) == 0 {
 			mut ins := s.instance()
 			s.appendInstance(ins) // Append instance before precheck.
 		}
 
 		// Precheck is instance is not checked already.
-		{
+		if len(s.Generics) == 0 {
 			mut ins := s.Instances[0]
 			if !ins.Checked {
 				ins.Checked = true
@@ -2438,18 +2434,13 @@ impl sema {
 			ret
 		}
 
-		// Generic instances are checked instantly.
-		if len(s.Generics) > 0 {
-			ret
-		}
-
-		if len(s.Instances) == 0 {
+		if len(s.Generics) == 0 && len(s.Instances) == 0 {
 			mut ins := s.instance()
 			s.appendInstance(ins) // Append instance before precheck.
 		}
 
 		// Precheck is instance is not checked already.
-		{
+		if len(s.Generics) == 0 {
 			mut ins := s.Instances[0]
 			if !ins.Checked {
 				ins.Checked = true
@@ -2492,9 +2483,10 @@ impl sema {
 	}
 
 	fn checkFuncInsCaller(mut &self, mut &f: &FuncIns, mut caller: &token::Token) {
-		if f.Decl.Binded {
+		if f.Decl.Binded || f.checked {
 			ret
 		}
+		f.checked = true
 
 		mut old := f.Decl.sema.file
 		defer { f.Decl.sema.setCurrentFile(old) }
@@ -2521,12 +2513,6 @@ impl sema {
 		if f.Binded {
 			ret
 		}
-
-		// Generic instances are checked instantly.
-		if len(f.Generics) > 0 {
-			ret
-		}
-
 		for (_, mut ins) in f.Instances {
 			self.checkFuncIns(ins)
 		}
@@ -2569,16 +2555,7 @@ impl sema {
 	}
 
 	fn precheckFunc(mut &self, mut &f: &Func) {
-		if f.Binded {
-			ret
-		}
-
-		// Generic instances are checked instantly.
-		if len(f.Generics) > 0 {
-			ret
-		}
-
-		if len(f.Instances) == 0 {
+		if !f.Binded && len(f.Generics) == 0 && len(f.Instances) == 0 {
 			mut ins := f.instanceForce()
 			f.Instances = append(f.Instances, ins)
 			ok := self.reloadFuncInsTypes(ins)
