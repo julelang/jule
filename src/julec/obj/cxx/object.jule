@@ -1076,11 +1076,34 @@ impl ObjectCoder {
 				}
 				identCoder.func(self.Buf, sm)
 				self.write("(")
-				self.write("_self_.as<")
-				self.tc.structureIns(self.Buf, ins)
+				mut ptr := !m.Params[0].IsRef()
+				// Structure uses source type. Handle it.
+				if ins.Source != nil {
+					// Use the actual type for the allocation handling.
+					mut act := &sema::Type{Kind: ins.Source.ActualKind()}
+					if ptr && act.Sptr() != nil {
+						// Method uses pass-by-reference self parameter and
+						// source type is smart pointer. By Jule Memory Model,
+						// trait uses base smart pointer of the allocation.
+						// So cast to element type for correct handling.
+						// Then pass address of the temporary variable to receiver.
+						self.write("&")
+						self.write("_self_.as<")
+						ptr = false // Avoid ".alloc" suffix. We have a pointer already.
+						self.tc.kind(self.Buf, act.Sptr().Elem)
+					} else {
+						// Function uses smart pointer self parameter.
+						// By Jule Memory Model, trait uses base smart pointer
+						// of the allocation. So cast to full type directly.
+						self.write("_self_.as<")
+						self.tc.kind(self.Buf, act)
+					}
+				} else {
+					// Structure is plain. Use the type directly.
+					self.write("_self_.as<")
+					self.tc.structureIns(self.Buf, ins)
+				}
 				self.write(">()")
-
-				ptr := !m.Params[0].IsRef()
 				if ptr {
 					self.write(".alloc")
 				}
