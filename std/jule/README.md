@@ -49,7 +49,7 @@ For example:
 \
 These packages are specially processed and treated differently than standard use declarations. These treatments only apply to supported packages. To see relevant treatments, see implicit imports section of the reference.\
 \
-Typical uses are things like capturing or tracing private behavior. For example, the reference Jule compiler may embed the `std/runtime` package for some special calls. The semantic analyzer makes the necessary private calls for this embedded package when necessary. For example, appends instance to array compare generic method for array comparions.
+Typical uses are things like capturing or tracing private behavior. For example, the reference Jule compiler may embed the `std/runtime` package for some special calls. The semantic analyzer makes the necessary private calls for this embedded package when necessary. For example, appends instance to array compare generic method for array comparison.
     - **(8.1)** The `Token` field is used to distinguish specific packages. If the `Token` field of the AST element is set to `nil`, the package built-in use declaration is considered. Accordingly, AST must always set the `Token` field for each use declaration which is not implicitly imported.
     - **(8.2)** Semantic analyzer will ignore implicit use declaration for duplication analysis. So, built-in implicit imported packages may be duplicated if placed source file contains separate use declaration for the same package.
     - **(8.3)** These packages should be placed as first use declarations of the main package's first file.
