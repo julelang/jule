@@ -2688,11 +2688,14 @@ impl sema {
 			for (_, mut ta) in self.file.TypeAliases {
 				if ta.Strict {
 					mut s := (&StructIns)(ta.TypeSym.Type.Kind)
-					s.Checked = true
-					ok := self.precheckStructIns(s, nil)
-					if ok {
-						self.checkTypeStruct(s.Decl)
+					if !s.Checked {
+						s.Checked = true
+						ok := self.precheckStructIns(s, nil)
+						if !ok {
+							ret
+						}
 					}
+					self.checkTypeStruct(s.Decl)
 				}
 			}
 		}
