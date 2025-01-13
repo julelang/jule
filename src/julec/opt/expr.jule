@@ -74,7 +74,7 @@ impl exprOptimizer {
 				| &sema::BinaryExpr:
 					mut binary := (&sema::BinaryExpr)(m)
 
-					// Do not continue to checking. Binay expression is using || operator.
+					// Do not continue to checking. Binary expression is using || operator.
 					// So we can't know whether operands are guaranteed to be executed.
 					// For example:
 					//
@@ -151,7 +151,7 @@ impl exprOptimizer {
 		| token::Id.DblAmper:
 			if c.ReadBool() {
 				// Use left operand as model directly.
-				// Logical and with constant true exprssion is always will be true.
+				// Logical and with constant true expression is always will be true.
 				// The non-constant left operand should be true,
 				// this is the only important thing. So eliminate constant true.
 				*self.model = m.Left.Model
@@ -170,7 +170,7 @@ impl exprOptimizer {
 				*self.model = c
 			} else {
 				// Use left operand as model directly.
-				// Logical or with constant false exprssion is always will be false.
+				// Logical or with constant false expression is always will be false.
 				// The non-constant left operand should be true,
 				// this is the only important thing. So eliminate constant false.
 				*self.model = m.Left.Model
@@ -315,7 +315,7 @@ impl exprOptimizer {
 				// Parts should be in same addition order of the source code.
 				// By operator precedence and CAST production,
 				// the first node of the CAST is always the last binary expression.
-				// For exampple:
+				// For example:
 				//   _ = "foo" + x + "bar" + "baz"
 				//                         ^
 				//  In the expression above, the first binary expression node will be pointed one.
@@ -349,14 +349,14 @@ impl exprOptimizer {
 				ret false
 			}
 			if c.ReadStr() == "" && m.Op.Id == token::Id.Plus {
-				// Concatenation with empty string, use the non-constnat operand's model.
+				// Concatenation with empty string, use the non-constant operand's model.
 				*self.model = nc.Model
 				ret true
 			}
 			ret false
 		}
 
-		// Following algoritms are designed for zero-constant math operations.
+		// Following algorithms are designed for zero-constant math operations.
 		// So make required conditions are guaranteed.
 		if !Math || c.AsF64() != 0 {
 			ret false
@@ -517,7 +517,7 @@ impl exprOptimizer {
 	fn binaryMath(self, mut &m: &sema::BinaryExpr): (applied: bool) {
 		// Break optimizations if types are not primitive.
 		// No need for checking whether types are arithmetic,
-		// because relevant operators are conly avaliable for arithmetic primitives.
+		// because relevant operators are only available for arithmetic primitives.
 		lp := m.Left.Type.Prim()
 		if lp == nil {
 			ret false
@@ -529,7 +529,7 @@ impl exprOptimizer {
 
 		match m.Op.Id {
 		| token::Id.Plus:
-			// If type is integer and expressions is like "x+x", then we can simplfy to "x<<1" which is faster.
+			// If type is integer and expressions is like "x+x", then we can simplify to "x<<1" which is faster.
 			// Floating-point types is exceptional because we cannot predict the result because of NaN or similar values.
 			// Also floating-point types are not supports bit shifting operators.
 			if !types::IsInt(lp.Kind) || !obj::EqualModels(m.Left.Model, m.Right.Model) {
@@ -545,7 +545,7 @@ impl exprOptimizer {
 			*self.model = unsafe { *(*sema::Expr)(&model) }
 			ret true
 		| token::Id.Minus:
-			// If type is integer and expressions is like "x-x", then we can simplfy to "0" which is cheaper.
+			// If type is integer and expressions is like "x-x", then we can simplify to "0" which is cheaper.
 			// Floating-point types is exceptional because we cannot predict the result because of NaN or similar values.
 			if !types::IsInt(lp.Kind) || !obj::EqualModels(m.Left.Model, m.Right.Model) {
 				break
@@ -698,7 +698,7 @@ impl exprOptimizer {
 			// There is no risk for checkpoint data mutation. Do soft load.
 			self.data.loadCheckpoint(checkpoint.getMutCheckpoint())
 
-			// Childs are optmized. Now, we can skip childs of binary expression.
+			// Children are optimized. Now, we can skip children of binary expression.
 			// Avoid duplicated analysis.
 			self.inspector.SkipChild = true
 		}
@@ -727,7 +727,7 @@ impl exprOptimizer {
 					mut model := any(&UnsafeDerefExpr{Base: m})
 					*self.model = unsafe { *(*sema::Expr)(&model) }
 				} else {
-					// Now this varible is safe until it mutated.
+					// Now this variable is safe until it mutated.
 					self.data.nils.pushVar(var, true)
 				}
 			}
