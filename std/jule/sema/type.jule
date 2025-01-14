@@ -932,6 +932,8 @@ struct typeChecker {
 	// If selection is a struct, returns invalid instance that only has decl field.
 	selection: bool
 
+	disableTA: int
+
 	// See developer reference (4).
 	ownerAlias: &TypeAlias
 
@@ -963,8 +965,12 @@ impl typeChecker {
 	fn pushTA(mut self, tags: int) {
 		if self.referencer != nil && self.referencer.ins != nil {
 			mut s := self.referencer.ins
-			s.Comparable = s.Comparable && tags&taNotComparable != taNotComparable
-			s.Mutable = s.Mutable || tags&taMutable == taMutable
+			if self.disableTA&taNotComparable != taNotComparable {
+				s.Comparable = s.Comparable && tags&taNotComparable != taNotComparable
+			}
+			if self.disableTA&taMutable != taMutable {
+				s.Mutable = s.Mutable || tags&taMutable == taMutable
+			}
 		}
 	}
 
@@ -1514,6 +1520,10 @@ impl typeChecker {
 
 		self.pushTA(taMutable)
 
+		disableTA := self.disableTA
+		self.disableTA |= taMutable | taNotComparable
+		defer { self.disableTA = disableTA }
+
 		mut elem := self.checkDecl(decl.Elem)
 		ret self.buildSptrFromType(elem)
 	}
@@ -1522,6 +1532,12 @@ impl typeChecker {
 		cycleRisk := self.cycleRisk
 		self.cycleRisk = false
 		defer { self.cycleRisk = cycleRisk }
+
+		// Do not disable mutability analysis.
+		// Element type of channel is directly affects the mutability of channel.
+		disableTA := self.disableTA
+		self.disableTA |= taNotComparable
+		defer { self.disableTA = disableTA }
 
 		mut elem := self.checkDecl(decl.Elem)
 		if elem == nil {
@@ -1566,6 +1582,10 @@ impl typeChecker {
 
 		self.pushTA(taMutable)
 
+		disableTA := self.disableTA
+		self.disableTA |= taMutable | taNotComparable
+		defer { self.disableTA = disableTA }
+
 		mut elem := (&Type)(nil)
 
 		if !decl.IsUnsafe() {
@@ -1584,6 +1604,10 @@ impl typeChecker {
 		defer { self.cycleRisk = cycleRisk }
 
 		self.pushTA(taNotComparable | taMutable)
+
+		disableTA := self.disableTA
+		self.disableTA |= taMutable | taNotComparable
+		defer { self.disableTA = disableTA }
 
 		mut elem := self.checkDecl(decl.Elem)
 
@@ -1631,6 +1655,8 @@ impl typeChecker {
 			}
 		}
 
+		// Do not disable mutability and comparable analysis.
+		// Element type of array is directly affects the mutability and comparability of array.
 		mut elem := self.checkDecl(decl.Elem)
 
 		// Check special cases.
@@ -1658,6 +1684,11 @@ impl typeChecker {
 
 	fn buildMap(mut self, mut decl: &ast::MapType): &Map {
 		self.pushTA(taNotComparable)
+
+		disableTA := self.disableTA
+		self.disableTA |= taMutable | taNotComparable
+		defer { self.disableTA = disableTA }
+
 		// Evaluate key type with cycle risk, but do not log errors about it.
 		// We have to do this for checking correct map type dependencies,
 		// cycle types are prevents valid map key types. So, caught them but
@@ -1763,6 +1794,10 @@ impl typeChecker {
 
 		self.pushTA(taNotComparable)
 
+		disableTA := self.disableTA
+		self.disableTA |= taMutable | taNotComparable
+		defer { self.disableTA = disableTA }
+
 		if len(decl.Generics) > 0 {
 			self.pushErr(decl.Token, build::LogMsg.GenericedFuncAsAnonFunc)
 			ret nil
@@ -1794,6 +1829,10 @@ impl typeChecker {
 			self.pushErr(ns.Namespace, build::LogMsg.NamespaceNotExist, ns.Namespace.Kind)
 			ret nil
 		}
+
+		disableTA := self.disableTA
+		self.disableTA |= taMutable | taNotComparable
+		defer { self.disableTA = disableTA }
 
 		self.disallowBuiltin()
 		mut lookup := self.lookup
