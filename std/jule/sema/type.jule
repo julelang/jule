@@ -143,8 +143,8 @@ impl Type {
 	fn Comparable(self): bool {
 		unsafe {
 			mut _self := &self
-			if _self.Struct() != nil {
-				ret _self.Struct().Comparable
+			if _self.softStruct() != nil {
+				ret _self.softStruct().Comparable
 			}
 			if _self.Array() != nil {
 				ret _self.Array().Elem.Comparable()
@@ -157,8 +157,8 @@ impl Type {
 	fn Mutable(self): bool {
 		unsafe {
 			mut _self := &self
-			if _self.Struct() != nil {
-				ret _self.Struct().Mutable
+			if _self.softStruct() != nil {
+				ret _self.softStruct().Mutable
 			}
 			if _self.Chan() != nil {
 				ret _self.Chan().Elem.Mutable()
@@ -865,11 +865,19 @@ impl Ptr {
 struct referencer {
 	ident: str
 	owner: any
+	ins:   &StructIns // If owner is a struct, this is a checker instance.
 	refs:  *[]any
 }
 
+// Cycle state flags.
 const cycleErrEnable = 0b01 // Enables error logging for cycle analysis.
 const cycleErrFail = 0b10   // Means the last cycle analysis reports cycles exist.
+
+// Type analysis tags.
+// See developer reference (12).
+const taNA = 0 << 0
+const taNotComparable = 1 << 0
+const taMutable = 1 << 1
 
 // Checks type and builds result as kind.
 // Removes kind if error occurs,
@@ -948,6 +956,16 @@ impl typeChecker {
 
 	fn disallowBuiltin(mut self) {
 		self.disBuiltin = true
+	}
+
+	// Push type analysis flag to owner structure instance if exist.
+	// See developer reference (12).
+	fn pushTA(mut self, tags: int) {
+		if self.referencer != nil && self.referencer.ins != nil {
+			mut s := self.referencer.ins
+			s.Comparable = s.Comparable && tags&taNotComparable != taNotComparable
+			s.Mutable = s.Mutable || tags&taMutable == taMutable
+		}
 	}
 
 	fn pushReference[T](mut self, mut &t: T) {
@@ -1151,8 +1169,9 @@ impl typeChecker {
 
 		if ta.Strict && self.s.step&stepFlag.ImplsImplemented == stepFlag.ImplsImplemented {
 			// Check strict type structure if impl statements are implemented.
+			// But do not check if source type is nil, it means type type alias is still checking.
 			mut s := ta.TypeSym.Type.softStruct()
-			if !s.Checked {
+			if s.Source != nil && !s.Checked {
 				ok := self.checkStructIns(s, decl.Token)
 				if !ok {
 					ret nil
@@ -1207,6 +1226,7 @@ impl typeChecker {
 			self.pushErr(decl.Token, build::LogMsg.TypeNotSupportsGenerics, decl.Ident)
 			ret nil
 		}
+		self.pushTA(taMutable)
 		self.pushReference[&Trait](t)
 		ret t
 	}
@@ -1221,7 +1241,6 @@ impl typeChecker {
 		if self.referencer != nil && self.referencer.owner == ins.Decl {
 			ret true
 		}
-
 		if !self.s.precheckStructIns(ins, errorToken) {
 			ret false
 		}
@@ -1344,7 +1363,16 @@ impl typeChecker {
 			ret nil
 		}
 
-		ret self.fromStructIns(ins, decl.Token)
+		ins = self.fromStructIns(ins, decl.Token)
+		if ins != nil {
+			if !ins.Comparable {
+				self.pushTA(taNotComparable)
+			}
+			if ins.Mutable {
+				self.pushTA(taMutable)
+			}
+		}
+		ret ins
 	}
 
 	// Returns identifier if found. Also checks founded identifier.
@@ -1406,6 +1434,9 @@ impl typeChecker {
 		mut ta := self.lookup.FindTypeAlias(decl.Ident, decl.Binded)
 		if ta == nil && !self.disBuiltin {
 			ta = findBuiltinTypeAlias(decl.Ident)
+			if ta != nil && ta.Ident == types::Kind.Any {
+				self.pushTA(taMutable)
+			}
 		}
 		if ta != nil {
 			ret self.fromTypeAlias(decl, ta)
@@ -1472,6 +1503,8 @@ impl typeChecker {
 		self.cycleRisk = false
 		defer { self.cycleRisk = cycleRisk }
 
+		self.pushTA(taMutable)
+
 		mut elem := self.checkDecl(decl.Elem)
 		ret self.buildSptrFromType(elem)
 	}
@@ -1491,6 +1524,9 @@ impl typeChecker {
 			mut ins := s.instance()
 			ins.Generics = [&InsGeneric{Type: elem}]
 			_ = self.fromStructIns(ins, decl.Elem.Token)
+		}
+		if elem.Mutable() {
+			self.pushTA(taMutable)
 		}
 		ret &Chan{
 			Recv: decl.Recv,
@@ -1519,6 +1555,8 @@ impl typeChecker {
 		self.cycleRisk = false
 		defer { self.cycleRisk = cycleRisk }
 
+		self.pushTA(taMutable)
+
 		mut elem := (&Type)(nil)
 
 		if !decl.IsUnsafe() {
@@ -1535,6 +1573,8 @@ impl typeChecker {
 		cycleRisk := self.cycleRisk
 		self.cycleRisk = false
 		defer { self.cycleRisk = cycleRisk }
+
+		self.pushTA(taNotComparable | taMutable)
 
 		mut elem := self.checkDecl(decl.Elem)
 
@@ -1554,7 +1594,6 @@ impl typeChecker {
 
 	fn buildArray(mut self, mut decl: &ast::ArrayType): &Array {
 		mut n := 0
-
 		if !decl.AutoSized() {
 			mut size := self.s.eval(self.lookup).evalExpr(decl.Size)
 			if size == nil {
@@ -1594,6 +1633,13 @@ impl typeChecker {
 			ret nil
 		}
 
+		if !elem.Comparable() {
+			self.pushTA(taNotComparable)
+		}
+		if elem.Mutable() {
+			self.pushTA(taMutable)
+		}
+
 		ret &Array{
 			Auto: decl.AutoSized(),
 			N: n,
@@ -1602,6 +1648,7 @@ impl typeChecker {
 	}
 
 	fn buildMap(mut self, mut decl: &ast::MapType): &Map {
+		self.pushTA(taNotComparable)
 		// Evaluate key type with cycle risk, but do not log errors about it.
 		// We have to do this for checking correct map type dependencies,
 		// cycle types are prevents valid map key types. So, caught them but
@@ -1704,6 +1751,8 @@ impl typeChecker {
 		cycleRisk := self.cycleRisk
 		self.cycleRisk = false
 		defer { self.cycleRisk = cycleRisk }
+
+		self.pushTA(taNotComparable)
 
 		if len(decl.Generics) > 0 {
 			self.pushErr(decl.Token, build::LogMsg.GenericedFuncAsAnonFunc)
@@ -2012,6 +2061,9 @@ fn applyImplicitCast(mut &s: &sema, mut &dest: &Type, mut &d: &Data,
 fn validTypeForXof(mut &t: &Type): bool {
 	ret !t.Void() && t.Func() == nil && t.Tuple() == nil && !t.comptime()
 }
+
+// Pseudo source type for strict type alias structure instances.
+static mut pseudoSource = new(Type)
 
 // Initializes new structure for strict types.
 // See developer reference (11) for details.

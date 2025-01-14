@@ -91,6 +91,10 @@ impl Struct {
 			Refers: ReferenceStack.new(),
 		}
 
+		// See developer reference (12).
+		ins.Mutable = false
+		ins.Comparable = true
+
 		for (_, mut s) in self.Statics {
 			ins.Statics = append(ins.Statics, new(Var, *s))
 		}
@@ -285,8 +289,12 @@ impl StructIns {
 			ret
 		}
 		self.Source = t
-		self.Comparable = t.Comparable()
-		self.Mutable = t.Mutable()
+		// We have to check mutable and comparable conditions again.
+		// Because type analysis is a simple precondition checker.
+		// For the actual type, we have to check.
+		// See developer reference (12.2.1).
+		self.Comparable = self.Comparable || t.Comparable()
+		self.Mutable = self.Mutable || t.Mutable()
 	}
 
 	// Reports whether instances are same.

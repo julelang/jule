@@ -1086,11 +1086,15 @@ impl sema {
 				self.setCurrentFile(file)
 			}
 		}
-		ok = self.checkTypeSymWithRefers(ta.TypeSym, l, nil, &referencer{
+		mut referencer := &referencer{
 			ident: ta.Ident,
 			owner: ta,
 			refs: &ta.Refers,
-		})
+		}
+		if ta.Strict {
+			referencer.ins = ta.TypeSym.Type.softStruct()
+		}
+		ok = self.checkTypeSymWithRefers(ta.TypeSym, l, nil, referencer)
 		if ok && ta.TypeSym.Type.Array() != nil && ta.TypeSym.Type.Array().Auto {
 			self.pushErr(ta.TypeSym.Decl.Token, build::LogMsg.ArrayAutoSized)
 			ok = false
@@ -1109,7 +1113,7 @@ impl sema {
 		// Type alias is strict, make strict type alias analysis.
 		// See developer reference (11).
 		if ta.Strict {
-			mut s := initNewStructType(ta.Ident, nil)
+			mut s := initNewStructType(ta.Ident, pseudoSource)
 			s.Decl.sema = self
 			s.Decl.Binded = ta.Binded
 			s.Decl.Token = ta.Token
@@ -2262,6 +2266,11 @@ impl sema {
 	// Which is contains fields and generic-type constraints.
 	// If generic instance will be check, errorToken should be passed.
 	fn checkStructEnv(mut &self, mut &s: &StructIns, mut errorToken: &token::Token): (ok: bool) {
+		// If source is not nil, do not check.
+		// This is unnecessary process for strict type alias structure instances.
+		if s.Source != nil {
+			ret true
+		}
 		mut tc := typeChecker{
 			s: s.Decl.sema,
 			rootLookup: s.Decl.sema,
@@ -2325,6 +2334,14 @@ impl sema {
 		mut eval := self.eval(self)
 		s.Comparable = !s.Decl.Binded
 		for (_, mut f) in s.Fields {
+			// Set instance for referencer if field declaration is not mutable.
+			// But field declared as mutable, do not set.
+			// It basically for the `!f.Decl.Mutable && f.Type.Mutable()` condition.
+			if !f.Decl.Mutable {
+				tc.referencer.ins = s
+			} else {
+				tc.referencer.ins = nil
+			}
 			mut kind := tc.checkDecl(f.Decl.TypeSym.Decl)
 			ok = kind != nil && ok
 			if kind == nil {
@@ -2335,6 +2352,10 @@ impl sema {
 				continue
 			}
 			f.Type = kind
+			// We have to check mutable and comparable conditions again.
+			// Because type analysis is a simple precondition checker.
+			// For the actual type, we have to check.
+			// See developer reference (12.2.1).
 			s.Mutable = s.Mutable || (!f.Decl.Mutable && f.Type.Mutable())
 			s.Comparable = s.Comparable && f.Type.Comparable()
 
@@ -2364,7 +2385,13 @@ impl sema {
 		ret
 	}
 
-	fn precheckStructIns(mut &self, mut &s: &StructIns, mut errorToken: &token::Token): (ok: bool) {
+	fn precheckStructIns(mut &self, mut s: &StructIns, mut errorToken: &token::Token): (ok: bool) {
+		// Return is source type is still pseudoSource of a strict type alias instance.
+		// Following analysis must be done with real source type.
+		if s.Source == pseudoSource {
+			s.Checked = false
+			ret true
+		}
 		ok = self.checkStructEnv(s, errorToken)
 		if ok {
 			// See implicit imports reference (1).
@@ -2373,18 +2400,31 @@ impl sema {
 			// push instance for runtime function.
 			if s.Comparable && self.meta.runtime != nil {
 				mut decl := runtimeFindFunc(self.meta.runtime, "arrayCmp")
-				for (_, mut field) in s.Fields {
-					mut arr := field.Type.Array()
+				pushArr := fn(mut t: Kind, mut token: &token::Token) {
+					match type t {
+					| &Array:
+						break
+					|:
+						ret
+					}
+					mut arr := (&Array)(t)
 					if arr == nil {
-						continue
+						ret
 					}
 					mut f := decl.instanceForce()
 					f.Generics = append(f.Generics, &InsGeneric{Type: arr.Elem})
-					gok, _ := self.checkGenericFunc(f, field.Decl.Token)
-					if !gok {
+					ok, _ = self.checkGenericFunc(f, token)
+					if !ok {
 						panic("sema: arrayCmp evaluation failed, this is an implementation mistake")
 					}
 					s.Refers.Push(f)
+				}
+				if s.Source == nil {
+					for (_, mut field) in s.Fields {
+						pushArr(field.Type.ActualKind(), field.Decl.Token)
+					}
+				} else {
+					pushArr(s.Source.ActualKind(), s.Decl.Token)
 				}
 			}
 		}
