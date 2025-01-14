@@ -936,6 +936,7 @@ struct typeChecker {
 	// If selection is a struct, returns invalid instance that only has decl field.
 	selection: bool
 
+	// Disabled type analysis flags.
 	disableTA: int
 
 	// See developer reference (4).
@@ -1554,7 +1555,7 @@ impl typeChecker {
 			ins.Generics = [&InsGeneric{Type: elem}]
 			_ = self.fromStructIns(ins, decl.Elem.Token)
 		}
-		if elem.Mutable() {
+		if self.disableTA&taMutable != taMutable && elem.Mutable() {
 			self.pushTA(taMutable)
 		}
 		ret &Chan{
@@ -1672,10 +1673,10 @@ impl typeChecker {
 			ret nil
 		}
 
-		if !elem.Comparable() {
+		if self.disableTA&taNotComparable != taNotComparable && !elem.Comparable() {
 			self.pushTA(taNotComparable)
 		}
-		if elem.Mutable() {
+		if self.disableTA&taMutable != taMutable && elem.Mutable() {
 			self.pushTA(taMutable)
 		}
 
@@ -1756,7 +1757,7 @@ impl typeChecker {
 			_ = self.fromStructIns(ins, decl.Key.Token)
 		}
 
-		if key.Mutable() || val.Mutable() {
+		if self.disableTA&taMutable != taMutable && (key.Mutable() || val.Mutable()) {
 			self.pushTA(taMutable)
 		}
 
