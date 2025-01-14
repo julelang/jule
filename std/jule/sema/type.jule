@@ -1151,7 +1151,16 @@ impl typeChecker {
 			}
 		}
 
-		{
+		// Easy case:
+		// If the owner alias and ta is not equal, it is fine.
+		// Otherwise cyclic reference exist, because same type alias used
+		// in the source type. To caught such this cases, do not use
+		// separate typeChecker instances to keep ownerAlias.
+		if self.ownerAlias == ta {
+			self.pushErr(decl.Token, build::LogMsg.IllegalCycleRefersItself, self.referencer.ident)
+			ret nil
+		} else {
+			// Hard case: analysis references to caught any reference cycle.
 			ok := self.checkIllegalCycles(decl.Token, ta)
 			if !ok && self.cycleErr&cycleErrEnable == cycleErrEnable {
 				ret nil
@@ -1160,7 +1169,7 @@ impl typeChecker {
 
 		// Build kind if not built already.
 		// If this type alias is checking now, do not check again.
-		if ta.TypeSym.Type == nil && self.ownerAlias != ta {
+		if ta.TypeSym.Type == nil {
 			ok := self.s.checkTypeAliasDecl(ta, self.lookup)
 			if !ok {
 				ret nil
