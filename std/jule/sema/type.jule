@@ -173,6 +173,10 @@ impl Type {
 			if _self.Array() != nil {
 				ret _self.Array().Elem.Mutable()
 			}
+			if _self.Map() != nil {
+				m := _self.Map()
+				ret m.Key.Mutable() || m.Val.Mutable()
+			}
 			ret _self.Slice() != nil ||
 				_self.Ptr() != nil ||
 				_self.Sptr() != nil
@@ -1685,8 +1689,10 @@ impl typeChecker {
 	fn buildMap(mut self, mut decl: &ast::MapType): &Map {
 		self.pushTA(taNotComparable)
 
+		// Do not disable mutability analysis.
+		// Key and Value type of map is directly affects the mutability of map.
 		disableTA := self.disableTA
-		self.disableTA |= taMutable | taNotComparable
+		self.disableTA |= taNotComparable
 		defer { self.disableTA = disableTA }
 
 		// Evaluate key type with cycle risk, but do not log errors about it.
@@ -1748,6 +1754,10 @@ impl typeChecker {
 			mut ins := s.instance()
 			ins.Generics = [&InsGeneric{Type: key}, &InsGeneric{Type: val}]
 			_ = self.fromStructIns(ins, decl.Key.Token)
+		}
+
+		if key.Mutable() || val.Mutable() {
+			self.pushTA(taMutable)
 		}
 
 		ret &Map{
