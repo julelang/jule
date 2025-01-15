@@ -638,7 +638,7 @@ impl eval {
 		// Do not check if v.Used is true. It means it already analyzed.
 		// If variable is global, it should be have initialize expression.
 		// So, nil value means something may be wrong.
-		if !v.Checked && !v.Binded && v.Scope == nil && (v.Value == nil || v.Value.Data == nil) {
+		if !v.Checked && !v.Binded && v.Scope == nil && (v.ValueSym == nil || v.ValueSym.Data == nil) {
 			// Save source file of global variable.
 			// Use it for evaluation and checking for correct analysis.
 			// Otherwise, evaluation problems may occur.
@@ -670,12 +670,12 @@ impl eval {
 			Type: v.TypeSym.Type,
 			Model: v,
 		}
-		if v.Value != nil && v.Value.Data != nil {
+		if v.ValueSym != nil && v.ValueSym.Data != nil {
 			if !v.Binded && v.IsInitialized() {
-				d.IsRune = v.Value.Data.IsRune
+				d.IsRune = v.ValueSym.Data.IsRune
 			}
-			if v.Constant && v.Value.Data.Constant != nil {
-				d.Constant = new(constant::Const, *v.Value.Data.Constant)
+			if v.Constant && v.ValueSym.Data.Constant != nil {
+				d.Constant = new(constant::Const, *v.ValueSym.Data.Constant)
 				d.Model = d.Constant
 				if v.untypedConstant() {
 					self.applyNumericPrefix(d)
@@ -4642,7 +4642,7 @@ fn buildErrorVar(mut &s: &Scope, mut &fc: &ast::FuncCallExpr): &Var {
 		Token: fc.Token,
 		TypeSym: findBuiltinTypeAlias(types::Kind.Any).TypeSym,
 		Scope: s,
-		Value: &ValueSym{
+		ValueSym: &ValueSym{
 			Data: new(Data),
 		},
 	}

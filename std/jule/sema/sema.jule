@@ -80,7 +80,7 @@ fn appendRetVars(mut &dest: []&Var, mut &f: &FuncIns) {
 			TypeSym: &TypeSym{
 				Type: types[i],
 			},
-			Value: &ValueSym{
+			ValueSym: &ValueSym{
 				Data: new(Data),
 			},
 			RetOrder: i,
@@ -110,7 +110,7 @@ fn appendParamVars(mut &dest: []&Var, mut &f: &FuncIns) {
 			Token: p.Decl.Token,
 			TypeSym: new(TypeSym),
 			Scope: f.Scope,
-			Value: new(ValueSym),
+			ValueSym: new(ValueSym),
 		}
 
 		match {
@@ -2130,43 +2130,43 @@ impl sema {
 	fn checkVarValue(mut &self, mut &v: &Var) {
 		if v.IsTypeInferred() {
 			// Build new TypeSym because auto-type symbols are nil.
-			v.TypeSym = &TypeSym{Type: v.Value.Data.Type}
+			v.TypeSym = &TypeSym{Type: v.ValueSym.Data.Type}
 
-			self.checkDataForTypeInference(v.Value.Data, v.Value.Expr.Token)
+			self.checkDataForTypeInference(v.ValueSym.Data, v.ValueSym.Expr.Token)
 			self.checkValidityForInitExpr(
 				v.Mutable,
 				v.Reference,
 				v.TypeSym.Type,
-				v.Value.Data,
-				v.Value.Expr.Token)
+				v.ValueSym.Data,
+				v.ValueSym.Expr.Token)
 		} else {
 			mut arr := v.TypeSym.Type.Array()
 			if arr != nil {
 				if arr.Auto {
-					dataArr := v.Value.Data.Type.Array()
+					dataArr := v.ValueSym.Data.Type.Array()
 					if dataArr != nil {
 						arr.N = dataArr.N
 					}
 				}
 			}
 
-			if self.checkAssignType(v.Reference, v.TypeSym.Type, v.Value.Data, v.Value.Expr.Token, v.Refers) {
+			if self.checkAssignType(v.Reference, v.TypeSym.Type, v.ValueSym.Data, v.ValueSym.Expr.Token, v.Refers) {
 				self.checkValidityForInitExpr(
 					v.Mutable,
 					v.Reference,
 					v.TypeSym.Type,
-					v.Value.Data,
-					v.Value.Expr.Token)
+					v.ValueSym.Data,
+					v.ValueSym.Expr.Token)
 			}
 		}
 
 		if v.Constant {
-			if !v.Value.Data.IsConst() && !v.Value.Data.Type.comptime() {
-				self.pushErr(v.Value.Expr.Token, build::LogMsg.ExprNotConst)
+			if !v.ValueSym.Data.IsConst() && !v.ValueSym.Data.Type.comptime() {
+				self.pushErr(v.ValueSym.Expr.Token, build::LogMsg.ExprNotConst)
 			}
 		} else {
-			v.Value.Data.Constant = nil
-			v.Value.Data.untyped = false
+			v.ValueSym.Data.Constant = nil
+			v.ValueSym.Data.untyped = false
 		}
 
 		// Remove kind for avoid more tuple-type errors.
@@ -2188,7 +2188,7 @@ impl sema {
 			eval = self.evalpd(l, nil, decl)
 		}
 		eval.target.mutable = decl.Mutable
-		decl.Value.Data = eval.evalExpr(decl.Value.Expr)
+		decl.ValueSym.Data = eval.evalExpr(decl.ValueSym.Expr)
 	}
 
 	// Evaluateds value of variable and checks.
@@ -2196,7 +2196,7 @@ impl sema {
 	fn checkVar(mut &self, mut &decl: &Var, mut l: Lookup) {
 		decl.Checked = true
 		self.evalVarValue(decl, l)
-		if decl.Value.Data == nil {
+		if decl.ValueSym.Data == nil {
 			ret // Skip checks if error occurs.
 		}
 		self.checkVarValue(decl)
