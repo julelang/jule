@@ -618,7 +618,7 @@ impl scopeOptimizer {
 		mut i := 0
 		for i < len(assign.Left) {
 			mut l := assign.Left[i]
-			mut r := tup.Datas[i]
+			mut r := tup.Values[i]
 			if l == nil && r != nil {
 				// expression is assigned to blank identifier
 				// so we can handle as expression statement
@@ -681,20 +681,20 @@ impl scopeOptimizer {
 			continue
 		remove:
 			assign.Left = append(assign.Left[:i], assign.Left[i+1:]...)
-			tup.Datas = append(tup.Datas[:i], tup.Datas[i+1:]...)
+			tup.Values = append(tup.Values[:i], tup.Values[i+1:]...)
 		}
 	}
 
 	// Tries to optimize swap assignments, such as "x, y = y, x", and reports whether optimization applied.
 	// Designed for tuple expressions, so the right expression should be tuple.
 	fn tryOptimizeSwap(mut &self, mut &assign: &sema::MultiAssign, mut &tup: &sema::TupleExpr): (applied: bool) {
-		if len(tup.Datas) != 2 || len(assign.Left) != 2 ||
+		if len(tup.Values) != 2 || len(assign.Left) != 2 ||
 			assign.Left[0] == nil || assign.Left[1] == nil {
 			ret false
 		}
 		// Catch swaps.
-		if !obj::EqualModels(assign.Left[0].Model, tup.Datas[1].Model) ||
-			!obj::EqualModels(assign.Left[1].Model, tup.Datas[0].Model) {
+		if !obj::EqualModels(assign.Left[0].Model, tup.Values[1].Model) ||
+			!obj::EqualModels(assign.Left[1].Model, tup.Values[0].Model) {
 			ret false
 		}
 		mut model := &SwapExpr{
@@ -715,8 +715,8 @@ impl scopeOptimizer {
 		// Therefore, we can just able to split variable assignments.
 
 		// Make guaranteed that both operands just use variables.
-		for i in tup.Datas {
-			r := tup.Datas[i]
+		for i in tup.Values {
+			r := tup.Values[i]
 			l := assign.Left[i]
 			if l != nil {
 				match type l.Model {
@@ -746,7 +746,7 @@ impl scopeOptimizer {
 				}
 			}
 			if checkTup {
-				for j, jl in unsafe { tup.Datas } {
+				for j, jl in unsafe { tup.Values } {
 					for j != i && jl != nil && obj::EqualModels(jl.Model, m) {
 						ret true
 					}
@@ -765,7 +765,7 @@ impl scopeOptimizer {
 				continue
 			}
 
-			mut r := tup.Datas[i]
+			mut r := tup.Values[i]
 
 			// check l.Model in left operand and right operand. Because l.Model
 			// will be mutated, so if it exist in right operand, cannot split.
@@ -790,7 +790,7 @@ impl scopeOptimizer {
 
 			// remove operands
 			assign.Left = append(assign.Left[:i], assign.Left[i+1:]...)
-			tup.Datas = append(tup.Datas[:i], tup.Datas[i+1:]...)
+			tup.Values = append(tup.Values[:i], tup.Values[i+1:]...)
 		}
 		self.i = z
 	}
@@ -845,7 +845,7 @@ impl scopeOptimizer {
 					}
 				}
 				{
-					mut r := tup.Datas[0]
+					mut r := tup.Values[0]
 					self.setCurrentStmt(&sema::Assign{
 						Left: &sema::OperandExpr{Type: l.Type, Model: l.Model},
 						Right: &sema::OperandExpr{Type: r.Type, Model: r.Model},
@@ -889,7 +889,7 @@ impl scopeOptimizer {
 					}
 				}
 				if self.data.nils != nil {
-					if tup != nil && isGuaranteedNonNilExpr(self.data.nils, tup.Datas[i].Model) {
+					if tup != nil && isGuaranteedNonNilExpr(self.data.nils, tup.Values[i].Model) {
 						if isNilValidType(l.Type) {
 							const safe = true
 							checkpoint.nils.pushVar(getNilVar(l.Model), safe)
@@ -900,7 +900,7 @@ impl scopeOptimizer {
 				}
 				if self.data.dynamic != nil && tup != nil {
 					mut kind := isTypeGuaranteedDynamicValue(
-						self.data.dynamic, tup.Datas[i].Type, tup.Datas[i].Model)
+						self.data.dynamic, tup.Values[i].Type, tup.Values[i].Model)
 					if kind != nil {
 						if isDynamicValidType(l.Type) {
 							checkpoint.dynamic.pushVar(getDynamicVar(l.Model), kind)
