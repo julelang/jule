@@ -81,7 +81,7 @@ fn appendRetVars(mut &dest: []&Var, mut &f: &FuncIns) {
 				Type: types[i],
 			},
 			ValueSym: &ValueSym{
-				Data: new(Data),
+				Data: new(Value),
 			},
 			RetOrder: i,
 		})
@@ -730,14 +730,14 @@ impl sema {
 
 	// Do not checks mutability.
 	fn checkAssignType(mut &self, destIsRef: bool, mut &dest: &Type,
-		mut &d: &Data, mut errorToken: &token::Token, mut refers: &ReferenceStack): bool {
-		if d.Decl {
+		mut &v: &Value, mut errorToken: &token::Token, mut refers: &ReferenceStack): bool {
+		if v.Decl {
 			self.pushErr(errorToken, build::LogMsg.InvalidExpr)
 			ret false
 		}
 		if destIsRef {
-			if !dest.Equal(d.Type) {
-				self.pushErr(errorToken, build::LogMsg.IncompatibleTypes, dest.Str(), d.Type.Str())
+			if !dest.Equal(v.Type) {
+				self.pushErr(errorToken, build::LogMsg.IncompatibleTypes, dest.Str(), v.Type.Str())
 				ret false
 			}
 		} else {
@@ -745,7 +745,7 @@ impl sema {
 				s: self,
 				errorToken: errorToken,
 				dest: dest,
-				d: d,
+				v: v,
 				refers: refers,
 			}
 			ok := atc.check()
@@ -754,7 +754,7 @@ impl sema {
 			}
 		}
 
-		if !d.IsConst() || dest.Prim() == nil {
+		if !v.IsConst() || dest.Prim() == nil {
 			ret true
 		}
 
@@ -762,11 +762,11 @@ impl sema {
 
 		match {
 		| types::IsSigInt(kind):
-			d.Constant.SetI64(d.Constant.AsI64())
+			v.Constant.SetI64(v.Constant.AsI64())
 		| types::IsUnsigInt(kind):
-			d.Constant.SetU64(d.Constant.AsU64())
+			v.Constant.SetU64(v.Constant.AsU64())
 		| types::IsFloat(kind):
-			d.Constant.SetF64(d.Constant.AsF64())
+			v.Constant.SetF64(v.Constant.AsF64())
 		}
 
 		ret true
@@ -799,7 +799,7 @@ impl sema {
 		ret false
 	}
 
-	fn pushCompatibilityError(mut self, mut &dest: &Type, mut &src: &Data,
+	fn pushCompatibilityError(mut self, mut &dest: &Type, mut &src: &Value,
 		mut &errorToken: &token::Token) {
 		if src.untyped && src.IsConst() {
 			match {
@@ -817,7 +817,7 @@ impl sema {
 		self.pushErr(errorToken, build::LogMsg.IncompatibleTypes, dest.Str(), src.Type.Str())
 	}
 
-	fn checkTypeCompatibility1(mut &self, mut &dest: &Type, mut &src: &Data,
+	fn checkTypeCompatibility1(mut &self, mut &dest: &Type, mut &src: &Value,
 		mut &errorToken: &token::Token): bool {
 		if self._checkTypeCompatibility(dest, src.Type, errorToken) {
 			ret true
@@ -1003,12 +1003,12 @@ impl sema {
 		})
 	}
 
-	fn checkRefValidityForInitExpr(mut &self, leftMut: bool, mut &d: &Data, mut &errorToken: &token::Token): bool {
-		if !isValidModelForRef(d.Model) {
+	fn checkRefValidityForInitExpr(mut &self, leftMut: bool, mut &v: &Value, mut &errorToken: &token::Token): bool {
+		if !isValidModelForRef(v.Model) {
 			self.pushErr(errorToken, build::LogMsg.RefAssignNonVar)
 			ret false
 		}
-		if leftMut && !d.Mutable {
+		if leftMut && !v.Mutable {
 			self.pushErr(errorToken, build::LogMsg.MutRefPointsImmut)
 			ret false
 		}
@@ -1048,28 +1048,28 @@ impl sema {
 	}
 
 	fn checkValidityForInitExpr(mut &self, leftMut: bool, leftRef: bool,
-		&leftKind: &Type, mut &d: &Data, mut &errorToken: &token::Token): bool {
-		if leftMut && !d.Mutable {
+		&leftKind: &Type, mut &v: &Value, mut &errorToken: &token::Token): bool {
+		if leftMut && !v.Mutable {
 			// Check classical assignment mutability.
-			if d.Type.Mutable() || d.Type.Variadic {
-				self.pushErr(errorToken, build::LogMsg.AssignNonMutToMut, d.Type.Str())
+			if v.Type.Mutable() || v.Type.Variadic {
+				self.pushErr(errorToken, build::LogMsg.AssignNonMutToMut, v.Type.Str())
 				ret false
 			}
 			// Check interior mutability risk for the struct copy.
-			s := d.Type.Struct()
+			s := v.Type.Struct()
 			if s != nil && self.isMutRiskyStruct(s) {
-				self.pushErr(errorToken, build::LogMsg.CopyWithMutableData, d.Type.Str())
+				self.pushErr(errorToken, build::LogMsg.CopyWithMutableData, v.Type.Str())
 				ret false
 			}
 		}
 		if leftRef {
-			if !self.checkRefValidityForInitExpr(leftMut, d, errorToken) {
+			if !self.checkRefValidityForInitExpr(leftMut, v, errorToken) {
 				ret false
 			}
 		}
 		mut atc := &assignTypeChecker{
 			s: self,
-			d: d,
+			v: v,
 			errorToken: errorToken,
 		}
 		ret atc.checkValidity()
@@ -1178,24 +1178,24 @@ impl sema {
 		for (_, mut item) in e.Items {
 			if item.AutoExpr() {
 				item.ValueSym = &ValueSym{
-					Data: &Data{
+					Data: &Value{
 						Constant: constant::Const.NewStr(item.Ident),
 					},
 				}
 				item.ValueSym.Data.Model = item.ValueSym.Data.Constant
 			} else {
-				mut d := eval.evalExpr(item.ValueSym.Expr)
-				if d == nil {
+				mut v := eval.evalExpr(item.ValueSym.Expr)
+				if v == nil {
 					continue
 				}
 
-				if !d.IsConst() {
+				if !v.IsConst() {
 					self.pushErr(item.ValueSym.Expr.Token, build::LogMsg.ExprNotConst)
 				}
 
 				mut refers := (&ReferenceStack)(nil) // constant expressions not uses
-				_ = self.checkAssignType(false, e.TypeSym.Type, d, item.Token, refers)
-				item.ValueSym.Data = d
+				_ = self.checkAssignType(false, e.TypeSym.Type, v, item.Token, refers)
+				item.ValueSym.Data = v
 			}
 		}
 	}
@@ -1203,7 +1203,7 @@ impl sema {
 	fn checkEnumItemInt[Int](mut &self, mut &eval: &eval, mut &e: &Enum, &prim: &Prim, mut &item: &EnumItem, mut &n: Int) {
 		if item.AutoExpr() {
 			item.ValueSym = &ValueSym{
-				Data: new(Data),
+				Data: new(Value),
 			}
 			const match type Int {
 			| i64:
@@ -1215,16 +1215,16 @@ impl sema {
 			}
 			item.ValueSym.Data.Model = item.ValueSym.Data.Constant
 		} else {
-			mut d := eval.evalExpr(item.ValueSym.Expr)
-			if d == nil {
+			mut v := eval.evalExpr(item.ValueSym.Expr)
+			if v == nil {
 				ret
 			}
-			if !d.IsConst() {
+			if !v.IsConst() {
 				self.pushErr(item.ValueSym.Expr.Token, build::LogMsg.ExprNotConst)
 			}
 			mut refers := (&ReferenceStack)(nil) // constant expressions not uses
-			_ = self.checkAssignType(false, e.TypeSym.Type, d, item.Token, refers)
-			item.ValueSym.Data = d
+			_ = self.checkAssignType(false, e.TypeSym.Type, v, item.Token, refers)
+			item.ValueSym.Data = v
 			const match type Int {
 			| i64:
 				n = item.ValueSym.Data.Constant.ReadI64()
@@ -1917,9 +1917,9 @@ impl sema {
 				}
 			}
 			if exist {
-				d := findDirective(sf.Directives, build::Directive.Deprecated)
-				if d != nil {
-					self.pushErr(d.Tag, build::LogMsg.TraitImplDeprecated)
+				v := findDirective(sf.Directives, build::Directive.Deprecated)
+				if v != nil {
+					self.pushErr(v.Tag, build::LogMsg.TraitImplDeprecated)
 				}
 				ok = false
 			} else {
@@ -2115,13 +2115,13 @@ impl sema {
 		}
 	}
 
-	fn checkDataForTypeInference(mut self, &d: &Data, &errToken: &token::Token) {
+	fn checkDataForTypeInference(mut self, &v: &Value, &errToken: &token::Token) {
 		match {
-		| d.IsNil():
+		| v.IsNil():
 			self.pushErr(errToken, build::LogMsg.NilForTypeInference)
-		| d.IsVoid():
+		| v.IsVoid():
 			self.pushErr(errToken, build::LogMsg.VoidForTypeInference)
-		| d.Type.Variadic:
+		| v.Type.Variadic:
 			self.pushErr(errToken, build::LogMsg.InvalidExprForTypeInference)
 		}
 	}
@@ -2920,8 +2920,8 @@ impl missingRetChecker {
 				if self.checkScope((&Scope)(st)) {
 					ret true
 				}
-			| &Data:
-				match type (&Data)(st).Model {
+			| &Value:
+				match type (&Value)(st).Model {
 				| &BuiltinPanicCallExpr
 				| &BuiltinErrorCallExpr:
 					ret true

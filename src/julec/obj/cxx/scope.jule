@@ -33,8 +33,8 @@ enum compStmt: type {
 
 // Channel and case hash for select.
 struct chanCase {
-	Case: &sema::Case
-	Data: &sema::Data
+	Case:  &sema::Case
+	Value: &sema::Value
 }
 
 struct scopeCoder {
@@ -94,7 +94,7 @@ impl scopeCoder {
 			model := any(sb.Str())
 			mut expr := new(sema::ChanRecv)
 			expr.Token = it.ExprToken
-			expr.Expr = new(sema::Data)
+			expr.Expr = new(sema::Value)
 			expr.Expr.Type = it.Expr.Type
 			expr.Expr.Model = unsafe { *(*sema::Expr)(&model) }
 			self.oc.ec.chanRecv(expr, fn() { self.oc.write("&__ok") }, false)
@@ -1038,11 +1038,11 @@ impl scopeCoder {
 		// So chans[i] always the matched case, if exist.
 		mut chans := make([]chanCase, 0, len(slct.Cases))
 		mut &_chans := chans // Used by closure, unsafely.
-		obj::IterCaseExprs(slct.Cases, fn(mut &c: &sema::Case, mut &expr: &sema::Data) {
-			match type expr.Model {
+		obj::IterCaseExprs(slct.Cases, fn(mut &c: &sema::Case, mut &val: &sema::Value) {
+			match type val.Model {
 			| &sema::ChanRecv:
-				unsafe { _chans = append(_chans, chanCase{c, expr}) }
-				mut cr := (&sema::ChanRecv)(expr.Model)
+				unsafe { _chans = append(_chans, chanCase{c, val}) }
+				mut cr := (&sema::ChanRecv)(val.Model)
 				self.oc.ec.possibleRefExpr(cr.Expr.Model)
 				self.oc.write(".as<")
 				self.oc.write(hchan)
@@ -1050,11 +1050,11 @@ impl scopeCoder {
 			}
 		})
 		recvChans := len(chans) // Total count of chan-recv cases.
-		obj::IterCaseExprs(slct.Cases, fn(mut &c: &sema::Case, mut &expr: &sema::Data) {
-			match type expr.Model {
+		obj::IterCaseExprs(slct.Cases, fn(mut &c: &sema::Case, mut &val: &sema::Value) {
+			match type val.Model {
 			| &sema::ChanSend:
-				unsafe { _chans = append(_chans, chanCase{c, expr}) }
-				mut cr := (&sema::ChanSend)(expr.Model)
+				unsafe { _chans = append(_chans, chanCase{c, val}) }
+				mut cr := (&sema::ChanSend)(val.Model)
 				self.oc.ec.possibleRefExpr(cr.Chan.Model)
 				self.oc.write(".as<")
 				self.oc.write(hchan)
@@ -1091,9 +1091,9 @@ impl scopeCoder {
 			sb.WriteStr("__jule_chans[")!
 			sb.WriteStr(conv::Itoa(i))!
 			sb.WriteStr("].as<")!
-			match type c.Data.Model {
+			match type c.Value.Model {
 			| &sema::ChanRecv:
-				mut cr := (&sema::ChanRecv)(c.Data.Model)
+				mut cr := (&sema::ChanRecv)(c.Value.Model)
 				mut pchan := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, cr.Expr.Type.Chan().Elem)
 				self.oc.tc.structureIns(sb, pchan)
 				sb.WriteStr(">()")!
@@ -1101,7 +1101,7 @@ impl scopeCoder {
 				cr.Expr.Model = unsafe { *(*sema::Expr)(&model) }
 				self.oc.ec.chanRecv(cr, nil, true)
 			| &sema::ChanSend:
-				mut cs := (&sema::ChanSend)(c.Data.Model)
+				mut cs := (&sema::ChanSend)(c.Value.Model)
 				mut pchan := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, cs.Chan.Type.Chan().Elem)
 				self.oc.tc.structureIns(sb, pchan)
 				sb.WriteStr(">()")!
@@ -1280,8 +1280,8 @@ impl scopeCoder {
 			self.scope((&sema::Scope)(st))
 		| &sema::Var:
 			self.var((&sema::Var)(st))
-		| &sema::Data:
-			self.oc.ec.model((&sema::Data)(st).Model)
+		| &sema::Value:
+			self.oc.ec.model((&sema::Value)(st).Model)
 		| &sema::Conditional:
 			self.conditional((&sema::Conditional)(st))
 		| &sema::InfIter:
@@ -1438,22 +1438,22 @@ impl scopeCoder {
 	}
 }
 
-fn isCopyOptimizable(&expr: &sema::Data): bool {
-	if !expr.Lvalue {
+fn isCopyOptimizable(&v: &sema::Value): bool {
+	if !v.Lvalue {
 		ret false
 	}
-	match type expr.Model {
+	match type v.Model {
 	| &sema::SlicingExpr:
 		ret false
 	}
 	ret true
 }
 
-fn isIterCopyOptimizable(&expr: &sema::Data, &v: &sema::Var): bool {
-	if !expr.Lvalue && !expr.Type.Mutable() {
+fn isIterCopyOptimizable(&val: &sema::Value, &v: &sema::Var): bool {
+	if !val.Lvalue && !val.Type.Mutable() {
 		ret true
 	}
-	ret !v.Mutable && !expr.Mutable
+	ret !v.Mutable && !val.Mutable
 }
 
 fn captureVarHandling(mut &oc: &ObjectCoder, mut &m: &sema::AnonFuncExpr, mut &v: &sema::Var): bool {

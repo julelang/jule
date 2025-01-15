@@ -12,7 +12,7 @@ use "std/jule/types"
 // All comptime-structure methods starts with underscore (_).
 
 trait comptimeRangeKind {
-	fn index(mut self, mut &d: &Data, i: int)
+	fn index(mut self, mut &v: &Value, i: int)
 	fn ready(mut self, mut &keyA: &Var, mut &keyB: &Var)
 	fn step(mut self, i: int, mut &keyA: &Var, mut &keyB: &Var)
 	fn len(self): int
@@ -39,19 +39,19 @@ impl Kind for comptimeStructField {
 }
 
 impl comptimeStructField {
-	fn _Decl(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Decl(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Decl")
 			ret nil
 		}
-		ret &Data{
+		ret &Value{
 			Type: &Type{
 				Kind: &comptimeDecl{decl: self.field.Decl},
 			},
 		}
 	}
 
-	fn _Type(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Type(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Type")
 			ret nil
@@ -59,18 +59,18 @@ impl comptimeStructField {
 		ret buildComptimeTypeInfoData(e.s, self.field.Type)
 	}
 
-	fn subIdent(mut &self, &ident: str): &Data {
+	fn subIdent(mut &self, &ident: str): &Value {
 		match ident {
 		| "Decl":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Decl(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
 		| "Type":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Type(e, fc)
 				},
 			}
@@ -96,14 +96,14 @@ impl comptimeRangeKind for comptimeStructFields {
 		if keyA != nil {
 			keyA.Constant = true
 			keyA.ValueSym = &ValueSym{
-				Data: new(Data),
+				Data: new(Value),
 			}
 			keyA.TypeSym = findBuiltinTypeAlias(types::Kind.Int).TypeSym
 		}
 		if keyB != nil {
 			keyB.Constant = true
 			keyB.ValueSym = &ValueSym{
-				Data: new(Data),
+				Data: new(Value),
 			}
 			keyB.TypeSym = &TypeSym{
 				Type: &Type{
@@ -113,11 +113,11 @@ impl comptimeRangeKind for comptimeStructFields {
 		}
 	}
 
-	fn index(mut self, mut &d: &Data, i: int) {
-		d.Decl = false
-		d.untyped = false
-		d.Constant = nil
-		d.Type = &Type{
+	fn index(mut self, mut &v: &Value, i: int) {
+		v.Decl = false
+		v.untyped = false
+		v.Constant = nil
+		v.Type = &Type{
 			Kind: &comptimeStructField{
 				field: self.fields[i],
 			},
@@ -152,19 +152,19 @@ impl Kind for comptimeStatic {
 }
 
 impl comptimeStatic {
-	fn _Decl(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Decl(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Decl")
 			ret nil
 		}
-		ret &Data{
+		ret &Value{
 			Type: &Type{
 				Kind: &comptimeDecl{decl: self.field},
 			},
 		}
 	}
 
-	fn _Type(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Type(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Type")
 			ret nil
@@ -172,18 +172,18 @@ impl comptimeStatic {
 		ret buildComptimeTypeInfoData(e.s, self.field.TypeSym.Type)
 	}
 
-	fn subIdent(mut &self, &ident: str): &Data {
+	fn subIdent(mut &self, &ident: str): &Value {
 		match ident {
 		| "Decl":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Decl(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
 		| "Type":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Type(e, fc)
 				},
 			}
@@ -209,14 +209,14 @@ impl comptimeRangeKind for comptimeStatics {
 		if keyA != nil {
 			keyA.Constant = true
 			keyA.ValueSym = &ValueSym{
-				Data: new(Data),
+				Data: new(Value),
 			}
 			keyA.TypeSym = findBuiltinTypeAlias(types::Kind.Int).TypeSym
 		}
 		if keyB != nil {
 			keyB.Constant = true
 			keyB.ValueSym = &ValueSym{
-				Data: new(Data),
+				Data: new(Value),
 			}
 			keyB.TypeSym = &TypeSym{
 				Type: &Type{
@@ -226,11 +226,11 @@ impl comptimeRangeKind for comptimeStatics {
 		}
 	}
 
-	fn index(mut self, mut &d: &Data, i: int) {
-		d.Decl = false
-		d.untyped = false
-		d.Constant = nil
-		d.Type = &Type{
+	fn index(mut self, mut &v: &Value, i: int) {
+		v.Decl = false
+		v.untyped = false
+		v.Constant = nil
+		v.Type = &Type{
 			Kind: &comptimeStatic{
 				field: self.fields[i],
 			},
@@ -265,23 +265,23 @@ impl Kind for comptimeEnumField {
 }
 
 impl comptimeEnumField {
-	fn _Decl(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Decl(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Decl")
 			ret nil
 		}
-		ret &Data{
+		ret &Value{
 			Type: &Type{
 				Kind: &comptimeDecl{decl: self.field},
 			},
 		}
 	}
 
-	fn subIdent(mut &self, &ident: str): &Data {
+	fn subIdent(mut &self, &ident: str): &Value {
 		match ident {
 		| "Decl":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Decl(e, fc)
 				},
 			}
@@ -307,14 +307,14 @@ impl comptimeRangeKind for comptimeEnumFields {
 		if keyA != nil {
 			keyA.Constant = true
 			keyA.ValueSym = &ValueSym{
-				Data: new(Data),
+				Data: new(Value),
 			}
 			keyA.TypeSym = findBuiltinTypeAlias(types::Kind.Int).TypeSym
 		}
 		if keyB != nil {
 			keyB.Constant = true
 			keyB.ValueSym = &ValueSym{
-				Data: new(Data),
+				Data: new(Value),
 			}
 			keyB.TypeSym = &TypeSym{
 				Type: &Type{
@@ -324,11 +324,11 @@ impl comptimeRangeKind for comptimeEnumFields {
 		}
 	}
 
-	fn index(mut self, mut &d: &Data, i: int) {
-		d.Decl = false
-		d.untyped = false
-		d.Constant = nil
-		d.Type = &Type{
+	fn index(mut self, mut &v: &Value, i: int) {
+		v.Decl = false
+		v.untyped = false
+		v.Constant = nil
+		v.Type = &Type{
 			Kind: &comptimeEnumField{
 				field: self.fields[i],
 			},
@@ -363,19 +363,19 @@ impl Kind for comptimeParam {
 }
 
 impl comptimeParam {
-	fn _Decl(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Decl(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Decl")
 			ret nil
 		}
-		ret &Data{
+		ret &Value{
 			Type: &Type{
 				Kind: &comptimeDecl{decl: self.param.Decl},
 			},
 		}
 	}
 
-	fn _Type(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Type(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Type")
 			ret nil
@@ -383,38 +383,38 @@ impl comptimeParam {
 		ret buildComptimeTypeInfoData(e.s, self.param.Type)
 	}
 
-	fn _Recv(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Recv(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Recv")
 			ret nil
 		}
 		mut constant := constant::Const.NewBool(self.param.Decl.IsSelf())
-		ret &Data{
+		ret &Value{
 			Type: primBool,
 			Constant: constant,
 			Model: constant,
 		}
 	}
 
-	fn subIdent(mut &self, &ident: str): &Data {
+	fn subIdent(mut &self, &ident: str): &Value {
 		match ident {
 		| "Decl":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Decl(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
 		| "Recv":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Recv(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
 		| "Type":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Type(e, fc)
 				},
 			}
@@ -440,14 +440,14 @@ impl comptimeRangeKind for comptimeParams {
 		if keyA != nil {
 			keyA.Constant = true
 			keyA.ValueSym = &ValueSym{
-				Data: new(Data),
+				Data: new(Value),
 			}
 			keyA.TypeSym = findBuiltinTypeAlias(types::Kind.Int).TypeSym
 		}
 		if keyB != nil {
 			keyB.Constant = true
 			keyB.ValueSym = &ValueSym{
-				Data: new(Data),
+				Data: new(Value),
 			}
 			keyB.TypeSym = &TypeSym{
 				Type: &Type{
@@ -457,11 +457,11 @@ impl comptimeRangeKind for comptimeParams {
 		}
 	}
 
-	fn index(mut self, mut &d: &Data, i: int) {
-		d.Decl = false
-		d.untyped = false
-		d.Constant = nil
-		d.Type = &Type{
+	fn index(mut self, mut &v: &Value, i: int) {
+		v.Decl = false
+		v.untyped = false
+		v.Constant = nil
+		v.Type = &Type{
 			Kind: &comptimeParam{
 				param: self.params[i],
 			},
@@ -500,14 +500,14 @@ impl comptimeRangeKind for comptimeTypeInfos {
 		if keyA != nil {
 			keyA.Constant = true
 			keyA.ValueSym = &ValueSym{
-				Data: new(Data),
+				Data: new(Value),
 			}
 			keyA.TypeSym = findBuiltinTypeAlias(types::Kind.Int).TypeSym
 		}
 		if keyB != nil {
 			keyB.Constant = true
 			keyB.ValueSym = &ValueSym{
-				Data: new(Data),
+				Data: new(Value),
 			}
 			keyB.TypeSym = &TypeSym{
 				Type: &Type{
@@ -517,11 +517,11 @@ impl comptimeRangeKind for comptimeTypeInfos {
 		}
 	}
 
-	fn index(mut self, mut &d: &Data, i: int) {
-		d.Decl = false
-		d.untyped = false
-		d.Constant = nil
-		d.Type = &Type{
+	fn index(mut self, mut &v: &Value, i: int) {
+		v.Decl = false
+		v.untyped = false
+		v.Constant = nil
+		v.Type = &Type{
 			Kind: self.types[i],
 		}
 	}
@@ -554,7 +554,7 @@ impl Kind for comptimeTypeInfo {
 }
 
 impl comptimeTypeInfo {
-	fn _Decl(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Decl(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Decl")
 			ret nil
@@ -584,27 +584,27 @@ impl comptimeTypeInfo {
 			e.pushErr(fc.Token, build::LogMsg.InvalidTypeForFunc, self.base.Str(), "Decl")
 			ret nil
 		}
-		ret &Data{
+		ret &Value{
 			Type: &Type{
 				Kind: &comptimeDecl{decl: decl},
 			},
 		}
 	}
 
-	fn _Str(&self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Str(&self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Str")
 			ret nil
 		}
 		mut constant := constant::Const.NewStr(self.base.Str())
-		ret &Data{
+		ret &Value{
 			Type: primStr,
 			Constant: constant,
 			Model: constant,
 		}
 	}
 
-	fn _Kind(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Kind(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Kind")
 			ret nil
@@ -686,7 +686,7 @@ impl comptimeTypeInfo {
 		ret evalEnumStatic(e.s, enm, item, fc.Token, e.getOwnerRefers())
 	}
 
-	fn _Bits(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Bits(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Bits")
 			ret nil
@@ -702,7 +702,7 @@ impl comptimeTypeInfo {
 			ret nil
 		}
 		mut constant := constant::Const.NewI64(i64(n))
-		ret &Data{
+		ret &Value{
 			untyped: true,
 			Type: primInt,
 			Constant: constant,
@@ -710,7 +710,7 @@ impl comptimeTypeInfo {
 		}
 	}
 
-	fn _Elem(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Elem(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Elem")
 			ret nil
@@ -747,7 +747,7 @@ impl comptimeTypeInfo {
 		ret nil
 	}
 
-	fn _Size(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Size(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Size")
 			ret nil
@@ -758,7 +758,7 @@ impl comptimeTypeInfo {
 			ret nil
 		}
 		mut constant := constant::Const.NewI64(i64(arr.N))
-		ret &Data{
+		ret &Value{
 			untyped: true,
 			Type: primInt,
 			Constant: constant,
@@ -766,7 +766,7 @@ impl comptimeTypeInfo {
 		}
 	}
 
-	fn _Key(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Key(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Key")
 			ret nil
@@ -779,7 +779,7 @@ impl comptimeTypeInfo {
 		ret buildComptimeTypeInfoData(e.s, m.Key)
 	}
 
-	fn _Value(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Value(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Value")
 			ret nil
@@ -792,14 +792,14 @@ impl comptimeTypeInfo {
 		ret buildComptimeTypeInfoData(e.s, m.Val)
 	}
 
-	fn _Fields(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Fields(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Fields")
 			ret nil
 		}
 		mut s := self.base.Struct()
 		if s != nil {
-			ret &Data{
+			ret &Value{
 				Type: &Type{
 					Kind: &comptimeStructFields{
 						fields: s.Fields,
@@ -809,7 +809,7 @@ impl comptimeTypeInfo {
 		}
 		mut enm := self.base.Enum()
 		if enm != nil {
-			ret &Data{
+			ret &Value{
 				Type: &Type{
 					Kind: &comptimeEnumFields{
 						fields: enm.Items,
@@ -821,7 +821,7 @@ impl comptimeTypeInfo {
 		ret nil
 	}
 
-	fn _Statics(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Statics(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Statics")
 			ret nil
@@ -831,7 +831,7 @@ impl comptimeTypeInfo {
 			e.pushErr(fc.Token, build::LogMsg.InvalidTypeForFunc, self.base.Str(), "Fields")
 			ret nil
 		}
-		ret &Data{
+		ret &Value{
 			Type: &Type{
 				Kind: &comptimeStatics{
 					fields: s.Statics,
@@ -840,59 +840,59 @@ impl comptimeTypeInfo {
 		}
 	}
 
-	fn _Binded(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Binded(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Binded")
 			ret nil
 		}
 		mut constant := constant::Const.NewBool(self.base.Binded())
-		ret &Data{
+		ret &Value{
 			Type: primBool,
 			Constant: constant,
 			Model: constant,
 		}
 	}
 
-	fn _Ordered(&self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Ordered(&self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Ordered")
 			ret nil
 		}
 		mut constant := constant::Const.NewBool(self.base.Ordered())
-		ret &Data{
+		ret &Value{
 			Type: primBool,
 			Constant: constant,
 			Model: constant,
 		}
 	}
 
-	fn _Comparable(&self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Comparable(&self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Comparable")
 			ret nil
 		}
 		mut constant := constant::Const.NewBool(self.base.Comparable())
-		ret &Data{
+		ret &Value{
 			Type: primBool,
 			Constant: constant,
 			Model: constant,
 		}
 	}
 
-	fn _Mutable(&self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Mutable(&self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Mutable")
 			ret nil
 		}
 		mut constant := constant::Const.NewBool(self.base.Mutable())
-		ret &Data{
+		ret &Value{
 			Type: primBool,
 			Constant: constant,
 			Model: constant,
 		}
 	}
 
-	fn _Types(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Types(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Types")
 			ret nil
@@ -908,40 +908,40 @@ impl comptimeTypeInfo {
 		for (_, mut t) in tup.Types {
 			infos.types = append(infos.types, e.s.meta.pushComptimeTypeInfo(t))
 		}
-		ret &Data{
+		ret &Value{
 			Type: &Type{
 				Kind: infos,
 			},
 		}
 	}
 
-	fn _CanNil(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _CanNil(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "CanNil")
 			ret nil
 		}
 		mut constant := constant::Const.NewBool(self.base.NilCompatible())
-		ret &Data{
+		ret &Value{
 			Type: primBool,
 			Constant: constant,
 			Model: constant,
 		}
 	}
 
-	fn _GC(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _GC(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "GC")
 			ret nil
 		}
 		mut constant := constant::Const.NewBool(self.base.GC())
-		ret &Data{
+		ret &Value{
 			Type: primBool,
 			Constant: constant,
 			Model: constant,
 		}
 	}
 
-	fn _Result(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Result(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Result")
 			ret nil
@@ -957,7 +957,7 @@ impl comptimeTypeInfo {
 		ret buildComptimeTypeInfoData(e.s, f.Result)
 	}
 
-	fn _Params(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Params(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Params")
 			ret nil
@@ -967,165 +967,165 @@ impl comptimeTypeInfo {
 			e.pushErr(fc.Token, build::LogMsg.InvalidTypeForFunc, self.base.Str(), "Params")
 			ret nil
 		}
-		ret &Data{
+		ret &Value{
 			Type: &Type{
 				Kind: &comptimeParams{params: f.Params},
 			},
 		}
 	}
 
-	fn _Strict(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Strict(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Strict")
 			ret nil
 		}
 		s := self.base.softStruct()
 		mut constant := constant::Const.NewBool(s != nil && s.Source != nil)
-		ret &Data{
+		ret &Value{
 			Type: primBool,
 			Constant: constant,
 			Model: constant,
 		}
 	}
 
-	fn subIdent(mut &self, &ident: str): &Data {
+	fn subIdent(mut &self, &ident: str): &Value {
 		match ident {
 		| "Strict":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Strict(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
 		| "Decl":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Decl(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
 		| "Str":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Str(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
 		| "Bits":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Bits(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
 		| "Elem":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Elem(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
 		| "Size":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Size(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
 		| "Key":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Key(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
 		| "Value":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Value(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
 		| "Fields":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Fields(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
 		| "Statics":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Statics(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
 		| "Params":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Params(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
 		| "Types":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Types(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
 		| "Binded":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Binded(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
 		| "Ordered":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Ordered(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
 		| "Comparable":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Comparable(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
 		| "Mutable":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Mutable(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
 		| "CanNil":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._CanNil(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
 		| "GC":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._GC(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
 		| "Result":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Result(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
 		| "Kind":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Kind(e, fc)
 				},
 			}
@@ -1138,7 +1138,7 @@ impl comptimeTypeInfo {
 
 // Compile-time value information data.
 struct comptimeValue {
-	data: &Data
+	v: &Value
 }
 
 impl Kind for comptimeValue {
@@ -1147,232 +1147,232 @@ impl Kind for comptimeValue {
 }
 
 impl comptimeValue {
-	fn _Unwrap(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Unwrap(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Unwrap")
 			ret nil
 		}
-		ret self.data
+		ret self.v
 	}
 
-	fn _Type(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Type(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Type")
 			ret nil
 		}
-		ret buildComptimeTypeInfoData(e.s, self.data.Type)
+		ret buildComptimeTypeInfoData(e.s, self.v.Type)
 	}
 
-	fn _Lvalue(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Lvalue(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Lvalue")
 			ret nil
 		}
-		mut constant := constant::Const.NewBool(self.data.Lvalue)
-		ret &Data{
+		mut constant := constant::Const.NewBool(self.v.Lvalue)
+		ret &Value{
 			Type: primBool,
 			Constant: constant,
 			Model: constant,
 		}
 	}
 
-	fn _Mutable(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Mutable(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Mutable")
 			ret nil
 		}
-		mut constant := constant::Const.NewBool(self.data.Mutable)
-		ret &Data{
+		mut constant := constant::Const.NewBool(self.v.Mutable)
+		ret &Value{
 			Type: primBool,
 			Constant: constant,
 			Model: constant,
 		}
 	}
 
-	fn _Const(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Const(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Const")
 			ret nil
 		}
-		mut constant := constant::Const.NewBool(self.data.IsConst())
-		ret &Data{
+		mut constant := constant::Const.NewBool(self.v.IsConst())
+		ret &Value{
 			Type: primBool,
 			Constant: constant,
 			Model: constant,
 		}
 	}
 
-	fn _Field(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Field(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 1 {
 			e.pushErr(fc.Args[1].Token, build::LogMsg.ArgumentOverflow, "Field")
 			ret nil
 		}
-		mut s := self.data.Type.Struct()
+		mut s := self.v.Type.Struct()
 		if s == nil {
-			e.pushErr(fc.Token, build::LogMsg.InvalidTypeForFunc, self.data.Type.Str(), "Field")
+			e.pushErr(fc.Token, build::LogMsg.InvalidTypeForFunc, self.v.Type.Str(), "Field")
 			ret nil
 		}
 		mut arg := fc.Args[0]
-		mut d := e.evalExpr(arg)
-		if d == nil {
+		mut v := e.evalExpr(arg)
+		if v == nil {
 			ret nil
 		}
-		if !d.IsConst() {
+		if !v.IsConst() {
 			e.pushErr(arg.Token, build::LogMsg.ExprNotConst)
 			ret nil
 		}
-		prim := d.Type.Prim()
+		prim := v.Type.Prim()
 		if prim == nil || !prim.IsStr() {
-			e.pushErr(arg.Token, build::LogMsg.IncompatibleTypes, str(types::Kind.Str), d.Type.Str())
+			e.pushErr(arg.Token, build::LogMsg.IncompatibleTypes, str(types::Kind.Str), v.Type.Str())
 			ret nil
 		}
-		ident := d.Constant.ReadStr()
+		ident := v.Constant.ReadStr()
 		mut f := s.FindField(ident)
 		if f == nil {
 			e.pushErr(arg.Token, build::LogMsg.ObjHaveNotIdent, s.Decl.Ident, ident)
 			ret nil
 		}
-		d = new(Data, *self.data)
-		d = e.evalStructSubIdentField(d, s, arg.Token, f)
-		ret buildComptimeValue(d)
+		v = new(Value, *self.v)
+		v = e.evalStructSubIdentField(v, s, arg.Token, f)
+		ret buildComptimeValue(v)
 	}
 
-	fn _FieldByIndex(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _FieldByIndex(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 1 {
 			e.pushErr(fc.Args[1].Token, build::LogMsg.ArgumentOverflow, "FieldByIndex")
 			ret nil
 		}
-		mut s := self.data.Type.Struct()
+		mut s := self.v.Type.Struct()
 		if s == nil {
-			e.pushErr(fc.Token, build::LogMsg.InvalidTypeForFunc, self.data.Type.Str(), "Field")
+			e.pushErr(fc.Token, build::LogMsg.InvalidTypeForFunc, self.v.Type.Str(), "Field")
 			ret nil
 		}
 		mut arg := fc.Args[0]
-		mut d := e.evalExpr(arg)
-		if d == nil {
+		mut v := e.evalExpr(arg)
+		if v == nil {
 			ret nil
 		}
-		if !d.IsConst() {
+		if !v.IsConst() {
 			e.pushErr(arg.Token, build::LogMsg.ExprNotConst)
 			ret nil
 		}
-		log := checkDataForIntegerIndexing(e.s, d, arg.Token, e.getOwnerRefers())
+		log := checkDataForIntegerIndexing(e.s, v, arg.Token, e.getOwnerRefers())
 		if log != build::LogMsg.Empty {
 			e.pushErr(arg.Token, log)
 			ret nil
 		}
-		i := d.Constant.AsU64()
+		i := v.Constant.AsU64()
 		if i >= u64(len(s.Fields)) {
 			e.pushErr(arg.Token, build::LogMsg.IndexOutOfRange, conv::FmtUint(i, 10), conv::Itoa(len(s.Fields)))
 			ret nil
 		}
 		mut f := s.Fields[i]
-		d = new(Data, *self.data)
-		d = e.evalStructSubIdentField(d, s, arg.Token, f)
-		ret buildComptimeValue(d)
+		v = new(Value, *self.v)
+		v = e.evalStructSubIdentField(v, s, arg.Token, f)
+		ret buildComptimeValue(v)
 	}
 
-	fn _Method(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Method(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 1 {
 			e.pushErr(fc.Args[1].Token, build::LogMsg.ArgumentOverflow, "Method")
 			ret nil
 		}
 		mut ref := false
 		mut s := (&StructIns)(nil)
-		match type self.data.Type.Kind {
+		match type self.v.Type.Kind {
 		| &Sptr:
-			s = (&Sptr)(self.data.Type.Kind).Elem.softStruct()
+			s = (&Sptr)(self.v.Type.Kind).Elem.softStruct()
 			ref = true
 		| &StructIns:
-			s = (&StructIns)(self.data.Type.Kind)
+			s = (&StructIns)(self.v.Type.Kind)
 		}
 		if s == nil {
-			e.pushErr(fc.Token, build::LogMsg.InvalidTypeForFunc, self.data.Type.Str(), "Method")
+			e.pushErr(fc.Token, build::LogMsg.InvalidTypeForFunc, self.v.Type.Str(), "Method")
 			ret nil
 		}
 		mut arg := fc.Args[0]
-		mut d := e.evalExpr(arg)
-		if d == nil {
+		mut v := e.evalExpr(arg)
+		if v == nil {
 			ret nil
 		}
-		if !d.IsConst() {
+		if !v.IsConst() {
 			e.pushErr(arg.Token, build::LogMsg.ExprNotConst)
 			ret nil
 		}
-		prim := d.Type.Prim()
+		prim := v.Type.Prim()
 		if prim == nil || !prim.IsStr() {
-			e.pushErr(arg.Token, build::LogMsg.IncompatibleTypes, str(types::Kind.Str), d.Type.Str())
+			e.pushErr(arg.Token, build::LogMsg.IncompatibleTypes, str(types::Kind.Str), v.Type.Str())
 			ret nil
 		}
-		ident := d.Constant.ReadStr()
+		ident := v.Constant.ReadStr()
 		const Static = false
 		mut m := s.FindMethod(ident, Static)
 		if m == nil {
 			e.pushErr(arg.Token, build::LogMsg.ObjHaveNotIdent, s.Decl.Ident, ident)
 			ret nil
 		}
-		d = new(Data, *self.data)
+		v = new(Value, *self.v)
 		if ref {
-			makeImplicitDeref(d, fc.Token)
+			makeImplicitDeref(v, fc.Token)
 		}
-		d = e.evalStructSubIdentMethod(d, s, arg.Token, m, ref)
-		ret buildComptimeValue(d)
+		v = e.evalStructSubIdentMethod(v, s, arg.Token, m, ref)
+		ret buildComptimeValue(v)
 	}
 
-	fn subIdent(mut &self, &ident: str): &Data {
+	fn subIdent(mut &self, &ident: str): &Value {
 		match ident {
 		| "Unwrap":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Unwrap(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
 		| "Type":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Type(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
 		| "Lvalue":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Lvalue(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
 		| "Mutable":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Mutable(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
 		| "Const":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Const(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
 		| "Field":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Field(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
 		| "FieldByIndex":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._FieldByIndex(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
 		| "Method":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Method(e, fc)
 				},
 			}
@@ -1398,14 +1398,14 @@ impl comptimeRangeKind for comptimeFiles {
 		if keyA != nil {
 			keyA.Constant = true
 			keyA.ValueSym = &ValueSym{
-				Data: new(Data),
+				Data: new(Value),
 			}
 			keyA.TypeSym = findBuiltinTypeAlias(types::Kind.Int).TypeSym
 		}
 		if keyB != nil {
 			keyB.Constant = true
 			keyB.ValueSym = &ValueSym{
-				Data: new(Data),
+				Data: new(Value),
 			}
 			keyB.TypeSym = &TypeSym{
 				Type: &Type{
@@ -1415,11 +1415,11 @@ impl comptimeRangeKind for comptimeFiles {
 		}
 	}
 
-	fn index(mut self, mut &d: &Data, i: int) {
-		d.Decl = false
-		d.untyped = false
-		d.Constant = nil
-		d.Type = &Type{
+	fn index(mut self, mut &v: &Value, i: int) {
+		v.Decl = false
+		v.untyped = false
+		v.Constant = nil
+		v.Type = &Type{
 			Kind: &comptimeFile{
 				file: self.files[i],
 			},
@@ -1454,64 +1454,64 @@ impl Kind for comptimeFile {
 }
 
 impl comptimeFile {
-	fn _Path(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Path(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Path")
 			ret nil
 		}
 		mut constant := constant::Const.NewStr(self.file.File.Path)
-		ret &Data{
+		ret &Value{
 			Type: primStr,
 			Constant: constant,
 			Model: constant,
 		}
 	}
 
-	fn _Name(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Name(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Name")
 			ret nil
 		}
 		mut constant := constant::Const.NewStr(self.file.File.Name())
-		ret &Data{
+		ret &Value{
 			Type: primStr,
 			Constant: constant,
 			Model: constant,
 		}
 	}
 
-	fn _Dir(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Dir(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Dir")
 			ret nil
 		}
 		mut constant := constant::Const.NewStr(self.file.File.Dir())
-		ret &Data{
+		ret &Value{
 			Type: primStr,
 			Constant: constant,
 			Model: constant,
 		}
 	}
 
-	fn subIdent(mut &self, &ident: str): &Data {
+	fn subIdent(mut &self, &ident: str): &Value {
 		match ident {
 		| "Path":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Path(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
 		| "Name":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Name(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
 		| "Dir":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Dir(e, fc)
 				},
 			}
@@ -1537,14 +1537,14 @@ impl comptimeRangeKind for comptimeDecls {
 		if keyA != nil {
 			keyA.Constant = true
 			keyA.ValueSym = &ValueSym{
-				Data: new(Data),
+				Data: new(Value),
 			}
 			keyA.TypeSym = findBuiltinTypeAlias(types::Kind.Int).TypeSym
 		}
 		if keyB != nil {
 			keyB.Constant = true
 			keyB.ValueSym = &ValueSym{
-				Data: new(Data),
+				Data: new(Value),
 			}
 			keyB.TypeSym = &TypeSym{
 				Type: &Type{
@@ -1554,11 +1554,11 @@ impl comptimeRangeKind for comptimeDecls {
 		}
 	}
 
-	fn index(mut self, mut &d: &Data, i: int) {
-		d.Decl = false
-		d.untyped = false
-		d.Constant = nil
-		d.Type = &Type{
+	fn index(mut self, mut &v: &Value, i: int) {
+		v.Decl = false
+		v.untyped = false
+		v.Constant = nil
+		v.Type = &Type{
 			Kind: self.decls[i],
 		}
 	}
@@ -1633,7 +1633,7 @@ impl comptimeDecl {
 		}
 	}
 
-	fn _Name(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Name(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Name")
 			ret nil
@@ -1664,14 +1664,14 @@ impl comptimeDecl {
 			panic("sema: comptimeDecl.Name: unimplemented declaration kind")
 		}
 		mut constant := constant::Const.NewStr(name)
-		ret &Data{
+		ret &Value{
 			Type: primStr,
 			Constant: constant,
 			Model: constant,
 		}
 	}
 
-	fn _Public(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Public(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Public")
 			ret nil
@@ -1702,14 +1702,14 @@ impl comptimeDecl {
 			panic("sema: comptimeDecl.Public: unimplemented declaration kind")
 		}
 		mut constant := constant::Const.NewBool(public)
-		ret &Data{
+		ret &Value{
 			Type: primBool,
 			Constant: constant,
 			Model: constant,
 		}
 	}
 
-	fn _Binded(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Binded(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Binded")
 			ret nil
@@ -1736,14 +1736,14 @@ impl comptimeDecl {
 			panic("sema: comptimeDecl.Binded: unimplemented declaration kind")
 		}
 		mut constant := constant::Const.NewBool(binded)
-		ret &Data{
+		ret &Value{
 			Type: primBool,
 			Constant: constant,
 			Model: constant,
 		}
 	}
 
-	fn _Exceptional(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Exceptional(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Exceptional")
 			ret nil
@@ -1757,14 +1757,14 @@ impl comptimeDecl {
 		}
 		mut f := (&Func)(self.decl)
 		mut constant := constant::Const.NewBool(f.Exceptional)
-		ret &Data{
+		ret &Value{
 			Type: primBool,
 			Constant: constant,
 			Model: constant,
 		}
 	}
 
-	fn _Mutable(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Mutable(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Mutable")
 			ret nil
@@ -1790,14 +1790,14 @@ impl comptimeDecl {
 			panic("sema: comptimeDecl.Mutable: unimplemented declaration kind")
 		}
 		mut constant := constant::Const.NewBool(mutable)
-		ret &Data{
+		ret &Value{
 			Type: primBool,
 			Constant: constant,
 			Model: constant,
 		}
 	}
 
-	fn _Variadic(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Variadic(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Variadic")
 			ret nil
@@ -1821,14 +1821,14 @@ impl comptimeDecl {
 			panic("sema: comptimeDecl.Variadic: unimplemented declaration kind")
 		}
 		mut constant := constant::Const.NewBool(variadic)
-		ret &Data{
+		ret &Value{
 			Type: primBool,
 			Constant: constant,
 			Model: constant,
 		}
 	}
 
-	fn _Reference(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Reference(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Reference")
 			ret nil
@@ -1853,14 +1853,14 @@ impl comptimeDecl {
 			panic("sema: comptimeDecl.Reference: unimplemented declaration kind")
 		}
 		mut constant := constant::Const.NewBool(ref)
-		ret &Data{
+		ret &Value{
 			Type: primBool,
 			Constant: constant,
 			Model: constant,
 		}
 	}
 
-	fn _Params(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Params(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Params")
 			ret nil
@@ -1883,7 +1883,7 @@ impl comptimeDecl {
 			for (i, mut param) in f.Params {
 				params[i] = &comptimeDecl{decl: param}
 			}
-			ret &Data{
+			ret &Value{
 				Type: &Type{
 					Kind: &comptimeDecls{
 						decls: params,
@@ -1895,7 +1895,7 @@ impl comptimeDecl {
 		}
 	}
 
-	fn _Fields(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Fields(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Fields")
 			ret nil
@@ -1927,7 +1927,7 @@ impl comptimeDecl {
 		|:
 			panic("sema: comptimeDecl.Fields: unimplemented declaration kind")
 		}
-		ret &Data{
+		ret &Value{
 			Type: &Type{
 				Kind: &comptimeDecls{
 					decls: fields,
@@ -1936,7 +1936,7 @@ impl comptimeDecl {
 		}
 	}
 
-	fn _Statics(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Statics(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Statics")
 			ret nil
@@ -1963,7 +1963,7 @@ impl comptimeDecl {
 		|:
 			panic("sema: comptimeDecl.Statics: unimplemented declaration kind")
 		}
-		ret &Data{
+		ret &Value{
 			Type: &Type{
 				Kind: &comptimeDecls{
 					decls: fields,
@@ -1972,7 +1972,7 @@ impl comptimeDecl {
 		}
 	}
 
-	fn _Methods(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+	fn _Methods(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Methods")
 			ret nil
@@ -2004,7 +2004,7 @@ impl comptimeDecl {
 		|:
 			panic("sema: comptimeDecl.Methods: unimplemented declaration kind")
 		}
-		ret &Data{
+		ret &Value{
 			Type: &Type{
 				Kind: &comptimeDecls{
 					decls: methods,
@@ -2013,81 +2013,81 @@ impl comptimeDecl {
 		}
 	}
 
-	fn subIdent(mut &self, &ident: str): &Data {
+	fn subIdent(mut &self, &ident: str): &Value {
 		match ident {
 		| "Name":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Name(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
 		| "Public":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Public(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
 		| "Binded":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Binded(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
 		| "Exceptional":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Exceptional(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
 		| "Mutable":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Mutable(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
 		| "Variadic":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Variadic(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
 		| "Reference":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Reference(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
 		| "Params":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Params(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
 		| "Fields":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Fields(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
 		| "Statics":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Statics(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
 		| "Methods":
 			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Methods(e, fc)
 				},
 			}
@@ -2107,14 +2107,14 @@ impl comptimeRangeKind for comptimeSliceRange {
 		if keyA != nil {
 			keyA.Constant = true
 			keyA.ValueSym = &ValueSym{
-				Data: new(Data),
+				Data: new(Value),
 			}
 			keyA.TypeSym = findBuiltinTypeAlias(types::Kind.Int).TypeSym
 		}
 		if keyB != nil {
 			keyB.Constant = true
 			keyB.ValueSym = &ValueSym{
-				Data: new(Data),
+				Data: new(Value),
 			}
 			keyB.TypeSym = &TypeSym{
 				Type: self.s.ElemType,
@@ -2122,7 +2122,7 @@ impl comptimeRangeKind for comptimeSliceRange {
 		}
 	}
 
-	fn index(mut self, mut &d: &Data, i: int) {
+	fn index(mut self, mut &v: &Value, i: int) {
 		panic("sema: index method of comptimeSliceRange should not be used")
 	}
 
@@ -2143,8 +2143,8 @@ impl comptimeRangeKind for comptimeSliceRange {
 	}
 }
 
-fn buildAsComptimeMethodData(mut &f: &FuncIns): &Data {
-	ret &Data{
+fn buildAsComptimeMethodData(mut &f: &FuncIns): &Value {
+	ret &Value{
 		Type: &Type{
 			Kind: f,
 		},
@@ -2157,19 +2157,19 @@ fn findComptimePackage(mut &s: &sema): &ImportInfo {
 	})
 }
 
-fn buildComptimeTypeInfoData(mut &s: &sema, mut &t: &Type): &Data {
-	ret &Data{
+fn buildComptimeTypeInfoData(mut &s: &sema, mut &t: &Type): &Value {
+	ret &Value{
 		Type: &Type{
 			Kind: s.meta.pushComptimeTypeInfo(t),
 		},
 	}
 }
 
-fn buildComptimeValue(mut &d: &Data): &Data {
-	ret &Data{
+fn buildComptimeValue(mut &v: &Value): &Value {
+	ret &Value{
 		Type: &Type{
 			Kind: &comptimeValue{
-				data: d,
+				v: v,
 			},
 		},
 	}

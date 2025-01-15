@@ -15,7 +15,7 @@ use "std/jule/types"
 //  e: Caller owner Eval instance.
 //  fc: Function call expression.
 //  d: Data instance for evaluated expression of function.
-type builtinCaller = fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &d: &Data): &Data
+type builtinCaller = fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Value): &Value
 
 fn findBuiltinFunc(&ident: str): &FuncIns {
 	match ident {
@@ -109,7 +109,7 @@ fn findBuiltinVar(&ident: str): &Var {
 			},
 			Constant: true,
 			ValueSym: &ValueSym{
-				Data: &Data{
+				Data: &Value{
 					Constant: constant::Const.NewNil(),
 				},
 			},
@@ -122,7 +122,7 @@ fn findBuiltinVar(&ident: str): &Var {
 			TypeSym: findBuiltinTypeAlias("bool").TypeSym,
 			Constant: true,
 			ValueSym: &ValueSym{
-				Data: &Data{
+				Data: &Value{
 					Constant: constant::Const.NewBool(true),
 					untyped: true,
 				},
@@ -136,7 +136,7 @@ fn findBuiltinVar(&ident: str): &Var {
 			TypeSym: findBuiltinTypeAlias("bool").TypeSym,
 			Constant: true,
 			ValueSym: &ValueSym{
-				Data: &Data{
+				Data: &Value{
 					Constant: constant::Const.NewBool(false),
 					untyped: true,
 				},
@@ -294,7 +294,7 @@ fn findPackageBuiltinDef(&linkPath: str, &ident: str): any {
 	}
 }
 
-fn builtinCallerError(mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
+fn builtinCallerError(mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 	if len(fc.Args) < 1 {
 		e.pushErr(fc.Token, build::LogMsg.MissingExprFor, "err")
 		ret nil
@@ -320,12 +320,12 @@ fn builtinCallerError(mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Data {
 
 	applyRuntimeToStr(e.s, expr.Type, primAny, token, e.getOwnerRefers())
 
-	mut d := buildVoidData()
-	d.Model = &BuiltinErrorCallExpr{Err: expr}
-	ret d
+	mut v := buildVoidData()
+	v.Model = &BuiltinErrorCallExpr{Err: expr}
+	ret v
 }
 
-fn builtinCallerPrint(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+fn builtinCallerPrint(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 	if len(fc.Args) < 1 {
 		e.pushErr(fc.Token, build::LogMsg.MissingExprFor, "v")
 		ret nil
@@ -347,24 +347,24 @@ fn builtinCallerPrint(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data)
 
 	pushRuntimeToStr(e.s, expr.Type, arg.Token, e.getOwnerRefers())
 
-	mut d := buildVoidData()
-	d.Model = &BuiltinPrintCallExpr{Expr: expr}
-	ret d
+	mut v := buildVoidData()
+	v.Model = &BuiltinPrintCallExpr{Expr: expr}
+	ret v
 }
 
-fn builtinCallerPrintln(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &d: &Data): &Data {
-	d = builtinCallerPrint(e, fc, d)
-	if d == nil {
+fn builtinCallerPrintln(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Value): &Value {
+	v = builtinCallerPrint(e, fc, v)
+	if v == nil {
 		ret nil
 	}
 
-	d.Model = &BuiltinPrintlnCallExpr{
-		Expr: (&BuiltinPrintCallExpr)(d.Model).Expr,
+	v.Model = &BuiltinPrintlnCallExpr{
+		Expr: (&BuiltinPrintCallExpr)(v.Model).Expr,
 	}
-	ret d
+	ret v
 }
 
-fn builtinCallerNew(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &d: &Data): &Data {
+fn builtinCallerNew(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Value): &Value {
 	if len(fc.Args) < 1 {
 		e.pushErr(fc.Token, build::LogMsg.MissingExprFor, "type")
 		ret nil
@@ -383,7 +383,7 @@ fn builtinCallerNew(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &d: &Data): 
 		ret nil
 	}
 
-	d.Type = &Type{
+	v.Type = &Type{
 		Kind: &Sptr{
 			Elem: t.Type,
 		},
@@ -404,21 +404,21 @@ fn builtinCallerNew(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &d: &Data): 
 				e.target.mutable, Reference, t.Type, init, token)
 			_ = e.s.checkAssignType(false, t.Type, init, token, e.getOwnerRefers())
 
-			d.Model = &BuiltinNewCallExpr{
+			v.Model = &BuiltinNewCallExpr{
 				Type: t.Type,
 				Init: init.Model,
 			}
 		}
 	} else {
-		d.Model = &BuiltinNewCallExpr{
+		v.Model = &BuiltinNewCallExpr{
 			Type: t.Type,
 		}
 	}
 
-	ret d
+	ret v
 }
 
-fn builtinCallerPanic(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+fn builtinCallerPanic(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 	if len(fc.Args) < 1 {
 		e.pushErr(fc.Token, build::LogMsg.MissingExprFor, "message")
 		ret nil
@@ -436,15 +436,15 @@ fn builtinCallerPanic(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data)
 		e.pushErr(fc.Token, build::LogMsg.PanickedWithNonStr)
 	}
 
-	mut d := buildVoidData()
-	d.Model = &BuiltinPanicCallExpr{
+	mut v := buildVoidData()
+	v.Model = &BuiltinPanicCallExpr{
 		Token: fc.Token,
 		Expr: expr.Model,
 	}
-	ret d
+	ret v
 }
 
-fn builtinCallerMake(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &d: &Data): &Data {
+fn builtinCallerMake(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Value): &Value {
 	if len(fc.Args) == 0 {
 		// All types of the make function, takes at least an argument.
 		// So if function called like make(), push an error and return immediately.
@@ -476,19 +476,19 @@ fn builtinCallerMake(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &d: &Data):
 			ret nil
 		}
 		mut model := &BuiltinMakeCallExpr{Type: t.Type}
-		d.Model = model
-		d.Type = t.Type
+		v.Model = model
+		v.Type = t.Type
 		if len(fc.Args) == 2 {
 			// We have buffer size argument, evaluate it.
 			// So channel is buffered.
 			mut capExpr := e.s.eval(e.lookup).evalExpr(fc.Args[1])
 			if capExpr == nil {
-				ret d
+				ret v
 			}
 			e.checkIntegerIndexingByData(capExpr, fc.Args[1].Token)
 			model.Cap = capExpr.Model
 		}
-		ret d
+		ret v
 	| t.Type.Slice() != nil:
 		// Type is slice. Make slice allocation.
 		if len(fc.Args) < 2 {
@@ -497,7 +497,7 @@ fn builtinCallerMake(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &d: &Data):
 			e.pushErr(fc.Token, build::LogMsg.MissingExprFor, "size")
 			ret nil
 		}
-		d.Type = t.Type
+		v.Type = t.Type
 		mut lenExpr := e.s.evalp(e.lookup, t.Type).evalExpr(fc.Args[1])
 		if lenExpr == nil {
 			ret nil
@@ -507,17 +507,17 @@ fn builtinCallerMake(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &d: &Data):
 			Type: t.Type,
 			Len: lenExpr.Model,
 		}
-		d.Model = model
+		v.Model = model
 		if len(fc.Args) == 3 {
 			// We have capacity argument, evaluate it.
 			mut capExpr := e.s.evalp(e.lookup, t.Type).evalExpr(fc.Args[2])
 			if capExpr == nil {
-				ret d
+				ret v
 			}
 			e.checkIntegerIndexingByData(capExpr, fc.Args[2].Token)
 			model.Cap = capExpr.Model
 		}
-		ret d
+		ret v
 	|:
 		// Type is not supported by the make function.
 		// Push an error and return as nil immediately.
@@ -526,7 +526,7 @@ fn builtinCallerMake(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &d: &Data):
 	}
 }
 
-fn builtinCallerAppend(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &d: &Data): &Data {
+fn builtinCallerAppend(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Value): &Value {
 	if len(fc.Args) < 2 {
 		if len(fc.Args) == 1 {
 			e.pushErr(fc.Token, build::LogMsg.MissingExprFor, "values")
@@ -561,7 +561,7 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &d: &Data
 	e.prefix = t.Type
 	defer { e.prefix = prefix }
 
-	d = &Data{
+	v = &Value{
 		Mutable: true,
 		Type: t.Type,
 	}
@@ -580,11 +580,11 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &d: &Data
 			if e1.Type.Prim() != nil && e1.Type.Prim().IsStr() {
 				// append([]byte, str...)
 				makeVariadic(e1, primU8)
-				d.Model = &BuiltinAppendCallExpr{
+				v.Model = &BuiltinAppendCallExpr{
 					Dest: t.Model,
 					Elements: e1.Model,
 				}
-				ret d
+				ret v
 			}
 		}
 
@@ -608,11 +608,11 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &d: &Data
 		} else {
 			e1.Type.Variadic = true
 		}
-		d.Model = &BuiltinAppendCallExpr{
+		v.Model = &BuiltinAppendCallExpr{
 			Dest: t.Model,
 			Elements: e1.Model,
 		}
-		ret d
+		ret v
 	}
 
 	mut e1 := e.evalExpr(secondArg)
@@ -622,7 +622,7 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &d: &Data
 
 	mut slice := &SliceExpr{
 		ElemType: s.Elem,
-		Elems: make([]&Data, 0, len(fc.Args)-1),
+		Elems: make([]&Value, 0, len(fc.Args)-1),
 	}
 	for (_, mut arg) in fc.Args[1:] {
 		e1 = e.evalExpr(arg)
@@ -639,14 +639,14 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &d: &Data
 		}
 		slice.Elems = append(slice.Elems, e1)
 	}
-	d.Model = &BuiltinAppendCallExpr{
+	v.Model = &BuiltinAppendCallExpr{
 		Dest: t.Model,
 		Elements: slice,
 	}
-	ret d
+	ret v
 }
 
-fn callerCopySlice(mut &dest: &Data, mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &d: &Data): &Data {
+fn callerCopySlice(mut &dest: &Value, mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Value): &Value {
 	if !dest.Mutable {
 		e.pushErr(fc.Args[0].Token, build::LogMsg.MutOperationOnImmut)
 	}
@@ -672,15 +672,15 @@ fn callerCopySlice(mut &dest: &Data, mut &e: &eval, mut &fc: &ast::FuncCallExpr,
 		}
 	}
 
-	d.Type = lenKind()
-	d.Model = &BuiltinCopyCallExpr{
+	v.Type = lenKind()
+	v.Model = &BuiltinCopyCallExpr{
 		Dest: dest,
 		Src: src,
 	}
-	ret d
+	ret v
 }
 
-fn builtinCallerCopy(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &d: &Data): &Data {
+fn builtinCallerCopy(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Value): &Value {
 	if len(fc.Args) < 2 {
 		if len(fc.Args) == 1 {
 			e.pushErr(fc.Token, build::LogMsg.MissingExprFor, "src")
@@ -698,57 +698,57 @@ fn builtinCallerCopy(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &d: &Data):
 	| dest == nil:
 		ret nil
 	| dest.Type.Slice() != nil:
-		ret callerCopySlice(dest, e, fc, d)
+		ret callerCopySlice(dest, e, fc, v)
 	|:
 		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidType)
 		ret nil
 	}
 }
 
-fn callerLenSlice(mut &expr: &Data, mut &d: &Data): &Data {
-	d.Type = lenKind()
-	d.Model = &BuiltinLenCallExpr{
+fn callerLenSlice(mut &expr: &Value, mut &v: &Value): &Value {
+	v.Type = lenKind()
+	v.Model = &BuiltinLenCallExpr{
 		Expr: expr,
 	}
-	ret d
+	ret v
 }
 
-fn callerLenMap(mut &expr: &Data, mut &d: &Data): &Data {
-	d.Type = lenKind()
-	d.Model = &BuiltinLenCallExpr{
+fn callerLenMap(mut &expr: &Value, mut &v: &Value): &Value {
+	v.Type = lenKind()
+	v.Model = &BuiltinLenCallExpr{
 		Expr: expr,
 	}
-	ret d
+	ret v
 }
 
-fn callerLenArray(mut &expr: &Data, mut &d: &Data): &Data {
-	d.Type = lenKind()
-	d.Constant = constant::Const.NewI64(i64(expr.Type.Array().N))
-	d.Model = d.Constant
-	ret d
+fn callerLenArray(mut &expr: &Value, mut &v: &Value): &Value {
+	v.Type = lenKind()
+	v.Constant = constant::Const.NewI64(i64(expr.Type.Array().N))
+	v.Model = v.Constant
+	ret v
 }
 
-fn callerLenStr(mut &expr: &Data, mut &d: &Data): &Data {
-	d.Type = lenKind()
+fn callerLenStr(mut &expr: &Value, mut &v: &Value): &Value {
+	v.Type = lenKind()
 	if expr.IsConst() {
-		d.Constant = constant::Const.NewI64(i64(len(expr.Constant.ReadStr())))
-		d.Model = d.Constant
+		v.Constant = constant::Const.NewI64(i64(len(expr.Constant.ReadStr())))
+		v.Model = v.Constant
 	} else {
-		d.Model = &BuiltinLenCallExpr{
+		v.Model = &BuiltinLenCallExpr{
 			Expr: expr,
 		}
 	}
-	ret d
+	ret v
 }
 
-fn callerLenComptime(mut &d: &Data, n: int): &Data {
-	d.Type = lenKind()
-	d.Constant = constant::Const.NewI64(i64(n))
-	d.Model = d.Constant
-	ret d
+fn callerLenComptime(mut &v: &Value, n: int): &Value {
+	v.Type = lenKind()
+	v.Constant = constant::Const.NewI64(i64(n))
+	v.Model = v.Constant
+	ret v
 }
 
-fn builtinCallerLen(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &d: &Data): &Data {
+fn builtinCallerLen(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Value): &Value {
 	if len(fc.Args) < 1 {
 		e.pushErr(fc.Token, build::LogMsg.MissingExprFor, "obj")
 		ret nil
@@ -761,42 +761,42 @@ fn builtinCallerLen(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &d: &Data): 
 	| dest == nil:
 		ret nil
 	| dest.Type.Slice() != nil:
-		ret callerLenSlice(dest, d)
+		ret callerLenSlice(dest, v)
 	| dest.Type.Array() != nil:
-		ret callerLenArray(dest, d)
+		ret callerLenArray(dest, v)
 	| dest.Type.Map() != nil:
-		ret callerLenMap(dest, d)
+		ret callerLenMap(dest, v)
 	| dest.Type.Prim() != nil && dest.Type.Prim().IsStr():
-		ret callerLenStr(dest, d)
+		ret callerLenStr(dest, v)
 	| dest.Type.comptimeStructFields() != nil:
-		ret callerLenComptime(d, len(dest.Type.comptimeStructFields().fields))
+		ret callerLenComptime(v, len(dest.Type.comptimeStructFields().fields))
 	| dest.Type.comptimeEnumFields() != nil:
-		ret callerLenComptime(d, len(dest.Type.comptimeEnumFields().fields))
+		ret callerLenComptime(v, len(dest.Type.comptimeEnumFields().fields))
 	| dest.Type.comptimeTypeInfos() != nil:
-		ret callerLenComptime(d, len(dest.Type.comptimeTypeInfos().types))
+		ret callerLenComptime(v, len(dest.Type.comptimeTypeInfos().types))
 	| dest.Type.comptimeParams() != nil:
-		ret callerLenComptime(d, len(dest.Type.comptimeParams().params))
+		ret callerLenComptime(v, len(dest.Type.comptimeParams().params))
 	| dest.Type.comptimeStatics() != nil:
-		ret callerLenComptime(d, len(dest.Type.comptimeStatics().fields))
+		ret callerLenComptime(v, len(dest.Type.comptimeStatics().fields))
 	| dest.Type.comptimeFiles() != nil:
-		ret callerLenComptime(d, len(dest.Type.comptimeFiles().files))
+		ret callerLenComptime(v, len(dest.Type.comptimeFiles().files))
 	| dest.Type.comptimeDecls() != nil:
-		ret callerLenComptime(d, len(dest.Type.comptimeDecls().decls))
+		ret callerLenComptime(v, len(dest.Type.comptimeDecls().decls))
 	|:
 		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidExpr)
 		ret nil
 	}
 }
 
-fn callerCapSlice(mut &expr: &Data, mut &d: &Data): &Data {
-	d.Type = lenKind()
-	d.Model = &BuiltinCapCallExpr{
+fn callerCapSlice(mut &expr: &Value, mut &v: &Value): &Value {
+	v.Type = lenKind()
+	v.Model = &BuiltinCapCallExpr{
 		Expr: expr,
 	}
-	ret d
+	ret v
 }
 
-fn builtinCallerCap(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &d: &Data): &Data {
+fn builtinCallerCap(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Value): &Value {
 	if len(fc.Args) < 1 {
 		e.pushErr(fc.Token, build::LogMsg.MissingExprFor, "obj")
 		ret nil
@@ -812,18 +812,18 @@ fn builtinCallerCap(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &d: &Data): 
 		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidExpr)
 		ret nil
 	| dest.Type.Slice() != nil:
-		ret callerCapSlice(dest, d)
+		ret callerCapSlice(dest, v)
 	|:
 		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidExpr)
 		ret nil
 	}
 }
 
-fn callerDeleteMap(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &expr: &Data, mut &d: &Data): &Data {
+fn callerDeleteMap(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &expr: &Value, mut &v: &Value): &Value {
 	if !expr.Mutable {
 		e.pushErr(fc.Args[0].Token, build::LogMsg.MutOperationOnImmut)
 	}
-	d = buildVoidData()
+	v = buildVoidData()
 	mut model := &BuiltinDeleteCallExpr{
 		Dest: expr,
 	}
@@ -844,11 +844,11 @@ fn callerDeleteMap(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &expr: &Data,
 		}
 		model.Key = key
 	}
-	d.Model = model
-	ret d
+	v.Model = model
+	ret v
 }
 
-fn builtinCallerDelete(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &d: &Data): &Data {
+fn builtinCallerDelete(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Value): &Value {
 	if len(fc.Args) < 1 {
 		e.pushErr(fc.Token, build::LogMsg.MissingExprFor, "map")
 		ret nil
@@ -864,14 +864,14 @@ fn builtinCallerDelete(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &d: &Data
 		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidExpr)
 		ret nil
 	| dest.Type.Map() != nil:
-		ret callerDeleteMap(e, fc, dest, d)
+		ret callerDeleteMap(e, fc, dest, v)
 	|:
 		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidExpr)
 		ret nil
 	}
 }
 
-fn builtinCallerClose(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &d: &Data): &Data {
+fn builtinCallerClose(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Value): &Value {
 	if len(fc.Args) < 1 {
 		e.pushErr(fc.Token, build::LogMsg.MissingExprFor, "c")
 		ret nil
@@ -891,19 +891,19 @@ fn builtinCallerClose(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &d: &Data)
 		if !c.Send {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.CloseRecvOnlyChan)
 		}
-		d = buildVoidData()
-		d.Model = &BuiltinCloseCallExpr{
+		v = buildVoidData()
+		v.Model = &BuiltinCloseCallExpr{
 			Token: fc.Args[0].Token,
 			Chan: dest,
 		}
-		ret d
+		ret v
 	|:
 		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidExpr)
 		ret nil
 	}
 }
 
-fn builtinCallerStdComptimeTypeOf(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+fn builtinCallerStdComptimeTypeOf(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 	if len(fc.Args) < 1 {
 		e.pushErr(fc.Token, build::LogMsg.MissingExprFor, "type|expr")
 		ret nil
@@ -912,11 +912,11 @@ fn builtinCallerStdComptimeTypeOf(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mu
 		e.pushErr(fc.Args[1].Token, build::LogMsg.ArgumentOverflow, "TypeOf")
 	}
 
-	mut d := e.evalExprKind(fc.Args[0].Kind)
-	if d == nil {
+	mut v := e.evalExprKind(fc.Args[0].Kind)
+	if v == nil {
 		ret nil
 	}
-	f := d.Type.Func()
+	f := v.Type.Func()
 	if f != nil {
 		if f.IsBuiltin() {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidTypeForTypeOf, "<built-in fn>")
@@ -927,19 +927,19 @@ fn builtinCallerStdComptimeTypeOf(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mu
 			ret nil
 		}
 	}
-	s := d.Type.Struct()
+	s := v.Type.Struct()
 	if s != nil && len(s.Generics) != len(s.Decl.Generics) {
 		e.pushErr(fc.Args[0].Token, build::LogMsg.HasGenerics)
 		ret nil
 	}
-	if d.Type.comptime() {
-		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidTypeForTypeOf, d.Type.Str())
+	if v.Type.comptime() {
+		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidTypeForTypeOf, v.Type.Str())
 		ret nil
 	}
-	ret buildComptimeTypeInfoData(e.s, d.Type)
+	ret buildComptimeTypeInfoData(e.s, v.Type)
 }
 
-fn builtinCallerStdComptimeValueOf(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+fn builtinCallerStdComptimeValueOf(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 	if len(fc.Args) < 1 {
 		e.pushErr(fc.Token, build::LogMsg.MissingExprFor, "expr")
 		ret nil
@@ -947,35 +947,35 @@ fn builtinCallerStdComptimeValueOf(mut &e: &eval, mut &fc: &ast::FuncCallExpr, m
 	if len(fc.Args) > 1 {
 		e.pushErr(fc.Args[1].Token, build::LogMsg.ArgumentOverflow, "ValueOf")
 	}
-	mut d := e.evalExpr(fc.Args[0])
-	if d == nil {
+	mut v := e.evalExpr(fc.Args[0])
+	if v == nil {
 		ret nil
 	}
 	// Do not allow value if has unsupported type for type infer.
-	if !isGoodValueToInfer(d) {
-		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidTypeForFunc, d.Type.Str(), "ValueOf")
+	if !isGoodValueToInfer(v) {
+		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidTypeForFunc, v.Type.Str(), "ValueOf")
 		ret nil
 	}
-	ret buildComptimeValue(d)
+	ret buildComptimeValue(v)
 }
 
-fn builtinCallerStdComptimeLine(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+fn builtinCallerStdComptimeLine(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 	if len(fc.Args) > 0 {
 		e.pushErr(fc.Args[1].Token, build::LogMsg.ArgumentOverflow, "Line")
 	}
 	mut constant := constant::Const.NewI64(i64(fc.Token.Row))
-	ret &Data{
+	ret &Value{
 		Type: primInt,
 		Constant: constant,
 		Model: constant,
 	}
 }
 
-fn builtinCallerStdComptimeFile(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+fn builtinCallerStdComptimeFile(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 	if len(fc.Args) > 0 {
 		e.pushErr(fc.Args[1].Token, build::LogMsg.ArgumentOverflow, "File")
 	}
-	ret &Data{
+	ret &Value{
 		Type: &Type{
 			Kind: &comptimeFile{
 				file: e.s.file,
@@ -984,11 +984,11 @@ fn builtinCallerStdComptimeFile(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut 
 	}
 }
 
-fn builtinCallerStdComptimeFiles(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+fn builtinCallerStdComptimeFiles(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 	if len(fc.Args) > 0 {
 		e.pushErr(fc.Args[1].Token, build::LogMsg.ArgumentOverflow, "Files")
 	}
-	ret &Data{
+	ret &Value{
 		Type: &Type{
 			Kind: &comptimeFiles{
 				files: e.s.files,
@@ -997,7 +997,7 @@ fn builtinCallerStdComptimeFiles(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut
 	}
 }
 
-fn builtinCallerStdComptimeTypeAlias(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+fn builtinCallerStdComptimeTypeAlias(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 	if len(fc.Args) > 2 {
 		e.pushErr(fc.Args[1].Token, build::LogMsg.ArgumentOverflow, "TypeAlias")
 		ret nil
@@ -1057,8 +1057,8 @@ fn builtinCallerStdComptimeTypeAlias(mut &e: &eval, mut &fc: &ast::FuncCallExpr,
 	ret buildVoidData()
 }
 
-fn builtinCallerStdMemSizeOf(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
-	mut result := &Data{
+fn builtinCallerStdMemSizeOf(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
+	mut result := &Value{
 		Type: primUint,
 	}
 
@@ -1070,20 +1070,20 @@ fn builtinCallerStdMemSizeOf(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_:
 		e.pushErr(fc.Args[1].Token, build::LogMsg.ArgumentOverflow, "SizeOf")
 	}
 
-	mut d := e.evalExprKind(fc.Args[0].Kind)
-	if d == nil {
+	mut v := e.evalExprKind(fc.Args[0].Kind)
+	if v == nil {
 		ret result
 	}
-	if !validTypeForXof(d.Type) {
-		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidTypeForFunc, d.Type.Str(), "SizeOf")
+	if !validTypeForXof(v.Type) {
+		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidTypeForFunc, v.Type.Str(), "SizeOf")
 	}
 
-	result.Model = &SizeofExpr{Expr: d.Type}
+	result.Model = &SizeofExpr{Expr: v.Type}
 	ret result
 }
 
-fn builtinCallerStdMemAlignOf(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
-	mut result := &Data{
+fn builtinCallerStdMemAlignOf(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
+	mut result := &Value{
 		Type: primUint,
 	}
 
@@ -1095,19 +1095,19 @@ fn builtinCallerStdMemAlignOf(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_
 		e.pushErr(fc.Args[1].Token, build::LogMsg.ArgumentOverflow, "AlignOf")
 	}
 
-	mut d := e.evalExprKind(fc.Args[0].Kind)
-	if d == nil {
+	mut v := e.evalExprKind(fc.Args[0].Kind)
+	if v == nil {
 		ret result
 	}
-	if !validTypeForXof(d.Type) {
-		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidTypeForFunc, d.Type.Str(), "AlignOf")
+	if !validTypeForXof(v.Type) {
+		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidTypeForFunc, v.Type.Str(), "AlignOf")
 	}
 
-	result.Model = &AlignofExpr{Expr: d.Type}
+	result.Model = &AlignofExpr{Expr: v.Type}
 	ret result
 }
 
-fn builtinCallerStdMemFree(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Data): &Data {
+fn builtinCallerStdMemFree(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 	if len(fc.Args) < 1 {
 		e.pushErr(fc.Token, build::LogMsg.MissingExprFor, "h")
 		ret nil
@@ -1116,21 +1116,21 @@ fn builtinCallerStdMemFree(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &
 		e.pushErr(fc.Args[1].Token, build::LogMsg.ArgumentOverflow, "Free")
 	}
 
-	mut d := e.evalExpr(fc.Args[0])
-	if d == nil {
+	mut v := e.evalExpr(fc.Args[0])
+	if v == nil {
 		ret nil
 	}
 
-	if !d.Type.GC() {
+	if !v.Type.GC() {
 		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidExpr)
 	}
 
 	mut result := buildVoidData()
-	result.Model = &FreeExpr{Expr: d.Model}
+	result.Model = &FreeExpr{Expr: v.Model}
 	ret result
 }
 
-fn builtinCallerStdJuleIntegratedEmit(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &d: &Data): &Data {
+fn builtinCallerStdJuleIntegratedEmit(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Value): &Value {
 	if !e.isUnsafe() {
 		e.pushErr(fc.Token, build::LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
 	}
@@ -1140,43 +1140,43 @@ fn builtinCallerStdJuleIntegratedEmit(mut &e: &eval, mut &fc: &ast::FuncCallExpr
 		ret nil
 	}
 
-	mut argd := e.evalExpr(fc.Args[0])
-	if argd == nil {
+	mut argVal := e.evalExpr(fc.Args[0])
+	if argVal == nil {
 		ret nil
 	}
 
-	if argd.Type.Prim() == nil || !argd.Type.Prim().IsStr() {
-		e.pushErr(fc.Args[0].Token, build::LogMsg.IncompatibleTypes, argd.Type.Str(), argd.Type.Str())
+	if argVal.Type.Prim() == nil || !argVal.Type.Prim().IsStr() {
+		e.pushErr(fc.Args[0].Token, build::LogMsg.IncompatibleTypes, argVal.Type.Str(), argVal.Type.Str())
 		ret nil
 	}
 
-	if !argd.IsConst() || !argd.Constant.IsStr() {
+	if !argVal.IsConst() || !argVal.Constant.IsStr() {
 		e.pushErr(fc.Args[0].Token, build::LogMsg.ExprNotConst)
 		ret nil
 	}
 
 	mut r := buildVoidData()
 
-	mut f := d.Type.Func()
+	mut f := v.Type.Func()
 	if len(f.Generics) > 0 {
 		r.Type = f.Generics[0].Type
 	}
 
 	mut model := &BackendEmitExpr{
-		Code: argd.Constant.ReadStr(),
+		Code: argVal.Constant.ReadStr(),
 	}
 
 	if len(fc.Args) > 1 {
 		model.Exprs = make([]Expr, 0, len(fc.Args)-1)
 		for (_, mut arg) in fc.Args[1:] {
-			argd = e.eval1(arg)
-			if argd == nil {
+			argVal = e.eval1(arg)
+			if argVal == nil {
 				ret nil
 			}
-			if argd.Decl {
-				model.Exprs = append(model.Exprs, argd.Type)
+			if argVal.Decl {
+				model.Exprs = append(model.Exprs, argVal.Type)
 			} else {
-				model.Exprs = append(model.Exprs, argd.Model)
+				model.Exprs = append(model.Exprs, argVal.Model)
 			}
 		}
 	}

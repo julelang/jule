@@ -66,8 +66,8 @@ impl scopeOptimizer {
 		ret false
 	}
 
-	fn optimizeData(mut &self, mut d: &sema::Data) {
-		exprOptimizer.optimizeData(d.Model, self.data, self)
+	fn optimizeValue(mut &self, mut val: &sema::Value) {
+		exprOptimizer.optimizeValue(val.Model, self.data, self)
 	}
 
 	fn optimizeVar(mut &self, mut v: &sema::Var) {
@@ -79,7 +79,7 @@ impl scopeOptimizer {
 				self.data.nils.pushVar(getNilVar(v), safe)
 			}
 			if self.data.dynamic != nil {
-				mut kind := isTypeGuaranteedDynamicData(
+				mut kind := isTypeGuaranteedDynamicValue(
 					self.data.dynamic, v.TypeSym.Type, v.ValueSym.Data.Model)
 				if kind != nil {
 					if isDynamicValidType(v.TypeSym.Type) {
@@ -87,7 +87,7 @@ impl scopeOptimizer {
 					}
 				}
 			}
-			exprOptimizer.optimizeData(v.ValueSym.Data.Model, self.data, self)
+			exprOptimizer.optimizeValue(v.ValueSym.Data.Model, self.data, self)
 		}
 	}
 
@@ -102,7 +102,7 @@ impl scopeOptimizer {
 		mut checkpoint := self.data.getCheckpoint()
 
 		for (_, mut elif) in c.Elifs {
-			exprOptimizer.optimizeConditionalData(elif.Expr, self.data, self)
+			exprOptimizer.optimizeConditionalValue(elif.Expr, self.data, self)
 			self.optimizeChild(elif.Scope)
 			alive.removeDeads(self.data)
 			self.data.loadCheckpoint(checkpoint)
@@ -217,11 +217,11 @@ impl scopeOptimizer {
 
 		for (_, mut case) in m.Cases {
 			for (_, mut expr) in case.Exprs {
-				exprOptimizer.optimizeConditionalData(expr.Model, self.data, self)
+				exprOptimizer.optimizeConditionalValue(expr.Model, self.data, self)
 			}
 			if len(case.Exprs) == 1 && self.data.dynamic != nil {
 				// We can know the exact kind of dynamic type if expression is single.
-				mut kind := isTypeGuaranteedDynamicData(self.data.dynamic, case.Exprs[0].Type, nil)
+				mut kind := isTypeGuaranteedDynamicValue(self.data.dynamic, case.Exprs[0].Type, nil)
 				if kind != nil {
 					self.data.dynamic.pushVar(var, kind)
 				} else {
@@ -306,11 +306,11 @@ impl scopeOptimizer {
 
 		for (_, mut case) in slct.Cases {
 			for (_, mut expr) in case.Exprs {
-				exprOptimizer.optimizeData(expr.Model, self.data, self)
+				exprOptimizer.optimizeValue(expr.Model, self.data, self)
 			}
 			if len(case.Exprs) == 1 && self.data.dynamic != nil {
 				// We can know the exact kind of dynamic type if expression is single.
-				mut kind := isTypeGuaranteedDynamicData(self.data.dynamic, case.Exprs[0].Type, nil)
+				mut kind := isTypeGuaranteedDynamicValue(self.data.dynamic, case.Exprs[0].Type, nil)
 				if kind != nil {
 					self.data.dynamic.pushVar(var, kind)
 				} else {
@@ -362,7 +362,7 @@ impl scopeOptimizer {
 				| prim.IsI32():
 					// Expression is: []rune(str)
 					// Avoid making allocation, iterate runes of string.
-					exprOptimizer.optimizeData(cem.Expr.Model, self.data, self) // Optimize string expression.
+					exprOptimizer.optimizeValue(cem.Expr.Model, self.data, self) // Optimize string expression.
 					self.setCurrentStmt(&StrRuneIter{
 						Expr: cem.Expr,
 						Base: it,
@@ -383,11 +383,11 @@ impl scopeOptimizer {
 				}
 			}
 		}
-		exprOptimizer.optimizeData(it.Expr.Model, self.data, self)
+		exprOptimizer.optimizeValue(it.Expr.Model, self.data, self)
 	}
 
 	fn optimizeWhileIter(mut &self, mut it: &sema::WhileIter) {
-		exprOptimizer.optimizeData(it.Expr, self.data, self)
+		exprOptimizer.optimizeValue(it.Expr, self.data, self)
 		self.optimizeStmt(it.Next)
 		self.optimizeChildHard(it.Scope)
 	}
@@ -435,7 +435,7 @@ impl scopeOptimizer {
 		if self.data.boundary != nil {
 			possibleBoundaryRemove(self.data.boundary, postfix.Expr)
 		}
-		exprOptimizer.optimizeData(postfix.Expr, self.data, self)
+		exprOptimizer.optimizeValue(postfix.Expr, self.data, self)
 	}
 
 	fn cmplxAssign(mut &self, mut &assign: &sema::Assign): bool {
@@ -476,7 +476,7 @@ impl scopeOptimizer {
 			ret false
 		}
 		siem.Method = fc.Func
-		self.setCurrentStmt(&sema::Data{Model: fc})
+		self.setCurrentStmt(&sema::Value{Model: fc})
 		ret true
 	}
 
@@ -504,7 +504,7 @@ impl scopeOptimizer {
 			}
 		}
 		if self.data.dynamic != nil {
-			mut kind := isTypeGuaranteedDynamicData(
+			mut kind := isTypeGuaranteedDynamicValue(
 				self.data.dynamic, assign.Right.Type, assign.Right.Model)
 			if kind != nil {
 				if isDynamicValidType(assign.Left.Type) {
@@ -522,8 +522,8 @@ impl scopeOptimizer {
 			ret
 		}
 
-		exprOptimizer.optimizeData(assign.Left.Model, self.data, self)
-		exprOptimizer.optimizeData(assign.Right.Model, self.data, self)
+		exprOptimizer.optimizeValue(assign.Left.Model, self.data, self)
+		exprOptimizer.optimizeValue(assign.Right.Model, self.data, self)
 
 		match assign.Op.Id {
 		| token::Id.CaretEq | token::Id.SolidusEq | token::Id.PercentEq
@@ -564,7 +564,7 @@ impl scopeOptimizer {
 				Right: assign.Right,
 			}
 			mut model := sema::Expr(b)
-			exprOptimizer.optimizeData(model, self.data, self)
+			exprOptimizer.optimizeValue(model, self.data, self)
 			if model != b || b.Op != assign.Op {
 				// Binary model optimized.
 				// Use optimized model directly.
@@ -899,7 +899,7 @@ impl scopeOptimizer {
 					}
 				}
 				if self.data.dynamic != nil && tup != nil {
-					mut kind := isTypeGuaranteedDynamicData(
+					mut kind := isTypeGuaranteedDynamicValue(
 						self.data.dynamic, tup.Datas[i].Type, tup.Datas[i].Model)
 					if kind != nil {
 						if isDynamicValidType(l.Type) {
@@ -909,17 +909,17 @@ impl scopeOptimizer {
 						possibleDynamicRemove(checkpoint.dynamic, l.Model)
 					}
 				}
-				exprOptimizer.optimizeData(l.Model, self.data, self)
+				exprOptimizer.optimizeValue(l.Model, self.data, self)
 			}
 		}
-		exprOptimizer.optimizeData(assign.Right, self.data, self)
+		exprOptimizer.optimizeValue(assign.Right, self.data, self)
 
 		// Load data to optimized checkpoint.
 		self.data.loadCheckpoint(checkpoint)
 	}
 
 	fn optimizeRet(mut &self, mut r: &sema::Ret) {
-		exprOptimizer.optimizeData(r.Expr, self.data, self)
+		exprOptimizer.optimizeValue(r.Expr, self.data, self)
 
 		// Break algorithm is exceptional-specific optimizations are not enabled.
 		// The following algorithms tries to apply specific optimizations for exceptionals.
@@ -946,8 +946,8 @@ impl scopeOptimizer {
 		match type stmt {
 		| &sema::Scope:
 			self.optimizeChildHard((&sema::Scope)(stmt))
-		| &sema::Data:
-			self.optimizeData((&sema::Data)(stmt))
+		| &sema::Value:
+			self.optimizeValue((&sema::Value)(stmt))
 		| &sema::Var:
 			self.optimizeVar((&sema::Var)(stmt))
 		| &sema::Conditional:

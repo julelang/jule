@@ -909,20 +909,20 @@ impl exprCoder {
 		self.oc.write("}")
 	}
 
-	fn writeUseExpr(mut &self, mut &f: &sema::FuncIns, mut d: &sema::Data) {
-		if d.Type.Tuple() == nil {
-			self.possibleRefExpr(d.Model)
+	fn writeUseExpr(mut &self, mut &f: &sema::FuncIns, mut val: &sema::Value) {
+		if val.Type.Tuple() == nil {
+			self.possibleRefExpr(val.Model)
 			self.oc.write(";")
 			ret
 		}
-		mut tup := (&sema::TupleExpr)(d.Model)
+		mut tup := (&sema::TupleExpr)(val.Model)
 		self.oc.tc.rc.tuple(self.oc.Buf, f.Result.Tuple())
 		self.oc.write("{")
-		for i, data in tup.Datas {
+		for i, tupval in tup.Datas {
 			self.oc.write("." + resultArgName)
 			self.oc.write(conv::Itoa(i))
 			self.oc.write("=")
-			self.possibleRefExpr(data.Model)
+			self.possibleRefExpr(tupval.Model)
 			if len(tup.Datas)-i > 1 {
 				self.oc.write(", ")
 			}
@@ -975,14 +975,14 @@ impl exprCoder {
 				}
 				mut stmt := m.Except.Stmts[len(m.Except.Stmts)-1]
 				match type stmt {
-				| &sema::Data:
+				| &sema::Value:
 					m.Except.Stmts = m.Except.Stmts[:len(m.Except.Stmts)-1]
 					self.oc.write("{\n")
 					self.oc.addIndent()
 					self.oc.sc.scopeStmts(m.Except)
 					self.oc.write("\n")
 					self.oc.indent()
-					self.writeUseExpr(m.Func, (&sema::Data)(stmt))
+					self.writeUseExpr(m.Func, (&sema::Value)(stmt))
 					self.oc.write("\n")
 					self.oc.doneIndent()
 					self.oc.indent()

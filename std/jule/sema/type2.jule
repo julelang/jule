@@ -28,43 +28,43 @@ fn traitHasReferenceReceiver(&t: &Trait): bool {
 	ret false
 }
 
-fn floatAssignable(&kind: str, &d: &Data): bool {
-	value := conv::FmtFloat(d.Constant.AsF64(), 'g', -1, 64)
+fn floatAssignable(&kind: str, &v: &Value): bool {
+	value := conv::FmtFloat(v.Constant.AsF64(), 'g', -1, 64)
 	ret types::CheckBitFloat(value, types::BitSizeOf(kind))
 }
 
-fn sigAssignable(kind: str, &d: &Data): bool {
+fn sigAssignable(kind: str, &v: &Value): bool {
 	min := types::Min(kind)
 	max := types::Max(kind)
 	match {
-	| d.Constant.IsF64():
-		x := d.Constant.ReadF64()
+	| v.Constant.IsF64():
+		x := v.Constant.ReadF64()
 		i, frac := math::Modf(x)
 		if frac != 0 {
 			ret false
 		}
 		ret i >= min && i <= max
-	| d.Constant.IsU64():
-		x := d.Constant.AsF64()
+	| v.Constant.IsU64():
+		x := v.Constant.AsF64()
 		if x <= max {
 			ret true
 		}
-	| d.Constant.IsI64():
-		x := d.Constant.AsF64()
+	| v.Constant.IsI64():
+		x := v.Constant.AsF64()
 		ret min <= x && x <= max
 	}
 	ret false
 }
 
-fn unsigAssignable(kind: str, &d: &Data): bool {
+fn unsigAssignable(kind: str, &v: &Value): bool {
 	max := types::Max(kind)
-	if d.IsRune && kind == types::Kind.U8 {
-		ret lit::IsAscii(rune(d.Constant.ReadI64()))
+	if v.IsRune && kind == types::Kind.U8 {
+		ret lit::IsAscii(rune(v.Constant.ReadI64()))
 	}
 
 	match {
-	| d.Constant.IsF64():
-		x := d.Constant.ReadF64()
+	| v.Constant.IsF64():
+		x := v.Constant.ReadF64()
 		if x < 0 {
 			ret false
 		}
@@ -73,24 +73,24 @@ fn unsigAssignable(kind: str, &d: &Data): bool {
 			ret false
 		}
 		ret i <= max
-	| d.Constant.IsU64():
-		x := d.Constant.AsF64()
+	| v.Constant.IsU64():
+		x := v.Constant.AsF64()
 		if x <= max {
 			ret true
 		}
-	| d.Constant.IsI64():
-		x := d.Constant.AsF64()
+	| v.Constant.IsI64():
+		x := v.Constant.AsF64()
 		ret 0 <= x && x <= max
 	}
 	ret false
 }
 
-fn intAssignable(kind: str, &d: &Data): bool {
+fn intAssignable(kind: str, &v: &Value): bool {
 	match {
 	| types::IsSigInt(kind):
-		ret sigAssignable(kind, d)
+		ret sigAssignable(kind, v)
 	| types::IsUnsigInt(kind):
-		ret unsigAssignable(kind, d)
+		ret unsigAssignable(kind, v)
 	|:
 		ret false
 	}
@@ -246,7 +246,7 @@ impl typeCompatibilityChecker {
 struct assignTypeChecker {
 	s:          &sema // Used for error logging and type checking.
 	dest:       &Type
-	d:          &Data
+	v:          &Value
 	errorToken: &token::Token
 	refers:     &ReferenceStack
 }
@@ -259,8 +259,8 @@ impl assignTypeChecker {
 	fn checkValidity(mut self): bool {
 		mut valid := true
 		match {
-		| self.d.Type.Func() != nil:
-			f := self.d.Type.Func()
+		| self.v.Type.Func() != nil:
+			f := self.v.Type.Func()
 			match {
 			| f.IsBuiltin():
 				self.pushErr(build::LogMsg.BuiltinAsNonFunc)
@@ -276,7 +276,7 @@ impl assignTypeChecker {
 				self.s.pushSuggestion(build::LogMsg.InstantiateGenericFuncToUseAsAnon)
 				valid = false
 			}
-		| self.d.Type.Tuple() != nil:
+		| self.v.Type.Tuple() != nil:
 			self.pushErr(build::LogMsg.TupleAssignToSingle)
 			valid = false
 		}
@@ -284,12 +284,12 @@ impl assignTypeChecker {
 	}
 
 	fn checkConst(mut self): bool {
-		if !self.d.untyped {
+		if !self.v.untyped {
 			ret false
 		}
-		if !self.d.IsConst() {
+		if !self.v.IsConst() {
 			// Allow if value is untyped and actual kinds are equal.
-			ret self.dest.ActualEqual(self.d.Type)
+			ret self.dest.ActualEqual(self.v.Type)
 		}
 		mut prim := self.dest.Prim()
 		if prim == nil {
@@ -297,24 +297,24 @@ impl assignTypeChecker {
 		}
 		match {
 		| prim.IsStr():
-			prim = self.d.Type.Prim()
+			prim = self.v.Type.Prim()
 			ret prim != nil && prim.IsStr()
 		| prim.IsBool():
-			prim = self.d.Type.Prim()
+			prim = self.v.Type.Prim()
 			ret prim != nil && prim.IsBool()
 		}
 		kind := prim.Kind
 		match {
 		| types::IsFloat(kind):
-			if !floatAssignable(kind, self.d) {
+			if !floatAssignable(kind, self.v) {
 				ret false
 			}
-			self.d.Constant.Kind = kind
+			self.v.Constant.Kind = kind
 		| types::IsInt(kind):
-			if !intAssignable(kind, self.d) {
+			if !intAssignable(kind, self.v) {
 				ret false
 			}
-			self.d.Constant.Kind = kind
+			self.v.Constant.Kind = kind
 		|:
 			ret false
 		}
@@ -326,7 +326,7 @@ impl assignTypeChecker {
 		if f1 == nil {
 			ret false
 		}
-		f2 := self.d.Type.Func()
+		f2 := self.v.Type.Func()
 		if f2 == nil {
 			ret false
 		}
@@ -335,7 +335,7 @@ impl assignTypeChecker {
 
 	fn checkCompatibility(mut self): bool {
 		match {
-		| self.d == nil:
+		| self.v == nil:
 			// Skip Data is nil.
 			ret false
 		| !self.checkValidity():
@@ -343,7 +343,7 @@ impl assignTypeChecker {
 			ret false
 		| self.checkConst():
 			ret true
-		| self.d.Type.Enum() != nil:
+		| self.v.Type.Enum() != nil:
 			mut dkind := self.dest
 			if self.dest.Enum() != nil {
 				dkind = self.dest.Enum().TypeSym.Type
@@ -353,14 +353,14 @@ impl assignTypeChecker {
 				// Ignore direct comparison if prim is nil or any.
 				break
 			}
-			mut dest := self.d.Type.Enum().TypeSym.Type
+			mut dest := self.v.Type.Enum().TypeSym.Type
 			ret self.s.checkTypeCompatibility(dest, dkind, self.errorToken)
-		| self.d.Type.Chan() != nil:
+		| self.v.Type.Chan() != nil:
 			dc := self.dest.Chan()
 			if dc == nil {
 				break
 			}
-			vc := self.d.Type.Chan()
+			vc := self.v.Type.Chan()
 			if !dc.Elem.Equal(vc.Elem) {
 				break
 			}
@@ -368,18 +368,18 @@ impl assignTypeChecker {
 				break
 			}
 			ret true
-		| self.d.Type.Func() != nil:
+		| self.v.Type.Func() != nil:
 			if self.checkFunc() {
 				ret true
 			}
 		}
-		ret self.s.checkTypeCompatibility1(self.dest, self.d, self.errorToken)
+		ret self.s.checkTypeCompatibility1(self.dest, self.v, self.errorToken)
 	}
 
 	fn check(mut self): bool {
 		ok := self.checkCompatibility()
-		if ok && !self.d.Type.Variadic {
-			applyImplicitCast(self.s, self.dest, self.d, self.errorToken, self.refers)
+		if ok && !self.v.Type.Variadic {
+			applyImplicitCast(self.s, self.dest, self.v, self.errorToken, self.refers)
 		}
 		ret ok
 	}
@@ -389,7 +389,7 @@ struct dynamicTypeAnnotation {
 	e:          &eval
 	f:          &FuncIns
 	p:          &ParamIns
-	a:          &Data
+	a:          &Value
 	errorToken: &token::Token
 	k:          *&Type
 	c:          &ast::Type
@@ -791,7 +791,7 @@ impl fnCallArgChecker {
 		ret false
 	}
 
-	fn checkArg(mut self, mut &p: &ParamIns, mut &arg: &Data, mut &errorToken: &token::Token): (ok: bool) {
+	fn checkArg(mut self, mut &p: &ParamIns, mut &arg: &Value, mut &errorToken: &token::Token): (ok: bool) {
 		if self.dynamicAnnotation && parameterUsesGenerics(p, self.f.Decl.Generics) {
 			// Accept as fail if parameter is variadic or expression is invalid.
 			ok = !p.Decl.Variadic && isGoodValueToInfer(arg)
@@ -830,17 +830,17 @@ impl fnCallArgChecker {
 		} else {
 			self.e.prefix = nil
 		}
-		mut d := self.e.evalExpr(arg)
+		mut v := self.e.evalExpr(arg)
 
 		self.e.prefix = old
 		self.e.target.mutable = oldMut
 
-		if d == nil {
+		if v == nil {
 			ret false
 		}
 
-		ok = self.checkArg(p, d, arg.Token)
-		self.argModels = append(self.argModels, d.Model)
+		ok = self.checkArg(p, v, arg.Token)
+		self.argModels = append(self.argModels, v.Model)
 		ret
 	}
 
@@ -884,24 +884,24 @@ impl fnCallArgChecker {
 				self.e.prefix = p.Type
 			}
 
-			mut d := self.e.eval(arg)
-			if d == nil {
+			mut v := self.e.eval(arg)
+			if v == nil {
 				ok = false
 				continue
 			}
 
-			if d.Type.Variadic {
+			if v.Type.Variadic {
 				variadiced = true
 				p.Type.Variadic = true
-				ok = ok && self.checkArg(p, d, arg.Token)
+				ok = ok && self.checkArg(p, v, arg.Token)
 				p.Type.Variadic = false
-				match type d.Model {
+				match type v.Model {
 				| &SliceExpr:
-					model = (&SliceExpr)(d.Model)
+					model = (&SliceExpr)(v.Model)
 					model.ElemType = p.Type
 				|:
 					model = nil
-					self.argModels = append(self.argModels, d.Model)
+					self.argModels = append(self.argModels, v.Model)
 				}
 				// Break iteration early, this argument is variadic, so should be last.
 				// If this argument is not last, following algorithm will create error log for that.
@@ -910,8 +910,8 @@ impl fnCallArgChecker {
 				break
 			}
 
-			ok = ok && self.checkArg(p, d, arg.Token)
-			model.Elems = append(model.Elems, d)
+			ok = ok && self.checkArg(p, v, arg.Token)
+			model.Elems = append(model.Elems, v)
 		}
 		self.e.prefix = old
 		self.e.target.mutable = oldMut
@@ -1018,22 +1018,22 @@ impl structLitChecker {
 		self.e.pushSuggestion(fmt, args...)
 	}
 
-	fn pushMatch(mut self, mut &f: &FieldIns, mut &d: &Data, mut &errorToken: &token::Token) {
+	fn pushMatch(mut self, mut &f: &FieldIns, mut &v: &Value, mut &errorToken: &token::Token) {
 		const Reference = false
 		// If evaluated for the immutable memory, check as immutable.
 		// But if field in scope of the interior mutability, check as mutable.
 		// Do not accept as risky if structure is not have any method.
 		// Because if there is no method, no risk for interior mutability.
 		mutable := self.e.target.mutable || (f.Decl.Mutable && len(self.s.Methods) > 0)
-		if self.e.s.checkValidityForInitExpr(mutable, Reference, f.Type, d, errorToken) {
+		if self.e.s.checkValidityForInitExpr(mutable, Reference, f.Type, v, errorToken) {
 			// Check type if validity is good.
 			// Helps to reduce error logs and duplicated logs.
-			_ = self.e.s.checkAssignType(false, f.Type, d, errorToken, self.e.getOwnerRefers())
+			_ = self.e.s.checkAssignType(false, f.Type, v, errorToken, self.e.getOwnerRefers())
 		}
 		self.args = append(self.args, &StructArgExpr{
 			Token: errorToken,
 			Field: f,
-			Expr: d,
+			Expr: v,
 		})
 	}
 
@@ -1076,11 +1076,11 @@ impl structLitChecker {
 		defer { self.e.prefix = prefix }
 		self.e.prefix = f.Type
 
-		mut d := self.e.evalExpr(pair.Expr)
-		if d == nil {
+		mut v := self.e.evalExpr(pair.Expr)
+		if v == nil {
 			ret
 		}
-		self.pushMatch(f, d, pair.Field)
+		self.pushMatch(f, v, pair.Field)
 	}
 
 	fn readyExprs(mut self, mut &exprs: []&ast::Expr): bool {
@@ -1145,12 +1145,12 @@ impl structLitChecker {
 				defer { self.e.prefix = prefix }
 				self.e.prefix = field.Type
 
-				mut d := self.e.evalExpr(expr)
-				if d == nil {
+				mut v := self.e.evalExpr(expr)
+				if v == nil {
 					continue
 				}
 
-				self.pushMatch(field, d, expr.Token)
+				self.pushMatch(field, v, expr.Token)
 			}
 		}
 
@@ -1180,7 +1180,7 @@ struct rangeChecker {
 	sc:   &scopeChecker
 	rang: &ast::RangeKind
 	Kind: &RangeIter
-	d:    &Data
+	v:    &Value
 }
 
 impl rangeChecker {
@@ -1200,10 +1200,10 @@ impl rangeChecker {
 	// Check range expression validity.
 	// It bypass mutability error if necessary.
 	//
-	//  - d:   data to check.
+	//  - v:   value to check.
 	//  - key: data passed to this key.
 	//  - k:   element kind of expression.
-	fn checkRangeExprValidity(mut self, mut &d: &Data, &key: &Var, mut &k: &Type) {
+	fn checkRangeExprValidity(mut self, mut &v: &Value, &key: &Var, mut &k: &Type) {
 		mut _mut := key.Mutable
 		if _mut && !k.Mutable() {
 			// Bypass mutability error.
@@ -1213,7 +1213,7 @@ impl rangeChecker {
 		}
 
 		self.sc.s.checkValidityForInitExpr(
-			_mut, key.Reference, key.TypeSym.Type, d, self.rang.InToken)
+			_mut, key.Reference, key.TypeSym.Type, v, self.rang.InToken)
 	}
 
 	fn checkSlice(mut self) {
@@ -1222,11 +1222,11 @@ impl rangeChecker {
 			ret
 		}
 
-		mut slc := self.d.Type.Slice()
+		mut slc := self.v.Type.Slice()
 		self.Kind.KeyB = self.buildVar(self.rang.KeyB)
 		self.Kind.KeyB.TypeSym = &TypeSym{Type: slc.Elem}
 
-		self.checkRangeExprValidity(self.d, self.Kind.KeyB, slc.Elem)
+		self.checkRangeExprValidity(self.v, self.Kind.KeyB, slc.Elem)
 	}
 
 	fn checkArray(mut self) {
@@ -1235,11 +1235,11 @@ impl rangeChecker {
 			ret
 		}
 
-		mut arr := self.d.Type.Array()
+		mut arr := self.v.Type.Array()
 		self.Kind.KeyB = self.buildVar(self.rang.KeyB)
 		self.Kind.KeyB.TypeSym = &TypeSym{Type: arr.Elem}
 
-		self.checkRangeExprValidity(self.d, self.Kind.KeyB, arr.Elem)
+		self.checkRangeExprValidity(self.v, self.Kind.KeyB, arr.Elem)
 	}
 
 	fn checkMapKeyA(mut self) {
@@ -1247,14 +1247,14 @@ impl rangeChecker {
 			ret
 		}
 
-		mut m := self.d.Type.Map()
+		mut m := self.v.Type.Map()
 		self.Kind.KeyA = self.buildVar(self.rang.KeyA)
 		self.Kind.KeyA.TypeSym = &TypeSym{Type: m.Key}
 
-		mut d := new(Data, *self.d)
-		d.Type = m.Key
+		mut v := new(Value, *self.v)
+		v.Type = m.Key
 
-		self.checkRangeExprValidity(d, self.Kind.KeyA, m.Key)
+		self.checkRangeExprValidity(v, self.Kind.KeyA, m.Key)
 	}
 
 	fn checkMapKeyB(mut self) {
@@ -1262,14 +1262,14 @@ impl rangeChecker {
 			ret
 		}
 
-		mut m := self.d.Type.Map()
+		mut m := self.v.Type.Map()
 		self.Kind.KeyB = self.buildVar(self.rang.KeyB)
 		self.Kind.KeyB.TypeSym = &TypeSym{Type: m.Val}
 
-		mut d := new(Data, *self.d)
-		d.Type = m.Val
+		mut v := new(Value, *self.v)
+		v.Type = m.Val
 
-		self.checkRangeExprValidity(d, self.Kind.KeyB, m.Val)
+		self.checkRangeExprValidity(v, self.Kind.KeyB, m.Val)
 	}
 
 	fn checkMap(mut self) {
@@ -1287,7 +1287,7 @@ impl rangeChecker {
 	}
 
 	fn checkChan(mut self) {
-		mut c := self.d.Type.Chan()
+		mut c := self.v.Type.Chan()
 		if !c.Recv {
 			self.sc.s.pushErr(self.rang.InToken, build::LogMsg.RecvFromSendOnlyChan)
 		}
@@ -1299,9 +1299,9 @@ impl rangeChecker {
 		}
 		self.Kind.KeyA = self.buildVar(self.rang.KeyA)
 		self.Kind.KeyA.TypeSym = &TypeSym{Type: c.Elem}
-		mut d := new(Data, *self.d)
-		d.Type = c.Elem
-		self.checkRangeExprValidity(d, self.Kind.KeyA, c.Elem)
+		mut v := new(Value, *self.v)
+		v.Type = c.Elem
+		self.checkRangeExprValidity(v, self.Kind.KeyA, c.Elem)
 	}
 
 	fn checkComptime(mut self) {
@@ -1319,7 +1319,7 @@ impl rangeChecker {
 	}
 
 	fn checkComptimeRange(mut self): bool {
-		mut range := self.d.Type.comptimeRange()
+		mut range := self.v.Type.comptimeRange()
 		match type range.kind {
 		| &comptimeStructFields
 		| &comptimeEnumFields
@@ -1339,24 +1339,24 @@ impl rangeChecker {
 
 	fn check(mut self): bool {
 		match {
-		| self.d.Type.Variadic:
+		| self.v.Type.Variadic:
 			// Fail.
-		| self.d.Type.Slice() != nil:
+		| self.v.Type.Slice() != nil:
 			self.checkSlice()
 			ret true
-		| self.d.Type.Array() != nil:
+		| self.v.Type.Array() != nil:
 			self.checkArray()
 			ret true
-		| self.d.Type.Map() != nil:
+		| self.v.Type.Map() != nil:
 			self.checkMap()
 			ret true
-		| self.d.Type.Chan() != nil:
+		| self.v.Type.Chan() != nil:
 			self.checkChan()
 			ret true
-		| self.d.Type.comptimeRange() != nil:
+		| self.v.Type.comptimeRange() != nil:
 			ret self.checkComptimeRange()
 		|:
-			prim := self.d.Type.Prim()
+			prim := self.v.Type.Prim()
 			if prim != nil && prim.IsStr() {
 				self.checkStr()
 				ret true
@@ -1371,8 +1371,8 @@ impl rangeChecker {
 struct retTypeChecker {
 	sc:         &scopeChecker
 	f:          &FuncIns
-	types:      []&Type // Return types.
-	exprs:      []&Data // Return expressions.
+	types:      []&Type  // Return types.
+	exprs:      []&Value // Return expressions.
 	exprDecls:  []&ast::Expr
 	errorToken: &token::Token
 	model:      Expr
@@ -1403,10 +1403,10 @@ impl retTypeChecker {
 			if i < len(self.types) {
 				eval.prefix = self.types[i]
 			}
-			mut d := eval.evalExpr(expr)
-			ok = ok && d != nil
+			mut v := eval.evalExpr(expr)
+			ok = ok && v != nil
 			if ok {
-				self.exprs = append(self.exprs, d)
+				self.exprs = append(self.exprs, v)
 			}
 		}
 		ret
@@ -1416,16 +1416,16 @@ impl retTypeChecker {
 		if len(self.exprs) == 0 {
 			ret
 		}
-		for (i, mut d) in self.exprs {
+		for (i, mut v) in self.exprs {
 			mut expr := self.exprDecls[i]
-			if self.mutable && !d.Mutable && d.Type.Mutable() {
+			if self.mutable && !v.Mutable && v.Type.Mutable() {
 				self.sc.s.pushErr(expr.Token, build::LogMsg.RetWithMutTypedNonMut)
 				ret
 			}
 			mut ac := assignTypeChecker{
 				s: self.sc.s,
 				dest: self.types[i],
-				d: d,
+				v: v,
 				errorToken: expr.Token,
 				refers: self.sc.getHardRoot().owner.Refers,
 			}
@@ -1514,6 +1514,6 @@ impl retTypeChecker {
 fn lenKind(): &Type { ret primInt }
 
 // Reports whether d is good for dynamic type infer.
-fn isGoodValueToInfer(&d: &Data): bool {
-	ret !d.IsNil()
+fn isGoodValueToInfer(&v: &Value): bool {
+	ret !v.IsNil()
 }
