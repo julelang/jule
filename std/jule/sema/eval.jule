@@ -71,8 +71,8 @@ impl Value {
 
 // Value.
 struct ValueSym {
-	Expr: &ast::Expr
-	Data: &Value
+	Expr:  &ast::Expr
+	Value: &Value
 }
 
 // Informations about expressions that evaluating for assignments.
@@ -638,7 +638,7 @@ impl eval {
 		// Do not check if v.Used is true. It means it already analyzed.
 		// If variable is global, it should be have initialize expression.
 		// So, nil value means something may be wrong.
-		if !v.Checked && !v.Binded && v.Scope == nil && (v.ValueSym == nil || v.ValueSym.Data == nil) {
+		if !v.Checked && !v.Binded && v.Scope == nil && (v.ValueSym == nil || v.ValueSym.Value == nil) {
 			// Save source file of global variable.
 			// Use it for evaluation and checking for correct analysis.
 			// Otherwise, evaluation problems may occur.
@@ -670,12 +670,12 @@ impl eval {
 			Type: v.TypeSym.Type,
 			Model: v,
 		}
-		if v.ValueSym != nil && v.ValueSym.Data != nil {
+		if v.ValueSym != nil && v.ValueSym.Value != nil {
 			if !v.Binded && v.IsInitialized() {
-				val.IsRune = v.ValueSym.Data.IsRune
+				val.IsRune = v.ValueSym.Value.IsRune
 			}
-			if v.Constant && v.ValueSym.Data.Constant != nil {
-				val.Constant = new(constant::Const, *v.ValueSym.Data.Constant)
+			if v.Constant && v.ValueSym.Value.Constant != nil {
+				val.Constant = new(constant::Const, *v.ValueSym.Value.Constant)
 				val.Model = val.Constant
 				if v.untypedConstant() {
 					self.applyNumericPrefix(val)
@@ -3814,13 +3814,13 @@ impl binaryEval {
 		| token::Id.Amper:
 			first := self.l.Type.Enum().Items[0]
 			match {
-			| first.ValueSym.Data.Constant.IsI64():
-				if first.ValueSym.Data.Constant.ReadI64() == 0 {
+			| first.ValueSym.Value.Constant.IsI64():
+				if first.ValueSym.Value.Constant.ReadI64() == 0 {
 					goto next
 				}
 				goto err
-			| first.ValueSym.Data.Constant.IsU64():
-				if first.ValueSym.Data.Constant.ReadU64() == 0 {
+			| first.ValueSym.Value.Constant.IsU64():
+				if first.ValueSym.Value.Constant.ReadU64() == 0 {
 					goto next
 				}
 				goto err
@@ -4642,7 +4642,7 @@ fn buildErrorVar(mut &s: &Scope, mut &fc: &ast::FuncCallExpr): &Var {
 		TypeSym: findBuiltinTypeAlias(types::Kind.Any).TypeSym,
 		Scope: s,
 		ValueSym: &ValueSym{
-			Data: new(Value),
+			Value: new(Value),
 		},
 	}
 }
@@ -4862,7 +4862,7 @@ fn evalEnumStatic(mut &s: &sema, mut &enm: &Enum, mut &item: &EnumItem,
 		},
 	}
 	if item != nil {
-		v.Constant = new(constant::Const, *item.ValueSym.Data.Constant)
+		v.Constant = new(constant::Const, *item.ValueSym.Value.Constant)
 		v.Model = v.Constant
 		applyCastModelByEnum(s, v, enm, token, refers)
 	}

@@ -81,7 +81,7 @@ fn appendRetVars(mut &dest: []&Var, mut &f: &FuncIns) {
 				Type: types[i],
 			},
 			ValueSym: &ValueSym{
-				Data: new(Value),
+				Value: new(Value),
 			},
 			RetOrder: i,
 		})
@@ -1178,11 +1178,11 @@ impl sema {
 		for (_, mut item) in e.Items {
 			if item.AutoExpr() {
 				item.ValueSym = &ValueSym{
-					Data: &Value{
+					Value: &Value{
 						Constant: constant::Const.NewStr(item.Ident),
 					},
 				}
-				item.ValueSym.Data.Model = item.ValueSym.Data.Constant
+				item.ValueSym.Value.Model = item.ValueSym.Value.Constant
 			} else {
 				mut v := eval.evalExpr(item.ValueSym.Expr)
 				if v == nil {
@@ -1195,7 +1195,7 @@ impl sema {
 
 				mut refers := (&ReferenceStack)(nil) // constant expressions not uses
 				_ = self.checkAssignType(false, e.TypeSym.Type, v, item.Token, refers)
-				item.ValueSym.Data = v
+				item.ValueSym.Value = v
 			}
 		}
 	}
@@ -1203,17 +1203,17 @@ impl sema {
 	fn checkEnumItemInt[Int](mut &self, mut &eval: &eval, mut &e: &Enum, &prim: &Prim, mut &item: &EnumItem, mut &n: Int) {
 		if item.AutoExpr() {
 			item.ValueSym = &ValueSym{
-				Data: new(Value),
+				Value: new(Value),
 			}
 			const match type Int {
 			| i64:
-				item.ValueSym.Data.Constant = constant::Const.NewI64(n)
+				item.ValueSym.Value.Constant = constant::Const.NewI64(n)
 			| u64:
-				item.ValueSym.Data.Constant = constant::Const.NewU64(n)
+				item.ValueSym.Value.Constant = constant::Const.NewU64(n)
 			|:
 				panic("sema: unimplemented enum int type, this panic call should be unreachable")
 			}
-			item.ValueSym.Data.Model = item.ValueSym.Data.Constant
+			item.ValueSym.Value.Model = item.ValueSym.Value.Constant
 		} else {
 			mut v := eval.evalExpr(item.ValueSym.Expr)
 			if v == nil {
@@ -1224,12 +1224,12 @@ impl sema {
 			}
 			mut refers := (&ReferenceStack)(nil) // constant expressions not uses
 			_ = self.checkAssignType(false, e.TypeSym.Type, v, item.Token, refers)
-			item.ValueSym.Data = v
+			item.ValueSym.Value = v
 			const match type Int {
 			| i64:
-				n = item.ValueSym.Data.Constant.ReadI64()
+				n = item.ValueSym.Value.Constant.ReadI64()
 			| u64:
-				n = item.ValueSym.Data.Constant.ReadU64()
+				n = item.ValueSym.Value.Constant.ReadU64()
 			|:
 				panic("sema: unimplemented enum int type, this panic call should be unreachable")
 			}
@@ -1251,12 +1251,12 @@ impl sema {
 		mut n := Int(0)
 		mut first := e.Items[0]
 		self.checkEnumItemInt(eval, e, prim, first, n)
-		if first.ValueSym.Data != nil {
+		if first.ValueSym.Value != nil {
 			const match type Int {
 			| i64:
-				n = first.ValueSym.Data.Constant.AsI64()
+				n = first.ValueSym.Value.Constant.AsI64()
 			| u64:
-				n = first.ValueSym.Data.Constant.AsU64()
+				n = first.ValueSym.Value.Constant.AsU64()
 			|:
 				panic("sema: unimplemented enum int type, this panic call should be unreachable")
 			}
@@ -2130,43 +2130,43 @@ impl sema {
 	fn checkVarValue(mut &self, mut &v: &Var) {
 		if v.IsTypeInferred() {
 			// Build new TypeSym because auto-type symbols are nil.
-			v.TypeSym = &TypeSym{Type: v.ValueSym.Data.Type}
+			v.TypeSym = &TypeSym{Type: v.ValueSym.Value.Type}
 
-			self.checkDataForTypeInference(v.ValueSym.Data, v.ValueSym.Expr.Token)
+			self.checkDataForTypeInference(v.ValueSym.Value, v.ValueSym.Expr.Token)
 			self.checkValidityForInitExpr(
 				v.Mutable,
 				v.Reference,
 				v.TypeSym.Type,
-				v.ValueSym.Data,
+				v.ValueSym.Value,
 				v.ValueSym.Expr.Token)
 		} else {
 			mut arr := v.TypeSym.Type.Array()
 			if arr != nil {
 				if arr.Auto {
-					dataArr := v.ValueSym.Data.Type.Array()
+					dataArr := v.ValueSym.Value.Type.Array()
 					if dataArr != nil {
 						arr.N = dataArr.N
 					}
 				}
 			}
 
-			if self.checkAssignType(v.Reference, v.TypeSym.Type, v.ValueSym.Data, v.ValueSym.Expr.Token, v.Refers) {
+			if self.checkAssignType(v.Reference, v.TypeSym.Type, v.ValueSym.Value, v.ValueSym.Expr.Token, v.Refers) {
 				self.checkValidityForInitExpr(
 					v.Mutable,
 					v.Reference,
 					v.TypeSym.Type,
-					v.ValueSym.Data,
+					v.ValueSym.Value,
 					v.ValueSym.Expr.Token)
 			}
 		}
 
 		if v.Constant {
-			if !v.ValueSym.Data.IsConst() && !v.ValueSym.Data.Type.comptime() {
+			if !v.ValueSym.Value.IsConst() && !v.ValueSym.Value.Type.comptime() {
 				self.pushErr(v.ValueSym.Expr.Token, build::LogMsg.ExprNotConst)
 			}
 		} else {
-			v.ValueSym.Data.Constant = nil
-			v.ValueSym.Data.untyped = false
+			v.ValueSym.Value.Constant = nil
+			v.ValueSym.Value.untyped = false
 		}
 
 		// Remove kind for avoid more tuple-type errors.
@@ -2188,7 +2188,7 @@ impl sema {
 			eval = self.evalpd(l, nil, decl)
 		}
 		eval.target.mutable = decl.Mutable
-		decl.ValueSym.Data = eval.evalExpr(decl.ValueSym.Expr)
+		decl.ValueSym.Value = eval.evalExpr(decl.ValueSym.Expr)
 	}
 
 	// Evaluateds value of variable and checks.
@@ -2196,7 +2196,7 @@ impl sema {
 	fn checkVar(mut &self, mut &decl: &Var, mut l: Lookup) {
 		decl.Checked = true
 		self.evalVarValue(decl, l)
-		if decl.ValueSym.Data == nil {
+		if decl.ValueSym.Value == nil {
 			ret // Skip checks if error occurs.
 		}
 		self.checkVarValue(decl)
