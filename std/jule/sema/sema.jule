@@ -1177,59 +1177,59 @@ impl sema {
 		mut eval := self.eval(self)
 		for (_, mut item) in e.Items {
 			if item.AutoExpr() {
-				item.Value = &ValueSym{
+				item.ValueSym = &ValueSym{
 					Data: &Data{
 						Constant: constant::Const.NewStr(item.Ident),
 					},
 				}
-				item.Value.Data.Model = item.Value.Data.Constant
+				item.ValueSym.Data.Model = item.ValueSym.Data.Constant
 			} else {
-				mut d := eval.evalExpr(item.Value.Expr)
+				mut d := eval.evalExpr(item.ValueSym.Expr)
 				if d == nil {
 					continue
 				}
 
 				if !d.IsConst() {
-					self.pushErr(item.Value.Expr.Token, build::LogMsg.ExprNotConst)
+					self.pushErr(item.ValueSym.Expr.Token, build::LogMsg.ExprNotConst)
 				}
 
 				mut refers := (&ReferenceStack)(nil) // constant expressions not uses
 				_ = self.checkAssignType(false, e.TypeSym.Type, d, item.Token, refers)
-				item.Value.Data = d
+				item.ValueSym.Data = d
 			}
 		}
 	}
 
 	fn checkEnumItemInt[Int](mut &self, mut &eval: &eval, mut &e: &Enum, &prim: &Prim, mut &item: &EnumItem, mut &n: Int) {
 		if item.AutoExpr() {
-			item.Value = &ValueSym{
+			item.ValueSym = &ValueSym{
 				Data: new(Data),
 			}
 			const match type Int {
 			| i64:
-				item.Value.Data.Constant = constant::Const.NewI64(n)
+				item.ValueSym.Data.Constant = constant::Const.NewI64(n)
 			| u64:
-				item.Value.Data.Constant = constant::Const.NewU64(n)
+				item.ValueSym.Data.Constant = constant::Const.NewU64(n)
 			|:
 				panic("sema: unimplemented enum int type, this panic call should be unreachable")
 			}
-			item.Value.Data.Model = item.Value.Data.Constant
+			item.ValueSym.Data.Model = item.ValueSym.Data.Constant
 		} else {
-			mut d := eval.evalExpr(item.Value.Expr)
+			mut d := eval.evalExpr(item.ValueSym.Expr)
 			if d == nil {
 				ret
 			}
 			if !d.IsConst() {
-				self.pushErr(item.Value.Expr.Token, build::LogMsg.ExprNotConst)
+				self.pushErr(item.ValueSym.Expr.Token, build::LogMsg.ExprNotConst)
 			}
 			mut refers := (&ReferenceStack)(nil) // constant expressions not uses
 			_ = self.checkAssignType(false, e.TypeSym.Type, d, item.Token, refers)
-			item.Value.Data = d
+			item.ValueSym.Data = d
 			const match type Int {
 			| i64:
-				n = item.Value.Data.Constant.ReadI64()
+				n = item.ValueSym.Data.Constant.ReadI64()
 			| u64:
-				n = item.Value.Data.Constant.ReadU64()
+				n = item.ValueSym.Data.Constant.ReadU64()
 			|:
 				panic("sema: unimplemented enum int type, this panic call should be unreachable")
 			}
@@ -1251,12 +1251,12 @@ impl sema {
 		mut n := Int(0)
 		mut first := e.Items[0]
 		self.checkEnumItemInt(eval, e, prim, first, n)
-		if first.Value.Data != nil {
+		if first.ValueSym.Data != nil {
 			const match type Int {
 			| i64:
-				n = first.Value.Data.Constant.AsI64()
+				n = first.ValueSym.Data.Constant.AsI64()
 			| u64:
-				n = first.Value.Data.Constant.AsU64()
+				n = first.ValueSym.Data.Constant.AsU64()
 			|:
 				panic("sema: unimplemented enum int type, this panic call should be unreachable")
 			}
