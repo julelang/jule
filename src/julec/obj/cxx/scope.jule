@@ -557,17 +557,10 @@ impl scopeCoder {
 		identCoder.label(self.oc.Buf, uintptr(gt.Label))
 	}
 
-	fn postfix(mut &self, mut p: &sema::Postfix) {
-		self.oc.write("(")
-		self.oc.ec.possibleRefExpr(p.Expr)
-		self.oc.write(")")
-		self.oc.write(p.Op)
-	}
-
-	fn assignLeft(mut &self, mut &model: sema::Expr) {
-		match type model {
+	fn tryMapSet(mut &self, m: sema::Expr): (ok: bool) {
+		match type m {
 		| &sema::IndexingExpr:
-			mut iem := (&sema::IndexingExpr)(model)
+			mut iem := (&sema::IndexingExpr)(m)
 			_map := iem.Expr.Type.Map()
 			if _map == nil {
 				break
@@ -590,9 +583,26 @@ impl scopeCoder {
 			self.oc.write("), ")
 			self.oc.ec.possibleRefExpr(iem.Index.Model)
 			self.oc.write("))")
-			ret
+			ok = true
 		}
-		self.oc.ec.possibleRefExpr(model)
+		ret
+	}
+
+	fn postfix(mut &self, mut p: &sema::Postfix) {
+		self.oc.write("(")
+		ok := self.tryMapSet(p.Expr)
+		if !ok {
+			self.oc.ec.possibleRefExpr(p.Expr)
+		}
+		self.oc.write(")")
+		self.oc.write(p.Op)
+	}
+
+	fn assignLeft(mut &self, mut &model: sema::Expr) {
+		ok := self.tryMapSet(model)
+		if !ok {
+			self.oc.ec.possibleRefExpr(model)
+		}
 	}
 
 	fn shl(mut &self, mut a: &sema::Assign) {
