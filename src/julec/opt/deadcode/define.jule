@@ -75,14 +75,14 @@ impl ObjectDeadCode {
 					continue
 				}
 
-				// Push all methods as live if s is requires all methods should be alive.
+				// Push all methods as live if s is requires all methods should be live.
 				if allLive {
 					self.pushLive[&sema::FuncIns](ins)
 					self.setReferencesAsLive(ins.Refers)
 					continue
 				}
 
-				// Set trait implemented methods as alive.
+				// Set trait implemented methods as live.
 				// Push as live the method if implements a trait's method.
 				// Other methods will be marked as live by referenced defines,
 				// no need for special tracking algorithm to caught.
@@ -91,7 +91,7 @@ impl ObjectDeadCode {
 					self.setReferencesAsLive(ins.Refers)
 				}
 
-				// Set reserved methods as alive.
+				// Set reserved methods as live.
 				// So, removing these methods may cause compilation problems,
 				// or unexpected program bavior.
 				const Binded = false
@@ -249,6 +249,31 @@ impl ObjectDeadCode {
 				self.pushLive[&sema::FuncIns](ins)
 			}
 			self.setReferencesAsLive(ins.Refers)
+		}
+
+		// Finally analysis is done. We have to mark as live methods of the
+		// structures which is implementes a live trait. Because a trait
+		// may use the method, but following remove algorithm of the analysis
+		// will may remove the trait methods because of zero references.
+		// So push as live the methods of implemented live structures.
+		for (_, mut t) in self.live.traits {
+			for (_, mut s) in t.Implemented {
+				for (_, mut ins) in s.Instances {
+					if !self.isLive[&sema::StructIns](ins) {
+						continue
+					}
+					for _, tm in t.Methods {
+						const Static = false
+						mut m := ins.FindMethod(tm.Ident, Static)
+						for (_, mut mins) in m.Instances {
+							if !self.isLive[&sema::FuncIns](mins) {
+								self.pushLive[&sema::FuncIns](mins)
+								self.setReferencesAsLive(mins.Refers)
+							}
+						}
+					}
+				}
+			}
 		}
 	}
 
