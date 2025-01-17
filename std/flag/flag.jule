@@ -22,6 +22,7 @@ trait CommonFlag {
 	fn Reset(mut self)
 }
 
+// A Flag for FlagSet.
 struct Flag[T] {
 	name:    str
 	short:   rune
@@ -53,6 +54,23 @@ type BoolFlag = &Flag[bool]
 type StrFlag = &Flag[str]
 
 // Flag parser for command-line arguments.
+//
+// Syntax:
+//	Long names can be used with double dash (--). Short names can be
+//	used with a single dash (-). When Boolean flags are used, they use
+//	the opposite of their default values. Floating-point values are the
+//	same as the [ParseFloat] function provided by the "std/conv" package.
+//	Decimal, octal, binary and hexadecimal formats are supported for
+//	signed and unsigned integer types. String types accept values ​​directly.
+//
+//	Octal values are represented by starts with 0o or 0 prefix.
+//	Hexadecimal values are represented by starts with 0x prefix.
+//	Binary values are represented by starts with 0b prefix.
+//
+//	A space is required to give a value. When a single dash (-) is used,
+//	all following characters are considered short names and thus collective
+//	use is allowed. If the short name flags used need values, the values ​
+//	should follow respectively.
 struct FlagSet {
 	flags: []CommonFlag
 }
@@ -95,23 +113,6 @@ impl FlagSet {
 	// Parse arguments and process flags.
 	// Returns non-flag content.
 	// Exceptional always is string and holds error message.
-	//
-	// Syntax:
-	//   Long names can be used with double dash (--). Short names can be
-	//   used with a single dash (-). When Boolean flags are used, they use
-	//   the opposite of their default values. Floating-point values are the
-	//   same as the [ParseFloat] function provided by the "std/conv" package.
-	//   Decimal, octal, binary and hexadecimal formats are supported for
-	//   signed and unsigned integer types. String types accept values ​​directly.
-	//
-	//   Octal values are represented by starts with 0o or 0 prefix.
-	//   Hexadecimal values are represented by starts with 0x prefix.
-	//   Binary values are represented by starts with 0b prefix.
-	//
-	//   A space is required to give a value. When a single dash (-) is used,
-	//   all following characters are considered short names and thus collective
-	//   use is allowed. If the short name flags used need values, the values ​
-	//   should follow respectively.
 	fn Parse(mut self, args: []str)!: []str {
 		mut ap := argParser{
 			set: self,
@@ -150,20 +151,13 @@ impl FlagSet {
 	// Panics if name or short name is alreadys exist.
 	// Zero (0) short names will be ignored.
 	// Panics if used unsupported type.
-	//
-	// Supported types are:
-	//  - i64
-	//  - u64
-	//  - f64
-	//  - str
-	//  - bool
 	fn Add[T: i64 | u64 | f64 | bool | str](mut self, name: str, short: rune, default: T, what: str): &T {
 		mut flag := self.addFlagCommon[T](name, short, what)
 		flag.data = new(T, default)
 		ret flag.data
 	}
 
-	// Same with add method but do not allocates new reference, uses existing.
+	// Same with the Add method but do not allocates new reference, uses existing.
 	fn AddVar[T: i64 | u64 | f64 | bool | str](mut self, mut var: &T, name: str, short: rune, what: str) {
 		if var == nil {
 			panic("flag: FlatSet.AddVar[T]: variable is nil")
