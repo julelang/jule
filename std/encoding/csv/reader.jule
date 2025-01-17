@@ -114,17 +114,17 @@ struct Reader {
 	// Comment, if not 0, is the comment character. Lines beginning with the
 	// Comment character without preceding whitespace are ignored.
 	// With leading whitespace the Comment character becomes part of the
-	// field, even if Trim_leading_space is true.
+	// field, even if TrimLeadingSpace is true.
 	// Comment must be a valid rune and must not be \r, \n,
 	// or the Unicode replacement character (0xFFFD).
 	// It must also not be equal to comma.
 	Comment: rune
 
 	// The number of expected fields per record.
-	// If fields_per_record is positive, read requires each record to
-	// have the given number of fields. If fields_per_record is 0, read sets it to
+	// If FieldsPerRecord is positive, read requires each record to
+	// have the given number of fields. If FieldsPerRecord is 0, read sets it to
 	// the number of fields in the first record, so that future records must
-	// have the same field count. If fields_per_record is negative, no check is
+	// have the same field count. If FieldsPerRecord is negative, no check is
 	// made and records may have a variable number of fields.
 	FieldsPerRecord: int
 
@@ -153,13 +153,13 @@ struct Reader {
 	rawBuffer: []byte
 
 	// Holds the unescaped fields, one after another.
-	// The fields can be accessed by using the indexes in field_indexes.
+	// The fields can be accessed by using the indexes in fieldIndexes.
 	// E.g., For the row `a,"b","c""d",e`, recordBuffer will contain `abc"de`
-	// and field_indexes will contain the indexes [1, 2, 5, 6].
+	// and fieldIndexes will contain the indexes [1, 2, 5, 6].
 	recordBuffer: []byte
 
-	// Index of fields inside record_buffer.
-	// The i'th field ends at offset field_indexes[i] in record_buffer.
+	// Index of fields inside recordBuffer.
+	// The i'th field ends at offset fieldIndexes[i] in recordBuffer.
 	fieldIndexes: []int
 
 	// fieldPositions is an index of field positions for the
@@ -211,7 +211,7 @@ impl Reader {
 	// If this is called with an out-of-bounds index, it panics.
 	fn FieldPos(self, field: int): (line: int, column: int) {
 		if field < 0 || field >= len(self.fieldPositions) {
-			panic("csv: Reader: out of range index passed to field_pos")
+			panic("csv: Reader: out of range index passed to fieldPos")
 		}
 		p := &self.fieldPositions[field]
 		unsafe {
@@ -235,7 +235,7 @@ impl Reader {
 
 	// Reads the next line (with the trailing endline).
 	// If EOF is hit without a trailing endline, it will be omitted.
-	// The result is only valid until the next call to read_line.
+	// The result is only valid until the next call to readLine.
 	fn readLine(mut self)!: []byte {
 		scan := self.s.Scan() else { error(error) }
 		if !scan {
