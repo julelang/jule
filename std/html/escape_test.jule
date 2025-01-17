@@ -1,0 +1,114 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/strings"
+use "std/testing"
+
+struct unescapeTest {
+	desc:      str // A short description of the test case.
+	html:      str // The HTML text.
+	unescaped: str // The unescaped text.
+}
+
+static unescapeTests: []unescapeTest = [
+	// Handle no entities.
+	{
+		"copy",
+		"A\ttext\nstring",
+		"A\ttext\nstring",
+	},
+	// Handle simple named entities.
+	{
+		"simple",
+		"&amp; &gt; &lt;",
+		"& > <",
+	},
+	// Handle hitting the end of the string.
+	{
+		"stringEnd",
+		"&amp &amp",
+		"& &",
+	},
+	// Handle entities with two codepoints.
+	{
+		"multiCodepoint",
+		"text &gesl; blah",
+		"text \u22db\ufe00 blah",
+	},
+	// Handle decimal numeric entities.
+	{
+		"decimalEntity",
+		"Delta = &#916; ",
+		"Delta = Δ ",
+	},
+	// Handle hexadecimal numeric entities.
+	{
+		"hexadecimalEntity",
+		"Lambda = &#x3bb; = &#X3Bb ",
+		"Lambda = λ = λ ",
+	},
+	// Handle numeric early termination.
+	{
+		"numericEnds",
+		"&# &#x &#128;43 &copy = &#169f = &#xa9",
+		"&# &#x €43 © = ©f = ©",
+	},
+	// Handle numeric ISO-8859-1 entity replacements.
+	{
+		"numericReplacements",
+		"Footnote&#x87;",
+		"Footnote‡",
+	},
+	// Handle single ampersand.
+	{
+		"copySingleAmpersand",
+		"&",
+		"&",
+	},
+	// Handle ampersand followed by non-entity.
+	{
+		"copyAmpersandNonEntity",
+		"text &test",
+		"text &test",
+	},
+	// Handle "&#".
+	{
+		"copyAmpersandHash",
+		"text &#",
+		"text &#",
+	},
+]
+
+#test
+fn testUnescape(t: &testing::T) {
+	for _, tt in unescapeTests {
+		unescaped := UnescapeStr(tt.html)
+		if unescaped != tt.unescaped {
+			t.Errorf("TestUnescape {}: want {}, got {}", tt.desc, tt.unescaped, unescaped)
+		}
+	}
+}
+
+#test
+fn testUnescapeEscape(t: &testing::T) {
+	ss := [
+		``,
+		`abc def`,
+		`a & b`,
+		`a&amp;b`,
+		`a &amp b`,
+		`&quot;`,
+		`"`,
+		`"<&>"`,
+		`&quot;&lt;&amp;&gt;&quot;`,
+		`3&5==1 && 0<1, "0&lt;1", a+acute=&aacute;`,
+		`The special characters are: <, >, &, ' and "`,
+	]
+	for _, s in ss {
+		got := UnescapeStr(EscapeStr(s))
+		if got != s {
+			t.Errorf("got {} want {}", got, s)
+		}
+	}
+}

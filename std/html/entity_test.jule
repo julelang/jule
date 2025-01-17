@@ -1,0 +1,31 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/testing"
+use "std/unicode/utf8"
+
+#test
+fn testEntityLength(t: &testing::T) {
+	if len(entity) == 0 || len(entity2) == 0 {
+		panic("maps not loaded")
+		ret
+	}
+
+	// We verify that the length of UTF-8 encoding of each value is <= 1 + len(key).
+	// The +1 comes from the leading "&". This property implies that the length of
+	// unescaped text is <= the length of escaped text.
+	for k, v in entity {
+		if 1+len(k) < utf8::RuneLen(v) {
+			t.Errorf("escaped entity &" + k + " is shorter than its UTF-8 encoding " + str(v))
+		}
+		if len(k) > longestEntityWithoutSemicolon && k[len(k)-1] != ';' {
+			t.Errorf("entity name %s is %d characters, but longestEntityWithoutSemicolon=%d", k, len(k), longestEntityWithoutSemicolon)
+		}
+	}
+	for k, v in entity2 {
+		if 1+len(k) < utf8::RuneLen(v[0])+utf8::RuneLen(v[1]) {
+			t.Errorf("escaped entity &" + k + " is shorter than its UTF-8 encoding " + str(v[0]) + str(v[1]))
+		}
+	}
+}
