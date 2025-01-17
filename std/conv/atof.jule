@@ -553,7 +553,7 @@ fn atof32exact(mantissa: u64, mut exp: int, mut neg: bool): (f: f32, ok: bool) {
 // and returns it as a f64.
 // The string s has already been parsed into a mantissa, exponent, and sign (neg==true for negative).
 // If trunc is true, trailing non-zero bits have been omitted from the mantissa.
-fn atofHex(&flt: floatInfo, mut mantissa: u64, mut exp: int, neg: bool, trunc: bool): (f64, ConvError) {
+fn atofHex(&flt: floatInfo, mut mantissa: u64, mut exp: int, neg: bool, trunc: bool): (f64, int) {
 	maxExp := int(1<<flt.expbits) + flt.bias - 2
 	minExp := flt.bias + 1
 	exp += int(flt.mantbits) // mantissa now implicitly divided by 2^mantbits.
@@ -600,11 +600,11 @@ fn atofHex(&flt: floatInfo, mut mantissa: u64, mut exp: int, neg: bool, trunc: b
 	if mantissa>>flt.mantbits == 0 { // Denormal or zero.
 		exp = flt.bias
 	}
-	mut err := ConvError.Ok
+	mut err := noError
 	if exp > maxExp { // infinity and range error
 		mantissa = u64(1 << flt.mantbits)
 		exp = maxExp + 1
-		err = ConvError.OutOfRange
+		err = Error.OutOfRange
 	}
 
 	mut bits := mantissa & (1<<flt.mantbits - 1)
@@ -618,18 +618,19 @@ fn atofHex(&flt: floatInfo, mut mantissa: u64, mut exp: int, neg: bool, trunc: b
 	ret math::F64FromBits(bits), err
 }
 
-fn atof32(s: str): (f: f32, n: int, err: ConvError) {
+fn atof32(s: str): (f: f32, n: int, err: int) {
+	err = noError
 	{
 		val, _n, ok := special(s)
 		if ok {
-			ret f32(val), _n, ConvError.Ok
+			ret f32(val), _n, noError
 		}
 	}
 
 	mantissa, exp, neg, trunc, hex, _n, mut ok := readFloat(s)
 	n = _n
 	if !ok {
-		ret 0, n, ConvError.InvalidSyntax
+		ret 0, n, Error.InvalidSyntax
 	}
 
 	if hex {
@@ -644,13 +645,13 @@ fn atof32(s: str): (f: f32, n: int, err: ConvError) {
 		if !trunc {
 			f, ok = atof32exact(mantissa, exp, neg)
 			if ok {
-				ret f, n, ConvError.Ok
+				ret f, n, noError
 			}
 		}
 		f, ok = eiselLemire32(mantissa, exp, neg)
 		if ok {
 			if !trunc {
-				ret f, n, ConvError.Ok
+				ret f, n, noError
 			}
 			// Even if the mantissa was truncated, we may
 			// have found the correct result. Confirm by
@@ -658,7 +659,7 @@ fn atof32(s: str): (f: f32, n: int, err: ConvError) {
 			mut fUp := f32(0)
 			fUp, ok = eiselLemire32(mantissa+1, exp, neg)
 			if ok && f == fUp {
-				ret f, n, ConvError.Ok
+				ret f, n, noError
 			}
 		}
 	}
@@ -666,28 +667,29 @@ fn atof32(s: str): (f: f32, n: int, err: ConvError) {
 	// Slow fallback.
 	mut d := decimal{}
 	if !d.set(unsafe::StrBytes(s)[:n]) {
-		ret 0, n, ConvError.InvalidSyntax
+		ret 0, n, Error.InvalidSyntax
 	}
 	b, ovf := d.floatBits(f32info)
 	f = math::F32FromBits(u32(b))
 	if ovf {
-		err = ConvError.OutOfRange
+		err = Error.OutOfRange
 	}
 	ret f, n, err
 }
 
-fn atof64(s: str): (f: f64, n: int, err: ConvError) {
+fn atof64(s: str): (f: f64, n: int, err: int) {
+	err = noError
 	{
 		val, _n, ok := special(s)
 		if ok {
-			ret val, _n, ConvError.Ok
+			ret val, _n, noError
 		}
 	}
 
 	mantissa, exp, neg, trunc, hex, _n, mut ok := readFloat(s)
 	n = _n
 	if !ok {
-		ret 0, n, ConvError.InvalidSyntax
+		ret 0, n, Error.InvalidSyntax
 	}
 
 	if hex {
@@ -701,13 +703,13 @@ fn atof64(s: str): (f: f64, n: int, err: ConvError) {
 		if !trunc {
 			f, ok = atof64exact(mantissa, exp, neg)
 			if ok {
-				ret f, n, ConvError.Ok
+				ret f, n, noError
 			}
 		}
 		f, ok = eiselLemire64(mantissa, exp, neg)
 		if ok {
 			if !trunc {
-				ret f, n, ConvError.Ok
+				ret f, n, noError
 			}
 			// Even if the mantissa was truncated, we may
 			// have found the correct result. Confirm by
@@ -715,7 +717,7 @@ fn atof64(s: str): (f: f64, n: int, err: ConvError) {
 			mut fUp := 0.
 			fUp, ok = eiselLemire64(mantissa+1, exp, neg)
 			if ok && f == fUp {
-				ret f, n, ConvError.Ok
+				ret f, n, noError
 			}
 		}
 	}
@@ -723,17 +725,17 @@ fn atof64(s: str): (f: f64, n: int, err: ConvError) {
 	// Slow fallback.
 	mut d := decimal{}
 	if !d.set(unsafe::StrBytes(s)[:n]) {
-		ret 0, n, ConvError.InvalidSyntax
+		ret 0, n, Error.InvalidSyntax
 	}
 	b, ovf := d.floatBits(f64info)
 	f = math::F64FromBits(b)
 	if ovf {
-		err = ConvError.OutOfRange
+		err = Error.OutOfRange
 	}
 	ret f, n, err
 }
 
-fn parseFloatPrefix(&s: str, bitSize: int): (f64, int, ConvError) {
+fn parseFloatPrefix(&s: str, bitSize: int): (f64, int, int) {
 	if bitSize == 32 {
 		f, n, err := atof32(s)
 		ret f64(f), n, err
@@ -755,23 +757,23 @@ fn parseFloatPrefix(&s: str, bitSize: int): (f64, int, ConvError) {
 // there are more bits in the hexadecimal representation than
 // will fit in the mantissa.)
 //
-// The exceptional errors that have concrete type ConvError.
+// The exceptional errors that have concrete type Error.
 //
-// If s is not syntactically well-formed, throws exception = ConvError.InvalidSyntax.
+// If s is not syntactically well-formed, throws exception = Error.InvalidSyntax.
 //
 // If s is syntactically well-formed but is more than 1/2 ULP
 // away from the largest floating point number of the given size,
-// Exceptional = ConvError.OutOfRange.
+// Exceptional = Error.OutOfRange.
 //
 // Recognizes the string "NaN", and the (possibly signed) strings "inf" and "infinity"
 // as their respective special floating point values. It ignores case when matching.
 fn ParseFloat(s: str, bitSize: int)!: f64 {
 	f, n, err := parseFloatPrefix(s, bitSize)
-	if n != len(s) && (err == ConvError.Ok || err != ConvError.InvalidSyntax) {
-		error(ConvError.InvalidSyntax)
+	if n != len(s) && (err == noError || err != Error.InvalidSyntax) {
+		error(Error.InvalidSyntax)
 	}
-	if err != ConvError.Ok {
-		error(err)
+	if err != noError {
+		error(intToError(err))
 	}
 	ret f
 }

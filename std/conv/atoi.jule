@@ -48,9 +48,10 @@ fn lower(c: byte): byte {
 	ret c | ('x' - 'X')
 }
 
-fn parseUint(mut &s: str, mut base: int, mut bitSize: int): (u64, ConvError) {
+fn parseUint(mut &s: str, mut base: int, mut bitSize: int): (u64, err: int) {
+	err = noError
 	if s == "" {
-		ret 0, ConvError.InvalidSyntax
+		ret 0, Error.InvalidSyntax
 	}
 
 	match {
@@ -76,13 +77,13 @@ fn parseUint(mut &s: str, mut base: int, mut bitSize: int): (u64, ConvError) {
 			}
 		}
 	|:
-		ret 0, ConvError.InvalidBase
+		ret 0, Error.InvalidBase
 	}
 
 	if bitSize == 0 {
 		bitSize = IntSize
 	} else if bitSize < 0 || bitSize > 64 {
-		ret 0, ConvError.InvalidBitSize
+		ret 0, Error.InvalidBitSize
 	}
 
 	// Cutoff is the smallest number such that cutoff*base > u64.Max.
@@ -116,28 +117,28 @@ fn parseUint(mut &s: str, mut base: int, mut bitSize: int): (u64, ConvError) {
 		| c == '_':
 			continue
 		|:
-			ret 0, ConvError.InvalidSyntax
+			ret 0, Error.InvalidSyntax
 		}
 
 		if d >= byte(base) {
-			ret 0, ConvError.InvalidSyntax
+			ret 0, Error.InvalidSyntax
 		}
 
 		if n >= cutoff {
 			// n*base overflows
-			ret maxVal, ConvError.OutOfRange
+			ret maxVal, Error.OutOfRange
 		}
 		n *= u64(base)
 
 		n1 := n + u64(d)
 		if n1 < n || n1 > maxVal {
 			// n+d overflows
-			ret maxVal, ConvError.OutOfRange
+			ret maxVal, Error.OutOfRange
 		}
 		n = n1
 	}
 
-	ret n, ConvError.Ok
+	ret n, noError
 }
 
 // Is like ParseInt but for unsigned numbers.
@@ -145,8 +146,8 @@ fn parseUint(mut &s: str, mut base: int, mut bitSize: int): (u64, ConvError) {
 // A sign prefix is not permitted.
 fn ParseUint(mut s: str, mut base: int, mut bitSize: int)!: u64 {
 	un, err := parseUint(s, base, bitSize)
-	if err != ConvError.Ok {
-		error(err)
+	if err != noError {
+		error(intToError(err))
 	}
 	ret un
 }
@@ -165,13 +166,13 @@ fn ParseUint(mut s: str, mut base: int, mut bitSize: int)!: u64 {
 // correspond to int, i8, i16, i32, and i64.
 // If bitSize is below 0 or above 64, throws exception.
 //
-// The exception errors that parse_int throws have concrete type ConvError.
-// If s is empty or contains invalid digits, exception = ConvError.InvalidSyntax;
+// The exception errors that parse_int throws have concrete type Error.
+// If s is empty or contains invalid digits, exception = Error.InvalidSyntax;
 // if the value corresponding to s cannot be represented by a signed integer of
-// the given size, exception = ConvError.OutOfRange.
+// the given size, exception = Error.OutOfRange.
 fn ParseInt(mut s: str, base: int, mut bitSize: int)!: i64 {
 	if s == "" {
-		error(ConvError.InvalidSyntax)
+		error(Error.InvalidSyntax)
 	}
 
 	// Pick off leading sign.
@@ -185,8 +186,8 @@ fn ParseInt(mut s: str, base: int, mut bitSize: int)!: i64 {
 
 	// Convert unsigned and check range.
 	mut un, err := parseUint(s, base, bitSize)
-	if err != ConvError.Ok && err != ConvError.OutOfRange {
-		error(err)
+	if err != noError && err != Error.OutOfRange {
+		error(intToError(err))
 	}
 
 	if bitSize == 0 {
@@ -195,10 +196,10 @@ fn ParseInt(mut s: str, base: int, mut bitSize: int)!: i64 {
 
 	cutoff := u64(1 << uint(bitSize-1))
 	if !neg && un >= cutoff {
-		error(ConvError.OutOfRange)
+		error(Error.OutOfRange)
 	}
 	if neg && un > cutoff {
-		error(ConvError.OutOfRange)
+		error(Error.OutOfRange)
 	}
 	mut n := i64(un)
 	if neg {
