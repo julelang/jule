@@ -1,0 +1,40 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/strings"
+use "std/testing"
+
+struct replacerTest {
+	oldnew: []str
+	input:  str
+	out:    str
+}
+
+static replacerTests = []replacerTest([
+	{oldnew: [], input: "", out: ""},
+	{oldnew: [], input: "foobarbaz", out: "foobarbaz"},
+	{oldnew: ["hello", "hi"], input: "hello, world", out: "hi, world"},
+	{oldnew: ["a", "o", "o", "u"], input: "banana", out: "bonono"},
+	{oldnew: ["foo", "", "bar", ""], input: "lorem foo dolor sit bar", out: "lorem  dolor sit "},
+	{oldnew: ["foo", "bar", "fooo", "baz"], input: "foofoofoooofoooooofoooofoofooo", out: "barbarbaroobaroooobaroobarbaro"},
+	{oldnew: ["foo", "lorem ipsum", "o", "O"], input: "foofoofoooofoooooofoooofoofooo", out: "lorem ipsumlorem ipsumlorem ipsumOOlorem ipsumOOOOlorem ipsumOOlorem ipsumlorem ipsumO"},
+	{oldnew: ["foo", "lorem ipsum", "oo", "O"], input: "foofoofoooofoooooofoooofoofooo", out: "lorem ipsumlorem ipsumlorem ipsumOlorem ipsumOOlorem ipsumOlorem ipsumlorem ipsumo"},
+	{oldnew: ["foo", "lorem ipsum", "oo", "O"], input: "foofoofoooofoooooofoooofoofooo", out: "lorem ipsumlorem ipsumlorem ipsumOlorem ipsumOOlorem ipsumOlorem ipsumlorem ipsumo"},
+	{oldnew: ["bar", "k", "barbaz", "z"], input: "barbazbarbarbazbarbarbarbaz", out: "kbazkkbazkkkbaz"},
+	{oldnew: ["L", "", "h", "", "r", ""], input: "HeLLo, WOrLD", out: "Heo, WOD"},
+	{oldnew: ["ü", "u"], input: "Merhaba, Dünya", out: "Merhaba, Dunya"},
+	{oldnew: ["世界", "World"], input: "Hello, 世界", out: "Hello, World"},
+	{oldnew: ["ç", "", "ş", "Ş", "O", "ö"], input: "çÇÇçşşŞööOOOOööOşÖçŞş", out: "ÇÇŞŞŞöööööööööŞÖŞŞ"},
+])
+
+#test
+fn testReplacer(t: &testing::T) {
+	for _, test in replacerTests {
+		r := strings::Replacer.New(test.oldnew...)
+		out := r.Replace(test.input)
+		if out != test.out {
+			t.Errorf("Replacer.Replace({}) == {}, expected {}", test.input, out, test.out)
+		}
+	}
+}

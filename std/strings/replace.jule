@@ -1,0 +1,120 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/io"
+
+// Replaces a list of strings with replacements.
+// It is more efficient than Replace function for multiple replacements on one string.
+// It is safe for concurrent use by multiple threads.
+struct Replacer {
+	mut oldnew: []str
+}
+
+impl Replacer {
+	// Returns a new [Replacer] from a list of old, new string
+	// pairs. Replacements are performed in the order they appear in the
+	// target string, without overlapping matches. The old string
+	// comparisons are done in argument order.
+	//
+	// Panics if given an odd number of arguments.
+	static fn New(oldnew: ...str): &Replacer {
+		if len(oldnew)%2 == 1 {
+			panic("std/strings: Replacer.New: odd argument count")
+		}
+		mut r := &Replacer{oldnew: append([]str(nil), oldnew...)}
+		if len(r.oldnew) == 0 {
+			ret r
+		}
+		// Sort replacements by length.
+		replacesort(r.oldnew)
+		ret r
+	}
+
+	// Applies replace on s and writes result to w.
+	// Forwards any exception if any.
+	fn write(self, s: str, mut w: io::StrWriter)!: (n: int) {
+		mut last := 0
+		for last < len(s) {
+			// Find the lowest index to match.
+			// Search should start at shortest replacement.
+			mut low, mut lowpos := -1, -1
+			{
+				mut i := 0
+				for i < len(self.oldnew); i += 2 {
+					pos := Index(s[last:], self.oldnew[i])
+					if pos != -1 && (low == -1 || pos < low) {
+						low, lowpos = pos, i
+						// Zero index is the lowest, break immediately.
+						if low == 0 {
+							break
+						}
+					}
+				}
+			}
+			if low == -1 {
+				break
+			}
+			n += w.WriteStr(s[last:last+low]) else { error(error) }
+			n += w.WriteStr(self.oldnew[lowpos+1]) else { error(error) }
+			last += low + len(self.oldnew[lowpos])
+		}
+		if last < len(s) {
+			n += w.WriteStr(s[last:]) else { error(error) }
+		}
+		ret n
+	}
+
+	// Replaces s and returns the result.
+	fn Replace(self, s: str): str {
+		if len(self.oldnew) == 0 {
+			ret s
+		}
+		// Compute number of replacements to
+		// preallocate anough memory at one time.
+		mut t := len(s)
+		{
+			mut found := false
+			mut i := 0
+			for i < len(self.oldnew); i += 2 {
+				n := Count(s, self.oldnew[i])
+				found = found || n > 0
+				t -= n * len(self.oldnew[i])   // Remove length of old.
+				t += n * len(self.oldnew[i+1]) // Add length of new.
+			}
+			// No any replacement exist.
+			// Return immediately.
+			if !found {
+				ret s
+			}
+		}
+		mut b := new(Builder)
+		b.Grow(t)
+		self.write(s, b)!
+		ret b.Str()
+	}
+
+	// Applies replace on s and writes result to w.
+	// Forwards any exception if any.
+	fn WriteStr(self, s: str, mut w: io::StrWriter)!: (n: int) {
+		if len(self.oldnew) == 0 {
+			ret w.WriteStr(s) else { error(error) }
+		}
+		ret self.write(s, w) else { error(error) }
+	}
+}
+
+// Implements basic bubble sort algorithm for Replacer oldnew.
+fn replacesort(mut s: []str) {
+	n := len(s)
+	mut i := 0
+	for i < n-2; i += 2 {
+		mut j := 0
+		for j < n-i-2; j += 2 {
+			if len(s[j]) > len(s[j+2]) {
+				s[j], s[j+2] = s[j+2], s[j]
+				s[j+1], s[j+3] = s[j+3], s[j+1]
+			}
+		}
+	}
+}
