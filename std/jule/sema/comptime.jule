@@ -821,25 +821,6 @@ impl comptimeTypeInfo {
 		ret nil
 	}
 
-	fn _Statics(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
-		if len(fc.Args) > 0 {
-			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Statics")
-			ret nil
-		}
-		mut s := self.base.Struct()
-		if s == nil {
-			e.pushErr(fc.Token, build::LogMsg.InvalidTypeForFunc, self.base.Str(), "Fields")
-			ret nil
-		}
-		ret &Value{
-			Type: &Type{
-				Kind: &comptimeStatics{
-					fields: s.Statics,
-				},
-			},
-		}
-	}
-
 	fn _Binded(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Binded")
@@ -1050,13 +1031,6 @@ impl comptimeTypeInfo {
 			mut method := &FuncIns{
 				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Fields(e, fc)
-				},
-			}
-			ret buildAsComptimeMethodData(method)
-		| "Statics":
-			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
-					ret self._Statics(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)
@@ -1936,42 +1910,6 @@ impl comptimeDecl {
 		}
 	}
 
-	fn _Statics(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
-		if len(fc.Args) > 0 {
-			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Statics")
-			ret nil
-		}
-		mut fields := ([]&comptimeDecl)(nil)
-		match type self.decl {
-		| &TypeEnum
-		| &Trait
-		| &TypeAlias
-		| &EnumItem
-		| &Field
-		| &Var
-		| &Param
-		| &Func
-		| &Enum:
-			e.pushErr(fc.Token, build::LogMsg.InvalidTypeForFunc, self.declAsStr(), "Statics")
-			ret nil
-		| &Struct:
-			mut s := (&Struct)(self.decl)
-			fields = make([]&comptimeDecl, len(s.Statics))
-			for (i, mut field) in s.Statics {
-				fields[i] = &comptimeDecl{decl: field}
-			}
-		|:
-			panic("sema: comptimeDecl.Statics: unimplemented declaration kind")
-		}
-		ret &Value{
-			Type: &Type{
-				Kind: &comptimeDecls{
-					decls: fields,
-				},
-			},
-		}
-	}
-
 	fn _Methods(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 		if len(fc.Args) > 0 {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Methods")
@@ -2075,13 +2013,6 @@ impl comptimeDecl {
 			mut method := &FuncIns{
 				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
 					ret self._Fields(e, fc)
-				},
-			}
-			ret buildAsComptimeMethodData(method)
-		| "Statics":
-			mut method := &FuncIns{
-				caller: fn(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
-					ret self._Statics(e, fc)
 				},
 			}
 			ret buildAsComptimeMethodData(method)

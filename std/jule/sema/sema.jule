@@ -1729,23 +1729,12 @@ impl sema {
 			dest.Methods = append(dest.Methods, f)
 		}
 
-		for (_, mut v) in ipl.Statics {
-			const Static = true
-			if dest.FindMethod(v.Ident, Static) != nil || dest.FindStatic(v.Ident) != nil {
-				self.pushErr(v.Token, build::LogMsg.StructAlreadyHaveIdent, dest.Ident, v.Ident)
-				ok = false
-				continue
-			}
-			dest.Statics = append(dest.Statics, v)
-		}
-
 		if len(dest.Instances) == 1 {
 			// We have an instance. It's should be impossible if structure is not
 			// constructed by a strict type alias. If so, update data of the instance.
 			mut s := dest.Instances[0]
 			if s.Source != nil {
 				s.Methods = dest.Methods
-				s.Statics = dest.Statics
 			}
 		}
 
@@ -1785,10 +1774,6 @@ impl sema {
 
 		pushImplemented(base, dest)
 		pushImplements(dest, base)
-
-		if len(decl.Statics) > 0 {
-			self.pushErr(decl.Statics[0].Token, build::LogMsg.TraitImplHasStatic)
-		}
 
 		match {
 		| !self.checkTraitImplMethods(base, decl):
@@ -2316,21 +2301,6 @@ impl sema {
 		}
 
 		ok = true
-
-		if len(s.Statics) > 0 {
-			mut n := len(self.errors)
-			self.files[0].TypeAliases = append(tc.useGenerics, self.files[0].TypeAliases...)
-			for (_, mut v) in s.Statics {
-				self.checkVarDecl(v, self)
-				self.checkVar(v, self)
-				ok = len(self.errors)-n == 0 && ok
-			}
-			self.files[0].TypeAliases = self.files[0].TypeAliases[len(tc.useGenerics):]
-			if !ok {
-				ret false
-			}
-		}
-
 		mut eval := self.eval(self)
 		s.Comparable = !s.Decl.Binded
 		for (_, mut f) in s.Fields {

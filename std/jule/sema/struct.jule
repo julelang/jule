@@ -44,7 +44,6 @@ struct Struct {
 	Ident:      str
 	Fields:     []&Field
 	Methods:    []&Func
-	Statics:    []&Var
 	Public:     bool
 	Binded:     bool
 	Directives: []&ast::Directive
@@ -87,17 +86,12 @@ impl Struct {
 		mut ins := &StructIns{
 			Decl: self,
 			Fields: make([]&FieldIns, 0, len(self.Fields)),
-			Statics: make([]&Var, 0, len(self.Statics)),
 			Refers: ReferenceStack.new(),
 		}
 
 		// See developer reference (12).
 		ins.Mutable = false
 		ins.Comparable = true
-
-		for (_, mut s) in self.Statics {
-			ins.Statics = append(ins.Statics, new(Var, *s))
-		}
 
 		for (_, mut f) in self.Fields {
 			mut f2 := f.instance()
@@ -146,17 +140,6 @@ impl Struct {
 		for (_, mut f) in self.Methods {
 			if f.Statically == statically && f.Ident == ident {
 				ret f
-			}
-		}
-		ret nil
-	}
-
-	// Returns static field by identifier.
-	// Returns nil if not exist any static field in this identifier.
-	fn FindStatic(mut self, ident: str): &Var {
-		for (_, mut v) in self.Statics {
-			if v.Ident == ident {
-				ret v
 			}
 		}
 		ret nil
@@ -219,7 +202,6 @@ struct StructIns {
 	Decl:       &Struct
 	Generics:   []&InsGeneric
 	Fields:     []&FieldIns
-	Statics:    []&Var
 	Methods:    []&Func
 	Mutable:    bool // This structure has mutable defines.
 	Comparable: bool
@@ -329,17 +311,6 @@ impl StructIns {
 		for (_, mut f) in self.Fields {
 			if f.Decl.Ident == ident {
 				ret f
-			}
-		}
-		ret nil
-	}
-
-	// Returns static field by identifier.
-	// Returns nil if not exist any static field in this identifier.
-	fn FindStatic(mut self, ident: str): &Var {
-		for (_, mut v) in self.Statics {
-			if v.Ident == ident {
-				ret v
 			}
 		}
 		ret nil
