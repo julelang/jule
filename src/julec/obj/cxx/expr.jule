@@ -57,7 +57,7 @@ impl exprCoder {
 	fn string(mut &self, &c: &constant::Const) {
 		content := c.ReadStr()
 		if len(content) == 0 { // Empty.
-			self.oc.write(typeCoder.Str + "()")
+			self.oc.write(typeStr + "()")
 			ret
 		}
 		len := conv::FmtInt(i64(len(content)), 10)
@@ -482,7 +482,7 @@ impl exprCoder {
 		match {
 		| obj::IsAny(m.Type):
 			if m.Expr.Type.IsNil() {
-				self.oc.write(typeCoder.Any + "()")
+				self.oc.write(typeAny + "()")
 				ret
 			}
 			if m.Expr.Type.TypeEnum() != nil {
@@ -490,7 +490,7 @@ impl exprCoder {
 				ret
 			}
 			i := self.oc.pushAnyType(m.Expr.Type)
-			self.oc.write(typeCoder.Any + "(")
+			self.oc.write(typeAny + "(")
 			match type m.Expr.Model {
 			| &constant::Const:
 				prim := m.Expr.Type.Prim()
@@ -558,7 +558,7 @@ impl exprCoder {
 				self.oc.locInfo(m.Token)
 				self.oc.write("\", ")
 			}
-			self.oc.write("(" + typeCoder.Trait + "::Type*)&")
+			self.oc.write("(" + typeTrait + "::Type*)&")
 			identCoder.traitDecl(self.oc.Buf, m.Expr.Type.Trait())
 			self.oc.write("_mptr_data")
 			self.oc.write(conv::Itoa(obj::FindTraitTypeOffset(m.Expr.Type.Trait(), m.Type)))
@@ -568,7 +568,7 @@ impl exprCoder {
 			self.oc.tc.kind(self.oc.Buf, m.Type)
 			self.oc.write("(")
 			self.possibleRefExpr(m.Expr.Model)
-			self.oc.write(", (" + typeCoder.Trait + "::Type*)&")
+			self.oc.write(", (" + typeTrait + "::Type*)&")
 			identCoder.traitDecl(self.oc.Buf, m.Type.Trait())
 			self.oc.write("_mptr_data")
 			self.oc.write(conv::Itoa(obj::FindTraitTypeOffset(m.Type.Trait(), m.Expr.Type)))
@@ -850,7 +850,7 @@ impl exprCoder {
 			self.oc.write("; if (!")
 			self.oc.write(argData)
 			self.oc.write(`) __jule_panic((`)
-			self.oc.write(typeCoder.U8)
+			self.oc.write(typeU8)
 			self.oc.write(`*)"memory allocation failed for concurrent call", 44);` + "\n")
 			self.oc.indent()
 
@@ -900,7 +900,7 @@ impl exprCoder {
 			self.oc.write(") { delete ")
 			self.oc.write(argData)
 			self.oc.write("; __jule_panic((")
-			self.oc.write(typeCoder.U8)
+			self.oc.write(typeU8)
 			self.oc.write(`*)"thread creation failed for concurrent call", 42); }`)
 		}
 		self.oc.write("\n")
@@ -1049,13 +1049,13 @@ impl exprCoder {
 		match type m.Expr.Model {
 		| &constant::Const:
 			// Constant string indexed. Use fast way, avoid making literal.
-			self.oc.write(typeCoder.Str + "::at(")
+			self.oc.write(typeStr + "::at(")
 			if !env::Production {
 				self.oc.write("\"")
 				self.oc.locInfo(m.Token)
 				self.oc.write("\", ")
 			}
-			self.oc.write("reinterpret_cast<const " + typeCoder.U8 + "*>(")
+			self.oc.write("reinterpret_cast<const " + typeU8 + "*>(")
 			s := (&constant::Const)(m.Expr.Model).ReadStr()
 			cstrLit(self.oc.Buf, s)
 			self.oc.write("), ")
@@ -1136,7 +1136,7 @@ impl exprCoder {
 					self.oc.write(",")
 				}
 			}
-			self.oc.write("}).as<" + typeCoder.Uintptr + ">(), ")
+			self.oc.write("}).as<" + typeUintptr + ">(), ")
 			self.oc.write(ident)
 			self.oc.write(anonFuncCtxHandlerSuffix + ")")
 		} else {
@@ -1355,7 +1355,7 @@ impl exprCoder {
 					ret
 				}
 			}
-			self.oc.write("jule::VoidExceptional{.error=" + typeCoder.Any + "(")
+			self.oc.write("jule::VoidExceptional{.error=" + typeAny + "(")
 		} else {
 			self.oc.write("jule::Exceptional<")
 			self.oc.tc.rc.codeMut1(self.oc.Buf, m.Func.Result)
@@ -1367,7 +1367,7 @@ impl exprCoder {
 					ret
 				}
 			}
-			self.oc.write(">{.error=" + typeCoder.Any + "(")
+			self.oc.write(">{.error=" + typeAny + "(")
 		}
 		self.possibleRefExpr(m.Err.Model)
 		i := self.oc.pushAnyType(m.Err.Type)
@@ -1732,10 +1732,10 @@ impl exprCoder {
 	}
 
 	fn strConcat(mut &self, mut m: &opt::StrConcatExpr) {
-		self.oc.write("({ " + typeCoder.Int + " size = 0; ")
+		self.oc.write("({ " + typeInt + " size = 0; ")
 		for i, p in m.Parts {
 			ident := "part" + conv::Itoa(i)
-			self.oc.write(typeCoder.Str + " ")
+			self.oc.write(typeStr + " ")
 			self.oc.write(ident)
 			self.oc.write(" = std::move(")
 			self.possibleRefExpr(p)
@@ -1743,14 +1743,14 @@ impl exprCoder {
 			self.oc.write(ident)
 			self.oc.write(".len(); ")
 		}
-		self.oc.write("jule::Slice<" + typeCoder.U8 + "> buf; buf.alloc_new(0, size); ")
+		self.oc.write("jule::Slice<" + typeU8 + "> buf; buf.alloc_new(0, size); ")
 		for i in m.Parts {
 			ident := "part" + conv::Itoa(i)
 			self.oc.write("buf.append(")
 			self.oc.write(ident)
 			self.oc.write("); ")
 		}
-		self.oc.write(typeCoder.Str + " result; result._len = buf._len; result.buffer = std::move(buf.data); result._slice = buf._slice; std::move(result); })")
+		self.oc.write(typeStr + " result; result._len = buf._len; result.buffer = std::move(buf.data); result._slice = buf._slice; std::move(result); })")
 	}
 
 	fn strFromBytes(mut &self, mut m: &opt::StrFromBytes) {
@@ -2004,7 +2004,7 @@ impl exprCoder {
 			} else if prim.IsBool() {
 				self.oc.write("false")
 			} else if prim.IsStr() {
-				self.oc.write(typeCoder.Str + "()")
+				self.oc.write(typeStr + "()")
 			}
 			ret
 		}
@@ -2152,7 +2152,7 @@ fn structBinary(mut &buf: strings::Builder, mut &s: &sema::StructIns, &l: str,
 // Literal is not including quotes, just string content in bytes.
 fn strLit(mut &buf: strings::Builder, lit: str, len: str) {
 	identCoder.funcIns(buf, meta::Program.Runtime.StrBytePtr)
-	buf.WriteStr("((" + typeCoder.U8 + "*)")!
+	buf.WriteStr("((" + typeU8 + "*)")!
 	cstrLit(buf, lit)
 	buf.WriteByte(',')!
 	buf.WriteStr(len)!
@@ -2163,7 +2163,7 @@ fn strLit(mut &buf: strings::Builder, lit: str, len: str) {
 // The lit function should return the length of content.
 fn strLitF(mut &buf: strings::Builder, lit: fn(): int) {
 	identCoder.funcIns(buf, meta::Program.Runtime.StrBytePtr)
-	buf.WriteStr("((" + typeCoder.U8 + "*)")!
+	buf.WriteStr("((" + typeU8 + "*)")!
 	len := conv::Itoa(lit())
 	buf.WriteByte(',')!
 	buf.WriteStr(len)!
@@ -2173,7 +2173,7 @@ fn strLitF(mut &buf: strings::Builder, lit: fn(): int) {
 // Like the strLit function, but writes as slice (will not perform allocation).
 fn strLitAsSlice(mut &buf: strings::Builder, lit: str, len: str) {
 	identCoder.funcIns(buf, meta::Program.Runtime.SliceBytePtr)
-	buf.WriteStr("((" + typeCoder.U8 + "*)")!
+	buf.WriteStr("((" + typeU8 + "*)")!
 	cstrLit(buf, lit)
 	buf.WriteByte(',')!
 	buf.WriteStr(len)!

@@ -44,9 +44,9 @@ impl IP {
 		match {
 		| len(self) == len(other):
 			ret str(self) == str(other)
-		| len(self) == IPv4.Len && len(other) == IPv6.Len:
+		| len(self) == IPv4Len && len(other) == IPv6Len:
 			ret str(other[:12]) == str(v4InV6Prefix) && str(self) == str(other[12:])
-		| len(self) == IPv6.Len && len(other) == IPv4.Len:
+		| len(self) == IPv6Len && len(other) == IPv4Len:
 			ret str(self[:12]) == str(v4InV6Prefix) && str(self[12:]) == str(other)
 		|:
 			ret false
@@ -85,17 +85,17 @@ impl IP {
 		}
 		// Following RFC 4193, Section 8. IANA Considerations which says:
 		//   The IANA has assigned the FC00::/7 prefix to "Unique Local Unicast".
-		ret len(self) == IPv6.Len && self[0]&0xFE == 0xFC
+		ret len(self) == IPv6Len && self[0]&0xFE == 0xFC
 	}
 
 	// Converts the IPv4 address to a 4-byte representation.
 	// Returns empty if IP is not an IPv4 address.
 	// Returned IP may use the common mutable allocation with self.
 	fn To4(mut self): IP {
-		if len(self) == IPv4.Len {
+		if len(self) == IPv4Len {
 			ret self
 		}
-		if len(self) == IPv6.Len &&
+		if len(self) == IPv6Len &&
 			isZeros(self[:10]) &&
 			self[10] == 0xFF &&
 			self[11] == 0xFF {
@@ -108,9 +108,9 @@ impl IP {
 	// Returns empty if address is not an IP address (it is the wrong length).
 	fn To16(mut self): IP {
 		match {
-		| len(self) == IPv4.Len:
+		| len(self) == IPv4Len:
 			ret IPv4.Addr(self[0], self[1], self[2], self[3])
-		| len(self) == IPv6.Len:
+		| len(self) == IPv6Len:
 			ret self
 		|:
 			ret IP.Empty()
@@ -127,11 +127,11 @@ impl IP {
 		if self.Empty() {
 			ret "<nil>"
 		}
-		if len(self) != IPv4.Len && len(self) != IPv6.Len {
+		if len(self) != IPv4Len && len(self) != IPv6Len {
 			ret "?" + hexStr(self)
 		}
 		ip4 := unsafe { (*(&self)).To4() }
-		if len(ip4) == IPv4.Len {
+		if len(ip4) == IPv4Len {
 			ret str4(ipAddrFrom4(ip4))
 		}
 		ret str16(ipAddrFrom16(self))
@@ -140,13 +140,13 @@ impl IP {
 
 static v4InV6Prefix = IP([0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0xFF, 0xFF])
 
+// Length of IPv4 address in bytes.
+const IPv4Len = 1 << 2
+
 // IPv4 functionalities.
 struct IPv4{}
 
 impl IPv4 {
-	// Length of IPv4 address in bytes.
-	const Len = 1 << 2
-
 	// Returns IPv4 address known as limited broadcast.
 	// The IP that returned is statically allocated and mutable.
 	static fn Broadcast(): IP {
@@ -178,7 +178,7 @@ impl IPv4 {
 	// Returns the IP address (in 16-byte form) of the
 	// IPv4 address a.b.c.d.
 	static fn Addr(a: byte, b: byte, c: byte, d: byte): IP {
-		mut ip := make(IP, IPv6.Len)
+		mut ip := make(IP, IPv6Len)
 		copy(ip, v4InV6Prefix)
 		ip[12] = a
 		ip[13] = b
@@ -188,13 +188,13 @@ impl IPv4 {
 	}
 }
 
+// Length of IPv6 address in bytes.
+const IPv6Len = 1 << 4
+
 // IPv6 functionalities.
 struct IPv6{}
 
 impl IPv6 {
-	// Length of IPv6 address in bytes.
-	const Len = 1 << 4
-
 	// Returns IPv6 address known as all zeros.
 	// The IP that returned is statically allocated and mutable.
 	static fn Zero(): IP {

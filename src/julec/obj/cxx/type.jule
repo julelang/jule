@@ -12,7 +12,7 @@ use "std/jule/types"
 use "std/strings"
 use "std/unsafe"
 
-const ctxParamType = typeCoder.Ptr + "<" + typeCoder.Uintptr + ">"
+const ctxParamType = typePtr + "<" + typeUintptr + ">"
 
 struct customType {
 	kind: str
@@ -28,26 +28,26 @@ impl sema::Kind for customType {
 	}
 }
 
+const typeAny = "jule::Any"
+const typeStr = "jule::Str"
+const typeMap = "jule::Map"
+const typePtr = "jule::Ptr"
+const typeSptr = "jule::Sptr"
+const typeSlice = "jule::Slice"
+const typeTrait = "jule::Trait"
+const typeArray = "jule::Array"
+const typeFunc = "jule::Fn"
+const typeBool = "jule::Bool"
+const typeInt = "jule::Int"
+const typeUintptr = "jule::Uintptr"
+const typeU8 = "jule::U8"
+
 struct typeCoder {
 	oc: &ObjectCoder
 	rc: &resultCoder
 }
 
 impl typeCoder {
-	const Any = "jule::Any"
-	const Str = "jule::Str"
-	const Map = "jule::Map"
-	const Ptr = "jule::Ptr"
-	const Sptr = "jule::Sptr"
-	const Slice = "jule::Slice"
-	const Trait = "jule::Trait"
-	const Array = "jule::Array"
-	const Func = "jule::Fn"
-	const Bool = "jule::Bool"
-	const Int = "jule::Int"
-	const Uintptr = "jule::Uintptr"
-	const U8 = "jule::U8"
-
 	static fn new(mut &oc: &ObjectCoder): &typeCoder {
 		mut tc := &typeCoder{oc: oc}
 		tc.rc = resultCoder.new(tc)
@@ -87,14 +87,14 @@ impl typeCoder {
 
 	// Generates C++ code of smart pointer type with element type.
 	fn asSptr(mut self, mut &buf: strings::Builder, elem: []byte) {
-		buf.WriteStr(typeCoder.Ptr + "<")!
+		buf.WriteStr(typePtr + "<")!
 		buf.Write(elem)!
 		buf.WriteByte('>')!
 	}
 
 	// Generates C++ code of smart pointer type.
 	fn sptr(mut self, mut &buf: strings::Builder, mut sptr: &sema::Sptr) {
-		buf.WriteStr(typeCoder.Ptr + "<")!
+		buf.WriteStr(typePtr + "<")!
 		self.kind(buf, sptr.Elem)
 		buf.WriteByte('>')!
 	}
@@ -117,11 +117,11 @@ impl typeCoder {
 
 	// Generates C++ code of TypeEnum type.
 	fn typeEnumDecl(mut self, mut &buf: strings::Builder, mut e: &sema::TypeEnum) {
-		buf.WriteStr(typeCoder.Any)!
+		buf.WriteStr(typeAny)!
 	}
 
 	fn asSlice(mut self, mut &buf: strings::Builder, mut elem: &sema::Type) {
-		buf.WriteStr(typeCoder.Slice + "<")!
+		buf.WriteStr(typeSlice + "<")!
 		self.kind(buf, elem)
 		buf.WriteByte('>')!
 	}
@@ -174,7 +174,7 @@ impl typeCoder {
 
 	// Generates C++ code of Arr type.
 	fn array(mut self, mut &buf: strings::Builder, mut a: &sema::Array) {
-		buf.WriteStr(typeCoder.Array + "<")!
+		buf.WriteStr(typeArray + "<")!
 		self.kind(buf, a.Elem)
 		buf.WriteByte(',')!
 		buf.WriteStr(conv::Itoa(a.N))!
@@ -184,7 +184,7 @@ impl typeCoder {
 	// Generates C++ prototype code of parameter.
 	fn param(mut self, mut &buf: strings::Builder, mut &p: &sema::Param) {
 		if p.Variadic {
-			buf.WriteStr(typeCoder.Slice + "<")!
+			buf.WriteStr(typeSlice + "<")!
 			self.kind(buf, p.TypeSym.Type)
 			buf.WriteByte('>')!
 		} else {
@@ -198,7 +198,7 @@ impl typeCoder {
 	// Generates C++ prototype code of parameter instance.
 	fn paramIns(mut self, mut &buf: strings::Builder, mut &p: &sema::ParamIns) {
 		if p.Decl.Variadic {
-			buf.WriteStr(typeCoder.Slice + "<")!
+			buf.WriteStr(typeSlice + "<")!
 			self.kind(buf, p.Type)
 			buf.WriteByte('>')!
 		} else {
@@ -268,7 +268,7 @@ impl typeCoder {
 
 	// Generates C++ code of function type.
 	fn func(mut self, mut &buf: strings::Builder, mut f: &sema::FuncIns) {
-		buf.WriteStr(typeCoder.Func + "<")!
+		buf.WriteStr(typeFunc + "<")!
 		self.anonFunc(buf, f)
 		buf.WriteByte('>')!
 	}
@@ -317,7 +317,7 @@ impl typeCoder {
 			self.mapType(buf, k.Map())
 			ret
 		| k.Trait() != nil:
-			buf.WriteStr(typeCoder.Trait)!
+			buf.WriteStr(typeTrait)!
 			ret
 		| k.Array() != nil:
 			self.array(buf, k.Array())
@@ -338,57 +338,57 @@ impl typeCoder {
 	}
 }
 
+const resultMap = "m"
+const resultSlice = "s"
+const resultPtr = "p"
+const resultSptr = "x"
+const resultArray = "a"
+const resultReference = "r"
+const resultFunc = "f"
+const resultChan = "c"
+const resultBindPrefix = "b"
+
 struct resultCoder {
 	tc: &typeCoder
 }
 
 impl resultCoder {
-	const Map = "m"
-	const Slice = "s"
-	const Ptr = "p"
-	const Sptr = "x"
-	const Array = "a"
-	const Reference = "r"
-	const Func = "f"
-	const Chan = "c"
-	const BindPrefix = "b"
-
 	static fn new(mut &tc: &typeCoder): &resultCoder {
 		ret &resultCoder{tc: tc}
 	}
 
 	fn ptr(mut self, mut &s: strings::Builder, mut p: &sema::Ptr) {
-		s.WriteStr(resultCoder.Ptr)!
+		s.WriteStr(resultPtr)!
 		self.codeMut(s, p.Elem)
 	}
 
 	fn sptr(mut self, mut &s: strings::Builder, mut p: &sema::Sptr) {
-		s.WriteStr(resultCoder.Sptr)!
+		s.WriteStr(resultSptr)!
 		self.codeMut(s, p.Elem)
 	}
 
 	fn mapType(mut self, mut &s: strings::Builder, mut p: &sema::Map) {
-		s.WriteStr(resultCoder.Map)!
+		s.WriteStr(resultMap)!
 		self.codeMut(s, p.Key)
 		self.codeMut(s, p.Val)
 	}
 
 	fn slice(mut self, mut &s: strings::Builder, mut slc: &sema::Slice) {
-		s.WriteStr(resultCoder.Slice)!
+		s.WriteStr(resultSlice)!
 		self.codeMut(s, slc.Elem)
 	}
 
 	fn array(mut self, mut &s: strings::Builder, mut arr: &sema::Array) {
-		s.WriteStr(resultCoder.Array)!
+		s.WriteStr(resultArray)!
 		s.WriteStr(conv::FmtInt(i64(arr.N), 16))!
 		self.codeMut(s, arr.Elem)
 	}
 
 	fn func(mut self, mut &s: strings::Builder, mut f: &sema::FuncIns) {
-		s.WriteStr(resultCoder.Func)!
+		s.WriteStr(resultFunc)!
 		for (_, mut p) in f.Params {
 			if p.Decl.Reference {
-				s.WriteStr(resultCoder.Reference)!
+				s.WriteStr(resultReference)!
 			}
 			self.codeMut(s, p.Type)
 		}
@@ -398,7 +398,7 @@ impl resultCoder {
 	}
 
 	fn channel(mut self, mut &s: strings::Builder, mut ch: &sema::Chan) {
-		s.WriteStr(resultCoder.Chan)!
+		s.WriteStr(resultChan)!
 		self.codeMut(s, ch.Elem)
 	}
 
@@ -418,7 +418,7 @@ impl resultCoder {
 			//   this makes the result identifier is non-unique
 			//   if namespace directive will not be removed in the future,
 			//   fix this conflict issues
-			s.WriteStr(resultCoder.BindPrefix)!
+			s.WriteStr(resultBindPrefix)!
 			s.WriteStr(obj::GetBindIdent(t))!
 			ret
 		}
