@@ -56,7 +56,7 @@ impl IP {
 	// Reports whether IP is an unspecified address,
 	// which is "0.0.0.0" in IPv4 or "::" in IPv6.
 	fn IsUnspecified(self): bool {
-		ret self.Equal(IPv4.Zero()) || self.Equal(IPv6.Unspecified())
+		ret self.Equal(IPv4Zero) || self.Equal(IPv6Unspecified)
 	}
 
 	// Reports whether IP is a loopback address.
@@ -65,7 +65,7 @@ impl IP {
 		if !ip4.Empty() {
 			ret ip4[0] == 127
 		}
-		ret self.Equal(IPv6.Loopback())
+		ret self.Equal(IPv6Loopback)
 	}
 
 	// Reports whether IP is a private address according to
@@ -74,11 +74,11 @@ impl IP {
 		ip4 := unsafe { (*(&self)).To4() }
 		if !ip4.Empty() {
 			// Following RFC 1918, Section 3. Private Address Space which says:
-			//   The Internet Assigned Numbers Authority (IANA) has reserved the
-			//   following three blocks of the IP address space for private internets:
-			//     10.0.0.0        -   10.255.255.255  (10/8 prefix)
-			//     172.16.0.0      -   172.31.255.255  (172.16/12 prefix)
-			//     192.168.0.0     -   192.168.255.255 (192.168/16 prefix)
+			//	The Internet Assigned Numbers Authority (IANA) has reserved the
+			//	following three blocks of the IP address space for private internets:
+			//		10.0.0.0        -   10.255.255.255  (10/8 prefix)
+			//		172.16.0.0      -   172.31.255.255  (172.16/12 prefix)
+			//		192.168.0.0     -   192.168.255.255 (192.168/16 prefix)
 			ret ip4[0] == 10 ||
 				(ip4[0] == 172 && ip4[1]&0xF0 == 16) ||
 				(ip4[0] == 192 && ip4[1] == 168)
@@ -109,7 +109,7 @@ impl IP {
 	fn To16(mut self): IP {
 		match {
 		| len(self) == IPv4Len:
-			ret IPv4.Addr(self[0], self[1], self[2], self[3])
+			ret IPv4(self[0], self[1], self[2], self[3])
 		| len(self) == IPv6Len:
 			ret self
 		|:
@@ -119,10 +119,10 @@ impl IP {
 
 	// Returns string form of the IP address.
 	// It returns one of 4 forms:
-	//   - "<nil>", if ip is empty
-	//   - dotted decimal ("192.0.2.1"), if ip is an IPv4 or IP4-mapped IPv6 address
-	//   - IPv6 conforming to RFC 5952 ("2001:db8::1"), if ip is a valid IPv6 address
-	//   - the hexadecimal form of ip, without punctuation, if no other cases apply
+	//	- "<nil>", if ip is empty
+	//	- dotted decimal ("192.0.2.1"), if ip is an IPv4 or IP4-mapped IPv6 address
+	//	- IPv6 conforming to RFC 5952 ("2001:db8::1"), if ip is a valid IPv6 address
+	//	- the hexadecimal form of ip, without punctuation, if no other cases apply
 	fn Str(self): str {
 		if self.Empty() {
 			ret "<nil>"
@@ -143,100 +143,59 @@ static v4InV6Prefix = IP([0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0xFF
 // Length of IPv4 address in bytes.
 const IPv4Len = 1 << 2
 
-// IPv4 functionalities.
-struct IPv4{}
+// The IPv4 address known as limited broadcast.
+// The IP that returned is statically allocated and mutable.
+static mut Broadcast = IPv4(255, 255, 255, 255)
 
-impl IPv4 {
-	// Returns IPv4 address known as limited broadcast.
-	// The IP that returned is statically allocated and mutable.
-	static fn Broadcast(): IP {
-		static mut addr = IPv4.Addr(255, 255, 255, 255)
-		ret addr
-	}
+// The IPv4 address known as all systems.
+// The IP that returned is statically allocated and mutable.
+static mut IPv4AllSystems = IPv4(224, 0, 0, 1)
 
-	// Returns IPv4 address known as all systems.
-	// The IP that returned is statically allocated and mutable.
-	static fn AllSystems(): IP {
-		static mut addr = IPv4.Addr(224, 0, 0, 1)
-		ret addr
-	}
+// The IPv4 address known as all routers.
+// The IP that returned is statically allocated and mutable.
+static mut IPv4AllRouters = IPv4(224, 0, 0, 2)
 
-	// Returns IPv4 address known as all routers.
-	// The IP that returned is statically allocated and mutable.
-	static fn AllRouters(): IP {
-		static mut addr = IPv4.Addr(224, 0, 0, 2)
-		ret addr
-	}
+// The IPv4 address known as all zeros.
+// The IP that returned is statically allocated and mutable.
+static mut IPv4Zero = IPv4(0, 0, 0, 0)
 
-	// Returns IPv4 address known as all zeros.
-	// The IP that returned is statically allocated and mutable.
-	static fn Zero(): IP {
-		static mut addr = IPv4.Addr(0, 0, 0, 0)
-		ret addr
-	}
-
-	// Returns the IP address (in 16-byte form) of the
-	// IPv4 address a.b.c.d.
-	static fn Addr(a: byte, b: byte, c: byte, d: byte): IP {
-		mut ip := make(IP, IPv6Len)
-		copy(ip, v4InV6Prefix)
-		ip[12] = a
-		ip[13] = b
-		ip[14] = c
-		ip[15] = d
-		ret ip
-	}
+// Returns the IP address (in 16-byte form) of the IPv4 address a.b.c.d.
+fn IPv4(a: byte, b: byte, c: byte, d: byte): IP {
+	mut ip := make(IP, IPv6Len)
+	copy(ip, v4InV6Prefix)
+	ip[12] = a
+	ip[13] = b
+	ip[14] = c
+	ip[15] = d
+	ret ip
 }
 
 // Length of IPv6 address in bytes.
 const IPv6Len = 1 << 4
 
-// IPv6 functionalities.
-struct IPv6{}
+// The IPv6 address known as all zeros.
+// The IP that returned is statically allocated and mutable.
+static mut IPv6Zero = IP([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 
-impl IPv6 {
-	// Returns IPv6 address known as all zeros.
-	// The IP that returned is statically allocated and mutable.
-	static fn Zero(): IP {
-		static mut ip = IP([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
-		ret ip
-	}
+// The IPv6 address known as unspecified.
+// The IP that returned is statically allocated and mutable.
+static mut IPv6Unspecified = IP([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 
-	// Returns IPv6 address known as unspecified.
-	// The IP that returned is statically allocated and mutable.
-	static fn Unspecified(): IP {
-		static mut ip = IP([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
-		ret ip
-	}
+// The IPv6 address known as loopback.
+// The IP that returned is statically allocated and mutable.
+static mut IPv6Loopback = IP([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1])
 
-	// Returns IPv6 address known as loopback.
-	// The IP that returned is statically allocated and mutable.
-	static fn Loopback(): IP {
-		static mut ip = IP([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1])
-		ret ip
-	}
+// The IPv6 address known as interterface local all nodes.
+// The IP that returned is statically allocated and mutable.
+static mut IPv6InterfaceLocalAllNodes = IP([0xFF, 0x01, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01])
 
-	// Returns IPv6 address known as interterface local all nodes.
-	// The IP that returned is statically allocated and mutable.
-	static fn InterfaceLocalAllNodes(): IP {
-		static mut ip = IP([0xFF, 0x01, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01])
-		ret ip
-	}
+// The IPv6 address known as link local all nodes.
+// The IP that returned is statically allocated and mutable.
+static mut IPv6LinkLocalAllNodes = IP([0xFF, 0x02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01])
 
-	// Returns IPv6 address known as link local all nodes.
-	// The IP that returned is statically allocated and mutable.
-	static fn LinkLocalAllNodes(): IP {
-		static mut ip = IP([0xFF, 0x02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01])
-		ret ip
-	}
-
-	// Returns IPv6 address known as link local all routers.
-	// The IP that returned is statically allocated and mutable.
-	static fn LinkLocalAllRouters(): IP {
-		static mut ip = IP([0xFF, 0x02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x02])
-		ret ip
-	}
-}
+// The IPv6 address known as link local all routers.
+// The IP that returned is statically allocated and mutable.
+static mut IPv6LinkLocalAllRouters = IP([0xFF, 0x02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x02])
 
 // Reports whether addr is just all-zeros.
 fn isZeros(ip: IP): bool {
