@@ -208,7 +208,7 @@ impl Mutex {
 				new = (old - 1<<mutexWaiterShift) | mutexWoken
 				{
 					if atomic::CompareAndSwap(self.state, old, new, atomic::SeqCst) {
-						runtime::semrelease(self.sema)
+						runtime::semrelease(self.sema, false)
 						ret
 					}
 				}
@@ -216,11 +216,11 @@ impl Mutex {
 			}
 		} else {
 			// Starving mode: handoff mutex ownership to the next waiter,
-			// so that the next waiter can start to run immediately.
+			// so that the next waiter can start to run without wasting time.
 			// Note: mutexLocked is not set, the waiter will set it after wakeup.
 			// But mutex is still considered locked if mutexStarving is set,
-			// so new coming thread won't acquire it.
-			runtime::semrelease(self.sema)
+			// so new coming thread will not acquire it.
+			runtime::semrelease(self.sema, true)
 		}
 	}
 }

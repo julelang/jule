@@ -201,7 +201,8 @@ fn semacquire(mut &sema: u32, lifo: bool, opt: u32) {
 // if one is blocked in semacquire.
 // It is intended as a simple wakeup primitive for use by the synchronization
 // library and should not be used directly.
-fn semrelease(mut &sema: u32) {
+// If handoff is true, tries to pass count directly to the first waiter.
+fn semrelease(mut &sema: u32, handoff: bool) {
 	mut root := semtable_rootFor(sema)
 	atomicAdd(sema, 1, atomicSeqCst)
 
@@ -226,6 +227,13 @@ fn semrelease(mut &sema: u32) {
 		atomicAdd(root.nwait, ^u32(0), atomicSeqCst)
 	}
 	root.lock.unlock()
+	// If handoff is true, immediately yield the CPU with no analysis.
+	// This thread is not the expected owner of the next semacquire.
+	// So this thread doesn't matter for now, yield the CPU to increase
+	// the chances of semacquire of the dequeued thread.
+	if handoff {
+		osyield()
+	}
 }
 
 // Checks if a < b, considering a & b running counts that may overflow the
