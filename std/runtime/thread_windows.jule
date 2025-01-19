@@ -3,6 +3,7 @@
 // license that can be found in the LICENSE file.
 
 use integ "std/jule/integrated"
+use "std/mem"
 use "std/sys"
 
 cpp unsafe fn CreateThread(*unsafe, int, *unsafe, *unsafe, int, *unsafe): *unsafe
@@ -71,8 +72,14 @@ fn __init() {
 	// Set numcpu.
 	{
 		let info: cpp.SYSTEM_INFO
-		unsafe { cpp.GetSystemInfo(&info) }
+		unsafe {
+			memset(&info, 0, mem::SizeOf(cpp.SYSTEM_INFO))
+			cpp.GetSystemInfo(&info)
+		}
 		numcpu = int(info.dwNumberOfProcessors)
+		if numcpu == 0 {
+			numcpu = 1
+		}
 	}
 	// Push the main thread to threads.
 	// See the documentation of the pushNewThread function.
