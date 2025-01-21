@@ -5,6 +5,7 @@
 use "std/jule/ast"
 use "std/jule/build"
 use "std/jule/token"
+use "std/strings"
 
 struct exprBuilder {
 	p: &parser
@@ -456,35 +457,7 @@ impl exprBuilder {
 		ret pair
 	}
 
-	fn buildStructLitExpr(mut self, mut &tokens: []&token::Token): &ast::Expr {
-		mut token := tokens[0]
-		if token.Id == token::Id.Ident && len(tokens) > 1 {
-			token = tokens[1]
-			if token.Id == token::Id.Colon {
-				ret &ast::Expr{
-					Token: token,
-					End: tokens[len(tokens)-1],
-					Kind: self.buildFieldExprPair(tokens),
-				}
-			}
-		}
-		ret self.buildFromTokens(tokens)
-	}
-
-	fn buildStructLitExprs(mut self, mut &tokens: []&token::Token): []&ast::Expr {
-		mut parts := self.getBraceRangeLitExprParts(tokens)
-		if len(parts) == 0 {
-			ret nil
-		}
-
-		mut pairs := make([]&ast::Expr, 0, len(parts))
-		for (_, mut part) in parts {
-			pairs = append(pairs, self.buildStructLitExpr(part))
-		}
-		ret pairs
-	}
-
-	fn buildTypedStructLiteral(mut self, mut tokens: []&token::Token): &ast::StructLit {
+	fn buildTypedStructLiteral(mut self, mut tokens: []&token::Token): &ast::TypedBraceLit {
 		mut i := 0
 		mut t, ok := unsafe { self.p.buildType(tokens, &i, true) }
 		if !ok {
@@ -500,11 +473,9 @@ impl exprBuilder {
 			self.pushErr(token, build::LogMsg.InvalidSyntax)
 			ret nil
 		}
-
-		ret &ast::StructLit{
-			End: tokens[len(tokens)-1],
+		ret &ast::TypedBraceLit{
 			Kind: t,
-			Exprs: self.buildStructLitExprs(tokens),
+			Lit: self.buildBraceLit(tokens),
 		}
 	}
 
@@ -586,8 +557,7 @@ impl exprBuilder {
 			ret self.buildUnsafe(tokens)
 		| token::Id.Fn:
 			ret self.buildAnonFunc(tokens)
-		| token::Id.Ident
-		| token::Id.Cpp:
+		| token::Id.Map | token::Id.Ident | token::Id.Cpp:
 			ret self.buildTypedStructLiteral(tokens)
 		|:
 			self.pushErr(exprTokens[0], build::LogMsg.InvalidSyntax)
@@ -827,9 +797,6 @@ impl exprBuilder {
 	}
 
 	fn build(mut self, mut &tokens: []&token::Token): ast::ExprData {
-		if tokens[0].Id == token::Id.Map {
-			ret self.buildType(tokens)
-		}
 		i := findLowestPrecOp(tokens)
 		if i == -1 {
 			ret self.buildData(tokens)

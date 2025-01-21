@@ -1958,7 +1958,7 @@ impl eval {
 	}
 
 	fn evalStructLitExplicit(mut &self, mut s: &StructIns,
-		mut exprs: []&ast::Expr, mut errorToken: &token::Token): &Value {
+		mut lit: &ast::BraceLit, mut errorToken: &token::Token): &Value {
 		ok := self.s.checkGenericQuantity(len(s.Decl.Generics), len(s.Generics), errorToken)
 		if !ok {
 			ret nil
@@ -1976,7 +1976,7 @@ impl eval {
 			errorToken: errorToken,
 			s: s,
 		}
-		slc.check(exprs)
+		slc.check(lit.Exprs)
 
 		mut v := &Value{
 			Mutable: self.target.mutable,
@@ -1991,7 +1991,7 @@ impl eval {
 		ret v
 	}
 
-	fn evalStructLit(mut &self, mut lit: &ast::StructLit): &Value {
+	fn evalTypedBraceLit(mut &self, mut lit: &ast::TypedBraceLit): &Value {
 		mut t := buildType(lit.Kind)
 		ok := self.s.checkTypeSym(t, self.lookup)
 		if !ok {
@@ -2006,12 +2006,16 @@ impl eval {
 					goto eval
 				}
 			}
+			mut m := t.Type.Map()
+			if m != nil {
+				ret self.evalMap(m, lit.Lit)
+			}
 			self.pushErr(lit.Kind.Token, build::LogMsg.InvalidSyntax)
 			ret nil
 		}
 
 	eval:
-		mut v := self.evalStructLitExplicit(s, lit.Exprs, lit.Kind.Token)
+		mut v := self.evalStructLitExplicit(s, lit.Lit, lit.Kind.Token)
 		match type t.Type.Kind {
 		| &Sptr:
 			mut model := (&StructLitExpr)(v.Model)
@@ -3047,7 +3051,7 @@ impl eval {
 		| self.prefix.Map() != nil:
 			v = self.evalMap(self.prefix.Map(), lit)
 		| self.prefix.Struct() != nil:
-			v = self.evalStructLitExplicit(self.prefix.Struct(), lit.Exprs, lit.Token)
+			v = self.evalStructLitExplicit(self.prefix.Struct(), lit, lit.Token)
 		|:
 			self.pushErr(lit.Token, build::LogMsg.InvalidSyntax)
 			ret nil
@@ -3221,8 +3225,8 @@ impl eval {
 			ret self.evalCast((&ast::CastExpr)(kind))
 		| &ast::NamespaceExpr:
 			ret self.evalNamespace((&ast::NamespaceExpr)(kind))
-		| &ast::StructLit:
-			ret self.evalStructLit((&ast::StructLit)(kind))
+		| &ast::TypedBraceLit:
+			ret self.evalTypedBraceLit((&ast::TypedBraceLit)(kind))
 		| &ast::Type:
 			ret self.evalType((&ast::Type)(kind))
 		| &ast::FuncCallExpr:
