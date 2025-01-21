@@ -2373,14 +2373,33 @@ fn checkAssign(mut &s: &sema, mut &left: &Value, mut right: &Value, op: &token::
 		s.pushErr(op, build::LogMsg.AssignTypeNotSupportValue)
 		ret false
 	}
-	match {
-	| left.IsConst():
+	// Assignment to constant memory.
+	if left.IsConst() {
 		s.pushErr(op, build::LogMsg.AssignConst)
 		s.pushSuggestion(build::LogMsg.RemoveConstToAssign)
 		ret false
-	| !left.Lvalue:
-		s.pushErr(op, build::LogMsg.AssignRequireLvalue)
-		ret false
+	}
+	// Fast path: check whether value is lvalue.
+	// If value is lvalue, it is ok.
+	if !left.Lvalue {
+		// Slow path: value is not lvalue. We need to check
+		// special cases.
+		match type left.Model {
+		| &IndexingExpr:
+			// Type is map. We need to check special case for maps.
+			// Because map indexing is not considered lvalue.
+			mut i := (&IndexingExpr)(left.Model)
+			// Map type indexing. Map indexing is not considered lvalue.
+			// But we can assign, so it is ok.
+			if i.Expr.Type.Map() != nil {
+				break
+			}
+			fall
+		|:
+			// Default case.
+			s.pushErr(op, build::LogMsg.AssignRequireLvalue)
+			ret false
+		}
 	}
 	ret checkAssignMut(s, left, right, op)
 }
