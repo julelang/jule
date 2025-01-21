@@ -805,7 +805,7 @@ impl scopeChecker {
 		}
 
 		mut rang := (&ast::RangeKind)(it.Kind)
-		makeComptimeRange(v)
+		makeComptimeRange(v, false)
 		if v.Decl {
 			self.s.pushErr(rang.Expr.Token, build::LogMsg.InvalidTypeForComptimeIter, v.Type.Str())
 			ret
@@ -2242,7 +2242,8 @@ fn removeEqFromOp(op: token::Id): token::Id {
 
 // Makes data d as comptimeRange.
 // If type is not supported, d.Decl will be true.
-fn makeComptimeRange(mut &v: &Value) {
+// If onlyComptime is true, only handles comptime types.
+fn makeComptimeRange(mut &v: &Value, onlyComptime: bool) {
 	match {
 	| v.Type.comptimeStructFields() != nil:
 		v.Type = &Type{Kind: &comptimeRange{v.Type.comptimeStructFields()}}
@@ -2265,7 +2266,7 @@ fn makeComptimeRange(mut &v: &Value) {
 	| v.Type.comptimeDecls() != nil:
 		v.Type = &Type{Kind: &comptimeRange{v.Type.comptimeDecls()}}
 		ret
-	| v.Type.Slice() != nil:
+	| !onlyComptime && v.Type.Slice() != nil:
 		match type v.Model {
 		| &SliceExpr:
 			mut s := (&SliceExpr)(v.Model)
