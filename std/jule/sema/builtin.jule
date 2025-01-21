@@ -233,9 +233,6 @@ fn findBuiltinDefStdMem(&ident: str): any {
 	| "AlignOf":
 		static mut f = &FuncIns{caller: builtinCallerStdMemAlignOf}
 		ret f
-	| "Free":
-		static mut f = &FuncIns{caller: builtinCallerStdMemFree}
-		ret f
 	|:
 		ret nil
 	}
@@ -1104,29 +1101,6 @@ fn builtinCallerStdMemAlignOf(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_
 	}
 
 	result.Model = &AlignofExpr{Expr: v.Type}
-	ret result
-}
-
-fn builtinCallerStdMemFree(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value): &Value {
-	if len(fc.Args) < 1 {
-		e.pushErr(fc.Token, build::LogMsg.MissingExprFor, "h")
-		ret nil
-	}
-	if len(fc.Args) > 1 {
-		e.pushErr(fc.Args[1].Token, build::LogMsg.ArgumentOverflow, "Free")
-	}
-
-	mut v := e.evalExpr(fc.Args[0])
-	if v == nil {
-		ret nil
-	}
-
-	if !v.Type.GC() {
-		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidExpr)
-	}
-
-	mut result := buildVoidValue()
-	result.Model = &FreeExpr{Expr: v.Model}
 	ret result
 }
 
