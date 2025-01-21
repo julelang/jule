@@ -459,8 +459,6 @@ impl eval {
 			ret nil
 		}
 
-		self.checkDeprecated(s.Directives, errorToken)
-
 		mut ins := s.instance()
 		if len(s.Generics) == 0 {
 			// For generics; it is safe. Because compiler should disallow using
@@ -492,30 +490,12 @@ impl eval {
 		}
 	}
 
-	fn checkDeprecated(mut self, mut &directives: []&ast::Directive, tok: &token::Token) {
-		if self.isUnsafe() {
-			ret
-		}
-
-		d := findDirective(directives, build::Directive.Deprecated)
-		if d != nil {
-			if len(d.Args) == 0 {
-				self.pushErr(tok, build::LogMsg.UsingDeprecated, "this code")
-			} else {
-				self.pushErr(tok, build::LogMsg.UsingDeprecated, d.Args[0].Kind)
-			}
-			self.pushSuggestion(build::LogMsg.UseUnsafeForDeprecated)
-		}
-	}
-
 	fn evalFunc(mut self, mut f: &Func, errorToken: &token::Token): &Value {
 		if !self.s.isAccessibleDefine(f.Public, f.Token) {
 			self.pushErr(errorToken, build::LogMsg.IdentIsNotAccessible, f.Ident)
 			self.pushSuggestion(build::LogMsg.MakePubToAccess)
 			ret nil
 		}
-
-		self.checkDeprecated(f.Directives, errorToken)
 
 		mut ins := f.instance()
 		if len(f.Generics) == 0 {
@@ -593,8 +573,6 @@ impl eval {
 			self.pushSuggestion(build::LogMsg.MakePubToAccess)
 			ret nil
 		}
-
-		self.checkDeprecated(v.Directives, errorToken)
 
 		if v.Token == nil {
 			// Variable is built-in.
@@ -2003,7 +1981,6 @@ impl eval {
 		}
 
 		self.pushReference[&StructIns](s)
-		self.checkDeprecated(s.Decl.Directives, errorToken)
 
 		mut slc := structLitChecker{
 			e: self,
@@ -2469,8 +2446,6 @@ impl eval {
 		if m.Params[0].IsRef() && !ref {
 			self.pushErr(tok, build::LogMsg.RefMethodUsedWithNotRefInstance)
 		}
-
-		self.checkDeprecated(m.Directives, tok)
 
 		mut ins := m.instance()
 		ins.Owner = s
