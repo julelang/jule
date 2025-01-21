@@ -500,7 +500,7 @@ impl eval {
 		d := findDirective(directives, build::Directive.Deprecated)
 		if d != nil {
 			if len(d.Args) == 0 {
-				self.pushErr(tok, build::LogMsg.UsingDeprecated, "this code is deprecated")
+				self.pushErr(tok, build::LogMsg.UsingDeprecated, "this code")
 			} else {
 				self.pushErr(tok, build::LogMsg.UsingDeprecated, d.Args[0].Kind)
 			}
@@ -999,6 +999,7 @@ impl eval {
 			ret
 		| !self.isUnsafe():
 			self.pushErr(i.Token, build::LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
+			self.pushSuggestion(build::LogMsg.WriteYourCodeInUnsafeJule)
 		}
 
 		v.Type = ptr.Elem
@@ -1533,6 +1534,7 @@ impl eval {
 
 		if !self.isUnsafe() {
 			self.pushErr(errorToken, build::LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
+			self.pushSuggestion(build::LogMsg.WriteYourCodeInUnsafeJule)
 			ret
 		}
 
@@ -1568,6 +1570,7 @@ impl eval {
 		if ptr != nil && sptr.Elem.Equal(ptr.Elem) {
 			if !self.isUnsafe() {
 				self.pushErr(errorToken, build::LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
+				self.pushSuggestion(build::LogMsg.WriteYourCodeInUnsafeJule)
 			}
 			// Ok.
 			ret
@@ -1736,6 +1739,7 @@ impl eval {
 				// Ignore case.
 			} else if !self.isUnsafe() {
 				self.pushErr(errorToken, build::LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
+				self.pushSuggestion(build::LogMsg.WriteYourCodeInUnsafeJule)
 			}
 			ret
 		}
@@ -2191,6 +2195,7 @@ impl eval {
 			}
 		} else if !self.isUnsafe() && f.Decl.Unsafety {
 			self.pushErr(fc.Token, build::LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
+			self.pushSuggestion(build::LogMsg.WriteYourCodeInUnsafeJule)
 		}
 
 		mut dynamicAnnotation := len(f.Decl.Generics) > 0 && len(f.Generics) == 0 && len(f.Params) > 0
@@ -2939,6 +2944,7 @@ impl eval {
 			}
 			if !self.isUnsafe() {
 				self.pushErr(si.Ident, build::LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
+				self.pushSuggestion(build::LogMsg.WriteYourCodeInUnsafeJule)
 			}
 			kind = ptr.Elem
 			makeImplicitDeref(v, si.Ident)
@@ -3564,6 +3570,7 @@ impl unaryEval {
 		| self.v.Type.Ptr() != nil:
 			if !self.e.isUnsafe() {
 				self.e.pushErr(self.u.Op, build::LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
+				self.e.pushSuggestion(build::LogMsg.WriteYourCodeInUnsafeJule)
 			}
 
 			mut t := self.v.Type.Ptr()
