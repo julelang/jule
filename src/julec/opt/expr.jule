@@ -830,6 +830,41 @@ impl exprOptimizer {
 		}
 	}
 
+	fn copyCall(self, mut m: &sema::BuiltinCopyCallExpr) {
+		if !ZCopy {
+			ret
+		}
+		// We have to use mutable memory for the dest argument of copy due to lang spec.
+		// But we can optimize the src argument too, it is safe.
+		if IsZCopyArray(m.Dest.Model) {
+			mut ie := (&sema::SlicingExpr)(m.Dest.Model)
+			mut model := any(&ArrayAsSlice{
+				Expr: ie.Expr.Model,
+			})
+			ie.Expr.Model = unsafe { *(*sema::Expr)(&model) }
+		}
+		if IsZCopyArray(m.Src.Model) {
+			mut ie := (&sema::SlicingExpr)(m.Src.Model)
+			mut model := any(&ArrayAsSlice{
+				Expr: ie.Expr.Model,
+			})
+			ie.Expr.Model = unsafe { *(*sema::Expr)(&model) }
+		}
+	}
+
+	fn appendCall(self, mut m: &sema::BuiltinAppendCallExpr) {
+		if !ZAppend {
+			ret
+		}
+		if IsZAppendArray(m.Elements) {
+			mut ie := (&sema::SlicingExpr)(m.Elements)
+			mut model := any(&ArrayAsSlice{
+				Expr: ie.Expr.Model,
+			})
+			ie.Expr.Model = unsafe { *(*sema::Expr)(&model) }
+		}
+	}
+
 	fn lenCall(self, mut m: &sema::BuiltinLenCallExpr) {
 		if !Len {
 			// skip optimizations if relevant flag is not passed
@@ -933,6 +968,10 @@ impl exprOptimizer {
 			self.casting((&sema::CastingExpr)(m))
 		| &sema::FuncCallExpr:
 			self.funcCall((&sema::FuncCallExpr)(m))
+		| &sema::BuiltinCopyCallExpr:
+			self.copyCall((&sema::BuiltinCopyCallExpr)(m))
+		| &sema::BuiltinAppendCallExpr:
+			self.appendCall((&sema::BuiltinAppendCallExpr)(m))
 		| &sema::BuiltinLenCallExpr:
 			self.lenCall((&sema::BuiltinLenCallExpr)(m))
 		| &sema::IndexingExpr:

@@ -37,6 +37,7 @@ enum compExpr: type {
 	&opt::FuncCallIgnoreExceptionalExpr,
 	&opt::StrConcatExpr,
 	&opt::StrFromBytes,
+	&opt::ArrayAsSlice,
 }
 
 struct exprCoder {
@@ -1180,7 +1181,7 @@ impl exprCoder {
 	}
 
 	fn slicing(mut &self, mut m: &sema::SlicingExpr) {
-		self.possibleRefExpr(m.Expr)
+		self.possibleRefExpr(m.Expr.Model)
 		self.oc.write(".slice(")
 		if !env::Production {
 			self.oc.write("\"")
@@ -1760,6 +1761,12 @@ impl exprCoder {
 		self.oc.write(")")
 	}
 
+	fn arrayAsSlice(mut &self, mut m: &opt::ArrayAsSlice) {
+		self.oc.write("(")
+		self.possibleRefExpr(m.Expr)
+		self.oc.write(").as_slice()")
+	}
+
 	fn model(mut &self, mut m: compExpr) {
 		match type m {
 		| str:
@@ -1866,6 +1873,8 @@ impl exprCoder {
 			self.strConcat((&opt::StrConcatExpr)(m))
 		| &opt::StrFromBytes:
 			self.strFromBytes((&opt::StrFromBytes)(m))
+		| &opt::ArrayAsSlice:
+			self.arrayAsSlice((&opt::ArrayAsSlice)(m))
 		|:
 			self.oc.write("<unimplemented_expression_model>")
 		}

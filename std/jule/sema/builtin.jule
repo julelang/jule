@@ -646,6 +646,17 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Valu
 fn callerCopySlice(mut &dest: &Value, mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Value): &Value {
 	if !dest.Mutable {
 		e.pushErr(fc.Args[0].Token, build::LogMsg.MutOperationOnImmut)
+	} else {
+		// Dest is mutable, array slicing may be mutable if possible due to slicing.
+		// But this function will use the direct memory of the array.
+		// So check this special case.
+		match type dest.Model {
+		| &SlicingExpr:
+			mut se := (&SlicingExpr)(dest.Model)
+			if !se.Expr.Mutable && se.Expr.Type.Array() != nil {
+				e.pushErr(fc.Args[0].Token, build::LogMsg.MutOperationOnImmut)
+			}
+		}
 	}
 
 	mut src := e.evalExpr(fc.Args[1])

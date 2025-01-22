@@ -57,6 +57,15 @@ namespace jule
             return this->begin() + N;
         }
 
+        jule::Slice<Item> as_slice(void) noexcept {
+            jule::Slice<Item> s;
+            s._cap = N;
+            s._len = N;
+            s._slice = this->begin();
+            s.data.alloc = s._slice;
+            return s;
+        }
+
         jule::Slice<Item> slice(
 #ifndef __JULE_ENABLE__PRODUCTION
             const char *file,
