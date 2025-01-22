@@ -63,12 +63,28 @@ static mut numcpu = 0
 fn NumCPU(): int { ret numcpu }
 
 // Allocates a new thread and sets state as running.
+//
+// Memory management and threads instances:
+//	Allocated threads are never will be deallocated. Closed threads
+//	will be marked as closed. Closed threads may be reused if a new thread spawned.
+//	It helps reduce the memory overhead of programs with high thread usage.
+//	Some tools like Valgrind may detect as memory leak, but this was done on purpose.
 fn newThread(): &thread {
 	mut t := new(thread)
 	unsafe {
 		// Remove RC pointer and disable GC for thread allocations.
 		// Because allocated threads will never be deallocated.
 		// Avoid GC cost for threads.
+		//
+		// NOTE:
+		//	This is also prevents misuse of concurrent data.
+		//	End of the program, compiler will release the threads if they performs GC.
+		//	But other running threads may use the threads, and since threadMutex
+		//	will not be locked, it may cause SEGFAULT due to using released memory.
+		//
+		//	Of course a good implementation will wait for the running threads,
+		//	but we have to be safe as possible here. If the main thread will end
+		//	before other running threads, avoid possible SEGFAULT.
 		mut p := (*sptrBase[thread])(&t)
 		_RCFree(p.ref)
 		p.ref = nil
