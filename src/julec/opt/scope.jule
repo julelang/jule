@@ -798,8 +798,8 @@ impl scopeOptimizer {
 	fn optimizeMultiAssign(mut &self, mut assign: &sema::MultiAssign) {
 		// Get tuple expression if exist.
 		// If there is a tuple expression, it means this multi-assign statement is:
-		//   like: x, y, z = a, b, c
-		//   not:  x, y, z = myFunc()
+		//	like: x, y, z = a, b, c
+		//	not:  x, y, z = myFunc()
 		mut tup := (&sema::TupleExpr)(nil)
 		match type assign.Right {
 		| &sema::TupleExpr:
@@ -863,20 +863,20 @@ impl scopeOptimizer {
 		// any swap expression may cause conflicts.
 		// For example, --opt-dynamic optimizations;
 		//
-		//   mut x := any(nil)
-		//   mut y := any(20)
-		//   x, y = y, x
-		//   _ = int(y)
+		//	mut x := any(nil)
+		//	mut y := any(20)
+		//	x, y = y, x
+		//	_ = int(y)
 		//
-		//   In the example program above, the "int(y)" expression will be optimized to unsafe,
-		//   which is removes the type checking. But the variable |y| will be nil.
-		//   This bug appears because of using common optimization data.
-		//   First, the variable |x| takes the value of the variable |y|,
-		//   which is non-nil and type-is-nil guaranteed. Then the variable |y|
-		//   takes the value of the variable |x|. It should be nil, but it's not.
-		//   Because the variable |x| will be marked like |y|, since common data used.
-		//   So use the self.data to determine optimization opportunities,
-		//   but apply optimization data update on the checkpoint copy to avoid conflicts.
+		//	In the example program above, the "int(y)" expression will be optimized to unsafe,
+		//	which is removes the type checking. But the variable |y| will be nil.
+		//	This bug appears because of using common optimization data.
+		//	First, the variable |x| takes the value of the variable |y|,
+		//	which is non-nil and type-is-nil guaranteed. Then the variable |y|
+		//	takes the value of the variable |x|. It should be nil, but it's not.
+		//	Because the variable |x| will be marked like |y|, since common data used.
+		//	So use the self.data to determine optimization opportunities,
+		//	but apply optimization data update on the checkpoint copy to avoid conflicts.
 		//
 		// Do not forget load checkpoint to self.data to keep updated data.
 		mut checkpoint := self.data.getCheckpoint()
@@ -989,27 +989,27 @@ impl scopeOptimizer {
 	//
 	// For example;
 	//
-	//   z := getSlice()
-	//   mut x := (&int)(nil)
-	//   for in z {
-	//       x = new(int)
-	//   }
-	//   println(*x)
+	//	z := getSlice()
+	//	mut x := (&int)(nil)
+	//	for in z {
+	//		x = new(int)
+	//	}
+	//	println(*x)
 	//
-	//   In the example code above, the variable |x| may optimized to unsafe dereferencing,
-	//   which is removes the nil checking. It probably will appear when the scope of the
-	//   iteration optimized with the optimizeChild method. Since the using mutable data,
-	//   the variable |x| will be marked as non-nil because of `new(int)` assignment.
-	//   But, the iteration may not iterate even once. So, the variable |x| may still remain nil.
-	//   In this case, the program behavior will be unsafe because of optimization mistake.
+	//	In the example code above, the variable |x| may optimized to unsafe dereferencing,
+	//	which is removes the nil checking. It probably will appear when the scope of the
+	//	iteration optimized with the optimizeChild method. Since the using mutable data,
+	//	the variable |x| will be marked as non-nil because of `new(int)` assignment.
+	//	But, the iteration may not iterate even once. So, the variable |x| may still remain nil.
+	//	In this case, the program behavior will be unsafe because of optimization mistake.
 	//
-	//   This optimizer method, uses responsive data. So handles dead variables and mutations.
-	//   For example, if scope code will assign the variable |x| to nil,
-	//   it remove the alive state of the variable |x|. Another example,
-	//   example case is not appear when used this method. Because it uses an immutable copy,
-	//   internally, so child optimizer will not mutate the checkpoint.
-	//   Removes possibly dead variables if checkpoint marks as alive after child optimizer,
-	//   and ignored possibly alive variables to avoid mistakes such as example case.
+	//	This optimizer method, uses responsive data. So handles dead variables and mutations.
+	//	For example, if scope code will assign the variable |x| to nil,
+	//	it remove the alive state of the variable |x|. Another example,
+	//	example case is not appear when used this method. Because it uses an immutable copy,
+	//	internally, so child optimizer will not mutate the checkpoint.
+	//	Removes possibly dead variables if checkpoint marks as alive after child optimizer,
+	//	and ignored possibly alive variables to avoid mistakes such as example case.
 	fn optimizeChildHard(mut &self, mut child: &sema::Scope) {
 		// Create the immutable copy of the data to determine alive and dead data.
 		// As described in the method documentation.

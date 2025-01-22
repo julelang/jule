@@ -78,9 +78,9 @@ impl exprOptimizer {
 					// So we can't know whether operands are guaranteed to be executed.
 					// For example:
 					//
-					//   if x != nil || y != nil { ... }
+					//	if x != nil || y != nil { ... }
 					//
-					//   In the example code above, we can't know which operand is not nil.
+					//	In the example code above, we can't know which operand is not nil.
 					//
 					// It also requires all binary expressions should be &&.
 					// Because the first node is the root binary expression.
@@ -316,12 +316,13 @@ impl exprOptimizer {
 				// By operator precedence and CAST production,
 				// the first node of the CAST is always the last binary expression.
 				// For example:
-				//   _ = "foo" + x + "bar" + "baz"
-				//                         ^
-				//  In the expression above, the first binary expression node will be pointed one.
-				//  So handle `"foo" + x + "bar"` expression first, then the right operand `+ "baz"`.
-				//  So, recursively handle the left binary expression operands,
-				//  and push the expression models by left-to-right order.
+				//	|
+				//	| _ = "foo" + x + "bar" + "baz"
+				//	|                       ^
+				//	In the expression above, the first binary expression node will be pointed one.
+				//	So handle `"foo" + x + "bar"` expression first, then the right operand `+ "baz"`.
+				//	So, recursively handle the left binary expression operands,
+				//	and push the expression models by left-to-right order.
 				mut binary := (&sema::BinaryExpr)(m)
 				unsafe {
 					// Apply common optimizations for each binary expression.
@@ -660,30 +661,30 @@ impl exprOptimizer {
 			// Because we can't whether they are really informative.
 			// For example:
 			//
-			//    x := (&int)(nil)
-			//    y := (&int)(nil)
-			//    if x != nil || *y == 20 {
-			//        println(*y)
-			//    }
+			//	x := (&int)(nil)
+			//	y := (&int)(nil)
+			//	if x != nil || *y == 20 {
+			//		println(*y)
+			//	}
 			//
-			//    In the example code above, we can't assume |y| is dereferenced, so checked.
-			//    Optimization analysis will update the optimization data. So,
-			//    if we don't use immutable checkpoint copy, the optimizer will
-			//    optimize |*y| expression of the println call, which is dangerous.
-			//    Therefore we have to handle data for operands.
-			//    To achieve that, get immutable checkpoint, optimize operands,
-			//    then load data to checkpoint copy.
+			//	In the example code above, we can't assume |y| is dereferenced, so checked.
+			//	Optimization analysis will update the optimization data. So,
+			//	if we don't use immutable checkpoint copy, the optimizer will
+			//	optimize |*y| expression of the println call, which is dangerous.
+			//	Therefore we have to handle data for operands.
+			//	To achieve that, get immutable checkpoint, optimize operands,
+			//	then load data to checkpoint copy.
 			//
 			// There is another issue. Internal data usage should be allowed.
 			// For example:
 			//
-			//    if x != nil || foo(*y, *y)
+			//	if x != nil || foo(*y, *y)
 			//
-			//    In the example code above, if the function |foo| called,
-			//    we know the |y| dereferenced twice. So, able to optimize the
-			//    second dereferencing. It should be allowed. So, the checkpoint
-			//    will help for that also. We can use data for the internal optimizations,
-			//    then ignore the optimization updates and restore to the checkpoint.
+			//	In the example code above, if the function |foo| called,
+			//	we know the |y| dereferenced twice. So, able to optimize the
+			//	second dereferencing. It should be allowed. So, the checkpoint
+			//	will help for that also. We can use data for the internal optimizations,
+			//	then ignore the optimization updates and restore to the checkpoint.
 			mut checkpoint := data{}
 			checkpoint.loadCheckpoint(self.data.getCheckpoint())
 
@@ -949,12 +950,13 @@ impl exprOptimizer {
 }
 
 // Checks for bit-shifting optimizations.
+//
 // Reports true if conditions are:
-//   - l is integer
-//   - r is integer
-//   - r is constant
-//   - r > 0 && r%2 == 0
-//   - log2(r) returns integer without fraction
+// - l is integer
+// - r is integer
+// - r is constant
+// - r > 0 && r%2 == 0
+// - log2(r) returns integer without fraction
 //
 // As a result: returns whether bit-shifting is possible and what nth power of 2^r.
 // Assumes the model r is constant.
