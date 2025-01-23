@@ -600,7 +600,10 @@ impl eval {
 			for s.owner == nil && s.parent != nil {
 				s = s.parent
 			}
-			if s.owner != nil && s.owner.Anon && v.Scope != s.owner.Scope {
+			// If scope owner is an anonymous function, it may be a closure.
+			// But closures performs risky memory handling for references. So catch them.
+			// Just one exception: deferred scope functions safe for references.
+			if s.owner != nil && !s.owner.Scope.Deferred && s.owner.Anon && v.Scope != s.owner.Scope {
 				self.pushErr(errorToken, build::LogMsg.UsedRefInAnonFuncFromParentScope, v.Ident)
 			}
 		}

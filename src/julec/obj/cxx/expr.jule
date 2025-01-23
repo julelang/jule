@@ -1346,19 +1346,23 @@ impl exprCoder {
 	}
 
 	fn errorCall(mut &self, mut m: &sema::BuiltinErrorCallExpr) {
-		self.oc.write("return ")
+		hasDefer := m.Func.Decl != nil && m.Func.Decl.HasDefer
 		if m.Func.Decl.IsVoid() {
 			match type m.Err.Model {
 			| &sema::Var:
 				v := (&sema::Var)(m.Err.Model)
 				if v.Ident == token::Kind.Error {
-					self.oc.write("jule::VoidExceptional{.error=std::move(except.error)}")
+					if hasDefer {
+						self.oc.write(deferStackName + ".call();\n")
+						self.oc.indent()
+					}
+					self.oc.write("return jule::VoidExceptional{.error=std::move(except.error)}")
 					ret
 				}
 			}
-			self.oc.write("jule::VoidExceptional{.error=" + typeAny + "(")
+			self.oc.write("return jule::VoidExceptional{.error=" + typeAny + "(")
 		} else {
-			self.oc.write("jule::Exceptional<")
+			self.oc.write("return jule::Exceptional<")
 			self.oc.tc.rc.codeMut1(self.oc.Buf, m.Func.Result)
 			match type m.Err.Model {
 			| &sema::Var:
@@ -1370,7 +1374,13 @@ impl exprCoder {
 			}
 			self.oc.write(">{.error=" + typeAny + "(")
 		}
+		if hasDefer {
+			self.oc.write("({ auto __result = ")
+		}
 		self.possibleRefExpr(m.Err.Model)
+		if hasDefer {
+			self.oc.write(";" + deferStackName + ".call(); __result; })")
+		}
 		i := self.oc.pushAnyType(m.Err.Type)
 		self.oc.write(", &" + anyTypeIdent)
 		self.oc.write(conv::Itoa(i))

@@ -18,6 +18,8 @@ const matchExpr = "_match_expr"
 const resultName = "__jule_func_result"
 const assignResultName = "__jule_assign_result"
 const resultArgName = "__jule_result_arg"
+const deferStackName = "__jule_deferStack"
+
 static assignArgName = "__jule_assign_arg"
 
 // Common group of semantic analysis stmt types and optimizer specific types.
@@ -1209,8 +1211,12 @@ impl scopeCoder {
 	}
 
 	fn retStmt(mut &self, mut r: &sema::Ret) {
-		// Void.
+		hasDefer := r.Func.Decl != nil && r.Func.Decl.HasDefer
 		if r.Func.Decl.IsVoid() {
+			if hasDefer {
+				self.oc.write(deferStackName + ".call();\n")
+				self.oc.indent()
+			}
 			if r.Func.Decl.Exceptional {
 				self.oc.write("return jule::VoidExceptional{};")
 				ret
@@ -1222,11 +1228,27 @@ impl scopeCoder {
 				self.oc.write("return jule::Exceptional<")
 				self.oc.tc.kind(self.oc.Buf, r.Func.Result)
 				self.oc.write(">{.result=")
+				if hasDefer {
+					self.oc.write("({ ")
+					self.oc.tc.kind(self.oc.Buf, r.Func.Result)
+					self.oc.write(" __result = ")
+				}
 				self.oc.ec.possibleRefExpr(r.Expr)
+				if hasDefer {
+					self.oc.write("; " + deferStackName + ".call(); __result; })")
+				}
 				self.oc.write("};")
 			} else {
 				self.oc.write("return ")
+				if hasDefer {
+					self.oc.write("({ ")
+					self.oc.tc.kind(self.oc.Buf, r.Func.Result)
+					self.oc.write(" __result = ")
+				}
 				self.oc.ec.possibleRefExpr(r.Expr)
+				if hasDefer {
+					self.oc.write(";" + deferStackName + ".call(); __result; })")
+				}
 				self.oc.write(";")
 			}
 			ret
@@ -1234,6 +1256,12 @@ impl scopeCoder {
 
 		if r.Expr != nil {
 			self.setResult(r)
+		}
+		// We can call defer stack here if exist.
+		// All result arguments evaluated and stored.
+		if hasDefer {
+			self.oc.write(deferStackName + ".call();\n")
+			self.oc.indent()
 		}
 		if r.Func.Decl.Exceptional {
 			self.oc.write("return jule::Exceptional<")
@@ -1291,7 +1319,20 @@ impl scopeCoder {
 		| &sema::Var:
 			self.var((&sema::Var)(st))
 		| &sema::Value:
-			self.oc.ec.model((&sema::Value)(st).Model)
+			v := (&sema::Value)(st)
+			// Catch anonymous functions created by defer scope.
+			// Push them to defer stack.
+			match type v.Model {
+			| &sema::AnonFuncExpr:
+				f := (&sema::AnonFuncExpr)(v.Model)
+				if f.Func.Scope != nil && f.Func.Scope.Deferred {
+					self.oc.write(deferStackName + ".push(")
+					self.oc.ec.model(v.Model)
+					self.oc.write(")")
+					ret
+				}
+			}
+			self.oc.ec.model(v.Model)
 		| &sema::Conditional:
 			self.conditional((&sema::Conditional)(st))
 		| &sema::InfIter:
@@ -1350,17 +1391,11 @@ impl scopeCoder {
 	// Generates C++ code of scope.
 	fn scope(mut &self, mut s: &sema::Scope) {
 		self.oc.addIndent()
-		if s.Deferred {
-			self.oc.write("__JULE_DEFER(")
-		}
 		self.oc.write("{\n")
 		self.scopeStmts(s)
 		self.oc.doneIndent()
 		self.oc.indent()
 		self.oc.write("}")
-		if s.Deferred {
-			self.oc.write(");")
-		}
 	}
 
 	fn commonFuncScope(mut &self, mut &f: &sema::FuncIns) {
@@ -1393,7 +1428,33 @@ impl scopeCoder {
 				self.oc.write(";\n")
 			}
 		}
+		if f.Decl.HasDefer {
+			self.oc.indent()
+			self.oc.write("jule::DeferStack " + deferStackName + ";\n")
+		}
 		self.scopeStmts(f.Scope)
+
+		// Before executing final steps, checks whether the scope has final statement
+		// already such as return statement or error call.
+		if len(f.Scope.Stmts) > 0 {
+			stmt := f.Scope.Stmts[len(f.Scope.Stmts)-1]
+			match type stmt {
+			| &sema::Ret:
+				ret
+			| &sema::Value:
+				v := (&sema::Value)(stmt)
+				match type v.Model {
+				| &sema::BuiltinErrorCallExpr
+				| &sema::BuiltinPanicCallExpr:
+					ret
+				}
+			}
+		}
+
+		if f.Decl.HasDefer {
+			self.oc.indent()
+			self.oc.write(deferStackName + ".call();\n")
+		}
 		if f.Decl.Exceptional && f.Decl.IsVoid() {
 			// Just for void exceptionals.
 			// Other cases checked by semantic analsis and disallowed

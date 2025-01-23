@@ -626,6 +626,20 @@ impl scopeChecker {
 	}
 
 	fn checkAnonScope(mut &self, mut tree: &ast::ScopeTree) {
+		// Scope is deferred. Handle as anonymous function, it may be a closure.
+		// See: https://manual.jule.dev/introduction/scopes#deferred-scopes
+		if tree.Deferred {
+			self.getRoot().owner.Decl.HasDefer = true
+			mut f := &ast::Func{
+				Scope: tree,
+				Ident: token::Ident.Anon,
+				Result: new(ast::RetType),
+			}
+			mut e := self.s.eval(self)
+			mut v := e.evalAnonFunc(f)
+			self.scope.Stmts = append(self.scope.Stmts, v)
+			ret
+		}
 		mut s := self.checkChild(tree)
 		self.scope.Stmts = append(self.scope.Stmts, s)
 	}

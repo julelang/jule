@@ -13,6 +13,7 @@
 #include "error.hpp"
 #include "ptr.hpp"
 #include "str.hpp"
+#include "slice.hpp"
 
 namespace jule
 {
@@ -87,6 +88,30 @@ namespace jule
         constexpr jule::Bool operator!=(std::nullptr_t) const noexcept
         {
             return !this->operator==(nullptr);
+        }
+    };
+
+    struct DeferStack
+    {
+        jule::Slice<jule::Fn<void>> stack;
+
+        void push(jule::Fn<void> func) noexcept
+        {
+            this->stack.push(func);
+        }
+
+        void call(void) noexcept
+        {
+            if (this->stack.len() == 0)
+            {
+                return;
+            }
+            auto it = this->stack.end() - 1;
+            const auto begin = this->stack.begin();
+            for (; it >= begin; it--)
+            {
+                (*it)();
+            }
         }
     };
 
