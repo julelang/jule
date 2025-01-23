@@ -1295,7 +1295,10 @@ impl ObjectCoder {
 		for (_, mut v) in self.ir.Ordered.Globals {
 			// Skip special cases
 			if v == meta::Program.Runtime.Threads ||
-				v == meta::Program.Runtime.NumCPU {
+				v == meta::Program.Runtime.NumCPU ||
+				v == meta::Program.Runtime.Argc ||
+				v == meta::Program.Runtime.Argv ||
+				v == meta::Program.Runtime.Envp {
 				continue
 			}
 			self.Buf.WriteByte(indentKind)!
@@ -1317,16 +1320,16 @@ impl ObjectCoder {
 	}
 
 	fn end(mut &self) {
-		self.write(`int main(int argc, char *argv[], char *envp[]) {`)
-		self.write("\n\t")
-		identCoder.funcIns(self.Buf, meta::Program.Runtime.Init)
-		self.write("();\n\n")
-		self.initGlobals()
-		self.write(`
+		self.write(`int main(int argc, char *argv[], char *envp[]) {
 	__jule_argc = static_cast<jule::Int>(argc);
 	__jule_argv = reinterpret_cast<jule::U8**>(argv);
 	__jule_envp = reinterpret_cast<jule::U8**>(envp);
 
+	`)
+		identCoder.funcIns(self.Buf, meta::Program.Runtime.Init)
+		self.write("();\n\n")
+		self.initGlobals()
+		self.write(`
 	__jule_call_initializers();
 	`)
 
