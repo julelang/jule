@@ -1512,21 +1512,28 @@ impl eval {
 		}
 	}
 
-	fn castStruct(mut self, mut t: &Type, mut v: &Value, errorToken: &token::Token) {
-		v.Constant = nil
-		v.untyped = false
+	fn castStruct(mut self, mut t: &Type, mut v: &Value, errorToken: &token::Token): (strict: bool) {
+		mut s := t.softStruct()
+		strict = s.Source != nil
+
 		mut tr := v.Type.Trait()
 		if tr == nil {
-			self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, v.Type.Str(), t.Str())
+			if !strict {
+				self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, v.Type.Str(), t.Str())
+			}
 			ret
 		}
 
-		mut s := t.Struct()
+		v.Constant = nil
+		v.untyped = false
 		self.pushReference[&StructIns](s)
 
 		if !s.Decl.IsImplements(tr) {
 			self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, v.Type.Str(), t.Str())
 		}
+		// Returns strict as false, because type is trait, and we know other types
+		// is not valid for it. Do not check by source type.
+		ret false
 	}
 
 	fn castSptr(mut self, mut t: &Type, mut v: &Value, errorToken: &token::Token) {
@@ -1545,9 +1552,13 @@ impl eval {
 		}
 
 		// For traits.
-		if sptr.Elem.Struct() != nil {
-			self.castStruct(sptr.Elem, v, errorToken)
-			ret
+		if sptr.Elem.softStruct() != nil {
+			strict := self.castStruct(sptr.Elem, v, errorToken)
+			if !strict {
+				ret
+			}
+			// Struct is belongs to strict type alias.
+			// So, no error logged; log it.
 		}
 
 		self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, v.Type.Str(), t.Str())
@@ -1831,36 +1842,44 @@ impl eval {
 				}
 				v.Constant = nil // Remove nil constant.
 				v.untyped = false
-			| v.Type.Prim() != nil && v.Type.Prim().IsAny():
-				if t.TypeEnum() != nil {
-					self.pushErr(errorToken, build::LogMsg.TypeEnumCastedFromAny)
+			| t.softStruct() != nil:
+				strict := self.castStruct(t, v, errorToken)
+				if !strict {
+					break
 				}
-				v.Constant = nil
-				v.untyped = false
-			| t.Prim() != nil && t.Prim().IsAny():
-				// The any type supports casting to any data type.
-				v.Constant = nil
-				v.untyped = false
-			| v.Type.TypeEnum() != nil:
-				self.castTypeEnum(t, v, errorToken)
-			| t.TypeEnum() != nil:
-				self.castTypeEnumT(t, v, errorToken)
-			| t.Ptr() != nil:
-				self.castPtr(t, v, errorToken)
-			| t.Sptr() != nil:
-				self.castSptr(t, v, errorToken)
-			| t.Slice() != nil:
-				self.castSlice(t, v, errorToken)
-			| t.Struct() != nil:
-				self.castStruct(t, v, errorToken)
-			| t.Prim() != nil:
-				self.castPrim(t, v, errorToken)
-				self.castConstant(t, v)
-			| t.Chan() != nil:
-				self.castChan(t, v, errorToken)
+				// Type is strict, check by source type also.
+				fall
 			|:
-				self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCasting, t.Str())
-				v = nil
+				match {
+				| v.Type.Prim() != nil && v.Type.Prim().IsAny():
+					if t.TypeEnum() != nil {
+						self.pushErr(errorToken, build::LogMsg.TypeEnumCastedFromAny)
+					}
+					v.Constant = nil
+					v.untyped = false
+				| t.Prim() != nil && t.Prim().IsAny():
+					// The any type supports casting to any data type.
+					v.Constant = nil
+					v.untyped = false
+				| v.Type.TypeEnum() != nil:
+					self.castTypeEnum(t, v, errorToken)
+				| t.TypeEnum() != nil:
+					self.castTypeEnumT(t, v, errorToken)
+				| t.Ptr() != nil:
+					self.castPtr(t, v, errorToken)
+				| t.Sptr() != nil:
+					self.castSptr(t, v, errorToken)
+				| t.Slice() != nil:
+					self.castSlice(t, v, errorToken)
+				| t.Prim() != nil:
+					self.castPrim(t, v, errorToken)
+					self.castConstant(t, v)
+				| t.Chan() != nil:
+					self.castChan(t, v, errorToken)
+				|:
+					self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCasting, t.Str())
+					v = nil
+				}
 			}
 		}
 
