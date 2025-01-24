@@ -1322,6 +1322,30 @@ impl sema {
 		}
 	}
 
+	fn checkTypeEnumItemType(mut &self, mut &e: &TypeEnum, mut &item: &TypeEnumItem): (ok: bool) {
+		mut old := self.file
+		defer {
+			self.setCurrentFile(old)
+		}
+		if e.Token != nil {
+			mut file := findFile(self.files, e.Token.File)
+			if file != nil {
+				self.setCurrentFile(file)
+			}
+		}
+		mut referencer := &referencer{
+			ident: e.Ident,
+			owner: e,
+			refs: &e.Refers,
+		}
+		ok = self.checkTypeSymWithRefers(item.TypeSym, self, nil, referencer)
+		if ok && item.TypeSym.Type.Array() != nil && item.TypeSym.Type.Array().Auto {
+			self.pushErr(item.TypeSym.Decl.Token, build::LogMsg.ArrayAutoSized)
+			ok = false
+		}
+		ret
+	}
+
 	fn checkTypeEnumDecl(mut &self, mut &e: &TypeEnum) {
 		if token::IsIgnoreIdent(e.Ident) {
 			self.pushErr(e.Token, build::LogMsg.IgnoreIdent)
@@ -1341,22 +1365,13 @@ impl sema {
 				self.pushErr(item.Token, build::LogMsg.MissingType)
 				continue
 			}
-			ok := self.checkTypeSym(item.TypeSym, self)
+			ok := self.checkTypeEnumItemType(e, item)
 			if !ok {
 				continue
 			}
 			p := item.TypeSym.Type.Prim()
 			if p != nil && p.IsAny() {
 				self.pushErr(item.Token, build::LogMsg.AnyWithTypeEnum)
-			}
-		}
-		if len(e.Items) == 1 {
-			mut item := e.Items[0]
-			tk := Type{
-				Kind: e,
-			}
-			if item.TypeSym.Type != nil && item.TypeSym.Type.Equal(unsafe { (&Type)(&tk) }) {
-				self.pushErr(item.Token, build::LogMsg.IllegalCycleRefersItself, e.Str())
 			}
 		}
 	}

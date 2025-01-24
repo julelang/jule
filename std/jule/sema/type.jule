@@ -1004,6 +1004,8 @@ impl typeChecker {
 		const Padding = 7
 		getIdent := fn(&def: any): str {
 			match type def {
+			| &TypeEnum:
+				ret (&TypeEnum)(def).Ident
 			| &TypeAlias:
 				ret (&TypeAlias)(def).Ident
 			| &Struct:
@@ -1022,6 +1024,21 @@ impl typeChecker {
 
 	fn checkCrossCycle(self, decl: any, mut &message: strings::Builder): bool {
 		match type decl {
+		| &TypeEnum:
+			te := (&TypeEnum)(decl)
+			for _, d in te.Refers {
+				n := message.Len()
+				self.pushCycleError(te, d, message)
+				if self.referencer.owner == d {
+					ret false
+				}
+				unsafe { message.SetBuf(message.Buf()[:n]) } // Pop last trace.
+				if !self.checkCrossCycle(d, message) {
+					self.pushCycleError(te, d, message)
+					ret false
+				}
+				unsafe { message.SetBuf(message.Buf()[:n]) } // Pop last trace.
+			}
 		| &TypeAlias:
 			ta := (&TypeAlias)(decl)
 			for _, d in ta.Refers {
@@ -1105,7 +1122,7 @@ impl typeChecker {
 		}
 
 		match type self.referencer.owner {
-		| &TypeAlias:
+		| &TypeAlias | &TypeEnum:
 			unsafe {
 				*self.referencer.refs = append(*self.referencer.refs, decl)
 			}
@@ -1232,6 +1249,10 @@ impl typeChecker {
 		}
 		if len(decl.Generics) > 0 {
 			self.pushErr(decl.Token, build::LogMsg.TypeNotSupportsGenerics, decl.Ident)
+			ret nil
+		}
+		mut ok := self.checkIllegalCycles(decl.Token, e)
+		if !ok && self.cycleErr&cycleErrEnable == cycleErrEnable {
 			ret nil
 		}
 		ret e
