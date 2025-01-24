@@ -1397,8 +1397,9 @@ impl scopeChecker {
 			ret
 		}
 
+		errors := len(self.s.errors)
 		mut eval := self.s.eval(self)
-		mut right, rightData, ok := self.getRightExprsOfMultiAssign(a, eval)
+		mut right, rightData, mut ok := self.getRightExprsOfMultiAssign(a, eval)
 		if !ok {
 			ret
 		}
@@ -1414,6 +1415,37 @@ impl scopeChecker {
 						{&Value{Mutable: right[0].data.Mutable, Type: iem.Expr.Type.Map().Val}, right[0].expr},
 						{&Value{Type: primBool}, right[0].expr},
 					]
+				}
+			| &CastingExpr:
+				mut ce := (&CastingExpr)(right[0].data.Model)
+				prim := ce.Expr.Type.Prim()
+				if prim != nil && prim.IsAny() || ce.Expr.Type.Trait() != nil {
+					strict = true
+					right = [
+						{&Value{Mutable: right[0].data.Mutable, Type: ce.Type}, right[0].expr},
+						{&Value{Type: primBool}, right[0].expr},
+					]
+					// Handle and add reference to dynAssertAssign function.
+					// If an error was generated while evaluating the expression,
+					// do not handle it to avoid more errors. Because runtime
+					// implementation may generate additional errors.
+					// On trait types, we should know type is compatible for casting.
+					// Otherwise runtime assertion implementation will generate
+					// errors about it too.
+					if errors == len(self.s.errors) && self.s.meta.runtime != nil {
+						mut decl := runtimeFindFunc(self.s.meta.runtime, "dynAssertAssign")
+						mut f := decl.instanceForce()
+						f.Generics = append(f.Generics, &InsGeneric{Type: ce.Expr.Type}, &InsGeneric{Type: ce.Type})
+						mut token := right[0].expr.Token
+						ok, _ = self.s.checkGenericFunc(f, token)
+						if !ok {
+							panic("sema: dynAssertAssign evaluation failed, this is an implementation mistake")
+						}
+						mut refers := self.getOwnerRefers()
+						if refers != nil && !refers.Exist[&FuncIns](f) {
+							refers.Push(f)
+						}
+					}
 				}
 			| &ChanRecv:
 				mut cr := (&ChanRecv)(right[0].data.Model)

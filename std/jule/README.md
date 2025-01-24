@@ -119,3 +119,4 @@ Here is the list of custom behaviors for this package;
 - (2): `toStr`: Built-in string conversion function for types. An instance is created in any situation that may be required.
 - (3): `_Map`: Built-in map type implementation. An instance created for each unique map type declaration.
 - (4): `pchan`: Built-in chan type implementation. An instance created for each unique channel type declaration.
+- (5) `dynAssertAssign`: Developed to eliminate the need for the Jule compiler to generate code specifically for assertion castings of dynamic types for each backend and to reduce analysis cost. The semantic analyzer creates the necessary instance for this generic function when an assertion casting is made. Thus, the necessary assertion casting function for each type is programmed at the Jule frontend level.

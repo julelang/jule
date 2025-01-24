@@ -843,6 +843,30 @@ impl scopeCoder {
 		self.oc.ec.chanRecv((&sema::ChanRecv)(a.Right), ok, false)
 	}
 
+	fn castingAssertionAssign(mut &self, mut a: &sema::MultiAssign) {
+		mut ce := (&sema::CastingExpr)(a.Right)
+		mut f := obj::FindFuncGenericInstance(meta::Program.Runtime.DynAssertAssign, ce.Expr.Type, ce.Type)
+		identCoder.funcIns(self.oc.Buf, f)
+		self.oc.write("(")
+		self.assignLeft(ce.Expr.Model)
+		self.oc.write(", ")
+		if a.Left[0] != nil {
+			self.oc.write("&(")
+			self.oc.ec.possibleRefExpr(a.Left[0].Model)
+			self.oc.write("), ")
+		} else {
+			self.oc.write("nullptr, ")
+		}
+		if a.Left[1] != nil {
+			self.oc.write("&(")
+			self.oc.ec.possibleRefExpr(a.Left[1].Model)
+			self.oc.write(")")
+		} else {
+			self.oc.write("nullptr")
+		}
+		self.oc.write(")")
+	}
+
 	fn multiAssign(mut &self, mut a: &sema::MultiAssign) {
 		// Write declarations without no initialization.
 		// It will initialize with assignments.
@@ -856,6 +880,9 @@ impl scopeCoder {
 		match type a.Right {
 		| &sema::IndexingExpr:
 			self.mapLookupAssign(a)
+			ret
+		| &sema::CastingExpr:
+			self.castingAssertionAssign(a)
 			ret
 		| &sema::ChanRecv:
 			self.chanRecvAssign(a)
