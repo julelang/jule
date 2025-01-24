@@ -173,7 +173,7 @@ namespace jule
 #endif
             }
 #endif
-            return *static_cast<T *>(this->data.alloc);
+            return *reinterpret_cast<T *>(this->data.alloc);
         }
 
         template <typename T>
