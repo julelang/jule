@@ -1289,6 +1289,11 @@ impl typeChecker {
 		mut referencer := self.referencer
 		self.referencer = nil
 		mut bannedGenerics := self.bannedGenerics
+		// Restore configuration.
+		defer {
+			self.bannedGenerics = bannedGenerics
+			self.referencer = referencer
+		}
 
 		// Set banned generics to catch initiation cycles.
 		// This just necessary for root, therefore avoid set each time.
@@ -1312,6 +1317,7 @@ impl typeChecker {
 		// Use rootLookup to parse generics with current current.
 		mut lookup := self.lookup
 		self.lookup = self.rootLookup
+		defer { self.lookup = lookup }
 
 		// Build generics.
 		mut ins := s.instance()
@@ -1323,11 +1329,6 @@ impl typeChecker {
 			}
 			ins.Generics = append(ins.Generics, &InsGeneric{Type: kind})
 		}
-
-		// Restore configuration.
-		self.lookup = lookup
-		self.bannedGenerics = bannedGenerics
-		self.referencer = referencer
 
 		ret ins
 	}
@@ -1413,6 +1414,22 @@ impl typeChecker {
 				if len(decl.Generics) > 0 {
 					self.pushErr(decl.Token, build::LogMsg.TypeNotSupportsGenerics, decl.Ident)
 					ret nil
+				}
+				// If generic type is astruct, check illegal cycles here.
+				// Because generic types are evaluated without referencer.
+				// So, any dependency will not be collected for structures.
+				// Also, type is already evaluated, so we have to check cycle risks.
+				// Because type analysis will return the evaluated type immediately.
+				// Cycle analysis required types should be handled here separately.
+				//
+				// Type aliases or type enums will not be handled,
+				// because there is no risk for type cycles.
+				mut st := g.TypeSym.Type.Struct()
+				if st != nil {
+					ok := self.checkIllegalCycles(decl.Token, st)
+					if !ok && self.cycleErr&cycleErrEnable == cycleErrEnable {
+						ret nil
+					}
 				}
 				ret g.TypeSym.Type.Kind
 			}
