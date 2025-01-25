@@ -731,6 +731,10 @@ impl parser {
 				ret
 			}
 			t.Kind, ok = unsafe { self.buildType(tokens, &i, true) }
+			// If result type analysis failed, set i to -1 for error mark.
+			if !ok {
+				i = -1
+			}
 			ret
 		}
 		i++
@@ -821,9 +825,14 @@ impl parser {
 	fn buildFunc(mut &self, mut &tokens: []&token::Token, method: bool, prototype: bool): &ast::Func {
 		mut i := 0
 		mut f := self.buildFuncPrototype(tokens, i, method)
+		// If i == -1, there is critical error for analysis.
+		// Return nil immediately.
+		if i == -1 {
+			ret nil
+		}
 		if prototype {
 			if i < len(tokens) {
-				self.pushErr(tokens[i+1], build::LogMsg.InvalidSyntax)
+				self.pushErr(tokens[i], build::LogMsg.InvalidSyntax)
 			}
 			ret f
 		} else if f == nil {
@@ -845,7 +854,7 @@ impl parser {
 			}
 		} else {
 			self.stop()
-			self.pushErr(f.Token, build::LogMsg.BodyNotExist)
+			self.pushErr(tokens[i], build::LogMsg.BodyNotExist)
 			self.pushSuggestion(build::LogMsg.ExpectedBody)
 			ret nil
 		}
