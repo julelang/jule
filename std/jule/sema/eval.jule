@@ -87,8 +87,8 @@ struct eval {
 	lookup:     Lookup
 	prefix:     &Type
 	unsafety:   bool
-	disBuiltin: bool // Disallow/suppress Jule's built-in defines.
-	owner:      &Var
+	disBuiltin: bool      // Disallow/suppress Jule's built-in defines.
+	owner:      &Var      // Global variable, which is owner of this evaluation.
 	field:      &FieldIns // Field of this default expression. Used for checking cycles and dependency collection.
 	target:     target
 }
@@ -513,60 +513,6 @@ impl eval {
 		ret self.evalFuncIns(ins)
 	}
 
-	fn pushIllegalCycleError(mut self, &v1: &Var, &v2: &Var, mut &message: strings::Builder) {
-		const Padding = 7
-		refersTo := build::Logf(build::LogMsg.RefersTo, v1.Ident, v2.Ident)
-		message.WriteStr(strings::Repeat(" ", Padding))!
-		message.WriteStr(refersTo)!
-		message.WriteByte('\n')!
-	}
-
-	fn checkCrossCycle(mut self, &v: &Var, mut &message: strings::Builder): bool {
-		for _, d in v.Depends {
-			n := message.Len()
-			self.pushIllegalCycleError(v, d, message)
-			if d == self.owner {
-				ret false
-			}
-			unsafe { message.SetBuf(message.Buf()[:n]) } // Pop last trace.
-			self.pushIllegalCycleError(v, d, message)
-			if !self.checkCrossCycle(d, message) {
-				ret false
-			}
-			unsafe { message.SetBuf(message.Buf()[:n]) } // Pop last trace.
-		}
-		ret true
-	}
-
-	// Checks owner illegal cycles.
-	// Appends depend to depends if there is no illegal cycle.
-	// Returns true if e.owner is nil.
-	fn checkIllegalCycles(mut self, mut &v: &Var, declToken: &token::Token): (ok: bool) {
-		// Skip cycle checking if owner is nil or not global.
-		if self.owner == nil || self.owner.Scope != nil {
-			ret true
-		}
-
-		// Check illegal cycle for itself.
-		// Because refers's owner is ta.
-		if self.owner == v {
-			self.pushErr(self.owner.Token, build::LogMsg.IllegalCycleRefersItself, self.owner.Ident)
-			ret false
-		}
-
-		mut message := strings::Builder{}
-		message.Grow(1 << 5)
-
-		self.pushIllegalCycleError(self.owner, v, message)
-		if !self.checkCrossCycle(v, message) {
-			self.pushErr(declToken, build::LogMsg.IllegalCrossCycle, message.Str())
-			ret false
-		}
-
-		self.owner.Depends = append(self.owner.Depends, v)
-		ret true
-	}
-
 	fn evalVar(mut self, mut v: &Var, errorToken: &token::Token): &Value {
 		if !self.s.isAccessibleDefine(v.Public, v.Token) {
 			self.pushErr(errorToken, build::LogMsg.IdentIsNotAccessible, v.Ident)
@@ -580,12 +526,6 @@ impl eval {
 		}
 
 		match type self.lookup {
-		| &sema:
-			// Check cycles for global scope.
-			ok := self.checkIllegalCycles(v, errorToken)
-			if !ok {
-				ret nil
-			}
 		| &scopeChecker:
 			mut s := (&scopeChecker)(self.lookup)
 			mut root := s.getRoot()
@@ -3134,12 +3074,19 @@ impl eval {
 			self.s.checkFuncIns(ins)
 		}
 
+		// If we are in global scope and evaluation owner is a global varaible,
+		// push reference to the anonymous function.
+		isGlobal := self.isGlobal()
+		if isGlobal && self.owner != nil {
+			self.pushReference[&FuncIns](ins)
+		}
+
 		ret &Value{
 			Type: &Type{Kind: ins},
 			Model: &AnonFuncExpr{
 				Captured: captured,
 				Func: ins,
-				Global: self.isGlobal(),
+				Global: isGlobal,
 			},
 		}
 	}

@@ -2621,9 +2621,9 @@ impl sema {
 		for (_, mut file) in self.files {
 			for (_, mut v) in file.Vars {
 				cached = cached[:0]
-				let mut refCheck: fn(mut r: &ReferenceStack, owner: str): bool
-				&_refCheck := refCheck
-				refCheck = fn(mut r: &ReferenceStack, owner: str): bool {
+				let mut refCheck: fn(mut &cached: []&ReferenceStack, mut r: &ReferenceStack, owner: str): (cycle: bool)
+				&_refCheck := refCheck // For closure.
+				refCheck = fn(mut &cached: []&ReferenceStack, mut r: &ReferenceStack, owner: str): (cycle: bool) {
 					// We already checked/checking this reference stack.
 					if slices::Contains(cached, r) {
 						ret false
@@ -2640,7 +2640,7 @@ impl sema {
 								break
 							}
 							pushIllegalCycleError(owner, s.Decl.Ident) // Push trace.
-							if unsafe { _refCheck(s.Refers, s.Decl.Ident) } {
+							if unsafe { _refCheck(cached, s.Refers, s.Decl.Ident) } {
 								ret true
 							}
 						| &FuncIns:
@@ -2649,7 +2649,7 @@ impl sema {
 								break
 							}
 							pushIllegalCycleError(owner, f.Decl.Ident) // Push trace.
-							if unsafe { _refCheck(f.Refers, f.Decl.Ident) } {
+							if unsafe { _refCheck(cached, f.Refers, f.Decl.Ident) } {
 								ret true
 							}
 						| &Var:
@@ -2658,17 +2658,20 @@ impl sema {
 							if v2 == v {
 								ret true
 							}
+							if unsafe { _refCheck(cached, v2.Refers, v2.Ident) } {
+								ret true
+							}
 							// Global variable v needs to global variable v2 for initialization.
 							// So add v2 to v.Depends for correct collection of dependencies.
-							if v2.Scope == nil {
+							if v2.Scope == nil && !v.depended(v2) {
 								v.Depends = append(v.Depends, v2)
 							}
 						}
+						unsafe { message.SetBuf(message.Buf()[:n]) } // Pop last trace.
 					}
-					unsafe { message.SetBuf(message.Buf()[:n]) } // Pop last trace.
 					ret false
 				}
-				if refCheck(v.Refers, v.Ident) {
+				if refCheck(cached, v.Refers, v.Ident) {
 					self.pushErr(v.Token, build::LogMsg.IllegalCrossCycle, message.Str())
 					ret
 				}
@@ -2726,7 +2729,10 @@ impl sema {
 			self.checkStructTypes()
 		}
 
-		self.checkInitializationCycles()
+		// If there is no error, check initialization cycles.
+		if len(self.errors) == 0 {
+			self.checkInitializationCycles()
+		}
 	}
 
 	fn setFileSemaFields(mut &self) {
