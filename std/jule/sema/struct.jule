@@ -33,12 +33,11 @@ struct Struct {
 
 	// This structure depended to these structures, except binded ones.
 	// Only stores plain identifier references such as A, B, and MyStruct.
-	// Not includes non-pain identifier references such as *A, &B, and []MyStruct.
+	// Not includes non-plain identifier references such as *A, &B, and []MyStruct.
+	//
+	// As far as tested, safe to store in structure declaration rather than instances.
+	// This collection applied for all instances.
 	Depends: []&Struct
-
-	// This structures uses these structures.
-	// Stores all referred structures.
-	Uses: []&Struct
 
 	Token:      &token::Token
 	Ident:      str
@@ -75,6 +74,16 @@ impl Struct {
 				}
 			}
 		}
+	}
+
+	// Reports whether s exist in Depends collection.
+	fn depended(self, s: &Struct): bool {
+		for _, ds in self.Depends {
+			if ds == s {
+				ret true
+			}
+		}
+		ret false
 	}
 
 	fn instance(mut &self): &StructIns {
@@ -166,16 +175,6 @@ impl Struct {
 		ret false
 	}
 
-	// Reports whether structure is uses given structure.
-	fn IsUses(self, s: &Struct): bool {
-		for _, u in self.Uses {
-			for s == u {
-				ret true
-			}
-		}
-		ret false
-	}
-
 	// Reports whether structure has only reference-type-accessible defines.
 	fn HasRefAccessible(self): bool {
 		for _, m in self.Methods {
@@ -206,6 +205,11 @@ struct StructIns {
 	Mutable:    bool // This structure has mutable defines.
 	Comparable: bool
 	Refers:     &ReferenceStack
+
+	// This structure depended to these structures, except binded ones.
+	// Only stores plain identifier references such as A, B, and MyStruct.
+	// Not includes non-pain identifier references such as *A, &B, and []MyStruct.
+	Depends: []&Struct
 }
 
 impl Kind for StructIns {

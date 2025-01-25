@@ -29,7 +29,6 @@ struct TypeAlias {
 	Token:    &token::Token
 	Ident:    str
 	TypeSym:  &TypeSym
-	Refers:   []any        // Referred identifiers, except binded ones.
 	Generics: []&TypeAlias // See developer reference (1).
 }
 
@@ -867,10 +866,12 @@ impl Ptr {
 }
 
 struct referencer {
-	ident: str
-	owner: any
-	ins:   &StructIns // If owner is a struct, this is a checker instance.
-	refs:  *[]any
+	owner: any         // StructIns, TypeAlias, TypeEnum.
+	name:  str         // Name of the owner.
+	tains: bool        // Whether owner is the TA-sensitive StructIns.
+	oself: bool        // Only self references. It used to caught type alias cycles.
+	prev:  &referencer // Previous referencer.
+	next:  &referencer // Next referencer.
 }
 
 // Cycle state flags.
@@ -921,10 +922,7 @@ struct typeChecker {
 	// This generics used as type alias for real kind.
 	useGenerics: []&TypeAlias
 
-	// Current checked type is risky for cycles.
-	// If this field is true, cycle analysis will be executed for type.
-	cycleRisk: bool = true
-	cycleErr:  int = cycleErrEnable
+	cycleErr: int = cycleErrEnable
 
 	// Disallow/suppress Jule's built-in defines.
 	disBuiltin: bool
@@ -938,9 +936,6 @@ struct typeChecker {
 
 	// Disabled type analysis flags.
 	disableTA: int
-
-	// See developer reference (4).
-	ownerAlias: &TypeAlias
 
 	// This generics are banned because of causes instantiation cycles.
 	// Usually stores structure generics and method generics.
@@ -968,8 +963,8 @@ impl typeChecker {
 	// Push type analysis flag to owner structure instance if exist.
 	// See developer reference (12).
 	fn pushTA(mut self, tags: int) {
-		if self.referencer != nil && self.referencer.ins != nil {
-			mut s := self.referencer.ins
+		if self.referencer != nil && self.referencer.tains {
+			mut s := (&StructIns)(self.referencer.owner)
 			if self.disableTA&taNotComparable != taNotComparable {
 				s.Comparable = s.Comparable && tags&taNotComparable != taNotComparable
 			}
@@ -1000,98 +995,83 @@ impl typeChecker {
 		}
 	}
 
-	fn pushCycleError(self, def1: any, def2: any, mut &message: strings::Builder) {
+	fn pushCycleError(self, def1: str, def2: str, mut &message: strings::Builder) {
 		const Padding = 7
-		getIdent := fn(&def: any): str {
-			match type def {
-			| &TypeEnum:
-				ret (&TypeEnum)(def).Ident
-			| &TypeAlias:
-				ret (&TypeAlias)(def).Ident
-			| &Struct:
-				ret (&Struct)(def).Ident
-			|:
-				ret ""
-			}
-		}
-		def1Ident := getIdent(def1)
-		def2Ident := getIdent(def2)
-		refersTo := build::Logf(build::LogMsg.RefersTo, def1Ident, def2Ident)
+		refersTo := build::Logf(build::LogMsg.RefersTo, def1, def2)
 		message.WriteStr(strings::Repeat(" ", Padding))!
 		message.WriteStr(refersTo)!
 		message.WriteByte('\n')!
 	}
 
-	fn checkCrossCycle(self, decl: any, mut &message: strings::Builder): bool {
-		match type decl {
-		| &TypeEnum:
-			te := (&TypeEnum)(decl)
-			for _, d in te.Refers {
-				n := message.Len()
-				self.pushCycleError(te, d, message)
-				if self.referencer.owner == d {
-					ret false
-				}
-				unsafe { message.SetBuf(message.Buf()[:n]) } // Pop last trace.
-				if !self.checkCrossCycle(d, message) {
-					self.pushCycleError(te, d, message)
-					ret false
-				}
-				unsafe { message.SetBuf(message.Buf()[:n]) } // Pop last trace.
+	fn checkCrossCycle(mut self, mut decl: any, mut &message: strings::Builder): (ok: bool, oselfExist: bool) {
+		// No cross risk, because referencer have not any previous node.
+		// Referencer is the root referencer.
+		// So, it is means there are only inline cycle possibility,
+		// but it is already checked.
+		if self.referencer.prev == nil {
+			ret true, self.referencer.oself
+		}
+		mut r := self.referencer
+		for r != nil && r.prev != nil; r = r.prev {
+		}
+		mut root := r
+		printErr := fn(mut &message: strings::Builder) {
+			r = root
+			for r != nil && r.next != nil; r = r.next {
+				unsafe { self.pushCycleError(r.name, r.next.name, message) }
 			}
-		| &TypeAlias:
-			ta := (&TypeAlias)(decl)
-			for _, d in ta.Refers {
-				n := message.Len()
-				self.pushCycleError(ta, d, message)
-				if self.referencer.owner == d {
-					ret false
+			unsafe { self.pushCycleError(r.name, root.name, message) }
+		}
+		mut oself := (&referencer)(nil)
+		for r != nil; r = r.next {
+			if oself != nil {
+				if oself.owner == decl {
+					printErr(message)
+					ret false, oself != nil
 				}
-				unsafe { message.SetBuf(message.Buf()[:n]) } // Pop last trace.
-				if !self.checkCrossCycle(d, message) {
-					self.pushCycleError(ta, d, message)
-					ret false
-				}
-				unsafe { message.SetBuf(message.Buf()[:n]) } // Pop last trace.
+				continue
 			}
-		| &Struct:
-			s := (&Struct)(decl)
-			for _, d in s.Depends {
-				n := message.Len()
-				self.pushCycleError(s, d, message)
-				if self.referencer.owner == d {
-					ret false
-				}
-				unsafe { message.SetBuf(message.Buf()[:n]) } // Pop last trace.
-				self.pushCycleError(s, d, message)
-				if !self.checkCrossCycle(d, message) {
-					ret false
-				}
-				unsafe { message.SetBuf(message.Buf()[:n]) } // Pop last trace.
+			if r.oself {
+				oself = r
+			}
+			if r.owner == decl {
+				printErr(message)
+				ret false, oself != nil
 			}
 		}
-		ret true
+		ret true, oself != nil
 	}
 
-	// Calls isIllegalCycle with error logs.
+	// Returns referencer by case.
+	// It may be returns nil.
+	// This should be used only for safe places, when absolutely no cycles.
+	fn getReferencer(mut self): &referencer {
+		mut r := self.referencer
+		for r != nil; r = r.prev {
+			// If oself is true, return nil referencer.
+			// Because there is no risk for type aliases and other things.
+			// Just safe. Do not track references, no risk for cycles.
+			if r.oself {
+				ret nil
+			}
+		}
+		ret self.referencer
+	}
+
 	fn checkIllegalCycles(mut self, &ident: &token::Token, mut decl: any): (ok: bool) {
 		ret self.isIllegalCycleSafe(ident, decl, self.cycleErr&cycleErrEnable == cycleErrEnable)
 	}
 
-	// Reports illegal cycles for supported declarations, whether it not exist.
-	// Appends reference to reference if there is no illegal cycle.
-	// Returns true if self.referencer is nil.
-	// Returns true if refers is nil.
-	// If err is true, logs error about cycles.
 	fn isIllegalCycleSafe(mut self, &ident: &token::Token, mut decl: any, err: bool): (ok: bool) {
 		self.cycleErr &= ^cycleErrFail
-		if self.referencer == nil || !self.cycleRisk {
+		if self.referencer == nil {
 			ret true
 		}
 
 		match type decl {
-		| &Struct:
-			if (&Struct)(decl).Binded {
+		| &StructIns:
+			s := (&StructIns)(decl)
+			if s.Decl != nil && s.Decl.Binded {
 				ret true
 			}
 		| &TypeAlias:
@@ -1101,19 +1081,28 @@ impl typeChecker {
 		}
 
 		// Check illegal cycle for itself.
-		// Because refers's owner is decl.
-		if self.referencer.owner == decl {
-			if err {
-				self.pushErr(ident, build::LogMsg.IllegalCycleRefersItself, self.referencer.ident)
+		{
+			mut itself := false
+			if self.referencer.oself {
+				match type decl {
+				| &TypeAlias | &TypeEnum:
+					itself = self.referencer.owner == decl
+				}
+			} else {
+				itself = self.referencer.owner == decl
 			}
-			self.cycleErr |= cycleErrFail
-			ret false
+			if itself {
+				if err {
+					self.pushErr(ident, build::LogMsg.IllegalCycleRefersItself, self.referencer.name)
+				}
+				self.cycleErr |= cycleErrFail
+				ret false
+			}
 		}
 
 		mut message := strings::Builder{}
-		message.Grow(1 << 5)
-		self.pushCycleError(self.referencer.owner, decl, message)
-		if !self.checkCrossCycle(decl, message) {
+		ok, oselfExist := self.checkCrossCycle(decl, message)
+		if !ok {
 			if err {
 				self.pushErr(ident, build::LogMsg.IllegalCrossCycle, message.Str())
 			}
@@ -1121,16 +1110,22 @@ impl typeChecker {
 			ret false
 		}
 
-		match type self.referencer.owner {
-		| &TypeAlias | &TypeEnum:
-			unsafe {
-				*self.referencer.refs = append(*self.referencer.refs, decl)
-			}
-		| &Struct:
-			match type decl {
-			| &Struct:
-				mut s := (&Struct)(self.referencer.owner)
-				s.Depends = append(s.Depends, (&Struct)(decl))
+		// Append to structure depend collection if oself is not exist.
+		// If oself exist, it means type is not plain.
+		if !oselfExist {
+			match type self.referencer.owner {
+			| &StructIns:
+				mut s := (&StructIns)(self.referencer.owner)
+				if s.Source == nil { // Play safe, ignore strict type alias structures.
+					match type decl {
+					| &StructIns:
+						mut ds := (&StructIns)(decl)
+						// Play safe, ignore strict type alias structures.
+						if ds.Source == nil && !s.Decl.depended(ds.Decl) {
+							s.Decl.Depends = append(s.Decl.Depends, ds.Decl)
+						}
+					}
+				}
 			}
 		}
 
@@ -1179,16 +1174,7 @@ impl typeChecker {
 			}
 		}
 
-		// Easy case:
-		// If the owner alias and ta is not equal, it is fine.
-		// Otherwise cyclic reference exist, because same type alias used
-		// in the source type. To caught such this cases, do not use
-		// separate typeChecker instances to keep ownerAlias.
-		if self.ownerAlias == ta {
-			self.pushErr(decl.Token, build::LogMsg.IllegalCycleRefersItself, self.referencer.ident)
-			ret nil
-		} else {
-			// Hard case: analysis references to caught any reference cycle.
+		{
 			ok := self.checkIllegalCycles(decl.Token, ta)
 			if !ok && self.cycleErr&cycleErrEnable == cycleErrEnable {
 				ret nil
@@ -1198,7 +1184,10 @@ impl typeChecker {
 		// Build kind if not built already.
 		// If this type alias is checking now, do not check again.
 		if ta.TypeSym.Type == nil {
-			ok := self.s.checkTypeAliasDecl(ta, self.lookup)
+			// Use self.referencer instead of getReferencer.
+			// Because we have to catch type alias cycles if exist.
+			// So, do not use possible nil referencer.
+			ok := self.s.checkTypeAliasDecl(ta, self.referencer, self.lookup)
 			if !ok {
 				ret nil
 			}
@@ -1218,8 +1207,12 @@ impl typeChecker {
 
 		// Push generic reference to owner type alias.
 		// See developer reference (3) and (4) for more information.
-		if ta.Generic && self.ownerAlias != nil {
-			self.ownerAlias.Generics = append(self.ownerAlias.Generics, ta)
+		if ta.Generic && self.referencer != nil {
+			match type self.referencer.owner {
+			| &TypeAlias:
+				mut rta := (&TypeAlias)(self.referencer.owner)
+				rta.Generics = append(rta.Generics, ta)
+			}
 		}
 
 		mut tk := &Type{
@@ -1282,26 +1275,13 @@ impl typeChecker {
 		if self.referencer != nil && self.referencer.owner == ins.Decl {
 			ret true
 		}
-		if !self.s.precheckStructIns(ins, errorToken) {
+		if !self.s.precheckStructIns(ins, self.getReferencer(), errorToken) {
 			ret false
 		}
 		if len(ins.Generics) > 0 {
 			self.s.checkStructIns(ins)
 		}
 		ret true
-	}
-
-	fn appendUsedStructReference(mut self, mut &s: &Struct) {
-		if self.referencer == nil {
-			ret
-		}
-		match type self.referencer.owner {
-		| &Struct:
-			mut refS := (&Struct)(self.referencer.owner)
-			if !refS.IsUses(s) {
-				refS.Uses = append(refS.Uses, s)
-			}
-		}
 	}
 
 	fn buildStructInstance(mut self, mut &decl: &ast::IdentType, mut &s: &Struct): &StructIns {
@@ -1388,18 +1368,12 @@ impl typeChecker {
 			}
 		}
 
-		mut ok := self.checkIllegalCycles(decl.Token, s)
-		if !ok && self.cycleErr&cycleErrEnable == cycleErrEnable {
-			ret nil
-		}
-		self.appendUsedStructReference(s)
-
 		mut ins := self.buildStructInstance(decl, s)
 		if ins == nil {
 			ret nil
 		}
 
-		ok = self.s.checkGenericQuantity(len(ins.Decl.Generics), len(ins.Generics), decl.Token)
+		mut ok := self.s.checkGenericQuantity(len(ins.Decl.Generics), len(ins.Generics), decl.Token)
 		if !ok {
 			ret nil
 		}
@@ -1411,6 +1385,10 @@ impl typeChecker {
 			}
 			if ins.Mutable {
 				self.pushTA(taMutable)
+			}
+			ok = self.checkIllegalCycles(decl.Token, ins)
+			if !ok && self.cycleErr&cycleErrEnable == cycleErrEnable {
+				ret nil
 			}
 		}
 		ret ins
@@ -1435,13 +1413,6 @@ impl typeChecker {
 				if len(decl.Generics) > 0 {
 					self.pushErr(decl.Token, build::LogMsg.TypeNotSupportsGenerics, decl.Ident)
 					ret nil
-				}
-				mut st := g.TypeSym.Type.Struct()
-				if st != nil {
-					ok := self.checkIllegalCycles(decl.Token, st.Decl)
-					if !ok && self.cycleErr&cycleErrEnable == cycleErrEnable {
-						ret nil
-					}
 				}
 				ret g.TypeSym.Type.Kind
 			}
@@ -1540,9 +1511,11 @@ impl typeChecker {
 	}
 
 	fn buildSptr(mut self, mut decl: &ast::SptrType): &Sptr {
-		cycleRisk := self.cycleRisk
-		self.cycleRisk = false
-		defer { self.cycleRisk = cycleRisk }
+		if self.referencer != nil {
+			oself := self.referencer.oself
+			self.referencer.oself = true
+			defer { self.referencer.oself = oself }
+		}
 
 		self.pushTA(taMutable)
 
@@ -1555,9 +1528,11 @@ impl typeChecker {
 	}
 
 	fn buildChan(mut self, mut decl: &ast::ChanType): &Chan {
-		cycleRisk := self.cycleRisk
-		self.cycleRisk = false
-		defer { self.cycleRisk = cycleRisk }
+		if self.referencer != nil {
+			oself := self.referencer.oself
+			self.referencer.oself = true
+			defer { self.referencer.oself = oself }
+		}
 
 		// Do not disable mutability analysis.
 		// Element type of channel is directly affects the mutability of channel.
@@ -1571,7 +1546,6 @@ impl typeChecker {
 		}
 		if self.s.meta.runtime != nil {
 			mut s := runtimeFindStruct(self.s.meta.runtime, "pchan")
-			self.appendUsedStructReference(s)
 			mut ins := s.instance()
 			ins.Generics = [&InsGeneric{Type: elem}]
 			_ = self.fromStructIns(ins, decl.Elem.Token)
@@ -1602,9 +1576,11 @@ impl typeChecker {
 	}
 
 	fn buildPtr(mut self, mut decl: &ast::PtrType): &Ptr {
-		cycleRisk := self.cycleRisk
-		self.cycleRisk = false
-		defer { self.cycleRisk = cycleRisk }
+		if self.referencer != nil {
+			oself := self.referencer.oself
+			self.referencer.oself = true
+			defer { self.referencer.oself = oself }
+		}
 
 		self.pushTA(taMutable)
 
@@ -1625,9 +1601,11 @@ impl typeChecker {
 	}
 
 	fn buildSlice(mut self, mut decl: &ast::SliceType): &Slice {
-		cycleRisk := self.cycleRisk
-		self.cycleRisk = false
-		defer { self.cycleRisk = cycleRisk }
+		if self.referencer != nil {
+			oself := self.referencer.oself
+			self.referencer.oself = true
+			defer { self.referencer.oself = oself }
+		}
 
 		self.pushTA(taNotComparable | taMutable)
 
@@ -1717,38 +1695,24 @@ impl typeChecker {
 		self.disableTA |= taNotComparable
 		defer { self.disableTA = disableTA }
 
-		// Evaluate key type with cycle risk, but do not log errors about it.
+		// Evaluate key type like no cycle risk, do not log errors about it.
 		// We have to do this for checking correct map type dependencies,
-		// cycle types are prevents valid map key types. So, caught them but
+		// cycle types are prevents valid map key types. So, catch them but
 		// do not log as cycle error, log as invalid key type error.
-		// Also remove appended references or dependencies after analysis for types.
 		cycleErr := self.cycleErr
 		self.cycleErr &= ^cycleErrFail
 		self.cycleErr &= ^cycleErrEnable
-		mut refCount := 0
 		if self.referencer != nil {
-			match type self.referencer.owner {
-			| &TypeAlias:
-				refCount = unsafe { len(*self.referencer.refs) }
-			| &Struct:
-				refCount = len((&Struct)(self.referencer.owner).Depends)
-			}
+			oself := self.referencer.oself
+			self.referencer.oself = true
+			defer { self.referencer.oself = oself }
 		}
 		mut key := self.checkDecl(decl.Key)
-		if self.referencer != nil {
-			match type self.referencer.owner {
-			| &TypeAlias:
-				unsafe { *self.referencer.refs = (*self.referencer.refs)[:refCount] }
-			| &Struct:
-				mut s := (&Struct)(self.referencer.owner)
-				s.Depends = s.Depends[:refCount]
-			}
-		}
 		if key == nil {
 			self.cycleErr = cycleErr
 			ret nil
 		}
-		// Check wther key type is valid.
+		// Check whether key type is valid.
 		// It should be comparable, if cycle analysis failed, we have cycles,
 		// so we have a map type (this type, actually), so it is not comparable.
 		if self.cycleErr&cycleErrFail == cycleErrFail || !key.Comparable() {
@@ -1759,10 +1723,7 @@ impl typeChecker {
 		self.cycleErr = cycleErr
 
 		// Evaluate value type with no cycle risk.
-		cycleRisk := self.cycleRisk
-		self.cycleRisk = false
 		mut val := self.checkDecl(decl.Val)
-		self.cycleRisk = cycleRisk
 		if val == nil {
 			ret nil
 		}
@@ -1772,7 +1733,6 @@ impl typeChecker {
 
 		if self.s.meta.runtime != nil {
 			mut s := runtimeFindStruct(self.s.meta.runtime, "_Map")
-			self.appendUsedStructReference(s)
 			mut ins := s.instance()
 			ins.Generics = [&InsGeneric{Type: key}, &InsGeneric{Type: val}]
 			_ = self.fromStructIns(ins, decl.Key.Token)
@@ -1820,9 +1780,11 @@ impl typeChecker {
 	}
 
 	fn buildFunc(mut self, mut decl: &ast::Func): &FuncIns {
-		cycleRisk := self.cycleRisk
-		self.cycleRisk = false
-		defer { self.cycleRisk = cycleRisk }
+		if self.referencer != nil {
+			oself := self.referencer.oself
+			self.referencer.oself = true
+			defer { self.referencer.oself = oself }
+		}
 
 		self.pushTA(taNotComparable)
 

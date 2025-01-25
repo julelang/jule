@@ -609,15 +609,6 @@ impl sema {
 			mut hard := (&scopeChecker)(l).getHardRoot()
 			tc.refers = hard.owner.Refers
 		}
-		// referencer's refs field is not nil if owner is type alias.
-		if referencer != nil && referencer.refs != nil {
-			// Set owner alias field of TypeChecker to collect generic dependencies.
-			// See developer reference (4).
-			match type referencer.owner {
-			| &TypeAlias:
-				tc.ownerAlias = (&TypeAlias)(referencer.owner)
-			}
-		}
 		ret tc
 	}
 
@@ -630,8 +621,7 @@ impl sema {
 	// Checks TypeSYm, builds result as Type and collects referred type aliases.
 	// Skips already checked types.
 	// See also developer reference (11).
-	fn checkTypeSymWithRefers(mut &self, mut &t: &TypeSym, mut l: Lookup,
-		mut generics: []&TypeAlias, mut referencer: &referencer): (ok: bool) {
+	fn checkTypeSymWithRefers(mut &self, mut &t: &TypeSym, mut l: Lookup, mut referencer: &referencer): (ok: bool) {
 		mut ta := false // Referencer owner is type alias.
 		if t.checked() {
 			match type referencer.owner {
@@ -642,7 +632,7 @@ impl sema {
 				ret true
 			}
 		}
-		mut tt := self.buildTypeWithRefers(t.Decl, l, generics, referencer)
+		mut tt := self.buildTypeWithRefers(t.Decl, l, nil, referencer)
 		if tt == nil || !ta {
 			t.Type = tt
 		} else {
@@ -658,7 +648,7 @@ impl sema {
 	// Checks type and builds result as Type.
 	// Skips already checked types.
 	fn checkTypeSym(mut &self, mut &t: &TypeSym, mut l: Lookup): bool {
-		ret self.checkTypeSymWithRefers(t, l, nil, nil)
+		ret self.checkTypeSymWithRefers(t, l, nil)
 	}
 
 	// Same as the checkTypeSym but takes referencer.
@@ -1075,7 +1065,7 @@ impl sema {
 		ret atc.checkValidity()
 	}
 
-	fn checkTypeAliasDeclKind(mut &self, mut &ta: &TypeAlias, mut l: Lookup): (ok: bool) {
+	fn checkTypeAliasDeclKind(mut &self, mut &ta: &TypeAlias, mut prev: &referencer, mut l: Lookup): (ok: bool) {
 		mut old := self.file
 		defer {
 			self.setCurrentFile(old)
@@ -1087,14 +1077,15 @@ impl sema {
 			}
 		}
 		mut referencer := &referencer{
-			ident: ta.Ident,
+			name: ta.Ident,
 			owner: ta,
-			refs: &ta.Refers,
+			prev: prev,
 		}
-		if ta.Strict {
-			referencer.ins = ta.TypeSym.Type.softStruct()
+		if prev != nil {
+			prev.next = referencer
+			defer { prev.next = nil }
 		}
-		ok = self.checkTypeSymWithRefers(ta.TypeSym, l, nil, referencer)
+		ok = self.checkTypeSymWithRefers(ta.TypeSym, l, referencer)
 		if ok && ta.TypeSym.Type.Array() != nil && ta.TypeSym.Type.Array().Auto {
 			self.pushErr(ta.TypeSym.Decl.Token, build::LogMsg.ArrayAutoSized)
 			ok = false
@@ -1102,7 +1093,7 @@ impl sema {
 		ret
 	}
 
-	fn checkTypeAliasDecl(mut &self, mut &ta: &TypeAlias, mut l: Lookup): (ok: bool) {
+	fn checkTypeAliasDecl(mut &self, mut &ta: &TypeAlias, mut prev: &referencer, mut l: Lookup): (ok: bool) {
 		if token::IsIgnoreIdent(ta.Ident) {
 			self.pushErr(ta.Token, build::LogMsg.IgnoreIdent)
 		}
@@ -1120,7 +1111,7 @@ impl sema {
 			s.Decl.Public = ta.Public
 			ta.TypeSym.Type = &Type{Kind: s}
 		}
-		ok = self.checkTypeAliasDeclKind(ta, l)
+		ok = self.checkTypeAliasDeclKind(ta, prev, l)
 		if !ok {
 			ret false
 		}
@@ -1137,7 +1128,7 @@ impl sema {
 			self.pushErr(ta.Token, build::LogMsg.DuplicatedIdent, ta.Ident)
 			self.pushSuggestion(build::LogMsg.RenameForAvoidDuplication)
 		}
-		self.checkTypeAliasDecl(ta, self)
+		self.checkTypeAliasDecl(ta, nil, self)
 	}
 
 	// Checks current package file's type alias declarations.
@@ -1334,11 +1325,10 @@ impl sema {
 			}
 		}
 		mut referencer := &referencer{
-			ident: e.Ident,
+			name: e.Ident,
 			owner: e,
-			refs: &e.Refers,
 		}
-		ok = self.checkTypeSymWithRefers(item.TypeSym, self, nil, referencer)
+		ok = self.checkTypeSymWithRefers(item.TypeSym, self, referencer)
 		if ok && item.TypeSym.Type.Array() != nil && item.TypeSym.Type.Array().Auto {
 			self.pushErr(item.TypeSym.Decl.Token, build::LogMsg.ArrayAutoSized)
 			ok = false
@@ -2060,20 +2050,6 @@ impl sema {
 		message.WriteStr(m)!
 	}
 
-	fn checkCrossCycle(self, &st1: &Struct, &st2: &Struct, mut &message: strings::Builder): bool {
-		for _, u in st2.Uses {
-			if u == st1 {
-				self.pushCycleError(st2.Ident, u.Ident, message)
-				ret false
-			}
-			if !self.checkCrossCycle(st1, u, message) {
-				self.pushCycleError(st2.Ident, u.Ident, message)
-				ret false
-			}
-		}
-		ret true
-	}
-
 	// Checks declarations of all package files.
 	// Breaks checking if checked file failed.
 	fn checkPackageDecls(mut &self) {
@@ -2265,7 +2241,7 @@ impl sema {
 	// Checks environment-dependent parts of structure instance.
 	// Which is contains fields and generic-type constraints.
 	// If generic instance will be check, errorToken should be passed.
-	fn checkStructEnv(mut &self, mut &s: &StructIns, mut errorToken: &token::Token): (ok: bool) {
+	fn checkStructEnv(mut &self, mut &s: &StructIns, mut prev: &referencer, mut errorToken: &token::Token): (ok: bool) {
 		// If source is not nil, do not check.
 		// This is unnecessary process for strict type alias structure instances.
 		if s.Source != nil {
@@ -2276,10 +2252,15 @@ impl sema {
 			rootLookup: s.Decl.sema,
 			lookup: s.Decl.sema,
 			referencer: &referencer{
-				ident: s.Decl.Ident,
-				owner: s.Decl,
+				name: s.Decl.Ident,
+				owner: s,
+				prev: prev,
 			},
 			refers: s.Refers,
+		}
+		if prev != nil {
+			prev.next = tc.referencer
+			defer { prev.next = nil }
 		}
 
 		if len(s.Generics) > 0 {
@@ -2323,9 +2304,9 @@ impl sema {
 			// But field declared as mutable, do not set.
 			// It basically for the `!f.Decl.Mutable && f.Type.Mutable()` condition.
 			if !f.Decl.Mutable {
-				tc.referencer.ins = s
+				tc.referencer.tains = true
 			} else {
-				tc.referencer.ins = nil
+				tc.referencer.tains = false
 			}
 			mut kind := tc.checkDecl(f.Decl.TypeSym.Decl)
 			ok = kind != nil && ok
@@ -2337,6 +2318,7 @@ impl sema {
 				continue
 			}
 			f.Type = kind
+
 			// We have to check mutable and comparable conditions again.
 			// Because type analysis is a simple precondition checker.
 			// For the actual type, we have to check.
@@ -2370,14 +2352,14 @@ impl sema {
 		ret
 	}
 
-	fn precheckStructIns(mut &self, mut s: &StructIns, mut errorToken: &token::Token): (ok: bool) {
+	fn precheckStructIns(mut &self, mut s: &StructIns, mut prev: &referencer, mut errorToken: &token::Token): (ok: bool) {
 		// Return is source type is still pseudoSource of a strict type alias instance.
 		// Following analysis must be done with real source type.
 		if s.Source == pseudoSource {
 			s.Checked = false
 			ret true
 		}
-		ok = self.checkStructEnv(s, errorToken)
+		ok = self.checkStructEnv(s, prev, errorToken)
 		if ok {
 			// See implicit imports reference (1).
 			// If structure instance is comparable and have not custom compare method,
@@ -2448,7 +2430,7 @@ impl sema {
 			mut ins := s.Instances[0]
 			if !ins.Checked {
 				ins.Checked = true
-				ok := self.precheckStructIns(ins, nil)
+				ok := self.precheckStructIns(ins, nil, nil)
 				if !ok {
 					ret
 				}
@@ -2481,7 +2463,7 @@ impl sema {
 			mut ins := s.Instances[0]
 			if !ins.Checked {
 				ins.Checked = true
-				ok := self.precheckStructIns(ins, nil)
+				ok := self.precheckStructIns(ins, nil, nil)
 				if !ok {
 					ret
 				}
@@ -2727,7 +2709,7 @@ impl sema {
 					mut s := (&StructIns)(ta.TypeSym.Type.Kind)
 					if !s.Checked {
 						s.Checked = true
-						ok := self.precheckStructIns(s, nil)
+						ok := self.precheckStructIns(s, nil, nil)
 						if !ok {
 							ret
 						}
