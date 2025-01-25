@@ -5,6 +5,9 @@
 #ifndef __JULE_STR_HPP
 #define __JULE_STR_HPP
 
+// ADDITIONAL:
+// https://github.com/julelang/jule/issues/121
+
 #include <string>
 #include <cstring>
 
@@ -64,7 +67,6 @@ namespace jule
         Str(void) : _len(0) {};
         Str(const jule::Str &src) : buffer(src.buffer), _slice(src._slice), _len(src._len) {}
         Str(jule::Str &&src) : buffer(std::move(src.buffer)), _slice(src._slice), _len(src._len) {}
-        Str(const std::basic_string<jule::U8> &src) : Str(src.c_str(), src.c_str() + src.size()) {}
         Str(const char *src, const jule::Int &len) : Str(reinterpret_cast<const jule::U8 *>(src), len) {}
         Str(const jule::U8 *src, const jule::Int &len) : jule::Str(src, src + len) {}
         Str(const jule::U8 *src) : Str(src, src + std::strlen(reinterpret_cast<const char *>(src))) {}
@@ -325,16 +327,6 @@ namespace jule
         operator const char *(void) const noexcept
         {
             return reinterpret_cast<char *>(this->_slice);
-        }
-
-        inline operator const std::basic_string<jule::U8>(void) const
-        {
-            return this->_slice;
-        }
-
-        inline operator const std::basic_string<char>(void) const
-        {
-            return std::basic_string<char>(this->begin(), this->end());
         }
 
         jule::Str &operator+=(const jule::Str &str)
