@@ -964,7 +964,15 @@ impl typeChecker {
 	// See developer reference (12).
 	fn pushTA(mut self, tags: int) {
 		if self.referencer != nil && self.referencer.tains {
-			mut s := (&StructIns)(self.referencer.owner)
+			mut s := (&StructIns)(nil)
+			match type self.referencer.owner {
+			| &StructIns:
+				s = (&StructIns)(self.referencer.owner)
+			| &TypeAlias:
+				s = (&TypeAlias)(self.referencer.owner).TypeSym.Type.softStruct()
+			|:
+				panic("unreachable")
+			}
 			if self.disableTA&taNotComparable != taNotComparable {
 				s.Comparable = s.Comparable && tags&taNotComparable != taNotComparable
 			}
