@@ -1512,16 +1512,21 @@ impl eval {
 		}
 	}
 
-	fn castStruct(mut self, mut t: &Type, mut v: &Value, errorToken: &token::Token): (strict: bool) {
+	// Casts struct type. If preStrict mode is not enabled,
+	// it will log error about casting failed for pre type check phase.
+	// Reports whether pre type check phase completed.
+	// The preStrict mode is useful to checking type and value is suitable for
+	// struct casting. It returns with no error and checked as false, if not suitable.
+	// Otherwise, logs errors and returns checked as true.
+	fn castStruct(mut self, mut t: &Type, mut v: &Value, errorToken: &token::Token, preStrict: bool): (checked: bool) {
 		mut s := t.softStruct()
-		strict = s.Source != nil
 
 		mut tr := v.Type.Trait()
 		if tr == nil {
-			if !strict {
+			if !preStrict {
 				self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, v.Type.Str(), t.Str())
 			}
-			ret
+			ret false
 		}
 
 		v.Constant = nil
@@ -1529,11 +1534,11 @@ impl eval {
 		self.pushReference[&StructIns](s)
 
 		if !s.Decl.IsImplements(tr) {
+			// Log error but do not return false.
+			// We know type is trait, casting is not possible.
 			self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, v.Type.Str(), t.Str())
 		}
-		// Returns strict as false, because type is trait, and we know other types
-		// is not valid for it. Do not check by source type.
-		ret false
+		ret true
 	}
 
 	fn castSptr(mut self, mut t: &Type, mut v: &Value, errorToken: &token::Token) {
@@ -1553,12 +1558,9 @@ impl eval {
 
 		// For traits.
 		if sptr.Elem.softStruct() != nil {
-			strict := self.castStruct(sptr.Elem, v, errorToken)
-			if !strict {
-				ret
-			}
-			// Struct is belongs to strict type alias.
-			// So, no error logged; log it.
+			const PreStrict = false
+			self.castStruct(sptr.Elem, v, errorToken, PreStrict)
+			ret
 		}
 
 		self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, v.Type.Str(), t.Str())
@@ -1842,14 +1844,24 @@ impl eval {
 				}
 				v.Constant = nil // Remove nil constant.
 				v.untyped = false
-			| t.softStruct() != nil:
-				strict := self.castStruct(t, v, errorToken)
-				if !strict {
-					break
-				}
-				// Type is strict, check by source type also.
-				fall
 			|:
+				// Check struct types first to handle strict type alias structures correctly.
+				{
+					ts := t.softStruct()
+					if ts != nil {
+						const PreStrict = true
+						checked := self.castStruct(t, v, errorToken, PreStrict)
+						// Return if checked or structure is not belongs to strict type alias.
+						// In this cases, nothing to do.
+						// But strict type aliases may be have different types
+						// such as smart pointer and etc. Handle them correctly,
+						// support the souce type for casting. Therefore, handle
+						// following types for the strict type aliases.
+						if checked || ts.Source == nil {
+							break
+						}
+					}
+				}
 				match {
 				| v.Type.Prim() != nil && v.Type.Prim().IsAny():
 					if t.TypeEnum() != nil {
