@@ -75,32 +75,19 @@ namespace jule
         return jule::__copy<jule::Slice<Item>, jule::Str>(dest, src);
     }
 
-    // Common template for the append function variants.
-    template <typename Dest, typename Components>
-    Dest __append(Dest dest, const Components &components)
-    {
-        if (components._len == 0)
-            return dest;
-        dest.alloc_for_append(components._len);
-        std::copy(
-            components._slice,
-            components._slice + components._len,
-            dest._slice + dest._len);
-        dest._len += components._len;
-        return dest;
-    }
-
     template <typename Item>
     inline jule::Slice<Item> append(jule::Slice<Item> dest,
                                     const jule::Slice<Item> &components) noexcept
     {
-        return jule::__append<jule::Slice<Item>, jule::Slice<Item>>(dest, components);
+        dest.append(components);
+        return dest;
     }
 
     inline jule::Slice<jule::U8> append(jule::Slice<jule::U8> dest,
                                         const jule::Str &components) noexcept
     {
-        return jule::__append<jule::Slice<jule::U8>, jule::Str>(dest, components);
+        dest.append(components);
+        return dest;
     }
 
 } // namespace jule

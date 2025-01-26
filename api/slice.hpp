@@ -353,6 +353,8 @@ namespace jule
         template <typename Items>
         void append(const Items &items)
         {
+            if (items._len == 0)
+                return;
             this->alloc_for_append(items._len);
             std::copy(items._slice, items._slice + items._len, this->_slice + this->_len);
             this->_len += items._len;
