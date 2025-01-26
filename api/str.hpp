@@ -74,7 +74,7 @@ namespace jule
                                           reinterpret_cast<const jule::U8 *>(src.c_str() + src.size())) {}
 
         Str(const char *src) : Str(reinterpret_cast<const jule::U8 *>(src),
-                                   reinterpret_cast<const jule::U8 *>(src) + std::strlen(reinterpret_cast<const char *>(src))) {}
+                                   reinterpret_cast<const jule::U8 *>(src) + std::strlen(src)) {}
 
         Str(const jule::U8 *begin, const jule::U8 *end)
         {

@@ -24,11 +24,6 @@ namespace jule
 
         Array(void) = default;
 
-        Array(const std::initializer_list<Item> &src)
-        {
-            std::copy(src.begin(), src.end(), this->begin());
-        }
-
         Array(const Item &def)
         {
             std::fill(this->begin(), this->end(), def);
