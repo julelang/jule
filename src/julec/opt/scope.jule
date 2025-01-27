@@ -215,12 +215,26 @@ impl scopeOptimizer {
 		// Use checkpoint for the self.data to use same data for each child scope.
 		mut checkpoint := self.data.getCheckpoint()
 
-		for (_, mut case) in m.Cases {
+		for (i, mut case) in m.Cases {
 			for (_, mut expr) in case.Exprs {
 				exprOptimizer.optimizeConditionalValue(expr.Model, self.data, self)
 			}
-			if len(case.Exprs) == 1 && self.data.dynamic != nil {
-				// We can know the exact kind of dynamic type if expression is single.
+			// We can know the exact kind of dynamic type if expression is single.
+			// So we can optimize any casting for this type.
+			//
+			// Special cases:
+			// - If previous case is exist and used the fall statement,
+			//   Then optimization is not possible because we do not know the actual type.
+			isFalled := fn(case: &sema::Case): bool {
+				if len(case.Scope.Stmts) == 0 {
+					ret false
+				}
+				last := case.Scope.Stmts[len(case.Scope.Stmts)-1]
+				_, ok := (&sema::Fall)(last)
+				ret ok
+			}
+			if len(case.Exprs) == 1 && self.data.dynamic != nil &&
+				(i == 0 || !isFalled(m.Cases[i-1])) {
 				mut kind := isTypeGuaranteedDynamicValue(self.data.dynamic, case.Exprs[0].Type, nil)
 				if kind != nil {
 					self.data.dynamic.pushVar(var, kind)
