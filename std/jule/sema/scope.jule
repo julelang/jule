@@ -578,6 +578,16 @@ impl scopeChecker {
 		}
 		self.removeInteriorMutRisk(v.ValueSym.Value)
 		self.s.checkVarValue(v)
+		// Variable v is a scope variable and scope variables will not collect
+		// referencer for themselves. So, if any reference exist for v,
+		// push the references to scope owner's referencer and clear from v.
+		if v.Refers.Len() > 0 {
+			mut refers := self.getOwnerRefers()
+			if refers != nil {
+				refers.buffer = append(refers.buffer, v.Refers.buffer...)
+				v.Refers.clear()
+			}
+		}
 	}
 
 	fn checkTypeAlias(mut &self, mut &ta: &TypeAlias) {
