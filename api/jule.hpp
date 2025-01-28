@@ -28,7 +28,6 @@ CONFIGURATION DEFINES
 #include "ptr.hpp"
 #include "slice.hpp"
 #include "str.hpp"
-#include "trait.hpp"
 #include "types.hpp"
 
 #endif // ifndef __JULE_HPP
