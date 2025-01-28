@@ -669,8 +669,17 @@ impl exprBuilder {
 		}
 		match type d {
 		| &ast::FuncCallExpr:
-			(&ast::FuncCallExpr)(d).Exception = &ast::ScopeTree{
-				Deferred: true,
+			mut f := (&ast::FuncCallExpr)(d)
+			// Catch already ignored exceptional calls.
+			// Like: foo()!!!!
+			//         the ^^^ part is unnecessary and invalid
+			if f.Ignored() {
+				self.pushErr(token, build::LogMsg.InvalidSyntax)
+				ret nil
+			} else {
+				f.Exception = &ast::ScopeTree{
+					Deferred: true,
+				}
 			}
 			ret d
 		}
