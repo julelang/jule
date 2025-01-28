@@ -30,11 +30,30 @@ fn ContainsTraitMethod(mut &t: &sema::Trait, &ident: str): bool {
 	ret false
 }
 
+// Returns structure type from t if exist.
+// It only returns only types: Struct and &Struct.
+fn FindStructFromType(mut t: &sema::Type): (&sema::StructIns, ptr: bool) {
+	match type t.Kind {
+	| &sema::Sptr:
+		t = (&sema::Sptr)(t.Kind).Elem
+		match type t.Kind {
+		| &sema::StructIns:
+			ret (&sema::StructIns)(t.Kind), true
+		}
+	| &sema::StructIns:
+		ret (&sema::StructIns)(t.Kind), false
+	}
+	ret nil, false
+}
+
 // Data offset of empty trait.
 const emptyTraitOffset = 0
 
 // Returns index of structu ins by trait implements.
-fn FindTraitTypeOffsetS(t: &sema::Trait, mut s: &sema::StructIns): int {
+//
+// See memory handling of traits to understand trait type offsets.
+// https://manual.jule.dev/memory/memory-model#traits
+fn FindTraitTypeOffsetS(t: &sema::Trait, s: &sema::StructIns): int {
 	if len(t.Implemented) == 0 {
 		ret emptyTraitOffset
 	}
@@ -45,11 +64,11 @@ fn FindTraitTypeOffsetS(t: &sema::Trait, mut s: &sema::StructIns): int {
 				if ins == s {
 					ret i
 				}
-				i++
+				i += 2
 			}
 			break
 		} else {
-			i += len(si.Instances)
+			i += len(si.Instances) << 1
 		}
 	}
 	ret -1
@@ -57,31 +76,28 @@ fn FindTraitTypeOffsetS(t: &sema::Trait, mut s: &sema::StructIns): int {
 
 // Same as [FindTraitTypeOffsetS] but designed for Type based lookup.
 // It checks structure instances even used with smart pointer.
+//
+// See memory handling of traits to understand trait type offsets.
+// https://manual.jule.dev/memory/memory-model#traits
 fn FindTraitTypeOffset(t: &sema::Trait, mut k: &sema::Type): int {
 	if len(t.Implemented) == 0 {
 		ret emptyTraitOffset
 	}
-	let mut s: &sema::StructIns = nil
-	match type k.Kind {
-	| &sema::Sptr:
-		k = (&sema::Sptr)(k.Kind).Elem
-		match type k.Kind {
-		| &sema::StructIns:
-			s = (&sema::StructIns)(k.Kind)
-		}
-	| &sema::StructIns:
-		s = (&sema::StructIns)(k.Kind)
-	}
+	s, ptr := FindStructFromType(k)
 	if s == nil {
 		ret -1
 	}
-	ret FindTraitTypeOffsetS(t, s)
+	i := FindTraitTypeOffsetS(t, s)
+	if ptr {
+		ret i + 1
+	}
+	ret i
 }
 
 // Returns function instance by generics.
 // Assumes generics parameter have enough and same size with generic count of f.
-// Panics if not exist any instance.
-fn FindFuncGenericInstance(mut &f: &sema::Func, generics: ...&sema::Type): &sema::FuncIns {
+// Returns nil not exist any instance.
+fn FindFuncGenericInstanceNoPanic(mut &f: &sema::Func, generics: ...&sema::Type): &sema::FuncIns {
 lookup:
 	for (_, mut ins) in f.Instances {
 		for i in ins.Generics {
@@ -91,7 +107,18 @@ lookup:
 		}
 		ret ins
 	}
-	panic("obj: generic instance lookup failed, this is an implementation mistake")
+	ret nil
+}
+
+// Returns function instance by generics.
+// Assumes generics parameter have enough and same size with generic count of f.
+// Panics if not exist any instance.
+fn FindFuncGenericInstance(mut &f: &sema::Func, generics: ...&sema::Type): &sema::FuncIns {
+	mut ins := FindFuncGenericInstanceNoPanic(f, generics...)
+	if ins == nil {
+		panic("obj: generic instance lookup failed, this is an implementation mistake")
+	}
+	ret ins
 }
 
 // Returns struct instance by generics.

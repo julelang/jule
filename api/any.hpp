@@ -9,6 +9,11 @@
 
 namespace jule
 {
+    // The type Any is also a trait data container for Jule's traits.
+    // The `type` field points to `jule::Trait::Type` for deallocation ant etc.,
+    // but it actually points to static data for trait's runtime data type if type is trait.
+    // So, compiler may cast it to actual data type to use it. Therefore,
+    // the first field of the static data is should be always common function pointers.
     class Any
     {
     public:
@@ -164,6 +169,34 @@ namespace jule
         inline jule::Ptr<T> unsafe_cast_ptr(void) const noexcept
         {
             return this->data.template as<T>();
+        }
+
+        // Maps type data with typeMapper and returns jule::Any with new type data.
+        inline jule::Any map(void *(*typeMapper)(const void *)) noexcept
+        {
+            jule::Any newAny;
+            newAny.type = (jule::Any::Type *)typeMapper((void *)this->type);
+            newAny.data = this->data;
+            return newAny;
+        }
+
+        // Returns the type data pointer with safety checks.
+        inline jule::Any::Type *safe_type(
+#ifndef __JULE_ENABLE__PRODUCTION
+            const char *file
+#else
+            void
+#endif
+        )
+        {
+#ifndef __JULE_DISABLE__SAFETY
+            this->must_ok(
+#ifndef __JULE_ENABLE__PRODUCTION
+                file
+#endif
+            );
+#endif
+            return this->type;
         }
 
         inline jule::Any &operator=(const jule::Any &src) noexcept
