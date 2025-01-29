@@ -1,0 +1,40 @@
+// Copyright 2024-2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/comptime"
+
+// Reports whether a and b equal.
+// Based on comptime, simple implementation.
+fn DeepEqual[T](a: T, b: T): bool {
+	const t = comptime::TypeOf(T)
+	const match {
+	| t.CanNil():
+		if a == nil {
+			ret b == nil
+		}
+		if b == nil {
+			ret false
+		}
+	}
+	const match t.Kind() {
+	| comptime::Kind.SmartPtr:
+		ret DeepEqual(*a, *b)
+	| comptime::Kind.Str | comptime::Kind.Bool
+	| comptime::Kind.F32 | comptime::Kind.F64
+	| comptime::Kind.Int | comptime::Kind.I8 | comptime::Kind.I16 | comptime::Kind.I32 | comptime::Kind.I64
+	| comptime::Kind.Uint | comptime::Kind.Uintptr | comptime::Kind.U8 | comptime::Kind.U16 | comptime::Kind.U32 | comptime::Kind.U64:
+		ret a == b
+	| comptime::Kind.Struct:
+		const av = comptime::ValueOf(a)
+		const bv = comptime::ValueOf(b)
+		const for i in t.Fields() {
+			if !DeepEqual(av.FieldByIndex(i).Unwrap(), bv.FieldByIndex(i).Unwrap()) {
+				ret false
+			}
+		}
+		ret true
+	|:
+		panic("std/internal/cmd: DeepEqual: unsupported type: " + t.Str())
+	}
+}
