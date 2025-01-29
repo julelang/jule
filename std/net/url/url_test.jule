@@ -1,0 +1,1736 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/internal/cmp"
+use "std/testing"
+
+struct urlTest {
+	input:     str
+	out:       &URL // expected parse
+	roundtrip: str  // expected result of reserializing the URL; empty means same as "in".
+}
+
+static urltests: []urlTest = [
+	// no path
+	{
+		"http://www.google.com",
+		&URL{
+			Scheme: "http",
+			Host: "www.google.com",
+		},
+		"",
+	},
+	// path
+	{
+		"http://www.google.com/",
+		&URL{
+			Scheme: "http",
+			Host: "www.google.com",
+			Path: "/",
+		},
+		"",
+	},
+	// path with hex escaping
+	{
+		"http://www.google.com/file%20one%26two",
+		&URL{
+			Scheme: "http",
+			Host: "www.google.com",
+			Path: "/file one&two",
+			RawPath: "/file%20one%26two",
+		},
+		"",
+	},
+	// fragment with hex escaping
+	{
+		"http://www.google.com/#file%20one%26two",
+		&URL{
+			Scheme: "http",
+			Host: "www.google.com",
+			Path: "/",
+			Fragment: "file one&two",
+			RawFragment: "file%20one%26two",
+		},
+		"",
+	},
+	// user
+	{
+		"ftp://webmaster@www.google.com/",
+		&URL{
+			Scheme: "ftp",
+			User: User("webmaster"),
+			Host: "www.google.com",
+			Path: "/",
+		},
+		"",
+	},
+	// escape sequence in username
+	{
+		"ftp://john%20doe@www.google.com/",
+		&URL{
+			Scheme: "ftp",
+			User: User("john doe"),
+			Host: "www.google.com",
+			Path: "/",
+		},
+		"ftp://john%20doe@www.google.com/",
+	},
+	// empty query
+	{
+		"http://www.google.com/?",
+		&URL{
+			Scheme: "http",
+			Host: "www.google.com",
+			Path: "/",
+			ForceQuery: true,
+		},
+		"",
+	},
+	// query ending in question mark (Issue 14573)
+	{
+		"http://www.google.com/?foo=bar?",
+		&URL{
+			Scheme: "http",
+			Host: "www.google.com",
+			Path: "/",
+			RawQuery: "foo=bar?",
+		},
+		"",
+	},
+	// query
+	{
+		"http://www.google.com/?q=go+language",
+		&URL{
+			Scheme: "http",
+			Host: "www.google.com",
+			Path: "/",
+			RawQuery: "q=go+language",
+		},
+		"",
+	},
+	// query with hex escaping: NOT parsed
+	{
+		"http://www.google.com/?q=go%20language",
+		&URL{
+			Scheme: "http",
+			Host: "www.google.com",
+			Path: "/",
+			RawQuery: "q=go%20language",
+		},
+		"",
+	},
+	// %20 outside query
+	{
+		"http://www.google.com/a%20b?q=c+d",
+		&URL{
+			Scheme: "http",
+			Host: "www.google.com",
+			Path: "/a b",
+			RawQuery: "q=c+d",
+		},
+		"",
+	},
+	// path without leading /, so no parsing
+	{
+		"http:www.google.com/?q=go+language",
+		&URL{
+			Scheme: "http",
+			Opaque: "www.google.com/",
+			RawQuery: "q=go+language",
+		},
+		"http:www.google.com/?q=go+language",
+	},
+	// path without leading /, so no parsing
+	{
+		"http:%2f%2fwww.google.com/?q=go+language",
+		&URL{
+			Scheme: "http",
+			Opaque: "%2f%2fwww.google.com/",
+			RawQuery: "q=go+language",
+		},
+		"http:%2f%2fwww.google.com/?q=go+language",
+	},
+	// non-authority with path
+	{
+		"mailto:/webmaster@jule.dev",
+		&URL{
+			Scheme: "mailto",
+			Path: "/webmaster@jule.dev",
+			OmitHost: true,
+		},
+		"",
+	},
+	// non-authority
+	{
+		"mailto:webmaster@jule.dev",
+		&URL{
+			Scheme: "mailto",
+			Opaque: "webmaster@jule.dev",
+		},
+		"",
+	},
+	// unescaped :// in query should not create a scheme
+	{
+		"/foo?query=http://bad",
+		&URL{
+			Path: "/foo",
+			RawQuery: "query=http://bad",
+		},
+		"",
+	},
+	// leading // without scheme should create an authority
+	{
+		"//foo",
+		&URL{
+			Host: "foo",
+		},
+		"",
+	},
+	// leading // without scheme, with userinfo, path, and query
+	{
+		"//user@foo/path?a=b",
+		&URL{
+			User: User("user"),
+			Host: "foo",
+			Path: "/path",
+			RawQuery: "a=b",
+		},
+		"",
+	},
+	// Three leading slashes isn't an authority, but doesn't return an error.
+	// (We can't return an error, as this code is also used via
+	// ServeHTTP -> ReadRequest -> Parse, which is arguably a
+	// different URL parsing context, but currently shares the
+	// same codepath)
+	{
+		"///threeslashes",
+		&URL{
+			Path: "///threeslashes",
+		},
+		"",
+	},
+	{
+		"http://user:password@google.com",
+		&URL{
+			Scheme: "http",
+			User: UserPassword("user", "password"),
+			Host: "google.com",
+		},
+		"http://user:password@google.com",
+	},
+	// unescaped @ in username should not confuse host
+	{
+		"http://j@ne:password@google.com",
+		&URL{
+			Scheme: "http",
+			User: UserPassword("j@ne", "password"),
+			Host: "google.com",
+		},
+		"http://j%40ne:password@google.com",
+	},
+	// unescaped @ in password should not confuse host
+	{
+		"http://jane:p@ssword@google.com",
+		&URL{
+			Scheme: "http",
+			User: UserPassword("jane", "p@ssword"),
+			Host: "google.com",
+		},
+		"http://jane:p%40ssword@google.com",
+	},
+	{
+		"http://j@ne:password@google.com/p@th?q=@go",
+		&URL{
+			Scheme: "http",
+			User: UserPassword("j@ne", "password"),
+			Host: "google.com",
+			Path: "/p@th",
+			RawQuery: "q=@go",
+		},
+		"http://j%40ne:password@google.com/p@th?q=@go",
+	},
+	{
+		"http://www.google.com/?q=go+language#foo",
+		&URL{
+			Scheme: "http",
+			Host: "www.google.com",
+			Path: "/",
+			RawQuery: "q=go+language",
+			Fragment: "foo",
+		},
+		"",
+	},
+	{
+		"http://www.google.com/?q=go+language#foo&bar",
+		&URL{
+			Scheme: "http",
+			Host: "www.google.com",
+			Path: "/",
+			RawQuery: "q=go+language",
+			Fragment: "foo&bar",
+		},
+		"http://www.google.com/?q=go+language#foo&bar",
+	},
+	{
+		"http://www.google.com/?q=go+language#foo%26bar",
+		&URL{
+			Scheme: "http",
+			Host: "www.google.com",
+			Path: "/",
+			RawQuery: "q=go+language",
+			Fragment: "foo&bar",
+			RawFragment: "foo%26bar",
+		},
+		"http://www.google.com/?q=go+language#foo%26bar",
+	},
+	{
+		"file:///home/adg/rabbits",
+		&URL{
+			Scheme: "file",
+			Host: "",
+			Path: "/home/adg/rabbits",
+		},
+		"file:///home/adg/rabbits",
+	},
+	// "Windows" paths are no exception to the rule.
+	{
+		"file:///C:/FooBar/Baz.txt",
+		&URL{
+			Scheme: "file",
+			Host: "",
+			Path: "/C:/FooBar/Baz.txt",
+		},
+		"file:///C:/FooBar/Baz.txt",
+	},
+	// case-insensitive scheme
+	{
+		"MaIlTo:webmaster@jule.dev",
+		&URL{
+			Scheme: "mailto",
+			Opaque: "webmaster@jule.dev",
+		},
+		"mailto:webmaster@jule.dev",
+	},
+	// Relative path
+	{
+		"a/b/c",
+		&URL{
+			Path: "a/b/c",
+		},
+		"a/b/c",
+	},
+	// escaped '?' in username and password
+	{
+		"http://%3Fam:pa%3Fsword@google.com",
+		&URL{
+			Scheme: "http",
+			User: UserPassword("?am", "pa?sword"),
+			Host: "google.com",
+		},
+		"",
+	},
+	// host subcomponent; IPv4 address in RFC 3986
+	{
+		"http://192.168.0.1/",
+		&URL{
+			Scheme: "http",
+			Host: "192.168.0.1",
+			Path: "/",
+		},
+		"",
+	},
+	// host and port subcomponents; IPv4 address in RFC 3986
+	{
+		"http://192.168.0.1:8080/",
+		&URL{
+			Scheme: "http",
+			Host: "192.168.0.1:8080",
+			Path: "/",
+		},
+		"",
+	},
+	// host subcomponent; IPv6 address in RFC 3986
+	{
+		"http://[fe80::1]/",
+		&URL{
+			Scheme: "http",
+			Host: "[fe80::1]",
+			Path: "/",
+		},
+		"",
+	},
+	// host and port subcomponents; IPv6 address in RFC 3986
+	{
+		"http://[fe80::1]:8080/",
+		&URL{
+			Scheme: "http",
+			Host: "[fe80::1]:8080",
+			Path: "/",
+		},
+		"",
+	},
+	// host subcomponent; IPv6 address with zone identifier in RFC 6874
+	{
+		"http://[fe80::1%25en0]/", // alphanum zone identifier
+		&URL{
+			Scheme: "http",
+			Host: "[fe80::1%en0]",
+			Path: "/",
+		},
+		"",
+	},
+	// host and port subcomponents; IPv6 address with zone identifier in RFC 6874
+	{
+		"http://[fe80::1%25en0]:8080/", // alphanum zone identifier
+		&URL{
+			Scheme: "http",
+			Host: "[fe80::1%en0]:8080",
+			Path: "/",
+		},
+		"",
+	},
+	// host subcomponent; IPv6 address with zone identifier in RFC 6874
+	{
+		"http://[fe80::1%25%65%6e%301-._~]/", // percent-encoded+unreserved zone identifier
+		&URL{
+			Scheme: "http",
+			Host: "[fe80::1%en01-._~]",
+			Path: "/",
+		},
+		"http://[fe80::1%25en01-._~]/",
+	},
+	// host and port subcomponents; IPv6 address with zone identifier in RFC 6874
+	{
+		"http://[fe80::1%25%65%6e%301-._~]:8080/", // percent-encoded+unreserved zone identifier
+		&URL{
+			Scheme: "http",
+			Host: "[fe80::1%en01-._~]:8080",
+			Path: "/",
+		},
+		"http://[fe80::1%25en01-._~]:8080/",
+	},
+	// alternate escapings of path survive round trip
+	{
+		"http://rest.rsc.io/foo%2fbar/baz%2Fquux?alt=media",
+		&URL{
+			Scheme: "http",
+			Host: "rest.rsc.io",
+			Path: "/foo/bar/baz/quux",
+			RawPath: "/foo%2fbar/baz%2Fquux",
+			RawQuery: "alt=media",
+		},
+		"",
+	},
+	{
+		"mysql://a,b,c/bar",
+		&URL{
+			Scheme: "mysql",
+			Host: "a,b,c",
+			Path: "/bar",
+		},
+		"",
+	},
+	// worst case host, still round trips
+	{
+		"scheme://!$&'()*+,;=hello!:1/path",
+		&URL{
+			Scheme: "scheme",
+			Host: "!$&'()*+,;=hello!:1",
+			Path: "/path",
+		},
+		"",
+	},
+	// worst case path, still round trips
+	{
+		"http://host/!$&'()*+,;=:@[hello]",
+		&URL{
+			Scheme: "http",
+			Host: "host",
+			Path: "/!$&'()*+,;=:@[hello]",
+			RawPath: "/!$&'()*+,;=:@[hello]",
+		},
+		"",
+	},
+	{
+		"http://example.com/oid/[order_id]",
+		&URL{
+			Scheme: "http",
+			Host: "example.com",
+			Path: "/oid/[order_id]",
+			RawPath: "/oid/[order_id]",
+		},
+		"",
+	},
+	// colon with empty port
+	{
+		"http://192.168.0.2:8080/foo",
+		&URL{
+			Scheme: "http",
+			Host: "192.168.0.2:8080",
+			Path: "/foo",
+		},
+		"",
+	},
+	{
+		"http://192.168.0.2:/foo",
+		&URL{
+			Scheme: "http",
+			Host: "192.168.0.2:",
+			Path: "/foo",
+		},
+		"",
+	},
+	{
+		// Malformed IPv6 but still accepted.
+		"http://2b01:e34:ef40:7730:8e70:5aff:fefe:edac:8080/foo",
+		&URL{
+			Scheme: "http",
+			Host: "2b01:e34:ef40:7730:8e70:5aff:fefe:edac:8080",
+			Path: "/foo",
+		},
+		"",
+	},
+	{
+		// Malformed IPv6 but still accepted.
+		"http://2b01:e34:ef40:7730:8e70:5aff:fefe:edac:/foo",
+		&URL{
+			Scheme: "http",
+			Host: "2b01:e34:ef40:7730:8e70:5aff:fefe:edac:",
+			Path: "/foo",
+		},
+		"",
+	},
+	{
+		"http://[2b01:e34:ef40:7730:8e70:5aff:fefe:edac]:8080/foo",
+		&URL{
+			Scheme: "http",
+			Host: "[2b01:e34:ef40:7730:8e70:5aff:fefe:edac]:8080",
+			Path: "/foo",
+		},
+		"",
+	},
+	{
+		"http://[2b01:e34:ef40:7730:8e70:5aff:fefe:edac]:/foo",
+		&URL{
+			Scheme: "http",
+			Host: "[2b01:e34:ef40:7730:8e70:5aff:fefe:edac]:",
+			Path: "/foo",
+		},
+		"",
+	},
+	// non-ascii %-encoded in host
+	{
+		"http://hello.世界.com/foo",
+		&URL{
+			Scheme: "http",
+			Host: "hello.世界.com",
+			Path: "/foo",
+		},
+		"http://hello.%E4%B8%96%E7%95%8C.com/foo",
+	},
+	{
+		"http://hello.%e4%b8%96%e7%95%8c.com/foo",
+		&URL{
+			Scheme: "http",
+			Host: "hello.世界.com",
+			Path: "/foo",
+		},
+		"http://hello.%E4%B8%96%E7%95%8C.com/foo",
+	},
+	{
+		"http://hello.%E4%B8%96%E7%95%8C.com/foo",
+		&URL{
+			Scheme: "http",
+			Host: "hello.世界.com",
+			Path: "/foo",
+		},
+		"",
+	},
+	// path beginning with //
+	{
+		"http://example.com//foo",
+		&URL{
+			Scheme: "http",
+			Host: "example.com",
+			Path: "//foo",
+		},
+		"",
+	},
+	// test that we can reparse the host names we accept.
+	{
+		"myscheme://authority<\"hi\">/foo",
+		&URL{
+			Scheme: "myscheme",
+			Host: "authority<\"hi\">",
+			Path: "/foo",
+		},
+		"",
+	},
+	// spaces in hosts are disallowed but escaped spaces in IPv6 scope IDs are grudgingly OK.
+	// This happens on Windows.
+	{
+		"tcp://[2020::2020:20:2020:2020%25Windows%20Loves%20Spaces]:2020",
+		&URL{
+			Scheme: "tcp",
+			Host: "[2020::2020:20:2020:2020%Windows Loves Spaces]:2020",
+		},
+		"",
+	},
+	// test we can roundtrip magnet url
+	{
+		"magnet:?xt=urn:btih:c12fe1c06bba254a9dc9f519b335aa7c1367a88a&dn",
+		&URL{
+			Scheme: "magnet",
+			Host: "",
+			Path: "",
+			RawQuery: "xt=urn:btih:c12fe1c06bba254a9dc9f519b335aa7c1367a88a&dn",
+		},
+		"magnet:?xt=urn:btih:c12fe1c06bba254a9dc9f519b335aa7c1367a88a&dn",
+	},
+	{
+		"mailto:?subject=hi",
+		&URL{
+			Scheme: "mailto",
+			Host: "",
+			Path: "",
+			RawQuery: "subject=hi",
+		},
+		"mailto:?subject=hi",
+	},
+]
+
+#test
+fn testParse(t: &testing::T) {
+	for _, c in urltests {
+		let u = Parse(c.input) else {
+			t.Errorf("Parse({}) throwed error", c.input)
+			continue
+		}
+		if !cmp::DeepEqual(u, c.out) {
+			t.Errorf("Parse({}):\n\tgot  {}\n\twant {}\n", c.input, *u, *c.out)
+		}
+	}
+}
+
+const pathThatLooksSchemeRelative = "//not.a.user@not.a.host/just/a/path"
+
+struct parseRequestURLTest {
+	url:           str
+	expectedValid: bool
+}
+
+static parseRequestURLTests: []parseRequestURLTest = [
+	{"http://foo.com", true},
+	{"http://foo.com/", true},
+	{"http://foo.com/path", true},
+	{"/", true},
+	{pathThatLooksSchemeRelative, true},
+	{"//not.a.user@%66%6f%6f.com/just/a/path/also", true},
+	{"*", true},
+	{"http://192.168.0.1/", true},
+	{"http://192.168.0.1:8080/", true},
+	{"http://[fe80::1]/", true},
+	{"http://[fe80::1]:8080/", true},
+
+	// Tests exercising RFC 6874 compliance:
+	{"http://[fe80::1%25en0]/", true},                     // with alphanum zone identifier
+	{"http://[fe80::1%25en0]:8080/", true},                // with alphanum zone identifier
+	{"http://[fe80::1%25%65%6e%301-._~]/", true},          // with percent-encoded+unreserved zone identifier
+	{"http://[fe80::1%25%65%6e%301-._~]:8080/", true},     // with percent-encoded+unreserved zone identifier
+
+	// ....
+	{"foo.html", false},
+	{"../dir/", false},
+	{" http://foo.com", false},
+	{"http://192.168.0.%31/", false},
+	{"http://192.168.0.%31:8080/", false},
+	{"http://[fe80::%31]/", false},
+	{"http://[fe80::%31]:8080/", false},
+	{"http://[fe80::%31%25en0]/", false},
+	{"http://[fe80::%31%25en0]:8080/", false},
+
+	// These two cases are valid as textual representations as
+	// described in RFC 4007, but are not valid as address
+	// literals with IPv6 zone identifiers in URIs as described in
+	// RFC 6874.
+	{"http://[fe80::1%en0]/", false},
+	{"http://[fe80::1%en0]:8080/", false},
+]
+
+#test
+fn testParseRequestURI(t: &testing::T) {
+	for _, test in parseRequestURLTests {
+		ParseRequestURI(test.url) else {
+			if test.expectedValid {
+				t.Errorf("ParseRequestURI({}) gave exception {}; want no error", test.url, error)
+			}
+			continue
+		}
+		if !test.expectedValid {
+			t.Errorf("ParseRequestURI({}) gave no exception; want some error", test.url)
+		}
+	}
+
+	url := ParseRequestURI(pathThatLooksSchemeRelative) else {
+		t.Errorf("Unexpected error {}", error)
+		ret
+	}
+	if url.Path != pathThatLooksSchemeRelative {
+		t.Errorf("ParseRequestURI path:\ngot  {\nwant {}", url.Path, pathThatLooksSchemeRelative)
+	}
+}
+
+struct strUrlTest {
+	url:  URL
+	want: str
+}
+
+static stringURLTests: []strUrlTest = [
+	// No leading slash on path should prepend slash on String() call
+	{
+		url: URL{
+			Scheme: "http",
+			Host: "www.google.com",
+			Path: "search",
+		},
+		want: "http://www.google.com/search",
+	},
+	// Relative path with first element containing ":" should be prepended with "./", golang.org/issue/17184
+	{
+		url: URL{
+			Path: "this:that",
+		},
+		want: "./this:that",
+	},
+	// Relative path with second element containing ":" should not be prepended with "./"
+	{
+		url: URL{
+			Path: "here/this:that",
+		},
+		want: "here/this:that",
+	},
+	// Non-relative path with first element containing ":" should not be prepended with "./"
+	{
+		url: URL{
+			Scheme: "http",
+			Host: "www.google.com",
+			Path: "this:that",
+		},
+		want: "http://www.google.com/this:that",
+	},
+]
+
+#test
+fn testURLString(t: &testing::T) {
+	for _, tt in urltests {
+		u := Parse(tt.input) else {
+			t.Errorf("Parse({}) returned error {}", tt.input, error)
+			continue
+		}
+		mut expected := tt.input
+		if tt.roundtrip != "" {
+			expected = tt.roundtrip
+		}
+		s := u.Str()
+		if s != expected {
+			t.Errorf("Parse({}).Str() == {} (expected {})", tt.input, s, expected)
+		}
+	}
+
+	for _, tt in stringURLTests {
+		got := tt.url.Str()
+		if got != tt.want {
+			t.Errorf("{}.Str() = {}; want {}", tt.url, got, tt.want)
+		}
+	}
+}
+
+struct urlRedactedTest {
+	name: str
+	url:  &URL
+	want: str
+}
+
+static urlRedactedTests: []urlRedactedTest = [
+	{
+		name: "non-blank Password",
+		url: &URL{
+			Scheme: "http",
+			Host: "host.tld",
+			Path: "this:that",
+			User: UserPassword("user", "password"),
+		},
+		want: "http://user:xxxxx@host.tld/this:that",
+	},
+	{
+		name: "blank Password",
+		url: &URL{
+			Scheme: "http",
+			Host: "host.tld",
+			Path: "this:that",
+			User: User("user"),
+		},
+		want: "http://user@host.tld/this:that",
+	},
+	{
+		name: "nil User",
+		url: &URL{
+			Scheme: "http",
+			Host: "host.tld",
+			Path: "this:that",
+			User: UserPassword("", "password"),
+		},
+		want: "http://:xxxxx@host.tld/this:that",
+	},
+	{
+		name: "blank Username, blank Password",
+		url: &URL{
+			Scheme: "http",
+			Host: "host.tld",
+			Path: "this:that",
+		},
+		want: "http://host.tld/this:that",
+	},
+	{
+		name: "empty URL",
+		url: &URL{},
+		want: "",
+	},
+]
+
+#test
+fn testURLRedacted(t: &testing::T) {
+	for _, tt in urlRedactedTests {
+		g, w := tt.url.Redacted(), tt.want
+		if g != w {
+			t.Errorf("got: {}\n    want: {}", g, w)
+		}
+	}
+}
+
+struct encodeQueryTest {
+	m:        Values
+	expected: str
+}
+
+static encodeQueryTests: []encodeQueryTest = [
+	{nil, ""},
+	{{}, ""},
+	{{"q": ["puppies"], "oe": ["utf8"]}, "oe=utf8&q=puppies"},
+	{{"q": ["dogs", "&", "7"]}, "q=dogs&q=%26&q=7"},
+	{{
+			"a": ["a1", "a2", "a3"],
+			"b": ["b1", "b2", "b3"],
+			"c": ["c1", "c2", "c3"],
+		},
+		"a=a1&a=a2&a=a3&b=b1&b=b2&b=b3&c=c1&c=c2&c=c3",
+	},
+]
+
+#test
+fn testEncodeQuery(t: &testing::T) {
+	for _, tt in encodeQueryTests {
+		q := tt.m.Encode()
+		if q != tt.expected {
+			t.Errorf(`EncodeQuery({}) = {}, want {}`, tt.m, q, tt.expected)
+		}
+	}
+}
+
+struct resolvePathTest {
+	base:     str
+	ref:      str
+	expected: str
+}
+
+static resolvePathTests: []resolvePathTest = [
+	{"a/b", ".", "/a/"},
+	{"a/b", "c", "/a/c"},
+	{"a/b", "..", "/"},
+	{"a/", "..", "/"},
+	{"a/", "../..", "/"},
+	{"a/b/c", "..", "/a/"},
+	{"a/b/c", "../d", "/a/d"},
+	{"a/b/c", ".././d", "/a/d"},
+	{"a/b", "./..", "/"},
+	{"a/./b", ".", "/a/"},
+	{"a/../", ".", "/"},
+	{"a/.././b", "c", "/c"},
+]
+
+#test
+fn testResolvePath(t: &testing::T) {
+	for _, test in resolvePathTests {
+		got := resolvePath(test.base, test.ref)
+		if got != test.expected {
+			t.Errorf("For {} + {} got {}; expected {}", test.base, test.ref, got, test.expected)
+		}
+	}
+}
+
+struct resolveReferenceTest {
+	base:     str
+	rel:      str
+	expected: str
+}
+
+static resolveReferenceTests: []resolveReferenceTest = [
+	// Absolute URL references
+	{"http://foo.com?a=b", "https://bar.com/", "https://bar.com/"},
+	{"http://foo.com/", "https://bar.com/?a=b", "https://bar.com/?a=b"},
+	{"http://foo.com/", "https://bar.com/?", "https://bar.com/?"},
+	{"http://foo.com/bar", "mailto:foo@example.com", "mailto:foo@example.com"},
+
+	// Path-absolute references
+	{"http://foo.com/bar", "/baz", "http://foo.com/baz"},
+	{"http://foo.com/bar?a=b#f", "/baz", "http://foo.com/baz"},
+	{"http://foo.com/bar?a=b", "/baz?", "http://foo.com/baz?"},
+	{"http://foo.com/bar?a=b", "/baz?c=d", "http://foo.com/baz?c=d"},
+
+	// Multiple slashes
+	{"http://foo.com/bar", "http://foo.com//baz", "http://foo.com//baz"},
+	{"http://foo.com/bar", "http://foo.com///baz/quux", "http://foo.com///baz/quux"},
+
+	// Scheme-relative
+	{"https://foo.com/bar?a=b", "//bar.com/quux", "https://bar.com/quux"},
+
+	// Path-relative references:
+
+	// ... current directory
+	{"http://foo.com", ".", "http://foo.com/"},
+	{"http://foo.com/bar", ".", "http://foo.com/"},
+	{"http://foo.com/bar/", ".", "http://foo.com/bar/"},
+
+	// ... going down
+	{"http://foo.com", "bar", "http://foo.com/bar"},
+	{"http://foo.com/", "bar", "http://foo.com/bar"},
+	{"http://foo.com/bar/baz", "quux", "http://foo.com/bar/quux"},
+
+	// ... going up
+	{"http://foo.com/bar/baz", "../quux", "http://foo.com/quux"},
+	{"http://foo.com/bar/baz", "../../../../../quux", "http://foo.com/quux"},
+	{"http://foo.com/bar", "..", "http://foo.com/"},
+	{"http://foo.com/bar/baz", "./..", "http://foo.com/"},
+	// ".." in the middle (issue 3560)
+	{"http://foo.com/bar/baz", "quux/dotdot/../tail", "http://foo.com/bar/quux/tail"},
+	{"http://foo.com/bar/baz", "quux/./dotdot/../tail", "http://foo.com/bar/quux/tail"},
+	{"http://foo.com/bar/baz", "quux/./dotdot/.././tail", "http://foo.com/bar/quux/tail"},
+	{"http://foo.com/bar/baz", "quux/./dotdot/./../tail", "http://foo.com/bar/quux/tail"},
+	{"http://foo.com/bar/baz", "quux/./dotdot/dotdot/././../../tail", "http://foo.com/bar/quux/tail"},
+	{"http://foo.com/bar/baz", "quux/./dotdot/dotdot/./.././../tail", "http://foo.com/bar/quux/tail"},
+	{"http://foo.com/bar/baz", "quux/./dotdot/dotdot/dotdot/./../../.././././tail", "http://foo.com/bar/quux/tail"},
+	{"http://foo.com/bar/baz", "quux/./dotdot/../dotdot/../dot/./tail/..", "http://foo.com/bar/quux/dot/"},
+
+	// Remove any dot-segments prior to forming the target URI.
+	// https://datatracker.ietf.org/doc/html/rfc3986#section-5.2.4
+	{"http://foo.com/dot/./dotdot/../foo/bar", "../baz", "http://foo.com/dot/baz"},
+
+	// Triple dot isn't special
+	{"http://foo.com/bar", "...", "http://foo.com/..."},
+
+	// Fragment
+	{"http://foo.com/bar", ".#frag", "http://foo.com/#frag"},
+	{"http://example.org/", "#!$&%27()*+,;=", "http://example.org/#!$&%27()*+,;="},
+
+	// Paths with escaping (issue 16947).
+	{"http://foo.com/foo%2fbar/", "../baz", "http://foo.com/baz"},
+	{"http://foo.com/1/2%2f/3%2f4/5", "../../a/b/c", "http://foo.com/1/a/b/c"},
+	{"http://foo.com/1/2/3", "./a%2f../../b/..%2fc", "http://foo.com/1/2/b/..%2fc"},
+	{"http://foo.com/1/2%2f/3%2f4/5", "./a%2f../b/../c", "http://foo.com/1/2%2f/3%2f4/a%2f../c"},
+	{"http://foo.com/foo%20bar/", "../baz", "http://foo.com/baz"},
+	{"http://foo.com/foo", "../bar%2fbaz", "http://foo.com/bar%2fbaz"},
+	{"http://foo.com/foo%2dbar/", "./baz-quux", "http://foo.com/foo%2dbar/baz-quux"},
+
+	// RFC 3986: Normal Examples
+	// https://datatracker.ietf.org/doc/html/rfc3986#section-5.4.1
+	{"http://a/b/c/d;p?q", "g:h", "g:h"},
+	{"http://a/b/c/d;p?q", "g", "http://a/b/c/g"},
+	{"http://a/b/c/d;p?q", "./g", "http://a/b/c/g"},
+	{"http://a/b/c/d;p?q", "g/", "http://a/b/c/g/"},
+	{"http://a/b/c/d;p?q", "/g", "http://a/g"},
+	{"http://a/b/c/d;p?q", "//g", "http://g"},
+	{"http://a/b/c/d;p?q", "?y", "http://a/b/c/d;p?y"},
+	{"http://a/b/c/d;p?q", "g?y", "http://a/b/c/g?y"},
+	{"http://a/b/c/d;p?q", "#s", "http://a/b/c/d;p?q#s"},
+	{"http://a/b/c/d;p?q", "g#s", "http://a/b/c/g#s"},
+	{"http://a/b/c/d;p?q", "g?y#s", "http://a/b/c/g?y#s"},
+	{"http://a/b/c/d;p?q", ";x", "http://a/b/c/;x"},
+	{"http://a/b/c/d;p?q", "g;x", "http://a/b/c/g;x"},
+	{"http://a/b/c/d;p?q", "g;x?y#s", "http://a/b/c/g;x?y#s"},
+	{"http://a/b/c/d;p?q", "", "http://a/b/c/d;p?q"},
+	{"http://a/b/c/d;p?q", ".", "http://a/b/c/"},
+	{"http://a/b/c/d;p?q", "./", "http://a/b/c/"},
+	{"http://a/b/c/d;p?q", "..", "http://a/b/"},
+	{"http://a/b/c/d;p?q", "../", "http://a/b/"},
+	{"http://a/b/c/d;p?q", "../g", "http://a/b/g"},
+	{"http://a/b/c/d;p?q", "../..", "http://a/"},
+	{"http://a/b/c/d;p?q", "../../", "http://a/"},
+	{"http://a/b/c/d;p?q", "../../g", "http://a/g"},
+
+	// RFC 3986: Abnormal Examples
+	// https://datatracker.ietf.org/doc/html/rfc3986#section-5.4.2
+	{"http://a/b/c/d;p?q", "../../../g", "http://a/g"},
+	{"http://a/b/c/d;p?q", "../../../../g", "http://a/g"},
+	{"http://a/b/c/d;p?q", "/./g", "http://a/g"},
+	{"http://a/b/c/d;p?q", "/../g", "http://a/g"},
+	{"http://a/b/c/d;p?q", "g.", "http://a/b/c/g."},
+	{"http://a/b/c/d;p?q", ".g", "http://a/b/c/.g"},
+	{"http://a/b/c/d;p?q", "g..", "http://a/b/c/g.."},
+	{"http://a/b/c/d;p?q", "..g", "http://a/b/c/..g"},
+	{"http://a/b/c/d;p?q", "./../g", "http://a/b/g"},
+	{"http://a/b/c/d;p?q", "./g/.", "http://a/b/c/g/"},
+	{"http://a/b/c/d;p?q", "g/./h", "http://a/b/c/g/h"},
+	{"http://a/b/c/d;p?q", "g/../h", "http://a/b/c/h"},
+	{"http://a/b/c/d;p?q", "g;x=1/./y", "http://a/b/c/g;x=1/y"},
+	{"http://a/b/c/d;p?q", "g;x=1/../y", "http://a/b/c/y"},
+	{"http://a/b/c/d;p?q", "g?y/./x", "http://a/b/c/g?y/./x"},
+	{"http://a/b/c/d;p?q", "g?y/../x", "http://a/b/c/g?y/../x"},
+	{"http://a/b/c/d;p?q", "g#s/./x", "http://a/b/c/g#s/./x"},
+	{"http://a/b/c/d;p?q", "g#s/../x", "http://a/b/c/g#s/../x"},
+
+	// Extras.
+	{"https://a/b/c/d;p?q", "//g?q", "https://g?q"},
+	{"https://a/b/c/d;p?q", "//g#s", "https://g#s"},
+	{"https://a/b/c/d;p?q", "//g/d/e/f?y#s", "https://g/d/e/f?y#s"},
+	{"https://a/b/c/d;p#s", "?y", "https://a/b/c/d;p?y"},
+	{"https://a/b/c/d;p?q#s", "?y", "https://a/b/c/d;p?y"},
+
+	// Empty path and query but with ForceQuery (issue 46033).
+	{"https://a/b/c/d;p?q#s", "?", "https://a/b/c/d;p?"},
+
+	// Opaque URLs (issue 66084).
+	{"https://foo.com/bar?a=b", "http:opaque", "http:opaque"},
+	{"http:opaque?x=y#zzz", "https:/foo?a=b#frag", "https:/foo?a=b#frag"},
+	{"http:opaque?x=y#zzz", "https:foo:bar", "https:foo:bar"},
+	{"http:opaque?x=y#zzz", "https:bar/baz?a=b#frag", "https:bar/baz?a=b#frag"},
+	{"http:opaque?x=y#zzz", "https://user@host:1234?a=b#frag", "https://user@host:1234?a=b#frag"},
+	{"http:opaque?x=y#zzz", "?a=b#frag", "http:opaque?a=b#frag"},
+]
+
+#test
+fn testResolveReference(t: &testing::T) {
+	mustParse := fn(url: str): &URL {
+		ret Parse(url) else {
+			t.Errorf("Parse({}) got err {}", url, error)
+			use nil
+		}
+	}
+	mut opaque := &URL{Scheme: "scheme", Opaque: "opaque"}
+	for _, test in resolveReferenceTests {
+		mut base := mustParse(test.base)
+		mut rel := mustParse(test.rel)
+		mut url := base.ResolveReference(rel)
+		{
+			got := url.Str()
+			if got != test.expected {
+				t.Errorf("URL({}).ResolveReference({})\n\tgot  {}\n\twant {}", test.base, test.rel, got, test.expected)
+			}
+		}
+		// Ensure that new instances are returned.
+		if base == url {
+			t.Errorf("Expected URL.ResolveReference to return new URL instance.")
+		}
+		// Test the convenience wrapper too.
+		url = base.Parse(test.rel) else {
+			t.Errorf("URL({}).Parse({}) failed: {}", test.base, test.rel, error)
+			use nil
+		}
+		if url != nil {
+			got := url.Str()
+			if got != test.expected {
+				t.Errorf("URL({}).Parse({})\n\tgot  {}\n\twant {}", test.base, test.rel, got, test.expected)
+			} else if base == url {
+				// Ensure that new instances are returned for the wrapper too.
+				t.Errorf("Expected URL.Parse to return new URL instance.")
+			}
+		}
+		// Ensure Opaque resets the URL.
+		url = base.ResolveReference(opaque)
+		if *url != *opaque {
+			t.Errorf("ResolveReference failed to resolve opaque URL:\n\tgot  {}\n\twant {}", url.Str(), opaque.Str())
+		}
+		// Test the convenience wrapper with an opaque URL too.
+		url = base.Parse("scheme:opaque") else {
+			t.Errorf(`URL({}).Parse("scheme:opaque") failed: {}`, test.base, error)
+			use nil
+		}
+		if url != nil {
+			if *url != *opaque {
+				t.Errorf("Parse failed to resolve opaque URL:\n\tgot  {}\n\twant {}", opaque.Str(), url.Str())
+			} else if base == url {
+				// Ensure that new instances are returned, again.
+				t.Errorf("Expected URL.Parse to return new URL instance.")
+			}
+		}
+	}
+}
+
+#test
+fn testQueryValues(t: &testing::T) {
+	u := Parse("http://x.com?foo=bar&bar=1&bar=2&baz")!
+	mut v := u.Query()!
+	if len(v) != 3 {
+		t.Errorf("got {} keys in Query values, want 3", len(v))
+	}
+	{
+		g, e := v.Get("foo"), "bar"
+		if g != e {
+			t.Errorf("Get(foo) = {}, want {}", g, e)
+		}
+	}
+	// Case sensitive:
+	{
+		g, e := v.Get("Foo"), ""
+		if g != e {
+			t.Errorf("Get(Foo) = {}, want {}", g, e)
+		}
+	}
+	{
+		g, e := v.Get("bar"), "1"
+		if g != e {
+			t.Errorf("Get(bar) = {}, want {}", g, e)
+		}
+	}
+	{
+		g, e := v.Get("baz"), ""
+		if g != e {
+			t.Errorf("Get(baz) = {}, want {}", g, e)
+		}
+	}
+	{
+		h, e := v.Has("foo"), true
+		if h != e {
+			t.Errorf("Has(foo) = {}, want {}", h, e)
+		}
+	}
+	{
+		h, e := v.Has("bar"), true
+		if h != e {
+			t.Errorf("Has(bar) = {}, want {}", h, e)
+		}
+	}
+	{
+		h, e := v.Has("baz"), true
+		if h != e {
+			t.Errorf("Has(baz) = {}, want {}", h, e)
+		}
+	}
+	{
+		h, e := v.Has("noexist"), false
+		if h != e {
+			t.Errorf("Has(noexist) = {}, want {}", h, e)
+		}
+	}
+	v.Del("bar")
+	{
+		g, e := v.Get("bar"), ""
+		if g != e {
+			t.Errorf("second Get(bar) = {}, want {}", g, e)
+		}
+	}
+}
+
+struct parseTest {
+	query: str
+	out:   Values
+	ok:    bool
+}
+
+static parseTests: []parseTest = [
+	{
+		query: "a=1",
+		out: {"a": ["1"]},
+		ok: true,
+	},
+	{
+		query: "a=1&b=2",
+		out: {"a": ["1"], "b": ["2"]},
+		ok: true,
+	},
+	{
+		query: "a=1&a=2&a=banana",
+		out: {"a": ["1", "2", "banana"]},
+		ok: true,
+	},
+	{
+		query: "ascii=%3Ckey%3A+0x90%3E",
+		out: {"ascii": ["<key: 0x90>"]},
+		ok: true,
+	},
+	{
+		query: "a=1;b=2",
+		out: {},
+		ok: false,
+	},
+	{
+		query: "a;b=1",
+		out: {},
+		ok: false,
+	},
+	{
+		query: "a=%3B",    // hex encoding for semicolon
+		out: {"a": [";"]},
+		ok: true,
+	},
+	{
+		query: "a%3Bb=1",
+		out: {"a;b": ["1"]},
+		ok: true,
+	},
+	{
+		query: "a=1&a=2;a=banana",
+		out: {},
+		ok: false,
+	},
+	{
+		query: "a;b&c=1",
+		out: {},
+		ok: false,
+	},
+	{
+		query: "a=1&b=2;a=3&c=4",
+		out: {},
+		ok: false,
+	},
+	{
+		query: "a=1&b=2;c=3",
+		out: {},
+		ok: false,
+	},
+	{
+		query: ";",
+		out: {},
+		ok: false,
+	},
+	{
+		query: "a=1;",
+		out: {},
+		ok: false,
+	},
+	{
+		query: "a=1&;",
+		out: {},
+		ok: false,
+	},
+	{
+		query: ";a=1&b=2",
+		out: {},
+		ok: false,
+	},
+	{
+		query: "a=1&b=2;",
+		out: {},
+		ok: false,
+	},
+]
+
+#test
+fn testParseQuery(t: &testing::T) {
+	for _, test in parseTests {
+		mut err := any(nil)
+		form := ParseQuery(test.query) else {
+			err = error
+			use nil
+		}
+		if test.ok != (err == nil) {
+			mut want := "<error>"
+			if test.ok {
+				want = "<nil>"
+			}
+			t.Errorf("Unexpected error: {}, want {}", err, want)
+		}
+		if len(form) != len(test.out) {
+			t.Errorf("len(form) = {}, want {}", len(form), len(test.out))
+		}
+		for k, evs in test.out {
+			vs, ok := form[k]
+			if !ok {
+				t.Errorf("Missing key {}", k)
+				continue
+			}
+			if len(vs) != len(evs) {
+				t.Errorf("len(form[{}]) = {}, want {}", k, len(vs), len(evs))
+				continue
+			}
+			for j, ev in evs {
+				v := vs[j]
+				if v != ev {
+					t.Errorf("form[{}][{}] = {}, want {}", k, j, v, ev)
+				}
+			}
+		}
+	}
+}
+
+struct requestURITest {
+	url: &URL
+	out: str
+}
+
+static requritests: []requestURITest = [
+	{
+		&URL{
+			Scheme: "http",
+			Host: "example.com",
+			Path: "",
+		},
+		"/",
+	},
+	{
+		&URL{
+			Scheme: "http",
+			Host: "example.com",
+			Path: "/a b",
+		},
+		"/a%20b",
+	},
+	// golang.org/issue/4860 variant 1
+	{
+		&URL{
+			Scheme: "http",
+			Host: "example.com",
+			Opaque: "/%2F/%2F/",
+		},
+		"/%2F/%2F/",
+	},
+	// golang.org/issue/4860 variant 2
+	{
+		&URL{
+			Scheme: "http",
+			Host: "example.com",
+			Opaque: "//other.example.com/%2F/%2F/",
+		},
+		"http://other.example.com/%2F/%2F/",
+	},
+	// better fix for issue 4860
+	{
+		&URL{
+			Scheme: "http",
+			Host: "example.com",
+			Path: "/////",
+			RawPath: "/%2F/%2F/",
+		},
+		"/%2F/%2F/",
+	},
+	{
+		&URL{
+			Scheme: "http",
+			Host: "example.com",
+			Path: "/////",
+			RawPath: "/WRONG/", // ignored because doesn't match Path
+		},
+		"/////",
+	},
+	{
+		&URL{
+			Scheme: "http",
+			Host: "example.com",
+			Path: "/a b",
+			RawQuery: "q=go+language",
+		},
+		"/a%20b?q=go+language",
+	},
+	{
+		&URL{
+			Scheme: "http",
+			Host: "example.com",
+			Path: "/a b",
+			RawPath: "/a b", // ignored because invalid
+			RawQuery: "q=go+language",
+		},
+		"/a%20b?q=go+language",
+	},
+	{
+		&URL{
+			Scheme: "http",
+			Host: "example.com",
+			Path: "/a?b",
+			RawPath: "/a?b", // ignored because invalid
+			RawQuery: "q=go+language",
+		},
+		"/a%3Fb?q=go+language",
+	},
+	{
+		&URL{
+			Scheme: "myschema",
+			Opaque: "opaque",
+		},
+		"opaque",
+	},
+	{
+		&URL{
+			Scheme: "myschema",
+			Opaque: "opaque",
+			RawQuery: "q=go+language",
+		},
+		"opaque?q=go+language",
+	},
+	{
+		&URL{
+			Scheme: "http",
+			Host: "example.com",
+			Path: "//foo",
+		},
+		"//foo",
+	},
+	{
+		&URL{
+			Scheme: "http",
+			Host: "example.com",
+			Path: "/foo",
+			ForceQuery: true,
+		},
+		"/foo?",
+	},
+]
+
+#test
+fn testRequestURI(t: &testing::T) {
+	for _, tt in requritests {
+		s := tt.url.RequestURI()
+		if s != tt.out {
+			t.Errorf("{}.RequestURI() == {} (expected {})", tt.url, s, tt.out)
+		}
+	}
+}
+
+struct parseErrorTest {
+	input:   str
+	wantErr: bool
+}
+
+#test
+fn testParseErrors(t: &testing::T) {
+	tests := []parseErrorTest([
+		{"http://[::1]", false},
+		{"http://[::1]:80", false},
+		{"http://[::1]:namedport", true},                                                                // rfc3986 3.2.3
+		{"http://x:namedport", true},                                                                    // rfc3986 3.2.3
+		{"http://[::1]/", false},
+		{"http://[::1]a", true},
+		{"http://[::1]%23", true},
+		{"http://[::1%25en0]", false},                                                                   // valid zone id
+		{"http://[::1]:", false},                                                                        // colon, but no port OK
+		{"http://x:", false},                                                                            // colon, but no port OK
+		{"http://[::1]:%38%30", true},                                                                   // not allowed: % encoding only for non-ASCII
+		{"http://[::1%25%41]", false},                                                                   // RFC 6874 allows over-escaping in zone
+		{"http://[%10::1]", true},                                                                       // no %xx escapes in IP address
+		{"http://[::1]/%48", false},                                                                     // %xx in path is fine
+		{"http://%41:8080/", true},                                                                      // not allowed: % encoding only for non-ASCII
+		{"mysql://x@y(z:123)/foo", true},                                                                // not well-formed per RFC 3986, golang.org/issue/33646
+		{"mysql://x@y(1.2.3.4:123)/foo", true},
+
+		{" http://foo.com", true},                                                                       // invalid character in schema
+		{"ht tp://foo.com", true},                                                                       // invalid character in schema
+		{"ahttp://foo.com", false},                                                                      // valid schema characters
+		{"1http://foo.com", true},                                                                       // invalid character in schema
+
+		{"http://[]%20%48%54%54%50%2f%31%2e%31%0a%4d%79%48%65%61%64%65%72%3a%20%31%32%33%0a%0a/", true}, // golang.org/issue/11208
+		{"http://a b.com/", true},                                                                       // no space in host name please
+		{"cache_object://foo", true},                                                                    // scheme cannot have _, relative path cannot have : in first segment
+		{"cache_object:foo", true},
+		{"cache_object:foo/bar", true},
+		{"cache_object/:foo/bar", false},
+	])
+	for _, tt in tests {
+		u := Parse(tt.input) else {
+			if !tt.wantErr {
+				t.Errorf("Parse({}) = {}; want no error", tt.input, error)
+			}
+			continue
+		}
+		if tt.wantErr {
+			t.Errorf("Parse({}) = {}; want an error", tt.input, u)
+		}
+	}
+}
+
+#test
+fn testStarRequest(t: &testing::T) {
+	u := Parse("*") else {
+		t.Errorf("{}", error)
+		ret
+	}
+	got, want := u.RequestURI(), "*"
+	if got != want {
+		t.Errorf("RequestURI = {}; want {}", got, want)
+	}
+}
+
+struct shouldEscapeTest {
+	input:  byte
+	mode:   encoding
+	escape: bool
+}
+
+static shouldEscapeTests: []shouldEscapeTest = [
+	// Unreserved characters (§2.3)
+	{'a', encoding.Path, false},
+	{'a', encoding.UserPassword, false},
+	{'a', encoding.QueryComponent, false},
+	{'a', encoding.Fragment, false},
+	{'a', encoding.Host, false},
+	{'z', encoding.Path, false},
+	{'A', encoding.Path, false},
+	{'Z', encoding.Path, false},
+	{'0', encoding.Path, false},
+	{'9', encoding.Path, false},
+	{'-', encoding.Path, false},
+	{'-', encoding.UserPassword, false},
+	{'-', encoding.QueryComponent, false},
+	{'-', encoding.Fragment, false},
+	{'.', encoding.Path, false},
+	{'_', encoding.Path, false},
+	{'~', encoding.Path, false},
+
+	// User information (§3.2.1)
+	{':', encoding.UserPassword, true},
+	{'/', encoding.UserPassword, true},
+	{'?', encoding.UserPassword, true},
+	{'@', encoding.UserPassword, true},
+	{'$', encoding.UserPassword, false},
+	{'&', encoding.UserPassword, false},
+	{'+', encoding.UserPassword, false},
+	{',', encoding.UserPassword, false},
+	{';', encoding.UserPassword, false},
+	{'=', encoding.UserPassword, false},
+
+	// Host (IP address, IPv6 address, registered name, port suffix; §3.2.2)
+	{'!', encoding.Host, false},
+	{'$', encoding.Host, false},
+	{'&', encoding.Host, false},
+	{'\'', encoding.Host, false},
+	{'(', encoding.Host, false},
+	{')', encoding.Host, false},
+	{'*', encoding.Host, false},
+	{'+', encoding.Host, false},
+	{',', encoding.Host, false},
+	{';', encoding.Host, false},
+	{'=', encoding.Host, false},
+	{':', encoding.Host, false},
+	{'[', encoding.Host, false},
+	{']', encoding.Host, false},
+	{'0', encoding.Host, false},
+	{'9', encoding.Host, false},
+	{'A', encoding.Host, false},
+	{'z', encoding.Host, false},
+	{'_', encoding.Host, false},
+	{'-', encoding.Host, false},
+	{'.', encoding.Host, false},
+]
+
+#test
+fn testShouldEscape(t: &testing::T) {
+	for _, tt in shouldEscapeTests {
+		if shouldEscape(tt.input, tt.mode) != tt.escape {
+			t.Errorf("shouldEscape({}, {}) returned {}; expected {}", tt.input, tt.mode, !tt.escape, tt.escape)
+		}
+	}
+}
+
+struct hostnameAndPortTest {
+	input: str // URL.Host field
+	host:  str
+	port:  str
+}
+
+#test
+fn testURLHostnameAndPort(t: &testing::T) {
+	tests := []hostnameAndPortTest([
+		{"foo.com:80", "foo.com", "80"},
+		{"foo.com", "foo.com", ""},
+		{"foo.com:", "foo.com", ""},
+		{"FOO.COM", "FOO.COM", ""},                                                                              // no canonicalization
+		{"1.2.3.4", "1.2.3.4", ""},
+		{"1.2.3.4:80", "1.2.3.4", "80"},
+		{"[1:2:3:4]", "1:2:3:4", ""},
+		{"[1:2:3:4]:80", "1:2:3:4", "80"},
+		{"[::1]:80", "::1", "80"},
+		{"[::1]", "::1", ""},
+		{"[::1]:", "::1", ""},
+		{"localhost", "localhost", ""},
+		{"localhost:443", "localhost", "443"},
+		{"some.super.long.domain.example.org:8080", "some.super.long.domain.example.org", "8080"},
+		{"[2001:0db8:85a3:0000:0000:8a2e:0370:7334]:17000", "2001:0db8:85a3:0000:0000:8a2e:0370:7334", "17000"},
+		{"[2001:0db8:85a3:0000:0000:8a2e:0370:7334]", "2001:0db8:85a3:0000:0000:8a2e:0370:7334", ""},
+
+		// Ensure that even when not valid, Host is one of "Hostname",
+		// "Hostname:Port", "[Hostname]" or "[Hostname]:Port".
+		// See https://golang.org/issue/29098.
+		{"[google.com]:80", "google.com", "80"},
+		{"google.com]:80", "google.com]", "80"},
+		{"google.com:80_invalid_port", "google.com:80_invalid_port", ""},
+		{"[::1]extra]:80", "::1]extra", "80"},
+		{"google.com]extra:extra", "google.com]extra:extra", ""},
+	])
+	for _, tt in tests {
+		u := &URL{Host: tt.input}
+		host, port := u.Hostname(), u.Port()
+		if host != tt.host {
+			t.Errorf("Hostname for Host {} = {}; want {}", tt.input, host, tt.host)
+		}
+		if port != tt.port {
+			t.Errorf("Port for Host {} = {}; want {}", tt.input, port, tt.port)
+		}
+	}
+}
+
+struct joinPathTest {
+	base: str
+	elem: []str
+	out:  str
+}
+
+#test
+fn testJoinPath(t: &testing::T) {
+	tests := []joinPathTest([
+		{
+			base: "https://go.googlesource.com",
+			elem: ["go"],
+			out: "https://go.googlesource.com/go",
+		},
+		{
+			base: "https://go.googlesource.com/a/b/c",
+			elem: ["../../../go"],
+			out: "https://go.googlesource.com/go",
+		},
+		{
+			base: "https://go.googlesource.com/",
+			elem: ["../go"],
+			out: "https://go.googlesource.com/go",
+		},
+		{
+			base: "https://go.googlesource.com",
+			elem: ["../go"],
+			out: "https://go.googlesource.com/go",
+		},
+		{
+			base: "https://go.googlesource.com",
+			elem: ["../go", "../../go", "../../../go"],
+			out: "https://go.googlesource.com/go",
+		},
+		{
+			base: "https://go.googlesource.com/../go",
+			elem: nil,
+			out: "https://go.googlesource.com/go",
+		},
+		{
+			base: "https://go.googlesource.com/",
+			elem: ["./go"],
+			out: "https://go.googlesource.com/go",
+		},
+		{
+			base: "https://go.googlesource.com//",
+			elem: ["/go"],
+			out: "https://go.googlesource.com/go",
+		},
+		{
+			base: "https://go.googlesource.com//",
+			elem: ["/go", "a", "b", "c"],
+			out: "https://go.googlesource.com/go/a/b/c",
+		},
+		{
+			base: "http://[fe80::1%en0]:8080/",
+			elem: ["/go"],
+		},
+		{
+			base: "https://go.googlesource.com",
+			elem: ["go/"],
+			out: "https://go.googlesource.com/go/",
+		},
+		{
+			base: "https://go.googlesource.com",
+			elem: ["go//"],
+			out: "https://go.googlesource.com/go/",
+		},
+		{
+			base: "https://go.googlesource.com",
+			elem: nil,
+			out: "https://go.googlesource.com/",
+		},
+		{
+			base: "https://go.googlesource.com/",
+			elem: nil,
+			out: "https://go.googlesource.com/",
+		},
+		{
+			base: "https://go.googlesource.com/a%2fb",
+			elem: ["c"],
+			out: "https://go.googlesource.com/a%2fb/c",
+		},
+		{
+			base: "https://go.googlesource.com/a%2fb",
+			elem: ["c%2fd"],
+			out: "https://go.googlesource.com/a%2fb/c%2fd",
+		},
+		{
+			base: "https://go.googlesource.com/a/b",
+			elem: ["/go"],
+			out: "https://go.googlesource.com/a/b/go",
+		},
+		{
+			base: "/",
+			elem: nil,
+			out: "/",
+		},
+		{
+			base: "a",
+			elem: nil,
+			out: "a",
+		},
+		{
+			base: "a",
+			elem: ["b"],
+			out: "a/b",
+		},
+		{
+			base: "a",
+			elem: ["../b"],
+			out: "b",
+		},
+		{
+			base: "a",
+			elem: ["../../b"],
+			out: "b",
+		},
+		{
+			base: "",
+			elem: ["a"],
+			out: "a",
+		},
+		{
+			base: "",
+			elem: ["../a"],
+			out: "a",
+		},
+	])
+	for _, tt in tests {
+		mut wantErr := "nil"
+		if tt.out == "" {
+			wantErr = "non-nil error"
+		}
+		{
+			out := JoinPath(tt.base, tt.elem...) else {
+				if tt.out != "" {
+					t.Errorf("JoinPath({}, {}) = {}, want {}", tt.base, tt.elem, error, wantErr)
+				}
+				use "--"
+			}
+			if out != "--" && out != tt.out {
+				t.Errorf("JoinPath({}, {}) = {}, want {}", tt.base, tt.elem, out, tt.out)
+			}
+		}
+		mut u := Parse(tt.base) else {
+			if tt.out != "" {
+				t.Errorf("Parse({}).JoinPath({}) = {}, want {}", tt.base, tt.elem, error, wantErr)
+			}
+			continue
+		}
+		u = u.JoinPath(tt.elem...)
+		out := u.Str()
+		if out != tt.out {
+			t.Errorf("Parse({}).JoinPath({}) = {}, want {}", tt.base, tt.elem, out, tt.out)
+		}
+	}
+}
