@@ -10,7 +10,7 @@ use "std/jule/constant"
 use "std/jule/sema"
 use "std/jule/token"
 use "std/jule/types"
-use "std/math"
+use "std/math/bits"
 
 // Expression optimizer that applies target-independent optimizations.
 struct exprOptimizer {
@@ -994,8 +994,7 @@ impl exprOptimizer {
 // - l is integer
 // - r is integer
 // - r is constant
-// - r > 0 && r%2 == 0
-// - log2(r) returns integer without fraction
+// - r is power of two
 //
 // As a result: returns whether bit-shifting is possible and what nth power of 2^r.
 // Assumes the model r is constant.
@@ -1006,15 +1005,16 @@ fn checkForBitShiftOpt(mut &l: &sema::OperandExpr, mut &r: &sema::OperandExpr): 
 		ret false, 0
 	}
 	x = (&constant::Const)(r.Model).AsU64()
-	if x == 0 || x%2 != 0 {
+	if !isPowerOfTwo(x) {
 		ret false, 0
 	}
-	j := math::Log2(f64(x))
-	z := u64(j)
-	if f64(z) != j {
-		ret false, 0
-	}
-	ret true, z
+	ok = true
+	x = u64(bits::TrailingZeros64(x))
+	ret
+}
+
+fn isPowerOfTwo(x: u64): bool {
+	ret x != 0 && x&(x-1) == 0
 }
 
 // Reports l and r the same lvalue expression.
