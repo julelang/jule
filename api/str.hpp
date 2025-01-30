@@ -79,6 +79,8 @@ namespace jule
         Str(const jule::U8 *begin, const jule::U8 *end)
         {
             this->_len = end - begin;
+            if (this->_len == 0)
+                return;
             auto buf = jule::Str::alloc(this->_len);
             this->buffer = jule::Str::buffer_t::make(buf);
             this->_slice = buf;
