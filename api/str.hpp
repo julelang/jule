@@ -329,6 +329,10 @@ namespace jule
             return reinterpret_cast<char *>(this->_slice);
         }
 
+        inline operator std::string(void) const {
+            return std::string(this->operator const char *(), this->_len);
+        }
+
         jule::Str &operator+=(const jule::Str &str)
         {
             if (str._len == 0)
