@@ -867,6 +867,20 @@ impl scopeCoder {
 		self.oc.write(")")
 	}
 
+	fn castingAssertionAssignUnsafe(mut &self, mut a: &sema::MultiAssign, mut uc: &opt::UnsafeCastingExpr) {
+		if a.Left[0] != nil {
+			self.oc.ec.possibleRefExpr(a.Left[0].Model)
+			self.oc.write(" = ")
+		}
+		self.oc.ec.unsafeCasting(uc)
+		if a.Left[1] != nil {
+			self.oc.write(";\n")
+			self.oc.indent()
+			self.oc.ec.possibleRefExpr(a.Left[1].Model)
+			self.oc.write(" = true")
+		}
+	}
+
 	fn multiAssign(mut &self, mut a: &sema::MultiAssign) {
 		// Write declarations without no initialization.
 		// It will initialize with assignments.
@@ -877,19 +891,26 @@ impl scopeCoder {
 		}
 
 		// Special cases.
-		match type a.Right {
+		let mut r: compExpr = a.Right
+		match type r {
 		| &sema::IndexingExpr:
 			self.mapLookupAssign(a)
 			ret
 		| &sema::CastingExpr:
 			self.castingAssertionAssign(a)
 			ret
+		| &opt::UnsafeCastingExpr:
+			// We avoiding misanalysis for assertion casting expressions here.
+			// Since we know the casting result, assign directly with no analysis.
+			mut uc := (&opt::UnsafeCastingExpr)(r)
+			self.castingAssertionAssignUnsafe(a, uc)
+			ret
 		| &sema::ChanRecv:
 			self.chanRecvAssign(a)
 			ret
 		}
 
-		match type a.Right {
+		match type r {
 		| &sema::TupleExpr:
 			self.multiAssignTuple(a)
 		| &sema::FuncCallExpr:
