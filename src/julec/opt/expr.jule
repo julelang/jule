@@ -555,6 +555,25 @@ impl exprOptimizer {
 			c.Kind = lp.Kind
 			*self.model = c
 			ret true
+		| token::Id.Caret:
+			// Optimize x^0 and 0^x computations to x.
+			mut c, mut ok := (&constant::Const)(m.Right.Model)
+			if ok {
+				s := c.AsF64()
+				if s == 0 {
+					*self.model = m.Left.Model
+					ret true
+				}
+			}
+			c, ok = (&constant::Const)(m.Left.Model)
+			if ok {
+				s := c.AsF64()
+				if s == 0 {
+					*self.model = m.Right.Model
+					ret true
+				}
+			}
+			ret false
 		}
 
 		// Check whether the right operand is constant for safety.
@@ -598,13 +617,6 @@ impl exprOptimizer {
 				c.SetI64(1)
 				// No need to set model as UnsafeBinaryExpr,
 				// bitwise and is not checked at runtime, so it is optimize enough.
-				ret true
-			}
-		| token::Id.Caret:
-			// Optimize x^0 computations to x.
-			s := (&constant::Const)(m.Right.Model).AsF64()
-			if s == 0 {
-				*self.model = m.Left.Model
 				ret true
 			}
 		| token::Id.Shl | token::Id.Shr:
