@@ -555,6 +555,29 @@ impl exprOptimizer {
 			c.Kind = lp.Kind
 			*self.model = c
 			ret true
+		| token::Id.Amper:
+			// Optimize x&0 and 0&x computations to 0.
+			mut c, mut ok := (&constant::Const)(m.Right.Model)
+			if ok {
+				s := c.AsF64()
+				if s == 0 {
+					c = constant::Const.NewI64(0)
+					c.Kind = lp.Kind
+					*self.model = c
+					ret true
+				}
+			}
+			c, ok = (&constant::Const)(m.Left.Model)
+			if ok {
+				s := c.AsF64()
+				if s == 0 {
+					c = constant::Const.NewI64(0)
+					c.Kind = rp.Kind
+					*self.model = c
+					ret true
+				}
+			}
+			ret false
 		| token::Id.Vline | token::Id.Caret:
 			// Optimize x^0 and 0^x computations to x.
 			mut c, mut ok := (&constant::Const)(m.Right.Model)
