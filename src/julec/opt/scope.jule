@@ -881,12 +881,12 @@ impl scopeOptimizer {
 		// Use self.data to determine whether optimization opportunities.
 		// But use this checkpoint for optimizations. Because,
 		// any swap expression may cause conflicts.
-		// For example, --opt-dynamic optimizations;
+		// For example, --opt-dynamic optimizations:
 		//
-		//	mut x := any(nil)
-		//	mut y := any(20)
-		//	x, y = y, x
-		//	_ = int(y)
+		//		mut x := any(nil)
+		//		mut y := any(20)
+		//		x, y = y, x
+		//		_ = int(y)
 		//
 		//	In the example program above, the "int(y)" expression will be optimized to unsafe,
 		//	which is removes the type checking. But the variable |y| will be nil.
@@ -899,6 +899,19 @@ impl scopeOptimizer {
 		//	but apply optimization data update on the checkpoint copy to avoid conflicts.
 		//
 		// Do not forget load checkpoint to self.data to keep updated data.
+		//
+		// This also prevents following example:
+		//
+		//		x := any(...)
+		//		c, ok := int(x)
+		//		a = int(x)
+		//		b = int(x)
+		//
+		//	In the example code above, variable |a| should use safe casting.
+		//	The variable |b| can use unsafe casting. But variable |a| must
+		//	not evaluate assertion casting expression as a type information.
+		//	Using checkpoint prevents this. Because checkpoint stores the old
+		//	type information data of the variable |x|, so we can have safe casting.
 		mut checkpoint := self.data.getCheckpoint()
 
 		for (i, mut l) in assign.Left {
