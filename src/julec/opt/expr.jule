@@ -927,12 +927,33 @@ impl exprOptimizer {
 			ret
 		}
 
-		array := m.Expr.Type.Array() != nil
-		// Constants checked by semantic analysis for arrays, safe.
-		if array && m.Index.IsConst() {
-			mut model := any(&UnsafeIndexingExpr{Node: m})
-			*self.model = unsafe { *(*sema::Expr)(&model) }
-			ret
+		array := m.Expr.Type.Array()
+		if array != nil {
+			// Constants checked by semantic analysis for arrays, safe.
+			if m.Index.IsConst() {
+				mut model := any(&UnsafeIndexingExpr{Node: m})
+				*self.model = unsafe { *(*sema::Expr)(&model) }
+				ret
+			}
+			// If array length is power of two, optimize masked expressions if possible.
+			// Like expression array[i&(len(array)-1)] will always be within the bounds.
+			if isPowerOfTwo(u64(array.N)) {
+				mask := u64(array.N - 1)
+				bin, mut ok := (&sema::BinaryExpr)(m.Index.Model)
+				if ok && bin.Op.Kind == token::Kind.Amper {
+					let mut c: &constant::Const
+					c, ok = (&constant::Const)(bin.Left.Model)
+					if ok && c.AsU64() == mask {
+						mut model := any(&UnsafeIndexingExpr{Node: m})
+						*self.model = unsafe { *(*sema::Expr)(&model) }
+					}
+					c, ok = (&constant::Const)(bin.Right.Model)
+					if ok && c.AsU64() == mask {
+						mut model := any(&UnsafeIndexingExpr{Node: m})
+						*self.model = unsafe { *(*sema::Expr)(&model) }
+					}
+				}
+			}
 		}
 
 		if self.data.boundary != nil && isBoundaryValidType(m.Expr.Type) {
