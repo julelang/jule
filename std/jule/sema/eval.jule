@@ -1751,6 +1751,16 @@ impl eval {
 		v.untyped = false
 	}
 
+	fn castTrait(mut self, mut &t: &Type, mut &v: &Value, mut &errorToken: &token::Token) {
+		n := len(self.s.errors)
+		if !self.s.checkTypeCompatibility(t, v.Type, errorToken) {
+			self.s.errors = self.s.errors[:n] // Remove logges errors by checkTypeCompatibility.
+			self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCastingTo, v.Type.Str(), t.Str())
+		}
+		v.Constant = nil
+		v.untyped = false
+	}
+
 	fn castChan(mut self, mut &t: &Type, mut &v: &Value, mut &errorToken: &token::Token) {
 		vc := v.Type.Chan()
 		if vc == nil {
@@ -1854,6 +1864,8 @@ impl eval {
 				| t.Prim() != nil:
 					self.castPrim(t, v, errorToken)
 					self.castConstant(t, v)
+				| t.Trait() != nil:
+					self.castTrait(t, v, errorToken)
 				| t.Chan() != nil:
 					self.castChan(t, v, errorToken)
 				|:
