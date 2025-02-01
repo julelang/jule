@@ -1813,10 +1813,38 @@ impl eval {
 					// The any type supports casting to any data type.
 					v.Constant = nil
 					v.untyped = false
+				| t.TypeEnum() != nil:
+					// We have to evaluate the type for type enum cases.
+					// If destination type is enum, we can cast correctly.
+					// Otherwise, value type-enum case evaluated first.
+					// But in this case, it may be casted to type-enum.
+					// But type checker only performs type-enum analysis if
+					// the destination type is type-enum. So casting will be faliled
+					// even for supported types.
+					//
+					// For example:
+					//
+					//	enum Bar: type {
+					//		str,
+					//	}
+					//	enum Foo: type {
+					//		Bar,
+					//		int,
+					//	}
+					//	fn main() {
+					//		let x: Bar = ""
+					//		let y: Foo = str(x)
+					//		let z: Foo = Foo(x)
+					//		_ = y, z
+					//	}
+					//
+					//	In the example code above will be failed if value case
+					//	evaluated first. Because type destination will be str.
+					//	So type checker will expect the variable |x| should be
+					//	equal to any compatible type with str, which is not type-enum Bar.
+					self.castTypeEnumT(t, v, errorToken)
 				| v.Type.TypeEnum() != nil:
 					self.castTypeEnum(t, v, errorToken)
-				| t.TypeEnum() != nil:
-					self.castTypeEnumT(t, v, errorToken)
 				| t.Ptr() != nil:
 					self.castPtr(t, v, errorToken)
 				| t.Sptr() != nil:
