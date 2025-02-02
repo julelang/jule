@@ -429,14 +429,20 @@ impl typeBuilder {
 		| token::Id.Chan | token::Id.RArrow:
 			ret self.buildChan()
 		| token::Id.Unsafe:
-			if len(self.tokens)-*self.i > 1 && self.tokens[*self.i+1].Id == token::Id.Fn {
-				// unsafe function
-				*self.i++ // point to function keyword
-				mut f := self.buildFunc()
-				if f != nil {
-					(&ast::Func)(f.Kind).Unsafety = true
+			if len(self.tokens)-*self.i > 1 {
+				match self.tokens[*self.i+1].Id {
+				| token::Id.Fn:
+					// unsafe function
+					*self.i++ // point to function keyword
+					mut f := self.buildFunc()
+					if f != nil {
+						(&ast::Func)(f.Kind).Unsafety = true
+					}
+					ret f
+				| token::Id.DblColon:
+					// unsafe namespace
+					ret self.buildNamespace()
 				}
-				ret f
 			}
 		| token::Id.Fn:
 			ret self.buildFunc()
