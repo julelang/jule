@@ -39,28 +39,10 @@ impl randmach {
 		const incLo = 1442695040888963407
 
 		// state = state * mul + inc
-		// hi, lo := bits::Mul64(self.lo, mulLo)
-		const mask32 = 1<<32 - 1
-		x0 := self.lo & mask32
-		x1 := self.lo >> 32
-		y0 := u64(mulLo & mask32)
-		y1 := u64(mulLo >> 32)
-		w0 := x0 * y0
-		t := x1*y0 + w0>>32
-		mut w1 := t & mask32
-		w2 := t >> 32
-		w1 += x0 * y1
-		mut hi := x1*y1 + w2 + w1>>32
-		mut lo := self.lo * mulLo
-
+		mut hi, mut lo := mul64(self.lo, mulLo)
 		hi = hi + self.hi*mulLo + self.lo*mulHi
-
-		// lo, c := bits::Add64(lo, incLo, 0)
-		c := ((lo & incLo) | ((lo | incLo) & ^(lo + incLo))) >> 63
-		lo = lo + incLo
-
-		// hi, _ = bits::Add64(hi, incHi, c)
-		hi = hi + incHi + c
+		lo, c := add64(lo, incLo, 0)
+		hi, _ = add64(hi, incHi, c)
 
 		self.lo = lo
 		self.hi = hi
