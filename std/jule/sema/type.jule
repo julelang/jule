@@ -1245,13 +1245,24 @@ impl typeChecker {
 		if self.referencer != nil && self.referencer.owner == ins.Decl {
 			ret true
 		}
-		if !self.s.precheckStructIns(ins, self.getReferencer(), errorToken) {
-			ret false
-		}
-		if len(ins.Generics) > 0 {
-			self.s.checkStructIns(ins)
-		}
-		ret true
+		// Do not evaluate generic methods immediately. Just precheck.
+		// Otherwise type issues may occur. For example:
+		//
+		//	struct Bar[T]{}
+		//	struct Baz[t]{}
+		//
+		//	struct Foo[T] {
+		//		br: Bar[T]
+		//		bz: Baz[T]
+		//	}
+		//
+		//	In this example code above, we assume Bar uses Foo's bz field, which is Baz.
+		//	If generic method will be checked here immediately, the Foo's bz field's type
+		//	may not be evaluated here. Because durint evaluation of Bar[T],
+		//	it will refer to the bz field, which is not evaluated yet.
+		//	So, do not evaluate to avoid this issue. End of the semantic analysis,
+		//	algorithm should check all instances gether.
+		ret self.s.precheckStructIns(ins, self.getReferencer(), errorToken)
 	}
 
 	// Returns whether instantiation cycle catch analysis required.
