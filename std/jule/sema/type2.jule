@@ -407,7 +407,12 @@ impl dynamicTypeAnnotation {
 			| ast::SliceType:
 				elem = k.Slice().Elem
 			| ast::PtrType:
-				elem = k.Ptr().Elem
+				mut p := k.Ptr()
+				if p.IsUnsafe() {
+					self.e.pushErr(self.errorToken, build::LogMsg.UnsafePointerForAnnotation)
+					ret false
+				}
+				elem = p.Elem
 			| ast::SptrType:
 				elem = k.Sptr().Elem
 			| ast::ChanType:
@@ -479,6 +484,11 @@ impl dynamicTypeAnnotation {
 			if g.Ident == ident.Ident {
 				mut fg := self.f.Generics[i]
 				if fg != nil {
+					ret false
+				}
+				p := k.Ptr()
+				if p != nil && p.IsUnsafe() {
+					self.e.pushErr(self.errorToken, build::LogMsg.UnsafePointerForAnnotation)
 					ret false
 				}
 				self.pushGeneric(k, i)
@@ -620,6 +630,10 @@ impl dynamicTypeAnnotation {
 			ret false
 		}
 		mut ptr := k.Ptr()
+		if ptr.IsUnsafe() {
+			self.e.pushErr(self.errorToken, build::LogMsg.UnsafePointerForAnnotation)
+			ret false
+		}
 		self.k = &pptr.Elem
 		ret self.annotateKind(ptr.Elem)
 	}
