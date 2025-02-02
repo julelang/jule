@@ -98,7 +98,7 @@ impl Type {
 
 	// Returns actual kind of the type, so returns the root type.
 	// If kind is a struct, which is implemented by the type statement,
-	// see developer reference (11) for details, returns the actual kind of
+	// see developer reference (9) for details, returns the actual kind of
 	// the source type of the struct.
 	fn ActualKind(mut self): Kind {
 		match type self.Kind {
@@ -879,7 +879,7 @@ const cycleErrEnable = 0b01 // Enables error logging for cycle analysis.
 const cycleErrFail = 0b10   // Means the last cycle analysis reports cycles exist.
 
 // Type analysis tags.
-// See developer reference (12).
+// See developer reference (10).
 const taNA = 0 << 0
 const taNotComparable = 1 << 0
 const taMutable = 1 << 1
@@ -936,15 +936,6 @@ struct typeChecker {
 
 	// Disabled type analysis flags.
 	disableTA: int
-
-	// This generics are banned because of causes instantiation cycles.
-	// Usually stores structure generics and method generics.
-	// See developer reference (5).
-	bannedGenerics: []&TypeAlias
-
-	// Enable/Disable status of instantiation catching.
-	// See developer reference (6).
-	inscatch: bool
 }
 
 impl typeChecker {
@@ -961,7 +952,7 @@ impl typeChecker {
 	}
 
 	// Push type analysis flag to owner structure instance if exist.
-	// See developer reference (12).
+	// See developer reference (10).
 	fn pushTA(mut self, tags: int) {
 		if self.referencer != nil && self.referencer.tains {
 			mut s := (&StructIns)(nil)
@@ -1153,35 +1144,6 @@ impl typeChecker {
 			ret nil
 		}
 
-		// Enable instantiation cycle catching if type alias is
-		// one of the banned generics.
-		if !self.inscatch && self.bannedGenerics != nil {
-			self.inscatch = true
-			for _, bg in self.bannedGenerics {
-				if bg == ta || ta.TypeSym.Type != nil && ta.TypeSym.Type.Equal(bg.TypeSym.Type) {
-					self.inscatch = false
-					break
-				}
-			}
-		}
-
-		// Catch instantiation cycles.
-		// See developer reference (5).
-		if self.inscatch {
-			for _, bg in self.bannedGenerics {
-				if bg == ta {
-					self.pushErr(decl.Token, build::LogMsg.InitiationCycle, decl.Ident)
-					ret nil
-				}
-				for _, dg in ta.Generics {
-					if bg == dg {
-						self.pushErr(decl.Token, build::LogMsg.InitiationCycle, decl.Ident)
-						ret nil
-					}
-				}
-			}
-		}
-
 		{
 			ok := self.checkIllegalCycles(decl.Token, ta)
 			if !ok && self.cycleErr&cycleErrEnable == cycleErrEnable {
@@ -1292,35 +1254,42 @@ impl typeChecker {
 		ret true
 	}
 
+	// Returns whether instantiation cycle catch analysis required.
+	// Also returns allowed generic type alias identifiers.
+	// The identifier slice will not include method generics, if any.
+	// Because we can't know exactly there is no cycle risk with no more analysis.
+	// Keep it simple.
+	fn inscatchNeeded(mut self, mut &s: &Struct): (yes: bool, letGenerics: []&ast::Generic) {
+		if len(s.Generics) == 0 {
+			ret false, nil
+		}
+		mut sc, mut ok := (&scopeChecker)(self.lookup)
+		if ok {
+			root := sc.getHardRoot()
+			yes = root != nil && root.owner != nil &&
+				root.owner.Decl != nil && root.owner.Decl.Owner == s
+			if yes {
+				letGenerics = s.Generics
+			}
+			ret
+		}
+		mut r := self.referencer
+		for r != nil; r = r.prev {
+			si, (ok) := (&StructIns)(r.owner)
+			if ok && si.Decl == s {
+				ret true, s.Generics
+			}
+		}
+		ret false, nil
+	}
+
 	fn buildStructInstance(mut self, mut &decl: &ast::IdentType, mut &s: &Struct): &StructIns {
+		inscatch, letGenerics := self.inscatchNeeded(s)
+
 		// Save configuration.
 		mut referencer := self.referencer
 		self.referencer = nil
-		mut bannedGenerics := self.bannedGenerics
-		// Restore configuration.
-		defer {
-			self.bannedGenerics = bannedGenerics
-			self.referencer = referencer
-		}
-
-		// Set banned generics to catch initiation cycles.
-		// This just necessary for root, therefore avoid set each time.
-		if self.bannedGenerics == nil {
-			match type self.lookup {
-			| &scopeChecker:
-				mut sc := (&scopeChecker)(self.lookup)
-				mut hard := sc.getHardRoot()
-				if hard.owner.Owner == nil || hard.owner.Owner.Decl != s {
-					break
-				}
-				n := len(hard.owner.Generics) + len(hard.owner.Owner.Generics)
-				// Add scope generics to to catch instantiation cycles.
-				// See developer reference (5).
-				self.bannedGenerics = hard.table.TypeAliases[:n]
-			}
-		} else {
-			self.inscatch = true
-		}
+		defer { self.referencer = referencer }
 
 		// Use rootLookup to parse generics with current current.
 		mut lookup := self.lookup
@@ -1334,6 +1303,28 @@ impl typeChecker {
 			mut kind := self.build(g.Kind)
 			if kind == nil {
 				ret nil
+			}
+			// Catch initiation cycles here if needed.
+			// If type is a type alias (strict or soft), it can cause cycle.
+			// Handle them here and avoid to be in cycle.
+			// If struct refers to itself in generics, it causes endless instantiatation.
+			if inscatch {
+				ks := kind.Struct()
+				if ks != nil && ks.Decl == s {
+					idt, ok := (&ast::IdentType)(g.Kind)
+					// If generic type is based identifier. Check if it's one of
+					// self generic types. If so, there is no cycle risk.
+					if ok {
+						for _, lg in letGenerics {
+							if lg.Ident == idt.Ident {
+								goto Ok
+							}
+						}
+					}
+					self.pushErr(g.Token, build::LogMsg.InitiationCycle, decl.Ident)
+					ret nil
+				}
+			Ok:
 			}
 			ins.Generics = append(ins.Generics, &InsGeneric{Type: kind})
 		}
@@ -1876,55 +1867,46 @@ impl typeChecker {
 				kind = t
 			}
 		| &ast::ChanType:
-			self.inscatch = true
 			mut t := self.buildChan((&ast::ChanType)(declKind))
 			if t != nil {
 				kind = t
 			}
 		| &ast::SptrType:
-			self.inscatch = true
 			mut t := self.buildSptr((&ast::SptrType)(declKind))
 			if t != nil {
 				kind = t
 			}
 		| &ast::PtrType:
-			self.inscatch = true
 			mut t := self.buildPtr((&ast::PtrType)(declKind))
 			if t != nil {
 				kind = t
 			}
 		| &ast::SliceType:
-			self.inscatch = true
 			mut t := self.buildSlice((&ast::SliceType)(declKind))
 			if t != nil {
 				kind = t
 			}
 		| &ast::ArrayType:
-			self.inscatch = true
 			mut t := self.buildArray((&ast::ArrayType)(declKind))
 			if t != nil {
 				kind = t
 			}
 		| &ast::MapType:
-			self.inscatch = true
 			mut t := self.buildMap((&ast::MapType)(declKind))
 			if t != nil {
 				kind = t
 			}
 		| &ast::TupleType:
-			self.inscatch = true
 			mut t := self.buildTuple((&ast::TupleType)(declKind))
 			if t != nil {
 				kind = t
 			}
 		| &ast::Func:
-			self.inscatch = true
 			mut t := self.buildFunc((&ast::Func)(declKind))
 			if t != nil {
 				kind = t
 			}
 		| &ast::NamespaceType:
-			self.inscatch = true
 			mut t := self.buildNamespace((&ast::NamespaceType)(declKind))
 			if t != nil {
 				kind = t
@@ -2104,7 +2086,7 @@ fn validTypeForXof(mut &t: &Type): bool {
 static mut pseudoSource = new(Type)
 
 // Initializes new structure for strict types.
-// See developer reference (11) for details.
+// See developer reference (9) for details.
 fn initNewStructType(ident: str, mut source: &Type): &StructIns {
 	mut s := new(Struct)
 	s.Ident = ident
