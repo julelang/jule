@@ -1,0 +1,57 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+// Hashing algorithm inspired by
+// https://github.com/golang/go/blob/f229e7031a6efb2f23241b5da000c3b3203081d6/src/runtime/hash32.go
+
+#build i386
+
+unsafe fn memhash(p: *unsafe, mut s: uintptr, mut seed: uintptr): uintptr {
+	mut a, mut b := mix32(u32(seed), u32(s^hashkey[0]))
+	if s == 0 {
+		ret uintptr(a ^ b)
+	}
+	for s > 8; s -= 8 {
+		a ^= readUnaligned32(p)
+		b ^= readUnaligned32(add(p, 4))
+		a, b = mix32(a, b)
+		*(&p) = add(p, 8)
+	}
+	if s >= 4 {
+		a ^= readUnaligned32(p)
+		b ^= readUnaligned32(add(p, s-4))
+	} else {
+		mut t := u32(*(*byte)(p))
+		t |= u32(*(*byte)(add(p, s>>1))) << 8
+		t |= u32(*(*byte)(add(p, s-1))) << 16
+		b ^= t
+	}
+	a, b = mix32(a, b)
+	a, b = mix32(a, b)
+	ret uintptr(a ^ b)
+}
+
+unsafe fn memhash32(p: *unsafe, seed: uintptr): uintptr {
+	mut a, mut b := mix32(u32(seed), u32(4^hashkey[0]))
+	t := readUnaligned32(p)
+	a ^= t
+	b ^= t
+	a, b = mix32(a, b)
+	a, b = mix32(a, b)
+	ret uintptr(a ^ b)
+}
+
+unsafe fn memhash64(p: *unsafe, seed: uintptr): uintptr {
+	mut a, mut b := mix32(u32(seed), u32(8^hashkey[0]))
+	a ^= readUnaligned32(p)
+	b ^= readUnaligned32(add(p, 4))
+	a, b = mix32(a, b)
+	a, b = mix32(a, b)
+	ret uintptr(a ^ b)
+}
+
+fn mix32(a: u32, b: u32): (u32, u32) {
+	c := u64(a^u32(hashkey[1])) * u64(b^u32(hashkey[2]))
+	ret u32(c), u32(c >> 32)
+}

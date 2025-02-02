@@ -31,7 +31,6 @@
 //   limitations under the License.
 
 use "std/math/bits"
-use "std/unsafe"
 
 const groupSize = 8
 const maxAvgGroupLoad = 4
@@ -143,9 +142,10 @@ impl _Map {
 	}
 
 	// Returns hash for key.
-	fn hash(self, k: Key): u64 {
-		bytes := toStr(k)
-		ret hash(unsafe::StrBytes(bytes))
+	fn hash(self, &k: Key): u64 {
+		// Use self pointer address as seed.
+		// It should be unique for the map.
+		ret u64(maphash(k, uintptr(&self)))
 	}
 
 	fn rehash(mut self, n: u32) {

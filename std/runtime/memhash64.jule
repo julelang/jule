@@ -1,0 +1,80 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+// Hashing algorithm inspired by
+// https://github.com/golang/go/blob/f9eb3e3cd59c1cf38a98f2367c6c8dc180db9a95/src/runtime/hash64.go
+
+#build arm64 || amd64
+
+const m5 = 0x1d8e4e27c47d124f
+
+unsafe fn memhash(p: *unsafe, s: uintptr, mut seed: uintptr): uintptr {
+	let mut a: uintptr
+	let mut b: uintptr
+	seed ^= hashkey[0]
+	match {
+	| s == 0:
+		ret seed
+	| s < 4:
+		a = uintptr(*(*byte)(p))
+		a |= uintptr(*(*byte)(add(p, s>>1))) << 8
+		a |= uintptr(*(*byte)(add(p, s-1))) << 16
+	| s == 4:
+		a = r4(p)
+		b = a
+	| s < 8:
+		a = r4(p)
+		b = r4(add(p, s-4))
+	| s == 8:
+		a = r8(p)
+		b = a
+	| s <= 16:
+		a = r8(p)
+		b = r8(add(p, s-8))
+	|:
+		mut l := s
+		if l > 48 {
+			mut seed1 := seed
+			mut seed2 := seed
+			for l > 48; l -= 48 {
+				seed = mix(r8(p)^hashkey[1], r8(add(p, 8))^seed)
+				seed1 = mix(r8(add(p, 16))^hashkey[2], r8(add(p, 24))^seed1)
+				seed2 = mix(r8(add(p, 32))^hashkey[3], r8(add(p, 40))^seed2)
+				*(&p) = add(p, 48)
+			}
+			seed ^= seed1 ^ seed2
+		}
+		for l > 16; l -= 16 {
+			seed = mix(r8(p)^hashkey[1], r8(add(p, 8))^seed)
+			*(&p) = add(p, 16)
+		}
+		a = r8(add(p, l-16))
+		b = r8(add(p, l-8))
+	}
+
+	ret mix(m5^s, mix(a^hashkey[1], b^seed))
+}
+
+unsafe fn memhash32(p: *unsafe, seed: uintptr): uintptr {
+	a := r4(p)
+	ret mix(m5^4, mix(a^hashkey[1], a^seed^hashkey[0]))
+}
+
+unsafe fn memhash64(p: *unsafe, seed: uintptr): uintptr {
+	a := r8(p)
+	ret mix(m5^8, mix(a^hashkey[1], a^seed^hashkey[0]))
+}
+
+fn mix(a: uintptr, b: uintptr): uintptr {
+	hi, lo := mul64(u64(a), u64(b))
+	ret uintptr(hi ^ lo)
+}
+
+unsafe fn r4(p: *unsafe): uintptr {
+	ret uintptr(readUnaligned32(p))
+}
+
+unsafe fn r8(p: *unsafe): uintptr {
+	ret uintptr(readUnaligned64(p))
+}
