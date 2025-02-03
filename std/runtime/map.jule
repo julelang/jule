@@ -6,7 +6,7 @@
 // The built-in map type implementation is typically a hashmap.
 // It is not lock-free in terms of concurrency, that is,
 // it does not offer a thread-safe implementation.
-// Uses the [hash] function to hash keys.
+// Uses the [maphash] function to hash keys.
 // An empty initialization literal is valid and equals to nil map.
 // To make it pass-by-reference, compiler implements map instances using with smart pointers.
 // So, typically a nil map actually is a nil smart pointer.
@@ -33,7 +33,7 @@
 use "std/math/bits"
 
 const groupSize = 8
-const maxAvgGroupLoad = 4
+const maxAvgGroupLoad = 7
 
 const loBits = 0x0101010101010101
 const hiBits = 0x8080808080808080
@@ -83,12 +83,7 @@ fn numGroups(n: u32): (groups: u32) {
 	ret
 }
 
-fn newEmptyMetadata(): (meta: metadata) {
-	for i in meta {
-		meta[i] = empty
-	}
-	ret
-}
+fn newEmptyMetadata(): (meta: metadata) { ret [empty, ...] }
 
 fn splitHash(h: u64): (h1, h2) {
 	ret h1((h & h1Mask) >> 7), h2(h & h2Mask)
@@ -109,7 +104,7 @@ const empty = -128   // 0b1000_0000
 const tombstone = -2 // 0b1111_1110
 
 // Default initial size of a map.
-const mapInitialSize = 8
+const mapInitialSize = 16
 
 // group is a group of 16 key-value pairs
 struct group[Key: comparable, Val] {
