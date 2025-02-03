@@ -865,6 +865,11 @@ impl Ptr {
 	fn IsUnsafe(self): bool { ret self.Elem == nil }
 }
 
+enum semaTypeKind: type {
+	ast::TypeKind,
+	&Type,
+}
+
 struct referencer {
 	owner: any         // StructIns, TypeAlias, TypeEnum.
 	name:  str         // Name of the owner.
@@ -1879,9 +1884,11 @@ impl typeChecker {
 		ret kind
 	}
 
-	fn build(mut self, mut &declKind: ast::TypeKind): &Type {
+	fn build(mut self, mut declKind: semaTypeKind): &Type {
 		let mut kind: Kind = nil
 		match type declKind {
+		| &Type:
+			kind = (&Type)(declKind)
 		| &ast::IdentType:
 			mut t := self.buildIdent((&ast::IdentType)(declKind))
 			if t != nil {

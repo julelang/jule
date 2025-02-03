@@ -1081,6 +1081,20 @@ impl eval {
 			}
 		| &ast::Type:
 			generics = append(generics, (&ast::Type)(expr.Kind))
+		| &ast::IndexingExpr:
+			mut v := self.eval(expr)
+			if v == nil {
+				ret false
+			}
+			if !v.Decl {
+				self.pushErr(expr.Token, build::LogMsg.InvalidType)
+				self.pushSuggestion(build::LogMsg.ExpectedType)
+				ret false
+			}
+			mut kind := semaTypeKind(v.Type)
+			generics = append(generics, &ast::Type{
+				Kind: unsafe { *(*ast::TypeKind)(&kind) },
+			})
 		| &ast::SubIdentExpr:
 			mut sexpr := (&ast::SubIdentExpr)(expr.Kind)
 			ret self.pushGenericsFromExprSubIdent(sexpr, generics, expr)
