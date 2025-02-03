@@ -1245,7 +1245,6 @@ impl typeChecker {
 			ret true
 		}
 		ins.Checked = true
-
 		// Break algorithm cycle.
 		if self.referencer != nil && self.referencer.owner == ins.Decl {
 			ret true
@@ -1267,7 +1266,40 @@ impl typeChecker {
 		//	it will refer to the bz field, which is not evaluated yet.
 		//	So, do not evaluate to avoid this issue. End of the semantic analysis,
 		//	algorithm should check all instances gether.
-		ret self.s.precheckStructIns(ins, self.getReferencer(), errorToken)
+		//
+		// Enable generic struct collection if instance coming from different package.
+		// Collect them and other relevant dependencies for deferred analysis.
+		// The deferred analysis is mandatory for this kind of generic defines,
+		// because this package analysis will not check them, so we have to collect
+		// them for deferred check analysis.
+		gstructs := self.s.meta.flags & semametaGstruct
+		if self.s != ins.Decl.sema && len(ins.Decl.Generics) > 0 {
+			self.s.meta.flags |= semametaGstruct
+		}
+		ok = self.s.precheckStructIns(ins, self.getReferencer(), errorToken)
+		if ok && len(ins.Decl.Generics) > 0 {
+			// If gstruct collection mode already enabled for this sema,
+			// just push this instance into the collection.
+			// Otherwise, this semantic analysis process is the root gstruct collector.
+			// Check collected generic structures waiting for deferred analysis.
+			if gstructs == semametaGstruct {
+				self.s.meta.gstructs = append(self.s.meta.gstructs, ins)
+			} else if self.s != ins.Decl.sema { // Avoid checking generic defines of this sema.
+				// We can check structures using this sema.
+				// The checkStructIns method will check structure instance in
+				// its environment and errors will be reflected to this sema.
+				for (_, mut gins) in self.s.meta.gstructs {
+					self.s.checkStructIns(gins)
+				}
+				self.s.checkStructIns(ins)
+				// Remove gstruct collection items, they are checked.
+				// But keep the capacity to reduce allocations.
+				// Disable gstruct collection.
+				self.s.meta.gstructs = self.s.meta.gstructs[:0]
+				self.s.meta.flags &= ^semametaGstruct
+			}
+		}
+		ret
 	}
 
 	// Returns whether instantiation cycle catch analysis required.
@@ -1590,14 +1622,7 @@ impl typeChecker {
 			mut s := runtimeFindStruct(self.s.meta.runtime, "pchan")
 			mut ins := s.instance()
 			ins.Generics = [&InsGeneric{Type: elem}]
-			ins = self.fromStructIns(ins, decl.Elem.Token)
-			self.s.checkStructIns(ins) // Check instance immediately, will not be checked after.
-			// Channel also instantiating queue. Check it too.
-			ins = ins.FindField("queue").Type.Struct()
-			if ins == nil {
-				panic("sema: runtime channel not uses struct")
-			}
-			self.s.checkStructIns(ins) // Check instance immediately, will not be checked after.
+			_ = self.fromStructIns(ins, decl.Elem.Token)
 		}
 		if self.disableTA&taMutable != taMutable && elem.Mutable() {
 			self.pushTA(taMutable)
@@ -1784,15 +1809,7 @@ impl typeChecker {
 			mut s := runtimeFindStruct(self.s.meta.runtime, "_Map")
 			mut ins := s.instance()
 			ins.Generics = [&InsGeneric{Type: key}, &InsGeneric{Type: val}]
-			ins = self.fromStructIns(ins, decl.Key.Token)
-			self.s.checkStructIns(ins) // Check instance immediately, will not be checked after.
-			// Map also instantiating iterator type. Check it too.
-			mut iterator := ins.FindMethod("iterator", false)
-			ins = iterator.Instances[0].Result.Struct()
-			if ins == nil {
-				panic("sema: runtime map not returns iterator")
-			}
-			self.s.checkStructIns(ins) // Check instance immediately, will not be checked after.
+			_ = self.fromStructIns(ins, decl.Key.Token)
 		}
 
 		if self.disableTA&taMutable != taMutable && (key.Mutable() || val.Mutable()) {
