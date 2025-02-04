@@ -29,6 +29,15 @@
 //   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
+//
+// Google's C++ implementation:
+//
+//	https://github.com/abseil/abseil-cpp/blob/master/absl/container/internal/raw_hash_set.h
+//
+//	See also:
+//		https://abseil.io/about/design/swisstables.
+//		https://faultlore.com/blah/hashbrown-tldr/.
+//
 
 use "std/math/bits"
 
@@ -38,25 +47,53 @@ const maxAvgGroupLoad = 7
 const loBits = 0x0101010101010101
 const hiBits = 0x8080808080808080
 
+// Equals to the metadata in bytes.
+// Allows to handle whole metadata content as an integer.
 type bitset = u64
 
-// h1 is a 57 bit hash prefix
+// 57-bit hash prefix
 type h1 = u64
 
-// h2 is a 7 bit hash suffix
+// 7-bit hash suffix
 type h2 = i8
 
-// metadata is the h2 metadata array for a group.
+// This is a single control byte, which can have one of three
+// states: empty, deleted, and full (which has an associated seven-bit h2 value). They have the following bit patterns:
+//
+//      empty: 1 0 0 0 0 0 0 0
+//    deleted: 1 1 1 1 1 1 1 0
+//       full: 0 h h h h h h h  // h represents the hash bits.
+type ctrl = i8
+
+// The h2 metadata array for a group.
 // find operations first probe the controls bytes
 // to filter candidates before matching keys
-type metadata: [groupSize]i8
+type metadata: [groupSize]ctrl
 
+// Returns the set of bits which are full and for which the 7-bit hash
+// matches the given value. May return false positives.
 unsafe fn metaMatchH2(m: *metadata, h: h2): bitset {
-	// https://graphics.stanford.edu/~seander/bithacks.html##ValueInWord
+	// For the technique, see:
+	// http://graphics.stanford.edu/~seander/bithacks.html##ValueInWord
+	// (Determine if a word has a byte equal to n).
+	//
+	// Caveat: there are false positives but:
+	// - they only occur if there is a real match
+	// - they never occur on empty, tombstone, or 0b11111111
+	// - they will be handled gracefully by subsequent checks in code
+	//
+	// Example:
+	//	v = 0x1716151413121110
+	//	hash = 0x12
+	//	retval = (v - lsbs) & ~v & msbs = 0x0000000080800000
 	ret hasZeroByte(castU64(m) ^ (loBits * u64(h)))
 }
 
+// Returns the set of bits in the group that are empty.
 unsafe fn metaMatchEmpty(m: *metadata): bitset {
+	//    empty: 1 0 0 0 0 0 0 0
+	//  deleted: 1 1 1 1 1 1 1 0
+	//     full: 0 h h h h h h h  // h represents the hash bits.
 	ret hasZeroByte(castU64(m) ^ hiBits)
 }
 
@@ -66,12 +103,14 @@ fn nextMatch(mut &b: bitset): u32 {
 	ret s >> 3 // div by 8
 }
 
-fn hasZeroByte(x: u64): bitset {
+fn hasZeroByte(x: bitset): bitset {
 	ret bitset(((x - loBits) & ^(x)) & hiBits)
 }
 
-unsafe fn castU64(m: *metadata): u64 {
-	ret unsafe { *(*u64)(m) }
+// Casts metadata pointer to bitset.
+// See documentation of bitset.
+unsafe fn castU64(m: *metadata): bitset {
+	ret unsafe { *(*bitset)(m) }
 }
 
 // Returns the minimum number of groups needed to store |n| elems.
@@ -100,19 +139,20 @@ fn fastModN(x: u32, n: u32): u32 {
 
 const h1Mask = 0xffff_ffff_ffff_ff80
 const h2Mask = 0x0000_0000_0000_007f
-const empty = -128   // 0b1000_0000
-const tombstone = -2 // 0b1111_1110
+const empty: ctrl = -128   // 0b1000_0000
+const tombstone: ctrl = -2 // 0b1111_1110
 
 // Default initial size of a map.
 const mapInitialSize = 16
 
-// group is a group of 16 key-value pairs
+// Group of 16 key-value pairs.
 struct group[Key: comparable, Val] {
 	keys:   [groupSize]Key
 	values: [groupSize]Val
 }
 
 struct _Map[Key: comparable, Val] {
+	seed:     uintptr
 	ctrl:     []metadata
 	groups:   []group[Key, Val]
 	resident: u32
