@@ -61,6 +61,8 @@ type h2 = i8
 //       full: 0 h h h h h h h  // h represents the hash bits.
 type ctrl: i8
 
+// A bitset array value which is sets all ctrl elements to empty.
+// For empty ctrl bits, see the documentation of ctrl.
 const bitsetEmpty = 0b10000000_10000000_10000000_10000000_10000000_10000000_10000000_10000000
 
 // The h2 bitset array for a group. Aka [8]ctrl type in bits.
@@ -208,10 +210,9 @@ impl _Map {
 			mut s := u32(0)
 			for s < ctrls.len(); s++ {
 				c := ctrls.at(s)
-				if c == empty || c == tombstone {
-					continue
+				if c != empty && c != tombstone {
+					self.uncheckedSet(groups[g].keys[s], groups[g].values[s])
 				}
-				unsafe { *self.set(groups[g].keys[s]) = groups[g].values[s] }
 			}
 		}
 	}
@@ -293,6 +294,32 @@ impl _Map {
 			self.lookup(key, value, ok)
 		}
 		ret
+	}
+
+	// Inserts |key| and |value|.
+	// Assumes |key| is already not exist in the map and
+	// we have enough space to add new entry.
+	fn uncheckedSet(mut self, mut key: K, mut value: V) {
+		hi, lo := splitHash(self.hash(key))
+		mut g := probeStart(hi, len(self.groups))
+		for { // inlined find loop
+			// We assume |key| is not in group |g|,
+			// stop probing if we see an empty slot.
+			mut matches := self.ctrl[g].metaMatchEmpty()
+			if matches.bits != 0 { // insert
+				s := matches.nextMatch()
+				self.groups[g].keys[s] = key
+				self.groups[g].values[s] = value
+				self.ctrl[g].set(s, ctrl(lo))
+				self.resident++
+				ret
+			}
+			g++ // linear probing
+			if g >= u32(len(self.groups)) {
+				g = 0
+			}
+		}
+		panic("unreachable")
 	}
 
 	// Attempts to insert |key|.
