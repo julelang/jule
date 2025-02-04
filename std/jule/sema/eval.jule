@@ -1820,15 +1820,17 @@ impl eval {
 				{
 					ts := t.softStruct()
 					if ts != nil {
-						preStrict := ts.Source != nil
-						checked := self.castStruct(t, v, errorToken, preStrict)
-						// Return if checked or structure is not belongs to strict type alias.
-						// In this cases, nothing to do.
-						// But strict type aliases may be have different types
-						// such as smart pointer and etc. Handle them correctly,
-						// support the source type for casting. Therefore, handle
-						// following types for the strict type aliases.
-						if checked || ts.Source == nil {
+						// PreStrict mode should always be enabled.
+						// It will check the possible strictTypeAlias(trait) casting
+						// expression with no error logging. Otherwise we fallback
+						// to ordinary checking algorithm, which is based source type.
+						// Thus, we can check by source type if structure is a
+						// strict type alias instance. Also, we still have to check
+						// special cases. For example, dynamic types (especially `any` type)
+						// may be used for casting and it will be successful probably.
+						const PreStrict = true
+						checked := self.castStruct(t, v, errorToken, PreStrict)
+						if checked {
 							break
 						}
 					}
