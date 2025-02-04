@@ -163,7 +163,9 @@ struct _Map[Key: comparable, Val] {
 impl _Map {
 	// Return non-nil map instance for [Key, Val] pair.
 	static fn make(): &_Map[Key, Val] {
-		ret new(_Map[Key, Val])
+		ret &_Map[Key, Val]{
+			seed: uintptr(rand()),
+		}
 	}
 
 	fn initData(mut self, cap: u32) {
@@ -178,9 +180,7 @@ impl _Map {
 
 	// Returns hash for key.
 	fn hash(self, &k: Key): u64 {
-		// Use self pointer address as seed.
-		// It should be unique for the map.
-		ret u64(maphash(k, uintptr(&self)))
+		ret u64(maphash(k, self.seed))
 	}
 
 	fn rehash(mut self, n: u32) {
@@ -348,6 +348,12 @@ impl _Map {
 					let mut val: Val
 					self.groups[g].keys[s] = key
 					self.groups[g].values[s] = val
+					if self.len() == 0 {
+						// Reset the hash seed to make it more difficult for attackers to
+						// repeatedly trigger hash collisions.
+						// See: https://github.com/golang/go/issues/25237
+						self.seed = uintptr(rand())
+					}
 					ret
 				}
 			}
@@ -388,6 +394,10 @@ impl _Map {
 			}
 		}
 		self.resident, self.dead = 0, 0
+		// Reset the hash seed to make it more difficult for attackers to
+		// repeatedly trigger hash collisions.
+		// See: https://github.com/golang/go/issues/25237
+		self.seed = uintptr(rand())
 	}
 
 	// Returns the number of elements in the map.
