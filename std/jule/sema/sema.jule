@@ -2974,6 +2974,20 @@ fn pushRuntimeToStr(mut &s: &sema, mut &t: &Type, mut &token: &token::Token,
 	refers.Push(f)
 }
 
+fn pushRuntimeMaphash(mut &s: &sema, mut &t: &Type, mut &token: &token::Token,
+	mut refers: &ReferenceStack) {
+	if s.meta.runtime == nil || t.IsNil() || refers == nil {
+		ret
+	}
+	mut f := runtimeFindFunc(s.meta.runtime, "maphash").instanceForce()
+	f.Generics = append(f.Generics, &InsGeneric{Type: t})
+	ok, _ := s.checkGenericFunc(f, token)
+	if !ok {
+		panic("sema: maphash evaluation failed, this is an implementation mistake")
+	}
+	refers.Push(f)
+}
+
 // Reports whether the alias valid for the import alias.
 // Designed to check auto aliases.
 fn isValidImpAlias(mut alias: str): (valid: bool) {

@@ -21,6 +21,7 @@ namespace jule
         {
         public:
             void (*dealloc)(jule::Ptr<jule::Uintptr> &alloc);
+            jule::Uintptr (*hash)(jule::Ptr<jule::Uintptr> *hash, jule::Uintptr seed);
             jule::Bool (*eq)(void *alloc, void *other);
             jule::Str (*to_str)(void *alloc);
         };

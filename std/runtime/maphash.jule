@@ -3,9 +3,7 @@
 // license that can be found in the LICENSE file.
 
 use "std/comptime"
-use "std/internal/byteorder"
-use "std/math/bits"
-use "std/unsafe"
+use integ "std/jule/integrated"
 
 // Size of a pointer in bytes - mem::SizeOf(uintptr(0)) but as an ideal constant.
 // It is also the size of the machine's native word size (that is, 4 on 32-bit systems, 8 on 64-bit).
@@ -81,6 +79,15 @@ fn i64hash(i: u64, seed: uintptr): uintptr {
 	ret unsafe { memhash64(&i, seed) }
 }
 
+// Common hash function for dynamic types with underlying smart pointer type.
+// It should be same as pointer hashing.
+//
+// Exported as private non-usual API to escape from deadcode optimizations.
+#export "__jule_priv_dynhash"
+fn dynhash(ptr: *&uintptr, seed: uintptr): uintptr {
+	ret unsafe { memhash((*unsafe)(uintptr(*ptr)), _ptrSize, seed) }
+}
+
 fn maphash[K](k: K, seed: uintptr): uintptr {
 	const t = comptime::TypeOf(K)
 	const match {
@@ -106,7 +113,11 @@ fn maphash[K](k: K, seed: uintptr): uintptr {
 	| comptime::Kind.F64:
 		ret f64hash(f64(k), seed)
 	| comptime::Kind.Trait | comptime::Kind.Any | comptime::Kind.TypeEnum:
-		ret strhash(toStr(k), seed)
+		// If hash function pointer equals to nil, underlying type is not hashable.
+		if unsafe { integ::Emit[*unsafe]("{}.type->hash", k) } == nil {
+			panic("runtime: dynamic type used as map key with not-hashable/not-comparable underlying type")
+		}
+		ret unsafe { integ::Emit[uintptr]("{}.type->hash(&{}.data, {})", k, k, seed) }
 	| comptime::Kind.Str:
 		ret strhash(str(k), seed)
 	| comptime::Kind.Ptr | comptime::Kind.SmartPtr:

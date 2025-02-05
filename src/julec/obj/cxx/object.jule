@@ -363,7 +363,7 @@ impl ObjectCoder {
 			self.anyObj.WriteStr(si)!
 			self.anyObj.WriteStr("{.dealloc=" + deallocatedTypeIdent)!
 			self.anyObj.WriteStr(conv::Itoa(di))!
-			self.anyObj.WriteStr(", .eq=__jule_ptrEqual, .to_str=__jule_ptrToStr};\n")!
+			self.anyObj.WriteStr(", .hash=__jule_priv_dynhash, .eq=__jule_ptrEqual, .to_str=__jule_ptrToStr};\n")!
 
 			// comparison function.
 			self.anyObj.WriteStr(typeBool + " " + anyTypeIdent)!
@@ -382,6 +382,26 @@ impl ObjectCoder {
 			// Deallocator function.
 			di := self.pushDealloc(t)
 
+			// Hasher function.
+			comparable := t.Comparable()
+			mut hashhable := false
+			if comparable {
+				// Lookup hasher function for the type with no panic.
+				// Because trait data may push type t as dynamic type, but this
+				// type may be not used, so we have not any possible hashing by dynamic type.
+				mut f := obj::FindFuncGenericInstanceNoPanic(meta::Program.Runtime.Maphash, t)
+				if f != nil {
+					hashhable = true
+					self.anyObj.WriteStr(typeUintptr + " " + anyTypeIdent)!
+					self.anyObj.WriteStr(si)!
+					self.anyObj.WriteStr("_hash(jule::Ptr<jule::Uintptr> *ptr, jule::Uintptr seed) noexcept { return ")!
+					identCoder.funcIns(self.anyObj, f)
+					self.anyObj.WriteStr("(*reinterpret_cast<")!
+					self.anyObj.WriteStr(kind)!
+					self.anyObj.WriteStr("*>(ptr->alloc), seed); }\n")!
+				}
+			}
+
 			// eq function.
 
 			// Common model for custom expressions.
@@ -395,7 +415,7 @@ impl ObjectCoder {
 			self.anyObj.WriteStr(typeBool + " " + anyTypeIdent)!
 			self.anyObj.WriteStr(si)!
 			self.anyObj.WriteStr("_eq(void *alloc, void *other) noexcept { ")!
-			if t.Comparable() {
+			if comparable {
 				self.anyObj.WriteStr("return ")!
 				self.ec._unsafeBinary(self.anyObj, lmodel, rmodel, t, t, token::Id.Eqs, token::Kind.Eqs)
 				self.anyObj.WriteStr("; }\n")!
@@ -444,6 +464,13 @@ impl ObjectCoder {
 			self.anyObj.WriteStr(si)!
 			self.anyObj.WriteStr("{.dealloc=" + deallocatedTypeIdent)!
 			self.anyObj.WriteStr(conv::Itoa(di))!
+			if hashhable {
+				self.anyObj.WriteStr(", .hash=" + anyTypeIdent)!
+				self.anyObj.WriteStr(si)!
+				self.anyObj.WriteStr("_hash")!
+			} else {
+				self.anyObj.WriteStr(", .hash=nullptr")!
+			}
 			self.anyObj.WriteStr(", .eq=" + anyTypeIdent)!
 			self.anyObj.WriteStr(si)!
 			self.anyObj.WriteStr("_eq, .to_str=" + anyTypeIdent)!
@@ -921,6 +948,8 @@ impl ObjectCoder {
 			self.indent()
 			self.write("void(*dealloc)(jule::Ptr < jule::Uintptr > &alloc);\n")
 			self.indent()
+			self.write("jule::Uintptr (*hash)(jule::Ptr<jule::Uintptr> *hash, jule::Uintptr seed);\n")
+			self.indent()
 			self.write("jule::Bool(*eq)(void*alloc, void*other);\n")
 			self.indent()
 			self.write("jule::Str(*to_str)(void * alloc);\n")
@@ -1210,6 +1239,8 @@ impl ObjectCoder {
 			self.indent()
 			self.write(".dealloc=" + anyTypeIdent + jtoa + ".dealloc,\n")
 			self.indent()
+			self.write(".hash=" + anyTypeIdent + jtoa + ".hash,\n")
+			self.indent()
 			self.write(".eq=" + anyTypeIdent + jtoa + ".eq,\n")
 			self.indent()
 			self.write(".to_str=" + anyTypeIdent + jtoa + ".to_str,\n")
@@ -1235,6 +1266,8 @@ impl ObjectCoder {
 			mut jtoa := conv::Itoa(j)
 			self.indent()
 			self.write(".dealloc=" + anyTypeIdent + jtoa + ".dealloc,\n")
+			self.indent()
+			self.write(".hash=" + anyTypeIdent + jtoa + ".hash,\n")
 			self.indent()
 			self.write(".eq=" + anyTypeIdent + jtoa + ".eq,\n")
 			self.indent()

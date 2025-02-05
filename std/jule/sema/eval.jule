@@ -4727,6 +4727,17 @@ fn applyRuntimeToStr(mut &s: &sema, mut &from: &Type, mut &to: &Type,
 	}
 }
 
+fn applyRuntimeMaphash(mut &s: &sema, mut &from: &Type, mut &to: &Type,
+	mut &token: &token::Token, mut refers: &ReferenceStack) {
+	if from.Comparable() {
+		prim := to.Prim()
+		if prim != nil && prim.IsAny() || to.TypeEnum() != nil || to.Trait() != nil {
+			pushRuntimeMaphash(s, from, token, refers)
+			ret
+		}
+	}
+}
+
 fn applyImplicitCast(mut &s: &sema, mut &dest: &Type, mut &v: &Value,
 	mut &token: &token::Token, mut refers: &ReferenceStack) {
 	if v.Type.IsNil() {
@@ -4759,6 +4770,7 @@ fn applyImplicitCast(mut &s: &sema, mut &dest: &Type, mut &v: &Value,
 fn applyCastKindModel(mut &s: &sema, mut &v: &Value, mut &t: &Type,
 	mut &token: &token::Token, mut refers: &ReferenceStack) {
 	applyRuntimeToStr(s, v.Type, t, token, refers)
+	applyRuntimeMaphash(s, v.Type, t, token, refers)
 	v.Model = &CastingExpr{
 		Token: token,
 		Expr: new(Value, *v),
