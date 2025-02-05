@@ -1392,6 +1392,14 @@ impl exprCoder {
 	}
 
 	fn copyCall(mut &self, mut m: &sema::BuiltinCopyCallExpr) {
+		// We have to use mutable memory for the dest argument of copy due to lang spec.
+		if opt::IsZCopyArray(m.Dest.Model) {
+			mut ie := (&sema::SlicingExpr)(m.Dest.Model)
+			mut model := any(&opt::ArrayAsSlice{
+				Expr: ie.Expr.Model,
+			})
+			ie.Expr.Model = unsafe { *(*sema::Expr)(&model) }
+		}
 		self.oc.write("jule::copy(")
 		self.possibleRefExpr(m.Dest.Model)
 		self.oc.write(", ")
