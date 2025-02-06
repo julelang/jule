@@ -3,19 +3,20 @@
 // license that can be found in the LICENSE file.
 
 // State flags of threads.
-const threadRunning = 1 << 0
-const threadSuspended = 1 << 1
-const threadClosed = 1 << 2
+const threadRunning = 1 << 0   // Header group specifier of running thread state.
+const threadSuspended = 1 << 1 // Suspended running thread state. Use like threadRunning&threadSuspended.
+const threadClosed = 1 << 2    // Thread execution completed, thread closed.
 
 // State flags of threads for suspend reason.
 const reasonNA = 0 << 0
-const reasonRecv = 1 << 3      // Channel-recv.
-const reasonSend = 1 << 4      // Channel-send.
-const reasonWaitGroup = 1 << 5 // WaitGroup.
-const reasonMutex = 1 << 6     // Mutex kind.
-const reasonCond = 1 << 7      // Condition variable.
-const reasonSelect = 1 << 8    // Select statement.
-const reasonStrict = 1 << 9    // See documentation of the checkDeadlock function.
+const reasonRecv = 1 << 3        // Channel-recv.
+const reasonSend = 1 << 4        // Channel-send.
+const reasonWaitGroup = 1 << 5   // WaitGroup.
+const reasonMutex = 1 << 6       // Mutex kind.
+const reasonCond = 1 << 7        // Condition variable.
+const reasonSelect = 1 << 8      // Header group specifier of select statement.
+const reasonSelectEmpty = 1 << 9 // Empty select statement state. Use like reasonSelect&reasonSelectEmpty.
+const reasonStrict = 1 << 10     // See documentation of the checkDeadlock function.
 
 // A thread instance is represents a spawned thread.
 // Used by the Jule runtime to manage threads.
@@ -177,8 +178,7 @@ fn closeThread(tptr: *unsafe) {
 		if &t.os.handle == tptr {
 			// We do not have to clear all state and reasons of the thread.
 			// If this will be reuse, the pushNewThread function will reset.
-			t.state &= ^(threadRunning | threadSuspended)
-			t.state |= threadClosed
+			t.state = threadClosed
 			// We have empty select special case.
 			// We have to check deadlocks after any thread closed. Because at least
 			// one thread is in deep sleep and we do not know when this thread will wake up.
@@ -439,6 +439,28 @@ fn checkDeadlock(mu: uintptr, reason: u32) {
 	if mu != 0 && (reason&reasonSend == reasonSend || reason&reasonRecv == reasonRecv) {
 		t = threads
 		for t != nil; t = t.next {
+			// If the thread have select statement (but not empty statement),
+			// this means thread waiting for the blocking select statement.
+			// We have to assume this select statement will send to/read from
+			// this channel. Otherwise, select statement will fall into an
+			// infinite blocking state, which will cause the thread to deadlock
+			// after consuming all of its frame rights. Frame analysis stage
+			// will catch that deadlock.
+			//
+			// We should skip the empty select statements, because they have no
+			// effect in this case. If we return for the empty select statements
+			// here, the runtime continues even if there is a deadlock.
+			// For example, let's say there are two threads, one is doing
+			// blocking-send and the other is continuously yielding the CPU with
+			// the empty select statement. In this case, the channel continues
+			// to park for send and if we return for the empty select statement here,
+			// the program falls into an infinite loop. Therefore, in the worst
+			// case, we have to assume we have possible thread to unpark this
+			// channel even with consuming the frame rights of the thread.
+			if t.state&reasonSelect == reasonSelect &&
+				t.state&reasonSelectEmpty != reasonSelectEmpty {
+				ret
+			}
 			if t.mu == mu {
 				mut lt := threads
 				for lt != nil; lt = lt.next {
