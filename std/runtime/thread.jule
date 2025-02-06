@@ -151,7 +151,7 @@ fn yield(mu: uintptr, mut reason: u32) {
 	}
 	t.state |= threadSuspended | reason
 	t.mu = mu
-	checkDeadlock(mu, reason)
+	frameConsumed := checkDeadlock(mu, reason)
 	// Unlock the mutex because other threads may need to lock.
 	// There is nothing to do for this thread for now, so release lock.
 	threadMutex.unlock()
@@ -161,7 +161,43 @@ fn yield(mu: uintptr, mut reason: u32) {
 	}
 	// Yield the CPU if possible, it may return immediately for the same thread.
 	// However, this part of thread management belongs to the operating system.
-	osyield()
+	//
+	// Special case:
+	//	If a frame consumed, we should pause the program using sleep;
+	//	otherwise, frames may be consumed too quickly, leading to a false
+	//	deadlock detection and causing the program to panic.
+	//
+	//	For example, let's consider two threads. One thread is receiving data
+	//	from a channel, while the other thread is waiting to lock a mutex and
+	//	it able to do that. After acquiring the mutex, it will send data to
+	//	the channel. In this case, there is no actual deadlock.
+	//
+	//	However, during the time spent waiting to acquire the mutex lock,
+	//	the operating system scheduler may frequently switch the CPU back to the
+	//	thread that is parked on the channel. In deadlock analysis, based on
+	//	channel behavior, a channel can exit deadlock analysis immediately if
+	//	there is a corresponding receiver/sender waiting for it. Otherwise,
+	//	it will consume a frame right of any thread. In such a case, the thread
+	//	may quickly consume all available frame rights, causing the analysis to
+	//	falsely detect a deadlock.
+	//
+	//	To prevent this, when a frame is consumed, we should put the thread to
+	//	sleep for pauseThreshold, ensuring that the OS scheduler cannot wake it
+	//	up before the threshold is reached. pauseThreshold is a crucial trick here.
+	//	Both fmutex and sync::Mutex wait the same amount of time to acquire a lock.
+	//	In this context, no two threads can fall into this situation simultaneously—there
+	//	must always be a slight deviation. Once threadMutex is released,
+	//	the other thread is immediately put to sleep for pauseThreshold. This
+	//	introduces a time difference between the incoming thread and the suspended thread.
+	//
+	//	In the worst case, detecting a deadlock may require waiting for a
+	//	duration of up to for all frame rights to be consumed but it should be
+	//	cheap and balanced.
+	if frameConsumed {
+		sleep(pauseThreshold)
+	} else {
+		osyield()
+	}
 	// CPU is back for this thread.
 	// Lock mutex again and wake up.
 	threadMutex.lock()
@@ -196,7 +232,7 @@ fn closeThread(tptr: *unsafe) {
 
 // Checks deadlock and panics if exist.
 // mut and reason is stores the current thread's parameters to yield CPU.
-fn checkDeadlock(mu: uintptr, reason: u32) {
+fn checkDeadlock(mu: uintptr, reason: u32): (frameConsumed: bool) {
 	// At this point, we should manage all threads under more diverse conditions.
 	// At the end, we have do frame count analysis.
 	//
@@ -488,7 +524,7 @@ fn checkDeadlock(mu: uintptr, reason: u32) {
 			t.state&threadSuspended == threadSuspended {
 			if t.frame > 0 {
 				t.frame--
-				ret
+				ret true
 			}
 		}
 	}
