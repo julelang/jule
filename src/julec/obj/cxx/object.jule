@@ -1149,23 +1149,24 @@ impl ObjectCoder {
 						// trait uses base smart pointer of the allocation.
 						// So cast to element type for correct handling.
 						// Then pass address of the temporary variable to receiver.
-						self.write("&")
-						self.write("_self_.as<")
-						ptr = false // Avoid ".alloc" suffix. We have a pointer already.
+						self.write("((jule::Ptr<")
 						self.tc.kind(self.Buf, act.Sptr().Elem)
+						self.write(">*)&_self_)")
+						ptr = false // Avoid ".alloc" suffix. We have a pointer already.
 					} else {
 						// Function uses smart pointer self parameter.
 						// By Jule Memory Model, trait uses base smart pointer
 						// of the allocation. So cast to full type directly.
 						self.write("_self_.as<")
 						self.tc.kind(self.Buf, act)
+						self.write(">()")
 					}
 				} else {
 					// Structure is plain. Use the type directly.
 					self.write("_self_.as<")
 					self.tc.structureIns(self.Buf, ins)
+					self.write(">()")
 				}
-				self.write(">()")
 				if ptr {
 					self.write(".alloc")
 				}
