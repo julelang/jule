@@ -514,10 +514,24 @@ impl exprCoder {
 		| obj::IsAny(m.Expr.Type):
 			self.possibleRefExpr(m.Expr.Model)
 			self.oc.write(".")
-			if m.Type.Sptr() != nil {
+			// We handling map and channel types as smart pointer,
+			// because this kind types implemented as smart pointers
+			// at machine code level.
+			match {
+			| m.Type.Sptr() != nil:
 				self.oc.write("cast_ptr<")
 				self.oc.tc.kind(self.oc.Buf, m.Type.Sptr().Elem)
-			} else {
+			| m.Type.Map() != nil:
+				self.oc.write("cast_ptr<")
+				mp := m.Type.Map()
+				mut mps := obj::FindStructGenericInstance(meta::Program.Runtime.Map, mp.Key, mp.Val)
+				self.oc.tc.structureIns(self.oc.Buf, mps)
+			| m.Type.Chan() != nil:
+				self.oc.write("cast_ptr<")
+				ch := m.Type.Chan()
+				mut chs := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Elem)
+				self.oc.tc.structureIns(self.oc.Buf, chs)
+			|:
 				self.oc.write("cast<")
 				self.oc.tc.kind(self.oc.Buf, m.Type)
 			}
@@ -546,10 +560,24 @@ impl exprCoder {
 			}
 			self.possibleRefExpr(m.Expr.Model)
 			self.oc.write(".")
-			if m.Type.Sptr() != nil {
+			// We handling map and channel types as smart pointer,
+			// because this kind types implemented as smart pointers
+			// at machine code level.
+			match {
+			| m.Type.Sptr() != nil:
 				self.oc.write("cast_ptr<")
 				self.oc.tc.kind(self.oc.Buf, m.Type.Sptr().Elem)
-			} else {
+			| m.Type.Map() != nil:
+				self.oc.write("cast_ptr<")
+				mp := m.Type.Map()
+				mut mps := obj::FindStructGenericInstance(meta::Program.Runtime.Map, mp.Key, mp.Val)
+				self.oc.tc.structureIns(self.oc.Buf, mps)
+			| m.Type.Chan() != nil:
+				self.oc.write("cast_ptr<")
+				ch := m.Type.Chan()
+				mut chs := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Elem)
+				self.oc.tc.structureIns(self.oc.Buf, chs)
+			|:
 				self.oc.write("cast<")
 				self.oc.tc.kind(self.oc.Buf, m.Type)
 			}
@@ -1741,11 +1769,25 @@ impl exprCoder {
 		match {
 		| obj::IsAny(m.Base.Expr.Type):
 			self.possibleRefExpr(m.Base.Expr.Model)
-			if m.Base.Type.Sptr() != nil {
-				self.oc.write(".unsafe_cast_ptr<")
+			// We handling map and channel types as smart pointer,
+			// because this kind types implemented as smart pointers
+			// at machine code level.
+			match {
+			| m.Base.Type.Sptr() != nil:
+				self.oc.write("unsafe_cast_ptr<")
 				self.oc.tc.kind(self.oc.Buf, m.Base.Type.Sptr().Elem)
-			} else {
-				self.oc.write(".unsafe_cast<")
+			| m.Base.Type.Map() != nil:
+				self.oc.write("unsafe_cast_ptr<")
+				mp := m.Base.Type.Map()
+				mut mps := obj::FindStructGenericInstance(meta::Program.Runtime.Map, mp.Key, mp.Val)
+				self.oc.tc.structureIns(self.oc.Buf, mps)
+			| m.Base.Type.Chan() != nil:
+				self.oc.write("unsafe_cast_ptr<")
+				ch := m.Base.Type.Chan()
+				mut chs := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Elem)
+				self.oc.tc.structureIns(self.oc.Buf, chs)
+			|:
+				self.oc.write("unsafe_cast<")
 				self.oc.tc.kind(self.oc.Buf, m.Base.Type)
 			}
 			self.oc.write(">()")
