@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/encoding"
 use "std/testing"
 
 #test
@@ -300,5 +301,49 @@ fn testCustomDecode3(t: &testing::T) {
 	}
 	if **a != 1 {
 		t.Errorf("want 1, found {}", **a)
+	}
+}
+
+struct objectfoo {
+	bar: str
+	baz: str
+}
+
+impl encoding::JSONEncoder for objectfoo {
+	fn EncodeJSON(self)!: []byte {
+		mapJSON := map[str]str{
+			"bar": self.bar,
+			"baz": self.baz,
+		}
+		ret Encode(mapJSON) else { error(error) }
+	}
+}
+
+impl encoding::JSONDecoder for objectfoo {
+	fn DecodeJSON(mut self, data: []byte)! {
+		mut mapJSON := map[str]str{}
+		Decode(data, mapJSON) else { error(error) }
+		self.bar, _ = mapJSON["bar"]
+		self.baz, _ = mapJSON["baz"]
+	}
+}
+
+#test
+fn testObjectCustomDecode(t: &testing::T) {
+	mut f := objectfoo{bar: "hello", baz: "custom json"}
+	bytes := Encode(f) else {
+		t.Errorf("encode failed")
+		ret
+	}
+	f = objectfoo{}
+	Decode(bytes, f) else {
+		t.Errorf("decode failed")
+		ret
+	}
+	if f.bar != "hello" {
+		t.Errorf("objectfoo.bar != \"hello\", found \"{}\"", f.bar)
+	}
+	if f.baz != "custom json" {
+		t.Errorf("objectfoo.baz != \"custom json\", found \"{}\"", f.baz)
 	}
 }
