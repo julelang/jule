@@ -7,7 +7,7 @@
 
 docker pull --platform linux/arm64 ubuntu:latest
 
-sudo docker build -f ./.devcontainers/release/linux-arm64.Dockerfile -t jule-linux-arm64 .
+sudo docker build --platform=linux/arm64 -f ./.devcontainers/release/linux-arm64.Dockerfile -t jule-linux-arm64 .
 
 id=$(docker create jule-linux-arm64)
 docker cp $id:/usr/local/jule/bin/julec ./julec-linux-arm64
@@ -23,7 +23,7 @@ docker image rm ubuntu:latest
 
 docker pull --platform linux/amd64 ubuntu:latest
 
-sudo docker build -f ./.devcontainers/release/linux-amd64.Dockerfile -t jule-linux-amd64 .
+sudo docker build --platform=linux/amd64 -f ./.devcontainers/release/linux-amd64.Dockerfile -t jule-linux-amd64 .
 
 id=$(docker create jule-linux-amd64)
 docker cp $id:/usr/local/jule/bin/julec ./julec-linux-amd64
