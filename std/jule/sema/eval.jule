@@ -862,6 +862,8 @@ impl eval {
 			|:
 				goto autoDetermine
 			}
+			// If prefix type is a strict type alias, we have to use its
+			// underliying structure type for the value.
 			if v != nil {
 				mut strct := self.prefix.softStruct()
 				if strct != nil && strct.Source != nil {
@@ -1997,7 +1999,9 @@ impl eval {
 		ret self.evalDef(def, s.Ident)
 	}
 
-	fn evalStructLitExplicit(mut &self, mut s: &StructIns,
+	// StructIns s is the struct type of literal.
+	// Type t is the actual value type, it may be strict type alias or pure struct type.
+	fn evalStructLitExplicit(mut &self, mut s: &StructIns, mut t: &Type,
 		mut lit: &ast::BraceLit, mut errorToken: &token::Token): &Value {
 		ok := self.s.checkGenericQuantity(len(s.Decl.Generics), len(s.Generics), errorToken)
 		if !ok {
@@ -2018,17 +2022,14 @@ impl eval {
 		}
 		slc.check(lit.Exprs)
 
-		mut v := &Value{
+		ret &Value{
 			Mutable: self.target.mutable,
-			Type: &Type{
-				Kind: s,
-			},
+			Type: t,
 			Model: &StructLitExpr{
 				Strct: s,
 				Args: slc.args,
 			},
 		}
-		ret v
 	}
 
 	fn evalTypedBraceLit(mut &self, mut lit: &ast::TypedBraceLit): &Value {
@@ -2048,14 +2049,14 @@ impl eval {
 			}
 			mut m := t.Type.Map()
 			if m != nil {
-				ret self.evalMap(m, lit.Lit)
+				ret self.evalMap(m, t.Type, lit.Lit)
 			}
 			self.pushErr(lit.Kind.Token, build::LogMsg.InvalidSyntax)
 			ret nil
 		}
 
 	eval:
-		mut v := self.evalStructLitExplicit(s, lit.Lit, lit.Kind.Token)
+		mut v := self.evalStructLitExplicit(s, t.Type, lit.Lit, lit.Kind.Token)
 		match type t.Type.Kind {
 		| &Sptr:
 			mut model := (&StructLitExpr)(v.Model)
@@ -3030,7 +3031,9 @@ impl eval {
 		})
 	}
 
-	fn evalMap(mut &self, mut m: &Map, mut lit: &ast::BraceLit): &Value {
+	// Map m is the map type of literal.
+	// Type t is the actual value type, it may be strict type alias or pure map type.
+	fn evalMap(mut &self, mut m: &Map, mut t: &Type, mut lit: &ast::BraceLit): &Value {
 		mut model := &MapExpr{
 			Kind: m,
 		}
@@ -3078,35 +3081,23 @@ impl eval {
 
 		ret &Value{
 			Mutable: true,
-			Type: &Type{Kind: m},
+			Type: t,
 			Model: model,
 		}
 	}
 
-	fn evalBraceLit(mut &self, mut lit: &ast::BraceLit): (v: &Value) {
+	fn evalBraceLit(mut &self, mut lit: &ast::BraceLit): &Value {
 		match {
 		| self.prefix == nil:
 			self.pushErr(lit.Token, build::LogMsg.InvalidSyntax)
 			ret nil
 		| self.prefix.Map() != nil:
-			v = self.evalMap(self.prefix.Map(), lit)
+			ret self.evalMap(self.prefix.Map(), self.prefix, lit)
 		| self.prefix.Struct() != nil:
-			v = self.evalStructLitExplicit(self.prefix.Struct(), lit, lit.Token)
-		|:
-			self.pushErr(lit.Token, build::LogMsg.InvalidSyntax)
-			ret nil
+			ret self.evalStructLitExplicit(self.prefix.Struct(), self.prefix, lit, lit.Token)
 		}
-		if v != nil {
-			mut strct := self.prefix.softStruct()
-			if strct != nil && strct.Source != nil {
-				v.Type = &Type{Kind: strct}
-				match type v.Model {
-				| &StructLitExpr:
-					(&StructLitExpr)(v.Model).Strct = strct
-				}
-			}
-		}
-		ret
+		self.pushErr(lit.Token, build::LogMsg.InvalidSyntax)
+		ret nil
 	}
 
 	fn evalAnonFunc(mut &self, mut decl: &ast::Func): &Value {
