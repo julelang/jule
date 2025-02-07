@@ -44,12 +44,13 @@ impl jsonDecoder {
 
 	// Scans to the end of what was started.
 	// Checks syntax errors.
-	fn skip(self)! {
+	// Unlike [scanValidLit], it supports objects and arrays.
+	fn scanValidValue(self)!: []byte {
 		mut b := self.data[self.i]
 		if b != '[' && b != '{' { // Literal.
-			self.scanValidLit() else { error(error) }
-			ret
+			ret self.scanValidLit() else { error(error) }
 		}
+		i := self.i
 		depth := len(self.parseState)
 		mut colon := false
 		for !self.eof() {
@@ -72,7 +73,8 @@ impl jsonDecoder {
 				self.popParseState()
 				self.i++
 				if depth >= len(self.parseState) {
-					ret
+					// Keep immutability, it will not be mutated.
+					ret unsafe { (*(&self.data))[i:self.i] }
 				}
 			| ']':
 				if colon || self.parseState[len(self.parseState)-1] != parseState.Array {
@@ -81,7 +83,8 @@ impl jsonDecoder {
 				self.popParseState()
 				self.i++
 				if depth >= len(self.parseState) {
-					ret
+					// Keep immutability, it will not be mutated.
+					ret unsafe { (*(&self.data))[i:self.i] }
 				}
 			| ':':
 				if colon {
@@ -144,6 +147,7 @@ impl jsonDecoder {
 
 	// Scans inputs efficiently, not checks validity.
 	// Only checks for length.
+	// It only supports basic literals, not objects or arrays.
 	fn scanLit(self)!: []byte {
 		i := self.i
 	Match:
@@ -410,7 +414,7 @@ impl jsonDecoder {
 				}
 			}
 			// Skip JSON object field if is not decoded for struct.
-			self.skip() else { error(error) }
+			self.scanValidValue() else { error(error) }
 			// To avoid unused error.
 			// Empty or no-public field structure may cause compile error(s).
 			goto fieldDecoded
@@ -461,7 +465,7 @@ impl jsonDecoder {
 										m.Type().Result().Kind() == comptime::Kind.Void:
 										const match name {
 										| "DecodeJSON":
-											lit := self.scanValidLit() else { error(error) }
+											lit := self.scanValidValue() else { error(error) }
 											m.Unwrap()(lit) else { error(error) }
 										| "DecodeText":
 											b := self.data[self.i]
