@@ -295,7 +295,23 @@ impl ObjectCoder {
 		self.deallocObj.WriteStr("void " + deallocatedTypeIdent)!
 		self.deallocObj.WriteStr(conv::Itoa(i))!
 		self.deallocObj.WriteStr("(jule::Ptr<jule::Uintptr> &alloc) noexcept { alloc.__as<")!
-		self.tc.kind(self.deallocObj, t)
+		// We handling map and channel types as smart pointer,
+		// because this kind types implemented as smart pointers
+		// at machine code level.
+		match {
+		| t.Sptr() != nil:
+			self.tc.kind(self.deallocObj, t.Sptr().Elem)
+		| t.Map() != nil:
+			mp := t.Map()
+			mut mps := obj::FindStructGenericInstance(meta::Program.Runtime.Map, mp.Key, mp.Val)
+			self.tc.structureIns(self.deallocObj, mps)
+		| t.Chan() != nil:
+			ch := t.Chan()
+			mut chs := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Elem)
+			self.tc.structureIns(self.deallocObj, chs)
+		|:
+			self.tc.kind(self.deallocObj, t)
+		}
 		self.deallocObj.WriteStr(">().dealloc(); }\n")!
 		ret i
 	}
@@ -350,13 +366,13 @@ impl ObjectCoder {
 		i = len(self.anyTypeMap)
 		self.anyTypeMap = append(self.anyTypeMap, t)
 		si := conv::Itoa(i)
-		if t.Sptr() != nil {
-			mut elemKind := strings::Builder{}
-			elemKind.Grow(40)
-			self.tc.kind(elemKind, t.Sptr().Elem)
-
+		// We handling map and channel types as smart pointer,
+		// because this kind types implemented as smart pointers
+		// at machine code level.
+		match {
+		| t.Sptr() != nil | t.Chan() != nil:
 			// Deallocator function.
-			di := self.pushDealloc(t.Sptr().Elem)
+			di := self.pushDealloc(t)
 
 			// Type structure.
 			self.anyObj.WriteStr("struct " + typeAny + "::Type ")!
@@ -370,11 +386,80 @@ impl ObjectCoder {
 			self.anyObj.WriteStr(typeBool + " " + anyTypeIdent)!
 			self.anyObj.WriteStr(si)!
 			self.anyObj.WriteStr("_compare(const " + typeAny + " &any, const ")!
-			self.tc.asSptr(self.anyObj, unsafe { elemKind.Buf() })
+			self.tc.kind(self.anyObj, t)
 			self.anyObj.WriteStr(" &other) { return any.type == &" + anyTypeIdent)!
 			self.anyObj.WriteStr(si)!
 			self.anyObj.WriteStr(" && __jule_ptrEqual(any.data.alloc, other.alloc); }\n")!
-		} else {
+		| t.Map() != nil:
+			// Consider map as a smart pointer.
+			// But it supports content-based string conversion unlike channels.
+			// Channels are just handled like pointers, no difference.
+			// But we have to handle special cases of maps here.
+			mp := t.Map()
+			mut mps := obj::FindStructGenericInstance(meta::Program.Runtime.Map, mp.Key, mp.Val)
+
+			// Get deallocator function based on map type for unique distribution.
+			di := self.pushDealloc(t)
+
+			// eq function. Map is not comparable, so panic if called.
+			{
+				self.anyObj.WriteStr(typeBool + " " + anyTypeIdent)!
+				self.anyObj.WriteStr(si)!
+				self.anyObj.WriteStr("_eq(void *alloc, void *other) noexcept { __jule_panic((")!
+				self.anyObj.WriteStr(typeU8)!
+				self.anyObj.WriteStr(`*)"runtime: comparing uncomparable type " "`)!
+				mut n := self.anyObj.Len()
+				cstrBytes(self.anyObj, t.Str())
+				n = self.anyObj.Len() - n
+				n += 37 // offset of message prefix
+				self.anyObj.WriteStr("\", ")!
+				self.anyObj.WriteStr(conv::Itoa(n))!
+				self.anyObj.WriteStr("); return false; }\n")!
+			}
+
+			// to_str function.
+			self.anyObj.WriteStr(typeStr + " " + anyTypeIdent)!
+			self.anyObj.WriteStr(si)!
+			self.anyObj.WriteStr("_to_str(void *alloc) noexcept { ")!
+			mut f := obj::FindFuncGenericInstanceNoPanic(meta::Program.Runtime.ToStr, t)
+			// If function f is nil, it have not to implement runtime string function.
+			// This means program will not use in any case this function.
+			// Otherwise, it means the compiler have issues for analysis.
+			if f == nil {
+				// This method should be unused.
+				// Implement as a panic call to help debugging.
+				self.anyObj.WriteStr(`__jule_panicStr(__jule_strBytePtr((jule::U8*)"runtime: type data have not string conversion data but used at runtime", 70)); }` + "\n")!
+			} else {
+				self.anyObj.WriteStr("return ")!
+				identCoder.funcIns(self.anyObj, f)
+				self.anyObj.WriteStr("(")!
+				self.tc.kind(self.anyObj, t)
+				self.anyObj.WriteStr("::make((")!
+				self.tc.structureIns(self.anyObj, mps)
+				self.anyObj.WriteStr("*)alloc, nullptr)); }\n")!
+			}
+
+			// Type structure.
+			self.anyObj.WriteStr("struct " + typeAny + "::Type ")!
+			self.anyObj.WriteStr(anyTypeIdent)!
+			self.anyObj.WriteStr(si)!
+			self.anyObj.WriteStr("{.dealloc=" + deallocatedTypeIdent)!
+			self.anyObj.WriteStr(conv::Itoa(di))!
+			self.anyObj.WriteStr(", .hash=nullptr, .eq=" + anyTypeIdent)!
+			self.anyObj.WriteStr(si)!
+			self.anyObj.WriteStr("_eq, .to_str=" + anyTypeIdent)!
+			self.anyObj.WriteStr(si)!
+			self.anyObj.WriteStr("_to_str};\n")!
+
+			// comparison function.
+			self.anyObj.WriteStr(typeBool + " " + anyTypeIdent)!
+			self.anyObj.WriteStr(si)!
+			self.anyObj.WriteStr("_compare(const " + typeAny + " &any, const ")!
+			self.tc.kind(self.anyObj, t)
+			self.anyObj.WriteStr(" &other) { return any.type == &" + anyTypeIdent)!
+			self.anyObj.WriteStr(si)!
+			self.anyObj.WriteStr(" && __jule_ptrEqual(any.data.alloc, other.alloc); }\n")!
+		|:
 			mut kindB := strings::Builder{}
 			kindB.Grow(40)
 			self.tc.kind(kindB, t)
