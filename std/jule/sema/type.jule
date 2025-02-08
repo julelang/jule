@@ -871,7 +871,7 @@ enum semaTypeKind: type {
 }
 
 struct referencer {
-	owner: any         // StructIns, TypeAlias, TypeEnum.
+	owner: any         // StructIns, TypeAlias.
 	name:  str         // Name of the owner.
 	tains: bool        // Whether owner is the TA-sensitive StructIns.
 	oself: bool        // Only self references. It used to caught type alias cycles.
@@ -1089,7 +1089,7 @@ impl typeChecker {
 			mut itself := false
 			if self.referencer.oself {
 				match type decl {
-				| &TypeAlias | &TypeEnum:
+				| &TypeAlias:
 					itself = self.referencer.owner == decl
 				}
 			} else {
@@ -1217,10 +1217,6 @@ impl typeChecker {
 		}
 		if len(decl.Generics) > 0 {
 			self.pushErr(decl.Token, build::LogMsg.TypeNotSupportsGenerics, decl.Ident)
-			ret nil
-		}
-		mut ok := self.checkIllegalCycles(decl.Token, e)
-		if !ok && self.cycleErr&cycleErrEnable == cycleErrEnable {
 			ret nil
 		}
 		ret e
