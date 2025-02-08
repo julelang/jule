@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/conv"
 use "std/encoding"
+use "std/strings"
 use "std/testing"
 
 #test
@@ -345,5 +347,141 @@ fn testObjectCustomDecode(t: &testing::T) {
 	}
 	if f.baz != "custom json" {
 		t.Errorf("objectfoo.baz != \"custom json\", found \"{}\"", f.baz)
+	}
+}
+
+fn printArray(mut &s: strings::Builder, a: Value) {
+	if a == nil {
+		s.WriteStr("nil")!
+		ret
+	}
+	match type a {
+	| String:
+		s.WriteStr("\"")!
+		s.WriteStr(str(String(a)))!
+		s.WriteStr("\"")!
+	| Bool:
+		if Bool(a) {
+			s.WriteStr("true")!
+		} else {
+			s.WriteStr("false")!
+		}
+	| Number:
+		s.WriteStr(conv::FmtFloat(f64(Number(a)), 'f', -1, 64))!
+	| Array:
+		s.WriteByte('[')!
+		for _, e in Array(a) {
+			printArray(s, e)
+			s.WriteByte(',')!
+		}
+		s.WriteByte(']')!
+	|:
+		panic("unreachable")
+	}
+}
+
+#test
+fn testDynDecode(t: &testing::T) {
+	mut v := new(Value)
+	data := []byte(`
+{
+	"foo": "pi",
+	"bar": "number",
+	"baz": {
+		"foo2": 123.456,
+		"bar2": null
+	},
+	"fiz": [
+		"barbaz",
+		1234,
+		-1234,
+		123.456,
+		null,
+		false,
+		true
+	]
+}
+`)
+	Decode(data, v) else {
+		t.Errorf("unexpected error: {}", error)
+		ret
+	}
+	mut ok := false
+	m, ok := Object(*v)
+	if !ok {
+		t.Errorf("value is not object")
+		ret
+	}
+	*v, ok = m["foo"]
+	if !ok {
+		t.Errorf("key is not exist: foo")
+	} else {
+		s, (ok) := String(*v)
+		if ok {
+			if s != "pi" {
+				t.Errorf("key foo is not `pi`")
+			}
+		} else {
+			t.Errorf("key foo is not string")
+		}
+	}
+	*v, ok = m["bar"]
+	if !ok {
+		t.Errorf("key is not exist: bar")
+	} else {
+		s, (ok) := String(*v)
+		if ok {
+			if s != "number" {
+				t.Errorf("key bar is not `number`")
+			}
+		} else {
+			t.Errorf("key bar is not string")
+		}
+	}
+	*v, ok = m["baz"]
+	if !ok {
+		t.Errorf("key is not exist: baz")
+	} else {
+		sm, (ok) := Object(*v)
+		if ok {
+			*v, ok = sm["foo2"]
+			if ok {
+				number, (ok) := Number(*v)
+				if ok {
+					if number != 123.456 {
+						t.Errorf("key bar2 is not 123.456")
+					}
+				} else {
+					t.Errorf("key bar2 is not number")
+				}
+			}
+			*v, ok = sm["bar2"]
+			if ok {
+				if *v != nil {
+					t.Errorf("key bar2 is not nil")
+				}
+			} else {
+				t.Errorf("key is not exist: bar2")
+			}
+		} else {
+			t.Errorf("key baz is not object")
+		}
+	}
+	*v, ok = m["fiz"]
+	if !ok {
+		t.Errorf("key is not exist: fiz")
+	} else {
+		_, (ok) := Array(*v)
+		if ok {
+			mut s := strings::Builder{}
+			printArray(s, *v)
+			found := s.Str()
+			want := `["barbaz",1234,-1234,123.456,nil,false,true,]`
+			if found != want {
+				t.Errorf("key fiz is not expected array;\n\tfound: {}\n\t want: {}", found, want)
+			}
+		} else {
+			t.Errorf("key fiz is not array")
+		}
 	}
 }

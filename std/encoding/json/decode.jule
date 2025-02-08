@@ -275,21 +275,25 @@ impl jsonDecoder {
 		}
 	}
 
-	fn objectMap[Map: map[K]V, K, V](self, mut &m: Map)! {
+	fn objectMap[Map](self, mut &m: Map)! {
+		const mapT = comptime::TypeOf(Map)
+		comptime::TypeAlias(K, mapT.Key())
+		comptime::TypeAlias(V, mapT.Value())
 		const keyT = comptime::TypeOf(K)
-		const match keyT.Kind() {
-		| comptime::Kind.Str
-		| comptime::Kind.Int
-		| comptime::Kind.I8
-		| comptime::Kind.I16
-		| comptime::Kind.I32
-		| comptime::Kind.I64
-		| comptime::Kind.Uint
-		| comptime::Kind.Uintptr
-		| comptime::Kind.U8
-		| comptime::Kind.U16
-		| comptime::Kind.U32
-		| comptime::Kind.U64:
+		const match {
+		| keyT == valueT | keyT == stringT
+		| keyT.Kind() == comptime::Kind.Str
+		| keyT.Kind() == comptime::Kind.Int
+		| keyT.Kind() == comptime::Kind.I8
+		| keyT.Kind() == comptime::Kind.I16
+		| keyT.Kind() == comptime::Kind.I32
+		| keyT.Kind() == comptime::Kind.I64
+		| keyT.Kind() == comptime::Kind.Uint
+		| keyT.Kind() == comptime::Kind.Uintptr
+		| keyT.Kind() == comptime::Kind.U8
+		| keyT.Kind() == comptime::Kind.U16
+		| keyT.Kind() == comptime::Kind.U32
+		| keyT.Kind() == comptime::Kind.U64:
 			break
 		|:
 			error(EncodeError.UnsupportedType)
@@ -300,7 +304,8 @@ impl jsonDecoder {
 			ret
 		}
 		self.pushParseState(parseState.Object) else { error(error) }
-		const quoted = keyT.Kind() == comptime::Kind.Str
+		// Consider string and dynamic JSON vlaue types as quoted. Directly assign string as key.
+		const quoted = keyT.Kind() == comptime::Kind.Str || keyT == valueT || keyT == stringT
 		for {
 			self.skipSpace()
 			if self.eof() || self.data[self.i] != '"' {
@@ -328,7 +333,12 @@ impl jsonDecoder {
 				if m == nil {
 					m = {} // create new map
 				}
-				m[K(s)] = value
+				const match {
+				| keyT == valueT:
+					m[String(s)] = value
+				|:
+					m[K(s)] = value
+				}
 			|:
 				// Quoted non-string type, parse unquoted value by type to assign.
 				key := unquoteBytes(lit)
@@ -345,7 +355,7 @@ impl jsonDecoder {
 					panic("json: unimplemented type, this panic call should be unreachable")
 				}
 				if m == nil {
-					m = {} // create new map
+					m = {} // Create new empty map.
 				}
 				m[keyV] = value
 			}
@@ -502,20 +512,30 @@ impl jsonDecoder {
 		b := self.data[self.i]
 		match b {
 		| '{': // Object.
-			const match tt.Kind() {
-			| comptime::Kind.Map:
+			const match {
+			| tt == valueT | tt == objectT:
+				mut m := Object{}
+				self.objectMap(m) else { error(error) }
+				t = m
+				ret
+			| tt.Kind() == comptime::Kind.Map:
 				self.objectMap(t) else { error(error) }
 				ret
-			| comptime::Kind.Struct:
+			| tt.Kind() == comptime::Kind.Struct:
 				self.objectStruct(t) else { error(error) }
 				ret
 			|:
 				error(DecodeError.InvalidValue)
 			}
 		| '[': // Array.
-			const match tt.Kind() {
-			| comptime::Kind.Array
-			| comptime::Kind.Slice:
+			const match {
+			| tt == valueT | tt == arrayT:
+				mut array := Array(nil)
+				self.array(array) else { error(error) }
+				t = array
+				ret
+			| tt.Kind() == comptime::Kind.Array
+			| tt.Kind() == comptime::Kind.Slice:
 				self.array(t) else { error(error) }
 				ret
 			|:
@@ -523,6 +543,13 @@ impl jsonDecoder {
 			}
 		| '"': // String literal.
 			const match {
+			| tt == valueT | tt == stringT:
+				// Don't check validity for literal, following algorithms will check it.
+				lit := self.scanLit() else { error(error) }
+				mut s := ""
+				decodeString(s, lit) else { error(error) }
+				t = String(s)
+				ret
 			| tt.Kind() == comptime::Kind.Str:
 				// Don't check validity for literal, following algorithms will check it.
 				lit := self.scanLit() else { error(error) }
@@ -553,8 +580,11 @@ impl jsonDecoder {
 			}
 		| 't' | 'f': // Boolean literal.
 			self.scanValidLit() else { error(error) }
-			const match tt.Kind() {
-			| comptime::Kind.Bool:
+			const match {
+			| tt == valueT | tt == boolT:
+				t = Bool(b == 't')
+				ret
+			| tt.Kind() == comptime::Kind.Bool:
 				t = b == 't'
 				ret
 			|:
@@ -565,14 +595,29 @@ impl jsonDecoder {
 			// Don't check validity for literal, following algorithms will check it.
 			lit := self.scanLit() else { error(error) }
 			_ = lit // Avoid unused error.
-			const match tt.Kind() {
-			| comptime::Kind.Int | comptime::Kind.I8 | comptime::Kind.I16 | comptime::Kind.I32 | comptime::Kind.I64:
+			const match {
+			| tt == valueT | tt == numberT:
+				mut f := f64(0)
+				decodeFloat(f, lit) else { error(error) }
+				t = Number(f)
+				ret
+			| tt.Kind() == comptime::Kind.Int
+			| tt.Kind() == comptime::Kind.I8
+			| tt.Kind() == comptime::Kind.I16
+			| tt.Kind() == comptime::Kind.I32
+			| tt.Kind() == comptime::Kind.I64:
 				decodeInt(t, lit) else { error(error) }
 				ret
-			| comptime::Kind.Uint | comptime::Kind.Uintptr | comptime::Kind.U8 | comptime::Kind.U16 | comptime::Kind.U32 | comptime::Kind.U64:
+			| tt.Kind() == comptime::Kind.Uint
+			| tt.Kind() == comptime::Kind.Uintptr
+			| tt.Kind() == comptime::Kind.U8
+			| tt.Kind() == comptime::Kind.U16
+			| tt.Kind() == comptime::Kind.U32
+			| tt.Kind() == comptime::Kind.U64:
 				decodeUInt(t, lit) else { error(error) }
 				ret
-			| comptime::Kind.F32 | comptime::Kind.F64:
+			| tt.Kind() == comptime::Kind.F32
+			| tt.Kind() == comptime::Kind.F64:
 				decodeFloat(t, lit) else { error(error) }
 				ret
 			|:
@@ -668,6 +713,24 @@ impl jsonDecoder {
 //	Smart Pointers:
 //		If smart pointer is nil, will be allocated by the algorithm for decoding.
 //		Otherwise, will decode into dereferenced value.
+//
+// Dynamic decoding details:
+//	Dynamic JSON decoding uses dynamic JSON types:
+//	Value, Object, Array, Bool, Number, and String.
+//	No dynamic decoding can be achieved outside of these types;
+//	for example, the [any] type is not supported.
+//	If you want to obtain any JSON value, use [Value] instead.
+//
+//	Dynamic decoding will always decode using dynamic types;
+//		nil    -> for JSON null
+//		Object -> for JSON object
+//		Array  -> for JSON array
+//		Bool   -> for JSON boolean
+//		Number -> for JSON number
+//		String -> for JSON string
+//
+//	If you use Value as destination type, it may store any JSON value,
+//	and the type will be determined dynamically based on the JSON value.
 //
 // Too many nested types are not specifically checked and may cause too many
 // recursive function calls, resulting in a crash at runtime. As a result of the tests,
