@@ -1143,14 +1143,33 @@ impl ObjectCoder {
 				if ins.Source != nil {
 					// Use the actual type for the allocation handling.
 					mut act := &sema::Type{Kind: ins.Source.ActualKind()}
+					// We handling map and channel types as smart pointer,
+					// because this kind types implemented as smart pointers
+					// at machine code level.
+					//
+					// Smart pointers:
+					//	If method uses pass-by-reference self parameter and
+					//	source type is smart pointer, by Jule Memory Model,
+					//	trait uses base smart pointer of the allocation.
+					//	So cast to element type for correct handling.
+					//	Then pass address of the temporary variable to receiver.
 					if ptr && act.Sptr() != nil {
-						// Method uses pass-by-reference self parameter and
-						// source type is smart pointer. By Jule Memory Model,
-						// trait uses base smart pointer of the allocation.
-						// So cast to element type for correct handling.
-						// Then pass address of the temporary variable to receiver.
 						self.write("((jule::Ptr<")
 						self.tc.kind(self.Buf, act.Sptr().Elem)
+						self.write(">*)&_self_)")
+						ptr = false // Avoid ".alloc" suffix. We have a pointer already.
+					} else if ptr && act.Map() != nil {
+						self.write("((jule::Ptr<")
+						mp := act.Map()
+						mut mps := obj::FindStructGenericInstance(meta::Program.Runtime.Map, mp.Key, mp.Val)
+						self.tc.structureIns(self.Buf, mps)
+						self.write(">*)&_self_)")
+						ptr = false // Avoid ".alloc" suffix. We have a pointer already.
+					} else if ptr && act.Chan() != nil {
+						self.write("((jule::Ptr<")
+						ch := act.Chan()
+						mut chs := obj::FindStructGenericInstance(meta::Program.Runtime.Pchan, ch.Elem)
+						self.tc.structureIns(self.Buf, chs)
 						self.write(">*)&_self_)")
 						ptr = false // Avoid ".alloc" suffix. We have a pointer already.
 					} else {
