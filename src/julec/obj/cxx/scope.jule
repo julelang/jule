@@ -920,7 +920,7 @@ impl scopeCoder {
 		}
 	}
 
-	fn case(mut &self, mut m: &sema::Match, mut c: &sema::Case) {
+	fn case(mut &self, mut m: &sema::Match, mut &l: sema::OperandExpr, mut c: &sema::Case) {
 		if len(c.Exprs) != 0 && !m.Comptime {
 			if len(m.Cases) > 0 && m.Cases[0] == c {
 				self.oc.write("if (")
@@ -930,17 +930,6 @@ impl scopeCoder {
 			for (i, mut expr) in c.Exprs {
 				match {
 				| !m.TypeMatch:
-					mut matchExpr := compExpr(writeAndReadFromBuf(self.oc.Buf, fn() {
-						if m.Expr.IsConst() {
-							self.oc.ec.possibleRefExpr(m.Expr.Model)
-						} else {
-							self.oc.write(matchExpr)
-						}
-					}))
-					mut l := sema::OperandExpr{
-						Model: unsafe { *(*sema::Expr)(&matchExpr) },
-						Type: m.Expr.Type,
-					}
 					mut r := sema::OperandExpr{
 						Model: expr.Model,
 						Type: expr.Type,
@@ -994,27 +983,36 @@ impl scopeCoder {
 		if len(m.Cases) == 0 && m.Default == nil {
 			ret
 		}
-
 		if m.Comptime && (m.Default == nil || len(m.Default.Scope.Stmts) == 0) {
 			ret
 		}
-
 		self.oc.write("{\n")
-
 		self.oc.addIndent()
-
 		self.oc.indent()
 
+		mut l := sema::OperandExpr{}
+
 		// Constant expressions generated as literals in conditions.
-		if !m.Comptime && !m.Expr.IsConst() {
-			if opt::Copy && isCopyOptimizable(m.Expr) {
-				self.oc.write("auto &_match_expr{ ")
+		if !m.Comptime {
+			l.Type = m.Expr.Type
+			if m.Expr.IsConst() {
+				matchExprS := writeAndReadFromBuf(self.oc.Buf, fn() {
+					self.oc.ec.possibleRefExpr(m.Expr.Model)
+				})
+				mut matchExpr := compExpr(matchExprS)
+				l.Model = unsafe { *(*sema::Expr)(&matchExpr) }
 			} else {
-				self.oc.write("auto _match_expr{ ")
+				if opt::Copy && isCopyOptimizable(m.Expr) {
+					self.oc.write("auto &_match_expr{ ")
+				} else {
+					self.oc.write("auto _match_expr{ ")
+				}
+				mut matchExpr := compExpr(matchExpr)
+				l.Model = unsafe { *(*sema::Expr)(&matchExpr) }
+				self.oc.ec.possibleRefExpr(m.Expr.Model)
+				self.oc.write(" };\n")
+				self.oc.indent()
 			}
-			self.oc.ec.possibleRefExpr(m.Expr.Model)
-			self.oc.write(" };\n")
-			self.oc.indent()
 		}
 
 		if len(m.Cases) > 0 {
@@ -1024,13 +1022,13 @@ impl scopeCoder {
 				}
 				self.oc.write("\n")
 				self.oc.indent()
-				self.case(m, c)
+				self.case(m, l, c)
 			}
 		}
 
 		if m.Default != nil {
 			self.oc.write("\n")
-			self.case(m, m.Default)
+			self.case(m, l, m.Default)
 		}
 
 		self.oc.write("\n")
