@@ -920,16 +920,6 @@ impl scopeCoder {
 		}
 	}
 
-	fn matchExpr(mut &self, mut m: &sema::Match): fn() {
-		if !m.Expr.IsConst() {
-			ret fn() { self.oc.write(matchExpr) }
-		}
-		if !m.Expr.Constant.IsBool() || !m.Expr.Constant.ReadBool() {
-			ret fn() { self.oc.ec.possibleRefExpr(m.Expr.Model) }
-		}
-		ret nil
-	}
-
 	fn case(mut &self, mut m: &sema::Match, mut c: &sema::Case) {
 		if len(c.Exprs) != 0 && !m.Comptime {
 			if len(m.Cases) > 0 && m.Cases[0] == c {
@@ -940,20 +930,22 @@ impl scopeCoder {
 			for (i, mut expr) in c.Exprs {
 				match {
 				| !m.TypeMatch:
-					caseExpr := self.matchExpr(m)
-					if m.Expr.GoodOperand(expr) {
-						if caseExpr != nil {
-							caseExpr()
-							self.oc.write(" == ")
+					mut matchExpr := compExpr(writeAndReadFromBuf(self.oc.Buf, fn() {
+						if m.Expr.IsConst() {
+							self.oc.ec.possibleRefExpr(m.Expr.Model)
+						} else {
+							self.oc.write(matchExpr)
 						}
-						self.oc.ec.possibleRefExpr(expr.Model)
-					} else {
-						self.oc.ec.possibleRefExpr(expr.Model)
-						if caseExpr != nil {
-							self.oc.write(" == ")
-							caseExpr()
-						}
+					}))
+					mut l := sema::OperandExpr{
+						Model: unsafe { *(*sema::Expr)(&matchExpr) },
+						Type: m.Expr.Type,
 					}
+					mut r := sema::OperandExpr{
+						Model: expr.Model,
+						Type: expr.Type,
+					}
+					self.oc.ec._unsafeBinary(self.oc.Buf, l, r, token::Id.Eqs, token::Kind.Eqs)
 				|:
 					self.oc.write(matchExpr)
 					mut tk := (&sema::Type)(expr.Model)

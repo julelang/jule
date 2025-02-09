@@ -90,3 +90,19 @@ fn IsStructBinded(s: &sema::StructIns): bool {
 	}
 	ret false
 }
+
+// Checks value v and returns nil if it is hard dynamic type.
+// Otherwise returns the actual value, removes casting expressions and etc.
+fn IsHardDynamicType(mut &e: sema::Expr, mut &t: &sema::Type): (sema::Expr, &sema::Type) {
+	// Handle traits separately, see documentation of obj::IsAny.
+	// They handled as <any> type, but not have pure any type implementation,
+	// therefore we have to handle them separately.
+	if t.Trait() == nil && !IsAny(t) {
+		ret e, t
+	}
+	mut c, ok := (&sema::CastingExpr)(e)
+	if ok {
+		ret IsHardDynamicType(c.Expr.Model, c.Expr.Type)
+	}
+	ret nil, nil
+}

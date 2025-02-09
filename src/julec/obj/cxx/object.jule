@@ -385,11 +385,9 @@ impl ObjectCoder {
 			// comparison function.
 			self.anyObj.WriteStr(typeBool + " " + anyTypeIdent)!
 			self.anyObj.WriteStr(si)!
-			self.anyObj.WriteStr("_compare(const " + typeAny + " &any, const ")!
+			self.anyObj.WriteStr("_compare(const " + typeAny + " &any, const void *type, const ")!
 			self.tc.kind(self.anyObj, t)
-			self.anyObj.WriteStr(" &other) { return any.type == &" + anyTypeIdent)!
-			self.anyObj.WriteStr(si)!
-			self.anyObj.WriteStr(" && __jule_ptrEqual(any.data.alloc, other.alloc); }\n")!
+			self.anyObj.WriteStr(" &other) { return any.type == type && __jule_ptrEqual(any.data.alloc, other.alloc); }\n")!
 		| t.Map() != nil:
 			// Consider map as a smart pointer.
 			// But it supports content-based string conversion unlike channels.
@@ -454,11 +452,9 @@ impl ObjectCoder {
 			// comparison function.
 			self.anyObj.WriteStr(typeBool + " " + anyTypeIdent)!
 			self.anyObj.WriteStr(si)!
-			self.anyObj.WriteStr("_compare(const " + typeAny + " &any, const ")!
+			self.anyObj.WriteStr("_compare(const " + typeAny + " &any, const void *type, const ")!
 			self.tc.kind(self.anyObj, t)
-			self.anyObj.WriteStr(" &other) { return any.type == &" + anyTypeIdent)!
-			self.anyObj.WriteStr(si)!
-			self.anyObj.WriteStr(" && __jule_ptrEqual(any.data.alloc, other.alloc); }\n")!
+			self.anyObj.WriteStr(" &other) { return any.type == type && __jule_ptrEqual(any.data.alloc, other.alloc); }\n")!
 		|:
 			mut kindB := strings::Builder{}
 			kindB.Grow(40)
@@ -503,7 +499,7 @@ impl ObjectCoder {
 			self.anyObj.WriteStr("_eq(void *alloc, void *other) noexcept { ")!
 			if comparable {
 				self.anyObj.WriteStr("return ")!
-				self.ec._unsafeBinary(self.anyObj, lmodel, rmodel, t, t, token::Id.Eqs, token::Kind.Eqs)
+				self.ec._unsafeBinaryNoDynamic(self.anyObj, lmodel, rmodel, t, t, token::Id.Eqs, token::Kind.Eqs)
 				self.anyObj.WriteStr("; }\n")!
 			} else {
 				self.anyObj.WriteStr(`__jule_panic((`)!
@@ -556,6 +552,13 @@ impl ObjectCoder {
 			self.anyObj.WriteStr("_eq, .to_str=" + anyTypeIdent)!
 			self.anyObj.WriteStr(si)!
 			self.anyObj.WriteStr("_to_str};\n")!
+
+			// comparison function.
+			self.anyObj.WriteStr(typeBool + " " + anyTypeIdent)!
+			self.anyObj.WriteStr(si)!
+			self.anyObj.WriteStr("_compare(const " + typeAny + " &any, const void *type, const ")!
+			self.tc.kind(self.anyObj, t)
+			self.anyObj.WriteStr(" &other) { return any.type == type && any.type->eq(any.data.alloc, (void*)&other); }\n")!
 		}
 		ret i
 	}
@@ -864,7 +867,7 @@ impl ObjectCoder {
 			identCoder.field(fIdent, f.Decl)
 			lmodel += fIdent.Str()
 			rmodel += fIdent.Str()
-			self.ec._unsafeBinary(self.Buf, lmodel, rmodel, f.Type, f.Type, token::Id.Eqs, token::Kind.Eqs)
+			self.ec._unsafeBinaryNoDynamic(self.Buf, lmodel, rmodel, f.Type, f.Type, token::Id.Eqs, token::Kind.Eqs)
 			lmodel = lmodel[:len(lmodel)-fIdent.Len()]
 			rmodel = rmodel[:len(rmodel)-fIdent.Len()]
 		}

@@ -197,53 +197,99 @@ impl exprCoder {
 		self.oc.write(")); })")
 	}
 
-	fn _unsafeBinary(mut &self, mut &buf: strings::Builder, &l: str, &r: str,
-		mut &lk: &sema::Type, mut &rk: &sema::Type, op: token::Id, kind: str) {
+	// Tries to handle binary expressions with dynamic types and reports whether
+	// it successful. Should support all dynamic types.
+	fn unsafeDynamicBinary(mut &self, mut &buf: strings::Builder,
+		mut l: sema::OperandExpr, mut r: sema::OperandExpr, op: token::Id): bool {
+		// Return immediately if binary expression is not contain dynamic type.
+		// Handle traits separately, see documentation of obj::IsAny.
+		// They handled as <any> type, but not have pure any type implementation,
+		// therefore we have to handle them separately.
+		// The left operand must be enough to check because it will always be the dynamic type.
+		// See "std/jule/sema" developer reference (7).
+		if l.Type.Trait() == nil && !obj::IsAny(l.Type) {
+			ret false
+		}
+		// Return immediately if right operand is nil.
+		if r.Type.IsNil() {
+			ret false
+		}
+		// If left and right operand is hard dynamic type, then report false.
+		mut leftIsStrict := true
+		mut dynT := l.Type
+		mut e, mut t := obj::IsHardDynamicType(r.Model, r.Type)
+		if e == nil && t == nil {
+			e, t = obj::IsHardDynamicType(l.Model, l.Type)
+			if e == nil && t == nil {
+				ret false
+			}
+			leftIsStrict = false
+			dynT = r.Type
+		}
+
+		ls := writeAndReadFromBuf(self.oc.Buf, fn() {
+			if leftIsStrict {
+				self.possibleRefExpr(l.Model)
+			} else {
+				self.possibleRefExpr(r.Model)
+			}
+		})
+		rs := writeAndReadFromBuf(self.oc.Buf, fn() {
+			self.possibleRefExpr(e)
+		})
+
+		buf.WriteByte('(')!
+		if op == token::Id.NotEq {
+			buf.WriteByte('!')!
+		}
+		i := self.oc.pushAnyType(t)
+		si := conv::Itoa(i)
+		buf.WriteStr(anyTypeIdent)!
+		buf.WriteStr(si)!
+		buf.WriteStr("_compare(")!
+		buf.WriteStr(ls)!
+		buf.WriteStr(", &")!
+		if dynT.Trait() != nil { // Trait <any> type.
+			trt := dynT.Trait()
+			identCoder.traitDecl(buf, trt)
+			buf.WriteStr("_mptr_data")!
+			buf.WriteStr(conv::Itoa(obj::FindTraitTypeOffset(trt, t)))!
+		} else { // Pure <any> type.
+			buf.WriteStr(anyTypeIdent)!
+			buf.WriteStr(si)!
+		}
+		buf.WriteStr(", ")!
+		buf.WriteStr(rs)!
+		buf.WriteStr("))")!
+		ret true
+	}
+
+	fn _unsafeBinaryNoDynamic(mut &self, mut &buf: strings::Builder, &l: str,
+		&r: str, mut &lk: &sema::Type, mut &rk: &sema::Type, op: token::Id, kind: str) {
+		match {
+		| lk.Array() != nil:
+			// If this binary operator comparing array type.
+			// The left operand is will be array one always.
+			arr := lk.Array()
+			mut ins := obj::FindFuncGenericInstance(meta::Program.Runtime.ArrayCmp, arr.Elem)
+			if op == token::Id.NotEq {
+				buf.WriteByte('!')!
+			}
+			identCoder.funcIns(buf, ins)
+			buf.WriteByte('(')!
+			buf.WriteStr(l)!
+			buf.WriteStr(".begin(), ")!
+			buf.WriteStr(r)!
+			buf.WriteStr(".begin(), ")!
+			buf.WriteStr(conv::Itoa(arr.N))!
+			buf.WriteByte(')')!
+			ret
+		}
+
 		if lk.Struct() != nil {
 			mut s := lk.Struct()
 			structBinary(buf, s, l, r, op, kind)
 			ret
-		}
-
-		// Special cases for comparable types.
-		if op == token::Id.Eqs || op == token::Id.NotEq {
-			match {
-			| obj::IsAny(lk):
-				// If this binary operator comparing <any> type.
-				// The left operand is will be <any> one always.
-				if !rk.IsNil() && !obj::IsAny(rk) {
-					buf.WriteByte('(')!
-					if op == token::Id.NotEq {
-						buf.WriteByte('!')!
-					}
-					i := self.oc.pushAnyType(rk)
-					buf.WriteStr(anyTypeIdent)!
-					buf.WriteStr(conv::Itoa(i))!
-					buf.WriteStr("_compare(")!
-					buf.WriteStr(l)!
-					buf.WriteStr(", ")!
-					buf.WriteStr(r)!
-					buf.WriteStr("))")!
-					ret
-				}
-			| lk.Array() != nil:
-				// If this binary operator comparing array type.
-				// The left operand is will be array one always.
-				arr := lk.Array()
-				mut ins := obj::FindFuncGenericInstance(meta::Program.Runtime.ArrayCmp, arr.Elem)
-				if op == token::Id.NotEq {
-					buf.WriteByte('!')!
-				}
-				identCoder.funcIns(buf, ins)
-				buf.WriteByte('(')!
-				buf.WriteStr(l)!
-				buf.WriteStr(".begin(), ")!
-				buf.WriteStr(r)!
-				buf.WriteStr(".begin(), ")!
-				buf.WriteStr(conv::Itoa(arr.N))!
-				buf.WriteByte(')')!
-				ret
-			}
 		}
 
 		match op {
@@ -266,16 +312,19 @@ impl exprCoder {
 		buf.WriteByte(')')!
 	}
 
+	fn _unsafeBinary(mut &self, mut &buf: strings::Builder, mut l: sema::OperandExpr,
+		mut r: sema::OperandExpr, op: token::Id, kind: str) {
+		// Special cases for comparable types.
+		if (op == token::Id.Eqs || op == token::Id.NotEq) && self.unsafeDynamicBinary(buf, l, r, op) {
+			ret
+		}
+		ls := writeAndReadFromBuf(self.oc.Buf, fn() { self.possibleRefExpr(l.Model) })
+		rs := writeAndReadFromBuf(self.oc.Buf, fn() { self.possibleRefExpr(r.Model) })
+		self._unsafeBinaryNoDynamic(buf, ls, rs, l.Type, r.Type, op, kind)
+	}
+
 	fn unsafeBinary(mut &self, mut m: &sema::BinaryExpr) {
-		i := self.oc.Buf.Len()
-		mut oldbuf := unsafe { self.oc.Buf.Buf() }
-		self.possibleRefExpr(m.Left.Model)
-		l := str(unsafe { self.oc.Buf.Buf()[i:] })
-		unsafe { self.oc.Buf.SetBuf(oldbuf) }
-		self.possibleRefExpr(m.Right.Model)
-		r := str(unsafe { self.oc.Buf.Buf()[i:] })
-		unsafe { self.oc.Buf.SetBuf(oldbuf) }
-		self._unsafeBinary(self.oc.Buf, l, r, m.Left.Type, m.Right.Type, m.Op.Id, m.Op.Kind)
+		self._unsafeBinary(self.oc.Buf, *m.Left, *m.Right, m.Op.Id, m.Op.Kind)
 	}
 
 	fn shl(mut &self, mut &l: &sema::OperandExpr, mut &r: &sema::OperandExpr) {
@@ -2261,4 +2310,16 @@ fn strToSlice(mut &buf: strings::Builder, expr: str) {
 	buf.WriteByte('(')!
 	buf.WriteStr(expr)!
 	buf.WriteByte(')')!
+}
+
+// Function f writes buffer buf and this function returns
+// as separate string the written part. Buffer will not contain
+// written part.
+fn writeAndReadFromBuf(mut &buf: strings::Builder, f: fn()): str {
+	mut i := buf.Len()
+	mut oldbuf := unsafe { buf.Buf() }
+	f()
+	s := str(unsafe { buf.Buf()[i:] })
+	unsafe { buf.SetBuf(oldbuf) }
+	ret s
 }
