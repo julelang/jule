@@ -42,7 +42,7 @@ namespace jule
             __jule_pseudoMalloc(1, sizeof(T));
             T *alloc = new (std::nothrow) T;
             if (!alloc)
-                __jule_panic((jule::U8 *)"runtime: memory allocation failed for data of <any>\nfile: /api/any.hpp", 70);
+                __jule_panic((jule::U8 *)"runtime: memory allocation failed for data of dynamic-type\nfile: /api/any.hpp", 70);
 
             *alloc = data;
 #ifdef __JULE_DISABLE__REFERENCE_COUNTING
@@ -122,11 +122,11 @@ namespace jule
             if (this->type != type)
             {
 #ifndef __JULE_ENABLE__PRODUCTION
-                jule::Str error = __JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: <any> casted to incompatible type\nfile: ";
+                jule::Str error = __JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: dynamic-type casted to incompatible type\nfile: ";
                 error += file;
                 __jule_panicStr(error);
 #else
-                __jule_panicStr(__JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: <any> casted to incompatible type");
+                __jule_panicStr(__JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: dynamic-type casted to incompatible type");
 #endif
             }
 #endif
@@ -149,11 +149,11 @@ namespace jule
             if (this->type != type)
             {
 #ifndef __JULE_ENABLE__PRODUCTION
-                jule::Str error = __JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: <any> casted to incompatible type\nfile: ";
+                jule::Str error = __JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: dynamic-type casted to incompatible type\nfile: ";
                 error += file;
                 __jule_panicStr(error);
 #else
-                __jule_panicStr(__JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: <any> casted to incompatible type");
+                __jule_panicStr(__JULE_ERROR__INCOMPATIBLE_TYPE "\nruntime: dynamic-type casted to incompatible type");
 #endif
             }
 #endif
