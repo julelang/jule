@@ -397,19 +397,6 @@ fn checkDeadlock(mu: uintptr, reason: u32): (frameConsumed: bool) {
 	//		channels do not require excessive attention because concurrency rarely
 	//		triggers such situations. For this edge case to be triggered,
 	//		the program must have advanced to the frame analysis stage.
-	//
-	// A quick check before heavy analysis:
-	// mu is no zero and reason is mutex. For a fast check, we can try sema value.
-	// If sema is not locked, mutex have a chance, so no deadlock risk.
-	// It also prevents fake deadlock analysis results for mutexes.
-	// For example: all threads tries to lock a mutex and they in the suspended
-	// state but no one locked the mutex yet. In this case common analysis will
-	// result as deadlock due to all threads suspended.
-	if mu != 0 && reason&reasonMutex == reasonMutex {
-		if atomicLoad(unsafe { *(*u32)(mu) }, atomicSeqCst) > 0 {
-			ret
-		}
-	}
 	mut wgRuns := 0
 	mut condRuns := 0
 	mut nonlocked := 0
@@ -422,6 +409,18 @@ fn checkDeadlock(mu: uintptr, reason: u32): (frameConsumed: bool) {
 				// Thread is not suspended, so works.
 				// No requirement for heavy analysis, return immediately.
 				ret
+			}
+			// If mu is non-zero and reason is mutex.
+			// For a fast check, we can try sema value.
+			// If sema is not locked, mutex have a chance, so no deadlock risk.
+			// It also prevents fake deadlock analysis results for mutexes.
+			// For example: all threads tries to lock a mutex and they in the suspended
+			// state but no one locked the mutex yet. In this case common analysis will
+			// result as deadlock due to all threads suspended.
+			if t.mu != 0 && t.state&reasonMutex == reasonMutex {
+				if atomicLoad(unsafe { *(*u32)(t.mu) }, atomicRelaxed) > 0 {
+					ret
+				}
 			}
 			if t.state&reasonWaitGroup != reasonWaitGroup {
 				// Reason of this thread is not WaitGroup.
