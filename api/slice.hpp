@@ -186,6 +186,16 @@ namespace jule
             return this->_slice + this->_len;
         }
 
+        constexpr Iterator hard_end(void) noexcept
+        {
+            return this->_slice + this->_cap;
+        }
+
+        constexpr ConstIterator hard_end(void) const noexcept
+        {
+            return this->_slice + this->_cap;
+        }
+
         inline void mut_slice(
 #ifndef __JULE_ENABLE__PRODUCTION
             const char *file,

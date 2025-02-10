@@ -52,6 +52,16 @@ namespace jule
             return this->begin() + N;
         }
 
+        constexpr Iterator hard_end(void) noexcept
+        {
+            return this->end();
+        }
+
+        constexpr ConstIterator hard_end(void) const noexcept
+        {
+            return this->end();
+        }
+
         jule::Slice<Item> as_slice(void) noexcept {
             jule::Slice<Item> s;
             s._cap = N;
