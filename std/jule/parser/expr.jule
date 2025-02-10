@@ -595,7 +595,7 @@ impl exprBuilder {
 	}
 
 	fn buildSlicing(mut self, mut &exprTokens: []&token::Token, mut &start: []&token::Token,
-		mut &to: []&token::Token, mut &errorToken: &token::Token, mut end: &token::Token): &ast::SlicingExpr {
+		mut to: []&token::Token, mut &errorToken: &token::Token, mut end: &token::Token): &ast::SlicingExpr {
 		mut slc := &ast::SlicingExpr{
 			Token: errorToken,
 			End: end,
@@ -605,7 +605,21 @@ impl exprBuilder {
 			slc.Start = self.buildFromTokens(start)
 		}
 		if len(to) > 0 {
-			slc.To = self.buildFromTokens(to)
+			mut to2, mut cap := splitDelim(to, token::Id.Colon) // Catch cap-limit index.
+			if len(to2) > 0 || len(cap) > 0 {
+				if len(to2) > 0 {
+					slc.To = self.buildFromTokens(to2)
+				} else {
+					panic("unreachable")
+				}
+				if len(cap) > 0 {
+					slc.Cap = self.buildFromTokens(cap)
+				} else {
+					self.pushErr(errorToken, build::LogMsg.FinalIndexRequired)
+				}
+			} else {
+				slc.To = self.buildFromTokens(to)
+			}
 		}
 		ret slc
 	}
@@ -631,6 +645,11 @@ impl exprBuilder {
 		mut start, mut to := splitDelim(splitTokens, token::Id.Colon)
 		if start != nil || to != nil {
 			ret self.buildSlicing(exprTokens, start, to, errorToken, tokens[len(tokens)-1])
+		}
+		if tokens[1].Id == token::Id.DblColon {
+			// Special case: catch x[::] and x[::index3] like expressions.
+			self.pushErr(errorToken, build::LogMsg.MiddleIndexRequired)
+			ret nil
 		}
 		ret self.buildIndexing(exprTokens, tokens, errorToken)
 	}

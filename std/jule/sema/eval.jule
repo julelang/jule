@@ -1304,20 +1304,17 @@ impl eval {
 	// Returns zero integer expression if slicing have not left index.
 	// So, left index always represents an expression.
 	// Left data is nil if expression eval failed.
-	fn evalSlicingExprs(mut &self, mut &s: &ast::SlicingExpr): (&Value, &Value) {
+	fn evalSlicingExprs(mut &self, mut &s: &ast::SlicingExpr): (l: &Value, r: &Value, c: &Value) {
 		mut prefix := self.prefix
 		self.prefix = nil
 		defer { self.prefix = prefix }
-
-		let mut l: &Value = nil
-		let mut r: &Value = nil
 
 		if s.Start != nil {
 			l = self.evalExpr(s.Start)
 			if l != nil {
 				self.checkIntegerIndexingByData(l, s.Token)
 			} else {
-				ret nil, nil
+				ret nil, nil, nil
 			}
 		} else {
 			l = &Value{
@@ -1333,14 +1330,27 @@ impl eval {
 			if r != nil {
 				self.checkIntegerIndexingByData(r, s.Token)
 			} else {
-				ret nil, nil
+				ret nil, nil, nil
 			}
 		}
 
-		ret l, r
+		if s.Cap != nil {
+			c = self.evalExpr(s.Cap)
+			if r != nil {
+				self.checkIntegerIndexingByData(r, s.Token)
+			} else {
+				ret nil, nil, nil
+			}
+		}
+
+		ret
 	}
 
-	fn slicingArr(self, mut &v: &Value) {
+	fn slicingArr(mut self, &s: &ast::SlicingExpr, mut &v: &Value, &c: &Value) {
+		if c != nil {
+			self.pushErr(s.Token, build::LogMsg.UnsupportedTypeIndex3Slice, v.Type.Str())
+		}
+
 		mut elemType := v.Type.Array().Elem
 		v.Type = &Type{
 			Kind: &Slice{
@@ -1355,7 +1365,7 @@ impl eval {
 		v.Mutable = v.Mutable || !elemType.Mutable()
 	}
 
-	fn slicingStr(self, mut &v: &Value, &l: &Value, &r: &Value) {
+	fn slicingStr(mut self, &s: &ast::SlicingExpr, mut &v: &Value, &l: &Value, &c: &Value, &r: &Value) {
 		v.Lvalue = false
 		v.Mutable = true
 		if !v.IsConst() {
@@ -1368,16 +1378,20 @@ impl eval {
 			ret
 		}
 
+		if c != nil {
+			self.pushErr(s.Token, build::LogMsg.UnsupportedTypeIndex3Slice, v.Type.Str())
+		}
+
 		if l.IsConst() && r.IsConst() {
 			left := l.Constant.AsI64()
 			if left < 0 {
 				ret
 			}
 
-			s := v.Constant.ReadStr()
+			sconst := v.Constant.ReadStr()
 			mut right := i64(0)
 			if r == nil {
-				right = i64(len(s))
+				right = i64(len(sconst))
 			} else {
 				right = r.Constant.AsI64()
 			}
@@ -1385,7 +1399,7 @@ impl eval {
 			if left > right {
 				ret
 			}
-			v.Constant.SetStr(s[left:right])
+			v.Constant.SetStr(sconst[left:right])
 			v.Decl = true // Set Model: flag.
 		} else {
 			v.Constant = nil
@@ -1393,10 +1407,11 @@ impl eval {
 		}
 	}
 
-	fn checkSlicing(mut self, mut &v: &Value, &l: &Value, &r: &Value, &s: &ast::SlicingExpr) {
+	fn checkSlicing(mut self, mut &v: &Value, &l: &Value, &r: &Value, &c: &Value, &s: &ast::SlicingExpr) {
+		// NOTE: catch 3-index slicing expressions if type does not support it.
 		match {
 		| v.Type.Array() != nil:
-			self.slicingArr(v)
+			self.slicingArr(s, v, c)
 			ret
 		| v.Type.Slice() != nil:
 			ret
@@ -1404,7 +1419,7 @@ impl eval {
 			prim := v.Type.Prim()
 			match {
 			| prim.IsStr():
-				self.slicingStr(v, l, r)
+				self.slicingStr(s, v, l, c, r)
 				ret
 			}
 		}
@@ -1418,7 +1433,7 @@ impl eval {
 			ret nil
 		}
 
-		mut l, mut r := self.evalSlicingExprs(s)
+		mut l, mut r, mut c := self.evalSlicingExprs(s)
 		if l == nil {
 			ret v
 		}
@@ -1431,7 +1446,7 @@ impl eval {
 		// Store original copy of v, we need it for expression modelling.
 		mut base := new(Value, *v)
 
-		self.checkSlicing(v, l, r, s)
+		self.checkSlicing(v, l, r, c, s)
 
 		if v.IsConst() {
 			v.Decl = false
@@ -1446,6 +1461,9 @@ impl eval {
 			}
 			if r != nil {
 				model.Right = r.Model
+			}
+			if c != nil {
+				model.Cap = c.Model
 			}
 			v.Model = model
 		}

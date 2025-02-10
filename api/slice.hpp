@@ -191,6 +191,38 @@ namespace jule
             const char *file,
 #endif
             const jule::Int &start,
+            const jule::Int &end,
+            const jule::Int &cap) const noexcept
+        {
+#ifndef __JULE_DISABLE__SAFETY
+            if (start != 0 && end != 0)
+                this->check(
+#ifndef __JULE_ENABLE__PRODUCTION
+                    file
+#endif
+                );
+            if (start < 0 || end < 0 || cap < 0 || start > end || end > this->_cap || end > cap || cap > this->_cap)
+            {
+                jule::Str error;
+                __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE3(error, start, end, cap, this->cap(), "capacity");
+                error += "\nruntime: slice slicing with out of range indexes";
+#ifndef __JULE_ENABLE__PRODUCTION
+                error += "\nfile: ";
+                error += file;
+#endif
+                __jule_panicStr(error);
+            }
+#endif
+            this->_slice = this->_slice + start;
+            this->_len = end - start;
+            this->_cap = cap - start;
+        }
+
+        inline void mut_slice(
+#ifndef __JULE_ENABLE__PRODUCTION
+            const char *file,
+#endif
+            const jule::Int &start,
             const jule::Int &end) const noexcept
         {
 #ifndef __JULE_DISABLE__SAFETY
@@ -244,6 +276,41 @@ namespace jule
 #endif
                 0,
                 this->len());
+        }
+
+        inline Slice<Item> slice(
+#ifndef __JULE_ENABLE__PRODUCTION
+            const char *file,
+#endif
+            const jule::Int &start,
+            const jule::Int &end,
+            const jule::Int &cap) const noexcept
+        {
+#ifndef __JULE_DISABLE__SAFETY
+            if (start != 0 && end != 0)
+                this->check(
+#ifndef __JULE_ENABLE__PRODUCTION
+                    file
+#endif
+                );
+            if (start < 0 || end < 0 || cap < 0 || start > end || end > this->_cap || end > cap || cap > this->_cap)
+            {
+                jule::Str error;
+                __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE3(error, start, end, cap, this->cap(), "capacity");
+                error += "\nruntime: slice slicing with out of range indexes";
+#ifndef __JULE_ENABLE__PRODUCTION
+                error += "\nfile: ";
+                error += file;
+#endif
+                __jule_panicStr(error);
+            }
+#endif
+            jule::Slice<Item> slice;
+            slice.data = this->data;
+            slice._slice = this->_slice + start;
+            slice._len = end - start;
+            slice._cap = cap - start;
+            return slice;
         }
 
         inline Slice<Item> slice(

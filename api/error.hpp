@@ -22,6 +22,16 @@
     STR += "] with " SIZE_TYPE " ";                                                    \
     STR += __jule_i64ToStr((jule::I64)LEN)
 
+#define __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE3(STR, START, END, CAP, LEN, SIZE_TYPE) \
+    STR += __JULE_ERROR__INDEX_OUT_OF_RANGE " [";                                            \
+    STR += __jule_i64ToStr((jule::I64)START);                                                \
+    STR += ":";                                                                              \
+    STR += __jule_i64ToStr((jule::I64)END);                                                  \
+    STR += ":";                                                                              \
+    STR += __jule_i64ToStr((jule::I64)CAP);                                                  \
+    STR += "] with " SIZE_TYPE " ";                                                          \
+    STR += __jule_i64ToStr((jule::I64)LEN)
+
 #define __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(STR, INDEX, LEN) \
     STR += __JULE_ERROR__INDEX_OUT_OF_RANGE " [";              \
     STR += __jule_i64ToStr((jule::I64)INDEX);                  \
