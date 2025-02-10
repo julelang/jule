@@ -8,21 +8,10 @@
 // It also may be used as threshold for spinlocks before sleeping or fall in starvation mode.
 const pauseThreshold = 1e6
 
-const fmutexSize = 32 + 32 + 32 // u32 + u32 + i32
+const fmutexSize = 32 // i32
 
 // Simpler mutex implementation for elementary purposes.
 struct fmutex {
-	// Ticket number of the next waiter.
-	mut wait: u32
-
-	// Ticket number of the next waiter to be notified.
-	//
-	// Both wait & notify can wrap around, and such cases will be correctly
-	// handled as long as their "unwrapped" difference is bounded by 2^31.
-	// For this not to be the case, we'd need to have 2^31+ threads
-	// blocked on the same condvar, which is currently not possible.
-	mut notify: u32
-
 	mut state: i32
 }
 
@@ -37,36 +26,17 @@ impl fmutex {
 				waitstart = nanotime()
 				continue
 			}
-			// If mutex tries more than pauseThreshold, fall in starvation mode.
+			// If mutex tries more than pauseThreshold, try to yield CPU.
 			if nanotime()-waitstart > pauseThreshold {
-				break
-			}
-		}
-		// Starvation mode, add a waiter for this thread and wait for it.
-		waitstart = 0
-		ticket := atomicAdd(self.wait, 1, atomicRelaxed) - 1
-		for {
-			if less(ticket, atomicLoad(self.notify, atomicAcquire)) {
-				ret
-			}
-			if waitstart == 0 {
-				waitstart = nanotime()
-				continue
-			}
-			// If mutex tries more than pauseThreshold, yield CPU.
-			if nanotime()-waitstart > pauseThreshold {
+				// Yield the CPU if possible, it may return immediately for the same thread.
+				// However, this part of thread management belongs to the operating system.
 				osyield()
+				waitstart = nanotime()
 			}
 		}
 	}
 
 	fn unlock(self) {
-		// Fast-path: if there are new waiters since the last notification
-		// we need to increment notify. Mutex is already locked, handoff to waiter.
-		if atomicLoad(self.wait, atomicAcqRel) != atomicLoad(self.notify, atomicAcqRel) {
-			atomicAdd(self.notify, 1, atomicRelaxed)
-			ret
-		}
 		new := atomicAdd(self.state, -1, atomicAcqRel)
 		if new != 0 {
 			panic("runtime: mutex: unlock of unlocked mutex")
