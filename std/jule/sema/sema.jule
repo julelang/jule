@@ -2213,24 +2213,25 @@ impl sema {
 	// Checks new generics function instance.
 	// If instance is already exist, f will point to exist instantantiation.
 	fn checkGenericFunc(mut &self, mut &f: &FuncIns, mut &et: &token::Token): (ok: bool, exist: bool) {
+		mut existInstance := f.Decl.appendInstance(f)
+		// If instance already exist with same generics, return immediately.
+		// This function should be already checked, or it will be.
+		if existInstance != nil {
+			// Set f to exist one.
+			f = existInstance
+			ret true, true
+		}
 		ok = self.reloadFuncInsTypes(f)
 		f.reloaded = true
 		if !ok {
 			ret false, false
 		}
-		mut existInstance := f.Decl.appendInstance(f)
 		// TODO: [check] is possible to optimize here using same environment with realoadFuncInsTypes?
 		if !self.checkConstraintsFunc(f, et, existInstance) {
 			ret false, false
 		}
-		if existInstance != nil {
-			// Set f to exist one.
-			f = existInstance
-			exist = true
-		} else {
-			// Check generic function instance instantly.
-			self.checkFuncInsCaller(f, et)
-		}
+		// Check generic function instance instantly.
+		self.checkFuncInsCaller(f, et)
 		ok = true
 		ret
 	}
