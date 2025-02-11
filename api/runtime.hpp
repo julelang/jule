@@ -51,5 +51,7 @@ jule::Str __jule_strBytePtr(jule::U8 *b, jule::Int n);
 jule::Slice<jule::U8> __jule_sliceBytePtr(jule::U8 *b, jule::Int len, jule::Int cap);
 jule::Slice<jule::U8> __jule_strAsSlice(jule::Str s);
 jule::Str __jule_sliceAsStr(jule::Slice<jule::U8> b);
+void __jule_print(jule::Str s);
+void __jule_println(jule::Str s);
 
 #endif // #ifndef __JULE_RUNTIME_HPP

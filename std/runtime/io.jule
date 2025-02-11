@@ -4,6 +4,7 @@
 
 use "std/internal/poll"
 use "std/sys"
+use "std/unsafe"
 
 // File descriptors for the standard input/output.
 static mut stdin = poll::FD.New(u64(sys::STDIN), poll::FDKind.Console)
@@ -41,4 +42,17 @@ fn readStdin(mut buf: []byte): int {
 		n = -1
 	}
 	ret n
+}
+
+// The runtime implementation of the built-in print function.
+#export "__jule_print"
+fn zprint(s: str) {
+	writeStdout(unsafe::StrBytes(s))
+}
+
+// The runtime implementation of the built-in println function.
+#export "__jule_println"
+fn zprintln(s: str) {
+	writeStdout(unsafe::StrBytes(s))
+	writeStdout(unsafe::StrBytes("\n"))
 }
