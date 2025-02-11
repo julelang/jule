@@ -578,11 +578,22 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Valu
 		if s.Elem.Prim() != nil && s.Elem.Prim().IsU8() { // []byte
 			if e1.Type.Prim() != nil && e1.Type.Prim().IsStr() {
 				// append([]byte, str...)
-				makeVariadic(e1, primU8)
 				v.Model = &BuiltinAppendCallExpr{
-					Dest: t.Model,
-					Elements: e1.Model,
+					Dest: t,
+					Elements: e1,
 				}
+
+				if e.s.meta.runtime != nil {
+					// Add instance to relevant runtime function for slice type if not exist.
+					mut f := runtimeFindFunc(e.s.meta.runtime, "memappend").instanceForce()
+					f.Generics = append(f.Generics, &InsGeneric{Type: t.Type}, &InsGeneric{Type: primStr})
+					ok, _ := e.s.checkGenericFunc(f, fc.Token)
+					if !ok {
+						panic("sema: memappend evaluation failed, this is an implementation mistake")
+					}
+					e.pushReference[&FuncIns](f)
+				}
+
 				ret v
 			}
 		}
@@ -591,6 +602,26 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Valu
 			e.pushErr(secondArg.Token, build::LogMsg.VariadicWithNonVariadicable, e1.Type.Str())
 			ret nil
 		}
+
+		if e.s.meta.runtime != nil {
+			// Add instance to relevant runtime function for slice type if not exist.
+			mut f := runtimeFindFunc(e.s.meta.runtime, "memappend").instanceForce()
+			f.Generics = append(f.Generics, &InsGeneric{Type: t.Type}, &InsGeneric{Type: e1.Type})
+			ok, _ := e.s.checkGenericFunc(f, fc.Token)
+			if !ok {
+				panic("sema: memappend evaluation failed, this is an implementation mistake")
+			}
+			e.pushReference[&FuncIns](f)
+		}
+		// Source should use the same type with destination.
+		// So, to make e1 unvariadic, use type of the destination.
+		mut elems := new(Value, *e1)
+		elems.Type = t.Type
+		v.Model = &BuiltinAppendCallExpr{
+			Dest: t,
+			Elements: elems,
+		}
+
 		makeVariadic(e1, s.Elem)
 
 		// Before the analysis, set variadic kind as not variadic.
@@ -607,10 +638,7 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Valu
 		} else {
 			e1.Type.Variadic = true
 		}
-		v.Model = &BuiltinAppendCallExpr{
-			Dest: t.Model,
-			Elements: e1.Model,
-		}
+
 		ret v
 	}
 
@@ -638,10 +666,30 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Valu
 		}
 		slice.Elems = append(slice.Elems, e1)
 	}
-	v.Model = &BuiltinAppendCallExpr{
-		Dest: t.Model,
-		Elements: slice,
+	mut srcType := &Type{
+		Kind: &Slice{
+			Elem: slice.ElemType,
+		},
 	}
+	v.Model = &BuiltinAppendCallExpr{
+		Dest: t,
+		Elements: &Value{
+			Type: srcType,
+			Model: slice,
+		},
+	}
+
+	if e.s.meta.runtime != nil {
+		// Add instance to relevant runtime function for slice type if not exist.
+		mut f := runtimeFindFunc(e.s.meta.runtime, "memappend").instanceForce()
+		f.Generics = append(f.Generics, &InsGeneric{Type: t.Type}, &InsGeneric{Type: srcType})
+		ok, _ := e.s.checkGenericFunc(f, fc.Token)
+		if !ok {
+			panic("sema: memappend evaluation failed, this is an implementation mistake")
+		}
+		e.pushReference[&FuncIns](f)
+	}
+
 	ret v
 }
 
@@ -680,6 +728,17 @@ fn callerCopySlice(mut &dest: &Value, mut &e: &eval, mut &fc: &ast::FuncCallExpr
 		if destPrim == nil || prim == nil || !prim.IsStr() || !destPrim.IsU8() {
 			e.pushErr(fc.Args[1].Token, build::LogMsg.IncompatibleTypes, dest.Type.Str(), src.Type.Str())
 		}
+	}
+
+	if e.s.meta.runtime != nil {
+		// Add instance to relevant runtime function for slice type if not exist.
+		mut f := runtimeFindFunc(e.s.meta.runtime, "memcopy").instanceForce()
+		f.Generics = append(f.Generics, &InsGeneric{Type: dest.Type.Slice().Elem}, &InsGeneric{Type: src.Type})
+		ok, _ := e.s.checkGenericFunc(f, fc.Token)
+		if !ok {
+			panic("sema: memcopy evaluation failed, this is an implementation mistake")
+		}
+		e.pushReference[&FuncIns](f)
 	}
 
 	v.Type = lenKind()

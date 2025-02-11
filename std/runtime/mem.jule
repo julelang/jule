@@ -116,3 +116,73 @@ unsafe fn readUnaligned64(p: *unsafe): u64 {
 	}
 	ret u64(q[0]) | u64(q[1])<<8 | u64(q[2])<<16 | u64(q[3])<<24 | u64(q[4])<<32 | u64(q[5])<<40 | u64(q[6])<<48 | u64(q[7])<<56
 }
+
+// The runtime implementation of the built-in copy function.
+fn memcopy[E, Src](mut dest: []E, mut src: Src): (n: int) {
+	n = len(src)
+	if n > len(dest) {
+		n = len(dest)
+	}
+	if n == 0 {
+		ret
+	}
+	// Use pointers to skip boundary checking cost and fast access.
+	unsafe {
+		// memcopy may have string type for Src but it is safe to
+		// handle them as slice. According to Jule memory model,
+		// slice memory model can represent a string memory model.
+		// And this implementation does not need to slice-specific data.
+		mut d := (*sliceBase[E])(&dest).slice
+		mut s := (*sliceBase[E])(&src).slice
+		if d > s && u64(d-s) < u64(n) {
+			// to overlaps with from
+			// <from...>
+			//        <to...>
+			// copy in reverse, to avoid overwriting from
+			f := s
+			i := n - 1
+			d += i
+			s += i
+			for f <= s {
+				*d = *s
+				d--
+				s--
+			}
+		} else {
+			// to overlaps with from
+			//      <from...>
+			// <to...>
+			// copy in reverse, to avoid overwriting from
+			end := s + n
+			for s < end {
+				*d = *s
+				d++
+				s++
+			}
+		}
+	}
+	ret
+}
+
+// Prepreation phase of memory append.
+// If the slice s have not enough capacity for newItems, allocates a new slice for s.
+fn prememappend[S: []E, E](mut &s: S, newItems: int) {
+	if cap(s)-len(s) > newItems {
+		ret
+	}
+	mut ns := make(S, len(s), (len(s)+newItems)*2)
+	memcopy(ns, s)
+	s = ns
+}
+
+// The runtime implementation of the built-in append function.
+fn memappend[Dest, Src](mut dest: Dest, mut src: Src): Dest {
+	if len(src) == 0 {
+		ret dest
+	}
+	prememappend(dest, len(src))
+	n := len(dest)
+	dest = dest[:len(dest)+len(src)]
+	memcopy(dest[n:], src)
+	ret dest
+}

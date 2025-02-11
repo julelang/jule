@@ -1481,7 +1481,9 @@ impl exprCoder {
 			})
 			ie.Expr.Model = unsafe { *(*sema::Expr)(&model) }
 		}
-		self.oc.write("jule::copy(")
+		mut ins := obj::FindFuncGenericInstance(meta::Program.Runtime.Memcopy, m.Dest.Type.Slice().Elem, m.Src.Type)
+		identCoder.funcIns(self.oc.Buf, ins)
+		self.oc.write("(")
 		self.possibleRefExpr(m.Dest.Model)
 		self.oc.write(", ")
 		self.possibleRefExpr(m.Src.Model)
@@ -1590,14 +1592,16 @@ impl exprCoder {
 		// in the child scope to avoid potential repeated high-cost memory access overhead.
 		const destIdent = "__jule_push_dest"
 
+		mut s := (&sema::SliceExpr)(m.Base.Elements.Model)
+
 		self.oc.write("{ ")
-		self.oc.tc.asSlice(self.oc.Buf, m.Elems.ElemType)
+		self.oc.tc.asSlice(self.oc.Buf, s.ElemType)
 
 		mut ptr := false
-		match type m.Dest {
+		match type m.Base.Dest.Model {
 		| &sema::UnaryExpr:
 			// Use raw pointer directly if exist.
-			mut u := (&sema::UnaryExpr)(m.Dest)
+			mut u := (&sema::UnaryExpr)(m.Base.Dest.Model)
 			if u.Expr.Type.Ptr() != nil {
 				self.oc.write(" *" + destIdent + " = ")
 				self.possibleRefExpr(u.Expr.Model)
@@ -1608,30 +1612,21 @@ impl exprCoder {
 			fall
 		|:
 			self.oc.write(" &" + destIdent + " = ")
-			self.possibleRefExpr(m.Dest)
+			self.possibleRefExpr(m.Base.Dest.Model)
 			self.oc.write("; ")
-		}
-		// Pushed single item.
-		if len(m.Elems.Elems) == 1 {
-			if ptr {
-				self.oc.write(destIdent + "->push(")
-			} else {
-				self.oc.write(destIdent + ".push(")
-			}
-			self.possibleRefExpr(m.Elems.Elems[0].Model)
-			self.oc.write("); }")
-			ret
 		}
 		// Pushed more than single item.
 		// Pre-allocate enough capacity if not exist for appendation.
-		if ptr {
-			self.oc.write(destIdent + "->alloc_for_append(")
-		} else {
-			self.oc.write(destIdent + ".alloc_for_append(")
+		mut ins := obj::FindFuncGenericInstance(meta::Program.Runtime.Prememappend, m.Base.Dest.Type, s.ElemType)
+		identCoder.funcIns(self.oc.Buf, ins)
+		self.oc.write("(")
+		if !ptr {
+			self.oc.write("&")
 		}
-		self.oc.write(conv::Itoa(len(m.Elems.Elems)))
+		self.oc.write(destIdent + ", ")
+		self.oc.write(conv::Itoa(len(s.Elems)))
 		self.oc.write("); ")
-		for (_, mut e) in m.Elems.Elems {
+		for (_, mut e) in s.Elems {
 			self.oc.write(destIdent)
 			// Use the "__push" method to skip allocation boundary checking.
 			if ptr {
@@ -1645,19 +1640,13 @@ impl exprCoder {
 		self.oc.write("}")
 	}
 
-	fn appendToSlice(mut &self, mut m: &opt::AppendToSliceExpr) {
-		self.oc.write("(")
-		self.possibleRefExpr(m.Dest)
-		self.oc.write(").append(")
-		self.possibleRefExpr(m.Slice)
-		self.oc.write(");")
-	}
-
 	fn appendCall(mut &self, mut m: &sema::BuiltinAppendCallExpr) {
-		self.oc.write("jule::append(")
-		self.possibleRefExpr(m.Dest)
+		mut ins := obj::FindFuncGenericInstance(meta::Program.Runtime.Memappend, m.Dest.Type, m.Elements.Type)
+		identCoder.funcIns(self.oc.Buf, ins)
+		self.oc.write("(")
+		self.possibleRefExpr(m.Dest.Model)
 		self.oc.write(",")
-		self.possibleRefExpr(m.Elements)
+		self.possibleRefExpr(m.Elements.Model)
 		self.oc.write(")")
 	}
 

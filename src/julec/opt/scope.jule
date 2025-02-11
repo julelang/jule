@@ -40,7 +40,7 @@ impl scopeOptimizer {
 
 	// Removes current statement.
 	fn removeCurrent(mut &self) {
-		self.scope.Stmts = append(self.scope.Stmts[:self.i], self.scope.Stmts[self.i+1:]...)
+		self.scope.Stmts = append(self.scope.Stmts[:self.i], self.scope.Stmts[self.i+1 : ]...)
 	}
 
 	fn isLastStmt(mut &self): bool {
@@ -611,21 +611,14 @@ impl scopeOptimizer {
 			match type assign.Right.Model {
 			| &sema::BuiltinAppendCallExpr:
 				mut m := (&sema::BuiltinAppendCallExpr)(assign.Right.Model)
-				if !areSameLvalueExpr(assign.Left.Model, m.Dest) {
+				if !areSameLvalueExpr(assign.Left.Model, m.Dest.Model) {
 					ret
 				}
-				match type m.Elements {
+				match type m.Elements.Model {
 				| &sema::SliceExpr:
 					// Push items one-by-one for self-appended memory.
 					self.setCurrentStmt(&PushToSliceExpr{
-						Dest: m.Dest,
-						Elems: (&sema::SliceExpr)(m.Elements),
-					})
-				|:
-					// Append directly if appended to slice and assigned to the same memory.
-					self.setCurrentStmt(&AppendToSliceExpr{
-						Dest: assign.Left.Model,
-						Slice: m.Elements,
+						Base: m,
 					})
 				}
 			}
@@ -701,8 +694,8 @@ impl scopeOptimizer {
 			i++
 			continue
 		remove:
-			assign.Left = append(assign.Left[:i], assign.Left[i+1:]...)
-			tup.Values = append(tup.Values[:i], tup.Values[i+1:]...)
+			assign.Left = append(assign.Left[:i], assign.Left[i+1 : ]...)
+			tup.Values = append(tup.Values[:i], tup.Values[i+1 : ]...)
 		}
 	}
 
@@ -810,8 +803,8 @@ impl scopeOptimizer {
 			})
 
 			// remove operands
-			assign.Left = append(assign.Left[:i], assign.Left[i+1:]...)
-			tup.Values = append(tup.Values[:i], tup.Values[i+1:]...)
+			assign.Left = append(assign.Left[:i], assign.Left[i+1 : ]...)
+			tup.Values = append(tup.Values[:i], tup.Values[i+1 : ]...)
 		}
 		self.i = z
 	}
