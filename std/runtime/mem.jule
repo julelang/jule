@@ -164,13 +164,28 @@ fn memcopy[E, Src](mut dest: []E, mut src: Src): (n: int) {
 	ret
 }
 
+fn nextslicecap(newLen: int, oldCap: int): int {
+	if oldCap == 0 {
+		ret newLen
+	}
+	newcap := (oldCap<<1 + oldCap) >> 1 // oldCap * 1.5
+	// We need to check `newcap >= newLen` and whether `newcap` overflowed.
+	// newLen is guaranteed to be larger than zero, hence
+	// when newcap overflows then `uint(newcap) > uint(newLen)`.
+	// This allows to check for both with the same comparison.
+	if uint(newcap) >= uint(newLen) {
+		ret newcap
+	}
+	ret newLen
+}
+
 // Prepreation phase of memory append.
 // If the slice s have not enough capacity for newItems, allocates a new slice for s.
 fn prememappend[S: []E, E](mut &s: S, newItems: int) {
 	if cap(s)-len(s) > newItems {
 		ret
 	}
-	mut ns := make(S, len(s), (len(s)+newItems)*2)
+	mut ns := make(S, len(s), nextslicecap(len(s)+newItems, cap(s)))
 	memcopy(ns, s)
 	s = ns
 }
