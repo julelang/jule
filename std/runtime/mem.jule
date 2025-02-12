@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/comptime"
+
 const sptrSize = ptrSize << 1
 
 struct sptrBase[T] {
@@ -118,7 +120,7 @@ unsafe fn readUnaligned64(p: *unsafe): u64 {
 }
 
 // The runtime implementation of the built-in copy function.
-fn memcopy[E, Src](mut dest: []E, mut src: Src): (n: int) {
+fn memcopy[Dest, Src](mut dest: Dest, mut src: Src): (n: int) {
 	n = len(src)
 	if n > len(dest) {
 		n = len(dest)
@@ -132,6 +134,7 @@ fn memcopy[E, Src](mut dest: []E, mut src: Src): (n: int) {
 		// handle them as slice. According to Jule memory model,
 		// slice memory model can represent a string memory model.
 		// And this implementation does not need to slice-specific data.
+		comptime::TypeAlias(E, comptime::TypeOf(Dest).Elem())
 		mut d := (*sliceBase[E])(&dest).slice
 		mut s := (*sliceBase[E])(&src).slice
 		if d > s && u64(d-s) < u64(n) {
@@ -181,11 +184,11 @@ fn nextslicecap(newLen: int, oldCap: int): int {
 
 // Prepreation phase of memory append.
 // If the slice s have not enough capacity for newItems, allocates a new slice for s.
-fn prememappend[S: []E, E](mut &s: S, newItems: int) {
+fn prememappend[Slice](mut &s: Slice, newItems: int) {
 	if cap(s)-len(s) >= newItems {
 		ret
 	}
-	mut ns := make(S, len(s), nextslicecap(len(s)+newItems, cap(s)))
+	mut ns := make(Slice, len(s), nextslicecap(len(s)+newItems, cap(s)))
 	memcopy(ns, s)
 	s = ns
 }
