@@ -34,6 +34,9 @@ namespace jule
     using Uintptr = std::uint64_t;
 #endif
 
+    typedef jule::U8 Byte;  // builtin: type byte: u8
+    typedef jule::I32 Rune; // builtin: type rune: i32
+
     constexpr decltype(nullptr) nil = nullptr;
 
     constexpr jule::F32 MAX_F32 = 3.402823466e+38F;           // 0x1p127 * (1 + (1 - 0x1p-23))

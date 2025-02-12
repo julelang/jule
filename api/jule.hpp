@@ -20,7 +20,6 @@ CONFIGURATION DEFINES
 #include "impl_flag.hpp"
 #include "any.hpp"
 #include "array.hpp"
-#include "builtin.hpp"
 #include "error.hpp"
 #include "exceptional.hpp"
 #include "fn.hpp"
