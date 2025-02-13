@@ -37,15 +37,6 @@ namespace jule
     typedef jule::U8 Byte;  // builtin: type byte: u8
     typedef jule::I32 Rune; // builtin: type rune: i32
 
-    constexpr decltype(nullptr) nil = nullptr;
-
-    constexpr jule::F32 MAX_F32 = 3.402823466e+38F;           // 0x1p127 * (1 + (1 - 0x1p-23))
-    constexpr jule::F32 MIN_F32 = -3.402823466e+38F;          // -0x1p127 * (1 + (1 - 0x1p-23))
-    constexpr jule::F64 MAX_F64 = 1.797693134862315708e+308;  // 0x1p1023 * (1 + (1 - 0x1p-52))
-    constexpr jule::F64 MIN_F64 = -1.797693134862315708e+308; // -0x1p1023 * (1 + (1 - 0x1p-52))
-    constexpr jule::I64 MAX_I64 = 9223372036854775807LL;
-    constexpr jule::I64 MIN_I64 = -9223372036854775807 - 1;
-    constexpr jule::U64 MAX_U64 = 18446744073709551615LLU;
 } // namespace jule
 
 #endif // ifndef __JULE_TYPES_HPP
