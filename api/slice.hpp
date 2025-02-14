@@ -245,7 +245,7 @@ namespace jule
             if (start < 0 || end < 0 || start > end || end > this->_cap)
             {
                 jule::Str error;
-                __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(error, start, end, this->len(), "capacity");
+                __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(error, start, end, this->cap(), "capacity");
                 error += "\nruntime: slice slicing with out of range indexes";
 #ifndef __JULE_ENABLE__PRODUCTION
                 error += "\nfile: ";
@@ -340,7 +340,7 @@ namespace jule
             if (start < 0 || end < 0 || start > end || end > this->_cap)
             {
                 jule::Str error;
-                __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(error, start, end, this->len(), "capacity");
+                __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(error, start, end, this->cap(), "capacity");
                 error += "\nruntime: slice slicing with out of range indexes";
 #ifndef __JULE_ENABLE__PRODUCTION
                 error += "\nfile: ";
