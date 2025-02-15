@@ -1079,24 +1079,19 @@ fn builtinCallerStdComptimeTypeAlias(mut &e: &eval, mut &fc: &ast::FuncCallExpr,
 		e.pushErr(fc.Token, build::LogMsg.MissingExprFor, "type")
 		ret nil
 	}
-	match type fc.Args[0].Kind {
-	| &ast::IdentExpr:
-		break
-	|:
+	mut ie, mut ok := (&ast::IdentExpr)(fc.Args[0].Kind)
+	if !ok {
 		e.pushErr(fc.Args[0].Token, build::LogMsg.InvalidSyntax)
 		e.pushSuggestion(build::LogMsg.ExpectedIdentifier)
 		ret nil
 	}
-	mut ident := (&ast::IdentExpr)(fc.Args[0].Kind).Token
-	match type e.lookup {
-	| &scopeChecker:
-		break
-	|:
+	mut sc, ok := (&scopeChecker)(e.lookup)
+	if !ok {
 		e.pushErr(fc.Token, build::LogMsg.CalledOutOfScope, "TypeAlias")
 		ret nil
 	}
 
-	mut sc := (&scopeChecker)(e.lookup)
+	mut ident := ie.Token
 	mut alias := &TypeAlias{
 		Scope: sc.tree,
 		Public: mod::IsPub(ident.Kind),

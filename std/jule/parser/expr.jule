@@ -206,7 +206,7 @@ impl exprBuilder {
 			self.pushSuggestion(build::LogMsg.EmptyParentNotValid)
 			ret nil
 		}
-		tokens = tokens[1:len(tokens)-1] // Remove parentheses.
+		tokens = tokens[1 : len(tokens)-1] // Remove parentheses.
 		ret &ast::RangeExpr{
 			Expr: self.buildFromTokens(tokens),
 		}
@@ -259,7 +259,7 @@ impl exprBuilder {
 				self.pushErr(typeTokens[0], build::LogMsg.MissingType)
 				self.pushSuggestion(build::LogMsg.GiveTypeForCast)
 			} else {
-				typeTokens = typeTokens[1:len(typeTokens)-1] // Remove parentheses.
+				typeTokens = typeTokens[1 : len(typeTokens)-1] // Remove parentheses.
 				mut typeIndex := 0
 				mut t, ok := unsafe { self.p.buildType(typeTokens, &typeIndex, true) }
 				if ok && typeIndex < len(typeTokens) {
@@ -290,7 +290,7 @@ impl exprBuilder {
 		if len(tokens) < 2 {
 			ret nil
 		}
-		tokens = tokens[1:len(tokens)-1] // Remove parentheses.
+		tokens = tokens[1 : len(tokens)-1] // Remove parentheses.
 		mut parts, errs := parts(tokens, token::Id.Comma, true)
 		self.p.errors = append(self.p.errors, errs...)
 		mut args := make([]&ast::Expr, 0, len(parts))
@@ -387,7 +387,7 @@ impl exprBuilder {
 
 		mut last := 0
 		mut rangeN := 0
-		tokens = tokens[1:len(tokens)-1] // Remove parentheses.
+		tokens = tokens[1 : len(tokens)-1] // Remove parentheses.
 		for i, token in tokens {
 			match token.Id {
 			| token::Id.LBrace
@@ -509,22 +509,20 @@ impl exprBuilder {
 			if d == nil {
 				ret nil
 			}
-			match type d {
-			| &ast::FuncCallExpr:
-				tokens = tokens[len(exprTokens)+1:] // Get range: {...}
-				mut i := 0
-				mut rangeTokens := range(i, token::Id.LBrace, token::Id.RBrace, tokens)
-				mut model := (&ast::FuncCallExpr)(d)
-				if model.Ignored() {
-					self.pushErr(elseToken, build::LogMsg.InvalidSyntax)
-					self.pushSuggestion(build::LogMsg.JustIgnoreOrHandle)
-				}
-				model.Exception = self.p.buildScope(rangeTokens, tokens[i-1])
-				ret d
-			|:
+			mut model, ok := (&ast::FuncCallExpr)(d)
+			if !ok {
 				self.pushErr(exprTokens[0], build::LogMsg.InvalidSyntax)
 				ret nil
 			}
+			tokens = tokens[len(exprTokens)+1:] // Get range: {...}
+			mut i := 0
+			mut rangeTokens := range(i, token::Id.LBrace, token::Id.RBrace, tokens)
+			if model.Ignored() {
+				self.pushErr(elseToken, build::LogMsg.InvalidSyntax)
+				self.pushSuggestion(build::LogMsg.JustIgnoreOrHandle)
+			}
+			model.Exception = self.p.buildScope(rangeTokens, tokens[i-1])
+			ret d
 		}
 
 		match exprTokens[0].Id {
@@ -542,7 +540,7 @@ impl exprBuilder {
 
 	// Tokens is should be store enumerable range tokens.
 	fn getEnumerableParts(mut self, mut tokens: []&token::Token): [][]&token::Token {
-		tokens = tokens[1:len(tokens)-1] // Remove range tokens.
+		tokens = tokens[1 : len(tokens)-1] // Remove range tokens.
 		mut parts, errors := parts(tokens, token::Id.Comma, true)
 		self.p.errors = append(self.p.errors, errors...)
 		ret parts
@@ -573,7 +571,7 @@ impl exprBuilder {
 	fn buildIndexing(mut self, mut exprTokens: []&token::Token,
 		mut tokens: []&token::Token, mut errorToken: &token::Token): &ast::IndexingExpr {
 		mut end := tokens[len(tokens)-1]
-		tokens = tokens[1:len(tokens)-1] // Remove brackets.
+		tokens = tokens[1 : len(tokens)-1] // Remove brackets.
 		if len(tokens) == 0 {
 			self.pushErr(errorToken, build::LogMsg.MissingExpr)
 			ret nil
@@ -641,7 +639,7 @@ impl exprBuilder {
 		tokens = tokens[len(exprTokens):]
 
 		// Catch slicing expressions.
-		mut splitTokens := tokens[1:len(tokens)-1] // Remove brackets.
+		mut splitTokens := tokens[1 : len(tokens)-1] // Remove brackets.
 		mut start, mut to := splitDelim(splitTokens, token::Id.Colon)
 		if start != nil || to != nil {
 			ret self.buildSlicing(exprTokens, start, to, errorToken, tokens[len(tokens)-1])
@@ -661,24 +659,23 @@ impl exprBuilder {
 		if d == nil {
 			ret nil
 		}
-		match type d {
-		| &ast::FuncCallExpr:
-			mut f := (&ast::FuncCallExpr)(d)
-			// Catch already ignored exceptional calls.
-			// Like: foo()!!!!
-			//         the ^^^ part is unnecessary and invalid
-			if f.Ignored() {
-				self.pushErr(token, build::LogMsg.InvalidSyntax)
-				ret nil
-			} else {
-				f.Exception = &ast::ScopeTree{
-					Deferred: true,
-				}
-			}
-			ret d
+		mut f, ok := (&ast::FuncCallExpr)(d)
+		if !ok {
+			self.pushErr(token, build::LogMsg.InvalidSyntax)
+			ret nil
 		}
-		self.pushErr(token, build::LogMsg.InvalidSyntax)
-		ret nil
+		// Catch already ignored exceptional calls.
+		// Like: foo()!!!!
+		//         the ^^^ part is unnecessary and invalid
+		if f.Ignored() {
+			self.pushErr(token, build::LogMsg.InvalidSyntax)
+			ret nil
+		} else {
+			f.Exception = &ast::ScopeTree{
+				Deferred: true,
+			}
+		}
+		ret d
 	}
 
 	// First token should be "<-" of the tokens.

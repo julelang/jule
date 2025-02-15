@@ -492,12 +492,9 @@ impl scopeChecker {
 	// Just lookups current scope.
 	fn findLabel(mut self, &ident: str): &Label {
 		for (_, mut st) in self.scope.Stmts {
-			match type st {
-			| &Label:
-				mut label := (&Label)(st)
-				if label.Ident == ident {
-					ret label
-				}
+			mut label, ok := (&Label)(st)
+			if ok && label.Ident == ident {
+				ret label
 			}
 		}
 		ret nil
@@ -1634,31 +1631,28 @@ impl scopeChecker {
 			ret
 		}
 		stmt := s.Stmts[0]
-		match type stmt {
-		| &Value:
-			v := (&Value)(stmt)
-			match type v.Model {
-			| &BuiltinPanicCallExpr:
-				mut m := (&BuiltinPanicCallExpr)(v.Model)
-				match type m.Expr {
-				| &constant::Const:
-					c := (&constant::Const)(m.Expr)
-					if !c.IsStr() {
-						break
-					}
-					if callToken == nil {
-						mut root := self.getHardRoot()
-						if root.calledFrom == nil {
-							callToken = m.Token
-						} else {
-							callToken = root.calledFrom
-						}
-					}
-					self.s.pushErr(callToken, build::LogMsg.ComptimePanic, c.ReadStr())
-					self.stop()
-				}
+		v, mut ok := (&Value)(stmt)
+		if !ok {
+			ret
+		}
+		mut m, (ok) := (&BuiltinPanicCallExpr)(v.Model)
+		if !ok {
+			ret
+		}
+		c, (ok) := (&constant::Const)(m.Expr)
+		if !ok || !c.IsStr() {
+			ret
+		}
+		if callToken == nil {
+			mut root := self.getHardRoot()
+			if root.calledFrom == nil {
+				callToken = m.Token
+			} else {
+				callToken = root.calledFrom
 			}
 		}
+		self.s.pushErr(callToken, build::LogMsg.ComptimePanic, c.ReadStr())
+		self.stop()
 	}
 
 	fn processConstMatch(mut &self, mut &tm: &Match, mut &m: &ast::Match) {
@@ -2472,12 +2466,8 @@ fn isValidStForNextSt(&st: Stmt): bool {
 	| &MultiAssign:
 		ret true
 	| &Value:
-		match type (&Value)(st).Model {
-		| &FuncCallExpr:
-			ret true
-		|:
-			ret false
-		}
+		_, ok := (&FuncCallExpr)((&Value)(st).Model)
+		ret ok
 	|:
 		ret false
 	}

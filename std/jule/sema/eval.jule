@@ -118,12 +118,8 @@ impl eval {
 
 	// Reports whether evaluated expression is in global scope.
 	fn isGlobal(self): bool {
-		match type self.lookup {
-		| &sema:
-			ret true
-		|:
-			ret false
-		}
+		_, ok := (&sema)(self.lookup)
+		ret ok
 	}
 
 	fn applyNumericPrefix(mut self, mut &v: &Value): bool {
@@ -754,18 +750,13 @@ impl eval {
 		mut filled := false
 
 		if len(s.Exprs) == 2 {
-			match type s.Exprs[1].Kind {
-			| &ast::VariadicExpr:
-				if (&ast::VariadicExpr)(s.Exprs[1].Kind).Expr != nil {
-					break
-				}
+			vr, ok := (&ast::VariadicExpr)(s.Exprs[1].Kind)
+			if ok && vr.Expr == nil {
 				// Filled.
-
 				if pt.Auto {
 					self.pushErr(s.Token, build::LogMsg.AutoSizedArrFilled)
 					ret nil
 				}
-
 				filled = true
 				s.Exprs = s.Exprs[:1]
 			}
@@ -3063,16 +3054,11 @@ impl eval {
 
 		mut prefix := self.prefix
 		for (_, mut expr) in lit.Exprs {
-			match type expr.Kind {
-			| &ast::KeyValPair:
-				// Ok.
-				break
-			|:
+			mut pair, ok := (&ast::KeyValPair)(expr.Kind)
+			if !ok {
 				self.pushErr(lit.Token, build::LogMsg.InvalidSyntax)
 				ret nil
 			}
-
-			mut pair := (&ast::KeyValPair)(expr.Kind)
 
 			self.prefix = model.Kind.Key
 			mut key := self.evalExpr(pair.Key)

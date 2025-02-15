@@ -72,18 +72,14 @@ impl constraintChecker {
 					n := len(sema.errors)
 					mut kind := sema.buildTypeWithRefers(mask, sema, generics, nil)
 					if kind == nil {
-						match type mask.Kind {
-						| &ast::IdentType:
-							mut itd := (&ast::IdentType)(mask.Kind)
-							if len(itd.Generics) == 0 && isBuiltinConstraint(itd.Ident) {
-								kind = &Type{Kind: buildPrimType(itd.Ident)}
-								sema.errors = sema.errors[:n]
-								goto success
-							}
+						mut itd, ok := (&ast::IdentType)(mask.Kind)
+						if ok && len(itd.Generics) == 0 && isBuiltinConstraint(itd.Ident) {
+							kind = &Type{Kind: buildPrimType(itd.Ident)}
+							sema.errors = sema.errors[:n]
+						} else {
+							ret false
 						}
-						ret false
 					}
-				success:
 					generic.Constraint = append(generic.Constraint, kind)
 				}
 			}

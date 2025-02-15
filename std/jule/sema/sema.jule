@@ -2372,14 +2372,8 @@ impl sema {
 			if s.Comparable && self.meta.runtime != nil {
 				mut decl := runtimeFindFunc(self.meta.runtime, "arrayCmp")
 				pushArr := fn(mut t: Kind, mut token: &token::Token) {
-					match type t {
-					| &Array:
-						break
-					|:
-						ret
-					}
-					mut arr := (&Array)(t)
-					if arr == nil {
+					mut arr, (ok) := (&Array)(t)
+					if !ok || arr == nil {
 						ret
 					}
 					mut f := decl.instanceForce()
@@ -2566,12 +2560,9 @@ impl sema {
 			ret
 		}
 
-		match type sptr.Elem.Kind {
-		| &StructIns:
-			s := (&StructIns)(sptr.Elem.Kind)
-			if s.Source == nil && isStdPackage(s.Decl.Token.File.Path, "testing") {
-				ret
-			}
+		s, ok := (&StructIns)(sptr.Elem.Kind)
+		if ok && s.Source == nil && isStdPackage(s.Decl.Token.File.Path, "testing") {
+			ret
 		}
 		self.pushErr(f.Decl.Token, build::LogMsg.WrongTestFuncDecl)
 		self.pushSuggestion(build::LogMsg.UseExpectedTestFuncDecl)

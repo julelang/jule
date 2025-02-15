@@ -398,51 +398,49 @@ struct dynamicTypeAnnotation {
 
 impl dynamicTypeAnnotation {
 	fn annotateConstraintElem[T](mut self, mut &k: &Type): bool {
-		match type self.c.Kind {
-		| &T:
-			mut elem := (&Type)(nil)
-			const match type T {
-			| ast::ArrayType:
-				elem = k.Array().Elem
-			| ast::SliceType:
-				elem = k.Slice().Elem
-			| ast::PtrType:
-				mut p := k.Ptr()
-				if p.IsUnsafe() {
-					self.e.pushErr(self.errorToken, build::LogMsg.UnsafePointerForAnnotation)
-					ret false
-				}
-				elem = p.Elem
-			| ast::SptrType:
-				elem = k.Sptr().Elem
-			| ast::ChanType:
-				elem = k.Chan().Elem
-			}
-			self.c = (&T)(self.c.Kind).Elem
-			ret self.annotateConstraint(elem)
+		mut c, mut ok := (&T)(self.c.Kind)
+		if !ok {
+			ret false
 		}
-		ret false
+		mut elem := (&Type)(nil)
+		const match type T {
+		| ast::ArrayType:
+			elem = k.Array().Elem
+		| ast::SliceType:
+			elem = k.Slice().Elem
+		| ast::PtrType:
+			mut p := k.Ptr()
+			if p.IsUnsafe() {
+				self.e.pushErr(self.errorToken, build::LogMsg.UnsafePointerForAnnotation)
+				ret false
+			}
+			elem = p.Elem
+		| ast::SptrType:
+			elem = k.Sptr().Elem
+		| ast::ChanType:
+			elem = k.Chan().Elem
+		}
+		self.c = c.Elem
+		ret self.annotateConstraint(elem)
 	}
 
 	fn annotateConstraintMap(mut self, mut &k: &Type): (ok: bool) {
-		match type self.c.Kind {
-		| &ast::MapType:
-			mut m := k.Map()
-			mut m2 := (&ast::MapType)(self.c.Kind)
-			self.c = m2.Key
-			if !self.annotateConstraint(m.Key) {
-				ret false
-			}
-			self.c = m2.Val
-			ret self.annotateConstraint(m.Val)
+		mut m2, ok := (&ast::MapType)(self.c.Kind)
+		if !ok {
+			ret
 		}
-		ret false
+		mut m := k.Map()
+		self.c = m2.Key
+		if !self.annotateConstraint(m.Key) {
+			ret false
+		}
+		self.c = m2.Val
+		ret self.annotateConstraint(m.Val)
 	}
 
 	fn annotateConstraintTuple(mut self, mut &k: &Type): (ok: bool) {
-		match type self.c.Kind {
-		| &ast::TupleType:
-			mut tup := (&ast::TupleType)(self.c.Kind)
+		mut tup, ok := (&ast::TupleType)(self.c.Kind)
+		if ok {
 			mut tup2 := k.Tuple()
 			for (_, mut t2) in tup2.Types {
 				for (_, mut t) in tup.Types {
@@ -457,9 +455,8 @@ impl dynamicTypeAnnotation {
 	}
 
 	fn annotateConstraintFunc(mut self, mut &k: &Type): (ok: bool) {
-		match type self.c.Kind {
-		| &ast::Func:
-			mut pf := (&ast::Func)(self.c.Kind)
+		mut pf, ok := (&ast::Func)(self.c.Kind)
+		if ok {
 			mut f := k.Func()
 			for (i, mut fp) in f.Params {
 				self.c = pf.Params[i].Kind
@@ -1067,9 +1064,8 @@ impl structLitChecker {
 		// Check duplications.
 	dupLookup:
 		for (_, mut expr) in exprs {
-			match type expr.Kind {
-			| &ast::FieldExprPair:
-				mut dpair := (&ast::FieldExprPair)(expr.Kind)
+			mut dpair, ok := (&ast::FieldExprPair)(expr.Kind)
+			if ok {
 				match {
 				| pair == dpair:
 					break dupLookup
