@@ -304,11 +304,11 @@ impl exprOptimizer {
 		}
 
 		mut model := new(StrConcatExpr)
-		let mut step: fn(m: sema::Expr)
+		let mut step: fn(mut m: sema::Expr)
 		// Point to the step variable in the closure. Otherwise it will be copied,
 		// so the step function remains as nil, which is causes nil dereferencing.
 		&_step := step
-		step = fn(m: sema::Expr) {
+		step = fn(mut m: sema::Expr) {
 			match type m {
 			| &sema::BinaryExpr:
 				// First, handle the left operand.
@@ -970,16 +970,19 @@ impl exprOptimizer {
 				mask := u64(array.N - 1)
 				bin, mut ok := (&sema::BinaryExpr)(m.Index.Model)
 				if ok && bin.Op.Kind == token::Kind.Amper {
-					let mut c: &constant::Const
-					c, ok = (&constant::Const)(bin.Left.Model)
-					if ok && c.AsU64() == mask {
-						mut model := any(&UnsafeIndexingExpr{Node: m})
-						*self.model = unsafe { *(*sema::Expr)(&model) }
+					{
+						c, (ok) := (&constant::Const)(bin.Left.Model)
+						if ok && c.AsU64() == mask {
+							mut model := any(&UnsafeIndexingExpr{Node: m})
+							*self.model = unsafe { *(*sema::Expr)(&model) }
+						}
 					}
-					c, ok = (&constant::Const)(bin.Right.Model)
-					if ok && c.AsU64() == mask {
-						mut model := any(&UnsafeIndexingExpr{Node: m})
-						*self.model = unsafe { *(*sema::Expr)(&model) }
+					{
+						c, (ok) := (&constant::Const)(bin.Right.Model)
+						if ok && c.AsU64() == mask {
+							mut model := any(&UnsafeIndexingExpr{Node: m})
+							*self.model = unsafe { *(*sema::Expr)(&model) }
+						}
 					}
 				}
 			}
