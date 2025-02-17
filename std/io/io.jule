@@ -138,3 +138,48 @@ trait Stream {
 	ReadWriter
 	Closer
 }
+
+// Copy copies from src to dst until either EOF is reached
+// on src or an error occurs. It returns the number of bytes
+// copied and the first error encountered while copying, if any.
+//
+// Forwards any exceptional and may be throw InvalidWrite or ShortWrite.
+fn Copy(mut dst: Writer, mut src: Reader)!: (written: i64) {
+	ret copyBuffer(dst, src, nil) else { error(error) }
+}
+
+// Identical to Copy except that it stages through the
+// provided buffer (if one is required) rather than allocating a
+// temporary one. If buf is nil, one is allocated; otherwise if it has
+// zero length, it panics.
+fn CopyBuffer(mut dst: Writer, mut src: Reader, mut buf: []byte)!: (written: i64) {
+	if buf != nil && len(buf) == 0 {
+		panic("std/io: empty buffer in CopyBuffer")
+	}
+	ret copyBuffer(dst, src, buf) else { error(error) }
+}
+
+// Actual implementation of Copy and CopyBuffer.
+// if buf is nil, one is allocated.
+fn copyBuffer(mut dst: Writer, mut src: Reader, mut buf: []byte)!: (written: i64) {
+	if buf == nil {
+		buf = make([]byte, 32*1024)
+	}
+	for {
+		nr := src.Read(buf) else { error(error) }
+		if nr == 0 { // EOF
+			break
+		}
+		if nr > 0 {
+			nw := dst.Write(buf[0:nr]) else { error(error) }
+			if nw < 0 || nr < nw {
+				error(InvalidWrite)
+			}
+			written += i64(nw)
+			if nr != nw {
+				error(ShortWrite)
+			}
+		}
+	}
+	ret written
+}

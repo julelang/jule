@@ -1,0 +1,59 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/io"
+use "std/testing"
+
+struct testbuffer {
+	buf: []byte
+	r:   int
+}
+
+impl io::Writer for testbuffer {
+	fn Write(mut self, data: []byte)!: int {
+		self.buf = append(self.buf, data...)
+		ret len(data)
+	}
+}
+
+impl io::Reader for testbuffer {
+	fn Read(mut self, mut data: []byte)!: int {
+		n := copy(data, self.buf[self.r:])
+		self.r += n
+		ret n
+	}
+}
+
+#test
+fn testCopy(t: &testing::T) {
+	mut rb := new(testbuffer)
+	mut wb := new(testbuffer)
+	rb.buf = append(rb.buf, "hello, world."...)
+	io::Copy(wb, rb)!
+	if str(wb.buf) != "hello, world." {
+		t.Errorf("Copy did not work properly")
+	}
+}
+
+#test
+fn testCopyBuffer(t: &testing::T) {
+	mut rb := new(testbuffer)
+	mut wb := new(testbuffer)
+	rb.buf = append(rb.buf, "hello, world."...)
+	io::CopyBuffer(wb, rb, make([]byte, 1))! // Tiny buffer to keep it honest.
+	if str(wb.buf) != "hello, world." {
+		t.Errorf("CopyBuffer did not work properly")
+	}
+}
+
+#test
+fn testCopyBufferNil(t: &testing::T) {
+	mut rb := new(testbuffer)
+	mut wb := new(testbuffer)
+	rb.buf = append(rb.buf, "hello, world."...)
+	io::CopyBuffer(wb, rb, nil)! // Should allocate a buffer.
+	if str(wb.buf) != "hello, world." {
+		t.Errorf("CopyBuffer did not work properly")
+	}
+}
