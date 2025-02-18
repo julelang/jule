@@ -4,22 +4,11 @@
 
 use "std/mem"
 use "std/os/filepath"
+use "std/os/internal/windows"
 use "std/sys"
-
-#typedef
-cpp struct FILE_ATTRIBUTE_TAG_INFO{}
 
 cpp type HANDLE: *unsafe
 cpp type DWORD: u32
-
-cpp type FILE_INFO_BY_HANDLE_CLASS: int
-
-cpp unsafe fn GetFileInformationByHandleEx(h: cpp.HANDLE, infoClass: cpp.FILE_INFO_BY_HANDLE_CLASS, fileInfo: *unsafe, bufferSize: cpp.DWORD): bool
-
-struct _FILE_ATTRIBUTE_TAG_INFO {
-	FileAttributes: u32
-	ReparseTag:     u32
-}
 
 struct winstatInfo {
 	// from Win32FindData and GetFileInformationByHandleEx
@@ -135,9 +124,8 @@ fn newFileInfoFromGetFileInformationByHandle(h: sys::Handle)!: (d: sys::Win32Fil
 	}
 
 	if fd.FileAttributes&sys::FILE_ATTRIBUTE_REPARSE_POINT != 0 {
-		const FileAttributeTagInfo = 9
-		let mut ti: _FILE_ATTRIBUTE_TAG_INFO
-		ok = unsafe { cpp.GetFileInformationByHandleEx(cpp.HANDLE(h), cpp.FILE_INFO_BY_HANDLE_CLASS(FileAttributeTagInfo), &ti, cpp.DWORD(mem::SizeOf(ti))) }
+		let mut ti: windows::FILE_ATTRIBUTE_TAG_INFO
+		ok = unsafe { windows::GetFileInformationByHandleEx(h, windows::FileAttributeTagInfo, &ti, u32(mem::SizeOf(ti))) }
 		if !ok {
 			error(getLastFsErrorWindows())
 		}
