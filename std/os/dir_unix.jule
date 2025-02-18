@@ -6,46 +6,41 @@ use integ "std/jule/integrated"
 use "std/os/filepath"
 use "std/sys"
 
-impl Dir {
-	// Reads the named directory and returns all its directory entries can read.
-	static fn Read(path: str)!: (dirents: []Dir) {
-		s := integ::StrToBytes(path)
-		mut dir := unsafe { sys::Opendir(&s[0]) }
-		if dir == nil {
-			error(getLastFsError())
-		}
-		for {
-			dirent := unsafe { sys::Readdir(dir) }
-			if dirent == nil {
-				break
-			}
-			name := unsafe { integ::BytePtrToStr((*byte)(dirent.d_name)) }
-			mut stat := Stat.Of(filepath::Join(path, name)) else { error(error) }
-			dirents = append(dirents, Dir{
-				Name: name,
-				Stat: stat,
-			})
-		}
-		_ = unsafe { sys::Closedir(dir) }
-		ret
+fn readDir(path: str)!: (dirents: []DirEntry) {
+	s := integ::StrToBytes(path)
+	mut dir := unsafe { sys::Opendir(&s[0]) }
+	if dir == nil {
+		error(getLastFsError())
 	}
-
-	// Creates directory.
-	static fn Create(path: str)! {
-		// NOTICE
-		// Also can has EMLINK error-code.
-		// Make sure this situation should documented or not.
-		s := integ::StrToBytes(path)
-		if unsafe { sys::Mkdir(&s[0], 0700) } != 0 {
-			error(getLastFsError())
+	for {
+		dirent := unsafe { sys::Readdir(dir) }
+		if dirent == nil {
+			break
 		}
+		name := unsafe { integ::BytePtrToStr((*byte)(dirent.d_name)) }
+		mut stat := Stat(filepath::Join(path, name)) else { error(error) }
+		dirents = append(dirents, DirEntry{
+			Name: name,
+			Stat: stat,
+		})
 	}
+	_ = unsafe { sys::Closedir(dir) }
+	ret
+}
 
-	// Removes empty directory.
-	static fn Remove(path: str)! {
-		s := integ::StrToBytes(path)
-		if unsafe { sys::Rmdir(&s[0]) } != 0 {
-			error(getLastFsError())
-		}
+fn mkdir(path: str)! {
+	// NOTICE
+	// Also can has EMLINK error-code.
+	// Make sure this situation should documented or not.
+	s := integ::StrToBytes(path)
+	if unsafe { sys::Mkdir(&s[0], 0700) } != 0 {
+		error(getLastFsError())
+	}
+}
+
+fn rmdir(path: str)! {
+	s := integ::StrToBytes(path)
+	if unsafe { sys::Rmdir(&s[0]) } != 0 {
+		error(getLastFsError())
 	}
 }

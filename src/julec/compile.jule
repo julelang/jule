@@ -31,13 +31,13 @@ fn init() {
 fn openOutput(&path: str): &os::File {
 	dir := filepath::Dir(path)
 
-	os::Stat.Of(dir) else {
-		os::Dir.Create(dir) else {
+	os::Stat(dir) else {
+		os::Mkdir(dir) else {
 			handle::Throw("a problem occurs when code generation")
 		}
 	}
 
-	ret os::File.Create(path) else {
+	ret os::Create(path) else {
 		handle::Throw("a problem occurs when code generation")
 		use nil
 	}
@@ -45,7 +45,7 @@ fn openOutput(&path: str): &os::File {
 
 // Remove generated objects for compilation.
 fn clearObjects() {
-	os::File.Remove(getCompilePath()) else {
+	os::Remove(getCompilePath()) else {
 		println("a problem occurs when object cleaning")
 		ret
 	}
@@ -53,7 +53,7 @@ fn clearObjects() {
 	// All created objects are cleaned.
 	// So, deletes directory if empty after cleaned all objects,
 	// if not, leaves the directory.
-	os::Dir.Remove(OutDir) else {}
+	os::Rmdir(OutDir) else {}
 }
 
 // Compie generated IR.
@@ -357,7 +357,7 @@ fn buildIr(&args: []str): &obj::IR {
 	}
 
 	// Check standard library.
-	inf := os::Stat.Of(build::PathStdlib) else {
+	inf := os::Stat(build::PathStdlib) else {
 		handle::Throw(build::Logf(build::LogMsg.StdlibNotExist))
 		ret nil // Avoid error.
 	}

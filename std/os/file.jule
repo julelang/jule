@@ -52,67 +52,98 @@ impl io::WriteCloser for File {}
 impl io::ReadWriter for File {}
 impl io::Stream for File {}
 
-impl File {
-	// Creates or truncates the named file. If the file already exists,
-	// it is truncated. If the file does not exist, it is created with mode 0666
-	// (before umask). If successful, methods on the returned File can
-	// be used for I/O; the associated file descriptor has mode O_RDWR.
-	// Calls internally `File.Open` and forwards any exceptional.
-	static fn Create(path: str)!: &File {
-		ret File.Open(path, O_RDWR|O_CREATE|O_TRUNC, 0666) else { error(error) }
+// Opens file stream with named file, specified flag
+// (O_RDRW, O_TRUNC etc.) and perm. If named file does
+// not exist and O_CREATE flag is passed, will created with
+// mode (before umask). If successful, returns File reference with handle
+// to file stream and the reference can used for I/O operations.
+fn OpenFile(path: str, flag: oFlag, mode: int)!: &File {
+	ret openFile(path, flag, mode) else { error(error) }
+}
+
+// Removes named file.
+fn Remove(path: str)! {
+	remove(path) else { error(error) }
+}
+
+// Creates or truncates the named file. If the file already exists,
+// it is truncated. If the file does not exist, it is created with mode 0666
+// (before umask). If successful, methods on the returned File can
+// be used for I/O; the associated file descriptor has mode O_RDWR.
+// Calls internally `File.Open` and forwards any exceptional.
+fn Create(path: str)!: &File {
+	ret OpenFile(path, O_RDWR|O_CREATE|O_TRUNC, 0666) else { error(error) }
+}
+
+// Reads bytes of file.
+// First, learns byte-size of file.
+// Then reads bytes and returns buffer.
+fn ReadFile(path: str)!: []byte {
+	s := Stat(path) else { error(error) }
+	if !s.IsReg() {
+		error(FSError.IsDir)
 	}
 
-	// Reads bytes of file.
-	// First, learns byte-size of file.
-	// Then reads bytes and returns buffer.
-	static fn Read(path: str)!: []byte {
-		s := Stat.Of(path) else { error(error) }
-		if !s.IsReg() {
-			error(FSError.IsDir)
-		}
-
-		mut sz := int(s.Size())
-		if sz != int(s.Size()) {
-			sz = 0
-		}
-		// Following information adopted from Go:
-		//
-		// If a file claims a small size, read at least 512 bytes.
-		// In particular, files in Linux's /proc claim size 0 but
-		// then do not work right if read in small pieces,
-		// so an initial read of 1 byte would not work correctly.
-		if sz < 1<<9 {
-			sz = 1 << 9
-		}
-
-		mut f := File.Open(path, O_RDONLY, 0) else { error(error) }
-		mut buf := make([]byte, sz)
-		mut n := 0
-		for n < sz {
-			rn := f.Read(buf[n:]) else { error(error) }
-			if rn == 0 {
-				break
-			}
-			n += rn
-		}
-		f.Close() else { error(error) }
-		ret buf[:n]
+	mut sz := int(s.Size())
+	if sz != int(s.Size()) {
+		sz = 0
+	}
+	// Following information adopted from Go:
+	//
+	// If a file claims a small size, read at least 512 bytes.
+	// In particular, files in Linux's /proc claim size 0 but
+	// then do not work right if read in small pieces,
+	// so an initial read of 1 byte would not work correctly.
+	if sz < 1<<9 {
+		sz = 1 << 9
 	}
 
-	// Writes data to the named file, creating it if necessary.
-	// If the file does not exist, creates it with permissions perm (before umask);
-	// otherwise truncates it before writing, without changing permissions.
-	// Since requires multiple system calls to complete, a failure mid-operation
-	// can leave the file in a partially written state.
-	// Calls internally `File.Open`, `File.Write`, `File.Close` and forwards any exceptional.
-	static fn Write(path: str, data: []byte, perm: int)! {
-		mut f := File.Open(path, O_WRONLY|O_CREATE|O_TRUNC, perm) else { error(error) }
-		f.Write(data) else { error(error) }
-		f.Close() else { error(error) }
+	mut f := OpenFile(path, O_RDONLY, 0) else { error(error) }
+	mut buf := make([]byte, sz)
+	mut n := 0
+	for n < sz {
+		rn := f.Read(buf[n:]) else { error(error) }
+		if rn == 0 {
+			break
+		}
+		n += rn
 	}
+	f.Close() else { error(error) }
+	ret buf[:n]
+}
+
+// Writes data to the named file, creating it if necessary.
+// If the file does not exist, creates it with permissions perm (before umask);
+// otherwise truncates it before writing, without changing permissions.
+// Since requires multiple system calls to complete, a failure mid-operation
+// can leave the file in a partially written state.
+// Calls internally `File.Open`, `File.Write`, `File.Close` and forwards any exceptional.
+fn WriteFile(path: str, data: []byte, perm: int)! {
+	mut f := OpenFile(path, O_WRONLY|O_CREATE|O_TRUNC, perm) else { error(error) }
+	f.Write(data) else { error(error) }
+	f.Close() else { error(error) }
 }
 
 impl File {
+	// Writes bytes to handle and returns written byte count.
+	// The number of bytes written can never exceed the length of the buf.
+	//
+	// Implements the io::Writer trait.
+	fn Write(mut self, buf: []byte)!: (n: int) {
+		ret self.write(buf) else { error(error) }
+	}
+
+	// Read bytes to buffer from handle and returns read byte count.
+	// The number of bytes read can never exceed the length of the buf.
+	// If the buf is larger than the number of bytes that can be read,
+	// the buffer will not cause an overflow. Offset will be shifted
+	// by the number of bytes read.
+	//
+	// Implements the io::Reader trait.
+	fn Read(mut self, mut buf: []byte)!: (n: int) {
+		ret self.read(buf) else { error(error) }
+	}
+
 	// Sets offset to next Read/Write operation and returns the new offset.
 	// whence: 0 (Seek.Set) means, relative to the origin of the file, 1 (Seek.Cur)
 	// means relative to the current offset, and 2 (Seek.End) means relative to end.

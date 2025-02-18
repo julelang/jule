@@ -7,36 +7,24 @@ use integ "std/jule/integrated"
 use "std/runtime"
 use "std/sys"
 
-impl File {
-	// Opens file stream with named file, specified flag
-	// (O_RDRW, O_TRUNC etc.) and perm. If named file does
-	// not exist and O_CREATE flag is passed, will created with
-	// mode (before umask). If successful, returns File reference with handle
-	// to file stream and the reference can used for I/O operations.
-	static fn Open(path: str, flag: oFlag, mode: int)!: &File {
-		s := integ::StrToBytes(path)
-		handle := unsafe { sys::Open(&s[0], int(flag), mode) }
-		if handle == -1 {
-			error(getLastFsError())
-		}
-		ret &File{fd: poll::FD.New(u64(handle), poll::FDKind.File)}
+fn openFile(path: str, flag: oFlag, mode: int)!: &File {
+	s := integ::StrToBytes(path)
+	handle := unsafe { sys::Open(&s[0], int(flag), mode) }
+	if handle == -1 {
+		error(getLastFsError())
 	}
+	ret &File{fd: poll::FD.New(u64(handle), poll::FDKind.File)}
+}
 
-	// Removes named file.
-	static fn Remove(path: str)! {
-		s := integ::StrToBytes(path)
-		if unsafe { sys::Unlink(&s[0]) } != 0 {
-			error(getLastFsError())
-		}
+fn remove(path: str)! {
+	s := integ::StrToBytes(path)
+	if unsafe { sys::Unlink(&s[0]) } != 0 {
+		error(getLastFsError())
 	}
 }
 
 impl File {
-	// Writes bytes to handle and returns written byte count.
-	// The number of bytes written can never exceed the length of the buf.
-	//
-	// Implements the io::Writer trait.
-	fn Write(mut self, buf: []byte)!: (n: int) {
+	fn write(mut self, buf: []byte)!: (n: int) {
 		n, ok := self.fd.Write(buf)
 		if !ok {
 			error(getLastFsError())
@@ -44,14 +32,7 @@ impl File {
 		ret
 	}
 
-	// Read bytes to buffer from handle and returns read byte count.
-	// The number of bytes read can never exceed the length of the buf.
-	// If the buf is larger than the number of bytes that can be read,
-	// the buffer will not cause an overflow. Offset will be shifted
-	// by the number of bytes read.
-	//
-	// Implements the io::Reader trait.
-	fn Read(mut self, mut buf: []byte)!: (n: int) {
+	fn read(mut self, mut buf: []byte)!: (n: int) {
 		n, ok := self.fd.Read(buf)
 		if !ok {
 			error(getLastFsError())

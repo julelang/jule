@@ -6,46 +6,41 @@ use integ "std/jule/integrated"
 use "std/os/filepath"
 use "std/sys"
 
-impl Dir {
-	// Reads the named directory and returns all its directory entries can read.
-	static fn Read(path: str)!: (dirents: []Dir) {
-		utf16Path := integ::UTF16FromStr(filepath::Join(path, "*"))
-		mut data := sys::Win32FindData{}
-		handle := unsafe { sys::FindFirstFile(&utf16Path[0], &data) }
-		if handle == sys::InvalidHandle {
-			ret
-		}
-		for {
-			mut entry := Dir{
-				Name: unsafe { integ::U16PtrToStr((*u16)(data.cFileName)) },
-			}
-			entry.Stat = Stat.Of(filepath::Join(path, entry.Name)) else { error(error) }
-			dirents = append(dirents, entry)
-			if unsafe { sys::FindNextFile(handle, &data) } == 0 {
-				break
-			}
-		}
-		sys::FindClose(handle)
+fn readDir(path: str)!: (dirents: []DirEntry) {
+	utf16Path := integ::UTF16FromStr(filepath::Join(path, "*"))
+	mut data := sys::Win32FindData{}
+	handle := unsafe { sys::FindFirstFile(&utf16Path[0], &data) }
+	if handle == sys::InvalidHandle {
 		ret
 	}
-
-	// Creates directory.
-	static fn Create(path: str)! {
-		// NOTICE
-		// Also can has EMLINK error-code.
-		// Make sure this situation should documented or not.
-
-		utf16Path := integ::UTF16FromStr(path)
-		if unsafe { !sys::CreateDirectory(&utf16Path[0]) } {
-			error(getLastFsErrorWindows())
+	for {
+		mut entry := DirEntry{
+			Name: unsafe { integ::U16PtrToStr((*u16)(data.cFileName)) },
+		}
+		entry.Stat = Stat(filepath::Join(path, entry.Name)) else { error(error) }
+		dirents = append(dirents, entry)
+		if unsafe { sys::FindNextFile(handle, &data) } == 0 {
+			break
 		}
 	}
+	sys::FindClose(handle)
+	ret
+}
 
-	// Removes empty directory.
-	static fn Remove(path: str)! {
-		utf16Path := integ::UTF16FromStr(path)
-		if unsafe { !sys::RemoveDirectory(&utf16Path[0]) } {
-			error(getLastFsErrorWindows())
-		}
+fn mkdir(path: str)! {
+	// NOTICE
+	// Also can has EMLINK error-code.
+	// Make sure this situation should documented or not.
+
+	utf16Path := integ::UTF16FromStr(path)
+	if unsafe { !sys::CreateDirectory(&utf16Path[0]) } {
+		error(getLastFsErrorWindows())
+	}
+}
+
+fn rmdir(path: str)! {
+	utf16Path := integ::UTF16FromStr(path)
+	if unsafe { !sys::RemoveDirectory(&utf16Path[0]) } {
+		error(getLastFsErrorWindows())
 	}
 }
