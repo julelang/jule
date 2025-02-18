@@ -22,9 +22,13 @@ cpp struct _stat {
 }
 
 #typedef
-cpp struct WIN32_FIND_DATAW {
-	cFileName: *integ::Wchar
-}
+cpp struct WIN32_FIND_DATAW{}
+
+#typedef
+cpp struct SECURITY_ATTRIBUTES{}
+
+#typedef
+cpp struct BY_HANDLE_FILE_INFORMATION{}
 
 cpp fn GetStdHandle(stdh: uintptr): *unsafe
 cpp unsafe fn CloseHandle(stdh: *unsafe): bool
@@ -49,12 +53,13 @@ cpp fn WSAGetLastError(): int
 cpp unsafe fn FindFirstFileW(*integ::Wchar, *cpp.WIN32_FIND_DATAW): cpp.HANDLE
 cpp unsafe fn FindNextFileW(cpp.HANDLE, *cpp.WIN32_FIND_DATAW): int
 cpp fn FindClose(cpp.HANDLE): int
+cpp unsafe fn GetFileAttributesExW(name: *integ::Wchar, infoLevel: cpp.GET_FILEEX_INFO_LEVELS, info: *unsafe): bool
+cpp unsafe fn CreateFileW(path: *integ::Wchar, desiredAccess: cpp.DWORD, shareMode: cpp.DWORD, securityAttrs: *cpp.SECURITY_ATTRIBUTES, creationDisposition: cpp.DWORD, flagsAndAttrs: cpp.DWORD, templateFile: cpp.HANDLE): cpp.HANDLE
+cpp unsafe fn GetFileType(h: cpp.HANDLE): cpp.DWORD
+cpp unsafe fn GetFileInformationByHandle(h: cpp.HANDLE, *cpp.BY_HANDLE_FILE_INFORMATION): bool
 
 // C's stat.
 type SysStat: cpp._stat
-
-// C's WIN32_FIND_DATAW structure.
-type Win32FindData: cpp.WIN32_FIND_DATAW
 
 type Handle: uintptr
 
@@ -90,6 +95,28 @@ unsafe fn GetCurrentDirectory(bufflen: u32, mut buff: *u16): u32 {
 // Reports operation is success.
 unsafe fn SetCurrentDirectory(path: *u16): bool {
 	ret cpp.SetCurrentDirectoryW((*integ::Wchar)(path))
+}
+
+// Create file.
+unsafe fn CreateFile(path: *u16, desiredAccess: u32, shareMode: u32, securityAttrs: *SecurityAttributes, creationDisposition: u32, flagsAndAttrs: u32, templateFile: Handle): Handle {
+	ret Handle(cpp.CreateFileW(
+		(*integ::Wchar)(path),
+		cpp.DWORD(desiredAccess),
+		cpp.DWORD(shareMode),
+		(*cpp.SECURITY_ATTRIBUTES)(securityAttrs),
+		cpp.DWORD(creationDisposition),
+		cpp.DWORD(flagsAndAttrs),
+		cpp.HANDLE(templateFile)))
+}
+
+// Calls Windows's GetFileType function.
+unsafe fn GetFileType(h: Handle): u32 {
+	ret u32(cpp.GetFileType(cpp.HANDLE(h)))
+}
+
+// Calls Windows's GetFileInformationByHandle function.
+unsafe fn GetFileInformationByHandle(h: Handle, info: *ByHandleFileInformation): bool {
+	ret cpp.GetFileInformationByHandle(cpp.HANDLE(h), (*cpp.BY_HANDLE_FILE_INFORMATION)(info))
 }
 
 // Delete file.
@@ -166,4 +193,9 @@ unsafe fn GetEnvironmentVariable(key: *u16, mut out: *u16, outLen: u32): u32 {
 // Windows's SetEnvironmentVariableW function.
 unsafe fn SetEnvironmentVariable(key: *u16, val: *u16): bool {
 	ret cpp.SetEnvironmentVariableW((*integ::Wchar)(key), (*integ::Wchar)(val))
+}
+
+// Windows's GetFileAttributesExW function.
+unsafe fn GetFileAttributesEx(name: *u16, infoLevel: int, info: *unsafe): bool {
+	ret cpp.GetFileAttributesExW((*integ::Wchar)(name), cpp.GET_FILEEX_INFO_LEVELS(infoLevel), info)
 }

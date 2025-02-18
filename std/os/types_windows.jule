@@ -1,0 +1,154 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/mem"
+use "std/os/filepath"
+use "std/sys"
+
+#typedef
+cpp struct FILE_ATTRIBUTE_TAG_INFO{}
+
+cpp type HANDLE: *unsafe
+cpp type DWORD: u32
+
+cpp type FILE_INFO_BY_HANDLE_CLASS: int
+
+cpp unsafe fn GetFileInformationByHandleEx(h: cpp.HANDLE, infoClass: cpp.FILE_INFO_BY_HANDLE_CLASS, fileInfo: *unsafe, bufferSize: cpp.DWORD): bool
+
+struct _FILE_ATTRIBUTE_TAG_INFO {
+	FileAttributes: u32
+	ReparseTag:     u32
+}
+
+struct winstatInfo {
+	// from Win32FindData and GetFileInformationByHandleEx
+	reparseTag: u32
+
+	// what sys::GetFileType returns
+	filetype: u32
+}
+
+// Reparse tag values are taken from
+// https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-fscc/c8e77b37-3909-4fe6-a4ea-2b9d423b1ee4
+const _FSCTL_SET_REPARSE_POINT = 0x000900A4
+const _IO_REPARSE_TAG_MOUNT_POINT = 0xA0000003
+const _IO_REPARSE_TAG_DEDUP = 0x80000013
+const _IO_REPARSE_TAG_AF_UNIX = 0x80000023
+const _SYMLINK_FLAG_RELATIVE = 1
+
+// Determines whether a tag's associated reparse point is a surrogate for
+// another named entity (for example, a mounted folder).
+//
+// See https://learn.microsoft.com/en-us/windows/win32/api/winnt/nf-winnt-isreparsetagnamesurrogate
+// and https://learn.microsoft.com/en-us/windows/win32/fileio/reparse-point-tags.
+fn win32FileAttributeDataIsReparseTagNameSurrogate(&d: sys::Win32FileAttributeData, &info: winstatInfo): bool {
+	// True for IO_REPARSE_TAG_SYMLINK and IO_REPARSE_TAG_MOUNT_POINT.
+	ret d.FileAttributes&sys::FILE_ATTRIBUTE_REPARSE_POINT != 0 && info.reparseTag&0x20000000 != 0
+}
+
+// Returns FileMode from sys::Win32FileAttributeData d.
+fn modeFromWin32FileAttributeData(&d: sys::Win32FileAttributeData, &info: winstatInfo): (m: FileMode) {
+	if d.FileAttributes&sys::FILE_ATTRIBUTE_READONLY != 0 {
+		m |= 0444
+	} else {
+		m |= 0666
+	}
+
+	// Windows reports the FILE_ATTRIBUTE_DIRECTORY bit for reparse points
+	// that refer to directories, such as symlinks and mount points.
+	// However, we follow symlink POSIX semantics and do not set the mode bits.
+	// This allows users to walk directories without following links
+	// by just calling "fi, err := os.Lstat(name); err == nil && fi.IsDir()".
+	// Note that POSIX only defines the semantics for symlinks, not for
+	// mount points or other surrogate reparse points, but we treat them
+	// the same way for consistency. Also, mount points can contain infinite
+	// loops, so it is not safe to walk them without special handling.
+	if !win32FileAttributeDataIsReparseTagNameSurrogate(d, info) {
+		if d.FileAttributes&sys::FILE_ATTRIBUTE_DIRECTORY != 0 {
+			m |= ModeDir | 0111
+		}
+
+		match info.filetype {
+		| sys::FILE_TYPE_PIPE:
+			m |= ModeNamedPipe
+		| sys::FILE_TYPE_CHAR:
+			m |= ModeDevice | ModeCharDevice
+		}
+	}
+
+	if d.FileAttributes&sys::FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+		match info.reparseTag {
+		| sys::IO_REPARSE_TAG_SYMLINK:
+			m |= ModeSymlink
+		| _IO_REPARSE_TAG_AF_UNIX:
+			m |= ModeSocket
+		| _IO_REPARSE_TAG_DEDUP:
+			// If the Data Deduplication service is enabled on Windows Server, its
+			// Optimization job may convert regular files to _IO_REPARSE_TAG_DEDUP
+			// whenever that job runs.
+			//
+			// However, DEDUP reparse points remain similar in most respects to
+			// regular files: they continue to support random-access reads and writes
+			// of persistent data, and they shouldn't add unexpected latency or
+			// unavailability in the way that a network filesystem might.
+			//
+			// Jule programs may use ModeIrregular to filter out unusual files (such as
+			// raw device files on Linux, POSIX FIFO special files, and so on), so
+			// to avoid files changing unpredictably from regular to irregular we will
+			// consider DEDUP files to be close enough to regular to treat as such.
+		|:
+			m |= ModeIrregular
+		}
+	}
+	ret
+}
+
+// Copies all required information from sys::Win32FileAttributeData d into the newly created FileInfo.
+fn newFileStatFromWin32FileAttributeData(&d: sys::Win32FileAttributeData, &info: winstatInfo): (f: FileInfo) {
+	f.size = i64(d.FileSizeHigh)<<32 + i64(d.FileSizeLow)
+	f.mode = modeFromWin32FileAttributeData(d, info)
+	ret
+}
+
+// Copies all required information from sys::Win32FindData d into the newly created FileInfo.
+fn newFileStatFromWin32FindData(&d: sys::Win32FindData): (f: FileInfo) {
+	mut info := winstatInfo{}
+	if d.FileAttributes&sys::FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+		// Per https://learn.microsoft.com/en-us/windows/win32/api/minwinbase/ns-minwinbase-win32_find_dataw:
+		// “If the dwFileAttributes member includes the FILE_ATTRIBUTE_REPARSE_POINT
+		// attribute, this member specifies the reparse point tag. Otherwise, this
+		// value is undefined and should not be used.”
+		info.reparseTag = d.Reserved0
+	}
+	f.size = i64(d.FileSizeHigh)<<32 + i64(d.FileSizeLow)
+	f.mode = modeFromWin32FileAttributeData(unsafe { *(*sys::Win32FileAttributeData)(&d) }, info)
+	ret
+}
+
+// Calls GetFileInformationByHandle to gather all required information about the file handle h.
+fn newFileInfoFromGetFileInformationByHandle(h: sys::Handle)!: (d: sys::Win32FileAttributeData, info: winstatInfo) {
+	let mut fd: sys::ByHandleFileInformation
+	mut ok := unsafe { sys::GetFileInformationByHandle(h, &fd) }
+	if !ok {
+		error(getLastFsErrorWindows())
+	}
+
+	if fd.FileAttributes&sys::FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+		const FileAttributeTagInfo = 9
+		let mut ti: _FILE_ATTRIBUTE_TAG_INFO
+		ok = unsafe { cpp.GetFileInformationByHandleEx(cpp.HANDLE(h), cpp.FILE_INFO_BY_HANDLE_CLASS(FileAttributeTagInfo), &ti, cpp.DWORD(mem::SizeOf(ti))) }
+		if !ok {
+			error(getLastFsErrorWindows())
+		}
+		info.reparseTag = ti.ReparseTag
+	}
+
+	d.FileAttributes = fd.FileAttributes
+	d.CreationTime = fd.CreationTime
+	d.LastAccessTime = fd.LastAccessTime
+	d.LastWriteTime = fd.LastWriteTime
+	d.FileSizeHigh = fd.FileSizeHigh
+	d.FileSizeLow = fd.FileSizeLow
+	ret
+}

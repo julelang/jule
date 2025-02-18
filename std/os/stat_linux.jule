@@ -1,0 +1,35 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/sys"
+
+fn fillFileStatFromSys(mut &stat: FileInfo, systat: sys::SysStat) {
+	stat.size = unsafe { i64(systat.st_size) }
+	stat.mode = unsafe { FileMode(systat.st_mode & 0777) }
+	match systat.st_mode & sys::S_IFMT {
+	| sys::S_IFBLK:
+		stat.mode |= ModeDevice
+	| sys::S_IFCHR:
+		stat.mode |= ModeDevice | ModeCharDevice
+	| sys::S_IFDIR:
+		stat.mode |= ModeDir
+	| sys::S_IFIFO:
+		stat.mode |= ModeNamedPipe
+	| sys::S_IFLNK:
+		stat.mode |= ModeSymlink
+	| sys::S_IFREG:
+		// nothing to do
+	| sys::S_IFSOCK:
+		stat.mode |= ModeSocket
+	}
+	if systat.st_mode&sys::S_ISGID != 0 {
+		stat.mode |= ModeSetgid
+	}
+	if systat.st_mode&sys::S_ISUID != 0 {
+		stat.mode |= ModeSetuid
+	}
+	if systat.st_mode&sys::S_ISVTX != 0 {
+		stat.mode |= ModeSticky
+	}
+}
