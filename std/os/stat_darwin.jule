@@ -3,10 +3,12 @@
 // license that can be found in the LICENSE file.
 
 use "std/sys"
+use "std/time"
 
 fn fillFileStatFromSys(mut &stat: FileInfo, systat: sys::SysStat) {
 	stat.size = unsafe { i64(systat.st_size) }
 	stat.mode = unsafe { FileMode(systat.st_mode & 0777) }
+	stat.modtime = unsafe { time::Unix(i64(systat.st_mtimespec.tv_sec), i64(systat.st_mtimespec.tv_nsec)) }
 	match systat.st_mode & sys::S_IFMT {
 	| sys::S_IFBLK | sys::S_IFWHT:
 		stat.mode |= ModeDevice

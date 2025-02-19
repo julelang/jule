@@ -3,9 +3,9 @@
 // license that can be found in the LICENSE file.
 
 use "std/mem"
-use "std/os/filepath"
 use "std/os/internal/windows"
 use "std/sys"
+use "std/time"
 
 cpp type HANDLE: *unsafe
 cpp type DWORD: u32
@@ -97,6 +97,7 @@ fn modeFromWin32FileAttributeData(&d: sys::Win32FileAttributeData, &info: winsta
 fn newFileStatFromWin32FileAttributeData(&d: sys::Win32FileAttributeData, &info: winstatInfo): (f: FileInfo) {
 	f.size = i64(d.FileSizeHigh)<<32 + i64(d.FileSizeLow)
 	f.mode = modeFromWin32FileAttributeData(d, info)
+	f.modtime = time::Unix(0, d.LastWriteTime.Nanoseconds())
 	ret
 }
 
@@ -112,6 +113,7 @@ fn newFileStatFromWin32FindData(&d: sys::Win32FindData): (f: FileInfo) {
 	}
 	f.size = i64(d.FileSizeHigh)<<32 + i64(d.FileSizeLow)
 	f.mode = modeFromWin32FileAttributeData(unsafe { *(*sys::Win32FileAttributeData)(&d) }, info)
+	f.modtime = time::Unix(0, d.LastWriteTime.Nanoseconds())
 	ret
 }
 
