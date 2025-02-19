@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/sync"
 use "std/sync/atomic"
 use "std/testing"
 
-fn reader(mut rwm: &RWMutex, numIterations: int, mut activity: &i32, cdone: chan bool) {
+fn reader(mut rwm: &sync::RWMutex, numIterations: int, mut activity: &i32, cdone: chan bool) {
 	mut i := 0
 	for i < numIterations; i++ {
 		rwm.RLock()
@@ -23,7 +24,7 @@ fn reader(mut rwm: &RWMutex, numIterations: int, mut activity: &i32, cdone: chan
 	cdone <- true
 }
 
-fn writer(mut rwm: &RWMutex, numIterations: int, mut activity: &i32, cdone: chan bool) {
+fn writer(mut rwm: &sync::RWMutex, numIterations: int, mut activity: &i32, cdone: chan bool) {
 	mut i := 0
 	for i < numIterations; i++ {
 		rwm.Lock()
@@ -44,7 +45,7 @@ fn writer(mut rwm: &RWMutex, numIterations: int, mut activity: &i32, cdone: chan
 fn hammerRWMutex(numReaders: int, numIterations: int) {
 	// Number of active readers + 10000 * number of active writers.
 	mut activity := new(i32)
-	mut rwm := new(RWMutex)
+	mut rwm := new(sync::RWMutex)
 	cdone := make(chan bool)
 	co writer(rwm, numIterations, activity, cdone)
 	mut i := 0
@@ -64,7 +65,7 @@ fn hammerRWMutex(numReaders: int, numIterations: int) {
 
 #test
 fn testRWMutex(t: &testing::T) {
-	m := RWMutex{}
+	m := sync::RWMutex{}
 	m.Lock()
 	if m.TryLock() {
 		t.Errorf("TryLock succeeded with mutex locked")
@@ -111,7 +112,7 @@ fn testRWMutex(t: &testing::T) {
 
 #test
 fn testRLocker(t: &testing::T) {
-	mut wl := new(RWMutex)
+	mut wl := new(sync::RWMutex)
 	wlocked := make(chan bool, 1)
 	rlocked := make(chan bool, 1)
 	rl := wl.RLocker()
