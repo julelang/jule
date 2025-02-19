@@ -1,0 +1,62 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use integ "std/jule/integrated"
+use "std/mem"
+
+cpp unsafe fn LoadLibraryExW(lib: *integ::Wchar, h: cpp.HANDLE, flags: cpp.DWORD): *unsafe
+cpp unsafe fn GetProcAddress(lib: cpp.HMODULE, procName: *integ::Char): *unsafe
+
+cpp type HMODULE: *unsafe
+
+#typedef
+cpp struct RTL_OSVERSIONINFOW{}
+
+// This is true when the OS supports opting into
+// proper long path handling without the need for fixups.
+static mut CanUseLongPaths = false
+
+// https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/ns-wdm-_osversioninfow
+struct OSVERSIONINFOW {
+	osVersionInfoSize: u32
+	majorVersion:      u32
+	minorVersion:      u32
+	buildNumber:       u32
+	platformId:        u32
+	csdVersion:        [128]u16
+}
+
+const _LOAD_LIBRARY_SEARCH_SYSTEM32 = 0x00000800
+
+static mut _RtlGetVersion: uintptr = 0
+
+fn findLibFunc(lib: uintptr, name: str): uintptr {
+	ret unsafe { uintptr(cpp.GetProcAddress(cpp.HMODULE(lib), (*integ::Char)(&name[0]))) }
+}
+
+fn loadWinAPI() {
+	ntdlldll := [...]u16(['n', 't', 'd', 'l', 'l', '.', 'd', 'l', 'l', 0])
+	n32 := unsafe { uintptr(cpp.LoadLibraryExW((*integ::Wchar)(&ntdlldll[0]), nil, _LOAD_LIBRARY_SEARCH_SYSTEM32)) }
+	if n32 == 0 {
+		panic("ntdll.dll not found")
+	}
+	_RtlGetVersion = findLibFunc(n32, "RtlGetVersion\000")
+}
+
+fn init() {
+	loadWinAPI()
+
+	// Check that we're ≥ 10.0.15063.
+	mut info := OSVERSIONINFOW{}
+	info.osVersionInfoSize = u32(mem::SizeOf(info))
+	unsafe {
+		// TODO: refactor here if possible after dynamic library linkage support added.
+		integ::Emit("((void(*)({})){})({})", *cpp.RTL_OSVERSIONINFOW, _RtlGetVersion, (*cpp.RTL_OSVERSIONINFOW)(&info))
+	}
+	if info.majorVersion < 10 || (info.majorVersion == 10 && info.minorVersion == 0 && info.buildNumber < 15063) {
+		ret
+	}
+
+	CanUseLongPaths = true
+}

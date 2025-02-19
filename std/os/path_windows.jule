@@ -1,0 +1,130 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/internal/byteslite"
+use integ "std/jule/integrated"
+use "std/os/filepath"
+use "std/os/internal"
+use "std/os/internal/windows"
+use "std/sync"
+use "std/sys"
+
+// Working directory cache.
+// It used by the addExtendedPrefix function.
+static mut wd = ""
+static wdmu = new(sync::Mutex)
+
+// Returns the extended-length (\\?\-prefixed) form of
+// path when needed, in order to avoid the default 260 character file
+// path limit imposed by Windows. If the path is short enough or already
+// has the extended-length prefix, fixLongPath returns path unmodified.
+// If the path is relative and joining it with the current working
+// directory results in a path that is too long, fixLongPath returns
+// the absolute path with the extended-length prefix.
+//
+// See https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#maximum-path-length-limitation
+fn fixLongPath(path: str): str {
+	if windows::CanUseLongPaths {
+		ret path
+	}
+	ret addExtendedPrefix(path)
+}
+
+// Adds the extended path prefix (\\?\) to path.
+fn addExtendedPrefix(path: str): str {
+	if len(path) >= 4 {
+		if path[:4] == `\??\` {
+			// Already extended with \??\
+			ret path
+		}
+		if filepath::IsPathSep(path[0]) && filepath::IsPathSep(path[1]) && path[2] == '?' && filepath::IsPathSep(path[3]) {
+			// Already extended with \\?\ or any combination of directory separators.
+			ret path
+		}
+	}
+
+	// Do nothing (and don't allocate) if the path is "short".
+	// Empirically (at least on the Windows Server 2013 builder),
+	// the kernel is arbitrarily okay with < 248 bytes. That
+	// matches what the docs above say:
+	// "When using an API to create a directory, the specified
+	// path cannot be so long that you cannot append an 8.3 file
+	// name (that is, the directory name cannot exceed MAX_PATH
+	// minus 12)." Since MAX_PATH is 260, 260 - 12 = 248.
+	//
+	// The MSDN docs appear to say that a normal path that is 248 bytes long
+	// will work; empirically the path must be less then 248 bytes long.
+	mut pathLength := len(path)
+	if !filepath::IsAbs(path) {
+		// If the path is relative, we need to prepend the working directory
+		// plus a separator to the path before we can determine if it's too long.
+		// We don't want to call sys::Getwd equivalent here, as that call is expensive to do
+		// every time fixLongPath is called with a relative path, so we use a cache.
+		// Note that getwdCache might be outdated if the working directory has been
+		// changed without using os::Chdir, i.e. using sys::Chdir equivalent directly or Integrated Jule.
+		// This is fine, as the worst that can happen is that we fail to fix the path.
+		wdmu.Lock()
+		if wd == "" {
+			// Init the working directory cache.
+			wd = internal::Getwd()
+		}
+		pathLength += len(wd) + 1
+		wdmu.Unlock()
+	}
+
+	if pathLength < 248 {
+		// Don't fix.
+		ret path
+	}
+
+	let mut isUNC: bool
+	let mut isDevice: bool
+	if len(path) >= 2 && filepath::IsPathSep(path[0]) && filepath::IsPathSep(path[1]) {
+		if len(path) >= 4 && path[2] == '.' && filepath::IsPathSep(path[3]) {
+			// Starts with //./
+			isDevice = true
+		} else {
+			// Starts with //
+			isUNC = true
+		}
+	}
+	let mut prefix: []u16
+	if isUNC {
+		// UNC path, prepend the \\?\UNC\ prefix.
+		prefix = ['\\', '\\', '?', '\\', 'U', 'N', 'C', '\\']
+	} else if isDevice {
+		// Don't add the extended prefix to device paths, as it would
+		// change its meaning.
+	} else {
+		prefix = ['\\', '\\', '?', '\\']
+	}
+
+	// If path contains zero-byte; don't fix, return path.
+	if byteslite::IndexByteStr(path, 0) != -1 {
+		ret path
+	}
+	p := integ::UTF16FromStr(path)
+	// Estimate the required buffer size using the path length plus the null terminator.
+	// pathLength includes the working directory. This should be accurate unless
+	// the working directory has changed without using os.Chdir.
+	mut n := u32(pathLength) + 1
+	let mut buf: []u16
+	for {
+		buf = make([]u16, n+u32(len(prefix)))
+		n = unsafe { sys::GetFullPathName(&p[0], n, &buf[len(prefix)], nil) }
+		if n == 0 {
+			ret path
+		}
+		if n <= u32(len(buf)-len(prefix)) {
+			buf = buf[:n+u32(len(prefix))]
+			break
+		}
+	}
+	if isUNC {
+		// Remove leading \\.
+		buf = buf[2:]
+	}
+	copy(buf, prefix)
+	ret integ::UTF16ToStr(buf)
+}

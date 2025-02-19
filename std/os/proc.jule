@@ -3,6 +3,7 @@
 // license that can be found in the LICENSE file.
 
 use integ "std/jule/integrated"
+use "std/os/filepath"
 use "std/os/internal"
 use "std/runtime"
 use "std/sys"
@@ -46,6 +47,18 @@ fn Chdir(path: str)! {
 	ok := internal::Chdir(path)
 	if !ok {
 		error(getLastOsError())
+	}
+	// Update the working directory cache.
+	const match runtime::OS {
+	| "windows":
+		abs := filepath::IsAbs(path)
+		wdmu.Lock()
+		if abs {
+			wd = path
+		} else {
+			wd = ""
+		}
+		wdmu.Unlock()
 	}
 }
 
