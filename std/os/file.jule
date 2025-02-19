@@ -47,6 +47,13 @@ impl io::WriteCloser for File {}
 impl io::ReadWriter for File {}
 impl io::Stream for File {}
 
+// Opens the named file for reading. If successful, methods on
+// the returned file can be used for reading; the associated file
+// descriptor has mode O_RDONLY.
+fn Open(path: str)!: &File {
+	ret OpenFile(path, O_RDONLY, 0) else { error(error) }
+}
+
 // Opens file stream with named file, specified flag
 // (O_RDRW, O_TRUNC etc.) and perm. If named file does
 // not exist and O_CREATE flag is passed, will created with
@@ -74,7 +81,7 @@ fn Create(path: str)!: &File {
 // First, learns byte-size of file.
 // Then reads bytes and returns buffer.
 fn ReadFile(path: str)!: []byte {
-	mut f := OpenFile(path, O_RDONLY, 0) else { error(error) }
+	mut f := Open(path) else { error(error) }
 	s := Stat(path) else { error(error) }
 
 	mut sz := int(s.Size())
