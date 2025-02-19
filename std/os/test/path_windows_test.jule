@@ -1,0 +1,115 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/os"
+use "std/os/filepath"
+use "std/strings"
+use "std/testing"
+
+struct addExtendedPrefixTest {
+	input: str
+	want:  str
+}
+
+#test
+fn testAddExtendedPrefix(t: &testing::T) {
+	// Test addExtendedPrefix instead of fixLongPath so the path manipulation code
+	// is exercised even if long path are supported by the system, else the
+	// function might not be tested at all if/when all test builders support long paths.
+	mut cwd := os::Getwd()!
+	drive := strings::ToLower(filepath::VolumeName(cwd))
+	cwd = strings::ToLower(cwd[len(drive)+1:])
+	// Build a very long pathname. Paths in Go are supposed to be arbitrarily long,
+	// so let's make a long path which is comfortably bigger than MAX_PATH on Windows
+	// (256) and thus requires fixLongPath to be correctly interpreted in I/O syscalls.
+	veryLong := "l" + strings::Repeat("o", 500) + "ng"
+	for _, test in []addExtendedPrefixTest([
+		// Test cases use word substitutions:
+		//   * "long" is replaced with a very long pathname
+		//   * "c:" or "C:" are replaced with the drive of the current directory (preserving case)
+		//   * "cwd" is replaced with the current directory
+
+		// Drive Absolute
+		{`C:\long\foo.txt`, `\\?\C:\long\foo.txt`},
+		{`C:/long/foo.txt`, `\\?\C:\long\foo.txt`},
+		{`C:\\\long///foo.txt`, `\\?\C:\long\foo.txt`},
+		{`C:\long\.\foo.txt`, `\\?\C:\long\foo.txt`},
+		{`C:\long\..\foo.txt`, `\\?\C:\foo.txt`},
+		{`C:\long\..\..\foo.txt`, `\\?\C:\foo.txt`},
+
+		// Drive Relative
+		{`C:long\foo.txt`, `\\?\C:\cwd\long\foo.txt`},
+		{`C:long/foo.txt`, `\\?\C:\cwd\long\foo.txt`},
+		{`C:long///foo.txt`, `\\?\C:\cwd\long\foo.txt`},
+		{`C:long\.\foo.txt`, `\\?\C:\cwd\long\foo.txt`},
+		{`C:long\..\foo.txt`, `\\?\C:\cwd\foo.txt`},
+
+		// Rooted
+		{`\long\foo.txt`, `\\?\C:\long\foo.txt`},
+		{`/long/foo.txt`, `\\?\C:\long\foo.txt`},
+		{`\long///foo.txt`, `\\?\C:\long\foo.txt`},
+		{`\long\.\foo.txt`, `\\?\C:\long\foo.txt`},
+		{`\long\..\foo.txt`, `\\?\C:\foo.txt`},
+
+		// Relative
+		{`long\foo.txt`, `\\?\C:\cwd\long\foo.txt`},
+		{`long/foo.txt`, `\\?\C:\cwd\long\foo.txt`},
+		{`long///foo.txt`, `\\?\C:\cwd\long\foo.txt`},
+		{`long\.\foo.txt`, `\\?\C:\cwd\long\foo.txt`},
+		{`long\..\foo.txt`, `\\?\C:\cwd\foo.txt`},
+		{`.\long\foo.txt`, `\\?\C:\cwd\long\foo.txt`},
+
+		// UNC Absolute
+		{`\\srv\share\long`, `\\?\UNC\srv\share\long`},
+		{`//srv/share/long`, `\\?\UNC\srv\share\long`},
+		{`/\srv/share/long`, `\\?\UNC\srv\share\long`},
+		{`\\srv\share\long\`, `\\?\UNC\srv\share\long\`},
+		{`\\srv\share\bar\.\long`, `\\?\UNC\srv\share\bar\long`},
+		{`\\srv\share\bar\..\long`, `\\?\UNC\srv\share\long`},
+		{`\\srv\share\bar\..\..\long`, `\\?\UNC\srv\share\long`}, // share name is not removed by ".."
+
+		// Local Device
+		{`\\.\C:\long\foo.txt`, `\\.\C:\long\foo.txt`},
+		{`//./C:/long/foo.txt`, `\\.\C:\long\foo.txt`},
+		{`/\./C:/long/foo.txt`, `\\.\C:\long\foo.txt`},
+		{`\\.\C:\long///foo.txt`, `\\.\C:\long\foo.txt`},
+		{`\\.\C:\long\.\foo.txt`, `\\.\C:\long\foo.txt`},
+		{`\\.\C:\long\..\foo.txt`, `\\.\C:\foo.txt`},
+
+		// Misc tests
+		{`C:\short.txt`, `C:\short.txt`},
+		{`C:\`, `C:\`},
+		{`C:`, `C:`},
+		{`\\srv\path`, `\\srv\path`},
+		{`long.txt`, `\\?\C:\cwd\long.txt`},
+		{`C:long.txt`, `\\?\C:\cwd\long.txt`},
+		{`C:\long\.\bar\baz`, `\\?\C:\long\bar\baz`},
+		{`C:long\.\bar\baz`, `\\?\C:\cwd\long\bar\baz`},
+		{`C:\long\..\bar\baz`, `\\?\C:\bar\baz`},
+		{`C:long\..\bar\baz`, `\\?\C:\cwd\bar\baz`},
+		{`C:\long\foo\\bar\.\baz\\`, `\\?\C:\long\foo\bar\baz\`},
+		{`C:\long\..`, `\\?\C:\`},
+		{`C:\.\long\..\.`, `\\?\C:\`},
+		{`\\?\C:\long\foo.txt`, `\\?\C:\long\foo.txt`},
+		{`\\?\C:\long/foo.txt`, `\\?\C:\long/foo.txt`},
+	]) {
+		mut input := strings::ReplaceAll(test.input, "long", veryLong)
+		input = strings::ToLower(input)
+		input = strings::ReplaceAll(input, "c:", drive)
+
+		mut want := strings::ReplaceAll(test.want, "long", veryLong)
+		want = strings::ToLower(want)
+		want = strings::ReplaceAll(want, "c:", drive)
+		want = strings::ReplaceAll(want, "cwd", cwd)
+
+		mut got := os::AddExtendedPrefix(input)
+		got = strings::ToLower(got)
+		if got != want {
+			input = strings::ReplaceAll(input, veryLong, "long")
+			got = strings::ReplaceAll(got, veryLong, "long")
+			want = strings::ReplaceAll(want, veryLong, "long")
+			t.Errorf("addExtendedPrefix({}) = {}; want {}", input, got, want)
+		}
+	}
+}
