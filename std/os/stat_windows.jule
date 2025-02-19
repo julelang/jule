@@ -7,6 +7,7 @@
 // license that can be found in the LICENSE file.
 
 use integ "std/jule/integrated"
+use "std/os/filepath"
 use "std/sys"
 
 fn winstat(path: str, followSurrogates: bool)!: FileInfo {
@@ -95,4 +96,17 @@ fn statHandle(h: sys::Handle)!: (fi: sys::Win32FileAttributeData, info: winstatI
 
 fn stat(path: str)!: FileInfo {
 	ret winstat(path, true) else { error(error) }
+}
+
+fn lstat(path: str)!: FileInfo {
+	mut followSurrogates := false
+	if path != "" && filepath::IsPathSep(path[len(path)-1]) {
+		// We try to implement POSIX semantics for Lstat path resolution
+		// (per https://pubs.opengroup.org/onlinepubs/9699919799.2013edition/basedefs/V1_chap04.html#tag_04_12):
+		// symlinks before the last separator in the path must be resolved. Since
+		// the last separator in this case follows the last path element, we should
+		// follow symlinks in the last path element.
+		followSurrogates = true
+	}
+	ret winstat(path, followSurrogates) else { error(error) }
 }
