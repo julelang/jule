@@ -7,13 +7,13 @@ use integ "std/jule/integrated"
 use "std/os/filepath"
 use "std/os/internal"
 use "std/os/internal/windows"
-use "std/sync"
+use "std/runtime"
 use "std/sys"
 
 // Working directory cache.
 // It used by the addExtendedPrefix function.
 static mut wd = ""
-static wdmu = new(sync::Mutex)
+static wdmu = runtime::fmutex{}
 
 // Returns the extended-length (\\?\-prefixed) form of
 // path when needed, in order to avoid the default 260 character file
@@ -64,13 +64,13 @@ fn addExtendedPrefix(path: str): str {
 		// Note that getwdCache might be outdated if the working directory has been
 		// changed without using os::Chdir, i.e. using sys::Chdir equivalent directly or Integrated Jule.
 		// This is fine, as the worst that can happen is that we fail to fix the path.
-		wdmu.Lock()
+		wdmu.lock()
 		if wd == "" {
 			// Init the working directory cache.
 			wd = internal::Getwd()
 		}
 		pathLength += len(wd) + 1
-		wdmu.Unlock()
+		wdmu.unlock()
 	}
 
 	if pathLength < 248 {
