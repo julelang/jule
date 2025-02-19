@@ -4,18 +4,92 @@
 
 use "std/internal/poll"
 use integ "std/jule/integrated"
+use "std/mem"
 use "std/runtime"
 use "std/sys"
 use "std/unicode/utf16"
 use "std/unicode/utf8"
 
-fn openFile(path: str, flag: oFlag, mode: int)!: &File {
+fn openFile(path: str, mut mode: int, mut perm: FileMode)!: &File {
+	perm = syscallMode(perm)
+	mode |= sys::O_CLOEXEC
 	utf16Path := integ::UTF16FromStr(fixLongPath(path))
-	handle := unsafe { sys::Wopen(&utf16Path[0], int(flag), mode) }
-	if handle == -1 {
-		error(getLastFsError())
+	let mut access: u32
+	match mode & (sys::O_RDONLY | sys::O_WRONLY | sys::O_RDWR) {
+	| sys::O_RDONLY:
+		access = sys::GENERIC_READ
+	| sys::O_WRONLY:
+		access = sys::GENERIC_WRITE
+	| sys::O_RDWR:
+		access = sys::GENERIC_READ | sys::GENERIC_WRITE
 	}
-	ret &File{fd: poll::FD.New(u64(handle), poll::FDKind.File)}
+	if mode&sys::O_CREAT != 0 {
+		access |= sys::GENERIC_WRITE
+	}
+	if mode&sys::O_APPEND != 0 {
+		access &= ^sys::GENERIC_WRITE
+		access |= sys::FILE_APPEND_DATA
+	}
+	sharemode := u32(sys::FILE_SHARE_READ | sys::FILE_SHARE_WRITE)
+	let mut sa: sys::SecurityAttributes
+	if mode&sys::O_CLOEXEC == 0 {
+		sa.Length = u32(mem::SizeOf(sa))
+		sa.InheritHandle = 1
+	}
+	let mut createmode: u32
+	match {
+	| mode&(sys::O_CREAT|sys::O_EXCL) == (sys::O_CREAT|sys::O_EXCL):
+		createmode = sys::CREATE_NEW
+	| mode&(sys::O_CREAT|sys::O_TRUNC) == (sys::O_CREAT|sys::O_TRUNC):
+		createmode = sys::CREATE_ALWAYS
+	| mode&sys::O_CREAT == sys::O_CREAT:
+		createmode = sys::OPEN_ALWAYS
+	| mode&sys::O_TRUNC == sys::O_TRUNC:
+		createmode = sys::TRUNCATE_EXISTING
+	|:
+		createmode = sys::OPEN_EXISTING
+	}
+	let mut attrs: u32 = sys::FILE_ATTRIBUTE_NORMAL
+	if perm&sys::S_IWRITE == 0 {
+		attrs = sys::FILE_ATTRIBUTE_READONLY
+		if createmode == sys::CREATE_ALWAYS {
+			// We have been asked to create a read-only file.
+			// If the file already exists, the semantics of
+			// the Unix open system call is to preserve the
+			// existing permissions. If we pass CREATE_ALWAYS
+			// and FILE_ATTRIBUTE_READONLY to CreateFile,
+			// and the file already exists, CreateFile will
+			// change the file permissions.
+			// Avoid that to preserve the Unix semantics.
+			h := unsafe { sys::CreateFile(&utf16Path[0], access, sharemode, &sa, sys::TRUNCATE_EXISTING, sys::FILE_ATTRIBUTE_NORMAL, 0) }
+			if h == sys::InvalidHandle {
+				e := sys::GetLastError()
+				if e == sys::ERROR_FILE_NOT_FOUND || e == sys::ERROR_BAD_NETPATH || e == sys::ERROR_PATH_NOT_FOUND {
+					// File does not exist. These are the same
+					// errors as Errno.Is checks for ErrNotExist.
+					// Carry on to create the file.
+				} else {
+					error(getLastFsErrorWindows())
+				}
+			} else {
+				// Success.
+				ret &File{fd: poll::FD.New(u64(h), poll::FDKind.File)}
+			}
+		}
+	}
+	if createmode == sys::OPEN_EXISTING && access == sys::GENERIC_READ {
+		// Necessary for opening directory handles.
+		attrs |= sys::FILE_FLAG_BACKUP_SEMANTICS
+	}
+	if mode&sys::O_SYNC != 0 {
+		const _FILE_FLAG_WRITE_THROUGH = 0x80000000
+		attrs |= _FILE_FLAG_WRITE_THROUGH
+	}
+	h := unsafe { sys::CreateFile(&utf16Path[0], access, sharemode, &sa, createmode, attrs, 0) }
+	if h == sys::InvalidHandle {
+		error(getLastFsErrorWindows())
+	}
+	ret &File{fd: poll::FD.New(u64(h), poll::FDKind.File)}
 }
 
 fn remove(path: str)! {

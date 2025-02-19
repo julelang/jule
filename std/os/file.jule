@@ -13,13 +13,8 @@ enum Seek: int {
 	End: 2, // Seek relative to the end
 }
 
-// Flags to open wrapping those of the underlying system.
-// Not all flags may be implemented on a given system.
-// Exactly one of O_RDONLY, O_WRONLY, or O_RDWR must be specified.
-//
-// All flags have the underlying enum type for type safety.
-type oFlag: int
-
+// Flags to OpenFile wrapping those of the underlying system. Not all
+// flags may be implemented on a given system.
 const O_RDONLY = sys::O_RDONLY // Open the file read-only
 const O_WRONLY = sys::O_WRONLY // Open the file write-only
 const O_RDWR = sys::O_RDWR     // Open the file read-write
@@ -57,8 +52,8 @@ impl io::Stream for File {}
 // not exist and O_CREATE flag is passed, will created with
 // mode (before umask). If successful, returns File reference with handle
 // to file stream and the reference can used for I/O operations.
-fn OpenFile(path: str, flag: oFlag, mode: int)!: &File {
-	ret openFile(path, flag, mode) else { error(error) }
+fn OpenFile(path: str, mode: int, perm: FileMode)!: &File {
+	ret openFile(path, mode, perm) else { error(error) }
 }
 
 // Removes named file.
@@ -118,7 +113,7 @@ fn ReadFile(path: str)!: []byte {
 // Since requires multiple system calls to complete, a failure mid-operation
 // can leave the file in a partially written state.
 // Calls internally `File.Open`, `File.Write`, `File.Close` and forwards any exceptional.
-fn WriteFile(path: str, data: []byte, perm: int)! {
+fn WriteFile(path: str, data: []byte, perm: FileMode)! {
 	mut f := OpenFile(path, O_WRONLY|O_CREATE|O_TRUNC, perm) else { error(error) }
 	f.Write(data) else { error(error) }
 	f.Close() else { error(error) }
@@ -145,10 +140,10 @@ impl File {
 	}
 
 	// Sets offset to next Read/Write operation and returns the new offset.
-	// whence: 0 (Seek.Set) means, relative to the origin of the file, 1 (Seek.Cur)
+	// whence: 0 (Seek.Set) means, relative to the whence of the file, 1 (Seek.Cur)
 	// means relative to the current offset, and 2 (Seek.End) means relative to end.
-	fn Seek(mut self, offset: int, origin: Seek)!: int {
-		pos, ok := self.fd.Seek(offset, int(origin))
+	fn Seek(mut self, offset: i64, whence: Seek)!: i64 {
+		pos, ok := self.fd.Seek(offset, int(whence))
 		if !ok {
 			error(getLastFsError())
 		}

@@ -57,6 +57,11 @@ cpp unsafe fn GetFileAttributesExW(name: *integ::Wchar, infoLevel: cpp.GET_FILEE
 cpp unsafe fn CreateFileW(path: *integ::Wchar, desiredAccess: cpp.DWORD, shareMode: cpp.DWORD, securityAttrs: *cpp.SECURITY_ATTRIBUTES, creationDisposition: cpp.DWORD, flagsAndAttrs: cpp.DWORD, templateFile: cpp.HANDLE): cpp.HANDLE
 cpp unsafe fn GetFileType(h: cpp.HANDLE): cpp.DWORD
 cpp unsafe fn GetFileInformationByHandle(h: cpp.HANDLE, *cpp.BY_HANDLE_FILE_INFORMATION): bool
+cpp unsafe fn ReadFile(h: cpp.HANDLE, buf: *unsafe, bytesToRead: cpp.DWORD, mut bytesRead: *cpp.DWORD, overlap: *cpp.OVERLAPPED): bool
+cpp unsafe fn WriteFile(h: cpp.HANDLE, buf: *unsafe, bytesToWrite: cpp.DWORD, mut bytesWritten: *cpp.DWORD, overlap: *cpp.OVERLAPPED): bool
+
+#typedef
+cpp struct OVERLAPPED{}
 
 // C's stat.
 type SysStat: cpp._stat
@@ -107,6 +112,16 @@ unsafe fn CreateFile(path: *u16, desiredAccess: u32, shareMode: u32, securityAtt
 		cpp.DWORD(creationDisposition),
 		cpp.DWORD(flagsAndAttrs),
 		cpp.HANDLE(templateFile)))
+}
+
+// Read file.
+unsafe fn ReadFile(h: Handle, buf: *unsafe, bytesToRead: u32, mut bytesRead: *u32, overlap: *unsafe): bool {
+	ret cpp.ReadFile(cpp.HANDLE(h), buf, cpp.DWORD(bytesToRead), (*cpp.DWORD)(bytesRead), (*cpp.OVERLAPPED)(overlap))
+}
+
+// Write file.
+unsafe fn WriteFile(h: Handle, buf: *unsafe, bytesToWrite: u32, mut bytesWritten: *u32, overlap: *unsafe): bool {
+	ret cpp.WriteFile(cpp.HANDLE(h), buf, cpp.DWORD(bytesToWrite), (*cpp.DWORD)(bytesWritten), (*cpp.OVERLAPPED)(overlap))
 }
 
 // Calls Windows's GetFileType function.

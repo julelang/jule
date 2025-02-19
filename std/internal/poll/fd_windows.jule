@@ -7,6 +7,16 @@ use "std/sys"
 use "std/unicode/utf16"
 use "std/unicode/utf8"
 
+cpp type DWORD: u32
+cpp type HANDLE: *unsafe
+
+#typedef
+cpp struct LARGE_INTEGER {
+	QuadPart: i64
+}
+
+cpp unsafe fn SetFilePointerEx(h: cpp.HANDLE, toMove: cpp.LARGE_INTEGER, mut newPointer: *cpp.LARGE_INTEGER, moveMethod: cpp.DWORD): bool
+
 // This information adopted from the Go programming language:
 //
 // Windows ReadFile and WSARecv use DWORD (u32) parameter to pass buffer length.
@@ -51,7 +61,7 @@ impl FD {
 			| FDKind.Console:
 				nn = self.writeConsole(b)
 			| FDKind.File:
-				nn = unsafe { sys::Write(int(self.File), &b[0], uint(len(b))) }
+				nn = self.writeFile(b)
 			| FDKind.Socket:
 				nn = unsafe { sys::Send(uint(self.File), &b[0], uint(len(buf)), 0) }
 				if nn < 0 {
@@ -97,6 +107,17 @@ impl FD {
 			}
 		}
 		ret
+	}
+
+	// Writes buf to file handle, returns written byte count.
+	// Returns -1 if error occurred.
+	fn writeFile(mut self, mut buf: []byte): (n: int) {
+		mut n32 := u32(0)
+		ok := unsafe { sys::WriteFile(sys::Handle(self.File), &buf[0], u32(len(buf)), &n32, nil) }
+		if !ok {
+			ret -1
+		}
+		ret int(n32)
 	}
 
 	// Writes buf to console handle, returns written byte count.
@@ -163,8 +184,7 @@ impl FD {
 		| FDKind.Console:
 			n, ok = self.readConsole(buf)
 		| FDKind.File:
-			n = unsafe { sys::Read(int(self.File), &buf[0], uint(len(buf))) }
-			ok = n != -1
+			n, ok = self.readFile(buf)
 		| FDKind.Socket:
 			n = unsafe { sys::Recv(uint(self.File), &buf[0], uint(len(buf)), 0) }
 			ok = n >= 0
@@ -197,7 +217,21 @@ impl FD {
 		ret
 	}
 
-	// Reads from console handle into buf to console handle, returns read byte count.
+	// Reads from file handle into buf, returns read byte count.
+	fn readFile(mut self, mut buf: []byte): (n: int, ok: bool) {
+		mut n32 := u32(0)
+		ok = unsafe { sys::ReadFile(sys::Handle(self.File), &buf[0], u32(len(buf)), &n32, nil) }
+		if !ok {
+			if sys::GetLastError() == sys::ERROR_BROKEN_PIPE {
+				// Work around ERROR_BROKEN_PIPE is returned on reading EOF from stdin
+				ret 0, true
+			}
+			ret 0, false
+		}
+		ret int(n32), true
+	}
+
+	// Reads from console handle into buf, returns read byte count.
 	fn readConsole(mut self, mut buf: []byte): (n: int, ok: bool) {
 		if self.readu16 == nil {
 			// This information adopted from the Go programming language:
@@ -266,15 +300,49 @@ impl FD {
 		ret i, true
 	}
 
+	// Sets offset to next Read/Write operation and returns the new offset.
+	// whence: 0 (Seek.Set) means, relative to the whence of the file, 1 (Seek.Cur)
+	// means relative to the current offset, and 2 (Seek.End) means relative to end.
+	fn Seek(mut self, offset: i64, whence: int): (newoffset: i64, ok: bool) {
+		let mut w: u32
+		match whence {
+		| 0:
+			w = sys::FILE_BEGIN
+		| 1:
+			w = sys::FILE_CURRENT
+		| 2:
+			w = sys::FILE_END
+		}
+		ok = unsafe { setFilePointerEx(sys::Handle(self.File), offset, &newoffset, w) }
+		ret
+	}
+
 	// Closes file descriptor.
 	fn Close(mut self): (ok: bool) {
 		match self.Kind {
-		| FDKind.File | FDKind.Console:
-			ret sys::Close(int(self.File)) != -1
+		| FDKind.File:
+			ret unsafe { sys::CloseHandle(sys::Handle(self.File)) }
 		| FDKind.Socket | FDKind.SocketNoConn:
 			ret sys::CloseSocket(uint(self.File)) >= 0
 		|:
 			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for Close")
 		}
 	}
+}
+
+// Calls SetFilePointerEx.
+// See https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-setfilepointerex
+unsafe fn setFilePointerEx(handle: sys::Handle, distToMove: i64, newFilePointer: *i64, whence: u32): (ok: bool) {
+	let mut liOffset: cpp.LARGE_INTEGER
+	liOffset.QuadPart = distToMove
+
+	let mut newPos: cpp.LARGE_INTEGER
+	ok = cpp.SetFilePointerEx(cpp.HANDLE(handle), liOffset, &newPos, cpp.DWORD(whence))
+	if !ok {
+		ret false
+	}
+	if newFilePointer != nil {
+		*newFilePointer = newPos.QuadPart
+	}
+	ret true
 }
