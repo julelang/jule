@@ -7,16 +7,6 @@ use "std/sys"
 use "std/unicode/utf16"
 use "std/unicode/utf8"
 
-cpp type DWORD: u32
-cpp type HANDLE: *unsafe
-
-#typedef
-cpp struct LARGE_INTEGER {
-	QuadPart: i64
-}
-
-cpp unsafe fn SetFilePointerEx(h: cpp.HANDLE, toMove: cpp.LARGE_INTEGER, mut newPointer: *cpp.LARGE_INTEGER, moveMethod: cpp.DWORD): bool
-
 // This information adopted from the Go programming language:
 //
 // Windows ReadFile and WSARecv use DWORD (u32) parameter to pass buffer length.
@@ -304,26 +294,14 @@ impl FD {
 	// whence: 0 (Seek.Set) means, relative to the whence of the file, 1 (Seek.Cur)
 	// means relative to the current offset, and 2 (Seek.End) means relative to end.
 	fn Seek(mut self, offset: i64, whence: int): (newoffset: i64, ok: bool) {
-		let mut w: u32
-		match whence {
-		| 0: // io::SeekStart
-			w = sys::FILE_BEGIN
-		| 1: // io::SeekCurrent
-			w = sys::FILE_CURRENT
-		| 2: // io::SeekEnd
-			w = sys::FILE_END
-		}
-		ok = unsafe { setFilePointerEx(sys::Handle(self.File), offset, &newoffset, w) }
+		newoffset = unsafe { sys::Seek(sys::Handle(self.File), offset, whence) }
+		ok = newoffset != -1
 		ret
 	}
 
 	// Imitates the POSIX ftruncate function.
 	fn Ftruncate(mut self, size: i64): (ok: bool) {
-		_, ok = self.Seek(size, 0)
-		if !ok {
-			ret
-		}
-		ret unsafe { sys::SetEndOfFile(sys::Handle(self.File)) }
+		ret unsafe { sys::Ftruncate(sys::Handle(self.File), size) } == 0
 	}
 
 	// Wraps sys::FlushFileBuffers.
@@ -342,21 +320,4 @@ impl FD {
 			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for Close")
 		}
 	}
-}
-
-// Calls SetFilePointerEx.
-// See https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-setfilepointerex
-unsafe fn setFilePointerEx(handle: sys::Handle, distToMove: i64, newFilePointer: *i64, whence: u32): (ok: bool) {
-	let mut liOffset: cpp.LARGE_INTEGER
-	liOffset.QuadPart = distToMove
-
-	let mut newPos: cpp.LARGE_INTEGER
-	ok = cpp.SetFilePointerEx(cpp.HANDLE(handle), liOffset, &newPos, cpp.DWORD(whence))
-	if !ok {
-		ret false
-	}
-	if newFilePointer != nil {
-		*newFilePointer = newPos.QuadPart
-	}
-	ret true
 }
