@@ -5,10 +5,7 @@
 use "std/internal/poll"
 use integ "std/jule/integrated"
 use "std/mem"
-use "std/runtime"
 use "std/sys"
-use "std/unicode/utf16"
-use "std/unicode/utf8"
 
 const devNull = "NUL"
 
@@ -19,7 +16,7 @@ fn makeInheritSa(mut &sa: sys::SecurityAttributes) {
 
 fn openFile(path: str, mut mode: int, mut perm: FileMode)!: &File {
 	if path == "" {
-		error(FSError.NotExist)
+		error(sys::Errno(sys::ERROR_FILE_NOT_FOUND))
 	}
 	perm = syscallMode(perm)
 	mode |= sys::O_CLOEXEC
@@ -78,7 +75,7 @@ fn openFile(path: str, mut mode: int, mut perm: FileMode)!: &File {
 					// errors as Errno.Is checks for ErrNotExist.
 					// Carry on to create the file.
 				} else {
-					error(getLastFsErrorWindows())
+					error(sys::GetLastErrno())
 				}
 			} else {
 				// Success.
@@ -96,7 +93,7 @@ fn openFile(path: str, mut mode: int, mut perm: FileMode)!: &File {
 	}
 	h := unsafe { sys::CreateFile(&utf16Path[0], access, sharemode, &sa, createmode, attrs, 0) }
 	if h == sys::InvalidHandle {
-		error(getLastFsErrorWindows())
+		error(sys::GetLastErrno())
 	}
 	ret &File{fd: poll::FD.New(u64(h), poll::FDKind.File)}
 }
@@ -104,52 +101,6 @@ fn openFile(path: str, mut mode: int, mut perm: FileMode)!: &File {
 fn remove(path: str)! {
 	utf16Path := integ::UTF16FromStr(fixLongPath(path))
 	if unsafe { !sys::DeleteFile(&utf16Path[0]) } {
-		error(getLastFsErrorWindows())
-	}
-}
-
-impl File {
-	fn write(mut self, buf: []byte)!: (n: int) {
-		n, ok := self.fd.Write(buf)
-		if !ok {
-			if self.fd.Kind == poll::FDKind.File {
-				error(getLastFsError())
-			}
-			error(getLastFsErrorWindows())
-		}
-		ret
-	}
-
-	fn read(mut self, mut buf: []byte)!: (n: int) {
-		n, ok := self.fd.Read(buf)
-		if !ok {
-			if self.fd.Kind == poll::FDKind.File {
-				error(getLastFsError())
-			}
-			error(getLastFsErrorWindows())
-		}
-		ret
-	}
-
-	fn seek(mut self, offset: i64, whence: int)!: i64 {
-		pos, ok := self.fd.Seek(offset, whence)
-		if !ok {
-			error(getLastFsErrorWindows())
-		}
-		ret pos
-	}
-
-	fn sync(mut self)! {
-		ok := self.fd.Fsync()
-		if !ok {
-			error(getLastFsError())
-		}
-	}
-
-	fn truncate(mut self, size: i64)! {
-		ok := self.fd.Ftruncate(size)
-		if !ok {
-			error(getLastFsErrorWindows())
-		}
+		error(sys::GetLastErrno())
 	}
 }

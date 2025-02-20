@@ -4,19 +4,18 @@
 
 use "std/internal/poll"
 use integ "std/jule/integrated"
-use "std/runtime"
 use "std/sys"
 
 const devNull = "/dev/null"
 
 fn openFile(path: str, mode: int, perm: FileMode)!: &File {
 	if path == "" {
-		error(FSError.NotExist)
+		error(sys::ENOENT)
 	}
 	s := integ::StrToBytes(path)
 	handle := unsafe { sys::Open(&s[0], mode|sys::O_CLOEXEC, int(syscallMode(perm))) }
 	if handle == -1 {
-		error(getLastFsError())
+		error(sys::GetLastErrno())
 	}
 	ret &File{fd: poll::FD.New(u64(handle), poll::FDKind.File)}
 }
@@ -24,46 +23,6 @@ fn openFile(path: str, mode: int, perm: FileMode)!: &File {
 fn remove(path: str)! {
 	s := integ::StrToBytes(path)
 	if unsafe { sys::Unlink(&s[0]) } != 0 {
-		error(getLastFsError())
-	}
-}
-
-impl File {
-	fn write(mut self, buf: []byte)!: (n: int) {
-		n, ok := self.fd.Write(buf)
-		if !ok {
-			error(getLastFsError())
-		}
-		ret
-	}
-
-	fn read(mut self, mut buf: []byte)!: (n: int) {
-		n, ok := self.fd.Read(buf)
-		if !ok {
-			error(getLastFsError())
-		}
-		ret
-	}
-
-	fn seek(mut self, offset: i64, whence: int)!: i64 {
-		pos, ok := self.fd.Seek(offset, whence)
-		if !ok {
-			error(getLastFsError())
-		}
-		ret pos
-	}
-
-	fn sync(mut self)! {
-		ok := self.fd.Fsync()
-		if !ok {
-			error(getLastFsError())
-		}
-	}
-
-	fn truncate(mut self, size: i64)! {
-		ok := self.fd.Ftruncate(size)
-		if !ok {
-			error(getLastFsError())
-		}
+		error(sys::GetLastErrno())
 	}
 }

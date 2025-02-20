@@ -10,7 +10,7 @@ use "std/time"
 // It will forward any exceptional from network connectors.
 //
 // For UDP network, the [ListenUDP] function should be used.
-// If the network parameter is points udp network, function will panic.
+// If the network parameter is points UDP network, function will panic.
 //
 // See the [Dial] function for a description of the network and addr parameters.
 fn Listen(network: Network, addr: str)!: Listener {
@@ -18,7 +18,7 @@ fn Listen(network: Network, addr: str)!: Listener {
 	| Network.TCP | Network.TCP4 | Network.TCP6:
 		ret tcpBind(network, addr) else { error(error) }
 	|:
-		error(AddrError.UnknownNetwork)
+		error(&AddrError{Err: "invalid network: " + str(network)})
 	}
 }
 
@@ -78,7 +78,6 @@ fn Dial(network: Network, addr: str)!: Conn {
 // For UDP networks, timeout will be ignored.
 // Timeout precision is microseconds.
 // If the timeout is below one microsecond it will be ignored.
-// If timeout is invalid or out of range, throws exceptional with Error.InvalidTimeout.
 fn DialTimeout(network: Network, addr: str, timeout: time::Duration)!: Conn {
 	match network {
 	| Network.TCP | Network.TCP4 | Network.TCP6:
@@ -86,7 +85,7 @@ fn DialTimeout(network: Network, addr: str, timeout: time::Duration)!: Conn {
 	| Network.UDP | Network.UDP4 | Network.UDP6:
 		ret udpDial(network, addr) else { error(error) }
 	|:
-		error(AddrError.UnknownNetwork)
+		error(&AddrError{Err: "invalid network: " + str(network)})
 	}
 }
 

@@ -44,7 +44,6 @@ impl TCPListener {
 	}
 
 	// Accepts incoming connection, returns &TCPConn.
-	// All exceptionals are error code of implementation.
 	// Panics if connection is closed.
 	fn Accept(self)!: Conn {
 		if self.fd == nil {
@@ -108,7 +107,6 @@ impl TCPListener {
 	}
 
 	// Closes connection.
-	// All exceptionals are error code of implementation.
 	fn Close(mut self)! {
 		if self.fd == nil {
 			ret
@@ -164,13 +162,13 @@ fn tcpBind(network: Network, &addr: str)!: &TCPListener {
 				}
 			}
 		|:
-			error(AddrError.UnknownNetwork)
+			error(&AddrError{Err: "invalid network: " + str(network)})
 		}
 	} else {
 		mut ipv4 := tcpAddr.IP.To4()
 		if ipv4.Empty() {
 			if network == Network.TCP4 {
-				error(AddrError.NoSuitable)
+				error(&AddrError{Err: "expected IPv4 address but found IPv6", Addr: addr})
 			}
 			v6 = true
 			handle := sys::Socket(sys::AF_INET6, sys::SOCK_STREAM, sys::IPPROTO_TCP)
@@ -194,7 +192,7 @@ fn tcpBind(network: Network, &addr: str)!: &TCPListener {
 			}
 		} else {
 			if network == Network.TCP6 {
-				error(AddrError.NoSuitable)
+				error(&AddrError{Err: "expected IPv6 address but found IPv4", Addr: addr})
 			}
 			tcpAddr.IP = ipv4
 			handle := sys::Socket(sys::AF_INET, sys::SOCK_STREAM, sys::IPPROTO_TCP)
@@ -270,13 +268,13 @@ fn tcpDial(network: Network, &addr: str, timeout: time::Duration)!: &TCPConn {
 				}
 			}
 		|:
-			error(AddrError.UnknownNetwork)
+			error(&AddrError{Err: "invalid network: " + str(network)})
 		}
 	} else {
 		mut ipv4 := tcpAddr.IP.To4()
 		if ipv4.Empty() {
 			if network == Network.TCP4 {
-				error(AddrError.NoSuitable)
+				error(&AddrError{Err: "expected IPv4 address but found IPv6", Addr: addr})
 			}
 			v6 = true
 			handle := sys::Socket(sys::AF_INET6, sys::SOCK_STREAM, sys::IPPROTO_TCP)
@@ -300,7 +298,7 @@ fn tcpDial(network: Network, &addr: str, timeout: time::Duration)!: &TCPConn {
 			}
 		} else {
 			if network == Network.TCP6 {
-				error(AddrError.NoSuitable)
+				error(&AddrError{Err: "expected IPv6 address but found IPv4", Addr: addr})
 			}
 			tcpAddr.IP = ipv4
 			handle := sys::Socket(sys::AF_INET, sys::SOCK_STREAM, sys::IPPROTO_TCP)

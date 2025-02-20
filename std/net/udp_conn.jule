@@ -50,7 +50,6 @@ impl UDPConn {
 	// If the buffer is larger than the number of bytes that can be read,
 	// the buffer will not cause an overflow.
 	// It will panic if connection is closed.
-	// All exceptionals are error code of implementation.
 	fn Read(mut self, mut buf: []byte)!: (n: int) {
 		if self.fd == nil {
 			panic("net: UDPConn.Read: connection is closed")
@@ -69,7 +68,6 @@ impl UDPConn {
 
 	// Writes bytes to connection and returns written byte count.
 	// The number of bytes written can never exceed the length of the buffer.
-	// All exceptionals are error code of implementation.
 	fn Write(mut self, buf: []byte)!: (n: int) {
 		if self.fd == nil {
 			panic("net: UDPConn.Write: connection is closed")
@@ -90,7 +88,6 @@ impl UDPConn {
 	// Timeout precision is microseconds.
 	// If the timeout is below one microsecond it will be accepted as zero.
 	// The zero timeout, clears current timeout if exist.
-	// All exceptionals are error code of implementation.
 	fn SetReadTimeout(mut self, timeout: time::Duration)! {
 		if self.fd == nil {
 			panic("net: TCPConn.SetReadTimeout: connection is closed")
@@ -102,7 +99,6 @@ impl UDPConn {
 	// Timeout precision is microseconds.
 	// If the timeout is below one microsecond it will be accepted as zero.
 	// The zero timeout, clears current timeout if exist.
-	// All exceptionals are error code of implementation.
 	fn SetWriteTimeout(mut self, timeout: time::Duration)! {
 		if self.fd == nil {
 			panic("net: TCPConn.SetReadTimeout: connection is closed")
@@ -124,7 +120,6 @@ impl UDPConn {
 	}
 
 	// Closes connection.
-	// All exceptionals are error code of implementation.
 	fn Close(mut self)! {
 		if self.fd == nil {
 			ret
@@ -176,13 +171,13 @@ fn udpBind(network: Network, &addr: str)!: &UDPConn {
 				}
 			}
 		|:
-			error(AddrError.UnknownNetwork)
+			error(&AddrError{Err: "invalid network: " + str(network)})
 		}
 	} else {
 		mut ipv4 := conn.Addr.IP.To4()
 		if ipv4.Empty() {
 			if network == Network.UDP4 {
-				error(AddrError.NoSuitable)
+				error(&AddrError{Err: "expected IPv4 address but found IPv6", Addr: addr})
 			}
 			conn.v6 = true
 			handle := sys::Socket(sys::AF_INET6, sys::SOCK_DGRAM, sys::IPPROTO_UDP)
@@ -204,7 +199,7 @@ fn udpBind(network: Network, &addr: str)!: &UDPConn {
 			}
 		} else {
 			if network == Network.UDP6 {
-				error(AddrError.NoSuitable)
+				error(&AddrError{Err: "expected IPv6 address but found IPv4", Addr: addr})
 			}
 			conn.Addr.IP = ipv4
 			handle := sys::Socket(sys::AF_INET, sys::SOCK_DGRAM, sys::IPPROTO_UDP)
@@ -254,13 +249,13 @@ fn udpDial(network: Network, &addr: str)!: &UDPConn {
 			conn.sockaddr6.sin6_family = sys::AF_INET6
 			conn.sockaddr6.sin6_port = htons(conn.Addr.Port)
 		|:
-			error(AddrError.UnknownNetwork)
+			error(&AddrError{Err: "invalid network: " + str(network)})
 		}
 	} else {
 		mut ipv4 := conn.Addr.IP.To4()
 		if ipv4.Empty() {
 			if network == Network.UDP4 {
-				error(AddrError.NoSuitable)
+				error(&AddrError{Err: "expected IPv4 address but found IPv6", Addr: addr})
 			}
 			conn.v6 = true
 			handle := sys::Socket(sys::AF_INET6, sys::SOCK_DGRAM, sys::IPPROTO_UDP)
@@ -276,7 +271,7 @@ fn udpDial(network: Network, &addr: str)!: &UDPConn {
 			conn.sockaddr6.sin6_port = htons(conn.Addr.Port)
 		} else {
 			if network == Network.UDP6 {
-				error(AddrError.NoSuitable)
+				error(&AddrError{Err: "expected IPv6 address but found IPv4", Addr: addr})
 			}
 			conn.Addr.IP = ipv4
 			handle := sys::Socket(sys::AF_INET, sys::SOCK_DGRAM, sys::IPPROTO_UDP)

@@ -5,12 +5,11 @@
 use "std/internal/poll"
 use integ "std/jule/integrated"
 use "std/mem"
-use "std/runtime"
 use "std/sys"
 use "std/time"
 
-fn lastErrorCode(): int {
-	ret sys::WSAGetLastError()
+fn lastErrorCode(): sys::Errno {
+	ret sys::Errno(sys::WSAGetLastError())
 }
 
 fn setSocketBlockingMode(handle: poll::NetHandle, mode: integ::UnsignedLong)! {
@@ -37,7 +36,7 @@ unsafe fn connectSocket(handle: poll::NetHandle, sockAddr: *sys::Sockaddr, sockL
 	}
 	tv, ok := timevalFromDuration(timeout)
 	if !ok {
-		error(Error.InvalidTimeout)
+		error(ErrInvalidTimeout)
 	}
 	if tv.tv_sec == 0 && tv.tv_usec == 0 {
 		connectSocketNoTimeout(handle, sockAddr, sockLen) else { error(error) }
@@ -77,7 +76,7 @@ unsafe fn connectSocket(handle: poll::NetHandle, sockAddr: *sys::Sockaddr, sockL
 fn setSocketTimeout(handle: poll::NetHandle, scope: int, timeout: time::Duration)! {
 	tv, ok := timevalFromDuration(timeout)
 	if !ok {
-		error(Error.InvalidTimeout)
+		error(ErrInvalidTimeout)
 	}
 	unsafe {
 		if sys::Setsockopt(handle, sys::SOL_SOCKET, scope, (*integ::Char)(&tv), int(mem::SizeOf(tv))) < 0 {

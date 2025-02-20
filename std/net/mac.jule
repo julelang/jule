@@ -24,55 +24,58 @@ impl HardwareAddr {
 	//	0000.0000.fe80.0000.0000.0000.0200.5e10.0000.0001
 	//
 	// Exceptional is always will be AddrError.Unable.
-	static fn Parse(addr: str)!: HardwareAddr {
-		if len(addr) < 14 {
-			error(AddrError.Unable)
+	static fn Parse(s: str)!: HardwareAddr {
+		if len(s) < 14 {
+			goto err
 		}
-		mut addrB := unsafe::StrBytes(addr)
-		if addr[2] == ':' || addr[2] == '-' {
-			if (len(addr)+1)%3 != 0 {
-				error(AddrError.Unable)
-			}
-			n := (len(addr) + 1) / 3
-			if n != 6 && n != 8 && n != 20 {
-				error(AddrError.Unable)
-			}
-			mut hAddr := make(HardwareAddr, n)
-			mut x, mut i := 0, 0
-			for i < n {
-				(hAddr[i]), ok := xtoi(addrB[x:], addr[2])
-				if !ok {
-					error(AddrError.Unable)
+		{
+			mut addrB := unsafe::StrBytes(s)
+			if s[2] == ':' || s[2] == '-' {
+				if (len(s)+1)%3 != 0 {
+					goto err
 				}
-				i++
-				x += 3
-			}
-			ret hAddr
-		} else if addr[4] == '.' {
-			if (len(addr)+1)%5 != 0 {
-				error(AddrError.Unable)
-			}
-			n := ((len(addr) + 1) << 1) / 5
-			if n != 6 && n != 8 && n != 20 {
-				error(AddrError.Unable)
-			}
-			mut hAddr := make(HardwareAddr, n)
-			mut x, mut i := 0, 0
-			for i < n {
-				(hAddr[i]), mut ok := xtoi(addrB[x:x+2], 0)
-				if !ok {
-					error(AddrError.Unable)
+				n := (len(s) + 1) / 3
+				if n != 6 && n != 8 && n != 20 {
+					goto err
 				}
-				hAddr[i+1], ok = xtoi(addrB[x+2:], addr[4])
-				if !ok {
-					error(AddrError.Unable)
+				mut hAddr := make(HardwareAddr, n)
+				mut x, mut i := 0, 0
+				for i < n {
+					(hAddr[i]), ok := xtoi(addrB[x:], s[2])
+					if !ok {
+						goto err
+					}
+					i++
+					x += 3
 				}
-				i += 2
-				x += 5
+				ret hAddr
+			} else if s[4] == '.' {
+				if (len(s)+1)%5 != 0 {
+					goto err
+				}
+				n := ((len(s) + 1) << 1) / 5
+				if n != 6 && n != 8 && n != 20 {
+					goto err
+				}
+				mut hAddr := make(HardwareAddr, n)
+				mut x, mut i := 0, 0
+				for i < n {
+					(hAddr[i]), mut ok := xtoi(addrB[x:x+2], 0)
+					if !ok {
+						goto err
+					}
+					hAddr[i+1], ok = xtoi(addrB[x+2:], s[4])
+					if !ok {
+						goto err
+					}
+					i += 2
+					x += 5
+				}
+				ret hAddr
 			}
-			ret hAddr
 		}
-		error(AddrError.Unable)
+	err:
+		error(&AddrError{Err: "invalid MAC address", Addr: s})
 	}
 
 	// Returns address in string form.

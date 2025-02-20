@@ -5,29 +5,6 @@
 use "std/internal/byteslite"
 use "std/internal/conv"
 
-// Address errors.
-enum AddrError {
-	NoSuitable,                    // No suitable address.
-	Unable,                        // Unable to parse address.
-	MissingIPv6,                   // IPv6 address is missing.
-	UnexpectedToken,               // Address have unexpected token(s).
-	TooShort,                      // Address is too short.
-	TooLong,                       // Address is too long.
-	IPv4FieldValueOverflow,        // IPv4 address field has value > 255.
-	EmptyField,                    // IPv4 address field must have at least one digit.
-	IPv4FieldOctetWithLeadingZero, // IPv4 field has octet with leading zero.
-	EmptyZone,                     // Zone must be a non-empty string.
-	IPv6FieldValueOverflow,        // Each group must have 4 or less digits or field has value >=2^16.
-	IPv6ShortColon,                // Colon must be followed by more characters.
-	MissingPort,                   // Port is missing.
-	InvalidPort,                   // Port is invalid.
-	TooManyColons,                 // There is too many colons.
-	MissingRBracket,               // There is missing right bracket "]".
-	UnexpectedLBracket,            // Address have unexpected left bracket "[".
-	UnexpectedRBracket,            // Address have unexpected right bracket "]".
-	UnknownNetwork,                // Unknown network name.
-}
-
 const localhost = "localhost"
 
 // Represents a network end point address.
@@ -61,46 +38,47 @@ fn JoinHostPort(host: str, port: str): str {
 //
 // See the [Dial] function for a description of the hostport parameter, and host
 // and port results.
-//
-// Exceptionals are always will be AddrError.
 fn SplitHostPort(hostport: str)!: (host: str, port: str) {
+	const missingPort = "missing port in address"
+	const tooManyColons = "too many colons in address"
+
 	mut j, mut k := 0, 0
 	i := byteslite::LastIndexByteStr(hostport, ':')
 	if i == -1 {
-		error(AddrError.MissingPort)
+		error(&AddrError{Err: missingPort, Addr: hostport})
 	}
 	if hostport[0] == '[' {
 		// Expect the first ']' just before the last ':'.
 		end := byteslite::IndexByteStr(hostport, ']')
 		if end == -1 {
-			error(AddrError.MissingRBracket)
+			error(&AddrError{Err: "missing ']' in address", Addr: hostport})
 		}
 		match end + 1 {
 		| len(hostport):
-			error(AddrError.MissingPort)
+			error(&AddrError{Err: missingPort, Addr: hostport})
 		| i:
 			// Expected result, it's fine.
 		|:
 			// Either ']' isn't followed by a colon, or it is
 			// followed by a colon that is not the last one.
 			if hostport[end+1] == ':' {
-				error(AddrError.TooManyColons)
+				error(&AddrError{Err: tooManyColons, Addr: hostport})
 			}
-			error(AddrError.MissingPort)
+			error(&AddrError{Err: missingPort, Addr: hostport})
 		}
 		host = hostport[1:end]
 		j, k = 1, end+1 // There can't be a '[' resp. ']' before these positions.
 	} else {
 		host = hostport[:i]
 		if byteslite::IndexByteStr(host, ':') != -1 {
-			error(AddrError.TooManyColons)
+			error(&AddrError{Err: tooManyColons, Addr: hostport})
 		}
 	}
 	if byteslite::IndexByteStr(hostport[j:], '[') != -1 {
-		error(AddrError.UnexpectedLBracket)
+		error(&AddrError{Err: "unexpected '[' in address", Addr: hostport})
 	}
 	if byteslite::IndexByteStr(hostport[k:], ']') != -1 {
-		error(AddrError.UnexpectedRBracket)
+		error(&AddrError{Err: "unexpected ']' in address", Addr: hostport})
 	}
 	port = hostport[i+1:]
 	ret
@@ -125,8 +103,6 @@ enum ipAddr: type {
 // Parses addr as an IP address, returning the result. The string
 // addr can be in dotted decimal ("192.0.2.1"), IPv6 ("2001:db8::68"),
 // or IPv6 with a scoped addressing zone ("fe80::1cc0:3e8c:119f:c2e1%ens18").
-//
-// Exceptionals are always will be AddrError.
 fn parseAddr(addr: str)!: ipAddr {
 	for _, b in addr {
 		match b {
@@ -137,10 +113,10 @@ fn parseAddr(addr: str)!: ipAddr {
 		| '%':
 			// Assume that this was trying to be an IPv6 address with
 			// a zone specifier, but the address is missing.
-			error(AddrError.MissingIPv6)
+			error(&parseAddrError{input: addr, msg: "missing IPv6 address"})
 		}
 	}
-	error(AddrError.Unable)
+	error(&parseAddrError{input: addr, msg: "unable to parse IP"})
 }
 
 // Resolvers addr which may be aliteral IP address and
@@ -148,9 +124,6 @@ fn parseAddr(addr: str)!: ipAddr {
 //
 // Forwards any exceptional from used methods.
 fn resolveInternetAddr(&net: Network, &addr: str)!: Addr {
-	if addr == "" {
-		error(AddrError.MissingPort)
-	}
 	mut host, mut port := "", ""
 	mut portnum := 0
 	match net {
@@ -159,10 +132,10 @@ fn resolveInternetAddr(&net: Network, &addr: str)!: Addr {
 		host, port = SplitHostPort(addr) else { error(error) }
 		(portnum), ok := conv::Atoi(port)
 		if !ok {
-			error(AddrError.InvalidPort)
+			error(&AddrError{Err: "invalid port: " + port})
 		}
 	|:
-		error(AddrError.UnknownNetwork)
+		error(&AddrError{Err: "invalid network: " + str(net)})
 	}
 	if host == "" {
 		ret internetAddr(net, IP.Empty(), portnum, "")
@@ -244,8 +217,6 @@ fn buildLocalhostAddr(&net: Network, port: int): Addr {
 			IP: IPv4(127, 0, 0, 1),
 			Port: port,
 		}
-	}
-	match net {
 	| Network.TCP6:
 		mut ip := make(IP, IPv6Len)
 		ip[len(ip)-1] = 1

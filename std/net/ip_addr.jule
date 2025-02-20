@@ -6,6 +6,21 @@ use "std/internal/byteslite"
 use "std/strings"
 use "std/unsafe"
 
+struct parseAddrError {
+	input: str // the string given to ParseAddr
+	msg:   str // an explanation of the parse failure
+	at:    str // optionally, the unparsed portion of in at which the error occurred.
+}
+
+impl parseAddrError {
+	fn Str(self): str {
+		if self.at != "" {
+			ret self.msg + " (input " + self.input + ") (at " + self.at + ")"
+		}
+		ret self.msg + " (input" + self.input + ")"
+	}
+}
+
 // Returns the address of the IPv4 address given by the 4-bytes representation.
 fn ipAddrFrom4(ip: IP): u128 {
 	ret u128{
@@ -146,39 +161,39 @@ fn str16(ip: u128): str {
 fn parseIPv4Fields(&addr: str, off: int, end: int, mut ip: IP)! {
 	mut val, mut pos := 0, 0
 	mut digLen := 0 // number of digits in current octet
-	s := unsafe::StrBytes(addr)[off:end]
+	mut s := addr[off:end]
 	mut i := 0
 	for i < len(s); i++ {
 		if s[i] >= '0' && s[i] <= '9' {
 			if digLen == 1 && val == 0 {
-				error(AddrError.IPv4FieldOctetWithLeadingZero)
+				error(&parseAddrError{input: addr, msg: "IPv4 field has octet with leading zero"})
 			}
 			val = val*10 + int(s[i]) - '0'
 			digLen++
 			if val > 255 {
-				error(AddrError.IPv4FieldValueOverflow)
+				error(&parseAddrError{input: addr, msg: "IPv4 field has value >255"})
 			}
 		} else if s[i] == '.' {
 			// .1.2.3
 			// 1.2.3.
 			// 1..2.3
 			if i == 0 || i == len(s)-1 || s[i-1] == '.' {
-				error(AddrError.EmptyField)
+				error(&parseAddrError{input: addr, msg: "IPv4 field must have at least one digit", at: s[i:]})
 			}
 			// 1.2.3.4.5
 			if pos == 3 {
-				error(AddrError.TooLong)
+				error(&parseAddrError{input: addr, msg: "IPv4 address too long"})
 			}
 			ip[pos] = byte(val)
 			pos++
 			val = 0
 			digLen = 0
 		} else {
-			error(AddrError.UnexpectedToken)
+			error(&parseAddrError{input: addr, msg: "unexpected character", at: s[i:]})
 		}
 	}
 	if pos < 3 {
-		error(AddrError.TooShort)
+		error(&parseAddrError{input: addr, msg: "IPv4 address too short"})
 	}
 	ip[3] = byte(val)
 }
@@ -191,19 +206,19 @@ fn parseIPv4(&addr: str)!: IP {
 
 // Parses addr as an IPv6 address (in form "2001:db8::68").
 fn parseIPv6(&addr: str)!: TCPAddr {
-	mut s := unsafe::StrBytes(addr)
+	mut s := addr
 
 	// Split off the zone right from the start. Yes it's a second scan
 	// of the string, but trying to handle it inline makes a bunch of
 	// other inner loop conditionals more expensive, and it ends up
 	// being slower.
-	let mut zone: []byte = nil
-	mut i := byteslite::IndexByte(s, '%')
+	let mut zone: str = ""
+	mut i := byteslite::IndexByteStr(s, '%')
 	if i != -1 {
 		s, zone = s[:i], s[i+1:]
 		if len(zone) == 0 {
 			// Not allowed to have an empty zone if explicitly specified.
-			error(AddrError.EmptyZone)
+			error(&parseAddrError{input: addr, msg: "zone must be a non-empty string"})
 		}
 	}
 
@@ -218,7 +233,7 @@ fn parseIPv6(&addr: str)!: TCPAddr {
 		if len(s) == 0 {
 			mut tcpAddr := TCPAddr{
 				IP: IPv6Unspecified.To16(),
-				Zone: str(zone),
+				Zone: zone,
 			}
 			ret tcpAddr
 		}
@@ -244,27 +259,27 @@ fn parseIPv6(&addr: str)!: TCPAddr {
 			}
 			if off > 3 {
 				// More than 4 digits in group, fail.
-				error(AddrError.IPv6FieldValueOverflow)
+				error(&parseAddrError{input: addr, msg: "each group must have 4 or less digits", at: s})
 			}
 			if acc > u32(u16.Max) {
 				// Overflow, fail.
-				error(AddrError.IPv6FieldValueOverflow)
+				error(&parseAddrError{input: addr, msg: "IPv6 field has value >2^16", at: s})
 			}
 		}
 		if off == 0 {
 			// No digits found, fail.
-			error(AddrError.EmptyField)
+			error(&parseAddrError{input: addr, msg: "each colon-separated field must have at least one digit", at: s})
 		}
 
 		// If followed by dot, might be in trailing IPv4.
 		if off < len(s) && s[off] == '.' {
 			if ellipsis < 0 && i != 12 {
 				// Not the right place.
-				error(AddrError.UnexpectedToken)
+				error(&parseAddrError{input: addr, msg: "embedded IPv4 address must replace the final 2 fields of the address", at: s})
 			}
 			if i+4 > 16 {
 				// Not enough room.
-				error(AddrError.TooLong)
+				error(&parseAddrError{input: addr, msg: "too many hex fields to fit and embedded IPv4 at the end of the address", at: s})
 			}
 
 			mut end := len(addr)
@@ -290,16 +305,16 @@ fn parseIPv6(&addr: str)!: TCPAddr {
 
 		// Otherwise must be followed by colon and more.
 		if s[0] != ':' {
-			error(AddrError.UnexpectedToken)
+			error(&parseAddrError{input: addr, msg: "unexpected character, want colon", at: s})
 		} else if len(s) == 1 {
-			error(AddrError.IPv6ShortColon)
+			error(&parseAddrError{input: addr, msg: "colon must be followed by more characters", at: s})
 		}
 		s = s[1:]
 
 		// Look for ellipsis.
 		if s[0] == ':' {
 			if ellipsis >= 0 { // already have one
-				error(AddrError.UnexpectedToken)
+				error(&parseAddrError{input: addr, msg: "multiple :: in address", at: s})
 			}
 			ellipsis = i
 			s = s[1:]
@@ -310,13 +325,13 @@ fn parseIPv6(&addr: str)!: TCPAddr {
 	}
 	// Must have used entire string.
 	if len(s) != 0 {
-		error(AddrError.UnexpectedToken)
+		error(&parseAddrError{input: addr, msg: "trailing garbage after address", at: s})
 	}
 
 	// If didn't parse enough, expand ellipsis.
 	if i < 16 {
 		if ellipsis < 0 {
-			error(AddrError.TooShort)
+			error(&parseAddrError{input: addr, msg: "address string too short"})
 		}
 		n := 16 - i
 		mut j := i - 1
@@ -329,7 +344,7 @@ fn parseIPv6(&addr: str)!: TCPAddr {
 		}
 	} else if ellipsis >= 0 {
 		// Ellipsis must represent at least one 0 group.
-		error(AddrError.TooShort)
+		error(&parseAddrError{input: addr, msg: "the :: must expand to at least one field of zeros"})
 	}
 
 	// Parse IP address.

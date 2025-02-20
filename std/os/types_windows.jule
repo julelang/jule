@@ -122,14 +122,14 @@ fn newFileInfoFromGetFileInformationByHandle(h: sys::Handle)!: (d: sys::Win32Fil
 	let mut fd: sys::ByHandleFileInformation
 	mut ok := unsafe { sys::GetFileInformationByHandle(h, &fd) }
 	if !ok {
-		error(getLastFsErrorWindows())
+		error(sys::GetLastErrno())
 	}
 
 	if fd.FileAttributes&sys::FILE_ATTRIBUTE_REPARSE_POINT != 0 {
 		let mut ti: windows::FILE_ATTRIBUTE_TAG_INFO
 		ok = unsafe { windows::GetFileInformationByHandleEx(h, windows::FileAttributeTagInfo, &ti, u32(mem::SizeOf(ti))) }
 		if !ok {
-			error(getLastFsErrorWindows())
+			error(sys::GetLastErrno())
 		}
 		info.reparseTag = ti.ReparseTag
 	}

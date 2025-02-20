@@ -2,7 +2,37 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/internal/conv"
+
+// Common type of connection error codes.
+type Error: int
+
+// Common type of address errors.
+struct AddrError {
+	Err:  str
+	Addr: str
+}
+
+impl AddrError {
+	fn Str(self): str {
+		mut s := self.Err
+		if self.Addr != "" {
+			s = "address " + self.Addr + ": " + s
+		}
+		ret s
+	}
+}
+
 // Common connection error codes.
-enum Error {
-	InvalidTimeout, // Timeout value is not valid. Duration is out of range.
+const ErrInvalidTimeout = Error(0) // Timeout value is not valid. Duration is out of range.
+
+impl Error {
+	fn Str(self): str {
+		match self {
+		| ErrInvalidTimeout:
+			ret "timeout value is not valid, duration is out of range"
+		|:
+			ret "unknown error #" + conv::Itoa(int(self))
+		}
+	}
 }

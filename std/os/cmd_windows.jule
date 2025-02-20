@@ -60,7 +60,7 @@ impl Cmd {
 		unsafe {
 			if cpp.CreateProcessW(nil, (*integ::Wchar)(&argv[0]), nil, nil, 0,
 				flags, envp, nil, &startupInfo, &processInfo) == 0 {
-				error(getLastCmdError())
+				error(sys::GetLastErrno())
 			}
 		}
 		self.attrs.hProcess = processInfo.hProcess
@@ -182,7 +182,7 @@ fn createEnvBlock(env: []str)!: []u16 {
 	mut n := 0
 	for _, s in env {
 		if byteslite::IndexByteStr(s, 0) != -1 {
-			error(CmdError.Env)
+			error(sys::EINVAL)
 		}
 		n += len(s) + 1
 	}
@@ -196,21 +196,4 @@ fn createEnvBlock(env: []str)!: []u16 {
 	}
 	b = utf16::AppendRune(b, 0)
 	ret b
-}
-
-fn cmdErrorFromCode(code: int): CmdError {
-	match code {
-	| sys::ERROR_ACCESS_DENIED:
-		ret CmdError.Denied
-	| sys::ERROR_FILE_NOT_FOUND
-	| sys::ERROR_PATH_NOT_FOUND:
-		ret CmdError.NotExist
-	|:
-		ret CmdError.Other
-	}
-}
-
-// Returns last Cmd error by error.
-fn getLastCmdError(): CmdError {
-	ret cmdErrorFromCode(int(sys::GetLastError()))
 }

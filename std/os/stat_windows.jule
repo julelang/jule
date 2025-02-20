@@ -12,7 +12,7 @@ use "std/sys"
 
 fn winstat(path: str, followSurrogates: bool)!: FileInfo {
 	if path == "" {
-		error(FSError.NotExist)
+		error(sys::Errno(sys::ERROR_PATH_NOT_FOUND))
 	}
 	utf16Path := integ::UTF16FromStr(fixLongPath(path))
 
@@ -34,7 +34,7 @@ fn winstat(path: str, followSurrogates: bool)!: FileInfo {
 		let mut fd: sys::Win32FindData
 		handle := unsafe { sys::FindFirstFile(&utf16Path[0], &fd) }
 		if handle == sys::InvalidHandle {
-			error(getLastFsErrorWindows())
+			error(sys::GetLastErrno())
 		}
 		sys::FindClose(handle)
 		if fd.FileAttributes&sys::FILE_ATTRIBUTE_REPARSE_POINT == 0 {
@@ -61,7 +61,7 @@ fn winstat(path: str, followSurrogates: bool)!: FileInfo {
 		// Since CreateFile failed, we can't determine whether name refers to a
 		// name surrogate, or some other kind of reparse point. Since we can't return a
 		// FileInfo with a known-accurate Mode, we must return an error.
-		error(getLastFsErrorWindows())
+		error(sys::GetLastErrno())
 	}
 	mut d, mut info := statHandle(h) else { error(error) }
 	unsafe { sys::CloseHandle(h) }
@@ -71,7 +71,7 @@ fn winstat(path: str, followSurrogates: bool)!: FileInfo {
 		// (See https://devblogs.microsoft.com/oldnewthing/20100212-00/?p=14963.)
 		h = unsafe { sys::CreateFile(&utf16Path[0], 0, 0, nil, sys::OPEN_EXISTING, sys::FILE_FLAG_BACKUP_SEMANTICS, 0) }
 		if h == sys::InvalidHandle {
-			error(getLastFsErrorWindows())
+			error(sys::GetLastErrno())
 		}
 		d, info = statHandle(h) else { error(error) }
 		unsafe { sys::CloseHandle(h) }
@@ -83,7 +83,7 @@ fn winstat(path: str, followSurrogates: bool)!: FileInfo {
 fn statHandle(h: sys::Handle)!: (fi: sys::Win32FileAttributeData, info: winstatInfo) {
 	ft := unsafe { sys::GetFileType(h) }
 	if ft == sys::FILE_TYPE_UNKNOWN && sys::GetLastError() != 0 {
-		error(getLastFsErrorWindows())
+		error(sys::GetLastErrno())
 	}
 	if ft == sys::FILE_TYPE_PIPE || ft == sys::FILE_TYPE_CHAR {
 		info.filetype = ft
