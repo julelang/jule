@@ -12,6 +12,11 @@ use "std/unicode/utf8"
 
 const devNull = "NUL"
 
+fn makeInheritSa(mut &sa: sys::SecurityAttributes) {
+	sa.Length = u32(mem::SizeOf(sa))
+	sa.InheritHandle = 1
+}
+
 fn openFile(path: str, mut mode: int, mut perm: FileMode)!: &File {
 	if path == "" {
 		error(FSError.NotExist)
@@ -38,8 +43,7 @@ fn openFile(path: str, mut mode: int, mut perm: FileMode)!: &File {
 	sharemode := u32(sys::FILE_SHARE_READ | sys::FILE_SHARE_WRITE)
 	let mut sa: sys::SecurityAttributes
 	if mode&sys::O_CLOEXEC == 0 {
-		sa.Length = u32(mem::SizeOf(sa))
-		sa.InheritHandle = 1
+		makeInheritSa(sa)
 	}
 	let mut createmode: u32
 	match {

@@ -1,0 +1,19 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/internal/poll"
+use "std/sys"
+
+fn pipe()!: (r: &File, w: &File) {
+	let p: [2]sys::Handle
+	let mut sa: sys::SecurityAttributes
+	makeInheritSa(sa)
+	ok := unsafe { sys::CreatePipe(&p[0], &p[1], &sa, 0) }
+	if !ok {
+		error(getLastOsError())
+	}
+	r = &File{fd: poll::FD.New(unsafe { u64(p[0]) }, poll::FDKind.File)}
+	w = &File{fd: poll::FD.New(unsafe { u64(p[1]) }, poll::FDKind.File)}
+	ret
+}

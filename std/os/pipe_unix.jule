@@ -1,0 +1,23 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+#build darwin
+
+use "std/internal/poll"
+use integ "std/jule/integrated"
+use "std/sys"
+
+cpp unsafe fn pipe(mut *integ::Int): int
+
+fn pipe()!: (r: &File, w: &File) {
+	let mut p: [2]integ::Int
+	if unsafe { cpp.pipe(&p[0]) } == -1 {
+		error(getLastOsError())
+	}
+	sys::Fcntl(unsafe { int(p[0]) }, sys::F_SETFD, sys::FD_CLOEXEC)
+	sys::Fcntl(unsafe { int(p[1]) }, sys::F_SETFD, sys::FD_CLOEXEC)
+	r = &File{fd: poll::FD.New(unsafe { u64(p[0]) }, poll::FDKind.File)}
+	w = &File{fd: poll::FD.New(unsafe { u64(p[1]) }, poll::FDKind.File)}
+	ret
+}

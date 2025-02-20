@@ -16,13 +16,6 @@ cpp unsafe fn waitpid(pid: int, mut status: *integ::Int, options: int): int
 cpp fn WEXITSTATUS(status: int): int
 cpp fn kill(pid: int, sig: int): int
 cpp unsafe fn setenv(*integ::Char, *integ::Char, int): int
-cpp fn fcntl(int, int): int
-cpp unsafe fn pipe(mut *integ::Int): int
-
-cpp let X_OK: int
-cpp let F_GETFD: int
-cpp let F_SETFD: int
-cpp let FD_CLOEXEC: int
 
 // Type of a process id.
 type pid = int
@@ -90,7 +83,7 @@ impl Cmd {
 		}
 		pipe0 := unsafe { int(pipe[0]) }
 		pipe1 := unsafe { int(pipe[1]) }
-		if sys::Fcntl(pipe1, cpp.F_SETFD, cpp.fcntl(pipe1, cpp.F_GETFD)|cpp.FD_CLOEXEC) == -1 {
+		if sys::Fcntl(pipe1, sys::F_SETFD, sys::Fcntl(pipe1, sys::F_GETFD, 0)|sys::FD_CLOEXEC) == -1 {
 			sys::Close(pipe0)
 			sys::Close(pipe1)
 			error(CmdError.Spawn)
