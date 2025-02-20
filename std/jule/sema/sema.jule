@@ -2155,30 +2155,30 @@ impl sema {
 	}
 
 	// Evaluates value of variable if initialized.
-	fn evalVarValue(mut &self, mut &decl: &Var, mut l: Lookup) {
-		if !decl.IsInitialized() {
+	fn evalVarValue(mut &self, mut &v: &Var, mut l: Lookup) {
+		if !v.IsInitialized() {
 			ret
 		}
 
 		mut eval := (&eval)(nil)
-		if decl.TypeSym != nil {
-			eval = self.evalpd(l, decl.TypeSym.Type, decl)
+		if v.TypeSym != nil {
+			eval = self.evalpd(l, v.TypeSym.Type, v)
 		} else {
-			eval = self.evalpd(l, nil, decl)
+			eval = self.evalpd(l, nil, v)
 		}
-		eval.target.mutable = decl.Mutable
-		decl.ValueSym.Value = eval.evalExpr(decl.ValueSym.Expr)
+		eval.target.mutable = v.Mutable
+		v.ValueSym.Value = eval.evalExpr(v.ValueSym.Expr)
 	}
 
 	// Evaluateds value of variable and checks.
 	// Assumes the variable is global.
-	fn checkVar(mut &self, mut &decl: &Var, mut l: Lookup) {
-		decl.Checked = true
-		self.evalVarValue(decl, l)
-		if decl.ValueSym.Value == nil {
+	fn checkVar(mut &self, mut &v: &Var, mut l: Lookup) {
+		v.Checked = true
+		self.evalVarValue(v, l)
+		if v.ValueSym.Value == nil {
 			ret // Skip checks if error occurs.
 		}
-		self.checkVarValue(decl)
+		self.checkVarValue(v)
 	}
 
 	// Checks current package file's global variables.
@@ -2676,14 +2676,12 @@ impl sema {
 	// Checks all types of all package files.
 	// Breaks checking if checked file failed.
 	fn checkPackageTypes(mut &self) {
-		// Precheck necessary types first.
-		for (_, mut f) in self.files {
-			self.setCurrentFile(f)
-			self.checkGlobals()
-		}
-		if len(self.errors) > 0 {
-			ret
-		}
+		// Functions should be checked first.
+		// Because they might be used by a global variable.
+		// It may cause issues because functions will not be prechecked by eval.
+		// So check functions first to make sure they are prechecked.
+		// Generics; eval checks generics and not-instantiated generics are
+		// not allowed for global variables, so no need special routine for generics.
 		for (_, mut f) in self.files {
 			self.setCurrentFile(f)
 			self.precheckFuncs()
@@ -2691,6 +2689,20 @@ impl sema {
 		if len(self.errors) > 0 {
 			ret
 		}
+		// We can check global variables here. Structures may refer to a global
+		// variable, or a global variable may refer to a struct. But it is safe.
+		// Eval uses type-checker for structure types and type-checker prechecks
+		// structure if needed. For global variables, they will be evaluated if
+		// needed when referred from a struct. So cycles are safe from now.
+		for (_, mut f) in self.files {
+			self.setCurrentFile(f)
+			self.checkGlobals()
+		}
+		if len(self.errors) > 0 {
+			ret
+		}
+		// Precheck structures before analysis of the implementations such as
+		// function bodies, structure method bodies and etc.
 		for (_, mut f) in self.files {
 			self.setCurrentFile(f)
 			self.precheckStructTypes()
@@ -2698,7 +2710,6 @@ impl sema {
 		if len(self.errors) > 0 {
 			ret
 		}
-
 		// Check structures of strict type aliases.
 		for (_, mut f) in self.files {
 			self.setCurrentFile(f)
@@ -2712,6 +2723,9 @@ impl sema {
 							ret
 						}
 					}
+					// We can check strict structures here. It should be safe
+					// as described above; structures will be prechecked if needed.
+					// So other unchecked strict type aliases should not be a concern.
 					self.checkTypeStruct(s.Decl)
 				}
 			}
