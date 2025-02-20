@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/internal/conv"
+use integ "std/jule/integrated"
+
+cpp fn FormatMessageW(flags: cpp.DWORD, msgsrc: *unsafe, msgid: cpp.DWORD, langid: cpp.DWORD, mut buf: *integ::Wchar, size: cpp.DWORD, args: *unsafe): cpp.DWORD
+
 const E2BIG = Errno(0x7)            // Argument list too long
 const EACCES = Errno(0xd)           // Permission denied
 const EADDRINUSE = Errno(0x64)      // Address already in use
@@ -81,3 +86,33 @@ const ETIMEDOUT = Errno(0x8a)       // Connection timed out
 const ETXTBSY = Errno(0x8b)         // Text file busy
 const EWOULDBLOCK = Errno(0x8c)     // Operation would block
 const EXDEV = Errno(0x12)           // Cross-device link
+
+const FORMAT_MESSAGE_ALLOCATE_BUFFER = 0x00000100
+const FORMAT_MESSAGE_ARGUMENT_ARRAY = 0x00002000
+const FORMAT_MESSAGE_FROM_HMODULE = 0x00000800
+const FORMAT_MESSAGE_FROM_STRING = 0x00000400
+const FORMAT_MESSAGE_FROM_SYSTEM = 0x00001000
+const FORMAT_MESSAGE_IGNORE_INSERTS = 0x00000200
+
+// Underliying type of Errno for Windows.
+type errno = uintptr
+
+fn getLastErrno(): Errno { ret Errno(GetLastError()) }
+
+fn langid(pri: u16, sub: u16): u32 { ret u32(sub)<<10 | u32(pri) }
+
+fn formatError(e: Errno): str {
+	let flags: u32 = FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ARGUMENT_ARRAY | FORMAT_MESSAGE_IGNORE_INSERTS
+	mut b := make([]u16, 300)
+	mut n := unsafe { cpp.FormatMessageW(cpp.DWORD(flags), nil, cpp.DWORD(e), cpp.DWORD(langid(LANG_ENGLISH, SUBLANG_ENGLISH_US)), (*integ::Wchar)(&b[0]), cpp.DWORD(len(b)), nil) }
+	if n == 0 {
+		n = unsafe { cpp.FormatMessageW(cpp.DWORD(flags), nil, cpp.DWORD(e), cpp.DWORD(0), (*integ::Wchar)(&b[0]), cpp.DWORD(len(b)), nil) }
+		if n == 0 {
+			ret "winapi error #" + conv::Itoa(int(e))
+		}
+	}
+	// trim terminating \r and \n
+	for n > 0 && (b[n-1] == '\n' || b[n-1] == '\r'); n-- {
+	}
+	ret integ::UTF16ToStr(b[:n])
+}
