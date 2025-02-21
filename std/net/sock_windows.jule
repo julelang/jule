@@ -14,8 +14,10 @@ fn lastErrorCode(): sys::Errno {
 
 fn setSocketBlockingMode(handle: poll::NetHandle, mode: integ::UnsignedLong)! {
 	FIONBIO := 0x80000000 | (unsafe { (integ::Long)(mem::SizeOf(integ::UnsignedLong) & 0x7F) } << 16) | ('f' << 8) | 126
+	size := u32(mem::SizeOf(u32))
+	r := u32(0)
 	unsafe {
-		if sys::Ioctlsocket(handle, FIONBIO, &mode) == sys::SOCKET_ERROR {
+		if sys::WSAIoctl(u64(handle), u32(FIONBIO), (*byte)(&mode), size, nil, 0, &r) == sys::SOCKET_ERROR {
 			error(lastErrorCode())
 		}
 	}
@@ -60,7 +62,7 @@ unsafe fn connectSocket(handle: poll::NetHandle, sockAddr: *sys::Sockaddr, sockL
 	if res <= 0 {
 		if res == 0 {
 			// Timeout.
-			error(-1)
+			error(ErrTimeout)
 		}
 		error(lastErrorCode())
 	}
