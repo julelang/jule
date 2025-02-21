@@ -98,7 +98,19 @@ fn openFile(path: str, mut mode: int, mut perm: FileMode)!: &File {
 			error(e)
 		}
 	}
-	ret &File{fd: poll::FD.New(u64(h), poll::File) else { error(error) }}
+	ret newFile(u64(h), poll::File) else { error(error) }
+}
+
+fn newFile(h: u64, mut flags: int)!: &File {
+	if flags&poll::File == poll::File {
+		mut m := u32(0)
+		if unsafe { sys::GetConsoleMode(sys::Handle(h), &m) } {
+			flags &= ^poll::File
+			flags |= poll::Console
+		}
+	}
+	mut fd := poll::FD.New(u64(h), flags) else { error(error) }
+	ret &File{fd: fd}
 }
 
 fn remove(path: str)! {
