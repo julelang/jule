@@ -147,7 +147,7 @@ impl jsonEncoder {
 			if n > utf8::UTFMax {
 				n = utf8::UTFMax
 			}
-			c, size := utf8::DecodeRuneStr(s[i:i+n])
+			c, size := utf8::DecodeRuneStr(s[i : i+n])
 			if c == utf8::RuneError && size == 1 {
 				self.buf.writeStr(s[start:i])
 				self.buf.writeStr(`\ufffd`)
@@ -231,18 +231,18 @@ impl jsonEncoder {
 		const keyT = tt.Key()
 		const valT = tt.Value()
 		match keyT.Kind() {
-		| comptime::Kind.Str
-		| comptime::Kind.Int
-		| comptime::Kind.I8
-		| comptime::Kind.I16
-		| comptime::Kind.I32
-		| comptime::Kind.I64
-		| comptime::Kind.Uint
-		| comptime::Kind.Uintptr
-		| comptime::Kind.U8
-		| comptime::Kind.U16
-		| comptime::Kind.U32
-		| comptime::Kind.U64:
+		| comptime::Str
+		| comptime::Int
+		| comptime::I8
+		| comptime::I16
+		| comptime::I32
+		| comptime::I64
+		| comptime::Uint
+		| comptime::Uintptr
+		| comptime::U8
+		| comptime::U16
+		| comptime::U32
+		| comptime::U64:
 			break
 		|:
 			error(EncodeError.UnsupportedType)
@@ -251,7 +251,7 @@ impl jsonEncoder {
 			self.encodeNil()
 			ret
 		}
-		const quoted = keyT.Kind() == comptime::Kind.Str
+		const quoted = keyT.Kind() == comptime::Str
 		const useIndent = comptime::TypeOf(Flag) == comptime::TypeOf(encodeFlagType.Indent)
 		self.buf.writeByte('{')
 		const match {
@@ -339,7 +339,7 @@ impl jsonEncoder {
 			ret
 		}
 		const match comptime::TypeOf(T).Elem().Kind() {
-		| comptime::Kind.U8:
+		| comptime::U8:
 			self.encodeByteSlice([]byte(t))
 		|:
 			self.encodeArray[T, Flag](t) else { error(error) }
@@ -351,7 +351,7 @@ impl jsonEncoder {
 		const match {
 		| tt.Binded():
 			error(EncodeError.UnsupportedType)
-		| tt.Strict() || tt.Kind() == comptime::Kind.Struct:
+		| tt.Strict() || tt.Kind() == comptime::Struct:
 			// Before using the default encoding strategy, look for the custom encoder
 			// methods and use it, if any. If not exist any custom encoder method,
 			// fallback to default encoding.
@@ -387,25 +387,25 @@ impl jsonEncoder {
 			// Fallback to the default strategy.
 		}
 		const match tt.Kind() {
-		| comptime::Kind.Int | comptime::Kind.I8 | comptime::Kind.I16 | comptime::Kind.I32 | comptime::Kind.I64:
+		| comptime::Int | comptime::I8 | comptime::I16 | comptime::I32 | comptime::I64:
 			self.encodeInt(i64(t))
 			ret
-		| comptime::Kind.Uint | comptime::Kind.U8 | comptime::Kind.U16 | comptime::Kind.U32 | comptime::Kind.U64:
+		| comptime::Uint | comptime::U8 | comptime::U16 | comptime::U32 | comptime::U64:
 			self.encodeUint(u64(t))
 			ret
-		| comptime::Kind.F32:
+		| comptime::F32:
 			self.encodeFloat(f64(t), 1<<5) else { error(error) }
 			ret
-		| comptime::Kind.F64:
+		| comptime::F64:
 			self.encodeFloat(f64(t), 1<<6) else { error(error) }
 			ret
-		| comptime::Kind.Bool:
+		| comptime::Bool:
 			self.encodeBool(bool(t))
 			ret
-		| comptime::Kind.Str:
+		| comptime::Str:
 			self.encodeStr(str(t))
 			ret
-		| comptime::Kind.SmartPtr:
+		| comptime::SmartPtr:
 			// Avoid to implement as a function.
 			// Fills call stack faster especially with recursive structures.
 			// Handle smart pointers here efficiently and forward to relevant encoder.
@@ -415,13 +415,13 @@ impl jsonEncoder {
 				comptime::TypeAlias(elem, tt.Elem())
 				self.encode[elem, Flag](*t) else { error(error) }
 			}
-		| comptime::Kind.Struct:
+		| comptime::Struct:
 			self.encodeStruct[T, Flag](t) else { error(error) }
-		| comptime::Kind.Map:
+		| comptime::Map:
 			self.encodeMap[T, Flag](t) else { error(error) }
-		| comptime::Kind.Array:
+		| comptime::Array:
 			self.encodeArray[T, Flag](t) else { error(error) }
-		| comptime::Kind.Slice:
+		| comptime::Slice:
 			self.encodeSlice[T, Flag](t) else { error(error) }
 		|:
 			error(EncodeError.UnsupportedType)

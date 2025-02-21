@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/comptime"
 use "std/conv"
 use "std/jule/ast"
 use "std/jule/build"
@@ -609,81 +610,84 @@ impl comptimeTypeInfo {
 			e.pushErr(fc.Args[0].Token, build::LogMsg.ArgumentOverflow, "Kind")
 			ret nil
 		}
-		mut enm := findComptimePackage(e.s).FindEnum("Kind")
-		let mut item: &EnumItem = nil
+		let mut c: &constant::Const = nil
 		match {
 		| self.base.Void():
-			item = enm.FindItem("Void")
+			c = constant::Const.NewI64(comptime::Void)
 		| self.base.Struct() != nil:
-			item = enm.FindItem("Struct")
+			c = constant::Const.NewI64(comptime::Struct)
 		| self.base.Trait() != nil:
-			item = enm.FindItem("Trait")
+			c = constant::Const.NewI64(comptime::Trait)
 		| self.base.Ptr() != nil:
 			if self.base.Ptr().IsUnsafe() {
-				item = enm.FindItem("UnsafePtr")
+				c = constant::Const.NewI64(comptime::UnsafePtr)
 			} else {
-				item = enm.FindItem("Ptr")
+				c = constant::Const.NewI64(comptime::Ptr)
 			}
 		| self.base.Sptr() != nil:
-			item = enm.FindItem("SmartPtr")
+			c = constant::Const.NewI64(comptime::SmartPtr)
 		| self.base.Enum() != nil:
-			item = enm.FindItem("Enum")
+			c = constant::Const.NewI64(comptime::Enum)
 		| self.base.TypeEnum() != nil:
-			item = enm.FindItem("TypeEnum")
+			c = constant::Const.NewI64(comptime::TypeEnum)
 		| self.base.Map() != nil:
-			item = enm.FindItem("Map")
+			c = constant::Const.NewI64(comptime::Map)
 		| self.base.Slice() != nil:
-			item = enm.FindItem("Slice")
+			c = constant::Const.NewI64(comptime::Slice)
 		| self.base.Array() != nil:
-			item = enm.FindItem("Array")
+			c = constant::Const.NewI64(comptime::Array)
 		| self.base.Func() != nil:
-			item = enm.FindItem("Func")
+			c = constant::Const.NewI64(comptime::Func)
 		| self.base.Tuple() != nil:
-			item = enm.FindItem("Tuple")
+			c = constant::Const.NewI64(comptime::Tuple)
 		| self.base.Chan() != nil:
-			item = enm.FindItem("Chan")
+			c = constant::Const.NewI64(comptime::Chan)
 		| self.base.Prim() != nil:
 			prim := self.base.Prim()
 			match {
 			| prim.IsAny():
-				item = enm.FindItem("Any")
+				c = constant::Const.NewI64(comptime::Any)
 			| prim.IsBool():
-				item = enm.FindItem("Bool")
+				c = constant::Const.NewI64(comptime::Bool)
 			| prim.IsStr():
-				item = enm.FindItem("Str")
+				c = constant::Const.NewI64(comptime::Str)
 			| prim.IsF32():
-				item = enm.FindItem("F32")
+				c = constant::Const.NewI64(comptime::F32)
 			| prim.IsF64():
-				item = enm.FindItem("F64")
+				c = constant::Const.NewI64(comptime::F64)
 			| prim.IsI8():
-				item = enm.FindItem("I8")
+				c = constant::Const.NewI64(comptime::I8)
 			| prim.IsI16():
-				item = enm.FindItem("I16")
+				c = constant::Const.NewI64(comptime::I16)
 			| prim.IsI32():
-				item = enm.FindItem("I32")
+				c = constant::Const.NewI64(comptime::I32)
 			| prim.IsI64():
-				item = enm.FindItem("I64")
+				c = constant::Const.NewI64(comptime::I64)
 			| prim.IsU8():
-				item = enm.FindItem("U8")
+				c = constant::Const.NewI64(comptime::U8)
 			| prim.IsU16():
-				item = enm.FindItem("U16")
+				c = constant::Const.NewI64(comptime::U16)
 			| prim.IsU32():
-				item = enm.FindItem("U32")
+				c = constant::Const.NewI64(comptime::U32)
 			| prim.IsU64():
-				item = enm.FindItem("U64")
+				c = constant::Const.NewI64(comptime::U64)
 			| prim.IsInt():
-				item = enm.FindItem("Int")
+				c = constant::Const.NewI64(comptime::Int)
 			| prim.IsUint():
-				item = enm.FindItem("Uint")
+				c = constant::Const.NewI64(comptime::Uint)
 			| prim.IsUintptr():
-				item = enm.FindItem("Uintptr")
-			|:
-				panic("sema: Kind(): unimplemented type for comptime: " + self.base.Str())
+				c = constant::Const.NewI64(comptime::Uintptr)
 			}
-		|:
+		}
+		if c == nil {
 			panic("sema: Kind(): unimplemented type for comptime: " + self.base.Str())
 		}
-		ret evalEnumStatic(e.s, enm, item, fc.Token, e.getOwnerRefers())
+		ret &Value{
+			untyped: true,
+			Type: primInt,
+			Constant: c,
+			Model: c,
+		}
 	}
 
 	fn _Bits(mut &self, mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {

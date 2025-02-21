@@ -215,7 +215,7 @@ impl jsonDecoder {
 			ret
 		}
 		const match t.Kind() {
-		| comptime::Kind.Slice:
+		| comptime::Slice:
 			a = a[:0] // Keep capacity, but clear current elements.
 		}
 		self.pushParseState(parseState.Array) else { error(error) }
@@ -227,13 +227,13 @@ impl jsonDecoder {
 				error(DecodeError.InvalidValue)
 			}
 			const match t.Kind() {
-			| comptime::Kind.Array:
+			| comptime::Array:
 				if i >= len(a) {
 					// Ran out of fixed array.
 					error(DecodeError.InvalidValue)
 				}
 				self.value(a[i]) else { error(error) }
-			| comptime::Kind.Slice:
+			| comptime::Slice:
 				let mut v: elem
 				self.value(v) else { error(error) }
 				a = append(a, v)
@@ -260,13 +260,13 @@ impl jsonDecoder {
 		self.popParseState()
 		if i < len(a) {
 			const match t.Kind() {
-			| comptime::Kind.Array:
+			| comptime::Array:
 				// Assign to default value of array's zero remainder.
 				let mut default: elem
 				for i < len(a); i++ {
 					a[i] = default
 				}
-			| comptime::Kind.Slice:
+			| comptime::Slice:
 				// Truncate the slice.
 				a = a[:i]
 			|:
@@ -282,18 +282,18 @@ impl jsonDecoder {
 		const keyT = comptime::TypeOf(K)
 		const match {
 		| keyT == valueT | keyT == stringT
-		| keyT.Kind() == comptime::Kind.Str
-		| keyT.Kind() == comptime::Kind.Int
-		| keyT.Kind() == comptime::Kind.I8
-		| keyT.Kind() == comptime::Kind.I16
-		| keyT.Kind() == comptime::Kind.I32
-		| keyT.Kind() == comptime::Kind.I64
-		| keyT.Kind() == comptime::Kind.Uint
-		| keyT.Kind() == comptime::Kind.Uintptr
-		| keyT.Kind() == comptime::Kind.U8
-		| keyT.Kind() == comptime::Kind.U16
-		| keyT.Kind() == comptime::Kind.U32
-		| keyT.Kind() == comptime::Kind.U64:
+		| keyT.Kind() == comptime::Str
+		| keyT.Kind() == comptime::Int
+		| keyT.Kind() == comptime::I8
+		| keyT.Kind() == comptime::I16
+		| keyT.Kind() == comptime::I32
+		| keyT.Kind() == comptime::I64
+		| keyT.Kind() == comptime::Uint
+		| keyT.Kind() == comptime::Uintptr
+		| keyT.Kind() == comptime::U8
+		| keyT.Kind() == comptime::U16
+		| keyT.Kind() == comptime::U32
+		| keyT.Kind() == comptime::U64:
 			break
 		|:
 			error(EncodeError.UnsupportedType)
@@ -305,7 +305,7 @@ impl jsonDecoder {
 		}
 		self.pushParseState(parseState.Object) else { error(error) }
 		// Consider string and dynamic JSON vlaue types as quoted. Directly assign string as key.
-		const quoted = keyT.Kind() == comptime::Kind.Str || keyT == valueT || keyT == stringT
+		const quoted = keyT.Kind() == comptime::Str || keyT == valueT || keyT == stringT
 		for {
 			self.skipSpace()
 			if self.eof() || self.data[self.i] != '"' {
@@ -347,9 +347,9 @@ impl jsonDecoder {
 				}
 				let mut keyV: K
 				const match keyT.Kind() {
-				| comptime::Kind.Int | comptime::Kind.I8 | comptime::Kind.I16 | comptime::Kind.I32 | comptime::Kind.I64:
+				| comptime::Int | comptime::I8 | comptime::I16 | comptime::I32 | comptime::I64:
 					decodeInt(keyV, key) else { error(error) }
-				| comptime::Kind.Uint | comptime::Kind.Uintptr | comptime::Kind.U8 | comptime::Kind.U16 | comptime::Kind.U32 | comptime::Kind.U64:
+				| comptime::Uint | comptime::Uintptr | comptime::U8 | comptime::U16 | comptime::U32 | comptime::U64:
 					decodeUint(keyV, key) else { error(error) }
 				|:
 					panic("json: unimplemented type, this panic call should be unreachable")
@@ -456,7 +456,7 @@ impl jsonDecoder {
 	fn tryCustomDecode[T](self, mut &t: T)!: bool {
 		const tt = comptime::TypeOf(T)
 		const match {
-		| tt.Strict() || tt.Kind() == comptime::Kind.Struct:
+		| tt.Strict() || tt.Kind() == comptime::Struct:
 			const for _, name in ["DecodeJSON", "DecodeText"] {
 				const for _, method in tt.Decl().Methods() {
 					const match {
@@ -474,7 +474,7 @@ impl jsonDecoder {
 								| []byte:
 									const match {
 									| m.Type().Decl().Exceptional() &&
-										m.Type().Result().Kind() == comptime::Kind.Void:
+										m.Type().Result().Kind() == comptime::Void:
 										const match name {
 										| "DecodeJSON":
 											lit := self.scanValidValue() else { error(error) }
@@ -485,7 +485,7 @@ impl jsonDecoder {
 												// Next literal is a string literal.
 												// DecodeText is suitable.
 												lit := self.scanValidLit() else { error(error) }
-												m.Unwrap()(lit[1:len(lit)-1]) else { error(error) }
+												m.Unwrap()(lit[1 : len(lit)-1]) else { error(error) }
 											}
 										|:
 											panic("std/encoding/json: unimplemented decoding method")
@@ -520,10 +520,10 @@ impl jsonDecoder {
 				self.objectMap(m) else { error(error) }
 				t = m
 				ret
-			| tt.Kind() == comptime::Kind.Map:
+			| tt.Kind() == comptime::Map:
 				self.objectMap(t) else { error(error) }
 				ret
-			| tt.Kind() == comptime::Kind.Struct:
+			| tt.Kind() == comptime::Struct:
 				self.objectStruct(t) else { error(error) }
 				ret
 			|:
@@ -536,8 +536,8 @@ impl jsonDecoder {
 				self.array(array) else { error(error) }
 				t = array
 				ret
-			| tt.Kind() == comptime::Kind.Array
-			| tt.Kind() == comptime::Kind.Slice:
+			| tt.Kind() == comptime::Array
+			| tt.Kind() == comptime::Slice:
 				self.array(t) else { error(error) }
 				ret
 			|:
@@ -552,14 +552,14 @@ impl jsonDecoder {
 				decodeString(s, lit) else { error(error) }
 				t = String(s)
 				ret
-			| tt.Kind() == comptime::Kind.Str:
+			| tt.Kind() == comptime::Str:
 				// Don't check validity for literal, following algorithms will check it.
 				lit := self.scanLit() else { error(error) }
 				decodeString(unsafe { *(*str)(&t) }, lit) else { error(error) }
 				ret
-			| tt.Kind() == comptime::Kind.Slice:
+			| tt.Kind() == comptime::Slice:
 				const match tt.Elem().Kind() {
-				| comptime::Kind.U8:
+				| comptime::U8:
 					lit := self.scanLit() else { error(error) }
 					mut s2 := unquoteBytes(lit)
 					if s2 == nil {
@@ -586,7 +586,7 @@ impl jsonDecoder {
 			| tt == valueT | tt == boolT:
 				t = Bool(b == 't')
 				ret
-			| tt.Kind() == comptime::Kind.Bool:
+			| tt.Kind() == comptime::Bool:
 				t = b == 't'
 				ret
 			|:
@@ -603,23 +603,23 @@ impl jsonDecoder {
 				decodeFloat(f, lit) else { error(error) }
 				t = Number(f)
 				ret
-			| tt.Kind() == comptime::Kind.Int
-			| tt.Kind() == comptime::Kind.I8
-			| tt.Kind() == comptime::Kind.I16
-			| tt.Kind() == comptime::Kind.I32
-			| tt.Kind() == comptime::Kind.I64:
+			| tt.Kind() == comptime::Int
+			| tt.Kind() == comptime::I8
+			| tt.Kind() == comptime::I16
+			| tt.Kind() == comptime::I32
+			| tt.Kind() == comptime::I64:
 				decodeInt(t, lit) else { error(error) }
 				ret
-			| tt.Kind() == comptime::Kind.Uint
-			| tt.Kind() == comptime::Kind.Uintptr
-			| tt.Kind() == comptime::Kind.U8
-			| tt.Kind() == comptime::Kind.U16
-			| tt.Kind() == comptime::Kind.U32
-			| tt.Kind() == comptime::Kind.U64:
+			| tt.Kind() == comptime::Uint
+			| tt.Kind() == comptime::Uintptr
+			| tt.Kind() == comptime::U8
+			| tt.Kind() == comptime::U16
+			| tt.Kind() == comptime::U32
+			| tt.Kind() == comptime::U64:
 				decodeUInt(t, lit) else { error(error) }
 				ret
-			| tt.Kind() == comptime::Kind.F32
-			| tt.Kind() == comptime::Kind.F64:
+			| tt.Kind() == comptime::F32
+			| tt.Kind() == comptime::F64:
 				decodeFloat(t, lit) else { error(error) }
 				ret
 			|:
@@ -639,7 +639,7 @@ impl jsonDecoder {
 		}
 		const tt = comptime::TypeOf(T)
 		const match tt.Kind() {
-		| comptime::Kind.SmartPtr:
+		| comptime::SmartPtr:
 			b := self.data[self.i]
 			if b == 'n' { // Null literal.
 				self.scanValidLit() else { error(error) }
@@ -783,7 +783,7 @@ fn unquoteBytes(s: []byte): (t: []byte) {
 	if len(s) < 2 || s[0] != '"' || s[len(s)-1] != '"' {
 		ret
 	}
-	unsafe { *(&s) = (*(&s))[1:len(s)-1] }
+	unsafe { *(&s) = (*(&s))[1 : len(s)-1] }
 
 	// Check for unusual characters. If there are none,
 	// then no unquoting is needed, so return a slice of the

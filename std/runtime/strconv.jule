@@ -197,7 +197,7 @@ fn tryToCallStr[T](x: T): (str, ok: bool) {
 			const methodv = v.Method(method.Name())
 			const match {
 			| !methodv.Type().Decl().Exceptional() &&
-				methodv.Type().Result().Kind() == comptime::Kind.Str:
+				methodv.Type().Result().Kind() == comptime::Str:
 				const params = method.Params()
 				const match {
 				| len(params) == 1 && !params[0].Mutable():
@@ -257,34 +257,34 @@ fn toStr[T](x: T): str {
 	}
 
 	const match t.Kind() {
-	| comptime::Kind.Str:
+	| comptime::Str:
 		ret str(x)
-	| comptime::Kind.Int | comptime::Kind.I8 | comptime::Kind.I16 | comptime::Kind.I32 | comptime::Kind.I64:
+	| comptime::Int | comptime::I8 | comptime::I16 | comptime::I32 | comptime::I64:
 		ret i64ToStr(i64(x))
-	| comptime::Kind.Uint | comptime::Kind.Uintptr | comptime::Kind.U8 | comptime::Kind.U16 | comptime::Kind.U32 | comptime::Kind.U64:
+	| comptime::Uint | comptime::Uintptr | comptime::U8 | comptime::U16 | comptime::U32 | comptime::U64:
 		ret u64ToStr(u64(x))
-	| comptime::Kind.F32 | comptime::Kind.F64:
+	| comptime::F32 | comptime::F64:
 		ret f64ToStr(f64(x))
-	| comptime::Kind.Bool:
+	| comptime::Bool:
 		ret boolToStr(bool(x))
-	| comptime::Kind.Any | comptime::Kind.TypeEnum | comptime::Kind.Trait:
+	| comptime::Any | comptime::TypeEnum | comptime::Trait:
 		ret unsafe { integ::Emit[str]("{}.type->to_str({}.data.alloc)", x, x) }
-	| comptime::Kind.Func:
+	| comptime::Func:
 		ret unsafe { ptrToStr(integ::Emit[*unsafe]("({}){}.f", *unsafe, x)) }
-	| comptime::Kind.Slice | comptime::Kind.Array:
+	| comptime::Slice | comptime::Array:
 		ret arrToStr(x)
-	| comptime::Kind.Map:
+	| comptime::Map:
 		ret mapToStr(x)
-	| comptime::Kind.Struct:
+	| comptime::Struct:
 		ret structToStr(x)
-	| comptime::Kind.SmartPtr:
+	| comptime::SmartPtr:
 		ret unsafe { ptrToStr((*unsafe)(uintptr(x))) }
-	| comptime::Kind.Ptr | comptime::Kind.UnsafePtr:
+	| comptime::Ptr | comptime::UnsafePtr:
 		ret ptrToStr(unsafe { (*unsafe)(uintptr(x)) })
-	| comptime::Kind.Enum:
+	| comptime::Enum:
 		comptime::TypeAlias(elemType, t.Elem())
 		ret toStr(elemType(x))
-	| comptime::Kind.Chan:
+	| comptime::Chan:
 		// Channels are smart pointers behind the scene.
 		// Take raw pointer, handle as &uintptr to read memory address of
 		// smart pointer, and pass to ptrToStr as unsafe raw pointer to
