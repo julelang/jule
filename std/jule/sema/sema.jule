@@ -529,37 +529,36 @@ impl sema {
 		} else if !isImplicitImport(imp) && !self.checkAutoAlias(imp) {
 			ret false
 		}
-
-		if len(imp.Package.Files) == 0 {
-			ret true
-		}
-
-		if !imp.Duplicate {
-			mut sema := &sema{
-				flags: self.flags,
-				meta: self.meta,
-			}
-			sema.check(imp.Package.Files)
-			if len(sema.errors) != 0 {
-				self.errors = append(self.errors, sema.errors...)
-				sema.errors = nil
-				ret false
-			}
-		}
 		ret true
 	}
 
-	fn checkImports(mut self) {
-		for (_, mut file) in self.files {
-			self.setCurrentFile(file)
-			for (_, mut imp) in file.Imports {
-				ok := self.checkImport(imp)
-				// Break checking if package has error.
-				if !ok {
-					ret
+	// Checks all imports.
+	// Assumes imports comes from Importer.AllPackages().
+	fn checkPackages(mut &self, mut imports: []&ImportInfo): (ok: bool) {
+		mut semas := make([]&sema, len(imports))
+		for (i, mut imp) in imports {
+			if !imp.Binded {
+				mut s := &sema{
+					files: imp.Package.Files,
+					flags: self.flags,
+					meta: self.meta,
+				}
+				s.setSemaFields()
+				semas[i] = s
+			}
+		}
+		for (i, mut imp) in imports {
+			if !imp.Binded {
+				mut sema := semas[i]
+				sema.check()
+				if len(sema.errors) != 0 {
+					self.errors = append(self.errors, sema.errors...)
+					sema.errors = nil
+					ret false
 				}
 			}
 		}
+		ret true
 	}
 
 	fn implFileImpls(mut &self) {
@@ -2759,16 +2758,7 @@ impl sema {
 		}
 	}
 
-	fn check(mut &self, mut &files: []&SymTab) {
-		self.files = files
-
-		self.setSemaFields()
-
-		self.checkImports()
-		if len(self.errors) != 0 {
-			ret
-		}
-
+	fn check(mut &self) {
 		self.checkInherits()
 		if len(self.errors) != 0 {
 			ret

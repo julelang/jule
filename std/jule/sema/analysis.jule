@@ -54,6 +54,7 @@ fn analyzePackage(mut &files: []&ast::AST, mut &importer: Importer, &flags: Flag
 	}
 
 	mut sema := &sema{
+		files: tables,
 		flags: flags,
 		meta: new(commonSemaMeta),
 	}
@@ -63,7 +64,12 @@ fn analyzePackage(mut &files: []&ast::AST, mut &importer: Importer, &flags: Flag
 	mut firstTable := tables[0]
 	collectImplicitImports(sema, firstTable)
 
-	sema.check(tables)
+	sema.setSemaFields()
+	ok := sema.checkPackages(importer.AllPackages())
+	if !ok {
+		ret nil, sema.errors
+	}
+	sema.check()
 	if len(sema.errors) > 0 {
 		ret nil, sema.errors
 	}
