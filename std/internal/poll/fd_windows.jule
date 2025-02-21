@@ -20,8 +20,8 @@ const maxRW = 1 << 30 // 1GB is large enough and keeps subsequent reads aligned
 struct FD {
 	// The file descriptor should be compatible
 	// with pointers and other integer kinds such as UNIX file descriptors.
-	File: u64
-	Kind: FDKind
+	File:  u64
+	Flags: int
 
 	// For console input/output.
 	lastbits:       []byte // first few bytes of the last incomplete rune in last write
@@ -47,12 +47,12 @@ impl FD {
 				b = b[:maxRW]
 			}
 			mut nn := 0
-			match self.Kind {
-			| FDKind.Console:
+			match {
+			| self.Flags&Console == Console:
 				nn = self.writeConsole(b)
-			| FDKind.File:
+			| self.Flags&File == File:
 				nn = self.writeFile(b)
-			| FDKind.Socket:
+			| self.Flags&Socket == Socket:
 				nn = unsafe { sys::Send(uint(self.File), &b[0], uint(len(buf)), 0) }
 				if nn < 0 {
 					nn = -1
@@ -78,7 +78,7 @@ impl FD {
 			// without trying to read.
 			ret 0, true
 		}
-		if self.Kind != FDKind.SocketNoConn {
+		if self.Flags&SocketNoConn != SocketNoConn {
 			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for ReadV")
 		}
 		for {
@@ -170,12 +170,12 @@ impl FD {
 			buf = buf[:maxRW]
 		}
 
-		match self.Kind {
-		| FDKind.Console:
+		match {
+		| self.Flags&Console == Console:
 			n, ok = self.readConsole(buf)
-		| FDKind.File:
+		| self.Flags&File == File:
 			n, ok = self.readFile(buf)
-		| FDKind.Socket:
+		| self.Flags&Socket == Socket:
 			n = unsafe { sys::Recv(uint(self.File), &buf[0], uint(len(buf)), 0) }
 			ok = n >= 0
 			if !ok {
@@ -195,7 +195,7 @@ impl FD {
 			// without trying to read.
 			ret 0, true
 		}
-		if self.Kind != FDKind.SocketNoConn {
+		if self.Flags&SocketNoConn != SocketNoConn {
 			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for ReadV")
 		}
 		if len(buf) > maxRW {
@@ -311,10 +311,10 @@ impl FD {
 
 	// Closes file descriptor.
 	fn Close(mut self): (ok: bool) {
-		match self.Kind {
-		| FDKind.File | FDKind.Console:
+		match {
+		| self.Flags&File == File | self.Flags&Console == Console:
 			ret unsafe { sys::CloseHandle(sys::Handle(self.File)) }
-		| FDKind.Socket | FDKind.SocketNoConn:
+		| self.Flags&Socket == Socket | self.Flags&SocketNoConn == SocketNoConn:
 			ret sys::CloseSocket(uint(self.File)) >= 0
 		|:
 			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for Close")
