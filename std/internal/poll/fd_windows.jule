@@ -3,6 +3,7 @@
 // license that can be found in the LICENSE file.
 
 use integ "std/jule/integrated"
+use "std/mem"
 use "std/sys"
 use "std/unicode/utf16"
 use "std/unicode/utf8"
@@ -31,6 +32,20 @@ struct FD {
 }
 
 impl FD {
+	fn Init(mut self)! {
+		// Disable SIO_UDP_CONNRESET behavior.
+		// http://support.microsoft.com/kb/263823
+		if self.Flags&SocketNoConn == SocketNoConn {
+			r := u32(0)
+			flag := u32(0)
+			size := u32(mem::SizeOf(flag))
+			fr := unsafe { sys::WSAIoctl(sys::Handle(self.File), sys::SIO_UDP_CONNRESET, (*byte)(&flag), size, nil, 0, &r) }
+			if fr != 0 {
+				error(sys::Errno(sys::WSAGetLastError()))
+			}
+		}
+	}
+
 	// Writes bytes to the file descriptor and returns written byte count.
 	// The number of bytes written can never exceed the length of the buf.
 	fn Write(mut self, buf: []byte): (n: int, ok: bool) {
