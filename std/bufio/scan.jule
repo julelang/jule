@@ -7,18 +7,17 @@
 // There may be various changes in the algorithm. Optimized and adopted for Jule.
 
 use "std/bytes"
+use "std/errors"
 use "std/io"
 use "std/unicode/utf8"
 use "std/unsafe"
 
-// Error codes for scanner.
-enum ScanError {
-	TooLong,         // Token size exceeds the maximum token size limit.
-	BadReadCount,    // The reader returned invalid read count.
-	NegativeAdvance, // Advance value of the splitter function was negative.
-	AdvanceTooFar,   // Advance value of the splitter function was too far.
-	NoProgress,      // No progress for the scanning.
-}
+// Errors returned by Scanner.
+// Mutation is undefined behavior.
+static mut ErrTooLong = errors::New("bufio::Scanner: token too long")
+static mut ErrNegativeAdvance = errors::New("bufio::Scanner: SplitFunc returns negative advance count")
+static mut ErrAdvanceTooFar = errors::New("bufio::Scanner: SplitFunc returns advance count beyond input")
+static mut ErrBadReadCount = errors::New("bufio::Scanner: Read returned impossible count")
 
 const maxConsecutiveEmptyReads = 100
 
@@ -158,10 +157,10 @@ impl Scanner {
 					error(error)
 				}
 				if advance < 0 {
-					error(ScanError.NegativeAdvance)
+					error(ErrNegativeAdvance)
 				}
 				if advance > self.end-self.start {
-					error(ScanError.AdvanceTooFar)
+					error(ErrAdvanceTooFar)
 				}
 				self.start += advance
 				if token != nil {
@@ -197,7 +196,7 @@ impl Scanner {
 				// Guarantee no overflow in the multiplication below.
 				const maxInt = int(^uint(0) >> 1)
 				if len(self.buf) >= self.max || len(self.buf) > maxInt/2 {
-					error(ScanError.TooLong)
+					error(ErrTooLong)
 				}
 				mut newSize := len(self.buf) << 1
 				if newSize == 0 {
@@ -214,7 +213,7 @@ impl Scanner {
 			// Finally we can read some input
 			n := self.r.Read(self.buf[self.end:]) else { error(error) }
 			if n < 0 || len(self.buf)-self.end < n {
-				error(ScanError.BadReadCount)
+				error(ErrBadReadCount)
 			}
 			if n == 0 {
 				// Read buffer should not be empty.
@@ -236,7 +235,7 @@ impl Scanner {
 	// Panics if it is called after scanning has started.
 	fn Split(mut self, split: SplitFunc) {
 		if self.state&scanUsed == scanUsed {
-			panic("std/bufio: Scan.Split: called after Scan")
+			panic("std/bufio: Scanner.Split: called after Scan")
 		}
 		self.split = split
 	}
@@ -252,7 +251,7 @@ impl Scanner {
 	// Panics if it is called after scanning has started.
 	fn Buffer(mut self, mut buf: []byte, max: int) {
 		if self.state&scanUsed == scanUsed {
-			panic("std/bufio: Scan.Buffer: called after Scan")
+			panic("std/bufio: Scanner.Buffer: called after Scan")
 		}
 		self.buf = buf[0:cap(buf)]
 		self.max = max
@@ -262,7 +261,7 @@ impl Scanner {
 // Drops a terminal \r from the data.
 fn dropCR(mut data: []byte): []byte {
 	if len(data) > 0 && data[len(data)-1] == '\r' {
-		ret data[0:len(data)-1]
+		ret data[0 : len(data)-1]
 	}
 	ret data
 }
