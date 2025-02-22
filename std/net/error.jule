@@ -2,10 +2,13 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/errors"
 use "std/internal/conv"
 
-// Common type of connection error codes.
-type Error: int
+// Common errors of net package.
+// Mutation is undefined behavior.
+static mut ErrInvalidTimeout = errors::New("timeout value is not valid, duration is out of range")
+static mut ErrTimeout = errors::New("connection timed out")
 
 // Common type of address errors.
 struct AddrError {
@@ -20,22 +23,5 @@ impl AddrError {
 			s = "address " + self.Addr + ": " + s
 		}
 		ret s
-	}
-}
-
-// Common connection error codes.
-const ErrInvalidTimeout = Error(0) // Timeout value is not valid. Duration is out of range.
-const ErrTimeout = Error(1)        // Connection timeout.
-
-impl Error {
-	fn Str(self): str {
-		match self {
-		| ErrInvalidTimeout:
-			ret "timeout value is not valid, duration is out of range"
-		| ErrTimeout:
-			ret "connection timed out"
-		|:
-			ret "unknown error #" + conv::Itoa(int(self))
-		}
 	}
 }
