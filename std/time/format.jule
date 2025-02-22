@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/errors"
 use "std/internal/stringslite"
 use "std/unsafe"
 
@@ -412,8 +413,8 @@ fn nextStdChunk(layout: str): (prefix: str, std: int, suffix: str) {
 		| '_': // _2, _2006, __2
 			if len(layout) >= i+2 && layout[i+1] == '2' {
 				// _2006 is really a literal _, followed by stdLongYear
-				if len(layout) >= i+5 && layout[i+1 : i+5] == "2006" {
-					ret layout[0:i+1], stdLongYear, layout[i+5:]
+				if len(layout) >= i+5 && layout[i+1:i+5] == "2006" {
+					ret layout[0 : i+1], stdLongYear, layout[i+5:]
 				}
 				ret layout[0:i], stdUnderDay, layout[i+2:]
 			}
@@ -695,12 +696,80 @@ fn isDigit[bytes: []byte | str](s: bytes, i: int): bool {
 	ret '0' <= c && c <= '9'
 }
 
-// Error codes for time parsing.
-enum ParseError {
-	BadField,      // Bad value for field.
-	InvalidNumber, // Invalid number.
-	LeadingInt,    // Bad [0-9]*
-	InvalidRange,  // Invalid range for month, hour, timezone offset or other elements.
+static mut errBad = errors::New("bad value for field") // placeholder not passed to user
+
+// These are borrowed from unicode/utf8 and conv and replicate behavior in
+// that package, since we can't take a dependency on either.
+const lowerhex = "0123456789abcdef"
+const runeSelf = 0x80
+const runeError = '\uFFFD'
+
+fn quote(s: str): str {
+	mut buf := make([]byte, 1, len(s)+2) // slice will be at least len(s) + quotes
+	buf[0] = '"'
+	for i, c in []rune(s) {
+		if c >= runeSelf || c < ' ' {
+			// This means you are asking us to parse a time.Duration or
+			// time.Location with unprintable or non-ASCII characters in it.
+			// We don't expect to hit this case very often. We could try to
+			// reproduce strconv.Quote's behavior with full fidelity but
+			// given how rarely we expect to hit these edge cases, speed and
+			// conciseness are better.
+			let mut width: int
+			if c == runeError {
+				width = 1
+				if i+2 < len(s) && s[i:i+3] == str(runeError) {
+					width = 3
+				}
+			} else {
+				width = len(str(c))
+			}
+			mut j := 0
+			for j < width; j++ {
+				buf = append(buf, `\x`...)
+				buf = append(buf, lowerhex[s[i+j]>>4])
+				buf = append(buf, lowerhex[s[i+j]&0xF])
+			}
+		} else {
+			if c == '"' || c == '\\' {
+				buf = append(buf, '\\')
+			}
+			buf = append(buf, str(c)...)
+		}
+	}
+	buf = append(buf, '"')
+	ret unsafe::StrFromBytes(buf)
+}
+
+// Describes a problem parsing a time string.
+struct ParseError {
+	Layout:     str
+	Value:      str
+	LayoutElem: str
+	ValueElem:  str
+	Message:    str
+}
+
+impl ParseError {
+	fn Str(self): str {
+		if self.Message == "" {
+			ret "parsing time " +
+				quote(self.Value) + " as " +
+				quote(self.Layout) + ": cannot parse " +
+				quote(self.ValueElem) + " as " +
+				quote(self.LayoutElem)
+		}
+		ret "parsing time " +
+			quote(self.Value) + self.Message
+	}
+}
+
+// Creates a new ParseError.
+// The provided value and valueElem are cloned to avoid escaping their values.
+fn newParseError(layout: str, value: str, layoutElem: str, valueElem: str, message: str): &ParseError {
+	valueCopy := stringslite::Clone(value)
+	valueElemCopy := stringslite::Clone(valueElem)
+	ret &ParseError{layout, valueCopy, layoutElem, valueElemCopy, message}
 }
 
 // Parses a formatted string and returns the time value it represents.
@@ -773,8 +842,10 @@ fn ParseInLocation(layout: str, value: str, loc: &Location)!: Time {
 }
 
 fn parse(mut layout: str, mut value: str, defaultLocation: &Location, mut local: &Location)!: Time {
-	mut amSet := false // do we need to subtract 12 from the hour for midnight?
-	mut pmSet := false // do we need to add 12 to the hour?
+	alayout, avalue := layout, value
+	mut rangeErrStr := "" // set if a value is out of range
+	mut amSet := false    // do we need to subtract 12 from the hour for midnight?
+	mut pmSet := false    // do we need to add 12 to the hour?
 
 	// Time being constructed.
 	mut year := 0
@@ -792,10 +863,11 @@ fn parse(mut layout: str, mut value: str, defaultLocation: &Location, mut local:
 	// Each iteration processes one std value.
 	for {
 		prefix, mut std, suffix := nextStdChunk(layout)
+		stdstr := layout[len(prefix) : len(layout)-len(suffix)]
 		value = skip(value, prefix) else { error(error) }
 		if std == 0 {
 			if len(value) != 0 {
-				error(ParseError.BadField)
+				error(newParseError(alayout, avalue, "", value, ": extra text: "+quote(value)))
 			}
 			break
 		}
@@ -804,7 +876,7 @@ fn parse(mut layout: str, mut value: str, defaultLocation: &Location, mut local:
 		match std & stdMask {
 		| stdYear:
 			if len(value) < 2 {
-				error(ParseError.BadField)
+				error(errBad)
 			}
 			p, value = value[0:2], value[2:]
 			year = atoi(p) else { error(error) }
@@ -815,7 +887,7 @@ fn parse(mut layout: str, mut value: str, defaultLocation: &Location, mut local:
 			}
 		| stdLongYear:
 			if len(value) < 4 || !isDigit(value, 0) {
-				error(ParseError.BadField)
+				error(errBad)
 			}
 			p, value = value[0:4], value[4:]
 			year = atoi(p) else { error(error) }
@@ -828,7 +900,7 @@ fn parse(mut layout: str, mut value: str, defaultLocation: &Location, mut local:
 		| stdNumMonth | stdZeroMonth:
 			month, value = getnum(value, std == stdZeroMonth) else { error(error) }
 			if month <= 0 || 12 < month {
-				error(ParseError.InvalidRange)
+				rangeErrStr = "month"
 			}
 		| stdWeekDay:
 			// Ignore weekday except for error checking.
@@ -855,22 +927,22 @@ fn parse(mut layout: str, mut value: str, defaultLocation: &Location, mut local:
 		| stdHour:
 			hour, value = getnum(value, false) else { error(error) }
 			if hour < 0 || 24 <= hour {
-				error(ParseError.InvalidRange)
+				rangeErrStr = "hour"
 			}
 		| stdHour12 | stdZeroHour12:
 			hour, value = getnum(value, std == stdZeroHour12) else { error(error) }
 			if hour < 0 || 12 < hour {
-				error(ParseError.InvalidRange)
+				rangeErrStr = "hour"
 			}
 		| stdMinute | stdZeroMinute:
 			min, value = getnum(value, std == stdZeroMinute) else { error(error) }
 			if min < 0 || 60 <= min {
-				error(ParseError.InvalidRange)
+				rangeErrStr = "minute"
 			}
 		| stdSecond | stdZeroSecond:
 			sec, value = getnum(value, std == stdZeroSecond) else { error(error) }
 			if sec < 0 || 60 <= sec {
-				error(ParseError.InvalidRange)
+				rangeErrStr = "second"
 			}
 			// Special case: do we have a fractional second but no
 			// fractional second in the format?
@@ -885,12 +957,12 @@ fn parse(mut layout: str, mut value: str, defaultLocation: &Location, mut local:
 				mut n := 2
 				for n < len(value) && isDigit(value, n); n++ {
 				}
-				nsec = parseNanoseconds(value, n) else { error(error) }
+				nsec, rangeErrStr = parseNanoseconds(value, n) else { error(error) }
 				value = value[n:]
 			}
 		| stdPM:
 			if len(value) < 2 {
-				error(ParseError.BadField)
+				error(errBad)
 			}
 			p, value = value[0:2], value[2:]
 			match p {
@@ -899,11 +971,11 @@ fn parse(mut layout: str, mut value: str, defaultLocation: &Location, mut local:
 			| "AM":
 				amSet = true
 			|:
-				error(ParseError.BadField)
+				error(errBad)
 			}
 		| stdpm:
 			if len(value) < 2 {
-				error(ParseError.BadField)
+				error(errBad)
 			}
 			p, value = value[0:2], value[2:]
 			match p {
@@ -912,7 +984,7 @@ fn parse(mut layout: str, mut value: str, defaultLocation: &Location, mut local:
 			| "am":
 				amSet = true
 			|:
-				error(ParseError.BadField)
+				error(errBad)
 			}
 		| stdISO8601TZ | stdISO8601ShortTZ | stdISO8601ColonTZ | stdISO8601SecondsTZ | stdISO8601ColonSecondsTZ:
 			if len(value) >= 1 && value[0] == 'Z' {
@@ -928,33 +1000,33 @@ fn parse(mut layout: str, mut value: str, defaultLocation: &Location, mut local:
 			mut secondsS := ""
 			if std == stdISO8601ColonTZ || std == stdNumColonTZ {
 				if len(value) < 6 {
-					error(ParseError.BadField)
+					error(errBad)
 				}
 				if value[3] != ':' {
-					error(ParseError.BadField)
+					error(errBad)
 				}
 				signS, hourS, minS, secondsS, value = value[0:1], value[1:3], value[4:6], "00", value[6:]
 			} else if std == stdNumShortTZ || std == stdISO8601ShortTZ {
 				if len(value) < 3 {
-					error(ParseError.BadField)
+					error(errBad)
 				}
 				signS, hourS, minS, secondsS, value = value[0:1], value[1:3], "00", "00", value[3:]
 			} else if std == stdISO8601ColonSecondsTZ || std == stdNumColonSecondsTZ {
 				if len(value) < 9 {
-					error(ParseError.BadField)
+					error(errBad)
 				}
 				if value[3] != ':' || value[6] != ':' {
-					error(ParseError.BadField)
+					error(errBad)
 				}
 				signS, hourS, minS, secondsS, value = value[0:1], value[1:3], value[4:6], value[7:9], value[9:]
 			} else if std == stdISO8601SecondsTZ || std == stdNumSecondsTz {
 				if len(value) < 7 {
-					error(ParseError.BadField)
+					error(errBad)
 				}
 				signS, hourS, minS, secondsS, value = value[0:1], value[1:3], value[3:5], value[5:7], value[7:]
 			} else {
 				if len(value) < 5 {
-					error(ParseError.BadField)
+					error(errBad)
 				}
 				signS, hourS, minS, secondsS, value = value[0:1], value[1:3], value[3:5], "00", value[5:]
 			}
@@ -966,13 +1038,13 @@ fn parse(mut layout: str, mut value: str, defaultLocation: &Location, mut local:
 			// as some people do write offsets of 24 hours
 			// or 60 minutes or 60 seconds.
 			if hr > 24 {
-				error(ParseError.InvalidRange)
+				rangeErrStr = "time zone offset hour"
 			}
 			if mm > 60 {
-				error(ParseError.InvalidRange)
+				rangeErrStr = "time zone offset minute"
 			}
 			if ss > 60 {
-				error(ParseError.InvalidRange)
+				rangeErrStr = "time zone offset second"
 			}
 
 			zoneOffset = (hr*60+mm)*60 + ss // offset is in seconds
@@ -981,7 +1053,7 @@ fn parse(mut layout: str, mut value: str, defaultLocation: &Location, mut local:
 			| '-':
 				zoneOffset = -zoneOffset
 			|:
-				error(ParseError.BadField)
+				error(errBad)
 			}
 		| stdTZ:
 			// Does it look like a time zone?
@@ -992,7 +1064,7 @@ fn parse(mut layout: str, mut value: str, defaultLocation: &Location, mut local:
 			}
 			n, ok := parseTimeZone(value)
 			if !ok {
-				error(ParseError.BadField)
+				error(errBad)
 			}
 			zoneName, value = value[:n], value[n:]
 		| stdFracSecond0:
@@ -1000,9 +1072,9 @@ fn parse(mut layout: str, mut value: str, defaultLocation: &Location, mut local:
 			// the layout.
 			ndigit := 1 + digitsLen(std)
 			if len(value) < ndigit {
-				error(ParseError.BadField)
+				error(errBad)
 			}
-			nsec = parseNanoseconds(value, ndigit) else { error(error) }
+			nsec, rangeErrStr = parseNanoseconds(value, ndigit) else { error(error) }
 			value = value[ndigit:]
 		| stdFracSecond9:
 			if len(value) < 2 || !commaOrPeriod(value[0]) || value[1] < '0' || '9' < value[1] {
@@ -1015,8 +1087,11 @@ fn parse(mut layout: str, mut value: str, defaultLocation: &Location, mut local:
 			for i+1 < len(value) && '0' <= value[i+1] && value[i+1] <= '9' {
 				i++
 			}
-			nsec = parseNanoseconds(value, 1+i) else { error(error) }
+			nsec, rangeErrStr = parseNanoseconds(value, 1+i) else { error(error) }
 			value = value[1+i:]
+		}
+		if rangeErrStr != "" {
+			error(newParseError(alayout, avalue, stdstr, value, ": "+rangeErrStr+" out of range"))
 		}
 	}
 	if pmSet && hour < 12 {
@@ -1038,7 +1113,7 @@ fn parse(mut layout: str, mut value: str, defaultLocation: &Location, mut local:
 			}
 		}
 		if yday < 1 || yday > 365 {
-			error(ParseError.InvalidRange)
+			error(newParseError(alayout, avalue, "", value, ": day-of-year out of range"))
 		}
 		if m == 0 {
 			m = (yday-1)/31 + 1
@@ -1050,11 +1125,11 @@ fn parse(mut layout: str, mut value: str, defaultLocation: &Location, mut local:
 		// If month, day already seen, yday's m, d must match.
 		// Otherwise, set them from m, d.
 		if month >= 0 && month != m {
-			error(ParseError.InvalidRange)
+			error(newParseError(alayout, avalue, "", value, ": day-of-year does not match month"))
 		}
 		month = m
 		if day >= 0 && day != d {
-			error(ParseError.InvalidRange)
+			error(newParseError(alayout, avalue, "", value, ": day-of-year does not match day"))
 		}
 		day = d
 	} else {
@@ -1068,7 +1143,7 @@ fn parse(mut layout: str, mut value: str, defaultLocation: &Location, mut local:
 
 	// Validate the day of the month.
 	if day < 1 || day > daysIn(Month(month), year) {
-		error(ParseError.InvalidRange)
+		error(newParseError(alayout, avalue, "", value, ": day out of range"))
 	}
 
 	if z != nil {
@@ -1124,18 +1199,20 @@ fn commaOrPeriod(b: byte): bool {
 	ret b == '.' || b == ','
 }
 
-fn parseNanoseconds[bytes: []byte | str](value: bytes, mut nbytes: int)!: (ns: int) {
+fn parseNanoseconds[bytes: []byte | str](value: bytes, mut nbytes: int)!: (ns: int, rangeErrStr: str) {
 	if !commaOrPeriod(value[0]) {
-		error(ParseError.BadField)
+		error(errBad)
 	}
 	if nbytes > 10 {
 		unsafe { *(&value) = (*(&value))[:10] } // Break immutability for slicing.
 		nbytes = 10
 	}
 
-	ns = atoi(value[1:nbytes]) else { error(error) }
+	ns = atoi(value[1:nbytes]) else {
+		ret 0, ""
+	}
 	if ns < 0 {
-		error(ParseError.BadField)
+		rangeErrStr = "fractional second"
 	}
 	// We need nanoseconds, which means scaling by the number
 	// of missing digits in the format, maximum length 10.
@@ -1242,11 +1319,11 @@ fn parseSignedOffset(value: str): int {
 // remainder of the string.
 fn getnum(s: str, fixed: bool)!: (int, str) {
 	if !isDigit(s, 0) {
-		error(ParseError.BadField)
+		error(errBad)
 	}
 	if !isDigit(s, 1) {
 		if fixed {
-			error(ParseError.BadField)
+			error(errBad)
 		}
 		ret int(s[0] - '0'), s[1:]
 	}
@@ -1263,10 +1340,12 @@ fn getnum3(s: str, fixed: bool)!: (int, str) {
 		n = n*10 + int(s[i]-'0')
 	}
 	if i == 0 || fixed && i != 3 {
-		error(ParseError.BadField)
+		error(errBad)
 	}
 	ret n, s[i:]
 }
+
+static mut errLeadingInt = errors::New("time: bad [0-9]*") // never printed
 
 // Consumes the leading [0-9]* from s.
 fn leadingInt[bytes: []byte | str](s: bytes)!: (x: u64, rem: bytes) {
@@ -1278,16 +1357,19 @@ fn leadingInt[bytes: []byte | str](s: bytes)!: (x: u64, rem: bytes) {
 		}
 		if x > 1<<63/10 {
 			// overflow
-			error(ParseError.LeadingInt)
+			error(errLeadingInt)
 		}
 		x = x*10 + u64(c) - '0'
 		if x > 1<<63 {
 			// overflow
-			error(ParseError.LeadingInt)
+			error(errLeadingInt)
 		}
 	}
 	ret x, unsafe { (*(&s))[i:] } // Break immutability for return.
 }
+
+// Never printed, just needs to be non-nil for return by atoi.
+static mut errAtoi = errors::New("time: invalid number")
 
 // Duplicates functionality in strconv, but avoids dependency.
 fn atoi[bytes: []byte | str](s: bytes)!: (x: int) {
@@ -1296,10 +1378,10 @@ fn atoi[bytes: []byte | str](s: bytes)!: (x: int) {
 		neg = s[0] == '-'
 		unsafe { *(&s) = (*(&s))[1:] } // Break immutability for slicing.
 	}
-	q, rem := leadingInt(s) else { error(error) }
+	q, rem := leadingInt(s) else { error(errAtoi) }
 	x = int(q)
 	if len(rem) > 0 {
-		error(ParseError.InvalidNumber)
+		error(errAtoi)
 	}
 	if neg {
 		x = -x
@@ -1320,14 +1402,14 @@ fn skip(mut value: str, mut prefix: str)!: str {
 	for len(prefix) > 0 {
 		if prefix[0] == ' ' {
 			if len(value) > 0 && value[0] != ' ' {
-				error(ParseError.BadField)
+				error(errBad)
 			}
 			prefix = cutspace(prefix)
 			value = cutspace(value)
 			continue
 		}
 		if len(value) == 0 || value[0] != prefix[0] {
-			error(ParseError.BadField)
+			error(errBad)
 		}
 		prefix = prefix[1:]
 		value = value[1:]
@@ -1360,7 +1442,7 @@ fn lookup(tab: []str, val: str)!: (int, str) {
 			ret i, val[len(v):]
 		}
 	}
-	error(ParseError.BadField)
+	error(errBad)
 }
 
 // leadingFraction consumes the leading [0-9]* from s.
