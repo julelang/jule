@@ -35,6 +35,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // ====================================================
 
+use "std/conv"
 use "std/io"
 
 // Returns the maximum length of an encoding of n source bytes.
@@ -126,9 +127,17 @@ fn Encode(mut dest: []byte, src: []byte): int {
 	ret n
 }
 
+type CorruptInputError: i64
+
+impl CorruptInputError {
+	fn Str(self): str {
+		ret "illegal ascii85 data at input byte " + conv::FmtInt(i64(self), 10)
+	}
+}
+
 // Decodes src into dest, returning both the number
 // of bytes written to dest and the number consumed from src.
-// If src contains invalid ascii85 data, eecode will throw exception with DecodeError.Format.
+// If src contains invalid ascii85 data, encode will throw exception with CorruptInputError.
 // Decode ignores space and control characters in src.
 // Often, ascii85-encoded data is wrapped in <~ and ~> symbols.
 // Decode expects these to have been stripped by the caller.
@@ -155,7 +164,7 @@ fn Decode(mut dest: []byte, src: []byte, flush: bool)!: (ndst: int, nsrc: int) {
 			v = v*85 + u32(b-'!')
 			nb++
 		|:
-			error(DecodeError.Format)
+			error(CorruptInputError(i))
 		}
 		if nb == 5 {
 			nsrc = i + 1
@@ -176,7 +185,7 @@ fn Decode(mut dest: []byte, src: []byte, flush: bool)!: (ndst: int, nsrc: int) {
 			// the extra byte provides enough bits to cover
 			// the inefficiency of the encoding for the block.
 			if nb == 1 {
-				error(DecodeError.Format)
+				error(CorruptInputError(len(src)))
 			}
 			mut j := nb
 			for j < 5; j++ {
