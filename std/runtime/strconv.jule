@@ -278,6 +278,15 @@ fn toStr[T](x: T): str {
 	| comptime::Struct:
 		ret structToStr(x)
 	| comptime::SmartPtr:
+		// Handle element type of smart pointer.
+		const elem = t.Elem()
+		const match {
+		| elem.Strict() | elem.Kind() == comptime::Struct:
+			r, ok := tryToCallStr(*x)
+			if ok {
+				ret r
+			}
+		}
 		ret unsafe { ptrToStr((*unsafe)(uintptr(x))) }
 	| comptime::Ptr | comptime::UnsafePtr:
 		ret ptrToStr(unsafe { (*unsafe)(uintptr(x)) })

@@ -374,13 +374,61 @@ impl ObjectCoder {
 			// Deallocator function.
 			di := self.pushDealloc(t)
 
+			mut sptr := t.Sptr()
+
+			// Whether we have to use generic runtime stringer function.
+			runtimeToStr := t.SoftStruct() != nil || sptr != nil && sptr.Elem.SoftStruct() != nil
+
+			// Write to_str function.
+			// If type is a soft struct type, or element of smart pointer is,
+			// we have to use runtime string conversion function, because it
+			// might be have custom stringer function.
+			if runtimeToStr {
+				self.anyObj.WriteStr(typeStr + " " + anyTypeIdent)!
+				self.anyObj.WriteStr(si)!
+				self.anyObj.WriteStr("_to_str(void *alloc) noexcept { ")!
+				mut f := obj::FindFuncGenericInstanceNoPanic(meta::Program.Runtime.ToStr, t)
+				// If function f is nil, it have not to implement runtime string function.
+				// This means program will not use in any case this function.
+				// Otherwise, it means the compiler have issues for analysis.
+				if f == nil {
+					// This method should be unused.
+					// Implement as a panic call to help debugging.
+					self.anyObj.WriteStr(`__jule_panicStr(__jule_strBytePtr((jule::U8*)"runtime: type data have not string conversion data but used at runtime", 70)); }` + "\n")!
+				} else {
+					self.anyObj.WriteStr("return ")!
+					identCoder.funcIns(self.anyObj, f)
+					self.anyObj.WriteStr("(")!
+					// If type is a smart pointer, we have to point to element.
+					// See memory model of dynamic types.
+					if sptr != nil {
+						self.tc.kind(self.anyObj, t)
+						self.anyObj.WriteStr("::make(reinterpret_cast<")!
+						self.tc.kind(self.anyObj, sptr.Elem)
+						self.anyObj.WriteStr("*>(alloc), nullptr)); }\n")!
+					} else {
+						self.anyObj.WriteStr("*reinterpret_cast<")!
+						self.tc.kind(self.anyObj, t)
+						self.anyObj.WriteStr("*>(alloc)); }\n")!
+					}
+				}
+			}
+
 			// Type structure.
 			self.anyObj.WriteStr("struct " + typeAny + "::Type ")!
 			self.anyObj.WriteStr(anyTypeIdent)!
 			self.anyObj.WriteStr(si)!
 			self.anyObj.WriteStr("{.dealloc=" + deallocatedTypeIdent)!
 			self.anyObj.WriteStr(conv::Itoa(di))!
-			self.anyObj.WriteStr(", .hash=__jule_priv_dynhash, .eq=__jule_ptrEqual, .to_str=__jule_ptrToStr};\n")!
+			self.anyObj.WriteStr(", .hash=__jule_priv_dynhash, .eq=__jule_ptrEqual, .to_str=")!
+			if runtimeToStr {
+				self.anyObj.WriteStr(anyTypeIdent)!
+				self.anyObj.WriteStr(si)!
+				self.anyObj.WriteStr("_to_str")!
+			} else {
+				self.anyObj.WriteStr("__jule_ptrToStr")!
+			}
+			self.anyObj.WriteStr("};\n")!
 
 			// comparison function.
 			self.anyObj.WriteStr(typeBool + " " + anyTypeIdent)!

@@ -138,8 +138,8 @@ impl Type {
 	fn Comparable(self): bool {
 		unsafe {
 			mut _self := &self
-			if _self.softStruct() != nil {
-				ret _self.softStruct().Comparable
+			if _self.SoftStruct() != nil {
+				ret _self.SoftStruct().Comparable
 			}
 			if _self.Array() != nil {
 				ret _self.Array().Elem.Comparable()
@@ -152,8 +152,8 @@ impl Type {
 	fn Mutable(self): bool {
 		unsafe {
 			mut _self := &self
-			if _self.softStruct() != nil {
-				ret _self.softStruct().Mutable
+			if _self.SoftStruct() != nil {
+				ret _self.SoftStruct().Mutable
 			}
 			if _self.Chan() != nil {
 				ret _self.Chan().Elem.Mutable()
@@ -298,7 +298,10 @@ impl Type {
 		ret s
 	}
 
-	fn softStruct(mut self): &StructIns {
+	// Returns struct type if actual kind is structure.
+	// If type kind is the strict type alias source, returns the underlying
+	// structure type of the strict type alias.
+	fn SoftStruct(mut self): &StructIns {
 		mut s, _ := (&StructIns)(self.Kind)
 		ret s
 	}
@@ -799,7 +802,7 @@ impl typeChecker {
 			| &StructIns:
 				s = (&StructIns)(self.referencer.owner)
 			| &TypeAlias:
-				s = (&TypeAlias)(self.referencer.owner).TypeSym.Type.softStruct()
+				s = (&TypeAlias)(self.referencer.owner).TypeSym.Type.SoftStruct()
 			|:
 				panic("unreachable")
 			}
@@ -824,8 +827,8 @@ impl typeChecker {
 
 	fn pushReferenceByKind(mut self, mut &k: &Type) {
 		match {
-		| k.softStruct() != nil:
-			mut t := k.softStruct()
+		| k.SoftStruct() != nil:
+			mut t := k.SoftStruct()
 			self.pushReference[&StructIns](t)
 		| k.Trait() != nil:
 			mut t := k.Trait()
@@ -999,7 +1002,7 @@ impl typeChecker {
 		if ta.Strict && self.s.step&stepFlag.ImplsImplemented == stepFlag.ImplsImplemented {
 			// Check strict type structure if impl statements are implemented.
 			// But do not check if source type is nil, it means type type alias is still checking.
-			mut s := ta.TypeSym.Type.softStruct()
+			mut s := ta.TypeSym.Type.SoftStruct()
 			if s.Source != nil && !s.Checked {
 				ok := self.checkStructIns(s, decl.Token)
 				if !ok {
