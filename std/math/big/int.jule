@@ -36,10 +36,12 @@ struct Int {
 impl Int {
 	// Returns int with the value of s, interpreted in the given base,
 	// and returns int and a boolean indicating success. The entire string
-	// (not just a prefix) must be valid for success. If Parse fails, it panics.
+	// (not just a prefix) must be valid for success. If it fails, it panics.
 	// The first byte is optional to determine sign of value of s.
 	// This first byte is not sign, it assumes value as positive.
 	// The `-` sign handled as negative number, `+` is valid also.
+	// If the entire string is not valid, it returns false for success
+	// with the integer value scanned successfully.
 	//
 	// The base argument must be 0 or a value between 2 and [MaxBase].
 	// For base 0, the number prefix determines the actual base: A prefix of
@@ -58,7 +60,7 @@ impl Int {
 	// Incorrect placement of underscores is reported as an error if there
 	// are no other errors. If base != 0, underscores are not recognized
 	// and act like any other character that is not a valid digit.
-	static fn Parse(mut s: str, base: int)!: Int {
+	static fn Parse(mut s: str, base: int): (Int, ok: bool) {
 		mut z := Int{}
 
 		// determine sign
@@ -75,17 +77,17 @@ impl Int {
 
 		// parse abs
 		mut r := strScan.new(s)
-		z.abs, _, _, err := scanW(r, base, false)
-		if err != -1 {
-			error(unsafe { *(*ConvError)(&err) })
+		z.abs, _, _, ok := scanW(r, base, false)
+		if !ok {
+			ret Int{}, false
 		}
 		// entire content must have been consumed
 		if len(r.s) != r.i {
-			error(ConvError.InvalidFormat)
+			ret z, false
 		}
 
 		z.neg = len(z.abs) > 0 && neg // 0 has no sign
-		ret z
+		ret z, true
 	}
 
 	// Returns Int by x.

@@ -346,13 +346,6 @@ impl strScan {
 	}
 }
 
-// Conversion error codes.
-enum ConvError {
-	NoDigits,   // number has no digits
-	InvalidSep, // '_' must separate successive digits
-	InvalidFormat,
-}
-
 // Scans the number corresponding to the longest possible prefix
 // from r representing an unsigned number in a given conversion base.
 // scan returns the corresponding natural number res, the actual base b,
@@ -400,8 +393,8 @@ enum ConvError {
 //
 // Returns ConvError in integer form.
 // err = -1 if no error occurred.
-fn scanW(mut &r: strScan, base: int, mut fracOk: bool): (res: []Word, b: int, count: int, err: int) {
-	err = -1
+fn scanW(mut &r: strScan, base: int, mut fracOk: bool): (res: []Word, b: int, count: int, ok: bool) {
+	ok = true
 	// reject invalid bases
 	baseOk := base == 0 ||
 		!fracOk && 2 <= base && base <= MaxBase ||
@@ -514,19 +507,17 @@ fn scanW(mut &r: strScan, base: int, mut fracOk: bool): (res: []Word, b: int, co
 		ch, end = r.read()
 	}
 
-	// other errors take precedence over invalid separators
-	if !end && (invalSep || prev == '_') {
-		err = ConvError.InvalidSep
-	}
+	// invalid separators
+	ok = ok && (!invalSep && prev != '_')
 
 	if count == 0 {
 		// no digits found
 		if prefix == '0' {
 			// there was only the octal prefix 0 (possibly followed by separators and digits > 7);
 			// interpret as decimal 0
-			ret res[:0], 10, 1, err
+			ret res[:0], 10, 1, ok
 		}
-		err = ConvError.NoDigits // fall through; result will be 0
+		ok = false // fall through; result will be 0
 	}
 
 	// add remaining digits to result
@@ -545,9 +536,9 @@ fn scanW(mut &r: strScan, base: int, mut fracOk: bool): (res: []Word, b: int, co
 
 fn fromStrW(s: str): []Word {
 	mut r := strScan.new(s)
-	mut x, _, _, err := scanW(r, 0, false)
-	if err != -1 {
-		panic("std/math/big: fromStrW: " + conv::Itoa(err))
+	mut x, _, _, ok := scanW(r, 0, false)
+	if !ok {
+		panic("std/math/big: fromStrW failed")
 	}
 	ret x
 }
