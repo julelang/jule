@@ -43,13 +43,17 @@ const __P_S = 8                // a symbolic character.
 const __P_Z = 16               // a spacing character.
 const __P_LU = 32              // an upper-case letter.
 const __P_LL = 64              // a lower-case letter.
-const __PP = 128               // a printable character according to Go's definition.
+const __PP = 128               // a printable character according to Jule's definition.
 const __PG = __PP | __P_Z      // a graphical character according to the Unicode definition.
 const __P_LO = __P_LL | __P_LU // a letter that is neither upper nor lower case.
 const __P_L_MASK = __P_LO
 
 // Defines the set of graphic characters according to Unicode.
 static GraphicRanges = [L, M, N, P, S, ZS]
+
+// Defines the set of printable characters according to Jule.
+// ASCII space, U+0020, is handled separately.
+static PrintRanges = [L, M, N, P, S]
 
 // Such characters include letters, marks, numbers, punctuation, symbols, and
 // spaces, from categories L, M, N, P, S, ZS.
@@ -114,4 +118,16 @@ fn IsSpace(r: rune): bool {
 		ret false
 	}
 	ret isExcludingLatin(WhiteSpace, r)
+}
+
+// Reports whether the rune is defined as printable by Jule. Such
+// characters include letters, marks, numbers, punctuation, symbols, and the
+// ASCII space character, from categories [L], [M], [N], [P], [S] and the ASCII space
+// character. This categorization is the same as [IsGraphic] except that the
+// only spacing character is ASCII space, U+0020.
+fn IsPrint(r: rune): bool {
+	if u32(r) <= MaxLatin1 {
+		ret _PROPERTIES[u8(r)]&__PP != 0
+	}
+	ret In(r, PrintRanges...)
 }
