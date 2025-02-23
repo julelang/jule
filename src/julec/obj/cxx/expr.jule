@@ -38,6 +38,7 @@ enum compExpr: type {
 	&opt::StrConcatExpr,
 	&opt::StrFromBytes,
 	&opt::ArrayAsSlice,
+	&opt::BytesFromStr,
 }
 
 struct exprCoder {
@@ -1866,6 +1867,13 @@ impl exprCoder {
 		self.oc.write(")")
 	}
 
+	fn bytesFromStr(mut &self, mut m: &opt::BytesFromStr) {
+		identCoder.funcIns(self.oc.Buf, meta::Program.Runtime.StrAsSlice)
+		self.oc.write("(")
+		self.possibleRefExpr(m.Expr)
+		self.oc.write(")")
+	}
+
 	fn arrayAsSlice(mut &self, mut m: &opt::ArrayAsSlice) {
 		self.oc.write("(")
 		self.possibleRefExpr(m.Expr)
@@ -1978,6 +1986,8 @@ impl exprCoder {
 			self.strConcat((&opt::StrConcatExpr)(m))
 		| &opt::StrFromBytes:
 			self.strFromBytes((&opt::StrFromBytes)(m))
+		| &opt::BytesFromStr:
+			self.bytesFromStr((&opt::BytesFromStr)(m))
 		| &opt::ArrayAsSlice:
 			self.arrayAsSlice((&opt::ArrayAsSlice)(m))
 		|:
@@ -2185,7 +2195,7 @@ fn sbtoa(b: byte): str {
 }
 
 fn cstrBytes(mut &s: strings::Builder, ctx: str) {
-	for _, b in ctx {
+	for _, b in []byte(ctx) {
 		s.WriteStr(sbtoa(b))!
 	}
 }

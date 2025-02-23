@@ -251,7 +251,9 @@ fn PathUnescape(s: str)!: str {
 
 fn escape(s: str, mode: encoding): str {
 	mut spaceCount, mut hexCount := 0, 0
-	for _, c in s {
+	mut i := 0
+	for i < len(s); i++ {
+		c := s[i]
 		if shouldEscape(c, mode) {
 			if c == ' ' && mode == encoding.QueryComponent {
 				spaceCount++
@@ -270,8 +272,9 @@ fn escape(s: str, mode: encoding): str {
 
 	if hexCount == 0 {
 		copy(t, s)
-		for i, c in s {
-			if c == ' ' {
+		i = 0
+		for i < len(s); i++ {
+			if s[i] == ' ' {
 				t[i] = '+'
 			}
 		}
@@ -279,7 +282,9 @@ fn escape(s: str, mode: encoding): str {
 	}
 
 	mut j := 0
-	for _, c in s {
+	i = 0
+	for i < len(s); i++ {
+		c := s[i]
 		match {
 		| c == ' ' && mode == encoding.QueryComponent:
 			t[j] = '+'
@@ -300,12 +305,14 @@ fn escape(s: str, mode: encoding): str {
 // Reports whether s is a valid encoded path or fragment, according to mode.
 // It must not contain any bytes that require escaping during encoding.
 fn validEncoded(s: str, mode: encoding): bool {
-	for _, b in s {
+	mut i := 0
+	for i < len(s); i++ {
 		// RFC 3986, Appendix A.
 		// pchar = unreserved / pct-encoded / sub-delims / ":" / "@".
 		// shouldEscape is not quite compliant with the RFC,
 		// so we check the sub-delims ourselves and let
 		// shouldEscape handle the others.
+		b := s[i]
 		match b {
 		| '!' | '$' | '&' | '\'' | '(' | ')' | '*' | '+' | ',' | ';' | '=' | ':' | '@':
 			// ok
@@ -436,7 +443,7 @@ fn splitHostPort(&hostPort: str): (host: str, port: str) {
 		host, port = host[:colon], host[colon+1:]
 	}
 	if strings::HasPrefix(host, "[") && strings::HasSuffix(host, "]") {
-		host = host[1:len(host)-1]
+		host = host[1 : len(host)-1]
 	}
 	ret
 }
@@ -804,7 +811,9 @@ fn UserPassword(username: str, password: str): &UserInfo {
 // (Scheme must be [a-zA-Z][a-zA-Z0-9+.-]*)
 // If so, return scheme, path; else return "", rawURL.
 fn getScheme(rawURL: str)!: (scheme: str, path: str) {
-	for i, c in rawURL {
+	mut i := 0
+	for i < len(rawURL); i++ {
+		c := rawURL[i]
 		match {
 		| 'a' <= c && c <= 'z' | 'A' <= c && c <= 'Z':
 			// do nothing

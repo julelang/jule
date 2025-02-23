@@ -330,7 +330,7 @@ impl scopeCoder {
 		self.oc.write("}")
 	}
 
-	fn strRuneIter(mut &self, mut it: &opt::StrRuneIter) {
+	fn strRuneIter(mut &self, mut &it: opt::StrRuneIter, utf8: bool) {
 		mut sb := strings::Builder{}
 		sb.Grow(1 << 6)
 		identCoder.iterBegin(sb, uintptr(it.Base))
@@ -425,7 +425,11 @@ impl scopeCoder {
 		self.oc.indent()
 		if it.Base.KeyA != nil {
 			identCoder.var(self.oc.Buf, it.Base.KeyA)
-			self.oc.write("++;\n")
+			if utf8 {
+				self.oc.write(" += len;\n")
+			} else {
+				self.oc.write("++;\n")
+			}
 			self.oc.indent()
 		}
 		self.oc.write("goto ")
@@ -543,7 +547,8 @@ impl scopeCoder {
 		| it.Expr.Type.Map() != nil:
 			self.rangeHashmapIter(it)
 		|:
-			self.rangeIndexIter(it) // Str
+			mut sit := opt::StrRuneIter{Expr: it.Expr, Base: it}
+			self.strRuneIter(sit, true) // Str
 		}
 	}
 
@@ -1415,7 +1420,8 @@ impl scopeCoder {
 		| &opt::ExceptionalForwardingExpr:
 			self.exceptionalForwarding((&opt::ExceptionalForwardingExpr)(st))
 		| &opt::StrRuneIter:
-			self.strRuneIter((&opt::StrRuneIter)(st))
+			mut sit := (&opt::StrRuneIter)(st)
+			self.strRuneIter(*sit, false)
 		|:
 			self.oc.write("<unimplemented_stmt>")
 		}

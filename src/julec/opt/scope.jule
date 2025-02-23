@@ -40,7 +40,7 @@ impl scopeOptimizer {
 
 	// Removes current statement.
 	fn removeCurrent(mut &self) {
-		self.scope.Stmts = append(self.scope.Stmts[:self.i], self.scope.Stmts[self.i+1 : ]...)
+		self.scope.Stmts = append(self.scope.Stmts[:self.i], self.scope.Stmts[self.i+1:]...)
 	}
 
 	fn isLastStmt(mut &self): bool {
@@ -51,19 +51,6 @@ impl scopeOptimizer {
 			}
 		}
 		ret true
-	}
-
-	fn isIter(mut &self): bool {
-		mut r := self.parent
-		for r != nil; r = r.parent {
-			match type r.scope.Stmts[r.i] {
-			| &sema::RangeIter
-			| &sema::WhileIter
-			| &sema::InfIter:
-				ret true
-			}
-		}
-		ret false
 	}
 
 	fn optimizeValue(mut &self, mut val: &sema::Value) {
@@ -377,8 +364,9 @@ impl scopeOptimizer {
 				match {
 				| prim.IsU8():
 					// Expression is: []byte(str)
-					// Use string expression directly, byte casting is unnecessary.
-					it.Expr = cem.Expr
+					// Use string's bytes directly, byte casting is unnecessary.
+					mut model := any(&BytesFromStr{Expr: cem.Expr.Model})
+					it.Expr.Model = unsafe { *(*sema::Expr)(&model) }
 				| prim.IsI32():
 					// Expression is: []rune(str)
 					// Avoid making allocation, iterate runes of string.
@@ -694,8 +682,8 @@ impl scopeOptimizer {
 			i++
 			continue
 		remove:
-			assign.Left = append(assign.Left[:i], assign.Left[i+1 : ]...)
-			tup.Values = append(tup.Values[:i], tup.Values[i+1 : ]...)
+			assign.Left = append(assign.Left[:i], assign.Left[i+1:]...)
+			tup.Values = append(tup.Values[:i], tup.Values[i+1:]...)
 		}
 	}
 
@@ -803,8 +791,8 @@ impl scopeOptimizer {
 			})
 
 			// remove operands
-			assign.Left = append(assign.Left[:i], assign.Left[i+1 : ]...)
-			tup.Values = append(tup.Values[:i], tup.Values[i+1 : ]...)
+			assign.Left = append(assign.Left[:i], assign.Left[i+1:]...)
+			tup.Values = append(tup.Values[:i], tup.Values[i+1:]...)
 		}
 		self.i = z
 	}
