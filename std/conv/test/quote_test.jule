@@ -1,0 +1,368 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/conv"
+use "std/strings"
+use "std/testing"
+
+struct quoteTest {
+	input:   str
+	out:     str
+	ascii:   str
+	graphic: str
+}
+
+static quotetests = []quoteTest([
+	{"\a\b\f\r\n\t\v", `"\a\b\f\r\n\t\v"`, `"\a\b\f\r\n\t\v"`, `"\a\b\f\r\n\t\v"`},
+	{"\\", `"\\"`, `"\\"`, `"\\"`},
+	{"abc\xffdef", `"abc\xffdef"`, `"abc\xffdef"`, `"abc\xffdef"`},
+	{"\u263a", `"☺"`, `"\u263a"`, `"☺"`},
+	{"\U0010ffff", `"\U0010ffff"`, `"\U0010ffff"`, `"\U0010ffff"`},
+	{"\x04", `"\x04"`, `"\x04"`, `"\x04"`},
+	// Some non-printable but graphic runes. Final column is double-quoted.
+	{"!\u00a0!\u2000!\u3000!", `"!\u00a0!\u2000!\u3000!"`, `"!\u00a0!\u2000!\u3000!"`, "\"!\u00a0!\u2000!\u3000!\""},
+	{"\x7f", `"\x7f"`, `"\x7f"`, `"\x7f"`},
+])
+
+#test
+fn testQuote(t: &testing::T) {
+	for _, tt in quotetests {
+		{
+			out := conv::Quote(tt.input)
+			if out != tt.out {
+				t.Errorf("Quote({}) = {}, want {}", tt.input, out, tt.out)
+			}
+		}
+		{
+			out := conv::AppendQuote([]byte("abc"), tt.input)
+			if str(out) != "abc"+tt.out {
+				t.Errorf("AppendQuote({}, {}) = {}, want {}", "abc", tt.input, out, "abc"+tt.out)
+			}
+		}
+	}
+}
+
+#test
+fn testQuoteToASCII(t: &testing::T) {
+	for _, tt in quotetests {
+		{
+			out := conv::QuoteToASCII(tt.input)
+			if out != tt.ascii {
+				t.Errorf("QuoteToASCII({}) = {}, want {}", tt.input, out, tt.ascii)
+			}
+		}
+		{
+			out := conv::AppendQuoteToASCII([]byte("abc"), tt.input)
+			if str(out) != "abc"+tt.ascii {
+				t.Errorf("AppendQuoteToASCII({}, {}) = {}, want {}", "abc", tt.input, out, "abc"+tt.ascii)
+			}
+		}
+	}
+}
+
+#test
+fn testQuoteToGraphic(t: &testing::T) {
+	for _, tt in quotetests {
+		{
+			out := conv::QuoteToGraphic(tt.input)
+			if out != tt.graphic {
+				t.Errorf("QuoteToGraphic({}) = {}, want {}", tt.input, out, tt.graphic)
+			}
+		}
+		{
+			out := conv::AppendQuoteToGraphic([]byte("abc"), tt.input)
+			if str(out) != "abc"+tt.graphic {
+				t.Errorf("AppendQuoteToGraphic({}, {}) = {}, want {}", "abc", tt.input, out, "abc"+tt.graphic)
+			}
+		}
+	}
+}
+
+struct quoteRuneTest {
+	input:   rune
+	out:     str
+	ascii:   str
+	graphic: str
+}
+
+static quoterunetests = []quoteRuneTest([
+	{'a', `'a'`, `'a'`, `'a'`},
+	{'\a', `'\a'`, `'\a'`, `'\a'`},
+	{'\\', `'\\'`, `'\\'`, `'\\'`},
+	{0xFF, `'ÿ'`, `'\u00ff'`, `'ÿ'`},
+	{0x263a, `'☺'`, `'\u263a'`, `'☺'`},
+	{0xdead, `'�'`, `'\ufffd'`, `'�'`},
+	{0xfffd, `'�'`, `'\ufffd'`, `'�'`},
+	{0x0010ffff, `'\U0010ffff'`, `'\U0010ffff'`, `'\U0010ffff'`},
+	{0x0010ffff + 1, `'�'`, `'\ufffd'`, `'�'`},
+	{0x04, `'\x04'`, `'\x04'`, `'\x04'`},
+	// Some differences between graphic and printable. Note the last column is double-quoted.
+	{'\u00a0', `'\u00a0'`, `'\u00a0'`, "'\u00a0'"},
+	{'\u2000', `'\u2000'`, `'\u2000'`, "'\u2000'"},
+	{'\u3000', `'\u3000'`, `'\u3000'`, "'\u3000'"},
+])
+
+#test
+fn testQuoteRune(t: &testing::T) {
+	for _, tt in quoterunetests {
+		{
+			out := conv::QuoteRune(tt.input)
+			if out != tt.out {
+				t.Errorf("QuoteRune({}) = {}, want {}", tt.input, out, tt.out)
+			}
+		}
+		{
+			out := conv::AppendQuoteRune([]byte("abc"), tt.input)
+			if str(out) != "abc"+tt.out {
+				t.Errorf("AppendQuoteRune({}, {}) = {}, want {}", "abc", tt.input, out, "abc"+tt.out)
+			}
+		}
+	}
+}
+
+#test
+fn testQuoteRuneToASCII(t: &testing::T) {
+	for _, tt in quoterunetests {
+		{
+			out := conv::QuoteRuneToASCII(tt.input)
+			if out != tt.ascii {
+				t.Errorf("QuoteRuneToASCII({}) = {}, want {}", tt.input, out, tt.ascii)
+			}
+		}
+		{
+			out := conv::AppendQuoteRuneToASCII([]byte("abc"), tt.input)
+			if str(out) != "abc"+tt.ascii {
+				t.Errorf("AppendQuoteRuneToASCII({}, {}) = {}, want {}", "abc", tt.input, out, "abc"+tt.ascii)
+			}
+		}
+	}
+}
+
+#test
+fn testQuoteRuneToGraphic(t: &testing::T) {
+	for _, tt in quoterunetests {
+		{
+			out := conv::QuoteRuneToGraphic(tt.input)
+			if out != tt.graphic {
+				t.Errorf("QuoteRuneToGraphic({}) = {}, want {}", tt.input, out, tt.graphic)
+			}
+		}
+		{
+			out := conv::AppendQuoteRuneToGraphic([]byte("abc"), tt.input)
+			if str(out) != "abc"+tt.graphic {
+				t.Errorf("AppendQuoteRuneToGraphic({}, {}) = {}, want {}", "abc", tt.input, out, "abc"+tt.graphic)
+			}
+		}
+	}
+}
+
+struct canBackquoteTest {
+	input: str
+	out:   bool
+}
+
+static canbackquotetests = []canBackquoteTest([
+	{"`", false},
+	{str(rune(0)), false},
+	{str(rune(1)), false},
+	{str(rune(2)), false},
+	{str(rune(3)), false},
+	{str(rune(4)), false},
+	{str(rune(5)), false},
+	{str(rune(6)), false},
+	{str(rune(7)), false},
+	{str(rune(8)), false},
+	{str(rune(9)), true},                        // \t
+	{str(rune(10)), false},
+	{str(rune(11)), false},
+	{str(rune(12)), false},
+	{str(rune(13)), false},
+	{str(rune(14)), false},
+	{str(rune(15)), false},
+	{str(rune(16)), false},
+	{str(rune(17)), false},
+	{str(rune(18)), false},
+	{str(rune(19)), false},
+	{str(rune(20)), false},
+	{str(rune(21)), false},
+	{str(rune(22)), false},
+	{str(rune(23)), false},
+	{str(rune(24)), false},
+	{str(rune(25)), false},
+	{str(rune(26)), false},
+	{str(rune(27)), false},
+	{str(rune(28)), false},
+	{str(rune(29)), false},
+	{str(rune(30)), false},
+	{str(rune(31)), false},
+	{str(rune(0x7F)), false},
+	{`' !"#$%&'()*+,-./:;<=>?@[\]^_{|}~`, true},
+	{`0123456789`, true},
+	{`ABCDEFGHIJKLMNOPQRSTUVWXYZ`, true},
+	{`abcdefghijklmnopqrstuvwxyz`, true},
+	{`☺`, true},
+	{"\x80", false},
+	{"a\xe0\xa0z", false},
+	{"\ufeffabc", false},
+	{"a\ufeffz", false},
+])
+
+#test
+fn testCanBackquote(t: &testing::T) {
+	for _, tt in canbackquotetests {
+		out := conv::CanBackquote(tt.input)
+		if out != tt.out {
+			t.Errorf("CanBackquote({}) = {}, want {}", tt.input, out, tt.out)
+		}
+	}
+}
+
+struct unQuoteTest {
+	input: str
+	out:   str
+}
+
+static unquotetests = []unQuoteTest([
+	{`""`, ""},
+	{`"a"`, "a"},
+	{`"abc"`, "abc"},
+	{`"☺"`, "☺"},
+	{`"hello world"`, "hello world"},
+	{`"\xFF"`, "\xFF"},
+	{`"\377"`, "\377"},
+	{`"\u1234"`, "\u1234"},
+	{`"\U00010111"`, "\U00010111"},
+	{`"\U0001011111"`, "\U0001011111"},
+	{`"\a\b\f\n\r\t\v\\\""`, "\a\b\f\n\r\t\v\\\""},
+	{`"'"`, "'"},
+	{`'a'`, "a"},
+	{`'☹'`, "☹"},
+	{`'\a'`, "\a"},
+	{`'\x10'`, "\x10"},
+	{`'\377'`, "\377"},
+	{`'\u1234'`, "\u1234"},
+	{`'\U00010111'`, "\U00010111"},
+	{`'\t'`, "\t"},
+	{`' '`, " "},
+	{`'\''`, "'"},
+	{`'"'`, "\""},
+	{"``", ``},
+	{"`a`", `a`},
+	{"`abc`", `abc`},
+	{"`☺`", `☺`},
+	{"`hello world`", `hello world`},
+	{"`\\xFF`", `\xFF`},
+	{"`\\377`", `\377`},
+	{"`\\`", `\`},
+	{"`\n`", "\n"},
+	{"`	`", `	`},
+	{"` `", ` `},
+	{"`a\rb`", "ab"},
+])
+
+static misquoted = [
+	``,
+	`"`,
+	`"a`,
+	`"'`,
+	`b"`,
+	`"\"`,
+	`"\9"`,
+	`"\19"`,
+	`"\129"`,
+	`'\'`,
+	`'\9'`,
+	`'\19'`,
+	`'\129'`,
+	`'ab'`,
+	`"\x1!"`,
+	`"\U12345678"`,
+	`"\z"`,
+	"`",
+	"`xxx",
+	"``x\r",
+	"`\"",
+	`"\'"`,
+	`'\"'`,
+	"\"\n\"",
+	"\"\\n\n\"",
+	"'\n'",
+	`"\udead"`,
+	`"\ud83d\ude4f"`,
+]
+
+struct unquoteInvalidTest {
+	input: str
+
+	// one of:
+	want:    str
+	wantErr: any
+}
+
+#test
+fn testUnquote(t: &testing::T) {
+	for _, tt in unquotetests {
+		_testUnquote(t, tt.input, tt.out, nil)
+	}
+	for _, tt in quotetests {
+		_testUnquote(t, tt.out, tt.input, nil)
+	}
+	for _, s in misquoted {
+		_testUnquote(t, s, "", conv::ErrSyntax)
+	}
+}
+
+// Invalid UTF-8 should not go through the fast path.
+#test
+fn testUnquoteInvalidUTF8(t: &testing::T) {
+	mut tests := []unquoteInvalidTest([
+		{input: `"foo"`, want: "foo"},
+		{input: `"foo`, wantErr: conv::ErrSyntax},
+		{input: `"` + "\xc0" + `"`, want: "\xef\xbf\xbd"},
+		{input: `"a` + "\xc0" + `"`, want: "a\xef\xbf\xbd"},
+		{input: `"\t` + "\xc0" + `"`, want: "\t\xef\xbf\xbd"},
+	])
+	for (_, mut tt) in tests {
+		_testUnquote(t, tt.input, tt.want, tt.wantErr)
+	}
+}
+
+fn _testUnquote(t: &testing::T, mut input: str, mut want: str, mut wantErr: any) {
+	if input != "``x\r" {
+		ret
+	}
+	// Test QuotedPrefix.
+	// Test Unquote.
+	let mut gotErr: any
+	mut got := conv::Unquote(input) else {
+		gotErr = error
+		use ""
+	}
+	if got != want || gotErr != wantErr {
+		t.Errorf("Unquote({}) = ({}, {}), want ({}, {})", input, got, gotErr, want, wantErr)
+	}
+	// Adding an arbitrary suffix should not change the result of QuotedPrefix
+	// assume that the suffix doesn't accidentally terminate a truncated input.
+	if gotErr == nil {
+		want = input
+	}
+	mut suffix := "\n\r\\\"`'" // special characters for quoted strings
+	if len(input) > 0 {
+		suffix = strings::ReplaceAll(suffix, input[:1], "")
+	}
+	input += suffix
+	gotErr = nil
+	got = conv::QuotedPrefix(input) else {
+		gotErr = error
+		use ""
+	}
+	if gotErr == nil && wantErr != nil {
+		wantErr = nil
+		conv::Unquote(got) else { wantErr = error } // original input had trailing junk, reparse with only valid prefix
+		want = got
+	}
+	if got != want || gotErr != wantErr {
+		t.Errorf("QuotedPrefix({}) = ({}, {}), want ({}, {})", input, got, gotErr, want, wantErr)
+	}
+}
