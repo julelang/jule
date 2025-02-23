@@ -3,6 +3,7 @@
 // license that can be found in the LICENSE file.
 
 use "std/conv"
+use "std/internal/byteslite"
 use "std/unicode/utf8"
 use "std/unsafe"
 
@@ -54,17 +55,9 @@ fn ToStr(mut lit: str): (str, errors: []Error) {
 	if len(lit) == 2 {
 		ret "", nil
 	}
-
-	// Means string is just ASCII text without escape sequences.
-	mut isPure := true
-	for _, r in lit {
-		if r >= utf8::RuneSelf || r == '\\' {
-			isPure = false
-			break
-		}
-	}
-
-	if isPure {
+	// If no escape sequence used, return the string directly with no quotes.
+	escapeseq := byteslite::IndexByteStr(lit, '\\') >= 0
+	if escapeseq {
 		ret lit[1 : len(lit)-1], nil
 	}
 
