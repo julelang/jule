@@ -225,11 +225,6 @@ fn testDecodeSurrogateRune(t: &testing::T) {
 	}
 }
 
-struct info {
-	index: int
-	r:     rune
-}
-
 fn runtimeRuneCount(s: str): int {
 	ret len([]rune(s))
 }
@@ -396,6 +391,81 @@ fn testValidRune(t: &testing::T) {
 		ok := utf8::ValidRune(tt.r)
 		if ok != tt.ok {
 			t.Errorf("ValidRune({}) = {}, want {}", tt.r, ok, tt.ok)
+		}
+	}
+}
+
+struct info {
+	index: int
+	r:     rune
+}
+
+fn testSequence(t: &testing::T, s: str) {
+	mut index := make([]info, len(s))
+	b := []byte(s)
+	mut si := 0
+	mut j := 0
+	for i, r in s {
+		if si != i {
+			t.Errorf("Sequence({}) mismatched index {}, want {}", s, si, i)
+			ret
+		}
+		index[j] = info{i, r}
+		j++
+		r1, size1 := utf8::DecodeRune(b[i:])
+		if r != r1 {
+			t.Errorf("DecodeRune({}) = {}, want {}", s[i:], r1, r)
+			ret
+		}
+		r2, size2 := utf8::DecodeRuneStr(s[i:])
+		if r != r2 {
+			t.Errorf("DecodeRuneStr({}) = {}, want {}", s[i:], r2, r)
+			ret
+		}
+		if size1 != size2 {
+			t.Errorf("DecodeRune/DecodeRuneStr({}) size mismatch {}/{}", s[i:], size1, size2)
+			ret
+		}
+		si += size1
+	}
+	j--
+	si = len(s)
+	for si > 0 {
+		r1, size1 := utf8::DecodeLastRune(b[0:si])
+		r2, size2 := utf8::DecodeLastRuneStr(s[0:si])
+		if size1 != size2 {
+			t.Errorf("DecodeLastRune/DecodeLastRuneStr({}, {}) size mismatch {}/{}", s, si, size1, size2)
+			ret
+		}
+		if r1 != index[j].r {
+			t.Errorf("DecodeLastRune({}, {}) = {}, want {}", s, si, r1, index[j].r)
+			ret
+		}
+		if r2 != index[j].r {
+			t.Errorf("DecodeLastRuneStr({}, {}) = {}, want {}", s, si, r2, index[j].r)
+			ret
+		}
+		si -= size1
+		if si != index[j].index {
+			t.Errorf("DecodeLastRune({}) index mismatch at {}, want {}", s, si, index[j].index)
+			ret
+		}
+		j--
+	}
+	if si != 0 {
+		t.Errorf("DecodeLastRune({}) finished at {}, not 0", s, si)
+	}
+}
+
+// Check that DecodeRune and DecodeLastRune correspond to
+// the equivalent range loop.
+#test
+fn testSequencing(t: &testing::T) {
+	for _, ts in testStrings {
+		for _, m in utf8map {
+			for _, s in [ts + m.s, m.s + ts, ts + m.s + ts] {
+				testSequence(t, s)
+			}
 		}
 	}
 }
