@@ -12,8 +12,20 @@ fn Valid(data: []byte): bool {
 	if decoder.eof() {
 		ret false
 	}
+	mut lit := false
 	for {
+		// scanValidValue will not check literal sequences.
+		// So "10 10" or similar expressions may be result as true.
+		// We have handle them. Special case is:
+		// if the current and previous value is a literal, not valid.
+		if lit {
+			ret false
+		}
 		decoder.scanValidValue() else { ret false }
+		if !decoder.eof() {
+			b := decoder.data[decoder.i]
+			lit = b != '[' && b != '{'
+		}
 		decoder.skipSpace()
 		if decoder.eof() {
 			break

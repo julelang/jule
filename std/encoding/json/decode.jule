@@ -5,6 +5,7 @@
 use "std/comptime"
 use "std/conv"
 use "std/encoding/base64"
+use "std/errors"
 use "std/internal/nbits"
 use "std/unicode"
 use "std/unicode/utf16"
@@ -15,21 +16,19 @@ use "std/unsafe"
 // This is permitted by https://tools.ietf.org/html/rfc7159#section-9
 const maxNestingDepth = 10000
 
-// These values are stored in the parseState stack.
+// These values are stored in the parse state stack.
 // They give the current state of a composite value
 // being scanned. If the parser is inside a nested value
-// the parseState describes the nested state, outermost at entry 0.
-enum parseState {
-	Object, // parsing object key (before colon)
-	Array,  // parsing array value
-}
+// the parse state describes the nested state, outermost at entry 0.
+const parseObject = 1 // parsing object key (before colon)
+const parseArray = 2  // parsing array value
 
 struct jsonDecoder {
 	data:  []byte
 	mut i: int // Read offset for data.
 
 	// Stack of what we're in the middle of - array values, object keys, object values.
-	mut parseState: []parseState
+	mut parseState: []int
 }
 
 impl jsonDecoder {
@@ -52,7 +51,9 @@ impl jsonDecoder {
 		}
 		i := self.i
 		depth := len(self.parseState)
+		bf := b
 		mut colon := false
+		mut j := 0 // Last seen actual byte. Non-space.
 		for !self.eof() {
 			b = self.data[self.i]
 			if isSpace(b) {
@@ -62,13 +63,13 @@ impl jsonDecoder {
 			match b {
 			| '{':
 				self.i++
-				self.pushParseState(parseState.Object) else { error(error) }
+				self.pushParseState(parseObject) else { error(error) }
 			| '[':
-				self.pushParseState(parseState.Array) else { error(error) }
+				self.pushParseState(parseArray) else { error(error) }
 				self.i++
 			| '}':
-				if colon || self.parseState[len(self.parseState)-1] != parseState.Object {
-					error(DecodeError.InvalidValue)
+				if colon || self.parseState[len(self.parseState)-1] != parseObject {
+					error(errors::New("json: invalid character " + quoteChar(b) + " looking for beginning of value"))
 				}
 				self.popParseState()
 				self.i++
@@ -77,8 +78,8 @@ impl jsonDecoder {
 					ret unsafe { (*(&self.data))[i:self.i] }
 				}
 			| ']':
-				if colon || self.parseState[len(self.parseState)-1] != parseState.Array {
-					error(DecodeError.InvalidToken)
+				if colon || self.parseState[len(self.parseState)-1] != parseArray {
+					error(errors::New("json: invalid character " + quoteChar(b) + " looking for beginning of value"))
 				}
 				self.popParseState()
 				self.i++
@@ -86,61 +87,98 @@ impl jsonDecoder {
 					// Keep immutability, it will not be mutated.
 					ret unsafe { (*(&self.data))[i:self.i] }
 				}
-			| ':':
-				if colon {
-					error(DecodeError.InvalidToken)
-				}
-				if self.parseState[len(self.parseState)-1] != parseState.Object {
-					error(DecodeError.InvalidToken)
-				}
-				if len(self.data)-self.i <= 1 || self.data[self.i-1] != '"' {
-					error(DecodeError.InvalidToken)
-				}
-				self.i++
-				colon = true
-				continue
+				//| ':':
+				//	error(errors::New("json: invalid character " + quoteChar(b) + " looking for beginning of value"))
+				//	if colon {
+				//		error(errors::New("json: invalid character " + quoteChar(b) + " looking for beginning of value"))
+				//	}
+				//	if self.parseState[len(self.parseState)-1] != parseObject {
+				//		error(errors::New("json: invalid character " + quoteChar(b) + " used out of object value"))
+				//	}
+				//	if len(self.data)-self.i <= 1 || self.data[j] != '"' {
+				//		error(errors::New("json: invalid character " + quoteChar(b) + " after " + quoteChar(self.data[j])))
+				//	}
+				//	j = self.i
+				//	self.i++
+				//	colon = true
+				//	continue
 			| ',':
 				if colon {
-					error(DecodeError.InvalidToken)
+					error(errors::New("json: invalid character " + quoteChar(b) + " looking for beginning of value"))
 				}
 				self.i++
 				self.skipSpace()
-				if self.parseState[len(self.parseState)-1] == parseState.Object {
-					if self.eof() || self.data[self.i] != '"' {
-						error(DecodeError.InvalidToken)
+				if self.parseState[len(self.parseState)-1] == parseObject {
+					if self.eof() {
+						continue // Error will be handled by next iteration step.
+					}
+					if self.data[self.i] != '"' {
+						error(errors::New("json: invalid character " + quoteChar(self.data[self.i]) + " looking for beginning of object key string"))
 					}
 					self.scanValidLit() else { error(error) }
 					self.skipSpace()
-					if self.eof() || self.data[self.i] != ':' {
-						error(DecodeError.InvalidToken)
+					if self.eof() {
+						continue // Error will be handled by next iteration step.
 					}
+					if self.data[self.i] != ':' {
+						error(errors::New("json: invalid character " + quoteChar(self.data[self.i]) + " after object key"))
+					}
+					j = self.i
 					self.i++
 					colon = true
 					continue
 				}
 				if self.eof() {
-					error(DecodeError.InvalidToken)
+					continue // Error will be handled by next iteration step.
 				}
-				b = self.data[self.i]
-				if b == ',' || b == ':' || b == '}' || b == ']' {
-					error(DecodeError.InvalidToken)
+				b2 := self.data[self.i]
+				if b2 == ',' || b2 == ':' || b2 == '}' || b2 == ']' {
+					// We can say array element because object values are handled separately above.
+					// So we should be in array value.
+					error(errors::New("json: invalid character " + quoteChar(b2) + " after array element"))
 				}
 			| '-' | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'
 			| '"' | 't' | 'f' | 'n':
 				self.scanValidLit() else { error(error) }
+				// Internal handling of literal sequences.
+				// See the checkScanValidLit.
+				j = self.i - 1
+				self.skipSpace()
+				if self.eof() {
+					continue // Error will be handled by next iteration step.
+				}
+				b2 := self.data[self.i]
+				if b == '"' && b2 == ':' {
+					if self.parseState[len(self.parseState)-1] != parseObject {
+						error(errors::New("json: invalid character " + quoteChar(b2) + " used out of object value"))
+					}
+					j = self.i
+					self.i++
+					colon = true
+				} else {
+					colon = false
+					if b2 != ',' && b2 != '}' && b2 != ']' {
+						error(errors::New("json: invalid character " + quoteChar(b2) + " after " + quoteChar(self.data[j])))
+					}
+				}
+				continue
 			|:
-				error(DecodeError.InvalidValue)
+				error(errors::New("json: invalid character " + quoteChar(b) + " looking for beginning of value"))
 			}
 			colon = false
+			j = self.i - 1
 		}
-		error(DecodeError.InvalidValue)
+		if bf == '{' {
+			error(errors::New("json: object is not ended"))
+		}
+		error(errors::New("json: array is not ended"))
 	}
 
 	// Calls the [scanLit] and checks it with the [isValidLit] function.
 	fn scanValidLit(self)!: []byte {
 		mut lit := self.scanLit() else { error(error) }
 		if !isValidLit(lit) {
-			error(DecodeError.InvalidValue)
+			error(errors::New("json: invalid character " + quoteChar(lit[0]) + " looking for beginning of value"))
 		}
 		ret lit
 	}
@@ -150,8 +188,9 @@ impl jsonDecoder {
 	// It only supports basic literals, not objects or arrays.
 	fn scanLit(self)!: []byte {
 		i := self.i
+		b := self.data[self.i]
 	Match:
-		match self.data[self.i] {
+		match b {
 		| '"': // string
 			self.i++
 			for !self.eof(); self.i++ {
@@ -181,10 +220,10 @@ impl jsonDecoder {
 		| 'n': // null
 			self.i += len("null")
 		|:
-			error(DecodeError.InvalidToken)
+			error(errors::New("json: invalid character " + quoteChar(b) + " looking for literal"))
 		}
 		if self.i > len(self.data) {
-			error(DecodeError.InvalidValue)
+			error(errors::New("json: unexpexted end of JSON, looking for literal: " + conv::Quote(unsafe::StrFromBytes(self.data[i:]))))
 		}
 		// Keep immutability, it will not be mutated.
 		ret unsafe { (*(&self.data))[i:self.i] }
@@ -192,10 +231,10 @@ impl jsonDecoder {
 
 	// Pushes a new parse state p onto the parse stack.
 	// Throws exceptional if maxNestingDepth was exceeded.
-	fn pushParseState(self, newParseState: parseState)! {
+	fn pushParseState(self, newParseState: int)! {
 		self.parseState = append(self.parseState, newParseState)
 		if len(self.parseState) > maxNestingDepth {
-			error(DecodeError.ExceededMaxDepth)
+			error(errors::New("json: exceeded max depth"))
 		}
 	}
 
@@ -218,19 +257,19 @@ impl jsonDecoder {
 		| comptime::Slice:
 			a = a[:0] // Keep capacity, but clear current elements.
 		}
-		self.pushParseState(parseState.Array) else { error(error) }
+		self.pushParseState(parseArray) else { error(error) }
 		mut i := 0
 		for {
 			// Look ahead for ] - can only happen on first iteration.
 			self.skipSpace()
 			if self.eof() {
-				error(DecodeError.InvalidValue)
+				error(errors::New("json: array is not ended"))
 			}
 			const match t.Kind() {
 			| comptime::Array:
 				if i >= len(a) {
 					// Ran out of fixed array.
-					error(DecodeError.InvalidValue)
+					error(errors::New("json: array exceeds length of fixed array of type :" + t.Str() + ", got " + conv::Itoa(i)))
 				}
 				self.value(a[i]) else { error(error) }
 			| comptime::Slice:
@@ -243,7 +282,7 @@ impl jsonDecoder {
 			i++
 			self.skipSpace()
 			if self.eof() {
-				error(DecodeError.InvalidValue)
+				error(errors::New("json: array is not ended"))
 			}
 			// Next token must be , or ].
 			b := self.data[self.i]
@@ -255,7 +294,7 @@ impl jsonDecoder {
 				self.i++
 				break
 			}
-			error(DecodeError.InvalidToken)
+			error(errors::New("json: invalid character " + quoteChar(b) + " after array element"))
 		}
 		self.popParseState()
 		if i < len(a) {
@@ -296,31 +335,37 @@ impl jsonDecoder {
 		| keyT.Kind() == comptime::U64:
 			break
 		|:
-			error(EncodeError.UnsupportedType)
+			error(&UnsupportedTypeError{Type: mapT.Str()})
 		}
 		self.i++
 		if !self.eof() && self.data[self.i] == '}' {
 			self.i++
 			ret
 		}
-		self.pushParseState(parseState.Object) else { error(error) }
+		self.pushParseState(parseObject) else { error(error) }
 		// Consider string and dynamic JSON vlaue types as quoted. Directly assign string as key.
 		const quoted = keyT.Kind() == comptime::Str || keyT == valueT || keyT == stringT
 		for {
 			self.skipSpace()
-			if self.eof() || self.data[self.i] != '"' {
-				error(DecodeError.InvalidToken)
+			if self.eof() {
+				error(errors::New("json: object is not ended"))
+			}
+			if self.data[self.i] != '"' {
+				error(errors::New("json: invalid character " + quoteChar(self.data[self.i]) + " looking for beginning of object key string"))
 			}
 			// Don't check validity for literal, following algorithms will check it.
 			lit := self.scanLit() else { error(error) }
 			self.skipSpace()
-			if self.eof() || self.data[self.i] != ':' {
-				error(DecodeError.InvalidToken)
+			if self.eof() {
+				error(errors::New("json: object is not ended"))
+			}
+			if self.data[self.i] != ':' {
+				error(errors::New("json: invalid character " + quoteChar(self.data[self.i]) + " after object key"))
 			}
 			self.i++
 			self.skipSpace()
 			if self.eof() {
-				error(DecodeError.InvalidValue)
+				error(errors::New("json: object is not ended"))
 			}
 			let mut value: V
 			self.value(value) else { error(error) }
@@ -329,7 +374,10 @@ impl jsonDecoder {
 				// String type, assign directly to the key.
 				// Use [self.decodeStr] method to efficient string handling.
 				mut s := ""
-				decodeString(s, lit) else { error(error) }
+				ok := decodeString(s, lit)
+				if !ok {
+					error(errors::New("json: invalid value for type " + keyT.Str() + ": " + str(lit)))
+				}
 				if m == nil {
 					m = {} // create new map
 				}
@@ -343,7 +391,7 @@ impl jsonDecoder {
 				// Quoted non-string type, parse unquoted value by type to assign.
 				key := unquoteBytes(lit)
 				if key == nil {
-					error(DecodeError.InvalidValue)
+					error(errors::New("json: invalid value for object key type" + keyT.Str() + ": " + str(lit)))
 				}
 				let mut keyV: K
 				const match keyT.Kind() {
@@ -361,7 +409,7 @@ impl jsonDecoder {
 			}
 			self.skipSpace()
 			if self.eof() {
-				error(DecodeError.InvalidValue)
+				error(errors::New("json: object is not ended"))
 			}
 			// Next token must be , or }.
 			b := self.data[self.i]
@@ -373,7 +421,7 @@ impl jsonDecoder {
 				self.i++
 				break
 			}
-			error(DecodeError.InvalidToken)
+			error(errors::New("json: invalid character " + quoteChar(b) + " after object key:value pair"))
 		}
 		self.popParseState()
 	}
@@ -385,26 +433,32 @@ impl jsonDecoder {
 			self.i++
 			ret
 		}
-		self.pushParseState(parseState.Object) else { error(error) }
+		self.pushParseState(parseObject) else { error(error) }
 		for {
 			self.skipSpace()
-			if self.eof() || self.data[self.i] != '"' {
-				error(DecodeError.InvalidToken)
+			if self.eof() {
+				error(errors::New("json: object is not ended"))
+			}
+			if self.data[self.i] != '"' {
+				error(errors::New("json: invalid character " + quoteChar(self.data[self.i]) + " looking for beginning of object key string"))
 			}
 			// Don't check validity for literal, following algorithms will check it.
 			lit := self.scanLit() else { error(error) }
 			self.skipSpace()
-			if self.eof() || self.data[self.i] != ':' {
-				error(DecodeError.InvalidToken)
+			if self.eof() {
+				error(errors::New("json: object is not ended"))
+			}
+			if self.data[self.i] != ':' {
+				error(errors::New("json: invalid character " + quoteChar(self.data[self.i]) + " after object key"))
 			}
 			self.i++
 			self.skipSpace()
 			if self.eof() {
-				error(DecodeError.InvalidValue)
+				error(errors::New("json: object is not ended"))
 			}
 			key := unquoteBytes(lit)
 			if key == nil {
-				error(DecodeError.InvalidValue)
+				error(errors::New("json: invalid value for object key type" + comptime::TypeOf(str).Str() + ": " + str(lit)))
 			}
 			keyS := unsafe::BytesStr(key)
 			// To avoid unused error.
@@ -432,7 +486,7 @@ impl jsonDecoder {
 		fieldDecoded:
 			self.skipSpace()
 			if self.eof() {
-				error(DecodeError.InvalidValue)
+				error(errors::New("json: object is not ended"))
 			}
 			// Next token must be , or }.
 			b := self.data[self.i]
@@ -444,9 +498,30 @@ impl jsonDecoder {
 				self.i++
 				break
 			}
-			error(DecodeError.InvalidToken)
+			error(errors::New("json: invalid character " + quoteChar(b) + " after object key:value pair"))
 		}
 		self.popParseState()
+	}
+
+	// Check literal validity in quick way rather than using the Valid function.
+	// It should be used after the scanValidLit.
+	fn checkScanValidLit(self)! {
+		lb := self.data[self.i-1]
+		self.skipSpace()
+		if self.eof() {
+			// No parse state, just literal is fine.
+			if len(self.parseState) == 0 {
+				ret
+			}
+			if self.parseState[len(self.parseState)] != parseObject {
+				error(errors::New("json: object is not ended"))
+			}
+			error(errors::New("json: array is not ended"))
+		}
+		b := self.data[self.i]
+		if b != '[' && b != '{' {
+			error(errors::New("json: invalid character " + quoteChar(b) + " after " + quoteChar(lb)))
+		}
 	}
 
 	// Tries to use custom decoding method if exist for supported types.
@@ -478,19 +553,22 @@ impl jsonDecoder {
 										const match name {
 										| "DecodeJSON":
 											lit := self.scanValidValue() else { error(error) }
+											self.checkScanValidLit() else { error(error) }
 											m.Unwrap()(lit) else { error(error) }
+											ret true
 										| "DecodeText":
 											b := self.data[self.i]
 											if b == '"' {
 												// Next literal is a string literal.
 												// DecodeText is suitable.
 												lit := self.scanValidLit() else { error(error) }
+												self.checkScanValidLit() else { error(error) }
 												m.Unwrap()(lit[1 : len(lit)-1]) else { error(error) }
+												ret true
 											}
 										|:
 											panic("std/encoding/json: unimplemented decoding method")
 										}
-										ret true
 									}
 								}
 							}
@@ -506,7 +584,7 @@ impl jsonDecoder {
 		// Before using the default decoding strategy, look for the custom decoder
 		// methods and use it, if any. If not exist any custom decoder method,
 		// fallback to default decoding.
-		ok := self.tryCustomDecode(t) else { error(error) }
+		mut ok := self.tryCustomDecode(t) else { error(error) }
 		if ok {
 			ret
 		}
@@ -527,7 +605,7 @@ impl jsonDecoder {
 				self.objectStruct(t) else { error(error) }
 				ret
 			|:
-				error(DecodeError.InvalidValue)
+				error(errors::New("json: invalid value for type " + tt.Str() + ": object"))
 			}
 		| '[': // Array.
 			const match {
@@ -541,7 +619,7 @@ impl jsonDecoder {
 				self.array(t) else { error(error) }
 				ret
 			|:
-				error(DecodeError.InvalidValue)
+				error(errors::New("json: invalid value for type " + tt.Str() + ": array"))
 			}
 		| '"': // String literal.
 			const match {
@@ -549,13 +627,19 @@ impl jsonDecoder {
 				// Don't check validity for literal, following algorithms will check it.
 				lit := self.scanLit() else { error(error) }
 				mut s := ""
-				decodeString(s, lit) else { error(error) }
+				ok = decodeString(s, lit)
+				if !ok {
+					error(errors::New("json: invalid value for type " + tt.Str() + ": " + str(lit)))
+				}
 				t = String(s)
 				ret
 			| tt.Kind() == comptime::Str:
 				// Don't check validity for literal, following algorithms will check it.
 				lit := self.scanLit() else { error(error) }
-				decodeString(unsafe { *(*str)(&t) }, lit) else { error(error) }
+				ok = decodeString(unsafe { *(*str)(&t) }, lit)
+				if !ok {
+					error(errors::New("json: invalid value for type " + tt.Str() + ": " + str(lit)))
+				}
 				ret
 			| tt.Kind() == comptime::Slice:
 				const match tt.Elem().Kind() {
@@ -563,14 +647,14 @@ impl jsonDecoder {
 					lit := self.scanLit() else { error(error) }
 					mut s2 := unquoteBytes(lit)
 					if s2 == nil {
-						error(DecodeError.InvalidValue)
+						error(errors::New("json: invalid value for type " + tt.Str() + ": " + str(lit)))
 					}
 					mut r := base64::Decode(s2)
 					t = unsafe { *(*T)(&r) }
 					ret
 				}
 			}
-			error(DecodeError.InvalidValue)
+			error(errors::New("json: invalid value for type " + tt.Str() + ": string"))
 		| 'n': // Null literal.
 			self.scanValidLit() else { error(error) }
 			const match {
@@ -578,7 +662,7 @@ impl jsonDecoder {
 				t = nil
 				ret
 			|:
-				error(DecodeError.InvalidValue)
+				error(errors::New("json: invalid value for type " + tt.Str() + ": null"))
 			}
 		| 't' | 'f': // Boolean literal.
 			self.scanValidLit() else { error(error) }
@@ -590,7 +674,7 @@ impl jsonDecoder {
 				t = b == 't'
 				ret
 			|:
-				error(DecodeError.InvalidValue)
+				error(errors::New("json: invalid value for type " + tt.Str() + ": boolean"))
 			}
 		}
 		if b == '-' || b == '0' || '1' <= b && b <= '9' {
@@ -623,10 +707,10 @@ impl jsonDecoder {
 				decodeFloat(t, lit) else { error(error) }
 				ret
 			|:
-				error(DecodeError.InvalidValue)
+				error(errors::New("json: invalid value for type " + tt.Str() + ": " + str(lit)))
 			}
 		}
-		error(DecodeError.MissingBeginningOfValue)
+		error(errors::New("json: invalid character " + quoteChar(b) + " looking for beginning of value"))
 	}
 
 	fn value[T](self, mut &t: T)! {
@@ -663,7 +747,7 @@ impl jsonDecoder {
 		}
 		self.skipSpace()
 		if len(self.data)-self.i > 0 {
-			error(DecodeError.UnexpectedEnd)
+			error(errors::New("json: unexpexted end of JSON: " + conv::Quote(unsafe::StrFromBytes(self.data[self.i:]))))
 		}
 	}
 }
@@ -679,9 +763,9 @@ impl jsonDecoder {
 // Decoding details:
 //	Since this function designed for comptime type analysis, the type [T] should
 //	be valid type for comptime. The type [any], which is stores dynamic type, is not valid.
-//	Any unsupported type causes exceptional with [DecodeError.UnsupportedType].
+//	Any unsupported type causes exceptional with [UnsupportedTypeError].
 //	Any incompatible value for type, invalid literal or something else causes
-//	exceptional with [DecodeError.UnsupportedType].
+//	exceptional with [UnsupportedTypeError].
 //
 //	Signed/Unsigned Integers, Floating-Points:
 //		Decode as JSON numbers.
@@ -710,7 +794,7 @@ impl jsonDecoder {
 //	Maps:
 //		Decode as JSON object.
 //		Map's key type only can be: signed integer, unsigned integer and string.
-//		Other types will cause exceptional with [DecodeError.UnsupportedType].
+//		Other types will cause exceptional with [UnsupportedTypeError].
 //
 //	Smart Pointers:
 //		If smart pointer is nil, will be allocated by the algorithm for decoding.
@@ -895,9 +979,12 @@ fn unquoteBytes(s: []byte): (t: []byte) {
 fn decodeInt[T](mut &t: T, lit: []byte)! {
 	// Use [unsafe::ByteStr] instead of casting.
 	// The byte buffer will not change, so it's safe and efficient.
-	n := conv::ParseInt(unsafe::BytesStr(lit), 0xA, 1<<6) else { error(DecodeError.InvalidValue) }
-	if !nbits::Fits(n, comptime::TypeOf(T).Bits()) {
-		error(DecodeError.InvalidValue)
+	const tt = comptime::TypeOf(T)
+	n := conv::ParseInt(unsafe::BytesStr(lit), 0xA, 1<<6) else {
+		error(errors::New("json: invalid value for type " + tt.Str() + ": " + str(lit)))
+	}
+	if !nbits::Fits(n, tt.Bits()) {
+		error(errors::New("json: invalid value for type " + tt.Str() + ": " + str(lit)))
 	}
 	t = (T)(n)
 }
@@ -905,9 +992,12 @@ fn decodeInt[T](mut &t: T, lit: []byte)! {
 fn decodeUInt[T](mut &t: T, lit: []byte)! {
 	// Use [unsafe::ByteStr] instead of casting.
 	// The byte buffer will not change, so it's safe and efficient.
-	n := conv::ParseUint(unsafe::BytesStr(lit), 0xA, 1<<6) else { error(DecodeError.InvalidValue) }
+	const tt = comptime::TypeOf(T)
+	n := conv::ParseUint(unsafe::BytesStr(lit), 0xA, 1<<6) else {
+		error(errors::New("json: invalid value for type " + tt.Str() + ": " + str(lit)))
+	}
 	if !nbits::FitsU(n, comptime::TypeOf(T).Bits()) {
-		error(DecodeError.InvalidValue)
+		error(errors::New("json: invalid value for type " + tt.Str() + ": " + str(lit)))
 	}
 	t = (T)(n)
 }
@@ -915,21 +1005,24 @@ fn decodeUInt[T](mut &t: T, lit: []byte)! {
 fn decodeFloat[T](mut &t: T, lit: []byte)! {
 	// Use [unsafe::ByteStr] instead of casting.
 	// The byte buffer will not change, so it's safe and efficient.
-	n := conv::ParseFloat(unsafe::BytesStr(lit), 1<<6) else { error(DecodeError.InvalidValue) }
+	const tt = comptime::TypeOf(T)
+	n := conv::ParseFloat(unsafe::BytesStr(lit), 1<<6) else {
+		error(errors::New("json: invalid value for type " + tt.Str() + ": " + str(lit)))
+	}
 	if f64(T.Max) < n {
-		error(DecodeError.InvalidValue)
+		error(errors::New("json: invalid value for type " + tt.Str() + ": " + str(lit)))
 	}
 	t = (T)(n)
 }
 
-fn decodeString(mut &s: str, lit: []byte)! {
+fn decodeString(mut &s: str, lit: []byte): (ok: bool) {
 	mut s2 := unquoteBytes(lit)
 	if s2 == nil {
-		error(DecodeError.InvalidValue)
+		ret false
 	}
 	if len(s2) == 0 {
 		s = ""
-		ret
+		ret true
 	}
 	if &lit[1] == &s2[0] {
 		// Returned mutable slice from self.data slice.
@@ -941,6 +1034,7 @@ fn decodeString(mut &s: str, lit: []byte)! {
 		// So we can return as string directly without making new allocation.
 		s = unsafe::StrFromBytes(s2)
 	}
+	ret true
 }
 
 // Reports whether the literal b is valid JSON string literal.
@@ -1061,4 +1155,19 @@ fn isValidLit(b: []byte): bool {
 	|:
 		ret false
 	}
+}
+
+// Formats c as a quoted character literal.
+fn quoteChar(c: byte): str {
+	// special cases - different from quoted strings
+	if c == '\'' {
+		ret `'\''`
+	}
+	if c == '"' {
+		ret `'"'`
+	}
+
+	// use quoted string with different quotation marks
+	s := conv::Quote(str(c))
+	ret "'" + s[1 : len(s)-1] + "'"
 }

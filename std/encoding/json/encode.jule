@@ -6,8 +6,48 @@ use "std/comptime"
 use "std/conv"
 use "std/encoding/base64"
 use "std/math"
+use "std/runtime"
 use "std/unicode/utf8"
 use "std/unsafe"
+
+// Returned by [Encode] and [EncodeIndent] when attempting
+// to encode an unsupported value type.
+struct UnsupportedTypeError {
+	Type: str
+}
+
+impl UnsupportedTypeError {
+	fn Str(self): str {
+		ret "json: unsupported type: " + self.Type
+	}
+}
+
+// Returned by [Encode] and [EncodeIndent] when attempting
+// to encode an unsupported value.
+struct UnsupportedValueError {
+	Value: str
+}
+
+impl UnsupportedValueError {
+	fn Str(self): str {
+		ret "json: unsupported value: " + self.Value
+	}
+}
+
+// Represents an error from calling a reserved [EncodeJSON] or [EncodeText] method.
+struct EncodeError {
+	Type:       str
+	Err:        any
+	sourceFunc: str
+}
+
+impl EncodeError {
+	fn Str(self): str {
+		ret "json: error calling " +
+			self.sourceFunc + " for type " +
+			self.Type + ": " + runtime::toStr(self.Err)
+	}
+}
 
 const hex = "0123456789abcdef"
 
@@ -79,7 +119,7 @@ impl jsonEncoder {
 
 	fn encodeFloat(mut self, f: f64, bits: int)! {
 		if math::IsNaN(f) || math::IsInf(f, 0) {
-			error(EncodeError.UnsupportedFloatValue)
+			error(&UnsupportedValueError{conv::FmtFloat(f, 'g', -1, bits)})
 		}
 		mut fmt := 'f'
 		abs := math::Abs(f)
@@ -245,7 +285,7 @@ impl jsonEncoder {
 		| comptime::U64:
 			break
 		|:
-			error(EncodeError.UnsupportedType)
+			error(&UnsupportedTypeError{Type: tt.Str()})
 		}
 		if t == nil {
 			self.encodeNil()
@@ -350,7 +390,7 @@ impl jsonEncoder {
 		const tt = comptime::TypeOf(T)
 		const match {
 		| tt.Binded():
-			error(EncodeError.UnsupportedType)
+			error(&UnsupportedTypeError{Type: tt.Str()})
 		| tt.Strict() || tt.Kind() == comptime::Struct:
 			// Before using the default encoding strategy, look for the custom encoder
 			// methods and use it, if any. If not exist any custom encoder method,
@@ -366,11 +406,13 @@ impl jsonEncoder {
 							const match {
 							| m.Type().Decl().Exceptional() &&
 								m.Type().Result() == comptime::TypeOf([]byte):
-								bytes := m.Unwrap()() else { error(error) }
+								bytes := m.Unwrap()() else {
+									error(&EncodeError{Type: tt.Str(), Err: error, sourceFunc: name})
+								}
 								const match name {
 								| "EncodeJSON":
 									if !Valid(bytes) {
-										error(EncodeError.EncodeJSON)
+										error(&EncodeError{Type: tt.Str(), Err: "returned JSON value is not valid", sourceFunc: name})
 									}
 									self.buf.write(bytes)
 								| "EncodeText":
@@ -424,7 +466,7 @@ impl jsonEncoder {
 		| comptime::Slice:
 			self.encodeSlice[T, Flag](t) else { error(error) }
 		|:
-			error(EncodeError.UnsupportedType)
+			error(&UnsupportedTypeError{Type: tt.Str()})
 		}
 	}
 }
@@ -449,11 +491,11 @@ fn encoder(): jsonEncoder {
 // Encoding details:
 //	Since this function designed for comptime type analysis, the type [T] should
 //	be valid type for comptime. The type [any], which is stores dynamic type, is not valid.
-//	Any unsupported type causes exceptional with [EncodeError.UnsupportedType].
+//	Any unsupported type causes exceptional with [UnsupportedTypeError].
 //
 //	Signed/Unsigned Integers, Floating-Points:
 //		Encode as JSON numbers.
-//		For floating-points, NaN or ±Inf will cause exceptional with [EncodeError.UnsupportedFloatValue].
+//		For floating-points, NaN or ±Inf will cause exceptional with [UnsupportedValueError].
 //
 //	Booleans:
 //		Encode as JSON booleans.
@@ -481,7 +523,7 @@ fn encoder(): jsonEncoder {
 //		If map is nil, encode as null JSON value.
 //		The keys of the map always will be quoted.
 //		Also map's key type only can be: signed integer, unsigned integer and string.
-//		Other types will cause exceptional with [EncodeError.UnsupportedType].
+//		Other types will cause exceptional with [UnsupportedTypeError].
 //
 //	Smart Pointers:
 //		If smart pointer is nil, encode as null JSON value.
