@@ -784,11 +784,28 @@ impl scopeOptimizer {
 			// also following statement optimizations may apply
 			// some optimizations on the new inserted assign statements
 			offset := self.i + 1
-			self.scope.Stmts = slices::Insert(self.scope.Stmts, offset, &sema::Assign{
-				Left: &sema::OperandExpr{Type: l.Type, Model: l.Model},
-				Right: &sema::OperandExpr{Type: r.Type, Model: r.Model},
-				Op: assign.Op,
-			})
+			// Insert assignment model for this one separately.
+			// Special case: if memory is a varaible, it may be declared here.
+			// So handle them as variable declarations.
+			mut lv, ok := (&sema::Var)(l.Model)
+			mut j := -1
+			if ok {
+				j = slices::Find(assign.Decls, lv)
+			}
+			if j != -1 {
+				if lv.ValueSym == nil {
+					lv.ValueSym = new(sema::ValueSym)
+				}
+				lv.ValueSym.Value = r
+				self.scope.Stmts = slices::Insert(self.scope.Stmts, offset, lv)
+				assign.Decls = append(assign.Decls[:j], assign.Decls[j:]...)
+			} else {
+				self.scope.Stmts = slices::Insert(self.scope.Stmts, offset, &sema::Assign{
+					Left: &sema::OperandExpr{Type: l.Type, Model: l.Model},
+					Right: &sema::OperandExpr{Type: r.Type, Model: r.Model},
+					Op: assign.Op,
+				})
+			}
 
 			// remove operands
 			assign.Left = append(assign.Left[:i], assign.Left[i+1:]...)
