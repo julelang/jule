@@ -76,7 +76,7 @@ struct decimalSlice {
 // zeros are removed).
 // The special precision -1 uses the smallest number of digits
 // necessary such that ParseFloat will return f exactly.
-fn FmtFloat(f: f64, fmt: byte, prec: int, bitSize: int): str {
+fn FormatFloat(f: f64, fmt: byte, prec: int, bitSize: int): str {
 	// Return value of [genericFtoa] can be converted with [unsafe::StrFromBytes] safely.
 	// It returns always head pointer of slice, so deallocation is safe.
 	// There is no need to make new allocation for string.
@@ -124,10 +124,10 @@ fn genericFtoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bitSize: int
 
 	// Pick off easy binary, hex formats.
 	if fmt == 'b' {
-		ret fmtB(dst, neg, mant, exp, *flt)
+		ret formatB(dst, neg, mant, exp, *flt)
 	}
 	if fmt == 'x' || fmt == 'X' {
-		ret fmtX(dst, prec, fmt, neg, mant, exp, *flt)
+		ret formatX(dst, prec, fmt, neg, mant, exp, *flt)
 	}
 
 	if !optimize {
@@ -180,7 +180,7 @@ fn genericFtoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bitSize: int
 	if !ok {
 		ret bigFtoa(dst, prec, fmt, neg, mant, exp, *flt)
 	}
-	ret fmtDigits(dst, shortest, neg, digs, prec, fmt)
+	ret formatDigits(dst, shortest, neg, digs, prec, fmt)
 }
 
 // Uses multiprecision computations to format a float.
@@ -218,16 +218,16 @@ fn bigFtoa(mut dst: []byte, mut prec: int, fmt: byte, neg: bool,
 		}
 		digs = decimalSlice{d: d.d[:], nd: d.nd, dp: d.dp}
 	}
-	ret fmtDigits(dst, shortest, neg, digs, prec, fmt)
+	ret formatDigits(dst, shortest, neg, digs, prec, fmt)
 }
 
-fn fmtDigits(mut dst: []byte, shortest: bool, neg: bool,
+fn formatDigits(mut dst: []byte, shortest: bool, neg: bool,
 	digs: decimalSlice, mut prec: int, fmt: byte): []byte {
 	match fmt {
 	| 'e' | 'E':
-		ret fmtE(dst, neg, digs, prec, fmt)
+		ret formatE(dst, neg, digs, prec, fmt)
 	| 'f':
-		ret fmtF(dst, neg, digs, prec)
+		ret formatF(dst, neg, digs, prec)
 	| 'g' | 'G':
 		// trailing fractional zeros in 'e' form will be trimmed.
 		mut eprec := prec
@@ -245,12 +245,12 @@ fn fmtDigits(mut dst: []byte, shortest: bool, neg: bool,
 			if prec > digs.nd {
 				prec = digs.nd
 			}
-			ret fmtE(dst, neg, digs, prec-1, fmt+'e'-'g')
+			ret formatE(dst, neg, digs, prec-1, fmt+'e'-'g')
 		}
 		if prec > digs.dp {
 			prec = digs.nd
 		}
-		ret fmtF(dst, neg, digs, max(prec-digs.dp, 0))
+		ret formatF(dst, neg, digs, max(prec-digs.dp, 0))
 	}
 
 	// unknown format
@@ -398,7 +398,7 @@ fn roundShortest(mut &d: decimal, mant: u64, exp: int, &flt: floatInfo) {
 }
 
 // %e: -d.ddddde±dd
-fn fmtE(mut dst: []byte, neg: bool, d: decimalSlice, prec: int, fmt: byte): []byte {
+fn formatE(mut dst: []byte, neg: bool, d: decimalSlice, prec: int, fmt: byte): []byte {
 	// sign
 	if neg {
 		dst = append(dst, '-')
@@ -453,7 +453,7 @@ fn fmtE(mut dst: []byte, neg: bool, d: decimalSlice, prec: int, fmt: byte): []by
 }
 
 // %f: -ddddddd.ddddd
-fn fmtF(mut dst: []byte, neg: bool, d: decimalSlice, prec: int): []byte {
+fn formatF(mut dst: []byte, neg: bool, d: decimalSlice, prec: int): []byte {
 	// sign
 	if neg {
 		dst = append(dst, '-')
@@ -486,14 +486,14 @@ fn fmtF(mut dst: []byte, neg: bool, d: decimalSlice, prec: int): []byte {
 }
 
 // %b: -ddddddddp±ddd
-fn fmtB(mut dst: []byte, neg: bool, mant: u64, mut exp: int, &flt: floatInfo): []byte {
+fn formatB(mut dst: []byte, neg: bool, mant: u64, mut exp: int, &flt: floatInfo): []byte {
 	// sign
 	if neg {
 		dst = append(dst, '-')
 	}
 
 	// mantissa
-	dst, _ = fmtBits(dst, mant, 10, false, true)
+	dst, _ = formatBits(dst, mant, 10, false, true)
 
 	// p
 	dst = append(dst, 'p')
@@ -503,12 +503,12 @@ fn fmtB(mut dst: []byte, neg: bool, mant: u64, mut exp: int, &flt: floatInfo): [
 	if exp >= 0 {
 		dst = append(dst, '+')
 	}
-	dst, _ = fmtBits(dst, u64(exp), 10, exp < 0, true)
+	dst, _ = formatBits(dst, u64(exp), 10, exp < 0, true)
 	ret dst
 }
 
 // %x: -0x1.yyyyyyyyp±ddd or -0x0p+0. (y is hex digit, d is decimal digit)
-fn fmtX(mut dst: []byte, prec: int, fmt: byte, neg: bool,
+fn formatX(mut dst: []byte, prec: int, fmt: byte, neg: bool,
 	mut mant: u64, mut exp: int, &flt: floatInfo): []byte {
 	if mant == 0 {
 		exp = 0

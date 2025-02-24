@@ -3,24 +3,41 @@
 // license that can be found in the LICENSE file.
 
 use "std/errors"
+use "std/runtime"
 
 // Indicates that a value does not have the right syntax for the target type.
 // Mutation is undefined behavior.
 static mut ErrSyntax = errors::New("invalid syntax")
 
-// Error codes of conv package.
-enum Error {
-	OutOfRange,     // Indicates that a value is out of range for the target type.
-	InvalidSyntax,  // Indicates that a value does not have the right syntax for the target type.
-	InvalidBase,    // Indicates that a base is invalid.
-	InvalidBitSize, // Indicates that a bit size is invalid.
+// That a value is out of range for the target type.
+// Mutation is undefined behavior.
+static mut ErrRange = errors::New("value out of range")
+
+// Records a failed conversion.
+struct NumError {
+	Func: str // the failing function (ParseBool, ParseInt, ParseUint, ParseFloat, ParseComplex)
+	Num:  str // the input
+	Err:  any // the reason the conversion failed (e.g. ErrRange, ErrSyntax, etc.)
 }
 
-// For internal parser algorithms, that error code means no error.
-// It is intended avoid to use exceptionals.
-// Error codes should be integer, if returned error code is equals to noError,
-// it means one of the Error fields.
-const noError = -1
+impl NumError {
+	fn Str(self): str {
+		ret "conv::" + self.Func + ": " + "parsing " + Quote(self.Num) + ": " + runtime::toStr(self.Err)
+	}
+}
 
-// Returns i as Error.
-fn intToError(i: int): Error { ret unsafe { *(*Error)(&i) } }
+fn syntaxError(f: str, s: str): &NumError {
+	ret &NumError{f, s, ErrSyntax}
+}
+
+fn rangeError(f: str, s: str): &NumError {
+	ret &NumError{f, s, ErrRange}
+}
+
+fn baseError(f: str, s: str, base: int): &NumError {
+	ret &NumError{f, s, errors::New("invalid base " + Itoa(base))}
+}
+
+fn bitSizeError(f: str, s: str, bitSize: int): &NumError {
+	ret &NumError{f, s, errors::New("invalid bit size " + Itoa(bitSize))}
+}
