@@ -11,6 +11,7 @@ use "std/jule/constant/lit"
 use "std/jule/internal/mod"
 use "std/jule/token"
 use "std/jule/types"
+use "std/math/big"
 use "std/os/filepath"
 use "std/strings"
 use "std/unsafe"
@@ -228,47 +229,22 @@ impl eval {
 	}
 
 	fn litInt(mut self, &l: &ast::LitExpr): &Value {
-		const BitSize = 1 << 6
-
-		mut lit := l.Value
-		mut base := 0
-
-		match {
-		| strings::HasPrefix(lit, "0x"): // Hexadecimal
-			lit = lit[2:]
-			base = 1 << 4
-		| strings::HasPrefix(lit, "0b"): // Binary
-			lit = lit[2:]
-			base = 1 << 1
-		| strings::HasPrefix(lit, "0o"): // Ocatal
-			lit = lit[2:]
-			base = 1 << 3
-		| lit[0] == '0' && len(lit) > 1: // Octal
-			lit = lit[1:]
-			base = 1 << 3
-		|:
-			// Decimal
-			base = 1<<3 + 2
-		}
-
 		mut v := new(Value)
-
-		mut ok := true
-		sig := conv::ParseInt(lit, base, BitSize) else {
-			ok = false
-			use 0
+		i, ok := big::Int.Parse(l.Value, 0)
+		if !ok {
+			self.pushErr(l.Token, build::LogMsg.InvalidNumericRange)
+			self.pushSuggestion(build::LogMsg.TryFloatingPoint)
 		}
-		if ok {
-			v.Constant = constant::Const.NewI64(sig)
+		match {
+		| i.IsI64():
+			v.Constant = constant::Const.NewI64(i.I64())
 			v.Type = primInt
-		} else {
-			unsig := conv::ParseUint(lit, base, BitSize) else {
-				self.pushErr(l.Token, build::LogMsg.InvalidNumericRange)
-				self.pushSuggestion(build::LogMsg.TryFloatingPoint)
-				use u64.Max
-			}
-			v.Constant = constant::Const.NewU64(unsig)
+		| i.IsU64():
+			v.Constant = constant::Const.NewU64(i.U64())
 			v.Type = primUint
+		|:
+			self.pushErr(l.Token, build::LogMsg.InvalidNumericRange)
+			self.pushSuggestion(build::LogMsg.TryFloatingPoint)
 		}
 
 		v.Model = v.Constant
