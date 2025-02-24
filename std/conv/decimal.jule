@@ -42,6 +42,8 @@
 // because 2 divides 10; cannot do decimal floating point
 // in multiprecision binary precisely.
 
+use "std/unsafe"
+
 // Maximum shift that we can do in one pass without overflow.
 // A uint has 32 or 64 bits, and we have to be able to accommodate 9<<k.
 const uintSize = 32 << (^uint(0) >> 63)
@@ -148,7 +150,7 @@ struct decimal {
 
 impl decimal {
 	// Assign v.
-	fn assign(mut self, mut v: u64) {
+	fn Assign(mut self, mut v: u64) {
 		let mut buf: [24]byte
 
 		// Write reversed decimal in buf.
@@ -173,7 +175,7 @@ impl decimal {
 	}
 
 	// Binary shift left (k > 0) or right (k < 0).
-	fn shift(mut self, mut k: int) {
+	fn Shift(mut self, mut k: int) {
 		match {
 		| self.nd == 0:
 			// nothing to do: a == 0
@@ -193,7 +195,7 @@ impl decimal {
 	}
 
 	// Round a down to nd digits (or fewer).
-	fn roundDown(mut self, nd: int) {
+	fn RoundDown(mut self, nd: int) {
 		if nd < 0 || nd >= self.nd {
 			ret
 		}
@@ -202,7 +204,7 @@ impl decimal {
 	}
 
 	// Round a up to nd digits (or fewer).
-	fn roundUp(mut self, nd: int) {
+	fn RoundUp(mut self, nd: int) {
 		if nd < 0 || nd >= self.nd {
 			ret
 		}
@@ -229,20 +231,20 @@ impl decimal {
 	// If nd is zero, it means we're rounding
 	// just to the left of the digits, as in
 	// 0.09 -> 0.1.
-	fn round(mut self, nd: int) {
+	fn Round(mut self, nd: int) {
 		if nd < 0 || nd >= self.nd {
 			ret
 		}
 		if shouldRoundUp(self, nd) {
-			self.roundUp(nd)
+			self.RoundUp(nd)
 		} else {
-			self.roundDown(nd)
+			self.RoundDown(nd)
 		}
 	}
 
 	// Extract integer part, rounded appropriately.
 	// No guarantees about overflow.
-	fn roundedInteger(mut self): u64 {
+	fn RoundedInteger(mut self): u64 {
 		if self.dp > 20 {
 			ret 0xFFFFFFFFFFFFFFFF
 		}
@@ -258,6 +260,42 @@ impl decimal {
 			n++
 		}
 		ret n
+	}
+
+	fn Str(self): str {
+		mut n := 10 + self.nd
+		if self.dp > 0 {
+			n += self.dp
+		}
+		if self.dp < 0 {
+			n += -self.dp
+		}
+
+		mut buf := make([]byte, n)
+		mut w := 0
+		match {
+		| self.nd == 0:
+			ret "0"
+		| self.dp <= 0:
+			// zeros fill space between decimal point and digits
+			buf[w] = '0'
+			w++
+			buf[w] = '.'
+			w++
+			w += digitZero(buf[w : w+-self.dp])
+			w += copy(buf[w:], self.d[0:self.nd])
+		| self.dp < self.nd:
+			// decimal point in middle of digits
+			w += copy(buf[w:], self.d[0:self.dp])
+			buf[w] = '.'
+			w++
+			w += copy(buf[w:], self.d[self.dp:self.nd])
+		|:
+			// zeros fill space between digits and decimal point
+			w += copy(buf[w:], self.d[0:self.nd])
+			w += digitZero(buf[w : w+self.dp-self.nd])
+		}
+		ret unsafe::StrFromBytes(buf[0:w])
 	}
 }
 

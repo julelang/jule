@@ -1,0 +1,94 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/bytes"
+use "std/conv"
+use "std/testing"
+
+struct atobTest {
+	input: str
+	out:   bool
+	err:   any
+}
+
+static atobtests: []atobTest = [
+	{"", false, conv::ErrSyntax},
+	{"asdf", false, conv::ErrSyntax},
+	{"0", false, nil},
+	{"f", false, nil},
+	{"F", false, nil},
+	{"FALSE", false, nil},
+	{"false", false, nil},
+	{"False", false, nil},
+	{"1", true, nil},
+	{"t", true, nil},
+	{"T", true, nil},
+	{"TRUE", true, nil},
+	{"true", true, nil},
+	{"True", true, nil},
+]
+
+#test
+fn testParseBool(t: &testing::T) {
+	for _, test in atobtests {
+		let mut e: any
+		b := conv::ParseBool(test.input) else {
+			e = error
+			use false
+		}
+		if test.err != nil {
+			// expect an error
+			if e == nil {
+				t.Errorf("ParseBool({}) = nil; want {}", test.input, test.err)
+			} else {
+				// NumError casting must succeed; it's the only thing we return.
+				if (&conv::NumError)(e).Err != test.err {
+					t.Errorf("ParseBool({}) = {}; want {}", test.input, e, test.err)
+				}
+			}
+		} else {
+			if e != nil {
+				t.Errorf("ParseBool({}) = {}; want nil", test.input, e)
+			}
+			if b != test.out {
+				t.Errorf("ParseBool({}) = {}; want {}", test.input, b, test.out)
+			}
+		}
+	}
+}
+
+static boolString = map[bool]str{
+	true: "true",
+	false: "false",
+}
+
+#test
+fn testFormatBool(t: &testing::T) {
+	for b, s in boolString {
+		f := conv::FormatBool(b)
+		if f != s {
+			t.Errorf("FormatBool({}) = {}; want {}", b, f, s)
+		}
+	}
+}
+
+struct appendBoolTest {
+	b:     bool
+	input: []byte
+	out:   []byte
+}
+
+static mut appendBoolTests: []appendBoolTest = [
+	{true, []byte("foo "), []byte("foo true")},
+	{false, []byte("foo "), []byte("foo false")},
+]
+
+fn TestAppendBool(t: &testing::T) {
+	for (_, mut test) in appendBoolTests {
+		b := conv::AppendBool(test.input, test.b)
+		if !bytes::Equal(b, test.out) {
+			t.Errorf("AppendBool({}, {}) = {}; want {}", test.input, test.b, b, test.out)
+		}
+	}
+}

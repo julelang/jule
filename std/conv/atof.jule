@@ -44,7 +44,7 @@ use "std/unsafe"
 //   2) Multiply/divide decimal by powers of two until in range [0.5, 1)
 //   3) Multiply by 2^precision and round to get mantissa.
 
-const optimize = true // set to false to force slow-path conversions for testing
+static mut optimize = true // set to false to force slow-path conversions for testing
 
 // Returns the length of the common
 // prefix of s and prefix, with the character case of s ignored.
@@ -72,7 +72,7 @@ fn commonPrefixLenIgnoreCase(s: str, prefix: str): int {
 // and NaN. The result is ok if a prefix of s contains one
 // of these representations and n is the length of that prefix.
 // The character case is ignored.
-fn special(s: str): (f: f64, n: int, ok: bool) {
+fn special(mut s: str): (f: f64, n: int, ok: bool) {
 	if len(s) == 0 {
 		ret 0, 0, false
 	}
@@ -84,24 +84,20 @@ fn special(s: str): (f: f64, n: int, ok: bool) {
 			sign = -1
 		}
 		nsign = 1
-		unsafe {
-			// Break immutabilty, do not change content, just slicing.
-			mut sp := &s
-			*sp = (*sp)[1:]
-		}
+		s = s[1:]
 		fall
 	| 'i' | 'I':
-		mut caseN := commonPrefixLenIgnoreCase(s, "infinity")
+		n = commonPrefixLenIgnoreCase(s, "infinity")
 		// Anything longer than "inf" is ok, but if we
 		// don't have "infinity", only consume "inf".
-		if 3 < caseN && caseN < 8 {
-			caseN = 3
+		if 3 < n && n < 8 {
+			n = 3
 		}
-		if caseN == 3 || caseN == 8 {
+		if n == 3 || n == 8 {
 			ret math::Inf(sign), nsign + n, true
 		}
 	| 'n' | 'N':
-		if commonPrefixLenIgnoreCase(s, "NaN") == 3 {
+		if commonPrefixLenIgnoreCase(s, "nan") == 3 {
 			ret math::NaN(), 3, true
 		}
 	}
@@ -112,6 +108,8 @@ fn special(s: str): (f: f64, n: int, ok: bool) {
 // string representation in s; the number may be followed by other characters.
 // Reports the number of bytes consumed (i), and whether the number is valid (ok).
 fn readFloat(&s: str): (mantissa: u64, exp: int, neg: bool, trunc: bool, hex: bool, i: int, ok: bool) {
+	mut underscores := false
+
 	// optional sign
 	if i >= len(s) {
 		ret
@@ -127,7 +125,7 @@ fn readFloat(&s: str): (mantissa: u64, exp: int, neg: bool, trunc: bool, hex: bo
 	// digits
 	mut base := u64(10)
 	mut maxMantDigits := 19 // 10^19 fits in u64
-	mut expChar := 'e'
+	mut expChar := byte('e')
 	if i+2 < len(s) && s[i] == '0' && lower(s[i+1]) == 'x' {
 		base = 16
 		maxMantDigits = 16 // 16^16 fits in u64
@@ -135,21 +133,21 @@ fn readFloat(&s: str): (mantissa: u64, exp: int, neg: bool, trunc: bool, hex: bo
 		expChar = 'p'
 		hex = true
 	}
-	mut underscores := false
 	mut sawdot := false
 	mut sawdigits := false
 	mut nd := 0
 	mut ndMant := 0
 	mut dp := 0
+loop:
 	for i < len(s); i++ {
 		c := s[i]
-		match {
+		match true {
 		| c == '_':
 			underscores = true
 			continue
 		| c == '.':
 			if sawdot {
-				goto loop_end
+				break loop
 			}
 			sawdot = true
 			dp = nd
@@ -183,7 +181,6 @@ fn readFloat(&s: str): (mantissa: u64, exp: int, neg: bool, trunc: bool, hex: bo
 		}
 		break
 	}
-loop_end:
 	if !sawdigits {
 		ret
 	}
@@ -248,7 +245,7 @@ loop_end:
 static powtab = [1, 3, 6, 9, 13, 16, 19, 23, 26]
 
 impl decimal {
-	fn set(mut self, s: []byte): (ok: bool) {
+	fn Set(mut self, s: []byte): (ok: bool) {
 		mut i := 0
 		self.neg = false
 		self.trunc = false
@@ -342,7 +339,7 @@ impl decimal {
 		ret
 	}
 
-	fn floatBits(mut self, &flt: floatInfo): (b: u64, overflow: bool) {
+	fn FloatBits(mut self, &flt: floatInfo): (b: u64, overflow: bool) {
 		mut exp := 0
 		mut mant := u64(0)
 
@@ -375,7 +372,7 @@ impl decimal {
 			} else {
 				n = powtab[self.dp]
 			}
-			self.shift(-n)
+			self.Shift(-n)
 			exp += n
 		}
 		for self.dp < 0 || self.dp == 0 && self.d[0] < '5' {
@@ -385,7 +382,7 @@ impl decimal {
 			} else {
 				n = powtab[-self.dp]
 			}
-			self.shift(n)
+			self.Shift(n)
 			exp -= n
 		}
 
@@ -397,7 +394,7 @@ impl decimal {
 		// adjust d accordingly.
 		if exp < flt.bias+1 {
 			n := flt.bias + 1 - exp
-			self.shift(-n)
+			self.Shift(-n)
 			exp += n
 		}
 
@@ -406,8 +403,8 @@ impl decimal {
 		}
 
 		// Extract 1+flt.mantbits bits.
-		self.shift(int(1 + flt.mantbits))
-		mant = self.roundedInteger()
+		self.Shift(int(1 + flt.mantbits))
+		mant = self.RoundedInteger()
 
 		// Rounding might have added a bit; shift down.
 		if mant == 2<<flt.mantbits {
@@ -676,10 +673,10 @@ fn atof32(s: str): (f: f32, n: int, err: any) {
 
 	// Slow fallback.
 	mut d := decimal{}
-	if !d.set(unsafe::StrBytes(s)[:n]) {
+	if !d.Set(unsafe::StrBytes(s)[:n]) {
 		ret 0, n, syntaxError(fnParseFloat, s)
 	}
-	b, ovf := d.floatBits(f32info)
+	b, ovf := d.FloatBits(f32info)
 	f = math::F32FromBits(u32(b))
 	if ovf {
 		err = rangeError(fnParseFloat, s)
@@ -732,10 +729,10 @@ fn atof64(s: str): (f: f64, n: int, err: any) {
 
 	// Slow fallback.
 	mut d := decimal{}
-	if !d.set(unsafe::StrBytes(s)[:n]) {
+	if !d.Set(unsafe::StrBytes(s)[:n]) {
 		ret 0, n, syntaxError(fnParseFloat, s)
 	}
-	b, ovf := d.floatBits(f64info)
+	b, ovf := d.FloatBits(f64info)
 	f = math::F64FromBits(b)
 	if ovf {
 		err = rangeError(fnParseFloat, s)
@@ -755,7 +752,7 @@ const fnParseFloat = "ParseFloat"
 
 // Converts the string s to a floating-point number
 // with the precision specified by bitSize: 32 for f32, or 64 for f64.
-// When bitSize=32, the result still has type float64, but it will be
+// When bitSize=32, the result still has type f64, but it will be
 // convertible to f32 without changing its value.
 //
 // It accepts decimal and hexadecimal floating-point numbers

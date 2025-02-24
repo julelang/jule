@@ -1,0 +1,694 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/conv"
+use "std/errors"
+use "std/internal/cmp"
+use "std/runtime"
+use "std/testing"
+
+struct parseUint64Test {
+	input: str
+	out:   u64
+	err:   any
+}
+
+static parseUint64Tests: []parseUint64Test = [
+	{"", 0, conv::ErrSyntax},
+	{"0", 0, nil},
+	{"1", 1, nil},
+	{"12345", 12345, nil},
+	{"012345", 12345, nil},
+	{"12345x", 0, conv::ErrSyntax},
+	{"98765432100", 98765432100, nil},
+	{"18446744073709551615", 1<<64 - 1, nil},
+	{"18446744073709551616", 1<<64 - 1, conv::ErrRange},
+	{"18446744073709551620", 1<<64 - 1, conv::ErrRange},
+	{"1_2_3_4_5", 0, conv::ErrSyntax},                   // base=10 so no underscores allowed
+	{"_12345", 0, conv::ErrSyntax},
+	{"1__2345", 0, conv::ErrSyntax},
+	{"12345_", 0, conv::ErrSyntax},
+	{"-0", 0, conv::ErrSyntax},
+	{"-1", 0, conv::ErrSyntax},
+	{"+1", 0, conv::ErrSyntax},
+]
+
+struct parseUint64BaseTest {
+	input: str
+	base:  int
+	out:   u64
+	err:   any
+}
+
+static parseUint64BaseTests: []parseUint64BaseTest = [
+	{"", 0, 0, conv::ErrSyntax},
+	{"0", 0, 0, nil},
+	{"0x", 0, 0, conv::ErrSyntax},
+	{"0X", 0, 0, conv::ErrSyntax},
+	{"1", 0, 1, nil},
+	{"12345", 0, 12345, nil},
+	{"012345", 0, 012345, nil},
+	{"0x12345", 0, 0x12345, nil},
+	{"0X12345", 0, 0x12345, nil},
+	{"12345x", 0, 0, conv::ErrSyntax},
+	{"0xabcdefg123", 0, 0, conv::ErrSyntax},
+	{"123456789abc", 0, 0, conv::ErrSyntax},
+	{"98765432100", 0, 98765432100, nil},
+	{"18446744073709551615", 0, 1<<64 - 1, nil},
+	{"18446744073709551616", 0, 1<<64 - 1, conv::ErrRange},
+	{"18446744073709551620", 0, 1<<64 - 1, conv::ErrRange},
+	{"0xFFFFFFFFFFFFFFFF", 0, 1<<64 - 1, nil},
+	{"0x10000000000000000", 0, 1<<64 - 1, conv::ErrRange},
+	{"01777777777777777777777", 0, 1<<64 - 1, nil},
+	{"01777777777777777777778", 0, 0, conv::ErrSyntax},
+	{"02000000000000000000000", 0, 1<<64 - 1, conv::ErrRange},
+	{"0200000000000000000000", 0, 1<<61, nil},
+	{"0b", 0, 0, conv::ErrSyntax},
+	{"0B", 0, 0, conv::ErrSyntax},
+	{"0b101", 0, 5, nil},
+	{"0B101", 0, 5, nil},
+	{"0o", 0, 0, conv::ErrSyntax},
+	{"0O", 0, 0, conv::ErrSyntax},
+	{"0o377", 0, 255, nil},
+	{"0O377", 0, 255, nil},
+
+	// underscores allowed with base == 0 only
+	{"1_2_3_4_5", 0, 12345, nil},                              // base 0 => 10
+	{"_12345", 0, 0, conv::ErrSyntax},
+	{"1__2345", 0, 0, conv::ErrSyntax},
+	{"12345_", 0, 0, conv::ErrSyntax},
+
+	{"1_2_3_4_5", 10, 0, conv::ErrSyntax},                     // base 10
+	{"_12345", 10, 0, conv::ErrSyntax},
+	{"1__2345", 10, 0, conv::ErrSyntax},
+	{"12345_", 10, 0, conv::ErrSyntax},
+
+	{"0x_1_2_3_4_5", 0, 0x12345, nil},                         // base 0 => 16
+	{"_0x12345", 0, 0, conv::ErrSyntax},
+	{"0x__12345", 0, 0, conv::ErrSyntax},
+	{"0x1__2345", 0, 0, conv::ErrSyntax},
+	{"0x1234__5", 0, 0, conv::ErrSyntax},
+	{"0x12345_", 0, 0, conv::ErrSyntax},
+
+	{"1_2_3_4_5", 16, 0, conv::ErrSyntax},                     // base 16
+	{"_12345", 16, 0, conv::ErrSyntax},
+	{"1__2345", 16, 0, conv::ErrSyntax},
+	{"1234__5", 16, 0, conv::ErrSyntax},
+	{"12345_", 16, 0, conv::ErrSyntax},
+
+	{"0_1_2_3_4_5", 0, 012345, nil},                           // base 0 => 8 (0377)
+	{"_012345", 0, 0, conv::ErrSyntax},
+	{"0__12345", 0, 0, conv::ErrSyntax},
+	{"01234__5", 0, 0, conv::ErrSyntax},
+	{"012345_", 0, 0, conv::ErrSyntax},
+
+	{"0o_1_2_3_4_5", 0, 012345, nil},                          // base 0 => 8 (0o377)
+	{"_0o12345", 0, 0, conv::ErrSyntax},
+	{"0o__12345", 0, 0, conv::ErrSyntax},
+	{"0o1234__5", 0, 0, conv::ErrSyntax},
+	{"0o12345_", 0, 0, conv::ErrSyntax},
+
+	{"0_1_2_3_4_5", 8, 0, conv::ErrSyntax},                    // base 8
+	{"_012345", 8, 0, conv::ErrSyntax},
+	{"0__12345", 8, 0, conv::ErrSyntax},
+	{"01234__5", 8, 0, conv::ErrSyntax},
+	{"012345_", 8, 0, conv::ErrSyntax},
+
+	{"0b_1_0_1", 0, 5, nil},                                   // base 0 => 2 (0b101)
+	{"_0b101", 0, 0, conv::ErrSyntax},
+	{"0b__101", 0, 0, conv::ErrSyntax},
+	{"0b1__01", 0, 0, conv::ErrSyntax},
+	{"0b10__1", 0, 0, conv::ErrSyntax},
+	{"0b101_", 0, 0, conv::ErrSyntax},
+
+	{"1_0_1", 2, 0, conv::ErrSyntax},                          // base 2
+	{"_101", 2, 0, conv::ErrSyntax},
+	{"1_01", 2, 0, conv::ErrSyntax},
+	{"10_1", 2, 0, conv::ErrSyntax},
+	{"101_", 2, 0, conv::ErrSyntax},
+]
+
+struct parseInt64Test {
+	input: str
+	out:   i64
+	err:   any
+}
+
+static mut parseInt64Tests: []parseInt64Test = [
+	{"", 0, conv::ErrSyntax},
+	{"0", 0, nil},
+	{"-0", 0, nil},
+	{"+0", 0, nil},
+	{"1", 1, nil},
+	{"-1", -1, nil},
+	{"+1", 1, nil},
+	{"12345", 12345, nil},
+	{"-12345", -12345, nil},
+	{"012345", 12345, nil},
+	{"-012345", -12345, nil},
+	{"98765432100", 98765432100, nil},
+	{"-98765432100", -98765432100, nil},
+	{"9223372036854775807", 1<<63 - 1, nil},
+	{"-9223372036854775807", -(1<<63 - 1), nil},
+	{"9223372036854775808", 1<<63 - 1, conv::ErrRange},
+	{"-9223372036854775808", -1<<63, nil},
+	{"9223372036854775809", 1<<63 - 1, conv::ErrRange},
+	{"-9223372036854775809", -1<<63, conv::ErrRange},
+	{"-1_2_3_4_5", 0, conv::ErrSyntax},                 // base=10 so no underscores allowed
+	{"-_12345", 0, conv::ErrSyntax},
+	{"_12345", 0, conv::ErrSyntax},
+	{"1__2345", 0, conv::ErrSyntax},
+	{"12345_", 0, conv::ErrSyntax},
+	{"123%45", 0, conv::ErrSyntax},
+]
+
+struct parseInt64BaseTest {
+	input: str
+	base:  int
+	out:   i64
+	err:   any
+}
+
+static parseInt64BaseTests: []parseInt64BaseTest = [
+	{"", 0, 0, conv::ErrSyntax},
+	{"0", 0, 0, nil},
+	{"-0", 0, 0, nil},
+	{"1", 0, 1, nil},
+	{"-1", 0, -1, nil},
+	{"12345", 0, 12345, nil},
+	{"-12345", 0, -12345, nil},
+	{"012345", 0, 012345, nil},
+	{"-012345", 0, -012345, nil},
+	{"0x12345", 0, 0x12345, nil},
+	{"-0X12345", 0, -0x12345, nil},
+	{"12345x", 0, 0, conv::ErrSyntax},
+	{"-12345x", 0, 0, conv::ErrSyntax},
+	{"98765432100", 0, 98765432100, nil},
+	{"-98765432100", 0, -98765432100, nil},
+	{"9223372036854775807", 0, 1<<63 - 1, nil},
+	{"-9223372036854775807", 0, -(1<<63 - 1), nil},
+	{"9223372036854775808", 0, 1<<63 - 1, conv::ErrRange},
+	{"-9223372036854775808", 0, -1<<63, nil},
+	{"9223372036854775809", 0, 1<<63 - 1, conv::ErrRange},
+	{"-9223372036854775809", 0, -1<<63, conv::ErrRange},
+
+	// other bases
+	{"g", 17, 16, nil},
+	{"10", 25, 25, nil},
+	{"holycow", 35, (((((17*35+24)*35+21)*35+34)*35+12)*35+24)*35 + 32, nil},
+	{"holycow", 36, (((((17*36+24)*36+21)*36+34)*36+12)*36+24)*36 + 32, nil},
+
+	// base 2
+	{"0", 2, 0, nil},
+	{"-1", 2, -1, nil},
+	{"1010", 2, 10, nil},
+	{"1000000000000000", 2, 1<<15, nil},
+	{"111111111111111111111111111111111111111111111111111111111111111", 2, 1<<63 - 1, nil},
+	{"1000000000000000000000000000000000000000000000000000000000000000", 2, 1<<63 - 1, conv::ErrRange},
+	{"-1000000000000000000000000000000000000000000000000000000000000000", 2, -1<<63, nil},
+	{"-1000000000000000000000000000000000000000000000000000000000000001", 2, -1<<63, conv::ErrRange},
+
+	// base 8
+	{"-10", 8, -8, nil},
+	{"57635436545", 8, 057635436545, nil},
+	{"100000000", 8, 1<<24, nil},
+
+	// base 16
+	{"10", 16, 16, nil},
+	{"-123456789abcdef", 16, -0x123456789abcdef, nil},
+	{"7fffffffffffffff", 16, 1<<63 - 1, nil},
+
+	// underscores
+	{"-0x_1_2_3_4_5", 0, -0x12345, nil},
+	{"0x_1_2_3_4_5", 0, 0x12345, nil},
+	{"-_0x12345", 0, 0, conv::ErrSyntax},
+	{"_-0x12345", 0, 0, conv::ErrSyntax},
+	{"_0x12345", 0, 0, conv::ErrSyntax},
+	{"0x__12345", 0, 0, conv::ErrSyntax},
+	{"0x1__2345", 0, 0, conv::ErrSyntax},
+	{"0x1234__5", 0, 0, conv::ErrSyntax},
+	{"0x12345_", 0, 0, conv::ErrSyntax},
+
+	{"-0_1_2_3_4_5", 0, -012345, nil},                                                                  // octal
+	{"0_1_2_3_4_5", 0, 012345, nil},                                                                    // octal
+	{"-_012345", 0, 0, conv::ErrSyntax},
+	{"_-012345", 0, 0, conv::ErrSyntax},
+	{"_012345", 0, 0, conv::ErrSyntax},
+	{"0__12345", 0, 0, conv::ErrSyntax},
+	{"01234__5", 0, 0, conv::ErrSyntax},
+	{"012345_", 0, 0, conv::ErrSyntax},
+	{"+0xf", 0, 0xf, nil},
+	{"-0xf", 0, -0xf, nil},
+	{"0x+f", 0, 0, conv::ErrSyntax},
+	{"0x-f", 0, 0, conv::ErrSyntax},
+]
+
+struct parseUint32Test {
+	input: str
+	out:   u32
+	err:   any
+}
+
+static parseUint32Tests: []parseUint32Test = [
+	{"", 0, conv::ErrSyntax},
+	{"0", 0, nil},
+	{"1", 1, nil},
+	{"12345", 12345, nil},
+	{"012345", 12345, nil},
+	{"12345x", 0, conv::ErrSyntax},
+	{"987654321", 987654321, nil},
+	{"4294967295", 1<<32 - 1, nil},
+	{"4294967296", 1<<32 - 1, conv::ErrRange},
+	{"1_2_3_4_5", 0, conv::ErrSyntax},         // base=10 so no underscores allowed
+	{"_12345", 0, conv::ErrSyntax},
+	{"_12345", 0, conv::ErrSyntax},
+	{"1__2345", 0, conv::ErrSyntax},
+	{"12345_", 0, conv::ErrSyntax},
+]
+
+struct parseInt32Test {
+	input: str
+	out:   i32
+	err:   any
+}
+
+static mut parseInt32Tests: []parseInt32Test = [
+	{"", 0, conv::ErrSyntax},
+	{"0", 0, nil},
+	{"-0", 0, nil},
+	{"1", 1, nil},
+	{"-1", -1, nil},
+	{"12345", 12345, nil},
+	{"-12345", -12345, nil},
+	{"012345", 12345, nil},
+	{"-012345", -12345, nil},
+	{"12345x", 0, conv::ErrSyntax},
+	{"-12345x", 0, conv::ErrSyntax},
+	{"987654321", 987654321, nil},
+	{"-987654321", -987654321, nil},
+	{"2147483647", 1<<31 - 1, nil},
+	{"-2147483647", -(1<<31 - 1), nil},
+	{"2147483648", 1<<31 - 1, conv::ErrRange},
+	{"-2147483648", -1<<31, nil},
+	{"2147483649", 1<<31 - 1, conv::ErrRange},
+	{"-2147483649", -1<<31, conv::ErrRange},
+	{"-1_2_3_4_5", 0, conv::ErrSyntax},        // base=10 so no underscores allowed
+	{"-_12345", 0, conv::ErrSyntax},
+	{"_12345", 0, conv::ErrSyntax},
+	{"1__2345", 0, conv::ErrSyntax},
+	{"12345_", 0, conv::ErrSyntax},
+	{"123%45", 0, conv::ErrSyntax},
+]
+
+struct numErrorTest {
+	num:  str
+	want: str
+}
+
+static numErrorTests: []numErrorTest = [
+	{"0", `conv::ParseFloat: parsing "0": failed`},
+	{"`", "conv::ParseFloat: parsing \"`\": failed"},
+	{"1\x00.2", `conv::ParseFloat: parsing "1\x00.2": failed`},
+]
+
+fn init() {
+	// The parse routines return NumErrors wrapping
+	// the error and the string. Convert the tables above.
+	for i in parseUint64Tests {
+		mut &test := unsafe { *(&parseUint64Tests[i]) }
+		if test.err != nil {
+			test.err = &conv::NumError{"ParseUint", test.input, test.err}
+		}
+	}
+	for i in parseUint64BaseTests {
+		mut &test := unsafe { *(&parseUint64BaseTests[i]) }
+		if test.err != nil {
+			test.err = &conv::NumError{"ParseUint", test.input, test.err}
+		}
+	}
+	for i in parseInt64Tests {
+		mut &test := unsafe { *(&parseInt64Tests[i]) }
+		if test.err != nil {
+			test.err = &conv::NumError{"ParseInt", test.input, test.err}
+		}
+	}
+	for i in parseInt64BaseTests {
+		mut &test := unsafe { *(&parseInt64BaseTests[i]) }
+		if test.err != nil {
+			test.err = &conv::NumError{"ParseInt", test.input, test.err}
+		}
+	}
+	for i in parseUint32Tests {
+		mut &test := unsafe { *(&parseUint32Tests[i]) }
+		if test.err != nil {
+			test.err = &conv::NumError{"ParseUint", test.input, test.err}
+		}
+	}
+	for i in parseInt32Tests {
+		mut &test := unsafe { *(&parseInt32Tests[i]) }
+		if test.err != nil {
+			test.err = &conv::NumError{"ParseInt", test.input, test.err}
+		}
+	}
+}
+
+#test
+fn testParseU32(t: &testing::T) {
+	for i in parseUint32Tests {
+		test := parseUint32Tests[i]
+		let mut err: any
+		out := conv::ParseUint(test.input, 10, 32) else {
+			err = error
+			use u64(test.out)
+		}
+		if u64(test.out) != out || !equalErr(test.err, err) {
+			t.Errorf("ParseUint({}, 10, 32) = {}, {} want {}, {}",
+				test.input, out, err, test.out, test.err)
+		}
+	}
+}
+
+#test
+fn testParseU64(t: &testing::T) {
+	for i in parseUint64Tests {
+		test := parseUint64Tests[i]
+		let mut err: any
+		out := conv::ParseUint(test.input, 10, 64) else {
+			err = error
+			use test.out
+		}
+		if test.out != out || !equalErr(test.err, err) {
+			t.Errorf("ParseUint({}, 10, 64) = {}, {} want {}, {}",
+				test.input, out, err, test.out, test.err)
+		}
+	}
+}
+
+#test
+fn testParseUint64Base(t: &testing::T) {
+	for i in parseUint64BaseTests {
+		test := parseUint64BaseTests[i]
+		let mut err: any
+		out := conv::ParseUint(test.input, test.base, 64) else {
+			err = error
+			use test.out
+		}
+		if test.out != out || !equalErr(test.err, err) {
+			t.Errorf("ParseUint({}, {}, 64) = {}, {} want {}, {}",
+				test.input, test.base, out, err, test.out, test.err)
+		}
+	}
+}
+
+#test
+fn testParseInt32(t: &testing::T) {
+	for i in parseInt32Tests {
+		test := parseInt32Tests[i]
+		let mut err: any
+		out := conv::ParseInt(test.input, 10, 32) else {
+			err = error
+			use i64(test.out)
+		}
+		if i64(test.out) != out || !equalErr(test.err, err) {
+			t.Errorf("ParseInt({}, 10 ,32) = {}, {} want {}, {}",
+				test.input, out, err, test.out, test.err)
+		}
+	}
+}
+
+#test
+fn testParseInt64(t: &testing::T) {
+	for i in parseInt64Tests {
+		test := parseInt64Tests[i]
+		let mut err: any
+		out := conv::ParseInt(test.input, 10, 64) else {
+			err = error
+			use test.out
+		}
+		if test.out != out || !equalErr(test.err, err) {
+			t.Errorf("ParseInt({}, 10, 64) = {}, {} want {}, {}",
+				test.input, out, err, test.out, test.err)
+		}
+	}
+}
+
+#test
+fn testParseInt64Base(t: &testing::T) {
+	for i in parseInt64BaseTests {
+		test := parseInt64BaseTests[i]
+		let mut err: any
+		out := conv::ParseInt(test.input, test.base, 64) else {
+			err = error
+			use test.out
+		}
+		if test.out != out || !equalErr(test.err, err) {
+			t.Errorf("ParseInt({}, {}, 64) = {}, {} want {}, {}",
+				test.input, test.base, out, err, test.out, test.err)
+		}
+	}
+}
+
+#test
+fn testParseUint(t: &testing::T) {
+	match conv::IntSize {
+	| 32:
+		for i in parseUint32Tests {
+			test := parseUint32Tests[i]
+			let mut err: any
+			out := conv::ParseUint(test.input, 10, 0) else {
+				err = error
+				use u64(test.out)
+			}
+			if u64(test.out) != out || !equalErr(test.err, err) {
+				t.Errorf("ParseUint({}, 10, 0) = {}, {} want {}, {}",
+					test.input, out, err, test.out, test.err)
+			}
+		}
+	| 64:
+		for i in parseUint64Tests {
+			test := parseUint64Tests[i]
+			let mut err: any
+			out := conv::ParseUint(test.input, 10, 0) else {
+				err = error
+				use test.out
+			}
+			if test.out != out || !equalErr(test.err, err) {
+				t.Errorf("ParseUint({}, 10, 0) = {}, {} want {}, {}",
+					test.input, out, err, test.out, test.err)
+			}
+		}
+	}
+}
+
+#test
+fn testParseInt(t: &testing::T) {
+	match conv::IntSize {
+	| 32:
+		for i in parseInt32Tests {
+			test := parseInt32Tests[i]
+			let mut err: any
+			out := conv::ParseInt(test.input, 10, 0) else {
+				err = error
+				use i64(test.out)
+			}
+			if i64(test.out) != out || !equalErr(test.err, err) {
+				t.Errorf("ParseInt({}, 10, 0) = {}, {} want {}, {}",
+					test.input, out, err, test.out, test.err)
+			}
+		}
+	| 64:
+		for i in parseInt64Tests {
+			test := parseInt64Tests[i]
+			let mut err: any
+			out := conv::ParseInt(test.input, 10, 0) else {
+				err = error
+				use test.out
+			}
+			if test.out != out || !equalErr(test.err, err) {
+				t.Errorf("ParseInt({}, 10, 0) = {}, {} want {}, {}",
+					test.input, out, err, test.out, test.err)
+			}
+		}
+	}
+}
+
+#test
+fn testAtoi(t: &testing::T) {
+	match conv::IntSize {
+	| 32:
+		for i in parseInt32Tests {
+			mut test := parseInt32Tests[i]
+			let mut err: any
+			out := conv::Atoi(test.input) else {
+				err = error
+				use int(test.out)
+			}
+			let mut testErr: any
+			if test.err != nil {
+				testErr = &conv::NumError{"Atoi", test.input, (&conv::NumError)(test.err).Err}
+			}
+			if int(test.out) != out || !equalErr(testErr, err) {
+				t.Errorf("Atoi({}) = {}, {} want {}, {}",
+					test.input, out, err, test.out, testErr)
+			}
+		}
+	| 64:
+		for i in parseInt64Tests {
+			mut test := parseInt64Tests[i]
+			let mut err: any
+			out := conv::Atoi(test.input) else {
+				err = error
+				use int(test.out)
+			}
+			let mut testErr: any
+			if test.err != nil {
+				testErr = &conv::NumError{"Atoi", test.input, (&conv::NumError)(test.err).Err}
+			}
+			if test.out != i64(out) || !equalErr(testErr, err) {
+				t.Errorf("Atoi({}) = {}, {} want {}, {}",
+					test.input, out, err, test.out, testErr)
+			}
+		}
+	}
+}
+
+fn bitSizeErrStub(name: str, bitSize: int): any {
+	ret conv::BitSizeError(name, "0", bitSize)
+}
+
+fn baseErrStub(name: str, base: int): any {
+	ret conv::BaseError(name, "0", base)
+}
+
+fn noErrStub(name: str, arg: int): any {
+	ret nil
+}
+
+struct parseErrorTest {
+	arg:     int
+	errStub: fn(name: str, arg: int): any
+}
+
+static parseBitSizeTests: []parseErrorTest = [
+	{-1, bitSizeErrStub},
+	{0, noErrStub},
+	{64, noErrStub},
+	{65, bitSizeErrStub},
+]
+
+static parseBaseTests: []parseErrorTest = [
+	{-1, baseErrStub},
+	{0, noErrStub},
+	{1, baseErrStub},
+	{2, noErrStub},
+	{36, noErrStub},
+	{37, baseErrStub},
+]
+
+#test
+fn testParseIntBitSize(t: &testing::T) {
+	for i in parseBitSizeTests {
+		test := parseBitSizeTests[i]
+		testErr := test.errStub("ParseInt", test.arg)
+		let mut err: any
+		conv::ParseInt("0", 0, test.arg) else {
+			err = error
+		}
+		if !equalErr2(testErr, err) {
+			t.Errorf("ParseInt(\"0\", 0, {}) = 0, {} want 0, {}",
+				test.arg, err, testErr)
+		}
+	}
+}
+
+#test
+fn testParseUintBitSize(t: &testing::T) {
+	for i in parseBitSizeTests {
+		test := parseBitSizeTests[i]
+		testErr := test.errStub("ParseUint", test.arg)
+		let mut err: any
+		conv::ParseUint("0", 0, test.arg) else {
+			err = error
+		}
+		if !equalErr2(testErr, err) {
+			t.Errorf("ParseUint(\"0\", 0, {}) = 0, {} want 0, {}",
+				test.arg, err, testErr)
+		}
+	}
+}
+
+#test
+fn testParseIntBase(t: &testing::T) {
+	for i in parseBaseTests {
+		test := parseBaseTests[i]
+		testErr := test.errStub("ParseInt", test.arg)
+		let mut err: any
+		conv::ParseInt("0", test.arg, 0) else {
+			err = error
+		}
+		if !equalErr2(testErr, err) {
+			t.Errorf("ParseInt(\"0\", {}, 0) = 0, {} want 0, {}",
+				test.arg, err, testErr)
+		}
+	}
+}
+
+#test
+fn testParseUintBase(t: &testing::T) {
+	for i in parseBaseTests {
+		test := parseBaseTests[i]
+		testErr := test.errStub("ParseUint", test.arg)
+		let mut err: any
+		conv::ParseUint("0", test.arg, 0) else {
+			err = error
+		}
+		if !equalErr2(testErr, err) {
+			t.Errorf("ParseUint(\"0\", {}, 0) = 0, {} want 0, {}",
+				test.arg, err, testErr)
+		}
+	}
+}
+
+#test
+fn testNumError(t: &testing::T) {
+	for _, test in numErrorTests {
+		err := &conv::NumError{
+			Func: "ParseFloat",
+			Num: test.num,
+			Err: errors::New("failed"),
+		}
+		got := err.Str()
+		if got != test.want {
+			t.Errorf(`(&NumError{"ParseFloat", {}, "failed"}).Str() = {}, want {}`, test.num, got, test.want)
+		}
+	}
+}
+
+fn equalErr(e1: any, e2: any): bool {
+	if e1 == nil {
+		ret e2 == nil
+	}
+	if e2 == nil {
+		ret e1 == nil
+	}
+	e1n, mut ok := (&conv::NumError)(e1)
+	if !ok {
+		ret false
+	}
+	e2n, ok := (&conv::NumError)(e2)
+	if !ok {
+		ret false
+	}
+	ret cmp::DeepEqual(e1n, e2n)
+}
+
+fn equalErr2(a: any, b: any): bool {
+	if a == nil {
+		ret b == nil
+	}
+	if b == nil {
+		ret a == nil
+	}
+	ret runtime::toStr(a) == runtime::toStr(b)
+}
