@@ -95,27 +95,34 @@ impl exprCoder {
 	fn float32(mut &self, &c: &constant::Const) {
 		x := c.AsF64()
 
+		self.oc.write("jule::F32(")
+
 		// Special cases.
 		if self.ftoaSpecialCases(x) {
+			self.oc.write(")")
 			ret
 		}
 
 		match {
 		| x == types::MaxF32:
-			self.oc.write("3.402823466e+38F")
+			self.oc.write("(3.402823466e+38F")
 		| x == types::MinF32:
 			self.oc.write("-3.402823466e+38F")
 		|:
 			ftoa(self.oc.Buf, x, 1<<5)
 			self.oc.write("f")
 		}
+		self.oc.write(")")
 	}
 
 	fn float64(mut &self, &c: &constant::Const) {
 		x := c.AsF64()
 
+		self.oc.write("jule::F64(")
+
 		// Special cases.
 		if self.ftoaSpecialCases(x) {
+			self.oc.write(")")
 			ret
 		}
 
@@ -127,6 +134,7 @@ impl exprCoder {
 		|:
 			ftoa(self.oc.Buf, x, 1<<6)
 		}
+		self.oc.write(")")
 	}
 
 	fn constant(mut &self, mut c: &constant::Const) {
@@ -143,9 +151,23 @@ impl exprCoder {
 				self.float64(c)
 			}
 		| c.IsI64():
+			if c.Kind != "" {
+				self.oc.tc.toType(self.oc.Buf, c.Kind)
+				self.oc.write("(")
+			}
 			itoa(self.oc.Buf, c.ReadI64())
+			if c.Kind != "" {
+				self.oc.write(")")
+			}
 		| c.IsU64():
+			if c.Kind != "" {
+				self.oc.tc.toType(self.oc.Buf, c.Kind)
+				self.oc.write("(")
+			}
 			utoa(self.oc.Buf, c.ReadU64())
+			if c.Kind != "" {
+				self.oc.write(")")
+			}
 		| c.IsNil():
 			self.nilLit()
 		|:
@@ -293,14 +315,22 @@ impl exprCoder {
 			ret
 		}
 
+		// guarantee integer wrap around if expressions is not a condition
 		match op {
-		| token::Id.Plus | token::Id.Minus | token::Id.Star | token::Id.Shl:
-			// guarantee unsigned integer wrap around
+		| token::Id.Gt | token::Id.GtEq
+		| token::Id.Lt | token::Id.LtEq
+		| token::Id.Eqs | token::Id.NotEq:
+			// No op.
+		|:
 			lp := lk.Prim()
-			if lp != nil && types::IsUnsigInt(lp.Kind) {
+			if lp != nil && types::IsInt(lp.Kind) {
 				buf.WriteByte('(')!
 				self.oc.tc.prim(buf, lp)
 				buf.WriteByte(')')!
+				buf.WriteByte('(')!
+				defer {
+					buf.WriteByte(')')!
+				}
 			}
 		}
 
@@ -422,6 +452,20 @@ impl exprCoder {
 	}
 
 	fn unary(mut &self, mut m: &sema::UnaryExpr) {
+		// guarantee integer wrap around
+		match m.Op.Id {
+		| token::Id.Plus | token::Id.Minus | token::Id.Caret:
+			lp := m.Expr.Type.Prim()
+			if lp != nil && types::IsInt(lp.Kind) {
+				self.oc.write("(")
+				self.oc.tc.prim(self.oc.Buf, lp)
+				self.oc.write(")(")
+				defer {
+					self.oc.write(")")
+				}
+			}
+		}
+
 		match m.Op.Id {
 		| token::Id.Caret:
 			self.oc.write("(~(")
