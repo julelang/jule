@@ -30,15 +30,15 @@ fn checkBit(v: str, bit: int, checker: bitChecker): bool {
 	| len(v) == 1:
 		ret true
 	| strings::HasPrefix(v, "0x"):
-		ret checker(v[2:], 1<<4, bit) // Hexadecimal
+		ret checker(v[2:], 16, bit) // Hexadecimal
 	| strings::HasPrefix(v, "0b"):
-		ret checker(v[2:], 1<<1, bit) // Binary
+		ret checker(v[2:], 2, bit) // Binary
 	| strings::HasPrefix(v, "0o"):
-		ret checker(v[2:], 1<<3, bit) // Octal
+		ret checker(v[2:], 8, bit) // Octal
 	| v[0] == '0':
-		ret checker(v[1:], 1<<3, bit) // Octal
+		ret checker(v[1:], 8, bit) // Octal
 	|:
-		ret checker(v, 1<<3+2, bit) // Decimal
+		ret checker(v, 10, bit) // Decimal
 	}
 }
 
@@ -47,10 +47,10 @@ fn checkBit(v: str, bit: int, checker: bitChecker): bool {
 // Bit-size is determined by runtime.
 fn RealKindOf(kind: str): str {
 	match kind {
-	| Kind.Int:
+	| Int:
 		ret SysInt
-	| Kind.Uint
-	| Kind.Uintptr:
+	| Uint
+	| Uintptr:
 		ret SysUint
 	|:
 		ret kind
@@ -61,23 +61,15 @@ fn RealKindOf(kind: str): str {
 // Returns -1 if kind is not numeric.
 fn BitSizeOf(k: str): int {
 	match k {
-	| Kind.I8
-	| Kind.U8:
-		ret 1 << 3
-	| Kind.I16
-	| Kind.U16:
-		ret 1 << 4
-	| Kind.I32
-	| Kind.U32
-	| Kind.F32:
-		ret 1 << 5
-	| Kind.I64
-	| Kind.U64
-	| Kind.F64:
-		ret 1 << 6
-	| Kind.Uint
-	| Kind.Int
-	| Kind.Uintptr:
+	| I8 | U8:
+		ret 8
+	| I16 | U16:
+		ret 16
+	| I32 | U32 | F32:
+		ret 32
+	| I64 | U64 | F64:
+		ret 64
+	| Uint | Int | Uintptr:
 		ret BitSize
 	|:
 		ret -1
@@ -89,48 +81,48 @@ fn BitSizeOf(k: str): int {
 // Returns empty string if bits is invalid.
 fn IntFromBits(bits: int): str {
 	match bits {
-	| 1 << 3:
-		ret Kind.I8
-	| 1 << 4:
-		ret Kind.I16
-	| 1 << 5:
-		ret Kind.I32
-	| 1 << 6:
-		ret Kind.I64
+	| 8:
+		ret I8
+	| 16:
+		ret I16
+	| 32:
+		ret I32
+	| 64:
+		ret I64
 	|:
-		ret ""
+		panic("unreachable")
 	}
 }
 
 // Returns unsigned integer kind by bit-size.
 // Possible bit-sizes are: 8, 16, 32, and 64.
-// Returns empty string if bits is invalid.
+// Panics if bits is invalid.
 fn UintFromBits(bits: int): str {
 	match bits {
-	| 1 << 3:
-		ret Kind.U8
-	| 1 << 4:
-		ret Kind.U16
-	| 1 << 5:
-		ret Kind.U32
-	| 1 << 6:
-		ret Kind.U64
+	| 8:
+		ret U8
+	| 16:
+		ret U16
+	| 32:
+		ret U32
+	| 64:
+		ret U64
 	|:
-		ret ""
+		panic("unreachable")
 	}
 }
 
 // Returns floating-point kind by bit-size.
 // Possible bit-sizes are: 32, and 64.
-// Returns empty string if bits is invalid.
+// Panics if bits is invalid.
 fn FloatFromBits(bits: int): str {
 	match bits {
-	| 1 << 5:
-		ret Kind.F32
-	| 1 << 6:
-		ret Kind.F64
+	| 32:
+		ret F32
+	| 64:
+		ret F64
 	|:
-		ret ""
+		panic("unreachable")
 	}
 }
 
@@ -164,9 +156,11 @@ fn CheckBitFloat(val: str, bit: int): bool {
 fn BitSizeOfFloat(x: f64): int {
 	match {
 	| MinF32 <= x && x <= MaxF32:
-		ret 1 << 5
+		ret 32
+	| MinF64 <= x && x <= MaxF64:
+		ret 64
 	|:
-		ret 1 << 6
+		panic("unreachable")
 	}
 }
 
@@ -180,13 +174,15 @@ fn BitSizeOfFloat(x: f64): int {
 fn BitSizeOfInt(x: i64): int {
 	match {
 	| MinI8 <= x && x <= MaxI8:
-		ret 1 << 3
+		ret 8
 	| MinI16 <= x && x <= MaxI16:
-		ret 1 << 4
+		ret 16
 	| MinI32 <= x && x <= MaxI32:
-		ret 1 << 5
+		ret 32
+	| MinI64 <= x && x <= MaxI64:
+		ret 64
 	|:
-		ret 1 << 6
+		panic("unreachable")
 	}
 }
 
@@ -200,13 +196,15 @@ fn BitSizeOfInt(x: i64): int {
 fn BitSizeOfUint(x: u64): int {
 	match {
 	| x <= MaxU8:
-		ret 1 << 3
+		ret 8
 	| x <= MaxU16:
-		ret 1 << 4
+		ret 16
 	| x <= MaxU32:
-		ret 1 << 5
+		ret 32
+	| x <= MaxU64:
+		ret 64
 	|:
-		ret 1 << 6
+		panic("unreachable")
 	}
 }
 
@@ -217,13 +215,15 @@ fn UpdateTarget() {
 	unsafe {
 		match build::Arch {
 		| "arm64" | "amd64":
-			*(&BitSize) = 1 << 6
-			*(&SysInt) = Kind.I64
-			*(&SysUint) = Kind.U64
+			*(&BitSize) = 64
+			*(&SysInt) = I64
+			*(&SysUint) = U64
 		| "i386":
-			*(&BitSize) = 1 << 5
-			*(&SysInt) = Kind.I32
-			*(&SysUint) = Kind.U32
+			*(&BitSize) = 32
+			*(&SysInt) = I32
+			*(&SysUint) = U32
+		|:
+			panic("unreachable")
 		}
 	}
 }
