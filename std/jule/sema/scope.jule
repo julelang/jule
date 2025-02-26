@@ -667,7 +667,7 @@ impl scopeChecker {
 	fn checkExpr(mut &self, mut expr: &ast::Expr) {
 		mut eval := self.s.eval(self)
 		eval.target.ignored = true
-		mut v := eval.evalExpr(expr)
+		mut v := eval.evalExpr(expr, evalDefault|evalPhysicalMem)
 		if v == nil || v.Model == nil {
 			// Skip nil data, because evaluation failed and error documented (it should be) already.
 			// Skip nil modeled data, this return only caused by built-in functions and it should be safe.
@@ -700,7 +700,7 @@ impl scopeChecker {
 	fn checkIf(mut &self, mut i: &ast::If): &If {
 		mut s := self.checkChild(i.Scope)
 
-		mut v := self.s.eval(self).evalExpr(i.Expr)
+		mut v := self.s.eval(self).evalExpr(i.Expr, evalDefault|evalPhysicalMem)
 		if v == nil {
 			ret nil
 		}
@@ -773,7 +773,7 @@ impl scopeChecker {
 		kind.Scope = self.checkIterScope(uintptr(kind), it.Scope)
 
 		if wh.Expr != nil {
-			mut v := self.s.eval(self).evalExpr(wh.Expr)
+			mut v := self.s.eval(self).evalExpr(wh.Expr, evalDefault|evalPhysicalMem)
 			if v == nil {
 				ret
 			}
@@ -878,7 +878,7 @@ impl scopeChecker {
 		mut eval := self.s.eval(self)
 		eval.target.mutable = true
 
-		mut v := eval.evalExpr1(rang.Expr)
+		mut v := eval.evalExpr1(rang.Expr, evalDefault|evalPhysicalMem)
 		if v == nil {
 			ret
 		}
@@ -1112,7 +1112,7 @@ impl scopeChecker {
 		eval.target.mutable = true
 
 		mut expr := a.Left[0].Expr
-		mut v := eval.evalExpr(expr)
+		mut v := eval.evalExpr(expr, evalDefault)
 		if v == nil {
 			ret
 		}
@@ -1175,7 +1175,7 @@ impl scopeChecker {
 			mut expr := a.Left[0].Expr
 			mut eval := self.s.eval(self)
 			eval.target.mutable = true
-			l = eval.evalExpr(expr)
+			l = eval.evalExpr(expr, evalDefault)
 			if l == nil {
 				ret
 			}
@@ -1189,7 +1189,7 @@ impl scopeChecker {
 		}
 		eval.target.mutable = true
 		eval.unsafety = self.isUnsafe()
-		mut r := eval.evalExpr(a.Right)
+		mut r := eval.evalExpr(a.Right, evalDefault|evalPhysicalMem)
 		if r == nil {
 			ret
 		}
@@ -1242,7 +1242,7 @@ impl scopeChecker {
 		}
 		id := a.Setter.Id
 		a.Setter.Id = removeEqFromOp(a.Setter.Id)
-		mut solver := binaryEval.new(eval, a.Setter)
+		mut solver := binaryEval.new(eval, a.Setter, a.Setter, a.Right.Token)
 		solver.l, solver.r = l, r
 		_ = solver.evalOp()
 		a.Setter.Id = id
@@ -1362,7 +1362,7 @@ impl scopeChecker {
 					ret nil
 				}
 				updateMut(*_i)
-				mut v := eval.evalExpr(expr)
+				mut v := eval.evalExpr(expr, evalDefault|evalPhysicalMem)
 				if v != nil {
 					*_parts = append(*_parts, exprPart{v, expr})
 				}
@@ -1373,7 +1373,7 @@ impl scopeChecker {
 			// It is mutability safe even if map stored in immutable memory and have mutable type value.
 			// Because mutability will be checked by assignment analysis.
 			updateMut(0)
-			right = eval.evalExpr(a.Right)
+			right = eval.evalExpr(a.Right, evalDefault|evalPhysicalMem)
 			if right == nil {
 				ret
 			}
@@ -1497,7 +1497,7 @@ impl scopeChecker {
 					}
 				}
 			eval:
-				l = eval.evalExpr(lexpr.Expr)
+				l = eval.evalExpr(lexpr.Expr, evalDefault)
 				if l == nil {
 					continue
 				}
@@ -1685,7 +1685,7 @@ impl scopeChecker {
 	}
 
 	fn checkTypeMatch(mut &self, mut &m: &ast::Match) {
-		mut v := self.s.eval(self).eval1(m.Expr)
+		mut v := self.s.eval(self).eval1(m.Expr, evalDefault|evalPhysicalMem)
 		if v == nil {
 			ret
 		}
@@ -1736,7 +1736,7 @@ impl scopeChecker {
 			}
 			v.Model = v.Constant
 		} else {
-			v = self.s.eval(self).evalExpr1(m.Expr)
+			v = self.s.eval(self).evalExpr1(m.Expr, evalDefault|evalPhysicalMem)
 			if v == nil {
 				ret
 			}
@@ -1791,7 +1791,7 @@ impl scopeChecker {
 		case.Exprs = make([]&Value, 0, len(c.Exprs))
 		mut eval := self.s.eval(self)
 		for (_, mut e) in c.Exprs {
-			mut v := eval.evalExpr(e)
+			mut v := eval.evalExpr(e, evalDefault|evalPhysicalMem)
 			if v == nil {
 				continue
 			}
@@ -2065,7 +2065,7 @@ impl scopeChecker {
 		match type stmt.Data {
 		| &ast::UseExpr:
 			mut ue := (&ast::UseExpr)(stmt.Data)
-			mut v := self.s.eval(self).evalExpr(ue.Expr)
+			mut v := self.s.eval(self).evalExpr(ue.Expr, evalDefault|evalPhysicalMem)
 			if v == nil {
 				ret
 			}
@@ -2079,7 +2079,7 @@ impl scopeChecker {
 			_ = rtc.check(ue.Expr)
 		| &ast::Expr:
 			mut expr := (&ast::Expr)(stmt.Data)
-			mut v := self.s.eval(self).evalExpr(expr)
+			mut v := self.s.eval(self).evalExpr(expr, evalDefault|evalPhysicalMem)
 			if v == nil {
 				ret
 			}

@@ -798,14 +798,11 @@ impl sema {
 		mut &errorToken: &token::Token) {
 		if src.untyped && src.IsConst() {
 			match {
-			| src.Constant.IsI64():
-				self.pushErr(errorToken, build::LogMsg.IncompatibleTypes, dest.Str(), "untyped integer")
-				ret
-			| src.Constant.IsU64():
-				self.pushErr(errorToken, build::LogMsg.IncompatibleTypes, dest.Str(), "untyped unsigned integer")
+			| src.Constant.IsInt():
+				self.pushErr(errorToken, build::LogMsg.IncompatibleTypes, dest.Str(), "untyped integer ("+src.Constant.Str()+")")
 				ret
 			| src.Constant.IsF64():
-				self.pushErr(errorToken, build::LogMsg.IncompatibleTypes, dest.Str(), "untyped float")
+				self.pushErr(errorToken, build::LogMsg.IncompatibleTypes, dest.Str(), "untyped float ("+src.Constant.Str()+")")
 				ret
 			}
 		}
@@ -1181,7 +1178,7 @@ impl sema {
 				}
 				item.ValueSym.Value.Model = item.ValueSym.Value.Constant
 			} else {
-				mut v := eval.evalExpr(item.ValueSym.Expr)
+				mut v := eval.evalExpr(item.ValueSym.Expr, evalDefault|evalPhysicalMem)
 				if v == nil {
 					continue
 				}
@@ -1212,7 +1209,7 @@ impl sema {
 			}
 			item.ValueSym.Value.Model = item.ValueSym.Value.Constant
 		} else {
-			mut v := eval.evalExpr(item.ValueSym.Expr)
+			mut v := eval.evalExpr(item.ValueSym.Expr, evalDefault|evalPhysicalMem)
 			if v == nil {
 				ret
 			}
@@ -1222,11 +1219,12 @@ impl sema {
 			mut refers := (&ReferenceStack)(nil) // constant expressions not uses
 			_ = self.checkAssignType(false, e.TypeSym.Type, v, item.Token, refers)
 			item.ValueSym.Value = v
+			i := item.ValueSym.Value.Constant.ReadInt()
 			const match type Int {
 			| i64:
-				n = item.ValueSym.Value.Constant.ReadI64()
+				n = i.I64()
 			| u64:
-				n = item.ValueSym.Value.Constant.ReadU64()
+				n = i.U64()
 			|:
 				panic("sema: unimplemented enum int type, this panic call should be unreachable")
 			}
@@ -2128,6 +2126,12 @@ impl sema {
 				}
 			}
 
+			// If variable is constant and have a exact type, check the value with
+			// physical memory constraints.
+			if v.Constant && v.ValueSym.Value.untyped {
+				//_ = checkValue(v.ValueSym.Value, self, v.ValueSym.Expr.Token, evalDefault|evalPhysicalMem)
+			}
+
 			if self.checkAssignType(v.Reference, v.TypeSym.Type, v.ValueSym.Value, v.ValueSym.Expr.Token, v.Refers) {
 				self.checkValidityForInitExpr(
 					v.Mutable,
@@ -2166,7 +2170,14 @@ impl sema {
 			eval = self.evalpd(l, nil, v)
 		}
 		eval.target.mutable = v.Mutable
-		v.ValueSym.Value = eval.evalExpr(v.ValueSym.Expr)
+		mut flags := evalDefault
+		// If variable is constant, allow comptime arbitrary values such as
+		// std/comptime types or arbitrary-large integers with no memory constraint.
+		// Otherwise evaluate with physical memory constraint.
+		if !v.Constant {
+			flags |= evalPhysicalMem
+		}
+		v.ValueSym.Value = eval.evalExpr(v.ValueSym.Expr, evalDefault)
 	}
 
 	// Evaluateds value of variable and checks.
@@ -2336,7 +2347,7 @@ impl sema {
 			eval.prefix = f.Type
 			eval.field = f
 			eval.target.mutable = true // struct may used as mutable, expressions should be mutable
-			f.Default = eval.evalExpr(f.Decl.Default)
+			f.Default = eval.evalExpr(f.Decl.Default, evalDefault|evalPhysicalMem)
 
 			// Skip if eval returned nil.
 			// Relevant error(s) logged by eval.

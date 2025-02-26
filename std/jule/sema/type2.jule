@@ -29,16 +29,16 @@ fn traitHasReferenceReceiver(&t: &Trait): bool {
 }
 
 fn floatAssignable(&kind: str, &v: &Value): bool {
-	if !v.Constant.IsI64() && !v.Constant.IsU64() && !v.Constant.IsF64() {
+	if !v.Constant.IsInt() && !v.Constant.IsF64() {
 		ret false
 	}
 	value := conv::FormatFloat(v.Constant.AsF64(), 'g', -1, 64)
 	ret types::CheckBitFloat(value, types::BitSizeOf(kind))
 }
 
-fn sigAssignable(kind: str, &v: &Value): bool {
-	min := types::Min(kind)
-	max := types::Max(kind)
+fn sigAssignable(kind: str, mut &v: &Value): bool {
+	min := types::MinI(kind)
+	max := types::MaxI(kind)
 	match {
 	| v.Constant.IsF64():
 		x := v.Constant.ReadF64()
@@ -46,23 +46,24 @@ fn sigAssignable(kind: str, &v: &Value): bool {
 		if frac != 0 {
 			ret false
 		}
-		ret i >= min && i <= max
-	| v.Constant.IsU64():
-		x := v.Constant.AsF64()
-		if x <= max {
-			ret true
+		ret i64(i) >= min && i64(i) <= max
+	| v.Constant.IsInt():
+		i := v.Constant.ReadInt()
+		if i.IsU64() {
+			ret i.U64() <= u64(max)
 		}
-	| v.Constant.IsI64():
-		x := v.Constant.AsF64()
-		ret min <= x && x <= max
+		if i.IsI64() {
+			x := i.I64()
+			ret min <= x && x <= max
+		}
 	}
 	ret false
 }
 
-fn unsigAssignable(kind: str, &v: &Value): bool {
-	max := types::Max(kind)
+fn unsigAssignable(kind: str, mut &v: &Value): bool {
+	max := types::MaxU(kind)
 	if v.IsRune && kind == types::Kind.U8 {
-		ret lit::IsAscii(rune(v.Constant.ReadI64()))
+		ret lit::IsAscii(rune(v.Constant.ReadInt().U64()))
 	}
 
 	match {
@@ -75,20 +76,24 @@ fn unsigAssignable(kind: str, &v: &Value): bool {
 		if frac != 0 {
 			ret false
 		}
-		ret i <= max
-	| v.Constant.IsU64():
-		x := v.Constant.AsF64()
+		ret u64(i) <= max
+	| v.Constant.IsInt():
+		i := v.Constant.ReadInt()
+		if i.Sign() == -1 {
+			ret false
+		}
+		if !i.IsU64() {
+			ret false
+		}
+		x := i.U64()
 		if x <= max {
 			ret true
 		}
-	| v.Constant.IsI64():
-		x := v.Constant.AsF64()
-		ret 0 <= x && x <= max
 	}
 	ret false
 }
 
-fn intAssignable(kind: str, &v: &Value): bool {
+fn intAssignable(kind: str, mut &v: &Value): bool {
 	match {
 	| types::IsSigInt(kind):
 		ret sigAssignable(kind, v)
@@ -375,6 +380,15 @@ impl assignTypeChecker {
 		| self.v.Type.Func() != nil:
 			if self.checkFunc() {
 				ret true
+			}
+		}
+		// If value is untyped and constant checking is failed,
+		// it is not fits in the destination type.
+		if self.v.untyped {
+			p := self.dest.Prim()
+			if p != nil && types::IsNum(p.Kind) {
+				self.s.pushCompatibilityError(self.dest, self.v, self.errorToken)
+				ret false
 			}
 		}
 		ret self.s.checkTypeCompatibility1(self.dest, self.v, self.errorToken)
@@ -845,7 +859,7 @@ impl fnCallArgChecker {
 		} else {
 			self.e.prefix = nil
 		}
-		mut v := self.e.evalExpr(arg)
+		mut v := self.e.evalExpr(arg, evalDefault|evalPhysicalMem)
 
 		self.e.prefix = old
 		self.e.target.mutable = oldMut
@@ -899,7 +913,7 @@ impl fnCallArgChecker {
 				self.e.prefix = p.Type
 			}
 
-			mut v := self.e.eval(arg)
+			mut v := self.e.eval(arg, evalDefault|evalPhysicalMem)
 			if v == nil {
 				ok = false
 				continue
@@ -1090,7 +1104,7 @@ impl structLitChecker {
 		defer { self.e.prefix = prefix }
 		self.e.prefix = f.Type
 
-		mut v := self.e.evalExpr(pair.Expr)
+		mut v := self.e.evalExpr(pair.Expr, evalDefault|evalPhysicalMem)
 		if v == nil {
 			ret
 		}
@@ -1159,7 +1173,7 @@ impl structLitChecker {
 				defer { self.e.prefix = prefix }
 				self.e.prefix = field.Type
 
-				mut v := self.e.evalExpr(expr)
+				mut v := self.e.evalExpr(expr, evalDefault|evalPhysicalMem)
 				if v == nil {
 					continue
 				}
@@ -1417,7 +1431,7 @@ impl retTypeChecker {
 			if i < len(self.types) {
 				eval.prefix = self.types[i]
 			}
-			mut v := eval.evalExpr(expr)
+			mut v := eval.evalExpr(expr, evalDefault|evalPhysicalMem)
 			ok = ok && v != nil
 			if ok {
 				self.exprs = append(self.exprs, v)

@@ -1529,7 +1529,7 @@ impl typeChecker {
 	fn buildArray(mut self, mut decl: &ast::ArrayType): &Array {
 		mut n := 0
 		if !decl.AutoSized() {
-			mut size := self.s.eval(self.lookup).evalExpr(decl.Size)
+			mut size := self.s.eval(self.lookup).evalExpr(decl.Size, evalDefault|evalPhysicalMem)
 			if size == nil {
 				ret nil
 			}
@@ -1550,7 +1550,7 @@ impl typeChecker {
 				max := types::MaxI(types::Kind.Int)
 				if types::BitSize != 64 && i64(n) > max {
 					self.pushErr(decl.Size.Token, build::LogMsg.ArraySizeOverflow,
-						constoa(size.Constant), conv::FormatInt(max, 10))
+						size.Constant.Str(), conv::FormatInt(max, 10))
 					ret nil
 				}
 			}

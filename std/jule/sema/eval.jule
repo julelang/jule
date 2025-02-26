@@ -11,10 +11,14 @@ use "std/jule/constant/lit"
 use "std/jule/internal/mod"
 use "std/jule/token"
 use "std/jule/types"
+use "std/math"
 use "std/math/big"
 use "std/os/filepath"
 use "std/strings"
 use "std/unsafe"
+
+// Bitsize limit of comptime arbitrary large literals.
+const bitLimit = 256
 
 // Value.
 struct Value {
@@ -81,6 +85,10 @@ struct target {
 	ignored: bool // whether the destination ignores the evaluated expression.
 	mutable: bool // Will be assigned to the mutable storage.
 }
+
+// Eval flags.
+const evalDefault = 0          // Default evaluation mode.
+const evalPhysicalMem = 1 << 0 // Checks whether the value is sutaible for physical memory.
 
 // Evaluator.
 struct eval {
@@ -229,32 +237,61 @@ impl eval {
 	}
 
 	fn litInt(mut self, &l: &ast::LitExpr): &Value {
-		mut v := new(Value)
-		i, ok := big::Int.Parse(l.Value, 0)
-		if !ok {
-			self.pushErr(l.Token, build::LogMsg.InvalidNumericRange)
-			self.pushSuggestion(build::LogMsg.TryFloatingPoint)
-		}
+		// Maximum value of bitLimit integer.
+		const maxbinary = "1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111"
+		const maxoctal = "17777777777777777777777777777777777777777777777777777777777777777777777777777777777777"
+		const maxdecimal = "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+		const maxhex = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
 		match {
-		| i.IsI64():
-			v.Constant = constant::Const.NewI64(i.I64())
-			v.Type = primInt
-		| i.IsU64():
-			v.Constant = constant::Const.NewU64(i.U64())
-			v.Type = primUint
+		| strings::HasPrefix(l.Value, "0x"): // Hexadecimal
+			lit := l.Value[2:]
+			n := len(lit) - strings::Count(lit, "_")
+			if n > len(maxhex) {
+				self.pushErr(l.Token, build::LogMsg.ConstantOverflow)
+				ret nil
+			}
+		| strings::HasPrefix(l.Value, "0b"): // Binary
+			lit := l.Value[2:]
+			n := len(lit) - strings::Count(lit, "_")
+			if n > len(maxbinary) {
+				self.pushErr(l.Token, build::LogMsg.ConstantOverflow)
+				ret nil
+			}
+		| strings::HasPrefix(l.Value, "0o"): // Ocatal
+			lit := l.Value[2:]
+			n := len(lit) - strings::Count(lit, "_")
+			if n > len(maxoctal) {
+				self.pushErr(l.Token, build::LogMsg.ConstantOverflow)
+				ret nil
+			}
+		| l.Value[0] == '0' && len(l.Value) > 1: // Octal
+			lit := l.Value[1:]
+			n := len(lit) - strings::Count(lit, "_")
+			if n > len(maxoctal) {
+				self.pushErr(l.Token, build::LogMsg.ConstantOverflow)
+				ret nil
+			}
 		|:
-			self.pushErr(l.Token, build::LogMsg.InvalidNumericRange)
-			self.pushSuggestion(build::LogMsg.TryFloatingPoint)
+			// Decimal
+			lit := l.Value[1:]
+			n := len(lit) - strings::Count(lit, "_")
+			if n > len(maxdecimal) {
+				self.pushErr(l.Token, build::LogMsg.ConstantOverflow)
+				ret nil
+			}
 		}
 
+		mut v := new(Value)
+		i, _ := big::Int.Parse(l.Value, 0)
+		if i.BitLen() > bitLimit {
+			self.pushErr(l.Token, build::LogMsg.ConstantOverflow)
+			ret nil
+		}
+		v.Constant = constant::Const.NewInt(i)
+		v.Type = primInt // Type is symbolic.
 		v.Model = v.Constant
 		v.untyped = true
-		if !self.applyNumericPrefix(v) {
-			// If prefix is not implemented, check constant bitsize.
-			// Arcihtecture bitsize type might be insufficient to store constant data.
-			// If this concern is true, set kind to minimum type that has enough bitsize.
-			fitBitsize(v)
-		}
+		_ = self.applyNumericPrefix(v)
 		ret v
 	}
 
@@ -571,8 +608,8 @@ impl eval {
 				val.Constant = new(constant::Const, *v.ValueSym.Value.Constant)
 				val.Model = val.Constant
 				if v.untypedConstant() {
-					self.applyNumericPrefix(val)
 					val.untyped = true
+					self.applyNumericPrefix(val)
 				}
 			}
 		}
@@ -690,7 +727,7 @@ impl eval {
 		self.prefix = nil
 		defer { self.prefix = prefix }
 
-		mut val := self.evalExpr(v.Expr)
+		mut val := self.evalExpr(v.Expr, evalDefault|evalPhysicalMem)
 		if val == nil {
 			ret nil
 		}
@@ -705,7 +742,7 @@ impl eval {
 	fn evalUnsafe(mut &self, mut u: &ast::UnsafeExpr): &Value {
 		unsafety := self.unsafety
 		self.unsafety = true
-		mut v := self.evalExpr(u.Expr)
+		mut v := self.evalExpr(u.Expr, evalDefault)
 		self.unsafety = unsafety
 		ret v
 	}
@@ -756,7 +793,7 @@ impl eval {
 		mut prefix := self.prefix
 		self.prefix = arr.Elem
 		for (_, mut elem) in s.Exprs {
-			mut v := self.evalExpr(elem)
+			mut v := self.evalExpr(elem, evalDefault|evalPhysicalMem)
 			if v == nil {
 				continue
 			}
@@ -800,7 +837,7 @@ impl eval {
 		mut prefix := self.prefix
 		self.prefix = slc.Elem
 		for (_, mut elem) in s.Exprs[i:] {
-			mut v := self.evalExpr(elem)
+			mut v := self.evalExpr(elem, evalDefault|evalPhysicalMem)
 			if v != nil {
 				const destIsRef = false
 				if self.s.checkValidityForInitExpr(self.target.mutable, destIsRef, slc.Elem, v, elem.Token) {
@@ -851,7 +888,7 @@ impl eval {
 		}
 
 		mut firstExpr := s.Exprs[0]
-		mut firstElem := self.evalExpr(firstExpr)
+		mut firstElem := self.evalExpr(firstExpr, evalDefault|evalPhysicalMem)
 		if firstElem == nil {
 			ret nil
 		}
@@ -945,6 +982,7 @@ impl eval {
 		v.untyped = v.IsConst()
 		if !index.IsConst() {
 			v.Constant = nil
+			v.untyped = false
 			ret
 		}
 
@@ -1053,7 +1091,7 @@ impl eval {
 		| &ast::Type:
 			generics = append(generics, (&ast::Type)(expr.Kind))
 		| &ast::IndexingExpr:
-			mut v := self.eval(expr)
+			mut v := self.eval(expr, evalDefault|evalPhysicalMem)
 			if v == nil {
 				ret false
 			}
@@ -1235,7 +1273,7 @@ impl eval {
 			self.prefix = m.Key
 		}
 
-		mut index := self.evalExpr(i.Index)
+		mut index := self.evalExpr(i.Index, evalDefault|evalPhysicalMem)
 		self.prefix = nil
 		if index == nil {
 			ret nil
@@ -1279,7 +1317,7 @@ impl eval {
 		defer { self.prefix = prefix }
 
 		if s.Start != nil {
-			l = self.evalExpr(s.Start)
+			l = self.evalExpr(s.Start, evalDefault|evalPhysicalMem)
 			if l != nil {
 				self.checkIntegerIndexingByData(l, s.Token)
 			} else {
@@ -1295,7 +1333,7 @@ impl eval {
 		}
 
 		if s.To != nil {
-			r = self.evalExpr(s.To)
+			r = self.evalExpr(s.To, evalDefault|evalPhysicalMem)
 			if r != nil {
 				self.checkIntegerIndexingByData(r, s.Token)
 			} else {
@@ -1304,7 +1342,7 @@ impl eval {
 		}
 
 		if s.Cap != nil {
-			c = self.evalExpr(s.Cap)
+			c = self.evalExpr(s.Cap, evalDefault|evalPhysicalMem)
 			if r != nil {
 				self.checkIntegerIndexingByData(r, s.Token)
 			} else {
@@ -1397,7 +1435,7 @@ impl eval {
 	}
 
 	fn evalSlicing(mut &self, mut s: &ast::SlicingExpr): &Value {
-		mut v := self.evalExpr(s.Expr)
+		mut v := self.evalExpr(s.Expr, evalDefault|evalPhysicalMem)
 		if v == nil {
 			ret nil
 		}
@@ -1952,7 +1990,12 @@ impl eval {
 				self.prefix = t
 			}
 		}
-		mut v := self.evalExpr(e)
+		// Do not allow arbitrary large literals for casting.
+		// Because casting will result as a valid memory type.
+		// If we do not eval with the physical memory constraints,
+		// arbitrary large literals may overflow largest bitsize of any actual type.
+		// So we need to make sure that the value can fit at least the largest type.
+		mut v := self.evalExpr(e, evalDefault|evalPhysicalMem)
 		if v == nil || self.prefix != nil {
 			ret v
 		}
@@ -2973,7 +3016,7 @@ impl eval {
 		mut prefix := self.prefix
 		self.prefix = nil
 		defer { self.prefix = prefix }
-		mut v := self.eval1(si.Expr)
+		mut v := self.eval1(si.Expr, evalDefault|evalPhysicalMem)
 		if v == nil || v.Type == nil {
 			ret nil
 		}
@@ -3014,7 +3057,7 @@ impl eval {
 
 	fn evalTuple(mut &self, mut tup: &ast::TupleExpr): &Value {
 		ret self.evalTupleFunc(tup, fn(mut &expr: &ast::Expr): &Value {
-			ret self.evalExpr(expr)
+			ret self.evalExpr(expr, evalDefault|evalPhysicalMem)
 		})
 	}
 
@@ -3034,14 +3077,14 @@ impl eval {
 			}
 
 			self.prefix = model.Kind.Key
-			mut key := self.evalExpr(pair.Key)
+			mut key := self.evalExpr(pair.Key, evalDefault|evalPhysicalMem)
 			self.prefix = prefix
 			if key == nil {
 				ret nil
 			}
 
 			self.prefix = model.Kind.Val
-			mut val := self.evalExpr(pair.Val)
+			mut val := self.evalExpr(pair.Val, evalDefault|evalPhysicalMem)
 			self.prefix = prefix
 			if val == nil {
 				ret nil
@@ -3136,14 +3179,13 @@ impl eval {
 				mut prefix := self.prefix
 				self.prefix = nil
 				defer { self.prefix = prefix }
-				ret bs.eval(op)
 			}
 		}
 		ret bs.eval(op)
 	}
 
 	fn evalChanRecv(mut &self, mut expr: &ast::ChanRecv): &Value {
-		mut v := self.evalExpr(expr.Expr)
+		mut v := self.evalExpr(expr.Expr, evalDefault|evalPhysicalMem)
 		if v == nil {
 			ret nil
 		}
@@ -3166,7 +3208,7 @@ impl eval {
 	}
 
 	fn evalChanSend(mut &self, mut chs: &ast::ChanSend): &Value {
-		mut l := self.evalExpr(chs.Chan)
+		mut l := self.evalExpr(chs.Chan, evalDefault|evalPhysicalMem)
 		if l == nil {
 			ret nil
 		}
@@ -3185,7 +3227,7 @@ impl eval {
 		self.prefix = ch.Elem
 		self.target.mutable = l.Mutable
 		self.unsafety = self.isUnsafe()
-		mut r := self.evalExpr(chs.Data)
+		mut r := self.evalExpr(chs.Data, evalDefault|evalPhysicalMem)
 		self.prefix = prefix
 		self.target.mutable = mutable
 		self.unsafety = unsafety
@@ -3272,7 +3314,7 @@ impl eval {
 
 	// Returns value data of evaluated expression.
 	// Returns nil if error occurs.
-	fn eval1(mut &self, mut expr: &ast::Expr): &Value {
+	fn eval1(mut &self, mut expr: &ast::Expr, flags: int): &Value {
 		mut v := self.evalExprKind(expr.Kind)
 		if v == nil || v.Type == nil {
 			ret nil
@@ -3311,14 +3353,19 @@ impl eval {
 			}
 		}
 
+		ok := checkValue(v, self.s, expr.Token, flags)
+		if !ok {
+			v = nil
+		}
+
 		ret v
 	}
 
 	// Returns value data of evaluated expression.
 	// Returns nil if error occurs.
 	// Accepts comptime expressions as invalid.
-	fn eval(mut &self, mut expr: &ast::Expr): &Value {
-		mut v := self.eval1(expr)
+	fn eval(mut &self, mut expr: &ast::Expr, flags: int): &Value {
+		mut v := self.eval1(expr, flags)
 		if v == nil {
 			ret nil
 		}
@@ -3332,8 +3379,8 @@ impl eval {
 	// Returns value data of evaluated expression by eval1.
 	// Returns nil if error occurs.
 	// Accepts decls as invalid expression.
-	fn evalExpr1(mut &self, mut expr: &ast::Expr): &Value {
-		mut v := self.eval1(expr)
+	fn evalExpr1(mut &self, mut expr: &ast::Expr, flags: int): &Value {
+		mut v := self.eval1(expr, flags)
 		match {
 		| v == nil:
 			ret nil
@@ -3348,8 +3395,8 @@ impl eval {
 	// Returns value data of evaluated expression by eval.
 	// Returns nil if error occurs.
 	// Accepts decls as invalid expression.
-	fn evalExpr(mut &self, mut expr: &ast::Expr): &Value {
-		mut v := self.eval(expr)
+	fn evalExpr(mut &self, mut expr: &ast::Expr, flags: int): &Value {
+		mut v := self.eval(expr, flags)
 		match {
 		| v == nil:
 			ret nil
@@ -3397,12 +3444,81 @@ impl unaryEval {
 			match {
 			| self.v.Constant.IsF64():
 				self.v.Constant.SetF64(-self.v.Constant.ReadF64())
-			| self.v.Constant.IsI64():
-				self.v.Constant.SetI64(-self.v.Constant.ReadI64())
-			| self.v.Constant.IsU64():
-				self.v.Constant.SetI64(-self.v.Constant.AsI64())
+			| self.v.Constant.IsInt():
+				i := self.v.Constant.ReadInt()
+				if self.v.untyped {
+					self.v.Constant.SetInt(i.Neg())
+				} else {
+					kind := self.v.Type.Prim().Kind
+					sz := types::BitSizeOf(kind)
+					match {
+					| types::IsSigInt(kind):
+						match sz {
+						| 8:
+							if i.Sign() == -1 {
+								self.v.Constant.SetI64(i64(-i8(i.I64())))
+							} else {
+								self.v.Constant.SetI64(i64(-i8(i.U64())))
+							}
+						| 16:
+							if i.Sign() == -1 {
+								self.v.Constant.SetI64(i64(-i16(i.I64())))
+							} else {
+								self.v.Constant.SetI64(i64(-i16(i.U64())))
+							}
+						| 32:
+							if i.Sign() == -1 {
+								self.v.Constant.SetI64(i64(-i32(i.I64())))
+							} else {
+								self.v.Constant.SetI64(i64(-i32(i.U64())))
+							}
+						| 64:
+							if i.Sign() == -1 {
+								self.v.Constant.SetI64(-i.I64())
+							} else {
+								self.v.Constant.SetI64(-i64(i.U64()))
+							}
+						|:
+							panic("sema: unimplemented bitsize for unaryEval.caret, this panic call should be unreachable")
+						}
+					| types::IsUnsigInt(kind):
+						match sz {
+						| 8:
+							if i.Sign() == -1 {
+								self.v.Constant.SetU64(u64(-u8(i.I64())))
+							} else {
+								self.v.Constant.SetU64(u64(-u8(i.U64())))
+							}
+						| 16:
+							if i.Sign() == -1 {
+								self.v.Constant.SetU64(u64(-u16(i.I64())))
+							} else {
+								self.v.Constant.SetU64(u64(-u16(i.U64())))
+							}
+						| 32:
+							if i.Sign() == -1 {
+								self.v.Constant.SetU64(u64(-u32(i.I64())))
+							} else {
+								self.v.Constant.SetU64(u64(-u32(i.U64())))
+							}
+						| 64:
+							if i.Sign() == -1 {
+								self.v.Constant.SetU64(-u64(i.I64()))
+							} else {
+								self.v.Constant.SetU64(-i.U64())
+							}
+						|:
+							panic("sema: unimplemented bitsize for unaryEval.caret, this panic call should be unreachable")
+						}
+					}
+				}
 			|:
 				panic("sema: unimplemented constant type for unaryEval.minus, this panic call should be unreachable")
+			}
+			if self.v.Constant.IsInt() && self.v.Constant.ReadInt().BitLen() > bitLimit {
+				self.e.pushErr(self.u.Op, build::LogMsg.ConstantOverflowResult)
+				self.v.Decl = true // Do not log error.
+				ret
 			}
 			// Do not self model for constant expressions. It's a overhead,
 			// because model will be changed to constant by following algorithm.
@@ -3437,14 +3553,12 @@ impl unaryEval {
 			match {
 			| self.v.Constant.IsF64():
 				self.v.Constant.SetF64(+self.v.Constant.ReadF64())
-			| self.v.Constant.IsI64():
-				self.v.Constant.SetI64(+self.v.Constant.ReadI64())
-			| self.v.Constant.IsU64():
-				self.v.Constant.SetI64(+self.v.Constant.AsI64())
+			| self.v.Constant.IsInt():
+				// No-op
 			|:
 				panic("sema: unimplemented constant type for unaryEval.plus, this panic call should be unreachable")
 			}
-			// Do not self model for constant expressions. It's a overhead,
+			// Do not update self model for constant expressions. It's a overhead,
 			// because model will be changed to constant by following algorithm.
 			ret
 		}
@@ -3478,38 +3592,83 @@ impl unaryEval {
 		// Also other types should be evaluated by their own bitsize.
 		// So implement this operator by bitsize in general.
 		if self.v.IsConst() {
-			sz := types::BitSizeOf(self.v.Type.Prim().Kind)
-			match {
-			| self.v.Constant.IsI64():
-				match sz {
-				| 8:
-					self.v.Constant.SetI64(i64(^i8(self.v.Constant.ReadI64())))
-				| 16:
-					self.v.Constant.SetI64(i64(^i16(self.v.Constant.ReadI64())))
-				| 32:
-					self.v.Constant.SetI64(i64(^i32(self.v.Constant.ReadI64())))
-				| 64:
-					self.v.Constant.SetI64(^self.v.Constant.ReadI64())
+			i := self.v.Constant.ReadInt()
+			// If value is untyped and constant have not any kind, set as untyped.
+			// Otherwise set by type of value.
+			if self.v.untyped && self.v.Constant.Kind == "" {
+				self.v.Constant.SetInt(i.BitNot())
+			} else {
+				kind := self.v.Type.Prim().Kind
+				sz := types::BitSizeOf(kind)
+				match {
+				| types::IsSigInt(kind):
+					match sz {
+					| 8:
+						if i.Sign() == -1 {
+							self.v.Constant.SetI64(i64(^i8(i.I64())))
+						} else {
+							self.v.Constant.SetI64(i64(^i8(i.U64())))
+						}
+					| 16:
+						if i.Sign() == -1 {
+							self.v.Constant.SetI64(i64(^i16(i.I64())))
+						} else {
+							self.v.Constant.SetI64(i64(^i16(i.U64())))
+						}
+					| 32:
+						if i.Sign() == -1 {
+							self.v.Constant.SetI64(i64(^i32(i.I64())))
+						} else {
+							self.v.Constant.SetI64(i64(^i32(i.U64())))
+						}
+					| 64:
+						if i.Sign() == -1 {
+							self.v.Constant.SetI64(^i.I64())
+						} else {
+							self.v.Constant.SetI64(^i64(i.U64()))
+						}
+					|:
+						panic("sema: unimplemented bitsize for unaryEval.caret, this panic call should be unreachable")
+					}
+				| types::IsUnsigInt(kind):
+					match sz {
+					| 8:
+						if i.Sign() == -1 {
+							self.v.Constant.SetU64(u64(^u8(i.I64())))
+						} else {
+							self.v.Constant.SetU64(u64(^u8(i.U64())))
+						}
+					| 16:
+						if i.Sign() == -1 {
+							self.v.Constant.SetU64(u64(^u16(i.I64())))
+						} else {
+							self.v.Constant.SetU64(u64(^u16(i.U64())))
+						}
+					| 32:
+						if i.Sign() == -1 {
+							self.v.Constant.SetU64(u64(^u32(i.I64())))
+						} else {
+							self.v.Constant.SetU64(u64(^u32(i.U64())))
+						}
+					| 64:
+						if i.Sign() == -1 {
+							self.v.Constant.SetU64(^u64(i.I64()))
+						} else {
+							self.v.Constant.SetU64(^i.U64())
+						}
+					|:
+						panic("sema: unimplemented bitsize for unaryEval.caret, this panic call should be unreachable")
+					}
 				|:
-					panic("sema: unimplemented bitsize for unaryEval.caret, this panic call should be unreachable")
+					panic("sema: unimplemented constant type for unaryEval.caret, this panic call should be unreachable")
 				}
-			| self.v.Constant.IsU64():
-				match sz {
-				| 8:
-					self.v.Constant.SetU64(u64(^u8(self.v.Constant.ReadU64())))
-				| 16:
-					self.v.Constant.SetU64(u64(^u16(self.v.Constant.ReadU64())))
-				| 32:
-					self.v.Constant.SetU64(u64(^u32(self.v.Constant.ReadU64())))
-				| 64:
-					self.v.Constant.SetU64(^self.v.Constant.ReadU64())
-				|:
-					panic("sema: unimplemented bitsize for unaryEval.caret, this panic call should be unreachable")
-				}
-			|:
-				panic("sema: unimplemented constant type for unaryEval.caret, this panic call should be unreachable")
 			}
-			// Do not self model for constant expressions. It's a overhead,
+			if self.v.Constant.IsInt() && self.v.Constant.ReadInt().BitLen() > bitLimit {
+				self.e.pushErr(self.u.Op, build::LogMsg.ConstantOverflowResult)
+				self.v.Decl = true // Do not log error.
+				ret
+			}
+			// Do not update self model for constant expressions. It's a overhead,
 			// because model will be changed to constant by following algorithm.
 			ret
 		}
@@ -3635,10 +3794,10 @@ impl unaryEval {
 		| token::Id.Amper:
 			mut prefix := self.e.prefix
 			self.e.prefix = nil
-			self.v = self.e.eval(self.u.Expr)
+			self.v = self.e.eval(self.u.Expr, evalDefault)
 			self.e.prefix = prefix
 		|:
-			self.v = self.e.eval(self.u.Expr)
+			self.v = self.e.eval(self.u.Expr, evalDefault)
 		}
 	}
 
@@ -3653,6 +3812,11 @@ impl unaryEval {
 			ret self.v
 		}
 
+		// NOTE
+		// The self.v.Decl is false now.
+		// Any function may be set to true.
+		// For this cases, following algorithm will not log error and
+		// returns nil.
 		kind := self.v.Type
 		match self.u.Op.Id {
 		| token::Id.Minus:
@@ -3672,6 +3836,8 @@ impl unaryEval {
 		}
 
 		match {
+		| self.v.Decl:
+			self.v = nil
 		| self.v == nil:
 			self.e.pushErr(self.u.Op, build::LogMsg.InvalidExprForUnary, self.u.Op.Kind, kind.Str())
 			ret nil
@@ -3687,6 +3853,8 @@ struct binaryEval {
 	l:  &Value
 	r:  &Value
 	op: &token::Token
+	lt: &token::Token
+	rt: &token::Token
 }
 
 impl binaryEval {
@@ -3696,10 +3864,13 @@ impl binaryEval {
 		}
 	}
 
-	static fn new(mut e: &eval, mut op: &token::Token): binaryEval {
+	static fn new(mut e: &eval, mut op: &token::Token,
+		mut lt: &token::Token, mut rt: &token::Token): binaryEval {
 		ret binaryEval{
 			e: e,
 			op: op,
+			lt: lt,
+			rt: rt,
 		}
 	}
 
@@ -3799,15 +3970,16 @@ impl binaryEval {
 				Type: primBool,
 			}
 		| token::Id.Amper:
-			first := self.l.Type.Enum().Items[0]
+			mut first := self.l.Type.Enum().Items[0]
+			i := first.ValueSym.Value.Constant.ReadInt()
 			match {
-			| first.ValueSym.Value.Constant.IsI64():
-				if first.ValueSym.Value.Constant.ReadI64() == 0 {
+			| i.IsI64():
+				if i.I64() == 0 {
 					goto next
 				}
 				goto err
-			| first.ValueSym.Value.Constant.IsU64():
-				if first.ValueSym.Value.Constant.ReadU64() == 0 {
+			| i.IsU64():
+				if i.U64() == 0 {
 					goto next
 				}
 				goto err
@@ -4046,11 +4218,21 @@ impl binaryEval {
 			}
 			self.r.untyped = false
 		} else if self.l.untyped && self.r.untyped {
-			self.r.Type = self.l.Type
-			if self.r.IsConst() {
-				self.r.Constant.Kind = lp.Kind
+			ls := getUntypedCmpScore(lp.Kind)
+			rs := getUntypedCmpScore(rp.Kind)
+			if ls > rs {
+				self.r.Type = self.l.Type
+				if self.r.IsConst() {
+					self.r.Constant.Kind = lp.Kind
+				}
+				self.l.untyped = false
+			} else if ls < rs {
+				self.l.Type = self.r.Type
+				if self.l.IsConst() {
+					self.l.Constant.Kind = rp.Kind
+				}
+				self.l.untyped = false
 			}
-			self.r.untyped = false
 		}
 	}
 
@@ -4174,8 +4356,32 @@ impl binaryEval {
 		// integer guaranteed
 
 		if !isOkForShifting(self.r) {
-			self.e.pushErr(self.op, build::LogMsg.BitShiftMustUnsigned)
+			if self.r.untyped {
+				self.e.s.pushCompatibilityError(primUint, self.r, self.rt)
+			} else {
+				self.e.pushErr(self.rt, build::LogMsg.BitShiftMustUnsigned)
+			}
 			ret nil
+		}
+		// value is valid guaranteed
+
+		const maxShiftCount = bitLimit
+		if self.r.IsConst() {
+			if self.r.Constant.IsInt() {
+				i := self.r.Constant.ReadInt()
+				if i.IsI64() && i.I64() > maxShiftCount ||
+					i.IsU64() && i.U64() > maxShiftCount {
+					self.e.pushErr(self.rt, build::LogMsg.InvalidShiftCount, i.Str())
+					ret nil
+				}
+			} else if self.r.Constant.IsF64() && self.r.Constant.ReadF64() > maxShiftCount {
+				self.e.pushErr(self.rt, build::LogMsg.InvalidShiftCount, self.r.Constant.Str())
+				ret nil
+			}
+		}
+
+		if self.r.untyped || !self.r.Type.Equal(self.l.Type) {
+			applyImplicitCast(self.e.s, self.l.Type, self.r, self.rt, self.e.getOwnerRefers())
 		}
 		// unsigned guaranteed
 		ret self.l
@@ -4280,7 +4486,8 @@ impl binaryEval {
 			ret self.evalStr()
 		}
 
-		if self.r.Type.Prim() == nil {
+		rp := self.r.Type.Prim()
+		if rp == nil {
 			self.e.pushErr(self.op, build::LogMsg.IncompatibleTypes, prim.Str(), self.r.Type.Str())
 			ret nil
 		}
@@ -4430,13 +4637,6 @@ impl binaryEval {
 				self.e.pushErr(self.op, build::LogMsg.DivByZero)
 			}
 			v.Constant = self.l.Constant
-			mut prim := v.Type.Prim()
-			match {
-			| types::IsSigInt(prim.Kind):
-				v.Constant.SetI64(v.Constant.AsI64())
-			| types::IsUnsigInt(prim.Kind):
-				v.Constant.SetU64(v.Constant.AsU64())
-			}
 		| token::Id.Percent:
 			ok := self.l.Constant.Mod(*self.r.Constant)
 			if !ok && self.r.Constant.AsF64() == 0 {
@@ -4458,6 +4658,86 @@ impl binaryEval {
 		| token::Id.Shr:
 			_ = self.l.Constant.Rshift(*self.r.Constant)
 			v.Constant = self.l.Constant
+		}
+		// Value is arbitrary large literal.
+		// We have to do extra work.
+		if v.Constant.IsInt() {
+			// If computation result overflows the bitsize limit, log error,
+			// and return nil value.
+			i := v.Constant.ReadInt()
+			if i.BitLen() > bitLimit {
+				self.e.pushErr(self.op, build::LogMsg.ConstantOverflowResult)
+				v = nil
+				ret
+			}
+			// If value is not untyped, then cast the result to exact type if possible.
+			// As far as tested, it should be work for all types with no issue.
+			if !v.untyped && (i.IsI64() || i.IsU64()) {
+				kind := v.Type.Prim().Kind
+				sz := types::BitSizeOf(kind)
+				match {
+				| types::IsSigInt(kind):
+					match sz {
+					| 8:
+						if i.Sign() == -1 {
+							v.Constant.SetI64(i64(i8(i.I64())))
+						} else {
+							v.Constant.SetI64(i64(i8(i.U64())))
+						}
+					| 16:
+						if i.Sign() == -1 {
+							v.Constant.SetI64(i64(i16(i.I64())))
+						} else {
+							v.Constant.SetI64(i64(i16(i.U64())))
+						}
+					| 32:
+						if i.Sign() == -1 {
+							v.Constant.SetI64(i64(i32(i.I64())))
+						} else {
+							v.Constant.SetI64(i64(i32(i.U64())))
+						}
+					| 64:
+						if i.Sign() == -1 {
+							v.Constant.SetI64(i.I64())
+						} else {
+							v.Constant.SetI64(i64(i.U64()))
+						}
+					|:
+						panic("sema: unimplemented bitsize for unaryEval.caret, this panic call should be unreachable")
+					}
+				| types::IsUnsigInt(kind):
+					match sz {
+					| 8:
+						if i.Sign() == -1 {
+							v.Constant.SetU64(u64(u8(i.I64())))
+						} else {
+							v.Constant.SetU64(u64(u8(i.U64())))
+						}
+					| 16:
+						if i.Sign() == -1 {
+							v.Constant.SetU64(u64(u16(i.I64())))
+						} else {
+							v.Constant.SetU64(u64(u16(i.U64())))
+						}
+					| 32:
+						if i.Sign() == -1 {
+							v.Constant.SetU64(u64(u32(i.I64())))
+						} else {
+							v.Constant.SetU64(u64(u32(i.U64())))
+						}
+					| 64:
+						if i.Sign() == -1 {
+							v.Constant.SetU64(u64(i.I64()))
+						} else {
+							v.Constant.SetU64(i.U64())
+						}
+					|:
+						panic("sema: unimplemented bitsize for unaryEval.caret, this panic call should be unreachable")
+					}
+				|:
+					panic("sema: unimplemented constant type for unaryEval.caret, this panic call should be unreachable")
+				}
+			}
 		}
 		v.Model = v.Constant
 		applyCastModelByEnum(self.e.s, v, v.Type.Enum(), self.op, self.e.getOwnerRefers())
@@ -4536,7 +4816,7 @@ impl binaryEval {
 			ret nil
 		}
 
-		mut l := self.e.evalExpr1(op.Left)
+		mut l := self.e.evalExpr1(op.Left, evalDefault)
 		if l == nil || l.Type == nil {
 			ret nil
 		}
@@ -4544,12 +4824,14 @@ impl binaryEval {
 		mut prefix := self.e.prefix
 		self.e.prefix = l.Type
 		defer { self.e.prefix = prefix }
-		mut r := self.e.evalExpr1(op.Right)
+		mut r := self.e.evalExpr1(op.Right, evalDefault)
 		if r == nil || r.Type == nil {
 			ret nil
 		}
 
 		self.op = op.Op
+		self.lt = op.Left.Token
+		self.rt = op.Right.Token
 
 		mut v := self.solveExplicit(l, r)
 
@@ -4574,40 +4856,6 @@ fn findDirective(mut &directives: []&ast::Directive, d: build::Directive): &ast:
 
 fn findBuiltinsImport(&ident: str, imp: &ImportInfo): any {
 	ret findPackageBuiltinDef(imp.LinkPath, ident)
-}
-
-// If current type is not enough to store constant data, update to minimum type
-// that can store constant data. This function designed for numerical types only.
-// Data should be numerical constant of course. Also fits types for integers.
-// If data is signed but kind is unsigned, type will be fit to signed and same
-// thing for unsigned data and signed kinds.
-fn fitBitsize(mut &v: &Value) {
-	mut prim := v.Type.Prim()
-	z := types::BitSizeOf(prim.Str())
-	match {
-	| v.Constant.IsI64():
-		k := types::BitSizeOfInt(v.Constant.ReadI64())
-		if k > z || types::IsUnsigInt(prim.Kind) {
-			v.Constant.Kind = types::IntFromBits(k)
-			v.Type = findBuiltinTypeAlias(v.Constant.Kind).TypeSym.Type
-		}
-	| v.Constant.IsU64():
-		k := types::BitSizeOfUint(v.Constant.ReadU64())
-		if k > z || types::IsSigInt(prim.Kind) {
-			v.Constant.Kind = types::UintFromBits(k)
-			v.Type = findBuiltinTypeAlias(v.Constant.Kind).TypeSym.Type
-		}
-	| v.Constant.IsF64():
-		if z == 1<<6 {
-			// z is already equals to biggest bitsize.
-			ret
-		}
-		k := types::BitSizeOfFloat(v.Constant.ReadF64())
-		if k > z {
-			v.Constant.Kind = types::FloatFromBits(k)
-			v.Type = findBuiltinTypeAlias(v.Constant.Kind).TypeSym.Type
-		}
-	}
 }
 
 fn makeStructLitAlloc(mut &v: &Value, mut &lit: &StructLitExpr) {
@@ -4652,20 +4900,34 @@ fn findBuiltinsSema(&ident: str, mut s: &sema): any {
 }
 
 fn isOkForShifting(mut &v: &Value): bool {
-	if v.IsConst() {
-		match {
-		| v.Constant.IsI64():
-			ret v.Constant.ReadI64() >= 0
-		| v.Constant.IsU64():
-			ret true
-		| v.Constant.IsF64():
-			ret v.Constant.ReadF64() >= 0
-		|:
+	if !v.untyped || !v.IsConst() {
+		prim := v.Type.Prim()
+		ret prim != nil && types::IsInt(prim.Str())
+	}
+	max := types::MaxU(types::Kind.Uint)
+	match {
+	| v.Constant.IsInt():
+		i := v.Constant.ReadInt()
+		if i.Sign() == -1 {
 			ret false
 		}
+		if !i.IsU64() {
+			ret false
+		}
+		x := i.U64()
+		ret x <= max
+	| v.Constant.IsF64():
+		f := v.Constant.ReadF64()
+		if f < 0 {
+			ret false
+		}
+		i, frac := math::Modf(f)
+		if frac != 0 {
+			ret false
+		}
+		ret u64(i) <= max
 	}
-	prim := v.Type.Prim()
-	ret prim != nil && types::IsInt(prim.Str())
+	ret false
 }
 
 fn isInstancedStruct(s: &StructIns): bool {
@@ -4867,17 +5129,6 @@ fn pushSubIdentFromExpr(mut expr: ast::ExprData, mut &t: &ast::SubIdentType): bo
 	ret true
 }
 
-fn constoa(&c: &constant::Const): str {
-	match {
-	| c.IsI64():
-		ret conv::FormatInt(c.ReadI64(), 10)
-	| c.IsU64():
-		ret conv::FormatUint(c.ReadU64(), 10)
-	|:
-		ret ""
-	}
-}
-
 fn evalEnumStatic(mut &s: &sema, mut &enm: &Enum, mut &item: &EnumItem,
 	mut &token: &token::Token, mut refers: &ReferenceStack): &Value {
 	mut v := &Value{
@@ -4966,4 +5217,34 @@ fn findNamespace(mut lookup: Lookup, namespace: str): &ImportInfo {
 	ret lookup.SelectPackage(fn(imp: &ImportInfo): bool {
 		ret imp.Alias == namespace && !isImplicitImport(imp)
 	})
+}
+
+// Checks value by flags.
+fn checkValue(mut v: &Value, mut s: &sema, mut token: &token::Token, flags: int): (ok: bool) {
+	// Catch arbitrary integers with no type.
+	// In order for this value to be assigned to memory,
+	// we need to make sure that it can fit at least the largest integer type.
+	if flags&evalPhysicalMem == evalPhysicalMem {
+		if v.untyped && v.IsConst() && v.Constant.IsInt() {
+			i := v.Constant.ReadInt()
+			if !i.IsI64() && !i.IsU64() {
+				s.pushErr(token, build::LogMsg.UntypedNumericForPhysical, i.Str())
+				ret false
+			}
+		}
+	}
+	ret true
+}
+
+fn getUntypedCmpScore(k: str): int {
+	if types::IsInt(k) {
+		ret 1
+	}
+	if types::IsFloat(k) {
+		ret 2
+	}
+	if k == types::Kind.Str {
+		ret 3
+	}
+	ret -1
 }
