@@ -1,0 +1,742 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/math/bits"
+use "std/mem"
+use "std/testing"
+
+#test
+fn testUintSize(t: &testing::T) {
+	let mut x: uint
+	want := mem::SizeOf(x) * 8
+	if bits::UintSize != want {
+		t.Errorf("UintSize = {}; want {}", bits::UintSize, want)
+		panic("")
+	}
+}
+
+#test
+fn testLeadingZeros(t: &testing::T) {
+	mut i := 0
+	for i < 256; i++ {
+		nlz := tab[i].nlz
+		mut k := 0
+		for k < 64-8; k++ {
+			x := u64(i) << uint(k)
+			if x <= 1<<8-1 {
+				got := bits::LeadingZeros8(u8(x))
+				mut want := nlz - k + (8 - 8)
+				if x == 0 {
+					want = 8
+				}
+				if got != want {
+					t.Errorf("LeadingZeros8({}) == {}; want {}", x, got, want)
+				}
+			}
+
+			if x <= 1<<16-1 {
+				got := bits::LeadingZeros16(u16(x))
+				mut want := nlz - k + (16 - 8)
+				if x == 0 {
+					want = 16
+				}
+				if got != want {
+					t.Errorf("LeadingZeros16({}) == {}; want {}", x, got, want)
+				}
+			}
+
+			if x <= 1<<32-1 {
+				mut got := bits::LeadingZeros32(u32(x))
+				mut want := nlz - k + (32 - 8)
+				if x == 0 {
+					want = 32
+				}
+				if got != want {
+					t.Errorf("LeadingZeros32({}) == {}; want {}", x, got, want)
+				}
+				if bits::UintSize == 32 {
+					got = bits::LeadingZeros(uint(x))
+					if got != want {
+						t.Errorf("LeadingZeros({}) == {}; want {}", x, got, want)
+					}
+				}
+			}
+
+			if x <= 1<<64-1 {
+				mut got := bits::LeadingZeros64(u64(x))
+				mut want := nlz - k + (64 - 8)
+				if x == 0 {
+					want = 64
+				}
+				if got != want {
+					t.Errorf("LeadingZeros64({}) == {}; want {}", x, got, want)
+				}
+				if bits::UintSize == 64 {
+					got = bits::LeadingZeros(uint(x))
+					if got != want {
+						t.Errorf("LeadingZeros({}) == {}; want {}", x, got, want)
+					}
+				}
+			}
+		}
+	}
+}
+
+#test
+fn testTrailingZeros(t: &testing::T) {
+	mut i := 0
+	for i < 256; i++ {
+		ntz := tab[i].ntz
+		mut k := 0
+		for k < 64-8; k++ {
+			x := u64(i) << uint(k)
+			mut want := ntz + k
+			if x <= 1<<8-1 {
+				got := bits::TrailingZeros8(u8(x))
+				if x == 0 {
+					want = 8
+				}
+				if got != want {
+					t.Errorf("TrailingZeros8({}) == {}; want {}", x, got, want)
+				}
+			}
+
+			if x <= 1<<16-1 {
+				got := bits::TrailingZeros16(u16(x))
+				if x == 0 {
+					want = 16
+				}
+				if got != want {
+					t.Errorf("TrailingZeros16({}) == {}; want {}", x, got, want)
+				}
+			}
+
+			if x <= 1<<32-1 {
+				mut got := bits::TrailingZeros32(u32(x))
+				if x == 0 {
+					want = 32
+				}
+				if got != want {
+					t.Errorf("TrailingZeros32({}) == {}; want {}", x, got, want)
+				}
+				if bits::UintSize == 32 {
+					got = bits::TrailingZeros(uint(x))
+					if got != want {
+						t.Errorf("TrailingZeros({}) == {}; want {}", x, got, want)
+					}
+				}
+			}
+
+			if x <= 1<<64-1 {
+				mut got := bits::TrailingZeros64(u64(x))
+				if x == 0 {
+					want = 64
+				}
+				if got != want {
+					t.Errorf("TrailingZeros64({}) == {}; want {}", x, got, want)
+				}
+				if bits::UintSize == 64 {
+					got = bits::TrailingZeros(uint(x))
+					if got != want {
+						t.Errorf("TrailingZeros({}) == {}; want {}", x, got, want)
+					}
+				}
+			}
+		}
+	}
+}
+
+fn _testOnesCount(t: &testing::T, x: u64, want: int) {
+	if x <= 1<<8-1 {
+		got := bits::OnesCount8(u8(x))
+		if got != want {
+			t.Errorf("OnesCount8({}) == {}; want {}", u8(x), got, want)
+		}
+	}
+
+	if x <= 1<<16-1 {
+		got := bits::OnesCount16(u16(x))
+		if got != want {
+			t.Errorf("OnesCount16({}) == {}; want {}", u16(x), got, want)
+		}
+	}
+
+	if x <= 1<<32-1 {
+		mut got := bits::OnesCount32(u32(x))
+		if got != want {
+			t.Errorf("OnesCount32({}) == {}; want {}", u32(x), got, want)
+		}
+		if bits::UintSize == 32 {
+			got = bits::OnesCount(uint(x))
+			if got != want {
+				t.Errorf("OnesCount({}) == {}; want {}", u32(x), got, want)
+			}
+		}
+	}
+
+	if x <= 1<<64-1 {
+		mut got := bits::OnesCount64(u64(x))
+		if got != want {
+			t.Errorf("OnesCount64({}) == {}; want {}", x, got, want)
+		}
+		if bits::UintSize == 64 {
+			got = bits::OnesCount(uint(x))
+			if got != want {
+				t.Errorf("OnesCount({}) == {}; want {}", x, got, want)
+			}
+		}
+	}
+}
+
+#test
+fn testOnesCount(t: &testing::T) {
+	let mut x: u64
+	mut i := 0
+	for i <= 64; i++ {
+		_testOnesCount(t, x, i)
+		x = x<<1 | 1
+	}
+
+	i = 64
+	for i >= 0; i-- {
+		_testOnesCount(t, x, i)
+		x = x << 1
+	}
+
+	i = 0
+	for i < 256; i++ {
+		mut k := 0
+		for k < 64-8; k++ {
+			_testOnesCount(t, u64(i)<<uint(k), tab[i].pop)
+		}
+	}
+}
+
+#test
+fn testRotateLeft(t: &testing::T) {
+	let m: u64 = bits::DeBruijn64
+
+	mut k := uint(0)
+	for k < 128; k++ {
+		x8 := u8(m)
+		mut got8 := bits::RotateLeft8(x8, int(k))
+		want8 := x8<<(k&0x7) | x8>>(8-k&0x7)
+		if got8 != want8 {
+			t.Errorf("RotateLeft8({}, {}) == {}; want {}", x8, k, got8, want8)
+		}
+		got8 = bits::RotateLeft8(want8, -int(k))
+		if got8 != x8 {
+			t.Errorf("RotateLeft8({}, -{}) == {}; want {}", want8, k, got8, x8)
+		}
+
+		x16 := u16(m)
+		mut got16 := bits::RotateLeft16(x16, int(k))
+		want16 := x16<<(k&0xf) | x16>>(16-k&0xf)
+		if got16 != want16 {
+			t.Errorf("RotateLeft16({}, {}) == {}; want {}", x16, k, got16, want16)
+		}
+		got16 = bits::RotateLeft16(want16, -int(k))
+		if got16 != x16 {
+			t.Errorf("RotateLeft16({}, -{}) == {}; want {}", want16, k, got16, x16)
+		}
+
+		x32 := u32(m)
+		mut got32 := bits::RotateLeft32(x32, int(k))
+		want32 := x32<<(k&0x1f) | x32>>(32-k&0x1f)
+		if got32 != want32 {
+			t.Errorf("RotateLeft32({}, {}) == {}; want {}", x32, k, got32, want32)
+		}
+		got32 = bits::RotateLeft32(want32, -int(k))
+		if got32 != x32 {
+			t.Errorf("RotateLeft32({}, -{}) == {}; want {}", want32, k, got32, x32)
+		}
+		if bits::UintSize == 32 {
+			x := uint(m)
+			mut got := bits::RotateLeft(x, int(k))
+			want := x<<(k&0x1f) | x>>(32-k&0x1f)
+			if got != want {
+				t.Errorf("RotateLeft({}, {}) == {}; want {}", x, k, got, want)
+			}
+			got = bits::RotateLeft(want, -int(k))
+			if got != x {
+				t.Errorf("RotateLeft({}, -{}) == {}; want {}", want, k, got, x)
+			}
+		}
+
+		x64 := u64(m)
+		mut got64 := bits::RotateLeft64(x64, int(k))
+		want64 := x64<<(k&0x3f) | x64>>(64-k&0x3f)
+		if got64 != want64 {
+			t.Errorf("RotateLeft64({}, {}) == {}; want {}", x64, k, got64, want64)
+		}
+		got64 = bits::RotateLeft64(want64, -int(k))
+		if got64 != x64 {
+			t.Errorf("RotateLeft64({}, -{}) == {}; want {}", want64, k, got64, x64)
+		}
+		if bits::UintSize == 64 {
+			x := uint(m)
+			mut got := bits::RotateLeft(x, int(k))
+			want := x<<(k&0x3f) | x>>(64-k&0x3f)
+			if got != want {
+				t.Errorf("RotateLeft({}, {}) == {}; want {}", x, k, got, want)
+			}
+			got = bits::RotateLeft(want, -int(k))
+			if got != x {
+				t.Errorf("RotateLeft({}, -{}) == {}; want {}", want, k, got, x)
+			}
+		}
+	}
+}
+
+struct reverseTest {
+	x: u64
+	r: u64
+}
+
+#test
+fn testReverse(t: &testing::T) {
+	// test each bit
+	mut i := uint(0)
+	for i < 64; i++ {
+		_testReverse(t, u64(1)<<i, u64(1)<<(63-i))
+	}
+
+	// test a few patterns
+	for _, test in []reverseTest([
+		{0, 0},
+		{0x1, 0x8 << 60},
+		{0x2, 0x4 << 60},
+		{0x3, 0xc << 60},
+		{0x4, 0x2 << 60},
+		{0x5, 0xa << 60},
+		{0x6, 0x6 << 60},
+		{0x7, 0xe << 60},
+		{0x8, 0x1 << 60},
+		{0x9, 0x9 << 60},
+		{0xa, 0x5 << 60},
+		{0xb, 0xd << 60},
+		{0xc, 0x3 << 60},
+		{0xd, 0xb << 60},
+		{0xe, 0x7 << 60},
+		{0xf, 0xf << 60},
+		{0x5686487, 0xe12616a000000000},
+		{0x0123456789abcdef, 0xf7b3d591e6a2c480},
+	]) {
+		_testReverse(t, test.x, test.r)
+		_testReverse(t, test.r, test.x)
+	}
+}
+
+fn _testReverse(t: &testing::T, x64: u64, want64: u64) {
+	x8 := u8(x64)
+	got8 := bits::Reverse8(x8)
+	want8 := u8(want64 >> (64 - 8))
+	if got8 != want8 {
+		t.Errorf("Reverse8({}) == {}; want {}", x8, got8, want8)
+	}
+
+	x16 := u16(x64)
+	got16 := bits::Reverse16(x16)
+	want16 := u16(want64 >> (64 - 16))
+	if got16 != want16 {
+		t.Errorf("Reverse16({}) == {}; want {}", x16, got16, want16)
+	}
+
+	x32 := u32(x64)
+	got32 := bits::Reverse32(x32)
+	want32 := u32(want64 >> (64 - 32))
+	if got32 != want32 {
+		t.Errorf("Reverse32({}) == {}; want {}", x32, got32, want32)
+	}
+	if bits::UintSize == 32 {
+		x := uint(x32)
+		got := bits::Reverse(x)
+		want := uint(want32)
+		if got != want {
+			t.Errorf("Reverse({}) == {}; want {}", x, got, want)
+		}
+	}
+
+	got64 := bits::Reverse64(x64)
+	if got64 != want64 {
+		t.Errorf("Reverse64({}) == {}; want {}", x64, got64, want64)
+	}
+	if bits::UintSize == 64 {
+		x := uint(x64)
+		got := bits::Reverse(x)
+		want := uint(want64)
+		if got != want {
+			t.Errorf("Reverse({}) == {}; want {}", x, got, want)
+		}
+	}
+}
+
+#test
+fn testLen(t: &testing::T) {
+	mut i := 0
+	for i < 256; i++ {
+		len := 8 - tab[i].nlz
+		mut k := 0
+		for k < 64-8; k++ {
+			x := u64(i) << uint(k)
+			mut want := 0
+			if x != 0 {
+				want = len + k
+			}
+			if x <= 1<<8-1 {
+				got8 := bits::Len8(u8(x))
+				if got8 != want {
+					t.Errorf("Len8({}) == {}; want {}", x, got8, want)
+				}
+			}
+
+			if x <= 1<<16-1 {
+				got16 := bits::Len16(u16(x))
+				if got16 != want {
+					t.Errorf("Len16({}) == {}; want {}", x, got16, want)
+				}
+			}
+
+			if x <= 1<<32-1 {
+				mut got := bits::Len32(u32(x))
+				if got != want {
+					t.Errorf("Len32({}) == {}; want {}", x, got, want)
+				}
+				if bits::UintSize == 32 {
+					got32 := bits::Len(uint(x))
+					if got32 != want {
+						t.Errorf("Len({}) == {}; want {}", x, got32, want)
+					}
+				}
+			}
+
+			if x <= 1<<64-1 {
+				got := bits::Len64(u64(x))
+				if got != want {
+					t.Errorf("Len64({}) == {}; want {}", x, got, want)
+				}
+				if bits::UintSize == 64 {
+					got64 := bits::Len(uint(x))
+					if got64 != want {
+						t.Errorf("Len({}) == {}; want {}", x, got64, want)
+					}
+				}
+			}
+		}
+	}
+}
+
+const _M = 1<<bits::UintSize - 1
+const _M32 = 1<<32 - 1
+const _M64 = 1<<64 - 1
+
+struct addSubUintTest {
+	x:    uint
+	y:    uint
+	c:    uint
+	z:    uint
+	cout: uint
+}
+
+#test
+fn testAddSubUint(t: &testing::T) {
+	test := fn(msg: str, f: fn(x: uint, y: uint, c: uint): (z: uint, cout: uint), x: uint, y: uint, c: uint, z: uint, cout: uint) {
+		z1, cout1 := f(x, y, c)
+		if z1 != z || cout1 != cout {
+			t.Errorf("{}: got z:cout = {}:{}; want {}:{}", msg, z1, cout1, z, cout)
+		}
+	}
+	for _, a in []addSubUintTest([
+		{0, 0, 0, 0, 0},
+		{0, 1, 0, 1, 0},
+		{0, 0, 1, 1, 0},
+		{0, 1, 1, 2, 0},
+		{12345, 67890, 0, 80235, 0},
+		{12345, 67890, 1, 80236, 0},
+		{_M, 1, 0, 0, 1},
+		{_M, 0, 1, 0, 1},
+		{_M, 1, 1, 1, 1},
+		{_M, _M, 0, _M - 1, 1},
+		{_M, _M, 1, _M, 1},
+	]) {
+		test("Add", bits::Add, a.x, a.y, a.c, a.z, a.cout)
+		test("Add symmetric", bits::Add, a.y, a.x, a.c, a.z, a.cout)
+		test("Sub", bits::Sub, a.z, a.x, a.c, a.y, a.cout)
+		test("Sub symmetric", bits::Sub, a.z, a.y, a.c, a.x, a.cout)
+		// The above code can't test intrinsic implementation, because the passed function is not called directly.
+		// The following code uses a closure to test the intrinsic version in case the function is intrinsified.
+		test("Add intrinsic", fn(x: uint, y: uint, c: uint): (uint, uint) { ret bits::Add(x, y, c) }, a.x, a.y, a.c, a.z, a.cout)
+		test("Add intrinsic symmetric", fn(x: uint, y: uint, c: uint): (uint, uint) { ret bits::Add(x, y, c) }, a.y, a.x, a.c, a.z, a.cout)
+		test("Sub intrinsic", fn(x: uint, y: uint, c: uint): (uint, uint) { ret bits::Sub(x, y, c) }, a.z, a.x, a.c, a.y, a.cout)
+		test("Sub intrinsic symmetric", fn(x: uint, y: uint, c: uint): (uint, uint) { ret bits::Sub(x, y, c) }, a.z, a.y, a.c, a.x, a.cout)
+	}
+}
+
+struct addSubU32Test {
+	x:    u32
+	y:    u32
+	c:    u32
+	z:    u32
+	cout: u32
+}
+
+#test
+fn testAddSubUint32(t: &testing::T) {
+	test := fn(msg: str, f: fn(x: u32, y: u32, c: u32): (z: u32, cout: u32), x: u32, y: u32, c: u32, z: u32, cout: u32) {
+		z1, cout1 := f(x, y, c)
+		if z1 != z || cout1 != cout {
+			t.Errorf("{}: got z:cout = {}:{}; want {}:{}", msg, z1, cout1, z, cout)
+		}
+	}
+	for _, a in []addSubU32Test([
+		{0, 0, 0, 0, 0},
+		{0, 1, 0, 1, 0},
+		{0, 0, 1, 1, 0},
+		{0, 1, 1, 2, 0},
+		{12345, 67890, 0, 80235, 0},
+		{12345, 67890, 1, 80236, 0},
+		{_M32, 1, 0, 0, 1},
+		{_M32, 0, 1, 0, 1},
+		{_M32, 1, 1, 1, 1},
+		{_M32, _M32, 0, _M32 - 1, 1},
+		{_M32, _M32, 1, _M32, 1},
+	]) {
+		test("Add32", bits::Add32, a.x, a.y, a.c, a.z, a.cout)
+		test("Add32 symmetric", bits::Add32, a.y, a.x, a.c, a.z, a.cout)
+		test("Sub32", bits::Sub32, a.z, a.x, a.c, a.y, a.cout)
+		test("Sub32 symmetric", bits::Sub32, a.z, a.y, a.c, a.x, a.cout)
+	}
+}
+
+struct addSubU64Test {
+	x:    u64
+	y:    u64
+	c:    u64
+	z:    u64
+	cout: u64
+}
+
+#test
+fn testAddSubUint64(t: &testing::T) {
+	test := fn(msg: str, f: fn(x: u64, y: u64, c: u64): (z: u64, cout: u64), x: u64, y: u64, c: u64, z: u64, cout: u64) {
+		z1, cout1 := f(x, y, c)
+		if z1 != z || cout1 != cout {
+			t.Errorf("{}: got z:cout = {}:{}; want {}:{}", msg, z1, cout1, z, cout)
+		}
+	}
+	for _, a in []addSubU64Test([
+		{0, 0, 0, 0, 0},
+		{0, 1, 0, 1, 0},
+		{0, 0, 1, 1, 0},
+		{0, 1, 1, 2, 0},
+		{12345, 67890, 0, 80235, 0},
+		{12345, 67890, 1, 80236, 0},
+		{_M64, 1, 0, 0, 1},
+		{_M64, 0, 1, 0, 1},
+		{_M64, 1, 1, 1, 1},
+		{_M64, _M64, 0, _M64 - 1, 1},
+		{_M64, _M64, 1, _M64, 1},
+	]) {
+		test("Add64", bits::Add64, a.x, a.y, a.c, a.z, a.cout)
+		test("Add64 symmetric", bits::Add64, a.y, a.x, a.c, a.z, a.cout)
+		test("Sub64", bits::Sub64, a.z, a.x, a.c, a.y, a.cout)
+		test("Sub64 symmetric", bits::Sub64, a.z, a.y, a.c, a.x, a.cout)
+		// The above code can't test intrinsic implementation, because the passed function is not called directly.
+		// The following code uses a closure to test the intrinsic version in case the function is intrinsified.
+		test("Add64 intrinsic", fn(x: u64, y: u64, c: u64): (u64, u64) { ret bits::Add64(x, y, c) }, a.x, a.y, a.c, a.z, a.cout)
+		test("Add64 intrinsic symmetric", fn(x: u64, y: u64, c: u64): (u64, u64) { ret bits::Add64(x, y, c) }, a.y, a.x, a.c, a.z, a.cout)
+		test("Sub64 intrinsic", fn(x: u64, y: u64, c: u64): (u64, u64) { ret bits::Sub64(x, y, c) }, a.z, a.x, a.c, a.y, a.cout)
+		test("Sub64 intrinsic symmetric", fn(x: u64, y: u64, c: u64): (u64, u64) { ret bits::Sub64(x, y, c) }, a.z, a.y, a.c, a.x, a.cout)
+	}
+}
+
+struct mulDivTest {
+	x:  uint
+	y:  uint
+	hi: uint
+	lo: uint
+	r:  uint
+}
+
+#test
+fn testMulDiv(t: &testing::T) {
+	testMul := fn(msg: str, f: fn(x: uint, y: uint): (hi: uint, lo: uint), x: uint, y: uint, hi: uint, lo: uint) {
+		hi1, lo1 := f(x, y)
+		if hi1 != hi || lo1 != lo {
+			t.Errorf("{}: got hi:lo = {}:{}; want {}:{}", msg, hi1, lo1, hi, lo)
+		}
+	}
+	testDiv := fn(msg: str, f: fn(hi: uint, lo: uint, y: uint): (q: uint, r: uint), hi: uint, lo: uint, y: uint, q: uint, r: uint) {
+		q1, r1 := f(hi, lo, y)
+		if q1 != q || r1 != r {
+			t.Errorf("{}: got q:r = {}:{}; want {}:{}", msg, q1, r1, q, r)
+		}
+	}
+	for _, a in []mulDivTest([
+		{1 << (bits::UintSize - 1), 2, 1, 0, 1},
+		{_M, _M, _M - 1, 1, 42},
+	]) {
+		testMul("Mul", bits::Mul, a.x, a.y, a.hi, a.lo)
+		testMul("Mul symmetric", bits::Mul, a.y, a.x, a.hi, a.lo)
+		testDiv("Div", bits::Div, a.hi, a.lo+a.r, a.y, a.x, a.r)
+		testDiv("Div symmetric", bits::Div, a.hi, a.lo+a.r, a.x, a.y, a.r)
+		// The above code can't test intrinsic implementation, because the passed function is not called directly.
+		// The following code uses a closure to test the intrinsic version in case the function is intrinsified.
+		testMul("Mul intrinsic", fn(x: uint, y: uint): (uint, uint) { ret bits::Mul(x, y) }, a.x, a.y, a.hi, a.lo)
+		testMul("Mul intrinsic symmetric", fn(x: uint, y: uint): (uint, uint) { ret bits::Mul(x, y) }, a.y, a.x, a.hi, a.lo)
+		testDiv("Div intrinsic", fn(hi: uint, lo: uint, y: uint): (uint, uint) { ret bits::Div(hi, lo, y) }, a.hi, a.lo+a.r, a.y, a.x, a.r)
+		testDiv("Div intrinsic symmetric", fn(hi: uint, lo: uint, y: uint): (uint, uint) { ret bits::Div(hi, lo, y) }, a.hi, a.lo+a.r, a.x, a.y, a.r)
+	}
+}
+
+struct mulDivTestU32 {
+	x:  u32
+	y:  u32
+	hi: u32
+	lo: u32
+	r:  u32
+}
+
+#test
+fn testMulDiv32(t: &testing::T) {
+	testMul := fn(msg: str, f: fn(x: u32, y: u32): (hi: u32, lo: u32), x: u32, y: u32, hi: u32, lo: u32) {
+		hi1, lo1 := f(x, y)
+		if hi1 != hi || lo1 != lo {
+			t.Errorf("{}: got hi:lo = {}:{}; want {}:{}", msg, hi1, lo1, hi, lo)
+		}
+	}
+	testDiv := fn(msg: str, f: fn(hi: u32, lo: u32, y: u32): (q: u32, r: u32), hi: u32, lo: u32, y: u32, q: u32, r: u32) {
+		q1, r1 := f(hi, lo, y)
+		if q1 != q || r1 != r {
+			t.Errorf("{}: got q:r = {}:{}; want {}:{}", msg, q1, r1, q, r)
+		}
+	}
+	for _, a in []mulDivTestU32([
+		{1 << 31, 2, 1, 0, 1},
+		{0xc47dfa8c, 50911, 0x98a4, 0x998587f4, 13},
+		{_M32, _M32, _M32 - 1, 1, 42},
+	]) {
+		testMul("Mul32", bits::Mul32, a.x, a.y, a.hi, a.lo)
+		testMul("Mul32 symmetric", bits::Mul32, a.y, a.x, a.hi, a.lo)
+		testDiv("Div32", bits::Div32, a.hi, a.lo+a.r, a.y, a.x, a.r)
+		testDiv("Div32 symmetric", bits::Div32, a.hi, a.lo+a.r, a.x, a.y, a.r)
+	}
+}
+
+struct mulDivTestU64 {
+	x:  u64
+	y:  u64
+	hi: u64
+	lo: u64
+	r:  u64
+}
+
+#test
+fn testMulDiv64(t: &testing::T) {
+	testMul := fn(msg: str, f: fn(x: u64, y: u64): (hi: u64, lo: u64), x: u64, y: u64, hi: u64, lo: u64) {
+		hi1, lo1 := f(x, y)
+		if hi1 != hi || lo1 != lo {
+			t.Errorf("{}: got hi:lo = {}:{}; want {}:{}", msg, hi1, lo1, hi, lo)
+		}
+	}
+	testDiv := fn(msg: str, f: fn(hi: u64, lo: u64, y: u64): (q: u64, r: u64), hi: u64, lo: u64, y: u64, q: u64, r: u64) {
+		q1, r1 := f(hi, lo, y)
+		if q1 != q || r1 != r {
+			t.Errorf("{}: got q:r = {}:{}; want {}:{}", msg, q1, r1, q, r)
+		}
+	}
+	for _, a in []mulDivTestU64([
+		{1 << 63, 2, 1, 0, 1},
+		{0x3626229738a3b9, 0xd8988a9f1cc4a61, 0x2dd0712657fe8, 0x9dd6a3364c358319, 13},
+		{_M64, _M64, _M64 - 1, 1, 42},
+	]) {
+		testMul("Mul64", bits::Mul64, a.x, a.y, a.hi, a.lo)
+		testMul("Mul64 symmetric", bits::Mul64, a.y, a.x, a.hi, a.lo)
+		testDiv("Div64", bits::Div64, a.hi, a.lo+a.r, a.y, a.x, a.r)
+		testDiv("Div64 symmetric", bits::Div64, a.hi, a.lo+a.r, a.x, a.y, a.r)
+		// The above code can't test intrinsic implementation, because the passed function is not called directly.
+		// The following code uses a closure to test the intrinsic version in case the function is intrinsified.
+		testMul("Mul64 intrinsic", fn(x: u64, y: u64): (u64, u64) { ret bits::Mul64(x, y) }, a.x, a.y, a.hi, a.lo)
+		testMul("Mul64 intrinsic symmetric", fn(x: u64, y: u64): (u64, u64) { ret bits::Mul64(x, y) }, a.y, a.x, a.hi, a.lo)
+		testDiv("Div64 intrinsic", fn(hi: u64, lo: u64, y: u64): (u64, u64) { ret bits::Div64(hi, lo, y) }, a.hi, a.lo+a.r, a.y, a.x, a.r)
+		testDiv("Div64 intrinsic symmetric", fn(hi: u64, lo: u64, y: u64): (u64, u64) { ret bits::Div64(hi, lo, y) }, a.hi, a.lo+a.r, a.x, a.y, a.r)
+	}
+}
+
+#test
+fn testRem32(t: &testing::T) {
+	// Sanity check: for non-overflowing dividends, the result is the
+	// same as the rem returned by Div32
+	hi, lo, mut y := u32(510510), u32(9699690), u32(510510+1) // ensure hi < y
+	mut i := 0
+	for i < 1000; i++ {
+		r := bits::Rem32(hi, lo, y)
+		_, r2 := bits::Div32(hi, lo, y)
+		if r != r2 {
+			t.Errorf("Rem32({}, {}, {}) returned {}, but Div32 returned rem {}", hi, lo, y, r, r2)
+		}
+		y += 13
+	}
+}
+
+#test
+fn testRem64(t: &testing::T) {
+	// Sanity check: for non-overflowing dividends, the result is the
+	// same as the rem returned by Div64
+	hi, lo, mut y := u64(510510), u64(9699690), u64(510510+1) // ensure hi < y
+	mut i := 0
+	for i < 1000; i++ {
+		r := bits::Rem64(hi, lo, y)
+		_, r2 := bits::Div64(hi, lo, y)
+		if r != r2 {
+			t.Errorf("Rem64({}, {}, {}) returned {}, but Div64 returned rem {}", hi, lo, y, r, r2)
+		}
+		y += 13
+	}
+}
+
+// ----------------------------------------------------------------------------
+// Testing support
+
+struct entry {
+	nlz: int
+	ntz: int
+	pop: int
+}
+
+// tab contains results for all uint8 values
+static mut tab: [256]entry = []
+
+fn init() {
+	tab[0] = entry{8, 8, 0}
+	mut i := 1
+	for i < len(tab); i++ {
+		// nlz
+		mut x := i // x != 0
+		mut n := 0
+		for x&0x80 == 0 {
+			n++
+			x <<= 1
+		}
+		tab[i].nlz = n
+
+		// ntz
+		x = i // x != 0
+		n = 0
+		for x&1 == 0 {
+			n++
+			x >>= 1
+		}
+		tab[i].ntz = n
+
+		// pop
+		x = i // x != 0
+		n = 0
+		for x != 0 {
+			n += int(x & 1)
+			x >>= 1
+		}
+		tab[i].pop = n
+	}
+}
