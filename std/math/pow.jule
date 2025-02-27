@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 // The Jule code is a modified version of the original Go code from
-// https://github.com/golang/go/blob/go1.19/src/math/pow.go and came with this notice.
+// https://github.com/golang/go/blob/go1.23.0/src/math/pow.go and came with this notice.
 //
 // ====================================================
 // Copyright (c) 2009 The Go Authors. All rights reserved.
@@ -41,6 +41,7 @@
 // Returns x**y, the base-x exponential of y.
 //
 // Special cases are (in order):
+//
 //	Pow(x, ±0) = 1 for any x
 //	Pow(1, y) = 1 for any y
 //	Pow(x, 1) = x for any x
@@ -63,21 +64,21 @@
 //	Pow(x, y) = NaN for finite x < 0 and finite non-integer y
 fn Pow(x: f64, y: f64): f64 {
 	match {
-	| y == 0 | x == 1:
+	| y == 0 || x == 1:
 		ret 1
 	| y == 1:
 		ret x
-	| IsNaN(x) | IsNaN(y):
+	| IsNaN(x) || IsNaN(y):
 		ret NaN()
 	| x == 0:
 		match {
 		| y < 0:
-			if isOddInt(y) {
-				ret Copysign(Inf(1), x)
+			if Signbit(x) && isOddInt(y) {
+				ret Inf(-1)
 			}
 			ret Inf(1)
 		| y > 0:
-			if isOddInt(y) {
+			if Signbit(x) && isOddInt(y) {
 				ret x
 			}
 			ret 0
@@ -111,7 +112,7 @@ fn Pow(x: f64, y: f64): f64 {
 	if yf != 0 && x < 0 {
 		ret NaN()
 	}
-	if yi >= 1<<63 {
+	if yi >= 9.223372036854776e+18 {
 		// yi is a large even int that will lead to overflow (or underflow to 0)
 		// for all x except -1 (x == 1 was handled earlier)
 		match {
@@ -159,7 +160,7 @@ fn Pow(x: f64, y: f64): f64 {
 		}
 		x1 *= x1
 		xe <<= 1
-		if x1 < 0.5 {
+		if x1 < .5 {
 			x1 += x1
 			xe--
 		}
@@ -176,6 +177,15 @@ fn Pow(x: f64, y: f64): f64 {
 }
 
 fn isOddInt(x: f64): bool {
+	if Abs(x) >= 9.007199254740992e+15 {
+		// 1 << 53 is the largest exact integer in the f64 format.
+		// Any number outside this range will be truncated before the decimal point and therefore will always be
+		// an even integer.
+		// Without this check and if x overflows i64 the i64(xi) conversion below may produce incorrect results
+		// on some architectures (and does so on arm64). See issue #57465 of Go.
+		ret false
+	}
+
 	xi, xf := Modf(x)
 	ret xf == 0 && i64(xi)&1 == 1
 }

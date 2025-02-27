@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 // The Jule code is a modified version of the original Go code from
-// https://github.com/golang/go/blob/go1.19/src/math/fma.go and came with this notice.
+// https://github.com/golang/go/blob/go1.23.0/src/math/fma.go and came with this notice.
 //
 // ====================================================
 // Copyright (c) 2009 The Go Authors. All rights reserved.
@@ -122,7 +122,7 @@ fn split(b: u64): (sign: u32, exp: i32, mantissa: u64) {
 fn FMA(x: f64, y: f64, z: f64): f64 {
 	bx, by, bz := F64Bits(x), F64Bits(y), F64Bits(z)
 
-	// inf or NaN or zero involved. At most one rounding will occur.
+	// Inf or NaN or zero involved. At most one rounding will occur.
 	if x == 0.0 || y == 0.0 || z == 0.0 || bx&uvinf == uvinf || by&uvinf == uvinf {
 		ret x*y + z
 	}
@@ -131,7 +131,6 @@ fn FMA(x: f64, y: f64, z: f64): f64 {
 	if bz&uvinf == uvinf {
 		ret z
 	}
-
 	// Inputs are (sub)normal.
 	// Split x, y, z into sign, exponent, mantissa.
 	xs, xe, xm := split(bx)
@@ -156,15 +155,20 @@ fn FMA(x: f64, y: f64, z: f64): f64 {
 
 	// Swap addition operands so |p| >= |z|
 	if pe < ze || pe == ze && pm1 < zm1 {
-		ps, pe, pm1, pm2, zs, ze, zm1, zm2 = zs, ze, zm1, zm2, ps, i32(pe), pm1, pm2
+		ps, pe, pm1, pm2, zs, ze, zm1, zm2 = zs, ze, zm1, zm2, ps, pe, pm1, pm2
+	}
+
+	// Special case: if p == -z the result is always +0 since neither operand is zero.
+	if ps != zs && pe == ze && pm1 == zm1 && pm2 == zm2 {
+		ret 0
 	}
 
 	// Align significands
 	zm1, zm2 = shrcompress(zm1, zm2, uint(pe-ze))
 
 	// Compute resulting significands, normalizing if necessary.
-	mut m := u64(0)
-	mut c := u64(0)
+	let mut m: u64
+	let mut c: u64
 	if ps == zs {
 		// Adding (pm1:pm2) + (zm1:zm2)
 		pm2, c = bits::Add64(pm2, zm2, 0)
@@ -173,6 +177,7 @@ fn FMA(x: f64, y: f64, z: f64): f64 {
 		pm1, m = shrcompress(pm1, pm2, uint(64+pm1>>63))
 	} else {
 		// Subtracting (pm1:pm2) - (zm1:zm2)
+		// TODO: should we special-case cancellation?
 		pm2, c = bits::Sub64(pm2, zm2, 0)
 		pm1, _ = bits::Sub64(pm1, zm1, c)
 		nz := lz(pm1, pm2)

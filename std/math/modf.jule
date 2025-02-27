@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 // The Jule code is a modified version of the original Go code from
-// https://github.com/golang/go/blob/go1.19/src/math/modf.go and came with this notice.
+// https://github.com/golang/go/blob/go1.23.0/src/math/modf.go and came with this notice.
 //
 // ====================================================
 // Copyright (c) 2009 The Go Authors. All rights reserved.
@@ -39,23 +39,29 @@
 // that sum to f. Both values have the same sign as f.
 //
 // Special cases are:
+//
 //	Modf(±Inf) = ±Inf, NaN
 //	Modf(NaN) = NaN, NaN
-fn Modf(f: f64): (integer: f64, frac: f64) {
-	const ModfMaxPowTwo = 4.503599627370496000e+15
-	absF := Abs(f)
-	mut i := 0.0
-	if absF > ModfMaxPowTwo {
-		i = f
-	} else {
-		i = absF + ModfMaxPowTwo
-		i -= ModfMaxPowTwo
-		for i > absF {
-			i--
+fn Modf(f: f64): (i: f64, frac: f64) {
+	if f < 1 {
+		match {
+		| f < 0:
+			i, frac = Modf(-f)
+			ret -i, -frac
+		| f == 0:
+			ret f, f // Return -0, -0 when f == -0
 		}
-		if f < 0.0 {
-			i = -i
-		}
+		ret 0, f
 	}
-	ret i, f - i
+
+	mut x := F64Bits(f)
+	e := uint(x>>shift)&mask - bias
+
+	// Keep the top 12+e bits, the integer part; clear the rest.
+	if e < 64-12 {
+		x &= ^(1<<(64-12-e) - 1)
+	}
+	i = F64FromBits(x)
+	frac = f - i
+	ret
 }
