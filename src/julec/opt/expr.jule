@@ -610,37 +610,30 @@ impl exprOptimizer {
 
 		match m.Op.Id {
 		| token::Id.Star:
-			ok, x := checkForBitShiftOpt(m.Left, m.Right)
-			if ok {
-				m.Op = new(token::Token, *m.Op)
-				m.Op.Id = token::Id.Shl
-				m.Op.Kind = token::Kind.Shl
-				mut c := (&constant::Const)(m.Right.Model)
-				c.SetU64(x)
-				self.shift(m) // We should try to optimize new optimized shifting expression.
-				ret true
-			}
-		| token::Id.Solidus:
-			ok, x := checkForBitShiftOpt(m.Left, m.Right)
-			if ok {
-				m.Op = new(token::Token, *m.Op)
-				m.Op.Id = token::Id.Shr
-				m.Op.Kind = token::Kind.Shr
-				mut c := (&constant::Const)(m.Right.Model)
-				c.SetU64(x)
-				self.shift(m) // We should try to optimize new optimized shifting expression.
-				ret true
+			if types::IsInt(lp.Kind) && types::IsUnsigInt(rp.Kind) {
+				ok, x := checkForBitShiftOpt(m.Left, m.Right)
+				if ok {
+					m.Op = new(token::Token, *m.Op)
+					m.Op.Id = token::Id.Shl
+					m.Op.Kind = token::Kind.Shl
+					mut c := (&constant::Const)(m.Right.Model)
+					c.SetU64(x)
+					self.shift(m) // We should try to optimize new optimized shifting expression.
+					ret true
+				}
 			}
 		| token::Id.Percent:
-			mut c := (&constant::Const)(m.Right.Model)
-			if c.AsF64() == 0b10 {
-				m.Op = new(token::Token, *m.Op)
-				m.Op.Id = token::Id.Amper
-				m.Op.Kind = token::Kind.Amper
-				c.SetI64(1)
-				// No need to set model as UnsafeBinaryExpr,
-				// bitwise and is not checked at runtime, so it is optimize enough.
-				ret true
+			if types::IsUnsigInt(lp.Kind) {
+				mut c := (&constant::Const)(m.Right.Model)
+				if c.AsF64() == 0b10 {
+					m.Op = new(token::Token, *m.Op)
+					m.Op.Id = token::Id.Amper
+					m.Op.Kind = token::Kind.Amper
+					c.SetI64(1)
+					// No need to set model as UnsafeBinaryExpr,
+					// bitwise and is not checked at runtime, so it is optimize enough.
+					ret true
+				}
 			}
 		| token::Id.Shl | token::Id.Shr:
 			self.shift(m)
