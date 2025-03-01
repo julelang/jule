@@ -279,3 +279,21 @@ fn copyBuffer(mut dst: Writer, mut src: Reader, mut buf: []byte)!: (written: i64
 fn WriteStr(mut w: Writer, s: str)!: (n: int) {
 	ret w.Write([]byte(s)) else { error(error) }
 }
+
+// Reads from r until an error or EOF and returns the data it read.
+// A successful call throws no exception.
+fn ReadAll(mut r: Reader)!: []byte {
+	mut b := make([]byte, 0, 512)
+	for {
+		n := r.Read(b[len(b):cap(b)]) else { error(error) }
+		if n == 0 {
+			ret b
+		}
+		b = b[:len(b)+n]
+
+		if len(b) == cap(b) {
+			// Add more capacity (let append pick how much).
+			b = append(b, 0)[:len(b)]
+		}
+	}
+}
