@@ -953,21 +953,25 @@ fn findLowestPrecOp(&tokens: []&token::Token): int {
 	const MaxPrec = byte(255)
 	mut prec := MaxPrec
 	mut precPos := -1
+	mut op := true // Ready to read operator.
 
 	mut braceN := 0
 	mut skipToNextBraceOpen := false
 	for i, token in tokens {
 		match token.Id {
 		| token::Id.LBrace:
+			op = true
 			skipToNextBraceOpen = false
 			fall
 		| token::Id.LParent
 		| token::Id.LBracket:
+			op = true
 			braceN++
 			continue
 		| token::Id.RBrace
 		| token::Id.RParent
 		| token::Id.RBracket:
+			op = true
 			braceN--
 			continue
 		| token::Id.If:
@@ -982,6 +986,9 @@ fn findLowestPrecOp(&tokens: []&token::Token): int {
 		| braceN > 0:
 			continue
 		| !token::IsBinOp(token.Id):
+			op = true
+			continue
+		| !op:
 			continue
 		}
 
@@ -1002,6 +1009,7 @@ fn findLowestPrecOp(&tokens: []&token::Token): int {
 			}
 		}
 
+		op = false
 		p := token.Prec()
 		if p != 0 && p <= prec {
 			prec = p
