@@ -56,10 +56,10 @@ trait StrWriter {
 // Implements the basic ReadByte method.
 //
 // It should read byte and return one for n without throwing exceptional if success.
-// It should return zero n for EOF.
+// It should return zero n for EOF, the EOF byte is implementation-dependent.
 // If read failed, should throw exceptional.
 //
-// The ReadByte method mutable because of same reasons of the `Writer` trait.
+// The ReadByte method mutable because of same reasons of the `Reader` trait.
 //
 // Exceptionals are not standardized. Should be documented by implementations.
 trait ByteReader {
@@ -78,14 +78,15 @@ trait ByteWriter {
 
 // Implements the basic ReadRune method.
 //
-// It should read rune and return without throwing exceptional if success.
-// If read failed, should throw exceptional.
+// It reads a single encoded Unicode character
+// and returns the rune and its size in bytes.
+// It should return zero size for EOF, the EOF rune is implementation-dependent.
 //
-// The ReadRune method mutable because of same reasons of the `Writer` trait.
+// The ReadRune method mutable because of same reasons of the `Reader` trait.
 //
 // Exceptionals are not standardized. Should be documented by implementations.
 trait RuneReader {
-	fn ReadRune(mut self)!: rune
+	fn ReadRune(mut self)!: (r: rune, size: int)
 }
 
 // Implements the basic WriteRune method.
@@ -109,7 +110,7 @@ trait RuneWriter {
 // After first call the Close method behavior may be undefined,
 // but exceptional throw recommended if any error should be occur.
 //
-// The Close method mutable because of same reasons of the `Writer` trait.
+// The Close method mutable because of same reasons of the `Reader` trait.
 //
 // Exceptionals are not standardized. Should be documented by implementations.
 trait Closer {
@@ -139,7 +140,10 @@ trait Closer {
 // Clients of ReadAt can execute parallel ReadAt calls on the
 // same input source.
 //
+// The ReadAt method mutable because of same reasons of the `Reader` trait.
+//
 // Implementations must not retain p.
+// Exceptionals are not standardized. Should be documented by implementations.
 trait ReaderAt {
 	fn ReadAt(mut self, mut p: []byte, off: i64)!: (n: int)
 }
@@ -149,6 +153,10 @@ trait ReaderAt {
 // It writes data to w until there's no more data to write or
 // when an error occurs. The return value n is the number of bytes
 // written. Any error encountered during the write is also forwarded.
+//
+// The WriteTo method mutable because of same reasons of the `Reader` trait.
+//
+// Exceptionals are not standardized. Should be documented by implementations.
 trait WriterTo {
 	fn WriteTo(mut self, mut w: Writer)!: (n: i64)
 }
@@ -168,6 +176,10 @@ trait WriterTo {
 // Seeking to any positive offset may be allowed, but if the new offset exceeds
 // the size of the underlying object the behavior of subsequent I/O operations
 // is implementation-dependent.
+//
+// The Seek method mutable because of same reasons of the `Reader` trait.
+//
+// Exceptionals are not standardized. Should be documented by implementations.
 trait Seeker {
 	fn Seek(mut self, offset: i64, whence: int)!: i64
 }
