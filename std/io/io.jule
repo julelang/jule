@@ -226,6 +226,29 @@ impl StrWriter for discard {
 	}
 }
 
+// Returns a Reader that reads from r
+// but stops like EOF after n bytes.
+fn LimitReader(mut r: Reader, n: i64): Reader { ret &limitedReader{r, n} }
+
+struct limitedReader {
+	r: Reader // underlying reader
+	n: i64    // max bytes remaining
+}
+
+impl Reader for limitedReader {
+	fn Read(mut self, mut p: []byte)!: (n: int) {
+		if self.n <= 0 {
+			ret 0
+		}
+		if i64(len(p)) > self.n {
+			p = p[0:self.n]
+		}
+		n = self.r.Read(p) else { error(error) }
+		self.n -= i64(n)
+		ret
+	}
+}
+
 // A [Writer] on which all Write calls succeed without doing anything.
 static mut Discard = discard{}
 
