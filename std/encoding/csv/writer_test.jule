@@ -1,0 +1,69 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/strings"
+use "std/testing"
+
+struct writeTest {
+	Input:   [][]str
+	Output:  str
+	Error:   any
+	UseCRLF: bool
+	Comma:   rune
+}
+
+static writeTests: []writeTest = [
+	{Input: [["abc"]], Output: "abc\n"},
+	{Input: [["abc"]], Output: "abc\r\n", UseCRLF: true},
+	{Input: [[`"abc"`]], Output: `"""abc"""` + "\n"},
+	{Input: [[`a"b`]], Output: `"a""b"` + "\n"},
+	{Input: [[`"a"b"`]], Output: `"""a""b"""` + "\n"},
+	{Input: [[" abc"]], Output: `" abc"` + "\n"},
+	{Input: [["abc,def"]], Output: `"abc,def"` + "\n"},
+	{Input: [["abc", "def"]], Output: "abc,def\n"},
+	{Input: [["abc"], ["def"]], Output: "abc\ndef\n"},
+	{Input: [["abc\ndef"]], Output: "\"abc\ndef\"\n"},
+	{Input: [["abc\ndef"]], Output: "\"abc\r\ndef\"\r\n", UseCRLF: true},
+	{Input: [["abc\rdef"]], Output: "\"abcdef\"\r\n", UseCRLF: true},
+	{Input: [["abc\rdef"]], Output: "\"abc\rdef\"\n", UseCRLF: false},
+	{Input: [[""]], Output: "\n"},
+	{Input: [["", ""]], Output: ",\n"},
+	{Input: [["", "", ""]], Output: ",,\n"},
+	{Input: [["", "", "a"]], Output: ",,a\n"},
+	{Input: [["", "a", ""]], Output: ",a,\n"},
+	{Input: [["", "a", "a"]], Output: ",a,a\n"},
+	{Input: [["a", "", ""]], Output: "a,,\n"},
+	{Input: [["a", "", "a"]], Output: "a,,a\n"},
+	{Input: [["a", "a", ""]], Output: "a,a,\n"},
+	{Input: [["a", "a", "a"]], Output: "a,a,a\n"},
+	{Input: [[`\.`]], Output: "\"\\.\"\n"},
+	{Input: [["x09\x41\xb4\x1c", "aktau"]], Output: "x09\x41\xb4\x1c,aktau\n"},
+	{Input: [[",x09\x41\xb4\x1c", "aktau"]], Output: "\",x09\x41\xb4\x1c\",aktau\n"},
+	{Input: [["a", "a", ""]], Output: "a|a|\n", Comma: '|'},
+	{Input: [[",", ",", ""]], Output: ",|,|\n", Comma: '|'},
+	{Input: [["foo"]], Comma: '"', Error: errInvalidDelim},
+]
+
+#test
+fn testWrite(t: &testing::T) {
+	for n, tt in writeTests {
+		mut b := &strings::Builder{}
+		mut f := Writer.New(b)
+		f.UseCRLF = tt.UseCRLF
+		if tt.Comma != 0 {
+			f.Comma = tt.Comma
+		}
+		let mut err: any
+		f.WriteAll(tt.Input) else {
+			err = error
+		}
+		if err != tt.Error {
+			t.Errorf("Unexpected error:\ngot  {}\nwant {}", err, tt.Error)
+		}
+		out := b.Str()
+		if out != tt.Output {
+			t.Errorf("#{}: out={} want {}", n, out, tt.Output)
+		}
+	}
+}
