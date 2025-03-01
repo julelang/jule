@@ -49,7 +49,7 @@ use "std/unsafe"
 //
 // Comma is the field delimiter.
 //
-// If use_crlf is true, the Writer ends each output line with \r\n instead of \n.
+// If UseCRLF is true, the Writer ends each output line with \r\n instead of \n.
 //
 // The writes of individual records are buffered.
 // After all data has been written, the client should call the
@@ -57,7 +57,7 @@ use "std/unsafe"
 // the underlying io::Writer.
 struct Writer {
 	Comma:   rune // Field delimiter (set to ',' by new)
-	UseCrlf: bool // True to use \r\n as the line terminator
+	UseCRLF: bool // True to use \r\n as the line terminator
 
 	w: io::Writer
 }
@@ -74,7 +74,7 @@ impl Writer {
 	// Reports whether our field must be enclosed in quotes.
 	// Fields with a comma, fields with a quote or newline, and
 	// fields which start with a space must be enclosed in quotes.
-	// We used to quote empty strings, but we do not anymore (as of Go 1.4).
+	// We used to quote empty strings, but we do not anymore.
 	// The two representations should be equivalent, but Postgres distinguishes
 	// quoted vs non-quoted empty string during database imports, and it has
 	// an option to force the quoted behavior for non-quoted CSV but it has
@@ -148,11 +148,11 @@ impl Writer {
 					| '"':
 						self.w.Write(unsafe::StrBytes(`""`)) else { error(error) }
 					| '\r':
-						if !self.UseCrlf {
+						if !self.UseCRLF {
 							self.w.Write(['\r']) else { error(error) }
 						}
 					| '\n':
-						if self.UseCrlf {
+						if self.UseCRLF {
 							self.w.Write(unsafe::StrBytes("\r\n")) else { error(error) }
 						} else {
 							self.w.Write(unsafe::StrBytes("\n")) else { error(error) }
@@ -164,7 +164,7 @@ impl Writer {
 
 			self.w.Write(unsafe::StrBytes("\"")) else { error(error) }
 		}
-		if self.UseCrlf {
+		if self.UseCRLF {
 			self.w.Write(unsafe::StrBytes("\r\n")) else { error(error) }
 		} else {
 			self.w.Write(unsafe::StrBytes("\n")) else { error(error) }

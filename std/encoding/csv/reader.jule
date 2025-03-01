@@ -83,7 +83,6 @@
 //	{`Multi-line
 //	field`, `comma is ,`}
 
-use "std/bufio"
 use "std/bytes"
 use "std/errors"
 use "std/fmt"
@@ -172,16 +171,13 @@ struct Reader {
 	// By default, each call to read returns newly allocated memory owned by the caller.
 	ReuseRecord: bool
 
-	s: &bufio::Scanner
+	r: &bufreader
 
 	// The current line being read in the CSV file.
 	numLine: int
 
 	// The input stream byte offset of the current reader position.
 	offset: i64
-
-	// rawBuffer is a line buffer only used by the readLine method.
-	rawBuffer: []byte
 
 	// Holds the unescaped fields, one after another.
 	// The fields can be accessed by using the indexes in fieldIndexes.
@@ -206,7 +202,7 @@ impl Reader {
 	static fn New(mut r: io::Reader): &Reader {
 		ret &Reader{
 			Comma: ',',
-			s: bufio::Scanner.New(r),
+			r: bufreader.new(r),
 		}
 	}
 
@@ -266,21 +262,21 @@ impl Reader {
 	// If EOF is hit without a trailing endline, it will be omitted.
 	// The result is only valid until the next call to readLine.
 	fn readLine(mut self)!: []byte {
-		scan := self.s.Scan() else { error(error) }
-		if !scan {
-			ret nil
-		}
-		mut line := self.s.Token()
-		if len(line) == 0 {
-			ret nil
+		mut line := self.r.readSlice('\n') else { error(error) }
+		mut readSize := len(line)
+		if readSize > 0 {
+			// For backwards compatibility, drop trailing \r before EOF.
+			if line[readSize-1] == '\r' {
+				line = line[:readSize-1]
+			}
 		}
 		self.numLine++
-		self.offset += i64(len(line))
-
+		self.offset += i64(readSize)
 		// Normalize \r\n to \n on all input lines.
-		if len(line) >= 2 && line[len(line)-2] == '\r' && line[len(line)-1] == '\n' {
-			line[len(line)-2] = '\n'
-			line = line[:len(line)-1]
+		n := len(line)
+		if n >= 2 && line[n-2] == '\r' && line[n-1] == '\n' {
+			line[n-2] = '\n'
+			line = line[:n-1]
 		}
 		ret line
 	}
@@ -296,7 +292,7 @@ impl Reader {
 		let mut line: []byte
 		for {
 			line = self.readLine() else { error(error) }
-			if line == nil {
+			if len(line) == 0 {
 				ret nil
 			}
 			if self.Comment != 0 && nextRune(line) == self.Comment {
@@ -437,11 +433,11 @@ impl Reader {
 		// Create a single string and create slices out of it.
 		// This pins the memory of the fields together, but allocates once.
 		s := str(self.recordBuffer) // Convert to string once to batch allocations
+		dst = dst[:0]
 		if cap(dst) < len(self.fieldIndexes) {
 			dst = make([]str, len(self.fieldIndexes))
-		} else {
-			dst = dst[:0]
 		}
+		dst = dst[:len(self.fieldIndexes)]
 		mut preIdx := 0
 		for i, idx in self.fieldIndexes {
 			dst[i] = s[preIdx:idx]
@@ -486,4 +482,46 @@ fn lengthNl(b: []byte): int {
 		ret 1
 	}
 	ret 0
+}
+
+struct bufreader {
+	buf: []byte
+	rd:  io::Reader // reader provided by the client
+	r:   int
+	w:   int
+}
+
+impl bufreader {
+	static fn new(mut r: io::Reader): &bufreader {
+		const defaultBufSize = 4096
+		mut br := new(bufreader)
+		br.buf = make([]byte, defaultBufSize)
+		br.rd = r
+		ret br
+	}
+
+	fn readSlice(mut self, delim: byte)!: (line: []byte) {
+		mut n := 0
+		for {
+			i := bytes::IndexByte(self.buf[self.r:], delim)
+			if i >= 0 {
+				line = self.buf[self.r : self.r+i+1]
+				self.r += i + 1
+				ret
+			}
+			if self.r >= len(self.buf) {
+				mut buf := make([]byte, len(self.buf)*2)
+				copy(buf, self.buf)
+				self.buf = buf
+			}
+			w := self.rd.Read(self.buf[self.r+n:]) else { error(error) }
+			if w == 0 {
+				line = self.buf[self.r:self.w]
+				self.r = self.w
+				ret
+			}
+			n += w
+			self.w += w
+		}
+	}
 }
