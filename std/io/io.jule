@@ -56,7 +56,7 @@ trait StrWriter {
 // Implements the basic ReadByte method.
 //
 // It should read byte and return one for n without throwing exceptional if success.
-// Is should return zero for n for EOF.
+// It should return zero n for EOF.
 // If read failed, should throw exceptional.
 //
 // The ReadByte method mutable because of same reasons of the `Writer` trait.
@@ -114,6 +114,34 @@ trait RuneWriter {
 // Exceptionals are not standardized. Should be documented by implementations.
 trait Closer {
 	fn Close(mut self)!
+}
+
+// The trait that wraps the basic ReadAt method.
+//
+// It reads len(p) bytes into p starting at offset off in the
+// underlying input source. It returns the number of bytes
+// read (0 <= n <= len(p)) and any error encountered.
+//
+// If n < len(p), it throws an exception explaining why more bytes were not read.
+// In this respect, ReadAt is stricter than Read.
+//
+// Even if n < len(p), it may use all of p as scratch space during the call.
+// If some data is available but not len(p) bytes, it blocks until either all
+// the data is available or an error occurs.
+// In this respect ReadAt is different from Read.
+//
+// It should return zero n for EOF.
+//
+// If it is reading from an input source with a seek offset,
+// it should not affect nor be affected by the underlying
+// seek offset.
+//
+// Clients of ReadAt can execute parallel ReadAt calls on the
+// same input source.
+//
+// Implementations must not retain p.
+trait ReaderAt {
+	fn ReadAt(mut self, mut p: []byte, off: i64)!: (n: int)
 }
 
 // Inheritance group for the Reader and Closer traits.
