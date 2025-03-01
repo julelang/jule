@@ -1,0 +1,170 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/fmt"
+use "std/io"
+use "std/strings"
+use "std/testing"
+
+struct readerTest {
+	off:     i64
+	seek:    int
+	n:       int
+	want:    str
+	wantpos: i64
+	readerr: any
+	seekerr: str
+}
+
+#test
+fn testReader(t: &testing::T) {
+	mut r := strings::Reader.New("0123456789")
+	tests := []readerTest([
+		{seek: io::SeekStart, off: 0, n: 20, want: "0123456789"},
+		{seek: io::SeekStart, off: 1, n: 1, want: "1"},
+		{seek: io::SeekCurrent, off: 1, wantpos: 3, n: 2, want: "34"},
+		{seek: io::SeekStart, off: -1, seekerr: "strings::Reader.Seek: negative position"},
+		{seek: io::SeekStart, off: 1 << 33, wantpos: 1 << 33},
+		{seek: io::SeekCurrent, off: 1, wantpos: 1<<33 + 1},
+		{seek: io::SeekStart, n: 5, want: "01234"},
+		{seek: io::SeekCurrent, n: 5, want: "56789"},
+		{seek: io::SeekEnd, off: -1, n: 1, wantpos: 9, want: "9"},
+	])
+
+	for i, tt in tests {
+		let mut err: any
+		pos := r.Seek(tt.off, tt.seek) else {
+			err = error
+			use 0
+		}
+		if err == nil && tt.seekerr != "" {
+			t.Errorf("{}. want seek error {}", i, tt.seekerr)
+			continue
+		}
+		serr := fmt::Format("{}", err)
+		if err != nil && serr != tt.seekerr {
+			t.Errorf("{}. seek error = {}; want {}", i, serr, tt.seekerr)
+			continue
+		}
+		if tt.wantpos != 0 && tt.wantpos != pos {
+			t.Errorf("{}. pos = {}, want {}", i, pos, tt.wantpos)
+		}
+		mut buf := make([]byte, tt.n)
+		err = nil
+		n := r.Read(buf) else {
+			err = error
+			use 0
+		}
+		if err != tt.readerr {
+			t.Errorf("{}. read = {}; want {}", i, err, tt.readerr)
+			continue
+		}
+		got := str(buf[:n])
+		if got != tt.want {
+			t.Errorf("{}. got {}; want {}", i, got, tt.want)
+		}
+	}
+}
+
+#test
+fn testReadAfterBigSeek(t: &testing::T) {
+	mut r := strings::Reader.New("0123456789")
+	let mut err: any
+	r.Seek(1<<31+5, io::SeekStart) else {
+		err = error
+	}
+	if err != nil {
+		t.Errorf("{}", err)
+	}
+	err = nil
+	n := r.Read(make([]byte, 10)) else {
+		err = error
+		use 0
+	}
+	if n != 0 || (r.Read(make([]byte, 10)) else { use 0 }) != 0 {
+		t.Errorf("Read = {}, {}; want 0, EOF", n, err)
+	}
+}
+
+struct readerAtTest {
+	off:     i64
+	n:       int
+	want:    str
+	wanterr: any
+}
+
+#test
+fn testReaderAt(t: &testing::T) {
+	mut r := strings::Reader.New("0123456789")
+	tests := []readerAtTest([
+		{0, 10, "0123456789", nil},
+		{1, 10, "123456789", nil},
+		{1, 9, "123456789", nil},
+		{11, 10, "", nil},
+		{0, 0, "", nil},
+		{-1, 0, "", "strings::Reader.ReadAt: negative offset"},
+	])
+	for i, tt in tests {
+		mut b := make([]byte, tt.n)
+		let mut err: any
+		rn := r.ReadAt(b, tt.off) else {
+			err = error
+			use 0
+		}
+		got := str(b[:rn])
+		if got != tt.want {
+			t.Errorf("{}. got {}; want {}", i, got, tt.want)
+		}
+		if fmt::Format("{}", err) != fmt::Format("{}", tt.wanterr) {
+			t.Errorf("{}. got error = {}; want {}", i, err, tt.wanterr)
+		}
+	}
+}
+
+// tests that Len is affected by reads, but Size is not.
+#test
+fn testReaderLenSize(t: &testing::T) {
+	mut r := strings::Reader.New("abc")
+	io::CopyN(io::Discard, r, 1)!
+	if r.Len() != 2 {
+		t.Errorf("Len = {}; want 2", r.Len())
+	}
+	if r.Size() != 3 {
+		t.Errorf("Size = {}; want 3", r.Size())
+	}
+}
+
+#test
+fn testReaderReset(t: &testing::T) {
+	mut r := strings::Reader.New("世界")
+	let mut err: any
+	r.ReadRune() else {
+		err = error
+	}
+	if err != nil {
+		t.Errorf("ReadRune: unexpected error: {}", err)
+	}
+
+	const want = "abcdef"
+	r.Reset(want)
+	err = nil
+	r.UnreadRune() else {
+		err = error
+	}
+	if err == nil {
+		t.Errorf("UnreadRune: expected error, got nil")
+	}
+	err = nil
+	buf := io::ReadAll(r) else {
+		err = error
+		use nil
+	}
+	if err != nil {
+		t.Errorf("ReadAll: unexpected error: {}", err)
+	}
+	got := str(buf)
+	if got != want {
+		t.Errorf("ReadAll: got {}, want {}", got, want)
+	}
+}
