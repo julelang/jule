@@ -878,6 +878,27 @@ impl Int {
 	// Returns 0 if |x| == |y|
 	// Returns -1 if |x| < |y|
 	fn CmpAbs(self, y: Int): int { ret cmpW(self.abs, y.abs) }
+
+	// Returns the f64 value nearest x(self),
+	// and an indication of any rounding that occurred.
+	fn F64(self): (f64, Accuracy) {
+		n := bitLenW(self.abs) // NB: still uses slow crypto impl!
+		if n == 0 {
+			ret 0.0, Exact
+		}
+
+		// Fast path: no more than 53 significant bits.
+		if n <= 53 || n < 64 && n-int(trailingZeroBitsW(self.abs)) <= 53 {
+			mut f := f64(low64W(self.abs))
+			if self.neg {
+				f = -f
+			}
+			ret f, Exact
+		}
+		mut f := float{}
+		f.SetInt(self)
+		ret f.F64()
+	}
 }
 
 // Attempts to simulate several Euclidean update steps

@@ -1,0 +1,836 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+// This file implements multi-precision floating-point numbers.
+// Like in the GNU MPFR library (https://www.mpfr.org/), operands
+// can be of mixed precision. Unlike MPFR, the rounding mode is
+// not specified with each operation, but with each operand. The
+// rounding mode of the result operand determines the rounding
+// mode of an operation. This is a from-scratch implementation.
+
+use "std/fmt"
+use "std/math"
+
+const debugFloat = false // enable for debugging
+
+// Exponent and precision limits.
+const maxExp = i32.Max  // largest supported exponent
+const minExp = i32.Min  // smallest supported exponent
+const maxPrec = u32.Max // largest (theoretically) supported precision; likely memory-limited
+
+// Internal representation: The mantissa bits x.mant of a nonzero finite
+// Float x are stored in a nat slice long enough to hold up to x.prec bits;
+// the slice may (but doesn't have to) be shorter if the mantissa contains
+// trailing 0 bits. x.mant is normalized if the msb of x.mant == 1 (i.e.,
+// the msb is shifted all the way "to the left"). Thus, if the mantissa has
+// trailing 0 bits or x.prec is not a multiple of the Word size _W,
+// x.mant[0] has trailing zero bits. The msb of the mantissa corresponds
+// to the value 0.5; the exponent x.exp shifts the binary point as needed.
+//
+// A zero or non-finite Float x ignores x.mant and x.exp.
+//
+// x                 form      neg      mant         exp
+// ----------------------------------------------------------
+// ±0                zero      sign     -            -
+// 0 < |x| < +Inf    finite    sign     mantissa     exponent
+// ±Inf              inf       sign     -            -
+
+// Describes the internal representation.
+type form: byte
+
+// The form value order is relevant - do not change!
+const zero: form = 0
+const finite: form = 1
+const inf: form = 2
+
+// Determines how a [Float] value is rounded to the
+// desired precision. Rounding may change the [Float] value; the
+// rounding error is described by the [Float]'s [Accuracy].
+type roundingMode: byte
+
+// These constants define supported rounding modes.
+const toNearestEven: roundingMode = 0 // == IEEE 754-2008 roundTiesToEven
+const toNearestAway: roundingMode = 1 // == IEEE 754-2008 roundTiesToAway
+const toZero: roundingMode = 2        // == IEEE 754-2008 roundTowardZero
+const awayFromZero: roundingMode = 3  // no IEEE 754-2008 equivalent
+const toNegativeInf: roundingMode = 4 // == IEEE 754-2008 roundTowardNegative
+const toPositiveInf: roundingMode = 5 // == IEEE 754-2008 roundTowardPositive
+
+// Describes the rounding error produced by the most recent
+// operation that generated a [Float] value, relative to the exact value.
+type Accuracy: i8
+
+// Constants describing the [Accuracy] of a [Float].
+const Below: Accuracy = -1
+const Exact: Accuracy = 0
+const Above: Accuracy = +1
+
+struct float {
+	prec: u32
+	mode: roundingMode
+	acc:  Accuracy
+	form: form
+	neg:  bool
+	mant: []Word
+	exp:  i32
+}
+
+impl float {
+	// Returns [Float] with the (possibly rounded) value of x.
+	// If the precision is 0, it is changed to 53 (and rounding will have
+	// no effect). SetF64 panics with if x is a NaN.
+	static fn FromF64(x: f64, prec: u32): (f: float) {
+		f.prec = prec
+		if f.prec == 0 {
+			f.prec = 53
+		}
+		if math::IsNaN(x) {
+			panic("std/math/big: Float.FromF64(NaN)")
+		}
+		f.acc = Exact
+		f.neg = math::Signbit(x) // handle -0, -Inf correctly
+		if x == 0 {
+			f.form = zero
+			ret
+		}
+		if math::IsInf(x, 0) {
+			f.form = inf
+			ret
+		}
+		// normalized x != 0
+		f.form = finite
+		fmant, exp := math::Frexp(x) // get normalized mantissa
+		setWU64(f.mant, 1<<63|math::F64bits(fmant)<<11)
+		f.exp = i32(exp) // always fits
+		if f.prec < 53 {
+			f.round(0)
+		}
+		ret
+	}
+
+	// debugging support
+	fn validate(self) {
+		if !debugFloat {
+			// avoid performance bugs
+			panic("validate called but debugFloat is not set")
+		}
+		msg := self.validate0()
+		if msg != "" {
+			panic(msg)
+		}
+	}
+
+	fn validate0(self): str {
+		if self.form != finite {
+			ret ""
+		}
+		m := len(self.mant)
+		if m == 0 {
+			ret "nonzero finite number with empty mantissa"
+		}
+		const msb = 1 << (_W - 1)
+		if self.mant[m-1]&msb == 0 {
+			ret fmt::Format("msb not set in last word {} of {}", self.mant[m-1], self.Format('p', 0))
+		}
+		if self.prec == 0 {
+			ret "zero precision finite number"
+		}
+		ret ""
+	}
+
+	fn setExpAndRound(mut self, exp: i64, sbit: uint) {
+		if exp < minExp {
+			// underflow
+			self.acc = makeAcc(self.neg)
+			self.form = zero
+			ret
+		}
+
+		if exp > maxExp {
+			// overflow
+			self.acc = makeAcc(!self.neg)
+			self.form = inf
+			ret
+		}
+
+		self.form = finite
+		self.exp = i32(exp)
+		self.round(sbit)
+	}
+
+	// Rounds z(self) according to z.mode to z.prec bits and sets z.acc accordingly.
+	// sbit must be 0 or 1 and summarizes any "sticky bit" information one might
+	// have before calling round. z's mantissa must be normalized (with the msb set)
+	// or empty.
+	//
+	// CAUTION: The rounding modes [ToNegativeInf], [ToPositiveInf] are affected by the
+	// sign of z. For correct rounding, the sign of z must be set correctly before
+	// calling round.
+	fn round(mut self, mut sbit: uint) {
+		if debugFloat {
+			self.validate()
+		}
+
+		self.acc = Exact
+		if self.form != finite {
+			// ±0 or ±Inf => nothing left to do
+			ret
+		}
+		// self.form == finite && len(zelf.mant) > 0
+		// m > 0 implies self.prec > 0 (checked by validate)
+
+		m := u32(len(self.mant)) // present mantissa length in words
+		bits := m * _W           // present mantissa bits; bits > 0
+		if bits <= self.prec {
+			// mantissa fits => nothing to do
+			ret
+		}
+		// bits > self.prec
+
+		// Rounding is based on two bits: the rounding bit (rbit) and the
+		// sticky bit (sbit). The rbit is the bit immediately before the
+		// self.prec leading mantissa bits (the "0.5"). The sbit is set if any
+		// of the bits before the rbit are set (the "0.25", "0.125", etc.):
+		//
+		//   rbit  sbit  => "fractional part"
+		//
+		//   0     0        == 0
+		//   0     1        >  0  , < 0.5
+		//   1     0        == 0.5
+		//   1     1        >  0.5, < 1.0
+
+		// bits > self.prec: mantissa too large => round
+		r := uint(bits - self.prec - 1) // rounding bit position; r >= 0
+		rbit := bitW(self.mant, r) & 1  // rounding bit; be safe and ensure it's a single bit
+		// The sticky bit is only needed for rounding ToNearestEven
+		// or when the rounding bit is zero. Avoid computation otherwise.
+		if sbit == 0 && (rbit == 0 || self.mode == toNearestEven) {
+			sbit = stickyW(self.mant, r)
+		}
+		sbit &= 1 // be safe and ensure it's a single bit
+
+		// cut off extra words
+		n := (self.prec + (_W - 1)) / _W // mantissa length in words for desired precision
+		if m > n {
+			copy(self.mant, self.mant[m-n:]) // move n last words to front
+			self.mant = self.mant[:n]
+		}
+
+		// determine number of trailing zero bits (ntz) and compute lsb mask of mantissa's least-significant word
+		ntz := n*_W - self.prec // 0 <= ntz < _W
+		lsb := Word(1) << ntz
+
+		// round if result is inexact
+		if rbit|sbit != 0 {
+			// Make rounding decision: The result mantissa is truncated ("rounded down")
+			// by default. Decide if we need to increment, or "round up", the (unsigned)
+			// mantissa.
+			mut inc := false
+			match self.mode {
+			| toNegativeInf:
+				inc = self.neg
+			| toZero:
+				// nothing to do
+			| toNearestEven:
+				inc = rbit != 0 && (sbit != 0 || self.mant[0]&lsb != 0)
+			| toNearestAway:
+				inc = rbit != 0
+			| awayFromZero:
+				inc = true
+			| toPositiveInf:
+				inc = !self.neg
+			|:
+				panic("unreachable")
+			}
+
+			// A positive result (!self.neg) is Above the exact result if we increment,
+			// and it's Below if we truncate (Exact results require no rounding).
+			// For a negative result (self.neg) it is exactly the opposite.
+			self.acc = makeAcc(inc != self.neg)
+
+			if inc {
+				// add 1 to mantissa
+				if addVW(self.mant, self.mant, lsb) != 0 {
+					// mantissa overflow => adjust exponent
+					if self.exp >= maxExp {
+						// exponent overflow
+						self.form = inf
+						ret
+					}
+					self.exp++
+					// adjust mantissa: divide by 2 to compensate for exponent adjustment
+					shrVU(self.mant, self.mant, 1)
+					// set msb == carry == 1 from the mantissa overflow above
+					const msb = 1 << (_W - 1)
+					self.mant[n-1] |= msb
+				}
+			}
+		}
+
+		// zero out trailing bits in least-significant word
+		self.mant[0] &= ^(lsb - 1)
+
+		if debugFloat {
+			self.validate()
+		}
+	}
+
+	// Returns [Float] setted to the (possibly rounded) value |x(self)| (the absolute value of x).
+	fn Abs(self): float {
+		let mut z: float
+		z.Set(self)
+		z.neg = false
+		ret z
+	}
+
+	// Returns [Float] setted to the (possibly rounded) value of x(self) with its sign negated.
+	fn Neg(self): float {
+		let mut z: float
+		z.Set(self)
+		z.neg = !z.neg
+		ret z
+	}
+
+	// Returns the mantissa precision of x(self) in bits.
+	// The result may be 0 for |x| == 0 and |x| == Inf.
+	fn Prec(self): uint {
+		ret uint(self.prec)
+	}
+
+	// Returns the rounding mode of x(self).
+	fn Mode(self): roundingMode {
+		ret self.mode
+	}
+
+	// Returns the accuracy of x(self) produced by the most recent
+	// operation, unless explicitly documented otherwise by that
+	// operation.
+	fn Acc(self): Accuracy {
+		ret self.acc
+	}
+
+	// Sets z(self)'s precision to prec and returns the (possibly) rounded
+	// value of z. Rounding occurs according to z's rounding mode if the mantissa
+	// cannot be represented in prec bits without loss of precision.
+	// SetPrec(0) maps all finite values to ±0; infinite values remain unchanged.
+	// If prec > [MaxPrec], it is set to [MaxPrec].
+	fn SetPrec(mut self, mut prec: uint) {
+		self.acc = Exact // optimistically assume no rounding is needed
+
+		// special case
+		if prec == 0 {
+			self.prec = 0
+			if self.form == finite {
+				// truncate self to 0
+				self.acc = makeAcc(self.neg)
+				self.form = zero
+			}
+			ret
+		}
+
+		// general case
+		if prec > maxPrec {
+			prec = maxPrec
+		}
+		old := self.prec
+		self.prec = u32(prec)
+		if self.prec < old {
+			self.round(0)
+		}
+		ret
+	}
+
+	// Sets z(self)'s rounding mode to mode.
+	// z remains unchanged otherwise.
+	// z.SetMode(z.Mode()) is a cheap way to set z's accuracy to [Exact].
+	fn SetMode(mut self, mode: roundingMode) {
+		self.mode = mode
+		self.acc = Exact
+	}
+
+	// Returns the minimum precision required to represent x(self) exactly
+	// (i.e., the smallest prec before x.SetPrec(prec) would start rounding x).
+	// The result is 0 for |x| == 0 and |x| == Inf.
+	fn MinPrec(self): uint {
+		if self.form != finite {
+			ret 0
+		}
+		ret uint(len(self.mant))*_W - trailingZeroBitsW(self.mant)
+	}
+
+	// Returns of x(self):
+	//   - -1 if x < 0;
+	//   - 0 if x is ±0;
+	//   - +1 if x > 0.
+	fn Sign(self): int {
+		if debugFloat {
+			self.validate()
+		}
+		if self.form == zero {
+			ret 0
+		}
+		if self.neg {
+			ret -1
+		}
+		ret 1
+	}
+
+	// Returns -1, 0, or +1, depending on whether
+	// |x(self)| < |y|, |x| == |y|, or |x| > |y|.
+	// x and y must have a non-empty mantissa and valid exponent.
+	fn ucmp(self, y: float): int {
+		if debugFloat {
+			validateBinaryOperands(self, y)
+		}
+
+		match {
+		| self.exp < y.exp:
+			ret -1
+		| self.exp > y.exp:
+			ret +1
+		}
+		// self.exp == y.exp
+
+		// compare mantissas
+		mut i := len(self.mant)
+		mut j := len(y.mant)
+		for i > 0 || j > 0 {
+			let mut xm: Word
+			let mut ym: Word
+			if i > 0 {
+				i--
+				xm = self.mant[i]
+			}
+			if j > 0 {
+				j--
+				ym = y.mant[j]
+			}
+			match {
+			| xm < ym:
+				ret -1
+			| xm > ym:
+				ret +1
+			}
+		}
+
+		ret 0
+	}
+
+	// Classifies x(self) and returns:
+	//
+	//	-2 if -Inf == x
+	//	-1 if -Inf < x < 0
+	//	 0 if x == 0 (signed or unsigned)
+	//	+1 if 0 < x < +Inf
+	//	+2 if x == +Inf
+	fn ord(self): int {
+		let mut m: int
+		match self.form {
+		| finite:
+			m = 1
+		| zero:
+			ret 0
+		| inf:
+			m = 2
+		}
+		if self.neg {
+			m = -m
+		}
+		ret m
+	}
+
+	// Compares x(self) and y and returns:
+	//   - -1 if x < y;
+	//   - 0 if x == y (incl. -0 == 0, -Inf == -Inf, and +Inf == +Inf);
+	//   - +1 if x > y.
+	fn Cmp(self, y: float): int {
+		if debugFloat {
+			self.validate()
+			y.validate()
+		}
+
+		mx := self.ord()
+		my := y.ord()
+		match {
+		| mx < my:
+			ret -1
+		| mx > my:
+			ret +1
+		}
+		// mx == my
+
+		// only if |mx| == 1 we have to compare the mantissae
+		match mx {
+		| -1:
+			ret y.ucmp(self)
+		| +1:
+			ret self.ucmp(y)
+		}
+
+		ret 0
+	}
+
+	// Sets z(self) to the (possibly rounded) value of x.
+	// If z's precision is 0, it is changed to the larger of x.BitLen()
+	// or 64 (and rounding will have no effect).
+	fn SetInt(mut self, x: Int) {
+		// TODO: can be more efficient if self.prec > 0
+		// but small compared to the size of x, or if there
+		// are many trailing 0's.
+		bits := u32(x.BitLen())
+		if self.prec == 0 {
+			self.prec = bits
+			if self.prec < 64 {
+				self.prec = 64
+			}
+		}
+		self.acc = Exact
+		self.neg = x.neg
+		if len(x.abs) == 0 {
+			self.form = zero
+			ret
+		}
+		// x != 0
+		setWW(self.mant, x.abs)
+		fnorm(self.mant)
+		self.setExpAndRound(i64(bits), 0)
+	}
+
+	// Sets z(self) to the (possibly rounded) value of x.
+	// If z's precision is 0, it is changed to the precision of x
+	// before setting z (and rounding will have no effect).
+	// Rounding is performed according to z's precision and rounding
+	// mode; and z's accuracy reports the result error relative to the
+	// exact (not rounded) result.
+	fn Set(mut self, x: float) {
+		if debugFloat {
+			x.validate()
+		}
+		self.acc = Exact
+		self.form = x.form
+		self.neg = x.neg
+		if x.form == finite {
+			self.exp = x.exp
+			setWW(self.mant, x.mant)
+		}
+		if self.prec == 0 {
+			self.prec = x.prec
+		} else if self.prec < x.prec {
+			self.round(0)
+		}
+	}
+
+	// Returns the f64 value nearest to x(self). If x is too small to be
+	// represented by a f64 (|x| < [f64.SmallestNonzero]), the result
+	// is (0, [Below]) or (-0, [Above]), respectively, depending on the sign of x.
+	// If x is too large to be represented by a f64 (|x| > [f64.Max]),
+	// the result is (+Inf, [Above]) or (-Inf, [Below]), depending on the sign of x.
+	fn F64(self): (f64, Accuracy) {
+		if debugFloat {
+			self.validate()
+		}
+
+		match self.form {
+		| finite:
+			// 0 < |x| < +Inf
+
+			const fbits = 64                //        float size
+			const mbits = 52                //        mantissa size (excluding implicit msb)
+			const ebits = fbits - mbits - 1 //    11  exponent size
+			const bias = 1<<(ebits-1) - 1   //  1023  exponent bias
+			const dmin = 1 - bias - mbits   // -1074  smallest unbiased exponent (denormal)
+			const emin = 1 - bias           // -1022  smallest unbiased exponent (normal)
+			const emax = bias               //  1023  largest unbiased exponent (normal)
+
+			// Float mantissa m is 0.5 <= m < 1.0; compute exponent e for f64 mantissa.
+			mut e := self.exp - 1 // exponent for normal mantissa m with 1.0 <= m < 2.0
+
+			// Compute precision p for f64 mantissa.
+			// If the exponent is too small, we have a denormal number before
+			// rounding and fewer than p mantissa bits of precision available
+			// (the exponent remains fixed but the mantissa gets shifted right).
+			mut p := mbits + 1 // precision of normal float
+			if e < emin {
+				// recompute precision
+				p = mbits + 1 - emin + int(e)
+				// If p == 0, the mantissa of x is shifted so much to the right
+				// that its msb falls immediately to the right of the f64
+				// mantissa space. In other words, if the smallest denormal is
+				// considered "1.0", for p == 0, the mantissa value m is >= 0.5.
+				// If m > 0.5, it is rounded up to 1.0; i.e., the smallest denormal.
+				// If m == 0.5, it is rounded down to even, i.e., 0.0.
+				// If p < 0, the mantissa value m is <= "0.25" which is never rounded up.
+				if p < 0 /* m <= 0.25 */ || p == 0 && stickyW(self.mant, uint(len(self.mant))*_W-1) == 0 { /* m == 0.5 */
+					// underflow to ±0
+					if self.neg {
+						let z: f64
+						ret -z, Above
+					}
+					ret 0.0, Below
+				}
+				// otherwise, round up
+				// We handle p == 0 explicitly because it's easy and because
+				// Float.round doesn't support rounding to 0 bits of precision.
+				if p == 0 {
+					if self.neg {
+						ret -f64.SmallestNonZero, Below
+					}
+					ret f64.SmallestNonZero, Above
+				}
+			}
+			// p > 0
+
+			// round
+			let mut r: float
+			r.prec = u32(p)
+			r.Set(self)
+			e = r.exp - 1
+
+			// Rounding may have caused r to overflow to ±Inf
+			// (rounding never causes underflows to 0).
+			// If the exponent is too large, also overflow to ±Inf.
+			if r.form == inf || e > emax {
+				// overflow
+				if self.neg {
+					ret math::Inf(-1), Below
+				}
+				ret math::Inf(+1), Above
+			}
+			// e <= emax
+
+			// Determine sign, biased exponent, and mantissa.
+			let mut sign: u64
+			let mut bexp: u64
+			let mut mant: u64
+			if self.neg {
+				sign = 1 << (fbits - 1)
+			}
+
+			// Rounding may have caused a denormal number to
+			// become normal. Check again.
+			if e < emin {
+				// denormal number: recompute precision
+				// Since rounding may have at best increased precision
+				// and we have eliminated p <= 0 early, we know p > 0.
+				// bexp == 0 for denormals
+				p = mbits + 1 - emin + int(e)
+				mant = msb64(r.mant) >> uint(fbits-p)
+			} else {
+				// normal number: emin <= e <= emax
+				bexp = u64(e+bias) << mbits
+				mant = msb64(r.mant) >> ebits & (1<<mbits - 1) // cut off msb (implicit 1 bit)
+			}
+
+			ret math::F64frombits(sign | bexp | mant), r.acc
+		| zero:
+			if self.neg {
+				let z: f64
+				ret -z, Exact
+			}
+			ret 0.0, Exact
+		| inf:
+			if self.neg {
+				ret math::Inf(-1), Exact
+			}
+			ret math::Inf(+1), Exact
+		}
+
+		panic("unreachable")
+	}
+
+	// Returns the f32 value nearest to x. If x is too small to be
+	// represented by a f32 (|x| < [math.SmallestNonzeroFloat32]), the result
+	// is (0, [Below]) or (-0, [Above]), respectively, depending on the sign of x.
+	// If x is too large to be represented by a f32 (|x| > [math.MaxFloat32]),
+	// the result is (+Inf, [Above]) or (-Inf, [Below]), depending on the sign of x.
+	fn F32(self): (f32, Accuracy) {
+		if debugFloat {
+			self.validate()
+		}
+
+		match self.form {
+		| finite:
+			// 0 < |x| < +Inf
+
+			const fbits = 32                //        float size
+			const mbits = 23                //        mantissa size (excluding implicit msb)
+			const ebits = fbits - mbits - 1 //     8  exponent size
+			const bias = 1<<(ebits-1) - 1   //   127  exponent bias
+			const dmin = 1 - bias - mbits   //  -149  smallest unbiased exponent (denormal)
+			const emin = 1 - bias           //  -126  smallest unbiased exponent (normal)
+			const emax = bias               //   127  largest unbiased exponent (normal)
+
+			// Float mantissa m is 0.5 <= m < 1.0; compute exponent e for f32 mantissa.
+			mut e := self.exp - 1 // exponent for normal mantissa m with 1.0 <= m < 2.0
+
+			// Compute precision p for f32 mantissa.
+			// If the exponent is too small, we have a denormal number before
+			// rounding and fewer than p mantissa bits of precision available
+			// (the exponent remains fixed but the mantissa gets shifted right).
+			mut p := mbits + 1 // precision of normal float
+			if e < emin {
+				// recompute precision
+				p = mbits + 1 - emin + int(e)
+				// If p == 0, the mantissa of x is shifted so much to the right
+				// that its msb falls immediately to the right of the f32
+				// mantissa space. In other words, if the smallest denormal is
+				// considered "1.0", for p == 0, the mantissa value m is >= 0.5.
+				// If m > 0.5, it is rounded up to 1.0; i.e., the smallest denormal.
+				// If m == 0.5, it is rounded down to even, i.e., 0.0.
+				// If p < 0, the mantissa value m is <= "0.25" which is never rounded up.
+				if p < 0 /* m <= 0.25 */ || p == 0 && stickyW(self.mant, uint(len(self.mant))*_W-1) == 0 { /* m == 0.5 */
+					// underflow to ±0
+					if self.neg {
+						let mut z: f32
+						ret -z, Above
+					}
+					ret 0.0, Below
+				}
+				// otherwise, round up
+				// We handle p == 0 explicitly because it's easy and because
+				// Float.round doesn't support rounding to 0 bits of precision.
+				if p == 0 {
+					if self.neg {
+						ret -f32.SmallestNonZero, Below
+					}
+					ret f32.SmallestNonZero, Above
+				}
+			}
+			// p > 0
+
+			// round
+			let mut r: float
+			r.prec = u32(p)
+			r.Set(self)
+			e = r.exp - 1
+
+			// Rounding may have caused r to overflow to ±Inf
+			// (rounding never causes underflows to 0).
+			// If the exponent is too large, also overflow to ±Inf.
+			if r.form == inf || e > emax {
+				// overflow
+				if self.neg {
+					ret f32(math::Inf(-1)), Below
+				}
+				ret f32(math::Inf(+1)), Above
+			}
+			// e <= emax
+
+			// Determine sign, biased exponent, and mantissa.
+			let mut sign: u32
+			let mut bexp: u32
+			let mut mant: u32
+			if self.neg {
+				sign = 1 << (fbits - 1)
+			}
+
+			// Rounding may have caused a denormal number to
+			// become normal. Check again.
+			if e < emin {
+				// denormal number: recompute precision
+				// Since rounding may have at best increased precision
+				// and we have eliminated p <= 0 early, we know p > 0.
+				// bexp == 0 for denormals
+				p = mbits + 1 - emin + int(e)
+				mant = msb32(r.mant) >> uint(fbits-p)
+			} else {
+				// normal number: emin <= e <= emax
+				bexp = u32(e+bias) << mbits
+				mant = msb32(r.mant) >> ebits & (1<<mbits - 1) // cut off msb (implicit 1 bit)
+			}
+
+			ret math::F32frombits(sign | bexp | mant), r.acc
+		| zero:
+			if self.neg {
+				let z: f32
+				ret -z, Exact
+			}
+			ret 0.0, Exact
+		| inf:
+			if self.neg {
+				ret f32(math::Inf(-1)), Exact
+			}
+			ret f32(math::Inf(+1)), Exact
+		}
+
+		panic("unreachable")
+	}
+}
+
+// Normalizes mantissa m by shifting it to the left
+// such that the msb of the most-significant word (msw) is 1.
+// It returns the shift amount. It assumes that len(m) != 0.
+fn fnorm(mut m: []Word): i64 {
+	if debugFloat && (len(m) == 0 || m[len(m)-1] == 0) {
+		panic("msw of mantissa is 0")
+	}
+	s := nlz(m[len(m)-1])
+	if s > 0 {
+		c := shlVU(m, m, s)
+		if debugFloat && c != 0 {
+			panic("nlz or shlVU incorrect")
+		}
+	}
+	ret i64(s)
+}
+
+fn makeAcc(above: bool): Accuracy {
+	if above {
+		ret Above
+	}
+	ret Below
+}
+
+// Returns the 32 most significant bits of x.
+fn msb32(x: []Word): u32 {
+	i := len(x) - 1
+	if i < 0 {
+		ret 0
+	}
+	if debugFloat && x[i]&(1<<(_W-1)) == 0 {
+		panic("x not normalized")
+	}
+	match _W {
+	| 32:
+		ret u32(x[i])
+	| 64:
+		ret u32(x[i] >> 32)
+	}
+	panic("unreachable")
+}
+
+// Returns the 64 most significant bits of x.
+fn msb64(x: []Word): u64 {
+	i := len(x) - 1
+	if i < 0 {
+		ret 0
+	}
+	if debugFloat && x[i]&(1<<(_W-1)) == 0 {
+		panic("x not normalized")
+	}
+	match _W {
+	| 32:
+		mut v := u64(x[i]) << 32
+		if i > 0 {
+			v |= u64(x[i-1])
+		}
+		ret v
+	| 64:
+		ret u64(x[i])
+	}
+	panic("unreachable")
+}
+
+fn validateBinaryOperands(x: float, y: float) {
+	if !debugFloat {
+		// avoid performance bugs
+		panic("validateBinaryOperands called but debugFloat is not set")
+	}
+	if len(x.mant) == 0 {
+		panic("empty mantissa for x")
+	}
+	if len(y.mant) == 0 {
+		panic("empty mantissa for y")
+	}
+}

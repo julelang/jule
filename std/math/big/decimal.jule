@@ -1,0 +1,235 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+// This file implements multi-precision decimal numbers.
+// The implementation is for float to decimal conversion only;
+// not general purpose use.
+// The only operations are precise conversion from binary to
+// decimal and rounding.
+//
+// The key observation and some code (shr) is borrowed from
+// conv/decimal.jule: conversion of binary fractional values can be done
+// precisely in multi-precision decimal because 2 divides 10 (required for
+// >> of mantissa); but conversion of decimal floating-point values cannot
+// be done precisely in binary representation.
+//
+// In contrast to conv/decimal.jule, only right shift is implemented in
+// decimal format - left shift can be done precisely in binary format.
+
+// Maximum shift amount that can be done in one pass without overflow.
+// A Word has _W bits and (1<<maxShift - 1)*10 + 9 must fit into Word.
+const maxShift = _W - 4
+
+// A decimal represents an unsigned floating-point number in decimal representation.
+// The value of a non-zero decimal d is d.mant * 10**d.exp with 0.1 <= d.mant < 1,
+// with the most-significant mantissa digit at index 0. For the zero decimal, the
+// mantissa length and exponent are 0.
+// The zero value for decimal represents a ready-to-use 0.0.
+struct decimal {
+	mant: []byte // mantissa ASCII digits, big-endian
+	exp:  int    // exponent
+}
+
+// TODO: Since we know the desired decimal precision when converting
+// a floating-point number, we may be able to limit the number of decimal
+// digits that need to be computed by init by providing an additional
+// precision argument and keeping track of when a number was truncated early
+// (equivalent of "sticky bit" in binary rounding).
+
+// TODO: Along the same lines, enforce some limit to shift magnitudes
+// to avoid "infinitely" long running conversions (until we run out of space).
+
+impl decimal {
+	// Initializes x(self) to the decimal representation of m << shift (for
+	// shift >= 0), or m >> -shift (for shift < 0).
+	fn init(mut self, m: []Word, mut shift: int) {
+		// special case 0
+		if len(m) == 0 {
+			self.mant = self.mant[:0]
+			self.exp = 0
+			ret
+		}
+
+		// Optimization: If we need to shift right, first remove any trailing
+		// zero bits from m to reduce shift amount that needs to be done in
+		// decimal format (since that is likely slower).
+		if shift < 0 {
+			ntz := trailingZeroBitsW(m)
+			mut s := uint(-shift)
+			if s >= ntz {
+				s = ntz // shift at most ntz bits
+			}
+			mut r := []Word(nil)
+			rshW(r, m, s)
+			unsafe { *(&m) = r }
+			shift += int(s)
+		}
+
+		// Do any shift left in binary representation.
+		if shift > 0 {
+			mut r := []Word(nil)
+			lshW(r, m, uint(shift))
+			unsafe { *(&m) = r }
+			shift = 0
+		}
+
+		// Convert mantissa into decimal representation.
+		s := utoaW(m, 10)
+		mut n := len(s)
+		self.exp = n
+		// Trim trailing zeros; instead the exponent is tracking
+		// the decimal point independent of the number of digits.
+		for n > 0 && s[n-1] == '0' {
+			n--
+		}
+		self.mant = append(self.mant[:0], s[:n]...)
+
+		// Do any (remaining) shift right in decimal representation.
+		if shift < 0 {
+			for shift < -maxShift {
+				shr(self, maxShift)
+				shift += maxShift
+			}
+			shr(self, uint(-shift))
+		}
+	}
+
+	// Returns the i'th mantissa digit, starting with the most significant digit at 0.
+	fn at(self, i: int): byte {
+		if 0 <= i && i < len(self.mant) {
+			ret self.mant[i]
+		}
+		ret '0'
+	}
+
+	// Sets x(self) to (at most) n mantissa digits by rounding it
+	// to the nearest even value with n (or fever) mantissa digits.
+	// If n < 0, x remains unchanged.
+	fn round(mut self, n: int) {
+		if n < 0 || n >= len(self.mant) {
+			ret // nothing to do
+		}
+
+		if shouldRoundUp(self, n) {
+			self.roundUp(n)
+		} else {
+			self.roundDown(n)
+		}
+	}
+
+	fn roundUp(mut self, mut n: int) {
+		if n < 0 || n >= len(self.mant) {
+			ret // nothing to do
+		}
+		// 0 <= n < len(self.mant)
+
+		// find first digit < '9'
+		for n > 0 && self.mant[n-1] >= '9' {
+			n--
+		}
+
+		if n == 0 {
+			// all digits are '9's => round up to '1' and update exponent
+			self.mant[0] = '1' // ok since len(self.mant) > n
+			self.mant = self.mant[:1]
+			self.exp++
+			ret
+		}
+
+		// n > 0 && self.mant[n-1] < '9'
+		self.mant[n-1]++
+		self.mant = self.mant[:n]
+		// self already trimmed
+	}
+
+	fn roundDown(mut self, n: int) {
+		if n < 0 || n >= len(self.mant) {
+			ret // nothing to do
+		}
+		self.mant = self.mant[:n]
+		trim(self)
+	}
+}
+
+// Implements x >> s, for s <= maxShift.
+fn shr(mut &x: decimal, s: uint) {
+	// Division by 1<<s using shift-and-subtract algorithm.
+
+	// pick up enough leading digits to cover first shift
+	mut r := 0 // read index
+	let mut n: Word
+	for n>>s == 0 && r < len(x.mant) {
+		ch := Word(x.mant[r])
+		r++
+		n = n*10 + ch - '0'
+	}
+	if n == 0 {
+		// x == 0; shouldn't get here, but handle anyway
+		x.mant = x.mant[:0]
+		ret
+	}
+	for n>>s == 0 {
+		r++
+		n *= 10
+	}
+	x.exp += 1 - r
+
+	// read a digit, write a digit
+	mut w := 0 // write index
+	mask := Word(1)<<s - 1
+	for r < len(x.mant) {
+		ch := Word(x.mant[r])
+		r++
+		d := n >> s
+		n &= mask // n -= d << s
+		x.mant[w] = byte(d + '0')
+		w++
+		n = n*10 + ch - '0'
+	}
+
+	// write extra digits that still fit
+	for n > 0 && w < len(x.mant) {
+		d := n >> s
+		n &= mask
+		x.mant[w] = byte(d + '0')
+		w++
+		n = n * 10
+	}
+	x.mant = x.mant[:w] // the number may be shorter (e.g. 1024 >> 10)
+
+	// append additional digits that didn't fit
+	for n > 0 {
+		d := n >> s
+		n &= mask
+		x.mant = append(x.mant, byte(d+'0'))
+		n = n * 10
+	}
+
+	trim(x)
+}
+
+// Cuts off any trailing zeros from x's mantissa;
+// they are meaningless for the value of x.
+fn trim(mut &x: decimal) {
+	mut i := len(x.mant)
+	for i > 0 && x.mant[i-1] == '0' {
+		i--
+	}
+	x.mant = x.mant[:i]
+	if i == 0 {
+		x.exp = 0
+	}
+}
+
+// Reports if x should be rounded up
+// if shortened to n digits. n must be a valid index
+// for x.mant.
+fn shouldRoundUp(&x: decimal, n: int): bool {
+	if x.mant[n] == '5' && n+1 == len(x.mant) {
+		// exactly halfway - round to even
+		ret n > 0 && (x.mant[n-1]-'0')&1 != 0
+	}
+	// not halfway - digit tells all (x.mant has no trailing zeros)
+	ret x.mant[n] >= '5'
+}
