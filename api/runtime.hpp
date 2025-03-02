@@ -53,5 +53,7 @@ jule::Slice<jule::U8> __jule_strAsSlice(jule::Str s);
 jule::Str __jule_sliceAsStr(jule::Slice<jule::U8> b);
 void __jule_print(jule::Str s);
 void __jule_println(jule::Str s);
+jule::F64 __jule_NaN(void);
+jule::F64 __jule_Inf(jule::Int sign);
 
 #endif // #ifndef __JULE_RUNTIME_HPP

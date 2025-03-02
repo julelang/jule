@@ -188,19 +188,35 @@ impl exprCoder {
 		self.possibleRefExpr(r.Model)
 		self.oc.write("; if (")
 		self.oc.write(yVar)
-		self.oc.write(` == 0) __jule_panicStr(`)
-		strLitF(self.oc.Buf, fn(): int {
-			self.oc.write("\"runtime: divide by zero")
-			mut len := 23 // runtime: divide by zero
-			if !env::Production {
-				self.oc.write("\\nlocation: ")
-				len += 11 // \nlocation:
-				len += unsafe { self.oc.locInfo(op) }
+		self.oc.write(` == 0) `)
+		lp, rp := l.Type.Prim(), r.Type.Prim()
+		if types::IsFloat(lp.Kind) || types::IsFloat(rp.Kind) {
+			if types::IsFloat(lp.Kind) {
+				self.oc.tc.kind(self.oc.Buf, l.Type)
+			} else {
+				self.oc.tc.kind(self.oc.Buf, r.Type)
 			}
-			self.oc.write("\"")
-			ret len
-		})
-		self.oc.write("); ((")
+			self.oc.write("(__jule_Inf(")
+			self.oc.write(xVar)
+			self.oc.write(" > 0 && ")
+			self.oc.write(yVar)
+			self.oc.write(" > 0 ? 1 : -1)); ")
+		} else {
+			self.oc.write(`__jule_panicStr(`)
+			strLitF(self.oc.Buf, fn(): int {
+				self.oc.write("\"runtime: divide by zero")
+				mut len := 23 // runtime: divide by zero
+				if !env::Production {
+					self.oc.write("\\nlocation: ")
+					len += 11 // \nlocation:
+					len += unsafe { self.oc.locInfo(op) }
+				}
+				self.oc.write("\"")
+				ret len
+			})
+			self.oc.write("); ")
+		}
+		self.oc.write("((")
 		self.oc.tc.kind(self.oc.Buf, l.Type)
 		self.oc.write(")(")
 		self.oc.write(xVar)
