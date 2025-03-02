@@ -1675,13 +1675,7 @@ impl eval {
 
 	fn castInt(mut self, mut t: &Type, mut v: &Value, errorToken: &token::Token) {
 		if v.IsConst() {
-			prim := t.Prim()
-			match {
-			| types::IsSigInt(prim.Kind):
-				v.Constant.SetI64(v.Constant.AsI64())
-			| types::IsUnsigInt(prim.Kind):
-				v.Constant.SetU64(v.Constant.AsU64())
-			}
+			castConstByType(t.Prim().Kind, v)
 		} else {
 			v.Constant = nil
 			v.untyped = false
@@ -1722,15 +1716,7 @@ impl eval {
 
 	fn castNum(mut self, mut t: &Type, mut v: &Value, errorToken: &token::Token) {
 		if v.IsConst() {
-			prim := t.Prim()
-			match {
-			| types::IsFloat(prim.Kind):
-				v.Constant.SetF64(v.Constant.AsF64())
-			| types::IsSigInt(prim.Kind):
-				v.Constant.SetI64(v.Constant.AsI64())
-			| types::IsUnsigInt(prim.Kind):
-				v.Constant.SetU64(v.Constant.AsU64())
-			}
+			castConstByType(t.Prim().Kind, v)
 		} else {
 			v.Constant = nil
 			v.untyped = false
@@ -3442,7 +3428,11 @@ impl unaryEval {
 		if self.v.IsConst() {
 			match {
 			| self.v.Constant.IsF64():
-				self.v.Constant.SetF64(-self.v.Constant.ReadF64())
+				if self.v.Type.Prim().IsF32() {
+					self.v.Constant.SetF64(f64(-f32(self.v.Constant.ReadF64())))
+				} else {
+					self.v.Constant.SetF64(-self.v.Constant.ReadF64())
+				}
 			| self.v.Constant.IsInt():
 				i := self.v.Constant.ReadInt()
 				if self.v.untyped {
@@ -4737,6 +4727,12 @@ impl binaryEval {
 					panic("sema: unimplemented constant type for unaryEval.caret, this panic call should be unreachable")
 				}
 			}
+		} else {
+			if v.Type.Prim() != nil {
+				castConstByType(v.Type.Prim().Kind, v)
+			} else {
+				castConstByType(v.Type.Enum().TypeSym.Type.Prim().Kind, v)
+			}
 		}
 		v.Model = v.Constant
 		applyCastModelByEnum(self.e.s, v, v.Type.Enum(), self.op, self.e.getOwnerRefers())
@@ -5060,35 +5056,35 @@ fn applyCastModelByEnum(mut &s: &sema, mut &v: &Value, mut e: &Enum,
 	applyCastKindModel(s, v, e.TypeSym.Type, token, refers)
 }
 
-fn castConstByType(&t: str, mut &v: &Value) {
+fn castConstByType(t: str, mut &v: &Value) {
 	match {
 	| types::IsSigInt(t):
 		match types::BitSizeOf(types::RealKindOf(t)) {
-		| 1 << 6:
+		| 64:
 			v.Constant.SetI64(v.Constant.AsI64())
-		| 1 << 5:
+		| 32:
 			v.Constant.SetI64(i64(i32(v.Constant.AsI64())))
-		| 1 << 4:
+		| 16:
 			v.Constant.SetI64(i64(i16(v.Constant.AsI64())))
-		| 1 << 3:
+		| 8:
 			v.Constant.SetI64(i64(i8(v.Constant.AsI64())))
 		}
 	| types::IsUnsigInt(t):
 		match types::BitSizeOf(types::RealKindOf(t)) {
-		| 1 << 6:
+		| 64:
 			v.Constant.SetU64(v.Constant.AsU64())
-		| 1 << 5:
+		| 32:
 			v.Constant.SetU64(u64(u32(v.Constant.AsU64())))
-		| 1 << 4:
+		| 16:
 			v.Constant.SetU64(u64(u16(v.Constant.AsU64())))
-		| 1 << 3:
+		| 8:
 			v.Constant.SetU64(u64(u8(v.Constant.AsU64())))
 		}
 	| types::IsFloat(t):
 		match types::BitSizeOf(types::RealKindOf(t)) {
-		| 1 << 6:
+		| 64:
 			v.Constant.SetF64(v.Constant.AsF64())
-		| 1 << 5:
+		| 32:
 			v.Constant.SetF64(f64(f32(v.Constant.AsF64())))
 		}
 	}
