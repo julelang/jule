@@ -87,70 +87,75 @@ fn u64ToBuf(mut buf: []byte, mut x: u64): int {
 
 // Returns x in decimal string format.
 #export "__jule_f64ToStr"
-fn f64ToStr(mut f: f64): str {
-	const mantbits = 52
-	const expbits = 11
-	bits := f64bits(f)
-	neg := bits>>(expbits+mantbits) != 0
-	exp := int(bits>>mantbits) & int(1<<expbits-1)
-	mant := bits & (u64(1)<<mantbits - 1)
+fn f64ToStr(mut v: f64): str {
+	match {
+	| v != v:
+		ret "NaN"
+	| v+v == v && v > 0:
+		ret "+Inf"
+	| v+v == v && v < 0:
+		ret "-Inf"
+	}
 
-	// check cases for NaN or ±Inf
-	if exp == int(1<<expbits)-1 {
-		match {
-		| mant != 0:
-			ret "NaN"
-		| neg:
-			ret "-Inf"
-		|:
-			ret "+Inf"
+	const n = 7 // digits printed
+	let mut buf: [n + 7]byte
+	buf[0] = '+'
+	mut e := 0 // exp
+	if v == 0 {
+		if 1/v < 0 {
+			buf[0] = '-'
+		}
+	} else {
+		if v < 0 {
+			v = -v
+			buf[0] = '-'
+		}
+
+		// normalize
+		for v >= 10 {
+			e++
+			v /= 10
+		}
+		for v < 1 {
+			e--
+			v *= 10
+		}
+
+		// round
+		mut h := 5.0
+		mut i := 0
+		for i < n; i++ {
+			h /= 10
+		}
+		v += h
+		if v >= 10 {
+			e++
+			v /= 10
 		}
 	}
 
-	const Prec = 4 // Fraction precision.
-
-	//   ±   u64  .   frac
-	n := 1 + 20 + 1 + Prec // enough size for base 10
-	mut buf := make([]byte, n)
-	mut j := 0
-	if neg {
-		buf[0] = '-'
-		j++
-		f = -f
-	}
-
-	intPart := u64(f)
-	j += u64ToBuf(buf[j:], intPart)
-
-	buf[j] = '.'
-	mut fracPart := f - f64(intPart)
+	// format +d.dddd+edd
 	mut i := 0
+	for i < n; i++ {
+		s := int(v)
+		buf[i+2] = byte(s + '0')
+		v -= f64(s)
+		v *= 10
+	}
+	buf[1] = buf[2]
+	buf[2] = '.'
 
-	// 17 is a maximum precision, subtract j to find remaining precision for after dot
-	prec := 17 - j
-	for i < prec; i++ {
-		fracPart *= 10
-		digit := int(fracPart)
-		if digit < 0 || digit > 9 {
-			break
-		}
-		j++
-		buf[j] = byte('0' + digit)
-		fracPart -= f64(digit)
+	buf[n+2] = 'e'
+	buf[n+3] = '+'
+	if e < 0 {
+		e = -e
+		buf[n+3] = '-'
 	}
 
-	// trim trailing zeros
-	for j >= 0; j-- {
-		if buf[j] != '0' {
-			break
-		}
-	}
-	if buf[j] != '.' {
-		j++
-	}
-	buf = buf[:j]
-
-	ret unsafe::StrFromBytes(buf)
+	buf[n+4] = byte(e/100) + '0'
+	buf[n+5] = byte(e/10)%10 + '0'
+	buf[n+6] = byte(e%10) + '0'
+	ret unsafe::StrFromBytes(buf[:])
 }
 
 // Returns x in string form with default format.
