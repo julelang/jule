@@ -1977,10 +1977,17 @@ impl eval {
 		}
 		// Do not allow arbitrary large literals for casting.
 		// Because casting will result as a valid memory type.
-		// If we do not eval with the physical memory constraints,
+		// If we do not eval with the physical memory constraint,
 		// arbitrary large literals may overflow largest bitsize of any actual type.
 		// So we need to make sure that the value can fit at least the largest type.
-		mut v := self.evalExpr(e, evalDefault|evalPhysicalMem)
+		//
+		// For floating-point types; eval with no physical memory constraint.
+		// Because floating-point types allows casting from any arbitrary integer value.
+		mut flags := evalDefault
+		if t.Prim() == nil || !types::IsFloat(t.Prim().Kind) {
+			flags |= evalPhysicalMem
+		}
+		mut v := self.evalExpr(e, flags)
 		if v == nil || self.prefix != nil {
 			ret v
 		}
