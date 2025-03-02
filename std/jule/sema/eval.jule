@@ -5076,6 +5076,7 @@ fn castConstByType(t: str, mut &v: &Value) {
 		| 8:
 			v.Constant.SetI64(i64(i8(v.Constant.AsI64())))
 		}
+		v.Constant.Kind = t
 	| types::IsUnsigInt(t):
 		match types::BitSizeOf(types::RealKindOf(t)) {
 		| 64:
@@ -5087,6 +5088,7 @@ fn castConstByType(t: str, mut &v: &Value) {
 		| 8:
 			v.Constant.SetU64(u64(u8(v.Constant.AsU64())))
 		}
+		v.Constant.Kind = t
 	| types::IsFloat(t):
 		match types::BitSizeOf(types::RealKindOf(t)) {
 		| 64:
@@ -5094,6 +5096,7 @@ fn castConstByType(t: str, mut &v: &Value) {
 		| 32:
 			v.Constant.SetF64(f64(f32(v.Constant.AsF64())))
 		}
+		v.Constant.Kind = t
 	}
 }
 
@@ -5227,7 +5230,7 @@ fn checkValue(mut v: &Value, mut s: &sema, mut token: &token::Token, flags: int)
 	// In order for this value to be assigned to memory,
 	// we need to make sure that it can fit at least the largest integer type.
 	if flags&evalPhysicalMem == evalPhysicalMem {
-		if v.untyped && v.IsConst() && v.Constant.IsInt() {
+		if v.IsConst() && v.Constant.IsInt() {
 			i := v.Constant.ReadInt()
 			if !i.IsI64() && !i.IsU64() {
 				s.pushErr(token, build::LogMsg.UntypedNumericForPhysical, i.Str())
