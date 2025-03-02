@@ -11,36 +11,6 @@ struct Cmplx {
 }
 
 impl Cmplx {
-	// Returns new complex number.
-	static fn New(real: f64, imag: f64): Cmplx {
-		ret Cmplx{
-			real: real,
-			imag: imag,
-		}
-	}
-
-	// Returns NaN complex number.
-	static fn NaN(): Cmplx {
-		ret Cmplx{
-			real: math::NaN(),
-			imag: math::NaN(),
-		}
-	}
-
-	// Returns Inf complex number.
-	// Uses positive infinity if sign >= 0, negative infinity if !sign < 0.
-	static fn Inf(sign: int): Cmplx {
-		ret Cmplx{
-			real: math::Inf(sign),
-			imag: math::Inf(sign),
-		}
-	}
-
-	// Returns zero complex number.
-	static fn Zero(): Cmplx {
-		ret Cmplx.New(0, 0)
-	}
-
 	// Returns real part of complex number.
 	fn Real(self): f64 {
 		ret self.real
@@ -49,11 +19,6 @@ impl Cmplx {
 	// Returns imaginary part of complex number.
 	fn Imag(self): f64 {
 		ret self.imag
-	}
-
-	// Returns conjugate of complex number.
-	fn Conj(self): Cmplx {
-		ret Cmplx.New(self.Real(), -self.Imag())
 	}
 
 	// Returns addition of complex numbers.
@@ -153,7 +118,7 @@ impl Cmplx {
 			static inf = math::F64frombits(0x7FF0000000000000)
 
 			match {
-			| m.IsZero() && (!math::IsNaN(a) || !math::IsNaN(b)):
+			| IsZero(m) && (!math::IsNaN(a) || !math::IsNaN(b)):
 				r = math::Copysign(inf, c) * a
 				i = math::Copysign(inf, c) * b
 			| (isInf(a) || isInf(b)) && isFinite(c) && isFinite(d):
@@ -174,29 +139,7 @@ impl Cmplx {
 
 	// Unary minus operator.
 	fn Neg(self): Cmplx {
-		ret Cmplx.New(-self.Real(), -self.Imag())
-	}
-
-	// Reports whether either real or imag is an infinity.
-	fn IsInf(self): bool {
-		ret math::IsInf(self.Real(), 0) || math::IsInf(self.Imag(), 0)
-	}
-
-	// Reports whether either real or imag is NaN and neither is an infinity.
-	fn IsNaN(self): bool {
-		match {
-		| math::IsInf(self.Real(), 0) | math::IsInf(self.Imag(), 0):
-			ret false
-		| math::IsNaN(self.Real()) | math::IsNaN(self.Imag()):
-			ret true
-		|:
-			ret false
-		}
-	}
-
-	// Reports whether real and imag is zero.
-	fn IsZero(self): bool {
-		ret self.Real() == 0 && self.Imag() == 0
+		ret New(-self.Real(), -self.Imag())
 	}
 }
 
@@ -218,4 +161,55 @@ fn inf2one(f: f64): f64 {
 		g = 1.0
 	}
 	ret math::Copysign(g, f)
+}
+
+// Returns conjugate of complex number.
+fn Conj(x: Cmplx): Cmplx {
+	ret New(x.Real(), -x.Imag())
+}
+
+// Reports whether either real or imag is an infinity.
+fn IsInf(x: Cmplx): bool {
+	ret math::IsInf(x.Real(), 0) || math::IsInf(x.Imag(), 0)
+}
+
+// Reports whether either real or imag is NaN and neither is an infinity.
+fn IsNaN(x: Cmplx): bool {
+	match {
+	| math::IsInf(x.Real(), 0) | math::IsInf(x.Imag(), 0):
+		ret false
+	| math::IsNaN(x.Real()) | math::IsNaN(x.Imag()):
+		ret true
+	|:
+		ret false
+	}
+}
+
+// Reports whether real and imag is zero.
+fn IsZero(x: Cmplx): bool {
+	ret x.Real() == 0 && x.Imag() == 0
+}
+
+// Returns new complex number.
+fn New(real: f64, imag: f64): Cmplx {
+	ret Cmplx{
+		real: real,
+		imag: imag,
+	}
+}
+
+// Returns NaN complex number.
+fn NaN(): Cmplx {
+	ret New(math::NaN(), math::NaN())
+}
+
+// Returns Inf complex number.
+// Uses positive infinity if sign >= 0, negative infinity if !sign < 0.
+fn Inf(sign: int): Cmplx {
+	ret New(math::Inf(sign), math::Inf(sign))
+}
+
+// Returns zero complex number.
+fn Zero(): Cmplx {
+	ret New(0, 0)
 }

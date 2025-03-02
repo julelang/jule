@@ -1,0 +1,1388 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/math"
+use "std/testing"
+
+// The higher-precision values in vc26 were used to derive the
+// input arguments vc (see also comment below). For reference
+// only (do not delete).
+static vc26 = [
+	New(4.97901192488367350108546816, 7.73887247457810456552351752),
+	New(7.73887247457810456552351752, -0.27688005719200159404635997),
+	New(-0.27688005719200159404635997, -5.01060361827107492160848778),
+	New(-5.01060361827107492160848778, 9.63629370719841737980004837),
+	New(9.63629370719841737980004837, 2.92637723924396464525443662),
+	New(2.92637723924396464525443662, 5.22908343145930665230025625),
+	New(5.22908343145930665230025625, 2.72793991043601025126008608),
+	New(2.72793991043601025126008608, 1.82530809168085506044576505),
+	New(1.82530809168085506044576505, -8.68592476857560136238589621),
+	New(-8.68592476857560136238589621, 4.97901192488367350108546816),
+]
+
+static vc = [
+	New(4.9790119248836735e+00, 7.7388724745781045e+00),
+	New(7.7388724745781045e+00, -2.7688005719200159e-01),
+	New(-2.7688005719200159e-01, -5.0106036182710749e+00),
+	New(-5.0106036182710749e+00, 9.6362937071984173e+00),
+	New(9.6362937071984173e+00, 2.9263772392439646e+00),
+	New(2.9263772392439646e+00, 5.2290834314593066e+00),
+	New(5.2290834314593066e+00, 2.7279399104360102e+00),
+	New(2.7279399104360102e+00, 1.8253080916808550e+00),
+	New(1.8253080916808550e+00, -8.6859247685756013e+00),
+	New(-8.6859247685756013e+00, 4.9790119248836735e+00),
+]
+
+// The expected results below were computed by the high precision calculators
+// at https://keisan.casio.com/.  More exact input values (array vc[], above)
+// were obtained by printing them with "%.26f".  The answers were calculated
+// to 26 digits (by using the "Digit number" drop-down control of each
+// calculator).
+
+static abs = [
+	9.2022120669932650313380972e+00,
+	7.7438239742296106616261394e+00,
+	5.0182478202557746902556648e+00,
+	1.0861137372799545160704002e+01,
+	1.0070841084922199607011905e+01,
+	5.9922447613166942183705192e+00,
+	5.8978784056736762299945176e+00,
+	3.2822866700678709020367184e+00,
+	8.8756430028990417290744307e+00,
+	1.0011785496777731986390856e+01,
+]
+
+static acos = [
+	New(1.0017679804707456328694569, -2.9138232718554953784519807),
+	New(0.03606427612041407369636057, 2.7358584434576260925091256),
+	New(1.6249365462333796703711823, 2.3159537454335901187730929),
+	New(2.0485650849650740120660391, -3.0795576791204117911123886),
+	New(0.29621132089073067282488147, -3.0007392508200622519398814),
+	New(1.0664555914934156601503632, -2.4872865024796011364747111),
+	New(0.48681307452231387690013905, -2.463655912283054555225301),
+	New(0.6116977071277574248407752, -1.8734458851737055262693056),
+	New(1.3649311280370181331184214, 2.8793528632328795424123832),
+	New(2.6189310485682988308904501, -2.9956543302898767795858704),
+]
+static acosh = [
+	New(2.9138232718554953784519807, 1.0017679804707456328694569),
+	New(2.7358584434576260925091256, -0.03606427612041407369636057),
+	New(2.3159537454335901187730929, -1.6249365462333796703711823),
+	New(3.0795576791204117911123886, 2.0485650849650740120660391),
+	New(3.0007392508200622519398814, 0.29621132089073067282488147),
+	New(2.4872865024796011364747111, 1.0664555914934156601503632),
+	New(2.463655912283054555225301, 0.48681307452231387690013905),
+	New(1.8734458851737055262693056, 0.6116977071277574248407752),
+	New(2.8793528632328795424123832, -1.3649311280370181331184214),
+	New(2.9956543302898767795858704, 2.6189310485682988308904501),
+]
+static asin = [
+	New(0.56902834632415098636186476, 2.9138232718554953784519807),
+	New(1.5347320506744825455349611, -2.7358584434576260925091256),
+	New(-0.054140219438483051139860579, -2.3159537454335901187730929),
+	New(-0.47776875817017739283471738, 3.0795576791204117911123886),
+	New(1.2745850059041659464064402, 3.0007392508200622519398814),
+	New(0.50434073530148095908095852, 2.4872865024796011364747111),
+	New(1.0839832522725827423311826, 2.463655912283054555225301),
+	New(0.9590986196671391943905465, 1.8734458851737055262693056),
+	New(0.20586519875787848611290031, -2.8793528632328795424123832),
+	New(-1.0481347217734022116591284, 2.9956543302898767795858704),
+]
+static asinh = [
+	New(2.9113760469415295679342185, 0.99639459545704326759805893),
+	New(2.7441755423994259061579029, -0.035468308789000500601119392),
+	New(-2.2962136462520690506126678, -1.5144663565690151885726707),
+	New(-3.0771233459295725965402455, 1.0895577967194013849422294),
+	New(3.0048366100923647417557027, 0.29346979169819220036454168),
+	New(2.4800059370795363157364643, 1.0545868606049165710424232),
+	New(2.4718773838309585611141821, 0.47502344364250803363708842),
+	New(1.8910743588080159144378396, 0.56882925572563602341139174),
+	New(2.8735426423367341878069406, -1.362376149648891420997548),
+	New(-2.9981750586172477217567878, 0.5183571985225367505624207),
+]
+static atan = [
+	New(1.5115747079332741358607654, 0.091324403603954494382276776),
+	New(1.4424504323482602560806727, -0.0045416132642803911503770933),
+	New(-1.5593488703630532674484026, -0.20163295409248362456446431),
+	New(-1.5280619472445889867794105, 0.081721556230672003746956324),
+	New(1.4759909163240799678221039, 0.028602969320691644358773586),
+	New(1.4877353772046548932715555, 0.14566877153207281663773599),
+	New(1.4206983927779191889826, 0.076830486127880702249439993),
+	New(1.3162236060498933364869556, 0.16031313000467530644933363),
+	New(1.5473450684303703578810093, -0.11064907507939082484935782),
+	New(-1.4841462340185253987375812, 0.049341850305024399493142411),
+]
+static atanh = [
+	New(0.058375027938968509064640438, 1.4793488495105334458167782),
+	New(0.12977343497790381229915667, -1.5661009410463561327262499),
+	New(-0.010576456067347252072200088, -1.3743698658402284549750563),
+	New(-0.042218595678688358882784918, 1.4891433968166405606692604),
+	New(0.095218997991316722061828397, 1.5416884098777110330499698),
+	New(0.079965459366890323857556487, 1.4252510353873192700350435),
+	New(0.15051245471980726221708301, 1.4907432533016303804884461),
+	New(0.25082072933993987714470373, 1.392057665392187516442986),
+	New(0.022896108815797135846276662, -1.4609224989282864208963021),
+	New(-0.08665624101841876130537396, 1.5207902036935093480142159),
+]
+static conj = [
+	New(4.9790119248836735e+00, -7.7388724745781045e+00),
+	New(7.7388724745781045e+00, 2.7688005719200159e-01),
+	New(-2.7688005719200159e-01, 5.0106036182710749e+00),
+	New(-5.0106036182710749e+00, -9.6362937071984173e+00),
+	New(9.6362937071984173e+00, -2.9263772392439646e+00),
+	New(2.9263772392439646e+00, -5.2290834314593066e+00),
+	New(5.2290834314593066e+00, -2.7279399104360102e+00),
+	New(2.7279399104360102e+00, -1.8253080916808550e+00),
+	New(1.8253080916808550e+00, 8.6859247685756013e+00),
+	New(-8.6859247685756013e+00, -4.9790119248836735e+00),
+]
+static cos = [
+	New(3.024540920601483938336569e+02, 1.1073797572517071650045357e+03),
+	New(1.192858682649064973252758e-01, 2.7857554122333065540970207e-01),
+	New(7.2144394304528306603857962e+01, -2.0500129667076044169954205e+01),
+	New(2.24921952538403984190541e+03, -7.317363745602773587049329e+03),
+	New(-9.148222970032421760015498e+00, 1.953124661113563541862227e+00),
+	New(-9.116081175857732248227078e+01, -1.992669213569952232487371e+01),
+	New(3.795639179042704640002918e+00, 6.623513350981458399309662e+00),
+	New(-2.9144840732498869560679084e+00, -1.214620271628002917638748e+00),
+	New(-7.45123482501299743872481e+02, 2.8641692314488080814066734e+03),
+	New(-5.371977967039319076416747e+01, 4.893348341339375830564624e+01),
+]
+static cosh = [
+	New(8.34638383523018249366948e+00, 7.2181057886425846415112064e+01),
+	New(1.10421967379919366952251e+03, -3.1379638689277575379469861e+02),
+	New(3.051485206773701584738512e-01, -2.6805384730105297848044485e-01),
+	New(-7.33294728684187933370938e+01, 1.574445942284918251038144e+01),
+	New(-7.478643293945957535757355e+03, 1.6348382209913353929473321e+03),
+	New(4.622316522966235701630926e+00, -8.088695185566375256093098e+00),
+	New(-8.544333183278877406197712e+01, 3.7505836120128166455231717e+01),
+	New(-1.934457815021493925115198e+00, 7.3725859611767228178358673e+00),
+	New(-2.352958770061749348353548e+00, -2.034982010440878358915409e+00),
+	New(7.79756457532134748165069e+02, 2.8549350716819176560377717e+03),
+]
+static exp = [
+	New(1.669197736864670815125146e+01, 1.4436895109507663689174096e+02),
+	New(2.2084389286252583447276212e+03, -6.2759289284909211238261917e+02),
+	New(2.227538273122775173434327e-01, 7.2468284028334191250470034e-01),
+	New(-6.5182985958153548997881627e-03, -1.39965837915193860879044e-03),
+	New(-1.4957286524084015746110777e+04, 3.269676455931135688988042e+03),
+	New(9.218158701983105935659273e+00, -1.6223985291084956009304582e+01),
+	New(-1.7088175716853040841444505e+02, 7.501382609870410713795546e+01),
+	New(-3.852461315830959613132505e+00, 1.4808420423156073221970892e+01),
+	New(-4.586775503301407379786695e+00, -4.178501081246873415144744e+00),
+	New(4.451337963005453491095747e-05, -1.62977574205442915935263e-04),
+]
+static log = [
+	New(2.2194438972179194425697051e+00, 9.9909115046919291062461269e-01),
+	New(2.0468956191154167256337289e+00, -3.5762575021856971295156489e-02),
+	New(1.6130808329853860438751244e+00, -1.6259990074019058442232221e+00),
+	New(2.3851910394823008710032651e+00, 2.0502936359659111755031062e+00),
+	New(2.3096442270679923004800651e+00, 2.9483213155446756211881774e-01),
+	New(1.7904660933974656106951860e+00, 1.0605860367252556281902109e+00),
+	New(1.7745926939841751666177512e+00, 4.8084556083358307819310911e-01),
+	New(1.1885403350045342425648780e+00, 5.8969634164776659423195222e-01),
+	New(2.1833107837679082586772505e+00, -1.3636647724582455028314573e+00),
+	New(2.3037629487273259170991671e+00, 2.6210913895386013290915234e+00),
+]
+static log10 = [
+	New(9.6389223745559042474184943e-01, 4.338997735671419492599631e-01),
+	New(8.8895547241376579493490892e-01, -1.5531488990643548254864806e-02),
+	New(7.0055210462945412305244578e-01, -7.0616239649481243222248404e-01),
+	New(1.0358753067322445311676952e+00, 8.9043121238134980156490909e-01),
+	New(1.003065742975330237172029e+00, 1.2804396782187887479857811e-01),
+	New(7.7758954439739162532085157e-01, 4.6060666333341810869055108e-01),
+	New(7.7069581462315327037689152e-01, 2.0882857371769952195512475e-01),
+	New(5.1617650901191156135137239e-01, 2.5610186717615977620363299e-01),
+	New(9.4819982567026639742663212e-01, -5.9223208584446952284914289e-01),
+	New(1.0005115362454417135973429e+00, 1.1383255270407412817250921e+00),
+]
+
+struct ff {
+	r:     f64
+	theta: f64
+}
+
+static polar: []ff = [
+	{9.2022120669932650313380972e+00, 9.9909115046919291062461269e-01},
+	{7.7438239742296106616261394e+00, -3.5762575021856971295156489e-02},
+	{5.0182478202557746902556648e+00, -1.6259990074019058442232221e+00},
+	{1.0861137372799545160704002e+01, 2.0502936359659111755031062e+00},
+	{1.0070841084922199607011905e+01, 2.9483213155446756211881774e-01},
+	{5.9922447613166942183705192e+00, 1.0605860367252556281902109e+00},
+	{5.8978784056736762299945176e+00, 4.8084556083358307819310911e-01},
+	{3.2822866700678709020367184e+00, 5.8969634164776659423195222e-01},
+	{8.8756430028990417290744307e+00, -1.3636647724582455028314573e+00},
+	{1.0011785496777731986390856e+01, 2.6210913895386013290915234e+00},
+]
+static pow = [
+	New(-2.499956739197529585028819e+00, 1.759751724335650228957144e+00),
+	New(7.357094338218116311191939e+04, -5.089973412479151648145882e+04),
+	New(1.320777296067768517259592e+01, -3.165621914333901498921986e+01),
+	New(-3.123287828297300934072149e-07, -1.9849567521490553032502223e-7),
+	New(8.0622651468477229614813e+04, -7.80028727944573092944363e+04),
+	New(-1.0268824572103165858577141e+00, -4.716844738244989776610672e-01),
+	New(-4.35953819012244175753187e+01, 2.2036445974645306917648585e+02),
+	New(8.3556092283250594950239e-01, -1.2261571947167240272593282e+01),
+	New(1.582292972120769306069625e+03, 1.273564263524278244782512e+04),
+	New(6.592208301642122149025369e-08, 2.584887236651661903526389e-08),
+]
+static sin = [
+	New(-1.1073801774240233539648544e+03, 3.024539773002502192425231e+02),
+	New(1.0317037521400759359744682e+00, -3.2208979799929570242818e-02),
+	New(-2.0501952097271429804261058e+01, -7.2137981348240798841800967e+01),
+	New(7.3173638080346338642193078e+03, 2.249219506193664342566248e+03),
+	New(-1.964375633631808177565226e+00, -9.0958264713870404464159683e+00),
+	New(1.992783647158514838337674e+01, -9.11555769410191350416942e+01),
+	New(-6.680335650741921444300349e+00, 3.763353833142432513086117e+00),
+	New(1.2794028166657459148245993e+00, -2.7669092099795781155109602e+00),
+	New(2.8641693949535259594188879e+03, 7.451234399649871202841615e+02),
+	New(-4.893811726244659135553033e+01, -5.371469305562194635957655e+01),
+]
+static sinh = [
+	New(8.34559353341652565758198e+00, 7.2187893208650790476628899e+01),
+	New(1.1042192548260646752051112e+03, -3.1379650595631635858792056e+02),
+	New(-8.239469336509264113041849e-02, 9.9273668758439489098514519e-01),
+	New(7.332295456982297798219401e+01, -1.574585908122833444899023e+01),
+	New(-7.4786432301380582103534216e+03, 1.63483823493980029604071e+03),
+	New(4.595842179016870234028347e+00, -8.135290105518580753211484e+00),
+	New(-8.543842533574163435246793e+01, 3.750798997857594068272375e+01),
+	New(-1.918003500809465688017307e+00, 7.4358344619793504041350251e+00),
+	New(-2.233816733239658031433147e+00, -2.143519070805995056229335e+00),
+	New(-7.797564130187551181105341e+02, -2.8549352346594918614806877e+03),
+]
+static sqrt = [
+	New(2.6628203086086130543813948e+00, 1.4531345674282185229796902e+00),
+	New(2.7823278427251986247149295e+00, -4.9756907317005224529115567e-02),
+	New(1.5397025302089642757361015e+00, -1.6271336573016637535695727e+00),
+	New(1.7103411581506875260277898e+00, 2.8170677122737589676157029e+00),
+	New(3.1390392472953103383607947e+00, 4.6612625849858653248980849e-01),
+	New(2.1117080764822417640789287e+00, 1.2381170223514273234967850e+00),
+	New(2.3587032281672256703926939e+00, 5.7827111903257349935720172e-01),
+	New(1.7335262588873410476661577e+00, 5.2647258220721269141550382e-01),
+	New(2.3131094974708716531499282e+00, -1.8775429304303785570775490e+00),
+	New(8.1420535745048086240947359e-01, 3.0575897587277248522656113e+00),
+]
+static tan = [
+	New(-1.928757919086441129134525e-07, 1.0000003267499169073251826e+00),
+	New(1.242412685364183792138948e+00, -3.17149693883133370106696e+00),
+	New(-4.6745126251587795225571826e-05, -9.9992439225263959286114298e-01),
+	New(4.792363401193648192887116e-09, 1.0000000070589333451557723e+00),
+	New(2.345740824080089140287315e-03, 9.947733046570988661022763e-01),
+	New(-2.396030789494815566088809e-05, 9.9994781345418591429826779e-01),
+	New(-7.370204836644931340905303e-03, 1.0043553413417138987717748e+00),
+	New(-3.691803847992048527007457e-02, 9.6475071993469548066328894e-01),
+	New(-2.781955256713729368401878e-08, -1.000000049848910609006646e+00),
+	New(9.4281590064030478879791249e-05, 9.9999119340863718183758545e-01),
+]
+static tanh = [
+	New(1.0000921981225144748819918e+00, 2.160986245871518020231507e-05),
+	New(9.9999967727531993209562591e-01, -1.9953763222959658873657676e-07),
+	New(-1.765485739548037260789686e+00, 1.7024216325552852445168471e+00),
+	New(-9.999189442732736452807108e-01, 3.64906070494473701938098e-05),
+	New(9.9999999224622333738729767e-01, -3.560088949517914774813046e-09),
+	New(1.0029324933367326862499343e+00, -4.948790309797102353137528e-03),
+	New(9.9996113064788012488693567e-01, -4.226995742097032481451259e-05),
+	New(1.0074784189316340029873945e+00, -4.194050814891697808029407e-03),
+	New(9.9385534229718327109131502e-01, 5.144217985914355502713437e-02),
+	New(-1.0000000491604982429364892e+00, -2.901873195374433112227349e-08),
+]
+
+// Values along the real axis for testing reducePi in Tan
+static hugeIn = [
+	New(2.68435456e+08, 0),
+	New(5.36870912e+08, 0),
+	New(1.073741824e+09, 0),
+	New(3.4359738368e+10, 0),
+	New(-1.329227995784916e+36, 0),
+	New(1.7668470647783843e+72, 0),
+	New(2.037035976334486e+90, 0),
+	New(-3.1217485503159922e+144, 0),
+	New(1.8919697882131776e+69, 0),
+	New(-2.514859209672214e+105, 0),
+]
+
+// Results for tanHuge[i] calculated with https://github.com/robpike/ivy
+// using 4096 bits of working precision.
+static tanHuge = [
+	New(5.95641897939639421, 0),
+	New(-0.34551069233430392, 0),
+	New(-0.78469661331920043, 0),
+	New(0.84276385870875983, 0),
+	New(0.40806638884180424, 0),
+	New(-0.37603456702698076, 0),
+	New(4.60901287677810962, 0),
+	New(3.39135965054779932, 0),
+	New(-6.76813854009065030, 0),
+	New(-0.76417695016604922, 0),
+]
+
+// special cases conform to C99 standard appendix G.6 Complex arithmetic
+static inf = math::Inf(1)
+static nan = math::NaN()
+
+static zero = 0.0
+static eps = 1.1102230246251565e-16
+
+struct cmplxTest {
+	input: Cmplx
+	want:  Cmplx
+}
+
+static vcAbsSC = [
+	NaN(),
+]
+static absSC = [
+	math::NaN(),
+]
+static acosSC: []cmplxTest = [
+	// G.6.1.1
+	{New(zero, zero), New(math::Pi/2, -zero)},
+	{New(-zero, zero), New(math::Pi/2, -zero)},
+	{New(zero, nan), New(math::Pi/2, nan)},
+	{New(-zero, nan), New(math::Pi/2, nan)},
+	{New(1.0, inf), New(math::Pi/2, -inf)},
+	{New(1.0, nan), NaN()},
+	{New(-inf, 1.0), New(math::Pi, -inf)},
+	{New(inf, 1.0), New(0.0, -inf)},
+	{New(-inf, inf), New(3*math::Pi/4, -inf)},
+	{New(inf, inf), New(math::Pi/4, -inf)},
+	{New(inf, nan), New(nan, -inf)},            // imaginary sign unspecified
+	{New(-inf, nan), New(nan, inf)},            // imaginary sign unspecified
+	{New(nan, 1.0), NaN()},
+	{New(nan, inf), New(nan, -inf)},
+	{NaN(), NaN()},
+]
+static acoshSC: []cmplxTest = [
+	// G.6.2.1
+	{New(zero, zero), New(zero, math::Pi/2)},
+	{New(-zero, zero), New(zero, math::Pi/2)},
+	{New(1.0, inf), New(inf, math::Pi/2)},
+	{New(1.0, nan), NaN()},
+	{New(-inf, 1.0), New(inf, math::Pi)},
+	{New(inf, 1.0), New(inf, zero)},
+	{New(-inf, inf), New(inf, 3*math::Pi/4)},
+	{New(inf, inf), New(inf, math::Pi/4)},
+	{New(inf, nan), New(inf, nan)},
+	{New(-inf, nan), New(inf, nan)},
+	{New(nan, 1.0), NaN()},
+	{New(nan, inf), New(inf, nan)},
+	{NaN(), NaN()},
+]
+static asinSC: []cmplxTest = [
+	// Derived from Asin(z) = -i * Asinh(i * z), G.6 #7
+	{New(zero, zero), New(zero, zero)},
+	{New(1.0, inf), New(0, inf)},
+	{New(1.0, nan), NaN()},
+	{New(inf, 1), New(math::Pi/2, inf)},
+	{New(inf, inf), New(math::Pi/4, inf)},
+	{New(inf, nan), New(nan, inf)},        // imaginary sign unspecified
+	{New(nan, zero), NaN()},
+	{New(nan, 1), NaN()},
+	{New(nan, inf), New(nan, inf)},
+	{NaN(), NaN()},
+]
+static asinhSC: []cmplxTest = [
+	// G.6.2.2
+	{New(zero, zero), New(zero, zero)},
+	{New(1.0, inf), New(inf, math::Pi/2)},
+	{New(1.0, nan), NaN()},
+	{New(inf, 1.0), New(inf, zero)},
+	{New(inf, inf), New(inf, math::Pi/4)},
+	{New(inf, nan), New(inf, nan)},
+	{New(nan, zero), New(nan, zero)},
+	{New(nan, 1.0), NaN()},
+	{New(nan, inf), New(inf, nan)},        // sign of real part unspecified
+	{NaN(), NaN()},
+]
+static atanSC: []cmplxTest = [
+	// Derived from Atan(z) = -i * Atanh(i * z), G.6 #7
+	{New(0, zero), New(0, zero)},
+	{New(0, nan), NaN()},
+	{New(1.0, zero), New(math::Pi/4, zero)},
+	{New(1.0, inf), New(math::Pi/2, zero)},
+	{New(1.0, nan), NaN()},
+	{New(inf, 1), New(math::Pi/2, zero)},
+	{New(inf, inf), New(math::Pi/2, zero)},
+	{New(inf, nan), New(math::Pi/2, zero)},
+	{New(nan, 1), NaN()},
+	{New(nan, inf), New(nan, zero)},
+	{NaN(), NaN()},
+]
+static atanhSC: []cmplxTest = [
+	// G.6.2.3
+	{New(zero, zero), New(zero, zero)},
+	{New(zero, nan), New(zero, nan)},
+	{New(1.0, zero), New(inf, zero)},
+	{New(1.0, inf), New(0, math::Pi/2)},
+	{New(1.0, nan), NaN()},
+	{New(inf, 1.0), New(zero, math::Pi/2)},
+	{New(inf, inf), New(zero, math::Pi/2)},
+	{New(inf, nan), New(0, nan)},
+	{New(nan, 1.0), NaN()},
+	{New(nan, inf), New(zero, math::Pi/2)}, // sign of real part not specified.
+	{NaN(), NaN()},
+]
+static vcConjSC = [
+	NaN(),
+]
+static conjSC = [
+	NaN(),
+]
+static cosSC: []cmplxTest = [
+	// Derived from Cos(z) = Cosh(i * z), G.6 #7
+	{New(zero, zero), New(1.0, -zero)},
+	{New(zero, inf), New(inf, -zero)},
+	{New(zero, nan), New(nan, zero)},   // imaginary sign unspecified
+	{New(1.0, inf), New(inf, -inf)},
+	{New(1.0, nan), NaN()},
+	{New(inf, zero), New(nan, -zero)},
+	{New(inf, 1.0), NaN()},
+	{New(inf, inf), New(inf, nan)},     // real sign unspecified
+	{New(inf, nan), NaN()},
+	{New(nan, zero), New(nan, -zero)},  // imaginary sign unspecified
+	{New(nan, 1.0), NaN()},
+	{New(nan, inf), New(inf, nan)},
+	{NaN(), NaN()},
+]
+static coshSC: []cmplxTest = [
+	// G.6.2.4
+	{New(zero, zero), New(1.0, zero)},
+	{New(zero, inf), New(nan, zero)},                             // imaginary sign unspecified
+	{New(zero, nan), New(nan, zero)},                             // imaginary sign unspecified
+	{New(1.0, inf), NaN()},
+	{New(1.0, nan), NaN()},
+	{New(inf, zero), New(inf, zero)},
+	{New(inf, 1.0), New(inf*math::Cos(1.0), inf*math::Sin(1.0))}, // +inf  cis(y)
+	{New(inf, inf), New(inf, nan)},                               // real sign unspecified
+	{New(inf, nan), New(inf, nan)},
+	{New(nan, zero), New(nan, zero)},                             // imaginary sign unspecified
+	{New(nan, 1.0), NaN()},
+	{New(nan, inf), NaN()},
+	{NaN(), NaN()},
+]
+static expSC: []cmplxTest = [
+	// G.6.3.1
+	{New(zero, zero), New(1.0, zero)},
+	{New(-zero, zero), New(1.0, zero)},
+	{New(1.0, inf), NaN()},
+	{New(1.0, nan), NaN()},
+	{New(inf, zero), New(inf, zero)},
+	{New(-inf, 1.0), New(math::Copysign(0.0, math::Cos(1.0)), math::Copysign(0.0, math::Sin(1.0)))}, // +0 cis(y)
+	{New(inf, 1.0), New(inf*math::Cos(1.0), inf*math::Sin(1.0))},                                    // +inf  cis(y)
+	{New(-inf, inf), New(zero, zero)},                                                               // real and imaginary sign unspecified
+	{New(inf, inf), New(inf, nan)},                                                                  // real sign unspecified
+	{New(-inf, nan), New(zero, zero)},                                                               // real and imaginary sign unspecified
+	{New(inf, nan), New(inf, nan)},                                                                  // real sign unspecified
+	{New(nan, zero), New(nan, zero)},
+	{New(nan, 1.0), NaN()},
+	{New(nan, inf), NaN()},
+	{NaN(), NaN()},
+]
+static vcIsNaNSC = [
+	New(math::Inf(-1), math::Inf(-1)),
+	New(math::Inf(-1), math::NaN()),
+	New(math::NaN(), math::Inf(-1)),
+	New(0, math::NaN()),
+	New(math::NaN(), 0),
+	New(math::Inf(1), math::Inf(1)),
+	New(math::Inf(1), math::NaN()),
+	New(math::NaN(), math::Inf(1)),
+	New(math::NaN(), math::NaN()),
+]
+static isNaNSC = [
+	false,
+	false,
+	false,
+	true,
+	true,
+	false,
+	false,
+	false,
+	true,
+]
+
+static logSC: []cmplxTest = [
+	// G.6.3.2
+	{New(zero, zero), New(-inf, zero)},
+	{New(-zero, zero), New(-inf, math::Pi)},
+	{New(1.0, inf), New(inf, math::Pi/2)},
+	{New(1.0, nan), NaN()},
+	{New(-inf, 1.0), New(inf, math::Pi)},
+	{New(inf, 1.0), New(inf, 0.0)},
+	{New(-inf, inf), New(inf, 3*math::Pi/4)},
+	{New(inf, inf), New(inf, math::Pi/4)},
+	{New(-inf, nan), New(inf, nan)},
+	{New(inf, nan), New(inf, nan)},
+	{New(nan, 1.0), NaN()},
+	{New(nan, inf), New(inf, nan)},
+	{NaN(), NaN()},
+]
+static log10SC: []cmplxTest = [
+	// derived from Log special cases via Log10(x) = math.Log10E*Log(x)
+	{New(zero, zero), New(-inf, zero)},
+	{New(-zero, zero), New(-inf, f64(math::Log10E)*f64(math::Pi))},
+	{New(1.0, inf), New(inf, f64(math::Log10E)*f64(math::Pi/2))},
+	{New(1.0, nan), NaN()},
+	{New(-inf, 1.0), New(inf, f64(math::Log10E)*f64(math::Pi))},
+	{New(inf, 1.0), New(inf, 0.0)},
+	{New(-inf, inf), New(inf, f64(math::Log10E)*f64(3*math::Pi/4))},
+	{New(inf, inf), New(inf, f64(math::Log10E)*f64(math::Pi/4))},
+	{New(-inf, nan), New(inf, nan)},
+	{New(inf, nan), New(inf, nan)},
+	{New(nan, 1.0), NaN()},
+	{New(nan, inf), New(inf, nan)},
+	{NaN(), NaN()},
+]
+static vcPolarSC = [
+	NaN(),
+]
+static polarSC: []ff = [
+	{math::NaN(), math::NaN()},
+]
+static vcPowSC: [][2]Cmplx = [
+	[NaN(), NaN()],
+	[Zero(), NaN()],
+]
+static powSC = [
+	NaN(),
+	NaN(),
+]
+static sinSC: []cmplxTest = [
+	// Derived from Sin(z) = -i * Sinh(i * z), G.6 #7
+	{New(zero, zero), New(zero, zero)},
+	{New(zero, inf), New(zero, inf)},
+	{New(zero, nan), New(zero, nan)},
+	{New(1.0, inf), New(inf, inf)},
+	{New(1.0, nan), NaN()},
+	{New(inf, zero), New(nan, zero)},
+	{New(inf, 1.0), NaN()},
+	{New(inf, inf), New(nan, inf)},
+	{New(inf, nan), NaN()},
+	{New(nan, zero), New(nan, zero)},
+	{New(nan, 1.0), NaN()},
+	{New(nan, inf), New(nan, inf)},
+	{NaN(), NaN()},
+]
+
+static sinhSC: []cmplxTest = [
+	// G.6.2.5
+	{New(zero, zero), New(zero, zero)},
+	{New(zero, inf), New(zero, nan)},                             // real sign unspecified
+	{New(zero, nan), New(zero, nan)},                             // real sign unspecified
+	{New(1.0, inf), NaN()},
+	{New(1.0, nan), NaN()},
+	{New(inf, zero), New(inf, zero)},
+	{New(inf, 1.0), New(inf*math::Cos(1.0), inf*math::Sin(1.0))}, // +inf  cis(y)
+	{New(inf, inf), New(inf, nan)},                               // real sign unspecified
+	{New(inf, nan), New(inf, nan)},                               // real sign unspecified
+	{New(nan, zero), New(nan, zero)},
+	{New(nan, 1.0), NaN()},
+	{New(nan, inf), NaN()},
+	{NaN(), NaN()},
+]
+
+static sqrtSC: []cmplxTest = [
+	// G.6.4.2
+	{New(zero, zero), New(zero, zero)},
+	{New(-zero, zero), New(zero, zero)},
+	{New(1.0, inf), New(inf, inf)},
+	{New(nan, inf), New(inf, inf)},
+	{New(1.0, nan), NaN()},
+	{New(-inf, 1.0), New(zero, inf)},
+	{New(inf, 1.0), New(inf, zero)},
+	{New(-inf, nan), New(nan, inf)},     // imaginary sign unspecified
+	{New(inf, nan), New(inf, nan)},
+	{New(nan, 1.0), NaN()},
+	{NaN(), NaN()},
+]
+static tanSC: []cmplxTest = [
+	// Derived from Tan(z) = -i * Tanh(i * z), G.6 #7
+	{New(zero, zero), New(zero, zero)},
+	{New(zero, nan), New(zero, nan)},
+	{New(1.0, inf), New(zero, 1.0)},
+	{New(1.0, nan), NaN()},
+	{New(inf, 1.0), NaN()},
+	{New(inf, inf), New(zero, 1.0)},
+	{New(inf, nan), NaN()},
+	{New(nan, zero), NaN()},
+	{New(nan, 1.0), NaN()},
+	{New(nan, inf), New(zero, 1.0)},
+	{NaN(), NaN()},
+]
+static tanhSC: []cmplxTest = [
+	// G.6.2.6
+	{New(zero, zero), New(zero, zero)},
+	{New(1.0, inf), NaN()},
+	{New(1.0, nan), NaN()},
+	{New(inf, 1.0), New(1.0, math::Copysign(0.0, math::Sin(2*1.0)))}, // 1 + i 0 sin(2y)
+	{New(inf, inf), New(1.0, zero)},                                  // imaginary sign unspecified
+	{New(inf, nan), New(1.0, zero)},                                  // imaginary sign unspecified
+	{New(nan, zero), New(nan, zero)},
+	{New(nan, 1.0), NaN()},
+	{New(nan, inf), NaN()},
+	{NaN(), NaN()},
+]
+
+// branch cut continuity checks
+// points on each axis at |z| > 1 are checked for one-sided continuity from both the positive and negative side
+// all possible branch cuts for the elementary functions are at one of these points
+
+static branchPoints: [][2]Cmplx = [
+	[New(2.0, zero), New(2.0, eps)],
+	[New(2.0, -zero), New(2.0, -eps)],
+	[New(-2.0, zero), New(-2.0, eps)],
+	[New(-2.0, -zero), New(-2.0, -eps)],
+	[New(zero, 2.0), New(eps, 2.0)],
+	[New(-zero, 2.0), New(-eps, 2.0)],
+	[New(zero, -2.0), New(eps, -2.0)],
+	[New(-zero, -2.0), New(-eps, -2.0)],
+]
+
+// functions borrowed from pkg/math/all_test.go
+fn tolerance(a: f64, b: f64, mut e: f64): bool {
+	mut d := a - b
+	if d < 0 {
+		d = -d
+	}
+
+	// note: b is correct (expected) value, a is actual value.
+	// make error tolerance a fraction of b, not a.
+	if b != 0 {
+		e = e * b
+		if e < 0 {
+			e = -e
+		}
+	}
+	ret d < e
+}
+fn veryclose(a: f64, b: f64): bool { ret tolerance(a, b, 4e-16) }
+fn alike(a: f64, b: f64): bool {
+	match {
+	| a != a && b != b: // math::IsNaN(a) && math::IsNaN(b):
+		ret true
+	| a == b:
+		ret math::Signbit(a) == math::Signbit(b)
+	}
+	ret false
+}
+
+fn cTolerance(a: Cmplx, b: Cmplx, mut e: f64): bool {
+	d := Abs(a.Sub(b))
+	if b != Zero() {
+		e = e * Abs(b)
+		if e < 0 {
+			e = -e
+		}
+	}
+	ret d < e
+}
+fn cSoclose(a: Cmplx, b: Cmplx, e: f64): bool { ret cTolerance(a, b, e) }
+fn cVeryclose(a: Cmplx, b: Cmplx): bool { ret cTolerance(a, b, 4e-16) }
+fn cAlike(a: Cmplx, b: Cmplx): bool {
+	let mut realAlike: bool
+	let mut imagAlike: bool
+	if isExact(b.Real()) {
+		realAlike = alike(a.Real(), b.Real())
+	} else {
+		// Allow non-exact special cases to have errors in ULP.
+		realAlike = veryclose(a.Real(), b.Real())
+	}
+	if isExact(b.Imag()) {
+		imagAlike = alike(a.Imag(), b.Imag())
+	} else {
+		// Allow non-exact special cases to have errors in ULP.
+		imagAlike = veryclose(a.Imag(), b.Imag())
+	}
+	ret realAlike && imagAlike
+}
+fn isExact(x: f64): bool {
+	// Special cases that should match exactly.  Other cases are multiples
+	// of Pi that may not be last bit identical on all platforms.
+	ret math::IsNaN(x) || math::IsInf(x, 0) || x == 0 || x == 1 || x == -1
+}
+
+#test
+fn testAbs(t: &testing::T) {
+	mut i := 0
+	for i < len(vc); i++ {
+		f := Abs(vc[i])
+		if !veryclose(abs[i], f) {
+			t.Errorf("Abs({}) = {}, want {}", vc[i], f, abs[i])
+		}
+	}
+	i = 0
+	for i < len(vcAbsSC); i++ {
+		f := Abs(vcAbsSC[i])
+		if !alike(absSC[i], f) {
+			t.Errorf("Abs({}) = {}, want {}", vcAbsSC[i], f, absSC[i])
+		}
+	}
+}
+
+#test
+fn testAcos(t: &testing::T) {
+	mut i := 0
+	for i < len(vc); i++ {
+		f := Acos(vc[i])
+		if !cSoclose(acos[i], f, 1e-14) {
+			t.Errorf("Acos({}) = {}, want {}", vc[i], f, acos[i])
+		}
+	}
+	for _, v in acosSC {
+		mut f := Acos(v.input)
+		if !cAlike(v.want, f) {
+			t.Errorf("Acos({}) = {}, want {}", v.input, f, v.want)
+		}
+		if math::IsNaN(v.input.Imag()) || math::IsNaN(v.want.Imag()) {
+			// Negating NaN is undefined with regard to the sign bit produced.
+			continue
+		}
+		// Acos(Conj(z))  == Conj(Acos(z))
+		f = Acos(Conj(v.input))
+		if !cAlike(Conj(v.want), f) && !cAlike(v.input, Conj(v.input)) {
+			t.Errorf("Acos({}) = {}, want {}", Conj(v.input), f, Conj(v.want))
+		}
+	}
+	for _, pt in branchPoints {
+		f0, f1 := Acos(pt[0]), Acos(pt[1])
+		if !cVeryclose(f0, f1) {
+			t.Errorf("Acos({}) not continuous, got {} want {}", pt[0], f0, f1)
+		}
+	}
+}
+
+#test
+fn testAcosh(t: &testing::T) {
+	mut i := 0
+	for i < len(vc); i++ {
+		f := Acosh(vc[i])
+		if !cSoclose(acosh[i], f, 1e-14) {
+			t.Errorf("Acosh({}) = {}, want {}", vc[i], f, acosh[i])
+		}
+	}
+	for _, v in acoshSC {
+		mut f := Acosh(v.input)
+		if !cAlike(v.want, f) {
+			t.Errorf("Acosh({}) = {}, want {}", v.input, f, v.want)
+		}
+		if math::IsNaN(v.input.Imag()) || math::IsNaN(v.want.Imag()) {
+			// Negating NaN is undefined with regard to the sign bit produced.
+			continue
+		}
+		// Acosh(Conj(z))  == Conj(Acosh(z))
+		f = Acosh(Conj(v.input))
+		if !cAlike(Conj(v.want), f) && !cAlike(v.input, Conj(v.input)) {
+			t.Errorf("Acosh({}) = {}, want {}", Conj(v.input), f, Conj(v.want))
+		}
+	}
+	for _, pt in branchPoints {
+		f0, f1 := Acosh(pt[0]), Acosh(pt[1])
+		if !cVeryclose(f0, f1) {
+			t.Errorf("Acosh({}) not continuous, got {} want {}", pt[0], f0, f1)
+		}
+	}
+}
+
+#test
+fn testAsin(t: &testing::T) {
+	mut i := 0
+	for i < len(vc); i++ {
+		f := Asin(vc[i])
+		if !cSoclose(asin[i], f, 1e-14) {
+			t.Errorf("Asin({}) = {}, want {}", vc[i], f, asin[i])
+		}
+	}
+	for _, v in asinSC {
+		mut f := Asin(v.input)
+		if !cAlike(v.want, f) {
+			t.Errorf("Asin({}) = {}, want {}", v.input, f, v.want)
+		}
+		if math::IsNaN(v.input.Imag()) || math::IsNaN(v.want.Imag()) {
+			// Negating NaN is undefined with regard to the sign bit produced.
+			continue
+		}
+		// Asin(Conj(z))  == Asin(Sinh(z))
+		f = Asin(Conj(v.input))
+		if !cAlike(Conj(v.want), f) && !cAlike(v.input, Conj(v.input)) {
+			t.Errorf("Asin({}) = {}, want {}", Conj(v.input), f, Conj(v.want))
+		}
+		if math::IsNaN(v.input.Real()) || math::IsNaN(v.want.Real()) {
+			// Negating NaN is undefined with regard to the sign bit produced.
+			continue
+		}
+		// Asin(-z)  == -Asin(z)
+		f = Asin(v.input.Neg())
+		if !cAlike(v.want.Neg(), f) && !cAlike(v.input, v.input.Neg()) {
+			t.Errorf("Asin({}) = {}, want {}", v.input.Neg(), f, v.want.Neg())
+		}
+	}
+	for _, pt in branchPoints {
+		f0, f1 := Asin(pt[0]), Asin(pt[1])
+		if !cVeryclose(f0, f1) {
+			t.Errorf("Asin({}) not continuous, got {} want {}", pt[0], f0, f1)
+		}
+	}
+}
+
+#test
+fn testAsinh(t: &testing::T) {
+	mut i := 0
+	for i < len(vc); i++ {
+		f := Asinh(vc[i])
+		if !cSoclose(asinh[i], f, 4e-15) {
+			t.Errorf("Asinh({}) = {}, want {}", vc[i], f, asinh[i])
+		}
+	}
+	for _, v in asinhSC {
+		mut f := Asinh(v.input)
+		if !cAlike(v.want, f) {
+			t.Errorf("Asinh({}) = {}, want {}", v.input, f, v.want)
+		}
+		if math::IsNaN(v.input.Imag()) || math::IsNaN(v.want.Imag()) {
+			// Negating NaN is undefined with regard to the sign bit produced.
+			continue
+		}
+		// Asinh(Conj(z))  == Asinh(Sinh(z))
+		f = Asinh(Conj(v.input))
+		if !cAlike(Conj(v.want), f) && !cAlike(v.input, Conj(v.input)) {
+			t.Errorf("Asinh({}) = {}, want {}", Conj(v.input), f, Conj(v.want))
+		}
+		if math::IsNaN(v.input.Real()) || math::IsNaN(v.want.Real()) {
+			// Negating NaN is undefined with regard to the sign bit produced.
+			continue
+		}
+		// Asinh(-z)  == -Asinh(z)
+		f = Asinh(v.input.Neg())
+		if !cAlike(v.want.Neg(), f) && !cAlike(v.input, v.input.Neg()) {
+			t.Errorf("Asinh({}) = {}, want {}", v.input.Neg(), f, v.want.Neg())
+		}
+	}
+	for _, pt in branchPoints {
+		f0, f1 := Asinh(pt[0]), Asinh(pt[1])
+		if !cVeryclose(f0, f1) {
+			t.Errorf("Asinh({}) not continuous, got {} want {}", pt[0], f0, f1)
+		}
+	}
+}
+
+#test
+fn testAtan(t: &testing::T) {
+	mut i := 0
+	for i < len(vc); i++ {
+		f := Atan(vc[i])
+		if !cVeryclose(atan[i], f) {
+			t.Errorf("Atan({}) = {}, want {}", vc[i], f, atan[i])
+		}
+	}
+	for _, v in atanSC {
+		mut f := Atan(v.input)
+		if !cAlike(v.want, f) {
+			t.Errorf("Atan({}) = {}, want {}", v.input, f, v.want)
+		}
+		if math::IsNaN(v.input.Imag()) || math::IsNaN(v.want.Imag()) {
+			// Negating NaN is undefined with regard to the sign bit produced.
+			continue
+		}
+		// Atan(Conj(z))  == Conj(Atan(z))
+		f = Atan(Conj(v.input))
+		if !cAlike(Conj(v.want), f) && !cAlike(v.input, Conj(v.input)) {
+			t.Errorf("Atan({}) = {}, want {}", Conj(v.input), f, Conj(v.want))
+		}
+		if math::IsNaN(v.input.Real()) || math::IsNaN(v.want.Real()) {
+			// Negating NaN is undefined with regard to the sign bit produced.
+			continue
+		}
+		// Atan(-z)  == -Atan(z)
+		f = Atan(v.input.Neg())
+		if !cAlike(v.want.Neg(), f) && !cAlike(v.input, v.input.Neg()) {
+			t.Errorf("Atan({}) = {}, want {}", v.input.Neg(), f, v.want.Neg())
+		}
+	}
+	for _, pt in branchPoints {
+		f0, f1 := Atan(pt[0]), Atan(pt[1])
+		if !cVeryclose(f0, f1) {
+			t.Errorf("Atan({}) not continuous, got {} want {}", pt[0], f0, f1)
+		}
+	}
+}
+
+#test
+fn testAtanh(t: &testing::T) {
+	mut i := 0
+	for i < len(vc); i++ {
+		f := Atanh(vc[i])
+		if !cVeryclose(atanh[i], f) {
+			t.Errorf("Atanh({}) = {}, want {}", vc[i], f, atanh[i])
+		}
+	}
+	for _, v in atanhSC {
+		mut f := Atanh(v.input)
+		if !cAlike(v.want, f) {
+			t.Errorf("Atanh({}) = {}, want {}", v.input, f, v.want)
+		}
+		if math::IsNaN(v.input.Imag()) || math::IsNaN(v.want.Imag()) {
+			// Negating NaN is undefined with regard to the sign bit produced.
+			continue
+		}
+		// Atanh(Conj(z))  == Conj(Atanh(z))
+		f = Atanh(Conj(v.input))
+		if !cAlike(Conj(v.want), f) && !cAlike(v.input, Conj(v.input)) {
+			t.Errorf("Atanh({}) = {}, want {}", Conj(v.input), f, Conj(v.want))
+		}
+		if math::IsNaN(v.input.Real()) || math::IsNaN(v.want.Real()) {
+			// Negating NaN is undefined with regard to the sign bit produced.
+			continue
+		}
+		// Atanh(-z)  == -Atanh(z)
+		f = Atanh(v.input.Neg())
+		if !cAlike(v.want.Neg(), f) && !cAlike(v.input, v.input.Neg()) {
+			t.Errorf("Atanh({}) = {}, want {}", v.input.Neg(), f, v.want.Neg())
+		}
+	}
+	for _, pt in branchPoints {
+		f0, f1 := Atanh(pt[0]), Atanh(pt[1])
+		if !cVeryclose(f0, f1) {
+			t.Errorf("Atanh({}) not continuous, got {} want {}", pt[0], f0, f1)
+		}
+	}
+}
+
+#test
+fn testConj(t: &testing::T) {
+	mut i := 0
+	for i < len(vc); i++ {
+		f := Conj(vc[i])
+		if !cVeryclose(conj[i], f) {
+			t.Errorf("Conj({}) = {}, want {}", vc[i], f, conj[i])
+		}
+	}
+	i = 0
+	for i < len(vcConjSC); i++ {
+		f := Conj(vcConjSC[i])
+		if !cAlike(conjSC[i], f) {
+			t.Errorf("Conj({}) = {}, want {}", vcConjSC[i], f, conjSC[i])
+		}
+	}
+}
+
+#test
+fn testCos(t: &testing::T) {
+	mut i := 0
+	for i < len(vc); i++ {
+		f := Cos(vc[i])
+		if !cSoclose(cos[i], f, 3e-15) {
+			t.Errorf("Cos({}) = {}, want {}", vc[i], f, cos[i])
+		}
+	}
+	for _, v in cosSC {
+		mut f := Cos(v.input)
+		if !cAlike(v.want, f) {
+			t.Errorf("Cos({}) = {}, want {}", v.input, f, v.want)
+		}
+		if math::IsNaN(v.input.Imag()) || math::IsNaN(v.want.Imag()) {
+			// Negating NaN is undefined with regard to the sign bit produced.
+			continue
+		}
+		// Cos(Conj(z))  == Cos(Cosh(z))
+		f = Cos(Conj(v.input))
+		if !cAlike(Conj(v.want), f) && !cAlike(v.input, Conj(v.input)) {
+			t.Errorf("Cos({}) = {}, want {}", Conj(v.input), f, Conj(v.want))
+		}
+		if math::IsNaN(v.input.Real()) || math::IsNaN(v.want.Real()) {
+			// Negating NaN is undefined with regard to the sign bit produced.
+			continue
+		}
+		// Cos(-z)  == Cos(z)
+		f = Cos(v.input.Neg())
+		if !cAlike(v.want, f) && !cAlike(v.input, v.input.Neg()) {
+			t.Errorf("Cos({}) = {}, want {}", v.input.Neg(), f, v.want)
+		}
+	}
+}
+
+#test
+fn testCosh(t: &testing::T) {
+	mut i := 0
+	for i < len(vc); i++ {
+		f := Cosh(vc[i])
+		if !cSoclose(cosh[i], f, 2e-15) {
+			t.Errorf("Cosh({}) = {}, want {}", vc[i], f, cosh[i])
+		}
+	}
+	for _, v in coshSC {
+		mut f := Cosh(v.input)
+		if !cAlike(v.want, f) {
+			t.Errorf("Cosh({}) = {}, want {}", v.input, f, v.want)
+		}
+		if math::IsNaN(v.input.Imag()) || math::IsNaN(v.want.Imag()) {
+			// Negating NaN is undefined with regard to the sign bit produced.
+			continue
+		}
+		// Cosh(Conj(z))  == Conj(Cosh(z))
+		f = Cosh(Conj(v.input))
+		if !cAlike(Conj(v.want), f) && !cAlike(v.input, Conj(v.input)) {
+			t.Errorf("Cosh({}) = {}, want {}", Conj(v.input), f, Conj(v.want))
+		}
+		if math::IsNaN(v.input.Real()) || math::IsNaN(v.want.Real()) {
+			// Negating NaN is undefined with regard to the sign bit produced.
+			continue
+		}
+		// Cosh(-z)  == Cosh(z)
+		f = Cosh(v.input.Neg())
+		if !cAlike(v.want, f) && !cAlike(v.input, v.input.Neg()) {
+			t.Errorf("Cosh({}) = {}, want {}", v.input.Neg(), f, v.want)
+		}
+	}
+}
+
+#test
+fn testExp(t: &testing::T) {
+	mut i := 0
+	for i < len(vc); i++ {
+		f := Exp(vc[i])
+		if !cSoclose(exp[i], f, 1e-15) {
+			t.Errorf("Exp({}) = {}, want {}", vc[i], f, exp[i])
+		}
+	}
+	for _, v in expSC {
+		mut f := Exp(v.input)
+		if !cAlike(v.want, f) {
+			t.Errorf("Exp({}) = {}, want {}", v.input, f, v.want)
+		}
+		if math::IsNaN(v.input.Imag()) || math::IsNaN(v.want.Imag()) {
+			// Negating NaN is undefined with regard to the sign bit produced.
+			continue
+		}
+		// Exp(Conj(z))  == Exp(Cosh(z))
+		f = Exp(Conj(v.input))
+		if !cAlike(Conj(v.want), f) && !cAlike(v.input, Conj(v.input)) {
+			t.Errorf("Exp({}) = {}, want {}", Conj(v.input), f, Conj(v.want))
+		}
+	}
+}
+
+#test
+fn testIsNaN(t: &testing::T) {
+	mut i := 0
+	for i < len(vcIsNaNSC); i++ {
+		f := IsNaN(vcIsNaNSC[i])
+		if isNaNSC[i] != f {
+			t.Errorf("IsNaN({}) = {}, want {}", vcIsNaNSC[i], f, isNaNSC[i])
+		}
+	}
+}
+
+#test
+fn testLog(t: &testing::T) {
+	mut i := 0
+	for i < len(vc); i++ {
+		f := Log(vc[i])
+		if !cVeryclose(log[i], f) {
+			t.Errorf("Log({}) = {}, want {}", vc[i], f, log[i])
+		}
+	}
+	for _, v in logSC {
+		mut f := Log(v.input)
+		if !cAlike(v.want, f) {
+			t.Errorf("Log({}) = {}, want {}", v.input, f, v.want)
+		}
+		if math::IsNaN(v.input.Imag()) || math::IsNaN(v.want.Imag()) {
+			// Negating NaN is undefined with regard to the sign bit produced.
+			continue
+		}
+		// Log(Conj(z))  == Conj(Log(z))
+		f = Log(Conj(v.input))
+		if !cAlike(Conj(v.want), f) && !cAlike(v.input, Conj(v.input)) {
+			t.Errorf("Log({}) = {}, want {}", Conj(v.input), f, Conj(v.want))
+		}
+	}
+	for _, pt in branchPoints {
+		f0, f1 := Log(pt[0]), Log(pt[1])
+		if !cVeryclose(f0, f1) {
+			t.Errorf("Log({}) not continuous, got {} want {}", pt[0], f0, f1)
+		}
+	}
+}
+
+#test
+fn testLog10(t: &testing::T) {
+	mut i := 0
+	for i < len(vc); i++ {
+		f := Log10(vc[i])
+		if !cVeryclose(log10[i], f) {
+			t.Errorf("Log10({}) = {}, want {}", vc[i], f, log10[i])
+		}
+	}
+	for _, v in log10SC {
+		mut f := Log10(v.input)
+		if !cAlike(v.want, f) {
+			t.Errorf("Log10({}) = {}, want {}", v.input, f, v.want)
+		}
+		if math::IsNaN(v.input.Imag()) || math::IsNaN(v.want.Imag()) {
+			// Negating NaN is undefined with regard to the sign bit produced.
+			continue
+		}
+		// Log10(Conj(z))  == Conj(Log10(z))
+		f = Log10(Conj(v.input))
+		if !cAlike(Conj(v.want), f) && !cAlike(v.input, Conj(v.input)) {
+			t.Errorf("Log10({}) = {}, want {}", Conj(v.input), f, Conj(v.want))
+		}
+	}
+}
+
+#test
+fn testPolar(t: &testing::T) {
+	mut i := 0
+	for i < len(vc); i++ {
+		r, theta := Polar(vc[i])
+		if !veryclose(polar[i].r, r) && !veryclose(polar[i].theta, theta) {
+			t.Errorf("Polar({}) = {}, {} want {}, {}", vc[i], r, theta, polar[i].r, polar[i].theta)
+		}
+	}
+	i = 0
+	for i < len(vcPolarSC); i++ {
+		r, theta := Polar(vcPolarSC[i])
+		if !alike(polarSC[i].r, r) && !alike(polarSC[i].theta, theta) {
+			t.Errorf("Polar({}) = {}, {}, want {}, {}", vcPolarSC[i], r, theta, polarSC[i].r, polarSC[i].theta)
+		}
+	}
+}
+
+#test
+fn testPow(t: &testing::T) {
+	// Special cases for Pow(0, c).
+	zero := New(0, 0)
+	zeroPowers := [][2]Cmplx([
+		[Zero(), New(1, 0)],
+		[New(1.5, 0), New(0, 0)],
+		[New(-1.5, 0), New(math::Inf(0), 0)],
+		[New(-1.5, 1.5), Inf(1)],
+	])
+	for _, zp in zeroPowers {
+		f := Pow(zero, zp[0])
+		if f != zp[1] {
+			t.Errorf("Pow({}, {}) = {}, want {}", zero, zp[0], f, zp[1])
+		}
+	}
+	a := New(3.0, 3.0)
+	mut i := 0
+	for i < len(vc); i++ {
+		f := Pow(a, vc[i])
+		if !cSoclose(pow[i], f, 4e-15) {
+			t.Errorf("Pow({}, {}) = {}, want {}", a, vc[i], f, pow[i])
+		}
+	}
+	i = 0
+	for i < len(vcPowSC); i++ {
+		f := Pow(vcPowSC[i][0], vcPowSC[i][1])
+		if !cAlike(powSC[i], f) {
+			t.Errorf("Pow({}, {}) = {}, want {}", vcPowSC[i][0], vcPowSC[i][1], f, powSC[i])
+		}
+	}
+	for _, pt in branchPoints {
+		f0, f1 := Pow(pt[0], New(0.1, 0)), Pow(pt[1], New(0.1, 0))
+		if !cVeryclose(f0, f1) {
+			t.Errorf("Pow({}, 0.1) not continuous, got {} want {}", pt[0], f0, f1)
+		}
+	}
+}
+
+#test
+fn testRect(t: &testing::T) {
+	mut i := 0
+	for i < len(vc); i++ {
+		f := Rect(polar[i].r, polar[i].theta)
+		if !cVeryclose(vc[i], f) {
+			t.Errorf("Rect({}, {}) = {} want {}", polar[i].r, polar[i].theta, f, vc[i])
+		}
+	}
+	i = 0
+	for i < len(vcPolarSC); i++ {
+		f := Rect(polarSC[i].r, polarSC[i].theta)
+		if !cAlike(vcPolarSC[i], f) {
+			t.Errorf("Rect({}, {}) = {}, want {}", polarSC[i].r, polarSC[i].theta, f, vcPolarSC[i])
+		}
+	}
+}
+
+#test
+fn testSin(t: &testing::T) {
+	mut i := 0
+	for i < len(vc); i++ {
+		f := Sin(vc[i])
+		if !cSoclose(sin[i], f, 2e-15) {
+			t.Errorf("Sin({}) = {}, want {}", vc[i], f, sin[i])
+		}
+	}
+	for _, v in sinSC {
+		mut f := Sin(v.input)
+		if !cAlike(v.want, f) {
+			t.Errorf("Sin({}) = {}, want {}", v.input, f, v.want)
+		}
+		if math::IsNaN(v.input.Imag()) || math::IsNaN(v.want.Imag()) {
+			// Negating NaN is undefined with regard to the sign bit produced.
+			continue
+		}
+		// Sin(Conj(z))  == Conj(Sin(z))
+		f = Sin(Conj(v.input))
+		if !cAlike(Conj(v.want), f) && !cAlike(v.input, Conj(v.input)) {
+			t.Errorf("Sinh({}) = {}, want {}", Conj(v.input), f, Conj(v.want))
+		}
+		if math::IsNaN(v.input.Real()) || math::IsNaN(v.want.Real()) {
+			// Negating NaN is undefined with regard to the sign bit produced.
+			continue
+		}
+		// Sin(-z)  == -Sin(z)
+		f = Sin(v.input.Neg())
+		if !cAlike(v.want.Neg(), f) && !cAlike(v.input, v.input.Neg()) {
+			t.Errorf("Sinh({}) = {}, want {}", v.input.Neg(), f, v.want.Neg())
+		}
+	}
+}
+
+fn testSinh(t: &testing::T) {
+	mut i := 0
+	for i < len(vc); i++ {
+		f := Sinh(vc[i])
+		if !cSoclose(sinh[i], f, 2e-15) {
+			t.Errorf("Sinh({}) = {}, want {}", vc[i], f, sinh[i])
+		}
+	}
+	for _, v in sinhSC {
+		mut f := Sinh(v.input)
+		if !cAlike(v.want, f) {
+			t.Errorf("Sinh({}) = {}, want {}", v.input, f, v.want)
+		}
+		if math::IsNaN(v.input.Imag()) || math::IsNaN(v.want.Imag()) {
+			// Negating NaN is undefined with regard to the sign bit produced.
+			continue
+		}
+		// Sinh(Conj(z))  == Conj(Sinh(z))
+		f = Sinh(Conj(v.input))
+		if !cAlike(Conj(v.want), f) && !cAlike(v.input, Conj(v.input)) {
+			t.Errorf("Sinh({}) = {}, want {}", Conj(v.input), f, Conj(v.want))
+		}
+		if math::IsNaN(v.input.Real()) || math::IsNaN(v.want.Real()) {
+			// Negating NaN is undefined with regard to the sign bit produced.
+			continue
+		}
+		// Sinh(-z)  == -Sinh(z)
+		f = Sinh(v.input.Neg())
+		if !cAlike(v.want.Neg(), f) && !cAlike(v.input, v.input.Neg()) {
+			t.Errorf("Sinh({}) = {}, want {}", v.input.Neg(), f, v.want.Neg())
+		}
+	}
+}
+
+#test
+fn testSqrt(t: &testing::T) {
+	mut i := 0
+	for i < len(vc); i++ {
+		f := Sqrt(vc[i])
+		if !cVeryclose(sqrt[i], f) {
+			t.Errorf("Sqrt({}) = {}, want {}", vc[i], f, sqrt[i])
+		}
+	}
+	for _, v in sqrtSC {
+		mut f := Sqrt(v.input)
+		if !cAlike(v.want, f) {
+			t.Errorf("Sqrt({}) = {}, want {}", v.input, f, v.want)
+		}
+		if math::IsNaN(v.input.Imag()) || math::IsNaN(v.want.Imag()) {
+			// Negating NaN is undefined with regard to the sign bit produced.
+			continue
+		}
+		// Sqrt(Conj(z)) == Conj(Sqrt(z))
+		f = Sqrt(Conj(v.input))
+		if !cAlike(Conj(v.want), f) && !cAlike(v.input, Conj(v.input)) {
+			t.Errorf("Sqrt({}) = {}, want {}", Conj(v.input), f, Conj(v.want))
+		}
+	}
+	for _, pt in branchPoints {
+		f0, f1 := Sqrt(pt[0]), Sqrt(pt[1])
+		if !cVeryclose(f0, f1) {
+			t.Errorf("Sqrt({}) not continuous, got {} want {}", pt[0], f0, f1)
+		}
+	}
+}
+
+#test
+fn testTan(t: &testing::T) {
+	mut i := 0
+	for i < len(vc); i++ {
+		f := Tan(vc[i])
+		if !cSoclose(tan[i], f, 3e-15) {
+			t.Errorf("Tan({}) = {}, want {}", vc[i], f, tan[i])
+		}
+	}
+	for _, v in tanSC {
+		mut f := Tan(v.input)
+		if !cAlike(v.want, f) {
+			t.Errorf("Tan({}) = {}, want {}", v.input, f, v.want)
+		}
+		if math::IsNaN(v.input.Imag()) || math::IsNaN(v.want.Imag()) {
+			// Negating NaN is undefined with regard to the sign bit produced.
+			continue
+		}
+		// Tan(Conj(z))  == Conj(Tan(z))
+		f = Tan(Conj(v.input))
+		if !cAlike(Conj(v.want), f) && !cAlike(v.input, Conj(v.input)) {
+			t.Errorf("Tan({}) = {}, want {}", Conj(v.input), f, Conj(v.want))
+		}
+		if math::IsNaN(v.input.Real()) || math::IsNaN(v.want.Real()) {
+			// Negating NaN is undefined with regard to the sign bit produced.
+			continue
+		}
+		// Tan(-z)  == -Tan(z)
+		f = Tan(v.input.Neg())
+		if !cAlike(v.want.Neg(), f) && !cAlike(v.input, v.input.Neg()) {
+			t.Errorf("Tan({}) = {}, want {}", v.input.Neg(), f, v.want.Neg())
+		}
+	}
+}
+
+#test
+fn testTanh(t: &testing::T) {
+	mut i := 0
+	for i < len(vc); i++ {
+		f := Tanh(vc[i])
+		if !cSoclose(tanh[i], f, 2e-15) {
+			t.Errorf("Tanh({}) = {}, want {}", vc[i], f, tanh[i])
+		}
+	}
+	for _, v in tanhSC {
+		mut f := Tanh(v.input)
+		if !cAlike(v.want, f) {
+			t.Errorf("Tanh({}) = {}, want {}", v.input, f, v.want)
+		}
+		if math::IsNaN(v.input.Imag()) || math::IsNaN(v.want.Imag()) {
+			// Negating NaN is undefined with regard to the sign bit produced.
+			continue
+		}
+		// Tanh(Conj(z))  == Conj(Tanh(z))
+		f = Tanh(Conj(v.input))
+		if !cAlike(Conj(v.want), f) && !cAlike(v.input, Conj(v.input)) {
+			t.Errorf("Tanh({}) = {}, want {}", Conj(v.input), f, Conj(v.want))
+		}
+		if math::IsNaN(v.input.Real()) || math::IsNaN(v.want.Real()) {
+			// Negating NaN is undefined with regard to the sign bit produced.
+			continue
+		}
+		// Tanh(-z)  == -Tanh(z)
+		f = Tanh(v.input.Neg())
+		if !cAlike(v.want.Neg(), f) && !cAlike(v.input, v.input.Neg()) {
+			t.Errorf("Tanh({}) = {}, want {}", v.input.Neg(), f, v.want.Neg())
+		}
+	}
+}
+
+// See Go's issue 17577
+#test
+fn testInfiniteLoopIntanSeries(t: &testing::T) {
+	want := Inf(1)
+	got := Cot(Zero())
+	if got != want {
+		t.Errorf("Cot(0): got {}, want {}", got, want)
+	}
+}

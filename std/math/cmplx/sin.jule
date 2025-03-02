@@ -30,150 +30,149 @@ use "std/math"
 //   Stephen L. Moshier
 //   moshier@na-net.ornl.gov
 
-impl Cmplx {
-	// Complex circular sine
-	//
-	// DESCRIPTION:
-	//
-	// If
-	//     z = x + iy,
-	//
-	// then
-	//
-	//     w = sin x  cosh y  +  i cos x sinh y.
-	//
-	// csin(z) = -i csinh(iz).
-	//
-	// ACCURACY:
-	//
-	//                      Relative error:
-	// arithmetic   domain     # trials      peak         rms
-	//    DEC       -10,+10      8400       5.3e-17     1.3e-17
-	//    IEEE      -10,+10     30000       3.8e-16     1.0e-16
-	// Also tested by csin(casin(z)) = z.
+// Complex circular sine
+//
+// DESCRIPTION:
+//
+// If
+//     z = x + iy,
+//
+// then
+//
+//     w = sin x  cosh y  +  i cos x sinh y.
+//
+// csin(z) = -i csinh(iz).
+//
+// ACCURACY:
+//
+//                      Relative error:
+// arithmetic   domain     # trials      peak         rms
+//    DEC       -10,+10      8400       5.3e-17     1.3e-17
+//    IEEE      -10,+10     30000       3.8e-16     1.0e-16
+// Also tested by csin(casin(z)) = z.
 
-	// Returns the sine of complex number.
-	fn Sin(self): Cmplx {
+// Returns the sine of complex number.
+fn Sin(x: Cmplx): Cmplx {
+	match {
+	| x.Imag() == 0 && (math::IsInf(x.Real(), 0) || math::IsNaN(x.Real())):
+		ret New(math::NaN(), x.Imag())
+	| math::IsInf(x.Imag(), 0):
 		match {
-		| self.Imag() == 0 && (math::IsInf(self.Real(), 0) || math::IsNaN(self.Real())):
-			ret Cmplx.New(math::NaN(), self.Imag())
-		| math::IsInf(self.Imag(), 0):
-			match {
-			| self.Real() == 0:
-				ret self
-			| math::IsInf(self.Real(), 0) | math::IsNaN(self.Real()):
-				ret Cmplx.New(math::NaN(), self.Imag())
-			}
-		| self.Real() == 0 && math::IsNaN(self.Imag()):
-			ret self
+		| x.Real() == 0:
+			ret x
+		| math::IsInf(x.Real(), 0) | math::IsNaN(x.Real()):
+			ret New(math::NaN(), x.Imag())
 		}
-		s, c := math::Sincos(self.Real())
-		sh, ch := sinhcosh(self.Imag())
-		ret Cmplx.New(s*ch, c*sh)
+	| x.Real() == 0 && math::IsNaN(x.Imag()):
+		ret x
 	}
+	s, c := math::Sincos(x.Real())
+	sh, ch := sinhcosh(x.Imag())
+	ret New(s*ch, c*sh)
+}
 
-	// Complex hyperbolic sine
-	//
-	// DESCRIPTION:
-	//
-	// csinh z = (cexp(z) - cexp(-z))/2
-	//         = sinh x * cos y  +  i cosh x * sin y .
-	//
-	// ACCURACY:
-	//
-	//                      Relative error:
-	// arithmetic   domain     # trials      peak         rms
-	//    IEEE      -10,+10     30000       3.1e-16     8.2e-17
+// Complex hyperbolic sine
+//
+// DESCRIPTION:
+//
+// csinh z = (cexp(z) - cexp(-z))/2
+//         = sinh x * cos y  +  i cosh x * sin y .
+//
+// ACCURACY:
+//
+//                      Relative error:
+// arithmetic   domain     # trials      peak         rms
+//    IEEE      -10,+10     30000       3.1e-16     8.2e-17
 
-	// Returns the hyperbolic sine of complex number.
-	fn Sinh(self): Cmplx {
+// Returns the hyperbolic sine of complex number.
+fn Sinh(x: Cmplx): Cmplx {
+	match {
+	| x.Real() == 0 && (math::IsInf(x.Imag(), 0) || math::IsNaN(x.Imag())):
+		ret New(x.Real(), math::NaN())
+	| math::IsInf(x.Real(), 0):
 		match {
-		| self.Real() == 0 && (math::IsInf(self.Imag(), 0) || math::IsNaN(self.Imag())):
-			ret Cmplx.New(self.Real(), math::NaN())
-		| math::IsInf(self.Real(), 0):
-			match {
-			| self.Imag() == 0:
-				ret Cmplx.New(self.Real(), self.Imag())
-			| math::IsInf(self.Imag(), 0) | math::IsNaN(self.Imag()):
-				ret Cmplx.New(self.Real(), math::NaN())
-			}
-		| self.Imag() == 0 && math::IsNaN(self.Real()):
-			ret Cmplx.New(math::NaN(), self.Imag())
+		| x.Imag() == 0:
+			ret New(x.Real(), x.Imag())
+		| math::IsInf(x.Imag(), 0) | math::IsNaN(x.Imag()):
+			ret New(x.Real(), math::NaN())
 		}
-		s, c := math::Sincos(self.Imag())
-		sh, ch := sinhcosh(self.Real())
-		ret Cmplx.New(c*sh, s*ch)
+	| x.Imag() == 0 && math::IsNaN(x.Real()):
+		ret New(math::NaN(), x.Imag())
 	}
+	s, c := math::Sincos(x.Imag())
+	sh, ch := sinhcosh(x.Real())
+	ret New(c*sh, s*ch)
+}
 
-	// Complex circular cosine
-	//
-	// DESCRIPTION:
-	//
-	// If
-	//     z = x + iy,
-	//
-	// then
-	//
-	//     w = cos x  cosh y  -  i sin x sinh y.
-	//
-	// ACCURACY:
-	//
-	//                      Relative error:
-	// arithmetic   domain     # trials      peak         rms
-	//    DEC       -10,+10      8400       4.5e-17     1.3e-17
-	//    IEEE      -10,+10     30000       3.8e-16     1.0e-16
+// Complex circular cosine
+//
+// DESCRIPTION:
+//
+// If
+//     z = x + iy,
+//
+// then
+//
+//     w = cos x  cosh y  -  i sin x sinh y.
+//
+// ACCURACY:
+//
+//                      Relative error:
+// arithmetic   domain     # trials      peak         rms
+//    DEC       -10,+10      8400       4.5e-17     1.3e-17
+//    IEEE      -10,+10     30000       3.8e-16     1.0e-16
 
-	// Returns the cosine of complex number.
-	fn Cos(self): Cmplx {
+// Returns the cosine of complex number.
+fn Cos(x: Cmplx): Cmplx {
+	re, im := x.Real(), x.Imag()
+	match {
+	| im == 0 && (math::IsInf(re, 0) || math::IsNaN(re)):
+		ret New(math::NaN(), -im*math::Copysign(0, re))
+	| math::IsInf(im, 0):
 		match {
-		| self.Imag() == 0 && (math::IsInf(self.Real(), 0) || math::IsNaN(self.Real())):
-			ret Cmplx.New(math::NaN(), -self.Imag()*math::Copysign(0, self.Real()))
-		| math::IsInf(self.Imag(), 0):
-			match {
-			| self.Real() == 0:
-				ret Cmplx.New(math::Inf(1), -self.Real()*math::Copysign(0, self.Imag()))
-			| math::IsInf(self.Real(), 0) | math::IsNaN(self.Real()):
-				ret Cmplx.New(math::Inf(1), math::NaN())
-			}
-		| self.Real() == 0 && math::IsNaN(self.Imag()):
-			ret Cmplx.New(math::NaN(), 0)
+		| re == 0:
+			ret New(math::Inf(1), -re*math::Copysign(0, im))
+		| math::IsInf(re, 0) || math::IsNaN(re):
+			ret New(math::Inf(1), math::NaN())
 		}
-		s, c := math::Sincos(self.Real())
-		sh, ch := sinhcosh(self.Imag())
-		ret Cmplx.New(c*ch, -s*sh)
+	| re == 0 && math::IsNaN(im):
+		ret New(math::NaN(), 0)
 	}
+	s, mut c := math::Sincos(x.Real())
+	sh, ch := sinhcosh(x.Imag())
+	ret New(c*ch, -s*sh)
+}
 
-	// Complex hyperbolic cosine
-	//
-	// DESCRIPTION:
-	//
-	// ccosh(z) = cosh x  cos y + i sinh x sin y .
-	//
-	// ACCURACY:
-	//
-	//                      Relative error:
-	// arithmetic   domain     # trials      peak         rms
-	//    IEEE      -10,+10     30000       2.9e-16     8.1e-17
+// Complex hyperbolic cosine
+//
+// DESCRIPTION:
+//
+// ccosh(z) = cosh x  cos y + i sinh x sin y .
+//
+// ACCURACY:
+//
+//                      Relative error:
+// arithmetic   domain     # trials      peak         rms
+//    IEEE      -10,+10     30000       2.9e-16     8.1e-17
 
-	// Returns the hyperbolic cosine of complex number.
-	fn Cosh(self): Cmplx {
+// Returns the hyperbolic cosine of complex number.
+fn Cosh(x: Cmplx): Cmplx {
+	match {
+	| x.Real() == 0 && (math::IsInf(x.Imag(), 0) || math::IsNaN(x.Imag())):
+		ret New(math::NaN(), x.Real()*math::Copysign(0, x.Imag()))
+	| math::IsInf(x.Real(), 0):
 		match {
-		| self.Real() == 0 && (math::IsInf(self.Imag(), 0) || math::IsNaN(self.Imag())):
-			ret Cmplx.New(math::NaN(), self.Real()*math::Copysign(0, self.Imag()))
-		| math::IsInf(self.Real(), 0):
-			match {
-			| self.Imag() == 0:
-				ret Cmplx.New(math::Inf(1), self.Imag()*math::Copysign(0, self.Real()))
-			| math::IsInf(self.Imag(), 0) || math::IsNaN(self.Imag()):
-				ret Cmplx.New(math::Inf(1), math::NaN())
-			}
-		| self.Imag() == 0 && math::IsNaN(self.Real()):
-			ret Cmplx.New(math::NaN(), self.Imag())
+		| x.Imag() == 0:
+			ret New(math::Inf(1), x.Imag()*math::Copysign(0, x.Real()))
+		| math::IsInf(x.Imag(), 0) || math::IsNaN(x.Imag()):
+			ret New(math::Inf(1), math::NaN())
 		}
-		s, c := math::Sincos(self.Imag())
-		sh, ch := sinhcosh(self.Real())
-		ret Cmplx.New(c*ch, s*sh)
+	| x.Imag() == 0 && math::IsNaN(x.Real()):
+		ret New(math::NaN(), x.Imag())
 	}
+	s, c := math::Sincos(x.Imag())
+	sh, ch := sinhcosh(x.Real())
+	ret New(c*ch, s*sh)
 }
 
 // calculate sinh and cosh.

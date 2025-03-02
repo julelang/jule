@@ -44,42 +44,40 @@ use "std/math"
 // arithmetic   domain     # trials      peak         rms
 //    IEEE      -10,+10     30000       9.4e-15     1.5e-15
 
-impl Cmplx {
-	// Returns x**y, the base-x (self) exponential of y.
-	// For generalized compatibility with math::pow:
-	//
-	//	Pow(0, ±0) returns 1+0i
-	//	Pow(0, c) for c.Real()<0 returns Inf+0i if c.Imag() is zero, otherwise Inf+Inf i.
-	fn Pow(self, y: Cmplx): Cmplx {
-		if self.IsZero() { // Guaranteed also true for x == -0.
-			if y.IsNaN() {
-				ret Cmplx.NaN()
+// Returns x**y, the base-x exponential of y.
+// For generalized compatibility with math::pow:
+//
+//	Pow(0, ±0) returns 1+0i
+//	Pow(0, c) for c.Real()<0 returns Inf+0i if c.Imag() is zero, otherwise Inf+Inf i.
+fn Pow(x: Cmplx, y: Cmplx): Cmplx {
+	if IsZero(x) { // Guaranteed also true for x == -0.
+		if IsNaN(y) {
+			ret NaN()
+		}
+		match {
+		| y.Real() == 0:
+			ret New(1, 0)
+		| y.Real() < 0:
+			if y.Imag() == 0 {
+				ret New(math::Inf(1), 0)
 			}
-			match {
-			| y.Real() == 0:
-				ret Cmplx.New(1, 0)
-			| y.Real() < 0:
-				if y.Imag() == 0 {
-					ret Cmplx.New(math::Inf(1), 0)
-				}
-				ret Cmplx.Inf(1)
-			| y.Real() > 0:
-				ret Cmplx.Zero()
-			}
-			panic("cmplx: not reached")
+			ret Inf(1)
+		| y.Real() > 0:
+			ret Zero()
 		}
-		modulus := self.Abs()
-		if modulus == 0 {
-			ret Cmplx.Zero()
-		}
-		mut r := math::Pow(modulus, y.Real())
-		arg := self.Phase()
-		mut theta := y.Real() * arg
-		if y.Imag() != 0 {
-			r *= math::Exp(-y.Imag() * arg)
-			theta += y.Imag() * math::Log(modulus)
-		}
-		s, c := math::Sincos(theta)
-		ret Cmplx.New(r*c, r*s)
+		panic("cmplx: not reached")
 	}
+	modulus := Abs(x)
+	if modulus == 0 {
+		ret Zero()
+	}
+	mut r := math::Pow(modulus, y.Real())
+	arg := Phase(x)
+	mut theta := y.Real() * arg
+	if y.Imag() != 0 {
+		r *= math::Exp(-y.Imag() * arg)
+		theta += y.Imag() * math::Log(modulus)
+	}
+	s, c := math::Sincos(theta)
+	ret New(r*c, r*s)
 }

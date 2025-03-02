@@ -31,123 +31,121 @@ use "std/math/bits"
 //   Stephen L. Moshier
 //   moshier@na-net.ornl.gov
 
-impl Cmplx {
-	// Complex circular tangent
-	//
-	// DESCRIPTION:
-	//
-	// If
-	//     z = x + iy,
-	//
-	// then
-	//
-	//           sin 2x  +  i sinh 2y
-	//     w  =  --------------------.
-	//            cos 2x  +  cosh 2y
-	//
-	// On the real axis the denominator is zero at odd multiples
-	// of PI/2. The denominator is evaluated by its Taylor
-	// series near these points.
-	//
-	// ctan(z) = -i ctanh(iz).
-	//
-	// ACCURACY:
-	//
-	//                      Relative error:
-	// arithmetic   domain     # trials      peak         rms
-	//    DEC       -10,+10      5200       7.1e-17     1.6e-17
-	//    IEEE      -10,+10     30000       7.2e-16     1.2e-16
-	// Also tested by ctan * ccot = 1 and catan(ctan(z))  =  z.
+// Complex circular tangent
+//
+// DESCRIPTION:
+//
+// If
+//     z = x + iy,
+//
+// then
+//
+//           sin 2x  +  i sinh 2y
+//     w  =  --------------------.
+//            cos 2x  +  cosh 2y
+//
+// On the real axis the denominator is zero at odd multiples
+// of PI/2. The denominator is evaluated by its Taylor
+// series near these points.
+//
+// ctan(z) = -i ctanh(iz).
+//
+// ACCURACY:
+//
+//                      Relative error:
+// arithmetic   domain     # trials      peak         rms
+//    DEC       -10,+10      5200       7.1e-17     1.6e-17
+//    IEEE      -10,+10     30000       7.2e-16     1.2e-16
+// Also tested by ctan * ccot = 1 and catan(ctan(z))  =  z.
 
-	// Returns the tangent of complex number.
-	fn Tan(self): Cmplx {
+// Returns the tangent of complex number.
+fn Tan(x: Cmplx): Cmplx {
+	match {
+	| math::IsInf(x.Imag(), 0):
 		match {
-		| math::IsInf(self.Imag(), 0):
-			match {
-			| math::IsInf(self.Real(), 0) | math::IsNaN(self.Real()):
-				ret Cmplx.New(math::Copysign(0, self.Real()), math::Copysign(1, self.Imag()))
-			}
-			ret Cmplx.New(math::Copysign(0, math::Sin(2*self.Real())), math::Copysign(1, self.Imag()))
-		| self.Real() == 0 && math::IsNaN(self.Imag()):
-			ret self
+		| math::IsInf(x.Real(), 0) | math::IsNaN(x.Real()):
+			ret New(math::Copysign(0, x.Real()), math::Copysign(1, x.Imag()))
 		}
-		mut d := math::Cos(2*self.Real()) + math::Cosh(2*self.Imag())
-		if math::Abs(d) < 0.25 {
-			d = tanSeries(self)
-		}
-		if d == 0 {
-			ret Cmplx.Inf(1)
-		}
-		ret Cmplx.New(math::Sin(2*self.Real())/d, math::Sinh(2*self.Imag())/d)
+		ret New(math::Copysign(0, math::Sin(2*x.Real())), math::Copysign(1, x.Imag()))
+	| x.Real() == 0 && math::IsNaN(x.Imag()):
+		ret x
 	}
+	mut d := math::Cos(2*x.Real()) + math::Cosh(2*x.Imag())
+	if math::Abs(d) < 0.25 {
+		d = tanSeries(x)
+	}
+	if d == 0 {
+		ret Inf(1)
+	}
+	ret New(math::Sin(2*x.Real())/d, math::Sinh(2*x.Imag())/d)
+}
 
-	// Complex hyperbolic tangent
-	//
-	// DESCRIPTION:
-	//
-	// tanh z = (sinh 2x  +  i sin 2y) / (cosh 2x + cos 2y) .
-	//
-	// ACCURACY:
-	//
-	//                      Relative error:
-	// arithmetic   domain     # trials      peak         rms
-	//    IEEE      -10,+10     30000       1.7e-14     2.4e-16
+// Complex hyperbolic tangent
+//
+// DESCRIPTION:
+//
+// tanh z = (sinh 2x  +  i sin 2y) / (cosh 2x + cos 2y) .
+//
+// ACCURACY:
+//
+//                      Relative error:
+// arithmetic   domain     # trials      peak         rms
+//    IEEE      -10,+10     30000       1.7e-14     2.4e-16
 
-	// Returns the hyperbolic tangent of complex number.
-	fn Tanh(self): Cmplx {
+// Returns the hyperbolic tangent of complex number.
+fn Tanh(x: Cmplx): Cmplx {
+	match {
+	| math::IsInf(x.Real(), 0):
 		match {
-		| math::IsInf(self.Real(), 0):
-			match {
-			| math::IsInf(self.Imag(), 0) | math::IsNaN(self.Imag()):
-				ret Cmplx.New(math::Copysign(1, self.Real()), math::Copysign(0, self.Imag()))
-			}
-			ret Cmplx.New(math::Copysign(1, self.Real()), math::Copysign(0, math::Sin(2*self.Imag())))
-		| self.Imag() == 0 && math::IsNaN(self.Real()):
-			ret self
+		| math::IsInf(x.Imag(), 0) | math::IsNaN(x.Imag()):
+			ret New(math::Copysign(1, x.Real()), math::Copysign(0, x.Imag()))
 		}
-		d := math::Cosh(2*self.Real()) + math::Cos(2*self.Imag())
-		if d == 0 {
-			ret Cmplx.Inf(1)
-		}
-		ret Cmplx.New(math::Sinh(2*self.Real())/d, math::Sin(2*self.Imag())/d)
+		ret New(math::Copysign(1, x.Real()), math::Copysign(0, math::Sin(2*x.Imag())))
+	| x.Imag() == 0 && math::IsNaN(x.Real()):
+		ret x
 	}
-
-	// Complex circular cotangent
-	//
-	// DESCRIPTION:
-	//
-	// If
-	//     z = x + iy,
-	//
-	// then
-	//
-	//           sin 2x  -  i sinh 2y
-	//     w  =  --------------------.
-	//            cosh 2y  -  cos 2x
-	//
-	// On the real axis, the denominator has zeros at even
-	// multiples of PI/2.  Near these points it is evaluated
-	// by a Taylor series.
-	//
-	// ACCURACY:
-	//
-	//                      Relative error:
-	// arithmetic   domain     # trials      peak         rms
-	//    DEC       -10,+10      3000       6.5e-17     1.6e-17
-	//    IEEE      -10,+10     30000       9.2e-16     1.2e-16
-	// Also tested by ctan * ccot = 1 + i0.
-
-	// Returns the cotangent of complex number.
-	fn Cot(self): Cmplx {
-		mut d := math::Cosh(2*self.Imag()) - math::Cos(2*self.Real())
-		if math::Abs(d) < 0.25 {
-			d = tanSeries(self)
-		}
-		if d == 0 {
-			ret Cmplx.Inf(1)
-		}
-		ret Cmplx.New(math::Sin(2*self.Real())/d, -math::Sinh(2*self.Imag())/d)
+	d := math::Cosh(2*x.Real()) + math::Cos(2*x.Imag())
+	if d == 0 {
+		ret Inf(1)
 	}
+	ret New(math::Sinh(2*x.Real())/d, math::Sin(2*x.Imag())/d)
+}
+
+// Complex circular cotangent
+//
+// DESCRIPTION:
+//
+// If
+//     z = x + iy,
+//
+// then
+//
+//           sin 2x  -  i sinh 2y
+//     w  =  --------------------.
+//            cosh 2y  -  cos 2x
+//
+// On the real axis, the denominator has zeros at even
+// multiples of PI/2.  Near these points it is evaluated
+// by a Taylor series.
+//
+// ACCURACY:
+//
+//                      Relative error:
+// arithmetic   domain     # trials      peak         rms
+//    DEC       -10,+10      3000       6.5e-17     1.6e-17
+//    IEEE      -10,+10     30000       9.2e-16     1.2e-16
+// Also tested by ctan * ccot = 1 + i0.
+
+// Returns the cotangent of complex number.
+fn Cot(x: Cmplx): Cmplx {
+	mut d := math::Cosh(2*x.Imag()) - math::Cos(2*x.Real())
+	if math::Abs(d) < 0.25 {
+		d = tanSeries(x)
+	}
+	if d == 0 {
+		ret Inf(1)
+	}
+	ret New(math::Sin(2*x.Real())/d, -math::Sinh(2*x.Imag())/d)
 }
 
 // Reduces the input argument x to the range (-PI/2, PI/2].
