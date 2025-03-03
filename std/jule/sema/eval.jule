@@ -87,8 +87,9 @@ struct target {
 }
 
 // Eval flags.
-const evalDefault = 0          // Default evaluation mode.
-const evalPhysicalMem = 1 << 0 // Checks whether the value is sutaible for physical memory.
+const evalDefault = 0            // Default evaluation mode.
+const evalPhysicalMem = 1 << 0   // Checks whether the value is sutaible for physical memory.
+const evalUnwrapUntyped = 1 << 1 // Unwraps untyped literal value to physical memory with default type.
 
 // Evaluator.
 struct eval {
@@ -288,7 +289,7 @@ impl eval {
 			ret nil
 		}
 		v.Constant = constant::Const.NewInt(i)
-		v.Type = primInt // Type is symbolic.
+		v.Type = primInt // Default type for unwrap.
 		v.Model = v.Constant
 		v.untyped = true
 		_ = self.applyNumericPrefix(v)
@@ -726,7 +727,7 @@ impl eval {
 		self.prefix = nil
 		defer { self.prefix = prefix }
 
-		mut val := self.evalExpr(v.Expr, evalDefault|evalPhysicalMem)
+		mut val := self.evalExpr(v.Expr, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 		if val == nil {
 			ret nil
 		}
@@ -792,7 +793,8 @@ impl eval {
 		mut prefix := self.prefix
 		self.prefix = arr.Elem
 		for (_, mut elem) in s.Exprs {
-			mut v := self.evalExpr(elem, evalDefault|evalPhysicalMem)
+			// Do not unwrap untyped literals, type analysis will check overflows.
+			mut v := self.evalExpr(elem, evalDefault)
 			if v == nil {
 				continue
 			}
@@ -836,7 +838,8 @@ impl eval {
 		mut prefix := self.prefix
 		self.prefix = slc.Elem
 		for (_, mut elem) in s.Exprs[i:] {
-			mut v := self.evalExpr(elem, evalDefault|evalPhysicalMem)
+			// Do not unwrap untyped literals, type analysis will check overflows.
+			mut v := self.evalExpr(elem, evalDefault)
 			if v != nil {
 				const destIsRef = false
 				if self.s.checkValidityForInitExpr(self.target.mutable, destIsRef, slc.Elem, v, elem.Token) {
@@ -887,7 +890,7 @@ impl eval {
 		}
 
 		mut firstExpr := s.Exprs[0]
-		mut firstElem := self.evalExpr(firstExpr, evalDefault|evalPhysicalMem)
+		mut firstElem := self.evalExpr(firstExpr, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 		if firstElem == nil {
 			ret nil
 		}
@@ -1090,7 +1093,7 @@ impl eval {
 		| &ast::Type:
 			generics = append(generics, (&ast::Type)(expr.Kind))
 		| &ast::IndexingExpr:
-			mut v := self.eval(expr, evalDefault|evalPhysicalMem)
+			mut v := self.eval(expr, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 			if v == nil {
 				ret false
 			}
@@ -1272,7 +1275,7 @@ impl eval {
 			self.prefix = m.Key
 		}
 
-		mut index := self.evalExpr(i.Index, evalDefault|evalPhysicalMem)
+		mut index := self.evalExpr(i.Index, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 		self.prefix = nil
 		if index == nil {
 			ret nil
@@ -1316,7 +1319,7 @@ impl eval {
 		defer { self.prefix = prefix }
 
 		if s.Start != nil {
-			l = self.evalExpr(s.Start, evalDefault|evalPhysicalMem)
+			l = self.evalExpr(s.Start, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 			if l != nil {
 				self.checkIntegerIndexingByData(l, s.Token)
 			} else {
@@ -1332,7 +1335,7 @@ impl eval {
 		}
 
 		if s.To != nil {
-			r = self.evalExpr(s.To, evalDefault|evalPhysicalMem)
+			r = self.evalExpr(s.To, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 			if r != nil {
 				self.checkIntegerIndexingByData(r, s.Token)
 			} else {
@@ -1341,7 +1344,7 @@ impl eval {
 		}
 
 		if s.Cap != nil {
-			c = self.evalExpr(s.Cap, evalDefault|evalPhysicalMem)
+			c = self.evalExpr(s.Cap, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 			if r != nil {
 				self.checkIntegerIndexingByData(r, s.Token)
 			} else {
@@ -1434,7 +1437,7 @@ impl eval {
 	}
 
 	fn evalSlicing(mut &self, mut s: &ast::SlicingExpr): &Value {
-		mut v := self.evalExpr(s.Expr, evalDefault|evalPhysicalMem)
+		mut v := self.evalExpr(s.Expr, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 		if v == nil {
 			ret nil
 		}
@@ -1973,11 +1976,11 @@ impl eval {
 		// arbitrary large literals may overflow largest bitsize of any actual type.
 		// So we need to make sure that the value can fit at least the largest type.
 		//
-		// For floating-point types; eval with no physical memory constraint.
-		// Because floating-point types allows casting from any arbitrary integer value.
+		// For numeric types; do not eval with physical memory constraint or unwrap.
+		// Casting analysis will check the overflows for the corresponding type.
 		mut flags := evalDefault
-		if t.Prim() == nil || !types::IsFloat(t.Prim().Kind) {
-			flags |= evalPhysicalMem
+		if t.Prim() == nil || !types::IsNum(t.Prim().Kind) {
+			flags |= evalPhysicalMem | evalUnwrapUntyped
 		}
 		mut v := self.evalExpr(e, flags)
 		if v == nil || self.prefix != nil {
@@ -3000,7 +3003,7 @@ impl eval {
 		mut prefix := self.prefix
 		self.prefix = nil
 		defer { self.prefix = prefix }
-		mut v := self.eval1(si.Expr, evalDefault|evalPhysicalMem)
+		mut v := self.eval1(si.Expr, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 		if v == nil || v.Type == nil {
 			ret nil
 		}
@@ -3061,14 +3064,16 @@ impl eval {
 			}
 
 			self.prefix = model.Kind.Key
-			mut key := self.evalExpr(pair.Key, evalDefault|evalPhysicalMem)
+			// Do not unwrap untyped literals, type analysis will check overflows.
+			mut key := self.evalExpr(pair.Key, evalDefault)
 			self.prefix = prefix
 			if key == nil {
 				ret nil
 			}
 
 			self.prefix = model.Kind.Val
-			mut val := self.evalExpr(pair.Val, evalDefault|evalPhysicalMem)
+			// Do not unwrap untyped literals, type analysis will check overflows.
+			mut val := self.evalExpr(pair.Val, evalDefault)
 			self.prefix = prefix
 			if val == nil {
 				ret nil
@@ -3169,7 +3174,7 @@ impl eval {
 	}
 
 	fn evalChanRecv(mut &self, mut expr: &ast::ChanRecv): &Value {
-		mut v := self.evalExpr(expr.Expr, evalDefault|evalPhysicalMem)
+		mut v := self.evalExpr(expr.Expr, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 		if v == nil {
 			ret nil
 		}
@@ -3192,7 +3197,7 @@ impl eval {
 	}
 
 	fn evalChanSend(mut &self, mut chs: &ast::ChanSend): &Value {
-		mut l := self.evalExpr(chs.Chan, evalDefault|evalPhysicalMem)
+		mut l := self.evalExpr(chs.Chan, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 		if l == nil {
 			ret nil
 		}
@@ -3211,7 +3216,8 @@ impl eval {
 		self.prefix = ch.Elem
 		self.target.mutable = l.Mutable
 		self.unsafety = self.isUnsafe()
-		mut r := self.evalExpr(chs.Data, evalDefault|evalPhysicalMem)
+		// Do not unwrap untyped literals, type analysis will check overflows.
+		mut r := self.evalExpr(chs.Data, evalDefault)
 		self.prefix = prefix
 		self.target.mutable = mutable
 		self.unsafety = unsafety
@@ -5226,6 +5232,29 @@ fn findNamespace(mut lookup: Lookup, namespace: str): &ImportInfo {
 
 // Checks value by flags.
 fn checkValue(mut v: &Value, mut s: &sema, mut token: &token::Token, flags: int): (ok: bool) {
+	// Catch arbitrary integers with no type, they should be fit in int.
+	if flags&evalUnwrapUntyped == evalUnwrapUntyped {
+		if v.untyped && v.IsConst() && v.Constant.IsInt() {
+			i := v.Constant.ReadInt()
+			max := types::MaxI(types::RealKindOf(types::Int))
+			min := types::MinI(types::RealKindOf(types::Int))
+			if i.IsU64() {
+				if u64(max) < i.U64() {
+					s.pushErr(token, build::LogMsg.ConstantOverflowType, v.Constant.Str(), primInt.Str())
+					ret false
+				}
+			} else if i.IsI64() {
+				x := i.I64()
+				if x < min || max < x {
+					s.pushErr(token, build::LogMsg.ConstantOverflowType, v.Constant.Str(), primInt.Str())
+					ret false
+				}
+			} else {
+				s.pushErr(token, build::LogMsg.ConstantOverflowType, v.Constant.Str(), primInt.Str())
+				ret false
+			}
+		}
+	}
 	// Catch arbitrary integers with no type.
 	// In order for this value to be assigned to memory,
 	// we need to make sure that it can fit at least the largest integer type.

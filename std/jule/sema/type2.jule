@@ -316,12 +316,14 @@ impl assignTypeChecker {
 		match {
 		| types::IsFloat(kind):
 			if !floatAssignable(kind, self.v) {
-				ret false
+				self.s.pushErr(self.errorToken, build::LogMsg.ConstantOverflowType, self.v.Constant.Str(), self.dest.Str())
+				ret true // Return true to avoid more errors.
 			}
 			self.v.Constant.Kind = kind
 		| types::IsInt(kind):
 			if !intAssignable(kind, self.v) {
-				ret false
+				self.s.pushErr(self.errorToken, build::LogMsg.ConstantOverflowType, self.v.Constant.Str(), self.dest.Str())
+				ret true // Return true to avoid more errors.
 			}
 			self.v.Constant.Kind = kind
 		|:
@@ -386,14 +388,17 @@ impl assignTypeChecker {
 				ret true
 			}
 		}
-		// If value is untyped and constant checking is failed,
-		// it is not fits in the destination type.
 		if self.v.untyped {
+			// If value is untyped and constant checking is failed,
+			// it is not fits in the destination type.
 			p := self.dest.Prim()
 			if p != nil && types::IsNum(p.Kind) {
 				self.s.pushCompatibilityError(self.dest, self.v, self.errorToken)
 				ret false
 			}
+			// Destination type is not numeric.
+			// So check and make sure the untyped value can unwrap safely.
+			_ = checkValue(self.v, self.s, self.errorToken, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 		}
 		ret self.s.checkTypeCompatibility1(self.dest, self.v, self.errorToken)
 	}
@@ -863,7 +868,8 @@ impl fnCallArgChecker {
 		} else {
 			self.e.prefix = nil
 		}
-		mut v := self.e.evalExpr(arg, evalDefault|evalPhysicalMem)
+		// Do not unwrap untyped literals, type analysis will check overflows.
+		mut v := self.e.evalExpr(arg, evalDefault)
 
 		self.e.prefix = old
 		self.e.target.mutable = oldMut
@@ -917,7 +923,7 @@ impl fnCallArgChecker {
 				self.e.prefix = p.Type
 			}
 
-			mut v := self.e.eval(arg, evalDefault|evalPhysicalMem)
+			mut v := self.e.eval(arg, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 			if v == nil {
 				ok = false
 				continue
@@ -1108,7 +1114,8 @@ impl structLitChecker {
 		defer { self.e.prefix = prefix }
 		self.e.prefix = f.Type
 
-		mut v := self.e.evalExpr(pair.Expr, evalDefault|evalPhysicalMem)
+		// Do not unwrap untyped literals, type analysis will check overflows.
+		mut v := self.e.evalExpr(pair.Expr, evalDefault)
 		if v == nil {
 			ret
 		}
@@ -1177,7 +1184,8 @@ impl structLitChecker {
 				defer { self.e.prefix = prefix }
 				self.e.prefix = field.Type
 
-				mut v := self.e.evalExpr(expr, evalDefault|evalPhysicalMem)
+				// Do not unwrap untyped literals, type analysis will check overflows.
+				mut v := self.e.evalExpr(expr, evalDefault)
 				if v == nil {
 					continue
 				}
@@ -1435,7 +1443,8 @@ impl retTypeChecker {
 			if i < len(self.types) {
 				eval.prefix = self.types[i]
 			}
-			mut v := eval.evalExpr(expr, evalDefault|evalPhysicalMem)
+			// Do not unwrap untyped literals, type analysis will check overflows.
+			mut v := eval.evalExpr(expr, evalDefault)
 			ok = ok && v != nil
 			if ok {
 				self.exprs = append(self.exprs, v)

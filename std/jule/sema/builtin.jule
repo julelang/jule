@@ -299,7 +299,7 @@ fn builtinCallerError(mut &e: &eval, mut &fc: &ast::FuncCallExpr): &Value {
 	if len(fc.Args) > 1 {
 		e.pushErr(fc.Args[1].Token, build::LogMsg.ArgumentOverflow, "error")
 	}
-	mut expr := e.evalExpr(fc.Args[0], evalDefault|evalPhysicalMem)
+	mut expr := e.evalExpr(fc.Args[0], evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 	if expr == nil {
 		ret nil
 	}
@@ -331,7 +331,7 @@ fn builtinCallerPrint(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value
 	}
 
 	mut arg := fc.Args[0]
-	mut expr := e.evalExpr(arg, evalDefault|evalPhysicalMem)
+	mut expr := e.evalExpr(arg, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 	if expr == nil {
 		ret nil
 	}
@@ -378,7 +378,7 @@ fn builtinCallerNew(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Value):
 		e.pushErr(fc.Args[2].Token, build::LogMsg.ArgumentOverflow, "new")
 	}
 
-	mut t := e.eval1(fc.Args[0], evalDefault|evalPhysicalMem)
+	mut t := e.eval1(fc.Args[0], evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 	if t == nil {
 		ret nil
 	}
@@ -400,7 +400,7 @@ fn builtinCallerNew(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Value):
 		mut old := e.prefix
 		e.prefix = t.Type
 
-		mut init := e.evalExpr(fc.Args[1], evalDefault|evalPhysicalMem)
+		mut init := e.evalExpr(fc.Args[1], evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 
 		e.prefix = old
 
@@ -434,7 +434,7 @@ fn builtinCallerPanic(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &_: &Value
 		e.pushErr(fc.Args[2].Token, build::LogMsg.ArgumentOverflow, "panic")
 	}
 
-	mut expr := e.evalExpr(fc.Args[0], evalDefault|evalPhysicalMem)
+	mut expr := e.evalExpr(fc.Args[0], evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 	if expr == nil {
 		ret nil
 	}
@@ -490,7 +490,7 @@ fn builtinCallerMake(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Value)
 		if len(fc.Args) == 2 {
 			// We have buffer size argument, evaluate it.
 			// So channel is buffered.
-			mut capExpr := e.s.eval(e.lookup).evalExpr(fc.Args[1], evalDefault|evalPhysicalMem)
+			mut capExpr := e.s.eval(e.lookup).evalExpr(fc.Args[1], evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 			if capExpr == nil {
 				ret v
 			}
@@ -507,7 +507,7 @@ fn builtinCallerMake(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Value)
 			ret nil
 		}
 		v.Type = t.Type
-		mut lenExpr := e.s.evalp(e.lookup, t.Type).evalExpr(fc.Args[1], evalDefault|evalPhysicalMem)
+		mut lenExpr := e.s.evalp(e.lookup, t.Type).evalExpr(fc.Args[1], evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 		if lenExpr == nil {
 			ret nil
 		}
@@ -519,7 +519,7 @@ fn builtinCallerMake(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Value)
 		v.Model = model
 		if len(fc.Args) == 3 {
 			// We have capacity argument, evaluate it.
-			mut capExpr := e.s.evalp(e.lookup, t.Type).evalExpr(fc.Args[2], evalDefault|evalPhysicalMem)
+			mut capExpr := e.s.evalp(e.lookup, t.Type).evalExpr(fc.Args[2], evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 			if capExpr == nil {
 				ret v
 			}
@@ -546,7 +546,7 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Valu
 	}
 
 	mut firstArg := fc.Args[0]
-	mut t := e.evalExpr(firstArg, evalDefault|evalPhysicalMem)
+	mut t := e.evalExpr(firstArg, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 	if t == nil {
 		ret nil
 	}
@@ -581,7 +581,7 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Valu
 			e.pushErr(fc.Args[2].Token, build::LogMsg.MoreArgsWithVariadiced)
 		}
 
-		mut e1 := e.evalExpr((&ast::VariadicExpr)(secondArg.Kind).Expr, evalDefault|evalPhysicalMem)
+		mut e1 := e.evalExpr((&ast::VariadicExpr)(secondArg.Kind).Expr, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 		if e1 == nil {
 			ret nil
 		}
@@ -652,17 +652,13 @@ fn builtinCallerAppend(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Valu
 		ret v
 	}
 
-	mut e1 := e.evalExpr(secondArg, evalDefault|evalPhysicalMem)
-	if e1 == nil {
-		ret nil
-	}
-
 	mut slice := &SliceExpr{
 		ElemType: s.Elem,
 		Elems: make([]&Value, 0, len(fc.Args)-1),
 	}
 	for (_, mut arg) in fc.Args[1:] {
-		e1 = e.evalExpr(arg, evalDefault|evalPhysicalMem)
+		// Do not unwrap untyped literals, type analysis will check overflows.
+		mut e1 := e.evalExpr(arg, evalDefault)
 		if e1 == nil {
 			ret nil
 		}
@@ -719,7 +715,7 @@ fn callerCopySlice(mut &dest: &Value, mut &e: &eval, mut &fc: &ast::FuncCallExpr
 		}
 	}
 
-	mut src := e.evalExpr(fc.Args[1], evalDefault|evalPhysicalMem)
+	mut src := e.evalExpr(fc.Args[1], evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 	if src == nil {
 		ret nil
 	}
@@ -774,7 +770,7 @@ fn builtinCallerCopy(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Value)
 		e.pushErr(fc.Args[2].Token, build::LogMsg.ArgumentOverflow, "copy")
 	}
 
-	mut dest := e.evalExpr(fc.Args[0], evalDefault|evalPhysicalMem)
+	mut dest := e.evalExpr(fc.Args[0], evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 	match {
 	| dest == nil:
 		ret nil
@@ -845,7 +841,7 @@ fn builtinCallerLen(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Value):
 	if len(fc.Args) > 1 {
 		e.pushErr(fc.Args[1].Token, build::LogMsg.ArgumentOverflow, "len")
 	}
-	mut dest := e.evalExpr1(fc.Args[0], evalDefault|evalPhysicalMem)
+	mut dest := e.evalExpr1(fc.Args[0], evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 	match {
 	| dest == nil:
 		ret nil
@@ -895,7 +891,7 @@ fn builtinCallerCap(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Value):
 	if len(fc.Args) > 1 {
 		e.pushErr(fc.Args[1].Token, build::LogMsg.ArgumentOverflow, "cap")
 	}
-	mut dest := e.evalExpr(fc.Args[0], evalDefault|evalPhysicalMem)
+	mut dest := e.evalExpr(fc.Args[0], evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 	match {
 	| dest == nil:
 		ret nil
@@ -919,7 +915,7 @@ fn callerDeleteMap(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &expr: &Value
 		Dest: expr,
 	}
 	if len(fc.Args) == 2 {
-		mut key := e.evalExpr(fc.Args[1], evalDefault|evalPhysicalMem)
+		mut key := e.evalExpr(fc.Args[1], evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 		match {
 		| key == nil:
 			ret nil
@@ -947,7 +943,7 @@ fn builtinCallerDelete(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Valu
 	if len(fc.Args) > 2 {
 		e.pushErr(fc.Args[1].Token, build::LogMsg.ArgumentOverflow, "delete")
 	}
-	mut dest := e.evalExpr(fc.Args[0], evalDefault|evalPhysicalMem)
+	mut dest := e.evalExpr(fc.Args[0], evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 	match {
 	| dest == nil:
 		ret nil
@@ -970,7 +966,7 @@ fn builtinCallerClose(mut &e: &eval, mut &fc: &ast::FuncCallExpr, mut &v: &Value
 	if len(fc.Args) > 2 {
 		e.pushErr(fc.Args[1].Token, build::LogMsg.ArgumentOverflow, "close")
 	}
-	mut dest := e.evalExpr(fc.Args[0], evalDefault|evalPhysicalMem)
+	mut dest := e.evalExpr(fc.Args[0], evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 	match {
 	| dest == nil:
 		ret nil
@@ -1042,7 +1038,7 @@ fn builtinCallerStdComptimeValueOf(mut &e: &eval, mut &fc: &ast::FuncCallExpr, m
 	if len(fc.Args) > 1 {
 		e.pushErr(fc.Args[1].Token, build::LogMsg.ArgumentOverflow, "ValueOf")
 	}
-	mut v := e.evalExpr(fc.Args[0], evalDefault|evalPhysicalMem)
+	mut v := e.evalExpr(fc.Args[0], evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 	if v == nil {
 		ret nil
 	}
@@ -1132,7 +1128,7 @@ fn builtinCallerStdComptimeTypeAlias(mut &e: &eval, mut &fc: &ast::FuncCallExpr,
 		Ident: ident.Kind,
 		TypeSym: new(TypeSym),
 	}
-	mut t := e.eval1(fc.Args[1], evalDefault|evalPhysicalMem)
+	mut t := e.eval1(fc.Args[1], evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 	if t == nil {
 		ret nil
 	}
@@ -1212,7 +1208,7 @@ fn builtinCallerStdJuleIntegratedEmit(mut &e: &eval, mut &fc: &ast::FuncCallExpr
 		ret nil
 	}
 
-	mut argVal := e.evalExpr(fc.Args[0], evalDefault|evalPhysicalMem)
+	mut argVal := e.evalExpr(fc.Args[0], evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 	if argVal == nil {
 		ret nil
 	}
@@ -1241,7 +1237,7 @@ fn builtinCallerStdJuleIntegratedEmit(mut &e: &eval, mut &fc: &ast::FuncCallExpr
 	if len(fc.Args) > 1 {
 		model.Exprs = make([]Expr, 0, len(fc.Args)-1)
 		for (_, mut arg) in fc.Args[1:] {
-			argVal = e.eval1(arg, evalDefault|evalPhysicalMem)
+			argVal = e.eval1(arg, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 			if argVal == nil {
 				ret nil
 			}

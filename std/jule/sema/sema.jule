@@ -1178,7 +1178,7 @@ impl sema {
 				}
 				item.ValueSym.Value.Model = item.ValueSym.Value.Constant
 			} else {
-				mut v := eval.evalExpr(item.ValueSym.Expr, evalDefault|evalPhysicalMem)
+				mut v := eval.evalExpr(item.ValueSym.Expr, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
 				if v == nil {
 					continue
 				}
@@ -1209,7 +1209,8 @@ impl sema {
 			}
 			item.ValueSym.Value.Model = item.ValueSym.Value.Constant
 		} else {
-			mut v := eval.evalExpr(item.ValueSym.Expr, evalDefault|evalPhysicalMem)
+			// Do not unwrap untyped literals, type analysis will check overflows.
+			mut v := eval.evalExpr(item.ValueSym.Expr, evalDefault)
 			if v == nil {
 				ret
 			}
@@ -2108,6 +2109,11 @@ impl sema {
 			// Build new TypeSym because auto-type symbols are nil.
 			v.TypeSym = &TypeSym{Type: v.ValueSym.Value.Type}
 
+			// Check value for unwrap and physical memory constraint.
+			if !v.Constant && v.ValueSym.Value.untyped {
+				_ = checkValue(v.ValueSym.Value, self, v.ValueSym.Expr.Token, evalDefault|evalPhysicalMem|evalUnwrapUntyped)
+			}
+
 			self.checkDataForTypeInference(v.ValueSym.Value, v.ValueSym.Expr.Token)
 			self.checkValidityForInitExpr(
 				v.Mutable,
@@ -2124,12 +2130,6 @@ impl sema {
 						arr.N = dataArr.N
 					}
 				}
-			}
-
-			// If variable is constant and have a exact type, check the value with
-			// physical memory constraints.
-			if v.Constant && v.ValueSym.Value.untyped {
-				_ = checkValue(v.ValueSym.Value, self, v.ValueSym.Expr.Token, evalDefault|evalPhysicalMem)
 			}
 
 			if self.checkAssignType(v.Reference, v.TypeSym.Type, v.ValueSym.Value, v.ValueSym.Expr.Token, v.Refers) {
@@ -2170,13 +2170,7 @@ impl sema {
 			eval = self.evalpd(l, nil, v)
 		}
 		eval.target.mutable = v.Mutable
-		mut flags := evalDefault
-		// If variable is constant, allow comptime arbitrary values such as
-		// std/comptime types or arbitrary-large integers with no memory constraint.
-		// Otherwise evaluate with physical memory constraint.
-		if !v.Constant {
-			flags |= evalPhysicalMem
-		}
+		// Do not unwrap untyped literals, type analysis will check overflows.
 		v.ValueSym.Value = eval.evalExpr(v.ValueSym.Expr, evalDefault)
 	}
 
@@ -2347,7 +2341,8 @@ impl sema {
 			eval.prefix = f.Type
 			eval.field = f
 			eval.target.mutable = true // struct may used as mutable, expressions should be mutable
-			f.Default = eval.evalExpr(f.Decl.Default, evalDefault|evalPhysicalMem)
+			// Do not unwrap untyped literals, type analysis will check overflows.
+			f.Default = eval.evalExpr(f.Decl.Default, evalDefault)
 
 			// Skip if eval returned nil.
 			// Relevant error(s) logged by eval.
