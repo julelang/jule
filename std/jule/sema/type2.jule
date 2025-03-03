@@ -4,13 +4,13 @@
 
 // This file reserved for type compatibility checking.
 
-use "std/conv"
 use "std/jule/ast"
 use "std/jule/build"
 use "std/jule/constant/lit"
 use "std/jule/token"
 use "std/jule/types"
 use "std/math"
+use "std/math/big"
 use "std/strings"
 
 fn traitHasReferenceReceiver(&t: &Trait): bool {
@@ -32,8 +32,35 @@ fn floatAssignable(&kind: str, &v: &Value): bool {
 	if !v.Constant.IsInt() && !v.Constant.IsF64() {
 		ret false
 	}
-	value := conv::FormatFloat(v.Constant.AsF64(), 'g', -1, 64)
-	ret types::CheckBitFloat(value, types::BitSizeOf(kind))
+	// If value is not untyped, trust wrap-around.
+	if !v.untyped {
+		ret true
+	}
+	let mut f: f64
+	bits := types::BitSizeOf(kind)
+	if v.Constant.IsInt() {
+		(f), acc := v.Constant.ReadInt().F64()
+		if acc != big::Exact {
+			ret false
+		}
+	} else {
+		f = v.Constant.AsF64()
+	}
+	// If float is 64-bit, all typed primitive types should fit.
+	if bits == 64 {
+		ret true
+	}
+	f2 := f64(f32(f))
+	match {
+	| math::IsNaN(f):
+		ret math::IsNaN(f2)
+	| math::IsInf(f, 1):
+		ret math::IsInf(f2, 1)
+	| math::IsInf(f, -1):
+		ret math::IsInf(f2, -1)
+	|:
+		ret f == f2
+	}
 }
 
 fn sigAssignable(kind: str, mut &v: &Value): bool {
