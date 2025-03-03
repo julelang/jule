@@ -1675,7 +1675,8 @@ impl eval {
 
 	fn castInt(mut self, mut t: &Type, mut v: &Value, errorToken: &token::Token) {
 		if v.IsConst() {
-			castConstByType(t.Prim().Kind, v)
+			castConstByType(self.s, errorToken, t, v)
+			v.Decl = true // Do not use casting model.
 		} else {
 			v.Constant = nil
 			v.untyped = false
@@ -1716,7 +1717,8 @@ impl eval {
 
 	fn castNum(mut self, mut t: &Type, mut v: &Value, errorToken: &token::Token) {
 		if v.IsConst() {
-			castConstByType(t.Prim().Kind, v)
+			castConstByType(self.s, errorToken, t, v)
+			v.Decl = true // Do not use casting model.
 		} else {
 			v.Constant = nil
 			v.untyped = false
@@ -1753,15 +1755,6 @@ impl eval {
 		|:
 			self.pushErr(errorToken, build::LogMsg.TypeNotSupportsCasting, t.Str())
 		}
-	}
-
-	fn castConstant(mut self, mut &t: &Type, mut &v: &Value) {
-		if v == nil || !v.IsConst() {
-			ret
-		}
-		prim := t.Prim()
-		castConstByType(prim.Kind, v)
-		v.Model = v.Constant
 	}
 
 	fn castTypeEnum(mut self, mut &t: &Type, mut &v: &Value, mut &errorToken: &token::Token) {
@@ -1898,7 +1891,6 @@ impl eval {
 					self.castSlice(t, v, errorToken)
 				| t.Prim() != nil:
 					self.castPrim(t, v, errorToken)
-					self.castConstant(t, v)
 				| t.Trait() != nil:
 					self.castTrait(t, v, errorToken)
 				| t.Chan() != nil:
@@ -4262,15 +4254,14 @@ impl binaryEval {
 			ret false
 		}
 		if self.l.IsConst() && self.l.untyped {
+			if !self.r.untyped && self.r.IsConst() {
+				ret castConstByType(self.e.s, self.lt, self.r.Type, self.l)
+			}
 			ret true
 		}
 		if lk == types::F32 {
 			if self.r.IsConst() && self.r.untyped {
-				if !floatAssignable(lk, self.r) {
-					self.e.s.pushCompatibilityError(self.l.Type, self.r, self.op)
-					ret false
-				}
-				ret true
+				ret castConstByType(self.e.s, self.rt, self.l.Type, self.r)
 			}
 			if rk != types::F32 {
 				self.e.s.pushCompatibilityError(self.l.Type, self.r, self.op)
@@ -4280,11 +4271,7 @@ impl binaryEval {
 		}
 		if lk == types::F64 {
 			if self.r.IsConst() && self.r.untyped {
-				if !floatAssignable(lk, self.r) {
-					self.e.s.pushCompatibilityError(self.l.Type, self.r, self.op)
-					ret false
-				}
-				ret true
+				ret castConstByType(self.e.s, self.rt, self.l.Type, self.r)
 			}
 			if rk != types::F64 {
 				self.e.s.pushCompatibilityError(self.l.Type, self.r, self.op)
@@ -4293,10 +4280,6 @@ impl binaryEval {
 			ret true
 		}
 		if self.r.IsConst() && self.r.untyped {
-			if !intAssignable(lk, self.r) {
-				self.e.s.pushCompatibilityError(self.l.Type, self.r, self.op)
-				ret false
-			}
 			ret true
 		}
 		ret self.checkTypeCompatibility()
@@ -4735,11 +4718,7 @@ impl binaryEval {
 				}
 			}
 		} else {
-			if v.Type.Prim() != nil {
-				castConstByType(v.Type.Prim().Kind, v)
-			} else {
-				castConstByType(v.Type.Enum().TypeSym.Type.Prim().Kind, v)
-			}
+			castConstByType(self.e.s, nil, v.Type, v)
 		}
 		v.Model = v.Constant
 		applyCastModelByEnum(self.e.s, v, v.Type.Enum(), self.op, self.e.getOwnerRefers())
@@ -4823,9 +4802,11 @@ impl binaryEval {
 			ret nil
 		}
 
-		mut prefix := self.e.prefix
-		self.e.prefix = l.Type
-		defer { self.e.prefix = prefix }
+		if !l.untyped {
+			mut prefix := self.e.prefix
+			self.e.prefix = l.Type
+			defer { self.e.prefix = prefix }
+		}
 		mut r := self.e.evalExpr1(op.Right, evalDefault)
 		if r == nil || r.Type == nil {
 			ret nil
@@ -5063,10 +5044,20 @@ fn applyCastModelByEnum(mut &s: &sema, mut &v: &Value, mut e: &Enum,
 	applyCastKindModel(s, v, e.TypeSym.Type, token, refers)
 }
 
-fn castConstByType(t: str, mut &v: &Value) {
+fn castConstByType(mut &s: &sema, token: &token::Token, mut t: &Type, mut &v: &Value): (overflow: bool) {
+	mut kind := ""
+	if t.Prim() != nil {
+		kind = t.Prim().Kind
+	} else {
+		kind = t.Enum().TypeSym.Type.Prim().Kind
+	}
 	match {
-	| types::IsSigInt(t):
-		match types::BitSizeOf(types::RealKindOf(t)) {
+	| types::IsSigInt(kind):
+		if v.untyped && token != nil && !sigAssignable(kind, v) {
+			s.pushErr(token, build::LogMsg.ConstantOverflowType, v.Constant.Str(), t.Str())
+			ret false
+		}
+		match types::BitSizeOf(types::RealKindOf(kind)) {
 		| 64:
 			v.Constant.SetI64(v.Constant.AsI64())
 		| 32:
@@ -5076,9 +5067,13 @@ fn castConstByType(t: str, mut &v: &Value) {
 		| 8:
 			v.Constant.SetI64(i64(i8(v.Constant.AsI64())))
 		}
-		v.Constant.Kind = t
-	| types::IsUnsigInt(t):
-		match types::BitSizeOf(types::RealKindOf(t)) {
+		v.Constant.Kind = kind
+	| types::IsUnsigInt(kind):
+		if v.untyped && token != nil && !unsigAssignable(kind, v) {
+			s.pushErr(token, build::LogMsg.ConstantOverflowType, v.Constant.Str(), t.Str())
+			ret false
+		}
+		match types::BitSizeOf(types::RealKindOf(kind)) {
 		| 64:
 			v.Constant.SetU64(v.Constant.AsU64())
 		| 32:
@@ -5088,16 +5083,21 @@ fn castConstByType(t: str, mut &v: &Value) {
 		| 8:
 			v.Constant.SetU64(u64(u8(v.Constant.AsU64())))
 		}
-		v.Constant.Kind = t
-	| types::IsFloat(t):
-		match types::BitSizeOf(types::RealKindOf(t)) {
+		v.Constant.Kind = kind
+	| types::IsFloat(kind):
+		if v.untyped && token != nil && !floatAssignable(kind, v) {
+			s.pushErr(token, build::LogMsg.ConstantOverflowType, v.Constant.Str(), t.Str())
+			ret false
+		}
+		match types::BitSizeOf(types::RealKindOf(kind)) {
 		| 64:
 			v.Constant.SetF64(v.Constant.AsF64())
 		| 32:
 			v.Constant.SetF64(f64(f32(v.Constant.AsF64())))
 		}
-		v.Constant.Kind = t
+		v.Constant.Kind = kind
 	}
+	ret true
 }
 
 fn updateModelToGenericIns(mut &m: Expr, mut &f: &FuncIns) {
