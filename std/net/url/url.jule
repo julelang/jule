@@ -40,6 +40,9 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // ====================================================
 
+use "std/conv"
+use "std/errors"
+use "std/fmt"
 use "std/path"
 use "std/slices"
 use "std/strings"
@@ -55,6 +58,33 @@ enum encoding {
 	UserPassword,
 	QueryComponent,
 	Fragment,
+}
+
+// Reports an error and the operation and URL that caused it.
+struct Error {
+	Op:  str
+	URL: str
+	Err: any
+}
+
+impl Error {
+	fn Str(self): str { ret fmt::Format("{} {}: {}", self.Op, self.URL, self.Err) }
+}
+
+type EscapeError: str
+
+impl EscapeError {
+	fn Str(self): str {
+		ret "invalid URL escape " + conv::Quote(str(self))
+	}
+}
+
+type InvalidHostError: str
+
+impl InvalidHostError {
+	fn Str(self): str {
+		ret "invalid character " + conv::Quote(str(self)) + " in host name"
+	}
 }
 
 // Returns true if the specified character should be escaped when
@@ -135,7 +165,7 @@ fn shouldEscape(c: byte, mode: encoding): bool {
 
 // Unescapes a string; the mode specifies
 // which section of the URL string is being unescaped.
-fn unescape(s: str, mode: encoding)!: str {
+fn unescape(mut s: str, mode: encoding)!: str {
 	// Count %, check that they're well-formed.
 	mut n := 0
 	mut hasPlus := false
@@ -145,7 +175,11 @@ fn unescape(s: str, mode: encoding)!: str {
 		| '%':
 			n++
 			if i+2 >= len(s) || !ishex(s[i+1]) || !ishex(s[i+2]) {
-				error(URLError.Escape)
+				s = s[i:]
+				if len(s) > 3 {
+					s = s[:3]
+				}
+				error(EscapeError(s))
 			}
 			// Per https://tools.ietf.org/html/rfc3986#page-21
 			// in the host component %-encoding can only be used
@@ -154,7 +188,7 @@ fn unescape(s: str, mode: encoding)!: str {
 			// introduces %25 being allowed to escape a percent sign
 			// in IPv6 scoped-address literals. Yay.
 			if mode == encoding.Host && unhex(s[i+1]) < 8 && s[i:i+3] != "%25" {
-				error(URLError.Escape)
+				error(EscapeError(s[i : i+3]))
 			}
 			if mode == encoding.Zone {
 				// RFC 6874 says basically "anything goes" for zone identifiers
@@ -166,7 +200,7 @@ fn unescape(s: str, mode: encoding)!: str {
 				// But Windows puts spaces here! Yay.
 				v := unhex(s[i+1])<<4 | unhex(s[i+2])
 				if s[i:i+3] != "%25" && v != ' ' && shouldEscape(v, encoding.Host) {
-					error(URLError.Escape)
+					error(EscapeError(s[i : i+3]))
 				}
 			}
 			i += 3
@@ -175,7 +209,7 @@ fn unescape(s: str, mode: encoding)!: str {
 			i++
 		|:
 			if (mode == encoding.Host || mode == encoding.Zone) && s[i] < 0x80 && shouldEscape(s[i], mode) {
-				error(URLError.InvalidHost)
+				error(InvalidHostError(s[i : i+1]))
 			}
 			i++
 		}
@@ -823,7 +857,7 @@ fn getScheme(rawURL: str)!: (scheme: str, path: str) {
 			}
 		| c == ':':
 			if i == 0 {
-				error(URLError.MissingProtocolScheme)
+				error(errors::New("missing protocol scheme"))
 			}
 			ret rawURL[:i], rawURL[i+1:]
 		|:
@@ -900,11 +934,11 @@ fn parseHost(mut host: str)!: str {
 		// E.g., "[fe80::1]", "[fe80::1%25en0]", "[fe80::1]:80".
 		i := strings::LastIndex(host, "]")
 		if i < 0 {
-			error(URLError.InvalidFormat)
+			error(errors::New("missing ']' in host"))
 		}
 		colonPort := host[i+1:]
 		if !validOptionalPort(colonPort) {
-			error(URLError.InvalidPort)
+			error(errors::New("invalid port " + colonPort + " after host"))
 		}
 
 		// RFC 6874 defines that %25 (%-encoded percent) introduces
@@ -925,7 +959,7 @@ fn parseHost(mut host: str)!: str {
 		if i != -1 {
 			colonPort := host[i:]
 			if !validOptionalPort(colonPort) {
-				error(URLError.InvalidPort)
+				error(errors::New("invalid port " + colonPort + " after host"))
 			}
 		}
 	}
@@ -943,7 +977,7 @@ fn parseAuthority(authority: str)!: (user: &UserInfo, host: str) {
 	host = parseHost(authority[i+1:]) else { error(error) }
 	mut userinfo := authority[:i]
 	if !validUserinfo(userinfo) {
-		error(URLError.InvalidUserInfo)
+		error(errors::New("invalid userinfo"))
 	}
 	if !strings::Contains(userinfo, ":") {
 		userinfo = unescape(userinfo, encoding.UserPassword) else { error(error) }
@@ -965,11 +999,11 @@ fn parse(rawURL: str, viaRequest: bool)!: &URL {
 	mut rest := ""
 
 	if strContainsCTLByte(rawURL) {
-		error(URLError.InvalidControlCharacter)
+		error(errors::New("invalid control character in URL"))
 	}
 
 	if rawURL == "" && viaRequest {
-		error(URLError.EmptyURL)
+		error(errors::New("empty url"))
 	}
 
 	mut url := new(URL)
@@ -998,7 +1032,7 @@ fn parse(rawURL: str, viaRequest: bool)!: &URL {
 			ret url
 		}
 		if viaRequest {
-			error(URLError.InvalidURI)
+			error(errors::New("invalid URI for request"))
 		}
 
 		// Avoid confusion with malformed schemes, like cache_object:foo/bar.
@@ -1009,7 +1043,7 @@ fn parse(rawURL: str, viaRequest: bool)!: &URL {
 		segment, _, _ := strings::Cut(rest, "/")
 		if strings::Contains(segment, ":") {
 			// First path segment has colon. Not allowed in relative URL.
-			error(URLError.FirstPathSegmentCannotContainColon)
+			error(errors::New("first path segment in URL cannot contain colon"))
 		}
 	}
 
@@ -1043,11 +1077,15 @@ fn parse(rawURL: str, viaRequest: bool)!: &URL {
 fn Parse(rawURL: str)!: &URL {
 	// Cut off #frag
 	u, frag, _ := strings::Cut(rawURL, "#")
-	mut url := parse(u, false) else { error(error) }
+	mut url := parse(u, false) else {
+		error(&Error{"parse", u, error})
+	}
 	if frag == "" {
 		ret url
 	}
-	url.setFragment(frag) else { error(error) }
+	url.setFragment(frag) else {
+		error(&Error{"parse", rawURL, error})
+	}
 	ret url
 }
 
@@ -1057,7 +1095,9 @@ fn Parse(rawURL: str)!: &URL {
 // a #fragment suffix.
 // (Web browsers strip #fragment before sending the URL to a web server.)
 fn ParseRequestURI(rawURL: str)!: &URL {
-	ret parse(rawURL, true) else { error(error) }
+	ret parse(rawURL, true) else {
+		error(&Error{"parse", rawURL, error})
+	}
 }
 
 // Maps a string key to a list of values.
@@ -1132,7 +1172,7 @@ fn parseQuery(mut &m: Values, mut query: str)! {
 		mut key := ""
 		key, query, _ = strings::Cut(query, "&")
 		if strings::Contains(key, ";") {
-			error(URLError.InvalidFormat)
+			error(errors::New("invalid semicolon separator in query"))
 		}
 		if key == "" {
 			continue
