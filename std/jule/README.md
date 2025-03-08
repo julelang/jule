@@ -87,6 +87,8 @@ An example of a faulty analysis scenario:
       ```
       In the example above, when FuncTest is analyzed, it is necessary to also analyze Test. During the analysis of Test, the mutability status determined in the preliminary analysis is recorded in the implicit structure instance underlying the Test type. Since Test is a strict type alias, it creates its own structure internally. In such cases, the mutability and comparability status may not be reflected in dependent types like FuncTest. Therefore, during the structure analysis phase, a check is performed on the base type as well. Since the f field returns a Test type that is marked as mutable, FuncTest also inherits the mutable type information through this check.
 
+- **(11)** When constant values are cast, the expression model is not updated as a casting model. Only the type of the value and, if necessary, the `Kind` data of the `constant::Const` type are updated. Ultimately, it always remains a constant value, and the expression model never becomes a casting expression model in any way.
+
 ### Implicit Imports
 
 Implicit imports are as described in developer reference (9). This section addresses which package is supported and what special behaviors it has.
