@@ -1175,7 +1175,7 @@ impl typeChecker {
 		self.disBuiltin = false
 		defer { self.disBuiltin = disBuiltin }
 
-		// Use rootLookup to parse generics with current current.
+		// Use rootLookup to parse generics with root lookup.
 		mut lookup := self.lookup
 		self.lookup = self.rootLookup
 		defer { self.lookup = lookup }
@@ -1445,7 +1445,8 @@ impl typeChecker {
 			mut s := runtimeFindStruct(self.s.meta.runtime, "pchan")
 			mut ins := s.instance()
 			ins.Generics = [&InsGeneric{Type: elem}]
-			_ = self.fromStructIns(ins, decl.Elem.Token)
+			ins = self.fromStructIns(ins, decl.Elem.Token)
+			self.pushReference[&StructIns](ins)
 		}
 		if self.disableTA&taMutable != taMutable && elem.Mutable() {
 			self.pushTA(taMutable)
@@ -1632,7 +1633,8 @@ impl typeChecker {
 			mut s := runtimeFindStruct(self.s.meta.runtime, "_Map")
 			mut ins := s.instance()
 			ins.Generics = [&InsGeneric{Type: key}, &InsGeneric{Type: val}]
-			_ = self.fromStructIns(ins, decl.Key.Token)
+			ins = self.fromStructIns(ins, decl.Key.Token)
+			self.pushReference[&StructIns](ins)
 		}
 
 		if self.disableTA&taMutable != taMutable && (key.Mutable() || val.Mutable()) {

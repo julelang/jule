@@ -1993,12 +1993,11 @@ impl eval {
 	}
 
 	fn evalCast(mut &self, mut c: &ast::CastExpr): &Value {
-		mut t := buildType(c.Kind)
-		ok := self.s.checkTypeSym(t, self.lookup)
-		if !ok {
+		mut t := self.evalType1(c.Kind)
+		if t == nil {
 			ret nil
 		}
-		ret self.evalCastT(t.Type, c.Expr, c.Kind.Token)
+		ret self.evalCastT(t, c.Expr, c.Kind.Token)
 	}
 
 	fn evalNamespace(mut self, mut s: &ast::NamespaceExpr): &Value {
@@ -2053,38 +2052,37 @@ impl eval {
 	}
 
 	fn evalTypedBraceLit(mut &self, mut lit: &ast::TypedBraceLit): &Value {
-		mut t := buildType(lit.Kind)
-		ok := self.s.checkTypeSym(t, self.lookup)
-		if !ok {
+		mut t := self.evalType1(lit.Kind)
+		if t == nil {
 			ret nil
 		}
 
-		mut s := t.Type.Struct()
+		mut s := t.Struct()
 		if s == nil {
-			if t.Type.Sptr() != nil {
-				s = t.Type.Sptr().Elem.Struct()
+			if t.Sptr() != nil {
+				s = t.Sptr().Elem.Struct()
 				if s != nil {
 					goto eval
 				}
 			}
-			mut m := t.Type.Map()
+			mut m := t.Map()
 			if m != nil {
-				ret self.evalMap(m, t.Type, lit.Lit)
+				ret self.evalMap(m, t, lit.Lit)
 			}
 			self.pushErr(lit.Kind.Token, build::LogMsg.InvalidSyntax)
 			ret nil
 		}
 
 	eval:
-		mut v := self.evalStructLitExplicit(s, t.Type, lit.Lit, lit.Kind.Token)
-		match type t.Type.Kind {
+		mut v := self.evalStructLitExplicit(s, t, lit.Lit, lit.Kind.Token)
+		match type t.Kind {
 		| &Sptr:
 			mut model := (&StructLitExpr)(v.Model)
 			makeStructLitAlloc(v, model)
 		}
 
 		if v != nil {
-			mut strct := t.Type.SoftStruct()
+			mut strct := t.SoftStruct()
 			if strct != nil && strct.Source != nil {
 				(&StructLitExpr)(v.Model).Strct = strct
 				v.Type = &Type{Kind: strct}
@@ -2098,16 +2096,38 @@ impl eval {
 		ret self.s.typeChecker(self.lookup, nil, nil)
 	}
 
+	fn evalType1(mut self, mut t: &ast::Type): &Type {
+		let mut tc: typeChecker
+		tc.s = self.s
+		tc.refers = self.getOwnerRefers()
+		tc.lookup = self.lookup
+		tc.rootLookup = self.lookup
+		// Push reference to owner if global.
+		if self.owner != nil && self.owner.Scope == nil {
+			tc.referencer = &referencer{
+				name: self.owner.Ident,
+				owner: self.owner,
+			}
+		}
+		// If field exist, push reference to struct.
+		if self.field != nil {
+			tc.referencer = &referencer{
+				name: self.field.Owner.Decl.Ident,
+				owner: self.field.Owner,
+			}
+		}
+		ret tc.checkDecl(t)
+	}
+
 	fn evalType(mut self, mut t: &ast::Type): &Value {
-		mut tk := buildType(t)
-		ok := self.s.checkTypeSym(tk, self.lookup)
-		if !ok {
+		mut t1 := self.evalType1(t)
+		if t1 == nil {
 			ret nil
 		}
 		ret &Value{
 			Decl: true,
-			Type: tk.Type,
-			Model: tk.Type,
+			Type: t1,
+			Model: t1,
 		}
 	}
 
