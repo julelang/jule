@@ -17,11 +17,18 @@ use "std/jule/sema"
 use "std/jule/types"
 use "std/os"
 use "std/os/filepath"
+use "std/runtime"
 use "std/strings"
 
 static mut OutDir = "dist"
 static mut OutName = "ir.cpp"
 static mut Out = ""
+
+static targets = map[str][]str{
+	"windows": ["amd64", "arm64", "i386"],
+	"linux": ["amd64", "arm64", "i386"],
+	"darwin": ["amd64", "arm64"],
+}
 
 fn init() {
 	// Configure compiler to default by platform
@@ -258,6 +265,15 @@ fn checkTargetOs(os: str) {
 	}
 }
 
+fn checkTargetPair(os: str, arch: str) {
+	for _, a in targets[os] {
+		if arch == a {
+			ret
+		}
+	}
+	handle::Throw("invalid target: " + os + "-" + arch)
+}
+
 fn checkTargetFlag(&target: str) {
 	if target == "" {
 		handle::Throw("missing option value: --target")
@@ -268,16 +284,23 @@ fn checkTargetFlag(&target: str) {
 		handle::Throw("--target: undefined platform target format: " + target)
 	}
 
-	os, arch := parts[0], parts[1]
+	mut os, mut arch := parts[0], parts[1]
 
-	if os != "native" {
+	if os == "native" {
+		os = runtime::OS
+		build::OS = runtime::OS
+	} else {
 		checkTargetOs(os)
 		build::OS = os
 	}
-	if arch != "native" {
+	if arch == "native" {
+		arch = runtime::Arch
+		build::Arch = runtime::Arch
+	} else {
 		checkTargetArch(arch)
 		build::Arch = arch
 	}
+	checkTargetPair(os, arch)
 	types::UpdateTarget()
 }
 
