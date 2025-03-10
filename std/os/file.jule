@@ -5,6 +5,7 @@
 use "std/internal/poll"
 use "std/io"
 use "std/sys"
+use "std/unsafe"
 
 // The name of the operating system's “null device.”
 // On Unix-like systems, it is "/dev/null"; on Windows, "NUL".
@@ -44,6 +45,7 @@ impl io::WriteCloser for File {}
 impl io::ReadWriter for File {}
 impl io::Stream for File {}
 impl io::Seeker for File {}
+impl io::StrWriter for File {}
 
 // Opens the named file for reading. If successful, methods on
 // the returned file can be used for reading; the associated file
@@ -124,8 +126,6 @@ fn WriteFile(path: str, data: []byte, perm: FileMode)! {
 impl File {
 	// Writes bytes to handle and returns written byte count.
 	// The number of bytes written can never exceed the length of the buf.
-	//
-	// Implements the io::Writer trait.
 	fn Write(mut self, buf: []byte)!: (n: int) {
 		n, ok := self.fd.Write(buf)
 		if !ok {
@@ -134,13 +134,16 @@ impl File {
 		ret
 	}
 
+	// Like Write, but writes the contents of string s rather than a slice of bytes.
+	fn WriteStr(mut self, s: str)!: (n: int) {
+		ret self.Write(unsafe::StrBytes(s)) else { error(error) }
+	}
+
 	// Read bytes to buffer from handle and returns read byte count.
 	// The number of bytes read can never exceed the length of the buf.
 	// If the buf is larger than the number of bytes that can be read,
 	// the buffer will not cause an overflow. Offset will be shifted
 	// by the number of bytes read.
-	//
-	// Implements the io::Reader trait.
 	fn Read(mut self, mut buf: []byte)!: (n: int) {
 		n, ok := self.fd.Read(buf)
 		if !ok {
@@ -180,8 +183,6 @@ impl File {
 	}
 
 	// Closes file handle.
-	//
-	// Implements the io::Closer trait.
 	fn Close(mut self)! {
 		ok := self.fd.Close()
 		if !ok {
