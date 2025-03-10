@@ -103,8 +103,8 @@ fn openFile(path: str, mut mode: int, mut perm: FileMode)!: &File {
 
 fn newFile(h: u64, mut flags: int)!: &File {
 	if flags&poll::File == poll::File {
-		t := unsafe { sys::GetFileType(sys::Handle(h)) }
-		if t == sys::FILE_TYPE_CHAR || (t == sys::FILE_TYPE_UNKNOWN && sys::GetLastError() != 0) {
+		t, err := unsafe { sys::GetFileType(sys::Handle(h)) }
+		if err || t == sys::FILE_TYPE_CHAR {
 			mut m := u32(0)
 			if unsafe { sys::GetConsoleMode(sys::Handle(h), &m) } {
 				flags &= ^poll::File
