@@ -369,7 +369,7 @@ impl exprBuilder {
 	fn pushRangeLitPart(mut self, mut part: []&token::Token,
 		errorToken: &token::Token, mut &parts: [][]&token::Token) {
 		if len(part) == 0 {
-			self.pushErr(errorToken, build::LogMsg.InvalidSyntax)
+			self.pushErr(errorToken, build::LogMsg.MissingExpr)
 			self.pushSuggestion(build::LogMsg.ExpectedExpr)
 			ret
 		}
@@ -419,19 +419,6 @@ impl exprBuilder {
 		ret parts
 	}
 
-	fn buildFieldExprPair(mut self, mut tokens: []&token::Token): &ast::FieldExprPair {
-		if len(tokens)-2 == 0 {
-			self.pushErr(tokens[1], build::LogMsg.MissingExpr)
-			ret nil
-		}
-		mut pair := &ast::FieldExprPair{
-			Field: tokens[0],
-		}
-		tokens = tokens[2:] // Remove field identifier and colon tokens.
-		pair.Expr = self.buildFromTokens(tokens)
-		ret pair
-	}
-
 	fn buildTypedStructLiteral(mut self, mut tokens: []&token::Token): &ast::TypedBraceLit {
 		mut i := 0
 		mut t, ok := unsafe { self.p.buildType(tokens, &i, true) }
@@ -458,6 +445,11 @@ impl exprBuilder {
 		mut l, mut r := splitDelim(tokens, token::Id.Colon)
 		// If left is not nil, colon token found.
 		if l != nil {
+			if len(r) == 0 {
+				self.pushErr(tokens[len(l)], build::LogMsg.MissingExpr)
+				self.pushSuggestion(build::LogMsg.ExpectedExpr)
+				ret nil
+			}
 			ret &ast::Expr{
 				Token: tokens[0],
 				End: tokens[len(tokens)-1],
