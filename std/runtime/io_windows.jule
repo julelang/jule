@@ -1,0 +1,30 @@
+// Copyright 2025 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use "std/internal/poll"
+use "std/sys"
+
+fn newStdioPoll(h: u64): &poll::FD {
+	// Console handle might be a pipe handle instead of console handle.
+	// In order to handle I/O in the correct way, we need to catch the pipe cases.
+	// If handle is not console and pipe; then it is an invalid handle.
+	//
+	// See issue https://github.com/julelang/jule/issues/107
+	//
+	// Code derived from Windows implementation of the `std/os` package's [newFile] function.
+	let mut flags: int
+	t, err := unsafe { sys::GetFileType(sys::Handle(h)) }
+	if err || t == sys::FILE_TYPE_CHAR {
+		mut m := u32(0)
+		if unsafe { sys::GetConsoleMode(sys::Handle(h), &m) } {
+			flags |= poll::Console
+		}
+	} else if t == sys::FILE_TYPE_PIPE {
+		flags |= poll::Pipe
+	}
+	if flags == 0 {
+		panic("unreachable")
+	}
+	ret poll::FD.New(h, flags)!
+}
