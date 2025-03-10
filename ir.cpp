@@ -15,9 +15,8 @@
 #include <iostream>
 
 
-#include "/Users/mertcandav/Desktop/dev/jule/api/jule.hpp"
-
-#include "/Users/mertcandav/Desktop/dev/jule/std/jule/integrated/integrated.hpp"
+#include "api/jule.hpp"
+#include "std/jule/integrated/integrated.hpp"
 
 struct _1a89b6cc5_Char;
 struct _1a89b7325_Wchar;
