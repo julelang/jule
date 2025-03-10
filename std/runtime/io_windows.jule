@@ -3,6 +3,7 @@
 // license that can be found in the LICENSE file.
 
 use "std/internal/poll"
+use integ "std/jule/integrated"
 use "std/sys"
 
 fn newStdioPoll(h: u64): &poll::FD {
@@ -12,10 +13,14 @@ fn newStdioPoll(h: u64): &poll::FD {
 		mut m := u32(0)
 		if unsafe { sys::GetConsoleMode(sys::Handle(h), &m) } {
 			flags |= poll::Console
+			unsafe { integ::Emit("std::cout << \"console\" << std::endl;") }
 		}
 	} else if t == sys::FILE_TYPE_PIPE {
 		flags |= poll::Pipe
-	} else {
+		unsafe { integ::Emit("std::cout << \"pipe\" << std::endl;") }
+	}
+	if flags == 0 {
+		unsafe { integ::Emit("std::cout << \"err\" << std::endl;") }
 		panic("unreachable")
 	}
 	ret poll::FD.New(h, flags)!
