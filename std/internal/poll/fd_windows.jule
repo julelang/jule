@@ -65,7 +65,7 @@ impl FD {
 			match {
 			| self.Flags&Console == Console:
 				nn = self.writeConsole(b)
-			| self.Flags&File == File:
+			| self.Flags&File == File | self.Flags&Pipe == Pipe:
 				nn = self.writeFile(b)
 			| self.Flags&Socket == Socket:
 				nn = unsafe { sys::Send(uint(self.File), &b[0], uint(len(buf)), 0) }
@@ -188,7 +188,7 @@ impl FD {
 		match {
 		| self.Flags&Console == Console:
 			n, ok = self.readConsole(buf)
-		| self.Flags&File == File:
+		| self.Flags&File == File | self.Flags&Pipe == Pipe:
 			n, ok = self.readFile(buf)
 		| self.Flags&Socket == Socket:
 			n = unsafe { sys::Recv(uint(self.File), &buf[0], uint(len(buf)), 0) }
@@ -327,7 +327,7 @@ impl FD {
 	// Closes file descriptor.
 	fn Close(mut self): (ok: bool) {
 		match {
-		| self.Flags&File == File | self.Flags&Console == Console:
+		| self.Flags&File == File | self.Flags&Pipe == Pipe | self.Flags&Console == Console:
 			ret unsafe { sys::CloseHandle(sys::Handle(self.File)) }
 		| self.Flags&Socket == Socket | self.Flags&SocketNoConn == SocketNoConn:
 			ret sys::CloseSocket(uint(self.File)) >= 0
