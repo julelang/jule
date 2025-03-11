@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use "std/internal/conv"
+use "std/io"
 use "std/sys"
 
 // This information adopted from the Go programming language:
@@ -21,6 +23,14 @@ struct FD {
 	// with pointers and other integer kinds such as UNIX file descriptors.
 	File:  u64
 	Flags: int
+
+	// Whether this is a streaming descriptor,
+	// as opposed to a packet-based descriptor like a UDP socket.
+	IsStream: bool
+
+	// Whether a zero byte read indicates EOF. This is false for a
+	// message based socket connection.
+	ZeroReadIsEOF: bool
 }
 
 impl FD {
@@ -29,25 +39,33 @@ impl FD {
 	// Writes bytes to the file descriptor and returns written byte count.
 	// The number of bytes written can never exceed the length of the buf.
 	fn Write(mut self, buf: []byte): (n: int, ok: bool) {
-		if len(buf) == 0 {
-			// If the caller wanted a zero byte write, return immediately
-			// without trying to write.
-			ret 0, true
-		}
 		// File and console descriptors, also socket descriptors, can use the Write function.
 		// But other kinds are not supported. For socket descriptors, correct use case
 		// will be equivalent to send syscall.
 		if self.Flags&File != File && self.Flags&Console != Console && self.Flags&Socket != Socket {
 			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for Write")
 		}
+		if len(buf) == 0 {
+			// If the caller wanted a zero byte write, return immediately
+			// without trying to write.
+			ret 0, true
+		}
 		for {
 			mut max := len(buf)
-			if max-n > maxRW {
+			if self.IsStream && max-n > maxRW {
 				max = n + maxRW
 			}
 			part := buf[n:max]
 			nn := unsafe { sys::Write(int(self.File), &part[0], uint(len(part))) }
 			if nn > 0 {
+				if n > max-nn {
+					// This can reportedly happen when using
+					// some VPN software. Go's issue #61060.
+					// If we don't check this we will panic
+					// with slice bounds out of range.
+					// Use a more informative panic.
+					panic("invalid return from write: got " + conv::Itoa(n) + " from a write of " + conv::Itoa(max-nn))
+				}
 				n += nn
 			}
 			ok = nn != -1
@@ -60,28 +78,27 @@ impl FD {
 	// Like Write, but wraps sendto syscall.
 	// General for V4 and V6. Unsafe variant.
 	unsafe fn WriteV(mut self, buf: []byte, addr: *sys::Sockaddr, addrLen: uint): (n: int, ok: bool) {
+		if self.Flags&SocketNoConn != SocketNoConn {
+			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for ReadV")
+		}
 		if len(buf) == 0 {
 			// If the caller wanted a zero byte read, return immediately
 			// without trying to read.
 			ret 0, true
 		}
-		if self.Flags&SocketNoConn != SocketNoConn {
-			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for ReadV")
-		}
 		for {
-			mut max := len(buf)
-			if max-n > maxRW {
-				max = n + maxRW
-			}
-			part := buf[n:max]
-			nn := sys::Sendto(int(self.File), &part[0], uint(len(part)), 0, addr, u32(addrLen))
+			nn := sys::Sendto(int(self.File), &buf[0], uint(len(buf)), 0, addr, u32(addrLen))
 			if nn > 0 {
 				n += nn
 			}
 			ok = nn >= 0
-			if n == len(buf) || !ok {
-				ret
+			if !ok {
+				if sys::GetLastErrno() == sys::EINTR {
+					continue
+				}
+				ret 0, false
 			}
+			ret len(buf), true
 		}
 		ret
 	}
@@ -92,18 +109,18 @@ impl FD {
 	// the buffer will not cause an overflow. Offset will be shifted
 	// by the number of bytes read.
 	fn Read(mut self, mut buf: []byte): (n: int, ok: bool) {
-		if len(buf) == 0 {
-			// If the caller wanted a zero byte read, return immediately
-			// without trying to read.
-			ret 0, true
-		}
 		// File and console descriptors, also socket descriptors, can use the Read function.
 		// But other kinds are not supported. For socket descriptors, correct use case
 		// will be equivalent to recv syscall.
 		if self.Flags&File != File && self.Flags&Console != Console && self.Flags&Socket != Socket {
 			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for Read")
 		}
-		if len(buf) > maxRW {
+		if len(buf) == 0 {
+			// If the caller wanted a zero byte read, return immediately
+			// without trying to read.
+			ret 0, true
+		}
+		if self.IsStream && len(buf) > maxRW {
 			buf = buf[:maxRW]
 		}
 		n = unsafe { sys::Read(int(self.File), &buf[0], uint(len(buf))) }
@@ -114,22 +131,25 @@ impl FD {
 	// Like Read, but wraps recvfrom syscall.
 	// General for V4 and V6. Unsafe variant.
 	unsafe fn ReadV(mut self, mut buf: []byte, addr: *sys::Sockaddr, addrLen: uint): (n: int, ok: bool) {
+		if self.Flags&SocketNoConn != SocketNoConn {
+			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for ReadV")
+		}
 		if len(buf) == 0 {
 			// If the caller wanted a zero byte read, return immediately
 			// without trying to read.
 			ret 0, true
 		}
-		if self.Flags&SocketNoConn != SocketNoConn {
-			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for ReadV")
+		for {
+			addrLenI := u32(addrLen)
+			n = sys::Recvfrom(int(self.File), &buf[0], uint(len(buf)), 0, addr, &addrLenI)
+			ok = n >= 0
+			if !ok {
+				if sys::GetLastErrno() == sys::EINTR {
+					continue
+				}
+			}
+			ret
 		}
-		if len(buf) > maxRW {
-			buf = buf[:maxRW]
-		}
-
-		addrLenI := u32(addrLen)
-		n = sys::Recvfrom(int(self.File), &buf[0], uint(len(buf)), 0, addr, &addrLenI)
-		ok = n >= 0
-		ret
 	}
 
 	// Sets offset to next Read/Write operation and returns the new offset.

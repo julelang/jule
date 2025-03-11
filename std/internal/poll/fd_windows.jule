@@ -24,6 +24,14 @@ struct FD {
 	File:  u64
 	Flags: int
 
+	// Whether this is a streaming descriptor,
+	// as opposed to a packet-based descriptor like a UDP socket.
+	IsStream: bool
+
+	// Whether a zero byte read indicates EOF. This is false for a
+	// message based socket connection.
+	ZeroReadIsEOF: bool
+
 	// For console input/output.
 	lastbits:       []byte // first few bytes of the last incomplete rune in last write
 	readu16:        []u16  // buffer to hold u16s obtained with ReadConsole
@@ -88,13 +96,13 @@ impl FD {
 	// Like Write, but wraps sendto syscall.
 	// General for V4 and V6. Unsafe variant.
 	unsafe fn WriteV(mut self, buf: []byte, addr: *sys::Sockaddr, addrLen: uint): (n: int, ok: bool) {
+		if self.Flags&SocketNoConn != SocketNoConn {
+			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for ReadV")
+		}
 		if len(buf) == 0 {
 			// If the caller wanted a zero byte read, return immediately
 			// without trying to read.
 			ret 0, true
-		}
-		if self.Flags&SocketNoConn != SocketNoConn {
-			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for ReadV")
 		}
 		for {
 			mut max := len(buf)
@@ -205,13 +213,13 @@ impl FD {
 	// Like Read, but wraps recvfrom syscall.
 	// General for V4 and V6. Unsafe variant.
 	unsafe fn ReadV(mut self, mut buf: []byte, addr: *sys::Sockaddr, addrLen: uint): (n: int, ok: bool) {
+		if self.Flags&SocketNoConn != SocketNoConn {
+			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for ReadV")
+		}
 		if len(buf) == 0 {
 			// If the caller wanted a zero byte read, return immediately
 			// without trying to read.
 			ret 0, true
-		}
-		if self.Flags&SocketNoConn != SocketNoConn {
-			panic("std/internal/poll: unimplemented/unsupported file descriptor kind for ReadV")
 		}
 		if len(buf) > maxRW {
 			buf = buf[:maxRW]

@@ -96,3 +96,24 @@ fn setSocketTimeout(handle: poll::NetHandle, scope: int, timeout: time::Duration
 		}
 	}
 }
+
+unsafe fn accept(h: poll::NetHandle, addr: *sys::Sockaddr, addrLen: *poll::AddrLen): (poll::NetHandle, ok: bool) {
+	for {
+		handle := sys::Accept(h, addr, addrLen)
+		ok = handle != -1
+		if ok {
+			ret handle, ok
+		}
+		err := lastErrorCode()
+		match err {
+		| sys::EINTR:
+			continue
+		| sys::ECONNABORTED:
+			// This means that a socket on the listen
+			// queue was closed before we Accept()ed it;
+			// it's a silly error, so try again.
+			continue
+		}
+		ret 0, false
+	}
+}
