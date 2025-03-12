@@ -4113,6 +4113,8 @@ impl binaryEval {
 		match self.op.Id {
 		| token::Id.Eqs
 		| token::Id.NotEq:
+			// We will not have to check whether array type is comparable.
+			// Binary eval already checked comparable special cases, so operands should be comparable.
 			if self.e.s.meta.runtime != nil {
 				// Add instance to relevant runtime function for array element type if not exist.
 				mut f := runtimeFindFunc(self.e.s.meta.runtime, "arrayCmp").instanceForce()
@@ -5020,6 +5022,22 @@ fn applyCastKindModel(mut &s: &sema, mut &v: &Value, mut &t: &Type,
 	mut &token: &token::Token, mut refers: &ReferenceStack) {
 	applyRuntimeToStr(s, v.Type, t, token, refers)
 	applyRuntimeMaphash(s, v.Type, t, token, refers)
+
+	// Add arrayCmp instance if needed.
+	if s.meta.runtime != nil {
+		mut arr := v.Type.Array()
+		if arr != nil && v.Type.Comparable() {
+			// Add instance to relevant runtime function for array element type if not exist.
+			mut f := runtimeFindFunc(s.meta.runtime, "arrayCmp").instanceForce()
+			f.Generics = append(f.Generics, &InsGeneric{Type: arr.Elem})
+			ok, _ := s.checkGenericFunc(f, token)
+			if !ok {
+				panic("sema: arrayCmp evaluation failed, this is an implementation mistake")
+			}
+			refers.Push(f)
+		}
+	}
+
 	v.Model = &CastingExpr{
 		Token: token,
 		Expr: new(Value, *v),
