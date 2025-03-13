@@ -126,7 +126,7 @@ fn cutPath(path: str): (before: str, after: str, found: bool) {
 	ret path, "", false
 }
 
-fn fullPath(name: str): (path: str, ok: bool) {
+fn fullPath(name: str)!: (path: str) {
 	utf16Name := integ::UTF16FromStr(name)
 	p := &utf16Name[0]
 	mut n := u32(100)
@@ -134,27 +134,24 @@ fn fullPath(name: str): (path: str, ok: bool) {
 		mut buf := make([]u16, n)
 		n = unsafe { sys::GetFullPathName(p, u32(len(buf)), &buf[0], nil) }
 		if n == 0 {
-			ret "", false
+			error(sys::GetLastErrno())
 		}
 		if n <= u32(len(buf)) {
-			ret integ::UTF16ToStr(buf[:n]), true
+			ret integ::UTF16ToStr(buf[:n])
 		}
 	}
-	ret "", false
+	error(sys::GetLastErrno())
 }
 
-fn abs(mut path: str): (str, ok: bool) {
+fn abs(mut path: str)!: str {
 	if path == "" {
 		// full_path returns an error on empty path, because it's not a valid path.
 		// To implement Abs behavior of returning working directory on empty string input,
 		// special-case empty path by changing it to "." path. See golang.org/issue/24441.
 		path = "."
 	}
-	path, ok = fullPath(path)
-	if !ok {
-		ret "", false
-	}
-	ret Clean(path), true
+	path = fullPath(path) else { error(error) }
+	ret Clean(path)
 }
 
 fn join(elem: ...str): str {
@@ -197,4 +194,34 @@ fn join(elem: ...str): str {
 		ret ""
 	}
 	ret Clean(s.Str())
+}
+
+fn splitList(path: str): []str {
+	if path == "" {
+		ret []
+	}
+
+	// Split path, respecting but preserving quotes.
+	mut list := []str(nil)
+	mut start := 0
+	mut quo := false
+	mut i := 0
+	for i < len(path); i++ {
+		c := path[i]
+		match {
+		| c == '"':
+			quo = !quo
+		| c == ListSeparator && !quo:
+			list = append(list, path[start:i])
+			start = i + 1
+		}
+	}
+	list = append(list, path[start:])
+
+	// Remove quotes.
+	for j, s in list {
+		list[j] = strings::ReplaceAll(s, `"`, ``)
+	}
+
+	ret list
 }

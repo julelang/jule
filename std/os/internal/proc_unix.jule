@@ -5,17 +5,19 @@
 use integ "std/jule/integrated"
 use "std/sys"
 
-fn Getwd(): str {
+fn Getwd()!: str {
 	mut buf := unsafe { sys::Getcwd(nil, 0) }
 	if buf == nil {
-		ret ""
+		error(sys::GetLastErrno())
 	}
 	pwd := unsafe { integ::BytePtrToStr(buf) }
 	unsafe { integ::Free(buf) }
 	ret pwd
 }
 
-fn Chdir(path: str): (ok: bool) {
+fn Chdir(path: str)! {
 	s := integ::StrToBytes(path)
-	ret unsafe { sys::Chdir(&s[0]) } == 0
+	if unsafe { sys::Chdir(&s[0]) } != 0 {
+		error(sys::GetLastErrno())
+	}
 }

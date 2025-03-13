@@ -5,16 +5,18 @@
 use integ "std/jule/integrated"
 use "std/sys"
 
-fn Getwd(): str {
+fn Getwd()!: str {
 	let mut buf: [sys::MAX_PATH + 1]u16
 	n := unsafe { sys::GetCurrentDirectory(u32(len(buf)), &buf[0]) }
 	if n == 0 {
-		ret ""
+		error(sys::GetLastErrno())
 	}
 	ret unsafe { integ::U16PtrToStr(&buf[0]) }
 }
 
-fn Chdir(path: str): (ok: bool) {
+fn Chdir(path: str)! {
 	utf16Path := integ::UTF16FromStr(path)
-	ret unsafe { sys::SetCurrentDirectory(&utf16Path[0]) }
+	if unsafe { !sys::SetCurrentDirectory(&utf16Path[0]) } {
+		error(sys::GetLastErrno())
+	}
 }
